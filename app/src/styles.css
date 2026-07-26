@@ -111,3 +111,28 @@
     border-color: var(--hf-color-border-default);
   }
 }
+
+/* ── PSB Tracker brand overrides ─────────────────────────────────────────────
+ * Internal data tool: pin the PSB dark-green surface + system UI font on top of
+ * the scaffold's Quanta base, so the whole app reads as ProSapiens Biomechanic. */
+@layer base {
+  html,
+  body {
+    background-color: #0f1712;
+    color: #e8e6e0;
+    font-family:
+      system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+}
+
+/* Native form controls should follow the dark theme (date pickers, selects). */
+input,
+select,
+textarea,
+button {
+  font-family: inherit;
+}
+::placeholder {
+  color: #6b7a6e;
+}
+

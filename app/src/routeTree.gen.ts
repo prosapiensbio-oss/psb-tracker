@@ -12,6 +12,14 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiSessionRouteImport } from './routes/api/session'
+import { Route as ApiResetRouteImport } from './routes/api/reset'
+import { Route as ApiOverrideRouteImport } from './routes/api/override'
+import { Route as ApiLogoutRouteImport } from './routes/api/logout'
+import { Route as ApiLoginRouteImport } from './routes/api/login'
+import { Route as ApiIngestRouteImport } from './routes/api/ingest'
+import { Route as ApiDataRouteImport } from './routes/api/data'
+import { Route as ApiAnomalyRouteImport } from './routes/api/anomaly'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
@@ -28,35 +36,141 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSessionRoute = ApiSessionRouteImport.update({
+  id: '/api/session',
+  path: '/api/session',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiResetRoute = ApiResetRouteImport.update({
+  id: '/api/reset',
+  path: '/api/reset',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOverrideRoute = ApiOverrideRouteImport.update({
+  id: '/api/override',
+  path: '/api/override',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiLogoutRoute = ApiLogoutRouteImport.update({
+  id: '/api/logout',
+  path: '/api/logout',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiLoginRoute = ApiLoginRouteImport.update({
+  id: '/api/login',
+  path: '/api/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiIngestRoute = ApiIngestRouteImport.update({
+  id: '/api/ingest',
+  path: '/api/ingest',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDataRoute = ApiDataRouteImport.update({
+  id: '/api/data',
+  path: '/api/data',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAnomalyRoute = ApiAnomalyRouteImport.update({
+  id: '/api/anomaly',
+  path: '/api/anomaly',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/api/anomaly': typeof ApiAnomalyRoute
+  '/api/data': typeof ApiDataRoute
+  '/api/ingest': typeof ApiIngestRoute
+  '/api/login': typeof ApiLoginRoute
+  '/api/logout': typeof ApiLogoutRoute
+  '/api/override': typeof ApiOverrideRoute
+  '/api/reset': typeof ApiResetRoute
+  '/api/session': typeof ApiSessionRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/api/anomaly': typeof ApiAnomalyRoute
+  '/api/data': typeof ApiDataRoute
+  '/api/ingest': typeof ApiIngestRoute
+  '/api/login': typeof ApiLoginRoute
+  '/api/logout': typeof ApiLogoutRoute
+  '/api/override': typeof ApiOverrideRoute
+  '/api/reset': typeof ApiResetRoute
+  '/api/session': typeof ApiSessionRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/api/anomaly': typeof ApiAnomalyRoute
+  '/api/data': typeof ApiDataRoute
+  '/api/ingest': typeof ApiIngestRoute
+  '/api/login': typeof ApiLoginRoute
+  '/api/logout': typeof ApiLogoutRoute
+  '/api/override': typeof ApiOverrideRoute
+  '/api/reset': typeof ApiResetRoute
+  '/api/session': typeof ApiSessionRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/robots.txt' | '/sitemap.xml'
+  fullPaths:
+    | '/'
+    | '/robots.txt'
+    | '/sitemap.xml'
+    | '/api/anomaly'
+    | '/api/data'
+    | '/api/ingest'
+    | '/api/login'
+    | '/api/logout'
+    | '/api/override'
+    | '/api/reset'
+    | '/api/session'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/robots.txt' | '/sitemap.xml'
-  id: '__root__' | '/' | '/robots.txt' | '/sitemap.xml'
+  to:
+    | '/'
+    | '/robots.txt'
+    | '/sitemap.xml'
+    | '/api/anomaly'
+    | '/api/data'
+    | '/api/ingest'
+    | '/api/login'
+    | '/api/logout'
+    | '/api/override'
+    | '/api/reset'
+    | '/api/session'
+  id:
+    | '__root__'
+    | '/'
+    | '/robots.txt'
+    | '/sitemap.xml'
+    | '/api/anomaly'
+    | '/api/data'
+    | '/api/ingest'
+    | '/api/login'
+    | '/api/logout'
+    | '/api/override'
+    | '/api/reset'
+    | '/api/session'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   RobotsDottxtRoute: typeof RobotsDottxtRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  ApiAnomalyRoute: typeof ApiAnomalyRoute
+  ApiDataRoute: typeof ApiDataRoute
+  ApiIngestRoute: typeof ApiIngestRoute
+  ApiLoginRoute: typeof ApiLoginRoute
+  ApiLogoutRoute: typeof ApiLogoutRoute
+  ApiOverrideRoute: typeof ApiOverrideRoute
+  ApiResetRoute: typeof ApiResetRoute
+  ApiSessionRoute: typeof ApiSessionRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -82,6 +196,62 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/session': {
+      id: '/api/session'
+      path: '/api/session'
+      fullPath: '/api/session'
+      preLoaderRoute: typeof ApiSessionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/reset': {
+      id: '/api/reset'
+      path: '/api/reset'
+      fullPath: '/api/reset'
+      preLoaderRoute: typeof ApiResetRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/override': {
+      id: '/api/override'
+      path: '/api/override'
+      fullPath: '/api/override'
+      preLoaderRoute: typeof ApiOverrideRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/logout': {
+      id: '/api/logout'
+      path: '/api/logout'
+      fullPath: '/api/logout'
+      preLoaderRoute: typeof ApiLogoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/login': {
+      id: '/api/login'
+      path: '/api/login'
+      fullPath: '/api/login'
+      preLoaderRoute: typeof ApiLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/ingest': {
+      id: '/api/ingest'
+      path: '/api/ingest'
+      fullPath: '/api/ingest'
+      preLoaderRoute: typeof ApiIngestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/data': {
+      id: '/api/data'
+      path: '/api/data'
+      fullPath: '/api/data'
+      preLoaderRoute: typeof ApiDataRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/anomaly': {
+      id: '/api/anomaly'
+      path: '/api/anomaly'
+      fullPath: '/api/anomaly'
+      preLoaderRoute: typeof ApiAnomalyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -89,6 +259,14 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   RobotsDottxtRoute: RobotsDottxtRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
+  ApiAnomalyRoute: ApiAnomalyRoute,
+  ApiDataRoute: ApiDataRoute,
+  ApiIngestRoute: ApiIngestRoute,
+  ApiLoginRoute: ApiLoginRoute,
+  ApiLogoutRoute: ApiLogoutRoute,
+  ApiOverrideRoute: ApiOverrideRoute,
+  ApiResetRoute: ApiResetRoute,
+  ApiSessionRoute: ApiSessionRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
