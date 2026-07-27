@@ -3,6 +3,7 @@ import { useMemo, useRef, useState } from "react";
 import {
   monthlyFinance,
   predictEarnings,
+  TARGET_H,
   ZONE_HI,
   ZONE_LO,
   type CapacityRow,
@@ -62,6 +63,7 @@ export function Dashboard({
   clients,
   register,
   sixM,
+  capacity,
   actions,
   onNavigate,
 }: {
@@ -171,6 +173,8 @@ export function Dashboard({
         <StatCard value={stats.sixMCount} label="6M klientov" onClick={() => onNavigate("6m")} />
       </StatGrid>
 
+      <CapacityCard capacity={capacity} onNavigate={onNavigate} />
+
       {/* Nosný graf — hore, všetky týždne (posúva sa doľava/doprava) */}
       <Card>
         <H3>
@@ -239,6 +243,65 @@ export function Dashboard({
         <ResetButton onReset={actions.reset} />
       </div>
     </>
+  );
+}
+
+function CapacityCard({ capacity, onNavigate }: { capacity: CapacityRow[]; onNavigate: (t: string) => void }) {
+  const jerry = capacity.find((c) => c.trainer === "Jerry");
+  const terezka = capacity.find((c) => c.trainer === "Terezka");
+  const clients = (c?: CapacityRow) => (c ? c.anchor + c.stable + c.sporadic : 0);
+  const totalClients = clients(jerry) + clients(terezka);
+  const totalEff = (jerry?.effHours || 0) + (terezka?.effHours || 0);
+
+  type Col = { name: string; clients: number; eff: number; target: number; need: string };
+  const need = (eff: number, target: number): string => {
+    if (eff >= ZONE_LO && eff <= ZONE_HI) return "✓ v zdravej zóne";
+    if (eff > ZONE_HI) return "nad zónou — priveľa";
+    const gap = target - eff;
+    return `treba +${Math.ceil(gap / 1.08)} Anchor alebo +${Math.ceil(gap / 0.66)} Stabilných`;
+  };
+  const cols: Col[] = [
+    { name: "Jerry", clients: clients(jerry), eff: jerry?.effHours || 0, target: TARGET_H, need: need(jerry?.effHours || 0, TARGET_H) },
+    { name: "Terezka", clients: clients(terezka), eff: terezka?.effHours || 0, target: TARGET_H, need: need(terezka?.effHours || 0, TARGET_H) },
+    { name: "Spolu (PSB)", clients: totalClients, eff: totalEff, target: TARGET_H * 2, need: need(totalEff / 2, TARGET_H) },
+  ];
+
+  return (
+    <Card>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+        <H3>
+          <Info
+            text="Vyťaženie = efektívne tréningy za týždeň (koľko klienti reálne odchodia podľa svojej dochádzky) oproti cieľu 29h na trénera. Pod 100 % = je priestor prijať klientov, nad ním = plno. Klik → Klienti pre detail."
+            label="Kapacita & vyťaženie"
+          />
+        </H3>
+        <button onClick={() => onNavigate("klienti")} style={{ ...linkBtn, fontSize: 12 }}>Detail v Klientoch →</button>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10, marginTop: 10 }}>
+        {cols.map((col) => {
+          const util = col.target ? (col.eff / col.target) * 100 : 0;
+          const inZone = col.name.startsWith("Spolu") ? col.eff / 2 >= ZONE_LO && col.eff / 2 <= ZONE_HI : col.eff >= ZONE_LO && col.eff <= ZONE_HI;
+          const over = (col.name.startsWith("Spolu") ? col.eff / 2 : col.eff) > ZONE_HI;
+          const color = inZone ? C.green : over ? C.red : C.orange;
+          return (
+            <div key={col.name} style={{ background: C.bg, borderRadius: 10, padding: 14, border: `1px solid ${C.border}` }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: C.accentLight, marginBottom: 8 }}>{col.name}</div>
+              <div style={{ fontSize: 30, fontWeight: 800, color, lineHeight: 1 }}>{util.toFixed(0)}%</div>
+              <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 10 }}>vyťaženie (cieľ {col.target}h)</div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: C.textMuted, marginBottom: 3 }}>
+                <span>Klienti</span>
+                <strong style={{ color: C.text }}>{col.clients}</strong>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: C.textMuted, marginBottom: 8 }}>
+                <span>Tréningy/týž (podľa dochádzky)</span>
+                <strong style={{ color: C.text }}>{col.eff.toFixed(0)}</strong>
+              </div>
+              <div style={{ fontSize: 11.5, color: inZone ? C.green : C.orange }}>{col.need}</div>
+            </div>
+          );
+        })}
+      </div>
+    </Card>
   );
 }
 
