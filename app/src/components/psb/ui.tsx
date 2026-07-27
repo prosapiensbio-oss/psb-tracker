@@ -1,7 +1,17 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 
 import { C, S, badge } from "../../lib/psb/theme";
+
+// Scrolls a horizontally-overflowing container to its right edge on mount/update
+// so charts open showing the most recent data (user scrolls left into the past).
+function useScrollEnd<T extends HTMLElement>(enabled: boolean, dep: unknown) {
+  const ref = useRef<T>(null);
+  useEffect(() => {
+    if (enabled && ref.current) ref.current.scrollLeft = ref.current.scrollWidth;
+  }, [enabled, dep]);
+  return ref;
+}
 
 export function Card({ children, style }: { children: ReactNode; style?: CSSProperties }) {
   return <div style={{ ...S.card, ...style }}>{children}</div>;
@@ -429,56 +439,61 @@ export function ZoneBars({
   zone,
   height = 150,
   stacked = false,
+  alignEnd = false,
 }: {
   data: { label: string; values: number[] }[];
   series: { name: string; color: string }[];
   zone?: { lo: number; hi: number };
   height?: number;
   stacked?: boolean;
+  alignEnd?: boolean;
 }) {
   const plotH = height - 22;
   const max = useMemo(() => {
     const totals = data.map((d) => (stacked ? d.values.reduce((a, b) => a + b, 0) : Math.max(...d.values, 0)));
     return Math.max(1, ...totals, zone ? zone.hi * 1.1 : 0);
   }, [data, stacked, zone]);
+  const scrollRef = useScrollEnd<HTMLDivElement>(alignEnd, data.length);
   return (
     <div>
-      <div style={{ position: "relative", display: "flex", gap: 8, alignItems: "flex-end", height, overflowX: "auto", paddingBottom: 4 }}>
-        {zone && (
-          <div
-            style={{
-              position: "absolute",
-              left: 0,
-              right: 0,
-              bottom: 22 + (zone.lo / max) * plotH,
-              height: ((zone.hi - zone.lo) / max) * plotH,
-              background: C.greenBg,
-              borderTop: `1px dashed ${C.green}66`,
-              borderBottom: `1px dashed ${C.green}66`,
-              pointerEvents: "none",
-            }}
-          />
-        )}
-        {data.map((d, i) => (
-          <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: 40, zIndex: 1 }}>
-            <div style={{ display: "flex", gap: 2, alignItems: "flex-end", height: plotH, flexDirection: stacked ? "column-reverse" : "row" }}>
-              {d.values.map((v, j) => (
-                <div
-                  key={j}
-                  title={`${series[j]?.name}: ${Math.round(v)}`}
-                  style={{
-                    width: stacked ? 20 : 9,
-                    height: `${(v / max) * plotH}px`,
-                    minHeight: v > 0 ? 2 : 0,
-                    background: series[j]?.color,
-                    borderRadius: stacked ? 0 : "3px 3px 0 0",
-                  }}
-                />
-              ))}
+      <div ref={scrollRef} style={{ overflowX: "auto", paddingBottom: 4 }}>
+        <div style={{ position: "relative", display: "flex", gap: 8, alignItems: "flex-end", height, width: "max-content", minWidth: "100%" }}>
+          {zone && (
+            <div
+              style={{
+                position: "absolute",
+                left: 0,
+                right: 0,
+                bottom: 22 + (zone.lo / max) * plotH,
+                height: ((zone.hi - zone.lo) / max) * plotH,
+                background: C.greenBg,
+                borderTop: `1px dashed ${C.green}66`,
+                borderBottom: `1px dashed ${C.green}66`,
+                pointerEvents: "none",
+              }}
+            />
+          )}
+          {data.map((d, i) => (
+            <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: 40, flex: 1, zIndex: 1 }}>
+              <div style={{ display: "flex", gap: 2, alignItems: "flex-end", height: plotH, flexDirection: stacked ? "column-reverse" : "row" }}>
+                {d.values.map((v, j) => (
+                  <div
+                    key={j}
+                    title={`${series[j]?.name}: ${Math.round(v)}`}
+                    style={{
+                      width: stacked ? 20 : 9,
+                      height: `${(v / max) * plotH}px`,
+                      minHeight: v > 0 ? 2 : 0,
+                      background: series[j]?.color,
+                      borderRadius: stacked ? 0 : "3px 3px 0 0",
+                    }}
+                  />
+                ))}
+              </div>
+              <div style={{ fontSize: 10, color: C.textDim, marginTop: 4, whiteSpace: "nowrap" }}>{d.label}</div>
             </div>
-            <div style={{ fontSize: 10, color: C.textDim, marginTop: 4, whiteSpace: "nowrap" }}>{d.label}</div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
       <div style={{ display: "flex", gap: 14, marginTop: 8, flexWrap: "wrap" }}>
         {series.map((s) => (
@@ -500,17 +515,20 @@ export function ValueBars({
   forecastColor,
   fmt,
   height = 170,
+  alignEnd = false,
 }: {
   data: { label: string; value: number; forecast?: boolean }[];
   color: string;
   forecastColor?: string;
   fmt: (n: number) => string;
   height?: number;
+  alignEnd?: boolean;
 }) {
   const plotH = height - 40;
   const max = Math.max(1, ...data.map((d) => d.value));
+  const scrollRef = useScrollEnd<HTMLDivElement>(alignEnd, data.length);
   return (
-    <div style={{ display: "flex", gap: 8, alignItems: "flex-end", height, overflowX: "auto", paddingBottom: 4 }}>
+    <div ref={scrollRef} style={{ display: "flex", gap: 8, alignItems: "flex-end", height, overflowX: "auto", paddingBottom: 4 }}>
       {data.map((d, i) => (
         <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", minWidth: 48, flex: 1 }}>
           <div style={{ fontSize: 10.5, color: d.forecast ? C.textDim : C.textMuted, marginBottom: 3, whiteSpace: "nowrap" }}>{fmt(d.value)}</div>

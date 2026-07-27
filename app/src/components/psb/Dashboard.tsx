@@ -155,6 +155,16 @@ export function Dashboard({
     return bars;
   }, [data, clients, trainer]);
 
+  const sixMPhases = useMemo(() => {
+    const f = sixM.filter((c) => matchT(c.primaryTrainer));
+    const n = (p: string) => f.filter((c) => c.phase === p).length;
+    return { total: f.length, data: [
+      { label: "Obnova (1–6)", value: n("Obnova"), color: C.green },
+      { label: "Integrácia (7–18)", value: n("Integrácia"), color: C.orange },
+      { label: "Udržateľnosť (19+)", value: n("Udržateľnosť"), color: C.red },
+    ] };
+  }, [sixM, trainer]);
+
   const missing = REPORTS.filter((r) => (data[r.key] as unknown[]).length === 0);
   const open = register.filter((r) => !r.acked);
   const acked = register.filter((r) => r.acked);
@@ -173,44 +183,58 @@ export function Dashboard({
         <StatCard value={stats.sixMCount} label="6M klientov" onClick={() => onNavigate("6m")} />
       </StatGrid>
 
-      <CapacityCard capacity={capacity} onNavigate={onNavigate} />
+      {/* Nosný riadok: hodiny/týždeň (ľavá polovica) + týždne v zóne (pravá) */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 12, marginBottom: 12, alignItems: "stretch" }}>
+        <Card style={{ marginBottom: 0 }}>
+          <H3>
+            <Info text="Odtrénované hodiny za týždeň. Otvára sa na najnovšom týždni — posúvaj doľava do minulosti. Zelené pásmo 24–34h je zdravá zóna na jedného trénera." label="Odrobené hodiny / týždeň" />
+          </H3>
+          {weeklyHours.data.length ? (
+            <ZoneBars data={weeklyHours.data} series={weeklyHours.series} zone={{ lo: ZONE_LO, hi: ZONE_HI }} height={180} alignEnd />
+          ) : (
+            <Empty>Nahraj Payroll by Session.</Empty>
+          )}
+        </Card>
+        <Card style={{ marginBottom: 0 }}>
+          <H3>
+            <Info text="Koľko trénerských týždňov padlo do zdravej zóny (24–34h), pod ňu alebo nad ňu — za celé obdobie." label="Týždne v zdravej zóne" />
+          </H3>
+          {zones.total ? (
+            <Donut
+              size={140}
+              centerLabel={`${Math.round((zones.zdrava / zones.total) * 100)}%`}
+              data={[
+                { label: "Zdravá zóna", value: zones.zdrava, color: C.green },
+                { label: "Pod zónou", value: zones.pod, color: C.red },
+                { label: "Nad zónou", value: zones.nad, color: C.orange },
+              ]}
+            />
+          ) : (
+            <Empty>Nahraj Payroll by Session.</Empty>
+          )}
+        </Card>
+      </div>
 
-      {/* Nosný graf — hore, všetky týždne (posúva sa doľava/doprava) */}
+      {/* Kapacita (ľavá) + 6M fázy (pravá) */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 12, marginBottom: 12, alignItems: "stretch" }}>
+        <CapacityCard capacity={capacity} trainer={trainer} onNavigate={onNavigate} />
+        <Card style={{ marginBottom: 0 }}>
+          <H3>
+            <Info text="Rozdelenie 6M klientov podľa fázy procesu: Obnova (1.–6. mesiac), Integrácia (7.–18.), Udržateľnosť (19+). Mení sa podľa prepínača trénera hore." label="6M klienti podľa fázy" />
+          </H3>
+          {sixMPhases.total ? (
+            <Donut size={140} centerLabel={String(sixMPhases.total)} data={sixMPhases.data} />
+          ) : (
+            <Empty>{trainer === "all" ? "Žiadni 6M klienti." : `${trainer} nemá 6M klientov.`}</Empty>
+          )}
+        </Card>
+      </div>
+
       <Card>
         <H3>
-          <Info text="Odtrénované hodiny za týždeň, od začiatku dát. Graf sa posúva doľava/doprava. Zelené pásmo 24–34h je zdravá zóna na jedného trénera." label="Odrobené hodiny / týždeň" />
+          <Info text="Vyfakturované zárobky za mesiac. Otvára sa na najnovšom mesiaci — posúvaj doľava do minulosti. Posledné 2 svetlé stĺpce (⌁) sú odhad na ďalšie mesiace." label={trainer === "all" ? "Mesačné zárobky + odhad" : `Mesačné zárobky — ${trainer}`} />
         </H3>
-        {weeklyHours.data.length ? (
-          <ZoneBars data={weeklyHours.data} series={weeklyHours.series} zone={{ lo: ZONE_LO, hi: ZONE_HI }} height={180} />
-        ) : (
-          <Empty>Nahraj Payroll by Session.</Empty>
-        )}
-      </Card>
-
-      <Card>
-        <H3>
-          <Info text="Koľko trénerských týždňov padlo do zdravej zóny (24–34h), pod ňu alebo nad ňu — za celé obdobie." label="Týždne v zdravej zóne" />
-        </H3>
-        {zones.total ? (
-          <Donut
-            size={140}
-            centerLabel={`${Math.round((zones.zdrava / zones.total) * 100)}%`}
-            data={[
-              { label: "Zdravá zóna", value: zones.zdrava, color: C.green },
-              { label: "Pod zónou", value: zones.pod, color: C.red },
-              { label: "Nad zónou", value: zones.nad, color: C.orange },
-            ]}
-          />
-        ) : (
-          <Empty>Nahraj Payroll by Session.</Empty>
-        )}
-      </Card>
-
-      <Card>
-        <H3>
-          <Info text="Vyfakturované zárobky za mesiac od septembra 2025. Posledné 2 svetlé stĺpce (⌁) sú odhad na ďalšie mesiace. Graf sa posúva doľava/doprava." label={trainer === "all" ? "Mesačné zárobky + odhad" : `Mesačné zárobky — ${trainer}`} />
-        </H3>
-        {earnings.length ? <ValueBars data={earnings} color={C.accent} forecastColor={C.blue} fmt={(n) => `${Math.round(n / 1000)}k`} height={180} /> : <Empty>Nahraj Payroll.</Empty>}
+        {earnings.length ? <ValueBars data={earnings} color={C.accent} forecastColor={C.blue} fmt={(n) => `${Math.round(n / 1000)}k`} height={180} alignEnd /> : <Empty>Nahraj Payroll.</Empty>}
       </Card>
 
       <Card>
@@ -246,60 +270,60 @@ export function Dashboard({
   );
 }
 
-function CapacityCard({ capacity, onNavigate }: { capacity: CapacityRow[]; onNavigate: (t: string) => void }) {
+function CapacityCard({ capacity, trainer, onNavigate }: { capacity: CapacityRow[]; trainer: string; onNavigate: (t: string) => void }) {
   const jerry = capacity.find((c) => c.trainer === "Jerry");
   const terezka = capacity.find((c) => c.trainer === "Terezka");
-  const clients = (c?: CapacityRow) => (c ? c.anchor + c.stable + c.sporadic : 0);
-  const totalClients = clients(jerry) + clients(terezka);
-  const totalEff = (jerry?.effHours || 0) + (terezka?.effHours || 0);
+  const clientCount = (c?: CapacityRow) => (c ? c.anchor + c.stable + c.sporadic : 0);
 
-  type Col = { name: string; clients: number; eff: number; target: number; need: string };
-  const need = (eff: number, target: number): string => {
-    if (eff >= ZONE_LO && eff <= ZONE_HI) return "✓ v zdravej zóne";
-    if (eff > ZONE_HI) return "nad zónou — priveľa";
-    const gap = target - eff;
-    return `treba +${Math.ceil(gap / 1.08)} Anchor alebo +${Math.ceil(gap / 0.66)} Stabilných`;
-  };
-  const cols: Col[] = [
-    { name: "Jerry", clients: clients(jerry), eff: jerry?.effHours || 0, target: TARGET_H, need: need(jerry?.effHours || 0, TARGET_H) },
-    { name: "Terezka", clients: clients(terezka), eff: terezka?.effHours || 0, target: TARGET_H, need: need(terezka?.effHours || 0, TARGET_H) },
-    { name: "Spolu (PSB)", clients: totalClients, eff: totalEff, target: TARGET_H * 2, need: need(totalEff / 2, TARGET_H) },
-  ];
+  // Follows the trainer pill: Obaja = Spolu PSB, else the selected trainer.
+  let name: string, clients: number, eff: number, target: number;
+  if (trainer === "all") {
+    name = "Spolu (PSB)";
+    clients = clientCount(jerry) + clientCount(terezka);
+    eff = (jerry?.effHours || 0) + (terezka?.effHours || 0);
+    target = TARGET_H * 2;
+  } else {
+    const c = trainer === "Jerry" ? jerry : terezka;
+    name = trainer;
+    clients = clientCount(c);
+    eff = c?.effHours || 0;
+    target = TARGET_H;
+  }
+  const perTrainerEff = trainer === "all" ? eff / 2 : eff;
+  const util = target ? (eff / target) * 100 : 0;
+  const inZone = perTrainerEff >= ZONE_LO && perTrainerEff <= ZONE_HI;
+  const over = perTrainerEff > ZONE_HI;
+  const color = inZone ? C.green : over ? C.red : C.orange;
+  const gap = TARGET_H - perTrainerEff;
+  const need = inZone ? "✓ v zdravej zóne" : over ? "nad zónou — priveľa" : `treba +${Math.ceil(gap / 1.08)} Anchor alebo +${Math.ceil(gap / 0.66)} Stabilných klientov`;
 
   return (
-    <Card>
+    <Card style={{ marginBottom: 0, height: "100%" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
         <H3>
           <Info
-            text="Vyťaženie = efektívne tréningy za týždeň (koľko klienti reálne odchodia podľa svojej dochádzky) oproti cieľu 29h na trénera. Pod 100 % = je priestor prijať klientov, nad ním = plno. Klik → Klienti pre detail."
-            label="Kapacita & vyťaženie"
+            text="Vyťaženie = efektívne tréningy za týždeň (koľko klienti reálne odchodia podľa svojej dochádzky) oproti cieľu 29h na trénera. Pod 100 % = priestor prijať klientov, nad ním = plno. Mení sa podľa prepínača trénera hore."
+            label={`Kapacita & vyťaženie — ${name}`}
           />
         </H3>
-        <button onClick={() => onNavigate("klienti")} style={{ ...linkBtn, fontSize: 12 }}>Detail v Klientoch →</button>
+        <button onClick={() => onNavigate("klienti")} style={{ ...linkBtn, fontSize: 12 }}>Detail →</button>
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10, marginTop: 10 }}>
-        {cols.map((col) => {
-          const util = col.target ? (col.eff / col.target) * 100 : 0;
-          const inZone = col.name.startsWith("Spolu") ? col.eff / 2 >= ZONE_LO && col.eff / 2 <= ZONE_HI : col.eff >= ZONE_LO && col.eff <= ZONE_HI;
-          const over = (col.name.startsWith("Spolu") ? col.eff / 2 : col.eff) > ZONE_HI;
-          const color = inZone ? C.green : over ? C.red : C.orange;
-          return (
-            <div key={col.name} style={{ background: C.bg, borderRadius: 10, padding: 14, border: `1px solid ${C.border}` }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: C.accentLight, marginBottom: 8 }}>{col.name}</div>
-              <div style={{ fontSize: 30, fontWeight: 800, color, lineHeight: 1 }}>{util.toFixed(0)}%</div>
-              <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 10 }}>vyťaženie (cieľ {col.target}h)</div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: C.textMuted, marginBottom: 3 }}>
-                <span>Klienti</span>
-                <strong style={{ color: C.text }}>{col.clients}</strong>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: C.textMuted, marginBottom: 8 }}>
-                <span>Tréningy/týž (podľa dochádzky)</span>
-                <strong style={{ color: C.text }}>{col.eff.toFixed(0)}</strong>
-              </div>
-              <div style={{ fontSize: 11.5, color: inZone ? C.green : C.orange }}>{col.need}</div>
-            </div>
-          );
-        })}
+      <div style={{ display: "flex", gap: 20, alignItems: "center", marginTop: 8, flexWrap: "wrap" }}>
+        <div>
+          <div style={{ fontSize: 40, fontWeight: 800, color, lineHeight: 1 }}>{util.toFixed(0)}%</div>
+          <div style={{ fontSize: 11, color: C.textMuted }}>vyťaženie (cieľ {target}h)</div>
+        </div>
+        <div style={{ flex: 1, minWidth: 150 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: C.textMuted, marginBottom: 5 }}>
+            <span>Klienti</span>
+            <strong style={{ color: C.text }}>{clients}</strong>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: C.textMuted, marginBottom: 8 }}>
+            <span>Max tréningov/týž</span>
+            <strong style={{ color: C.text }}>{eff.toFixed(0)}</strong>
+          </div>
+          <div style={{ fontSize: 12.5, color: inZone ? C.green : C.orange }}>{need}</div>
+        </div>
       </div>
     </Card>
   );
