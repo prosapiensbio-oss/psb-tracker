@@ -79,8 +79,8 @@ export function Dashboard({
 
   const stats = useMemo(() => {
     const list = Object.values(clients);
-    const isActive = (c: ClientAgg) => c.status === "Aktívny" || c.status === "Sporadický";
-    const active = list.filter((c) => isActive(c) && matchT(c.primaryTrainer)).length;
+    // "Aktívny" = everyone except Neaktívny (matches the Klienti tab count).
+    const active = list.filter((c) => c.status !== "Neaktívny" && matchT(c.primaryTrainer)).length;
     const weeks = data.sessions.map((s) => weekKey(s.date)).sort();
     const lastWeek = weeks[weeks.length - 1];
     const weekHours = data.sessions
@@ -97,52 +97,61 @@ export function Dashboard({
     return { active, weekHours, lastWeek, monthRevenue, lastMonth: lastMonth?.month, sixMCount };
   }, [clients, data, sixM, trainer]);
 
-  const weeklyHours = useMemo(() => {
-    const map: Record<string, { ts: number; Jerry: number; Terezka: number }> = {};
+  // All weeks (chronological) — the chart scrolls horizontally.
+  const weekRows = useMemo(() => {
+    const map: Record<string, { Jerry: number; Terezka: number }> = {};
     for (const s of data.sessions) {
       const k = weekKey(s.date);
-      const e = (map[k] ||= { ts: new Date(s.date).getTime(), Jerry: 0, Terezka: 0 });
+      const e = (map[k] ||= { Jerry: 0, Terezka: 0 });
       if (s.sessionTrainer === "Jerry") e.Jerry += s.duration / 60;
       else if (s.sessionTrainer === "Terezka") e.Terezka += s.duration / 60;
     }
-    const rows = Object.entries(map).sort((a, b) => a[0].localeCompare(b[0])).slice(-8);
+    return Object.entries(map).sort((a, b) => a[0].localeCompare(b[0]));
+  }, [data.sessions]);
+
+  const weeklyHours = useMemo(() => {
     const series = trainer === "all"
       ? [{ name: "Jerry", color: C.accent }, { name: "Terezka", color: C.accentLight }]
       : [{ name: trainer, color: C.accent }];
     return {
       series,
-      data: rows.map(([k, v]) => ({
+      data: weekRows.map(([k, v]) => ({
         label: weekLabel(k),
         values: trainer === "all" ? [v.Jerry, v.Terezka] : [trainer === "Jerry" ? v.Jerry : v.Terezka],
       })),
     };
-  }, [data.sessions, trainer]);
+  }, [weekRows, trainer]);
+
+  // How many trainer-weeks landed in / below / above the healthy zone.
+  const zones = useMemo(() => {
+    let zdrava = 0, pod = 0, nad = 0;
+    const trainers = trainer === "all" ? (["Jerry", "Terezka"] as const) : [trainer];
+    for (const [, v] of weekRows) {
+      for (const t of trainers) {
+        const h = (v as Record<string, number>)[t];
+        if (!h) continue;
+        if (h >= ZONE_LO && h <= ZONE_HI) zdrava++;
+        else if (h < ZONE_LO) pod++;
+        else nad++;
+      }
+    }
+    return { zdrava, pod, nad, total: zdrava + pod + nad };
+  }, [weekRows, trainer]);
 
   const earnings = useMemo(() => {
-    const months = monthlyFinance(data).slice(-6);
-    const bars = months.map((m) => ({
+    const months = monthlyFinance(data); // all months, from Sep 2025 — chart scrolls
+    const bars: { label: string; value: number; forecast?: boolean }[] = months.map((m) => ({
       label: monthLabel(m.month),
       value: trainer === "all" ? m.revenue : m.byTrainer[trainer]?.revenue || 0,
     }));
     if (trainer === "all") {
       const pred = predictEarnings(data, clients, { excludeSpecial: false });
-      // pred.months[0] is the current month; [1],[2] are the next two.
-      for (const pm of pred.months.slice(1, 3)) {
-        bars.push({ label: monthLabel(pm.month), value: Math.round(pm.guaranteed + pm.expected), forecast: true } as never);
+      for (const pm of pred.months.slice(0, 2)) {
+        bars.push({ label: monthLabel(pm.month), value: Math.round(pm.guaranteed + pm.expected), forecast: true });
       }
     }
-    return bars as { label: string; value: number; forecast?: boolean }[];
+    return bars;
   }, [data, clients, trainer]);
-
-  const segmentDonut = useMemo(() => {
-    const list = Object.values(clients).filter((c) => c.status !== "Neaktívny" && matchT(c.primaryTrainer));
-    const seg = (s: string) => list.filter((c) => c.segment === s).length;
-    return [
-      { label: "Anchor", value: seg("Anchor"), color: C.green },
-      { label: "Stabilný", value: seg("Stabilný"), color: C.orange },
-      { label: "Sporadický", value: seg("Sporadický"), color: C.red },
-    ];
-  }, [clients, trainer]);
 
   const missing = REPORTS.filter((r) => (data[r.key] as unknown[]).length === 0);
   const open = register.filter((r) => !r.acked);
@@ -156,16 +165,16 @@ export function Dashboard({
       </div>
 
       <StatGrid>
-        <StatCard value={stats.active} label="Aktívnych klientov" />
-        <StatCard value={`${stats.weekHours.toFixed(0)}h`} label={stats.lastWeek ? `Odrobené (týž. ${weekLabel(stats.lastWeek)})` : "Týždenné hodiny"} />
-        <StatCard value={fmtCZK(stats.monthRevenue)} label={stats.lastMonth ? `Zárobky ${monthLabel(stats.lastMonth)}` : "Mesačné zárobky"} />
-        <StatCard value={stats.sixMCount} label="6M klientov" />
+        <StatCard value={stats.active} label="Aktívnych klientov" onClick={() => onNavigate("klienti")} />
+        <StatCard value={`${stats.weekHours.toFixed(0)}h`} label={stats.lastWeek ? `Odrobené (týž. ${weekLabel(stats.lastWeek)})` : "Týždenné hodiny"} onClick={() => onNavigate("treningy")} />
+        <StatCard value={fmtCZK(stats.monthRevenue)} label={stats.lastMonth ? `Zárobky ${monthLabel(stats.lastMonth)}` : "Mesačné zárobky"} onClick={() => onNavigate("financie")} />
+        <StatCard value={stats.sixMCount} label="6M klientov" onClick={() => onNavigate("6m")} />
       </StatGrid>
 
-      {/* Nosný graf — hore */}
+      {/* Nosný graf — hore, všetky týždne (posúva sa doľava/doprava) */}
       <Card>
         <H3>
-          <Info text="Odtrénované hodiny za týždeň. Zelené pásmo 24–34h je zdravá zóna na jedného trénera — vidíš, ako ďaleko ste od nej." label="Odrobené hodiny / týždeň (posledných 8)" />
+          <Info text="Odtrénované hodiny za týždeň, od začiatku dát. Graf sa posúva doľava/doprava. Zelené pásmo 24–34h je zdravá zóna na jedného trénera." label="Odrobené hodiny / týždeň" />
         </H3>
         {weeklyHours.data.length ? (
           <ZoneBars data={weeklyHours.data} series={weeklyHours.series} zone={{ lo: ZONE_LO, hi: ZONE_HI }} height={180} />
@@ -174,18 +183,31 @@ export function Dashboard({
         )}
       </Card>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 12, marginBottom: 12 }}>
-        <Card style={{ marginBottom: 0 }}>
-          <H3>
-            <Info text="Prijaté/vyfakturované zárobky za mesiac. Posledné 2 svetlé stĺpce (⌁) sú odhad na ďalšie mesiace z predikcie." label={trainer === "all" ? "Mesačné zárobky + odhad" : `Mesačné zárobky — ${trainer}`} />
-          </H3>
-          {earnings.length ? <ValueBars data={earnings} color={C.accent} forecastColor={C.blue} fmt={(n) => `${Math.round(n / 1000)}k`} height={170} /> : <Empty>Nahraj Payroll.</Empty>}
-        </Card>
-        <Card style={{ marginBottom: 0 }}>
-          <H3>{trainer === "all" ? "Aktívni klienti podľa segmentu" : `Segmenty — ${trainer}`}</H3>
-          {segmentDonut.some((d) => d.value > 0) ? <Donut data={segmentDonut} size={140} centerLabel={String(stats.active)} /> : <Empty>Žiadni klienti.</Empty>}
-        </Card>
-      </div>
+      <Card>
+        <H3>
+          <Info text="Koľko trénerských týždňov padlo do zdravej zóny (24–34h), pod ňu alebo nad ňu — za celé obdobie." label="Týždne v zdravej zóne" />
+        </H3>
+        {zones.total ? (
+          <Donut
+            size={140}
+            centerLabel={`${Math.round((zones.zdrava / zones.total) * 100)}%`}
+            data={[
+              { label: "Zdravá zóna", value: zones.zdrava, color: C.green },
+              { label: "Pod zónou", value: zones.pod, color: C.red },
+              { label: "Nad zónou", value: zones.nad, color: C.orange },
+            ]}
+          />
+        ) : (
+          <Empty>Nahraj Payroll by Session.</Empty>
+        )}
+      </Card>
+
+      <Card>
+        <H3>
+          <Info text="Vyfakturované zárobky za mesiac od septembra 2025. Posledné 2 svetlé stĺpce (⌁) sú odhad na ďalšie mesiace. Graf sa posúva doľava/doprava." label={trainer === "all" ? "Mesačné zárobky + odhad" : `Mesačné zárobky — ${trainer}`} />
+        </H3>
+        {earnings.length ? <ValueBars data={earnings} color={C.accent} forecastColor={C.blue} fmt={(n) => `${Math.round(n / 1000)}k`} height={180} /> : <Empty>Nahraj Payroll.</Empty>}
+      </Card>
 
       <Card>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>

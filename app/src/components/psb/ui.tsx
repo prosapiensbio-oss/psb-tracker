@@ -7,11 +7,39 @@ export function Card({ children, style }: { children: ReactNode; style?: CSSProp
   return <div style={{ ...S.card, ...style }}>{children}</div>;
 }
 
-export function StatCard({ value, label, color }: { value: ReactNode; label: string; color?: string }) {
+export function StatCard({
+  value,
+  label,
+  color,
+  onClick,
+}: {
+  value: ReactNode;
+  label: ReactNode;
+  color?: string;
+  onClick?: () => void;
+}) {
   return (
-    <div style={{ ...S.card, marginBottom: 0, textAlign: "center", padding: 14 }}>
+    <div
+      onClick={onClick}
+      style={{
+        ...S.card,
+        marginBottom: 0,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        textAlign: "center",
+        padding: 16,
+        cursor: onClick ? "pointer" : "default",
+        transition: "border-color .15s",
+        borderColor: onClick ? `${C.accent}44` : C.border,
+      }}
+    >
       <div style={{ ...S.statNum, color: color ?? C.accentLight }}>{value}</div>
-      <div style={S.statLabel}>{label}</div>
+      <div style={{ ...S.statLabel, display: "flex", alignItems: "center", gap: 4 }}>
+        {label}
+        {onClick && <span style={{ color: C.textDim, fontSize: 10 }}>→</span>}
+      </div>
     </div>
   );
 }

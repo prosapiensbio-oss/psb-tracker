@@ -163,18 +163,32 @@ const WINDOWS = [
   { value: "7", label: "Posledný týždeň", days: 7 },
   { value: "30", label: "Posledný mesiac", days: 30 },
   { value: "90", label: "Posledný kvartál", days: 90 },
+  { value: "custom", label: "Vlastné obdobie", days: -1 },
 ];
 
 function Analyza({ data }: { data: PSBData }) {
   const [trainerF, setTrainerF] = useState("all");
   const [win, setWin] = useState("all");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
   const { sort, toggle, sorted } = useSort({ key: "month", dir: "asc" });
 
   const filtered = useMemo(() => {
-    const days = Number(WINDOWS.find((w) => w.value === win)?.days || 0);
-    const cutoff = days ? Date.now() - days * 86400000 : 0;
-    return data.sessions.filter((s) => (trainerF === "all" || s.sessionTrainer === trainerF) && new Date(s.date).getTime() >= cutoff);
-  }, [data.sessions, trainerF, win]);
+    let lo = 0;
+    let hi = Infinity;
+    if (win === "custom") {
+      lo = from ? new Date(from).getTime() : 0;
+      hi = to ? new Date(to).getTime() + 86400000 : Infinity;
+    } else {
+      const days = Number(WINDOWS.find((w) => w.value === win)?.days || 0);
+      if (days > 0) lo = Date.now() - days * 86400000;
+    }
+    return data.sessions.filter((s) => {
+      if (trainerF !== "all" && s.sessionTrainer !== trainerF) return false;
+      const t = new Date(s.date).getTime();
+      return t >= lo && t <= hi;
+    });
+  }, [data.sessions, trainerF, win, from, to]);
 
   const donut = useMemo(() => {
     let off = 0, onTc = 0, uvod = 0;
@@ -215,6 +229,13 @@ function Analyza({ data }: { data: PSBData }) {
               { value: "Terezka", label: "Terezka" },
             ]} />
             <Select value={win} onChange={setWin} options={WINDOWS.map((w) => ({ value: w.value, label: w.label }))} />
+            {win === "custom" && (
+              <>
+                <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} style={{ ...S.select, colorScheme: "dark" }} />
+                <span style={{ color: C.textDim, alignSelf: "center" }}>–</span>
+                <input type="date" value={to} onChange={(e) => setTo(e.target.value)} style={{ ...S.select, colorScheme: "dark" }} />
+              </>
+            )}
           </div>
         </div>
         {filtered.length ? <Donut data={donut} size={160} centerLabel={String(filtered.length)} /> : <Empty>Žiadne sedenia pre tento filter.</Empty>}

@@ -17,6 +17,7 @@ const KPI_WINDOWS = [
   { value: "all", label: "Celá história", days: 0 },
   { value: "30", label: "Posledný mesiac", days: 30 },
   { value: "90", label: "Posledný kvartál", days: 90 },
+  { value: "custom", label: "Vlastné obdobie", days: -1 },
 ];
 
 export function Klienti({ clients, capacity, actions }: { clients: Record<string, ClientAgg>; capacity: CapacityRow[]; actions: Actions }) {
@@ -26,10 +27,23 @@ export function Klienti({ clients, capacity, actions }: { clients: Record<string
   const [modalityF, setModalityF] = useState("all");
   const [showInactive, setShowInactive] = useState(false);
   const [kpiWin, setKpiWin] = useState("all");
+  const [kpiFrom, setKpiFrom] = useState("");
+  const [kpiTo, setKpiTo] = useState("");
   const [edit, setEdit] = useState<string | null>(null);
   const { sort, toggle, sorted } = useSort({ key: "name", dir: "asc" });
 
   const all = useMemo(() => Object.values(clients), [clients]);
+
+  // Package-type filter options built from the real memberships in the data.
+  const typeOptions = useMemo(() => {
+    const memberships = [...new Set(all.map((c) => c.membership).filter(Boolean))].sort();
+    return [
+      { value: "all", label: "Všetky typy" },
+      { value: "grp:6M Predplatné", label: "6M Predplatné (všetky)" },
+      { value: "grp:Balíček", label: "Balíček (všetky)" },
+      ...memberships.map((m) => ({ value: `m:${m}`, label: m })),
+    ];
+  }, [all]);
 
   const matrix = useMemo(() => {
     const m: Record<string, Record<string, number>> = {};
@@ -45,7 +59,8 @@ export function Klienti({ clients, capacity, actions }: { clients: Record<string
     let arr = all.filter((c) => (showInactive ? true : c.status !== "Neaktívny"));
     if (fTrainer !== "all") arr = arr.filter((c) => c.primaryTrainer === fTrainer);
     if (fSegment !== "all") arr = arr.filter((c) => c.segment === fSegment);
-    if (typeF !== "all") arr = arr.filter((c) => c.clientType === typeF);
+    if (typeF.startsWith("grp:")) arr = arr.filter((c) => c.clientType === typeF.slice(4));
+    else if (typeF.startsWith("m:")) arr = arr.filter((c) => c.membership === typeF.slice(2));
     if (modalityF !== "all") arr = arr.filter((c) => c.modality === modalityF);
     return sorted(arr, {
       name: (c) => c.name,
@@ -69,21 +84,30 @@ export function Klienti({ clients, capacity, actions }: { clients: Record<string
 
   // KPI tiles scoped to the chosen time window.
   const kpis = useMemo(() => {
-    const days = Number(KPI_WINDOWS.find((w) => w.value === kpiWin)?.days || 0);
-    const cutoff = days ? Date.now() - days * 86400000 : 0;
+    const preset = KPI_WINDOWS.find((w) => w.value === kpiWin);
+    let lo = 0;
+    let hi = Infinity;
+    let scoped = kpiWin !== "all";
+    if (kpiWin === "custom") {
+      lo = kpiFrom ? new Date(kpiFrom).getTime() : 0;
+      hi = kpiTo ? new Date(kpiTo).getTime() + 86400000 : Infinity;
+      scoped = !!(kpiFrom || kpiTo);
+    } else if (preset && preset.days > 0) {
+      lo = Date.now() - preset.days * 86400000;
+    }
     let hours = 0, paid = 0, paidN = 0, clientsWithSess = 0;
     for (const c of list) {
-      const sess = days ? c.sessions.filter((s) => new Date(s.date).getTime() >= cutoff) : c.sessions;
+      const sess = scoped ? c.sessions.filter((s) => { const t = new Date(s.date).getTime(); return t >= lo && t <= hi; }) : c.sessions;
       if (sess.length) clientsWithSess++;
       for (const s of sess) {
         hours += s.duration / 60;
         if (s.price > 0) { paid += s.price; paidN++; }
       }
     }
-    const denom = (kpiWin === "all" ? list.length : clientsWithSess) || 1;
+    const denom = (scoped ? clientsWithSess : list.length) || 1;
     const att = list.length ? (list.reduce((a, c) => a + c.attendance, 0) / list.length) * 100 : 0;
-    return { count: list.length, activeInWin: clientsWithSess, att, hpc: hours / denom, avg: paidN ? paid / paidN : 0 };
-  }, [list, kpiWin]);
+    return { count: list.length, activeInWin: clientsWithSess, att, hpc: hours / denom, avg: paidN ? paid / paidN : 0, scoped };
+  }, [list, kpiWin, kpiFrom, kpiTo]);
 
   const cell = (t: string, seg: string) => {
     const active = fTrainer === t && fSegment === seg;
@@ -143,14 +167,21 @@ export function Klienti({ clients, capacity, actions }: { clients: Record<string
           {donut.some((d) => d.value > 0) ? <Donut data={donut} size={130} centerLabel={String(kpis.count)} /> : <Empty>Žiadni klienti.</Empty>}
         </Card>
         <div>
-          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
             <Select value={kpiWin} onChange={setKpiWin} options={KPI_WINDOWS.map((w) => ({ value: w.value, label: w.label }))} />
+            {kpiWin === "custom" && (
+              <>
+                <input type="date" value={kpiFrom} onChange={(e) => setKpiFrom(e.target.value)} style={{ ...S.select, colorScheme: "dark" }} />
+                <span style={{ color: C.textDim, alignSelf: "center" }}>–</span>
+                <input type="date" value={kpiTo} onChange={(e) => setKpiTo(e.target.value)} style={{ ...S.select, colorScheme: "dark" }} />
+              </>
+            )}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 12 }}>
-            <StatCard value={kpiWin === "all" ? kpis.count : kpis.activeInWin} label={kpiWin === "all" ? "Klientov vo výbere" : "Chodilo v období"} />
-            <StatCard value={`${kpis.att.toFixed(0)}%`} label="Ø dochádzka (18 týž.)" />
-            <StatCard value={kpis.hpc.toFixed(1)} label={`Ø hodín/klient${kpiWin === "all" ? "" : " (obd.)"}`} />
-            <StatCard value={fmtCZK(kpis.avg)} label="Ø CZK/sedenie" />
+            <StatCard value={kpis.scoped ? kpis.activeInWin : kpis.count} label={kpis.scoped ? "Chodilo v období" : "Klientov vo výbere"} />
+            <StatCard value={`${kpis.att.toFixed(0)}%`} label={<Info text="Priemerný podiel týždňov, v ktorých mal klient aspoň jeden tréning, za posledných 18 týždňov. Vždy 18 týž., nezávisí od filtra času." label="Ø dochádzka" />} />
+            <StatCard value={kpis.hpc.toFixed(1)} label={<Info text="Priemerný počet odtrénovaných hodín na klienta za zvolené obdobie (alebo celú históriu)." label={`Ø hodín/klient${kpis.scoped ? " (obd.)" : ""}`} />} />
+            <StatCard value={fmtCZK(kpis.avg)} label={<Info text="Priemerná cena zaplateného sedenia za zvolené obdobie (bezplatné sedenia sa nepočítajú)." label="Ø CZK/sedenie" />} />
           </div>
         </div>
       </div>
@@ -163,11 +194,7 @@ export function Klienti({ clients, capacity, actions }: { clients: Record<string
           {(fTrainer !== "all" || fSegment !== "all") && (
             <button onClick={() => { setFTrainer("all"); setFSegment("all"); }} style={{ background: C.cardHover, border: "none", borderRadius: 6, padding: "5px 10px", color: C.textMuted, fontSize: 12, cursor: "pointer" }}>✕ zrušiť filter matice</button>
           )}
-          <Select value={typeF} onChange={setTypeF} options={[
-            { value: "all", label: "Všetky typy" },
-            { value: "6M Predplatné", label: "6M Predplatné" },
-            { value: "Balíček", label: "Balíček" },
-          ]} />
+          <Select value={typeF} onChange={setTypeF} options={typeOptions} />
           <Select value={modalityF} onChange={setModalityF} options={[
             { value: "all", label: "Offline + Online" },
             { value: "Offline", label: "Prevažne Offline" },

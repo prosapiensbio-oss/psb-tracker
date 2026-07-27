@@ -613,9 +613,11 @@ export type Prediction = {
   }[];
 };
 
+// The next `n` FULL months, starting next month (forward-looking forecast).
 const nextMonthKeys = (n: number): string[] => {
   const out: string[] = [];
   const d = new Date();
+  d.setMonth(d.getMonth() + 1);
   for (let i = 0; i < n; i++) {
     out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
     d.setMonth(d.getMonth() + 1);

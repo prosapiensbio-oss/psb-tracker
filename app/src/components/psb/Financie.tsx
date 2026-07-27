@@ -190,6 +190,11 @@ function Predikcia({ data, clients }: { data: PSBData; clients: Record<string, C
   });
   const hasData = pred.perClient.length > 0;
   const label = horizon === 1 ? "1 mesiac" : "3 mesiace";
+  const monthsCovered = pred.months.length
+    ? horizon === 1
+      ? monthLabel(pred.months[0].month)
+      : `${monthLabel(pred.months[0].month)} – ${monthLabel(pred.months[pred.months.length - 1].month)}`
+    : "";
 
   return (
     <>
@@ -197,8 +202,8 @@ function Predikcia({ data, clients }: { data: PSBData; clients: Record<string, C
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
           <H3>
             <Info
-              text="Odhad príjmu z reálnej histórie. Očakávaný mesačný príjem klienta = ako často chodí × priemerná cena sedenia, vážené dôverou obnovy podľa segmentu. Optimistický/realistický/negatívny = horné/stredné/dolné pásmo dôvery."
-              label={`Predikcia zárobkov — ${label}`}
+              text="Odhad príjmu z reálnej histórie na budúce mesiace. Očakávaný mesačný príjem klienta = ako často chodí × priemerná cena sedenia, vážené dôverou obnovy podľa segmentu. Optimistický/realistický/negatívny = horné/stredné/dolné pásmo dôvery."
+              label={`Predikcia zárobkov — ${monthsCovered || label}`}
             />
           </H3>
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
@@ -211,9 +216,9 @@ function Predikcia({ data, clients }: { data: PSBData; clients: Record<string, C
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, margin: "14px 0 6px" }}>
-          <StatCard value={fmtCZK(pred.scenarios.optimistic)} label={`Optimistický (${label})`} color={C.green} />
-          <StatCard value={fmtCZK(pred.scenarios.realistic)} label={`Realistický (${label})`} color={C.accentLight} />
-          <StatCard value={fmtCZK(pred.scenarios.negative)} label={`Negatívny (${label})`} color={C.orange} />
+          <StatCard value={fmtCZK(pred.scenarios.optimistic)} label={`Optimistický · ${monthsCovered}`} color={C.green} />
+          <StatCard value={fmtCZK(pred.scenarios.realistic)} label={`Realistický · ${monthsCovered}`} color={C.accentLight} />
+          <StatCard value={fmtCZK(pred.scenarios.negative)} label={`Negatívny · ${monthsCovered}`} color={C.orange} />
           <StatCard value={fmtCZK(pred.monthlyRunRate)} label="Očak. mesačný run-rate" color={C.blue} />
         </div>
         {!hasData && <Empty>Nahraj Payroll + Packages & Memberships CSV pre predikciu.</Empty>}
