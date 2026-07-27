@@ -464,3 +464,47 @@ export function ZoneBars({
     </div>
   );
 }
+
+// ── Single-series bars with value labels + optional forecast tail ────────────
+export function ValueBars({
+  data,
+  color,
+  forecastColor,
+  fmt,
+  height = 170,
+}: {
+  data: { label: string; value: number; forecast?: boolean }[];
+  color: string;
+  forecastColor?: string;
+  fmt: (n: number) => string;
+  height?: number;
+}) {
+  const plotH = height - 40;
+  const max = Math.max(1, ...data.map((d) => d.value));
+  return (
+    <div style={{ display: "flex", gap: 8, alignItems: "flex-end", height, overflowX: "auto", paddingBottom: 4 }}>
+      {data.map((d, i) => (
+        <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", minWidth: 48, flex: 1 }}>
+          <div style={{ fontSize: 10.5, color: d.forecast ? C.textDim : C.textMuted, marginBottom: 3, whiteSpace: "nowrap" }}>{fmt(d.value)}</div>
+          <div
+            title={`${d.label}: ${fmt(d.value)}`}
+            style={{
+              width: "78%",
+              maxWidth: 46,
+              height: `${(d.value / max) * plotH}px`,
+              minHeight: d.value > 0 ? 2 : 0,
+              background: d.forecast ? (forecastColor ?? color) : color,
+              opacity: d.forecast ? 0.5 : 1,
+              border: d.forecast ? `1px dashed ${forecastColor ?? color}` : "none",
+              borderRadius: "4px 4px 0 0",
+            }}
+          />
+          <div style={{ fontSize: 10, color: C.textDim, marginTop: 5, whiteSpace: "nowrap" }}>
+            {d.label}
+            {d.forecast && <span style={{ color: C.blue }}> ⌁</span>}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}

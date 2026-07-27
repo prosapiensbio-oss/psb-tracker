@@ -147,7 +147,7 @@ export function PSBApp() {
         {active === "dashboard" && (
           <Dashboard data={data} clients={clients} register={register} sixM={sixM} capacity={capacity} actions={actions} onNavigate={setActive} />
         )}
-        {active === "treningy" && <Treningy data={data} clients={clients} capacity={capacity} />}
+        {active === "treningy" && <Treningy data={data} clients={clients} />}
         {active === "klienti" && <Klienti clients={clients} capacity={capacity} actions={actions} />}
         {active === "financie" && <Financie data={data} clients={clients} />}
         {active === "6m" && <SixMTracker sixM={sixM} actions={actions} />}

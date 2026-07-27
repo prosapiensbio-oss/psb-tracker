@@ -1,50 +1,34 @@
 import { useMemo, useState } from "react";
 
-import {
-  capacityByTrainer,
-  groupTrainings,
-  periodZone,
-  sessionAnalysis,
-  TARGET_H,
-  type CapacityRow,
-  type ClientAgg,
-  type Period,
-} from "../../lib/psb/compute";
+import { groupTrainings, periodZone, sessionAnalysis, TARGET_H, type ClientAgg, type Period } from "../../lib/psb/compute";
 import { fmtCZK, monthLabel } from "../../lib/psb/format";
 import { C, S } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import { Card, Donut, Empty, H3, Info, Select, SortTh, StatCard, SubTabs, TableWrap, Toolbar, useSort, ZoneBars } from "./ui";
 
-export function Treningy({ data, clients, capacity }: { data: PSBData; clients: Record<string, ClientAgg>; capacity: CapacityRow[] }) {
+export function Treningy({ data }: { data: PSBData; clients: Record<string, ClientAgg> }) {
   const [sub, setSub] = useState("prehled");
   return (
     <>
-      <SubTabs
-        tabs={[
-          { id: "prehled", label: "Prehľad" },
-          { id: "analyza", label: "Analýza sedení" },
-          { id: "kapacita", label: "Kapacitný kalkulátor" },
-        ]}
-        value={sub}
-        onChange={setSub}
-      />
+      <SubTabs tabs={[{ id: "prehled", label: "Prehľad" }, { id: "analyza", label: "Analýza sedení" }]} value={sub} onChange={setSub} />
       {sub === "prehled" && <Prehlad data={data} />}
       {sub === "analyza" && <Analyza data={data} />}
-      {sub === "kapacita" && <Kapacita capacity={capacity ?? capacityByTrainer(clients)} />}
     </>
   );
 }
 
 function Prehlad({ data }: { data: PSBData }) {
   const [period, setPeriod] = useState<Period>("week");
+  const [trainerF, setTrainerF] = useState("all");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const { sort, toggle, sorted } = useSort({ key: "period", dir: "asc" });
 
   const rows = useMemo(
-    () => groupTrainings(data.sessions, period, "all", period === "custom" ? { from, to } : undefined),
-    [data.sessions, period, from, to],
+    () => groupTrainings(data.sessions, period, trainerF, period === "custom" ? { from, to } : undefined),
+    [data.sessions, period, trainerF, from, to],
   );
+  const both = trainerF === "all";
   const sortedRows = useMemo(
     () =>
       sorted(rows, {
@@ -60,6 +44,16 @@ function Prehlad({ data }: { data: PSBData }) {
     [rows, sorted],
   );
 
+  const summary = useMemo(() => {
+    if (!rows.length) return null;
+    const n = rows.length;
+    return {
+      avgH: rows.reduce((a, g) => a + g.total.hours, 0) / n,
+      avgScore: rows.reduce((a, g) => a + g.score, 0) / n,
+      avgCzk: rows.reduce((a, g) => a + (g.total.sessions ? g.total.revenue / g.total.sessions : 0), 0) / n,
+    };
+  }, [rows]);
+
   const zoneColor = (hours: number) => {
     const { lo, hi } = periodZone(period);
     if (hours >= lo && hours <= hi) return C.green;
@@ -69,14 +63,18 @@ function Prehlad({ data }: { data: PSBData }) {
 
   const chart = useMemo(() => {
     const chrono = [...rows].sort((a, b) => a.ts - b.ts).slice(-10);
-    return chrono.map((g) => ({ label: g.key, values: [g.byTrainer["Jerry"]?.hours || 0, g.byTrainer["Terezka"]?.hours || 0] }));
-  }, [rows]);
+    return chrono.map((g) =>
+      both
+        ? { label: g.key, values: [g.byTrainer["Jerry"]?.hours || 0, g.byTrainer["Terezka"]?.hours || 0] }
+        : { label: g.key, values: [g.total.hours] },
+    );
+  }, [rows, both]);
   const zone = periodZone(period);
 
   return (
     <Card>
       <H3>
-        <Info text="Odtrénované hodiny po obdobiach, chronologicky. Zelené pásmo je zdravá zóna na jedného trénera (týždeň 24–34h, mesiac ~104–147h). Klik na hlavičku stĺpca = zoradenie." label="Odrobené hodiny" />
+        <Info text="Odtrénované hodiny po obdobiach, chronologicky. Zelené pásmo = zdravá zóna na jedného trénera (týždeň 24–34h). Klik na hlavičku = zoradenie." label="Odrobené hodiny" />
       </H3>
       <Toolbar>
         <Select value={period} onChange={(v) => setPeriod(v as Period)} options={[
@@ -84,6 +82,11 @@ function Prehlad({ data }: { data: PSBData }) {
           { value: "month", label: "Mesiac" },
           { value: "quarter", label: "Kvartál" },
           { value: "custom", label: "Vlastné obdobie" },
+        ]} />
+        <Select value={trainerF} onChange={setTrainerF} options={[
+          { value: "all", label: "Obaja tréneri" },
+          { value: "Jerry", label: "Jerry" },
+          { value: "Terezka", label: "Terezka" },
         ]} />
         {period === "custom" && (
           <>
@@ -93,22 +96,36 @@ function Prehlad({ data }: { data: PSBData }) {
           </>
         )}
       </Toolbar>
-      {period !== "custom" && chart.length > 0 && (
-        <div style={{ marginBottom: 16 }}>
-          <ZoneBars data={chart} series={[{ name: "Jerry", color: C.accent }, { name: "Terezka", color: C.accentLight }]} zone={zone} height={170} />
+
+      {summary && (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 14 }}>
+          <StatCard value={`${summary.avgH.toFixed(1)}h`} label={`Ø hodín / ${period === "week" ? "týždeň" : period === "quarter" ? "kvartál" : "mesiac"}`} />
+          <StatCard value={summary.avgScore.toFixed(1)} label="Ø skóre (1–10)" color={summary.avgScore >= 7 ? C.green : summary.avgScore >= 4 ? C.orange : C.red} />
+          <StatCard value={fmtCZK(summary.avgCzk)} label="Ø CZK / sedenie" />
         </div>
       )}
+
+      {period !== "custom" && chart.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <ZoneBars data={chart} series={both ? [{ name: "Jerry", color: C.accent }, { name: "Terezka", color: C.accentLight }] : [{ name: trainerF, color: C.accent }]} zone={zone} height={170} />
+        </div>
+      )}
+
       <TableWrap>
         <thead>
           <tr>
             <SortTh label="Obdobie" sortKey="period" sort={sort} onSort={toggle} />
-            <SortTh label="Jerry h" sortKey="jerry" sort={sort} onSort={toggle} align="right" />
-            <SortTh label="Terezka h" sortKey="terezka" sort={sort} onSort={toggle} align="right" />
+            {both ? (
+              <>
+                <SortTh label="Jerry h" sortKey="jerry" sort={sort} onSort={toggle} align="right" />
+                <SortTh label="Terezka h" sortKey="terezka" sort={sort} onSort={toggle} align="right" />
+              </>
+            ) : null}
             <SortTh label="Spolu h" sortKey="total" sort={sort} onSort={toggle} align="right" />
             <SortTh label="Sedení" sortKey="sessions" sort={sort} onSort={toggle} align="right" />
             <SortTh label="Zárobky" sortKey="revenue" sort={sort} onSort={toggle} align="right" />
             <SortTh label="CZK/sed." sortKey="czk" sort={sort} onSort={toggle} align="right" />
-            <SortTh label="Skóre" sortKey="score" sort={sort} onSort={toggle} align="right" info="Blízkosť k stredu zdravej zóny (29h/týž) na trénera. 10 = ideál, nízke = pod alebo nad zónou." />
+            <SortTh label="Skóre" sortKey="score" sort={sort} onSort={toggle} align="right" info="Blízkosť k stredu zdravej zóny (29h/týž) na trénera. 10 = ideál." />
           </tr>
         </thead>
         <tbody>
@@ -119,9 +136,13 @@ function Prehlad({ data }: { data: PSBData }) {
             return (
               <tr key={g.key}>
                 <td style={S.td}>{g.key}</td>
-                <td style={{ ...S.td, textAlign: "right", color: jerry ? zoneColor(jerry.hours) : C.textDim }}>{jerry ? jerry.hours.toFixed(0) : "—"}</td>
-                <td style={{ ...S.td, textAlign: "right", color: terezka ? zoneColor(terezka.hours) : C.textDim }}>{terezka ? terezka.hours.toFixed(0) : "—"}</td>
-                <td style={{ ...S.td, textAlign: "right", fontWeight: 600 }}>{g.total.hours.toFixed(0)}</td>
+                {both ? (
+                  <>
+                    <td style={{ ...S.td, textAlign: "right", color: jerry ? zoneColor(jerry.hours) : C.textDim }}>{jerry ? jerry.hours.toFixed(0) : "—"}</td>
+                    <td style={{ ...S.td, textAlign: "right", color: terezka ? zoneColor(terezka.hours) : C.textDim }}>{terezka ? terezka.hours.toFixed(0) : "—"}</td>
+                  </>
+                ) : null}
+                <td style={{ ...S.td, textAlign: "right", fontWeight: 600, color: zoneColor(g.total.hours) }}>{g.total.hours.toFixed(0)}</td>
                 <td style={{ ...S.td, textAlign: "right" }}>{g.total.sessions}</td>
                 <td style={{ ...S.td, textAlign: "right" }}>{fmtCZK(g.total.revenue)}</td>
                 <td style={{ ...S.td, textAlign: "right" }}>{fmtCZK(czk)}</td>
@@ -174,10 +195,9 @@ function Analyza({ data }: { data: PSBData }) {
       sorted(sessionAnalysis(filtered), {
         month: (r) => r.month,
         trainer: (r) => r.trainer,
-        offline: (r) => r.OFFLINE,
-        online: (r) => r.ONLINE,
-        truecoach: (r) => r.TRUECOACH,
         uvodne: (r) => r.UVODNE,
+        offline: (r) => r.OFFLINE,
+        online: (r) => r.ONLINE + r.TRUECOACH,
         total: (r) => r.total,
       }),
     [filtered, sorted],
@@ -207,10 +227,9 @@ function Analyza({ data }: { data: PSBData }) {
             <tr>
               <SortTh label="Mesiac" sortKey="month" sort={sort} onSort={toggle} />
               <SortTh label="Tréner" sortKey="trainer" sort={sort} onSort={toggle} />
-              <SortTh label="Offline" sortKey="offline" sort={sort} onSort={toggle} align="right" />
-              <SortTh label="Online" sortKey="online" sort={sort} onSort={toggle} align="right" />
-              <SortTh label="TrueCoach" sortKey="truecoach" sort={sort} onSort={toggle} align="right" />
               <SortTh label="Úvodné" sortKey="uvodne" sort={sort} onSort={toggle} align="right" />
+              <SortTh label="Offline" sortKey="offline" sort={sort} onSort={toggle} align="right" />
+              <SortTh label="Online" sortKey="online" sort={sort} onSort={toggle} align="right" info="Online sedenia vrátane TrueCoach (počítajú sa spolu)." />
               <SortTh label="Celkom" sortKey="total" sort={sort} onSort={toggle} align="right" />
             </tr>
           </thead>
@@ -219,10 +238,9 @@ function Analyza({ data }: { data: PSBData }) {
               <tr key={i}>
                 <td style={S.td}>{monthLabel(r.month)}</td>
                 <td style={S.td}>{r.trainer}</td>
-                <td style={{ ...S.td, textAlign: "right" }}>{r.OFFLINE}</td>
-                <td style={{ ...S.td, textAlign: "right" }}>{r.ONLINE}</td>
-                <td style={{ ...S.td, textAlign: "right" }}>{r.TRUECOACH}</td>
                 <td style={{ ...S.td, textAlign: "right" }}>{r.UVODNE}</td>
+                <td style={{ ...S.td, textAlign: "right" }}>{r.OFFLINE}</td>
+                <td style={{ ...S.td, textAlign: "right" }}>{r.ONLINE + r.TRUECOACH}</td>
                 <td style={{ ...S.td, textAlign: "right", fontWeight: 600 }}>{r.total}</td>
               </tr>
             ))}
@@ -231,36 +249,5 @@ function Analyza({ data }: { data: PSBData }) {
         {!detail.length && <Empty>Žiadne dáta pre tento filter.</Empty>}
       </Card>
     </>
-  );
-}
-
-function Kapacita({ capacity }: { capacity: CapacityRow[] }) {
-  const empty = !capacity.some((c) => c.anchor + c.stable + c.sporadic > 0);
-  return (
-    <Card>
-      <H3>
-        <Info text="Koľko klientov ešte tréner potrebuje (alebo koľko má navyše), aby bol v zdravej zóne. Efekt. h/týž = odhad reálneho zaťaženia: každý klient prispieva podľa toho, ako často chodí." label="Kapacitný kalkulátor" />
-      </H3>
-      {empty && <Empty>Nahraj CSV pre výpočet kapacity.</Empty>}
-      {capacity.map((cap) => (
-        <div key={cap.trainer} style={{ marginBottom: 22 }}>
-          <div style={{ fontSize: 15, fontWeight: 600, color: C.accentLight, marginBottom: 10 }}>{cap.trainer}</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 8, marginBottom: 10 }}>
-            <StatCard value={cap.anchor} label="Anchor" color={C.green} />
-            <StatCard value={cap.stable} label="Stabilný" color={C.orange} />
-            <StatCard value={cap.sporadic} label="Sporadický" color={C.red} />
-            <div style={{ ...S.card, marginBottom: 0, textAlign: "center", padding: 14 }}>
-              <div style={{ ...S.statNum, color: cap.effHours >= 24 && cap.effHours <= 34 ? C.green : C.orange }}>{cap.effHours.toFixed(1)}</div>
-              <div style={S.statLabel}>
-                <Info text="Efektívne hodiny za týždeň — odhad reálneho zaťaženia trénera z frekvencie klientov." label="Efekt. h/týž" />
-              </div>
-            </div>
-          </div>
-          <div style={{ fontSize: 14, fontWeight: 500, color: cap.effHours > 34 || cap.gap > 0 ? C.orange : C.green, padding: "8px 12px", background: C.bg, borderRadius: 8 }}>
-            {cap.advice}
-          </div>
-        </div>
-      ))}
-    </Card>
   );
 }

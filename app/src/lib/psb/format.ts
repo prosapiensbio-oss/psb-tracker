@@ -15,27 +15,44 @@ export const monthKey = (d?: string | null): string => {
   return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}`;
 };
 
-// ISO-ish week key (matches the reference prototype).
+const MONTHS_SK = ["jan", "feb", "mar", "apr", "máj", "jún", "júl", "aug", "sep", "okt", "nov", "dec"];
+
+// Monday (UTC) of the week the date falls in.
+export const weekStart = (d: string | Date): Date => {
+  const dt = new Date(d);
+  const day = dt.getUTCDay(); // 0 = Sun
+  const delta = day === 0 ? -6 : 1 - day;
+  return new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate() + delta));
+};
+
+// Sortable week key = the Monday's ISO date (unique per week, string-sortable).
 export const weekKey = (d?: string | null): string => {
   if (!d) return "";
-  const dt = new Date(d);
-  const yr = dt.getFullYear();
-  const start = new Date(yr, 0, 1);
-  const diff = Math.floor((dt.getTime() - start.getTime()) / 86400000);
-  const wk = Math.ceil((diff + start.getDay() + 1) / 7);
-  return `T${wk}/${yr}`;
+  return weekStart(d).toISOString().slice(0, 10);
+};
+
+// Human week label = the Monday's day.month, e.g. "14.7." — instantly readable.
+export const weekLabel = (d?: string | null): string => {
+  if (!d) return "";
+  const m = weekStart(d);
+  return `${m.getUTCDate()}.${m.getUTCMonth() + 1}.`;
 };
 
 export const quarterKey = (d?: string | null): string => {
   if (!d) return "";
   const dt = new Date(d);
-  return `Q${Math.floor(dt.getMonth() / 3) + 1}/${dt.getFullYear()}`;
+  return `${dt.getFullYear()}-Q${Math.floor(dt.getMonth() / 3) + 1}`;
 };
 
+export const quarterLabel = (qk: string): string => {
+  const [y, q] = qk.split("-Q");
+  return q ? `Q${q} ${y.slice(2)}` : qk;
+};
+
+// "2026-07" → "júl 26"
 export const monthLabel = (mk: string): string => {
   const [y, m] = mk.split("-");
-  const names = ["Jan", "Feb", "Mar", "Apr", "Máj", "Jún", "Júl", "Aug", "Sep", "Okt", "Nov", "Dec"];
-  return m ? `${names[parseInt(m, 10) - 1]} ${y}` : mk;
+  return m ? `${MONTHS_SK[parseInt(m, 10) - 1]} ${y.slice(2)}` : mk;
 };
 
 export const monthsBetween = (d1: string, d2: string | Date): number => {

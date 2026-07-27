@@ -1,6 +1,6 @@
 // All derived analytics for the PSB Tracker. Pure functions over PSBData —
 // no browser globals. Reused across every module.
-import { monthKey, monthsBetween, weekKey } from "./format";
+import { daysBetween, monthKey, monthLabel, monthsBetween, quarterKey, quarterLabel, weekKey, weekLabel } from "./format";
 import type {
   PackageRow,
   PaymentRow,
@@ -65,11 +65,25 @@ export type ClientAgg = {
   trainerNote: string;
   contractSigned: boolean;
   clientType: "6M Predplatné" | "Balíček";
+  is6m: boolean;
+  membership: string; // current product from Packages report (e.g. "OFF - 6h S viazanostou")
+  modality: "Offline" | "Online";
   serviceCount: number;
   packageRemaining: number;
   packageTotal: number;
   packageStatus: string;
 };
+
+// A client is in the 6M process if a "S viazanostou" service was sold to them
+// OR their current membership (Packages report) is a "S viazanostou" product.
+// The service report attributes all such sales to the seller (Jerry), so the
+// packages source is essential to catch the other trainer's 6M clients.
+export function sixMClientSet(data: PSBData): Set<string> {
+  const set = new Set<string>();
+  for (const s of data.services) if (s.is6m) set.add(s.client);
+  for (const p of data.packages) if (/s viazanost/i.test(p.package)) set.add(p.client);
+  return set;
+}
 
 export function deriveClients(data: PSBData): Record<string, ClientAgg> {
   const ref = refNow(data);
@@ -103,6 +117,9 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
         trainerNote: "",
         contractSigned: false,
         clientType: "Balíček",
+        is6m: false,
+        membership: "",
+        modality: "Offline",
         serviceCount: 0,
         packageRemaining: 0,
         packageTotal: 0,
@@ -117,7 +134,7 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
     c.totalPrice += s.price;
   }
 
-  const sixMSet = new Set(data.services.filter((s) => s.is6m).map((s) => s.client));
+  const sixMSet = sixMClientSet(data);
   const serviceCounts: Record<string, number> = {};
   for (const s of data.services) serviceCounts[s.client] = (serviceCounts[s.client] || 0) + 1;
   const packByClient: Record<string, PackageRow[]> = {};
@@ -150,13 +167,21 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
     c.specialRateNote = ov?.specialRateNote || "";
     c.trainerNote = ov?.trainerNote || "";
     c.contractSigned = !!ov?.contractSigned;
-    c.clientType = sixMSet.has(c.name) ? "6M Predplatné" : "Balíček";
+    c.is6m = sixMSet.has(c.name);
+    c.clientType = c.is6m ? "6M Predplatné" : "Balíček";
     c.serviceCount = serviceCounts[c.name] || 0;
 
     const packs = packByClient[c.name] || [];
     c.packageRemaining = packs.reduce((a, p) => a + p.remaining, 0);
     c.packageTotal = packs.reduce((a, p) => a + p.total, 0);
     c.packageStatus = packs[0]?.status || "";
+    // Most recent membership (by having a balance, else first listed).
+    c.membership = (packs.find((p) => p.remaining > 0) || packs[0])?.package || "";
+
+    let off = 0;
+    let on = 0;
+    for (const s of c.sessions) s.sessionType === "OFFLINE" || s.sessionType === "UVODNE" ? off++ : on++;
+    c.modality = on > off ? "Online" : "Offline";
   }
   return map;
 }
@@ -179,10 +204,22 @@ export type SixMRow = {
 };
 
 export function deriveSixM(data: PSBData, clients: Record<string, ClientAgg>): SixMRow[] {
+  const members = sixMClientSet(data);
+  // Earliest 6M signal per client: a "S viazanostou" service, or a 6990 monthly
+  // payment (the recurring price). This recovers the true start for clients
+  // whose sale isn't in the service report (e.g. the other trainer's clients).
   const first: Record<string, { date: string; trainer: string; price: number }> = {};
-  for (const s of data.services.filter((x) => x.is6m)) {
-    if (!first[s.client] || s.date < first[s.client].date)
-      first[s.client] = { date: s.date, trainer: s.trainer, price: s.price };
+  const consider = (client: string, date: string, trainer: string, price: number) => {
+    if (!members.has(client)) return;
+    if (!first[client] || date < first[client].date) first[client] = { date, trainer, price };
+  };
+  for (const s of data.services) if (s.is6m) consider(s.client, s.date, s.trainer, s.price);
+  for (const p of data.payments) if (Math.round(p.amount) === 6990) consider(p.client, p.date, "", 6990);
+  // Any 6M member still without a start date: fall back to their first session.
+  for (const client of members) {
+    if (first[client]) continue;
+    const cl = clients[client];
+    if (cl) first[client] = { date: cl.firstSession, trainer: cl.primaryTrainer, price: 6990 };
   }
   const now = new Date();
   return Object.entries(first)
@@ -244,13 +281,11 @@ export function deriveSixM(data: PSBData, clients: Record<string, ClientAgg>): S
 // ── period grouping (Prehľad) ────────────────────────────────────────────────
 export type Period = "week" | "month" | "quarter" | "custom";
 
-const periodKey = (d: string, period: Period): string => {
-  if (period === "week") return weekKey(d);
-  if (period === "quarter") {
-    const dt = new Date(d);
-    return `Q${Math.floor(dt.getMonth() / 3) + 1}/${dt.getFullYear()}`;
-  }
-  return monthKey(d);
+// Returns a sortable grouping key + a human display label per period type.
+const periodInfo = (d: string, period: Period): { key: string; label: string } => {
+  if (period === "week") return { key: weekKey(d), label: weekLabel(d) };
+  if (period === "quarter") return { key: quarterKey(d), label: quarterLabel(quarterKey(d)) };
+  return { key: monthKey(d), label: monthLabel(monthKey(d)) };
 };
 
 export type PeriodRow = {
@@ -281,11 +316,11 @@ export function groupTrainings(
     if (trainerFilter !== "all" && s.sessionTrainer !== trainerFilter) continue;
     if (range?.from && s.date < range.from) continue;
     if (range?.to && s.date > range.to + "T23:59:59.999Z") continue;
-    const key = period === "custom" ? "Vlastné obdobie" : periodKey(s.date, period);
-    let g = map[key];
+    const info = period === "custom" ? { key: "custom", label: "Vlastné obdobie" } : periodInfo(s.date, period);
+    let g = map[info.key];
     if (!g) {
-      g = map[key] = {
-        key,
+      g = map[info.key] = {
+        key: info.label,
         ts: new Date(s.date).getTime(),
         total: { hours: 0, sessions: 0, clients: 0, revenue: 0 },
         byTrainer: {},
@@ -448,68 +483,47 @@ export type Anomaly = {
   note?: string;
 };
 
+// Practical, client-centric signals — one item per client per type (deduped),
+// the actionable things a trainer should follow up on this week.
 export function deriveAnomalies(data: PSBData, clients: Record<string, ClientAgg>): Anomaly[] {
   const out: Anomaly[] = [];
   const ack = data.anomalyAck || {};
   const push = (key: string, tone: Anomaly["tone"], label: string, detail: string) =>
     out.push({ key, tone, label, detail, acked: !!ack[key], note: ack[key]?.note });
 
-  const sixMSet = new Set(data.services.filter((s) => s.is6m).map((s) => s.client));
-  const clientNames = new Set(Object.keys(clients));
   const serviceClients = new Set(data.services.map((s) => s.client));
+  const now = new Date();
 
-  // Orphaned payments — a payment with no client or an unknown client.
-  for (const p of data.payments as PaymentRow[]) {
-    if (!p.client) {
-      // Implausibly large empty-client rows are report totals, not payments.
-      if (p.amount > 50000) continue;
-      push(
-        `orphan|${p.date}|${p.amount}`,
-        "orange",
-        "Osirotená platba",
-        `Platba ${Math.round(p.amount).toLocaleString("cs-CZ")} CZK z ${new Date(p.date).toLocaleDateString("cs-CZ")} bez priradeného klienta`,
-      );
-    } else if (!clientNames.has(p.client) && !serviceClients.has(p.client)) {
-      push(
-        `orphan|${p.date}|${p.client}|${p.amount}`,
-        "orange",
-        "Platba bez sedení",
-        `${p.client}: platba ${Math.round(p.amount).toLocaleString("cs-CZ")} CZK, ale klient nemá žiadne sedenia`,
-      );
-    }
-  }
-
-  // 6M-priced payment (6990) but client not in the 6M process.
-  for (const p of data.payments) {
-    if (Math.round(p.amount) === 6990 && p.client && !sixMSet.has(p.client)) {
-      push(
-        `sixm-pay|${p.date}|${p.client}`,
-        "red",
-        "Platba 6990 bez 6M zaradenia",
-        `${p.client}: platba za "S viazanostou" sumu, ale klient nie je v 6M procese`,
-      );
-    }
-  }
-
-  // Client with recent sessions but no active package / service.
-  const packSet = new Set(data.packages.filter((p) => p.remaining > 0).map((p) => p.client));
-  const now = Date.now();
   for (const c of Object.values(clients)) {
-    const recent = now - new Date(c.lastSession).getTime() < 45 * 86400000;
-    if (
-      recent &&
-      c.status !== "Neaktívny" &&
-      !packSet.has(c.name) &&
-      c.serviceCount === 0 &&
-      c.clientType !== "6M Predplatné"
-    ) {
-      push(
-        `nopack|${c.name}`,
-        "orange",
-        "Sedenia bez balíčka",
-        `${c.name}: aktívne sedenia, ale žiadny aktívny balíček ani predaj služby`,
-      );
+    if (c.status === "Neaktívny") continue;
+    const days = daysBetween(c.lastSession, now);
+    const recent = days <= 30;
+
+    // Package balance running out — the client to invoice / offer a renewal.
+    if (c.packageTotal > 0 && c.packageRemaining <= 0 && recent) {
+      push(`bal0|${c.name}`, "orange", "Balíček dočerpaný", `${c.name}: balíček dočerpaný (0 sedení), ešte chodí — pošli ponuku na obnovu / faktúru`);
+    } else if (c.packageTotal > 0 && c.packageRemaining > 0 && c.packageRemaining <= 1) {
+      push(`ballow|${c.name}`, "orange", "Nízky zostatok", `${c.name}: ostáva ${c.packageRemaining} sedenie z balíčka — čas na obnovu`);
     }
+
+    // Regular client who stopped coming — reach out before they churn.
+    if ((c.segment === "Anchor" || c.segment === "Stabilný") && days >= 14 && days <= 60) {
+      push(`gone|${c.name}`, days >= 21 ? "red" : "orange", "Prestal chodiť", `${c.name}: ${days} dní bez tréningu (${c.segment}) — ozvi sa`);
+    }
+
+    // Trains but has no package and no recorded sale — check the payment.
+    if (recent && c.packageTotal === 0 && c.serviceCount === 0 && !c.is6m) {
+      push(`nopack|${c.name}`, "orange", "Sedenia bez balíčka", `${c.name}: aktívne sedenia, ale žiadny balíček ani predaj — over platbu`);
+    }
+  }
+
+  // Payments from a name with no sessions at all (one per client).
+  const seen = new Set<string>();
+  for (const p of data.payments as PaymentRow[]) {
+    if (!p.client || p.amount > 50000) continue; // skip report-total rows
+    if (clients[p.client] || serviceClients.has(p.client) || seen.has(p.client)) continue;
+    seen.add(p.client);
+    push(`orphan|${p.client}`, "orange", "Platba bez sedení", `${p.client}: má platby, ale žiadne sedenia — over meno/priradenie`);
   }
 
   return out.sort((a, b) => (a.acked === b.acked ? 0 : a.acked ? 1 : -1));
@@ -591,7 +605,8 @@ export type Prediction = {
     trainer: string;
     type: string;
     remaining: number;
-    burnRate: number;
+    burnRate: number; // sessions/month
+    burnWeek: number; // sessions/week
     monthlyRevenue: number;
     guaranteed3m: number;
     confidence: number;
@@ -672,6 +687,7 @@ export function predictEarnings(
       type: c.clientType,
       remaining: c.packageRemaining,
       burnRate,
+      burnWeek: burnRate / 4.33,
       monthlyRevenue,
       guaranteed3m,
       confidence,
