@@ -255,6 +255,7 @@ const periodKey = (d: string, period: Period): string => {
 
 export type PeriodRow = {
   key: string;
+  ts: number; // earliest timestamp in the period, for chronological sorting
   total: { hours: number; sessions: number; clients: number; revenue: number };
   byTrainer: Record<string, { hours: number; sessions: number; clients: Set<string> }>;
   score: number;
@@ -285,12 +286,14 @@ export function groupTrainings(
     if (!g) {
       g = map[key] = {
         key,
+        ts: new Date(s.date).getTime(),
         total: { hours: 0, sessions: 0, clients: 0, revenue: 0 },
         byTrainer: {},
         score: 0,
         recommendation: "",
       };
     }
+    g.ts = Math.min(g.ts, new Date(s.date).getTime());
     g.total.hours += s.duration / 60;
     g.total.sessions++;
     g.total.revenue += s.price;
@@ -321,7 +324,7 @@ export function groupTrainings(
     else if (totalH > hi) g.recommendation = "Nad zónou — riziko preťaženia";
     else g.recommendation = "Zdravá zóna";
   }
-  return rows.sort((a, b) => a.key.localeCompare(b.key));
+  return rows.sort((a, b) => a.ts - b.ts);
 }
 
 export const periodZone = zoneForPeriod;
@@ -396,9 +399,11 @@ export function capacityByTrainer(clients: Record<string, ClientAgg>): CapacityR
     const effHours = anchor * ANCHOR_H + stable * STABLE_H + sporadic * SPORADIC_H;
     const gap = TARGET_H - effHours;
     const advice =
-      gap > 0
-        ? `Chýba ${gap.toFixed(1)}h — treba +${Math.ceil(gap / ANCHOR_H)} Anchor alebo +${Math.ceil(gap / STABLE_H)} Stabilných`
-        : `Kapacita naplnená (${Math.abs(gap).toFixed(1)}h nad cieľom)`;
+      effHours > ZONE_HI
+        ? `Nad zónou o ${(effHours - ZONE_HI).toFixed(1)}h — zváž presun klientov alebo zástup`
+        : gap > 0
+          ? `Do zdravej zóny treba +${Math.ceil(gap / ANCHOR_H)} Anchor alebo +${Math.ceil(gap / STABLE_H)} Stabilných klientov`
+          : `V zdravej zóne — priestor na ${Math.floor((ZONE_HI - effHours) / STABLE_H)} ďalších Stabilných`;
     return { trainer, anchor, stable, sporadic, effHours, gap, advice };
   });
 }
@@ -424,7 +429,12 @@ export function monthlyFinance(data: PSBData): FinanceMonth[] {
     bt.revenue += s.price;
     bt.sessions++;
   }
-  for (const p of data.payments) get(monthKey(p.date)).cash += p.amount;
+  // Skip unattributable rows (empty client) — those are report summary/total
+  // lines, not real payments, and would blow up the cashflow total.
+  for (const p of data.payments) {
+    if (!p.client) continue;
+    get(monthKey(p.date)).cash += p.amount;
+  }
   return Object.values(map).sort((a, b) => a.month.localeCompare(b.month));
 }
 
@@ -451,6 +461,8 @@ export function deriveAnomalies(data: PSBData, clients: Record<string, ClientAgg
   // Orphaned payments — a payment with no client or an unknown client.
   for (const p of data.payments as PaymentRow[]) {
     if (!p.client) {
+      // Implausibly large empty-client rows are report totals, not payments.
+      if (p.amount > 50000) continue;
       push(
         `orphan|${p.date}|${p.amount}`,
         "orange",
@@ -503,21 +515,85 @@ export function deriveAnomalies(data: PSBData, clients: Record<string, ClientAgg
   return out.sort((a, b) => (a.acked === b.acked ? 0 : a.acked ? 1 : -1));
 }
 
-// ── earnings prediction (two-layer) ──────────────────────────────────────────
-export type PredMonth = { month: string; guaranteed: number; renewal: number };
+// ── unified "na čo sa pozrieť" register ──────────────────────────────────────
+// One prioritised, actionable list merging 6M alerts, capacity warnings and
+// anomalies. Each item can be accepted (with a note) or hidden via anomalyAck.
+export type RegisterItem = {
+  key: string;
+  category: "6M" | "Kapacita" | "Anomália";
+  tone: "red" | "orange" | "blue";
+  title: string;
+  detail: string;
+  acked: boolean;
+  note?: string;
+  priority: number; // lower = more important
+};
+
+const toneRank: Record<string, number> = { red: 0, orange: 1, blue: 2 };
+
+export function deriveRegister(
+  data: PSBData,
+  clients: Record<string, ClientAgg>,
+  sixM: SixMRow[],
+  capacity: CapacityRow[],
+): RegisterItem[] {
+  const ack = data.anomalyAck || {};
+  const items: RegisterItem[] = [];
+  const add = (
+    key: string,
+    category: RegisterItem["category"],
+    tone: RegisterItem["tone"],
+    title: string,
+    detail: string,
+    basePriority: number,
+  ) =>
+    items.push({
+      key,
+      category,
+      tone,
+      title,
+      detail,
+      acked: !!ack[key],
+      note: ack[key]?.note,
+      priority: basePriority + toneRank[tone],
+    });
+
+  for (const c of sixM) {
+    if (!c.alert) continue;
+    const tone = c.alertTone === "red" ? "red" : "orange";
+    add(`sixm|${c.client}|${c.phase}|${c.monthInPhase}`, "6M", tone, `${c.client} — 6M`, c.alert, 0);
+  }
+  for (const cap of capacity) {
+    if (cap.effHours < ZONE_LO)
+      add(`cap|${cap.trainer}|under`, "Kapacita", "orange", `${cap.trainer} — pod zónou`, cap.advice, 10);
+    else if (cap.effHours > ZONE_HI)
+      add(`cap|${cap.trainer}|over`, "Kapacita", "red", `${cap.trainer} — nad zónou`, cap.advice, 10);
+  }
+  for (const a of deriveAnomalies(data, clients)) {
+    add(a.key, "Anomália", a.tone, a.label, a.detail, 20);
+  }
+
+  return items.sort((a, b) => {
+    if (a.acked !== b.acked) return a.acked ? 1 : -1;
+    return a.priority - b.priority;
+  });
+}
+
+// ── earnings prediction (run-rate + prepaid, two-layer) ──────────────────────
+export type PredMonth = { month: string; guaranteed: number; expected: number };
 export type Prediction = {
   months: PredMonth[];
-  guaranteedTotal: number;
-  scenarios: { optimistic: number; realistic: number; negative: number };
+  guaranteedTotal: number; // 3-month revenue backed by prepaid package balances
+  monthlyRunRate: number; // sum of clients' expected monthly revenue (gross)
+  scenarios: { optimistic: number; realistic: number; negative: number }; // 3-month totals
   perClient: {
     name: string;
     trainer: string;
     type: string;
     remaining: number;
     burnRate: number;
-    monthsLeft: number;
-    guaranteed: number;
-    renewalPrice: number;
+    monthlyRevenue: number;
+    guaranteed3m: number;
     confidence: number;
   }[];
 };
@@ -538,37 +614,27 @@ export function predictEarnings(
   opts: { excludeSpecial: boolean; horizon?: number } = { excludeSpecial: false },
 ): Prediction {
   const horizon = opts.horizon ?? 3;
-  const monthsArr = nextMonthKeys(horizon).map((m) => ({ month: m, guaranteed: 0, renewal: 0 }));
+  const monthsArr = nextMonthKeys(horizon).map((m) => ({ month: m, guaranteed: 0, expected: 0 }));
   const sixM = deriveSixM(data, clients);
   const sixMPhase: Record<string, SixMRow> = {};
   for (const r of sixM) sixMPhase[r.client] = r;
-  const lastServicePrice: Record<string, number> = {};
-  for (const s of data.services) lastServicePrice[s.client] = s.price || lastServicePrice[s.client];
 
   const scenarios = { optimistic: 0, realistic: 0, negative: 0 };
   const perClient: Prediction["perClient"] = [];
+  let monthlyRunRate = 0;
 
   for (const c of Object.values(clients)) {
     if (c.status === "Neaktívny") continue;
     if (opts.excludeSpecial && c.specialRate) continue;
 
-    const price = c.paidAvg || 1200;
+    // Expected monthly revenue from history: how often they come × avg paid price.
+    const price = c.paidAvg || 1150;
     const monthsActive = Math.max(1, monthsBetween(c.firstSession, new Date()) + 1);
-    const burnRate = Math.max(0.5, Math.min(12, c.sessionCount / monthsActive));
-    let remaining = c.packageRemaining;
-    const monthsLeft = remaining > 0 ? remaining / burnRate : 0;
+    const burnRate = Math.max(0.4, Math.min(10, c.sessionCount / monthsActive));
+    const monthlyRevenue = burnRate * price;
+    if (c.status === "Aktívny" || c.status === "Sporadický") monthlyRunRate += monthlyRevenue;
 
-    // Layer 1: burn down existing package balance.
-    let guaranteed = 0;
-    for (let i = 0; i < horizon; i++) {
-      const consume = Math.min(remaining, burnRate);
-      guaranteed += consume * price;
-      monthsArr[i].guaranteed += consume * price;
-      remaining -= consume;
-      if (remaining <= 0) break;
-    }
-
-    // Layer 2: renewal when the balance runs out within the horizon.
+    // Renewal confidence by segment / 6M phase (per spec).
     const is6m = c.clientType === "6M Predplatné";
     let confidence: number;
     if (is6m && sixMPhase[c.name]?.phase === "Obnova" && sixMPhase[c.name]?.monthInPhase === 5)
@@ -579,18 +645,26 @@ export function predictEarnings(
     else if (c.serviceCount <= 1) confidence = 0.4;
     else confidence = 0.3; // Sporadický
 
-    const renewalPrice = lastServicePrice[c.name] || price * 6 || 6990;
-    const renewMonth = Math.floor(monthsLeft);
-    if (c.packageRemaining > 0 && renewMonth < horizon) {
-      monthsArr[renewMonth].renewal += renewalPrice * confidence;
-    } else if (c.packageRemaining <= 0) {
-      // No balance — renewal expected near-term.
-      monthsArr[Math.min(1, horizon - 1)].renewal += renewalPrice * confidence;
+    // Walk the next `horizon` months. While a prepaid package balance lasts the
+    // month's sessions are GUARANTEED; sessions beyond the balance (or all of
+    // them for clients without package data) are EXPECTED, weighted by renewal
+    // confidence. This keeps totals close to the real monthly run-rate instead
+    // of adding a full package price per client.
+    let balance = c.packageRemaining;
+    let guaranteed3m = 0;
+    for (let i = 0; i < horizon; i++) {
+      const fromBalance = Math.min(balance, burnRate);
+      balance -= fromBalance;
+      const beyond = burnRate - fromBalance; // sessions needing renewal / ongoing pay
+      const gRev = fromBalance * price;
+      const eRev = beyond * price;
+      guaranteed3m += gRev;
+      monthsArr[i].guaranteed += gRev;
+      monthsArr[i].expected += eRev * confidence;
+      scenarios.realistic += gRev + eRev * confidence;
+      scenarios.optimistic += gRev + eRev * Math.min(1, confidence + 0.15);
+      scenarios.negative += gRev + eRev * Math.max(0, confidence - 0.2);
     }
-
-    scenarios.realistic += guaranteed + renewalPrice * confidence;
-    scenarios.optimistic += guaranteed + renewalPrice * Math.min(1, confidence + 0.15);
-    scenarios.negative += guaranteed + renewalPrice * Math.max(0, confidence - 0.2);
 
     perClient.push({
       name: c.name,
@@ -598,14 +672,13 @@ export function predictEarnings(
       type: c.clientType,
       remaining: c.packageRemaining,
       burnRate,
-      monthsLeft,
-      guaranteed,
-      renewalPrice,
+      monthlyRevenue,
+      guaranteed3m,
       confidence,
     });
   }
 
   const guaranteedTotal = monthsArr.reduce((a, m) => a + m.guaranteed, 0);
-  perClient.sort((a, b) => b.guaranteed + b.renewalPrice * b.confidence - (a.guaranteed + a.renewalPrice * a.confidence));
-  return { months: monthsArr, guaranteedTotal, scenarios, perClient };
+  perClient.sort((a, b) => b.monthlyRevenue - a.monthlyRevenue);
+  return { months: monthsArr, guaranteedTotal, monthlyRunRate, scenarios, perClient };
 }

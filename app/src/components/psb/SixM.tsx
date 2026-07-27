@@ -10,12 +10,15 @@ const phaseTone = (p: string) => (p === "Obnova" ? "green" : p === "Integrácia"
 
 export function SixMTracker({ sixM, actions }: { sixM: SixMRow[]; actions: Actions }) {
   const [noteFor, setNoteFor] = useState<string | null>(null);
+  const [trainer, setTrainer] = useState("all");
+
+  const shown = useMemo(() => (trainer === "all" ? sixM : sixM.filter((c) => c.primaryTrainer === trainer)), [sixM, trainer]);
 
   const byPhase = useMemo(() => {
     const acc = { Obnova: 0, Integrácia: 0, Udržateľnosť: 0 } as Record<string, number>;
-    for (const c of sixM) acc[c.phase]++;
+    for (const c of shown) acc[c.phase]++;
     return acc;
-  }, [sixM]);
+  }, [shown]);
 
   const byTrainer = useMemo(() => {
     const acc: Record<string, number> = {};
@@ -25,11 +28,36 @@ export function SixMTracker({ sixM, actions }: { sixM: SixMRow[]; actions: Actio
 
   return (
     <>
+      <div style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 12 }}>
+        <span style={{ fontSize: 12, color: C.textMuted }}>Tréner:</span>
+        {[
+          { value: "all", label: "Obaja" },
+          { value: "Jerry", label: "Jerry" },
+          { value: "Terezka", label: "Terezka" },
+        ].map((o) => (
+          <button
+            key={o.value}
+            onClick={() => setTrainer(o.value)}
+            style={{
+              padding: "5px 14px",
+              borderRadius: 20,
+              border: `1px solid ${trainer === o.value ? C.accent : C.border}`,
+              background: trainer === o.value ? C.accentBg : "transparent",
+              color: trainer === o.value ? C.accentLight : C.textMuted,
+              fontSize: 12,
+              cursor: "pointer",
+            }}
+          >
+            {o.label}
+            {o.value !== "all" && <span style={{ opacity: 0.6 }}> ({byTrainer[o.value] || 0})</span>}
+          </button>
+        ))}
+      </div>
       <StatGrid>
         <StatCard value={byPhase.Obnova} label="Obnova (1–6 mes.)" color={C.green} />
         <StatCard value={byPhase.Integrácia} label="Integrácia (7–18)" color={C.orange} />
         <StatCard value={byPhase.Udržateľnosť} label="Udržateľnosť (19+)" color={C.red} />
-        <StatCard value={sixM.length} label="Celkom 6M klientov" />
+        <StatCard value={shown.length} label="Celkom 6M klientov" />
       </StatGrid>
 
       <Card>
@@ -41,7 +69,7 @@ export function SixMTracker({ sixM, actions }: { sixM: SixMRow[]; actions: Actio
             </span>
           ))}
           <span style={{ marginLeft: "auto", color: C.textDim }}>
-            Aktívnych upozornení: {sixM.filter((c) => c.alert).length}
+            Aktívnych upozornení: {shown.filter((c) => c.alert).length}
           </span>
         </div>
       </Card>
@@ -59,7 +87,7 @@ export function SixMTracker({ sixM, actions }: { sixM: SixMRow[]; actions: Actio
             </tr>
           </thead>
           <tbody>
-            {sixM.map((c) => (
+            {shown.map((c) => (
               <tr key={c.client} style={{ background: c.alertTone === "red" ? C.redBg : c.alertTone === "orange" ? C.orangeBg : undefined }}>
                 <td style={{ ...S.td, fontWeight: 500 }}>{c.client}</td>
                 <td style={S.td}>{c.primaryTrainer}</td>
@@ -93,7 +121,13 @@ export function SixMTracker({ sixM, actions }: { sixM: SixMRow[]; actions: Actio
             ))}
           </tbody>
         </TableWrap>
-        {!sixM.length && <Empty>Nahraj Payroll by Service CSV pre 6M tracker (klienti so službou „S viazanostou").</Empty>}
+        {!shown.length && (
+          <Empty>
+            {sixM.length
+              ? `${trainer} zatiaľ nemá žiadnych 6M klientov (službu „S viazanostou“).`
+              : `Nahraj Payroll by Service CSV pre 6M tracker (klienti so službou „S viazanostou“).`}
+          </Empty>
+        )}
       </Card>
 
       {noteFor && (

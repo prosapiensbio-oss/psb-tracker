@@ -200,6 +200,10 @@ export function parsePayments(text: string): PaymentRow[] {
     const detail = parts.length > 1 ? parts.slice(0, -1).join(",").trim() : "";
     const amount = parseCZK(parts[parts.length - 1]);
     if (!detail || !amount || !currentDate) continue;
+    // Only real individual payments read "Payment (…) by Name:". This drops the
+    // report's day-summary and grand-total rows that otherwise get counted as a
+    // single giant anonymous payment.
+    if (!/\bby\b/i.test(detail)) continue;
     const nameMatch = detail.match(/by\s+(.+?):/i);
     const client = nameMatch ? nameMatch[1].trim() : "";
     const method = detail.toLowerCase().includes("bank")
