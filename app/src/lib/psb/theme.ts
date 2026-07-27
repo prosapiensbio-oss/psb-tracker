@@ -24,6 +24,17 @@ export const C = {
   blueBg: "#378ADD18",
 } as const;
 
+export const MEMBERSHIP_COLORS: Record<string, string> = {
+  "6h S viazanostou (6M)": C.accent,
+  "6h BEZ viazanosti": C.accentLight,
+  "8 hodín": C.blue,
+  "18 hodín": C.green,
+  "1 hodina": C.orange,
+  "Online balíček": "#8A7DDB",
+  "Bez balíčka": C.textDim,
+  "Iné": C.red,
+};
+
 type Variant = "accent" | "danger" | "ghost" | "outline";
 type Tone = "green" | "red" | "orange" | "blue" | "accent" | "muted";
 

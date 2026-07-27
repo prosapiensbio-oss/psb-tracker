@@ -4,7 +4,7 @@ import { groupTrainings, periodZone, sessionAnalysis, TARGET_H, type ClientAgg, 
 import { fmtCZK, monthLabel } from "../../lib/psb/format";
 import { C, S } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
-import { Card, Donut, Empty, H3, Info, Select, SortTh, StatCard, SubTabs, TableWrap, Toolbar, useSort, ZoneBars } from "./ui";
+import { Card, Donut, Empty, H3, Info, LineChart, Select, SortTh, StatCard, SubTabs, TableWrap, Toolbar, useSort } from "./ui";
 
 export function Treningy({ data }: { data: PSBData; clients: Record<string, ClientAgg> }) {
   const [sub, setSub] = useState("prehled");
@@ -62,14 +62,17 @@ function Prehlad({ data }: { data: PSBData }) {
   };
 
   const chart = useMemo(() => {
-    const chrono = [...rows].sort((a, b) => a.ts - b.ts).slice(-10);
+    const chrono = [...rows].sort((a, b) => a.ts - b.ts);
     return chrono.map((g) =>
       both
-        ? { label: g.key, values: [g.byTrainer["Jerry"]?.hours || 0, g.byTrainer["Terezka"]?.hours || 0] }
+        ? { label: g.key, values: [g.byTrainer["Jerry"]?.hours || 0, g.byTrainer["Terezka"]?.hours || 0, g.total.hours] }
         : { label: g.key, values: [g.total.hours] },
     );
   }, [rows, both]);
   const zone = periodZone(period);
+  const lineSeries = both
+    ? [{ name: "Jerry", color: C.accent }, { name: "Terezka", color: C.accentLight }, { name: "Spolu", color: C.blue }]
+    : [{ name: trainerF, color: C.accent }];
 
   return (
     <Card>
@@ -107,7 +110,8 @@ function Prehlad({ data }: { data: PSBData }) {
 
       {period !== "custom" && chart.length > 0 && (
         <div style={{ marginBottom: 16 }}>
-          <ZoneBars data={chart} series={both ? [{ name: "Jerry", color: C.accent }, { name: "Terezka", color: C.accentLight }] : [{ name: trainerF, color: C.accent }]} zone={zone} height={170} />
+          <LineChart data={chart} series={lineSeries} zone={zone} height={210} fmt={(n) => `${Math.round(n)}h`} />
+          <div style={{ fontSize: 11, color: C.textDim, marginTop: 4 }}>Trend odtrénovaných hodín — stúpa/klesá naprieč obdobiami.</div>
         </div>
       )}
 

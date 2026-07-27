@@ -4,7 +4,7 @@ import type { SixMRow } from "../../lib/psb/compute";
 import { fmtDate } from "../../lib/psb/format";
 import { C, S } from "../../lib/psb/theme";
 import type { Actions } from "./App";
-import { Badge, Card, Empty, H2, StatCard, StatGrid, TableWrap } from "./ui";
+import { Badge, Card, Donut, Empty, H2, H3, Info, StatCard, StatGrid, TableWrap } from "./ui";
 
 const phaseTone = (p: string) => (p === "Obnova" ? "green" : p === "Integrácia" ? "orange" : "red");
 
@@ -59,6 +59,25 @@ export function SixMTracker({ sixM, actions }: { sixM: SixMRow[]; actions: Actio
         <StatCard value={byPhase.Udržateľnosť} label="Udržateľnosť (19+)" color={C.red} />
         <StatCard value={shown.length} label="Celkom 6M klientov" />
       </StatGrid>
+
+      <Card>
+        <H3>
+          <Info text="Rozdelenie 6M klientov podľa fázy: Obnova (1.–6. mesiac), Integrácia (7.–18.), Udržateľnosť (19+). Mení sa podľa výberu trénera hore." label="Rozdelenie podľa fázy" />
+        </H3>
+        {shown.length ? (
+          <Donut
+            size={150}
+            centerLabel={String(shown.length)}
+            data={[
+              { label: "Obnova (1–6)", value: byPhase.Obnova, color: C.green },
+              { label: "Integrácia (7–18)", value: byPhase.Integrácia, color: C.orange },
+              { label: "Udržateľnosť (19+)", value: byPhase.Udržateľnosť, color: C.red },
+            ]}
+          />
+        ) : (
+          <Empty>Žiadni 6M klienti pre tento výber.</Empty>
+        )}
+      </Card>
 
       <Card>
         <div style={{ display: "flex", gap: 16, flexWrap: "wrap", fontSize: 12, color: C.textMuted }}>

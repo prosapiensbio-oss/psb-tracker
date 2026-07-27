@@ -11,6 +11,30 @@ import type {
 export const TRAINERS = ["Jerry", "Terezka"] as const;
 export type TrainerName = string;
 
+// Group a raw membership name into a friendly package bucket (shared by the
+// dashboard + Klienti donuts and the Klienti package filter).
+export const membershipBucket = (m: string): string => {
+  const s = (m || "").toLowerCase();
+  if (/s viazanost/.test(s)) return "6h S viazanostou (6M)";
+  if (/^on|online/.test(s)) return "Online balíček";
+  if (/18 hod/.test(s)) return "18 hodín";
+  if (/8 hod/.test(s)) return "8 hodín";
+  if (/1 hod/.test(s)) return "1 hodina";
+  if (/bez viazanosti/.test(s)) return "6h BEZ viazanosti";
+  if (!m) return "Bez balíčka";
+  return "Iné";
+};
+export const MEMBERSHIP_ORDER = [
+  "6h S viazanostou (6M)",
+  "6h BEZ viazanosti",
+  "8 hodín",
+  "18 hodín",
+  "1 hodina",
+  "Online balíček",
+  "Bez balíčka",
+  "Iné",
+] as const;
+
 // ── segmentation window ──────────────────────────────────────────────────────
 const SEG_WEEKS = 18;
 const ANCHOR_H = 1.08;

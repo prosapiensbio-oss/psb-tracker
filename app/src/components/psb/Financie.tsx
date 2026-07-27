@@ -4,7 +4,7 @@ import { monthlyFinance, predictEarnings, type ClientAgg } from "../../lib/psb/c
 import { fmtCZK, monthLabel } from "../../lib/psb/format";
 import { C, S } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
-import { BarRow, Card, Empty, H3, Info, Select, SortTh, StatCard, SubTabs, TableWrap, useSort, ValueBars } from "./ui";
+import { BarRow, Card, Empty, H3, Info, LineChart, Select, SortTh, StatCard, SubTabs, TableWrap, useSort, ValueBars } from "./ui";
 
 const MAX_SESSIONS_MONTH = 260;
 
@@ -117,6 +117,17 @@ function Cashflow({ monthly }: { monthly: Monthly }) {
           ? `Za zvolené obdobie ste prijali o ${fmtCZK(diff)} viac, než vyfakturovali → klienti platia dopredu (kredit na balíčkoch).`
           : `Za zvolené obdobie ste vyfakturovali o ${fmtCZK(-diff)} viac, než prijali → klienti čerpajú z vopred zaplatených balíčkov.`}
       </div>
+      {shown.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <LineChart
+            data={shown.map((m) => ({ label: monthLabel(m.month), values: [m.revenue, m.cash] }))}
+            series={[{ name: "Vyfakturované zárobky", color: C.accent }, { name: "Prijaté platby", color: C.blue }]}
+            height={210}
+            fmt={(n) => `${Math.round(n / 1000)}k`}
+          />
+        </div>
+      )}
+      <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 8 }}>Detail po mesiacoch:</div>
       {shown.map((m) => (
         <div key={m.month} style={{ marginBottom: 14 }}>
           <div style={{ fontSize: 12, color: C.text, marginBottom: 4 }}>{monthLabel(m.month)}</div>
@@ -178,9 +189,11 @@ function Predikcia({ data, clients }: { data: PSBData; clients: Record<string, C
   const [excludeSpecial, setExcludeSpecial] = useState(false);
   const [horizon, setHorizon] = useState(3);
   const [tempoUnit, setTempoUnit] = useState<"mes" | "tyz">("mes");
+  const [trainerF, setTrainerF] = useState("all");
   const { sort, toggle, sorted } = useSort({ key: "monthlyRevenue", dir: "desc" });
   const pred = useMemo(() => predictEarnings(data, clients, { excludeSpecial, horizon }), [data, clients, excludeSpecial, horizon]);
-  const rows = sorted(pred.perClient, {
+  const perClientF = useMemo(() => (trainerF === "all" ? pred.perClient : pred.perClient.filter((c) => c.trainer === trainerF)), [pred.perClient, trainerF]);
+  const rows = sorted(perClientF, {
     name: (c) => c.name,
     trainer: (c) => c.trainer,
     remaining: (c) => c.remaining,
@@ -228,12 +241,19 @@ function Predikcia({ data, clients }: { data: PSBData; clients: Record<string, C
         <Card>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 8 }}>
             <H3>Detail podľa klienta</H3>
-            <div style={{ display: "flex", gap: 4 }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              <Select value={trainerF} onChange={setTrainerF} options={[
+                { value: "all", label: "Obaja tréneri" },
+                { value: "Jerry", label: "Jerry" },
+                { value: "Terezka", label: "Terezka" },
+              ]} />
+              <div style={{ display: "flex", gap: 4 }}>
               {(["mes", "tyz"] as const).map((u) => (
                 <button key={u} onClick={() => setTempoUnit(u)} style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${tempoUnit === u ? C.accent : C.border}`, background: tempoUnit === u ? C.accentBg : "transparent", color: tempoUnit === u ? C.accentLight : C.textMuted, fontSize: 11, cursor: "pointer" }}>
                   tempo/{u === "mes" ? "mes." : "týž."}
                 </button>
               ))}
+              </div>
             </div>
           </div>
           <TableWrap>

@@ -376,11 +376,13 @@ export function Donut({
   size = 150,
   thickness = 26,
   centerLabel,
+  onSlice,
 }: {
   data: { label: string; value: number; color: string }[];
   size?: number;
   thickness?: number;
   centerLabel?: ReactNode;
+  onSlice?: (label: string) => void;
 }) {
   const total = data.reduce((a, d) => a + d.value, 0);
   const r = (size - thickness) / 2;
@@ -420,11 +422,16 @@ export function Donut({
       </svg>
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         {data.map((d) => (
-          <div key={d.label} style={{ fontSize: 12, color: C.textMuted, display: "flex", alignItems: "center", gap: 6 }}>
+          <div
+            key={d.label}
+            onClick={onSlice ? () => onSlice(d.label) : undefined}
+            style={{ fontSize: 12, color: C.textMuted, display: "flex", alignItems: "center", gap: 6, cursor: onSlice ? "pointer" : "default" }}
+          >
             <span style={{ width: 10, height: 10, borderRadius: 2, background: d.color, display: "inline-block" }} />
             {d.label}
             <span style={{ color: C.text, fontWeight: 600, marginLeft: 4 }}>{d.value}</span>
             {total > 0 && <span style={{ color: C.textDim }}>({((d.value / total) * 100).toFixed(0)}%)</span>}
+            {onSlice && <span style={{ color: C.textDim, fontSize: 10 }}>→</span>}
           </div>
         ))}
       </div>
@@ -551,6 +558,65 @@ export function ValueBars({
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+// ── Responsive multi-series line chart (trend) with optional zone band ───────
+export function LineChart({
+  data,
+  series,
+  zone,
+  height = 200,
+  fmt = (n: number) => String(Math.round(n)),
+}: {
+  data: { label: string; values: number[] }[];
+  series: { name: string; color: string }[];
+  zone?: { lo: number; hi: number };
+  height?: number;
+  fmt?: (n: number) => string;
+}) {
+  const W = 800;
+  const padL = 40, padR = 12, padT = 10, padB = 22;
+  const plotW = W - padL - padR;
+  const plotH = height - padT - padB;
+  const max = Math.max(1, ...data.flatMap((d) => d.values), zone ? zone.hi : 0) * 1.08;
+  const n = data.length;
+  const x = (i: number) => padL + (n <= 1 ? plotW / 2 : (i / (n - 1)) * plotW);
+  const y = (v: number) => padT + plotH - (v / max) * plotH;
+  const labelStep = Math.ceil(n / 12);
+
+  return (
+    <div>
+      <svg viewBox={`0 0 ${W} ${height}`} width="100%" height={height} preserveAspectRatio="none" style={{ overflow: "visible" }}>
+        {zone && (
+          <rect x={padL} y={y(zone.hi)} width={plotW} height={y(zone.lo) - y(zone.hi)} fill={C.greenBg} stroke={`${C.green}55`} strokeDasharray="4 4" />
+        )}
+        {[0, 0.5, 1].map((f) => (
+          <text key={f} x={padL - 6} y={y(max * f) + 3} textAnchor="end" fontSize={9} fill={C.textDim}>{fmt(max * f)}</text>
+        ))}
+        {series.map((s, si) => {
+          const pts = data.map((d, i) => `${x(i)},${y(d.values[si] ?? 0)}`).join(" ");
+          return (
+            <g key={s.name}>
+              <polyline points={pts} fill="none" stroke={s.color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+              {data.map((d, i) => <circle key={i} cx={x(i)} cy={y(d.values[si] ?? 0)} r={2.5} fill={s.color} />)}
+            </g>
+          );
+        })}
+        {data.map((d, i) => (i % labelStep === 0 || i === n - 1) && (
+          <text key={i} x={x(i)} y={height - 6} textAnchor="middle" fontSize={9} fill={C.textDim}>{d.label}</text>
+        ))}
+      </svg>
+      <div style={{ display: "flex", gap: 14, marginTop: 6, flexWrap: "wrap" }}>
+        {series.map((s) => (
+          <span key={s.name} style={{ fontSize: 11, color: C.textMuted }}>
+            <span style={{ display: "inline-block", width: 14, height: 3, background: s.color, borderRadius: 2, marginRight: 5, verticalAlign: "middle" }} />
+            {s.name}
+          </span>
+        ))}
+        {zone && <span style={{ fontSize: 11, color: C.green }}>▬ Zdravá zóna {zone.lo}–{zone.hi}h</span>}
+      </div>
     </div>
   );
 }

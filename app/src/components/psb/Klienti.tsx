@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 
-import { TRAINERS, type CapacityRow, type ClientAgg } from "../../lib/psb/compute";
+import { membershipBucket, MEMBERSHIP_ORDER, TRAINERS, type CapacityRow, type ClientAgg } from "../../lib/psb/compute";
 import { fmtCZK, fmtDate } from "../../lib/psb/format";
-import { C, S } from "../../lib/psb/theme";
+import { C, MEMBERSHIP_COLORS, S } from "../../lib/psb/theme";
 import type { Actions } from "./App";
 import { Badge, Card, Donut, Empty, H3, Info, Modal, Select, SortTh, StatCard, TableWrap, useSort } from "./ui";
 
@@ -25,6 +25,7 @@ export function Klienti({ clients, capacity, actions }: { clients: Record<string
   const [fSegment, setFSegment] = useState("all");
   const [typeF, setTypeF] = useState("all");
   const [modalityF, setModalityF] = useState("all");
+  const [membershipF, setMembershipF] = useState(""); // package bucket from the donut
   const [showInactive, setShowInactive] = useState(false);
   const [kpiWin, setKpiWin] = useState("all");
   const [kpiFrom, setKpiFrom] = useState("");
@@ -55,13 +56,29 @@ export function Klienti({ clients, capacity, actions }: { clients: Record<string
     return m;
   }, [all]);
 
-  const list = useMemo(() => {
+  // Everything except the package-donut filter — the donut is built from this,
+  // so its slices stay visible/clickable even after you pick one.
+  const baseList = useMemo(() => {
     let arr = all.filter((c) => (showInactive ? true : c.status !== "Neaktívny"));
     if (fTrainer !== "all") arr = arr.filter((c) => c.primaryTrainer === fTrainer);
     if (fSegment !== "all") arr = arr.filter((c) => c.segment === fSegment);
     if (typeF.startsWith("grp:")) arr = arr.filter((c) => c.clientType === typeF.slice(4));
     else if (typeF.startsWith("m:")) arr = arr.filter((c) => c.membership === typeF.slice(2));
     if (modalityF !== "all") arr = arr.filter((c) => c.modality === modalityF);
+    return arr;
+  }, [all, fTrainer, fSegment, typeF, modalityF, showInactive]);
+
+  const membershipDonut = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const c of baseList) {
+      const b = membershipBucket(c.membership);
+      counts[b] = (counts[b] || 0) + 1;
+    }
+    return MEMBERSHIP_ORDER.filter((k) => counts[k]).map((k) => ({ label: k, value: counts[k], color: MEMBERSHIP_COLORS[k] }));
+  }, [baseList]);
+
+  const list = useMemo(() => {
+    const arr = membershipF ? baseList.filter((c) => membershipBucket(c.membership) === membershipF) : baseList;
     return sorted(arr, {
       name: (c) => c.name,
       trainer: (c) => c.primaryTrainer,
@@ -75,7 +92,7 @@ export function Klienti({ clients, capacity, actions }: { clients: Record<string
       avg: (c) => c.paidAvg,
       last: (c) => new Date(c.lastSession).getTime(),
     });
-  }, [all, fTrainer, fSegment, typeF, modalityF, showInactive, sorted]);
+  }, [baseList, membershipF, sorted]);
 
   const donut = useMemo(
     () => SEGMENTS.map((s) => ({ label: s, value: list.filter((c) => c.segment === s).length, color: segColor(s) })),
@@ -164,11 +181,24 @@ export function Klienti({ clients, capacity, actions }: { clients: Record<string
         </TableWrap>
       </Card>
 
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(260px, 1fr) 2fr", gap: 12, marginBottom: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 12, marginBottom: 12 }}>
         <Card style={{ marginBottom: 0 }}>
           <H3>Segmenty — {filterLabel}</H3>
           {donut.some((d) => d.value > 0) ? <Donut data={donut} size={130} centerLabel={String(kpis.count)} /> : <Empty>Žiadni klienti.</Empty>}
         </Card>
+        <Card style={{ marginBottom: 0 }}>
+          <H3>
+            <Info text="Koľko klientov má aký balíček. Klikni na položku a zoznam dole sa vyfiltruje na daný balíček (rešpektuje aj výber trénera)." label="Klienti podľa balíčka" />
+          </H3>
+          {membershipDonut.length ? (
+            <Donut data={membershipDonut} size={130} centerLabel={String(membershipDonut.reduce((a, d) => a + d.value, 0))} onSlice={(l) => setMembershipF((v) => (v === l ? "" : l))} />
+          ) : (
+            <Empty>Nahraj Packages & Memberships.</Empty>
+          )}
+        </Card>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12, marginBottom: 12 }}>
         <div>
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
             <Select value={kpiWin} onChange={setKpiWin} options={KPI_WINDOWS.map((w) => ({ value: w.value, label: w.label }))} />
@@ -201,6 +231,9 @@ export function Klienti({ clients, capacity, actions }: { clients: Record<string
           ]} />
           {(fTrainer !== "all" || fSegment !== "all") && (
             <button onClick={() => { setFTrainer("all"); setFSegment("all"); }} style={{ background: C.cardHover, border: "none", borderRadius: 6, padding: "5px 10px", color: C.textMuted, fontSize: 12, cursor: "pointer" }}>✕ zrušiť filter</button>
+          )}
+          {membershipF && (
+            <button onClick={() => setMembershipF("")} style={{ background: C.accentBg, border: `1px solid ${C.accent}`, borderRadius: 6, padding: "5px 10px", color: C.accentLight, fontSize: 12, cursor: "pointer" }}>Balíček: {membershipF} ✕</button>
           )}
           <Select value={typeF} onChange={setTypeF} options={typeOptions} />
           <Select value={modalityF} onChange={setModalityF} options={[

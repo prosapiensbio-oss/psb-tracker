@@ -1,6 +1,8 @@
 import { useMemo, useRef, useState } from "react";
 
 import {
+  membershipBucket,
+  MEMBERSHIP_ORDER,
   monthlyFinance,
   predictEarnings,
   TARGET_H,
@@ -12,7 +14,7 @@ import {
   type SixMRow,
 } from "../../lib/psb/compute";
 import { fmtCZK, monthLabel, weekKey, weekLabel } from "../../lib/psb/format";
-import { C, S, badge, btn } from "../../lib/psb/theme";
+import { C, MEMBERSHIP_COLORS, S, badge, btn } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import type { IngestResult } from "../../lib/psb/db.server";
 import type { Actions } from "./App";
@@ -156,35 +158,13 @@ export function Dashboard({
   }, [data, clients, trainer]);
 
   const membershipDonut = useMemo(() => {
-    const bucket = (m: string): string => {
-      const s = m.toLowerCase();
-      if (/s viazanost/.test(s)) return "6h S viazanostou (6M)";
-      if (/^on|online/.test(s)) return "Online balíček";
-      if (/18 hod/.test(s)) return "18 hodín";
-      if (/8 hod/.test(s)) return "8 hodín";
-      if (/1 hod/.test(s)) return "1 hodina";
-      if (/bez viazanosti/.test(s)) return "6h BEZ viazanosti";
-      if (!m) return "Bez balíčka";
-      return "Iné";
-    };
-    const colors: Record<string, string> = {
-      "6h S viazanostou (6M)": C.accent,
-      "6h BEZ viazanosti": C.accentLight,
-      "8 hodín": C.blue,
-      "18 hodín": C.green,
-      "1 hodina": C.orange,
-      "Online balíček": "#8A7DDB",
-      "Bez balíčka": C.textDim,
-      Iné: C.red,
-    };
     const counts: Record<string, number> = {};
     for (const c of Object.values(clients)) {
       if (c.status === "Neaktívny" || !matchT(c.primaryTrainer)) continue;
-      const b = bucket(c.membership);
+      const b = membershipBucket(c.membership);
       counts[b] = (counts[b] || 0) + 1;
     }
-    const order = ["6h S viazanostou (6M)", "6h BEZ viazanosti", "8 hodín", "18 hodín", "1 hodina", "Online balíček", "Bez balíčka", "Iné"];
-    return order.filter((k) => counts[k]).map((k) => ({ label: k, value: counts[k], color: colors[k] }));
+    return MEMBERSHIP_ORDER.filter((k) => counts[k]).map((k) => ({ label: k, value: counts[k], color: MEMBERSHIP_COLORS[k] }));
   }, [clients, trainer]);
 
   const sixMPhases = useMemo(() => {
@@ -274,7 +254,7 @@ export function Dashboard({
           <H3>
             <Info text="Koľko klientov má aký typ balíčka/predplatného (z reportu Packages & Memberships). Mení sa podľa prepínača trénera hore." label="Klienti podľa balíčka" />
           </H3>
-          {membershipDonut.length ? <Donut size={130} centerLabel={String(membershipDonut.reduce((a, d) => a + d.value, 0))} data={membershipDonut} /> : <Empty>Nahraj Packages & Memberships.</Empty>}
+          {membershipDonut.length ? <Donut size={130} centerLabel={String(membershipDonut.reduce((a, d) => a + d.value, 0))} data={membershipDonut} onSlice={() => onNavigate("klienti")} /> : <Empty>Nahraj Packages & Memberships.</Empty>}
         </Card>
       </div>
 
