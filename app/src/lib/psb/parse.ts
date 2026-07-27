@@ -216,24 +216,38 @@ export function parsePayments(text: string): PaymentRow[] {
   return rows;
 }
 
+// Find "X left from Y" (or the common variants "X/Y", "X of Y") anywhere in the
+// row, so a shifted "# of sessions" column still parses. Ignores the classes
+// column ("0 left from 0") in favour of the first non-zero-total match.
+function extractSessions(parts: string[]): { remaining: number; total: number } {
+  let fallback: { remaining: number; total: number } | null = null;
+  for (const raw of parts) {
+    const s = raw.trim();
+    const m =
+      s.match(/(\d+)\s+left\s+from\s+(\d+)/i) ||
+      s.match(/^(\d+)\s*of\s*(\d+)$/i) ||
+      s.match(/^(\d+)\s*\/\s*(\d+)$/);
+    if (m) {
+      const remaining = parseInt(m[1], 10);
+      const total = parseInt(m[2], 10);
+      if (total > 0) return { remaining, total }; // prefer a real session package
+      fallback ||= { remaining, total };
+    }
+  }
+  return fallback ?? { remaining: 0, total: 0 };
+}
+
 export function parsePackages(text: string): PackageRow[] {
   const ls = lines(text);
   const rows: PackageRow[] = [];
   for (let i = 1; i < ls.length; i++) {
     const parts = splitCSVLine(ls[i]);
-    if (parts.length < 6) continue;
+    if (parts.length < 4) continue;
     const name = `${parts[0].trim()} ${parts[1].trim()}`.trim();
-    const status = parts[2].trim();
+    const status = parts.find((p) => /\b(active|inactive)\s+client\b/i.test(p))?.trim() || parts[2].trim();
     const pkg = parts[3].trim();
-    const sessionsRaw = parts[5].trim();
-    const match = sessionsRaw.match(/(\d+)\s+left\s+from\s+(\d+)/i);
-    rows.push({
-      client: name,
-      status,
-      package: pkg,
-      remaining: match ? parseInt(match[1], 10) : 0,
-      total: match ? parseInt(match[2], 10) : 0,
-    });
+    const { remaining, total } = extractSessions(parts);
+    rows.push({ client: name, status, package: pkg, remaining, total });
   }
   return rows;
 }
