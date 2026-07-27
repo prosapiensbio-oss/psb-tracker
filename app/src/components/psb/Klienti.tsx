@@ -130,7 +130,7 @@ export function Klienti({ clients, capacity, actions }: { clients: Record<string
     <>
       <Card>
         <H3>
-          <Info text="Klikni na bunku (Jerry × Anchor) a zoznam dole sa vyfiltruje na tých klientov. Klik na meno trénera = celý tréner, klik na segment = oba tréneri. Efekt. h/týž = odhad zaťaženia z frekvencie klientov; cieľ zdravej zóny 24–34h." label="Kapacita & segmenty" />
+          <Info text="Klikni na bunku (Jerry × Anchor) a zoznam dole sa vyfiltruje na tých klientov. Klik na meno trénera = celý tréner, klik na segment = oba tréneri. „Odrob. h/týž“ = reálne odtrénované hodiny za týždeň (priemer posledných 8 týž.); zdravá zóna 24–34h." label="Kapacita & segmenty" />
         </H3>
         <TableWrap>
           <thead>
@@ -141,18 +141,21 @@ export function Klienti({ clients, capacity, actions }: { clients: Record<string
                   {s}
                 </th>
               ))}
-              <th style={{ ...S.th, textAlign: "right" }}>Efekt. h/týž</th>
-              <th style={S.th}>Do zdravej zóny treba</th>
+              <th style={{ ...S.th, textAlign: "right" }}>Odrob. h/týž</th>
+              <th style={{ ...S.th, textAlign: "right" }}>Zvládne ešte</th>
+              <th style={S.th}>Odporúčanie</th>
             </tr>
           </thead>
           <tbody>
             {TRAINERS.map((t) => {
               const cap = capacity.find((c) => c.trainer === t);
+              const inZone = cap && cap.recentWeekly >= 24 && cap.recentWeekly <= 34;
               return (
                 <tr key={t}>
                   <td onClick={() => { setFTrainer(fTrainer === t ? "all" : t); setFSegment("all"); }} style={{ ...S.td, cursor: "pointer", fontWeight: 600, color: fTrainer === t ? C.accentLight : C.text }}>{t}</td>
                   {SEGMENTS.map((s) => cell(t, s))}
-                  <td style={{ ...S.td, textAlign: "right", color: cap && cap.effHours >= 24 && cap.effHours <= 34 ? C.green : C.orange }}>{cap?.effHours.toFixed(1)}</td>
+                  <td style={{ ...S.td, textAlign: "right", color: inZone ? C.green : (cap?.recentWeekly ?? 0) > 34 ? C.red : C.orange }}>{cap?.recentWeekly.toFixed(0)}</td>
+                  <td style={{ ...S.td, textAlign: "right", fontWeight: 600, color: C.accentLight }}>{cap ? `+${cap.canTake}` : "—"}</td>
                   <td style={{ ...S.td, fontSize: 12, color: C.textMuted }}>{cap?.advice}</td>
                 </tr>
               );
@@ -191,8 +194,13 @@ export function Klienti({ clients, capacity, actions }: { clients: Record<string
           <span style={{ fontSize: 13, color: C.accentLight, fontWeight: 600, marginRight: 4 }}>
             <Info text="Počet klientov, ktorí prešli aktuálnymi filtrami (matica + výbery nižšie)." label={`${filterLabel} · ${list.length}`} />
           </span>
+          <Select value={fTrainer} onChange={(v) => { setFTrainer(v); if (v !== "all") setFSegment(fSegment); }} options={[
+            { value: "all", label: "Obaja tréneri" },
+            { value: "Jerry", label: "Jerry" },
+            { value: "Terezka", label: "Terezka" },
+          ]} />
           {(fTrainer !== "all" || fSegment !== "all") && (
-            <button onClick={() => { setFTrainer("all"); setFSegment("all"); }} style={{ background: C.cardHover, border: "none", borderRadius: 6, padding: "5px 10px", color: C.textMuted, fontSize: 12, cursor: "pointer" }}>✕ zrušiť filter matice</button>
+            <button onClick={() => { setFTrainer("all"); setFSegment("all"); }} style={{ background: C.cardHover, border: "none", borderRadius: 6, padding: "5px 10px", color: C.textMuted, fontSize: 12, cursor: "pointer" }}>✕ zrušiť filter</button>
           )}
           <Select value={typeF} onChange={setTypeF} options={typeOptions} />
           <Select value={modalityF} onChange={setModalityF} options={[

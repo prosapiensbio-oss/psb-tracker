@@ -418,28 +418,48 @@ export type CapacityRow = {
   anchor: number;
   stable: number;
   sporadic: number;
-  effHours: number;
-  gap: number;
+  clients: number;
+  effHours: number; // segment-weighted (portfolio quality) — kept for reference
+  // Real-hours capacity (what the trainer actually works):
+  recentWeekly: number; // avg hours/week over the last ~8 active weeks
+  hoursPerClient: number; // recentWeekly / active clients
+  canTake: number; // additional clients until the top of the healthy zone (34h)
+  util: number; // recentWeekly / target (29h) as %
   advice: string;
 };
 
-export function capacityByTrainer(clients: Record<string, ClientAgg>): CapacityRow[] {
+const CAP_WEEKS = 8;
+
+export function capacityByTrainer(clients: Record<string, ClientAgg>, sessions: SessionRow[]): CapacityRow[] {
+  // The last CAP_WEEKS distinct weeks present in the data.
+  const allWeeks = [...new Set(sessions.map((s) => weekKey(s.date)))].sort();
+  const recentWeeks = new Set(allWeeks.slice(-CAP_WEEKS));
+  const nWeeks = recentWeeks.size || 1;
+
   return TRAINERS.map((trainer) => {
-    const cl = Object.values(clients).filter(
-      (c) => c.primaryTrainer === trainer && c.status !== "Neaktívny",
-    );
+    const cl = Object.values(clients).filter((c) => c.primaryTrainer === trainer && c.status !== "Neaktívny");
     const anchor = cl.filter((c) => c.segment === "Anchor").length;
     const stable = cl.filter((c) => c.segment === "Stabilný").length;
     const sporadic = cl.filter((c) => c.segment === "Sporadický").length;
+    const clientCount = cl.length;
     const effHours = anchor * ANCHOR_H + stable * STABLE_H + sporadic * SPORADIC_H;
-    const gap = TARGET_H - effHours;
+
+    // Actual hours the trainer worked per week over the recent window.
+    let recentHours = 0;
+    for (const s of sessions) {
+      if (s.sessionTrainer === trainer && recentWeeks.has(weekKey(s.date))) recentHours += s.duration / 60;
+    }
+    const recentWeekly = recentHours / nWeeks;
+    const hoursPerClient = clientCount ? recentWeekly / clientCount : 0;
+    const canTake = hoursPerClient > 0 ? Math.max(0, Math.floor((ZONE_HI - recentWeekly) / hoursPerClient)) : 0;
+    const util = (recentWeekly / TARGET_H) * 100;
+
     const advice =
-      effHours > ZONE_HI
-        ? `Nad zónou o ${(effHours - ZONE_HI).toFixed(1)}h — zváž presun klientov alebo zástup`
-        : gap > 0
-          ? `Do zdravej zóny treba +${Math.ceil(gap / ANCHOR_H)} Anchor alebo +${Math.ceil(gap / STABLE_H)} Stabilných klientov`
-          : `V zdravej zóne — priestor na ${Math.floor((ZONE_HI - effHours) / STABLE_H)} ďalších Stabilných`;
-    return { trainer, anchor, stable, sporadic, effHours, gap, advice };
+      recentWeekly > ZONE_HI
+        ? `Nad zónou (${recentWeekly.toFixed(0)}h/týž) — preťaženie, zváž zástup`
+        : `Zvládne ešte ~${canTake} klientov (do plnej kapacity 34h/týž)`;
+
+    return { trainer, anchor, stable, sporadic, clients: clientCount, effHours, recentWeekly, hoursPerClient, canTake, util, advice };
   });
 }
 

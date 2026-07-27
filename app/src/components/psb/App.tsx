@@ -65,7 +65,7 @@ export function PSBApp() {
 
   const clients = useMemo(() => deriveClients(data), [data]);
   const sixM = useMemo(() => deriveSixM(data, clients), [data, clients]);
-  const capacity = useMemo(() => capacityByTrainer(clients), [clients]);
+  const capacity = useMemo(() => capacityByTrainer(clients, data.sessions), [clients, data.sessions]);
   const register = useMemo(() => deriveRegister(data, clients, sixM, capacity), [data, clients, sixM, capacity]);
 
   const actions = useMemo<Actions>(
