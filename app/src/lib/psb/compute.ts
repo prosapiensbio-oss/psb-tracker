@@ -562,7 +562,9 @@ export function deriveAnomalies(data: PSBData, clients: Record<string, ClientAgg
   const now = new Date();
 
   for (const c of Object.values(clients)) {
-    if (c.status === "Neaktívny") continue;
+    // "Neaktívny" = churned; "Pauza" = agreed temporary break — both silence
+    // activity/renewal anomalies so paused clients don't nag in "Na čo sa pozrieť".
+    if (c.status === "Neaktívny" || c.status === "Pauza") continue;
     const days = daysBetween(c.lastSession, now);
     const recent = days <= 30;
 
