@@ -306,7 +306,7 @@ export function Dashboard({
         </Card>
       </div>
 
-      <SessionTrend sessions={sessionsT} showBand onNavigate={() => onNavigate("treningy", "analyza")} />
+      <SessionTrend sessions={sessionsT} onNavigate={() => onNavigate("treningy", "analyza")} />
 
       <Card>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
