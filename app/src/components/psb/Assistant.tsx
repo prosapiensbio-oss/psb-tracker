@@ -5,8 +5,20 @@ import { sendChat } from "../../lib/psb/client";
 import { C, mix } from "../../lib/psb/theme";
 import type { Actions } from "./App";
 
-type ParsedAction = { type: "ack-anomaly" | "unack-anomaly"; key: string; note: string; label: string; done?: boolean };
+type ParsedAction = {
+  type: "ack-anomaly" | "unack-anomaly" | "set-override";
+  label: string;
+  done?: boolean;
+  key?: string;
+  note?: string;
+  name?: string;
+  field?: string;
+  value?: unknown;
+};
 type Msg = { role: "user" | "assistant"; text: string; actions?: ParsedAction[] };
+
+// Client fields the assistant is allowed to edit (must match /api/override ALLOWED).
+const OVERRIDE_FIELDS = new Set(["status", "specialRate", "specialRateNote", "trainerNote", "contractSigned", "primaryTrainer"]);
 
 const SUGGESTIONS = [
   "Čo mám tento týždeň riešiť ako prvé?",
@@ -22,8 +34,11 @@ function parseActions(raw: string): { text: string; actions: ParsedAction[] } {
     .replace(/```psb-action\s*([\s\S]*?)```/g, (_m, body) => {
       try {
         const o = JSON.parse(String(body).trim());
-        if (o && (o.type === "ack-anomaly" || o.type === "unack-anomaly") && typeof o.key === "string") {
-          actions.push({ type: o.type, key: o.key, note: typeof o.note === "string" ? o.note : "", label: typeof o.label === "string" ? o.label : "Vykonať akciu" });
+        const label = typeof o?.label === "string" ? o.label : "Vykonať akciu";
+        if ((o?.type === "ack-anomaly" || o?.type === "unack-anomaly") && typeof o.key === "string") {
+          actions.push({ type: o.type, key: o.key, note: typeof o.note === "string" ? o.note : "", label });
+        } else if (o?.type === "set-override" && typeof o.name === "string" && OVERRIDE_FIELDS.has(o.field)) {
+          actions.push({ type: "set-override", name: o.name, field: o.field, value: o.value, label });
         }
       } catch {
         /* ignore malformed */
@@ -59,14 +74,44 @@ export function Assistant({ context, actions }: { context: AiContext; actions: A
   const [busy, setBusy] = useState(false);
   const [drag, setDrag] = useState(false);
   const [pending, setPending] = useState<{ filename: string; text: string }[] | null>(null);
+  const [size, setSize] = useState<{ w: number; h: number }>({ w: 400, h: 620 });
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     try {
       if (localStorage.getItem("psb-ai-open") === "1") setOpen(true);
+      const s = JSON.parse(localStorage.getItem("psb-ai-size") || "null");
+      if (s && typeof s.w === "number" && typeof s.h === "number") setSize({ w: s.w, h: s.h });
     } catch { /* ignore */ }
   }, []);
+
+  // Drag the top-left corner to resize (panel is anchored bottom-right).
+  function startResize(e: React.PointerEvent) {
+    e.preventDefault();
+    const startX = e.clientX, startY = e.clientY, startW = size.w, startH = size.h;
+    const maxW = window.innerWidth - 32, maxH = window.innerHeight - 40;
+    const move = (ev: PointerEvent) => {
+      const w = Math.max(320, Math.min(startW + (startX - ev.clientX), maxW));
+      const h = Math.max(360, Math.min(startH + (startY - ev.clientY), maxH));
+      setSize({ w, h });
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      setSize((s) => { try { localStorage.setItem("psb-ai-size", JSON.stringify(s)); } catch { /* ignore */ } return s; });
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  }
+
+  async function onPickFiles(list: FileList | null) {
+    const files = [...(list || [])].filter((f) => f.name.toLowerCase().endsWith(".csv"));
+    if (!files.length) return;
+    const read = await Promise.all(files.map(async (f) => ({ filename: f.name, text: await f.text() })));
+    setPending(read);
+  }
   useEffect(() => {
     try { localStorage.setItem("psb-ai-open", open ? "1" : "0"); } catch { /* ignore */ }
     if (open) setTimeout(() => inputRef.current?.focus(), 60);
@@ -97,8 +142,9 @@ export function Assistant({ context, actions }: { context: AiContext; actions: A
       const next = prev.map((m) => ({ ...m, actions: m.actions ? m.actions.map((a) => ({ ...a })) : undefined }));
       const a = next[mi]?.actions?.[ai];
       if (!a || a.done) return prev;
-      if (a.type === "ack-anomaly") actions.ackAnomaly(a.key, a.note, true);
-      else actions.ackAnomaly(a.key, "", false);
+      if (a.type === "ack-anomaly") actions.ackAnomaly(a.key || "", a.note || "", true);
+      else if (a.type === "unack-anomaly") actions.ackAnomaly(a.key || "", "", false);
+      else if (a.type === "set-override" && a.name && a.field) actions.setOverride(a.name, a.field as never, a.value);
       a.done = true;
       return next;
     });
@@ -123,10 +169,9 @@ export function Assistant({ context, actions }: { context: AiContext; actions: A
     setMsgs((m) => [...m, { role: "assistant", text: `**Import hotový.**\n${summary}\n\nDáta som obnovil — spýtaj sa ma na čokoľvek z nových čísel.` }]);
   }
 
-  const panelW = 400;
   const panel: CSSProperties = {
     position: "fixed", right: 20, bottom: 20, zIndex: 60,
-    width: `min(${panelW}px, calc(100vw - 32px))`, height: "min(620px, calc(100dvh - 40px))",
+    width: `min(${size.w}px, calc(100vw - 32px))`, height: `min(${size.h}px, calc(100dvh - 40px))`,
     background: C.card, border: `1px solid ${C.border}`, borderRadius: 16,
     display: "flex", flexDirection: "column", overflow: "hidden",
     boxShadow: "0 12px 40px rgba(0,0,0,.45)",
@@ -142,7 +187,10 @@ export function Assistant({ context, actions }: { context: AiContext; actions: A
 
   return (
     <div style={panel} onDragOver={(e) => { e.preventDefault(); setDrag(true); }} onDragLeave={() => setDrag(false)} onDrop={onDrop}>
-      <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "12px 14px", borderBottom: `1px solid ${C.border}`, background: mix(C.accent, 8) }}>
+      <div onPointerDown={startResize} title="Potiahni pre zmenu veľkosti" style={{ position: "absolute", top: 0, left: 0, width: 22, height: 22, cursor: "nwse-resize", zIndex: 2, display: "flex", alignItems: "flex-start", justifyContent: "flex-start", padding: 4 }}>
+        <svg width={12} height={12} viewBox="0 0 12 12" fill="none" stroke={C.textDim} strokeWidth={1.5} strokeLinecap="round" aria-hidden="true"><path d="M11 1 1 11M6.5 1 1 6.5M11 5.5 5.5 11" /></svg>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "12px 14px 12px 22px", borderBottom: `1px solid ${C.border}`, background: mix(C.accent, 8) }}>
         <span style={{ color: C.accent }}><Spark /></span>
         <div style={{ lineHeight: 1.15 }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>PSB Asistent</div>
@@ -199,6 +247,10 @@ export function Assistant({ context, actions }: { context: AiContext; actions: A
       )}
 
       <div style={{ borderTop: `1px solid ${C.border}`, padding: 10, display: "flex", gap: 8, alignItems: "flex-end" }}>
+        <input ref={fileRef} type="file" accept=".csv,text/csv" multiple style={{ display: "none" }} onChange={(e) => { void onPickFiles(e.target.files); e.target.value = ""; }} />
+        <button onClick={() => fileRef.current?.click()} title="Nahrať CSV" style={{ width: 38, height: 38, borderRadius: 10, border: `1px solid ${C.border}`, cursor: "pointer", background: "transparent", color: C.textMuted, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }} aria-label="Nahrať CSV">
+          <svg width={17} height={17} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21.4 11.05 12.25 20.2a5 5 0 0 1-7.07-7.07l9.19-9.19a3 3 0 0 1 4.24 4.24l-8.49 8.49a1 1 0 0 1-1.41-1.41l7.78-7.78" /></svg>
+        </button>
         <textarea
           ref={inputRef}
           value={input}

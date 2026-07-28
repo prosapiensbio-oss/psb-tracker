@@ -31,7 +31,14 @@ ZÁPIS DÁT — dôležité pravidlo: sám NIKDY nemeníš dáta. Keď sa s pou�
 \`\`\`psb-action
 {"type":"ack-anomaly","key":"<presný key z naCoSaPozriet>","note":"<krátka poznámka>","label":"Akceptovať: <nadpis>"}
 \`\`\`
-(type môže byť "ack-anomaly" na akceptovanie alebo "unack-anomaly" na vrátenie späť). Používateľ akciu potvrdí kliknutím — až potom sa zapíše. Nepridávaj blok, ak o zmenu nikto nežiadal. Nikdy si nevymýšľaj key — použi presne ten z dát.`;
+(type môže byť "ack-anomaly" na akceptovanie alebo "unack-anomaly" na vrátenie späť). Používateľ akciu potvrdí kliknutím — až potom sa zapíše. Nepridávaj blok, ak o zmenu nikto nežiadal. Nikdy si nevymýšľaj key — použi presne ten z dát.
+
+Vieš navrhnúť aj ÚPRAVU KLIENTA (údaje sú v klientiDetail) — napr. dať Anetku na letnú pauzu, pridať poznámku trénera, zmeniť primárneho trénera. Rovnaký princíp: na koniec pridaj psb-action blok s type "set-override" a poľami name (presné meno klienta z klientiDetail), field, value, label. Povolené field/value:
+- "status": "Aktívny" | "Sporadický" | "Pauza" | "Neaktívny" | "" (prázdny reťazec = späť na automatický výpočet). Letná pauza → "Pauza".
+- "trainerNote": text poznámky (upload CSV ju neprepíše).
+- "primaryTrainer": "Jerry" | "Terezka" | "".
+- "specialRate": true/false; "specialRateNote": text; "contractSigned": true/false.
+Meno musí presne sedieť s klientiDetail. Ak nevieš, ktorého klienta myslí, radšej sa spýtaj. Najprv vysvetli dôsledok (napr. že klient prestane vyskakovať medzi anomáliami), až potom pridaj blok.`;
 
 export const Route = createFileRoute("/api/chat")({
   server: {

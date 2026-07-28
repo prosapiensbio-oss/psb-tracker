@@ -134,6 +134,26 @@ export function buildAiContext(
   const sixMPhases: Record<string, number> = {};
   for (const c of sixM) sixMPhases[phase(c.monthInPhase)] = (sixMPhases[phase(c.monthInPhase)] || 0) + 1;
 
+  // Per-client detail (compact) — lets the assistant reason about and edit a
+  // specific client (status, note, trainer…). Sorted by most recent session.
+  const klientiDetail = clientList
+    .slice()
+    .sort((a, b) => (b.lastSession || "").localeCompare(a.lastSession || ""))
+    .map((c) => ({
+      meno: c.name,
+      segment: c.segment,
+      status: c.status,
+      statusAuto: c.statusAuto,
+      statusManual: c.statusOverride,
+      trener: c.primaryTrainer,
+      balicek: c.membership || "Bez balíčka",
+      zostatokSedeni: c.packageTotal ? `${c.packageRemaining}/${c.packageTotal}` : null,
+      posledneSedenie: c.lastSession || null,
+      is6m: c.is6m,
+      specialnaSadzba: c.specialRate || undefined,
+      poznamkaTrenera: c.trainerNote || null,
+    }));
+
   return {
     meta: {
       generatedAt: new Date().toISOString().slice(0, 10),
@@ -163,6 +183,7 @@ export function buildAiContext(
       podlaModality: dist((c) => c.modality),
     },
     sixM: { spolu: sixM.length, podlaFazy: sixMPhases, poznamka: "6M proces: Obnova 1.–6. mesiac, Integrácia 7.–18., Udržateľnosť 19.+" },
+    klientiDetail,
     naCoSaPozriet: register.map((r) => ({
       key: r.key,
       kategoria: r.category,

@@ -68,6 +68,7 @@ export function SessionTrend({ sessions, onNavigate }: { sessions: SessionRow[];
               refLine={{ value: avg, label: `Ø ${avg.toFixed(1)}` }}
               height={180}
               fmt={(x) => String(Math.round(x))}
+              autoY={type === "total" || type === "offline"}
             />
           </div>
           <div style={{ flex: "1 1 130px", textAlign: "center", padding: "4px 8px" }}>

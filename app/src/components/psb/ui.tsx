@@ -592,6 +592,7 @@ export function LineChart({
   pointWidth,
   alignEnd = false,
   onPoint,
+  autoY = false,
 }: {
   data: { label: string; values: number[] }[];
   series: { name: string; color: string }[];
@@ -602,7 +603,9 @@ export function LineChart({
   pointWidth?: number; // if set, chart is a fixed-width scroller (points don't squeeze)
   alignEnd?: boolean;
   onPoint?: (index: number) => void;
+  autoY?: boolean; // fit the Y axis to the data range (zoom in) instead of starting at 0
 }) {
+  const [hover, setHover] = useState<{ si: number; i: number } | null>(null);
   const n = data.length;
   const padL = 40, padR = 14, padT = 10, padB = 22;
   // Fixed inner width when pointWidth given (scrollable); else a responsive viewBox.
@@ -610,9 +613,19 @@ export function LineChart({
   const W = innerW + padL + padR;
   const plotW = innerW;
   const plotH = height - padT - padB;
-  const max = Math.max(1, ...data.flatMap((d) => d.values), zone ? zone.hi : 0, refLine ? refLine.value : 0) * 1.08;
+  // Y domain: zero-based by default; with autoY, fit to the data's min–max (+padding).
+  const allVals = data.flatMap((d) => d.values).concat(zone ? [zone.lo, zone.hi] : [], refLine ? [refLine.value] : []);
+  const rawMax = Math.max(1, ...allVals);
+  const rawMin = allVals.length ? Math.min(...allVals) : 0;
+  let lo = 0, hi = rawMax * 1.08;
+  if (autoY && rawMax > rawMin) {
+    const pad = Math.max(1, (rawMax - rawMin) * 0.14);
+    lo = Math.max(0, rawMin - pad);
+    hi = rawMax + pad;
+  }
+  const span = hi - lo || 1;
   const x = (i: number) => padL + (n <= 1 ? plotW / 2 : (i / (n - 1)) * plotW);
-  const y = (v: number) => padT + plotH - (v / max) * plotH;
+  const y = (v: number) => padT + plotH - ((v - lo) / span) * plotH;
   const labelStep = Math.max(1, Math.ceil(n / (pointWidth ? 24 : 12)));
   const scrollRef = useScrollEnd<HTMLDivElement>(!!alignEnd && !!pointWidth, n);
 
@@ -626,29 +639,52 @@ export function LineChart({
         </g>
       )}
       {[0, 0.5, 1].map((f) => (
-        <text key={f} x={padL - 6} y={y(max * f) + 3} textAnchor="end" fontSize={9} fill={C.textDim}>{fmt(max * f)}</text>
+        <text key={f} x={padL - 6} y={y(lo + span * f) + 3} textAnchor="end" fontSize={9} fill={C.textDim}>{fmt(lo + span * f)}</text>
       ))}
       {series.map((s, si) => (
         <g key={s.name}>
           <polyline points={data.map((d, i) => `${x(i)},${y(d.values[si] ?? 0)}`).join(" ")} fill="none" stroke={s.color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
           {data.map((d, i) => (
-            <circle
-              key={i}
-              cx={x(i)}
-              cy={y(d.values[si] ?? 0)}
-              r={onPoint ? 4 : 2.5}
-              fill={s.color}
-              style={{ cursor: onPoint ? "pointer" : "default" }}
-              onClick={onPoint ? () => onPoint(i) : undefined}
-            >
-              <title>{`${d.label} · ${s.name}: ${fmt(d.values[si] ?? 0)}`}</title>
-            </circle>
+            <circle key={i} cx={x(i)} cy={y(d.values[si] ?? 0)} r={hover && hover.si === si && hover.i === i ? 5 : onPoint ? 4 : 2.5} fill={s.color} />
           ))}
         </g>
       ))}
+      {/* Transparent hit targets — bigger than the dots so hover/click is easy. */}
+      {series.map((s, si) =>
+        data.map((d, i) => (
+          <circle
+            key={`${si}-${i}`}
+            cx={x(i)}
+            cy={y(d.values[si] ?? 0)}
+            r={13}
+            fill="transparent"
+            style={{ cursor: onPoint ? "pointer" : "default" }}
+            onMouseEnter={() => setHover({ si, i })}
+            onMouseLeave={() => setHover((h) => (h && h.si === si && h.i === i ? null : h))}
+            onClick={onPoint ? () => onPoint(i) : undefined}
+          />
+        )),
+      )}
       {data.map((d, i) => (i % labelStep === 0 || i === n - 1) && (
         <text key={i} x={x(i)} y={height - 6} textAnchor="middle" fontSize={9} fill={C.textDim}>{d.label}</text>
       ))}
+      {hover && (() => {
+        const d = data[hover.i];
+        const s = series[hover.si];
+        const v = d?.values[hover.si] ?? 0;
+        const label = series.length > 1 ? `${d.label} · ${s.name}: ${fmt(v)}` : `${d.label}: ${fmt(v)}`;
+        const bw = label.length * 5.6 + 14;
+        const cx = x(hover.i);
+        const cy = y(v);
+        const bx = Math.max(padL, Math.min(cx - bw / 2, padL + plotW - bw));
+        const by = cy - 26 < padT ? cy + 10 : cy - 26;
+        return (
+          <g pointerEvents="none">
+            <rect x={bx} y={by} width={bw} height={18} rx={4} fill={C.card} stroke={mix(s.color, 55)} />
+            <text x={bx + bw / 2} y={by + 12.5} textAnchor="middle" fontSize={10} fontWeight={600} fill={C.text}>{label}</text>
+          </g>
+        );
+      })()}
     </svg>
   );
 

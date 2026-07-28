@@ -758,6 +758,8 @@ function UploadCard({ data, missing, actions }: { data: PSBData; missing: typeof
   const [uploadResult, setUploadResult] = useState<IngestResult[] | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [busy, setBusy] = useState(false);
+  // Collapsed by default — CSV can also be uploaded via the AI assistant. Auto-open when reports are missing.
+  const [open, setOpen] = useState(missing.length > 0);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleFiles = async (fileList: FileList | null) => {
@@ -773,7 +775,14 @@ function UploadCard({ data, missing, actions }: { data: PSBData; missing: typeof
 
   return (
     <Card>
-      <H3>Upload CSV z PTmindera</H3>
+      <div onClick={() => setOpen((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+        <div style={{ ...S.h3, marginBottom: 0 }}>Upload CSV z PTmindera</div>
+        {missing.length > 0 && <span style={{ ...badge("orange"), fontSize: 10 }}>{missing.length} chýba</span>}
+        <span style={{ marginLeft: "auto", fontSize: 12, color: C.textDim }}>{open ? "▲" : "▼ rozbaliť"}</span>
+      </div>
+      <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 4 }}>Nahrať sa dá aj pretiahnutím do AI Asistenta (📎 vpravo dole).</div>
+      {open && (
+      <div style={{ marginTop: 12 }}>
       <div
         role="button"
         tabIndex={0}
@@ -806,6 +815,8 @@ function UploadCard({ data, missing, actions }: { data: PSBData; missing: typeof
             </div>
           ))}
         </div>
+      )}
+      </div>
       )}
     </Card>
   );
