@@ -196,11 +196,15 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
     c.serviceCount = serviceCounts[c.name] || 0;
 
     const packs = packByClient[c.name] || [];
-    c.packageRemaining = packs.reduce((a, p) => a + p.remaining, 0);
-    c.packageTotal = packs.reduce((a, p) => a + p.total, 0);
-    c.packageStatus = packs[0]?.status || "";
-    // Most recent membership (by having a balance, else first listed).
-    c.membership = (packs.find((p) => p.remaining > 0) || packs[0])?.package || "";
+    // Use only the ACTIVE package, not the sum across rows — a renewed client has
+    // an old depleted row (0/18) plus a new one (17/18); summing gave a wrong 17/36.
+    // Pick the row with the most sessions remaining (the live package); if all are
+    // depleted, the one with the largest total (the most significant package).
+    const active = packs.slice().sort((a, b) => b.remaining - a.remaining || b.total - a.total)[0];
+    c.packageRemaining = active?.remaining ?? 0;
+    c.packageTotal = active?.total ?? 0;
+    c.packageStatus = active?.status || "";
+    c.membership = active?.package || "";
 
     let off = 0;
     let on = 0;
