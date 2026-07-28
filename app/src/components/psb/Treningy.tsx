@@ -24,7 +24,7 @@ function Prehlad({ data }: { data: PSBData }) {
   const [to, setTo] = useState("");
   const [win, setWin] = useState("all"); // days window over history
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  const { sort, toggle, sorted } = useSort({ key: "period", dir: "asc" });
+  const { sort, toggle, sorted } = useSort({ key: "period", dir: "desc" });
 
   const range = useMemo(() => {
     if (period === "custom") return { from, to };
