@@ -78,12 +78,15 @@ const WIDGETS: WidgetMeta[] = [
   { id: "register", label: "Na čo sa pozrieť", span: 2 },
 ];
 const DEFAULT_ORDER = WIDGETS.map((w) => w.id);
+const DEFAULT_WIDTH: Record<string, number> = Object.fromEntries(WIDGETS.map((w) => [w.id, w.span]));
 const ORDER_KEY = "psb-dash-order";
 const HIDDEN_KEY = "psb-dash-hidden";
+const WIDTH_KEY = "psb-dash-width";
 
 function useDashLayout() {
   const [order, setOrder] = useState<string[]>(DEFAULT_ORDER);
   const [hidden, setHidden] = useState<string[]>([]);
+  const [widths, setWidths] = useState<Record<string, number>>(DEFAULT_WIDTH);
 
   useEffect(() => {
     try {
@@ -95,6 +98,12 @@ function useDashLayout() {
       }
       const h = JSON.parse(localStorage.getItem(HIDDEN_KEY) || "null");
       if (Array.isArray(h)) setHidden(h.filter((id: string) => DEFAULT_ORDER.includes(id)));
+      const w = JSON.parse(localStorage.getItem(WIDTH_KEY) || "null");
+      if (w && typeof w === "object") {
+        const merged: Record<string, number> = { ...DEFAULT_WIDTH };
+        for (const id of DEFAULT_ORDER) if (w[id] === 1 || w[id] === 2) merged[id] = w[id];
+        setWidths(merged);
+      }
     } catch {
       /* ignore */
     }
@@ -112,6 +121,14 @@ function useDashLayout() {
     setHidden(h);
     try {
       localStorage.setItem(HIDDEN_KEY, JSON.stringify(h));
+    } catch {
+      /* ignore */
+    }
+  };
+  const persistWidths = (w: Record<string, number>) => {
+    setWidths(w);
+    try {
+      localStorage.setItem(WIDTH_KEY, JSON.stringify(w));
     } catch {
       /* ignore */
     }
@@ -134,12 +151,14 @@ function useDashLayout() {
   };
   const toggleHide = (id: string) =>
     persistHidden(hidden.includes(id) ? hidden.filter((x) => x !== id) : [...hidden, id]);
+  const setWidth = (id: string, w: 1 | 2) => persistWidths({ ...widths, [id]: w });
   const reset = () => {
     persistOrder(DEFAULT_ORDER);
     persistHidden([]);
+    persistWidths(DEFAULT_WIDTH);
   };
 
-  return { order, hidden, move, dropOn, toggleHide, reset };
+  return { order, hidden, widths, move, dropOn, toggleHide, setWidth, reset };
 }
 
 // 2 columns on wide screens, 1 on narrow — inline styles can't hold media queries.
@@ -195,8 +214,10 @@ function WidgetShell({
   children: ReactNode;
 }) {
   const [over, setOver] = useState(false);
-  const span = Math.min(meta.span, cols);
-  const wrap: CSSProperties = { gridColumn: `span ${span}`, minWidth: 0, marginBottom: 12 };
+  const storedW = layout.widths[meta.id] ?? meta.span;
+  const span = Math.min(storedW, cols);
+  // Grid gap handles spacing; the item stretches to its row height (equal-height rows).
+  const wrap: CSSProperties = { gridColumn: `span ${span}`, minWidth: 0, display: "flex", flexDirection: "column" };
 
   if (!arranging) return <div style={wrap}>{children}</div>;
 
@@ -219,16 +240,28 @@ function WidgetShell({
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6, padding: "2px 4px" }}>
         <span style={{ cursor: "grab", color: C.textDim, fontSize: 15, lineHeight: 1 }} title="Ťahaj myšou">⠿</span>
         <span style={{ fontSize: 12, color: C.textMuted, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", flex: 1 }}>{meta.label}</span>
+        {cols > 1 && (
+          <button
+            onClick={() => layout.setWidth(meta.id, storedW === 2 ? 1 : 2)}
+            title={storedW === 2 ? "Zúžiť na 1 stĺpec" : "Rozšíriť na 2 stĺpce"}
+            style={{ ...arrBtn, minWidth: 34 }}
+          >
+            {storedW === 2 ? "▭▭" : "▭"}
+          </button>
+        )}
         <button onClick={() => layout.move(meta.id, -1)} title="Posunúť vyššie" style={arrBtn}>↑</button>
         <button onClick={() => layout.move(meta.id, 1)} title="Posunúť nižšie" style={arrBtn}>↓</button>
         <button onClick={() => layout.toggleHide(meta.id)} title={isHidden ? "Zobraziť" : "Skryť"} style={{ ...arrBtn, color: isHidden ? C.textDim : C.accentLight }}>
           {isHidden ? "🚫" : "👁"}
         </button>
       </div>
-      <div style={{ pointerEvents: "none" }}>{children}</div>
+      <div style={{ pointerEvents: "none", flex: 1, display: "flex", flexDirection: "column" }}>{children}</div>
     </div>
   );
 }
+
+// Body wrapper that fills a stretched card and vertically centers short content (donuts, KPI numbers).
+const centerBody: CSSProperties = { flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" };
 
 const arrBtn: CSSProperties = {
   background: C.card,
@@ -423,41 +456,45 @@ export function Dashboard({
       </Card>
     ),
     zony: (
-      <Card style={{ marginBottom: 0, height: "100%" }}>
+      <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column" }}>
         <H3>
           <Info text="Koľko trénerských týždňov padlo do zdravej zóny (24–34h), pod ňu alebo nad ňu — za celé obdobie." label="Týždne v zdravej zóne" />
         </H3>
-        {zones.total ? (
-          <Donut
-            size={140}
-            centerLabel={`${Math.round((zones.zdrava / zones.total) * 100)}%`}
-            data={[
-              { label: "Zdravá zóna", value: zones.zdrava, color: C.green },
-              { label: "Pod zónou", value: zones.pod, color: C.red },
-              { label: "Nad zónou", value: zones.nad, color: C.orange },
-            ]}
-          />
-        ) : (
-          <Empty>Nahraj Payroll by Session.</Empty>
-        )}
+        <div style={centerBody}>
+          {zones.total ? (
+            <Donut
+              size={140}
+              centerLabel={`${Math.round((zones.zdrava / zones.total) * 100)}%`}
+              data={[
+                { label: "Zdravá zóna", value: zones.zdrava, color: C.green },
+                { label: "Pod zónou", value: zones.pod, color: C.red },
+                { label: "Nad zónou", value: zones.nad, color: C.orange },
+              ]}
+            />
+          ) : (
+            <Empty>Nahraj Payroll by Session.</Empty>
+          )}
+        </div>
       </Card>
     ),
     kapacita: <CapacityCard capacity={capacity} trainer={trainer} onNavigate={onNavigate} />,
     "6m": (
-      <Card style={{ marginBottom: 0, height: "100%" }}>
+      <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column" }}>
         <H3>
           <Info text="Rozdelenie 6M klientov podľa fázy procesu: Obnova (1.–6. mesiac), Integrácia (7.–18.), Udržateľnosť (19+). Mení sa podľa prepínača trénera hore." label="6M klienti podľa fázy" />
         </H3>
-        {sixMPhases.total ? (
-          <Donut size={140} centerLabel={String(sixMPhases.total)} data={sixMPhases.data} />
-        ) : (
-          <Empty>{trainer === "all" ? "Žiadni 6M klienti." : `${trainer} nemá 6M klientov.`}</Empty>
-        )}
+        <div style={centerBody}>
+          {sixMPhases.total ? (
+            <Donut size={140} centerLabel={String(sixMPhases.total)} data={sixMPhases.data} />
+          ) : (
+            <Empty>{trainer === "all" ? "Žiadni 6M klienti." : `${trainer} nemá 6M klientov.`}</Empty>
+          )}
+        </div>
       </Card>
     ),
     tempo: (
-      <Card style={{ marginBottom: 0, height: "100%", cursor: "pointer" }}>
-        <div onClick={() => onNavigate("financie")}>
+      <Card style={{ marginBottom: 0, height: "100%", cursor: "pointer", display: "flex", flexDirection: "column" }}>
+        <div style={centerBody} onClick={() => onNavigate("financie")}>
           <H3>
             <Info text="Priemerné tempo klienta = ako často klient chodí (sedení za mesiac/týždeň), priemer cez klientov. Mení sa podľa prepínača trénera. Klik → Financie → Predikcia (detail podľa klienta)." label="Ø tempo klienta" />
           </H3>
@@ -476,8 +513,8 @@ export function Dashboard({
       </Card>
     ),
     dovera: (
-      <Card style={{ marginBottom: 0, height: "100%", cursor: "pointer" }}>
-        <div onClick={() => onNavigate("financie")}>
+      <Card style={{ marginBottom: 0, height: "100%", cursor: "pointer", display: "flex", flexDirection: "column" }}>
+        <div style={centerBody} onClick={() => onNavigate("financie")}>
           <H3>
             <Info text="Priemerná dôvera obnovy = ako pravdepodobne klienti obnovia/pokračujú (podľa segmentu a 6M fázy), priemer cez klientov. Klik → Financie → Predikcia." label="Ø dôvera obnovy" />
           </H3>
@@ -497,11 +534,13 @@ export function Dashboard({
       </Card>
     ),
     balicky: (
-      <Card style={{ marginBottom: 0, height: "100%" }}>
+      <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column" }}>
         <H3>
           <Info text="Koľko klientov má aký typ balíčka/predplatného (z reportu Packages & Memberships). Mení sa podľa prepínača trénera hore." label="Klienti podľa balíčka" />
         </H3>
-        {membershipDonut.length ? <Donut size={130} centerLabel={String(membershipDonut.reduce((a, d) => a + d.value, 0))} data={membershipDonut} onSlice={() => onNavigate("klienti")} /> : <Empty>Nahraj Packages & Memberships.</Empty>}
+        <div style={centerBody}>
+          {membershipDonut.length ? <Donut size={130} centerLabel={String(membershipDonut.reduce((a, d) => a + d.value, 0))} data={membershipDonut} onSlice={() => onNavigate("klienti")} /> : <Empty>Nahraj Packages & Memberships.</Empty>}
+        </div>
       </Card>
     ),
     trend: <SessionTrend sessions={sessionsT} onNavigate={() => onNavigate("treningy", "analyza")} />,
@@ -554,7 +593,7 @@ export function Dashboard({
 
       {arranging && (
         <div style={{ marginBottom: 12, padding: "9px 12px", borderRadius: 8, background: C.accentBg, border: `1px solid ${mix(C.accent, 33)}`, fontSize: 12, color: C.textMuted, lineHeight: 1.5 }}>
-          Ťahaj karty myšou na iné miesto, alebo použi šípky <strong style={{ color: C.text }}>↑ ↓</strong>. Klikni na <strong style={{ color: C.text }}>👁</strong> pre skrytie karty. Rozloženie sa uloží v tomto prehliadači.
+          Ťahaj karty myšou alebo použi šípky <strong style={{ color: C.text }}>↑ ↓</strong>. Tlačidlom <strong style={{ color: C.text }}>▭ / ▭▭</strong> prepneš šírku karty (1 alebo 2 stĺpce) — široký graf zúž a vedľa neho daj malý. <strong style={{ color: C.text }}>👁</strong> kartu skryje. Karty v riadku sa výškovo zarovnajú a obsah vycentruje. Uloží sa v tomto prehliadači.
         </div>
       )}
 
@@ -565,7 +604,7 @@ export function Dashboard({
         <StatCard value={stats.sixMCount} label="6M klientov" onClick={() => onNavigate("6m")} />
       </StatGrid>
 
-      <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, minmax(0,1fr))`, gridAutoFlow: "row dense", gap: 12, marginBottom: 12, alignItems: "start" }}>
+      <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, minmax(0,1fr))`, gridAutoFlow: "row dense", gap: 12, marginBottom: 12, alignItems: "stretch" }}>
         {shown.map((id) => {
           const meta = WIDGETS.find((w) => w.id === id);
           if (!meta) return null;
@@ -622,7 +661,7 @@ function CapacityCard({ capacity, trainer, onNavigate }: { capacity: CapacityRow
   const color = util <= 100 ? C.green : util <= 113 ? C.orange : C.red;
 
   return (
-    <Card style={{ marginBottom: 0, height: "100%" }}>
+    <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
         <H3>
           <Info
@@ -632,7 +671,7 @@ function CapacityCard({ capacity, trainer, onNavigate }: { capacity: CapacityRow
         </H3>
         <button onClick={() => onNavigate("klienti")} style={{ ...linkBtn, fontSize: 12 }}>Detail →</button>
       </div>
-      <div style={{ display: "flex", gap: 20, alignItems: "center", marginTop: 8, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 20, alignItems: "center", flex: 1, marginTop: 8, flexWrap: "wrap" }}>
         <div>
           <div style={{ fontSize: 40, fontWeight: 800, color, lineHeight: 1 }}>{util.toFixed(0)}%</div>
           <div style={{ fontSize: 11, color: C.textMuted }}>vyťaženie (ideál {trainer === "all" ? TARGET_H * 2 : TARGET_H}h)</div>
