@@ -19,6 +19,7 @@ import { Route as ApiLogoutRouteImport } from './routes/api/logout'
 import { Route as ApiLoginRouteImport } from './routes/api/login'
 import { Route as ApiIngestRouteImport } from './routes/api/ingest'
 import { Route as ApiDataRouteImport } from './routes/api/data'
+import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ApiAnomalyRouteImport } from './routes/api/anomaly'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
@@ -71,6 +72,11 @@ const ApiDataRoute = ApiDataRouteImport.update({
   path: '/api/data',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiChatRoute = ApiChatRouteImport.update({
+  id: '/api/chat',
+  path: '/api/chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAnomalyRoute = ApiAnomalyRouteImport.update({
   id: '/api/anomaly',
   path: '/api/anomaly',
@@ -82,6 +88,7 @@ export interface FileRoutesByFullPath {
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/api/anomaly': typeof ApiAnomalyRoute
+  '/api/chat': typeof ApiChatRoute
   '/api/data': typeof ApiDataRoute
   '/api/ingest': typeof ApiIngestRoute
   '/api/login': typeof ApiLoginRoute
@@ -95,6 +102,7 @@ export interface FileRoutesByTo {
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/api/anomaly': typeof ApiAnomalyRoute
+  '/api/chat': typeof ApiChatRoute
   '/api/data': typeof ApiDataRoute
   '/api/ingest': typeof ApiIngestRoute
   '/api/login': typeof ApiLoginRoute
@@ -109,6 +117,7 @@ export interface FileRoutesById {
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/api/anomaly': typeof ApiAnomalyRoute
+  '/api/chat': typeof ApiChatRoute
   '/api/data': typeof ApiDataRoute
   '/api/ingest': typeof ApiIngestRoute
   '/api/login': typeof ApiLoginRoute
@@ -124,6 +133,7 @@ export interface FileRouteTypes {
     | '/robots.txt'
     | '/sitemap.xml'
     | '/api/anomaly'
+    | '/api/chat'
     | '/api/data'
     | '/api/ingest'
     | '/api/login'
@@ -137,6 +147,7 @@ export interface FileRouteTypes {
     | '/robots.txt'
     | '/sitemap.xml'
     | '/api/anomaly'
+    | '/api/chat'
     | '/api/data'
     | '/api/ingest'
     | '/api/login'
@@ -150,6 +161,7 @@ export interface FileRouteTypes {
     | '/robots.txt'
     | '/sitemap.xml'
     | '/api/anomaly'
+    | '/api/chat'
     | '/api/data'
     | '/api/ingest'
     | '/api/login'
@@ -164,6 +176,7 @@ export interface RootRouteChildren {
   RobotsDottxtRoute: typeof RobotsDottxtRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   ApiAnomalyRoute: typeof ApiAnomalyRoute
+  ApiChatRoute: typeof ApiChatRoute
   ApiDataRoute: typeof ApiDataRoute
   ApiIngestRoute: typeof ApiIngestRoute
   ApiLoginRoute: typeof ApiLoginRoute
@@ -245,6 +258,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiDataRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/chat': {
+      id: '/api/chat'
+      path: '/api/chat'
+      fullPath: '/api/chat'
+      preLoaderRoute: typeof ApiChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/anomaly': {
       id: '/api/anomaly'
       path: '/api/anomaly'
@@ -260,6 +280,7 @@ const rootRouteChildren: RootRouteChildren = {
   RobotsDottxtRoute: RobotsDottxtRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   ApiAnomalyRoute: ApiAnomalyRoute,
+  ApiChatRoute: ApiChatRoute,
   ApiDataRoute: ApiDataRoute,
   ApiIngestRoute: ApiIngestRoute,
   ApiLoginRoute: ApiLoginRoute,

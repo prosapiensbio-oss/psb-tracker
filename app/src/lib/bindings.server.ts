@@ -24,6 +24,8 @@ type AppEnv = {
   CONTAINER?: DurableObjectNamespace;
   HF_ENV?: string;
   APP_SLUG?: string;
+  // AI assistant — Anthropic API key, set as a Higgsfield secret (server-only).
+  ANTHROPIC_API_KEY?: string;
 };
 
 export function bindings(): AppEnv {

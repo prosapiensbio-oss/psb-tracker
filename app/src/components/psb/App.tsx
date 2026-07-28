@@ -15,6 +15,8 @@ import {
   deriveRegister,
   deriveSixM,
 } from "../../lib/psb/compute";
+import { buildAiContext } from "../../lib/psb/aiContext";
+import { Assistant } from "./Assistant";
 import { C, S, tab } from "../../lib/psb/theme";
 import type { ClientOverride, PSBData } from "../../lib/psb/types";
 import { EMPTY_DATA } from "../../lib/psb/types";
@@ -82,6 +84,7 @@ export function PSBApp() {
   const sixM = useMemo(() => deriveSixM(data, clients), [data, clients]);
   const capacity = useMemo(() => capacityByTrainer(clients, data.sessions), [clients, data.sessions]);
   const register = useMemo(() => deriveRegister(data, clients, sixM, capacity), [data, clients, sixM, capacity]);
+  const aiContext = useMemo(() => buildAiContext(data, clients, sixM, capacity, register), [data, clients, sixM, capacity, register]);
 
   const actions = useMemo<Actions>(
     () => ({
@@ -172,6 +175,7 @@ export function PSBApp() {
       <div style={{ ...S.h3, textAlign: "center", color: C.textDim, fontSize: 11, padding: "8px 0 24px", fontWeight: 400 }}>
         ProSapiens Biomechanic · interný nástroj · nezdieľať externe
       </div>
+      <Assistant context={aiContext} actions={actions} />
     </div>
   );
 }

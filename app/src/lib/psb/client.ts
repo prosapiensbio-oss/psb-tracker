@@ -60,3 +60,19 @@ export async function saveAnomaly(key: string, note: string, ack = true): Promis
 export async function resetAll(): Promise<void> {
   await post("/api/reset", {});
 }
+
+export type ChatResult =
+  | { ok: true; reply: string }
+  | { ok: false; error: string; status?: number; detail?: string };
+
+export async function sendChat(
+  messages: { role: "user" | "assistant"; content: string }[],
+  context: unknown,
+): Promise<ChatResult> {
+  try {
+    const r = await post("/api/chat", { messages, context });
+    return (await r.json()) as ChatResult;
+  } catch (e) {
+    return { ok: false, error: "network", detail: String(e) };
+  }
+}
