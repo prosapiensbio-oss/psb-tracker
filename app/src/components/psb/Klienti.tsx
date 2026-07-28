@@ -145,6 +145,54 @@ export function Klienti({ clients, capacity, actions }: { clients: Record<string
 
   return (
     <>
+      {/* Filtre + KPI úplne hore */}
+      <Card>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 14 }}>
+          <Select value={fTrainer} onChange={(v) => { setFTrainer(v); if (v === "all") setFSegment("all"); }} options={[
+            { value: "all", label: "Obaja tréneri" },
+            { value: "Jerry", label: "Jerry" },
+            { value: "Terezka", label: "Terezka" },
+          ]} />
+          <Select value={typeF} onChange={setTypeF} options={typeOptions} />
+          <Select value={modalityF} onChange={setModalityF} options={[
+            { value: "all", label: "Offline + Online" },
+            { value: "Offline", label: "Prevažne Offline" },
+            { value: "Online", label: "Prevažne Online" },
+          ]} />
+          <label style={{ fontSize: 12, color: C.textMuted, display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+            <input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} style={{ accentColor: C.accent }} />
+            Aj neaktívnych
+          </label>
+          <div style={{ marginLeft: "auto", display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+            <span style={{ fontSize: 11, color: C.textDim }}>Obdobie štatistík:</span>
+            <Select value={kpiWin} onChange={setKpiWin} options={KPI_WINDOWS.map((w) => ({ value: w.value, label: w.label }))} />
+            {kpiWin === "custom" && (
+              <>
+                <input type="date" value={kpiFrom} onChange={(e) => setKpiFrom(e.target.value)} style={{ ...S.select, colorScheme: "dark" }} />
+                <span style={{ color: C.textDim, alignSelf: "center" }}>–</span>
+                <input type="date" value={kpiTo} onChange={(e) => setKpiTo(e.target.value)} style={{ ...S.select, colorScheme: "dark" }} />
+              </>
+            )}
+          </div>
+        </div>
+        {(fSegment !== "all" || membershipF) && (
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
+            {fSegment !== "all" && (
+              <button onClick={() => setFSegment("all")} style={{ background: C.accentBg, border: `1px solid ${C.accent}`, borderRadius: 6, padding: "4px 10px", color: C.accentLight, fontSize: 12, cursor: "pointer" }}>Segment: {fSegment} ✕</button>
+            )}
+            {membershipF && (
+              <button onClick={() => setMembershipF("")} style={{ background: C.accentBg, border: `1px solid ${C.accent}`, borderRadius: 6, padding: "4px 10px", color: C.accentLight, fontSize: 12, cursor: "pointer" }}>Balíček: {membershipF} ✕</button>
+            )}
+          </div>
+        )}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 12 }}>
+          <StatCard value={kpis.scoped ? kpis.activeInWin : kpis.count} label={<Info text="Počet klientov, ktorí prešli aktuálnymi filtrami. V časovom okne = koľko z nich reálne chodilo v danom období." label={kpis.scoped ? "Chodilo v období" : "Klientov vo výbere"} />} />
+          <StatCard value={`${kpis.att.toFixed(0)}%`} label={<Info text="Priemerný podiel týždňov, v ktorých mal klient aspoň jeden tréning, za posledných 18 týždňov. Vždy 18 týž., nezávisí od filtra času." label="Ø dochádzka" />} />
+          <StatCard value={kpis.hpc.toFixed(1)} label={<Info text="Priemerný počet odtrénovaných hodín na klienta za zvolené obdobie (alebo celú históriu)." label={`Ø hodín/klient${kpis.scoped ? " (obd.)" : ""}`} />} />
+          <StatCard value={fmtCZK(kpis.avg)} label={<Info text="Priemerná cena zaplateného sedenia za zvolené obdobie (bezplatné sedenia sa nepočítajú)." label="Ø CZK/sedenie" />} />
+        </div>
+      </Card>
+
       <Card>
         <H3>
           <Info text="Klikni na bunku (Jerry × Anchor) a zoznam dole sa vyfiltruje na tých klientov. Klik na meno trénera = celý tréner, klik na segment = oba tréneri. „Odrob. h/týž“ = reálne odtrénované hodiny za týždeň (priemer posledných 8 týž.); zdravá zóna 24–34h." label="Kapacita & segmenty" />
@@ -198,53 +246,9 @@ export function Klienti({ clients, capacity, actions }: { clients: Record<string
         </Card>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12, marginBottom: 12 }}>
-        <div>
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 6, marginBottom: 8, flexWrap: "wrap" }}>
-            <Select value={kpiWin} onChange={setKpiWin} options={KPI_WINDOWS.map((w) => ({ value: w.value, label: w.label }))} />
-            {kpiWin === "custom" && (
-              <>
-                <input type="date" value={kpiFrom} onChange={(e) => setKpiFrom(e.target.value)} style={{ ...S.select, colorScheme: "dark" }} />
-                <span style={{ color: C.textDim, alignSelf: "center" }}>–</span>
-                <input type="date" value={kpiTo} onChange={(e) => setKpiTo(e.target.value)} style={{ ...S.select, colorScheme: "dark" }} />
-              </>
-            )}
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 12 }}>
-            <StatCard value={kpis.scoped ? kpis.activeInWin : kpis.count} label={kpis.scoped ? "Chodilo v období" : "Klientov vo výbere"} />
-            <StatCard value={`${kpis.att.toFixed(0)}%`} label={<Info text="Priemerný podiel týždňov, v ktorých mal klient aspoň jeden tréning, za posledných 18 týždňov. Vždy 18 týž., nezávisí od filtra času." label="Ø dochádzka" />} />
-            <StatCard value={kpis.hpc.toFixed(1)} label={<Info text="Priemerný počet odtrénovaných hodín na klienta za zvolené obdobie (alebo celú históriu)." label={`Ø hodín/klient${kpis.scoped ? " (obd.)" : ""}`} />} />
-            <StatCard value={fmtCZK(kpis.avg)} label={<Info text="Priemerná cena zaplateného sedenia za zvolené obdobie (bezplatné sedenia sa nepočítajú)." label="Ø CZK/sedenie" />} />
-          </div>
-        </div>
-      </div>
-
       <Card>
         <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }}>
-          <span style={{ fontSize: 13, color: C.accentLight, fontWeight: 600, marginRight: 4 }}>
-            <Info text="Počet klientov, ktorí prešli aktuálnymi filtrami (matica + výbery nižšie)." label={`${filterLabel} · ${list.length}`} />
-          </span>
-          <Select value={fTrainer} onChange={(v) => { setFTrainer(v); if (v !== "all") setFSegment(fSegment); }} options={[
-            { value: "all", label: "Obaja tréneri" },
-            { value: "Jerry", label: "Jerry" },
-            { value: "Terezka", label: "Terezka" },
-          ]} />
-          {(fTrainer !== "all" || fSegment !== "all") && (
-            <button onClick={() => { setFTrainer("all"); setFSegment("all"); }} style={{ background: C.cardHover, border: "none", borderRadius: 6, padding: "5px 10px", color: C.textMuted, fontSize: 12, cursor: "pointer" }}>✕ zrušiť filter</button>
-          )}
-          {membershipF && (
-            <button onClick={() => setMembershipF("")} style={{ background: C.accentBg, border: `1px solid ${C.accent}`, borderRadius: 6, padding: "5px 10px", color: C.accentLight, fontSize: 12, cursor: "pointer" }}>Balíček: {membershipF} ✕</button>
-          )}
-          <Select value={typeF} onChange={setTypeF} options={typeOptions} />
-          <Select value={modalityF} onChange={setModalityF} options={[
-            { value: "all", label: "Offline + Online" },
-            { value: "Offline", label: "Prevažne Offline" },
-            { value: "Online", label: "Prevažne Online" },
-          ]} />
-          <label style={{ fontSize: 12, color: C.textMuted, display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
-            <input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} style={{ accentColor: C.accent }} />
-            Zobraziť aj neaktívnych
-          </label>
+          <span style={{ fontSize: 13, color: C.accentLight, fontWeight: 600, marginRight: 4 }}>{filterLabel} · {list.length} klientov</span>
         </div>
         <TableWrap>
           <thead>

@@ -79,7 +79,18 @@ export function Dashboard({
 }) {
   const [trainer, setTrainer] = useState("all");
   const [showAcked, setShowAcked] = useState(false);
+  const [tempoUnit, setTempoUnit] = useState<"mes" | "tyz">("mes");
   const matchT = (t: string) => trainer === "all" || t === trainer;
+
+  const predAgg = useMemo(() => {
+    const list = predictEarnings(data, clients).perClient.filter((c) => matchT(c.trainer));
+    const n = list.length || 1;
+    return {
+      tempoMes: list.reduce((a, c) => a + c.burnRate, 0) / n,
+      tempoTyz: list.reduce((a, c) => a + c.burnWeek, 0) / n,
+      conf: (list.reduce((a, c) => a + c.confidence, 0) / n) * 100,
+    };
+  }, [data, clients, trainer]);
 
   const stats = useMemo(() => {
     const list = Object.values(clients);
@@ -242,6 +253,39 @@ export function Dashboard({
         </Card>
       </div>
 
+      {/* Priemerné tempo + dôvera obnovy (klik → Predikcia) */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 12, marginBottom: 12, alignItems: "stretch" }}>
+        <Card style={{ marginBottom: 0, cursor: "pointer" }} >
+          <div onClick={() => onNavigate("financie")}>
+            <H3>
+              <Info text="Priemerné tempo klienta = ako často klient chodí (sedení za mesiac/týždeň), priemer cez klientov. Mení sa podľa prepínača trénera. Klik → Financie → Predikcia (detail podľa klienta)." label="Ø tempo klienta" />
+            </H3>
+            <div style={{ fontSize: 34, fontWeight: 800, color: C.accentLight, lineHeight: 1 }}>
+              {(tempoUnit === "mes" ? predAgg.tempoMes : predAgg.tempoTyz).toFixed(1)}
+              <span style={{ fontSize: 13, color: C.textMuted, fontWeight: 500 }}> sedení/{tempoUnit === "mes" ? "mes." : "týž."}</span>
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 4, marginTop: 8 }}>
+            {(["mes", "tyz"] as const).map((u) => (
+              <button key={u} onClick={(e) => { e.stopPropagation(); setTempoUnit(u); }} style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${tempoUnit === u ? C.accent : C.border}`, background: tempoUnit === u ? C.accentBg : "transparent", color: tempoUnit === u ? C.accentLight : C.textMuted, fontSize: 11, cursor: "pointer" }}>
+                tempo/{u === "mes" ? "mes." : "týž."}
+              </button>
+            ))}
+          </div>
+        </Card>
+        <Card style={{ marginBottom: 0, cursor: "pointer" }}>
+          <div onClick={() => onNavigate("financie")}>
+            <H3>
+              <Info text="Priemerná dôvera obnovy = ako pravdepodobne klienti obnovia/pokračujú (podľa segmentu a 6M fázy), priemer cez klientov. Klik → Financie → Predikcia." label="Ø dôvera obnovy" />
+            </H3>
+            <div style={{ fontSize: 34, fontWeight: 800, color: predAgg.conf >= 70 ? C.green : predAgg.conf >= 50 ? C.orange : C.red, lineHeight: 1 }}>
+              {predAgg.conf.toFixed(0)}%
+            </div>
+            <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4 }}>priemer cez {trainer === "all" ? "všetkých" : trainer} klientov · klik → Predikcia →</div>
+          </div>
+        </Card>
+      </div>
+
       {/* Mesačné zárobky (ľavá, širšia) + balíčky klientov (pravá) */}
       <div style={{ display: "grid", gridTemplateColumns: "minmax(320px, 2fr) minmax(240px, 1fr)", gap: 12, marginBottom: 12, alignItems: "stretch" }}>
         <Card style={{ marginBottom: 0 }}>
@@ -296,33 +340,33 @@ function CapacityCard({ capacity, trainer, onNavigate }: { capacity: CapacityRow
   const terezka = capacity.find((c) => c.trainer === "Terezka");
 
   // Follows the trainer pill: Obaja = Spolu PSB, else the selected trainer.
-  let name: string, clients: number, weekly: number, canTake: number, target: number;
+  let name: string, clients: number, avg: number, peak: number, canTake: number, target: number;
   if (trainer === "all") {
     name = "Spolu (PSB)";
     clients = (jerry?.clients || 0) + (terezka?.clients || 0);
-    weekly = (jerry?.recentWeekly || 0) + (terezka?.recentWeekly || 0);
+    avg = (jerry?.recentWeekly || 0) + (terezka?.recentWeekly || 0);
+    peak = (jerry?.peakWeekly || 0) + (terezka?.peakWeekly || 0);
     canTake = (jerry?.canTake || 0) + (terezka?.canTake || 0);
     target = TARGET_H * 2;
   } else {
     const c = trainer === "Jerry" ? jerry : terezka;
     name = trainer;
     clients = c?.clients || 0;
-    weekly = c?.recentWeekly || 0;
+    avg = c?.recentWeekly || 0;
+    peak = c?.peakWeekly || 0;
     canTake = c?.canTake || 0;
     target = TARGET_H;
   }
-  const perTrainerWeekly = trainer === "all" ? weekly / 2 : weekly;
-  const util = target ? (weekly / target) * 100 : 0;
-  const inZone = perTrainerWeekly >= ZONE_LO && perTrainerWeekly <= ZONE_HI;
-  const over = perTrainerWeekly > ZONE_HI;
-  const color = inZone ? C.green : over ? C.red : C.orange;
+  // Utilisation = how full the BUSY weeks are vs the 30h goal (the real limit).
+  const util = target ? (peak / target) * 100 : 0;
+  const color = util <= 100 ? C.green : util <= 113 ? C.orange : C.red;
 
   return (
     <Card style={{ marginBottom: 0, height: "100%" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
         <H3>
           <Info
-            text="Vyťaženie z REÁLNE odtrénovaných hodín za týždeň (priemer posledných 8 týždňov) oproti cieľu 29h na trénera. „Zvládne ešte N klientov“ = koľko klientov ako tvoj súčasný priemer sa ešte zmestí do hornej hranice zdravej zóny (34h). Nevieš dopredu, či bude Anchor/Stabilný — počíta sa preto z priemeru tvojich terajších klientov. Mení sa podľa prepínača trénera hore."
+            text={`Vyťaženie z REÁLNYCH hodín. 100 % = cieľ ${TARGET_H}h/týž v rušnom týždni (nie 34 — to je horná hranica zóny, ktorú nechceme prekračovať). Počíta sa z NAJRUŠNEJŠIEHO týždňa (posledných 12), lebo to je moment, keď prídu (skoro) všetci — a to určuje strop. „Zvládne ešte N" = koľko klientov pridať, aby ani rušný týždeň neprekročil ${TARGET_H}h. Mení sa podľa prepínača trénera.`}
             label={`Kapacita & vyťaženie — ${name}`}
           />
         </H3>
@@ -331,19 +375,19 @@ function CapacityCard({ capacity, trainer, onNavigate }: { capacity: CapacityRow
       <div style={{ display: "flex", gap: 20, alignItems: "center", marginTop: 8, flexWrap: "wrap" }}>
         <div>
           <div style={{ fontSize: 40, fontWeight: 800, color, lineHeight: 1 }}>{util.toFixed(0)}%</div>
-          <div style={{ fontSize: 11, color: C.textMuted }}>vyťaženie (cieľ {target}h)</div>
+          <div style={{ fontSize: 11, color: C.textMuted }}>rušný týždeň vs cieľ {target}h</div>
         </div>
-        <div style={{ flex: 1, minWidth: 160 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: C.textMuted, marginBottom: 5 }}>
+        <div style={{ flex: 1, minWidth: 170 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: C.textMuted, marginBottom: 4 }}>
             <span>Klienti</span>
             <strong style={{ color: C.text }}>{clients}</strong>
           </div>
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: C.textMuted, marginBottom: 8 }}>
-            <span>Odtrénované h/týž (Ø 8 týž.)</span>
-            <strong style={{ color: C.text }}>{weekly.toFixed(0)}</strong>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: C.textMuted, marginBottom: 4 }}>
+            <span>Priemerný / rušný týždeň</span>
+            <strong style={{ color: C.text }}>{avg.toFixed(0)}h / {peak.toFixed(0)}h</strong>
           </div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: over ? C.red : C.accentLight }}>
-            {over ? "Nad zónou — preťaženie" : `Zvládne ešte ~${canTake} klientov`}
+          <div style={{ fontSize: 14, fontWeight: 600, color: util > 100 ? C.orange : C.accentLight }}>
+            {util >= 100 ? `Rušné týždne na strope ${target}h` : `Zvládne ešte ~${canTake} klientov`}
           </div>
         </div>
       </div>

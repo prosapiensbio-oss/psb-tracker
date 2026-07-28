@@ -257,13 +257,29 @@ export function Modal({ title, onClose, children }: { title: string; onClose: ()
 }
 
 // ── Info tooltip (hover explanation) ─────────────────────────────────────────
+// Uses viewport-fixed positioning measured on hover, so the bubble never gets
+// clipped by a scrollable table/card (which overflow:auto would otherwise cut).
 export function Info({ text, label }: { text: string; label?: ReactNode }) {
-  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ left: number; top: number; above: boolean } | null>(null);
+  const ref = useRef<HTMLSpanElement>(null);
+  const W = 250;
+  const show = () => {
+    const el = ref.current;
+    if (!el || typeof window === "undefined") return;
+    const r = el.getBoundingClientRect();
+    const above = r.top > 150;
+    setPos({
+      left: Math.min(Math.max(8, r.left), window.innerWidth - W - 8),
+      top: above ? r.top - 8 : r.bottom + 8,
+      above,
+    });
+  };
   return (
     <span
-      style={{ position: "relative", display: "inline-flex", alignItems: "center", gap: 3, cursor: "help" }}
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
+      ref={ref}
+      style={{ display: "inline-flex", alignItems: "center", gap: 3, cursor: "help" }}
+      onMouseEnter={show}
+      onMouseLeave={() => setPos(null)}
     >
       {label}
       <span
@@ -279,28 +295,31 @@ export function Info({ text, label }: { text: string; label?: ReactNode }) {
           fontSize: 9,
           fontWeight: 700,
           lineHeight: 1,
+          flexShrink: 0,
         }}
       >
         i
       </span>
-      {open && (
+      {pos && (
         <span
           style={{
-            position: "absolute",
-            bottom: "calc(100% + 6px)",
-            left: 0,
-            zIndex: 50,
-            width: 240,
+            position: "fixed",
+            left: pos.left,
+            top: pos.top,
+            transform: pos.above ? "translateY(-100%)" : "none",
+            zIndex: 1000,
+            width: W,
             background: "#0A110C",
-            border: `1px solid ${C.accent}55`,
+            border: `1px solid ${C.accent}77`,
             borderRadius: 8,
             padding: "8px 10px",
             fontSize: 11.5,
             fontWeight: 400,
             lineHeight: 1.45,
             color: C.text,
-            boxShadow: "0 6px 24px #000a",
+            boxShadow: "0 6px 24px #000c",
             whiteSpace: "normal",
+            pointerEvents: "none",
           }}
         >
           {text}
@@ -569,45 +588,65 @@ export function LineChart({
   zone,
   height = 200,
   fmt = (n: number) => String(Math.round(n)),
+  pointWidth,
+  alignEnd = false,
+  onPoint,
 }: {
   data: { label: string; values: number[] }[];
   series: { name: string; color: string }[];
   zone?: { lo: number; hi: number };
   height?: number;
   fmt?: (n: number) => string;
+  pointWidth?: number; // if set, chart is a fixed-width scroller (points don't squeeze)
+  alignEnd?: boolean;
+  onPoint?: (index: number) => void;
 }) {
-  const W = 800;
-  const padL = 40, padR = 12, padT = 10, padB = 22;
-  const plotW = W - padL - padR;
+  const n = data.length;
+  const padL = 40, padR = 14, padT = 10, padB = 22;
+  // Fixed inner width when pointWidth given (scrollable); else a responsive viewBox.
+  const innerW = pointWidth ? Math.max(1, n) * pointWidth : 760;
+  const W = innerW + padL + padR;
+  const plotW = innerW;
   const plotH = height - padT - padB;
   const max = Math.max(1, ...data.flatMap((d) => d.values), zone ? zone.hi : 0) * 1.08;
-  const n = data.length;
   const x = (i: number) => padL + (n <= 1 ? plotW / 2 : (i / (n - 1)) * plotW);
   const y = (v: number) => padT + plotH - (v / max) * plotH;
-  const labelStep = Math.ceil(n / 12);
+  const labelStep = Math.max(1, Math.ceil(n / (pointWidth ? 24 : 12)));
+  const scrollRef = useScrollEnd<HTMLDivElement>(!!alignEnd && !!pointWidth, n);
+
+  const svg = (
+    <svg viewBox={`0 0 ${W} ${height}`} width={pointWidth ? W : "100%"} height={height} preserveAspectRatio={pointWidth ? "xMinYMid meet" : "none"} style={{ overflow: "visible", display: "block" }}>
+      {zone && <rect x={padL} y={y(zone.hi)} width={plotW} height={y(zone.lo) - y(zone.hi)} fill={C.greenBg} stroke={`${C.green}55`} strokeDasharray="4 4" />}
+      {[0, 0.5, 1].map((f) => (
+        <text key={f} x={padL - 6} y={y(max * f) + 3} textAnchor="end" fontSize={9} fill={C.textDim}>{fmt(max * f)}</text>
+      ))}
+      {series.map((s, si) => (
+        <g key={s.name}>
+          <polyline points={data.map((d, i) => `${x(i)},${y(d.values[si] ?? 0)}`).join(" ")} fill="none" stroke={s.color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+          {data.map((d, i) => (
+            <circle
+              key={i}
+              cx={x(i)}
+              cy={y(d.values[si] ?? 0)}
+              r={onPoint ? 4 : 2.5}
+              fill={s.color}
+              style={{ cursor: onPoint ? "pointer" : "default" }}
+              onClick={onPoint ? () => onPoint(i) : undefined}
+            >
+              <title>{`${d.label} · ${s.name}: ${fmt(d.values[si] ?? 0)}`}</title>
+            </circle>
+          ))}
+        </g>
+      ))}
+      {data.map((d, i) => (i % labelStep === 0 || i === n - 1) && (
+        <text key={i} x={x(i)} y={height - 6} textAnchor="middle" fontSize={9} fill={C.textDim}>{d.label}</text>
+      ))}
+    </svg>
+  );
 
   return (
     <div>
-      <svg viewBox={`0 0 ${W} ${height}`} width="100%" height={height} preserveAspectRatio="none" style={{ overflow: "visible" }}>
-        {zone && (
-          <rect x={padL} y={y(zone.hi)} width={plotW} height={y(zone.lo) - y(zone.hi)} fill={C.greenBg} stroke={`${C.green}55`} strokeDasharray="4 4" />
-        )}
-        {[0, 0.5, 1].map((f) => (
-          <text key={f} x={padL - 6} y={y(max * f) + 3} textAnchor="end" fontSize={9} fill={C.textDim}>{fmt(max * f)}</text>
-        ))}
-        {series.map((s, si) => {
-          const pts = data.map((d, i) => `${x(i)},${y(d.values[si] ?? 0)}`).join(" ");
-          return (
-            <g key={s.name}>
-              <polyline points={pts} fill="none" stroke={s.color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
-              {data.map((d, i) => <circle key={i} cx={x(i)} cy={y(d.values[si] ?? 0)} r={2.5} fill={s.color} />)}
-            </g>
-          );
-        })}
-        {data.map((d, i) => (i % labelStep === 0 || i === n - 1) && (
-          <text key={i} x={x(i)} y={height - 6} textAnchor="middle" fontSize={9} fill={C.textDim}>{d.label}</text>
-        ))}
-      </svg>
+      {pointWidth ? <div ref={scrollRef} style={{ overflowX: "auto" }}>{svg}</div> : svg}
       <div style={{ display: "flex", gap: 14, marginTop: 6, flexWrap: "wrap" }}>
         {series.map((s) => (
           <span key={s.name} style={{ fontSize: 11, color: C.textMuted }}>
@@ -616,6 +655,7 @@ export function LineChart({
           </span>
         ))}
         {zone && <span style={{ fontSize: 11, color: C.green }}>▬ Zdravá zóna {zone.lo}–{zone.hi}h</span>}
+        {onPoint && <span style={{ fontSize: 11, color: C.textDim }}>Klik na bod = detail obdobia dole</span>}
       </div>
     </div>
   );

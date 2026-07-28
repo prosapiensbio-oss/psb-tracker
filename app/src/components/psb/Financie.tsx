@@ -232,7 +232,7 @@ function Predikcia({ data, clients }: { data: PSBData; clients: Record<string, C
           <StatCard value={fmtCZK(pred.scenarios.optimistic)} label={`Optimistický · ${monthsCovered}`} color={C.green} />
           <StatCard value={fmtCZK(pred.scenarios.realistic)} label={`Realistický · ${monthsCovered}`} color={C.accentLight} />
           <StatCard value={fmtCZK(pred.scenarios.negative)} label={`Negatívny · ${monthsCovered}`} color={C.orange} />
-          <StatCard value={fmtCZK(pred.monthlyRunRate)} label="Očak. mesačný run-rate" color={C.blue} />
+          <StatCard value={fmtCZK(pred.monthlyRunRate)} label={<Info text="Run-rate = odhadovaný bežný mesačný príjem, ak klienti chodia ako doteraz. Súčet očakávaného mesačného príjmu všetkých aktívnych klientov (tempo × cena sedenia), pred vážením dôverou obnovy. Orientačné „koľko mesačne generuje portfólio“." label="Očak. mesačný run-rate" />} color={C.blue} />
         </div>
         {!hasData && <Empty>Nahraj Payroll + Packages & Memberships CSV pre predikciu.</Empty>}
       </Card>

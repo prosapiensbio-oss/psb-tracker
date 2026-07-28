@@ -22,16 +22,26 @@ function Prehlad({ data }: { data: PSBData }) {
   const [trainerF, setTrainerF] = useState("all");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [win, setWin] = useState("all"); // days window over history
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const { sort, toggle, sorted } = useSort({ key: "period", dir: "asc" });
 
+  const range = useMemo(() => {
+    if (period === "custom") return { from, to };
+    const days = Number(win);
+    if (days > 0) return { from: new Date(Date.now() - days * 86400000).toISOString().slice(0, 10) };
+    return undefined;
+  }, [period, from, to, win]);
+
   const rows = useMemo(
-    () => groupTrainings(data.sessions, period, trainerF, period === "custom" ? { from, to } : undefined),
-    [data.sessions, period, trainerF, from, to],
+    () => groupTrainings(data.sessions, period, trainerF, range),
+    [data.sessions, period, trainerF, range],
   );
+  const chrono = useMemo(() => [...rows].sort((a, b) => a.ts - b.ts), [rows]);
   const both = trainerF === "all";
   const sortedRows = useMemo(
     () =>
-      sorted(rows, {
+      sorted(selectedKey ? rows.filter((g) => g.key === selectedKey) : rows, {
         period: (g) => g.ts,
         jerry: (g) => g.byTrainer["Jerry"]?.hours || 0,
         terezka: (g) => g.byTrainer["Terezka"]?.hours || 0,
@@ -41,7 +51,7 @@ function Prehlad({ data }: { data: PSBData }) {
         czk: (g) => (g.total.sessions ? g.total.revenue / g.total.sessions : 0),
         score: (g) => g.score,
       }),
-    [rows, sorted],
+    [rows, sorted, selectedKey],
   );
 
   const summary = useMemo(() => {
@@ -61,14 +71,15 @@ function Prehlad({ data }: { data: PSBData }) {
     return C.red;
   };
 
-  const chart = useMemo(() => {
-    const chrono = [...rows].sort((a, b) => a.ts - b.ts);
-    return chrono.map((g) =>
-      both
-        ? { label: g.key, values: [g.byTrainer["Jerry"]?.hours || 0, g.byTrainer["Terezka"]?.hours || 0, g.total.hours] }
-        : { label: g.key, values: [g.total.hours] },
-    );
-  }, [rows, both]);
+  const chart = useMemo(
+    () =>
+      chrono.map((g) =>
+        both
+          ? { label: g.key, values: [g.byTrainer["Jerry"]?.hours || 0, g.byTrainer["Terezka"]?.hours || 0, g.total.hours] }
+          : { label: g.key, values: [g.total.hours] },
+      ),
+    [chrono, both],
+  );
   const zone = periodZone(period);
   const lineSeries = both
     ? [{ name: "Jerry", color: C.accent }, { name: "Terezka", color: C.accentLight }, { name: "Spolu", color: C.blue }]
@@ -91,6 +102,14 @@ function Prehlad({ data }: { data: PSBData }) {
           { value: "Jerry", label: "Jerry" },
           { value: "Terezka", label: "Terezka" },
         ]} />
+        {period !== "custom" && (
+          <Select value={win} onChange={setWin} options={[
+            { value: "all", label: "Celá história" },
+            { value: "365", label: "Posledný rok" },
+            { value: "180", label: "Posledných 6 mes." },
+            { value: "90", label: "Posledný kvartál" },
+          ]} />
+        )}
         {period === "custom" && (
           <>
             <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} style={{ ...S.select, colorScheme: "dark" }} />
@@ -110,8 +129,27 @@ function Prehlad({ data }: { data: PSBData }) {
 
       {period !== "custom" && chart.length > 0 && (
         <div style={{ marginBottom: 16 }}>
-          <LineChart data={chart} series={lineSeries} zone={zone} height={210} fmt={(n) => `${Math.round(n)}h`} />
-          <div style={{ fontSize: 11, color: C.textDim, marginTop: 4 }}>Trend odtrénovaných hodín — stúpa/klesá naprieč obdobiami.</div>
+          <LineChart
+            data={chart}
+            series={lineSeries}
+            zone={zone}
+            height={210}
+            fmt={(n) => `${Math.round(n)}h`}
+            pointWidth={48}
+            alignEnd
+            onPoint={(i) => setSelectedKey((k) => (k === chrono[i]?.key ? null : chrono[i]?.key ?? null))}
+          />
+          <div style={{ fontSize: 11, color: C.textDim, marginTop: 4 }}>
+            Trend odtrénovaných hodín — stúpa/klesá. Otvára sa na aktuálnom období, posúvaj doľava. Klik na bod = detail obdobia v tabuľke dole.
+          </div>
+        </div>
+      )}
+
+      {selectedKey && (
+        <div style={{ marginBottom: 10 }}>
+          <button onClick={() => setSelectedKey(null)} style={{ background: C.accentBg, border: `1px solid ${C.accent}`, borderRadius: 6, padding: "5px 10px", color: C.accentLight, fontSize: 12, cursor: "pointer" }}>
+            Vybraté obdobie: {selectedKey} ✕
+          </button>
         </div>
       )}
 

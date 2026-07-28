@@ -40,7 +40,7 @@ const SEG_WEEKS = 18;
 const ANCHOR_H = 1.08;
 const STABLE_H = 0.66;
 const SPORADIC_H = 0.33;
-export const TARGET_H = 29;
+export const TARGET_H = 30; // weekly goal per trainer (zone tops out at 34, but 30 is the aim)
 export const ZONE_LO = 24;
 export const ZONE_HI = 34;
 
@@ -446,19 +446,21 @@ export type CapacityRow = {
   effHours: number; // segment-weighted (portfolio quality) — kept for reference
   // Real-hours capacity (what the trainer actually works):
   recentWeekly: number; // avg hours/week over the last ~8 active weeks
-  hoursPerClient: number; // recentWeekly / active clients
-  canTake: number; // additional clients until the top of the healthy zone (34h)
-  util: number; // recentWeekly / target (29h) as %
+  peakWeekly: number; // busiest week in the recent window — the binding constraint
+  hoursPerClient: number; // peakWeekly / active clients (a busy-week client load)
+  canTake: number; // more clients until even a busy week stays within the 30h goal
+  util: number; // peakWeekly / goal (30h) as % — how full the busy weeks are
   advice: string;
 };
 
-const CAP_WEEKS = 8;
+const CAP_AVG_WEEKS = 8;
+const CAP_PEAK_WEEKS = 12;
 
 export function capacityByTrainer(clients: Record<string, ClientAgg>, sessions: SessionRow[]): CapacityRow[] {
-  // The last CAP_WEEKS distinct weeks present in the data.
   const allWeeks = [...new Set(sessions.map((s) => weekKey(s.date)))].sort();
-  const recentWeeks = new Set(allWeeks.slice(-CAP_WEEKS));
-  const nWeeks = recentWeeks.size || 1;
+  const avgWeeks = new Set(allWeeks.slice(-CAP_AVG_WEEKS));
+  const peakWeeks = allWeeks.slice(-CAP_PEAK_WEEKS);
+  const nAvg = avgWeeks.size || 1;
 
   return TRAINERS.map((trainer) => {
     const cl = Object.values(clients).filter((c) => c.primaryTrainer === trainer && c.status !== "Neaktívny");
@@ -468,22 +470,32 @@ export function capacityByTrainer(clients: Record<string, ClientAgg>, sessions: 
     const clientCount = cl.length;
     const effHours = anchor * ANCHOR_H + stable * STABLE_H + sporadic * SPORADIC_H;
 
-    // Actual hours the trainer worked per week over the recent window.
-    let recentHours = 0;
+    // Weekly hours actually worked. Avg = typical week; peak = the busiest of the
+    // last 12 weeks (the "everyone shows up" week) — that's what limits capacity.
+    const perWeek: Record<string, number> = {};
+    let avgHours = 0;
     for (const s of sessions) {
-      if (s.sessionTrainer === trainer && recentWeeks.has(weekKey(s.date))) recentHours += s.duration / 60;
+      if (s.sessionTrainer !== trainer) continue;
+      const w = weekKey(s.date);
+      perWeek[w] = (perWeek[w] || 0) + s.duration / 60;
+      if (avgWeeks.has(w)) avgHours += s.duration / 60;
     }
-    const recentWeekly = recentHours / nWeeks;
-    const hoursPerClient = clientCount ? recentWeekly / clientCount : 0;
-    const canTake = hoursPerClient > 0 ? Math.max(0, Math.floor((ZONE_HI - recentWeekly) / hoursPerClient)) : 0;
-    const util = (recentWeekly / TARGET_H) * 100;
+    const recentWeekly = avgHours / nAvg;
+    const peakWeekly = Math.max(0, ...peakWeeks.map((w) => perWeek[w] || 0));
+
+    // How many more average clients before a busy week would blow past the goal.
+    const perClientBusy = clientCount ? peakWeekly / clientCount : 0;
+    const canTake = perClientBusy > 0 && peakWeekly < TARGET_H ? Math.floor((TARGET_H - peakWeekly) / perClientBusy) : 0;
+    const util = peakWeekly ? (peakWeekly / TARGET_H) * 100 : 0;
 
     const advice =
-      recentWeekly > ZONE_HI
-        ? `Nad zónou (${recentWeekly.toFixed(0)}h/týž) — preťaženie, zváž zástup`
-        : `Zvládne ešte ~${canTake} klientov (do plnej kapacity 34h/týž)`;
+      peakWeekly > ZONE_HI
+        ? `Rušné týždne nad zónou (${peakWeekly.toFixed(0)}h) — preťaženie, zváž zástup`
+        : peakWeekly >= TARGET_H
+          ? `Rušné týždne už na cieli ${TARGET_H}h — priestor len cez uvoľnenie/zástup`
+          : `Zvládne ešte ~${canTake} klientov (aby aj rušný týždeň ostal do ${TARGET_H}h)`;
 
-    return { trainer, anchor, stable, sporadic, clients: clientCount, effHours, recentWeekly, hoursPerClient, canTake, util, advice };
+    return { trainer, anchor, stable, sporadic, clients: clientCount, effHours, recentWeekly, peakWeekly, hoursPerClient: perClientBusy, canTake, util, advice };
   });
 }
 
