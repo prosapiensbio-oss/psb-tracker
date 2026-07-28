@@ -348,25 +348,24 @@ function CapacityCard({ capacity, trainer, onNavigate }: { capacity: CapacityRow
   const terezka = capacity.find((c) => c.trainer === "Terezka");
 
   // Follows the trainer pill: Obaja = Spolu PSB, else the selected trainer.
-  let name: string, clients: number, avg: number, peak: number, canTake: number, target: number;
+  const BUSY = ZONE_HI; // 34h
+  let name: string, clients: number, avg: number, busy: number, canTake: number, util: number;
   if (trainer === "all") {
     name = "Spolu (PSB)";
     clients = (jerry?.clients || 0) + (terezka?.clients || 0);
     avg = (jerry?.recentWeekly || 0) + (terezka?.recentWeekly || 0);
-    peak = (jerry?.peakWeekly || 0) + (terezka?.peakWeekly || 0);
+    busy = (jerry?.busyWeekly || 0) + (terezka?.busyWeekly || 0);
     canTake = (jerry?.canTake || 0) + (terezka?.canTake || 0);
-    target = TARGET_H * 2;
+    util = Math.round(Math.max(avg / (TARGET_H * 2), busy / (BUSY * 2)) * 100);
   } else {
     const c = trainer === "Jerry" ? jerry : terezka;
     name = trainer;
     clients = c?.clients || 0;
     avg = c?.recentWeekly || 0;
-    peak = c?.peakWeekly || 0;
+    busy = c?.busyWeekly || 0;
     canTake = c?.canTake || 0;
-    target = TARGET_H;
+    util = c?.util || 0;
   }
-  // Utilisation = how full the BUSY weeks are vs the 30h goal (the real limit).
-  const util = target ? (peak / target) * 100 : 0;
   const color = util <= 100 ? C.green : util <= 113 ? C.orange : C.red;
 
   return (
@@ -374,7 +373,7 @@ function CapacityCard({ capacity, trainer, onNavigate }: { capacity: CapacityRow
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
         <H3>
           <Info
-            text={`Vyťaženie z REÁLNYCH hodín. 100 % = cieľ ${TARGET_H}h/týž v rušnom týždni (nie 34 — to je horná hranica zóny, ktorú nechceme prekračovať). Počíta sa z NAJRUŠNEJŠIEHO týždňa (posledných 12), lebo to je moment, keď prídu (skoro) všetci — a to určuje strop. „Zvládne ešte N" = koľko klientov pridať, aby ani rušný týždeň neprekročil ${TARGET_H}h. Mení sa podľa prepínača trénera.`}
+            text={`Vyťaženie z REÁLNYCH hodín – „dvojitý strop". Rastie sa, kým buď typický týždeň (priemer) nedosiahne ideál ${TARGET_H}h, ALEBO rušný týždeň (80. percentil, nie jednorazová špička) nenarazí na strop ${BUSY}h – čo príde skôr. 100 % = jeden z týchto stropov je naplnený. „Zvládne ešte N" = koľko priemerných klientov pridať do tohto stropu. Mení sa podľa prepínača trénera.`}
             label={`Kapacita & vyťaženie — ${name}`}
           />
         </H3>
@@ -383,7 +382,7 @@ function CapacityCard({ capacity, trainer, onNavigate }: { capacity: CapacityRow
       <div style={{ display: "flex", gap: 20, alignItems: "center", marginTop: 8, flexWrap: "wrap" }}>
         <div>
           <div style={{ fontSize: 40, fontWeight: 800, color, lineHeight: 1 }}>{util.toFixed(0)}%</div>
-          <div style={{ fontSize: 11, color: C.textMuted }}>rušný týždeň vs cieľ {target}h</div>
+          <div style={{ fontSize: 11, color: C.textMuted }}>vyťaženie (ideál {trainer === "all" ? TARGET_H * 2 : TARGET_H}h)</div>
         </div>
         <div style={{ flex: 1, minWidth: 170 }}>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: C.textMuted, marginBottom: 4 }}>
@@ -391,11 +390,11 @@ function CapacityCard({ capacity, trainer, onNavigate }: { capacity: CapacityRow
             <strong style={{ color: C.text }}>{clients}</strong>
           </div>
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: C.textMuted, marginBottom: 4 }}>
-            <span>Priemerný / rušný týždeň</span>
-            <strong style={{ color: C.text }}>{avg.toFixed(0)}h / {peak.toFixed(0)}h</strong>
+            <span>Typický / rušný týždeň</span>
+            <strong style={{ color: C.text }}>{avg.toFixed(0)}h / {busy.toFixed(0)}h</strong>
           </div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: util > 100 ? C.orange : C.accentLight }}>
-            {util >= 100 ? `Rušné týždne na strope ${target}h` : `Zvládne ešte ~${canTake} klientov`}
+          <div style={{ fontSize: 14, fontWeight: 600, color: util >= 100 ? C.orange : C.accentLight }}>
+            {util >= 100 ? "Na strope kapacity" : `Zvládne ešte ~${canTake} klientov`}
           </div>
         </div>
       </div>

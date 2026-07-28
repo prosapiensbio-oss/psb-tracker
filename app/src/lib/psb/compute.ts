@@ -40,7 +40,7 @@ const SEG_WEEKS = 18;
 const ANCHOR_H = 1.08;
 const STABLE_H = 0.66;
 const SPORADIC_H = 0.33;
-export const TARGET_H = 30; // weekly goal per trainer (zone tops out at 34, but 30 is the aim)
+export const TARGET_H = 29; // ideal weekly hours per trainer (golden middle of 24–34)
 export const ZONE_LO = 24;
 export const ZONE_HI = 34;
 
@@ -444,17 +444,26 @@ export type CapacityRow = {
   sporadic: number;
   clients: number;
   effHours: number; // segment-weighted (portfolio quality) — kept for reference
-  // Real-hours capacity (what the trainer actually works):
-  recentWeekly: number; // avg hours/week over the last ~8 active weeks
-  peakWeekly: number; // busiest week in the recent window — the binding constraint
-  hoursPerClient: number; // peakWeekly / active clients (a busy-week client load)
-  canTake: number; // more clients until even a busy week stays within the 30h goal
-  util: number; // peakWeekly / goal (30h) as % — how full the busy weeks are
+  // "Dvojitý strop" real-hours capacity:
+  recentWeekly: number; // avg hours/week over the last ~8 weeks — the typical week
+  busyWeekly: number; // 80th-percentile week over 12 weeks — a typically busy week
+  peakWeekly: number; // absolute max week (12 wks) — reference only
+  canTake: number; // more avg clients until typical→29h OR busy→34h, whichever first
+  util: number; // the binding constraint as % — how full you really are
   advice: string;
 };
 
 const CAP_AVG_WEEKS = 8;
 const CAP_PEAK_WEEKS = 12;
+const BUSY_CAP = ZONE_HI; // 34h — busy weeks must not exceed the zone top
+
+function percentile(arr: number[], p: number): number {
+  if (!arr.length) return 0;
+  const a = [...arr].sort((x, y) => x - y);
+  const i = (a.length - 1) * p;
+  const lo = Math.floor(i);
+  return lo >= a.length - 1 ? a[lo] : a[lo] + (a[lo + 1] - a[lo]) * (i - lo);
+}
 
 export function capacityByTrainer(clients: Record<string, ClientAgg>, sessions: SessionRow[]): CapacityRow[] {
   const allWeeks = [...new Set(sessions.map((s) => weekKey(s.date)))].sort();
@@ -470,8 +479,6 @@ export function capacityByTrainer(clients: Record<string, ClientAgg>, sessions: 
     const clientCount = cl.length;
     const effHours = anchor * ANCHOR_H + stable * STABLE_H + sporadic * SPORADIC_H;
 
-    // Weekly hours actually worked. Avg = typical week; peak = the busiest of the
-    // last 12 weeks (the "everyone shows up" week) — that's what limits capacity.
     const perWeek: Record<string, number> = {};
     let avgHours = 0;
     for (const s of sessions) {
@@ -481,21 +488,25 @@ export function capacityByTrainer(clients: Record<string, ClientAgg>, sessions: 
       if (avgWeeks.has(w)) avgHours += s.duration / 60;
     }
     const recentWeekly = avgHours / nAvg;
-    const peakWeekly = Math.max(0, ...peakWeeks.map((w) => perWeek[w] || 0));
+    const peakVals = peakWeeks.map((w) => perWeek[w] || 0);
+    const busyWeekly = percentile(peakVals, 0.8);
+    const peakWeekly = Math.max(0, ...peakVals);
 
-    // How many more average clients before a busy week would blow past the goal.
-    const perClientBusy = clientCount ? peakWeekly / clientCount : 0;
-    const canTake = perClientBusy > 0 && peakWeekly < TARGET_H ? Math.floor((TARGET_H - peakWeekly) / perClientBusy) : 0;
-    const util = peakWeekly ? (peakWeekly / TARGET_H) * 100 : 0;
+    // Double cap: grow until the TYPICAL week reaches 29h OR a BUSY week reaches
+    // 34h — whichever comes first. Each added client behaves like the current
+    // average client (raises load by load/clientCount).
+    const roomTypical = recentWeekly > 0 ? clientCount * ((TARGET_H - recentWeekly) / recentWeekly) : 0;
+    const roomBusy = busyWeekly > 0 ? clientCount * ((BUSY_CAP - busyWeekly) / busyWeekly) : 0;
+    const canTake = Math.max(0, Math.floor(Math.min(roomTypical, roomBusy)));
+    // Utilisation = the tighter constraint (typical vs 29h, busy vs 34h).
+    const util = Math.round(Math.max(recentWeekly / TARGET_H, busyWeekly / BUSY_CAP) * 100);
 
     const advice =
-      peakWeekly > ZONE_HI
-        ? `Rušné týždne nad zónou (${peakWeekly.toFixed(0)}h) — preťaženie, zváž zástup`
-        : peakWeekly >= TARGET_H
-          ? `Rušné týždne už na cieli ${TARGET_H}h — priestor len cez uvoľnenie/zástup`
-          : `Zvládne ešte ~${canTake} klientov (aby aj rušný týždeň ostal do ${TARGET_H}h)`;
+      util >= 100
+        ? `Na strope — typický ${recentWeekly.toFixed(0)}h / rušný ${busyWeekly.toFixed(0)}h; priestor len cez zástup`
+        : `Zvládne ešte ~${canTake} klientov (typický týždeň → ${TARGET_H}h, rušný → ${BUSY_CAP}h)`;
 
-    return { trainer, anchor, stable, sporadic, clients: clientCount, effHours, recentWeekly, peakWeekly, hoursPerClient: perClientBusy, canTake, util, advice };
+    return { trainer, anchor, stable, sporadic, clients: clientCount, effHours, recentWeekly, busyWeekly, peakWeekly, canTake, util, advice };
   });
 }
 
