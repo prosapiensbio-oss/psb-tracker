@@ -1,4 +1,5 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 import {
   membershipBucket,
@@ -17,7 +18,7 @@ import { fmtCZK, monthLabel, weekKey, weekLabel } from "../../lib/psb/format";
 import { C, MEMBERSHIP_COLORS, mix, S, badge, btn } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import type { IngestResult } from "../../lib/psb/db.server";
-import type { Actions } from "./App";
+import type { Actions, NavFocus } from "./App";
 import { SessionTrend } from "./SessionTrend";
 import { ThemeSwitch } from "./ThemeSwitch";
 import { Card, Donut, Empty, H3, Info, StatCard, StatGrid, ValueBars, ZoneBars } from "./ui";
@@ -62,6 +63,184 @@ function TrainerPills({ value, onChange }: { value: string; onChange: (v: string
   );
 }
 
+// ── Reorderable dashboard layout (persisted in localStorage) ──────────────────
+type WidgetMeta = { id: string; label: string; span: 1 | 2 };
+const WIDGETS: WidgetMeta[] = [
+  { id: "hodiny", label: "Odrobené hodiny / týždeň", span: 1 },
+  { id: "zony", label: "Týždne v zdravej zóne", span: 1 },
+  { id: "kapacita", label: "Kapacita & vyťaženie", span: 1 },
+  { id: "6m", label: "6M klienti podľa fázy", span: 1 },
+  { id: "tempo", label: "Ø tempo klienta", span: 1 },
+  { id: "dovera", label: "Ø dôvera obnovy", span: 1 },
+  { id: "zarobky", label: "Mesačné zárobky", span: 1 },
+  { id: "balicky", label: "Klienti podľa balíčka", span: 1 },
+  { id: "trend", label: "Trend typov sedení", span: 2 },
+  { id: "register", label: "Na čo sa pozrieť", span: 2 },
+];
+const DEFAULT_ORDER = WIDGETS.map((w) => w.id);
+const ORDER_KEY = "psb-dash-order";
+const HIDDEN_KEY = "psb-dash-hidden";
+
+function useDashLayout() {
+  const [order, setOrder] = useState<string[]>(DEFAULT_ORDER);
+  const [hidden, setHidden] = useState<string[]>([]);
+
+  useEffect(() => {
+    try {
+      const o = JSON.parse(localStorage.getItem(ORDER_KEY) || "null");
+      if (Array.isArray(o)) {
+        const known = o.filter((id: string) => DEFAULT_ORDER.includes(id));
+        // Append any widget added in a later version that the saved order predates.
+        setOrder([...known, ...DEFAULT_ORDER.filter((id) => !known.includes(id))]);
+      }
+      const h = JSON.parse(localStorage.getItem(HIDDEN_KEY) || "null");
+      if (Array.isArray(h)) setHidden(h.filter((id: string) => DEFAULT_ORDER.includes(id)));
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const persistOrder = (o: string[]) => {
+    setOrder(o);
+    try {
+      localStorage.setItem(ORDER_KEY, JSON.stringify(o));
+    } catch {
+      /* ignore */
+    }
+  };
+  const persistHidden = (h: string[]) => {
+    setHidden(h);
+    try {
+      localStorage.setItem(HIDDEN_KEY, JSON.stringify(h));
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const move = (id: string, dir: -1 | 1) => {
+    const i = order.indexOf(id);
+    const j = i + dir;
+    if (i < 0 || j < 0 || j >= order.length) return;
+    const next = [...order];
+    [next[i], next[j]] = [next[j], next[i]];
+    persistOrder(next);
+  };
+  const dropOn = (dragId: string, targetId: string) => {
+    if (dragId === targetId) return;
+    const next = order.filter((x) => x !== dragId);
+    const at = next.indexOf(targetId);
+    next.splice(at, 0, dragId);
+    persistOrder(next);
+  };
+  const toggleHide = (id: string) =>
+    persistHidden(hidden.includes(id) ? hidden.filter((x) => x !== id) : [...hidden, id]);
+  const reset = () => {
+    persistOrder(DEFAULT_ORDER);
+    persistHidden([]);
+  };
+
+  return { order, hidden, move, dropOn, toggleHide, reset };
+}
+
+// 2 columns on wide screens, 1 on narrow — inline styles can't hold media queries.
+function useDashColumns() {
+  const [cols, setCols] = useState(2);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 760px)");
+    const apply = () => setCols(mq.matches ? 1 : 2);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
+  return cols;
+}
+
+// A compact clickable stat used in the weekly-hours summary strip.
+function MiniStat({ label, value, color, onClick }: { label: ReactNode; value: string; color?: string; onClick?: () => void }) {
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        background: C.track,
+        borderRadius: 8,
+        padding: "8px 10px",
+        cursor: onClick ? "pointer" : "default",
+        border: `1px solid ${onClick ? mix(C.accent, 22) : "transparent"}`,
+        minWidth: 0,
+      }}
+    >
+      <div style={{ fontSize: 20, fontWeight: 800, color: color ?? C.accentLight, lineHeight: 1.1 }}>{value}</div>
+      <div style={{ fontSize: 10.5, color: C.textMuted, marginTop: 3, display: "flex", alignItems: "center", gap: 3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+        {label}
+        {onClick && <span style={{ color: C.textDim }}>→</span>}
+      </div>
+    </div>
+  );
+}
+
+// Wrapper that gives a widget its grid span and, in arrange mode, the drag/move/hide chrome.
+function WidgetShell({
+  meta,
+  cols,
+  arranging,
+  isHidden,
+  layout,
+  children,
+}: {
+  meta: WidgetMeta;
+  cols: number;
+  arranging: boolean;
+  isHidden: boolean;
+  layout: ReturnType<typeof useDashLayout>;
+  children: ReactNode;
+}) {
+  const [over, setOver] = useState(false);
+  const span = Math.min(meta.span, cols);
+  const wrap: CSSProperties = { gridColumn: `span ${span}`, minWidth: 0, marginBottom: 12 };
+
+  if (!arranging) return <div style={wrap}>{children}</div>;
+
+  return (
+    <div
+      draggable
+      onDragStart={(e) => { e.dataTransfer.setData("text/plain", meta.id); e.dataTransfer.effectAllowed = "move"; }}
+      onDragOver={(e) => { e.preventDefault(); setOver(true); }}
+      onDragLeave={() => setOver(false)}
+      onDrop={(e) => { e.preventDefault(); setOver(false); const id = e.dataTransfer.getData("text/plain"); if (id) layout.dropOn(id, meta.id); }}
+      style={{
+        ...wrap,
+        border: `2px dashed ${over ? C.accent : mix(C.accent, 30)}`,
+        borderRadius: 12,
+        padding: 6,
+        background: over ? C.accentBg : "transparent",
+        opacity: isHidden ? 0.45 : 1,
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6, padding: "2px 4px" }}>
+        <span style={{ cursor: "grab", color: C.textDim, fontSize: 15, lineHeight: 1 }} title="Ťahaj myšou">⠿</span>
+        <span style={{ fontSize: 12, color: C.textMuted, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", flex: 1 }}>{meta.label}</span>
+        <button onClick={() => layout.move(meta.id, -1)} title="Posunúť vyššie" style={arrBtn}>↑</button>
+        <button onClick={() => layout.move(meta.id, 1)} title="Posunúť nižšie" style={arrBtn}>↓</button>
+        <button onClick={() => layout.toggleHide(meta.id)} title={isHidden ? "Zobraziť" : "Skryť"} style={{ ...arrBtn, color: isHidden ? C.textDim : C.accentLight }}>
+          {isHidden ? "🚫" : "👁"}
+        </button>
+      </div>
+      <div style={{ pointerEvents: "none" }}>{children}</div>
+    </div>
+  );
+}
+
+const arrBtn: CSSProperties = {
+  background: C.card,
+  border: `1px solid ${C.border}`,
+  borderRadius: 6,
+  color: C.textMuted,
+  cursor: "pointer",
+  fontSize: 12,
+  lineHeight: 1,
+  padding: "4px 7px",
+};
+
 export function Dashboard({
   data,
   clients,
@@ -77,11 +256,14 @@ export function Dashboard({
   sixM: SixMRow[];
   capacity: CapacityRow[];
   actions: Actions;
-  onNavigate: (tab: string, sub?: string) => void;
+  onNavigate: (tab: string, sub?: string, focus?: NavFocus) => void;
 }) {
   const [trainer, setTrainer] = useState("all");
   const [showAcked, setShowAcked] = useState(false);
   const [tempoUnit, setTempoUnit] = useState<"mes" | "tyz">("mes");
+  const [arranging, setArranging] = useState(false);
+  const layout = useDashLayout();
+  const cols = useDashColumns();
   const matchT = (t: string) => trainer === "all" || t === trainer;
 
   const predAgg = useMemo(() => {
@@ -137,6 +319,25 @@ export function Dashboard({
         values: trainer === "all" ? [v.Jerry, v.Terezka] : [trainer === "Jerry" ? v.Jerry : v.Terezka],
       })),
     };
+  }, [weekRows, trainer]);
+
+  // Ø / max / min weekly hours (basis follows the trainer pill: "all" = PSB total per week).
+  const weekStats = useMemo(() => {
+    const pts = weekRows
+      .map(([k, v]) => ({
+        label: weekLabel(k),
+        h: trainer === "all" ? v.Jerry + v.Terezka : trainer === "Jerry" ? v.Jerry : v.Terezka,
+      }))
+      .filter((p) => p.h > 0);
+    if (!pts.length) return null;
+    let max = pts[0], min = pts[0];
+    let sum = 0;
+    for (const p of pts) {
+      sum += p.h;
+      if (p.h > max.h) max = p;
+      if (p.h < min.h) min = p;
+    }
+    return { avg: sum / pts.length, max, min, n: pts.length };
   }, [weekRows, trainer]);
 
   // How many trainer-weeks landed in / below / above the healthy zone.
@@ -197,118 +398,115 @@ export function Dashboard({
   const acked = register.filter((r) => r.acked);
   const visible = showAcked ? register : open;
 
-  return (
-    <>
-      <div style={{ marginBottom: 12 }}>
-        <TrainerPills value={trainer} onChange={setTrainer} />
-      </div>
+  // Click-through helper: focus one week in Tréningy → Prehľad.
+  const openWeek = (weekLabelStr: string) => onNavigate("treningy", "prehled", { week: weekLabelStr, trainer, nonce: Date.now() });
 
-      <StatGrid>
-        <StatCard value={stats.active} label="Aktívnych klientov" onClick={() => onNavigate("klienti")} />
-        <StatCard value={`${stats.weekHours.toFixed(0)}h`} label={stats.lastWeek ? `Odrobené (týž. ${weekLabel(stats.lastWeek)})` : "Týždenné hodiny"} onClick={() => onNavigate("treningy")} />
-        <StatCard value={fmtCZK(stats.monthRevenue)} label={stats.lastMonth ? `Zárobky ${monthLabel(stats.lastMonth)}` : "Mesačné zárobky"} onClick={() => onNavigate("financie")} />
-        <StatCard value={stats.sixMCount} label="6M klientov" onClick={() => onNavigate("6m")} />
-      </StatGrid>
-
-      {/* Nosný riadok: hodiny/týždeň (ľavá polovica) + týždne v zóne (pravá) */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 12, marginBottom: 12, alignItems: "stretch" }}>
-        <Card style={{ marginBottom: 0 }}>
-          <H3>
-            <Info text="Odtrénované hodiny za týždeň. Otvára sa na najnovšom týždni — posúvaj doľava do minulosti. Zelené pásmo 24–34h je zdravá zóna na jedného trénera." label="Odrobené hodiny / týždeň" />
-          </H3>
-          {weeklyHours.data.length ? (
-            <ZoneBars data={weeklyHours.data} series={weeklyHours.series} zone={{ lo: ZONE_LO, hi: ZONE_HI }} height={180} alignEnd />
-          ) : (
-            <Empty>Nahraj Payroll by Session.</Empty>
-          )}
-        </Card>
-        <Card style={{ marginBottom: 0 }}>
-          <H3>
-            <Info text="Koľko trénerských týždňov padlo do zdravej zóny (24–34h), pod ňu alebo nad ňu — za celé obdobie." label="Týždne v zdravej zóne" />
-          </H3>
-          {zones.total ? (
-            <Donut
-              size={140}
-              centerLabel={`${Math.round((zones.zdrava / zones.total) * 100)}%`}
-              data={[
-                { label: "Zdravá zóna", value: zones.zdrava, color: C.green },
-                { label: "Pod zónou", value: zones.pod, color: C.red },
-                { label: "Nad zónou", value: zones.nad, color: C.orange },
-              ]}
-            />
-          ) : (
-            <Empty>Nahraj Payroll by Session.</Empty>
-          )}
-        </Card>
-      </div>
-
-      {/* Kapacita (ľavá) + 6M fázy (pravá) */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 12, marginBottom: 12, alignItems: "stretch" }}>
-        <CapacityCard capacity={capacity} trainer={trainer} onNavigate={onNavigate} />
-        <Card style={{ marginBottom: 0 }}>
-          <H3>
-            <Info text="Rozdelenie 6M klientov podľa fázy procesu: Obnova (1.–6. mesiac), Integrácia (7.–18.), Udržateľnosť (19+). Mení sa podľa prepínača trénera hore." label="6M klienti podľa fázy" />
-          </H3>
-          {sixMPhases.total ? (
-            <Donut size={140} centerLabel={String(sixMPhases.total)} data={sixMPhases.data} />
-          ) : (
-            <Empty>{trainer === "all" ? "Žiadni 6M klienti." : `${trainer} nemá 6M klientov.`}</Empty>
-          )}
-        </Card>
-      </div>
-
-      {/* Priemerné tempo + dôvera obnovy (klik → Predikcia) */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 12, marginBottom: 12, alignItems: "stretch" }}>
-        <Card style={{ marginBottom: 0, cursor: "pointer" }} >
-          <div onClick={() => onNavigate("financie")}>
-            <H3>
-              <Info text="Priemerné tempo klienta = ako často klient chodí (sedení za mesiac/týždeň), priemer cez klientov. Mení sa podľa prepínača trénera. Klik → Financie → Predikcia (detail podľa klienta)." label="Ø tempo klienta" />
-            </H3>
-            <div style={{ fontSize: 34, fontWeight: 800, color: C.accentLight, lineHeight: 1 }}>
-              {(tempoUnit === "mes" ? predAgg.tempoMes : predAgg.tempoTyz).toFixed(1)}
-              <span style={{ fontSize: 13, color: C.textMuted, fontWeight: 500 }}> sedení/{tempoUnit === "mes" ? "mes." : "týž."}</span>
-            </div>
+  // Widget bodies, keyed by id — rendered in the user's saved order below.
+  const nodes: Record<string, ReactNode> = {
+    hodiny: (
+      <Card style={{ marginBottom: 0, height: "100%" }}>
+        <H3>
+          <Info text="Odtrénované hodiny za týždeň. Otvára sa na najnovšom týždni — posúvaj doľava do minulosti. Zelené pásmo 24–34h je zdravá zóna na jedného trénera." label="Odrobené hodiny / týždeň" />
+        </H3>
+        {weeklyHours.data.length ? (
+          <ZoneBars data={weeklyHours.data} series={weeklyHours.series} zone={{ lo: ZONE_LO, hi: ZONE_HI }} height={180} alignEnd />
+        ) : (
+          <Empty>Nahraj Payroll by Session.</Empty>
+        )}
+        {weekStats && (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 8, marginTop: 10 }}>
+            <MiniStat label={`Ø / týždeň (${weekStats.n})`} value={`${weekStats.avg.toFixed(1)}h`} />
+            <MiniStat label={`Max · ${weekStats.max.label}`} value={`${weekStats.max.h.toFixed(0)}h`} color={C.orange} onClick={() => openWeek(weekStats.max.label)} />
+            <MiniStat label={`Min · ${weekStats.min.label}`} value={`${weekStats.min.h.toFixed(0)}h`} color={C.blue} onClick={() => openWeek(weekStats.min.label)} />
           </div>
-          <div style={{ display: "flex", gap: 4, marginTop: 8 }}>
-            {(["mes", "tyz"] as const).map((u) => (
-              <button key={u} onClick={(e) => { e.stopPropagation(); setTempoUnit(u); }} style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${tempoUnit === u ? C.accent : C.border}`, background: tempoUnit === u ? C.accentBg : "transparent", color: tempoUnit === u ? C.accentLight : C.textMuted, fontSize: 11, cursor: "pointer" }}>
-                tempo/{u === "mes" ? "mes." : "týž."}
-              </button>
-            ))}
-          </div>
-        </Card>
-        <Card style={{ marginBottom: 0, cursor: "pointer" }}>
-          <div onClick={() => onNavigate("financie")}>
-            <H3>
-              <Info text="Priemerná dôvera obnovy = ako pravdepodobne klienti obnovia/pokračujú (podľa segmentu a 6M fázy), priemer cez klientov. Klik → Financie → Predikcia." label="Ø dôvera obnovy" />
-            </H3>
-            <div style={{ fontSize: 34, fontWeight: 800, color: predAgg.conf >= 70 ? C.green : predAgg.conf >= 50 ? C.orange : C.red, lineHeight: 1 }}>
-              {predAgg.conf.toFixed(0)}%
-            </div>
-            <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4 }}>priemer cez {trainer === "all" ? "všetkých" : trainer} klientov · klik → Predikcia →</div>
-          </div>
-        </Card>
-      </div>
-
-      {/* Mesačné zárobky (ľavá, širšia) + balíčky klientov (pravá) */}
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(320px, 2fr) minmax(240px, 1fr)", gap: 12, marginBottom: 12, alignItems: "stretch" }}>
-        <Card style={{ marginBottom: 0 }}>
+        )}
+      </Card>
+    ),
+    zony: (
+      <Card style={{ marginBottom: 0, height: "100%" }}>
+        <H3>
+          <Info text="Koľko trénerských týždňov padlo do zdravej zóny (24–34h), pod ňu alebo nad ňu — za celé obdobie." label="Týždne v zdravej zóne" />
+        </H3>
+        {zones.total ? (
+          <Donut
+            size={140}
+            centerLabel={`${Math.round((zones.zdrava / zones.total) * 100)}%`}
+            data={[
+              { label: "Zdravá zóna", value: zones.zdrava, color: C.green },
+              { label: "Pod zónou", value: zones.pod, color: C.red },
+              { label: "Nad zónou", value: zones.nad, color: C.orange },
+            ]}
+          />
+        ) : (
+          <Empty>Nahraj Payroll by Session.</Empty>
+        )}
+      </Card>
+    ),
+    kapacita: <CapacityCard capacity={capacity} trainer={trainer} onNavigate={onNavigate} />,
+    "6m": (
+      <Card style={{ marginBottom: 0, height: "100%" }}>
+        <H3>
+          <Info text="Rozdelenie 6M klientov podľa fázy procesu: Obnova (1.–6. mesiac), Integrácia (7.–18.), Udržateľnosť (19+). Mení sa podľa prepínača trénera hore." label="6M klienti podľa fázy" />
+        </H3>
+        {sixMPhases.total ? (
+          <Donut size={140} centerLabel={String(sixMPhases.total)} data={sixMPhases.data} />
+        ) : (
+          <Empty>{trainer === "all" ? "Žiadni 6M klienti." : `${trainer} nemá 6M klientov.`}</Empty>
+        )}
+      </Card>
+    ),
+    tempo: (
+      <Card style={{ marginBottom: 0, height: "100%", cursor: "pointer" }}>
+        <div onClick={() => onNavigate("financie")}>
           <H3>
-            <Info text="Vyfakturované zárobky za mesiac. Otvára sa na najnovšom mesiaci — posúvaj doľava do minulosti. Posledné 2 svetlé stĺpce (⌁) sú odhad na ďalšie mesiace." label={trainer === "all" ? "Mesačné zárobky + odhad" : `Mesačné zárobky — ${trainer}`} />
+            <Info text="Priemerné tempo klienta = ako často klient chodí (sedení za mesiac/týždeň), priemer cez klientov. Mení sa podľa prepínača trénera. Klik → Financie → Predikcia (detail podľa klienta)." label="Ø tempo klienta" />
           </H3>
-          {earnings.length ? <ValueBars data={earnings} color={C.accent} forecastColor={C.blue} fmt={(n) => `${Math.round(n / 1000)}k`} height={180} alignEnd /> : <Empty>Nahraj Payroll.</Empty>}
-        </Card>
-        <Card style={{ marginBottom: 0 }}>
+          <div style={{ fontSize: 34, fontWeight: 800, color: C.accentLight, lineHeight: 1 }}>
+            {(tempoUnit === "mes" ? predAgg.tempoMes : predAgg.tempoTyz).toFixed(1)}
+            <span style={{ fontSize: 13, color: C.textMuted, fontWeight: 500 }}> sedení/{tempoUnit === "mes" ? "mes." : "týž."}</span>
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 4, marginTop: 8 }}>
+          {(["mes", "tyz"] as const).map((u) => (
+            <button key={u} onClick={(e) => { e.stopPropagation(); setTempoUnit(u); }} style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${tempoUnit === u ? C.accent : C.border}`, background: tempoUnit === u ? C.accentBg : "transparent", color: tempoUnit === u ? C.accentLight : C.textMuted, fontSize: 11, cursor: "pointer" }}>
+              tempo/{u === "mes" ? "mes." : "týž."}
+            </button>
+          ))}
+        </div>
+      </Card>
+    ),
+    dovera: (
+      <Card style={{ marginBottom: 0, height: "100%", cursor: "pointer" }}>
+        <div onClick={() => onNavigate("financie")}>
           <H3>
-            <Info text="Koľko klientov má aký typ balíčka/predplatného (z reportu Packages & Memberships). Mení sa podľa prepínača trénera hore." label="Klienti podľa balíčka" />
+            <Info text="Priemerná dôvera obnovy = ako pravdepodobne klienti obnovia/pokračujú (podľa segmentu a 6M fázy), priemer cez klientov. Klik → Financie → Predikcia." label="Ø dôvera obnovy" />
           </H3>
-          {membershipDonut.length ? <Donut size={130} centerLabel={String(membershipDonut.reduce((a, d) => a + d.value, 0))} data={membershipDonut} onSlice={() => onNavigate("klienti")} /> : <Empty>Nahraj Packages & Memberships.</Empty>}
-        </Card>
-      </div>
-
-      <SessionTrend sessions={sessionsT} onNavigate={() => onNavigate("treningy", "analyza")} />
-
-      <Card>
+          <div style={{ fontSize: 34, fontWeight: 800, color: predAgg.conf >= 70 ? C.green : predAgg.conf >= 50 ? C.orange : C.red, lineHeight: 1 }}>
+            {predAgg.conf.toFixed(0)}%
+          </div>
+          <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4 }}>priemer cez {trainer === "all" ? "všetkých" : trainer} klientov · klik → Predikcia →</div>
+        </div>
+      </Card>
+    ),
+    zarobky: (
+      <Card style={{ marginBottom: 0, height: "100%" }}>
+        <H3>
+          <Info text="Vyfakturované zárobky za mesiac. Otvára sa na najnovšom mesiaci — posúvaj doľava do minulosti. Posledné 2 svetlé stĺpce (⌁) sú odhad na ďalšie mesiace." label={trainer === "all" ? "Mesačné zárobky + odhad" : `Mesačné zárobky — ${trainer}`} />
+        </H3>
+        {earnings.length ? <ValueBars data={earnings} color={C.accent} forecastColor={C.blue} fmt={(n) => `${Math.round(n / 1000)}k`} height={180} alignEnd /> : <Empty>Nahraj Payroll.</Empty>}
+      </Card>
+    ),
+    balicky: (
+      <Card style={{ marginBottom: 0, height: "100%" }}>
+        <H3>
+          <Info text="Koľko klientov má aký typ balíčka/predplatného (z reportu Packages & Memberships). Mení sa podľa prepínača trénera hore." label="Klienti podľa balíčka" />
+        </H3>
+        {membershipDonut.length ? <Donut size={130} centerLabel={String(membershipDonut.reduce((a, d) => a + d.value, 0))} data={membershipDonut} onSlice={() => onNavigate("klienti")} /> : <Empty>Nahraj Packages & Memberships.</Empty>}
+      </Card>
+    ),
+    trend: <SessionTrend sessions={sessionsT} onNavigate={() => onNavigate("treningy", "analyza")} />,
+    register: (
+      <Card style={{ marginBottom: 0 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
           <H3>
             <Info
@@ -328,6 +526,56 @@ export function Dashboard({
           <Empty>Nič nevyžaduje pozornosť 🌿</Empty>
         )}
       </Card>
+    ),
+  };
+
+  const shown = arranging ? layout.order : layout.order.filter((id) => !layout.hidden.includes(id));
+
+  return (
+    <>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+        <TrainerPills value={trainer} onChange={setTrainer} />
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          {arranging && (
+            <button onClick={layout.reset} style={{ ...btn("ghost"), fontSize: 12, padding: "6px 12px" }}>Obnoviť rozloženie</button>
+          )}
+          <button
+            onClick={() => setArranging((v) => !v)}
+            style={{
+              ...btn(arranging ? "accent" : "outline"),
+              fontSize: 12,
+              padding: "6px 14px",
+            }}
+          >
+            {arranging ? "Hotovo" : "⠿ Usporiadať"}
+          </button>
+        </div>
+      </div>
+
+      {arranging && (
+        <div style={{ marginBottom: 12, padding: "9px 12px", borderRadius: 8, background: C.accentBg, border: `1px solid ${mix(C.accent, 33)}`, fontSize: 12, color: C.textMuted, lineHeight: 1.5 }}>
+          Ťahaj karty myšou na iné miesto, alebo použi šípky <strong style={{ color: C.text }}>↑ ↓</strong>. Klikni na <strong style={{ color: C.text }}>👁</strong> pre skrytie karty. Rozloženie sa uloží v tomto prehliadači.
+        </div>
+      )}
+
+      <StatGrid>
+        <StatCard value={stats.active} label="Aktívnych klientov" onClick={() => onNavigate("klienti")} />
+        <StatCard value={`${stats.weekHours.toFixed(0)}h`} label={stats.lastWeek ? `Odrobené (týž. ${weekLabel(stats.lastWeek)})` : "Týždenné hodiny"} onClick={() => onNavigate("treningy")} />
+        <StatCard value={fmtCZK(stats.monthRevenue)} label={stats.lastMonth ? `Zárobky ${monthLabel(stats.lastMonth)}` : "Mesačné zárobky"} onClick={() => onNavigate("financie")} />
+        <StatCard value={stats.sixMCount} label="6M klientov" onClick={() => onNavigate("6m")} />
+      </StatGrid>
+
+      <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, minmax(0,1fr))`, gridAutoFlow: "row dense", gap: 12, marginBottom: 12, alignItems: "start" }}>
+        {shown.map((id) => {
+          const meta = WIDGETS.find((w) => w.id === id);
+          if (!meta) return null;
+          return (
+            <WidgetShell key={id} meta={meta} cols={cols} arranging={arranging} isHidden={layout.hidden.includes(id)} layout={layout}>
+              {nodes[id]}
+            </WidgetShell>
+          );
+        })}
+      </div>
 
       <UploadCard data={data} missing={missing} actions={actions} />
 

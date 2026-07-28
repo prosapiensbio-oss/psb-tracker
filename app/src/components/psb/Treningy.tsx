@@ -1,23 +1,24 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { groupTrainings, periodZone, sessionAnalysis, TARGET_H, type ClientAgg, type Period } from "../../lib/psb/compute";
 import { fmtCZK, monthLabel } from "../../lib/psb/format";
 import { C, S } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
+import type { NavFocus } from "./App";
 import { SessionTrend } from "./SessionTrend";
 import { Card, Donut, Empty, H3, Info, LineChart, Select, SortTh, StatCard, SubTabs, TableWrap, Toolbar, useSort } from "./ui";
 
-export function Treningy({ data, sub, onSub }: { data: PSBData; clients: Record<string, ClientAgg>; sub: string; onSub: (s: string) => void }) {
+export function Treningy({ data, sub, onSub, focus }: { data: PSBData; clients: Record<string, ClientAgg>; sub: string; onSub: (s: string) => void; focus?: NavFocus | null }) {
   return (
     <>
       <SubTabs tabs={[{ id: "prehled", label: "Prehľad" }, { id: "analyza", label: "Analýza sedení" }]} value={sub} onChange={onSub} />
-      {sub === "prehled" && <Prehlad data={data} />}
+      {sub === "prehled" && <Prehlad data={data} focus={focus} />}
       {sub === "analyza" && <Analyza data={data} />}
     </>
   );
 }
 
-function Prehlad({ data }: { data: PSBData }) {
+function Prehlad({ data, focus }: { data: PSBData; focus?: NavFocus | null }) {
   const [period, setPeriod] = useState<Period>("week");
   const [trainerF, setTrainerF] = useState("all");
   const [from, setFrom] = useState("");
@@ -25,6 +26,15 @@ function Prehlad({ data }: { data: PSBData }) {
   const [win, setWin] = useState("all"); // days window over history
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const { sort, toggle, sorted } = useSort({ key: "period", dir: "desc" });
+
+  // Deep-link from the Dashboard: focus a specific week (weekLabel is the row key).
+  useEffect(() => {
+    if (!focus?.week) return;
+    setPeriod("week");
+    setWin("all");
+    setTrainerF(focus.trainer && focus.trainer !== "all" ? focus.trainer : "all");
+    setSelectedKey(focus.week);
+  }, [focus?.nonce]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const range = useMemo(() => {
     if (period === "custom") return { from, to };

@@ -35,6 +35,9 @@ export type Actions = {
   refresh: () => Promise<void>;
 };
 
+// Deep-link into Tréningy → Prehľad focused on one week (from Dashboard click-throughs).
+export type NavFocus = { week?: string; trainer?: string; nonce?: number };
+
 const TABS = [
   { id: "dashboard", label: "Dashboard", icon: "home" },
   { id: "treningy", label: "Tréningy", icon: "calendar" },
@@ -49,11 +52,13 @@ export function PSBApp() {
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState("dashboard");
   const [treningySub, setTreningySub] = useState("prehled");
+  const [treningyFocus, setTreningyFocus] = useState<NavFocus | null>(null);
 
-  // Navigate to a tab, optionally to a specific Tréningy sub-tab.
-  const navigate = useCallback((tab: string, sub?: string) => {
+  // Navigate to a tab, optionally to a specific Tréningy sub-tab + focused week.
+  const navigate = useCallback((tab: string, sub?: string, focus?: NavFocus) => {
     setActive(tab);
     if (tab === "treningy" && sub) setTreningySub(sub);
+    if (tab === "treningy" && focus) setTreningyFocus(focus);
   }, []);
 
   const load = useCallback(async () => {
@@ -157,7 +162,7 @@ export function PSBApp() {
         {active === "dashboard" && (
           <Dashboard data={data} clients={clients} register={register} sixM={sixM} capacity={capacity} actions={actions} onNavigate={navigate} />
         )}
-        {active === "treningy" && <Treningy data={data} clients={clients} sub={treningySub} onSub={setTreningySub} />}
+        {active === "treningy" && <Treningy data={data} clients={clients} sub={treningySub} onSub={setTreningySub} focus={treningyFocus} />}
         {active === "klienti" && <Klienti clients={clients} capacity={capacity} actions={actions} />}
         {active === "financie" && <Financie data={data} clients={clients} />}
         {active === "6m" && <SixMTracker sixM={sixM} actions={actions} />}
