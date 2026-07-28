@@ -151,14 +151,21 @@ export async function ingest(DB: D1Database, filename: string, text: string): Pr
     }
     if (stmts.length) await DB.batch(stmts);
   } else if (type === "packages") {
-    // Snapshot report — replace wholesale.
+    // Per-client MERGE, not a wholesale replace: refresh package rows only for the
+    // clients present in THIS file, and leave every other client's packages intact.
+    // PTminder exports are often partial (one package type / filtered view), so a
+    // wholesale replace would wipe clients missing from the file. This way uploads
+    // accumulate safely by client, and a client's rows are always the latest snapshot.
     const rows = parsePackages(text);
-    await DB.prepare("DELETE FROM packages").run();
-    const stmts = rows.map((r) =>
-      DB.prepare(
-        "INSERT INTO packages (id,client_name,client_status,package_name,sessions_remaining,sessions_total) VALUES (?,?,?,?,?,?)",
-      ).bind(uid(), r.client, r.status, r.package, r.remaining, r.total),
-    );
+    const clientsInFile = [...new Set(rows.map((r) => r.client))];
+    const stmts = [
+      ...clientsInFile.map((name) => DB.prepare("DELETE FROM packages WHERE client_name = ?").bind(name)),
+      ...rows.map((r) =>
+        DB.prepare(
+          "INSERT INTO packages (id,client_name,client_status,package_name,sessions_remaining,sessions_total) VALUES (?,?,?,?,?,?)",
+        ).bind(uid(), r.client, r.status, r.package, r.remaining, r.total),
+      ),
+    ];
     if (stmts.length) await DB.batch(stmts);
     added = rows.length;
   }
