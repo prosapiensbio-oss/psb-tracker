@@ -586,6 +586,7 @@ export function LineChart({
   data,
   series,
   zone,
+  refLine,
   height = 200,
   fmt = (n: number) => String(Math.round(n)),
   pointWidth,
@@ -595,6 +596,7 @@ export function LineChart({
   data: { label: string; values: number[] }[];
   series: { name: string; color: string }[];
   zone?: { lo: number; hi: number };
+  refLine?: { value: number; label?: string; color?: string };
   height?: number;
   fmt?: (n: number) => string;
   pointWidth?: number; // if set, chart is a fixed-width scroller (points don't squeeze)
@@ -608,7 +610,7 @@ export function LineChart({
   const W = innerW + padL + padR;
   const plotW = innerW;
   const plotH = height - padT - padB;
-  const max = Math.max(1, ...data.flatMap((d) => d.values), zone ? zone.hi : 0) * 1.08;
+  const max = Math.max(1, ...data.flatMap((d) => d.values), zone ? zone.hi : 0, refLine ? refLine.value : 0) * 1.08;
   const x = (i: number) => padL + (n <= 1 ? plotW / 2 : (i / (n - 1)) * plotW);
   const y = (v: number) => padT + plotH - (v / max) * plotH;
   const labelStep = Math.max(1, Math.ceil(n / (pointWidth ? 24 : 12)));
@@ -617,6 +619,12 @@ export function LineChart({
   const svg = (
     <svg viewBox={`0 0 ${W} ${height}`} width={pointWidth ? W : "100%"} height={height} preserveAspectRatio={pointWidth ? "xMinYMid meet" : "none"} style={{ overflow: "visible", display: "block" }}>
       {zone && <rect x={padL} y={y(zone.hi)} width={plotW} height={y(zone.lo) - y(zone.hi)} fill={C.greenBg} stroke={`${mix(C.green, 33)}`} strokeDasharray="4 4" />}
+      {refLine && (
+        <g>
+          <line x1={padL} y1={y(refLine.value)} x2={padL + plotW} y2={y(refLine.value)} stroke={refLine.color ?? C.accentLight} strokeWidth={1.4} strokeDasharray="6 4" opacity={0.85} />
+          <text x={padL + plotW - 2} y={y(refLine.value) - 4} textAnchor="end" fontSize={9} fill={refLine.color ?? C.accentLight}>{refLine.label ?? `Ø ${fmt(refLine.value)}`}</text>
+        </g>
+      )}
       {[0, 0.5, 1].map((f) => (
         <text key={f} x={padL - 6} y={y(max * f) + 3} textAnchor="end" fontSize={9} fill={C.textDim}>{fmt(max * f)}</text>
       ))}

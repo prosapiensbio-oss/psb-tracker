@@ -18,6 +18,7 @@ import { C, MEMBERSHIP_COLORS, mix, S, badge, btn } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import type { IngestResult } from "../../lib/psb/db.server";
 import type { Actions } from "./App";
+import { SessionTrend } from "./SessionTrend";
 import { ThemeSwitch } from "./ThemeSwitch";
 import { Card, Donut, Empty, H3, Info, StatCard, StatGrid, ValueBars, ZoneBars } from "./ui";
 
@@ -76,7 +77,7 @@ export function Dashboard({
   sixM: SixMRow[];
   capacity: CapacityRow[];
   actions: Actions;
-  onNavigate: (tab: string) => void;
+  onNavigate: (tab: string, sub?: string) => void;
 }) {
   const [trainer, setTrainer] = useState("all");
   const [showAcked, setShowAcked] = useState(false);
@@ -168,6 +169,8 @@ export function Dashboard({
     }
     return bars;
   }, [data, clients, trainer]);
+
+  const sessionsT = useMemo(() => data.sessions.filter((s) => matchT(s.sessionTrainer)), [data.sessions, trainer]);
 
   const membershipDonut = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -302,6 +305,8 @@ export function Dashboard({
           {membershipDonut.length ? <Donut size={130} centerLabel={String(membershipDonut.reduce((a, d) => a + d.value, 0))} data={membershipDonut} onSlice={() => onNavigate("klienti")} /> : <Empty>Nahraj Packages & Memberships.</Empty>}
         </Card>
       </div>
+
+      <SessionTrend sessions={sessionsT} showBand onNavigate={() => onNavigate("treningy", "analyza")} />
 
       <Card>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>

@@ -48,6 +48,13 @@ export function PSBApp() {
   const [data, setData] = useState<PSBData>(EMPTY_DATA);
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState("dashboard");
+  const [treningySub, setTreningySub] = useState("prehled");
+
+  // Navigate to a tab, optionally to a specific Tréningy sub-tab.
+  const navigate = useCallback((tab: string, sub?: string) => {
+    setActive(tab);
+    if (tab === "treningy" && sub) setTreningySub(sub);
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -148,9 +155,9 @@ export function PSBApp() {
       </nav>
       <div style={{ padding: 16, maxWidth: 1200, margin: "0 auto" }}>
         {active === "dashboard" && (
-          <Dashboard data={data} clients={clients} register={register} sixM={sixM} capacity={capacity} actions={actions} onNavigate={setActive} />
+          <Dashboard data={data} clients={clients} register={register} sixM={sixM} capacity={capacity} actions={actions} onNavigate={navigate} />
         )}
-        {active === "treningy" && <Treningy data={data} clients={clients} />}
+        {active === "treningy" && <Treningy data={data} clients={clients} sub={treningySub} onSub={setTreningySub} />}
         {active === "klienti" && <Klienti clients={clients} capacity={capacity} actions={actions} />}
         {active === "financie" && <Financie data={data} clients={clients} />}
         {active === "6m" && <SixMTracker sixM={sixM} actions={actions} />}

@@ -4,13 +4,13 @@ import { groupTrainings, periodZone, sessionAnalysis, TARGET_H, type ClientAgg, 
 import { fmtCZK, monthLabel } from "../../lib/psb/format";
 import { C, S } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
+import { SessionTrend } from "./SessionTrend";
 import { Card, Donut, Empty, H3, Info, LineChart, Select, SortTh, StatCard, SubTabs, TableWrap, Toolbar, useSort } from "./ui";
 
-export function Treningy({ data }: { data: PSBData; clients: Record<string, ClientAgg> }) {
-  const [sub, setSub] = useState("prehled");
+export function Treningy({ data, sub, onSub }: { data: PSBData; clients: Record<string, ClientAgg>; sub: string; onSub: (s: string) => void }) {
   return (
     <>
-      <SubTabs tabs={[{ id: "prehled", label: "Prehľad" }, { id: "analyza", label: "Analýza sedení" }]} value={sub} onChange={setSub} />
+      <SubTabs tabs={[{ id: "prehled", label: "Prehľad" }, { id: "analyza", label: "Analýza sedení" }]} value={sub} onChange={onSub} />
       {sub === "prehled" && <Prehlad data={data} />}
       {sub === "analyza" && <Analyza data={data} />}
     </>
@@ -282,6 +282,8 @@ function Analyza({ data }: { data: PSBData }) {
         </div>
         {filtered.length ? <Donut data={donut} size={160} centerLabel={String(filtered.length)} /> : <Empty>Žiadne sedenia pre tento filter.</Empty>}
       </Card>
+
+      <SessionTrend sessions={filtered} />
 
       <Card>
         <H3>Detail po mesiacoch a trénerovi</H3>
