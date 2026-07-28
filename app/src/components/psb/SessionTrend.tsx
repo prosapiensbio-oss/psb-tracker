@@ -60,17 +60,17 @@ export function SessionTrend({ sessions, onNavigate }: { sessions: SessionRow[];
       </div>
 
       {monthly.length ? (
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(260px, 3fr) minmax(140px, 1fr)", gap: 16, alignItems: "center" }}>
-          <LineChart
-            data={data}
-            series={[{ name: cfg.label, color: cfg.color }]}
-            refLine={{ value: avg, label: `Ø ${avg.toFixed(1)}` }}
-            height={180}
-            pointWidth={46}
-            alignEnd
-            fmt={(x) => String(Math.round(x))}
-          />
-          <div style={{ textAlign: "center", borderLeft: `1px solid ${C.border}`, padding: "8px 4px" }}>
+        <div style={{ display: "flex", gap: 16, alignItems: "center", flexWrap: "wrap" }}>
+          <div style={{ flex: "4 1 280px", minWidth: 0 }}>
+            <LineChart
+              data={data}
+              series={[{ name: cfg.label, color: cfg.color }]}
+              refLine={{ value: avg, label: `Ø ${avg.toFixed(1)}` }}
+              height={180}
+              fmt={(x) => String(Math.round(x))}
+            />
+          </div>
+          <div style={{ flex: "1 1 130px", textAlign: "center", padding: "4px 8px" }}>
             <div style={{ fontSize: 40, fontWeight: 800, color: cfg.color, lineHeight: 1 }}>{avg.toFixed(1)}</div>
             <div style={{ fontSize: 12, color: C.textMuted, marginTop: 6 }}>Ø {cfg.label}<br />sedení / mesiac</div>
           </div>
