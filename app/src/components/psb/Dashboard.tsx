@@ -404,6 +404,22 @@ export function Dashboard({
     return bars;
   }, [data, clients, trainer]);
 
+  // Ø / max / min monthly earnings over ACTUAL months (forecast excluded), following the trainer pill.
+  const earningStats = useMemo(() => {
+    const pts = monthlyFinance(data)
+      .map((m) => ({ key: m.month, label: monthLabel(m.month), v: trainer === "all" ? m.revenue : m.byTrainer[trainer]?.revenue || 0 }))
+      .filter((p) => p.v > 0);
+    if (!pts.length) return null;
+    let max = pts[0], min = pts[0];
+    let sum = 0;
+    for (const p of pts) {
+      sum += p.v;
+      if (p.v > max.v) max = p;
+      if (p.v < min.v) min = p;
+    }
+    return { avg: sum / pts.length, max, min, n: pts.length };
+  }, [data, trainer]);
+
   const sessionsT = useMemo(() => data.sessions.filter((s) => matchT(s.sessionTrainer)), [data.sessions, trainer]);
 
   const membershipDonut = useMemo(() => {
@@ -431,8 +447,9 @@ export function Dashboard({
   const acked = register.filter((r) => r.acked);
   const visible = showAcked ? register : open;
 
-  // Click-through helper: focus one week in Tréningy → Prehľad.
+  // Click-through helpers: focus one week in Tréningy → Prehľad / one month in Financie → Zárobky.
   const openWeek = (weekLabelStr: string) => onNavigate("treningy", "prehled", { week: weekLabelStr, trainer, nonce: Date.now() });
+  const openMonth = (monthKey: string) => onNavigate("financie", undefined, { month: monthKey, trainer, nonce: Date.now() });
 
   // Widget bodies, keyed by id — rendered in the user's saved order below.
   const nodes: Record<string, ReactNode> = {
@@ -528,9 +545,16 @@ export function Dashboard({
     zarobky: (
       <Card style={{ marginBottom: 0, height: "100%" }}>
         <H3>
-          <Info text="Vyfakturované zárobky za mesiac. Otvára sa na najnovšom mesiaci — posúvaj doľava do minulosti. Posledné 2 svetlé stĺpce (⌁) sú odhad na ďalšie mesiace." label={trainer === "all" ? "Mesačné zárobky + odhad" : `Mesačné zárobky — ${trainer}`} />
+          <Info text="Vyfakturované zárobky za mesiac. Otvára sa na najnovšom mesiaci — posúvaj doľava do minulosti. Posledné 2 svetlé stĺpce (⌁) sú odhad na ďalšie mesiace. Priemer/max/min sú len z reálnych mesiacov (bez odhadu)." label={trainer === "all" ? "Mesačné zárobky + odhad" : `Mesačné zárobky — ${trainer}`} />
         </H3>
         {earnings.length ? <ValueBars data={earnings} color={C.accent} forecastColor={C.blue} fmt={(n) => `${Math.round(n / 1000)}k`} height={180} alignEnd /> : <Empty>Nahraj Payroll.</Empty>}
+        {earningStats && (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 8, marginTop: 10 }}>
+            <MiniStat label={`Ø / mes. (${earningStats.n})`} value={`${Math.round(earningStats.avg / 1000)}k`} />
+            <MiniStat label={`Max · ${earningStats.max.label}`} value={`${Math.round(earningStats.max.v / 1000)}k`} color={C.green} onClick={() => openMonth(earningStats.max.key)} />
+            <MiniStat label={`Min · ${earningStats.min.label}`} value={`${Math.round(earningStats.min.v / 1000)}k`} color={C.orange} onClick={() => openMonth(earningStats.min.key)} />
+          </div>
+        )}
       </Card>
     ),
     balicky: (

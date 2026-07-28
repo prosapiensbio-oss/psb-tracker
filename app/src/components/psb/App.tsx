@@ -35,8 +35,8 @@ export type Actions = {
   refresh: () => Promise<void>;
 };
 
-// Deep-link into Tréningy → Prehľad focused on one week (from Dashboard click-throughs).
-export type NavFocus = { week?: string; trainer?: string; nonce?: number };
+// Deep-link from Dashboard click-throughs: focus one week (Tréningy → Prehľad) or one month (Financie → Zárobky).
+export type NavFocus = { week?: string; month?: string; trainer?: string; nonce?: number };
 
 const TABS = [
   { id: "dashboard", label: "Dashboard", icon: "home" },
@@ -53,12 +53,14 @@ export function PSBApp() {
   const [active, setActive] = useState("dashboard");
   const [treningySub, setTreningySub] = useState("prehled");
   const [treningyFocus, setTreningyFocus] = useState<NavFocus | null>(null);
+  const [financieFocus, setFinancieFocus] = useState<NavFocus | null>(null);
 
-  // Navigate to a tab, optionally to a specific Tréningy sub-tab + focused week.
+  // Navigate to a tab, optionally to a specific Tréningy sub-tab + focused week/month.
   const navigate = useCallback((tab: string, sub?: string, focus?: NavFocus) => {
     setActive(tab);
     if (tab === "treningy" && sub) setTreningySub(sub);
     if (tab === "treningy" && focus) setTreningyFocus(focus);
+    if (tab === "financie" && focus) setFinancieFocus(focus);
   }, []);
 
   const load = useCallback(async () => {
@@ -164,7 +166,7 @@ export function PSBApp() {
         )}
         {active === "treningy" && <Treningy data={data} clients={clients} sub={treningySub} onSub={setTreningySub} focus={treningyFocus} />}
         {active === "klienti" && <Klienti clients={clients} capacity={capacity} actions={actions} />}
-        {active === "financie" && <Financie data={data} clients={clients} />}
+        {active === "financie" && <Financie data={data} clients={clients} focus={financieFocus} />}
         {active === "6m" && <SixMTracker sixM={sixM} actions={actions} />}
       </div>
       <div style={{ ...S.h3, textAlign: "center", color: C.textDim, fontSize: 11, padding: "8px 0 24px", fontWeight: 400 }}>

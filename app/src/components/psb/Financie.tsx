@@ -1,16 +1,26 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { monthlyFinance, predictEarnings, type ClientAgg } from "../../lib/psb/compute";
 import { fmtCZK, monthLabel } from "../../lib/psb/format";
 import { C, S } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
+import type { NavFocus } from "./App";
 import { BarRow, Card, Empty, H3, Info, LineChart, Select, SortTh, StatCard, SubTabs, TableWrap, useSort, ValueBars } from "./ui";
 
 const MAX_SESSIONS_MONTH = 260;
 
-export function Financie({ data, clients }: { data: PSBData; clients: Record<string, ClientAgg> }) {
+export function Financie({ data, clients, focus }: { data: PSBData; clients: Record<string, ClientAgg>; focus?: NavFocus | null }) {
   const [sub, setSub] = useState("zarobky");
+  const [focusMonth, setFocusMonth] = useState<string | null>(null);
   const monthly = useMemo(() => monthlyFinance(data), [data]);
+
+  // Deep-link from the Dashboard: jump to Mesačné zárobky and highlight one month.
+  useEffect(() => {
+    if (!focus?.month) return;
+    setSub("zarobky");
+    setFocusMonth(focus.month);
+  }, [focus?.nonce]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
     <>
       <SubTabs
@@ -23,7 +33,7 @@ export function Financie({ data, clients }: { data: PSBData; clients: Record<str
         value={sub}
         onChange={setSub}
       />
-      {sub === "zarobky" && <Zarobky monthly={monthly} />}
+      {sub === "zarobky" && <Zarobky monthly={monthly} focusMonth={focusMonth} onClearFocus={() => setFocusMonth(null)} />}
       {sub === "cashflow" && <Cashflow monthly={monthly} />}
       {sub === "sedenia" && <Sedenia monthly={monthly} />}
       {sub === "predikcia" && <Predikcia data={data} clients={clients} />}
@@ -35,7 +45,7 @@ const arrow = (mom: number | null) => (mom == null ? "►" : mom > 2 ? "▲" : m
 const arrowColor = (mom: number | null) => (mom == null ? C.textDim : mom > 2 ? C.green : mom < -2 ? C.red : C.textMuted);
 type Monthly = ReturnType<typeof monthlyFinance>;
 
-function Zarobky({ monthly }: { monthly: Monthly }) {
+function Zarobky({ monthly, focusMonth, onClearFocus }: { monthly: Monthly; focusMonth?: string | null; onClearFocus?: () => void }) {
   const { sort, toggle, sorted } = useSort({ key: "month", dir: "asc" });
   const withMom = useMemo(
     () =>
@@ -64,6 +74,13 @@ function Zarobky({ monthly }: { monthly: Monthly }) {
       </Card>
       <Card>
         <div style={{ fontSize: 11, color: C.textDim, marginBottom: 8 }}>Zdroj: Payroll by Session. Sedenia s CZK0 sa počítajú do počtu, nie do zárobkov.</div>
+        {focusMonth && (
+          <div style={{ marginBottom: 10 }}>
+            <button onClick={onClearFocus} style={{ background: C.accentBg, border: `1px solid ${C.accent}`, borderRadius: 6, padding: "5px 10px", color: C.accentLight, fontSize: 12, cursor: "pointer" }}>
+              Vybraný mesiac: {monthLabel(focusMonth)} ✕
+            </button>
+          </div>
+        )}
         <TableWrap>
           <thead>
             <tr>
@@ -76,7 +93,7 @@ function Zarobky({ monthly }: { monthly: Monthly }) {
             </tr>
           </thead>
           <tbody>
-            {rows.map((m) => (
+            {(focusMonth ? rows.filter((m) => m.month === focusMonth) : rows).map((m) => (
               <tr key={m.month}>
                 <td style={S.td}>{monthLabel(m.month)}</td>
                 <td style={{ ...S.td, textAlign: "right" }}>{fmtCZK(m.byTrainer["Jerry"]?.revenue || 0)}</td>
