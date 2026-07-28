@@ -8,6 +8,8 @@ import { Badge, Card, Donut, Empty, H3, Info, Modal, Select, SortTh, StatCard, T
 
 const segTone = (s: string) => (s === "Anchor" ? "green" : s === "Stabilný" ? "orange" : "red");
 const segColor = (s: string) => (s === "Anchor" ? C.green : s === "Stabilný" ? C.orange : C.red);
+// Logical status order for sorting (not alphabetical, so Pauza/Neaktívny land last).
+const STATUS_RANK: Record<string, number> = { "Aktívny": 0, "Sporadický": 1, "Pauza": 2, "Neaktívny": 3 };
 const statusTone = (s: string) =>
   s === "Aktívny" ? "green" : s === "Sporadický" ? "blue" : s === "Pauza" ? "orange" : "muted";
 const SEGMENTS = ["Anchor", "Stabilný", "Sporadický"] as const;
@@ -82,7 +84,7 @@ export function Klienti({ clients, capacity, actions }: { clients: Record<string
     return sorted(arr, {
       name: (c) => c.name,
       trainer: (c) => c.primaryTrainer,
-      status: (c) => c.status,
+      status: (c) => STATUS_RANK[c.status] ?? 9,
       segment: (c) => c.attendance,
       type: (c) => c.membership || c.clientType,
       pkg: (c) => c.packageRemaining,

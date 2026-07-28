@@ -63,3 +63,13 @@ export const monthsBetween = (d1: string, d2: string | Date): number => {
 
 export const daysBetween = (d1: string | Date, d2: string | Date): number =>
   Math.floor((new Date(d2).getTime() - new Date(d1).getTime()) / 86400000);
+
+// Normalise a person's name for tolerant matching across reports / user input:
+// strip diacritics, lowercase, collapse whitespace. So "Jakub Stigut" == "Jakub Štigut".
+export const normName = (s: string): string =>
+  (s || "")
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();

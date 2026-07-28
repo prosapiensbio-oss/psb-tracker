@@ -15,7 +15,16 @@ type ParsedAction = {
   field?: string;
   value?: unknown;
 };
-type Msg = { role: "user" | "assistant"; text: string; actions?: ParsedAction[] };
+type Msg = { role: "user" | "assistant"; text: string; actions?: ParsedAction[]; images?: string[] };
+
+function fileToDataUrl(f: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result));
+    r.onerror = reject;
+    r.readAsDataURL(f);
+  });
+}
 
 // Client fields the assistant is allowed to edit (must match /api/override ALLOWED).
 const OVERRIDE_FIELDS = new Set(["status", "specialRate", "specialRateNote", "trainerNote", "contractSigned", "primaryTrainer"]);
@@ -74,6 +83,7 @@ export function Assistant({ context, actions }: { context: AiContext; actions: A
   const [busy, setBusy] = useState(false);
   const [drag, setDrag] = useState(false);
   const [pending, setPending] = useState<{ filename: string; text: string }[] | null>(null);
+  const [attach, setAttach] = useState<string[]>([]);
   const [size, setSize] = useState<{ w: number; h: number }>({ w: 400, h: 620 });
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -106,11 +116,19 @@ export function Assistant({ context, actions }: { context: AiContext; actions: A
     window.addEventListener("pointerup", up);
   }
 
-  async function onPickFiles(list: FileList | null) {
-    const files = [...(list || [])].filter((f) => f.name.toLowerCase().endsWith(".csv"));
-    if (!files.length) return;
-    const read = await Promise.all(files.map(async (f) => ({ filename: f.name, text: await f.text() })));
-    setPending(read);
+  // CSV → import flow; images → attach to the next message (Claude reads them).
+  async function handleIncoming(list: FileList | File[] | null) {
+    const arr = [...(list || [])];
+    const csv = arr.filter((f) => f.name.toLowerCase().endsWith(".csv"));
+    const imgs = arr.filter((f) => f.type.startsWith("image/"));
+    if (csv.length) {
+      const read = await Promise.all(csv.map(async (f) => ({ filename: f.name, text: await f.text() })));
+      setPending(read);
+    }
+    if (imgs.length) {
+      const urls = await Promise.all(imgs.slice(0, 4).map(fileToDataUrl));
+      setAttach((a) => [...a, ...urls].slice(0, 4));
+    }
   }
   useEffect(() => {
     try { localStorage.setItem("psb-ai-open", open ? "1" : "0"); } catch { /* ignore */ }
@@ -122,12 +140,14 @@ export function Assistant({ context, actions }: { context: AiContext; actions: A
 
   async function ask(question: string) {
     const q = question.trim();
-    if (!q || busy) return;
-    const history = [...msgs, { role: "user" as const, text: q }];
+    if ((!q && !attach.length) || busy) return;
+    const imgs = attach.length ? attach : undefined;
+    const history: Msg[] = [...msgs, { role: "user", text: q || "Pozri tento obrázok.", images: imgs }];
     setMsgs(history);
     setInput("");
+    setAttach([]);
     setBusy(true);
-    const res = await sendChat(history.map((m) => ({ role: m.role, content: m.text })), context);
+    const res = await sendChat(history.map((m) => ({ role: m.role, content: m.text, images: m.images })), context);
     setBusy(false);
     if (res.ok) {
       const { text, actions: acts } = parseActions(res.reply);
@@ -153,10 +173,7 @@ export function Assistant({ context, actions }: { context: AiContext; actions: A
   async function onDrop(e: React.DragEvent) {
     e.preventDefault();
     setDrag(false);
-    const files = [...e.dataTransfer.files].filter((f) => f.name.toLowerCase().endsWith(".csv"));
-    if (!files.length) return;
-    const read = await Promise.all(files.map(async (f) => ({ filename: f.name, text: await f.text() })));
-    setPending(read);
+    await handleIncoming(e.dataTransfer.files);
   }
 
   async function confirmImport() {
@@ -218,6 +235,11 @@ export function Assistant({ context, actions }: { context: AiContext; actions: A
         {msgs.map((m, mi) => (
           <div key={mi} style={{ alignSelf: m.role === "user" ? "flex-end" : "flex-start", maxWidth: "88%" }}>
             <div style={{ background: m.role === "user" ? C.accent : mix(C.text, 7), color: m.role === "user" ? C.onAccent : C.text, padding: "9px 12px", borderRadius: 12, fontSize: 13, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
+              {m.images?.length ? (
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: m.text ? 8 : 0 }}>
+                  {m.images.map((src, k) => <img key={k} src={src} alt="" style={{ maxWidth: 150, maxHeight: 150, borderRadius: 8, display: "block" }} />)}
+                </div>
+              ) : null}
               {fmt(m.text)}
             </div>
             {m.actions?.map((a, ai) => (
@@ -246,9 +268,19 @@ export function Assistant({ context, actions }: { context: AiContext; actions: A
         </div>
       )}
 
-      <div style={{ borderTop: `1px solid ${C.border}`, padding: 10, display: "flex", gap: 8, alignItems: "flex-end" }}>
-        <input ref={fileRef} type="file" accept=".csv,text/csv" multiple style={{ display: "none" }} onChange={(e) => { void onPickFiles(e.target.files); e.target.value = ""; }} />
-        <button onClick={() => fileRef.current?.click()} title="Nahrať CSV" style={{ width: 38, height: 38, borderRadius: 10, border: `1px solid ${C.border}`, cursor: "pointer", background: "transparent", color: C.textMuted, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }} aria-label="Nahrať CSV">
+      {attach.length > 0 && (
+        <div style={{ borderTop: `1px solid ${C.border}`, padding: "8px 10px 0", display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {attach.map((src, k) => (
+            <div key={k} style={{ position: "relative" }}>
+              <img src={src} alt="" style={{ width: 46, height: 46, objectFit: "cover", borderRadius: 6, display: "block", border: `1px solid ${C.border}` }} />
+              <button onClick={() => setAttach((a) => a.filter((_, j) => j !== k))} title="Odobrať" style={{ position: "absolute", top: -6, right: -6, width: 18, height: 18, borderRadius: 9, border: "none", background: C.red, color: "#fff", fontSize: 11, cursor: "pointer", lineHeight: "18px", padding: 0 }}>✕</button>
+            </div>
+          ))}
+        </div>
+      )}
+      <div style={{ borderTop: attach.length ? "none" : `1px solid ${C.border}`, padding: 10, display: "flex", gap: 8, alignItems: "flex-end" }}>
+        <input ref={fileRef} type="file" accept=".csv,text/csv,image/*" multiple style={{ display: "none" }} onChange={(e) => { void handleIncoming(e.target.files); e.target.value = ""; }} />
+        <button onClick={() => fileRef.current?.click()} title="Nahrať CSV alebo obrázok" style={{ width: 38, height: 38, borderRadius: 10, border: `1px solid ${C.border}`, cursor: "pointer", background: "transparent", color: C.textMuted, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }} aria-label="Nahrať CSV alebo obrázok">
           <svg width={17} height={17} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21.4 11.05 12.25 20.2a5 5 0 0 1-7.07-7.07l9.19-9.19a3 3 0 0 1 4.24 4.24l-8.49 8.49a1 1 0 0 1-1.41-1.41l7.78-7.78" /></svg>
         </button>
         <textarea
@@ -260,7 +292,7 @@ export function Assistant({ context, actions }: { context: AiContext; actions: A
           rows={1}
           style={{ flex: 1, resize: "none", maxHeight: 120, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: "9px 11px", color: C.text, fontSize: 13, outline: "none", fontFamily: "inherit", lineHeight: 1.4 }}
         />
-        <button onClick={() => ask(input)} disabled={busy || !input.trim()} style={{ width: 38, height: 38, borderRadius: 10, border: "none", cursor: busy || !input.trim() ? "default" : "pointer", background: input.trim() ? C.accent : C.border, color: C.onAccent, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }} aria-label="Odoslať">
+        <button onClick={() => ask(input)} disabled={busy || (!input.trim() && !attach.length)} style={{ width: 38, height: 38, borderRadius: 10, border: "none", cursor: busy || (!input.trim() && !attach.length) ? "default" : "pointer", background: input.trim() || attach.length ? C.accent : C.border, color: C.onAccent, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }} aria-label="Odoslať">
           <Send />
         </button>
       </div>

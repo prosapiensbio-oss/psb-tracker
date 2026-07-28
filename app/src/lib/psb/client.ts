@@ -66,7 +66,7 @@ export type ChatResult =
   | { ok: false; error: string; status?: number; detail?: string };
 
 export async function sendChat(
-  messages: { role: "user" | "assistant"; content: string }[],
+  messages: { role: "user" | "assistant"; content: string; images?: string[] }[],
   context: unknown,
 ): Promise<ChatResult> {
   try {

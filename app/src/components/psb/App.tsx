@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   checkSession,
@@ -17,6 +17,7 @@ import {
 } from "../../lib/psb/compute";
 import { buildAiContext } from "../../lib/psb/aiContext";
 import { Assistant } from "./Assistant";
+import { normName } from "../../lib/psb/format";
 import { C, S, tab } from "../../lib/psb/theme";
 import type { ClientOverride, PSBData } from "../../lib/psb/types";
 import { EMPTY_DATA } from "../../lib/psb/types";
@@ -81,6 +82,9 @@ export function PSBApp() {
   }, [load]);
 
   const clients = useMemo(() => deriveClients(data), [data]);
+  // Latest clients for tolerant name resolution in setOverride (e.g. AI passes "Jakub Stigut" → "Jakub Štigut").
+  const clientsRef = useRef(clients);
+  clientsRef.current = clients;
   const sixM = useMemo(() => deriveSixM(data, clients), [data, clients]);
   const capacity = useMemo(() => capacityByTrainer(clients, data.sessions), [clients, data.sessions]);
   const register = useMemo(() => deriveRegister(data, clients, sixM, capacity), [data, clients, sixM, capacity]);
@@ -89,12 +93,21 @@ export function PSBApp() {
   const actions = useMemo<Actions>(
     () => ({
       setOverride: (name, key, value) => {
+        // Resolve to the real client name (diacritics/case/whitespace-insensitive)
+        // so an AI-proposed "Jakub Stigut" still edits "Jakub Štigut".
+        const all = clientsRef.current;
+        let canonical = name;
+        if (!all[name]) {
+          const target = normName(name);
+          const hit = Object.keys(all).find((n) => normName(n) === target);
+          if (hit) canonical = hit;
+        }
         // Optimistic local update, then persist.
         setData((prev) => ({
           ...prev,
-          clientOverrides: { ...prev.clientOverrides, [name]: { ...prev.clientOverrides[name], [key]: value } },
+          clientOverrides: { ...prev.clientOverrides, [canonical]: { ...prev.clientOverrides[canonical], [key]: value } },
         }));
-        void saveOverride(name, key, value);
+        void saveOverride(canonical, key, value);
       },
       ackAnomaly: (key, note, ack = true) => {
         setData((prev) => {
