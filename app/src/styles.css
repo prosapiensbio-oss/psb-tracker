@@ -112,20 +112,96 @@
   }
 }
 
-/* ── PSB Tracker brand overrides ─────────────────────────────────────────────
- * Internal data tool: pin the PSB dark-green surface + system UI font on top of
- * the scaffold's Quanta base, so the whole app reads as ProSapiens Biomechanic. */
+/* ── PSB Tracker palettes ────────────────────────────────────────────────────
+ * Three themes in the same "forest" language, switchable at runtime via
+ * data-psb-theme on <html>. Default = Tmavý. */
+:root,
+:root[data-psb-theme="dark"] {
+  --c-bg: #1a1e16;           /* tmavý mach */
+  --c-card: #252b1f;         /* lesná pôda */
+  --c-cardHover: #2f3627;
+  --c-border: #6b8c4230;
+  --c-accent: #6b8c42;       /* listová zeleň */
+  --c-accentLight: #95c45a;  /* svetlé lístie na slnku */
+  --c-accentBg: #6b8c421f;
+  --c-text: #e0dcc8;         /* teplý krémový */
+  --c-textMuted: #aaa995;
+  --c-textDim: #7c7e68;
+  --c-red: #c25b44;
+  --c-redBg: #c25b4422;
+  --c-orange: #d4a04a;       /* slnko — teplé varovanie */
+  --c-orangeBg: #d4a04a22;
+  --c-green: #8fbe52;
+  --c-greenBg: #8fbe5222;
+  --c-blue: #6e93ae;
+  --c-blueBg: #6e93ae22;
+  --c-bark: #7a5c3a;         /* kôra — progress + Udržateľnosť */
+  --c-track: #ffffff0d;
+  --c-onAccent: #faf8ef;
+  color-scheme: dark;
+}
+
+:root[data-psb-theme="mid"] {
+  --c-bg: #ddd8c6;           /* suchý mach na slnku */
+  --c-card: #ece9de;         /* svetlý lišajník */
+  --c-cardHover: #e3e0d2;
+  --c-border: #c8c2ae;       /* suchý list */
+  --c-accent: #5e7c38;
+  --c-accentLight: #456127;  /* tmavá zeleň pre čísla/nadpisy na svetlom */
+  --c-accentBg: #5e7c381a;
+  --c-text: #2c3524;         /* mokrý mach */
+  --c-textMuted: #6b7560;    /* tieň pod stromom */
+  --c-textDim: #8a9280;
+  --c-red: #b0503c;
+  --c-redBg: #b0503c1a;
+  --c-orange: #b9821f;
+  --c-orangeBg: #b9821f1a;
+  --c-green: #4e7a34;
+  --c-greenBg: #4e7a341a;
+  --c-blue: #3e6e86;
+  --c-blueBg: #3e6e861a;
+  --c-bark: #7a5c3a;
+  --c-track: #0000000d;
+  --c-onAccent: #fbfaf2;
+  color-scheme: light;
+}
+
+:root[data-psb-theme="light"] {
+  --c-bg: #343d2c;           /* podvečerný mach */
+  --c-card: #424b38;         /* tieň pod korunou */
+  --c-cardHover: #4c563f;
+  --c-border: #566048;       /* lišajník na kôre */
+  --c-accent: #7ba24c;
+  --c-accentLight: #aacb78;
+  --c-accentBg: #7ba24c22;
+  --c-text: #e8e5d6;
+  --c-textMuted: #b4b79e;
+  --c-textDim: #8a907a;
+  --c-red: #d0715a;
+  --c-redBg: #d0715a22;
+  --c-orange: #e0b05a;
+  --c-orangeBg: #e0b05a22;
+  --c-green: #9ccb63;
+  --c-greenBg: #9ccb6322;
+  --c-blue: #7fa8c4;
+  --c-blueBg: #7fa8c422;
+  --c-bark: #9a7a50;
+  --c-track: #ffffff10;
+  --c-onAccent: #1b2113;
+  color-scheme: dark;
+}
+
 @layer base {
   html,
   body {
-    background-color: #0f1712;
-    color: #e8e6e0;
+    background-color: var(--c-bg);
+    color: var(--c-text);
     font-family:
       system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   }
 }
 
-/* Native form controls should follow the dark theme (date pickers, selects). */
+/* Native form controls follow the active theme (date pickers, selects). */
 input,
 select,
 textarea,
@@ -133,6 +209,6 @@ button {
   font-family: inherit;
 }
 ::placeholder {
-  color: #6b7a6e;
+  color: var(--c-textDim);
 }
 

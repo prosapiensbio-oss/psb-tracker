@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 
-import { C, S, badge } from "../../lib/psb/theme";
+import { C, mix, S, badge } from "../../lib/psb/theme";
 
 // Scrolls a horizontally-overflowing container to its right edge on mount/update
 // so charts open showing the most recent data (user scrolls left into the past).
@@ -42,7 +42,7 @@ export function StatCard({
         padding: 16,
         cursor: onClick ? "pointer" : "default",
         transition: "border-color .15s",
-        borderColor: onClick ? `${C.accent}44` : C.border,
+        borderColor: onClick ? `${mix(C.accent, 27)}` : C.border,
       }}
     >
       <div style={{ ...S.statNum, color: color ?? C.accentLight }}>{value}</div>
@@ -176,7 +176,7 @@ export function BarRow({
         <span style={{ color: C.textMuted }}>{label}</span>
         <span style={{ color: C.textMuted }}>{sub}</span>
       </div>
-      <div style={{ height: 14, background: "#ffffff08", borderRadius: 4 }}>
+      <div style={{ height: 14, background: C.track, borderRadius: 4 }}>
         <div style={{ width: `${w}%`, height: "100%", background: color, borderRadius: 4, minWidth: 2 }} />
       </div>
     </div>
@@ -310,13 +310,13 @@ export function Info({ text, label }: { text: string; label?: ReactNode }) {
             zIndex: 1000,
             width: W,
             background: "#0A110C",
-            border: `1px solid ${C.accent}77`,
+            border: `1px solid ${mix(C.accent, 45)}`,
             borderRadius: 8,
             padding: "8px 10px",
             fontSize: 11.5,
             fontWeight: 400,
             lineHeight: 1.45,
-            color: C.text,
+            color: "#ECE9DC",
             boxShadow: "0 6px 24px #000c",
             whiteSpace: "normal",
             pointerEvents: "none",
@@ -419,7 +419,7 @@ export function Donut({
   return (
     <div style={{ display: "flex", gap: 18, alignItems: "center", flexWrap: "wrap" }}>
       <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
-        <circle cx={cx} cy={cx} r={r} fill="none" stroke="#ffffff10" strokeWidth={thickness} />
+        <circle cx={cx} cy={cx} r={r} fill="none" stroke={C.track} strokeWidth={thickness} />
         {segs.map((s, i) => (
           <circle
             key={i}
@@ -493,8 +493,8 @@ export function ZoneBars({
                 bottom: 22 + (zone.lo / max) * plotH,
                 height: ((zone.hi - zone.lo) / max) * plotH,
                 background: C.greenBg,
-                borderTop: `1px dashed ${C.green}66`,
-                borderBottom: `1px dashed ${C.green}66`,
+                borderTop: `1px dashed ${mix(C.green, 40)}`,
+                borderBottom: `1px dashed ${mix(C.green, 40)}`,
                 pointerEvents: "none",
               }}
             />
@@ -616,7 +616,7 @@ export function LineChart({
 
   const svg = (
     <svg viewBox={`0 0 ${W} ${height}`} width={pointWidth ? W : "100%"} height={height} preserveAspectRatio={pointWidth ? "xMinYMid meet" : "none"} style={{ overflow: "visible", display: "block" }}>
-      {zone && <rect x={padL} y={y(zone.hi)} width={plotW} height={y(zone.lo) - y(zone.hi)} fill={C.greenBg} stroke={`${C.green}55`} strokeDasharray="4 4" />}
+      {zone && <rect x={padL} y={y(zone.hi)} width={plotW} height={y(zone.lo) - y(zone.hi)} fill={C.greenBg} stroke={`${mix(C.green, 33)}`} strokeDasharray="4 4" />}
       {[0, 0.5, 1].map((f) => (
         <text key={f} x={padL - 6} y={y(max * f) + 3} textAnchor="end" fontSize={9} fill={C.textDim}>{fmt(max * f)}</text>
       ))}
@@ -658,5 +658,22 @@ export function LineChart({
         {onPoint && <span style={{ fontSize: 11, color: C.textDim }}>Klik na bod = detail obdobia dole</span>}
       </div>
     </div>
+  );
+}
+
+// ── Line icons for the main nav (Lucide-style) ───────────────────────────────
+const ICON_PATHS: Record<string, ReactNode> = {
+  home: (<><path d="M3 9.5 12 2.5l9 7v10a1.6 1.6 0 0 1-1.6 1.6H4.6A1.6 1.6 0 0 1 3 19.5z" /><path d="M9.3 21.1V13h5.4v8.1" /></>),
+  calendar: (<><rect x="3" y="4.2" width="18" height="16.8" rx="2" /><path d="M16 2.2v4M8 2.2v4M3 9.2h18" /></>),
+  userCheck: (<><path d="M15 21v-1.8a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4V21" /><circle cx="8.5" cy="7.5" r="3.8" /><path d="m16.5 11.5 2 2 4-4" /></>),
+  wallet: (<><rect x="3" y="6" width="18" height="13" rx="2.2" /><path d="M3 10.2h18" /><circle cx="16.6" cy="13.6" r="1.4" /></>),
+  activity: (<path d="M22 12h-4l-3 8.5L9 3.5l-3 8.5H2" />),
+};
+
+export function Icon({ name, size = 17 }: { name: string; size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.9} strokeLinecap="round" strokeLinejoin="round" style={{ display: "block", flexShrink: 0 }} aria-hidden="true">
+      {ICON_PATHS[name]}
+    </svg>
   );
 }

@@ -6,7 +6,7 @@ import { C, S } from "../../lib/psb/theme";
 import type { Actions } from "./App";
 import { Badge, Card, Donut, Empty, H2, H3, Info, StatCard, StatGrid, TableWrap } from "./ui";
 
-const phaseTone = (p: string) => (p === "Obnova" ? "green" : p === "Integrácia" ? "orange" : "red");
+const phaseTone = (p: string) => (p === "Obnova" ? "green" : p === "Integrácia" ? "orange" : "bark");
 
 export function SixMTracker({ sixM, actions }: { sixM: SixMRow[]; actions: Actions }) {
   const [noteFor, setNoteFor] = useState<string | null>(null);
@@ -56,7 +56,7 @@ export function SixMTracker({ sixM, actions }: { sixM: SixMRow[]; actions: Actio
       <StatGrid>
         <StatCard value={byPhase.Obnova} label="Obnova (1–6 mes.)" color={C.green} />
         <StatCard value={byPhase.Integrácia} label="Integrácia (7–18)" color={C.orange} />
-        <StatCard value={byPhase.Udržateľnosť} label="Udržateľnosť (19+)" color={C.red} />
+        <StatCard value={byPhase.Udržateľnosť} label="Udržateľnosť (19+)" color={C.bark} />
         <StatCard value={shown.length} label="Celkom 6M klientov" />
       </StatGrid>
 
@@ -71,7 +71,7 @@ export function SixMTracker({ sixM, actions }: { sixM: SixMRow[]; actions: Actio
             data={[
               { label: "Obnova (1–6)", value: byPhase.Obnova, color: C.green },
               { label: "Integrácia (7–18)", value: byPhase.Integrácia, color: C.orange },
-              { label: "Udržateľnosť (19+)", value: byPhase.Udržateľnosť, color: C.red },
+              { label: "Udržateľnosť (19+)", value: byPhase.Udržateľnosť, color: C.bark },
             ]}
           />
         ) : (

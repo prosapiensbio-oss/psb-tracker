@@ -1,27 +1,32 @@
-// PSB brand theme. Inline-style tokens — SSR-safe, framework-agnostic, and
-// isolated from the scaffold's Quanta layer.
+// PSB brand theme. Colors are CSS variables so the whole app can switch between
+// the Tmavý / Stredný / Svetlý palettes at runtime (see styles.css + ThemeSwitch).
 import type { CSSProperties } from "react";
 
+// color-mix keeps alpha working with CSS-var colors (can't append "55" to a var).
+export const mix = (v: string, pct: number) => `color-mix(in srgb, ${v} ${pct}%, transparent)`;
+
 export const C = {
-  bg: "#0F1712",
-  card: "#16211A",
-  cardHover: "#1C2B22",
-  border: "#2D7D5A33",
-  borderSolid: "#24473636",
-  accent: "#2D7D5A",
-  accentLight: "#A8C4B0",
-  accentBg: "#2D7D5A18",
-  text: "#E8E6E0",
-  textMuted: "#9CA89E",
-  textDim: "#6B7A6E",
-  red: "#E24B4A",
-  redBg: "#E24B4A18",
-  orange: "#EF9F27",
-  orangeBg: "#EF9F2718",
-  green: "#5DCA75",
-  greenBg: "#5DCA7518",
-  blue: "#378ADD",
-  blueBg: "#378ADD18",
+  bg: "var(--c-bg)",
+  card: "var(--c-card)",
+  cardHover: "var(--c-cardHover)",
+  border: "var(--c-border)",
+  accent: "var(--c-accent)",
+  accentLight: "var(--c-accentLight)",
+  accentBg: "var(--c-accentBg)",
+  text: "var(--c-text)",
+  textMuted: "var(--c-textMuted)",
+  textDim: "var(--c-textDim)",
+  red: "var(--c-red)",
+  redBg: "var(--c-redBg)",
+  orange: "var(--c-orange)",
+  orangeBg: "var(--c-orangeBg)",
+  green: "var(--c-green)",
+  greenBg: "var(--c-greenBg)",
+  blue: "var(--c-blue)",
+  blueBg: "var(--c-blueBg)",
+  bark: "var(--c-bark)", // brown — Udržateľnosť fáza + progress
+  track: "var(--c-track)", // subtle chart/bar background
+  onAccent: "var(--c-onAccent)", // text on an accent-filled surface
 } as const;
 
 export const MEMBERSHIP_COLORS: Record<string, string> = {
@@ -32,11 +37,11 @@ export const MEMBERSHIP_COLORS: Record<string, string> = {
   "1 hodina": C.orange,
   "Online balíček": "#8A7DDB",
   "Bez balíčka": C.textDim,
-  "Iné": C.red,
+  "Iné": C.bark,
 };
 
 type Variant = "accent" | "danger" | "ghost" | "outline";
-type Tone = "green" | "red" | "orange" | "blue" | "accent" | "muted";
+type Tone = "green" | "red" | "orange" | "blue" | "accent" | "muted" | "bark";
 
 export const S = {
   h1: { fontSize: 20, fontWeight: 700, color: C.accentLight } as CSSProperties,
@@ -82,7 +87,7 @@ export const S = {
   statNum: { fontSize: 26, fontWeight: 700, color: C.accentLight } as CSSProperties,
   statLabel: { fontSize: 11, color: C.textMuted, marginTop: 4 } as CSSProperties,
   upload: {
-    border: `2px dashed ${C.accent}55`,
+    border: `2px dashed ${mix(C.accent, 40)}`,
     borderRadius: 12,
     padding: 28,
     textAlign: "center",
@@ -100,7 +105,7 @@ export const tab = (active: boolean): CSSProperties => ({
   fontSize: 13,
   fontWeight: 500,
   background: active ? C.accent : "transparent",
-  color: active ? "#fff" : C.textMuted,
+  color: active ? C.onAccent : C.textMuted,
   transition: "all .15s",
   whiteSpace: "nowrap",
 });
@@ -120,7 +125,7 @@ export const btn = (variant: Variant = "ghost"): CSSProperties => ({
         : variant === "outline"
           ? "transparent"
           : C.cardHover,
-  color: variant === "outline" ? C.textMuted : "#fff",
+  color: variant === "accent" || variant === "danger" ? C.onAccent : C.text,
   transition: "all .15s",
 });
 
@@ -130,7 +135,8 @@ const toneColors: Record<Tone, { fg: string; bg: string }> = {
   orange: { fg: C.orange, bg: C.orangeBg },
   blue: { fg: C.blue, bg: C.blueBg },
   accent: { fg: C.accentLight, bg: C.accentBg },
-  muted: { fg: C.textMuted, bg: "#ffffff08" },
+  muted: { fg: C.textMuted, bg: C.track },
+  bark: { fg: C.bark, bg: mix(C.bark, 16) },
 };
 
 export const badge = (tone: Tone): CSSProperties => ({
@@ -146,7 +152,7 @@ export const badge = (tone: Tone): CSSProperties => ({
 export const alertBox = (tone: Tone): CSSProperties => ({
   ...S.card,
   background: toneColors[tone].bg,
-  borderColor: toneColors[tone].fg + "44",
+  borderColor: mix(toneColors[tone].fg, 27),
   padding: 12,
   marginBottom: 8,
 });

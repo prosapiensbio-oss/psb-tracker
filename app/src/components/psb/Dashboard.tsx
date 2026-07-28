@@ -14,10 +14,11 @@ import {
   type SixMRow,
 } from "../../lib/psb/compute";
 import { fmtCZK, monthLabel, weekKey, weekLabel } from "../../lib/psb/format";
-import { C, MEMBERSHIP_COLORS, S, badge, btn } from "../../lib/psb/theme";
+import { C, MEMBERSHIP_COLORS, mix, S, badge, btn } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import type { IngestResult } from "../../lib/psb/db.server";
 import type { Actions } from "./App";
+import { ThemeSwitch } from "./ThemeSwitch";
 import { Card, Donut, Empty, H3, Info, StatCard, StatGrid, ValueBars, ZoneBars } from "./ui";
 
 const REPORTS: { key: keyof PSBData; label: string; path: string }[] = [
@@ -184,7 +185,7 @@ export function Dashboard({
     return { total: f.length, data: [
       { label: "Obnova (1–6)", value: n("Obnova"), color: C.green },
       { label: "Integrácia (7–18)", value: n("Integrácia"), color: C.orange },
-      { label: "Udržateľnosť (19+)", value: n("Udržateľnosť"), color: C.red },
+      { label: "Udržateľnosť (19+)", value: n("Udržateľnosť"), color: C.bark },
     ] };
   }, [sixM, trainer]);
 
@@ -325,6 +326,13 @@ export function Dashboard({
 
       <UploadCard data={data} missing={missing} actions={actions} />
 
+      <Card>
+        <H3>
+          <Info text="Zmení farebnú schému celej appky. Uloží sa v tomto prehliadači." label="Vzhľad / farebná schéma" />
+        </H3>
+        <ThemeSwitch />
+      </Card>
+
       <div style={{ marginTop: 12, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
         <div style={{ fontSize: 11, color: C.textDim }}>
           {data.uploadLog[0] ? `Posledný upload: ${new Date(data.uploadLog[0].date).toLocaleString("cs-CZ")}` : "Zatiaľ žiadny upload"}
@@ -402,7 +410,7 @@ function RegisterRow({ item, actions, onNavigate }: { item: RegisterItem; action
   const [note, setNote] = useState(item.note && item.note !== "skryté" ? item.note : "");
   const jump = item.category === "6M" ? "6m" : item.category === "Kapacita" ? "treningy" : "klienti";
   return (
-    <div style={{ padding: "9px 11px", marginBottom: 5, borderRadius: 8, background: item.acked ? "#ffffff06" : item.tone === "red" ? C.redBg : item.tone === "blue" ? C.blueBg : C.orangeBg, opacity: item.acked ? 0.6 : 1 }}>
+    <div style={{ padding: "9px 11px", marginBottom: 5, borderRadius: 8, background: item.acked ? C.track : item.tone === "red" ? C.redBg : item.tone === "blue" ? C.blueBg : C.orangeBg, opacity: item.acked ? 0.6 : 1 }}>
       <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, flexWrap: "wrap" }}>
         <span style={badge(catTone(item.category))}>{item.category}</span>
         <span style={{ color: C.text }}>{item.detail}</span>
@@ -458,7 +466,7 @@ function UploadCard({ data, missing, actions }: { data: PSBData; missing: typeof
         onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
         onDrop={(e) => { e.preventDefault(); setDragOver(false); void handleFiles(e.dataTransfer.files); }}
-        style={{ ...S.upload, borderColor: dragOver ? C.accent : `${C.accent}55`, background: dragOver ? C.accentBg : "transparent" }}
+        style={{ ...S.upload, borderColor: dragOver ? C.accent : `${mix(C.accent, 33)}`, background: dragOver ? C.accentBg : "transparent" }}
       >
         <div style={{ fontSize: 24, marginBottom: 6 }}>⬆</div>
         <div style={{ color: C.text }}>{busy ? "Spracúvam…" : "Pretiahni CSV súbory sem alebo klikni"}</div>
@@ -492,7 +500,7 @@ function ResetButton({ onReset }: { onReset: () => Promise<void> }) {
   const [confirm, setConfirm] = useState(false);
   if (!confirm)
     return (
-      <button onClick={() => setConfirm(true)} style={{ ...btn("outline"), color: C.red, borderColor: C.red + "55" }}>
+      <button onClick={() => setConfirm(true)} style={{ ...btn("outline"), color: C.red, borderColor: mix(C.red, 33) }}>
         Vymazať všetky dáta
       </button>
     );

@@ -133,7 +133,7 @@ export function Klienti({ clients, capacity, actions }: { clients: Record<string
       <td
         key={seg}
         onClick={() => { setFTrainer(active ? "all" : t); setFSegment(active ? "all" : seg); }}
-        style={{ ...S.td, cursor: "pointer", textAlign: "center", fontWeight: 700, background: active ? segColor(seg) : n ? segColor(seg) + "22" : undefined, color: active ? "#0F1712" : segColor(seg), borderRadius: 6 }}
+        style={{ ...S.td, cursor: "pointer", textAlign: "center", fontWeight: 700, background: active ? segColor(seg) : n ? segColor(seg) + "22" : undefined, color: active ? "#14180F" : segColor(seg), borderRadius: 6 }}
       >
         {n}
       </td>

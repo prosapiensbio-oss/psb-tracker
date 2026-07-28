@@ -19,6 +19,7 @@ import { C, S, tab } from "../../lib/psb/theme";
 import type { ClientOverride, PSBData } from "../../lib/psb/types";
 import { EMPTY_DATA } from "../../lib/psb/types";
 import type { IngestResult } from "../../lib/psb/db.server";
+import { Icon } from "./ui";
 import { Login } from "./Login";
 import { Dashboard } from "./Dashboard";
 import { Treningy } from "./Treningy";
@@ -35,11 +36,11 @@ export type Actions = {
 };
 
 const TABS = [
-  { id: "dashboard", label: "◉ Dashboard" },
-  { id: "treningy", label: "◈ Tréningy" },
-  { id: "klienti", label: "◇ Klienti" },
-  { id: "financie", label: "◆ Financie" },
-  { id: "6m", label: "◎ 6M Tracker" },
+  { id: "dashboard", label: "Dashboard", icon: "home" },
+  { id: "treningy", label: "Tréningy", icon: "calendar" },
+  { id: "klienti", label: "Klienti", icon: "userCheck" },
+  { id: "financie", label: "Financie", icon: "wallet" },
+  { id: "6m", label: "6M Tracker", icon: "activity" },
 ];
 
 export function PSBApp() {
@@ -103,7 +104,7 @@ export function PSBApp() {
 
   if (authed === null || (authed && loading)) {
     return (
-      <div style={{ minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ minHeight: "100dvh", background: C.bg, color: C.text, display: "flex", alignItems: "center", justifyContent: "center" }}>
         <p style={{ color: C.textMuted }}>Načítavam…</p>
       </div>
     );
@@ -118,10 +119,12 @@ export function PSBApp() {
   };
 
   return (
-    <div style={{ minHeight: "100dvh" }}>
+    <div style={{ minHeight: "100dvh", background: C.bg, color: C.text }}>
       <div style={{ padding: "16px 16px 0", display: "flex", alignItems: "center", gap: 12, maxWidth: 1200, margin: "0 auto" }}>
-        <span style={{ fontSize: 20, fontWeight: 800, color: C.accent, letterSpacing: -0.5 }}>PSB</span>
-        <span style={{ fontSize: 15, fontWeight: 500, color: C.textMuted }}>Tracker</span>
+        <div style={{ lineHeight: 1.1 }}>
+          <div style={{ fontSize: 20, fontWeight: 800, color: C.accent, letterSpacing: -0.3 }}>Tracker</div>
+          <div style={{ fontSize: 11, fontWeight: 500, color: C.textMuted, letterSpacing: 0.2 }}>ProSapiens Biomechanic</div>
+        </div>
         <button onClick={logout} style={{ marginLeft: "auto", background: "none", border: "none", color: C.textDim, cursor: "pointer", fontSize: 12 }}>
           Odhlásiť sa
         </button>
@@ -138,8 +141,8 @@ export function PSBApp() {
         }}
       >
         {TABS.map((t) => (
-          <button key={t.id} style={tab(active === t.id)} onClick={() => setActive(t.id)}>
-            {t.label}
+          <button key={t.id} style={{ ...tab(active === t.id), display: "inline-flex", alignItems: "center", gap: 7 }} onClick={() => setActive(t.id)}>
+            <Icon name={t.icon} /> {t.label}
           </button>
         ))}
       </nav>

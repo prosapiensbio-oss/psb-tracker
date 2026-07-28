@@ -19,15 +19,11 @@ export function Login({ onSuccess }: { onSuccess: () => void }) {
   };
 
   return (
-    <div style={{ minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+    <div style={{ minHeight: "100dvh", background: C.bg, color: C.text, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
       <form onSubmit={submit} style={{ ...S.card, maxWidth: 360, width: "100%", marginBottom: 0, padding: 28 }}>
-        <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 4 }}>
-          <span style={{ fontSize: 24, fontWeight: 800, color: C.accent, letterSpacing: -0.5 }}>PSB</span>
-          <span style={{ fontSize: 16, fontWeight: 500, color: C.textMuted }}>Tracker</span>
-        </div>
-        <div style={{ fontSize: 12, color: C.textDim, marginBottom: 20 }}>
-          ProSapiens Biomechanic — interná evidencia
-        </div>
+        <div style={{ fontSize: 26, fontWeight: 800, color: C.accent, letterSpacing: -0.4 }}>Tracker</div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 2 }}>ProSapiens Biomechanic</div>
+        <div style={{ fontSize: 12, color: C.textDim, marginBottom: 20 }}>interná evidencia</div>
         <label style={{ fontSize: 12, color: C.textMuted, display: "block", marginBottom: 6 }}>Heslo</label>
         <input
           type="password"
