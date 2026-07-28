@@ -583,15 +583,14 @@ export function Dashboard({
           <Info text="Klienti, ktorým ostáva 1 alebo 0 sedení z balíčka a stále chodia — čas poslať ponuku na obnovu / faktúru. Berie aktívny balíček klienta. Mení sa podľa prepínača trénera." label="Blíži sa koniec balíčka" />
         </H3>
         {packageEnding.length ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 8 }}>
             {packageEnding.map((c) => (
-              <button key={c.name} onClick={() => onNavigate("klienti")} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 4px", background: "none", border: "none", borderBottom: `1px solid ${C.border}`, cursor: "pointer", textAlign: "left", width: "100%" }}>
+              <button key={c.name} onClick={() => onNavigate("klienti")} title={`${c.name} — ${c.membership || "—"} · ${c.primaryTrainer}`} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 10px", background: mix(C.text, 4), border: `1px solid ${C.border}`, borderRadius: 9, cursor: "pointer", textAlign: "left", width: "100%", minWidth: 0 }}>
                 <span style={{ ...badge(c.packageRemaining <= 0 ? "red" : "orange"), fontSize: 10, flexShrink: 0 }}>{c.packageRemaining}/{c.packageTotal}</span>
                 <span style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ fontSize: 13, color: C.text, fontWeight: 500 }}>{c.name}</span>
-                  <span style={{ fontSize: 11, color: C.textDim, display: "block" }}>{c.membership || "—"} · {c.primaryTrainer}</span>
+                  <span style={{ fontSize: 13, color: C.text, fontWeight: 500, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</span>
+                  <span style={{ fontSize: 11, color: C.textDim, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.membership || "—"} · {c.primaryTrainer}</span>
                 </span>
-                <span style={{ color: C.textDim, fontSize: 12 }}>→</span>
               </button>
             ))}
           </div>
