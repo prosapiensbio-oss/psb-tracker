@@ -74,6 +74,7 @@ const WIDGETS: WidgetMeta[] = [
   { id: "dovera", label: "Ø dôvera obnovy", span: 1 },
   { id: "zarobky", label: "Mesačné zárobky", span: 1 },
   { id: "balicky", label: "Klienti podľa balíčka", span: 1 },
+  { id: "koniecBalicka", label: "Blíži sa koniec balíčka", span: 1 },
   { id: "trend", label: "Trend typov sedení", span: 2 },
   { id: "register", label: "Na čo sa pozrieť", span: 2 },
 ];
@@ -452,6 +453,15 @@ export function Dashboard({
   const openMonth = (monthKey: string) => onNavigate("financie", undefined, { month: monthKey, trainer, nonce: Date.now() });
 
   // Widget bodies, keyed by id — rendered in the user's saved order below.
+  // Clients down to their last session (or 0) on their active package — renewal cues.
+  const packageEnding = useMemo(
+    () =>
+      Object.values(clients)
+        .filter((c) => c.packageTotal > 0 && c.packageRemaining <= 1 && c.status !== "Neaktívny" && matchT(c.primaryTrainer))
+        .sort((a, b) => a.packageRemaining - b.packageRemaining || a.name.localeCompare(b.name)),
+    [clients, trainer], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
   const nodes: Record<string, ReactNode> = {
     hodiny: (
       <Card style={{ marginBottom: 0, height: "100%" }}>
@@ -565,6 +575,29 @@ export function Dashboard({
         <div style={centerBody}>
           {membershipDonut.length ? <Donut size={130} centerLabel={String(membershipDonut.reduce((a, d) => a + d.value, 0))} data={membershipDonut} onSlice={() => onNavigate("klienti")} /> : <Empty>Nahraj Packages & Memberships.</Empty>}
         </div>
+      </Card>
+    ),
+    koniecBalicka: (
+      <Card style={{ marginBottom: 0, height: "100%" }}>
+        <H3>
+          <Info text="Klienti, ktorým ostáva 1 alebo 0 sedení z balíčka a stále chodia — čas poslať ponuku na obnovu / faktúru. Berie aktívny balíček klienta. Mení sa podľa prepínača trénera." label="Blíži sa koniec balíčka" />
+        </H3>
+        {packageEnding.length ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            {packageEnding.map((c) => (
+              <button key={c.name} onClick={() => onNavigate("klienti")} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 4px", background: "none", border: "none", borderBottom: `1px solid ${C.border}`, cursor: "pointer", textAlign: "left", width: "100%" }}>
+                <span style={{ ...badge(c.packageRemaining <= 0 ? "red" : "orange"), fontSize: 10, flexShrink: 0 }}>{c.packageRemaining}/{c.packageTotal}</span>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ fontSize: 13, color: C.text, fontWeight: 500 }}>{c.name}</span>
+                  <span style={{ fontSize: 11, color: C.textDim, display: "block" }}>{c.membership || "—"} · {c.primaryTrainer}</span>
+                </span>
+                <span style={{ color: C.textDim, fontSize: 12 }}>→</span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <Empty>Nikomu sa balíček nekončí 🌿</Empty>
+        )}
       </Card>
     ),
     trend: <SessionTrend sessions={sessionsT} onNavigate={() => onNavigate("treningy", "analyza")} />,
@@ -806,16 +839,21 @@ function UploadCard({ data, missing, actions }: { data: PSBData; missing: typeof
           ))}
         </div>
       )}
-      {missing.length > 0 && (
-        <div style={{ marginTop: 12, padding: 12, background: C.orangeBg, borderRadius: 8 }}>
-          <div style={{ fontSize: 12, color: C.orange, fontWeight: 600, marginBottom: 6 }}>Chýbajúce reporty:</div>
-          {missing.map((m) => (
-            <div key={m.label} style={{ fontSize: 12, color: C.textMuted, marginBottom: 2 }}>
-              <strong style={{ color: C.text }}>{m.label}</strong> — {m.path}
+      <div style={{ marginTop: 14, padding: 12, background: mix(C.accent, 6), borderRadius: 8 }}>
+        <div style={{ fontSize: 12, color: C.textMuted, fontWeight: 600, marginBottom: 8 }}>Potrebné CSV z PTmindera (kde ich nájdeš):</div>
+        {REPORTS.map((r) => {
+          const present = (((data[r.key] as unknown[]) || []).length) > 0;
+          return (
+            <div key={r.label} style={{ fontSize: 12, color: C.textMuted, marginBottom: 5, display: "flex", gap: 8 }}>
+              <span style={{ color: present ? C.green : C.orange, flexShrink: 0 }}>{present ? "✓" : "✗"}</span>
+              <span><strong style={{ color: C.text }}>{r.label}</strong><br /><span style={{ color: C.textDim }}>PTminder → {r.path}</span></span>
             </div>
-          ))}
+          );
+        })}
+        <div style={{ fontSize: 11, color: C.textDim, marginTop: 8, lineHeight: 1.5 }}>
+          Packages report môže PTminder dávať po častiach (podľa typu balíčka) — nahraj všetky časti, každá sa bezpečne pripočíta po klientovi. Rovnaký súbor nič nezduplikuje.
         </div>
-      )}
+      </div>
       </div>
       )}
     </Card>

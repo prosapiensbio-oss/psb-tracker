@@ -21,6 +21,9 @@ export const membershipBucket = (m: string): string => {
   if (/8 hod/.test(s)) return "8 hodín";
   if (/1 hod/.test(s)) return "1 hodina";
   if (/bez viazanosti/.test(s)) return "6h BEZ viazanosti";
+  if (/one year|ročn|rok/.test(s)) return "Ročné (ONE YEAR)";
+  if (/doplnenie/.test(s)) return "Doplnenie členstva";
+  if (/special|špeci/.test(s)) return "Špeciál";
   if (!m) return "Bez balíčka";
   return "Iné";
 };
@@ -31,6 +34,9 @@ export const MEMBERSHIP_ORDER = [
   "18 hodín",
   "1 hodina",
   "Online balíček",
+  "Ročné (ONE YEAR)",
+  "Doplnenie členstva",
+  "Špeciál",
   "Bez balíčka",
   "Iné",
 ] as const;
