@@ -90,7 +90,7 @@ export function buildAiContext(
   };
 
   // ── Earnings ──
-  const finActual = fin.map((m) => ({ mesiac: monthLabel(m.month), revenue: r0(m.revenue), jerry: r0(m.byTrainer["Jerry"]?.revenue || 0), terezka: r0(m.byTrainer["Terezka"]?.revenue || 0), sedeni: m.sessions }));
+  const finActual = fin.map((m) => ({ mesiac: monthLabel(m.month), vyfakturovane: r0(m.revenue), prijateTrzby: r0(m.cash), jerry: r0(m.byTrainer["Jerry"]?.revenue || 0), terezka: r0(m.byTrainer["Terezka"]?.revenue || 0), sedeni: m.sessions }));
   const revVals = fin.map((m) => m.revenue).filter((v) => v > 0);
   const earnAvg = revVals.length ? r0(revVals.reduce((a, b) => a + b, 0) / revVals.length) : 0;
   const earnMax = revVals.length ? r0(Math.max(...revVals)) : 0;

@@ -32,6 +32,7 @@ export function Klienti({ clients, capacity, actions, focus }: { clients: Record
   const [typeF, setTypeF] = useState("all");
   const [modalityF, setModalityF] = useState("all");
   const [membershipF, setMembershipF] = useState(""); // package bucket from the donut
+  const [nameSearch, setNameSearch] = useState("");
   const [showInactive, setShowInactive] = useState(false);
   const [kpiWin, setKpiWin] = useState("all");
   const [kpiFrom, setKpiFrom] = useState("");
@@ -68,11 +69,8 @@ export function Klienti({ clients, capacity, actions, focus }: { clients: Record
     let arr = all.filter((c) => (showInactive ? true : c.status !== "Neaktívny"));
     if (fTrainer !== "all") arr = arr.filter((c) => c.primaryTrainer === fTrainer);
     if (fSegment !== "all") arr = arr.filter((c) => c.segment === fSegment);
-    if (typeF.startsWith("grp:")) arr = arr.filter((c) => c.clientType === typeF.slice(4));
-    else if (typeF.startsWith("m:")) arr = arr.filter((c) => c.membership === typeF.slice(2));
-    if (modalityF !== "all") arr = arr.filter((c) => c.modality === modalityF);
     return arr;
-  }, [all, fTrainer, fSegment, typeF, modalityF, showInactive]);
+  }, [all, fTrainer, fSegment, showInactive]);
 
   const membershipDonut = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -89,7 +87,16 @@ export function Klienti({ clients, capacity, actions, focus }: { clients: Record
       const t = normName(focusClient);
       return all.filter((c) => normName(c.name) === t);
     }
-    const arr = membershipF ? baseList.filter((c) => membershipBucket(c.membership) === membershipF) : baseList;
+    // Table-only filters (name search + package type + modality + package bucket from the donut).
+    let arr = baseList;
+    if (membershipF) arr = arr.filter((c) => membershipBucket(c.membership) === membershipF);
+    if (typeF.startsWith("grp:")) arr = arr.filter((c) => c.clientType === typeF.slice(4));
+    else if (typeF.startsWith("m:")) arr = arr.filter((c) => c.membership === typeF.slice(2));
+    if (modalityF !== "all") arr = arr.filter((c) => c.modality === modalityF);
+    if (nameSearch.trim()) {
+      const q = normName(nameSearch);
+      arr = arr.filter((c) => normName(c.name).includes(q));
+    }
     return sorted(arr, {
       name: (c) => c.name,
       trainer: (c) => c.primaryTrainer,
@@ -104,7 +111,7 @@ export function Klienti({ clients, capacity, actions, focus }: { clients: Record
       last: (c) => new Date(c.lastSession).getTime(),
       bitcoin: (c) => (c.bitcoin ? 1 : 0),
     });
-  }, [baseList, membershipF, sorted, focusClient, all]);
+  }, [baseList, membershipF, typeF, modalityF, nameSearch, sorted, focusClient, all]);
 
   const donut = useMemo(
     () => SEGMENTS.map((s) => ({ label: s, value: list.filter((c) => c.segment === s).length, color: segColor(s) })),
@@ -165,12 +172,6 @@ export function Klienti({ clients, capacity, actions, focus }: { clients: Record
             { value: "Jerry", label: "Jerry" },
             { value: "Terezka", label: "Terezka" },
           ]} />
-          <Select value={typeF} onChange={setTypeF} options={typeOptions} />
-          <Select value={modalityF} onChange={setModalityF} options={[
-            { value: "all", label: "Offline + Online" },
-            { value: "Offline", label: "Prevažne Offline" },
-            { value: "Online", label: "Prevažne Online" },
-          ]} />
           <label style={{ fontSize: 12, color: C.textMuted, display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
             <input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} style={{ accentColor: C.accent }} />
             Aj neaktívnych
@@ -187,14 +188,9 @@ export function Klienti({ clients, capacity, actions, focus }: { clients: Record
             )}
           </div>
         </div>
-        {(fSegment !== "all" || membershipF) && (
+        {fSegment !== "all" && (
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
-            {fSegment !== "all" && (
-              <button onClick={() => setFSegment("all")} style={{ background: C.accentBg, border: `1px solid ${C.accent}`, borderRadius: 6, padding: "4px 10px", color: C.accentLight, fontSize: 12, cursor: "pointer" }}>Segment: {fSegment} ✕</button>
-            )}
-            {membershipF && (
-              <button onClick={() => setMembershipF("")} style={{ background: C.accentBg, border: `1px solid ${C.accent}`, borderRadius: 6, padding: "4px 10px", color: C.accentLight, fontSize: 12, cursor: "pointer" }}>Balíček: {membershipF} ✕</button>
-            )}
+            <button onClick={() => setFSegment("all")} style={{ background: C.accentBg, border: `1px solid ${C.accent}`, borderRadius: 6, padding: "4px 10px", color: C.accentLight, fontSize: 12, cursor: "pointer" }}>Segment: {fSegment} ✕</button>
           </div>
         )}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 12 }}>
@@ -259,13 +255,29 @@ export function Klienti({ clients, capacity, actions, focus }: { clients: Record
       </div>
 
       <Card>
+        <H3><Info text="Všetci klienti podľa filtrov. Hľadaj podľa mena, filtruj typ balíčka a modalitu, alebo klikni na výsek v koláči „Klienti podľa balíčka“ hore." label="Všetci klienti" /></H3>
         <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }}>
           {focusClient ? (
             <button onClick={() => setFocusClient(null)} style={{ background: C.accentBg, border: `1px solid ${C.accent}`, borderRadius: 6, padding: "5px 10px", color: C.accentLight, fontSize: 12, cursor: "pointer", fontWeight: 600 }}>
               Vybraný klient: {focusClient} ✕ (zobraziť všetkých)
             </button>
           ) : (
-            <span style={{ fontSize: 13, color: C.accentLight, fontWeight: 600, marginRight: 4 }}>{filterLabel} · {list.length} klientov</span>
+            <>
+              <input value={nameSearch} onChange={(e) => setNameSearch(e.target.value)} placeholder="🔍 Hľadať meno…" style={{ ...S.input, width: "auto", minWidth: 160, flex: "0 1 200px" }} />
+              <Select value={typeF} onChange={setTypeF} options={typeOptions} />
+              <Select value={modalityF} onChange={setModalityF} options={[
+                { value: "all", label: "Offline + Online" },
+                { value: "Offline", label: "Prevažne Offline" },
+                { value: "Online", label: "Prevažne Online" },
+              ]} />
+              {membershipF && (
+                <button onClick={() => setMembershipF("")} style={{ background: C.accentBg, border: `1px solid ${C.accent}`, borderRadius: 6, padding: "6px 10px", color: C.accentLight, fontSize: 12, cursor: "pointer", whiteSpace: "nowrap" }}>Balíček: {membershipF} ✕</button>
+              )}
+              {(typeF !== "all" || modalityF !== "all" || nameSearch) && (
+                <button onClick={() => { setTypeF("all"); setModalityF("all"); setNameSearch(""); setMembershipF(""); }} style={{ background: "none", border: "none", color: C.textDim, fontSize: 12, cursor: "pointer" }}>Zrušiť filtre</button>
+              )}
+              <span style={{ marginLeft: "auto", fontSize: 13, color: C.accentLight, fontWeight: 600 }}>{list.length} klientov</span>
+            </>
           )}
         </div>
         <TableWrap>
