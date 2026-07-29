@@ -72,19 +72,40 @@ export async function sendChat(
 ): Promise<ChatResult> {
   try {
     const r = await post("/api/chat", { messages, context });
-    // Errors (no_key, api_error…) come back as JSON; a successful answer streams as text/plain.
+    // Errors (no_key, api_error…) come back as JSON; a successful answer streams as
+    // Server-Sent Events (text/event-stream) — `data: {"t":"…"}` frames, then `[DONE]`.
     if ((r.headers.get("content-type") || "").includes("application/json")) {
       return (await r.json()) as ChatResult;
     }
     if (!r.body) return { ok: false, error: "network" };
     const reader = r.body.getReader();
     const decoder = new TextDecoder();
+    let buf = "";
     let full = "";
     for (;;) {
       const { done, value } = await reader.read();
       if (done) break;
-      full += decoder.decode(value, { stream: true });
-      onDelta?.(full);
+      buf += decoder.decode(value, { stream: true });
+      let idx: number;
+      while ((idx = buf.indexOf("\n\n")) >= 0) {
+        const frame = buf.slice(0, idx);
+        buf = buf.slice(idx + 2);
+        for (const line of frame.split("\n")) {
+          const t = line.trim();
+          if (!t.startsWith("data:")) continue; // skip ": open" comments
+          const payload = t.slice(5).trim();
+          if (!payload || payload === "[DONE]") continue;
+          try {
+            const j = JSON.parse(payload) as { t?: string };
+            if (typeof j.t === "string") {
+              full += j.t;
+              onDelta?.(full);
+            }
+          } catch {
+            /* ignore partial/malformed frame */
+          }
+        }
+      }
     }
     return { ok: true, reply: full };
   } catch (e) {

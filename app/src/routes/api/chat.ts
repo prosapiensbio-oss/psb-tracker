@@ -93,11 +93,19 @@ export const Route = createFileRoute("/api/chat")({
         }
         if (!messages.length) return Response.json({ ok: false, error: "empty" }, { status: 400 });
 
+        // Two blocks: a STABLE prefix (instructions + knowledge, ~13k tokens) that is
+        // cached, and the VOLATILE data snapshot as its own uncached block. Previously
+        // the changing <data> was glued into the cached block, so the cache key changed
+        // every call and the prompt cache never hit — this splits them so it does.
         const system = [
           {
             type: "text",
-            text: `${SYSTEM}\n\n<pozadie_psb>\n${PSB_KNOWLEDGE}\n</pozadie_psb>\n\n<data>\n${context}\n</data>`,
+            text: `${SYSTEM}\n\n<pozadie_psb>\n${PSB_KNOWLEDGE}\n</pozadie_psb>`,
             cache_control: { type: "ephemeral" },
+          },
+          {
+            type: "text",
+            text: `<data>\n${context}\n</data>`,
           },
         ];
 
@@ -127,13 +135,18 @@ export const Route = createFileRoute("/api/chat")({
           return Response.json({ ok: false, error: "api_error", status: resp.status, detail: detail.slice(0, 500) }, { status: 200 });
         }
 
-        // Stream Anthropic's SSE as plain text deltas — keeps the connection alive
-        // (no long idle wait → no gateway timeout) and lets the answer appear live.
+        // Re-emit Anthropic's stream as our OWN Server-Sent Events (text/event-stream).
+        // This is the critical bit: the hosting edge BUFFERS text/plain responses (so a
+        // long answer delivered nothing until it finished → past the ~30s gateway cut →
+        // empty reply), but passes text/event-stream through unbuffered by design. Each
+        // text delta becomes a `data: {"t":"…"}` frame that reaches the browser live.
         const decoder = new TextDecoder();
         const encoder = new TextEncoder();
         const upstream = resp.body.getReader();
         const stream = new ReadableStream({
           async start(controller) {
+            // Open the pipe immediately so the edge flushes headers + starts streaming.
+            controller.enqueue(encoder.encode(": open\n\n"));
             let buf = "";
             try {
               for (;;) {
@@ -150,16 +163,24 @@ export const Route = createFileRoute("/api/chat")({
                   try {
                     const evt = JSON.parse(data) as { type?: string; delta?: { type?: string; text?: string } };
                     if (evt.type === "content_block_delta" && evt.delta?.type === "text_delta" && evt.delta.text) {
-                      controller.enqueue(encoder.encode(evt.delta.text));
+                      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ t: evt.delta.text })}\n\n`));
                     }
                   } catch { /* ignore partial JSON */ }
                 }
               }
             } catch { /* upstream ended */ }
+            controller.enqueue(encoder.encode("data: [DONE]\n\n"));
             controller.close();
           },
         });
-        return new Response(stream, { headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store", "x-accel-buffering": "no" } });
+        return new Response(stream, {
+          headers: {
+            "content-type": "text/event-stream; charset=utf-8",
+            "cache-control": "no-store, no-transform",
+            connection: "keep-alive",
+            "x-accel-buffering": "no",
+          },
+        });
       },
     },
   },
