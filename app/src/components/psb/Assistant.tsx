@@ -58,7 +58,7 @@ function parseActions(raw: string): { text: string; actions: ParsedAction[] } {
   return { text, actions };
 }
 
-// Minimal formatter: **bold**, `code`, and newlines/• bullets.
+// Minimal formatter: **bold**, `code`, and newlines.
 function fmt(text: string) {
   return text.split("\n").map((line, i) => {
     const parts = line.split(/(\*\*[^*]+\*\*|`[^`]+`)/g).map((p, j) => {
@@ -66,57 +66,21 @@ function fmt(text: string) {
       if (p.startsWith("`") && p.endsWith("`")) return <code key={j} style={{ background: mix(C.accent, 14), padding: "1px 4px", borderRadius: 4, fontSize: 12 }}>{p.slice(1, -1)}</code>;
       return <Fragment key={j}>{p}</Fragment>;
     });
-    return (
-      <div key={i} style={{ minHeight: line.trim() ? undefined : 6 }}>
-        {parts}
-      </div>
-    );
+    return <div key={i} style={{ minHeight: line.trim() ? undefined : 6 }}>{parts}</div>;
   });
 }
 
-const bubbleBase: CSSProperties = { position: "fixed", right: 20, bottom: 20, zIndex: 60 };
+// ── Shared chat brain — instantiate ONCE (in App) so the floating panel and the
+// inline dashboard widget share the same conversation. ─────────────────────────
+export type AssistantChat = ReturnType<typeof useAssistantChat>;
 
-export function Assistant({ context, actions }: { context: AiContext; actions: Actions }) {
-  const [open, setOpen] = useState(false);
+export function useAssistantChat(context: AiContext, actions: Actions) {
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
-  const [drag, setDrag] = useState(false);
   const [pending, setPending] = useState<{ filename: string; text: string }[] | null>(null);
   const [attach, setAttach] = useState<string[]>([]);
-  const [size, setSize] = useState<{ w: number; h: number }>({ w: 400, h: 620 });
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    try {
-      if (localStorage.getItem("psb-ai-open") === "1") setOpen(true);
-      const s = JSON.parse(localStorage.getItem("psb-ai-size") || "null");
-      if (s && typeof s.w === "number" && typeof s.h === "number") setSize({ w: s.w, h: s.h });
-    } catch { /* ignore */ }
-  }, []);
-
-  // Drag the top-left corner to resize (panel is anchored bottom-right).
-  function startResize(e: React.PointerEvent) {
-    e.preventDefault();
-    const startX = e.clientX, startY = e.clientY, startW = size.w, startH = size.h;
-    const maxW = window.innerWidth - 32, maxH = window.innerHeight - 40;
-    const move = (ev: PointerEvent) => {
-      const w = Math.max(320, Math.min(startW + (startX - ev.clientX), maxW));
-      const h = Math.max(360, Math.min(startH + (startY - ev.clientY), maxH));
-      setSize({ w, h });
-    };
-    const up = () => {
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", up);
-      setSize((s) => { try { localStorage.setItem("psb-ai-size", JSON.stringify(s)); } catch { /* ignore */ } return s; });
-    };
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
-  }
-
-  // CSV → import flow; images → attach to the next message (Claude reads them).
   async function handleIncoming(list: FileList | File[] | null) {
     const arr = [...(list || [])];
     const csv = arr.filter((f) => f.name.toLowerCase().endsWith(".csv"));
@@ -130,13 +94,6 @@ export function Assistant({ context, actions }: { context: AiContext; actions: A
       setAttach((a) => [...a, ...urls].slice(0, 4));
     }
   }
-  useEffect(() => {
-    try { localStorage.setItem("psb-ai-open", open ? "1" : "0"); } catch { /* ignore */ }
-    if (open) setTimeout(() => inputRef.current?.focus(), 60);
-  }, [open]);
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [msgs, busy, pending]);
 
   async function ask(question: string) {
     const q = question.trim();
@@ -170,12 +127,6 @@ export function Assistant({ context, actions }: { context: AiContext; actions: A
     });
   }
 
-  async function onDrop(e: React.DragEvent) {
-    e.preventDefault();
-    setDrag(false);
-    await handleIncoming(e.dataTransfer.files);
-  }
-
   async function confirmImport() {
     if (!pending) return;
     setBusy(true);
@@ -186,45 +137,36 @@ export function Assistant({ context, actions }: { context: AiContext; actions: A
     setMsgs((m) => [...m, { role: "assistant", text: `**Import hotový.**\n${summary}\n\nDáta som obnovil — spýtaj sa ma na čokoľvek z nových čísel.` }]);
   }
 
-  const panel: CSSProperties = {
-    position: "fixed", right: 20, bottom: 20, zIndex: 60,
-    width: `min(${size.w}px, calc(100vw - 32px))`, height: `min(${size.h}px, calc(100dvh - 40px))`,
-    background: C.card, border: `1px solid ${C.border}`, borderRadius: 16,
-    display: "flex", flexDirection: "column", overflow: "hidden",
-    boxShadow: "0 12px 40px rgba(0,0,0,.45)",
-  };
+  return { msgs, setMsgs, input, setInput, busy, pending, setPending, attach, setAttach, ask, runAction, confirmImport, handleIncoming };
+}
 
-  if (!open) {
-    return (
-      <button onClick={() => setOpen(true)} style={{ ...bubbleBase, display: "flex", alignItems: "center", gap: 9, padding: "12px 18px", borderRadius: 30, border: "none", cursor: "pointer", background: C.accent, color: C.onAccent, fontSize: 14, fontWeight: 600, boxShadow: "0 8px 24px rgba(0,0,0,.4)" }} aria-label="Otvoriť PSB Asistenta">
-        <Spark /> Asistent
-      </button>
-    );
-  }
+// ── The conversation UI (messages + input) — used by both the floating panel and
+// the inline widget. Each instance has its own scroll/refs/drag state. ──────────
+export function ChatConversation({ chat, autoFocus }: { chat: AssistantChat; autoFocus?: boolean }) {
+  const { msgs, input, setInput, busy, pending, setPending, attach, setAttach, ask, runAction, confirmImport, handleIncoming } = chat;
+  const [drag, setDrag] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  }, [msgs, busy, pending]);
+  useEffect(() => {
+    if (autoFocus) setTimeout(() => inputRef.current?.focus(), 60);
+  }, [autoFocus]);
 
   return (
-    <div style={panel} onDragOver={(e) => { e.preventDefault(); setDrag(true); }} onDragLeave={() => setDrag(false)} onDrop={onDrop}>
-      <div onPointerDown={startResize} title="Potiahni pre zmenu veľkosti" style={{ position: "absolute", top: 0, left: 0, width: 22, height: 22, cursor: "nwse-resize", zIndex: 2, display: "flex", alignItems: "flex-start", justifyContent: "flex-start", padding: 4 }}>
-        <svg width={12} height={12} viewBox="0 0 12 12" fill="none" stroke={C.textDim} strokeWidth={1.5} strokeLinecap="round" aria-hidden="true"><path d="M11 1 1 11M6.5 1 1 6.5M11 5.5 5.5 11" /></svg>
-      </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "12px 14px 12px 22px", borderBottom: `1px solid ${C.border}`, background: mix(C.accent, 8) }}>
-        <span style={{ color: C.accent }}><Spark /></span>
-        <div style={{ lineHeight: 1.15 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>PSB Asistent</div>
-          <div style={{ fontSize: 10.5, color: C.textDim }}>vidí tvoje reálne dáta · Claude Sonnet</div>
-        </div>
-        <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
-          {msgs.length > 0 && (
-            <button onClick={() => setMsgs([])} title="Vyčistiť konverzáciu" style={iconBtn}>⟲</button>
-          )}
-          <button onClick={() => setOpen(false)} title="Zavrieť" style={iconBtn}>✕</button>
-        </div>
-      </div>
-
+    <div
+      style={{ position: "relative", flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}
+      onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
+      onDragLeave={() => setDrag(false)}
+      onDrop={(e) => { e.preventDefault(); setDrag(false); void handleIncoming(e.dataTransfer.files); }}
+    >
       <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: 14, display: "flex", flexDirection: "column", gap: 12 }}>
         {msgs.length === 0 && (
           <div style={{ color: C.textMuted, fontSize: 13 }}>
-            <p style={{ margin: "2px 0 12px" }}>Ahoj Jerry 👋 Pýtaj sa ma na čokoľvek z tvojich dát — vysvetlím čísla na kartách, rozoberiem „Na čo sa pozrieť“, poradím so zlepšeniami. CSV môžeš pretiahnuť sem do okna.</p>
+            <p style={{ margin: "2px 0 12px" }}>Ahoj Jerry 👋 Pýtaj sa ma na čokoľvek z tvojich dát — vysvetlím čísla na kartách, rozoberiem „Na čo sa pozrieť“, poradím so zlepšeniami. CSV/obrázok pretiahni sem alebo cez 📎.</p>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {SUGGESTIONS.map((s) => (
                 <button key={s} onClick={() => ask(s)} style={chip}>{s}</button>
@@ -263,8 +205,8 @@ export function Assistant({ context, actions }: { context: AiContext; actions: A
       </div>
 
       {drag && (
-        <div style={{ position: "absolute", inset: 0, background: mix(C.accent, 22), border: `2px dashed ${C.accent}`, borderRadius: 16, display: "flex", alignItems: "center", justifyContent: "center", color: C.accentLight, fontWeight: 600, fontSize: 15, pointerEvents: "none" }}>
-          Pusti CSV sem
+        <div style={{ position: "absolute", inset: 0, background: mix(C.accent, 22), border: `2px dashed ${C.accent}`, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", color: C.accentLight, fontWeight: 600, fontSize: 15, pointerEvents: "none" }}>
+          Pusti CSV alebo obrázok sem
         </div>
       )}
 
@@ -296,6 +238,83 @@ export function Assistant({ context, actions }: { context: AiContext; actions: A
           <Send />
         </button>
       </div>
+    </div>
+  );
+}
+
+function ChatHeader({ chat, extra }: { chat: AssistantChat; extra?: React.ReactNode }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "12px 14px 12px 16px", borderBottom: `1px solid ${C.border}`, background: mix(C.accent, 8) }}>
+      <span style={{ color: C.accent }}><Spark /></span>
+      <div style={{ lineHeight: 1.15 }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>PSB Asistent</div>
+        <div style={{ fontSize: 10.5, color: C.textDim }}>vidí tvoje reálne dáta · Claude Sonnet</div>
+      </div>
+      <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
+        {chat.msgs.length > 0 && <button onClick={() => chat.setMsgs([])} title="Vyčistiť konverzáciu" style={iconBtn}>⟲</button>}
+        {extra}
+      </div>
+    </div>
+  );
+}
+
+// Inline version for a Dashboard widget — same conversation as the floating panel.
+export function AssistantInline({ chat }: { chat: AssistantChat }) {
+  return (
+    <div style={{ marginBottom: 0, height: "100%", minHeight: 440, display: "flex", flexDirection: "column", overflow: "hidden", background: C.card, border: `1px solid ${C.border}`, borderRadius: 12 }}>
+      <ChatHeader chat={chat} />
+      <ChatConversation chat={chat} />
+    </div>
+  );
+}
+
+// Floating bottom-right panel (resizable, open/close persisted).
+export function Assistant({ chat }: { chat: AssistantChat }) {
+  const [open, setOpen] = useState(false);
+  const [size, setSize] = useState<{ w: number; h: number }>({ w: 400, h: 620 });
+
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("psb-ai-open") === "1") setOpen(true);
+      const s = JSON.parse(localStorage.getItem("psb-ai-size") || "null");
+      if (s && typeof s.w === "number" && typeof s.h === "number") setSize({ w: s.w, h: s.h });
+    } catch { /* ignore */ }
+  }, []);
+  useEffect(() => {
+    try { localStorage.setItem("psb-ai-open", open ? "1" : "0"); } catch { /* ignore */ }
+  }, [open]);
+
+  function startResize(e: React.PointerEvent) {
+    e.preventDefault();
+    const startX = e.clientX, startY = e.clientY, startW = size.w, startH = size.h;
+    const maxW = window.innerWidth - 32, maxH = window.innerHeight - 40;
+    const move = (ev: PointerEvent) => {
+      setSize({ w: Math.max(320, Math.min(startW + (startX - ev.clientX), maxW)), h: Math.max(360, Math.min(startH + (startY - ev.clientY), maxH)) });
+    };
+    const up = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+      setSize((s) => { try { localStorage.setItem("psb-ai-size", JSON.stringify(s)); } catch { /* ignore */ } return s; });
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+  }
+
+  if (!open) {
+    return (
+      <button onClick={() => setOpen(true)} style={{ position: "fixed", right: 20, bottom: 20, zIndex: 60, display: "flex", alignItems: "center", gap: 9, padding: "12px 18px", borderRadius: 30, border: "none", cursor: "pointer", background: C.accent, color: C.onAccent, fontSize: 14, fontWeight: 600, boxShadow: "0 8px 24px rgba(0,0,0,.4)" }} aria-label="Otvoriť PSB Asistenta">
+        <Spark /> Asistent
+      </button>
+    );
+  }
+
+  return (
+    <div style={{ position: "fixed", right: 20, bottom: 20, zIndex: 60, width: `min(${size.w}px, calc(100vw - 32px))`, height: `min(${size.h}px, calc(100dvh - 40px))`, background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 12px 40px rgba(0,0,0,.45)" }}>
+      <div onPointerDown={startResize} title="Potiahni pre zmenu veľkosti" style={{ position: "absolute", top: 0, left: 0, width: 22, height: 22, cursor: "nwse-resize", zIndex: 2, padding: 4 }}>
+        <svg width={12} height={12} viewBox="0 0 12 12" fill="none" stroke={C.textDim} strokeWidth={1.5} strokeLinecap="round" aria-hidden="true"><path d="M11 1 1 11M6.5 1 1 6.5M11 5.5 5.5 11" /></svg>
+      </div>
+      <ChatHeader chat={chat} extra={<button onClick={() => setOpen(false)} title="Zavrieť" style={iconBtn}>✕</button>} />
+      <ChatConversation chat={chat} autoFocus={open} />
     </div>
   );
 }

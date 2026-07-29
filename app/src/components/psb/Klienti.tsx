@@ -1,9 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { membershipBucket, MEMBERSHIP_ORDER, TRAINERS, type CapacityRow, type ClientAgg } from "../../lib/psb/compute";
-import { fmtCZK, fmtDate } from "../../lib/psb/format";
+import { fmtCZK, fmtDate, normName } from "../../lib/psb/format";
 import { C, MEMBERSHIP_COLORS, S } from "../../lib/psb/theme";
-import type { Actions } from "./App";
+import type { Actions, NavFocus } from "./App";
 import { Badge, Card, Donut, Empty, H3, Info, Modal, Select, SortTh, StatCard, TableWrap, useSort } from "./ui";
 
 const segTone = (s: string) => (s === "Anchor" ? "green" : s === "Stabilný" ? "orange" : "red");
@@ -22,7 +22,11 @@ const KPI_WINDOWS = [
   { value: "custom", label: "Vlastné obdobie", days: -1 },
 ];
 
-export function Klienti({ clients, capacity, actions }: { clients: Record<string, ClientAgg>; capacity: CapacityRow[]; actions: Actions }) {
+export function Klienti({ clients, capacity, actions, focus }: { clients: Record<string, ClientAgg>; capacity: CapacityRow[]; actions: Actions; focus?: NavFocus | null }) {
+  const [focusClient, setFocusClient] = useState<string | null>(null);
+  useEffect(() => {
+    if (focus?.client) setFocusClient(focus.client);
+  }, [focus?.nonce]); // eslint-disable-line react-hooks/exhaustive-deps
   const [fTrainer, setFTrainer] = useState("all");
   const [fSegment, setFSegment] = useState("all");
   const [typeF, setTypeF] = useState("all");
@@ -80,6 +84,11 @@ export function Klienti({ clients, capacity, actions }: { clients: Record<string
   }, [baseList]);
 
   const list = useMemo(() => {
+    // A click-through from the Dashboard focuses one client — show only them (even if inactive).
+    if (focusClient) {
+      const t = normName(focusClient);
+      return all.filter((c) => normName(c.name) === t);
+    }
     const arr = membershipF ? baseList.filter((c) => membershipBucket(c.membership) === membershipF) : baseList;
     return sorted(arr, {
       name: (c) => c.name,
@@ -94,7 +103,7 @@ export function Klienti({ clients, capacity, actions }: { clients: Record<string
       avg: (c) => c.paidAvg,
       last: (c) => new Date(c.lastSession).getTime(),
     });
-  }, [baseList, membershipF, sorted]);
+  }, [baseList, membershipF, sorted, focusClient, all]);
 
   const donut = useMemo(
     () => SEGMENTS.map((s) => ({ label: s, value: list.filter((c) => c.segment === s).length, color: segColor(s) })),
@@ -250,7 +259,13 @@ export function Klienti({ clients, capacity, actions }: { clients: Record<string
 
       <Card>
         <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }}>
-          <span style={{ fontSize: 13, color: C.accentLight, fontWeight: 600, marginRight: 4 }}>{filterLabel} · {list.length} klientov</span>
+          {focusClient ? (
+            <button onClick={() => setFocusClient(null)} style={{ background: C.accentBg, border: `1px solid ${C.accent}`, borderRadius: 6, padding: "5px 10px", color: C.accentLight, fontSize: 12, cursor: "pointer", fontWeight: 600 }}>
+              Vybraný klient: {focusClient} ✕ (zobraziť všetkých)
+            </button>
+          ) : (
+            <span style={{ fontSize: 13, color: C.accentLight, fontWeight: 600, marginRight: 4 }}>{filterLabel} · {list.length} klientov</span>
+          )}
         </div>
         <TableWrap>
           <thead>

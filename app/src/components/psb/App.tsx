@@ -16,7 +16,7 @@ import {
   deriveSixM,
 } from "../../lib/psb/compute";
 import { buildAiContext } from "../../lib/psb/aiContext";
-import { Assistant } from "./Assistant";
+import { Assistant, useAssistantChat } from "./Assistant";
 import { normName } from "../../lib/psb/format";
 import { C, S, tab } from "../../lib/psb/theme";
 import type { ClientOverride, PSBData } from "../../lib/psb/types";
@@ -39,7 +39,7 @@ export type Actions = {
 };
 
 // Deep-link from Dashboard click-throughs: focus one week (Tréningy → Prehľad) or one month (Financie → Zárobky).
-export type NavFocus = { week?: string; month?: string; trainer?: string; nonce?: number };
+export type NavFocus = { week?: string; month?: string; client?: string; trainer?: string; nonce?: number };
 
 const TABS = [
   { id: "dashboard", label: "Dashboard", icon: "home" },
@@ -57,13 +57,15 @@ export function PSBApp() {
   const [treningySub, setTreningySub] = useState("prehled");
   const [treningyFocus, setTreningyFocus] = useState<NavFocus | null>(null);
   const [financieFocus, setFinancieFocus] = useState<NavFocus | null>(null);
+  const [klientiFocus, setKlientiFocus] = useState<NavFocus | null>(null);
 
-  // Navigate to a tab, optionally to a specific Tréningy sub-tab + focused week/month.
+  // Navigate to a tab, optionally to a focused week/month/client.
   const navigate = useCallback((tab: string, sub?: string, focus?: NavFocus) => {
     setActive(tab);
     if (tab === "treningy" && sub) setTreningySub(sub);
     if (tab === "treningy" && focus) setTreningyFocus(focus);
     if (tab === "financie" && focus) setFinancieFocus(focus);
+    if (tab === "klienti" && focus) setKlientiFocus(focus);
   }, []);
 
   const load = useCallback(async () => {
@@ -132,6 +134,9 @@ export function PSBApp() {
     [load],
   );
 
+  // One shared chat brain for both the floating panel and the inline dashboard widget.
+  const chat = useAssistantChat(aiContext, actions);
+
   if (authed === null || (authed && loading)) {
     return (
       <div style={{ minHeight: "100dvh", background: C.bg, color: C.text, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -178,17 +183,17 @@ export function PSBApp() {
       </nav>
       <div style={{ padding: 16, maxWidth: 1200, margin: "0 auto" }}>
         {active === "dashboard" && (
-          <Dashboard data={data} clients={clients} register={register} sixM={sixM} capacity={capacity} actions={actions} onNavigate={navigate} />
+          <Dashboard data={data} clients={clients} register={register} sixM={sixM} capacity={capacity} actions={actions} onNavigate={navigate} assistantChat={chat} />
         )}
         {active === "treningy" && <Treningy data={data} clients={clients} sub={treningySub} onSub={setTreningySub} focus={treningyFocus} />}
-        {active === "klienti" && <Klienti clients={clients} capacity={capacity} actions={actions} />}
+        {active === "klienti" && <Klienti clients={clients} capacity={capacity} actions={actions} focus={klientiFocus} />}
         {active === "financie" && <Financie data={data} clients={clients} focus={financieFocus} />}
         {active === "6m" && <SixMTracker sixM={sixM} actions={actions} />}
       </div>
       <div style={{ ...S.h3, textAlign: "center", color: C.textDim, fontSize: 11, padding: "8px 0 24px", fontWeight: 400 }}>
         ProSapiens Biomechanic · interný nástroj · nezdieľať externe
       </div>
-      <Assistant context={aiContext} actions={actions} />
+      <Assistant chat={chat} />
     </div>
   );
 }

@@ -19,6 +19,7 @@ import { C, MEMBERSHIP_COLORS, mix, S, badge, btn } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import type { IngestResult } from "../../lib/psb/db.server";
 import type { Actions, NavFocus } from "./App";
+import { AssistantInline, type AssistantChat } from "./Assistant";
 import { SessionTrend } from "./SessionTrend";
 import { ThemeSwitch } from "./ThemeSwitch";
 import { Card, Donut, Empty, H3, Info, StatCard, StatGrid, ValueBars, ZoneBars } from "./ui";
@@ -75,6 +76,7 @@ const WIDGETS: WidgetMeta[] = [
   { id: "zarobky", label: "Mesačné zárobky", span: 1 },
   { id: "balicky", label: "Klienti podľa balíčka", span: 1 },
   { id: "koniecBalicka", label: "Blíži sa koniec balíčka", span: 1 },
+  { id: "asistent", label: "AI Asistent", span: 1 },
   { id: "trend", label: "Trend typov sedení", span: 2 },
   { id: "register", label: "Na čo sa pozrieť", span: 2 },
 ];
@@ -283,6 +285,7 @@ export function Dashboard({
   capacity,
   actions,
   onNavigate,
+  assistantChat,
 }: {
   data: PSBData;
   clients: Record<string, ClientAgg>;
@@ -291,9 +294,11 @@ export function Dashboard({
   capacity: CapacityRow[];
   actions: Actions;
   onNavigate: (tab: string, sub?: string, focus?: NavFocus) => void;
+  assistantChat: AssistantChat;
 }) {
   const [trainer, setTrainer] = useState("all");
   const [showAcked, setShowAcked] = useState(false);
+  const [registerExpanded, setRegisterExpanded] = useState(false);
   const [tempoUnit, setTempoUnit] = useState<"mes" | "tyz">("mes");
   const [arranging, setArranging] = useState(false);
   const layout = useDashLayout();
@@ -585,7 +590,7 @@ export function Dashboard({
         {packageEnding.length ? (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 8 }}>
             {packageEnding.map((c) => (
-              <button key={c.name} onClick={() => onNavigate("klienti")} title={`${c.name} — ${c.membership || "—"} · ${c.primaryTrainer}`} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 10px", background: mix(C.text, 4), border: `1px solid ${C.border}`, borderRadius: 9, cursor: "pointer", textAlign: "left", width: "100%", minWidth: 0 }}>
+              <button key={c.name} onClick={() => onNavigate("klienti", undefined, { client: c.name, nonce: Date.now() })} title={`${c.name} — ${c.membership || "—"} · ${c.primaryTrainer}`} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 10px", background: mix(C.text, 4), border: `1px solid ${C.border}`, borderRadius: 9, cursor: "pointer", textAlign: "left", width: "100%", minWidth: 0 }}>
                 <span style={{ ...badge(c.packageRemaining <= 0 ? "red" : "orange"), fontSize: 10, flexShrink: 0 }}>{c.packageRemaining}/{c.packageTotal}</span>
                 <span style={{ flex: 1, minWidth: 0 }}>
                   <span style={{ fontSize: 13, color: C.text, fontWeight: 500, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</span>
@@ -600,23 +605,34 @@ export function Dashboard({
       </Card>
     ),
     trend: <SessionTrend sessions={sessionsT} onNavigate={() => onNavigate("treningy", "analyza")} />,
+    asistent: <AssistantInline chat={assistantChat} />,
     register: (
-      <Card style={{ marginBottom: 0 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
+      <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
           <H3>
             <Info
-              text="Zoznam vecí na akciu: 6M upozornenia, kapacita, klienti čo prestali chodiť, dochádzajúce balíčky. Akceptovať (s poznámkou) alebo Skryť ich odstráni z tohto zoznamu. (AI asistent, ktorý sa ťa doptá, pribudne keď dodáš API kľúč.)"
+              text="Zoznam vecí na akciu: 6M upozornenia, kapacita, klienti čo prestali chodiť, dochádzajúce balíčky, koniec pauzy. Akceptovať (s poznámkou) alebo Skryť ich odstráni z tohto zoznamu. Debatovať o nich vieš aj s AI asistentom."
               label={`Na čo sa pozrieť (${open.length})`}
             />
           </H3>
-          {acked.length > 0 && (
-            <button onClick={() => setShowAcked((v) => !v)} style={{ background: "none", border: "none", color: C.textDim, fontSize: 12, cursor: "pointer" }}>
-              {showAcked ? "Skryť vybavené" : `Zobraziť vybavené (${acked.length})`}
-            </button>
-          )}
+          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+            {open.length > 3 && (
+              <button onClick={() => setRegisterExpanded((v) => !v)} style={{ background: "none", border: "none", color: C.accentLight, fontSize: 12, cursor: "pointer", fontWeight: 500 }}>
+                {registerExpanded ? "Zbaliť" : `Rozbaliť všetky (${open.length})`}
+              </button>
+            )}
+            {acked.length > 0 && (
+              <button onClick={() => setShowAcked((v) => !v)} style={{ background: "none", border: "none", color: C.textDim, fontSize: 12, cursor: "pointer" }}>
+                {showAcked ? "Skryť vybavené" : `Zobraziť vybavené (${acked.length})`}
+              </button>
+            )}
+          </div>
         </div>
         {visible.length ? (
-          visible.map((r) => <RegisterRow key={r.key} item={r} actions={actions} onNavigate={onNavigate} />)
+          // Compact: ~3 items visible, the rest scrolls. Expanded: full list.
+          <div style={{ overflowY: registerExpanded ? "visible" : "auto", maxHeight: registerExpanded ? undefined : 340, paddingRight: registerExpanded ? 0 : 2 }}>
+            {visible.map((r) => <RegisterRow key={r.key} item={r} actions={actions} onNavigate={onNavigate} />)}
+          </div>
         ) : (
           <Empty>Nič nevyžaduje pozornosť 🌿</Empty>
         )}
@@ -752,17 +768,18 @@ function CapacityCard({ capacity, trainer, onNavigate }: { capacity: CapacityRow
 
 const linkBtn = { background: "none", border: "none", color: C.accentLight, cursor: "pointer", fontSize: 12, padding: 0 } as const;
 
-function RegisterRow({ item, actions, onNavigate }: { item: RegisterItem; actions: Actions; onNavigate: (t: string) => void }) {
+function RegisterRow({ item, actions, onNavigate }: { item: RegisterItem; actions: Actions; onNavigate: (tab: string, sub?: string, focus?: NavFocus) => void }) {
   const [open, setOpen] = useState(false);
   const [note, setNote] = useState(item.note && item.note !== "skryté" ? item.note : "");
   const jump = item.category === "6M" ? "6m" : item.category === "Kapacita" ? "treningy" : "klienti";
+  const openItem = () => onNavigate(jump, undefined, item.client ? { client: item.client, nonce: Date.now() } : undefined);
   return (
     <div style={{ padding: "9px 11px", marginBottom: 5, borderRadius: 8, background: item.acked ? C.track : item.tone === "red" ? C.redBg : item.tone === "blue" ? C.blueBg : C.orangeBg, opacity: item.acked ? 0.6 : 1 }}>
       <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, flexWrap: "wrap" }}>
         <span style={badge(catTone(item.category))}>{item.category}</span>
         <span style={{ color: C.text }}>{item.detail}</span>
         <div style={{ marginLeft: "auto", display: "flex", gap: 10 }}>
-          {!item.acked && <button onClick={() => onNavigate(jump)} style={linkBtn}>Otvoriť →</button>}
+          {!item.acked && <button onClick={openItem} style={linkBtn}>Otvoriť →</button>}
           {item.acked ? (
             <button onClick={() => actions.ackAnomaly(item.key, "", false)} style={linkBtn}>Vrátiť</button>
           ) : (

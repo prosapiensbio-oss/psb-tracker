@@ -568,6 +568,7 @@ export type Anomaly = {
   detail: string;
   acked: boolean;
   note?: string;
+  client?: string; // the client this item is about (for click-through to Klienti)
 };
 
 // Practical, client-centric signals — one item per client per type (deduped),
@@ -575,8 +576,8 @@ export type Anomaly = {
 export function deriveAnomalies(data: PSBData, clients: Record<string, ClientAgg>): Anomaly[] {
   const out: Anomaly[] = [];
   const ack = data.anomalyAck || {};
-  const push = (key: string, tone: Anomaly["tone"], label: string, detail: string) =>
-    out.push({ key, tone, label, detail, acked: !!ack[key], note: ack[key]?.note });
+  const push = (key: string, tone: Anomaly["tone"], label: string, detail: string, client?: string) =>
+    out.push({ key, tone, label, detail, acked: !!ack[key], note: ack[key]?.note, client });
 
   const serviceClients = new Set(data.services.map((s) => s.client));
   const now = new Date();
@@ -586,7 +587,7 @@ export function deriveAnomalies(data: PSBData, clients: Record<string, ClientAgg
     // But once a DATED pause is over, surface a reminder to reach out.
     if (c.status === "Pauza") {
       if (c.pauseUntil && daysBetween(c.pauseUntil, now) >= 0) {
-        push(`pauzakoniec|${c.name}`, "orange", "Pauza sa skončila", `${c.name}: dohodnutá pauza sa skončila (${fmtDMY(c.pauseUntil)}) — ozvi sa a naplánujte tréning`);
+        push(`pauzakoniec|${c.name}`, "orange", "Pauza sa skončila", `${c.name}: dohodnutá pauza sa skončila (${fmtDMY(c.pauseUntil)}) — ozvi sa a naplánujte tréning`, c.name);
       }
       continue;
     }
@@ -596,19 +597,19 @@ export function deriveAnomalies(data: PSBData, clients: Record<string, ClientAgg
 
     // Package balance running out — the client to invoice / offer a renewal.
     if (c.packageTotal > 0 && c.packageRemaining <= 0 && recent) {
-      push(`bal0|${c.name}`, "orange", "Balíček dočerpaný", `${c.name}: balíček dočerpaný (0 sedení), ešte chodí — pošli ponuku na obnovu / faktúru`);
+      push(`bal0|${c.name}`, "orange", "Balíček dočerpaný", `${c.name}: balíček dočerpaný (0 sedení), ešte chodí — pošli ponuku na obnovu / faktúru`, c.name);
     } else if (c.packageTotal > 0 && c.packageRemaining > 0 && c.packageRemaining <= 1) {
-      push(`ballow|${c.name}`, "orange", "Nízky zostatok", `${c.name}: ostáva ${c.packageRemaining} sedenie z balíčka — čas na obnovu`);
+      push(`ballow|${c.name}`, "orange", "Nízky zostatok", `${c.name}: ostáva ${c.packageRemaining} sedenie z balíčka — čas na obnovu`, c.name);
     }
 
     // Regular client who stopped coming — reach out before they churn.
     if ((c.segment === "Anchor" || c.segment === "Stabilný") && days >= 14 && days <= 60) {
-      push(`gone|${c.name}`, days >= 21 ? "red" : "orange", "Prestal chodiť", `${c.name}: ${days} dní bez tréningu (${c.segment}) — ozvi sa`);
+      push(`gone|${c.name}`, days >= 21 ? "red" : "orange", "Prestal chodiť", `${c.name}: ${days} dní bez tréningu (${c.segment}) — ozvi sa`, c.name);
     }
 
     // Trains but has no package and no recorded sale — check the payment.
     if (recent && c.packageTotal === 0 && c.serviceCount === 0 && !c.is6m) {
-      push(`nopack|${c.name}`, "orange", "Sedenia bez balíčka", `${c.name}: aktívne sedenia, ale žiadny balíček ani predaj — over platbu`);
+      push(`nopack|${c.name}`, "orange", "Sedenia bez balíčka", `${c.name}: aktívne sedenia, ale žiadny balíček ani predaj — over platbu`, c.name);
     }
   }
 
@@ -636,6 +637,7 @@ export type RegisterItem = {
   acked: boolean;
   note?: string;
   priority: number; // lower = more important
+  client?: string; // client this item is about → "Otvoriť" focuses them in Klienti
 };
 
 const toneRank: Record<string, number> = { red: 0, orange: 1, blue: 2 };
@@ -655,6 +657,7 @@ export function deriveRegister(
     title: string,
     detail: string,
     basePriority: number,
+    client?: string,
   ) =>
     items.push({
       key,
@@ -665,12 +668,13 @@ export function deriveRegister(
       acked: !!ack[key],
       note: ack[key]?.note,
       priority: basePriority + toneRank[tone],
+      client,
     });
 
   for (const c of sixM) {
     if (!c.alert) continue;
     const tone = c.alertTone === "red" ? "red" : "orange";
-    add(`sixm|${c.client}|${c.phase}|${c.monthInPhase}`, "6M", tone, `${c.client} — 6M`, c.alert, 0);
+    add(`sixm|${c.client}|${c.phase}|${c.monthInPhase}`, "6M", tone, `${c.client} — 6M`, c.alert, 0, c.client);
   }
   for (const cap of capacity) {
     if (cap.effHours < ZONE_LO)
@@ -679,7 +683,7 @@ export function deriveRegister(
       add(`cap|${cap.trainer}|over`, "Kapacita", "red", `${cap.trainer} — nad zónou`, cap.advice, 10);
   }
   for (const a of deriveAnomalies(data, clients)) {
-    add(a.key, "Anomália", a.tone, a.label, a.detail, 20);
+    add(a.key, "Anomália", a.tone, a.label, a.detail, 20, a.client);
   }
 
   return items.sort((a, b) => {
