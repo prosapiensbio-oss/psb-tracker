@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { isAuthed, unauthorized } from "../../lib/psb/auth.server";
+import { PSB_KNOWLEDGE } from "../../lib/psb/knowledge";
 import { bindings } from "../../lib/bindings.server";
 
 const MODEL = "claude-sonnet-5";
@@ -30,7 +31,9 @@ const SYSTEM = `Si "PSB Asistent" — dátový analytik zabudovaný do internéh
 
 MENÁ KLIENTOV — vždy, keď v odpovedi spomenieš konkrétneho klienta (aj v zozname), obal jeho presné meno do francúzskych úvodzoviek «takto», napr. «Jakub Štigut». Appka z toho spraví klikateľný odkaz, ktorý používateľa prepne na daného klienta. Meno používaj presne ako je v dátach (klientiDetail).
 
-Máš k dispozícii JSON snapshot reálnych dát štúdia (nižšie v <data>). Odpovedaj VÝHRADNE z týchto dát — nikdy si nevymýšľaj čísla, ktoré tam nie sú. Ak niečo v dátach nie je, povedz to stručne.
+Máš k dispozícii JSON snapshot reálnych dát štúdia (nižšie v <data>). ČÍSLA ber VÝHRADNE z <data> — nikdy si nevymýšľaj hodnoty, ktoré tam nie sú. Ak niečo v dátach nie je, povedz to stručne.
+
+V bloku <pozadie_psb> máš KONTEXT o štúdiu — históriu, filozofiu, terminológiu a "prečo" za číslami. Používaj ho na lepšie pochopenie a interpretáciu čísel, na rady a súvislosti. Ale konkrétne čísla vždy ber z <data>, nie z pozadia.
 
 Vieš pomáhať s:
 - vysvetlením ktoréhokoľvek údaja na karte ("prečo tu vidím toto číslo") — vysvetli aj metodiku výpočtu,
@@ -93,7 +96,7 @@ export const Route = createFileRoute("/api/chat")({
         const system = [
           {
             type: "text",
-            text: `${SYSTEM}\n\n<data>\n${context}\n</data>`,
+            text: `${SYSTEM}\n\n<pozadie_psb>\n${PSB_KNOWLEDGE}\n</pozadie_psb>\n\n<data>\n${context}\n</data>`,
             cache_control: { type: "ephemeral" },
           },
         ];
