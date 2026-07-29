@@ -8,7 +8,17 @@ import { C, mix, S, badge } from "../../lib/psb/theme";
 function useScrollEnd<T extends HTMLElement>(enabled: boolean, dep: unknown) {
   const ref = useRef<T>(null);
   useEffect(() => {
-    if (enabled && ref.current) ref.current.scrollLeft = ref.current.scrollWidth;
+    if (!enabled || !ref.current) return;
+    const el = ref.current;
+    const toEnd = () => { el.scrollLeft = el.scrollWidth; };
+    // Run now, then again after layout + fonts settle — otherwise scrollWidth can
+    // still equal clientWidth at first paint (no overflow yet) and the scroll no-ops.
+    toEnd();
+    const raf = requestAnimationFrame(() => { toEnd(); requestAnimationFrame(toEnd); });
+    const timers = [setTimeout(toEnd, 120), setTimeout(toEnd, 450)];
+    // Re-align once web fonts finish loading (they can widen the content).
+    (document as Document & { fonts?: { ready?: Promise<unknown> } }).fonts?.ready?.then(toEnd).catch(() => {});
+    return () => { cancelAnimationFrame(raf); timers.forEach(clearTimeout); };
   }, [enabled, dep]);
   return ref;
 }
