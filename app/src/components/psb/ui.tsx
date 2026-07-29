@@ -483,7 +483,7 @@ export function ZoneBars({
   return (
     <div>
       <div ref={scrollRef} style={{ overflowX: "auto", paddingBottom: 4 }}>
-        <div style={{ position: "relative", display: "flex", gap: 8, alignItems: "flex-end", height, width: "max-content", minWidth: "100%" }}>
+        <div style={{ position: "relative", display: "flex", gap: 8, alignItems: "flex-end", justifyContent: "flex-end", height, width: "max-content", minWidth: "100%" }}>
           {zone && (
             <div
               style={{
@@ -500,7 +500,7 @@ export function ZoneBars({
             />
           )}
           {data.map((d, i) => (
-            <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: 40, flex: 1, zIndex: 1 }}>
+            <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: "0 0 46px", zIndex: 1 }}>
               <div style={{ display: "flex", gap: 2, alignItems: "flex-end", height: plotH, flexDirection: stacked ? "column-reverse" : "row" }}>
                 {d.values.map((v, j) => (
                   <div
@@ -554,9 +554,11 @@ export function ValueBars({
   const max = Math.max(1, ...data.map((d) => d.value));
   const scrollRef = useScrollEnd<HTMLDivElement>(alignEnd, data.length);
   return (
-    <div ref={scrollRef} style={{ display: "flex", gap: 8, alignItems: "flex-end", height, overflowX: "auto", paddingBottom: 4 }}>
+    // Fixed-width bars + right-aligned: the newest bar is always at the right edge,
+    // history scrolls off to the left (opens on the current date via alignEnd).
+    <div ref={scrollRef} style={{ display: "flex", gap: 8, alignItems: "flex-end", justifyContent: "flex-end", height, overflowX: "auto", paddingBottom: 4 }}>
       {data.map((d, i) => (
-        <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", minWidth: 48, flex: 1 }}>
+        <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", flex: "0 0 54px" }}>
           <div style={{ fontSize: 10.5, color: d.forecast ? C.textDim : C.textMuted, marginBottom: 3, whiteSpace: "nowrap" }}>{fmt(d.value)}</div>
           <div
             title={`${d.label}: ${fmt(d.value)}`}
