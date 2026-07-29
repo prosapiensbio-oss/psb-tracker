@@ -483,7 +483,7 @@ export function ZoneBars({
   return (
     <div>
       <div ref={scrollRef} style={{ overflowX: "auto", paddingBottom: 4 }}>
-        <div style={{ position: "relative", display: "flex", gap: 8, alignItems: "flex-end", justifyContent: "flex-end", height, width: "max-content", minWidth: "100%" }}>
+        <div style={{ position: "relative", display: "flex", gap: 8, alignItems: "flex-end", height, width: "max-content", minWidth: "100%" }}>
           {zone && (
             <div
               style={{
@@ -554,9 +554,9 @@ export function ValueBars({
   const max = Math.max(1, ...data.map((d) => d.value));
   const scrollRef = useScrollEnd<HTMLDivElement>(alignEnd, data.length);
   return (
-    // Fixed-width bars + right-aligned: the newest bar is always at the right edge,
-    // history scrolls off to the left (opens on the current date via alignEnd).
-    <div ref={scrollRef} style={{ display: "flex", gap: 8, alignItems: "flex-end", justifyContent: "flex-end", height, overflowX: "auto", paddingBottom: 4 }}>
+    // Fixed-width bars so the chart overflows and useScrollEnd opens it scrolled to
+    // the newest (right) — scroll LEFT for history. (No justify-end: it breaks left-scroll.)
+    <div ref={scrollRef} style={{ display: "flex", gap: 8, alignItems: "flex-end", height, overflowX: "auto", paddingBottom: 4 }}>
       {data.map((d, i) => (
         <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", flex: "0 0 54px" }}>
           <div style={{ fontSize: 10.5, color: d.forecast ? C.textDim : C.textMuted, marginBottom: 3, whiteSpace: "nowrap" }}>{fmt(d.value)}</div>
