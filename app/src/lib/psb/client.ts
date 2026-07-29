@@ -68,10 +68,25 @@ export type ChatResult =
 export async function sendChat(
   messages: { role: "user" | "assistant"; content: string; images?: string[] }[],
   context: unknown,
+  onDelta?: (fullText: string) => void,
 ): Promise<ChatResult> {
   try {
     const r = await post("/api/chat", { messages, context });
-    return (await r.json()) as ChatResult;
+    // Errors (no_key, api_error…) come back as JSON; a successful answer streams as text/plain.
+    if ((r.headers.get("content-type") || "").includes("application/json")) {
+      return (await r.json()) as ChatResult;
+    }
+    if (!r.body) return { ok: false, error: "network" };
+    const reader = r.body.getReader();
+    const decoder = new TextDecoder();
+    let full = "";
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      full += decoder.decode(value, { stream: true });
+      onDelta?.(full);
+    }
+    return { ok: true, reply: full };
   } catch (e) {
     return { ok: false, error: "network", detail: String(e) };
   }

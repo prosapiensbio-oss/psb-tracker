@@ -5,7 +5,7 @@ import { PSB_KNOWLEDGE } from "../../lib/psb/knowledge";
 import { bindings } from "../../lib/bindings.server";
 
 const MODEL = "claude-sonnet-5";
-const MAX_TOKENS = 1500;
+const MAX_TOKENS = 3000;
 
 type InMsg = { role: "user" | "assistant"; content: string; images?: string[] };
 
@@ -27,7 +27,7 @@ function toContent(m: InMsg): string | unknown[] {
 
 const SYSTEM = `Si "PSB Asistent" — dátový analytik zabudovaný do interného nástroja štúdia osobných trénerov ProSapiens Biomechanic (PSB), tréneri Jerry a Terezka. Komunikuj po slovensky.
 
-ŠTÝL — BUĎ VÝRAZNE STRUČNÝ. Odpovedaj čo najkratšie, ideálne 1–3 vety alebo krátky zoznam s odrážkami. Žiadne dlhé úvody, žiadne opakovanie otázky, žiadne zbytočné vysvetľovanie. Rovno k veci. Detaily rozviň LEN keď o ne používateľ výslovne požiada.
+ŠTÝL — prispôsob dĺžku otázke. Pri jednoduchých faktických otázkach ("koľko…", "kto…") odpovedaj VÝRAZNE stručne (1–3 vety / krátky zoznam), bez úvodov a omáčky. ALE keď používateľ žiada ROZBOR, VYHODNOTENIE, RADY, STRATÉGIU alebo názor na biznis, daj poriadnu, štruktúrovanú odpoveď (nadpisy/odrážky, kľúčové čísla, konkrétne odporúčania) — vecne, bez vaty, ale dostatočne do hĺbky. Vždy sa opri o reálne čísla z <data> a o kontext z <pozadie_psb> (história, filozofia, advisory pravidlá) — rady maj naviazané na PSB realitu, nie generické.
 
 MENÁ KLIENTOV — vždy, keď v odpovedi spomenieš konkrétneho klienta (aj v zozname), obal jeho presné meno do francúzskych úvodzoviek «takto», napr. «Jakub Štigut». Appka z toho spraví klikateľný odkaz, ktorý používateľa prepne na daného klienta. Meno používaj presne ako je v dátach (klientiDetail).
 
@@ -113,6 +113,7 @@ export const Route = createFileRoute("/api/chat")({
             body: JSON.stringify({
               model: MODEL,
               max_tokens: MAX_TOKENS,
+              stream: true,
               system,
               messages: messages.map((m) => ({ role: m.role, content: toContent(m) })),
             }),
@@ -121,14 +122,44 @@ export const Route = createFileRoute("/api/chat")({
           return Response.json({ ok: false, error: "fetch_failed", detail: String(e) }, { status: 200 });
         }
 
-        if (!resp.ok) {
+        if (!resp.ok || !resp.body) {
           const detail = await resp.text().catch(() => "");
           return Response.json({ ok: false, error: "api_error", status: resp.status, detail: detail.slice(0, 500) }, { status: 200 });
         }
 
-        const json = (await resp.json()) as { content?: { type: string; text?: string }[] };
-        const reply = (json.content || []).filter((b) => b.type === "text").map((b) => b.text || "").join("\n").trim();
-        return Response.json({ ok: true, reply });
+        // Stream Anthropic's SSE as plain text deltas — keeps the connection alive
+        // (no long idle wait → no gateway timeout) and lets the answer appear live.
+        const decoder = new TextDecoder();
+        const encoder = new TextEncoder();
+        const upstream = resp.body.getReader();
+        const stream = new ReadableStream({
+          async start(controller) {
+            let buf = "";
+            try {
+              for (;;) {
+                const { done, value } = await upstream.read();
+                if (done) break;
+                buf += decoder.decode(value, { stream: true });
+                let nl: number;
+                while ((nl = buf.indexOf("\n")) >= 0) {
+                  const line = buf.slice(0, nl).trim();
+                  buf = buf.slice(nl + 1);
+                  if (!line.startsWith("data:")) continue;
+                  const data = line.slice(5).trim();
+                  if (!data || data === "[DONE]") continue;
+                  try {
+                    const evt = JSON.parse(data) as { type?: string; delta?: { type?: string; text?: string } };
+                    if (evt.type === "content_block_delta" && evt.delta?.type === "text_delta" && evt.delta.text) {
+                      controller.enqueue(encoder.encode(evt.delta.text));
+                    }
+                  } catch { /* ignore partial JSON */ }
+                }
+              }
+            } catch { /* upstream ended */ }
+            controller.close();
+          },
+        });
+        return new Response(stream, { headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store", "x-accel-buffering": "no" } });
       },
     },
   },

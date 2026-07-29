@@ -155,17 +155,24 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
     if ((!q && !attach.length) || busy) return;
     const imgs = attach.length ? attach : undefined;
     const history: Msg[] = [...msgs, { role: "user", text: q || "Pozri tento obrázok.", images: imgs }];
-    setMsgs(history);
+    // Add the user message + an empty assistant placeholder that fills as the answer streams.
+    setMsgs([...history, { role: "assistant", text: "" }]);
     setInput("");
     setAttach([]);
     setBusy(true);
-    const res = await sendChat(history.map((m) => ({ role: m.role, content: m.text, images: m.images })), context);
+    const setLast = (patch: Msg) => setMsgs((m) => { const n = m.slice(); n[n.length - 1] = patch; return n; });
+    const res = await sendChat(
+      history.map((m) => ({ role: m.role, content: m.text, images: m.images })),
+      context,
+      // Live update — strip any (possibly partial) action block from the visible text.
+      (full) => setLast({ role: "assistant", text: full.replace(/```psb-action[\s\S]*$/, "").trimEnd() }),
+    );
     setBusy(false);
     if (res.ok) {
       const { text, actions: acts } = parseActions(res.reply);
-      setMsgs((m) => [...m, { role: "assistant", text: text || "…", actions: acts.length ? acts : undefined }]);
+      setLast({ role: "assistant", text: text || "…", actions: acts.length ? acts : undefined });
     } else {
-      setMsgs((m) => [...m, { role: "assistant", text: errorText(res.error) }]);
+      setLast({ role: "assistant", text: errorText(res.error) });
     }
   }
 
@@ -220,6 +227,8 @@ export function ChatConversation({ chat, autoFocus, onClientClick }: { chat: Ass
     >
       <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: 14, display: "flex", flexDirection: "column", gap: 12 }}>
         {msgs.map((m, mi) => (
+          // Skip the empty assistant placeholder before the first streamed token ("Rozmýšľam…" covers it).
+          m.role === "assistant" && !m.text && !m.images && !m.actions?.length ? null : (
           <div key={mi} style={{ alignSelf: m.role === "user" ? "flex-end" : "flex-start", maxWidth: "88%" }}>
             <div style={{ background: m.role === "user" ? C.accent : mix(C.text, 7), color: m.role === "user" ? C.onAccent : C.text, padding: "9px 12px", borderRadius: 12, fontSize: 13, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
               {m.images?.length ? (
@@ -235,8 +244,9 @@ export function ChatConversation({ chat, autoFocus, onClientClick }: { chat: Ass
               </button>
             ))}
           </div>
+          )
         ))}
-        {busy && <div style={{ alignSelf: "flex-start", color: C.textDim, fontSize: 13, fontStyle: "italic" }}>Rozmýšľam…</div>}
+        {busy && (!msgs.length || !msgs[msgs.length - 1].text) && <div style={{ alignSelf: "flex-start", color: C.textDim, fontSize: 13, fontStyle: "italic" }}>Rozmýšľam…</div>}
         {pending && (
           <div style={{ alignSelf: "stretch", border: `1px solid ${C.accent}`, background: mix(C.accent, 10), borderRadius: 10, padding: 12 }}>
             <div style={{ fontSize: 13, color: C.text, marginBottom: 8 }}>Naimportovať {pending.length} CSV do databázy?</div>
