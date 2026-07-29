@@ -53,6 +53,8 @@ export function buildAiContext(
   const tyzdenneHodiny = perWeekTotal.length
     ? { priemer: r1(wSum / perWeekTotal.length), max: { tyzden: wMax.label, hodiny: r0(wMax.h) }, min: { tyzden: wMin.label, hodiny: r0(wMin.h) }, pocetTyzdnov: perWeekTotal.length, zdravaZona: `${ZONE_LO}–${ZONE_HI}h na trénera` }
     : null;
+  // Full weekly history split by trainer — lets the bot answer "koľko urobil Jerry vs Terezka v týždni X".
+  const tyzdennePodlaTrenera = weekRows.map(([k, v]) => ({ tyzden: weekLabel(k), jerry: r1(v.Jerry), terezka: r1(v.Terezka), spolu: r1(v.Jerry + v.Terezka) }));
 
   // ── Zdravá zóna donut: trainer-weeks in / below / above the zone ──
   let zdrava = 0, pod = 0, nad = 0;
@@ -88,7 +90,7 @@ export function buildAiContext(
   };
 
   // ── Earnings ──
-  const finActual = fin.map((m) => ({ mesiac: monthLabel(m.month), revenue: r0(m.revenue), sedeni: m.sessions }));
+  const finActual = fin.map((m) => ({ mesiac: monthLabel(m.month), revenue: r0(m.revenue), jerry: r0(m.byTrainer["Jerry"]?.revenue || 0), terezka: r0(m.byTrainer["Terezka"]?.revenue || 0), sedeni: m.sessions }));
   const revVals = fin.map((m) => m.revenue).filter((v) => v > 0);
   const earnAvg = revVals.length ? r0(revVals.reduce((a, b) => a + b, 0) / revVals.length) : 0;
   const earnMax = revVals.length ? r0(Math.max(...revVals)) : 0;
@@ -147,22 +149,34 @@ export function buildAiContext(
       statusManual: c.statusOverride,
       pauzaDo: c.pauseUntil || null,
       trener: c.primaryTrainer,
+      trenerManual: c.primaryTrainerOverride,
       balicek: c.membership || "Bez balíčka",
       zostatokSedeni: c.packageTotal ? `${c.packageRemaining}/${c.packageTotal}` : null,
-      posledneSedenie: c.lastSession || null,
+      stavBalicka: c.packageStatus || null,
+      typ: c.clientType,
       is6m: c.is6m,
-      specialnaSadzba: c.specialRate || undefined,
+      modalita: c.modality,
+      zmluvaPodpisana: c.contractSigned,
+      specialnaSadzba: c.specialRate,
+      pozn_specialnaSadzba: c.specialRateNote || null,
       poznamkaTrenera: c.trainerNote || null,
+      pocetSedeni: c.sessionCount,
+      hodinySpolu: r1(c.totalHours),
+      priemCenaSedenia: r0(c.paidAvg),
+      dochadzkaPct: r0(c.attendance * 100),
+      prveSedenie: c.firstSession || null,
+      posledneSedenie: c.lastSession || null,
     }));
 
   return {
     meta: {
       generatedAt: new Date().toISOString().slice(0, 10),
-      note: "Čísla sú za OBOCH trénerov spolu (Jerry + Terezka), ak nie je uvedené inak. Na dashboarde si vie používateľ prepnúť trénera a čísla sa prepočítajú.",
+      note: "Súhrnné čísla sú za OBOCH trénerov spolu (Jerry + Terezka), ak nie je uvedené inak. Rozpisy po trénerovi máš v zarobky.mesacne (jerry/terezka), tyzdennePodlaTrenera a kapacita.podlaTrenera. Detail každého klienta (aj editovateľné polia) je v klientiDetail.",
       totalClients: clientList.length,
     },
     kpi,
     tyzdenneHodiny,
+    tyzdennePodlaTrenera,
     zdravaZona,
     kapacita: { spolu: capSpolu, podlaTrenera: capPerTrainer },
     zarobky: {

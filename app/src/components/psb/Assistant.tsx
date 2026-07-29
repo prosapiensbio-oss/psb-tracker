@@ -16,6 +16,20 @@ type ParsedAction = {
   value?: unknown;
 };
 type Msg = { role: "user" | "assistant"; text: string; actions?: ParsedAction[]; images?: string[] };
+type SavedChat = { id: string; title: string; messages: Msg[]; updatedAt: number; archived?: boolean };
+
+const CHATS_KEY = "psb-ai-chats";
+const newId = () => (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2, 6));
+const chatTitle = (msgs: Msg[]) => {
+  const first = msgs.find((m) => m.role === "user")?.text?.trim();
+  return first ? (first.length > 44 ? first.slice(0, 44) + "…" : first) : "Nový chat";
+};
+const relTime = (ts: number) => {
+  const d = new Date(ts), now = new Date();
+  const sameDay = d.toDateString() === now.toDateString();
+  if (sameDay) return `${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;
+  return `${d.getDate()}.${d.getMonth() + 1}.`;
+};
 
 function fileToDataUrl(f: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -89,6 +103,39 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
     try { localStorage.setItem("psb-ai-open", floatingOpen ? "1" : "0"); } catch { /* ignore */ }
   }, [floatingOpen]);
 
+  // ── Chat history (saved in localStorage; archive/delete) ──
+  const [chats, setChats] = useState<SavedChat[]>([]);
+  const [chatId, setChatId] = useState<string>(newId);
+  useEffect(() => {
+    try {
+      const raw = JSON.parse(localStorage.getItem(CHATS_KEY) || "null");
+      if (Array.isArray(raw) && raw.length) {
+        setChats(raw);
+        const recent = raw.filter((c: SavedChat) => !c.archived).sort((a: SavedChat, b: SavedChat) => b.updatedAt - a.updatedAt)[0];
+        if (recent) { setChatId(recent.id); setMsgs(recent.messages || []); }
+      }
+    } catch { /* ignore */ }
+  }, []);
+  // Auto-save the active conversation on every change.
+  useEffect(() => {
+    if (!msgs.length) return;
+    setChats((prev) => {
+      const existing = prev.find((c) => c.id === chatId);
+      const next = [{ id: chatId, title: chatTitle(msgs), messages: msgs, updatedAt: Date.now(), archived: existing?.archived }, ...prev.filter((c) => c.id !== chatId)];
+      try { localStorage.setItem(CHATS_KEY, JSON.stringify(next.slice(0, 50))); } catch { /* ignore */ }
+      return next;
+    });
+  }, [msgs, chatId]);
+
+  const persistChats = (next: SavedChat[]) => {
+    setChats(next);
+    try { localStorage.setItem(CHATS_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+  };
+  const newChat = () => { setChatId(newId()); setMsgs([]); setInput(""); setAttach([]); };
+  const openChat = (id: string) => { const c = chats.find((x) => x.id === id); if (c) { setChatId(id); setMsgs(c.messages || []); } };
+  const deleteChat = (id: string) => { persistChats(chats.filter((c) => c.id !== id)); if (id === chatId) newChat(); };
+  const archiveChat = (id: string) => { persistChats(chats.map((c) => (c.id === id ? { ...c, archived: !c.archived } : c))); if (id === chatId) newChat(); };
+
   async function handleIncoming(list: FileList | File[] | null) {
     const arr = [...(list || [])];
     const csv = arr.filter((f) => f.name.toLowerCase().endsWith(".csv"));
@@ -145,7 +192,7 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
     setMsgs((m) => [...m, { role: "assistant", text: `**Import hotový.**\n${summary}\n\nDáta som obnovil — spýtaj sa ma na čokoľvek z nových čísel.` }]);
   }
 
-  return { msgs, setMsgs, input, setInput, busy, pending, setPending, attach, setAttach, ask, runAction, confirmImport, handleIncoming, floatingOpen, setFloatingOpen };
+  return { msgs, setMsgs, input, setInput, busy, pending, setPending, attach, setAttach, ask, runAction, confirmImport, handleIncoming, floatingOpen, setFloatingOpen, chats, chatId, newChat, openChat, deleteChat, archiveChat };
 }
 
 // ── The conversation UI (messages + input) — used by both the floating panel and
@@ -241,16 +288,62 @@ export function ChatConversation({ chat, autoFocus, onClientClick }: { chat: Ass
 }
 
 function ChatHeader({ chat, extra }: { chat: AssistantChat; extra?: React.ReactNode }) {
+  const [showHistory, setShowHistory] = useState(false);
+  const active = chat.chats.filter((c) => !c.archived).sort((a, b) => b.updatedAt - a.updatedAt);
+  const archived = chat.chats.filter((c) => c.archived).sort((a, b) => b.updatedAt - a.updatedAt);
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 9, padding: "12px 14px 12px 16px", borderBottom: `1px solid ${C.border}`, background: mix(C.accent, 8) }}>
+    <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 9, padding: "12px 14px 12px 16px", borderBottom: `1px solid ${C.border}`, background: mix(C.accent, 8) }}>
       <span style={{ color: C.accent }}><Spark /></span>
       <div style={{ lineHeight: 1.15 }}>
         <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>PSB Asistent</div>
         <div style={{ fontSize: 10.5, color: C.textDim }}>vidí tvoje reálne dáta · Claude Sonnet</div>
       </div>
-      <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
-        {chat.msgs.length > 0 && <button onClick={() => chat.setMsgs([])} title="Vyčistiť konverzáciu" style={iconBtn}>⟲</button>}
+      <div style={{ marginLeft: "auto", display: "flex", gap: 2 }}>
+        <button onClick={() => { chat.newChat(); setShowHistory(false); }} title="Nový chat" style={iconBtn}>＋</button>
+        <button onClick={() => setShowHistory((v) => !v)} title="História chatov" style={{ ...iconBtn, color: showHistory ? C.accentLight : C.textMuted }}>
+          <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /><path d="M12 7v5l3 2" /></svg>
+        </button>
         {extra}
+      </div>
+      {showHistory && (
+        <>
+          <div onClick={() => setShowHistory(false)} style={{ position: "fixed", inset: 0, zIndex: 3 }} />
+          <div style={{ position: "absolute", top: "100%", right: 8, marginTop: 4, width: 280, maxHeight: 360, overflowY: "auto", background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: "0 10px 30px rgba(0,0,0,.4)", zIndex: 4, padding: 6 }}>
+            <div style={{ fontSize: 11, color: C.textDim, padding: "4px 8px 6px", fontWeight: 600 }}>Nedávne chaty</div>
+            {active.length === 0 && <div style={{ fontSize: 12, color: C.textDim, padding: "4px 8px 8px" }}>Zatiaľ žiadne uložené chaty.</div>}
+            {active.map((c) => (
+              <ChatHistoryRow key={c.id} c={c} current={c.id === chat.chatId} onOpen={() => { chat.openChat(c.id); setShowHistory(false); }} onArchive={() => chat.archiveChat(c.id)} onDelete={() => chat.deleteChat(c.id)} archiveTitle="Archivovať" />
+            ))}
+            {archived.length > 0 && (
+              <>
+                <div style={{ fontSize: 11, color: C.textDim, padding: "8px 8px 6px", fontWeight: 600, borderTop: `1px solid ${C.border}`, marginTop: 4 }}>Archív ({archived.length})</div>
+                {archived.map((c) => (
+                  <ChatHistoryRow key={c.id} c={c} current={c.id === chat.chatId} onOpen={() => { chat.openChat(c.id); setShowHistory(false); }} onArchive={() => chat.archiveChat(c.id)} onDelete={() => chat.deleteChat(c.id)} archiveTitle="Vrátiť z archívu" dim />
+                ))}
+              </>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function ChatHistoryRow({ c, current, onOpen, onArchive, onDelete, archiveTitle, dim }: { c: SavedChat; current: boolean; onOpen: () => void; onArchive: () => void; onDelete: () => void; archiveTitle: string; dim?: boolean }) {
+  const [hover, setHover] = useState(false);
+  return (
+    <div onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} style={{ display: "flex", alignItems: "center", gap: 4, borderRadius: 8, background: current ? mix(C.accent, 12) : "transparent", opacity: dim ? 0.6 : 1 }}>
+      <button onClick={onOpen} style={{ flex: 1, minWidth: 0, textAlign: "left", background: "none", border: "none", cursor: "pointer", padding: "7px 8px" }}>
+        <div style={{ fontSize: 12.5, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.title}</div>
+        <div style={{ fontSize: 10.5, color: C.textDim }}>{relTime(c.updatedAt)}</div>
+      </button>
+      <div style={{ display: "flex", gap: 2, paddingRight: 4, visibility: hover ? "visible" : "hidden" }}>
+        <button onClick={onArchive} title={archiveTitle} style={{ ...iconBtn, width: 24, height: 24, fontSize: 13 }}>
+          <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="4" rx="1" /><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8M10 12h4" /></svg>
+        </button>
+        <button onClick={onDelete} title="Vymazať" style={{ ...iconBtn, width: 24, height: 24, fontSize: 13, color: C.red }}>
+          <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-14" /></svg>
+        </button>
       </div>
     </div>
   );
