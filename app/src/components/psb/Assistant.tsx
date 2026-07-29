@@ -351,8 +351,11 @@ function ChatHistoryRow({ c, current, onOpen, onArchive, onDelete, archiveTitle,
 
 // Inline version for a Dashboard widget — same conversation as the floating panel.
 export function AssistantInline({ chat, onClientClick }: { chat: AssistantChat; onClientClick?: (name: string) => void }) {
+  // FIXED height so the conversation SCROLLS inside instead of the widget growing
+  // with every message. A fixed height also sets the grid-row height, so the
+  // neighbour (register, height:100%) matches it — equal-height side by side.
   return (
-    <div style={{ marginBottom: 0, height: "100%", minHeight: 440, display: "flex", flexDirection: "column", overflow: "hidden", background: C.card, border: `1px solid ${C.border}`, borderRadius: 12 }}>
+    <div style={{ marginBottom: 0, height: 460, display: "flex", flexDirection: "column", overflow: "hidden", background: C.card, border: `1px solid ${C.border}`, borderRadius: 12 }}>
       <ChatHeader chat={chat} />
       <ChatConversation chat={chat} onClientClick={onClientClick} />
     </div>

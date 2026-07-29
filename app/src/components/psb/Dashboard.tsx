@@ -10,6 +10,7 @@ import {
   ZONE_HI,
   ZONE_LO,
   type CapacityRow,
+  type FinanceMonth,
   type ClientAgg,
   type RegisterItem,
   type SixMRow,
@@ -302,6 +303,8 @@ export function Dashboard({
   const [showAcked, setShowAcked] = useState(false);
   const [registerExpanded, setRegisterExpanded] = useState(false);
   const [tempoUnit, setTempoUnit] = useState<"mes" | "tyz">("mes");
+  // "vyfakturovane" = value of trained sessions; "prijate" = cash received (= PTminder "Payments" / tržby).
+  const [earnMode, setEarnMode] = useState<"vyfakturovane" | "prijate">("vyfakturovane");
   const [arranging, setArranging] = useState(false);
   const layout = useDashLayout();
   const cols = useDashColumns();
@@ -397,25 +400,28 @@ export function Dashboard({
     return { zdrava, pod, nad, total: zdrava + pod + nad };
   }, [weekRows, trainer]);
 
+  // Value of a month in the chosen earnings mode. "prijate" (cash) is studio-level
+  // (payments aren't attributed to a trainer), so it ignores the trainer pill.
+  const monthVal = (m: FinanceMonth) =>
+    earnMode === "prijate" ? m.cash : trainer === "all" ? m.revenue : m.byTrainer[trainer]?.revenue || 0;
+
   const earnings = useMemo(() => {
     const months = monthlyFinance(data); // all months, from Sep 2025 — chart scrolls
-    const bars: { label: string; value: number; forecast?: boolean }[] = months.map((m) => ({
-      label: monthLabel(m.month),
-      value: trainer === "all" ? m.revenue : m.byTrainer[trainer]?.revenue || 0,
-    }));
-    if (trainer === "all") {
+    const bars: { label: string; value: number; forecast?: boolean }[] = months.map((m) => ({ label: monthLabel(m.month), value: monthVal(m) }));
+    // Forecast only makes sense for delivered (vyfakturované) earnings, not cash received.
+    if (trainer === "all" && earnMode === "vyfakturovane") {
       const pred = predictEarnings(data, clients, { excludeSpecial: false });
       for (const pm of pred.months.slice(0, 2)) {
         bars.push({ label: monthLabel(pm.month), value: Math.round(pm.guaranteed + pm.expected), forecast: true });
       }
     }
     return bars;
-  }, [data, clients, trainer]);
+  }, [data, clients, trainer, earnMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Ø / max / min monthly earnings over ACTUAL months (forecast excluded), following the trainer pill.
+  // Ø / max / min monthly earnings over ACTUAL months (forecast excluded), following the trainer pill + mode.
   const earningStats = useMemo(() => {
     const pts = monthlyFinance(data)
-      .map((m) => ({ key: m.month, label: monthLabel(m.month), v: trainer === "all" ? m.revenue : m.byTrainer[trainer]?.revenue || 0 }))
+      .map((m) => ({ key: m.month, label: monthLabel(m.month), v: monthVal(m) }))
       .filter((p) => p.v > 0);
     if (!pts.length) return null;
     let max = pts[0], min = pts[0];
@@ -426,7 +432,7 @@ export function Dashboard({
       if (p.v < min.v) min = p;
     }
     return { avg: sum / pts.length, max, min, n: pts.length };
-  }, [data, trainer]);
+  }, [data, trainer, earnMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sessionsT = useMemo(() => data.sessions.filter((s) => matchT(s.sessionTrainer)), [data.sessions, trainer]);
 
@@ -562,10 +568,22 @@ export function Dashboard({
     ),
     zarobky: (
       <Card style={{ marginBottom: 0, height: "100%" }}>
-        <H3>
-          <Info text="Vyfakturované zárobky za mesiac. Otvára sa na najnovšom mesiaci — posúvaj doľava do minulosti. Posledné 2 svetlé stĺpce (⌁) sú odhad na ďalšie mesiace. Priemer/max/min sú len z reálnych mesiacov (bez odhadu)." label={trainer === "all" ? "Mesačné zárobky + odhad" : `Mesačné zárobky — ${trainer}`} />
-        </H3>
-        {earnings.length ? <ValueBars data={earnings} color={C.accent} forecastColor={C.blue} fmt={(n) => `${Math.round(n / 1000)}k`} height={180} alignEnd /> : <Empty>Nahraj Payroll.</Empty>}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+          <H3>
+            <Info
+              text={earnMode === "vyfakturovane"
+                ? "VYFAKTUROVANÉ = hodnota odtrénovaných sedení za mesiac (Payroll by Session) — koľko si reálne odpracoval. Posledné 2 svetlé stĺpce (⌁) sú odhad. Priemer/max/min bez odhadu."
+                : "PRIJATÉ PLATBY (tržby) = peniaze reálne prijaté za mesiac (Payments Recorded) — presne to, čo vidíš v PTminderi ako Payments. Skáče, keď si niekto kúpi väčší balíček dopredu. Za celé štúdio (nedelí sa na trénera)."}
+              label={earnMode === "prijate" ? "Mesačné tržby (prijaté)" : trainer === "all" ? "Mesačné zárobky + odhad" : `Mesačné zárobky — ${trainer}`}
+            />
+          </H3>
+          <div style={{ display: "flex", gap: 3 }}>
+            {([["vyfakturovane", "Vyfakturované"], ["prijate", "Prijaté (tržby)"]] as const).map(([id, lbl]) => (
+              <button key={id} onClick={() => setEarnMode(id)} style={{ padding: "4px 9px", borderRadius: 7, border: `1px solid ${earnMode === id ? C.accent : C.border}`, background: earnMode === id ? C.accentBg : "transparent", color: earnMode === id ? C.accentLight : C.textMuted, fontSize: 10.5, cursor: "pointer", whiteSpace: "nowrap" }}>{lbl}</button>
+            ))}
+          </div>
+        </div>
+        {earnings.length ? <ValueBars data={earnings} color={earnMode === "prijate" ? C.blue : C.accent} forecastColor={C.blue} fmt={(n) => `${Math.round(n / 1000)}k`} height={180} alignEnd /> : <Empty>Nahraj Payroll.</Empty>}
         {earningStats && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 8, marginTop: 10 }}>
             <MiniStat label={`Ø / mes. (${earningStats.n})`} value={`${Math.round(earningStats.avg / 1000)}k`} />
@@ -610,7 +628,7 @@ export function Dashboard({
     trend: <SessionTrend sessions={sessionsT} onNavigate={() => onNavigate("treningy", "analyza")} />,
     asistent: <AssistantInline chat={assistantChat} onClientClick={onClientClick} />,
     register: (
-      <Card style={{ marginBottom: 0 }}>
+      <Card style={{ marginBottom: 0, ...(registerExpanded ? {} : { height: "100%", maxHeight: 460, display: "flex", flexDirection: "column" }) }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
           <H3>
             <Info
@@ -632,8 +650,8 @@ export function Dashboard({
           </div>
         </div>
         {visible.length ? (
-          // Compact: ~3 items visible, the rest scrolls. Expanded: full list.
-          <div style={{ overflowY: registerExpanded ? "visible" : "auto", maxHeight: registerExpanded ? undefined : 200, paddingRight: registerExpanded ? 0 : 2 }}>
+          // Compact: list fills the card and scrolls (card height matches the chat). Expanded: full list, card grows.
+          <div style={registerExpanded ? { overflowY: "visible" } : { flex: 1, minHeight: 0, overflowY: "auto", paddingRight: 2 }}>
             {visible.map((r) => <RegisterRow key={r.key} item={r} actions={actions} onNavigate={onNavigate} />)}
           </div>
         ) : (
