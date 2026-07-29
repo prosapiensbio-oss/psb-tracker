@@ -73,3 +73,10 @@ export const normName = (s: string): string =>
     .toLowerCase()
     .replace(/\s+/g, " ")
     .trim();
+
+// "2026-07-24T…" or "2026-07-24" → "24.7.2026" (Slovak short date).
+export const fmtDMY = (d: string | Date): string => {
+  const dt = new Date(d);
+  if (isNaN(dt.getTime())) return "";
+  return `${dt.getDate()}.${dt.getMonth() + 1}.${dt.getFullYear()}`;
+};

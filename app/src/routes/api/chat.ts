@@ -50,7 +50,7 @@ ZÁPIS DÁT — dôležité pravidlo: sám NIKDY nemeníš dáta. Keď sa s pou�
 (type môže byť "ack-anomaly" na akceptovanie alebo "unack-anomaly" na vrátenie späť). Používateľ akciu potvrdí kliknutím — až potom sa zapíše. Nepridávaj blok, ak o zmenu nikto nežiadal. Nikdy si nevymýšľaj key — použi presne ten z dát.
 
 Vieš navrhnúť aj ÚPRAVU KLIENTA (údaje sú v klientiDetail) — napr. dať Anetku na letnú pauzu, pridať poznámku trénera, zmeniť primárneho trénera. Rovnaký princíp: na koniec pridaj psb-action blok s type "set-override" a poľami name (presné meno klienta z klientiDetail), field, value, label. Povolené field/value:
-- "status": "Aktívny" | "Sporadický" | "Pauza" | "Neaktívny" | "" (prázdny reťazec = späť na automatický výpočet). Letná pauza → "Pauza".
+- "status": "Aktívny" | "Sporadický" | "Pauza" | "Neaktívny" | "" (prázdny = automatický). Pauza BEZ dátumu → "Pauza". Pauza S DÁTUMOM konca → "Pauza|YYYY-MM-DD" (napr. letná pauza do septembra → "Pauza|2026-09-01"). Po tom dátume systém sám pridá do "Na čo sa pozrieť" pripomienku "ozvi sa". Keď klient spomenie dĺžku/koniec pauzy ("do septembra", "na 2 mesiace", "na leto"), VŽDY použi variant s dátumom — konkrétny dátum dopočítaj z meta.generatedAt (dnešok).
 - "trainerNote": text poznámky (upload CSV ju neprepíše).
 - "primaryTrainer": "Jerry" | "Terezka" | "".
 - "specialRate": true/false; "specialRateNote": text; "contractSigned": true/false.

@@ -14,7 +14,7 @@ import {
   type RegisterItem,
   type SixMRow,
 } from "../../lib/psb/compute";
-import { fmtCZK, monthLabel, weekKey, weekLabel } from "../../lib/psb/format";
+import { fmtCZK, fmtDMY, monthLabel, weekKey, weekLabel } from "../../lib/psb/format";
 import { C, MEMBERSHIP_COLORS, mix, S, badge, btn } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import type { IngestResult } from "../../lib/psb/db.server";
@@ -839,13 +839,27 @@ function UploadCard({ data, missing, actions }: { data: PSBData; missing: typeof
         </div>
       )}
       <div style={{ marginTop: 14, padding: 12, background: mix(C.accent, 6), borderRadius: 8 }}>
-        <div style={{ fontSize: 12, color: C.textMuted, fontWeight: 600, marginBottom: 8 }}>Potrebné CSV z PTmindera (kde ich nájdeš):</div>
+        <div style={{ fontSize: 12, color: C.textMuted, fontWeight: 600, marginBottom: 8 }}>Potrebné CSV z PTmindera (kde ich nájdeš · aktuálnosť):</div>
         {REPORTS.map((r) => {
-          const present = (((data[r.key] as unknown[]) || []).length) > 0;
+          const arr = (data[r.key] as { date?: string }[]) || [];
+          const present = arr.length > 0;
+          let info = "";
+          if (r.key === "packages") {
+            const up = data.uploadLog?.find((l) => l.type === "packages");
+            info = up ? `nahrané ${fmtDMY(up.date)}` : "";
+          } else if (present) {
+            let mx = "";
+            for (const x of arr) if (x.date && x.date > mx) mx = x.date;
+            info = mx ? `dáta do ${fmtDMY(mx)}` : "";
+          }
           return (
             <div key={r.label} style={{ fontSize: 12, color: C.textMuted, marginBottom: 5, display: "flex", gap: 8 }}>
               <span style={{ color: present ? C.green : C.orange, flexShrink: 0 }}>{present ? "✓" : "✗"}</span>
-              <span><strong style={{ color: C.text }}>{r.label}</strong><br /><span style={{ color: C.textDim }}>PTminder → {r.path}</span></span>
+              <span>
+                <strong style={{ color: C.text }}>{r.label}</strong>
+                {info && <span style={{ color: present ? C.accentLight : C.textDim, fontWeight: 500 }}> · {info}</span>}
+                <br /><span style={{ color: C.textDim }}>PTminder → {r.path}</span>
+              </span>
             </div>
           );
         })}

@@ -2,10 +2,13 @@ import { useEffect, useState } from "react";
 
 import { C } from "../../lib/psb/theme";
 
+// NOTE: the CSS palette ids are legacy — "light" is the medium-green palette and
+// "mid" is the light cream one. Labels below match the ACTUAL brightness so the
+// buttons aren't swapped (dark → medium → light).
 const THEMES = [
   { id: "dark", label: "Tmavý" },
-  { id: "mid", label: "Stredný" },
-  { id: "light", label: "Svetlý" },
+  { id: "light", label: "Stredný" },
+  { id: "mid", label: "Svetlý" },
 ];
 
 // Swaps the CSS-variable palette on <html data-psb-theme>. Persists the choice.

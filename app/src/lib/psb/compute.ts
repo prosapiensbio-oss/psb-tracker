@@ -1,6 +1,6 @@
 // All derived analytics for the PSB Tracker. Pure functions over PSBData —
 // no browser globals. Reused across every module.
-import { daysBetween, monthKey, monthLabel, monthsBetween, quarterKey, quarterLabel, weekKey, weekLabel } from "./format";
+import { daysBetween, fmtDMY, monthKey, monthLabel, monthsBetween, quarterKey, quarterLabel, weekKey, weekLabel } from "./format";
 import type {
   PackageRow,
   PaymentRow,
@@ -90,6 +90,7 @@ export type ClientAgg = {
   statusAuto: string;
   status: string;
   statusOverride: boolean;
+  pauseUntil?: string; // ISO date — when a "Pauza" is meant to end (from status override "Pauza|YYYY-MM-DD")
   specialRate: boolean;
   specialRateNote: string;
   trainerNote: string;
@@ -191,7 +192,16 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
 
     c.statusAuto =
       c.attendance >= 0.5 ? "Aktívny" : c.attendance >= 0.16 ? "Sporadický" : "Neaktívny";
-    c.status = ov?.status || c.statusAuto;
+    // A "Pauza" override may carry an end date encoded as "Pauza|YYYY-MM-DD".
+    const rawStatus = ov?.status || null;
+    if (rawStatus && rawStatus.startsWith("Pauza")) {
+      c.status = "Pauza";
+      const bar = rawStatus.indexOf("|");
+      c.pauseUntil = bar >= 0 ? rawStatus.slice(bar + 1).trim() || undefined : undefined;
+    } else {
+      c.status = rawStatus || c.statusAuto;
+      c.pauseUntil = undefined;
+    }
     c.statusOverride = !!ov?.status;
     c.specialRate = !!ov?.specialRate;
     c.specialRateNote = ov?.specialRateNote || "";
@@ -572,9 +582,15 @@ export function deriveAnomalies(data: PSBData, clients: Record<string, ClientAgg
   const now = new Date();
 
   for (const c of Object.values(clients)) {
-    // "Neaktívny" = churned; "Pauza" = agreed temporary break — both silence
-    // activity/renewal anomalies so paused clients don't nag in "Na čo sa pozrieť".
-    if (c.status === "Neaktívny" || c.status === "Pauza") continue;
+    // "Pauza" = agreed temporary break — silences activity/renewal anomalies.
+    // But once a DATED pause is over, surface a reminder to reach out.
+    if (c.status === "Pauza") {
+      if (c.pauseUntil && daysBetween(c.pauseUntil, now) >= 0) {
+        push(`pauzakoniec|${c.name}`, "orange", "Pauza sa skončila", `${c.name}: dohodnutá pauza sa skončila (${fmtDMY(c.pauseUntil)}) — ozvi sa a naplánujte tréning`);
+      }
+      continue;
+    }
+    if (c.status === "Neaktívny") continue;
     const days = daysBetween(c.lastSession, now);
     const recent = days <= 30;
 

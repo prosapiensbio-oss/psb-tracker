@@ -300,13 +300,25 @@ export function Klienti({ clients, capacity, actions }: { clients: Record<string
           {editC.membership && <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 12 }}>Predplatné: <strong style={{ color: C.text }}>{editC.membership}</strong>{editC.packageTotal ? ` · zostatok ${editC.packageRemaining}/${editC.packageTotal}` : ""}</div>}
           <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4 }}>Status (manuálny override vždy vyhráva)</div>
           <div style={{ fontSize: 11, color: C.textDim, marginBottom: 6 }}>Automatický návrh: {editC.statusAuto}</div>
-          <Select style={{ width: "100%", marginBottom: 14 }} value={editC.statusOverride ? editC.status : ""} onChange={(v) => actions.setOverride(editC.name, "status", v)} options={[
+          <Select style={{ width: "100%", marginBottom: 14 }} value={editC.statusOverride ? editC.status : ""} onChange={(v) => actions.setOverride(editC.name, "status", v === "Pauza" && editC.pauseUntil ? `Pauza|${editC.pauseUntil}` : v)} options={[
             { value: "", label: "Automatický" },
             { value: "Aktívny", label: "Aktívny" },
             { value: "Sporadický", label: "Sporadický" },
             { value: "Pauza", label: "Pauza" },
             { value: "Neaktívny", label: "Neaktívny" },
           ]} />
+          {editC.status === "Pauza" && (
+            <div style={{ marginTop: -6, marginBottom: 14 }}>
+              <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4 }}>Pauza do (nepovinné — po dátume príde pripomienka „ozvi sa")</div>
+              <input
+                type="date"
+                value={editC.pauseUntil || ""}
+                onChange={(e) => actions.setOverride(editC.name, "status", e.target.value ? `Pauza|${e.target.value}` : "Pauza")}
+                style={{ ...S.input, colorScheme: "dark" }}
+              />
+              {editC.pauseUntil && <button onClick={() => actions.setOverride(editC.name, "status", "Pauza")} style={{ marginLeft: 8, background: "none", border: "none", color: C.textDim, fontSize: 12, cursor: "pointer" }}>zrušiť dátum</button>}
+            </div>
+          )}
           <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4 }}>Primárny tréner (override)</div>
           <Select style={{ width: "100%", marginBottom: 14 }} value={editC.primaryTrainerOverride ? editC.primaryTrainer : ""} onChange={(v) => actions.setOverride(editC.name, "primaryTrainer", v)} options={[
             { value: "", label: `Automatický (${editC.primaryTrainer})` },

@@ -145,6 +145,7 @@ export function buildAiContext(
       status: c.status,
       statusAuto: c.statusAuto,
       statusManual: c.statusOverride,
+      pauzaDo: c.pauseUntil || null,
       trener: c.primaryTrainer,
       balicek: c.membership || "Bez balíčka",
       zostatokSedeni: c.packageTotal ? `${c.packageRemaining}/${c.packageTotal}` : null,
