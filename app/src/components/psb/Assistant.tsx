@@ -351,13 +351,16 @@ function ChatHistoryRow({ c, current, onOpen, onArchive, onDelete, archiveTitle,
 
 // Inline version for a Dashboard widget — same conversation as the floating panel.
 export function AssistantInline({ chat, onClientClick }: { chat: AssistantChat; onClientClick?: (name: string) => void }) {
-  // FIXED height so the conversation SCROLLS inside instead of the widget growing
-  // with every message. A fixed height also sets the grid-row height, so the
-  // neighbour (register, height:100%) matches it — equal-height side by side.
+  // Collapsible: expanded = fixed 460 (conversation scrolls inside, doesn't grow);
+  // collapsed = just the header (one line). Persisted.
+  const [collapsed, setCollapsed] = useState(false);
+  useEffect(() => { try { setCollapsed(localStorage.getItem("psb-ai-inline-collapsed") === "1"); } catch { /* ignore */ } }, []);
+  const toggle = () => setCollapsed((v) => { const n = !v; try { localStorage.setItem("psb-ai-inline-collapsed", n ? "1" : "0"); } catch { /* ignore */ } return n; });
+  const triangle = <button onClick={toggle} title={collapsed ? "Zväčšiť chat" : "Zmenšiť chat"} style={iconBtn}>{collapsed ? "▸" : "▾"}</button>;
   return (
-    <div style={{ marginBottom: 0, height: 460, display: "flex", flexDirection: "column", overflow: "hidden", background: C.card, border: `1px solid ${C.border}`, borderRadius: 12 }}>
-      <ChatHeader chat={chat} />
-      <ChatConversation chat={chat} onClientClick={onClientClick} />
+    <div style={{ marginBottom: 0, ...(collapsed ? {} : { height: 460 }), display: "flex", flexDirection: "column", overflow: "hidden", background: C.card, border: `1px solid ${C.border}`, borderRadius: 12 }}>
+      <ChatHeader chat={chat} extra={triangle} />
+      {!collapsed && <ChatConversation chat={chat} onClientClick={onClientClick} />}
     </div>
   );
 }

@@ -66,7 +66,7 @@ function TrainerPills({ value, onChange }: { value: string; onChange: (v: string
 }
 
 // ── Reorderable dashboard layout (persisted in localStorage) ──────────────────
-type WidgetMeta = { id: string; label: string; span: 1 | 2 };
+type WidgetMeta = { id: string; label: string; span: 1 | 2; noStretch?: boolean };
 const WIDGETS: WidgetMeta[] = [
   { id: "hodiny", label: "Odrobené hodiny / týždeň", span: 1 },
   { id: "zony", label: "Týždne v zdravej zóne", span: 1 },
@@ -77,9 +77,9 @@ const WIDGETS: WidgetMeta[] = [
   { id: "zarobky", label: "Mesačné zárobky", span: 1 },
   { id: "balicky", label: "Klienti podľa balíčka", span: 1 },
   { id: "koniecBalicka", label: "Blíži sa koniec balíčka", span: 1 },
-  { id: "asistent", label: "AI Asistent", span: 1 },
+  { id: "asistent", label: "AI Asistent", span: 1, noStretch: true },
   { id: "trend", label: "Trend typov sedení", span: 2 },
-  { id: "register", label: "Na čo sa pozrieť", span: 2 },
+  { id: "register", label: "Na čo sa pozrieť", span: 2, noStretch: true },
 ];
 const DEFAULT_ORDER = WIDGETS.map((w) => w.id);
 const DEFAULT_WIDTH: Record<string, number> = Object.fromEntries(WIDGETS.map((w) => [w.id, w.span]));
@@ -221,7 +221,9 @@ function WidgetShell({
   const storedW = layout.widths[meta.id] ?? meta.span;
   const span = Math.min(storedW, cols);
   // Grid gap handles spacing; the item stretches to its row height (equal-height rows).
-  const wrap: CSSProperties = { gridColumn: `span ${span}`, minWidth: 0, display: "flex", flexDirection: "column" };
+  // noStretch widgets (register, chat) size to their own content instead of
+  // filling the row height — so an empty register collapses to its header.
+  const wrap: CSSProperties = { gridColumn: `span ${span}`, minWidth: 0, display: "flex", flexDirection: "column", alignSelf: meta.noStretch ? "start" : undefined };
 
   if (!arranging) return <div style={wrap}>{children}</div>;
 
@@ -303,8 +305,8 @@ export function Dashboard({
   const [showAcked, setShowAcked] = useState(false);
   const [registerExpanded, setRegisterExpanded] = useState(false);
   const [tempoUnit, setTempoUnit] = useState<"mes" | "tyz">("mes");
-  // "vyfakturovane" = value of trained sessions; "prijate" = cash received (= PTminder "Payments" / tržby).
-  const [earnMode, setEarnMode] = useState<"vyfakturovane" | "prijate">("vyfakturovane");
+  // "prijate" = cash received (= PTminder "Payments" / tržby) — the default; "vyfakturovane" = value of trained sessions.
+  const [earnMode, setEarnMode] = useState<"vyfakturovane" | "prijate">("prijate");
   const [arranging, setArranging] = useState(false);
   const layout = useDashLayout();
   const cols = useDashColumns();
@@ -408,12 +410,16 @@ export function Dashboard({
   const earnings = useMemo(() => {
     const months = monthlyFinance(data); // all months, from Sep 2025 — chart scrolls
     const bars: { label: string; value: number; forecast?: boolean }[] = months.map((m) => ({ label: monthLabel(m.month), value: monthVal(m) }));
-    // Forecast only makes sense for delivered (vyfakturované) earnings, not cash received.
-    if (trainer === "all" && earnMode === "vyfakturovane") {
-      const pred = predictEarnings(data, clients, { excludeSpecial: false });
-      for (const pm of pred.months.slice(0, 2)) {
-        bars.push({ label: monthLabel(pm.month), value: Math.round(pm.guaranteed + pm.expected), forecast: true });
-      }
+    const pred = predictEarnings(data, clients, { excludeSpecial: false });
+    const next2 = pred.months.slice(0, 2);
+    if (earnMode === "prijate") {
+      // Tržby forecast = trailing 3-month cash average (payments are lumpy).
+      const cash = months.map((m) => m.cash).slice(-3);
+      const f = cash.length ? Math.round(cash.reduce((a, b) => a + b, 0) / cash.length) : 0;
+      for (const pm of next2) bars.push({ label: monthLabel(pm.month), value: f, forecast: true });
+    } else if (trainer === "all") {
+      // Vyfakturované forecast = run-rate model (only for both trainers combined).
+      for (const pm of next2) bars.push({ label: monthLabel(pm.month), value: Math.round(pm.guaranteed + pm.expected), forecast: true });
     }
     return bars;
   }, [data, clients, trainer, earnMode]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -628,7 +634,7 @@ export function Dashboard({
     trend: <SessionTrend sessions={sessionsT} onNavigate={() => onNavigate("treningy", "analyza")} />,
     asistent: <AssistantInline chat={assistantChat} onClientClick={onClientClick} />,
     register: (
-      <Card style={{ marginBottom: 0, ...(registerExpanded ? {} : { height: "100%", maxHeight: 460, display: "flex", flexDirection: "column" }) }}>
+      <Card style={{ marginBottom: 0 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
           <H3>
             <Info
@@ -650,12 +656,13 @@ export function Dashboard({
           </div>
         </div>
         {visible.length ? (
-          // Compact: list fills the card and scrolls (card height matches the chat). Expanded: full list, card grows.
-          <div style={registerExpanded ? { overflowY: "visible" } : { flex: 1, minHeight: 0, overflowY: "auto", paddingRight: 2 }}>
+          // Content-height, capped at ~3 rows then scrolls; grows only as items appear. Expanded: full list.
+          <div style={registerExpanded ? { overflowY: "visible" } : { maxHeight: 192, overflowY: "auto", paddingRight: 2 }}>
             {visible.map((r) => <RegisterRow key={r.key} item={r} actions={actions} onNavigate={onNavigate} />)}
           </div>
         ) : (
-          <Empty>{showAcked ? "Žiadne skryté položky." : "Nič nevyžaduje pozornosť 🌿"}</Empty>
+          // Empty → stay minimal (just the header + a one-line note).
+          <div style={{ fontSize: 12.5, color: C.textMuted, padding: "2px 2px 4px" }}>{showAcked ? "Žiadne skryté položky." : "Nič nevyžaduje pozornosť 🌿"}</div>
         )}
       </Card>
     ),

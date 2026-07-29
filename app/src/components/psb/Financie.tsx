@@ -151,16 +151,13 @@ function Trzby({ monthly }: { monthly: Monthly }) {
       {monthly.length > 0 && (
         <Card>
           <H3>
-            <Info text="Tržby sú nepravidelné (jednorazové platby za balíčky), preto odhad vychádza z priemeru posledných mesiacov, nie z bodového výpočtu. Rozpätie = konzervatívny (nižší priemer) až optimistický (vyšší priemer)." label="Odhad tržieb — ďalšie 3 mesiace" />
+            <Info text="Tržby sú nepravidelné (jednorazové platby za balíčky), preto odhad vychádza z priemeru posledných mesiacov, nie z bodového výpočtu. Rozpätie = konzervatívny (nižší priemer) až optimistický (vyšší priemer)." label="Odhad tržieb (na ďalší mesiac)" />
           </H3>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, margin: "12px 0 6px" }}>
             <StatCard value={fmtCZK(avg3)} label="Ø posledné 3 mes." color={C.accentLight} />
             <StatCard value={fmtCZK(avg6)} label="Ø posledných 6 mes." color={C.blue} />
             <StatCard value={fmtCZK(avg12)} label="Ø celé obdobie" color={C.textMuted} />
-            <StatCard value={`${fmtCZK(lo * 3)} – ${fmtCZK(hi * 3)}`} label="Odhad tržieb / 3 mes." color={C.green} />
-          </div>
-          <div style={{ fontSize: 12, color: C.textMuted, marginTop: 6 }}>
-            Očakávané mesačné tržby ≈ <strong style={{ color: C.text }}>{fmtCZK(lo)} – {fmtCZK(hi)}</strong>. Reálne číslo kolíše podľa toho, koľko klientov si v danom mesiaci kúpi nový balíček.
+            <StatCard value={`${fmtCZK(lo)} – ${fmtCZK(hi)}`} label="Odhad tržieb / mesiac" color={C.green} />
           </div>
         </Card>
       )}
