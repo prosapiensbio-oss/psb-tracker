@@ -16,12 +16,14 @@ export type TrainerName = string;
 export const membershipBucket = (m: string): string => {
   const s = (m || "").toLowerCase();
   if (/s viazanost/.test(s)) return "6h S viazanostou (6M)";
-  if (/^on|online/.test(s)) return "Online balíček";
+  if (/one year|ročn|rok/.test(s)) return "Ročné (ONE YEAR)";
+  // "^on[ -]" matches the online product prefix ("ON - 6h…") without catching
+  // words that merely start with "on" (e.g. "ONE YEAR", handled just above).
+  if (/^on[ -]|online/.test(s)) return "Online balíček";
   if (/18 hod/.test(s)) return "18 hodín";
   if (/8 hod/.test(s)) return "8 hodín";
   if (/1 hod/.test(s)) return "1 hodina";
   if (/bez viazanosti/.test(s)) return "6h BEZ viazanosti";
-  if (/one year|ročn|rok/.test(s)) return "Ročné (ONE YEAR)";
   if (/doplnenie/.test(s)) return "Doplnenie členstva";
   if (/special|špeci/.test(s)) return "Špeciál";
   if (!m) return "Bez balíčka";
@@ -668,11 +670,16 @@ export function deriveRegister(
     const tone = c.alertTone === "red" ? "red" : "orange";
     add(`sixm|${c.client}|${c.phase}|${c.monthInPhase}`, "6M", tone, `${c.client} — 6M`, c.alert, 0, c.client);
   }
+  // Capacity signal uses the SAME real-hours utilisation the capacity card and the
+  // assistant show (util = tighter of typical→29h / busy→34h), NOT the reference-only
+  // effHours — that segment-weighted proxy sits far below the 24–34h zone and used to
+  // flag both trainers "pod zónou" permanently. Only surface the actionable extremes:
+  // genuinely at the cap (burnout risk) or a lot of free room (fill the schedule).
   for (const cap of capacity) {
-    if (cap.effHours < ZONE_LO)
-      add(`cap|${cap.trainer}|under`, "Kapacita", "orange", `${cap.trainer} — pod zónou`, cap.advice, 10);
-    else if (cap.effHours > ZONE_HI)
-      add(`cap|${cap.trainer}|over`, "Kapacita", "red", `${cap.trainer} — nad zónou`, cap.advice, 10);
+    if (cap.util >= 100)
+      add(`cap|${cap.trainer}|over`, "Kapacita", "red", `${cap.trainer} — na strope kapacity`, cap.advice, 10, undefined);
+    else if (cap.util < 60)
+      add(`cap|${cap.trainer}|under`, "Kapacita", "orange", `${cap.trainer} — veľa voľného priestoru`, cap.advice, 10, undefined);
   }
   for (const a of deriveAnomalies(data, clients)) {
     add(a.key, "Anomália", a.tone, a.label, a.detail, 20, a.client);
