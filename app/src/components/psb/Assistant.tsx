@@ -29,13 +29,6 @@ function fileToDataUrl(f: File): Promise<string> {
 // Client fields the assistant is allowed to edit (must match /api/override ALLOWED).
 const OVERRIDE_FIELDS = new Set(["status", "specialRate", "specialRateNote", "trainerNote", "contractSigned", "primaryTrainer"]);
 
-const SUGGESTIONS = [
-  "Čo mám tento týždeň riešiť ako prvé?",
-  "Prečo mám len 24 % týždňov v zdravej zóne?",
-  "Kde môžem zlepšiť kvalitu dát?",
-  "Zhrň mi najdôležitejšie z „Na čo sa pozrieť“.",
-];
-
 // Pull ```psb-action {json}``` blocks out of the reply; return clean text + actions.
 function parseActions(raw: string): { text: string; actions: ParsedAction[] } {
   const actions: ParsedAction[] = [];
@@ -58,12 +51,18 @@ function parseActions(raw: string): { text: string; actions: ParsedAction[] } {
   return { text, actions };
 }
 
-// Minimal formatter: **bold**, `code`, and newlines.
-function fmt(text: string) {
+// Minimal formatter: **bold**, `code`, «clickable client name», and newlines.
+function fmt(text: string, onClientClick?: (name: string) => void) {
   return text.split("\n").map((line, i) => {
-    const parts = line.split(/(\*\*[^*]+\*\*|`[^`]+`)/g).map((p, j) => {
+    const parts = line.split(/(\*\*[^*]+\*\*|`[^`]+`|«[^»]+»)/g).map((p, j) => {
       if (p.startsWith("**") && p.endsWith("**")) return <strong key={j}>{p.slice(2, -2)}</strong>;
       if (p.startsWith("`") && p.endsWith("`")) return <code key={j} style={{ background: mix(C.accent, 14), padding: "1px 4px", borderRadius: 4, fontSize: 12 }}>{p.slice(1, -1)}</code>;
+      if (p.startsWith("«") && p.endsWith("»")) {
+        const name = p.slice(1, -1);
+        return onClientClick
+          ? <button key={j} onClick={() => onClientClick(name)} style={{ background: "none", border: "none", padding: 0, margin: 0, color: C.accentLight, fontWeight: 600, cursor: "pointer", textDecoration: "underline", fontSize: "inherit", fontFamily: "inherit" }}>{name}</button>
+          : <strong key={j}>{name}</strong>;
+      }
       return <Fragment key={j}>{p}</Fragment>;
     });
     return <div key={i} style={{ minHeight: line.trim() ? undefined : 6 }}>{parts}</div>;
@@ -80,6 +79,15 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<{ filename: string; text: string }[] | null>(null);
   const [attach, setAttach] = useState<string[]>([]);
+  // Whether the floating bottom-right panel is open (shared so a client-name click
+  // from the inline widget can pop it open on the next tab). Persisted.
+  const [floatingOpen, setFloatingOpen] = useState(false);
+  useEffect(() => {
+    try { if (localStorage.getItem("psb-ai-open") === "1") setFloatingOpen(true); } catch { /* ignore */ }
+  }, []);
+  useEffect(() => {
+    try { localStorage.setItem("psb-ai-open", floatingOpen ? "1" : "0"); } catch { /* ignore */ }
+  }, [floatingOpen]);
 
   async function handleIncoming(list: FileList | File[] | null) {
     const arr = [...(list || [])];
@@ -137,12 +145,12 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
     setMsgs((m) => [...m, { role: "assistant", text: `**Import hotový.**\n${summary}\n\nDáta som obnovil — spýtaj sa ma na čokoľvek z nových čísel.` }]);
   }
 
-  return { msgs, setMsgs, input, setInput, busy, pending, setPending, attach, setAttach, ask, runAction, confirmImport, handleIncoming };
+  return { msgs, setMsgs, input, setInput, busy, pending, setPending, attach, setAttach, ask, runAction, confirmImport, handleIncoming, floatingOpen, setFloatingOpen };
 }
 
 // ── The conversation UI (messages + input) — used by both the floating panel and
 // the inline widget. Each instance has its own scroll/refs/drag state. ──────────
-export function ChatConversation({ chat, autoFocus }: { chat: AssistantChat; autoFocus?: boolean }) {
+export function ChatConversation({ chat, autoFocus, onClientClick }: { chat: AssistantChat; autoFocus?: boolean; onClientClick?: (name: string) => void }) {
   const { msgs, input, setInput, busy, pending, setPending, attach, setAttach, ask, runAction, confirmImport, handleIncoming } = chat;
   const [drag, setDrag] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -164,16 +172,6 @@ export function ChatConversation({ chat, autoFocus }: { chat: AssistantChat; aut
       onDrop={(e) => { e.preventDefault(); setDrag(false); void handleIncoming(e.dataTransfer.files); }}
     >
       <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: 14, display: "flex", flexDirection: "column", gap: 12 }}>
-        {msgs.length === 0 && (
-          <div style={{ color: C.textMuted, fontSize: 13 }}>
-            <p style={{ margin: "2px 0 12px" }}>Ahoj Jerry 👋 Pýtaj sa ma na čokoľvek z tvojich dát — vysvetlím čísla na kartách, rozoberiem „Na čo sa pozrieť“, poradím so zlepšeniami. CSV/obrázok pretiahni sem alebo cez 📎.</p>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {SUGGESTIONS.map((s) => (
-                <button key={s} onClick={() => ask(s)} style={chip}>{s}</button>
-              ))}
-            </div>
-          </div>
-        )}
         {msgs.map((m, mi) => (
           <div key={mi} style={{ alignSelf: m.role === "user" ? "flex-end" : "flex-start", maxWidth: "88%" }}>
             <div style={{ background: m.role === "user" ? C.accent : mix(C.text, 7), color: m.role === "user" ? C.onAccent : C.text, padding: "9px 12px", borderRadius: 12, fontSize: 13, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
@@ -182,7 +180,7 @@ export function ChatConversation({ chat, autoFocus }: { chat: AssistantChat; aut
                   {m.images.map((src, k) => <img key={k} src={src} alt="" style={{ maxWidth: 150, maxHeight: 150, borderRadius: 8, display: "block" }} />)}
                 </div>
               ) : null}
-              {fmt(m.text)}
+              {fmt(m.text, m.role === "assistant" ? onClientClick : undefined)}
             </div>
             {m.actions?.map((a, ai) => (
               <button key={ai} disabled={a.done} onClick={() => runAction(mi, ai)} style={{ marginTop: 6, display: "block", width: "100%", textAlign: "left", padding: "8px 11px", borderRadius: 9, cursor: a.done ? "default" : "pointer", fontSize: 12.5, fontWeight: 600, border: `1px solid ${a.done ? C.border : C.accent}`, background: a.done ? "transparent" : mix(C.accent, 14), color: a.done ? C.textDim : C.accentLight }}>
@@ -259,30 +257,27 @@ function ChatHeader({ chat, extra }: { chat: AssistantChat; extra?: React.ReactN
 }
 
 // Inline version for a Dashboard widget — same conversation as the floating panel.
-export function AssistantInline({ chat }: { chat: AssistantChat }) {
+export function AssistantInline({ chat, onClientClick }: { chat: AssistantChat; onClientClick?: (name: string) => void }) {
   return (
     <div style={{ marginBottom: 0, height: "100%", minHeight: 440, display: "flex", flexDirection: "column", overflow: "hidden", background: C.card, border: `1px solid ${C.border}`, borderRadius: 12 }}>
       <ChatHeader chat={chat} />
-      <ChatConversation chat={chat} />
+      <ChatConversation chat={chat} onClientClick={onClientClick} />
     </div>
   );
 }
 
-// Floating bottom-right panel (resizable, open/close persisted).
-export function Assistant({ chat }: { chat: AssistantChat }) {
-  const [open, setOpen] = useState(false);
+// Floating bottom-right panel (resizable). Open state lives in the shared chat.
+export function Assistant({ chat, onClientClick }: { chat: AssistantChat; onClientClick?: (name: string) => void }) {
+  const open = chat.floatingOpen;
+  const setOpen = chat.setFloatingOpen;
   const [size, setSize] = useState<{ w: number; h: number }>({ w: 400, h: 620 });
 
   useEffect(() => {
     try {
-      if (localStorage.getItem("psb-ai-open") === "1") setOpen(true);
       const s = JSON.parse(localStorage.getItem("psb-ai-size") || "null");
       if (s && typeof s.w === "number" && typeof s.h === "number") setSize({ w: s.w, h: s.h });
     } catch { /* ignore */ }
   }, []);
-  useEffect(() => {
-    try { localStorage.setItem("psb-ai-open", open ? "1" : "0"); } catch { /* ignore */ }
-  }, [open]);
 
   function startResize(e: React.PointerEvent) {
     e.preventDefault();
@@ -314,7 +309,7 @@ export function Assistant({ chat }: { chat: AssistantChat }) {
         <svg width={12} height={12} viewBox="0 0 12 12" fill="none" stroke={C.textDim} strokeWidth={1.5} strokeLinecap="round" aria-hidden="true"><path d="M11 1 1 11M6.5 1 1 6.5M11 5.5 5.5 11" /></svg>
       </div>
       <ChatHeader chat={chat} extra={<button onClick={() => setOpen(false)} title="Zavrieť" style={iconBtn}>✕</button>} />
-      <ChatConversation chat={chat} autoFocus={open} />
+      <ChatConversation chat={chat} autoFocus={open} onClientClick={onClientClick} />
     </div>
   );
 }
@@ -326,7 +321,6 @@ function errorText(err: string): string {
 }
 
 const iconBtn: CSSProperties = { width: 28, height: 28, borderRadius: 7, border: "none", background: "transparent", color: C.textMuted, cursor: "pointer", fontSize: 15, display: "flex", alignItems: "center", justifyContent: "center" };
-const chip: CSSProperties = { textAlign: "left", padding: "8px 11px", borderRadius: 9, border: `1px solid ${C.border}`, background: "transparent", color: C.text, fontSize: 12.5, cursor: "pointer" };
 const actBtn: CSSProperties = { padding: "7px 14px", borderRadius: 8, border: "none", cursor: "pointer", fontSize: 12.5, fontWeight: 600 };
 
 function Spark() {

@@ -136,6 +136,12 @@ export function PSBApp() {
 
   // One shared chat brain for both the floating panel and the inline dashboard widget.
   const chat = useAssistantChat(aiContext, actions);
+  // Clicking a client name in a bot reply → open that client in Klienti + pop the
+  // floating chat open (so the conversation follows you onto the new tab).
+  const onClientClick = (name: string) => {
+    navigate("klienti", undefined, { client: name, nonce: Date.now() });
+    chat.setFloatingOpen(true);
+  };
 
   if (authed === null || (authed && loading)) {
     return (
@@ -183,7 +189,7 @@ export function PSBApp() {
       </nav>
       <div style={{ padding: 16, maxWidth: 1200, margin: "0 auto" }}>
         {active === "dashboard" && (
-          <Dashboard data={data} clients={clients} register={register} sixM={sixM} capacity={capacity} actions={actions} onNavigate={navigate} assistantChat={chat} />
+          <Dashboard data={data} clients={clients} register={register} sixM={sixM} capacity={capacity} actions={actions} onNavigate={navigate} assistantChat={chat} onClientClick={onClientClick} />
         )}
         {active === "treningy" && <Treningy data={data} clients={clients} sub={treningySub} onSub={setTreningySub} focus={treningyFocus} />}
         {active === "klienti" && <Klienti clients={clients} capacity={capacity} actions={actions} focus={klientiFocus} />}
@@ -193,7 +199,7 @@ export function PSBApp() {
       <div style={{ ...S.h3, textAlign: "center", color: C.textDim, fontSize: 11, padding: "8px 0 24px", fontWeight: 400 }}>
         ProSapiens Biomechanic · interný nástroj · nezdieľať externe
       </div>
-      <Assistant chat={chat} />
+      <Assistant chat={chat} onClientClick={onClientClick} />
     </div>
   );
 }

@@ -286,6 +286,7 @@ export function Dashboard({
   actions,
   onNavigate,
   assistantChat,
+  onClientClick,
 }: {
   data: PSBData;
   clients: Record<string, ClientAgg>;
@@ -295,6 +296,7 @@ export function Dashboard({
   actions: Actions;
   onNavigate: (tab: string, sub?: string, focus?: NavFocus) => void;
   assistantChat: AssistantChat;
+  onClientClick: (name: string) => void;
 }) {
   const [trainer, setTrainer] = useState("all");
   const [showAcked, setShowAcked] = useState(false);
@@ -451,7 +453,8 @@ export function Dashboard({
   const missing = REPORTS.filter((r) => (data[r.key] as unknown[]).length === 0);
   const open = register.filter((r) => !r.acked);
   const acked = register.filter((r) => r.acked);
-  const visible = showAcked ? register : open;
+  // "Ukázať skryté" swaps to the hidden/accepted items only (so it's obvious they appeared).
+  const visible = showAcked ? acked : open;
 
   // Click-through helpers: focus one week in Tréningy → Prehľad / one month in Financie → Zárobky.
   const openWeek = (weekLabelStr: string) => onNavigate("treningy", "prehled", { week: weekLabelStr, trainer, nonce: Date.now() });
@@ -605,36 +608,36 @@ export function Dashboard({
       </Card>
     ),
     trend: <SessionTrend sessions={sessionsT} onNavigate={() => onNavigate("treningy", "analyza")} />,
-    asistent: <AssistantInline chat={assistantChat} />,
+    asistent: <AssistantInline chat={assistantChat} onClientClick={onClientClick} />,
     register: (
-      <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column" }}>
+      <Card style={{ marginBottom: 0 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
           <H3>
             <Info
-              text="Zoznam vecí na akciu: 6M upozornenia, kapacita, klienti čo prestali chodiť, dochádzajúce balíčky, koniec pauzy. Akceptovať (s poznámkou) alebo Skryť ich odstráni z tohto zoznamu. Debatovať o nich vieš aj s AI asistentom."
+              text="Zoznam vecí na akciu: 6M upozornenia, kapacita, klienti čo prestali chodiť, koniec pauzy. Skryť ich odstráni zo zoznamu (vieš ich vrátiť cez „Ukázať skryté“). Debatovať o nich vieš aj s AI asistentom."
               label={`Na čo sa pozrieť (${open.length})`}
             />
           </H3>
           <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-            {open.length > 3 && (
+            {visible.length > 3 && (
               <button onClick={() => setRegisterExpanded((v) => !v)} style={{ background: "none", border: "none", color: C.accentLight, fontSize: 12, cursor: "pointer", fontWeight: 500 }}>
-                {registerExpanded ? "Zbaliť" : `Rozbaliť všetky (${open.length})`}
+                {registerExpanded ? "Zbaliť" : `Rozbaliť všetky (${visible.length})`}
               </button>
             )}
-            {acked.length > 0 && (
+            {(acked.length > 0 || showAcked) && (
               <button onClick={() => setShowAcked((v) => !v)} style={{ background: "none", border: "none", color: C.textDim, fontSize: 12, cursor: "pointer" }}>
-                {showAcked ? "Skryť vybavené" : `Zobraziť vybavené (${acked.length})`}
+                {showAcked ? "← Späť na aktívne" : `Ukázať skryté (${acked.length})`}
               </button>
             )}
           </div>
         </div>
         {visible.length ? (
           // Compact: ~3 items visible, the rest scrolls. Expanded: full list.
-          <div style={{ overflowY: registerExpanded ? "visible" : "auto", maxHeight: registerExpanded ? undefined : 340, paddingRight: registerExpanded ? 0 : 2 }}>
+          <div style={{ overflowY: registerExpanded ? "visible" : "auto", maxHeight: registerExpanded ? undefined : 200, paddingRight: registerExpanded ? 0 : 2 }}>
             {visible.map((r) => <RegisterRow key={r.key} item={r} actions={actions} onNavigate={onNavigate} />)}
           </div>
         ) : (
-          <Empty>Nič nevyžaduje pozornosť 🌿</Empty>
+          <Empty>{showAcked ? "Žiadne skryté položky." : "Nič nevyžaduje pozornosť 🌿"}</Empty>
         )}
       </Card>
     ),
@@ -769,8 +772,6 @@ function CapacityCard({ capacity, trainer, onNavigate }: { capacity: CapacityRow
 const linkBtn = { background: "none", border: "none", color: C.accentLight, cursor: "pointer", fontSize: 12, padding: 0 } as const;
 
 function RegisterRow({ item, actions, onNavigate }: { item: RegisterItem; actions: Actions; onNavigate: (tab: string, sub?: string, focus?: NavFocus) => void }) {
-  const [open, setOpen] = useState(false);
-  const [note, setNote] = useState(item.note && item.note !== "skryté" ? item.note : "");
   const jump = item.category === "6M" ? "6m" : item.category === "Kapacita" ? "treningy" : "klienti";
   const openItem = () => onNavigate(jump, undefined, item.client ? { client: item.client, nonce: Date.now() } : undefined);
   return (
@@ -783,22 +784,10 @@ function RegisterRow({ item, actions, onNavigate }: { item: RegisterItem; action
           {item.acked ? (
             <button onClick={() => actions.ackAnomaly(item.key, "", false)} style={linkBtn}>Vrátiť</button>
           ) : (
-            <>
-              <button onClick={() => setOpen((v) => !v)} style={linkBtn}>Akceptovať</button>
-              <button onClick={() => actions.ackAnomaly(item.key, "skryté")} style={{ ...linkBtn, color: C.textDim }}>Skryť</button>
-            </>
+            <button onClick={() => actions.ackAnomaly(item.key, "skryté")} style={{ ...linkBtn, color: C.textDim }}>Skryť</button>
           )}
         </div>
       </div>
-      {item.acked && item.note && item.note !== "skryté" && <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4 }}>Pozn.: {item.note}</div>}
-      {open && !item.acked && (
-        <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
-          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Vysvetlenie (napr. klient prestal odpisovať)" style={{ ...S.input, fontSize: 12 }} autoFocus />
-          <button onClick={() => { actions.ackAnomaly(item.key, note || "akceptované"); setOpen(false); }} style={{ ...btn("accent"), fontSize: 12, padding: "6px 12px", whiteSpace: "nowrap" }}>
-            Uložiť
-          </button>
-        </div>
-      )}
     </div>
   );
 }

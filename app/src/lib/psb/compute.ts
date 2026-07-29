@@ -593,23 +593,12 @@ export function deriveAnomalies(data: PSBData, clients: Record<string, ClientAgg
     }
     if (c.status === "Neaktívny") continue;
     const days = daysBetween(c.lastSession, now);
-    const recent = days <= 30;
-
-    // Package balance running out — the client to invoice / offer a renewal.
-    if (c.packageTotal > 0 && c.packageRemaining <= 0 && recent) {
-      push(`bal0|${c.name}`, "orange", "Balíček dočerpaný", `${c.name}: balíček dočerpaný (0 sedení), ešte chodí — pošli ponuku na obnovu / faktúru`, c.name);
-    } else if (c.packageTotal > 0 && c.packageRemaining > 0 && c.packageRemaining <= 1) {
-      push(`ballow|${c.name}`, "orange", "Nízky zostatok", `${c.name}: ostáva ${c.packageRemaining} sedenie z balíčka — čas na obnovu`, c.name);
-    }
 
     // Regular client who stopped coming — reach out before they churn.
+    // (Package-balance + no-package signals live in the "Blíži sa koniec balíčka"
+    // widget / Klienti, so they're intentionally NOT duplicated here.)
     if ((c.segment === "Anchor" || c.segment === "Stabilný") && days >= 14 && days <= 60) {
       push(`gone|${c.name}`, days >= 21 ? "red" : "orange", "Prestal chodiť", `${c.name}: ${days} dní bez tréningu (${c.segment}) — ozvi sa`, c.name);
-    }
-
-    // Trains but has no package and no recorded sale — check the payment.
-    if (recent && c.packageTotal === 0 && c.serviceCount === 0 && !c.is6m) {
-      push(`nopack|${c.name}`, "orange", "Sedenia bez balíčka", `${c.name}: aktívne sedenia, ale žiadny balíček ani predaj — over platbu`, c.name);
     }
   }
 
