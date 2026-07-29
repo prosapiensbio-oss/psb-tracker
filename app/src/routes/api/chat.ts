@@ -122,6 +122,12 @@ export const Route = createFileRoute("/api/chat")({
               model: MODEL,
               max_tokens: MAX_TOKENS,
               stream: true,
+              // Extended thinking OFF: on analytical prompts the model would spend 25s+
+              // emitting thinking tokens (which we don't forward) BEFORE any answer text,
+              // blowing past the ~30s gateway cut → empty reply. Straight-to-text keeps
+              // the whole response well inside the window; the answer stays grounded in
+              // the <data> + <pozadie_psb> we provide.
+              thinking: { type: "disabled" },
               system,
               messages: messages.map((m) => ({ role: m.role, content: toContent(m) })),
             }),
@@ -164,6 +170,12 @@ export const Route = createFileRoute("/api/chat")({
                     const evt = JSON.parse(data) as { type?: string; delta?: { type?: string; text?: string } };
                     if (evt.type === "content_block_delta" && evt.delta?.type === "text_delta" && evt.delta.text) {
                       controller.enqueue(encoder.encode(`data: ${JSON.stringify({ t: evt.delta.text })}\n\n`));
+                    } else if (evt.type === "content_block_delta" && evt.delta?.type === "thinking_delta") {
+                      // Should not occur (thinking disabled) — but if it ever does, keep the
+                      // pipe warm with a comment ping so the connection doesn't idle out.
+                      controller.enqueue(encoder.encode(": .\n\n"));
+                    } else if (evt.type === "ping") {
+                      controller.enqueue(encoder.encode(": ping\n\n"));
                     }
                   } catch { /* ignore partial JSON */ }
                 }
