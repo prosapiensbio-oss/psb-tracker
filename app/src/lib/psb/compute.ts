@@ -95,6 +95,7 @@ export type ClientAgg = {
   specialRateNote: string;
   trainerNote: string;
   contractSigned: boolean;
+  bitcoin: boolean;
   clientType: "6M Predplatné" | "Balíček";
   is6m: boolean;
   membership: string; // current product from Packages report (e.g. "OFF - 6h S viazanostou")
@@ -147,6 +148,7 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
         specialRateNote: "",
         trainerNote: "",
         contractSigned: false,
+        bitcoin: false,
         clientType: "Balíček",
         is6m: false,
         membership: "",
@@ -207,6 +209,7 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
     c.specialRateNote = ov?.specialRateNote || "";
     c.trainerNote = ov?.trainerNote || "";
     c.contractSigned = !!ov?.contractSigned;
+    c.bitcoin = !!ov?.bitcoin;
     c.is6m = sixMSet.has(c.name);
     c.clientType = c.is6m ? "6M Predplatné" : "Balíček";
     c.serviceCount = serviceCounts[c.name] || 0;

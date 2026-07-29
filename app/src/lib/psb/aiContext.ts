@@ -157,6 +157,7 @@ export function buildAiContext(
       is6m: c.is6m,
       modalita: c.modality,
       zmluvaPodpisana: c.contractSigned,
+      platiBitcoin: c.bitcoin,
       specialnaSadzba: c.specialRate,
       pozn_specialnaSadzba: c.specialRateNote || null,
       poznamkaTrenera: c.trainerNote || null,

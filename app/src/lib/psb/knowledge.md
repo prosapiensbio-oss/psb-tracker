@@ -719,3 +719,27 @@ Toto NIE sú citáty z kníh, ale stručné princípy z uznávaných biznis rám
 - **Trusted advisor / Company of One:** buduj dôveru a vzťah (hlavný retenčný kanál PSB), rast cez maržu/hodnotu, nie cez objem. Malé, ziskové, udržateľné > veľké a krehké.
 
 Pravidlo: tieto rámce sú kontext pre úsudok. Konkrétne odporúčanie vždy naviaž na reálne číslo z Trackera a rešpektuj tvrdé mantinely z pravidiel vyššie (žiadne FP kurzy/licencie/štandardizované náhrady 1:1).
+
+===================================================================
+
+# Doplnky: platby, zľavy, BTC, a manuály
+
+## Platby v Bitcoine (BTC) a zľavové tarify
+PSB prijíma aj platby v Bitcoine. V nástroji má každý klient príznak "bitcoin" (áno/nie) — či platí v BTC. Vieš z toho vyhodnotiť, koľko klientov platí v BTC vs. klasicky.
+
+Zľavové tarify (znížené sadzby oproti cenníku):
+- **Starí/pôvodní klienti: 10 % zľava** na platby.
+- **Noví klienti: 20 % z prvej platby, 5 % z každej ďalšej.**
+Kvôli týmto zľavám (a BTC) sa reálne zaplatené sumy legitímne líšia od cenníkových cien — nižšia zaplatená suma NEMUSÍ byť chyba. Klienti so zníženou sadzbou majú byť v nástroji označení príznakom "špeciálna sadzba" (specialRate). Keď hľadáš cenové nezrovnalosti, ber tieto zľavy do úvahy, nehlás každú odchýlku ako chybu.
+
+Pomôcka pri hľadaní nezrovnalostí (na požiadanie používateľa): porovnaj priemernú cenu sedenia / platby klienta s jeho evidovaným balíčkom/kategóriou. Príklad: klient platí ~6 990 Kč mesačne (to je cena 6M subscription), ale NIE je označený ako 6M → pravdepodobne patrí do 6M, len nie je správne zaradený — over. Podobne klient platiaci výrazne inú sumu než zodpovedá jeho balíčku (aj po zohľadnení zliav) je hodný overenia.
+
+## Aktuálny cenník — doplnok
+Okrem cien v sekcii 4 vyššie existujú aj "podpultové členstvá": Pack 8h/2 mes. = 9 400 Kč (1 175 Kč/h); Subscription 18h/mes (3×6h) = 20 970 Kč (~1 165 Kč/h). Inak platí cenník zo sekcie 4 (offline/online/TrueCoach).
+
+## Predajný a operačný manuál — kľúčové princípy (nad rámec sekcií vyššie)
+- **Retencia sa rozhoduje v prvých 30 dňoch**, nie v 5.–6. mesiaci. Klient musí v prvom mesiaci pochopiť: zmena je neurologická (nie svalová), jeho problém bol systémový, 6M je biologické minimum, regres je normálny, tréning má štruktúru.
+- **Námietky nie sú nikdy o cene** — cena je racionalizácia. Odpor sa rieši návratom k systému, nie zľavou. Reakcia zo strachu (zľava, kompromis) oslabuje autoritu a znižuje retenciu u všetkých naokolo. Ak sa tá istá námietka opakuje u viacerých klientov, problém je v komunikácii/štruktúre, nie v klientovi.
+- **Bonusový model:** keď klient dokončí 6M a pokračuje do ďalšej fázy, tréner dostane **2 500 Kč** (vyplatené po prvom zaplatenom mesiaci ďalšej fázy). Nie je to provízia za predaj — je to odmena za kontinuitu (nulové akvizičné náklady, vyššie LTV).
+- **Prechod z Packu na 6M — 3 scenáre:** noví klienti → predstaviť 6M v 3.–4. hodine; krátkodobí (2–6 mes.) → len ak sami signalizujú pokračovanie; dlhodobí (rok+) → netlačiť, kým cenový rozdiel nie je aspoň 300 Kč/h alebo kým sami neotvoria tému stability. Fáza Obnova sa vždy ráta od prvého tréningu, nie od dátumu prechodu.
+- Existujú plné interné manuály (Operačný, Predajný DocA, Marketingový, Kariérny plán trénera) — tieto princípy sú ich zhrnutie; ak používateľ potrebuje detail konkrétneho scenára/skriptu, môže sa opýtať a ty odpovedz podľa týchto princípov (a ak niečo nevieš z podkladov, povedz to).

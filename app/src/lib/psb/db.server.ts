@@ -79,6 +79,7 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
       trainerNote: r.trainer_note || "",
       contractSigned: !!r.contract_signed,
       primaryTrainer: r.primary_trainer,
+      bitcoin: !!r.bitcoin,
     };
   }
   for (const r of acks.results as any[]) {
@@ -194,6 +195,7 @@ export async function setOverride(
     trainer_note: "",
     contract_signed: 0,
     primary_trainer: null,
+    bitcoin: 0,
   };
   const colMap: Record<string, string> = {
     status: "status",
@@ -202,21 +204,22 @@ export async function setOverride(
     trainerNote: "trainer_note",
     contractSigned: "contract_signed",
     primaryTrainer: "primary_trainer",
+    bitcoin: "bitcoin",
   };
   const col = colMap[key as string];
   if (!col) return;
   let v: any = value;
-  if (col === "special_rate" || col === "contract_signed") v = value ? 1 : 0;
+  if (col === "special_rate" || col === "contract_signed" || col === "bitcoin") v = value ? 1 : 0;
   if ((col === "status" || col === "primary_trainer") && (value === "" || value == null)) v = null;
   cur[col] = v;
 
   await DB.prepare(
-    `INSERT INTO client_overrides (name,status,special_rate,special_rate_note,trainer_note,contract_signed,primary_trainer,updated_at)
-     VALUES (?,?,?,?,?,?,?,?)
+    `INSERT INTO client_overrides (name,status,special_rate,special_rate_note,trainer_note,contract_signed,primary_trainer,bitcoin,updated_at)
+     VALUES (?,?,?,?,?,?,?,?,?)
      ON CONFLICT(name) DO UPDATE SET status=excluded.status, special_rate=excluded.special_rate,
        special_rate_note=excluded.special_rate_note, trainer_note=excluded.trainer_note,
        contract_signed=excluded.contract_signed, primary_trainer=excluded.primary_trainer,
-       updated_at=excluded.updated_at`,
+       bitcoin=excluded.bitcoin, updated_at=excluded.updated_at`,
   )
     .bind(
       name,
@@ -226,6 +229,7 @@ export async function setOverride(
       cur.trainer_note ?? "",
       cur.contract_signed ?? 0,
       cur.primary_trainer ?? null,
+      cur.bitcoin ?? 0,
       new Date().toISOString(),
     )
     .run();

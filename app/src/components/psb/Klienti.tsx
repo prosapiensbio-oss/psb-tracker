@@ -102,6 +102,7 @@ export function Klienti({ clients, capacity, actions, focus }: { clients: Record
       attendance: (c) => c.attendance,
       avg: (c) => c.paidAvg,
       last: (c) => new Date(c.lastSession).getTime(),
+      bitcoin: (c) => (c.bitcoin ? 1 : 0),
     });
   }, [baseList, membershipF, sorted, focusClient, all]);
 
@@ -281,6 +282,7 @@ export function Klienti({ clients, capacity, actions, focus }: { clients: Record
               <SortTh label="Dochádzka" sortKey="attendance" sort={sort} onSort={toggle} align="right" info="Podiel týždňov s tréningom za posledných 18 týždňov." />
               <SortTh label="Ø CZK" sortKey="avg" sort={sort} onSort={toggle} align="right" />
               <SortTh label="Posledný" sortKey="last" sort={sort} onSort={toggle} align="right" />
+              <SortTh label="₿" sortKey="bitcoin" sort={sort} onSort={toggle} align="center" info="Platí v Bitcoine. Zaškrtni klientov platiacich BTC — potom ich vieš filtrovať a AI asistent vie porovnať BTC vs. klasické platby." />
               <th style={S.th}></th>
             </tr>
           </thead>
@@ -302,6 +304,9 @@ export function Klienti({ clients, capacity, actions, focus }: { clients: Record
                 <td style={{ ...S.td, textAlign: "right" }}>{(c.attendance * 100).toFixed(0)}%</td>
                 <td style={{ ...S.td, textAlign: "right" }}>{fmtCZK(c.paidAvg)}</td>
                 <td style={{ ...S.td, textAlign: "right" }}>{fmtDate(c.lastSession)}</td>
+                <td style={{ ...S.td, textAlign: "center" }}>
+                  <input type="checkbox" checked={c.bitcoin} onChange={(e) => actions.setOverride(c.name, "bitcoin", e.target.checked)} title="Platí v Bitcoine" style={{ accentColor: "#f7931a", cursor: "pointer" }} />
+                </td>
                 <td style={S.td}><button onClick={() => setEdit(c.name)} style={{ background: C.cardHover, border: "none", borderRadius: 6, padding: "4px 9px", cursor: "pointer", color: C.text, fontSize: 11 }}>✎</button></td>
               </tr>
             ))}

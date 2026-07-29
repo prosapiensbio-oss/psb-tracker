@@ -43,6 +43,7 @@ export type ClientOverride = {
   trainerNote?: string;
   contractSigned?: boolean;
   primaryTrainer?: string | null;
+  bitcoin?: boolean;
 };
 
 export type UploadLogEntry = {

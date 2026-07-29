@@ -12,6 +12,7 @@ const ALLOWED = new Set<keyof ClientOverride>([
   "trainerNote",
   "contractSigned",
   "primaryTrainer",
+  "bitcoin",
 ]);
 
 export const Route = createFileRoute("/api/override")({

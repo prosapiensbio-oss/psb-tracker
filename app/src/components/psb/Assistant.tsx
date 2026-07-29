@@ -41,7 +41,7 @@ function fileToDataUrl(f: File): Promise<string> {
 }
 
 // Client fields the assistant is allowed to edit (must match /api/override ALLOWED).
-const OVERRIDE_FIELDS = new Set(["status", "specialRate", "specialRateNote", "trainerNote", "contractSigned", "primaryTrainer"]);
+const OVERRIDE_FIELDS = new Set(["status", "specialRate", "specialRateNote", "trainerNote", "contractSigned", "primaryTrainer", "bitcoin"]);
 
 // Pull ```psb-action {json}``` blocks out of the reply; return clean text + actions.
 function parseActions(raw: string): { text: string; actions: ParsedAction[] } {
