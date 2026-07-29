@@ -26,6 +26,7 @@ export function Financie({ data, clients, focus }: { data: PSBData; clients: Rec
       <SubTabs
         tabs={[
           { id: "zarobky", label: "Mesačné zárobky" },
+          { id: "trzby", label: "Tržby (prijaté)" },
           { id: "cashflow", label: "Cashflow" },
           { id: "sedenia", label: "Sedenia & cena" },
           { id: "predikcia", label: "Predikcia" },
@@ -33,6 +34,7 @@ export function Financie({ data, clients, focus }: { data: PSBData; clients: Rec
         value={sub}
         onChange={setSub}
       />
+      {sub === "trzby" && <Trzby monthly={monthly} />}
       {sub === "zarobky" && <Zarobky monthly={monthly} focusMonth={focusMonth} onClearFocus={() => setFocusMonth(null)} />}
       {sub === "cashflow" && <Cashflow monthly={monthly} />}
       {sub === "sedenia" && <Sedenia monthly={monthly} />}
@@ -106,6 +108,86 @@ function Zarobky({ monthly, focusMonth, onClearFocus }: { monthly: Monthly; focu
           </tbody>
         </TableWrap>
         {!monthly.length && <Empty>Nahraj Payroll by Session CSV.</Empty>}
+      </Card>
+    </>
+  );
+}
+
+// Tržby = money actually received per month (Payments Recorded) — what PTminder
+// shows as "Payments". Lumpy (clients pre-pay packages), so the forecast uses
+// trailing averages rather than the session run-rate.
+function Trzby({ monthly }: { monthly: Monthly }) {
+  const { sort, toggle, sorted } = useSort({ key: "month", dir: "asc" });
+  const withMom = useMemo(
+    () =>
+      monthly.map((m, i) => {
+        const prev = monthly[i - 1];
+        const mom = prev && prev.cash ? ((m.cash - prev.cash) / prev.cash) * 100 : null;
+        return { ...m, mom };
+      }),
+    [monthly],
+  );
+  const rows = sorted(withMom, { month: (m) => m.month, cash: (m) => m.cash, revenue: (m) => m.revenue, mom: (m) => m.mom ?? -999 });
+  const chart = monthly.map((m) => ({ label: monthLabel(m.month), value: m.cash }));
+
+  // Trailing-average forecast (tržby are lumpy, so averages beat a point estimate).
+  const cashVals = monthly.map((m) => m.cash);
+  const avgOf = (n: number) => {
+    const s = cashVals.slice(-n);
+    return s.length ? s.reduce((a, b) => a + b, 0) / s.length : 0;
+  };
+  const avg3 = avgOf(3), avg6 = avgOf(6), avg12 = avgOf(12);
+  const lo = Math.min(avg3, avg6), hi = Math.max(avg3, avg6);
+
+  return (
+    <>
+      <Card>
+        <H3>
+          <Info text="Mesačné tržby = peniaze reálne prijaté za mesiac (report Payments Recorded). Presne to, čo v PTminderi vidíš ako Payments. Skáče, keď si niekto kúpi väčší balíček dopredu — tie tréningy sa potom čerpajú ďalšie mesiace (preto sa tržby líšia od vyfakturovaných zárobkov)." label="Mesačné tržby (prijaté platby)" />
+        </H3>
+        {chart.length ? <ValueBars data={chart} color={C.blue} fmt={(n) => `${Math.round(n / 1000)}k`} height={180} alignEnd /> : <Empty>Nahraj Payments Recorded.</Empty>}
+      </Card>
+
+      {monthly.length > 0 && (
+        <Card>
+          <H3>
+            <Info text="Tržby sú nepravidelné (jednorazové platby za balíčky), preto odhad vychádza z priemeru posledných mesiacov, nie z bodového výpočtu. Rozpätie = konzervatívny (nižší priemer) až optimistický (vyšší priemer)." label="Odhad tržieb — ďalšie 3 mesiace" />
+          </H3>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, margin: "12px 0 6px" }}>
+            <StatCard value={fmtCZK(avg3)} label="Ø posledné 3 mes." color={C.accentLight} />
+            <StatCard value={fmtCZK(avg6)} label="Ø posledných 6 mes." color={C.blue} />
+            <StatCard value={fmtCZK(avg12)} label="Ø celé obdobie" color={C.textMuted} />
+            <StatCard value={`${fmtCZK(lo * 3)} – ${fmtCZK(hi * 3)}`} label="Odhad tržieb / 3 mes." color={C.green} />
+          </div>
+          <div style={{ fontSize: 12, color: C.textMuted, marginTop: 6 }}>
+            Očakávané mesačné tržby ≈ <strong style={{ color: C.text }}>{fmtCZK(lo)} – {fmtCZK(hi)}</strong>. Reálne číslo kolíše podľa toho, koľko klientov si v danom mesiaci kúpi nový balíček.
+          </div>
+        </Card>
+      )}
+
+      <Card>
+        <div style={{ fontSize: 11, color: C.textDim, marginBottom: 8 }}>Zdroj: Payments Recorded. Zoradené najstaršie → najnovšie.</div>
+        <TableWrap>
+          <thead>
+            <tr>
+              <SortTh label="Mesiac" sortKey="month" sort={sort} onSort={toggle} />
+              <SortTh label="Prijaté (tržby)" sortKey="cash" sort={sort} onSort={toggle} align="right" />
+              <SortTh label="Vyfakturované" sortKey="revenue" sort={sort} onSort={toggle} align="right" info="Pre porovnanie: hodnota odtrénovaných sedení za mesiac." />
+              <SortTh label="MoM %" sortKey="mom" sort={sort} onSort={toggle} align="right" info="Zmena tržieb oproti predošlému mesiacu." />
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((m) => (
+              <tr key={m.month}>
+                <td style={S.td}>{monthLabel(m.month)}</td>
+                <td style={{ ...S.td, textAlign: "right", fontWeight: 600, color: C.blue }}>{fmtCZK(m.cash)}</td>
+                <td style={{ ...S.td, textAlign: "right", color: C.textMuted }}>{fmtCZK(m.revenue)}</td>
+                <td style={{ ...S.td, textAlign: "right", color: arrowColor(m.mom) }}>{m.mom == null ? "—" : `${arrow(m.mom)} ${m.mom.toFixed(1)}%`}</td>
+              </tr>
+            ))}
+          </tbody>
+        </TableWrap>
+        {!monthly.length && <Empty>Nahraj Payments Recorded CSV.</Empty>}
       </Card>
     </>
   );
