@@ -608,7 +608,7 @@ export function deriveAnomalies(data: PSBData, clients: Record<string, ClientAgg
     if (!p.client || p.amount > 50000) continue; // skip report-total rows
     if (clients[p.client] || serviceClients.has(p.client) || seen.has(p.client)) continue;
     seen.add(p.client);
-    push(`orphan|${p.client}`, "orange", "Platba bez sedení", `${p.client}: má platby, ale žiadne sedenia — over meno/priradenie`);
+    push(`orphan|${p.client}`, "orange", "Platba bez sedení", `${p.client}: má platby, ale žiadne sedenia — over meno/priradenie`, p.client);
   }
 
   return out.sort((a, b) => (a.acked === b.acked ? 0 : a.acked ? 1 : -1));

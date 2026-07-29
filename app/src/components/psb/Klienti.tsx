@@ -307,7 +307,13 @@ export function Klienti({ clients, capacity, actions, focus }: { clients: Record
             ))}
           </tbody>
         </TableWrap>
-        {!list.length && <Empty>Žiadni klienti pre tento filter.</Empty>}
+        {!list.length && (
+          <Empty>
+            {focusClient
+              ? `„${focusClient}“ nemá žiadne odtrénované sedenia — je len v platbách. Pravdepodobne preklep v mene platby alebo klient zaplatil vopred a ešte netrénoval. Skontroluj Financie → Cashflow alebo podobné mená v tabuľke (zruš filter ✕ vyššie).`
+              : "Žiadni klienti pre tento filter."}
+          </Empty>
+        )}
       </Card>
 
       {editC && (
