@@ -61,6 +61,24 @@ export async function resetAll(): Promise<void> {
   await post("/api/reset", {});
 }
 
+export type MonthNote = { month: string; note: string; answers: Record<string, string>; updatedAt?: string };
+
+export async function fetchMonthNotes(): Promise<Record<string, MonthNote>> {
+  try {
+    const r = await fetch("/api/vzas-notes");
+    if (!r.ok) return {};
+    const j = (await r.json()) as { notes?: Record<string, MonthNote> };
+    return j.notes ?? {};
+  } catch {
+    return {};
+  }
+}
+
+export async function saveMonthNote(month: string, note: string, answers: Record<string, string>): Promise<boolean> {
+  const r = await post("/api/vzas-notes", { month, note, answers });
+  return r.ok;
+}
+
 export type ChatResult =
   | { ok: true; reply: string }
   | { ok: false; error: string; status?: number; detail?: string };

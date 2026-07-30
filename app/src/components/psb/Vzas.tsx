@@ -1,5 +1,6 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 
+import { fetchMonthNotes, saveMonthNote, type MonthNote } from "../../lib/psb/client";
 import { fmtCZK } from "../../lib/psb/format";
 import { C, mix, S } from "../../lib/psb/theme";
 import {
@@ -9,11 +10,15 @@ import {
   PRIJMY,
   SALARY,
   SPOLOCNE,
+  MONTH_QUESTIONS,
+  SEED_NOTES,
   VZAS_MONTH_LABELS,
   VZAS_TARGETS,
   byCommitment,
   commitmentTotal,
   jarekCalc,
+  monthDeviations,
+  monthKeyOf,
   pnlCalc,
   salaryCalc,
   spolocneHalf,
@@ -1069,6 +1074,87 @@ function ForecastCard() {
   );
 }
 
+// Numbers say what happened; the note says why. Opens with an auto-computed
+// "what was different" list so the answer usually doesn't have to be recalled.
+function MonthNoteRow({ mi, colSpan, notes, onSaved }: {
+  mi: number; colSpan: number; notes: Record<string, MonthNote>; onSaved: (n: MonthNote) => void;
+}) {
+  const key = monthKeyOf(mi);
+  const existing = notes[key];
+  const [note, setNote] = useState(existing?.note ?? SEED_NOTES[key] ?? "");
+  const [answers, setAnswers] = useState<Record<string, string>>(existing?.answers ?? {});
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const devs = useMemo(() => monthDeviations(mi), [mi]);
+
+  const save = async () => {
+    setSaving(true);
+    const ok = await saveMonthNote(key, note, answers);
+    setSaving(false);
+    if (ok) {
+      setSaved(true);
+      onSaved({ month: key, note, answers });
+      setTimeout(() => setSaved(false), 2200);
+    }
+  };
+  const field: React.CSSProperties = {
+    width: "100%", background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8,
+    color: C.text, fontSize: 12.5, padding: "8px 10px", fontFamily: "inherit", resize: "vertical",
+  };
+
+  return (
+    <tr>
+      <td colSpan={colSpan} style={{ padding: "14px 16px", background: mix(C.accent, 5), borderBottom: `1px solid ${mix(C.border, 55)}` }}>
+        {devs.length > 0 && (
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: C.accent, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 7 }}>
+              Čo bolo v tomto mesiaci iné
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              {devs.map((d) => (
+                <div key={d.label} style={{ fontSize: 12.5, color: C.textMuted, lineHeight: 1.5 }}>
+                  <b style={{ color: C.text }}>{d.label}</b> <span style={{ color: C.textDim }}>· {d.group}</span> —{" "}
+                  <b style={{ color: d.diff > 0 ? (d.group === "Príjmy" ? C.green : C.red) : d.group === "Príjmy" ? C.red : C.green }}>
+                    {money(d.value)}
+                  </b>{" "}
+                  namiesto obvyklých {money(Math.round(d.typical))}{" "}
+                  <span style={{ color: d.diff > 0 ? C.red : C.green }}>({d.diff > 0 ? "+" : ""}{money(Math.round(d.diff))})</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div style={{ fontSize: 11, fontWeight: 700, color: C.accent, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 7 }}>Otázky na tento mesiac</div>
+        <div style={{ display: "grid", gap: 8, marginBottom: 14 }}>
+          {MONTH_QUESTIONS.map((q) => (
+            <div key={q.id}>
+              <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 3 }}>{q.q}</div>
+              <input value={answers[q.id] ?? ""} onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })}
+                placeholder="…" style={{ ...field, padding: "6px 10px" }} />
+            </div>
+          ))}
+        </div>
+
+        <div style={{ fontSize: 11, fontWeight: 700, color: C.accent, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 7 }}>Voľná poznámka</div>
+        <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={3} style={field}
+          placeholder="Čokoľvek, čo by si o tomto mesiaci chcel vedieť o rok…" />
+
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 10 }}>
+          <button onClick={save} disabled={saving}
+            style={{ padding: "6px 16px", borderRadius: 8, border: `1px solid ${C.accent}`, background: C.accentBg, color: C.accentLight, fontSize: 12.5, fontWeight: 600, cursor: saving ? "default" : "pointer", opacity: saving ? 0.6 : 1 }}>
+            {saving ? "Ukladám…" : "Uložiť"}
+          </button>
+          {saved && <span style={{ fontSize: 12, color: C.green }}>✓ Uložené</span>}
+          {existing?.updatedAt && !saved && (
+            <span style={{ fontSize: 11, color: C.textDim }}>Naposledy {new Date(existing.updatedAt).toLocaleDateString("sk-SK")}</span>
+          )}
+        </div>
+      </td>
+    </tr>
+  );
+}
+
 // ── Mesačné výsledky ─────────────────────────────────────────────────────────
 const METRICS = [
   { value: "prijmy", label: "Príjmy" },
@@ -1081,6 +1167,9 @@ function MesacneTab() {
   const p = pnlCalc();
   const r = useRange();
   const [metric, setMetric] = useState("prijmy");
+  const [openNote, setOpenNote] = useState<number | null>(null);
+  const [notes, setNotes] = useState<Record<string, MonthNote>>({});
+  useEffect(() => { fetchMonthNotes().then(setNotes); }, []);
   const idx = r.idx;
   const seriesFor = (k: string): Vals =>
     k === "prijmy" ? p.prijmy : k === "naklady" ? p.celkoveNaklady : k === "zisk" ? p.hrubyZisk : p.marza;
@@ -1159,15 +1248,28 @@ function MesacneTab() {
             <tbody>
               {idx.map((i, n) => {
                 const prev = n > 0 ? p.hrubyZisk[idx[n - 1]] : null;
+                const nKey = monthKeyOf(i);
+                const hasNote = !!(notes[nKey]?.note || Object.values(notes[nKey]?.answers ?? {}).some(Boolean) || SEED_NOTES[nKey]);
                 return (
-                  <tr key={i}>
-                    <td style={{ padding: "7px 10px", fontSize: 12.5, color: C.text, borderBottom: `1px solid ${mix(C.border, 55)}` }}>{MONTHS[i]} 26</td>
+                  <Fragment key={i}>
+                  <tr>
+                    <td onClick={() => setOpenNote(openNote === i ? null : i)}
+                      style={{ padding: "7px 10px", fontSize: 12.5, color: C.text, borderBottom: `1px solid ${mix(C.border, 55)}`, cursor: "pointer", whiteSpace: "nowrap" }}>
+                      <span style={{ display: "inline-block", width: 14, color: C.textDim, fontSize: 9 }}>{openNote === i ? "▼" : "▶"}</span>
+                      {MONTHS[i]} 26
+                      {hasNote && <span title="má poznámku" style={{ marginLeft: 6, color: C.accent, fontSize: 11 }}>●</span>}
+                    </td>
                     <td style={{ ...cell, color: C.green }}>{money(p.prijmy[i])}</td>
                     <td style={{ ...cell, color: C.red }}>{money(p.celkoveNaklady[i])}</td>
                     <td style={{ ...cell, color: signColor(p.hrubyZisk[i]), fontWeight: 600 }}>{money(p.hrubyZisk[i])}</td>
                     <td style={{ ...cell, color: p.marza[i] >= VZAS_TARGETS.marzaPct ? C.green : p.marza[i] >= 0 ? C.orange : C.red }}>{p.marza[i].toFixed(1)}%</td>
                     <td style={{ ...cell, color: prev == null ? C.textDim : signColor(p.hrubyZisk[i] - prev), borderLeft: `1px solid ${C.border}` }}>{prev == null ? "—" : pctStr(pct(p.hrubyZisk[i], prev))}</td>
                   </tr>
+                  {openNote === i && (
+                    <MonthNoteRow mi={i} colSpan={6} notes={notes}
+                      onSaved={(nn) => setNotes((prevN) => ({ ...prevN, [nn.month]: nn }))} />
+                  )}
+                  </Fragment>
                 );
               })}
               <tr style={{ background: mix(C.accent, 10) }}>

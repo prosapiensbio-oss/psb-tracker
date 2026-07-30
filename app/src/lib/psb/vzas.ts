@@ -338,6 +338,50 @@ export function byCommitment(): Record<Commitment, CommitmentBucket> {
 
 export const commitmentTotal = (b: CommitmentBucket): Vals => vAdd(...b.items.map((i) => i.values));
 
+// ── Monthly commentary ───────────────────────────────────────────────────────
+export const monthKeyOf = (i: number) => `2026-${String(i + 1).padStart(2, "0")}`;
+
+// Marketing summaries carried over from the Excel ("Mesačné výsledky" → Shrnutí).
+export const SEED_NOTES: Record<string, string> = {
+  "2026-01": 'Marketing: Najúspešnejší príspevok — reels z 22.1. „Změňte svůj pohyb" – 530 ThruPlay, 1 569 záujemcov o stránku.',
+  "2026-02": 'Marketing: Najúspešnejší — reels z 12.2. „Změňte svůj pohyb" – 5 614 ThruPlay (601 Kč). Reels z 10.2. – 4 401 ThruPlay. +101 sledujúcich.',
+  "2026-03": 'Marketing: Najúspešnejší príspevok na IG bolo reels z 13.3. „Když sedíš osm hodin denně" – 1 855 ThruPlay za 623 Kč. Ďalší úspešný bol reels zo 17.3. – 1 556 ThruPlay za 547 Kč.',
+};
+
+// Questions worth answering every month — the things numbers can never explain.
+export const MONTH_QUESTIONS: { id: string; q: string }[] = [
+  { id: "trzby", q: "Čo stálo za tržbami — prišla veľká jednorazová platba, alebo bol mesiac bežný?" },
+  { id: "klienti", q: "Pribudol alebo odišiel niekto z klientov? Prečo?" },
+  { id: "naklady", q: "Bol nejaký nezvyčajný výdavok? Je jednorazový, alebo sa bude opakovať?" },
+  { id: "marketing", q: "Čo z marketingu fungovalo a čo nie?" },
+  { id: "inak", q: "Čo by som budúci mesiac spravil inak?" },
+];
+
+export type Deviation = { label: string; group: string; value: number; typical: number; diff: number; pct: number };
+
+// What actually made this month different: every line compared against its own
+// average across the other months, biggest gaps first. This is what turns
+// "why were April's costs so high?" into an answer instead of a question.
+export function monthDeviations(monthIdx: number, topN = 6, floor = 3000): Deviation[] {
+  const out: Deviation[] = [];
+  const consider = (label: string, group: string, values: Vals) => {
+    const others = values.filter((_, i) => i !== monthIdx);
+    if (!others.length) return;
+    const typical = others.reduce((a, b) => a + b, 0) / others.length;
+    const value = values[monthIdx];
+    const diff = value - typical;
+    if (Math.abs(diff) < floor) return;
+    out.push({ label, group, value, typical, diff, pct: typical !== 0 ? (diff / Math.abs(typical)) * 100 : 0 });
+  };
+  for (const section of Object.values(PNL))
+    for (const g of Object.values(section.subcategories))
+      for (const it of Object.values(g.items)) consider(it.label, g.label, it.values);
+  consider("Výplata Jerry", "Výplaty", salaryCalc("jerry").poslane);
+  consider("Výplata Terezka", "Výplaty", salaryCalc("terezka").poslane);
+  consider("Tržby", "Príjmy", PRIJMY);
+  return out.sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff)).slice(0, topN);
+}
+
 // Targets for the KPI cards (Výsledky).
 export const VZAS_TARGETS = {
   rocneTrzby: 2300000,
