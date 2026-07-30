@@ -58,8 +58,9 @@ const RANGE_OPTS = [
 
 function windowFilter<T extends { month: string }>(arr: T[], win: string, from: string, to: string): T[] {
   if (win === "custom") {
-    const lo = from || arr[0]?.month || "";
-    const hi = to || arr[arr.length - 1]?.month || "";
+    let lo = from || arr[0]?.month || "";
+    let hi = to || arr[arr.length - 1]?.month || "";
+    if (lo > hi) [lo, hi] = [hi, lo]; // tolerate od > do
     return arr.filter((m) => m.month >= lo && m.month <= hi);
   }
   const n = Number(win);
@@ -141,8 +142,8 @@ function Zarobky({ monthly, focusMonth, onClearFocus }: { monthly: Monthly; focu
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, margin: "12px 0 6px" }}>
             <StatCard value={fmtCZK(total)} label={`Spolu za obdobie · ${view.length} mes.`} color={C.accentLight} />
             <StatCard value={fmtCZK(avgAll)} label="Ø / mesiac" color={C.accent} />
-            <StatCard value={fmtCZK(avg3)} label="Ø posledné 3 mes." color={C.green} />
-            <StatCard value={fmtCZK(avg6)} label="Ø posledných 6 mes." color={C.blue} />
+            {view.length > 3 && <StatCard value={fmtCZK(avg3)} label="Ø posledné 3 mes." color={C.green} />}
+            {view.length > 6 && <StatCard value={fmtCZK(avg6)} label="Ø posledných 6 mes." color={C.blue} />}
           </div>
           <div style={{ fontSize: 11, color: C.textDim, marginTop: 4 }}>Sedení spolu za obdobie: {sessTotal}</div>
         </Card>
