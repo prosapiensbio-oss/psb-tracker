@@ -22,7 +22,7 @@ import {
   type PersonKey,
   type Vals,
 } from "../../lib/psb/vzas";
-import { Card, Empty, H3, Info, LineChart, Select, StatCard, SubTabs, ValueBars } from "./ui";
+import { Card, Empty, H3, Info, LineChart, Select, StatCard, SubTabs } from "./ui";
 
 const MONTHS = VZAS_MONTH_LABELS;
 const money = (n: number) => (n === 0 ? "—" : fmtCZK(n).replace(" CZK", ""));
@@ -141,6 +141,48 @@ function TotalRow({ label, values, color, big = false, showAvg = true, onClick, 
 
 const ScrollX = ({ children }: { children: ReactNode }) => <div style={{ overflowX: "auto" }}>{children}</div>;
 const tableStyle = { width: "100%", borderCollapse: "collapse" as const, minWidth: 760 };
+
+// Bar chart with a zero baseline — the shared ValueBars clamps negatives to
+// zero height, which would hide loss months entirely.
+function SignedBars({ data, fmt, height = 190, posColor = C.accent, negColor = C.red }: {
+  data: { label: string; value: number }[];
+  fmt: (n: number) => string;
+  height?: number;
+  posColor?: string;
+  negColor?: string;
+}) {
+  const plotH = height - 46;
+  const max = Math.max(0, ...data.map((d) => d.value));
+  const min = Math.min(0, ...data.map((d) => d.value));
+  const range = max - min || 1;
+  const posH = (max / range) * plotH;
+  const negH = (-min / range) * plotH;
+  return (
+    <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
+      {data.map((d, i) => {
+        const up = d.value >= 0;
+        return (
+          <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: "0 0 54px" }}>
+            <div style={{ height: posH, display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "center", width: "100%" }}>
+              {up && <div style={{ fontSize: 10.5, color: C.textMuted, marginBottom: 3, whiteSpace: "nowrap" }}>{fmt(d.value)}</div>}
+              {up && (
+                <div title={`${d.label}: ${fmt(d.value)}`} style={{ width: "78%", maxWidth: 46, height: Math.max(2, (d.value / range) * plotH), background: posColor, borderRadius: "4px 4px 0 0" }} />
+              )}
+            </div>
+            <div style={{ width: "100%", height: 1, background: mix(C.border, 90) }} />
+            <div style={{ height: negH, display: "flex", flexDirection: "column", alignItems: "center", width: "100%" }}>
+              {!up && (
+                <div title={`${d.label}: ${fmt(d.value)}`} style={{ width: "78%", maxWidth: 46, height: Math.max(2, (-d.value / range) * plotH), background: negColor, borderRadius: "0 0 4px 4px" }} />
+              )}
+              {!up && <div style={{ fontSize: 10.5, color: negColor, marginTop: 3, whiteSpace: "nowrap" }}>{fmt(d.value)}</div>}
+            </div>
+            <div style={{ fontSize: 10, color: C.textDim, marginTop: 5, whiteSpace: "nowrap" }}>{d.label}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 // ── VZAS 2026 (P&L) ──────────────────────────────────────────────────────────
 function PnlTab() {
@@ -489,10 +531,10 @@ function JarekTab() {
       </Card>
 
       <Card>
-        <H3><Info text="Vývoj dlhu voči externému investorovi. Krivka stúpa k nule — čím vyššie, tým menší dlh." label="Vývoj dlhu v čase" /></H3>
+        <H3><Info text="Zostatok dlhu voči externému investorovi. Krivka klesá, ako sa dlh spláca — čím nižšie, tým lepšie." label="Vývoj dlhu v čase" /></H3>
         <LineChart
-          data={MONTHS.map((m, i) => ({ label: m, values: [stav[i]] }))}
-          series={[{ name: "Stav dlhu", color: C.red }]}
+          data={MONTHS.map((m, i) => ({ label: m, values: [Math.abs(stav[i])] }))}
+          series={[{ name: "Zostatok dlhu", color: C.red }]}
           height={220}
           fmt={(n) => `${Math.round(n / 1000)}k`}
           autoY
@@ -624,8 +666,8 @@ function KvartalneTab() {
 
       <Card>
         <H3>Zisk po mesiacoch</H3>
-        <ValueBars data={MONTHS.map((m, i) => ({ label: m, value: p.hrubyZisk[i] }))} color={C.accent} fmt={(n) => `${Math.round(n / 1000)}k`} height={170} alignEnd />
-        <div style={{ fontSize: 11, color: C.textDim, marginTop: 6 }}>Záporné stĺpce = stratový mesiac.</div>
+        <SignedBars data={MONTHS.map((m, i) => ({ label: m, value: p.hrubyZisk[i] }))} fmt={(n) => `${Math.round(n / 1000)}k`} height={200} />
+        <div style={{ fontSize: 11, color: C.textDim, marginTop: 6 }}>Červené stĺpce pod nulou = stratový mesiac.</div>
       </Card>
     </>
   );
@@ -674,7 +716,12 @@ function MesacneTab() {
 
       <Card>
         <H3>{METRICS.find((m) => m.value === metric)?.label} po mesiacoch</H3>
-        <ValueBars data={sel.map((s) => ({ label: s.label, value: s.v }))} color={metric === "naklady" ? C.red : metric === "zisk" ? C.accent : C.green} fmt={(n) => (isPct ? `${n.toFixed(0)}%` : `${Math.round(n / 1000)}k`)} height={180} alignEnd />
+        <SignedBars
+          data={sel.map((s) => ({ label: s.label, value: s.v }))}
+          posColor={metric === "naklady" ? C.red : metric === "zisk" ? C.accent : C.green}
+          fmt={(n) => (isPct ? `${n.toFixed(1)}%` : `${Math.round(n / 1000)}k`)}
+          height={200}
+        />
       </Card>
 
       <Card>
