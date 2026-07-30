@@ -29,6 +29,7 @@ import { Treningy } from "./Treningy";
 import { Klienti } from "./Klienti";
 import { Financie } from "./Financie";
 import { SixMTracker } from "./SixM";
+import { Vzas } from "./Vzas";
 
 export type Actions = {
   setOverride: (name: string, key: keyof ClientOverride, value: unknown) => void;
@@ -41,27 +42,44 @@ export type Actions = {
 // Deep-link from Dashboard click-throughs: focus one week (Tréningy → Prehľad) or one month (Financie → Zárobky).
 export type NavFocus = { week?: string; month?: string; client?: string; trainer?: string; nonce?: number };
 
+// Three top-level areas: the shared Dashboard, the operational Tracker
+// (Tréningy/Klienti/Financie/6M as sections) and the financial VZAS module.
 const TABS = [
   { id: "dashboard", label: "Dashboard", icon: "home" },
+  { id: "tracker", label: "Tracker", icon: "activity" },
+  { id: "vzas", label: "VZAS", icon: "wallet" },
+];
+
+const TRACKER_SECTIONS = [
   { id: "treningy", label: "Tréningy", icon: "calendar" },
   { id: "klienti", label: "Klienti", icon: "userCheck" },
   { id: "financie", label: "Financie", icon: "wallet" },
   { id: "6m", label: "6M Tracker", icon: "activity" },
 ];
+const TRACKER_IDS = TRACKER_SECTIONS.map((s) => s.id);
 
 export function PSBApp() {
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [data, setData] = useState<PSBData>(EMPTY_DATA);
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState("dashboard");
+  const [trackerSection, setTrackerSection] = useState("treningy");
+  const [vzasSub, setVzasSub] = useState("pnl");
   const [treningySub, setTreningySub] = useState("prehled");
   const [treningyFocus, setTreningyFocus] = useState<NavFocus | null>(null);
   const [financieFocus, setFinancieFocus] = useState<NavFocus | null>(null);
   const [klientiFocus, setKlientiFocus] = useState<NavFocus | null>(null);
 
-  // Navigate to a tab, optionally to a focused week/month/client.
+  // Navigate to a tab, optionally to a focused week/month/client. Dashboard
+  // click-throughs still pass the old section ids (treningy/klienti/…), so map
+  // those onto the Tracker tab + its section rather than making callers change.
   const navigate = useCallback((tab: string, sub?: string, focus?: NavFocus) => {
-    setActive(tab);
+    if (TRACKER_IDS.includes(tab)) {
+      setActive("tracker");
+      setTrackerSection(tab);
+    } else {
+      setActive(tab);
+    }
     if (tab === "treningy" && sub) setTreningySub(sub);
     if (tab === "treningy" && focus) setTreningyFocus(focus);
     if (tab === "financie" && focus) setFinancieFocus(focus);
@@ -191,10 +209,44 @@ export function PSBApp() {
         {active === "dashboard" && (
           <Dashboard data={data} clients={clients} register={register} sixM={sixM} capacity={capacity} actions={actions} onNavigate={navigate} assistantChat={chat} onClientClick={onClientClick} />
         )}
-        {active === "treningy" && <Treningy data={data} clients={clients} sub={treningySub} onSub={setTreningySub} focus={treningyFocus} />}
-        {active === "klienti" && <Klienti clients={clients} capacity={capacity} actions={actions} focus={klientiFocus} />}
-        {active === "financie" && <Financie data={data} clients={clients} focus={financieFocus} />}
-        {active === "6m" && <SixMTracker sixM={sixM} actions={actions} />}
+
+        {active === "tracker" && (
+          <>
+            <div style={{ display: "flex", gap: 6, marginBottom: 14, flexWrap: "wrap" }}>
+              {TRACKER_SECTIONS.map((s) => {
+                const on = trackerSection === s.id;
+                return (
+                  <button
+                    key={s.id}
+                    onClick={() => setTrackerSection(s.id)}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 7,
+                      padding: "7px 14px",
+                      borderRadius: 8,
+                      border: `1px solid ${on ? C.accent : C.border}`,
+                      background: on ? C.accentBg : "transparent",
+                      color: on ? C.accentLight : C.textMuted,
+                      fontSize: 13,
+                      fontWeight: 500,
+                      cursor: "pointer",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    <Icon name={s.icon} /> {s.label}
+                  </button>
+                );
+              })}
+            </div>
+            {trackerSection === "treningy" && <Treningy data={data} clients={clients} sub={treningySub} onSub={setTreningySub} focus={treningyFocus} />}
+            {trackerSection === "klienti" && <Klienti clients={clients} capacity={capacity} actions={actions} focus={klientiFocus} />}
+            {trackerSection === "financie" && <Financie data={data} clients={clients} focus={financieFocus} />}
+            {trackerSection === "6m" && <SixMTracker sixM={sixM} actions={actions} />}
+          </>
+        )}
+
+        {active === "vzas" && <Vzas sub={vzasSub} onSub={setVzasSub} />}
       </div>
       <div style={{ ...S.h3, textAlign: "center", color: C.textDim, fontSize: 11, padding: "8px 0 24px", fontWeight: 400 }}>
         ProSapiens Biomechanic · interný nástroj · nezdieľať externe
