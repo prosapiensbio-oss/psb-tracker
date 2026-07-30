@@ -528,6 +528,62 @@ function PersonCard({ pk, idx }: { pk: PersonKey; idx: number[] }) {
   );
 }
 
+// The debt screens showed a balance but never its direction. A balance alone
+// can't tell you whether things are getting better — the slope can.
+function DebtTrendCard({ idx }: { idx: number[] }) {
+  const people = (["jerry", "terezka"] as const).map((k) => {
+    const c = salaryCalc(k);
+    const sel = pick(c.rozdiel, idx);
+    const slope = avg(sel); // + = debt shrinking, − = growing
+    const dlh = c.cumDebt[c.cumDebt.length - 1];
+    const narokAvg = avg(pick(c.narok, idx));
+    const poslaneAvg = avg(pick(c.poslane, idx));
+    const months = slope > 0 ? Math.ceil(Math.abs(dlh) / slope) : null;
+    return { k, label: SALARY[k].label, c, slope, dlh, narokAvg, poslaneAvg, months, over: poslaneAvg - narokAvg };
+  });
+  return (
+    <Card>
+      <H3>
+        <Info text="Zostatok dlhu sám o sebe nestačí — dôležitý je smer. Ø rozdiel za mesiac je sklon: kladný = dlh sa spláca, záporný = rastie. Strop je suma, pod ktorou musí mesačný výber zostať, aby dlh prestal rásť (= priemerný nárok)." label="Kam smeruje dlh" />
+      </H3>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12, margin: "12px 0 14px" }}>
+        {people.map((p) => {
+          const rastie = p.slope < 0;
+          return (
+            <div key={p.k} style={{ background: C.card, border: `1px solid ${rastie ? mix(C.red, 45) : mix(C.green, 40)}`, borderRadius: 12, padding: "14px 16px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
+                <span style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{p.label}</span>
+                <span style={{ fontSize: 17, fontWeight: 700, color: signColor(p.dlh), fontVariantNumeric: "tabular-nums" }}>{fmtCZK(p.dlh)}</span>
+              </div>
+              <div style={{ fontSize: 12.5, color: rastie ? C.red : C.green, marginTop: 6, fontWeight: 600 }}>
+                {rastie ? "▼ dlh rastie" : "▲ dlh klesá"} o {fmtCZK(Math.abs(p.slope))} / mes.
+              </div>
+              <div style={{ fontSize: 12, color: C.textMuted, marginTop: 6, lineHeight: 1.5 }}>
+                {rastie ? (
+                  <>Pri tomto tempe sa <b style={{ color: C.red }}>nesplatí nikdy</b>. Aby prestal rásť, mesačný výber musí klesnúť
+                    na <b>{fmtCZK(p.narokAvg)}</b> — teraz je o <b style={{ color: C.red }}>{fmtCZK(p.over)}</b> vyšší.</>
+                ) : (
+                  <>Pri tomto tempe splatené o <b style={{ color: C.green }}>~{p.months} mesiacov</b>. Výber sa drží
+                    pod nárokom ({fmtCZK(p.poslaneAvg)} vs {fmtCZK(p.narokAvg)}).</>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <LineChart
+        data={idx.map((i) => ({ label: MONTHS[i], values: [salaryCalc("jerry").cumDebt[i], salaryCalc("terezka").cumDebt[i]] }))}
+        series={[{ name: "Jerry", color: C.accent }, { name: "Terezka", color: C.blue }]}
+        height={200}
+        fmt={(n) => `${Math.round(n / 1000)}k`}
+        refLine={{ value: 0, label: "bez dlhu", color: C.textDim }}
+        autoY
+        alignEnd
+      />
+    </Card>
+  );
+}
+
 function SalaryTab() {
   const r = useRange();
   const idx = r.idx;
@@ -589,6 +645,8 @@ function SalaryTab() {
           </>
         )}
       </Card>
+
+      <DebtTrendCard idx={idx} />
 
       <PersonCard pk="jerry" idx={idx} />
       <PersonCard pk="terezka" idx={idx} />
@@ -654,13 +712,24 @@ function JarekTab() {
   // tracked months (months with no payment count as 0 — that IS the real pace).
   const pace = avg(jk.splatkySpolu);
   const monthsLeft = pace > 0 ? Math.ceil(Math.abs(last) / pace) : null;
-  const payoff = useMemo(() => {
-    if (monthsLeft == null) return null;
-    const d = new Date(2026, 5, 1); // jún 2026 = last tracked month
-    d.setMonth(d.getMonth() + monthsLeft);
-    const MN = ["jan", "feb", "mar", "apr", "máj", "jún", "júl", "aug", "sep", "okt", "nov", "dec"];
+  // Three honest paces: the whole period, the last 3 months, and cash only —
+  // almost half of "repayment" is Sofia's forgone revenue, which is never money.
+  const cashVals = (JAREK_SPLATKY as Record<string, Vals>)["Fix splátka (P&L náklad)"] ?? [];
+  const nonCash = vSum(jk.splatkySpolu) - vSum(cashVals);
+  const paceRecent = avg(jk.splatkySpolu.slice(-3));
+  const paceCash = avg(cashVals);
+  const MN = ["jan", "feb", "mar", "apr", "máj", "jún", "júl", "aug", "sep", "okt", "nov", "dec"];
+  const monthName = (add: number) => {
+    const d = new Date(2026, 5, 1);
+    d.setMonth(d.getMonth() + add);
     return `${MN[d.getMonth()]} ${d.getFullYear()}`;
-  }, [monthsLeft]);
+  };
+  const payoff = monthsLeft != null ? monthName(monthsLeft) : null;
+  const scenarios = [
+    { label: "Priemer celé obdobie", p: pace },
+    { label: "Tempo posledné 3 mes.", p: paceRecent },
+    { label: "Len z hotovosti (bez Sofie)", p: paceCash },
+  ].map((s) => ({ ...s, m: s.p > 0 ? Math.ceil(Math.abs(last) / s.p) : null }));
   const cell = { textAlign: "right" as const, padding: "5px 8px", fontSize: 12, fontVariantNumeric: "tabular-nums" as const, whiteSpace: "nowrap" as const };
 
   return (
@@ -668,12 +737,27 @@ function JarekTab() {
       <Card>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12 }}>
           <StatCard value={fmtCZK(last)} label="Stav dlhu k jún 26" color={C.red} />
-          <StatCard value={fmtCZK(pace)} label="Ø splátka / mes." color={C.green} />
+          <StatCard value={fmtCZK(pace)} label={<Info text={`Z toho reálna hotovosť je len ${fmtCZK(paceCash)}/mes — zvyšok (${fmtCZK(nonCash)} za obdobie, ${((nonCash / vSum(jk.splatkySpolu)) * 100).toFixed(0)} %) je Sofia, teda vzdaná tržba, nie prijaté peniaze.`} label="Ø splátka / mes." />} color={C.green} />
           <StatCard
             value={monthsLeft != null ? `${payoff} · ${monthsLeft} mes.` : "—"}
             label={<Info text="Odhadované splatenie pri aktuálnom tempe (priemer za sledované obdobie vrátane mesiacov bez splátky). Nezohľadňuje nové vklady ani zmenu splátky." label="Predpokladané splatenie" />}
             color={C.blue}
           />
+        </div>
+        <div style={{ marginTop: 14, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 10 }}>
+          {scenarios.map((s) => (
+            <div key={s.label} style={{ background: mix(C.blue, 8), border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 13px" }}>
+              <div style={{ fontSize: 11, color: C.textMuted }}>{s.label}</div>
+              <div style={{ fontSize: 13.5, fontWeight: 600, color: C.text, marginTop: 3, fontVariantNumeric: "tabular-nums" }}>
+                {s.m != null ? `${monthName(s.m)} · ${s.m} mes.` : "nespláca sa"}
+              </div>
+              <div style={{ fontSize: 11, color: C.textDim, marginTop: 2 }}>{fmtCZK(s.p)} / mes.</div>
+            </div>
+          ))}
+        </div>
+        <div style={{ fontSize: 11.5, color: C.textMuted, marginTop: 10, lineHeight: 1.5 }}>
+          V júni splátka nebola vôbec a takmer polovica doterajšieho „splácania“ je <b>Sofia</b> — vzdaná tržba, nie prijaté peniaze.
+          Preto ber „priemer celé obdobie“ ako optimistický a tempo z hotovosti ako realistické dno.
         </div>
       </Card>
 
@@ -948,7 +1032,12 @@ function KpiTab() {
       <Card>
         <H3><Info text="Kľúčové ukazovatele voči cieľom roka 2026. H1 je polovica roka — pri ročnom cieli je ~50 % na pláne." label="KPI voči cieľom 2026" /></H3>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 12 }}>
-          <KpiCard label="Tržby H1 / ročný cieľ" value={vSum(PRIJMY)} target={VZAS_TARGETS.rocneTrzby} unit=" Kč" />
+          <KpiCard
+            label={<Info text={`Ročný cieľ ${fmtCZK(VZAS_TARGETS.rocneTrzby)} prepočítaný na uplynulé obdobie: po ${MONTHS.length} z 12 mesiacov je plán ${fmtCZK((VZAS_TARGETS.rocneTrzby / 12) * MONTHS.length)}. Porovnávať polrok s celoročným cieľom by ukazovalo ~50 % a vyzeralo by to ako zaostávanie, hoci ste na pláne.`} label={`Tržby / plán za ${MONTHS.length} mes.`} />}
+            value={vSum(PRIJMY)}
+            target={(VZAS_TARGETS.rocneTrzby / 12) * MONTHS.length}
+            unit=" Kč"
+          />
           <KpiCard label="Marža H1" value={marzaH1} target={VZAS_TARGETS.marzaPct} unit=" %" />
           <KpiCard label="Ø hodín/mes · Jerry" value={avg(SALARY.jerry.hours)} target={VZAS_TARGETS.hodinyJerry} unit="h" />
           <KpiCard label="Ø hodín/mes · Terezka" value={avg(SALARY.terezka.hours)} target={VZAS_TARGETS.hodinyTerezka} unit="h" />
