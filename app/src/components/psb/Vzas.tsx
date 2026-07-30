@@ -302,9 +302,15 @@ function PersonCard({ pk, idx }: { pk: PersonKey; idx: number[] }) {
           <span style={{ display: "inline-block", width: 15, color: C.textDim, fontSize: 9 }}>{open ? "▼" : "▶"}</span>
           {s.label}
         </div>
-        <div style={{ textAlign: "right" }}>
-          <div style={{ fontSize: 11, color: C.textMuted }}>Kumulovaný dlh</div>
-          <div style={{ fontSize: 18, fontWeight: 700, color: signColor(konecny), fontVariantNumeric: "tabular-nums" }}>{fmtCZK(konecny)}</div>
+        <div style={{ display: "flex", gap: 20 }}>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontSize: 11, color: C.textMuted }}>Ø hodín / mes.</div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: C.text, fontVariantNumeric: "tabular-nums" }}>{avg(money2(s.hours)).toFixed(1)} h</div>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <div style={{ fontSize: 11, color: C.textMuted }}>Kumulovaný dlh</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: signColor(konecny), fontVariantNumeric: "tabular-nums" }}>{fmtCZK(konecny)}</div>
+          </div>
         </div>
       </div>
 
@@ -388,6 +394,65 @@ function PersonCard({ pk, idx }: { pk: PersonKey; idx: number[] }) {
   );
 }
 
+// Is the split fair? The model pays for hours, so the honest comparison is
+// hours → nárok → poslané. A gap between the last two is not pay, it's a loan.
+function FairnessCard({ idx }: { idx: number[] }) {
+  const rows = (["jerry", "terezka"] as const).map((k) => {
+    const c = salaryCalc(k);
+    const h = vSum(idx.map((i) => SALARY[k].hours[i]));
+    const narok = vSum(idx.map((i) => c.narok[i]));
+    const poslane = vSum(idx.map((i) => c.poslane[i]));
+    return { k, label: SALARY[k].label, h, narok, poslane, narokH: h ? narok / h : 0, poslaneH: h ? poslane / h : 0, dlh: c.cumDebt[c.cumDebt.length - 1] };
+  });
+  const [j, t] = rows;
+  const diff = (a: number, b: number) => (b !== 0 ? ((a / b - 1) * 100) : 0);
+  const dH = diff(j.h, t.h), dN = diff(j.narok, t.narok), dP = diff(j.poslane, t.poslane);
+  const cell = { textAlign: "right" as const, padding: "7px 10px", fontSize: 12.5, fontVariantNumeric: "tabular-nums" as const, whiteSpace: "nowrap" as const, borderBottom: `1px solid ${mix(C.border, 55)}` };
+  const line = (label: ReactNode, get: (r: typeof j) => string, delta: number, invert = false) => (
+    <tr>
+      <td style={{ padding: "7px 10px", fontSize: 12.5, color: C.text, borderBottom: `1px solid ${mix(C.border, 55)}` }}>{label}</td>
+      {rows.map((r) => <td key={r.k} style={{ ...cell, color: C.text }}>{get(r)}</td>)}
+      <td style={{ ...cell, color: signColor(invert ? -delta : delta), borderLeft: `1px solid ${C.border}` }}>{delta > 0 ? "+" : ""}{delta.toFixed(1)} %</td>
+    </tr>
+  );
+
+  return (
+    <Card>
+      <H3>
+        <Info text="Model platí za hodiny: Nárok = Fix + (hodiny − 60) × sadzba. Preto sa férovosť posudzuje reťazcom hodiny → nárok → poslané. Ak niekto berie viac, než je jeho nárok, nejde o vyššiu výplatu, ale o pôžičku od firmy — a tá sa kumuluje v dlhu." label="Férovosť výplat — hodiny vs. výplata" />
+      </H3>
+      <ScrollX>
+        <table style={{ ...tableStyle, minWidth: 520 }}>
+          <thead>
+            <tr style={{ borderBottom: `2px solid ${mix(C.accent, 35)}` }}>
+              <th style={{ textAlign: "left", padding: "8px 10px", fontSize: 11, color: C.textMuted, fontWeight: 600, minWidth: 170 }} />
+              {rows.map((r) => <th key={r.k} style={{ ...cell, fontSize: 11, color: C.textMuted, fontWeight: 600, borderBottom: "none" }}>{r.label}</th>)}
+              <th style={{ ...cell, fontSize: 11, color: C.textMuted, fontWeight: 600, borderBottom: "none", borderLeft: `1px solid ${C.border}` }}>Jerry vs T.</th>
+            </tr>
+          </thead>
+          <tbody>
+            {line("Odrobené hodiny", (r) => `${r.h.toFixed(0)} h`, dH)}
+            {line("Nárok (podľa modelu)", (r) => money(r.narok), dN)}
+            {line("Poslané (reálne vzaté)", (r) => money(r.poslane), dP)}
+            {line("Nárok / hodinu", (r) => `${Math.round(r.narokH)} Kč`, diff(j.narokH, t.narokH))}
+            {line("Reálne vzaté / hodinu", (r) => `${Math.round(r.poslaneH)} Kč`, diff(j.poslaneH, t.poslaneH))}
+            <tr style={{ background: mix(C.accent, 10) }}>
+              <td style={{ padding: "8px 10px", fontSize: 13, fontWeight: 700, color: C.text }}>Kumulovaný dlh</td>
+              {rows.map((r) => <td key={r.k} style={{ ...cell, fontWeight: 700, color: signColor(r.dlh), borderBottom: "none" }}>{money(r.dlh)}</td>)}
+              <td style={{ ...cell, borderBottom: "none", borderLeft: `1px solid ${C.border}` }} />
+            </tr>
+          </tbody>
+        </table>
+      </ScrollX>
+      <div style={{ marginTop: 12, padding: "10px 14px", borderRadius: 10, background: mix(C.orange, 12), border: `1px solid ${mix(C.orange, 35)}`, fontSize: 12.5, color: C.text, lineHeight: 1.55 }}>
+        <b>Ako to čítať:</b> Jerry odrobil o <b>{dH.toFixed(1)} %</b> viac hodín, takže mu podľa modelu patrí o <b>{dN.toFixed(1)} %</b> viac —
+        to je férové. Reálne si ale vzal o <b>{dP.toFixed(1)} %</b> viac. Ten rozdiel nie je výplata navyše, ale <b>pôžička od firmy</b>,
+        ktorá sa mu kumuluje v dlhu ({money(j.dlh)} vs {money(t.dlh)}).
+      </div>
+    </Card>
+  );
+}
+
 function SalaryTab() {
   const r = useRange();
   const idx = r.idx;
@@ -449,6 +514,8 @@ function SalaryTab() {
           </>
         )}
       </Card>
+
+      <FairnessCard idx={idx} />
 
       <PersonCard pk="jerry" idx={idx} />
       <PersonCard pk="terezka" idx={idx} />
@@ -529,8 +596,11 @@ function JarekTab() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12 }}>
           <StatCard value={fmtCZK(last)} label="Stav dlhu k jún 26" color={C.red} />
           <StatCard value={fmtCZK(pace)} label="Ø splátka / mes." color={C.green} />
-          <StatCard value={monthsLeft != null ? `${monthsLeft} mes.` : "—"} label={<Info text="Pri aktuálnom tempe splácania (priemer za sledované obdobie vrátane mesiacov bez splátky)." label="Zostáva" />} color={C.accentLight} />
-          <StatCard value={payoff ?? "—"} label={<Info text="Odhadovaný mesiac splatenia pri aktuálnom tempe. Nezohľadňuje nové vklady ani zmenu splátky." label="Predpokladané splatenie" />} color={C.blue} />
+          <StatCard
+            value={monthsLeft != null ? `${payoff} · ${monthsLeft} mes.` : "—"}
+            label={<Info text="Odhadované splatenie pri aktuálnom tempe (priemer za sledované obdobie vrátane mesiacov bez splátky). Nezohľadňuje nové vklady ani zmenu splátky." label="Predpokladané splatenie" />}
+            color={C.blue}
+          />
         </div>
       </Card>
 
