@@ -47,8 +47,52 @@ const arrow = (mom: number | null) => (mom == null ? "►" : mom > 2 ? "▲" : m
 const arrowColor = (mom: number | null) => (mom == null ? C.textDim : mom > 2 ? C.green : mom < -2 ? C.red : C.textMuted);
 type Monthly = ReturnType<typeof monthlyFinance>;
 
+// ── shared period filter for the finance tabs ────────────────────────────────
+const RANGE_OPTS = [
+  { value: "all", label: "Celé obdobie" },
+  { value: "3", label: "Posledné 3 mes." },
+  { value: "6", label: "Posledných 6 mes." },
+  { value: "12", label: "Posledných 12 mes." },
+  { value: "custom", label: "Vlastné" },
+];
+
+function windowFilter<T extends { month: string }>(arr: T[], win: string, from: string, to: string): T[] {
+  if (win === "custom") {
+    const lo = from || arr[0]?.month || "";
+    const hi = to || arr[arr.length - 1]?.month || "";
+    return arr.filter((m) => m.month >= lo && m.month <= hi);
+  }
+  const n = Number(win);
+  return n > 0 ? arr.slice(-n) : arr;
+}
+
+function useMonthWindow() {
+  const [win, setWin] = useState("all");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  return { win, setWin, from, setFrom, to, setTo };
+}
+
+// Dropdown row: Celé obdobie / Posledné N / Vlastné (+ from–to month pickers).
+function RangeControls({ w, monthly }: { w: ReturnType<typeof useMonthWindow>; monthly: Monthly }) {
+  const opts = monthly.map((m) => ({ value: m.month, label: monthLabel(m.month) }));
+  return (
+    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+      <Select value={w.win} onChange={w.setWin} options={RANGE_OPTS} />
+      {w.win === "custom" && monthly.length > 0 && (
+        <>
+          <Select value={w.from || monthly[0].month} onChange={w.setFrom} options={opts} />
+          <span style={{ color: C.textDim }}>–</span>
+          <Select value={w.to || monthly[monthly.length - 1].month} onChange={w.setTo} options={opts} />
+        </>
+      )}
+    </div>
+  );
+}
+
 function Zarobky({ monthly, focusMonth, onClearFocus }: { monthly: Monthly; focusMonth?: string | null; onClearFocus?: () => void }) {
   const { sort, toggle, sorted } = useSort({ key: "month", dir: "asc" });
+  const w = useMonthWindow();
   const withMom = useMemo(
     () =>
       monthly.map((m, i) => {
@@ -58,7 +102,8 @@ function Zarobky({ monthly, focusMonth, onClearFocus }: { monthly: Monthly; focu
       }),
     [monthly],
   );
-  const rows = sorted(withMom, {
+  const view = useMemo(() => windowFilter(withMom, w.win, w.from, w.to), [withMom, w.win, w.from, w.to]);
+  const rows = sorted(view, {
     month: (m) => m.month,
     jerry: (m) => m.byTrainer["Jerry"]?.revenue || 0,
     terezka: (m) => m.byTrainer["Terezka"]?.revenue || 0,
@@ -66,11 +111,11 @@ function Zarobky({ monthly, focusMonth, onClearFocus }: { monthly: Monthly; focu
     sessions: (m) => m.sessions,
     mom: (m) => m.mom ?? -999,
   });
-  const chart = monthly.map((m) => ({ label: monthLabel(m.month), value: m.revenue }));
-  // Súhrn za celé nahrané obdobie (vyfakturované = hodnota odtrénovaných sedení).
-  const revVals = monthly.map((m) => m.revenue);
+  const chart = view.map((m) => ({ label: monthLabel(m.month), value: m.revenue }));
+  // Súhrn za zvolené obdobie (vyfakturované = hodnota odtrénovaných sedení).
+  const revVals = view.map((m) => m.revenue);
   const total = revVals.reduce((a, b) => a + b, 0);
-  const sessTotal = monthly.reduce((a, m) => a + m.sessions, 0);
+  const sessTotal = view.reduce((a, m) => a + m.sessions, 0);
   const avgAll = revVals.length ? total / revVals.length : 0;
   const avgOf = (n: number) => {
     const s = revVals.slice(-n);
@@ -81,17 +126,20 @@ function Zarobky({ monthly, focusMonth, onClearFocus }: { monthly: Monthly; focu
   return (
     <>
       <Card>
-        <H3>Mesačné zárobky (spolu)</H3>
-        {chart.length ? <ValueBars data={chart} color={C.accent} fmt={(n) => `${Math.round(n / 1000)}k`} height={170} alignEnd /> : <Empty>Nahraj Payroll by Session.</Empty>}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
+          <H3>Mesačné zárobky (spolu)</H3>
+          <RangeControls w={w} monthly={monthly} />
+        </div>
+        {chart.length ? <ValueBars data={chart} color={C.accent} fmt={(n) => `${Math.round(n / 1000)}k`} height={170} alignEnd /> : <Empty>Žiadne dáta pre zvolené obdobie.</Empty>}
       </Card>
 
-      {monthly.length > 0 && (
+      {view.length > 0 && (
         <Card>
           <H3>
-            <Info text="Súhrn vyfakturovaných zárobkov za celé nahrané obdobie. Spolu = súčet všetkých mesiacov dokopy; priemery sú za daný počet posledných mesiacov. Zdroj Payroll by Session — sedenia s CZK0 sa rátajú do počtu, nie do súm." label="Súhrn zárobkov (za celé obdobie)" />
+            <Info text="Súhrn vyfakturovaných zárobkov za zvolené obdobie (podľa filtra vpravo hore). Spolu = súčet všetkých mesiacov v období; priemery sú za daný počet posledných mesiacov v ňom. Zdroj Payroll by Session — sedenia s CZK0 sa rátajú do počtu, nie do súm." label="Súhrn zárobkov (za zvolené obdobie)" />
           </H3>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, margin: "12px 0 6px" }}>
-            <StatCard value={fmtCZK(total)} label={`Spolu za obdobie · ${monthly.length} mes.`} color={C.accentLight} />
+            <StatCard value={fmtCZK(total)} label={`Spolu za obdobie · ${view.length} mes.`} color={C.accentLight} />
             <StatCard value={fmtCZK(avgAll)} label="Ø / mesiac" color={C.accent} />
             <StatCard value={fmtCZK(avg3)} label="Ø posledné 3 mes." color={C.green} />
             <StatCard value={fmtCZK(avg6)} label="Ø posledných 6 mes." color={C.blue} />
@@ -143,6 +191,7 @@ function Zarobky({ monthly, focusMonth, onClearFocus }: { monthly: Monthly; focu
 // trailing averages rather than the session run-rate.
 function Trzby({ monthly }: { monthly: Monthly }) {
   const { sort, toggle, sorted } = useSort({ key: "month", dir: "asc" });
+  const w = useMonthWindow();
   const withMom = useMemo(
     () =>
       monthly.map((m, i) => {
@@ -152,13 +201,16 @@ function Trzby({ monthly }: { monthly: Monthly }) {
       }),
     [monthly],
   );
-  const rows = sorted(withMom, { month: (m) => m.month, cash: (m) => m.cash, revenue: (m) => m.revenue, mom: (m) => m.mom ?? -999 });
-  const chart = monthly.map((m) => ({ label: monthLabel(m.month), value: m.cash }));
+  const view = useMemo(() => windowFilter(withMom, w.win, w.from, w.to), [withMom, w.win, w.from, w.to]);
+  const rows = sorted(view, { month: (m) => m.month, cash: (m) => m.cash, revenue: (m) => m.revenue, mom: (m) => m.mom ?? -999 });
+  const chart = view.map((m) => ({ label: monthLabel(m.month), value: m.cash }));
 
-  // Trailing-average forecast (tržby are lumpy, so averages beat a point estimate).
+  // Súhrn za zvolené obdobie.
+  const totalCash = view.reduce((a, m) => a + m.cash, 0);
+  const totalRev = view.reduce((a, m) => a + m.revenue, 0);
+
+  // Trailing-average forecast — vždy z celej histórie (výhľad dopredu, nezávislý od filtra).
   const cashVals = monthly.map((m) => m.cash);
-  const totalCash = cashVals.reduce((a, b) => a + b, 0);
-  const totalRev = monthly.reduce((a, m) => a + m.revenue, 0);
   const avgOf = (n: number) => {
     const s = cashVals.slice(-n);
     return s.length ? s.reduce((a, b) => a + b, 0) / s.length : 0;
@@ -169,20 +221,23 @@ function Trzby({ monthly }: { monthly: Monthly }) {
   return (
     <>
       <Card>
-        <H3>
-          <Info text="Mesačné tržby = peniaze reálne prijaté za mesiac (report Payments Recorded). Presne to, čo v PTminderi vidíš ako Payments. Skáče, keď si niekto kúpi väčší balíček dopredu — tie tréningy sa potom čerpajú ďalšie mesiace (preto sa tržby líšia od vyfakturovaných zárobkov)." label="Mesačné tržby (prijaté platby)" />
-        </H3>
-        {chart.length ? <ValueBars data={chart} color={C.blue} fmt={(n) => `${Math.round(n / 1000)}k`} height={180} alignEnd /> : <Empty>Nahraj Payments Recorded.</Empty>}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
+          <H3>
+            <Info text="Mesačné tržby = peniaze reálne prijaté za mesiac (report Payments Recorded). Presne to, čo v PTminderi vidíš ako Payments. Skáče, keď si niekto kúpi väčší balíček dopredu — tie tréningy sa potom čerpajú ďalšie mesiace (preto sa tržby líšia od vyfakturovaných zárobkov)." label="Mesačné tržby (prijaté platby)" />
+          </H3>
+          <RangeControls w={w} monthly={monthly} />
+        </div>
+        {chart.length ? <ValueBars data={chart} color={C.blue} fmt={(n) => `${Math.round(n / 1000)}k`} height={180} alignEnd /> : <Empty>Žiadne dáta pre zvolené obdobie.</Empty>}
       </Card>
 
-      {monthly.length > 0 && (
+      {view.length > 0 && (
         <Card>
           <H3>
-            <Info text="Súčet za celé nahrané obdobie: prijaté platby (report Payments) aj vyfakturované zárobky (hodnota odtrénovaných sedení). Priemery sú za daný počet posledných mesiacov." label="Súhrn tržieb (za celé obdobie)" />
+            <Info text="Súčet za zvolené obdobie (podľa filtra vpravo hore): prijaté platby (report Payments) aj vyfakturované zárobky (hodnota odtrénovaných sedení)." label="Súhrn tržieb (za zvolené obdobie)" />
           </H3>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, margin: "12px 0 6px" }}>
-            <StatCard value={fmtCZK(totalCash)} label={`Prijaté spolu · ${monthly.length} mes.`} color={C.blue} />
-            <StatCard value={fmtCZK(totalCash / (monthly.length || 1))} label="Ø prijaté / mesiac" color={C.accent} />
+            <StatCard value={fmtCZK(totalCash)} label={`Prijaté spolu · ${view.length} mes.`} color={C.blue} />
+            <StatCard value={fmtCZK(totalCash / (view.length || 1))} label="Ø prijaté / mesiac" color={C.accent} />
             <StatCard value={fmtCZK(totalRev)} label="Vyfakturované spolu" color={C.accentLight} />
           </div>
         </Card>
@@ -231,8 +286,8 @@ function Trzby({ monthly }: { monthly: Monthly }) {
 }
 
 function Cashflow({ monthly }: { monthly: Monthly }) {
-  const [win, setWin] = useState("all");
-  const shown = win === "all" ? monthly : monthly.slice(-Number(win));
+  const w = useMonthWindow();
+  const shown = windowFilter(monthly, w.win, w.from, w.to);
   const max = Math.max(1, ...shown.map((m) => Math.max(m.revenue, m.cash)));
   const totals = shown.reduce((a, m) => ({ cash: a.cash + m.cash, rev: a.rev + m.revenue }), { cash: 0, rev: 0 });
   const diff = totals.cash - totals.rev;
@@ -242,11 +297,7 @@ function Cashflow({ monthly }: { monthly: Monthly }) {
         <H3>
           <Info text="Prijaté platby = peniaze reálne prijaté (report Payments Recorded). Vyfakturované zárobky = hodnota odtrénovaných sedení (Payroll by Session)." label="Cashflow — prijaté platby vs. zárobky" />
         </H3>
-        <Select value={win} onChange={setWin} options={[
-          { value: "all", label: "Celé obdobie" },
-          { value: "6", label: "Posledných 6 mes." },
-          { value: "12", label: "Posledných 12 mes." },
-        ]} />
+        <RangeControls w={w} monthly={monthly} />
       </div>
       <div style={{ padding: "10px 12px", marginTop: 10, marginBottom: 14, borderRadius: 8, background: diff >= 0 ? C.greenBg : C.orangeBg, fontSize: 13, color: C.text }}>
         {diff >= 0
@@ -278,31 +329,36 @@ function Cashflow({ monthly }: { monthly: Monthly }) {
 
 function Sedenia({ monthly }: { monthly: Monthly }) {
   const { sort, toggle, sorted } = useSort({ key: "month", dir: "asc" });
+  const w = useMonthWindow();
+  const view = useMemo(() => windowFilter(monthly, w.win, w.from, w.to), [monthly, w.win, w.from, w.to]);
   const rows = sorted(
-    monthly.map((m) => ({ ...m, perSess: m.sessions ? m.revenue / m.sessions : 0, util: (m.sessions / MAX_SESSIONS_MONTH) * 100 })),
+    view.map((m) => ({ ...m, perSess: m.sessions ? m.revenue / m.sessions : 0, util: (m.sessions / MAX_SESSIONS_MONTH) * 100 })),
     { month: (m) => m.month, sessions: (m) => m.sessions, revenue: (m) => m.revenue, perSess: (m) => m.perSess, util: (m) => m.util },
   );
-  const chart = monthly.map((m) => ({ label: monthLabel(m.month), value: m.sessions }));
-  // Súhrn za celé nahrané obdobie.
-  const sessTotal = monthly.reduce((a, m) => a + m.sessions, 0);
-  const revTotal = monthly.reduce((a, m) => a + m.revenue, 0);
-  const avgSess = monthly.length ? sessTotal / monthly.length : 0;
+  const chart = view.map((m) => ({ label: monthLabel(m.month), value: m.sessions }));
+  // Súhrn za zvolené obdobie.
+  const sessTotal = view.reduce((a, m) => a + m.sessions, 0);
+  const revTotal = view.reduce((a, m) => a + m.revenue, 0);
+  const avgSess = view.length ? sessTotal / view.length : 0;
   const perSessAll = sessTotal ? revTotal / sessTotal : 0;
-  const avgUtil = monthly.length ? monthly.reduce((a, m) => a + (m.sessions / MAX_SESSIONS_MONTH) * 100, 0) / monthly.length : 0;
+  const avgUtil = view.length ? view.reduce((a, m) => a + (m.sessions / MAX_SESSIONS_MONTH) * 100, 0) / view.length : 0;
   return (
     <>
       <Card>
-        <H3>Počet sedení / mesiac</H3>
-        {monthly.length ? <ValueBars data={chart} color={C.accent} fmt={(n) => String(Math.round(n))} height={150} alignEnd /> : <Empty>Nahraj Payroll by Session.</Empty>}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
+          <H3>Počet sedení / mesiac</H3>
+          <RangeControls w={w} monthly={monthly} />
+        </div>
+        {chart.length ? <ValueBars data={chart} color={C.accent} fmt={(n) => String(Math.round(n))} height={150} alignEnd /> : <Empty>Žiadne dáta pre zvolené obdobie.</Empty>}
       </Card>
 
-      {monthly.length > 0 && (
+      {view.length > 0 && (
         <Card>
           <H3>
-            <Info text="Súhrn za celé nahrané obdobie: spolu sedení, priemer na mesiac, priemerná cena za sedenie (zárobky ÷ sedenia) a priemerné využitie kapacity (z max. 260 sedení/mes. pre 2 trénerov)." label="Súhrn sedení (za celé obdobie)" />
+            <Info text="Súhrn za zvolené obdobie (podľa filtra vpravo hore): spolu sedení, priemer na mesiac, priemerná cena za sedenie (zárobky ÷ sedenia) a priemerné využitie kapacity (z max. 260 sedení/mes. pre 2 trénerov)." label="Súhrn sedení (za zvolené obdobie)" />
           </H3>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, margin: "12px 0 6px" }}>
-            <StatCard value={String(sessTotal)} label={`Sedení spolu · ${monthly.length} mes.`} color={C.accentLight} />
+            <StatCard value={String(sessTotal)} label={`Sedení spolu · ${view.length} mes.`} color={C.accentLight} />
             <StatCard value={avgSess.toFixed(0)} label="Ø sedení / mesiac" color={C.accent} />
             <StatCard value={fmtCZK(perSessAll)} label="Ø CZK / sedenie" color={C.blue} />
             <StatCard value={`${avgUtil.toFixed(0)} %`} label="Ø využitie kapacity" color={C.green} />
@@ -344,7 +400,7 @@ function Sedenia({ monthly }: { monthly: Monthly }) {
 
 function Predikcia({ data, clients }: { data: PSBData; clients: Record<string, ClientAgg> }) {
   const [excludeSpecial, setExcludeSpecial] = useState(false);
-  const [horizon, setHorizon] = useState(3);
+  const [horizon, setHorizon] = useState(1);
   const [tempoUnit, setTempoUnit] = useState<"mes" | "tyz">("mes");
   const [trainerF, setTrainerF] = useState("all");
   const { sort, toggle, sorted } = useSort({ key: "monthlyRevenue", dir: "desc" });
