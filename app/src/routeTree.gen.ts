@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiVzasStatusRouteImport } from './routes/api/vzas-status'
 import { Route as ApiSessionRouteImport } from './routes/api/session'
 import { Route as ApiResetRouteImport } from './routes/api/reset'
 import { Route as ApiOverrideRouteImport } from './routes/api/override'
@@ -35,6 +36,11 @@ const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiVzasStatusRoute = ApiVzasStatusRouteImport.update({
+  id: '/api/vzas-status',
+  path: '/api/vzas-status',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSessionRoute = ApiSessionRouteImport.update({
@@ -96,6 +102,7 @@ export interface FileRoutesByFullPath {
   '/api/override': typeof ApiOverrideRoute
   '/api/reset': typeof ApiResetRoute
   '/api/session': typeof ApiSessionRoute
+  '/api/vzas-status': typeof ApiVzasStatusRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -110,6 +117,7 @@ export interface FileRoutesByTo {
   '/api/override': typeof ApiOverrideRoute
   '/api/reset': typeof ApiResetRoute
   '/api/session': typeof ApiSessionRoute
+  '/api/vzas-status': typeof ApiVzasStatusRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -125,6 +133,7 @@ export interface FileRoutesById {
   '/api/override': typeof ApiOverrideRoute
   '/api/reset': typeof ApiResetRoute
   '/api/session': typeof ApiSessionRoute
+  '/api/vzas-status': typeof ApiVzasStatusRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -141,6 +150,7 @@ export interface FileRouteTypes {
     | '/api/override'
     | '/api/reset'
     | '/api/session'
+    | '/api/vzas-status'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -155,6 +165,7 @@ export interface FileRouteTypes {
     | '/api/override'
     | '/api/reset'
     | '/api/session'
+    | '/api/vzas-status'
   id:
     | '__root__'
     | '/'
@@ -169,6 +180,7 @@ export interface FileRouteTypes {
     | '/api/override'
     | '/api/reset'
     | '/api/session'
+    | '/api/vzas-status'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -184,6 +196,7 @@ export interface RootRouteChildren {
   ApiOverrideRoute: typeof ApiOverrideRoute
   ApiResetRoute: typeof ApiResetRoute
   ApiSessionRoute: typeof ApiSessionRoute
+  ApiVzasStatusRoute: typeof ApiVzasStatusRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -207,6 +220,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/vzas-status': {
+      id: '/api/vzas-status'
+      path: '/api/vzas-status'
+      fullPath: '/api/vzas-status'
+      preLoaderRoute: typeof ApiVzasStatusRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/session': {
@@ -288,6 +308,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiOverrideRoute: ApiOverrideRoute,
   ApiResetRoute: ApiResetRoute,
   ApiSessionRoute: ApiSessionRoute,
+  ApiVzasStatusRoute: ApiVzasStatusRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
