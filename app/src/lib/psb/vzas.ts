@@ -341,21 +341,34 @@ export const commitmentTotal = (b: CommitmentBucket): Vals => vAdd(...b.items.ma
 // ── Monthly commentary ───────────────────────────────────────────────────────
 export const monthKeyOf = (i: number) => `2026-${String(i + 1).padStart(2, "0")}`;
 
-// Marketing summaries carried over from the Excel ("Mesačné výsledky" → Shrnutí).
-export const SEED_NOTES: Record<string, string> = {
-  "2026-01": 'Marketing: Najúspešnejší príspevok — reels z 22.1. „Změňte svůj pohyb" – 530 ThruPlay, 1 569 záujemcov o stránku.',
-  "2026-02": 'Marketing: Najúspešnejší — reels z 12.2. „Změňte svůj pohyb" – 5 614 ThruPlay (601 Kč). Reels z 10.2. – 4 401 ThruPlay. +101 sledujúcich.',
-  "2026-03": 'Marketing: Najúspešnejší príspevok na IG bolo reels z 13.3. „Když sedíš osm hodin denně" – 1 855 ThruPlay za 623 Kč. Ďalší úspešný bol reels zo 17.3. – 1 556 ThruPlay za 547 Kč.',
+// Jerry's own monthly review, carried over from the Excel (VZAS 2026, row 132 —
+// the notes lived in cell comments). These are his questions, not invented ones.
+export const MONTH_QUESTIONS: { id: string; q: string }[] = [
+  { id: "stalo", q: "Čo zásadné sa tento mesiac stalo?" },
+  { id: "trzby", q: "Prečo sú tržby vysoké/nízke?" },
+  { id: "odkud", q: "Odkiaľ prišli noví ľudia na úvodné tréningy?" },
+  { id: "pokracovalo", q: "Koľko ľudí z úvodného tréningu pokračovalo ďalej? Ak bol úbytok, čím to bolo?" },
+  { id: "energie", q: "Aký bol pomer medzi odpracovanými hodinami a tvojím pocitom vyhorenia/energie?" },
+  { id: "fungovalo", q: "Čo tento mesiac fungovalo a chcem v tom pokračovať?" },
+  { id: "nefungovalo", q: "Čo nefungovalo a pálilo to energiu/peniaze?" },
+];
+
+export const SEED_ANSWERS: Record<string, Record<string, string>> = {
+  "2026-01": {"stalo": "prešli sme na nové členstva ostalo už len par klientov so starými sumami", "trzby": "pravdepodobne konsolidacia vydno že naklady sú nižšie ako kedysi aj na vyplatach sme trošku ušetrili", "odkud": "prevažne referencie", "pokracovalo": "Zo 7 uvodnych pokračovalo 5 klientov. a dvaja nepokračovali pretože len skušali", "energie": "velka rezerva", "fungovalo": "hovorenie na internete", "nefungovalo": "všetko funguje"},
+  "2026-02": {"stalo": "radek a lenka si predplatili 18h a gažo omylom poslal za 16h", "trzby": "predchádzajúca odpoved", "odkud": "prokop 1 je teda google organicky a ostatný refeerencie", "pokracovalo": "traja", "energie": "je tam stále rezerva spraivli sme 160h čo je malo"},
+  "2026-03": {"stalo": "mali sme najviac trénikov s najmenej tržbami. vela ludi vyprokrastinovalo platby mali by mse o cca 50k viac keby nemeškali. je to naša chyby pretože sme na nich malo tlačili", "odkud": "prevažne referencie", "pokracovalo": "4 z 5", "energie": "na to že sme spravili najviac hodín a bol tu tyžden kedy sme spravili cez 30h tyzdenne tak sa citím celkom fresh"},
+  "2026-04": {"stalo": "zomrela Katka Janovi sme preto pomohli zaplatiť aspon jeden mesiac najmiu. súčastne. sme mali najvyššie tržby za jeden mesiac", "trzby": "tržby boli vysoké pretože vaicerý klienti predplacali hodiny dopredu a všetci klienti už skončili svoje staré baličky (za staré ceny) takže sa naplno prejavila konsolidacia", "odkud": "väčšina cez refenrecie", "energie": "je tam stale rezerva s ktorou sa da pracovat"},
+  "2026-06": {"stalo": "tento mesiac sme mali obmedzenú prevadzku pretoze sme mali ahsoku"},
 };
 
-// Questions worth answering every month — the things numbers can never explain.
-export const MONTH_QUESTIONS: { id: string; q: string }[] = [
-  { id: "trzby", q: "Čo stálo za tržbami — prišla veľká jednorazová platba, alebo bol mesiac bežný?" },
-  { id: "klienti", q: "Pribudol alebo odišiel niekto z klientov? Prečo?" },
-  { id: "naklady", q: "Bol nejaký nezvyčajný výdavok? Je jednorazový, alebo sa bude opakovať?" },
-  { id: "marketing", q: "Čo z marketingu fungovalo a čo nie?" },
-  { id: "inak", q: "Čo by som budúci mesiac spravil inak?" },
-];
+export const SEED_NOTES: Record<string, string> = {
+  "2026-01": "Detaily k položkám (z Excelu):\n• nedoplatok za december tym padom bol caption 2x v januari učtovany\n• Amazon Group Media\n• dumbrovska zmluva na polročnéčlnestva\n• Apple Pen + Kryt Ipad; Vysvač; Stojan na kotúče; Kabel USB-B 3\n• APPLE.COM/BILL, APPLE.COM/BIL, IE, dne 24.1.2026,\n• 31.1 – 1000 Kč – Jerry výplata; 29.1 – 1000 Kč – Terka výplata; 16.1 – 600 Kč – Terez výplata; 15.1 – 1000 Kč – Jerry výplata; 9.1 – 500 Kč – Jerry výplata; 3.1 – 300 Kč – Jerry výplata; ; 26.1 – 3826 Kč – vysávač, kábel, stojan; 17.1 – 1400 Kč – hrniec, miska; 7.1 – 2898 Kč – iPad; 7.1 – 2377 Kč – doplnky",
+  "2026-02": "Detaily k položkám (z Excelu):\n• platili sme energie 3011\n• Claude PRO\n• 26.2 ; 1500kc 106776 jerry vyplata; 4.2; 2440kč 156789 jerry FP",
+  "2026-03": "Detaily k položkám (z Excelu):\n• Dlh + platba\n• Clude + Chat GPT\n• Higgsfield\n• UniHobby presadzanie\n• Kotúče 10kg 5kg + lopta 4kg",
+  "2026-04": "Detaily k položkám (z Excelu):\n• Lozias poslanie 550kč neviem za čo\n• Olej na kladku joom",
+  "2026-05": "Detaily k položkám (z Excelu):\n• RG Bell 3 + 9kg ; FP trička 2x",
+  "2026-06": "Detaily k položkám (z Excelu):\n• Nubound Robo školenie\n• Adapter na nabijačky+ventilator+kanvica",
+};
 
 export type Deviation = { label: string; group: string; value: number; typical: number; diff: number; pct: number };
 

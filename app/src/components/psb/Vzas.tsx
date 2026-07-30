@@ -11,6 +11,7 @@ import {
   SALARY,
   SPOLOCNE,
   MONTH_QUESTIONS,
+  SEED_ANSWERS,
   SEED_NOTES,
   VZAS_MONTH_LABELS,
   VZAS_TARGETS,
@@ -1081,8 +1082,12 @@ function MonthNoteRow({ mi, colSpan, notes, onSaved }: {
 }) {
   const key = monthKeyOf(mi);
   const existing = notes[key];
+  // Until a month is saved in the app, fall back to what Jerry already wrote in
+  // the Excel so nothing has to be retyped.
   const [note, setNote] = useState(existing?.note ?? SEED_NOTES[key] ?? "");
-  const [answers, setAnswers] = useState<Record<string, string>>(existing?.answers ?? {});
+  const [answers, setAnswers] = useState<Record<string, string>>(
+    existing?.answers && Object.keys(existing.answers).length ? existing.answers : (SEED_ANSWERS[key] ?? {}),
+  );
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const devs = useMemo(() => monthDeviations(mi), [mi]);
@@ -1130,8 +1135,8 @@ function MonthNoteRow({ mi, colSpan, notes, onSaved }: {
           {MONTH_QUESTIONS.map((q) => (
             <div key={q.id}>
               <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 3 }}>{q.q}</div>
-              <input value={answers[q.id] ?? ""} onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })}
-                placeholder="…" style={{ ...field, padding: "6px 10px" }} />
+              <textarea value={answers[q.id] ?? ""} onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })}
+                rows={(answers[q.id] ?? "").length > 90 ? 3 : 1} placeholder="…" style={{ ...field, padding: "6px 10px" }} />
             </div>
           ))}
         </div>
@@ -1249,7 +1254,12 @@ function MesacneTab() {
               {idx.map((i, n) => {
                 const prev = n > 0 ? p.hrubyZisk[idx[n - 1]] : null;
                 const nKey = monthKeyOf(i);
-                const hasNote = !!(notes[nKey]?.note || Object.values(notes[nKey]?.answers ?? {}).some(Boolean) || SEED_NOTES[nKey]);
+                const hasNote = !!(
+                  notes[nKey]?.note ||
+                  Object.values(notes[nKey]?.answers ?? {}).some(Boolean) ||
+                  SEED_NOTES[nKey] ||
+                  SEED_ANSWERS[nKey]
+                );
                 return (
                   <Fragment key={i}>
                   <tr>
