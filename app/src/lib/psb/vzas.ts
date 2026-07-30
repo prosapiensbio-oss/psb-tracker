@@ -260,6 +260,84 @@ export function pnlCalc(): PnlCalc {
   return { fixneTotal, varTotal, bezVyplat, poslaneJerry, poslaneTerezka, matyas: MATYAS, vyplatySpolu, celkoveNaklady, prijmy: PRIJMY, hrubyZisk, marza };
 }
 
+// ── Alternative lens: commitment, not fix/variable ───────────────────────────
+// The fix/variable split says little for decisions — several "fixed" rows swing
+// wildly (Facebook ads, AI tools, štát) and two aren't operating costs at all.
+// The useful question is "in a bad month, what can I actually stop paying?".
+//   zavazne      — contracts, the state, and systems the studio can't run without
+//   volitelne    — marketing, creative tools, equipment, hospitality: pausable
+//   neprevadzkove— not an operating expense: debt principal, reserve transfers
+export type Commitment = "zavazne" | "volitelne" | "neprevadzkove";
+
+// Keyed "section.group.item" because item keys repeat across groups (e.g. "ine").
+const COMMITMENT: Record<string, Commitment> = {
+  // Fixné → Prevádzka
+  "fixne.prevadzka.najom": "zavazne",
+  "fixne.prevadzka.splatkaJarek": "neprevadzkove", // splátka istiny = financovanie
+  "fixne.prevadzka.statTerezka": "zavazne",
+  "fixne.prevadzka.statJerry": "zavazne",
+  "fixne.prevadzka.fondNaradie": "neprevadzkove", // presun do/z rezervy, nie výdavok
+  // Fixné → Marketing (všetko voliteľné — rozhoduješ sa každý mesiac)
+  "fixne.marketing.facebook": "volitelne",
+  "fixne.marketing.google": "volitelne",
+  "fixne.marketing.offline": "volitelne",
+  // Fixné → Apps
+  "fixne.apps.adobe": "volitelne",
+  "fixne.apps.canva": "volitelne",
+  "fixne.apps.captions": "volitelne",
+  "fixne.apps.capcut": "volitelne",
+  "fixne.apps.ai": "volitelne",
+  "fixne.apps.idoklad": "zavazne", // účtovníctvo
+  "fixne.apps.mailer": "volitelne",
+  "fixne.apps.metricool": "volitelne",
+  "fixne.apps.microsoft": "zavazne",
+  "fixne.apps.ptminder": "zavazne", // rezervácie — bez toho štúdio nebeží
+  "fixne.apps.truecoach": "zavazne", // doručovanie tréningov klientom
+  "fixne.apps.ine": "volitelne",
+  // Variabilné → Služby
+  "variabilne.sluzby.pravnicka": "zavazne",
+  "variabilne.sluzby.telefon": "zavazne",
+  "variabilne.sluzby.grafik": "volitelne",
+  "variabilne.sluzby.web": "zavazne",
+  "variabilne.sluzby.teambuilding": "volitelne",
+  "variabilne.sluzby.ine": "volitelne",
+  // Variabilné → Produkty
+  "variabilne.produkty.atipicke": "volitelne",
+  "variabilne.produkty.merch": "volitelne",
+  // Variabilné → Prevádzka
+  "variabilne.prevadzka2.pomocky": "volitelne",
+  "variabilne.prevadzka2.kava": "volitelne",
+  "variabilne.prevadzka2.caj": "volitelne",
+  "variabilne.prevadzka2.drogeria": "zavazne", // upratovanie — prevádzková nutnosť
+  "variabilne.prevadzka2.elektro": "volitelne",
+  "variabilne.prevadzka2.poistenie": "zavazne",
+};
+
+export type CommitmentBucket = { key: Commitment; label: string; items: { path: string; label: string; values: Vals; group: string }[] };
+
+// Regroup every P&L line by commitment, keeping the original group name so a row
+// still reads "Nájom + energie · Prevádzka".
+export function byCommitment(): Record<Commitment, CommitmentBucket> {
+  const out: Record<Commitment, CommitmentBucket> = {
+    zavazne: { key: "zavazne", label: "Záväzné náklady", items: [] },
+    volitelne: { key: "volitelne", label: "Voliteľné náklady", items: [] },
+    neprevadzkove: { key: "neprevadzkove", label: "Neprevádzkové", items: [] },
+  };
+  for (const [sk, section] of Object.entries(PNL)) {
+    for (const [gk, group] of Object.entries(section.subcategories)) {
+      for (const [ik, item] of Object.entries(group.items)) {
+        const path = `${sk}.${gk}.${ik}`;
+        const c = COMMITMENT[path] ?? "zavazne";
+        out[c].items.push({ path, label: item.label, values: item.values, group: group.label });
+      }
+    }
+  }
+  for (const b of Object.values(out)) b.items.sort((a, z) => vSum(z.values) - vSum(a.values));
+  return out;
+}
+
+export const commitmentTotal = (b: CommitmentBucket): Vals => vAdd(...b.items.map((i) => i.values));
+
 // Targets for the KPI cards (Výsledky).
 export const VZAS_TARGETS = {
   rocneTrzby: 2300000,

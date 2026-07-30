@@ -11,6 +11,8 @@ import {
   SPOLOCNE,
   VZAS_MONTH_LABELS,
   VZAS_TARGETS,
+  byCommitment,
+  commitmentTotal,
   jarekCalc,
   pnlCalc,
   salaryCalc,
@@ -205,9 +207,12 @@ function HealthCard({ idx }: { idx: number[] }) {
   const trzby = vSum(prijmySel);
   const mzdyPct = trzby > 0 ? (mzdy / trzby) * 100 : 0;
 
-  const fix = vSum(pick(p.fixneTotal, idx));
-  const varN = vSum(pick(p.varTotal, idx));
-  const fixPct = fix + varN > 0 ? (fix / (fix + varN)) * 100 : 0;
+  // "How much could I stop paying?" beats fix/variable — several "fixed" rows
+  // (ads, AI tools) are fully discretionary, and two aren't operating costs.
+  const bk = byCommitment();
+  const volitelne = vSum(pick(commitmentTotal(bk.volitelne), idx));
+  const zavazne = vSum(pick(commitmentTotal(bk.zavazne), idx));
+  const skrtPct = zavazne + volitelne > 0 ? (volitelne / (zavazne + volitelne)) * 100 : 0;
 
   return (
     <Card>
@@ -218,7 +223,7 @@ function HealthCard({ idx }: { idx: number[] }) {
         <StatCard value={fmtCZK(beAvg)} label={<Info text="Koľko musíte mesačne zarobiť, aby ste pokryli prevádzku aj nároky na výplaty. Pod týmto číslom je mesiac stratový." label="Break-even / mesiac" />} color={C.orange} />
         <StatCard value={`${rezerva > 0 ? "+" : ""}${rezerva.toFixed(1)} %`} label={<Info text="O koľko % sú priemerné tržby nad break-even. Malá rezerva = jeden slabý mesiac stačí na stratu." label="Rezerva nad break-even" />} color={rezerva >= 20 ? C.green : rezerva >= 0 ? C.orange : C.red} />
         <StatCard value={`${mzdyPct.toFixed(1)} %`} label={<Info text="Podiel mzdových nákladov (nárok oboch trénerov + zamestnanci) na tržbách. Pri službách je to hlavná nákladová položka — čím vyššie, tým menej zostáva na maržu." label="Mzdy z tržieb" />} color={mzdyPct <= 50 ? C.green : mzdyPct <= 60 ? C.orange : C.red} />
-        <StatCard value={`${fixPct.toFixed(0)} %`} label={<Info text="Koľko z prevádzkových nákladov (bez výplat) je fixných — teda platíte ich, aj keď mesiac nič neodtrénujete. Vysoký podiel = menšia flexibilita pri výpadku tržieb." label="Fixné z prevádzky" />} color={fixPct <= 60 ? C.green : fixPct <= 80 ? C.orange : C.red} />
+        <StatCard value={`${fmtCZK(volitelne / idx.length)} · ${skrtPct.toFixed(0)} %`} label={<Info text="Koľko z prevádzkových nákladov (bez výplat) je voliteľných — reklama, kreatívne nástroje, vybavenie, pohostenie. To sú peniaze, ktoré vieš v zlom mesiaci prestať míňať bez zastavenia štúdia. Zvyšok sú záväzné: nájom, štát, poistenie a systémy, na ktorých prevádzka stojí." label="Viem škrtnúť / mes." />} color={skrtPct >= 30 ? C.green : skrtPct >= 15 ? C.orange : C.red} />
       </div>
       <div style={{ fontSize: 11.5, color: C.textMuted, margin: "8px 0 14px", lineHeight: 1.5 }}>
         Prevádzka bez výplat {fmtCZK(avg(pick(p.bezVyplat, idx)))} + nároky na výplaty {fmtCZK(avg(idx.map((i) => j.narok[i] + t.narok[i] + p.matyas[i])))} = <b>{fmtCZK(beAvg)}</b> mesačne.
@@ -237,11 +242,75 @@ function HealthCard({ idx }: { idx: number[] }) {
   );
 }
 
+// P&L regrouped by commitment. Same rows, same totals — different question:
+// not "is it fixed?" but "in a bad month, can I stop paying it?".
+function CommitmentTable({ idx }: { idx: number[] }) {
+  const p = pnlCalc();
+  const b = byCommitment();
+  const zav = commitmentTotal(b.zavazne);
+  const vol = commitmentTotal(b.volitelne);
+  const nep = commitmentTotal(b.neprevadzkove);
+  const prevadzkoveNaklady = MONTHS.map((_, i) => zav[i] + vol[i] + p.vyplatySpolu[i]);
+  const prevadzkovyZisk = MONTHS.map((_, i) => p.prijmy[i] - prevadzkoveNaklady[i]);
+  const span = idx.length + 3;
+  // Zero rows only add noise in this view.
+  const rows = (key: "zavazne" | "volitelne" | "neprevadzkove") =>
+    b[key].items.filter((it) => vSum(it.values) !== 0).map((it) => (
+      <Row key={it.path} depth={1} values={pick(it.values, idx)}
+        label={<>{it.label} <span style={{ color: C.textDim, fontSize: 11 }}>· {it.group}</span></>} />
+    ));
+
+  return (
+    <>
+      <ScrollX>
+        <table style={tableStyle}>
+          <thead><MonthHead idx={idx} /></thead>
+          <tbody>
+            <Divider label="Záväzné — musíš platiť" span={span} />
+            {rows("zavazne")}
+            <Row label="Záväzné spolu" values={pick(zav, idx)} bold color={C.red} />
+
+            <Divider label="Voliteľné — vieš zastaviť" span={span} />
+            {rows("volitelne")}
+            <Row label="Voliteľné spolu" values={pick(vol, idx)} bold color={C.orange} />
+
+            <Divider label="Výplaty" span={span} />
+            <Row label="Jerry (Poslané)" values={pick(p.poslaneJerry, idx)} />
+            <Row label="Terezka (Poslané)" values={pick(p.poslaneTerezka, idx)} />
+            <Row label="Matyáš (jan–mar)" values={pick(p.matyas, idx)} />
+            <Row label="Výplaty spolu" values={pick(p.vyplatySpolu, idx)} bold color={C.red} />
+
+            <TotalRow label="Prevádzkové náklady" values={pick(prevadzkoveNaklady, idx)} color={C.red} />
+
+            <Divider label="Tržby" span={span} />
+            <Row label="Celkové príjmy" values={pick(p.prijmy, idx)} bold color={C.green} />
+
+            <TotalRow label="Prevádzkový zisk" values={pick(prevadzkovyZisk, idx)} color={signColor(vSum(pick(prevadzkovyZisk, idx)))} big />
+
+            <Divider label="Neprevádzkové — nie je to náklad prevádzky" span={span} />
+            {rows("neprevadzkove")}
+            <Row label="Neprevádzkové spolu" values={pick(nep, idx)} bold color={C.blue} />
+
+            <TotalRow label="Výsledok po neprevádzkových" values={pick(p.hrubyZisk, idx)} color={signColor(vSum(pick(p.hrubyZisk, idx)))} big />
+          </tbody>
+        </table>
+      </ScrollX>
+      <div style={{ marginTop: 12, padding: "10px 14px", borderRadius: 10, background: mix(C.blue, 10), border: `1px solid ${mix(C.blue, 30)}`, fontSize: 12.5, color: C.text, lineHeight: 1.55 }}>
+        <b>Rozdiel oproti pôvodnému pohľadu:</b> „Splátka Jarek“ a „Fond na náradie“ sú vyňaté z prevádzky —
+        splátka je umorovanie istiny (financovanie) a fond je presun do/z rezervy, nie výdavok. Preto vidíš dva
+        výsledky: <b>prevádzkový zisk</b> (ako si na tom samotné štúdio) a <b>výsledok po neprevádzkových</b>,
+        ktorý sedí na hrubý zisk v pôvodnom pohľade.
+      </div>
+    </>
+  );
+}
+
 // ── VZAS 2026 (P&L) ──────────────────────────────────────────────────────────
 function PnlTab() {
   const p = pnlCalc();
   const r = useRange();
   const [mode, setMode] = useState<"avg" | "sum">("avg"); // default: priemer
+  const [lens, setLens] = useState<"fixvar" | "zavaznost">("fixvar");
   const i = r.idx;
   const sel = {
     prijmy: pick(p.prijmy, i),
@@ -277,7 +346,18 @@ function PnlTab() {
       <HealthCard idx={i} />
 
       <Card>
-        <H3><Info text="Mesačný výkaz ziskov a strát. Klikni na kategóriu pre rozklad na položky. Hrubý zisk = Celkové príjmy − Celkové náklady (vrátane výplat)." label="VZAS 2026 — mesačný P&L" /></H3>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
+          <H3><Info text="Mesačný výkaz ziskov a strát. Klikni na kategóriu pre rozklad na položky. Hrubý zisk = Celkové príjmy − Celkové náklady (vrátane výplat)." label="VZAS 2026 — mesačný P&L" /></H3>
+          <div style={{ display: "flex", gap: 4 }}>
+            {([["fixvar", "Fix / Variabilné"], ["zavaznost", "Záväzné / Voliteľné"]] as const).map(([id, lbl]) => (
+              <button key={id} onClick={() => setLens(id)}
+                style={{ padding: "5px 12px", borderRadius: 7, border: `1px solid ${lens === id ? C.accent : C.border}`, background: lens === id ? C.accentBg : "transparent", color: lens === id ? C.accentLight : C.textMuted, fontSize: 12, cursor: "pointer" }}>
+                {lbl}
+              </button>
+            ))}
+          </div>
+        </div>
+        {lens === "zavaznost" ? <CommitmentTable idx={i} /> : (
         <ScrollX>
           <table style={tableStyle}>
             <thead><MonthHead idx={i} /></thead>
@@ -324,6 +404,7 @@ function PnlTab() {
             </tbody>
           </table>
         </ScrollX>
+        )}
         <div style={{ fontSize: 11, color: C.textDim, marginTop: 10 }}>Zdroj: VZAS 2026 (Excel), jan–jún 2026. Bankový import pribudne v ďalšom kroku.</div>
       </Card>
     </>
