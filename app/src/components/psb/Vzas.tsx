@@ -279,7 +279,7 @@ function PnlTab() {
 
 // ── J&T Výplaty ──────────────────────────────────────────────────────────────
 function PersonCard({ pk, idx }: { pk: PersonKey; idx: number[] }) {
-  const [open, setOpen] = useState(true); // partially expanded by default
+  const [open, setOpen] = useState(false);
   const [narokOpen, setNarokOpen] = useState(false);
   const [poslaneOpen, setPoslaneOpen] = useState(false);
   const s = SALARY[pk];
@@ -298,22 +298,13 @@ function PersonCard({ pk, idx }: { pk: PersonKey; idx: number[] }) {
   return (
     <Card>
       <div onClick={() => setOpen(!open)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, cursor: "pointer", flexWrap: "wrap" }}>
-        <div>
-          <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>
-            <span style={{ display: "inline-block", width: 15, color: C.textDim, fontSize: 9 }}>{open ? "▼" : "▶"}</span>
-            {s.label}
-          </div>
-          <div style={{ fontSize: 11, color: C.textMuted, marginLeft: 15 }}>Fix {fmtCZK(s.fix)} + variabil nad {s.hoursThreshold}h × {s.hourlyRate} Kč/h</div>
+        <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>
+          <span style={{ display: "inline-block", width: 15, color: C.textDim, fontSize: 9 }}>{open ? "▼" : "▶"}</span>
+          {s.label}
         </div>
-        <div style={{ display: "flex", gap: 20 }}>
-          <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: 11, color: C.textMuted }}>Ø poslané / mes.</div>
-            <div style={{ fontSize: 15, fontWeight: 600, color: C.text, fontVariantNumeric: "tabular-nums" }}>{fmtCZK(avg(money2(c.poslane)))}</div>
-          </div>
-          <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: 11, color: C.textMuted }}>Kumulovaný dlh</div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: signColor(konecny), fontVariantNumeric: "tabular-nums" }}>{fmtCZK(konecny)}</div>
-          </div>
+        <div style={{ textAlign: "right" }}>
+          <div style={{ fontSize: 11, color: C.textMuted }}>Kumulovaný dlh</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: signColor(konecny), fontVariantNumeric: "tabular-nums" }}>{fmtCZK(konecny)}</div>
         </div>
       </div>
 
@@ -403,6 +394,7 @@ function SalaryTab() {
   const [showJ, setShowJ] = useState(true);
   const [showT, setShowT] = useState(true);
   const [showAvg, setShowAvg] = useState(false);
+  const [chartOpen, setChartOpen] = useState(false);
   const [spolOpen, setSpolOpen] = useState(false);
   const j = salaryCalc("jerry");
   const t = salaryCalc("terezka");
@@ -430,23 +422,32 @@ function SalaryTab() {
   return (
     <>
       <Card>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
-          <H3><Info text="Vývoj reálne poslaných výplat v čase. Prepínačmi si vyber, koho chceš v grafe vidieť." label="Vývoj výplat v čase" /></H3>
-          <RangeBar r={r} />
+        <div onClick={() => setChartOpen(!chartOpen)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", cursor: "pointer" }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>
+            <span style={{ display: "inline-block", width: 15, color: C.textDim, fontSize: 9 }}>{chartOpen ? "▼" : "▶"}</span>
+            Vývoj výplat v čase
+          </div>
+          {chartOpen && <div onClick={(e) => e.stopPropagation()}><RangeBar r={r} /></div>}
         </div>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-          {toggle(showJ, setShowJ, "Jerry", C.accent)}
-          {toggle(showT, setShowT, "Terezka", C.blue)}
-          {toggle(showAvg, setShowAvg, "Priemer", C.orange)}
-        </div>
-        {series.length ? (
-          <LineChart data={chart} series={series} height={220} fmt={(n) => `${Math.round(n / 1000)}k`} autoY alignEnd />
-        ) : <Empty>Zapni aspoň jednu sériu.</Empty>}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginTop: 14 }}>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginTop: 12 }}>
           <StatCard value={fmtCZK(avg(idx.map((i) => j.poslane[i])))} label="Ø Jerry / mes." color={C.accent} />
           <StatCard value={fmtCZK(avg(idx.map((i) => t.poslane[i])))} label="Ø Terezka / mes." color={C.blue} />
           <StatCard value={fmtCZK(avg(idx.map((i) => j.poslane[i] + t.poslane[i])))} label="Ø výplaty spolu / mes." color={C.red} />
         </div>
+
+        {chartOpen && (
+          <>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "14px 0 12px" }}>
+              {toggle(showJ, setShowJ, "Jerry", C.accent)}
+              {toggle(showT, setShowT, "Terezka", C.blue)}
+              {toggle(showAvg, setShowAvg, "Priemer", C.orange)}
+            </div>
+            {series.length ? (
+              <LineChart data={chart} series={series} height={220} fmt={(n) => `${Math.round(n / 1000)}k`} autoY alignEnd />
+            ) : <Empty>Zapni aspoň jednu sériu.</Empty>}
+          </>
+        )}
       </Card>
 
       <PersonCard pk="jerry" idx={idx} />
@@ -693,12 +694,19 @@ function MesacneTab() {
 
   return (
     <>
+      <Card>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <H3><Info text="Vyber ukazovateľ a obdobie — pravý graf, priemer aj najlepší/najhorší mesiac sa prepočítajú." label="Mesačné výsledky" /></H3>
+          <RangeBar r={r} extra={<Select value={metric} onChange={setMetric} options={METRICS} />} />
+        </div>
+      </Card>
+
       {/* Both charts open on the newest month (right) — scroll left for history. */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 14 }}>
         <Card>
           <H3>Tržby vs. náklady</H3>
           <LineChart
-            data={MONTHS.map((m, i) => ({ label: m, values: [p.prijmy[i], p.celkoveNaklady[i]] }))}
+            data={idx.map((i) => ({ label: MONTHS[i], values: [p.prijmy[i], p.celkoveNaklady[i]] }))}
             series={[{ name: "Tržby", color: C.green }, { name: "Náklady", color: C.red }]}
             height={220}
             fmt={(n) => `${Math.round(n / 1000)}k`}
@@ -708,17 +716,18 @@ function MesacneTab() {
           />
         </Card>
         <Card>
-          <H3>Zisk po mesiacoch</H3>
-          <SignedBars data={MONTHS.map((m, i) => ({ label: m, value: p.hrubyZisk[i] }))} fmt={(n) => `${Math.round(n / 1000)}k`} height={220} />
-          <div style={{ fontSize: 11, color: C.textDim, marginTop: 6 }}>Červené stĺpce pod nulou = stratový mesiac.</div>
+          <H3>{METRICS.find((m) => m.value === metric)?.label} po mesiacoch</H3>
+          <SignedBars
+            data={sel.map((s) => ({ label: s.label, value: s.v }))}
+            posColor={metric === "naklady" ? C.red : metric === "zisk" ? C.accent : C.green}
+            fmt={(n) => (isPct ? `${n.toFixed(1)}%` : `${Math.round(n / 1000)}k`)}
+            height={220}
+          />
+          <div style={{ fontSize: 11, color: C.textDim, marginTop: 6 }}>Červené stĺpce pod nulou = záporná hodnota.</div>
         </Card>
       </div>
 
       <Card>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-          <H3><Info text="Vyber ukazovateľ a obdobie — priemer aj najlepší/najhorší mesiac sa prepočítajú." label="Mesačné výsledky" /></H3>
-          <RangeBar r={r} extra={<Select value={metric} onChange={setMetric} options={METRICS} />} />
-        </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
           <StatCard value={fmtV(avg(sel.map((s) => s.v)))} label={`Ø ${METRICS.find((m) => m.value === metric)?.label} / mes.`} color={C.accentLight} />
           <StatCard value={`${best.label} · ${fmtV(best.v)}`} label="Najlepší mesiac" color={C.green} />
