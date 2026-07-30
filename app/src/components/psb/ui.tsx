@@ -5,7 +5,7 @@ import { C, mix, S, badge } from "../../lib/psb/theme";
 
 // Scrolls a horizontally-overflowing container to its right edge on mount/update
 // so charts open showing the most recent data (user scrolls left into the past).
-function useScrollEnd<T extends HTMLElement>(enabled: boolean, dep: unknown) {
+export function useScrollEnd<T extends HTMLElement>(enabled: boolean, dep: unknown) {
   const ref = useRef<T>(null);
   useEffect(() => {
     if (!enabled || !ref.current) return;

@@ -22,7 +22,7 @@ import {
   type PersonKey,
   type Vals,
 } from "../../lib/psb/vzas";
-import { Card, Empty, H3, Info, LineChart, Select, StatCard, SubTabs } from "./ui";
+import { Card, Empty, H3, Info, LineChart, Select, StatCard, SubTabs, useScrollEnd } from "./ui";
 
 const MONTHS = VZAS_MONTH_LABELS;
 const money = (n: number) => (n === 0 ? "—" : fmtCZK(n).replace(" CZK", ""));
@@ -157,8 +157,10 @@ function SignedBars({ data, fmt, height = 190, posColor = C.accent, negColor = C
   const range = max - min || 1;
   const posH = (max / range) * plotH;
   const negH = (-min / range) * plotH;
+  // Open scrolled to the newest month on the right; scroll left for history.
+  const scrollRef = useScrollEnd<HTMLDivElement>(true, data.length);
   return (
-    <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
+    <div ref={scrollRef} style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
       {data.map((d, i) => {
         const up = d.value >= 0;
         return (
@@ -503,6 +505,7 @@ function SalaryTab() {
 
 // ── Jarek ────────────────────────────────────────────────────────────────────
 function JarekTab() {
+  const [kanalyOpen, setKanalyOpen] = useState(false);
   const jk = jarekCalc();
   const stav = jk.stav;
   const last = stav[stav.length - 1];
@@ -557,18 +560,24 @@ function JarekTab() {
               </tr>
             </thead>
             <tbody>
-              {Object.entries(JAREK_SPLATKY).map(([k, vals]) => (
-                <tr key={k}>
-                  <td style={{ ...S.td, fontSize: 12, color: C.textMuted }}>{k}</td>
-                  {vals.map((v, i) => <td key={i} style={{ ...cell, color: v > 0 ? C.text : C.textDim }}>{money(v)}</td>)}
-                  <td style={{ ...cell, color: C.textMuted, borderLeft: `1px solid ${C.border}` }}>{money(vSum(vals))}</td>
-                </tr>
-              ))}
-              <tr style={{ borderTop: `1px solid ${C.border}` }}>
-                <td style={{ ...S.td, fontSize: 12, fontWeight: 600, color: C.text }}>Splátka spolu</td>
+              <tr>
+                <td style={{ ...S.td, fontSize: 12, fontWeight: 600, color: C.text }}>
+                  Splátka spolu
+                  <button onClick={() => setKanalyOpen(!kanalyOpen)}
+                    style={{ marginLeft: 8, padding: "1px 8px", borderRadius: 6, border: `1px solid ${kanalyOpen ? C.accent : C.border}`, background: kanalyOpen ? C.accentBg : "transparent", color: kanalyOpen ? C.accentLight : C.textDim, fontSize: 10, cursor: "pointer", whiteSpace: "nowrap" }}>
+                    {kanalyOpen ? "▼ detail" : "▶ detail"}
+                  </button>
+                </td>
                 {jk.splatkySpolu.map((v, i) => <td key={i} style={{ ...cell, color: C.green, fontWeight: 600 }}>{money(v)}</td>)}
                 <td style={{ ...cell, color: C.green, fontWeight: 600, borderLeft: `1px solid ${C.border}` }}>{money(vSum(jk.splatkySpolu))}</td>
               </tr>
+              {kanalyOpen && Object.entries(JAREK_SPLATKY).map(([k, vals]) => (
+                <tr key={k}>
+                  <td style={{ ...S.td, fontSize: 11, color: C.textMuted, paddingLeft: 26 }}>{k}</td>
+                  {vals.map((v, i) => <td key={i} style={{ ...cell, fontSize: 11, color: v > 0 ? C.textMuted : C.textDim }}>{money(v)}</td>)}
+                  <td style={{ ...cell, fontSize: 11, color: C.textDim, borderLeft: `1px solid ${C.border}` }}>{money(vSum(vals))}</td>
+                </tr>
+              ))}
               <tr style={{ background: mix(C.accent, 10) }}>
                 <td style={{ ...S.td, fontSize: 12, fontWeight: 700, color: C.text }}>Stav dlhu</td>
                 {stav.map((v, i) => <td key={i} style={{ ...cell, color: C.red, fontWeight: 700 }}>{money(v)}</td>)}
@@ -652,23 +661,6 @@ function KvartalneTab() {
         </ScrollX>
       </Card>
 
-      <Card>
-        <H3>Tržby vs. náklady po mesiacoch</H3>
-        <LineChart
-          data={MONTHS.map((m, i) => ({ label: m, values: [p.prijmy[i], p.celkoveNaklady[i]] }))}
-          series={[{ name: "Tržby", color: C.green }, { name: "Náklady", color: C.red }]}
-          height={220}
-          fmt={(n) => `${Math.round(n / 1000)}k`}
-          autoY
-          alignEnd
-        />
-      </Card>
-
-      <Card>
-        <H3>Zisk po mesiacoch</H3>
-        <SignedBars data={MONTHS.map((m, i) => ({ label: m, value: p.hrubyZisk[i] }))} fmt={(n) => `${Math.round(n / 1000)}k`} height={200} />
-        <div style={{ fontSize: 11, color: C.textDim, marginTop: 6 }}>Červené stĺpce pod nulou = stratový mesiac.</div>
-      </Card>
     </>
   );
 }
@@ -701,27 +693,42 @@ function MesacneTab() {
 
   return (
     <>
+      {/* Both charts open on the newest month (right) — scroll left for history. */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 14 }}>
+        <Card>
+          <H3>Tržby vs. náklady</H3>
+          <LineChart
+            data={MONTHS.map((m, i) => ({ label: m, values: [p.prijmy[i], p.celkoveNaklady[i]] }))}
+            series={[{ name: "Tržby", color: C.green }, { name: "Náklady", color: C.red }]}
+            height={220}
+            fmt={(n) => `${Math.round(n / 1000)}k`}
+            pointWidth={64}
+            autoY
+            alignEnd
+          />
+        </Card>
+        <Card>
+          <H3>Zisk po mesiacoch</H3>
+          <SignedBars data={MONTHS.map((m, i) => ({ label: m, value: p.hrubyZisk[i] }))} fmt={(n) => `${Math.round(n / 1000)}k`} height={220} />
+          <div style={{ fontSize: 11, color: C.textDim, marginTop: 6 }}>Červené stĺpce pod nulou = stratový mesiac.</div>
+        </Card>
+      </div>
+
       <Card>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-          <H3><Info text="Vyber ukazovateľ a obdobie — graf, priemer aj najlepší/najhorší mesiac sa prepočítajú." label="Mesačné výsledky" /></H3>
+          <H3><Info text="Vyber ukazovateľ a obdobie — priemer aj najlepší/najhorší mesiac sa prepočítajú." label="Mesačné výsledky" /></H3>
           <RangeBar r={r} extra={<Select value={metric} onChange={setMetric} options={METRICS} />} />
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
           <StatCard value={fmtV(avg(sel.map((s) => s.v)))} label={`Ø ${METRICS.find((m) => m.value === metric)?.label} / mes.`} color={C.accentLight} />
           <StatCard value={`${best.label} · ${fmtV(best.v)}`} label="Najlepší mesiac" color={C.green} />
           <StatCard value={`${worst.label} · ${fmtV(worst.v)}`} label="Najhorší mesiac" color={C.red} />
-          <StatCard value={pctStr(pct(sel[sel.length - 1].v, sel[0].v))} label="Zmena za obdobie" color={signColor((sel[sel.length - 1].v - sel[0].v) * (better ? 1 : -1))} />
+          <StatCard
+            value={pctStr(pct(sel[sel.length - 1].v, sel[0].v))}
+            label={<Info text={`Porovnáva posledný mesiac obdobia (${sel[sel.length - 1].label}) s prvým (${sel[0].label}) — o koľko % sa hodnota za obdobie posunula. Nie je to priemerný rast.`} label={`Zmena ${sel[0].label} → ${sel[sel.length - 1].label}`} />}
+            color={signColor((sel[sel.length - 1].v - sel[0].v) * (better ? 1 : -1))}
+          />
         </div>
-      </Card>
-
-      <Card>
-        <H3>{METRICS.find((m) => m.value === metric)?.label} po mesiacoch</H3>
-        <SignedBars
-          data={sel.map((s) => ({ label: s.label, value: s.v }))}
-          posColor={metric === "naklady" ? C.red : metric === "zisk" ? C.accent : C.green}
-          fmt={(n) => (isPct ? `${n.toFixed(1)}%` : `${Math.round(n / 1000)}k`)}
-          height={200}
-        />
       </Card>
 
       <Card>
@@ -805,26 +812,46 @@ function KpiTab() {
 
 // ── module shell ─────────────────────────────────────────────────────────────
 export function Vzas({ sub, onSub }: { sub: string; onSub: (s: string) => void }) {
+  // Výsledky is one menu entry with its own second level (Kvartálne/Mesačné/KPI).
+  const [vysledkySub, setVysledkySub] = useState("kvartalne");
+  const isVysledky = sub === "vysledky";
   return (
     <>
       <SubTabs
         tabs={[
           { id: "pnl", label: "VZAS 2026" },
           { id: "vyplaty", label: "J&T Výplaty" },
-          { id: "jarek", label: "Jarek — dlh" },
-          { id: "kvartalne", label: "Kvartálne" },
-          { id: "mesacne", label: "Mesačné" },
-          { id: "kpi", label: "KPI" },
+          { id: "jarek", label: "Jarek dlh" },
+          { id: "vysledky", label: "Výsledky" },
         ]}
-        value={sub}
+        value={isVysledky ? "vysledky" : sub}
         onChange={onSub}
       />
       {sub === "pnl" && <PnlTab />}
       {sub === "vyplaty" && <SalaryTab />}
       {sub === "jarek" && <JarekTab />}
-      {sub === "kvartalne" && <KvartalneTab />}
-      {sub === "mesacne" && <MesacneTab />}
-      {sub === "kpi" && <KpiTab />}
+      {isVysledky && (
+        <>
+          <div style={{ display: "flex", gap: 6, marginBottom: 14, flexWrap: "wrap" }}>
+            {[
+              { id: "kvartalne", label: "Kvartálne" },
+              { id: "mesacne", label: "Mesačné" },
+              { id: "kpi", label: "KPI" },
+            ].map((t) => {
+              const on = vysledkySub === t.id;
+              return (
+                <button key={t.id} onClick={() => setVysledkySub(t.id)}
+                  style={{ padding: "5px 13px", borderRadius: 999, border: `1px solid ${on ? C.accent : C.border}`, background: on ? C.accentBg : "transparent", color: on ? C.accentLight : C.textMuted, fontSize: 12.5, fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap" }}>
+                  {t.label}
+                </button>
+              );
+            })}
+          </div>
+          {vysledkySub === "kvartalne" && <KvartalneTab />}
+          {vysledkySub === "mesacne" && <MesacneTab />}
+          {vysledkySub === "kpi" && <KpiTab />}
+        </>
+      )}
     </>
   );
 }
