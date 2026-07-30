@@ -157,6 +157,8 @@ function Trzby({ monthly }: { monthly: Monthly }) {
 
   // Trailing-average forecast (tržby are lumpy, so averages beat a point estimate).
   const cashVals = monthly.map((m) => m.cash);
+  const totalCash = cashVals.reduce((a, b) => a + b, 0);
+  const totalRev = monthly.reduce((a, m) => a + m.revenue, 0);
   const avgOf = (n: number) => {
     const s = cashVals.slice(-n);
     return s.length ? s.reduce((a, b) => a + b, 0) / s.length : 0;
@@ -172,6 +174,19 @@ function Trzby({ monthly }: { monthly: Monthly }) {
         </H3>
         {chart.length ? <ValueBars data={chart} color={C.blue} fmt={(n) => `${Math.round(n / 1000)}k`} height={180} alignEnd /> : <Empty>Nahraj Payments Recorded.</Empty>}
       </Card>
+
+      {monthly.length > 0 && (
+        <Card>
+          <H3>
+            <Info text="Súčet za celé nahrané obdobie: prijaté platby (report Payments) aj vyfakturované zárobky (hodnota odtrénovaných sedení). Priemery sú za daný počet posledných mesiacov." label="Súhrn tržieb (za celé obdobie)" />
+          </H3>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, margin: "12px 0 6px" }}>
+            <StatCard value={fmtCZK(totalCash)} label={`Prijaté spolu · ${monthly.length} mes.`} color={C.blue} />
+            <StatCard value={fmtCZK(totalCash / (monthly.length || 1))} label="Ø prijaté / mesiac" color={C.accent} />
+            <StatCard value={fmtCZK(totalRev)} label="Vyfakturované spolu" color={C.accentLight} />
+          </div>
+        </Card>
+      )}
 
       {monthly.length > 0 && (
         <Card>
@@ -267,13 +282,34 @@ function Sedenia({ monthly }: { monthly: Monthly }) {
     monthly.map((m) => ({ ...m, perSess: m.sessions ? m.revenue / m.sessions : 0, util: (m.sessions / MAX_SESSIONS_MONTH) * 100 })),
     { month: (m) => m.month, sessions: (m) => m.sessions, revenue: (m) => m.revenue, perSess: (m) => m.perSess, util: (m) => m.util },
   );
-  const chart = monthly.slice(-8).map((m) => ({ label: monthLabel(m.month), value: m.sessions }));
+  const chart = monthly.map((m) => ({ label: monthLabel(m.month), value: m.sessions }));
+  // Súhrn za celé nahrané obdobie.
+  const sessTotal = monthly.reduce((a, m) => a + m.sessions, 0);
+  const revTotal = monthly.reduce((a, m) => a + m.revenue, 0);
+  const avgSess = monthly.length ? sessTotal / monthly.length : 0;
+  const perSessAll = sessTotal ? revTotal / sessTotal : 0;
+  const avgUtil = monthly.length ? monthly.reduce((a, m) => a + (m.sessions / MAX_SESSIONS_MONTH) * 100, 0) / monthly.length : 0;
   return (
     <>
       <Card>
         <H3>Počet sedení / mesiac</H3>
-        {monthly.length ? <ValueBars data={chart} color={C.accent} fmt={(n) => String(Math.round(n))} height={150} /> : <Empty>Nahraj Payroll by Session.</Empty>}
+        {monthly.length ? <ValueBars data={chart} color={C.accent} fmt={(n) => String(Math.round(n))} height={150} alignEnd /> : <Empty>Nahraj Payroll by Session.</Empty>}
       </Card>
+
+      {monthly.length > 0 && (
+        <Card>
+          <H3>
+            <Info text="Súhrn za celé nahrané obdobie: spolu sedení, priemer na mesiac, priemerná cena za sedenie (zárobky ÷ sedenia) a priemerné využitie kapacity (z max. 260 sedení/mes. pre 2 trénerov)." label="Súhrn sedení (za celé obdobie)" />
+          </H3>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, margin: "12px 0 6px" }}>
+            <StatCard value={String(sessTotal)} label={`Sedení spolu · ${monthly.length} mes.`} color={C.accentLight} />
+            <StatCard value={avgSess.toFixed(0)} label="Ø sedení / mesiac" color={C.accent} />
+            <StatCard value={fmtCZK(perSessAll)} label="Ø CZK / sedenie" color={C.blue} />
+            <StatCard value={`${avgUtil.toFixed(0)} %`} label="Ø využitie kapacity" color={C.green} />
+          </div>
+          <div style={{ fontSize: 11, color: C.textDim, marginTop: 4 }}>Zárobky spolu za obdobie: {fmtCZK(revTotal)}</div>
+        </Card>
+      )}
       <Card>
         <H3>Cena za sedenie a využitie kapacity</H3>
         <TableWrap>
