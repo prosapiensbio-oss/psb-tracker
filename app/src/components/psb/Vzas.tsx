@@ -343,8 +343,6 @@ function PnlTab() {
         </div>
       </Card>
 
-      <HealthCard idx={i} />
-
       <Card>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
           <H3><Info text="Mesačný výkaz ziskov a strát. Klikni na kategóriu pre rozklad na položky. Hrubý zisk = Celkové príjmy − Celkové náklady (vrátane výplat)." label="VZAS 2026 — mesačný P&L" /></H3>
@@ -528,6 +526,42 @@ function PersonCard({ pk, idx }: { pk: PersonKey; idx: number[] }) {
   );
 }
 
+type DebtPerson = { k: PersonKey; label: string; slope: number; dlh: number; narokAvg: number; poslaneAvg: number; months: number | null; over: number };
+
+// Collapsed to the headline (name + balance + direction); the "what it would
+// take" sentence is one click away.
+function DebtBox({ p }: { p: DebtPerson }) {
+  const [open, setOpen] = useState(false);
+  const rastie = p.slope < 0;
+  return (
+    <div style={{ background: C.card, border: `1px solid ${rastie ? mix(C.red, 45) : mix(C.green, 40)}`, borderRadius: 12, padding: "12px 14px" }}>
+      <div onClick={() => setOpen(!open)} style={{ cursor: "pointer" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
+          <span style={{ fontSize: 14, fontWeight: 700, color: C.text }}>
+            <span style={{ display: "inline-block", width: 14, color: C.textDim, fontSize: 9 }}>{open ? "▼" : "▶"}</span>
+            {p.label}
+          </span>
+          <span style={{ fontSize: 17, fontWeight: 700, color: signColor(p.dlh), fontVariantNumeric: "tabular-nums" }}>{fmtCZK(p.dlh)}</span>
+        </div>
+        <div style={{ fontSize: 12.5, color: rastie ? C.red : C.green, marginTop: 5, fontWeight: 600, marginLeft: 14 }}>
+          {rastie ? "▼ dlh rastie" : "▲ dlh klesá"} o {fmtCZK(Math.abs(p.slope))} / mes.
+        </div>
+      </div>
+      {open && (
+        <div style={{ fontSize: 12, color: C.textMuted, marginTop: 8, marginLeft: 14, lineHeight: 1.5 }}>
+          {rastie ? (
+            <>Pri tomto tempe sa <b style={{ color: C.red }}>nesplatí nikdy</b>. Aby prestal rásť, mesačný výber musí klesnúť
+              na <b>{fmtCZK(p.narokAvg)}</b> — teraz je o <b style={{ color: C.red }}>{fmtCZK(p.over)}</b> vyšší.</>
+          ) : (
+            <>Pri tomto tempe splatené o <b style={{ color: C.green }}>~{p.months} mesiacov</b>. Výber sa drží
+              pod nárokom ({fmtCZK(p.poslaneAvg)} vs {fmtCZK(p.narokAvg)}).</>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // The debt screens showed a balance but never its direction. A balance alone
 // can't tell you whether things are getting better — the slope can.
 function DebtTrendCard({ idx }: { idx: number[] }) {
@@ -546,31 +580,6 @@ function DebtTrendCard({ idx }: { idx: number[] }) {
       <H3>
         <Info text="Zostatok dlhu sám o sebe nestačí — dôležitý je smer. Ø rozdiel za mesiac je sklon: kladný = dlh sa spláca, záporný = rastie. Strop je suma, pod ktorou musí mesačný výber zostať, aby dlh prestal rásť (= priemerný nárok)." label="Kam smeruje dlh" />
       </H3>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12, margin: "12px 0 14px" }}>
-        {people.map((p) => {
-          const rastie = p.slope < 0;
-          return (
-            <div key={p.k} style={{ background: C.card, border: `1px solid ${rastie ? mix(C.red, 45) : mix(C.green, 40)}`, borderRadius: 12, padding: "14px 16px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
-                <span style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{p.label}</span>
-                <span style={{ fontSize: 17, fontWeight: 700, color: signColor(p.dlh), fontVariantNumeric: "tabular-nums" }}>{fmtCZK(p.dlh)}</span>
-              </div>
-              <div style={{ fontSize: 12.5, color: rastie ? C.red : C.green, marginTop: 6, fontWeight: 600 }}>
-                {rastie ? "▼ dlh rastie" : "▲ dlh klesá"} o {fmtCZK(Math.abs(p.slope))} / mes.
-              </div>
-              <div style={{ fontSize: 12, color: C.textMuted, marginTop: 6, lineHeight: 1.5 }}>
-                {rastie ? (
-                  <>Pri tomto tempe sa <b style={{ color: C.red }}>nesplatí nikdy</b>. Aby prestal rásť, mesačný výber musí klesnúť
-                    na <b>{fmtCZK(p.narokAvg)}</b> — teraz je o <b style={{ color: C.red }}>{fmtCZK(p.over)}</b> vyšší.</>
-                ) : (
-                  <>Pri tomto tempe splatené o <b style={{ color: C.green }}>~{p.months} mesiacov</b>. Výber sa drží
-                    pod nárokom ({fmtCZK(p.poslaneAvg)} vs {fmtCZK(p.narokAvg)}).</>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
       <LineChart
         data={idx.map((i) => ({ label: MONTHS[i], values: [salaryCalc("jerry").cumDebt[i], salaryCalc("terezka").cumDebt[i]] }))}
         series={[{ name: "Jerry", color: C.accent }, { name: "Terezka", color: C.blue }]}
@@ -580,6 +589,10 @@ function DebtTrendCard({ idx }: { idx: number[] }) {
         autoY
         alignEnd
       />
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12, marginTop: 14 }}>
+        {people.map((p) => <DebtBox key={p.k} p={p} />)}
+      </div>
 
       <div style={{ marginTop: 18 }}>
         <H3><Info text="Dlh sa dá otočiť dvoma pákami: odrobiť viac hodín (rastie nárok) alebo si posielať menej (klesá výber). Tabuľka ukazuje prvú páku — koľko hodín mesačne by bolo treba pri nezmenenom výbere. V zátvorke je druhá páka: o koľko si menej poslať, ak hodiny ostanú rovnaké." label="Čo by to chcelo" /></H3>
@@ -702,8 +715,6 @@ function SalaryTab() {
         )}
       </Card>
 
-      <DebtTrendCard idx={idx} />
-
       <PersonCard pk="jerry" idx={idx} />
       <PersonCard pk="terezka" idx={idx} />
 
@@ -754,6 +765,8 @@ function SalaryTab() {
           </ScrollX>
         )}
       </Card>
+
+      <DebtTrendCard idx={idx} />
     </>
   );
 }
@@ -1043,38 +1056,27 @@ function MesacneTab() {
 
   return (
     <>
+      <HealthCard idx={idx} />
+      <ForecastCard />
+
       <Card>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-          <H3><Info text="Vyber ukazovateľ a obdobie — pravý graf, priemer aj najlepší/najhorší mesiac sa prepočítajú." label="Mesačné výsledky" /></H3>
+          <H3><Info text="Vyber ukazovateľ a obdobie — graf, priemer aj najlepší/najhorší mesiac sa prepočítajú." label="Mesačné výsledky" /></H3>
           <RangeBar r={r} extra={<Select value={metric} onChange={setMetric} options={METRICS} />} />
         </div>
       </Card>
 
-      {/* Both charts open on the newest month (right) — scroll left for history. */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 14 }}>
-        <Card>
-          <H3>Tržby vs. náklady</H3>
-          <LineChart
-            data={idx.map((i) => ({ label: MONTHS[i], values: [p.prijmy[i], p.celkoveNaklady[i]] }))}
-            series={[{ name: "Tržby", color: C.green }, { name: "Náklady", color: C.red }]}
-            height={220}
-            fmt={(n) => `${Math.round(n / 1000)}k`}
-            pointWidth={64}
-            autoY
-            alignEnd
-          />
-        </Card>
-        <Card>
-          <H3>{METRICS.find((m) => m.value === metric)?.label} po mesiacoch</H3>
-          <SignedBars
-            data={sel.map((s) => ({ label: s.label, value: s.v }))}
-            posColor={metric === "naklady" ? C.red : metric === "zisk" ? C.accent : C.green}
-            fmt={(n) => (isPct ? `${n.toFixed(1)}%` : `${Math.round(n / 1000)}k`)}
-            height={220}
-          />
-          <div style={{ fontSize: 11, color: C.textDim, marginTop: 6 }}>Červené stĺpce pod nulou = záporná hodnota.</div>
-        </Card>
-      </div>
+      {/* Only the metric chart: tržby-vs-náklady already lives in the forecast card. */}
+      <Card>
+        <H3>{METRICS.find((m) => m.value === metric)?.label} po mesiacoch</H3>
+        <SignedBars
+          data={sel.map((s) => ({ label: s.label, value: s.v }))}
+          posColor={metric === "naklady" ? C.red : metric === "zisk" ? C.accent : C.green}
+          fmt={(n) => (isPct ? `${n.toFixed(1)}%` : `${Math.round(n / 1000)}k`)}
+          height={220}
+        />
+        <div style={{ fontSize: 11, color: C.textDim, marginTop: 6 }}>Červené stĺpce pod nulou = záporná hodnota.</div>
+      </Card>
 
       <Card>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
@@ -1211,7 +1213,7 @@ export function Vzas({ sub, onSub }: { sub: string; onSub: (s: string) => void }
             })}
           </div>
           {vysledkySub === "kvartalne" && <KvartalneTab />}
-          {vysledkySub === "mesacne" && <><ForecastCard /><MesacneTab /></>}
+          {vysledkySub === "mesacne" && <MesacneTab />}
           {vysledkySub === "kpi" && <KpiTab />}
         </>
       )}
