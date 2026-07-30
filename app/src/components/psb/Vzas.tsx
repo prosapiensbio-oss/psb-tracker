@@ -266,19 +266,18 @@ function CommitmentTable({ idx }: { idx: number[] }) {
         <table style={tableStyle}>
           <thead><MonthHead idx={idx} /></thead>
           <tbody>
-            <Divider label="Záväzné — musíš platiť" span={span} />
-            {rows("zavazne")}
-            <Row label="Záväzné spolu" values={pick(zav, idx)} bold color={C.red} />
-
-            <Divider label="Voliteľné — vieš zastaviť" span={span} />
-            {rows("volitelne")}
-            <Row label="Voliteľné spolu" values={pick(vol, idx)} bold color={C.orange} />
-
-            <Divider label="Výplaty" span={span} />
-            <Row label="Jerry (Poslané)" values={pick(p.poslaneJerry, idx)} />
-            <Row label="Terezka (Poslané)" values={pick(p.poslaneTerezka, idx)} />
-            <Row label="Matyáš (jan–mar)" values={pick(p.matyas, idx)} />
-            <Row label="Výplaty spolu" values={pick(p.vyplatySpolu, idx)} bold color={C.red} />
+            <Divider label="Náklady — podľa toho, či sa dajú zastaviť" span={span} />
+            <Row label="Záväzné — musíš platiť" values={pick(zav, idx)} bold color={C.red}>
+              {rows("zavazne")}
+            </Row>
+            <Row label="Voliteľné — vieš zastaviť" values={pick(vol, idx)} bold color={C.orange}>
+              {rows("volitelne")}
+            </Row>
+            <Row label="Výplaty" values={pick(p.vyplatySpolu, idx)} bold color={C.red}>
+              <Row label="Jerry (Poslané)" values={pick(p.poslaneJerry, idx)} depth={1} />
+              <Row label="Terezka (Poslané)" values={pick(p.poslaneTerezka, idx)} depth={1} />
+              <Row label="Matyáš (jan–mar)" values={pick(p.matyas, idx)} depth={1} />
+            </Row>
 
             <TotalRow label="Prevádzkové náklady" values={pick(prevadzkoveNaklady, idx)} color={C.red} />
 
@@ -288,8 +287,9 @@ function CommitmentTable({ idx }: { idx: number[] }) {
             <TotalRow label="Prevádzkový zisk" values={pick(prevadzkovyZisk, idx)} color={signColor(vSum(pick(prevadzkovyZisk, idx)))} big />
 
             <Divider label="Neprevádzkové — nie je to náklad prevádzky" span={span} />
-            {rows("neprevadzkove")}
-            <Row label="Neprevádzkové spolu" values={pick(nep, idx)} bold color={C.blue} />
+            <Row label="Neprevádzkové spolu" values={pick(nep, idx)} bold color={C.blue}>
+              {rows("neprevadzkove")}
+            </Row>
 
             <TotalRow label="Výsledok po neprevádzkových" values={pick(p.hrubyZisk, idx)} color={signColor(vSum(pick(p.hrubyZisk, idx)))} big />
           </tbody>
@@ -962,6 +962,47 @@ function KvartalneTab() {
   );
 }
 
+// Two bars per month plus the gap between them as a percentage — the number
+// that actually matters is not either bar, but how far apart they are.
+function GroupedBars({ data, height = 250 }: { data: { label: string; prijmy: number; naklady: number }[]; height?: number }) {
+  const plotH = height - 72;
+  const max = Math.max(1, ...data.flatMap((d) => [d.prijmy, d.naklady]));
+  const scrollRef = useScrollEnd<HTMLDivElement>(true, data.length);
+  return (
+    <>
+      <div ref={scrollRef} style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 4 }}>
+        {data.map((d, i) => {
+          // How much revenue exceeded cost (or fell short of it), relative to cost.
+          const diff = d.naklady !== 0 ? ((d.prijmy - d.naklady) / d.naklady) * 100 : 0;
+          const good = diff >= 0;
+          return (
+            <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: "0 0 78px" }}>
+              <div style={{ fontSize: 11.5, fontWeight: 700, color: good ? C.green : C.red, marginBottom: 4, whiteSpace: "nowrap" }}>
+                {good ? "+" : ""}{diff.toFixed(0)} %
+              </div>
+              <div style={{ height: plotH, display: "flex", alignItems: "flex-end", gap: 4, width: "100%", justifyContent: "center" }}>
+                {([["prijmy", C.green], ["naklady", C.red]] as const).map(([k, col]) => (
+                  <div key={k} style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: "0 0 30px" }}>
+                    <div style={{ fontSize: 9.5, color: C.textDim, marginBottom: 2, whiteSpace: "nowrap" }}>{Math.round(d[k] / 1000)}k</div>
+                    <div title={`${d.label} · ${k === "prijmy" ? "príjmy" : "náklady"}: ${money(d[k])}`}
+                      style={{ width: "100%", height: Math.max(2, (d[k] / max) * (plotH - 18)), background: col, borderRadius: "4px 4px 0 0" }} />
+                  </div>
+                ))}
+              </div>
+              <div style={{ fontSize: 10, color: C.textDim, marginTop: 5, whiteSpace: "nowrap" }}>{d.label}</div>
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ display: "flex", gap: 16, marginTop: 8, fontSize: 11.5, color: C.textMuted }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: C.green }} /> Príjmy</span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><span style={{ width: 10, height: 10, borderRadius: 2, background: C.red }} /> Náklady</span>
+        <span style={{ color: C.textDim }}>% = o koľko boli príjmy vyššie (zelené) alebo nižšie (červené) než náklady</span>
+      </div>
+    </>
+  );
+}
+
 // ── Výhľad ───────────────────────────────────────────────────────────────────
 // Costs split by how predictable they are: záväzné barely move (contracts, the
 // state), voliteľné and revenue swing — so each gets the averaging it deserves,
@@ -1066,16 +1107,26 @@ function MesacneTab() {
         </div>
       </Card>
 
-      {/* Only the metric chart: tržby-vs-náklady already lives in the forecast card. */}
+      {/* Príjmy/náklady are two sides of one comparison — show them together with
+          the gap in %. Zisk/marža stand alone, so they keep the signed bars. */}
       <Card>
-        <H3>{METRICS.find((m) => m.value === metric)?.label} po mesiacoch</H3>
-        <SignedBars
-          data={sel.map((s) => ({ label: s.label, value: s.v }))}
-          posColor={metric === "naklady" ? C.red : metric === "zisk" ? C.accent : C.green}
-          fmt={(n) => (isPct ? `${n.toFixed(1)}%` : `${Math.round(n / 1000)}k`)}
-          height={220}
-        />
-        <div style={{ fontSize: 11, color: C.textDim, marginTop: 6 }}>Červené stĺpce pod nulou = záporná hodnota.</div>
+        {metric === "prijmy" || metric === "naklady" ? (
+          <>
+            <H3><Info text="Príjmy a náklady vedľa seba po mesiacoch. Percento nad dvojicou je rozdiel medzi nimi — o koľko boli príjmy vyššie než náklady. Záporné číslo znamená stratový mesiac." label="Príjmy vs. náklady po mesiacoch" /></H3>
+            <GroupedBars data={sel.map((s) => ({ label: s.label, prijmy: p.prijmy[s.i], naklady: p.celkoveNaklady[s.i] }))} />
+          </>
+        ) : (
+          <>
+            <H3>{METRICS.find((m) => m.value === metric)?.label} po mesiacoch</H3>
+            <SignedBars
+              data={sel.map((s) => ({ label: s.label, value: s.v }))}
+              posColor={metric === "zisk" ? C.accent : C.green}
+              fmt={(n) => (isPct ? `${n.toFixed(1)}%` : `${Math.round(n / 1000)}k`)}
+              height={220}
+            />
+            <div style={{ fontSize: 11, color: C.textDim, marginTop: 6 }}>Červené stĺpce pod nulou = záporná hodnota.</div>
+          </>
+        )}
       </Card>
 
       <Card>
