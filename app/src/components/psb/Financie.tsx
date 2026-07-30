@@ -66,14 +66,39 @@ function Zarobky({ monthly, focusMonth, onClearFocus }: { monthly: Monthly; focu
     sessions: (m) => m.sessions,
     mom: (m) => m.mom ?? -999,
   });
-  const chart = monthly.slice(-8).map((m) => ({ label: monthLabel(m.month), value: m.revenue }));
+  const chart = monthly.map((m) => ({ label: monthLabel(m.month), value: m.revenue }));
+  // Súhrn za celé nahrané obdobie (vyfakturované = hodnota odtrénovaných sedení).
+  const revVals = monthly.map((m) => m.revenue);
+  const total = revVals.reduce((a, b) => a + b, 0);
+  const sessTotal = monthly.reduce((a, m) => a + m.sessions, 0);
+  const avgAll = revVals.length ? total / revVals.length : 0;
+  const avgOf = (n: number) => {
+    const s = revVals.slice(-n);
+    return s.length ? s.reduce((a, b) => a + b, 0) / s.length : 0;
+  };
+  const avg3 = avgOf(3), avg6 = avgOf(6);
 
   return (
     <>
       <Card>
         <H3>Mesačné zárobky (spolu)</H3>
-        {chart.length ? <ValueBars data={chart} color={C.accent} fmt={(n) => `${Math.round(n / 1000)}k`} height={170} /> : <Empty>Nahraj Payroll by Session.</Empty>}
+        {chart.length ? <ValueBars data={chart} color={C.accent} fmt={(n) => `${Math.round(n / 1000)}k`} height={170} alignEnd /> : <Empty>Nahraj Payroll by Session.</Empty>}
       </Card>
+
+      {monthly.length > 0 && (
+        <Card>
+          <H3>
+            <Info text="Súhrn vyfakturovaných zárobkov za celé nahrané obdobie. Spolu = súčet všetkých mesiacov dokopy; priemery sú za daný počet posledných mesiacov. Zdroj Payroll by Session — sedenia s CZK0 sa rátajú do počtu, nie do súm." label="Súhrn zárobkov (za celé obdobie)" />
+          </H3>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, margin: "12px 0 6px" }}>
+            <StatCard value={fmtCZK(total)} label={`Spolu za obdobie · ${monthly.length} mes.`} color={C.accentLight} />
+            <StatCard value={fmtCZK(avgAll)} label="Ø / mesiac" color={C.accent} />
+            <StatCard value={fmtCZK(avg3)} label="Ø posledné 3 mes." color={C.green} />
+            <StatCard value={fmtCZK(avg6)} label="Ø posledných 6 mes." color={C.blue} />
+          </div>
+          <div style={{ fontSize: 11, color: C.textDim, marginTop: 4 }}>Sedení spolu za obdobie: {sessTotal}</div>
+        </Card>
+      )}
       <Card>
         <div style={{ fontSize: 11, color: C.textDim, marginBottom: 8 }}>Zdroj: Payroll by Session. Sedenia s CZK0 sa počítajú do počtu, nie do zárobkov.</div>
         {focusMonth && (
