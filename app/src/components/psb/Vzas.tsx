@@ -580,6 +580,62 @@ function DebtTrendCard({ idx }: { idx: number[] }) {
         autoY
         alignEnd
       />
+
+      <div style={{ marginTop: 18 }}>
+        <H3><Info text="Dlh sa dá otočiť dvoma pákami: odrobiť viac hodín (rastie nárok) alebo si posielať menej (klesá výber). Tabuľka ukazuje prvú páku — koľko hodín mesačne by bolo treba pri nezmenenom výbere. V zátvorke je druhá páka: o koľko si menej poslať, ak hodiny ostanú rovnaké." label="Čo by to chcelo" /></H3>
+        <ScrollX>
+          <table style={{ ...tableStyle, minWidth: 560 }}>
+            <thead>
+              <tr style={{ borderBottom: `2px solid ${mix(C.accent, 35)}` }}>
+                <th style={{ textAlign: "left", padding: "8px 10px", fontSize: 11, color: C.textMuted, fontWeight: 600, minWidth: 200 }}>Cieľ</th>
+                {people.map((p) => <th key={p.k} style={{ textAlign: "right", padding: "8px 10px", fontSize: 11, color: C.textMuted, fontWeight: 600 }}>{p.label}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style={{ ...S.td, fontSize: 12.5, color: C.textMuted }}>Teraz odrobí</td>
+                {people.map((p) => (
+                  <td key={p.k} style={{ ...S.td, textAlign: "right", fontSize: 12.5, color: C.text, fontVariantNumeric: "tabular-nums" }}>
+                    {avg(pick(SALARY[p.k].hours, idx)).toFixed(1)} h
+                  </td>
+                ))}
+              </tr>
+              {[
+                { label: "Zastaviť rast dlhu", extra: 0 },
+                { label: "Splatiť celý dlh do 24 mes.", extra: 24 },
+                { label: "Splatiť celý dlh do 12 mes.", extra: 12 },
+              ].map((sc) => (
+                <tr key={sc.label}>
+                  <td style={{ ...S.td, fontSize: 12.5, color: C.text }}>{sc.label}</td>
+                  {people.map((p) => {
+                    const s = SALARY[p.k];
+                    const nowH = avg(pick(s.hours, idx));
+                    // Required entitlement = current draw + monthly repayment.
+                    const repay = sc.extra > 0 ? Math.abs(Math.min(0, p.dlh)) / sc.extra : 0;
+                    const needNarok = p.poslaneAvg + repay;
+                    const needH = s.hoursThreshold + Math.max(0, needNarok - s.fix) / s.hourlyRate;
+                    const dH = needH - nowH;
+                    const done = dH <= 0;
+                    return (
+                      <td key={p.k} style={{ ...S.td, textAlign: "right", fontSize: 12.5, fontVariantNumeric: "tabular-nums", color: done ? C.green : dH <= 10 ? C.orange : C.red }}>
+                        {done ? "✓ už spĺňa" : (
+                          <>
+                            {needH.toFixed(0)} h <span style={{ color: C.textDim, fontSize: 11 }}>(+{dH.toFixed(0)} h / alebo −{fmtCZK(dH * s.hourlyRate)})</span>
+                          </>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </ScrollX>
+        <div style={{ fontSize: 11.5, color: C.textMuted, marginTop: 8, lineHeight: 1.5 }}>
+          Hodina nad prahom {SALARY.jerry.hoursThreshold} h pridá k nároku {fmtCZK(SALARY.jerry.hourlyRate)}, takže „+9 h“ a „posielať si o 7 650 Kč menej“
+          majú na dlh rovnaký účinok — dá sa to aj kombinovať.
+        </div>
+      </div>
     </Card>
   );
 }
@@ -893,6 +949,72 @@ function KvartalneTab() {
   );
 }
 
+// ── Výhľad ───────────────────────────────────────────────────────────────────
+// Costs split by how predictable they are: záväzné barely move (contracts, the
+// state), voliteľné and revenue swing — so each gets the averaging it deserves,
+// and the range comes from the spread of recent months rather than a guess.
+function ForecastCard() {
+  const p = pnlCalc();
+  const b = byCommitment();
+  const zav = commitmentTotal(b.zavazne);
+  const vol = commitmentTotal(b.volitelne);
+  const nep = commitmentTotal(b.neprevadzkove);
+  const last = <T,>(a: T[], n: number) => a.slice(-n);
+  const m3 = (v: Vals) => avg(last(v, 3));
+
+  // Záväzné + výplaty are the stable core; voliteľné and tržby are the movers.
+  const zavF = m3(zav);
+  const volF = m3(vol);
+  const vyplF = m3(p.vyplatySpolu);
+  const nepF = m3(nep);
+  const nakladyF = zavF + volF + vyplF + nepF;
+
+  const trzby3 = m3(p.prijmy);
+  const trzby6 = avg(p.prijmy);
+  const trzbyLo = Math.min(trzby3, trzby6);
+  const trzbyHi = Math.max(trzby3, trzby6);
+  const ziskStred = trzby3 - nakladyF;
+  const ziskLo = trzbyLo - nakladyF;
+  const ziskHi = trzbyHi - nakladyF;
+
+  const MN = ["jan", "feb", "mar", "apr", "máj", "jún", "júl", "aug", "sep", "okt", "nov", "dec"];
+  const nextMonths = [1, 2, 3].map((k) => {
+    const d = new Date(2026, 5 + k, 1);
+    return `${MN[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`;
+  });
+
+  return (
+    <Card>
+      <H3>
+        <Info text="Výhľad z histórie, nie z prianí. Náklady sa rátajú po zložkách: záväzné a výplaty sú stabilné (priemer 3 mes.), voliteľné kolíšu. Rozpätie zisku vychádza z rozdielu medzi 3- a 6-mesačným priemerom tržieb — čím sú tržby nevyrovnanejšie, tým je pásmo širšie. Nezohľadňuje sezónnosť ani jednorazové platby (napr. ročný hosting)." label="Výhľad na ďalšie 3 mesiace" />
+      </H3>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, margin: "12px 0 6px" }}>
+        <StatCard value={fmtCZK(trzby3)} label="Očak. tržby / mes." color={C.green} />
+        <StatCard value={fmtCZK(nakladyF)} label="Očak. náklady / mes." color={C.red} />
+        <StatCard value={fmtCZK(ziskStred)} label="Očak. zisk / mes." color={signColor(ziskStred)} />
+        <StatCard value={`${fmtCZK(ziskLo)} – ${fmtCZK(ziskHi)}`} label="Pásmo zisku" color={C.blue} />
+      </div>
+      <div style={{ fontSize: 11.5, color: C.textMuted, margin: "6px 0 14px", lineHeight: 1.55 }}>
+        Náklady sa skladajú zo: záväzné {fmtCZK(zavF)} + voliteľné {fmtCZK(volF)} + výplaty {fmtCZK(vyplF)}
+        {nepF !== 0 && <> + neprevádzkové {fmtCZK(nepF)}</>}. Za {nextMonths.join(", ")} to spolu vychádza
+        na zisk <b style={{ color: signColor(ziskStred * 3) }}>{fmtCZK(ziskStred * 3)}</b>.
+      </div>
+      <LineChart
+        data={[
+          ...MONTHS.map((m, i) => ({ label: m, values: [p.prijmy[i], p.celkoveNaklady[i]] })),
+          ...nextMonths.map((m) => ({ label: `${m} ⌁`, values: [trzby3, nakladyF] })),
+        ]}
+        series={[{ name: "Tržby", color: C.green }, { name: "Náklady", color: C.red }]}
+        height={210}
+        fmt={(n) => `${Math.round(n / 1000)}k`}
+        autoY
+        alignEnd
+      />
+      <div style={{ fontSize: 11, color: C.textDim, marginTop: 6 }}>Posledné tri body (⌁) sú odhad, nie skutočnosť.</div>
+    </Card>
+  );
+}
+
 // ── Mesačné výsledky ─────────────────────────────────────────────────────────
 const METRICS = [
   { value: "prijmy", label: "Príjmy" },
@@ -1089,7 +1211,7 @@ export function Vzas({ sub, onSub }: { sub: string; onSub: (s: string) => void }
             })}
           </div>
           {vysledkySub === "kvartalne" && <KvartalneTab />}
-          {vysledkySub === "mesacne" && <MesacneTab />}
+          {vysledkySub === "mesacne" && <><ForecastCard /><MesacneTab /></>}
           {vysledkySub === "kpi" && <KpiTab />}
         </>
       )}

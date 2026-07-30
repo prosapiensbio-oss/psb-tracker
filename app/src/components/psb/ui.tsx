@@ -630,10 +630,17 @@ export function LineChart({
   const rawMax = Math.max(1, ...allVals);
   const rawMin = allVals.length ? Math.min(...allVals) : 0;
   let lo = 0, hi = rawMax * 1.08;
+  const padY = Math.max(1, (rawMax - rawMin) * 0.14);
   if (autoY && rawMax > rawMin) {
-    const pad = Math.max(1, (rawMax - rawMin) * 0.14);
-    lo = Math.max(0, rawMin - pad);
-    hi = rawMax + pad;
+    // Only clamp the floor at zero when the data is non-negative — clamping a
+    // negative series (e.g. a debt balance) pushes it below the plot area and
+    // it gets drawn outside the card.
+    lo = rawMin >= 0 ? Math.max(0, rawMin - padY) : rawMin - padY;
+    hi = rawMax + padY;
+  } else if (rawMin < 0) {
+    // Zero-based scale can't show negatives either — extend downward.
+    lo = rawMin - padY;
+    hi = Math.max(0, rawMax) + padY;
   }
   const span = hi - lo || 1;
   const x = (i: number) => padL + (n <= 1 ? plotW / 2 : (i / (n - 1)) * plotW);
