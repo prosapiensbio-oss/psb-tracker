@@ -7,9 +7,7 @@ import type { PSBData } from "../../lib/psb/types";
 import {
   CURRENT_ERA,
   DEBT_CHECKPOINT_2026,
-  JAREK_OBNOVA,
   JAREK_SPLATKY,
-  JAREK_ZLAVA_ROCNE,
   JAREK_VKLADY,
   PNL,
   PRIJMY,
@@ -1133,6 +1131,7 @@ function JarekTab() {
   const last = stav[stav.length - 1];
   // Payoff estimate at the current pace = average monthly repayment across the
   // tracked months (months with no payment count as 0 — that IS the real pace).
+  // The yearly 20 % discount is part of the ledger, so this already carries it.
   const pace = avg(jk.splatkySpolu);
   // Three honest paces: the whole period, the last 3 months, and cash only —
   // almost half of "repayment" is Sofia's forgone revenue, which is never money.
@@ -1146,7 +1145,6 @@ function JarekTab() {
   // The 20 % discount repeats every year when Jarek renews, so it belongs in a
   // forward-looking pace — but spread over twelve months, not left sitting in
   // whichever month it happened to land in.
-  const paceOpak = avg(jk.splatkySpolu.map((v, i) => v - zlavaVals[i])) + JAREK_ZLAVA_ROCNE / 12;
   const vkladySpolu = vSum(jk.vklady);
   const MN = ["jan", "feb", "mar", "apr", "máj", "jún", "júl", "aug", "sep", "okt", "nov", "dec"];
   const monthName = (add: number) => {
@@ -1154,11 +1152,11 @@ function JarekTab() {
     d.setMonth(d.getMonth() + add);
     return `${MN[d.getMonth()]} ${d.getFullYear()}`;
   };
-  const mesiacovOpak = paceOpak > 0 ? Math.ceil(Math.abs(last) / paceOpak) : null;
+  const mesiacovOpak = pace > 0 ? Math.ceil(Math.abs(last) / pace) : null;
   const scenarios = [
-    { label: "Tempo, ktoré sa opakuje", p: paceOpak },
+    { label: "Tempo, ktoré sa opakuje", p: pace },
     { label: "Posledné 3 mesiace", p: paceRecent },
-    { label: "Len zapísané splátky (bez tohtoročnej zľavy)", p: pace },
+    { label: "Bez ročných zliav (len hotovosť a Sofia)", p: avg(jk.splatkySpolu.map((v, i) => v - zlavaVals[i])) },
   ].map((s) => ({ ...s, m: s.p > 0 ? Math.ceil(Math.abs(last) / s.p) : null }));
   const cell = { textAlign: "right" as const, padding: "5px 8px", fontSize: 12, fontVariantNumeric: "tabular-nums" as const, whiteSpace: "nowrap" as const };
 
@@ -1168,10 +1166,10 @@ function JarekTab() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12 }}>
           <StatCard value={fmtCZK(last)} label="Stav dlhu k jún 26" color={C.red} />
           <StatCard value={fmtCZK(vkladySpolu)} label={<Info text="Koľko do firmy vložil. Prvá suma (jan 2025) je zostatok prenesený z roku 2024, druhá (300 000 Kč, feb 2025) je reálny druhý vklad." label="Vklady spolu" />} color={C.orange} />
-          <StatCard value={fmtCZK(paceOpak)} label={<Info text={`Tempo, ktoré sa dá čakať aj ďalej: ${fmtCZK(paceCash)}/mes v hotovosti + ${fmtCZK(paceSofia)}/mes cez Sofiu. Jednorazová 20 % zľava z jan 25 je vynechaná — s ňou by priemer vyšiel ${fmtCZK(pace)} a splatenie by vyzeralo o pol roka bližšie, než v skutočnosti je. Nehotovostná časť je ${fmtCZK(nonCash)} za obdobie (${((nonCash / vSum(jk.splatkySpolu)) * 100).toFixed(0)} %).`} label="Ø splátka / mes." />} color={C.green} />
+          <StatCard value={fmtCZK(pace)} label={<Info text={`Skladba: ${fmtCZK(paceCash)}/mes v hotovosti + ${fmtCZK(paceSofia)}/mes cez Sofiu (odtrénované, nefakturované) + 20 % zľava pri každoročnej obnove členstva. Nehotovostná časť je ${fmtCZK(nonCash)} za obdobie (${((nonCash / vSum(jk.splatkySpolu)) * 100).toFixed(0)} %) — dlh reálne klesá, len z toho nepríde hotovosť.`} label="Ø splátka / mes." />} color={C.green} />
           <StatCard
             value={mesiacovOpak != null ? `${monthName(mesiacovOpak)} · ${mesiacovOpak} mes.` : "—"}
-            label={<Info text="Odhadované splatenie pri tempe, ktoré sa opakuje (vrátane mesiacov bez splátky, bez jednorazovej zľavy). Nezohľadňuje nové vklady ani zmenu splátky." label="Predpokladané splatenie" />}
+            label={<Info text="Odhadované splatenie pri doterajšom tempe, vrátane mesiacov bez splátky aj ročnej zľavy pri obnove. Nezohľadňuje nové vklady ani zmenu splátky." label="Predpokladané splatenie" />}
             color={C.blue}
           />
         </div>

@@ -309,17 +309,16 @@ export const RECORDED_DEBT: Record<PersonKey, { pozicka: Vals; splatka: Vals }> 
 // operation; "Sofia" is forgone revenue (never a bank transaction).
 // The 20 % discount is NOT a one-off: Jarek renews his annual membership every
 // year (2025-01-22, then 2026-06-23) and the discount is credited against the
-// debt each time. The 2026 renewal is confirmed by his 54 600 Kč payment on
-// 23.6.2026, but the koruna amount of the discount was never written down —
-// so it stays 0 in the ledger until Jerry confirms it, and the payoff estimate
-// carries it as a recurring yearly item instead of pretending it stopped.
-export const JAREK_ZLAVA_ROCNE = 16880; // last recorded amount (jan 2025)
+// debt each time. 2026: list price 91 000 → he pays 80 % (72 800), and the
+// remaining 18 200 comes off the debt. Confirmed by Jerry 2026-07-31; the
+// 54 600 Kč cash payment on 23.6. plus this 18 200 is exactly that 72 800.
+export const JAREK_ZLAVA_ROCNE = 18200; // 20 % z 91 000, obnova 2026
 export const JAREK_OBNOVA = { datum: "2026-06-23", platba: 54600, mesiacIdx: 17 };
 
 export const JAREK_SPLATKY: Record<string, Vals> = {
   "Fix splátka (P&L náklad)": [0, 8000, 4000, 4000, 4000, 0, 0, 4000, 4000, 4000, 4000, 4000, 5000, 5000, 5000, 5000, 5000, 0],
   "Sofia (vzdaná tržba)": [6850, 0, 6850, 0, 6850, 0, 0, 6850, 0, 6850, 0, 0, 7790, 0, 7790, 7790, 0, 0],
-  "20 % zľava ročné": [16880, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+  "20 % zľava ročné": [16880, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 18200],
 };
 
 // Money in from the investor. The jan 2025 figure is the balance carried over
