@@ -1036,13 +1036,19 @@ function JarekTab() {
   // Payoff estimate at the current pace = average monthly repayment across the
   // tracked months (months with no payment count as 0 — that IS the real pace).
   const pace = avg(jk.splatkySpolu);
-  const monthsLeft = pace > 0 ? Math.ceil(Math.abs(last) / pace) : null;
   // Three honest paces: the whole period, the last 3 months, and cash only —
   // almost half of "repayment" is Sofia's forgone revenue, which is never money.
   const cashVals = (JAREK_SPLATKY as Record<string, Vals>)["Fix splátka (P&L náklad)"] ?? [];
+  const sofiaVals = (JAREK_SPLATKY as Record<string, Vals>)["Sofia (vzdaná tržba)"] ?? [];
+  const zlavaVals = (JAREK_SPLATKY as Record<string, Vals>)["20 % zľava ročné"] ?? [];
   const nonCash = vSum(jk.splatkySpolu) - vSum(cashVals);
   const paceRecent = avg(jk.splatkySpolu.slice(-3));
   const paceCash = avg(cashVals);
+  const paceSofia = avg(sofiaVals);
+  // The 20 % discount was a one-off in jan 2025 and will never repeat, so it has
+  // no business in a forward-looking pace — it made the payoff look ~6 months
+  // closer than it is.
+  const paceOpak = avg(jk.splatkySpolu.map((v, i) => v - zlavaVals[i]));
   const vkladySpolu = vSum(jk.vklady);
   const MN = ["jan", "feb", "mar", "apr", "máj", "jún", "júl", "aug", "sep", "okt", "nov", "dec"];
   const monthName = (add: number) => {
@@ -1050,11 +1056,11 @@ function JarekTab() {
     d.setMonth(d.getMonth() + add);
     return `${MN[d.getMonth()]} ${d.getFullYear()}`;
   };
-  const payoff = monthsLeft != null ? monthName(monthsLeft) : null;
+  const mesiacovOpak = paceOpak > 0 ? Math.ceil(Math.abs(last) / paceOpak) : null;
   const scenarios = [
-    { label: "Priemer celé obdobie", p: pace },
-    { label: "Tempo posledné 3 mes.", p: paceRecent },
-    { label: "Len z hotovosti (bez Sofie)", p: paceCash },
+    { label: "Tempo, ktoré sa opakuje", p: paceOpak },
+    { label: "Posledné 3 mesiace", p: paceRecent },
+    { label: "Celé obdobie (aj s jednorazovou zľavou)", p: pace },
   ].map((s) => ({ ...s, m: s.p > 0 ? Math.ceil(Math.abs(last) / s.p) : null }));
   const cell = { textAlign: "right" as const, padding: "5px 8px", fontSize: 12, fontVariantNumeric: "tabular-nums" as const, whiteSpace: "nowrap" as const };
 
@@ -1064,10 +1070,10 @@ function JarekTab() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12 }}>
           <StatCard value={fmtCZK(last)} label="Stav dlhu k jún 26" color={C.red} />
           <StatCard value={fmtCZK(vkladySpolu)} label={<Info text="Koľko do firmy vložil. Prvá suma (jan 2025) je zostatok prenesený z roku 2024, druhá (300 000 Kč, feb 2025) je reálny druhý vklad." label="Vklady spolu" />} color={C.orange} />
-          <StatCard value={fmtCZK(pace)} label={<Info text={`Z toho reálna hotovosť je len ${fmtCZK(paceCash)}/mes — zvyšok (${fmtCZK(nonCash)} za obdobie, ${((nonCash / vSum(jk.splatkySpolu)) * 100).toFixed(0)} %) je Sofia, teda vzdaná tržba, nie prijaté peniaze.`} label="Ø splátka / mes." />} color={C.green} />
+          <StatCard value={fmtCZK(paceOpak)} label={<Info text={`Tempo, ktoré sa dá čakať aj ďalej: ${fmtCZK(paceCash)}/mes v hotovosti + ${fmtCZK(paceSofia)}/mes cez Sofiu. Jednorazová 20 % zľava z jan 25 je vynechaná — s ňou by priemer vyšiel ${fmtCZK(pace)} a splatenie by vyzeralo o pol roka bližšie, než v skutočnosti je. Nehotovostná časť je ${fmtCZK(nonCash)} za obdobie (${((nonCash / vSum(jk.splatkySpolu)) * 100).toFixed(0)} %).`} label="Ø splátka / mes." />} color={C.green} />
           <StatCard
-            value={monthsLeft != null ? `${payoff} · ${monthsLeft} mes.` : "—"}
-            label={<Info text="Odhadované splatenie pri aktuálnom tempe (priemer za sledované obdobie vrátane mesiacov bez splátky). Nezohľadňuje nové vklady ani zmenu splátky." label="Predpokladané splatenie" />}
+            value={mesiacovOpak != null ? `${monthName(mesiacovOpak)} · ${mesiacovOpak} mes.` : "—"}
+            label={<Info text="Odhadované splatenie pri tempe, ktoré sa opakuje (vrátane mesiacov bez splátky, bez jednorazovej zľavy). Nezohľadňuje nové vklady ani zmenu splátky." label="Predpokladané splatenie" />}
             color={C.blue}
           />
         </div>
@@ -1082,9 +1088,12 @@ function JarekTab() {
             </div>
           ))}
         </div>
-        <div style={{ fontSize: 11.5, color: C.textMuted, marginTop: 10, lineHeight: 1.5 }}>
-          V júni splátka nebola vôbec a takmer polovica doterajšieho „splácania“ je <b>Sofia</b> — vzdaná tržba, nie prijaté peniaze.
-          Preto ber „priemer celé obdobie“ ako optimistický a tempo z hotovosti ako realistické dno.
+        <div style={{ fontSize: 11.5, color: C.textMuted, marginTop: 10, lineHeight: 1.55 }}>
+          Skladba splátky: <b>{fmtCZK(paceCash)}</b>/mes v hotovosti + <b>{fmtCZK(paceSofia)}</b>/mes Sofia (odtrénované, nefakturované)
+          {vSum(zlavaVals) > 0 && <> + jednorazová 20 % zľava {fmtCZK(vSum(zlavaVals))} v jan 25, ktorá sa už nezopakuje</>}.
+          Sofia nie je horší spôsob splácania, je iný: hodnotu dodávaš a dlh reálne klesá, len z toho nepríde hotovosť.
+          Cena nie sú peniaze, ale <b>kapacita</b> — sú to hodiny, ktoré sa nedajú predať niekomu inému.
+          Jediná páka na zrýchlenie je preto fix splátka, nie Sofia.
         </div>
       </Card>
 
