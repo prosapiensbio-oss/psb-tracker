@@ -111,12 +111,19 @@ export type BtcReserve = {
   generatedAt: string;
 };
 
+// Two hops on purpose: our server signs a short-lived URL (it holds the shared
+// token), the browser then calls the Bitcoin app directly. Worker-to-worker
+// calls inside the platform time out, so this is the path that works.
 export async function fetchBtcReserve(): Promise<BtcReserve | null> {
   try {
     const r = await fetch("/api/btc-reserve");
     if (!r.ok) return null;
-    const j = (await r.json()) as { ok?: boolean; reserve?: BtcReserve };
-    return j.ok && j.reserve ? j.reserve : null;
+    const j = (await r.json()) as { ok?: boolean; url?: string };
+    if (!j.ok || !j.url) return null;
+    const s = await fetch(j.url);
+    if (!s.ok) return null;
+    const data = (await s.json()) as BtcReserve & { ok?: boolean };
+    return data.ok === false ? null : data;
   } catch {
     return null;
   }
