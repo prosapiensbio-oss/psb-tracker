@@ -86,8 +86,8 @@ export function Badge({ tone, children }: { tone: Parameters<typeof badge>[0]; c
 export function H2({ children }: { children: ReactNode }) {
   return <div style={S.h2}>{children}</div>;
 }
-export function H3({ children }: { children: ReactNode }) {
-  return <div style={S.h3}>{children}</div>;
+export function H3({ children, onClick }: { children: ReactNode; onClick?: () => void }) {
+  return <div style={{ ...S.h3, ...(onClick ? { cursor: "pointer" } : {}) }} onClick={onClick}>{children}</div>;
 }
 
 export function Select({

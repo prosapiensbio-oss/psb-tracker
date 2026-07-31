@@ -102,6 +102,26 @@ export async function saveVzasSetting(key: string, value: unknown): Promise<bool
   return r.ok;
 }
 
+export type BtcReserve = {
+  sats: number;
+  czk: number | null;
+  rateCzkPerBtc: number | null;
+  rateUpdatedAt: string | null;
+  goalSats: number | null;
+  generatedAt: string;
+};
+
+export async function fetchBtcReserve(): Promise<BtcReserve | null> {
+  try {
+    const r = await fetch("/api/btc-reserve");
+    if (!r.ok) return null;
+    const j = (await r.json()) as { ok?: boolean; reserve?: BtcReserve };
+    return j.ok && j.reserve ? j.reserve : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function saveLead(lead: Partial<Lead> & { id?: string; remove?: boolean }): Promise<string | null> {
   const r = await post("/api/leads", lead);
   if (!r.ok) return null;

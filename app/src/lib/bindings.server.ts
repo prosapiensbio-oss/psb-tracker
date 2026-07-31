@@ -26,6 +26,8 @@ type AppEnv = {
   APP_SLUG?: string;
   // AI assistant — Anthropic API key, set as a Higgsfield secret (server-only).
   ANTHROPIC_API_KEY?: string;
+  // Shared read-only token for the PSB Bitcoin app's /api/reserve endpoint.
+  BTC_RESERVE_TOKEN?: string;
 };
 
 export function bindings(): AppEnv {

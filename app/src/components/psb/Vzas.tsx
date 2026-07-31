@@ -1,13 +1,15 @@
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 
-import { fetchMonthNotes, fetchVzasSettings, fetchWeekEntries, saveMonthNote, saveVzasSetting, type MonthNote, type WeekEntry } from "../../lib/psb/client";
+import { fetchBtcReserve, fetchMonthNotes, fetchVzasSettings, fetchWeekEntries, saveMonthNote, saveVzasSetting, type BtcReserve, type MonthNote, type WeekEntry } from "../../lib/psb/client";
 import { fmtCZK } from "../../lib/psb/format";
 import { C, mix, S } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import {
   CURRENT_ERA,
   DEBT_CHECKPOINT_2026,
+  JAREK_OBNOVA,
   JAREK_SPLATKY,
+  JAREK_ZLAVA_ROCNE,
   JAREK_VKLADY,
   PNL,
   PRIJMY,
@@ -24,6 +26,7 @@ import {
   answerKey,
   eraAt,
   itemNote,
+  VZAS_MONTHS,
   VZAS_MONTH_LABELS,
   VZAS_TARGETS,
   KPI_GROUP_LABELS,
@@ -68,7 +71,7 @@ const RANGES = [
   { value: "custom", label: "Vlastné" },
 ];
 
-function useRange(initial = "all") {
+function useRange(initial = "2026") {
   const [win, setWin] = useState(initial);
   const [from, setFrom] = useState(0);
   const [to, setTo] = useState(MONTHS.length - 1);
@@ -246,6 +249,7 @@ function SignedBars({ data, fmt, height = 190, posColor = C.accent, negColor = C
 // Break-even uses NÁROK, not Poslané: what the firm must earn is what the
 // founders are owed. Anything drawn above that is a loan, not a cost.
 function HealthCard({ idx }: { idx: number[] }) {
+  const [open, setOpen] = useState(true);
   const p = pnlCalc();
   const j = salaryCalc("jerry");
   const t = salaryCalc("terezka");
@@ -270,9 +274,11 @@ function HealthCard({ idx }: { idx: number[] }) {
 
   return (
     <Card>
-      <H3>
+      <H3 onClick={() => setOpen(!open)}>
+        <span style={{ display: "inline-block", width: 15, color: C.textDim, fontSize: 9 }}>{open ? "▼" : "▶"}</span>
         <Info text="Tri čísla, ktoré hovoria, ako pevne firma stojí. Break-even ráta s NÁROKOM trénerov (Fix + variabil), nie s tým, čo si reálne vzali — to, čo si niekto vezme navyše, je pôžička, nie náklad." label="Break-even & zdravie firmy" />
       </H3>
+      {open && (<>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, margin: "12px 0 4px" }}>
         <StatCard value={fmtCZK(beAvg)} label={<Info text="Koľko musíte mesačne zarobiť, aby ste pokryli prevádzku aj nároky na výplaty. Pod týmto číslom je mesiac stratový." label="Break-even / mesiac" />} color={C.orange} />
         <StatCard value={`${rezerva > 0 ? "+" : ""}${rezerva.toFixed(1)} %`} label={<Info text="O koľko % sú priemerné tržby nad break-even. Malá rezerva = jeden slabý mesiac stačí na stratu." label="Rezerva nad break-even" />} color={rezerva >= 20 ? C.green : rezerva >= 0 ? C.orange : C.red} />
@@ -292,6 +298,7 @@ function HealthCard({ idx }: { idx: number[] }) {
         alignEnd
       />
       <div style={{ fontSize: 11, color: C.textDim, marginTop: 6 }}>Kde je zelená pod oranžovou, mesiac nezarobil ani na vlastnú prevádzku a výplaty.</div>
+      </>)}
     </Card>
   );
 }
@@ -858,12 +865,14 @@ function SalaryTab() {
   return (
     <>
       <Card>
-        <div onClick={() => setChartOpen(!chartOpen)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", cursor: "pointer" }}>
-          <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <div onClick={() => setChartOpen(!chartOpen)} style={{ fontSize: 15, fontWeight: 700, color: C.text, cursor: "pointer" }}>
             <span style={{ display: "inline-block", width: 15, color: C.textDim, fontSize: 9 }}>{chartOpen ? "▼" : "▶"}</span>
             Vývoj výplat v čase
           </div>
-          {chartOpen && <div onClick={(e) => e.stopPropagation()}><RangeBar r={r} /></div>}
+          {/* The filter drives the whole tab, so it stays reachable even with
+              the chart rolled up. */}
+          <RangeBar r={r} />
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginTop: 12 }}>
@@ -979,6 +988,8 @@ function CashflowTab() {
         </div>
       </Card>
 
+      <ReserveCard idx={idx} />
+
       <Card>
         <H3>Kumulatívna hotovosť</H3>
         <LineChart
@@ -1027,6 +1038,53 @@ function CashflowTab() {
   );
 }
 
+// ── Rezerva ──────────────────────────────────────────────────────────────────
+// The reserve is not a P&L line — it is what the studio has, not what it earned.
+// It lives in the Bitcoin app; this reads it live so nobody retypes two numbers.
+// Measured in months of operating cost, because "178 000 Kč" means nothing until
+// you know it buys about one month.
+function ReserveCard({ idx }: { idx: number[] }) {
+  const [res, setRes] = useState<BtcReserve | null>(null);
+  const [stav, setStav] = useState<"load" | "ok" | "err">("load");
+  useEffect(() => { fetchBtcReserve().then((r) => { setRes(r); setStav(r ? "ok" : "err"); }); }, []);
+
+  const p = pnlCalc();
+  const j = salaryCalc("jerry");
+  const t = salaryCalc("terezka");
+  const beMes = idx.length ? idx.reduce((a, i) => a + p.bezVyplat[i] + j.narok[i] + t.narok[i] + p.matyas[i], 0) / idx.length : 0;
+  const czk = res?.czk ?? 0;
+  const mesiace = beMes > 0 ? czk / beMes : 0;
+  const cielKc = 120000; // "Rezerva 120 000 Kč+" z Cieľov 2026
+  const goalPct = res?.goalSats ? (res.sats / res.goalSats) * 100 : null;
+
+  return (
+    <Card>
+      <H3><Info text="Bitcoinová rezerva sa načítava priamo z appky PSB Bitcoin (len na čítanie). Nie je to príjem ani náklad, preto nie je v P&L — je to majetok. Prepočet na mesiace používa break-even za zvolené obdobie, teda vrátane nárokov na výplaty." label="Rezerva" /></H3>
+      {stav === "load" && <div style={{ fontSize: 12.5, color: C.textDim }}>Načítavam z BTC appky…</div>}
+      {stav === "err" && <Empty>BTC appka je nedostupná — skús to o chvíľu.</Empty>}
+      {stav === "ok" && res && (
+        <>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12 }}>
+            <StatCard value={fmtCZK(czk)} label={<Info text={`${res.sats.toLocaleString("sk-SK")} sats pri kurze ${fmtCZK(res.rateCzkPerBtc ?? 0)} / BTC.`} label="Hodnota rezervy" />} color={C.orange} />
+            <StatCard value={`${mesiace.toFixed(1)} mes.`} label={<Info text={`Koľko mesiacov prevádzky rezerva pokryje pri break-even ${fmtCZK(beMes)}/mes.`} label="Mesiacov prevádzky" />} color={mesiace >= 3 ? C.green : mesiace >= 1 ? C.orange : C.red} />
+            <StatCard value={`${Math.round((czk / cielKc) * 100)} %`} label={<Info text="Cieľ „Rezerva 120 000 Kč+“ z Cieľov 2026. Splnený je — ale v bitcoine, nie v hotovosti." label="Cieľ 120 000 Kč" />} color={czk >= cielKc ? C.green : C.orange} />
+            {goalPct != null && (
+              <StatCard value={`${Math.round(goalPct)} %`} label={<Info text={`Cieľ z BTC appky: ${(res.goalSats ?? 0).toLocaleString("sk-SK")} sats.`} label="Cieľ v satoshi" />} color={C.blue} />
+            )}
+          </div>
+          <div style={{ marginTop: 12, padding: "10px 14px", borderRadius: 10, background: mix(C.orange, 10), border: `1px solid ${mix(C.orange, 30)}`, fontSize: 12.5, color: C.text, lineHeight: 1.55 }}>
+            Rezerva v bitcoine nie je to isté ako rezerva v hotovosti: o mesiac môže byť o tretinu nižšia — a pravdepodobne práve vtedy, keď ju budeš potrebovať.
+            Preto ju čítaj ako <b>{mesiace.toFixed(1)} mesiaca prevádzky pri dnešnom kurze</b>, nie ako pevnú sumu.
+          </div>
+          <div style={{ fontSize: 11, color: C.textDim, marginTop: 8 }}>
+            Kurz aktualizovaný {res.rateUpdatedAt ? new Date(res.rateUpdatedAt).toLocaleString("sk-SK") : "—"} · zdroj: appka PSB Bitcoin
+          </div>
+        </>
+      )}
+    </Card>
+  );
+}
+
 // ── Jarek ────────────────────────────────────────────────────────────────────
 function JarekTab() {
   const [kanalyOpen, setKanalyOpen] = useState(false);
@@ -1045,10 +1103,10 @@ function JarekTab() {
   const paceRecent = avg(jk.splatkySpolu.slice(-3));
   const paceCash = avg(cashVals);
   const paceSofia = avg(sofiaVals);
-  // The 20 % discount was a one-off in jan 2025 and will never repeat, so it has
-  // no business in a forward-looking pace — it made the payoff look ~6 months
-  // closer than it is.
-  const paceOpak = avg(jk.splatkySpolu.map((v, i) => v - zlavaVals[i]));
+  // The 20 % discount repeats every year when Jarek renews, so it belongs in a
+  // forward-looking pace — but spread over twelve months, not left sitting in
+  // whichever month it happened to land in.
+  const paceOpak = avg(jk.splatkySpolu.map((v, i) => v - zlavaVals[i])) + JAREK_ZLAVA_ROCNE / 12;
   const vkladySpolu = vSum(jk.vklady);
   const MN = ["jan", "feb", "mar", "apr", "máj", "jún", "júl", "aug", "sep", "okt", "nov", "dec"];
   const monthName = (add: number) => {
@@ -1094,6 +1152,12 @@ function JarekTab() {
           Sofia nie je horší spôsob splácania, je iný: hodnotu dodávaš a dlh reálne klesá, len z toho nepríde hotovosť.
           Cena nie sú peniaze, ale <b>kapacita</b> — sú to hodiny, ktoré sa nedajú predať niekomu inému.
           Jediná páka na zrýchlenie je preto fix splátka, nie Sofia.
+        </div>
+        <div style={{ marginTop: 10, padding: "10px 14px", borderRadius: 10, background: mix(C.orange, 10), border: `1px solid ${mix(C.orange, 30)}`, fontSize: 12.5, color: C.text, lineHeight: 1.55 }}>
+          <b>Obnova {new Date(JAREK_OBNOVA.datum).toLocaleDateString("sk-SK")}</b> — Jarek si znova predplatil ročné členstvo ({fmtCZK(JAREK_OBNOVA.platba)}),
+          takže 20 % zľava sa opakuje. Suma za tento rok ale nie je nikde zapísaná, preto ju v stave dlhu zatiaľ nemám —
+          <b> dlh je o ňu nižší, než ukazuje</b>. Daj mi číslo a doplním ho. V odhade splatenia s ňou už rátam ({fmtCZK(JAREK_ZLAVA_ROCNE / 12)}/mes,
+          podľa poslednej zapísanej zľavy {fmtCZK(JAREK_ZLAVA_ROCNE)}).
         </div>
       </Card>
 
@@ -1330,14 +1394,19 @@ function GroupedBars({ data, height = 250 }: { data: { label: string; prijmy: nu
 // Costs split by how predictable they are: záväzné barely move (contracts, the
 // state), voliteľné and revenue swing — so each gets the averaging it deserves,
 // and the range comes from the spread of recent months rather than a guess.
-function ForecastCard() {
+function ForecastCard({ idx }: { idx: number[] }) {
+  const [open, setOpen] = useState(true);
   const p = pnlCalc();
   const b = byCommitment();
   const zav = commitmentTotal(b.zavazne);
   const vol = commitmentTotal(b.volitelne);
   const nep = commitmentTotal(b.neprevadzkove);
-  const last = <T,>(a: T[], n: number) => a.slice(-n);
-  const m3 = (v: Vals) => avg(last(v, 3));
+  // The forecast reads the LAST three months of the chosen period, and the wide
+  // average over that same period — so switching to 2025 forecasts 2025's
+  // trajectory instead of quietly mixing it with today's.
+  const win = idx.length ? idx : [];
+  const m3 = (v: Vals) => avg(win.slice(-3).map((i) => v[i]));
+  const mAll = (v: Vals) => avg(win.map((i) => v[i]));
 
   // Záväzné + výplaty are the stable core; voliteľné and tržby are the movers.
   const zavF = m3(zav);
@@ -1347,7 +1416,7 @@ function ForecastCard() {
   const nakladyF = zavF + volF + vyplF + nepF;
 
   const trzby3 = m3(p.prijmy);
-  const trzby6 = avg(p.prijmy);
+  const trzby6 = mAll(p.prijmy);
   const trzbyLo = Math.min(trzby3, trzby6);
   const trzbyHi = Math.max(trzby3, trzby6);
   const ziskStred = trzby3 - nakladyF;
@@ -1355,16 +1424,21 @@ function ForecastCard() {
   const ziskHi = trzbyHi - nakladyF;
 
   const MN = ["jan", "feb", "mar", "apr", "máj", "jún", "júl", "aug", "sep", "okt", "nov", "dec"];
+  // Forecast the months that follow the END of the chosen period.
+  const lastIdx = win.length ? win[win.length - 1] : VZAS_MONTHS.length - 1;
+  const [ly, lm] = VZAS_MONTHS[lastIdx].split("-").map(Number);
   const nextMonths = [1, 2, 3].map((k) => {
-    const d = new Date(2026, 5 + k, 1);
+    const d = new Date(ly, lm - 1 + k, 1);
     return `${MN[d.getMonth()]} ${String(d.getFullYear()).slice(2)}`;
   });
 
   return (
     <Card>
-      <H3>
+      <H3 onClick={() => setOpen(!open)}>
+        <span style={{ display: "inline-block", width: 15, color: C.textDim, fontSize: 9, cursor: "pointer" }}>{open ? "▼" : "▶"}</span>
         <Info text="Výhľad z histórie, nie z prianí. Náklady sa rátajú po zložkách: záväzné a výplaty sú stabilné (priemer 3 mes.), voliteľné kolíšu. Rozpätie zisku vychádza z rozdielu medzi 3- a 6-mesačným priemerom tržieb — čím sú tržby nevyrovnanejšie, tým je pásmo širšie. Nezohľadňuje sezónnosť ani jednorazové platby (napr. ročný hosting)." label="Výhľad na ďalšie 3 mesiace" />
       </H3>
+      {open && (<>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, margin: "12px 0 6px" }}>
         <StatCard value={fmtCZK(trzby3)} label="Očak. tržby / mes." color={C.green} />
         <StatCard value={fmtCZK(nakladyF)} label="Očak. náklady / mes." color={C.red} />
@@ -1378,7 +1452,7 @@ function ForecastCard() {
       </div>
       <LineChart
         data={[
-          ...MONTHS.map((m, i) => ({ label: m, values: [p.prijmy[i], p.celkoveNaklady[i]] })),
+          ...win.map((i) => ({ label: MONTHS[i], values: [p.prijmy[i], p.celkoveNaklady[i]] })),
           ...nextMonths.map((m) => ({ label: `${m} ⌁`, values: [trzby3, nakladyF] })),
         ]}
         series={[{ name: "Tržby", color: C.green }, { name: "Náklady", color: C.red }]}
@@ -1388,6 +1462,7 @@ function ForecastCard() {
         alignEnd
       />
       <div style={{ fontSize: 11, color: C.textDim, marginTop: 6 }}>Posledné tri body (⌁) sú odhad, nie skutočnosť.</div>
+      </>)}
     </Card>
   );
 }
@@ -1580,16 +1655,19 @@ function MesacneTab() {
 
   return (
     <>
-      <HealthCard idx={idx} />
-      <ForecastCard />
-      <EnergyTrendCard idx={idx} />
-
+      {/* One filter at the top drives everything below it — break-even, výhľad,
+          energiu aj tabuľku. Mať ho v polovici stránky znamenalo, že prvé dve
+          karty ticho ukazovali iné obdobie než zvyšok. */}
       <Card>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-          <H3><Info text="Vyber ukazovateľ a obdobie — graf, priemer aj najlepší/najhorší mesiac sa prepočítajú." label="Mesačné výsledky" /></H3>
+          <H3><Info text="Vyber obdobie a ukazovateľ — prepočíta sa všetko na tejto stránke: break-even, výhľad, grafy aj tabuľka." label="Obdobie" /></H3>
           <RangeBar r={r} extra={<Select value={metric} onChange={setMetric} options={METRICS} />} />
         </div>
       </Card>
+
+      <HealthCard idx={idx} />
+      <ForecastCard idx={idx} />
+      <EnergyTrendCard idx={idx} />
 
       {/* Príjmy/náklady are two sides of one comparison — show them together with
           the gap in %. Zisk/marža stand alone, so they keep the signed bars. */}
@@ -1800,9 +1878,11 @@ function KpiTab({ data }: { data: PSBData }) {
       return next;
     });
   };
+  const [rezerva, setRezerva] = useState<number | null>(null);
+  useEffect(() => { fetchBtcReserve().then((r) => setRezerva(r?.czk ?? null)); }, []);
   const kpis = useMemo(
-    () => computeKpis(year, data.sessions, data.payments, overrides),
-    [year, data.sessions, data.payments, overrides],
+    () => computeKpis(year, data.sessions, data.payments, overrides, rezerva),
+    [year, data.sessions, data.payments, overrides, rezerva],
   );
   const groups: KpiGroup[] = ["peniaze", "lievik", "kapacita", "cena"];
   const mimo = kpis.filter((k) => k.status === "mimo");

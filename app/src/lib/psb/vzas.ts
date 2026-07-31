@@ -307,6 +307,15 @@ export const RECORDED_DEBT: Record<PersonKey, { pozicka: Vals; splatka: Vals }> 
 
 // Jarek (external investor): fix repayment is BOTH a P&L cost and a debt
 // operation; "Sofia" is forgone revenue (never a bank transaction).
+// The 20 % discount is NOT a one-off: Jarek renews his annual membership every
+// year (2025-01-22, then 2026-06-23) and the discount is credited against the
+// debt each time. The 2026 renewal is confirmed by his 54 600 Kč payment on
+// 23.6.2026, but the koruna amount of the discount was never written down —
+// so it stays 0 in the ledger until Jerry confirms it, and the payoff estimate
+// carries it as a recurring yearly item instead of pretending it stopped.
+export const JAREK_ZLAVA_ROCNE = 16880; // last recorded amount (jan 2025)
+export const JAREK_OBNOVA = { datum: "2026-06-23", platba: 54600, mesiacIdx: 17 };
+
 export const JAREK_SPLATKY: Record<string, Vals> = {
   "Fix splátka (P&L náklad)": [0, 8000, 4000, 4000, 4000, 0, 0, 4000, 4000, 4000, 4000, 4000, 5000, 5000, 5000, 5000, 5000, 0],
   "Sofia (vzdaná tržba)": [6850, 0, 6850, 0, 6850, 0, 0, 6850, 0, 6850, 0, 0, 7790, 0, 7790, 7790, 0, 0],
@@ -691,6 +700,7 @@ const KPI_COMMON: KpiDef[] = [
   { id: "hodiny", label: "Individuálne hodiny", unit: "h", group: "kapacita", annual: true, why: "Odtrénované hodiny bez úvodných — optimum bez vyhorenia." },
   { id: "dlzka", label: "Priemerná dĺžka spolupráce", unit: "num", group: "kapacita", lo: 12, navrh: true, why: "Koľko mesiacov klient v priemere zostane. V štúdiu rozhoduje o tržbách viac než počet nových — jeden mesiac navyše u každého klienta je lacnejší než celý nový lievik. Číslo je orezané dĺžkou histórie, takže je to spodná hranica." },
   { id: "hodinovka", label: "Priemerná hodinovka", unit: "czk", group: "cena", why: "Tržby delené odtrénovanými hodinami — základ pre 20 % maržu." },
+  { id: "rezervaMes", label: "Rezerva v mesiacoch prevádzky", unit: "num", group: "peniaze", lo: 3, navrh: true, why: "Koľko mesiacov by firma ustála bez jedinej tržby. Počíta sa z bitcoinovej rezervy delenej break-evenom. Tvoj cieľ „Rezerva 120 000 Kč+“ je v korunách; toto je to isté číslo prepočítané na čas, čo je jediné, čo v zlom mesiaci naozaj rozhoduje." },
   { id: "ltv", label: "Hodnota klienta (LTV)", unit: "czk", group: "cena", lo: 30000, navrh: true, why: "Koľko za celý čas spolupráce klient v priemere zaplatí. S týmto číslom sa dá povedať, koľko sa oplatí zaplatiť za získanie jedného klienta." },
 ];
 
@@ -844,7 +854,7 @@ type PaymentLike = { date: string; amount: number };
 
 // Everything here is derived from the Tracker's own data (PTminder), not from
 // the Excel — the Excel is an archive from 2026-07-31 on.
-export function computeKpis(year: string, sessions: SessionLike[], payments: PaymentLike[], overrides?: KpiOverrides): KpiActual[] {
+export function computeKpis(year: string, sessions: SessionLike[], payments: PaymentLike[], overrides?: KpiOverrides, rezervaCzk?: number | null): KpiActual[] {
   const inYear = sessions.filter((s) => s.date.slice(0, 4) === year);
   const months = new Set(inYear.map((s) => s.date.slice(0, 7)));
   const nMonths = months.size || 1;
@@ -906,6 +916,8 @@ export function computeKpis(year: string, sessions: SessionLike[], payments: Pay
     trzby, marza, rezerva, uvodne: uvodne.length, uspesnost, aktivni, hodiny,
     hodinKlient: hodiny / klienti, hodinovka: hodiny > 0 ? trzby / hodiny : 0,
     online: hodnota > 0 ? (onlineHodnota / hodnota) * 100 : 0, dlzka, ltv,
+    // Reserve comes from the Bitcoin app; without it the row shows 0 and says so.
+    rezervaMes: rezervaCzk && be > 0 ? rezervaCzk / (be / idx.length) : 0,
   };
 
   const vzasWindow = `${VZAS_MONTH_LABELS[idx[0]]} – ${VZAS_MONTH_LABELS[idx[idx.length - 1]]}`;
@@ -928,7 +940,8 @@ export function computeKpis(year: string, sessions: SessionLike[], payments: Pay
       : def.hi ? `${def.lo}–${def.hi}` : `≥ ${def.lo}`;
     const status: KpiActual["status"] =
       target == null ? "info" : value >= target ? "ok" : value >= target * 0.85 ? "blizko" : "mimo";
-    const window = def.id === "marza" || def.id === "rezerva" ? vzasWindow
+    const window = def.id === "rezervaMes" ? "dnes, z BTC appky"
+      : def.id === "marza" || def.id === "rezerva" ? vzasWindow
       : def.id === "dlzka" || def.id === "ltv" ? "celá história"
       : dataWindow;
     const extra = def.id === "rezerva" ? `${Math.round(rezervaKc).toLocaleString("sk-SK")} Kč / mes. nad break-even`
