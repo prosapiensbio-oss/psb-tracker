@@ -655,6 +655,7 @@ function DebtBox({ p }: { p: DebtPerson }) {
 // The debt screens showed a balance but never its direction. A balance alone
 // can't tell you whether things are getting better — the slope can.
 function DebtTrendCard({ idx }: { idx: number[] }) {
+  const [open, setOpen] = useState(false);
   // Only months under the current model can say anything about the direction:
   // a 2025 loan was a decision, not the output of a formula.
   const modelIdx = idx.filter((i) => i >= CURRENT_ERA.from);
@@ -671,9 +672,11 @@ function DebtTrendCard({ idx }: { idx: number[] }) {
   });
   return (
     <Card>
-      <H3>
+      <H3 onClick={() => setOpen(!open)}>
+        <span style={{ display: "inline-block", width: 15, color: C.textDim, fontSize: 9 }}>{open ? "▼" : "▶"}</span>
         <Info text="Zostatok dlhu sám o sebe nestačí — dôležitý je smer. Ø rozdiel za mesiac je sklon: kladný = dlh sa spláca, záporný = rastie. Strop je suma, pod ktorou musí mesačný výber zostať, aby dlh prestal rásť (= priemerný nárok). Smer aj scenáre sa rátajú len z mesiacov pod dnešným modelom (od sep 2025) — pôžička z éry 70/30 bola rozhodnutie, nie výstup vzorca." label="Kam smeruje dlh" />
       </H3>
+      {open && (
       <LineChart
         data={idx.map((i) => ({ label: MONTHS[i], values: [salaryCalc("jerry").cumDebt[i], salaryCalc("terezka").cumDebt[i]] }))}
         series={[{ name: "Jerry", color: C.accent }, { name: "Terezka", color: C.blue }]}
@@ -683,11 +686,13 @@ function DebtTrendCard({ idx }: { idx: number[] }) {
         autoY
         alignEnd
       />
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12, marginTop: 14 }}>
         {people.map((p) => <DebtBox key={p.k} p={p} />)}
       </div>
 
+      {open && (
       <div style={{ marginTop: 18 }}>
         <H3><Info text="Dlh sa dá otočiť dvoma pákami: odrobiť viac hodín (rastie nárok) alebo si posielať menej (klesá výber). Tabuľka ukazuje prvú páku — koľko hodín mesačne by bolo treba pri nezmenenom výbere. V zátvorke je druhá páka: o koľko si menej poslať, ak hodiny ostanú rovnaké." label="Čo by to chcelo" /></H3>
         <ScrollX>
@@ -743,6 +748,7 @@ function DebtTrendCard({ idx }: { idx: number[] }) {
           majú na dlh rovnaký účinok — dá sa to aj kombinovať.
         </div>
       </div>
+      )}
     </Card>
   );
 }
@@ -950,11 +956,11 @@ function SalaryTab() {
         )}
       </Card>
 
-      {/* History of the model sits below the month-to-month numbers: it is
-          context, not something Jerry acts on every month. */}
-      <EraCard />
-
       <DebtTrendCard idx={idx} />
+
+      {/* Dead last on purpose: how the model changed in 2025 is history, and
+          nothing on the payouts screen is decided by it. */}
+      <EraCard />
     </>
   );
 }
@@ -1980,6 +1986,9 @@ function CieleTab({ data }: { data: PSBData }) {
   const [ciele, setCiele] = useState<Goal[]>(SEED_CIELE);
   const [loaded, setLoaded] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
+  // A goal you just created has no priority or deadline yet, so the normal sort
+  // would bury it somewhere in the middle — pin it to the top until reload.
+  const [novyId, setNovyId] = useState<string | null>(null);
   const [filterStav, setFilterStav] = useState<"vsetky" | GoalStav>("vsetky");
 
   useEffect(() => {
@@ -2002,7 +2011,9 @@ function CieleTab({ data }: { data: PSBData }) {
       stav: "nezacate", priorita: "stredna", dalsiKrok: "",
     };
     persist([g, ...ciele]);
+    setNovyId(g.id);
     setOpenId(g.id);
+    setFilterStav("vsetky");
   };
   const zmaz = (id: string) => persist(ciele.filter((g) => g.id !== id));
 
@@ -2013,6 +2024,7 @@ function CieleTab({ data }: { data: PSBData }) {
   const vidiel = filterStav === "vsetky" ? ciele : ciele.filter((g) => g.stav === filterStav);
   const poradie: Record<GoalPriorita, number> = { vysoka: 0, stredna: 1, nizka: 2 };
   const zoradene = [...vidiel].sort((a, b) =>
+    (b.id === novyId ? 1 : 0) - (a.id === novyId ? 1 : 0) ||
     (a.stav === "hotove" || a.stav === "zrusene" ? 1 : 0) - (b.stav === "hotove" || b.stav === "zrusene" ? 1 : 0) ||
     poradie[a.priorita] - poradie[b.priorita] ||
     (a.termin ?? "9999").localeCompare(b.termin ?? "9999"));
