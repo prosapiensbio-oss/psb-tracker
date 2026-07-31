@@ -1118,7 +1118,7 @@ function JarekTab() {
   const scenarios = [
     { label: "Tempo, ktoré sa opakuje", p: paceOpak },
     { label: "Posledné 3 mesiace", p: paceRecent },
-    { label: "Celé obdobie (aj s jednorazovou zľavou)", p: pace },
+    { label: "Len zapísané splátky (bez tohtoročnej zľavy)", p: pace },
   ].map((s) => ({ ...s, m: s.p > 0 ? Math.ceil(Math.abs(last) / s.p) : null }));
   const cell = { textAlign: "right" as const, padding: "5px 8px", fontSize: 12, fontVariantNumeric: "tabular-nums" as const, whiteSpace: "nowrap" as const };
 
@@ -1148,7 +1148,7 @@ function JarekTab() {
         </div>
         <div style={{ fontSize: 11.5, color: C.textMuted, marginTop: 10, lineHeight: 1.55 }}>
           Skladba splátky: <b>{fmtCZK(paceCash)}</b>/mes v hotovosti + <b>{fmtCZK(paceSofia)}</b>/mes Sofia (odtrénované, nefakturované)
-          {vSum(zlavaVals) > 0 && <> + jednorazová 20 % zľava {fmtCZK(vSum(zlavaVals))} v jan 25, ktorá sa už nezopakuje</>}.
+          {vSum(zlavaVals) > 0 && <> + 20 % zľava pri každoročnej obnove členstva ({fmtCZK(JAREK_ZLAVA_ROCNE)}, teda {fmtCZK(JAREK_ZLAVA_ROCNE / 12)}/mes)</>}.
           Sofia nie je horší spôsob splácania, je iný: hodnotu dodávaš a dlh reálne klesá, len z toho nepríde hotovosť.
           Cena nie sú peniaze, ale <b>kapacita</b> — sú to hodiny, ktoré sa nedajú predať niekomu inému.
           Jediná páka na zrýchlenie je preto fix splátka, nie Sofia.
