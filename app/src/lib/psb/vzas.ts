@@ -716,7 +716,9 @@ const KPI_YEAR_TARGETS: Record<string, Record<string, { lo?: number; hi?: number
 // Two 2026-only KPIs from his sheet — they had no meaning in 2025 (no online
 // service existed) but they are his, so they show up when the year has them.
 const KPI_EXTRA: KpiDef[] = [
-  { id: "hodinKlient", label: "Priemer hodín na klienta", unit: "h", group: "kapacita", why: "Ročné hodiny delené počtom klientov — stabilnejší cashflow než veľa ľudí občas." },
+  // Annual, like his sheet: 25 h per client is a YEAR's worth, so a seven-month
+  // figure has to be judged against seven twelfths of it.
+  { id: "hodinKlient", label: "Priemer hodín na klienta", unit: "h", group: "kapacita", annual: true, why: "Ročné hodiny delené počtom klientov — stabilnejší cashflow než veľa ľudí občas." },
   { id: "online", label: "Online podiel", unit: "pct", group: "cena", why: "Podiel online tréningov na hodnote odtrénovaného — decentralizácia rizika." },
 ];
 
