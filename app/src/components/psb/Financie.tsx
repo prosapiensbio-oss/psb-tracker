@@ -27,7 +27,6 @@ export function Financie({ data, clients, focus }: { data: PSBData; clients: Rec
         tabs={[
           { id: "zarobky", label: "Mesačné zárobky" },
           { id: "trzby", label: "Tržby (prijaté)" },
-          { id: "cashflow", label: "Cashflow" },
           { id: "sedenia", label: "Sedenia & cena" },
           { id: "predikcia", label: "Predikcia" },
         ]}
@@ -36,7 +35,6 @@ export function Financie({ data, clients, focus }: { data: PSBData; clients: Rec
       />
       {sub === "trzby" && <Trzby monthly={monthly} />}
       {sub === "zarobky" && <Zarobky monthly={monthly} focusMonth={focusMonth} onClearFocus={() => setFocusMonth(null)} />}
-      {sub === "cashflow" && <Cashflow monthly={monthly} />}
       {sub === "sedenia" && <Sedenia monthly={monthly} />}
       {sub === "predikcia" && <Predikcia data={data} clients={clients} />}
     </>
@@ -283,48 +281,6 @@ function Trzby({ monthly }: { monthly: Monthly }) {
         {!monthly.length && <Empty>Nahraj Payments Recorded CSV.</Empty>}
       </Card>
     </>
-  );
-}
-
-function Cashflow({ monthly }: { monthly: Monthly }) {
-  const w = useMonthWindow();
-  const shown = windowFilter(monthly, w.win, w.from, w.to);
-  const max = Math.max(1, ...shown.map((m) => Math.max(m.revenue, m.cash)));
-  const totals = shown.reduce((a, m) => ({ cash: a.cash + m.cash, rev: a.rev + m.revenue }), { cash: 0, rev: 0 });
-  const diff = totals.cash - totals.rev;
-  return (
-    <Card>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-        <H3>
-          <Info text="Prijaté platby = peniaze reálne prijaté (report Payments Recorded). Vyfakturované zárobky = hodnota odtrénovaných sedení (Payroll by Session)." label="Cashflow — prijaté platby vs. zárobky" />
-        </H3>
-        <RangeControls w={w} monthly={monthly} />
-      </div>
-      <div style={{ padding: "10px 12px", marginTop: 10, marginBottom: 14, borderRadius: 8, background: diff >= 0 ? C.greenBg : C.orangeBg, fontSize: 13, color: C.text }}>
-        {diff >= 0
-          ? `Za zvolené obdobie ste prijali o ${fmtCZK(diff)} viac, než vyfakturovali → klienti platia dopredu (kredit na balíčkoch).`
-          : `Za zvolené obdobie ste vyfakturovali o ${fmtCZK(-diff)} viac, než prijali → klienti čerpajú z vopred zaplatených balíčkov.`}
-      </div>
-      {shown.length > 0 && (
-        <div style={{ marginBottom: 16 }}>
-          <LineChart
-            data={shown.map((m) => ({ label: monthLabel(m.month), values: [m.revenue, m.cash] }))}
-            series={[{ name: "Vyfakturované zárobky", color: C.accent }, { name: "Prijaté platby", color: C.blue }]}
-            height={210}
-            fmt={(n) => `${Math.round(n / 1000)}k`}
-          />
-        </div>
-      )}
-      <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 8 }}>Detail po mesiacoch:</div>
-      {shown.map((m) => (
-        <div key={m.month} style={{ marginBottom: 14 }}>
-          <div style={{ fontSize: 12, color: C.text, marginBottom: 4 }}>{monthLabel(m.month)}</div>
-          <BarRow label="Vyfakturované zárobky" value={m.revenue} max={max} color={C.accent} sub={fmtCZK(m.revenue)} />
-          <BarRow label="Prijaté platby" value={m.cash} max={max} color={C.blue} sub={fmtCZK(m.cash)} />
-        </div>
-      ))}
-      {!monthly.length && <Empty>Nahraj Payroll by Session + Payments Recorded CSV.</Empty>}
-    </Card>
   );
 }
 

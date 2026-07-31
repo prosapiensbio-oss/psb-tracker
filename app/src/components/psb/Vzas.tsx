@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 
-import { fetchMonthNotes, saveMonthNote, type MonthNote } from "../../lib/psb/client";
+import { fetchMonthNotes, fetchWeekEntries, saveMonthNote, type MonthNote, type WeekEntry } from "../../lib/psb/client";
 import { fmtCZK } from "../../lib/psb/format";
 import { C, mix, S } from "../../lib/psb/theme";
 import {
@@ -10,9 +10,6 @@ import {
   PRIJMY,
   SALARY,
   SPOLOCNE,
-  ENERGY_HOURS,
-  ENERGY_NOTE,
-  ENERGY_SCORE,
   MONTH_QUESTIONS,
   SEED_ANSWERS,
   SEED_NOTES,
@@ -797,6 +794,89 @@ function SalaryTab() {
   );
 }
 
+// ── Cashflow ─────────────────────────────────────────────────────────────────
+// The Tracker's old "Cashflow" compared vyfakturované vs prijaté — two views of
+// the SAME side. Real cashflow needs the outgoing side too, which only VZAS has.
+// Non-cash lines are excluded: "Fond na náradie" is a transfer to/from a
+// reserve, not money leaving the business.
+function CashflowTab() {
+  const p = pnlCalc();
+  const r = useRange();
+  const idx = r.idx;
+  const fond = PNL.fixne.subcategories.prevadzka.items.fondNaradie.values;
+  const out = MONTHS.map((_, i) => p.celkoveNaklady[i] - fond[i]); // fond isn't cash out
+  const net = MONTHS.map((_, i) => p.prijmy[i] - out[i]);
+  const cum: number[] = [];
+  net.forEach((v, i) => cum.push((i === 0 ? 0 : cum[i - 1]) + v));
+
+  const inSel = pick(p.prijmy, idx);
+  const outSel = pick(out, idx);
+  const netSel = pick(net, idx);
+  const cell = { textAlign: "right" as const, padding: "7px 10px", fontSize: 12.5, fontVariantNumeric: "tabular-nums" as const, whiteSpace: "nowrap" as const, borderBottom: `1px solid ${mix(C.border, 55)}` };
+
+  return (
+    <>
+      <Card>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+          <H3><Info text="Peniaze dnu vs peniaze von. Zatiaľ z Excelu (cash pohľad — PSB nie je platca DPH, takže náklad = výdavok). „Fond na náradie“ je vyňatý, lebo je to presun do rezervy, nie odliv. Po importe z banky sa to nahradí reálnymi bankovými pohybmi." label="Cashflow" /></H3>
+          <RangeBar r={r} />
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
+          <StatCard value={fmtCZK(vSum(inSel))} label={`Prišlo · ${idx.length} mes.`} color={C.green} />
+          <StatCard value={fmtCZK(vSum(outSel))} label="Odišlo" color={C.red} />
+          <StatCard value={fmtCZK(vSum(netSel))} label="Čistý tok" color={signColor(vSum(netSel))} />
+          <StatCard value={fmtCZK(avg(netSel))} label="Ø čistý tok / mes." color={signColor(avg(netSel))} />
+        </div>
+      </Card>
+
+      <Card>
+        <H3>Kumulatívna hotovosť</H3>
+        <LineChart
+          data={idx.map((i) => ({ label: MONTHS[i], values: [cum[i]] }))}
+          series={[{ name: "Kumulatívne", color: C.accent }]}
+          height={200}
+          fmt={(n) => `${Math.round(n / 1000)}k`}
+          refLine={{ value: 0, label: "nula", color: C.textDim }}
+          autoY
+          alignEnd
+        />
+        <div style={{ fontSize: 11.5, color: C.textMuted, marginTop: 8 }}>
+          Koľko hotovosti firma za sledované obdobie pridala alebo ubrala. Rastúca krivka = tvorí sa rezerva.
+        </div>
+      </Card>
+
+      <Card>
+        <H3>Mesačný tok</H3>
+        <SignedBars data={idx.map((i) => ({ label: MONTHS[i], value: net[i] }))} fmt={(n) => `${Math.round(n / 1000)}k`} height={200} />
+        <ScrollX>
+          <table style={{ ...tableStyle, minWidth: 560, marginTop: 12 }}>
+            <thead>
+              <tr style={{ borderBottom: `2px solid ${mix(C.accent, 35)}` }}>
+                <th style={{ textAlign: "left", padding: "8px 10px", fontSize: 11, color: C.textMuted, fontWeight: 600 }}>Mesiac</th>
+                <th style={{ ...cell, fontSize: 11, color: C.textMuted, fontWeight: 600, borderBottom: "none" }}>Prišlo</th>
+                <th style={{ ...cell, fontSize: 11, color: C.textMuted, fontWeight: 600, borderBottom: "none" }}>Odišlo</th>
+                <th style={{ ...cell, fontSize: 11, color: C.textMuted, fontWeight: 600, borderBottom: "none" }}>Čistý tok</th>
+                <th style={{ ...cell, fontSize: 11, color: C.textMuted, fontWeight: 600, borderBottom: "none", borderLeft: `1px solid ${C.border}` }}>Kumulatívne</th>
+              </tr>
+            </thead>
+            <tbody>
+              {idx.map((i) => (
+                <tr key={i}>
+                  <td style={{ padding: "7px 10px", fontSize: 12.5, color: C.text, borderBottom: `1px solid ${mix(C.border, 55)}` }}>{MONTHS[i]} 26</td>
+                  <td style={{ ...cell, color: C.green }}>{money(p.prijmy[i])}</td>
+                  <td style={{ ...cell, color: C.red }}>{money(out[i])}</td>
+                  <td style={{ ...cell, color: signColor(net[i]), fontWeight: 600 }}>{money(net[i])}</td>
+                  <td style={{ ...cell, color: signColor(cum[i]), borderLeft: `1px solid ${C.border}` }}>{money(cum[i])}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </ScrollX>
+      </Card>
+    </>
+  );
+}
+
 // ── Jarek ────────────────────────────────────────────────────────────────────
 function JarekTab() {
   const [kanalyOpen, setKanalyOpen] = useState(false);
@@ -1097,35 +1177,6 @@ function ForecastCard() {
 
 const PEOPLE: PersonKey[] = ["jerry", "terezka"];
 
-// Energy is inherently per-person: the slider, the estimate of hours worked
-// outside training (which the app can't see), and one sentence.
-function EnergyFields({ person, answers, setAnswers, field }: {
-  person: PersonKey; answers: Record<string, string>; setAnswers: (a: Record<string, string>) => void; field: React.CSSProperties;
-}) {
-  const kScore = answerKey(ENERGY_SCORE, person);
-  const kHours = answerKey(ENERGY_HOURS, person);
-  const kNote = answerKey(ENERGY_NOTE, person);
-  const score = Number(answers[kScore] ?? 7);
-  const col = score >= 7 ? C.green : score >= 4 ? C.orange : C.red;
-  const set = (k: string, v: string) => setAnswers({ ...answers, [k]: v });
-  return (
-    <>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 7 }}>
-        <input type="range" min={1} max={10} step={1} value={score} onChange={(e) => set(kScore, e.target.value)}
-          style={{ flex: "1 1 150px", accentColor: col }} />
-        <span style={{ fontSize: 15, fontWeight: 700, minWidth: 42, textAlign: "right", color: col, fontVariantNumeric: "tabular-nums" }}>{score} / 10</span>
-      </div>
-      <label style={{ fontSize: 11.5, color: C.textMuted, display: "flex", alignItems: "center", gap: 6, marginBottom: 7 }}>
-        Iné hodiny (mimo tréningov)
-        <input type="number" min={0} max={400} value={answers[kHours] ?? ""} onChange={(e) => set(kHours, e.target.value)}
-          placeholder="napr. 30" style={{ ...field, width: 86, padding: "4px 8px" }} />
-      </label>
-      <textarea value={answers[kNote] ?? ""} onChange={(e) => set(kNote, e.target.value)}
-        rows={(answers[kNote] ?? "").length > 80 ? 2 : 1} placeholder="jedna veta k energii…" style={{ ...field, padding: "6px 10px" }} />
-    </>
-  );
-}
-
 // Numbers say what happened; the note says why. Opens with an auto-computed
 // "what was different" list so the answer usually doesn't have to be recalled.
 function MonthNoteRow({ mi, colSpan, notes, onSaved }: {
@@ -1187,22 +1238,9 @@ function MonthNoteRow({ mi, colSpan, notes, onSaved }: {
           {MONTH_QUESTIONS.map((q) => (
             <div key={q.id}>
               <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 5 }}>
-                {q.kind === "energy" ? (
-                  <Info text="Posuvník je subjektívna energia (1 = na dne, 10 = plná sila). Hodiny mimo tréningov sú odhad — appka pozná len odtrénované hodiny, takže bez tohto čísla sa energia nedá čítať poctivo. Zároveň ukazuje, koľko práce pre firmu mzdový model vôbec neplatí." label="Energia a záťaž" />
-                ) : q.q}
+                {q.q}
               </div>
-              {q.kind === "energy" ? (
-                // Energy keeps the two-column layout — slider, hours and a sentence each.
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12 }}>
-                  {PEOPLE.map((pk) => (
-                    <div key={pk} style={{ border: `1px solid ${C.border}`, borderRadius: 10, padding: "9px 11px", background: mix(C.accent, 4) }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: pk === "jerry" ? C.accent : C.blue, marginBottom: 6 }}>{SALARY[pk].label}</div>
-                      <EnergyFields person={pk} answers={answers} setAnswers={setAnswers} field={field} />
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                // One box per founder, stacked; the placeholder says whose it is.
+                              // One box per founder, stacked; the placeholder says whose it is.
                 <div style={{ display: "grid", gap: 6 }}>
                   {PEOPLE.map((pk) => (
                     <textarea
@@ -1214,7 +1252,6 @@ function MonthNoteRow({ mi, colSpan, notes, onSaved }: {
                       style={{ ...field, padding: "6px 10px" }} />
                   ))}
                 </div>
-              )}
             </div>
           ))}
         </div>
@@ -1235,6 +1272,61 @@ function MonthNoteRow({ mi, colSpan, notes, onSaved }: {
         </div>
       </td>
     </tr>
+  );
+}
+
+// Energy is logged weekly (Tréningy → Prehľad); here it is only averaged per
+// month, so nobody is asked the same question twice. "Iné hodiny" is summed —
+// it is the work the salary model never sees.
+function EnergyTrendCard() {
+  const [weeks, setWeeks] = useState<Record<string, WeekEntry>>({});
+  useEffect(() => { fetchWeekEntries().then(setWeeks); }, []);
+  const perMonth = useMemo(() => {
+    const acc: Record<string, { scores: Record<string, number[]>; hours: Record<string, number> }> = {};
+    for (const [wk, e] of Object.entries(weeks)) {
+      const m = wk.slice(0, 7);
+      const a = (acc[m] ||= { scores: { jerry: [], terezka: [] }, hours: { jerry: 0, terezka: 0 } });
+      for (const p of ["jerry", "terezka"] as const) {
+        const sc = Number(e[`${p}_score`]);
+        if (sc > 0) a.scores[p].push(sc);
+        const h = Number(e[`${p}_hours`]);
+        if (h > 0) a.hours[p] += h;
+      }
+    }
+    return acc;
+  }, [weeks]);
+
+  const rows = MONTHS.map((label, i) => {
+    const a = perMonth[monthKeyOf(i)];
+    const avg1 = (arr?: number[]) => (arr && arr.length ? arr.reduce((x, y) => x + y, 0) / arr.length : null);
+    return { label, i, jerry: avg1(a?.scores.jerry), terezka: avg1(a?.scores.terezka), hJ: a?.hours.jerry ?? 0, hT: a?.hours.terezka ?? 0 };
+  });
+  const any = rows.some((r) => r.jerry != null || r.terezka != null);
+
+  return (
+    <Card>
+      <H3>
+        <Info text="Priemer týždenných hodnotení energie za mesiac (1 = na dne, 10 = plná sila). Zadáva sa raz týždenne v Tréningy → Prehľad, kde sedí vedľa odtrénovaných hodín. Klesajúca krivka pri rastúcej záťaži je varovanie skôr, než sa to prejaví na výkone." label="Energia a vyhorenie" />
+      </H3>
+      {any ? (
+        <>
+          <LineChart
+            data={rows.map((r) => ({ label: r.label, values: [r.jerry ?? 0, r.terezka ?? 0] }))}
+            series={[{ name: "Jerry", color: C.accent }, { name: "Terezka", color: C.blue }]}
+            height={200}
+            fmt={(n) => n.toFixed(1)}
+            zone={{ lo: 6, hi: 10 }}
+            alignEnd
+          />
+          <div style={{ fontSize: 11.5, color: C.textMuted, marginTop: 8 }}>
+            Zelené pásmo 6–10 je zdravé. Iné hodiny mimo tréningov za obdobie: Jerry{" "}
+            <b>{rows.reduce((a, r) => a + r.hJ, 0)} h</b>, Terezka <b>{rows.reduce((a, r) => a + r.hT, 0)} h</b>.
+          </div>
+        </>
+      ) : (
+        <Empty>Zatiaľ žiadne týždenné hodnotenia — vyplň ich v Tracker → Tréningy → Prehľad (klik na týždeň).</Empty>
+      )}
+    </Card>
   );
 }
 
@@ -1271,6 +1363,7 @@ function MesacneTab() {
     <>
       <HealthCard idx={idx} />
       <ForecastCard />
+      <EnergyTrendCard />
 
       <Card>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -1427,6 +1520,7 @@ export function Vzas({ sub, onSub }: { sub: string; onSub: (s: string) => void }
         tabs={[
           { id: "pnl", label: "VZAS 2026" },
           { id: "vyplaty", label: "J&T Výplaty" },
+          { id: "cashflow", label: "Cashflow" },
           { id: "jarek", label: "Jarek dlh" },
           { id: "vysledky", label: "Výsledky" },
         ]}
@@ -1435,6 +1529,7 @@ export function Vzas({ sub, onSub }: { sub: string; onSub: (s: string) => void }
       />
       {sub === "pnl" && <PnlTab />}
       {sub === "vyplaty" && <SalaryTab />}
+      {sub === "cashflow" && <CashflowTab />}
       {sub === "jarek" && <JarekTab />}
       {isVysledky && (
         <>

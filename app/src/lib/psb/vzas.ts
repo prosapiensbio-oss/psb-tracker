@@ -347,19 +347,12 @@ export const monthKeyOf = (i: number) => `2026-${String(i + 1).padStart(2, "0")}
 // unanswered five months out of six. "energy" renders as a slider plus a
 // non-training hours field — the model only pays for training hours, so
 // without that second number an energy score can't be read honestly.
-export type QuestionKind = "text" | "energy";
-export const MONTH_QUESTIONS: { id: string; q: string; kind?: QuestionKind }[] = [
+export const MONTH_QUESTIONS: { id: string; q: string }[] = [
   { id: "stalo", q: "Čo zásadné sa tento mesiac stalo?" },
   { id: "jednorazove", q: "Čo z tržieb aj výdavkov bolo jednorazové a čo sa bude opakovať?" },
   { id: "klienti", q: "Pribudol alebo odišiel niekto z klientov? Prečo?" },
-  { id: "energia", q: "Energia a záťaž", kind: "energy" },
   { id: "buduci", q: "Čo už teraz viem o budúcom mesiaci?" },
 ];
-// Energy answers live under these keys inside the same answers JSON.
-export const ENERGY_SCORE = "energia_score";
-export const ENERGY_HOURS = "energia_hodiny";
-export const ENERGY_NOTE = "energia_note";
-
 // Every question is answered by both founders; the answers live under
 // "<id>__jerry" / "<id>__terezka" in the same JSON blob.
 export const answerKey = (base: string, person: PersonKey) => `${base}__${person}`;
@@ -373,29 +366,21 @@ export const SEED_ANSWERS: Record<string, Record<string, string>> = {
     stalo__jerry: "prešli sme na nové členstvá, ostalo už len pár klientov so starými sumami",
     jednorazove__jerry: "Konsolidácia cien — trvalá zmena, nie jednorazová: náklady sú nižšie ako kedysi a aj na výplatách sme trošku ušetrili.",
     klienti__jerry: "Noví prevažne cez referencie. Zo 7 úvodných pokračovalo 5 klientov, dvaja nie — len to skúšali.",
-    energia_score__jerry: "8",
-    energia_note__jerry: "veľká rezerva",
   },
   "2026-02": {
     stalo__jerry: "Radek a Lenka si predplatili 18 h a Gažo omylom poslal za 16 h",
     jednorazove__jerry: "Predplatby Radek + Lenka (18 h) a omylom poslaná platba od Gaža (za 16 h) — jednorazové, v ďalších mesiacoch sa nezopakujú.",
     klienti__jerry: "Prokop prišiel cez Google (organika), ostatní cez referencie. Z úvodných pokračovali traja.",
-    energia_score__jerry: "8",
-    energia_note__jerry: "je tam stále rezerva, spravili sme 160 h, čo je málo",
   },
   "2026-03": {
     stalo__jerry: "mali sme najviac tréningov s najmenej tržbami. veľa ľudí vyprokrastinovalo platby, mali by sme o cca 50k viac keby nemeškali. je to naša chyba, pretože sme na nich málo tlačili",
     jednorazove__jerry: "Chýbajúcich ~50 000 boli oneskorené platby klientov, nie výpadok dopytu — presunuli sa do ďalších mesiacov.",
     klienti__jerry: "Noví prevažne cez referencie. Z úvodných pokračovali 4 z 5.",
-    energia_score__jerry: "7",
-    energia_note__jerry: "na to, že sme spravili najviac hodín a bol tu týždeň cez 30 h týždenne, sa cítim celkom fresh",
   },
   "2026-04": {
     stalo__jerry: "zomrela Katka, Janovi sme preto pomohli zaplatiť aspoň jeden mesiac nájmu. súčasne sme mali najvyššie tržby za jeden mesiac",
     jednorazove__jerry: "Jednorazové: viacerí klienti predplatili hodiny dopredu a pomoc Janovi s nájmom. Trvalé: všetkým dobehli staré balíčky za staré ceny, takže sa naplno prejavila konsolidácia.",
     klienti__jerry: "Väčšina nových cez referencie.",
-    energia_score__jerry: "7",
-    energia_note__jerry: "je tam stále rezerva, s ktorou sa dá pracovať",
   },
   "2026-06": {
     stalo__jerry: "tento mesiac sme mali obmedzenú prevádzku, pretože sme mali Ahsoku",

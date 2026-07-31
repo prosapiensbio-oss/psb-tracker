@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiVzasWeeksRouteImport } from './routes/api/vzas-weeks'
 import { Route as ApiVzasStatusRouteImport } from './routes/api/vzas-status'
 import { Route as ApiVzasNotesRouteImport } from './routes/api/vzas-notes'
 import { Route as ApiSessionRouteImport } from './routes/api/session'
@@ -37,6 +38,11 @@ const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiVzasWeeksRoute = ApiVzasWeeksRouteImport.update({
+  id: '/api/vzas-weeks',
+  path: '/api/vzas-weeks',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiVzasStatusRoute = ApiVzasStatusRouteImport.update({
@@ -110,6 +116,7 @@ export interface FileRoutesByFullPath {
   '/api/session': typeof ApiSessionRoute
   '/api/vzas-notes': typeof ApiVzasNotesRoute
   '/api/vzas-status': typeof ApiVzasStatusRoute
+  '/api/vzas-weeks': typeof ApiVzasWeeksRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -126,6 +133,7 @@ export interface FileRoutesByTo {
   '/api/session': typeof ApiSessionRoute
   '/api/vzas-notes': typeof ApiVzasNotesRoute
   '/api/vzas-status': typeof ApiVzasStatusRoute
+  '/api/vzas-weeks': typeof ApiVzasWeeksRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -143,6 +151,7 @@ export interface FileRoutesById {
   '/api/session': typeof ApiSessionRoute
   '/api/vzas-notes': typeof ApiVzasNotesRoute
   '/api/vzas-status': typeof ApiVzasStatusRoute
+  '/api/vzas-weeks': typeof ApiVzasWeeksRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -161,6 +170,7 @@ export interface FileRouteTypes {
     | '/api/session'
     | '/api/vzas-notes'
     | '/api/vzas-status'
+    | '/api/vzas-weeks'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -177,6 +187,7 @@ export interface FileRouteTypes {
     | '/api/session'
     | '/api/vzas-notes'
     | '/api/vzas-status'
+    | '/api/vzas-weeks'
   id:
     | '__root__'
     | '/'
@@ -193,6 +204,7 @@ export interface FileRouteTypes {
     | '/api/session'
     | '/api/vzas-notes'
     | '/api/vzas-status'
+    | '/api/vzas-weeks'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -210,6 +222,7 @@ export interface RootRouteChildren {
   ApiSessionRoute: typeof ApiSessionRoute
   ApiVzasNotesRoute: typeof ApiVzasNotesRoute
   ApiVzasStatusRoute: typeof ApiVzasStatusRoute
+  ApiVzasWeeksRoute: typeof ApiVzasWeeksRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -233,6 +246,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/vzas-weeks': {
+      id: '/api/vzas-weeks'
+      path: '/api/vzas-weeks'
+      fullPath: '/api/vzas-weeks'
+      preLoaderRoute: typeof ApiVzasWeeksRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/vzas-status': {
@@ -330,6 +350,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSessionRoute: ApiSessionRoute,
   ApiVzasNotesRoute: ApiVzasNotesRoute,
   ApiVzasStatusRoute: ApiVzasStatusRoute,
+  ApiVzasWeeksRoute: ApiVzasWeeksRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

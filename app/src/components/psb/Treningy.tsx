@@ -1,12 +1,83 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState, type CSSProperties } from "react";
 
+import { fetchWeekEntries, saveWeekEntry, type WeekEntry } from "../../lib/psb/client";
 import { groupTrainings, periodZone, sessionAnalysis, TARGET_H, type ClientAgg, type Period } from "../../lib/psb/compute";
-import { fmtCZK, monthLabel } from "../../lib/psb/format";
-import { C, S } from "../../lib/psb/theme";
+import { fmtCZK, monthLabel, weekKey } from "../../lib/psb/format";
+import { C, mix, S } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import type { NavFocus } from "./App";
 import { SessionTrend } from "./SessionTrend";
 import { Card, Donut, Empty, H3, Info, LineChart, Select, SortTh, StatCard, SubTabs, TableWrap, Toolbar, useSort } from "./ui";
+
+const PEOPLE = [
+  { key: "jerry", label: "Jerry" },
+  { key: "terezka", label: "Terezka" },
+] as const;
+
+export const wkScore = (p: string) => `${p}_score`;
+export const wkHours = (p: string) => `${p}_hours`;
+export const wkNote = (p: string) => `${p}_note`;
+
+// Energy belongs next to the hours it has to be read against — the app only
+// sees training hours, so the "iné hodiny" estimate is what makes a score
+// interpretable at all. Asked weekly because by month-end you only remember
+// the last week.
+function WeekEnergyRow({ weekKeyIso, colSpan, entry, onSave }: {
+  weekKeyIso: string; colSpan: number; entry: WeekEntry; onSave: (week: string, data: WeekEntry) => void;
+}) {
+  const [draft, setDraft] = useState<WeekEntry>(entry);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const set = (k: string, v: string) => setDraft((d) => ({ ...d, [k]: v }));
+  const save = async () => {
+    setSaving(true);
+    await saveWeekEntry(weekKeyIso, draft);
+    setSaving(false);
+    setSaved(true);
+    onSave(weekKeyIso, draft);
+    setTimeout(() => setSaved(false), 2000);
+  };
+  const field: CSSProperties = {
+    background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8,
+    color: C.text, fontSize: 12.5, padding: "6px 9px", fontFamily: "inherit",
+  };
+  return (
+    <tr>
+      <td colSpan={colSpan} style={{ padding: "12px 14px", background: mix(C.accent, 5), borderBottom: `1px solid ${C.border}` }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(270px, 1fr))", gap: 12 }}>
+          {PEOPLE.map((p) => {
+            const score = Number(draft[wkScore(p.key)] ?? 7);
+            const col = score >= 7 ? C.green : score >= 4 ? C.orange : C.red;
+            return (
+              <div key={p.key} style={{ border: `1px solid ${C.border}`, borderRadius: 10, padding: "9px 11px", background: mix(C.accent, 4) }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: p.key === "jerry" ? C.accent : C.blue, marginBottom: 6 }}>{p.label}</div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 7 }}>
+                  <input type="range" min={1} max={10} step={1} value={score}
+                    onChange={(e) => set(wkScore(p.key), e.target.value)} style={{ flex: 1, accentColor: col }} />
+                  <span style={{ fontSize: 14, fontWeight: 700, minWidth: 40, textAlign: "right", color: col, fontVariantNumeric: "tabular-nums" }}>{score} / 10</span>
+                </div>
+                <label style={{ fontSize: 11.5, color: C.textMuted, display: "flex", alignItems: "center", gap: 6, marginBottom: 7 }}>
+                  Iné hodiny (mimo tréningov)
+                  <input type="number" min={0} max={120} value={draft[wkHours(p.key)] ?? ""}
+                    onChange={(e) => set(wkHours(p.key), e.target.value)} placeholder="napr. 8" style={{ ...field, width: 78 }} />
+                </label>
+                <input value={draft[wkNote(p.key)] ?? ""} onChange={(e) => set(wkNote(p.key), e.target.value)}
+                  placeholder="jedna veta…" style={{ ...field, width: "100%" }} />
+              </div>
+            );
+          })}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 10 }}>
+          <button onClick={save} disabled={saving}
+            style={{ padding: "5px 14px", borderRadius: 8, border: `1px solid ${C.accent}`, background: C.accentBg, color: C.accentLight, fontSize: 12.5, fontWeight: 600, cursor: saving ? "default" : "pointer", opacity: saving ? 0.6 : 1 }}>
+            {saving ? "Ukladám…" : "Uložiť"}
+          </button>
+          {saved && <span style={{ fontSize: 12, color: C.green }}>✓ Uložené</span>}
+        </div>
+      </td>
+    </tr>
+  );
+}
 
 export function Treningy({ data, sub, onSub, focus }: { data: PSBData; clients: Record<string, ClientAgg>; sub: string; onSub: (s: string) => void; focus?: NavFocus | null }) {
   return (
@@ -49,6 +120,10 @@ function Prehlad({ data, focus }: { data: PSBData; focus?: NavFocus | null }) {
   );
   const chrono = useMemo(() => [...rows].sort((a, b) => a.ts - b.ts), [rows]);
   const both = trainerF === "all";
+  const weekly = period === "week";
+  const [openWeek, setOpenWeek] = useState<string | null>(null);
+  const [weeks, setWeeks] = useState<Record<string, WeekEntry>>({});
+  useEffect(() => { fetchWeekEntries().then(setWeeks); }, []);
   const sortedRows = useMemo(
     () =>
       sorted(selectedKey ? rows.filter((g) => g.key === selectedKey) : rows, {
@@ -170,7 +245,9 @@ function Prehlad({ data, focus }: { data: PSBData; focus?: NavFocus | null }) {
             {both ? (
               <>
                 <SortTh label="Jerry h" sortKey="jerry" sort={sort} onSort={toggle} align="right" />
+                {weekly && <th style={{ ...S.th, textAlign: "right" }}><Info text="Subjektívna energia Jerryho za týždeň (1–10). Klikni na riadok a nastav ju posuvníkom." label="Jerry E" /></th>}
                 <SortTh label="Terezka h" sortKey="terezka" sort={sort} onSort={toggle} align="right" />
+                {weekly && <th style={{ ...S.th, textAlign: "right" }}><Info text="Subjektívna energia Terezky za týždeň (1–10). Klikni na riadok a nastav ju posuvníkom." label="Terezka E" /></th>}
               </>
             ) : null}
             <SortTh label="Spolu h" sortKey="total" sort={sort} onSort={toggle} align="right" />
@@ -185,13 +262,29 @@ function Prehlad({ data, focus }: { data: PSBData; focus?: NavFocus | null }) {
             const jerry = g.byTrainer["Jerry"];
             const terezka = g.byTrainer["Terezka"];
             const czk = g.total.sessions ? g.total.revenue / g.total.sessions : 0;
+            const wk = weekly ? weekKey(new Date(g.ts).toISOString()) : null;
+            const entry = wk ? (weeks[wk] ?? {}) : {};
+            const energyCell = (person: string) => {
+              const v = entry[wkScore(person)];
+              if (!v) return <td style={{ ...S.td, textAlign: "right", color: C.textDim }}>—</td>;
+              const n = Number(v);
+              return <td style={{ ...S.td, textAlign: "right", fontWeight: 600, color: n >= 7 ? C.green : n >= 4 ? C.orange : C.red }}>{n}</td>;
+            };
+            const nCols = 5 + (both ? (weekly ? 4 : 2) : 0);
             return (
-              <tr key={g.key}>
-                <td style={S.td}>{g.key}</td>
+              <Fragment key={g.key}>
+              <tr>
+                <td onClick={() => wk && setOpenWeek(openWeek === wk ? null : wk)}
+                  style={{ ...S.td, cursor: wk ? "pointer" : undefined, whiteSpace: "nowrap" }}>
+                  {wk && <span style={{ display: "inline-block", width: 14, color: C.textDim, fontSize: 9 }}>{openWeek === wk ? "▼" : "▶"}</span>}
+                  {g.key}
+                </td>
                 {both ? (
                   <>
                     <td style={{ ...S.td, textAlign: "right", color: jerry ? zoneColor(jerry.hours) : C.textDim }}>{jerry ? jerry.hours.toFixed(0) : "—"}</td>
+                    {weekly && energyCell("jerry")}
                     <td style={{ ...S.td, textAlign: "right", color: terezka ? zoneColor(terezka.hours) : C.textDim }}>{terezka ? terezka.hours.toFixed(0) : "—"}</td>
+                    {weekly && energyCell("terezka")}
                   </>
                 ) : null}
                 <td style={{ ...S.td, textAlign: "right", fontWeight: 600, color: zoneColor(g.total.hours) }}>{g.total.hours.toFixed(0)}</td>
@@ -200,6 +293,11 @@ function Prehlad({ data, focus }: { data: PSBData; focus?: NavFocus | null }) {
                 <td style={{ ...S.td, textAlign: "right" }}>{fmtCZK(czk)}</td>
                 <td style={{ ...S.td, textAlign: "right", fontWeight: 600, color: g.score >= 7 ? C.green : g.score >= 4 ? C.orange : C.red }}>{g.score}</td>
               </tr>
+              {wk && openWeek === wk && (
+                <WeekEnergyRow weekKeyIso={wk} colSpan={nCols} entry={entry}
+                  onSave={(w, d) => setWeeks((prev) => ({ ...prev, [w]: d }))} />
+              )}
+              </Fragment>
             );
           })}
         </tbody>

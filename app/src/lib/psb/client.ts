@@ -84,6 +84,24 @@ export async function saveMonthNote(
   return r.ok;
 }
 
+export type WeekEntry = Record<string, string>;
+
+export async function fetchWeekEntries(): Promise<Record<string, WeekEntry>> {
+  try {
+    const r = await fetch("/api/vzas-weeks");
+    if (!r.ok) return {};
+    const j = (await r.json()) as { weeks?: Record<string, WeekEntry> };
+    return j.weeks ?? {};
+  } catch {
+    return {};
+  }
+}
+
+export async function saveWeekEntry(week: string, data: WeekEntry): Promise<boolean> {
+  const r = await post("/api/vzas-weeks", { week, data });
+  return r.ok;
+}
+
 export type ChatResult =
   | { ok: true; reply: string }
   | { ok: false; error: string; status?: number; detail?: string };
