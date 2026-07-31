@@ -991,7 +991,9 @@ function CashflowTab() {
       <ReserveCard idx={idx} />
 
       <Card>
-        <H3>Kumulatívna hotovosť</H3>
+        <H3>
+          <Info text="Súčet mesačných tokov od januára 2025. NIE je to zostatok na účte — je to prevádzkový prebytok, ktorý medzitým odišiel inam (pôžičky zakladateľom, bitcoin). Rozdiel rozpisuje tabuľka nižšie." label="Kumulovaný prevádzkový prebytok" />
+        </H3>
         <LineChart
           data={idx.map((i) => ({ label: MONTHS[i], values: [cum[i]] }))}
           series={[{ name: "Kumulatívne", color: C.accent }]}
@@ -1002,9 +1004,11 @@ function CashflowTab() {
           alignEnd
         />
         <div style={{ fontSize: 11.5, color: C.textMuted, marginTop: 8 }}>
-          Koľko hotovosti firma za sledované obdobie pridala alebo ubrala. Rastúca krivka = tvorí sa rezerva.
+          Koľko firma za obdobie zarobila nad rámec toho, čo minula — vrátane výplat. Rastúca krivka znamená, že sa tvorí hodnota; nehovorí, kde tá hodnota leží.
         </div>
       </Card>
+
+      <KamOdisliCard cum={cum[cum.length - 1]} />
 
       <Card>
         <H3>Mesačný tok</H3>
@@ -1038,6 +1042,48 @@ function CashflowTab() {
   );
 }
 
+// "Kumulovaný prebytok 124 360" reads like a bank balance, and it is not one —
+// Jerry's first reaction to it was "toto fakt nemám". The money is real, it just
+// left the account by routes the P&L never shows: the founders' own loans and
+// the bitcoin that clients paid in and nobody ever converted back to CZK. This
+// card names those routes instead of leaving him to guess.
+function KamOdisliCard({ cum }: { cum: number }) {
+  const [res, setRes] = useState<BtcReserve | null>(null);
+  useEffect(() => { fetchBtcReserve().then(setRes); }, []);
+  const j = salaryCalc("jerry");
+  const t = salaryCalc("terezka");
+  const pozicky = Math.abs(Math.min(0, j.cumDebt[j.cumDebt.length - 1])) + Math.abs(Math.min(0, t.cumDebt[t.cumDebt.length - 1]));
+  const btc = res?.czk ?? 0;
+  const vklad = vSum(JAREK_VKLADY) - JAREK_VKLADY[0]; // jan 25 je zostatok z 2024, nie nový vklad
+  const zvysok = cum + vklad - pozicky - btc;
+  const riadok = (label: string, val: number, farba: string, info: string) => (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "8px 0", borderBottom: `1px solid ${mix(C.border, 55)}` }}>
+      <span style={{ fontSize: 12.5, color: C.textMuted }}><Info text={info} label={label} /></span>
+      <b style={{ fontSize: 14, color: farba, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{val >= 0 ? "+" : "−"} {fmtCZK(Math.abs(val))}</b>
+    </div>
+  );
+
+  return (
+    <Card>
+      <H3><Info text="Prevádzkový prebytok nie je zostatok na účte. Táto tabuľka ukazuje, kadiaľ z firmy odišiel — a čo by teoreticky malo zostať. Presný zostatok povie až import z Fia." label="Kde tie peniaze sú" /></H3>
+      <div style={{ marginTop: 6 }}>
+        {riadok("Prevádzkový prebytok (od jan 25)", cum, C.green, "Súčet mesačných tokov: príjmy mínus všetky výdavky vrátane výplat.")}
+        {riadok("Vklad od Jarka (feb 25)", vklad, C.green, "Peniaze, ktoré prišli do firmy, ale nie sú tržbou — preto ich P&L nevidí. Januárová suma sa nepočíta, to je zostatok prenesený z 2024.")}
+        {riadok("Pôžičky zakladateľom", -pozicky, C.red, "Presne to, čomu appka hovorí „kumulovaný dlh“ — peniaze, ktoré si vy dvaja vybrali nad rámec nároku. Z firmy odišli, ale nie sú nákladom, takže v P&L ich nevidno.")}
+        {riadok("Leží v bitcoine", -btc, C.orange, "Klientske platby v BTC sú v tržbách v korunách, ale koruny z nich nikdy neboli — sedia v satoshi. Načítané z BTC appky.")}
+      </div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "12px 0 2px", borderTop: `2px solid ${mix(C.accent, 45)}`, marginTop: 4 }}>
+        <span style={{ fontSize: 13.5, fontWeight: 700, color: C.text }}>Malo by zostať</span>
+        <b style={{ fontSize: 17, color: signColor(zvysok), fontVariantNumeric: "tabular-nums" }}>{fmtCZK(zvysok)}</b>
+      </div>
+      <div style={{ fontSize: 11.5, color: C.textMuted, marginTop: 10, lineHeight: 1.55 }}>
+        Ak toľko na účte nemáš, chýbajúci rozdiel je v pohyboch, ktoré appka zatiaľ nevidí — dane a odvody platené mimo,
+        zostatok prenesený z 2024, hotovosť. <b>Toto je presne tá diera, ktorú zaplní import z Fia</b>; dovtedy ber číslo ako orientačné.
+      </div>
+    </Card>
+  );
+}
+
 // ── Rezerva ──────────────────────────────────────────────────────────────────
 // The reserve is not a P&L line — it is what the studio has, not what it earned.
 // It lives in the Bitcoin app; this reads it live so nobody retypes two numbers.
@@ -1054,7 +1100,6 @@ function ReserveCard({ idx }: { idx: number[] }) {
   const beMes = idx.length ? idx.reduce((a, i) => a + p.bezVyplat[i] + j.narok[i] + t.narok[i] + p.matyas[i], 0) / idx.length : 0;
   const czk = res?.czk ?? 0;
   const mesiace = beMes > 0 ? czk / beMes : 0;
-  const cielKc = 120000; // "Rezerva 120 000 Kč+" z Cieľov 2026
   const goalPct = res?.goalSats ? (res.sats / res.goalSats) * 100 : null;
 
   return (
@@ -1066,15 +1111,10 @@ function ReserveCard({ idx }: { idx: number[] }) {
         <>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12 }}>
             <StatCard value={fmtCZK(czk)} label={<Info text={`${res.sats.toLocaleString("sk-SK")} sats pri kurze ${fmtCZK(res.rateCzkPerBtc ?? 0)} / BTC.`} label="Hodnota rezervy" />} color={C.orange} />
-            <StatCard value={`${mesiace.toFixed(1)} mes.`} label={<Info text={`Koľko mesiacov prevádzky rezerva pokryje pri break-even ${fmtCZK(beMes)}/mes.`} label="Mesiacov prevádzky" />} color={mesiace >= 3 ? C.green : mesiace >= 1 ? C.orange : C.red} />
-            <StatCard value={`${Math.round((czk / cielKc) * 100)} %`} label={<Info text="Cieľ „Rezerva 120 000 Kč+“ z Cieľov 2026. Splnený je — ale v bitcoine, nie v hotovosti." label="Cieľ 120 000 Kč" />} color={czk >= cielKc ? C.green : C.orange} />
+            <StatCard value={`${mesiace.toFixed(1)} mes.`} label={<Info text={`Koľko mesiacov prevádzky rezerva pokryje pri break-even ${fmtCZK(beMes)}/mes. Drž na pamäti, že je v bitcoine — pri poklese kurzu o tretinu je z toho tretina mesiaca menej.`} label="Mesiacov prevádzky" />} color={mesiace >= 3 ? C.green : mesiace >= 1 ? C.orange : C.red} />
             {goalPct != null && (
               <StatCard value={`${Math.round(goalPct)} %`} label={<Info text={`Cieľ z BTC appky: ${(res.goalSats ?? 0).toLocaleString("sk-SK")} sats.`} label="Cieľ v satoshi" />} color={C.blue} />
             )}
-          </div>
-          <div style={{ marginTop: 12, padding: "10px 14px", borderRadius: 10, background: mix(C.orange, 10), border: `1px solid ${mix(C.orange, 30)}`, fontSize: 12.5, color: C.text, lineHeight: 1.55 }}>
-            Rezerva v bitcoine nie je to isté ako rezerva v hotovosti: o mesiac môže byť o tretinu nižšia — a pravdepodobne práve vtedy, keď ju budeš potrebovať.
-            Preto ju čítaj ako <b>{mesiace.toFixed(1)} mesiaca prevádzky pri dnešnom kurze</b>, nie ako pevnú sumu.
           </div>
           <div style={{ fontSize: 11, color: C.textDim, marginTop: 8 }}>
             Kurz aktualizovaný {res.rateUpdatedAt ? new Date(res.rateUpdatedAt).toLocaleString("sk-SK") : "—"} · zdroj: appka PSB Bitcoin
@@ -1145,19 +1185,6 @@ function JarekTab() {
               <div style={{ fontSize: 11, color: C.textDim, marginTop: 2 }}>{fmtCZK(s.p)} / mes.</div>
             </div>
           ))}
-        </div>
-        <div style={{ fontSize: 11.5, color: C.textMuted, marginTop: 10, lineHeight: 1.55 }}>
-          Skladba splátky: <b>{fmtCZK(paceCash)}</b>/mes v hotovosti + <b>{fmtCZK(paceSofia)}</b>/mes Sofia (odtrénované, nefakturované)
-          {vSum(zlavaVals) > 0 && <> + 20 % zľava pri každoročnej obnove členstva ({fmtCZK(JAREK_ZLAVA_ROCNE)}, teda {fmtCZK(JAREK_ZLAVA_ROCNE / 12)}/mes)</>}.
-          Sofia nie je horší spôsob splácania, je iný: hodnotu dodávaš a dlh reálne klesá, len z toho nepríde hotovosť.
-          Cena nie sú peniaze, ale <b>kapacita</b> — sú to hodiny, ktoré sa nedajú predať niekomu inému.
-          Jediná páka na zrýchlenie je preto fix splátka, nie Sofia.
-        </div>
-        <div style={{ marginTop: 10, padding: "10px 14px", borderRadius: 10, background: mix(C.orange, 10), border: `1px solid ${mix(C.orange, 30)}`, fontSize: 12.5, color: C.text, lineHeight: 1.55 }}>
-          <b>Obnova {new Date(JAREK_OBNOVA.datum).toLocaleDateString("sk-SK")}</b> — Jarek si znova predplatil ročné členstvo ({fmtCZK(JAREK_OBNOVA.platba)}),
-          takže 20 % zľava sa opakuje. Suma za tento rok ale nie je nikde zapísaná, preto ju v stave dlhu zatiaľ nemám —
-          <b> dlh je o ňu nižší, než ukazuje</b>. Daj mi číslo a doplním ho. V odhade splatenia s ňou už rátam ({fmtCZK(JAREK_ZLAVA_ROCNE / 12)}/mes,
-          podľa poslednej zapísanej zľavy {fmtCZK(JAREK_ZLAVA_ROCNE)}).
         </div>
       </Card>
 
@@ -1786,8 +1813,7 @@ function KpiRow({ k, onTarget }: { k: KpiActual; onTarget: (id: string, lo: numb
         <div style={{ flex: "1 1 200px", minWidth: 180 }}>
           <div style={{ fontSize: 13, color: C.text }}>
             <span style={{ display: "inline-block", width: 13, color: C.textDim, fontSize: 9 }}>{open ? "▼" : "▶"}</span>
-            <Info text={`${k.def.why}${k.def.navrh ? " — toto KPI zatiaľ nesleduješ, je to môj návrh." : ""} Merané za: ${k.window}.`} label={k.def.label} />
-            {k.def.navrh && <span style={{ marginLeft: 7, fontSize: 9.5, padding: "1px 6px", borderRadius: 999, border: `1px solid ${mix(C.blue, 45)}`, color: C.blue, verticalAlign: "middle" }}>návrh</span>}
+            <Info text={`${k.def.why} Merané za: ${k.window}.`} label={k.def.label} />
           </div>
           <div style={{ fontSize: 10.5, color: C.textDim, marginTop: 2, marginLeft: 13 }}>{k.extra ?? k.window}</div>
         </div>
