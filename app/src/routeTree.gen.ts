@@ -14,6 +14,7 @@ import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiVzasWeeksRouteImport } from './routes/api/vzas-weeks'
 import { Route as ApiVzasStatusRouteImport } from './routes/api/vzas-status'
+import { Route as ApiVzasSettingsRouteImport } from './routes/api/vzas-settings'
 import { Route as ApiVzasNotesRouteImport } from './routes/api/vzas-notes'
 import { Route as ApiSessionRouteImport } from './routes/api/session'
 import { Route as ApiResetRouteImport } from './routes/api/reset'
@@ -49,6 +50,11 @@ const ApiVzasWeeksRoute = ApiVzasWeeksRouteImport.update({
 const ApiVzasStatusRoute = ApiVzasStatusRouteImport.update({
   id: '/api/vzas-status',
   path: '/api/vzas-status',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiVzasSettingsRoute = ApiVzasSettingsRouteImport.update({
+  id: '/api/vzas-settings',
+  path: '/api/vzas-settings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiVzasNotesRoute = ApiVzasNotesRouteImport.update({
@@ -122,6 +128,7 @@ export interface FileRoutesByFullPath {
   '/api/reset': typeof ApiResetRoute
   '/api/session': typeof ApiSessionRoute
   '/api/vzas-notes': typeof ApiVzasNotesRoute
+  '/api/vzas-settings': typeof ApiVzasSettingsRoute
   '/api/vzas-status': typeof ApiVzasStatusRoute
   '/api/vzas-weeks': typeof ApiVzasWeeksRoute
 }
@@ -140,6 +147,7 @@ export interface FileRoutesByTo {
   '/api/reset': typeof ApiResetRoute
   '/api/session': typeof ApiSessionRoute
   '/api/vzas-notes': typeof ApiVzasNotesRoute
+  '/api/vzas-settings': typeof ApiVzasSettingsRoute
   '/api/vzas-status': typeof ApiVzasStatusRoute
   '/api/vzas-weeks': typeof ApiVzasWeeksRoute
 }
@@ -159,6 +167,7 @@ export interface FileRoutesById {
   '/api/reset': typeof ApiResetRoute
   '/api/session': typeof ApiSessionRoute
   '/api/vzas-notes': typeof ApiVzasNotesRoute
+  '/api/vzas-settings': typeof ApiVzasSettingsRoute
   '/api/vzas-status': typeof ApiVzasStatusRoute
   '/api/vzas-weeks': typeof ApiVzasWeeksRoute
 }
@@ -179,6 +188,7 @@ export interface FileRouteTypes {
     | '/api/reset'
     | '/api/session'
     | '/api/vzas-notes'
+    | '/api/vzas-settings'
     | '/api/vzas-status'
     | '/api/vzas-weeks'
   fileRoutesByTo: FileRoutesByTo
@@ -197,6 +207,7 @@ export interface FileRouteTypes {
     | '/api/reset'
     | '/api/session'
     | '/api/vzas-notes'
+    | '/api/vzas-settings'
     | '/api/vzas-status'
     | '/api/vzas-weeks'
   id:
@@ -215,6 +226,7 @@ export interface FileRouteTypes {
     | '/api/reset'
     | '/api/session'
     | '/api/vzas-notes'
+    | '/api/vzas-settings'
     | '/api/vzas-status'
     | '/api/vzas-weeks'
   fileRoutesById: FileRoutesById
@@ -234,6 +246,7 @@ export interface RootRouteChildren {
   ApiResetRoute: typeof ApiResetRoute
   ApiSessionRoute: typeof ApiSessionRoute
   ApiVzasNotesRoute: typeof ApiVzasNotesRoute
+  ApiVzasSettingsRoute: typeof ApiVzasSettingsRoute
   ApiVzasStatusRoute: typeof ApiVzasStatusRoute
   ApiVzasWeeksRoute: typeof ApiVzasWeeksRoute
 }
@@ -273,6 +286,13 @@ declare module '@tanstack/react-router' {
       path: '/api/vzas-status'
       fullPath: '/api/vzas-status'
       preLoaderRoute: typeof ApiVzasStatusRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/vzas-settings': {
+      id: '/api/vzas-settings'
+      path: '/api/vzas-settings'
+      fullPath: '/api/vzas-settings'
+      preLoaderRoute: typeof ApiVzasSettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/vzas-notes': {
@@ -370,6 +390,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiResetRoute: ApiResetRoute,
   ApiSessionRoute: ApiSessionRoute,
   ApiVzasNotesRoute: ApiVzasNotesRoute,
+  ApiVzasSettingsRoute: ApiVzasSettingsRoute,
   ApiVzasStatusRoute: ApiVzasStatusRoute,
   ApiVzasWeeksRoute: ApiVzasWeeksRoute,
 }

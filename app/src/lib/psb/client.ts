@@ -84,6 +84,24 @@ export async function saveMonthNote(
   return r.ok;
 }
 
+export type KpiOverrides = Record<string, Record<string, { lo?: number; hi?: number }>>;
+
+export async function fetchVzasSettings(): Promise<Record<string, unknown>> {
+  try {
+    const r = await fetch("/api/vzas-settings");
+    if (!r.ok) return {};
+    const j = (await r.json()) as { settings?: Record<string, unknown> };
+    return j.settings ?? {};
+  } catch {
+    return {};
+  }
+}
+
+export async function saveVzasSetting(key: string, value: unknown): Promise<boolean> {
+  const r = await post("/api/vzas-settings", { key, value });
+  return r.ok;
+}
+
 export async function saveLead(lead: Partial<Lead> & { id?: string; remove?: boolean }): Promise<string | null> {
   const r = await post("/api/leads", lead);
   if (!r.ok) return null;

@@ -680,7 +680,11 @@ export const KPI_GROUP_LABELS: Record<KpiGroup, string> = {
 const KPI_COMMON: KpiDef[] = [
   { id: "trzby", label: "Tržby", unit: "czk", group: "peniaze", annual: true, why: "Ročný plán prepočítaný na uplynulé mesiace." },
   { id: "marza", label: "Zisková marža", unit: "pct", group: "peniaze", why: "Koľko z tržby zostane po všetkom vrátane výplat." },
-  { id: "rezerva", label: "Rezerva nad break-even", unit: "pct", group: "peniaze", lo: 20, navrh: true, why: "O koľko % sú tržby nad bodom, kde firma pokryje prevádzku aj nároky na výplaty. Pod 20 % stačí jeden slabý mesiac na stratu — a presne to sa v 2025 stalo päťkrát." },
+  // "Rezerva" was the wrong word: Jerry's own goal #7 is a 120 000 Kč cash
+  // reserve, and two different things called rezerva on the same screen is one
+  // misreading away from a bad decision. This one is a distance, not money set
+  // aside — so it says rozdiel, and shows the koruny as well as the percentage.
+  { id: "rezerva", label: "Rozdiel nad break-even", unit: "pct", group: "peniaze", lo: 20, navrh: true, why: "O koľko % sú tržby nad bodom, kde firma pokryje prevádzku aj nároky na výplaty. Nie je to odložená hotovosť — je to odstup. Pod 20 % stačí jeden slabý mesiac na stratu a presne to sa v 2025 stalo päťkrát." },
   { id: "uvodne", label: "Úvodné tréningy", unit: "num", group: "lievik", annual: true, why: "Vrch lievika: bez úvodných niet nových klientov." },
   { id: "uspesnost", label: "Úspešnosť po úvodnom", unit: "pct", group: "lievik", why: "Koľko % ľudí po úvodnom tréningu pokračovalo. Kvalita > kvantita." },
   { id: "aktivni", label: "Aktívni klienti (Ø/mes.)", unit: "num", group: "kapacita", why: "Koľko rôznych ľudí za mesiac reálne prišlo." },
@@ -722,11 +726,106 @@ const KPI_EXTRA: KpiDef[] = [
   { id: "online", label: "Online podiel", unit: "pct", group: "cena", why: "Podiel online tréningov na hodnote odtrénovaného — decentralizácia rizika." },
 ];
 
-export function kpiDefs(year: string): KpiDef[] {
+// Targets Jerry moved himself, keyed year → kpi id. They win over his sheet.
+export type KpiOverrides = Record<string, Record<string, { lo?: number; hi?: number }>>;
+
+export function kpiDefs(year: string, overrides?: KpiOverrides): KpiDef[] {
   const t = KPI_YEAR_TARGETS[year] ?? {};
+  const o = overrides?.[year] ?? {};
   return [...KPI_COMMON, ...KPI_EXTRA]
     .filter((d) => d.navrh || t[d.id] || d.id === "marza" || d.id === "trzby")
-    .map((d) => ({ ...d, ...(t[d.id] ?? {}) }));
+    .map((d) => ({ ...d, ...(t[d.id] ?? {}), ...(o[d.id] ?? {}) }));
+}
+
+// Slider bounds for editing a target: wide enough to be useful, tight enough
+// that dragging it feels like a decision rather than a lottery.
+export function kpiSlider(def: KpiDef): { min: number; max: number; step: number } {
+  const base = def.lo || 1;
+  if (def.unit === "czk") {
+    const step = base >= 500000 ? 50000 : base >= 10000 ? 1000 : 50;
+    return { min: Math.max(0, Math.round((base * 0.4) / step) * step), max: Math.round((base * 2) / step) * step, step };
+  }
+  if (def.unit === "pct") return { min: 0, max: Math.max(30, Math.ceil(base * 2)), step: 1 };
+  if (def.unit === "h") return { min: Math.round(base * 0.4), max: Math.round(base * 1.8), step: base > 500 ? 50 : 1 };
+  return { min: Math.max(0, Math.round(base * 0.4)), max: Math.round(base * 2), step: 1 };
+}
+
+// What to actually do about a KPI that is off target. Two rules: every line has
+// to name a lever this studio can pull, and where a number can be computed it is
+// computed — "zdvihni cenu" is advice, "+100 Kč/h ≈ +21 000 Kč/mes" is a decision.
+// Jerry's own book notes get added here once he sends them; until then this is
+// grounded in PSB's data and the advisory rules already in the knowledge base.
+export type KpiAdviceCtx = { value: number; target: number | null; unit: KpiUnit; hodinyMes: number; trzbyMes: number; klienti: number };
+
+export function kpiAdvice(id: string, c: KpiAdviceCtx): string[] {
+  const chyba = c.target != null ? c.target - c.value : 0;
+  const kc = (n: number) => `${Math.round(n).toLocaleString("sk-SK")} Kč`;
+  switch (id) {
+    case "trzby":
+      return [
+        "Tržby sú výsledok troch čísel: koľko hodín odtrénuješ, za koľko, a ako dlho klient zostane. Rásť sa dá v ktoromkoľvek — najlacnejšie je to tretie.",
+        `Dnes robíš ${Math.round(c.hodinyMes)} h/mes. Keby si zdvihol cenu o 100 Kč/h, je to ${kc(c.hodinyMes * 100)}/mes bez jedinej hodiny navyše.`,
+      ];
+    case "marza":
+      return [
+        chyba > 0 ? `Do cieľa chýba ${chyba.toFixed(1)} b. p., čo je pri dnešných tržbách asi ${kc((chyba / 100) * c.trzbyMes)}/mes.` : "Si na cieli — drž náklady, keď porastú tržby.",
+        "Marža sa nezlepší škrtaním drobností. Dve páky, ktoré s ňou naozaj hýbu: cena za hodinu a podiel výplat na tržbách (dnes ~60 %).",
+        "Pozor na poradie: najprv cena, potom náklady. Škrtanie voliteľných nákladov ti dá pár tisíc, cena desaťtisíce.",
+      ];
+    case "rezerva":
+      return [
+        "Toto číslo rozhoduje, či ťa jeden slabý mesiac položí. Break-even ráta s nárokom oboch trénerov, takže rastie zakaždým, keď si zvýšite výplatu.",
+        "Najrýchlejšia páka nie sú tržby, ale záväzné náklady — tie platíš aj v mesiaci, keď nikto nepríde.",
+      ];
+    case "uvodne":
+      return [
+        "Vrch lievika. Ak je tempo nad cieľom a úspešnosť tiež, problém nie je v počte úvodných — netlač viac ľudí do dverí, ktoré fungujú.",
+        "Referencie sú tvoj najsilnejší kanál. Pripomienka na 10 % zľavu za doporučenie je v „Na čo sa pozrieť“ — to je lacnejší úvodný tréning než akákoľvek reklama.",
+      ];
+    case "uspesnost":
+      return [
+        "Vysoká úspešnosť pri malom počte úvodných znamená, že brzdou je vrch lievika, nie predaj.",
+        "Ak klesne: nie je to o cene. Podľa tvojho vlastného manuálu je námietka „je to drahé“ takmer vždy o nejasnom výsledku — vráť sa k tomu, čo klient dostane za 8 týždňov.",
+      ];
+    case "aktivni":
+      return [
+        `Dnes ${Math.round(c.value)} ľudí mesačne. Každý ďalší znamená ďalšie hodiny — pozri najprv kapacitu, či je kam rásť.`,
+        "Ak je kapacita plná, rast už nie je o počte klientov, ale o cene za hodinu.",
+      ];
+    case "hodiny":
+      return [
+        "Strop nie je cieľ. Zdravá zóna je 24–34 h týždenne na trénera; nad ňou rastie riziko vyhorenia rýchlejšie než tržby.",
+        "Ak si na tempe a marža stále zaostáva, odpoveď nie je viac hodín.",
+      ];
+    case "hodinKlient":
+      return [
+        "Málo hodín na klienta = veľa ľudí, čo chodia občas. To je najhorší mix: rovnaká réžia, menej tržieb, horšie výsledky.",
+        "Páka je frekvencia a viazanosť — klient s 6M členstvom má toto číslo dvojnásobné oproti balíčkovému.",
+      ];
+    case "dlzka":
+      return [
+        `Priemer ${c.value.toFixed(1)} mes. Jeden mesiac navyše u každého z ${c.klienti} klientov je ~${kc((c.trzbyMes / Math.max(1, c.klienti)) * c.klienti)} tržieb — a nestojí ani korunu marketingu.`,
+        "Najväčší odchod je na konci balíčka. Widget „Blíži sa koniec balíčka“ je presne na to — ozvať sa skôr, než sa rozhodne sám.",
+        "Prechod z balíčkov na 6M členstvo rieši toto číslo aj kolísavý cashflow naraz.",
+      ];
+    case "hodinovka":
+      return [
+        `Každých +50 Kč/h je pri dnešnom objeme ~${kc(c.hodinyMes * 50)}/mes navyše.`,
+        "Cena sa dá zdvihnúť aj bez cenníka: doviesť starých klientov na nové členstvá, obmedziť zľavy na tie, čo majú dôvod (referencia, BTC).",
+      ];
+    case "ltv":
+      return [
+        `Klient ti za celý čas prinesie ~${kc(c.value)}. To je strop toho, čo sa oplatí zaplatiť za jeho získanie — a odpoveď na otázku, či má Google reklama zmysel.`,
+        "LTV rastie dvomi cestami: dlhšou spoluprácou alebo vyššou cenou. Prvá je lacnejšia.",
+      ];
+    case "online":
+      return [
+        "Online je jediná páka, ktorá zvyšuje tržby bez ďalších hodín v štúdiu — preto je v cieľoch.",
+        "Ak sa nehýbe, nie je to o dopyte, ale o tom, že sa neponúka. Zaraď ho do úvodného tréningu ako druhú možnosť, nie ako náhradu.",
+      ];
+    default:
+      return [];
+  }
 }
 
 export type KpiActual = {
@@ -736,6 +835,8 @@ export type KpiActual = {
   targetLabel: string;
   status: "ok" | "blizko" | "mimo" | "info";
   window: string;
+  extra?: string;          // second reading of the same fact, e.g. the koruny behind a %
+  advice: string[];
 };
 
 type SessionLike = { date: string; client: string; sessionTrainer: string; sessionType: string; duration: number; price: number };
@@ -743,7 +844,7 @@ type PaymentLike = { date: string; amount: number };
 
 // Everything here is derived from the Tracker's own data (PTminder), not from
 // the Excel — the Excel is an archive from 2026-07-31 on.
-export function computeKpis(year: string, sessions: SessionLike[], payments: PaymentLike[]): KpiActual[] {
+export function computeKpis(year: string, sessions: SessionLike[], payments: PaymentLike[], overrides?: KpiOverrides): KpiActual[] {
   const inYear = sessions.filter((s) => s.date.slice(0, 4) === year);
   const months = new Set(inYear.map((s) => s.date.slice(0, 7)));
   const nMonths = months.size || 1;
@@ -809,8 +910,17 @@ export function computeKpis(year: string, sessions: SessionLike[], payments: Pay
 
   const vzasWindow = `${VZAS_MONTH_LABELS[idx[0]]} – ${VZAS_MONTH_LABELS[idx[idx.length - 1]]}`;
   const dataWindow = `${nMonths} mes. ${year}`;
+  const ctx: KpiAdviceCtx = {
+    value: 0, target: null, unit: "num",
+    hodinyMes: hodiny / nMonths,
+    trzbyMes: trzby / nMonths,
+    klienti: Math.round(aktivni),
+  };
+  // The koruna reading of the break-even gap — a percentage alone never told
+  // anyone how big a bad month can be.
+  const rezervaKc = idx.length ? (vzasPrijmy - be) / idx.length : 0;
 
-  return kpiDefs(year).map((def) => {
+  return kpiDefs(year, overrides).map((def) => {
     const value = raw[def.id] ?? 0;
     const target = def.lo == null ? null : def.annual ? (def.lo / 12) * nMonths : def.lo;
     const targetLabel = def.lo == null ? "—"
@@ -821,6 +931,9 @@ export function computeKpis(year: string, sessions: SessionLike[], payments: Pay
     const window = def.id === "marza" || def.id === "rezerva" ? vzasWindow
       : def.id === "dlzka" || def.id === "ltv" ? "celá história"
       : dataWindow;
-    return { def, value, target, targetLabel, status, window };
+    const extra = def.id === "rezerva" ? `${Math.round(rezervaKc).toLocaleString("sk-SK")} Kč / mes. nad break-even`
+      : def.id === "dlzka" ? "mesiacov"
+      : undefined;
+    return { def, value, target, targetLabel, status, window, extra, advice: kpiAdvice(def.id, { ...ctx, value, target, unit: def.unit }) };
   });
 }

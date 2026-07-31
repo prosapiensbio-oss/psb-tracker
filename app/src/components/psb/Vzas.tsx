@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 
-import { fetchMonthNotes, fetchWeekEntries, saveMonthNote, type MonthNote, type WeekEntry } from "../../lib/psb/client";
+import { fetchMonthNotes, fetchVzasSettings, fetchWeekEntries, saveMonthNote, saveVzasSetting, type MonthNote, type WeekEntry } from "../../lib/psb/client";
 import { fmtCZK } from "../../lib/psb/format";
 import { C, mix, S } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
@@ -29,6 +29,7 @@ import {
   KPI_GROUP_LABELS,
   byCommitment,
   computeKpis,
+  kpiSlider,
   commitmentTotal,
   jarekCalc,
   monthDeviations,
@@ -43,6 +44,7 @@ import {
   yearOf,
   type KpiActual,
   type KpiGroup,
+  type KpiOverrides,
   type PersonKey,
   type Vals,
 } from "../../lib/psb/vzas";
@@ -1681,42 +1683,117 @@ function MesacneTab() {
 const kpiFmt = (v: number, unit: string) =>
   unit === "czk" ? fmtCZK(v) : unit === "pct" ? `${v.toFixed(1)} %` : unit === "h" ? `${Math.round(v)} h` : v.toFixed(1);
 
-function KpiRow({ k }: { k: KpiActual }) {
+function KpiRow({ k, onTarget }: { k: KpiActual; onTarget: (id: string, lo: number | null) => void }) {
+  const [open, setOpen] = useState(false);
   const col = k.status === "ok" ? C.green : k.status === "blizko" ? C.orange : k.status === "mimo" ? C.red : C.textMuted;
   const pct = k.target ? (k.value / k.target) * 100 : null;
+  const sl = kpiSlider(k.def);
+  const [draft, setDraft] = useState<number | null>(null);
+  const lo = draft ?? k.def.lo ?? 0;
+
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 12px", borderBottom: `1px solid ${mix(C.border, 55)}`, flexWrap: "wrap" }}>
-      <span style={{ width: 8, height: 8, borderRadius: 999, background: col, flex: "0 0 auto" }} />
-      <div style={{ flex: "1 1 200px", minWidth: 180 }}>
-        <div style={{ fontSize: 13, color: C.text }}>
-          <Info text={`${k.def.why}${k.def.navrh ? " — toto KPI zatiaľ nesleduješ, je to môj návrh." : ""} Merané za: ${k.window}.`} label={k.def.label} />
-          {k.def.navrh && <span style={{ marginLeft: 7, fontSize: 9.5, padding: "1px 6px", borderRadius: 999, border: `1px solid ${mix(C.blue, 45)}`, color: C.blue, verticalAlign: "middle" }}>návrh</span>}
+    <>
+      <div onClick={() => setOpen(!open)}
+        style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 12px", borderBottom: `1px solid ${mix(C.border, 55)}`, flexWrap: "wrap", cursor: "pointer" }}>
+        <span style={{ width: 8, height: 8, borderRadius: 999, background: col, flex: "0 0 auto" }} />
+        <div style={{ flex: "1 1 200px", minWidth: 180 }}>
+          <div style={{ fontSize: 13, color: C.text }}>
+            <span style={{ display: "inline-block", width: 13, color: C.textDim, fontSize: 9 }}>{open ? "▼" : "▶"}</span>
+            <Info text={`${k.def.why}${k.def.navrh ? " — toto KPI zatiaľ nesleduješ, je to môj návrh." : ""} Merané za: ${k.window}.`} label={k.def.label} />
+            {k.def.navrh && <span style={{ marginLeft: 7, fontSize: 9.5, padding: "1px 6px", borderRadius: 999, border: `1px solid ${mix(C.blue, 45)}`, color: C.blue, verticalAlign: "middle" }}>návrh</span>}
+          </div>
+          <div style={{ fontSize: 10.5, color: C.textDim, marginTop: 2, marginLeft: 13 }}>{k.extra ?? k.window}</div>
         </div>
-        <div style={{ fontSize: 10.5, color: C.textDim, marginTop: 2 }}>{k.window}</div>
-      </div>
-      <div style={{ textAlign: "right", minWidth: 110, fontVariantNumeric: "tabular-nums" }}>
-        <div style={{ fontSize: 16, fontWeight: 700, color: C.text }}>{kpiFmt(k.value, k.def.unit)}</div>
+        <div style={{ textAlign: "right", minWidth: 110, fontVariantNumeric: "tabular-nums" }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: C.text }}>{kpiFmt(k.value, k.def.unit)}</div>
+          {k.target != null && (
+            <div style={{ fontSize: 10.5, color: C.textMuted }}>
+              cieľ {k.def.unit === "czk" && !k.def.annual ? fmtCZK(k.def.lo!) : k.targetLabel}
+              {k.def.annual && <> · tempo {pct!.toFixed(0)} %</>}
+            </div>
+          )}
+        </div>
         {k.target != null && (
-          <div style={{ fontSize: 10.5, color: C.textMuted }}>
-            cieľ {k.def.unit === "czk" && !k.def.annual ? fmtCZK(k.def.lo!) : k.targetLabel}
-            {k.def.annual && <> · tempo {pct!.toFixed(0)} %</>}
+          <div style={{ flex: "0 0 84px", height: 6, borderRadius: 999, background: mix(C.border, 70), overflow: "hidden" }}>
+            <div style={{ width: `${Math.min(100, Math.max(3, pct!))}%`, height: "100%", background: col }} />
           </div>
         )}
       </div>
-      {k.target != null && (
-        <div style={{ flex: "0 0 84px", height: 6, borderRadius: 999, background: mix(C.border, 70), overflow: "hidden" }}>
-          <div style={{ width: `${Math.min(100, Math.max(3, pct!))}%`, height: "100%", background: col }} />
+
+      {open && (
+        <div style={{ padding: "12px 14px 16px 33px", background: mix(C.accent, 5), borderBottom: `1px solid ${mix(C.border, 55)}` }}>
+          {k.def.lo != null && (
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.accent, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 8 }}>Cieľ</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                <input type="range" min={sl.min} max={sl.max} step={sl.step} value={lo}
+                  onChange={(e) => setDraft(Number(e.target.value))}
+                  style={{ flex: "1 1 220px", maxWidth: 340, accentColor: C.accent }} />
+                <div style={{ fontSize: 15, fontWeight: 700, color: C.text, fontVariantNumeric: "tabular-nums", minWidth: 110 }}>
+                  {kpiFmt(lo, k.def.unit)}{k.def.annual && <span style={{ fontSize: 11, color: C.textMuted }}> / rok</span>}
+                </div>
+                {draft != null && draft !== k.def.lo && (
+                  <>
+                    <button onClick={() => { onTarget(k.def.id, draft); setDraft(null); }}
+                      style={{ padding: "5px 14px", borderRadius: 8, border: `1px solid ${C.accent}`, background: C.accentBg, color: C.accentLight, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                      Uložiť cieľ
+                    </button>
+                    <button onClick={() => setDraft(null)}
+                      style={{ padding: "5px 10px", borderRadius: 8, border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted, fontSize: 12, cursor: "pointer" }}>
+                      Späť
+                    </button>
+                  </>
+                )}
+                <button onClick={() => { onTarget(k.def.id, null); setDraft(null); }}
+                  style={{ padding: "5px 10px", borderRadius: 8, border: `1px solid ${C.border}`, background: "transparent", color: C.textDim, fontSize: 11, cursor: "pointer" }}>
+                  Pôvodný
+                </button>
+              </div>
+            </div>
+          )}
+
+          {k.advice.length > 0 && (
+            <>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.accent, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 7 }}>Ako to posunúť</div>
+              <ul style={{ margin: 0, paddingLeft: 18, display: "flex", flexDirection: "column", gap: 6 }}>
+                {k.advice.map((a, i) => <li key={i} style={{ fontSize: 12.5, color: C.textMuted, lineHeight: 1.55 }}>{a}</li>)}
+              </ul>
+              <div style={{ fontSize: 11, color: C.textDim, marginTop: 10, fontStyle: "italic" }}>
+                Zatiaľ z tvojich dát a z manuálu PSB. Keď pošleš poznámky ku knihám, doplním sem rady podľa nich.
+              </div>
+            </>
+          )}
         </div>
       )}
-    </div>
+    </>
   );
 }
 
 function KpiTab({ data }: { data: PSBData }) {
   const [year, setYear] = useState("2026");
+  // Targets Jerry moved himself live in the DB, so they survive a redeploy and
+  // are the same on his phone and his laptop.
+  const [overrides, setOverrides] = useState<KpiOverrides>({});
+  const [savedAt, setSavedAt] = useState(0);
+  useEffect(() => {
+    fetchVzasSettings().then((s) => {
+      const t = s["kpi_targets"];
+      if (t && typeof t === "object") setOverrides(t as KpiOverrides);
+    });
+  }, []);
+  const setTarget = (id: string, lo: number | null) => {
+    setOverrides((prev) => {
+      const forYear = { ...(prev[year] ?? {}) };
+      if (lo == null) delete forYear[id];
+      else forYear[id] = { ...(forYear[id] ?? {}), lo };
+      const next = { ...prev, [year]: forYear };
+      saveVzasSetting("kpi_targets", next).then((ok) => ok && setSavedAt(Date.now()));
+      return next;
+    });
+  };
   const kpis = useMemo(
-    () => computeKpis(year, data.sessions, data.payments),
-    [year, data.sessions, data.payments],
+    () => computeKpis(year, data.sessions, data.payments, overrides),
+    [year, data.sessions, data.payments, overrides],
   );
   const groups: KpiGroup[] = ["peniaze", "lievik", "kapacita", "cena"];
   const mimo = kpis.filter((k) => k.status === "mimo");
@@ -1737,6 +1814,7 @@ function KpiTab({ data }: { data: PSBData }) {
           </div>
         </div>
         <div style={{ fontSize: 12.5, color: C.textMuted, lineHeight: 1.55 }}>
+          {savedAt > 0 && <span style={{ color: C.green, marginRight: 8 }}>✓ Cieľ uložený ·</span>}
           Na cieli <b style={{ color: C.green }}>{ok.length}</b> z {kpis.filter((k) => k.target != null).length}
           {mimo.length > 0 && <> · mimo cieľa <b style={{ color: C.red }}>{mimo.map((k) => k.def.label).join(", ")}</b></>}
         </div>
@@ -1748,7 +1826,7 @@ function KpiTab({ data }: { data: PSBData }) {
         return (
           <Card key={g}>
             <H3>{KPI_GROUP_LABELS[g]}</H3>
-            <div>{rows.map((k) => <KpiRow key={k.def.id} k={k} />)}</div>
+            <div>{rows.map((k) => <KpiRow key={k.def.id} k={k} onTarget={setTarget} />)}</div>
           </Card>
         );
       })}
