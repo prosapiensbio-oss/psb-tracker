@@ -249,7 +249,7 @@ export function PSBApp() {
           </>
         )}
 
-        {active === "vzas" && <Vzas sub={vzasSub} onSub={setVzasSub} />}
+        {active === "vzas" && <Vzas sub={vzasSub} onSub={setVzasSub} data={data} />}
       </div>
       <div style={{ ...S.h3, textAlign: "center", color: C.textDim, fontSize: 11, padding: "8px 0 24px", fontWeight: 400 }}>
         ProSapiens Biomechanic · interný nástroj · nezdieľať externe

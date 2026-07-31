@@ -192,13 +192,28 @@ export type SalaryPerson = {
   personal: Record<string, Vals>;
 };
 
+// HOURS — the rule, confirmed by Jerry (2026-07-31), so nobody "fixes" it later:
+// ÚVODNÉ TRÉNINGY DO MZDOVÝCH HODÍN NEPATRIA. They are paid separately (300/600
+// Kč a piece in 2025) and PTminder logs them at 60 min in 2025 / 90 min in 2026.
+// That is the whole reason PTminder reports 18–25 h more per person than the
+// rows below: the gap tracks the intro sessions almost exactly (apr 2026, the
+// one month with zero intros, matches to the hour). Switching these arrays to
+// raw PTminder hours would silently inflate both founders' entitlement by
+// ~43 h ≈ 36 000 Kč and shrink the debts by the same amount.
+//
+// Two months WERE corrected against PTminder (Jerry apr 2025 51 → 58, Terezka
+// aug 2025 61 → 68) — those gaps are not explained by intros and both months
+// carry Jerry's own note about the books being behind ("boli sme v Amerike",
+// "dostrácali sme sa vo výplatách"), so they read as typos in the Excel. Neither
+// month falls under the fix+variabil model, so no debt balance moves.
+
 export const SALARY: Record<PersonKey, SalaryPerson> = {
   jerry: {
     label: "Jerry",
     fix: CURRENT_ERA.fix,
     hoursThreshold: CURRENT_ERA.hoursThreshold,
     hourlyRate: CURRENT_ERA.hourlyRate,
-    hours: [73.5, 88, 85, 51, 101, 76.5, 79, 75, 79.5, 92, 74, 56, 85, 86, 106, 106, 84, 82],
+    hours: [73.5, 88, 85, 58, 101, 76.5, 79, 75, 79.5, 92, 74, 56, 85, 86, 106, 106, 84, 82],
     personal: {
       // 2025 jan–júl is the sheet's own split (základ + úvodné + extra);
       // aug–dec the Excel records only the monthly total, so it lands in "Výplata".
@@ -219,7 +234,7 @@ export const SALARY: Record<PersonKey, SalaryPerson> = {
     fix: CURRENT_ERA.fix,
     hoursThreshold: CURRENT_ERA.hoursThreshold,
     hourlyRate: CURRENT_ERA.hourlyRate,
-    hours: [81, 94, 104, 61, 93, 87, 74, 61, 74, 86, 70, 66, 73, 67, 95, 97, 99, 84],
+    hours: [81, 94, 104, 61, 93, 87, 74, 68, 74, 86, 70, 66, 73, 67, 95, 97, 99, 84],
     personal: {
       "Výplata": [45320.9, 45521.7, 59832.5, 53854.5, 57633.8, 47075, 53074, 23410, 44138.93, 45764.4, 38366.5, 37802.5, 10900, 17230, 18200, 24000, 9438, 20500],
       "Úvodné tréningy (2025)": [0, 0, 600, 0, 300, 300, 300, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -257,7 +272,7 @@ export const MATYAS: Vals = [3200, 2720, 4320, 5120, 2560, 2860, 3840, 2880, 318
 // (The Excel's own "Mesačné výsledky" sheet lists only the PTminder figure next
 // to a profit computed from the total — which is why jan/feb 2025 look
 // inconsistent there. Here both lines are visible.)
-export const PRIJMY_PTMINDER: Vals = [166417, 219349, 170952, 105775, 189237, 133560, 190118.5, 153946.5, 134345, 145895.5, 180407, 170136, 149933, 221660, 122285.5, 245495, 221469.5, 180850];
+export const PRIJMY_PTMINDER: Vals = [166417, 219349, 170952, 105775, 189237, 133560, 190118.5, 153946.5, 134345, 145895.5, 180407, 168836, 149933, 221660, 122285.5, 245495, 221560, 180850];
 export const PRIJMY_INE: Vals = [14000, 34000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 500, 180, 0, 0, 0, 0, 0];
 export const PRIJMY: Vals = PRIJMY_PTMINDER.map((v, i) => v + PRIJMY_INE[i]);
 
@@ -634,3 +649,176 @@ export const VZAS_TARGETS_BY_YEAR: Record<string, YearTargets> = {
   "2026": { rocneTrzby: 2300000, marzaPct: 12, hodinyJerry: 90, hodinyTerezka: 80 },
 };
 export const VZAS_TARGETS = VZAS_TARGETS_BY_YEAR["2026"]; // medzikrok 12–15 %, dlhodobo 20 %
+
+// ── KPI ──────────────────────────────────────────────────────────────────────
+// Jerry's own KPI sheets, now computed from data instead of retyped by hand.
+// Two things stay explicit: WHOSE number a target is (his sheet vs my proposal)
+// and WHAT WINDOW it was measured over — a year-to-date figure judged against a
+// full-year target is the single easiest way to make a good year look like a
+// failure, which is exactly what the old Tržby card used to do.
+export type KpiUnit = "czk" | "pct" | "num" | "h";
+export type KpiGroup = "peniaze" | "lievik" | "kapacita" | "cena";
+export type KpiDef = {
+  id: string;
+  label: string;
+  unit: KpiUnit;
+  group: KpiGroup;
+  lo?: number;      // bottom of the target band (also the pass mark)
+  hi?: number;      // top of the band, informational — above it is not a failure
+  annual?: boolean; // target is a full-year total → pro-rated by months elapsed
+  navrh?: boolean;  // my proposal, not from Jerry's sheet
+  why: string;
+};
+
+export const KPI_GROUP_LABELS: Record<KpiGroup, string> = {
+  peniaze: "Peniaze",
+  lievik: "Lievik — odkiaľ chodia klienti",
+  kapacita: "Kapacita a klienti",
+  cena: "Cena a mix",
+};
+
+const KPI_COMMON: KpiDef[] = [
+  { id: "trzby", label: "Tržby", unit: "czk", group: "peniaze", annual: true, why: "Ročný plán prepočítaný na uplynulé mesiace." },
+  { id: "marza", label: "Zisková marža", unit: "pct", group: "peniaze", why: "Koľko z tržby zostane po všetkom vrátane výplat." },
+  { id: "rezerva", label: "Rezerva nad break-even", unit: "pct", group: "peniaze", lo: 20, navrh: true, why: "O koľko % sú tržby nad bodom, kde firma pokryje prevádzku aj nároky na výplaty. Pod 20 % stačí jeden slabý mesiac na stratu — a presne to sa v 2025 stalo päťkrát." },
+  { id: "uvodne", label: "Úvodné tréningy", unit: "num", group: "lievik", annual: true, why: "Vrch lievika: bez úvodných niet nových klientov." },
+  { id: "uspesnost", label: "Úspešnosť po úvodnom", unit: "pct", group: "lievik", why: "Koľko % ľudí po úvodnom tréningu pokračovalo. Kvalita > kvantita." },
+  { id: "aktivni", label: "Aktívni klienti (Ø/mes.)", unit: "num", group: "kapacita", why: "Koľko rôznych ľudí za mesiac reálne prišlo." },
+  { id: "hodiny", label: "Individuálne hodiny", unit: "h", group: "kapacita", annual: true, why: "Odtrénované hodiny bez úvodných — optimum bez vyhorenia." },
+  { id: "dlzka", label: "Priemerná dĺžka spolupráce", unit: "num", group: "kapacita", lo: 12, navrh: true, why: "Koľko mesiacov klient v priemere zostane. V štúdiu rozhoduje o tržbách viac než počet nových — jeden mesiac navyše u každého klienta je lacnejší než celý nový lievik. Číslo je orezané dĺžkou histórie, takže je to spodná hranica." },
+  { id: "hodinovka", label: "Priemerná hodinovka", unit: "czk", group: "cena", why: "Tržby delené odtrénovanými hodinami — základ pre 20 % maržu." },
+  { id: "ltv", label: "Hodnota klienta (LTV)", unit: "czk", group: "cena", lo: 30000, navrh: true, why: "Koľko za celý čas spolupráce klient v priemere zaplatí. S týmto číslom sa dá povedať, koľko sa oplatí zaplatiť za získanie jedného klienta." },
+];
+
+// Jerry's numbers per year; anything not listed keeps the common definition
+// without a target (shown as informational).
+const KPI_YEAR_TARGETS: Record<string, Record<string, { lo?: number; hi?: number }>> = {
+  "2025": {
+    trzby: { lo: 2000000 },
+    marza: { lo: 3 },
+    uvodne: { lo: 40 },
+    uspesnost: { lo: 75 },
+    hodiny: { lo: 2250 },
+  },
+  "2026": {
+    trzby: { lo: 2300000 },
+    marza: { lo: 12 },
+    uvodne: { lo: 36, hi: 48 },
+    uspesnost: { lo: 60, hi: 65 },
+    aktivni: { lo: 45, hi: 50 },
+    hodiny: { lo: 2050, hi: 2150 },
+    hodinovka: { lo: 1050 },
+    online: { lo: 10, hi: 15 },
+    hodinKlient: { lo: 25 },
+  },
+};
+
+// Two 2026-only KPIs from his sheet — they had no meaning in 2025 (no online
+// service existed) but they are his, so they show up when the year has them.
+const KPI_EXTRA: KpiDef[] = [
+  { id: "hodinKlient", label: "Priemer hodín na klienta", unit: "h", group: "kapacita", why: "Ročné hodiny delené počtom klientov — stabilnejší cashflow než veľa ľudí občas." },
+  { id: "online", label: "Online podiel", unit: "pct", group: "cena", why: "Podiel online tréningov na hodnote odtrénovaného — decentralizácia rizika." },
+];
+
+export function kpiDefs(year: string): KpiDef[] {
+  const t = KPI_YEAR_TARGETS[year] ?? {};
+  return [...KPI_COMMON, ...KPI_EXTRA]
+    .filter((d) => d.navrh || t[d.id] || d.id === "marza" || d.id === "trzby")
+    .map((d) => ({ ...d, ...(t[d.id] ?? {}) }));
+}
+
+export type KpiActual = {
+  def: KpiDef;
+  value: number;
+  target: number | null;   // pro-rated where annual
+  targetLabel: string;
+  status: "ok" | "blizko" | "mimo" | "info";
+  window: string;
+};
+
+type SessionLike = { date: string; client: string; sessionTrainer: string; sessionType: string; duration: number; price: number };
+type PaymentLike = { date: string; amount: number };
+
+// Everything here is derived from the Tracker's own data (PTminder), not from
+// the Excel — the Excel is an archive from 2026-07-31 on.
+export function computeKpis(year: string, sessions: SessionLike[], payments: PaymentLike[]): KpiActual[] {
+  const inYear = sessions.filter((s) => s.date.slice(0, 4) === year);
+  const months = new Set(inYear.map((s) => s.date.slice(0, 7)));
+  const nMonths = months.size || 1;
+  const payYear = payments.filter((p) => p.date.slice(0, 4) === year);
+
+  const uvodne = inYear.filter((s) => s.sessionType === "UVODNE");
+  const trenovane = inYear.filter((s) => s.sessionType !== "UVODNE");
+  const hodiny = trenovane.reduce((a, s) => a + s.duration / 60, 0);
+  const hodnota = inYear.reduce((a, s) => a + s.price, 0);
+  const onlineHodnota = inYear.filter((s) => s.sessionType === "ONLINE").reduce((a, s) => a + s.price, 0);
+  const trzby = payYear.reduce((a, p) => a + p.amount, 0);
+  const klienti = new Set(inYear.map((s) => s.client)).size || 1;
+
+  // Active clients: distinct people who actually came, averaged over months.
+  const perMonth: Record<string, Set<string>> = {};
+  for (const s of inYear) (perMonth[s.date.slice(0, 7)] ||= new Set()).add(s.client);
+  const aktivni = Object.values(perMonth).reduce((a, s) => a + s.size, 0) / nMonths;
+
+  // Conversion: of the people whose first intro session falls in this year, how
+  // many came back for a real session afterwards.
+  const firstUvodny: Record<string, string> = {};
+  for (const s of sessions) {
+    if (s.sessionType !== "UVODNE") continue;
+    if (!firstUvodny[s.client] || s.date < firstUvodny[s.client]) firstUvodny[s.client] = s.date;
+  }
+  const kandidati = Object.entries(firstUvodny).filter(([, d]) => d.slice(0, 4) === year);
+  const pokracovali = kandidati.filter(([c, d]) =>
+    sessions.some((s) => s.client === c && s.date > d && s.sessionType !== "UVODNE"));
+  const uspesnost = kandidati.length ? (pokracovali.length / kandidati.length) * 100 : 0;
+
+  // Tenure + LTV over the whole history (not just this year) — a one-year slice
+  // would say more about the window than about the clients.
+  const span: Record<string, { first: string; last: string; czk: number; n: number }> = {};
+  for (const s of sessions) {
+    const g = (span[s.client] ||= { first: s.date, last: s.date, czk: 0, n: 0 });
+    if (s.date < g.first) g.first = s.date;
+    if (s.date > g.last) g.last = s.date;
+    g.czk += s.price;
+    g.n++;
+  }
+  const usadeni = Object.values(span).filter((g) => g.n >= 3);
+  const MES = 1000 * 60 * 60 * 24 * 30.44;
+  const dlzka = usadeni.length ? usadeni.reduce((a, g) => a + (new Date(g.last).getTime() - new Date(g.first).getTime()) / MES, 0) / usadeni.length : 0;
+  const ltv = usadeni.length ? usadeni.reduce((a, g) => a + g.czk, 0) / usadeni.length : 0;
+
+  // Margin + break-even reserve come from VZAS (Excel-validated costs), so they
+  // only span the months VZAS covers — jan–jún for 2026, not the full year.
+  const p = pnlCalc();
+  const idx = YEAR_IDX[year] ?? [];
+  const vzasPrijmy = idx.reduce((a, i) => a + p.prijmy[i], 0);
+  const vzasZisk = idx.reduce((a, i) => a + p.hrubyZisk[i], 0);
+  const marza = vzasPrijmy > 0 ? (vzasZisk / vzasPrijmy) * 100 : 0;
+  const j = salaryCalc("jerry");
+  const t = salaryCalc("terezka");
+  const be = idx.reduce((a, i) => a + p.bezVyplat[i] + j.narok[i] + t.narok[i] + p.matyas[i], 0);
+  const rezerva = be > 0 ? ((vzasPrijmy - be) / be) * 100 : 0;
+
+  const raw: Record<string, number> = {
+    trzby, marza, rezerva, uvodne: uvodne.length, uspesnost, aktivni, hodiny,
+    hodinKlient: hodiny / klienti, hodinovka: hodiny > 0 ? trzby / hodiny : 0,
+    online: hodnota > 0 ? (onlineHodnota / hodnota) * 100 : 0, dlzka, ltv,
+  };
+
+  const vzasWindow = `${VZAS_MONTH_LABELS[idx[0]]} – ${VZAS_MONTH_LABELS[idx[idx.length - 1]]}`;
+  const dataWindow = `${nMonths} mes. ${year}`;
+
+  return kpiDefs(year).map((def) => {
+    const value = raw[def.id] ?? 0;
+    const target = def.lo == null ? null : def.annual ? (def.lo / 12) * nMonths : def.lo;
+    const targetLabel = def.lo == null ? "—"
+      : def.annual ? (def.hi ? `${def.lo}–${def.hi} / rok` : `${def.lo} / rok`)
+      : def.hi ? `${def.lo}–${def.hi}` : `≥ ${def.lo}`;
+    const status: KpiActual["status"] =
+      target == null ? "info" : value >= target ? "ok" : value >= target * 0.85 ? "blizko" : "mimo";
+    const window = def.id === "marza" || def.id === "rezerva" ? vzasWindow
+      : def.id === "dlzka" || def.id === "ltv" ? "celá história"
+      : dataWindow;
+    return { def, value, target, targetLabel, status, window };
+  });
+}

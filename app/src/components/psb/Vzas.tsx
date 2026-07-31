@@ -3,6 +3,7 @@ import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import { fetchMonthNotes, fetchWeekEntries, saveMonthNote, type MonthNote, type WeekEntry } from "../../lib/psb/client";
 import { fmtCZK } from "../../lib/psb/format";
 import { C, mix, S } from "../../lib/psb/theme";
+import type { PSBData } from "../../lib/psb/types";
 import {
   CURRENT_ERA,
   DEBT_CHECKPOINT_2026,
@@ -25,8 +26,9 @@ import {
   itemNote,
   VZAS_MONTH_LABELS,
   VZAS_TARGETS,
-  VZAS_TARGETS_BY_YEAR,
+  KPI_GROUP_LABELS,
   byCommitment,
+  computeKpis,
   commitmentTotal,
   jarekCalc,
   monthDeviations,
@@ -39,6 +41,8 @@ import {
   sumSection,
   vSum,
   yearOf,
+  type KpiActual,
+  type KpiGroup,
   type PersonKey,
   type Vals,
 } from "../../lib/psb/vzas";
@@ -1674,34 +1678,57 @@ function MesacneTab() {
 }
 
 // ── KPI ──────────────────────────────────────────────────────────────────────
-function KpiCard({ label, value, target, unit = "" }: { label: ReactNode; value: number; target?: number; unit?: string }) {
-  const p = target ? (value / target) * 100 : 0;
-  const color = !target ? C.accentLight : p >= 100 ? C.green : p >= 75 ? C.orange : C.red;
+const kpiFmt = (v: number, unit: string) =>
+  unit === "czk" ? fmtCZK(v) : unit === "pct" ? `${v.toFixed(1)} %` : unit === "h" ? `${Math.round(v)} h` : v.toFixed(1);
+
+function KpiRow({ k }: { k: KpiActual }) {
+  const col = k.status === "ok" ? C.green : k.status === "blizko" ? C.orange : k.status === "mimo" ? C.red : C.textMuted;
+  const pct = k.target ? (k.value / k.target) * 100 : null;
   return (
-    <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: "14px 16px" }}>
-      <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: 22, fontWeight: 700, color: C.text, fontVariantNumeric: "tabular-nums" }}>{unit === " Kč" ? fmtCZK(value) : `${Math.round(value)}${unit}`}</div>
-      {target != null && <div style={{ fontSize: 11, color, marginTop: 4 }}>Cieľ: {unit === " Kč" ? fmtCZK(target) : `${target}${unit}`} ({p.toFixed(0)} %)</div>}
+    <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 12px", borderBottom: `1px solid ${mix(C.border, 55)}`, flexWrap: "wrap" }}>
+      <span style={{ width: 8, height: 8, borderRadius: 999, background: col, flex: "0 0 auto" }} />
+      <div style={{ flex: "1 1 200px", minWidth: 180 }}>
+        <div style={{ fontSize: 13, color: C.text }}>
+          <Info text={`${k.def.why}${k.def.navrh ? " — toto KPI zatiaľ nesleduješ, je to môj návrh." : ""} Merané za: ${k.window}.`} label={k.def.label} />
+          {k.def.navrh && <span style={{ marginLeft: 7, fontSize: 9.5, padding: "1px 6px", borderRadius: 999, border: `1px solid ${mix(C.blue, 45)}`, color: C.blue, verticalAlign: "middle" }}>návrh</span>}
+        </div>
+        <div style={{ fontSize: 10.5, color: C.textDim, marginTop: 2 }}>{k.window}</div>
+      </div>
+      <div style={{ textAlign: "right", minWidth: 110, fontVariantNumeric: "tabular-nums" }}>
+        <div style={{ fontSize: 16, fontWeight: 700, color: C.text }}>{kpiFmt(k.value, k.def.unit)}</div>
+        {k.target != null && (
+          <div style={{ fontSize: 10.5, color: C.textMuted }}>
+            cieľ {k.def.unit === "czk" && !k.def.annual ? fmtCZK(k.def.lo!) : k.targetLabel}
+            {k.def.annual && <> · tempo {pct!.toFixed(0)} %</>}
+          </div>
+        )}
+      </div>
+      {k.target != null && (
+        <div style={{ flex: "0 0 84px", height: 6, borderRadius: 999, background: mix(C.border, 70), overflow: "hidden" }}>
+          <div style={{ width: `${Math.min(100, Math.max(3, pct!))}%`, height: "100%", background: col }} />
+        </div>
+      )}
     </div>
   );
 }
 
-function KpiTab() {
-  const p = pnlCalc();
+function KpiTab({ data }: { data: PSBData }) {
   const [year, setYear] = useState("2026");
-  const idx = YEAR_IDX[year];
-  const t = VZAS_TARGETS_BY_YEAR[year];
-  const trzby = vSum(pick(p.prijmy, idx));
-  const zisk = vSum(pick(p.hrubyZisk, idx));
-  const marza = trzby > 0 ? (zisk / trzby) * 100 : 0;
-  const plan = (t.rocneTrzby / 12) * idx.length;
+  const kpis = useMemo(
+    () => computeKpis(year, data.sessions, data.payments),
+    [year, data.sessions, data.payments],
+  );
+  const groups: KpiGroup[] = ["peniaze", "lievik", "kapacita", "cena"];
+  const mimo = kpis.filter((k) => k.status === "mimo");
+  const ok = kpis.filter((k) => k.status === "ok");
+
   return (
     <>
       <Card>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-          <H3><Info text="Kľúčové ukazovatele voči cieľom daného roka. Ročný cieľ tržieb sa prepočítava na uplynulé mesiace — porovnávať polrok s celoročným cieľom by ukazovalo ~50 % a vyzeralo by to ako zaostávanie, hoci ste na pláne." label={`KPI voči cieľom ${year}`} /></H3>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+          <H3><Info text="Tvoje KPI z hárku „KPI“, ale počítané z dát v Trackeri, nie prepisované ručne. Ročné ciele sa prepočítavajú na uplynulé mesiace — porovnávať polrok s celoročným cieľom by ukazovalo ~50 % a vyzeralo by to ako zaostávanie, hoci si na pláne. Pri každom riadku je napísané, za aké obdobie je meraný." label={`KPI ${year}`} /></H3>
           <div style={{ display: "flex", gap: 4 }}>
-            {Object.keys(VZAS_TARGETS_BY_YEAR).map((y) => (
+            {["2025", "2026"].map((y) => (
               <button key={y} onClick={() => setYear(y)}
                 style={{ padding: "5px 12px", borderRadius: 7, border: `1px solid ${year === y ? C.accent : C.border}`, background: year === y ? C.accentBg : "transparent", color: year === y ? C.accentLight : C.textMuted, fontSize: 12, cursor: "pointer" }}>
                 {y}
@@ -1709,28 +1736,33 @@ function KpiTab() {
             ))}
           </div>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 12 }}>
-          <KpiCard
-            label={<Info text={`Ročný cieľ ${fmtCZK(t.rocneTrzby)} prepočítaný na ${idx.length} z 12 mesiacov = ${fmtCZK(plan)}.`} label={`Tržby / plán za ${idx.length} mes.`} />}
-            value={trzby}
-            target={plan}
-            unit=" Kč"
-          />
-          <KpiCard label={<Info text={`Cieľ roka ${year} bol ${t.marzaPct} %. Pre 2026 je to medzikrok 12–15 %, dlhodobo 20 %.`} label={`Marža ${year}`} />} value={marza} target={t.marzaPct} unit=" %" />
-          <KpiCard label="Ø hodín/mes · Jerry" value={avg(pick(SALARY.jerry.hours, idx))} target={t.hodinyJerry} unit="h" />
-          <KpiCard label="Ø hodín/mes · Terezka" value={avg(pick(SALARY.terezka.hours, idx))} target={t.hodinyTerezka} unit="h" />
+        <div style={{ fontSize: 12.5, color: C.textMuted, lineHeight: 1.55 }}>
+          Na cieli <b style={{ color: C.green }}>{ok.length}</b> z {kpis.filter((k) => k.target != null).length}
+          {mimo.length > 0 && <> · mimo cieľa <b style={{ color: C.red }}>{mimo.map((k) => k.def.label).join(", ")}</b></>}
         </div>
       </Card>
+
+      {groups.map((g) => {
+        const rows = kpis.filter((k) => k.def.group === g);
+        if (!rows.length) return null;
+        return (
+          <Card key={g}>
+            <H3>{KPI_GROUP_LABELS[g]}</H3>
+            <div>{rows.map((k) => <KpiRow key={k.def.id} k={k} />)}</div>
+          </Card>
+        );
+      })}
+
       <Card>
-        <H3>Vybavenie, Ciele 2026 a marketing štatistiky</H3>
-        <Empty>Editovateľné zoznamy pribudnú neskôr — túto sekciu riešime až po importe z banky.</Empty>
+        <H3>Ciele 2026, vybavenie a marketingová história</H3>
+        <Empty>Zoznam 13 cieľov s termínmi, nákupný zoznam vybavenia a mesačné marketingové čísla z 2025 sú zatiaľ len v Exceli — doplníme ich sem ako ďalší krok.</Empty>
       </Card>
     </>
   );
 }
 
 // ── module shell ─────────────────────────────────────────────────────────────
-export function Vzas({ sub, onSub }: { sub: string; onSub: (s: string) => void }) {
+export function Vzas({ sub, onSub, data }: { sub: string; onSub: (s: string) => void; data: PSBData }) {
   // Výsledky is one menu entry with its own second level (Kvartálne/Mesačné/KPI).
   const [vysledkySub, setVysledkySub] = useState("kvartalne");
   const isVysledky = sub === "vysledky";
@@ -1770,7 +1802,7 @@ export function Vzas({ sub, onSub }: { sub: string; onSub: (s: string) => void }
           </div>
           {vysledkySub === "kvartalne" && <KvartalneTab />}
           {vysledkySub === "mesacne" && <MesacneTab />}
-          {vysledkySub === "kpi" && <KpiTab />}
+          {vysledkySub === "kpi" && <KpiTab data={data} />}
         </>
       )}
     </>
