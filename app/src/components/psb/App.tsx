@@ -29,6 +29,7 @@ import { Treningy } from "./Treningy";
 import { Klienti } from "./Klienti";
 import { Financie } from "./Financie";
 import { SixMTracker } from "./SixM";
+import { Marketing } from "./Marketing";
 import { Vzas } from "./Vzas";
 
 export type Actions = {
@@ -54,6 +55,7 @@ const TRACKER_SECTIONS = [
   { id: "treningy", label: "Tréningy", icon: "calendar" },
   { id: "klienti", label: "Klienti", icon: "userCheck" },
   { id: "financie", label: "Financie", icon: "wallet" },
+  { id: "marketing", label: "Marketing", icon: "activity" },
   { id: "6m", label: "6M Tracker", icon: "activity" },
 ];
 const TRACKER_IDS = TRACKER_SECTIONS.map((s) => s.id);
@@ -245,6 +247,7 @@ export function PSBApp() {
             {trackerSection === "treningy" && <Treningy data={data} clients={clients} sub={treningySub} onSub={setTreningySub} focus={treningyFocus} />}
             {trackerSection === "klienti" && <Klienti clients={clients} capacity={capacity} actions={actions} focus={klientiFocus} leads={data.leads} />}
             {trackerSection === "financie" && <Financie data={data} clients={clients} focus={financieFocus} />}
+            {trackerSection === "marketing" && <Marketing data={data} clients={clients} leads={data.leads} />}
             {trackerSection === "6m" && <SixMTracker sixM={sixM} actions={actions} />}
           </>
         )}
