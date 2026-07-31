@@ -4,19 +4,28 @@ import { fetchMonthNotes, fetchWeekEntries, saveMonthNote, type MonthNote, type 
 import { fmtCZK } from "../../lib/psb/format";
 import { C, mix, S } from "../../lib/psb/theme";
 import {
-  DEBT_OPENING,
+  CURRENT_ERA,
+  DEBT_CHECKPOINT_2026,
   JAREK_SPLATKY,
+  JAREK_VKLADY,
   PNL,
   PRIJMY,
+  PRIJMY_INE,
+  PRIJMY_PTMINDER,
+  QUARTERS,
   SALARY,
+  SALARY_ERAS,
   SPOLOCNE,
   MONTH_QUESTIONS,
   SEED_ANSWERS,
   SEED_NOTES,
+  YEAR_IDX,
   answerKey,
+  eraAt,
   itemNote,
   VZAS_MONTH_LABELS,
   VZAS_TARGETS,
+  VZAS_TARGETS_BY_YEAR,
   byCommitment,
   commitmentTotal,
   jarekCalc,
@@ -29,6 +38,7 @@ import {
   sumItems,
   sumSection,
   vSum,
+  yearOf,
   type PersonKey,
   type Vals,
 } from "../../lib/psb/vzas";
@@ -42,26 +52,30 @@ const pct = (cur: number, prev: number) => (prev !== 0 ? ((cur - prev) / Math.ab
 const pctStr = (v: number | null) => (v == null ? "—" : `${v > 0 ? "▲" : v < 0 ? "▼" : "►"} ${v.toFixed(1)} %`);
 
 // ── period filter shared by the tabs ─────────────────────────────────────────
+const ALL_IDX = MONTHS.map((_, i) => i);
 const RANGES = [
-  { value: "all", label: "Celé obdobie" },
-  { value: "q1", label: "Q1 (jan–mar)" },
-  { value: "q2", label: "Q2 (apr–jún)" },
+  { value: "all", label: "Celé obdobie (18 mes.)" },
+  { value: "2026", label: "2026 (jan–jún)" },
+  { value: "2025", label: "2025 (celý rok)" },
+  { value: "last6", label: "Posledných 6 mes." },
+  { value: "last12", label: "Posledných 12 mes." },
   { value: "custom", label: "Vlastné" },
 ];
 
-function useRange() {
-  const [win, setWin] = useState("all");
+function useRange(initial = "all") {
+  const [win, setWin] = useState(initial);
   const [from, setFrom] = useState(0);
   const [to, setTo] = useState(MONTHS.length - 1);
   const idx = useMemo(() => {
-    if (win === "q1") return [0, 1, 2];
-    if (win === "q2") return [3, 4, 5];
+    if (YEAR_IDX[win]) return YEAR_IDX[win];
+    if (win === "last6") return ALL_IDX.slice(-6);
+    if (win === "last12") return ALL_IDX.slice(-12);
     if (win === "custom") {
       const lo = Math.min(from, to);
       const hi = Math.max(from, to);
       return Array.from({ length: hi - lo + 1 }, (_, i) => lo + i);
     }
-    return MONTHS.map((_, i) => i);
+    return ALL_IDX;
   }, [win, from, to]);
   return { win, setWin, from, setFrom, to, setTo, idx };
 }
@@ -70,7 +84,7 @@ type Range = ReturnType<typeof useRange>;
 const pick = (v: Vals, idx: number[]) => idx.map((i) => v[i]);
 
 function RangeBar({ r, extra }: { r: Range; extra?: ReactNode }) {
-  const opts = MONTHS.map((m, i) => ({ value: String(i), label: `${m} 26` }));
+  const opts = MONTHS.map((m, i) => ({ value: String(i), label: m }));
   return (
     <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
       <Select value={r.win} onChange={r.setWin} options={RANGES} />
@@ -157,7 +171,12 @@ function TotalRow({ label, values, color, big = false, showAvg = true, onClick, 
   );
 }
 
-const ScrollX = ({ children }: { children: ReactNode }) => <div style={{ overflowX: "auto" }}>{children}</div>;
+// 18 columns rarely fit, so a table opens at the newest month on the right and
+// scrolls left into the history — the same rule the charts follow.
+const ScrollX = ({ children, dep }: { children: ReactNode; dep?: unknown }) => {
+  const ref = useScrollEnd<HTMLDivElement>(true, dep);
+  return <div ref={ref} style={{ overflowX: "auto" }}>{children}</div>;
+};
 const tableStyle = { width: "100%", borderCollapse: "collapse" as const, minWidth: 760 };
 
 // Bar chart with a zero baseline — the shared ValueBars clamps negatives to
@@ -279,7 +298,7 @@ function CommitmentTable({ idx }: { idx: number[] }) {
 
   return (
     <>
-      <ScrollX>
+      <ScrollX dep={idx.length}>
         <table style={tableStyle}>
           <thead><MonthHead idx={idx} /></thead>
           <tbody>
@@ -293,7 +312,7 @@ function CommitmentTable({ idx }: { idx: number[] }) {
             <Row label="Výplaty" values={pick(p.vyplatySpolu, idx)} bold color={C.red}>
               <Row label="Jerry (Poslané)" values={pick(p.poslaneJerry, idx)} depth={1} />
               <Row label="Terezka (Poslané)" values={pick(p.poslaneTerezka, idx)} depth={1} />
-              <Row label="Matyáš (jan–mar)" values={pick(p.matyas, idx)} depth={1} />
+              <Row label="Matyáš" values={pick(p.matyas, idx)} depth={1} />
             </Row>
 
             <TotalRow label="Prevádzkové náklady" values={pick(prevadzkoveNaklady, idx)} color={C.red} />
@@ -362,7 +381,7 @@ function PnlTab() {
 
       <Card>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
-          <H3><Info text="Mesačný výkaz ziskov a strát. Klikni na kategóriu pre rozklad na položky. Hrubý zisk = Celkové príjmy − Celkové náklady (vrátane výplat)." label="VZAS 2026 — mesačný P&L" /></H3>
+          <H3><Info text="Mesačný výkaz ziskov a strát za 18 mesiacov (jan 2025 – jún 2026). Klikni na kategóriu pre rozklad na položky. Hrubý zisk = Celkové príjmy − Celkové náklady (vrátane výplat). Riadky, ktoré existovali len v jednom roku (MultiBox, Freelo, Bonus na Finančák… v 2025; Štát, Telefón… v 2026), sú samostatné — zlúčením by sa stratilo, že sa zmenila samotná nákladová základňa." label="VZAS — mesačný P&L" /></H3>
           <div style={{ display: "flex", gap: 4 }}>
             {([["fixvar", "Fix / Variabilné"], ["zavaznost", "Záväzné / Voliteľné"]] as const).map(([id, lbl]) => (
               <button key={id} onClick={() => setLens(id)}
@@ -373,7 +392,7 @@ function PnlTab() {
           </div>
         </div>
         {lens === "zavaznost" ? <CommitmentTable idx={i} /> : (
-        <ScrollX>
+        <ScrollX dep={i.length}>
           <table style={tableStyle}>
             <thead><MonthHead idx={i} /></thead>
             <tbody>
@@ -405,13 +424,16 @@ function PnlTab() {
               <Divider label="Výplaty" span={i.length + 3} />
               <Row label="Jerry (Poslané)" values={pick(p.poslaneJerry, i)} />
               <Row label="Terezka (Poslané)" values={pick(p.poslaneTerezka, i)} />
-              <Row label={<Info text="Matyáš bol zamestnanec jan–mar 2026 — nemá nárokovo-dlhovú logiku zakladateľov, len mzdový náklad." label="Matyáš (jan–mar)" />} values={pick(p.matyas, i)} />
+              <Row label={<Info text="Matyáš bol zamestnanec celý rok 2025 a jan–mar 2026 — nemá nárokovo-dlhovú logiku zakladateľov, len mzdový náklad." label="Matyáš" />} values={pick(p.matyas, i)} />
               <Row label="Výplaty spolu" values={pick(p.vyplatySpolu, i)} bold color={C.red} />
 
               <TotalRow label="Celkové náklady" values={pick(p.celkoveNaklady, i)} color={C.red} />
 
               <Divider label="Tržby & Príjmy" span={i.length + 3} />
-              <Row label="Celkové príjmy" values={pick(p.prijmy, i)} bold color={C.green} />
+              <Row label="Celkové príjmy" values={pick(p.prijmy, i)} bold color={C.green}>
+                <Row label="Tržby (PTminder)" values={pick(PRIJMY_PTMINDER, i)} depth={1} />
+                <Row label={<Info text="Príjmy mimo tréningov — v jan/feb 2025 Jarkov preplatok za kurz a bitcoin. Excel ich v hárku „Mesačné výsledky“ nezobrazoval pri tržbách, ale zisk z nich počítal — preto tam tie dva mesiace nesedeli." label="Iné príjmy" />} values={pick(PRIJMY_INE, i)} depth={1} />
+              </Row>
 
               <TotalRow label="Hrubý zisk" values={pick(p.hrubyZisk, i)} color={signColor(vSum(sel.zisk))} big />
               <tr>
@@ -426,7 +448,10 @@ function PnlTab() {
           </table>
         </ScrollX>
         )}
-        <div style={{ fontSize: 11, color: C.textDim, marginTop: 10 }}>Zdroj: VZAS 2026 (Excel), jan–jún 2026. Bankový import pribudne v ďalšom kroku.</div>
+        <div style={{ fontSize: 11, color: C.textDim, marginTop: 10 }}>
+          Zdroj: VZAS 2025 + VZAS 2026 (Excel), jan 2025 – jún 2026. Každý mesiac sedí na Excel do koruny.
+          Júl 2026 pribudne až s prvým importom z Fia — tržby zaň síce v Trackeri sú, ale náklady zatiaľ nikde, takže by mesiac klamal.
+        </div>
       </Card>
     </>
   );
@@ -470,7 +495,7 @@ function PersonCard({ pk, idx }: { pk: PersonKey; idx: number[] }) {
       </div>
 
       {open && (
-        <ScrollX>
+        <ScrollX dep={idx.length}>
           <table style={{ ...tableStyle, marginTop: 12, minWidth: 700 }}>
             <thead>
               <tr style={{ borderBottom: `1px solid ${C.border}` }}>
@@ -481,6 +506,16 @@ function PersonCard({ pk, idx }: { pk: PersonKey; idx: number[] }) {
             </thead>
             <tbody>
               <tr>
+                <td style={{ ...lbl, fontSize: 11 }}>
+                  <Info text="Mzdový model sa v 2025 dvakrát menil. Do júla platilo 70/30 (70 % z klientovej platby trénerovi), august bol prechodný mesiac konsolidácie a od septembra 2025 platí Fix + variabil." label="Model" />
+                </td>
+                {idx.map((i) => {
+                  const e = eraAt(i);
+                  return <td key={i} style={{ ...cell, fontSize: 10, color: e.kind === "fixvar" ? C.accentLight : C.orange }}>{e.kind === "fixvar" ? "fix+var" : e.kind === "prechod" ? "prechod" : "70/30"}</td>;
+                })}
+                <td style={{ ...cell, borderLeft: `1px solid ${C.border}` }} />
+              </tr>
+              <tr>
                 <td style={lbl}>Hodiny{detailBtn(narokOpen, () => setNarokOpen(!narokOpen))}</td>
                 {idx.map((i) => <td key={i} style={{ ...cell, color: C.text }}>{s.hours[i]}</td>)}
                 <td style={{ ...cell, color: C.textMuted, borderLeft: `1px solid ${C.border}` }}>{avg(money2(s.hours)).toFixed(0)}</td>
@@ -489,19 +524,21 @@ function PersonCard({ pk, idx }: { pk: PersonKey; idx: number[] }) {
                 <>
                   <tr>
                     <td style={{ ...lbl, paddingLeft: 24, fontSize: 11 }}>Fix</td>
-                    {idx.map((i) => <td key={i} style={{ ...cell, fontSize: 11, color: C.textDim }}>{money(s.fix)}</td>)}
+                    {idx.map((i) => <td key={i} style={{ ...cell, fontSize: 11, color: C.textDim }}>{c.hasModel[i] ? money(eraAt(i).fix) : "—"}</td>)}
                     <td style={{ ...cell, fontSize: 11, color: C.textDim, borderLeft: `1px solid ${C.border}` }}>{money(s.fix)}</td>
                   </tr>
                   <tr>
                     <td style={{ ...lbl, paddingLeft: 24, fontSize: 11 }}>Variabil (nad {s.hoursThreshold}h)</td>
-                    {idx.map((i) => <td key={i} style={{ ...cell, fontSize: 11, color: C.textDim }}>{money(c.variabil[i])}</td>)}
-                    <td style={{ ...cell, fontSize: 11, color: C.textDim, borderLeft: `1px solid ${C.border}` }}>{money(avg(money2(c.variabil)))}</td>
+                    {idx.map((i) => <td key={i} style={{ ...cell, fontSize: 11, color: C.textDim }}>{c.hasModel[i] ? money(c.variabil[i]) : "—"}</td>)}
+                    <td style={{ ...cell, fontSize: 11, color: C.textDim, borderLeft: `1px solid ${C.border}` }}>{money(avg(idx.filter((i) => c.hasModel[i]).map((i) => c.variabil[i])))}</td>
                   </tr>
                 </>
               )}
               <tr style={{ borderTop: `1px solid ${C.border}` }}>
-                <td style={{ ...lbl, fontWeight: 600, color: C.text }}>Nárok</td>
-                {idx.map((i) => <td key={i} style={{ ...cell, color: C.green, fontWeight: 600 }}>{money(c.narok[i])}</td>)}
+                <td style={{ ...lbl, fontWeight: 600, color: C.text }}>
+                  <Info text="Od sep 2025: Fix + (hodiny − 60) × 850. Pred tým nárok neexistoval — pri modeli 70/30 bolo nárokom presne to, čo klient zaplatil, preto sú tie mesiace zobrazené šedo a rovnajú sa Poslanému." label="Nárok" />
+                </td>
+                {idx.map((i) => <td key={i} style={{ ...cell, color: c.hasModel[i] ? C.green : C.textDim, fontWeight: c.hasModel[i] ? 600 : 400, fontStyle: c.hasModel[i] ? "normal" : "italic" }}>{money(c.narok[i])}</td>)}
                 <td style={{ ...cell, color: C.green, fontWeight: 600, borderLeft: `1px solid ${C.border}` }}>{money(avg(money2(c.narok)))}</td>
               </tr>
 
@@ -529,14 +566,14 @@ function PersonCard({ pk, idx }: { pk: PersonKey; idx: number[] }) {
 
               <tr style={{ background: mix(C.accent, 10), borderTop: `2px solid ${mix(C.accent, 40)}` }}>
                 <td style={{ ...lbl, fontWeight: 700, color: C.text }}>
-                  <Info text="Rozdiel = Nárok − Poslané. Kladný = firma dlží trénerovi (dlh klesá). Záporný = tréner si vzal viac než nárok (dlh rastie)." label="Rozdiel" />
+                  <Info text="Od sep 2025: Rozdiel = Nárok − Poslané. Kladný = firma dlží trénerovi (dlh klesá), záporný = tréner si vzal viac než nárok (dlh rastie). V ére 70/30 nárok neexistoval, takže rozdielom je priamo zapísaná pôžička alebo splátka voči firme." label="Rozdiel" />
                 </td>
                 {idx.map((i) => <td key={i} style={{ ...cell, color: signColor(c.rozdiel[i]), fontWeight: 700 }}>{money(c.rozdiel[i])}</td>)}
                 <td style={{ ...cell, color: signColor(avg(money2(c.rozdiel))), fontWeight: 700, borderLeft: `1px solid ${C.border}` }}>{money(avg(money2(c.rozdiel)))}</td>
               </tr>
               <tr>
                 <td style={{ ...lbl, fontWeight: 600, color: C.text }}>
-                  <Info text={`Kumulovaný dlh(N) = dlh(N−1) + Rozdiel(N). Počiatočný stav k 1.1.2026: ${fmtCZK(DEBT_OPENING[pk])}.`} label="Kumulovaný dlh" />
+                  <Info text={`Kumulovaný dlh(N) = dlh(N−1) + Rozdiel(N), od nuly k 1.1.2025. Kontrolný bod z briefu k 1.1.2026: ${fmtCZK(DEBT_CHECKPOINT_2026[pk])} — vypočítaná reťaz naň sadá (rozdiel do 1 Kč je zaokrúhľovanie v Exceli).`} label="Kumulovaný dlh" />
                 </td>
                 {idx.map((i) => <td key={i} style={{ ...cell, color: signColor(c.cumDebt[i]), fontWeight: 600 }}>{money(c.cumDebt[i])}</td>)}
                 <td style={{ ...cell, color: C.textDim, borderLeft: `1px solid ${C.border}` }}>—</td>
@@ -588,20 +625,24 @@ function DebtBox({ p }: { p: DebtPerson }) {
 // The debt screens showed a balance but never its direction. A balance alone
 // can't tell you whether things are getting better — the slope can.
 function DebtTrendCard({ idx }: { idx: number[] }) {
+  // Only months under the current model can say anything about the direction:
+  // a 2025 loan was a decision, not the output of a formula.
+  const modelIdx = idx.filter((i) => i >= CURRENT_ERA.from);
   const people = (["jerry", "terezka"] as const).map((k) => {
     const c = salaryCalc(k);
-    const sel = pick(c.rozdiel, idx);
+    const use = modelIdx.length ? modelIdx : idx;
+    const sel = pick(c.rozdiel, use);
     const slope = avg(sel); // + = debt shrinking, − = growing
     const dlh = c.cumDebt[c.cumDebt.length - 1];
-    const narokAvg = avg(pick(c.narok, idx));
-    const poslaneAvg = avg(pick(c.poslane, idx));
+    const narokAvg = avg(pick(c.narok, use));
+    const poslaneAvg = avg(pick(c.poslane, use));
     const months = slope > 0 ? Math.ceil(Math.abs(dlh) / slope) : null;
     return { k, label: SALARY[k].label, c, slope, dlh, narokAvg, poslaneAvg, months, over: poslaneAvg - narokAvg };
   });
   return (
     <Card>
       <H3>
-        <Info text="Zostatok dlhu sám o sebe nestačí — dôležitý je smer. Ø rozdiel za mesiac je sklon: kladný = dlh sa spláca, záporný = rastie. Strop je suma, pod ktorou musí mesačný výber zostať, aby dlh prestal rásť (= priemerný nárok)." label="Kam smeruje dlh" />
+        <Info text="Zostatok dlhu sám o sebe nestačí — dôležitý je smer. Ø rozdiel za mesiac je sklon: kladný = dlh sa spláca, záporný = rastie. Strop je suma, pod ktorou musí mesačný výber zostať, aby dlh prestal rásť (= priemerný nárok). Smer aj scenáre sa rátajú len z mesiacov pod dnešným modelom (od sep 2025) — pôžička z éry 70/30 bola rozhodnutie, nie výstup vzorca." label="Kam smeruje dlh" />
       </H3>
       <LineChart
         data={idx.map((i) => ({ label: MONTHS[i], values: [salaryCalc("jerry").cumDebt[i], salaryCalc("terezka").cumDebt[i]] }))}
@@ -632,7 +673,7 @@ function DebtTrendCard({ idx }: { idx: number[] }) {
                 <td style={{ ...S.td, fontSize: 12.5, color: C.textMuted }}>Teraz odrobí</td>
                 {people.map((p) => (
                   <td key={p.k} style={{ ...S.td, textAlign: "right", fontSize: 12.5, color: C.text, fontVariantNumeric: "tabular-nums" }}>
-                    {avg(pick(SALARY[p.k].hours, idx)).toFixed(1)} h
+                    {avg(pick(SALARY[p.k].hours, modelIdx.length ? modelIdx : idx)).toFixed(1)} h
                   </td>
                 ))}
               </tr>
@@ -645,7 +686,7 @@ function DebtTrendCard({ idx }: { idx: number[] }) {
                   <td style={{ ...S.td, fontSize: 12.5, color: C.text }}>{sc.label}</td>
                   {people.map((p) => {
                     const s = SALARY[p.k];
-                    const nowH = avg(pick(s.hours, idx));
+                    const nowH = avg(pick(s.hours, modelIdx.length ? modelIdx : idx));
                     // Required entitlement = current draw + monthly repayment.
                     const repay = sc.extra > 0 ? Math.abs(Math.min(0, p.dlh)) / sc.extra : 0;
                     const needNarok = p.poslaneAvg + repay;
@@ -672,6 +713,94 @@ function DebtTrendCard({ idx }: { idx: number[] }) {
           majú na dlh rovnaký účinok — dá sa to aj kombinovať.
         </div>
       </div>
+    </Card>
+  );
+}
+
+// The single most consequential thing in these 18 months: the model that pays
+// the founders changed. Showing the eras as data (with what each one did to the
+// margin) is the difference between "výplaty kolíšu" and "vymenili sme model,
+// ktorý firmu nemohol uživiť".
+function EraCard() {
+  const [open, setOpen] = useState(false);
+  const p = pnlCalc();
+  const span = (from: number, to: number) => {
+    const ix = Array.from({ length: to - from + 1 }, (_, k) => from + k);
+    const trzby = vSum(pick(p.prijmy, ix));
+    const zisk = vSum(pick(p.hrubyZisk, ix));
+    const vypl = vSum(pick(p.vyplatySpolu, ix));
+    return { ix, trzby, zisk, marza: trzby > 0 ? (zisk / trzby) * 100 : 0, vyplPct: trzby > 0 ? (vypl / trzby) * 100 : 0 };
+  };
+  const pred = span(0, 6);   // jan–júl 2025, 70/30
+  const po = span(8, 17);    // sep 2025 – jún 2026, fix + variabil
+  const cell = { textAlign: "right" as const, padding: "7px 10px", fontSize: 13, fontVariantNumeric: "tabular-nums" as const, whiteSpace: "nowrap" as const };
+
+  return (
+    <Card>
+      <div onClick={() => setOpen(!open)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, cursor: "pointer", flexWrap: "wrap" }}>
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>
+            <span style={{ display: "inline-block", width: 15, color: C.textDim, fontSize: 9 }}>{open ? "▼" : "▶"}</span>
+            Mzdový model sa v 2025 zmenil
+          </div>
+          <div style={{ fontSize: 11.5, color: C.textMuted, marginLeft: 15 }}>70/30 → konsolidácia (aug 25) → Fix + variabil (od sep 25)</div>
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <div style={{ fontSize: 11, color: C.textMuted }}>Marža pred → po</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: C.green, fontVariantNumeric: "tabular-nums" }}>
+            {pred.marza.toFixed(1)} % → {po.marza.toFixed(1)} %
+          </div>
+        </div>
+      </div>
+      {open && (
+        <>
+          <div style={{ display: "grid", gap: 10, marginTop: 14 }}>
+            {SALARY_ERAS.map((e, k) => {
+              const to = k + 1 < SALARY_ERAS.length ? SALARY_ERAS[k + 1].from - 1 : MONTHS.length - 1;
+              const now = k === SALARY_ERAS.length - 1;
+              return (
+                <div key={e.label} style={{ background: mix(now ? C.accent : C.orange, 8), border: `1px solid ${mix(now ? C.accent : C.orange, 30)}`, borderRadius: 10, padding: "10px 13px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+                    <b style={{ fontSize: 13, color: C.text }}>{e.label}</b>
+                    <span style={{ fontSize: 12, color: C.textMuted }}>{MONTHS[e.from]} – {now ? "dnes" : MONTHS[to]}</span>
+                  </div>
+                  <div style={{ fontSize: 12, color: C.textMuted, marginTop: 5, lineHeight: 1.5 }}>{e.note}</div>
+                </div>
+              );
+            })}
+          </div>
+          <ScrollX>
+            <table style={{ ...tableStyle, minWidth: 460, marginTop: 14 }}>
+              <thead>
+                <tr style={{ borderBottom: `2px solid ${mix(C.accent, 35)}` }}>
+                  <th style={{ textAlign: "left", padding: "8px 10px", fontSize: 11, color: C.textMuted, fontWeight: 600 }}>Ø / mesiac</th>
+                  <th style={{ ...cell, fontSize: 11, color: C.textMuted, fontWeight: 600 }}>70/30 (jan–júl 25)</th>
+                  <th style={{ ...cell, fontSize: 11, color: C.textMuted, fontWeight: 600 }}>Fix + variabil (sep 25 – jún 26)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  { l: "Tržby", a: pred.trzby / pred.ix.length, b: po.trzby / po.ix.length, money: true },
+                  { l: "Zisk", a: pred.zisk / pred.ix.length, b: po.zisk / po.ix.length, money: true },
+                  { l: "Marža", a: pred.marza, b: po.marza, money: false },
+                  { l: "Výplaty z tržieb", a: pred.vyplPct, b: po.vyplPct, money: false },
+                ].map((row) => (
+                  <tr key={row.l}>
+                    <td style={{ ...S.td, fontSize: 12.5, color: C.text }}>{row.l}</td>
+                    <td style={{ ...cell, color: C.textMuted }}>{row.money ? money(row.a) : `${row.a.toFixed(1)} %`}</td>
+                    <td style={{ ...cell, color: row.b >= row.a ? C.green : C.orange, fontWeight: 600 }}>{row.money ? money(row.b) : `${row.b.toFixed(1)} %`}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </ScrollX>
+          <div style={{ marginTop: 12, padding: "10px 14px", borderRadius: 10, background: mix(C.blue, 10), border: `1px solid ${mix(C.blue, 30)}`, fontSize: 12.5, color: C.text, lineHeight: 1.55 }}>
+            Pri 70/30 zostávalo firme z tržieb ~49 000 Kč mesačne, ale samotná réžia stála ~66 000 Kč — <b>model matematicky nemohol vyjsť</b>, nech sa odrobilo koľkokoľvek.
+            Preto bolo 5 z 12 mesiacov roku 2025 stratových. Zmena v auguste nebola kozmetika, ale oprava štrukturálnej chyby.
+            Dnešný model je teda nastavený tesne — pri úvahách o jeho zmene (sploštenie sadzby, podiel na zisku) to treba mať na pamäti.
+          </div>
+        </>
+      )}
     </Card>
   );
 }
@@ -738,6 +867,8 @@ function SalaryTab() {
         )}
       </Card>
 
+      <EraCard />
+
       <PersonCard pk="jerry" idx={idx} />
       <PersonCard pk="terezka" idx={idx} />
 
@@ -748,7 +879,7 @@ function SalaryTab() {
               <span style={{ display: "inline-block", width: 15, color: C.textDim, fontSize: 9 }}>{spolOpen ? "▼" : "▶"}</span>
               Spoločné výdavky
             </div>
-            <div style={{ fontSize: 11, color: C.textMuted, marginLeft: 15 }}>Sčítajú sa a delia /2 — polovica Jerrymu, polovica Terezke</div>
+            <div style={{ fontSize: 11, color: C.textMuted, marginLeft: 15 }}>Sčítajú sa a delia /2 — polovica Jerrymu, polovica Terezke. Evidujú sa až od 2026; v 2025 táto kategória neexistovala, preto sú tie mesiace nulové.</div>
           </div>
           <div style={{ textAlign: "right" }}>
             <div style={{ fontSize: 11, color: C.textMuted }}>Ø spolu / mes.</div>
@@ -862,7 +993,7 @@ function CashflowTab() {
             <tbody>
               {idx.map((i) => (
                 <tr key={i}>
-                  <td style={{ padding: "7px 10px", fontSize: 12.5, color: C.text, borderBottom: `1px solid ${mix(C.border, 55)}` }}>{MONTHS[i]} 26</td>
+                  <td style={{ padding: "7px 10px", fontSize: 12.5, color: C.text, borderBottom: `1px solid ${mix(C.border, 55)}` }}>{MONTHS[i]}</td>
                   <td style={{ ...cell, color: C.green }}>{money(p.prijmy[i])}</td>
                   <td style={{ ...cell, color: C.red }}>{money(out[i])}</td>
                   <td style={{ ...cell, color: signColor(net[i]), fontWeight: 600 }}>{money(net[i])}</td>
@@ -893,6 +1024,7 @@ function JarekTab() {
   const nonCash = vSum(jk.splatkySpolu) - vSum(cashVals);
   const paceRecent = avg(jk.splatkySpolu.slice(-3));
   const paceCash = avg(cashVals);
+  const vkladySpolu = vSum(jk.vklady);
   const MN = ["jan", "feb", "mar", "apr", "máj", "jún", "júl", "aug", "sep", "okt", "nov", "dec"];
   const monthName = (add: number) => {
     const d = new Date(2026, 5, 1);
@@ -912,6 +1044,7 @@ function JarekTab() {
       <Card>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12 }}>
           <StatCard value={fmtCZK(last)} label="Stav dlhu k jún 26" color={C.red} />
+          <StatCard value={fmtCZK(vkladySpolu)} label={<Info text="Koľko do firmy vložil. Prvá suma (jan 2025) je zostatok prenesený z roku 2024, druhá (300 000 Kč, feb 2025) je reálny druhý vklad." label="Vklady spolu" />} color={C.orange} />
           <StatCard value={fmtCZK(pace)} label={<Info text={`Z toho reálna hotovosť je len ${fmtCZK(paceCash)}/mes — zvyšok (${fmtCZK(nonCash)} za obdobie, ${((nonCash / vSum(jk.splatkySpolu)) * 100).toFixed(0)} %) je Sofia, teda vzdaná tržba, nie prijaté peniaze.`} label="Ø splátka / mes." />} color={C.green} />
           <StatCard
             value={monthsLeft != null ? `${payoff} · ${monthsLeft} mes.` : "—"}
@@ -947,12 +1080,12 @@ function JarekTab() {
           alignEnd
         />
         <div style={{ fontSize: 11, color: C.textDim, marginTop: 6 }}>
-          Počiatočný stav k 1.1.2026: {fmtCZK(DEBT_OPENING.jarek)} · za H1 splatené {fmtCZK(vSum(jk.splatkySpolu))}.
+          Od nuly k 1.1.2025: vklady {fmtCZK(vkladySpolu)} (z toho {fmtCZK(jk.vklady[0])} je zostatok z 2024) · splatené {fmtCZK(vSum(jk.splatkySpolu))} · k 1.1.2026 kontrolný bod {fmtCZK(DEBT_CHECKPOINT_2026.jarek)}, sedí.
         </div>
       </Card>
 
       <Card>
-        <H3><Info text="Fix splátka je zároveň náklad v P&L aj zníženie dlhu. „Sofia“ a 20 % zľava z ročného nie sú bankové platby — sú to len dlhové operácie (vzdaná tržba)." label="Kanály splácania" /></H3>
+        <H3><Info text="Fix splátka je zároveň náklad v P&L aj zníženie dlhu. „Sofia“ a 20 % zľava z ročného nie sú bankové platby — sú to len dlhové operácie (vzdaná tržba). Vklad dlh naopak zvyšuje." label="Kanály splácania" /></H3>
         <ScrollX>
           <table style={{ ...tableStyle, minWidth: 660 }}>
             <thead>
@@ -981,6 +1114,11 @@ function JarekTab() {
                   <td style={{ ...cell, fontSize: 11, color: C.textDim, borderLeft: `1px solid ${C.border}` }}>{money(vSum(vals))}</td>
                 </tr>
               ))}
+              <tr>
+                <td style={{ ...S.td, fontSize: 12, color: C.orange }}>Vklad (zvyšuje dlh)</td>
+                {jk.vklady.map((v, i) => <td key={i} style={{ ...cell, color: v > 0 ? C.orange : C.textDim }}>{money(v)}</td>)}
+                <td style={{ ...cell, color: C.orange, borderLeft: `1px solid ${C.border}` }}>{money(vkladySpolu)}</td>
+              </tr>
               <tr style={{ background: mix(C.accent, 10) }}>
                 <td style={{ ...S.td, fontSize: 12, fontWeight: 700, color: C.text }}>Stav dlhu</td>
                 {stav.map((v, i) => <td key={i} style={{ ...cell, color: C.red, fontWeight: 700 }}>{money(v)}</td>)}
@@ -998,10 +1136,7 @@ function JarekTab() {
 function KvartalneTab() {
   const p = pnlCalc();
   const [openQ, setOpenQ] = useState<string | null>(null);
-  const quarters = [
-    { id: "q1", label: "Q1 2026", idx: [0, 1, 2] },
-    { id: "q2", label: "Q2 2026", idx: [3, 4, 5] },
-  ];
+  const quarters = QUARTERS;
   const agg = (idx: number[]) => {
     const prijmy = vSum(pick(p.prijmy, idx));
     const fix = vSum(pick(p.fixneTotal, idx));
@@ -1012,14 +1147,68 @@ function KvartalneTab() {
     return { prijmy, fix, varN, vypl, naklady, zisk, marza: prijmy > 0 ? (zisk / prijmy) * 100 : 0 };
   };
   const a = quarters.map((q) => ({ ...q, ...agg(q.idx) }));
-  const d = { prijmy: pct(a[1].prijmy, a[0].prijmy), naklady: pct(a[1].naklady, a[0].naklady), zisk: pct(a[1].zisk, a[0].zisk), marza: a[1].marza - a[0].marza };
+  const cur = a[a.length - 1];
+  const prev = a[a.length - 2];
+  const d = { prijmy: pct(cur.prijmy, prev.prijmy), naklady: pct(cur.naklady, prev.naklady), zisk: pct(cur.zisk, prev.zisk), marza: cur.marza - prev.marza };
+  // Like for like: the same six months a year apart, plus the full 2025 for context.
+  const h1_25 = agg([0, 1, 2, 3, 4, 5]);
+  const h1_26 = agg(YEAR_IDX["2026"]);
+  const rok25 = agg(YEAR_IDX["2025"]);
   const cell = { textAlign: "right" as const, padding: "8px 10px", fontSize: 13, fontVariantNumeric: "tabular-nums" as const, whiteSpace: "nowrap" as const };
   const sub = { ...cell, fontSize: 11, color: C.textDim, padding: "4px 10px" };
 
   return (
     <>
       <Card>
-        <H3><Info text="Klikni na riadok Náklady — rozbalí sa na fixné, variabilné a výplaty." label="Kvartálne porovnanie" /></H3>
+        <H3><Info text="Rovnakých šesť mesiacov o rok neskôr — jediné poctivé porovnanie, keď z 2026 zatiaľ existuje len polrok. Celý rok 2025 je vedľa pre kontext." label="H1 2025 vs H1 2026" /></H3>
+        <ScrollX>
+          <table style={{ ...tableStyle, minWidth: 520 }}>
+            <thead>
+              <tr style={{ borderBottom: `2px solid ${mix(C.accent, 35)}` }}>
+                <th style={{ textAlign: "left", padding: "8px 10px", fontSize: 11, color: C.textMuted, fontWeight: 600, minWidth: 150 }}>Položka</th>
+                <th style={{ ...cell, fontSize: 11, color: C.textMuted, fontWeight: 600 }}>H1 2025</th>
+                <th style={{ ...cell, fontSize: 11, color: C.textMuted, fontWeight: 600 }}>H1 2026</th>
+                <th style={{ ...cell, fontSize: 11, color: C.textMuted, fontWeight: 600, borderLeft: `1px solid ${C.border}` }}>Zmena</th>
+                <th style={{ ...cell, fontSize: 11, color: C.textDim, fontWeight: 600, borderLeft: `1px solid ${C.border}` }}>Celý 2025</th>
+              </tr>
+            </thead>
+            <tbody>
+              {([
+                { l: "Tržby", k: "prijmy" as const, col: C.green },
+                { l: "Náklady", k: "naklady" as const, col: C.red },
+                { l: "Zisk", k: "zisk" as const, col: undefined },
+              ]).map((row) => {
+                const ch = pct(h1_26[row.k], h1_25[row.k]);
+                return (
+                  <tr key={row.l}>
+                    <td style={{ ...S.td, fontSize: 13, color: C.text, fontWeight: row.k === "zisk" ? 700 : 400 }}>{row.l}</td>
+                    <td style={{ ...cell, color: row.col ?? signColor(h1_25[row.k]) }}>{money(h1_25[row.k])}</td>
+                    <td style={{ ...cell, color: row.col ?? signColor(h1_26[row.k]), fontWeight: row.k === "zisk" ? 700 : 400 }}>{money(h1_26[row.k])}</td>
+                    <td style={{ ...cell, color: signColor((ch ?? 0) * (row.k === "naklady" ? -1 : 1)), borderLeft: `1px solid ${C.border}` }}>{pctStr(ch)}</td>
+                    <td style={{ ...cell, fontSize: 12, color: C.textDim, borderLeft: `1px solid ${C.border}` }}>{money(rok25[row.k])}</td>
+                  </tr>
+                );
+              })}
+              <tr>
+                <td style={{ ...S.td, fontSize: 12, color: C.textMuted }}>Marža</td>
+                <td style={{ ...cell, fontSize: 12, color: h1_25.marza >= 0 ? C.orange : C.red }}>{h1_25.marza.toFixed(1)} %</td>
+                <td style={{ ...cell, fontSize: 12, color: h1_26.marza >= VZAS_TARGETS.marzaPct ? C.green : h1_26.marza >= 0 ? C.orange : C.red }}>{h1_26.marza.toFixed(1)} %</td>
+                <td style={{ ...cell, fontSize: 12, color: signColor(h1_26.marza - h1_25.marza), borderLeft: `1px solid ${C.border}` }}>
+                  {h1_26.marza > h1_25.marza ? "▲" : "▼"} {Math.abs(h1_26.marza - h1_25.marza).toFixed(1)} b.p.
+                </td>
+                <td style={{ ...cell, fontSize: 12, color: C.textDim, borderLeft: `1px solid ${C.border}` }}>{rok25.marza.toFixed(1)} %</td>
+              </tr>
+            </tbody>
+          </table>
+        </ScrollX>
+        <div style={{ fontSize: 11.5, color: C.textMuted, marginTop: 10, lineHeight: 1.55 }}>
+          Za celý rok 2025 firma zarobila {money(rok25.zisk)}. Za prvý polrok 2026 je to {money(h1_26.zisk)} —
+          <b> za polovicu času viac než za celý predchádzajúci rok</b>. Zdroj rozdielu nie sú tržby (tie rástli o {pctStr(pct(h1_26.prijmy, h1_25.prijmy))}), ale mzdový model.
+        </div>
+      </Card>
+
+      <Card>
+        <H3><Info text="Klikni na riadok Náklady — rozbalí sa na fixné, variabilné a výplaty. Stĺpec Zmena porovnáva posledný kvartál s predchádzajúcim." label="Kvartálne porovnanie" /></H3>
         <ScrollX>
           <table style={{ ...tableStyle, minWidth: 520 }}>
             <thead>
@@ -1046,7 +1235,7 @@ function KvartalneTab() {
                 <tr key={k}>
                   <td style={{ ...S.td, fontSize: 11, color: C.textDim, paddingLeft: 34 }}>{k === "fix" ? "Fixné náklady" : k === "varN" ? "Variabilné náklady" : "Výplaty"}</td>
                   {a.map((q) => <td key={q.id} style={sub}>{money(q[k])}</td>)}
-                  <td style={{ ...sub, borderLeft: `1px solid ${C.border}` }}>{pctStr(pct(a[1][k], a[0][k]))}</td>
+                  <td style={{ ...sub, borderLeft: `1px solid ${C.border}` }}>{pctStr(pct(cur[k], prev[k]))}</td>
                 </tr>
               ))}
               <tr style={{ background: mix(C.accent, 12), borderTop: `2px solid ${mix(C.accent, 45)}` }}>
@@ -1278,7 +1467,7 @@ function MonthNoteRow({ mi, colSpan, notes, onSaved }: {
 // Energy is logged weekly (Tréningy → Prehľad); here it is only averaged per
 // month, so nobody is asked the same question twice. "Iné hodiny" is summed —
 // it is the work the salary model never sees.
-function EnergyTrendCard() {
+function EnergyTrendCard({ idx }: { idx: number[] }) {
   const [weeks, setWeeks] = useState<Record<string, WeekEntry>>({});
   useEffect(() => { fetchWeekEntries().then(setWeeks); }, []);
   const perMonth = useMemo(() => {
@@ -1296,11 +1485,13 @@ function EnergyTrendCard() {
     return acc;
   }, [weeks]);
 
-  const rows = MONTHS.map((label, i) => {
+  // Weekly logging only started in 2026, so showing 18 months here would be a
+  // year of flat zeros — only months that carry data are charted.
+  const rows = idx.map((i) => {
     const a = perMonth[monthKeyOf(i)];
     const avg1 = (arr?: number[]) => (arr && arr.length ? arr.reduce((x, y) => x + y, 0) / arr.length : null);
-    return { label, i, jerry: avg1(a?.scores.jerry), terezka: avg1(a?.scores.terezka), hJ: a?.hours.jerry ?? 0, hT: a?.hours.terezka ?? 0 };
-  });
+    return { label: MONTHS[i], i, jerry: avg1(a?.scores.jerry), terezka: avg1(a?.scores.terezka), hJ: a?.hours.jerry ?? 0, hT: a?.hours.terezka ?? 0 };
+  }).filter((r) => r.jerry != null || r.terezka != null || r.hJ > 0 || r.hT > 0);
   const any = rows.some((r) => r.jerry != null || r.terezka != null);
 
   return (
@@ -1363,7 +1554,7 @@ function MesacneTab() {
     <>
       <HealthCard idx={idx} />
       <ForecastCard />
-      <EnergyTrendCard />
+      <EnergyTrendCard idx={idx} />
 
       <Card>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
@@ -1437,7 +1628,7 @@ function MesacneTab() {
                     <td onClick={() => setOpenNote(openNote === i ? null : i)}
                       style={{ padding: "7px 10px", fontSize: 12.5, color: C.text, borderBottom: `1px solid ${mix(C.border, 55)}`, cursor: "pointer", whiteSpace: "nowrap" }}>
                       <span style={{ display: "inline-block", width: 14, color: C.textDim, fontSize: 9 }}>{openNote === i ? "▼" : "▶"}</span>
-                      {MONTHS[i]} 26
+                      {MONTHS[i]}
                       {hasNote && <span title="má poznámku" style={{ marginLeft: 6, color: C.accent, fontSize: 11 }}>●</span>}
                     </td>
                     <td style={{ ...cell, color: C.green }}>{money(p.prijmy[i])}</td>
@@ -1484,21 +1675,37 @@ function KpiCard({ label, value, target, unit = "" }: { label: ReactNode; value:
 
 function KpiTab() {
   const p = pnlCalc();
-  const marzaH1 = vSum(p.prijmy) > 0 ? (vSum(p.hrubyZisk) / vSum(p.prijmy)) * 100 : 0;
+  const [year, setYear] = useState("2026");
+  const idx = YEAR_IDX[year];
+  const t = VZAS_TARGETS_BY_YEAR[year];
+  const trzby = vSum(pick(p.prijmy, idx));
+  const zisk = vSum(pick(p.hrubyZisk, idx));
+  const marza = trzby > 0 ? (zisk / trzby) * 100 : 0;
+  const plan = (t.rocneTrzby / 12) * idx.length;
   return (
     <>
       <Card>
-        <H3><Info text="Kľúčové ukazovatele voči cieľom roka 2026. H1 je polovica roka — pri ročnom cieli je ~50 % na pláne." label="KPI voči cieľom 2026" /></H3>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+          <H3><Info text="Kľúčové ukazovatele voči cieľom daného roka. Ročný cieľ tržieb sa prepočítava na uplynulé mesiace — porovnávať polrok s celoročným cieľom by ukazovalo ~50 % a vyzeralo by to ako zaostávanie, hoci ste na pláne." label={`KPI voči cieľom ${year}`} /></H3>
+          <div style={{ display: "flex", gap: 4 }}>
+            {Object.keys(VZAS_TARGETS_BY_YEAR).map((y) => (
+              <button key={y} onClick={() => setYear(y)}
+                style={{ padding: "5px 12px", borderRadius: 7, border: `1px solid ${year === y ? C.accent : C.border}`, background: year === y ? C.accentBg : "transparent", color: year === y ? C.accentLight : C.textMuted, fontSize: 12, cursor: "pointer" }}>
+                {y}
+              </button>
+            ))}
+          </div>
+        </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 12 }}>
           <KpiCard
-            label={<Info text={`Ročný cieľ ${fmtCZK(VZAS_TARGETS.rocneTrzby)} prepočítaný na uplynulé obdobie: po ${MONTHS.length} z 12 mesiacov je plán ${fmtCZK((VZAS_TARGETS.rocneTrzby / 12) * MONTHS.length)}. Porovnávať polrok s celoročným cieľom by ukazovalo ~50 % a vyzeralo by to ako zaostávanie, hoci ste na pláne.`} label={`Tržby / plán za ${MONTHS.length} mes.`} />}
-            value={vSum(PRIJMY)}
-            target={(VZAS_TARGETS.rocneTrzby / 12) * MONTHS.length}
+            label={<Info text={`Ročný cieľ ${fmtCZK(t.rocneTrzby)} prepočítaný na ${idx.length} z 12 mesiacov = ${fmtCZK(plan)}.`} label={`Tržby / plán za ${idx.length} mes.`} />}
+            value={trzby}
+            target={plan}
             unit=" Kč"
           />
-          <KpiCard label="Marža H1" value={marzaH1} target={VZAS_TARGETS.marzaPct} unit=" %" />
-          <KpiCard label="Ø hodín/mes · Jerry" value={avg(SALARY.jerry.hours)} target={VZAS_TARGETS.hodinyJerry} unit="h" />
-          <KpiCard label="Ø hodín/mes · Terezka" value={avg(SALARY.terezka.hours)} target={VZAS_TARGETS.hodinyTerezka} unit="h" />
+          <KpiCard label={<Info text={`Cieľ roka ${year} bol ${t.marzaPct} %. Pre 2026 je to medzikrok 12–15 %, dlhodobo 20 %.`} label={`Marža ${year}`} />} value={marza} target={t.marzaPct} unit=" %" />
+          <KpiCard label="Ø hodín/mes · Jerry" value={avg(pick(SALARY.jerry.hours, idx))} target={t.hodinyJerry} unit="h" />
+          <KpiCard label="Ø hodín/mes · Terezka" value={avg(pick(SALARY.terezka.hours, idx))} target={t.hodinyTerezka} unit="h" />
         </div>
       </Card>
       <Card>
@@ -1518,7 +1725,7 @@ export function Vzas({ sub, onSub }: { sub: string; onSub: (s: string) => void }
     <>
       <SubTabs
         tabs={[
-          { id: "pnl", label: "VZAS 2026" },
+          { id: "pnl", label: "VZAS P&L" },
           { id: "vyplaty", label: "J&T Výplaty" },
           { id: "cashflow", label: "Cashflow" },
           { id: "jarek", label: "Jarek dlh" },
