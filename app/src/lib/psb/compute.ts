@@ -1,6 +1,6 @@
 // All derived analytics for the PSB Tracker. Pure functions over PSBData —
 // no browser globals. Reused across every module.
-import { daysBetween, fmtDMY, monthKey, monthLabel, monthsBetween, quarterKey, quarterLabel, weekKey, weekLabel } from "./format";
+import { daysBetween, fmtDMY, monthKey, monthLabel, monthsBetween, normName, quarterKey, quarterLabel, weekKey, weekLabel } from "./format";
 import type {
   PackageRow,
   PaymentRow,
@@ -609,10 +609,14 @@ export function deriveAnomalies(data: PSBData, clients: Record<string, ClientAgg
 
   // A referral that actually converted earns the referrer a 10 % thank-you —
   // easy to forget, and forgetting it quietly kills the studio's best channel.
+  // "Did they convert?" is not asked — it's read from PTminder: the referred
+  // name showing up among clients IS the conversion.
+  const byNorm: Record<string, string> = {};
+  for (const n of Object.keys(clients)) byNorm[normName(n)] = n;
   for (const l of data.leads || []) {
-    if (l.source !== "referencia" || !l.referrer) continue;
-    if (l.status !== "prisiel" && l.status !== "klient") continue;
-    const ref = clients[l.referrer];
+    if (l.source !== "referencia" || !l.referrer || !l.name) continue;
+    if (!byNorm[normName(l.name)]) continue;
+    const ref = clients[byNorm[normName(l.referrer)] ?? l.referrer];
     if (!ref || ref.status === "Neaktívny") continue;
     push(
       `referral|${l.id}`,

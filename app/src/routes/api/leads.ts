@@ -4,7 +4,7 @@ import { isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 
 const SOURCES = ["referencia", "mail", "web", "google", "instagram", "ine"];
-const STATUSES = ["novy", "neodpisal", "uvodny", "prisiel", "klient"];
+const STATUSES = ["novy", "neodpisal", "dohodnuty", "zruseny"];
 
 export const Route = createFileRoute("/api/leads")({
   server: {

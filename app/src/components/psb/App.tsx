@@ -86,10 +86,13 @@ export function PSBApp() {
     if (tab === "klienti" && focus) setKlientiFocus(focus);
   }, []);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  // `silent` keeps the full-screen "Načítavam…" away on background refreshes —
+  // it unmounts the whole tree, which threw the user out of whatever sub-tab
+  // they were editing (e.g. every keystroke in Dopyty bounced back to Klienti).
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     setData(await fetchData());
-    setLoading(false);
+    if (!silent) setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -147,7 +150,7 @@ export function PSBApp() {
         await apiReset();
         await load();
       },
-      refresh: load,
+      refresh: () => load(true),
     }),
     [load],
   );

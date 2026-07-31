@@ -42,7 +42,7 @@ export type Lead = {
   name: string;
   source: "referencia" | "mail" | "web" | "google" | "instagram" | "ine";
   referrer: string;   // existing client who sent them (source = referencia)
-  status: "novy" | "neodpisal" | "uvodny" | "prisiel" | "klient";
+  status: "novy" | "neodpisal" | "dohodnuty" | "zruseny";
   note: string;
 };
 

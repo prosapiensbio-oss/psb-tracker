@@ -33,75 +33,96 @@ const SOURCES = [
   { value: "ine", label: "Iné" },
 ];
 const STATUSES = [
-  { value: "novy", label: "Nový" },
+  { value: "novy", label: "Ozval sa" },
   { value: "neodpisal", label: "Neodpísal" },
-  { value: "uvodny", label: "Úvodný dohodnutý" },
-  { value: "prisiel", label: "Prišiel na úvodný" },
-  { value: "klient", label: "Stal sa klientom" },
+  { value: "dohodnuty", label: "Dohodnutý úvodný" },
+  { value: "zruseny", label: "Zrušený úvodný" },
 ];
 const statusColor = (s: string) =>
-  s === "klient" ? C.green : s === "prisiel" ? C.accentLight : s === "uvodny" ? C.blue : s === "neodpisal" ? C.red : C.textMuted;
+  s === "dohodnuty" ? C.green : s === "zruseny" ? C.orange : s === "neodpisal" ? C.red : C.textMuted;
 
 // The top of the funnel PTminder can't see: people who write and then go quiet.
-// Without it there's no way to tell "not enough enquiries" from "enquiries that
-// don't convert" — two problems with completely different fixes.
+// Deliberately narrow — it only asks what lives in Jerry's inbox and DMs. Whether
+// someone actually showed up or became a client is already in the PTminder CSV,
+// so it is derived rather than typed twice.
 function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Record<string, ClientAgg>; refresh: () => Promise<void> }) {
   const [busy, setBusy] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [draft, setDraft] = useState<Partial<Lead>>({});
+
   const clientNames = useMemo(
-    () => Object.values(clients).filter((c) => c.status !== "Neaktívny").map((c) => c.name).sort((a, b) => a.localeCompare(b)),
+    () => Object.values(clients).map((c) => c.name).sort((a, b) => a.localeCompare(b)),
     [clients],
   );
+  // A referred person who already shows up as a client = the referral worked.
+  const clientByNorm = useMemo(() => {
+    const m: Record<string, string> = {};
+    for (const n of Object.keys(clients)) m[normName(n)] = n;
+    return m;
+  }, [clients]);
+  const converted = (l: Lead) => !!(l.name && clientByNorm[normName(l.name)]);
+
   const save = async (l: Partial<Lead> & { id?: string; remove?: boolean }) => {
     setBusy(true);
     await saveLead(l);
     await refresh();
     setBusy(false);
   };
-  const add = () => save({ date: new Date().toISOString().slice(0, 10), source: "instagram", status: "novy" });
+  const openAdd = () => {
+    setDraft({ date: new Date().toISOString().slice(0, 10), source: "instagram", status: "novy", name: "", referrer: "", note: "" });
+    setAdding(true);
+  };
+  const submitAdd = async () => {
+    setAdding(false);
+    await save(draft);
+  };
 
   const counts = useMemo(() => {
     const c: Record<string, number> = {};
     for (const l of leads) c[l.status] = (c[l.status] || 0) + 1;
-    const total = leads.length;
-    const converted = (c.klient || 0);
-    const reached = (c.uvodny || 0) + (c.prisiel || 0) + converted;
-    return { total, reached, converted, lost: c.neodpisal || 0, novy: c.novy || 0 };
-  }, [leads]);
+    const konv = leads.filter(converted).length;
+    return { total: leads.length, dohodnuty: c.dohodnuty || 0, neodpisal: c.neodpisal || 0, konv };
+  }, [leads, clientByNorm]);
 
   const bySource = useMemo(() => {
     const m: Record<string, { n: number; klient: number }> = {};
     for (const l of leads) {
       const e = (m[l.source] ||= { n: 0, klient: 0 });
       e.n++;
-      if (l.status === "klient") e.klient++;
+      if (converted(l)) e.klient++;
     }
     return m;
-  }, [leads]);
+  }, [leads, clientByNorm]);
 
   const inputStyle = { ...S.select, width: "100%", minWidth: 0 } as const;
+  const REFERRER_LIST = "psb-referrers";
 
   return (
     <>
+      <datalist id={REFERRER_LIST}>
+        {clientNames.map((n) => <option key={n} value={n} />)}
+      </datalist>
+
       <Card>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-          <H3><Info text="Každý, kto sa ozve — mail, Instagram, referencia. Aj ten, kto potom neodpíše. Bez toho sa nedá rozlíšiť, či je problém v marketingu (málo dopytov) alebo v predaji (dopyty neprejdú na úvodný tréning)." label="Dopyty" /></H3>
-          <button onClick={add} disabled={busy}
+          <H3><Info text="Každý, kto sa ozve — mail, Instagram, referencia. Aj ten, kto potom neodpíše. Zapisuje sa len to, čo appka inak nezistí; či klient reálne prišiel a či začal chodiť, vyčíta z PTminder CSV." label="Dopyty" /></H3>
+          <button onClick={openAdd} disabled={busy}
             style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${C.accent}`, background: C.accentBg, color: C.accentLight, fontSize: 12.5, fontWeight: 600, cursor: busy ? "default" : "pointer" }}>
             + Nový dopyt
           </button>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10 }}>
           <StatCard value={String(counts.total)} label="Dopytov spolu" color={C.blue} />
-          <StatCard value={String(counts.reached)} label="Došlo na úvodný" color={C.accentLight} />
-          <StatCard value={String(counts.converted)} label="Stali sa klientmi" color={C.green} />
-          <StatCard value={counts.total ? `${((counts.converted / counts.total) * 100).toFixed(0)} %` : "—"}
-            label={<Info text="Podiel dopytov, ktoré skončili platiacim klientom. Nízke číslo pri veľa dopytoch = problém v predaji; málo dopytov pri vysokom čísle = problém v marketingu." label="Konverzia dopyt → klient" />} color={C.green} />
+          <StatCard value={String(counts.dohodnuty)} label="Dohodnutý úvodný" color={C.accentLight} />
+          <StatCard value={String(counts.neodpisal)} label="Neodpísali" color={C.red} />
+          <StatCard value={counts.total ? `${((counts.konv / counts.total) * 100).toFixed(0)} %` : "—"}
+            label={<Info text="Podiel dopytov, ktorých meno sa už objavuje medzi klientmi v PTminderi — teda naozaj začali chodiť. Počíta sa automaticky, nezapisuje sa." label="Konverzia na klienta" />} color={C.green} />
         </div>
       </Card>
 
       {Object.keys(bySource).length > 0 && (
         <Card>
-          <H3>Podľa zdroja</H3>
+          <H3><Info text="Ktorý kanál naozaj prináša klientov, nie len správy." label="Podľa zdroja" /></H3>
           <TableWrap>
             <thead>
               <tr>
@@ -138,9 +159,10 @@ function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Record<st
               <tr>
                 <th style={{ ...S.th, minWidth: 118 }}>Dátum</th>
                 <th style={{ ...S.th, minWidth: 130 }}>Meno</th>
-                <th style={{ ...S.th, minWidth: 130 }}>Odkiaľ prišiel</th>
-                <th style={{ ...S.th, minWidth: 150 }}>Od koho / poznámka</th>
+                <th style={{ ...S.th, minWidth: 128 }}>Odkiaľ prišiel</th>
+                <th style={{ ...S.th, minWidth: 150 }}>Od koho</th>
                 <th style={{ ...S.th, minWidth: 150 }}>Stav</th>
+                <th style={{ ...S.th, minWidth: 140 }}>Poznámka</th>
                 <th style={S.th} />
               </tr>
             </thead>
@@ -148,12 +170,13 @@ function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Record<st
               {leads.map((l) => (
                 <tr key={l.id}>
                   <td style={S.td}>
-                    <input type="date" defaultValue={l.date} onBlur={(e) => save({ ...l, date: e.target.value })}
+                    <input type="date" defaultValue={l.date} onBlur={(e) => e.target.value !== l.date && save({ ...l, date: e.target.value })}
                       style={{ ...inputStyle, colorScheme: "dark" }} />
                   </td>
                   <td style={S.td}>
-                    <input defaultValue={l.name} placeholder="meno (ak vieme)" onBlur={(e) => save({ ...l, name: e.target.value })}
+                    <input defaultValue={l.name} placeholder="meno (ak vieme)" onBlur={(e) => e.target.value !== l.name && save({ ...l, name: e.target.value })}
                       style={inputStyle} />
+                    {converted(l) && <span title="už je medzi klientmi v PTminderi" style={{ color: C.green, fontSize: 11, marginLeft: 6 }}>✓ klient</span>}
                   </td>
                   <td style={S.td}>
                     <Select value={l.source} onChange={(v) => save({ ...l, source: v as Lead["source"], referrer: v === "referencia" ? l.referrer : "" })}
@@ -161,16 +184,16 @@ function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Record<st
                   </td>
                   <td style={S.td}>
                     {l.source === "referencia" ? (
-                      <Select value={l.referrer} onChange={(v) => save({ ...l, referrer: v })}
-                        options={[{ value: "", label: "— vyber klienta —" }, ...clientNames.map((n) => ({ value: n, label: n }))]}
-                        style={inputStyle} />
-                    ) : (
-                      <input defaultValue={l.note} placeholder="poznámka" onBlur={(e) => save({ ...l, note: e.target.value })} style={inputStyle} />
-                    )}
+                      <input list={REFERRER_LIST} defaultValue={l.referrer} placeholder="píš meno…"
+                        onBlur={(e) => e.target.value !== l.referrer && save({ ...l, referrer: e.target.value })} style={inputStyle} />
+                    ) : <span style={{ color: C.textDim, fontSize: 12 }}>—</span>}
                   </td>
                   <td style={S.td}>
                     <Select value={l.status} onChange={(v) => save({ ...l, status: v as Lead["status"] })} options={STATUSES}
                       style={{ ...inputStyle, color: statusColor(l.status) }} />
+                  </td>
+                  <td style={S.td}>
+                    <input defaultValue={l.note} placeholder="poznámka" onBlur={(e) => e.target.value !== l.note && save({ ...l, note: e.target.value })} style={inputStyle} />
                   </td>
                   <td style={{ ...S.td, textAlign: "right" }}>
                     <button onClick={() => save({ id: l.id, remove: true })} title="Zmazať"
@@ -182,9 +205,55 @@ function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Record<st
           </TableWrap>
         )}
         <div style={{ fontSize: 11, color: C.textDim, marginTop: 10 }}>
-          Keď referencia dôjde na úvodný tréning alebo sa stane klientom, objaví sa v „Na čo sa pozrieť“ pripomienka na 10 % zľavu pre toho, kto ju poslal.
+          Keď sa meno odporúčaného objaví medzi klientmi, v „Na čo sa pozrieť“ vyskočí pripomienka na 10 % zľavu pre toho, kto ho poslal.
         </div>
       </Card>
+
+      {adding && (
+        <Modal title="Nový dopyt" onClose={() => setAdding(false)}>
+          <div style={{ display: "grid", gap: 12 }}>
+            <label style={{ fontSize: 12, color: C.textMuted }}>
+              Dátum
+              <input type="date" value={draft.date ?? ""} onChange={(e) => setDraft({ ...draft, date: e.target.value })}
+                style={{ ...inputStyle, colorScheme: "dark", marginTop: 4 }} />
+            </label>
+            <label style={{ fontSize: 12, color: C.textMuted }}>
+              Meno <span style={{ color: C.textDim }}>(ak ho vieme)</span>
+              <input value={draft.name ?? ""} onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+                placeholder="napr. Peter Novák" style={{ ...inputStyle, marginTop: 4 }} />
+            </label>
+            <label style={{ fontSize: 12, color: C.textMuted }}>
+              Odkiaľ prišiel
+              <div style={{ marginTop: 4 }}>
+                <Select value={draft.source ?? "instagram"} onChange={(v) => setDraft({ ...draft, source: v as Lead["source"] })}
+                  options={SOURCES} style={inputStyle} />
+              </div>
+            </label>
+            {draft.source === "referencia" && (
+              <label style={{ fontSize: 12, color: C.textMuted }}>
+                Od koho <span style={{ color: C.textDim }}>(píš meno — nemusí to byť náš klient)</span>
+                <input list={REFERRER_LIST} value={draft.referrer ?? ""} onChange={(e) => setDraft({ ...draft, referrer: e.target.value })}
+                  placeholder="začni písať…" style={{ ...inputStyle, marginTop: 4 }} />
+              </label>
+            )}
+            <label style={{ fontSize: 12, color: C.textMuted }}>
+              Poznámka
+              <input value={draft.note ?? ""} onChange={(e) => setDraft({ ...draft, note: e.target.value })}
+                placeholder="napr. bolesti chrbta, píše z Brna…" style={{ ...inputStyle, marginTop: 4 }} />
+            </label>
+            <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+              <button onClick={submitAdd}
+                style={{ padding: "7px 16px", borderRadius: 8, border: `1px solid ${C.accent}`, background: C.accentBg, color: C.accentLight, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                Pridať
+              </button>
+              <button onClick={() => setAdding(false)}
+                style={{ padding: "7px 16px", borderRadius: 8, border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted, fontSize: 13, cursor: "pointer" }}>
+                Zrušiť
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </>
   );
 }
