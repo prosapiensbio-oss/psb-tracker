@@ -341,34 +341,97 @@ export const commitmentTotal = (b: CommitmentBucket): Vals => vAdd(...b.items.ma
 // ── Monthly commentary ───────────────────────────────────────────────────────
 export const monthKeyOf = (i: number) => `2026-${String(i + 1).padStart(2, "0")}`;
 
-// Jerry's own monthly review, carried over from the Excel (VZAS 2026, row 132 —
-// the notes lived in cell comments). These are his questions, not invented ones.
-export const MONTH_QUESTIONS: { id: string; q: string }[] = [
+// Jerry's monthly review. Six questions, reworked with him from the original
+// seven in the Excel: three of those asked the same "one-off vs recurring"
+// thing from different angles, and two (čo fungovalo / nefungovalo) went
+// unanswered five months out of six. "energy" renders as a slider plus a
+// non-training hours field — the model only pays for training hours, so
+// without that second number an energy score can't be read honestly.
+export type QuestionKind = "text" | "energy";
+export const MONTH_QUESTIONS: { id: string; q: string; kind?: QuestionKind }[] = [
   { id: "stalo", q: "Čo zásadné sa tento mesiac stalo?" },
-  { id: "trzby", q: "Prečo sú tržby vysoké/nízke?" },
-  { id: "odkud", q: "Odkiaľ prišli noví ľudia na úvodné tréningy?" },
-  { id: "pokracovalo", q: "Koľko ľudí z úvodného tréningu pokračovalo ďalej? Ak bol úbytok, čím to bolo?" },
-  { id: "energie", q: "Aký bol pomer medzi odpracovanými hodinami a tvojím pocitom vyhorenia/energie?" },
-  { id: "fungovalo", q: "Čo tento mesiac fungovalo a chcem v tom pokračovať?" },
-  { id: "nefungovalo", q: "Čo nefungovalo a pálilo to energiu/peniaze?" },
+  { id: "jednorazove", q: "Čo z tržieb aj výdavkov bolo jednorazové a čo sa bude opakovať?" },
+  { id: "klienti", q: "Pribudol alebo odišiel niekto z klientov? Prečo?" },
+  { id: "vyber", q: "Koľko som si vzal nad rámec nároku a prečo?" },
+  { id: "energia", q: "Energia a záťaž", kind: "energy" },
+  { id: "buduci", q: "Čo už teraz viem o budúcom mesiaci?" },
 ];
+// Energy answers live under these keys inside the same answers JSON.
+export const ENERGY_SCORE = "energia_score";
+export const ENERGY_HOURS = "energia_hodiny";
+export const ENERGY_NOTE = "energia_note";
 
+// Jerry's existing answers, remapped onto the new questions. The wording is
+// his; only the grouping changed (e.g. "odkiaľ noví" + "koľko pokračovalo"
+// merged into one client question). Energy scores are read from his own words
+// and are a starting point he can drag.
 export const SEED_ANSWERS: Record<string, Record<string, string>> = {
-  "2026-01": {"stalo": "prešli sme na nové členstva ostalo už len par klientov so starými sumami", "trzby": "pravdepodobne konsolidacia vydno že naklady sú nižšie ako kedysi aj na vyplatach sme trošku ušetrili", "odkud": "prevažne referencie", "pokracovalo": "Zo 7 uvodnych pokračovalo 5 klientov. a dvaja nepokračovali pretože len skušali", "energie": "velka rezerva", "fungovalo": "hovorenie na internete", "nefungovalo": "všetko funguje"},
-  "2026-02": {"stalo": "radek a lenka si predplatili 18h a gažo omylom poslal za 16h", "trzby": "predchádzajúca odpoved", "odkud": "prokop 1 je teda google organicky a ostatný refeerencie", "pokracovalo": "traja", "energie": "je tam stále rezerva spraivli sme 160h čo je malo"},
-  "2026-03": {"stalo": "mali sme najviac trénikov s najmenej tržbami. vela ludi vyprokrastinovalo platby mali by mse o cca 50k viac keby nemeškali. je to naša chyby pretože sme na nich malo tlačili", "odkud": "prevažne referencie", "pokracovalo": "4 z 5", "energie": "na to že sme spravili najviac hodín a bol tu tyžden kedy sme spravili cez 30h tyzdenne tak sa citím celkom fresh"},
-  "2026-04": {"stalo": "zomrela Katka Janovi sme preto pomohli zaplatiť aspon jeden mesiac najmiu. súčastne. sme mali najvyššie tržby za jeden mesiac", "trzby": "tržby boli vysoké pretože vaicerý klienti predplacali hodiny dopredu a všetci klienti už skončili svoje staré baličky (za staré ceny) takže sa naplno prejavila konsolidacia", "odkud": "väčšina cez refenrecie", "energie": "je tam stale rezerva s ktorou sa da pracovat"},
-  "2026-06": {"stalo": "tento mesiac sme mali obmedzenú prevadzku pretoze sme mali ahsoku"},
+  "2026-01": {
+    stalo: "prešli sme na nové členstvá, ostalo už len pár klientov so starými sumami",
+    jednorazove: "Konsolidácia cien — trvalá zmena, nie jednorazová: náklady sú nižšie ako kedysi a aj na výplatách sme trošku ušetrili.",
+    klienti: "Noví prevažne cez referencie. Zo 7 úvodných pokračovalo 5 klientov, dvaja nie — len to skúšali.",
+    energia_score: "8",
+    energia_note: "veľká rezerva",
+  },
+  "2026-02": {
+    stalo: "Radek a Lenka si predplatili 18 h a Gažo omylom poslal za 16 h",
+    jednorazove: "Predplatby Radek + Lenka (18 h) a omylom poslaná platba od Gaža (za 16 h) — jednorazové, v ďalších mesiacoch sa nezopakujú.",
+    klienti: "Prokop prišiel cez Google (organika), ostatní cez referencie. Z úvodných pokračovali traja.",
+    energia_score: "8",
+    energia_note: "je tam stále rezerva, spravili sme 160 h, čo je málo",
+  },
+  "2026-03": {
+    stalo: "mali sme najviac tréningov s najmenej tržbami. veľa ľudí vyprokrastinovalo platby, mali by sme o cca 50k viac keby nemeškali. je to naša chyba, pretože sme na nich málo tlačili",
+    jednorazove: "Chýbajúcich ~50 000 boli oneskorené platby klientov, nie výpadok dopytu — presunuli sa do ďalších mesiacov.",
+    klienti: "Noví prevažne cez referencie. Z úvodných pokračovali 4 z 5.",
+    energia_score: "7",
+    energia_note: "na to, že sme spravili najviac hodín a bol tu týždeň cez 30 h týždenne, sa cítim celkom fresh",
+  },
+  "2026-04": {
+    stalo: "zomrela Katka, Janovi sme preto pomohli zaplatiť aspoň jeden mesiac nájmu. súčasne sme mali najvyššie tržby za jeden mesiac",
+    jednorazove: "Jednorazové: viacerí klienti predplatili hodiny dopredu a pomoc Janovi s nájmom. Trvalé: všetkým dobehli staré balíčky za staré ceny, takže sa naplno prejavila konsolidácia.",
+    klienti: "Väčšina nových cez referencie.",
+    energia_score: "7",
+    energia_note: "je tam stále rezerva, s ktorou sa dá pracovať",
+  },
+  "2026-06": {
+    stalo: "tento mesiac sme mali obmedzenú prevádzku, pretože sme mali Ahsoku",
+    jednorazove: "Obmedzená prevádzka kvôli Ahsoke — jednorazové.",
+  },
 };
 
+// Free-form note per month. Item-level detail also shows as a hover on the P&L
+// line itself (ITEM_NOTES); it is repeated here so a month reads as one story.
 export const SEED_NOTES: Record<string, string> = {
-  "2026-01": "Detaily k položkám (z Excelu):\n• nedoplatok za december tym padom bol caption 2x v januari učtovany\n• Amazon Group Media\n• dumbrovska zmluva na polročnéčlnestva\n• Apple Pen + Kryt Ipad; Vysvač; Stojan na kotúče; Kabel USB-B 3\n• APPLE.COM/BILL, APPLE.COM/BIL, IE, dne 24.1.2026,\n• 31.1 – 1000 Kč – Jerry výplata; 29.1 – 1000 Kč – Terka výplata; 16.1 – 600 Kč – Terez výplata; 15.1 – 1000 Kč – Jerry výplata; 9.1 – 500 Kč – Jerry výplata; 3.1 – 300 Kč – Jerry výplata; ; 26.1 – 3826 Kč – vysávač, kábel, stojan; 17.1 – 1400 Kč – hrniec, miska; 7.1 – 2898 Kč – iPad; 7.1 – 2377 Kč – doplnky",
-  "2026-02": "Detaily k položkám (z Excelu):\n• platili sme energie 3011\n• Claude PRO\n• 26.2 ; 1500kc 106776 jerry vyplata; 4.2; 2440kč 156789 jerry FP",
-  "2026-03": "Detaily k položkám (z Excelu):\n• Dlh + platba\n• Clude + Chat GPT\n• Higgsfield\n• UniHobby presadzanie\n• Kotúče 10kg 5kg + lopta 4kg",
-  "2026-04": "Detaily k položkám (z Excelu):\n• Lozias poslanie 550kč neviem za čo\n• Olej na kladku joom",
-  "2026-05": "Detaily k položkám (z Excelu):\n• RG Bell 3 + 9kg ; FP trička 2x",
-  "2026-06": "Detaily k položkám (z Excelu):\n• Nubound Robo školenie\n• Adapter na nabijačky+ventilator+kanvica",
+  "2026-01": "Fungovalo: hovorenie na internete.\n\nDetaily k položkám (z Excelu):\n• Captions: nedoplatok za december, tým pádom bol Captions 2× v januári účtovaný\n• Apps/Iné: Amazon Group Media\n• Právnička/Účto: Dumbrovská zmluva na polročné členstvá\n• Elektro/Filtre: Apple Pen + kryt iPad, vysávač, stojan na kotúče, kábel USB-B 3\n• BTC výdaje: 31.1 – 1000 Kč Jerry výplata; 29.1 – 1000 Kč Terka výplata; 16.1 – 600 Kč Terez výplata; 15.1 – 1000 Kč Jerry výplata; 9.1 – 500 Kč Jerry výplata; 3.1 – 300 Kč Jerry výplata; 26.1 – 3826 Kč vysávač, kábel, stojan; 17.1 – 1400 Kč hrniec, miska; 7.1 – 2898 Kč iPad; 7.1 – 2377 Kč doplnky",
+  "2026-02": "Detaily k položkám (z Excelu):\n• Nájom + energie: platili sme energie 3011\n• AI nástroje: Claude PRO\n• BTC výdaje: 26.2 – 1500 Kč (106776) Jerry výplata; 4.2 – 2440 Kč (156789) Jerry FP",
+  "2026-03": "Detaily k položkám (z Excelu):\n• Štát Jerry: dlh + platba\n• AI nástroje: Claude + ChatGPT\n• Apps/Iné: Higgsfield\n• Iné výdaje: UniHobby presadzanie\n• Pomôcky na cvičenie: kotúče 10 kg, 5 kg + lopta 4 kg",
+  "2026-04": "Detaily k položkám (z Excelu):\n• Iné výdaje: Lozias poslanie 550 Kč — neviem za čo\n• Atipické nákupy: olej na kladku (Joom)",
+  "2026-05": "Detaily k položkám (z Excelu):\n• Pomôcky na cvičenie: RG Bell 3 + 9 kg, FP tričká 2×",
+  "2026-06": "Detaily k položkám (z Excelu):\n• Iné výdaje: Nubound Robo školenie\n• Elektro/Filtre: adaptér na nabíjačky + ventilátor + kanvica",
 };
+
+// Per-cell notes from the Excel, keyed "<section.group.item>|<monthIndex>".
+// These surface as a hover on the exact P&L line they belong to.
+export const ITEM_NOTES: Record<string, string> = {
+  "fixne.prevadzka.najom|1": "platili sme energie 3011",
+  "fixne.prevadzka.statJerry|2": "Dlh + platba",
+  "fixne.apps.captions|0": "nedoplatok za december, tým pádom bol Captions 2× v januári účtovaný",
+  "fixne.apps.ai|1": "Claude PRO",
+  "fixne.apps.ai|2": "Claude + ChatGPT",
+  "fixne.apps.ine|0": "Amazon Group Media",
+  "fixne.apps.ine|2": "Higgsfield",
+  "variabilne.sluzby.pravnicka|0": "Dumbrovská zmluva na polročné členstvá",
+  "variabilne.sluzby.ine|2": "UniHobby presadzanie",
+  "variabilne.sluzby.ine|3": "Lozias poslanie 550 Kč — neviem za čo",
+  "variabilne.sluzby.ine|5": "Nubound Robo školenie",
+  "variabilne.produkty.atipicke|3": "Olej na kladku (Joom)",
+  "variabilne.prevadzka2.pomocky|2": "Kotúče 10 kg, 5 kg + lopta 4 kg",
+  "variabilne.prevadzka2.pomocky|4": "RG Bell 3 + 9 kg, FP tričká 2×",
+  "variabilne.prevadzka2.elektro|0": "Apple Pen + kryt iPad, vysávač, stojan na kotúče, kábel USB-B 3",
+  "variabilne.prevadzka2.elektro|5": "Adaptér na nabíjačky + ventilátor + kanvica",
+};
+export const itemNote = (path: string, monthIdx: number): string | undefined => ITEM_NOTES[`${path}|${monthIdx}`];
 
 export type Deviation = { label: string; group: string; value: number; typical: number; diff: number; pct: number };
 

@@ -10,9 +10,13 @@ import {
   PRIJMY,
   SALARY,
   SPOLOCNE,
+  ENERGY_HOURS,
+  ENERGY_NOTE,
+  ENERGY_SCORE,
   MONTH_QUESTIONS,
   SEED_ANSWERS,
   SEED_NOTES,
+  itemNote,
   VZAS_MONTH_LABELS,
   VZAS_TARGETS,
   byCommitment,
@@ -97,8 +101,10 @@ function MonthHead({ idx, first = "Položka", showAvg = true }: { idx: number[];
   );
 }
 
-function Row({ label, values, depth = 0, bold = false, color, children, showAvg = true }: {
+function Row({ label, values, depth = 0, bold = false, color, children, showAvg = true, noteFor }: {
   label: ReactNode; values: Vals; depth?: number; bold?: boolean; color?: string; children?: ReactNode; showAvg?: boolean;
+  // Per-cell hover text (what that purchase actually was), by column position.
+  noteFor?: (col: number) => string | undefined;
 }) {
   const [open, setOpen] = useState(false);
   const hasKids = !!children;
@@ -111,9 +117,15 @@ function Row({ label, values, depth = 0, bold = false, color, children, showAvg 
           <span style={{ display: "inline-block", width: 15, color: C.textDim, fontSize: 9 }}>{hasKids ? (open ? "▼" : "▶") : ""}</span>
           {label}
         </td>
-        {values.map((v, i) => (
-          <td key={i} style={{ ...cell, color: color || (v < 0 ? C.red : C.textMuted) }}>{money(v)}</td>
-        ))}
+        {values.map((v, i) => {
+          const n = noteFor?.(i);
+          return (
+            <td key={i} title={n} style={{ ...cell, color: color || (v < 0 ? C.red : C.textMuted), cursor: n ? "help" : undefined }}>
+              {money(v)}
+              {n && <span style={{ color: C.accent, fontSize: 9, verticalAlign: "super", marginLeft: 2 }}>●</span>}
+            </td>
+          );
+        })}
         <td style={{ ...cell, color: color || (vSum(values) < 0 ? C.red : C.text), borderLeft: `1px solid ${C.border}`, fontWeight: 600 }}>{money(vSum(values))}</td>
         {showAvg && <td style={{ ...cell, color: C.textMuted }}>{money(avg(values))}</td>}
       </tr>
@@ -263,6 +275,7 @@ function CommitmentTable({ idx }: { idx: number[] }) {
   const rows = (key: "zavazne" | "volitelne" | "neprevadzkove") =>
     b[key].items.filter((it) => vSum(it.values) !== 0).map((it) => (
       <Row key={it.path} depth={1} values={pick(it.values, idx)}
+        noteFor={(col) => itemNote(it.path, idx[col])}
         label={<>{it.label} <span style={{ color: C.textDim, fontSize: 11 }}>· {it.group}</span></>} />
     ));
 
@@ -369,7 +382,10 @@ function PnlTab() {
               <Divider label="Fixné náklady" span={i.length + 3} />
               {Object.entries(PNL.fixne.subcategories).map(([k, g]) => (
                 <Row key={k} label={g.label} values={pick(sumItems(g.items), i)}>
-                  {Object.entries(g.items).map(([ik, it]) => <Row key={ik} label={it.label} values={pick(it.values, i)} depth={1} />)}
+                  {Object.entries(g.items).map(([ik, it]) => (
+                    <Row key={ik} label={it.label} values={pick(it.values, i)} depth={1}
+                      noteFor={(col) => itemNote(`fixne.${k}.${ik}`, i[col])} />
+                  ))}
                 </Row>
               ))}
               <Row label="Fixné náklady spolu" values={pick(sumSection(PNL.fixne), i)} bold color={C.red} />
@@ -377,7 +393,10 @@ function PnlTab() {
               <Divider label="Variabilné náklady" span={i.length + 3} />
               {Object.entries(PNL.variabilne.subcategories).map(([k, g]) => (
                 <Row key={k} label={g.label} values={pick(sumItems(g.items), i)}>
-                  {Object.entries(g.items).map(([ik, it]) => <Row key={ik} label={it.label} values={pick(it.values, i)} depth={1} />)}
+                  {Object.entries(g.items).map(([ik, it]) => (
+                    <Row key={ik} label={it.label} values={pick(it.values, i)} depth={1}
+                      noteFor={(col) => itemNote(`variabilne.${k}.${ik}`, i[col])} />
+                  ))}
                 </Row>
               ))}
               <Row label="Variabilné náklady spolu" values={pick(sumSection(PNL.variabilne), i)} bold color={C.red} />
@@ -1131,14 +1150,43 @@ function MonthNoteRow({ mi, colSpan, notes, onSaved }: {
         )}
 
         <div style={{ fontSize: 11, fontWeight: 700, color: C.accent, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 7 }}>Otázky na tento mesiac</div>
-        <div style={{ display: "grid", gap: 8, marginBottom: 14 }}>
-          {MONTH_QUESTIONS.map((q) => (
-            <div key={q.id}>
-              <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 3 }}>{q.q}</div>
-              <textarea value={answers[q.id] ?? ""} onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })}
-                rows={(answers[q.id] ?? "").length > 90 ? 3 : 1} placeholder="…" style={{ ...field, padding: "6px 10px" }} />
-            </div>
-          ))}
+        <div style={{ display: "grid", gap: 10, marginBottom: 14 }}>
+          {MONTH_QUESTIONS.map((q) => {
+            if (q.kind === "energy") {
+              const score = Number(answers[ENERGY_SCORE] ?? 7);
+              const setA = (k: string, v: string) => setAnswers({ ...answers, [k]: v });
+              return (
+                <div key={q.id}>
+                  <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 5 }}>
+                    <Info text="Posuvník je subjektívna energia (1 = na dne, 10 = plná sila). Hodiny mimo tréningov sú odhad — appka pozná len odtrénované hodiny, takže bez tohto čísla sa energia nedá čítať poctivo. Zároveň ukazuje, koľko práce pre firmu mzdový model vôbec neplatí." label="Energia a záťaž" />
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 7 }}>
+                    <input type="range" min={1} max={10} step={1} value={score}
+                      onChange={(e) => setA(ENERGY_SCORE, e.target.value)}
+                      style={{ flex: "1 1 200px", accentColor: score >= 7 ? C.green : score >= 4 ? C.orange : C.red }} />
+                    <span style={{ fontSize: 15, fontWeight: 700, minWidth: 42, textAlign: "right", color: score >= 7 ? C.green : score >= 4 ? C.orange : C.red, fontVariantNumeric: "tabular-nums" }}>
+                      {score} / 10
+                    </span>
+                    <label style={{ fontSize: 12, color: C.textMuted, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                      Iné hodiny (mimo tréningov)
+                      <input type="number" min={0} max={400} value={answers[ENERGY_HOURS] ?? ""}
+                        onChange={(e) => setA(ENERGY_HOURS, e.target.value)} placeholder="napr. 30"
+                        style={{ ...field, width: 90, padding: "5px 8px" }} />
+                    </label>
+                  </div>
+                  <textarea value={answers[ENERGY_NOTE] ?? ""} onChange={(e) => setA(ENERGY_NOTE, e.target.value)}
+                    rows={(answers[ENERGY_NOTE] ?? "").length > 90 ? 2 : 1} placeholder="jedna veta k energii…" style={{ ...field, padding: "6px 10px" }} />
+                </div>
+              );
+            }
+            return (
+              <div key={q.id}>
+                <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 3 }}>{q.q}</div>
+                <textarea value={answers[q.id] ?? ""} onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })}
+                  rows={(answers[q.id] ?? "").length > 90 ? 3 : 1} placeholder="…" style={{ ...field, padding: "6px 10px" }} />
+              </div>
+            );
+          })}
         </div>
 
         <div style={{ fontSize: 11, fontWeight: 700, color: C.accent, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 7 }}>Voľná poznámka</div>
