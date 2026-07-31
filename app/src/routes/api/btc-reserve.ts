@@ -26,15 +26,12 @@ export const Route = createFileRoute("/api/btc-reserve")({
         const token = bindings().BTC_RESERVE_TOKEN;
         if (!token) return Response.json({ ok: false, error: "no_token" });
         try {
-          const r = await fetch(SOURCE, {
-            headers: { authorization: `Bearer ${token}` },
-            signal: AbortSignal.timeout(8000),
-          });
+          const r = await fetch(SOURCE, { headers: { authorization: `Bearer ${token}` } });
           if (!r.ok) return Response.json({ ok: false, error: `source_${r.status}` });
           const j = (await r.json()) as BtcReserve & { ok?: boolean };
           return Response.json({ ok: true, reserve: j });
-        } catch {
-          return Response.json({ ok: false, error: "unreachable" });
+        } catch (e) {
+          return Response.json({ ok: false, error: "unreachable", detail: String(e).slice(0, 200) });
         }
       },
     },
