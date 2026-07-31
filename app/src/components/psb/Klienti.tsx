@@ -3,8 +3,10 @@ import { useEffect, useMemo, useState } from "react";
 import { membershipBucket, MEMBERSHIP_ORDER, TRAINERS, type CapacityRow, type ClientAgg } from "../../lib/psb/compute";
 import { fmtCZK, fmtDate, normName } from "../../lib/psb/format";
 import { C, MEMBERSHIP_COLORS, S } from "../../lib/psb/theme";
+import { saveLead } from "../../lib/psb/client";
+import type { Lead } from "../../lib/psb/types";
 import type { Actions, NavFocus } from "./App";
-import { Badge, Card, Donut, Empty, H3, Info, Modal, Select, SortTh, StatCard, TableWrap, useSort } from "./ui";
+import { Badge, Card, Donut, Empty, H3, Info, Modal, Select, SortTh, StatCard, SubTabs, TableWrap, useSort } from "./ui";
 
 const segTone = (s: string) => (s === "Anchor" ? "green" : s === "Stabilný" ? "orange" : "red");
 const segColor = (s: string) => (s === "Anchor" ? C.green : s === "Stabilný" ? C.orange : C.red);
@@ -22,7 +24,172 @@ const KPI_WINDOWS = [
   { value: "custom", label: "Vlastné obdobie", days: -1 },
 ];
 
-export function Klienti({ clients, capacity, actions, focus }: { clients: Record<string, ClientAgg>; capacity: CapacityRow[]; actions: Actions; focus?: NavFocus | null }) {
+const SOURCES = [
+  { value: "referencia", label: "Referencia" },
+  { value: "instagram", label: "Instagram" },
+  { value: "google", label: "Google" },
+  { value: "web", label: "Web" },
+  { value: "mail", label: "Mail" },
+  { value: "ine", label: "Iné" },
+];
+const STATUSES = [
+  { value: "novy", label: "Nový" },
+  { value: "neodpisal", label: "Neodpísal" },
+  { value: "uvodny", label: "Úvodný dohodnutý" },
+  { value: "prisiel", label: "Prišiel na úvodný" },
+  { value: "klient", label: "Stal sa klientom" },
+];
+const statusColor = (s: string) =>
+  s === "klient" ? C.green : s === "prisiel" ? C.accentLight : s === "uvodny" ? C.blue : s === "neodpisal" ? C.red : C.textMuted;
+
+// The top of the funnel PTminder can't see: people who write and then go quiet.
+// Without it there's no way to tell "not enough enquiries" from "enquiries that
+// don't convert" — two problems with completely different fixes.
+function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Record<string, ClientAgg>; refresh: () => Promise<void> }) {
+  const [busy, setBusy] = useState(false);
+  const clientNames = useMemo(
+    () => Object.values(clients).filter((c) => c.status !== "Neaktívny").map((c) => c.name).sort((a, b) => a.localeCompare(b)),
+    [clients],
+  );
+  const save = async (l: Partial<Lead> & { id?: string; remove?: boolean }) => {
+    setBusy(true);
+    await saveLead(l);
+    await refresh();
+    setBusy(false);
+  };
+  const add = () => save({ date: new Date().toISOString().slice(0, 10), source: "instagram", status: "novy" });
+
+  const counts = useMemo(() => {
+    const c: Record<string, number> = {};
+    for (const l of leads) c[l.status] = (c[l.status] || 0) + 1;
+    const total = leads.length;
+    const converted = (c.klient || 0);
+    const reached = (c.uvodny || 0) + (c.prisiel || 0) + converted;
+    return { total, reached, converted, lost: c.neodpisal || 0, novy: c.novy || 0 };
+  }, [leads]);
+
+  const bySource = useMemo(() => {
+    const m: Record<string, { n: number; klient: number }> = {};
+    for (const l of leads) {
+      const e = (m[l.source] ||= { n: 0, klient: 0 });
+      e.n++;
+      if (l.status === "klient") e.klient++;
+    }
+    return m;
+  }, [leads]);
+
+  const inputStyle = { ...S.select, width: "100%", minWidth: 0 } as const;
+
+  return (
+    <>
+      <Card>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+          <H3><Info text="Každý, kto sa ozve — mail, Instagram, referencia. Aj ten, kto potom neodpíše. Bez toho sa nedá rozlíšiť, či je problém v marketingu (málo dopytov) alebo v predaji (dopyty neprejdú na úvodný tréning)." label="Dopyty" /></H3>
+          <button onClick={add} disabled={busy}
+            style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${C.accent}`, background: C.accentBg, color: C.accentLight, fontSize: 12.5, fontWeight: 600, cursor: busy ? "default" : "pointer" }}>
+            + Nový dopyt
+          </button>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10 }}>
+          <StatCard value={String(counts.total)} label="Dopytov spolu" color={C.blue} />
+          <StatCard value={String(counts.reached)} label="Došlo na úvodný" color={C.accentLight} />
+          <StatCard value={String(counts.converted)} label="Stali sa klientmi" color={C.green} />
+          <StatCard value={counts.total ? `${((counts.converted / counts.total) * 100).toFixed(0)} %` : "—"}
+            label={<Info text="Podiel dopytov, ktoré skončili platiacim klientom. Nízke číslo pri veľa dopytoch = problém v predaji; málo dopytov pri vysokom čísle = problém v marketingu." label="Konverzia dopyt → klient" />} color={C.green} />
+        </div>
+      </Card>
+
+      {Object.keys(bySource).length > 0 && (
+        <Card>
+          <H3>Podľa zdroja</H3>
+          <TableWrap>
+            <thead>
+              <tr>
+                <th style={S.th}>Zdroj</th>
+                <th style={{ ...S.th, textAlign: "right" }}>Dopytov</th>
+                <th style={{ ...S.th, textAlign: "right" }}>Klientov</th>
+                <th style={{ ...S.th, textAlign: "right" }}>Konverzia</th>
+              </tr>
+            </thead>
+            <tbody>
+              {SOURCES.filter((s) => bySource[s.value]).map((s) => {
+                const e = bySource[s.value];
+                return (
+                  <tr key={s.value}>
+                    <td style={S.td}>{s.label}</td>
+                    <td style={{ ...S.td, textAlign: "right" }}>{e.n}</td>
+                    <td style={{ ...S.td, textAlign: "right", color: C.green }}>{e.klient}</td>
+                    <td style={{ ...S.td, textAlign: "right" }}>{e.n ? `${((e.klient / e.n) * 100).toFixed(0)} %` : "—"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </TableWrap>
+        </Card>
+      )}
+
+      <Card>
+        <H3>Zoznam</H3>
+        {!leads.length ? (
+          <Empty>Zatiaľ žiadne dopyty — pridaj prvý tlačidlom vyššie.</Empty>
+        ) : (
+          <TableWrap>
+            <thead>
+              <tr>
+                <th style={{ ...S.th, minWidth: 118 }}>Dátum</th>
+                <th style={{ ...S.th, minWidth: 130 }}>Meno</th>
+                <th style={{ ...S.th, minWidth: 130 }}>Odkiaľ prišiel</th>
+                <th style={{ ...S.th, minWidth: 150 }}>Od koho / poznámka</th>
+                <th style={{ ...S.th, minWidth: 150 }}>Stav</th>
+                <th style={S.th} />
+              </tr>
+            </thead>
+            <tbody>
+              {leads.map((l) => (
+                <tr key={l.id}>
+                  <td style={S.td}>
+                    <input type="date" defaultValue={l.date} onBlur={(e) => save({ ...l, date: e.target.value })}
+                      style={{ ...inputStyle, colorScheme: "dark" }} />
+                  </td>
+                  <td style={S.td}>
+                    <input defaultValue={l.name} placeholder="meno (ak vieme)" onBlur={(e) => save({ ...l, name: e.target.value })}
+                      style={inputStyle} />
+                  </td>
+                  <td style={S.td}>
+                    <Select value={l.source} onChange={(v) => save({ ...l, source: v as Lead["source"], referrer: v === "referencia" ? l.referrer : "" })}
+                      options={SOURCES} style={inputStyle} />
+                  </td>
+                  <td style={S.td}>
+                    {l.source === "referencia" ? (
+                      <Select value={l.referrer} onChange={(v) => save({ ...l, referrer: v })}
+                        options={[{ value: "", label: "— vyber klienta —" }, ...clientNames.map((n) => ({ value: n, label: n }))]}
+                        style={inputStyle} />
+                    ) : (
+                      <input defaultValue={l.note} placeholder="poznámka" onBlur={(e) => save({ ...l, note: e.target.value })} style={inputStyle} />
+                    )}
+                  </td>
+                  <td style={S.td}>
+                    <Select value={l.status} onChange={(v) => save({ ...l, status: v as Lead["status"] })} options={STATUSES}
+                      style={{ ...inputStyle, color: statusColor(l.status) }} />
+                  </td>
+                  <td style={{ ...S.td, textAlign: "right" }}>
+                    <button onClick={() => save({ id: l.id, remove: true })} title="Zmazať"
+                      style={{ background: "transparent", border: "none", color: C.textDim, cursor: "pointer", fontSize: 15 }}>✕</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </TableWrap>
+        )}
+        <div style={{ fontSize: 11, color: C.textDim, marginTop: 10 }}>
+          Keď referencia dôjde na úvodný tréning alebo sa stane klientom, objaví sa v „Na čo sa pozrieť“ pripomienka na 10 % zľavu pre toho, kto ju poslal.
+        </div>
+      </Card>
+    </>
+  );
+}
+
+export function Klienti({ clients, capacity, actions, focus, leads }: { clients: Record<string, ClientAgg>; capacity: CapacityRow[]; actions: Actions; focus?: NavFocus | null; leads: Lead[] }) {
   const [focusClient, setFocusClient] = useState<string | null>(null);
   useEffect(() => {
     if (focus?.client) setFocusClient(focus.client);
@@ -159,11 +326,20 @@ export function Klienti({ clients, capacity, actions, focus }: { clients: Record
     );
   };
 
+  const [sub, setSub] = useState("klienti");
+
   const editC = edit ? clients[edit] : null;
   const filterLabel = fTrainer === "all" && fSegment === "all" ? "Všetci klienti" : `${fTrainer === "all" ? "" : fTrainer} ${fSegment === "all" ? "" : fSegment}`.trim();
 
   return (
     <>
+      <SubTabs
+        tabs={[{ id: "klienti", label: "Klienti" }, { id: "dopyty", label: "Dopyty" }]}
+        value={sub}
+        onChange={setSub}
+      />
+      {sub === "dopyty" ? <Dopyty leads={leads} clients={clients} refresh={actions.refresh} /> : (
+      <>
       {/* Filtre + KPI úplne hore */}
       <Card>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 14 }}>
@@ -374,6 +550,8 @@ export function Klienti({ clients, capacity, actions, focus }: { clients: Record
           <textarea style={{ ...S.input, minHeight: 70, resize: "vertical", marginBottom: 14 }} defaultValue={editC.trainerNote} onBlur={(e) => actions.setOverride(editC.name, "trainerNote", e.target.value)} />
           <button onClick={() => setEdit(null)} style={{ background: C.accent, color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontSize: 13, width: "100%" }}>Hotovo</button>
         </Modal>
+      )}
+      </>
       )}
     </>
   );

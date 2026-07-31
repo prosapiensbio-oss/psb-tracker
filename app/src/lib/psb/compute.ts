@@ -607,6 +607,22 @@ export function deriveAnomalies(data: PSBData, clients: Record<string, ClientAgg
     }
   }
 
+  // A referral that actually converted earns the referrer a 10 % thank-you —
+  // easy to forget, and forgetting it quietly kills the studio's best channel.
+  for (const l of data.leads || []) {
+    if (l.source !== "referencia" || !l.referrer) continue;
+    if (l.status !== "prisiel" && l.status !== "klient") continue;
+    const ref = clients[l.referrer];
+    if (!ref || ref.status === "Neaktívny") continue;
+    push(
+      `referral|${l.id}`,
+      "orange",
+      "Odmena za odporúčanie",
+      `${l.referrer} odporučil${l.name ? ` ${l.name}` : "a nového klienta"} — nezabudni na 10 % zľavu za doporučenie`,
+      l.referrer,
+    );
+  }
+
   // Payments from a name with no sessions at all (one per client).
   const seen = new Set<string>();
   for (const p of data.payments as PaymentRow[]) {

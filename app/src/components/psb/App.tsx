@@ -240,7 +240,7 @@ export function PSBApp() {
               })}
             </div>
             {trackerSection === "treningy" && <Treningy data={data} clients={clients} sub={treningySub} onSub={setTreningySub} focus={treningyFocus} />}
-            {trackerSection === "klienti" && <Klienti clients={clients} capacity={capacity} actions={actions} focus={klientiFocus} />}
+            {trackerSection === "klienti" && <Klienti clients={clients} capacity={capacity} actions={actions} focus={klientiFocus} leads={data.leads} />}
             {trackerSection === "financie" && <Financie data={data} clients={clients} focus={financieFocus} />}
             {trackerSection === "6m" && <SixMTracker sixM={sixM} actions={actions} />}
           </>

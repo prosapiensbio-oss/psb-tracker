@@ -36,6 +36,16 @@ export type PackageRow = {
   total: number;
 };
 
+export type Lead = {
+  id: string;
+  date: string;
+  name: string;
+  source: "referencia" | "mail" | "web" | "google" | "instagram" | "ine";
+  referrer: string;   // existing client who sent them (source = referencia)
+  status: "novy" | "neodpisal" | "uvodny" | "prisiel" | "klient";
+  note: string;
+};
+
 export type ClientOverride = {
   status?: string | null;
   specialRate?: boolean;
@@ -64,6 +74,7 @@ export type PSBData = {
   clientOverrides: Record<string, ClientOverride>;
   anomalyAck: Record<string, AnomalyAck>;
   uploadLog: UploadLogEntry[];
+  leads: Lead[];
 };
 
 export const EMPTY_DATA: PSBData = {
@@ -74,6 +85,7 @@ export const EMPTY_DATA: PSBData = {
   clientOverrides: {},
   anomalyAck: {},
   uploadLog: [],
+  leads: [],
 };
 
 export type CSVType = "sessions" | "services" | "payments" | "packages";

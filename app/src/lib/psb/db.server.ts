@@ -16,7 +16,7 @@ import { EMPTY_DATA } from "./types";
 const uid = () => crypto.randomUUID();
 
 export async function loadData(DB: D1Database): Promise<PSBData> {
-  const [sessions, services, payments, packages, overrides, acks, log] = await Promise.all([
+  const [sessions, services, payments, packages, overrides, acks, log, leads] = await Promise.all([
     DB.prepare("SELECT * FROM sessions").all(),
     DB.prepare("SELECT * FROM services").all(),
     DB.prepare("SELECT * FROM payments").all(),
@@ -24,6 +24,7 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
     DB.prepare("SELECT * FROM client_overrides").all(),
     DB.prepare("SELECT * FROM anomaly_ack").all(),
     DB.prepare("SELECT * FROM upload_log ORDER BY date DESC LIMIT 40").all(),
+    DB.prepare("SELECT * FROM leads ORDER BY date DESC").all().catch(() => ({ results: [] })),
   ]);
 
   const data: PSBData = {
@@ -61,6 +62,15 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
       package: r.package_name,
       remaining: r.sessions_remaining,
       total: r.sessions_total,
+    })),
+    leads: (leads.results as any[]).map((r) => ({
+      id: r.id,
+      date: r.date,
+      name: r.name || "",
+      source: r.source,
+      referrer: r.referrer || "",
+      status: r.status,
+      note: r.note || "",
     })),
     uploadLog: (log.results as any[]).map((r) => ({
       date: r.date,

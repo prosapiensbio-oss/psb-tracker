@@ -72,7 +72,7 @@ function WeekEnergyRow({ weekKeyIso, colSpan, entry, onSave }: {
         <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
           {([["zrusene", "Zrušené", "koľko tréningov klienti tento týždeň zrušili"],
              ["presunute", "Presunuté", "koľko sa ich presunulo na iný termín"],
-             ["dopyty", "Dopyty", "koľko ľudí sa ozvalo (mail, Instagram, správa) — aj tí, čo už neodpísali"]] as const).map(([k, lbl, hint]) => (
+            ] as const).map(([k, lbl, hint]) => (
             <label key={k} style={{ fontSize: 11.5, color: C.textMuted, display: "flex", alignItems: "center", gap: 6 }} title={hint}>
               {lbl}
               <input type="number" min={0} max={99} value={draft[k] ?? ""} onChange={(e) => set(k, e.target.value)}
@@ -142,14 +142,13 @@ function Prehlad({ data, focus }: { data: PSBData; focus?: NavFocus | null }) {
   // Totals from the weekly log, limited to the weeks currently in the table.
   const shownWeeks = useMemo(() => new Set(rows.map((g) => weekKey(new Date(g.ts).toISOString()))), [rows]);
   const logged = useMemo(() => {
-    let zrusene = 0, presunute = 0, dopyty = 0;
+    let zrusene = 0, presunute = 0;
     for (const [wk, e] of Object.entries(weeks)) {
       if (!shownWeeks.has(wk)) continue;
       zrusene += Number(e.zrusene) || 0;
       presunute += Number(e.presunute) || 0;
-      dopyty += Number(e.dopyty) || 0;
     }
-    return { zrusene, presunute, dopyty, any: zrusene + presunute + dopyty > 0 };
+    return { zrusene, presunute, any: zrusene + presunute > 0 };
   }, [weeks, shownWeeks]);
   // Úvodné tréningy over the same window — the middle step of the funnel.
   const uvodne = useMemo(() => {
@@ -257,13 +256,7 @@ function Prehlad({ data, focus }: { data: PSBData; focus?: NavFocus | null }) {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10 }}>
             <StatCard value={String(logged.zrusene)} label="Zrušené tréningy" color={C.red} />
             <StatCard value={String(logged.presunute)} label="Presunuté" color={C.orange} />
-            <StatCard value={String(logged.dopyty)} label="Dopyty" color={C.blue} />
             <StatCard value={String(uvodne)} label="Úvodné tréningy" color={C.accentLight} />
-            <StatCard
-              value={logged.dopyty > 0 ? `${((uvodne / logged.dopyty) * 100).toFixed(0)} %` : "—"}
-              label={<Info text="Koľko z dopytov skončilo úvodným tréningom. Nízke číslo = problém je v predaji (ľudia sa ozvú, ale neprídu). Vysoké číslo pri málo dopytoch = problém je v marketingu." label="Dopyt → úvodný" />}
-              color={C.green}
-            />
           </div>
           {logged.zrusene > 0 && (
             <div style={{ fontSize: 11.5, color: C.textMuted, marginTop: 9 }}>

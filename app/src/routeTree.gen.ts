@@ -20,6 +20,7 @@ import { Route as ApiResetRouteImport } from './routes/api/reset'
 import { Route as ApiOverrideRouteImport } from './routes/api/override'
 import { Route as ApiLogoutRouteImport } from './routes/api/logout'
 import { Route as ApiLoginRouteImport } from './routes/api/login'
+import { Route as ApiLeadsRouteImport } from './routes/api/leads'
 import { Route as ApiIngestRouteImport } from './routes/api/ingest'
 import { Route as ApiDataRouteImport } from './routes/api/data'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
@@ -80,6 +81,11 @@ const ApiLoginRoute = ApiLoginRouteImport.update({
   path: '/api/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiLeadsRoute = ApiLeadsRouteImport.update({
+  id: '/api/leads',
+  path: '/api/leads',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiIngestRoute = ApiIngestRouteImport.update({
   id: '/api/ingest',
   path: '/api/ingest',
@@ -109,6 +115,7 @@ export interface FileRoutesByFullPath {
   '/api/chat': typeof ApiChatRoute
   '/api/data': typeof ApiDataRoute
   '/api/ingest': typeof ApiIngestRoute
+  '/api/leads': typeof ApiLeadsRoute
   '/api/login': typeof ApiLoginRoute
   '/api/logout': typeof ApiLogoutRoute
   '/api/override': typeof ApiOverrideRoute
@@ -126,6 +133,7 @@ export interface FileRoutesByTo {
   '/api/chat': typeof ApiChatRoute
   '/api/data': typeof ApiDataRoute
   '/api/ingest': typeof ApiIngestRoute
+  '/api/leads': typeof ApiLeadsRoute
   '/api/login': typeof ApiLoginRoute
   '/api/logout': typeof ApiLogoutRoute
   '/api/override': typeof ApiOverrideRoute
@@ -144,6 +152,7 @@ export interface FileRoutesById {
   '/api/chat': typeof ApiChatRoute
   '/api/data': typeof ApiDataRoute
   '/api/ingest': typeof ApiIngestRoute
+  '/api/leads': typeof ApiLeadsRoute
   '/api/login': typeof ApiLoginRoute
   '/api/logout': typeof ApiLogoutRoute
   '/api/override': typeof ApiOverrideRoute
@@ -163,6 +172,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/data'
     | '/api/ingest'
+    | '/api/leads'
     | '/api/login'
     | '/api/logout'
     | '/api/override'
@@ -180,6 +190,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/data'
     | '/api/ingest'
+    | '/api/leads'
     | '/api/login'
     | '/api/logout'
     | '/api/override'
@@ -197,6 +208,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/data'
     | '/api/ingest'
+    | '/api/leads'
     | '/api/login'
     | '/api/logout'
     | '/api/override'
@@ -215,6 +227,7 @@ export interface RootRouteChildren {
   ApiChatRoute: typeof ApiChatRoute
   ApiDataRoute: typeof ApiDataRoute
   ApiIngestRoute: typeof ApiIngestRoute
+  ApiLeadsRoute: typeof ApiLeadsRoute
   ApiLoginRoute: typeof ApiLoginRoute
   ApiLogoutRoute: typeof ApiLogoutRoute
   ApiOverrideRoute: typeof ApiOverrideRoute
@@ -304,6 +317,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiLoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/leads': {
+      id: '/api/leads'
+      path: '/api/leads'
+      fullPath: '/api/leads'
+      preLoaderRoute: typeof ApiLeadsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/ingest': {
       id: '/api/ingest'
       path: '/api/ingest'
@@ -343,6 +363,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiChatRoute: ApiChatRoute,
   ApiDataRoute: ApiDataRoute,
   ApiIngestRoute: ApiIngestRoute,
+  ApiLeadsRoute: ApiLeadsRoute,
   ApiLoginRoute: ApiLoginRoute,
   ApiLogoutRoute: ApiLogoutRoute,
   ApiOverrideRoute: ApiOverrideRoute,

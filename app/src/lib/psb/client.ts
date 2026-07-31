@@ -1,5 +1,5 @@
 // Client-side API helpers (browser only — called from effects/handlers).
-import type { ClientOverride, PSBData } from "./types";
+import type { ClientOverride, Lead, PSBData } from "./types";
 import { EMPTY_DATA } from "./types";
 import type { IngestResult } from "./db.server";
 
@@ -82,6 +82,13 @@ export async function saveMonthNote(
 ): Promise<boolean> {
   const r = await post("/api/vzas-notes", { month, note, answers, actor });
   return r.ok;
+}
+
+export async function saveLead(lead: Partial<Lead> & { id?: string; remove?: boolean }): Promise<string | null> {
+  const r = await post("/api/leads", lead);
+  if (!r.ok) return null;
+  const j = (await r.json()) as { id?: string };
+  return j.id ?? null;
 }
 
 export type WeekEntry = Record<string, string>;
