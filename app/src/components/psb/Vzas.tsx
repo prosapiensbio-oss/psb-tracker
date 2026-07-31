@@ -19,6 +19,9 @@ import {
   SPOLOCNE,
   MONTH_QUESTIONS,
   SEED_ANSWERS,
+  SEED_CIELE,
+  GOAL_STAV_LABEL,
+  GOAL_PRIORITA_LABEL,
   SEED_NOTES,
   YEAR_IDX,
   answerKey,
@@ -46,6 +49,9 @@ import {
   type KpiActual,
   type KpiGroup,
   type KpiOverrides,
+  type Goal,
+  type GoalStav,
+  type GoalPriorita,
   type PersonKey,
   type Vals,
 } from "../../lib/psb/vzas";
@@ -276,13 +282,13 @@ function HealthCard({ idx }: { idx: number[] }) {
         <span style={{ display: "inline-block", width: 15, color: C.textDim, fontSize: 9 }}>{open ? "▼" : "▶"}</span>
         <Info text="Tri čísla, ktoré hovoria, ako pevne firma stojí. Break-even ráta s NÁROKOM trénerov (Fix + variabil), nie s tým, čo si reálne vzali — to, čo si niekto vezme navyše, je pôžička, nie náklad." label="Break-even & zdravie firmy" />
       </H3>
-      {open && (<>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, margin: "12px 0 4px" }}>
         <StatCard value={fmtCZK(beAvg)} label={<Info text="Koľko musíte mesačne zarobiť, aby ste pokryli prevádzku aj nároky na výplaty. Pod týmto číslom je mesiac stratový." label="Break-even / mesiac" />} color={C.orange} />
         <StatCard value={`${rezerva > 0 ? "+" : ""}${rezerva.toFixed(1)} %`} label={<Info text="O koľko % sú priemerné tržby nad break-even. Malá rezerva = jeden slabý mesiac stačí na stratu." label="Rezerva nad break-even" />} color={rezerva >= 20 ? C.green : rezerva >= 0 ? C.orange : C.red} />
         <StatCard value={`${mzdyPct.toFixed(1)} %`} label={<Info text="Podiel mzdových nákladov (nárok oboch trénerov + zamestnanci) na tržbách. Pri službách je to hlavná nákladová položka — čím vyššie, tým menej zostáva na maržu." label="Mzdy z tržieb" />} color={mzdyPct <= 50 ? C.green : mzdyPct <= 60 ? C.orange : C.red} />
         <StatCard value={`${fmtCZK(volitelne / idx.length)} · ${skrtPct.toFixed(0)} %`} label={<Info text="Koľko z prevádzkových nákladov (bez výplat) je voliteľných — reklama, kreatívne nástroje, vybavenie, pohostenie. To sú peniaze, ktoré vieš v zlom mesiaci prestať míňať bez zastavenia štúdia. Zvyšok sú záväzné: nájom, štát, poistenie a systémy, na ktorých prevádzka stojí." label="Viem škrtnúť / mes." />} color={skrtPct >= 30 ? C.green : skrtPct >= 15 ? C.orange : C.red} />
       </div>
+      {open && (<>
       <div style={{ fontSize: 11.5, color: C.textMuted, margin: "8px 0 14px", lineHeight: 1.5 }}>
         Prevádzka bez výplat {fmtCZK(avg(pick(p.bezVyplat, idx)))} + nároky na výplaty {fmtCZK(avg(idx.map((i) => j.narok[i] + t.narok[i] + p.matyas[i])))} = <b>{fmtCZK(beAvg)}</b> mesačne.
         {podBE > 0 && <> Za zvolené obdobie bolo <b style={{ color: C.red }}>{podBE} z {idx.length}</b> mesiacov pod break-even.</>}
@@ -893,8 +899,6 @@ function SalaryTab() {
         )}
       </Card>
 
-      <EraCard />
-
       <PersonCard pk="jerry" idx={idx} />
       <PersonCard pk="terezka" idx={idx} />
 
@@ -945,6 +949,10 @@ function SalaryTab() {
           </ScrollX>
         )}
       </Card>
+
+      {/* History of the model sits below the month-to-month numbers: it is
+          context, not something Jerry acts on every month. */}
+      <EraCard />
 
       <DebtTrendCard idx={idx} />
     </>
@@ -1046,6 +1054,7 @@ function CashflowTab() {
 // the bitcoin that clients paid in and nobody ever converted back to CZK. This
 // card names those routes instead of leaving him to guess.
 function KamOdisliCard({ cum }: { cum: number }) {
+  const [open, setOpen] = useState(false);
   const [res, setRes] = useState<BtcReserve | null>(null);
   useEffect(() => { fetchBtcReserve().then(setRes); }, []);
   const j = salaryCalc("jerry");
@@ -1063,7 +1072,16 @@ function KamOdisliCard({ cum }: { cum: number }) {
 
   return (
     <Card>
-      <H3><Info text="Prevádzkový prebytok nie je zostatok na účte. Táto tabuľka ukazuje, kadiaľ z firmy odišiel — a čo by teoreticky malo zostať. Presný zostatok povie až import z Fia." label="Kde tie peniaze sú" /></H3>
+      <H3 onClick={() => setOpen(!open)}>
+        <span style={{ display: "inline-block", width: 15, color: C.textDim, fontSize: 9 }}>{open ? "▼" : "▶"}</span>
+        <Info text="Prevádzkový prebytok nie je zostatok na účte. Táto tabuľka ukazuje, kadiaľ z firmy odišiel — a čo by teoreticky malo zostať. Presný zostatok povie až import z Fia." label="Kde tie peniaze sú" />
+      </H3>
+      {!open && (
+        <div style={{ fontSize: 12.5, color: C.textMuted }}>
+          Malo by zostať <b style={{ color: signColor(zvysok) }}>{fmtCZK(zvysok)}</b> — rozklad po kliknutí.
+        </div>
+      )}
+      {open && (<>
       <div style={{ marginTop: 6 }}>
         {riadok("Prevádzkový prebytok (od jan 25)", cum, C.green, "Súčet mesačných tokov: príjmy mínus všetky výdavky vrátane výplat.")}
         {riadok("Vklad od Jarka (feb 25)", vklad, C.green, "Peniaze, ktoré prišli do firmy, ale nie sú tržbou — preto ich P&L nevidí. Januárová suma sa nepočíta, to je zostatok prenesený z 2024.")}
@@ -1078,6 +1096,7 @@ function KamOdisliCard({ cum }: { cum: number }) {
         Ak toľko na účte nemáš, chýbajúci rozdiel je v pohyboch, ktoré appka zatiaľ nevidí — dane a odvody platené mimo,
         zostatok prenesený z 2024, hotovosť. <b>Toto je presne tá diera, ktorú zaplní import z Fia</b>; dovtedy ber číslo ako orientačné.
       </div>
+      </>)}
     </Card>
   );
 }
@@ -1463,13 +1482,13 @@ function ForecastCard({ idx }: { idx: number[] }) {
         <span style={{ display: "inline-block", width: 15, color: C.textDim, fontSize: 9, cursor: "pointer" }}>{open ? "▼" : "▶"}</span>
         <Info text="Výhľad z histórie, nie z prianí. Náklady sa rátajú po zložkách: záväzné a výplaty sú stabilné (priemer 3 mes.), voliteľné kolíšu. Rozpätie zisku vychádza z rozdielu medzi 3- a 6-mesačným priemerom tržieb — čím sú tržby nevyrovnanejšie, tým je pásmo širšie. Nezohľadňuje sezónnosť ani jednorazové platby (napr. ročný hosting)." label="Výhľad na ďalšie 3 mesiace" />
       </H3>
-      {open && (<>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, margin: "12px 0 6px" }}>
         <StatCard value={fmtCZK(trzby3)} label="Očak. tržby / mes." color={C.green} />
         <StatCard value={fmtCZK(nakladyF)} label="Očak. náklady / mes." color={C.red} />
         <StatCard value={fmtCZK(ziskStred)} label="Očak. zisk / mes." color={signColor(ziskStred)} />
         <StatCard value={`${fmtCZK(ziskLo)} – ${fmtCZK(ziskHi)}`} label="Pásmo zisku" color={C.blue} />
       </div>
+      {open && (<>
       <div style={{ fontSize: 11.5, color: C.textMuted, margin: "6px 0 14px", lineHeight: 1.55 }}>
         Náklady sa skladajú zo: záväzné {fmtCZK(zavF)} + voliteľné {fmtCZK(volF)} + výplaty {fmtCZK(vyplF)}
         {nepF !== 0 && <> + neprevádzkové {fmtCZK(nepF)}</>}. Za {nextMonths.join(", ")} to spolu vychádza
@@ -1952,6 +1971,167 @@ function KpiTab({ data }: { data: PSBData }) {
   );
 }
 
+// ── Ciele ────────────────────────────────────────────────────────────────────
+// A goal list is only worth having if it can be argued with: every goal says why
+// it exists, measurable ones read their progress from the KPIs instead of being
+// retyped, and project ones carry the single next step. Goals already covered by
+// a KPI are deliberately absent — one number, one home.
+function CieleTab({ data }: { data: PSBData }) {
+  const [ciele, setCiele] = useState<Goal[]>(SEED_CIELE);
+  const [loaded, setLoaded] = useState(false);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [filterStav, setFilterStav] = useState<"vsetky" | GoalStav>("vsetky");
+
+  useEffect(() => {
+    fetchVzasSettings().then((s) => {
+      const c = s["ciele"];
+      if (Array.isArray(c) && c.length) setCiele(c as Goal[]);
+      setLoaded(true);
+    });
+  }, []);
+
+  const persist = (next: Goal[]) => {
+    setCiele(next);
+    saveVzasSetting("ciele", next);
+  };
+  const update = (id: string, patch: Partial<Goal>) =>
+    persist(ciele.map((g) => (g.id === id ? { ...g, ...patch } : g)));
+  const pridaj = () => {
+    const g: Goal = {
+      id: `c${Date.now().toString(36)}`, nazov: "Nový cieľ", preco: "", typ: "projekt",
+      stav: "nezacate", priorita: "stredna", dalsiKrok: "",
+    };
+    persist([g, ...ciele]);
+    setOpenId(g.id);
+  };
+  const zmaz = (id: string) => persist(ciele.filter((g) => g.id !== id));
+
+  // Measurable goals read their number straight from the KPI screen.
+  const kpis = useMemo(() => computeKpis("2026", data.sessions, data.payments), [data.sessions, data.payments]);
+  const kpiVal = (id?: string) => (id ? kpis.find((k) => k.def.id === id)?.value : undefined);
+
+  const vidiel = filterStav === "vsetky" ? ciele : ciele.filter((g) => g.stav === filterStav);
+  const poradie: Record<GoalPriorita, number> = { vysoka: 0, stredna: 1, nizka: 2 };
+  const zoradene = [...vidiel].sort((a, b) =>
+    (a.stav === "hotove" || a.stav === "zrusene" ? 1 : 0) - (b.stav === "hotove" || b.stav === "zrusene" ? 1 : 0) ||
+    poradie[a.priorita] - poradie[b.priorita] ||
+    (a.termin ?? "9999").localeCompare(b.termin ?? "9999"));
+
+  const stavFarba = (s: GoalStav) => (s === "hotove" ? C.green : s === "bezi" ? C.accent : s === "zrusene" ? C.textDim : C.textMuted);
+  const priorFarba = (p: GoalPriorita) => (p === "vysoka" ? C.red : p === "stredna" ? C.orange : C.textDim);
+  const pole: React.CSSProperties = {
+    width: "100%", background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8,
+    color: C.text, fontSize: 12.5, padding: "7px 10px", fontFamily: "inherit",
+  };
+  const label = (t: string) => <div style={{ fontSize: 10.5, color: C.textMuted, marginBottom: 3 }}>{t}</div>;
+
+  const bezi = ciele.filter((g) => g.stav === "bezi").length;
+  const hotove = ciele.filter((g) => g.stav === "hotove").length;
+  const poTermine = ciele.filter((g) => g.termin && g.stav !== "hotove" && g.stav !== "zrusene" && g.termin < new Date().toISOString().slice(0, 10)).length;
+
+  return (
+    <>
+      <Card>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+          <H3><Info text="Ciele z hárku „Ciele 2026“. Merateľné ciele si progres čítajú priamo z KPI, projektové majú stav a ďalší krok. Ciele, ktoré už sleduje KPI (rezerva, online podiel), tu zámerne nie sú — jedno číslo má mať jeden domov." label="Ciele 2026" /></H3>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+            <Select value={filterStav} onChange={(v) => setFilterStav(v as typeof filterStav)}
+              options={[{ value: "vsetky", label: "Všetky" }, ...(Object.keys(GOAL_STAV_LABEL) as GoalStav[]).map((s) => ({ value: s, label: GOAL_STAV_LABEL[s] }))]} />
+            <button onClick={pridaj}
+              style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${C.accent}`, background: C.accentBg, color: C.accentLight, fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>
+              + Nový cieľ
+            </button>
+          </div>
+        </div>
+        <div style={{ fontSize: 12.5, color: C.textMuted }}>
+          Beží <b style={{ color: C.accent }}>{bezi}</b> · hotové <b style={{ color: C.green }}>{hotove}</b> z {ciele.length}
+          {poTermine > 0 && <> · po termíne <b style={{ color: C.red }}>{poTermine}</b></>}
+          {!loaded && <span style={{ color: C.textDim }}> · načítavam…</span>}
+        </div>
+      </Card>
+
+      {zoradene.map((g) => {
+        const open = openId === g.id;
+        const hodnota = kpiVal(g.kpiId);
+        const pct = g.typ === "meratelny" && g.cielovaHodnota && hodnota != null ? (hodnota / g.cielovaHodnota) * 100 : null;
+        const zoslabene = g.stav === "hotove" || g.stav === "zrusene";
+        return (
+          <Card key={g.id} style={{ opacity: zoslabene ? 0.62 : 1 }}>
+            <div onClick={() => setOpenId(open ? null : g.id)} style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer", flexWrap: "wrap" }}>
+              <span style={{ width: 8, height: 8, borderRadius: 999, background: priorFarba(g.priorita), flex: "0 0 auto" }} />
+              <div style={{ flex: "1 1 220px", minWidth: 200 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>
+                  <span style={{ display: "inline-block", width: 13, color: C.textDim, fontSize: 9 }}>{open ? "▼" : "▶"}</span>
+                  {g.nazov}
+                </div>
+                {g.dalsiKrok && !open && (
+                  <div style={{ fontSize: 11.5, color: C.textMuted, marginLeft: 13, marginTop: 2 }}>→ {g.dalsiKrok}</div>
+                )}
+              </div>
+              {pct != null && (
+                <div style={{ textAlign: "right", minWidth: 90 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: pct >= 100 ? C.green : C.orange, fontVariantNumeric: "tabular-nums" }}>{pct.toFixed(0)} %</div>
+                  <div style={{ fontSize: 10.5, color: C.textDim }}>{hodnota?.toFixed(1)} z {g.cielovaHodnota}</div>
+                </div>
+              )}
+              <span style={{ fontSize: 11, padding: "2px 9px", borderRadius: 999, border: `1px solid ${mix(stavFarba(g.stav), 45)}`, color: stavFarba(g.stav), whiteSpace: "nowrap" }}>
+                {GOAL_STAV_LABEL[g.stav]}
+              </span>
+              <span style={{ fontSize: 11.5, color: g.termin && g.termin < new Date().toISOString().slice(0, 10) && !zoslabene ? C.red : C.textDim, minWidth: 78, textAlign: "right" }}>
+                {g.termin ? new Date(g.termin).toLocaleDateString("sk-SK") : "bez termínu"}
+              </span>
+            </div>
+
+            {open && (
+              <div style={{ marginTop: 14, display: "grid", gap: 10 }}>
+                <div>{label("Cieľ")}<input value={g.nazov} onChange={(e) => update(g.id, { nazov: e.target.value })} style={pole} /></div>
+                <div>{label("Prečo — aký problém rieši")}<textarea value={g.preco} rows={2} onChange={(e) => update(g.id, { preco: e.target.value })} style={{ ...pole, resize: "vertical" }} /></div>
+                <div>{label("Ďalší krok — jedna vec, ktorá sa dá spraviť tento týždeň")}<input value={g.dalsiKrok ?? ""} onChange={(e) => update(g.id, { dalsiKrok: e.target.value })} style={pole} /></div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10 }}>
+                  <div>{label("Typ")}
+                    <Select value={g.typ} onChange={(v) => update(g.id, { typ: v as Goal["typ"] })}
+                      options={[{ value: "projekt", label: "Projektový" }, { value: "meratelny", label: "Merateľný" }]} />
+                  </div>
+                  <div>{label("Stav")}
+                    <Select value={g.stav} onChange={(v) => update(g.id, { stav: v as GoalStav })}
+                      options={(Object.keys(GOAL_STAV_LABEL) as GoalStav[]).map((s) => ({ value: s, label: GOAL_STAV_LABEL[s] }))} />
+                  </div>
+                  <div>{label("Priorita")}
+                    <Select value={g.priorita} onChange={(v) => update(g.id, { priorita: v as GoalPriorita })}
+                      options={(Object.keys(GOAL_PRIORITA_LABEL) as GoalPriorita[]).map((s) => ({ value: s, label: GOAL_PRIORITA_LABEL[s] }))} />
+                  </div>
+                  <div>{label("Termín")}
+                    <input type="date" value={g.termin ?? ""} onChange={(e) => update(g.id, { termin: e.target.value })} style={pole} />
+                  </div>
+                </div>
+                {g.typ === "meratelny" && (
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10 }}>
+                    <div>{label("Meria sa cez KPI")}
+                      <Select value={g.kpiId ?? ""} onChange={(v) => update(g.id, { kpiId: v || undefined })}
+                        options={[{ value: "", label: "— vyber KPI —" }, ...kpis.map((k) => ({ value: k.def.id, label: k.def.label }))]} />
+                    </div>
+                    <div>{label("Cieľová hodnota")}
+                      <input type="number" value={g.cielovaHodnota ?? ""} onChange={(e) => update(g.id, { cielovaHodnota: e.target.value ? Number(e.target.value) : undefined })} style={pole} />
+                    </div>
+                  </div>
+                )}
+                <div>{label("Poznámka")}<input value={g.poznamka ?? ""} onChange={(e) => update(g.id, { poznamka: e.target.value })} style={pole} /></div>
+                <div>
+                  <button onClick={() => zmaz(g.id)}
+                    style={{ padding: "5px 12px", borderRadius: 8, border: `1px solid ${mix(C.red, 45)}`, background: "transparent", color: C.red, fontSize: 11.5, cursor: "pointer" }}>
+                    Zmazať cieľ
+                  </button>
+                  <span style={{ fontSize: 11, color: C.textDim, marginLeft: 10 }}>Zmeny sa ukladajú samé.</span>
+                </div>
+              </div>
+            )}
+          </Card>
+        );
+      })}
+    </>
+  );
+}
+
 // ── module shell ─────────────────────────────────────────────────────────────
 export function Vzas({ sub, onSub, data }: { sub: string; onSub: (s: string) => void; data: PSBData }) {
   // Výsledky is one menu entry with its own second level (Kvartálne/Mesačné/KPI).
@@ -1981,6 +2161,7 @@ export function Vzas({ sub, onSub, data }: { sub: string; onSub: (s: string) => 
               { id: "kvartalne", label: "Kvartálne" },
               { id: "mesacne", label: "Mesačné" },
               { id: "kpi", label: "KPI" },
+              { id: "ciele", label: "Ciele" },
             ].map((t) => {
               const on = vysledkySub === t.id;
               return (
@@ -1994,6 +2175,7 @@ export function Vzas({ sub, onSub, data }: { sub: string; onSub: (s: string) => 
           {vysledkySub === "kvartalne" && <KvartalneTab />}
           {vysledkySub === "mesacne" && <MesacneTab />}
           {vysledkySub === "kpi" && <KpiTab data={data} />}
+          {vysledkySub === "ciele" && <CieleTab data={data} />}
         </>
       )}
     </>

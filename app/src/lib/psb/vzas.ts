@@ -732,6 +732,7 @@ const KPI_EXTRA: KpiDef[] = [
   // Annual, like his sheet: 25 h per client is a YEAR's worth, so a seven-month
   // figure has to be judged against seven twelfths of it.
   { id: "hodinKlient", label: "Priemer hodín na klienta", unit: "h", group: "kapacita", annual: true, why: "Ročné hodiny delené počtom klientov — stabilnejší cashflow než veľa ľudí občas." },
+  { id: "marketingPct", label: "Marketing z tržieb", unit: "pct", group: "cena", lo: 5, navrh: true, why: "Koľko z tržieb ide na marketing. Tvoj cieľ na 2026 je 5 % — dnes je to zlomok toho, čo znamená, že rast stojí takmer výlučne na referenciách." },
   { id: "online", label: "Online podiel", unit: "pct", group: "cena", why: "Podiel online tréningov na hodnote odtrénovaného — decentralizácia rizika." },
 ];
 
@@ -917,6 +918,7 @@ export function computeKpis(year: string, sessions: SessionLike[], payments: Pay
     online: hodnota > 0 ? (onlineHodnota / hodnota) * 100 : 0, dlzka, ltv,
     // Reserve comes from the Bitcoin app; without it the row shows 0 and says so.
     rezervaMes: rezervaCzk && be > 0 ? rezervaCzk / (be / idx.length) : 0,
+    marketingPct: vzasPrijmy > 0 ? (idx.reduce((a, i) => a + sumItems(PNL.fixne.subcategories.marketing.items)[i], 0) / vzasPrijmy) * 100 : 0,
   };
 
   const vzasWindow = `${VZAS_MONTH_LABELS[idx[0]]} – ${VZAS_MONTH_LABELS[idx[idx.length - 1]]}`;
@@ -940,6 +942,7 @@ export function computeKpis(year: string, sessions: SessionLike[], payments: Pay
     const status: KpiActual["status"] =
       target == null ? "info" : value >= target ? "ok" : value >= target * 0.85 ? "blizko" : "mimo";
     const window = def.id === "rezervaMes" ? "dnes, z BTC appky"
+      : def.id === "marketingPct" ? vzasWindow
       : def.id === "marza" || def.id === "rezerva" ? vzasWindow
       : def.id === "dlzka" || def.id === "ltv" ? "celá história"
       : dataWindow;
@@ -949,3 +952,49 @@ export function computeKpis(year: string, sessions: SessionLike[], payments: Pay
     return { def, value, target, targetLabel, status, window, extra, advice: kpiAdvice(def.id, { ...ctx, value, target, unit: def.unit }) };
   });
 }
+
+// ── Ciele ────────────────────────────────────────────────────────────────────
+// From the "Ciele 2026" sheet. Two of his thirteen are gone on purpose: "Rezerva
+// 120 000 Kč+" and "Online tréningy 5–10 % obratu" are already tracked as KPIs,
+// and a goal that lives in two places gets updated in neither.
+//
+// The split that matters: a MEASURABLE goal points at a KPI and a target value,
+// so the app computes progress instead of asking; a PROJECT goal has no
+// percentage, only a state and a next step. Without that next step a goal list
+// is a wish list — it is the one field that decides whether anything moves.
+export type GoalStav = "nezacate" | "bezi" | "hotove" | "zrusene";
+export type GoalPriorita = "vysoka" | "stredna" | "nizka";
+export type Goal = {
+  id: string;
+  nazov: string;
+  preco: string;
+  typ: "meratelny" | "projekt";
+  kpiId?: string;
+  cielovaHodnota?: number;
+  termin?: string;      // YYYY-MM-DD
+  stav: GoalStav;
+  priorita: GoalPriorita;
+  dalsiKrok?: string;
+  poznamka?: string;
+};
+
+export const GOAL_STAV_LABEL: Record<GoalStav, string> = {
+  nezacate: "Nezačaté", bezi: "Beží", hotove: "Hotové", zrusene: "Zrušené",
+};
+export const GOAL_PRIORITA_LABEL: Record<GoalPriorita, string> = {
+  vysoka: "Vysoká", stredna: "Stredná", nizka: "Nízka",
+};
+
+export const SEED_CIELE: Goal[] = [
+  { id: "google", nazov: "Google reklamy a marketing", preco: "Referencie sú silné, ale nedajú sa naplánovať — potrebujem kanál, ktorý viem zapnúť.", typ: "meratelny", kpiId: "marketingPct", cielovaHodnota: 5, termin: "2026-02-28", stav: "bezi", priorita: "vysoka", dalsiKrok: "Navýšiť marketing na 5 % tržieb, z toho 75 % Google", poznamka: "" },
+  { id: "viazanost", nazov: "Polročná viazanosť", preco: "Dlhšia spolupráca je lacnejšia než nový klient a vyrovnáva cashflow.", typ: "projekt", termin: "2026-02-28", stav: "bezi", priorita: "vysoka", dalsiKrok: "Vymyslieť spôsob, ako ich predávať pri úvodnom tréningu", poznamka: "" },
+  { id: "online2x", nazov: "2× online tréning ZDARMA", preco: "Vstupná brána do online bez rizika pre klienta.", typ: "projekt", termin: "2026-02-28", stav: "nezacate", priorita: "vysoka", dalsiKrok: "Vytvoriť reklamu", poznamka: "" },
+  { id: "uvodny3", nazov: "3-krokový úvodný proces", preco: "Úvodný tréning konvertuje na 83 %, ale je ich málo — proces zvýši počet aj kvalitu.", typ: "projekt", termin: "2026-03-31", stav: "nezacate", priorita: "vysoka", dalsiKrok: "Samoanalýza → 20 min call → úvodný tréning", poznamka: "" },
+  { id: "newsletter", nazov: "Newsletter / Mailer", preco: "Kontakt na ľudí, ktorí ešte nie sú klienti — dnes ich nemám kde osloviť.", typ: "projekt", termin: "2026-06-30", stav: "nezacate", priorita: "stredna", dalsiKrok: "Pravidelný newsletter a testovanie ponúk", poznamka: "" },
+  { id: "eshop", nazov: "E-shop PSB.cz", preco: "Príjem, ktorý nestojí na odtrénovanej hodine.", typ: "projekt", termin: "2026-09-30", stav: "nezacate", priorita: "stredna", dalsiKrok: "Digitálne produkty — Bitrilógia, kapitoly", poznamka: "" },
+  { id: "vzdelavanie", nazov: "Vzdelávanie Nubound / P-DTR", preco: "Rozšírenie odborných kompetencií.", typ: "projekt", termin: "2026-12-31", stav: "bezi", priorita: "vysoka", dalsiKrok: "", poznamka: "" },
+  { id: "vybavenie", nazov: "Doplnenie vybavenia", preco: "Tyč, kettlebell, mace, medicinbal, závažia — chýbajúce náradie limituje tréning.", typ: "projekt", termin: "2026-12-31", stav: "bezi", priorita: "stredna", dalsiKrok: "", poznamka: "Nákupný zoznam z Excelu: ~17 000 Kč" },
+  { id: "vyziva", nazov: "Výživa — pilotný projekt", preco: "Test, či má zmysel doplnková služba.", typ: "projekt", termin: "2026-12-31", stav: "nezacate", priorita: "stredna", dalsiKrok: "2 klienti zdarma, case studies", poznamka: "" },
+  { id: "merch", nazov: "Merch (mikiny)", preco: "Budovanie značky + doplnkový príjem.", typ: "projekt", stav: "nezacate", priorita: "nizka", dalsiKrok: "", poznamka: "" },
+  { id: "herohero", nazov: "HeroHero / Patreon", preco: "Exkluzívny obsah — len ak bude jasná hodnota pre platiaceho.", typ: "projekt", stav: "nezacate", priorita: "nizka", dalsiKrok: "", poznamka: "" },
+];
