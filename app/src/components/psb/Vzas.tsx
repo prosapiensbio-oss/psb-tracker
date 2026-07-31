@@ -14,7 +14,6 @@ import {
   ENERGY_NOTE,
   ENERGY_SCORE,
   MONTH_QUESTIONS,
-  PERSONAL_QIDS,
   SEED_ANSWERS,
   SEED_NOTES,
   answerKey,
@@ -1096,6 +1095,8 @@ function ForecastCard() {
   );
 }
 
+const PEOPLE: PersonKey[] = ["jerry", "terezka"];
+
 // Energy is inherently per-person: the slider, the estimate of hours worked
 // outside training (which the app can't see), and one sentence.
 function EnergyFields({ person, answers, setAnswers, field }: {
@@ -1140,14 +1141,11 @@ function MonthNoteRow({ mi, colSpan, notes, onSaved }: {
   );
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [who, setWho] = useState<"obaja" | PersonKey>("obaja");
-  const shownPeople: PersonKey[] = who === "obaja" ? ["jerry", "terezka"] : [who];
   const devs = useMemo(() => monthDeviations(mi), [mi]);
 
   const save = async () => {
     setSaving(true);
-    // The active view doubles as attribution — no extra "who am I" selector.
-    const ok = await saveMonthNote(key, note, answers, who === "obaja" ? undefined : SALARY[who].label);
+    const ok = await saveMonthNote(key, note, answers);
     setSaving(false);
     if (ok) {
       setSaved(true);
@@ -1183,58 +1181,42 @@ function MonthNoteRow({ mi, colSpan, notes, onSaved }: {
           </div>
         )}
 
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 9 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: C.accent, textTransform: "uppercase", letterSpacing: 0.8 }}>Otázky na tento mesiac</div>
-          <div style={{ display: "flex", gap: 4 }}>
-            {([["obaja", "Obaja"], ["jerry", "Jerry"], ["terezka", "Terezka"]] as const).map(([id, lbl]) => (
-              <button key={id} onClick={() => setWho(id)}
-                style={{ padding: "4px 11px", borderRadius: 999, border: `1px solid ${who === id ? C.accent : C.border}`, background: who === id ? C.accentBg : "transparent", color: who === id ? C.accentLight : C.textMuted, fontSize: 12, cursor: "pointer" }}>
-                {lbl}
-              </button>
-            ))}
-          </div>
-        </div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: C.accent, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 9 }}>Otázky na tento mesiac</div>
 
         <div style={{ display: "grid", gap: 12, marginBottom: 14 }}>
-          {MONTH_QUESTIONS.map((q) => {
-            // Firm facts stay single; opinions render once per selected founder.
-            if (!PERSONAL_QIDS.has(q.id)) {
-              return (
-                <div key={q.id}>
-                  <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 3 }}>{q.q}</div>
-                  <textarea value={answers[q.id] ?? ""} onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })}
-                    rows={(answers[q.id] ?? "").length > 90 ? 3 : 1} placeholder="…" style={{ ...field, padding: "6px 10px" }} />
-                </div>
-              );
-            }
-            return (
-              <div key={q.id}>
-                <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 5 }}>
-                  {q.kind === "energy" ? (
-                    <Info text="Posuvník je subjektívna energia (1 = na dne, 10 = plná sila). Hodiny mimo tréningov sú odhad — appka pozná len odtrénované hodiny, takže bez tohto čísla sa energia nedá čítať poctivo. Zároveň ukazuje, koľko práce pre firmu mzdový model vôbec neplatí." label="Energia a záťaž" />
-                  ) : q.q}
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: shownPeople.length > 1 ? "repeat(auto-fit, minmax(260px, 1fr))" : "1fr", gap: 12 }}>
-                  {shownPeople.map((pk) => (
-                    <div key={pk} style={shownPeople.length > 1 ? { border: `1px solid ${C.border}`, borderRadius: 10, padding: "9px 11px", background: mix(C.accent, 4) } : undefined}>
-                      {shownPeople.length > 1 && (
-                        <div style={{ fontSize: 11, fontWeight: 700, color: pk === "jerry" ? C.accent : C.blue, marginBottom: 6 }}>{SALARY[pk].label}</div>
-                      )}
-                      {q.kind === "energy"
-                        ? <EnergyFields person={pk} answers={answers} setAnswers={setAnswers} field={field} />
-                        : (
-                          <textarea
-                            value={answers[answerKey(q.id, pk)] ?? ""}
-                            onChange={(e) => setAnswers({ ...answers, [answerKey(q.id, pk)]: e.target.value })}
-                            rows={(answers[answerKey(q.id, pk)] ?? "").length > 90 ? 3 : 1}
-                            placeholder="…" style={{ ...field, padding: "6px 10px" }} />
-                        )}
+          {MONTH_QUESTIONS.map((q) => (
+            <div key={q.id}>
+              <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 5 }}>
+                {q.kind === "energy" ? (
+                  <Info text="Posuvník je subjektívna energia (1 = na dne, 10 = plná sila). Hodiny mimo tréningov sú odhad — appka pozná len odtrénované hodiny, takže bez tohto čísla sa energia nedá čítať poctivo. Zároveň ukazuje, koľko práce pre firmu mzdový model vôbec neplatí." label="Energia a záťaž" />
+                ) : q.q}
+              </div>
+              {q.kind === "energy" ? (
+                // Energy keeps the two-column layout — slider, hours and a sentence each.
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 12 }}>
+                  {PEOPLE.map((pk) => (
+                    <div key={pk} style={{ border: `1px solid ${C.border}`, borderRadius: 10, padding: "9px 11px", background: mix(C.accent, 4) }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: pk === "jerry" ? C.accent : C.blue, marginBottom: 6 }}>{SALARY[pk].label}</div>
+                      <EnergyFields person={pk} answers={answers} setAnswers={setAnswers} field={field} />
                     </div>
                   ))}
                 </div>
-              </div>
-            );
-          })}
+              ) : (
+                // One box per founder, stacked; the placeholder says whose it is.
+                <div style={{ display: "grid", gap: 6 }}>
+                  {PEOPLE.map((pk) => (
+                    <textarea
+                      key={pk}
+                      value={answers[answerKey(q.id, pk)] ?? ""}
+                      onChange={(e) => setAnswers({ ...answers, [answerKey(q.id, pk)]: e.target.value })}
+                      rows={(answers[answerKey(q.id, pk)] ?? "").length > 90 ? 3 : 1}
+                      placeholder={SALARY[pk].label}
+                      style={{ ...field, padding: "6px 10px" }} />
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
         </div>
 
         <div style={{ fontSize: 11, fontWeight: 700, color: C.accent, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 7 }}>Voľná poznámka</div>
