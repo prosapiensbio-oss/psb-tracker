@@ -101,11 +101,22 @@ function RangeBar({ r, extra }: { r: Range; extra?: ReactNode }) {
 }
 
 // ── table primitives ─────────────────────────────────────────────────────────
+// With 18 columns the label column scrolls out of sight, and a row of numbers
+// with no name is useless — so the first column is pinned. mix() is
+// transparent-based, so a pinned cell needs an opaque base under the tint.
+const sticky = (tint?: string) => ({
+  position: "sticky" as const,
+  left: 0,
+  zIndex: 1,
+  backgroundColor: C.card,
+  ...(tint ? { backgroundImage: `linear-gradient(${tint}, ${tint})` } : {}),
+});
+
 function MonthHead({ idx, first = "Položka", showAvg = true }: { idx: number[]; first?: string; showAvg?: boolean }) {
   const th = (extra?: object) => ({ textAlign: "right" as const, padding: "8px 10px", fontSize: 11, color: C.textMuted, fontWeight: 600, whiteSpace: "nowrap" as const, ...extra });
   return (
     <tr style={{ borderBottom: `2px solid ${mix(C.accent, 35)}` }}>
-      <th style={{ ...th(), textAlign: "left", minWidth: 190 }}>{first}</th>
+      <th style={{ ...th(), textAlign: "left", minWidth: 190, ...sticky(), zIndex: 2 }}>{first}</th>
       {idx.map((i) => <th key={i} style={th()}>{MONTHS[i]}</th>)}
       <th style={th({ borderLeft: `1px solid ${C.border}` })}>Celkom</th>
       {showAvg && <th style={th()}>Ø / mes.</th>}
@@ -125,7 +136,7 @@ function Row({ label, values, depth = 0, bold = false, color, children, showAvg 
   return (
     <>
       <tr onClick={() => hasKids && setOpen(!open)} style={{ background: depth === 0 ? mix(C.accent, 7) : "transparent", cursor: hasKids ? "pointer" : "default" }}>
-        <td style={{ padding: "6px 10px", paddingLeft: depth * 16 + 10, fontSize: fs, fontWeight: bold ? 600 : 400, color: C.text, whiteSpace: "nowrap", borderBottom: `1px solid ${mix(C.border, 55)}` }}>
+        <td style={{ padding: "6px 10px", paddingLeft: depth * 16 + 10, fontSize: fs, fontWeight: bold ? 600 : 400, color: C.text, whiteSpace: "nowrap", borderBottom: `1px solid ${mix(C.border, 55)}`, ...sticky(depth === 0 ? mix(C.accent, 7) : undefined) }}>
           <span style={{ display: "inline-block", width: 15, color: C.textDim, fontSize: 9 }}>{hasKids ? (open ? "▼" : "▶") : ""}</span>
           {label}
         </td>
@@ -149,7 +160,9 @@ function Row({ label, values, depth = 0, bold = false, color, children, showAvg 
 function Divider({ label, span }: { label: string; span: number }) {
   return (
     <tr>
-      <td colSpan={span} style={{ padding: "14px 10px 5px", fontSize: 11, fontWeight: 700, color: C.accent, textTransform: "uppercase", letterSpacing: 1, borderBottom: `1px solid ${mix(C.accent, 30)}` }}>{label}</td>
+      <td colSpan={span} style={{ padding: "14px 10px 5px", fontSize: 11, fontWeight: 700, color: C.accent, textTransform: "uppercase", letterSpacing: 1, borderBottom: `1px solid ${mix(C.accent, 30)}` }}>
+        <span style={{ position: "sticky", left: 10, display: "inline-block" }}>{label}</span>
+      </td>
     </tr>
   );
 }
@@ -160,7 +173,7 @@ function TotalRow({ label, values, color, big = false, showAvg = true, onClick, 
   const cell = { textAlign: "right" as const, padding: big ? "10px" : "8px 10px", fontWeight: 700, fontSize: big ? 14 : 13, color, fontVariantNumeric: "tabular-nums" as const, whiteSpace: "nowrap" as const };
   return (
     <tr onClick={onClick} style={{ background: big ? mix(C.accent, 12) : "transparent", borderTop: `2px solid ${mix(C.accent, 45)}`, cursor: onClick ? "pointer" : "default" }}>
-      <td style={{ padding: big ? "10px" : "8px 10px", fontWeight: 700, fontSize: big ? 14 : 13, color: C.text, whiteSpace: "nowrap" }}>
+      <td style={{ padding: big ? "10px" : "8px 10px", fontWeight: 700, fontSize: big ? 14 : 13, color: C.text, whiteSpace: "nowrap", ...sticky(big ? mix(C.accent, 12) : undefined) }}>
         {onClick && <span style={{ display: "inline-block", width: 15, color: C.textDim, fontSize: 9 }}>{open ? "▼" : "▶"}</span>}
         {label}
       </td>
@@ -466,7 +479,7 @@ function PersonCard({ pk, idx }: { pk: PersonKey; idx: number[] }) {
   const c = salaryCalc(pk);
   const konecny = c.cumDebt[c.cumDebt.length - 1];
   const cell = { textAlign: "right" as const, padding: "5px 8px", fontSize: 12, fontVariantNumeric: "tabular-nums" as const, whiteSpace: "nowrap" as const };
-  const lbl = { ...S.td, fontSize: 12, color: C.textMuted } as const;
+  const lbl = { ...S.td, fontSize: 12, color: C.textMuted, ...sticky() } as const;
   const detailBtn = (on: boolean, fn: () => void) => (
     <button onClick={(e) => { e.stopPropagation(); fn(); }}
       style={{ marginLeft: 8, padding: "1px 8px", borderRadius: 6, border: `1px solid ${on ? C.accent : C.border}`, background: on ? C.accentBg : "transparent", color: on ? C.accentLight : C.textDim, fontSize: 10, cursor: "pointer", whiteSpace: "nowrap" }}>
@@ -499,7 +512,7 @@ function PersonCard({ pk, idx }: { pk: PersonKey; idx: number[] }) {
           <table style={{ ...tableStyle, marginTop: 12, minWidth: 700 }}>
             <thead>
               <tr style={{ borderBottom: `1px solid ${C.border}` }}>
-                <th style={{ textAlign: "left", padding: "6px 8px", fontSize: 11, color: C.textMuted, minWidth: 170 }} />
+                <th style={{ textAlign: "left", padding: "6px 8px", fontSize: 11, color: C.textMuted, minWidth: 170, ...sticky(), zIndex: 2 }} />
                 {idx.map((i) => <th key={i} style={{ ...cell, fontSize: 11, color: C.textMuted, fontWeight: 600 }}>{MONTHS[i]}</th>)}
                 <th style={{ ...cell, fontSize: 11, color: C.textMuted, fontWeight: 600, borderLeft: `1px solid ${C.border}` }}>Ø</th>
               </tr>
@@ -565,7 +578,7 @@ function PersonCard({ pk, idx }: { pk: PersonKey; idx: number[] }) {
               )}
 
               <tr style={{ background: mix(C.accent, 10), borderTop: `2px solid ${mix(C.accent, 40)}` }}>
-                <td style={{ ...lbl, fontWeight: 700, color: C.text }}>
+                <td style={{ ...lbl, fontWeight: 700, color: C.text, ...sticky(mix(C.accent, 10)) }}>
                   <Info text="Od sep 2025: Rozdiel = Nárok − Poslané. Kladný = firma dlží trénerovi (dlh klesá), záporný = tréner si vzal viac než nárok (dlh rastie). V ére 70/30 nárok neexistoval, takže rozdielom je priamo zapísaná pôžička alebo splátka voči firme." label="Rozdiel" />
                 </td>
                 {idx.map((i) => <td key={i} style={{ ...cell, color: signColor(c.rozdiel[i]), fontWeight: 700 }}>{money(c.rozdiel[i])}</td>)}
@@ -891,7 +904,7 @@ function SalaryTab() {
             <table style={{ ...tableStyle, marginTop: 12, minWidth: 660 }}>
               <thead>
                 <tr style={{ borderBottom: `1px solid ${C.border}` }}>
-                  <th style={{ textAlign: "left", padding: "6px 8px", fontSize: 11, color: C.textMuted, minWidth: 150 }} />
+                  <th style={{ textAlign: "left", padding: "6px 8px", fontSize: 11, color: C.textMuted, minWidth: 150, ...sticky(), zIndex: 2 }} />
                   {idx.map((i) => <th key={i} style={{ ...cell, fontSize: 11, color: C.textMuted, fontWeight: 600 }}>{MONTHS[i]}</th>)}
                   <th style={{ ...cell, fontSize: 11, color: C.textMuted, fontWeight: 600, borderLeft: `1px solid ${C.border}` }}>Ø</th>
                 </tr>
@@ -899,18 +912,18 @@ function SalaryTab() {
               <tbody>
                 {Object.entries(SPOLOCNE).map(([k, vals]) => (
                   <tr key={k}>
-                    <td style={{ ...S.td, fontSize: 12, color: C.textMuted }}>{k}</td>
+                    <td style={{ ...S.td, fontSize: 12, color: C.textMuted, ...sticky() }}>{k}</td>
                     {idx.map((i) => <td key={i} style={{ ...cell, color: vals[i] > 0 ? C.text : C.textDim }}>{money(vals[i])}</td>)}
                     <td style={{ ...cell, color: C.textDim, borderLeft: `1px solid ${C.border}` }}>{money(avg(idx.map((i) => vals[i])))}</td>
                   </tr>
                 ))}
                 <tr style={{ borderTop: `1px solid ${C.border}` }}>
-                  <td style={{ ...S.td, fontSize: 12, fontWeight: 600, color: C.orange }}>Spolu</td>
+                  <td style={{ ...S.td, fontSize: 12, fontWeight: 600, color: C.orange, ...sticky() }}>Spolu</td>
                   {idx.map((i) => <td key={i} style={{ ...cell, color: C.orange, fontWeight: 600 }}>{money(total[i])}</td>)}
                   <td style={{ ...cell, color: C.orange, fontWeight: 600, borderLeft: `1px solid ${C.border}` }}>{money(avg(idx.map((i) => total[i])))}</td>
                 </tr>
                 <tr>
-                  <td style={{ ...S.td, fontSize: 12, color: C.orange, fontStyle: "italic" }}>→ na osobu (/2)</td>
+                  <td style={{ ...S.td, fontSize: 12, color: C.orange, fontStyle: "italic", ...sticky() }}>→ na osobu (/2)</td>
                   {idx.map((i) => <td key={i} style={{ ...cell, color: C.orange, fontStyle: "italic" }}>{money(half[i])}</td>)}
                   <td style={{ ...cell, color: C.orange, fontStyle: "italic", borderLeft: `1px solid ${C.border}` }}>{money(avg(idx.map((i) => half[i])))}</td>
                 </tr>
@@ -1090,14 +1103,14 @@ function JarekTab() {
           <table style={{ ...tableStyle, minWidth: 660 }}>
             <thead>
               <tr style={{ borderBottom: `1px solid ${C.border}` }}>
-                <th style={{ textAlign: "left", padding: "6px 8px", fontSize: 11, color: C.textMuted, minWidth: 180 }} />
+                <th style={{ textAlign: "left", padding: "6px 8px", fontSize: 11, color: C.textMuted, minWidth: 180, ...sticky(), zIndex: 2 }} />
                 {MONTHS.map((m) => <th key={m} style={{ ...cell, fontSize: 11, color: C.textMuted, fontWeight: 600 }}>{m}</th>)}
                 <th style={{ ...cell, fontSize: 11, color: C.textMuted, fontWeight: 600, borderLeft: `1px solid ${C.border}` }}>Spolu</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td style={{ ...S.td, fontSize: 12, fontWeight: 600, color: C.text }}>
+                <td style={{ ...S.td, fontSize: 12, fontWeight: 600, color: C.text, ...sticky() }}>
                   Splátka spolu
                   <button onClick={() => setKanalyOpen(!kanalyOpen)}
                     style={{ marginLeft: 8, padding: "1px 8px", borderRadius: 6, border: `1px solid ${kanalyOpen ? C.accent : C.border}`, background: kanalyOpen ? C.accentBg : "transparent", color: kanalyOpen ? C.accentLight : C.textDim, fontSize: 10, cursor: "pointer", whiteSpace: "nowrap" }}>
@@ -1109,18 +1122,18 @@ function JarekTab() {
               </tr>
               {kanalyOpen && Object.entries(JAREK_SPLATKY).map(([k, vals]) => (
                 <tr key={k}>
-                  <td style={{ ...S.td, fontSize: 11, color: C.textMuted, paddingLeft: 26 }}>{k}</td>
+                  <td style={{ ...S.td, fontSize: 11, color: C.textMuted, paddingLeft: 26, ...sticky() }}>{k}</td>
                   {vals.map((v, i) => <td key={i} style={{ ...cell, fontSize: 11, color: v > 0 ? C.textMuted : C.textDim }}>{money(v)}</td>)}
                   <td style={{ ...cell, fontSize: 11, color: C.textDim, borderLeft: `1px solid ${C.border}` }}>{money(vSum(vals))}</td>
                 </tr>
               ))}
               <tr>
-                <td style={{ ...S.td, fontSize: 12, color: C.orange }}>Vklad (zvyšuje dlh)</td>
+                <td style={{ ...S.td, fontSize: 12, color: C.orange, ...sticky() }}>Vklad (zvyšuje dlh)</td>
                 {jk.vklady.map((v, i) => <td key={i} style={{ ...cell, color: v > 0 ? C.orange : C.textDim }}>{money(v)}</td>)}
                 <td style={{ ...cell, color: C.orange, borderLeft: `1px solid ${C.border}` }}>{money(vkladySpolu)}</td>
               </tr>
               <tr style={{ background: mix(C.accent, 10) }}>
-                <td style={{ ...S.td, fontSize: 12, fontWeight: 700, color: C.text }}>Stav dlhu</td>
+                <td style={{ ...S.td, fontSize: 12, fontWeight: 700, color: C.text, ...sticky(mix(C.accent, 10)) }}>Stav dlhu</td>
                 {stav.map((v, i) => <td key={i} style={{ ...cell, color: C.red, fontWeight: 700 }}>{money(v)}</td>)}
                 <td style={{ ...cell, borderLeft: `1px solid ${C.border}` }} />
               </tr>
