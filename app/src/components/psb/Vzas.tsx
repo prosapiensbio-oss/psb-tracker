@@ -14,8 +14,10 @@ import {
   ENERGY_NOTE,
   ENERGY_SCORE,
   MONTH_QUESTIONS,
+  PERSONAL_QIDS,
   SEED_ANSWERS,
   SEED_NOTES,
+  answerKey,
   itemNote,
   VZAS_MONTH_LABELS,
   VZAS_TARGETS,
@@ -1094,6 +1096,35 @@ function ForecastCard() {
   );
 }
 
+// Energy is inherently per-person: the slider, the estimate of hours worked
+// outside training (which the app can't see), and one sentence.
+function EnergyFields({ person, answers, setAnswers, field }: {
+  person: PersonKey; answers: Record<string, string>; setAnswers: (a: Record<string, string>) => void; field: React.CSSProperties;
+}) {
+  const kScore = answerKey(ENERGY_SCORE, person);
+  const kHours = answerKey(ENERGY_HOURS, person);
+  const kNote = answerKey(ENERGY_NOTE, person);
+  const score = Number(answers[kScore] ?? 7);
+  const col = score >= 7 ? C.green : score >= 4 ? C.orange : C.red;
+  const set = (k: string, v: string) => setAnswers({ ...answers, [k]: v });
+  return (
+    <>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 7 }}>
+        <input type="range" min={1} max={10} step={1} value={score} onChange={(e) => set(kScore, e.target.value)}
+          style={{ flex: "1 1 150px", accentColor: col }} />
+        <span style={{ fontSize: 15, fontWeight: 700, minWidth: 42, textAlign: "right", color: col, fontVariantNumeric: "tabular-nums" }}>{score} / 10</span>
+      </div>
+      <label style={{ fontSize: 11.5, color: C.textMuted, display: "flex", alignItems: "center", gap: 6, marginBottom: 7 }}>
+        Iné hodiny (mimo tréningov)
+        <input type="number" min={0} max={400} value={answers[kHours] ?? ""} onChange={(e) => set(kHours, e.target.value)}
+          placeholder="napr. 30" style={{ ...field, width: 86, padding: "4px 8px" }} />
+      </label>
+      <textarea value={answers[kNote] ?? ""} onChange={(e) => set(kNote, e.target.value)}
+        rows={(answers[kNote] ?? "").length > 80 ? 2 : 1} placeholder="jedna veta k energii…" style={{ ...field, padding: "6px 10px" }} />
+    </>
+  );
+}
+
 // Numbers say what happened; the note says why. Opens with an auto-computed
 // "what was different" list so the answer usually doesn't have to be recalled.
 function MonthNoteRow({ mi, colSpan, notes, onSaved }: {
@@ -1109,11 +1140,14 @@ function MonthNoteRow({ mi, colSpan, notes, onSaved }: {
   );
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [who, setWho] = useState<"obaja" | PersonKey>("obaja");
+  const shownPeople: PersonKey[] = who === "obaja" ? ["jerry", "terezka"] : [who];
   const devs = useMemo(() => monthDeviations(mi), [mi]);
 
   const save = async () => {
     setSaving(true);
-    const ok = await saveMonthNote(key, note, answers);
+    // The active view doubles as attribution — no extra "who am I" selector.
+    const ok = await saveMonthNote(key, note, answers, who === "obaja" ? undefined : SALARY[who].label);
     setSaving(false);
     if (ok) {
       setSaved(true);
@@ -1149,41 +1183,55 @@ function MonthNoteRow({ mi, colSpan, notes, onSaved }: {
           </div>
         )}
 
-        <div style={{ fontSize: 11, fontWeight: 700, color: C.accent, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 7 }}>Otázky na tento mesiac</div>
-        <div style={{ display: "grid", gap: 10, marginBottom: 14 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 9 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: C.accent, textTransform: "uppercase", letterSpacing: 0.8 }}>Otázky na tento mesiac</div>
+          <div style={{ display: "flex", gap: 4 }}>
+            {([["obaja", "Obaja"], ["jerry", "Jerry"], ["terezka", "Terezka"]] as const).map(([id, lbl]) => (
+              <button key={id} onClick={() => setWho(id)}
+                style={{ padding: "4px 11px", borderRadius: 999, border: `1px solid ${who === id ? C.accent : C.border}`, background: who === id ? C.accentBg : "transparent", color: who === id ? C.accentLight : C.textMuted, fontSize: 12, cursor: "pointer" }}>
+                {lbl}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ display: "grid", gap: 12, marginBottom: 14 }}>
           {MONTH_QUESTIONS.map((q) => {
-            if (q.kind === "energy") {
-              const score = Number(answers[ENERGY_SCORE] ?? 7);
-              const setA = (k: string, v: string) => setAnswers({ ...answers, [k]: v });
+            // Firm facts stay single; opinions render once per selected founder.
+            if (!PERSONAL_QIDS.has(q.id)) {
               return (
                 <div key={q.id}>
-                  <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 5 }}>
-                    <Info text="Posuvník je subjektívna energia (1 = na dne, 10 = plná sila). Hodiny mimo tréningov sú odhad — appka pozná len odtrénované hodiny, takže bez tohto čísla sa energia nedá čítať poctivo. Zároveň ukazuje, koľko práce pre firmu mzdový model vôbec neplatí." label="Energia a záťaž" />
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 7 }}>
-                    <input type="range" min={1} max={10} step={1} value={score}
-                      onChange={(e) => setA(ENERGY_SCORE, e.target.value)}
-                      style={{ flex: "1 1 200px", accentColor: score >= 7 ? C.green : score >= 4 ? C.orange : C.red }} />
-                    <span style={{ fontSize: 15, fontWeight: 700, minWidth: 42, textAlign: "right", color: score >= 7 ? C.green : score >= 4 ? C.orange : C.red, fontVariantNumeric: "tabular-nums" }}>
-                      {score} / 10
-                    </span>
-                    <label style={{ fontSize: 12, color: C.textMuted, display: "inline-flex", alignItems: "center", gap: 6 }}>
-                      Iné hodiny (mimo tréningov)
-                      <input type="number" min={0} max={400} value={answers[ENERGY_HOURS] ?? ""}
-                        onChange={(e) => setA(ENERGY_HOURS, e.target.value)} placeholder="napr. 30"
-                        style={{ ...field, width: 90, padding: "5px 8px" }} />
-                    </label>
-                  </div>
-                  <textarea value={answers[ENERGY_NOTE] ?? ""} onChange={(e) => setA(ENERGY_NOTE, e.target.value)}
-                    rows={(answers[ENERGY_NOTE] ?? "").length > 90 ? 2 : 1} placeholder="jedna veta k energii…" style={{ ...field, padding: "6px 10px" }} />
+                  <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 3 }}>{q.q}</div>
+                  <textarea value={answers[q.id] ?? ""} onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })}
+                    rows={(answers[q.id] ?? "").length > 90 ? 3 : 1} placeholder="…" style={{ ...field, padding: "6px 10px" }} />
                 </div>
               );
             }
             return (
               <div key={q.id}>
-                <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 3 }}>{q.q}</div>
-                <textarea value={answers[q.id] ?? ""} onChange={(e) => setAnswers({ ...answers, [q.id]: e.target.value })}
-                  rows={(answers[q.id] ?? "").length > 90 ? 3 : 1} placeholder="…" style={{ ...field, padding: "6px 10px" }} />
+                <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 5 }}>
+                  {q.kind === "energy" ? (
+                    <Info text="Posuvník je subjektívna energia (1 = na dne, 10 = plná sila). Hodiny mimo tréningov sú odhad — appka pozná len odtrénované hodiny, takže bez tohto čísla sa energia nedá čítať poctivo. Zároveň ukazuje, koľko práce pre firmu mzdový model vôbec neplatí." label="Energia a záťaž" />
+                  ) : q.q}
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: shownPeople.length > 1 ? "repeat(auto-fit, minmax(260px, 1fr))" : "1fr", gap: 12 }}>
+                  {shownPeople.map((pk) => (
+                    <div key={pk} style={shownPeople.length > 1 ? { border: `1px solid ${C.border}`, borderRadius: 10, padding: "9px 11px", background: mix(C.accent, 4) } : undefined}>
+                      {shownPeople.length > 1 && (
+                        <div style={{ fontSize: 11, fontWeight: 700, color: pk === "jerry" ? C.accent : C.blue, marginBottom: 6 }}>{SALARY[pk].label}</div>
+                      )}
+                      {q.kind === "energy"
+                        ? <EnergyFields person={pk} answers={answers} setAnswers={setAnswers} field={field} />
+                        : (
+                          <textarea
+                            value={answers[answerKey(q.id, pk)] ?? ""}
+                            onChange={(e) => setAnswers({ ...answers, [answerKey(q.id, pk)]: e.target.value })}
+                            rows={(answers[answerKey(q.id, pk)] ?? "").length > 90 ? 3 : 1}
+                            placeholder="…" style={{ ...field, padding: "6px 10px" }} />
+                        )}
+                    </div>
+                  ))}
+                </div>
               </div>
             );
           })}

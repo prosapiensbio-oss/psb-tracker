@@ -74,8 +74,13 @@ export async function fetchMonthNotes(): Promise<Record<string, MonthNote>> {
   }
 }
 
-export async function saveMonthNote(month: string, note: string, answers: Record<string, string>): Promise<boolean> {
-  const r = await post("/api/vzas-notes", { month, note, answers });
+export async function saveMonthNote(
+  month: string,
+  note: string,
+  answers: Record<string, string>,
+  actor?: string,
+): Promise<boolean> {
+  const r = await post("/api/vzas-notes", { month, note, answers, actor });
   return r.ok;
 }
 
