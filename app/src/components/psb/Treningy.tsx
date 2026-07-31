@@ -61,24 +61,24 @@ function WeekEnergyRow({ weekKeyIso, colSpan, entry, onSave }: {
                   <input type="number" min={0} max={120} value={draft[wkHours(p.key)] ?? ""}
                     onChange={(e) => set(wkHours(p.key), e.target.value)} placeholder="napr. 8" style={{ ...field, width: 78 }} />
                 </label>
+                {/* Per trainer: a cancellation belongs to whoever's client dropped
+                    out, and it is deleted from the calendar, so nothing can
+                    recover it later — it has to be logged when it happens. */}
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 7 }}>
+                  {([["zrusene", "Zrušené", "koľko jeho tréningov klienti tento týždeň zrušili"],
+                     ["presunute", "Presunuté", "koľko sa ich presunulo na iný termín"]] as const).map(([k, lbl, hint]) => (
+                    <label key={k} style={{ fontSize: 11.5, color: C.textMuted, display: "flex", alignItems: "center", gap: 5 }} title={hint}>
+                      {lbl}
+                      <input type="number" min={0} max={99} value={draft[`${p.key}_${k}`] ?? ""}
+                        onChange={(e) => set(`${p.key}_${k}`, e.target.value)} placeholder="0" style={{ ...field, width: 58 }} />
+                    </label>
+                  ))}
+                </div>
                 <input value={draft[wkNote(p.key)] ?? ""} onChange={(e) => set(wkNote(p.key), e.target.value)}
                   placeholder="jedna veta…" style={{ ...field, width: "100%" }} />
               </div>
             );
           })}
-        </div>
-        {/* Studio-level counts. A cancelled session is deleted from the calendar,
-            so nothing can recover it later — it has to be logged when it happens. */}
-        <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
-          {([["zrusene", "Zrušené", "koľko tréningov klienti tento týždeň zrušili"],
-             ["presunute", "Presunuté", "koľko sa ich presunulo na iný termín"],
-            ] as const).map(([k, lbl, hint]) => (
-            <label key={k} style={{ fontSize: 11.5, color: C.textMuted, display: "flex", alignItems: "center", gap: 6 }} title={hint}>
-              {lbl}
-              <input type="number" min={0} max={99} value={draft[k] ?? ""} onChange={(e) => set(k, e.target.value)}
-                placeholder="0" style={{ ...field, width: 62 }} />
-            </label>
-          ))}
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12 }}>
@@ -142,13 +142,26 @@ function Prehlad({ data, focus }: { data: PSBData; focus?: NavFocus | null }) {
   // Totals from the weekly log, limited to the weeks currently in the table.
   const shownWeeks = useMemo(() => new Set(rows.map((g) => weekKey(new Date(g.ts).toISOString()))), [rows]);
   const logged = useMemo(() => {
+    const per: Record<string, { zrusene: number; presunute: number }> = {
+      jerry: { zrusene: 0, presunute: 0 },
+      terezka: { zrusene: 0, presunute: 0 },
+    };
     let zrusene = 0, presunute = 0;
     for (const [wk, e] of Object.entries(weeks)) {
       if (!shownWeeks.has(wk)) continue;
+      for (const p of ["jerry", "terezka"] as const) {
+        const z = Number(e[`${p}_zrusene`]) || 0;
+        const s = Number(e[`${p}_presunute`]) || 0;
+        per[p].zrusene += z;
+        per[p].presunute += s;
+        zrusene += z;
+        presunute += s;
+      }
+      // Entries written before the split were studio-level; still count them.
       zrusene += Number(e.zrusene) || 0;
       presunute += Number(e.presunute) || 0;
     }
-    return { zrusene, presunute, any: zrusene + presunute > 0 };
+    return { per, zrusene, presunute, any: zrusene + presunute > 0 };
   }, [weeks, shownWeeks]);
   // Úvodné tréningy over the same window — the middle step of the funnel.
   const uvodne = useMemo(() => {
@@ -254,8 +267,16 @@ function Prehlad({ data, focus }: { data: PSBData; focus?: NavFocus | null }) {
             Z týždenných zápisov
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10 }}>
-            <StatCard value={String(logged.zrusene)} label="Zrušené tréningy" color={C.red} />
-            <StatCard value={String(logged.presunute)} label="Presunuté" color={C.orange} />
+            <StatCard
+              value={String(logged.zrusene)}
+              label={<Info text={`Jerry ${logged.per.jerry.zrusene} · Terezka ${logged.per.terezka.zrusene}`} label="Zrušené tréningy" />}
+              color={C.red}
+            />
+            <StatCard
+              value={String(logged.presunute)}
+              label={<Info text={`Jerry ${logged.per.jerry.presunute} · Terezka ${logged.per.terezka.presunute}`} label="Presunuté" />}
+              color={C.orange}
+            />
             <StatCard value={String(uvodne)} label="Úvodné tréningy" color={C.accentLight} />
           </div>
           {logged.zrusene > 0 && (
