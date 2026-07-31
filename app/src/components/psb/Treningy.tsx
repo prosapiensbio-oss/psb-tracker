@@ -67,7 +67,21 @@ function WeekEnergyRow({ weekKeyIso, colSpan, entry, onSave }: {
             );
           })}
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 10 }}>
+        {/* Studio-level counts. A cancelled session is deleted from the calendar,
+            so nothing can recover it later — it has to be logged when it happens. */}
+        <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
+          {([["zrusene", "Zrušené", "koľko tréningov klienti tento týždeň zrušili"],
+             ["presunute", "Presunuté", "koľko sa ich presunulo na iný termín"],
+             ["dopyty", "Dopyty", "koľko ľudí sa ozvalo (mail, Instagram, správa) — aj tí, čo už neodpísali"]] as const).map(([k, lbl, hint]) => (
+            <label key={k} style={{ fontSize: 11.5, color: C.textMuted, display: "flex", alignItems: "center", gap: 6 }} title={hint}>
+              {lbl}
+              <input type="number" min={0} max={99} value={draft[k] ?? ""} onChange={(e) => set(k, e.target.value)}
+                placeholder="0" style={{ ...field, width: 62 }} />
+            </label>
+          ))}
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12 }}>
           <button onClick={save} disabled={saving}
             style={{ padding: "5px 14px", borderRadius: 8, border: `1px solid ${C.accent}`, background: C.accentBg, color: C.accentLight, fontSize: 12.5, fontWeight: 600, cursor: saving ? "default" : "pointer", opacity: saving ? 0.6 : 1 }}>
             {saving ? "Ukladám…" : "Uložiť"}
@@ -124,6 +138,29 @@ function Prehlad({ data, focus }: { data: PSBData; focus?: NavFocus | null }) {
   const [openWeek, setOpenWeek] = useState<string | null>(null);
   const [weeks, setWeeks] = useState<Record<string, WeekEntry>>({});
   useEffect(() => { fetchWeekEntries().then(setWeeks); }, []);
+
+  // Totals from the weekly log, limited to the weeks currently in the table.
+  const shownWeeks = useMemo(() => new Set(rows.map((g) => weekKey(new Date(g.ts).toISOString()))), [rows]);
+  const logged = useMemo(() => {
+    let zrusene = 0, presunute = 0, dopyty = 0;
+    for (const [wk, e] of Object.entries(weeks)) {
+      if (!shownWeeks.has(wk)) continue;
+      zrusene += Number(e.zrusene) || 0;
+      presunute += Number(e.presunute) || 0;
+      dopyty += Number(e.dopyty) || 0;
+    }
+    return { zrusene, presunute, dopyty, any: zrusene + presunute + dopyty > 0 };
+  }, [weeks, shownWeeks]);
+  // Úvodné tréningy over the same window — the middle step of the funnel.
+  const uvodne = useMemo(() => {
+    const from = range?.from, to = range?.to;
+    return data.sessions.filter((s) => {
+      if (s.sessionType !== "UVODNE") return false;
+      if (from && s.date < from) return false;
+      if (to && s.date > to + "T23:59:59.999Z") return false;
+      return true;
+    }).length;
+  }, [data.sessions, range]);
   const sortedRows = useMemo(
     () =>
       sorted(selectedKey ? rows.filter((g) => g.key === selectedKey) : rows, {
@@ -209,6 +246,31 @@ function Prehlad({ data, focus }: { data: PSBData; focus?: NavFocus | null }) {
           <StatCard value={`${summary.avgH.toFixed(1)}h`} label={`Ø hodín / ${period === "week" ? "týždeň" : period === "quarter" ? "kvartál" : "mesiac"}`} />
           <StatCard value={summary.avgScore.toFixed(1)} label="Ø skóre (1–10)" color={summary.avgScore >= 7 ? C.green : summary.avgScore >= 4 ? C.orange : C.red} />
           <StatCard value={fmtCZK(summary.avgCzk)} label="Ø CZK / sedenie" />
+        </div>
+      )}
+
+      {weekly && logged.any && (
+        <div style={{ marginBottom: 16, padding: "12px 14px", borderRadius: 12, border: `1px solid ${C.border}`, background: mix(C.accent, 5) }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: C.accent, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 9 }}>
+            Z týždenných zápisov
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10 }}>
+            <StatCard value={String(logged.zrusene)} label="Zrušené tréningy" color={C.red} />
+            <StatCard value={String(logged.presunute)} label="Presunuté" color={C.orange} />
+            <StatCard value={String(logged.dopyty)} label="Dopyty" color={C.blue} />
+            <StatCard value={String(uvodne)} label="Úvodné tréningy" color={C.accentLight} />
+            <StatCard
+              value={logged.dopyty > 0 ? `${((uvodne / logged.dopyty) * 100).toFixed(0)} %` : "—"}
+              label={<Info text="Koľko z dopytov skončilo úvodným tréningom. Nízke číslo = problém je v predaji (ľudia sa ozvú, ale neprídu). Vysoké číslo pri málo dopytoch = problém je v marketingu." label="Dopyt → úvodný" />}
+              color={C.green}
+            />
+          </div>
+          {logged.zrusene > 0 && (
+            <div style={{ fontSize: 11.5, color: C.textMuted, marginTop: 9 }}>
+              Zrušené tréningy sú stratená kapacita — pri Ø {fmtCZK(summary?.avgCzk ?? 0)} za sedenie to je zhruba{" "}
+              <b style={{ color: C.red }}>{fmtCZK(logged.zrusene * (summary?.avgCzk ?? 0))}</b> nezarobených za zvolené obdobie.
+            </div>
+          )}
         </div>
       )}
 
