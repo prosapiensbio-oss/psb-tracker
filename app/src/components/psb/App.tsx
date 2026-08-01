@@ -30,7 +30,7 @@ import { Klienti } from "./Klienti";
 import { Financie } from "./Financie";
 import { SixMTracker } from "./SixM";
 import { Marketing } from "./Marketing";
-import { Vzas } from "./Vzas";
+import { Vysledky, Vzas } from "./Vzas";
 
 export type Actions = {
   setOverride: (name: string, key: keyof ClientOverride, value: unknown) => void;
@@ -43,19 +43,22 @@ export type Actions = {
 // Deep-link from Dashboard click-throughs: focus one week (Tréningy → Prehľad) or one month (Financie → Zárobky).
 export type NavFocus = { week?: string; month?: string; client?: string; trainer?: string; nonce?: number };
 
-// Three top-level areas: the shared Dashboard, the operational Tracker
-// (Tréningy/Klienti/Financie/6M as sections) and the financial VZAS module.
+// Five top-level areas, each answering a different question, left to right as a
+// story: what is happening now → the work → where the next client comes from →
+// the money → how it is going against the plan. Marketing and Výsledky used to
+// live inside Tracker and VZAS; both answer questions their host did not.
 const TABS = [
   { id: "dashboard", label: "Dashboard", icon: "home" },
   { id: "tracker", label: "Tracker", icon: "activity" },
+  { id: "marketing", label: "Marketing", icon: "activity" },
   { id: "vzas", label: "VZAS", icon: "wallet" },
+  { id: "vysledky", label: "Výsledky", icon: "calendar" },
 ];
 
 const TRACKER_SECTIONS = [
   { id: "treningy", label: "Tréningy", icon: "calendar" },
   { id: "klienti", label: "Klienti", icon: "userCheck" },
   { id: "financie", label: "Financie", icon: "wallet" },
-  { id: "marketing", label: "Marketing", icon: "activity" },
   { id: "6m", label: "6M Tracker", icon: "activity" },
 ];
 const TRACKER_IDS = TRACKER_SECTIONS.map((s) => s.id);
@@ -247,12 +250,13 @@ export function PSBApp() {
             {trackerSection === "treningy" && <Treningy data={data} clients={clients} sub={treningySub} onSub={setTreningySub} focus={treningyFocus} />}
             {trackerSection === "klienti" && <Klienti clients={clients} capacity={capacity} actions={actions} focus={klientiFocus} leads={data.leads} />}
             {trackerSection === "financie" && <Financie data={data} clients={clients} focus={financieFocus} />}
-            {trackerSection === "marketing" && <Marketing data={data} clients={clients} leads={data.leads} />}
             {trackerSection === "6m" && <SixMTracker sixM={sixM} actions={actions} />}
           </>
         )}
 
-        {active === "vzas" && <Vzas sub={vzasSub} onSub={setVzasSub} data={data} />}
+        {active === "marketing" && <Marketing data={data} clients={clients} leads={data.leads} />}
+        {active === "vzas" && <Vzas sub={vzasSub} onSub={setVzasSub} />}
+        {active === "vysledky" && <Vysledky data={data} onNavigate={navigate} />}
       </div>
       <div style={{ ...S.h3, textAlign: "center", color: C.textDim, fontSize: 11, padding: "8px 0 24px", fontWeight: 400 }}>
         ProSapiens Biomechanic · interný nástroj · nezdieľať externe

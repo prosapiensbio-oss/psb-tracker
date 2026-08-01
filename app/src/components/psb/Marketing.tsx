@@ -19,7 +19,7 @@ import {
 import { C, mix, S } from "../../lib/psb/theme";
 import type { ClientAgg } from "../../lib/psb/compute";
 import type { Lead, PSBData } from "../../lib/psb/types";
-import { Card, Empty, H3, Info, StatCard, SubTabs, ValueBars } from "./ui";
+import { Card, Empty, H3, Info, Select, StatCard, SubTabs, ValueBars } from "./ui";
 
 // Marketing — skeleton. Four questions in the order Jerry asked them: what did I
 // try, what worked, what did it cost, and what should I try next. The section
@@ -33,6 +33,40 @@ function Skeleton({ text }: { text: string }) {
   return (
     <div style={{ padding: "12px 14px", borderRadius: 10, border: `1px dashed ${mix(C.accent, 40)}`, background: mix(C.accent, 5), fontSize: 12.5, color: C.textMuted, lineHeight: 1.55 }}>
       <b style={{ color: C.accentLight }}>Kostra</b> — {text}
+    </div>
+  );
+}
+
+// Obdobie. Marketing má DVE časové mierky a miešať ich je chyba: obsah žije dni
+// (mesiac je jednotka, rok je kaša), kanály a SEO sa hýbu pomaly (rok je
+// jednotka, mesiac je šum). Preto má každá karta iné východzie okno — ale ten
+// istý ovládač, aký Jerry pozná z VZAS.
+//
+// A ešte niečo: pri 2–7 reels mesačne je rozdiel medzi 4 a 6 náhoda, nie trend.
+// Preto sa nikde nezačína jedným mesiacom — najkratšie okno sú tri.
+const OBDOBIA = [
+  { value: "3m", label: "Posledné 3 mesiace" },
+  { value: "6m", label: "Posledných 6 mesiacov" },
+  { value: "12m", label: "Posledných 12 mesiacov" },
+  { value: "2026", label: "2026" },
+  { value: "2025", label: "2025" },
+  { value: "all", label: "Celé obdobie (18 mes.)" },
+];
+
+// Vráti zoznam mesiacov "YYYY-MM", ktoré do okna patria.
+function oknoMesiacov(obdobie: string, vsetky: string[]): string[] {
+  const zoradene = [...new Set(vsetky)].sort();
+  if (obdobie === "all") return zoradene;
+  if (obdobie === "2025" || obdobie === "2026") return zoradene.filter((m) => m.startsWith(obdobie));
+  const n = obdobie === "3m" ? 3 : obdobie === "6m" ? 6 : 12;
+  return zoradene.slice(-n);
+}
+
+function ObdobieBar({ hodnota, onChange, poznamka }: { hodnota: string; onChange: (v: string) => void; poznamka?: string }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+      {poznamka && <span style={{ fontSize: 11, color: C.textDim }}>{poznamka}</span>}
+      <Select value={hodnota} onChange={onChange} options={OBDOBIA} />
     </div>
   );
 }
@@ -96,9 +130,11 @@ function SortTable<T extends Record<string, any>>({ riadky, stlpce, minWidth = 4
 }
 
 // ── Čo som robil ─────────────────────────────────────────────────────────────
-function CoSomRobil({ rok }: { rok: string }) {
+function CoSomRobil() {
   const [metrika, setMetrika] = useState<"obsah" | "views" | "dosah" | "spend">("obsah");
-  const data = MKT_MESACNE.filter((r) => r.m.startsWith(rok));
+  const [obdobie, setObdobie] = useState("3m");
+  const okno = oknoMesiacov(obdobie, MKT_MESACNE.map((r) => r.m));
+  const data = MKT_MESACNE.filter((r) => okno.includes(r.m));
   const hodnota = (r: (typeof MKT_MESACNE)[0]) =>
     metrika === "obsah" ? r.reels + r.posty : metrika === "views" ? r.views : metrika === "dosah" ? r.dosah : r.spend;
   const opts: [typeof metrika, string][] = [["obsah", "Príspevky"], ["views", "Videnia"], ["dosah", "Dosah"], ["spend", "Reklama"]];
@@ -106,8 +142,9 @@ function CoSomRobil({ rok }: { rok: string }) {
   return (
     <Card>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
-        <H3><Info text="Koľko obsahu si za mesiac vypustil, aký mal dosah a koľko stála reklama. Stories sa nerátajú do „príspevkov“ — sú v tabuľke nižšie, lebo majú úplne inú životnosť." label="Čo som robil" /></H3>
-        <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+        <H3><Info text="Koľko obsahu si za mesiac vypustil, aký mal dosah a koľko stála reklama. Stories sa nerátajú do „príspevkov“ — sú v tabuľke nižšie, lebo majú úplne inú životnosť. Východzie okno sú 3 mesiace: pri 2–7 reels mesačne je rozdiel medzi jedným a druhým mesiacom náhoda, nie trend." label="Čo som robil" /></H3>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <ObdobieBar hodnota={obdobie} onChange={setObdobie} />
           {opts.map(([id, lbl]) => (
             <button key={id} onClick={() => setMetrika(id)}
               style={{ padding: "5px 12px", borderRadius: 7, border: `1px solid ${metrika === id ? C.accent : C.border}`, background: metrika === id ? C.accentBg : "transparent", color: metrika === id ? C.accentLight : C.textMuted, fontSize: 12, cursor: "pointer" }}>
@@ -146,12 +183,20 @@ function CoSomRobil({ rok }: { rok: string }) {
 }
 
 // ── Čo fungovalo ─────────────────────────────────────────────────────────────
-function CoFungovalo({ rok }: { rok: string }) {
+function CoFungovalo() {
+  // Otázka znie „čo funguje TERAZ", nie „čo kedy fungovalo" — preto 90 dní.
+  const [obdobie, setObdobie] = useState("3m");
+  const okno = oknoMesiacov(obdobie, MKT_MESACNE.map((r) => r.m));
+  const vyber = MKT_TOP.filter((k) => okno.includes(k.m));
   return (
     <Card>
-      <H3><Info text="Rebríček podľa ULOŽENÍ, nie lajkov. Uloženie znamená „toto si chcem nechať“ a je zo všetkých metrík najbližšie k zámeru; lajk nehovorí nič." label="Čo fungovalo" /></H3>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <H3><Info text="Rebríček podľa ULOŽENÍ, nie lajkov. Uloženie znamená „toto si chcem nechať“ a je zo všetkých metrík najbližšie k zámeru; lajk nehovorí nič." label="Čo fungovalo" /></H3>
+        <ObdobieBar hodnota={obdobie} onChange={setObdobie} />
+      </div>
+      {!vyber.length && <Empty>V tomto okne nemám žiadny príspevok v rebríčku — skús dlhšie obdobie.</Empty>}
       <div style={{ marginTop: 4 }}>
-        {MKT_TOP.filter((k) => k.m.startsWith(rok)).map((k, i) => (
+        {vyber.map((k, i) => (
           <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 0", borderBottom: `1px solid ${mix(C.border, 55)}`, flexWrap: "wrap" }}>
             <span style={{ fontSize: 11, color: C.textDim, width: 52, flex: "0 0 auto" }}>{label(k.m)}</span>
             <span style={{ fontSize: 10, padding: "1px 7px", borderRadius: 999, border: `1px solid ${C.border}`, color: C.textMuted, flex: "0 0 auto" }}>{k.typ}</span>
@@ -324,8 +369,11 @@ function CoFungovaloWeb({ rok }: { rok: string }) {
 // ── Vyhľadávanie ─────────────────────────────────────────────────────────────
 // Toto je jediná karta, ktorá odpovedá na otázku „o čom písať" — a jediná, kde
 // je vidieť rozdiel medzi tým, čo prináša čitateľov, a tým, čo prináša klientov.
-function Vyhladavanie({ rok }: { rok: string }) {
-  const data = GSC_MESACNE.filter((r) => r.m.startsWith(rok));
+function Vyhladavanie() {
+  // SEO sa hýbe pomaly — na kratšom okne než rok je to šum.
+  const [obdobie, setObdobie] = useState("12m");
+  const okno = oknoMesiacov(obdobie, GSC_MESACNE.map((r) => r.m));
+  const data = GSC_MESACNE.filter((r) => okno.includes(r.m));
   const kliky = data.reduce((a, r) => a + r.kliky, 0);
   const zobrazenia = data.reduce((a, r) => a + r.zobrazenia, 0);
   const ctr = zobrazenia > 0 ? (kliky / zobrazenia) * 100 : 0;
@@ -351,9 +399,12 @@ function Vyhladavanie({ rok }: { rok: string }) {
   return (
     <>
       <Card>
-        <H3><Info text="Google Search Console za 31.3.2025 – 30.6.2026. Kliky = ľudia, ktorí prišli z vyhľadávania. Zobrazenia = koľkokrát sa web ukázal vo výsledkoch. MP = miera prekliku, teda koľko % zobrazení skončilo klikom." label="Vyhľadávanie (Search Console)" /></H3>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <H3><Info text="Google Search Console za 31.3.2025 – 30.6.2026. Kliky = ľudia, ktorí prišli z vyhľadávania. Zobrazenia = koľkokrát sa web ukázal vo výsledkoch. MP = miera prekliku, teda koľko % zobrazení skončilo klikom. Tabuľky dopytov a stránok sú vždy za celé obdobie — Search Console ich inak nedáva." label="Vyhľadávanie (Search Console)" /></H3>
+          <ObdobieBar hodnota={obdobie} onChange={setObdobie} />
+        </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, margin: "12px 0 14px" }}>
-          <StatCard value={num(kliky)} label={`Kliky z Googlu ${rok}`} color={C.green} />
+          <StatCard value={num(kliky)} label="Kliky z Googlu" color={C.green} />
           <StatCard value={num(zobrazenia)} label="Zobrazenia" color={C.accent} />
           <StatCard value={`${ctr.toFixed(2)} %`} label={<Info text="Priemerná miera prekliku. Pri prevažne informačných dopytoch je 2–3 % normál; pri dopytoch so zámerom kúpiť býva mnohonásobne vyššia." label="Miera prekliku" />} color={C.blue} />
           <StatCard value={`${mobilPct.toFixed(0)} %`} label={<Info text="Podiel klikov z mobilu za celé obdobie. Podľa toho sa dá posúdiť, či má web zmysel ladiť najprv pre telefón." label="Z mobilu" />} color={C.orange} />
@@ -426,13 +477,14 @@ export function Marketing({ data, clients, leads }: { data: PSBData; clients: Re
       <Card>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <div>
-            <H3><Info text="Zatiaľ kostra. Čísla sú jednorazový export z Metricoolu za 18 mesiacov (jan 2025 – jún 2026); importér mesačných exportov pribudne, aby sa to aktualizovalo samo ako PTminder." label="Marketing" /></H3>
+            <H3><Info text="Zatiaľ kostra. Čísla sú jednorazový export z Metricoolu, GA4 a Search Console (jan 2025 – jún/júl 2026); importér pribudne, aby sa to aktualizovalo samo ako PTminder. Prepínač rokov riadi ročné karty (web, články, návratnosť); karty o obsahu a vyhľadávaní majú vlastné okno, lebo sa hýbu inou rýchlosťou." label="Marketing" /></H3>
             <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>
               {vRoku.length} mesiacov {rok} · {suma("posty")} postov · {suma("reels")} reels · {num(suma("stories"))} stories · reklama {fmtCZK(suma("spend"))}
               <span style={{ color: C.textDim }}> · spolu za 18 mes. {fmtCZK(mktSum("spend"))}</span>
             </div>
           </div>
-          <div style={{ display: "flex", gap: 4 }}>
+          <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+            <span style={{ fontSize: 11, color: C.textDim, marginRight: 2 }}>Rok</span>
             {["2025", "2026"].map((y) => (
               <button key={y} onClick={() => setRok(y)}
                 style={{ padding: "5px 12px", borderRadius: 7, border: `1px solid ${rok === y ? C.accent : C.border}`, background: rok === y ? C.accentBg : "transparent", color: rok === y ? C.accentLight : C.textMuted, fontSize: 12, cursor: "pointer" }}>
@@ -445,13 +497,13 @@ export function Marketing({ data, clients, leads }: { data: PSBData; clients: Re
 
       {sub === "prehlad" && (
         <>
-          <CoSomRobil rok={rok} />
+          <CoSomRobil />
           <WebKanaly rok={rok} />
           <CoSkusitDalej />
         </>
       )}
-      {sub === "vykon" && (<><CoFungovalo rok={rok} /><CoFungovaloWeb rok={rok} /></>)}
-      {sub === "vyhladavanie" && <Vyhladavanie rok={rok} />}
+      {sub === "vykon" && (<><CoFungovalo /><CoFungovaloWeb rok={rok} /></>)}
+      {sub === "vyhladavanie" && <Vyhladavanie />}
       {sub === "navratnost" && <CoToPrinieslo data={data} clients={clients} leads={leads} rok={rok} />}
     </>
   );

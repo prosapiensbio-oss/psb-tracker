@@ -1905,7 +1905,7 @@ function KpiRow({ k, onTarget }: { k: KpiActual; onTarget: (id: string, lo: numb
   );
 }
 
-function KpiTab({ data }: { data: PSBData }) {
+function KpiTab({ data, onNavigate }: { data: PSBData; onNavigate?: (tab: string) => void }) {
   const [year, setYear] = useState("2026");
   // Targets Jerry moved himself live in the DB, so they survive a redeploy and
   // are the same on his phone and his laptop.
@@ -1961,9 +1961,20 @@ function KpiTab({ data }: { data: PSBData }) {
       {groups.map((g) => {
         const rows = kpis.filter((k) => k.def.group === g);
         if (!rows.length) return null;
+        // Lievik a cena/mix sa vysvetľujú v Marketingu — jedno číslo má jeden
+        // domov, ale môže mať viac dverí.
+        const doMarketingu = (g === "lievik" || g === "cena") && onNavigate;
         return (
           <Card key={g}>
-            <H3>{KPI_GROUP_LABELS[g]}</H3>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <H3>{KPI_GROUP_LABELS[g]}</H3>
+              {doMarketingu && (
+                <button onClick={() => onNavigate("marketing")}
+                  style={{ padding: "4px 11px", borderRadius: 7, border: `1px solid ${C.border}`, background: "transparent", color: C.accentLight, fontSize: 11.5, cursor: "pointer", whiteSpace: "nowrap" }}>
+                  Detail v Marketingu →
+                </button>
+              )}
+            </div>
             <div>{rows.map((k) => <KpiRow key={k.def.id} k={k} onTarget={setTarget} />)}</div>
           </Card>
         );
@@ -2145,10 +2156,7 @@ function CieleTab({ data }: { data: PSBData }) {
 }
 
 // ── module shell ─────────────────────────────────────────────────────────────
-export function Vzas({ sub, onSub, data }: { sub: string; onSub: (s: string) => void; data: PSBData }) {
-  // Výsledky is one menu entry with its own second level (Kvartálne/Mesačné/KPI).
-  const [vysledkySub, setVysledkySub] = useState("kvartalne");
-  const isVysledky = sub === "vysledky";
+export function Vzas({ sub, onSub }: { sub: string; onSub: (s: string) => void }) {
   return (
     <>
       <SubTabs
@@ -2157,39 +2165,39 @@ export function Vzas({ sub, onSub, data }: { sub: string; onSub: (s: string) => 
           { id: "vyplaty", label: "J&T Výplaty" },
           { id: "cashflow", label: "Cashflow" },
           { id: "jarek", label: "Jarek dlh" },
-          { id: "vysledky", label: "Výsledky" },
         ]}
-        value={isVysledky ? "vysledky" : sub}
+        value={sub}
         onChange={onSub}
       />
       {sub === "pnl" && <PnlTab />}
       {sub === "vyplaty" && <SalaryTab />}
       {sub === "cashflow" && <CashflowTab />}
       {sub === "jarek" && <JarekTab />}
-      {isVysledky && (
-        <>
-          <div style={{ display: "flex", gap: 6, marginBottom: 14, flexWrap: "wrap" }}>
-            {[
-              { id: "kvartalne", label: "Kvartálne" },
-              { id: "mesacne", label: "Mesačné" },
-              { id: "kpi", label: "KPI" },
-              { id: "ciele", label: "Ciele" },
-            ].map((t) => {
-              const on = vysledkySub === t.id;
-              return (
-                <button key={t.id} onClick={() => setVysledkySub(t.id)}
-                  style={{ padding: "5px 13px", borderRadius: 999, border: `1px solid ${on ? C.accent : C.border}`, background: on ? C.accentBg : "transparent", color: on ? C.accentLight : C.textMuted, fontSize: 12.5, fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap" }}>
-                  {t.label}
-                </button>
-              );
-            })}
-          </div>
-          {vysledkySub === "kvartalne" && <KvartalneTab />}
-          {vysledkySub === "mesacne" && <MesacneTab />}
-          {vysledkySub === "kpi" && <KpiTab data={data} />}
-          {vysledkySub === "ciele" && <CieleTab data={data} />}
-        </>
-      )}
+    </>
+  );
+}
+
+// Výsledky stojí vedľa VZAS, nie v ňom: VZAS je účtovná pravda (P&L, výplaty,
+// cashflow, dlhy), kým Výsledky odpovedajú na inú otázku — ako mi to ide voči
+// tomu, čo som si predsavzal. KPI a Ciele už dávno nie sú len o peniazoch.
+export function Vysledky({ data, onNavigate }: { data: PSBData; onNavigate?: (tab: string) => void }) {
+  const [sub, setSub] = useState("kvartalne");
+  return (
+    <>
+      <SubTabs
+        tabs={[
+          { id: "kvartalne", label: "Kvartálne" },
+          { id: "mesacne", label: "Mesačné" },
+          { id: "kpi", label: "KPI" },
+          { id: "ciele", label: "Ciele" },
+        ]}
+        value={sub}
+        onChange={setSub}
+      />
+      {sub === "kvartalne" && <KvartalneTab />}
+      {sub === "mesacne" && <MesacneTab />}
+      {sub === "kpi" && <KpiTab data={data} onNavigate={onNavigate} />}
+      {sub === "ciele" && <CieleTab data={data} />}
     </>
   );
 }
