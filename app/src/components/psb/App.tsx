@@ -254,7 +254,7 @@ export function PSBApp() {
           </>
         )}
 
-        {active === "marketing" && <Marketing data={data} clients={clients} leads={data.leads} />}
+        {active === "marketing" && <Marketing data={data} clients={clients} leads={data.leads} chat={chat} />}
         {active === "vzas" && <Vzas sub={vzasSub} onSub={setVzasSub} />}
         {active === "vysledky" && <Vysledky data={data} onNavigate={navigate} />}
       </div>

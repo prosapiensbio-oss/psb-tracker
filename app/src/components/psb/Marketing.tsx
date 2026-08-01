@@ -17,6 +17,7 @@ import {
   type GscStrana,
 } from "../../lib/psb/marketing";
 import { C, mix, S } from "../../lib/psb/theme";
+import type { AssistantChat } from "./Assistant";
 import type { ClientAgg } from "../../lib/psb/compute";
 import type { Lead, PSBData } from "../../lib/psb/types";
 import { Card, Empty, H3, Info, Select, StatCard, SubTabs, ValueBars } from "./ui";
@@ -28,6 +29,53 @@ import { Card, Empty, H3, Info, Select, StatCard, SubTabs, ValueBars } from "./u
 const MESIACE = ["jan", "feb", "mar", "apr", "máj", "jún", "júl", "aug", "sep", "okt", "nov", "dec"];
 const label = (m: string) => `${MESIACE[Number(m.slice(5, 7)) - 1]} ${m.slice(2, 4)}`;
 const num = (n: number) => n.toLocaleString("sk-SK");
+
+// ── „Vysvetli mi to" ─────────────────────────────────────────────────────────
+// Graf ukáže, ČO sa stalo. Nepovie, čo to znamená ani čo s tým. Toto tlačidlo
+// pošle Jarvisovi presne ten výrez, ktorý má Jerry práve pred sebou — vrátane
+// nastaveného filtra, lebo tie isté čísla znamenajú za 3 mesiace niečo iné než
+// za 18 — a nechá ho to vyložiť ako marketéra, nie zopakovať.
+//
+// Výrez sa skladá až pri kliknutí (funkcia, nie hodnota): karta sa prekresľuje
+// pri každom prepnutí filtra a nemá zmysel stavať text, ktorý sa možno nikdy
+// neodošle.
+function tsv(hlavicka: string[], riadky: (string | number)[][]) {
+  return [hlavicka.join(" | "), ...riadky.map((r) => r.join(" | "))].join("\n");
+}
+
+const obdobieLabel = (v: string) => OBDOBIA.find((o) => o.value === v)?.label ?? v;
+
+function Vysvetli({ chat, titul, filter, vyrez }: { chat?: AssistantChat; titul: string; filter?: string; vyrez: () => string }) {
+  if (!chat) return null;
+  const klik = () => {
+    chat.setFloatingOpen(true);
+    void chat.ask(
+      [
+        `Vysvetli mi kartu „${titul}" z Marketingu.`,
+        filter ? `Nastavené obdobie: ${filter}` : "",
+        "",
+        "Toto mám presne na obrazovke:",
+        vyrez(),
+        "",
+        "Vylož mi to ako marketér, ktorý pozná PSB: čo tie čísla naozaj hovoria, čo sa zmenilo oproti predchádzajúcemu obdobiu a čo z toho pre nás vyplýva.",
+        "Potom daj 2–3 konkrétne veci, čo skúsiť ďalej — téma reelu aj s prvou vetou, námet na článok, alebo úprava konkrétnej stránky. Nič všeobecné o Instagrame; len to, čo sedí na tieto čísla a na to, ako PSB funguje.",
+        "Buď stručný. Ak čísla na nejaký záver nestačia, povedz to rovno.",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    );
+  };
+  return (
+    <button
+      onClick={klik}
+      disabled={chat.busy}
+      title="Pošle Jarvisovi tento graf aj s nastaveným filtrom a nechá ho to vyložiť."
+      style={{ padding: "5px 11px", borderRadius: 7, border: `1px solid ${mix(C.accent, 45)}`, background: mix(C.accent, 8), color: C.accentLight, fontSize: 11.5, fontWeight: 600, cursor: chat.busy ? "default" : "pointer", opacity: chat.busy ? 0.5 : 1, whiteSpace: "nowrap" }}
+    >
+      Vysvetli mi to
+    </button>
+  );
+}
 
 function Skeleton({ text }: { text: string }) {
   return (
@@ -130,7 +178,7 @@ function SortTable<T extends Record<string, any>>({ riadky, stlpce, minWidth = 4
 }
 
 // ── Čo som robil ─────────────────────────────────────────────────────────────
-function CoSomRobil() {
+function CoSomRobil({ chat }: { chat?: AssistantChat }) {
   const [metrika, setMetrika] = useState<"obsah" | "views" | "dosah" | "spend">("obsah");
   const [obdobie, setObdobie] = useState("3m");
   const okno = oknoMesiacov(obdobie, MKT_MESACNE.map((r) => r.m));
@@ -138,6 +186,9 @@ function CoSomRobil() {
   const hodnota = (r: (typeof MKT_MESACNE)[0]) =>
     metrika === "obsah" ? r.reels + r.posty : metrika === "views" ? r.views : metrika === "dosah" ? r.dosah : r.spend;
   const opts: [typeof metrika, string][] = [["obsah", "Príspevky"], ["views", "Videnia"], ["dosah", "Dosah"], ["spend", "Reklama"]];
+  const vyrez = () =>
+    tsv(["mesiac", "reels", "posty", "stories", "videnia", "dosah", "uloženia", "zdieľania", "view rate", "reklama Kč"],
+      data.map((r) => [label(r.m), r.reels, r.posty, r.stories, r.views, r.dosah, r.ulozenia, r.zdielania, `${r.viewRate} %`, r.spend]));
 
   return (
     <Card>
@@ -145,6 +196,7 @@ function CoSomRobil() {
         <H3><Info text="Koľko obsahu si za mesiac vypustil, aký mal dosah a koľko stála reklama. Stories sa nerátajú do „príspevkov“ — sú v tabuľke nižšie, lebo majú úplne inú životnosť. Východzie okno sú 3 mesiace: pri 2–7 reels mesačne je rozdiel medzi jedným a druhým mesiacom náhoda, nie trend." label="Čo som robil" /></H3>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
           <ObdobieBar hodnota={obdobie} onChange={setObdobie} />
+          <Vysvetli chat={chat} titul="Čo som robil" filter={obdobieLabel(obdobie)} vyrez={vyrez} />
           {opts.map(([id, lbl]) => (
             <button key={id} onClick={() => setMetrika(id)}
               style={{ padding: "5px 12px", borderRadius: 7, border: `1px solid ${metrika === id ? C.accent : C.border}`, background: metrika === id ? C.accentBg : "transparent", color: metrika === id ? C.accentLight : C.textMuted, fontSize: 12, cursor: "pointer" }}>
@@ -183,16 +235,22 @@ function CoSomRobil() {
 }
 
 // ── Čo fungovalo ─────────────────────────────────────────────────────────────
-function CoFungovalo() {
+function CoFungovalo({ chat }: { chat?: AssistantChat }) {
   // Otázka znie „čo funguje TERAZ", nie „čo kedy fungovalo" — preto 90 dní.
   const [obdobie, setObdobie] = useState("3m");
   const okno = oknoMesiacov(obdobie, MKT_MESACNE.map((r) => r.m));
   const vyber = MKT_TOP.filter((k) => okno.includes(k.m));
+  const vyrez = () =>
+    tsv(["mesiac", "typ", "hook (prvá veta)", "uloženia", "videnia", "view rate"],
+      vyber.map((k) => [label(k.m), k.typ, k.hook, k.ulozenia, k.views, k.viewRate ? `${k.viewRate} %` : "—"]));
   return (
     <Card>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         <H3><Info text="Rebríček podľa ULOŽENÍ, nie lajkov. Uloženie znamená „toto si chcem nechať“ a je zo všetkých metrík najbližšie k zámeru; lajk nehovorí nič." label="Čo fungovalo" /></H3>
-        <ObdobieBar hodnota={obdobie} onChange={setObdobie} />
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <ObdobieBar hodnota={obdobie} onChange={setObdobie} />
+          <Vysvetli chat={chat} titul="Čo fungovalo" filter={obdobieLabel(obdobie)} vyrez={vyrez} />
+        </div>
       </div>
       {!vyber.length && <Empty>V tomto okne nemám žiadny príspevok v rebríčku — skús dlhšie obdobie.</Empty>}
       <div style={{ marginTop: 4 }}>
@@ -220,7 +278,7 @@ function CoFungovalo() {
 }
 
 // ── Čo to prinieslo ──────────────────────────────────────────────────────────
-function CoToPrinieslo({ data, clients, leads, rok }: { data: PSBData; clients: Record<string, ClientAgg>; leads: Lead[]; rok: string }) {
+function CoToPrinieslo({ data, clients, leads, rok, chat }: { data: PSBData; clients: Record<string, ClientAgg>; leads: Lead[]; rok: string; chat?: AssistantChat }) {
   const uvodne = useMemo(
     () => data.sessions.filter((s) => s.sessionType === "UVODNE" && s.date.slice(0, 4) === rok).length,
     [data.sessions, rok],
@@ -233,9 +291,16 @@ function CoToPrinieslo({ data, clients, leads, rok }: { data: PSBData; clients: 
     return g.length ? g.reduce((a, c) => a + c.totalPrice, 0) / g.length : 0;
   }, [clients]);
 
+  const vyrez = () =>
+    [`Rok ${rok}`, `Reklama spolu: ${Math.round(spend)} Kč`, `Úvodné tréningy: ${uvodne}`,
+      `Cena za úvodný (horný odhad): ${Math.round(cac)} Kč`, `Hodnota klienta (LTV, ≥3 sedenia): ${Math.round(ltv)} Kč`,
+      `Dopytov v lieviku: ${leads.length}`].join("\n");
   return (
     <Card>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
       <H3><Info text="Instagram nikdy nepovie, kto sa stal klientom. Preto sa tu porovnávajú len dve veci, ktoré vieme: koľko stála reklama a koľko úvodných tréningov reálne prišlo. Skutočnú odpoveď „odkiaľ“ dá až lievik dopytov." label="Čo to prinieslo" /></H3>
+      <Vysvetli chat={chat} titul="Čo to prinieslo" filter={`rok ${rok}`} vyrez={vyrez} />
+      </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, margin: "12px 0 4px" }}>
         <StatCard value={fmtCZK(spend)} label={`Reklama ${rok}`} color={C.orange} />
         <StatCard value={String(uvodne)} label={`Úvodné tréningy ${rok}`} color={C.accent} />
@@ -262,7 +327,7 @@ function CoToPrinieslo({ data, clients, leads, rok }: { data: PSBData; clients: 
 // a — čo je dôležitejšie — ČI prišli z platenej alebo organickej cesty. To je
 // jediné miesto v celej appke, kde sa tieto dve veci dajú oddeliť ešte pred tým,
 // než sa niekto ozve.
-function WebKanaly({ rok }: { rok: string }) {
+function WebKanaly({ rok, chat }: { rok: string; chat?: AssistantChat }) {
   const vsetky = GA4_MESACNE.filter((r) => r.m.startsWith(rok));
   // Mesiace bez merania sa NEPRIEMERUJÚ — nula by tvárila, že nikto neprišiel,
   // hoci sa len nemeralo.
@@ -289,9 +354,21 @@ function WebKanaly({ rok }: { rok: string }) {
     ["Referral", sum("referral"), C.textMuted],
   ];
 
+  const vyrez = () =>
+    [`Rok ${rok}. Noví na webe spolu: ${sum("novi")}`,
+      tsv(["kanál", "noví", "podiel"], kanaly.map(([n2, v]) => [n2, v, `${pod(v).toFixed(0)} %`])),
+      `Hlavné udalosti (konverzie): ${sum("udalosti")}`,
+      diery.length ? `Mesiace bez merania (nie nula, diera): ${diery.join(", ")}` : "",
+      castocne.length ? `Čiastočne merané mesiace: ${castocne.join(", ")}` : "",
+      tsv(["mesiac", "noví", "organic search", "paid social", "organic social", "direct", "referral"],
+        data.map((r) => [label(r.m), r.novi, r.organicSearch, r.paidSocial, r.organicSocial, r.direct, r.referral])),
+    ].filter(Boolean).join("\n");
   return (
     <Card>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
       <H3><Info text="Noví používatelia webu podľa toho, odkiaľ prišli. „Hlavné udalosti“ sú konverzie nastavené v GA4 — odoslaný formulár a podobne. Zdroj: export „Prehľad stavu prehľadov“." label="Web a kanály (GA4)" /></H3>
+      <Vysvetli chat={chat} titul="Web a kanály (GA4)" filter={`rok ${rok}`} vyrez={vyrez} />
+      </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, margin: "12px 0 14px" }}>
         <StatCard value={num(sum("novi"))} label={`Noví na webe ${rok}`} color={C.accent} />
         <StatCard value={`${pod(platene).toFixed(0)} %`} label={<Info text={`${num(platene)} nových prišlo z platenej reklamy, ${num(organicke)} organicky.`} label="Z platenej reklamy" />} color={C.orange} />
@@ -324,10 +401,23 @@ function WebKanaly({ rok }: { rok: string }) {
 }
 
 // ── Čo skúsiť ďalej ──────────────────────────────────────────────────────────
-function CoSkusitDalej() {
+function CoSkusitDalej({ chat }: { chat?: AssistantChat }) {
+  // Tu je výrez zámerne širší než pri ostatných kartách: otázka „čo skúsiť" sa
+  // nedá zodpovedať z jedného grafu — potrebuje aj to, čo fungovalo, aj to,
+  // koľko sa toho vôbec vypustilo.
+  const poslednych6 = MKT_MESACNE.slice(-6);
+  const vyrez = () =>
+    [tsv(["mesiac", "reels", "posty", "stories", "videnia", "uloženia", "view rate"],
+      poslednych6.map((r) => [label(r.m), r.reels, r.posty, r.stories, r.views, r.ulozenia, `${r.viewRate} %`])),
+      "",
+      "Najuchovávanejšie príspevky za celé obdobie:",
+      tsv(["typ", "hook", "uloženia"], MKT_TOP.map((k) => [k.typ, k.hook, k.ulozenia]))].join("\n");
   return (
     <Card>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
       <H3><Info text="Odporúčania z tvojej vlastnej histórie, nie zo všeobecných rád o Instagrame." label="Čo skúsiť ďalej" /></H3>
+      <Vysvetli chat={chat} titul="Čo skúsiť ďalej" filter="posledných 6 mesiacov + rebríček za celé obdobie" vyrez={vyrez} />
+      </div>
       <Skeleton text="tu bude porovnanie typu hooku × formátu (ktorá kombinácia má najviac uložení na jeden príspevok), návrh frekvencie podľa mesiacov, v ktorých pribúdali úvodné, a upozornenie na obsah, ktorý sa opakuje bez efektu." />
       <div style={{ fontSize: 12.5, color: C.textMuted, marginTop: 12, lineHeight: 1.55 }}>
         Čo už dnes z dát vidno: <b>stories padli</b> z 85 za mesiac (mar 2025) na ~35 (zač. 2026), zatiaľ čo reels rástli.
@@ -340,11 +430,15 @@ function CoSkusitDalej() {
 // ── Čo fungovalo na webe ─────────────────────────────────────────────────────
 // Instagram má životnosť dva dni, článok pracuje roky. Preto patria vedľa seba:
 // jedno ukazuje, čo zaujalo teraz, druhé to, čo ťa živí ticho na pozadí.
-function CoFungovaloWeb({ rok }: { rok: string }) {
+function CoFungovaloWeb({ rok, chat }: { rok: string; chat?: AssistantChat }) {
   const clanky = MKT_CLANKY.filter((c) => c.rok === rok);
+  const vyrez = () => `Rok ${rok}\n` + tsv(["článok", "zobrazenia"], clanky.map((c) => [c.nazov, c.zobrazenia]));
   return (
     <Card>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
       <H3><Info text="Najčítanejšie články na webe podľa GA4. Servisné stránky (Domov, Služby, Kontakt) sú vynechané — zaujíma nás obsah." label="Čo fungovalo na webe" /></H3>
+      <Vysvetli chat={chat} titul="Čo fungovalo na webe" filter={`rok ${rok}`} vyrez={vyrez} />
+      </div>
       {clanky.length ? (
         <SortTable
           riadky={clanky}
@@ -369,7 +463,7 @@ function CoFungovaloWeb({ rok }: { rok: string }) {
 // ── Vyhľadávanie ─────────────────────────────────────────────────────────────
 // Toto je jediná karta, ktorá odpovedá na otázku „o čom písať" — a jediná, kde
 // je vidieť rozdiel medzi tým, čo prináša čitateľov, a tým, čo prináša klientov.
-function Vyhladavanie() {
+function Vyhladavanie({ chat }: { chat?: AssistantChat }) {
   // SEO sa hýbe pomaly — na kratšom okne než rok je to šum.
   const [obdobie, setObdobie] = useState("12m");
   const okno = oknoMesiacov(obdobie, GSC_MESACNE.map((r) => r.m));
@@ -382,7 +476,11 @@ function Vyhladavanie() {
 
   const tabulka = (nadpis: string, info: string, riadky: GscDopyt[]) => (
     <Card>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
       <H3><Info text={info} label={nadpis} /></H3>
+      <Vysvetli chat={chat} titul={nadpis} filter="celé obdobie (Search Console inak dopyty nedáva)"
+        vyrez={() => tsv(["dopyt", "kliky", "zobrazenia", "MP %", "pozícia"], riadky.map((r) => [r.dopyt, r.kliky, r.zobrazenia, r.ctr, r.pozicia]))} />
+      </div>
       <SortTable
         riadky={riadky}
         stlpce={[
@@ -401,7 +499,12 @@ function Vyhladavanie() {
       <Card>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <H3><Info text="Google Search Console za 31.3.2025 – 30.6.2026. Kliky = ľudia, ktorí prišli z vyhľadávania. Zobrazenia = koľkokrát sa web ukázal vo výsledkoch. MP = miera prekliku, teda koľko % zobrazení skončilo klikom. Tabuľky dopytov a stránok sú vždy za celé obdobie — Search Console ich inak nedáva." label="Vyhľadávanie (Search Console)" /></H3>
-          <ObdobieBar hodnota={obdobie} onChange={setObdobie} />
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <ObdobieBar hodnota={obdobie} onChange={setObdobie} />
+            <Vysvetli chat={chat} titul="Vyhľadávanie (Search Console)" filter={obdobieLabel(obdobie)}
+              vyrez={() => [`Spolu: ${kliky} klikov, ${zobrazenia} zobrazení, MP ${ctr.toFixed(2)} %, z mobilu ${mobilPct.toFixed(0)} %`,
+                tsv(["mesiac", "kliky", "zobrazenia"], data.map((r) => [label(r.m), r.kliky, r.zobrazenia]))].join("\n")} />
+          </div>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, margin: "12px 0 14px" }}>
           <StatCard value={num(kliky)} label="Kliky z Googlu" color={C.green} />
@@ -437,7 +540,11 @@ function Vyhladavanie() {
       )}
 
       <Card>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         <H3><Info text="Ktoré stránky ťahajú návštevnosť z vyhľadávania. Klikni na hlavičku a zoradíš podľa čohokoľvek." label="Najsilnejšie stránky" /></H3>
+        <Vysvetli chat={chat} titul="Najsilnejšie stránky" filter="celé obdobie"
+          vyrez={() => tsv(["stránka", "kliky", "zobrazenia", "MP %", "pozícia"], (GSC_STRANY as unknown as GscStrana[]).map((r) => [r.url, r.kliky, r.zobrazenia, r.ctr, r.pozicia]))} />
+        </div>
         <SortTable
           riadky={GSC_STRANY as unknown as GscStrana[]}
           stlpce={[
@@ -453,7 +560,7 @@ function Vyhladavanie() {
   );
 }
 
-export function Marketing({ data, clients, leads }: { data: PSBData; clients: Record<string, ClientAgg>; leads: Lead[] }) {
+export function Marketing({ data, clients, leads, chat }: { data: PSBData; clients: Record<string, ClientAgg>; leads: Lead[]; chat?: AssistantChat }) {
   const [sub, setSub] = useState("prehlad");
   const [rok, setRok] = useState("2026");
   // The header used to sum all 18 months no matter which year was selected —
@@ -497,14 +604,14 @@ export function Marketing({ data, clients, leads }: { data: PSBData; clients: Re
 
       {sub === "prehlad" && (
         <>
-          <CoSomRobil />
-          <WebKanaly rok={rok} />
-          <CoSkusitDalej />
+          <CoSomRobil chat={chat} />
+          <WebKanaly rok={rok} chat={chat} />
+          <CoSkusitDalej chat={chat} />
         </>
       )}
-      {sub === "vykon" && (<><CoFungovalo /><CoFungovaloWeb rok={rok} /></>)}
-      {sub === "vyhladavanie" && <Vyhladavanie />}
-      {sub === "navratnost" && <CoToPrinieslo data={data} clients={clients} leads={leads} rok={rok} />}
+      {sub === "vykon" && (<><CoFungovalo chat={chat} /><CoFungovaloWeb rok={rok} chat={chat} /></>)}
+      {sub === "vyhladavanie" && <Vyhladavanie chat={chat} />}
+      {sub === "navratnost" && <CoToPrinieslo data={data} clients={clients} leads={leads} rok={rok} chat={chat} />}
     </>
   );
 }
