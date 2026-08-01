@@ -77,7 +77,7 @@ const WIDGETS: WidgetMeta[] = [
   { id: "zarobky", label: "Mesačné zárobky", span: 1 },
   { id: "balicky", label: "Klienti podľa balíčka", span: 1 },
   { id: "koniecBalicka", label: "Blíži sa koniec balíčka", span: 1 },
-  { id: "asistent", label: "AI Asistent", span: 1, noStretch: true },
+  { id: "asistent", label: "Jarvis", span: 1, noStretch: true },
   { id: "trend", label: "Trend typov sedení", span: 2 },
   { id: "register", label: "Na čo sa pozrieť", span: 2, noStretch: true },
 ];
@@ -843,7 +843,7 @@ function UploadCard({ data, missing, actions }: { data: PSBData; missing: typeof
         {missing.length > 0 && <span style={{ ...badge("orange"), fontSize: 10 }}>{missing.length} chýba</span>}
         <span style={{ marginLeft: "auto", fontSize: 12, color: C.textDim }}>{open ? "▲" : "▼ rozbaliť"}</span>
       </div>
-      <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 4 }}>Nahrať sa dá aj pretiahnutím do AI Asistenta (📎 vpravo dole).</div>
+      <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 4 }}>Nahrať sa dá aj pretiahnutím do Jarvisa (📎 vpravo dole).</div>
       {open && (
       <div style={{ marginTop: 12 }}>
       <div

@@ -305,7 +305,7 @@ function ChatHeader({ chat, extra }: { chat: AssistantChat; extra?: React.ReactN
     <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 9, padding: "12px 14px 12px 16px", borderBottom: `1px solid ${C.border}`, background: mix(C.accent, 8) }}>
       <span style={{ color: C.accent }}><Spark /></span>
       <div style={{ lineHeight: 1.15 }}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>PSB Asistent</div>
+        <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>Jarvis</div>
         <div style={{ fontSize: 10.5, color: C.textDim }}>vidí tvoje reálne dáta · Claude Sonnet</div>
       </div>
       <div style={{ marginLeft: "auto", display: "flex", gap: 2 }}>
@@ -406,8 +406,8 @@ export function Assistant({ chat, onClientClick }: { chat: AssistantChat; onClie
 
   if (!open) {
     return (
-      <button onClick={() => setOpen(true)} style={{ position: "fixed", right: 20, bottom: 20, zIndex: 60, display: "flex", alignItems: "center", gap: 9, padding: "12px 18px", borderRadius: 30, border: "none", cursor: "pointer", background: C.accent, color: C.onAccent, fontSize: 14, fontWeight: 600, boxShadow: "0 8px 24px rgba(0,0,0,.4)" }} aria-label="Otvoriť PSB Asistenta">
-        <Spark /> Asistent
+      <button onClick={() => setOpen(true)} style={{ position: "fixed", right: 20, bottom: 20, zIndex: 60, display: "flex", alignItems: "center", gap: 9, padding: "12px 18px", borderRadius: 30, border: "none", cursor: "pointer", background: C.accent, color: C.onAccent, fontSize: 14, fontWeight: 600, boxShadow: "0 8px 24px rgba(0,0,0,.4)" }} aria-label="Otvoriť Jarvisa">
+        <Spark /> Jarvis
       </button>
     );
   }
