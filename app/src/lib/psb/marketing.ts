@@ -88,3 +88,92 @@ export const GA4_MESACNE: Ga4Mesiac[] = [
   { m: "2025-11", novi: 272, organicSearch: 142, paidSocial: 0, organicSocial: 54, direct: 61, referral: 11, udalosti: 57 },
   { m: "2025-12", novi: 350, organicSearch: 165, paidSocial: 0, organicSocial: 36, direct: 139, referral: 8, udalosti: 61 },
 ];
+
+// Vyhľadávanie — Google Search Console (export Performance on Search,
+// 31.3.2025 – 30.6.2026). GA4 povie, že „Organic Search" je najväčší kanál;
+// toto povie, NA ČO. Je to jediný zdroj, ktorý ukazuje aj dopyty, kde sa web
+// zobrazuje, ale nikto neklikne — čiže kde je práca, ktorá sa ešte nezaplatila.
+export type GscMesiac = { m: string; kliky: number; zobrazenia: number; ctr: number };
+export type GscDopyt = { dopyt: string; kliky: number; zobrazenia: number; ctr: number; pozicia: number };
+export type GscStrana = { url: string; kliky: number; zobrazenia: number; ctr: number; pozicia: number };
+
+export const GSC_MESACNE: GscMesiac[] = [
+  { m: "2025-03", kliky: 11, zobrazenia: 166, ctr: 6.63 },
+  { m: "2025-04", kliky: 115, zobrazenia: 5427, ctr: 2.12 },
+  { m: "2025-05", kliky: 108, zobrazenia: 5611, ctr: 1.92 },
+  { m: "2025-06", kliky: 95, zobrazenia: 4357, ctr: 2.18 },
+  { m: "2025-07", kliky: 113, zobrazenia: 3880, ctr: 2.91 },
+  { m: "2025-08", kliky: 96, zobrazenia: 3092, ctr: 3.1 },
+  { m: "2025-09", kliky: 110, zobrazenia: 4030, ctr: 2.73 },
+  { m: "2025-10", kliky: 117, zobrazenia: 4274, ctr: 2.74 },
+  { m: "2025-11", kliky: 121, zobrazenia: 5367, ctr: 2.25 },
+  { m: "2025-12", kliky: 155, zobrazenia: 6281, ctr: 2.47 },
+  { m: "2026-01", kliky: 179, zobrazenia: 8618, ctr: 2.08 },
+  { m: "2026-02", kliky: 167, zobrazenia: 7586, ctr: 2.2 },
+  { m: "2026-03", kliky: 251, zobrazenia: 10500, ctr: 2.39 },
+  { m: "2026-04", kliky: 235, zobrazenia: 9725, ctr: 2.42 },
+  { m: "2026-05", kliky: 235, zobrazenia: 9745, ctr: 2.41 },
+  { m: "2026-06", kliky: 239, zobrazenia: 10085, ctr: 2.37 },
+];
+
+export const GSC_DOPYTY: GscDopyt[] = [
+  { dopyt: "prosapiens", kliky: 157, zobrazenia: 228, ctr: 68.86, pozicia: 3.3 },
+  { dopyt: "functional patterns", kliky: 67, zobrazenia: 1163, ctr: 5.76, pozicia: 7.5 },
+  { dopyt: "functional patterns praha", kliky: 50, zobrazenia: 128, ctr: 39.06, pozicia: 2.2 },
+  { dopyt: "mechanotransdukce", kliky: 35, zobrazenia: 330, ctr: 10.61, pozicia: 1.5 },
+  { dopyt: "biotensegrita", kliky: 33, zobrazenia: 100, ctr: 33.0, pozicia: 1.1 },
+  { dopyt: "pro sapiens", kliky: 24, zobrazenia: 37, ctr: 64.86, pozicia: 2.8 },
+  { dopyt: "předsunutá hlava", kliky: 17, zobrazenia: 228, ctr: 7.46, pozicia: 2.1 },
+  { dopyt: "rib flare", kliky: 15, zobrazenia: 453, ctr: 3.31, pozicia: 4.1 },
+  { dopyt: "subokcipitální svaly", kliky: 8, zobrazenia: 804, ctr: 1.0, pozicia: 2.3 },
+  { dopyt: "predsunuta hlava", kliky: 7, zobrazenia: 85, ctr: 8.24, pozicia: 3.4 },
+  { dopyt: "spiral line", kliky: 5, zobrazenia: 139, ctr: 3.6, pozicia: 30.9 },
+  { dopyt: "jak vyzivit fascie", kliky: 3, zobrazenia: 439, ctr: 0.68, pozicia: 5.7 },
+];
+
+export const GSC_PRILEZITOSTI: GscDopyt[] = [
+  { dopyt: "fasce", kliky: 2, zobrazenia: 3959, ctr: 0.05, pozicia: 4.8 },
+  { dopyt: "laterální", kliky: 0, zobrazenia: 1365, ctr: 0.0, pozicia: 7.9 },
+  { dopyt: "posturální svaly", kliky: 0, zobrazenia: 1022, ctr: 0.0, pozicia: 1.4 },
+  { dopyt: "fascia", kliky: 0, zobrazenia: 821, ctr: 0.0, pozicia: 9.6 },
+  { dopyt: "subokcipitální svaly", kliky: 8, zobrazenia: 804, ctr: 1.0, pozicia: 2.3 },
+  { dopyt: "scm sval", kliky: 0, zobrazenia: 659, ctr: 0.0, pozicia: 4.6 },
+  { dopyt: "fascie", kliky: 0, zobrazenia: 592, ctr: 0.0, pozicia: 29.1 },
+  { dopyt: "thorakolumbální fascie", kliky: 1, zobrazenia: 572, ctr: 0.17, pozicia: 1.7 },
+  { dopyt: "laterální strana", kliky: 1, zobrazenia: 441, ctr: 0.23, pozicia: 5.4 },
+  { dopyt: "jak vyzivit fascie", kliky: 3, zobrazenia: 439, ctr: 0.68, pozicia: 5.7 },
+];
+
+export const GSC_LOKALNE: GscDopyt[] = [
+  { dopyt: "skolióza a posilování", kliky: 0, zobrazenia: 111, ctr: 0.0, pozicia: 31.2 },
+  { dopyt: "online trenink", kliky: 0, zobrazenia: 18, ctr: 0.0, pozicia: 25.7 },
+  { dopyt: "skolioza a posilování", kliky: 0, zobrazenia: 16, ctr: 0.0, pozicia: 18.8 },
+  { dopyt: "trener brno", kliky: 0, zobrazenia: 9, ctr: 0.0, pozicia: 14.2 },
+  { dopyt: "bolesti kloubů a svalů terapie brno", kliky: 0, zobrazenia: 9, ctr: 0.0, pozicia: 33.8 },
+  { dopyt: "individuální trénink", kliky: 0, zobrazenia: 9, ctr: 0.0, pozicia: 56.0 },
+  { dopyt: "osobní trenér brno", kliky: 2, zobrazenia: 8, ctr: 25.0, pozicia: 23.5 },
+  { dopyt: "fitness trenér brno", kliky: 0, zobrazenia: 6, ctr: 0.0, pozicia: 22.5 },
+  { dopyt: "pro pain brno", kliky: 0, zobrazenia: 4, ctr: 0.0, pozicia: 9.2 },
+  { dopyt: "propain brno", kliky: 0, zobrazenia: 3, ctr: 0.0, pozicia: 3.7 },
+];
+
+export const GSC_STRANY: GscStrana[] = [
+  { url: "/", kliky: 405, zobrazenia: 3851, ctr: 10.52, pozicia: 6.3 },
+  { url: "/co-je-functional-patterns/", kliky: 262, zobrazenia: 3015, ctr: 8.69, pozicia: 7.2 },
+  { url: "/padajici-kolena-dovnitr/", kliky: 160, zobrazenia: 5924, ctr: 2.7, pozicia: 6.1 },
+  { url: "/anatomicke-vlaky/", kliky: 148, zobrazenia: 962, ctr: 15.38, pozicia: 4.2 },
+  { url: "/odstavajici-lopatky/", kliky: 140, zobrazenia: 5508, ctr: 2.54, pozicia: 6.0 },
+  { url: "/spiral-line/", kliky: 120, zobrazenia: 8477, ctr: 1.42, pozicia: 7.6 },
+  { url: "/lateral-line/", kliky: 97, zobrazenia: 14690, ctr: 0.66, pozicia: 5.5 },
+  { url: "/biotensegrita/", kliky: 94, zobrazenia: 1141, ctr: 8.24, pozicia: 6.6 },
+  { url: "/anterior-pelvic-tilt/", kliky: 90, zobrazenia: 3245, ctr: 2.77, pozicia: 5.0 },
+  { url: "/predsunuta-hlava/", kliky: 90, zobrazenia: 2611, ctr: 3.45, pozicia: 5.1 },
+];
+
+export const GSC_ZARIADENIA = [
+  { zariadenie: "Mobil", kliky: 1459, zobrazenia: 57035 },
+  { zariadenie: "Stolný počítač", kliky: 861, zobrazenia: 40348 },
+  { zariadenie: "Tablet", kliky: 27, zobrazenia: 1361 },
+] as const;
+
+// kliky spolu 2347, z toho Česko 2057 (88 %), Slovensko 208

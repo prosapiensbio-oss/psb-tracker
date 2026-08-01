@@ -1,7 +1,19 @@
 import { useMemo, useState } from "react";
 
 import { fmtCZK } from "../../lib/psb/format";
-import { GA4_MESACNE, MKT_MESACNE, MKT_TOP, mktSum } from "../../lib/psb/marketing";
+import {
+  GA4_MESACNE,
+  GSC_DOPYTY,
+  GSC_LOKALNE,
+  GSC_MESACNE,
+  GSC_PRILEZITOSTI,
+  GSC_STRANY,
+  GSC_ZARIADENIA,
+  MKT_MESACNE,
+  MKT_TOP,
+  mktSum,
+  type GscDopyt,
+} from "../../lib/psb/marketing";
 import { C, mix, S } from "../../lib/psb/theme";
 import type { ClientAgg } from "../../lib/psb/compute";
 import type { Lead, PSBData } from "../../lib/psb/types";
@@ -213,6 +225,110 @@ function CoSkusitDalej() {
   );
 }
 
+// ── Vyhľadávanie ─────────────────────────────────────────────────────────────
+// Toto je jediná karta, ktorá odpovedá na otázku „o čom písať" — a jediná, kde
+// je vidieť rozdiel medzi tým, čo prináša čitateľov, a tým, čo prináša klientov.
+function Vyhladavanie({ rok }: { rok: string }) {
+  const data = GSC_MESACNE.filter((r) => r.m.startsWith(rok));
+  const kliky = data.reduce((a, r) => a + r.kliky, 0);
+  const zobrazenia = data.reduce((a, r) => a + r.zobrazenia, 0);
+  const ctr = zobrazenia > 0 ? (kliky / zobrazenia) * 100 : 0;
+  const mobil = GSC_ZARIADENIA.find((z) => z.zariadenie === "Mobil");
+  const mobilPct = mobil ? (mobil.kliky / GSC_ZARIADENIA.reduce((a, z) => a + z.kliky, 0)) * 100 : 0;
+
+  const tabulka = (nadpis: string, info: string, riadky: GscDopyt[]) => (
+    <Card>
+      <H3><Info text={info} label={nadpis} /></H3>
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 460 }}>
+          <thead>
+            <tr style={{ borderBottom: `2px solid ${mix(C.accent, 35)}` }}>
+              {["Dopyt", "Kliky", "Zobrazenia", "MP", "Pozícia"].map((h, i) => (
+                <th key={h} style={{ textAlign: i === 0 ? "left" : "right", padding: "8px 10px", fontSize: 11, color: C.textMuted, fontWeight: 600, whiteSpace: "nowrap" }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {riadky.map((r) => (
+              <tr key={r.dopyt}>
+                <td style={{ ...S.td, fontSize: 12.5, color: C.text }}>{r.dopyt}</td>
+                <td style={{ ...S.td, textAlign: "right", fontSize: 12.5, color: r.kliky > 0 ? C.accentLight : C.textDim, fontVariantNumeric: "tabular-nums", fontWeight: r.kliky > 0 ? 600 : 400 }}>{r.kliky}</td>
+                <td style={{ ...S.td, textAlign: "right", fontSize: 12.5, color: C.textMuted, fontVariantNumeric: "tabular-nums" }}>{num(r.zobrazenia)}</td>
+                <td style={{ ...S.td, textAlign: "right", fontSize: 12.5, color: r.ctr >= 5 ? C.green : r.ctr >= 1 ? C.textMuted : C.red, fontVariantNumeric: "tabular-nums" }}>{r.ctr} %</td>
+                <td style={{ ...S.td, textAlign: "right", fontSize: 12.5, color: r.pozicia <= 10 ? C.text : C.textDim, fontVariantNumeric: "tabular-nums" }}>{r.pozicia}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  );
+
+  return (
+    <>
+      <Card>
+        <H3><Info text="Google Search Console za 31.3.2025 – 30.6.2026. Kliky = ľudia, ktorí prišli z vyhľadávania. Zobrazenia = koľkokrát sa web ukázal vo výsledkoch. MP = miera prekliku, teda koľko % zobrazení skončilo klikom." label="Vyhľadávanie (Search Console)" /></H3>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, margin: "12px 0 14px" }}>
+          <StatCard value={num(kliky)} label={`Kliky z Googlu ${rok}`} color={C.green} />
+          <StatCard value={num(zobrazenia)} label="Zobrazenia" color={C.accent} />
+          <StatCard value={`${ctr.toFixed(2)} %`} label={<Info text="Priemerná miera prekliku. Pri prevažne informačných dopytoch je 2–3 % normál; pri dopytoch so zámerom kúpiť býva mnohonásobne vyššia." label="Miera prekliku" />} color={C.blue} />
+          <StatCard value={`${mobilPct.toFixed(0)} %`} label={<Info text="Podiel klikov z mobilu za celé obdobie. Podľa toho sa dá posúdiť, či má web zmysel ladiť najprv pre telefón." label="Z mobilu" />} color={C.orange} />
+        </div>
+        <ValueBars
+          data={data.map((r) => ({ label: label(r.m), value: r.kliky }))}
+          color={C.green}
+          fmt={(n) => String(Math.round(n))}
+          height={150}
+          alignEnd
+        />
+        <div style={{ fontSize: 12.5, color: C.textMuted, marginTop: 10, lineHeight: 1.55 }}>
+          Kliky z vyhľadávania <b>rastú stabilne</b> — z ~110 mesačne v lete 2025 na ~240 dnes, bez jedinej koruny za reklamu.
+          Je to najpomalší kanál, aký máš, a zároveň jediný, ktorý neprestane fungovať, keď prestaneš platiť.
+        </div>
+      </Card>
+
+      {tabulka("Čo ťa nachádza", "Dopyty, ktoré reálne privádzajú ľudí. Značkové dopyty („prosapiens“) sú ľudia, čo ťa už poznajú — tie nerátaj medzi nových.", GSC_DOPYTY)}
+
+      {tabulka(
+        "Kde sa zobrazuješ, ale nikto neklikne",
+        "Dopyty s veľa zobrazeniami a takmer nulovým preklikom. Znamená to, že Google web ukazuje, ale titulok alebo popis nezaujme — alebo je to dopyt, ktorý s tvojou službou nesúvisí a nemá zmysel oň bojovať. Toto je najlacnejšia práca v SEO: text už existuje, mení sa len nadpis.",
+        GSC_PRILEZITOSTI,
+      )}
+
+      {tabulka(
+        "Dopyty so zámerom kúpiť",
+        "Presne tie dopyty, ktoré píše človek, čo hľadá tréning v Brne — nie encyklopédiu. Sem patria tvoji budúci klienti.",
+        GSC_LOKALNE,
+      )}
+
+      <Card>
+        <H3><Info text="Ktoré stránky ťahajú návštevnosť z vyhľadávania." label="Najsilnejšie stránky" /></H3>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 460 }}>
+            <thead>
+              <tr style={{ borderBottom: `2px solid ${mix(C.accent, 35)}` }}>
+                {["Stránka", "Kliky", "Zobrazenia", "MP"].map((h, i) => (
+                  <th key={h} style={{ textAlign: i === 0 ? "left" : "right", padding: "8px 10px", fontSize: 11, color: C.textMuted, fontWeight: 600 }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {GSC_STRANY.map((r) => (
+                <tr key={r.url}>
+                  <td style={{ ...S.td, fontSize: 12.5, color: C.text }}>{r.url}</td>
+                  <td style={{ ...S.td, textAlign: "right", fontSize: 12.5, color: C.accentLight, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{r.kliky}</td>
+                  <td style={{ ...S.td, textAlign: "right", fontSize: 12.5, color: C.textMuted, fontVariantNumeric: "tabular-nums" }}>{num(r.zobrazenia)}</td>
+                  <td style={{ ...S.td, textAlign: "right", fontSize: 12.5, color: r.ctr >= 5 ? C.green : C.textMuted, fontVariantNumeric: "tabular-nums" }}>{r.ctr} %</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    </>
+  );
+}
+
 export function Marketing({ data, clients, leads }: { data: PSBData; clients: Record<string, ClientAgg>; leads: Lead[] }) {
   const [sub, setSub] = useState("prehlad");
   const [rok, setRok] = useState("2026");
@@ -227,6 +343,7 @@ export function Marketing({ data, clients, leads }: { data: PSBData; clients: Re
         tabs={[
           { id: "prehlad", label: "Prehľad" },
           { id: "vykon", label: "Čo fungovalo" },
+          { id: "vyhladavanie", label: "Vyhľadávanie" },
           { id: "navratnost", label: "Čo to prinieslo" },
         ]}
         value={sub}
@@ -261,6 +378,7 @@ export function Marketing({ data, clients, leads }: { data: PSBData; clients: Re
         </>
       )}
       {sub === "vykon" && <CoFungovalo rok={rok} />}
+      {sub === "vyhladavanie" && <Vyhladavanie rok={rok} />}
       {sub === "navratnost" && <CoToPrinieslo data={data} clients={clients} leads={leads} rok={rok} />}
     </>
   );
