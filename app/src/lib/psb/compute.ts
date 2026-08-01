@@ -605,6 +605,21 @@ export function deriveAnomalies(data: PSBData, clients: Record<string, ClientAgg
     if ((c.segment === "Anchor" || c.segment === "Stabilný") && days >= 14 && days <= 60) {
       push(`gone|${c.name}`, days >= 21 ? "red" : "orange", "Prestal chodiť", `${c.name}: ${days} dní bez tréningu (${c.segment}) — ozvi sa`, c.name);
     }
+
+    // "Duch": zaplatil balíček, odchodil pár hodín a prestal sa ozývať. Jerryho
+    // najčastejší spôsob odchodu — kúpi 7 hodín, príde na 3, zvyšok prepadne.
+    // Krátkodobo je to hotovosť zadarmo, dlhodobo stratený klient za ~27 000 Kč.
+    // Zámerne skôr než "prestal chodiť" (14 dní), lebo tu ide o zaplatené hodiny,
+    // ktoré tichnú — a čím dlhšie sa čaká, tým horšie sa nadväzuje kontakt.
+    if (c.packageRemaining > 0 && days >= 21 && days <= 120 && c.segment !== "Anchor") {
+      push(
+        `duch|${c.name}`,
+        days >= 45 ? "red" : "orange",
+        "Zaplatené hodiny tichnú",
+        `${c.name}: ${days} dní ticho a ešte má ${c.packageRemaining} z ${c.packageTotal} zaplatených hodín — ozvi sa, kým je čo dochodiť`,
+        c.name,
+      );
+    }
   }
 
   // A referral that actually converted earns the referrer a 10 % thank-you —

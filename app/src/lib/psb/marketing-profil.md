@@ -24,10 +24,10 @@ prístupu; páči sa mu zlepšovanie chôdze a držania tela.
 **Obrie tekvice (najlepší klienti):** T — Danielka, Eva, Jakub. J — Radek, Jarek,
 Kalmus.
 
-⚠ **ROZPOR č. 1 — filter neexistuje.** Terezka má jasný zoznam, koho odmietať.
-Jerry na tú istú otázku hovorí: „asi skôr nič, každému dáme šancu." Zároveň obaja
-chcú *lepších* klientov, nie viac. Kvalitu ale nemožno vyberať, kým sa prijíma
-každý. Dnes žiadny filter nie je — vzniká až prirodzeným odpadom.
+**Filter je PASÍVNY, nie chýbajúci** (spresnené Jerrym 2026-08-01). Terezka má
+jasný zoznam, koho odmietať; Jerry hovorí „každému dáme šancu". Skúsenosť je, že
+kto nie je dobrý klient, odíde sám. To funguje — len s odloženou cenou, viď
+„duchovia" nižšie.
 
 ---
 
@@ -101,10 +101,13 @@ prenasledovala. T — nehovoria nič konkrétne, skôr „choď tam"; ťažko sa
 ⚠ **ROZPOR č. 2 — prvý dojem.** Sú to dve úplne odlišné prvé vety a len jedna z
 nich privádza ďalšieho človeka. Stojí za to zistiť, ktorá zaznieva častejšie.
 
-⚠ **NÁLEZ — najsilnejší kanál je neriadený.** 71 % klientov prichádza z
-referencií a **ani jeden z nich si o odporúčanie nikdy zámerne nepovedal**
-(„prišli samé"). Terezka si nespomína ani na konkrétny prípad. To je najväčšia
-nevyužitá páka v celej firme.
+⚠ **NÁLEZ — odmena existuje, ale nikto ju nepoužíva** (spresnené 2026-08-01).
+PSB má referral program: **10 % zľava z ďalšieho balíčka alebo tréning zadarmo**
+za doporučenie. Appka na odmenu sama upozorní, keď sa referencia premení na
+klienta. Chýba ale **okamih, kedy sa o nej klientovi povie** — obaja hovoria, že
+referencie „prišli samé", nikto o ne nikdy nepožiadal. Odmena, o ktorej klient
+nevie, nie je systém. Toto je najväčšia nevyužitá páka vo firme a zároveň
+najlacnejšia: mechanizmus je hotový, chýba veta.
 
 ---
 
@@ -135,6 +138,18 @@ ktoré inde nezoženú — napr. Anatomy Trains a myofasciálne línie nie sú p
 **Prečo ľudia odchádzajú:** J — zmení sa životná situácia, prípadne je to pre nich
 už veľa. T — zdravotné problémy, financie, sťahovanie, dlhšie dovolenky.
 
+**„DUCHOVIA" — najčastejší spôsob odchodu (Jerry, 2026-08-01):** klient si kúpi
+balíček napr. 7 hodín, príde na 3 a potom prestane chodiť aj odpisovať. Zvyšné
+4 hodiny prepadnú. Krátkodobo je to hotovosť za neodrobenú prácu, dlhodobo je to
+stratený klient (~27 000 Kč LTV) a blokované miesto. **Toto je presnejší popis
+odchodu než „prestal chodiť" — a appka naň teraz upozorňuje samostatne
+(signál „Zaplatené hodiny tichnú" v Na čo sa pozrieť).**
+
+Čo dáta vedia potvrdiť: z 51 klientov, ktorí prestali chodiť, **16 skončilo do
+štyroch sedení** (10 prišlo raz, 6 dva- až štyrikrát). Presný počet prepadnutých
+hodín sa spätne dopočítať nedá — export balíčkov je len momentka aktuálneho
+stavu, nie história.
+
 **Prvých 30 dní:** J — každý je iný, pristupujeme individuálne, nedá sa
 štandardizovať. T — intuitívne.
 
@@ -158,9 +173,9 @@ Terezka chce viac klientov, ideálne aby robili niekde do 120 h mesačne.
 **„Hotovo" o rok:** prišiel nový tréner, ktorý robí svojich prvých 50 tréningov;
 Jerry robí do 120 hodín mesačne, Terezka do 130.
 
-⚠ **POZOR na rozpor v cieli:** „Jerry do 120 h mesačne" v cieli na rok vs
-„10–15 h týždenne" (≈ 43–65 h mesačne) ako želanie na dva roky. Dnes robí 91,5 h.
-Tie dve čísla idú proti sebe — treba vyjasniť, ktoré platí.
+**Vyjasnené (2026-08-01):** 120 h mesačne je stav, ktorý Jerry robí/plánuje TERAZ.
+„10–15 h týždenne" je ideál kdesi v ďalekej budúcnosti, nie cieľ na rok. Žiadny
+rozpor — ale platí, že smer je nadol, nie nahor.
 
 **Pri plnej kapacite:** chcú lepších a kvalitnejších klientov. Keby bol stály
 prílev, vedeli by (a) vyseparovať tých, ktorých prístup im nesedí, (b) spraviť
