@@ -57,3 +57,34 @@ export const MKT_TOP: MktKus[] = [
 
 export const mktSum = (k: keyof MktMesiac) =>
   MKT_MESACNE.reduce((a, r) => a + (typeof r[k] === "number" ? (r[k] as number) : 0), 0);
+
+// Web z GA4 (export „Prehľad stavu prehľadov"). Toto je jediný zdroj, ktorý
+// oddeľuje PLATENÝ dosah od organického ešte pred tým, než sa niekto ozve —
+// preto je tu, aj keď o klientoch nič nevie. „Hlavné udalosti" sú konverzie
+// nastavené v GA4 (odoslaný formulár a podobne).
+// Zatiaľ len 2025: export za 2026 v priečinku nie je.
+export type Ga4Mesiac = {
+  m: string;
+  novi: number;
+  organicSearch: number;
+  paidSocial: number;
+  organicSocial: number;
+  direct: number;
+  referral: number;
+  udalosti: number;
+};
+
+export const GA4_MESACNE: Ga4Mesiac[] = [
+  { m: "2025-01", novi: 306, organicSearch: 106, paidSocial: 74, organicSocial: 41, direct: 60, referral: 20, udalosti: 182 },
+  { m: "2025-02", novi: 275, organicSearch: 133, paidSocial: 10, organicSocial: 44, direct: 69, referral: 14, udalosti: 75 },
+  { m: "2025-03", novi: 284, organicSearch: 152, paidSocial: 0, organicSocial: 40, direct: 49, referral: 11, udalosti: 44 },
+  { m: "2025-04", novi: 694, organicSearch: 139, paidSocial: 197, organicSocial: 135, direct: 66, referral: 7, udalosti: 143 },
+  { m: "2025-05", novi: 1224, organicSearch: 138, paidSocial: 427, organicSocial: 345, direct: 78, referral: 6, udalosti: 186 },
+  { m: "2025-06", novi: 716, organicSearch: 130, paidSocial: 231, organicSocial: 247, direct: 78, referral: 18, udalosti: 72 },
+  { m: "2025-07", novi: 501, organicSearch: 151, paidSocial: 109, organicSocial: 41, direct: 52, referral: 9, udalosti: 122 },
+  { m: "2025-08", novi: 271, organicSearch: 123, paidSocial: 0, organicSocial: 33, direct: 108, referral: 7, udalosti: 48 },
+  { m: "2025-09", novi: 285, organicSearch: 126, paidSocial: 1, organicSocial: 46, direct: 101, referral: 8, udalosti: 51 },
+  { m: "2025-10", novi: 315, organicSearch: 148, paidSocial: 0, organicSocial: 35, direct: 106, referral: 19, udalosti: 46 },
+  { m: "2025-11", novi: 272, organicSearch: 142, paidSocial: 0, organicSocial: 54, direct: 61, referral: 11, udalosti: 57 },
+  { m: "2025-12", novi: 350, organicSearch: 165, paidSocial: 0, organicSocial: 36, direct: 139, referral: 8, udalosti: 61 },
+];

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 
 import { fmtCZK } from "../../lib/psb/format";
-import { MKT_MESACNE, MKT_TOP, mktSum } from "../../lib/psb/marketing";
+import { GA4_MESACNE, MKT_MESACNE, MKT_TOP, mktSum } from "../../lib/psb/marketing";
 import { C, mix, S } from "../../lib/psb/theme";
 import type { ClientAgg } from "../../lib/psb/compute";
 import type { Lead, PSBData } from "../../lib/psb/types";
@@ -78,12 +78,12 @@ function CoSomRobil({ rok }: { rok: string }) {
 }
 
 // ── Čo fungovalo ─────────────────────────────────────────────────────────────
-function CoFungovalo() {
+function CoFungovalo({ rok }: { rok: string }) {
   return (
     <Card>
       <H3><Info text="Rebríček podľa ULOŽENÍ, nie lajkov. Uloženie znamená „toto si chcem nechať“ a je zo všetkých metrík najbližšie k zámeru; lajk nehovorí nič." label="Čo fungovalo" /></H3>
       <div style={{ marginTop: 4 }}>
-        {MKT_TOP.map((k, i) => (
+        {MKT_TOP.filter((k) => k.m.startsWith(rok)).map((k, i) => (
           <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 0", borderBottom: `1px solid ${mix(C.border, 55)}`, flexWrap: "wrap" }}>
             <span style={{ fontSize: 11, color: C.textDim, width: 52, flex: "0 0 auto" }}>{label(k.m)}</span>
             <span style={{ fontSize: 10, padding: "1px 7px", borderRadius: 999, border: `1px solid ${C.border}`, color: C.textMuted, flex: "0 0 auto" }}>{k.typ}</span>
@@ -107,11 +107,10 @@ function CoFungovalo() {
 }
 
 // ── Čo to prinieslo ──────────────────────────────────────────────────────────
-function CoToPrinieslo({ data, clients, leads }: { data: PSBData; clients: Record<string, ClientAgg>; leads: Lead[] }) {
-  const rok = "2026";
+function CoToPrinieslo({ data, clients, leads, rok }: { data: PSBData; clients: Record<string, ClientAgg>; leads: Lead[]; rok: string }) {
   const uvodne = useMemo(
     () => data.sessions.filter((s) => s.sessionType === "UVODNE" && s.date.slice(0, 4) === rok).length,
-    [data.sessions],
+    [data.sessions, rok],
   );
   const spend = MKT_MESACNE.filter((r) => r.m.startsWith(rok)).reduce((a, r) => a + r.spend, 0);
   const cac = uvodne > 0 ? spend / uvodne : 0;
@@ -145,6 +144,61 @@ function CoToPrinieslo({ data, clients, leads }: { data: PSBData; clients: Recor
   );
 }
 
+// ── Web a kanály (GA4) ───────────────────────────────────────────────────────
+// Instagram povie, koľko ľudí obsah videlo. GA4 povie, koľko ich prišlo na web
+// a — čo je dôležitejšie — ČI prišli z platenej alebo organickej cesty. To je
+// jediné miesto v celej appke, kde sa tieto dve veci dajú oddeliť ešte pred tým,
+// než sa niekto ozve.
+function WebKanaly({ rok }: { rok: string }) {
+  const data = GA4_MESACNE.filter((r) => r.m.startsWith(rok));
+  if (!data.length) {
+    return (
+      <Card>
+        <H3><Info text="Zdroj: export „Prehľad stavu prehľadov“ z GA4." label="Web a kanály (GA4)" /></H3>
+        <Empty>Za rok {rok} nemám GA4 export — v priečinku je zatiaľ len 2025. Stačí ho dotiahnuť rovnako ako ten minuloročný.</Empty>
+      </Card>
+    );
+  }
+  const sum = (k: keyof (typeof data)[0]) => data.reduce((a, r) => a + (r[k] as number), 0);
+  const platene = sum("paidSocial");
+  const organicke = sum("organicSearch") + sum("organicSocial") + sum("direct") + sum("referral");
+  const pod = (v: number) => (sum("novi") > 0 ? (v / sum("novi")) * 100 : 0);
+  const kanaly: [string, number, string][] = [
+    ["Organic Search", sum("organicSearch"), C.green],
+    ["Paid Social", platene, C.orange],
+    ["Organic Social", sum("organicSocial"), C.accent],
+    ["Direct", sum("direct"), C.blue],
+    ["Referral", sum("referral"), C.textMuted],
+  ];
+
+  return (
+    <Card>
+      <H3><Info text="Noví používatelia webu podľa toho, odkiaľ prišli. „Hlavné udalosti“ sú konverzie nastavené v GA4 — odoslaný formulár a podobne. Zdroj: export „Prehľad stavu prehľadov“." label="Web a kanály (GA4)" /></H3>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, margin: "12px 0 14px" }}>
+        <StatCard value={num(sum("novi"))} label={`Noví na webe ${rok}`} color={C.accent} />
+        <StatCard value={`${pod(platene).toFixed(0)} %`} label={<Info text={`${num(platene)} nových prišlo z platenej reklamy, ${num(organicke)} organicky.`} label="Z platenej reklamy" />} color={C.orange} />
+        <StatCard value={num(sum("udalosti"))} label={<Info text="Konverzie zaznamenané v GA4 za obdobie — odoslané formuláre a iné nastavené udalosti." label="Hlavné udalosti" />} color={C.green} />
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+        {kanaly.map(([n2, v, col]) => (
+          <div key={n2} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 12, color: C.textMuted, width: 112, flex: "0 0 auto" }}>{n2}</span>
+            <div style={{ flex: 1, height: 8, borderRadius: 999, background: mix(C.border, 70), overflow: "hidden" }}>
+              <div style={{ width: `${pod(v)}%`, height: "100%", background: col }} />
+            </div>
+            <span style={{ fontSize: 12, color: C.text, fontVariantNumeric: "tabular-nums", width: 92, textAlign: "right" }}>{num(v)} · {pod(v).toFixed(0)} %</span>
+          </div>
+        ))}
+      </div>
+      <div style={{ fontSize: 12.5, color: C.textMuted, marginTop: 14, lineHeight: 1.55 }}>
+        Platená reklama bežala len <b>apríl – júl 2025</b> a je na nej vidieť: v máji priniesla 427 nových ľudí z 1 224.
+        Odvtedy je na nule a web drží stabilných ~280 nových mesačne z vyhľadávania a priameho prístupu — to je
+        <b> základ, ktorý nezmizne, keď prestaneš platiť</b>.
+      </div>
+    </Card>
+  );
+}
+
 // ── Čo skúsiť ďalej ──────────────────────────────────────────────────────────
 function CoSkusitDalej() {
   return (
@@ -162,7 +216,10 @@ function CoSkusitDalej() {
 export function Marketing({ data, clients, leads }: { data: PSBData; clients: Record<string, ClientAgg>; leads: Lead[] }) {
   const [sub, setSub] = useState("prehlad");
   const [rok, setRok] = useState("2026");
-  const spendSpolu = mktSum("spend");
+  // The header used to sum all 18 months no matter which year was selected —
+  // the switch looked broken because the summary never moved.
+  const vRoku = MKT_MESACNE.filter((r) => r.m.startsWith(rok));
+  const suma = (k: "posty" | "reels" | "stories" | "spend") => vRoku.reduce((a, r) => a + r[k], 0);
 
   return (
     <>
@@ -181,7 +238,8 @@ export function Marketing({ data, clients, leads }: { data: PSBData; clients: Re
           <div>
             <H3><Info text="Zatiaľ kostra. Čísla sú jednorazový export z Metricoolu za 18 mesiacov (jan 2025 – jún 2026); importér mesačných exportov pribudne, aby sa to aktualizovalo samo ako PTminder." label="Marketing" /></H3>
             <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>
-              18 mesiacov · {mktSum("posty")} postov · {mktSum("reels")} reels · {num(mktSum("stories"))} stories · reklama {fmtCZK(spendSpolu)}
+              {vRoku.length} mesiacov {rok} · {suma("posty")} postov · {suma("reels")} reels · {num(suma("stories"))} stories · reklama {fmtCZK(suma("spend"))}
+              <span style={{ color: C.textDim }}> · spolu za 18 mes. {fmtCZK(mktSum("spend"))}</span>
             </div>
           </div>
           <div style={{ display: "flex", gap: 4 }}>
@@ -198,11 +256,12 @@ export function Marketing({ data, clients, leads }: { data: PSBData; clients: Re
       {sub === "prehlad" && (
         <>
           <CoSomRobil rok={rok} />
+          <WebKanaly rok={rok} />
           <CoSkusitDalej />
         </>
       )}
-      {sub === "vykon" && <CoFungovalo />}
-      {sub === "navratnost" && <CoToPrinieslo data={data} clients={clients} leads={leads} />}
+      {sub === "vykon" && <CoFungovalo rok={rok} />}
+      {sub === "navratnost" && <CoToPrinieslo data={data} clients={clients} leads={leads} rok={rok} />}
     </>
   );
 }
