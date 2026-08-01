@@ -93,6 +93,15 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<{ filename: string; text: string }[] | null>(null);
   const [attach, setAttach] = useState<string[]>([]);
+  // "Hlboká debata" — sends the turn to Opus instead of Sonnet. Off by default
+  // (Opus is slower); on for strategy talks, where the thinking is the point.
+  const [deep, setDeep] = useState(false);
+  useEffect(() => {
+    try { if (localStorage.getItem("psb-ai-deep") === "1") setDeep(true); } catch { /* ignore */ }
+  }, []);
+  useEffect(() => {
+    try { localStorage.setItem("psb-ai-deep", deep ? "1" : "0"); } catch { /* ignore */ }
+  }, [deep]);
   // Whether the floating bottom-right panel is open (shared so a client-name click
   // from the inline widget can pop it open on the next tab). Persisted.
   const [floatingOpen, setFloatingOpen] = useState(false);
@@ -166,6 +175,7 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
       context,
       // Live update — strip any (possibly partial) action block from the visible text.
       (full) => setLast({ role: "assistant", text: full.replace(/```psb-action[\s\S]*$/, "").trimEnd() }),
+      deep,
     );
     setBusy(false);
     if (res.ok) {
@@ -199,13 +209,13 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
     setMsgs((m) => [...m, { role: "assistant", text: `**Import hotový.**\n${summary}\n\nDáta som obnovil — spýtaj sa ma na čokoľvek z nových čísel.` }]);
   }
 
-  return { msgs, setMsgs, input, setInput, busy, pending, setPending, attach, setAttach, ask, runAction, confirmImport, handleIncoming, floatingOpen, setFloatingOpen, chats, chatId, newChat, openChat, deleteChat, archiveChat };
+  return { msgs, setMsgs, input, setInput, busy, deep, setDeep, pending, setPending, attach, setAttach, ask, runAction, confirmImport, handleIncoming, floatingOpen, setFloatingOpen, chats, chatId, newChat, openChat, deleteChat, archiveChat };
 }
 
 // ── The conversation UI (messages + input) — used by both the floating panel and
 // the inline widget. Each instance has its own scroll/refs/drag state. ──────────
 export function ChatConversation({ chat, autoFocus, onClientClick }: { chat: AssistantChat; autoFocus?: boolean; onClientClick?: (name: string) => void }) {
-  const { msgs, input, setInput, busy, pending, setPending, attach, setAttach, ask, runAction, confirmImport, handleIncoming } = chat;
+  const { msgs, input, setInput, busy, deep, setDeep, pending, setPending, attach, setAttach, ask, runAction, confirmImport, handleIncoming } = chat;
   const [drag, setDrag] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -246,7 +256,7 @@ export function ChatConversation({ chat, autoFocus, onClientClick }: { chat: Ass
           </div>
           )
         ))}
-        {busy && (!msgs.length || !msgs[msgs.length - 1].text) && <div style={{ alignSelf: "flex-start", color: C.textDim, fontSize: 13, fontStyle: "italic" }}>Rozmýšľam…</div>}
+        {busy && (!msgs.length || !msgs[msgs.length - 1].text) && <div style={{ alignSelf: "flex-start", color: C.textDim, fontSize: 13, fontStyle: "italic" }}>{deep ? "Rozmýšľam poriadne… (chvíľu to potrvá)" : "Rozmýšľam…"}</div>}
         {pending && (
           <div style={{ alignSelf: "stretch", border: `1px solid ${C.accent}`, background: mix(C.accent, 10), borderRadius: 10, padding: 12 }}>
             <div style={{ fontSize: 13, color: C.text, marginBottom: 8 }}>Naimportovať {pending.length} CSV do databázy?</div>
@@ -280,6 +290,13 @@ export function ChatConversation({ chat, autoFocus, onClientClick }: { chat: Ass
         <button onClick={() => fileRef.current?.click()} title="Nahrať CSV alebo obrázok" style={{ width: 38, height: 38, borderRadius: 10, border: `1px solid ${C.border}`, cursor: "pointer", background: "transparent", color: C.textMuted, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }} aria-label="Nahrať CSV alebo obrázok">
           <svg width={17} height={17} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21.4 11.05 12.25 20.2a5 5 0 0 1-7.07-7.07l9.19-9.19a3 3 0 0 1 4.24 4.24l-8.49 8.49a1 1 0 0 1-1.41-1.41l7.78-7.78" /></svg>
         </button>
+        <button
+          onClick={() => setDeep(!deep)}
+          title={deep ? "Hlboká debata je zapnutá — odpovedá silnejší model, trvá to dlhšie. Klikni pre vypnutie." : "Hlboká debata: zapni pre strategické otázky (marketing, positioning, rozhodnutia). Odpovedá silnejší model, ale pomalšie."}
+          style={{ width: 38, height: 38, borderRadius: 10, border: `1px solid ${deep ? C.accent : C.border}`, cursor: "pointer", background: deep ? mix(C.accent, 16) : "transparent", color: deep ? C.accentLight : C.textMuted, fontSize: 15, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, padding: 0 }}
+          aria-pressed={deep}
+          aria-label="Hlboká debata"
+        >🧠</button>
         <textarea
           ref={inputRef}
           value={input}

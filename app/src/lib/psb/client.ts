@@ -162,9 +162,10 @@ export async function sendChat(
   messages: { role: "user" | "assistant"; content: string; images?: string[] }[],
   context: unknown,
   onDelta?: (fullText: string) => void,
+  deep?: boolean,
 ): Promise<ChatResult> {
   try {
-    const r = await post("/api/chat", { messages, context });
+    const r = await post("/api/chat", { messages, context, deep: !!deep });
     // Errors (no_key, api_error…) come back as JSON; a successful answer streams as
     // Server-Sent Events (text/event-stream) — `data: {"t":"…"}` frames, then `[DONE]`.
     if ((r.headers.get("content-type") || "").includes("application/json")) {

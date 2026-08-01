@@ -4,8 +4,14 @@ import { isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { PSB_KNOWLEDGE } from "../../lib/psb/knowledge";
 import { bindings } from "../../lib/bindings.server";
 
+// Sonnet 5 runs every normal turn — fast enough that the answer starts well inside
+// the ~30s gateway window. "Hlboká debata" swaps in Opus for the strategic
+// conversations (marketing, positioning, rozhodnutia), where reasoning quality
+// matters more than latency. It is opt-in per message, not the default.
 const MODEL = "claude-sonnet-5";
+const MODEL_DEEP = "claude-opus-5";
 const MAX_TOKENS = 3000;
+const MAX_TOKENS_DEEP = 4000;
 
 type InMsg = { role: "user" | "assistant"; content: string; images?: string[] };
 
@@ -84,8 +90,10 @@ export const Route = createFileRoute("/api/chat")({
 
         let messages: InMsg[] = [];
         let context = "";
+        let deep = false;
         try {
-          const body = (await request.json()) as { messages?: unknown; context?: unknown };
+          const body = (await request.json()) as { messages?: unknown; context?: unknown; deep?: unknown };
+          deep = body.deep === true;
           if (Array.isArray(body.messages)) {
             messages = body.messages
               .filter((m): m is InMsg => !!m && (m as InMsg).role != null && typeof (m as InMsg).content === "string")
@@ -128,8 +136,8 @@ export const Route = createFileRoute("/api/chat")({
               "anthropic-version": "2023-06-01",
             },
             body: JSON.stringify({
-              model: MODEL,
-              max_tokens: MAX_TOKENS,
+              model: deep ? MODEL_DEEP : MODEL,
+              max_tokens: deep ? MAX_TOKENS_DEEP : MAX_TOKENS,
               stream: true,
               // Extended thinking OFF: on analytical prompts the model would spend 25s+
               // emitting thinking tokens (which we don't forward) BEFORE any answer text,
