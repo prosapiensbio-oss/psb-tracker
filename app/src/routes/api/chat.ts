@@ -23,9 +23,12 @@ const MAX_TOKENS_DEEP = 6000;
 // nízke pri bežných otázkach, vysoké pri hlbokej debate.
 const EFFORT = "medium";
 const EFFORT_DEEP = "high";
-// Koľko kôl nástrojov v jednej odpovedi. Štyri stačia na "pozri do dát → over
-// druhým dopytom → otvor knihu → odpovedz" a držia latenciu v rozumnom.
-const MAX_KOL = 4;
+// Koľko kôl nástrojov v jednej odpovedi. Päť stačí na "pozri do dát → over
+// druhým dopytom → otvor knihu → odpovedz" a drží latenciu v rozumnom.
+// V poslednom kole sa nástroje NEPOSIELAJÚ: bez toho model po vyčerpaní limitu
+// skončí uprostred vyšetrovania a používateľ dostane prázdnu odpoveď — presne
+// to sa stalo pri prvom teste, deväť dopytov a ani veta.
+const MAX_KOL = 5;
 
 type InMsg = { role: "user" | "assistant"; content: string; images?: string[] };
 
@@ -52,7 +55,7 @@ TVOJA ROLA — si JEDEN poradca s tromi klobúkmi, nie tri boti. Podľa otázky 
 NÁSTROJE — nie si odkázaný na to, čo ti appka predpočítala. Máš dva:
 - \`dopyt_db\` — jeden read-only SQL SELECT nad reálnou databázou. POUŽI HO VŽDY, keď odpoveď potrebuje číslo, ktoré v <data> nie je, alebo keď si chceš vlastný záver overiť. Radšej dva dopyty než jeden odhad. Typické prípady: prečo má klient inú sumu než cenník, kto koho priviedol, porovnanie kanálov, história jedného klienta, kontrola vlastnej hypotézy.
 - \`otvor_knihu\` — plné poznámky ku konkrétnej knihe. V <kniznica_register> máš zoznam všetkých kníh s tým, KEDY po ktorej siahnuť; vyberáš si SÁM podľa témy, používateľ ti knihu menovať nemusí. Keď prvá kniha neodpovie, otvor ďalšiu. Kniha sa otvára len keď reálne pomôže rozhodnúť — nie na ozdobu.
-Po nástroji vždy povedz, čo z neho vyšlo, a čísla ber z neho, nie z hlavy.
+Po nástroji vždy povedz, čo z neho vyšlo, a čísla ber z neho, nie z hlavy. Kôl s nástrojmi máš obmedzený počet — nepátraj donekonečna. Keď dva-tri dopyty odpoveď nedajú, povedz rovno, čo si zistil, čo sa zistiť NEDÁ a čo by sa muselo zapisovať, aby sa to dalo.
 
 ISTOTA — pri každom čísle musí byť jasné, odkiaľ je. Keď je spočítané (z <data> alebo z \`dopyt_db\`), povedz ho rovno. Keď je to odhad, extrapolácia alebo dojem, OZNAČ TO — "odhadom", "za predpokladu, že…", "toto som nespočítal". Nikdy nemiešaj tvrdé číslo s odhadom v jednej vete bez rozlíšenia. Keď si niečím nie si istý a dá sa to overiť dopytom, over to radšej, než by si to označil za odhad.
 
@@ -291,7 +294,10 @@ export const Route = createFileRoute("/api/chat")({
             const konverzacia: unknown[] = messages.map((m) => ({ role: m.role, content: toContent(m) }));
 
             try {
-              for (let kolo = 0; kolo < MAX_KOL; kolo++) {
+              for (let kolo = 0; kolo <= MAX_KOL; kolo++) {
+                // Posledné kolo je vždy odpoveď, nie ďalší dopyt.
+                const uzLenOdpoved = kolo === MAX_KOL;
+                if (uzLenOdpoved) posli({ s: "Skladám odpoveď…" });
                 const resp = await fetch("https://api.anthropic.com/v1/messages", {
                   method: "POST",
                   headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
@@ -302,7 +308,7 @@ export const Route = createFileRoute("/api/chat")({
                     thinking: { type: "adaptive" },
                     output_config: { effort: deep ? EFFORT_DEEP : EFFORT },
                     system,
-                    tools: TOOLS,
+                    ...(uzLenOdpoved ? {} : { tools: TOOLS }),
                     messages: konverzacia,
                   }),
                 });
