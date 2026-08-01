@@ -361,6 +361,13 @@ export const Route = createFileRoute("/api/chat")({
                 const pouzite = bloky.filter((b) => b && b.type === "tool_use");
                 if (stopReason !== "tool_use" || !pouzite.length) break;
 
+                // Model často napíše kus úvahy a AŽ POTOM siahne po nástroji. Tá
+                // úvaha je vzhľadom na výsledok nástroja predbežná a finálne kolo
+                // ju napíše znova — bez tohto by sa odpoveď zdvojila (a v prvom
+                // teste sa aj zdvojila). Necháme ju bežať naživo, nech je vidieť,
+                // ako uvažuje, a pred ďalším kolom ju z bubliny zmažeme.
+                if (bloky.some((b) => b && b.type === "text" && (b.text || "").trim())) posli({ r: 1 });
+
                 // Assistant správa presne tak, ako prišla (vrátane thinking).
                 konverzacia.push({
                   role: "assistant",

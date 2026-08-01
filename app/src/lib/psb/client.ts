@@ -193,11 +193,15 @@ export async function sendChat(
           const payload = t.slice(5).trim();
           if (!payload || payload === "[DONE]") continue;
           try {
-            const j = JSON.parse(payload) as { t?: string; s?: string; e?: string };
+            const j = JSON.parse(payload) as { t?: string; s?: string; e?: string; r?: number };
             if (typeof j.t === "string") {
               full += j.t;
               onStatus?.("");
               onDelta?.(full);
+            } else if (j.r) {
+              // Predbežná úvaha pred nástrojom — finálne kolo ju napíše znova.
+              full = "";
+              onDelta?.("");
             } else if (typeof j.s === "string") {
               onStatus?.(j.s);
             } else if (typeof j.e === "string" && !full) {
