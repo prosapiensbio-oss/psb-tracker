@@ -163,6 +163,9 @@ export async function sendChat(
   context: unknown,
   onDelta?: (fullText: string) => void,
   deep?: boolean,
+  // Čo práve robí — "Pozerám do dát…", dôvod dopytu, "Otváram knihu…".
+  // Prázdny reťazec = hotovo, skry.
+  onStatus?: (stav: string) => void,
 ): Promise<ChatResult> {
   try {
     const r = await post("/api/chat", { messages, context, deep: !!deep });
@@ -190,10 +193,15 @@ export async function sendChat(
           const payload = t.slice(5).trim();
           if (!payload || payload === "[DONE]") continue;
           try {
-            const j = JSON.parse(payload) as { t?: string };
+            const j = JSON.parse(payload) as { t?: string; s?: string; e?: string };
             if (typeof j.t === "string") {
               full += j.t;
+              onStatus?.("");
               onDelta?.(full);
+            } else if (typeof j.s === "string") {
+              onStatus?.(j.s);
+            } else if (typeof j.e === "string" && !full) {
+              return { ok: false, error: "api_error", detail: j.e };
             }
           } catch {
             /* ignore partial/malformed frame */
@@ -205,4 +213,42 @@ export async function sendChat(
   } catch (e) {
     return { ok: false, error: "network", detail: String(e) };
   }
+}
+
+
+// ── Jarvisova pamäť (D1) ─────────────────────────────────────────────────────
+// Chaty žili v localStorage jedného prehliadača; na telefóne boli prázdne.
+// Teraz sú v databáze — localStorage zostáva len ako okamžitá vyrovnávacia
+// pamäť, aby sa panel otvoril bez čakania na sieť.
+export type ZaverRec = {
+  id: string; datum: string; tema: string; zaver: string;
+  preco?: string; overit?: string; overitDo?: string; vysledok?: string; stav: string;
+};
+
+export async function fetchJarvisMemory(): Promise<{ chats: unknown[]; zavery: ZaverRec[] }> {
+  try {
+    const r = await fetch("/api/jarvis-memory", { credentials: "same-origin" });
+    const j = (await r.json()) as { chats?: unknown[]; zavery?: ZaverRec[] };
+    return { chats: j.chats || [], zavery: j.zavery || [] };
+  } catch {
+    return { chats: [], zavery: [] };
+  }
+}
+
+export async function saveJarvisChat(chat: { id: string; title: string; messages: unknown[]; archived?: boolean }) {
+  try {
+    await post("/api/jarvis-memory", { akcia: "chat", ...chat });
+  } catch { /* offline — localStorage kópia ostáva */ }
+}
+
+export async function deleteJarvisChat(id: string) {
+  try { await post("/api/jarvis-memory", { akcia: "zmaz-chat", id }); } catch { /* ignore */ }
+}
+
+export async function saveZaver(z: Record<string, unknown>) {
+  try { await post("/api/jarvis-memory", { akcia: "zaver", ...z }); } catch { /* ignore */ }
+}
+
+export async function vyhodnotZaver(id: string, stav: string, vysledok: string) {
+  try { await post("/api/jarvis-memory", { akcia: "vyhodnot", id, stav, vysledok }); } catch { /* ignore */ }
 }

@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import { isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { PSB_KNOWLEDGE } from "../../lib/psb/knowledge";
+import { IDS_KNIH, registerKniznice, textKnihy } from "../../lib/psb/kniznica";
 import { bindings } from "../../lib/bindings.server";
 
 // Sonnet 5 runs every normal turn — fast enough that the answer starts well inside
@@ -10,8 +11,17 @@ import { bindings } from "../../lib/bindings.server";
 // matters more than latency. It is opt-in per message, not the default.
 const MODEL = "claude-sonnet-5";
 const MODEL_DEEP = "claude-opus-5";
-const MAX_TOKENS = 3000;
-const MAX_TOKENS_DEEP = 4000;
+const MAX_TOKENS = 4000;
+const MAX_TOKENS_DEEP = 6000;
+// Rozmýšľanie pred odpoveďou. Predtým bolo vypnuté, lebo tichých 25 sekúnd
+// premýšľania prekročilo ~30s limit brány a odpoveď prišla prázdna. Teraz sa
+// každý thinking delta preposiela ako SSE komentár — bajty tečú, spojenie žije
+// a Jarvis konečne vie, aká bude jeho posledná veta skôr, než napíše prvú.
+const THINK_BUDGET = 1500;
+const THINK_BUDGET_DEEP = 4000;
+// Koľko kôl nástrojov v jednej odpovedi. Štyri stačia na "pozri do dát → over
+// druhým dopytom → otvor knihu → odpovedz" a držia latenciu v rozumnom.
+const MAX_KOL = 4;
 
 type InMsg = { role: "user" | "assistant"; content: string; images?: string[] };
 
@@ -34,6 +44,17 @@ function toContent(m: InMsg): string | unknown[] {
 const SYSTEM = `Si "Jarvis" — poradca zabudovaný do interného nástroja štúdia osobných trénerov ProSapiens Biomechanic (PSB), tréneri Jerry a Terezka. Komunikuj po slovensky.
 
 TVOJA ROLA — si JEDEN poradca s tromi klobúkmi, nie tri boti. Podľa otázky si nasadíš ten správny: (a) ANALYTIK — čísla, karty, anomálie; (b) ÚČTOVNÍK — P&L, výplaty, dlhy, cashflow; (c) MARKETÉR — pozícia, obsah, referencie, kanály, klienti. Klobúk sa nevyhlasuje, len sa použije. Najlepšie otázky idú naprieč (napr. "prečo bol marec stratový" potrebuje sedenia aj náklady) — vtedy ich spájaj.
+
+NÁSTROJE — nie si odkázaný na to, čo ti appka predpočítala. Máš dva:
+- \`dopyt_db\` — jeden read-only SQL SELECT nad reálnou databázou. POUŽI HO VŽDY, keď odpoveď potrebuje číslo, ktoré v <data> nie je, alebo keď si chceš vlastný záver overiť. Radšej dva dopyty než jeden odhad. Typické prípady: prečo má klient inú sumu než cenník, kto koho priviedol, porovnanie kanálov, história jedného klienta, kontrola vlastnej hypotézy.
+- \`otvor_knihu\` — plné poznámky ku konkrétnej knihe. V <kniznica_register> máš zoznam všetkých kníh s tým, KEDY po ktorej siahnuť; vyberáš si SÁM podľa témy, používateľ ti knihu menovať nemusí. Keď prvá kniha neodpovie, otvor ďalšiu. Kniha sa otvára len keď reálne pomôže rozhodnúť — nie na ozdobu.
+Po nástroji vždy povedz, čo z neho vyšlo, a čísla ber z neho, nie z hlavy.
+
+ISTOTA — pri každom čísle musí byť jasné, odkiaľ je. Keď je spočítané (z <data> alebo z \`dopyt_db\`), povedz ho rovno. Keď je to odhad, extrapolácia alebo dojem, OZNAČ TO — "odhadom", "za predpokladu, že…", "toto som nespočítal". Nikdy nemiešaj tvrdé číslo s odhadom v jednej vete bez rozlíšenia. Keď si niečím nie si istý a dá sa to overiť dopytom, over to radšej, než by si to označil za odhad.
+
+SPÝTAJ SA — keď by odpoveď dopadla podstatne inak podľa toho, čo používateľ myslel, polož JEDNU krátku otázku a počkaj. Nevymýšľaj si tri varianty pre istotu. Platí to najmä pri návrhoch, ktoré stoja čas alebo peniaze. Naopak pri jasnej faktickej otázke sa nepýtaj vôbec — odpovedz.
+
+PAMÄŤ — v <pamat_zaverov> sú závery z minulých debát. Nadviaž na ne: keď sa téma opakuje, povedz, na čom ste sa už dohodli a čo sa odvtedy stalo. Záver označený ⏰ TERMÍN OVERENIA UŽ PREŠIEL sám otvor — spýtaj sa, či sa to stalo, a podľa odpovede navrhni vyhodnotenie (blok "vyhodnot-zaver"). Keď v debate padne rozhodnutie, ktoré má prežiť tento chat, navrhni jeho zápis (blok "zapis-zaver"). Nezapisuj všetko — len to, čo má dôsledok a dá sa neskôr overiť.
 
 MARKETINGOVÝ REŽIM — keď je otázka o marketingu, značke, obsahu, klientoch alebo raste, máš v <pozadie_psb> dve špeciálne sekcie: MARKETINGOVÝ PROFIL PSB (ich vlastné odpovede na riadený rozhovor — kto sú, komu slúžia, čo neurobia) a MARKETINGOVÉ RÁMCE (destilát z Jerryho knižnice). Tvrdé pravidlá: (1) profil má prednosť pred rámcom — keď kniha radí niečo, čo je proti ich hodnotám alebo kapacite, povedz to; (2) NIKDY nenavrhuj nič zo zoznamu "neurobíme za žiadnu cenu"; (3) NIKDY nenavrhuj rast počtu klientov bez kontroly kapacity — Jerry chce pracovať MENEJ, nie viac, a úzke hrdlo firmy je ďalší TRÉNER, nie klient; (4) v profile sú označené ROZPORY medzi Jerrym a Terezkou — neprechádzaj ich mlčaním, sú to práve tie miesta, kde má debata najväčšiu cenu; (5) keď je téma na konkrétnu knihu, povedz ktorú stojí za to otvoriť, namiesto prerozprávania spamäti.
 
@@ -80,7 +101,128 @@ Vieš navrhnúť aj ÚPRAVU KLIENTA (údaje sú v klientiDetail) — napr. dať 
 - "specialRate": true/false; "specialRateNote": text; "contractSigned": true/false; "bitcoin": true/false (platí v Bitcoine).
 Meno v akcii použi presne ako je v klientiDetail. Používateľ ho môže napísať bez diakritiky alebo inak (napr. "Jakub Stigut" = "Jakub Štigut") — nájdi zodpovedajúceho klienta v klientiDetail a použi jeho presný zápis. Ak nevieš, ktorého klienta myslí, radšej sa spýtaj. Najprv vysvetli dôsledok (napr. že klient prestane vyskakovať medzi anomáliami), až potom pridaj blok.
 
+Okrem klientov vieš navrhnúť aj tieto zápisy (rovnaký psb-action blok, rovnaké potvrdenie klikom):
+- \`{"type":"zapis-zaver","tema":"marketing|ceny|klienti|prevadzka|ine","zaver":"…jedna veta, čo sme rozhodli…","preco":"…na základe čoho…","overit":"…čo sa má stať, aby sme vedeli, že to zabralo…","overitDo":"YYYY-MM-DD","label":"Zapísať záver: …"}\` — dátum overenia počítaj od dnešného dňa (meta.generatedAt) a daj mu zmysel: obsahová zmena sa hodnotí o 2–3 mesiace, cenová o pol roka.
+- \`{"type":"vyhodnot-zaver","id":"<id záveru>","stav":"zabralo|nezabralo","vysledok":"…čo sa naozaj stalo…","label":"Vyhodnotiť: …"}\`
+- \`{"type":"novy-ciel","nazov":"…","preco":"…","dalsiKrok":"…","termin":"YYYY-MM-DD","priorita":"vysoka|stredna|nizka","label":"Pridať cieľ: …"}\`
+
 Používateľ ti môže priložiť aj OBRÁZOK (screenshot). Popíš/rozober, čo na ňom je, a spoj to s dátami, ak to dáva zmysel.`;
+
+
+// ── Nástroje ─────────────────────────────────────────────────────────────────
+// Doteraz dostal Jarvis jeden hotový JSON snapshot a čokoľvek mimo neho musel
+// odhadnúť. Teraz sa vie databázy spýtať sám — to je rozdiel medzi komentátorom
+// snapshotu a analytikom. Zápis nedostal: mení sa len cez tlačidlo, ktoré
+// potvrdí človek (psb-action nižšie).
+
+const SCHEMA_DB = `sessions(id, date, time, client_name, session_trainer, session_name, session_type, duration_min, price_czk)
+  session_type: OFFLINE | ONLINE | UVODNE. date je ISO text s časom, na porovnanie roka použi substr(date,1,4).
+payments(id, date, client_name, amount_czk, payment_method)   payment_method: bank | cash | other
+packages(id, client_name, client_status, package_name, sessions_remaining, sessions_total)  — MOMENTKA aktuálneho stavu, nie história
+client_overrides(name, status, special_rate, special_rate_note, trainer_note, contract_signed, primary_trainer, bitcoin)
+leads(id, date, name, source, referrer, status, note)
+jarvis_zavery(id, datum, tema, zaver, preco, overit, overit_do, vysledok, stav)
+vzas_payments, vzas_payment_splits, vzas_periods, vzas_rules, vzas_salary_params, vzas_settings, vzas_month_notes, vzas_week_notes, anomaly_ack, services, upload_log`;
+
+const TOOLS = [
+  {
+    name: "dopyt_db",
+    description:
+      `Spusti JEDEN read-only SQL SELECT nad databázou PSB (SQLite/D1) a dostaneš riadky ako JSON. ` +
+      `Použi vždy, keď odpoveď potrebuje číslo, ktoré nie je v <data> — párovanie tabuliek, histórie, ` +
+      `rozbory podľa kanála, kontrolu ceny konkrétneho klienta. Radšej sa spýtaj dát, než aby si odhadoval.\n\n` +
+      `Schéma:\n${SCHEMA_DB}\n\n` +
+      `Pravidlá: len SELECT alebo WITH; bez stredníkov; max 200 riadkov (LIMIT doplním sám). ` +
+      `Mená klientov majú diakritiku a v rôznych tabuľkách sa môžu líšiť — pri párovaní použi LIKE.`,
+    input_schema: {
+      type: "object",
+      properties: {
+        sql: { type: "string", description: "Jeden SELECT alebo WITH dopyt." },
+        preco: { type: "string", description: "Jedna veta, čo tým zisťuješ — ukáže sa používateľovi." },
+      },
+      required: ["sql"],
+    },
+  },
+  {
+    name: "otvor_knihu",
+    description:
+      `Načítaj PLNÉ poznámky ku knihe z Jerryho knižnice (id z registra v systémovom prompte). ` +
+      `Použi, keď téma naozaj sadne na konkrétnu knihu — nie na ozdobu. Ak ti prvá kniha neodpovie, ` +
+      `pokojne otvor ďalšiu; register je zoradený podľa toho, KEDY po ktorej siahnuť. ` +
+      `Dostupné id: ${IDS_KNIH.join(", ")}`,
+    input_schema: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "id knihy z registra" },
+        preco: { type: "string", description: "Jedna veta, čo v nej hľadáš." },
+      },
+      required: ["id"],
+    },
+  },
+];
+
+/** Guard: pustíme len čítanie. Nič iné sa cez tento nástroj nedostane. */
+function bezpecnySql(raw: string): { sql: string } | { chyba: string } {
+  const sql = raw.trim().replace(/;+\s*$/, "");
+  if (!/^\s*(select|with)\b/i.test(sql)) return { chyba: "Povolený je len SELECT alebo WITH." };
+  if (sql.includes(";")) return { chyba: "Len jeden dopyt, bez stredníkov." };
+  if (/\b(insert|update|delete|drop|alter|create|replace|attach|detach|pragma|vacuum)\b/i.test(sql))
+    return { chyba: "Zápisové a DDL príkazy nie sú povolené — na zmenu dát použi psb-action blok." };
+  const sLimit = /\blimit\s+\d+/i.test(sql) ? sql : `${sql} LIMIT 200`;
+  return { sql: sLimit };
+}
+
+async function spustiNastroj(name: string, input: Record<string, unknown>): Promise<string> {
+  if (name === "otvor_knihu") {
+    const id = String(input.id || "");
+    const text = textKnihy(id);
+    if (!text) return `Kniha "${id}" v knižnici nie je. Dostupné: ${IDS_KNIH.join(", ")}`;
+    return text.slice(0, 40000);
+  }
+  if (name === "dopyt_db") {
+    const { DB } = bindings();
+    if (!DB) return "Databáza nie je dostupná.";
+    const g = bezpecnySql(String(input.sql || ""));
+    if ("chyba" in g) return g.chyba;
+    try {
+      const rs = await DB.prepare(g.sql).all();
+      const rows = rs.results as unknown[];
+      if (!rows.length) return "Dopyt prebehol, ale nevrátil ani jeden riadok.";
+      const out = JSON.stringify(rows);
+      return out.length > 14000
+        ? `${JSON.stringify(rows.slice(0, 60))}\n\n(orezané — dopyt vrátil ${rows.length} riadkov, zúž ho alebo agreguj)`
+        : out;
+    } catch (e) {
+      return `SQL chyba: ${String(e).slice(0, 300)}`;
+    }
+  }
+  return `Neznámy nástroj: ${name}`;
+}
+
+/** Závery z minulých debát — Jarvisova pamäť. Malé, preto sa posielajú celé. */
+async function nacitajPamat(): Promise<string> {
+  const { DB } = bindings();
+  if (!DB) return "";
+  try {
+    const rs = await DB.prepare(
+      "SELECT datum, tema, zaver, preco, overit, overit_do, vysledok, stav FROM jarvis_zavery WHERE stav != 'zrusene' ORDER BY datum DESC LIMIT 60",
+    ).all();
+    const rows = rs.results as Record<string, string>[];
+    if (!rows.length) return "";
+    const dnes = new Date().toISOString().slice(0, 10);
+    const riadky = rows.map((r) => {
+      const dozrelo = r.stav === "otvoreny" && r.overit_do && r.overit_do <= dnes;
+      return `- [${r.datum} · ${r.tema}] ${r.zaver}` +
+        (r.preco ? ` (dôvod: ${r.preco})` : "") +
+        (r.overit ? ` · overiť: ${r.overit}${r.overit_do ? ` do ${r.overit_do}` : ""}` : "") +
+        (r.vysledok ? ` · výsledok: ${r.vysledok}` : "") +
+        ` · stav: ${r.stav}${dozrelo ? " ⏰ TERMÍN OVERENIA UŽ PREŠIEL" : ""}`;
+    });
+    return riadky.join("\n");
+  } catch {
+    return "";
+  }
+}
 
 export const Route = createFileRoute("/api/chat")({
   server: {
@@ -112,98 +254,132 @@ export const Route = createFileRoute("/api/chat")({
         }
         if (!messages.length) return Response.json({ ok: false, error: "empty" }, { status: 400 });
 
-        // Two blocks: a STABLE prefix (instructions + knowledge, ~13k tokens) that is
-        // cached, and the VOLATILE data snapshot as its own uncached block. Previously
-        // the changing <data> was glued into the cached block, so the cache key changed
-        // every call and the prompt cache never hit — this splits them so it does.
+        // Systémový prompt v troch blokoch. Prvý je STABILNÝ (inštrukcie +
+        // pozadie + register knižnice) a cachuje sa; druhý je pamäť (mení sa
+        // zriedka); tretí je snapshot dát, ktorý sa mení každým volaním. Keby
+        // boli v jednom, cache by nikdy netrafila.
+        const pamat = await nacitajPamat();
         const system = [
           {
             type: "text",
-            text: `${SYSTEM}\n\n<pozadie_psb>\n${PSB_KNOWLEDGE}\n</pozadie_psb>`,
+            text: `${SYSTEM}\n\n<pozadie_psb>\n${PSB_KNOWLEDGE}\n</pozadie_psb>\n\n<kniznica_register>\n${registerKniznice()}\n</kniznica_register>`,
             cache_control: { type: "ephemeral" },
           },
-          {
-            type: "text",
-            text: `<data>\n${context}\n</data>`,
-          },
+          ...(pamat
+            ? [{ type: "text", text: `<pamat_zaverov>\n${pamat}\n</pamat_zaverov>` }]
+            : []),
+          { type: "text", text: `<data>\n${context}\n</data>` },
         ];
 
-        let resp: Response;
-        try {
-          resp = await fetch("https://api.anthropic.com/v1/messages", {
-            method: "POST",
-            headers: {
-              "content-type": "application/json",
-              "x-api-key": key,
-              "anthropic-version": "2023-06-01",
-            },
-            body: JSON.stringify({
-              model: deep ? MODEL_DEEP : MODEL,
-              max_tokens: deep ? MAX_TOKENS_DEEP : MAX_TOKENS,
-              stream: true,
-              // Extended thinking OFF: on analytical prompts the model would spend 25s+
-              // emitting thinking tokens (which we don't forward) BEFORE any answer text,
-              // blowing past the ~30s gateway cut → empty reply. Straight-to-text keeps
-              // the whole response well inside the window; the answer stays grounded in
-              // the <data> + <pozadie_psb> we provide.
-              thinking: { type: "disabled" },
-              system,
-              messages: messages.map((m) => ({ role: m.role, content: toContent(m) })),
-            }),
-          });
-        } catch (e) {
-          return Response.json({ ok: false, error: "fetch_failed", detail: String(e) }, { status: 200 });
-        }
-
-        if (!resp.ok || !resp.body) {
-          const detail = await resp.text().catch(() => "");
-          return Response.json({ ok: false, error: "api_error", status: resp.status, detail: detail.slice(0, 500) }, { status: 200 });
-        }
-
-        // Re-emit Anthropic's stream as our OWN Server-Sent Events (text/event-stream).
-        // This is the critical bit: the hosting edge BUFFERS text/plain responses (so a
-        // long answer delivered nothing until it finished → past the ~30s gateway cut →
-        // empty reply), but passes text/event-stream through unbuffered by design. Each
-        // text delta becomes a `data: {"t":"…"}` frame that reaches the browser live.
-        const decoder = new TextDecoder();
         const encoder = new TextEncoder();
-        const upstream = resp.body.getReader();
+        const decoder = new TextDecoder();
+
+        // Re-emit ako naše VLASTNÉ Server-Sent Events. Kritické: hosting bufferuje
+        // text/plain (dlhá odpoveď nedoručila nič, kým neskončila → za ~30s limitom
+        // brány → prázdna odpoveď), ale text/event-stream púšťa nebufferovane.
         const stream = new ReadableStream({
           async start(controller) {
-            // Open the pipe immediately so the edge flushes headers + starts streaming.
+            const posli = (o: unknown) => controller.enqueue(encoder.encode(`data: ${JSON.stringify(o)}\n\n`));
+            const ping = () => controller.enqueue(encoder.encode(": .\n\n"));
             controller.enqueue(encoder.encode(": open\n\n"));
-            let buf = "";
+
+            // História konverzácie, ktorú počas nástrojových kôl dopĺňame.
+            const konverzacia: unknown[] = messages.map((m) => ({ role: m.role, content: toContent(m) }));
+
             try {
-              for (;;) {
-                const { done, value } = await upstream.read();
-                if (done) break;
-                buf += decoder.decode(value, { stream: true });
-                let nl: number;
-                while ((nl = buf.indexOf("\n")) >= 0) {
-                  const line = buf.slice(0, nl).trim();
-                  buf = buf.slice(nl + 1);
-                  if (!line.startsWith("data:")) continue;
-                  const data = line.slice(5).trim();
-                  if (!data || data === "[DONE]") continue;
-                  try {
-                    const evt = JSON.parse(data) as { type?: string; delta?: { type?: string; text?: string } };
-                    if (evt.type === "content_block_delta" && evt.delta?.type === "text_delta" && evt.delta.text) {
-                      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ t: evt.delta.text })}\n\n`));
-                    } else if (evt.type === "content_block_delta" && evt.delta?.type === "thinking_delta") {
-                      // Should not occur (thinking disabled) — but if it ever does, keep the
-                      // pipe warm with a comment ping so the connection doesn't idle out.
-                      controller.enqueue(encoder.encode(": .\n\n"));
-                    } else if (evt.type === "ping") {
-                      controller.enqueue(encoder.encode(": ping\n\n"));
-                    }
-                  } catch { /* ignore partial JSON */ }
+              for (let kolo = 0; kolo < MAX_KOL; kolo++) {
+                const resp = await fetch("https://api.anthropic.com/v1/messages", {
+                  method: "POST",
+                  headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },
+                  body: JSON.stringify({
+                    model: deep ? MODEL_DEEP : MODEL,
+                    max_tokens: deep ? MAX_TOKENS_DEEP : MAX_TOKENS,
+                    stream: true,
+                    thinking: { type: "enabled", budget_tokens: deep ? THINK_BUDGET_DEEP : THINK_BUDGET },
+                    system,
+                    tools: TOOLS,
+                    messages: konverzacia,
+                  }),
+                });
+                if (!resp.ok || !resp.body) {
+                  const detail = await resp.text().catch(() => "");
+                  posli({ e: `api_error ${resp.status}: ${detail.slice(0, 200)}` });
+                  break;
                 }
+
+                // Skladáme bloky odpovede. Pri zapnutom thinking sa MUSIA poslať
+                // späť aj thinking bloky aj s podpisom, inak ďalšie kolo spadne.
+                type Blok = { type: string; text?: string; thinking?: string; signature?: string; id?: string; name?: string; input?: unknown; _json?: string };
+                const bloky: Blok[] = [];
+                let stopReason = "";
+                const upstream = resp.body.getReader();
+                let buf = "";
+                for (;;) {
+                  const { done, value } = await upstream.read();
+                  if (done) break;
+                  buf += decoder.decode(value, { stream: true });
+                  let nl: number;
+                  while ((nl = buf.indexOf("\n")) >= 0) {
+                    const line = buf.slice(0, nl).trim();
+                    buf = buf.slice(nl + 1);
+                    if (!line.startsWith("data:")) continue;
+                    const data = line.slice(5).trim();
+                    if (!data || data === "[DONE]") continue;
+                    let evt: Record<string, any>;
+                    try { evt = JSON.parse(data); } catch { continue; }
+
+                    if (evt.type === "content_block_start") {
+                      const cb = evt.content_block || {};
+                      bloky[evt.index] = { type: cb.type, text: "", thinking: "", id: cb.id, name: cb.name, _json: "" };
+                      if (cb.type === "tool_use") posli({ s: cb.name === "otvor_knihu" ? "Otváram knihu…" : "Pozerám do dát…" });
+                    } else if (evt.type === "content_block_delta") {
+                      const b = bloky[evt.index] || (bloky[evt.index] = { type: "text", text: "" });
+                      const d = evt.delta || {};
+                      if (d.type === "text_delta" && d.text) { b.text = (b.text || "") + d.text; posli({ t: d.text }); }
+                      else if (d.type === "thinking_delta") { b.thinking = (b.thinking || "") + (d.thinking || ""); ping(); }
+                      else if (d.type === "signature_delta") { b.signature = (b.signature || "") + (d.signature || ""); }
+                      else if (d.type === "input_json_delta") { b._json = (b._json || "") + (d.partial_json || ""); }
+                    } else if (evt.type === "message_delta") {
+                      stopReason = evt.delta?.stop_reason || stopReason;
+                    } else if (evt.type === "ping") {
+                      ping();
+                    }
+                  }
+                }
+
+                const pouzite = bloky.filter((b) => b && b.type === "tool_use");
+                if (stopReason !== "tool_use" || !pouzite.length) break;
+
+                // Assistant správa presne tak, ako prišla (vrátane thinking).
+                konverzacia.push({
+                  role: "assistant",
+                  content: bloky.filter(Boolean).map((b) => {
+                    if (b.type === "thinking") return { type: "thinking", thinking: b.thinking, signature: b.signature };
+                    if (b.type === "tool_use") { let inp: unknown = {}; try { inp = JSON.parse(b._json || "{}"); } catch { /* nechaj prázdne */ } return { type: "tool_use", id: b.id, name: b.name, input: inp }; }
+                    return { type: "text", text: b.text };
+                  }),
+                });
+
+                const vysledky: unknown[] = [];
+                for (const b of pouzite) {
+                  let inp: Record<string, unknown> = {};
+                  try { inp = JSON.parse(b._json || "{}"); } catch { /* prázdne */ }
+                  if (typeof inp.preco === "string" && inp.preco) posli({ s: inp.preco.slice(0, 90) });
+                  const out = await spustiNastroj(b.name || "", inp);
+                  vysledky.push({ type: "tool_result", tool_use_id: b.id, content: out });
+                  ping();
+                }
+                konverzacia.push({ role: "user", content: vysledky });
+                posli({ s: "" });
               }
-            } catch { /* upstream ended */ }
+            } catch (e) {
+              posli({ e: `stream: ${String(e).slice(0, 200)}` });
+            }
             controller.enqueue(encoder.encode("data: [DONE]\n\n"));
             controller.close();
           },
         });
+
         return new Response(stream, {
           headers: {
             "content-type": "text/event-stream; charset=utf-8",

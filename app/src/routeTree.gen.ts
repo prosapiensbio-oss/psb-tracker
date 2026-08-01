@@ -22,6 +22,7 @@ import { Route as ApiOverrideRouteImport } from './routes/api/override'
 import { Route as ApiLogoutRouteImport } from './routes/api/logout'
 import { Route as ApiLoginRouteImport } from './routes/api/login'
 import { Route as ApiLeadsRouteImport } from './routes/api/leads'
+import { Route as ApiJarvisMemoryRouteImport } from './routes/api/jarvis-memory'
 import { Route as ApiIngestRouteImport } from './routes/api/ingest'
 import { Route as ApiDataRouteImport } from './routes/api/data'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
@@ -93,6 +94,11 @@ const ApiLeadsRoute = ApiLeadsRouteImport.update({
   path: '/api/leads',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiJarvisMemoryRoute = ApiJarvisMemoryRouteImport.update({
+  id: '/api/jarvis-memory',
+  path: '/api/jarvis-memory',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiIngestRoute = ApiIngestRouteImport.update({
   id: '/api/ingest',
   path: '/api/ingest',
@@ -128,6 +134,7 @@ export interface FileRoutesByFullPath {
   '/api/chat': typeof ApiChatRoute
   '/api/data': typeof ApiDataRoute
   '/api/ingest': typeof ApiIngestRoute
+  '/api/jarvis-memory': typeof ApiJarvisMemoryRoute
   '/api/leads': typeof ApiLeadsRoute
   '/api/login': typeof ApiLoginRoute
   '/api/logout': typeof ApiLogoutRoute
@@ -148,6 +155,7 @@ export interface FileRoutesByTo {
   '/api/chat': typeof ApiChatRoute
   '/api/data': typeof ApiDataRoute
   '/api/ingest': typeof ApiIngestRoute
+  '/api/jarvis-memory': typeof ApiJarvisMemoryRoute
   '/api/leads': typeof ApiLeadsRoute
   '/api/login': typeof ApiLoginRoute
   '/api/logout': typeof ApiLogoutRoute
@@ -169,6 +177,7 @@ export interface FileRoutesById {
   '/api/chat': typeof ApiChatRoute
   '/api/data': typeof ApiDataRoute
   '/api/ingest': typeof ApiIngestRoute
+  '/api/jarvis-memory': typeof ApiJarvisMemoryRoute
   '/api/leads': typeof ApiLeadsRoute
   '/api/login': typeof ApiLoginRoute
   '/api/logout': typeof ApiLogoutRoute
@@ -191,6 +200,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/data'
     | '/api/ingest'
+    | '/api/jarvis-memory'
     | '/api/leads'
     | '/api/login'
     | '/api/logout'
@@ -211,6 +221,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/data'
     | '/api/ingest'
+    | '/api/jarvis-memory'
     | '/api/leads'
     | '/api/login'
     | '/api/logout'
@@ -231,6 +242,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/data'
     | '/api/ingest'
+    | '/api/jarvis-memory'
     | '/api/leads'
     | '/api/login'
     | '/api/logout'
@@ -252,6 +264,7 @@ export interface RootRouteChildren {
   ApiChatRoute: typeof ApiChatRoute
   ApiDataRoute: typeof ApiDataRoute
   ApiIngestRoute: typeof ApiIngestRoute
+  ApiJarvisMemoryRoute: typeof ApiJarvisMemoryRoute
   ApiLeadsRoute: typeof ApiLeadsRoute
   ApiLoginRoute: typeof ApiLoginRoute
   ApiLogoutRoute: typeof ApiLogoutRoute
@@ -357,6 +370,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiLeadsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/jarvis-memory': {
+      id: '/api/jarvis-memory'
+      path: '/api/jarvis-memory'
+      fullPath: '/api/jarvis-memory'
+      preLoaderRoute: typeof ApiJarvisMemoryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/ingest': {
       id: '/api/ingest'
       path: '/api/ingest'
@@ -404,6 +424,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiChatRoute: ApiChatRoute,
   ApiDataRoute: ApiDataRoute,
   ApiIngestRoute: ApiIngestRoute,
+  ApiJarvisMemoryRoute: ApiJarvisMemoryRoute,
   ApiLeadsRoute: ApiLeadsRoute,
   ApiLoginRoute: ApiLoginRoute,
   ApiLogoutRoute: ApiLogoutRoute,

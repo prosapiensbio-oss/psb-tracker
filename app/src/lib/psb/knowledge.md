@@ -743,3 +743,51 @@ Okrem cien v sekcii 4 vyššie existujú aj "podpultové členstvá": Pack 8h/2 
 - **Bonusový model:** keď klient dokončí 6M a pokračuje do ďalšej fázy, tréner dostane **2 500 Kč** (vyplatené po prvom zaplatenom mesiaci ďalšej fázy). Nie je to provízia za predaj — je to odmena za kontinuitu (nulové akvizičné náklady, vyššie LTV).
 - **Prechod z Packu na 6M — 3 scenáre:** noví klienti → predstaviť 6M v 3.–4. hodine; krátkodobí (2–6 mes.) → len ak sami signalizujú pokračovanie; dlhodobí (rok+) → netlačiť, kým cenový rozdiel nie je aspoň 300 Kč/h alebo kým sami neotvoria tému stability. Fáza Obnova sa vždy ráta od prvého tréningu, nie od dátumu prechodu.
 - Existujú plné interné manuály (Operačný, Predajný DocA, Marketingový, Kariérny plán trénera) — tieto princípy sú ich zhrnutie; ak používateľ potrebuje detail konkrétneho scenára/skriptu, môže sa opýtať a ty odpovedz podľa týchto princípov (a ak niečo nevieš z podkladov, povedz to).
+
+---
+
+# ZĽAVY — prečo klient zaplatil menej, než je cenník
+
+Toto je najčastejší zdroj zmätku pri čítaní tabuľky `payments`. Nižšia suma
+takmer nikdy neznamená chybu; znamená jednu z týchto vecí. **Dôvod zľavy sa
+nikde nezapisuje**, takže rozlíšiť sa dá len podľa presného percenta a podľa
+toho, či je klient označený ako BTC.
+
+## Bitcoin (pole `bitcoin` v client_overrides)
+
+PSB dáva zľavu za platbu v bitcoine. Sadzba závisí od toho, KEDY klient začal
+platiť v BTC:
+
+- **Klienti spred roku 2025** (chodili už pred 1. 1. 2025): **doživotne −10 %**
+  z každej platby v BTC.
+- **Klienti, ktorí začali platiť BTC po 1. 1. 2025**: **−20 % z prvej platby**
+  a **−5 % z každej ďalšej**.
+
+Pozor na dátum: tréningová história v Trackeri začína až 1. 1. 2025, takže
+klient, ktorý chodil aj predtým, má prvé sedenie v prvých dňoch januára 2025.
+Prvé sedenie 2.–10. 1. 2025 teda spravidla znamená „starý klient", nie „nový".
+
+Ako to vyzerá v dátach (overené):
+- Jan Kalmus (starý, BTC): 10 920 → platí 9 828 = presne −10 %, opakovane.
+  Po zmene cenníka 9 400 → platí 8 460 = tiež −10 %.
+- Peter Gažo (začal 5. 5. 2025, BTC): prvá platba 8 792 = 10 990 −20 %,
+  ďalšie 10 440,50 = 10 990 −5 %.
+- Matej Procházka (začal 9. 1. 2026, BTC): prvá 6 232 = 7 790 −20 %,
+  ďalšie 7 400,50 = 7 790 −5 %.
+
+## Odmena za doporučenie
+
+**10 % z ďalšieho balíčka alebo tréning zadarmo.** Existuje a naozaj sa dáva,
+ale nikde nie je zapísané, že práve táto platba bola odmena — preto sa nedá
+spočítať, koľko program stojí ani koľko prináša.
+
+Pravdepodobné prípady v dátach (10 % nadol krátko po tom, čo prišiel niekto,
+koho ten človek priviedol): Katarína Mátlová (7 790 → 7 011 mesiac po nástupe
+Richarda Matla), Iva Stoklasková (7 011 šesť dní po nástupe Veroniky
+Stoklaskovej), Natália Pecková a Regina Obrovská (obe 10 920 → 9 828 v polovici
+decembra 2025, deň po sebe).
+
+**Dôležité pri interpretácii:** rovnaká suma 9 828 Kč je u Jana Kalmusa jeho
+bežná BTC cena. Z výšky platby sa teda dôvod zľavy určiť NEDÁ — len naznačiť.
+Keď o tom hovoríš, povedz to takto: čo je isté, čo je pravdepodobné a čo by sa
+muselo zapísať, aby to bolo isté.

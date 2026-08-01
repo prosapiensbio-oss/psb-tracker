@@ -1,12 +1,15 @@
 import { type CSSProperties, Fragment, useEffect, useRef, useState } from "react";
 
 import type { AiContext } from "../../lib/psb/aiContext";
-import { sendChat } from "../../lib/psb/client";
+import {
+  deleteJarvisChat, fetchJarvisMemory, fetchVzasSettings, saveJarvisChat,
+  saveVzasSetting, saveZaver, sendChat, vyhodnotZaver,
+} from "../../lib/psb/client";
 import { C, mix } from "../../lib/psb/theme";
 import type { Actions } from "./App";
 
 type ParsedAction = {
-  type: "ack-anomaly" | "unack-anomaly" | "set-override";
+  type: "ack-anomaly" | "unack-anomaly" | "set-override" | "zapis-zaver" | "vyhodnot-zaver" | "novy-ciel";
   label: string;
   done?: boolean;
   key?: string;
@@ -14,6 +17,8 @@ type ParsedAction = {
   name?: string;
   field?: string;
   value?: unknown;
+  // zapis-zaver / vyhodnot-zaver / novy-ciel
+  data?: Record<string, unknown>;
 };
 type Msg = { role: "user" | "assistant"; text: string; actions?: ParsedAction[]; images?: string[] };
 type SavedChat = { id: string; title: string; messages: Msg[]; updatedAt: number; archived?: boolean };
@@ -55,6 +60,12 @@ function parseActions(raw: string): { text: string; actions: ParsedAction[] } {
           actions.push({ type: o.type, key: o.key, note: typeof o.note === "string" ? o.note : "", label });
         } else if (o?.type === "set-override" && typeof o.name === "string" && OVERRIDE_FIELDS.has(o.field)) {
           actions.push({ type: "set-override", name: o.name, field: o.field, value: o.value, label });
+        } else if (o?.type === "zapis-zaver" && typeof o.zaver === "string") {
+          actions.push({ type: "zapis-zaver", label, data: o });
+        } else if (o?.type === "vyhodnot-zaver" && typeof o.id === "string") {
+          actions.push({ type: "vyhodnot-zaver", label, data: o });
+        } else if (o?.type === "novy-ciel" && typeof o.nazov === "string") {
+          actions.push({ type: "novy-ciel", label, data: o });
         }
       } catch {
         /* ignore malformed */
@@ -96,6 +107,9 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
   // "Hlboká debata" — sends the turn to Opus instead of Sonnet. Off by default
   // (Opus is slower); on for strategy talks, where the thinking is the point.
   const [deep, setDeep] = useState(false);
+  // Čo práve robí — "Pozerám do dát…", dôvod dopytu, "Otváram knihu…".
+  // Bez toho vyzerá nástrojové kolo ako zamrznutá appka.
+  const [stav, setStav] = useState("");
   useEffect(() => {
     try { if (localStorage.getItem("psb-ai-deep") === "1") setDeep(true); } catch { /* ignore */ }
   }, []);
@@ -115,7 +129,10 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
   // ── Chat history (saved in localStorage; archive/delete) ──
   const [chats, setChats] = useState<SavedChat[]>([]);
   const [chatId, setChatId] = useState<string>(newId);
+  // Najprv localStorage (panel sa otvorí okamžite), potom D1 (pravda naprieč
+  // zariadeniami). Databáza vyhráva — je to jediná kópia, ktorú vidí aj mobil.
   useEffect(() => {
+    let zivy = true;
     try {
       const raw = JSON.parse(localStorage.getItem(CHATS_KEY) || "null");
       if (Array.isArray(raw) && raw.length) {
@@ -124,14 +141,27 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
         if (recent) { setChatId(recent.id); setMsgs(recent.messages || []); }
       }
     } catch { /* ignore */ }
+    void fetchJarvisMemory().then(({ chats: db }) => {
+      if (!zivy || !Array.isArray(db) || !db.length) return;
+      const zoz = db as SavedChat[];
+      setChats(zoz);
+      try { localStorage.setItem(CHATS_KEY, JSON.stringify(zoz.slice(0, 50))); } catch { /* ignore */ }
+      const recent = zoz.filter((c) => !c.archived).sort((a, b) => b.updatedAt - a.updatedAt)[0];
+      // Neprepisuj rozpísaný chat — len prázdny štart.
+      setMsgs((m) => (m.length ? m : recent?.messages || []));
+      setChatId((id) => (recent && !id.startsWith("c") ? recent.id : recent ? recent.id : id));
+    });
+    return () => { zivy = false; };
   }, []);
   // Auto-save the active conversation on every change.
   useEffect(() => {
     if (!msgs.length) return;
     setChats((prev) => {
       const existing = prev.find((c) => c.id === chatId);
-      const next = [{ id: chatId, title: chatTitle(msgs), messages: msgs, updatedAt: Date.now(), archived: existing?.archived }, ...prev.filter((c) => c.id !== chatId)];
+      const zaznam = { id: chatId, title: chatTitle(msgs), messages: msgs, updatedAt: Date.now(), archived: existing?.archived };
+      const next = [zaznam, ...prev.filter((c) => c.id !== chatId)];
       try { localStorage.setItem(CHATS_KEY, JSON.stringify(next.slice(0, 50))); } catch { /* ignore */ }
+      void saveJarvisChat({ id: zaznam.id, title: zaznam.title, messages: msgs, archived: !!zaznam.archived });
       return next;
     });
   }, [msgs, chatId]);
@@ -142,8 +172,14 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
   };
   const newChat = () => { setChatId(newId()); setMsgs([]); setInput(""); setAttach([]); };
   const openChat = (id: string) => { const c = chats.find((x) => x.id === id); if (c) { setChatId(id); setMsgs(c.messages || []); } };
-  const deleteChat = (id: string) => { persistChats(chats.filter((c) => c.id !== id)); if (id === chatId) newChat(); };
-  const archiveChat = (id: string) => { persistChats(chats.map((c) => (c.id === id ? { ...c, archived: !c.archived } : c))); if (id === chatId) newChat(); };
+  const deleteChat = (id: string) => { persistChats(chats.filter((c) => c.id !== id)); void deleteJarvisChat(id); if (id === chatId) newChat(); };
+  const archiveChat = (id: string) => {
+    const next = chats.map((c) => (c.id === id ? { ...c, archived: !c.archived } : c));
+    persistChats(next);
+    const c = next.find((x) => x.id === id);
+    if (c) void saveJarvisChat({ id: c.id, title: c.title, messages: c.messages, archived: !!c.archived });
+    if (id === chatId) newChat();
+  };
 
   async function handleIncoming(list: FileList | File[] | null) {
     const arr = [...(list || [])];
@@ -176,8 +212,10 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
       // Live update — strip any (possibly partial) action block from the visible text.
       (full) => setLast({ role: "assistant", text: full.replace(/```psb-action[\s\S]*$/, "").trimEnd() }),
       deep,
+      setStav,
     );
     setBusy(false);
+    setStav("");
     if (res.ok) {
       const { text, actions: acts } = parseActions(res.reply);
       setLast({ role: "assistant", text: text || "…", actions: acts.length ? acts : undefined });
@@ -194,6 +232,23 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
       if (a.type === "ack-anomaly") actions.ackAnomaly(a.key || "", a.note || "", true);
       else if (a.type === "unack-anomaly") actions.ackAnomaly(a.key || "", "", false);
       else if (a.type === "set-override" && a.name && a.field) actions.setOverride(a.name, a.field as never, a.value);
+      else if (a.type === "zapis-zaver" && a.data) void saveZaver(a.data);
+      else if (a.type === "vyhodnot-zaver" && a.data) {
+        void vyhodnotZaver(String(a.data.id || ""), String(a.data.stav || "otvoreny"), String(a.data.vysledok || ""));
+      } else if (a.type === "novy-ciel" && a.data) {
+        // Ciele žijú v jednom JSON kľúči — načítaj, pridaj, ulož späť.
+        const d = a.data;
+        void fetchVzasSettings().then((st) => {
+          const zoz = Array.isArray(st["ciele"]) ? (st["ciele"] as Record<string, unknown>[]) : [];
+          zoz.unshift({
+            id: `c${Date.now().toString(36)}`, nazov: String(d.nazov || "Nový cieľ"), preco: String(d.preco || ""),
+            typ: "projekt", stav: "nezacate", priorita: String(d.priorita || "stredna"),
+            dalsiKrok: String(d.dalsiKrok || ""), termin: d.termin ? String(d.termin) : undefined,
+            poznamka: "Navrhol Jarvis",
+          });
+          void saveVzasSetting("ciele", zoz);
+        });
+      }
       a.done = true;
       return next;
     });
@@ -209,13 +264,13 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
     setMsgs((m) => [...m, { role: "assistant", text: `**Import hotový.**\n${summary}\n\nDáta som obnovil — spýtaj sa ma na čokoľvek z nových čísel.` }]);
   }
 
-  return { msgs, setMsgs, input, setInput, busy, deep, setDeep, pending, setPending, attach, setAttach, ask, runAction, confirmImport, handleIncoming, floatingOpen, setFloatingOpen, chats, chatId, newChat, openChat, deleteChat, archiveChat };
+  return { msgs, setMsgs, input, setInput, busy, stav, deep, setDeep, pending, setPending, attach, setAttach, ask, runAction, confirmImport, handleIncoming, floatingOpen, setFloatingOpen, chats, chatId, newChat, openChat, deleteChat, archiveChat };
 }
 
 // ── The conversation UI (messages + input) — used by both the floating panel and
 // the inline widget. Each instance has its own scroll/refs/drag state. ──────────
 export function ChatConversation({ chat, autoFocus, onClientClick }: { chat: AssistantChat; autoFocus?: boolean; onClientClick?: (name: string) => void }) {
-  const { msgs, input, setInput, busy, deep, setDeep, pending, setPending, attach, setAttach, ask, runAction, confirmImport, handleIncoming } = chat;
+  const { msgs, input, setInput, busy, stav, deep, setDeep, pending, setPending, attach, setAttach, ask, runAction, confirmImport, handleIncoming } = chat;
   const [drag, setDrag] = useState(false);
   // Autoscroll drží odpoveď na očiach LEN vtedy, keď je človek dole. Keď si
   // odroluje hore a číta začiatok, streamovanie ho tam už nesmie ťahať späť —
@@ -281,7 +336,15 @@ export function ChatConversation({ chat, autoFocus, onClientClick }: { chat: Ass
           </div>
           )
         ))}
-        {busy && (!msgs.length || !msgs[msgs.length - 1].text) && <div style={{ alignSelf: "flex-start", color: C.textDim, fontSize: 13, fontStyle: "italic" }}>{deep ? "Rozmýšľam poriadne… (chvíľu to potrvá)" : "Rozmýšľam…"}</div>}
+        {busy && (!msgs.length || !msgs[msgs.length - 1].text) && (
+          <div style={{ alignSelf: "flex-start", color: C.textDim, fontSize: 13, fontStyle: "italic" }}>
+            {stav || (deep ? "Rozmýšľam poriadne… (chvíľu to potrvá)" : "Rozmýšľam…")}
+          </div>
+        )}
+        {busy && stav && !!msgs.length && !!msgs[msgs.length - 1].text && (
+          // Nástroj v polovici odpovede — nech je vidieť, že sa niečo deje.
+          <div style={{ alignSelf: "flex-start", color: C.accentLight, fontSize: 12, fontStyle: "italic", opacity: 0.85 }}>⚙ {stav}</div>
+        )}
         {pending && (
           <div style={{ alignSelf: "stretch", border: `1px solid ${C.accent}`, background: mix(C.accent, 10), borderRadius: 10, padding: 12 }}>
             <div style={{ fontSize: 13, color: C.text, marginBottom: 8 }}>Naimportovať {pending.length} CSV do databázy?</div>

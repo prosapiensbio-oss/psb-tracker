@@ -19,6 +19,7 @@ import {
   SPOLOCNE,
   MONTH_QUESTIONS,
   SEED_ANSWERS,
+  NOVE_CIELE,
   SEED_CIELE,
   GOAL_STAV_LABEL,
   GOAL_PRIORITA_LABEL,
@@ -2005,7 +2006,14 @@ function CieleTab({ data }: { data: PSBData }) {
   useEffect(() => {
     fetchVzasSettings().then((s) => {
       const c = s["ciele"];
-      if (Array.isArray(c) && c.length) setCiele(c as Goal[]);
+      // Uložený zoznam je pravda — Jerry si ho prepisuje sám. Nové ciele z dát
+      // sa k nemu len PRIDAJÚ podľa id, takže sa nezduplikujú a nič neprepíšu.
+      const ulozene = Array.isArray(c) && c.length ? (c as Goal[]) : SEED_CIELE;
+      const mame = new Set(ulozene.map((g) => g.id));
+      const pribudlo = NOVE_CIELE.filter((g) => !mame.has(g.id));
+      const spolu = pribudlo.length ? [...ulozene, ...pribudlo] : ulozene;
+      setCiele(spolu);
+      if (pribudlo.length) void saveVzasSetting("ciele", spolu);
       setLoaded(true);
     });
   }, []);

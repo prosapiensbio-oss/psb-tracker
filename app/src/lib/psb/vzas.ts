@@ -985,6 +985,19 @@ export const GOAL_PRIORITA_LABEL: Record<GoalPriorita, string> = {
   vysoka: "Vysoká", stredna: "Stredná", nizka: "Nízka",
 };
 
+// Ciele navrhnuté z dát (atribúcia z anamnéz, 1. 8. 2026). Nepatria do
+// SEED_CIELE: Jerry si zoznam medzitým sám prepísal a seed sa už nepoužíva —
+// tieto sa k jeho zoznamu PRIDAJÚ podľa id, takže sa nikdy nezduplikujú a nič
+// z toho, čo napísal, neprepíšu.
+export const NOVE_CIELE: Goal[] = [
+  { id: "zdroj-klienta", nazov: "Zdroj klienta pri každom novom", preco: "Anamnéza sa pýta „ako ste sa o nás dozvedeli“ od júna 2025 — 47 odpovedí, ale je to voľný text („tabula“, „Knapcok“) a nikde sa nespája s tržbami. Pevný zoznam a je z toho atribúcia navždy.", typ: "projekt", termin: "2026-12-31", stav: "nezacate", priorita: "vysoka", dalsiKrok: "Vo formulári zmeniť na pevný zoznam + pole „kto konkrétne“; doplniť pole „dôvod zľavy“ k platbe", poznamka: "Navrhol Jarvis · zmerané: referencie 55 %, Instagram 15 %, Google 13 %, FP adresár 13 %, offline 9 %" },
+  { id: "referral-odmena", nazov: "Odmena za doporučenie — odovzdaná a zapísaná 6×", preco: "Zľava 10 % sa naozaj dáva (nájdené 4 pravdepodobné prípady v platbách), ale nikde nie je zapísané, že práve tá platba bola odmena. Nedá sa teda spočítať, čo program stojí ani čo prináša.", typ: "projekt", termin: "2026-12-31", stav: "nezacate", priorita: "vysoka", dalsiKrok: "Ozvať sa Lukášovi Krížovi a Natálii Peckovej — obaja priviedli dvoch", poznamka: "Navrhol Jarvis" },
+  { id: "dalsi-trener", nazov: "Ďalší tréner", preco: "Jediný cieľ, ktorý reálne zníži Jerryho hodiny. Web je zámerne písaný pre trénerov, ale nikde sa nemeria, koľko ľudí sa ozvalo.", typ: "projekt", termin: "2027-06-30", stav: "nezacate", priorita: "vysoka", dalsiKrok: "Merať počet uchádzačov; cieľ aspoň 5, z toho 1 nastúpi", poznamka: "Navrhol Jarvis · úzke hrdlo firmy podľa ich vlastného profilu" },
+  { id: "fp-adresar", nazov: "FP adresár — 12 klientov za rok", preco: "Šesť klientov za 13 mesiacov prišlo cez stránku Functional Patterns. Kanál zadarmo, ktorý nikto nespravuje ani nesleduje — a je na úrovni Googlu.", typ: "projekt", termin: "2027-07-31", stav: "nezacate", priorita: "stredna", dalsiKrok: "Aktualizovať profil v FP adresári a skontrolovať, kam odkazuje", poznamka: "Navrhol Jarvis" },
+  { id: "ig-zdielania", nazov: "Zdieľania na Instagrame 7 → 20 mesačne", preco: "Zdieľanie je najbližšia vec k referencii — je to moment, keď niekto pošle obsah kamarátovi. Spadlo z 34 (apr 2026) na 7 (jún 2026), pričom uloženia zostali rovnaké. Obsah je stále užitočný, ale prestal byť prerozprávateľný.", typ: "projekt", termin: "2026-12-31", stav: "nezacate", priorita: "stredna", dalsiKrok: "Nie viac príspevkov — viac klientskych príbehov, kde prvú vetu hovorí klient", poznamka: "Navrhol Jarvis" },
+  { id: "google-kliky", nazov: "Kliky z Googlu 240 → 350 mesačne", preco: "Najpomalší kanál a jediný, ktorý neprestane fungovať, keď prestaneš platiť. Rastie sám (110 → 240 za rok), cieľ je hlavne poistka, aby si ho neprestal sledovať.", typ: "projekt", termin: "2026-12-31", stav: "nezacate", priorita: "nizka", dalsiKrok: "Prepísať titulky stránok s vysokými zobrazeniami a nulovým preklikom", poznamka: "Navrhol Jarvis" },
+];
+
 export const SEED_CIELE: Goal[] = [
   { id: "google", nazov: "Google reklamy a marketing", preco: "Referencie sú silné, ale nedajú sa naplánovať — potrebujem kanál, ktorý viem zapnúť.", typ: "meratelny", kpiId: "marketingPct", cielovaHodnota: 5, termin: "2026-02-28", stav: "bezi", priorita: "vysoka", dalsiKrok: "Navýšiť marketing na 5 % tržieb, z toho 75 % Google", poznamka: "" },
   { id: "viazanost", nazov: "Polročná viazanosť", preco: "Dlhšia spolupráca je lacnejšia než nový klient a vyrovnáva cashflow.", typ: "projekt", termin: "2026-02-28", stav: "bezi", priorita: "vysoka", dalsiKrok: "Vymyslieť spôsob, ako ich predávať pri úvodnom tréningu", poznamka: "" },
