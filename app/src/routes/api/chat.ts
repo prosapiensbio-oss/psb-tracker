@@ -17,8 +17,12 @@ const MAX_TOKENS_DEEP = 6000;
 // premýšľania prekročilo ~30s limit brány a odpoveď prišla prázdna. Teraz sa
 // každý thinking delta preposiela ako SSE komentár — bajty tečú, spojenie žije
 // a Jarvis konečne vie, aká bude jeho posledná veta skôr, než napíše prvú.
-const THINK_BUDGET = 1500;
-const THINK_BUDGET_DEEP = 4000;
+//
+// Modely radu 5 neberú pevný budget_tokens ("thinking.type.enabled is not
+// supported for this model"), ale adaptívne rozmýšľanie riadené effortom:
+// nízke pri bežných otázkach, vysoké pri hlbokej debate.
+const EFFORT = "medium";
+const EFFORT_DEEP = "high";
 // Koľko kôl nástrojov v jednej odpovedi. Štyri stačia na "pozri do dát → over
 // druhým dopytom → otvor knihu → odpovedz" a držia latenciu v rozumnom.
 const MAX_KOL = 4;
@@ -295,7 +299,8 @@ export const Route = createFileRoute("/api/chat")({
                     model: deep ? MODEL_DEEP : MODEL,
                     max_tokens: deep ? MAX_TOKENS_DEEP : MAX_TOKENS,
                     stream: true,
-                    thinking: { type: "enabled", budget_tokens: deep ? THINK_BUDGET_DEEP : THINK_BUDGET },
+                    thinking: { type: "adaptive" },
+                    output_config: { effort: deep ? EFFORT_DEEP : EFFORT },
                     system,
                     tools: TOOLS,
                     messages: konverzacia,
