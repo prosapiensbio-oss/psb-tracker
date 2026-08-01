@@ -217,13 +217,38 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
 export function ChatConversation({ chat, autoFocus, onClientClick }: { chat: AssistantChat; autoFocus?: boolean; onClientClick?: (name: string) => void }) {
   const { msgs, input, setInput, busy, deep, setDeep, pending, setPending, attach, setAttach, ask, runAction, confirmImport, handleIncoming } = chat;
   const [drag, setDrag] = useState(false);
+  // Autoscroll drží odpoveď na očiach LEN vtedy, keď je človek dole. Keď si
+  // odroluje hore a číta začiatok, streamovanie ho tam už nesmie ťahať späť —
+  // dovtedy, kým sa sám nevráti dole (alebo neklikne na šípku).
+  //
+  // Posúva sa naschvál skokovo (behavior "auto"), nie plynulo: pri streamovaní
+  // sa efekt spúšťa niekoľkokrát za sekundu a animovaný posun by generoval
+  // scroll udalosti z medzipolôh ďaleko od konca — tie by vyzerali ako "človek
+  // odrolo­val hore" a autoscroll by sa sám vypol.
+  const [drzatDole, setDrzatDole] = useState(true);
+  const drzatRef = useRef(true);
+  const setDrzat = (v: boolean) => { drzatRef.current = v; setDrzatDole(v); };
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+    const el = scrollRef.current;
+    if (!el || !drzatRef.current) return;
+    el.scrollTop = el.scrollHeight;
   }, [msgs, busy, pending]);
+  const naKoniec = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setDrzat(true);
+    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+  };
+  const priScrollovani = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const dole = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    if (dole !== drzatRef.current) setDrzat(dole);
+  };
   useEffect(() => {
     if (autoFocus) setTimeout(() => inputRef.current?.focus(), 60);
   }, [autoFocus]);
@@ -235,7 +260,7 @@ export function ChatConversation({ chat, autoFocus, onClientClick }: { chat: Ass
       onDragLeave={() => setDrag(false)}
       onDrop={(e) => { e.preventDefault(); setDrag(false); void handleIncoming(e.dataTransfer.files); }}
     >
-      <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: 14, display: "flex", flexDirection: "column", gap: 12 }}>
+      <div ref={scrollRef} onScroll={priScrollovani} style={{ flex: 1, overflowY: "auto", padding: 14, display: "flex", flexDirection: "column", gap: 12 }}>
         {msgs.map((m, mi) => (
           // Skip the empty assistant placeholder before the first streamed token ("Rozmýšľam…" covers it).
           m.role === "assistant" && !m.text && !m.images && !m.actions?.length ? null : (
@@ -268,6 +293,16 @@ export function ChatConversation({ chat, autoFocus, onClientClick }: { chat: Ass
           </div>
         )}
       </div>
+
+      {!drzatDole && (
+        <button
+          onClick={naKoniec}
+          title="Skočiť na koniec odpovede"
+          style={{ position: "absolute", right: 14, bottom: 74, zIndex: 3, height: 30, padding: "0 12px", borderRadius: 999, border: `1px solid ${C.border}`, background: C.card, color: C.textMuted, fontSize: 12, cursor: "pointer", boxShadow: "0 3px 10px rgba(0,0,0,.28)", display: "flex", alignItems: "center", gap: 6 }}
+        >
+          ↓ {busy ? "Píše sa" : "Na koniec"}
+        </button>
+      )}
 
       {drag && (
         <div style={{ position: "absolute", inset: 0, background: mix(C.accent, 22), border: `2px dashed ${C.accent}`, borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", color: C.accentLight, fontWeight: 600, fontSize: 15, pointerEvents: "none" }}>
