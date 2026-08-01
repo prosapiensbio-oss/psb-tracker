@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 
 import { fmtCZK } from "../../lib/psb/format";
 import {
@@ -9,10 +9,12 @@ import {
   GSC_PRILEZITOSTI,
   GSC_STRANY,
   GSC_ZARIADENIA,
+  MKT_CLANKY,
   MKT_MESACNE,
   MKT_TOP,
   mktSum,
   type GscDopyt,
+  type GscStrana,
 } from "../../lib/psb/marketing";
 import { C, mix, S } from "../../lib/psb/theme";
 import type { ClientAgg } from "../../lib/psb/compute";
@@ -31,6 +33,64 @@ function Skeleton({ text }: { text: string }) {
   return (
     <div style={{ padding: "12px 14px", borderRadius: 10, border: `1px dashed ${mix(C.accent, 40)}`, background: mix(C.accent, 5), fontSize: 12.5, color: C.textMuted, lineHeight: 1.55 }}>
       <b style={{ color: C.accentLight }}>Kostra</b> — {text}
+    </div>
+  );
+}
+
+// Sortovateľná tabuľka. Klik na hlavičku triedi; druhý klik otočí smer.
+// Číselné stĺpce začínajú zostupne, lebo pri „koľko klikov" chce človek vidieť
+// najprv to najväčšie, nie najmenšie.
+type Stlpec<T> = { id: keyof T & string; label: string; num?: boolean; info?: string; fmt?: (v: T[keyof T], r: T) => ReactNode; farba?: (r: T) => string | undefined };
+
+function SortTable<T extends Record<string, any>>({ riadky, stlpce, minWidth = 460, vychodzi }: {
+  riadky: T[]; stlpce: Stlpec<T>[]; minWidth?: number; vychodzi?: keyof T & string;
+}) {
+  const [sort, setSort] = useState<{ id: string; desc: boolean }>(() => {
+    const d = vychodzi ?? stlpce.find((c) => c.num)?.id ?? stlpce[0].id;
+    return { id: d, desc: true };
+  });
+  const zoradene = useMemo(() => {
+    const c = stlpce.find((x) => x.id === sort.id);
+    return [...riadky].sort((a, b) => {
+      const av = a[sort.id], bv = b[sort.id];
+      const r = c?.num ? Number(av) - Number(bv) : String(av).localeCompare(String(bv), "sk");
+      return sort.desc ? -r : r;
+    });
+  }, [riadky, sort, stlpce]);
+  const klik = (c: Stlpec<T>) =>
+    setSort((s) => (s.id === c.id ? { id: c.id, desc: !s.desc } : { id: c.id, desc: !!c.num }));
+
+  return (
+    <div style={{ overflowX: "auto" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", minWidth }}>
+        <thead>
+          <tr style={{ borderBottom: `2px solid ${mix(C.accent, 35)}` }}>
+            {stlpce.map((c) => {
+              const aktivny = sort.id === c.id;
+              return (
+                <th key={c.id} onClick={() => klik(c)}
+                  style={{ textAlign: c.num ? "right" : "left", padding: "8px 10px", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap", cursor: "pointer", color: aktivny ? C.accentLight : C.textMuted, userSelect: "none" }}>
+                  {c.info ? <Info text={c.info} label={c.label} /> : c.label}
+                  <span style={{ marginLeft: 4, fontSize: 9, color: aktivny ? C.accent : C.textDim }}>
+                    {aktivny ? (sort.desc ? "▼" : "▲") : "↕"}
+                  </span>
+                </th>
+              );
+            })}
+          </tr>
+        </thead>
+        <tbody>
+          {zoradene.map((r, i) => (
+            <tr key={i}>
+              {stlpce.map((c) => (
+                <td key={c.id} style={{ ...S.td, textAlign: c.num ? "right" : "left", fontSize: 12.5, color: c.farba?.(r) ?? (c.num ? C.textMuted : C.text), fontVariantNumeric: "tabular-nums", whiteSpace: c.num ? "nowrap" : "normal" }}>
+                  {c.fmt ? c.fmt(r[c.id], r) : c.num ? num(r[c.id]) : String(r[c.id])}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -63,27 +123,23 @@ function CoSomRobil({ rok }: { rok: string }) {
         height={170}
         alignEnd
       />
-      <div style={{ overflowX: "auto", marginTop: 12 }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 560 }}>
-          <thead>
-            <tr style={{ borderBottom: `2px solid ${mix(C.accent, 35)}` }}>
-              {["Mesiac", "Reels", "Posty", "Stories", "Videnia", "Uloženia", "Zdieľania", "Reklama"].map((h, i) => (
-                <th key={h} style={{ textAlign: i === 0 ? "left" : "right", padding: "8px 10px", fontSize: 11, color: C.textMuted, fontWeight: 600, whiteSpace: "nowrap" }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {data.map((r) => (
-              <tr key={r.m}>
-                <td style={{ ...S.td, fontSize: 12.5, color: C.text, whiteSpace: "nowrap" }}>{label(r.m)}</td>
-                {[r.reels, r.posty, r.stories, r.views, r.ulozenia, r.zdielania].map((v, i) => (
-                  <td key={i} style={{ ...S.td, textAlign: "right", fontSize: 12.5, color: C.textMuted, fontVariantNumeric: "tabular-nums" }}>{num(v)}</td>
-                ))}
-                <td style={{ ...S.td, textAlign: "right", fontSize: 12.5, color: r.spend > 0 ? C.orange : C.textDim, fontVariantNumeric: "tabular-nums" }}>{r.spend ? fmtCZK(r.spend) : "—"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div style={{ marginTop: 12 }}>
+        <SortTable
+          riadky={data}
+          vychodzi="m"
+          stlpce={[
+            { id: "m", label: "Mesiac", fmt: (v) => label(String(v)) },
+            { id: "reels", label: "Reels", num: true },
+            { id: "posty", label: "Posty", num: true },
+            { id: "stories", label: "Stories", num: true },
+            { id: "views", label: "Videnia", num: true },
+            { id: "ulozenia", label: "Uloženia", num: true, info: "Koľkokrát si niekto príspevok uložil. Zo všetkých metrík je najbližšie k zámeru — lajk nestojí nič, uloženie znamená „toto sa mi bude hodiť“." },
+            { id: "zdielania", label: "Zdieľania", num: true },
+            { id: "viewRate", label: "View rate", num: true, info: "Koľko % ľudí, ktorým sa reel začal prehrávať, ho pozeralo aspoň 3 sekundy. Meria silu hooku, teda prvej vety.", fmt: (v) => `${v} %` },
+            { id: "spend", label: "Reklama", num: true, fmt: (v) => (Number(v) ? fmtCZK(Number(v)) : "—"), farba: (r) => (r.spend > 0 ? C.orange : C.textDim) },
+          ]}
+          minWidth={640}
+        />
       </div>
     </Card>
   );
@@ -162,7 +218,12 @@ function CoToPrinieslo({ data, clients, leads, rok }: { data: PSBData; clients: 
 // jediné miesto v celej appke, kde sa tieto dve veci dajú oddeliť ešte pred tým,
 // než sa niekto ozve.
 function WebKanaly({ rok }: { rok: string }) {
-  const data = GA4_MESACNE.filter((r) => r.m.startsWith(rok));
+  const vsetky = GA4_MESACNE.filter((r) => r.m.startsWith(rok));
+  // Mesiace bez merania sa NEPRIEMERUJÚ — nula by tvárila, že nikto neprišiel,
+  // hoci sa len nemeralo.
+  const data = vsetky.filter((r) => !r.chyba);
+  const diery = vsetky.filter((r) => r.chyba).map((r) => label(r.m));
+  const castocne = vsetky.filter((r) => r.castocne).map((r) => label(r.m));
   if (!data.length) {
     return (
       <Card>
@@ -202,6 +263,12 @@ function WebKanaly({ rok }: { rok: string }) {
           </div>
         ))}
       </div>
+      {(diery.length > 0 || castocne.length > 0) && (
+        <div style={{ marginTop: 12, padding: "10px 14px", borderRadius: 10, background: mix(C.orange, 10), border: `1px solid ${mix(C.orange, 30)}`, fontSize: 12.5, color: C.text, lineHeight: 1.55 }}>
+          {diery.length > 0 && <><b>{diery.join(" a ")}</b> chýba — GA4 bolo odpojené, takže to nie je nula, ale diera. Do súčtov a priemerov sa nezapočítava. </>}
+          {castocne.length > 0 && <><b>{castocne.join(", ")}</b> je len čiastočný, meranie sa rozbehlo v priebehu mesiaca.</>}
+        </div>
+      )}
       <div style={{ fontSize: 12.5, color: C.textMuted, marginTop: 14, lineHeight: 1.55 }}>
         Platená reklama bežala len <b>apríl – júl 2025</b> a je na nej vidieť: v máji priniesla 427 nových ľudí z 1 224.
         Odvtedy je na nule a web drží stabilných ~280 nových mesačne z vyhľadávania a priameho prístupu — to je
@@ -225,6 +292,35 @@ function CoSkusitDalej() {
   );
 }
 
+// ── Čo fungovalo na webe ─────────────────────────────────────────────────────
+// Instagram má životnosť dva dni, článok pracuje roky. Preto patria vedľa seba:
+// jedno ukazuje, čo zaujalo teraz, druhé to, čo ťa živí ticho na pozadí.
+function CoFungovaloWeb({ rok }: { rok: string }) {
+  const clanky = MKT_CLANKY.filter((c) => c.rok === rok);
+  return (
+    <Card>
+      <H3><Info text="Najčítanejšie články na webe podľa GA4. Servisné stránky (Domov, Služby, Kontakt) sú vynechané — zaujíma nás obsah." label="Čo fungovalo na webe" /></H3>
+      {clanky.length ? (
+        <SortTable
+          riadky={clanky}
+          stlpce={[
+            { id: "nazov", label: "Článok", farba: () => C.text },
+            { id: "zobrazenia", label: "Zobrazenia", num: true, farba: () => C.accentLight },
+          ]}
+          minWidth={380}
+        />
+      ) : (
+        <Empty>Za rok {rok} nemám GA4 dáta.</Empty>
+      )}
+      <div style={{ fontSize: 12.5, color: C.textMuted, marginTop: 12, lineHeight: 1.55 }}>
+        Rozdiel oproti Instagramu je v životnosti: reel má dva dni, článok pracuje roky.
+        „Fascie – Voda v nás“ mal v 2025 sám <b>1 829 zobrazení</b> — viac než všetky ostatné články dokopy —
+        a dodnes ťa drží vo vyhľadávaní.
+      </div>
+    </Card>
+  );
+}
+
 // ── Vyhľadávanie ─────────────────────────────────────────────────────────────
 // Toto je jediná karta, ktorá odpovedá na otázku „o čom písať" — a jediná, kde
 // je vidieť rozdiel medzi tým, čo prináša čitateľov, a tým, čo prináša klientov.
@@ -239,28 +335,16 @@ function Vyhladavanie({ rok }: { rok: string }) {
   const tabulka = (nadpis: string, info: string, riadky: GscDopyt[]) => (
     <Card>
       <H3><Info text={info} label={nadpis} /></H3>
-      <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 460 }}>
-          <thead>
-            <tr style={{ borderBottom: `2px solid ${mix(C.accent, 35)}` }}>
-              {["Dopyt", "Kliky", "Zobrazenia", "MP", "Pozícia"].map((h, i) => (
-                <th key={h} style={{ textAlign: i === 0 ? "left" : "right", padding: "8px 10px", fontSize: 11, color: C.textMuted, fontWeight: 600, whiteSpace: "nowrap" }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {riadky.map((r) => (
-              <tr key={r.dopyt}>
-                <td style={{ ...S.td, fontSize: 12.5, color: C.text }}>{r.dopyt}</td>
-                <td style={{ ...S.td, textAlign: "right", fontSize: 12.5, color: r.kliky > 0 ? C.accentLight : C.textDim, fontVariantNumeric: "tabular-nums", fontWeight: r.kliky > 0 ? 600 : 400 }}>{r.kliky}</td>
-                <td style={{ ...S.td, textAlign: "right", fontSize: 12.5, color: C.textMuted, fontVariantNumeric: "tabular-nums" }}>{num(r.zobrazenia)}</td>
-                <td style={{ ...S.td, textAlign: "right", fontSize: 12.5, color: r.ctr >= 5 ? C.green : r.ctr >= 1 ? C.textMuted : C.red, fontVariantNumeric: "tabular-nums" }}>{r.ctr} %</td>
-                <td style={{ ...S.td, textAlign: "right", fontSize: 12.5, color: r.pozicia <= 10 ? C.text : C.textDim, fontVariantNumeric: "tabular-nums" }}>{r.pozicia}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <SortTable
+        riadky={riadky}
+        stlpce={[
+          { id: "dopyt", label: "Dopyt", farba: () => C.text },
+          { id: "kliky", label: "Kliky", num: true, info: "Koľko ľudí na výsledok reálne kliklo a prišlo na web.", farba: (r) => (r.kliky > 0 ? C.accentLight : C.textDim) },
+          { id: "zobrazenia", label: "Zobrazenia", num: true, info: "Koľkokrát sa web ukázal vo výsledkoch vyhľadávania — bez ohľadu na to, či niekto klikol." },
+          { id: "ctr", label: "MP", num: true, info: "Miera prekliku = kliky ÷ zobrazenia. Koľko % ľudí, ktorí ťa vo výsledkoch videli, aj kliklo. Vysoké zobrazenia s nízkou MP znamenajú, že Google ťa ukazuje, ale titulok nezaujme.", fmt: (v) => `${v} %`, farba: (r) => (r.ctr >= 5 ? C.green : r.ctr >= 1 ? C.textMuted : C.red) },
+          { id: "pozicia", label: "Pozícia", num: true, info: "Priemerné poradie vo výsledkoch. 1–10 je prvá strana Googlu; nad 20 už prakticky nikto nedočíta.", farba: (r) => (r.pozicia <= 10 ? C.text : C.textDim) },
+        ]}
+      />
     </Card>
   );
 
@@ -302,28 +386,17 @@ function Vyhladavanie({ rok }: { rok: string }) {
       )}
 
       <Card>
-        <H3><Info text="Ktoré stránky ťahajú návštevnosť z vyhľadávania." label="Najsilnejšie stránky" /></H3>
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 460 }}>
-            <thead>
-              <tr style={{ borderBottom: `2px solid ${mix(C.accent, 35)}` }}>
-                {["Stránka", "Kliky", "Zobrazenia", "MP"].map((h, i) => (
-                  <th key={h} style={{ textAlign: i === 0 ? "left" : "right", padding: "8px 10px", fontSize: 11, color: C.textMuted, fontWeight: 600 }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {GSC_STRANY.map((r) => (
-                <tr key={r.url}>
-                  <td style={{ ...S.td, fontSize: 12.5, color: C.text }}>{r.url}</td>
-                  <td style={{ ...S.td, textAlign: "right", fontSize: 12.5, color: C.accentLight, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{r.kliky}</td>
-                  <td style={{ ...S.td, textAlign: "right", fontSize: 12.5, color: C.textMuted, fontVariantNumeric: "tabular-nums" }}>{num(r.zobrazenia)}</td>
-                  <td style={{ ...S.td, textAlign: "right", fontSize: 12.5, color: r.ctr >= 5 ? C.green : C.textMuted, fontVariantNumeric: "tabular-nums" }}>{r.ctr} %</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <H3><Info text="Ktoré stránky ťahajú návštevnosť z vyhľadávania. Klikni na hlavičku a zoradíš podľa čohokoľvek." label="Najsilnejšie stránky" /></H3>
+        <SortTable
+          riadky={GSC_STRANY as unknown as GscStrana[]}
+          stlpce={[
+            { id: "url", label: "Stránka", farba: () => C.text },
+            { id: "kliky", label: "Kliky", num: true, farba: () => C.accentLight },
+            { id: "zobrazenia", label: "Zobrazenia", num: true },
+            { id: "ctr", label: "MP", num: true, info: "Miera prekliku = kliky ÷ zobrazenia.", fmt: (v) => `${v} %`, farba: (r) => (r.ctr >= 5 ? C.green : C.textMuted) },
+            { id: "pozicia", label: "Pozícia", num: true },
+          ]}
+        />
       </Card>
     </>
   );
@@ -377,7 +450,7 @@ export function Marketing({ data, clients, leads }: { data: PSBData; clients: Re
           <CoSkusitDalej />
         </>
       )}
-      {sub === "vykon" && <CoFungovalo rok={rok} />}
+      {sub === "vykon" && (<><CoFungovalo rok={rok} /><CoFungovaloWeb rok={rok} /></>)}
       {sub === "vyhladavanie" && <Vyhladavanie rok={rok} />}
       {sub === "navratnost" && <CoToPrinieslo data={data} clients={clients} leads={leads} rok={rok} />}
     </>

@@ -72,6 +72,8 @@ export type Ga4Mesiac = {
   direct: number;
   referral: number;
   udalosti: number;
+  chyba?: boolean;      // mesiac bez merania — nie nula, ale diera
+  castocne?: boolean;   // meranie sa rozbehlo v priebehu mesiaca
 };
 
 export const GA4_MESACNE: Ga4Mesiac[] = [
@@ -87,6 +89,14 @@ export const GA4_MESACNE: Ga4Mesiac[] = [
   { m: "2025-10", novi: 315, organicSearch: 148, paidSocial: 0, organicSocial: 35, direct: 106, referral: 19, udalosti: 46 },
   { m: "2025-11", novi: 272, organicSearch: 142, paidSocial: 0, organicSocial: 54, direct: 61, referral: 11, udalosti: 57 },
   { m: "2025-12", novi: 350, organicSearch: 165, paidSocial: 0, organicSocial: 36, direct: 139, referral: 8, udalosti: 61 },
+  { m: "2026-01", novi: 441, organicSearch: 219, paidSocial: 0, organicSocial: 25, direct: 182, referral: 13, udalosti: 68 },
+  { m: "2026-02", novi: 380, organicSearch: 214, paidSocial: 0, organicSocial: 54, direct: 87, referral: 17, udalosti: 123 },
+  { m: "2026-03", novi: 149, organicSearch: 69, paidSocial: 0, organicSocial: 4, direct: 68, referral: 8, udalosti: 448 },
+  // Apríl a máj 2026: GA4 bolo odpojené, dáta neexistujú (nie sú nulové — chýbajú).
+  // Jún je z rovnakého dôvodu len čiastočný, meranie sa rozbehlo 25.6.
+  { m: "2026-04", novi: 0, organicSearch: 0, paidSocial: 0, organicSocial: 0, direct: 0, referral: 0, udalosti: 0, chyba: true },
+  { m: "2026-05", novi: 0, organicSearch: 0, paidSocial: 0, organicSocial: 0, direct: 0, referral: 0, udalosti: 0, chyba: true },
+  { m: "2026-06", novi: 21, organicSearch: 13, paidSocial: 3, organicSocial: 0, direct: 5, referral: 0, udalosti: 1, castocne: true },
 ];
 
 // Vyhľadávanie — Google Search Console (export Performance on Search,
@@ -177,3 +187,30 @@ export const GSC_ZARIADENIA = [
 ] as const;
 
 // kliky spolu 2347, z toho Česko 2057 (88 %), Slovensko 208
+
+
+// Články, ktoré ľudia na webe reálne čítajú (GA4, zobrazenia stránok). Servisné
+// stránky (Domov, Služby, Kontakt…) sú vynechané — zaujíma nás obsah, nie menu.
+export type MktClanok = { rok: string; nazov: string; zobrazenia: number };
+export const MKT_CLANKY: MktClanok[] = [
+  { rok: "2025", nazov: "Fascie – Voda v nás", zobrazenia: 1829 },
+  { rok: "2025", nazov: "Spiral Line (SPL) - Spiralní Línie", zobrazenia: 380 },
+  { rok: "2025", nazov: "Postura – Základ fyzické i psychické rovnováhy", zobrazenia: 261 },
+  { rok: "2025", nazov: "Lateral Line (LL) - Boční Línie", zobrazenia: 215 },
+  { rok: "2025", nazov: "Biotensegrita: Budoucnost chápání toho, jak tělo funguje", zobrazenia: 180 },
+  { rok: "2025", nazov: "Superficial Back Line (SBL) - Povrchová zadní linie", zobrazenia: 166 },
+  { rok: "2025", nazov: "Víc než jen zakřivení: Skolióza a její komplexní řešení", zobrazenia: 141 },
+  { rok: "2025", nazov: "Superficial Front Line (SFL) - Povrchová Přední Linie", zobrazenia: 139 },
+  { rok: "2025", nazov: "Beyond Fitness, Beyond Money", zobrazenia: 76 },
+  { rok: "2025", nazov: "1. díl: Anatomické vlaky", zobrazenia: 71 },
+  { rok: "2026", nazov: "Odstávající lopatky: proč problém nezačíná na zádech?", zobrazenia: 104 },
+  { rok: "2026", nazov: "analyza drzani", zobrazenia: 76 },
+  { rok: "2026", nazov: "Padající kolena dovnitř: Proč se to děje – a jak to skutečně řeš", zobrazenia: 74 },
+  { rok: "2026", nazov: "Spiral Line (SPL) - Spiralní Línie", zobrazenia: 74 },
+  { rok: "2026", nazov: "Předsunutá hlava – když hlavu držíme proti tělu, ne s ním", zobrazenia: 64 },
+  { rok: "2026", nazov: "Superficial Back Line (SBL) - Povrchová zadní linie", zobrazenia: 64 },
+  { rok: "2026", nazov: "1. díl: Anatomické vlaky", zobrazenia: 57 },
+  { rok: "2026", nazov: "Lateral Line (LL) - Boční Línie", zobrazenia: 51 },
+  { rok: "2026", nazov: "Mechanotransdukce – Jak síly formují vaše tělo", zobrazenia: 51 },
+  { rok: "2026", nazov: "Superficial Front Line (SFL) - Povrchová Přední Linie", zobrazenia: 49 },
+];
