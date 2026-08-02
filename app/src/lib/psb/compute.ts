@@ -933,7 +933,7 @@ export function predictCash(
           perClient.push({
             name: c.name, kedy: mesiacKluc(d), suma: posledna.amount,
             confidence: konf,
-            tyzdnov: Math.max(0, Math.round(((prvaObnova.getTime() - teraz.getTime()) / (7 * 86400000)) * 10) / 10),
+            tyzdnov: Math.max(0, Math.round(((kedyDatum.getTime() - teraz.getTime()) / (7 * 86400000)) * 10) / 10),
           });
           prva = false;
         }
