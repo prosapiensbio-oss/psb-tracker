@@ -6,6 +6,10 @@
 //
 // To update: edit knowledge.md and redeploy.
 import knowledge from "./knowledge.md?raw";
+// Prevádzkové pravidlá — cenník, členstvá, zľavy, kto je kto. Nedajú sa
+// odvodiť z dát a bez nich si model z čísel vyrobí príbeh, ktorý nie je
+// pravdivý (9 828 Kč = bitcoin, nie odmena za doporučenie).
+import prevadzka from "./prevadzka.md?raw";
 // Ich vlastné odpovede na riadený marketingový rozhovor (2026-08-01) + destilát
 // rozhodovacích pravidiel z Jerryho knižnice. Profil je dôležitejší než rámce:
 // hovorí, kto sú a čo nechcú, kým rámce hovoria len, ako o tom uvažovať.
@@ -13,6 +17,10 @@ import marketingProfil from "./marketing-profil.md?raw";
 import marketingRamce from "./marketing-ramce.md?raw";
 
 export const PSB_KNOWLEDGE = `${knowledge}
+
+---
+
+${prevadzka}
 
 ---
 
