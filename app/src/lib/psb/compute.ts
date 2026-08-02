@@ -848,10 +848,12 @@ export function predictEarnings(
     const price = c.paidAvg || 1150;
     const teraz = new Date();
     const monthsActive = Math.max(1, monthsBetween(c.firstSession, teraz) + 1);
-    const celozivotne = c.sessionCount / monthsActive;
-    const poslednych90 = c.sessions.filter((x) => daysBetween(x.date, teraz) <= 90).length / 3;
-    // Ak klient chodí kratšie než 3 mesiace, nedávne tempo JE jeho tempo.
-    const tempo = monthsActive < 3 ? celozivotne : poslednych90 * 0.7 + celozivotne * 0.3;
+    // Len posledných 90 dní. Miešať do toho celoživotný priemer znie opatrne, ale
+    // v rastúcej firme to systematicky podstreľuje: run-rate vychádzal 147k,
+    // hoci posledné tri mesiace boli 176k — rozdiel ťahal nadol slabší rok 2025.
+    // Kto chodí kratšie než 90 dní, delí sa počtom mesiacov, ktoré naozaj mal.
+    const oknoMesiacov = Math.max(1, Math.min(3, monthsActive));
+    const tempo = c.sessions.filter((x) => daysBetween(x.date, teraz) <= 90).length / oknoMesiacov;
     const burnRate = Math.max(0.4, Math.min(10, tempo));
     // Sedenia za 0 Kč (doplnenie členstva, darované tréningy) sú ~19 % všetkých.
     // Do práce sa počítajú, do tržieb nie — inak by predikcia nafúkla obe.
