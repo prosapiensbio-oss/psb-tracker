@@ -239,6 +239,20 @@ balíčkoch sú teda pomerne spoľahlivý odhad budúcej práce aj budúcich tr�
 
 ---
 
+## 12b. Platba môže kryť aj spätný mesiac
+
+PSB je benevolentné a nechá klienta bežať mesiac pozadu. Platba preto NEZNAMENÁ
+automaticky, že si klient kúpil hodiny dopredu — môže vyrovnávať dlžobu.
+
+Príklad: Jakub Kaňovský zaplatil 1. 7. 2026 za seba aj za Annu Kadličkovú
+24 928 Kč (2 členstvá × 2 mesiace, prvá BTC platba −20 %). Bol to **jeden
+mesiac dozadu a jeden dopredu** — z dvanástich zaplatených hodín na osobu bola
+polovica už odchodená a dopredu zostalo šesť.
+
+**Dôsledok pre každý výpočet:** koľko hodín klientovi zostáva, sa dá zistiť LEN
+zo zostatku v exporte balíčkov, nikdy z výšky platby. Výška platby hovorí, koľko
+zaplatil, nie koľko má pred sebou.
+
 ## 13. Mesačná uzávierka — kedy sú dáta úplné
 
 Tréningy a platby sa do PTmindera nedopĺňajú v reálnom čase. **Uzávierka mesiaca

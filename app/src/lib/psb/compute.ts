@@ -889,14 +889,24 @@ export function predictCash(
     const zostatok = Math.max(0, c.packageRemaining);
     const tyzdnovDoMinutia = zostatok / tempoTyzdenne;
     const zoZostatku = new Date(teraz.getTime() + tyzdnovDoMinutia * 7 * 86400000);
-    // Zostatok 0 neznamená „platí zajtra". Export balíčkov je momentka a u
-    // klienta dochádzajúceho staré hodiny ukazuje nulu aj deň po tom, čo si
-    // kúpil rok dopredu — Krčmár zaplatil 24. 7. za 70 hodín a model ho čakal
-    // znova v auguste. Druhá kotva je preto samotná platba: kto si kúpil N
-    // hodín, nemôže potrebovať ďalšie skôr, než ich stihne odchodiť.
+
+    // Ktorej kotve veriť:
+    //
+    //  ZOSTATOK je pravda, keď je nenulový — je to aktuálny stav a hovorí presne,
+    //  koľko hodín ešte treba odchodiť. Z výšky platby sa to odvodiť NEDÁ:
+    //  PSB je benevolentné a nechá klienta bežať mesiac pozadu, takže platba
+    //  môže kryť aj spätný mesiac. Kaňovský 1. 7. zaplatil za jeden mesiac
+    //  dozadu a jeden dopredu — z dvanástich zaplatených hodín bola polovica
+    //  už odchodená a dopredu zostalo šesť, nie dvanásť.
+    //
+    //  PLATBA rozhoduje len vtedy, keď je zostatok nulový. Vtedy momentka nič
+    //  nehovorí (u klienta dochádzajúceho staré hodiny ukazuje nulu aj deň po
+    //  tom, čo si kúpil rok dopredu) a jediné vodítko je, koľko si kúpil.
     const zPlatby = new Date(posledna.date);
     zPlatby.setDate(zPlatby.getDate() + Math.round((hodinyKupene / tempoTyzdenne) * 7));
-    const prvaObnova = new Date(Math.max(zoZostatku.getTime(), zPlatby.getTime(), teraz.getTime()));
+    const prvaObnova = zostatok > 0
+      ? new Date(Math.max(zoZostatku.getTime(), teraz.getTime()))
+      : new Date(Math.max(zPlatby.getTime(), teraz.getTime()));
 
     const platnost = platnostMesiacov(c.membership);
     const expiracia = new Date(posledna.date);
