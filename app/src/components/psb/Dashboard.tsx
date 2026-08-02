@@ -802,9 +802,11 @@ function RegisterRow({ item, actions, onNavigate }: { item: RegisterItem; action
   // Otázka „je toto duch?" sa dá zodpovedať rovno tu. Odpoveď sa uloží ku
   // klientovi, takže sa už nepýta znova — a duchov konečne vieme spočítať.
   const jeOtazkaDuch = item.key.startsWith("duch|") && !!item.client;
-  const odpovedz = (odpoved: "ano" | "nie") => {
-    if (item.client) actions.setOverride(item.client, "duch" as never, odpoved);
-  };
+  // Dve odpovede, lebo mesiac ticha má v praxi presne dva významy: buď klient
+  // zmizol (duch), alebo je to dohodnutá prestávka. „Pauza" nastaví stav
+  // klienta, čím sa stíšia aj ostatné upozornenia — nie je to len odškrtnutie.
+  const odpovedzDuch = () => { if (item.client) actions.setOverride(item.client, "duch" as never, "ano"); };
+  const odpovedzPauza = () => { if (item.client) actions.setOverride(item.client, "status" as never, "Pauza"); };
   return (
     <div style={{ padding: "9px 11px", marginBottom: 5, borderRadius: 8, background: item.acked ? C.track : item.tone === "red" ? C.redBg : item.tone === "blue" ? C.blueBg : C.orangeBg, opacity: item.acked ? 0.6 : 1 }}>
       <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, flexWrap: "wrap" }}>
@@ -813,8 +815,8 @@ function RegisterRow({ item, actions, onNavigate }: { item: RegisterItem; action
         <div style={{ marginLeft: "auto", display: "flex", gap: 10 }}>
           {jeOtazkaDuch && !item.acked && (
             <>
-              <button onClick={() => odpovedz("ano")} style={{ ...linkBtn, color: C.red }}>Áno, duch</button>
-              <button onClick={() => odpovedz("nie")} style={{ ...linkBtn, color: C.green }}>Nie</button>
+              <button onClick={odpovedzDuch} style={{ ...linkBtn, color: C.red }}>Áno, duch</button>
+              <button onClick={odpovedzPauza} style={{ ...linkBtn, color: C.blue }}>Pauza</button>
             </>
           )}
           {!item.acked && <button onClick={openItem} style={linkBtn}>Otvoriť →</button>}
