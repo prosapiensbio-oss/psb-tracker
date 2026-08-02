@@ -888,7 +888,15 @@ export function predictCash(
     // po nej hodiny prepadnú a ďalšia platba už nie je obnova, ale nová dohoda.
     const zostatok = Math.max(0, c.packageRemaining);
     const tyzdnovDoMinutia = zostatok / tempoTyzdenne;
-    const prvaObnova = new Date(teraz.getTime() + tyzdnovDoMinutia * 7 * 86400000);
+    const zoZostatku = new Date(teraz.getTime() + tyzdnovDoMinutia * 7 * 86400000);
+    // Zostatok 0 neznamená „platí zajtra". Export balíčkov je momentka a u
+    // klienta dochádzajúceho staré hodiny ukazuje nulu aj deň po tom, čo si
+    // kúpil rok dopredu — Krčmár zaplatil 24. 7. za 70 hodín a model ho čakal
+    // znova v auguste. Druhá kotva je preto samotná platba: kto si kúpil N
+    // hodín, nemôže potrebovať ďalšie skôr, než ich stihne odchodiť.
+    const zPlatby = new Date(posledna.date);
+    zPlatby.setDate(zPlatby.getDate() + Math.round((hodinyKupene / tempoTyzdenne) * 7));
+    const prvaObnova = new Date(Math.max(zoZostatku.getTime(), zPlatby.getTime(), teraz.getTime()));
 
     const platnost = platnostMesiacov(c.membership);
     const expiracia = new Date(posledna.date);
@@ -924,7 +932,8 @@ export function predictCash(
         if (prva) {
           perClient.push({
             name: c.name, kedy: mesiacKluc(d), suma: posledna.amount,
-            confidence: konf, tyzdnov: Math.round(tyzdnovDoMinutia * 10) / 10,
+            confidence: konf,
+            tyzdnov: Math.max(0, Math.round(((prvaObnova.getTime() - teraz.getTime()) / (7 * 86400000)) * 10) / 10),
           });
           prva = false;
         }
