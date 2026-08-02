@@ -868,7 +868,15 @@ export function predictCash(
     // Úvodný tréning nie je členstvo — nepredpovedaj podľa neho ďalšiu platbu.
     if (posledna.amount <= 1500 && platby.length > 1) continue;
 
-    const platnost = platnostMesiacov(c.membership);
+    // Export balíčkov je momentka a u klienta, ktorý dochádza staré hodiny, píše
+    // „Doplnenie členstva" aj vtedy, keď má v skutočnosti ročné členstvo. Vtedy
+    // je najlepším vodítkom výška poslednej platby: 77 239 Kč nie je dvojmesačný
+    // balíček. Bez toho by model čakal od Krčmára obnovu o dva mesiace, hoci
+    // ďalšia príde až o rok.
+    const nazovNehovori = !c.membership || c.membership.toLowerCase().includes("doplnenie");
+    const platnost = nazovNehovori
+      ? (posledna.amount >= 40000 ? 12 : posledna.amount >= 15000 ? 6 : platnostMesiacov(c.membership))
+      : platnostMesiacov(c.membership);
     const d = new Date(posledna.date);
     d.setMonth(d.getMonth() + platnost);
     let kedy = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;

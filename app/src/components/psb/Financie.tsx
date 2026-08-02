@@ -259,7 +259,7 @@ function Trzby({ monthly, data, clients }: { monthly: Monthly; data: PSBData; cl
           </div>
           {cashPred.perClient.length > 0 && (
             <div style={{ fontSize: 12, color: C.textMuted, marginTop: 8, lineHeight: 1.55 }}>
-              Najväčšie očakávané obnovy: {cashPred.perClient.slice(0, 4).map((x) => `«${x.name}» ${fmtCZK(x.suma)} (${Math.round(x.confidence * 100)} %)`).join(" · ")}
+              Najväčšie očakávané obnovy: {cashPred.perClient.slice(0, 4).map((x) => `«${x.name}» ${fmtCZK(x.suma)} v ${monthLabel(x.kedy)} (${Math.round(x.confidence * 100)} %)`).join(" · ")}
             </div>
           )}
         </Card>
