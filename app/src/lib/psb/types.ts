@@ -54,6 +54,8 @@ export type ClientOverride = {
   contractSigned?: boolean;
   primaryTrainer?: string | null;
   bitcoin?: boolean;
+  /** Odpoveď na otázku „je duch?" — "" = nepýtané, "ano", "nie". */
+  duch?: string;
 };
 
 export type UploadLogEntry = {

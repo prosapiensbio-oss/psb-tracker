@@ -799,12 +799,24 @@ const linkBtn = { background: "none", border: "none", color: C.accentLight, curs
 function RegisterRow({ item, actions, onNavigate }: { item: RegisterItem; actions: Actions; onNavigate: (tab: string, sub?: string, focus?: NavFocus) => void }) {
   const jump = item.category === "6M" ? "6m" : item.category === "Kapacita" ? "treningy" : "klienti";
   const openItem = () => onNavigate(jump, undefined, item.client ? { client: item.client, nonce: Date.now() } : undefined);
+  // Otázka „je toto duch?" sa dá zodpovedať rovno tu. Odpoveď sa uloží ku
+  // klientovi, takže sa už nepýta znova — a duchov konečne vieme spočítať.
+  const jeOtazkaDuch = item.key.startsWith("duch|") && !!item.client;
+  const odpovedz = (odpoved: "ano" | "nie") => {
+    if (item.client) actions.setOverride(item.client, "duch" as never, odpoved);
+  };
   return (
     <div style={{ padding: "9px 11px", marginBottom: 5, borderRadius: 8, background: item.acked ? C.track : item.tone === "red" ? C.redBg : item.tone === "blue" ? C.blueBg : C.orangeBg, opacity: item.acked ? 0.6 : 1 }}>
       <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, flexWrap: "wrap" }}>
         <span style={badge(catTone(item.category))}>{item.category}</span>
         <span style={{ color: C.text }}>{item.detail}</span>
         <div style={{ marginLeft: "auto", display: "flex", gap: 10 }}>
+          {jeOtazkaDuch && !item.acked && (
+            <>
+              <button onClick={() => odpovedz("ano")} style={{ ...linkBtn, color: C.red }}>Áno, duch</button>
+              <button onClick={() => odpovedz("nie")} style={{ ...linkBtn, color: C.green }}>Nie</button>
+            </>
+          )}
           {!item.acked && <button onClick={openItem} style={linkBtn}>Otvoriť →</button>}
           {item.acked ? (
             <button onClick={() => actions.ackAnomaly(item.key, "", false)} style={linkBtn}>Vrátiť</button>

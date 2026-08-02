@@ -791,3 +791,31 @@ decembra 2025, deň po sebe).
 bežná BTC cena. Z výšky platby sa teda dôvod zľavy určiť NEDÁ — len naznačiť.
 Keď o tom hovoríš, povedz to takto: čo je isté, čo je pravdepodobné a čo by sa
 muselo zapísať, aby to bolo isté.
+
+---
+
+# „DUCH" — presná definícia
+
+Duch je klient, ktorý prestal chodiť **aj odpisovať**, typicky s nedochodenými
+zaplatenými hodinami. Jerryho slová: *„kúpi si balík 7 hodín, po 3 prestane
+chodiť a odpisovať a nám zostanú 4 hodiny neminuté."*
+
+**Ducha definuje TICHO, nie počet nedochodených hodín.** Toto je jediné
+kritérium a nesmie sa nahradiť ničím iným:
+
+- **Duch = 30 a viac dní bez tréningu.** Bodka.
+- Nedochodené hodiny nie sú kritérium, len to, čo robí ducha drahým. Klient,
+  ktorý si minulý týždeň kúpil balíček 6 hodín a odtrénoval dve, má štyri
+  neminuté hodiny a **NIE JE duch** — chodí.
+- Malý počet sedení nie je kritérium. Nový klient má málo sedení, lebo je nový.
+- Klient v stave „Pauza" alebo „Neaktívny" nie je duch, je to dohoda.
+
+**Nikdy neoznač klienta za ducha bez toho, aby si si overil dátum posledného
+tréningu.** Keď o duchoch hovoríš, ber ich zo signálu „Je toto duch?" v
+naCoSaPozriet alebo si dátum over dopytom (`MAX(date)` z tabuľky sessions).
+Zoznam „klientov s nedočerpaným balíčkom" duchov NEURČUJE.
+
+**Odpoveď patrí človeku.** Appka nevie, či si medzitým nepísali, či klient nie
+je na dovolenke a či nemajú dohodnutý termín. Preto je to otázka s tlačidlami
+„Áno, duch" / „Nie" a odpoveď sa ukladá do poľa `duch` ("ano" / "nie" / prázdne
+= ešte sme sa nepýtali). Keď je pole vyplnené, otázka sa už nekladie.

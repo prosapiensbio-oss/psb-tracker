@@ -106,6 +106,7 @@ Vieš navrhnúť aj ÚPRAVU KLIENTA (údaje sú v klientiDetail) — napr. dať 
 - "trainerNote": text poznámky (upload CSV ju neprepíše).
 - "primaryTrainer": "Jerry" | "Terezka" | "".
 - "specialRate": true/false; "specialRateNote": text; "contractSigned": true/false; "bitcoin": true/false (platí v Bitcoine).
+- "duch": "ano" | "nie" | "" — odpoveď na otázku „je toto duch?". Duch = 30+ dní bez tréningu, definuje ho TICHO, nie nedochodené hodiny (viď <pozadie_psb>). Nikdy nikoho neoznač za ducha bez overenia dátumu posledného tréningu.
 Meno v akcii použi presne ako je v klientiDetail. Používateľ ho môže napísať bez diakritiky alebo inak (napr. "Jakub Stigut" = "Jakub Štigut") — nájdi zodpovedajúceho klienta v klientiDetail a použi jeho presný zápis. Ak nevieš, ktorého klienta myslí, radšej sa spýtaj. Najprv vysvetli dôsledok (napr. že klient prestane vyskakovať medzi anomáliami), až potom pridaj blok.
 
 Okrem klientov vieš navrhnúť aj tieto zápisy (rovnaký psb-action blok, rovnaké potvrdenie klikom):

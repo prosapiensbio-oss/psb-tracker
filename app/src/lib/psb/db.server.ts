@@ -90,6 +90,7 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
       contractSigned: !!r.contract_signed,
       primaryTrainer: r.primary_trainer,
       bitcoin: !!r.bitcoin,
+      duch: String(r.duch || ""),
     };
   }
   for (const r of acks.results as any[]) {
@@ -206,6 +207,7 @@ export async function setOverride(
     contract_signed: 0,
     primary_trainer: null,
     bitcoin: 0,
+    duch: "",
   };
   const colMap: Record<string, string> = {
     status: "status",
@@ -215,6 +217,7 @@ export async function setOverride(
     contractSigned: "contract_signed",
     primaryTrainer: "primary_trainer",
     bitcoin: "bitcoin",
+    duch: "duch",
   };
   const col = colMap[key as string];
   if (!col) return;
@@ -224,12 +227,12 @@ export async function setOverride(
   cur[col] = v;
 
   await DB.prepare(
-    `INSERT INTO client_overrides (name,status,special_rate,special_rate_note,trainer_note,contract_signed,primary_trainer,bitcoin,updated_at)
-     VALUES (?,?,?,?,?,?,?,?,?)
+    `INSERT INTO client_overrides (name,status,special_rate,special_rate_note,trainer_note,contract_signed,primary_trainer,bitcoin,duch,updated_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?)
      ON CONFLICT(name) DO UPDATE SET status=excluded.status, special_rate=excluded.special_rate,
        special_rate_note=excluded.special_rate_note, trainer_note=excluded.trainer_note,
        contract_signed=excluded.contract_signed, primary_trainer=excluded.primary_trainer,
-       bitcoin=excluded.bitcoin, updated_at=excluded.updated_at`,
+       bitcoin=excluded.bitcoin, duch=excluded.duch, updated_at=excluded.updated_at`,
   )
     .bind(
       name,
@@ -240,6 +243,7 @@ export async function setOverride(
       cur.contract_signed ?? 0,
       cur.primary_trainer ?? null,
       cur.bitcoin ?? 0,
+      cur.duch ?? "",
       new Date().toISOString(),
     )
     .run();

@@ -98,6 +98,7 @@ export type ClientAgg = {
   trainerNote: string;
   contractSigned: boolean;
   bitcoin: boolean;
+  duch: string;
   clientType: "6M Predplatné" | "Balíček";
   is6m: boolean;
   membership: string; // current product from Packages report (e.g. "OFF - 6h S viazanostou")
@@ -151,6 +152,7 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
         trainerNote: "",
         contractSigned: false,
         bitcoin: false,
+        duch: "",
         clientType: "Balíček",
         is6m: false,
         membership: "",
@@ -212,6 +214,7 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
     c.trainerNote = ov?.trainerNote || "";
     c.contractSigned = !!ov?.contractSigned;
     c.bitcoin = !!ov?.bitcoin;
+    c.duch = ov?.duch || "";
     c.is6m = sixMSet.has(c.name);
     c.clientType = c.is6m ? "6M Predplatné" : "Balíček";
     c.serviceCount = serviceCounts[c.name] || 0;
@@ -606,17 +609,28 @@ export function deriveAnomalies(data: PSBData, clients: Record<string, ClientAgg
       push(`gone|${c.name}`, days >= 21 ? "red" : "orange", "Prestal chodiť", `${c.name}: ${days} dní bez tréningu (${c.segment}) — ozvi sa`, c.name);
     }
 
-    // "Duch": zaplatil balíček, odchodil pár hodín a prestal sa ozývať. Jerryho
-    // najčastejší spôsob odchodu — kúpi 7 hodín, príde na 3, zvyšok prepadne.
-    // Krátkodobo je to hotovosť zadarmo, dlhodobo stratený klient za ~27 000 Kč.
-    // Zámerne skôr než "prestal chodiť" (14 dní), lebo tu ide o zaplatené hodiny,
-    // ktoré tichnú — a čím dlhšie sa čaká, tým horšie sa nadväzuje kontakt.
-    if (c.packageRemaining > 0 && days >= 21 && days <= 120 && c.segment !== "Anchor") {
+    // "Duch": kúpi balíček, odchodí pár hodín a prestane chodiť AJ odpisovať.
+    // Jerryho najčastejší spôsob odchodu — kúpi 7 hodín, príde na 3, zvyšok
+    // prepadne. Krátkodobo hotovosť za neodrobenú prácu, dlhodobo stratený
+    // klient za ~27 000 Kč a blokované miesto.
+    //
+    // Ducha definuje TICHO, nie počet nedochodených hodín. Klient, ktorý si
+    // minulý týždeň kúpil balíček a odtrénoval tri hodiny, vyzerá v dátach
+    // rovnako ako ten, čo po troch hodinách zmizol — líšia sa len tým, kedy
+    // naposledy prišli. Preto je jediná podmienka mesiac bez tréningu.
+    //
+    // A preto je to OTÁZKA, nie tvrdenie: appka nevie, či si medzitým nepísali,
+    // či klient nie je na dovolenke a či sa už nedohodli na termíne. Odpoveď sa
+    // uloží (duch = "ano" / "nie"), takže sa tá istá otázka nepýta dokola.
+    if (days >= 30 && !c.duch) {
+      const hodiny = c.packageRemaining > 0
+        ? ` a ešte má ${c.packageRemaining} z ${c.packageTotal} zaplatených hodín`
+        : "";
       push(
         `duch|${c.name}`,
-        days >= 45 ? "red" : "orange",
-        "Zaplatené hodiny tichnú",
-        `${c.name}: ${days} dní ticho a ešte má ${c.packageRemaining} z ${c.packageTotal} zaplatených hodín — ozvi sa, kým je čo dochodiť`,
+        days >= 60 ? "red" : "orange",
+        "Je toto duch?",
+        `${c.name}: ${days} dní bez tréningu${hodiny} — je to duch, alebo to má vysvetlenie?`,
         c.name,
       );
     }

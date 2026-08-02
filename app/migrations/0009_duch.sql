@@ -1,0 +1,11 @@
+-- Odpoveď na otázku "je tento klient duch?".
+--
+-- Duch = klient, ktorý prestal chodiť AJ odpisovať, typicky s nedochodenými
+-- hodinami. Doteraz sa dal odhadnúť len z počtu sedení, čo je nespoľahlivé:
+-- klient, ktorý si minulý týždeň kúpil balíček a odtrénoval tri hodiny, vyzerá
+-- v dátach rovnako ako ten, čo po troch hodinách zmizol. Rozdiel je jediný —
+-- ticho. A to musí potvrdiť človek, lebo appka nevie, či si medzitým nepísali.
+--
+-- Tri stavy zámerne: '' = ešte sme sa nepýtali, 'ano' = duch, 'nie' = má to
+-- vysvetlenie. Bez toho tretieho stavu by sa tá istá otázka pýtala donekonečna.
+ALTER TABLE client_overrides ADD COLUMN duch TEXT NOT NULL DEFAULT '';
