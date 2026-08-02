@@ -26,6 +26,8 @@ export type PaymentRow = {
   client: string;
   amount: number;
   method: string; // bank | cash | other
+  /** Surový popis riadku z PTmindera — môže obsahovať kód zľavy. */
+  note?: string;
 };
 
 export type PackageRow = {
@@ -81,9 +83,23 @@ export type PSBData = {
   anomalyAck: Record<string, AnomalyAck>;
   uploadLog: UploadLogEntry[];
   leads: Lead[];
+  /** Závery z debát s Jarvisom — do registra sa dostanú tie po termíne overenia. */
+  zavery: ZaverRow[];
+};
+
+/** Rozhodnutie z debaty, ktoré má dátum, kedy sa má overiť, či zabralo. */
+export type ZaverRow = {
+  id: string;
+  datum: string;
+  tema: string;
+  zaver: string;
+  overit?: string;
+  overitDo?: string;
+  stav: string;
 };
 
 export const EMPTY_DATA: PSBData = {
+  zavery: [],
   sessions: [],
   services: [],
   payments: [],

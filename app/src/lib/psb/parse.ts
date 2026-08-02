@@ -211,7 +211,9 @@ export function parsePayments(text: string): PaymentRow[] {
       : detail.toLowerCase().includes("cash")
         ? "cash"
         : "other";
-    rows.push({ date: currentDate, client, amount, method });
+    // Celý popis si necháme — môže v ňom byť kód zľavy (BTC10, RF10, Sleva30…),
+    // ktorý je jediná cesta, ako prestať hádať dôvod nižšej sumy.
+    rows.push({ date: currentDate, client, amount, method, note: detail.slice(0, 300) });
   }
   return rows;
 }

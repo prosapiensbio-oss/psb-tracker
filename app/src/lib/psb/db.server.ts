@@ -16,7 +16,7 @@ import { EMPTY_DATA } from "./types";
 const uid = () => crypto.randomUUID();
 
 export async function loadData(DB: D1Database): Promise<PSBData> {
-  const [sessions, services, payments, packages, overrides, acks, log, leads] = await Promise.all([
+  const [sessions, services, payments, packages, overrides, acks, log, leads, zavery] = await Promise.all([
     DB.prepare("SELECT * FROM sessions").all(),
     DB.prepare("SELECT * FROM services").all(),
     DB.prepare("SELECT * FROM payments").all(),
@@ -25,6 +25,11 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
     DB.prepare("SELECT * FROM anomaly_ack").all(),
     DB.prepare("SELECT * FROM upload_log ORDER BY date DESC LIMIT 40").all(),
     DB.prepare("SELECT * FROM leads ORDER BY date DESC").all().catch(() => ({ results: [] })),
+    // Otvorené závery z debát — do registra sa dostanú tie, ktorým prešiel
+    // termín overenia. Bez toho by rozhodnutie žilo len v Jarvisovom prompte
+    // a nikto by sa k nemu nevrátil, kým sa naň sám nespýta.
+    DB.prepare("SELECT id, datum, tema, zaver, overit, overit_do, stav FROM jarvis_zavery WHERE stav = 'otvoreny'")
+      .all().catch(() => ({ results: [] })),
   ]);
 
   const data: PSBData = {
@@ -55,6 +60,7 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
       client: r.client_name,
       amount: r.amount_czk,
       method: r.payment_method,
+      note: r.note || "",
     })),
     packages: (packages.results as any[]).map((r) => ({
       client: r.client_name,
@@ -62,6 +68,10 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
       package: r.package_name,
       remaining: r.sessions_remaining,
       total: r.sessions_total,
+    })),
+    zavery: (zavery.results as any[]).map((r) => ({
+      id: r.id, datum: r.datum, tema: r.tema, zaver: r.zaver,
+      overit: r.overit, overitDo: r.overit_do, stav: r.stav,
     })),
     leads: (leads.results as any[]).map((r) => ({
       id: r.id,
@@ -158,8 +168,8 @@ export async function ingest(DB: D1Database, filename: string, text: string): Pr
       existing.add(key);
       stmts.push(
         DB.prepare(
-          "INSERT OR IGNORE INTO payments (id,date,client_name,amount_czk,payment_method,dedup_key) VALUES (?,?,?,?,?,?)",
-        ).bind(uid(), r.date, r.client, r.amount, r.method, key),
+          "INSERT OR IGNORE INTO payments (id,date,client_name,amount_czk,payment_method,note,dedup_key) VALUES (?,?,?,?,?,?,?)",
+        ).bind(uid(), r.date, r.client, r.amount, r.method, r.note || "", key),
       );
       added++;
     }

@@ -96,7 +96,7 @@ NEEXISTUJE (napriek tomu, že v klientele je veľa dvojíc a súrodencov).
 | Sleva30 | 30 % | 16× | **Osobná výnimka pre Michala Knapčoka.** Nikoho iného sa netýka. |
 | J40 | 40 % | 13× | **Jarek** — viď rozklad nižšie, nie je to celé zľava |
 | Dar100 | 100 % | 7× | Tréning zadarmo pri niečom výnimočnom. Používa sa zriedka a nie je to podstatná položka. |
-| DC15 | 15 % | 7× | **Dominika — prvá klientka PSB. 15 % navždy za prejavenú dôveru na začiatku.** |
+| DC15 | 15 % | 7× | **Dominika — prvá klientka PSB. 15 % navždy za prejavenú dôveru na začiatku.** Výnimočne ju dostal aj **Tomáš Krčmár** — poctivo chodí a zaplatil si rok dopredu. Kód teda nepatrí len Dominike. |
 | FC20 | 20 % | 4× | **„Friends" — keď príde niekto známy.** |
 | SC10 | 10 % | 1× | „Special" — jednorazové, netreba riešiť |
 
@@ -124,6 +124,10 @@ v našom CSV exporte nie. Preto sa z výšky platby dôvod uhádnuť NEDÁ a nik
 sa o to nepokúšaj: 9 828 Kč je u Jana Kalmusa bitcoin, nie odmena za
 doporučenie. Kým sa kód neimportuje, pri každej nižšej sume povedz, že dôvod
 nie je v dátach.
+
+**Aj „osobný" kód môže dostať niekto iný.** DC15 nie je len Dominikin a Sleva30
+síce vznikla pre Michala Knapčoka, ale pravidlo znie: kód hovorí, KOĽKO sa
+zľavilo, nie KOMU patrí. Meno pri kóde ber ako pôvod, nie ako obmedzenie.
 
 **Referral funguje.** RF10 bol uplatnený **16×** — odmena za doporučenie sa
 reálne dáva. Nikdy netvrď opak.

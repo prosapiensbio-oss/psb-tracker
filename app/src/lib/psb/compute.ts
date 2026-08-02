@@ -585,7 +585,7 @@ export function monthlyFinance(data: PSBData): FinanceMonth[] {
 // ── anomalies (persistent register) ──────────────────────────────────────────
 export type Anomaly = {
   key: string;
-  tone: "red" | "orange";
+  tone: "red" | "orange" | "blue";
   label: string;
   detail: string;
   acked: boolean;
@@ -648,6 +648,20 @@ export function deriveAnomalies(data: PSBData, clients: Record<string, ClientAgg
         c.name,
       );
     }
+  }
+
+  // Rozhodnutie, ktorému prešiel termín overenia. Bez tohto by záver z debaty
+  // žil len v Jarvisovom prompte a vrátil by sa k nemu, len keď sa naň niekto
+  // sám spýta — čiže nikdy. Tu sa ozve sám.
+  const dnes = new Date().toISOString().slice(0, 10);
+  for (const z of data.zavery || []) {
+    if (!z.overitDo || z.overitDo > dnes) continue;
+    push(
+      `zaver|${z.id}`,
+      "blue",
+      "Čas overiť rozhodnutie",
+      `Z ${z.datum}: ${z.zaver}${z.overit ? ` — malo sa overiť: ${z.overit}` : ""}. Zabralo to?`,
+    );
   }
 
   // A referral that actually converted earns the referrer a 10 % thank-you —
