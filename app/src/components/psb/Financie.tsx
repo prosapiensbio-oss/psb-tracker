@@ -402,7 +402,7 @@ function Predikcia({ data, clients }: { data: PSBData; clients: Record<string, C
           <StatCard value={fmtCZK(pred.scenarios.optimistic)} label={`Optimistický · ${monthsCovered}`} color={C.green} />
           <StatCard value={fmtCZK(pred.scenarios.realistic)} label={`Realistický · ${monthsCovered}`} color={C.accentLight} />
           <StatCard value={fmtCZK(pred.scenarios.negative)} label={`Negatívny · ${monthsCovered}`} color={C.orange} />
-          <StatCard value={fmtCZK(pred.monthlyRunRate)} label={<Info text="Run-rate = odhadovaný bežný mesačný príjem, ak klienti chodia ako doteraz. Súčet očakávaného mesačného príjmu všetkých aktívnych klientov (tempo × cena sedenia), pred vážením dôverou obnovy. Orientačné „koľko mesačne generuje portfólio“." label="Očak. mesačný run-rate" />} color={C.blue} />
+          <StatCard value={fmtCZK(pred.monthlyRunRate)} label={<Info text="Run-rate = koľko mesačne hodí portfólio, ak klienti chodia ako TERAZ. Tempo sa berie z posledných 90 dní, cena z reálne zaplatených sedení (sedenia za 0 Kč sa počítajú do práce, nie do tržieb). Pred vážením dôverou obnovy. POZOR na rozdiel oproti priemeru posledných 3 mesiacov: ten obsahuje aj klientov, ktorí medzitým prestali chodiť. K 2. 8. 2026 to bolo 15 klientov a 26 736 Kč mesačne — presne o toľko je run-rate nižší. Nie je to pesimizmus modelu, je to odchod, ktorý sa už stal." label="Očak. mesačný run-rate" />} color={C.blue} />
         </div>
         {!hasData && <Empty>Nahraj Payroll + Packages & Memberships CSV pre predikciu.</Empty>}
       </Card>
