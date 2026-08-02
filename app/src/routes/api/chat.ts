@@ -11,8 +11,11 @@ import { bindings } from "../../lib/bindings.server";
 // matters more than latency. It is opt-in per message, not the default.
 const MODEL = "claude-sonnet-5";
 const MODEL_DEEP = "claude-opus-5";
-const MAX_TOKENS = 4000;
-const MAX_TOKENS_DEEP = 6000;
+// Rozpočet zdieľa rozmýšľanie AJ text. Pri 4 000 sa stalo, že po štyroch kolách
+// dopytov minulo premýšľanie celý rozpočet a používateľ dostal prázdnu bublinu —
+// nie chybu, ticho. Preto je strop vyšší, než na akú dlhú odpoveď mierime.
+const MAX_TOKENS = 10000;
+const MAX_TOKENS_DEEP = 16000;
 // Rozmýšľanie pred odpoveďou. Predtým bolo vypnuté, lebo tichých 25 sekúnd
 // premýšľania prekročilo ~30s limit brány a odpoveď prišla prázdna. Teraz sa
 // každý thinking delta preposiela ako SSE komentár — bajty tečú, spojenie žije
@@ -186,7 +189,7 @@ async function spustiNastroj(name: string, input: Record<string, unknown>): Prom
     const id = String(input.id || "");
     const text = textKnihy(id);
     if (!text) return `Kniha "${id}" v knižnici nie je. Dostupné: ${IDS_KNIH.join(", ")}`;
-    return text.slice(0, 40000);
+    return text.slice(0, 24000);
   }
   if (name === "dopyt_db") {
     const { DB } = bindings();
@@ -198,8 +201,10 @@ async function spustiNastroj(name: string, input: Record<string, unknown>): Prom
       const rows = rs.results as unknown[];
       if (!rows.length) return "Dopyt prebehol, ale nevrátil ani jeden riadok.";
       const out = JSON.stringify(rows);
-      return out.length > 14000
-        ? `${JSON.stringify(rows.slice(0, 60))}\n\n(orezané — dopyt vrátil ${rows.length} riadkov, zúž ho alebo agreguj)`
+      // Výsledky sa v konverzácii hromadia a posielajú sa v každom ďalšom kole.
+      // Preto radšej tesnejší strop a odkaz nech si dopyt zúži.
+      return out.length > 8000
+        ? `${JSON.stringify(rows.slice(0, 40))}\n\n(orezané — dopyt vrátil ${rows.length} riadkov, zúž ho alebo agreguj)`
         : out;
     } catch (e) {
       return `SQL chyba: ${String(e).slice(0, 300)}`;
@@ -294,6 +299,7 @@ export const Route = createFileRoute("/api/chat")({
 
             // História konverzácie, ktorú počas nástrojových kôl dopĺňame.
             const konverzacia: unknown[] = messages.map((m) => ({ role: m.role, content: toContent(m) }));
+            let vypisaneZnaky = 0;
 
             try {
               for (let kolo = 0; kolo <= MAX_KOL; kolo++) {
@@ -348,7 +354,7 @@ export const Route = createFileRoute("/api/chat")({
                     } else if (evt.type === "content_block_delta") {
                       const b = bloky[evt.index] || (bloky[evt.index] = { type: "text", text: "" });
                       const d = evt.delta || {};
-                      if (d.type === "text_delta" && d.text) { b.text = (b.text || "") + d.text; posli({ t: d.text }); }
+                      if (d.type === "text_delta" && d.text) { b.text = (b.text || "") + d.text; vypisaneZnaky += d.text.length; posli({ t: d.text }); }
                       else if (d.type === "thinking_delta") { b.thinking = (b.thinking || "") + (d.thinking || ""); ping(); }
                       else if (d.type === "signature_delta") { b.signature = (b.signature || "") + (d.signature || ""); }
                       else if (d.type === "input_json_delta") { b._json = (b._json || "") + (d.partial_json || ""); }
@@ -368,7 +374,7 @@ export const Route = createFileRoute("/api/chat")({
                 // ju napíše znova — bez tohto by sa odpoveď zdvojila (a v prvom
                 // teste sa aj zdvojila). Necháme ju bežať naživo, nech je vidieť,
                 // ako uvažuje, a pred ďalším kolom ju z bubliny zmažeme.
-                if (bloky.some((b) => b && b.type === "text" && (b.text || "").trim())) posli({ r: 1 });
+                if (bloky.some((b) => b && b.type === "text" && (b.text || "").trim())) { vypisaneZnaky = 0; posli({ r: 1 }); }
 
                 // Assistant správa presne tak, ako prišla (vrátane thinking).
                 konverzacia.push({
@@ -394,6 +400,12 @@ export const Route = createFileRoute("/api/chat")({
               }
             } catch (e) {
               posli({ e: `stream: ${String(e).slice(0, 200)}` });
+            }
+            // Poistka proti tichu: keď po všetkých kolách nepadlo ani slovo,
+            // povedz to. Prázdna bublina vyzerá ako pokazená appka a používateľ
+            // nemá ako vedieť, že stačí otázku zopakovať užšie.
+            if (!vypisaneZnaky) {
+              posli({ t: "Prepáč — pri hľadaní v dátach som minul rozpočet odpovede a nezostalo miesto na jej napísanie. Skús otázku položiť užšie (napr. na jednu vec naraz)." });
             }
             controller.enqueue(encoder.encode("data: [DONE]\n\n"));
             controller.close();
