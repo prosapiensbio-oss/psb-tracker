@@ -770,6 +770,29 @@ export function deriveRegister(
 }
 
 // ── earnings prediction (run-rate + prepaid, two-layer) ──────────────────────
+//
+// Predplatené hodiny sú najtvrdší údaj, aký o budúcnosti máme — sú zaplatené a
+// niekto ich musí odchodiť. Model ich preto berie ako záruku, ale až odkedy
+// poznáme dve veci, ktoré predtým ignoroval:
+//
+//  1. ČLENSTVÁ MAJÚ PLATNOSŤ. Päť hodín na mesačnom členstve sa nedá rozložiť
+//     do troch mesiacov — buď sa odchodia, alebo prepadnú. Rozprestierať ich
+//     rovnomerne znamenalo sľubovať prácu, ktorá už nemôže nastať.
+//  2. TICHO ZNAMENÁ RIZIKO. Klient, ktorý mesiac nedal o sebe vedieť, má
+//     zaplatené hodiny, ale nie je isté, že po ne príde — to je presne vzorec
+//     „ducha". Jeho zostatok nie je záruka, je to nádej.
+
+/** Koľko mesiacov platí členstvo podľa názvu balíčka (viď prevadzka.md). */
+export function platnostMesiacov(nazovBalicka: string): number {
+  const n = (nazovBalicka || "").toLowerCase();
+  if (n.includes("one year")) return 12;
+  if (n.includes("18 hod")) return 6;
+  if (n.includes("s viazanost")) return 1;      // mesačné, max 2 h sa prenášajú
+  if (n.includes("bez viazanost")) return 2;    // 8 týždňov
+  if (n.includes("8 hod")) return 2;            // 8 týždňov
+  if (n.includes("1 hodina")) return 1;         // 4 týždne
+  return 2;                                     // doplnenie členstva a neznáme
+}
 export type PredMonth = { month: string; guaranteed: number; expected: number };
 export type Prediction = {
   months: PredMonth[];
@@ -820,11 +843,21 @@ export function predictEarnings(
     if (c.status === "Neaktívny") continue;
     if (opts.excludeSpecial && c.specialRate) continue;
 
-    // Expected monthly revenue from history: how often they come × avg paid price.
+    // Tempo: nedávne správanie váži viac než celoživotný priemer. Klient, ktorý
+    // pred rokom chodil štyrikrát mesačne a dnes raz, nie je klient na štyri.
     const price = c.paidAvg || 1150;
-    const monthsActive = Math.max(1, monthsBetween(c.firstSession, new Date()) + 1);
-    const burnRate = Math.max(0.4, Math.min(10, c.sessionCount / monthsActive));
-    const monthlyRevenue = burnRate * price;
+    const teraz = new Date();
+    const monthsActive = Math.max(1, monthsBetween(c.firstSession, teraz) + 1);
+    const celozivotne = c.sessionCount / monthsActive;
+    const poslednych90 = c.sessions.filter((x) => daysBetween(x.date, teraz) <= 90).length / 3;
+    // Ak klient chodí kratšie než 3 mesiace, nedávne tempo JE jeho tempo.
+    const tempo = monthsActive < 3 ? celozivotne : poslednych90 * 0.7 + celozivotne * 0.3;
+    const burnRate = Math.max(0.4, Math.min(10, tempo));
+    // Sedenia za 0 Kč (doplnenie členstva, darované tréningy) sú ~19 % všetkých.
+    // Do práce sa počítajú, do tržieb nie — inak by predikcia nafúkla obe.
+    const platenych = c.sessions.filter((x) => x.price > 0).length;
+    const podielPlatenych = c.sessionCount ? Math.max(0.5, platenych / c.sessionCount) : 1;
+    const monthlyRevenue = burnRate * price * podielPlatenych;
     if (c.status === "Aktívny" || c.status === "Sporadický") monthlyRunRate += monthlyRevenue;
 
     // Renewal confidence by segment / 6M phase (per spec).
@@ -843,14 +876,32 @@ export function predictEarnings(
     // them for clients without package data) are EXPECTED, weighted by renewal
     // confidence. This keeps totals close to the real monthly run-rate instead
     // of adding a full package price per client.
+    // Ticho = riziko. Po 30 dňoch bez tréningu prestáva byť zostatok zárukou.
+    const dniTicha = daysBetween(c.lastSession, new Date());
+    const mlci = dniTicha >= 30;
+    if (mlci) confidence = Math.max(0.1, confidence * 0.5);
+
+    // Dokedy sa dá zostatok minúť: od poslednej platby + platnosť členstva.
+    // Bez platby to nevieme, tak nechávame celý horizont (ako predtým).
+    const poslednaPlatba = (data.payments || [])
+      .filter((pmt) => pmt.client === c.name)
+      .reduce((max, pmt) => (pmt.date > max ? pmt.date : max), "");
+    const mesiacovPlatnosti = poslednaPlatba
+      ? Math.max(0, platnostMesiacov(c.membership) - monthsBetween(poslednaPlatba, new Date()))
+      : horizon;
+
     let balance = c.packageRemaining;
     let guaranteed3m = 0;
     for (let i = 0; i < horizon; i++) {
-      const fromBalance = Math.min(balance, burnRate);
+      // Po vypršaní platnosti (alebo keď klient mlčí) zostatok už nie je záruka —
+      // hodiny buď prepadnú, alebo sa dochodia cez „doplnenie členstva", čo je
+      // nová dohoda, nie istota.
+      const zostatokPlati = i < mesiacovPlatnosti && !mlci;
+      const fromBalance = zostatokPlati ? Math.min(balance, burnRate) : 0;
       balance -= fromBalance;
       const beyond = burnRate - fromBalance; // sessions needing renewal / ongoing pay
-      const gRev = fromBalance * price;
-      const eRev = beyond * price;
+      const gRev = fromBalance * price * podielPlatenych;
+      const eRev = beyond * price * podielPlatenych;
       guaranteed3m += gRev;
       monthsArr[i].guaranteed += gRev;
       monthsArr[i].expected += eRev * confidence;
