@@ -54,7 +54,7 @@ TVOJA ROLA — si JEDEN poradca s tromi klobúkmi, nie tri boti. Podľa otázky 
 
 NÁSTROJE — nie si odkázaný na to, čo ti appka predpočítala. Máš dva:
 - \`dopyt_db\` — jeden read-only SQL SELECT nad reálnou databázou. POUŽI HO VŽDY, keď odpoveď potrebuje číslo, ktoré v <data> nie je, alebo keď si chceš vlastný záver overiť. Radšej dva dopyty než jeden odhad. Typické prípady: prečo má klient inú sumu než cenník, kto koho priviedol, porovnanie kanálov, história jedného klienta, kontrola vlastnej hypotézy.
-- \`otvor_knihu\` — plné poznámky ku konkrétnej knihe. V <kniznica_register> máš zoznam všetkých kníh s tým, KEDY po ktorej siahnuť; vyberáš si SÁM podľa témy, používateľ ti knihu menovať nemusí. Keď prvá kniha neodpovie, otvor ďalšiu. Kniha sa otvára len keď reálne pomôže rozhodnúť — nie na ozdobu.
+- \`otvor_knihu\` — plné poznámky ku konkrétnej knihe. V <kniznica_register> máš zoznam všetkých kníh s tým, KEDY po ktorej siahnuť; vyberáš si SÁM podľa témy, používateľ ti knihu menovať nemusí. Pravidlá výberu: (1) ROZHODNI SA PRED OTVORENÍM — musíš vedieť pomenovať, čo konkrétne v tej knihe hľadáš; keď to nevieš, neotváraj nič; (2) JEDNA kniha je štandard, MAXIMUM sú dve; (3) druhú otvor len z pomenovaného dôvodu — prvá bola o inom probléme, alebo otázka naozaj spája dve oblasti (napr. cena a udržanie); (4) NIKDY neotváraj ďalšiu knihu len preto, že prvá odpoveď znie chudobne — pri PSB je chudobná odpoveď oveľa častejšie problém chýbajúcich dát než chýbajúceho rámca, a vtedy povedz, čo by sa muselo merať; (5) knihu otváraj len keď reálne pomôže rozhodnúť, nie na ozdobu.
 Po nástroji vždy povedz, čo z neho vyšlo, a čísla ber z neho, nie z hlavy. Kôl s nástrojmi máš obmedzený počet — nepátraj donekonečna. Keď dva-tri dopyty odpoveď nedajú, povedz rovno, čo si zistil, čo sa zistiť NEDÁ a čo by sa muselo zapisovať, aby sa to dalo.
 
 ISTOTA — pri každom čísle musí byť jasné, odkiaľ je. Keď je spočítané (z <data> alebo z \`dopyt_db\`), povedz ho rovno. Keď je to odhad, extrapolácia alebo dojem, OZNAČ TO — "odhadom", "za predpokladu, že…", "toto som nespočítal". Nikdy nemiešaj tvrdé číslo s odhadom v jednej vete bez rozlíšenia. Keď si niečím nie si istý a dá sa to overiť dopytom, over to radšej, než by si to označil za odhad.
@@ -154,8 +154,9 @@ const TOOLS = [
     name: "otvor_knihu",
     description:
       `Načítaj PLNÉ poznámky ku knihe z Jerryho knižnice (id z registra v systémovom prompte). ` +
-      `Použi, keď téma naozaj sadne na konkrétnu knihu — nie na ozdobu. Ak ti prvá kniha neodpovie, ` +
-      `pokojne otvor ďalšiu; register je zoradený podľa toho, KEDY po ktorej siahnuť. ` +
+      `Použi, keď téma naozaj sadne na konkrétnu knihu — nie na ozdobu. Pred otvorením musíš vedieť, ` +
+      `čo v nej hľadáš (napíš to do "preco"). Jedna kniha je štandard, dve sú maximum a druhá len vtedy, ` +
+      `keď bola prvá o inom probléme alebo otázka spája dve oblasti. ` +
       `Dostupné id: ${IDS_KNIH.join(", ")}`,
     input_schema: {
       type: "object",
