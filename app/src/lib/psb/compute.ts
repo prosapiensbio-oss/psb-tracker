@@ -886,10 +886,19 @@ export function predictCash(
     if (daysBetween(c.lastSession, teraz) >= 30) confidence *= 0.5;   // ticho = riziko
     if (doslaLehota) confidence *= 0.6;
 
-    months[idx].expected += posledna.amount * confidence;
-    months[idx].lo += posledna.amount * Math.max(0, confidence - 0.2);
-    months[idx].hi += posledna.amount * Math.min(1, confidence + 0.15);
-    perClient.push({ name: c.name, kedy, suma: posledna.amount, confidence });
+    // Mesačné členstvo sa obnovuje KAŽDÝ mesiac, nie raz za horizont. Bez tohto
+    // by druhý a tretí mesiac vychádzali umelo nízko — klient by v nich zmizol,
+    // hoci platí ďalej. Každá ďalšia obnova je ale menej istá než tá najbližšia.
+    let i = idx;
+    let konf = confidence;
+    while (i < months.length) {
+      months[i].expected += posledna.amount * konf;
+      months[i].lo += posledna.amount * Math.max(0, konf - 0.2);
+      months[i].hi += posledna.amount * Math.min(1, konf + 0.15);
+      if (i === idx) perClient.push({ name: c.name, kedy, suma: posledna.amount, confidence });
+      i += Math.max(1, platnost);
+      konf *= 0.85;
+    }
   }
 
   for (const m of months) { m.expected = Math.round(m.expected); m.lo = Math.round(m.lo); m.hi = Math.round(m.hi); }
