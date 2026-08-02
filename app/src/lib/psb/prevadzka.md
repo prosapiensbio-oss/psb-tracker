@@ -93,12 +93,21 @@ NEEXISTUJE (napriek tomu, že v klientele je veľa dvojíc a súrodencov).
 | BTC5 | 5 % | 16× | Bitcoin, každá ďalšia platba po prvej |
 | BTC20 | 20 % | 4× | Bitcoin, prvá platba nového BTC klienta |
 | RF10 | 10 % | 16× | **Odmena za doporučenie** |
-| Sleva30 | 30 % | 16× | ⚠ nevysvetlené |
-| J40 | 40 % | 13× | Jarek |
-| Dar100 | 100 % | 7× | tréning zadarmo (dar) |
-| DC15 | 15 % | 7× | „Dominika" — ⚠ nevysvetlené |
-| FC20 | 20 % | 4× | „Friends" — ⚠ nevysvetlené |
-| SC10 | 10 % | 1× | „Special" — ⚠ nevysvetlené |
+| Sleva30 | 30 % | 16× | **Osobná výnimka pre Michala Knapčoka.** Nikoho iného sa netýka. |
+| J40 | 40 % | 13× | **Jarek** — viď rozklad nižšie, nie je to celé zľava |
+| Dar100 | 100 % | 7× | Tréning zadarmo pri niečom výnimočnom. Jerry tvrdí, že sa prakticky nepoužíva — ⚠ v PTminderi je ale 7 uplatnení. |
+| DC15 | 15 % | 7× | **Dominika — prvá klientka PSB, zľava navždy za prejavenú dôveru na začiatku.** ⚠ Jerry hovorí 10 %, kód je nastavený na 15 % — jedno z toho je zle. |
+| FC20 | 20 % | 4× | „Friends" — ⚠ stále nevysvetlené |
+| SC10 | 10 % | 1× | „Special" — jednorazové, netreba riešiť |
+
+### Jarek (J40) — 40 % nie je zľava, je to 20 % + 20 %
+Jarek má zľavu od začiatku, ale **od roku 2025 sa delí na polovicu**:
+- **20 percentuálnych bodov je skutočná zľava**,
+- **20 percentuálnych bodov sa odpočítava z jeho dlhu voči PSB.**
+
+Prakticky teda **zaplatí 60 % ceny členstva** a jeho dlh sa pri každej platbe zníži
+o ďalších 20 % ceny. Pri čítaní jeho platieb to nikdy nečítaj ako 40 % zľavu —
+polovica z toho je splátka.
 
 ### Bitcoinové pravidlo (overené proti platbám do koruny)
 - Klient, ktorý chodil **pred 1. 1. 2025** → **doživotne −10 %** z každej BTC platby.
@@ -159,7 +168,12 @@ týždenne prepíše finálny stav.
 - **Matyáš Rozbořil** — zamestnanec celý rok 2025 a jan–mar 2026, tréner do
   augusta 2025 (84 sedení, 89 h). Skončil ako študent medicíny, nestíhal to
   popri škole. Povedal, že sa vráti; PSB je presvedčené, že sa nevráti.
-- **Sofia** — **barter, NEPOČÍTA sa do tržieb.** Odpočítava sa z Jarkovho dlhu.
+- **Sofia** — **barter, NEPOČÍTA sa do tržieb.** Funguje ako bežná klientka: keď
+  by mala „zaplatiť" členstvo, namiesto platby sa tá suma odpočíta z Jarkovho
+  dlhu. Preto jej platba nechodí každý mesiac, ale v rytme členstiev — a preto je
+  vo VZAS vedená hodnotou ČLENSTVA (7 790 Kč), nie hodnotou odchodených hodín.
+  VZAS to má správne; hodnota jej sedení v Trackeri je len hodnota odvedenej
+  práce, nie mechanizmus splácania.
 - **Jarek** — zatiaľ **pôžička**. Keby vznikla s.r.o., bol by to 10 % podiel.
   Účtuje sa ako náklad.
 - **Prideľovanie nových klientov:** prvý kontakt a úvodný telefonát má v 99,9 %
@@ -184,3 +198,36 @@ patrí do poznámky trénera.
 
 Preto je signál „Je toto duch?" formulovaný ako otázka s tlačidlami
 **Áno, duch / Pauza** — nie ako tvrdenie.
+
+
+---
+
+## 11. Peniaze: kde je zdroj pravdy
+
+**PTminder je zdroj pravdy o príjmoch.** Nie banka. Cez bankový účet totiž
+neprejde bitcoin, hotovosť ani barter — banka teda nikdy neuvidí všetky tržby a
+**nesmie sa použiť ako zdroj pravdy o hotovosti**.
+
+**Fio slúži hlavne na VÝDAVKY.** Príchodzie platby sa v ňom sledujú nanajvýš ako
+kontrola, nie ako zdroj. Pri importe z toho plynie:
+- výdavky z Fio → kategórie P&L (toto je hlavný úžitok importu),
+- príjmy z Fio → len krížová kontrola proti PTminderu,
+- rozdiel medzi bankou a PTminderom **nie je chyba** — je to BTC + hotovosť +
+  barter. Má sa vyčísliť, nie odstraňovať.
+
+**Bitcoinové platby majú vlastnú evidenciu.** Každá platba klienta v BTC je
+zapísaná v appke prosapiens-btc ako `income` s menom klienta, sumou v satoshi a
+CZK hodnotou v čase platby. To je jediná úplná evidencia BTC príjmov a dá sa
+použiť na krížovú kontrolu proti PTminderu.
+
+## 12. Storno a predplatené hodiny
+
+**Storno neznamená stratené peniaze.** Klient má balíček predplatený vopred, takže
+peniaze prišli skôr — pri storne sa len odčerpá hodina. Storno teda **neskresľuje
+tržby**; skresľuje **odrobené hodiny a vyťaženie trénera**, lebo sa zapíše ako
+odchodený tréning, hoci nikto necvičil. Zatiaľ sa nikde neeviduje a Jerry
+premýšľa, ako to zapisovať.
+
+**Predplatenosť je zároveň signál na predikciu.** Keď v júli príde platba za dva
+mesiace, tie hodiny sa odchodia v auguste a septembri — nezaplatené hodiny v
+balíčkoch sú teda pomerne spoľahlivý odhad budúcej práce aj budúcich tržieb.
