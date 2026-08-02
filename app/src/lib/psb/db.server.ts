@@ -91,6 +91,8 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
       primaryTrainer: r.primary_trainer,
       bitcoin: !!r.bitcoin,
       duch: String(r.duch || ""),
+      zdroj: String(r.zdroj || ""),
+      zdrojKto: String(r.zdroj_kto || ""),
     };
   }
   for (const r of acks.results as any[]) {
@@ -208,6 +210,8 @@ export async function setOverride(
     primary_trainer: null,
     bitcoin: 0,
     duch: "",
+    zdroj: "",
+    zdroj_kto: "",
   };
   const colMap: Record<string, string> = {
     status: "status",
@@ -218,6 +222,8 @@ export async function setOverride(
     primaryTrainer: "primary_trainer",
     bitcoin: "bitcoin",
     duch: "duch",
+    zdroj: "zdroj",
+    zdrojKto: "zdroj_kto",
   };
   const col = colMap[key as string];
   if (!col) return;
@@ -227,12 +233,13 @@ export async function setOverride(
   cur[col] = v;
 
   await DB.prepare(
-    `INSERT INTO client_overrides (name,status,special_rate,special_rate_note,trainer_note,contract_signed,primary_trainer,bitcoin,duch,updated_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?)
+    `INSERT INTO client_overrides (name,status,special_rate,special_rate_note,trainer_note,contract_signed,primary_trainer,bitcoin,duch,zdroj,zdroj_kto,updated_at)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
      ON CONFLICT(name) DO UPDATE SET status=excluded.status, special_rate=excluded.special_rate,
        special_rate_note=excluded.special_rate_note, trainer_note=excluded.trainer_note,
        contract_signed=excluded.contract_signed, primary_trainer=excluded.primary_trainer,
-       bitcoin=excluded.bitcoin, duch=excluded.duch, updated_at=excluded.updated_at`,
+       bitcoin=excluded.bitcoin, duch=excluded.duch, zdroj=excluded.zdroj,
+       zdroj_kto=excluded.zdroj_kto, updated_at=excluded.updated_at`,
   )
     .bind(
       name,
@@ -244,6 +251,8 @@ export async function setOverride(
       cur.primary_trainer ?? null,
       cur.bitcoin ?? 0,
       cur.duch ?? "",
+      cur.zdroj ?? "",
+      cur.zdroj_kto ?? "",
       new Date().toISOString(),
     )
     .run();

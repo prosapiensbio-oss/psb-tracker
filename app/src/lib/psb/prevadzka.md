@@ -95,9 +95,9 @@ NEEXISTUJE (napriek tomu, že v klientele je veľa dvojíc a súrodencov).
 | RF10 | 10 % | 16× | **Odmena za doporučenie** |
 | Sleva30 | 30 % | 16× | **Osobná výnimka pre Michala Knapčoka.** Nikoho iného sa netýka. |
 | J40 | 40 % | 13× | **Jarek** — viď rozklad nižšie, nie je to celé zľava |
-| Dar100 | 100 % | 7× | Tréning zadarmo pri niečom výnimočnom. Jerry tvrdí, že sa prakticky nepoužíva — ⚠ v PTminderi je ale 7 uplatnení. |
-| DC15 | 15 % | 7× | **Dominika — prvá klientka PSB, zľava navždy za prejavenú dôveru na začiatku.** ⚠ Jerry hovorí 10 %, kód je nastavený na 15 % — jedno z toho je zle. |
-| FC20 | 20 % | 4× | „Friends" — ⚠ stále nevysvetlené |
+| Dar100 | 100 % | 7× | Tréning zadarmo pri niečom výnimočnom. Používa sa zriedka a nie je to podstatná položka. |
+| DC15 | 15 % | 7× | **Dominika — prvá klientka PSB. 15 % navždy za prejavenú dôveru na začiatku.** |
+| FC20 | 20 % | 4× | **„Friends" — keď príde niekto známy.** |
 | SC10 | 10 % | 1× | „Special" — jednorazové, netreba riešiť |
 
 ### Jarek (J40) — 40 % nie je zľava, je to 20 % + 20 %
@@ -231,3 +231,28 @@ premýšľa, ako to zapisovať.
 **Predplatenosť je zároveň signál na predikciu.** Keď v júli príde platba za dva
 mesiace, tie hodiny sa odchodia v auguste a septembri — nezaplatené hodiny v
 balíčkoch sú teda pomerne spoľahlivý odhad budúcej práce aj budúcich tržieb.
+
+
+---
+
+## 13. Mesačná uzávierka — kedy sú dáta úplné
+
+Tréningy a platby sa do PTmindera nedopĺňajú v reálnom čase. **Uzávierka mesiaca
+je prvý víkend nasledujúceho mesiaca**; ak 1. deň padne na piatok alebo víkend,
+uzávierka je až ten ďalší víkend.
+
+Dôsledok pri čítaní čísel: **posledný týždeň a hlavne prvé dni mesiaca sú vždy
+neúplné.** Keď v dátach niečo chýba tesne pred uzávierkou, prvá hypotéza nie je
+„klient neplatil" ani „chyba", ale „ešte to nie je zapísané". Nikdy z posledných
+dní nerob závery o poklese tržieb ani o odchode klienta.
+
+Príklad z 2. 8. 2026: v BTC appke boli Krčmárove platby za 75 425 Kč z 23.–24. 7.,
+v PTminderi po nich nebola stopa. Nebola to nezrovnalosť — len ešte nebola
+uzávierka.
+
+## 14. Kontrolné zdroje verzus zdroj pravdy
+
+Pri prijatých platbách je zdrojom pravdy **PTminder**. Bankový účet aj BTC appka
+slúžia iba na **kontrolu** — overia, že to, čo je v PTminderi, sa naozaj stalo,
+a ukážu prípady, kde niečo chýba alebo nesedí kurzom. Nikdy z nich nepočítaj
+tržby.

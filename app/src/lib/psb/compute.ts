@@ -99,6 +99,8 @@ export type ClientAgg = {
   contractSigned: boolean;
   bitcoin: boolean;
   duch: string;
+  zdroj: string;
+  zdrojKto: string;
   clientType: "6M Predplatné" | "Balíček";
   is6m: boolean;
   membership: string; // current product from Packages report (e.g. "OFF - 6h S viazanostou")
@@ -153,6 +155,8 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
         contractSigned: false,
         bitcoin: false,
         duch: "",
+        zdroj: "",
+        zdrojKto: "",
         clientType: "Balíček",
         is6m: false,
         membership: "",
@@ -186,7 +190,15 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
     const clientWeeks = new Set(c.sessions.map((s) => weekKey(s.date)));
     let hit = 0;
     for (const w of clientWeeks) if (window.has(w)) hit++;
-    c.attendance = hit / SEG_WEEKS;
+    // Menovateľ je počet týždňov, ktoré klient MOHOL odchodiť — nie vždy 18.
+    // Predtým sa delilo natvrdo osemnástimi, takže klient, ktorý chodí dva
+    // týždne, vyšiel na 2/18 = 0,11 a appka ho označila za neaktívneho a skryla
+    // ho zo zoznamu klientov. Merala ho za obdobie, v ktorom ešte neexistoval.
+    // Dolná hranica 6 týždňov bráni opačnému extrému: jeden tréning v prvom
+    // týždni by inak spravil 1/1 = Anchor.
+    const prve = c.sessions.reduce((min, s) => (s.date < min ? s.date : min), c.sessions[0]?.date || "");
+    const tyzdnovOdZaciatku = prve ? Math.floor(daysBetween(prve, new Date()) / 7) + 1 : SEG_WEEKS;
+    c.attendance = hit / Math.max(6, Math.min(SEG_WEEKS, tyzdnovOdZaciatku));
     c.segment = c.attendance >= 0.84 ? "Anchor" : c.attendance >= 0.5 ? "Stabilný" : "Sporadický";
 
     const ov = data.clientOverrides?.[c.name];
@@ -215,6 +227,8 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
     c.contractSigned = !!ov?.contractSigned;
     c.bitcoin = !!ov?.bitcoin;
     c.duch = ov?.duch || "";
+    c.zdroj = ov?.zdroj || "";
+    c.zdrojKto = ov?.zdrojKto || "";
     c.is6m = sixMSet.has(c.name);
     c.clientType = c.is6m ? "6M Predplatné" : "Balíček";
     c.serviceCount = serviceCounts[c.name] || 0;

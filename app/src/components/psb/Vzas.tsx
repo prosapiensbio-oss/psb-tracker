@@ -2009,11 +2009,16 @@ function CieleTab({ data }: { data: PSBData }) {
       // Uložený zoznam je pravda — Jerry si ho prepisuje sám. Nové ciele z dát
       // sa k nemu len PRIDAJÚ podľa id, takže sa nezduplikujú a nič neprepíšu.
       const ulozene = Array.isArray(c) && c.length ? (c as Goal[]) : SEED_CIELE;
-      const mame = new Set(ulozene.map((g) => g.id));
-      const pribudlo = NOVE_CIELE.filter((g) => !mame.has(g.id));
-      const spolu = pribudlo.length ? [...ulozene, ...pribudlo] : ulozene;
+      // Dva "ciele" sem nikdy nepatrili: zapisovanie zdroja klienta je stĺpec
+      // v Klientoch a odmena za doporučenie je prevádzkové pravidlo s
+      // pripomienkou v registri. Cieľ je ambícia, nie funkcia — odstraňujú sa.
+      const NEPATRI = new Set(["zdroj-klienta", "referral-odmena"]);
+      const ocistene = ulozene.filter((g) => !NEPATRI.has(g.id));
+      const mame = new Set(ocistene.map((g) => g.id));
+      const pribudlo = NOVE_CIELE.filter((g) => !mame.has(g.id) && !NEPATRI.has(g.id));
+      const spolu = pribudlo.length ? [...ocistene, ...pribudlo] : ocistene;
       setCiele(spolu);
-      if (pribudlo.length) void saveVzasSetting("ciele", spolu);
+      if (pribudlo.length || ocistene.length !== ulozene.length) void saveVzasSetting("ciele", spolu);
       setLoaded(true);
     });
   }, []);
@@ -2037,7 +2042,12 @@ function CieleTab({ data }: { data: PSBData }) {
   const zmaz = (id: string) => persist(ciele.filter((g) => g.id !== id));
 
   // Measurable goals read their number straight from the KPI screen.
-  const kpis = useMemo(() => computeKpis("2026", data.sessions, data.payments), [data.sessions, data.payments]);
+  // Rok sa berie z kalendára, nie natvrdo — inak by ciele od januára 2027
+  // ticho merali vlaňajšie čísla.
+  const kpis = useMemo(
+    () => computeKpis(String(new Date().getFullYear()), data.sessions, data.payments),
+    [data.sessions, data.payments],
+  );
   const kpiVal = (id?: string) => (id ? kpis.find((k) => k.def.id === id)?.value : undefined);
 
   const vidiel = filterStav === "vsetky" ? ciele : ciele.filter((g) => g.stav === filterStav);

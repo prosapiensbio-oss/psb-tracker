@@ -344,25 +344,35 @@ export function Dashboard({
 
   // All weeks (chronological) — the chart scrolls horizontally.
   const weekRows = useMemo(() => {
-    const map: Record<string, { Jerry: number; Terezka: number }> = {};
+    const map: Record<string, { Jerry: number; Terezka: number; iny: number }> = {};
     for (const s of data.sessions) {
       const k = weekKey(s.date);
-      const e = (map[k] ||= { Jerry: 0, Terezka: 0 });
+      const e = (map[k] ||= { Jerry: 0, Terezka: 0, iny: 0 });
       if (s.sessionTrainer === "Jerry") e.Jerry += s.duration / 60;
       else if (s.sessionTrainer === "Terezka") e.Terezka += s.duration / 60;
+      // Matyáš odtrénoval 89 hodín (jan–aug 2025). Padali mimo grafu, hoci inde
+      // v appke sa počítajú — pri „Obaja" tak chýbala celá jedna tretia osoba.
+      else e.iny += s.duration / 60;
     }
     return Object.entries(map).sort((a, b) => a[0].localeCompare(b[0]));
   }, [data.sessions]);
 
   const weeklyHours = useMemo(() => {
+    const maIneho = weekRows.some(([, v]) => v.iny > 0);
     const series = trainer === "all"
-      ? [{ name: "Jerry", color: C.accent }, { name: "Terezka", color: C.accentLight }]
+      ? [
+          { name: "Jerry", color: C.accent },
+          { name: "Terezka", color: C.accentLight },
+          ...(maIneho ? [{ name: "Matyáš", color: C.textDim }] : []),
+        ]
       : [{ name: trainer, color: C.accent }];
     return {
       series,
       data: weekRows.map(([k, v]) => ({
         label: weekLabel(k),
-        values: trainer === "all" ? [v.Jerry, v.Terezka] : [trainer === "Jerry" ? v.Jerry : v.Terezka],
+        values: trainer === "all"
+          ? (maIneho ? [v.Jerry, v.Terezka, v.iny] : [v.Jerry, v.Terezka])
+          : [trainer === "Jerry" ? v.Jerry : v.Terezka],
       })),
     };
   }, [weekRows, trainer]);
@@ -372,7 +382,7 @@ export function Dashboard({
     const pts = weekRows
       .map(([k, v]) => ({
         label: weekLabel(k),
-        h: trainer === "all" ? v.Jerry + v.Terezka : trainer === "Jerry" ? v.Jerry : v.Terezka,
+        h: trainer === "all" ? v.Jerry + v.Terezka + v.iny : trainer === "Jerry" ? v.Jerry : v.Terezka,
       }))
       .filter((p) => p.h > 0);
     if (!pts.length) return null;
@@ -578,7 +588,7 @@ export function Dashboard({
           <H3>
             <Info
               text={earnMode === "vyfakturovane"
-                ? "VYFAKTUROVANÉ = hodnota odtrénovaných sedení za mesiac (Payroll by Session) — koľko si reálne odpracoval. Posledné 2 svetlé stĺpce (⌁) sú odhad. Priemer/max/min bez odhadu."
+                ? "VYFAKTUROVANÉ = hodnota odtrénovaných sedení za mesiac (Payroll by Session) — koľko si reálne odpracoval. Posledné 2 svetlé stĺpce (⌁) sú odhad. Priemer/max/min bez odhadu. POZOR: sú v tom aj Sofiine hodiny (barter proti Jarkovmu dlhu, ~2 600 Kč/mes), ktoré nie sú tržba — v „Prijaté“ správne nie sú. A posledné dni mesiaca bývajú neúplné: uzávierka je až prvý víkend nasledujúceho mesiaca."
                 : "PRIJATÉ PLATBY (tržby) = peniaze reálne prijaté za mesiac (Payments Recorded) — presne to, čo vidíš v PTminderi ako Payments. Skáče, keď si niekto kúpi väčší balíček dopredu. Za celé štúdio (nedelí sa na trénera)."}
               label={earnMode === "prijate" ? "Mesačné tržby (prijaté)" : trainer === "all" ? "Mesačné zárobky + odhad" : `Mesačné zárobky — ${trainer}`}
             />

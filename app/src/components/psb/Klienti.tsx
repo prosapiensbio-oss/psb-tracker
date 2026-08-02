@@ -258,6 +258,19 @@ function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Record<st
   );
 }
 
+// Odkiaľ klienti reálne chodia — kategórie sú tie, ktoré vyšli zo 47 anamnéz
+// (jún 2025 – júl 2026), nie vymyslené. Poradie podľa početnosti.
+export const ZDROJE = [
+  { value: "", label: "—" },
+  { value: "referencia", label: "Referencia" },
+  { value: "instagram", label: "Instagram" },
+  { value: "google", label: "Google" },
+  { value: "fp", label: "FP adresár" },
+  { value: "offline", label: "Tabuľa / billboard / leták" },
+  { value: "ai", label: "AI (ChatGPT a pod.)" },
+  { value: "ine", label: "Iné" },
+];
+
 export function Klienti({ clients, capacity, actions, focus, leads }: { clients: Record<string, ClientAgg>; capacity: CapacityRow[]; actions: Actions; focus?: NavFocus | null; leads: Lead[] }) {
   const [focusClient, setFocusClient] = useState<string | null>(null);
   useEffect(() => {
@@ -346,6 +359,7 @@ export function Klienti({ clients, capacity, actions, focus, leads }: { clients:
       avg: (c) => c.paidAvg,
       last: (c) => new Date(c.lastSession).getTime(),
       bitcoin: (c) => (c.bitcoin ? 1 : 0),
+      zdroj: (c) => c.zdroj || "zzz",
     });
   }, [baseList, membershipF, typeF, modalityF, nameSearch, sorted, focusClient, all]);
 
@@ -539,6 +553,7 @@ export function Klienti({ clients, capacity, actions, focus, leads }: { clients:
               <SortTh label="Dochádzka" sortKey="attendance" sort={sort} onSort={toggle} align="right" info="Podiel týždňov s tréningom za posledných 18 týždňov." />
               <SortTh label="Ø CZK" sortKey="avg" sort={sort} onSort={toggle} align="right" />
               <SortTh label="Posledný" sortKey="last" sort={sort} onSort={toggle} align="right" />
+              <SortTh label="Zdroj" sortKey="zdroj" sort={sort} onSort={toggle} info="Odkiaľ sa o nás klient dozvedel. Toto je jediné miesto, kde sa marketing spája s peniazmi — bez neho je každé číslo o návratnosti kanála odhad. Pri referencii dopíš aj meno toho, kto ho poslal (klik na ✎)." />
               <SortTh label="₿" sortKey="bitcoin" sort={sort} onSort={toggle} align="center" info="Platí v Bitcoine. Zaškrtni klientov platiacich BTC — potom ich vieš filtrovať a AI asistent vie porovnať BTC vs. klasické platby." />
               <th style={S.th}></th>
             </tr>
@@ -561,6 +576,21 @@ export function Klienti({ clients, capacity, actions, focus, leads }: { clients:
                 <td style={{ ...S.td, textAlign: "right" }}>{(c.attendance * 100).toFixed(0)}%</td>
                 <td style={{ ...S.td, textAlign: "right" }}>{fmtCZK(c.paidAvg)}</td>
                 <td style={{ ...S.td, textAlign: "right" }}>{fmtDate(c.lastSession)}</td>
+                <td style={S.td}>
+                  <select
+                    value={c.zdroj}
+                    onChange={(e) => actions.setOverride(c.name, "zdroj", e.target.value)}
+                    title={c.zdrojKto ? `Poslal: ${c.zdrojKto}` : "Odkiaľ sa o nás dozvedel"}
+                    style={{ background: c.zdroj ? C.cardHover : "transparent", color: c.zdroj ? C.text : C.textDim, border: `1px solid ${c.zdroj ? C.border : "transparent"}`, borderRadius: 6, fontSize: 11.5, padding: "2px 4px", cursor: "pointer", maxWidth: 130 }}
+                  >
+                    {ZDROJE.map((z) => <option key={z.value} value={z.value}>{z.label}</option>)}
+                  </select>
+                  {c.zdroj === "referencia" && (
+                    <span title={c.zdrojKto || "Kto ho poslal? Dopíš cez ✎ — bez mena sa nedá odovzdať odmena."} style={{ marginLeft: 4, fontSize: 10, color: c.zdrojKto ? C.green : C.orange }}>
+                      {c.zdrojKto ? "✓" : "?"}
+                    </span>
+                  )}
+                </td>
                 <td style={{ ...S.td, textAlign: "center" }}>
                   <input type="checkbox" checked={c.bitcoin} onChange={(e) => actions.setOverride(c.name, "bitcoin", e.target.checked)} title="Platí v Bitcoine" style={{ accentColor: "#f7931a", cursor: "pointer" }} />
                 </td>
@@ -615,6 +645,23 @@ export function Klienti({ clients, capacity, actions, focus, leads }: { clients:
           {editC.specialRate && (
             <input style={{ ...S.input, marginBottom: 14 }} placeholder="Dôvod špeciálnej sadzby" defaultValue={editC.specialRateNote} onBlur={(e) => actions.setOverride(editC.name, "specialRateNote", e.target.value)} />
           )}
+          <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4, marginTop: 4 }}>Odkiaľ sa o nás dozvedel</div>
+          <Select
+            value={editC.zdroj}
+            onChange={(v) => actions.setOverride(editC.name, "zdroj", v)}
+            options={ZDROJE}
+          />
+          {editC.zdroj === "referencia" && (
+            <input
+              style={{ ...S.input, marginTop: 8 }}
+              placeholder="Kto ho poslal? (meno)"
+              defaultValue={editC.zdrojKto}
+              onBlur={(e) => actions.setOverride(editC.name, "zdrojKto", e.target.value)}
+            />
+          )}
+          <div style={{ fontSize: 11.5, color: C.textDim, margin: "6px 0 14px", lineHeight: 1.5 }}>
+            Bez mena odporúčateľa sa nedá odovzdať odmena za doporučenie (10 % z ďalšieho balíčka alebo tréning zadarmo).
+          </div>
           <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4, marginTop: 4 }}>Poznámka trénera (nikdy sa neprepíše uploadom)</div>
           <textarea style={{ ...S.input, minHeight: 70, resize: "vertical", marginBottom: 14 }} defaultValue={editC.trainerNote} onBlur={(e) => actions.setOverride(editC.name, "trainerNote", e.target.value)} />
           <button onClick={() => setEdit(null)} style={{ background: C.accent, color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontSize: 13, width: "100%" }}>Hotovo</button>

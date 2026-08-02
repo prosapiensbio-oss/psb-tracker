@@ -109,6 +109,8 @@ Vieš navrhnúť aj ÚPRAVU KLIENTA (údaje sú v klientiDetail) — napr. dať 
 - "trainerNote": text poznámky (upload CSV ju neprepíše).
 - "primaryTrainer": "Jerry" | "Terezka" | "".
 - "specialRate": true/false; "specialRateNote": text; "contractSigned": true/false; "bitcoin": true/false (platí v Bitcoine).
+- "zdroj": "referencia" | "instagram" | "google" | "fp" | "offline" | "ai" | "ine" | "" — odkiaľ sa klient o PSB dozvedel. Toto je JEDINÉ miesto, kde sa marketing spája s peniazmi; keď v rozhovore padne, odkiaľ niekto prišiel, navrhni zápis.
+- "zdrojKto": meno človeka, ktorý klienta poslal (len pri zdroj = "referencia"). Bez mena sa nedá odovzdať odmena za doporučenie.
 - "duch": "ano" | "nie" | "" — odpoveď na otázku „je toto duch?". Duch = 30+ dní bez tréningu, definuje ho TICHO, nie nedochodené hodiny (viď <pozadie_psb>). Po pol roku ticha hodiny prepadli definitívne. Nikdy nikoho neoznač za ducha bez overenia dátumu posledného tréningu.
 Meno v akcii použi presne ako je v klientiDetail. Používateľ ho môže napísať bez diakritiky alebo inak (napr. "Jakub Stigut" = "Jakub Štigut") — nájdi zodpovedajúceho klienta v klientiDetail a použi jeho presný zápis. Ak nevieš, ktorého klienta myslí, radšej sa spýtaj. Najprv vysvetli dôsledok (napr. že klient prestane vyskakovať medzi anomáliami), až potom pridaj blok.
 

@@ -56,6 +56,10 @@ export type ClientOverride = {
   bitcoin?: boolean;
   /** Odpoveď na otázku „je duch?" — "" = nepýtané, "ano", "nie". */
   duch?: string;
+  /** Odkiaľ sa o nás dozvedel — pevný zoznam, viď ZDROJE. */
+  zdroj?: string;
+  /** Pri referencii: kto konkrétne ho poslal. */
+  zdrojKto?: string;
 };
 
 export type UploadLogEntry = {
