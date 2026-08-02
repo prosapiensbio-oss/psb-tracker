@@ -701,7 +701,7 @@ export function deriveAnomalies(data: PSBData, clients: Record<string, ClientAgg
 // anomalies. Each item can be accepted (with a note) or hidden via anomalyAck.
 export type RegisterItem = {
   key: string;
-  category: "6M" | "Kapacita" | "Anomália";
+  category: "6M" | "Kapacita" | "Anomália" | "Rozhodnutie";
   tone: "red" | "orange" | "blue";
   title: string;
   detail: string;
@@ -759,7 +759,8 @@ export function deriveRegister(
       add(`cap|${cap.trainer}|under`, "Kapacita", "orange", `${cap.trainer} — veľa voľného priestoru`, cap.advice, 10, undefined);
   }
   for (const a of deriveAnomalies(data, clients)) {
-    add(a.key, "Anomália", a.tone, a.label, a.detail, 20, a.client);
+    // Záver z debaty nie je anomália — je to sľub, ktorý si sám pripomenul.
+    add(a.key, a.key.startsWith("zaver|") ? "Rozhodnutie" : "Anomália", a.tone, a.label, a.detail, 20, a.client);
   }
 
   return items.sort((a, b) => {

@@ -32,7 +32,8 @@ const REPORTS: { key: keyof PSBData; label: string; path: string }[] = [
   { key: "packages", label: "Packages & Memberships", path: "General Reports › Packages & Memberships" },
 ];
 
-const catTone = (c: RegisterItem["category"]) => (c === "6M" ? "accent" : c === "Kapacita" ? "blue" : "orange");
+const catTone = (c: RegisterItem["category"]) =>
+  c === "6M" ? "accent" : c === "Kapacita" ? "blue" : c === "Rozhodnutie" ? "blue" : "orange";
 
 const TRAINER_OPTS = [
   { value: "all", label: "Obaja" },
@@ -808,6 +809,7 @@ const linkBtn = { background: "none", border: "none", color: C.accentLight, curs
 
 function RegisterRow({ item, actions, onNavigate }: { item: RegisterItem; actions: Actions; onNavigate: (tab: string, sub?: string, focus?: NavFocus) => void }) {
   const jump = item.category === "6M" ? "6m" : item.category === "Kapacita" ? "treningy" : "klienti";
+  const jeRozhodnutie = item.category === "Rozhodnutie";
   const openItem = () => onNavigate(jump, undefined, item.client ? { client: item.client, nonce: Date.now() } : undefined);
   // Otázka „je toto duch?" sa dá zodpovedať rovno tu. Odpoveď sa uloží ku
   // klientovi, takže sa už nepýta znova — a duchov konečne vieme spočítať.
@@ -829,7 +831,7 @@ function RegisterRow({ item, actions, onNavigate }: { item: RegisterItem; action
               <button onClick={odpovedzPauza} style={{ ...linkBtn, color: C.blue }}>Pauza</button>
             </>
           )}
-          {!item.acked && <button onClick={openItem} style={linkBtn}>Otvoriť →</button>}
+          {!item.acked && !jeRozhodnutie && <button onClick={openItem} style={linkBtn}>Otvoriť →</button>}
           {item.acked ? (
             <button onClick={() => actions.ackAnomaly(item.key, "", false)} style={linkBtn}>Vrátiť</button>
           ) : (
