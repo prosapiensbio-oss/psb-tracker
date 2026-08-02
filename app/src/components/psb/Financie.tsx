@@ -249,7 +249,7 @@ function Trzby({ monthly, data, clients }: { monthly: Monthly; data: PSBData; cl
       {monthly.length > 0 && (
         <Card>
           <H3>
-            <Info text="Peniaze nechodia rovnomerne — chodia, keď niekomu skončí členstvo a kúpi si ďalšie. Odhad preto ide klient po klientovi: posledná platba + platnosť jeho členstva = kedy pravdepodobne príde ďalšia, a suma sa berie z jeho POSLEDNEJ platby (tá už v sebe nesie jeho zľavy — bitcoin, referral, Jarek). Vážené dôverou obnovy; kto mlčí 30+ dní, má polovičnú. Priemery vedľa sú len na porovnanie — ukazujú, čo bolo, nie čo príde." label={`Odhad tržieb — ${monthLabel(buduci?.month || "")}`} />
+            <Info text="Peniaze nechodia podľa kalendára, ale keď klientovi dôjdu hodiny. Šesťhodinový balíček s dvojmesačnou platnosťou minie človek chodiaci raz týždenne za šesť týždňov — a vtedy platí znova. Odhad preto ide klient po klientovi: ZOSTATOK hodín delený jeho tempom za posledných 90 dní = o koľko týždňov dôjdu; platnosť členstva je len strop, po ktorom hodiny prepadnú. Suma sa berie z jeho POSLEDNEJ platby (nesie v sebe jeho zľavy — bitcoin, referral, Jarek), počet kúpených hodín z jej výšky, nie z názvu balíčka. Dôvera zohľadňuje pravidelnosť dochádzky: kto chodí poctivo, minie hodiny naozaj v odhadovanom čase; kto chodil ledabolo, to isté rozťahuje. Kto mlčí 30+ dní, má polovičnú. Priemery vedľa ukazujú, čo bolo, nie čo príde." label={`Odhad tržieb — ${monthLabel(buduci?.month || "")}`} />
           </H3>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, margin: "12px 0 6px" }}>
             <StatCard value={fmtCZK(buduci?.expected || 0)} label={`Odhad · ${monthLabel(buduci?.month || "")}`} color={C.green} />
@@ -259,7 +259,7 @@ function Trzby({ monthly, data, clients }: { monthly: Monthly; data: PSBData; cl
           </div>
           {cashPred.perClient.length > 0 && (
             <div style={{ fontSize: 12, color: C.textMuted, marginTop: 8, lineHeight: 1.55 }}>
-              Najväčšie očakávané obnovy: {cashPred.perClient.slice(0, 4).map((x) => `«${x.name}» ${fmtCZK(x.suma)} v ${monthLabel(x.kedy)} (${Math.round(x.confidence * 100)} %)`).join(" · ")}
+              Najväčšie očakávané obnovy: {cashPred.perClient.slice(0, 5).map((x) => `«${x.name}» ${fmtCZK(x.suma)} v ${monthLabel(x.kedy)} — dochodí zostatok o ~${x.tyzdnov} týž. (${Math.round(x.confidence * 100)} %)`).join(" · ")}
             </div>
           )}
         </Card>

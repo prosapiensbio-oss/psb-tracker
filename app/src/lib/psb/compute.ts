@@ -848,15 +848,16 @@ export function predictCash(
   data: PSBData,
   clients: Record<string, ClientAgg>,
   horizon = 3,
-): { months: CashPred[]; perClient: { name: string; kedy: string; suma: number; confidence: number }[] } {
+): { months: CashPred[]; perClient: { name: string; kedy: string; suma: number; confidence: number; tyzdnov: number }[] } {
   const poslednyMesiacDat = data.payments.reduce((max, p) => (p.date.slice(0, 7) > max ? p.date.slice(0, 7) : max), "");
   const keys = nextMonthKeys(horizon, poslednyMesiacDat);
   const months: CashPred[] = keys.map((m) => ({ month: m, expected: 0, lo: 0, hi: 0 }));
-  const perClient: { name: string; kedy: string; suma: number; confidence: number }[] = [];
+  const perClient: { name: string; kedy: string; suma: number; confidence: number; tyzdnov: number }[] = [];
   const sixM = deriveSixM(data, clients);
   const sixMPhase: Record<string, SixMRow> = {};
   for (const r of sixM) sixMPhase[r.client] = r;
   const teraz = new Date();
+  const mesiacKluc = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 
   for (const c of Object.values(clients)) {
     if (c.status === "Neaktívny") continue;
@@ -868,44 +869,69 @@ export function predictCash(
     // Úvodný tréning nie je členstvo — nepredpovedaj podľa neho ďalšiu platbu.
     if (posledna.amount <= 1500 && platby.length > 1) continue;
 
-    // Export balíčkov je momentka a u klienta, ktorý dochádza staré hodiny, píše
-    // „Doplnenie členstva" aj vtedy, keď má v skutočnosti ročné členstvo. Vtedy
-    // je najlepším vodítkom výška poslednej platby: 77 239 Kč nie je dvojmesačný
-    // balíček. Bez toho by model čakal od Krčmára obnovu o dva mesiace, hoci
-    // ďalšia príde až o rok.
-    const nazovNehovori = !c.membership || c.membership.toLowerCase().includes("doplnenie");
-    const platnost = nazovNehovori
-      ? (posledna.amount >= 40000 ? 12 : posledna.amount >= 15000 ? 6 : platnostMesiacov(c.membership))
-      : platnostMesiacov(c.membership);
-    const d = new Date(posledna.date);
-    d.setMonth(d.getMonth() + platnost);
-    let kedy = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    // Termín už prešiel (napr. kvôli benevolencii alebo doplneniu členstva) —
-    // spadne do prvého predpovedaného mesiaca, ale s menšou istotou.
-    let doslaLehota = false;
-    if (kedy < keys[0]) { kedy = keys[0]; doslaLehota = true; }
+    // Tempo v hodinách za týždeň z posledných 90 dní. Bez neho sa nedá povedať
+    // nič — klient bez tréningov v poslednom štvrťroku nekupuje ďalší balíček.
+    const sedeni90 = c.sessions.filter((x) => daysBetween(x.date, teraz) <= 90).length;
+    const tempoTyzdenne = sedeni90 / 13;
+    if (tempoTyzdenne <= 0.05) continue;
 
-    const idx = keys.indexOf(kedy);
-    if (idx < 0) continue;
+    // Koľko hodín si naposledy kúpil — z ceny, nie z názvu balíčka. Názov je
+    // momentka a u klienta dochádzajúceho staré hodiny píše „Doplnenie
+    // členstva" aj pri ročnom členstve za 77 tisíc.
+    const cenaHodiny = c.paidAvg || 1150;
+    const hodinyKupene = Math.max(1, Math.min(100, posledna.amount / cenaHodiny));
+
+    // ── Jadro: platba nepríde podľa kalendára, ale keď dôjdu hodiny ──────────
+    // Šesťhodinový balíček s dvojmesačnou platnosťou minie klient chodiaci raz
+    // týždenne za šesť týždňov, nie za dva mesiace — a vtedy platí znova.
+    // Preto sa termín počíta zo ZOSTATKU a TEMPA, a platnosť je len strop:
+    // po nej hodiny prepadnú a ďalšia platba už nie je obnova, ale nová dohoda.
+    const zostatok = Math.max(0, c.packageRemaining);
+    const tyzdnovDoMinutia = zostatok / tempoTyzdenne;
+    const prvaObnova = new Date(teraz.getTime() + tyzdnovDoMinutia * 7 * 86400000);
+
+    const platnost = platnostMesiacov(c.membership);
+    const expiracia = new Date(posledna.date);
+    expiracia.setMonth(expiracia.getMonth() + platnost);
+    // Zostatok, ktorý sa do platnosti nestihne minúť, prepadne — vtedy je
+    // dátumom ďalšej platby koniec platnosti, nie dopočítané minutie.
+    const kedyDatum = prvaObnova > expiracia && c.membership && !c.membership.toLowerCase().includes("doplnenie")
+      ? expiracia
+      : prvaObnova;
+
+    // Dĺžka ďalšieho cyklu = koľko hodín si kupuje / ako rýchlo ich míňa.
+    const cyklusTyzdnov = Math.max(2, hodinyKupene / tempoTyzdenne);
 
     const is6m = c.clientType === "6M Predplatné";
     let confidence = is6m ? 0.9 : c.segment === "Anchor" ? 0.8 : c.segment === "Stabilný" ? 0.6 : 0.35;
     if (sixMPhase[c.name]?.phase === "Obnova" && sixMPhase[c.name]?.monthInPhase === 5) confidence = 0.7;
+    // Pravidelnosť dochádzky rozhoduje o tom, či sa dá termínu veriť. Kto chodí
+    // poctivo každý týždeň, minie šesť hodín naozaj za šesť týždňov; kto chodil
+    // pol roka ledabolo, to isté rozťahuje a termín je len zbožné prianie.
+    confidence *= 0.6 + 0.4 * Math.min(1, c.attendance / 0.7);
     if (daysBetween(c.lastSession, teraz) >= 30) confidence *= 0.5;   // ticho = riziko
-    if (doslaLehota) confidence *= 0.6;
 
-    // Mesačné členstvo sa obnovuje KAŽDÝ mesiac, nie raz za horizont. Bez tohto
-    // by druhý a tretí mesiac vychádzali umelo nízko — klient by v nich zmizol,
-    // hoci platí ďalej. Každá ďalšia obnova je ale menej istá než tá najbližšia.
-    let i = idx;
-    let konf = confidence;
-    while (i < months.length) {
-      months[i].expected += posledna.amount * konf;
-      months[i].lo += posledna.amount * Math.max(0, konf - 0.2);
-      months[i].hi += posledna.amount * Math.min(1, konf + 0.15);
-      if (i === idx) perClient.push({ name: c.name, kedy, suma: posledna.amount, confidence });
-      i += Math.max(1, platnost);
-      konf *= 0.85;
+    // Obnovy sa opakujú v rytme cyklu, každá ďalšia je o niečo menej istá.
+    const d = new Date(kedyDatum);
+    let konf = Math.max(0.05, Math.min(0.95, confidence));
+    let prva = true;
+    for (let guard = 0; guard < 24; guard++) {
+      const idx = keys.indexOf(mesiacKluc(d));
+      if (idx >= 0) {
+        months[idx].expected += posledna.amount * konf;
+        months[idx].lo += posledna.amount * Math.max(0, konf - 0.2);
+        months[idx].hi += posledna.amount * Math.min(1, konf + 0.15);
+        if (prva) {
+          perClient.push({
+            name: c.name, kedy: mesiacKluc(d), suma: posledna.amount,
+            confidence: konf, tyzdnov: Math.round(tyzdnovDoMinutia * 10) / 10,
+          });
+          prva = false;
+        }
+        konf *= 0.85;
+      }
+      d.setDate(d.getDate() + Math.round(cyklusTyzdnov * 7));
+      if (mesiacKluc(d) > keys[keys.length - 1]) break;
     }
   }
 
