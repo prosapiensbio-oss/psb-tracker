@@ -813,9 +813,17 @@ export type Prediction = {
 };
 
 // The next `n` FULL months, starting next month (forward-looking forecast).
-const nextMonthKeys = (n: number): string[] => {
+// Predpoveď má začínať tam, kde končia DÁTA, nie tam, kde končí kalendár.
+// Uzávierka je až prvý víkend nasledujúceho mesiaca, takže začiatkom mesiaca
+// ešte nie sú nahraté žiadne tréningy — a bez tohto by aktuálny mesiac vypadol
+// úplne: nebol by ani skutočnosť, ani odhad (2. 8. viedol graf júl → september).
+const nextMonthKeys = (n: number, poslednyZDat?: string): string[] => {
   const out: string[] = [];
-  const d = new Date();
+  const teraz = new Date();
+  const zaciatok = poslednyZDat && poslednyZDat < `${teraz.getFullYear()}-${String(teraz.getMonth() + 1).padStart(2, "0")}`
+    ? new Date(Number(poslednyZDat.slice(0, 4)), Number(poslednyZDat.slice(5, 7)) - 1, 1)
+    : teraz;
+  const d = zaciatok;
   d.setMonth(d.getMonth() + 1);
   for (let i = 0; i < n; i++) {
     out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
@@ -824,13 +832,79 @@ const nextMonthKeys = (n: number): string[] => {
   return out;
 };
 
+// ── predikcia PRIJATÝCH tržieb (peniaze, nie odpracované hodiny) ─────────────
+//
+// Tržby a zárobky sú dve rôzne veci a doteraz sa predpovedali rovnako naivne:
+// priemerom posledných mesiacov. Lenže peniaze nechodia rovnomerne — chodia,
+// keď niekomu skončí členstvo a kúpi si ďalšie. To je predvídateľné:
+//   posledná platba + platnosť členstva = kedy pravdepodobne príde ďalšia.
+//
+// Suma sa berie z POSLEDNEJ platby klienta, nie z cenníka. Je to elegantnejšie
+// aj presnejšie: posledná platba už v sebe nesie jeho zľavy — bitcoin, referral,
+// Jarkových 40 %, Dominikinu pätnástku — bez toho, aby ich model musel poznať.
+export type CashPred = { month: string; expected: number; lo: number; hi: number };
+
+export function predictCash(
+  data: PSBData,
+  clients: Record<string, ClientAgg>,
+  horizon = 3,
+): { months: CashPred[]; perClient: { name: string; kedy: string; suma: number; confidence: number }[] } {
+  const poslednyMesiacDat = data.payments.reduce((max, p) => (p.date.slice(0, 7) > max ? p.date.slice(0, 7) : max), "");
+  const keys = nextMonthKeys(horizon, poslednyMesiacDat);
+  const months: CashPred[] = keys.map((m) => ({ month: m, expected: 0, lo: 0, hi: 0 }));
+  const perClient: { name: string; kedy: string; suma: number; confidence: number }[] = [];
+  const sixM = deriveSixM(data, clients);
+  const sixMPhase: Record<string, SixMRow> = {};
+  for (const r of sixM) sixMPhase[r.client] = r;
+  const teraz = new Date();
+
+  for (const c of Object.values(clients)) {
+    if (c.status === "Neaktívny") continue;
+    const platby = data.payments
+      .filter((p) => p.client === c.name && p.amount > 0)
+      .sort((a, b) => a.date.localeCompare(b.date));
+    if (!platby.length) continue;
+    const posledna = platby[platby.length - 1];
+    // Úvodný tréning nie je členstvo — nepredpovedaj podľa neho ďalšiu platbu.
+    if (posledna.amount <= 1500 && platby.length > 1) continue;
+
+    const platnost = platnostMesiacov(c.membership);
+    const d = new Date(posledna.date);
+    d.setMonth(d.getMonth() + platnost);
+    let kedy = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    // Termín už prešiel (napr. kvôli benevolencii alebo doplneniu členstva) —
+    // spadne do prvého predpovedaného mesiaca, ale s menšou istotou.
+    let doslaLehota = false;
+    if (kedy < keys[0]) { kedy = keys[0]; doslaLehota = true; }
+
+    const idx = keys.indexOf(kedy);
+    if (idx < 0) continue;
+
+    const is6m = c.clientType === "6M Predplatné";
+    let confidence = is6m ? 0.9 : c.segment === "Anchor" ? 0.8 : c.segment === "Stabilný" ? 0.6 : 0.35;
+    if (sixMPhase[c.name]?.phase === "Obnova" && sixMPhase[c.name]?.monthInPhase === 5) confidence = 0.7;
+    if (daysBetween(c.lastSession, teraz) >= 30) confidence *= 0.5;   // ticho = riziko
+    if (doslaLehota) confidence *= 0.6;
+
+    months[idx].expected += posledna.amount * confidence;
+    months[idx].lo += posledna.amount * Math.max(0, confidence - 0.2);
+    months[idx].hi += posledna.amount * Math.min(1, confidence + 0.15);
+    perClient.push({ name: c.name, kedy, suma: posledna.amount, confidence });
+  }
+
+  for (const m of months) { m.expected = Math.round(m.expected); m.lo = Math.round(m.lo); m.hi = Math.round(m.hi); }
+  perClient.sort((a, b) => b.suma * b.confidence - a.suma * a.confidence);
+  return { months, perClient };
+}
+
 export function predictEarnings(
   data: PSBData,
   clients: Record<string, ClientAgg>,
   opts: { excludeSpecial: boolean; horizon?: number } = { excludeSpecial: false },
 ): Prediction {
   const horizon = opts.horizon ?? 3;
-  const monthsArr = nextMonthKeys(horizon).map((m) => ({ month: m, guaranteed: 0, expected: 0 }));
+  const poslednyMesiacDat = data.sessions.reduce((max, x) => (x.date.slice(0, 7) > max ? x.date.slice(0, 7) : max), "");
+  const monthsArr = nextMonthKeys(horizon, poslednyMesiacDat).map((m) => ({ month: m, guaranteed: 0, expected: 0 }));
   const sixM = deriveSixM(data, clients);
   const sixMPhase: Record<string, SixMRow> = {};
   for (const r of sixM) sixMPhase[r.client] = r;

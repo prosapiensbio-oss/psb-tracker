@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { monthlyFinance, predictEarnings, type ClientAgg } from "../../lib/psb/compute";
+import { monthlyFinance, predictCash, predictEarnings, type ClientAgg } from "../../lib/psb/compute";
 import { fmtCZK, monthLabel } from "../../lib/psb/format";
 import { C, S } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
@@ -33,7 +33,7 @@ export function Financie({ data, clients, focus }: { data: PSBData; clients: Rec
         value={sub}
         onChange={setSub}
       />
-      {sub === "trzby" && <Trzby monthly={monthly} />}
+      {sub === "trzby" && <Trzby monthly={monthly} data={data} clients={clients} />}
       {sub === "zarobky" && <Zarobky monthly={monthly} focusMonth={focusMonth} onClearFocus={() => setFocusMonth(null)} />}
       {sub === "sedenia" && <Sedenia monthly={monthly} />}
       {sub === "predikcia" && <Predikcia data={data} clients={clients} />}
@@ -188,7 +188,7 @@ function Zarobky({ monthly, focusMonth, onClearFocus }: { monthly: Monthly; focu
 // Tržby = money actually received per month (Payments Recorded) — what PTminder
 // shows as "Payments". Lumpy (clients pre-pay packages), so the forecast uses
 // trailing averages rather than the session run-rate.
-function Trzby({ monthly }: { monthly: Monthly }) {
+function Trzby({ monthly, data, clients }: { monthly: Monthly; data: PSBData; clients: Record<string, ClientAgg> }) {
   const { sort, toggle, sorted } = useSort({ key: "month", dir: "asc" });
   const w = useMonthWindow();
   const withMom = useMemo(
@@ -215,7 +215,11 @@ function Trzby({ monthly }: { monthly: Monthly }) {
     return s.length ? s.reduce((a, b) => a + b, 0) / s.length : 0;
   };
   const avg3 = avgOf(3), avg6 = avgOf(6), avg12 = avgOf(12);
-  const lo = Math.min(avg3, avg6), hi = Math.max(avg3, avg6);
+  // Predikcia z obnov členstiev — priemery zostávajú ako porovnanie, ale hlavné
+  // číslo je teraz bodový odhad: kto má kedy skončiť členstvo a koľko naposledy
+  // zaplatil.
+  const cashPred = useMemo(() => predictCash(data, clients, 2), [data, clients]);
+  const buduci = cashPred.months[0];
 
   return (
     <>
@@ -245,14 +249,19 @@ function Trzby({ monthly }: { monthly: Monthly }) {
       {monthly.length > 0 && (
         <Card>
           <H3>
-            <Info text="Tržby sú nepravidelné (jednorazové platby za balíčky), preto odhad vychádza z priemeru posledných mesiacov, nie z bodového výpočtu. Rozpätie = konzervatívny (nižší priemer) až optimistický (vyšší priemer)." label="Odhad tržieb (na ďalší mesiac)" />
+            <Info text="Peniaze nechodia rovnomerne — chodia, keď niekomu skončí členstvo a kúpi si ďalšie. Odhad preto ide klient po klientovi: posledná platba + platnosť jeho členstva = kedy pravdepodobne príde ďalšia, a suma sa berie z jeho POSLEDNEJ platby (tá už v sebe nesie jeho zľavy — bitcoin, referral, Jarek). Vážené dôverou obnovy; kto mlčí 30+ dní, má polovičnú. Priemery vedľa sú len na porovnanie — ukazujú, čo bolo, nie čo príde." label={`Odhad tržieb — ${monthLabel(buduci?.month || "")}`} />
           </H3>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, margin: "12px 0 6px" }}>
-            <StatCard value={fmtCZK(avg3)} label="Ø posledné 3 mes." color={C.accentLight} />
-            <StatCard value={fmtCZK(avg6)} label="Ø posledných 6 mes." color={C.blue} />
+            <StatCard value={fmtCZK(buduci?.expected || 0)} label={`Odhad · ${monthLabel(buduci?.month || "")}`} color={C.green} />
+            <StatCard value={`${fmtCZK(buduci?.lo || 0)} – ${fmtCZK(buduci?.hi || 0)}`} label="Rozpätie" color={C.accentLight} />
+            <StatCard value={fmtCZK(avg3)} label="Ø posledné 3 mes." color={C.blue} />
             <StatCard value={fmtCZK(avg12)} label="Ø celé obdobie" color={C.textMuted} />
-            <StatCard value={`${fmtCZK(lo)} – ${fmtCZK(hi)}`} label="Odhad tržieb / mesiac" color={C.green} />
           </div>
+          {cashPred.perClient.length > 0 && (
+            <div style={{ fontSize: 12, color: C.textMuted, marginTop: 8, lineHeight: 1.55 }}>
+              Najväčšie očakávané obnovy: {cashPred.perClient.slice(0, 4).map((x) => `«${x.name}» ${fmtCZK(x.suma)} (${Math.round(x.confidence * 100)} %)`).join(" · ")}
+            </div>
+          )}
         </Card>
       )}
 

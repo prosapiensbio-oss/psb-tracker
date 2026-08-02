@@ -5,6 +5,7 @@ import {
   membershipBucket,
   MEMBERSHIP_ORDER,
   monthlyFinance,
+  predictCash,
   predictEarnings,
   TARGET_H,
   ZONE_HI,
@@ -424,10 +425,10 @@ export function Dashboard({
     const pred = predictEarnings(data, clients, { excludeSpecial: false });
     const next2 = pred.months.slice(0, 2);
     if (earnMode === "prijate") {
-      // Tržby forecast = trailing 3-month cash average (payments are lumpy).
-      const cash = months.map((m) => m.cash).slice(-3);
-      const f = cash.length ? Math.round(cash.reduce((a, b) => a + b, 0) / cash.length) : 0;
-      for (const pm of next2) bars.push({ label: monthLabel(pm.month), value: f, forecast: true });
+      // Tržby chodia, keď niekomu skončí členstvo a kúpi si ďalšie — nie
+      // rovnomerne. Priemer posledných mesiacov to rozmazal na plocho.
+      const cash = predictCash(data, clients, 2);
+      for (const cm of cash.months) bars.push({ label: monthLabel(cm.month), value: cm.expected, forecast: true });
     } else if (trainer === "all") {
       // Vyfakturované forecast = run-rate model (only for both trainers combined).
       for (const pm of next2) bars.push({ label: monthLabel(pm.month), value: Math.round(pm.guaranteed + pm.expected), forecast: true });
