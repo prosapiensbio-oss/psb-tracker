@@ -140,10 +140,13 @@ export function buildReport(
     // ručne a report by potom hovoril o rozhodnutí, nie o skutočnosti. Tridsať
     // dní je tá istá hranica, akú používa signál „Prestal chodiť" na dashboarde.
     const dnes = new Date().toISOString().slice(0, 10);
+    // Klient na dohodnutej pauze neprestal chodiť — to je dohoda, nie strata.
+    // Keď pauza skončí a nepríde, spadne sem sám.
     const stratili = zoznam.filter(
       (c) =>
         c.lastSession &&
         vRozsahu(monthKey(c.lastSession), f) &&
+        !(c.pauseUntil && c.pauseUntil >= dnes) &&
         (Date.parse(dnes) - Date.parse(c.lastSession)) / 86400000 > 30,
     );
 
@@ -158,7 +161,7 @@ export function buildReport(
     out.push(`- **Aktívnych:** ${aktivni.length} z ${zoznam.length} evidovaných`);
     out.push(`- **V 6M procese:** ${sixM.length}`);
     out.push(`- **Pribudli v období:** ${novi.length}${novi.length && f.detail ? ` — ${novi.map((c) => c.name).join(", ")}` : ""}`);
-    out.push(`- **Prestali chodiť:** ${stratili.length}${stratili.length && f.detail ? ` — ${stratili.map((c) => c.name).join(", ")}` : ""}`);
+    out.push(`- **Prestali chodiť:** ${stratili.length}${stratili.length && f.detail ? ` — ${stratili.map((c) => c.name).join(", ")}` : ""} *(posledný tréning v období, odvtedy 30+ dní ticho; dohodnuté pauzy sa nerátajú)*`);
     out.push("");
     out.push(`**Podľa segmentu:** ${podla((c) => c.segment).map(([k, v]) => `${k} ${v}`).join(" · ")}`);
     out.push("");
