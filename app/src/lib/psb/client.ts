@@ -102,6 +102,8 @@ export async function saveVzasSetting(key: string, value: unknown): Promise<bool
   return r.ok;
 }
 
+export type BtcPlatba = { klient: string | null; datum: string; sats: number; czk: number | null };
+
 export type BtcReserve = {
   sats: number;
   czk: number | null;
@@ -109,14 +111,15 @@ export type BtcReserve = {
   rateUpdatedAt: string | null;
   goalSats: number | null;
   generatedAt: string;
+  platby?: BtcPlatba[];
 };
 
 // Two hops on purpose: our server signs a short-lived URL (it holds the shared
 // token), the browser then calls the Bitcoin app directly. Worker-to-worker
 // calls inside the platform time out, so this is the path that works.
-export async function fetchBtcReserve(): Promise<BtcReserve | null> {
+export async function fetchBtcReserve(sPlatbami = false): Promise<BtcReserve | null> {
   try {
-    const r = await fetch("/api/btc-reserve");
+    const r = await fetch(`/api/btc-reserve${sPlatbami ? "?platby=1" : ""}`);
     if (!r.ok) return null;
     const j = (await r.json()) as { ok?: boolean; url?: string };
     if (!j.ok || !j.url) return null;

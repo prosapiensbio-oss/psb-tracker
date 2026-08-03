@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { monthlyFinance, predictCash, predictEarnings, type ClientAgg } from "../../lib/psb/compute";
-import { fmtCZK, monthLabel } from "../../lib/psb/format";
+import { fetchBtcReserve, type BtcPlatba } from "../../lib/psb/client";
+import { fmtCZK, monthLabel, normName } from "../../lib/psb/format";
 import { C, S } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import type { NavFocus } from "./App";
@@ -188,6 +189,89 @@ function Zarobky({ monthly, focusMonth, onClearFocus }: { monthly: Monthly; focu
 // Tržby = money actually received per month (Payments Recorded) — what PTminder
 // shows as "Payments". Lumpy (clients pre-pay packages), so the forecast uses
 // trailing averages rather than the session run-rate.
+// Krížová kontrola bitcoinových platieb proti PTminderu.
+//
+// Zmysel nie je počítať tržby — tie sú z PTmindera. Zmysel je nájsť to, čo v
+// jednom mieste je a v druhom nie: platbu, ktorá dorazila a nikto ju nezapísal,
+// alebo zápis bez platby. Presne to sa stalo 2. 8.: v BTC appke bolo 75 425 Kč
+// od Krčmára a v PTminderi po nich nebola stopa — nebola to chyba, len ešte
+// nebola uzávierka. Práve preto sa tolerancia počíta v dňoch aj v korunách:
+// kurz medzi okamihom platby a prepočtom sa vždy trochu líši.
+function BtcKontrola({ data }: { data: PSBData }) {
+  const [stav, setStav] = useState<"nacitava" | "hotovo" | "chyba">("nacitava");
+  const [platby, setPlatby] = useState<BtcPlatba[]>([]);
+  useEffect(() => {
+    let zivy = true;
+    void fetchBtcReserve(true).then((r) => {
+      if (!zivy) return;
+      if (!r) { setStav("chyba"); return; }
+      setPlatby(r.platby || []);
+      setStav("hotovo");
+    });
+    return () => { zivy = false; };
+  }, []);
+
+  const porovnanie = useMemo(() => {
+    const TOLERANCIA_DNI = 4;
+    const TOLERANCIA_KC = 400;
+    const pt = data.payments.filter((p) => p.amount > 0);
+    const pouzite = new Set<number>();
+    const nesedi: { typ: string; text: string; tone: string }[] = [];
+    let sedi = 0;
+
+    for (const b of platby) {
+      if (!b.klient || b.czk == null) continue;
+      const cieľ = normName(b.klient);
+      let najdene = -1;
+      for (let i = 0; i < pt.length; i++) {
+        if (pouzite.has(i)) continue;
+        const p = pt[i];
+        if (normName(p.client) !== cieľ) continue;
+        const dni = Math.abs((new Date(p.date).getTime() - new Date(b.datum).getTime()) / 86400000);
+        if (dni > TOLERANCIA_DNI) continue;
+        najdene = i;
+        break;
+      }
+      if (najdene < 0) {
+        nesedi.push({ typ: "chýba v PTminderi", tone: "orange", text: `«${b.klient}» ${fmtCZK(b.czk)} z ${b.datum} — v BTC appke je, v PTminderi nie` });
+        continue;
+      }
+      pouzite.add(najdene);
+      const rozdiel = Math.abs(pt[najdene].amount - b.czk);
+      if (rozdiel > TOLERANCIA_KC) {
+        nesedi.push({ typ: "iná suma", tone: "blue", text: `«${b.klient}» ${b.datum}: BTC appka ${fmtCZK(b.czk)} vs PTminder ${fmtCZK(pt[najdene].amount)} — rozdiel ${fmtCZK(rozdiel)}` });
+      } else sedi++;
+    }
+    return { sedi, nesedi, spolu: platby.filter((p) => p.klient && p.czk != null).length };
+  }, [platby, data.payments]);
+
+  return (
+    <Card>
+      <H3><Info text="Porovnáva bitcoinové platby zapísané v appke prosapiens-btc s platbami v PTminderi. Zdrojom pravdy o tržbách zostáva PTminder — toto je len kontrola, či niečo nechýba. Tolerancia sú 4 dni a 400 Kč: kurz medzi okamihom platby a prepočtom sa vždy trochu líši. Rozdiel nemusí znamenať chybu — do uzávierky (prvý víkend nasledujúceho mesiaca) nemusí byť platba ešte zapísaná." label="Kontrola bitcoinových platieb" /></H3>
+      {stav === "nacitava" && <div style={{ fontSize: 12.5, color: C.textDim, padding: "6px 0" }}>Načítavam z BTC appky…</div>}
+      {stav === "chyba" && <Empty>BTC appka neodpovedala. Skús obnoviť stránku.</Empty>}
+      {stav === "hotovo" && (
+        <>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, margin: "12px 0 6px" }}>
+            <StatCard value={String(porovnanie.spolu)} label="BTC platieb spolu" color={C.blue} />
+            <StatCard value={String(porovnanie.sedi)} label="Sedí s PTminderom" color={C.green} />
+            <StatCard value={String(porovnanie.nesedi.length)} label="Na pozretie" color={porovnanie.nesedi.length ? C.orange : C.textMuted} />
+          </div>
+          {porovnanie.nesedi.length ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 8 }}>
+              {porovnanie.nesedi.map((n, i) => (
+                <div key={i} style={{ padding: "8px 11px", borderRadius: 8, background: n.tone === "orange" ? C.orangeBg : C.blueBg, fontSize: 12.5, color: C.text, lineHeight: 1.5 }}>{n.text}</div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ fontSize: 12.5, color: C.textMuted, marginTop: 8 }}>Všetky bitcoinové platby sedia s PTminderom 🌿</div>
+          )}
+        </>
+      )}
+    </Card>
+  );
+}
+
 function Trzby({ monthly, data, clients }: { monthly: Monthly; data: PSBData; clients: Record<string, ClientAgg> }) {
   const { sort, toggle, sorted } = useSort({ key: "month", dir: "asc" });
   const w = useMonthWindow();
@@ -264,6 +348,8 @@ function Trzby({ monthly, data, clients }: { monthly: Monthly; data: PSBData; cl
           )}
         </Card>
       )}
+
+      <BtcKontrola data={data} />
 
       <Card>
         <div style={{ fontSize: 11, color: C.textDim, marginBottom: 8 }}>Zdroj: Payments Recorded. Zoradené najstaršie → najnovšie.</div>

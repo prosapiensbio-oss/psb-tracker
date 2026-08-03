@@ -30,7 +30,12 @@ export const Route = createFileRoute("/api/btc-reserve")({
         if (!token) return Response.json({ ok: false, error: "no_token" });
         const exp = Date.now() + TTL_MS;
         const sig = await sign(token, `exp=${exp}`);
-        return Response.json({ ok: true, url: `${SOURCE}?exp=${exp}&sig=${sig}` });
+        // ?platby=1 pridá zoznam bitcoinových platieb klientov na krížovú
+        // kontrolu proti PTminderu. Podpis je ten istý — parameter nie je
+        // súčasťou podpisovanej správy, lebo nič neodomyká, len rozširuje odpoveď.
+        const chcePlatby = new URL(request.url).searchParams.get("platby") === "1";
+        const zaklad = `${SOURCE}?exp=${exp}&sig=${sig}`;
+        return Response.json({ ok: true, url: chcePlatby ? `${zaklad}&platby=1` : zaklad });
       },
     },
   },
