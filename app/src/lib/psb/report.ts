@@ -135,13 +135,17 @@ export function buildReport(
     );
     const aktivni = zoznam.filter((c) => c.status !== "Neaktívny");
     const novi = zoznam.filter((c) => vRozsahu(monthKey(c.firstSession), f));
-    // „Prestal chodiť" = posledné sedenie padlo do obdobia, ale odvtedy nič.
-    // Zámerne sa neopiera o status: ten sa dá prepísať ručne a report by potom
-    // hovoril o rozhodnutí, nie o skutočnosti.
-    const koniecObdobia = `${f.doM}-31`;
+    // „Prestal chodiť" = posledné sedenie padlo do obdobia a odvtedy ubehlo
+    // viac ako 30 dní. Zámerne sa to neopiera o status: ten sa dá prepísať
+    // ručne a report by potom hovoril o rozhodnutí, nie o skutočnosti. Tridsať
+    // dní je tá istá hranica, akú používa signál „Prestal chodiť" na dashboarde.
+    const dnes = new Date().toISOString().slice(0, 10);
     const stratili = zoznam.filter(
-      (c) => c.lastSession && vRozsahu(monthKey(c.lastSession), f) && c.lastSession < koniecObdobia && !data.sessions.some((s) => s.client === c.name && s.date > c.lastSession),
-    ).filter((c) => c.status === "Neaktívny");
+      (c) =>
+        c.lastSession &&
+        vRozsahu(monthKey(c.lastSession), f) &&
+        (Date.parse(dnes) - Date.parse(c.lastSession)) / 86400000 > 30,
+    );
 
     const podla = (fn: (c: ClientAgg) => string) => {
       const m: Record<string, number> = {};
