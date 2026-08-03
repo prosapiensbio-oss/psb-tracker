@@ -141,6 +141,19 @@ export function protistranaZPopisu(popis: string): string {
   return popis.slice(0, 40).trim();
 }
 
+/**
+ * Vyzerá text ako bankový výpis? Rozhoduje sa to na klientovi, aby upload vedel
+ * súbor poslať tam, kam patrí: výpis z PTmindera sa dá nahrať naslepo, výpis
+ * z banky nie — každý výdavok potrebuje kategóriu a na účte sú aj súkromné veci.
+ */
+export function jeBankovyVypis(text: string): boolean {
+  const h = text.slice(0, 1500).toLowerCase();
+  if (h.includes("objem") && h.includes("datum")) return true;
+  if (h.includes("zpráva pro příjemce") || h.includes("protiúčet")) return true;
+  // Textová podoba z internetbankingu: aspoň dva pohyby v tvare dátum + suma.
+  return (text.match(/\d{1,2}\.\d{1,2}\.\d{4}\s*-?[\d\s\u00a0]+,\d{2}\s*CZK/g) || []).length >= 2;
+}
+
 export function parseFio(text: string, pravidla: { vzor: string; kategoria: string }[] = []): FioParse {
   const riadky = text.split(/\r?\n/).filter((l) => l.trim());
   if (!riadky.length) return { ok: false, chyba: "Súbor je prázdny.", ukazka: [] };

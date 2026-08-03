@@ -17,11 +17,13 @@ import {
   type SixMRow,
 } from "../../lib/psb/compute";
 import { fmtCZK, fmtDMY, monthLabel, weekKey, weekLabel } from "../../lib/psb/format";
+import { jeBankovyVypis } from "../../lib/psb/fio";
 import { C, MEMBERSHIP_COLORS, mix, S, badge, btn } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import type { IngestResult } from "../../lib/psb/db.server";
 import type { Actions, NavFocus } from "./App";
 import { AssistantInline, type AssistantChat } from "./Assistant";
+import { BankovyImport } from "./Banka";
 import { SessionTrend } from "./SessionTrend";
 import { ThemeSwitch } from "./ThemeSwitch";
 import { Card, Donut, Empty, H3, Info, StatCard, StatGrid, ValueBars, ZoneBars } from "./ui";
@@ -850,17 +852,30 @@ function UploadCard({ data, missing, actions }: { data: PSBData; missing: typeof
   const [busy, setBusy] = useState(false);
   // Collapsed by default — CSV can also be uploaded via the AI assistant. Auto-open when reports are missing.
   const [open, setOpen] = useState(missing.length > 0);
+  // Bankový výpis sa nedá nahrať naslepo: každý výdavok potrebuje kategóriu a na
+  // účte sú aj súkromné veci. Preto JEDNO miesto na nahrávanie, ale dve
+  // správania — výpis z PTmindera sa zapíše hneď, výpis z banky otvorí náhľad
+  // rovno tu. Dve samostatné obrazovky boli len zbytočné blúdenie.
+  const [bankovyText, setBankovyText] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleFiles = async (fileList: FileList | null) => {
     if (!fileList || !fileList.length) return;
     setBusy(true);
     const files: { filename: string; text: string }[] = [];
-    for (const f of Array.from(fileList)) files.push({ filename: f.name, text: await f.text() });
-    const res = await actions.ingest(files);
-    setUploadResult(res);
+    const bankove: string[] = [];
+    for (const f of Array.from(fileList)) {
+      const text = await f.text();
+      if (jeBankovyVypis(text)) bankove.push(text);
+      else files.push({ filename: f.name, text });
+    }
+    if (bankove.length) setBankovyText(bankove.join("\n"));
+    if (files.length) {
+      const res = await actions.ingest(files);
+      setUploadResult(res);
+      setTimeout(() => setUploadResult(null), 9000);
+    }
     setBusy(false);
-    setTimeout(() => setUploadResult(null), 9000);
   };
 
   return (
@@ -884,9 +899,17 @@ function UploadCard({ data, missing, actions }: { data: PSBData; missing: typeof
       >
         <div style={{ fontSize: 24, marginBottom: 6 }}>⬆</div>
         <div style={{ color: C.text }}>{busy ? "Spracúvam…" : "Pretiahni CSV súbory sem alebo klikni"}</div>
-        <div style={{ fontSize: 12, color: C.textDim, marginTop: 6 }}>Automaticky rozpozná typ. Duplicity preskočí, históriu zachová.</div>
+        <div style={{ fontSize: 12, color: C.textDim, marginTop: 6 }}>
+          PTminder aj bankový výpis z Fio. Typ rozpozná sám; duplicity preskočí, históriu zachová.
+          Bankový výpis sa najprv ukáže na kontrolu.
+        </div>
       </div>
-      <input ref={inputRef} type="file" accept=".csv" multiple style={{ display: "none" }} onChange={(e) => { void handleFiles(e.target.files); e.target.value = ""; }} />
+      <input ref={inputRef} type="file" accept=".csv,.txt" multiple style={{ display: "none" }} onChange={(e) => { void handleFiles(e.target.files); e.target.value = ""; }} />
+      {bankovyText && (
+        <div style={{ marginTop: 12 }}>
+          <BankovyImport vstup={bankovyText} onHotovo={() => { setBankovyText(""); void actions.refresh(); }} />
+        </div>
+      )}
       {uploadResult && (
         <div style={{ marginTop: 12 }}>
           {uploadResult.map((r, i) => (

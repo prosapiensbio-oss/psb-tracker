@@ -148,7 +148,11 @@ export function PSBApp() {
       },
       ingest: async (files) => {
         const res = await ingestFiles(files);
-        await load();
+        // Ticho. Neticho by zaplo celoobrazovkové „Načítavam…", ktoré odmontuje
+        // celý strom — a s ním aj kartu uploadu, jej rozbalený stav a pozíciu
+        // scrollu. Po nahratí to vyzeralo, akoby appka skočila na začiatok a
+        // upload sa sám zabalil; pritom sa len prekreslila od nuly.
+        await load(true);
         return res;
       },
       reset: async () => {

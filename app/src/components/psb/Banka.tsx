@@ -1,10 +1,10 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { fmtCZK } from "../../lib/psb/format";
 import { MIMO_PNL, VYPLATY, type FioRiadok } from "../../lib/psb/fio";
 import { C, mix, S } from "../../lib/psb/theme";
 import { PNL } from "../../lib/psb/vzas";
-import { Card, Empty, H3, Info, TableWrap } from "./ui";
+import { Card, H3, Info, TableWrap } from "./ui";
 
 // Import bankového výpisu — s náhľadom, nie naslepo.
 //
@@ -31,14 +31,18 @@ function kategorie(): { value: string; label: string }[] {
   return out;
 }
 
-export function Banka() {
-  const [text, setText] = useState("");
+export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: () => void }) {
   const [nahlad, setNahlad] = useState<Nahlad[] | null>(null);
   const [chyba, setChyba] = useState<{ chyba: string; ukazka: string[] } | null>(null);
   const [vysledok, setVysledok] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
   const KAT = useMemo(kategorie, []);
+
+  // Náhľad sa načíta hneď, ako príde nový text — komponent sa objaví až vtedy,
+  // keď používateľ pustí bankový výpis do uploadu.
+  useEffect(() => {
+    if (vstup && vstup.trim().length > 20) void nacitajNahlad(vstup);
+  }, [vstup]);
 
   const nacitajNahlad = async (obsah: string) => {
     setBusy(true); setChyba(null); setVysledok(null);
@@ -62,7 +66,8 @@ export function Banka() {
     setBusy(false);
     if (r.ok) {
       setVysledok(`Zapísané: ${r.pridane} pohybov${r.preskocene ? `, ${r.preskocene} už v databáze bolo` : ""}${r.zamknute ? `, ${r.zamknute} odmietnutých (uzavretý mesiac)` : ""}. Naučených pravidiel: ${r.pravidla}.`);
-      setNahlad(null); setText("");
+      setNahlad(null);
+      onHotovo?.();
     } else setVysledok("Zápis sa nepodaril.");
   };
 
@@ -84,35 +89,12 @@ export function Banka() {
   return (
     <>
       <Card>
-        <H3><Info text="Prijme oba tvary výpisu z Fio: CSV „Pohyby na všech účtech“ aj text skopírovaný z internetbankingu (funguje aj text z PDF). Nič sa nezapíše hneď — najprv uvidíš, čo appka pochopila, a kategórie sa dajú prepnúť. Čo zaradíš, to si zapamätá ako pravidlo a nabudúce navrhne sama." label="Import z banky" /></H3>
-        <div style={{ fontSize: 12.5, color: C.textMuted, margin: "6px 0 12px", lineHeight: 1.55 }}>
+        <H3><Info text="Nič sa nezapíše hneď — najprv uvidíš, čo appka z výpisu pochopila, a kategórie sa dajú prepnúť. Čo zaradíš, to si zapamätá ako pravidlo a nabudúce navrhne sama. Rozumie CSV „Pohyby na všech účtech“ aj textu skopírovanému z internetbankingu." label="Bankový výpis — náhľad pred zápisom" /></H3>
+        <div style={{ fontSize: 12.5, color: C.textMuted, margin: "6px 0 0", lineHeight: 1.55 }}>
           Účet nie je čisto firemný — sú na ňom aj potraviny, taxíky a výplaty. Preto má každý riadok kategóriu
           a dva koše mimo P&L: <b>Výplaty zakladateľov</b> a <b>Mimo P&L — súkromné</b>. Čo sa dá, appka zaradí sama;
           zvyšok zaradíš raz a už sa to nebude pýtať.
         </div>
-        <input
-          ref={fileRef} type="file" accept=".csv,.txt,text/csv,text/plain" style={{ display: "none" }}
-          onChange={async (e) => {
-            const f = e.target.files?.[0];
-            e.target.value = "";
-            if (f) { const t = await f.text(); setText(t); void nacitajNahlad(t); }
-          }}
-        />
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
-          <button onClick={() => fileRef.current?.click()} disabled={busy}
-            style={{ padding: "8px 14px", borderRadius: 8, border: `1px solid ${mix(C.accent, 45)}`, background: mix(C.accent, 10), color: C.accentLight, fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>
-            Vybrať súbor (CSV alebo text)
-          </button>
-          <button onClick={() => void nacitajNahlad(text)} disabled={busy || text.trim().length < 20}
-            style={{ padding: "8px 14px", borderRadius: 8, border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted, fontSize: 12.5, cursor: "pointer" }}>
-            Načítať z vloženého textu
-          </button>
-        </div>
-        <textarea
-          value={text} onChange={(e) => setText(e.target.value)}
-          placeholder="…alebo sem vlož skopírované pohyby z internetbankingu"
-          style={{ ...S.input, minHeight: 90, resize: "vertical", fontFamily: "ui-monospace, monospace", fontSize: 11.5 }}
-        />
         {busy && <div style={{ fontSize: 12.5, color: C.textDim, marginTop: 8 }}>Spracúvam…</div>}
         {vysledok && <div style={{ marginTop: 10, padding: "9px 12px", borderRadius: 8, background: mix(C.green, 12), color: C.text, fontSize: 12.5 }}>{vysledok}</div>}
         {chyba && (
@@ -190,11 +172,6 @@ export function Banka() {
         </Card>
       )}
 
-      {!nahlad && !busy && (
-        <Card>
-          <Empty>Vyber výpis alebo vlož text a uvidíš náhľad. Nič sa nezapíše, kým to nepotvrdíš.</Empty>
-        </Card>
-      )}
     </>
   );
 }
