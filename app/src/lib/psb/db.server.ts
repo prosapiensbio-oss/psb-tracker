@@ -3,7 +3,7 @@ import type { D1Database } from "@cloudflare/workers-types";
 
 import { audit, jeZamknuty, zamknuteMesiace } from "./audit.server";
 import { normName } from "./format";
-import { parseAnamneza, parseCennik, parseGa4, parseGsc, parseMetricool } from "./parse";
+import { parseAnamneza, parseCennik, parseGa4, parseGsc, parseKanaly, parseMetricool } from "./parse";
 import {
   detectCSVType,
   parsePackages,
@@ -269,6 +269,22 @@ export async function ingest(DB: D1Database, filename: string, text: string, act
         "INSERT INTO raw_uploads (id, filename, kind, content, bytes, dedup_key, uploaded_at) VALUES (?1,?2,?3,?4,?5,?6,?7)",
       ).bind(uid(), filename, type, text.slice(0, 4_000_000), text.length, kluc, new Date().toISOString()).run();
       if (type !== "metricool" && type !== "ga4" && type !== "gsc") added = 1;
+    }
+  } else if (type === "kanaly") {
+    // Mesačná zostava zo všetkých kanálov. Nahratie toho istého mesiaca prepíše
+    // predošlé — je to snímka, nie prírastok.
+    const riadky = parseKanaly(text);
+    if (riadky.length) {
+      const now = new Date().toISOString();
+      const stmts = riadky.map((r) =>
+        DB.prepare(
+          `INSERT INTO kanaly_mesiace (mesiac, kanal, metrika, hodnota, zmena, poznamka, updated_at)
+           VALUES (?1,?2,?3,?4,?5,?6,?7)
+           ON CONFLICT(mesiac, kanal, metrika) DO UPDATE SET hodnota=?4, zmena=?5, poznamka=?6, updated_at=?7`,
+        ).bind(r.mesiac, r.kanal, r.metrika, r.hodnota, r.zmena, r.poznamka, now),
+      );
+      for (let i = 0; i < stmts.length; i += 40) await DB.batch(stmts.slice(i, i + 40));
+      added = riadky.length;
     }
   } else if (type === "anamneza") {
     // Z anamnézy sa berie jediná vec: odkiaľ sa klient o PSB dozvedel. Zdravotná

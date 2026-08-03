@@ -21,7 +21,7 @@ export const Route = createFileRoute("/api/marketing")({
         const { DB } = bindings();
         if (!DB) return Response.json({ ok: false, mesacne: [], top: [] });
         try {
-          const [mes, top, ga4, gscM, gscD, gscS] = await Promise.all([
+          const [mes, top, ga4, gscM, gscD, gscS, kan] = await Promise.all([
             DB.prepare(
               `SELECT mesiac,
                       SUM(CASE WHEN druh = 'reel'  THEN 1 ELSE 0 END) AS reels,
@@ -42,6 +42,7 @@ export const Route = createFileRoute("/api/marketing")({
             DB.prepare("SELECT * FROM gsc_mesiace ORDER BY mesiac").all().catch(() => ({ results: [] })),
             DB.prepare("SELECT * FROM gsc_dopyty ORDER BY kliky DESC LIMIT 60").all().catch(() => ({ results: [] })),
             DB.prepare("SELECT * FROM gsc_strany ORDER BY kliky DESC LIMIT 40").all().catch(() => ({ results: [] })),
+            DB.prepare("SELECT mesiac, kanal, metrika, hodnota, zmena, poznamka FROM kanaly_mesiace ORDER BY mesiac DESC, kanal, metrika").all().catch(() => ({ results: [] })),
           ]);
           return Response.json({
             ok: true,
@@ -80,11 +81,17 @@ export const Route = createFileRoute("/api/marketing")({
               url: r.url, kliky: Number(r.kliky) || 0, zobrazenia: Number(r.zobrazenia) || 0,
               ctr: Number(r.ctr) || 0, pozicia: Number(r.pozicia) || 0,
             })),
+            kanaly: (kan.results as Record<string, unknown>[]).map((r) => ({
+              mesiac: r.mesiac, kanal: r.kanal, metrika: r.metrika,
+              hodnota: Number(r.hodnota) || 0,
+              zmena: r.zmena == null ? null : Number(r.zmena),
+              poznamka: r.poznamka || "",
+            })),
           });
         } catch {
           // Tabuľka ešte nie je (staršia migrácia) — obrazovka si vystačí s tým,
           // čo má v kóde.
-          return Response.json({ ok: false, mesacne: [], top: [], ga4: [], gscMesacne: [], gscDopyty: [], gscStrany: [] });
+          return Response.json({ ok: false, mesacne: [], top: [], ga4: [], gscMesacne: [], gscDopyty: [], gscStrany: [], kanaly: [] });
         }
       },
     },

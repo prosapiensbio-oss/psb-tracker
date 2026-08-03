@@ -161,6 +161,9 @@ export function detectCSVType(text: string): CSVType | null {
   // Anamnéza z Google formulára. Kotva je otázka o zdroji — je to jediný stĺpec,
   // ktorý appka z tohto exportu naozaj potrebuje, a zároveň sa nevyskytuje inde.
   if (h.includes("dozvěděli") || h.includes("časová pečiatka")) return "anamneza";
+
+  // Mesačná zostava za všetky kanály — vlastný formát, viď parseKanaly.
+  if (/mesiac\s*,\s*kan[aá]l\s*,\s*metrika/.test(h) || /mesiac\s*,\s*platforma\s*,\s*metrika/.test(h)) return "kanaly";
   return null;
 }
 
@@ -623,4 +626,57 @@ export function parseGsc(text: string): GscImport {
     return { kluc: (p[0] || "").trim(), kliky: parseFloat(p[1]) || 0, zobrazenia: parseFloat(p[2]) || 0, ctr: pct(p[3]), pozicia: parseFloat(p[4]) || 0 };
   }).filter((x) => x.kluc);
   return riadky.length ? { druh, riadky } : null;
+}
+
+// ── Mesačné čísla za všetky kanály ───────────────────────────────────────────
+//
+// Metricool posiela mesačnú zostavu ako PDF a to sa strojovo čítať nedá (text
+// je v podmnožinách fontov, čísla sú vykreslené do grafov). Jerry ju prečíta
+// Claudom a uloží ako jednoduchú tabuľku — appka číta tú.
+//
+// Formát je zámerne najhlúpejší, aký môže byť:
+//
+//   mesiac,kanal,metrika,hodnota,zmena
+//   2026-07,Instagram,Followers,1518,2.02
+//   2026-07,Meta Ads,Spent,4795.91,154.96
+//
+// Štyri stĺpce prežijú aj to, keď Metricool budúci rok premenuje polovicu
+// metrík. Tabuľka so stĺpcom na každú metriku by potrebovala migráciu.
+export type KanalRiadok = { mesiac: string; kanal: string; metrika: string; hodnota: number; zmena: number | null; poznamka: string };
+
+/** „226 400" aj „4 795,91" aj „+93.76%" → číslo. */
+const cisloZTabulky = (s: string | undefined): number | null => {
+  if (s == null) return null;
+  const t = String(s).replace(/[\s  ]/g, "").replace("%", "").replace(/^\+/, "").replace(",", ".");
+  if (!t || !/^-?\d*\.?\d+$/.test(t)) return null;
+  const n = parseFloat(t);
+  return isFinite(n) ? n : null;
+};
+
+export function parseKanaly(text: string): KanalRiadok[] {
+  const rows = csvZaznamy(text);
+  if (rows.length < 2) return [];
+  const head = rows[0].map((h) => h.replace(/^﻿/, "").trim().toLowerCase());
+  const i = (...f: string[]) => head.findIndex((h) => f.some((x) => h === x || h.includes(x)));
+  const iM = i("mesiac"), iK = i("kanal", "kanál", "platforma"), iMe = i("metrika"), iH = i("hodnota"), iZ = i("zmena");
+  if (iM < 0 || iK < 0 || iMe < 0 || iH < 0) return [];
+
+  const out: KanalRiadok[] = [];
+  for (const r of rows.slice(1)) {
+    const mesiac = (r[iM] || "").trim().slice(0, 7);
+    if (!/^\d{4}-\d{2}$/.test(mesiac)) continue;
+    const kanal = (r[iK] || "").trim().slice(0, 40);
+    const metrika = (r[iMe] || "").trim().slice(0, 60);
+    const hodnota = cisloZTabulky(r[iH]);
+    if (!kanal || !metrika || hodnota == null) continue;
+    out.push({
+      mesiac, kanal, metrika, hodnota,
+      zmena: iZ >= 0 ? cisloZTabulky(r[iZ]) : null,
+      // Rebríčky (kampane, stránky, konkurencia) potrebujú aj text — názov
+      // kampane sa do „metriky" nezmestí zmysluplne, ale zahodiť ho by bola
+      // škoda.
+      poznamka: (r[head.findIndex((h) => h.includes("poznámka") || h.includes("poznamka"))] || "").trim().slice(0, 200),
+    });
+  }
+  return out;
 }
