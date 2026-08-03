@@ -26,7 +26,10 @@ export const Route = createFileRoute("/api/wishlist")({
         if (!DB) return Response.json({ ok: false, polozky: [] });
         try {
           const rs = await DB.prepare(
-            "SELECT id, nazov, cena, link, kupene, kupene_at, poznamka, poradie, kategoria FROM wishlist ORDER BY kategoria, kupene, poradie, nazov",
+            // Radí sa podľa poradia, nie podľa názvu kategórie — inak by abeceda dala
+            // Kurzy pred Vybavenie a v Exceli je to opačne. Zoskupenie a odsun
+            // kúpených nadol si robí obrazovka sama.
+            "SELECT id, nazov, cena, link, kupene, kupene_at, poznamka, poradie, kategoria FROM wishlist ORDER BY poradie, nazov",
           ).all();
           return Response.json({
             ok: true,
