@@ -730,6 +730,8 @@ const ICON_PATHS: Record<string, ReactNode> = {
   calendar: (<><rect x="3" y="4.2" width="18" height="16.8" rx="2" /><path d="M16 2.2v4M8 2.2v4M3 9.2h18" /></>),
   userCheck: (<><path d="M15 21v-1.8a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4V21" /><circle cx="8.5" cy="7.5" r="3.8" /><path d="m16.5 11.5 2 2 4-4" /></>),
   wallet: (<><rect x="3" y="6" width="18" height="13" rx="2.2" /><path d="M3 10.2h18" /><circle cx="16.6" cy="13.6" r="1.4" /></>),
+  // Šípka do priehradky — nahrávanie a obsluha dát.
+  upload: (<><path d="M21 15v4.4A1.6 1.6 0 0 1 19.4 21H4.6A1.6 1.6 0 0 1 3 19.4V15" /><path d="m7.5 9 4.5-4.5L16.5 9" /><path d="M12 4.5v10.8" /></>),
   activity: (<path d="M22 12h-4l-3 8.5L9 3.5l-3 8.5H2" />),
 };
 

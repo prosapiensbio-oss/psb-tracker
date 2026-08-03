@@ -60,7 +60,6 @@ import {
 import { Card, Empty, H3, Info, LineChart, Select, StatCard, SubTabs, useScrollEnd } from "./ui";
 import { Nakupy } from "./Nakupy";
 import { Report } from "./Report";
-import { Uzavierky } from "./Uzavierky";
 
 const MONTHS = VZAS_MONTH_LABELS;
 const money = (n: number) => (n === 0 ? "—" : fmtCZK(n).replace(" CZK", ""));
@@ -2203,7 +2202,6 @@ export function Vzas({ sub, onSub }: { sub: string; onSub: (s: string) => void }
           { id: "cashflow", label: "Cashflow" },
           { id: "jarek", label: "Jarek dlh" },
           { id: "nakupy", label: "Nákupy" },
-          { id: "uzavierky", label: "Uzávierky" },
         ]}
         value={sub}
         onChange={onSub}
@@ -2213,7 +2211,6 @@ export function Vzas({ sub, onSub }: { sub: string; onSub: (s: string) => void }
       {sub === "cashflow" && <CashflowTab />}
       {sub === "jarek" && <JarekTab />}
       {sub === "nakupy" && <Nakupy />}
-      {sub === "uzavierky" && <Uzavierky />}
     </>
   );
 }
@@ -2222,7 +2219,7 @@ export function Vzas({ sub, onSub }: { sub: string; onSub: (s: string) => void }
 // cashflow, dlhy), kým Výsledky odpovedajú na inú otázku — ako mi to ide voči
 // tomu, čo som si predsavzal. KPI a Ciele už dávno nie sú len o peniazoch.
 export function Vysledky({
-  data, onNavigate, clients, sixM, capacity, register,
+  data, onNavigate, clients, sixM, capacity, register, sub, onSub,
 }: {
   data: PSBData;
   onNavigate?: (tab: string) => void;
@@ -2230,8 +2227,10 @@ export function Vysledky({
   sixM: SixMRow[];
   capacity: CapacityRow[];
   register: RegisterItem[];
+  sub: string;
+  onSub: (s: string) => void;
 }) {
-  const [sub, setSub] = useState("kvartalne");
+  const setSub = onSub;
   return (
     <>
       <SubTabs

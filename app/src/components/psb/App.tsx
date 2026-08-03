@@ -31,6 +31,8 @@ import { Financie } from "./Financie";
 import { SixMTracker } from "./SixM";
 import { Marketing } from "./Marketing";
 import { Vysledky, Vzas } from "./Vzas";
+import { Udaje } from "./Udaje";
+import { HladanieKlienta } from "./Hladanie";
 
 export type Actions = {
   setOverride: (name: string, key: keyof ClientOverride, value: unknown) => void;
@@ -53,6 +55,11 @@ const TABS = [
   { id: "marketing", label: "Marketing", icon: "activity" },
   { id: "vzas", label: "VZAS", icon: "wallet" },
   { id: "vysledky", label: "Výsledky", icon: "calendar" },
+  // Údaje sú posledné a zámerne mimo príbehu: nie je to pohľad na štúdio, je to
+  // obsluha appky — nahrávanie, uzávierky, audit, kontá, záloha, vzhľad, reset.
+  // Predtým to viselo pod Dashboardom, kde to pod aktuálnou situáciou nemá čo
+  // robiť; uzávierky prišli z VZAS, lebo nie sú o peniazoch, ale o dátach.
+  { id: "udaje", label: "Údaje", icon: "upload" },
 ];
 
 const TRACKER_SECTIONS = [
@@ -71,10 +78,55 @@ export function PSBApp() {
   const [active, setActive] = useState("dashboard");
   const [trackerSection, setTrackerSection] = useState("treningy");
   const [vzasSub, setVzasSub] = useState("pnl");
+  const [vysledkySub, setVysledkySub] = useState("kvartalne");
   const [treningySub, setTreningySub] = useState("prehled");
   const [treningyFocus, setTreningyFocus] = useState<NavFocus | null>(null);
   const [financieFocus, setFinancieFocus] = useState<NavFocus | null>(null);
   const [klientiFocus, setKlientiFocus] = useState<NavFocus | null>(null);
+
+  // Kde som — v adrese, nie len v hlave appky.
+  //
+  // Doteraz appka po obnovení stránky vždy skončila na Dashboarde. Znamenalo to,
+  // že sa nedal poslať odkaz („pozri sa na Jarkov dlh"), nefungovalo tlačidlo
+  // späť a po každom nasadení sa človek musel preklikať tam, kde bol. Adresa je
+  // najlacnejšia pamäť, akú prehliadač má.
+  //
+  // Formát je #zalozka/podzalozka, napr. #tracker/klienti alebo #vzas/jarek.
+  const cestaZoStavu = () => {
+    if (active === "tracker") return `#tracker/${trackerSection}${trackerSection === "treningy" ? `/${treningySub}` : ""}`;
+    if (active === "vzas") return `#vzas/${vzasSub}`;
+    if (active === "vysledky") return `#vysledky/${vysledkySub}`;
+    return `#${active}`;
+  };
+
+  const nastavZCesty = useCallback((hash: string) => {
+    const [zal, pod, pod2] = hash.replace(/^#\/?/, "").split("/").filter(Boolean);
+    if (!zal) return;
+    if (!TABS.some((t) => t.id === zal)) return;
+    setActive(zal);
+    if (zal === "tracker" && pod && TRACKER_IDS.includes(pod)) {
+      setTrackerSection(pod);
+      if (pod === "treningy" && pod2) setTreningySub(pod2);
+    }
+    if (zal === "vzas" && pod) setVzasSub(pod);
+    if (zal === "vysledky" && pod) setVysledkySub(pod);
+  }, []);
+
+  // Pri štarte a pri tlačidle späť čítame z adresy.
+  useEffect(() => {
+    nastavZCesty(window.location.hash);
+    const h = () => nastavZCesty(window.location.hash);
+    window.addEventListener("hashchange", h);
+    return () => window.removeEventListener("hashchange", h);
+  }, [nastavZCesty]);
+
+  // Pri prepínaní zapisujeme. replaceState, nie pushState: každé kliknutie na
+  // podzáložku by inak pridalo krok do histórie a tlačidlo späť by sa muselo
+  // stláčať desaťkrát, kým by človek opustil appku.
+  useEffect(() => {
+    const c = cestaZoStavu();
+    if (window.location.hash !== c) window.history.replaceState(null, "", c);
+  }); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Navigate to a tab, optionally to a focused week/month/client. Dashboard
   // click-throughs still pass the old section ids (treningy/klienti/…), so map
@@ -199,7 +251,8 @@ export function PSBApp() {
           <div style={{ fontSize: 20, fontWeight: 800, color: C.accent, letterSpacing: -0.3 }}>Tracker</div>
           <div style={{ fontSize: 11, fontWeight: 500, color: C.textMuted, letterSpacing: 0.2 }}>ProSapiens Biomechanic</div>
         </div>
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+          <HladanieKlienta clients={clients} onPick={(meno) => navigate("klienti", undefined, { client: meno, nonce: Date.now() })} />
           {ktoSom && ktoSom !== "app" && (
             <span style={{ fontSize: 12, color: C.textMuted }} title="Pod týmto menom sa zapisujú zmeny do auditu">
               {ktoSom.charAt(0).toUpperCase() + ktoSom.slice(1)}
@@ -270,7 +323,8 @@ export function PSBApp() {
 
         {active === "marketing" && <Marketing data={data} clients={clients} leads={data.leads} chat={chat} />}
         {active === "vzas" && <Vzas sub={vzasSub} onSub={setVzasSub} />}
-        {active === "vysledky" && <Vysledky data={data} onNavigate={navigate} clients={clients} sixM={sixM} capacity={capacity} register={register} />}
+        {active === "vysledky" && <Vysledky data={data} onNavigate={navigate} clients={clients} sixM={sixM} capacity={capacity} register={register} sub={vysledkySub} onSub={setVysledkySub} />}
+        {active === "udaje" && <Udaje data={data} actions={actions} />}
       </div>
       <div style={{ ...S.h3, textAlign: "center", color: C.textDim, fontSize: 11, padding: "8px 0 24px", fontWeight: 400 }}>
         ProSapiens Biomechanic · interný nástroj · nezdieľať externe
