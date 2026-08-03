@@ -23,6 +23,7 @@ import { Route as ApiResetRouteImport } from './routes/api/reset'
 import { Route as ApiRawUploadsRouteImport } from './routes/api/raw-uploads'
 import { Route as ApiPeriodsRouteImport } from './routes/api/periods'
 import { Route as ApiOverrideRouteImport } from './routes/api/override'
+import { Route as ApiMarketingRouteImport } from './routes/api/marketing'
 import { Route as ApiLogoutRouteImport } from './routes/api/logout'
 import { Route as ApiLoginRouteImport } from './routes/api/login'
 import { Route as ApiLeadsRouteImport } from './routes/api/leads'
@@ -106,6 +107,11 @@ const ApiOverrideRoute = ApiOverrideRouteImport.update({
   path: '/api/override',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiMarketingRoute = ApiMarketingRouteImport.update({
+  id: '/api/marketing',
+  path: '/api/marketing',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiLogoutRoute = ApiLogoutRouteImport.update({
   id: '/api/logout',
   path: '/api/logout',
@@ -183,6 +189,7 @@ export interface FileRoutesByFullPath {
   '/api/leads': typeof ApiLeadsRoute
   '/api/login': typeof ApiLoginRoute
   '/api/logout': typeof ApiLogoutRoute
+  '/api/marketing': typeof ApiMarketingRoute
   '/api/override': typeof ApiOverrideRoute
   '/api/periods': typeof ApiPeriodsRoute
   '/api/raw-uploads': typeof ApiRawUploadsRoute
@@ -211,6 +218,7 @@ export interface FileRoutesByTo {
   '/api/leads': typeof ApiLeadsRoute
   '/api/login': typeof ApiLoginRoute
   '/api/logout': typeof ApiLogoutRoute
+  '/api/marketing': typeof ApiMarketingRoute
   '/api/override': typeof ApiOverrideRoute
   '/api/periods': typeof ApiPeriodsRoute
   '/api/raw-uploads': typeof ApiRawUploadsRoute
@@ -240,6 +248,7 @@ export interface FileRoutesById {
   '/api/leads': typeof ApiLeadsRoute
   '/api/login': typeof ApiLoginRoute
   '/api/logout': typeof ApiLogoutRoute
+  '/api/marketing': typeof ApiMarketingRoute
   '/api/override': typeof ApiOverrideRoute
   '/api/periods': typeof ApiPeriodsRoute
   '/api/raw-uploads': typeof ApiRawUploadsRoute
@@ -270,6 +279,7 @@ export interface FileRouteTypes {
     | '/api/leads'
     | '/api/login'
     | '/api/logout'
+    | '/api/marketing'
     | '/api/override'
     | '/api/periods'
     | '/api/raw-uploads'
@@ -298,6 +308,7 @@ export interface FileRouteTypes {
     | '/api/leads'
     | '/api/login'
     | '/api/logout'
+    | '/api/marketing'
     | '/api/override'
     | '/api/periods'
     | '/api/raw-uploads'
@@ -326,6 +337,7 @@ export interface FileRouteTypes {
     | '/api/leads'
     | '/api/login'
     | '/api/logout'
+    | '/api/marketing'
     | '/api/override'
     | '/api/periods'
     | '/api/raw-uploads'
@@ -355,6 +367,7 @@ export interface RootRouteChildren {
   ApiLeadsRoute: typeof ApiLeadsRoute
   ApiLoginRoute: typeof ApiLoginRoute
   ApiLogoutRoute: typeof ApiLogoutRoute
+  ApiMarketingRoute: typeof ApiMarketingRoute
   ApiOverrideRoute: typeof ApiOverrideRoute
   ApiPeriodsRoute: typeof ApiPeriodsRoute
   ApiRawUploadsRoute: typeof ApiRawUploadsRoute
@@ -468,6 +481,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiOverrideRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/marketing': {
+      id: '/api/marketing'
+      path: '/api/marketing'
+      fullPath: '/api/marketing'
+      preLoaderRoute: typeof ApiMarketingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/logout': {
       id: '/api/logout'
       path: '/api/logout'
@@ -571,6 +591,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiLeadsRoute: ApiLeadsRoute,
   ApiLoginRoute: ApiLoginRoute,
   ApiLogoutRoute: ApiLogoutRoute,
+  ApiMarketingRoute: ApiMarketingRoute,
   ApiOverrideRoute: ApiOverrideRoute,
   ApiPeriodsRoute: ApiPeriodsRoute,
   ApiRawUploadsRoute: ApiRawUploadsRoute,

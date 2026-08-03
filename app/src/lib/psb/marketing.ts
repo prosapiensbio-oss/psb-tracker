@@ -23,7 +23,7 @@ export type MktMesiac = {
 
 export type MktKus = { m: string; typ: "reel" | "post"; hook: string; views: number; ulozenia: number; viewRate: number };
 
-export const MKT_MESACNE: MktMesiac[] = [
+export let MKT_MESACNE: MktMesiac[] = [
   { m: "2025-01", reels: 3, posty: 1, stories: 16, views: 3430, dosah: 3178, ulozenia: 9, zdielania: 5, spend: 700, viewRate: 34.4 },
   { m: "2025-02", reels: 2, posty: 2, stories: 66, views: 3815, dosah: 7004, ulozenia: 6, zdielania: 2, spend: 400, viewRate: 38.0 },
   { m: "2025-03", reels: 4, posty: 1, stories: 85, views: 3670, dosah: 7553, ulozenia: 9, zdielania: 5, spend: 300, viewRate: 37.0 },
@@ -44,7 +44,7 @@ export const MKT_MESACNE: MktMesiac[] = [
   { m: "2026-06", reels: 6, posty: 4, stories: 61, views: 5233, dosah: 6686, ulozenia: 16, zdielania: 7, spend: 2696, viewRate: 33.9 },
 ];
 
-export const MKT_TOP: MktKus[] = [
+export let MKT_TOP: MktKus[] = [
   { m: "2026-05", typ: "post", hook: "Když se řekne bránice, většina lidí si představí nádech a výdech. Sval, který se pohybuje ", views: 689, ulozenia: 9, viewRate: 0 },
   { m: "2025-05", typ: "reel", hook: "Jarek je s námi od úplného začátku. Přišel ve chvíli, kdy už vyzkoušel všechno – silový tr", views: 1251, ulozenia: 8, viewRate: 50.7 },
   { m: "2025-06", typ: "post", hook: "💡 STRES a TVOJE DRŽENÍ TĚLA – VÍC SOUVISÍ, NEŽ SI MYSLÍŠ!", views: 1154, ulozenia: 6, viewRate: 0 },
@@ -214,3 +214,26 @@ export const MKT_CLANKY: MktClanok[] = [
   { rok: "2026", nazov: "Mechanotransdukce – Jak síly formují vaše tělo", zobrazenia: 51 },
   { rok: "2026", nazov: "Superficial Front Line (SFL) - Povrchová Přední Linie", zobrazenia: 49 },
 ];
+
+
+// ── Živé dáta z importu ──────────────────────────────────────────────────────
+//
+// Čísla vyššie sú jednorazový prepis z Metricoolu — appka o marketingu vedela
+// presne toľko, koľko som do nej raz prepísal, a každý ďalší mesiac by musel
+// niekto prepísať znova.
+//
+// Keď sa nahrá export, nahradia sa. Prepisuje sa premenná modulu a nie stav
+// komponentu zámerne: MKT_MESACNE číta desať miest naprieč obrazovkou Marketing
+// a preťahovať to všade cez props by znamenalo prepísať celý súbor kvôli jednej
+// vete. ESM export je živá väzba, takže priradenie tu vidia všetci.
+//
+// Kým sa nič nenahrá, zostáva pôvodný prepis — obrazovka nikdy nie je prázdna.
+export let MKT_ZDROJ: "kod" | "import" = "kod";
+
+export function nastavMarketingZImportu(mesacne: MktMesiac[], top: MktKus[]): boolean {
+  if (!mesacne.length) return false;
+  MKT_MESACNE = mesacne;
+  if (top.length) MKT_TOP = top;
+  MKT_ZDROJ = "import";
+  return true;
+}

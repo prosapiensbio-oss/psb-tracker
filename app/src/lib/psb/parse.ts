@@ -412,3 +412,104 @@ export function parseAnamneza(text: string): AnamnezaRiadok[] {
   }
   return out;
 }
+
+// ── Metricool ────────────────────────────────────────────────────────────────
+//
+// Tri tvary exportu (posty, reels, stories) s trochu inými hlavičkami. Namiesto
+// troch parserov jeden, ktorý si stĺpce nájde podľa názvu — Metricool ich
+// premenúva medzi verziami a pevné poradie by sa raz ticho rozsypalo.
+export type MktPrispevok = {
+  id: string;
+  druh: "reel" | "post" | "story";
+  datum: string;
+  mesiac: string;
+  url: string;
+  hook: string;
+  views: number;
+  dosah: number;
+  ulozenia: number;
+  zdielania: number;
+  komentare: number;
+  lajky: number;
+  spend: number;
+  viewRate: number;
+};
+
+const cislo = (s: string | undefined): number => {
+  if (!s) return 0;
+  const n = parseFloat(String(s).replace(/\s/g, "").replace(",", "."));
+  return isFinite(n) ? n : 0;
+};
+
+/** „2026-05-18 15:42" aj „2026-05-18T…" → ISO deň. */
+const denZDatumu = (s: string | undefined): string => {
+  const t = (s || "").trim();
+  const m = t.match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  const d = new Date(t);
+  return isNaN(d.getTime()) ? "" : d.toISOString().slice(0, 10);
+};
+
+export function parseMetricool(text: string): MktPrispevok[] {
+  const rows = csvZaznamy(text);
+  if (rows.length < 2) return [];
+  const head = rows[0].map((h) => h.replace(/^﻿/, "").trim().toLowerCase());
+  const col = (...frag: string[]) => {
+    for (const f of frag) {
+      const i = head.findIndex((h) => h === f);
+      if (i >= 0) return i;
+    }
+    for (const f of frag) {
+      const i = head.findIndex((h) => h.includes(f));
+      if (i >= 0) return i;
+    }
+    return -1;
+  };
+  const at = (r: string[], i: number) => (i >= 0 ? r[i] || "" : "");
+
+  // Druh sa pozná podľa stĺpcov, nie podľa názvu súboru — ten si používateľ
+  // premenuje alebo stiahne dvakrát ako „(1)".
+  const jeReel = head.includes("% view rate (+3 secs)") || head.some((h) => h.includes("avg watch time"));
+  const jeStory = head.some((h) => h.includes("taps forward")) || head.some((h) => h.includes("taps back"));
+  const druh: MktPrispevok["druh"] = jeStory ? "story" : jeReel ? "reel" : "post";
+
+  const iId = col("id");
+  const iUrl = col("url", "post url");
+  const iDatum = col("date", "timestamp");
+  const iHook = col("title", "content");
+  const iViews = col("views (organic)", "views", "impressions (organic)");
+  const iDosah = col("reach (organic)");
+  const iUloz = col("saved (organic)", "saved");
+  const iZdiel = col("shares (organic)", "shares", "reposts");
+  const iKom = col("comments (organic)", "comments", "replies");
+  const iLajk = col("likes (organic)", "likes");
+  const iSpend = col("spend");
+  const iVr = col("% view rate (+3 secs)");
+
+  const out: MktPrispevok[] = [];
+  for (const r of rows.slice(1)) {
+    const datum = denZDatumu(at(r, iDatum));
+    if (!datum) continue;
+    // Stories nemajú Id — kľúčom je URL. Bez stabilného kľúča by každý ďalší
+    // export pridal tie isté príspevky znova.
+    const id = (at(r, iId) || at(r, iUrl)).trim();
+    if (!id) continue;
+    out.push({
+      id,
+      druh,
+      datum,
+      mesiac: datum.slice(0, 7),
+      url: at(r, iUrl).trim(),
+      hook: at(r, iHook).replace(/\s+/g, " ").trim().slice(0, 300),
+      views: Math.round(cislo(at(r, iViews))),
+      dosah: Math.round(cislo(at(r, iDosah))),
+      ulozenia: Math.round(cislo(at(r, iUloz))),
+      zdielania: Math.round(cislo(at(r, iZdiel))),
+      komentare: Math.round(cislo(at(r, iKom))),
+      lajky: Math.round(cislo(at(r, iLajk))),
+      spend: cislo(at(r, iSpend)),
+      viewRate: cislo(at(r, iVr)),
+    });
+  }
+  return out;
+}

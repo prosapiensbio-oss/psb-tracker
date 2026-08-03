@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { fmtCZK } from "../../lib/psb/format";
 import {
@@ -13,8 +13,12 @@ import {
   MKT_MESACNE,
   MKT_TOP,
   mktSum,
+  MKT_ZDROJ,
+  nastavMarketingZImportu,
   type GscDopyt,
   type GscStrana,
+  type MktKus,
+  type MktMesiac,
 } from "../../lib/psb/marketing";
 import { KATEGORIE_HOOKOV, MKT_OBSAH } from "../../lib/psb/marketing-obsah";
 import { C, mix, S } from "../../lib/psb/theme";
@@ -687,6 +691,18 @@ function Vyhladavanie({ chat }: { chat?: AssistantChat }) {
 export function Marketing({ data, clients, leads, chat }: { data: PSBData; clients: Record<string, ClientAgg>; leads: Lead[]; chat?: AssistantChat }) {
   const [sub, setSub] = useState("prehlad");
   const [rok, setRok] = useState("2026");
+  // Nahraté exporty vyhrávajú nad číslami v kóde. Načíta sa raz pri otvorení;
+  // `tik` je len na to, aby sa obrazovka po výmene prekreslila — samotné dáta
+  // žijú v module, lebo ich číta desať miest naprieč touto obrazovkou.
+  const [, tik] = useState(0);
+  useEffect(() => {
+    void fetch("/api/marketing", { credentials: "same-origin" })
+      .then((r) => r.json())
+      .then((j: { mesacne?: MktMesiac[]; top?: MktKus[] }) => {
+        if (nastavMarketingZImportu(j.mesacne || [], j.top || [])) tik((x) => x + 1);
+      })
+      .catch(() => {});
+  }, []);
   // The header used to sum all 18 months no matter which year was selected —
   // the switch looked broken because the summary never moved.
   const vRoku = MKT_MESACNE.filter((r) => r.m.startsWith(rok));
@@ -708,7 +724,7 @@ export function Marketing({ data, clients, leads, chat }: { data: PSBData; clien
       <Card>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <div>
-            <H3><Info text="Zatiaľ kostra. Čísla sú jednorazový export z Metricoolu, GA4 a Search Console (jan 2025 – jún/júl 2026); importér pribudne, aby sa to aktualizovalo samo ako PTminder. Prepínač rokov riadi ročné karty (web, články, návratnosť); karty o obsahu a vyhľadávaní majú vlastné okno, lebo sa hýbu inou rýchlosťou." label="Marketing" /></H3>
+            <H3><Info text="Instagramové čísla sa berú z nahratých Metricool exportov (Údaje → Upload CSV: posty, reels aj stories). Kým sa nič nenahrá, ukazuje sa jednorazový prepis z Metricoolu za jan 2025 – jún 2026. GA4 a Search Console sú zatiaľ stále ten jednorazový export. Prepínač rokov riadi ročné karty (web, články, návratnosť); karty o obsahu a vyhľadávaní majú vlastné okno, lebo sa hýbu inou rýchlosťou." label="Marketing" /></H3>
             <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>
               {vRoku.length} mesiacov {rok} · {suma("posty")} postov · {suma("reels")} reels · {num(suma("stories"))} stories · reklama {fmtCZK(suma("spend"))}
               <span style={{ color: C.textDim }}> · spolu za 18 mes. {fmtCZK(mktSum("spend"))}</span>

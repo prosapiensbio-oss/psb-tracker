@@ -3,7 +3,7 @@ import type { D1Database } from "@cloudflare/workers-types";
 
 import { audit, jeZamknuty, zamknuteMesiace } from "./audit.server";
 import { normName } from "./format";
-import { parseAnamneza, parseCennik } from "./parse";
+import { parseAnamneza, parseCennik, parseMetricool } from "./parse";
 import {
   detectCSVType,
   parsePackages,
@@ -201,16 +201,37 @@ export async function ingest(DB: D1Database, filename: string, text: string, act
     }
     if (stmts.length) await DB.batch(stmts);
   } else if (type === "metricool" || type === "ga4" || type === "gsc") {
-    // Uloží sa surovo. Nekreslí sa to zatiaľ nikde, ale nič sa nestratí — a to
-    // je pri Metricoole časovo obmedzená vec.
+    // Metricool sa už aj spracúva: jeden riadok = jeden príspevok. Mesačné súčty
+    // sa počítajú z nich, nie naopak — z uloženého agregátu sa už nedá zistiť,
+    // ktorý reel to ťahal.
+    //
+    // Surová kópia sa ukladá aj tak. Formát exportu sa mení a keď sa raz ukáže,
+    // že sa niečo parsovalo zle, pôvodný súbor je jediné, z čoho sa to dá
+    // opraviť — a Metricool ho po čase už nevydá.
+    if (type === "metricool") {
+      const prispevky = parseMetricool(text);
+      if (prispevky.length) {
+        const now = new Date().toISOString();
+        const stmts = prispevky.map((x) =>
+          DB.prepare(
+            `INSERT INTO mkt_prispevky (id, druh, datum, mesiac, url, hook, views, dosah, ulozenia, zdielania, komentare, lajky, spend, view_rate, updated_at)
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15)
+             ON CONFLICT(id) DO UPDATE SET druh=?2, datum=?3, mesiac=?4, url=?5, hook=?6, views=?7, dosah=?8,
+               ulozenia=?9, zdielania=?10, komentare=?11, lajky=?12, spend=?13, view_rate=?14, updated_at=?15`,
+          ).bind(x.id, x.druh, x.datum, x.mesiac, x.url, x.hook, x.views, x.dosah, x.ulozenia, x.zdielania, x.komentare, x.lajky, x.spend, x.viewRate, now),
+        );
+        for (let i = 0; i < stmts.length; i += 40) await DB.batch(stmts.slice(i, i + 40));
+        added = prispevky.length;
+      }
+    }
     const kluc = `${type}|${filename}|${text.length}`;
     const uz = await DB.prepare("SELECT id FROM raw_uploads WHERE dedup_key = ?1").bind(kluc).first();
-    if (uz) skipped = 1;
+    if (uz) skipped += 1;
     else {
       await DB.prepare(
         "INSERT INTO raw_uploads (id, filename, kind, content, bytes, dedup_key, uploaded_at) VALUES (?1,?2,?3,?4,?5,?6,?7)",
       ).bind(uid(), filename, type, text.slice(0, 4_000_000), text.length, kluc, new Date().toISOString()).run();
-      added = 1;
+      if (type !== "metricool") added = 1;
     }
   } else if (type === "anamneza") {
     // Z anamnézy sa berie jediná vec: odkiaľ sa klient o PSB dozvedel. Zdravotná
