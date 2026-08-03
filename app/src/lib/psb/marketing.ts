@@ -230,9 +230,21 @@ export const MKT_CLANKY: MktClanok[] = [
 // Kým sa nič nenahrá, zostáva pôvodný prepis — obrazovka nikdy nie je prázdna.
 export let MKT_ZDROJ: "kod" | "import" = "kod";
 
+/** Mesiace, ktoré prišli z importu — v tabuľkách sa dajú odlíšiť od prepisu. */
+export const MKT_IMPORTOVANE = new Set<string>();
+
 export function nastavMarketingZImportu(mesacne: MktMesiac[], top: MktKus[]): boolean {
   if (!mesacne.length) return false;
-  MKT_MESACNE = mesacne;
+  // Zlučuje sa po mesiacoch, nenahrádza sa celá séria. Keby sa nahradila, jeden
+  // nahratý súbor za júl by zmazal osemnásť mesiacov histórie z grafu — a keby
+  // sa naopak sčítavali, ten istý mesiac by mal dva zdroje a číslo by bolo
+  // nezmyselné. Takto má každý mesiac práve jeden zdroj a nahratý vyhráva.
+  const podla = new Map(MKT_MESACNE.map((m) => [m.m, m]));
+  for (const m of mesacne) {
+    podla.set(m.m, m);
+    MKT_IMPORTOVANE.add(m.m);
+  }
+  MKT_MESACNE = [...podla.values()].sort((a, b) => a.m.localeCompare(b.m));
   if (top.length) MKT_TOP = top;
   MKT_ZDROJ = "import";
   return true;
