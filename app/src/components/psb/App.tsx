@@ -270,7 +270,7 @@ export function PSBApp() {
 
         {active === "marketing" && <Marketing data={data} clients={clients} leads={data.leads} chat={chat} />}
         {active === "vzas" && <Vzas sub={vzasSub} onSub={setVzasSub} />}
-        {active === "vysledky" && <Vysledky data={data} onNavigate={navigate} />}
+        {active === "vysledky" && <Vysledky data={data} onNavigate={navigate} clients={clients} sixM={sixM} capacity={capacity} register={register} />}
       </div>
       <div style={{ ...S.h3, textAlign: "center", color: C.textDim, fontSize: 11, padding: "8px 0 24px", fontWeight: 400 }}>
         ProSapiens Biomechanic · interný nástroj · nezdieľať externe

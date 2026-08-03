@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { fetchBtcReserve, fetchMonthNotes, fetchVzasSettings, fetchWeekEntries, saveMonthNote, saveVzasSetting, type BtcReserve, type MonthNote, type WeekEntry } from "../../lib/psb/client";
+import type { CapacityRow, ClientAgg, RegisterItem, SixMRow } from "../../lib/psb/compute";
 import { fmtCZK } from "../../lib/psb/format";
 import { C, mix, S } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
@@ -58,6 +59,7 @@ import {
 } from "../../lib/psb/vzas";
 import { Card, Empty, H3, Info, LineChart, Select, StatCard, SubTabs, useScrollEnd } from "./ui";
 import { Nakupy } from "./Nakupy";
+import { Report } from "./Report";
 import { Uzavierky } from "./Uzavierky";
 
 const MONTHS = VZAS_MONTH_LABELS;
@@ -2219,7 +2221,16 @@ export function Vzas({ sub, onSub }: { sub: string; onSub: (s: string) => void }
 // Výsledky stojí vedľa VZAS, nie v ňom: VZAS je účtovná pravda (P&L, výplaty,
 // cashflow, dlhy), kým Výsledky odpovedajú na inú otázku — ako mi to ide voči
 // tomu, čo som si predsavzal. KPI a Ciele už dávno nie sú len o peniazoch.
-export function Vysledky({ data, onNavigate }: { data: PSBData; onNavigate?: (tab: string) => void }) {
+export function Vysledky({
+  data, onNavigate, clients, sixM, capacity, register,
+}: {
+  data: PSBData;
+  onNavigate?: (tab: string) => void;
+  clients: Record<string, ClientAgg>;
+  sixM: SixMRow[];
+  capacity: CapacityRow[];
+  register: RegisterItem[];
+}) {
   const [sub, setSub] = useState("kvartalne");
   return (
     <>
@@ -2229,6 +2240,7 @@ export function Vysledky({ data, onNavigate }: { data: PSBData; onNavigate?: (ta
           { id: "mesacne", label: "Mesačné" },
           { id: "kpi", label: "KPI" },
           { id: "ciele", label: "Ciele" },
+          { id: "report", label: "Report" },
         ]}
         value={sub}
         onChange={setSub}
@@ -2237,6 +2249,7 @@ export function Vysledky({ data, onNavigate }: { data: PSBData; onNavigate?: (ta
       {sub === "mesacne" && <MesacneTab />}
       {sub === "kpi" && <KpiTab data={data} onNavigate={onNavigate} />}
       {sub === "ciele" && <CieleTab data={data} />}
+      {sub === "report" && <Report data={data} clients={clients} sixM={sixM} capacity={capacity} register={register} />}
     </>
   );
 }
