@@ -633,7 +633,7 @@ export function Dashboard({
                 ? `${c.packageRemaining}/${c.packageTotal} hodín`
                 : doKonca < 0 ? `platnosť vypršala ${fmtDMY(c.packageValidTo)}`
                 : doKonca === 0 ? "platnosť končí dnes"
-                : `platnosť do ${fmtDMY(c.packageValidTo)} · ${doKonca} dní`;
+                : `platnosť do ${fmtDMY(c.packageValidTo)} · ${doKonca} ${doKonca < 5 ? "dni" : "dní"}`;
               return (
                 <button key={c.name} onClick={() => onNavigate("klienti", undefined, { client: c.name, nonce: Date.now() })} title={`${c.name} — ${c.membership || "—"} · ${c.primaryTrainer}`} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 10px", background: mix(C.text, 4), border: `1px solid ${C.border}`, borderRadius: 9, cursor: "pointer", textAlign: "left", width: "100%", minWidth: 0 }}>
                   <span style={{ ...badge(naliehave ? "red" : "orange"), fontSize: 10, flexShrink: 0 }}>
