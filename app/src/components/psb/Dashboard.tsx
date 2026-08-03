@@ -28,12 +28,20 @@ import { SessionTrend } from "./SessionTrend";
 import { ThemeSwitch } from "./ThemeSwitch";
 import { Card, Donut, Empty, H3, Info, StatCard, StatGrid, ValueBars, ZoneBars } from "./ui";
 
+// Zdroj `banka` nie je v PSBData — bankové pohyby žijú vo vlastnej tabuľke a
+// načítavajú sa až na obrazovke, kde treba. V zozname je preto zvlášť: nie je
+// z PTmindera, ale je to piaty súbor, bez ktorého appka nevie, kam idú peniaze.
 const REPORTS: { key: keyof PSBData; label: string; path: string }[] = [
-  { key: "sessions", label: "Payroll by Session", path: "Payroll Reports › By Session" },
-  { key: "services", label: "Payroll by Service", path: "Payroll Reports › By Service" },
-  { key: "payments", label: "Payments Recorded", path: "Financial Reports › Payments Recorded" },
-  { key: "packages", label: "Packages & Memberships", path: "General Reports › Packages & Memberships" },
+  { key: "sessions", label: "Payroll by Session", path: "PTminder → Payroll Reports › By Session" },
+  { key: "services", label: "Payroll by Service", path: "PTminder → Payroll Reports › By Service" },
+  { key: "payments", label: "Payments Recorded", path: "PTminder → Financial Reports › Payments Recorded" },
+  { key: "packages", label: "Packages & Memberships", path: "PTminder → General Reports › Packages & Memberships (všetky 4 pohľady)" },
 ];
+
+const BANKA_ZDROJ = {
+  label: "Fio banka — pohyby",
+  path: "Fio → Výpisy a reporty › Pohyby na všech účtech (CSV), alebo text z internetbankingu",
+};
 
 const catTone = (c: RegisterItem["category"]) =>
   c === "6M" ? "accent" : c === "Kapacita" ? "blue" : c === "Rozhodnutie" ? "blue" : "orange";
@@ -857,6 +865,19 @@ function UploadCard({ data, missing, actions }: { data: PSBData; missing: typeof
   // správania — výpis z PTmindera sa zapíše hneď, výpis z banky otvorí náhľad
   // rovno tu. Dve samostatné obrazovky boli len zbytočné blúdenie.
   const [bankovyText, setBankovyText] = useState("");
+  // Stav bankových pohybov sa nedá prečítať z PSBData — má vlastnú tabuľku.
+  const [bankaStav, setBankaStav] = useState<{ pocet: number; posledny: string } | null>(null);
+  useEffect(() => {
+    void fetch("/api/fio", { credentials: "same-origin" })
+      .then((r) => r.json())
+      .then((j) => {
+        const p = (j.pohyby || []) as { datum: string }[];
+        setBankaStav({ pocet: p.length, posledny: p.reduce((m, x) => (x.datum > m ? x.datum : m), "") });
+      })
+      .catch(() => setBankaStav({ pocet: 0, posledny: "" }));
+  }, [bankovyText]);
+  const bankaNahrata = (bankaStav?.pocet || 0) > 0;
+  const bankaInfo = bankaStav?.posledny ? `dáta do ${fmtDMY(bankaStav.posledny)}` : "";
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleFiles = async (fileList: FileList | null) => {
@@ -881,7 +902,7 @@ function UploadCard({ data, missing, actions }: { data: PSBData; missing: typeof
   return (
     <Card>
       <div onClick={() => setOpen((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-        <div style={{ ...S.h3, marginBottom: 0 }}>Upload CSV z PTmindera</div>
+        <div style={{ ...S.h3, marginBottom: 0 }}>Upload CSV</div>
         {missing.length > 0 && <span style={{ ...badge("orange"), fontSize: 10 }}>{missing.length} chýba</span>}
         <span style={{ marginLeft: "auto", fontSize: 12, color: C.textDim }}>{open ? "▲" : "▼ rozbaliť"}</span>
       </div>
@@ -920,7 +941,7 @@ function UploadCard({ data, missing, actions }: { data: PSBData; missing: typeof
         </div>
       )}
       <div style={{ marginTop: 14, padding: 12, background: mix(C.accent, 6), borderRadius: 8 }}>
-        <div style={{ fontSize: 12, color: C.textMuted, fontWeight: 600, marginBottom: 8 }}>Potrebné CSV z PTmindera (kde ich nájdeš · aktuálnosť):</div>
+        <div style={{ fontSize: 12, color: C.textMuted, fontWeight: 600, marginBottom: 8 }}>Potrebné CSV (kde ich nájdeš · aktuálnosť):</div>
         {REPORTS.map((r) => {
           const arr = (data[r.key] as { date?: string }[]) || [];
           const present = arr.length > 0;
@@ -939,13 +960,23 @@ function UploadCard({ data, missing, actions }: { data: PSBData; missing: typeof
               <span>
                 <strong style={{ color: C.text }}>{r.label}</strong>
                 {info && <span style={{ color: present ? C.accentLight : C.textDim, fontWeight: 500 }}> · {info}</span>}
-                <br /><span style={{ color: C.textDim }}>PTminder → {r.path}</span>
+                <br /><span style={{ color: C.textDim }}>{r.path}</span>
               </span>
             </div>
           );
         })}
+        <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 5, display: "flex", gap: 8, marginTop: 2 }}>
+          <span style={{ color: bankaNahrata ? C.green : C.orange, flexShrink: 0 }}>{bankaNahrata ? "✓" : "✗"}</span>
+          <span>
+            <strong style={{ color: C.text }}>{BANKA_ZDROJ.label}</strong>
+            {bankaInfo && <span style={{ color: C.accentLight, fontWeight: 500 }}> · {bankaInfo}</span>}
+            <br /><span style={{ color: C.textDim }}>{BANKA_ZDROJ.path}</span>
+          </span>
+        </div>
         <div style={{ fontSize: 11, color: C.textDim, marginTop: 8, lineHeight: 1.5 }}>
-          Packages report môže PTminder dávať po častiach (podľa typu balíčka) — nahraj všetky časti, každá sa bezpečne pripočíta po klientovi. Rovnaký súbor nič nezduplikuje.
+          Packages report dáva PTminder v štyroch pohľadoch (šablóny balíčkov, šablóny členstiev, balíčky klientov,
+          členstvá klientov) — nahraj všetky, každý nesie niečo iné a ten posledný má aj platnosť členstva.
+          Rovnaký súbor nič nezduplikuje.
         </div>
       </div>
       </div>
