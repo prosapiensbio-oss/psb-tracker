@@ -1,8 +1,9 @@
-import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
+import { Fragment, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { fetchBtcReserve, fetchMonthNotes, fetchVzasSettings, fetchWeekEntries, saveMonthNote, saveVzasSetting, type BtcReserve, type MonthNote, type WeekEntry } from "../../lib/psb/client";
 import type { CapacityRow, ClientAgg, RegisterItem, SixMRow } from "../../lib/psb/compute";
 import { fmtCZK } from "../../lib/psb/format";
+import { ObdobieCtx } from "../../lib/psb/obdobie";
 import { C, mix, S } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import {
@@ -80,7 +81,12 @@ const RANGES = [
 ];
 
 function useRange(initial = "2026") {
-  const [win, setWin] = useState(initial);
+  const zdielane = useContext(ObdobieCtx);
+  const [localWin, setLocalWin] = useState(initial);
+  // Obdobie je spoločné pre celú appku (viď lib/psb/obdobie.ts); hranice pri
+  // „Vlastné" zostávajú lokálne — patria ku konkrétnej tabuľke.
+  const win = zdielane ? zdielane.obdobie : localWin;
+  const setWin = zdielane ? zdielane.setObdobie : setLocalWin;
   const [from, setFrom] = useState(0);
   const [to, setTo] = useState(MONTHS.length - 1);
   const idx = useMemo(() => {

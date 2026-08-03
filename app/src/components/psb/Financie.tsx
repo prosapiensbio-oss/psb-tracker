@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 
 import { monthlyFinance, predictCash, predictEarnings, type ClientAgg } from "../../lib/psb/compute";
 import { fetchBtcReserve, type BtcPlatba } from "../../lib/psb/client";
 import { fmtCZK, monthLabel, normName } from "../../lib/psb/format";
+import { ObdobieCtx } from "../../lib/psb/obdobie";
 import { C, S } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import type { NavFocus } from "./App";
@@ -47,11 +48,15 @@ const arrowColor = (mom: number | null) => (mom == null ? C.textDim : mom > 2 ? 
 type Monthly = ReturnType<typeof monthlyFinance>;
 
 // ── shared period filter for the finance tabs ────────────────────────────────
+// Rovnaké hodnoty ako vo VZAS, aby sa dali zdieľať. Predtým tu bolo „3/6/12"
+// a vo VZAS „last6/last12/2025/2026" — tie isté otázky v dvoch jazykoch, takže
+// sa nedalo prepnúť obdobie raz pre všetky peniaze.
 const RANGE_OPTS = [
   { value: "all", label: "Celé obdobie" },
-  { value: "3", label: "Posledné 3 mes." },
-  { value: "6", label: "Posledných 6 mes." },
-  { value: "12", label: "Posledných 12 mes." },
+  { value: "2026", label: "2026" },
+  { value: "2025", label: "2025" },
+  { value: "last6", label: "Posledných 6 mes." },
+  { value: "last12", label: "Posledných 12 mes." },
   { value: "custom", label: "Vlastné" },
 ];
 
@@ -62,14 +67,21 @@ function windowFilter<T extends { month: string }>(arr: T[], win: string, from: 
     if (lo > hi) [lo, hi] = [hi, lo]; // tolerate od > do
     return arr.filter((m) => m.month >= lo && m.month <= hi);
   }
-  const n = Number(win);
-  return n > 0 ? arr.slice(-n) : arr;
+  if (win === "last6") return arr.slice(-6);
+  if (win === "last12") return arr.slice(-12);
+  if (/^\d{4}$/.test(win)) return arr.filter((r) => r.month.startsWith(win));
+  return arr;
 }
 
 function useMonthWindow() {
-  const [win, setWin] = useState("all");
+  const zdielane = useContext(ObdobieCtx);
+  const [localWin, setLocalWin] = useState("all");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  // Obdobie je spoločné pre celú appku; hranice pri „Vlastné" zostávajú lokálne
+  // — sú to dve políčka, ktoré človek nastavuje pre konkrétnu tabuľku.
+  const win = zdielane ? zdielane.obdobie : localWin;
+  const setWin = zdielane ? zdielane.setObdobie : setLocalWin;
   return { win, setWin, from, setFrom, to, setTo };
 }
 

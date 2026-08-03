@@ -2,8 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 
 import {
-  membershipBucket,
-  MEMBERSHIP_ORDER,
   monthlyFinance,
   predictCash,
   predictEarnings,
@@ -17,11 +15,10 @@ import {
   type SixMRow,
 } from "../../lib/psb/compute";
 import { fmtCZK, fmtDMY, monthLabel, weekKey, weekLabel } from "../../lib/psb/format";
-import { C, MEMBERSHIP_COLORS, mix, S, badge, btn } from "../../lib/psb/theme";
+import { C, mix, S, badge, btn } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import type { Actions, NavFocus } from "./App";
 import type { AssistantChat } from "./Assistant";
-import { SessionTrend } from "./SessionTrend";
 import { Card, Donut, Empty, H3, Info, StatCard, StatGrid, ValueBars, ZoneBars } from "./ui";
 
 const catTone = (c: RegisterItem["category"]) =>
@@ -68,10 +65,13 @@ const WIDGETS: WidgetMeta[] = [
   { id: "tempo", label: "Ø tempo klienta", span: 1 },
   { id: "dovera", label: "Ø dôvera obnovy", span: 1 },
   { id: "zarobky", label: "Mesačné zárobky", span: 1 },
-  { id: "balicky", label: "Klienti podľa balíčka", span: 1 },
   { id: "koniecBalicka", label: "Blíži sa koniec balíčka", span: 1 },
-  { id: "trend", label: "Trend typov sedení", span: 2 },
 ];
+// Trend typov sedení a donut balíčkov tu boli tiež — a boli to presné kópie
+// grafov z Tréningov → Analýza a z Klientov. Dashboard odpovedá na „čo sa deje
+// teraz": tento týždeň, kapacita, peniaze tento mesiac, komu sa končí balíček.
+// „Ako sa za rok menil pomer typov sedení" je analýza a patrí tam, kde sa s ňou
+// dá pracovať — nie dvakrát, zakaždým s trochu iným filtrom.
 // „register" a „asistent" tu zámerne nie sú. Register je pripnutý nad celým
 // dashboardom — je to výstražný panel, nie kartička, ktorú si človek omylom
 // presunie na koniec alebo skryje. Inline chat zmizol úplne: Jarvis je stále
@@ -286,6 +286,8 @@ export function Dashboard({
   onNavigate,
   assistantChat,
   onClientClick,
+  trainer,
+  onTrainer,
 }: {
   data: PSBData;
   clients: Record<string, ClientAgg>;
@@ -296,8 +298,9 @@ export function Dashboard({
   onNavigate: (tab: string, sub?: string, focus?: NavFocus) => void;
   assistantChat: AssistantChat;
   onClientClick: (name: string) => void;
+  trainer: string;
+  onTrainer: (t: string) => void;
 }) {
-  const [trainer, setTrainer] = useState("all");
   const [showAcked, setShowAcked] = useState(false);
   const [registerExpanded, setRegisterExpanded] = useState(false);
   const [tempoUnit, setTempoUnit] = useState<"mes" | "tyz">("mes");
@@ -445,18 +448,6 @@ export function Dashboard({
     }
     return { avg: sum / pts.length, max, min, n: pts.length };
   }, [data, trainer, earnMode]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const sessionsT = useMemo(() => data.sessions.filter((s) => matchT(s.sessionTrainer)), [data.sessions, trainer]);
-
-  const membershipDonut = useMemo(() => {
-    const counts: Record<string, number> = {};
-    for (const c of Object.values(clients)) {
-      if (c.status === "Neaktívny" || !matchT(c.primaryTrainer)) continue;
-      const b = membershipBucket(c.membership);
-      counts[b] = (counts[b] || 0) + 1;
-    }
-    return MEMBERSHIP_ORDER.filter((k) => counts[k]).map((k) => ({ label: k, value: counts[k], color: MEMBERSHIP_COLORS[k] }));
-  }, [clients, trainer]);
 
   const sixMPhases = useMemo(() => {
     const f = sixM.filter((c) => matchT(c.primaryTrainer));
@@ -629,16 +620,6 @@ export function Dashboard({
         )}
       </Card>
     ),
-    balicky: (
-      <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column" }}>
-        <H3>
-          <Info text="Koľko klientov má aký typ balíčka/predplatného (z reportu Packages & Memberships). Mení sa podľa prepínača trénera hore." label="Klienti podľa balíčka" />
-        </H3>
-        <div style={centerBody}>
-          {membershipDonut.length ? <Donut size={130} centerLabel={String(membershipDonut.reduce((a, d) => a + d.value, 0))} data={membershipDonut} onSlice={() => onNavigate("klienti")} /> : <Empty>Nahraj Packages & Memberships.</Empty>}
-        </div>
-      </Card>
-    ),
     koniecBalicka: (
       <Card style={{ marginBottom: 0, height: "100%" }}>
         <H3>
@@ -673,7 +654,6 @@ export function Dashboard({
         )}
       </Card>
     ),
-    trend: <SessionTrend sessions={sessionsT} onNavigate={() => onNavigate("treningy", "analyza")} />,
   };
 
   // Výstražný panel. Pripnutý nad všetkým a mimo mriežky widgetov: toto je
@@ -740,7 +720,7 @@ export function Dashboard({
       {registerPanel}
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
-        <TrainerPills value={trainer} onChange={setTrainer} />
+        <TrainerPills value={trainer} onChange={onTrainer} />
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           {arranging && (
             <button onClick={layout.reset} style={{ ...btn("ghost"), fontSize: 12, padding: "6px 12px" }}>Obnoviť rozloženie</button>

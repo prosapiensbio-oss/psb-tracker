@@ -271,12 +271,13 @@ export const ZDROJE = [
   { value: "ine", label: "Iné" },
 ];
 
-export function Klienti({ clients, capacity, actions, focus, leads }: { clients: Record<string, ClientAgg>; capacity: CapacityRow[]; actions: Actions; focus?: NavFocus | null; leads: Lead[] }) {
+export function Klienti({ clients, capacity, actions, focus, leads, trainer, onTrainer }: { clients: Record<string, ClientAgg>; capacity: CapacityRow[]; actions: Actions; focus?: NavFocus | null; leads: Lead[]; trainer: string; onTrainer: (t: string) => void }) {
   const [focusClient, setFocusClient] = useState<string | null>(null);
   useEffect(() => {
     if (focus?.client) setFocusClient(focus.client);
   }, [focus?.nonce]); // eslint-disable-line react-hooks/exhaustive-deps
-  const [fTrainer, setFTrainer] = useState("all");
+  const fTrainer = trainer;
+  const setFTrainer = onTrainer;
   const [fSegment, setFSegment] = useState("all");
   const [typeF, setTypeF] = useState("all");
   const [modalityF, setModalityF] = useState("all");

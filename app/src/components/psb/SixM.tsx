@@ -8,9 +8,9 @@ import { Badge, Card, Donut, Empty, H2, H3, Info, StatCard, StatGrid, TableWrap 
 
 const phaseTone = (p: string) => (p === "Obnova" ? "green" : p === "Integrácia" ? "orange" : "bark");
 
-export function SixMTracker({ sixM, actions }: { sixM: SixMRow[]; actions: Actions }) {
+export function SixMTracker({ sixM, actions, trainer, onTrainer }: { sixM: SixMRow[]; actions: Actions; trainer: string; onTrainer: (t: string) => void }) {
   const [noteFor, setNoteFor] = useState<string | null>(null);
-  const [trainer, setTrainer] = useState("all");
+  const setTrainer = onTrainer;
 
   const shown = useMemo(() => (trainer === "all" ? sixM : sixM.filter((c) => c.primaryTrainer === trainer)), [sixM, trainer]);
 

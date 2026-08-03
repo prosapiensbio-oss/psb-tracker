@@ -20,6 +20,7 @@ import {
 import { buildAiContext } from "../../lib/psb/aiContext";
 import { Assistant, useAssistantChat } from "./Assistant";
 import { normName } from "../../lib/psb/format";
+import { ObdobieCtx } from "../../lib/psb/obdobie";
 import { C, S, tab } from "../../lib/psb/theme";
 import type { ClientOverride, PSBData } from "../../lib/psb/types";
 import { EMPTY_DATA } from "../../lib/psb/types";
@@ -83,6 +84,14 @@ export function PSBApp() {
   const [trackerSection, setTrackerSection] = useState("treningy");
   const [vzasSub, setVzasSub] = useState("pnl");
   const [vysledkySub, setVysledkySub] = useState("kvartalne");
+  // Filter trénera a obdobia žije tu, nie na každej obrazovke zvlášť.
+  //
+  // Doteraz mal svoj vlastný Dashboard, Tréningy, Klienti, Financie aj 6M — a
+  // vo VZAS dokonca každá záložka svoj vlastný. Prepnutie na Terezku na jednej
+  // obrazovke teda neznamenalo nič na druhej a človek si musel pamätať, čo kde
+  // nastavil. To je presne opak jednej pravdy na jeden údaj.
+  const [trainer, setTrainer] = useState("all");
+  const [obdobie, setObdobie] = useState("2026");
   // Týždenné zápisy a mesačné poznámky nie sú v PSBData — majú vlastné tabuľky
   // a doteraz sa čítali až na obrazovke, kde sa píšu. Lenže pripomienka musí
   // vedieť, či je to vyplnené, skôr než tam človek príde.
@@ -282,6 +291,7 @@ export function PSBApp() {
   };
 
   return (
+    <ObdobieCtx.Provider value={{ obdobie, setObdobie }}>
     <div style={{ minHeight: "100dvh", background: C.bg, color: C.text }}>
       <div style={{ padding: "16px 16px 0", display: "flex", alignItems: "center", gap: 12, maxWidth: 1200, margin: "0 auto" }}>
         <div style={{ lineHeight: 1.1 }}>
@@ -320,7 +330,7 @@ export function PSBApp() {
       </nav>
       <div style={{ padding: 16, maxWidth: 1200, margin: "0 auto" }}>
         {active === "dashboard" && (
-          <Dashboard data={data} clients={clients} register={registerAll} sixM={sixM} capacity={capacity} actions={actions} onNavigate={navigate} assistantChat={chat} onClientClick={onClientClick} />
+          <Dashboard trainer={trainer} onTrainer={setTrainer} data={data} clients={clients} register={registerAll} sixM={sixM} capacity={capacity} actions={actions} onNavigate={navigate} assistantChat={chat} onClientClick={onClientClick} />
         )}
 
         {active === "tracker" && (
@@ -352,10 +362,10 @@ export function PSBApp() {
                 );
               })}
             </div>
-            {trackerSection === "treningy" && <Treningy data={data} clients={clients} sub={treningySub} onSub={setTreningySub} focus={treningyFocus} />}
-            {trackerSection === "klienti" && <Klienti clients={clients} capacity={capacity} actions={actions} focus={klientiFocus} leads={data.leads} />}
+            {trackerSection === "treningy" && <Treningy data={data} clients={clients} sub={treningySub} onSub={setTreningySub} focus={treningyFocus} trainer={trainer} onTrainer={setTrainer} />}
+            {trackerSection === "klienti" && <Klienti clients={clients} capacity={capacity} actions={actions} focus={klientiFocus} leads={data.leads} trainer={trainer} onTrainer={setTrainer} />}
             {trackerSection === "financie" && <Financie data={data} clients={clients} focus={financieFocus} />}
-            {trackerSection === "6m" && <SixMTracker sixM={sixM} actions={actions} />}
+            {trackerSection === "6m" && <SixMTracker sixM={sixM} actions={actions} trainer={trainer} onTrainer={setTrainer} />}
           </>
         )}
 
@@ -369,5 +379,6 @@ export function PSBApp() {
       </div>
       <Assistant chat={chat} onClientClick={onClientClick} />
     </div>
+    </ObdobieCtx.Provider>
   );
 }

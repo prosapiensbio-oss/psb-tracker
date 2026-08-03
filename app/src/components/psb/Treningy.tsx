@@ -101,19 +101,20 @@ function WeekEnergyRow({ weekKeyIso, colSpan, entry, onSave }: {
   );
 }
 
-export function Treningy({ data, sub, onSub, focus }: { data: PSBData; clients: Record<string, ClientAgg>; sub: string; onSub: (s: string) => void; focus?: NavFocus | null }) {
+export function Treningy({ data, sub, onSub, focus, trainer, onTrainer }: { data: PSBData; clients: Record<string, ClientAgg>; sub: string; onSub: (s: string) => void; focus?: NavFocus | null; trainer: string; onTrainer: (t: string) => void }) {
   return (
     <>
       <SubTabs tabs={[{ id: "prehled", label: "Prehľad" }, { id: "analyza", label: "Analýza sedení" }]} value={sub} onChange={onSub} />
-      {sub === "prehled" && <Prehlad data={data} focus={focus} />}
+      {sub === "prehled" && <Prehlad data={data} focus={focus} trainer={trainer} onTrainer={onTrainer} />}
       {sub === "analyza" && <Analyza data={data} />}
     </>
   );
 }
 
-function Prehlad({ data, focus }: { data: PSBData; focus?: NavFocus | null }) {
+function Prehlad({ data, focus, trainer, onTrainer }: { data: PSBData; focus?: NavFocus | null; trainer: string; onTrainer: (t: string) => void }) {
   const [period, setPeriod] = useState<Period>("week");
-  const [trainerF, setTrainerF] = useState("all");
+  const trainerF = trainer;
+  const setTrainerF = onTrainer;
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [win, setWin] = useState("all"); // days window over history
