@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import type { CapacityRow, ClientAgg, RegisterItem, SixMRow } from "../../lib/psb/compute";
 import { monthLabel } from "../../lib/psb/format";
 import { buildReport, dostupneMesiace, SEKCIE, type SekciaId } from "../../lib/psb/report";
+import { vytlacReport } from "../../lib/psb/reportHtml";
 import { C, mix } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import { Card, H3, Info, Select } from "./ui";
@@ -71,6 +72,8 @@ export function Report({
       setSkopirovane(false);
     }
   };
+
+  const obdobiePopis = `Report za ${odOk === doM ? monthLabel(odOk) : `${monthLabel(odOk)} – ${monthLabel(doM)}`}${trener !== "obaja" ? ` · ${trener}` : ""}`;
 
   const stiahni = () => {
     const blob = new Blob([text], { type: "text/markdown;charset=utf-8" });
@@ -156,6 +159,7 @@ export function Report({
           <button onClick={() => void kopiruj()} style={tlac(true)}>
             {skopirovane ? "✓ Skopírované" : "Kopírovať"}
           </button>
+          <button onClick={() => vytlacReport(text, obdobiePopis)} style={tlac(true)}>PDF</button>
           <button onClick={stiahni} style={tlac(false)}>Stiahnuť .md</button>
           <span style={{ fontSize: 11, color: C.textDim, marginLeft: "auto" }}>
             {text.split("\n").length} riadkov · {Math.round(text.length / 1000)} tis. znakov
