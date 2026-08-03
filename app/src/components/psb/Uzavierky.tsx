@@ -59,7 +59,9 @@ function Konta() {
   const [hotovo, setHotovo] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const nacitaj = () => { void fetchKonta().then((r) => { setUsers(r.users); setJa(r.ja); }); };
+  // Len aktívne kontá. Deaktivované konto je pre appku preč — kým sa nezaloží
+  // znova s heslom, nemá sa čím pripomínať.
+  const nacitaj = () => { void fetchKonta().then((r) => { setUsers(r.users.filter((u) => u.active)); setJa(r.ja); }); };
   useEffect(nacitaj, []);
 
   const uloz = async (e: React.FormEvent) => {

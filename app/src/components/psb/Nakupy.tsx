@@ -1,0 +1,159 @@
+import { useEffect, useMemo, useState } from "react";
+
+import { fetchWishlist, ulozWish, type WishPolozka } from "../../lib/psb/client";
+import { C, mix } from "../../lib/psb/theme";
+import { Card, Empty, H3, Info } from "./ui";
+
+// Nákupný zoznam náradia.
+//
+// Existuje preto, že v cieli „Doplnenie vybavenia" bola veta „~17 000 Kč" a
+// nikto — ani Jerry — už nevedel, z čoho to číslo je a čo z toho je kúpené.
+// Suma sa preto nikdy neaktualizovala a cieľ sa nedal uzavrieť.
+//
+// Nie je to náklad: kým sa vec nekúpi, je to plán. Do peňazí vstúpi až cez
+// banku ako každý iný výdavok — tu ide len o to, čo chceme, koľko to stojí a
+// čo už máme.
+
+const kc = (n: number) => `${Math.round(n).toLocaleString("cs-CZ")} Kč`;
+
+const vstup = (extra: React.CSSProperties = {}): React.CSSProperties => ({
+  padding: "7px 9px", borderRadius: 7, border: `1px solid ${C.border}`,
+  background: C.bg, color: C.text, fontSize: 13, width: "100%", ...extra,
+});
+
+export function Nakupy() {
+  const [polozky, setPolozky] = useState<WishPolozka[]>([]);
+  const [nacitava, setNacitava] = useState(true);
+  const [nazov, setNazov] = useState("");
+  const [cena, setCena] = useState("");
+  const [link, setLink] = useState("");
+
+  const nacitaj = () => { void fetchWishlist().then((p) => { setPolozky(p); setNacitava(false); }); };
+  useEffect(nacitaj, []);
+
+  const suma = useMemo(() => {
+    const chceme = polozky.filter((p) => !p.kupene).reduce((a, p) => a + p.cena, 0);
+    const kupene = polozky.filter((p) => p.kupene).reduce((a, p) => a + p.cena, 0);
+    return { chceme, kupene, spolu: chceme + kupene };
+  }, [polozky]);
+
+  // Optimisticky lokálne, potom na server. Písanie do inputu, ktoré čaká na
+  // odpoveď databázy, sa píše ako cez blato — a pri cene, ktorú človek prepisuje
+  // podľa e-shopu, je to najhoršie.
+  const uprav = (id: string, zmena: Partial<WishPolozka>) => {
+    setPolozky((prev) => prev.map((p) => (p.id === id ? { ...p, ...zmena } : p)));
+    const p = { ...polozky.find((x) => x.id === id)!, ...zmena };
+    void ulozWish({ id, nazov: p.nazov, cena: p.cena, link: p.link, kupene: p.kupene, poznamka: p.poznamka });
+  };
+
+  const zmaz = (p: WishPolozka) => {
+    setPolozky((prev) => prev.filter((x) => x.id !== p.id));
+    void ulozWish({ id: p.id, zmazat: true });
+  };
+
+  const pridaj = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const n = nazov.trim();
+    if (!n) return;
+    await ulozWish({ nazov: n, cena: Number(cena.replace(/\s/g, "")) || 0, link: link.trim() });
+    setNazov(""); setCena(""); setLink("");
+    nacitaj();
+  };
+
+  const chceme = polozky.filter((p) => !p.kupene);
+  const kupene = polozky.filter((p) => p.kupene);
+
+  return (
+    <Card>
+      <H3><Info text="Zoznam náradia, ktoré chceme dokúpiť. Zaškrtnutá položka sa presunie dole medzi kúpené a odráta sa zo sumy „ešte treba“. Nie je to náklad — do peňazí to vstúpi až cez banku ako bežný výdavok. Cenu si doplň z e-shopu spolu s odkazom, nech sa nehľadá druhýkrát." label="Nákupný zoznam náradia" /></H3>
+
+      <div style={{ display: "flex", gap: 18, flexWrap: "wrap", margin: "10px 0 16px" }}>
+        <div>
+          <div style={{ fontSize: 11, color: C.textMuted }}>Ešte treba</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: C.text, fontVariantNumeric: "tabular-nums" }}>{kc(suma.chceme)}</div>
+          <div style={{ fontSize: 11, color: C.textDim }}>{chceme.length} položiek</div>
+        </div>
+        <div>
+          <div style={{ fontSize: 11, color: C.textMuted }}>Už kúpené</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: C.green, fontVariantNumeric: "tabular-nums" }}>{kc(suma.kupene)}</div>
+          <div style={{ fontSize: 11, color: C.textDim }}>{kupene.length} položiek</div>
+        </div>
+        <div>
+          <div style={{ fontSize: 11, color: C.textMuted }}>Celý zoznam</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: C.textMuted, fontVariantNumeric: "tabular-nums" }}>{kc(suma.spolu)}</div>
+          <div style={{ fontSize: 11, color: C.textDim }}>{polozky.length} položiek</div>
+        </div>
+      </div>
+
+      {nacitava ? (
+        <div style={{ fontSize: 12.5, color: C.textDim }}>Načítavam…</div>
+      ) : polozky.length === 0 ? (
+        <Empty>Zoznam je prázdny — pridaj prvú položku nižšie.</Empty>
+      ) : (
+        <div>
+          {[...chceme, ...kupene].map((p) => (
+            <div
+              key={p.id}
+              style={{
+                display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap",
+                padding: "8px 0", borderBottom: `1px solid ${mix(C.border, 55)}`,
+                opacity: p.kupene ? 0.55 : 1,
+              }}
+            >
+              <input
+                type="checkbox" checked={p.kupene} onChange={(e) => uprav(p.id, { kupene: e.target.checked })}
+                title={p.kupene ? `Kúpené ${p.kupeneAt?.slice(0, 10) || ""}` : "Označ ako kúpené"}
+                style={{ width: 17, height: 17, accentColor: C.green, cursor: "pointer", flex: "0 0 auto" }}
+              />
+              <input
+                value={p.nazov} onChange={(e) => uprav(p.id, { nazov: e.target.value })}
+                style={vstup({ flex: "2 1 150px", width: "auto", textDecoration: p.kupene ? "line-through" : "none" })}
+              />
+              <input
+                value={p.cena || ""} onChange={(e) => uprav(p.id, { cena: Number(e.target.value.replace(/[^\d]/g, "")) || 0 })}
+                inputMode="numeric" placeholder="cena"
+                style={vstup({ flex: "0 1 100px", width: "auto", textAlign: "right", fontVariantNumeric: "tabular-nums" })}
+              />
+              <input
+                value={p.link} onChange={(e) => uprav(p.id, { link: e.target.value })} placeholder="odkaz na e-shop"
+                style={vstup({ flex: "2 1 180px", width: "auto", fontSize: 12 })}
+              />
+              {p.link && (
+                <a href={p.link.startsWith("http") ? p.link : `https://${p.link}`} target="_blank" rel="noreferrer"
+                  title="Otvoriť odkaz" style={{ color: C.accentLight, fontSize: 13, textDecoration: "none", flex: "0 0 auto" }}>
+                  ↗
+                </a>
+              )}
+              <button
+                onClick={() => zmaz(p)} title="Zmazať položku"
+                style={{ background: "none", border: "none", color: C.textDim, cursor: "pointer", fontSize: 15, flex: "0 0 auto", padding: "0 4px" }}
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <form onSubmit={pridaj} style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 14 }}>
+        <input value={nazov} onChange={(e) => setNazov(e.target.value)} placeholder="Nová položka"
+          style={vstup({ flex: "2 1 150px", width: "auto" })} />
+        <input value={cena} onChange={(e) => setCena(e.target.value.replace(/[^\d]/g, ""))} inputMode="numeric" placeholder="cena"
+          style={vstup({ flex: "0 1 100px", width: "auto", textAlign: "right" })} />
+        <input value={link} onChange={(e) => setLink(e.target.value)} placeholder="odkaz na e-shop"
+          style={vstup({ flex: "2 1 180px", width: "auto", fontSize: 12 })} />
+        <button type="submit" disabled={!nazov.trim()}
+          style={{
+            padding: "8px 16px", borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: nazov.trim() ? "pointer" : "default",
+            border: `1px solid ${mix(C.accent, 45)}`, background: mix(C.accent, 8), color: C.accentLight,
+            opacity: nazov.trim() ? 1 : 0.45,
+          }}>
+          Pridať
+        </button>
+      </form>
+      <div style={{ fontSize: 11, color: C.textDim, marginTop: 8, lineHeight: 1.5 }}>
+        Zmeny sa ukladajú samé. Do auditu ide pridanie, zmazanie a zaškrtnutie „kúpené“ — nie prepisovanie ceny.
+      </div>
+    </Card>
+  );
+}

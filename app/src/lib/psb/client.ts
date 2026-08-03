@@ -299,3 +299,22 @@ export async function setPeriodLock(month: string, locked: boolean, note = ""): 
   const r = await post("/api/periods", { month, locked, note });
   return r.ok;
 }
+
+
+// ── Nákupný zoznam náradia ───────────────────────────────────────────────────
+export type WishPolozka = { id: string; nazov: string; cena: number; link: string; kupene: boolean; kupeneAt?: string; poznamka?: string };
+
+export async function fetchWishlist(): Promise<WishPolozka[]> {
+  try {
+    const r = await fetch("/api/wishlist", { credentials: "same-origin" });
+    const j = (await r.json()) as { polozky?: WishPolozka[] };
+    return j.polozky || [];
+  } catch {
+    return [];
+  }
+}
+
+export async function ulozWish(p: Partial<WishPolozka> & { zmazat?: boolean }): Promise<boolean> {
+  const r = await post("/api/wishlist", p);
+  return r.ok;
+}

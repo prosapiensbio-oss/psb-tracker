@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiWishlistRouteImport } from './routes/api/wishlist'
 import { Route as ApiVzasWeeksRouteImport } from './routes/api/vzas-weeks'
 import { Route as ApiVzasStatusRouteImport } from './routes/api/vzas-status'
 import { Route as ApiVzasSettingsRouteImport } from './routes/api/vzas-settings'
@@ -48,6 +49,11 @@ const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWishlistRoute = ApiWishlistRouteImport.update({
+  id: '/api/wishlist',
+  path: '/api/wishlist',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiVzasWeeksRoute = ApiVzasWeeksRouteImport.update({
@@ -187,6 +193,7 @@ export interface FileRoutesByFullPath {
   '/api/vzas-settings': typeof ApiVzasSettingsRoute
   '/api/vzas-status': typeof ApiVzasStatusRoute
   '/api/vzas-weeks': typeof ApiVzasWeeksRoute
+  '/api/wishlist': typeof ApiWishlistRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -214,6 +221,7 @@ export interface FileRoutesByTo {
   '/api/vzas-settings': typeof ApiVzasSettingsRoute
   '/api/vzas-status': typeof ApiVzasStatusRoute
   '/api/vzas-weeks': typeof ApiVzasWeeksRoute
+  '/api/wishlist': typeof ApiWishlistRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -242,6 +250,7 @@ export interface FileRoutesById {
   '/api/vzas-settings': typeof ApiVzasSettingsRoute
   '/api/vzas-status': typeof ApiVzasStatusRoute
   '/api/vzas-weeks': typeof ApiVzasWeeksRoute
+  '/api/wishlist': typeof ApiWishlistRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -271,6 +280,7 @@ export interface FileRouteTypes {
     | '/api/vzas-settings'
     | '/api/vzas-status'
     | '/api/vzas-weeks'
+    | '/api/wishlist'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -298,6 +308,7 @@ export interface FileRouteTypes {
     | '/api/vzas-settings'
     | '/api/vzas-status'
     | '/api/vzas-weeks'
+    | '/api/wishlist'
   id:
     | '__root__'
     | '/'
@@ -325,6 +336,7 @@ export interface FileRouteTypes {
     | '/api/vzas-settings'
     | '/api/vzas-status'
     | '/api/vzas-weeks'
+    | '/api/wishlist'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -353,6 +365,7 @@ export interface RootRouteChildren {
   ApiVzasSettingsRoute: typeof ApiVzasSettingsRoute
   ApiVzasStatusRoute: typeof ApiVzasStatusRoute
   ApiVzasWeeksRoute: typeof ApiVzasWeeksRoute
+  ApiWishlistRoute: typeof ApiWishlistRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -376,6 +389,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/wishlist': {
+      id: '/api/wishlist'
+      path: '/api/wishlist'
+      fullPath: '/api/wishlist'
+      preLoaderRoute: typeof ApiWishlistRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/vzas-weeks': {
@@ -561,6 +581,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiVzasSettingsRoute: ApiVzasSettingsRoute,
   ApiVzasStatusRoute: ApiVzasStatusRoute,
   ApiVzasWeeksRoute: ApiVzasWeeksRoute,
+  ApiWishlistRoute: ApiWishlistRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
