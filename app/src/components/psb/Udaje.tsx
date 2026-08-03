@@ -103,6 +103,53 @@ function UploadCard({ data, missing, actions }: { data: PSBData; missing: typeof
   }, [uploadResult]);
   const inputRef = useRef<HTMLInputElement>(null);
   const [neCsv, setNeCsv] = useState<{ meno: string; pripona: string }[]>([]);
+  const [pdfStav, setPdfStav] = useState("");
+
+  // Mesačná zostava z Metricoolu. Appka ju prečítať nevie — text je v
+  // podmnožinách fontov a čísla sú vykreslené do grafov — tak ju prečíta model,
+  // ktorý sa na strany pozerá ako človek. Odpoveď chodí po kúskoch, lebo to
+  // trvá aj minútu a tichý request by spadol na timeout.
+  const citajPdf = async (f: File) => {
+    setPdfStav(`${f.name}: pripravujem…`);
+    const buf = new Uint8Array(await f.arrayBuffer());
+    let bin = "";
+    for (let i = 0; i < buf.length; i += 8192) bin += String.fromCharCode(...buf.subarray(i, i + 8192));
+    const base64 = btoa(bin);
+    try {
+      const r = await fetch("/api/pdf-import", {
+        method: "POST", credentials: "same-origin",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ filename: f.name, base64 }),
+      });
+      const reader = r.body?.getReader();
+      if (!reader) { setPdfStav(`${f.name}: bez odpovede`); return; }
+      const dec = new TextDecoder();
+      let zvysok = "";
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        zvysok += dec.decode(value, { stream: true });
+        const casti = zvysok.split("\n\n");
+        zvysok = casti.pop() || "";
+        for (const c of casti) {
+          const line = c.replace(/^data: /, "").trim();
+          if (!line) continue;
+          try {
+            const o = JSON.parse(line) as { s?: string; e?: string; hotovo?: { riadkov: number; mesiace: string[]; kanaly: string[]; odhady: number } };
+            if (o.s) setPdfStav(`${f.name}: ${o.s}`);
+            if (o.e) setPdfStav(`${f.name}: ${o.e}`);
+            if (o.hotovo) {
+              const h = o.hotovo;
+              setPdfStav(`${f.name}: načítaných ${h.riadkov} metrík za ${h.mesiace.join(", ")} — ${h.kanaly.join(", ")}${h.odhady ? ` (${h.odhady} odčítaných z grafu)` : ""}. Nájdeš to v Marketing → Kanály.`);
+              void actions.refresh();
+            }
+          } catch { /* neúplný riadok */ }
+        }
+      }
+    } catch (e) {
+      setPdfStav(`${f.name}: nepodarilo sa — ${String(e).slice(0, 100)}`);
+    }
+  };
 
   const handleFiles = async (fileList: FileList | null) => {
     if (!fileList || !fileList.length) return;
@@ -110,13 +157,18 @@ function UploadCard({ data, missing, actions }: { data: PSBData; missing: typeof
     const files: { filename: string; text: string }[] = [];
     const bankove: string[] = [];
     const neCsv: { meno: string; pripona: string }[] = [];
+    const pdfka: File[] = [];
     for (const f of Array.from(fileList)) {
       // PDF, XLSX ani ZIP sa nedajú prečítať ako text. Doteraz sa aj tak
       // poslali na server a ten odpovedal „Súbor je príliš veľký" — pravda o
       // veľkosti, ale úplne zavádzajúca rada. Metricool ponúka PDF ako prvé,
       // takže na to naozaj narazí každý.
       const pripona = f.name.toLowerCase().split(".").pop() || "";
-      if (["pdf", "xlsx", "xls", "zip", "pptx", "docx"].includes(pripona)) {
+      // PDF sa neodmieta — pošle sa Jarvisovi, ktorý si strany vykreslí a
+      // prečíta ich vrátane grafov. Jedno miesto na nahrávanie, ako to má byť:
+      // človek nemá riešiť, ktorý formát appka zvláda.
+      if (pripona === "pdf") { pdfka.push(f); continue; }
+      if (["xlsx", "xls", "zip", "pptx", "docx"].includes(pripona)) {
         neCsv.push({ meno: f.name, pripona });
         continue;
       }
@@ -125,6 +177,7 @@ function UploadCard({ data, missing, actions }: { data: PSBData; missing: typeof
       else files.push({ filename: f.name, text });
     }
     setNeCsv(neCsv);
+    for (const f of pdfka) await citajPdf(f);
     if (bankove.length) setBankovyText(bankove.join("\n"));
     if (files.length) {
       const res = await actions.ingest(files);
@@ -160,6 +213,12 @@ function UploadCard({ data, missing, actions }: { data: PSBData; missing: typeof
           Bankový výpis sa najprv ukáže na kontrolu.
         </div>
       </div>
+      {pdfStav && (
+        <div style={{ padding: "10px 13px", marginBottom: 10, borderRadius: 9, background: mix(C.accent, 8), border: `1px solid ${mix(C.accent, 28)}`, fontSize: 12.5, color: C.text, lineHeight: 1.55 }}>
+          {pdfStav}
+          <button onClick={() => setPdfStav("")} style={{ marginLeft: 8, background: "none", border: "none", color: C.textDim, fontSize: 12, cursor: "pointer" }}>zavrieť</button>
+        </div>
+      )}
       {neCsv.length > 0 && (
         <div style={{ padding: "10px 13px", marginBottom: 10, borderRadius: 9, background: mix(C.orange, 8), border: `1px solid ${mix(C.orange, 28)}`, fontSize: 12.5, color: C.text, lineHeight: 1.55 }}>
           <b>{neCsv.map((x) => x.meno).join(", ")}</b> — toto je {neCsv[0].pripona.toUpperCase()}, nie CSV. Appka číta tabuľky, nie hotové zostavy.
@@ -172,7 +231,7 @@ function UploadCard({ data, missing, actions }: { data: PSBData; missing: typeof
           <button onClick={() => setNeCsv([])} style={{ marginLeft: 8, background: "none", border: "none", color: C.textDim, fontSize: 12, cursor: "pointer" }}>rozumiem</button>
         </div>
       )}
-      <input ref={inputRef} type="file" accept=".csv,.txt" multiple style={{ display: "none" }} onChange={(e) => { void handleFiles(e.target.files); e.target.value = ""; }} />
+      <input ref={inputRef} type="file" accept=".csv,.txt,.pdf" multiple style={{ display: "none" }} onChange={(e) => { void handleFiles(e.target.files); e.target.value = ""; }} />
       {bankovyText && (
         <div style={{ marginTop: 12 }}>
           <BankovyImport vstup={bankovyText} onHotovo={() => { setBankovyText(""); void actions.refresh(); }} />
