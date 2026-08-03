@@ -259,3 +259,23 @@ export async function saveZaver(z: Record<string, unknown>) {
 export async function vyhodnotZaver(id: string, stav: string, vysledok: string) {
   try { await post("/api/jarvis-memory", { akcia: "vyhodnot", id, stav, vysledok }); } catch { /* ignore */ }
 }
+
+
+// ── Uzávierky a audit ────────────────────────────────────────────────────────
+export type Obdobie = { month: string; locked: boolean; lockedAt?: string; note?: string };
+export type AuditRiadok = { at: string; actor: string; action: string; predmet?: string; month?: string; old?: string; neu?: string; reason?: string };
+
+export async function fetchPeriods(): Promise<{ periods: Obdobie[]; audit: AuditRiadok[] }> {
+  try {
+    const r = await fetch("/api/periods", { credentials: "same-origin" });
+    const j = (await r.json()) as { periods?: Obdobie[]; audit?: AuditRiadok[] };
+    return { periods: j.periods || [], audit: j.audit || [] };
+  } catch {
+    return { periods: [], audit: [] };
+  }
+}
+
+export async function setPeriodLock(month: string, locked: boolean, note = ""): Promise<boolean> {
+  const r = await post("/api/periods", { month, locked, note });
+  return r.ok;
+}

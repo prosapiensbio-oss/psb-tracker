@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
+import { audit } from "../../lib/psb/audit.server";
 import { isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 import { ackAnomaly, unackAnomaly } from "../../lib/psb/db.server";
@@ -25,6 +26,7 @@ export const Route = createFileRoute("/api/anomaly")({
         if (!key) return Response.json({ ok: false, error: "bad_field" }, { status: 400 });
         if (ack) await ackAnomaly(DB, key, note);
         else await unackAnomaly(DB, key);
+        await audit(DB, { action: ack ? "skrytie-signalu" : "vratenie-signalu", predmet: key, reason: note || undefined });
         return Response.json({ ok: true });
       },
     },

@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
+import { audit } from "../../lib/psb/audit.server";
 import { isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 
@@ -23,6 +24,7 @@ export const Route = createFileRoute("/api/leads")({
         const id = typeof b.id === "string" && b.id ? b.id.slice(0, 64) : crypto.randomUUID();
         if (b.remove === true) {
           await DB.prepare("DELETE FROM leads WHERE id = ?").bind(id).run();
+          await audit(DB, { action: "zmazanie-dopytu", predmet: id });
           return Response.json({ ok: true, id });
         }
         const date = typeof b.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(b.date) ? b.date : new Date().toISOString().slice(0, 10);

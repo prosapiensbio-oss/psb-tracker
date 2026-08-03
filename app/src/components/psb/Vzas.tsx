@@ -57,6 +57,7 @@ import {
   type Vals,
 } from "../../lib/psb/vzas";
 import { Card, Empty, H3, Info, LineChart, Select, StatCard, SubTabs, useScrollEnd } from "./ui";
+import { Uzavierky } from "./Uzavierky";
 
 const MONTHS = VZAS_MONTH_LABELS;
 const money = (n: number) => (n === 0 ? "—" : fmtCZK(n).replace(" CZK", ""));
@@ -2183,6 +2184,7 @@ export function Vzas({ sub, onSub }: { sub: string; onSub: (s: string) => void }
           { id: "vyplaty", label: "J&T Výplaty" },
           { id: "cashflow", label: "Cashflow" },
           { id: "jarek", label: "Jarek dlh" },
+          { id: "uzavierky", label: "Uzávierky" },
         ]}
         value={sub}
         onChange={onSub}
@@ -2191,6 +2193,7 @@ export function Vzas({ sub, onSub }: { sub: string; onSub: (s: string) => void }
       {sub === "vyplaty" && <SalaryTab />}
       {sub === "cashflow" && <CashflowTab />}
       {sub === "jarek" && <JarekTab />}
+      {sub === "uzavierky" && <Uzavierky />}
     </>
   );
 }

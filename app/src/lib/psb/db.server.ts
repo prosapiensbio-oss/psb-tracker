@@ -1,5 +1,7 @@
 // Server-only D1 access for the PSB Tracker. All reads/writes hit env.DB.
 import type { D1Database } from "@cloudflare/workers-types";
+
+import { audit, jeZamknuty, zamknuteMesiace } from "./audit.server";
 import {
   detectCSVType,
   parsePackages,
@@ -111,7 +113,11 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
   return data;
 }
 
-export type IngestResult = { filename: string; type: string | null; added: number; skipped: number; error?: string };
+export type IngestResult = {
+  filename: string; type: string | null; added: number; skipped: number; error?: string;
+  /** Koľko riadkov import odmietol, lebo patria do uzavretého mesiaca. */
+  zamknute?: number;
+};
 
 export async function ingest(DB: D1Database, filename: string, text: string): Promise<IngestResult> {
   const type = detectCSVType(text);
@@ -119,6 +125,16 @@ export async function ingest(DB: D1Database, filename: string, text: string): Pr
 
   let added = 0;
   let skipped = 0;
+  // Uzavretý mesiac sa neprepisuje. Nie varovaním — odmietnutím. Import je
+  // jediná cesta, ktorou sa do appky dostávajú tréningy a platby, takže stačí
+  // strážiť ju; riadky z uzamknutých mesiacov sa preskočia a povie sa o tom.
+  const zamky = await zamknuteMesiace(DB);
+  let zamknutych = 0;
+  const zamknuty = (isoDatum: string | null | undefined) => {
+    if (!jeZamknuty(zamky, isoDatum)) return false;
+    zamknutych++;
+    return true;
+  };
 
   if (type === "sessions") {
     const rows = parseSessions(text);
@@ -127,6 +143,7 @@ export async function ingest(DB: D1Database, filename: string, text: string): Pr
     );
     const stmts = [];
     for (const r of rows) {
+      if (zamknuty(r.date)) continue;
       const key = sessionKey(r);
       if (existing.has(key)) { skipped++; continue; }
       existing.add(key);
@@ -145,6 +162,7 @@ export async function ingest(DB: D1Database, filename: string, text: string): Pr
     );
     const stmts = [];
     for (const r of rows) {
+      if (zamknuty(r.date)) continue;
       const key = serviceKey(r);
       if (existing.has(key)) { skipped++; continue; }
       existing.add(key);
@@ -163,6 +181,7 @@ export async function ingest(DB: D1Database, filename: string, text: string): Pr
     );
     const stmts = [];
     for (const r of rows) {
+      if (zamknuty(r.date)) continue;
       const key = paymentKey(r);
       if (existing.has(key)) { skipped++; continue; }
       existing.add(key);
@@ -198,7 +217,13 @@ export async function ingest(DB: D1Database, filename: string, text: string): Pr
     "INSERT INTO upload_log (id,date,filename,type,added,skipped) VALUES (?,?,?,?,?,?)",
   ).bind(uid(), new Date().toISOString(), filename, type, added, skipped).run();
 
-  return { filename, type, added, skipped };
+  await audit(DB, {
+    action: "import",
+    predmet: filename,
+    neu: `${type}: +${added} riadkov, ${skipped} duplicít${zamknutych ? `, ${zamknutych} odmietnutých (uzavretý mesiac)` : ""}`,
+  });
+
+  return { filename, type, added, skipped, zamknute: zamknutych };
 }
 
 export async function setOverride(

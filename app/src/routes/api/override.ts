@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
+import { audit } from "../../lib/psb/audit.server";
 import { isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 import { setOverride } from "../../lib/psb/db.server";
@@ -40,6 +41,7 @@ export const Route = createFileRoute("/api/override")({
           return Response.json({ ok: false, error: "bad_field" }, { status: 400 });
         }
         await setOverride(DB, name, key as keyof ClientOverride, value);
+        await audit(DB, { action: "uprava-klienta", predmet: `${name} · ${key}`, neu: value });
         return Response.json({ ok: true });
       },
     },

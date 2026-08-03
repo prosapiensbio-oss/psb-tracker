@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
+import { audit } from "../../lib/psb/audit.server";
 import { isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 
@@ -90,12 +91,14 @@ export const Route = createFileRoute("/api/jarvis-memory")({
              ON CONFLICT(id) DO UPDATE SET tema = ?3, zaver = ?4, preco = ?5, overit = ?6, overit_do = ?7`,
           ).bind(id, s(b.datum, 10) || now.slice(0, 10), s(b.tema, 40) || "ine", s(b.zaver, 600),
             s(b.preco, 800), s(b.overit, 600), s(b.overitDo, 10) || null, s(b.chatId, 64) || null, now).run();
+          await audit(DB, { action: "zapis-zaveru", predmet: s(b.tema, 40), neu: s(b.zaver, 300) });
           return Response.json({ ok: true, id });
         }
 
         if (akcia === "vyhodnot") {
           await DB.prepare("UPDATE jarvis_zavery SET stav = ?2, vysledok = ?3 WHERE id = ?1")
             .bind(s(b.id, 64), s(b.stav, 20) || "otvoreny", s(b.vysledok, 800)).run();
+          await audit(DB, { action: "vyhodnotenie-zaveru", predmet: s(b.id, 64), neu: s(b.stav, 20), reason: s(b.vysledok, 300) });
           return Response.json({ ok: true });
         }
 

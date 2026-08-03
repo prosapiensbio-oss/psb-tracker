@@ -18,12 +18,14 @@ import { Route as ApiVzasSettingsRouteImport } from './routes/api/vzas-settings'
 import { Route as ApiVzasNotesRouteImport } from './routes/api/vzas-notes'
 import { Route as ApiSessionRouteImport } from './routes/api/session'
 import { Route as ApiResetRouteImport } from './routes/api/reset'
+import { Route as ApiPeriodsRouteImport } from './routes/api/periods'
 import { Route as ApiOverrideRouteImport } from './routes/api/override'
 import { Route as ApiLogoutRouteImport } from './routes/api/logout'
 import { Route as ApiLoginRouteImport } from './routes/api/login'
 import { Route as ApiLeadsRouteImport } from './routes/api/leads'
 import { Route as ApiJarvisMemoryRouteImport } from './routes/api/jarvis-memory'
 import { Route as ApiIngestRouteImport } from './routes/api/ingest'
+import { Route as ApiExportRouteImport } from './routes/api/export'
 import { Route as ApiDataRouteImport } from './routes/api/data'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ApiBtcReserveRouteImport } from './routes/api/btc-reserve'
@@ -74,6 +76,11 @@ const ApiResetRoute = ApiResetRouteImport.update({
   path: '/api/reset',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPeriodsRoute = ApiPeriodsRouteImport.update({
+  id: '/api/periods',
+  path: '/api/periods',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiOverrideRoute = ApiOverrideRouteImport.update({
   id: '/api/override',
   path: '/api/override',
@@ -102,6 +109,11 @@ const ApiJarvisMemoryRoute = ApiJarvisMemoryRouteImport.update({
 const ApiIngestRoute = ApiIngestRouteImport.update({
   id: '/api/ingest',
   path: '/api/ingest',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiExportRoute = ApiExportRouteImport.update({
+  id: '/api/export',
+  path: '/api/export',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiDataRoute = ApiDataRouteImport.update({
@@ -133,12 +145,14 @@ export interface FileRoutesByFullPath {
   '/api/btc-reserve': typeof ApiBtcReserveRoute
   '/api/chat': typeof ApiChatRoute
   '/api/data': typeof ApiDataRoute
+  '/api/export': typeof ApiExportRoute
   '/api/ingest': typeof ApiIngestRoute
   '/api/jarvis-memory': typeof ApiJarvisMemoryRoute
   '/api/leads': typeof ApiLeadsRoute
   '/api/login': typeof ApiLoginRoute
   '/api/logout': typeof ApiLogoutRoute
   '/api/override': typeof ApiOverrideRoute
+  '/api/periods': typeof ApiPeriodsRoute
   '/api/reset': typeof ApiResetRoute
   '/api/session': typeof ApiSessionRoute
   '/api/vzas-notes': typeof ApiVzasNotesRoute
@@ -154,12 +168,14 @@ export interface FileRoutesByTo {
   '/api/btc-reserve': typeof ApiBtcReserveRoute
   '/api/chat': typeof ApiChatRoute
   '/api/data': typeof ApiDataRoute
+  '/api/export': typeof ApiExportRoute
   '/api/ingest': typeof ApiIngestRoute
   '/api/jarvis-memory': typeof ApiJarvisMemoryRoute
   '/api/leads': typeof ApiLeadsRoute
   '/api/login': typeof ApiLoginRoute
   '/api/logout': typeof ApiLogoutRoute
   '/api/override': typeof ApiOverrideRoute
+  '/api/periods': typeof ApiPeriodsRoute
   '/api/reset': typeof ApiResetRoute
   '/api/session': typeof ApiSessionRoute
   '/api/vzas-notes': typeof ApiVzasNotesRoute
@@ -176,12 +192,14 @@ export interface FileRoutesById {
   '/api/btc-reserve': typeof ApiBtcReserveRoute
   '/api/chat': typeof ApiChatRoute
   '/api/data': typeof ApiDataRoute
+  '/api/export': typeof ApiExportRoute
   '/api/ingest': typeof ApiIngestRoute
   '/api/jarvis-memory': typeof ApiJarvisMemoryRoute
   '/api/leads': typeof ApiLeadsRoute
   '/api/login': typeof ApiLoginRoute
   '/api/logout': typeof ApiLogoutRoute
   '/api/override': typeof ApiOverrideRoute
+  '/api/periods': typeof ApiPeriodsRoute
   '/api/reset': typeof ApiResetRoute
   '/api/session': typeof ApiSessionRoute
   '/api/vzas-notes': typeof ApiVzasNotesRoute
@@ -199,12 +217,14 @@ export interface FileRouteTypes {
     | '/api/btc-reserve'
     | '/api/chat'
     | '/api/data'
+    | '/api/export'
     | '/api/ingest'
     | '/api/jarvis-memory'
     | '/api/leads'
     | '/api/login'
     | '/api/logout'
     | '/api/override'
+    | '/api/periods'
     | '/api/reset'
     | '/api/session'
     | '/api/vzas-notes'
@@ -220,12 +240,14 @@ export interface FileRouteTypes {
     | '/api/btc-reserve'
     | '/api/chat'
     | '/api/data'
+    | '/api/export'
     | '/api/ingest'
     | '/api/jarvis-memory'
     | '/api/leads'
     | '/api/login'
     | '/api/logout'
     | '/api/override'
+    | '/api/periods'
     | '/api/reset'
     | '/api/session'
     | '/api/vzas-notes'
@@ -241,12 +263,14 @@ export interface FileRouteTypes {
     | '/api/btc-reserve'
     | '/api/chat'
     | '/api/data'
+    | '/api/export'
     | '/api/ingest'
     | '/api/jarvis-memory'
     | '/api/leads'
     | '/api/login'
     | '/api/logout'
     | '/api/override'
+    | '/api/periods'
     | '/api/reset'
     | '/api/session'
     | '/api/vzas-notes'
@@ -263,12 +287,14 @@ export interface RootRouteChildren {
   ApiBtcReserveRoute: typeof ApiBtcReserveRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiDataRoute: typeof ApiDataRoute
+  ApiExportRoute: typeof ApiExportRoute
   ApiIngestRoute: typeof ApiIngestRoute
   ApiJarvisMemoryRoute: typeof ApiJarvisMemoryRoute
   ApiLeadsRoute: typeof ApiLeadsRoute
   ApiLoginRoute: typeof ApiLoginRoute
   ApiLogoutRoute: typeof ApiLogoutRoute
   ApiOverrideRoute: typeof ApiOverrideRoute
+  ApiPeriodsRoute: typeof ApiPeriodsRoute
   ApiResetRoute: typeof ApiResetRoute
   ApiSessionRoute: typeof ApiSessionRoute
   ApiVzasNotesRoute: typeof ApiVzasNotesRoute
@@ -342,6 +368,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiResetRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/periods': {
+      id: '/api/periods'
+      path: '/api/periods'
+      fullPath: '/api/periods'
+      preLoaderRoute: typeof ApiPeriodsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/override': {
       id: '/api/override'
       path: '/api/override'
@@ -384,6 +417,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiIngestRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/export': {
+      id: '/api/export'
+      path: '/api/export'
+      fullPath: '/api/export'
+      preLoaderRoute: typeof ApiExportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/data': {
       id: '/api/data'
       path: '/api/data'
@@ -423,12 +463,14 @@ const rootRouteChildren: RootRouteChildren = {
   ApiBtcReserveRoute: ApiBtcReserveRoute,
   ApiChatRoute: ApiChatRoute,
   ApiDataRoute: ApiDataRoute,
+  ApiExportRoute: ApiExportRoute,
   ApiIngestRoute: ApiIngestRoute,
   ApiJarvisMemoryRoute: ApiJarvisMemoryRoute,
   ApiLeadsRoute: ApiLeadsRoute,
   ApiLoginRoute: ApiLoginRoute,
   ApiLogoutRoute: ApiLogoutRoute,
   ApiOverrideRoute: ApiOverrideRoute,
+  ApiPeriodsRoute: ApiPeriodsRoute,
   ApiResetRoute: ApiResetRoute,
   ApiSessionRoute: ApiSessionRoute,
   ApiVzasNotesRoute: ApiVzasNotesRoute,
