@@ -125,7 +125,7 @@ export type IngestResult = {
   zamknute?: number;
 };
 
-export async function ingest(DB: D1Database, filename: string, text: string): Promise<IngestResult> {
+export async function ingest(DB: D1Database, filename: string, text: string, actor?: string): Promise<IngestResult> {
   const type = detectCSVType(text);
   if (!type) return { filename, type: null, added: 0, skipped: 0, error: "Nerozpoznaný typ CSV" };
 
@@ -261,6 +261,7 @@ export async function ingest(DB: D1Database, filename: string, text: string): Pr
     action: "import",
     predmet: filename,
     neu: `${type}: +${added} riadkov, ${skipped} duplicít${zamknutych ? `, ${zamknutych} odmietnutých (uzavretý mesiac)` : ""}`,
+    actor,
   });
 
   return { filename, type, added, skipped, zamknute: zamknutych };

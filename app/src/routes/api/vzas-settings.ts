@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { audit } from "../../lib/psb/audit.server";
-import { isAuthed, unauthorized } from "../../lib/psb/auth.server";
+import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 
 // Small key/value store for things the app lets Jerry change and expects to
@@ -39,7 +39,7 @@ export const Route = createFileRoute("/api/vzas-settings")({
         if (!/^[a-z0-9_]+$/.test(key)) return Response.json({ ok: false, error: "bad_key" }, { status: 400 });
         const value = JSON.stringify(body.value ?? null).slice(0, 20000);
         const stare = await DB.prepare("SELECT value FROM vzas_settings WHERE key = ?1").bind(key).first<{ value: string }>();
-        await audit(DB, { action: "nastavenie", predmet: key, old: stare?.value, neu: value });
+        await audit(DB, { action: "nastavenie", predmet: key, old: stare?.value, neu: value, actor: await currentUser(request) || undefined });
         await DB.prepare(
           `INSERT INTO vzas_settings (key, value, updated_at) VALUES (?,?,?)
            ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at`,

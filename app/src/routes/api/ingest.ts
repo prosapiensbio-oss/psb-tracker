@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { isAuthed, unauthorized } from "../../lib/psb/auth.server";
+import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 import { ingest, type IngestResult } from "../../lib/psb/db.server";
 
@@ -34,7 +34,7 @@ export const Route = createFileRoute("/api/ingest")({
             results.push({ filename: f.filename, type: null, added: 0, skipped: 0, error: "Súbor je príliš veľký" });
             continue;
           }
-          results.push(await ingest(DB, f.filename, f.text));
+          results.push(await ingest(DB, f.filename, f.text, (await currentUser(request)) || undefined));
         }
         return Response.json({ ok: true, results });
       },

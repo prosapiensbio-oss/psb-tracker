@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { audit } from "../../lib/psb/audit.server";
-import { isAuthed, unauthorized } from "../../lib/psb/auth.server";
+import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 
 // Uzávierky mesiacov + čítanie auditu.
@@ -67,6 +67,7 @@ export const Route = createFileRoute("/api/periods")({
           old: stare ? (stare.locked ? "zamknuté" : "otvorené") : "otvorené",
           neu: locked ? "zamknuté" : "otvorené",
           reason: note || undefined,
+          actor: await currentUser(request) || undefined,
         });
         return Response.json({ ok: true });
       },

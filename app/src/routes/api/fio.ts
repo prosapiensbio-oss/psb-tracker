@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { audit, jeZamknuty, zamknuteMesiace } from "../../lib/psb/audit.server";
-import { isAuthed, unauthorized } from "../../lib/psb/auth.server";
+import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 import { parseFio, type FioRiadok } from "../../lib/psb/fio";
 
@@ -125,6 +125,7 @@ export const Route = createFileRoute("/api/fio")({
             action: "import-banka",
             predmet: `${pridane} pohybov`,
             neu: `+${pridane}, ${preskocene} duplicít${zamknute ? `, ${zamknute} odmietnutých (uzavretý mesiac)` : ""}, ${naucene.size} pravidiel`,
+            actor: await currentUser(request) || undefined,
           });
           return Response.json({ ok: true, pridane, preskocene, zamknute, pravidla: naucene.size });
         }

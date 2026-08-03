@@ -12,19 +12,39 @@ async function post(url: string, body: unknown) {
   return r;
 }
 
-export async function checkSession(): Promise<boolean> {
+export type Session = { authed: boolean; user: string | null; pouzivatelia: { login: string; name: string }[] };
+
+export async function checkSession(): Promise<Session> {
   try {
     const r = await fetch("/api/session");
-    const j = (await r.json()) as { authed?: boolean };
-    return !!j.authed;
+    const j = (await r.json()) as Partial<Session>;
+    return { authed: !!j.authed, user: j.user ?? null, pouzivatelia: j.pouzivatelia ?? [] };
   } catch {
-    return false;
+    return { authed: false, user: null, pouzivatelia: [] };
   }
 }
 
-export async function login(password: string): Promise<boolean> {
-  const r = await post("/api/login", { password });
+export async function login(password: string, meno = ""): Promise<boolean> {
+  const r = await post("/api/login", { password, login: meno });
   return r.ok;
+}
+
+export type Konto = { login: string; name: string; active: boolean; lastLogin?: string };
+
+export async function fetchKonta(): Promise<{ ja: string | null; users: Konto[] }> {
+  try {
+    const r = await fetch("/api/users", { credentials: "same-origin" });
+    const j = (await r.json()) as { ja?: string; users?: Konto[] };
+    return { ja: j.ja ?? null, users: j.users ?? [] };
+  } catch {
+    return { ja: null, users: [] };
+  }
+}
+
+export async function ulozKonto(k: { login: string; name?: string; password?: string; active?: boolean }): Promise<{ ok: boolean; error?: string }> {
+  const r = await post("/api/users", k);
+  const j = (await r.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+  return { ok: !!j.ok, error: j.error };
 }
 
 export async function logout(): Promise<void> {

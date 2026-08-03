@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { audit } from "../../lib/psb/audit.server";
-import { isAuthed, unauthorized } from "../../lib/psb/auth.server";
+import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 
 // Zmazanie jedného klienta zo všetkých tabuliek.
@@ -50,6 +50,7 @@ export const Route = createFileRoute("/api/client-delete")({
           predmet: name,
           neu: Object.entries(zmazane).map(([t, n]) => `${t}: ${n}`).join(", "),
           reason: b.reason ? String(b.reason).slice(0, 300) : undefined,
+          actor: await currentUser(request) || undefined,
         });
         return Response.json({ ok: true, zmazane });
       },

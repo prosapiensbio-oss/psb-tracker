@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { audit } from "../../lib/psb/audit.server";
-import { isAuthed, unauthorized } from "../../lib/psb/auth.server";
+import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 
 // Kompletná záloha databázy ako jeden JSON na stiahnutie.
@@ -46,6 +46,7 @@ export const Route = createFileRoute("/api/export")({
           action: "zaloha",
           predmet: `psb-zaloha-${den}.json`,
           neu: `${Object.values(data).reduce((a, r) => a + r.length, 0)} riadkov`,
+          actor: await currentUser(request) || undefined,
         });
 
         return new Response(JSON.stringify({ verzia: 1, vytvorene: new Date().toISOString(), data }, null, 1), {

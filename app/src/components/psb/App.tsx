@@ -65,6 +65,7 @@ const TRACKER_IDS = TRACKER_SECTIONS.map((s) => s.id);
 
 export function PSBApp() {
   const [authed, setAuthed] = useState<boolean | null>(null);
+  const [ktoSom, setKtoSom] = useState<string | null>(null);
   const [data, setData] = useState<PSBData>(EMPTY_DATA);
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState("dashboard");
@@ -102,9 +103,10 @@ export function PSBApp() {
 
   useEffect(() => {
     (async () => {
-      const ok = await checkSession();
-      setAuthed(ok);
-      if (ok) await load();
+      const s = await checkSession();
+      setAuthed(s.authed);
+      setKtoSom(s.user);
+      if (s.authed) await load();
       else setLoading(false);
     })();
   }, [load]);
@@ -181,11 +183,12 @@ export function PSBApp() {
     );
   }
 
-  if (!authed) return <Login onSuccess={() => { setAuthed(true); void load(); }} />;
+  if (!authed) return <Login onSuccess={() => { setAuthed(true); void checkSession().then((s) => setKtoSom(s.user)); void load(); }} />;
 
   const logout = async () => {
     await apiLogout();
     setAuthed(false);
+    setKtoSom(null);
     setData(EMPTY_DATA);
   };
 
@@ -196,9 +199,16 @@ export function PSBApp() {
           <div style={{ fontSize: 20, fontWeight: 800, color: C.accent, letterSpacing: -0.3 }}>Tracker</div>
           <div style={{ fontSize: 11, fontWeight: 500, color: C.textMuted, letterSpacing: 0.2 }}>ProSapiens Biomechanic</div>
         </div>
-        <button onClick={logout} style={{ marginLeft: "auto", background: "none", border: "none", color: C.textDim, cursor: "pointer", fontSize: 12 }}>
-          Odhlásiť sa
-        </button>
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 }}>
+          {ktoSom && ktoSom !== "app" && (
+            <span style={{ fontSize: 12, color: C.textMuted }} title="Pod týmto menom sa zapisujú zmeny do auditu">
+              {ktoSom.charAt(0).toUpperCase() + ktoSom.slice(1)}
+            </span>
+          )}
+          <button onClick={logout} style={{ background: "none", border: "none", color: C.textDim, cursor: "pointer", fontSize: 12 }}>
+            Odhlásiť sa
+          </button>
+        </div>
       </div>
       <nav
         style={{

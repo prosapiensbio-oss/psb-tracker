@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { fetchPeriods, setPeriodLock, type AuditRiadok, type Obdobie } from "../../lib/psb/client";
+import { fetchKonta, fetchPeriods, setPeriodLock, ulozKonto, type AuditRiadok, type Konto, type Obdobie } from "../../lib/psb/client";
 import { C, mix } from "../../lib/psb/theme";
 import { Card, Empty, H3, Info } from "./ui";
 
@@ -31,7 +31,103 @@ const POPIS: Record<string, string> = {
   "zamknutie-obdobia": "Zamknutie mesiaca",
   "odomknutie-obdobia": "Odomknutie mesiaca",
   "zaloha": "Stiahnutá záloha",
+  "import-banka": "Import z banky",
+  "zmazanie-klienta": "Zmazanie klienta",
+  "nove-konto": "Nové konto",
+  "uprava-konta": "Úprava konta",
 };
+
+const CHYBY: Record<string, string> = {
+  bad_login: "Prihlasovacie meno smie mať len písmená bez diakritiky, číslice, bodku, pomlčku alebo podčiarkovník.",
+  short_password: "Heslo musí mať aspoň 8 znakov.",
+  need_password: "Nové konto sa nedá založiť bez hesla.",
+  no_db: "Databáza neodpovedala.",
+};
+
+// Kontá — kto sa prihlasuje pod svojím menom.
+//
+// Nejde o oprávnenia: Jerry aj Terezka vidia všetko. Ide o to, aby sa v audite
+// nižšie dalo prečítať, KTO zmenu spravil. Kým konto nemá nikto, appka beží na
+// zdieľanom hesle a v audite je pri všetkom „app".
+function Konta() {
+  const [users, setUsers] = useState<Konto[]>([]);
+  const [ja, setJa] = useState<string | null>(null);
+  const [login, setLogin] = useState("");
+  const [meno, setMeno] = useState("");
+  const [heslo, setHeslo] = useState("");
+  const [chyba, setChyba] = useState("");
+  const [hotovo, setHotovo] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const nacitaj = () => { void fetchKonta().then((r) => { setUsers(r.users); setJa(r.ja); }); };
+  useEffect(nacitaj, []);
+
+  const uloz = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setChyba(""); setHotovo(""); setBusy(true);
+    const r = await ulozKonto({ login, name: meno || login, password: heslo });
+    setBusy(false);
+    if (!r.ok) { setChyba(CHYBY[r.error || ""] || "Nepodarilo sa uložiť."); return; }
+    setHotovo(`Konto ${meno || login} uložené.`);
+    setLogin(""); setMeno(""); setHeslo("");
+    nacitaj();
+  };
+
+  return (
+    <Card>
+      <H3><Info text="Kým konto nemá nikto, appka beží na zdieľanom hesle a v audite je pri každej zmene „app“. Keď má každý vlastné konto, v audite je vidieť meno. Prístup majú obaja rovnaký — konto je identita, nie oprávnenie. Zdieľané heslo zostáva funkčné ako núdzová brzda." label="Kontá" /></H3>
+      {users.length === 0 ? (
+        <div style={{ fontSize: 12, color: C.textDim, margin: "6px 0 12px", lineHeight: 1.55 }}>
+          Zatiaľ žiadne kontá — appka beží na zdieľanom hesle a v audite je pri všetkom „app“.
+        </div>
+      ) : (
+        <div style={{ margin: "8px 0 14px" }}>
+          {users.map((u) => (
+            <div key={u.login} style={{ display: "flex", gap: 10, alignItems: "baseline", padding: "6px 0", borderBottom: `1px solid ${mix(C.border, 55)}`, fontSize: 12.5 }}>
+              <span style={{ color: C.text, fontWeight: 600, minWidth: 110 }}>{u.name}</span>
+              <span style={{ color: C.textDim, fontSize: 11 }}>{u.login}</span>
+              {ja === u.login && <span style={{ color: C.green, fontSize: 11 }}>· prihlásený</span>}
+              <span style={{ marginLeft: "auto", color: C.textDim, fontSize: 11 }}>
+                {u.lastLogin ? `naposledy ${u.lastLogin.slice(0, 10)}` : "ešte sa neprihlásil"}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <form onSubmit={uloz} style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
+        <label style={{ flex: "1 1 130px", fontSize: 11, color: C.textMuted }}>
+          Meno
+          <input value={meno} onChange={(e) => setMeno(e.target.value)} placeholder="Terezka"
+            style={{ width: "100%", marginTop: 4, padding: "8px 10px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 13 }} />
+        </label>
+        <label style={{ flex: "1 1 130px", fontSize: 11, color: C.textMuted }}>
+          Prihlasovacie meno
+          <input value={login} onChange={(e) => setLogin(e.target.value)} placeholder="terezka" autoComplete="off"
+            style={{ width: "100%", marginTop: 4, padding: "8px 10px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 13 }} />
+        </label>
+        <label style={{ flex: "1 1 150px", fontSize: 11, color: C.textMuted }}>
+          Heslo (min. 8 znakov)
+          <input value={heslo} onChange={(e) => setHeslo(e.target.value)} type="password" autoComplete="new-password"
+            style={{ width: "100%", marginTop: 4, padding: "8px 10px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 13 }} />
+        </label>
+        <button type="submit" disabled={busy || !login || heslo.length < 8}
+          style={{
+            padding: "9px 16px", borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: busy || !login || heslo.length < 8 ? "default" : "pointer",
+            border: `1px solid ${mix(C.accent, 45)}`, background: mix(C.accent, 8), color: C.accentLight,
+            opacity: busy || !login || heslo.length < 8 ? 0.45 : 1,
+          }}>
+          {busy ? "Ukladám…" : "Uložiť konto"}
+        </button>
+      </form>
+      <div style={{ fontSize: 11, color: C.textDim, marginTop: 8, lineHeight: 1.5 }}>
+        Rovnaké prihlasovacie meno prepíše existujúcemu kontu heslo — tak sa heslo aj mení.
+      </div>
+      {chyba && <div style={{ fontSize: 12, color: C.red, marginTop: 8 }}>{chyba}</div>}
+      {hotovo && <div style={{ fontSize: 12, color: C.green, marginTop: 8 }}>{hotovo}</div>}
+    </Card>
+  );
+}
 
 export function Uzavierky() {
   const [obdobia, setObdobia] = useState<Obdobie[]>([]);
@@ -137,6 +233,7 @@ export function Uzavierky() {
                 <span style={{ color: C.textDim, fontSize: 11, minWidth: 118, fontVariantNumeric: "tabular-nums" }}>
                   {r.at.slice(0, 16).replace("T", " ")}
                 </span>
+                <span style={{ color: C.textMuted, fontSize: 11, minWidth: 58 }}>{r.actor === "app" ? "—" : r.actor}</span>
                 <span style={{ color: C.accentLight, minWidth: 150 }}>{POPIS[r.action] || r.action}</span>
                 <span style={{ color: C.text, flex: "1 1 200px", minWidth: 0 }}>
                   {r.predmet}
@@ -147,6 +244,8 @@ export function Uzavierky() {
           </div>
         )}
       </Card>
+
+      <Konta />
     </>
   );
 }
