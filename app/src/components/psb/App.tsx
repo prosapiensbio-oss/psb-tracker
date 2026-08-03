@@ -293,7 +293,7 @@ export function PSBApp() {
   return (
     <ObdobieCtx.Provider value={{ obdobie, setObdobie }}>
     <div style={{ minHeight: "100dvh", background: C.bg, color: C.text }}>
-      <div style={{ padding: "16px 16px 0", display: "flex", alignItems: "center", gap: 12, maxWidth: 1200, margin: "0 auto" }}>
+      <div style={{ padding: "16px 16px 0", display: "flex", alignItems: "center", gap: 12, maxWidth: 1200, margin: "0 auto", flexWrap: "wrap" }}>
         <div style={{ lineHeight: 1.1 }}>
           <div style={{ fontSize: 20, fontWeight: 800, color: C.accent, letterSpacing: -0.3 }}>Tracker</div>
           <div style={{ fontSize: 11, fontWeight: 500, color: C.textMuted, letterSpacing: 0.2 }}>ProSapiens Biomechanic</div>
@@ -306,7 +306,7 @@ export function PSBApp() {
               {ktoSom.charAt(0).toUpperCase() + ktoSom.slice(1)}
             </span>
           )}
-          <button onClick={logout} style={{ background: "none", border: "none", color: C.textDim, cursor: "pointer", fontSize: 12 }}>
+          <button onClick={logout} style={{ background: "none", border: "none", color: C.textDim, cursor: "pointer", fontSize: 12, whiteSpace: "nowrap" }}>
             Odhlásiť sa
           </button>
         </div>
