@@ -24,6 +24,7 @@ import {
   type MktMesiac,
 } from "../../lib/psb/marketing";
 import { KATEGORIE_HOOKOV, MKT_OBSAH } from "../../lib/psb/marketing-obsah";
+import { Algoritmus } from "./Algoritmus";
 import { Kanaly } from "./Kanaly";
 import { C, mix, S } from "../../lib/psb/theme";
 import type { AssistantChat } from "./Assistant";
@@ -720,6 +721,7 @@ export function Marketing({ data, clients, leads, chat }: { data: PSBData; clien
         tabs={[
           { id: "prehlad", label: "Prehľad" },
           { id: "kanaly", label: "Kanály" },
+          { id: "algoritmus", label: "Algoritmus" },
           { id: "vykon", label: "Čo fungovalo" },
           { id: "vyhladavanie", label: "Vyhľadávanie" },
           { id: "navratnost", label: "Čo to prinieslo" },
@@ -757,6 +759,7 @@ export function Marketing({ data, clients, leads, chat }: { data: PSBData; clien
         </>
       )}
       {sub === "kanaly" && <Kanaly />}
+      {sub === "algoritmus" && <Algoritmus />}
       {sub === "vykon" && (<><CoFungovalo chat={chat} /><CoFungovaloWeb rok={rok} chat={chat} /></>)}
       {sub === "vyhladavanie" && <Vyhladavanie chat={chat} />}
       {sub === "navratnost" && <CoToPrinieslo data={data} clients={clients} leads={leads} rok={rok} chat={chat} />}

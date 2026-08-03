@@ -15,6 +15,9 @@ import prevadzka from "./prevadzka.md?raw";
 // hovorí, kto sú a čo nechcú, kým rámce hovoria len, ako o tom uvažovať.
 import marketingProfil from "./marketing-profil.md?raw";
 import marketingRamce from "./marketing-ramce.md?raw";
+// Ako platformy rozhodujú o dosahu — s číslami PSB pri každom signáli. Datované
+// a zastarávajúce; appka sleduje oficiálne kanály a pripomína polročnú revíziu.
+import algoritmy from "./algoritmy.md?raw";
 
 export const PSB_KNOWLEDGE = `${knowledge}
 
@@ -32,4 +35,8 @@ ${marketingProfil}
 
 # MARKETINGOVÉ RÁMCE (destilát)
 
-${marketingRamce}`;
+${marketingRamce}
+
+---
+
+${algoritmy}`;

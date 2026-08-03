@@ -37,6 +37,7 @@ import { Route as ApiClientDeleteRouteImport } from './routes/api/client-delete'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ApiBtcReserveRouteImport } from './routes/api/btc-reserve'
 import { Route as ApiAnomalyRouteImport } from './routes/api/anomaly'
+import { Route as ApiAlgoRouteImport } from './routes/api/algo'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
@@ -178,11 +179,17 @@ const ApiAnomalyRoute = ApiAnomalyRouteImport.update({
   path: '/api/anomaly',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAlgoRoute = ApiAlgoRouteImport.update({
+  id: '/api/algo',
+  path: '/api/algo',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/api/algo': typeof ApiAlgoRoute
   '/api/anomaly': typeof ApiAnomalyRoute
   '/api/btc-reserve': typeof ApiBtcReserveRoute
   '/api/chat': typeof ApiChatRoute
@@ -213,6 +220,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/api/algo': typeof ApiAlgoRoute
   '/api/anomaly': typeof ApiAnomalyRoute
   '/api/btc-reserve': typeof ApiBtcReserveRoute
   '/api/chat': typeof ApiChatRoute
@@ -244,6 +252,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/api/algo': typeof ApiAlgoRoute
   '/api/anomaly': typeof ApiAnomalyRoute
   '/api/btc-reserve': typeof ApiBtcReserveRoute
   '/api/chat': typeof ApiChatRoute
@@ -276,6 +285,7 @@ export interface FileRouteTypes {
     | '/'
     | '/robots.txt'
     | '/sitemap.xml'
+    | '/api/algo'
     | '/api/anomaly'
     | '/api/btc-reserve'
     | '/api/chat'
@@ -306,6 +316,7 @@ export interface FileRouteTypes {
     | '/'
     | '/robots.txt'
     | '/sitemap.xml'
+    | '/api/algo'
     | '/api/anomaly'
     | '/api/btc-reserve'
     | '/api/chat'
@@ -336,6 +347,7 @@ export interface FileRouteTypes {
     | '/'
     | '/robots.txt'
     | '/sitemap.xml'
+    | '/api/algo'
     | '/api/anomaly'
     | '/api/btc-reserve'
     | '/api/chat'
@@ -367,6 +379,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   RobotsDottxtRoute: typeof RobotsDottxtRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  ApiAlgoRoute: typeof ApiAlgoRoute
   ApiAnomalyRoute: typeof ApiAnomalyRoute
   ApiBtcReserveRoute: typeof ApiBtcReserveRoute
   ApiChatRoute: typeof ApiChatRoute
@@ -592,6 +605,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAnomalyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/algo': {
+      id: '/api/algo'
+      path: '/api/algo'
+      fullPath: '/api/algo'
+      preLoaderRoute: typeof ApiAlgoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -599,6 +619,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   RobotsDottxtRoute: RobotsDottxtRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
+  ApiAlgoRoute: ApiAlgoRoute,
   ApiAnomalyRoute: ApiAnomalyRoute,
   ApiBtcReserveRoute: ApiBtcReserveRoute,
   ApiChatRoute: ApiChatRoute,
