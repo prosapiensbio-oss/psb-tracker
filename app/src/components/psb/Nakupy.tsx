@@ -92,11 +92,16 @@ export function Nakupy() {
       ) : (
         <div>
           {[...chceme, ...kupene].map((p) => (
+            // Mriežka, nie flex: pri flexe si input vypýta svoju vlastnú šírku a
+            // na telefóne aj na užšom okne odskočilo × na samostatný riadok.
+            // Takto sú riadky rovnaké v každej šírke — hore názov a cena, pod
+            // tým odkaz.
             <div
               key={p.id}
               style={{
-                display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap",
-                padding: "8px 0", borderBottom: `1px solid ${mix(C.border, 55)}`,
+                display: "grid", gridTemplateColumns: "auto minmax(0, 1fr) 92px auto auto",
+                gap: 8, alignItems: "center", padding: "9px 0",
+                borderBottom: `1px solid ${mix(C.border, 55)}`,
                 opacity: p.kupene ? 0.55 : 1,
               }}
             >
@@ -107,41 +112,40 @@ export function Nakupy() {
               />
               <input
                 value={p.nazov} onChange={(e) => uprav(p.id, { nazov: e.target.value })}
-                style={vstup({ flex: "2 1 150px", width: "auto", textDecoration: p.kupene ? "line-through" : "none" })}
+                style={vstup({ minWidth: 0, textDecoration: p.kupene ? "line-through" : "none" })}
               />
               <input
                 value={p.cena || ""} onChange={(e) => uprav(p.id, { cena: Number(e.target.value.replace(/[^\d]/g, "")) || 0 })}
                 inputMode="numeric" placeholder="cena"
-                style={vstup({ flex: "0 1 100px", width: "auto", textAlign: "right", fontVariantNumeric: "tabular-nums" })}
+                style={vstup({ minWidth: 0, textAlign: "right", fontVariantNumeric: "tabular-nums" })}
               />
-              <input
-                value={p.link} onChange={(e) => uprav(p.id, { link: e.target.value })} placeholder="odkaz na e-shop"
-                style={vstup({ flex: "2 1 180px", width: "auto", fontSize: 12 })}
-              />
-              {p.link && (
-                <a href={p.link.startsWith("http") ? p.link : `https://${p.link}`} target="_blank" rel="noreferrer"
-                  title="Otvoriť odkaz" style={{ color: C.accentLight, fontSize: 13, textDecoration: "none", flex: "0 0 auto" }}>
-                  ↗
-                </a>
-              )}
+              <a
+                href={p.link ? (p.link.startsWith("http") ? p.link : `https://${p.link}`) : undefined}
+                target="_blank" rel="noreferrer" title={p.link ? "Otvoriť odkaz" : "Bez odkazu"}
+                style={{ color: p.link ? C.accentLight : mix(C.textDim, 40), fontSize: 14, textDecoration: "none", padding: "0 2px", cursor: p.link ? "pointer" : "default" }}
+              >
+                ↗
+              </a>
               <button
                 onClick={() => zmaz(p)} title="Zmazať položku"
-                style={{ background: "none", border: "none", color: C.textDim, cursor: "pointer", fontSize: 15, flex: "0 0 auto", padding: "0 4px" }}
+                style={{ background: "none", border: "none", color: C.textDim, cursor: "pointer", fontSize: 16, padding: "0 2px" }}
               >
                 ×
               </button>
+              <input
+                value={p.link} onChange={(e) => uprav(p.id, { link: e.target.value })} placeholder="odkaz na e-shop"
+                style={vstup({ gridColumn: "2 / -1", minWidth: 0, fontSize: 11.5, padding: "5px 8px", color: C.textMuted })}
+              />
             </div>
           ))}
         </div>
       )}
 
-      <form onSubmit={pridaj} style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 14 }}>
+      <form onSubmit={pridaj} style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 92px auto", gap: 8, marginTop: 14 }}>
         <input value={nazov} onChange={(e) => setNazov(e.target.value)} placeholder="Nová položka"
-          style={vstup({ flex: "2 1 150px", width: "auto" })} />
+          style={vstup({ minWidth: 0 })} />
         <input value={cena} onChange={(e) => setCena(e.target.value.replace(/[^\d]/g, ""))} inputMode="numeric" placeholder="cena"
-          style={vstup({ flex: "0 1 100px", width: "auto", textAlign: "right" })} />
-        <input value={link} onChange={(e) => setLink(e.target.value)} placeholder="odkaz na e-shop"
-          style={vstup({ flex: "2 1 180px", width: "auto", fontSize: 12 })} />
+          style={vstup({ minWidth: 0, textAlign: "right" })} />
         <button type="submit" disabled={!nazov.trim()}
           style={{
             padding: "8px 16px", borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: nazov.trim() ? "pointer" : "default",
@@ -150,6 +154,8 @@ export function Nakupy() {
           }}>
           Pridať
         </button>
+        <input value={link} onChange={(e) => setLink(e.target.value)} placeholder="odkaz na e-shop (nepovinné)"
+          style={vstup({ gridColumn: "1 / -1", minWidth: 0, fontSize: 11.5, padding: "5px 8px" })} />
       </form>
       <div style={{ fontSize: 11, color: C.textDim, marginTop: 8, lineHeight: 1.5 }}>
         Zmeny sa ukladajú samé. Do auditu ide pridanie, zmazanie a zaškrtnutie „kúpené“ — nie prepisovanie ceny.
