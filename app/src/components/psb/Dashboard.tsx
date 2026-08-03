@@ -176,6 +176,41 @@ function useDashColumns() {
   return cols;
 }
 
+// Telefón. Nie je to to isté ako „jeden stĺpec": na 375 px má dashboard aj po
+// zúžení cez dva metre výšky a človek sa k registru hore vráti len scrollovaním
+// späť. Preto sa na telefóne grafy zbalia a rozbalia sa klikom — čísla a
+// signály zostanú, tvary si vyžiada ten, kto ich chce.
+function useTelefon() {
+  const [je, setJe] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 560px)");
+    const apply = () => setJe(mq.matches);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
+  return je;
+}
+
+/** Na telefóne sa graf skryje za klik; na väčšom displeji sa nič nemení. */
+function Zbalitelny({ telefon, popis, children }: { telefon: boolean; popis: string; children: ReactNode }) {
+  const [otvorene, setOtvorene] = useState(false);
+  if (!telefon) return <>{children}</>;
+  if (otvorene) return <>{children}</>;
+  return (
+    <button
+      onClick={() => setOtvorene(true)}
+      style={{
+        width: "100%", padding: "10px 12px", borderRadius: 9, cursor: "pointer",
+        border: `1px dashed ${mix(C.accent, 35)}`, background: "transparent",
+        color: C.textMuted, fontSize: 12, textAlign: "left",
+      }}
+    >
+      {popis} — <span style={{ color: C.accentLight }}>ukázať graf</span>
+    </button>
+  );
+}
+
 // A compact clickable stat used in the weekly-hours summary strip.
 function MiniStat({ label, value, color, onClick }: { label: ReactNode; value: string; color?: string; onClick?: () => void }) {
   return (
@@ -310,6 +345,7 @@ export function Dashboard({
   const [arranging, setArranging] = useState(false);
   const layout = useDashLayout();
   const cols = useDashColumns();
+  const telefon = useTelefon();
   const matchT = (t: string) => trainer === "all" || t === trainer;
 
   // Zdravá zóna pre zvoleného trénera: pri „Obaja" je to dvojnásobok, lebo
@@ -517,7 +553,9 @@ export function Dashboard({
           <Info text="Odtrénované hodiny za týždeň. Otvára sa na najnovšom týždni — posúvaj doľava do minulosti. Zelené pásmo 24–34h je zdravá zóna na jedného trénera." label="Odrobené hodiny / týždeň" />
         </H3>
         {weeklyHours.data.length ? (
-          <ZoneBars data={weeklyHours.data} series={weeklyHours.series} zone={{ lo: ZONE_LO, hi: ZONE_HI }} height={116} alignEnd />
+          <Zbalitelny telefon={telefon} popis={`${weeklyHours.data.length} týždňov`}>
+            <ZoneBars data={weeklyHours.data} series={weeklyHours.series} zone={{ lo: ZONE_LO, hi: ZONE_HI }} height={116} alignEnd />
+          </Zbalitelny>
         ) : (
           <Empty>Nahraj Payroll by Session.</Empty>
         )}
@@ -584,7 +622,11 @@ export function Dashboard({
             ))}
           </div>
         </div>
-        {earnings.length ? <ValueBars data={earnings} color={earnMode === "prijate" ? C.blue : C.accent} forecastColor={C.blue} fmt={(n) => `${Math.round(n / 1000)}k`} height={180} alignEnd /> : <Empty>Nahraj Payroll.</Empty>}
+        {earnings.length ? (
+          <Zbalitelny telefon={telefon} popis={`${earnings.length} mesiacov`}>
+            <ValueBars data={earnings} color={earnMode === "prijate" ? C.blue : C.accent} forecastColor={C.blue} fmt={(n) => `${Math.round(n / 1000)}k`} height={180} alignEnd />
+          </Zbalitelny>
+        ) : <Empty>Nahraj Payroll.</Empty>}
         {earningStats && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 8, marginTop: 10 }}>
             <MiniStat label={`Ø / mes. (${earningStats.n})`} value={`${Math.round(earningStats.avg / 1000)}k`} />
