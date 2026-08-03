@@ -23,7 +23,7 @@ const inline = (s: string) =>
     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
     .replace(/(^|[^*])\*([^*]+?)\*/g, "$1<em>$2</em>");
 
-export function markdownToHtml(md: string): string {
+export function markdownToHtml(md: string, grafy: Record<string, string> = {}): string {
   const riadky = md.split("\n");
   const out: string[] = [];
   let vZozname = false;
@@ -37,6 +37,17 @@ export function markdownToHtml(md: string): string {
     const t = r.trim();
 
     if (!t) { zavriZoznam(); zavriTabulku(); continue; }
+
+    // Značka grafu. Keď graf pre dané obdobie nevznikol (napr. marketing za
+    // mesiace, ktoré export ešte nepokrýva), riadok ticho zmizne — prázdny
+    // rámček s nadpisom „graf" je horší než žiadny graf.
+    const znacka = t.match(/^::graf:([a-z0-9_-]+)::$/i);
+    if (znacka) {
+      zavriZoznam(); zavriTabulku();
+      const svg = grafy[znacka[1]];
+      if (svg) out.push(`<figure class="graf-obal">${svg}</figure>`);
+      continue;
+    }
 
     // Tabuľka: hlavička, oddeľovač, riadky.
     if (t.startsWith("|")) {
@@ -77,8 +88,8 @@ export function markdownToHtml(md: string): string {
  * Celý dokument na tlač. Vracia samostatné HTML — nič sa neťahá zvonku, takže
  * to funguje aj offline a v PDF nechýbajú štýly.
  */
-export function reportDocument(md: string, podnadpis: string): string {
-  const telo = markdownToHtml(md);
+export function reportDocument(md: string, podnadpis: string, grafy: Record<string, string> = {}): string {
+  const telo = markdownToHtml(md, grafy);
   const den = new Date().toLocaleDateString("sk-SK", { day: "numeric", month: "long", year: "numeric" });
 
   return `<!doctype html>
@@ -188,6 +199,15 @@ export function reportDocument(md: string, podnadpis: string): string {
   td:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
   th:not(:first-child) { text-align: right; }
 
+  /* ── Grafy ────────────────────────────────────────────────────────────── */
+  .graf-obal {
+    margin: 4px 0 18px; padding: 10px 12px;
+    background: #fff; border: 1px solid var(--linka); border-radius: 7px;
+    /* Graf rozseknutý medzi dve strany je nečitateľný. */
+    break-inside: avoid; page-break-inside: avoid;
+  }
+  .graf-obal svg { display: block; width: 100%; height: auto; }
+
   /* ── Pätka ────────────────────────────────────────────────────────────── */
   .patka {
     margin-top: 26px; padding-top: 10px; border-top: 1px solid var(--linka);
@@ -219,8 +239,8 @@ export function reportDocument(md: string, podnadpis: string): string {
  * blokujú blokovače vyskakovacích okien a na telefóne sa otvorí ako ďalšia
  * karta, ktorú musí človek zavrieť ručne.
  */
-export function vytlacReport(md: string, podnadpis: string): void {
-  const doc = reportDocument(md, podnadpis);
+export function vytlacReport(md: string, podnadpis: string, grafy: Record<string, string> = {}): void {
+  const doc = reportDocument(md, podnadpis, grafy);
   const ram = document.createElement("iframe");
   ram.setAttribute("aria-hidden", "true");
   ram.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;opacity:0;";

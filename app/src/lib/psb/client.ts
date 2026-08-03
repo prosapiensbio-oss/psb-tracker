@@ -302,7 +302,7 @@ export async function setPeriodLock(month: string, locked: boolean, note = ""): 
 
 
 // ── Nákupný zoznam náradia ───────────────────────────────────────────────────
-export type WishPolozka = { id: string; nazov: string; cena: number; link: string; kupene: boolean; kupeneAt?: string; poznamka?: string };
+export type WishPolozka = { id: string; nazov: string; cena: number; link: string; kupene: boolean; kupeneAt?: string; poznamka?: string; kategoria: string };
 
 export async function fetchWishlist(): Promise<WishPolozka[]> {
   try {

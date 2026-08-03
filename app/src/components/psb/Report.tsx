@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 
 import type { CapacityRow, ClientAgg, RegisterItem, SixMRow } from "../../lib/psb/compute";
 import { monthLabel } from "../../lib/psb/format";
-import { buildReport, dostupneMesiace, SEKCIE, type SekciaId } from "../../lib/psb/report";
+import { buildReport, dostupneMesiace, reportGrafy, SEKCIE, type SekciaId } from "../../lib/psb/report";
 import { vytlacReport } from "../../lib/psb/reportHtml";
 import { C, mix } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
@@ -71,6 +71,18 @@ export function Report({
       // Clipboard bez povolenia — nech sa dá text aspoň označiť ručne.
       setSkopirovane(false);
     }
+  };
+
+  // PDF si pýta vlastnú verziu markdownu — so značkami grafov. Text na
+  // kopírovanie ich mať nesmie: v Claude projekte by to bol šum a v .md by ich
+  // nemal čo vykresliť.
+  const doPdf = () => {
+    const filter = { od: odOk, doM, trener, sekcie, detail, grafy: true };
+    vytlacReport(
+      buildReport(data, clients, sixM, capacity, register, filter),
+      obdobiePopis,
+      reportGrafy(data, clients, filter),
+    );
   };
 
   const obdobiePopis = `Report za ${odOk === doM ? monthLabel(odOk) : `${monthLabel(odOk)} – ${monthLabel(doM)}`}${trener !== "obaja" ? ` · ${trener}` : ""}`;
@@ -150,7 +162,7 @@ export function Report({
         </div>
         <div style={{ fontSize: 11, color: C.textDim, lineHeight: 1.5 }}>
           {trener !== "obaja" && "Filter podľa trénera platí na sedenia a hodiny — platby v PTminderi trénera nemajú, takže tržby zostávajú za celé štúdio. "}
-          Report sa prepisuje sám, ako meníš filtre.
+          Report sa prepisuje sám, ako meníš filtre. Grafy sú len v PDF — v texte na kopírovanie by boli šum.
         </div>
       </Card>
 
@@ -159,7 +171,7 @@ export function Report({
           <button onClick={() => void kopiruj()} style={tlac(true)}>
             {skopirovane ? "✓ Skopírované" : "Kopírovať"}
           </button>
-          <button onClick={() => vytlacReport(text, obdobiePopis)} style={tlac(true)}>PDF</button>
+          <button onClick={doPdf} style={tlac(true)}>PDF</button>
           <button onClick={stiahni} style={tlac(false)}>Stiahnuť .md</button>
           <span style={{ fontSize: 11, color: C.textDim, marginLeft: "auto" }}>
             {text.split("\n").length} riadkov · {Math.round(text.length / 1000)} tis. znakov

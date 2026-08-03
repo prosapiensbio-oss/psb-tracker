@@ -29,6 +29,7 @@ import {
 } from "./compute";
 import { monthKey, monthLabel } from "./format";
 import { GA4_MESACNE, GSC_DOPYTY, GSC_MESACNE, MKT_MESACNE, MKT_TOP } from "./marketing";
+import { FARBY, pruhovyGraf, stlpcovyGraf } from "./reportGrafy";
 import type { PSBData } from "./types";
 
 export type SekciaId = "peniaze" | "klienti" | "treningy" | "marketing" | "dopyty" | "signaly";
@@ -48,7 +49,13 @@ export type ReportFilter = {
   trener: string;        // "obaja" | "Jerry" | "Terezka"
   sekcie: SekciaId[];
   detail: boolean;       // true = tabuľky po mesiacoch a menné zoznamy
+  /** Vloží značky pre grafy. Zapína sa len pri PDF — v texte pre Clauda by
+   *  boli šum a v .md by ich nemal čo vykresliť. */
+  grafy?: boolean;
 };
+
+/** Značka, ktorú tlačový dokument nahradí obrázkom. */
+const graf = (id: string) => `::graf:${id}::`;
 
 const r0 = (n: number) => Math.round(n);
 const r1 = (n: number) => Math.round(n * 10) / 10;
@@ -126,6 +133,10 @@ export function buildReport(
       out.push(tabulka(["Mesiac", "Prijaté tržby", "Vyfakturované", "Sedení"], rows));
       out.push("");
     }
+    if (f.grafy && fin.length > 1) {
+      out.push(graf("trzby"));
+      out.push("");
+    }
   }
 
   // ── Klienti ────────────────────────────────────────────────────────────────
@@ -167,6 +178,7 @@ export function buildReport(
     out.push("");
     out.push(`**Podľa balíčka:** ${podla((c) => c.membership || "Bez balíčka").map(([k, v]) => `${k} ${v}`).join(" · ")}`);
     out.push("");
+    if (f.grafy) { out.push(graf("balicky")); out.push(""); }
     if (f.detail) {
       const rows = aktivni
         .slice()
@@ -195,6 +207,7 @@ export function buildReport(
     out.push(`- **Podľa trénera:** ${Object.entries(podlaTrenera).map(([k, v]) => `${k} ${r0(v)} h`).join(" · ") || "—"}`);
     out.push(`- **Typy sedení:** ${Object.entries(typy).map(([k, v]) => `${k} ${v}`).join(" · ") || "—"}`);
     out.push("");
+    if (f.grafy) { out.push(graf("hodiny")); out.push(""); }
     const cap = capacity.filter((c) => !trenerFilter || c.trainer === f.trener);
     if (cap.length) {
       out.push(tabulka(
@@ -222,6 +235,7 @@ export function buildReport(
       out.push(`- **Uloženia:** ${sum("ulozenia")} · zdieľania ${sum("zdielania")}`);
       out.push(`- **Reklama:** ${kc(sum("spend"))}`);
       out.push("");
+      if (f.grafy) { out.push(graf("marketing")); out.push(""); }
       if (f.detail) {
         out.push(tabulka(
           ["Mesiac", "Posty", "Reels", "Stories", "Videnia", "Dosah", "Reklama"],
@@ -311,4 +325,82 @@ export function buildReport(
   }
 
   return out.join("\n").replace(/\n{3,}/g, "\n\n").trim() + "\n";
+}
+
+
+/**
+ * SVG grafy k reportu. Kľúče sedia so značkami, ktoré do markdownu vkladá
+ * buildReport pri f.grafy — čo sa nevygeneruje, to tlačový dokument ticho
+ * vynechá (napr. marketing za obdobie, ktoré export ešte nepokrýva).
+ */
+export function reportGrafy(
+  data: PSBData,
+  clients: Record<string, ClientAgg>,
+  f: ReportFilter,
+): Record<string, string> {
+  const trenerFilter = f.trener !== "obaja";
+  const sedenia = data.sessions.filter(
+    (s) => vRozsahu(monthKey(s.date), f) && (!trenerFilter || s.sessionTrainer === f.trener),
+  );
+  const out: Record<string, string> = {};
+
+  // ── Peniaze: prijaté tržby vs vyfakturované ───────────────────────────────
+  const fin = monthlyFinance(data).filter((m) => vRozsahu(m.month, f));
+  if (fin.length > 1) {
+    out.trzby = stlpcovyGraf({
+      popisky: fin.map((m) => monthLabel(m.month)),
+      jednotka: "Kč",
+      serie: [
+        { nazov: "Prijaté tržby", farba: FARBY.hlavna, hodnoty: fin.map((m) => m.cash) },
+        {
+          nazov: "Vyfakturované",
+          farba: FARBY.vedlajsia,
+          hodnoty: fin.map((m) =>
+            trenerFilter
+              ? sedenia.filter((s) => monthKey(s.date) === m.month).reduce((a, s) => a + s.price, 0)
+              : m.revenue,
+          ),
+        },
+      ],
+    });
+  }
+
+  // ── Klienti: rozloženie balíčkov ──────────────────────────────────────────
+  const aktivni = Object.values(clients).filter(
+    (c) => c.status !== "Neaktívny" && (!trenerFilter || c.primaryTrainer === f.trener),
+  );
+  const balicky: Record<string, number> = {};
+  for (const c of aktivni) balicky[c.membership || "Bez balíčka"] = (balicky[c.membership || "Bez balíčka"] || 0) + 1;
+  const zoradene = Object.entries(balicky).sort((a, b) => b[1] - a[1]);
+  if (zoradene.length) {
+    out.balicky = pruhovyGraf({ polozky: zoradene.map(([nazov, hodnota]) => ({ nazov, hodnota })) });
+  }
+
+  // ── Tréningy: hodiny po mesiacoch, po trénerovi ───────────────────────────
+  const mesiace = [...new Set(sedenia.map((s) => monthKey(s.date)))].sort();
+  if (mesiace.length) {
+    const hod = (t: string, m: string) =>
+      sedenia.filter((s) => monthKey(s.date) === m && s.sessionTrainer === t).reduce((a, s) => a + s.duration / 60, 0);
+    const serie = trenerFilter
+      ? [{ nazov: f.trener, farba: FARBY.hlavna, hodnoty: mesiace.map((m) => hod(f.trener, m)) }]
+      : [
+          { nazov: "Jerry", farba: FARBY.hlavna, hodnoty: mesiace.map((m) => hod("Jerry", m)) },
+          { nazov: "Terezka", farba: FARBY.vedlajsia, hodnoty: mesiace.map((m) => hod("Terezka", m)) },
+        ];
+    out.hodiny = stlpcovyGraf({ popisky: mesiace.map(monthLabel), serie, jednotka: "hodín" });
+  }
+
+  // ── Marketing: videnia a dosah ────────────────────────────────────────────
+  const mkt = MKT_MESACNE.filter((m) => vRozsahu(m.m, f));
+  if (mkt.length > 1) {
+    out.marketing = stlpcovyGraf({
+      popisky: mkt.map((m) => monthLabel(m.m)),
+      serie: [
+        { nazov: "Videnia", farba: FARBY.hlavna, hodnoty: mkt.map((m) => m.views) },
+        { nazov: "Dosah", farba: FARBY.vedlajsia, hodnoty: mkt.map((m) => m.dosah) },
+      ],
+    });
+  }
+
+  return out;
 }
