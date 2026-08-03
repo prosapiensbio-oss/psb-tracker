@@ -30,7 +30,9 @@ const ZDROJE: { nazov: string; url: string }[] = [
 const KLUCOVE = [
   "algorithm", "ranking", "core update", "search update", "spam polic",
   "recommendation", "how we recommend", "distribution", "reach",
-  "for you", "visibility", "helpful content", "content policy",
+  // „for you" samo o sebe chytalo vety typu „for your first Short" — musí to
+  // byť názov plochy, nie predložka.
+  "for you page", "for you feed", "visibility", "helpful content", "content policy",
 ];
 
 const hash = (s: string) => {
