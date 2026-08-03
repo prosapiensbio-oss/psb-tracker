@@ -27,6 +27,7 @@ import { Route as ApiJarvisMemoryRouteImport } from './routes/api/jarvis-memory'
 import { Route as ApiIngestRouteImport } from './routes/api/ingest'
 import { Route as ApiExportRouteImport } from './routes/api/export'
 import { Route as ApiDataRouteImport } from './routes/api/data'
+import { Route as ApiClientDeleteRouteImport } from './routes/api/client-delete'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ApiBtcReserveRouteImport } from './routes/api/btc-reserve'
 import { Route as ApiAnomalyRouteImport } from './routes/api/anomaly'
@@ -121,6 +122,11 @@ const ApiDataRoute = ApiDataRouteImport.update({
   path: '/api/data',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiClientDeleteRoute = ApiClientDeleteRouteImport.update({
+  id: '/api/client-delete',
+  path: '/api/client-delete',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiChatRoute = ApiChatRouteImport.update({
   id: '/api/chat',
   path: '/api/chat',
@@ -144,6 +150,7 @@ export interface FileRoutesByFullPath {
   '/api/anomaly': typeof ApiAnomalyRoute
   '/api/btc-reserve': typeof ApiBtcReserveRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/client-delete': typeof ApiClientDeleteRoute
   '/api/data': typeof ApiDataRoute
   '/api/export': typeof ApiExportRoute
   '/api/ingest': typeof ApiIngestRoute
@@ -167,6 +174,7 @@ export interface FileRoutesByTo {
   '/api/anomaly': typeof ApiAnomalyRoute
   '/api/btc-reserve': typeof ApiBtcReserveRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/client-delete': typeof ApiClientDeleteRoute
   '/api/data': typeof ApiDataRoute
   '/api/export': typeof ApiExportRoute
   '/api/ingest': typeof ApiIngestRoute
@@ -191,6 +199,7 @@ export interface FileRoutesById {
   '/api/anomaly': typeof ApiAnomalyRoute
   '/api/btc-reserve': typeof ApiBtcReserveRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/client-delete': typeof ApiClientDeleteRoute
   '/api/data': typeof ApiDataRoute
   '/api/export': typeof ApiExportRoute
   '/api/ingest': typeof ApiIngestRoute
@@ -216,6 +225,7 @@ export interface FileRouteTypes {
     | '/api/anomaly'
     | '/api/btc-reserve'
     | '/api/chat'
+    | '/api/client-delete'
     | '/api/data'
     | '/api/export'
     | '/api/ingest'
@@ -239,6 +249,7 @@ export interface FileRouteTypes {
     | '/api/anomaly'
     | '/api/btc-reserve'
     | '/api/chat'
+    | '/api/client-delete'
     | '/api/data'
     | '/api/export'
     | '/api/ingest'
@@ -262,6 +273,7 @@ export interface FileRouteTypes {
     | '/api/anomaly'
     | '/api/btc-reserve'
     | '/api/chat'
+    | '/api/client-delete'
     | '/api/data'
     | '/api/export'
     | '/api/ingest'
@@ -286,6 +298,7 @@ export interface RootRouteChildren {
   ApiAnomalyRoute: typeof ApiAnomalyRoute
   ApiBtcReserveRoute: typeof ApiBtcReserveRoute
   ApiChatRoute: typeof ApiChatRoute
+  ApiClientDeleteRoute: typeof ApiClientDeleteRoute
   ApiDataRoute: typeof ApiDataRoute
   ApiExportRoute: typeof ApiExportRoute
   ApiIngestRoute: typeof ApiIngestRoute
@@ -431,6 +444,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiDataRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/client-delete': {
+      id: '/api/client-delete'
+      path: '/api/client-delete'
+      fullPath: '/api/client-delete'
+      preLoaderRoute: typeof ApiClientDeleteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/chat': {
       id: '/api/chat'
       path: '/api/chat'
@@ -462,6 +482,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAnomalyRoute: ApiAnomalyRoute,
   ApiBtcReserveRoute: ApiBtcReserveRoute,
   ApiChatRoute: ApiChatRoute,
+  ApiClientDeleteRoute: ApiClientDeleteRoute,
   ApiDataRoute: ApiDataRoute,
   ApiExportRoute: ApiExportRoute,
   ApiIngestRoute: ApiIngestRoute,
