@@ -222,8 +222,8 @@ function UploadCard({ data, missing, actions }: { data: PSBData; missing: typeof
       {neCsv.length > 0 && (
         <div style={{ padding: "10px 13px", marginBottom: 10, borderRadius: 9, background: mix(C.orange, 8), border: `1px solid ${mix(C.orange, 28)}`, fontSize: 12.5, color: C.text, lineHeight: 1.55 }}>
           <b>{neCsv.map((x) => x.meno).join(", ")}</b> — toto je {neCsv[0].pripona.toUpperCase()}, nie CSV. Appka číta tabuľky, nie hotové zostavy.
-          {neCsv.some((x) => x.pripona === "pdf" || x.pripona === "pptx") && (
-            <> V Metricoole je PDF ponúknuté ako prvé, ale potrebné je <b>Analytics → Export → CSV</b>, zvlášť pre posty, reels a stories.</>
+          {neCsv.some((x) => x.pripona === "pptx") && (
+            <> PPTX appka nečíta. Z Metricoolu ber buď <b>Analytics → Export → CSV</b>, alebo mesačnú zostavu v <b>PDF</b> — tú prečíta Jarvis.</>
           )}
           {neCsv.some((x) => x.pripona === "zip") && (
             <> Search Console sťahuje ZIP — rozbaľ ho a nahraj súbory zvnútra (Graf, Dopyty, Stránky).</>
