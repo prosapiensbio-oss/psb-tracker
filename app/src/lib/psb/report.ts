@@ -27,7 +27,7 @@ import {
   type RegisterItem,
   type SixMRow,
 } from "./compute";
-import { monthKey, monthLabel } from "./format";
+import { fmtDMY, monthKey, monthLabel } from "./format";
 import { GA4_MESACNE, GSC_DOPYTY, GSC_MESACNE, MKT_MESACNE, MKT_TOP } from "./marketing";
 import { FARBY, pruhovyGraf, stlpcovyGraf } from "./reportGrafy";
 import type { PSBData } from "./types";
@@ -186,7 +186,7 @@ export function buildReport(
         .map((c) => [
           c.name, c.segment, c.membership || "—", c.primaryTrainer || "—",
           c.packageTotal ? `${c.packageRemaining}/${c.packageTotal}` : "—",
-          c.lastSession || "—",
+          c.lastSession ? fmtDMY(c.lastSession) : "—",
         ]);
       out.push(tabulka(["Klient", "Segment", "Balíček", "Tréner", "Zostatok", "Naposledy"], rows));
       out.push("");
@@ -300,7 +300,7 @@ export function buildReport(
     if (f.detail && dopyty.length) {
       out.push(tabulka(
         ["Dátum", "Meno", "Zdroj", "Stav", "Poznámka"],
-        dopyty.map((l) => [l.date, l.name, l.source + (l.referrer ? ` (${l.referrer})` : ""), l.status, (l.note || "").replace(/\|/g, "/").slice(0, 80)]),
+        dopyty.map((l) => [l.date ? fmtDMY(l.date) : "—", l.name, l.source + (l.referrer ? ` (${l.referrer})` : ""), l.status, (l.note || "").replace(/\|/g, "/").slice(0, 80)]),
       ));
       out.push("");
     }
