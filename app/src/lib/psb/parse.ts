@@ -519,3 +519,108 @@ export function parseMetricool(text: string): MktPrispevok[] {
   }
   return out;
 }
+
+// ── GA4 („Prehľad stavu prehľadov") ──────────────────────────────────────────
+//
+// Nie je to tabuľka. Je to pätnásť malých tabuliek v jednom súbore, oddelených
+// prázdnym riadkom, každá s vlastnou hlavičkou a komentárovými riadkami. Preto
+// sa nehľadajú stĺpce, ale bloky — a z nich len tie dva, ktoré niečo hovoria:
+// odkiaľ prišli noví ľudia a koľko bolo kľúčových udalostí (odoslaný formulár).
+export type Ga4Import = {
+  mesiac: string;
+  novi: number;
+  organicSearch: number;
+  paidSocial: number;
+  organicSocial: number;
+  direct: number;
+  referral: number;
+  udalosti: number;
+};
+
+export function parseGa4(text: string): Ga4Import | null {
+  const t = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  // Mesiac z prvého „# Dátum začatia: 20260701". Keby ich bolo viac (bloky majú
+  // vlastné rozsahy), platí ten prvý — je to hlavička celého exportu.
+  const md = t.match(/D[áa]tum za[čc]atia:\s*(\d{4})(\d{2})\d{2}/);
+  if (!md) return null;
+  const mesiac = `${md[1]}-${md[2]}`;
+
+  const bloky = t.split(/\n\s*\n/).filter((b) => b.trim());
+  const kanaly: Record<string, number> = {};
+  let udalosti = 0;
+
+  for (const b of bloky) {
+    const riadky = b.split("\n").map((x) => x.trim()).filter((x) => x && !x.startsWith("#"));
+    if (riadky.length < 2) continue;
+    const hlav = riadky[0].toLowerCase();
+
+    // „Hlavná skupina kanálov NOVÉHO POUŽÍVATEĽA" — pozor, existuje aj blok pre
+    // relácie s tými istými názvami kanálov. Relácie sú návštevy, nie ľudia;
+    // zámena by nafúkla čísla asi o tretinu.
+    if (hlav.includes("nov") && hlav.includes("kan") && hlav.includes("použ")) {
+      for (const r of riadky.slice(1)) {
+        const p = splitCSVLine(r);
+        if (p.length >= 2) kanaly[p[0].trim().toLowerCase()] = parseFloat(p[1]) || 0;
+      }
+    }
+    // Kľúčové udalosti = konverzie nastavené v GA4 (kontakt, ďakovná stránka).
+    if (hlav.startsWith("názov udalosti") && hlav.includes("hlavné udalosti")) {
+      for (const r of riadky.slice(1)) {
+        const p = splitCSVLine(r);
+        if (p.length >= 2) udalosti += parseFloat(p[1]) || 0;
+      }
+    }
+  }
+  if (!Object.keys(kanaly).length && !udalosti) return null;
+
+  const k = (n: string) => Math.round(kanaly[n] || 0);
+  return {
+    mesiac,
+    novi: Math.round(Object.values(kanaly).reduce((a, b) => a + b, 0)),
+    organicSearch: k("organic search"),
+    paidSocial: k("paid social"),
+    organicSocial: k("organic social"),
+    direct: k("direct"),
+    referral: k("referral"),
+    udalosti: Math.round(udalosti),
+  };
+}
+
+// ── Search Console ───────────────────────────────────────────────────────────
+//
+// Štyri súbory z jedného stiahnutého priečinka. Poznajú sa podľa prvého stĺpca,
+// nie podľa názvu súboru — ten je lokalizovaný a človek si ho premenuje.
+export type GscImport =
+  | { druh: "graf"; mesiace: { mesiac: string; kliky: number; zobrazenia: number }[] }
+  | { druh: "dopyty" | "strany"; riadky: { kluc: string; kliky: number; zobrazenia: number; ctr: number; pozicia: number }[] }
+  | null;
+
+const pct = (s: string) => parseFloat(String(s).replace("%", "").replace(",", ".")) || 0;
+
+export function parseGsc(text: string): GscImport {
+  const ls = text.replace(/\r\n/g, "\n").split("\n").map((x) => x.trim()).filter(Boolean);
+  if (ls.length < 2) return null;
+  const prvy = splitCSVLine(ls[0])[0].trim().toLowerCase();
+
+  if (prvy.startsWith("dátum") || prvy.startsWith("datum")) {
+    const podla = new Map<string, { mesiac: string; kliky: number; zobrazenia: number }>();
+    for (const r of ls.slice(1)) {
+      const p = splitCSVLine(r);
+      const m = (p[0] || "").slice(0, 7);
+      if (!/^\d{4}-\d{2}$/.test(m)) continue;
+      const e = podla.get(m) || { mesiac: m, kliky: 0, zobrazenia: 0 };
+      e.kliky += parseFloat(p[1]) || 0;
+      e.zobrazenia += parseFloat(p[2]) || 0;
+      podla.set(m, e);
+    }
+    return podla.size ? { druh: "graf", mesiace: [...podla.values()] } : null;
+  }
+
+  const druh = prvy.includes("dopyt") ? "dopyty" : prvy.includes("strán") || prvy.includes("stran") ? "strany" : null;
+  if (!druh) return null;   // Zariadenia, Krajiny, Filtre — zatiaľ nič neriadia.
+  const riadky = ls.slice(1).map((r) => {
+    const p = splitCSVLine(r);
+    return { kluc: (p[0] || "").trim(), kliky: parseFloat(p[1]) || 0, zobrazenia: parseFloat(p[2]) || 0, ctr: pct(p[3]), pozicia: parseFloat(p[4]) || 0 };
+  }).filter((x) => x.kluc);
+  return riadky.length ? { druh, riadky } : null;
+}

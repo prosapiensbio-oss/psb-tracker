@@ -3,7 +3,7 @@ import type { D1Database } from "@cloudflare/workers-types";
 
 import { audit, jeZamknuty, zamknuteMesiace } from "./audit.server";
 import { normName } from "./format";
-import { parseAnamneza, parseCennik, parseMetricool } from "./parse";
+import { parseAnamneza, parseCennik, parseGa4, parseGsc, parseMetricool } from "./parse";
 import {
   detectCSVType,
   parsePackages,
@@ -224,6 +224,43 @@ export async function ingest(DB: D1Database, filename: string, text: string, act
         added = prispevky.length;
       }
     }
+    if (type === "ga4") {
+      const g = parseGa4(text);
+      if (g) {
+        await DB.prepare(
+          `INSERT INTO ga4_mesiace (mesiac, novi, organic_search, paid_social, organic_social, direct, referral, udalosti, updated_at)
+           VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)
+           ON CONFLICT(mesiac) DO UPDATE SET novi=?2, organic_search=?3, paid_social=?4, organic_social=?5,
+             direct=?6, referral=?7, udalosti=?8, updated_at=?9`,
+        ).bind(g.mesiac, g.novi, g.organicSearch, g.paidSocial, g.organicSocial, g.direct, g.referral, g.udalosti, new Date().toISOString()).run();
+        added = 1;
+      }
+    }
+    if (type === "gsc") {
+      const v = parseGsc(text);
+      const now = new Date().toISOString();
+      if (v && v.druh === "graf") {
+        for (const m of v.mesiace) {
+          await DB.prepare(
+            `INSERT INTO gsc_mesiace (mesiac, kliky, zobrazenia, updated_at) VALUES (?1,?2,?3,?4)
+             ON CONFLICT(mesiac) DO UPDATE SET kliky=?2, zobrazenia=?3, updated_at=?4`,
+          ).bind(m.mesiac, Math.round(m.kliky), Math.round(m.zobrazenia), now).run();
+        }
+        added = v.mesiace.length;
+      } else if (v && (v.druh === "dopyty" || v.druh === "strany")) {
+        // Rebríček je snímka za obdobie, nie časový rad — starý sa zahodí celý.
+        // Miešať dva rebríčky z rôznych období nejde: pozícia je priemer.
+        const tab = v.druh === "dopyty" ? "gsc_dopyty" : "gsc_strany";
+        const stlpec = v.druh === "dopyty" ? "dopyt" : "url";
+        await DB.prepare(`DELETE FROM ${tab}`).run();
+        const stmts = v.riadky.slice(0, 500).map((r) =>
+          DB.prepare(`INSERT OR REPLACE INTO ${tab} (${stlpec}, kliky, zobrazenia, ctr, pozicia, updated_at) VALUES (?1,?2,?3,?4,?5,?6)`)
+            .bind(r.kluc, Math.round(r.kliky), Math.round(r.zobrazenia), r.ctr, r.pozicia, now),
+        );
+        for (let i = 0; i < stmts.length; i += 40) await DB.batch(stmts.slice(i, i + 40));
+        added = stmts.length;
+      }
+    }
     const kluc = `${type}|${filename}|${text.length}`;
     const uz = await DB.prepare("SELECT id FROM raw_uploads WHERE dedup_key = ?1").bind(kluc).first();
     if (uz) skipped += 1;
@@ -231,7 +268,7 @@ export async function ingest(DB: D1Database, filename: string, text: string, act
       await DB.prepare(
         "INSERT INTO raw_uploads (id, filename, kind, content, bytes, dedup_key, uploaded_at) VALUES (?1,?2,?3,?4,?5,?6,?7)",
       ).bind(uid(), filename, type, text.slice(0, 4_000_000), text.length, kluc, new Date().toISOString()).run();
-      if (type !== "metricool") added = 1;
+      if (type !== "metricool" && type !== "ga4" && type !== "gsc") added = 1;
     }
   } else if (type === "anamneza") {
     // Z anamnézy sa berie jediná vec: odkiaľ sa klient o PSB dozvedel. Zdravotná

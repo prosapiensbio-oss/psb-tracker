@@ -102,17 +102,29 @@ function UploadCard({ data, missing, actions }: { data: PSBData; missing: typeof
       .catch(() => setSurove([]));
   }, [uploadResult]);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [neCsv, setNeCsv] = useState<{ meno: string; pripona: string }[]>([]);
 
   const handleFiles = async (fileList: FileList | null) => {
     if (!fileList || !fileList.length) return;
     setBusy(true);
     const files: { filename: string; text: string }[] = [];
     const bankove: string[] = [];
+    const neCsv: { meno: string; pripona: string }[] = [];
     for (const f of Array.from(fileList)) {
+      // PDF, XLSX ani ZIP sa nedajú prečítať ako text. Doteraz sa aj tak
+      // poslali na server a ten odpovedal „Súbor je príliš veľký" — pravda o
+      // veľkosti, ale úplne zavádzajúca rada. Metricool ponúka PDF ako prvé,
+      // takže na to naozaj narazí každý.
+      const pripona = f.name.toLowerCase().split(".").pop() || "";
+      if (["pdf", "xlsx", "xls", "zip", "pptx", "docx"].includes(pripona)) {
+        neCsv.push({ meno: f.name, pripona });
+        continue;
+      }
       const text = await f.text();
       if (jeBankovyVypis(text)) bankove.push(text);
       else files.push({ filename: f.name, text });
     }
+    setNeCsv(neCsv);
     if (bankove.length) setBankovyText(bankove.join("\n"));
     if (files.length) {
       const res = await actions.ingest(files);
@@ -148,6 +160,18 @@ function UploadCard({ data, missing, actions }: { data: PSBData; missing: typeof
           Bankový výpis sa najprv ukáže na kontrolu.
         </div>
       </div>
+      {neCsv.length > 0 && (
+        <div style={{ padding: "10px 13px", marginBottom: 10, borderRadius: 9, background: mix(C.orange, 8), border: `1px solid ${mix(C.orange, 28)}`, fontSize: 12.5, color: C.text, lineHeight: 1.55 }}>
+          <b>{neCsv.map((x) => x.meno).join(", ")}</b> — toto je {neCsv[0].pripona.toUpperCase()}, nie CSV. Appka číta tabuľky, nie hotové zostavy.
+          {neCsv.some((x) => x.pripona === "pdf" || x.pripona === "pptx") && (
+            <> V Metricoole je PDF ponúknuté ako prvé, ale potrebné je <b>Analytics → Export → CSV</b>, zvlášť pre posty, reels a stories.</>
+          )}
+          {neCsv.some((x) => x.pripona === "zip") && (
+            <> Search Console sťahuje ZIP — rozbaľ ho a nahraj súbory zvnútra (Graf, Dopyty, Stránky).</>
+          )}
+          <button onClick={() => setNeCsv([])} style={{ marginLeft: 8, background: "none", border: "none", color: C.textDim, fontSize: 12, cursor: "pointer" }}>rozumiem</button>
+        </div>
+      )}
       <input ref={inputRef} type="file" accept=".csv,.txt" multiple style={{ display: "none" }} onChange={(e) => { void handleFiles(e.target.files); e.target.value = ""; }} />
       {bankovyText && (
         <div style={{ marginTop: 12 }}>

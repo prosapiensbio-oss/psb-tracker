@@ -21,7 +21,7 @@ export const Route = createFileRoute("/api/marketing")({
         const { DB } = bindings();
         if (!DB) return Response.json({ ok: false, mesacne: [], top: [] });
         try {
-          const [mes, top] = await Promise.all([
+          const [mes, top, ga4, gscM, gscD, gscS] = await Promise.all([
             DB.prepare(
               `SELECT mesiac,
                       SUM(CASE WHEN druh = 'reel'  THEN 1 ELSE 0 END) AS reels,
@@ -38,6 +38,10 @@ export const Route = createFileRoute("/api/marketing")({
                  FROM mkt_prispevky WHERE druh <> 'story'
                 ORDER BY ulozenia DESC, views DESC LIMIT 12`,
             ).all(),
+            DB.prepare("SELECT * FROM ga4_mesiace ORDER BY mesiac").all().catch(() => ({ results: [] })),
+            DB.prepare("SELECT * FROM gsc_mesiace ORDER BY mesiac").all().catch(() => ({ results: [] })),
+            DB.prepare("SELECT * FROM gsc_dopyty ORDER BY kliky DESC LIMIT 60").all().catch(() => ({ results: [] })),
+            DB.prepare("SELECT * FROM gsc_strany ORDER BY kliky DESC LIMIT 40").all().catch(() => ({ results: [] })),
           ]);
           return Response.json({
             ok: true,
@@ -58,11 +62,29 @@ export const Route = createFileRoute("/api/marketing")({
               views: Number(r.views) || 0, ulozenia: Number(r.ulozenia) || 0,
               viewRate: Number(r.view_rate) || 0,
             })),
+            ga4: (ga4.results as Record<string, unknown>[]).map((r) => ({
+              m: r.mesiac, novi: Number(r.novi) || 0,
+              organicSearch: Number(r.organic_search) || 0, paidSocial: Number(r.paid_social) || 0,
+              organicSocial: Number(r.organic_social) || 0, direct: Number(r.direct) || 0,
+              referral: Number(r.referral) || 0, udalosti: Number(r.udalosti) || 0,
+            })),
+            gscMesacne: (gscM.results as Record<string, unknown>[]).map((r) => {
+              const k = Number(r.kliky) || 0, z = Number(r.zobrazenia) || 0;
+              return { m: r.mesiac, kliky: k, zobrazenia: z, ctr: z ? Math.round((k / z) * 1000) / 10 : 0 };
+            }),
+            gscDopyty: (gscD.results as Record<string, unknown>[]).map((r) => ({
+              dopyt: r.dopyt, kliky: Number(r.kliky) || 0, zobrazenia: Number(r.zobrazenia) || 0,
+              ctr: Number(r.ctr) || 0, pozicia: Number(r.pozicia) || 0,
+            })),
+            gscStrany: (gscS.results as Record<string, unknown>[]).map((r) => ({
+              url: r.url, kliky: Number(r.kliky) || 0, zobrazenia: Number(r.zobrazenia) || 0,
+              ctr: Number(r.ctr) || 0, pozicia: Number(r.pozicia) || 0,
+            })),
           });
         } catch {
           // Tabuľka ešte nie je (staršia migrácia) — obrazovka si vystačí s tým,
           // čo má v kóde.
-          return Response.json({ ok: false, mesacne: [], top: [] });
+          return Response.json({ ok: false, mesacne: [], top: [], ga4: [], gscMesacne: [], gscDopyty: [], gscStrany: [] });
         }
       },
     },

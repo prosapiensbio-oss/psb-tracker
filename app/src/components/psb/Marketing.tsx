@@ -15,7 +15,10 @@ import {
   mktSum,
   MKT_ZDROJ,
   nastavMarketingZImportu,
+  nastavWebZImportu,
+  type Ga4Mesiac,
   type GscDopyt,
+  type GscMesiac,
   type GscStrana,
   type MktKus,
   type MktMesiac,
@@ -698,8 +701,10 @@ export function Marketing({ data, clients, leads, chat }: { data: PSBData; clien
   useEffect(() => {
     void fetch("/api/marketing", { credentials: "same-origin" })
       .then((r) => r.json())
-      .then((j: { mesacne?: MktMesiac[]; top?: MktKus[] }) => {
-        if (nastavMarketingZImportu(j.mesacne || [], j.top || [])) tik((x) => x + 1);
+      .then((j: { mesacne?: MktMesiac[]; top?: MktKus[]; ga4?: Ga4Mesiac[]; gscMesacne?: GscMesiac[]; gscDopyty?: GscDopyt[]; gscStrany?: GscStrana[] }) => {
+        const a = nastavMarketingZImportu(j.mesacne || [], j.top || []);
+        const b = nastavWebZImportu(j.ga4 || [], j.gscMesacne || [], j.gscDopyty || [], j.gscStrany || []);
+        if (a || b) tik((x) => x + 1);
       })
       .catch(() => {});
   }, []);

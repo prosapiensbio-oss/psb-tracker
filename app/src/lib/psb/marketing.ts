@@ -76,7 +76,7 @@ export type Ga4Mesiac = {
   castocne?: boolean;   // meranie sa rozbehlo v priebehu mesiaca
 };
 
-export const GA4_MESACNE: Ga4Mesiac[] = [
+export let GA4_MESACNE: Ga4Mesiac[] = [
   { m: "2025-01", novi: 306, organicSearch: 106, paidSocial: 74, organicSocial: 41, direct: 60, referral: 20, udalosti: 182 },
   { m: "2025-02", novi: 275, organicSearch: 133, paidSocial: 10, organicSocial: 44, direct: 69, referral: 14, udalosti: 75 },
   { m: "2025-03", novi: 284, organicSearch: 152, paidSocial: 0, organicSocial: 40, direct: 49, referral: 11, udalosti: 44 },
@@ -107,7 +107,7 @@ export type GscMesiac = { m: string; kliky: number; zobrazenia: number; ctr: num
 export type GscDopyt = { dopyt: string; kliky: number; zobrazenia: number; ctr: number; pozicia: number };
 export type GscStrana = { url: string; kliky: number; zobrazenia: number; ctr: number; pozicia: number };
 
-export const GSC_MESACNE: GscMesiac[] = [
+export let GSC_MESACNE: GscMesiac[] = [
   { m: "2025-03", kliky: 11, zobrazenia: 166, ctr: 6.63 },
   { m: "2025-04", kliky: 115, zobrazenia: 5427, ctr: 2.12 },
   { m: "2025-05", kliky: 108, zobrazenia: 5611, ctr: 1.92 },
@@ -126,7 +126,7 @@ export const GSC_MESACNE: GscMesiac[] = [
   { m: "2026-06", kliky: 239, zobrazenia: 10085, ctr: 2.37 },
 ];
 
-export const GSC_DOPYTY: GscDopyt[] = [
+export let GSC_DOPYTY: GscDopyt[] = [
   { dopyt: "prosapiens", kliky: 157, zobrazenia: 228, ctr: 68.86, pozicia: 3.3 },
   { dopyt: "functional patterns", kliky: 67, zobrazenia: 1163, ctr: 5.76, pozicia: 7.5 },
   { dopyt: "functional patterns praha", kliky: 50, zobrazenia: 128, ctr: 39.06, pozicia: 2.2 },
@@ -167,7 +167,7 @@ export const GSC_LOKALNE: GscDopyt[] = [
   { dopyt: "propain brno", kliky: 0, zobrazenia: 3, ctr: 0.0, pozicia: 3.7 },
 ];
 
-export const GSC_STRANY: GscStrana[] = [
+export let GSC_STRANY: GscStrana[] = [
   { url: "/", kliky: 405, zobrazenia: 3851, ctr: 10.52, pozicia: 6.3 },
   { url: "/co-je-functional-patterns/", kliky: 262, zobrazenia: 3015, ctr: 8.69, pozicia: 7.2 },
   { url: "/padajici-kolena-dovnitr/", kliky: 160, zobrazenia: 5924, ctr: 2.7, pozicia: 6.1 },
@@ -248,4 +248,33 @@ export function nastavMarketingZImportu(mesacne: MktMesiac[], top: MktKus[]): bo
   if (top.length) MKT_TOP = top;
   MKT_ZDROJ = "import";
   return true;
+}
+
+
+/** GA4 a Search Console z importu — rovnaké pravidlo ako pri Metricoole. */
+export function nastavWebZImportu(
+  ga4: Ga4Mesiac[],
+  gscMes: GscMesiac[],
+  dopyty: GscDopyt[],
+  strany: GscStrana[],
+): boolean {
+  let zmena = false;
+  if (ga4.length) {
+    const m = new Map(GA4_MESACNE.map((x) => [x.m, x]));
+    for (const x of ga4) m.set(x.m, x);
+    GA4_MESACNE = [...m.values()].sort((a, b) => a.m.localeCompare(b.m));
+    zmena = true;
+  }
+  if (gscMes.length) {
+    const m = new Map(GSC_MESACNE.map((x) => [x.m, x]));
+    for (const x of gscMes) m.set(x.m, x);
+    GSC_MESACNE = [...m.values()].sort((a, b) => a.m.localeCompare(b.m));
+    zmena = true;
+  }
+  // Rebríčky sa nezlučujú — nahrádzajú sa celé. Dopyt z júla a dopyt z mája
+  // vedľa seba v jednej tabuľke by tvrdili, že ide o to isté obdobie, a
+  // priemerná pozícia by neznamenala nič.
+  if (dopyty.length) { GSC_DOPYTY = dopyty; zmena = true; }
+  if (strany.length) { GSC_STRANY = strany; zmena = true; }
+  return zmena;
 }
