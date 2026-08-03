@@ -220,7 +220,7 @@ function UploadCard({ data, missing, actions }: { data: PSBData; missing: typeof
             <br /><span style={{ color: C.textDim }}>{BANKA_ZDROJ.path}</span>
           </span>
         </div>
-        <div style={{ fontSize: 12, color: C.textMuted, fontWeight: 600, margin: "12px 0 8px" }}>Marketing (zatiaľ sa len ukladá):</div>
+        <div style={{ fontSize: 12, color: C.textMuted, fontWeight: 600, margin: "12px 0 8px" }}>Marketing a web:</div>
         {MARKETING_ZDROJE.map((m) => {
           const st = surove.find((x) => x.druh === m.druh);
           const je = (st?.pocet || 0) > 0;
@@ -236,9 +236,9 @@ function UploadCard({ data, missing, actions }: { data: PSBData; missing: typeof
           );
         })}
         <div style={{ fontSize: 11, color: C.textDim, marginTop: 6, lineHeight: 1.5, padding: "8px 10px", borderRadius: 7, background: mix(C.orange, 8) }}>
-          Marketingové exporty sa zatiaľ do obrazoviek nekreslia — Marketing beží na jednorazovom exporte.
-          Nahrávaj ich aj tak: <strong style={{ color: C.text }}>v novembri Metricoolu prepadnú staršie príspevky</strong> a
-          spracovanie sa dá dorobiť kedykoľvek, stiahnuť dáta spätne nie.
+          Nahratý mesiac prepíše čísla v obrazovke Marketing; mesiace, ktoré si nenahral, bežia ďalej na
+          jednorazovom prepise. <strong style={{ color: C.text }}>V novembri Metricoolu prepadnú staršie príspevky</strong> —
+          čo sa nestiahne dovtedy, už nebude odkiaľ vziať.
         </div>
         <div style={{ fontSize: 11, color: C.textDim, marginTop: 8, lineHeight: 1.5 }}>
           Packages report dáva PTminder v štyroch pohľadoch (šablóny balíčkov, šablóny členstiev, balíčky klientov,
