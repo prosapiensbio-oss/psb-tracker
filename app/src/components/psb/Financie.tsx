@@ -11,8 +11,8 @@ import { BarRow, Card, Empty, H3, Info, LineChart, Select, SortTh, StatCard, Sub
 
 const MAX_SESSIONS_MONTH = 260;
 
-export function Financie({ data, clients, focus }: { data: PSBData; clients: Record<string, ClientAgg>; focus?: NavFocus | null }) {
-  const [sub, setSub] = useState("zarobky");
+export function Financie({ data, clients, focus, sub, onSub }: { data: PSBData; clients: Record<string, ClientAgg>; focus?: NavFocus | null; sub: string; onSub: (s: string) => void }) {
+  const setSub = onSub;
   const [focusMonth, setFocusMonth] = useState<string | null>(null);
   const monthly = useMemo(() => monthlyFinance(data), [data]);
 

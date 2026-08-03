@@ -56,7 +56,10 @@ export type NavFocus = { week?: string; month?: string; client?: string; trainer
 // live inside Tracker and VZAS; both answer questions their host did not.
 const TABS = [
   { id: "dashboard", label: "Dashboard", icon: "home" },
-  { id: "tracker", label: "Tracker", icon: "activity" },
+  // Appka sa volá Tracker a záložka tiež — na otázku „kde to je" sa nedalo
+  // odpovedať bez vysvetľovania. Obsah je prevádzka: tréningy, klienti, peniaze
+  // z PTmindera, 6M.
+  { id: "tracker", label: "Prevádzka", icon: "activity" },
   { id: "marketing", label: "Marketing", icon: "activity" },
   { id: "vzas", label: "VZAS", icon: "wallet" },
   { id: "vysledky", label: "Výsledky", icon: "calendar" },
@@ -97,6 +100,7 @@ export function PSBApp() {
   // vedieť, či je to vyplnené, skôr než tam človek príde.
   const [zapisy, setZapisy] = useState<{ weeks: Record<string, Record<string, string>>; mesiace: Record<string, { note?: string; answers?: Record<string, string> }> }>({ weeks: {}, mesiace: {} });
   const [treningySub, setTreningySub] = useState("prehled");
+  const [financieSub, setFinancieSub] = useState("zarobky");
   const [treningyFocus, setTreningyFocus] = useState<NavFocus | null>(null);
   const [financieFocus, setFinancieFocus] = useState<NavFocus | null>(null);
   const [klientiFocus, setKlientiFocus] = useState<NavFocus | null>(null);
@@ -110,7 +114,7 @@ export function PSBApp() {
   //
   // Formát je #zalozka/podzalozka, napr. #tracker/klienti alebo #vzas/jarek.
   const cestaZoStavu = () => {
-    if (active === "tracker") return `#tracker/${trackerSection}${trackerSection === "treningy" ? `/${treningySub}` : ""}`;
+    if (active === "tracker") return `#tracker/${trackerSection}${trackerSection === "treningy" ? `/${treningySub}` : trackerSection === "financie" ? `/${financieSub}` : ""}`;
     if (active === "vzas") return `#vzas/${vzasSub}`;
     if (active === "vysledky") return `#vysledky/${vysledkySub}`;
     return `#${active}`;
@@ -124,6 +128,7 @@ export function PSBApp() {
     if (zal === "tracker" && pod && TRACKER_IDS.includes(pod)) {
       setTrackerSection(pod);
       if (pod === "treningy" && pod2) setTreningySub(pod2);
+      if (pod === "financie" && pod2) setFinancieSub(pod2);
     }
     if (zal === "vzas" && pod) setVzasSub(pod);
     if (zal === "vysledky" && pod) setVysledkySub(pod);
@@ -156,6 +161,7 @@ export function PSBApp() {
       setActive(tab);
     }
     if (tab === "treningy" && sub) setTreningySub(sub);
+    if (tab === "financie" && sub) setFinancieSub(sub);
     if (tab === "treningy" && focus) setTreningyFocus(focus);
     if (tab === "financie" && focus) setFinancieFocus(focus);
     if (tab === "klienti" && focus) setKlientiFocus(focus);
@@ -364,7 +370,7 @@ export function PSBApp() {
             </div>
             {trackerSection === "treningy" && <Treningy data={data} clients={clients} sub={treningySub} onSub={setTreningySub} focus={treningyFocus} trainer={trainer} onTrainer={setTrainer} />}
             {trackerSection === "klienti" && <Klienti clients={clients} capacity={capacity} actions={actions} focus={klientiFocus} leads={data.leads} trainer={trainer} onTrainer={setTrainer} />}
-            {trackerSection === "financie" && <Financie data={data} clients={clients} focus={financieFocus} />}
+            {trackerSection === "financie" && <Financie data={data} clients={clients} focus={financieFocus} sub={financieSub} onSub={setFinancieSub} />}
             {trackerSection === "6m" && <SixMTracker sixM={sixM} actions={actions} trainer={trainer} onTrainer={setTrainer} />}
           </>
         )}

@@ -24,12 +24,18 @@ const KPI_WINDOWS = [
   { value: "custom", label: "Vlastné obdobie", days: -1 },
 ];
 
+// Kanály presne tak, ako to Jerry popísal: „IG DM, hlavne maily z webového
+// formulára, občas telefón, občas osobný Instagram". Telefón a osobný profil
+// doteraz spadli do „Iné" — čiže najosobnejšie kanály, ktoré stoja najviac
+// času, boli v štatistike neviditeľné.
 const SOURCES = [
   { value: "referencia", label: "Referencia" },
-  { value: "instagram", label: "Instagram" },
+  { value: "mail", label: "Mail (web formulár)" },
+  { value: "instagram", label: "Instagram — firemný" },
+  { value: "instagram_osobny", label: "Instagram — osobný" },
+  { value: "telefon", label: "Telefón" },
   { value: "google", label: "Google" },
   { value: "web", label: "Web" },
-  { value: "mail", label: "Mail" },
   { value: "ine", label: "Iné" },
 ];
 const STATUSES = [

@@ -62,11 +62,13 @@ const WIDGETS: WidgetMeta[] = [
   { id: "zony", label: "Týždne v zdravej zóne", span: 1 },
   { id: "kapacita", label: "Kapacita & vyťaženie", span: 1 },
   { id: "6m", label: "6M klienti podľa fázy", span: 1 },
-  { id: "tempo", label: "Ø tempo klienta", span: 1 },
-  { id: "dovera", label: "Ø dôvera obnovy", span: 1 },
   { id: "zarobky", label: "Mesačné zárobky", span: 1 },
   { id: "koniecBalicka", label: "Blíži sa koniec balíčka", span: 1 },
 ];
+// Preč odtiaľto šli aj „Ø tempo klienta" a „Ø dôvera obnovy". Priemer cez
+// všetkých klientov neriadi nič — tempo aj dôvera majú zmysel pri konkrétnom
+// človeku a tam obe sú, vo Financie → Predikcia. Na displeji zaberali miesto
+// číslu, ktoré sa nedá použiť.
 // Trend typov sedení a donut balíčkov tu boli tiež — a boli to presné kópie
 // grafov z Tréningov → Analýza a z Klientov. Dashboard odpovedá na „čo sa deje
 // teraz": tento týždeň, kapacita, peniaze tento mesiac, komu sa končí balíček.
@@ -303,23 +305,12 @@ export function Dashboard({
 }) {
   const [showAcked, setShowAcked] = useState(false);
   const [registerExpanded, setRegisterExpanded] = useState(false);
-  const [tempoUnit, setTempoUnit] = useState<"mes" | "tyz">("mes");
   // "prijate" = cash received (= PTminder "Payments" / tržby) — the default; "vyfakturovane" = value of trained sessions.
   const [earnMode, setEarnMode] = useState<"vyfakturovane" | "prijate">("prijate");
   const [arranging, setArranging] = useState(false);
   const layout = useDashLayout();
   const cols = useDashColumns();
   const matchT = (t: string) => trainer === "all" || t === trainer;
-
-  const predAgg = useMemo(() => {
-    const list = predictEarnings(data, clients).perClient.filter((c) => matchT(c.trainer));
-    const n = list.length || 1;
-    return {
-      tempoMes: list.reduce((a, c) => a + c.burnRate, 0) / n,
-      tempoTyz: list.reduce((a, c) => a + c.burnWeek, 0) / n,
-      conf: (list.reduce((a, c) => a + c.confidence, 0) / n) * 100,
-    };
-  }, [data, clients, trainer]);
 
   const stats = useMemo(() => {
     const list = Object.values(clients);
@@ -332,14 +323,23 @@ export function Dashboard({
       .reduce((a, s) => a + s.duration / 60, 0);
     const months = monthlyFinance(data);
     const lastMonth = months[months.length - 1];
-    const monthRevenue = lastMonth
-      ? trainer === "all"
-        ? lastMonth.revenue
-        : lastMonth.byTrainer[trainer]?.revenue || 0
-      : 0;
+    // Tržba = peniaz, ktorý prišiel. Doteraz tu bolo `revenue` — hodnota
+    // odtrénovaných sedení — pod nálepkou „Zárobky". To je iné číslo a Jerry
+    // sleduje tržby: čo prišlo na účet, nie čo sa odpracovalo. Tržby sa navyše
+    // nedelia na trénera (platba v PTminderi trénera nemá), takže prepínač
+    // trénera na tejto karte nič nerobí a nemá predstierať, že áno.
+    const monthCash = lastMonth ? lastMonth.cash : 0;
     const sixMCount = sixM.filter((c) => matchT(c.primaryTrainer)).length;
-    return { active, weekHours, lastWeek, monthRevenue, lastMonth: lastMonth?.month, sixMCount };
+    return { active, weekHours, lastWeek, monthCash, lastMonth: lastMonth?.month, sixMCount };
   }, [clients, data, sixM, trainer]);
+
+  // Predikcia tržieb na najbližší mesiac — podľa Jerryho „to najdôležitejšie
+  // číslo, aké appka počíta". Doteraz bola schovaná vo Financiách → Predikcia a
+  // na dashboarde nebola vôbec.
+  const trzbyOdhad = useMemo(() => {
+    const cash = predictCash(data, clients, 1);
+    return cash.months[0] || null;
+  }, [data, clients]);
 
   // All weeks (chronological) — the chart scrolls horizontally.
   const weekRows = useMemo(() => {
@@ -560,39 +560,6 @@ export function Dashboard({
         </div>
       </Card>
     ),
-    tempo: (
-      <Card style={{ marginBottom: 0, height: "100%", cursor: "pointer", display: "flex", flexDirection: "column" }}>
-        <div style={centerBody} onClick={() => onNavigate("financie")}>
-          <H3>
-            <Info text="Priemerné tempo klienta = ako často klient chodí (sedení za mesiac/týždeň), priemer cez klientov. Mení sa podľa prepínača trénera. Klik → Financie → Predikcia (detail podľa klienta)." label="Ø tempo klienta" />
-          </H3>
-          <div style={{ fontSize: 34, fontWeight: 800, color: C.accentLight, lineHeight: 1 }}>
-            {(tempoUnit === "mes" ? predAgg.tempoMes : predAgg.tempoTyz).toFixed(1)}
-            <span style={{ fontSize: 13, color: C.textMuted, fontWeight: 500 }}> sedení/{tempoUnit === "mes" ? "mes." : "týž."}</span>
-          </div>
-        </div>
-        <div style={{ display: "flex", gap: 4, marginTop: 8 }}>
-          {(["mes", "tyz"] as const).map((u) => (
-            <button key={u} onClick={(e) => { e.stopPropagation(); setTempoUnit(u); }} style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${tempoUnit === u ? C.accent : C.border}`, background: tempoUnit === u ? C.accentBg : "transparent", color: tempoUnit === u ? C.accentLight : C.textMuted, fontSize: 11, cursor: "pointer" }}>
-              tempo/{u === "mes" ? "mes." : "týž."}
-            </button>
-          ))}
-        </div>
-      </Card>
-    ),
-    dovera: (
-      <Card style={{ marginBottom: 0, height: "100%", cursor: "pointer", display: "flex", flexDirection: "column" }}>
-        <div style={centerBody} onClick={() => onNavigate("financie")}>
-          <H3>
-            <Info text="Priemerná dôvera obnovy = ako pravdepodobne klienti obnovia/pokračujú (podľa segmentu a 6M fázy), priemer cez klientov. Klik → Financie → Predikcia." label="Ø dôvera obnovy" />
-          </H3>
-          <div style={{ fontSize: 34, fontWeight: 800, color: predAgg.conf >= 70 ? C.green : predAgg.conf >= 50 ? C.orange : C.red, lineHeight: 1 }}>
-            {predAgg.conf.toFixed(0)}%
-          </div>
-          <div style={{ fontSize: 11, color: C.textMuted, marginTop: 4 }}>priemer cez {trainer === "all" ? "všetkých" : trainer} klientov · klik → Predikcia →</div>
-        </div>
-      </Card>
-    ),
     zarobky: (
       <Card style={{ marginBottom: 0, height: "100%" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
@@ -747,8 +714,13 @@ export function Dashboard({
       <StatGrid>
         <StatCard value={stats.active} label="Aktívnych klientov" onClick={() => onNavigate("klienti")} />
         <StatCard value={`${stats.weekHours.toFixed(0)}h`} label={stats.lastWeek ? `Odrobené (týž. ${weekLabel(stats.lastWeek)})` : "Týždenné hodiny"} onClick={() => onNavigate("treningy")} />
-        <StatCard value={fmtCZK(stats.monthRevenue)} label={stats.lastMonth ? `Zárobky ${monthLabel(stats.lastMonth)}` : "Mesačné zárobky"} onClick={() => onNavigate("financie")} />
-        <StatCard value={stats.sixMCount} label="6M klientov" onClick={() => onNavigate("6m")} />
+        <StatCard value={fmtCZK(stats.monthCash)} label={stats.lastMonth ? `Tržby ${monthLabel(stats.lastMonth)}` : "Mesačné tržby"} onClick={() => onNavigate("financie")} />
+        <StatCard
+          value={trzbyOdhad ? fmtCZK(trzbyOdhad.expected) : "—"}
+          label={trzbyOdhad ? `Odhad tržieb ${monthLabel(trzbyOdhad.month)}` : "Odhad tržieb"}
+          color={C.blue}
+          onClick={() => onNavigate("financie", "predikcia")}
+        />
       </StatGrid>
 
       <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, minmax(0,1fr))`, gridAutoFlow: "row dense", gap: 12, marginBottom: 12, alignItems: "stretch" }}>
