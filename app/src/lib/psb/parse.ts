@@ -147,8 +147,14 @@ export function detectCSVType(text: string): CSVType | null {
   // Marketingové exporty. Zatiaľ sa neparsujú do obrazoviek — ukladajú sa tak,
   // ako prišli. Dôvod je termín, nie lenivosť: v novembri Metricoolu prepadnú
   // staršie príspevky a spracovanie sa dá dorobiť kedykoľvek, dáta nie.
-  if (h.includes("id,type,image,url,content,timestamp") || h.includes("id,url,image,title,date")
-    || h.includes("hashtag,count,views")) return "metricool";
+  // Metricool sa poznáva podľa NÁZVOV stĺpcov, nie podľa ich poradia.
+  //
+  // Pôvodne sa hľadal presný začiatok hlavičky („id,url,image,title,date") a
+  // stálo to presne to, čo malo: export stories má hlavičku úplne inú
+  // („Type,Post URL,Content,…") a appka ho vôbec nerozpoznala. Sto šesťdesiat
+  // stories by ticho spadlo pod stôl s hláškou „Nerozpoznaný typ CSV".
+  const mkt = ["views (organic)", "reach (organic)", "impressions (organic)", "% view rate (+3 secs)", "taps forward", "hashtag,count,views"];
+  if (mkt.some((k) => h.includes(k))) return "metricool";
   if (h.includes("prehľad stavu prehľadov") || (h.startsWith("# ---") && h.includes("vlastníctvo"))) return "ga4";
   if (h.includes("kliknutia,zobrazenia,mp,pozícia") || h.includes("filter,hodnota")) return "gsc";
 
