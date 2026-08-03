@@ -1675,7 +1675,7 @@ function EnergyTrendCard() {
             series={[{ name: "Jerry", color: C.accent }, { name: "Terezka", color: C.blue }]}
             height={200}
             fmt={(n) => n.toFixed(1)}
-            zone={{ lo: 6, hi: 10 }}
+            zone={{ lo: 6, hi: 10, unit: "" }}
             alignEnd
           />
           <div style={{ fontSize: 11.5, color: C.textMuted, marginTop: 8 }}>

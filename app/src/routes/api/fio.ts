@@ -110,6 +110,11 @@ export const Route = createFileRoute("/api/fio")({
             if (vzor.length >= 3 && r.kategoria) naucene.set(vzor.toLowerCase(), r.kategoria);
           }
           for (const [vzor, kategoria] of naucene) {
+            // Upsert cez DELETE+INSERT: tabuľka nemá unique na text_pattern a
+            // každý ďalší import by pridal duplicitný riadok. Posledné
+            // zaradenie vyhráva — keď Jerry preradí Adobe inam, staré pravidlo
+            // nesmie ďalej hlasovať.
+            await DB.prepare("DELETE FROM vzas_rules WHERE text_pattern = ?1 AND created_by = 'import'").bind(vzor).run().catch(() => {});
             await DB.prepare(
               `INSERT INTO vzas_rules (id, counterparty, merchant, text_pattern, category, priority, hit_count, active, created_by, created_at)
                VALUES (?1, NULL, NULL, ?2, ?3, 50, 0, 1, 'import', ?4)`,

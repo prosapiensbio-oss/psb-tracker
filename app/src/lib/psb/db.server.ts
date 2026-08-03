@@ -233,8 +233,15 @@ export async function ingest(DB: D1Database, filename: string, text: string): Pr
     // accumulate safely by client, and a client's rows are always the latest snapshot.
     const rows = parsePackages(text);
     const clientsInFile = [...new Set(rows.map((r) => r.client))];
+    // Mazať sa smie len ten POHĽAD, ktorý súbor nesie. Report má štyri pohľady
+    // a klient môže byť v dvoch naraz (dochodí starý balíček A má nové
+    // členstvo) — keby súbor s členstvami zmazal klientovi aj riadky balíčkov,
+    // druhý upload by ticho zahodil dáta prvého.
+    const kindInFile = rows[0]?.kind || "";
     const stmts = [
-      ...clientsInFile.map((name) => DB.prepare("DELETE FROM packages WHERE client_name = ?").bind(name)),
+      ...clientsInFile.map((name) =>
+        DB.prepare("DELETE FROM packages WHERE client_name = ? AND (kind = ? OR kind = '')").bind(name, kindInFile),
+      ),
       ...rows.map((r) =>
         DB.prepare(
           "INSERT INTO packages (id,client_name,client_status,package_name,sessions_remaining,sessions_total,added,valid_from,valid_to,payment_czk,kind) VALUES (?,?,?,?,?,?,?,?,?,?,?)",

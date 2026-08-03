@@ -597,6 +597,20 @@ export type Anomaly = {
   client?: string; // the client this item is about (for click-through to Klienti)
 };
 
+// Odpoveď na otázku „je toto duch?" sa ukladá s dátumom ("ano|2026-08-03").
+// Bez dátumu by platila NAVŽDY: klient, ktorý sa vráti a o rok znova stíchne,
+// by už nikdy nevyskočil — odpoveď z minulej epizódy ticha by ho kryla.
+// Epizódy ticha oddeľuje tréning: keď je posledné sedenie NOVŠIE než odpoveď,
+// odpoveď patrí starej epizóde a neplatí. Holé "ano"/"nie" (staré zápisy bez
+// dátumu) sa berú ako platné — nemáme ako zistiť ich vek.
+export function duchOdpoved(c: { duch: string; lastSession: string }): "ano" | "nie" | "" {
+  if (!c.duch) return "";
+  const [odpoved, datum] = c.duch.split("|");
+  if (odpoved !== "ano" && odpoved !== "nie") return "";
+  if (datum && c.lastSession && c.lastSession.slice(0, 10) > datum) return "";
+  return odpoved;
+}
+
 // Practical, client-centric signals — one item per client per type (deduped),
 // the actionable things a trainer should follow up on this week.
 export function deriveAnomalies(data: PSBData, clients: Record<string, ClientAgg>): Anomaly[] {
@@ -620,10 +634,13 @@ export function deriveAnomalies(data: PSBData, clients: Record<string, ClientAgg
     if (c.status === "Neaktívny") continue;
     const days = daysBetween(c.lastSession, now);
 
+    const duch = duchOdpoved(c);
+
     // Regular client who stopped coming — reach out before they churn.
-    // (Package-balance + no-package signals live in the "Blíži sa koniec balíčka"
-    // widget / Klienti, so they're intentionally NOT duplicated here.)
-    if ((c.segment === "Anchor" || c.segment === "Stabilný") && days >= 14 && days <= 60) {
+    // Od 30 dní preberá štafetu otázka „Je toto duch?" — obe naraz by boli tá
+    // istá výzva dvakrát. A keď je duch potvrdený, nenaháňa sa vôbec: vieme,
+    // že odišiel, a „ozvi sa" by bol šum.
+    if ((c.segment === "Anchor" || c.segment === "Stabilný") && days >= 14 && days < 30 && duch !== "ano") {
       push(`gone|${c.name}`, days >= 21 ? "red" : "orange", "Prestal chodiť", `${c.name}: ${days} dní bez tréningu (${c.segment}) — ozvi sa`, c.name);
     }
 
@@ -640,7 +657,7 @@ export function deriveAnomalies(data: PSBData, clients: Record<string, ClientAgg
     // A preto je to OTÁZKA, nie tvrdenie: appka nevie, či si medzitým nepísali,
     // či klient nie je na dovolenke a či sa už nedohodli na termíne. Odpoveď sa
     // uloží (duch = "ano" / "nie"), takže sa tá istá otázka nepýta dokola.
-    if (days >= 30 && !c.duch) {
+    if (days >= 30 && !duch) {
       const hodiny = c.packageRemaining > 0
         ? ` a ešte má ${c.packageRemaining} z ${c.packageTotal} zaplatených hodín`
         : "";
@@ -865,6 +882,7 @@ export function predictCash(
 
   for (const c of Object.values(clients)) {
     if (c.status === "Neaktívny") continue;
+    if (duchOdpoved(c) === "ano") continue;   // potvrdený duch už nezaplatí
     const platby = data.payments
       .filter((p) => p.client === c.name && p.amount > 0)
       .sort((a, b) => a.date.localeCompare(b.date));
@@ -987,6 +1005,10 @@ export function predictEarnings(
   for (const c of Object.values(clients)) {
     if (c.status === "Neaktívny") continue;
     if (opts.excludeSpecial && c.specialRate) continue;
+    // Potvrdený duch negeneruje budúci príjem. Bez tohto by mŕtvy klient ešte
+    // ~2 mesiace prispieval do run-rate (minimálne tempo 0,4 sedenia/mes.),
+    // kým mu dochádzka neklesne pod prah Neaktívny.
+    if (duchOdpoved(c) === "ano") continue;
 
     // Tempo: nedávne správanie váži viac než celoživotný priemer. Klient, ktorý
     // pred rokom chodil štyrikrát mesačne a dnes raz, nie je klient na štyri.

@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { fetchPeriods, setPeriodLock, type AuditRiadok, type Obdobie } from "../../lib/psb/client";
-import { VZAS_MONTHS } from "../../lib/psb/vzas";
 import { C, mix } from "../../lib/psb/theme";
 import { Card, Empty, H3, Info } from "./ui";
 
@@ -50,10 +49,22 @@ export function Uzavierky() {
   useEffect(nacitaj, []);
 
   const zamky = useMemo(() => new Map(obdobia.map((o) => [o.month, o])), [obdobia]);
-  // Ponúkajú sa len mesiace, ktoré už skončili — zamykať bežiaci mesiac nedáva
-  // zmysel, dáta doň ešte len pribúdajú (uzávierka je prvý víkend nasledujúceho).
+  // Mesiace idú z kalendára (od januára 2025 po posledný SKONČENÝ mesiac), nie
+  // z rozsahu VZAS. Ten má natvrdo 18 mesiacov z Excelu a končí júnom 2026 —
+  // takže júl, prvý mesiac, ktorý reálne treba uzavrieť pred bankou, sa nedal
+  // zamknúť. Bežiaci mesiac sa nezamyká: dáta doň ešte pribúdajú (uzávierka je
+  // prvý víkend nasledujúceho).
   const dnesMesiac = new Date().toISOString().slice(0, 7);
-  const mesiace = useMemo(() => VZAS_MONTHS.filter((m) => m < dnesMesiac).slice().reverse(), [dnesMesiac]);
+  const mesiace = useMemo(() => {
+    const out: string[] = [];
+    for (let rok = 2025; rok <= Number(dnesMesiac.slice(0, 4)); rok++) {
+      for (let m = 1; m <= 12; m++) {
+        const mk = `${rok}-${String(m).padStart(2, "0")}`;
+        if (mk < dnesMesiac) out.push(mk);
+      }
+    }
+    return out.reverse();
+  }, [dnesMesiac]);
 
   const prepni = async (m: string, na: boolean) => {
     setPrebieha(m);

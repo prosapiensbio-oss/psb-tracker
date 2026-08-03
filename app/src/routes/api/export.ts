@@ -17,6 +17,10 @@ const TABULKY = [
   "vzas_settings", "vzas_month_notes", "vzas_week_notes", "vzas_periods", "vzas_audit",
   "vzas_payments", "vzas_payment_splits", "vzas_rules", "vzas_salary_params",
   "jarvis_chats", "jarvis_zavery",
+  // Pribudli po prvom nasadení zálohy — bez nich by obnova stratila bankové
+  // pohyby a surové marketingové exporty, teda presne to, čo sa nedá stiahnuť
+  // znova.
+  "fio_transactions", "raw_uploads",
 ];
 
 export const Route = createFileRoute("/api/export")({

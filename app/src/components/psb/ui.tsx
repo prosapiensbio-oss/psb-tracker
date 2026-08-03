@@ -479,7 +479,7 @@ export function ZoneBars({
 }: {
   data: { label: string; values: number[] }[];
   series: { name: string; color: string }[];
-  zone?: { lo: number; hi: number };
+  zone?: { lo: number; hi: number; unit?: string };
   height?: number;
   stacked?: boolean;
   alignEnd?: boolean;
@@ -538,7 +538,7 @@ export function ZoneBars({
             {s.name}
           </span>
         ))}
-        {zone && <span style={{ fontSize: 11, color: C.green }}>▬ Zdravá zóna {zone.lo}–{zone.hi}h</span>}
+        {zone && <span style={{ fontSize: 11, color: C.green }}>▬ Zdravá zóna {zone.lo}–{zone.hi}{zone.unit ?? "h"}</span>}
       </div>
     </div>
   );
@@ -608,7 +608,7 @@ export function LineChart({
 }: {
   data: { label: string; values: number[] }[];
   series: { name: string; color: string }[];
-  zone?: { lo: number; hi: number };
+  zone?: { lo: number; hi: number; unit?: string };
   refLine?: { value: number; label?: string; color?: string };
   height?: number;
   fmt?: (n: number) => string;
@@ -717,7 +717,7 @@ export function LineChart({
             {s.name}
           </span>
         ))}
-        {zone && <span style={{ fontSize: 11, color: C.green }}>▬ Zdravá zóna {zone.lo}–{zone.hi}h</span>}
+        {zone && <span style={{ fontSize: 11, color: C.green }}>▬ Zdravá zóna {zone.lo}–{zone.hi}{zone.unit ?? "h"}</span>}
         {onPoint && <span style={{ fontSize: 11, color: C.textDim }}>Klik na bod = detail obdobia dole</span>}
       </div>
     </div>

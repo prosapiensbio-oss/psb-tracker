@@ -838,7 +838,11 @@ function RegisterRow({ item, actions, onNavigate }: { item: RegisterItem; action
   // Dve odpovede, lebo mesiac ticha má v praxi presne dva významy: buď klient
   // zmizol (duch), alebo je to dohodnutá prestávka. „Pauza" nastaví stav
   // klienta, čím sa stíšia aj ostatné upozornenia — nie je to len odškrtnutie.
-  const odpovedzDuch = () => { if (item.client) actions.setOverride(item.client, "duch" as never, "ano"); };
+  const odpovedzDuch = () => {
+    // Dátum v odpovedi viaže odpoveď na TÚTO epizódu ticha — keď sa klient
+    // vráti a o rok znova stíchne, otázka sa položí znova.
+    if (item.client) actions.setOverride(item.client, "duch" as never, `ano|${new Date().toISOString().slice(0, 10)}`);
+  };
   const odpovedzPauza = () => { if (item.client) actions.setOverride(item.client, "status" as never, "Pauza"); };
   return (
     <div style={{ padding: "9px 11px", marginBottom: 5, borderRadius: 8, background: item.acked ? C.track : item.tone === "red" ? C.redBg : item.tone === "blue" ? C.blueBg : C.orangeBg, opacity: item.acked ? 0.6 : 1 }}>

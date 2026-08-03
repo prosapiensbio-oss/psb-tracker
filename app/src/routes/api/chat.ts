@@ -111,7 +111,7 @@ Vieš navrhnúť aj ÚPRAVU KLIENTA (údaje sú v klientiDetail) — napr. dať 
 - "specialRate": true/false; "specialRateNote": text; "contractSigned": true/false; "bitcoin": true/false (platí v Bitcoine).
 - "zdroj": "referencia" | "instagram" | "google" | "fp" | "offline" | "ai" | "ine" | "" — odkiaľ sa klient o PSB dozvedel. Toto je JEDINÉ miesto, kde sa marketing spája s peniazmi; keď v rozhovore padne, odkiaľ niekto prišiel, navrhni zápis.
 - "zdrojKto": meno človeka, ktorý klienta poslal (len pri zdroj = "referencia"). Bez mena sa nedá odovzdať odmena za doporučenie.
-- "duch": "ano" | "nie" | "" — odpoveď na otázku „je toto duch?". Duch = 30+ dní bez tréningu, definuje ho TICHO, nie nedochodené hodiny (viď <pozadie_psb>). Po pol roku ticha hodiny prepadli definitívne. Nikdy nikoho neoznač za ducha bez overenia dátumu posledného tréningu.
+- "duch": "ano|YYYY-MM-DD" | "nie|YYYY-MM-DD" | "" — odpoveď na otázku „je toto duch?", VŽDY s dnešným dátumom za zvislou čiarou (dátum viaže odpoveď na aktuálnu epizódu ticha; keď klient znova trénuje a potom znova stíchne, otázka sa položí odznova). Duch = 30+ dní bez tréningu, definuje ho TICHO, nie nedochodené hodiny (viď <pozadie_psb>). Po pol roku ticha hodiny prepadli definitívne. Nikdy nikoho neoznač za ducha bez overenia dátumu posledného tréningu.
 Meno v akcii použi presne ako je v klientiDetail. Používateľ ho môže napísať bez diakritiky alebo inak (napr. "Jakub Stigut" = "Jakub Štigut") — nájdi zodpovedajúceho klienta v klientiDetail a použi jeho presný zápis. Ak nevieš, ktorého klienta myslí, radšej sa spýtaj. Najprv vysvetli dôsledok (napr. že klient prestane vyskakovať medzi anomáliami), až potom pridaj blok.
 
 Okrem klientov vieš navrhnúť aj tieto zápisy (rovnaký psb-action blok, rovnaké potvrdenie klikom):
@@ -131,10 +131,12 @@ Používateľ ti môže priložiť aj OBRÁZOK (screenshot). Popíš/rozober, č
 const SCHEMA_DB = `sessions(id, date, time, client_name, session_trainer, session_name, session_type, duration_min, price_czk)
   session_type: OFFLINE | ONLINE | UVODNE. date je ISO text s časom, na porovnanie roka použi substr(date,1,4).
 payments(id, date, client_name, amount_czk, payment_method)   payment_method: bank | cash | other
-packages(id, client_name, client_status, package_name, sessions_remaining, sessions_total)  — MOMENTKA aktuálneho stavu, nie história
+packages(id, client_name, client_status, package_name, sessions_remaining, sessions_total, added, valid_from, valid_to, payment_czk, kind)  — MOMENTKA aktuálneho stavu, nie história; valid_to = skutočný koniec platnosti členstva, payment_czk = koľko klient za tento balíček reálne zaplatil (nesie jeho zľavy), kind = package | membership
 client_overrides(name, status, special_rate, special_rate_note, trainer_note, contract_signed, primary_trainer, bitcoin)
 leads(id, date, name, source, referrer, status, note)
 jarvis_zavery(id, datum, tema, zaver, preco, overit, overit_do, vysledok, stav)
+fio_transactions(id, date, amount_czk, counterparty, note, typ, category)  — bankové pohyby z Fio; category = položka P&L alebo "vyplaty"/"mimo"; záporná suma = výdavok. Tržby sa z nich NIKDY nepočítajú, zdroj pravdy o príjmoch je PTminder.
+raw_uploads(id, filename, kind, bytes, uploaded_at)  — surové marketingové exporty (metricool | ga4 | gsc), obsah nečítaj cez SELECT * (je veľký), zaujímavý je len prehľad
 vzas_payments, vzas_payment_splits, vzas_periods, vzas_rules, vzas_salary_params, vzas_settings, vzas_month_notes, vzas_week_notes, anomaly_ack, services, upload_log`;
 
 const TOOLS = [

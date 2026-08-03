@@ -147,23 +147,36 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
       setChats(zoz);
       try { localStorage.setItem(CHATS_KEY, JSON.stringify(zoz.slice(0, 50))); } catch { /* ignore */ }
       const recent = zoz.filter((c) => !c.archived).sort((a, b) => b.updatedAt - a.updatedAt)[0];
-      // Neprepisuj rozpísaný chat — len prázdny štart.
-      setMsgs((m) => (m.length ? m : recent?.messages || []));
-      setChatId((id) => (recent && !id.startsWith("c") ? recent.id : recent ? recent.id : id));
+      // Chat z databázy sa preberá LEN pri prázdnom štarte. Keby sa chatId
+      // prepol vždy, rozpísaná konverzácia z localStorage by sa pri najbližšom
+      // autosave zapísala pod cudzie id a zliala dve histórie do jednej.
+      setMsgs((m) => {
+        if (m.length) return m;
+        if (recent) setChatId(recent.id);
+        return recent?.messages || [];
+      });
     });
     return () => { zivy = false; };
   }, []);
-  // Auto-save the active conversation on every change.
+  // Auto-save: localStorage okamžite, databáza s odstupom. Počas streamovania
+  // sa msgs mení niekoľkokrát za sekundu — ukladať do D1 pri každej delte by
+  // znamenalo POST s celou históriou (vrátane base64 obrázkov) desiatky ráz na
+  // jednu odpoveď. Sekunda a pol po poslednej zmene bohato stačí; localStorage
+  // medzitým drží aktuálny stav pre prípad zavretia okna.
   useEffect(() => {
     if (!msgs.length) return;
+    let zaznam: SavedChat | null = null;
     setChats((prev) => {
       const existing = prev.find((c) => c.id === chatId);
-      const zaznam = { id: chatId, title: chatTitle(msgs), messages: msgs, updatedAt: Date.now(), archived: existing?.archived };
+      zaznam = { id: chatId, title: chatTitle(msgs), messages: msgs, updatedAt: Date.now(), archived: existing?.archived };
       const next = [zaznam, ...prev.filter((c) => c.id !== chatId)];
       try { localStorage.setItem(CHATS_KEY, JSON.stringify(next.slice(0, 50))); } catch { /* ignore */ }
-      void saveJarvisChat({ id: zaznam.id, title: zaznam.title, messages: msgs, archived: !!zaznam.archived });
       return next;
     });
+    const t = setTimeout(() => {
+      if (zaznam) void saveJarvisChat({ id: zaznam.id, title: zaznam.title, messages: msgs, archived: !!zaznam.archived });
+    }, 1500);
+    return () => clearTimeout(t);
   }, [msgs, chatId]);
 
   const persistChats = (next: SavedChat[]) => {
