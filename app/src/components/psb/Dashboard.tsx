@@ -43,6 +43,16 @@ const BANKA_ZDROJ = {
   path: "Fio → Výpisy a reporty › Pohyby na všech účtech (CSV), alebo text z internetbankingu",
 };
 
+// Marketingové zdroje. Zatiaľ sa len ukladajú — obrazovka Marketing beží na
+// jednorazovom exporte spracovanom ručne. V zozname sú napriek tomu, lebo
+// hrozba nie je zobrazenie, ale strata: Metricoolu v novembri prepadnú staršie
+// príspevky a čo sa nestiahne dovtedy, už nezískame.
+const MARKETING_ZDROJE: { druh: string; label: string; path: string }[] = [
+  { druh: "metricool", label: "Metricool — príspevky, reels, stories", path: "Metricool → Analytics › Export (CSV za mesiac)" },
+  { druh: "ga4", label: "Google Analytics 4", path: "GA4 → Prehľady › Prehľad stavu prehľadov › Stiahnuť CSV" },
+  { druh: "gsc", label: "Google Search Console", path: "Search Console → Výsledky vyhľadávania › Exportovať › CSV" },
+];
+
 const catTone = (c: RegisterItem["category"]) =>
   c === "6M" ? "accent" : c === "Kapacita" ? "blue" : c === "Rozhodnutie" ? "blue" : "orange";
 
@@ -878,6 +888,13 @@ function UploadCard({ data, missing, actions }: { data: PSBData; missing: typeof
   }, [bankovyText]);
   const bankaNahrata = (bankaStav?.pocet || 0) > 0;
   const bankaInfo = bankaStav?.posledny ? `dáta do ${fmtDMY(bankaStav.posledny)}` : "";
+  const [surove, setSurove] = useState<{ druh: string; pocet: number; posledny: string }[]>([]);
+  useEffect(() => {
+    void fetch("/api/raw-uploads", { credentials: "same-origin" })
+      .then((r) => r.json())
+      .then((j) => setSurove(j.subory || []))
+      .catch(() => setSurove([]));
+  }, [uploadResult]);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleFiles = async (fileList: FileList | null) => {
@@ -972,6 +989,26 @@ function UploadCard({ data, missing, actions }: { data: PSBData; missing: typeof
             {bankaInfo && <span style={{ color: C.accentLight, fontWeight: 500 }}> · {bankaInfo}</span>}
             <br /><span style={{ color: C.textDim }}>{BANKA_ZDROJ.path}</span>
           </span>
+        </div>
+        <div style={{ fontSize: 12, color: C.textMuted, fontWeight: 600, margin: "12px 0 8px" }}>Marketing (zatiaľ sa len ukladá):</div>
+        {MARKETING_ZDROJE.map((m) => {
+          const st = surove.find((x) => x.druh === m.druh);
+          const je = (st?.pocet || 0) > 0;
+          return (
+            <div key={m.druh} style={{ fontSize: 12, color: C.textMuted, marginBottom: 5, display: "flex", gap: 8 }}>
+              <span style={{ color: je ? C.green : C.orange, flexShrink: 0 }}>{je ? "✓" : "✗"}</span>
+              <span>
+                <strong style={{ color: C.text }}>{m.label}</strong>
+                {je && <span style={{ color: C.accentLight, fontWeight: 500 }}> · {st?.pocet} súborov, naposledy {fmtDMY(st?.posledny || "")}</span>}
+                <br /><span style={{ color: C.textDim }}>{m.path}</span>
+              </span>
+            </div>
+          );
+        })}
+        <div style={{ fontSize: 11, color: C.textDim, marginTop: 6, lineHeight: 1.5, padding: "8px 10px", borderRadius: 7, background: mix(C.orange, 8) }}>
+          Marketingové exporty sa zatiaľ do obrazoviek nekreslia — Marketing beží na jednorazovom exporte.
+          Nahrávaj ich aj tak: <strong style={{ color: C.text }}>v novembri Metricoolu prepadnú staršie príspevky</strong> a
+          spracovanie sa dá dorobiť kedykoľvek, stiahnuť dáta spätne nie.
         </div>
         <div style={{ fontSize: 11, color: C.textDim, marginTop: 8, lineHeight: 1.5 }}>
           Packages report dáva PTminder v štyroch pohľadoch (šablóny balíčkov, šablóny členstiev, balíčky klientov,

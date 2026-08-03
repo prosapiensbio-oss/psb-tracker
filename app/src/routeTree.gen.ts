@@ -18,6 +18,7 @@ import { Route as ApiVzasSettingsRouteImport } from './routes/api/vzas-settings'
 import { Route as ApiVzasNotesRouteImport } from './routes/api/vzas-notes'
 import { Route as ApiSessionRouteImport } from './routes/api/session'
 import { Route as ApiResetRouteImport } from './routes/api/reset'
+import { Route as ApiRawUploadsRouteImport } from './routes/api/raw-uploads'
 import { Route as ApiPeriodsRouteImport } from './routes/api/periods'
 import { Route as ApiOverrideRouteImport } from './routes/api/override'
 import { Route as ApiLogoutRouteImport } from './routes/api/logout'
@@ -76,6 +77,11 @@ const ApiSessionRoute = ApiSessionRouteImport.update({
 const ApiResetRoute = ApiResetRouteImport.update({
   id: '/api/reset',
   path: '/api/reset',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiRawUploadsRoute = ApiRawUploadsRouteImport.update({
+  id: '/api/raw-uploads',
+  path: '/api/raw-uploads',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPeriodsRoute = ApiPeriodsRouteImport.update({
@@ -167,6 +173,7 @@ export interface FileRoutesByFullPath {
   '/api/logout': typeof ApiLogoutRoute
   '/api/override': typeof ApiOverrideRoute
   '/api/periods': typeof ApiPeriodsRoute
+  '/api/raw-uploads': typeof ApiRawUploadsRoute
   '/api/reset': typeof ApiResetRoute
   '/api/session': typeof ApiSessionRoute
   '/api/vzas-notes': typeof ApiVzasNotesRoute
@@ -192,6 +199,7 @@ export interface FileRoutesByTo {
   '/api/logout': typeof ApiLogoutRoute
   '/api/override': typeof ApiOverrideRoute
   '/api/periods': typeof ApiPeriodsRoute
+  '/api/raw-uploads': typeof ApiRawUploadsRoute
   '/api/reset': typeof ApiResetRoute
   '/api/session': typeof ApiSessionRoute
   '/api/vzas-notes': typeof ApiVzasNotesRoute
@@ -218,6 +226,7 @@ export interface FileRoutesById {
   '/api/logout': typeof ApiLogoutRoute
   '/api/override': typeof ApiOverrideRoute
   '/api/periods': typeof ApiPeriodsRoute
+  '/api/raw-uploads': typeof ApiRawUploadsRoute
   '/api/reset': typeof ApiResetRoute
   '/api/session': typeof ApiSessionRoute
   '/api/vzas-notes': typeof ApiVzasNotesRoute
@@ -245,6 +254,7 @@ export interface FileRouteTypes {
     | '/api/logout'
     | '/api/override'
     | '/api/periods'
+    | '/api/raw-uploads'
     | '/api/reset'
     | '/api/session'
     | '/api/vzas-notes'
@@ -270,6 +280,7 @@ export interface FileRouteTypes {
     | '/api/logout'
     | '/api/override'
     | '/api/periods'
+    | '/api/raw-uploads'
     | '/api/reset'
     | '/api/session'
     | '/api/vzas-notes'
@@ -295,6 +306,7 @@ export interface FileRouteTypes {
     | '/api/logout'
     | '/api/override'
     | '/api/periods'
+    | '/api/raw-uploads'
     | '/api/reset'
     | '/api/session'
     | '/api/vzas-notes'
@@ -321,6 +333,7 @@ export interface RootRouteChildren {
   ApiLogoutRoute: typeof ApiLogoutRoute
   ApiOverrideRoute: typeof ApiOverrideRoute
   ApiPeriodsRoute: typeof ApiPeriodsRoute
+  ApiRawUploadsRoute: typeof ApiRawUploadsRoute
   ApiResetRoute: typeof ApiResetRoute
   ApiSessionRoute: typeof ApiSessionRoute
   ApiVzasNotesRoute: typeof ApiVzasNotesRoute
@@ -392,6 +405,13 @@ declare module '@tanstack/react-router' {
       path: '/api/reset'
       fullPath: '/api/reset'
       preLoaderRoute: typeof ApiResetRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/raw-uploads': {
+      id: '/api/raw-uploads'
+      path: '/api/raw-uploads'
+      fullPath: '/api/raw-uploads'
+      preLoaderRoute: typeof ApiRawUploadsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/periods': {
@@ -513,6 +533,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiLogoutRoute: ApiLogoutRoute,
   ApiOverrideRoute: ApiOverrideRoute,
   ApiPeriodsRoute: ApiPeriodsRoute,
+  ApiRawUploadsRoute: ApiRawUploadsRoute,
   ApiResetRoute: ApiResetRoute,
   ApiSessionRoute: ApiSessionRoute,
   ApiVzasNotesRoute: ApiVzasNotesRoute,

@@ -199,6 +199,18 @@ export async function ingest(DB: D1Database, filename: string, text: string): Pr
       added++;
     }
     if (stmts.length) await DB.batch(stmts);
+  } else if (type === "metricool" || type === "ga4" || type === "gsc") {
+    // Uloží sa surovo. Nekreslí sa to zatiaľ nikde, ale nič sa nestratí — a to
+    // je pri Metricoole časovo obmedzená vec.
+    const kluc = `${type}|${filename}|${text.length}`;
+    const uz = await DB.prepare("SELECT id FROM raw_uploads WHERE dedup_key = ?1").bind(kluc).first();
+    if (uz) skipped = 1;
+    else {
+      await DB.prepare(
+        "INSERT INTO raw_uploads (id, filename, kind, content, bytes, dedup_key, uploaded_at) VALUES (?1,?2,?3,?4,?5,?6,?7)",
+      ).bind(uid(), filename, type, text.slice(0, 4_000_000), text.length, kluc, new Date().toISOString()).run();
+      added = 1;
+    }
   } else if (type === "cennik") {
     // Cenník nie sú pohyby — je to zoznam šablón. Ukladá sa ako nastavenie,
     // aby Jarvis aj karty vedeli aktuálne ceny bez toho, aby ich niekto

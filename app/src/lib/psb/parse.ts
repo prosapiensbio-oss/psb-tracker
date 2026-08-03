@@ -143,6 +143,14 @@ export function detectCSVType(text: string): CSVType | null {
   // Cenníkové prehľady z toho istého reportu: nemajú mená klientov, len šablóny
   // s cenou a počtom aktívnych. Bez kotvy na začiatok — súbor môže začínať BOM.
   if (h.includes("name,payment,duration")) return "cennik";
+
+  // Marketingové exporty. Zatiaľ sa neparsujú do obrazoviek — ukladajú sa tak,
+  // ako prišli. Dôvod je termín, nie lenivosť: v novembri Metricoolu prepadnú
+  // staršie príspevky a spracovanie sa dá dorobiť kedykoľvek, dáta nie.
+  if (h.includes("id,type,image,url,content,timestamp") || h.includes("id,url,image,title,date")
+    || h.includes("hashtag,count,views")) return "metricool";
+  if (h.includes("prehľad stavu prehľadov") || (h.startsWith("# ---") && h.includes("vlastníctvo"))) return "ga4";
+  if (h.includes("kliknutia,zobrazenia,mp,pozícia") || h.includes("filter,hodnota")) return "gsc";
   return null;
 }
 
