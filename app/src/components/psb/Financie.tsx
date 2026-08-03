@@ -216,7 +216,12 @@ function BtcKontrola({ data }: { data: PSBData }) {
     // v štyroch kusoch za dva dni. Porovnávať transakciu proti transakcii preto
     // vyrába falošné poplachy; porovnávajú sa ZHLUKY: čo od jedného klienta
     // prišlo v rozpätí pár dní, je jedna platba.
-    const OKNO_DNI = 4;
+    const OKNO_DNI = 4;        // čo prišlo od jedného klienta do 4 dní, je jedna platba
+    // Na spárovanie treba širšie okno než na zhlukovanie: zápis v PTminderi a
+    // pohyb v bitcoine sa bežne líšia o niekoľko dní (Gažo — bitcoin 12. 2.,
+    // zápis 4. 2.). Desať dní je stále bezpečných, lebo aj mesačný klient platí
+    // s odstupom tridsiatich.
+    const OKNO_PAROVANIA = 10;
     const TOLERANCIA_KC = 400;
     const TOLERANCIA_PCT = 0.03;   // pri veľkých sumách rozhoduje kurz, nie koruny
 
@@ -262,7 +267,7 @@ function BtcKontrola({ data }: { data: PSBData }) {
       let najdene = -1;
       for (let i = 0; i < pt.length; i++) {
         if (pouzite.has(i) || pt[i].kluc !== b.kluc) continue;
-        if (Math.abs(pt[i].od - b.od) / 86400000 > OKNO_DNI + 2) continue;
+        if (Math.abs(pt[i].od - b.od) / 86400000 > OKNO_PAROVANIA) continue;
         najdene = i;
         break;
       }
