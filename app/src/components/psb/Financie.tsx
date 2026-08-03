@@ -19,7 +19,7 @@ export function Financie({ data, clients, focus, sub, onSub }: { data: PSBData; 
   // Deep-link from the Dashboard: jump to Mesačné zárobky and highlight one month.
   useEffect(() => {
     if (!focus?.month) return;
-    setSub("zarobky");
+    setSub("trzby");
     setFocusMonth(focus.month);
   }, [focus?.nonce]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -27,16 +27,14 @@ export function Financie({ data, clients, focus, sub, onSub }: { data: PSBData; 
     <>
       <SubTabs
         tabs={[
-          { id: "zarobky", label: "Mesačné zárobky" },
-          { id: "trzby", label: "Tržby (prijaté)" },
+          { id: "trzby", label: "Peniaze po mesiacoch" },
           { id: "sedenia", label: "Sedenia & cena" },
           { id: "predikcia", label: "Predikcia" },
         ]}
         value={sub}
         onChange={setSub}
       />
-      {sub === "trzby" && <Trzby monthly={monthly} data={data} clients={clients} />}
-      {sub === "zarobky" && <Zarobky monthly={monthly} focusMonth={focusMonth} onClearFocus={() => setFocusMonth(null)} />}
+      {sub === "trzby" && <Trzby monthly={monthly} data={data} clients={clients} focusMonth={focusMonth} onClearFocus={() => setFocusMonth(null)} />}
       {sub === "sedenia" && <Sedenia monthly={monthly} />}
       {sub === "predikcia" && <Predikcia data={data} clients={clients} />}
     </>
@@ -101,114 +99,6 @@ function RangeControls({ w, monthly }: { w: ReturnType<typeof useMonthWindow>; m
     </div>
   );
 }
-
-function Zarobky({ monthly, focusMonth, onClearFocus }: { monthly: Monthly; focusMonth?: string | null; onClearFocus?: () => void }) {
-  const { sort, toggle, sorted } = useSort({ key: "month", dir: "asc" });
-  const w = useMonthWindow();
-  const withMom = useMemo(
-    () =>
-      monthly.map((m, i) => {
-        const prev = monthly[i - 1];
-        const mom = prev && prev.revenue ? ((m.revenue - prev.revenue) / prev.revenue) * 100 : null;
-        return { ...m, mom };
-      }),
-    [monthly],
-  );
-  const view = useMemo(() => windowFilter(withMom, w.win, w.from, w.to), [withMom, w.win, w.from, w.to]);
-  const rows = sorted(view, {
-    month: (m) => m.month,
-    jerry: (m) => m.byTrainer["Jerry"]?.revenue || 0,
-    terezka: (m) => m.byTrainer["Terezka"]?.revenue || 0,
-    total: (m) => m.revenue,
-    sessions: (m) => m.sessions,
-    mom: (m) => m.mom ?? -999,
-  });
-  const chart = view.map((m) => ({ label: monthLabel(m.month), value: m.revenue }));
-  // Súhrn za zvolené obdobie (vyfakturované = hodnota odtrénovaných sedení).
-  const revVals = view.map((m) => m.revenue);
-  const total = revVals.reduce((a, b) => a + b, 0);
-  const sessTotal = view.reduce((a, m) => a + m.sessions, 0);
-  const avgAll = revVals.length ? total / revVals.length : 0;
-  const avgOf = (n: number) => {
-    const s = revVals.slice(-n);
-    return s.length ? s.reduce((a, b) => a + b, 0) / s.length : 0;
-  };
-  const avg3 = avgOf(3), avg6 = avgOf(6);
-
-  return (
-    <>
-      <Card>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
-          <H3>Mesačné zárobky (spolu)</H3>
-          <RangeControls w={w} monthly={monthly} />
-        </div>
-        {chart.length ? <ValueBars data={chart} color={C.accent} fmt={(n) => `${Math.round(n / 1000)}k`} height={170} alignEnd /> : <Empty>Žiadne dáta pre zvolené obdobie.</Empty>}
-      </Card>
-
-      {view.length > 0 && (
-        <Card>
-          <H3>
-            <Info text="Súhrn vyfakturovaných zárobkov za zvolené obdobie (podľa filtra vpravo hore). Spolu = súčet všetkých mesiacov v období; priemery sú za daný počet posledných mesiacov v ňom. Zdroj Payroll by Session — sedenia s CZK0 sa rátajú do počtu, nie do súm." label="Súhrn zárobkov (za zvolené obdobie)" />
-          </H3>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, margin: "12px 0 6px" }}>
-            <StatCard value={fmtCZK(total)} label={`Spolu za obdobie · ${view.length} mes.`} color={C.accentLight} />
-            <StatCard value={fmtCZK(avgAll)} label="Ø / mesiac" color={C.accent} />
-            {view.length > 3 && <StatCard value={fmtCZK(avg3)} label="Ø posledné 3 mes." color={C.green} />}
-            {view.length > 6 && <StatCard value={fmtCZK(avg6)} label="Ø posledných 6 mes." color={C.blue} />}
-          </div>
-          <div style={{ fontSize: 11, color: C.textDim, marginTop: 4 }}>Sedení spolu za obdobie: {sessTotal}</div>
-        </Card>
-      )}
-      <Card>
-        <div style={{ fontSize: 11, color: C.textDim, marginBottom: 8 }}>Zdroj: Payroll by Session. Sedenia s CZK0 sa počítajú do počtu, nie do zárobkov.</div>
-        {focusMonth && (
-          <div style={{ marginBottom: 10 }}>
-            <button onClick={onClearFocus} style={{ background: C.accentBg, border: `1px solid ${C.accent}`, borderRadius: 6, padding: "5px 10px", color: C.accentLight, fontSize: 12, cursor: "pointer" }}>
-              Vybraný mesiac: {monthLabel(focusMonth)} ✕
-            </button>
-          </div>
-        )}
-        <TableWrap>
-          <thead>
-            <tr>
-              <SortTh label="Mesiac" sortKey="month" sort={sort} onSort={toggle} />
-              <SortTh label="Jerry" sortKey="jerry" sort={sort} onSort={toggle} align="right" />
-              <SortTh label="Terezka" sortKey="terezka" sort={sort} onSort={toggle} align="right" />
-              <SortTh label="PSB spolu" sortKey="total" sort={sort} onSort={toggle} align="right" />
-              <SortTh label="Sedení" sortKey="sessions" sort={sort} onSort={toggle} align="right" />
-              <SortTh label="MoM %" sortKey="mom" sort={sort} onSort={toggle} align="right" info="Month-over-Month — percentuálna zmena zárobkov oproti predošlému mesiacu. Kladné = rast, záporné = pokles." />
-            </tr>
-          </thead>
-          <tbody>
-            {(focusMonth ? rows.filter((m) => m.month === focusMonth) : rows).map((m) => (
-              <tr key={m.month}>
-                <td style={S.td}>{monthLabel(m.month)}</td>
-                <td style={{ ...S.td, textAlign: "right" }}>{fmtCZK(m.byTrainer["Jerry"]?.revenue || 0)}</td>
-                <td style={{ ...S.td, textAlign: "right" }}>{fmtCZK(m.byTrainer["Terezka"]?.revenue || 0)}</td>
-                <td style={{ ...S.td, textAlign: "right", fontWeight: 600, color: C.accentLight }}>{fmtCZK(m.revenue)}</td>
-                <td style={{ ...S.td, textAlign: "right" }}>{m.sessions}</td>
-                <td style={{ ...S.td, textAlign: "right", color: arrowColor(m.mom) }}>{m.mom == null ? "—" : `${arrow(m.mom)} ${m.mom.toFixed(1)}%`}</td>
-              </tr>
-            ))}
-          </tbody>
-        </TableWrap>
-        {!monthly.length && <Empty>Nahraj Payroll by Session CSV.</Empty>}
-      </Card>
-    </>
-  );
-}
-
-// Tržby = money actually received per month (Payments Recorded) — what PTminder
-// shows as "Payments". Lumpy (clients pre-pay packages), so the forecast uses
-// trailing averages rather than the session run-rate.
-// Krížová kontrola bitcoinových platieb proti PTminderu.
-//
-// Zmysel nie je počítať tržby — tie sú z PTmindera. Zmysel je nájsť to, čo v
-// jednom mieste je a v druhom nie: platbu, ktorá dorazila a nikto ju nezapísal,
-// alebo zápis bez platby. Presne to sa stalo 2. 8.: v BTC appke bolo 75 425 Kč
-// od Krčmára a v PTminderi po nich nebola stopa — nebola to chyba, len ešte
-// nebola uzávierka. Práve preto sa tolerancia počíta v dňoch aj v korunách:
-// kurz medzi okamihom platby a prepočtom sa vždy trochu líši.
 function BtcKontrola({ data }: { data: PSBData }) {
   const [stav, setStav] = useState<"nacitava" | "hotovo" | "chyba">("nacitava");
   const [platby, setPlatby] = useState<BtcPlatba[]>([]);
@@ -339,7 +229,16 @@ function BtcKontrola({ data }: { data: PSBData }) {
   );
 }
 
-function Trzby({ monthly, data, clients }: { monthly: Monthly; data: PSBData; clients: Record<string, ClientAgg> }) {
+// Jeden kanonický pohľad na peniaze dnu.
+//
+// Boli tu dve takmer rovnaké obrazovky — „Mesačné zárobky" a „Tržby" — líšili sa
+// jedným poľom v tom istom grafe a tej istej tabuľke. Dve odpovede na otázku
+// „koľko sme zarobili" znamenali, že sa človek musel najprv rozhodnúť, ktorú
+// otvoriť, a potom si pamätať, ktorú vlastne vidí. Teraz je to jedna obrazovka
+// s prepínačom; rozdiel medzi prijatým a vyfakturovaným je vysvetlený na mieste,
+// nie schovaný do názvu záložky.
+function Trzby({ monthly, data, clients, focusMonth, onClearFocus }: { monthly: Monthly; data: PSBData; clients: Record<string, ClientAgg>; focusMonth?: string | null; onClearFocus?: () => void }) {
+  const [rezim, setRezim] = useState<"prijate" | "vyfakturovane">("prijate");
   const { sort, toggle, sorted } = useSort({ key: "month", dir: "asc" });
   const w = useMonthWindow();
   const withMom = useMemo(
@@ -352,8 +251,16 @@ function Trzby({ monthly, data, clients }: { monthly: Monthly; data: PSBData; cl
     [monthly],
   );
   const view = useMemo(() => windowFilter(withMom, w.win, w.from, w.to), [withMom, w.win, w.from, w.to]);
-  const rows = sorted(view, { month: (m) => m.month, cash: (m) => m.cash, revenue: (m) => m.revenue, mom: (m) => m.mom ?? -999 });
-  const chart = view.map((m) => ({ label: monthLabel(m.month), value: m.cash }));
+  const rows = sorted(view, {
+    month: (m) => m.month,
+    cash: (m) => m.cash,
+    revenue: (m) => m.revenue,
+    jerry: (m) => m.byTrainer["Jerry"]?.revenue || 0,
+    terezka: (m) => m.byTrainer["Terezka"]?.revenue || 0,
+    sessions: (m) => m.sessions,
+    mom: (m) => m.mom ?? -999,
+  });
+  const chart = view.map((m) => ({ label: monthLabel(m.month), value: rezim === "prijate" ? m.cash : m.revenue }));
 
   // Súhrn za zvolené obdobie.
   const totalCash = view.reduce((a, m) => a + m.cash, 0);
@@ -369,7 +276,7 @@ function Trzby({ monthly, data, clients }: { monthly: Monthly; data: PSBData; cl
   // Predikcia z obnov členstiev — priemery zostávajú ako porovnanie, ale hlavné
   // číslo je teraz bodový odhad: kto má kedy skončiť členstvo a koľko naposledy
   // zaplatil.
-  const cashPred = useMemo(() => predictCash(data, clients, 2), [data, clients]);
+  const cashPred = useMemo(() => predictCash(data, clients, 1), [data, clients]);
   const buduci = cashPred.months[0];
 
   return (
@@ -377,11 +284,18 @@ function Trzby({ monthly, data, clients }: { monthly: Monthly; data: PSBData; cl
       <Card>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 4 }}>
           <H3>
-            <Info text="Mesačné tržby = peniaze reálne prijaté za mesiac (report Payments Recorded). Presne to, čo v PTminderi vidíš ako Payments. Skáče, keď si niekto kúpi väčší balíček dopredu — tie tréningy sa potom čerpajú ďalšie mesiace (preto sa tržby líšia od vyfakturovaných zárobkov)." label="Mesačné tržby (prijaté platby)" />
+            <Info text="PRIJATÉ = peniaze, ktoré reálne prišli za mesiac (report Payments Recorded) — presne to, čo v PTminderi vidíš ako Payments. Skáče, keď si niekto kúpi väčší balíček dopredu. VYFAKTUROVANÉ = hodnota odtrénovaných sedení za mesiac (Payroll by Session), teda koľko práce sa naozaj odviedlo. Tie dve čísla sa nemajú rovnať a ani jedno nie je „správnejšie“ — prijaté hovoria o cashflowe, vyfakturované o práci. Delenie na trénerov má zmysel len pri vyfakturovanom; platba trénera nemá." label="Peniaze po mesiacoch" />
           </H3>
-          <RangeControls w={w} monthly={monthly} />
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: 3 }}>
+              {([["prijate", "Prijaté (tržby)"], ["vyfakturovane", "Vyfakturované"]] as const).map(([id, lbl]) => (
+                <button key={id} onClick={() => setRezim(id)} style={{ padding: "5px 11px", borderRadius: 7, border: `1px solid ${rezim === id ? C.accent : C.border}`, background: rezim === id ? C.accentBg : "transparent", color: rezim === id ? C.accentLight : C.textMuted, fontSize: 11.5, cursor: "pointer", whiteSpace: "nowrap" }}>{lbl}</button>
+              ))}
+            </div>
+            <RangeControls w={w} monthly={monthly} />
+          </div>
         </div>
-        {chart.length ? <ValueBars data={chart} color={C.blue} fmt={(n) => `${Math.round(n / 1000)}k`} height={180} alignEnd /> : <Empty>Žiadne dáta pre zvolené obdobie.</Empty>}
+        {chart.length ? <ValueBars data={chart} color={rezim === "prijate" ? C.blue : C.accent} fmt={(n) => `${Math.round(n / 1000)}k`} height={180} alignEnd /> : <Empty>Žiadne dáta pre zvolené obdobie.</Empty>}
       </Card>
 
       {view.length > 0 && (
@@ -419,22 +333,35 @@ function Trzby({ monthly, data, clients }: { monthly: Monthly; data: PSBData; cl
       <BtcKontrola data={data} />
 
       <Card>
-        <div style={{ fontSize: 11, color: C.textDim, marginBottom: 8 }}>Zdroj: Payments Recorded. Zoradené najstaršie → najnovšie.</div>
+        <div style={{ fontSize: 11, color: C.textDim, marginBottom: 8 }}>Zdroj: Payments Recorded (prijaté) a Payroll by Session (vyfakturované, aj rozpis po trénerovi). Sedenia za 0 Kč sa počítajú do počtu, nie do súm.</div>
+        {focusMonth && (
+          <div style={{ marginBottom: 10 }}>
+            <button onClick={onClearFocus} style={{ background: C.accentBg, border: `1px solid ${C.accent}`, borderRadius: 6, padding: "5px 10px", color: C.accentLight, fontSize: 12, cursor: "pointer" }}>
+              Vybraný mesiac: {monthLabel(focusMonth)} ✕
+            </button>
+          </div>
+        )}
         <TableWrap>
           <thead>
             <tr>
               <SortTh label="Mesiac" sortKey="month" sort={sort} onSort={toggle} />
               <SortTh label="Prijaté (tržby)" sortKey="cash" sort={sort} onSort={toggle} align="right" />
-              <SortTh label="Vyfakturované" sortKey="revenue" sort={sort} onSort={toggle} align="right" info="Pre porovnanie: hodnota odtrénovaných sedení za mesiac." />
-              <SortTh label="MoM %" sortKey="mom" sort={sort} onSort={toggle} align="right" info="Zmena tržieb oproti predošlému mesiacu." />
+              <SortTh label="Vyfakturované" sortKey="revenue" sort={sort} onSort={toggle} align="right" info="Hodnota odtrénovaných sedení za mesiac." />
+              <SortTh label="Jerry" sortKey="jerry" sort={sort} onSort={toggle} align="right" info="Vyfakturované — platby sa na trénerov nedelia." />
+              <SortTh label="Terezka" sortKey="terezka" sort={sort} onSort={toggle} align="right" info="Vyfakturované — platby sa na trénerov nedelia." />
+              <SortTh label="Sedení" sortKey="sessions" sort={sort} onSort={toggle} align="right" />
+              <SortTh label="MoM %" sortKey="mom" sort={sort} onSort={toggle} align="right" info="Zmena prijatých tržieb oproti predošlému mesiacu." />
             </tr>
           </thead>
           <tbody>
-            {rows.map((m) => (
+            {(focusMonth ? rows.filter((m) => m.month === focusMonth) : rows).map((m) => (
               <tr key={m.month}>
                 <td style={S.td}>{monthLabel(m.month)}</td>
                 <td style={{ ...S.td, textAlign: "right", fontWeight: 600, color: C.blue }}>{fmtCZK(m.cash)}</td>
-                <td style={{ ...S.td, textAlign: "right", color: C.textMuted }}>{fmtCZK(m.revenue)}</td>
+                <td style={{ ...S.td, textAlign: "right", color: C.accentLight }}>{fmtCZK(m.revenue)}</td>
+                <td style={{ ...S.td, textAlign: "right", color: C.textMuted }}>{fmtCZK(m.byTrainer["Jerry"]?.revenue || 0)}</td>
+                <td style={{ ...S.td, textAlign: "right", color: C.textMuted }}>{fmtCZK(m.byTrainer["Terezka"]?.revenue || 0)}</td>
+                <td style={{ ...S.td, textAlign: "right", color: C.textMuted }}>{m.sessions}</td>
                 <td style={{ ...S.td, textAlign: "right", color: arrowColor(m.mom) }}>{m.mom == null ? "—" : `${arrow(m.mom)} ${m.mom.toFixed(1)}%`}</td>
               </tr>
             ))}

@@ -31,7 +31,6 @@ import { Dashboard } from "./Dashboard";
 import { Treningy } from "./Treningy";
 import { Klienti } from "./Klienti";
 import { Financie } from "./Financie";
-import { SixMTracker } from "./SixM";
 import { Marketing } from "./Marketing";
 import { Vysledky, Vzas } from "./Vzas";
 import { Udaje } from "./Udaje";
@@ -74,7 +73,6 @@ const TRACKER_SECTIONS = [
   { id: "treningy", label: "Tréningy", icon: "calendar" },
   { id: "klienti", label: "Klienti", icon: "userCheck" },
   { id: "financie", label: "Financie", icon: "wallet" },
-  { id: "6m", label: "6M Tracker", icon: "activity" },
 ];
 const TRACKER_IDS = TRACKER_SECTIONS.map((s) => s.id);
 
@@ -100,7 +98,8 @@ export function PSBApp() {
   // vedieť, či je to vyplnené, skôr než tam človek príde.
   const [zapisy, setZapisy] = useState<{ weeks: Record<string, Record<string, string>>; mesiace: Record<string, { note?: string; answers?: Record<string, string> }> }>({ weeks: {}, mesiace: {} });
   const [treningySub, setTreningySub] = useState("prehled");
-  const [financieSub, setFinancieSub] = useState("zarobky");
+  const [financieSub, setFinancieSub] = useState("trzby");
+  const [klientiSub, setKlientiSub] = useState("klienti");
   const [treningyFocus, setTreningyFocus] = useState<NavFocus | null>(null);
   const [financieFocus, setFinancieFocus] = useState<NavFocus | null>(null);
   const [klientiFocus, setKlientiFocus] = useState<NavFocus | null>(null);
@@ -114,7 +113,10 @@ export function PSBApp() {
   //
   // Formát je #zalozka/podzalozka, napr. #tracker/klienti alebo #vzas/jarek.
   const cestaZoStavu = () => {
-    if (active === "tracker") return `#tracker/${trackerSection}${trackerSection === "treningy" ? `/${treningySub}` : trackerSection === "financie" ? `/${financieSub}` : ""}`;
+    if (active === "tracker") {
+      const pod = trackerSection === "treningy" ? treningySub : trackerSection === "financie" ? financieSub : trackerSection === "klienti" ? klientiSub : "";
+      return `#tracker/${trackerSection}${pod ? `/${pod}` : ""}`;
+    }
     if (active === "vzas") return `#vzas/${vzasSub}`;
     if (active === "vysledky") return `#vysledky/${vysledkySub}`;
     return `#${active}`;
@@ -129,6 +131,7 @@ export function PSBApp() {
       setTrackerSection(pod);
       if (pod === "treningy" && pod2) setTreningySub(pod2);
       if (pod === "financie" && pod2) setFinancieSub(pod2);
+      if (pod === "klienti" && pod2) setKlientiSub(pod2);
     }
     if (zal === "vzas" && pod) setVzasSub(pod);
     if (zal === "vysledky" && pod) setVysledkySub(pod);
@@ -154,6 +157,14 @@ export function PSBApp() {
   // click-throughs still pass the old section ids (treningy/klienti/…), so map
   // those onto the Tracker tab + its section rather than making callers change.
   const navigate = useCallback((tab: string, sub?: string, focus?: NavFocus) => {
+    // „6m" už nie je sekcia — je to pohľad v Klientoch. Staré odkazy (register,
+    // karta na dashboarde) tým pádom vedú tam, kde 6M dnes žije.
+    if (tab === "6m") {
+      setActive("tracker");
+      setTrackerSection("klienti");
+      setKlientiSub("6m");
+      return;
+    }
     if (TRACKER_IDS.includes(tab)) {
       setActive("tracker");
       setTrackerSection(tab);
@@ -162,6 +173,7 @@ export function PSBApp() {
     }
     if (tab === "treningy" && sub) setTreningySub(sub);
     if (tab === "financie" && sub) setFinancieSub(sub);
+    if (tab === "klienti" && sub) setKlientiSub(sub);
     if (tab === "treningy" && focus) setTreningyFocus(focus);
     if (tab === "financie" && focus) setFinancieFocus(focus);
     if (tab === "klienti" && focus) setKlientiFocus(focus);
@@ -369,10 +381,9 @@ export function PSBApp() {
               })}
             </div>
             {trackerSection === "treningy" && <Treningy data={data} clients={clients} sub={treningySub} onSub={setTreningySub} focus={treningyFocus} trainer={trainer} onTrainer={setTrainer} />}
-            {trackerSection === "klienti" && <Klienti clients={clients} capacity={capacity} actions={actions} focus={klientiFocus} leads={data.leads} trainer={trainer} onTrainer={setTrainer} />}
+            {trackerSection === "klienti" && <Klienti clients={clients} capacity={capacity} actions={actions} focus={klientiFocus} leads={data.leads} trainer={trainer} onTrainer={setTrainer} sixM={sixM} sub={klientiSub} onSub={setKlientiSub} />}
             {trackerSection === "financie" && <Financie data={data} clients={clients} focus={financieFocus} sub={financieSub} onSub={setFinancieSub} />}
-            {trackerSection === "6m" && <SixMTracker sixM={sixM} actions={actions} trainer={trainer} onTrainer={setTrainer} />}
-          </>
+              </>
         )}
 
         {active === "marketing" && <Marketing data={data} clients={clients} leads={data.leads} chat={chat} />}

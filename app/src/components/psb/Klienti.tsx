@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { duchOdpoved, membershipBucket, MEMBERSHIP_ORDER, TRAINERS, type CapacityRow, type ClientAgg } from "../../lib/psb/compute";
+import { duchOdpoved, membershipBucket, MEMBERSHIP_ORDER, TRAINERS, type CapacityRow, type ClientAgg, type SixMRow } from "../../lib/psb/compute";
 import { fmtCZK, fmtDate, normName } from "../../lib/psb/format";
 import { C, MEMBERSHIP_COLORS, mix, S } from "../../lib/psb/theme";
 import { saveLead } from "../../lib/psb/client";
 import type { Lead } from "../../lib/psb/types";
 import type { Actions, NavFocus } from "./App";
+import { SixMTracker } from "./SixM";
 import { Badge, Card, Donut, Empty, H3, Info, Modal, Select, SortTh, StatCard, SubTabs, TableWrap, useSort } from "./ui";
 
 const segTone = (s: string) => (s === "Anchor" ? "green" : s === "Stabilný" ? "orange" : "red");
@@ -277,7 +278,7 @@ export const ZDROJE = [
   { value: "ine", label: "Iné" },
 ];
 
-export function Klienti({ clients, capacity, actions, focus, leads, trainer, onTrainer }: { clients: Record<string, ClientAgg>; capacity: CapacityRow[]; actions: Actions; focus?: NavFocus | null; leads: Lead[]; trainer: string; onTrainer: (t: string) => void }) {
+export function Klienti({ clients, capacity, actions, focus, leads, trainer, onTrainer, sixM, sub, onSub }: { clients: Record<string, ClientAgg>; capacity: CapacityRow[]; actions: Actions; focus?: NavFocus | null; leads: Lead[]; trainer: string; onTrainer: (t: string) => void; sixM: SixMRow[]; sub: string; onSub: (s: string) => void }) {
   const [focusClient, setFocusClient] = useState<string | null>(null);
   useEffect(() => {
     if (focus?.client) setFocusClient(focus.client);
@@ -416,19 +417,24 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
     );
   };
 
-  const [sub, setSub] = useState("klienti");
+  const setSub = onSub;
 
   const editC = edit ? clients[edit] : null;
   const filterLabel = fTrainer === "all" && fSegment === "all" ? "Všetci klienti" : `${fTrainer === "all" ? "" : fTrainer} ${fSegment === "all" ? "" : fSegment}`.trim();
 
   return (
     <>
+      {/* 6M sem prišlo z vlastnej sekcie. Šesťmesačný proces nie je iný modul,
+          je to pohľad na tých istých klientov — a doteraz bol na troch miestach
+          naraz (vlastná sekcia, karta na dashboarde, upozornenia v registri).
+          Kto hľadal klienta v 6M, musel vedieť, že sa naňho pozerá inde. */}
       <SubTabs
-        tabs={[{ id: "klienti", label: "Klienti" }, { id: "dopyty", label: "Dopyty" }]}
+        tabs={[{ id: "klienti", label: "Klienti" }, { id: "6m", label: "6M proces" }, { id: "dopyty", label: "Dopyty" }]}
         value={sub}
         onChange={setSub}
       />
-      {sub === "dopyty" ? <Dopyty leads={leads} clients={clients} refresh={actions.refresh} /> : (
+      {sub === "6m" ? <SixMTracker sixM={sixM} actions={actions} trainer={trainer} onTrainer={onTrainer} /> :
+       sub === "dopyty" ? <Dopyty leads={leads} clients={clients} refresh={actions.refresh} /> : (
       <>
       {/* Filtre + KPI úplne hore */}
       <Card>
