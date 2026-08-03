@@ -25,6 +25,7 @@ import { Route as ApiLoginRouteImport } from './routes/api/login'
 import { Route as ApiLeadsRouteImport } from './routes/api/leads'
 import { Route as ApiJarvisMemoryRouteImport } from './routes/api/jarvis-memory'
 import { Route as ApiIngestRouteImport } from './routes/api/ingest'
+import { Route as ApiFioRouteImport } from './routes/api/fio'
 import { Route as ApiExportRouteImport } from './routes/api/export'
 import { Route as ApiDataRouteImport } from './routes/api/data'
 import { Route as ApiClientDeleteRouteImport } from './routes/api/client-delete'
@@ -112,6 +113,11 @@ const ApiIngestRoute = ApiIngestRouteImport.update({
   path: '/api/ingest',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiFioRoute = ApiFioRouteImport.update({
+  id: '/api/fio',
+  path: '/api/fio',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiExportRoute = ApiExportRouteImport.update({
   id: '/api/export',
   path: '/api/export',
@@ -153,6 +159,7 @@ export interface FileRoutesByFullPath {
   '/api/client-delete': typeof ApiClientDeleteRoute
   '/api/data': typeof ApiDataRoute
   '/api/export': typeof ApiExportRoute
+  '/api/fio': typeof ApiFioRoute
   '/api/ingest': typeof ApiIngestRoute
   '/api/jarvis-memory': typeof ApiJarvisMemoryRoute
   '/api/leads': typeof ApiLeadsRoute
@@ -177,6 +184,7 @@ export interface FileRoutesByTo {
   '/api/client-delete': typeof ApiClientDeleteRoute
   '/api/data': typeof ApiDataRoute
   '/api/export': typeof ApiExportRoute
+  '/api/fio': typeof ApiFioRoute
   '/api/ingest': typeof ApiIngestRoute
   '/api/jarvis-memory': typeof ApiJarvisMemoryRoute
   '/api/leads': typeof ApiLeadsRoute
@@ -202,6 +210,7 @@ export interface FileRoutesById {
   '/api/client-delete': typeof ApiClientDeleteRoute
   '/api/data': typeof ApiDataRoute
   '/api/export': typeof ApiExportRoute
+  '/api/fio': typeof ApiFioRoute
   '/api/ingest': typeof ApiIngestRoute
   '/api/jarvis-memory': typeof ApiJarvisMemoryRoute
   '/api/leads': typeof ApiLeadsRoute
@@ -228,6 +237,7 @@ export interface FileRouteTypes {
     | '/api/client-delete'
     | '/api/data'
     | '/api/export'
+    | '/api/fio'
     | '/api/ingest'
     | '/api/jarvis-memory'
     | '/api/leads'
@@ -252,6 +262,7 @@ export interface FileRouteTypes {
     | '/api/client-delete'
     | '/api/data'
     | '/api/export'
+    | '/api/fio'
     | '/api/ingest'
     | '/api/jarvis-memory'
     | '/api/leads'
@@ -276,6 +287,7 @@ export interface FileRouteTypes {
     | '/api/client-delete'
     | '/api/data'
     | '/api/export'
+    | '/api/fio'
     | '/api/ingest'
     | '/api/jarvis-memory'
     | '/api/leads'
@@ -301,6 +313,7 @@ export interface RootRouteChildren {
   ApiClientDeleteRoute: typeof ApiClientDeleteRoute
   ApiDataRoute: typeof ApiDataRoute
   ApiExportRoute: typeof ApiExportRoute
+  ApiFioRoute: typeof ApiFioRoute
   ApiIngestRoute: typeof ApiIngestRoute
   ApiJarvisMemoryRoute: typeof ApiJarvisMemoryRoute
   ApiLeadsRoute: typeof ApiLeadsRoute
@@ -430,6 +443,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiIngestRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/fio': {
+      id: '/api/fio'
+      path: '/api/fio'
+      fullPath: '/api/fio'
+      preLoaderRoute: typeof ApiFioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/export': {
       id: '/api/export'
       path: '/api/export'
@@ -485,6 +505,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiClientDeleteRoute: ApiClientDeleteRoute,
   ApiDataRoute: ApiDataRoute,
   ApiExportRoute: ApiExportRoute,
+  ApiFioRoute: ApiFioRoute,
   ApiIngestRoute: ApiIngestRoute,
   ApiJarvisMemoryRoute: ApiJarvisMemoryRoute,
   ApiLeadsRoute: ApiLeadsRoute,
