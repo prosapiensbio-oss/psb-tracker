@@ -17,17 +17,20 @@ const ZDROJE: { nazov: string; url: string }[] = [
   { nazov: "Google Search Central", url: "https://developers.google.com/search/blog/feed.xml" },
   { nazov: "Meta Newsroom", url: "https://about.fb.com/news/feed/" },
   { nazov: "Facebook Developers", url: "https://developers.facebook.com/blog/feed/" },
-  { nazov: "TikTok Newsroom", url: "https://newsroom.tiktok.com/rss" },
   { nazov: "YouTube Blog", url: "https://blog.youtube/rss/" },
 ];
 
-// Slová, ktoré v titulku znamenajú „toto sa môže týkať dosahu". Zámerne široké:
-// radšej označiť viac a nechať človeka mávnuť rukou, než prehliadnuť jadrovú
-// aktualizáciu, lebo ju niekto nazval inak.
+// Slová, ktoré v titulku znamenajú „toto sa môže týkať dosahu".
+//
+// Prvá verzia mala medzi nimi „creator" a „feed" a hneď pri prvej kontrole
+// označila ako dôležité tri správy o YouTube FIFA Creator Cupe. To je presne
+// tá cesta, ktorou karta prestane niečo znamenať: keď svieti na futbal, človek
+// ju za týždeň prestane čítať. Radšej užší zoznam a občas prehliadnutá správa
+// (celý zoznam je aj tak na jeden klik) než signál, ktorý nikto neberie vážne.
 const KLUCOVE = [
-  "algorithm", "ranking", "rank", "core update", "search update", "spam",
-  "recommend", "reach", "distribution", "feed", "reels", "discovery",
-  "creator", "content policy", "for you", "visibility", "helpful content",
+  "algorithm", "ranking", "core update", "search update", "spam polic",
+  "recommendation", "how we recommend", "distribution", "reach",
+  "for you", "visibility", "helpful content", "content policy",
 ];
 
 const hash = (s: string) => {
@@ -121,6 +124,20 @@ export const Route = createFileRoute("/api/algo")({
             chybne++;
           }
         }
+        // Zoznam kľúčových slov sa časom upresňuje. Keby sa prehodnotili len
+        // nové správy, staré by naveky nosili označenie podľa pravidiel, ktoré
+        // už neplatia — a karta by tvrdila, že futbalový turnaj je zmena
+        // algoritmu. Preto sa pri každej kontrole prejdú aj uložené.
+        const vsetky = (await DB.prepare("SELECT id, titulok, relevantne FROM algo_novinky").all())
+          .results as { id: string; titulok: string; relevantne: number }[];
+        for (const r of vsetky) {
+          const low = String(r.titulok).toLowerCase();
+          const rel = KLUCOVE.some((k) => low.includes(k)) ? 1 : 0;
+          if (rel !== r.relevantne) {
+            await DB.prepare("UPDATE algo_novinky SET relevantne = ?2 WHERE id = ?1").bind(r.id, rel).run();
+          }
+        }
+
         return Response.json({ ok: true, pridane, chybne, zdrojov: ZDROJE.length });
       },
     },

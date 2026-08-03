@@ -116,8 +116,11 @@ Appka tieto kanály číta sama (Marketing → Algoritmus → Skontrolovať zmen
 | Google Search Central Blog | jadrové aktualizácie, zmeny v hodnotení | **áno** (Atom) |
 | Meta Newsroom | ohlásenia pre Facebook aj Instagram | **áno** (RSS) |
 | Facebook Developers Blog | zmeny v API a distribúcii | **áno** (RSS) |
-| TikTok Newsroom | ohlásenia TikToku | **áno** (RSS) |
 | YouTube Official Blog | zmeny v odporúčaniach | **áno** (RSS) |
+
+**TikTok tam nie je zámerne:** newsroom.tiktok.com síce na `/rss` odpovedá
+stavom 200, ale vracia HTML stránku, nie feed — a to platí pre všetky varianty
+adresy. Skúšané, nefunguje; TikTok patrí k ručnej polročnej kontrole.
 
 **Čo strojovo čitateľné NIE JE — a je to najdôležitejší zdroj:** Adam Mosseri
 oznamuje zmeny Instagramu vo videách na svojom profile a na Threads. Instagram
