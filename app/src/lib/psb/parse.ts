@@ -151,6 +151,10 @@ export function detectCSVType(text: string): CSVType | null {
     || h.includes("hashtag,count,views")) return "metricool";
   if (h.includes("prehľad stavu prehľadov") || (h.startsWith("# ---") && h.includes("vlastníctvo"))) return "ga4";
   if (h.includes("kliknutia,zobrazenia,mp,pozícia") || h.includes("filter,hodnota")) return "gsc";
+
+  // Anamnéza z Google formulára. Kotva je otázka o zdroji — je to jediný stĺpec,
+  // ktorý appka z tohto exportu naozaj potrebuje, a zároveň sa nevyskytuje inde.
+  if (h.includes("dozvěděli") || h.includes("časová pečiatka")) return "anamneza";
   return null;
 }
 
@@ -332,3 +336,79 @@ export function parsePackages(text: string): PackageRow[] {
 export const sessionKey = (r: SessionRow) => `${r.date}|${r.time}|${r.client}|${r.sessionTrainer}`;
 export const serviceKey = (r: ServiceRow) => `${r.date}|${r.client}|${r.description}`;
 export const paymentKey = (r: PaymentRow) => `${r.date}|${r.client}|${r.amount}`;
+
+// ── Anamnéza (export z Google formulára) ─────────────────────────────────────
+//
+// Formulár zostáva tam, kde je — funguje a prerábať ho do appky by znamenalo
+// riešiť prístupy aj zdravotné údaje v cudzej databáze. Appka si z exportu berie
+// jedinú vec, ktorú inak nemá odkiaľ vziať: **odkiaľ sa klient o PSB dozvedel**.
+// To je jediné miesto, kde sa marketing spája s peniazmi.
+//
+// Zdravotná časť anamnézy sa zámerne NEUKLADÁ. Nie je na ňu v appke dôvod a
+// bola by to najcitlivejšia vec v celej databáze.
+export type AnamnezaRiadok = { meno: string; zdroj: string; zdrojKto: string };
+
+// Odpovede sú voľný text z formulára a ľudia píšu, čo chcú. Preto sa mapuje na
+// pevný zoznam ZDROJE a všetko, čo vyzerá ako meno človeka, sa berie ako
+// referencia — v praxi to tak vždy bolo („Knapcok", „manzelkina sestra…").
+const zdrojZOdpovede = (raw: string): { zdroj: string; kto: string } => {
+  const t = raw.trim();
+  if (!t) return { zdroj: "", kto: "" };
+  // Viacnásobná odpoveď: „Instagram;Functional Patterns" alebo „Reference;Meno".
+  const casti = t.split(";").map((x) => x.trim()).filter(Boolean);
+  const prva = casti[0].toLowerCase();
+  const zvysok = casti.slice(1).join(", ");
+
+  if (prva.startsWith("refer")) return { zdroj: "referencia", kto: zvysok };
+  if (prva.includes("google")) return { zdroj: "google", kto: "" };
+  if (prva.includes("instagram")) return { zdroj: "instagram", kto: "" };
+  if (prva.includes("functional") || prva === "fp") return { zdroj: "fp", kto: "" };
+  if (/tabul|bilboard|billboard|letak|letáč|leták|vonku|vonkajš|reklama z/.test(prva)) return { zdroj: "offline", kto: "" };
+  if (/\bai\b|chatgpt|umel/.test(prva)) return { zdroj: "ai", kto: "" };
+  // Zostáva voľný text. Ak obsahuje meno alebo vzťah, je to referencia; inak iné.
+  if (/[a-zá-ž]/i.test(t)) return { zdroj: "referencia", kto: t };
+  return { zdroj: "ine", kto: "" };
+};
+
+// Odpovede z formulára obsahujú odriadkovania vnútri úvodzoviek (ľudia píšu
+// odseky), takže rozdelenie po riadkoch tu nestačí — potrebný je parser, ktorý
+// vie, že nový záznam začína až mimo úvodzoviek.
+const csvZaznamy = (text: string): string[][] => {
+  const out: string[][] = [];
+  let riadok: string[] = [];
+  let cur = "";
+  let inQ = false;
+  const t = text.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  for (let i = 0; i < t.length; i++) {
+    const ch = t[i];
+    if (ch === '"') {
+      if (inQ && t[i + 1] === '"') { cur += '"'; i++; }
+      else inQ = !inQ;
+    } else if (ch === "," && !inQ) { riadok.push(cur); cur = ""; }
+    else if (ch === "\n" && !inQ) { riadok.push(cur); out.push(riadok); riadok = []; cur = ""; }
+    else cur += ch;
+  }
+  if (cur || riadok.length) { riadok.push(cur); out.push(riadok); }
+  return out.filter((r) => r.some((c) => c.trim()));
+};
+
+export function parseAnamneza(text: string): AnamnezaRiadok[] {
+  const rows = csvZaznamy(text);
+  if (rows.length < 2) return [];
+  const head = rows[0].map((h) => h.trim().toLowerCase());
+  const idx = (frag: string) => head.findIndex((h) => h.includes(frag));
+  const iMeno = idx("meno");
+  const iPriezvisko = idx("příjmení") >= 0 ? idx("příjmení") : idx("priezvisko");
+  const iZdroj = idx("dozvěděli") >= 0 ? idx("dozvěděli") : idx("dozvedeli");
+  if (iMeno < 0 || iZdroj < 0) return [];
+
+  const out: AnamnezaRiadok[] = [];
+  for (const r of rows.slice(1)) {
+    const meno = `${(r[iMeno] || "").trim()} ${(iPriezvisko >= 0 ? r[iPriezvisko] || "" : "").trim()}`.trim();
+    if (!meno) continue;
+    const { zdroj, kto } = zdrojZOdpovede(r[iZdroj] || "");
+    if (!zdroj) continue;
+    out.push({ meno, zdroj, zdrojKto: kto });
+  }
+  return out;
+}

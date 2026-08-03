@@ -2,7 +2,8 @@
 import type { D1Database } from "@cloudflare/workers-types";
 
 import { audit, jeZamknuty, zamknuteMesiace } from "./audit.server";
-import { parseCennik } from "./parse";
+import { normName } from "./format";
+import { parseAnamneza, parseCennik } from "./parse";
 import {
   detectCSVType,
   parsePackages,
@@ -210,6 +211,43 @@ export async function ingest(DB: D1Database, filename: string, text: string, act
         "INSERT INTO raw_uploads (id, filename, kind, content, bytes, dedup_key, uploaded_at) VALUES (?1,?2,?3,?4,?5,?6,?7)",
       ).bind(uid(), filename, type, text.slice(0, 4_000_000), text.length, kluc, new Date().toISOString()).run();
       added = 1;
+    }
+  } else if (type === "anamneza") {
+    // Z anamnézy sa berie jediná vec: odkiaľ sa klient o PSB dozvedel. Zdravotná
+    // časť sa neukladá — nie je na ňu v appke dôvod a bola by to najcitlivejšia
+    // vec v celej databáze.
+    //
+    // Mená vo formulári si ľudia píšu sami, takže sa nezhodujú s PTminderom na
+    // znak („Kaňunsky" vs „Kaňovský"). Preto sa páruje bez diakritiky a keď to
+    // nesedí celé, skúsi sa priezvisko — a riadok, ktorý sa nespáruje, sa
+    // zaráta ako preskočený, nie ako úspech.
+    const riadky = parseAnamneza(text);
+    const menaDb = (await DB.prepare("SELECT DISTINCT client_name FROM sessions").all()).results.map((r: any) => String(r.client_name));
+    const podlaNorm = new Map<string, string>();
+    const podlaPriezviska = new Map<string, string[]>();
+    for (const m of menaDb) {
+      podlaNorm.set(normName(m), m);
+      const p = normName(m).split(" ").filter(Boolean).pop() || "";
+      if (p.length >= 4) podlaPriezviska.set(p, [...(podlaPriezviska.get(p) || []), m]);
+    }
+    // Čo je už vyplnené, sa neprepisuje: ručný zápis vie viac než formulár.
+    const uzMa = new Set(
+      (await DB.prepare("SELECT name FROM client_overrides WHERE zdroj IS NOT NULL AND zdroj <> ''").all())
+        .results.map((r: any) => String(r.name)),
+    );
+    for (const r of riadky) {
+      const n = normName(r.meno);
+      let meno = podlaNorm.get(n);
+      if (!meno) {
+        const p = n.split(" ").filter(Boolean).pop() || "";
+        const kand = podlaPriezviska.get(p) || [];
+        if (kand.length === 1) meno = kand[0];
+      }
+      if (!meno || uzMa.has(meno)) { skipped++; continue; }
+      await setOverride(DB, meno, "zdroj", r.zdroj);
+      if (r.zdrojKto) await setOverride(DB, meno, "zdrojKto", r.zdrojKto);
+      uzMa.add(meno);
+      added++;
     }
   } else if (type === "cennik") {
     // Cenník nie sú pohyby — je to zoznam šablón. Ukladá sa ako nastavenie,
