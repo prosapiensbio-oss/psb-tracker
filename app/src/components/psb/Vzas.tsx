@@ -1666,7 +1666,7 @@ function EnergyTrendCard() {
   return (
     <Card>
       <H3>
-        <Info text="Priemer týždenných hodnotení energie za mesiac (1 = na dne, 10 = plná sila). Zadáva sa raz týždenne v Tréningy → Prehľad, kde sedí vedľa odtrénovaných hodín. Klesajúca krivka pri rastúcej záťaži je varovanie skôr, než sa to prejaví na výkone. Zobrazujú sa všetky mesiace, v ktorých je niečo zapísané — aj tie mimo rozsahu VZAS, ktorý končí júnom 2026." label="Energia a vyhorenie" />
+        <Info text="Priemer týždenných hodnotení náročnosti za mesiac: 1 = ľahký týždeň, 10 = veľmi ťažký (rovnaká logika ako RPE). NÍZKE číslo je dobré. Zadáva sa raz týždenne v Tréningy → Prehľad, kde sedí vedľa odtrénovaných hodín. Rastúca krivka pri rastúcich hodinách je varovanie skôr, než sa to prejaví na výkone. Zobrazujú sa všetky mesiace, v ktorých je niečo zapísané — aj tie mimo rozsahu VZAS, ktorý končí júnom 2026." label="Náročnosť týždňov a vyhorenie" />
       </H3>
       {any ? (
         <>
@@ -1675,11 +1675,12 @@ function EnergyTrendCard() {
             series={[{ name: "Jerry", color: C.accent }, { name: "Terezka", color: C.blue }]}
             height={200}
             fmt={(n) => n.toFixed(1)}
-            zone={{ lo: 6, hi: 10, unit: "" }}
+            zone={{ lo: 1, hi: 6, unit: "" }}
             alignEnd
           />
           <div style={{ fontSize: 11.5, color: C.textMuted, marginTop: 8 }}>
-            Zelené pásmo 6–10 je zdravé. Iné hodiny mimo tréningov za obdobie: Jerry{" "}
+            Zelené pásmo 1–6 je udržateľné; mesiace nad 8 sú varovanie, aj keď sa zatiaľ nič nedeje na výkone.
+            Iné hodiny mimo tréningov za obdobie: Jerry{" "}
             <b>{rows.reduce((a, r) => a + r.hJ, 0)} h</b>, Terezka <b>{rows.reduce((a, r) => a + r.hT, 0)} h</b>.
           </div>
         </>

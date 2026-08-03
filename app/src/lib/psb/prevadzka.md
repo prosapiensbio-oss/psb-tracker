@@ -283,3 +283,48 @@ Pri prijatých platbách je zdrojom pravdy **PTminder**. Bankový účet aj BTC 
 slúžia iba na **kontrolu** — overia, že to, čo je v PTminderi, sa naozaj stalo,
 a ukážu prípady, kde niečo chýba alebo nesedí kurzom. Nikdy z nich nepočítaj
 tržby.
+
+---
+
+## 15. Týždenné hodnotenie je NÁROČNOSŤ, nie energia
+
+Jerry aj Terezka si raz týždenne zapisujú jedno číslo 1–10. Znamená, **aký ťažký
+bol týždeň**: 1 = super ľahký, 10 = super ťažký. Je to rovnaká logika ako RPE,
+ktoré ako tréneri používajú denne.
+
+**Nízke číslo je dobré.** Zdravé pásmo je 1–6; mesačný priemer nad 8 je varovanie
+pred vyhorením, aj keď sa zatiaľ nič nedeje na výkone.
+
+⚠ Do 3. 8. 2026 to appka čítala OPAČNE („1 = na dne, 10 = plná sila", zelené
+pásmo 6–10) a posuvník nemal štítok. Existujúce zápisy sú správne podľa Jerryho
+modelu — Jerry 4 („tento týždeň bol pohoda") a Terezka 3 („stabilný") sú ľahké
+týždne, nie vyhorenie. Historické dáta sa nemenili, menil sa výklad.
+
+Vypĺňa **každý svoje** — nie jeden za oboch.
+
+## 16. Rituály, na ktoré sa appka viaže
+
+- **Víkend (piatok alebo nedeľa)** — týždenný zápis: náročnosť, iné hodiny,
+  zrušené/presunuté tréningy.
+- **Raz mesačne** — mesačné výsledky a poznámka k mesiacu.
+- **Raz kvartálne** — kvartálne výsledky.
+
+Pripomienky sa majú viazať na tieto tri okamihy, nie na vymyslený deň. Appka je
+nová a zapisovanie je pre PSB úplne nový zvyk — Jerry ho chce nechať bežať a po
+pár mesiacoch vyhodnotiť, či dáva zmysel.
+
+## 17. Kto appku používa
+
+**Obaja majú plný prístup a vidia všetko** vrátane VZAS, výplat a dlhov.
+
+- **Jerry** — celý prehľad, financie, marketing, úpravy.
+- **Terezka** — dopyty (má prvý kontakt s klientom v 99,9 % prípadov, takže
+  lievik je jej vstup), vlastná náročnosť týždňa, pauzy a duchovia pri svojich
+  klientoch, poznámky ku klientom.
+
+Prihlásenie je oddelené, aby audit vedel povedať aj KTO, nielen čo a kedy.
+
+## 18. Kam chodia dopyty
+
+Instagram DM · **mail cez formulár na webe (najčastejšie)** · občas priamy
+telefonát · občas na osobné Instagram účty Jerryho alebo Terezky.

@@ -46,11 +46,19 @@ function WeekEnergyRow({ weekKeyIso, colSpan, entry, onSave }: {
       <td colSpan={colSpan} style={{ padding: "12px 14px", background: mix(C.accent, 5), borderBottom: `1px solid ${C.border}` }}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(270px, 1fr))", gap: 12 }}>
           {PEOPLE.map((p) => {
-            const score = Number(draft[wkScore(p.key)] ?? 7);
-            const col = score >= 7 ? C.green : score >= 4 ? C.orange : C.red;
+            // Škála je RPE, nie „energia": 1 = ľahký týždeň, 10 = veľmi ťažký.
+            // Pôvodne bola opačne a posuvník nemal štítok, takže Jerry aj
+            // Terezka doň prirodzene písali náročnosť (ako RPE, ktoré ako
+            // tréneri používajú denne) a appka to čítala ako vyhorenie.
+            // Nízke je dobré, vysoké je varovanie; východzia je stredná päťka.
+            const score = Number(draft[wkScore(p.key)] ?? 5);
+            const col = score <= 4 ? C.green : score <= 7 ? C.orange : C.red;
             return (
               <div key={p.key} style={{ border: `1px solid ${C.border}`, borderRadius: 10, padding: "9px 11px", background: mix(C.accent, 4) }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: p.key === "jerry" ? C.accent : C.blue, marginBottom: 6 }}>{p.label}</div>
+                <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 3 }}>
+                  Náročnosť týždňa <span style={{ color: C.textDim }}>· 1 = ľahký · 10 = veľmi ťažký</span>
+                </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 7 }}>
                   <input type="range" min={1} max={10} step={1} value={score}
                     onChange={(e) => set(wkScore(p.key), e.target.value)} style={{ flex: 1, accentColor: col }} />
@@ -321,9 +329,9 @@ function Prehlad({ data, focus }: { data: PSBData; focus?: NavFocus | null }) {
             {both ? (
               <>
                 <SortTh label="Jerry h" sortKey="jerry" sort={sort} onSort={toggle} align="right" />
-                {weekly && <th style={{ ...S.th, textAlign: "right" }}><Info text="Subjektívna energia Jerryho za týždeň (1–10). Klikni na riadok a nastav ju posuvníkom." label="Jerry E" /></th>}
+                {weekly && <th style={{ ...S.th, textAlign: "right" }}><Info text="Ako ťažký bol týždeň podľa Jerryho: 1 = ľahký, 10 = veľmi ťažký (rovnaká logika ako RPE). Nízke číslo je dobré. Klikni na riadok a nastav ho posuvníkom." label="Jerry N" /></th>}
                 <SortTh label="Terezka h" sortKey="terezka" sort={sort} onSort={toggle} align="right" />
-                {weekly && <th style={{ ...S.th, textAlign: "right" }}><Info text="Subjektívna energia Terezky za týždeň (1–10). Klikni na riadok a nastav ju posuvníkom." label="Terezka E" /></th>}
+                {weekly && <th style={{ ...S.th, textAlign: "right" }}><Info text="Ako ťažký bol týždeň podľa Terezky: 1 = ľahký, 10 = veľmi ťažký (rovnaká logika ako RPE). Nízke číslo je dobré. Klikni na riadok a nastav ho posuvníkom." label="Terezka N" /></th>}
               </>
             ) : null}
             <SortTh label="Spolu h" sortKey="total" sort={sort} onSort={toggle} align="right" />
