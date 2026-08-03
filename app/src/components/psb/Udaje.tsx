@@ -40,7 +40,7 @@ const BANKA_ZDROJ = {
 // hrozba nie je zobrazenie, ale strata: Metricoolu v novembri prepadnú staršie
 // príspevky a čo sa nestiahne dovtedy, už nezískame.
 const MARKETING_ZDROJE: { druh: string; label: string; path: string }[] = [
-  { druh: "metricool", label: "Metricool — príspevky, reels, stories", path: "Metricool → Analytics › Export › CSV. Tri samostatné súbory: instagram-posts, instagram-reels, instagram-stories. PDF ani PPTX sa načítať nedajú — sú to hotové zostavy, nie tabuľky." },
+  { druh: "metricool", label: "Metricool — príspevky, reels, stories", path: "Dve cesty, obe sem. (1) Analytics › Export › CSV — tri súbory instagram-posts, instagram-reels, instagram-stories; z nich má appka Instagram príspevok po príspevku. (2) Mesačná zostava v PDF — tú appka prečítať nevie (čísla sú vykreslené do grafov), tak ju prečíta Jarvis a vytiahne z nej všetky kanály naraz vrátane Facebooku, TikToku a Meta Ads. Stačí ju sem pretiahnuť. PPTX a XLSX nie." },
   { druh: "ga4", label: "Google Analytics 4", path: "GA4 → Prehľady › Prehľad stavu prehľadov › Stiahnuť CSV (jeden súbor za mesiac)" },
   { druh: "gsc", label: "Google Search Console", path: "Search Console → Výsledky vyhľadávania › Exportovať › CSV. Stiahne sa ZIP — rozbaľ ho a nahraj tri súbory: Graf.csv (kliky po dňoch), Dopyty.csv (na čo ťa ľudia našli), Strany.csv (ktorý článok ťahá). Krajiny, Zariadenia a Filtre appka zatiaľ nepoužíva." },
 ];
