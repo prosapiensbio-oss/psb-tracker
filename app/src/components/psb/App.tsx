@@ -3,6 +3,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   checkSession,
   fetchData,
+  fetchMonthNotes,
+  fetchWeekEntries,
   ingestFiles,
   logout as apiLogout,
   resetAll as apiReset,
@@ -33,6 +35,8 @@ import { Marketing } from "./Marketing";
 import { Vysledky, Vzas } from "./Vzas";
 import { Udaje } from "./Udaje";
 import { HladanieKlienta } from "./Hladanie";
+import { ZapisButton } from "./Zapis";
+import { ritualy as spocitajRitualy } from "../../lib/psb/rituals";
 
 export type Actions = {
   setOverride: (name: string, key: keyof ClientOverride, value: unknown) => void;
@@ -79,6 +83,10 @@ export function PSBApp() {
   const [trackerSection, setTrackerSection] = useState("treningy");
   const [vzasSub, setVzasSub] = useState("pnl");
   const [vysledkySub, setVysledkySub] = useState("kvartalne");
+  // Týždenné zápisy a mesačné poznámky nie sú v PSBData — majú vlastné tabuľky
+  // a doteraz sa čítali až na obrazovke, kde sa píšu. Lenže pripomienka musí
+  // vedieť, či je to vyplnené, skôr než tam človek príde.
+  const [zapisy, setZapisy] = useState<{ weeks: Record<string, Record<string, string>>; mesiace: Record<string, { note?: string; answers?: Record<string, string> }> }>({ weeks: {}, mesiace: {} });
   const [treningySub, setTreningySub] = useState("prehled");
   const [treningyFocus, setTreningyFocus] = useState<NavFocus | null>(null);
   const [financieFocus, setFinancieFocus] = useState<NavFocus | null>(null);
@@ -153,15 +161,20 @@ export function PSBApp() {
     if (!silent) setLoading(false);
   }, []);
 
+  const nacitajZapisy = useCallback(async () => {
+    const [weeks, mesiace] = await Promise.all([fetchWeekEntries(), fetchMonthNotes()]);
+    setZapisy({ weeks, mesiace });
+  }, []);
+
   useEffect(() => {
     (async () => {
       const s = await checkSession();
       setAuthed(s.authed);
       setKtoSom(s.user);
-      if (s.authed) await load();
+      if (s.authed) { await load(); void nacitajZapisy(); }
       else setLoading(false);
     })();
-  }, [load]);
+  }, [load, nacitajZapisy]);
 
   const clients = useMemo(() => deriveClients(data), [data]);
   // Latest clients for tolerant name resolution in setOverride (e.g. AI passes "Jakub Stigut" → "Jakub Štigut").
@@ -170,6 +183,30 @@ export function PSBApp() {
   const sixM = useMemo(() => deriveSixM(data, clients), [data, clients]);
   const capacity = useMemo(() => capacityByTrainer(clients, data.sessions), [clients, data.sessions]);
   const register = useMemo(() => deriveRegister(data, clients, sixM, capacity), [data, clients, sixM, capacity]);
+  // Rituály: čo sa má zapísať a či je to zapísané. Doplnia sa do registra ako
+  // ďalšie položky — nie ako samostatná karta. Register je jediné miesto, kam
+  // sa človek pozerá, keď hľadá „čo mám spraviť"; druhý zoznam vedľa neho by
+  // znamenal dve miesta na tú istú otázku.
+  const rituals = useMemo(() => spocitajRitualy(new Date(), zapisy.weeks, zapisy.mesiace), [zapisy]);
+  const registerAll = useMemo(() => {
+    const ack = data.anomalyAck || {};
+    const extra = rituals
+      .filter((r) => r.splatne)
+      .map((r) => ({
+        key: `zapis|${r.id}`,
+        category: "Zápis" as const,
+        tone: (r.druh === "kvartal" ? "blue" : "orange") as "blue" | "orange",
+        title: r.nadpis,
+        detail: `${r.nadpis} — ${r.detail}`,
+        acked: !!ack[`zapis|${r.id}`],
+        // Cieľ navigácie sa vezie v `client` — register nemá vlastné pole na
+        // odkaz a zaviesť ho kvôli trom položkám by bolo viac kódu než úžitku.
+        client: `${r.ciel.tab}|${r.ciel.sub || ""}`,
+        priority: r.druh === "tyzden" ? 5 : r.druh === "mesiac" ? 6 : 40,
+      }));
+    return [...extra, ...register].sort((a, b) => a.priority - b.priority);
+  }, [rituals, register, data.anomalyAck]);
+
   const aiContext = useMemo(() => buildAiContext(data, clients, sixM, capacity, register), [data, clients, sixM, capacity, register]);
 
   const actions = useMemo<Actions>(
@@ -253,6 +290,7 @@ export function PSBApp() {
         </div>
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
           <HladanieKlienta clients={clients} onPick={(meno) => navigate("klienti", undefined, { client: meno, nonce: Date.now() })} />
+          <ZapisButton ritualy={rituals} onNavigate={(t, sub) => { navigate(t, sub); void nacitajZapisy(); }} />
           {ktoSom && ktoSom !== "app" && (
             <span style={{ fontSize: 12, color: C.textMuted }} title="Pod týmto menom sa zapisujú zmeny do auditu">
               {ktoSom.charAt(0).toUpperCase() + ktoSom.slice(1)}
@@ -282,7 +320,7 @@ export function PSBApp() {
       </nav>
       <div style={{ padding: 16, maxWidth: 1200, margin: "0 auto" }}>
         {active === "dashboard" && (
-          <Dashboard data={data} clients={clients} register={register} sixM={sixM} capacity={capacity} actions={actions} onNavigate={navigate} assistantChat={chat} onClientClick={onClientClick} />
+          <Dashboard data={data} clients={clients} register={registerAll} sixM={sixM} capacity={capacity} actions={actions} onNavigate={navigate} assistantChat={chat} onClientClick={onClientClick} />
         )}
 
         {active === "tracker" && (

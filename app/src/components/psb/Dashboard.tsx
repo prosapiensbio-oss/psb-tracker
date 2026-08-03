@@ -25,7 +25,7 @@ import { SessionTrend } from "./SessionTrend";
 import { Card, Donut, Empty, H3, Info, StatCard, StatGrid, ValueBars, ZoneBars } from "./ui";
 
 const catTone = (c: RegisterItem["category"]) =>
-  c === "6M" ? "accent" : c === "Kapacita" ? "blue" : c === "Rozhodnutie" ? "blue" : "orange";
+  c === "6M" ? "accent" : c === "Kapacita" || c === "Rozhodnutie" || c === "Zápis" ? "blue" : "orange";
 
 const TRAINER_OPTS = [
   { value: "all", label: "Obaja" },
@@ -851,7 +851,13 @@ const linkBtn = { background: "none", border: "none", color: C.accentLight, curs
 function RegisterRow({ item, actions, onNavigate }: { item: RegisterItem; actions: Actions; onNavigate: (tab: string, sub?: string, focus?: NavFocus) => void }) {
   const jump = item.category === "6M" ? "6m" : item.category === "Kapacita" ? "treningy" : "klienti";
   const jeRozhodnutie = item.category === "Rozhodnutie";
-  const openItem = () => onNavigate(jump, undefined, item.client ? { client: item.client, nonce: Date.now() } : undefined);
+  // Pripomienka zápisu nesie cieľ v sebe (klient|tab|sub) — nemá klienta, má
+  // miesto, kam sa ide písať.
+  const zapisCiel = item.category === "Zápis" ? (item.client || "").split("|") : null;
+  const openItem = () =>
+    zapisCiel
+      ? onNavigate(zapisCiel[0], zapisCiel[1] || undefined)
+      : onNavigate(jump, undefined, item.client ? { client: item.client, nonce: Date.now() } : undefined);
   // Otázka „je toto duch?" sa dá zodpovedať rovno tu. Odpoveď sa uloží ku
   // klientovi, takže sa už nepýta znova — a duchov konečne vieme spočítať.
   const jeOtazkaDuch = item.key.startsWith("duch|") && !!item.client;

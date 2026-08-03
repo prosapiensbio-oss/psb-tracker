@@ -722,7 +722,7 @@ export function deriveAnomalies(data: PSBData, clients: Record<string, ClientAgg
 // anomalies. Each item can be accepted (with a note) or hidden via anomalyAck.
 export type RegisterItem = {
   key: string;
-  category: "6M" | "Kapacita" | "Anomália" | "Rozhodnutie";
+  category: "6M" | "Kapacita" | "Anomália" | "Rozhodnutie" | "Zápis";
   tone: "red" | "orange" | "blue";
   title: string;
   detail: string;
