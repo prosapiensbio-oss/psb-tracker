@@ -40,9 +40,9 @@ const BANKA_ZDROJ = {
 // hrozba nie je zobrazenie, ale strata: Metricoolu v novembri prepadnú staršie
 // príspevky a čo sa nestiahne dovtedy, už nezískame.
 const MARKETING_ZDROJE: { druh: string; label: string; path: string }[] = [
-  { druh: "metricool", label: "Metricool — príspevky, reels, stories", path: "Metricool → Analytics › Export (CSV za mesiac)" },
-  { druh: "ga4", label: "Google Analytics 4", path: "GA4 → Prehľady › Prehľad stavu prehľadov › Stiahnuť CSV" },
-  { druh: "gsc", label: "Google Search Console", path: "Search Console → Výsledky vyhľadávania › Exportovať › CSV" },
+  { druh: "metricool", label: "Metricool — príspevky, reels, stories", path: "Metricool → Analytics › Export › CSV. Tri samostatné súbory: instagram-posts, instagram-reels, instagram-stories. PDF ani PPTX sa načítať nedajú — sú to hotové zostavy, nie tabuľky." },
+  { druh: "ga4", label: "Google Analytics 4", path: "GA4 → Prehľady › Prehľad stavu prehľadov › Stiahnuť CSV (jeden súbor za mesiac)" },
+  { druh: "gsc", label: "Google Search Console", path: "Search Console → Výsledky vyhľadávania › Exportovať › CSV. Stiahne sa ZIP — rozbaľ ho a nahraj tri súbory: Graf.csv (kliky po dňoch), Dopyty.csv (na čo ťa ľudia našli), Strany.csv (ktorý článok ťahá). Krajiny, Zariadenia a Filtre appka zatiaľ nepoužíva." },
 ];
 
 export function Udaje({ data, actions }: { data: PSBData; actions: Actions }) {
