@@ -36,6 +36,14 @@ export type PackageRow = {
   package: string;
   remaining: number;
   total: number;
+  /** Kedy bol balíček pridaný (ISO deň). */
+  added?: string;
+  /** Obdobie platnosti — pri členstvách je v exporte ako rozsah. */
+  validFrom?: string;
+  validTo?: string;
+  /** Koľko klient za TENTO balíček zaplatil — nesie v sebe jeho zľavy. */
+  payment?: number;
+  kind?: string; // package | membership
 };
 
 export type Lead = {
@@ -110,4 +118,4 @@ export const EMPTY_DATA: PSBData = {
   leads: [],
 };
 
-export type CSVType = "sessions" | "services" | "payments" | "packages";
+export type CSVType = "sessions" | "services" | "payments" | "packages" | "cennik";

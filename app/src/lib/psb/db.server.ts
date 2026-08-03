@@ -2,6 +2,7 @@
 import type { D1Database } from "@cloudflare/workers-types";
 
 import { audit, jeZamknuty, zamknuteMesiace } from "./audit.server";
+import { parseCennik } from "./parse";
 import {
   detectCSVType,
   parsePackages,
@@ -70,6 +71,11 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
       package: r.package_name,
       remaining: r.sessions_remaining,
       total: r.sessions_total,
+      added: r.added || "",
+      validFrom: r.valid_from || "",
+      validTo: r.valid_to || "",
+      payment: r.payment_czk ?? undefined,
+      kind: r.kind || "",
     })),
     zavery: (zavery.results as any[]).map((r) => ({
       id: r.id, datum: r.datum, tema: r.tema, zaver: r.zaver,
@@ -193,6 +199,20 @@ export async function ingest(DB: D1Database, filename: string, text: string): Pr
       added++;
     }
     if (stmts.length) await DB.batch(stmts);
+  } else if (type === "cennik") {
+    // Cenník nie sú pohyby — je to zoznam šablón. Ukladá sa ako nastavenie,
+    // aby Jarvis aj karty vedeli aktuálne ceny bez toho, aby ich niekto
+    // prepisoval ručne do znalostí.
+    const riadky = parseCennik(text);
+    if (riadky.length) {
+      const stare = await DB.prepare("SELECT value FROM vzas_settings WHERE key = 'cennik'").first<{ value: string }>();
+      const spolu: Record<string, unknown> = stare ? JSON.parse(stare.value || "{}") : {};
+      for (const r of riadky) spolu[r.nazov] = r;
+      await DB.prepare(
+        "INSERT INTO vzas_settings (key, value, updated_at) VALUES ('cennik', ?1, ?2) ON CONFLICT(key) DO UPDATE SET value = ?1, updated_at = ?2",
+      ).bind(JSON.stringify(spolu), new Date().toISOString()).run();
+      added = riadky.length;
+    }
   } else if (type === "packages") {
     // Per-client MERGE, not a wholesale replace: refresh package rows only for the
     // clients present in THIS file, and leave every other client's packages intact.
@@ -205,8 +225,9 @@ export async function ingest(DB: D1Database, filename: string, text: string): Pr
       ...clientsInFile.map((name) => DB.prepare("DELETE FROM packages WHERE client_name = ?").bind(name)),
       ...rows.map((r) =>
         DB.prepare(
-          "INSERT INTO packages (id,client_name,client_status,package_name,sessions_remaining,sessions_total) VALUES (?,?,?,?,?,?)",
-        ).bind(uid(), r.client, r.status, r.package, r.remaining, r.total),
+          "INSERT INTO packages (id,client_name,client_status,package_name,sessions_remaining,sessions_total,added,valid_from,valid_to,payment_czk,kind) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+        ).bind(uid(), r.client, r.status, r.package, r.remaining, r.total,
+          r.added || "", r.validFrom || "", r.validTo || "", r.payment ?? null, r.kind || ""),
       ),
     ];
     if (stmts.length) await DB.batch(stmts);

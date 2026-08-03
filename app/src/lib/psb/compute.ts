@@ -99,6 +99,8 @@ export type ClientAgg = {
   contractSigned: boolean;
   bitcoin: boolean;
   duch: string;
+  /** Skutočný koniec platnosti balíčka z exportu — prázdne, ak ho export nemá. */
+  packageValidTo: string;
   zdroj: string;
   zdrojKto: string;
   clientType: "6M Predplatné" | "Balíček";
@@ -155,6 +157,7 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
         contractSigned: false,
         bitcoin: false,
         duch: "",
+        packageValidTo: "",
         zdroj: "",
         zdrojKto: "",
         clientType: "Balíček",
@@ -243,6 +246,7 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
     c.packageTotal = active?.total ?? 0;
     c.packageStatus = active?.status || "";
     c.membership = active?.package || "";
+    c.packageValidTo = active?.validTo || "";
 
     let off = 0;
     let on = 0;
@@ -908,9 +912,14 @@ export function predictCash(
       ? new Date(Math.max(zoZostatku.getTime(), teraz.getTime()))
       : new Date(Math.max(zPlatby.getTime(), teraz.getTime()));
 
+    // Skutočný koniec platnosti z exportu má prednosť pred odhadom. Export
+    // členstiev ho odteraz nesie ("30 Jun 2026 - 24 Aug 2026") a je to presne
+    // to číslo, ktoré model dovtedy dopočítaval z názvu balíčka a poslednej
+    // platby — teda hádal.
     const platnost = platnostMesiacov(c.membership);
-    const expiracia = new Date(posledna.date);
-    expiracia.setMonth(expiracia.getMonth() + platnost);
+    const expiracia = c.packageValidTo
+      ? new Date(c.packageValidTo)
+      : (() => { const d = new Date(posledna.date); d.setMonth(d.getMonth() + platnost); return d; })();
     // Zostatok, ktorý sa do platnosti nestihne minúť, prepadne — vtedy je
     // dátumom ďalšej platby koniec platnosti, nie dopočítané minutie.
     const kedyDatum = prvaObnova > expiracia && c.membership && !c.membership.toLowerCase().includes("doplnenie")

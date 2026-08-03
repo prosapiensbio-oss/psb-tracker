@@ -108,6 +108,29 @@ const splitCSVLine = (line: string): string[] => {
   return out;
 };
 
+export type CennikRiadok = { nazov: string; cena: number; obdobie: string; sedeni: string; aktivnych: number };
+
+/** Cenníkový prehľad — šablóny balíčkov aj členstiev, bez mien klientov. */
+export function parseCennik(text: string): CennikRiadok[] {
+  const ls = lines(text);
+  if (ls.length < 2) return [];
+  const out: CennikRiadok[] = [];
+  for (let i = 1; i < ls.length; i++) {
+    const p = splitCSVLine(ls[i]);
+    if (p.length < 5 || !p[0].trim()) continue;
+    const cena = Number((p[1] || "").replace(/[^\d.]/g, ""));
+    const aktivnych = Number((p[p.length - 3] || "").replace(/[^\d]/g, "")) || 0;
+    out.push({
+      nazov: p[0].trim(),
+      cena: Number.isFinite(cena) ? cena : 0,
+      obdobie: (p[2] || "").trim(),
+      sedeni: (p[3] || "").trim(),
+      aktivnych,
+    });
+  }
+  return out;
+}
+
 export function detectCSVType(text: string): CSVType | null {
   const h = text.slice(0, 600).toLowerCase();
   if (h.includes("payments recorded report")) return "payments";
@@ -117,6 +140,9 @@ export function detectCSVType(text: string): CSVType | null {
   if (h.includes("first name,last name,client status") || h.includes("packages & memberships"))
     return "packages";
   if (h.includes("staff,date,time")) return "sessions";
+  // Cenníkové prehľady z toho istého reportu: nemajú mená klientov, len šablóny
+  // s cenou a počtom aktívnych. Bez kotvy na začiatok — súbor môže začínať BOM.
+  if (h.includes("name,payment,duration")) return "cennik";
   return null;
 }
 
@@ -239,8 +265,29 @@ function extractSessions(parts: string[]): { remaining: number; total: number } 
   return fallback ?? { remaining: 0, total: 0 };
 }
 
+// "05 Jul; 2026" | "30 Jun  2026" → ISO deň
+function ptDatum(s: string): string {
+  const m = /(\d{1,2})\s+([A-Za-z]{3})[a-z]*;?\s+(\d{4})/.exec(s || "");
+  if (!m) return "";
+  const mes = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
+    .indexOf(m[2].toLowerCase().slice(0, 3));
+  if (mes < 0) return "";
+  return `${m[3]}-${String(mes + 1).padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+}
+
 export function parsePackages(text: string): PackageRow[] {
   const ls = lines(text);
+  if (!ls.length) return [];
+  // Ten istý report má dva tvary: „Package" (bez platnosti) a „Membership"
+  // (s obdobím a s hodinami v aktuálnom období). Rozlíšia sa podľa hlavičky.
+  const hlavicka = splitCSVLine(ls[0]).map((h) => h.trim().toLowerCase());
+  const idx = (...m: string[]) => hlavicka.findIndex((h) => m.some((x) => h.includes(x)));
+  const iPlatba = idx("payment");
+  const iPridane = idx("added");
+  const iObdobie = idx("dates");
+  const iExpiry = idx("expiry");
+  const jeClenstvo = hlavicka.some((h) => h.includes("membership"));
+
   const rows: PackageRow[] = [];
   for (let i = 1; i < ls.length; i++) {
     const parts = splitCSVLine(ls[i]);
@@ -249,7 +296,26 @@ export function parsePackages(text: string): PackageRow[] {
     const status = parts.find((p) => /\b(active|inactive)\s+client\b/i.test(p))?.trim() || parts[2].trim();
     const pkg = parts[3].trim();
     const { remaining, total } = extractSessions(parts);
-    rows.push({ client: name, status, package: pkg, remaining, total });
+
+    // Platnosť: pri členstvách je to rozsah „30 Jun 2026 - 24 Aug 2026",
+    // pri balíčkoch samostatný stĺpec Expiry (často prázdny).
+    let od = "", do_ = "";
+    if (iObdobie >= 0 && parts[iObdobie]) {
+      const kusy = parts[iObdobie].split(/\s+-\s+/);
+      od = ptDatum(kusy[0] || "");
+      do_ = ptDatum(kusy[1] || "");
+    }
+    if (!do_ && iExpiry >= 0) do_ = ptDatum(parts[iExpiry] || "");
+
+    const platba = iPlatba >= 0 ? Number((parts[iPlatba] || "").replace(/[^\d.]/g, "")) : NaN;
+
+    rows.push({
+      client: name, status, package: pkg, remaining, total,
+      added: iPridane >= 0 ? ptDatum(parts[iPridane] || "") : "",
+      validFrom: od, validTo: do_,
+      payment: Number.isFinite(platba) && platba > 0 ? platba : undefined,
+      kind: jeClenstvo ? "membership" : "package",
+    });
   }
   return rows;
 }
