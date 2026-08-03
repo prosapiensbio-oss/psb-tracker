@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { membershipBucket, MEMBERSHIP_ORDER, TRAINERS, type CapacityRow, type ClientAgg } from "../../lib/psb/compute";
+import { duchOdpoved, membershipBucket, MEMBERSHIP_ORDER, TRAINERS, type CapacityRow, type ClientAgg } from "../../lib/psb/compute";
 import { fmtCZK, fmtDate, normName } from "../../lib/psb/format";
-import { C, MEMBERSHIP_COLORS, S } from "../../lib/psb/theme";
+import { C, MEMBERSHIP_COLORS, mix, S } from "../../lib/psb/theme";
 import { saveLead } from "../../lib/psb/client";
 import type { Lead } from "../../lib/psb/types";
 import type { Actions, NavFocus } from "./App";
@@ -618,6 +618,23 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
       {editC && (
         <Modal title={editC.name} onClose={() => setEdit(null)}>
           {editC.membership && <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 12 }}>Predplatné: <strong style={{ color: C.text }}>{editC.membership}</strong>{editC.packageTotal ? ` · zostatok ${editC.packageRemaining}/${editC.packageTotal}` : ""}</div>}
+          {duchOdpoved(editC) === "ano" && (
+            // Zadné vrátka. Potvrdenie ducha je rozhodnutie, nie rozsudok —
+            // ľudia sa vracajú a vtedy sa to musí dať zrušiť jedným klikom,
+            // nie hľadaním v dvoch poliach.
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "9px 11px", marginBottom: 12, borderRadius: 8, background: mix(C.red, 8), border: `1px solid ${mix(C.red, 25)}` }}>
+              <span style={{ fontSize: 12, color: C.text }}>
+                Potvrdený duch ({editC.duch.split("|")[1] || "bez dátumu"}) — vedený ako neaktívny
+                {editC.packageRemaining > 0 && <>, neminuté hodiny <b>{editC.packageRemaining}</b> sa berú ako prepadnuté</>}.
+              </span>
+              <button
+                onClick={() => { actions.setOverride(editC.name, "duch", ""); actions.setOverride(editC.name, "status", ""); }}
+                style={{ marginLeft: "auto", background: "none", border: `1px solid ${C.border}`, borderRadius: 7, color: C.accentLight, fontSize: 12, padding: "5px 11px", cursor: "pointer", whiteSpace: "nowrap" }}
+              >
+                Vrátiť späť
+              </button>
+            </div>
+          )}
           <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4 }}>Status (manuálny override vždy vyhráva)</div>
           <div style={{ fontSize: 11, color: C.textDim, marginBottom: 6 }}>Automatický návrh: {editC.statusAuto}</div>
           <Select style={{ width: "100%", marginBottom: 14 }} value={editC.statusOverride ? editC.status : ""} onChange={(v) => actions.setOverride(editC.name, "status", v === "Pauza" && editC.pauseUntil ? `Pauza|${editC.pauseUntil}` : v)} options={[

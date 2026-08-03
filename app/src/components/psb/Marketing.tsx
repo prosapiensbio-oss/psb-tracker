@@ -476,21 +476,23 @@ function CoSkusitDalej({ chat }: { chat?: AssistantChat }) {
   return (
     <Card>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-      <H3><Info text="Odporúčania z tvojej vlastnej histórie, nie zo všeobecných rád o Instagrame." label="Čo skúsiť ďalej" /></H3>
+      <H3><Info text="Fakty z tvojej vlastnej histórie — poradie typov hookov podľa view rate, frekvencia a to, čo sa z týchto dát povedať NEDÁ. Interpretáciu a nápady si vypýtaj cez „Vysvetli mi to“: Jarvis vidí tie isté čísla, ale vie odpovedať aj na doplňujúcu otázku. Statický odsek s radami tu bol tiež a starol — tento vidí aj to, čo si nahral včera." label="Čo o obsahu vidno z dát" /></H3>
       <Vysvetli chat={chat} titul="Čo skúsiť ďalej" filter="posledných 6 mesiacov + rebríček za celé obdobie" vyrez={vyrez} />
       </div>
       <CoSkusitObsah />
-      <div style={{ fontSize: 12.5, color: C.textMuted, marginTop: 12, lineHeight: 1.55 }}>
-        Čo už dnes z dát vidno: <b>stories padli</b> z 85 za mesiac (mar 2025) na ~35 (zač. 2026), zatiaľ čo reels rástli.
-        Priemerný view rate je <b>36,5 %</b> a drží sa stabilne, takže problém nie je v tom, či ľudia vydržia pozerať — ale v tom, koľko ich vôbec príde.
+      <div style={{ fontSize: 12.5, color: C.textDim, marginTop: 12, lineHeight: 1.55 }}>
+        Čo s tým ďalej — na to je tlačidlo <b style={{ color: C.textMuted }}>Vysvetli mi to</b> vyššie. Jarvis vidí tie isté čísla a odpovie aj na to, čo sa spýtaš potom.
       </div>
     </Card>
   );
 }
 
-// ── Návrh, čo skúsiť ─────────────────────────────────────────────────────────
-// Odporúčania sa počítajú z jeho vlastnej histórie, nie zo všeobecných rád.
-// Kde na záver nie sú dáta, povie sa to — návrh bez opory je len názor.
+// ── Čo o obsahu vidno z dát ──────────────────────────────────────────────────
+// Zámerne len fakty: poradie, počty, rozdiel v percentuálnych bodoch. Rady tu
+// boli tiež („rob viac toho, čo funguje", „pozor na obsah zo zvyku") a bol to
+// zamrznutý text vedľa živého Jarvisa, ktorý vidí tie isté čísla a vie odpovedať
+// aj na doplňujúcu otázku. Dve odpovede na tú istú otázku, z ktorých jedna
+// nestarne a druhá áno — nechávame tú, čo nestarne.
 function CoSkusitObsah() {
   const n = useMemo(() => {
     const reels = MKT_OBSAH.filter((r) => r.f === "Reel" && r.vr > 0);
@@ -523,24 +525,21 @@ function CoSkusitObsah() {
     <div style={{ fontSize: 12.5, color: C.textMuted, lineHeight: 1.6 }}>
       {n.rebricek.length > 1 && (
         <div style={{ marginBottom: 12 }}>
-          <b style={{ color: C.text }}>1. Rob viac toho, čo ľudí udrží pri obrazovke.</b><br />
-          Poradie typov hookov podľa view rate na reels (len kategórie s aspoň 3 kusmi):{" "}
+          <b style={{ color: C.text }}>View rate podľa typu hooku</b> — reels, len kategórie s aspoň 3 kusmi:{" "}
           {n.rebricek.map((r, i) => (
             <span key={r.kat}>{i > 0 && " · "}<b style={{ color: i === 0 ? C.accentLight : C.textMuted }}>{r.kat}</b> {r.vr.toFixed(1)} % ({r.ks})</span>
           ))}.
-          {" "}Rozdiel medzi prvým a posledným je {(n.rebricek[0].vr - n.rebricek[n.rebricek.length - 1].vr).toFixed(1)} percentuálneho bodu —
-          pri jednom reeli to nie je vidieť, pri štyridsiatich za rok áno.
+          {" "}Rozdiel medzi prvým a posledným: {(n.rebricek[0].vr - n.rebricek[n.rebricek.length - 1].vr).toFixed(1)} percentuálneho bodu.
         </div>
       )}
       {n.zoZvyku && (
         <div style={{ marginBottom: 12 }}>
-          <b style={{ color: C.orange }}>2. Pozor na obsah zo zvyku.</b><br />
-          „{n.zoZvyku.kat}" je zároveň najčastejší typ ({n.zoZvyku.ks} kusov) <b>aj ten s najnižším view rate</b>.
-          To je obsah, ktorý sa vyrába, lebo sa vyrábal — nie preto, že funguje.
+          <b style={{ color: C.orange }}>Najčastejší typ má zároveň najnižší view rate</b><br />
+          „{n.zoZvyku.kat}" — {n.zoZvyku.ks} kusov.
         </div>
       )}
       <div style={{ marginBottom: 12 }}>
-        <b style={{ color: C.text }}>{n.zoZvyku ? "3." : "2."} Frekvencia.</b><br />
+        <b style={{ color: C.text }}>Frekvencia</b><br />
         Posledných 6 mesiacov: {n.poslednych6.map((m, i) => `${label(m)} ${n.frekvencia[i]}`).join(" · ")} — priemer <b>{n.priemer}</b> príspevkov s textom mesačne.
       </div>
       <div style={{ padding: "10px 14px", borderRadius: 10, background: mix(C.blue, 10), border: `1px solid ${mix(C.blue, 30)}`, color: C.text }}>

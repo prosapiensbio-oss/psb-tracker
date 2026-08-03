@@ -519,7 +519,12 @@ function Sedenia({ monthly }: { monthly: Monthly }) {
 
 function Predikcia({ data, clients }: { data: PSBData; clients: Record<string, ClientAgg> }) {
   const [excludeSpecial, setExcludeSpecial] = useState(false);
-  const [horizon, setHorizon] = useState(1);
+  // Jeden mesiac, natvrdo. Jerry: „predikcia tržieb je hlavný prístroj, jedno
+  // mesačné číslo, čo najpresnejšie — kvartál ma nezaujíma." Trojmesačný
+  // horizont pritom nebol len navyše, bol horší: čím ďalej sa strieľa, tým viac
+  // je v čísle domnienok, a tri mesiace sa opierali o obnovy, ktoré sa ešte
+  // nestali. Číslo vyzeralo presnejšie, než bolo.
+  const horizon = 1;
   const [tempoUnit, setTempoUnit] = useState<"mes" | "tyz">("mes");
   const [trainerF, setTrainerF] = useState("all");
   const { sort, toggle, sorted } = useSort({ key: "monthlyRevenue", dir: "desc" });
@@ -534,12 +539,7 @@ function Predikcia({ data, clients }: { data: PSBData; clients: Record<string, C
     confidence: (c) => c.confidence,
   });
   const hasData = pred.perClient.length > 0;
-  const label = horizon === 1 ? "1 mesiac" : "3 mesiace";
-  const monthsCovered = pred.months.length
-    ? horizon === 1
-      ? monthLabel(pred.months[0].month)
-      : `${monthLabel(pred.months[0].month)} – ${monthLabel(pred.months[pred.months.length - 1].month)}`
-    : "";
+  const monthsCovered = pred.months.length ? monthLabel(pred.months[0].month) : "budúci mesiac";
 
   return (
     <>
@@ -548,11 +548,10 @@ function Predikcia({ data, clients }: { data: PSBData; clients: Record<string, C
           <H3>
             <Info
               text="Odhad príjmu z reálnej histórie na budúce mesiace. Očakávaný mesačný príjem klienta = ako často chodí × priemerná cena sedenia, vážené dôverou obnovy podľa segmentu. Optimistický/realistický/negatívny = horné/stredné/dolné pásmo dôvery."
-              label={`Predikcia zárobkov — ${monthsCovered || label}`}
+              label={`Predikcia tržieb — ${monthsCovered}`}
             />
           </H3>
           <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-            <Select value={String(horizon)} onChange={(v) => setHorizon(Number(v))} options={[{ value: "1", label: "1 mesiac" }, { value: "3", label: "3 mesiace" }]} />
             <label style={{ fontSize: 12, color: C.textMuted, display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
               <input type="checkbox" checked={excludeSpecial} onChange={(e) => setExcludeSpecial(e.target.checked)} style={{ accentColor: C.accent }} />
               Bez špeciálnych sadzieb

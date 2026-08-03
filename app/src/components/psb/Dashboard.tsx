@@ -425,11 +425,13 @@ export function Dashboard({
     const months = monthlyFinance(data); // all months, from Sep 2025 — chart scrolls
     const bars: { label: string; value: number; forecast?: boolean }[] = months.map((m) => ({ label: monthLabel(m.month), value: monthVal(m) }));
     const pred = predictEarnings(data, clients, { excludeSpecial: false });
-    const next2 = pred.months.slice(0, 2);
+    const next2 = pred.months.slice(0, 1);
     if (earnMode === "prijate") {
       // Tržby chodia, keď niekomu skončí členstvo a kúpi si ďalšie — nie
       // rovnomerne. Priemer posledných mesiacov to rozmazal na plocho.
-      const cash = predictCash(data, clients, 2);
+      // Jeden mesiac dopredu, nie dva — rovnako ako na obrazovke Predikcia.
+      // Druhý stĺpec bol z väčšej časti dohad o obnovách, ktoré sa ešte nestali.
+      const cash = predictCash(data, clients, 1);
       for (const cm of cash.months) bars.push({ label: monthLabel(cm.month), value: cm.expected, forecast: true });
     } else if (trainer === "all") {
       // Vyfakturované forecast = run-rate model (only for both trainers combined).
@@ -835,9 +837,18 @@ function RegisterRow({ item, actions, onNavigate }: { item: RegisterItem; action
   // zmizol (duch), alebo je to dohodnutá prestávka. „Pauza" nastaví stav
   // klienta, čím sa stíšia aj ostatné upozornenia — nie je to len odškrtnutie.
   const odpovedzDuch = () => {
+    if (!item.client) return;
     // Dátum v odpovedi viaže odpoveď na TÚTO epizódu ticha — keď sa klient
     // vráti a o rok znova stíchne, otázka sa položí znova.
-    if (item.client) actions.setOverride(item.client, "duch" as never, `ano|${new Date().toISOString().slice(0, 10)}`);
+    actions.setOverride(item.client, "duch" as never, `ano|${new Date().toISOString().slice(0, 10)}`);
+    // A odpoveď spraví aj to, čo z nej vyplýva. Doteraz sa len zapísala: klient
+    // zostal medzi aktívnymi, počítal sa do počtu klientov a jeho neminuté
+    // hodiny visel v appke ako záväzok, ktorý nikto nevyužije. Potvrdiť ducha
+    // a nechať ho v tabuľke aktívnych je to isté ako nepotvrdiť ho.
+    //
+    // Vrátiť sa to dá vždy — v karte klienta (Klienti → ✎) je na to tlačidlo a
+    // zruší oboje naraz.
+    actions.setOverride(item.client, "status" as never, "Neaktívny");
   };
   const odpovedzPauza = () => { if (item.client) actions.setOverride(item.client, "status" as never, "Pauza"); };
   return (
