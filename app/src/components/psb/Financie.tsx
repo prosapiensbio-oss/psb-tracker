@@ -256,6 +256,7 @@ function BtcKontrola({ data }: { data: PSBData }) {
 
     const pouzite = new Set<number>();
     const nesedi: { text: string; tone: string }[] = [];
+    const ciastocne: string[] = [];
     let sedi = 0;
     for (const b of btc) {
       let najdene = -1;
@@ -271,13 +272,21 @@ function BtcKontrola({ data }: { data: PSBData }) {
         continue;
       }
       pouzite.add(najdene);
-      const rozdiel = Math.abs(pt[najdene].suma - b.suma);
+      const rozdiel = pt[najdene].suma - b.suma;
       const limit = Math.max(TOLERANCIA_KC, b.suma * TOLERANCIA_PCT);
+      // Asymetria je zámerná. Keď je v PTminderi VIAC než v BTC appke, klient
+      // zaplatil časť inak — Lukáš Kríž platil na dvakrát a v bitcoine bola len
+      // časť. To nie je nezrovnalosť, to je bežná vec, a hlásiť ju ako problém
+      // by kartu zaplnilo šumom. Opačný smer je vážny: peniaze dorazili a
+      // v PTminderi po nich nie je stopa.
       if (rozdiel > limit) {
-        nesedi.push({ tone: "blue", text: `«${b.meno}» ${den}: BTC appka ${fmtCZK(b.suma)} vs PTminder ${fmtCZK(pt[najdene].suma)} — rozdiel ${fmtCZK(rozdiel)}` });
+        ciastocne.push(`«${b.meno}» ${den}: v BTC ${fmtCZK(b.suma)} z ${fmtCZK(pt[najdene].suma)} — zvyšok inou cestou`);
+        sedi++;
+      } else if (-rozdiel > limit) {
+        nesedi.push({ tone: "orange", text: `«${b.meno}» ${den}: BTC appka ${fmtCZK(b.suma)} vs PTminder ${fmtCZK(pt[najdene].suma)} — v BTC prišlo o ${fmtCZK(-rozdiel)} VIAC` });
       } else sedi++;
     }
-    return { sedi, nesedi, spolu: btc.length };
+    return { sedi, nesedi, ciastocne, spolu: btc.length };
   }, [platby, data.payments]);
 
   return (
@@ -300,6 +309,12 @@ function BtcKontrola({ data }: { data: PSBData }) {
             </div>
           ) : (
             <div style={{ fontSize: 12.5, color: C.textMuted, marginTop: 8 }}>Všetky bitcoinové platby sedia s PTminderom 🌿</div>
+          )}
+          {porovnanie.ciastocne.length > 0 && (
+            <div style={{ fontSize: 12, color: C.textDim, marginTop: 10, lineHeight: 1.55 }}>
+              <b>Čiastočne v bitcoine</b> (zvyšok prišiel inou cestou — nie je to chyba):{" "}
+              {porovnanie.ciastocne.join(" · ")}
+            </div>
           )}
         </>
       )}

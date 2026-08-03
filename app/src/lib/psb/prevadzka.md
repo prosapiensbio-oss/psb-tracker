@@ -223,6 +223,11 @@ kontrola, nie ako zdroj. Pri importe z toho plynie:
 - rozdiel medzi bankou a PTminderom **nie je chyba** — je to BTC + hotovosť +
   barter. Má sa vyčísliť, nie odstraňovať.
 
+**Jedna platba môže byť rozdelená medzi bitcoin a inú cestu.** Lukáš Kríž
+zaplatil na dvakrát a v bitcoine bola len časť. Keď je teda v PTminderi vyššia
+suma než v BTC appke, nie je to nezrovnalosť — zvyšok prišiel inak. Vážny je len
+opačný smer: v bitcoine prišlo viac, než je zapísané.
+
 **Bitcoinové platby majú vlastnú evidenciu.** Každá platba klienta v BTC je
 zapísaná v appke prosapiens-btc ako `income` s menom klienta, sumou v satoshi a
 CZK hodnotou v čase platby. To je jediná úplná evidencia BTC príjmov a dá sa
