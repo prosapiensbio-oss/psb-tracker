@@ -59,7 +59,11 @@ položke. **Nikdy z toho nerob záver, že je to chyba alebo zľava.**
 
 **Výnimka: Josef Šnyrych a Janka Šnyrychová** majú SPECIAL 3 (3 h / 3 990 Kč).
 Chodia dlho, dnes už menej často, tak im PSB spravilo výnimku.
-⚠ **Janka to má v PTminderi zapísané zle** — pri jej číslach s tým rátaj.
+
+Uzavreté 2. 8. 2026: **je to u oboch to isté, len inak zapísané.** Josef má
+SPECIAL 3 s tromi hodinami, Janka má tie isté tri hodiny vedené ako „Doplnenie
+členstva". Od ďalších mesiacov bude mať SPECIAL 3 aj Janka. Nie je to teda chyba
+v dátach ani iné členstvo — netreba to opravovať ani na to upozorňovať.
 
 ---
 

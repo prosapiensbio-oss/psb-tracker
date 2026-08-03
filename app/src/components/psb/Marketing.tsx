@@ -16,6 +16,7 @@ import {
   type GscDopyt,
   type GscStrana,
 } from "../../lib/psb/marketing";
+import { KATEGORIE_HOOKOV, MKT_OBSAH } from "../../lib/psb/marketing-obsah";
 import { C, mix, S } from "../../lib/psb/theme";
 import type { AssistantChat } from "./Assistant";
 import type { ClientAgg } from "../../lib/psb/compute";
@@ -74,14 +75,6 @@ function Vysvetli({ chat, titul, filter, vyrez }: { chat?: AssistantChat; titul:
     >
       Vysvetli mi to
     </button>
-  );
-}
-
-function Skeleton({ text }: { text: string }) {
-  return (
-    <div style={{ padding: "12px 14px", borderRadius: 10, border: `1px dashed ${mix(C.accent, 40)}`, background: mix(C.accent, 5), fontSize: 12.5, color: C.textMuted, lineHeight: 1.55 }}>
-      <b style={{ color: C.accentLight }}>Kostra</b> — {text}
-    </div>
   );
 }
 
@@ -234,6 +227,74 @@ function CoSomRobil({ chat }: { chat?: AssistantChat }) {
   );
 }
 
+// ── Triedenie podľa hooku ────────────────────────────────────────────────────
+// Podľa hashtagov to nejde — v každom príspevku sú skoro všetky. Jediné, čo sa
+// dá triediť a zároveň jediné, čo rozhoduje o dopozeraní, je prvá veta.
+//
+// Dôležitejšie než rebríček je ale poctivosť o tom, čo z toho vieme. Uloženia
+// sú 1–3 na príspevok; rozdiel medzi 2,0 a 2,5 pri desiatich kusoch je šum, nie
+// nález. Preto sa nesľubuje víťaz — ukáže sa tabuľka a povie sa, ktorá metrika
+// má dosť dát na záver a ktorá nie.
+function PodlaHooku({ okno }: { okno: string[] }) {
+  const data = useMemo(() => {
+    const vyber = MKT_OBSAH.filter((r) => okno.includes(r.m));
+    const map = new Map<string, { k: string; f: string; n: number; u: number; v: number; z: number; vr: number[] }>();
+    for (const r of vyber) {
+      const key = `${r.k}|${r.f}`;
+      const e = map.get(key) || { k: r.k, f: r.f, n: 0, u: 0, v: 0, z: 0, vr: [] };
+      e.n++; e.u += r.u; e.v += r.v; e.z += r.z;
+      if (r.vr > 0) e.vr.push(r.vr);
+      map.set(key, e);
+    }
+    return [...map.values()]
+      .map((e) => ({
+        kat: e.k, format: e.f, ks: e.n,
+        ulozenia: Math.round((e.u / e.n) * 10) / 10,
+        videnia: Math.round(e.v / e.n),
+        zdielania: Math.round((e.z / e.n) * 10) / 10,
+        viewRate: e.vr.length ? Math.round((e.vr.reduce((a, b) => a + b, 0) / e.vr.length) * 10) / 10 : 0,
+      }))
+      .sort((a, b) => b.ks - a.ks);
+  }, [okno]);
+
+  // View rate je jediná metrika s dosť veľkou vzorkou na záver: každý príspevok
+  // ju počíta zo stoviek divákov, kým uloženia sú jednotky kusov.
+  const reels = data.filter((r) => r.format === "Reel" && r.ks >= 3 && r.viewRate > 0);
+  const najlepsi = [...reels].sort((a, b) => b.viewRate - a.viewRate)[0];
+  const najhorsi = [...reels].sort((a, b) => a.viewRate - b.viewRate)[0];
+
+  if (!data.length) return <Empty>V tomto okne nemám príspevky s textom.</Empty>;
+  return (
+    <>
+      <H3><Info text="Príspevky zaradené podľa toho, ČÍM ZAČÍNAJÚ — hook je jediné, čo sa dá zmysluplne triediť (hashtagy sú v každom príspevku skoro všetky) a zároveň jediné, čo rozhoduje, či to niekto dopozerá. Kategórie sú vytiahnuté z reálnych prvých viet, nie vymyslené." label="Podľa typu hooku" /></H3>
+      <div style={{ marginTop: 8 }}>
+        <SortTable
+          riadky={data}
+          vychodzi="ks"
+          stlpce={[
+            { id: "kat", label: "Typ hooku", farba: () => C.text },
+            { id: "format", label: "Formát" },
+            { id: "ks", label: "Kusov", num: true },
+            { id: "ulozenia", label: "Ø uložení", num: true, info: "Priemer na jeden príspevok. Pozor: sú to jednotky, takže rozdiely medzi kategóriami sú v tomto rozsahu prevažne šum." },
+            { id: "videnia", label: "Ø videní", num: true },
+            { id: "zdielania", label: "Ø zdieľaní", num: true },
+            { id: "viewRate", label: "Ø view rate", num: true, info: "Koľko % ľudí pozeralo aspoň 3 sekundy. Jediná metrika, ktorá má na záver dosť veľkú vzorku — každý reel ju počíta zo stoviek divákov. Pri postoch sa nemeria.", fmt: (v) => (Number(v) ? `${v} %` : "—") },
+          ]}
+          minWidth={620}
+        />
+      </div>
+      <div style={{ fontSize: 12.5, color: C.textMuted, marginTop: 12, lineHeight: 1.55 }}>
+        <b>Čo z toho ide a čo nie:</b> uloženia sú 1–3 na príspevok, takže rozdiel medzi 2,0 a 2,5 pri desiatich kusoch
+        <b> nie je nález, je to šum</b> — na rebríček podľa uložení by bolo treba rádovo viac príspevkov alebo rádovo viac uložení.
+        {najlepsi && najhorsi && najlepsi.kat !== najhorsi.kat && (
+          <> Zato <b>view rate na reels</b> má vzorku dosť veľkú: <b>{najlepsi.kat}</b> drží {najlepsi.viewRate} % oproti {najhorsi.viewRate} % pri „{najhorsi.kat}".
+            To je rozdiel v tom, koľko ľudí zostane po prvých troch sekundách — a tam sa rozhoduje všetko ostatné.</>
+        )}
+      </div>
+    </>
+  );
+}
+
 // ── Čo fungovalo ─────────────────────────────────────────────────────────────
 function CoFungovalo({ chat }: { chat?: AssistantChat }) {
   // Otázka znie „čo funguje TERAZ", nie „čo kedy fungovalo" — preto 90 dní.
@@ -270,8 +331,8 @@ function CoFungovalo({ chat }: { chat?: AssistantChat }) {
         Štyri z ôsmich najuchovávanejších kusov sú <b>klientske príbehy</b> — Jarek, „Nepřišel proto, že by chtěl víc svalů“,
         „Prkno. Sklapovačky.“ Naopak najslabšie dopadli všeobecné edukatívne reels a vianočný darčekový.
       </div>
-      <div style={{ marginTop: 12 }}>
-        <Skeleton text="sem príde triedenie podľa témy a formátu. Skúsil som to podľa hashtagov a je to nepoužiteľné — v každom príspevku máš skoro všetky. Triediť sa to musí podľa hooku, teda prvého riadku, čo je aj to jediné, čo rozhoduje, či to niekto dopozerá." />
+      <div style={{ marginTop: 16 }}>
+        <PodlaHooku okno={okno} />
       </div>
     </Card>
   );
@@ -418,12 +479,76 @@ function CoSkusitDalej({ chat }: { chat?: AssistantChat }) {
       <H3><Info text="Odporúčania z tvojej vlastnej histórie, nie zo všeobecných rád o Instagrame." label="Čo skúsiť ďalej" /></H3>
       <Vysvetli chat={chat} titul="Čo skúsiť ďalej" filter="posledných 6 mesiacov + rebríček za celé obdobie" vyrez={vyrez} />
       </div>
-      <Skeleton text="tu bude porovnanie typu hooku × formátu (ktorá kombinácia má najviac uložení na jeden príspevok), návrh frekvencie podľa mesiacov, v ktorých pribúdali úvodné, a upozornenie na obsah, ktorý sa opakuje bez efektu." />
+      <CoSkusitObsah />
       <div style={{ fontSize: 12.5, color: C.textMuted, marginTop: 12, lineHeight: 1.55 }}>
         Čo už dnes z dát vidno: <b>stories padli</b> z 85 za mesiac (mar 2025) na ~35 (zač. 2026), zatiaľ čo reels rástli.
         Priemerný view rate je <b>36,5 %</b> a drží sa stabilne, takže problém nie je v tom, či ľudia vydržia pozerať — ale v tom, koľko ich vôbec príde.
       </div>
     </Card>
+  );
+}
+
+// ── Návrh, čo skúsiť ─────────────────────────────────────────────────────────
+// Odporúčania sa počítajú z jeho vlastnej histórie, nie zo všeobecných rád.
+// Kde na záver nie sú dáta, povie sa to — návrh bez opory je len názor.
+function CoSkusitObsah() {
+  const n = useMemo(() => {
+    const reels = MKT_OBSAH.filter((r) => r.f === "Reel" && r.vr > 0);
+    const podlaKat = new Map<string, { n: number; vr: number; u: number }>();
+    for (const r of reels) {
+      const e = podlaKat.get(r.k) || { n: 0, vr: 0, u: 0 };
+      e.n++; e.vr += r.vr; e.u += r.u;
+      podlaKat.set(r.k, e);
+    }
+    const rebricek = [...podlaKat.entries()]
+      .filter(([, e]) => e.n >= 3)
+      .map(([k, e]) => ({ kat: k, ks: e.n, vr: e.vr / e.n }))
+      .sort((a, b) => b.vr - a.vr);
+
+    // Ktorý typ hooku sa opakuje najviac a zároveň drží najnižší view rate —
+    // to je obsah, ktorý sa vyrába zo zvyku, nie preto, že funguje.
+    const najcastejsi = [...rebricek].sort((a, b) => b.ks - a.ks)[0];
+    const zoZvyku = najcastejsi && rebricek.length > 1 && najcastejsi.kat === rebricek[rebricek.length - 1].kat
+      ? najcastejsi
+      : null;
+
+    const poslednych6 = [...new Set(MKT_OBSAH.map((r) => r.m))].sort().slice(-6);
+    const frekvencia = poslednych6.map((m) => MKT_OBSAH.filter((r) => r.m === m).length);
+    const priemer = frekvencia.length ? frekvencia.reduce((a, b) => a + b, 0) / frekvencia.length : 0;
+
+    return { rebricek, zoZvyku, priemer: Math.round(priemer * 10) / 10, poslednych6, frekvencia };
+  }, []);
+
+  return (
+    <div style={{ fontSize: 12.5, color: C.textMuted, lineHeight: 1.6 }}>
+      {n.rebricek.length > 1 && (
+        <div style={{ marginBottom: 12 }}>
+          <b style={{ color: C.text }}>1. Rob viac toho, čo ľudí udrží pri obrazovke.</b><br />
+          Poradie typov hookov podľa view rate na reels (len kategórie s aspoň 3 kusmi):{" "}
+          {n.rebricek.map((r, i) => (
+            <span key={r.kat}>{i > 0 && " · "}<b style={{ color: i === 0 ? C.accentLight : C.textMuted }}>{r.kat}</b> {r.vr.toFixed(1)} % ({r.ks})</span>
+          ))}.
+          {" "}Rozdiel medzi prvým a posledným je {(n.rebricek[0].vr - n.rebricek[n.rebricek.length - 1].vr).toFixed(1)} percentuálneho bodu —
+          pri jednom reeli to nie je vidieť, pri štyridsiatich za rok áno.
+        </div>
+      )}
+      {n.zoZvyku && (
+        <div style={{ marginBottom: 12 }}>
+          <b style={{ color: C.orange }}>2. Pozor na obsah zo zvyku.</b><br />
+          „{n.zoZvyku.kat}" je zároveň najčastejší typ ({n.zoZvyku.ks} kusov) <b>aj ten s najnižším view rate</b>.
+          To je obsah, ktorý sa vyrába, lebo sa vyrábal — nie preto, že funguje.
+        </div>
+      )}
+      <div style={{ marginBottom: 12 }}>
+        <b style={{ color: C.text }}>{n.zoZvyku ? "3." : "2."} Frekvencia.</b><br />
+        Posledných 6 mesiacov: {n.poslednych6.map((m, i) => `${label(m)} ${n.frekvencia[i]}`).join(" · ")} — priemer <b>{n.priemer}</b> príspevkov s textom mesačne.
+      </div>
+      <div style={{ padding: "10px 14px", borderRadius: 10, background: mix(C.blue, 10), border: `1px solid ${mix(C.blue, 30)}`, color: C.text }}>
+        <b>Čo z týchto dát POVEDAŤ NEJDE:</b> či obsah priniesol klientov. Medzi príspevkom a úvodným tréningom nie je
+        žiadne spojenie — a 18 mesiacov je primálo na to, aby sa dalo veriť korelácii medzi počtom príspevkov a počtom
+        úvodných. Odpoveď dá až otázka „odkiaľ ste sa o nás dozvedeli" pri každom novom klientovi.
+      </div>
+    </div>
   );
 }
 
