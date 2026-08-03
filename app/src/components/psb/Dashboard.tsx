@@ -62,7 +62,7 @@ const WIDGETS: WidgetMeta[] = [
   { id: "zony", label: "Týždne v zdravej zóne", span: 1 },
   { id: "kapacita", label: "Kapacita & vyťaženie", span: 1 },
   { id: "6m", label: "6M klienti podľa fázy", span: 1 },
-  { id: "zarobky", label: "Mesačné zárobky", span: 1 },
+  { id: "zarobky", label: "Mesačné tržby", span: 1 },
   { id: "koniecBalicka", label: "Blíži sa koniec balíčka", span: 1 },
 ];
 // Preč odtiaľto šli aj „Ø tempo klienta" a „Ø dôvera obnovy". Priemer cez
@@ -312,6 +312,11 @@ export function Dashboard({
   const cols = useDashColumns();
   const matchT = (t: string) => trainer === "all" || t === trainer;
 
+  // Zdravá zóna pre zvoleného trénera: pri „Obaja" je to dvojnásobok, lebo
+  // karta sčítava oboch.
+  const zonaLo = trainer === "all" ? ZONE_LO * 2 : ZONE_LO;
+  const zonaHi = trainer === "all" ? ZONE_HI * 2 : ZONE_HI;
+
   const stats = useMemo(() => {
     const list = Object.values(clients);
     // "Aktívny" = everyone except Neaktívny (matches the Klienti tab count).
@@ -510,7 +515,7 @@ export function Dashboard({
           <Info text="Odtrénované hodiny za týždeň. Otvára sa na najnovšom týždni — posúvaj doľava do minulosti. Zelené pásmo 24–34h je zdravá zóna na jedného trénera." label="Odrobené hodiny / týždeň" />
         </H3>
         {weeklyHours.data.length ? (
-          <ZoneBars data={weeklyHours.data} series={weeklyHours.series} zone={{ lo: ZONE_LO, hi: ZONE_HI }} height={180} alignEnd />
+          <ZoneBars data={weeklyHours.data} series={weeklyHours.series} zone={{ lo: ZONE_LO, hi: ZONE_HI }} height={116} alignEnd />
         ) : (
           <Empty>Nahraj Payroll by Session.</Empty>
         )}
@@ -713,7 +718,20 @@ export function Dashboard({
 
       <StatGrid>
         <StatCard value={stats.active} label="Aktívnych klientov" onClick={() => onNavigate("klienti")} />
-        <StatCard value={`${stats.weekHours.toFixed(0)}h`} label={stats.lastWeek ? `Odrobené (týž. ${weekLabel(stats.lastWeek)})` : "Týždenné hodiny"} onClick={() => onNavigate("treningy")} />
+        <StatCard
+          value={`${stats.weekHours.toFixed(0)}h`}
+          label={stats.lastWeek ? `Odrobené (týž. ${weekLabel(stats.lastWeek)})` : "Týždenné hodiny"}
+          // Farba znamená odchýlku, nie „toto je karta". Keď svietilo všetko,
+          // nesvietilo nič — v kokpite je zelená rovnako informácia ako červená
+          // len vtedy, keď nie je všade.
+          color={
+            stats.weekHours === 0 ? undefined
+              : stats.weekHours < zonaLo ? C.orange
+              : stats.weekHours > zonaHi ? C.red
+              : undefined
+          }
+          onClick={() => onNavigate("treningy")}
+        />
         <StatCard value={fmtCZK(stats.monthCash)} label={stats.lastMonth ? `Tržby ${monthLabel(stats.lastMonth)}` : "Mesačné tržby"} onClick={() => onNavigate("financie")} />
         <StatCard
           value={trzbyOdhad ? fmtCZK(trzbyOdhad.expected) : "—"}
