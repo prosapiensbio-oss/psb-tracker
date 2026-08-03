@@ -212,37 +212,72 @@ function BtcKontrola({ data }: { data: PSBData }) {
   }, []);
 
   const porovnanie = useMemo(() => {
-    const TOLERANCIA_DNI = 4;
+    // Jedna platba môže prísť vo viacerých prevodoch — Krčmár poslal 77 tisíc
+    // v štyroch kusoch za dva dni. Porovnávať transakciu proti transakcii preto
+    // vyrába falošné poplachy; porovnávajú sa ZHLUKY: čo od jedného klienta
+    // prišlo v rozpätí pár dní, je jedna platba.
+    const OKNO_DNI = 4;
     const TOLERANCIA_KC = 400;
-    const pt = data.payments.filter((p) => p.amount > 0);
-    const pouzite = new Set<number>();
-    const nesedi: { typ: string; text: string; tone: string }[] = [];
-    let sedi = 0;
+    const TOLERANCIA_PCT = 0.03;   // pri veľkých sumách rozhoduje kurz, nie koruny
 
-    for (const b of platby) {
-      if (!b.klient || b.czk == null) continue;
-      const cieľ = normName(b.klient);
+    // Mená sa medzi appkami líšia diakritikou aj preklepmi („Prochádzka" vs
+    // „Prochadzka"), takže presná zhoda nestačí.
+    const kluc = (m: string) => {
+      const n = normName(m).split(" ").filter(Boolean);
+      const priez = n[n.length - 1] || "";
+      return `${priez.slice(0, 5)}|${(n[0] || "").slice(0, 3)}`;
+    };
+
+    type Zhluk = { kluc: string; meno: string; od: number; suma: number };
+    const zhlukni = <T,>(polozky: T[], meno: (x: T) => string, datum: (x: T) => number, suma: (x: T) => number): Zhluk[] => {
+      const podlaKlienta: Record<string, T[]> = {};
+      for (const x of polozky) (podlaKlienta[kluc(meno(x))] ||= []).push(x);
+      const out: Zhluk[] = [];
+      for (const [k, zoz] of Object.entries(podlaKlienta)) {
+        const zoradene = [...zoz].sort((a, b) => datum(a) - datum(b));
+        let akt: Zhluk | null = null;
+        for (const x of zoradene) {
+          const d = datum(x);
+          if (akt && (d - akt.od) / 86400000 <= OKNO_DNI) akt.suma += suma(x);
+          else { akt = { kluc: k, meno: meno(x), od: d, suma: suma(x) }; out.push(akt); }
+        }
+      }
+      return out;
+    };
+
+    const btc = zhlukni(
+      platby.filter((b) => b.klient && b.czk != null),
+      (b) => b.klient as string, (b) => new Date(b.datum).getTime(), (b) => b.czk as number,
+    );
+    const pt = zhlukni(
+      data.payments.filter((p) => p.amount > 0),
+      (p) => p.client, (p) => new Date(p.date).getTime(), (p) => p.amount,
+    );
+
+    const pouzite = new Set<number>();
+    const nesedi: { text: string; tone: string }[] = [];
+    let sedi = 0;
+    for (const b of btc) {
       let najdene = -1;
       for (let i = 0; i < pt.length; i++) {
-        if (pouzite.has(i)) continue;
-        const p = pt[i];
-        if (normName(p.client) !== cieľ) continue;
-        const dni = Math.abs((new Date(p.date).getTime() - new Date(b.datum).getTime()) / 86400000);
-        if (dni > TOLERANCIA_DNI) continue;
+        if (pouzite.has(i) || pt[i].kluc !== b.kluc) continue;
+        if (Math.abs(pt[i].od - b.od) / 86400000 > OKNO_DNI + 2) continue;
         najdene = i;
         break;
       }
+      const den = new Date(b.od).toISOString().slice(0, 10);
       if (najdene < 0) {
-        nesedi.push({ typ: "chýba v PTminderi", tone: "orange", text: `«${b.klient}» ${fmtCZK(b.czk)} z ${b.datum} — v BTC appke je, v PTminderi nie` });
+        nesedi.push({ tone: "orange", text: `«${b.meno}» ${fmtCZK(b.suma)} z ${den} — v BTC appke je, v PTminderi nie` });
         continue;
       }
       pouzite.add(najdene);
-      const rozdiel = Math.abs(pt[najdene].amount - b.czk);
-      if (rozdiel > TOLERANCIA_KC) {
-        nesedi.push({ typ: "iná suma", tone: "blue", text: `«${b.klient}» ${b.datum}: BTC appka ${fmtCZK(b.czk)} vs PTminder ${fmtCZK(pt[najdene].amount)} — rozdiel ${fmtCZK(rozdiel)}` });
+      const rozdiel = Math.abs(pt[najdene].suma - b.suma);
+      const limit = Math.max(TOLERANCIA_KC, b.suma * TOLERANCIA_PCT);
+      if (rozdiel > limit) {
+        nesedi.push({ tone: "blue", text: `«${b.meno}» ${den}: BTC appka ${fmtCZK(b.suma)} vs PTminder ${fmtCZK(pt[najdene].suma)} — rozdiel ${fmtCZK(rozdiel)}` });
       } else sedi++;
     }
-    return { sedi, nesedi, spolu: platby.filter((p) => p.klient && p.czk != null).length };
+    return { sedi, nesedi, spolu: btc.length };
   }, [platby, data.payments]);
 
   return (
@@ -253,7 +288,7 @@ function BtcKontrola({ data }: { data: PSBData }) {
       {stav === "hotovo" && (
         <>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, margin: "12px 0 6px" }}>
-            <StatCard value={String(porovnanie.spolu)} label="BTC platieb spolu" color={C.blue} />
+            <StatCard value={String(porovnanie.spolu)} label="BTC platieb (zhlukov)" color={C.blue} />
             <StatCard value={String(porovnanie.sedi)} label="Sedí s PTminderom" color={C.green} />
             <StatCard value={String(porovnanie.nesedi.length)} label="Na pozretie" color={porovnanie.nesedi.length ? C.orange : C.textMuted} />
           </div>
