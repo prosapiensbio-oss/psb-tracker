@@ -1622,7 +1622,7 @@ function MonthNoteRow({ mi, colSpan, notes, onSaved }: {
 // Energy is logged weekly (Tréningy → Prehľad); here it is only averaged per
 // month, so nobody is asked the same question twice. "Iné hodiny" is summed —
 // it is the work the salary model never sees.
-function EnergyTrendCard({ idx }: { idx: number[] }) {
+function EnergyTrendCard() {
   const [weeks, setWeeks] = useState<Record<string, WeekEntry>>({});
   useEffect(() => { fetchWeekEntries().then(setWeeks); }, []);
   const perMonth = useMemo(() => {
@@ -1640,19 +1640,33 @@ function EnergyTrendCard({ idx }: { idx: number[] }) {
     return acc;
   }, [weeks]);
 
-  // Weekly logging only started in 2026, so showing 18 months here would be a
-  // year of flat zeros — only months that carry data are charted.
-  const rows = idx.map((i) => {
-    const a = perMonth[monthKeyOf(i)];
+  // Mesiace sa berú z toho, čo je zapísané — NIE z rozsahu VZAS. Ten končí
+  // júnom 2026 (P&L má natvrdo 18 mesiacov z Excelu), takže hodnotenie za
+  // júlový týždeň nemalo kam padnúť a ticho zmizlo. Energia je ale týždenné
+  // sebahodnotenie a s účtovným obdobím nemá nič spoločné.
+  const rows = useMemo(() => {
     const avg1 = (arr?: number[]) => (arr && arr.length ? arr.reduce((x, y) => x + y, 0) / arr.length : null);
-    return { label: MONTHS[i], i, jerry: avg1(a?.scores.jerry), terezka: avg1(a?.scores.terezka), hJ: a?.hours.jerry ?? 0, hT: a?.hours.terezka ?? 0 };
-  }).filter((r) => r.jerry != null || r.terezka != null || r.hJ > 0 || r.hT > 0);
+    const nazov = (mk: string) => {
+      const i = (VZAS_MONTHS as readonly string[]).indexOf(mk);
+      if (i >= 0) return MONTHS[i];
+      // Mesiac mimo rozsahu VZAS — pomenuj ho sám.
+      const m = Number(mk.slice(5, 7));
+      return `${["jan", "feb", "mar", "apr", "máj", "jún", "júl", "aug", "sep", "okt", "nov", "dec"][m - 1]} ${mk.slice(2, 4)}`;
+    };
+    return Object.keys(perMonth)
+      .sort()
+      .map((mk) => {
+        const a = perMonth[mk];
+        return { label: nazov(mk), i: (VZAS_MONTHS as readonly string[]).indexOf(mk), jerry: avg1(a.scores.jerry), terezka: avg1(a.scores.terezka), hJ: a.hours.jerry, hT: a.hours.terezka };
+      })
+      .filter((r) => r.jerry != null || r.terezka != null || r.hJ > 0 || r.hT > 0);
+  }, [perMonth]);
   const any = rows.some((r) => r.jerry != null || r.terezka != null);
 
   return (
     <Card>
       <H3>
-        <Info text="Priemer týždenných hodnotení energie za mesiac (1 = na dne, 10 = plná sila). Zadáva sa raz týždenne v Tréningy → Prehľad, kde sedí vedľa odtrénovaných hodín. Klesajúca krivka pri rastúcej záťaži je varovanie skôr, než sa to prejaví na výkone." label="Energia a vyhorenie" />
+        <Info text="Priemer týždenných hodnotení energie za mesiac (1 = na dne, 10 = plná sila). Zadáva sa raz týždenne v Tréningy → Prehľad, kde sedí vedľa odtrénovaných hodín. Klesajúca krivka pri rastúcej záťaži je varovanie skôr, než sa to prejaví na výkone. Zobrazujú sa všetky mesiace, v ktorých je niečo zapísané — aj tie mimo rozsahu VZAS, ktorý končí júnom 2026." label="Energia a vyhorenie" />
       </H3>
       {any ? (
         <>
@@ -1719,7 +1733,7 @@ function MesacneTab() {
 
       <HealthCard idx={idx} />
       <ForecastCard idx={idx} />
-      <EnergyTrendCard idx={idx} />
+      <EnergyTrendCard />
 
       {/* Príjmy/náklady are two sides of one comparison — show them together with
           the gap in %. Zisk/marža stand alone, so they keep the signed bars. */}
