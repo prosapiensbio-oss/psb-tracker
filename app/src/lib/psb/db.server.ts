@@ -267,28 +267,22 @@ export async function ingest(DB: D1Database, filename: string, text: string, act
   return { filename, type, added, skipped, zamknute: zamknutych };
 }
 
+// Zapíše JEDEN stĺpec. Nie celý riadok — a to je oprava skutočnej chyby.
+//
+// Predtým sa riadok najprv načítal, v pamäti sa mu prepísalo jedno pole a
+// zapísal sa celý späť. Keď prišli dve zmeny tesne po sebe (a to sa deje: „Áno,
+// duch" nastavuje naraz odpoveď aj stav klienta), obe si prečítali ten istý
+// starý riadok a druhá prepísala prvú. Zmena ticho zmizla — bez chyby, bez
+// stopy, len sa neuložila.
+//
+// Názov stĺpca sa do SQL vkladá textom, ale len z pevnej mapy nižšie; hodnota
+// ide cez parameter. Kľúč mimo mapy sa zahodí ešte predtým.
 export async function setOverride(
   DB: D1Database,
   name: string,
   key: keyof ClientOverride,
   value: unknown,
 ): Promise<void> {
-  const existing = await DB.prepare("SELECT * FROM client_overrides WHERE name = ?")
-    .bind(name)
-    .first<any>();
-  const cur: any = existing || {
-    name,
-    status: null,
-    special_rate: 0,
-    special_rate_note: "",
-    trainer_note: "",
-    contract_signed: 0,
-    primary_trainer: null,
-    bitcoin: 0,
-    duch: "",
-    zdroj: "",
-    zdroj_kto: "",
-  };
   const colMap: Record<string, string> = {
     status: "status",
     specialRate: "special_rate",
@@ -303,34 +297,16 @@ export async function setOverride(
   };
   const col = colMap[key as string];
   if (!col) return;
-  let v: any = value;
+
+  let v: unknown = value;
   if (col === "special_rate" || col === "contract_signed" || col === "bitcoin") v = value ? 1 : 0;
   if ((col === "status" || col === "primary_trainer") && (value === "" || value == null)) v = null;
-  cur[col] = v;
 
   await DB.prepare(
-    `INSERT INTO client_overrides (name,status,special_rate,special_rate_note,trainer_note,contract_signed,primary_trainer,bitcoin,duch,zdroj,zdroj_kto,updated_at)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
-     ON CONFLICT(name) DO UPDATE SET status=excluded.status, special_rate=excluded.special_rate,
-       special_rate_note=excluded.special_rate_note, trainer_note=excluded.trainer_note,
-       contract_signed=excluded.contract_signed, primary_trainer=excluded.primary_trainer,
-       bitcoin=excluded.bitcoin, duch=excluded.duch, zdroj=excluded.zdroj,
-       zdroj_kto=excluded.zdroj_kto, updated_at=excluded.updated_at`,
+    `INSERT INTO client_overrides (name, ${col}, updated_at) VALUES (?1, ?2, ?3)
+     ON CONFLICT(name) DO UPDATE SET ${col} = ?2, updated_at = ?3`,
   )
-    .bind(
-      name,
-      cur.status ?? null,
-      cur.special_rate ?? 0,
-      cur.special_rate_note ?? "",
-      cur.trainer_note ?? "",
-      cur.contract_signed ?? 0,
-      cur.primary_trainer ?? null,
-      cur.bitcoin ?? 0,
-      cur.duch ?? "",
-      cur.zdroj ?? "",
-      cur.zdroj_kto ?? "",
-      new Date().toISOString(),
-    )
+    .bind(name, v as never, new Date().toISOString())
     .run();
 }
 
