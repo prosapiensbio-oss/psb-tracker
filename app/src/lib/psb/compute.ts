@@ -256,10 +256,17 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
     c.serviceCount = serviceCounts[c.name] || 0;
 
     const packs = packByClient[c.name] || [];
-    // Use only the ACTIVE package, not the sum across rows — a renewed client has
-    // an old depleted row (0/18) plus a new one (17/18); summing gave a wrong 17/36.
-    // Pick the row with the most sessions remaining (the live package); if all are
-    // depleted, the one with the largest total (the most significant package).
+    // Dva riadky toho istého balíčka sú NORMÁLNY stav, nie chyba v dátach.
+    //
+    // Jerryho pravidlo, doslova: „Lenka si platí 18 h, ktoré platia 6 mesiacov,
+    // ale keďže chodí 2× týždenne, minie ich za 3. Preto tam to jedno členstvo
+    // 0/18 stále plynie — samo prirodzene odíde, keď skončí jeho platnosť.
+    // Kde je 0/18, to je už neplatné; kde je x/18, to stále funguje."
+    //
+    // Čiže: riadok so zostatkom je ten živý, nulový je dobehnutý a čaká, kým mu
+    // vyprší platnosť. Nikdy sa nesčítavajú — súčet by u Lenky dal 2/35 a appka
+    // by tvrdila, že má zaplatených 35 hodín. Ak by boli nulové oba, berie sa
+    // ten s väčším celkom (významnejší balíček).
     //
     // „Doplnenie členstva" a „Za protokol" sa do výberu neberú, kým existuje
     // čokoľvek iné. Nie sú to balíčky — sú to jednotlivé hodiny dokúpené k
