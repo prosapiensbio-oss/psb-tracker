@@ -202,7 +202,20 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
     const prve = c.sessions.reduce((min, s) => (s.date < min ? s.date : min), c.sessions[0]?.date || "");
     const tyzdnovOdZaciatku = prve ? Math.floor(daysBetween(prve, new Date()) / 7) + 1 : SEG_WEEKS;
     c.attendance = hit / Math.max(6, Math.min(SEG_WEEKS, tyzdnovOdZaciatku));
-    c.segment = c.attendance >= 0.84 ? "Anchor" : c.attendance >= 0.5 ? "Stabilný" : "Sporadický";
+    // Segment potrebuje aj ČAS, nielen pravidelnosť.
+    //
+    // Predtým stačila dochádzka za posledných 18 týždňov, takže klient s dvoma
+    // mesiacmi histórie vyšiel ako Anchor, kým Jaroslav Broskva (19 mesiacov,
+    // 129 sedení) nie — stačilo, aby mal v poslednom okne dovolenku. To je
+    // presne naopak, než čo slovo „anchor" znamená: klient, ktorého strata bolí
+    // najviac. Dva mesiace nikoho takým nespravia.
+    const mesiacovKlienta = c.firstSession && c.lastSession
+      ? daysBetween(c.firstSession, new Date(c.lastSession)) / 30.4
+      : 0;
+    c.segment =
+      mesiacovKlienta >= 6 && c.attendance >= 0.5 ? "Anchor"
+      : c.attendance >= 0.5 || (mesiacovKlienta >= 6 && c.attendance >= 0.35) ? "Stabilný"
+      : "Sporadický";
 
     const ov = data.clientOverrides?.[c.name];
     const autoPrimary =
@@ -765,8 +778,14 @@ export function deriveRegister(
 
   for (const c of sixM) {
     if (!c.alert) continue;
+    // Klient na dohodnutej pauze nepotrebuje hodnotiaci rozhovor tento týždeň.
+    // Svieti to na neho zbytočne a v zozname 33 upozornení je každé zbytočné
+    // dôvodom, prečo sa zoznam prestane čítať.
+    if (clients[c.client]?.status === "Pauza") continue;
     const tone = c.alertTone === "red" ? "red" : "orange";
-    add(`sixm|${c.client}|${c.phase}|${c.monthInPhase}`, "6M", tone, `${c.client} — 6M`, c.alert, 0, c.client);
+    // Meno patrí do textu, nie len do titulku — v registri sa zobrazuje detail
+    // a bez mena sa nedalo zistiť, koho sa to týka.
+    add(`sixm|${c.client}|${c.phase}|${c.monthInPhase}`, "6M", tone, `${c.client} — 6M`, `${c.client}: ${c.alert}`, 0, c.client);
   }
   // Capacity signal uses the SAME real-hours utilisation the capacity card and the
   // assistant show (util = tighter of typical→29h / busy→34h), NOT the reference-only

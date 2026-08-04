@@ -66,20 +66,21 @@ export function RastAStrata({ data, clients }: { data: PSBData; clients: Record<
 
   // ── 1. Rast a strata po mesiacoch ─────────────────────────────────────────
   const mesacne = useMemo(() => {
-    const m = new Map<string, { prislo: number; odislo: number }>();
+    // Držia sa aj mená, nie len počty — číslo „3 odišli" je bez mien
+    // nepoužiteľné, lebo prvá otázka je vždy „ktorí".
+    const m = new Map<string, { prisli: string[]; odisli: string[] }>();
+    const daj = (k: string) => {
+      const e = m.get(k) || { prisli: [], odisli: [] };
+      m.set(k, e);
+      return e;
+    };
     for (const c of zoznam) {
-      const p = monthKey(c.firstSession);
-      const e = m.get(p) || { prislo: 0, odislo: 0 };
-      e.prislo++;
-      m.set(p, e);
-      if (c._odisiel) {
-        const o = monthKey(c.lastSession);
-        const f = m.get(o) || { prislo: 0, odislo: 0 };
-        f.odislo++;
-        m.set(o, f);
-      }
+      daj(monthKey(c.firstSession)).prisli.push(c.name);
+      if (c._odisiel) daj(monthKey(c.lastSession)).odisli.push(c.name);
     }
-    return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+    return [...m.entries()]
+      .map(([k, v]) => [k, { prislo: v.prisli.length, odislo: v.odisli.length, prisli: v.prisli, odisli: v.odisli }] as const)
+      .sort((a, b) => a[0].localeCompare(b[0]));
   }, [zoznam]);
 
   // Posledných 12 uzavretých mesiacov — bežiaci mesiac je vždy neúplný a
@@ -153,8 +154,12 @@ export function RastAStrata({ data, clients }: { data: PSBData; clients: Record<
                 return (
                   <tr key={mk}>
                     <td style={S.td}>{monthLabel(mk)}</td>
-                    <td style={{ ...S.td, textAlign: "right", color: C.green }}>{v.prislo || "—"}</td>
-                    <td style={{ ...S.td, textAlign: "right", color: C.red }}>{v.odislo || "—"}</td>
+                    <td style={{ ...S.td, textAlign: "right", color: C.green, cursor: v.prislo ? "help" : "default" }} title={v.prisli.join(", ")}>
+                      {v.prislo || "—"}
+                    </td>
+                    <td style={{ ...S.td, textAlign: "right", color: C.red, cursor: v.odislo ? "help" : "default" }} title={v.odisli.join(", ")}>
+                      {v.odislo || "—"}
+                    </td>
                     <td style={{ ...S.td, textAlign: "right", fontWeight: 600, color: cisty > 0 ? C.accentLight : cisty < 0 ? C.red : C.textMuted }}>
                       {cisty > 0 ? "+" : ""}{cisty}
                     </td>
@@ -164,6 +169,7 @@ export function RastAStrata({ data, clients }: { data: PSBData; clients: Record<
             </tbody>
           </TableWrap>
           <div style={{ fontSize: 11, color: C.textDim, marginTop: 8, lineHeight: 1.5 }}>
+            Prejdi myšou po čísle a ukáže mená. {" "}
             Posledné dva–tri mesiace budú vždy vyzerať lepšie, než sú: kto prestal chodiť minulý mesiac, ešte nemá
             {" "}{hranica} dní ticha a ako odídený sa zatiaľ neráta. Dáta sú po {kotva ? kotva.slice(0, 10) : "—"}.
             {" "}A augusty budú strašiť každý rok — leto je mŕtve, nie je to fluktuácia.

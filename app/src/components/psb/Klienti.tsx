@@ -385,7 +385,6 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
       segment: (c) => c.attendance,
       type: (c) => c.membership || c.clientType,
       pkg: (c) => c.packageRemaining,
-      hours: (c) => c.totalHours,
       sessions: (c) => c.sessionCount,
       attendance: (c) => c.attendance,
       avg: (c) => c.paidAvg,
@@ -594,8 +593,7 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
               <SortTh label="Segment" sortKey="segment" sort={sort} onSort={toggle} info="Anchor ≥84 % týždňov, Stabilný ≥50 %, Sporadický <50 % — z posledných 18 týždňov." />
               <SortTh label="Predplatné" sortKey="type" sort={sort} onSort={toggle} info="Aktuálny produkt z reportu Packages & Memberships." />
               <SortTh label="Zostatok" sortKey="pkg" sort={sort} onSort={toggle} align="right" info="Zostatok sedení v aktuálnom balíčku." />
-              <SortTh label="Hodiny" sortKey="hours" sort={sort} onSort={toggle} align="right" info="Celková odtrénovaná história." />
-              <SortTh label="Sedení" sortKey="sessions" sort={sort} onSort={toggle} align="right" />
+              <SortTh label="Sedení" sortKey="sessions" sort={sort} onSort={toggle} align="right" info="Celková odtrénovaná história. Stĺpec s hodinami tu bol tiež a hovoril prakticky to isté — sedenie trvá 60 alebo 90 minút, takže sa obe čísla líšili len mierkou. Presné hodiny ukáže myš nad číslom." />
               <SortTh label="Dochádzka" sortKey="attendance" sort={sort} onSort={toggle} align="right" info="Podiel týždňov s tréningom za posledných 18 týždňov." />
               <SortTh label="Ø CZK" sortKey="avg" sort={sort} onSort={toggle} align="right" />
               <SortTh label="Posledný" sortKey="last" sort={sort} onSort={toggle} align="right" />
@@ -617,8 +615,7 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
                 <td style={S.td}><Badge tone={segTone(c.segment)}>{c.segment}</Badge></td>
                 <td style={{ ...S.td, fontSize: 12, color: c.is6m ? C.accentLight : C.textMuted }} title={c.membership}>{c.membership ? shortPkg(c.membership) : c.clientType}</td>
                 <td style={{ ...S.td, textAlign: "right" }}>{c.packageTotal ? `${c.packageRemaining}/${c.packageTotal}` : "—"}</td>
-                <td style={{ ...S.td, textAlign: "right" }}>{c.totalHours.toFixed(0)}</td>
-                <td style={{ ...S.td, textAlign: "right" }}>{c.sessionCount}</td>
+                <td style={{ ...S.td, textAlign: "right" }} title={`${c.totalHours.toFixed(0)} hodín`}>{c.sessionCount}</td>
                 <td style={{ ...S.td, textAlign: "right" }}>{(c.attendance * 100).toFixed(0)}%</td>
                 <td style={{ ...S.td, textAlign: "right" }}>{fmtCZK(c.paidAvg)}</td>
                 <td style={{ ...S.td, textAlign: "right" }}>{fmtDate(c.lastSession)}</td>

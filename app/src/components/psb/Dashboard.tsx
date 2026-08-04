@@ -316,7 +316,7 @@ const arrBtn: CSSProperties = {
 export function Dashboard({
   data,
   clients,
-  register,
+  register: registerVsetky,
   sixM,
   capacity,
   actions,
@@ -436,6 +436,22 @@ export function Dashboard({
     return { avg: sum / pts.length, max, min, n: pts.length };
   }, [weekRows, trainer]);
 
+  // Priemerné týždenné hodiny každého trénera zvlášť — počíta sa len z týždňov,
+  // v ktorých daný tréner naozaj trénoval, inak by dovolenka jedného stiahla
+  // priemer druhého.
+  const podlaTrenera = useMemo(() => {
+    const out = { Jerry: 0, Terezka: 0 } as Record<string, number>;
+    for (const t of ["Jerry", "Terezka"] as const) {
+      const h = weekRows.map(([, v]) => v[t]).filter((x) => x > 0);
+      out[t] = h.length ? h.reduce((a, b) => a + b, 0) / h.length : 0;
+    }
+    return out;
+  }, [weekRows]);
+
+  // Kliknutie na kartu trénera prepne globálny filter — je to najrýchlejšia
+  // cesta z „koľko kto odrobil" na „a čo z toho vyplýva".
+  const setTrainerLocal = (t: string) => onTrainer(t);
+
   // How many trainer-weeks landed in / below / above the healthy zone.
   const zones = useMemo(() => {
     let zdrava = 0, pod = 0, nad = 0;
@@ -502,6 +518,20 @@ export function Dashboard({
     ] };
   }, [sixM, trainer]);
 
+  // Register sa riadi prepínačom trénera. Predtým ukazoval všetkých 33
+  // upozornení bez ohľadu na to, koho si vybral — pri dvoch tréneroch to
+  // znamená, že polovica z toho nie je tvoja starosť.
+  //
+  // Položka bez klienta (kapacita, zápisy) zostáva vždy: kapacita jedného
+  // trénera sa týka oboch a pripomienka zápisu tiež.
+  const patriTrenerovi = (r: RegisterItem) => {
+    if (trainer === "all") return true;
+    if (r.category === "Kapacita") return r.title.startsWith(trainer);
+    if (!r.client) return true;
+    const c = clients[r.client];
+    return !c || c.primaryTrainer === trainer;
+  };
+  const register = registerVsetky.filter(patriTrenerovi);
   const open = register.filter((r) => !r.acked);
   const acked = register.filter((r) => r.acked);
   // "Ukázať skryté" swaps to the hidden/accepted items only (so it's obvious they appeared).
@@ -527,16 +557,30 @@ export function Dashboard({
   const packageEnding = useMemo(() => {
     const dnes = new Date().toISOString().slice(0, 10);
     const dni = (d: string) => Math.round((Date.parse(d) - Date.parse(dnes)) / 86400000);
+    const ack = data.anomalyAck || {};
     return Object.values(clients)
-      .filter((c) => c.status !== "Neaktívny" && matchT(c.primaryTrainer))
+      .filter((c) => c.status !== "Neaktívny" && c.status !== "Pauza" && matchT(c.primaryTrainer))
+      .filter((c) => !ack[`balicek|${c.name}`])
       .map((c) => {
         const doKonca = c.packageValidTo ? dni(c.packageValidTo) : null;
-        const hodinyDosli = c.packageTotal > 0 && c.packageRemaining <= 1;
+        // Prah podľa toho, ako často klient reálne chodí.
+        //
+        // Anna Kadličkova chodí raz za týždeň. Pri prahu „zostávajú 3 hodiny"
+        // by na ňu karta svietila tri týždne — a to je presne to, čo z 33
+        // upozornení robí tapetu. Kto chodí častejšie než raz týždenne, minie
+        // dve hodiny za týždeň, takže má zmysel ozvať sa pri dvoch. Kto chodí
+        // menej často, má zmysel až pri poslednej.
+        const tyzdnov = c.firstSession && c.lastSession
+          ? Math.max(1, (Date.parse(c.lastSession) - Date.parse(c.firstSession)) / 604800000)
+          : 1;
+        const frekvencia = c.sessionCount / tyzdnov;
+        const prah = frekvencia > 1 ? 2 : 1;
+        const hodinyDosli = c.packageTotal > 0 && c.packageRemaining <= prah;
         // Platnosť, ktorá vypršala pred viac než dvoma mesiacmi, už nie je
         // signál na obnovu — to je starý riadok v exporte, nie klient, ktorému
         // sa niečo končí.
         const platnostKonci = doKonca !== null && doKonca <= 21 && doKonca > -60;
-        return { c, doKonca, hodinyDosli, platnostKonci };
+        return { c, doKonca, hodinyDosli, platnostKonci, prah, frekvencia };
       })
       .filter((x) => x.hodinyDosli || x.platnostKonci)
       .sort((a, b) => {
@@ -544,7 +588,12 @@ export function Dashboard({
         const kb = b.doKonca ?? (b.c.packageRemaining <= 0 ? -1 : 21);
         return ka - kb || a.c.name.localeCompare(b.c.name);
       });
-  }, [clients, trainer]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [clients, trainer, data.anomalyAck]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Mená, ktoré si niekto odložil — aby sa dali vrátiť jedným klikom.
+  const odlozene = Object.keys(data.anomalyAck || {})
+    .filter((k) => k.startsWith("balicek|"))
+    .map((k) => k.slice("balicek|".length));
 
   const nodes: Record<string, ReactNode> = {
     hodiny: (
@@ -553,17 +602,32 @@ export function Dashboard({
           <Info text="Odtrénované hodiny za týždeň. Otvára sa na najnovšom týždni — posúvaj doľava do minulosti. Zelené pásmo 24–34h je zdravá zóna na jedného trénera." label="Odrobené hodiny / týždeň" />
         </H3>
         {weeklyHours.data.length ? (
-          <Zbalitelny telefon={telefon} popis={`${weeklyHours.data.length} týždňov`}>
-            <ZoneBars data={weeklyHours.data} series={weeklyHours.series} zone={{ lo: ZONE_LO, hi: ZONE_HI }} height={116} alignEnd />
-          </Zbalitelny>
+          <div onClick={() => onNavigate("treningy", "prehled")} style={{ cursor: "pointer" }} title="Otvoriť Tréningy → Prehľad">
+            <Zbalitelny telefon={telefon} popis={`${weeklyHours.data.length} týždňov`}>
+              <ZoneBars data={weeklyHours.data} series={weeklyHours.series} zone={{ lo: ZONE_LO, hi: ZONE_HI }} height={116} alignEnd />
+            </Zbalitelny>
+          </div>
         ) : (
           <Empty>Nahraj Payroll by Session.</Empty>
         )}
         {weekStats && (
+          // Pri „Obaja" hovorí max a min o štúdiu ako celku a nedá sa s tým nič
+          // spraviť — užitočnejšie je, ako sa tá práca delí medzi dvoch ľudí.
+          // Keď je vybraný jeden tréner, delenie nemá zmysel a vracia sa max/min,
+          // lebo vtedy je to jeho vlastný najťažší a najľahší týždeň.
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 8, marginTop: 10 }}>
-            <MiniStat label={`Ø / týždeň (${weekStats.n})`} value={`${weekStats.avg.toFixed(1)}h`} />
-            <MiniStat label={`Max · ${weekStats.max.label}`} value={`${weekStats.max.h.toFixed(0)}h`} color={C.orange} onClick={() => openWeek(weekStats.max.label)} />
-            <MiniStat label={`Min · ${weekStats.min.label}`} value={`${weekStats.min.h.toFixed(0)}h`} color={C.blue} onClick={() => openWeek(weekStats.min.label)} />
+            <MiniStat label={`Ø / týždeň (${weekStats.n})`} value={`${weekStats.avg.toFixed(1)}h`} onClick={() => onNavigate("treningy", "prehled")} />
+            {trainer === "all" ? (
+              <>
+                <MiniStat label="Jerry · Ø / týždeň" value={`${podlaTrenera.Jerry.toFixed(1)}h`} color={C.accent} onClick={() => setTrainerLocal("Jerry")} />
+                <MiniStat label="Terezka · Ø / týždeň" value={`${podlaTrenera.Terezka.toFixed(1)}h`} color={C.accentLight} onClick={() => setTrainerLocal("Terezka")} />
+              </>
+            ) : (
+              <>
+                <MiniStat label={`Max · ${weekStats.max.label}`} value={`${weekStats.max.h.toFixed(0)}h`} color={C.orange} onClick={() => openWeek(weekStats.max.label)} />
+                <MiniStat label={`Min · ${weekStats.min.label}`} value={`${weekStats.min.h.toFixed(0)}h`} color={C.blue} onClick={() => openWeek(weekStats.min.label)} />
+              </>
+            )}
           </div>
         )}
       </Card>
@@ -638,12 +702,22 @@ export function Dashboard({
     ),
     koniecBalicka: (
       <Card style={{ marginBottom: 0, height: "100%" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         <H3>
-          <Info text="Klienti, ktorým sa balíček končí — buď došli hodiny (0 alebo 1 zostáva), alebo do 21 dní vyprší platnosť členstva. Platnosť je vlastný dátum z exportu a končí nezávisle od hodín: klient s 3/6 hodinami a členstvom do budúceho týždňa potrebuje ozvanie rovnako. Čas poslať ponuku na obnovu. Mení sa podľa prepínača trénera." label="Blíži sa koniec balíčka" />
+          <Info text="Klienti, ktorým sa balíček končí. Prah sa riadi tým, ako často kto chodí: kto chodí viac než raz týždenne, objaví sa pri posledných dvoch hodinách (minie ich za týždeň), kto chodí menej, až pri poslednej — inak by na neho karta svietila tri týždne. Druhý dôvod je platnosť členstva do 21 dní. Platnosť je vlastný dátum z exportu a končí nezávisle od hodín: klient s 3/6 hodinami a členstvom do budúceho týždňa potrebuje ozvanie rovnako. Čas poslať ponuku na obnovu. Mení sa podľa prepínača trénera." label="Blíži sa koniec balíčka" />
         </H3>
+        {odlozene.length > 0 && (
+          <button
+            onClick={() => odlozene.forEach((n) => actions.ackAnomaly(`balicek|${n}`, "", false))}
+            style={{ background: "none", border: "none", color: C.textDim, fontSize: 11.5, cursor: "pointer" }}
+          >
+            Vrátiť odložené ({odlozene.length})
+          </button>
+        )}
+        </div>
         {packageEnding.length ? (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 8 }}>
-            {packageEnding.map(({ c, doKonca, hodinyDosli }) => {
+            {packageEnding.map(({ c, doKonca, hodinyDosli, frekvencia }) => {
               const naliehave = (doKonca !== null && doKonca <= 7) || c.packageRemaining <= 0;
               const dovod = doKonca === null
                 ? `${c.packageRemaining}/${c.packageTotal} hodín`
@@ -651,17 +725,31 @@ export function Dashboard({
                 : doKonca === 0 ? "platnosť končí dnes"
                 : `platnosť do ${fmtDMY(c.packageValidTo)} · ${doKonca} ${doKonca < 5 ? "dni" : "dní"}`;
               return (
-                <button key={c.name} onClick={() => onNavigate("klienti", undefined, { client: c.name, nonce: Date.now() })} title={`${c.name} — ${c.membership || "—"} · ${c.primaryTrainer}`} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 10px", background: mix(C.text, 4), border: `1px solid ${C.border}`, borderRadius: 9, cursor: "pointer", textAlign: "left", width: "100%", minWidth: 0 }}>
+                <div key={c.name} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 10px", background: mix(C.text, 4), border: `1px solid ${C.border}`, borderRadius: 9, width: "100%", minWidth: 0 }}>
                   <span style={{ ...badge(naliehave ? "red" : "orange"), fontSize: 10, flexShrink: 0 }}>
                     {c.packageTotal > 0 ? `${c.packageRemaining}/${c.packageTotal}` : "—"}
                   </span>
-                  <span style={{ flex: 1, minWidth: 0 }}>
+                  <button
+                    onClick={() => onNavigate("klienti", undefined, { client: c.name, nonce: Date.now() })}
+                    title={`${c.name} — ${c.membership || "—"} · ${c.primaryTrainer} · chodí ${frekvencia.toFixed(1)}× týždenne`}
+                    style={{ flex: 1, minWidth: 0, background: "none", border: "none", padding: 0, textAlign: "left", cursor: "pointer" }}
+                  >
                     <span style={{ fontSize: 13, color: C.text, fontWeight: 500, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</span>
                     <span style={{ fontSize: 11, color: C.textDim, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                       {hodinyDosli && doKonca === null ? `${c.membership || "—"} · ${c.primaryTrainer}` : dovod}
                     </span>
-                  </span>
-                </button>
+                  </button>
+                  {/* Odložiť, nie zmazať: klient, ktorý má pauzu alebo sa už
+                      ozval, nemá svietiť — ale keď si kúpi ďalší balíček, karta
+                      sa mu vráti sama. Vrátiť sa dá cez „Ukázať odložené". */}
+                  <button
+                    onClick={() => actions.ackAnomaly(`balicek|${c.name}`, "odložené z karty")}
+                    title="Odložiť — už to riešim alebo má pauzu"
+                    style={{ background: "none", border: "none", color: C.textDim, fontSize: 15, cursor: "pointer", padding: "0 2px", flexShrink: 0 }}
+                  >
+                    ×
+                  </button>
+                </div>
               );
             })}
           </div>
