@@ -3,7 +3,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import ALGORITMY from "../../lib/psb/algoritmy.md?raw";
 import { fmtDMY } from "../../lib/psb/format";
 import { C, mix } from "../../lib/psb/theme";
-import { Card, Empty, H3, Info } from "./ui";
+import { Card, H3, Info } from "./ui";
 
 // Ako fungujú algoritmy — a čo sa v nich práve zmenilo.
 //
@@ -105,51 +105,10 @@ export function Algoritmus() {
 
   const dniOdRevizie = Math.round((Date.now() - Date.parse(PLATI_OD)) / 86400000);
   const zastarane = dniOdRevizie > POL_ROKA;
-  const zobrazene = vsetky ? novinky : novinky.filter((n) => n.relevantne && !n.precitane);
+  const neprecitane = novinky.filter((n) => n.relevantne && !n.precitane).length;
 
   return (
     <>
-      <Card>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-          <H3><Info text="Čo sa zmenilo na oficiálnych kanáloch platforiem — Google Search Central, Meta Newsroom, Facebook Developers, TikTok Newsroom a YouTube Blog. Appka ich číta priamo, nie cez blogy o marketingu. Instagram medzi nimi nie je: Mosseri oznamuje zmeny videami a Instagram oficiálny feed nemá, preto tú časť treba prejsť raz za pol roka ručne." label="Zmeny v algoritmoch" /></H3>
-          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            {novinky.length > 0 && (
-              <button onClick={() => setVsetky((v) => !v)} style={{ background: "none", border: "none", color: C.textDim, fontSize: 12, cursor: "pointer" }}>
-                {vsetky ? "Len relevantné" : `Všetky (${novinky.length})`}
-              </button>
-            )}
-            <button
-              onClick={() => void skontroluj()} disabled={busy}
-              style={{ padding: "6px 13px", borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: busy ? "default" : "pointer", border: `1px solid ${mix(C.accent, 45)}`, background: mix(C.accent, 8), color: C.accentLight, opacity: busy ? 0.5 : 1 }}
-            >
-              {busy ? "Kontrolujem…" : "Skontrolovať zmeny"}
-            </button>
-          </div>
-        </div>
-
-        <div style={{ fontSize: 11.5, color: C.textDim, margin: "6px 0 10px" }}>
-          {kontrolovane ? `Naposledy kontrolované ${fmtDMY(kontrolovane)}.` : "Zatiaľ sa nekontrolovalo."}
-          {sprava && <span style={{ color: C.accentLight }}> {sprava}</span>}
-        </div>
-
-        {zobrazene.length === 0 ? (
-          <Empty>{novinky.length ? "Nič nové, čo by sa týkalo dosahu." : "Klikni na „Skontrolovať zmeny“."}</Empty>
-        ) : (
-          <div style={{ maxHeight: 320, overflowY: "auto" }}>
-            {zobrazene.map((n) => (
-              <div key={n.id} style={{ display: "flex", gap: 9, alignItems: "baseline", padding: "7px 0", borderBottom: `1px solid ${mix(C.border, 50)}`, fontSize: 12.5, flexWrap: "wrap", opacity: n.precitane ? 0.5 : 1 }}>
-                <span style={{ color: C.textDim, fontSize: 11, minWidth: 74, fontVariantNumeric: "tabular-nums" }}>{n.datum ? fmtDMY(n.datum) : "—"}</span>
-                <span style={{ color: C.accentLight, fontSize: 11, minWidth: 128 }}>{n.zdroj}</span>
-                <a href={n.url} target="_blank" rel="noreferrer" style={{ color: C.text, flex: "1 1 220px", minWidth: 0, textDecoration: "none" }}>{n.titulok}</a>
-                {!n.precitane && (
-                  <button onClick={() => oznacPrecitane(n.id)} style={{ background: "none", border: "none", color: C.textDim, fontSize: 11.5, cursor: "pointer" }}>vybavené</button>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </Card>
-
       <Card>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
           <H3><Info text="Zhrnutie toho, ako jednotlivé platformy rozhodujú o dosahu, s číslami PSB priamo pri každom signáli. Jarvis má ten istý text v znalostiach, takže sa naň dá pýtať." label="Ako to funguje (stav k 3. 8. 2026)" /></H3>
@@ -159,6 +118,48 @@ export function Algoritmus() {
         </div>
         <Text md={ALGORITMY} />
       </Card>
+
+      {/* Sledovanie oficiálnych kanálov zostalo, ale zmenšené na jeden riadok.
+          Prvý ostrý beh prešiel 50 správ a ako dôležitú vypichol jednu — novú
+          spam politiku Googlu o „back button hijacking", ktorá sa PSB netýka.
+          To je odpoveď na otázku, či to má byť karta: nemá. Meta zmeny
+          hodnotenia vo feedoch neoznamuje (Mosseri ich hovorí do videa), takže
+          práve ten kanál, kvôli ktorému to vzniklo, sa sledovať nedá.
+
+          A hlavne: appka nepotrebuje vedieť, že sa algoritmus zmenil.
+          Potrebuje si všimnúť, že sa zmenili JEJ čísla — a tie už má. */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "9px 13px", borderRadius: 9, background: mix(C.text, 3), border: `1px solid ${mix(C.border, 70)}` }}>
+        <span style={{ fontSize: 11.5, color: C.textDim, flex: "1 1 260px", lineHeight: 1.5 }}>
+          Oficiálne kanály (Google Search Central, Meta Newsroom, Facebook Developers, YouTube):{" "}
+          {kontrolovane ? `naposledy kontrolované ${fmtDMY(kontrolovane)}` : "zatiaľ nekontrolované"}
+          {neprecitane > 0 && <span style={{ color: C.accentLight }}> · {neprecitane} nových na pozretie</span>}
+          {sprava && <span style={{ color: C.accentLight }}> · {sprava}</span>}
+        </span>
+        {novinky.length > 0 && (
+          <button onClick={() => setVsetky((v) => !v)} style={{ background: "none", border: "none", color: C.textDim, fontSize: 11.5, cursor: "pointer" }}>
+            {vsetky ? "skryť" : "ukázať"}
+          </button>
+        )}
+        <button
+          onClick={() => void skontroluj()} disabled={busy}
+          style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 7, color: C.textMuted, fontSize: 11.5, padding: "4px 10px", cursor: busy ? "default" : "pointer", opacity: busy ? 0.5 : 1, whiteSpace: "nowrap" }}
+        >
+          {busy ? "kontrolujem…" : "skontrolovať"}
+        </button>
+      </div>
+
+      {vsetky && (
+        <div style={{ maxHeight: 260, overflowY: "auto", marginTop: 8 }}>
+          {novinky.map((n) => (
+            <div key={n.id} style={{ display: "flex", gap: 9, alignItems: "baseline", padding: "5px 0", borderBottom: `1px solid ${mix(C.border, 40)}`, fontSize: 11.5, flexWrap: "wrap", opacity: n.precitane ? 0.45 : 1 }}>
+              <span style={{ color: C.textDim, minWidth: 70, fontVariantNumeric: "tabular-nums" }}>{n.datum ? fmtDMY(n.datum) : "—"}</span>
+              <span style={{ color: n.relevantne ? C.accentLight : C.textDim, minWidth: 124 }}>{n.zdroj}</span>
+              <a href={n.url} target="_blank" rel="noreferrer" style={{ color: n.relevantne ? C.text : C.textMuted, flex: "1 1 200px", minWidth: 0, textDecoration: "none" }}>{n.titulok}</a>
+              {!n.precitane && <button onClick={() => oznacPrecitane(n.id)} style={{ background: "none", border: "none", color: C.textDim, fontSize: 11, cursor: "pointer" }}>ok</button>}
+            </div>
+          ))}
+        </div>
+      )}
     </>
   );
 }

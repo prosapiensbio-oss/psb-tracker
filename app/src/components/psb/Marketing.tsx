@@ -25,6 +25,7 @@ import {
 } from "../../lib/psb/marketing";
 import { KATEGORIE_HOOKOV, MKT_OBSAH } from "../../lib/psb/marketing-obsah";
 import { Algoritmus } from "./Algoritmus";
+import { Lievik, Naklady, Referencie } from "./MarketingLievik";
 import { Kanaly } from "./Kanaly";
 import { C, mix, S } from "../../lib/psb/theme";
 import type { AssistantChat } from "./Assistant";
@@ -214,25 +215,77 @@ function CoSomRobil({ chat }: { chat?: AssistantChat }) {
         height={170}
         alignEnd
       />
-      <div style={{ marginTop: 12 }}>
-        <SortTable
-          riadky={data}
-          vychodzi="m"
-          stlpce={[
-            { id: "m", label: "Mesiac", fmt: (v) => label(String(v)) },
-            { id: "reels", label: "Reels", num: true },
-            { id: "posty", label: "Posty", num: true },
-            { id: "stories", label: "Stories", num: true },
-            { id: "views", label: "Videnia", num: true },
-            { id: "ulozenia", label: "Uloženia", num: true, info: "Koľkokrát si niekto príspevok uložil. Zo všetkých metrík je najbližšie k zámeru — lajk nestojí nič, uloženie znamená „toto sa mi bude hodiť“." },
-            { id: "zdielania", label: "Zdieľania", num: true },
-            { id: "viewRate", label: "View rate", num: true, info: "Koľko % ľudí, ktorým sa reel začal prehrávať, ho pozeralo aspoň 3 sekundy. Meria silu hooku, teda prvej vety.", fmt: (v) => `${v} %` },
-            { id: "spend", label: "Reklama", num: true, fmt: (v) => (Number(v) ? fmtCZK(Number(v)) : "—"), farba: (r) => (r.spend > 0 ? C.orange : C.textDim) },
-          ]}
-          minWidth={640}
-        />
-      </div>
+      {/* Mesačná tabuľka impresií tu bola a je preč. Podľa nej sa nikdy
+          nespravilo rozhodnutie — bol to výkaz. Namiesto nej porovnanie s
+          benchmarkom, lebo „405 videní" samo o sebe neznamená nič a „405 pri
+          priemere 580, ale view rate 48 pri priemere 30" znamená veľa. */}
+      <Benchmark />
     </Card>
+  );
+}
+
+// Benchmark pre účty s 1–5 tis. sledovateľmi (Socialinsider, 2026). Sú to
+// PRIEMERY naprieč odvetviami — nie cieľ, ale mierka. Bez nich je každé číslo
+// v tejto appke len číslo.
+const BENCHMARK: { metrika: string; nase: (r: (typeof MKT_MESACNE)[0][]) => number; norma: number; jednotka?: string; vyssieLepsie?: boolean; poznamka: string }[] = [
+  {
+    metrika: "Videnia na reel", norma: 580, poznamka: "priemer účtov 1–5 tis. sledovateľov",
+    nase: (rs) => {
+      const reels = rs.reduce((a, r) => a + r.reels, 0);
+      return reels ? Math.round(rs.reduce((a, r) => a + r.views, 0) / Math.max(1, reels + rs.reduce((a, r) => a + r.posty, 0)) ) : 0;
+    },
+  },
+  {
+    metrika: "View rate reels", norma: 30, jednotka: " %", poznamka: "koľko % divákov vydrží aspoň 3 sekundy",
+    nase: (rs) => {
+      const s = rs.filter((r) => r.viewRate > 0);
+      return s.length ? Math.round((s.reduce((a, r) => a + r.viewRate, 0) / s.length) * 10) / 10 : 0;
+    },
+  },
+  {
+    metrika: "Uloženia na príspevok", norma: 1, poznamka: "uloženie je najbližšie k zámeru zo všetkých metrík",
+    nase: (rs) => {
+      const ks = rs.reduce((a, r) => a + r.reels + r.posty, 0);
+      return ks ? Math.round((rs.reduce((a, r) => a + r.ulozenia, 0) / ks) * 10) / 10 : 0;
+    },
+  },
+  {
+    metrika: "Zdieľania na príspevok", norma: 1, poznamka: "podľa Mosseriho 3–5× váha lajku a najsilnejší signál pre nových ľudí",
+    nase: (rs) => {
+      const ks = rs.reduce((a, r) => a + r.reels + r.posty, 0);
+      return ks ? Math.round((rs.reduce((a, r) => a + r.zdielania, 0) / ks) * 10) / 10 : 0;
+    },
+  },
+];
+
+function Benchmark() {
+  const rs = MKT_MESACNE.slice(-3);
+  if (!rs.length) return null;
+  return (
+    <div style={{ marginTop: 14 }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: C.textMuted, marginBottom: 8 }}>
+        Posledné 3 mesiace oproti benchmarku
+      </div>
+      {BENCHMARK.map((b) => {
+        const v = b.nase(rs);
+        const pomer = b.norma ? v / b.norma : 0;
+        const farba = pomer >= 1 ? C.green : pomer >= 0.7 ? C.orange : C.red;
+        return (
+          <div key={b.metrika} style={{ display: "flex", gap: 10, alignItems: "baseline", padding: "6px 0", borderBottom: `1px solid ${mix(C.border, 45)}`, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 12.5, color: C.text, flex: "1 1 170px", minWidth: 0 }}>{b.metrika}</span>
+            <span style={{ fontSize: 14, fontWeight: 700, color: farba, fontVariantNumeric: "tabular-nums", minWidth: 56, textAlign: "right" }}>
+              {v}{b.jednotka || ""}
+            </span>
+            <span style={{ fontSize: 11.5, color: C.textDim, minWidth: 78, textAlign: "right" }}>norma {b.norma}{b.jednotka || ""}</span>
+            <span style={{ fontSize: 11, color: C.textDim, flex: "1 1 220px" }}>{b.poznamka}</span>
+          </div>
+        );
+      })}
+      <div style={{ fontSize: 11, color: C.textDim, marginTop: 8, lineHeight: 1.5 }}>
+        Zelená znamená nad priemerom, oranžová do 30 % pod ním, červená hlbšie. Norma nie je cieľ — je to mierka,
+        aby číslo niečo znamenalo.
+      </div>
+    </div>
   );
 }
 
@@ -694,7 +747,7 @@ function Vyhladavanie({ chat }: { chat?: AssistantChat }) {
 }
 
 export function Marketing({ data, clients, leads, chat }: { data: PSBData; clients: Record<string, ClientAgg>; leads: Lead[]; chat?: AssistantChat }) {
-  const [sub, setSub] = useState("prehlad");
+  const [sub, setSub] = useState("lievik");
   const [rok, setRok] = useState("2026");
   // Nahraté exporty vyhrávajú nad číslami v kóde. Načíta sa raz pri otvorení;
   // `tik` je len na to, aby sa obrazovka po výmene prekreslila — samotné dáta
@@ -718,18 +771,23 @@ export function Marketing({ data, clients, leads, chat }: { data: PSBData; clien
   return (
     <>
       <SubTabs
+        // Poradie je poradie otázok, ktoré rozhodujú o peniazoch — nie zoznam
+        // kanálov. Predtým bol prvý „Prehľad" s počtom postov a reels, čo je
+        // výkaz práce, nie odpoveď. Instagram priviedol za 18 mesiacov 5
+        // klientov, referencie 26; karty majú zodpovedať tomuto pomeru, nie
+        // tomu, kde je najviac dát.
         tabs={[
-          { id: "prehlad", label: "Prehľad" },
-          { id: "kanaly", label: "Kanály" },
+          { id: "lievik", label: "Odkiaľ prišli klienti" },
+          { id: "naklady", label: "Čo to stálo" },
+          { id: "referencie", label: "Referencie" },
+          { id: "dosah", label: "Dosah a obsah" },
           { id: "algoritmus", label: "Algoritmus" },
-          { id: "vykon", label: "Čo fungovalo" },
-          { id: "vyhladavanie", label: "Vyhľadávanie" },
-          { id: "navratnost", label: "Čo to prinieslo" },
         ]}
         value={sub}
         onChange={setSub}
       />
 
+      {sub === "dosah" && (
       <Card>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <div>
@@ -750,19 +808,28 @@ export function Marketing({ data, clients, leads, chat }: { data: PSBData; clien
           </div>
         </div>
       </Card>
+      )}
 
-      {sub === "prehlad" && (
+      {sub === "lievik" && (
         <>
-          <CoSomRobil chat={chat} />
-          <WebKanaly rok={rok} chat={chat} />
-          <CoSkusitDalej chat={chat} />
+          <Lievik data={data} clients={clients} />
+          <CoToPrinieslo data={data} clients={clients} leads={leads} rok={rok} chat={chat} />
         </>
       )}
-      {sub === "kanaly" && <Kanaly />}
+      {sub === "naklady" && <Naklady data={data} clients={clients} />}
+      {sub === "referencie" && <Referencie data={data} clients={clients} />}
+      {sub === "dosah" && (
+        <>
+          <Kanaly />
+          <CoSomRobil chat={chat} />
+          <CoSkusitDalej chat={chat} />
+          <CoFungovalo chat={chat} />
+          <Vyhladavanie chat={chat} />
+          <WebKanaly rok={rok} chat={chat} />
+          <CoFungovaloWeb rok={rok} chat={chat} />
+        </>
+      )}
       {sub === "algoritmus" && <Algoritmus />}
-      {sub === "vykon" && (<><CoFungovalo chat={chat} /><CoFungovaloWeb rok={rok} chat={chat} /></>)}
-      {sub === "vyhladavanie" && <Vyhladavanie chat={chat} />}
-      {sub === "navratnost" && <CoToPrinieslo data={data} clients={clients} leads={leads} rok={rok} chat={chat} />}
     </>
   );
 }
