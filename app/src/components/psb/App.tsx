@@ -174,6 +174,14 @@ export function PSBApp() {
     if (tab === "treningy" && sub) setTreningySub(sub);
     if (tab === "financie" && sub) setFinancieSub(sub);
     if (tab === "klienti" && sub) setKlientiSub(sub);
+    // Podzáložka Výsledkov sa nikdy nenastavovala — pripomienka „Mesačná
+    // uzávierka" tak doviedla človeka na Kvartálne a vyzeralo to, že klik
+    // nefunguje. Rovnaká mechanika ako pri ostatných, len chýbala.
+    if (tab === "vysledky" && sub) setVysledkySub(sub);
+    // Fokus na klienta má zmysel len v zozname klientov. Keď bol človek práve
+    // v Dopytoch alebo v Raste a strate a klikol na meno vo vyhľadávaní,
+    // zameranie sa nastavilo do podzáložky, ktorú nevidno — a nič sa nestalo.
+    if (tab === "klienti" && !sub && focus?.client) setKlientiSub("klienti");
     if (tab === "treningy" && focus) setTreningyFocus(focus);
     if (tab === "financie" && focus) setFinancieFocus(focus);
     if (tab === "klienti" && focus) setKlientiFocus(focus);

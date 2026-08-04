@@ -86,9 +86,12 @@ export function RastAStrata({ data, clients, onKlient }: { data: PSBData; client
       .sort((a, b) => a[0].localeCompare(b[0]));
   }, [zoznam]);
 
-  // Posledných 12 uzavretých mesiacov — bežiaci mesiac je vždy neúplný a
-  // priemer by ťahal nadol.
-  const poslednych12 = mesacne.slice(-13, -1);
+  // Posledných 12 UZAVRETÝCH mesiacov. „Uzavretý" sa meria kalendárom, nie
+  // poradím v dátach: predtým sa vždy zahodil posledný záznam, čo po skončení
+  // júla zahodilo júl — kompletný mesiac s piatimi príchodmi — a priemer aj
+  // zadanie pre reklamu počítali z posunutého okna.
+  const beziaci = new Date().toISOString().slice(0, 7);
+  const poslednych12 = mesacne.filter(([mk]) => mk < beziaci).slice(-12);
   const odisloMes = poslednych12.length ? poslednych12.reduce((a, [, v]) => a + v.odislo, 0) / poslednych12.length : 0;
   const prisloMes = poslednych12.length ? poslednych12.reduce((a, [, v]) => a + v.prislo, 0) / poslednych12.length : 0;
   const [cielRastu, setCielRastu] = useState("3");

@@ -132,12 +132,18 @@ const SCHEMA_DB = `sessions(id, date, time, client_name, session_trainer, sessio
   session_type: OFFLINE | ONLINE | UVODNE. date je ISO text s časom, na porovnanie roka použi substr(date,1,4).
 payments(id, date, client_name, amount_czk, payment_method)   payment_method: bank | cash | other
 packages(id, client_name, client_status, package_name, sessions_remaining, sessions_total, added, valid_from, valid_to, payment_czk, kind)  — MOMENTKA aktuálneho stavu, nie história; valid_to = skutočný koniec platnosti členstva, payment_czk = koľko klient za tento balíček reálne zaplatil (nesie jeho zľavy), kind = package | membership
-client_overrides(name, status, special_rate, special_rate_note, trainer_note, contract_signed, primary_trainer, bitcoin)
+client_overrides(name, status, special_rate, special_rate_note, trainer_note, contract_signed, primary_trainer, bitcoin, duch, zdroj, zdroj_kto)  — zdroj: referencia|reklama|instagram|google|fp|offline|ai|ine; zdroj_kto = meno odporúčateľa
 leads(id, date, name, source, referrer, status, note)
 jarvis_zavery(id, datum, tema, zaver, preco, overit, overit_do, vysledok, stav)
 fio_transactions(id, date, amount_czk, counterparty, note, typ, category)  — bankové pohyby z Fio; category = položka P&L alebo "vyplaty"/"mimo"; záporná suma = výdavok. Tržby sa z nich NIKDY nepočítajú, zdroj pravdy o príjmoch je PTminder.
 raw_uploads(id, filename, kind, bytes, uploaded_at)  — surové marketingové exporty (metricool | ga4 | gsc), obsah nečítaj cez SELECT * (je veľký), zaujímavý je len prehľad
-vzas_payments, vzas_payment_splits, vzas_periods, vzas_rules, vzas_salary_params, vzas_settings, vzas_month_notes, vzas_week_notes, anomaly_ack, services, upload_log`;
+wishlist(id, nazov, cena, link, kupene, kupene_at, kategoria)  — nákupný zoznam náradia a kurzov
+mkt_prispevky(id, druh, datum, mesiac, hook, views, dosah, ulozenia, zdielania, spend, view_rate)  — instagramové príspevky z Metricool CSV; druh: reel | post | story
+kanaly_mesiace(mesiac, kanal, metrika, hodnota, zmena)  — mesačné čísla všetkých kanálov (Facebook, TikTok, Meta Ads…) z mesačnej zostavy
+ga4_mesiace(mesiac, novi, organic_search, paid_social, direct, udalosti)  — web; udalosti = odoslané formuláre
+gsc_mesiace(mesiac, kliky, zobrazenia) · gsc_dopyty(dopyt, kliky, zobrazenia, ctr, pozicia) · gsc_strany(url, kliky, zobrazenia, ctr, pozicia)  — Google vyhľadávanie
+users(login, name, active, last_login)  — kontá; vzas_audit(at, actor, action, ...) — kto čo zmenil
+vzas_payments, vzas_payment_splits, vzas_periods, vzas_rules, vzas_salary_params, vzas_settings, vzas_month_notes, vzas_week_notes, anomaly_ack, services, upload_log, algo_novinky`;
 
 const TOOLS = [
   {

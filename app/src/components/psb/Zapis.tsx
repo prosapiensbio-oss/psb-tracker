@@ -36,9 +36,11 @@ export function ZapisButton({
       sub: r.ciel.sub,
       stav: r.hotove ? ("hotove" as const) : r.splatne ? ("chyba" as const) : undefined,
     })),
-    { nadpis: "Nový dopyt", popis: "Kto sa ozval, odkiaľ a čo sa s tým stalo.", tab: "marketing" },
+    // Dopyty sa medzitým presťahovali z Marketingu do Klientov — rozcestník
+    // ukazoval na starú adresu.
+    { nadpis: "Nový dopyt", popis: "Kto sa ozval, odkiaľ a čo sa s tým stalo.", tab: "klienti", sub: "dopyty" },
     { nadpis: "Poznámka ku klientovi", popis: "Stav, pauza, poznámka trénera — v karte klienta.", tab: "klienti" },
-    { nadpis: "Záver z debaty", popis: "Rozhodnutie s dátumom, kedy sa overí, či zabralo.", tab: "marketing" },
+    { nadpis: "Záver z debaty", popis: "Napíš Jarvisovi — záver si zapíše sám a objaví sa v registri.", tab: "dashboard" },
   ];
 
   const chod = (p: Polozka) => {
