@@ -57,6 +57,48 @@ const statusColor = (s: string) =>
 // Deliberately narrow — it only asks what lives in Jerry's inbox and DMs. Whether
 // someone actually showed up or became a client is already in the PTminder CSV,
 // so it is derived rather than typed twice.
+// Pole odporúčateľa sa ukladá samo.
+//
+// Predtým to bol nekontrolovaný input, ktorý zapisoval až pri opustení poľa.
+// Kto meno dopísal a zavrel okno klávesou alebo klikom mimo, prišiel oň — a
+// keďže to bolo jediné miesto, kde sa meno zadáva, referenčný rebríček zostal
+// prázdny bez toho, aby to niekomu prišlo divné.
+//
+// Ukladá sa pol sekundy po dopísaní, pri opustení poľa aj pri Enteri. Ponuka
+// mien existujúcich klientov je tam preto, že odporúčateľ je skoro vždy niekto,
+// koho appka už pozná — a rovnaké meno napísané dvoma spôsobmi rozbije rebríček.
+function PoleOdporucatela({ meno, hodnota, mena, onUloz }: { meno: string; hodnota: string; mena: string[]; onUloz: (v: string) => void }) {
+  const [v, setV] = useState(hodnota);
+  const [ulozene, setUlozene] = useState(true);
+  useEffect(() => { setV(hodnota); setUlozene(true); }, [meno, hodnota]);
+  useEffect(() => {
+    if (v === hodnota) return;
+    setUlozene(false);
+    const t = setTimeout(() => { onUloz(v); setUlozene(true); }, 500);
+    return () => clearTimeout(t);
+  }, [v]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div style={{ marginTop: 8 }}>
+      <input
+        style={{ ...S.input }}
+        placeholder="Kto ho poslal? (meno)"
+        list="psb-referrers"
+        value={v}
+        onChange={(e) => setV(e.target.value)}
+        onBlur={() => { if (v !== hodnota) { onUloz(v); setUlozene(true); } }}
+        onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+      />
+      <datalist id="psb-referrers">
+        {mena.map((n) => <option key={n} value={n} />)}
+      </datalist>
+      <div style={{ fontSize: 11, color: ulozene ? C.green : C.textDim, marginTop: 4 }}>
+        {ulozene ? (v ? "Uložené — objaví sa v Marketing → Referencie" : "") : "Ukladám…"}
+      </div>
+    </div>
+  );
+}
+
 function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Record<string, ClientAgg>; refresh: () => Promise<void> }) {
   const [busy, setBusy] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -314,6 +356,10 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
   const [modalityF, setModalityF] = useState("all");
   const [membershipF, setMembershipF] = useState(""); // package bucket from the donut
   const [nameSearch, setNameSearch] = useState("");
+  // Mená klientov na ponuku pri odporúčateľovi — odporúčateľ je skoro vždy
+  // niekto, koho appka pozná, a rovnaké meno napísané dvoma spôsobmi rozbije
+  // rebríček.
+  const clientNames = useMemo(() => Object.keys(clients).sort((a, b) => a.localeCompare(b)), [clients]);
   const [showInactive, setShowInactive] = useState(false);
   const [kpiWin, setKpiWin] = useState("all");
   const [kpiFrom, setKpiFrom] = useState("");
@@ -629,9 +675,17 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
                     {ZDROJE.map((z) => <option key={z.value} value={z.value}>{z.label}</option>)}
                   </select>
                   {c.zdroj === "referencia" && (
-                    <span title={c.zdrojKto || "Kto ho poslal? Dopíš cez ✎ — bez mena sa nedá odovzdať odmena."} style={{ marginLeft: 4, fontSize: 10, color: c.zdrojKto ? C.green : C.orange }}>
+                    // Otáznik bol obyčajný text — dal sa naň klikať a nič sa
+                    // nedialo. Pritom je to jediné miesto, kde appka hovorí
+                    // „tu niečo chýba", takže je logické, že tam človek klikne.
+                    // Teraz otvorí kartu klienta rovno na poli odporúčateľa.
+                    <button
+                      onClick={() => setEdit(c.name)}
+                      title={c.zdrojKto ? `Poslal: ${c.zdrojKto} — klik na úpravu` : "Kto ho poslal? Klikni a dopíš — bez mena sa nedá odovzdať odmena."}
+                      style={{ marginLeft: 4, fontSize: 11, color: c.zdrojKto ? C.green : C.orange, background: "none", border: "none", cursor: "pointer", padding: "0 2px" }}
+                    >
                       {c.zdrojKto ? "✓" : "?"}
-                    </span>
+                    </button>
                   )}
                 </td>
                 <td style={{ ...S.td, textAlign: "center" }}>
@@ -712,11 +766,11 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
             options={ZDROJE}
           />
           {editC.zdroj === "referencia" && (
-            <input
-              style={{ ...S.input, marginTop: 8 }}
-              placeholder="Kto ho poslal? (meno)"
-              defaultValue={editC.zdrojKto}
-              onBlur={(e) => actions.setOverride(editC.name, "zdrojKto", e.target.value)}
+            <PoleOdporucatela
+              meno={editC.name}
+              hodnota={editC.zdrojKto}
+              mena={clientNames}
+              onUloz={(v) => actions.setOverride(editC.name, "zdrojKto", v)}
             />
           )}
           <div style={{ fontSize: 11.5, color: C.textDim, margin: "6px 0 14px", lineHeight: 1.5 }}>
