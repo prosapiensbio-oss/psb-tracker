@@ -16,6 +16,7 @@ import {
 } from "../../lib/psb/compute";
 import { fmtCZK, fmtDMY, monthLabel, weekKey, weekLabel } from "../../lib/psb/format";
 import { C, mix, S, badge, btn } from "../../lib/psb/theme";
+import { nastavPrijmyZTrackera, pnlCalc, VZAS_MONTHS } from "../../lib/psb/vzas";
 import type { PSBData } from "../../lib/psb/types";
 import type { Actions, NavFocus } from "./App";
 import type { AssistantChat } from "./Assistant";
@@ -373,6 +374,20 @@ export function Dashboard({
     const sixMCount = sixM.filter((c) => matchT(c.primaryTrainer)).length;
     return { active, weekHours, lastWeek, monthCash, lastMonth: lastMonth?.month, sixMCount };
   }, [clients, data, sixM, trainer]);
+
+  // Zisk za posledný mesiac, ktorý má kompletný P&L — teda aj náklady.
+  // Tržby za júl máme, ale náklady prídu až s Fio; ukázať „zisk" bez nich by
+  // znamenalo vydávať tržbu za zisk. Preto sa berie posledný mesiac VZAS a
+  // v popisku je jeho meno, nech je jasné, o ktorom mesiaci karta hovorí.
+  // Pred výpočtom sa do VZAS pretlačia živé tržby (idempotentné).
+  const zisk = useMemo(() => {
+    const cash: Record<string, number> = {};
+    for (const m of monthlyFinance(data)) cash[m.month] = m.cash;
+    nastavPrijmyZTrackera(cash);
+    const p = pnlCalc();
+    const i = VZAS_MONTHS.length - 1;
+    return { mesiac: VZAS_MONTHS[i] as string, v: p.hrubyZisk[i] };
+  }, [data]);
 
   // Predikcia tržieb na najbližší mesiac — podľa Jerryho „to najdôležitejšie
   // číslo, aké appka počíta". Doteraz bola schovaná vo Financiách → Predikcia a
@@ -892,7 +907,12 @@ export function Dashboard({
           }
           onClick={() => onNavigate("treningy")}
         />
-        <StatCard value={fmtCZK(stats.monthCash)} label={stats.lastMonth ? `Tržby ${monthLabel(stats.lastMonth)}` : "Mesačné tržby"} onClick={() => onNavigate("financie")} />
+        <StatCard
+          value={zisk ? fmtCZK(zisk.v) : "—"}
+          label={zisk ? `Zisk ${monthLabel(zisk.mesiac)}` : "Zisk (čaká na P&L)"}
+          color={zisk && zisk.v < 0 ? C.red : undefined}
+          onClick={() => onNavigate("vzas")}
+        />
         <StatCard
           value={trzbyOdhad ? fmtCZK(trzbyOdhad.expected) : "—"}
           label={trzbyOdhad ? `Odhad tržieb ${monthLabel(trzbyOdhad.month)}` : "Odhad tržieb"}

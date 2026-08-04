@@ -262,6 +262,13 @@ export function PSBApp() {
     return out;
   }, [data, webMetriky]);
 
+  // Zoznam pre quick-poznámku v „+ Zápis": meno + existujúca poznámka, nech
+  // sa edituje celá a nič sa slepo neprepíše.
+  const zapisKlienti = useMemo(
+    () => Object.values(clients).map((c) => ({ meno: c.name, poznamka: c.trainerNote || "" })).sort((a, b) => a.meno.localeCompare(b.meno)),
+    [clients],
+  );
+
   // Rituály: čo sa má zapísať a či je to zapísané. Doplnia sa do registra ako
   // ďalšie položky — nie ako samostatná karta. Register je jediné miesto, kam
   // sa človek pozerá, keď hľadá „čo mám spraviť"; druhý zoznam vedľa neho by
@@ -385,13 +392,15 @@ export function PSBApp() {
     <ObdobieCtx.Provider value={{ obdobie, setObdobie }}>
     <div style={{ minHeight: "100dvh", background: C.bg, color: C.text }}>
       <div style={{ padding: "16px 16px 0", display: "flex", alignItems: "center", gap: 12, maxWidth: 1200, margin: "0 auto", flexWrap: "wrap" }}>
-        <div style={{ lineHeight: 1.1 }}>
-          <div style={{ fontSize: 20, fontWeight: 800, color: C.accent, letterSpacing: -0.3 }}>Tracker</div>
+        {/* Logo je zároveň cesta domov — najstarší weborý zvyk a jediné miesto,
+            kde ho každý hľadá inštinktívne. */}
+        <button onClick={() => navigate("dashboard")} style={{ lineHeight: 1.1, background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left" }}>
+          <div style={{ fontSize: 20, fontWeight: 800, color: C.accent, letterSpacing: -0.3 }}>Kokpit</div>
           <div style={{ fontSize: 11, fontWeight: 500, color: C.textMuted, letterSpacing: 0.2 }}>ProSapiens Biomechanic</div>
-        </div>
+        </button>
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
           <HladanieKlienta clients={clients} leads={data.leads} onPick={(meno) => navigate("klienti", undefined, { client: meno, nonce: Date.now() })} onPickLead={() => navigate("klienti", "dopyty")} />
-          <ZapisButton ritualy={rituals} onNavigate={(t, sub) => { navigate(t, sub); void nacitajZapisy(); }} onRefresh={() => void actions.refresh()} />
+          <ZapisButton ritualy={rituals} onNavigate={(t, sub) => { navigate(t, sub); void nacitajZapisy(); }} onRefresh={() => void actions.refresh()} klienti={zapisKlienti} onPoznamka={(m, p) => actions.setOverride(m, "trainerNote", p)} />
           {ktoSom && ktoSom !== "app" && (
             <span style={{ fontSize: 12, color: C.textMuted }} title="Pod týmto menom sa zapisujú zmeny do auditu">
               {ktoSom.charAt(0).toUpperCase() + ktoSom.slice(1)}
