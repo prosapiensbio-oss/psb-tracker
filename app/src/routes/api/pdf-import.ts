@@ -72,12 +72,18 @@ export const Route = createFileRoute("/api/pdf-import")({
             const tik = setInterval(() => posli({ s: "Jarvis číta zostavu…" }), 5000);
             try {
               posli({ s: "Posielam zostavu na prečítanie…" });
+              // stream: true je tu nutnosť, nie optimalizácia. Bez streamu čaká
+              // celá odpoveď na jeden blok — pri 99 stranách to je vyše 100
+              // sekúnd ticha a Cloudflare pred Anthropic API také spojenie
+              // zabije s chybou 524 skôr, než model stihne odpovedať. So
+              // streamom prídu prvé bajty do pár sekúnd a spojenie žije.
               const resp = await fetch("https://api.anthropic.com/v1/messages", {
                 method: "POST",
                 headers: { "content-type": "application/json", "x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01" },
                 body: JSON.stringify({
                   model: MODEL,
                   max_tokens: 16000,
+                  stream: true,
                   messages: [{
                     role: "user",
                     content: [
@@ -87,14 +93,39 @@ export const Route = createFileRoute("/api/pdf-import")({
                   }],
                 }),
               });
-              if (!resp.ok) {
+              if (!resp.ok || !resp.body) {
                 const d = await resp.text().catch(() => "");
                 posli({ e: `Model odmietol súbor (${resp.status}). ${d.slice(0, 180)}` });
                 clearInterval(tik); ctrl.close(); return;
               }
-              const j = (await resp.json()) as { content?: { type: string; text?: string }[] };
-              const csv = (j.content || []).filter((c) => c.type === "text").map((c) => c.text || "").join("\n").trim()
-                .replace(/^```[a-z]*\n?/i, "").replace(/```$/, "");
+              // Zbierame textové delty; priebežne hlásime, koľko riadkov CSV
+              // už dorazilo, nech je vidno, že sa niečo deje.
+              let text = "";
+              let hlasene = 0;
+              const reader = resp.body.getReader();
+              const dec = new TextDecoder();
+              let zvysok = "";
+              for (;;) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                zvysok += dec.decode(value, { stream: true });
+                const casti = zvysok.split("\n");
+                zvysok = casti.pop() || "";
+                for (const r of casti) {
+                  if (!r.startsWith("data: ")) continue;
+                  try {
+                    const ev = JSON.parse(r.slice(6)) as { type?: string; delta?: { type?: string; text?: string }; error?: { message?: string } };
+                    if (ev.type === "content_block_delta" && ev.delta?.text) text += ev.delta.text;
+                    if (ev.type === "error") { posli({ e: `Model zlyhal: ${String(ev.error?.message).slice(0, 160)}` }); clearInterval(tik); ctrl.close(); return; }
+                  } catch { /* neúplný riadok */ }
+                }
+                const riadkovTeraz = (text.match(/\n/g) || []).length;
+                if (riadkovTeraz >= hlasene + 15) {
+                  hlasene = riadkovTeraz;
+                  posli({ s: `Čítam… ${riadkovTeraz} riadkov` });
+                }
+              }
+              const csv = text.trim().replace(/^```[a-z]*\n?/i, "").replace(/```$/, "");
 
               const riadky = parseKanaly(csv);
               if (!riadky.length) {
