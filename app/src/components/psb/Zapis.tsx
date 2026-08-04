@@ -23,9 +23,13 @@ type Polozka = { nadpis: string; popis: string; tab: string; sub?: string; stav?
 export function ZapisButton({
   ritualy,
   onNavigate,
+  onRefresh,
 }: {
   ritualy: Ritual[];
   onNavigate: (tab: string, sub?: string) => void;
+  /** Po uložení dopytu sa musia dotiahnuť dáta — inak ho hľadanie a lievik
+   *  neuvidia až do ďalšieho otvorenia appky. */
+  onRefresh?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [dopytMeno, setDopytMeno] = useState("");
@@ -88,7 +92,7 @@ export function ZapisButton({
               if (!m || dopytBusy) return;
               setDopytBusy(true);
               void saveLead({ date: new Date().toISOString().slice(0, 10), name: m, source: dopytZdroj as never, status: "novy", referrer: "", note: "" })
-                .then(() => { setDopytMeno(""); setDopytOk(m); setTimeout(() => setDopytOk(""), 4000); })
+                .then(() => { setDopytMeno(""); setDopytOk(m); onRefresh?.(); setTimeout(() => setDopytOk(""), 4000); })
                 .finally(() => setDopytBusy(false));
             }}
             style={{ marginBottom: 14, padding: "11px 13px", borderRadius: 10, border: `1px solid ${mix(C.accent, 30)}`, background: mix(C.accent, 5) }}
