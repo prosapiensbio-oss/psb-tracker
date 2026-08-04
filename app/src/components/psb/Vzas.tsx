@@ -1758,6 +1758,8 @@ function MesacneTab({ data, clients }: { data: PSBData; clients: Record<string, 
 
   return (
     <>
+      <Vyhlad data={data} clients={clients} />
+    <>
       {/* One filter at the top drives everything below it — break-even, výhľad,
           energiu aj tabuľku. Mať ho v polovici stránky znamenalo, že prvé dve
           karty ticho ukazovali iné obdobie než zvyšok. */}
@@ -1865,6 +1867,7 @@ function MesacneTab({ data, clients }: { data: PSBData; clients: Record<string, 
           </table>
         </ScrollX>
       </Card>
+    </>
     </>
   );
 }
