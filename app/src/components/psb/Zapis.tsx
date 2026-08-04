@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { saveLead } from "../../lib/psb/client";
 import type { Ritual } from "../../lib/psb/rituals";
+import { Dennik } from "./Dennik";
 import { SOURCES } from "./Klienti";
 import { C, mix } from "../../lib/psb/theme";
 import { Modal } from "./ui";
@@ -25,14 +26,12 @@ export function ZapisButton({
   onNavigate,
   onRefresh,
   klienti = [],
-  onPoznamka,
 }: {
   ritualy: Ritual[];
   onNavigate: (tab: string, sub?: string) => void;
-  /** Mená + existujúce poznámky — nech quick-zápis needitovanú poznámku
-   *  neprepíše naslepo, ale ukáže ju a nechá doplniť. */
+  /** Mená + stále poznámky — stála poznámka sa pri vybranom klientovi ukáže
+   *  ako kontext, zápis ide do denníka. */
   klienti?: { meno: string; poznamka: string }[];
-  onPoznamka?: (meno: string, poznamka: string) => void;
   /** Po uložení dopytu sa musia dotiahnuť dáta — inak ho hľadanie a lievik
    *  neuvidia až do ďalšieho otvorenia appky. */
   onRefresh?: () => void;
@@ -43,10 +42,8 @@ export function ZapisButton({
   const [dopytBusy, setDopytBusy] = useState(false);
   const [dopytOk, setDopytOk] = useState("");
   const [poznMeno, setPoznMeno] = useState("");
-  const [poznText, setPoznText] = useState("");
-  const [poznOk, setPoznOk] = useState("");
-  // Platné meno = existujúci klient. Voľný text sa neukladá — poznámka bez
-  // klienta nemá kam patriť a preklep by ju stratil.
+  // Platné meno = existujúci klient. Voľný text sa neukladá — zápis bez
+  // klienta nemá kam patriť a preklep by ho stratil.
   const vybranyKlient = klienti.find((k) => k.meno === poznMeno);
   const cakajuce = ritualy.filter((r) => r.splatne).length;
 
@@ -126,49 +123,35 @@ export function ZapisButton({
             {dopytOk && <div style={{ fontSize: 11.5, color: C.green, marginTop: 6 }}>Zapísané: {dopytOk}. Detail doplníš v Klienti → Dopyty.</div>}
           </form>
 
-          {/* Poznámka ku klientovi — rovnaký princíp ako dopyt: meno + text,
-              bez navigácie. Pri vybranom klientovi sa načíta existujúca
-              poznámka a edituje sa celá — slepé prepísanie by zahodilo, čo tam
-              už je, a tiché pridávanie na koniec by z poznámky spravilo smetisko. */}
-          {onPoznamka && (
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (!vybranyKlient) return;
-                onPoznamka(vybranyKlient.meno, poznText.trim());
-                setPoznOk(vybranyKlient.meno);
-                setPoznMeno(""); setPoznText("");
-                setTimeout(() => setPoznOk(""), 4000);
-              }}
-              style={{ marginBottom: 14, padding: "11px 13px", borderRadius: 10, border: `1px solid ${mix(C.accent, 30)}`, background: mix(C.accent, 5) }}
-            >
-              <div style={{ fontSize: 12.5, fontWeight: 600, color: C.text, marginBottom: 8 }}>Poznámka ku klientovi</div>
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                <input
-                  value={poznMeno} list="zapis-klienti" placeholder="Klient — začni písať"
-                  onChange={(e) => {
-                    setPoznMeno(e.target.value);
-                    const k = klienti.find((x) => x.meno === e.target.value);
-                    if (k) setPoznText(k.poznamka);
-                  }}
-                  style={{ flex: "2 1 160px", minWidth: 0, padding: "7px 10px", borderRadius: 8, border: `1px solid ${vybranyKlient ? mix(C.green, 50) : C.border}`, background: C.bg, color: C.text, fontSize: 13 }}
-                />
-                <datalist id="zapis-klienti">
-                  {klienti.map((k) => <option key={k.meno} value={k.meno} />)}
-                </datalist>
-                <button type="submit" disabled={!vybranyKlient}
-                  style={{ padding: "7px 14px", borderRadius: 8, fontSize: 12.5, fontWeight: 600, border: `1px solid ${mix(C.accent, 45)}`, background: mix(C.accent, 10), color: C.accentLight, cursor: vybranyKlient ? "pointer" : "default", opacity: vybranyKlient ? 1 : 0.45 }}>
-                  Uložiť
-                </button>
-              </div>
-              <textarea
-                value={poznText} onChange={(e) => setPoznText(e.target.value)}
-                placeholder={vybranyKlient ? "Poznámka (ukladá sa celá — čo zmažeš, zmizne)" : "Najprv vyber klienta zo zoznamu"}
-                disabled={!vybranyKlient}
-                style={{ width: "100%", marginTop: 6, minHeight: 54, resize: "vertical", padding: "7px 10px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 12.5, opacity: vybranyKlient ? 1 : 0.55 }}
+          {/* Denník klienta — rovnaký princíp ako dopyt: meno + text, bez
+              navigácie. Zápisy sa PRIDÁVAJÚ a nikdy nemažú — poznámky v čase
+              nie sú smetisko, sú príbeh klienta (Jerryho formulácia, a je
+              správna: „marec: rameno prestalo bolieť" sa nedá zrekonštruovať
+              z ničoho iného). Stála poznámka na fakty žije na karte klienta. */}
+          {klienti.length > 0 && (
+            <div style={{ marginBottom: 14, padding: "11px 13px", borderRadius: 10, border: `1px solid ${mix(C.accent, 30)}`, background: mix(C.accent, 5) }}>
+              <div style={{ fontSize: 12.5, fontWeight: 600, color: C.text, marginBottom: 8 }}>Denník klienta — čo sa stalo</div>
+              <input
+                value={poznMeno} list="zapis-klienti" placeholder="Klient — začni písať"
+                onChange={(e) => setPoznMeno(e.target.value)}
+                style={{ width: "100%", marginBottom: 6, padding: "7px 10px", borderRadius: 8, border: `1px solid ${vybranyKlient ? mix(C.green, 50) : C.border}`, background: C.bg, color: C.text, fontSize: 13 }}
               />
-              {poznOk && <div style={{ fontSize: 11.5, color: C.green, marginTop: 4 }}>Uložené ku klientovi {poznOk}.</div>}
-            </form>
+              <datalist id="zapis-klienti">
+                {klienti.map((k) => <option key={k.meno} value={k.meno} />)}
+              </datalist>
+              {vybranyKlient ? (
+                <>
+                  {vybranyKlient.poznamka && (
+                    <div style={{ fontSize: 11.5, color: C.textDim, margin: "2px 0 8px", lineHeight: 1.5 }}>
+                      Stála poznámka: <span style={{ color: C.textMuted }}>{vybranyKlient.poznamka}</span>
+                    </div>
+                  )}
+                  <Dennik meno={vybranyKlient.meno} limit={3} />
+                </>
+              ) : (
+                <div style={{ fontSize: 11.5, color: C.textDim }}>Vyber klienta zo zoznamu — potom sa ukáže jeho denník.</div>
+              )}
+            </div>
           )}
           <div style={{ display: "grid", gap: 8 }}>
             {polozky.map((p) => (

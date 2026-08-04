@@ -6,6 +6,7 @@ import { C, MEMBERSHIP_COLORS, mix, S } from "../../lib/psb/theme";
 import { saveLead } from "../../lib/psb/client";
 import type { Lead, PSBData } from "../../lib/psb/types";
 import type { Actions, NavFocus } from "./App";
+import { Dennik } from "./Dennik";
 import { RastAStrata } from "./Fluktuacia";
 import { SixMTracker } from "./SixM";
 import { Badge, Card, Donut, Empty, H3, Info, Modal, Select, SortTh, StatCard, SubTabs, TableWrap, useSort } from "./ui";
@@ -790,8 +791,16 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
           <div style={{ fontSize: 11.5, color: C.textDim, margin: "6px 0 14px", lineHeight: 1.5 }}>
             Bez mena odporúčateľa sa nedá odovzdať odmena za doporučenie (10 % z ďalšieho balíčka alebo tréning zadarmo).
           </div>
-          <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4, marginTop: 4 }}>Poznámka trénera (nikdy sa neprepíše uploadom)</div>
+          {/* Dve vrstvy poznámok: stála = fakty, ktoré platia (kto platí, na čo
+              pozor) a prepisuje sa; denník = udalosti v čase, pridáva sa a
+              nemaže. Pri prepise stálej poznámky server odloží starú verziu do
+              denníka — nič sa nestráca ani tu. */}
+          <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4, marginTop: 4 }}>Stála poznámka (fakty — prepisuje sa, stará verzia sa odloží do denníka)</div>
           <textarea style={{ ...S.input, minHeight: 70, resize: "vertical", marginBottom: 14 }} defaultValue={editC.trainerNote} onBlur={(e) => actions.setOverride(editC.name, "trainerNote", e.target.value)} />
+          <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 6 }}>Denník — príbeh klienta v čase (pridáva sa, nemaže)</div>
+          <div style={{ marginBottom: 14 }}>
+            <Dennik meno={editC.name} limit={4} />
+          </div>
           <button onClick={() => setEdit(null)} style={{ background: C.accent, color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontSize: 13, width: "100%" }}>Hotovo</button>
         </Modal>
       )}

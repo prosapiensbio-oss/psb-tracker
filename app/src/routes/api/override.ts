@@ -40,6 +40,22 @@ export const Route = createFileRoute("/api/override")({
         if (!name || !ALLOWED.has(key as keyof ClientOverride)) {
           return Response.json({ ok: false, error: "bad_field" }, { status: 400 });
         }
+        // Stála poznámka sa prepisuje — ale poznámky v čase sú príbeh klienta,
+        // nie smetisko. Pred prepisom sa stará verzia odloží do denníka
+        // (client_notes), takže sa nedá nič stratiť ani nechtiac.
+        if (key === "trainerNote") {
+          try {
+            const stara = await DB.prepare("SELECT trainer_note FROM client_overrides WHERE name = ?1")
+              .bind(name).first<{ trainer_note: string | null }>();
+            const stary = (stara?.trainer_note || "").trim();
+            const novy = String(value ?? "").trim();
+            if (stary && stary !== novy) {
+              await DB.prepare(
+                "INSERT INTO client_notes (id, client_name, note, author, created_at) VALUES (?1, ?2, ?3, ?4, ?5)",
+              ).bind(crypto.randomUUID(), name, `Stála poznámka predtým: ${stary}`, (await currentUser(request)) || "app", new Date().toISOString()).run();
+            }
+          } catch { /* denník je poistka — jeho výpadok nesmie zablokovať uloženie */ }
+        }
         await setOverride(DB, name, key as keyof ClientOverride, value);
         await audit(DB, { action: "uprava-klienta", predmet: `${name} · ${key}`, neu: value, actor: await currentUser(request) || undefined });
         return Response.json({ ok: true });

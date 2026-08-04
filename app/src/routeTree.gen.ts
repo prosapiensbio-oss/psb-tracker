@@ -33,6 +33,7 @@ import { Route as ApiIngestRouteImport } from './routes/api/ingest'
 import { Route as ApiFioRouteImport } from './routes/api/fio'
 import { Route as ApiExportRouteImport } from './routes/api/export'
 import { Route as ApiDataRouteImport } from './routes/api/data'
+import { Route as ApiClientNotesRouteImport } from './routes/api/client-notes'
 import { Route as ApiClientDeleteRouteImport } from './routes/api/client-delete'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ApiBtcReserveRouteImport } from './routes/api/btc-reserve'
@@ -159,6 +160,11 @@ const ApiDataRoute = ApiDataRouteImport.update({
   path: '/api/data',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiClientNotesRoute = ApiClientNotesRouteImport.update({
+  id: '/api/client-notes',
+  path: '/api/client-notes',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiClientDeleteRoute = ApiClientDeleteRouteImport.update({
   id: '/api/client-delete',
   path: '/api/client-delete',
@@ -194,6 +200,7 @@ export interface FileRoutesByFullPath {
   '/api/btc-reserve': typeof ApiBtcReserveRoute
   '/api/chat': typeof ApiChatRoute
   '/api/client-delete': typeof ApiClientDeleteRoute
+  '/api/client-notes': typeof ApiClientNotesRoute
   '/api/data': typeof ApiDataRoute
   '/api/export': typeof ApiExportRoute
   '/api/fio': typeof ApiFioRoute
@@ -225,6 +232,7 @@ export interface FileRoutesByTo {
   '/api/btc-reserve': typeof ApiBtcReserveRoute
   '/api/chat': typeof ApiChatRoute
   '/api/client-delete': typeof ApiClientDeleteRoute
+  '/api/client-notes': typeof ApiClientNotesRoute
   '/api/data': typeof ApiDataRoute
   '/api/export': typeof ApiExportRoute
   '/api/fio': typeof ApiFioRoute
@@ -257,6 +265,7 @@ export interface FileRoutesById {
   '/api/btc-reserve': typeof ApiBtcReserveRoute
   '/api/chat': typeof ApiChatRoute
   '/api/client-delete': typeof ApiClientDeleteRoute
+  '/api/client-notes': typeof ApiClientNotesRoute
   '/api/data': typeof ApiDataRoute
   '/api/export': typeof ApiExportRoute
   '/api/fio': typeof ApiFioRoute
@@ -290,6 +299,7 @@ export interface FileRouteTypes {
     | '/api/btc-reserve'
     | '/api/chat'
     | '/api/client-delete'
+    | '/api/client-notes'
     | '/api/data'
     | '/api/export'
     | '/api/fio'
@@ -321,6 +331,7 @@ export interface FileRouteTypes {
     | '/api/btc-reserve'
     | '/api/chat'
     | '/api/client-delete'
+    | '/api/client-notes'
     | '/api/data'
     | '/api/export'
     | '/api/fio'
@@ -352,6 +363,7 @@ export interface FileRouteTypes {
     | '/api/btc-reserve'
     | '/api/chat'
     | '/api/client-delete'
+    | '/api/client-notes'
     | '/api/data'
     | '/api/export'
     | '/api/fio'
@@ -384,6 +396,7 @@ export interface RootRouteChildren {
   ApiBtcReserveRoute: typeof ApiBtcReserveRoute
   ApiChatRoute: typeof ApiChatRoute
   ApiClientDeleteRoute: typeof ApiClientDeleteRoute
+  ApiClientNotesRoute: typeof ApiClientNotesRoute
   ApiDataRoute: typeof ApiDataRoute
   ApiExportRoute: typeof ApiExportRoute
   ApiFioRoute: typeof ApiFioRoute
@@ -577,6 +590,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiDataRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/client-notes': {
+      id: '/api/client-notes'
+      path: '/api/client-notes'
+      fullPath: '/api/client-notes'
+      preLoaderRoute: typeof ApiClientNotesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/client-delete': {
       id: '/api/client-delete'
       path: '/api/client-delete'
@@ -624,6 +644,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiBtcReserveRoute: ApiBtcReserveRoute,
   ApiChatRoute: ApiChatRoute,
   ApiClientDeleteRoute: ApiClientDeleteRoute,
+  ApiClientNotesRoute: ApiClientNotesRoute,
   ApiDataRoute: ApiDataRoute,
   ApiExportRoute: ApiExportRoute,
   ApiFioRoute: ApiFioRoute,

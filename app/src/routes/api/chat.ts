@@ -133,6 +133,7 @@ const SCHEMA_DB = `sessions(id, date, time, client_name, session_trainer, sessio
 payments(id, date, client_name, amount_czk, payment_method)   payment_method: bank | cash | other
 packages(id, client_name, client_status, package_name, sessions_remaining, sessions_total, added, valid_from, valid_to, payment_czk, kind)  — MOMENTKA aktuálneho stavu, nie história; valid_to = skutočný koniec platnosti členstva, payment_czk = koľko klient za tento balíček reálne zaplatil (nesie jeho zľavy), kind = package | membership
 client_overrides(name, status, special_rate, special_rate_note, trainer_note, contract_signed, primary_trainer, bitcoin, duch, zdroj, zdroj_kto)  — zdroj: referencia|reklama|instagram|google|fp|offline|ai|ine; zdroj_kto = meno odporúčateľa
+client_notes(id, client_name, note, author, created_at)  — denník klienta: dátované zápisy trénerov v čase (append-only, nič sa nemaže); trainer_note v client_overrides je len „stála poznámka" s faktami
 leads(id, date, name, source, referrer, status, note)
 jarvis_zavery(id, datum, tema, zaver, preco, overit, overit_do, vysledok, stav)
 fio_transactions(id, date, amount_czk, counterparty, note, typ, category)  — bankové pohyby z Fio; category = položka P&L alebo "vyplaty"/"mimo"; záporná suma = výdavok. Tržby sa z nich NIKDY nepočítajú, zdroj pravdy o príjmoch je PTminder.

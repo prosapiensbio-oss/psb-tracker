@@ -13,7 +13,7 @@ import { bindings } from "../../lib/bindings.server";
 // istej databáze, ktorú zálohuje.
 const TABULKY = [
   "sessions", "services", "payments", "packages", "leads",
-  "client_overrides", "anomaly_ack", "upload_log",
+  "client_overrides", "client_notes", "anomaly_ack", "upload_log",
   "vzas_settings", "vzas_month_notes", "vzas_week_notes", "vzas_periods", "vzas_audit",
   "vzas_payments", "vzas_payment_splits", "vzas_rules", "vzas_salary_params",
   "jarvis_chats", "jarvis_zavery",
