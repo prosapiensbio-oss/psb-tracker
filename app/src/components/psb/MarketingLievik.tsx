@@ -17,7 +17,10 @@ import { Card, Empty, H3, Info, Select, TableWrap } from "./ui";
 // Instagram priviedol za 18 mesiacov 5 klientov, referencie 26. Poradie kariet
 // má odteraz zodpovedať tomuto pomeru, nie tomu, kde je najviac dát.
 
-const pct = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 100) : null);
+// Konverzia nad 100 % je nemožná a znamená len to, že chýba čitateľ — typicky
+// nezapísané dopyty. Vypísať „1200 %" by vyzeralo ako úspech; radšej pomlčka a
+// vysvetlenie pod lievikom.
+const pct = (a: number, b: number) => (b > 0 && a <= b ? Math.round((a / b) * 100) : null);
 
 const OBDOBIA = [
   { value: "1", label: "Posledný mesiac" },
@@ -42,7 +45,16 @@ function krokyZa(data: PSBData, clients: Record<string, ClientAgg>, mesiace: str
   // Úvodný tréning ako UDALOSŤ, nie ako sedenie: keď niekto príde dvakrát,
   // stále je to jeden človek na začiatku cesty.
   const uvodne = new Set(data.sessions.filter((s) => s.sessionType === "UVODNE" && v(s.date)).map((s) => s.client)).size;
-  const novi = Object.values(clients).filter((c) => c.firstSession && v(c.firstSession));
+  // Nový KLIENT nie je každý, kto prišiel na úvodný tréning — je to ten, kto
+  // potom aj niečo zaplatil. Bez tohto rozlíšenia by konverzia úvodný → klient
+  // vždy vyšla 100 %, lebo úvodný tréning JE prvé sedenie a obe čísla by
+  // počítali tých istých ľudí.
+  const novi = Object.values(clients).filter((c) => {
+    if (!c.firstSession || !v(c.firstSession)) return false;
+    const zaplatil = data.payments.some((p) => p.client === c.name)
+      || c.sessions.some((x) => x.sessionType !== "UVODNE" && x.price > 0);
+    return zaplatil;
+  });
   // Tržba z NOVÝCH klientov — nie celková. Celková tržba obsahuje aj obnovy
   // starých klientov a tie marketing nepriviedol.
   const menaNovych = new Set(novi.map((c) => c.name));
