@@ -4,7 +4,7 @@ import { fetchBtcReserve, fetchMonthNotes, fetchVzasSettings, fetchWeekEntries, 
 import { monthlyFinance, predictCash, type CapacityRow, type ClientAgg, type RegisterItem, type SixMRow } from "../../lib/psb/compute";
 import { fmtCZK } from "../../lib/psb/format";
 import { ObdobieCtx } from "../../lib/psb/obdobie";
-import { nastavPrijmyZTrackera } from "../../lib/psb/vzas";
+import { nastavPrijmyZTrackera, nastavVyplaty, vyplatyNaUlozenie } from "../../lib/psb/vzas";
 import { C, mix, S } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import {
@@ -500,12 +500,57 @@ function PnlTab() {
 }
 
 // ── J&T Výplaty ──────────────────────────────────────────────────────────────
-function PersonCard({ pk, idx }: { pk: PersonKey; idx: number[] }) {
+function PersonCard({ pk, idx, onZmena }: { pk: PersonKey; idx: number[]; onZmena?: () => void }) {
   const [open, setOpen] = useState(false);
   const [narokOpen, setNarokOpen] = useState(false);
   const [poslaneOpen, setPoslaneOpen] = useState(false);
+  // Úprava výplatných kategórií. Mení sa priamo v modeli (SALARY[pk].personal),
+  // takže nárok, rozdiel aj dlh sa prepočítajú okamžite — až potom sa ukladá.
+  const [uprava, setUprava] = useState(false);
+  const [ukladam, setUkladam] = useState(false);
   const s = SALARY[pk];
   const c = salaryCalc(pk);
+
+  const premenuj = (stary: string, novy: string) => {
+    const meno = novy.trim().slice(0, 40);
+    if (!meno || meno === stary || s.personal[meno]) return;
+    // Poradie riadkov sa zachová — prepísanie kľúča v objekte by ho hodilo na koniec.
+    const dvojice = Object.entries(s.personal).map(([k, v]) => [k === stary ? meno : k, v] as const);
+    for (const k of Object.keys(s.personal)) delete s.personal[k];
+    for (const [k, v] of dvojice) s.personal[k] = v;
+    onZmena?.();
+  };
+  const nastavHodnotu = (kat: string, i: number, v: number) => {
+    if (!s.personal[kat]) return;
+    s.personal[kat][i] = Number.isFinite(v) ? v : 0;
+    onZmena?.();
+  };
+  const pridaj = () => {
+    let meno = "Nová položka";
+    let n = 2;
+    while (s.personal[meno]) meno = `Nová položka ${n++}`;
+    s.personal[meno] = Array.from({ length: MONTHS.length }, () => 0);
+    setUprava(true);
+    onZmena?.();
+  };
+  const zmaz = (kat: string) => {
+    delete s.personal[kat];
+    onZmena?.();
+  };
+  const uloz = async () => {
+    setUkladam(true);
+    await saveVzasSetting("salary_personal", vyplatyNaUlozenie());
+    setUkladam(false);
+    setUprava(false);
+  };
+  const vratPovodne = async () => {
+    setUkladam(true);
+    nastavVyplaty(undefined);
+    await saveVzasSetting("salary_personal", null);
+    setUkladam(false);
+    setUprava(false);
+    onZmena?.();
+  };
   const konecny = c.cumDebt[c.cumDebt.length - 1];
   const cell = { textAlign: "right" as const, padding: "5px 8px", fontSize: 12, fontVariantNumeric: "tabular-nums" as const, whiteSpace: "nowrap" as const };
   const lbl = { ...S.td, fontSize: 12, color: C.textMuted, ...sticky() } as const;
@@ -585,7 +630,18 @@ function PersonCard({ pk, idx }: { pk: PersonKey; idx: number[] }) {
               </tr>
 
               <tr>
-                <td style={{ ...lbl, fontWeight: 600, color: C.text }}>Poslané spolu{detailBtn(poslaneOpen, () => setPoslaneOpen(!poslaneOpen))}</td>
+                <td style={{ ...lbl, fontWeight: 600, color: C.text }}>
+                  Poslané spolu{detailBtn(poslaneOpen, () => setPoslaneOpen(!poslaneOpen))}
+                  {poslaneOpen && (
+                    <button
+                      onClick={() => setUprava((v) => !v)}
+                      title="Pridať, premenovať alebo prepísať výplatné kategórie"
+                      style={{ marginLeft: 8, background: "none", border: `1px solid ${uprava ? C.accent : C.border}`, borderRadius: 6, color: uprava ? C.accentLight : C.textDim, fontSize: 10.5, padding: "2px 7px", cursor: "pointer" }}
+                    >
+                      {uprava ? "hotovo" : "upraviť"}
+                    </button>
+                  )}
+                </td>
                 {idx.map((i) => <td key={i} style={{ ...cell, color: C.red, fontWeight: 600 }}>{money(c.poslane[i])}</td>)}
                 <td style={{ ...cell, color: C.red, fontWeight: 600, borderLeft: `1px solid ${C.border}` }}>{money(avg(money2(c.poslane)))}</td>
               </tr>
@@ -593,11 +649,54 @@ function PersonCard({ pk, idx }: { pk: PersonKey; idx: number[] }) {
                 <>
                   {Object.entries(s.personal).map(([k, vals]) => (
                     <tr key={k}>
-                      <td style={{ ...lbl, paddingLeft: 24, fontSize: 11 }}>{k}</td>
-                      {idx.map((i) => <td key={i} style={{ ...cell, fontSize: 11, color: vals[i] > 0 ? C.textMuted : C.textDim }}>{money(vals[i])}</td>)}
+                      <td style={{ ...lbl, paddingLeft: uprava ? 8 : 24, fontSize: 11 }}>
+                        {uprava ? (
+                          <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                            <button onClick={() => zmaz(k)} title="Zmazať kategóriu"
+                              style={{ background: "none", border: "none", color: C.red, fontSize: 13, cursor: "pointer", padding: "0 2px", flexShrink: 0 }}>×</button>
+                            <input
+                              defaultValue={k}
+                              onBlur={(e) => premenuj(k, e.target.value)}
+                              style={{ width: 118, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 5, color: C.text, fontSize: 11, padding: "2px 5px" }}
+                            />
+                          </span>
+                        ) : k}
+                      </td>
+                      {idx.map((i) => (
+                        <td key={i} style={{ ...cell, fontSize: 11, color: vals[i] > 0 ? C.textMuted : C.textDim, padding: uprava ? "2px 3px" : cell.padding }}>
+                          {uprava ? (
+                            <input
+                              type="number"
+                              defaultValue={vals[i] || 0}
+                              onBlur={(e) => nastavHodnotu(k, i, Number(e.target.value))}
+                              style={{ width: 66, textAlign: "right", background: C.bg, border: `1px solid ${C.border}`, borderRadius: 5, color: C.text, fontSize: 11, padding: "2px 4px", fontVariantNumeric: "tabular-nums" }}
+                            />
+                          ) : money(vals[i])}
+                        </td>
+                      ))}
                       <td style={{ ...cell, fontSize: 11, color: C.textDim, borderLeft: `1px solid ${C.border}` }}>{money(avg(money2(vals)))}</td>
                     </tr>
                   ))}
+                  {uprava && (
+                    <tr>
+                      <td colSpan={idx.length + 2} style={{ ...lbl, paddingLeft: 8, paddingTop: 8 }}>
+                        <span style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+                          <button onClick={pridaj} style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 7, color: C.accentLight, fontSize: 11.5, padding: "4px 11px", cursor: "pointer" }}>+ kategória</button>
+                          <button onClick={() => void uloz()} disabled={ukladam}
+                            style={{ border: "none", borderRadius: 7, background: C.accent, color: C.onAccent, fontSize: 11.5, fontWeight: 600, padding: "5px 13px", cursor: ukladam ? "default" : "pointer", opacity: ukladam ? 0.5 : 1 }}>
+                            {ukladam ? "ukladám…" : "Uložiť"}
+                          </button>
+                          <button onClick={() => void vratPovodne()} disabled={ukladam}
+                            style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 7, color: C.textDim, fontSize: 11.5, padding: "4px 11px", cursor: "pointer" }}>
+                            Vrátiť pôvodné z Excelu
+                          </button>
+                          <span style={{ fontSize: 11, color: C.textDim, lineHeight: 1.5 }}>
+                            Zmeny sa prepočítajú hneď (nárok, rozdiel, dlh), ale uložia sa až tlačidlom.
+                          </span>
+                        </span>
+                      </td>
+                    </tr>
+                  )}
                   <tr>
                     <td style={{ ...lbl, paddingLeft: 24, fontSize: 11, color: C.orange, fontStyle: "italic" }}>+ Spoločné / 2</td>
                     {idx.map((i) => <td key={i} style={{ ...cell, fontSize: 11, color: C.orange }}>{money(c.spolocneHalf[i])}</td>)}
@@ -856,6 +955,18 @@ function EraCard() {
 function SalaryTab() {
   const r = useRange();
   const idx = r.idx;
+  // Upravené výplatné kategórie žijú v databáze; načítajú sa raz a zapíšu sa
+  // priamo do modelu, takže nárok aj dlh sa počítajú z nich. `tik` je len na
+  // prekreslenie — samotné čísla sedia v module, ktorý číta desať miest.
+  const [, tik] = useState(0);
+  useEffect(() => {
+    void fetchVzasSettings().then((nastavenia) => {
+      const ulozene = nastavenia["salary_personal"];
+      if (ulozene && typeof ulozene === "object") {
+        if (nastavVyplaty(ulozene as never)) tik((x) => x + 1);
+      }
+    }).catch(() => {});
+  }, []);
   const [showJ, setShowJ] = useState(true);
   const [showT, setShowT] = useState(true);
   const [showAvg, setShowAvg] = useState(false);
@@ -917,8 +1028,8 @@ function SalaryTab() {
         )}
       </Card>
 
-      <PersonCard pk="jerry" idx={idx} />
-      <PersonCard pk="terezka" idx={idx} />
+      <PersonCard pk="jerry" idx={idx} onZmena={() => tik((x) => x + 1)} />
+      <PersonCard pk="terezka" idx={idx} onZmena={() => tik((x) => x + 1)} />
 
       <Card>
         <div onClick={() => setSpolOpen(!spolOpen)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, cursor: "pointer", flexWrap: "wrap" }}>

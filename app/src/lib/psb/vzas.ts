@@ -249,6 +249,52 @@ export const SALARY: Record<PersonKey, SalaryPerson> = {
   },
 };
 
+// ── Osobné výplatné kategórie sa dajú upravovať ──────────────────────────────
+//
+// Riadky v SALARY[*].personal sú prepis Excelu a boli natvrdo v kóde. Lenže
+// výplata je jediná položka, ktorú Jerry mení najčastejšie: pribudne dôvod
+// („Notebook", „Salina"), niečo sa preúčtuje, niečo dopíše spätne. Kým to bolo
+// v kóde, znamenala každá zmena nasadenie.
+//
+// Preto sa dá zoznam prepísať z databázy. Východzí stav zo zdrojáku zostáva
+// uložený zvlášť, aby sa dalo kedykoľvek vrátiť späť a aby opakované volanie
+// nebolo kumulatívne.
+export type VyplatyKategorie = Record<string, Vals>;
+const VYPLATY_ZO_ZDROJAKU: Record<PersonKey, VyplatyKategorie> = {
+  jerry: {}, terezka: {},
+};
+export let VYPLATY_SU_UPRAVENE = false;
+
+/** Zapíše upravené kategórie do modelu. Prázdny vstup = návrat k zdrojáku. */
+export function nastavVyplaty(ulozene?: Partial<Record<PersonKey, VyplatyKategorie>>): boolean {
+  // Prvé volanie si odloží pôvodný stav.
+  for (const key of ["jerry", "terezka"] as PersonKey[]) {
+    if (!Object.keys(VYPLATY_ZO_ZDROJAKU[key]).length) {
+      for (const [k, v] of Object.entries(SALARY[key].personal)) VYPLATY_ZO_ZDROJAKU[key][k] = [...v];
+    }
+  }
+  let zmena = false;
+  for (const key of ["jerry", "terezka"] as PersonKey[]) {
+    const nove = ulozene?.[key];
+    const maNove = !!nove && Object.keys(nove).length > 0;
+    const zdroj = maNove ? nove : VYPLATY_ZO_ZDROJAKU[key];
+    const ciel = SALARY[key].personal;
+    for (const k of Object.keys(ciel)) delete ciel[k];
+    for (const [k, v] of Object.entries(zdroj)) {
+      ciel[k] = Array.from({ length: N }, (_, i) => Number(v?.[i]) || 0);
+    }
+    if (maNove) zmena = true;
+  }
+  VYPLATY_SU_UPRAVENE = zmena;
+  return zmena;
+}
+
+/** Aktuálny stav v tvare, v akom sa ukladá do databázy. */
+export const vyplatyNaUlozenie = (): Record<PersonKey, VyplatyKategorie> => ({
+  jerry: Object.fromEntries(Object.entries(SALARY.jerry.personal).map(([k, v]) => [k, [...v]])),
+  terezka: Object.fromEntries(Object.entries(SALARY.terezka.personal).map(([k, v]) => [k, [...v]])),
+});
+
 // Shared household spending — summed, then split /2 into each founder's
 // "Poslané". Only tracked from 2026; in 2025 each founder's payout went to
 // them whole, so the 2025 columns are zero (not missing data — it did not exist
