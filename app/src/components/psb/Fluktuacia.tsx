@@ -244,7 +244,13 @@ function Prezitie({ zoznam }: { zoznam: Klient[] }) {
       }));
   }, [zoznam]);
 
-  const bunka = (n: number, z: number) => (z ? `${n} · ${Math.round((n / z) * 100)} %` : "—");
+  // Kohorta stará dva mesiace nemôže mať nikoho, kto vydržal tri — a „0 · 0 %"
+  // by to ukázalo ako zlyhanie. Kým míľnik neprešiel, je tam pomlčka.
+  const bunka = (n: number, z: number, mk: string, mesiacov: number) => {
+    const vek = (Date.now() - Date.parse(`${mk}-01`)) / (30.4 * DEN);
+    if (vek < mesiacov) return "—";
+    return z ? `${n} · ${Math.round((n / z) * 100)} %` : "—";
+  };
 
   return (
     <Card>
@@ -270,9 +276,9 @@ function Prezitie({ zoznam }: { zoznam: Klient[] }) {
                   <td style={S.td}>{monthLabel(r.mk)}</td>
                   <td style={{ ...S.td, textAlign: "right", fontWeight: 600, color: C.text }}>{r.n}</td>
                   <td style={{ ...S.td, textAlign: "right", color: C.textDim }}>{r.sixM || "—"}</td>
-                  <td style={{ ...S.td, textAlign: "right", color: C.accentLight }}>{bunka(r.m3, r.n)}</td>
-                  <td style={{ ...S.td, textAlign: "right", color: C.textMuted }}>{bunka(r.m6, r.n)}</td>
-                  <td style={{ ...S.td, textAlign: "right", color: C.textMuted }}>{bunka(r.m12, r.n)}</td>
+                  <td style={{ ...S.td, textAlign: "right", color: C.accentLight }}>{bunka(r.m3, r.n, r.mk, 3)}</td>
+                  <td style={{ ...S.td, textAlign: "right", color: C.textMuted }}>{bunka(r.m6, r.n, r.mk, 6)}</td>
+                  <td style={{ ...S.td, textAlign: "right", color: C.textMuted }}>{bunka(r.m12, r.n, r.mk, 12)}</td>
                 </tr>
               ))}
             </tbody>
@@ -331,9 +337,12 @@ function HodnotaPodlaZdroja({ zoznam }: { zoznam: Klient[] }) {
           ))}
         </tbody>
       </TableWrap>
-      <div style={{ fontSize: 11, color: C.textDim, marginTop: 8, lineHeight: 1.5 }}>
-        Zdroj má vyplnený zhruba každý druhý klient (z anamnéz a ručných zápisov), takže riadok „nevyplnené“ je
-        najväčší a nedá sa z neho nič vyčítať. Čím viac zdrojov sa doplní, tým je táto tabuľka použiteľnejšia.
+      <div style={{ marginTop: 10, padding: "9px 12px", borderRadius: 9, background: mix(C.orange, 7), border: `1px solid ${mix(C.orange, 22)}`, fontSize: 11.5, color: C.text, lineHeight: 1.6 }}>
+        <b>Riadky sa medzi sebou porovnávať nedajú priamo.</b> Zdroj sa začal zapisovať až s anamnézou (jún 2025),
+        takže klienti so známym zdrojom sú prevažne tí novší — ich Ø dní a Ø tržba sú useknuté tým, že chodia kratšie.
+        Riadok „nevyplnené“ obsahuje starých klientov s dvojročnou históriou, preto vyzerá najlepšie. Nie je to tým,
+        že by neznámy zdroj privádzal lepších ľudí; je to tým, že mali viac času.
+        <br />Porovnávať má zmysel až rovnako staré kohorty — na to je tabuľka vyššie.
       </div>
     </Card>
   );
