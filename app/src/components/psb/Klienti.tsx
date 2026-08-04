@@ -4,8 +4,9 @@ import { duchOdpoved, membershipBucket, MEMBERSHIP_ORDER, TRAINERS, type Capacit
 import { fmtCZK, fmtDate, normName } from "../../lib/psb/format";
 import { C, MEMBERSHIP_COLORS, mix, S } from "../../lib/psb/theme";
 import { saveLead } from "../../lib/psb/client";
-import type { Lead } from "../../lib/psb/types";
+import type { Lead, PSBData } from "../../lib/psb/types";
 import type { Actions, NavFocus } from "./App";
+import { RastAStrata } from "./Fluktuacia";
 import { SixMTracker } from "./SixM";
 import { Badge, Card, Donut, Empty, H3, Info, Modal, Select, SortTh, StatCard, SubTabs, TableWrap, useSort } from "./ui";
 
@@ -301,7 +302,7 @@ export const ZDROJE = [
   { value: "ine", label: "Iné" },
 ];
 
-export function Klienti({ clients, capacity, actions, focus, leads, trainer, onTrainer, sixM, sub, onSub }: { clients: Record<string, ClientAgg>; capacity: CapacityRow[]; actions: Actions; focus?: NavFocus | null; leads: Lead[]; trainer: string; onTrainer: (t: string) => void; sixM: SixMRow[]; sub: string; onSub: (s: string) => void }) {
+export function Klienti({ clients, capacity, actions, focus, leads, trainer, onTrainer, sixM, sub, onSub, data }: { clients: Record<string, ClientAgg>; capacity: CapacityRow[]; actions: Actions; focus?: NavFocus | null; leads: Lead[]; trainer: string; onTrainer: (t: string) => void; sixM: SixMRow[]; sub: string; onSub: (s: string) => void; data: PSBData }) {
   const [focusClient, setFocusClient] = useState<string | null>(null);
   useEffect(() => {
     if (focus?.client) setFocusClient(focus.client);
@@ -452,11 +453,20 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
           naraz (vlastná sekcia, karta na dashboarde, upozornenia v registri).
           Kto hľadal klienta v 6M, musel vedieť, že sa naňho pozerá inde. */}
       <SubTabs
-        tabs={[{ id: "klienti", label: "Klienti" }, { id: "6m", label: "6M proces" }, { id: "dopyty", label: "Dopyty" }]}
+        tabs={[
+          { id: "klienti", label: "Klienti" },
+          { id: "6m", label: "6M proces" },
+          { id: "dopyty", label: "Dopyty" },
+          // Fluktuácia je druhá polovica rovnice rastu a doteraz sa nemerala
+          // vôbec. Patrí ku klientom, nie do marketingu — odchod nie je
+          // marketingová udalosť.
+          { id: "rast", label: "Rast a strata" },
+        ]}
         value={sub}
         onChange={setSub}
       />
-      {sub === "6m" ? <SixMTracker sixM={sixM} actions={actions} trainer={trainer} onTrainer={onTrainer} /> :
+      {sub === "rast" ? <RastAStrata data={data} clients={clients} /> :
+       sub === "6m" ? <SixMTracker sixM={sixM} actions={actions} trainer={trainer} onTrainer={onTrainer} /> :
        sub === "dopyty" ? <Dopyty leads={leads} clients={clients} refresh={actions.refresh} /> : (
       <>
       {/* Filtre + KPI úplne hore */}
