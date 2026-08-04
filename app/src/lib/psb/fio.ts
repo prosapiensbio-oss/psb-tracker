@@ -22,6 +22,9 @@
 // tržby sa z nich nikdy nepočítajú.
 
 export type FioRiadok = {
+  /** „ID operace" z výpisu — jediný spoľahlivý identifikátor pohybu.
+   *  Prázdne pri exportoch, ktoré ho nemajú (Vyhledané pohyby, textový výpis). */
+  id: string;
   datum: string;        // ISO
   suma: number;         // záporná = výdavok
   protistrana: string;  // názov protiúčtu alebo účet
@@ -31,9 +34,31 @@ export type FioRiadok = {
   kategoria: string;
 };
 
+/** Kontrolné súčty z hlavičky výpisu — na overenie, že import nič nestratil. */
+export type FioKontrola = { prijmy: number; vydaje: number; obdobie: string };
+
 export type FioParse =
-  | { ok: true; riadky: FioRiadok[]; hlavicka: string[] }
+  | { ok: true; riadky: FioRiadok[]; hlavicka: string[]; kontrola?: FioKontrola }
   | { ok: false; chyba: string; ukazka: string[] };
+
+// Výpis z účtu má nad tabuľkou riadky „Suma příjmů", „Suma výdajů" a „Období".
+// Sú to čísla od banky, teda nezávislá kontrola toho, čo parser prečítal —
+// keď sa súčet riadkov s nimi nezhoduje, niečo vypadlo a je to vidieť hneď,
+// nie o tri mesiace v P&L.
+function kontrolneSucty(riadky: string[]): FioKontrola | undefined {
+  const cislo = (r: string) => {
+    const m = r.match(/([+-]?[\d\s.,]+)\s*CZK/);
+    return m ? fioSuma(m[1]) : NaN;
+  };
+  let prijmy = NaN, vydaje = NaN, obdobie = "";
+  for (const r of riadky.slice(0, 12)) {
+    const low = r.toLowerCase();
+    if (low.includes("suma příjmů") || low.includes("suma prijmu")) prijmy = cislo(r);
+    else if (low.includes("suma výdajů") || low.includes("suma vydaju")) vydaje = cislo(r);
+    else if (low.includes("období") || low.includes("obdobi")) obdobie = r.replace(/"/g, "").replace(/^[^:]*:\s*/, "").trim();
+  }
+  return Number.isFinite(prijmy) && Number.isFinite(vydaje) ? { prijmy, vydaje, obdobie } : undefined;
+}
 
 const oddelovac = (riadok: string): string => {
   const kandidati = [";", "\t", ","];
@@ -183,6 +208,11 @@ export function parseFio(text: string, pravidla: { vzor: string; kategoria: stri
   const iPozn = najdi("poznámka", "poznamka");
   const iTyp = najdi("typ");
   const iVs = najdi("vs", "variabilní", "variabilni");
+  // „ID operace" má len export Výpis z účtu — a je to jediná vec, ktorá
+  // odlíši dve rovnaké platby v ten istý deň. V júni 2026 boli tri dvojice
+  // „Jerry vyplata −1000" na rovnaký dátum; bez ID sa z každej dvojice
+  // naimportuje jedna a 3 000 Kč výplat ticho zmizne.
+  const iId = najdi("id operace", "id operácie");
 
   if (iDatum < 0 || iSuma < 0) {
     return { ok: false, chyba: "Hlavičku som našiel, ale nie stĺpce s dátumom a sumou.", ukazka: [riadky[iHlavicka]] };
@@ -201,6 +231,7 @@ export function parseFio(text: string, pravidla: { vzor: string; kategoria: stri
     const typ = (iTyp >= 0 ? c[iTyp] : "") || "";
     const protistrana = protistranaZPopisu(popis) || (iProti >= 0 ? c[iProti] : "") || "";
     out.push({
+      id: iId >= 0 ? (c[iId] || "").trim() : "",
       datum, suma, protistrana, poznamka: popis.slice(0, 200), typ,
       kategoria: suma < 0 ? odhadniKategoriu(`${protistrana} ${popis} ${typ}`, pravidla) : "",
     });
@@ -210,7 +241,7 @@ export function parseFio(text: string, pravidla: { vzor: string; kategoria: stri
   // takže sem spadne — ale rozdeliť sa nedá, lebo stĺpce neexistujú. Vtedy to
   // nie je chyba súboru, len zle uhádnutý režim.
   if (!out.length) return parseFioText(text, pravidla);
-  return { ok: true, riadky: out, hlavicka };
+  return { ok: true, riadky: out, hlavicka, kontrola: kontrolneSucty(riadky.slice(0, iHlavicka)) };
 }
 
 
@@ -250,6 +281,7 @@ function parseFioText(text: string, pravidla: { vzor: string; kategoria: string 
     if (!datum || !suma) continue;
     const protistrana = protistranaZPopisu(popis);
     out.push({
+      id: "", // textový výpis ID operácie nenesie
       datum, suma, protistrana,
       poznamka: popis.slice(0, 200),
       typ: "",

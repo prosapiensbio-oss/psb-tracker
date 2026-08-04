@@ -16,8 +16,17 @@ import { parseFio, type FioRiadok } from "../../lib/psb/fio";
 // neskôr. Takto zlý odhad nestojí nič — neuvidí sa v ňom zmysel a nepotvrdí sa.
 
 const uid = () => crypto.randomUUID();
-const kluc = (r: { datum: string; suma: number; protistrana?: string }) =>
-  `${r.datum}|${r.suma}|${(r.protistrana || "").slice(0, 40)}`;
+// Kľúč na rozpoznanie „toto už máme".
+//
+// Prvá voľba je ID operácie z výpisu — jediná vec, ktorá spoľahlivo odlíši dva
+// rovnaké pohyby. V júni 2026 odišli tri dvojice „Jerry vyplata −1000" v ten
+// istý deň; podľa dátumu, sumy a protistrany sú nerozoznateľné, takže by sa
+// z každej dvojice zapísala jedna a 3 000 Kč výplat by ticho zmizlo.
+//
+// Bez ID (export „Vyhledané pohyby" ani textový výpis ho nemajú) sa vracia
+// pôvodný kľúč. Ten duplicitné platby zlúči — preto appka odporúča výpis.
+const kluc = (r: { id?: string; datum: string; suma: number; protistrana?: string }) =>
+  r.id ? `fio:${r.id}` : `${r.datum}|${r.suma}|${(r.protistrana || "").slice(0, 40)}`;
 
 export const Route = createFileRoute("/api/fio")({
   server: {
@@ -72,7 +81,19 @@ export const Route = createFileRoute("/api/fio")({
             uzMame: existujuce.has(kluc(r)),
             zamknuty: jeZamknuty(zamky, r.datum),
           }));
-          return Response.json({ ok: true, riadky, hlavicka: v.hlavicka });
+          // Kontrola proti hlavičke výpisu: sedí súčet toho, čo parser prečítal,
+          // s tým, čo tvrdí banka? A má súbor vôbec ID operácií?
+          const prijmy = v.riadky.filter((r) => r.suma > 0).reduce((a, r) => a + r.suma, 0);
+          const vydaje = v.riadky.filter((r) => r.suma < 0).reduce((a, r) => a + r.suma, 0);
+          const sedi = v.kontrola
+            ? Math.abs(prijmy - v.kontrola.prijmy) < 1 && Math.abs(vydaje - v.kontrola.vydaje) < 1
+            : null;
+          const bezId = v.riadky.filter((r) => !r.id).length;
+          return Response.json({
+            ok: true, riadky, hlavicka: v.hlavicka,
+            kontrola: v.kontrola ? { ...v.kontrola, precitanePrijmy: prijmy, precitaneVydaje: vydaje, sedi } : null,
+            bezId,
+          });
         }
 
         if (b.akcia === "zapis") {

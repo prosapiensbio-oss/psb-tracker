@@ -33,6 +33,9 @@ function kategorie(): { value: string; label: string }[] {
 
 export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: () => void }) {
   const [nahlad, setNahlad] = useState<Nahlad[] | null>(null);
+  // Kontrola z hlavičky výpisu (súčty od banky) + koľko riadkov nemá ID operácie.
+  const [kontrola, setKontrola] = useState<{ prijmy: number; vydaje: number; obdobie: string; precitanePrijmy: number; precitaneVydaje: number; sedi: boolean | null } | null>(null);
+  const [bezId, setBezId] = useState(0);
   const [chyba, setChyba] = useState<{ chyba: string; ukazka: string[] } | null>(null);
   const [vysledok, setVysledok] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -53,6 +56,8 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
     setBusy(false);
     if (!r.ok) { setChyba({ chyba: r.chyba || "Neznáma chyba", ukazka: r.ukazka || [] }); setNahlad(null); return; }
     setNahlad(r.riadky as Nahlad[]);
+    setKontrola(r.kontrola ?? null);
+    setBezId(Number(r.bezId) || 0);
   };
 
   const zapis = async () => {
@@ -108,6 +113,31 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
           </div>
         )}
       </Card>
+
+      {/* Overenie proti banke. Výpis z účtu nesie v hlavičke vlastné súčty a
+          ID operácií — dve veci, ktoré z importu robia kontrolovateľnú operáciu
+          namiesto dôvery. Export „Vyhledané pohyby" nemá ani jedno: tri výplaty
+          po 1 000 Kč v jeden deň sú v ňom nerozoznateľné a zapísala by sa jedna. */}
+      {nahlad && (kontrola || bezId > 0) && (
+        <Card>
+          {kontrola && (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", fontSize: 12.5, color: C.text }}>
+              <span style={{ width: 9, height: 9, borderRadius: 999, background: kontrola.sedi ? C.green : C.red, flexShrink: 0 }} />
+              <span>
+                {kontrola.sedi
+                  ? <>Sedí s výpisom za <b>{kontrola.obdobie}</b> — príjmy {fmtCZK(kontrola.prijmy)}, výdavky {fmtCZK(kontrola.vydaje)}.</>
+                  : <>Nesedí s hlavičkou výpisu: banka hlási príjmy {fmtCZK(kontrola.prijmy)} a výdavky {fmtCZK(kontrola.vydaje)}, ja som prečítal {fmtCZK(kontrola.precitanePrijmy)} a {fmtCZK(kontrola.precitaneVydaje)}. Niečo sa nenačítalo — nezapisuj to.</>}
+              </span>
+            </div>
+          )}
+          {bezId > 0 && (
+            <div style={{ marginTop: kontrola ? 9 : 0, padding: "9px 12px", borderRadius: 8, background: mix(C.orange, 10), border: `1px solid ${mix(C.orange, 28)}`, fontSize: 12, color: C.text, lineHeight: 1.55 }}>
+              <b>{bezId} riadkov nemá ID operácie.</b> Bez neho sa dva rovnaké pohyby v ten istý deň (napríklad dve výplaty po 1 000 Kč)
+              nedajú rozlíšiť a zapíše sa len jeden. Stiahni radšej export <b>Výpis z účtu</b> — ten ID aj kontrolné súčty má.
+            </div>
+          )}
+        </Card>
+      )}
 
       {nahlad && suhrn && (
         <Card>
