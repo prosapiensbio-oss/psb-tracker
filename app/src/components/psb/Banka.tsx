@@ -49,14 +49,42 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
 
   const nacitajNahlad = async (obsah: string) => {
     setBusy(true); setChyba(null); setVysledok(null);
-    const r = await fetch("/api/fio", {
-      method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ akcia: "nahlad", text: obsah }),
-    }).then((x) => x.json()).catch(() => ({ ok: false, chyba: "Nepodarilo sa spojiť so serverom." }));
+    // Diagnostika, nie „Neznáma chyba".
+    //
+    // Server vracia dva rôzne tvary: {chyba} keď výpisu nerozumie parser, a
+    // {error} keď požiadavku odmietne skôr (neprihlásený, chýbajúca databáza,
+    // pokazené telo). Kód čítal len prvý, takže druhý sa zobrazil ako
+    // „Neznáma chyba" a nedalo sa z toho zistiť vôbec nič. Teraz sa ukáže aj
+    // HTTP stav a odpoveď, ktorá sa nedá prečítať ako JSON.
+    let r: { ok?: boolean; chyba?: string; error?: string; ukazka?: string[]; [k: string]: unknown };
+    try {
+      const res = await fetch("/api/fio", {
+        method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ akcia: "nahlad", text: obsah }),
+      });
+      const surove = await res.text();
+      try {
+        r = JSON.parse(surove);
+      } catch {
+        r = { ok: false, chyba: `Server odpovedal ${res.status}, ale nie v JSON: ${surove.slice(0, 160)}` };
+      }
+      if (!res.ok && !r.chyba && !r.error) r = { ...r, ok: false, chyba: `Server odpovedal ${res.status}.` };
+      if (r.error) {
+        const preklad: Record<string, string> = {
+          unauthorized: "Prihlásenie vypršalo — obnov stránku a prihlás sa znova.",
+          no_db: "Databáza je nedostupná.",
+          bad_request: "Server nedokázal prečítať odoslaný súbor.",
+          unknown_action: "Chyba v komunikácii s appkou (neznáma akcia).",
+        };
+        r = { ...r, chyba: preklad[String(r.error)] || `Server vrátil chybu „${r.error}" (HTTP ${res.status}).` };
+      }
+    } catch (e) {
+      r = { ok: false, chyba: `Nepodarilo sa spojiť so serverom: ${e instanceof Error ? e.message : String(e)}` };
+    }
     setBusy(false);
     if (!r.ok) { setChyba({ chyba: r.chyba || "Neznáma chyba", ukazka: r.ukazka || [] }); setNahlad(null); return; }
     setNahlad(r.riadky as Nahlad[]);
-    setKontrola(r.kontrola ?? null);
+    setKontrola((r.kontrola as typeof kontrola) ?? null);
     setBezId(Number(r.bezId) || 0);
   };
 
