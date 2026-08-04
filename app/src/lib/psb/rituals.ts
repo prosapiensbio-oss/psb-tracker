@@ -36,12 +36,6 @@ const mesiacKluc = (d: Date) => `${d.getFullYear()}-${dvoj(d.getMonth() + 1)}`;
 /** Poradie dňa v týždni s pondelkom ako 1 a nedeľou ako 7. */
 const denVTyzdni = (d: Date) => d.getDay() || 7;
 
-/** Koľký deň v mesiaci pripadá na prvú nedeľu — hranica „prvého víkendu". */
-const prvaNedela = (rok: number, mesiac: number) => {
-  const prvy = new Date(rok, mesiac, 1);
-  return 1 + ((7 - denVTyzdni(prvy)) % 7);
-};
-
 export function ritualy(
   dnes: Date,
   weeks: Record<string, Record<string, string>>,
@@ -70,14 +64,15 @@ export function ritualy(
   });
 
   // ── Mesačný ─────────────────────────────────────────────────────────────
-  // Uzávierka je prvý víkend nasledujúceho mesiaca. Pripomíname od prvého dňa
-  // mesiaca do konca toho víkendu — potom sa už len tvárime, že je to hotové,
-  // a mesiac zostane navždy prázdny.
+  // Uzávierka je prvý víkend nasledujúceho mesiaca — ale pripomienka NEZHASÍNA
+  // kalendárom, iba zápisom. Prvá verzia zhasla po tom víkende a presne to sa
+  // stalo: 4. augusta odznak zmizol, hoci júl bol stále prázdny. Pripomienka,
+  // ktorá zmizne skôr než práca, je horšia než žiadna — tvári sa, že je
+  // hotovo. Jeden trvalý riadok za jeden chýbajúci mesiac nie je tapeta.
   const minuly = new Date(dnes.getFullYear(), dnes.getMonth() - 1, 1);
   const mk = mesiacKluc(minuly);
   const zapis = monthNotes[mk];
   const maMesiac = !!(zapis && ((zapis.note || "").trim() || Object.values(zapis.answers || {}).some((v) => String(v).trim())));
-  const koniecOkna = prvaNedela(dnes.getFullYear(), dnes.getMonth()) + 1;
   out.push({
     id: `mesiac-${mk}`,
     druh: "mesiac",
@@ -86,7 +81,7 @@ export function ritualy(
       ? `Mesiac ${mk} je zapísaný.`
       : `Mesiac ${mk} ešte nemá zápis — otázky mesiaca a poznámku. Potom sa dá zamknúť.`,
     ciel: { tab: "vysledky", sub: "mesacne" },
-    splatne: !maMesiac && denVMesiaci <= koniecOkna,
+    splatne: !maMesiac,
     hotove: maMesiac,
   });
 

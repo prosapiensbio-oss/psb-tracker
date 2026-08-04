@@ -86,14 +86,24 @@ export function RastAStrata({ data, clients, onKlient }: { data: PSBData; client
       .sort((a, b) => a[0].localeCompare(b[0]));
   }, [zoznam]);
 
-  // Posledných 12 UZAVRETÝCH mesiacov. „Uzavretý" sa meria kalendárom, nie
-  // poradím v dátach: predtým sa vždy zahodil posledný záznam, čo po skončení
-  // júla zahodilo júl — kompletný mesiac s piatimi príchodmi — a priemer aj
-  // zadanie pre reklamu počítali z posunutého okna.
+  // Príchody a odchody potrebujú RÔZNE okná — a to je jadro celej štatistiky.
+  //
+  // Príchod je vidno okamžite: prvý tréning je v dátach v deň, keď sa stal.
+  // Odchod je vidno až po ${hranica} dňoch ticha — mesiac, ktorý sa skončil
+  // pred tromi týždňami, ešte nemôže mať kompletné odchody a v priemere by
+  // ťahal stratu nadol. Presne to sa stalo: júl pridal päť príchodov a nula
+  // „odchodov", čistý rast vyskočil z +0,4 na +1,0 a zadanie pre reklamu
+  // kleslo o pol klienta — nie preto, že by sa niečo zlepšilo, ale preto, že
+  // júloví odídení ešte len tíchnu.
   const beziaci = new Date().toISOString().slice(0, 7);
-  const poslednych12 = mesacne.filter(([mk]) => mk < beziaci).slice(-12);
-  const odisloMes = poslednych12.length ? poslednych12.reduce((a, [, v]) => a + v.odislo, 0) / poslednych12.length : 0;
-  const prisloMes = poslednych12.length ? poslednych12.reduce((a, [, v]) => a + v.prislo, 0) / poslednych12.length : 0;
+  const uzavrete = mesacne.filter(([mk]) => mk < beziaci);
+  const prichodove = uzavrete.slice(-12);
+  const zrele = kotva
+    ? new Date(Date.parse(kotva) - Number(hranica) * DEN).toISOString().slice(0, 7)
+    : beziaci;
+  const odchodove = uzavrete.filter(([mk]) => mk < zrele).slice(-12);
+  const odisloMes = odchodove.length ? odchodove.reduce((a, [, v]) => a + v.odislo, 0) / odchodove.length : 0;
+  const prisloMes = prichodove.length ? prichodove.reduce((a, [, v]) => a + v.prislo, 0) / prichodove.length : 0;
   const [cielRastu, setCielRastu] = useState("3");
   const trebaZiskat = odisloMes + Number(cielRastu);
 
