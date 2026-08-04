@@ -325,7 +325,11 @@ export function Referencie({ data, clients }: { data: PSBData; clients: Record<s
       soZdrojom,
       bezMena: zRef.filter((c) => !(c.zdrojKto || "").trim()).length,
       trzbaRef: zRef.reduce((a, c) => a + trzbaKlienta(c.name), 0),
-      trzbaVsetci: vsetci.reduce((a, c) => a + trzbaKlienta(c.name), 0),
+      // Porovnáva sa s tržbou klientov so ZNÁMYM zdrojom, nie so všetkými.
+      // Inak by to vyzeralo, že odporúčania sú 55 % klientov, ale len 17 %
+      // peňazí — pritom ten rozdiel robí 68 klientov, pri ktorých sa jednoducho
+      // nevie, odkiaľ prišli. Percento z neznámeho základu je klamstvo.
+      trzbaZnamych: vsetci.filter((c) => c.zdroj).reduce((a, c) => a + trzbaKlienta(c.name), 0),
     };
   }, [clients, data.payments]);
 
@@ -347,7 +351,7 @@ export function Referencie({ data, clients }: { data: PSBData; clients: Record<s
           <div>
             <div style={{ fontSize: 22, fontWeight: 800, color: C.green, fontVariantNumeric: "tabular-nums" }}>{fmtCZK(r.trzbaRef)}</div>
             <div style={{ fontSize: 11.5, color: C.textMuted }}>
-              tržba z odporúčaní{r.trzbaVsetci ? ` · ${Math.round((r.trzbaRef / r.trzbaVsetci) * 100)} % všetkého` : ""}
+              tržba z odporúčaní{r.trzbaZnamych ? ` · ${Math.round((r.trzbaRef / r.trzbaZnamych) * 100)} % z klientov so známym zdrojom` : ""}
             </div>
           </div>
         </div>
