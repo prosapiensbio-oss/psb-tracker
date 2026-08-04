@@ -142,13 +142,20 @@ function useDashLayout() {
       /* ignore */
     }
   };
-  const persistHidden = (h: string[]) => {
-    setHidden(h);
-    try {
-      localStorage.setItem(HIDDEN_KEY, JSON.stringify(h));
-    } catch {
-      /* ignore */
-    }
+  // Berie aj funkciu, nie len hodnotu. Dva klikni-hneď-po-sebe (napr. „všetko"
+  // vo viacerých sekciách) by inak obidva vychádzali z toho istého starého
+  // zoznamu a druhý by prvý prepísal — presne to isté, čo kedysi zožralo
+  // rýchle zápisy v client_overrides.
+  const persistHidden = (h: string[] | ((p: string[]) => string[])) => {
+    setHidden((prev) => {
+      const next = typeof h === "function" ? h(prev) : h;
+      try {
+        localStorage.setItem(HIDDEN_KEY, JSON.stringify(next));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
   };
   const persistWidths = (w: Record<string, number>) => {
     setWidths(w);
@@ -175,11 +182,11 @@ function useDashLayout() {
     persistOrder(next);
   };
   const toggleHide = (id: string) =>
-    persistHidden(hidden.includes(id) ? hidden.filter((x) => x !== id) : [...hidden, id]);
+    persistHidden((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
   /** Zapnúť/vypnúť celú sekciu naraz — z knižnice grafov. */
   const sekciaVsetko = (sekcia: SekciaId, zapnut: boolean) => {
     const ids = WIDGETS.filter((w) => w.sekcia === sekcia).map((w) => w.id);
-    persistHidden(zapnut ? hidden.filter((x) => !ids.includes(x)) : [...new Set([...hidden, ...ids])]);
+    persistHidden((p) => (zapnut ? p.filter((x) => !ids.includes(x)) : [...new Set([...p, ...ids])]));
   };
   const setWidth = (id: string, w: 1 | 2) => persistWidths({ ...widths, [id]: w });
   const reset = () => {
