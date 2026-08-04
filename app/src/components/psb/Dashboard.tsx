@@ -16,7 +16,8 @@ import {
 } from "../../lib/psb/compute";
 import { fmtCZK, fmtDMY, monthLabel, weekKey, weekLabel } from "../../lib/psb/format";
 import { C, mix, S, badge, btn } from "../../lib/psb/theme";
-import { nastavPrijmyZTrackera, pnlCalc, VZAS_MONTHS } from "../../lib/psb/vzas";
+import { nastavPrijmyZTrackera, pnlCalc, salaryCalc, VZAS_MONTHS } from "../../lib/psb/vzas";
+import { tokyKlientov } from "./Fluktuacia";
 import type { PSBData } from "../../lib/psb/types";
 import type { Actions, NavFocus } from "./App";
 import type { AssistantChat } from "./Assistant";
@@ -57,14 +58,27 @@ function TrainerPills({ value, onChange }: { value: string; onChange: (v: string
 }
 
 // ── Reorderable dashboard layout (persisted in localStorage) ──────────────────
-type WidgetMeta = { id: string; label: string; span: 1 | 2; noStretch?: boolean };
+// Karty sú zoskupené do štyroch sekcií — štyri otázky pilota: máme peniaze?
+// nezabíjame sa? rastú klienti? funguje prílev? Sekcia je vlastnosť karty,
+// nie poradia — presúvanie a skrývanie (⠿) funguje ďalej, ale karta zostáva
+// vo svojej sekcii. Kotvy vedľa prepínača trénerov na sekciu zrolujú.
+type SekciaId = "peniaze" | "vytazenie" | "klienti" | "marketing";
+const SEKCIE: { id: SekciaId; label: string }[] = [
+  { id: "peniaze", label: "Peniaze" },
+  { id: "vytazenie", label: "Vyťaženie" },
+  { id: "klienti", label: "Klienti" },
+  { id: "marketing", label: "Marketing" },
+];
+type WidgetMeta = { id: string; label: string; span: 1 | 2; sekcia: SekciaId; noStretch?: boolean };
 const WIDGETS: WidgetMeta[] = [
-  { id: "hodiny", label: "Odrobené hodiny / týždeň", span: 1 },
-  { id: "zony", label: "Týždne v zdravej zóne", span: 1 },
-  { id: "kapacita", label: "Kapacita & vyťaženie", span: 1 },
-  { id: "6m", label: "6M klienti podľa fázy", span: 1 },
-  { id: "zarobky", label: "Mesačné tržby", span: 1 },
-  { id: "koniecBalicka", label: "Blíži sa koniec balíčka", span: 1 },
+  { id: "zarobky", label: "Mesačné tržby", span: 1, sekcia: "peniaze" },
+  { id: "hodiny", label: "Odrobené hodiny / týždeň", span: 1, sekcia: "vytazenie" },
+  { id: "zony", label: "Týždne v zdravej zóne", span: 1, sekcia: "vytazenie" },
+  { id: "kapacita", label: "Kapacita & vyťaženie", span: 1, sekcia: "vytazenie" },
+  { id: "rastStrata", label: "Rast a strata klientov", span: 1, sekcia: "klienti" },
+  { id: "6m", label: "6M klienti podľa fázy", span: 1, sekcia: "klienti" },
+  { id: "koniecBalicka", label: "Blíži sa koniec balíčka", span: 1, sekcia: "klienti" },
+  { id: "lievik", label: "Lievik — tento mesiac", span: 1, sekcia: "marketing" },
 ];
 // Preč odtiaľto šli aj „Ø tempo klienta" a „Ø dôvera obnovy". Priemer cez
 // všetkých klientov neriadi nič — tempo aj dôvera majú zmysel pri konkrétnom
@@ -386,8 +400,42 @@ export function Dashboard({
     nastavPrijmyZTrackera(cash);
     const p = pnlCalc();
     const i = VZAS_MONTHS.length - 1;
-    return { mesiac: VZAS_MONTHS[i] as string, v: p.hrubyZisk[i] };
+    // Rezerva nad break-even (Ø posledných 6 mesiacov P&L) — rovnaký výpočet
+    // ako VZAS → Zdravie firmy: break-even je prevádzka + NÁROK trénerov.
+    const j = salaryCalc("jerry");
+    const t = salaryCalc("terezka");
+    const n = Math.min(6, VZAS_MONTHS.length);
+    const idx = Array.from({ length: n }, (_, k) => VZAS_MONTHS.length - n + k);
+    const beAvg = idx.reduce((a, x) => a + p.bezVyplat[x] + j.narok[x] + t.narok[x] + p.matyas[x], 0) / n;
+    const prAvg = idx.reduce((a, x) => a + p.prijmy[x], 0) / n;
+    const rezerva = beAvg > 0 ? ((prAvg - beAvg) / beAvg) * 100 : null;
+    return { mesiac: VZAS_MONTHS[i] as string, v: p.hrubyZisk[i], rezerva };
   }, [data]);
+
+  // Rast a strata v malom — Ø príchody/odchody za rok + posledné mesiace.
+  // Odchod „dozrieva": posledné ~2 mesiace sa ešte nedá povedať, kto odišiel,
+  // preto sa tam namiesto nuly ukazuje „?" — nula by klamala smerom k dobrému.
+  const toky = useMemo(() => {
+    const t = tokyKlientov(data, clients);
+    const bezici = new Date().toISOString().slice(0, 7);
+    const zrele = t.kotva ? new Date(Date.parse(t.kotva) - 60 * 86400000).toISOString().slice(0, 7) : bezici;
+    const posledne = t.mesacne.filter(([mk]) => mk < bezici).slice(-3)
+      .map(([mk, v]) => ({ mk, prislo: v.prislo, odislo: mk < zrele ? v.odislo : null }));
+    return { prisloMes: t.prisloMes, odisloMes: t.odisloMes, posledne };
+  }, [data, clients]);
+
+  // Lievik bežiaceho mesiaca: dopyty → úvodné → noví klienti. Zámerne bežiaci
+  // mesiac (nie uzavretý) — toto je prístroj na sledovanie prílevu v reálnom
+  // čase, od septembra hlavný displej pre reklamu.
+  const lievikMes = useMemo(() => {
+    const mes = new Date().toISOString().slice(0, 7);
+    const dopyty = (data.leads || []).filter((l) => (l.date || "").slice(0, 7) === mes);
+    const zdroje = new Map<string, number>();
+    for (const l of dopyty) zdroje.set(l.source, (zdroje.get(l.source) || 0) + 1);
+    const uvodne = new Set(data.sessions.filter((s) => s.sessionType === "UVODNE" && s.date.slice(0, 7) === mes).map((s) => s.client)).size;
+    const novi = Object.values(clients).filter((c) => (c.firstSession || "").slice(0, 7) === mes).length;
+    return { mes, dopyty: dopyty.length, zdroje: [...zdroje.entries()].sort((a, b) => b[1] - a[1]), uvodne, novi };
+  }, [data, clients]);
 
   // Predikcia tržieb na najbližší mesiac — podľa Jerryho „to najdôležitejšie
   // číslo, aké appka počíta". Doteraz bola schovaná vo Financiách → Predikcia a
@@ -737,6 +785,80 @@ export function Dashboard({
             <MiniStat label={`Min · ${earningStats.min.label}`} value={`${Math.round(earningStats.min.v / 1000)}k`} color={C.orange} onClick={() => openMonth(earningStats.min.key)} />
           </div>
         )}
+        {zisk.rezerva != null && (
+          // Tržby bez kontextu nákladov klamú — tento riadok hovorí, o koľko sú
+          // nad hranicou prežitia. Prahy zhodné so VZAS (20 % = zdravé).
+          <div
+            onClick={() => onNavigate("vzas")}
+            title="Otvoriť VZAS → Zdravie firmy"
+            style={{ marginTop: 8, padding: "7px 11px", borderRadius: 8, background: C.track, cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, fontSize: 11.5 }}
+          >
+            <span style={{ color: C.textMuted }}>Rezerva nad break-even (Ø 6 mes.)</span>
+            <b style={{ color: zisk.rezerva >= 20 ? C.green : zisk.rezerva >= 0 ? C.orange : C.red, whiteSpace: "nowrap" }}>
+              {zisk.rezerva > 0 ? "+" : ""}{zisk.rezerva.toFixed(1)} % <span style={{ color: C.textDim, fontWeight: 400 }}>→</span>
+            </b>
+          </div>
+        )}
+      </Card>
+    ),
+    rastStrata: (
+      <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column" }}>
+        <H3>
+          <Info
+            text="Prišiel = prvé sedenie v mesiaci, odišiel = posledné sedenie a odvtedy ticho. Posledné ~2 mesiace odchod ešte „nedozrel“ — namiesto čísla je „?“, nula by klamala. Klik otvorí plnú verziu s menami."
+            label="Rast a strata klientov"
+          />
+        </H3>
+        <div style={{ ...centerBody, cursor: "pointer" }} onClick={() => onNavigate("klienti", "rast")} title="Otvoriť Klienti → Rast a strata">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 8 }}>
+            <MiniStat label="Prišlo Ø / mes." value={`+${toky.prisloMes.toFixed(1)}`} color={C.green} />
+            <MiniStat label="Odišlo Ø / mes." value={`−${toky.odisloMes.toFixed(1)}`} color={C.red} />
+            <MiniStat
+              label="Čistý rast / mes."
+              value={`${toky.prisloMes - toky.odisloMes >= 0 ? "+" : ""}${(toky.prisloMes - toky.odisloMes).toFixed(1)}`}
+              color={toky.prisloMes - toky.odisloMes >= 0 ? C.green : C.red}
+            />
+          </div>
+          <div style={{ marginTop: 10 }}>
+            {toky.posledne.map((r) => (
+              <div key={r.mk} style={{ display: "flex", alignItems: "baseline", gap: 10, padding: "5px 2px", borderBottom: `1px solid ${mix(C.border, 40)}`, fontSize: 12 }}>
+                <span style={{ color: C.textMuted, flex: 1 }}>{monthLabel(r.mk)}</span>
+                <span style={{ color: C.green, fontVariantNumeric: "tabular-nums" }}>+{r.prislo}</span>
+                <span style={{ color: r.odislo == null ? C.textDim : C.red, fontVariantNumeric: "tabular-nums", minWidth: 26, textAlign: "right" }}>
+                  {r.odislo == null ? "?" : `−${r.odislo}`}
+                </span>
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize: 11, color: C.textDim, marginTop: 8 }}>Mená a detail → Klienti → Rast a strata</div>
+        </div>
+      </Card>
+    ),
+    lievik: (
+      <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column" }}>
+        <H3>
+          <Info
+            text="Prílev bežiaceho mesiaca: koľko dopytov prišlo, koľko ľudí bolo na úvodnom a koľko sa stalo klientmi (prvé sedenie tento mesiac). Zadanie z fluktuácie: ~6,3 nových mesačne = rast +3 klienti/rok. Klik otvorí plný lievik s konverziami a zdrojmi."
+            label={`Lievik — ${monthLabel(lievikMes.mes)}`}
+          />
+        </H3>
+        <div style={{ ...centerBody, cursor: "pointer" }} onClick={() => onNavigate("marketing", "lievik")} title="Otvoriť Marketing → Lievik">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 8 }}>
+            <MiniStat label="Dopyty" value={String(lievikMes.dopyty)} color={C.blue} />
+            <MiniStat label="Úvodné" value={String(lievikMes.uvodne)} color={C.accentLight} />
+            <MiniStat label="Noví klienti" value={String(lievikMes.novi)} color={lievikMes.novi >= 6 ? C.green : undefined} />
+          </div>
+          {lievikMes.zdroje.length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 10 }}>
+              {lievikMes.zdroje.map(([z, n]) => (
+                <span key={z} style={{ fontSize: 11, color: C.textMuted, background: C.track, borderRadius: 12, padding: "3px 9px" }}>{z} {n}</span>
+              ))}
+            </div>
+          )}
+          <div style={{ fontSize: 11, color: C.textDim, marginTop: 8, lineHeight: 1.5 }}>
+            Zadanie ~6,3 nových / mes. pre rast +3 za rok · mesiac ešte beží
+          </div>
+        </div>
       </Card>
     ),
     koniecBalicka: (
@@ -867,7 +989,23 @@ export function Dashboard({
       {registerPanel}
 
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
-        <TrainerPills value={trainer} onChange={onTrainer} />
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <TrainerPills value={trainer} onChange={onTrainer} />
+          {/* Kotvy sekcií — klik zroluje na sekciu, nič neprepína ani nefiltruje. */}
+          <div style={{ display: "flex", gap: 2, alignItems: "center" }}>
+            {SEKCIE.map((s, i) => (
+              <span key={s.id} style={{ display: "inline-flex", alignItems: "center" }}>
+                {i > 0 && <span style={{ color: C.textDim, fontSize: 11, margin: "0 2px" }}>·</span>}
+                <button
+                  onClick={() => document.getElementById(`sekcia-${s.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                  style={{ background: "none", border: "none", color: C.textMuted, fontSize: 12, cursor: "pointer", padding: "4px 4px" }}
+                >
+                  {s.label}
+                </button>
+              </span>
+            ))}
+          </div>
+        </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           {arranging && (
             <button onClick={layout.reset} style={{ ...btn("ghost"), fontSize: 12, padding: "6px 12px" }}>Obnoviť rozloženie</button>
@@ -921,17 +1059,30 @@ export function Dashboard({
         />
       </StatGrid>
 
-      <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, minmax(0,1fr))`, gridAutoFlow: "row dense", gap: 12, marginBottom: 12, alignItems: "stretch" }}>
-        {shown.map((id) => {
-          const meta = WIDGETS.find((w) => w.id === id);
-          if (!meta) return null;
-          return (
-            <WidgetShell key={id} meta={meta} cols={cols} arranging={arranging} isHidden={layout.hidden.includes(id)} layout={layout}>
-              {nodes[id]}
-            </WidgetShell>
-          );
-        })}
-      </div>
+      {SEKCIE.map((s) => {
+        const ids = shown.filter((id) => WIDGETS.find((w) => w.id === id)?.sekcia === s.id);
+        if (!ids.length) return null;
+        return (
+          // scrollMarginTop nechá pri zrolovaní hlavičku sekcie pod lepiacim headerom.
+          <div key={s.id} id={`sekcia-${s.id}`} style={{ scrollMarginTop: 64, marginBottom: 14 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "2px 0 8px" }}>
+              <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.4, textTransform: "uppercase", color: C.textDim }}>{s.label}</span>
+              <div style={{ flex: 1, height: 1, background: mix(C.border, 55) }} />
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, minmax(0,1fr))`, gridAutoFlow: "row dense", gap: 12, alignItems: "stretch" }}>
+              {ids.map((id) => {
+                const meta = WIDGETS.find((w) => w.id === id);
+                if (!meta) return null;
+                return (
+                  <WidgetShell key={id} meta={meta} cols={cols} arranging={arranging} isHidden={layout.hidden.includes(id)} layout={layout}>
+                    {nodes[id]}
+                  </WidgetShell>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
 
     </>
   );
