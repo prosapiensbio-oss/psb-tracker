@@ -510,7 +510,16 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
         value={sub}
         onChange={setSub}
       />
-      {sub === "rast" ? <RastAStrata data={data} clients={clients} /> :
+      {sub === "rast" ? (
+        <RastAStrata
+          data={data}
+          clients={clients}
+          // Klik na meno prepne na zoznam klientov a zameria ho. Zameraný klient
+          // obchádza všetky filtre vrátane „zobraziť neaktívnych", takže sa
+          // otvorí aj ten, kto v bežnom zozname nie je.
+          onKlient={(m) => { setFocusClient(m); onSub("klienti"); }}
+        />
+      ) :
        sub === "6m" ? <SixMTracker sixM={sixM} actions={actions} trainer={trainer} onTrainer={onTrainer} /> :
        sub === "dopyty" ? <Dopyty leads={leads} clients={clients} refresh={actions.refresh} /> : (
       <>

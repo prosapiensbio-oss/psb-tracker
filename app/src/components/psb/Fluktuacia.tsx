@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 
 import type { ClientAgg } from "../../lib/psb/compute";
 import { fmtCZK, monthKey, monthLabel } from "../../lib/psb/format";
@@ -57,8 +57,11 @@ function pripravKlientov(data: PSBData, clients: Record<string, ClientAgg>, hran
   return { zoznam, kotva };
 }
 
-export function RastAStrata({ data, clients }: { data: PSBData; clients: Record<string, ClientAgg> }) {
+export function RastAStrata({ data, clients, onKlient }: { data: PSBData; clients: Record<string, ClientAgg>; onKlient?: (meno: string) => void }) {
   const [hranica, setHranica] = useState("60");
+  // Rozbalený mesiac. Bublina pod myšou tu bola prvá a bola to chyba: na
+  // dotykovom displeji neexistuje a mená sa z nej nedali otvoriť.
+  const [otvoreny, setOtvoreny] = useState<string | null>(null);
   const { zoznam, kotva } = useMemo(() => pripravKlientov(data, clients, Number(hranica)), [data, clients, hranica]);
 
   const odisli = zoznam.filter((c) => c._odisiel);
@@ -151,25 +154,42 @@ export function RastAStrata({ data, clients }: { data: PSBData; clients: Record<
             <tbody>
               {mesacne.slice(-14).reverse().map(([mk, v]) => {
                 const cisty = v.prislo - v.odislo;
+                const je = otvoreny === mk;
+                const daSa = v.prislo + v.odislo > 0;
                 return (
-                  <tr key={mk}>
-                    <td style={S.td}>{monthLabel(mk)}</td>
-                    <td style={{ ...S.td, textAlign: "right", color: C.green, cursor: v.prislo ? "help" : "default" }} title={v.prisli.join(", ")}>
-                      {v.prislo || "—"}
-                    </td>
-                    <td style={{ ...S.td, textAlign: "right", color: C.red, cursor: v.odislo ? "help" : "default" }} title={v.odisli.join(", ")}>
-                      {v.odislo || "—"}
-                    </td>
-                    <td style={{ ...S.td, textAlign: "right", fontWeight: 600, color: cisty > 0 ? C.accentLight : cisty < 0 ? C.red : C.textMuted }}>
-                      {cisty > 0 ? "+" : ""}{cisty}
-                    </td>
-                  </tr>
+                  <Fragment key={mk}>
+                    <tr
+                      onClick={() => daSa && setOtvoreny(je ? null : mk)}
+                      style={{ cursor: daSa ? "pointer" : "default", background: je ? mix(C.accent, 6) : undefined }}
+                    >
+                      <td style={S.td}>
+                        <span style={{ color: C.textDim, marginRight: 6 }}>{daSa ? (je ? "▾" : "▸") : " "}</span>
+                        {monthLabel(mk)}
+                      </td>
+                      <td style={{ ...S.td, textAlign: "right", color: C.green }}>{v.prislo || "—"}</td>
+                      <td style={{ ...S.td, textAlign: "right", color: C.red }}>{v.odislo || "—"}</td>
+                      <td style={{ ...S.td, textAlign: "right", fontWeight: 600, color: cisty > 0 ? C.accentLight : cisty < 0 ? C.red : C.textMuted }}>
+                        {cisty > 0 ? "+" : ""}{cisty}
+                      </td>
+                    </tr>
+                    {je && (
+                      <tr>
+                        <td colSpan={4} style={{ ...S.td, background: mix(C.accent, 4) }}>
+                          <div style={{ display: "flex", gap: 24, flexWrap: "wrap", padding: "4px 0 8px" }}>
+                            <Zoznam nadpis="Prišli" mena={v.prisli} farba={C.green} onKlient={onKlient} clients={clients} />
+                            <Zoznam nadpis="Odišli" mena={v.odisli} farba={C.red} onKlient={onKlient} clients={clients} />
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 );
               })}
             </tbody>
           </TableWrap>
           <div style={{ fontSize: 11, color: C.textDim, marginTop: 8, lineHeight: 1.5 }}>
-            Prejdi myšou po čísle a ukáže mená. {" "}
+            Klikni na mesiac a rozbalí sa, kto prišiel a kto odišiel; meno otvorí kartu klienta aj vtedy, keď je
+            už neaktívny a v bežnom zozname sa nezobrazuje. {" "}
             Posledné dva–tri mesiace budú vždy vyzerať lepšie, než sú: kto prestal chodiť minulý mesiac, ešte nemá
             {" "}{hranica} dní ticha a ako odídený sa zatiaľ neráta. Dáta sú po {kotva ? kotva.slice(0, 10) : "—"}.
             {" "}A augusty budú strašiť každý rok — leto je mŕtve, nie je to fluktuácia.
@@ -351,5 +371,39 @@ function HodnotaPodlaZdroja({ zoznam }: { zoznam: Klient[] }) {
         <br />Porovnávať má zmysel až rovnako staré kohorty — na to je tabuľka vyššie.
       </div>
     </Card>
+  );
+}
+
+
+/** Mená v rozbalenom mesiaci — každé otvorí kartu klienta. */
+function Zoznam({ nadpis, mena, farba, onKlient, clients }: {
+  nadpis: string; mena: string[]; farba: string;
+  onKlient?: (m: string) => void; clients: Record<string, ClientAgg>;
+}) {
+  if (!mena.length) return null;
+  return (
+    <div style={{ flex: "1 1 220px", minWidth: 0 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: farba, marginBottom: 5 }}>{nadpis} ({mena.length})</div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+        {mena.map((m) => {
+          const neaktivny = clients[m]?.status === "Neaktívny";
+          return (
+            <button
+              key={m}
+              onClick={() => onKlient?.(m)}
+              title={neaktivny ? `${m} — vedený ako neaktívny, v bežnom zozname sa neukazuje` : m}
+              style={{
+                padding: "3px 9px", borderRadius: 7, fontSize: 11.5, cursor: onKlient ? "pointer" : "default",
+                border: `1px solid ${mix(C.border, 80)}`, background: "transparent",
+                color: neaktivny ? C.textDim : C.text,
+                textDecoration: neaktivny ? "line-through" : "none",
+              }}
+            >
+              {m}
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
