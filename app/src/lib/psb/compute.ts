@@ -27,7 +27,7 @@ export const membershipBucket = (m: string): string => {
   // Doplnenie je dokúpená hodina k paušálnemu členstvu (GOLD/SILVER/DIAMOND/
   // ONE), nie balíček. Ako názov skupiny to znelo ako produkt, ktorý si klient
   // kúpil — pritom hovorí len to, že balíček s hodinami evidovaný nemá.
-  if (/doplnenie|za protokol/.test(s)) return "Členstvo (bez balíčka hodín)";
+  if (/doplnenie|za protokol|členství/.test(s)) return "Členstvo (bez balíčka hodín)";
   if (/special|špeci/.test(s)) return "Špeciál";
   if (!m) return "Bez balíčka";
   return "Iné";
@@ -268,7 +268,11 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
     // hodiny — čas na ďalší balíček" u 40 zo 73 klientov, ktorým nič
     // nekončilo: Tomáš Krčmar má DIAMOND členstvo a 12 tréningov za osem
     // týždňov, a napriek tomu svietil ako klient na konci balíčka.
-    const jeDoplnok = (p: string) => /doplnenie|za protokol/i.test(p || "");
+    // „členstv í" (české ČLENSTVÍ ONE) je paušál, ktorý v exporte stojí na 0/1
+    // alebo 0/2 — nie balíček hodín. Pozor na rozdiel: Broskvov „ONE YEAR" je
+    // skutočný ročný balíček (62/78) a ten sa vylúčiť nesmie, preto sa hľadá
+    // české „členství", nie slovo „one".
+    const jeDoplnok = (p: string) => /doplnenie|za protokol|členství/i.test(p || "");
     const skutocne = packs.filter((p) => !jeDoplnok(p.package));
     const zdroj = skutocne.length ? skutocne : packs;
     const active = zdroj.slice().sort((a, b) => b.remaining - a.remaining || b.total - a.total)[0];
