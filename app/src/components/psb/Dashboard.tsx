@@ -91,11 +91,14 @@ const ORDER_KEY = "psb-dash-order";
 const HIDDEN_KEY = "psb-dash-hidden";
 const WIDTH_KEY = "psb-dash-width";
 const KNOWN_KEY = "psb-dash-known";
+const KPI_KEY = "psb-dash-kpi";
 
 function useDashLayout() {
   const [order, setOrder] = useState<string[]>(DEFAULT_ORDER);
   const [hidden, setHidden] = useState<string[]>(DEFAULT_HIDDEN);
   const [widths, setWidths] = useState<Record<string, number>>(DEFAULT_WIDTH);
+  /** Jednotlivé KPI riadky, ktoré si človek z karty odškrtol. */
+  const [kpiSkryte, setKpiSkryte] = useState<string[]>([]);
 
   useEffect(() => {
     try {
@@ -122,6 +125,9 @@ function useDashLayout() {
       setHidden(dalej);
       localStorage.setItem(HIDDEN_KEY, JSON.stringify(dalej));
       localStorage.setItem(KNOWN_KEY, JSON.stringify(DEFAULT_ORDER));
+
+      const kp = JSON.parse(localStorage.getItem(KPI_KEY) || "null");
+      if (Array.isArray(kp)) setKpiSkryte(kp);
 
       const w = JSON.parse(localStorage.getItem(WIDTH_KEY) || "null");
       if (w && typeof w === "object") {
@@ -189,13 +195,29 @@ function useDashLayout() {
     persistHidden((p) => (zapnut ? p.filter((x) => !ids.includes(x)) : [...new Set([...p, ...ids])]));
   };
   const setWidth = (id: string, w: 1 | 2) => persistWidths({ ...widths, [id]: w });
+  const toggleKpi = (id: string) =>
+    setKpiSkryte((p) => {
+      const next = p.includes(id) ? p.filter((x) => x !== id) : [...p, id];
+      try {
+        localStorage.setItem(KPI_KEY, JSON.stringify(next));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
   const reset = () => {
     persistOrder(DEFAULT_ORDER);
     persistHidden(DEFAULT_HIDDEN);
     persistWidths(DEFAULT_WIDTH);
+    setKpiSkryte([]);
+    try {
+      localStorage.removeItem(KPI_KEY);
+    } catch {
+      /* ignore */
+    }
   };
 
-  return { order, hidden, widths, move, dropOn, toggleHide, sekciaVsetko, setWidth, reset };
+  return { order, hidden, widths, kpiSkryte, move, dropOn, toggleHide, sekciaVsetko, setWidth, toggleKpi, reset };
 }
 
 // 2 columns on wide screens, 1 on narrow — inline styles can't hold media queries.
@@ -674,7 +696,7 @@ export function Dashboard({
     () => new Set(WIDGETS.map((w) => w.id).filter((id) => !layout.hidden.includes(id))),
     [layout.hidden],
   );
-  const extraNodes = useExtraGrafy({ data, clients, aktivne, onNavigate });
+  const extraNodes = useExtraGrafy({ data, clients, aktivne, onNavigate, kpiSkryte: layout.kpiSkryte });
 
   const nodes: Record<string, ReactNode> = {
     ...extraNodes,
@@ -719,7 +741,11 @@ export function Dashboard({
         <H3>
           <Info text="Koľko trénerských týždňov padlo do zdravej zóny (24–34h), pod ňu alebo nad ňu — za celé obdobie." label="Týždne v zdravej zóne" />
         </H3>
-        <div style={centerBody}>
+        <div
+          style={{ ...centerBody, cursor: zones.total ? "pointer" : "default" }}
+          onClick={() => zones.total && onNavigate("treningy", "prehled")}
+          title="Otvoriť Tréningy → Prehľad"
+        >
           {zones.total ? (
             <Donut
               size={140}
@@ -742,7 +768,11 @@ export function Dashboard({
         <H3>
           <Info text="Rozdelenie 6M klientov podľa fázy procesu: Obnova (1.–6. mesiac), Integrácia (7.–18.), Udržateľnosť (19+). Mení sa podľa prepínača trénera hore." label="6M klienti podľa fázy" />
         </H3>
-        <div style={centerBody}>
+        <div
+          style={{ ...centerBody, cursor: sixMPhases.total ? "pointer" : "default" }}
+          onClick={() => sixMPhases.total && onNavigate("klienti", "6m")}
+          title="Otvoriť Klienti → 6M proces"
+        >
           {sixMPhases.total ? (
             <Donut size={140} centerLabel={String(sixMPhases.total)} data={sixMPhases.data} />
           ) : (
@@ -769,9 +799,11 @@ export function Dashboard({
           </div>
         </div>
         {earnings.length ? (
-          <Zbalitelny telefon={telefon} popis={`${earnings.length} mesiacov`}>
-            <ValueBars data={earnings} color={earnMode === "prijate" ? C.blue : C.accent} forecastColor={C.blue} fmt={(n) => `${Math.round(n / 1000)}k`} height={180} alignEnd />
-          </Zbalitelny>
+          <div onClick={() => onNavigate("financie", "cashflow")} style={{ cursor: "pointer" }} title="Otvoriť Financie → Cashflow">
+            <Zbalitelny telefon={telefon} popis={`${earnings.length} mesiacov`}>
+              <ValueBars data={earnings} color={earnMode === "prijate" ? C.blue : C.accent} forecastColor={C.blue} fmt={(n) => `${Math.round(n / 1000)}k`} height={180} alignEnd />
+            </Zbalitelny>
+          </div>
         ) : <Empty>Nahraj Payroll.</Empty>}
         {earningStats && (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 8, marginTop: 10 }}>
@@ -969,24 +1001,8 @@ export function Dashboard({
     <>
       {registerPanel}
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
-        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-          <TrainerPills value={trainer} onChange={onTrainer} />
-          {/* Kotvy sekcií — klik zroluje na sekciu, nič neprepína ani nefiltruje. */}
-          <div style={{ display: "flex", gap: 2, alignItems: "center" }}>
-            {SEKCIE.map((s, i) => (
-              <span key={s.id} style={{ display: "inline-flex", alignItems: "center" }}>
-                {i > 0 && <span style={{ color: C.textDim, fontSize: 11, margin: "0 2px" }}>·</span>}
-                <button
-                  onClick={() => document.getElementById(`sekcia-${s.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" })}
-                  style={{ background: "none", border: "none", color: C.textMuted, fontSize: 12, cursor: "pointer", padding: "4px 4px" }}
-                >
-                  {s.label}
-                </button>
-              </span>
-            ))}
-          </div>
-        </div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
+        <TrainerPills value={trainer} onChange={onTrainer} />
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           {arranging && (
             <button onClick={layout.reset} style={{ ...btn("ghost"), fontSize: 12, padding: "6px 12px" }}>Obnoviť rozloženie</button>
@@ -1011,6 +1027,25 @@ export function Dashboard({
         </div>
       </div>
 
+      {/* Kotvy sekcií vo vlastnom riadku — klik zroluje, nič neprepína ani
+          nefiltruje. Vedľa prepínača trénerov splývali s ním do jedného pásu,
+          hoci robia niečo úplne iné. Sekcia, ktorá nemá zapnutý ani jeden graf,
+          tu nie je — kotva do prázdna je len sklamanie. */}
+      <div style={{ display: "flex", gap: 2, alignItems: "center", flexWrap: "wrap", marginBottom: 12, paddingBottom: 2 }}>
+        {SEKCIE.filter((s) => WIDGETS.some((w) => w.sekcia === s.id && !layout.hidden.includes(w.id))).map((s, i) => (
+          <span key={s.id} style={{ display: "inline-flex", alignItems: "center" }}>
+            {i > 0 && <span style={{ color: mix(C.textDim, 70), fontSize: 11, margin: "0 3px" }}>·</span>}
+            <button
+              onClick={() => document.getElementById(`sekcia-${s.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" })}
+              title={s.popis}
+              style={{ background: "none", border: "none", color: C.textMuted, fontSize: 12.5, cursor: "pointer", padding: "3px 7px" }}
+            >
+              {s.label}
+            </button>
+          </span>
+        ))}
+      </div>
+
       {kniznica && (
         <GrafyKniznica
           hidden={layout.hidden}
@@ -1018,6 +1053,8 @@ export function Dashboard({
           onSekciaVsetko={layout.sekciaVsetko}
           onReset={layout.reset}
           onClose={() => setKniznica(false)}
+          kpiSkryte={layout.kpiSkryte}
+          onKpi={layout.toggleKpi}
         />
       )}
 

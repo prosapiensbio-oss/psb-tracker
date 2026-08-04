@@ -1873,7 +1873,7 @@ function MesacneTab({ data, clients }: { data: PSBData; clients: Record<string, 
 }
 
 // ── KPI ──────────────────────────────────────────────────────────────────────
-const kpiFmt = (v: number, unit: string) =>
+export const kpiFmt = (v: number, unit: string) =>
   unit === "czk" ? fmtCZK(v) : unit === "pct" ? `${v.toFixed(1)} %` : unit === "h" ? `${Math.round(v)} h` : v.toFixed(1);
 
 function KpiRow({ k, onTarget }: { k: KpiActual; onTarget: (id: string, lo: number | null) => void }) {

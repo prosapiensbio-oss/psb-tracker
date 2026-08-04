@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 
-import { fetchBtcReserve, fetchWeekEntries } from "../../lib/psb/client";
+import { fetchBtcReserve, fetchVzasSettings, fetchWeekEntries } from "../../lib/psb/client";
 import { membershipBucket, type ClientAgg } from "../../lib/psb/compute";
 import { fmtCZK, monthLabel } from "../../lib/psb/format";
 import { GA4_MESACNE, GSC_MESACNE, MKT_MESACNE, nastavMarketingZImportu, nastavWebZImportu, type Ga4Mesiac, type GscDopyt, type GscMesiac, type GscStrana, type MktKus, type MktMesiac } from "../../lib/psb/marketing";
 import { C, MEMBERSHIP_COLORS, mix } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import {
-  byCommitment, commitmentTotal, jarekCalc, nastavPrijmyZTrackera, pnlCalc, QUARTERS, salaryCalc,
-  VZAS_MONTH_LABELS, VZAS_MONTHS, VZAS_TARGETS_BY_YEAR,
+  byCommitment, commitmentTotal, computeKpis, jarekCalc, kpiDefs, KPI_GROUP_LABELS, nastavPrijmyZTrackera,
+  pnlCalc, QUARTERS, salaryCalc, VZAS_MONTH_LABELS, VZAS_MONTHS, VZAS_TARGETS_BY_YEAR,
+  type KpiGroup, type KpiOverrides,
 } from "../../lib/psb/vzas";
+import { kpiFmt } from "./Vzas";
 import { monthlyFinance } from "../../lib/psb/compute";
 import type { KanalRiadok } from "./Kanaly";
 import { ZDROJE } from "./Klienti";
@@ -30,13 +32,30 @@ import { BarRow, Card, Donut, Empty, H3, Info, LineChart, Modal, ValueBars } fro
 // svojich domovských obrazovkách (jedna aritmetika, jedna pravda). Klik na
 // kartu vedie tam, kde sa s číslom dá pracovať.
 
-export type SekciaId = "peniaze" | "vytazenie" | "klienti" | "marketing";
+export type SekciaId = "peniaze" | "vytazenie" | "klienti" | "marketing" | "vysledky";
 export const SEKCIE: { id: SekciaId; label: string; popis: string }[] = [
   { id: "peniaze", label: "Peniaze", popis: "Zarábame? A vydržíme?" },
   { id: "vytazenie", label: "Vyťaženie", popis: "Koľko robíme a koľko ešte zvládneme." },
   { id: "klienti", label: "Klienti", popis: "Pribúdajú, alebo len rotujú?" },
   { id: "marketing", label: "Marketing", popis: "Odkiaľ chodia noví ľudia." },
+  { id: "vysledky", label: "Výsledky", popis: "KPI proti cieľom — každé číslo sa dá vypnúť zvlášť." },
 ];
+
+// KPI sa neberú ako jeden veľký graf, ale ako štyri karty podľa skupín z
+// Výsledkov — a v knižnici si v každej karte odškrtneš, ktoré riadky chceš
+// vidieť. Deväť KPI naraz je tabuľka; tri, ktoré práve riešiš, sú prístroj.
+const KPI_ROK = (() => {
+  const r = new Date().toISOString().slice(0, 4);
+  return r === "2025" ? "2025" : "2026";
+})();
+export const KPI_KARTY: { id: string; group: KpiGroup }[] = [
+  { id: "kpiPeniaze", group: "peniaze" },
+  { id: "kpiLievik", group: "lievik" },
+  { id: "kpiKapacita", group: "kapacita" },
+  { id: "kpiCena", group: "cena" },
+];
+/** Definície KPI pre knižnicu (bez hodnôt — tie potrebujú dáta). */
+export const kpiVSkupine = (g: KpiGroup) => kpiDefs(KPI_ROK).filter((d) => d.group === g);
 
 export type WidgetMeta = {
   id: string;
@@ -90,6 +109,12 @@ export const WIDGETS: WidgetMeta[] = [
   { id: "web", label: "Web (GA4)", span: 1, sekcia: "marketing", popis: "Noví návštevníci a kľúčové udalosti po mesiacoch.", doma: "Marketing → Dosah" },
   { id: "vyhladavanie", label: "Vyhľadávanie (Search Console)", span: 1, sekcia: "marketing", popis: "Kliky z Googlu a miera prekliku po mesiacoch.", doma: "Marketing → Dosah" },
   { id: "kanaly", label: "Kanály — mesačný súhrn", span: 1, sekcia: "marketing", popis: "Facebook, TikTok, YouTube a ďalšie z mesačnej zostavy.", doma: "Marketing → Dosah" },
+
+  // ── Výsledky (KPI) ─────────────────────────────────────────────────────────
+  { id: "kpiPeniaze", label: `KPI ${KPI_ROK} — Peniaze`, span: 1, sekcia: "vysledky", popis: "Tržby, marža, odstup od break-evenu, rezerva v mesiacoch.", doma: "Výsledky → KPI" },
+  { id: "kpiLievik", label: `KPI ${KPI_ROK} — Lievik`, span: 1, sekcia: "vysledky", popis: "Úvodné tréningy a úspešnosť po úvodnom.", doma: "Výsledky → KPI" },
+  { id: "kpiKapacita", label: `KPI ${KPI_ROK} — Kapacita a klienti`, span: 1, sekcia: "vysledky", popis: "Aktívni klienti, odtrénované hodiny, dĺžka spolupráce.", doma: "Výsledky → KPI" },
+  { id: "kpiCena", label: `KPI ${KPI_ROK} — Cena a mix`, span: 1, sekcia: "vysledky", popis: "Hodinovka, hodnota klienta, online podiel, marketing z tržieb.", doma: "Výsledky → KPI" },
 ];
 
 export const VYCHODZIE = new Set(WIDGETS.filter((w) => w.vychodzi).map((w) => w.id));
@@ -127,13 +152,16 @@ function Klik({ kam, onNavigate, children }: { kam?: () => void; onNavigate?: st
 
 // ── Knižnica (modálne okno) ──────────────────────────────────────────────────
 export function GrafyKniznica({
-  hidden, onToggle, onSekciaVsetko, onReset, onClose,
+  hidden, onToggle, onSekciaVsetko, onReset, onClose, kpiSkryte, onKpi,
 }: {
   hidden: string[];
   onToggle: (id: string) => void;
   onSekciaVsetko: (sekcia: SekciaId, zapnut: boolean) => void;
   onReset: () => void;
   onClose: () => void;
+  /** Jednotlivé KPI riadky, ktoré sa v karte nemajú ukazovať. */
+  kpiSkryte: string[];
+  onKpi: (id: string) => void;
 }) {
   const zapnutych = WIDGETS.filter((w) => !hidden.includes(w.id)).length;
   return (
@@ -157,9 +185,10 @@ export function GrafyKniznica({
             <div style={{ display: "grid", gap: 5 }}>
               {vSekcii.map((w) => {
                 const zapnute = !hidden.includes(w.id);
+                const kpiKarta = KPI_KARTY.find((k) => k.id === w.id);
                 return (
+                  <div key={w.id}>
                   <button
-                    key={w.id}
                     onClick={() => onToggle(w.id)}
                     style={{
                       display: "flex", alignItems: "flex-start", gap: 10, textAlign: "left", width: "100%", cursor: "pointer",
@@ -188,6 +217,34 @@ export function GrafyKniznica({
                       </span>
                     </span>
                   </button>
+
+                  {/* KPI karta má vlastné riadky — tu sa vyberá, ktoré z nich
+                      má ukazovať. Bez toho by karta bola tabuľka deviatich
+                      čísel, čo je presne to, čo dashboard nemá byť. */}
+                  {kpiKarta && zapnute && (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 5, padding: "7px 11px 2px 51px" }}>
+                      {kpiVSkupine(kpiKarta.group).map((d) => {
+                        const von = kpiSkryte.includes(d.id);
+                        return (
+                          <button
+                            key={d.id}
+                            onClick={() => onKpi(d.id)}
+                            title={d.why}
+                            style={{
+                              fontSize: 11, padding: "3px 9px", borderRadius: 12, cursor: "pointer",
+                              border: `1px solid ${von ? C.border : mix(C.accent, 45)}`,
+                              background: von ? "transparent" : mix(C.accent, 12),
+                              color: von ? C.textDim : C.accentLight,
+                              textDecoration: von ? "line-through" : "none",
+                            }}
+                          >
+                            {d.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                  </div>
                 );
               })}
             </div>
@@ -212,13 +269,14 @@ const MES_LAB = VZAS_MONTHS.map((_, i) => VZAS_MONTH_LABELS[i]);
 const kcK = (n: number) => `${Math.round(n / 1000)}k`;
 
 export function useExtraGrafy({
-  data, clients, aktivne, onNavigate,
+  data, clients, aktivne, onNavigate, kpiSkryte = [],
 }: {
   data: PSBData;
   clients: Record<string, ClientAgg>;
   /** Zapnuté karty — dáta z API sa ťahajú len pre ne. */
   aktivne: Set<string>;
   onNavigate: (tab: string, sub?: string) => void;
+  kpiSkryte?: string[];
 }): Record<string, ReactNode> {
   // Živé tržby do VZAS pred každým výpočtom (idempotentné, rovnako ako pri Zisku).
   const vzas = useMemo(() => {
@@ -241,12 +299,27 @@ export function useExtraGrafy({
     void fetchWeekEntries().then((w) => setWeeks(w as never));
   }, [aktivne, weeks]);
 
+  // Rezervu potrebuje aj KPI „rezerva v mesiacoch prevádzky", nielen karta BTC.
+  const chceKpi = KPI_KARTY.some((k) => aktivne.has(k.id));
   const [btc, setBtc] = useState<{ czk: number | null; sats: number } | null>(null);
   const [btcStav, setBtcStav] = useState<"load" | "ok" | "err">("load");
   useEffect(() => {
-    if (!aktivne.has("btc") || btc) return;
+    if (!(aktivne.has("btc") || chceKpi) || btc) return;
     void fetchBtcReserve().then((r) => { setBtc(r); setBtcStav(r ? "ok" : "err"); });
-  }, [aktivne, btc]);
+  }, [aktivne, chceKpi, btc]);
+
+  // Ciele, ktoré si Jerry posunul, žijú v DB — bez nich by karta merala proti
+  // pôvodným číslam z hárku a ukazovala iný stav než obrazovka Výsledky.
+  const [kpiOverrides, setKpiOverrides] = useState<KpiOverrides>({});
+  const [kpiNacitane, setKpiNacitane] = useState(false);
+  useEffect(() => {
+    if (!chceKpi || kpiNacitane) return;
+    void fetchVzasSettings().then((s) => {
+      const t = s["kpi_targets"];
+      if (t && typeof t === "object") setKpiOverrides(t as KpiOverrides);
+      setKpiNacitane(true);
+    }).catch(() => setKpiNacitane(true));
+  }, [chceKpi, kpiNacitane]);
 
   const [kanaly, setKanaly] = useState<KanalRiadok[]>([]);
   const [mktTik, setMktTik] = useState(0);
@@ -738,6 +811,52 @@ export function useExtraGrafy({
       </Card>
     );
 
+    // ── Výsledky (KPI) ───────────────────────────────────────────────────────
+    // Rovnaké čísla ako obrazovka Výsledky → KPI (tá istá computeKpis, tie isté
+    // ciele z DB) — len bez posuvníkov. Cieľ sa mení tam, kde sa o ňom
+    // rozhoduje; dashboard ho ukazuje.
+    const kpis = computeKpis(KPI_ROK, data.sessions, data.payments, kpiOverrides, btc?.czk ?? null);
+    for (const karta of KPI_KARTY) {
+      const riadky = kpis.filter((k) => k.def.group === karta.group && !kpiSkryte.includes(k.def.id));
+      const vsetkyVSkupine = kpis.filter((k) => k.def.group === karta.group).length;
+      nodes[karta.id] = (
+        <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column" }}>
+          <H3>
+            <Info
+              label={`KPI ${KPI_ROK} — ${KPI_GROUP_LABELS[karta.group]}`}
+              text="Počítané z dát v Kokpite, nie prepisované ručne. Ročné ciele sú prepočítané na uplynulé mesiace — polrok proti celoročnému cieľu by vyzeral ako zaostávanie, aj keby si bol na pláne. Ktoré riadky tu chceš, vyberáš v knižnici grafov; cieľ sa posúva vo Výsledkoch."
+            />
+          </H3>
+          <Klik kam={() => onNavigate("vysledky", "kpi")} onNavigate="Výsledky → KPI">
+            {riadky.length === 0 ? (
+              <Empty>{vsetkyVSkupine ? "Všetky riadky tejto skupiny sú v knižnici odškrtnuté." : "Zatiaľ bez dát."}</Empty>
+            ) : (
+              <div>
+                {riadky.map((k) => {
+                  const col = k.status === "ok" ? C.green : k.status === "blizko" ? C.orange : k.status === "mimo" ? C.red : C.textMuted;
+                  const pct = k.target ? (k.value / k.target) * 100 : null;
+                  return (
+                    <div key={k.def.id} style={{ display: "flex", alignItems: "center", gap: 9, padding: "6px 2px", borderBottom: `1px solid ${mix(C.border, 40)}` }}>
+                      <span style={{ width: 7, height: 7, borderRadius: 999, background: col, flex: "0 0 auto" }} />
+                      <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: C.textMuted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{k.def.label}</span>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: C.text, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+                        {kpiFmt(k.value, k.def.unit)}
+                      </span>
+                      {k.target != null && (
+                        <span style={{ flex: "0 0 46px", height: 5, borderRadius: 999, background: mix(C.border, 70), overflow: "hidden" }}>
+                          <span style={{ display: "block", width: `${Math.min(100, Math.max(3, pct!))}%`, height: "100%", background: col }} />
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Klik>
+        </Card>
+      );
+    }
+
     return nodes;
-  }, [vzas, toky, data, clients, weeks, btc, btcStav, kanaly, mktTik, onNavigate]);
+  }, [vzas, toky, data, clients, weeks, btc, btcStav, kanaly, mktTik, kpiOverrides, kpiSkryte, onNavigate]);
 }
