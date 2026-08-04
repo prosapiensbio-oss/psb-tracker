@@ -16,7 +16,11 @@ import {
 } from "../../lib/psb/compute";
 import { fmtCZK, fmtDMY, monthLabel, weekKey, weekLabel } from "../../lib/psb/format";
 import { C, mix, S, badge, btn } from "../../lib/psb/theme";
-import { nastavPrijmyZTrackera, pnlCalc, salaryCalc, VZAS_MONTHS } from "../../lib/psb/vzas";
+import { nastavPrijmyZTrackera, pnlCalc, VZAS_MONTHS } from "../../lib/psb/vzas";
+import {
+  centerBody, GrafyKniznica, MiniStat, SEKCIE, useExtraGrafy, VYCHODZIE, WIDGETS,
+  type SekciaId, type WidgetMeta,
+} from "./DashGrafy";
 import { tokyKlientov } from "./Fluktuacia";
 import type { PSBData } from "../../lib/psb/types";
 import type { Actions, NavFocus } from "./App";
@@ -62,24 +66,9 @@ function TrainerPills({ value, onChange }: { value: string; onChange: (v: string
 // nezabíjame sa? rastú klienti? funguje prílev? Sekcia je vlastnosť karty,
 // nie poradia — presúvanie a skrývanie (⠿) funguje ďalej, ale karta zostáva
 // vo svojej sekcii. Kotvy vedľa prepínača trénerov na sekciu zrolujú.
-type SekciaId = "peniaze" | "vytazenie" | "klienti" | "marketing";
-const SEKCIE: { id: SekciaId; label: string }[] = [
-  { id: "peniaze", label: "Peniaze" },
-  { id: "vytazenie", label: "Vyťaženie" },
-  { id: "klienti", label: "Klienti" },
-  { id: "marketing", label: "Marketing" },
-];
-type WidgetMeta = { id: string; label: string; span: 1 | 2; sekcia: SekciaId; noStretch?: boolean };
-const WIDGETS: WidgetMeta[] = [
-  { id: "zarobky", label: "Mesačné tržby", span: 1, sekcia: "peniaze" },
-  { id: "hodiny", label: "Odrobené hodiny / týždeň", span: 1, sekcia: "vytazenie" },
-  { id: "zony", label: "Týždne v zdravej zóne", span: 1, sekcia: "vytazenie" },
-  { id: "kapacita", label: "Kapacita & vyťaženie", span: 1, sekcia: "vytazenie" },
-  { id: "rastStrata", label: "Rast a strata klientov", span: 1, sekcia: "klienti" },
-  { id: "6m", label: "6M klienti podľa fázy", span: 1, sekcia: "klienti" },
-  { id: "koniecBalicka", label: "Blíži sa koniec balíčka", span: 1, sekcia: "klienti" },
-  { id: "lievik", label: "Lievik — tento mesiac", span: 1, sekcia: "marketing" },
-];
+//
+// Katalóg všetkých grafov (aj tých, ktoré sa kreslia v DashGrafy.tsx) žije
+// tam — tu sa len skladá to, čo je zapnuté.
 // Preč odtiaľto šli aj „Ø tempo klienta" a „Ø dôvera obnovy". Priemer cez
 // všetkých klientov neriadi nič — tempo aj dôvera majú zmysel pri konkrétnom
 // človeku a tam obe sú, vo Financie → Predikcia. Na displeji zaberali miesto
@@ -96,13 +85,16 @@ const WIDGETS: WidgetMeta[] = [
 // boli len dve miesta, kde hľadať tú istú konverzáciu.
 const DEFAULT_ORDER = WIDGETS.map((w) => w.id);
 const DEFAULT_WIDTH: Record<string, number> = Object.fromEntries(WIDGETS.map((w) => [w.id, w.span]));
+/** Vypnuté hneď po inštalácii = všetko, čo nie je vo východzej zostave. */
+const DEFAULT_HIDDEN = WIDGETS.filter((w) => !w.vychodzi).map((w) => w.id);
 const ORDER_KEY = "psb-dash-order";
 const HIDDEN_KEY = "psb-dash-hidden";
 const WIDTH_KEY = "psb-dash-width";
+const KNOWN_KEY = "psb-dash-known";
 
 function useDashLayout() {
   const [order, setOrder] = useState<string[]>(DEFAULT_ORDER);
-  const [hidden, setHidden] = useState<string[]>([]);
+  const [hidden, setHidden] = useState<string[]>(DEFAULT_HIDDEN);
   const [widths, setWidths] = useState<Record<string, number>>(DEFAULT_WIDTH);
 
   useEffect(() => {
@@ -113,8 +105,20 @@ function useDashLayout() {
         // Append any widget added in a later version that the saved order predates.
         setOrder([...known, ...DEFAULT_ORDER.filter((id) => !known.includes(id))]);
       }
+      // Graf, ktorý appka pozná až od dnešnej verzie, sa nesmie objaviť sám —
+      // inak by po nasadení knižnice vyskočilo na dashboard dvadsať nových
+      // kariet. Preto zoznam „už videných" ID: čo v ňom nie je a nie je vo
+      // východzej zostave, sa pridá medzi vypnuté a od tej chvíle si to riadi
+      // človek. (Bez uloženého zoznamu = prvý štart → východzia zostava.)
+      const videne: string[] = JSON.parse(localStorage.getItem(KNOWN_KEY) || "null") || [];
       const h = JSON.parse(localStorage.getItem(HIDDEN_KEY) || "null");
-      if (Array.isArray(h)) setHidden(h.filter((id: string) => DEFAULT_ORDER.includes(id)));
+      const ulozeneHidden: string[] = Array.isArray(h) ? h.filter((id: string) => DEFAULT_ORDER.includes(id)) : [];
+      const nove = DEFAULT_ORDER.filter((id) => !videne.includes(id) && !VYCHODZIE.has(id) && !ulozeneHidden.includes(id));
+      // Prvé spustenie (nič uložené) berie východzie skryté; inak sa k uloženým
+      // pridajú len tie naozaj nové.
+      setHidden(Array.isArray(h) || videne.length ? [...ulozeneHidden, ...nove] : DEFAULT_HIDDEN);
+      localStorage.setItem(KNOWN_KEY, JSON.stringify(DEFAULT_ORDER));
+
       const w = JSON.parse(localStorage.getItem(WIDTH_KEY) || "null");
       if (w && typeof w === "object") {
         const merged: Record<string, number> = { ...DEFAULT_WIDTH };
@@ -168,14 +172,19 @@ function useDashLayout() {
   };
   const toggleHide = (id: string) =>
     persistHidden(hidden.includes(id) ? hidden.filter((x) => x !== id) : [...hidden, id]);
+  /** Zapnúť/vypnúť celú sekciu naraz — z knižnice grafov. */
+  const sekciaVsetko = (sekcia: SekciaId, zapnut: boolean) => {
+    const ids = WIDGETS.filter((w) => w.sekcia === sekcia).map((w) => w.id);
+    persistHidden(zapnut ? hidden.filter((x) => !ids.includes(x)) : [...new Set([...hidden, ...ids])]);
+  };
   const setWidth = (id: string, w: 1 | 2) => persistWidths({ ...widths, [id]: w });
   const reset = () => {
     persistOrder(DEFAULT_ORDER);
-    persistHidden([]);
+    persistHidden(DEFAULT_HIDDEN);
     persistWidths(DEFAULT_WIDTH);
   };
 
-  return { order, hidden, widths, move, dropOn, toggleHide, setWidth, reset };
+  return { order, hidden, widths, move, dropOn, toggleHide, sekciaVsetko, setWidth, reset };
 }
 
 // 2 columns on wide screens, 1 on narrow — inline styles can't hold media queries.
@@ -223,29 +232,6 @@ function Zbalitelny({ telefon, popis, children }: { telefon: boolean; popis: str
     >
       {popis} — <span style={{ color: C.accentLight }}>ukázať graf</span>
     </button>
-  );
-}
-
-// A compact clickable stat used in the weekly-hours summary strip.
-function MiniStat({ label, value, color, onClick }: { label: ReactNode; value: string; color?: string; onClick?: () => void }) {
-  return (
-    <div
-      onClick={onClick}
-      style={{
-        background: C.track,
-        borderRadius: 8,
-        padding: "8px 10px",
-        cursor: onClick ? "pointer" : "default",
-        border: `1px solid ${onClick ? mix(C.accent, 22) : "transparent"}`,
-        minWidth: 0,
-      }}
-    >
-      <div style={{ fontSize: 20, fontWeight: 800, color: color ?? C.accentLight, lineHeight: 1.1 }}>{value}</div>
-      <div style={{ fontSize: 10.5, color: C.textMuted, marginTop: 3, display: "flex", alignItems: "center", gap: 3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-        {label}
-        {onClick && <span style={{ color: C.textDim }}>→</span>}
-      </div>
-    </div>
   );
 }
 
@@ -314,9 +300,6 @@ function WidgetShell({
   );
 }
 
-// Body wrapper that fills a stretched card and vertically centers short content (donuts, KPI numbers).
-const centerBody: CSSProperties = { flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" };
-
 const arrBtn: CSSProperties = {
   background: C.card,
   border: `1px solid ${C.border}`,
@@ -358,6 +341,7 @@ export function Dashboard({
   // "prijate" = cash received (= PTminder "Payments" / tržby) — the default; "vyfakturovane" = value of trained sessions.
   const [earnMode, setEarnMode] = useState<"vyfakturovane" | "prijate">("prijate");
   const [arranging, setArranging] = useState(false);
+  const [kniznica, setKniznica] = useState(false);
   const layout = useDashLayout();
   const cols = useDashColumns();
   const telefon = useTelefon();
@@ -400,16 +384,7 @@ export function Dashboard({
     nastavPrijmyZTrackera(cash);
     const p = pnlCalc();
     const i = VZAS_MONTHS.length - 1;
-    // Rezerva nad break-even (Ø posledných 6 mesiacov P&L) — rovnaký výpočet
-    // ako VZAS → Zdravie firmy: break-even je prevádzka + NÁROK trénerov.
-    const j = salaryCalc("jerry");
-    const t = salaryCalc("terezka");
-    const n = Math.min(6, VZAS_MONTHS.length);
-    const idx = Array.from({ length: n }, (_, k) => VZAS_MONTHS.length - n + k);
-    const beAvg = idx.reduce((a, x) => a + p.bezVyplat[x] + j.narok[x] + t.narok[x] + p.matyas[x], 0) / n;
-    const prAvg = idx.reduce((a, x) => a + p.prijmy[x], 0) / n;
-    const rezerva = beAvg > 0 ? ((prAvg - beAvg) / beAvg) * 100 : null;
-    return { mesiac: VZAS_MONTHS[i] as string, v: p.hrubyZisk[i], rezerva };
+    return { mesiac: VZAS_MONTHS[i] as string, v: p.hrubyZisk[i] };
   }, [data]);
 
   // Rast a strata v malom — Ø príchody/odchody za rok + posledné mesiace.
@@ -682,7 +657,16 @@ export function Dashboard({
     .filter((k) => k.startsWith("balicek|"))
     .map((k) => k.slice("balicek|".length));
 
+  // Grafy z knižnice — kreslia sa v DashGrafy.tsx a dáta z API si ťahajú len
+  // tie, ktoré sú práve zapnuté.
+  const aktivne = useMemo(
+    () => new Set(WIDGETS.map((w) => w.id).filter((id) => !layout.hidden.includes(id))),
+    [layout.hidden],
+  );
+  const extraNodes = useExtraGrafy({ data, clients, aktivne, onNavigate });
+
   const nodes: Record<string, ReactNode> = {
+    ...extraNodes,
     hodiny: (
       <Card style={{ marginBottom: 0, height: "100%" }}>
         <H3>
@@ -783,20 +767,6 @@ export function Dashboard({
             <MiniStat label={`Ø / mes. (${earningStats.n})`} value={`${Math.round(earningStats.avg / 1000)}k`} />
             <MiniStat label={`Max · ${earningStats.max.label}`} value={`${Math.round(earningStats.max.v / 1000)}k`} color={C.green} onClick={() => openMonth(earningStats.max.key)} />
             <MiniStat label={`Min · ${earningStats.min.label}`} value={`${Math.round(earningStats.min.v / 1000)}k`} color={C.orange} onClick={() => openMonth(earningStats.min.key)} />
-          </div>
-        )}
-        {zisk.rezerva != null && (
-          // Tržby bez kontextu nákladov klamú — tento riadok hovorí, o koľko sú
-          // nad hranicou prežitia. Prahy zhodné so VZAS (20 % = zdravé).
-          <div
-            onClick={() => onNavigate("vzas")}
-            title="Otvoriť VZAS → Zdravie firmy"
-            style={{ marginTop: 8, padding: "7px 11px", borderRadius: 8, background: C.track, cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, fontSize: 11.5 }}
-          >
-            <span style={{ color: C.textMuted }}>Rezerva nad break-even (Ø 6 mes.)</span>
-            <b style={{ color: zisk.rezerva >= 20 ? C.green : zisk.rezerva >= 0 ? C.orange : C.red, whiteSpace: "nowrap" }}>
-              {zisk.rezerva > 0 ? "+" : ""}{zisk.rezerva.toFixed(1)} % <span style={{ color: C.textDim, fontWeight: 400 }}>→</span>
-            </b>
           </div>
         )}
       </Card>
@@ -1011,6 +981,13 @@ export function Dashboard({
             <button onClick={layout.reset} style={{ ...btn("ghost"), fontSize: 12, padding: "6px 12px" }}>Obnoviť rozloženie</button>
           )}
           <button
+            onClick={() => setKniznica(true)}
+            title="Všetky grafy z celej appky — zapni si, čo chceš mať na ploche"
+            style={{ ...btn("outline"), fontSize: 12, padding: "6px 14px" }}
+          >
+            ▦ Grafy <span style={{ color: C.textDim }}>{aktivne.size}/{WIDGETS.length}</span>
+          </button>
+          <button
             onClick={() => setArranging((v) => !v)}
             style={{
               ...btn(arranging ? "accent" : "outline"),
@@ -1022,6 +999,16 @@ export function Dashboard({
           </button>
         </div>
       </div>
+
+      {kniznica && (
+        <GrafyKniznica
+          hidden={layout.hidden}
+          onToggle={layout.toggleHide}
+          onSekciaVsetko={layout.sekciaVsetko}
+          onReset={layout.reset}
+          onClose={() => setKniznica(false)}
+        />
+      )}
 
       {arranging && (
         <div style={{ marginBottom: 12, padding: "9px 12px", borderRadius: 8, background: C.accentBg, border: `1px solid ${mix(C.accent, 33)}`, fontSize: 12, color: C.textMuted, lineHeight: 1.5 }}>
