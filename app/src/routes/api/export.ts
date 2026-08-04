@@ -21,6 +21,12 @@ const TABULKY = [
   // pohyby a surové marketingové exporty, teda presne to, čo sa nedá stiahnuť
   // znova.
   "fio_transactions", "raw_uploads",
+  // A znova to isté o pol roka neskôr: kontá, nákupný zoznam, marketingové
+  // tabuľky a algo novinky vznikli po poslednom rozšírení zálohy. Zoznam
+  // treba dopĺňať pri KAŽDEJ novej tabuľke — záloha, ktorá potichu nezachytáva
+  // časť databázy, je nebezpečnejšia než žiadna, lebo sa na ňu človek spolieha.
+  "users", "wishlist", "mkt_prispevky", "kanaly_mesiace",
+  "ga4_mesiace", "gsc_mesiace", "gsc_dopyty", "gsc_strany", "algo_novinky",
 ];
 
 export const Route = createFileRoute("/api/export")({
