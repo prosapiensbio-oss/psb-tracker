@@ -586,15 +586,26 @@ export function useExtraGrafy({
               <span style={{ width: 34, textAlign: "right" }}>6 m</span>
               <span style={{ width: 40, textAlign: "right" }}>12 m</span>
             </div>
-            {kohorty.map(([mk, cs]) => (
-              <div key={mk} style={{ display: "flex", fontSize: 12, padding: "5px 2px", borderBottom: `1px solid ${mix(C.border, 40)}`, fontVariantNumeric: "tabular-nums" }}>
-                <span style={{ flex: 1, color: C.textMuted }}>{monthLabel(mk)}</span>
-                <span style={{ width: 34, textAlign: "right", color: C.text }}>{cs.length}</span>
-                <span style={{ width: 34, textAlign: "right", color: C.green }}>{cs.filter((c) => c._zivot >= 90).length}</span>
-                <span style={{ width: 34, textAlign: "right", color: C.accentLight }}>{cs.filter((c) => c._zivot >= 180).length}</span>
-                <span style={{ width: 40, textAlign: "right", color: C.blue }}>{cs.filter((c) => c._zivot >= 365).length}</span>
-              </div>
-            ))}
+            {kohorty.map(([mk, cs]) => {
+              // Kohorta stará dva mesiace nemôže mať nikoho „ešte tu po pol
+              // roku" — nula by tam bola nepravda, nie výsledok. Nezrelé okno
+              // preto ukazuje pomlčku, rovnako ako odchody v Raste a strate.
+              const vek = toky.kotva ? (Date.parse(toky.kotva) - Date.parse(`${mk}-01`)) / 86400000 : 0;
+              const bunka = (dni: number, farba: string, sirka: number) => (
+                <span style={{ width: sirka, textAlign: "right", color: vek >= dni ? farba : C.textDim }}>
+                  {vek >= dni ? cs.filter((c) => c._zivot >= dni).length : "–"}
+                </span>
+              );
+              return (
+                <div key={mk} style={{ display: "flex", fontSize: 12, padding: "5px 2px", borderBottom: `1px solid ${mix(C.border, 40)}`, fontVariantNumeric: "tabular-nums" }}>
+                  <span style={{ flex: 1, color: C.textMuted }}>{monthLabel(mk)}</span>
+                  <span style={{ width: 34, textAlign: "right", color: C.text }}>{cs.length}</span>
+                  {bunka(90, C.green, 34)}
+                  {bunka(180, C.accentLight, 34)}
+                  {bunka(365, C.blue, 40)}
+                </div>
+              );
+            })}
           </div>
         </Klik>
       </Card>
@@ -605,7 +616,9 @@ export function useExtraGrafy({
       for (const c of toky.zoznam) m.set(c.zdroj || "", [...(m.get(c.zdroj || "") || []), c]);
       return [...m.entries()]
         .map(([z, cs]) => ({
-          z: ZDROJE.find((x) => x.value === z)?.label || (z || "nevyplnené"),
+          // Prázdny zdroj má v číselníku label „—", čo na najväčšom stĺpci
+          // nehovorí nič. Pomenovať dieru je pol opravy.
+          z: z ? ZDROJE.find((x) => x.value === z)?.label || z : "nevyplnené",
           n: cs.length,
           trzba: Math.round(cs.reduce((a, c) => a + c._trzba, 0) / cs.length),
         }))
