@@ -225,7 +225,6 @@ export const SALARY: Record<PersonKey, SalaryPerson> = {
       "Invest": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 500, 1500, 0, 500, 0, 500],
       "Salina": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 550, 550, 0, 550, 0, 1370],
       "Notebook": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2000, 2000, 2000, 2000, 0, 0],
-      "Nájom 2": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1500, 1500, 0, 1500, 1500, 1650],
       "Štát (len jan 26)": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9761, 0, 0, 0, 0, 0],
     },
   },
@@ -244,7 +243,6 @@ export const SALARY: Record<PersonKey, SalaryPerson> = {
       "Salina": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 550, 500, 0, 0, 0, 0],
       "Notebook": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2000, 2000, 2000, 2000, 0, 0],
       "Štát dlžob": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3600, 0, 0, 0, 0],
-      "Nájom 2": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1500, 1500, 0, 1500, 1500, 1650],
     },
   },
 };
@@ -264,6 +262,8 @@ const VYPLATY_ZO_ZDROJAKU: Record<PersonKey, VyplatyKategorie> = {
   jerry: {}, terezka: {},
 };
 export let VYPLATY_SU_UPRAVENE = false;
+/** Kategórie presunuté z osobných výplat do SPOLOCNE — v uložených dátach sa ignorujú. */
+const PRESUNUTE_DO_SPOLOCNYCH = new Set(["Nájom 2"]);
 
 /** Zapíše upravené kategórie do modelu. Prázdny vstup = návrat k zdrojáku. */
 export function nastavVyplaty(ulozene?: Partial<Record<PersonKey, VyplatyKategorie>>): boolean {
@@ -281,6 +281,10 @@ export function nastavVyplaty(ulozene?: Partial<Record<PersonKey, VyplatyKategor
     const ciel = SALARY[key].personal;
     for (const k of Object.keys(ciel)) delete ciel[k];
     for (const [k, v] of Object.entries(zdroj)) {
+      // Kategórie, ktoré sa medzitým presunuli do spoločných výdavkov, sa z
+      // uložených nastavení zahadzujú. Bez toho by sa po presune počítali
+      // dvakrát — raz osobne a raz ako polovica spoločného nákladu.
+      if (PRESUNUTE_DO_SPOLOCNYCH.has(k)) { zmena = true; continue; }
       ciel[k] = Array.from({ length: N }, (_, i) => Number(v?.[i]) || 0);
     }
     if (maNove) zmena = true;
@@ -301,6 +305,12 @@ export const vyplatyNaUlozenie = (): Record<PersonKey, VyplatyKategorie> => ({
 // as a category then).
 export const SPOLOCNE: Record<string, Vals> = {
   "Nájom": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 19700, 19700, 8000, 34700, 19700, 19700],
+  // Presunuté z osobných výplat oboch (Jerry, 4. 8. 2026). Každý mal vlastný
+  // riadok „Nájom 2" s tou istou sumou — je to jeden spoločný náklad platený
+  // na polovicu, takže patrí sem. Zmena je pre výpočet neutrálna: každý stratil
+  // 1 500 z osobnej časti a dostal späť 1 500 ako polovicu z 3 000, takže
+  // Poslané, Rozdiel ani kumulovaný dlh sa nepohli.
+  "Nájom 2": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3000, 3000, 0, 3000, 3000, 3300],
   "Potraviny": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 13900, 19500, 19500, 20000, 14093, 25201],
   "Ahsoka": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8000, 25998, 19725],
   "Výlety": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2924, 0],
