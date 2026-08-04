@@ -115,8 +115,12 @@ function useDashLayout() {
       const ulozeneHidden: string[] = Array.isArray(h) ? h.filter((id: string) => DEFAULT_ORDER.includes(id)) : [];
       const nove = DEFAULT_ORDER.filter((id) => !videne.includes(id) && !VYCHODZIE.has(id) && !ulozeneHidden.includes(id));
       // Prvé spustenie (nič uložené) berie východzie skryté; inak sa k uloženým
-      // pridajú len tie naozaj nové.
-      setHidden(Array.isArray(h) || videne.length ? [...ulozeneHidden, ...nove] : DEFAULT_HIDDEN);
+      // pridajú len tie naozaj nové. Výsledok sa MUSÍ uložiť spolu so zoznamom
+      // známych ID — inak by pri ďalšom otvorení bolo „všetko už videné" proti
+      // prázdnemu zoznamu skrytých a dashboard by sa zaplnil všetkými grafmi.
+      const dalej = Array.isArray(h) || videne.length ? [...ulozeneHidden, ...nove] : DEFAULT_HIDDEN;
+      setHidden(dalej);
+      localStorage.setItem(HIDDEN_KEY, JSON.stringify(dalej));
       localStorage.setItem(KNOWN_KEY, JSON.stringify(DEFAULT_ORDER));
 
       const w = JSON.parse(localStorage.getItem(WIDTH_KEY) || "null");
