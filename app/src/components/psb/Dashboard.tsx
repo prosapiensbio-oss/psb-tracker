@@ -743,11 +743,15 @@ export function Dashboard({
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 8 }}>
             {packageEnding.map(({ c, doKonca, hodinyDosli, frekvencia }) => {
               const naliehave = (doKonca !== null && doKonca <= 7) || c.packageRemaining <= 0;
-              const dovod = doKonca === null
-                ? `${c.packageRemaining}/${c.packageTotal} hodín`
+              // Dôvod má hovoriť, PREČO tu klient je. Predtým sa ukazovala
+              // platnosť vždy, keď existoval dátum — aj u klienta s 0/6, ktorý
+              // je v zozname kvôli dochodeným hodinám, nie kvôli členstvu.
+              const dovod = hodinyDosli
+                ? `zostáva ${c.packageRemaining} z ${c.packageTotal} — čas na ďalší balíček`
+                : doKonca === null ? `${c.packageRemaining}/${c.packageTotal} hodín`
                 : doKonca < 0 ? `platnosť vypršala ${fmtDMY(c.packageValidTo)}`
                 : doKonca === 0 ? "platnosť končí dnes"
-                : `platnosť do ${fmtDMY(c.packageValidTo)} · ${doKonca} ${doKonca < 5 ? "dni" : "dní"}`;
+                : `platnosť do ${fmtDMY(c.packageValidTo)} · ${doKonca} ${doKonca < 5 ? "dni" : "dní"} · hodiny nestihne minúť`;
               return (
                 <div key={c.name} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 10px", background: mix(C.text, 4), border: `1px solid ${C.border}`, borderRadius: 9, width: "100%", minWidth: 0 }}>
                   <span style={{ ...badge(naliehave ? "red" : "orange"), fontSize: 10, flexShrink: 0 }}>
@@ -760,7 +764,7 @@ export function Dashboard({
                   >
                     <span style={{ fontSize: 13, color: C.text, fontWeight: 500, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</span>
                     <span style={{ fontSize: 11, color: C.textDim, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {hodinyDosli && doKonca === null ? `${c.membership || "—"} · ${c.primaryTrainer}` : dovod}
+                      {dovod}
                     </span>
                   </button>
                   {/* Odložiť, nie zmazať: klient, ktorý má pauzu alebo sa už
