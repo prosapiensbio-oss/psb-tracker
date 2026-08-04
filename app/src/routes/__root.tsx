@@ -65,7 +65,9 @@ function toOwnAssetUrl(value: string | null | undefined): string | null {
 }
 
 function buildHead(meta: AppMeta) {
-  const title = meta.og_title ?? DEFAULT_TITLE;
+  // Appka sa premenovala na Kokpit, ale názov v platforme sa cez repo zmeniť
+  // nedá (a prepísať subdoménu by zabilo starú adresu). Preto sa slovo mení tu.
+  const title = (meta.og_title ?? DEFAULT_TITLE).replace(/^Tracker/, "Kokpit");
   const description = meta.og_description ?? DEFAULT_DESCRIPTION;
   const ogImage = toOwnAssetUrl(meta.og_image_url);
   const favicon = toOwnAssetUrl(meta.favicon_url);
