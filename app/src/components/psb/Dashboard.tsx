@@ -576,10 +576,20 @@ export function Dashboard({
         const frekvencia = c.sessionCount / tyzdnov;
         const prah = frekvencia > 1 ? 2 : 1;
         const hodinyDosli = c.packageTotal > 0 && c.packageRemaining <= prah;
-        // Platnosť, ktorá vypršala pred viac než dvoma mesiacmi, už nie je
-        // signál na obnovu — to je starý riadok v exporte, nie klient, ktorému
-        // sa niečo končí.
-        const platnostKonci = doKonca !== null && doKonca <= 21 && doKonca > -60;
+        // Platnosť sa hlási len vtedy, keď z nej niečo VYPLÝVA.
+        //
+        // Anna Kadličkova má 3 hodiny a členstvo do 24. 8. Pri jednom tréningu
+        // týždenne ich do vtedy stihne minúť — nič sa nedeje a upozornenie je
+        // šum. Klient s piatimi hodinami a desiatimi dňami ich nestihne a o tri
+        // hodiny príde; to je vec, o ktorej treba vedieť.
+        //
+        // Posledný týždeň sa hlási vždy, bez ohľadu na hodiny: koniec členstva
+        // je sám o sebe moment, kedy sa rieši ďalší balíček.
+        const tyzdnovDoKonca = doKonca !== null ? doKonca / 7 : 0;
+        const stihneMinut = frekvencia > 0 ? frekvencia * tyzdnovDoKonca >= c.packageRemaining : false;
+        const platnostKonci =
+          doKonca !== null && doKonca > -60 &&
+          (doKonca <= 7 || (doKonca <= 21 && !stihneMinut));
         return { c, doKonca, hodinyDosli, platnostKonci, prah, frekvencia };
       })
       .filter((x) => x.hodinyDosli || x.platnostKonci)
