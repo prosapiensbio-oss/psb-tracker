@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { fmtCZK } from "../../lib/psb/format";
-import { MIMO_PNL, VYPLATY, type FioRiadok } from "../../lib/psb/fio";
+import { MIMO_PNL, VYPLATY, VYPLATY_DELENE, VYPLATY_JERRY, VYPLATY_TEREZKA, type FioRiadok } from "../../lib/psb/fio";
 import { C, mix, S } from "../../lib/psb/theme";
-import { PNL } from "../../lib/psb/vzas";
+import { PNL, SPOLOCNE, VZAS_MONTHS } from "../../lib/psb/vzas";
 import { Card, H3, Info, TableWrap } from "./ui";
 
 // Import bankového výpisu — s náhľadom, nie naslepo.
@@ -16,19 +16,46 @@ import { Card, H3, Info, TableWrap } from "./ui";
 
 type Nahlad = FioRiadok & { uzMame?: boolean; zamknuty?: boolean };
 
-/** Všetky cieľové kategórie: položky P&L + dva koše mimo neho. */
-function kategorie(): { value: string; label: string }[] {
-  const out: { value: string; label: string }[] = [{ value: "", label: "— nezaradené —" }];
+type Kat = { value: string; label: string; skupina: string };
+
+// Položka je „živá", keď v tomto roku niečo mala. Zoznam mal cez päťdesiat
+// možností vrátane MultiBoxu a Freela, ktoré sa v 2026 nepoužívajú — a v
+// rozbaľovačke, kde človek hľadá jednu vec, je každá mŕtva položka prekážka.
+// Staré sa nemažú (historické mesiace ich potrebujú), len padnú do skupiny
+// „Staršie", ktorá je na konci.
+const ziveOd = VZAS_MONTHS.findIndex((m) => m.startsWith(String(new Date().getFullYear())));
+const jeZiva = (values: number[]) =>
+  ziveOd < 0 || values.slice(ziveOd).some((v) => v !== 0);
+
+/** Cieľové kategórie: P&L + spoločné výdavky + dva koše mimo neho. */
+function kategorie(): Kat[] {
+  const zive: Kat[] = [{ value: "", label: "— nezaradené —", skupina: "" }];
+  const stare: Kat[] = [];
   for (const [sekKey, sek] of Object.entries(PNL)) {
     for (const [subKey, sub] of Object.entries(sek.subcategories)) {
       for (const [itemKey, item] of Object.entries(sub.items)) {
-        out.push({ value: `${sekKey}.${subKey}.${itemKey}`, label: `${sub.label} · ${item.label}` });
+        const k: Kat = {
+          value: `${sekKey}.${subKey}.${itemKey}`,
+          label: `${sub.label} · ${item.label}`,
+          skupina: sek.label,
+        };
+        (jeZiva(item.values) ? zive : stare).push(k);
       }
     }
   }
-  out.push({ value: VYPLATY, label: "Výplaty zakladateľov (nie je náklad P&L)" });
-  out.push({ value: MIMO_PNL, label: "Mimo P&L — súkromné" });
-  return out;
+  // Spoločné výdavky domácnosti. Nie sú to náklady firmy — delia sa na polovicu
+  // a každému zakladateľovi sa započítajú ako čerpaná výplata. Ahsoka (pes) je
+  // presne tento prípad: od júla odchádza z účtu jedným prevodom s poznámkou,
+  // takže potrebuje vlastnú kategóriu, nie kôš „súkromné".
+  for (const nazov of Object.keys(SPOLOCNE)) {
+    zive.push({ value: `spolocne.${nazov}`, label: `Spoločné · ${nazov} (delí sa /2 do výplat)`, skupina: "Spoločné (delí sa /2)" });
+  }
+  zive.push({ value: VYPLATY_JERRY, label: "Výplata — Jerry", skupina: "Výplaty zakladateľov" });
+  zive.push({ value: VYPLATY_TEREZKA, label: "Výplata — Terezka", skupina: "Výplaty zakladateľov" });
+  zive.push({ value: VYPLATY_DELENE, label: "Výplata — spoločná (delí sa /2)", skupina: "Výplaty zakladateľov" });
+  zive.push({ value: VYPLATY, label: "Výplata — bez určenia", skupina: "Výplaty zakladateľov" });
+  zive.push({ value: MIMO_PNL, label: "Mimo P&L — súkromné", skupina: "Mimo P&L" });
+  return [...zive, ...stare.map((k) => ({ ...k, skupina: "Staršie (nepoužíva sa v tomto roku)" }))];
 }
 
 export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: () => void }) {
@@ -36,6 +63,9 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
   // Kontrola z hlavičky výpisu (súčty od banky) + koľko riadkov nemá ID operácie.
   const [kontrola, setKontrola] = useState<{ prijmy: number; vydaje: number; obdobie: string; precitanePrijmy: number; precitaneVydaje: number; sedi: boolean | null } | null>(null);
   const [bezId, setBezId] = useState(0);
+  // Príjmy a výdavky vedľa seba v jednej tabuľke sa zle prechádzajú — zaraďujú
+  // sa hlavne výdavky, príjmy sú len kontrola proti PTminderu.
+  const [smer, setSmer] = useState<"vsetko" | "vydaje" | "prijmy">("vydaje");
   const [chyba, setChyba] = useState<{ chyba: string; ukazka: string[] } | null>(null);
   const [vysledok, setVysledok] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -187,6 +217,21 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
               Príjmy sa zapisujú tiež, ale slúžia len na kontrolu proti PTminderu — tržby sa z banky nikdy nepočítajú.
             </span>
           </div>
+          {/* Zaraďujú sa hlavne výdavky; príjmy sú kontrola proti PTminderu.
+              V jednej tabuľke sa striedali a prechádzať sa to dalo zle. */}
+          <div style={{ display: "flex", gap: 4, marginBottom: 10, flexWrap: "wrap" }}>
+            {([["vydaje", `Výdavky (${nahlad.filter((r) => r.suma < 0).length})`],
+               ["prijmy", `Príjmy (${nahlad.filter((r) => r.suma > 0).length})`],
+               ["vsetko", `Všetko (${nahlad.length})`]] as const).map(([id, lbl]) => (
+              <button key={id} onClick={() => setSmer(id)}
+                style={{ padding: "5px 13px", borderRadius: 8, fontSize: 12, cursor: "pointer",
+                  border: `1px solid ${smer === id ? C.accent : C.border}`,
+                  background: smer === id ? mix(C.accent, 12) : "transparent",
+                  color: smer === id ? C.accentLight : C.textMuted }}>
+                {lbl}
+              </button>
+            ))}
+          </div>
           <TableWrap>
             <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 640 }}>
               <thead>
@@ -197,7 +242,9 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
                 </tr>
               </thead>
               <tbody>
-                {nahlad.map((r, i) => (
+                {nahlad.map((r, i) => [r, i] as const)
+                  .filter(([r]) => smer === "vsetko" || (smer === "vydaje" ? r.suma < 0 : r.suma > 0))
+                  .map(([r, i]) => (
                   <tr key={i} style={{ opacity: r.uzMame || r.zamknuty ? 0.45 : 1 }}>
                     <td style={{ ...S.td, whiteSpace: "nowrap", fontSize: 12 }}>{r.datum}</td>
                     <td style={{ ...S.td, textAlign: "right", whiteSpace: "nowrap", color: r.suma < 0 ? C.text : C.green, fontVariantNumeric: "tabular-nums" }}>{fmtCZK(r.suma)}</td>
@@ -216,7 +263,15 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
                           onChange={(e) => setNahlad((n) => n && n.map((x, j) => (j === i ? { ...x, kategoria: e.target.value } : x)))}
                           style={{ background: r.kategoria ? C.cardHover : mix(C.orange, 12), color: C.text, border: `1px solid ${r.kategoria ? C.border : mix(C.orange, 40)}`, borderRadius: 6, fontSize: 11.5, padding: "3px 5px", maxWidth: 260, cursor: "pointer" }}
                         >
-                          {KAT.map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
+                          {/* Zoskupené, nech sa v päťdesiatich možnostiach dá nájsť tá jedna. */}
+                          {[...new Set(KAT.map((k) => k.skupina))].map((sk) =>
+                            sk === ""
+                              ? KAT.filter((k) => k.skupina === "").map((k) => <option key={k.value} value={k.value}>{k.label}</option>)
+                              : (
+                                <optgroup key={sk} label={sk}>
+                                  {KAT.filter((k) => k.skupina === sk).map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
+                                </optgroup>
+                              ))}
                         </select>
                       ) : (
                         <span style={{ fontSize: 11.5, color: C.textDim }}>príjem — len kontrola</span>

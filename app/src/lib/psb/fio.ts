@@ -109,18 +109,37 @@ export function fioDatum(s: string): string | null {
 // zvyšok sa doučí z toho, čo Jerry zaradí ručne (uloží sa ako pravidlo).
 /** Kategórie mimo P&L — riadky, ktoré do nákladov firmy nepatria. */
 export const MIMO_PNL = "mimo";
+/** Výplata bez určenia človeka — zostáva kvôli starším zápisom. */
 export const VYPLATY = "vyplaty";
+// Výplata musí vedieť, KOMU patrí, inak sa z nej nedá počítať dlh voči
+// trénerom. „Jerry vyplata" a „Terézia Zaťková vyplata" sa dajú rozoznať z
+// textu; čo sa vybralo spoločne a delí sa na polovicu, má vlastnú hodnotu.
+export const VYPLATY_JERRY = "vyplaty.jerry";
+export const VYPLATY_TEREZKA = "vyplaty.terezka";
+export const VYPLATY_DELENE = "vyplaty.delene";
 
 const SEED: [RegExp, string][] = [
   // Výplaty zakladateľov nie sú náklad v P&L — sú to prevody, ktoré sleduje
   // modul J&T Výplaty. V tomto výpise sú najčastejšou položkou vôbec (19×).
-  [/vyplata|výplata|zaťkov|zatkov|terézia|terezia/i, VYPLATY],
+  // Poradie je dôležité: konkrétny človek pred všeobecnou výplatou.
+  // „Jerry stat" je odvod štátu za Jerryho, nie jeho výplata — má v P&L
+  // vlastný riadok a bez tohto pravidla by skončil vo výplatách.
+  [/jerry\s*stat|stat\s*jerry/i, "fixne.prevadzka.statJerry"],
+  [/(zdravotka|socialka|sociálka|zdravotná|zdravotna).*(teré|tere)|teré?zia.*zdravotka/i, "fixne.prevadzka.statTerezka"],
+  [/(zaťkov|zatkov|terézia|terezia)/i, VYPLATY_TEREZKA],
+  [/jerry/i, VYPLATY_JERRY],
+  [/vyplata|výplata/i, VYPLATY],
   // Súkromné. Účet nie je čisto firemný a bez tohto koša by P&L nafúklo
   // o nákupy potravín a taxíky.
   [/billa|rohlik|rohlík|lidl|albert|kaufland|tesco|globus|penny|potraviny|drogerie|spajz|spajza/i, MIMO_PNL],
   [/bolt\.|uber|liftago/i, MIMO_PNL],
   [/výběr z bankomatu|vyber z bankomatu/i, MIMO_PNL],
-  [/ahsoka/i, MIMO_PNL],
+  // Ahsoka (pes) nie je „súkromné" v zmysle jedného človeka — je to spoločný
+  // výdavok domácnosti, ktorý sa delí na polovicu a každému zakladateľovi sa
+  // započíta ako čerpaná výplata. Od júla 2026 odchádza z účtu jedným prevodom
+  // s poznámkou „Ahsoka", takže stačí jedno pravidlo. Veterina a psia škola
+  // sa dovtedy platili kartou priamo — tie riadky sú v starších mesiacoch.
+  [/ahsoka|klinika psu|klinika psů|psi skola|psí škola|online psi/i, "spolocne.Ahsoka"],
   [/adobe/i, "fixne.apps.adobe"],
   [/canva/i, "fixne.apps.canva"],
   [/captions/i, "fixne.apps.captions"],
