@@ -828,8 +828,11 @@ export function deriveRegister(
         "Zápis",
         dniStare >= 10 ? "red" : "orange",
         `Dáta z PTmindera končia ${fmtDMY(posledneData)}`,
-        `Posledné nahraté sedenie je spred ${dniStare} dní. Kým nenahráš nový export, dochádzka klientov klesá sama a čísla za tento mesiac sú neúplné — nula nových klientov nemusí znamenať, že nikto neprišiel.`,
+        `Posledné nahraté sedenie je z ${fmtDMY(posledneData)}, teda spred ${dniStare} dní. Kým nenahráš nový export, dochádzka klientov klesá sama a čísla za tento mesiac sú neúplné — nula nových klientov nemusí znamenať, že nikto neprišiel.`,
         1,
+        // Kategória Zápis nesie cieľ prekliku v poli client ako „tab|sub“.
+        // Bez neho by „Otvoriť“ viedlo na Klientov, teda nie tam, kde sa to rieši.
+        "udaje|",
       );
     }
   }
