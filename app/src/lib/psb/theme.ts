@@ -37,7 +37,7 @@ export const MEMBERSHIP_COLORS: Record<string, string> = {
   "1 hodina": C.orange,
   "Online balíček": "#8A7DDB",
   "Ročné (ONE YEAR)": "#D8A93B",
-  "Doplnenie členstva": "#5FA8A0",
+  "Členstvo (bez balíčka hodín)": "#5FA8A0",
   "Špeciál": "#B978C9",
   "Bez balíčka": C.textDim,
   "Iné": C.bark,

@@ -632,6 +632,10 @@ export function Dashboard({
     return Object.values(clients)
       .filter((c) => c.status !== "Neaktívny" && c.status !== "Pauza" && matchT(c.primaryTrainer))
       .filter((c) => !ack[`balicek|${c.name}`])
+      // Klient, ktorý má v exporte len doplnky k paušálnemu členstvu, tu nemá
+      // čo robiť — jeho „0 z 3" nie je dochodený balíček, ale dokúpená hodina
+      // spred roka. Toto samo o sebe brali 40 zo 73 klientov.
+      .filter((c) => !c.lenDoplnky)
       .map((c) => {
         const doKonca = c.packageValidTo ? dni(c.packageValidTo) : null;
         // Prah podľa toho, ako často klient reálne chodí.
@@ -678,7 +682,11 @@ export function Dashboard({
         return { c, doKonca, hodinyDosli, platnostKonci, prah, frekvencia };
       })
       .filter((x) => x.hodinyDosli || x.platnostKonci)
+      // Najprv došlé hodiny (predaj, ktorý sa dá spraviť dnes), potom končiace
+      // členstvá; v rámci skupiny podľa naliehavosti. Jeden porovnávač, nie dva
+      // reťazené — dva by sa prebili a zoradilo by to presne naopak.
       .sort((a, b) => {
+        if (a.hodinyDosli !== b.hodinyDosli) return a.hodinyDosli ? -1 : 1;
         const ka = a.doKonca ?? (a.c.packageRemaining <= 0 ? -1 : 21);
         const kb = b.doKonca ?? (b.c.packageRemaining <= 0 ? -1 : 21);
         return ka - kb || a.c.name.localeCompare(b.c.name);
@@ -890,8 +898,22 @@ export function Dashboard({
         )}
         </div>
         {packageEnding.length ? (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 8 }}>
-            {packageEnding.map(({ c, doKonca, hodinyDosli, frekvencia }) => {
+          <>
+          {/* Dva dôvody, dva nadpisy. Predtým to bol jeden zoznam a človek
+              čítal odznak „3/8" ako „zostávajú tri hodiny, prečo tu je?" —
+              pritom Vaško je tam za končiace členstvo, nie za hodiny. */}
+          {(["hodiny", "platnost"] as const).map((skupina) => {
+            const riadky = packageEnding.filter((x) => (skupina === "hodiny" ? x.hodinyDosli : !x.hodinyDosli));
+            if (!riadky.length) return null;
+            return (
+              <div key={skupina} style={{ marginBottom: 10 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.8, textTransform: "uppercase", color: C.textDim, margin: "2px 0 6px" }}>
+                  {skupina === "hodiny"
+                    ? `Došli hodiny — čas na ďalší balíček (${riadky.length})`
+                    : `Končí platnosť členstva (${riadky.length})`}
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 8 }}>
+                  {riadky.map(({ c, doKonca, hodinyDosli, frekvencia }) => {
               const naliehave = (doKonca !== null && doKonca <= 7) || c.packageRemaining <= 0;
               // Dôvod má hovoriť, PREČO tu klient je. Predtým sa ukazovala
               // platnosť vždy, keď existoval dátum — aj u klienta s 0/6, ktorý
@@ -929,8 +951,12 @@ export function Dashboard({
                   </button>
                 </div>
               );
-            })}
-          </div>
+                  })}
+                </div>
+              </div>
+            );
+          })}
+          </>
         ) : (
           <Empty>Nikomu sa balíček nekončí 🌿</Empty>
         )}

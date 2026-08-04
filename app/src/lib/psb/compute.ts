@@ -24,7 +24,10 @@ export const membershipBucket = (m: string): string => {
   if (/8 hod/.test(s)) return "8 hodín";
   if (/1 hod/.test(s)) return "1 hodina";
   if (/bez viazanosti/.test(s)) return "6h BEZ viazanosti";
-  if (/doplnenie/.test(s)) return "Doplnenie členstva";
+  // Doplnenie je dokúpená hodina k paušálnemu členstvu (GOLD/SILVER/DIAMOND/
+  // ONE), nie balíček. Ako názov skupiny to znelo ako produkt, ktorý si klient
+  // kúpil — pritom hovorí len to, že balíček s hodinami evidovaný nemá.
+  if (/doplnenie|za protokol/.test(s)) return "Členstvo (bez balíčka hodín)";
   if (/special|špeci/.test(s)) return "Špeciál";
   if (!m) return "Bez balíčka";
   return "Iné";
@@ -37,7 +40,7 @@ export const MEMBERSHIP_ORDER = [
   "1 hodina",
   "Online balíček",
   "Ročné (ONE YEAR)",
-  "Doplnenie členstva",
+  "Členstvo (bez balíčka hodín)",
   "Špeciál",
   "Bez balíčka",
   "Iné",
@@ -111,6 +114,8 @@ export type ClientAgg = {
   packageRemaining: number;
   packageTotal: number;
   packageStatus: string;
+  /** Klient má v exporte len doplnky k členstvu, nie balíček s hodinami. */
+  lenDoplnky: boolean;
 };
 
 // A client is in the 6M process if a "S viazanostou" service was sold to them
@@ -168,6 +173,7 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
         packageRemaining: 0,
         packageTotal: 0,
         packageStatus: "",
+        lenDoplnky: false,
       };
     }
     c.sessions.push(s);
@@ -254,7 +260,21 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
     // an old depleted row (0/18) plus a new one (17/18); summing gave a wrong 17/36.
     // Pick the row with the most sessions remaining (the live package); if all are
     // depleted, the one with the largest total (the most significant package).
-    const active = packs.slice().sort((a, b) => b.remaining - a.remaining || b.total - a.total)[0];
+    //
+    // „Doplnenie členstva" a „Za protokol" sa do výberu neberú, kým existuje
+    // čokoľvek iné. Nie sú to balíčky — sú to jednotlivé hodiny dokúpené k
+    // paušálnemu členstvu (GOLD/SILVER/DIAMOND/ONE), takže v exporte stoja
+    // navždy na 0/N. Appka ich brala ako aktuálny balíček a hlásila „došli
+    // hodiny — čas na ďalší balíček" u 40 zo 73 klientov, ktorým nič
+    // nekončilo: Tomáš Krčmar má DIAMOND členstvo a 12 tréningov za osem
+    // týždňov, a napriek tomu svietil ako klient na konci balíčka.
+    const jeDoplnok = (p: string) => /doplnenie|za protokol/i.test(p || "");
+    const skutocne = packs.filter((p) => !jeDoplnok(p.package));
+    const zdroj = skutocne.length ? skutocne : packs;
+    const active = zdroj.slice().sort((a, b) => b.remaining - a.remaining || b.total - a.total)[0];
+    // Klient, ktorý má LEN doplnky, nemá evidovaný balíček — má členstvo.
+    // Tvrdiť o ňom „0 z 3 hodín" je nepravda o produkte, ktorý si kúpil.
+    c.lenDoplnky = skutocne.length === 0 && packs.length > 0;
     c.packageRemaining = active?.remaining ?? 0;
     c.packageTotal = active?.total ?? 0;
     c.packageStatus = active?.status || "";
