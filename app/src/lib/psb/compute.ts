@@ -808,6 +808,28 @@ export function deriveRegister(
       client,
     });
 
+  // Staré dáta klamú ticho — a to je horší druh klamstva než chýbajúce číslo.
+  //
+  // Keď sa týždeň nenahrá export z PTmindera, appka nič nehlási: dochádzka
+  // každému klesne (okno 18 týždňov sa posúva, ale nové tréningy nepribúdajú),
+  // lievik bežiaceho mesiaca ukáže nula nových klientov a vyzerá to ako zlý
+  // mesiac namiesto prázdnej tabuľky. Preto to appka povie nahlas, kým je
+  // rozdiel medzi „nič sa nedialo" a „nič sme nenahrali" ešte zistiteľný.
+  const posledneData = data.sessions.reduce((m, s) => (s.date > m ? s.date : m), "");
+  if (posledneData) {
+    const dniStare = Math.floor(daysBetween(posledneData, new Date()));
+    if (dniStare >= 4) {
+      add(
+        `data|${posledneData.slice(0, 10)}`,
+        "Zápis",
+        dniStare >= 10 ? "red" : "orange",
+        `Dáta z PTmindera končia ${fmtDMY(posledneData)}`,
+        `Posledné nahraté sedenie je spred ${dniStare} dní. Kým nenahráš nový export, dochádzka klientov klesá sama a čísla za tento mesiac sú neúplné — nula nových klientov nemusí znamenať, že nikto neprišiel.`,
+        1,
+      );
+    }
+  }
+
   for (const c of sixM) {
     if (!c.alert) continue;
     // Klient na dohodnutej pauze nepotrebuje hodnotiaci rozhovor tento týždeň.

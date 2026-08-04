@@ -442,7 +442,12 @@ export function Dashboard({
     for (const l of dopyty) zdroje.set(l.source, (zdroje.get(l.source) || 0) + 1);
     const uvodne = new Set(data.sessions.filter((s) => s.sessionType === "UVODNE" && s.date.slice(0, 7) === mes).map((s) => s.client)).size;
     const novi = Object.values(clients).filter((c) => (c.firstSession || "").slice(0, 7) === mes).length;
-    return { mes, dopyty: dopyty.length, zdroje: [...zdroje.entries()].sort((a, b) => b[1] - a[1]), uvodne, novi };
+    // Nula úvodných môže znamenať dve úplne odlišné veci: nikto neprišiel, alebo
+    // sa mesiac ešte nenahral. Bez tohto rozdielu je karta v prvých dňoch mesiaca
+    // vždy „katastrofa", a človek ju prestane brať vážne práve vtedy, keď má.
+    const kotva = data.sessions.reduce((m, s) => (s.date > m ? s.date : m), "");
+    const bezDat = !!kotva && kotva.slice(0, 7) < mes;
+    return { mes, dopyty: dopyty.length, zdroje: [...zdroje.entries()].sort((a, b) => b[1] - a[1]), uvodne, novi, bezDat, kotva };
   }, [data, clients]);
 
   // Predikcia tržieb na najbližší mesiac — podľa Jerryho „to najdôležitejšie
@@ -866,9 +871,14 @@ export function Dashboard({
         <div style={{ ...centerBody, cursor: "pointer" }} onClick={() => onNavigate("marketing", "lievik")} title="Otvoriť Marketing → Lievik">
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 8 }}>
             <MiniStat label="Dopyty" value={String(lievikMes.dopyty)} color={C.blue} />
-            <MiniStat label="Úvodné" value={String(lievikMes.uvodne)} color={C.accentLight} />
-            <MiniStat label="Noví klienti" value={String(lievikMes.novi)} color={lievikMes.novi >= 6 ? C.green : undefined} />
+            <MiniStat label="Úvodné" value={lievikMes.bezDat ? "—" : String(lievikMes.uvodne)} color={C.accentLight} />
+            <MiniStat label="Noví klienti" value={lievikMes.bezDat ? "—" : String(lievikMes.novi)} color={!lievikMes.bezDat && lievikMes.novi >= 6 ? C.green : undefined} />
           </div>
+          {lievikMes.bezDat && (
+            <div style={{ fontSize: 11, color: C.orange, marginTop: 8, lineHeight: 1.5 }}>
+              Úvodné a noví klienti sa rátajú z PTmindera a ten je nahratý len do {fmtDMY(lievikMes.kotva)} — za tento mesiac zatiaľ nie sú dáta. Dopyty sú zapísané ručne, tie platia.
+            </div>
+          )}
           {lievikMes.zdroje.length > 0 && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 10 }}>
               {lievikMes.zdroje.map(([z, n]) => (
