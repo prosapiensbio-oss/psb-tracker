@@ -570,10 +570,20 @@ export function Dashboard({
         // upozornení robí tapetu. Kto chodí častejšie než raz týždenne, minie
         // dve hodiny za týždeň, takže má zmysel ozvať sa pri dvoch. Kto chodí
         // menej často, má zmysel až pri poslednej.
+        // Frekvencia z POSLEDNÝCH 8 TÝŽDŇOV, nie za celý život klienta.
+        //
+        // Anna Kadličkova má za 47 týždňov 38 sedení, čo je 0,81 týždenne — lenže
+        // v tom priemere sú Vianoce, dovolenka aj rozbeh. Posledné mesiace chodí
+        // raz týždenne a podľa toho sa má počítať, či zostávajúce hodiny stihne
+        // minúť. Celoživotný priemer podhodnotí tempo a appka potom hlási stratu
+        // hodín tam, kde žiadna nebude.
+        const odkedy = Date.parse(dnes) - 8 * 7 * 86400000;
+        const nedavne = c.sessions.filter((x) => Date.parse(x.date) >= odkedy).length;
         const tyzdnov = c.firstSession && c.lastSession
           ? Math.max(1, (Date.parse(c.lastSession) - Date.parse(c.firstSession)) / 604800000)
           : 1;
-        const frekvencia = c.sessionCount / tyzdnov;
+        // Klient s krátkou históriou nemá dosť nedávnych dát — vtedy platí celoživotný priemer.
+        const frekvencia = tyzdnov >= 8 ? nedavne / 8 : c.sessionCount / tyzdnov;
         const prah = frekvencia > 1 ? 2 : 1;
         const hodinyDosli = c.packageTotal > 0 && c.packageRemaining <= prah;
         // Platnosť sa hlási len vtedy, keď z nej niečo VYPLÝVA.
@@ -586,7 +596,11 @@ export function Dashboard({
         // Posledný týždeň sa hlási vždy, bez ohľadu na hodiny: koniec členstva
         // je sám o sebe moment, kedy sa rieši ďalší balíček.
         const tyzdnovDoKonca = doKonca !== null ? doKonca / 7 : 0;
-        const stihneMinut = frekvencia > 0 ? frekvencia * tyzdnovDoKonca >= c.packageRemaining : false;
+        // Tolerancia jednej hodiny: prísť o pol hodiny nie je dôvod na
+        // upozornenie, prísť o dve je.
+        const stihneMinut = frekvencia > 0
+          ? frekvencia * tyzdnovDoKonca >= c.packageRemaining - 1
+          : false;
         const platnostKonci =
           doKonca !== null && doKonca > -60 &&
           (doKonca <= 7 || (doKonca <= 21 && !stihneMinut));
