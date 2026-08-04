@@ -50,7 +50,7 @@ export type Lead = {
   id: string;
   date: string;
   name: string;
-  source: "referencia" | "mail" | "web" | "google" | "instagram" | "instagram_osobny" | "telefon" | "ine";
+  source: "referencia" | "reklama" | "mail" | "web" | "google" | "instagram" | "instagram_osobny" | "telefon" | "ine";
   referrer: string;   // existing client who sent them (source = referencia)
   status: "novy" | "neodpisal" | "dohodnuty" | "zruseny";
   note: string;

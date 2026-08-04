@@ -31,6 +31,10 @@ const KPI_WINDOWS = [
 // času, boli v štatistike neviditeľné.
 const SOURCES = [
   { value: "referencia", label: "Referencia" },
+  // Bez tohto sa platená a neplatená cesta nedajú rozlíšiť: kto uvidel platený
+  // reel, napíše „Instagram" rovnako ako ten, kto nás našiel sám. A kým sa to
+  // nerozlíši, veta „spustím reklamu = klienti" sa nedá ani overiť, ani vyladiť.
+  { value: "reklama", label: "Reklama (platená)" },
   { value: "mail", label: "Mail (web formulár)" },
   { value: "instagram", label: "Instagram — firemný" },
   { value: "instagram_osobny", label: "Instagram — osobný" },
@@ -55,6 +59,8 @@ const statusColor = (s: string) =>
 function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Record<string, ClientAgg>; refresh: () => Promise<void> }) {
   const [busy, setBusy] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [rychleMeno, setRychleMeno] = useState("");
+  const [rychlyZdroj, setRychlyZdroj] = useState("reklama");
   const [draft, setDraft] = useState<Partial<Lead>>({});
 
   const clientNames = useMemo(
@@ -113,10 +119,27 @@ function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Record<st
       <Card>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
           <H3><Info text="Každý, kto sa ozve — mail, Instagram, referencia. Aj ten, kto potom neodpíše. Zapisuje sa len to, čo appka inak nezistí; či klient reálne prišiel a či začal chodiť, vyčíta z PTminder CSV." label="Dopyty" /></H3>
-          <button onClick={openAdd} disabled={busy}
-            style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${C.accent}`, background: C.accentBg, color: C.accentLight, fontSize: 12.5, fontWeight: 600, cursor: busy ? "default" : "pointer" }}>
-            + Nový dopyt
-          </button>
+          {/* Rýchly zápis. Modálne okno so šiestimi poľami zostáva na doplnenie
+              detailu, ale prvý zápis musí trvať desať sekúnd — inak sa nestane.
+              Meno a zdroj stačia; dátum je dnešok a stav „ozval sa". */}
+          <form
+            onSubmit={(e) => { e.preventDefault(); if (!rychleMeno.trim()) return; void save({ date: new Date().toISOString().slice(0, 10), name: rychleMeno.trim(), source: rychlyZdroj as Lead["source"], status: "novy", referrer: "", note: "" }); setRychleMeno(""); }}
+            style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}
+          >
+            <input
+              value={rychleMeno} onChange={(e) => setRychleMeno(e.target.value)} placeholder="Meno — kto sa ozval"
+              style={{ ...S.select, width: 200, minWidth: 0 }}
+            />
+            <Select value={rychlyZdroj} onChange={setRychlyZdroj} options={SOURCES} />
+            <button type="submit" disabled={busy || !rychleMeno.trim()}
+              style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${C.accent}`, background: C.accentBg, color: C.accentLight, fontSize: 12.5, fontWeight: 600, cursor: busy || !rychleMeno.trim() ? "default" : "pointer", opacity: busy || !rychleMeno.trim() ? 0.45 : 1 }}>
+              Zapísať
+            </button>
+            <button type="button" onClick={openAdd} disabled={busy}
+              style={{ background: "none", border: "none", color: C.textDim, fontSize: 12, cursor: "pointer" }}>
+              s detailom
+            </button>
+          </form>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 10 }}>
           <StatCard value={String(counts.total)} label="Dopytov spolu" color={C.blue} />

@@ -25,7 +25,7 @@ import {
 } from "../../lib/psb/marketing";
 import { KATEGORIE_HOOKOV, MKT_OBSAH } from "../../lib/psb/marketing-obsah";
 import { Algoritmus } from "./Algoritmus";
-import { Lievik, Naklady, Referencie } from "./MarketingLievik";
+import { AkoMeratReklamu, Kohorta, Lievik, Naklady, Referencie } from "./MarketingLievik";
 import { Kanaly } from "./Kanaly";
 import { C, mix, S } from "../../lib/psb/theme";
 import type { AssistantChat } from "./Assistant";
@@ -813,10 +813,11 @@ export function Marketing({ data, clients, leads, chat }: { data: PSBData; clien
       {sub === "lievik" && (
         <>
           <Lievik data={data} clients={clients} />
+          <Kohorta data={data} clients={clients} />
           <CoToPrinieslo data={data} clients={clients} leads={leads} rok={rok} chat={chat} />
         </>
       )}
-      {sub === "naklady" && <Naklady data={data} clients={clients} />}
+      {sub === "naklady" && (<><Naklady data={data} clients={clients} /><AkoMeratReklamu /></>)}
       {sub === "referencie" && <Referencie data={data} clients={clients} />}
       {sub === "dosah" && (
         <>
