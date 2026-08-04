@@ -1,6 +1,8 @@
 import { useState } from "react";
 
+import { saveLead } from "../../lib/psb/client";
 import type { Ritual } from "../../lib/psb/rituals";
+import { SOURCES } from "./Klienti";
 import { C, mix } from "../../lib/psb/theme";
 import { Modal } from "./ui";
 
@@ -26,6 +28,10 @@ export function ZapisButton({
   onNavigate: (tab: string, sub?: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [dopytMeno, setDopytMeno] = useState("");
+  const [dopytZdroj, setDopytZdroj] = useState("reklama");
+  const [dopytBusy, setDopytBusy] = useState(false);
+  const [dopytOk, setDopytOk] = useState("");
   const cakajuce = ritualy.filter((r) => r.splatne).length;
 
   const polozky: Polozka[] = [
@@ -38,8 +44,9 @@ export function ZapisButton({
     })),
     // Dopyty sa medzitým presťahovali z Marketingu do Klientov — rozcestník
     // ukazoval na starú adresu.
-    { nadpis: "Nový dopyt", popis: "Kto sa ozval, odkiaľ a čo sa s tým stalo.", tab: "klienti", sub: "dopyty" },
-    { nadpis: "Poznámka ku klientovi", popis: "Stav, pauza, poznámka trénera — v karte klienta.", tab: "klienti" },
+    // sub je nutný: bez neho zostane posledná otvorená podzáložka (napr.
+    // Dopyty) a rozcestník dovedie človeka vedľa.
+    { nadpis: "Poznámka ku klientovi", popis: "Stav, pauza, poznámka trénera — v karte klienta.", tab: "klienti", sub: "klienti" },
     { nadpis: "Záver z debaty", popis: "Napíš Jarvisovi — záver si zapíše sám a objaví sa v registri.", tab: "dashboard" },
   ];
 
@@ -71,6 +78,40 @@ export function ZapisButton({
 
       {open && (
         <Modal title="Čo chceš zapísať" onClose={() => setOpen(false)}>
+          {/* Najčastejší zápis rovno tu, bez navigácie. Dopyt je meno + zdroj;
+              všetko ostatné sa dá doplniť neskôr v Dopytoch. Rozcestník nižšie
+              zostáva pre zápisy, ktoré potrebujú vlastnú obrazovku. */}
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const m = dopytMeno.trim();
+              if (!m || dopytBusy) return;
+              setDopytBusy(true);
+              void saveLead({ date: new Date().toISOString().slice(0, 10), name: m, source: dopytZdroj as never, status: "novy", referrer: "", note: "" })
+                .then(() => { setDopytMeno(""); setDopytOk(m); setTimeout(() => setDopytOk(""), 4000); })
+                .finally(() => setDopytBusy(false));
+            }}
+            style={{ marginBottom: 14, padding: "11px 13px", borderRadius: 10, border: `1px solid ${mix(C.accent, 30)}`, background: mix(C.accent, 5) }}
+          >
+            <div style={{ fontSize: 12.5, fontWeight: 600, color: C.text, marginBottom: 8 }}>Nový dopyt — kto sa ozval</div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              <input
+                value={dopytMeno} onChange={(e) => setDopytMeno(e.target.value)} placeholder="Meno"
+                style={{ flex: "2 1 140px", minWidth: 0, padding: "7px 10px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 13 }}
+              />
+              <select
+                value={dopytZdroj} onChange={(e) => setDopytZdroj(e.target.value)}
+                style={{ flex: "1 1 120px", minWidth: 0, padding: "7px 8px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 12.5 }}
+              >
+                {SOURCES.map((z) => <option key={z.value} value={z.value} style={{ background: C.card }}>{z.label}</option>)}
+              </select>
+              <button type="submit" disabled={dopytBusy || !dopytMeno.trim()}
+                style={{ padding: "7px 14px", borderRadius: 8, fontSize: 12.5, fontWeight: 600, border: `1px solid ${mix(C.accent, 45)}`, background: mix(C.accent, 10), color: C.accentLight, cursor: dopytBusy || !dopytMeno.trim() ? "default" : "pointer", opacity: dopytBusy || !dopytMeno.trim() ? 0.45 : 1 }}>
+                Zapísať
+              </button>
+            </div>
+            {dopytOk && <div style={{ fontSize: 11.5, color: C.green, marginTop: 6 }}>Zapísané: {dopytOk}. Detail doplníš v Klienti → Dopyty.</div>}
+          </form>
           <div style={{ display: "grid", gap: 8 }}>
             {polozky.map((p) => (
               <button

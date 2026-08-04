@@ -1,9 +1,10 @@
 import { Fragment, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { fetchBtcReserve, fetchMonthNotes, fetchVzasSettings, fetchWeekEntries, saveMonthNote, saveVzasSetting, type BtcReserve, type MonthNote, type WeekEntry } from "../../lib/psb/client";
-import type { CapacityRow, ClientAgg, RegisterItem, SixMRow } from "../../lib/psb/compute";
+import { monthlyFinance, predictCash, type CapacityRow, type ClientAgg, type RegisterItem, type SixMRow } from "../../lib/psb/compute";
 import { fmtCZK } from "../../lib/psb/format";
 import { ObdobieCtx } from "../../lib/psb/obdobie";
+import { nastavPrijmyZTrackera } from "../../lib/psb/vzas";
 import { C, mix, S } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import {
@@ -59,6 +60,7 @@ import {
   type Vals,
 } from "../../lib/psb/vzas";
 import { Card, Empty, H3, Info, LineChart, Select, StatCard, SubTabs, useScrollEnd } from "./ui";
+import { tokyKlientov } from "./Fluktuacia";
 import { Nakupy } from "./Nakupy";
 import { Report } from "./Report";
 
@@ -1707,7 +1709,33 @@ const METRICS = [
   { value: "marza", label: "Marža %" },
 ];
 
-function MesacneTab() {
+// Výhľad pred spätným zrkadlom. Mesačné výsledky hovorili len o minulosti —
+// pritom prvá otázka pri mesačnej uzávierke je „a čo ďalší mesiac".
+function Vyhlad({ data, clients }: { data: PSBData; clients: Record<string, ClientAgg> }) {
+  const v = useMemo(() => {
+    const cash = predictCash(data, clients, 1);
+    const toky = tokyKlientov(data, clients, 60);
+    return { odhad: cash.months[0], odislo: toky.odisloMes };
+  }, [data, clients]);
+  if (!v.odhad) return null;
+  return (
+    <Card>
+      <H3><Info text="Jediné dve dopredné čísla, ktoré appka vie: odhad tržieb z obnov členstiev (kto kedy dochodí hodiny a koľko naposledy zaplatil) a koľko klientov treba získať, aby počet rástol — lebo odchody bežia bez ohľadu na príchody. Detaily sú vo Financie → Predikcia a v Klienti → Rast a strata." label="Výhľad na ďalší mesiac" /></H3>
+      <div style={{ display: "flex", gap: 22, flexWrap: "wrap", marginTop: 10 }}>
+        <div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: C.green, fontVariantNumeric: "tabular-nums" }}>{fmtCZK(v.odhad.expected)}</div>
+          <div style={{ fontSize: 11.5, color: C.textMuted }}>odhad tržieb · {v.odhad.month.slice(5, 7)}/{v.odhad.month.slice(0, 4)}</div>
+        </div>
+        <div>
+          <div style={{ fontSize: 22, fontWeight: 800, color: C.accentLight, fontVariantNumeric: "tabular-nums" }}>{(v.odislo + 3).toFixed(1)}</div>
+          <div style={{ fontSize: 11.5, color: C.textMuted }}>nových klientov na rast +3 (odíde ~{v.odislo.toFixed(1)})</div>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function MesacneTab({ data, clients }: { data: PSBData; clients: Record<string, ClientAgg> }) {
   const p = pnlCalc();
   const r = useRange();
   const [metric, setMetric] = useState("prijmy");
@@ -2198,7 +2226,15 @@ function CieleTab({ data }: { data: PSBData }) {
 }
 
 // ── module shell ─────────────────────────────────────────────────────────────
-export function Vzas({ sub, onSub }: { sub: string; onSub: (s: string) => void }) {
+export function Vzas({ sub, onSub, data }: { sub: string; onSub: (s: string) => void; data: PSBData }) {
+  // Tržby do VZAS tečú živé z PTmindera — excelový prepis sa nahradí pri
+  // každom otvorení. `tik` len prekreslí strom po mutácii modulových polí.
+  const [, tik] = useState(0);
+  useEffect(() => {
+    const cash: Record<string, number> = {};
+    for (const m of monthlyFinance(data)) cash[m.month] = m.cash;
+    if (nastavPrijmyZTrackera(cash)) tik((x) => x + 1);
+  }, [data]);
   return (
     <>
       <SubTabs
@@ -2212,7 +2248,15 @@ export function Vzas({ sub, onSub }: { sub: string; onSub: (s: string) => void }
         value={sub}
         onChange={onSub}
       />
-      {sub === "pnl" && <PnlTab />}
+      {sub === "pnl" && (
+        <>
+          <div style={{ fontSize: 11.5, color: C.textDim, margin: "0 0 10px", lineHeight: 1.5 }}>
+            Tržby (PTminder) idú živé z nahratých platieb — už sa neprepisujú z Excelu.
+            Júl a august pribudnú spolu s nákladmi z Fio: mesiac len s tržbami by ukazoval zisk, ktorý neexistuje.
+          </div>
+          <PnlTab />
+        </>
+      )}
       {sub === "vyplaty" && <SalaryTab />}
       {sub === "cashflow" && <CashflowTab />}
       {sub === "jarek" && <JarekTab />}
@@ -2251,7 +2295,7 @@ export function Vysledky({
         onChange={setSub}
       />
       {sub === "kvartalne" && <KvartalneTab />}
-      {sub === "mesacne" && <MesacneTab />}
+      {sub === "mesacne" && <MesacneTab data={data} clients={clients} />}
       {sub === "kpi" && <KpiTab data={data} onNavigate={onNavigate} />}
       {sub === "ciele" && <CieleTab data={data} />}
       {sub === "report" && <Report data={data} clients={clients} sixM={sixM} capacity={capacity} register={register} />}

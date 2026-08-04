@@ -635,6 +635,18 @@ export function deriveAnomalies(data: PSBData, clients: Record<string, ClientAgg
   const serviceClients = new Set(data.services.map((s) => s.client));
   const now = new Date();
 
+  // Nový klient bez zdroja. Zdroj má vyplnený len každý druhý klient a
+  // dopĺňať sa dá jedine krátko po začiatku — o pol roka si už nikto nespomenie,
+  // odkiaľ človek prišiel. Preto pripomienka žije len 60 dní od prvého tréningu.
+  for (const c of Object.values(clients)) {
+    if (c.zdroj || c.status === "Neaktívny" || !c.firstSession) continue;
+    const dni = (now.getTime() - Date.parse(c.firstSession)) / 86400000;
+    if (dni >= 0 && dni <= 60) {
+      push(`zdroj|${c.name}`, "blue", "Chýba zdroj",
+        `${c.name}: nový klient bez zdroja — dopíš, odkiaľ prišiel, kým sa to vie`, c.name);
+    }
+  }
+
   for (const c of Object.values(clients)) {
     // "Pauza" = agreed temporary break — silences activity/renewal anomalies.
     // But once a DATED pause is over, surface a reminder to reach out.
@@ -735,7 +747,7 @@ export function deriveAnomalies(data: PSBData, clients: Record<string, ClientAgg
 // anomalies. Each item can be accepted (with a note) or hidden via anomalyAck.
 export type RegisterItem = {
   key: string;
-  category: "6M" | "Kapacita" | "Anomália" | "Rozhodnutie" | "Zápis";
+  category: "6M" | "Kapacita" | "Anomália" | "Rozhodnutie" | "Zápis" | "Zmena";
   tone: "red" | "orange" | "blue";
   title: string;
   detail: string;

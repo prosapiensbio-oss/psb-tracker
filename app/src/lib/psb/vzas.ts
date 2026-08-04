@@ -276,6 +276,30 @@ export const PRIJMY_PTMINDER: Vals = [166417, 219349, 170952, 105775, 189237, 13
 export const PRIJMY_INE: Vals = [14000, 34000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 500, 180, 0, 0, 0, 0, 0];
 export const PRIJMY: Vals = PRIJMY_PTMINDER.map((v, i) => v + PRIJMY_INE[i]);
 
+// Tržby z PTmindera boli doteraz PREPÍSANÉ z Excelu — druhý zdroj pravdy o
+// čísle, ktoré appka počíta živo z platieb. Kým sedeli (overené na korunu za
+// jan 2025 – jún 2026), nič sa nedialo; ale každý ďalší mesiac by ich musel
+// niekto prepisovať ručne a prvý preklep by sa nedal odhaliť, lebo by nebolo
+// s čím porovnať. Setter nahradí excelové hodnoty živými pri každom otvorení
+// VZAS. Mutuje sa priamo pole: čítajú ho výpočty za behu (pnlCalc, KPI) a
+// desiatka komponentov — prepojiť to cez props by znamenalo prepísať celý súbor.
+//
+// Júl a august tu zámerne NIE SÚ: pridať mesiac len s tržbami by znamenalo
+// P&L, kde zisk = tržby, lebo náklady (nula) ešte neexistujú. Vymyslený zisk
+// je horší než chýbajúci mesiac. Mesiace pribudnú s nákladmi z Fio.
+export let PRIJMY_SU_ZIVE = false;
+export function nastavPrijmyZTrackera(cashPodlaMesiaca: Record<string, number>): boolean {
+  let zmena = !PRIJMY_SU_ZIVE;
+  VZAS_MONTHS.forEach((mk, i) => {
+    const v = cashPodlaMesiaca[mk];
+    if (v == null || v <= 0) return;
+    if (Math.abs(PRIJMY_PTMINDER[i] - v) > 0.5) { PRIJMY_PTMINDER[i] = v; zmena = true; }
+  });
+  VZAS_MONTHS.forEach((_, i) => { PRIJMY[i] = PRIJMY_PTMINDER[i] + PRIJMY_INE[i]; });
+  PRIJMY_SU_ZIVE = true;
+  return zmena;
+}
+
 // Debt bookkeeping starts empty at 1.1.2025 — every balance below is built up
 // month by month from the records, not carried in as an assumption.
 export const DEBT_START = 0;

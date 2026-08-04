@@ -362,7 +362,7 @@ function PlatenaCesta({ data, clients, spend }: { data: PSBData; clients: Record
 }
 
 // ── Referenčný motor ─────────────────────────────────────────────────────────
-export function Referencie({ data, clients }: { data: PSBData; clients: Record<string, ClientAgg> }) {
+export function Referencie({ data, clients, onKlient }: { data: PSBData; clients: Record<string, ClientAgg>; onKlient?: (m: string) => void }) {
   const r = useMemo(() => {
     const vsetci = Object.values(clients);
     const zRef = vsetci.filter((c) => c.zdroj === "referencia");
@@ -437,9 +437,26 @@ export function Referencie({ data, clients }: { data: PSBData; clients: Record<s
             <tbody>
               {r.rebricek.map((x) => (
                 <tr key={x.kto}>
-                  <td style={{ ...S.td, fontWeight: 600, color: C.text }}>{x.kto}</td>
+                  <td style={{ ...S.td, fontWeight: 600 }}>
+                    {/* Odporúčateľ je klikateľný, len keď je sám klientom — cudzí
+                        človek nemá v appke kartu, na ktorú by sa dalo ísť. */}
+                    {clients[x.kto] && onKlient ? (
+                      <button onClick={() => onKlient(x.kto)} style={{ background: "none", border: "none", padding: 0, color: C.accentLight, fontWeight: 600, fontSize: 13, cursor: "pointer" }}>{x.kto}</button>
+                    ) : (
+                      <span style={{ color: C.text }}>{x.kto}</span>
+                    )}
+                  </td>
                   <td style={{ ...S.td, textAlign: "right", color: x.klienti.length > 1 ? C.accentLight : C.textMuted }}>{x.klienti.length}</td>
-                  <td style={{ ...S.td, color: C.textMuted, fontSize: 12 }}>{x.klienti.join(", ")}</td>
+                  <td style={{ ...S.td, fontSize: 12 }}>
+                    {x.klienti.map((m, i) => (
+                      <span key={m}>
+                        {i > 0 && ", "}
+                        {onKlient ? (
+                          <button onClick={() => onKlient(m)} style={{ background: "none", border: "none", padding: 0, color: C.textMuted, fontSize: 12, cursor: "pointer", textDecoration: "underline", textDecorationColor: mix(C.border, 90) }}>{m}</button>
+                        ) : m}
+                      </span>
+                    ))}
+                  </td>
                   <td style={{ ...S.td, textAlign: "right", color: C.green }}>{fmtCZK(x.trzba)}</td>
                 </tr>
               ))}

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { ClientAgg } from "../../lib/psb/compute";
+import type { Lead } from "../../lib/psb/types";
 import { normName } from "../../lib/psb/format";
 import { C, mix } from "../../lib/psb/theme";
 
@@ -16,10 +17,14 @@ import { C, mix } from "../../lib/psb/theme";
 // skočí, šípky vyberajú, Enter otvorí, Esc zavrie.
 export function HladanieKlienta({
   clients,
+  leads = [],
   onPick,
+  onPickLead,
 }: {
   clients: Record<string, ClientAgg>;
+  leads?: Lead[];
   onPick: (meno: string) => void;
+  onPickLead?: () => void;
 }) {
   const [q, setQ] = useState("");
   const [otvorene, setOtvorene] = useState(false);
@@ -30,8 +35,10 @@ export function HladanieKlienta({
   const najdene = useMemo(() => {
     const t = normName(q.trim());
     if (t.length < 2) return [];
+    // Hľadá sa aj v mene odporúčateľa — „kto priviedol Petra" je rovnako častá
+    // otázka ako „kde je Peter" a odpoveď je klient, ktorého Peter poslal.
     return Object.values(clients)
-      .filter((c) => normName(c.name).includes(t))
+      .filter((c) => normName(c.name).includes(t) || normName(c.zdrojKto || "").includes(t))
       // Aktívni hore a v rámci nich ten, kto tu bol naposledy — pri hľadaní
       // klienta ide skoro vždy o toho, s ktorým sa práve niečo rieši.
       .sort((a, b) => {
@@ -39,8 +46,16 @@ export function HladanieKlienta({
         const bb = b.status !== "Neaktívny" ? 0 : 1;
         return aa - bb || (b.lastSession || "").localeCompare(a.lastSession || "");
       })
-      .slice(0, 8);
+      .slice(0, 6);
   }, [q, clients]);
+
+  // Dopyty zvlášť: ľudia, ktorí ešte nie sú klienti, sa v zozname klientov
+  // nenájdu — ale hľadať ich chce človek rovnako.
+  const najdeneDopyty = useMemo(() => {
+    const t = normName(q.trim());
+    if (t.length < 2) return [];
+    return leads.filter((l) => l.name && normName(l.name).includes(t)).slice(0, 3);
+  }, [q, leads]);
 
   useEffect(() => setI(0), [q]);
 
@@ -81,7 +96,7 @@ export function HladanieKlienta({
     if (e.key === "Enter") { e.preventDefault(); vyber(najdene[i].name); }
   };
 
-  const ukazat = otvorene && najdene.length > 0;
+  const ukazat = otvorene && (najdene.length > 0 || najdeneDopyty.length > 0);
 
   return (
     <div ref={box} style={{ position: "relative", minWidth: 0, flex: "0 1 220px" }}>
@@ -107,6 +122,16 @@ export function HladanieKlienta({
             boxShadow: "0 10px 28px rgba(0,0,0,0.35)", overflow: "hidden",
           }}
         >
+          {najdeneDopyty.map((l) => (
+            <button
+              key={`d-${l.id}`}
+              onClick={() => { onPickLead?.(); setQ(""); setOtvorene(false); input.current?.blur(); }}
+              style={{ display: "block", width: "100%", textAlign: "left", cursor: "pointer", padding: "7px 10px", border: "none", background: "transparent" }}
+            >
+              <span style={{ fontSize: 12.5, color: C.text, display: "block" }}>{l.name}</span>
+              <span style={{ fontSize: 10.5, color: C.accentLight }}>dopyt · {l.status === "novy" ? "ozval sa" : l.status}</span>
+            </button>
+          ))}
           {najdene.map((c, idx) => (
             <button
               key={c.name}
@@ -121,6 +146,7 @@ export function HladanieKlienta({
               <span style={{ fontSize: 12.5, color: C.text, display: "block" }}>{c.name}</span>
               <span style={{ fontSize: 10.5, color: C.textDim }}>
                 {c.status === "Neaktívny" ? "neaktívny · " : ""}{c.membership || "bez balíčka"} · {c.primaryTrainer || "—"}
+                {c.zdrojKto && normName(c.zdrojKto).includes(normName(q.trim())) && !normName(c.name).includes(normName(q.trim())) ? ` · odporučil(a): ${c.zdrojKto}` : ""}
               </span>
             </button>
           ))}

@@ -389,9 +389,13 @@ function CoFungovalo({ chat }: { chat?: AssistantChat }) {
           </div>
         ))}
       </div>
-      <div style={{ fontSize: 12.5, color: C.textMuted, marginTop: 12, lineHeight: 1.55 }}>
-        Štyri z ôsmich najuchovávanejších kusov sú <b>klientske príbehy</b> — Jarek, „Nepřišel proto, že by chtěl víc svalů“,
-        „Prkno. Sklapovačky.“ Naopak najslabšie dopadli všeobecné edukatívne reels a vianočný darčekový.
+      {/* Veta „štyri z ôsmich sú klientske príbehy" tu bola natvrdo a viazala
+          sa na starý statický rebríček — od chvíle, keď top plní databáza z
+          nahratých exportov, by klamala. Interpretáciu robí Jarvis nad živými
+          dátami cez „Vysvetli mi to". */}
+      <div style={{ marginTop: 12, padding: "10px 14px", borderRadius: 10, background: mix(C.blue, 10), border: `1px solid ${mix(C.blue, 30)}`, color: C.text, fontSize: 12.5, lineHeight: 1.55 }}>
+        <b>Čo z týchto dát POVEDAŤ NEJDE:</b> či obsah priniesol klientov. Medzi príspevkom a úvodným tréningom nie je
+        žiadne spojenie — odpoveď dáva len dopyt a pole „odkiaľ prišiel“. Na to je záložka <b>Odkiaľ prišli klienti</b>.
       </div>
       <div style={{ marginTop: 16 }}>
         <PodlaHooku okno={okno} />
@@ -401,7 +405,10 @@ function CoFungovalo({ chat }: { chat?: AssistantChat }) {
 }
 
 // ── Čo to prinieslo ──────────────────────────────────────────────────────────
-function CoToPrinieslo({ data, clients, leads, rok, chat }: { data: PSBData; clients: Record<string, ClientAgg>; leads: Lead[]; rok: string; chat?: AssistantChat }) {
+function CoToPrinieslo({ data, clients, leads, chat }: { data: PSBData; clients: Record<string, ClientAgg>; leads: Lead[]; chat?: AssistantChat }) {
+  // Vlastný rok: globálny prepínač žil v hlavičke, ktorá sa zobrazuje len v
+  // Dosahu — z lievika, kde táto karta reálne je, sa rok nedal zmeniť vôbec.
+  const [rok, setRok] = useState("2026");
   const uvodne = useMemo(
     () => data.sessions.filter((s) => s.sessionType === "UVODNE" && s.date.slice(0, 4) === rok).length,
     [data.sessions, rok],
@@ -422,7 +429,15 @@ function CoToPrinieslo({ data, clients, leads, rok, chat }: { data: PSBData; cli
     <Card>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
       <H3><Info text="Instagram nikdy nepovie, kto sa stal klientom. Preto sa tu porovnávajú len dve veci, ktoré vieme: koľko stála reklama a koľko úvodných tréningov reálne prišlo. Skutočnú odpoveď „odkiaľ“ dá až lievik dopytov." label="Čo to prinieslo" /></H3>
-      <Vysvetli chat={chat} titul="Čo to prinieslo" filter={`rok ${rok}`} vyrez={vyrez} />
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        {["2025", "2026"].map((y) => (
+          <button key={y} onClick={() => setRok(y)}
+            style={{ padding: "5px 12px", borderRadius: 7, border: `1px solid ${rok === y ? C.accent : C.border}`, background: rok === y ? C.accentBg : "transparent", color: rok === y ? C.accentLight : C.textMuted, fontSize: 12, cursor: "pointer" }}>
+            {y}
+          </button>
+        ))}
+        <Vysvetli chat={chat} titul="Čo to prinieslo" filter={`rok ${rok}`} vyrez={vyrez} />
+      </div>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, margin: "12px 0 4px" }}>
         <StatCard value={fmtCZK(spend)} label={`Reklama ${rok}`} color={C.orange} />
@@ -520,96 +535,6 @@ function WebKanaly({ rok, chat }: { rok: string; chat?: AssistantChat }) {
         <b> základ, ktorý nezmizne, keď prestaneš platiť</b>.
       </div>
     </Card>
-  );
-}
-
-// ── Čo skúsiť ďalej ──────────────────────────────────────────────────────────
-function CoSkusitDalej({ chat }: { chat?: AssistantChat }) {
-  // Tu je výrez zámerne širší než pri ostatných kartách: otázka „čo skúsiť" sa
-  // nedá zodpovedať z jedného grafu — potrebuje aj to, čo fungovalo, aj to,
-  // koľko sa toho vôbec vypustilo.
-  const poslednych6 = MKT_MESACNE.slice(-6);
-  const vyrez = () =>
-    [tsv(["mesiac", "reels", "posty", "stories", "videnia", "uloženia", "view rate"],
-      poslednych6.map((r) => [label(r.m), r.reels, r.posty, r.stories, r.views, r.ulozenia, `${r.viewRate} %`])),
-      "",
-      "Najuchovávanejšie príspevky za celé obdobie:",
-      tsv(["typ", "hook", "uloženia"], MKT_TOP.map((k) => [k.typ, k.hook, k.ulozenia]))].join("\n");
-  return (
-    <Card>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-      <H3><Info text="Fakty z tvojej vlastnej histórie — poradie typov hookov podľa view rate, frekvencia a to, čo sa z týchto dát povedať NEDÁ. Interpretáciu a nápady si vypýtaj cez „Vysvetli mi to“: Jarvis vidí tie isté čísla, ale vie odpovedať aj na doplňujúcu otázku. Statický odsek s radami tu bol tiež a starol — tento vidí aj to, čo si nahral včera." label="Čo o obsahu vidno z dát" /></H3>
-      <Vysvetli chat={chat} titul="Čo skúsiť ďalej" filter="posledných 6 mesiacov + rebríček za celé obdobie" vyrez={vyrez} />
-      </div>
-      <CoSkusitObsah />
-      <div style={{ fontSize: 12.5, color: C.textDim, marginTop: 12, lineHeight: 1.55 }}>
-        Čo s tým ďalej — na to je tlačidlo <b style={{ color: C.textMuted }}>Vysvetli mi to</b> vyššie. Jarvis vidí tie isté čísla a odpovie aj na to, čo sa spýtaš potom.
-      </div>
-    </Card>
-  );
-}
-
-// ── Čo o obsahu vidno z dát ──────────────────────────────────────────────────
-// Zámerne len fakty: poradie, počty, rozdiel v percentuálnych bodoch. Rady tu
-// boli tiež („rob viac toho, čo funguje", „pozor na obsah zo zvyku") a bol to
-// zamrznutý text vedľa živého Jarvisa, ktorý vidí tie isté čísla a vie odpovedať
-// aj na doplňujúcu otázku. Dve odpovede na tú istú otázku, z ktorých jedna
-// nestarne a druhá áno — nechávame tú, čo nestarne.
-function CoSkusitObsah() {
-  const n = useMemo(() => {
-    const reels = MKT_OBSAH.filter((r) => r.f === "Reel" && r.vr > 0);
-    const podlaKat = new Map<string, { n: number; vr: number; u: number }>();
-    for (const r of reels) {
-      const e = podlaKat.get(r.k) || { n: 0, vr: 0, u: 0 };
-      e.n++; e.vr += r.vr; e.u += r.u;
-      podlaKat.set(r.k, e);
-    }
-    const rebricek = [...podlaKat.entries()]
-      .filter(([, e]) => e.n >= 3)
-      .map(([k, e]) => ({ kat: k, ks: e.n, vr: e.vr / e.n }))
-      .sort((a, b) => b.vr - a.vr);
-
-    // Ktorý typ hooku sa opakuje najviac a zároveň drží najnižší view rate —
-    // to je obsah, ktorý sa vyrába zo zvyku, nie preto, že funguje.
-    const najcastejsi = [...rebricek].sort((a, b) => b.ks - a.ks)[0];
-    const zoZvyku = najcastejsi && rebricek.length > 1 && najcastejsi.kat === rebricek[rebricek.length - 1].kat
-      ? najcastejsi
-      : null;
-
-    const poslednych6 = [...new Set(MKT_OBSAH.map((r) => r.m))].sort().slice(-6);
-    const frekvencia = poslednych6.map((m) => MKT_OBSAH.filter((r) => r.m === m).length);
-    const priemer = frekvencia.length ? frekvencia.reduce((a, b) => a + b, 0) / frekvencia.length : 0;
-
-    return { rebricek, zoZvyku, priemer: Math.round(priemer * 10) / 10, poslednych6, frekvencia };
-  }, []);
-
-  return (
-    <div style={{ fontSize: 12.5, color: C.textMuted, lineHeight: 1.6 }}>
-      {n.rebricek.length > 1 && (
-        <div style={{ marginBottom: 12 }}>
-          <b style={{ color: C.text }}>View rate podľa typu hooku</b> — reels, len kategórie s aspoň 3 kusmi:{" "}
-          {n.rebricek.map((r, i) => (
-            <span key={r.kat}>{i > 0 && " · "}<b style={{ color: i === 0 ? C.accentLight : C.textMuted }}>{r.kat}</b> {r.vr.toFixed(1)} % ({r.ks})</span>
-          ))}.
-          {" "}Rozdiel medzi prvým a posledným: {(n.rebricek[0].vr - n.rebricek[n.rebricek.length - 1].vr).toFixed(1)} percentuálneho bodu.
-        </div>
-      )}
-      {n.zoZvyku && (
-        <div style={{ marginBottom: 12 }}>
-          <b style={{ color: C.orange }}>Najčastejší typ má zároveň najnižší view rate</b><br />
-          „{n.zoZvyku.kat}" — {n.zoZvyku.ks} kusov.
-        </div>
-      )}
-      <div style={{ marginBottom: 12 }}>
-        <b style={{ color: C.text }}>Frekvencia</b><br />
-        Posledných 6 mesiacov: {n.poslednych6.map((m, i) => `${label(m)} ${n.frekvencia[i]}`).join(" · ")} — priemer <b>{n.priemer}</b> príspevkov s textom mesačne.
-      </div>
-      <div style={{ padding: "10px 14px", borderRadius: 10, background: mix(C.blue, 10), border: `1px solid ${mix(C.blue, 30)}`, color: C.text }}>
-        <b>Čo z týchto dát POVEDAŤ NEJDE:</b> či obsah priniesol klientov. Medzi príspevkom a úvodným tréningom nie je
-        žiadne spojenie — a 18 mesiacov je primálo na to, aby sa dalo veriť korelácii medzi počtom príspevkov a počtom
-        úvodných. Odpoveď dá až otázka „odkiaľ ste sa o nás dozvedeli" pri každom novom klientovi.
-      </div>
-    </div>
   );
 }
 
@@ -746,8 +671,8 @@ function Vyhladavanie({ chat }: { chat?: AssistantChat }) {
   );
 }
 
-export function Marketing({ data, clients, leads, chat }: { data: PSBData; clients: Record<string, ClientAgg>; leads: Lead[]; chat?: AssistantChat }) {
-  const [sub, setSub] = useState("lievik");
+export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient }: { data: PSBData; clients: Record<string, ClientAgg>; leads: Lead[]; chat?: AssistantChat; sub: string; onSub: (s: string) => void; onKlient?: (m: string) => void }) {
+  const setSub = onSub;
   const [rok, setRok] = useState("2026");
   // Nahraté exporty vyhrávajú nad číslami v kóde. Načíta sa raz pri otvorení;
   // `tik` je len na to, aby sa obrazovka po výmene prekreslila — samotné dáta
@@ -814,16 +739,15 @@ export function Marketing({ data, clients, leads, chat }: { data: PSBData; clien
         <>
           <Lievik data={data} clients={clients} />
           <Kohorta data={data} clients={clients} />
-          <CoToPrinieslo data={data} clients={clients} leads={leads} rok={rok} chat={chat} />
+          <CoToPrinieslo data={data} clients={clients} leads={leads} chat={chat} />
         </>
       )}
       {sub === "naklady" && (<><Naklady data={data} clients={clients} /><AkoMeratReklamu /></>)}
-      {sub === "referencie" && <Referencie data={data} clients={clients} />}
+      {sub === "referencie" && <Referencie data={data} clients={clients} onKlient={onKlient} />}
       {sub === "dosah" && (
         <>
           <Kanaly />
           <CoSomRobil chat={chat} />
-          <CoSkusitDalej chat={chat} />
           <CoFungovalo chat={chat} />
           <Vyhladavanie chat={chat} />
           <WebKanaly rok={rok} chat={chat} />

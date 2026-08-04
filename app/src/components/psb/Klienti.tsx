@@ -30,7 +30,7 @@ const KPI_WINDOWS = [
 // formulára, občas telefón, občas osobný Instagram". Telefón a osobný profil
 // doteraz spadli do „Iné" — čiže najosobnejšie kanály, ktoré stoja najviac
 // času, boli v štatistike neviditeľné.
-const SOURCES = [
+export const SOURCES = [
   { value: "referencia", label: "Referencia" },
   // Bez tohto sa platená a neplatená cesta nedajú rozlíšiť: kto uvidel platený
   // reel, napíše „Instagram" rovnako ako ten, kto nás našiel sám. A kým sa to
@@ -336,6 +336,11 @@ function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Record<st
 export const ZDROJE = [
   { value: "", label: "—" },
   { value: "referencia", label: "Referencia" },
+  // Reklama a web pribudli s meraním platenej cesty — klient, ktorý prišiel z
+  // dopytu so zdrojom „reklama", má ten zdroj niesť ďalej, inak sa atribúcia
+  // stratí presne v momente, keď sa z dopytu stane platiaci človek.
+  { value: "reklama", label: "Reklama (platená)" },
+  { value: "web", label: "Web / mail" },
   { value: "instagram", label: "Instagram" },
   { value: "google", label: "Google" },
   { value: "fp", label: "FP adresár" },

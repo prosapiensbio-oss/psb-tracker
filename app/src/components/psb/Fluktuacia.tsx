@@ -57,53 +57,52 @@ function pripravKlientov(data: PSBData, clients: Record<string, ClientAgg>, hran
   return { zoznam, kotva };
 }
 
+/**
+ * Mesačné toky klientov — jediné miesto, kde sa počítajú. Číta ich obrazovka
+ * Rast a strata aj výhľad v Mesačných výsledkoch; dve kópie tej istej
+ * aritmetiky by sa časom rozišli presne tak, ako sa rozišli tržby s Excelom.
+ */
+export function tokyKlientov(data: PSBData, clients: Record<string, ClientAgg>, hranicaDni = 60) {
+  const { zoznam, kotva } = pripravKlientov(data, clients, hranicaDni);
+  const m = new Map<string, { prisli: string[]; odisli: string[] }>();
+  const daj = (k: string) => {
+    const e = m.get(k) || { prisli: [], odisli: [] };
+    m.set(k, e);
+    return e;
+  };
+  for (const c of zoznam) {
+    daj(monthKey(c.firstSession)).prisli.push(c.name);
+    if (c._odisiel) daj(monthKey(c.lastSession)).odisli.push(c.name);
+  }
+  const mesacne = [...m.entries()]
+    .map(([k, v]) => [k, { prislo: v.prisli.length, odislo: v.odisli.length, prisli: v.prisli, odisli: v.odisli }] as const)
+    .sort((a, b) => a[0].localeCompare(b[0]));
+
+  const beziaci = new Date().toISOString().slice(0, 7);
+  const uzavrete = mesacne.filter(([mk]) => mk < beziaci);
+  const prichodove = uzavrete.slice(-12);
+  const zrele = kotva
+    ? new Date(Date.parse(kotva) - hranicaDni * DEN).toISOString().slice(0, 7)
+    : beziaci;
+  const odchodove = uzavrete.filter(([mk]) => mk < zrele).slice(-12);
+  return {
+    zoznam, kotva, mesacne,
+    prisloMes: prichodove.length ? prichodove.reduce((a, [, v]) => a + v.prislo, 0) / prichodove.length : 0,
+    odisloMes: odchodove.length ? odchodove.reduce((a, [, v]) => a + v.odislo, 0) / odchodove.length : 0,
+  };
+}
+
 export function RastAStrata({ data, clients, onKlient }: { data: PSBData; clients: Record<string, ClientAgg>; onKlient?: (meno: string) => void }) {
   const [hranica, setHranica] = useState("60");
   // Rozbalený mesiac. Bublina pod myšou tu bola prvá a bola to chyba: na
   // dotykovom displeji neexistuje a mená sa z nej nedali otvoriť.
   const [otvoreny, setOtvoreny] = useState<string | null>(null);
-  const { zoznam, kotva } = useMemo(() => pripravKlientov(data, clients, Number(hranica)), [data, clients, hranica]);
+  const toky = useMemo(() => tokyKlientov(data, clients, Number(hranica)), [data, clients, hranica]);
+  const { zoznam, kotva, mesacne, prisloMes, odisloMes } = toky;
 
   const odisli = zoznam.filter((c) => c._odisiel);
   const aktivni = zoznam.filter((c) => !c._odisiel);
 
-  // ── 1. Rast a strata po mesiacoch ─────────────────────────────────────────
-  const mesacne = useMemo(() => {
-    // Držia sa aj mená, nie len počty — číslo „3 odišli" je bez mien
-    // nepoužiteľné, lebo prvá otázka je vždy „ktorí".
-    const m = new Map<string, { prisli: string[]; odisli: string[] }>();
-    const daj = (k: string) => {
-      const e = m.get(k) || { prisli: [], odisli: [] };
-      m.set(k, e);
-      return e;
-    };
-    for (const c of zoznam) {
-      daj(monthKey(c.firstSession)).prisli.push(c.name);
-      if (c._odisiel) daj(monthKey(c.lastSession)).odisli.push(c.name);
-    }
-    return [...m.entries()]
-      .map(([k, v]) => [k, { prislo: v.prisli.length, odislo: v.odisli.length, prisli: v.prisli, odisli: v.odisli }] as const)
-      .sort((a, b) => a[0].localeCompare(b[0]));
-  }, [zoznam]);
-
-  // Príchody a odchody potrebujú RÔZNE okná — a to je jadro celej štatistiky.
-  //
-  // Príchod je vidno okamžite: prvý tréning je v dátach v deň, keď sa stal.
-  // Odchod je vidno až po ${hranica} dňoch ticha — mesiac, ktorý sa skončil
-  // pred tromi týždňami, ešte nemôže mať kompletné odchody a v priemere by
-  // ťahal stratu nadol. Presne to sa stalo: júl pridal päť príchodov a nula
-  // „odchodov", čistý rast vyskočil z +0,4 na +1,0 a zadanie pre reklamu
-  // kleslo o pol klienta — nie preto, že by sa niečo zlepšilo, ale preto, že
-  // júloví odídení ešte len tíchnu.
-  const beziaci = new Date().toISOString().slice(0, 7);
-  const uzavrete = mesacne.filter(([mk]) => mk < beziaci);
-  const prichodove = uzavrete.slice(-12);
-  const zrele = kotva
-    ? new Date(Date.parse(kotva) - Number(hranica) * DEN).toISOString().slice(0, 7)
-    : beziaci;
-  const odchodove = uzavrete.filter(([mk]) => mk < zrele).slice(-12);
-  const odisloMes = odchodove.length ? odchodove.reduce((a, [, v]) => a + v.odislo, 0) / odchodove.length : 0;
-  const prisloMes = prichodove.length ? prichodove.reduce((a, [, v]) => a + v.prislo, 0) / prichodove.length : 0;
   const [cielRastu, setCielRastu] = useState("3");
   const trebaZiskat = odisloMes + Number(cielRastu);
 
@@ -210,7 +209,7 @@ export function RastAStrata({ data, clients, onKlient }: { data: PSBData; client
         </div>
       </Card>
 
-      <KdeTecie odisli={odisli} />
+      <KdeTecie odisli={odisli} onKlient={onKlient} />
       <Prezitie zoznam={zoznam} />
       <HodnotaPodlaZdroja zoznam={zoznam} />
     </>
@@ -218,7 +217,10 @@ export function RastAStrata({ data, clients, onKlient }: { data: PSBData; client
 }
 
 // ── 2. Kde tečie ─────────────────────────────────────────────────────────────
-function KdeTecie({ odisli }: { odisli: Klient[] }) {
+function KdeTecie({ odisli, onKlient }: { odisli: Klient[]; onKlient?: (m: string) => void }) {
+  // Rovnaký vzor ako mesiace v Raste a strate: klik rozbalí mená. Číslo „16
+  // odišlo do 90 dní" je bez mien diagnóza bez pacientov.
+  const [otvoreny, setOtvoreny] = useState<string | null>(null);
   const koše = [
     { label: "Prišli raz a nikdy viac", filter: (c: Klient) => c.sessionCount <= 1, vysvetlenie: "úvodný tréning, ktorý nikam neviedol" },
     { label: "Do 90 dní", filter: (c: Klient) => c.sessionCount > 1 && c._zivot < 90, vysvetlenie: "na výsledky je to krátko — toto je o prvom dojme a očakávaniach" },
@@ -239,9 +241,15 @@ function KdeTecie({ odisli }: { odisli: Klient[] }) {
           {koše.map((k) => {
             const n = odisli.filter(k.filter).length;
             const p = Math.round((n / spolu) * 100);
+            const mena = odisli.filter(k.filter).map((c) => c.name);
+            const je = otvoreny === k.label;
             return (
               <div key={k.label} style={{ marginBottom: 10 }}>
-                <div style={{ display: "flex", gap: 10, alignItems: "baseline", flexWrap: "wrap" }}>
+                <div
+                  onClick={() => n > 0 && setOtvoreny(je ? null : k.label)}
+                  style={{ display: "flex", gap: 10, alignItems: "baseline", flexWrap: "wrap", cursor: n > 0 ? "pointer" : "default" }}
+                >
+                  <span style={{ color: C.textDim, fontSize: 11 }}>{n > 0 ? (je ? "▾" : "▸") : " "}</span>
                   <span style={{ fontSize: 12.5, color: C.text, minWidth: 150 }}>{k.label}</span>
                   <span style={{ fontSize: 14, fontWeight: 700, color: p >= 40 ? C.red : C.textMuted, fontVariantNumeric: "tabular-nums" }}>{n}</span>
                   <span style={{ fontSize: 11.5, color: C.textDim }}>{p} %</span>
@@ -250,6 +258,16 @@ function KdeTecie({ odisli }: { odisli: Klient[] }) {
                 <div style={{ height: 6, borderRadius: 3, background: C.track, marginTop: 4, overflow: "hidden" }}>
                   <div style={{ width: `${(n / max) * 100}%`, height: "100%", background: p >= 40 ? C.red : mix(C.accent, 60) }} />
                 </div>
+                {je && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginTop: 7 }}>
+                    {mena.map((meno) => (
+                      <button key={meno} onClick={() => onKlient?.(meno)}
+                        style={{ padding: "3px 9px", borderRadius: 7, fontSize: 11.5, cursor: onKlient ? "pointer" : "default", border: `1px solid ${mix(C.border, 80)}`, background: "transparent", color: C.textMuted }}>
+                        {meno}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })}

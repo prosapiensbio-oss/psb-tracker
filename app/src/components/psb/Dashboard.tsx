@@ -22,7 +22,7 @@ import type { AssistantChat } from "./Assistant";
 import { Card, Donut, Empty, H3, Info, StatCard, StatGrid, ValueBars, ZoneBars } from "./ui";
 
 const catTone = (c: RegisterItem["category"]) =>
-  c === "6M" ? "accent" : c === "Kapacita" || c === "Rozhodnutie" || c === "Zápis" ? "blue" : "orange";
+  c === "6M" ? "accent" : c === "Kapacita" || c === "Rozhodnutie" || c === "Zápis" ? "blue" : "orange";  // „Zmena" padá do orange — je to výstraha, nie informácia
 
 const TRAINER_OPTS = [
   { value: "all", label: "Obaja" },
@@ -983,7 +983,7 @@ function RegisterRow({ item, actions, onNavigate }: { item: RegisterItem; action
   const jeRozhodnutie = item.category === "Rozhodnutie";
   // Pripomienka zápisu nesie cieľ v sebe (klient|tab|sub) — nemá klienta, má
   // miesto, kam sa ide písať.
-  const zapisCiel = item.category === "Zápis" ? (item.client || "").split("|") : null;
+  const zapisCiel = item.category === "Zápis" || item.category === "Zmena" ? (item.client || "").split("|") : null;
   const openItem = () =>
     zapisCiel
       ? onNavigate(zapisCiel[0], zapisCiel[1] || undefined)

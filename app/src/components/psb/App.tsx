@@ -13,6 +13,7 @@ import {
 } from "../../lib/psb/client";
 import {
   capacityByTrainer,
+  monthlyFinance,
   deriveClients,
   deriveRegister,
   deriveSixM,
@@ -85,6 +86,7 @@ export function PSBApp() {
   const [trackerSection, setTrackerSection] = useState("treningy");
   const [vzasSub, setVzasSub] = useState("pnl");
   const [vysledkySub, setVysledkySub] = useState("kvartalne");
+  const [marketingSub, setMarketingSub] = useState("lievik");
   // Filter trénera a obdobia žije tu, nie na každej obrazovke zvlášť.
   //
   // Doteraz mal svoj vlastný Dashboard, Tréningy, Klienti, Financie aj 6M — a
@@ -119,6 +121,7 @@ export function PSBApp() {
     }
     if (active === "vzas") return `#vzas/${vzasSub}`;
     if (active === "vysledky") return `#vysledky/${vysledkySub}`;
+    if (active === "marketing") return `#marketing/${marketingSub}`;
     return `#${active}`;
   };
 
@@ -135,6 +138,7 @@ export function PSBApp() {
     }
     if (zal === "vzas" && pod) setVzasSub(pod);
     if (zal === "vysledky" && pod) setVysledkySub(pod);
+    if (zal === "marketing" && pod) setMarketingSub(pod);
   }, []);
 
   // Pri štarte a pri tlačidle späť čítame z adresy.
@@ -178,6 +182,7 @@ export function PSBApp() {
     // uzávierka" tak doviedla človeka na Kvartálne a vyzeralo to, že klik
     // nefunguje. Rovnaká mechanika ako pri ostatných, len chýbala.
     if (tab === "vysledky" && sub) setVysledkySub(sub);
+    if (tab === "marketing" && sub) setMarketingSub(sub);
     // Fokus na klienta má zmysel len v zozname klientov. Keď bol človek práve
     // v Dopytoch alebo v Raste a strate a klikol na meno vo vyhľadávaní,
     // zameranie sa nastavilo do podzáložky, ktorú nevidno — a nič sa nestalo.
@@ -218,6 +223,45 @@ export function PSBApp() {
   const sixM = useMemo(() => deriveSixM(data, clients), [data, clients]);
   const capacity = useMemo(() => capacityByTrainer(clients, data.sessions), [clients, data.sessions]);
   const register = useMemo(() => deriveRegister(data, clients, sixM, capacity), [data, clients, sixM, capacity]);
+  // Metrické zmeny — „prístroj si všimne, že sa zmenili jeho čísla".
+  // Ohlásenia platforiem sú hypotézy o internete; prepad vlastných klikov je
+  // fakt o nás. Pravidlo: posledný uzavretý mesiac vs priemer troch pred ním,
+  // hlási sa až prepad o ≥30 % a len pri aspoň štyroch mesiacoch dát — menej
+  // je šum, nie signál.
+  const [webMetriky, setWebMetriky] = useState<{ gsc: { m: string; kliky: number }[]; ga4: { m: string; udalosti: number }[] }>({ gsc: [], ga4: [] });
+  useEffect(() => {
+    void fetch("/api/marketing", { credentials: "same-origin" })
+      .then((r) => r.json())
+      .then((j: { gscMesacne?: { m: string; kliky: number }[]; ga4?: { m: string; udalosti: number }[] }) =>
+        setWebMetriky({ gsc: j.gscMesacne || [], ga4: j.ga4 || [] }))
+      .catch(() => {});
+  }, []);
+
+  const zmenyMetrik = useMemo(() => {
+    const ack = data.anomalyAck || {};
+    const beziaci = new Date().toISOString().slice(0, 7);
+    const out: typeof register = [];
+    const over = (rad: { m: string; v: number }[], kluc: string, nazov: string, ciel: string) => {
+      const uzavrete = rad.filter((r) => r.m < beziaci && r.v > 0).sort((a, b) => a.m.localeCompare(b.m));
+      if (uzavrete.length < 4) return;
+      const posledny = uzavrete[uzavrete.length - 1];
+      const zaklad = uzavrete.slice(-4, -1).reduce((a, r) => a + r.v, 0) / 3;
+      if (zaklad > 0 && posledny.v < zaklad * 0.7) {
+        const key = `zmena|${kluc}|${posledny.m}`;
+        out.push({
+          key, category: "Zmena", tone: "orange",
+          title: `${nazov} klesli`,
+          detail: `${nazov} za ${posledny.m}: ${Math.round(posledny.v).toLocaleString("cs-CZ")} — o ${Math.round((1 - posledny.v / zaklad) * 100)} % pod priemerom predošlých 3 mesiacov`,
+          acked: !!ack[key], note: ack[key]?.note, priority: 8, client: ciel,
+        });
+      }
+    };
+    over(monthlyFinance(data).map((m) => ({ m: m.month, v: m.cash })), "trzby", "Prijaté tržby", "financie|trzby");
+    over(webMetriky.gsc.map((g) => ({ m: g.m, v: g.kliky })), "gsc", "Kliky z Googlu", "marketing|dosah");
+    over(webMetriky.ga4.map((g) => ({ m: g.m, v: g.udalosti })), "ga4", "Odoslané formuláre", "marketing|lievik");
+    return out;
+  }, [data, webMetriky]);
+
   // Rituály: čo sa má zapísať a či je to zapísané. Doplnia sa do registra ako
   // ďalšie položky — nie ako samostatná karta. Register je jediné miesto, kam
   // sa človek pozerá, keď hľadá „čo mám spraviť"; druhý zoznam vedľa neho by
@@ -239,8 +283,8 @@ export function PSBApp() {
         client: `${r.ciel.tab}|${r.ciel.sub || ""}`,
         priority: r.druh === "tyzden" ? 5 : r.druh === "mesiac" ? 6 : 40,
       }));
-    return [...extra, ...register].sort((a, b) => a.priority - b.priority);
-  }, [rituals, register, data.anomalyAck]);
+    return [...extra, ...zmenyMetrik, ...register].sort((a, b) => a.priority - b.priority);
+  }, [rituals, register, zmenyMetrik, data.anomalyAck]);
 
   const aiContext = useMemo(() => buildAiContext(data, clients, sixM, capacity, register), [data, clients, sixM, capacity, register]);
 
@@ -290,6 +334,27 @@ export function PSBApp() {
     [load],
   );
 
+  // Zdroj klienta sa dopĺňa z dopytu sám. Keď sa dopyt premení na klienta,
+  // tá istá informácia sa doteraz zapisovala druhýkrát ručne — a väčšinou
+  // nezapisovala vôbec. Beží po každom načítaní; klient s už vyplneným zdrojom
+  // sa preskočí, takže sa nič neprepisuje a druhé kolo je no-op.
+  useEffect(() => {
+    const MAPA: Record<string, string> = {
+      referencia: "referencia", reklama: "reklama", instagram: "instagram",
+      instagram_osobny: "instagram", google: "google", web: "web", mail: "web",
+      telefon: "ine", ine: "ine",
+    };
+    const podlaNorm = new Map(Object.values(clients).map((c) => [normName(c.name), c]));
+    for (const l of data.leads) {
+      if (!l.name) continue;
+      const c = podlaNorm.get(normName(l.name));
+      if (!c || c.zdroj) continue;
+      actions.setOverride(c.name, "zdroj", MAPA[l.source] || "ine");
+      if (l.source === "referencia" && l.referrer && !c.zdrojKto) actions.setOverride(c.name, "zdrojKto", l.referrer);
+    }
+  }, [data.leads, clients, actions]);
+
+
   // One shared chat brain for both the floating panel and the inline dashboard widget.
   const chat = useAssistantChat(aiContext, actions);
   // Clicking a client name in a bot reply → open that client in Klienti + pop the
@@ -325,7 +390,7 @@ export function PSBApp() {
           <div style={{ fontSize: 11, fontWeight: 500, color: C.textMuted, letterSpacing: 0.2 }}>ProSapiens Biomechanic</div>
         </div>
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-          <HladanieKlienta clients={clients} onPick={(meno) => navigate("klienti", undefined, { client: meno, nonce: Date.now() })} />
+          <HladanieKlienta clients={clients} leads={data.leads} onPick={(meno) => navigate("klienti", undefined, { client: meno, nonce: Date.now() })} onPickLead={() => navigate("klienti", "dopyty")} />
           <ZapisButton ritualy={rituals} onNavigate={(t, sub) => { navigate(t, sub); void nacitajZapisy(); }} />
           {ktoSom && ktoSom !== "app" && (
             <span style={{ fontSize: 12, color: C.textMuted }} title="Pod týmto menom sa zapisujú zmeny do auditu">
@@ -394,8 +459,8 @@ export function PSBApp() {
               </>
         )}
 
-        {active === "marketing" && <Marketing data={data} clients={clients} leads={data.leads} chat={chat} />}
-        {active === "vzas" && <Vzas sub={vzasSub} onSub={setVzasSub} />}
+        {active === "marketing" && <Marketing data={data} clients={clients} leads={data.leads} chat={chat} sub={marketingSub} onSub={setMarketingSub} onKlient={(m) => navigate("klienti", undefined, { client: m, nonce: Date.now() })} />}
+        {active === "vzas" && <Vzas sub={vzasSub} onSub={setVzasSub} data={data} />}
         {active === "vysledky" && <Vysledky data={data} onNavigate={navigate} clients={clients} sixM={sixM} capacity={capacity} register={register} sub={vysledkySub} onSub={setVysledkySub} />}
         {active === "udaje" && <Udaje data={data} actions={actions} />}
       </div>
