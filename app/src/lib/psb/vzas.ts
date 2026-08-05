@@ -333,15 +333,26 @@ export function nastavVyplaty(ulozene?: Partial<Record<PersonKey, VyplatyKategor
     // Riadok „Z banky" nepochádza ani z Excelu, ani z ručných úprav — plní ho
     // import z Fio. Bez tejto výnimky ho načítanie uložených nastavení zmazalo
     // a výplaty za júl zmizli, hoci v banke boli.
-    const zBanky = ciel[Z_BANKY] ? [...ciel[Z_BANKY]] : null;
+    const prvyImportny = VZAS_MONTHS.indexOf(PRVY_MESIAC_Z_FIO);
+    const zImportu: Record<string, number[]> = {};
+    for (const r of RIADKY_Z_IMPORTU) {
+      if (!ciel[r] || prvyImportny < 0) continue;
+      zImportu[r] = ciel[r].slice(prvyImportny);
+    }
     for (const k of Object.keys(ciel)) delete ciel[k];
-    if (zBanky) ciel[Z_BANKY] = zBanky;
     for (const [k, v] of Object.entries(zdroj)) {
       // Kategórie, ktoré sa medzitým presunuli do spoločných výdavkov, sa z
       // uložených nastavení zahadzujú. Bez toho by sa po presune počítali
       // dvakrát — raz osobne a raz ako polovica spoločného nákladu.
       if (PRESUNUTE_DO_SPOLOCNYCH.has(k)) { zmena = true; continue; }
       ciel[k] = Array.from({ length: N }, (_, i) => Number(v?.[i]) || 0);
+    }
+    // Späť to, čo plnia importy: mesiace od júla 2026 patria banke a BTC appke,
+    // uložené nastavenia ich nesmú prepísať nulou.
+    for (const [r, hodnoty] of Object.entries(zImportu)) {
+      if (!ciel[r]) ciel[r] = Array.from({ length: N }, () => 0);
+      dorovnaj(ciel[r]);
+      hodnoty.forEach((v, k) => { if (v) ciel[r][prvyImportny + k] = v; });
     }
     // Chýbajúce historické kategórie sa doplnia zo zdrojáku — ich zmazanie by
     // ticho prepísalo náklady roku 2025.
@@ -361,7 +372,13 @@ export const vyplatyNaUlozenie = (): Record<PersonKey, VyplatyKategorie> => {
   // „Z banky" sa neukladá: pri ďalšom otvorení ho znova naplní import a
   // uložená kópia by sa s ním časom rozišla.
   const bez = (o: VyplatyKategorie) =>
-    Object.fromEntries(Object.entries(o).filter(([k]) => k !== Z_BANKY).map(([k, v]) => [k, [...v]]));
+    Object.fromEntries(Object.entries(o).map(([k, v]) => {
+      // Mesiace, ktoré plnia importy, sa neukladajú — pri ďalšom otvorení ich
+      // naplní banka a uložená kópia by sa s ňou časom rozišla.
+      const p0 = VZAS_MONTHS.indexOf(PRVY_MESIAC_Z_FIO);
+      if (!RIADKY_Z_IMPORTU.includes(k) || p0 < 0) return [k, [...v]];
+      return [k, v.map((x, i) => (i >= p0 ? 0 : x))];
+    }));
   return { jerry: bez(SALARY.jerry.personal), terezka: bez(SALARY.terezka.personal) };
 };
 
@@ -463,6 +480,34 @@ export function nastavJarekZTrackera(splatky: Record<string, number>): boolean {
 /** Klienti, ktorých členstvo je barter proti Jarkovmu dlhu, nie tržba. */
 export const BARTER_KLIENTI = ["Sofia Resnerová"];
 
+/**
+ * Výplaty vyplatené v bitcoine — z appky PSB Bitcoin.
+ *
+ * Časť výplaty neodíde z účtu, ale z bitcoinovej rezervy. Na bankovom výpise
+ * nie sú, takže bez tohto by mesiac vyzeral, akoby si tréner vzal menej, než
+ * naozaj vzal — a dlh by sa rozišiel s realitou. „FP spain" má vlastný riadok,
+ * lebo to nie je bežná výplata.
+ */
+export function nastavBtcVyplaty(
+  data: Record<string, { jerry: number; terezka: number; jerryFp: number }>,
+): boolean {
+  let zmena = false;
+  for (const [mk, v] of Object.entries(data)) {
+    const i = VZAS_MONTHS.indexOf(mk);
+    if (i < 0 || mk < PRVY_MESIAC_Z_FIO) continue;
+    const zapis = (kto: PersonKey, riadok: string, suma: number) => {
+      const per = SALARY[kto].personal;
+      if (!per[riadok]) per[riadok] = Array.from({ length: N }, () => 0);
+      dorovnaj(per[riadok]);
+      if (Math.abs(per[riadok][i] - suma) > 0.5) { per[riadok][i] = suma; zmena = true; }
+    };
+    zapis("jerry", RIADOK_BTC, v.jerry);
+    zapis("terezka", RIADOK_BTC, v.terezka);
+    if (v.jerryFp) zapis("jerry", RIADOK_FP, v.jerryFp);
+  }
+  return zmena;
+}
+
 export function nastavHodinyZTrackera(hodiny: Record<string, { jerry: number; terezka: number }>): boolean {
   let zmena = false;
   for (const [mk, h] of Object.entries(hodiny)) {
@@ -477,7 +522,16 @@ export function nastavHodinyZTrackera(hodiny: Record<string, { jerry: number; te
   return zmena;
 }
 
-const Z_BANKY = "Z banky";
+// Výplaty z banky idú do riadku „Výplata" — je to tá istá vec, len z iného
+// zdroja, a samostatný riadok len rozdeľoval jedno číslo na dve. Excel má za
+// tieto mesiace nulu, takže sa nič neprepisuje.
+const RIADOK_VYPLATA = "Výplata";
+/** Výplaty vyplatené v bitcoine — riadok, ktorý Excel používa tiež. */
+const RIADOK_BTC = "BTC";
+/** „FP spain" chodí tiež z BTC appky, ale nie je to bežná výplata. */
+const RIADOK_FP = "FP.Spain";
+/** Riadky, ktoré plnia importy — nesmú sa stratiť pri načítaní uložených úprav. */
+const RIADKY_Z_IMPORTU = [RIADOK_VYPLATA, RIADOK_BTC, RIADOK_FP];
 
 /**
  * `sumy` = { "2026-07": { "fixne.apps.adobe": 464, … } } — kladné čísla.
@@ -525,9 +579,9 @@ export function nastavNakladyZFio(
     if (i < 0 || mk < PRVY_MESIAC_Z_FIO) continue;
     for (const [k, suma] of [["jerry", v.jerry], ["terezka", v.terezka]] as const) {
       const per = SALARY[k as PersonKey].personal;
-      if (!per[Z_BANKY]) per[Z_BANKY] = Array.from({ length: N }, () => 0);
-      dorovnaj(per[Z_BANKY]);
-      if (per[Z_BANKY][i] !== suma) { per[Z_BANKY][i] = suma; zmena = true; }
+      if (!per[RIADOK_VYPLATA]) per[RIADOK_VYPLATA] = Array.from({ length: N }, () => 0);
+      dorovnaj(per[RIADOK_VYPLATA]);
+      if (per[RIADOK_VYPLATA][i] !== suma) { per[RIADOK_VYPLATA][i] = suma; zmena = true; }
     }
   }
   NAKLADY_Z_FIO = mesiace.sort();

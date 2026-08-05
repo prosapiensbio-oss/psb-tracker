@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { BARTER_KLIENTI, nastavHodinyZTrackera, nastavJarekZTrackera, nastavNakladyZFio } from "../../lib/psb/vzas";
+import { BARTER_KLIENTI, nastavBtcVyplaty, nastavHodinyZTrackera, nastavJarekZTrackera, nastavNakladyZFio } from "../../lib/psb/vzas";
 
 import {
   checkSession,
@@ -12,6 +12,7 @@ import {
   resetAll as apiReset,
   saveAnomaly,
   saveOverride,
+  fetchBtcReserve,
 } from "../../lib/psb/client";
 import {
   capacityByTrainer,
@@ -244,6 +245,26 @@ export function PSBApp() {
     }
     if (nastavHodinyZTrackera(podlaMesiaca)) setFioTik((x) => x + 1);
   }, [data.sessions]);
+
+  // Výplaty v bitcoine. Časť výplaty neodíde z účtu, ale z BTC rezervy — na
+  // bankovom výpise nie sú, takže bez nich by mesiac vyzeral, akoby si tréner
+  // vzal menej, než naozaj vzal.
+  useEffect(() => {
+    void fetchBtcReserve(false, true).then((r) => {
+      if (!r?.vyplaty?.length) return;
+      const podlaMesiaca: Record<string, { jerry: number; terezka: number; jerryFp: number }> = {};
+      for (const v of r.vyplaty) {
+        const mk = v.datum.slice(0, 7);
+        const e = (podlaMesiaca[mk] ||= { jerry: 0, terezka: 0, jerryFp: 0 });
+        const czk = v.czk || 0;
+        // „FP spain" nie je bežná výplata — v Exceli má vlastný riadok.
+        if (/fp\s*spain/i.test(v.poznamka)) e.jerryFp += czk;
+        else if (v.kto === "terezka") e.terezka += czk;
+        else e.jerry += czk;
+      }
+      if (nastavBtcVyplaty(podlaMesiaca)) setFioTik((x) => x + 1);
+    }).catch(() => {});
+  }, []);
 
   // Barterové členstvá (Sofia) sa započítavajú ako splátka Jarkovho dlhu —
   // cenu balíčka vie PTminder, takže sa neprepisuje ručne.
