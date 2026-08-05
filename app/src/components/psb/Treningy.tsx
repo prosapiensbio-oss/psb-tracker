@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useState, type CSSProperties } from "react";
 
 import { fetchWeekEntries, saveWeekEntry, type WeekEntry } from "../../lib/psb/client";
-import { groupTrainings, periodZone, sessionAnalysis, TARGET_H, type ClientAgg, type Period } from "../../lib/psb/compute";
+import { groupTrainings, kotvaDat, periodZone, sessionAnalysis, TARGET_H, type ClientAgg, type Period } from "../../lib/psb/compute";
 import { fmtCZK, monthLabel, weekKey } from "../../lib/psb/format";
 import { C, mix, S } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
@@ -142,6 +142,22 @@ function Prehlad({ data, focus, trainer, onTrainer }: { data: PSBData; focus?: N
     [data.sessions, period, trainerF, range],
   );
   const chrono = useMemo(() => [...rows].sort((a, b) => a.ts - b.ts), [rows]);
+
+  // Posledné obdobie býva rozrobené: dáta z PTmindera končia uprostred týždňa
+  // (alebo mesiaca) a posledný bod grafu potom klesne — nie preto, že sa robilo
+  // menej, ale preto, že obdobie ešte nemá všetky dni. Tu sa nezahadzuje:
+  // aktuálna záťaž je zmyslom tejto obrazovky. Len sa to povie.
+  const posledneNeuplne = useMemo(() => {
+    const den = kotvaDat({ sessions: data.sessions }).den;
+    if (!den || period === "custom") return false;
+    const d = new Date(`${den}T00:00:00Z`);
+    if (period === "week") return d.getUTCDay() !== 0; // nedeľa = koniec týždňa
+    const dalsi = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1));
+    const koniecMesiaca = new Date(dalsi.getTime() - 86400000).getUTCDate();
+    if (period === "month") return d.getUTCDate() !== koniecMesiaca;
+    // kvartál: posledný deň marca/júna/septembra/decembra
+    return !((d.getUTCMonth() + 1) % 3 === 0 && d.getUTCDate() === koniecMesiaca);
+  }, [data.sessions, period]);
   const both = trainerF === "all";
   const weekly = period === "week";
   const [openWeek, setOpenWeek] = useState<string | null>(null);
@@ -354,6 +370,9 @@ function Prehlad({ data, focus, trainer, onTrainer }: { data: PSBData; focus?: N
           />
           <div style={{ fontSize: 11, color: C.textDim, marginTop: 4 }}>
             Trend odtrénovaných hodín — stúpa/klesá. Otvára sa na aktuálnom období, posúvaj doľava. Klik na bod = detail obdobia v tabuľke dole.
+            {posledneNeuplne && (
+              <> <span style={{ color: C.orange }}>Posledný bod je rozrobené obdobie — nie je celý, neporovnávaj ho s predošlými.</span></>
+            )}
           </div>
         </div>
       )}

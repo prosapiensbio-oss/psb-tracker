@@ -1,6 +1,6 @@
 import { useContext, useEffect, useMemo, useState } from "react";
 
-import { monthlyFinance, predictCash, predictEarnings, type ClientAgg } from "../../lib/psb/compute";
+import { kotvaDat, monthlyFinance, predictCash, predictEarnings, type ClientAgg } from "../../lib/psb/compute";
 import { fetchBtcReserve, type BtcPlatba } from "../../lib/psb/client";
 import { fmtCZK, monthLabel, normName } from "../../lib/psb/format";
 import { ObdobieCtx } from "../../lib/psb/obdobie";
@@ -15,7 +15,13 @@ const MAX_SESSIONS_MONTH = 260;
 export function Financie({ data, clients, focus, sub, onSub }: { data: PSBData; clients: Record<string, ClientAgg>; focus?: NavFocus | null; sub: string; onSub: (s: string) => void }) {
   const setSub = onSub;
   const [focusMonth, setFocusMonth] = useState<string | null>(null);
-  const monthly = useMemo(() => monthlyFinance(data), [data]);
+  // Po posledný plný mesiac. Rozrobený mesiac tu robil najväčšiu škodu:
+  // v cashflow padal na dno, v priemeroch ťahal dole a v „najhorší mesiac"
+  // vyhrával vždy — hoci nešlo o výsledok, ale o pár dní.
+  const monthly = useMemo(() => {
+    const k = kotvaDat(data);
+    return monthlyFinance(data).filter((m) => !k.plny || m.month <= k.plny);
+  }, [data]);
 
   // Deep-link from the Dashboard: jump to Mesačné zárobky and highlight one month.
   useEffect(() => {

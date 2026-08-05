@@ -610,6 +610,59 @@ export type FinanceMonth = {
   byTrainer: Record<string, { revenue: number; sessions: number }>;
 };
 
+// ── kotva dát ────────────────────────────────────────────────────────────────
+//
+// Každý graf, ktorý kreslí mesiace, končil bežiacim kalendárnym mesiacom. Piaty
+// august tak vyzeral ako mesiac s tržbami za 5 dní — posledný stĺpec padol na
+// dno a graf hlásil prepad, ktorý sa nestal. To isté robil lievik: „Lievik —
+// aug 26" s nulami, hoci august sa ešte len začal.
+//
+// Kotva je posledný deň, o ktorom appka niečo vie (posledné sedenie alebo
+// platba z PTmindera). Mesiac je PLNÝ, keď kotva siaha aspoň po jeho posledný
+// deň. Grafy kreslia po posledný plný mesiac; bežiaci sa ukazuje len tam, kde
+// má zmysel sledovať ho v reálnom čase, a vždy označený.
+//
+// Zámerne jedno miesto: rovnaká úvaha bola predtým rozpísaná v troch
+// komponentoch a každý mal mierne iný výsledok.
+export type Kotva = {
+  /** Posledný deň s dátami, "" keď nie sú žiadne. */
+  den: string;
+  /** Mesiac tohto dňa. */
+  mesiac: string;
+  /** Posledný mesiac, ktorý je celý pokrytý dátami. */
+  plny: string;
+  /** Je `mesiac` rozrobený (kotva nesiaha po jeho koniec)? */
+  ciastocny: boolean;
+};
+
+const poslednyDenMesiaca = (mk: string) => {
+  const [r, m] = mk.split("-").map(Number);
+  return new Date(Date.UTC(r, m, 0)).toISOString().slice(0, 10);
+};
+
+const predchadzajuciMesiac = (mk: string) => {
+  const [r, m] = mk.split("-").map(Number);
+  return m === 1 ? `${r - 1}-12` : `${r}-${String(m - 1).padStart(2, "0")}`;
+};
+
+// Berie čokoľvek, čo má sedenia (a voliteľne platby) — nie celé PSBData.
+// Grafy, ktoré dostanú len `sessions`, tak nemusia kotvu počítať po svojom.
+export function kotvaDat(data: { sessions: { date: string }[]; payments?: { date: string }[] }): Kotva {
+  let den = "";
+  for (const s of data.sessions) if (s.date > den) den = s.date;
+  for (const p of data.payments || []) if (p.date > den) den = p.date;
+  den = den.slice(0, 10);
+  if (!den) return { den: "", mesiac: "", plny: "", ciastocny: false };
+  const mesiac = den.slice(0, 7);
+  const ciastocny = den < poslednyDenMesiaca(mesiac);
+  return { den, mesiac, plny: ciastocny ? predchadzajuciMesiac(mesiac) : mesiac, ciastocny };
+}
+
+/** Orezanie mesačnej série po posledný plný mesiac. */
+export function doPlnehoMesiaca<T>(rows: T[], k: Kotva, mk: (r: T) => string): T[] {
+  return k.plny ? rows.filter((r) => mk(r) <= k.plny) : rows;
+}
+
 export function monthlyFinance(data: PSBData): FinanceMonth[] {
   const map: Record<string, FinanceMonth> = {};
   const get = (mk: string) =>

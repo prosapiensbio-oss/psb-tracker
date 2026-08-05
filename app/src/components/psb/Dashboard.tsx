@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 
 import {
+  doPlnehoMesiaca,
+  kotvaDat,
   monthlyFinance,
   predictCash,
   predictEarnings,
@@ -385,6 +387,11 @@ export function Dashboard({
   const zonaLo = trainer === "all" ? ZONE_LO * 2 : ZONE_LO;
   const zonaHi = trainer === "all" ? ZONE_HI * 2 : ZONE_HI;
 
+  // Jedna kotva pre celý dashboard: posledný deň, o ktorom appka niečo vie.
+  // Grafy a dlaždice končia posledným plným mesiacom — rozrobený mesiac
+  // vyzeral ako prepad, ktorý sa nestal.
+  const kotva = useMemo(() => kotvaDat(data), [data]);
+
   const stats = useMemo(() => {
     const list = Object.values(clients);
     // "Aktívny" = everyone except Neaktívny (matches the Klienti tab count).
@@ -394,7 +401,9 @@ export function Dashboard({
     const weekHours = data.sessions
       .filter((s) => weekKey(s.date) === lastWeek && matchT(s.sessionTrainer))
       .reduce((a, s) => a + s.duration / 60, 0);
-    const months = monthlyFinance(data);
+    // Po posledný PLNÝ mesiac. Predtým sa bral posledný v poli, čo je bežiaci
+    // mesiac — piateho augusta teda „tržby za mesiac" znamenali tržby za 5 dní.
+    const months = doPlnehoMesiaca(monthlyFinance(data), kotva, (m) => m.month);
     const lastMonth = months[months.length - 1];
     // Tržba = peniaz, ktorý prišiel. Doteraz tu bolo `revenue` — hodnota
     // odtrénovaných sedení — pod nálepkou „Zárobky". To je iné číslo a Jerry
@@ -404,7 +413,7 @@ export function Dashboard({
     const monthCash = lastMonth ? lastMonth.cash : 0;
     const sixMCount = sixM.filter((c) => matchT(c.primaryTrainer)).length;
     return { active, weekHours, lastWeek, monthCash, lastMonth: lastMonth?.month, sixMCount };
-  }, [clients, data, sixM, trainer]);
+  }, [clients, data, sixM, trainer, kotva]);
 
   // Zisk za posledný mesiac, ktorý má kompletný P&L — teda aj náklady.
   // Tržby za júl máme, ale náklady prídu až s Fio; ukázať „zisk" bez nich by
@@ -436,23 +445,37 @@ export function Dashboard({
     return { prisloMes: t.prisloMes, odisloMes: t.odisloMes, posledne };
   }, [data, clients]);
 
-  // Lievik bežiaceho mesiaca: dopyty → úvodné → noví klienti. Zámerne bežiaci
-  // mesiac (nie uzavretý) — toto je prístroj na sledovanie prílevu v reálnom
-  // čase, od septembra hlavný displej pre reklamu.
+  // Lievik: dopyty → úvodné → noví klienti za posledný PLNÝ mesiac.
+  //
+  // Pôvodne kreslil bežiaci mesiac, aby sa prílev dal sledovať v reálnom čase.
+  // V praxi to znamenalo, že prvý týždeň v mesiaci karta hlásila samé nuly a
+  // nazývala sa menom mesiaca, ktorý sa ešte nestal — porovnávať sa nedalo s
+  // ničím. Uzavretý mesiac je celé číslo, ktoré niečo znamená; bežiaci mesiac
+  // sa dopočíta vedľa ako priebeh, nie ako výsledok.
   const lievikMes = useMemo(() => {
-    const mes = new Date().toISOString().slice(0, 7);
-    const dopyty = (data.leads || []).filter((l) => (l.date || "").slice(0, 7) === mes);
+    const mes = kotva.plny || new Date().toISOString().slice(0, 7);
+    const zaMesiac = (mk: string) => {
+      const dopyty = (data.leads || []).filter((l) => (l.date || "").slice(0, 7) === mk);
+      const uvodne = new Set(data.sessions.filter((s) => s.sessionType === "UVODNE" && s.date.slice(0, 7) === mk).map((s) => s.client)).size;
+      const novi = Object.values(clients).filter((c) => (c.firstSession || "").slice(0, 7) === mk).length;
+      return { dopyty, uvodne, novi };
+    };
+    const u = zaMesiac(mes);
     const zdroje = new Map<string, number>();
-    for (const l of dopyty) zdroje.set(l.source, (zdroje.get(l.source) || 0) + 1);
-    const uvodne = new Set(data.sessions.filter((s) => s.sessionType === "UVODNE" && s.date.slice(0, 7) === mes).map((s) => s.client)).size;
-    const novi = Object.values(clients).filter((c) => (c.firstSession || "").slice(0, 7) === mes).length;
-    // Nula úvodných môže znamenať dve úplne odlišné veci: nikto neprišiel, alebo
-    // sa mesiac ešte nenahral. Bez tohto rozdielu je karta v prvých dňoch mesiaca
-    // vždy „katastrofa", a človek ju prestane brať vážne práve vtedy, keď má.
-    const kotva = data.sessions.reduce((m, s) => (s.date > m ? s.date : m), "");
-    const bezDat = !!kotva && kotva.slice(0, 7) < mes;
-    return { mes, dopyty: dopyty.length, zdroje: [...zdroje.entries()].sort((a, b) => b[1] - a[1]), uvodne, novi, bezDat, kotva };
-  }, [data, clients]);
+    for (const l of u.dopyty) zdroje.set(l.source, (zdroje.get(l.source) || 0) + 1);
+    // Bežiaci mesiac ako doplnok — nie ako hlavné číslo. Ukáže sa, len keď v
+    // ňom už niečo je, nech prvý deň v mesiaci nesvieti riadok s nulami.
+    const bezici = new Date().toISOString().slice(0, 7);
+    const b = bezici > mes ? zaMesiac(bezici) : null;
+    const priebeh = b && (b.dopyty.length || b.uvodne || b.novi)
+      ? { mes: bezici, dopyty: b.dopyty.length, uvodne: b.uvodne, novi: b.novi }
+      : null;
+    return {
+      mes, dopyty: u.dopyty.length, uvodne: u.uvodne, novi: u.novi,
+      zdroje: [...zdroje.entries()].sort((a, b2) => b2[1] - a[1]),
+      priebeh, kotva: kotva.den, bezDat: !kotva.plny,
+    };
+  }, [data, clients, kotva]);
 
   // Predikcia tržieb na najbližší mesiac — podľa Jerryho „to najdôležitejšie
   // číslo, aké appka počíta". Doteraz bola schovaná vo Financiách → Predikcia a
@@ -554,7 +577,9 @@ export function Dashboard({
     earnMode === "prijate" ? m.cash : trainer === "all" ? m.revenue : m.byTrainer[trainer]?.revenue || 0;
 
   const earnings = useMemo(() => {
-    const months = monthlyFinance(data); // all months, from Sep 2025 — chart scrolls
+    // Po posledný plný mesiac — rozrobený mesiac kreslil stĺpec pri zemi
+    // a graf hlásil prepad. Predpoveď za ním nasleduje ako samostatný stĺpec.
+    const months = doPlnehoMesiaca(monthlyFinance(data), kotva, (m) => m.month);
     const bars: { label: string; value: number; forecast?: boolean }[] = months.map((m) => ({ label: monthLabel(m.month), value: monthVal(m) }));
     const pred = predictEarnings(data, clients, { excludeSpecial: false });
     const next2 = pred.months.slice(0, 1);
@@ -570,11 +595,12 @@ export function Dashboard({
       for (const pm of next2) bars.push({ label: monthLabel(pm.month), value: Math.round(pm.guaranteed + pm.expected), forecast: true });
     }
     return bars;
-  }, [data, clients, trainer, earnMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [data, clients, trainer, earnMode, kotva]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Ø / max / min monthly earnings over ACTUAL months (forecast excluded), following the trainer pill + mode.
+  // Len plné mesiace: rozrobený mesiac bol vždy „min" a kazil aj priemer.
   const earningStats = useMemo(() => {
-    const pts = monthlyFinance(data)
+    const pts = doPlnehoMesiaca(monthlyFinance(data), kotva, (m) => m.month)
       .map((m) => ({ key: m.month, label: monthLabel(m.month), v: monthVal(m) }))
       .filter((p) => p.v > 0);
     if (!pts.length) return null;
@@ -586,7 +612,7 @@ export function Dashboard({
       if (p.v < min.v) min = p;
     }
     return { avg: sum / pts.length, max, min, n: pts.length };
-  }, [data, trainer, earnMode]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [data, trainer, earnMode, kotva]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sixMPhases = useMemo(() => {
     const f = sixM.filter((c) => matchT(c.primaryTrainer));
@@ -868,7 +894,7 @@ export function Dashboard({
       <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column" }}>
         <H3>
           <Info
-            text="Prílev bežiaceho mesiaca: koľko dopytov prišlo, koľko ľudí bolo na úvodnom a koľko sa stalo klientmi (prvé sedenie tento mesiac). Zadanie z fluktuácie: ~6,3 nových mesačne = rast +3 klienti/rok. Klik otvorí plný lievik s konverziami a zdrojmi."
+            text="Prílev za posledný UZAVRETÝ mesiac: koľko dopytov prišlo, koľko ľudí bolo na úvodnom a koľko sa stalo klientmi (prvé sedenie v tom mesiaci). Zámerne uzavretý mesiac — rozrobený sa nedá s ničím porovnať a v prvých dňoch ukazuje samé nuly. Priebeh bežiaceho mesiaca je pod číslami, keď už v ňom niečo je. Zadanie z fluktuácie: ~6,3 nových mesačne = rast +3 klienti/rok. Klik otvorí plný lievik s konverziami a zdrojmi."
             label={`Lievik — ${monthLabel(lievikMes.mes)}`}
           />
         </H3>
@@ -880,7 +906,15 @@ export function Dashboard({
           </div>
           {lievikMes.bezDat && (
             <div style={{ fontSize: 11, color: C.orange, marginTop: 8, lineHeight: 1.5 }}>
-              Úvodné a noví klienti sa rátajú z PTmindera a ten je nahratý len do {fmtDMY(lievikMes.kotva)} — za tento mesiac zatiaľ nie sú dáta. Dopyty sú zapísané ručne, tie platia.
+              Z PTmindera zatiaľ nie je nahratý žiadny uzavretý mesiac. Dopyty sú zapísané ručne, tie platia.
+            </div>
+          )}
+          {/* Bežiaci mesiac ako priebeh, nie ako výsledok — vizuálne slabší,
+              nech sa nepletie s uzavretým číslom nad ním. */}
+          {lievikMes.priebeh && (
+            <div style={{ fontSize: 11, color: C.textDim, marginTop: 8, lineHeight: 1.5 }}>
+              Zatiaľ v {monthLabel(lievikMes.priebeh.mes)}: {lievikMes.priebeh.dopyty} dopytov ·{" "}
+              {lievikMes.priebeh.uvodne} úvodných · {lievikMes.priebeh.novi} nových — mesiac ešte beží.
             </div>
           )}
           {lievikMes.zdroje.length > 0 && (
@@ -891,7 +925,8 @@ export function Dashboard({
             </div>
           )}
           <div style={{ fontSize: 11, color: C.textDim, marginTop: 8, lineHeight: 1.5 }}>
-            Zadanie ~6,3 nových / mes. pre rast +3 za rok · mesiac ešte beží
+            Zadanie ~6,3 nových / mes. pre rast +3 za rok · uzavretý mesiac
+            {lievikMes.kotva && <> · dáta do {fmtDMY(lievikMes.kotva)}</>}
           </div>
         </div>
       </Card>

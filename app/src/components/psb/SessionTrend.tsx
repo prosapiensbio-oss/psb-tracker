@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 
-import { sessionAnalysisPSB, type PsbAnalysisRow } from "../../lib/psb/compute";
+import { kotvaDat, sessionAnalysisPSB, type PsbAnalysisRow } from "../../lib/psb/compute";
 import { monthLabel } from "../../lib/psb/format";
 import { C } from "../../lib/psb/theme";
 import type { SessionRow } from "../../lib/psb/types";
@@ -18,7 +18,12 @@ const TYPES: { id: string; label: string; color: string; get: (r: PsbAnalysisRow
 export function SessionTrend({ sessions, onNavigate }: { sessions: SessionRow[]; onNavigate?: () => void }) {
   const [type, setType] = useState("total");
   const cfg = TYPES.find((t) => t.id === type)!;
-  const monthly = useMemo(() => sessionAnalysisPSB(sessions), [sessions]);
+  // Po posledný plný mesiac. Rozrobený mesiac má sedenia za pár dní — v grafe
+  // padal na dno a zároveň ťahal dole priemer, oproti ktorému sa všetko meria.
+  const monthly = useMemo(() => {
+    const k = kotvaDat({ sessions });
+    return sessionAnalysisPSB(sessions).filter((m) => !k.plny || m.month <= k.plny);
+  }, [sessions]);
   const vals = monthly.map((m) => cfg.get(m));
   const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
   const data = monthly.map((m, i) => ({ label: monthLabel(m.month), values: [vals[i]] }));

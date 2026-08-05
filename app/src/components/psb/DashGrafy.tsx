@@ -9,10 +9,9 @@ import type { PSBData } from "../../lib/psb/types";
 import {
   byCommitment, commitmentTotal, computeKpis, jarekCalc, kpiDefs, KPI_GROUP_LABELS, nastavPrijmyZTrackera,
   pnlCalc, QUARTERS, salaryCalc, VZAS_MONTH_LABELS, VZAS_MONTHS, VZAS_TARGETS_BY_YEAR, vzasVerzia,
-  type KpiGroup, type KpiOverrides,
-} from "../../lib/psb/vzas";
+  type KpiGroup, type KpiOverrides, poslednyMesiacSDatami,} from "../../lib/psb/vzas";
 import { kpiFmt } from "./Vzas";
-import { monthlyFinance } from "../../lib/psb/compute";
+import { kotvaDat, monthlyFinance } from "../../lib/psb/compute";
 import type { KanalRiadok } from "./Kanaly";
 import { ZDROJE } from "./Klienti";
 import { tokyKlientov } from "./Fluktuacia";
@@ -266,6 +265,12 @@ const maliBtn: CSSProperties = {
 
 // ── Grafy, ktoré nežijú v Dashboard.tsx ──────────────────────────────────────
 const MES_LAB = VZAS_MONTHS.map((_, i) => VZAS_MONTH_LABELS[i]);
+
+// Mesiace VZAS rastú dopredu (dnešný + jeden), takže posledné jeden-dva sú
+// prázdne. Kreslené ako nula ich krivka zisku aj dlhu ťahala k zemi a graf
+// hlásil prepad, ktorý sa nestal. Grafy preto končia posledným mesiacom, o
+// ktorom model niečo vie.
+const mesiaceSDatami = () => MES_LAB.slice(0, poslednyMesiacSDatami() + 1);
 const kcK = (n: number) => `${Math.round(n / 1000)}k`;
 
 export function useExtraGrafy({
@@ -293,6 +298,10 @@ export function useExtraGrafy({
   }, [data, vzasVerzia()]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toky = useMemo(() => tokyKlientov(data, clients), [data, clients]);
+
+  // Posledný plný mesiac. Bez neho každý mesačný graf končil rozrobeným
+  // mesiacom a posledný bod padal k zemi — vyzeralo to ako prepad.
+  const kotva = useMemo(() => kotvaDat(data), [data]);
 
   // ── Dáta z API, len keď je príslušná karta zapnutá ──────────────────────────
   const [weeks, setWeeks] = useState<Record<string, Record<string, unknown>> | null>(null);
@@ -376,7 +385,7 @@ export function useExtraGrafy({
         <H3><Info label="Pásmo zisku" text="Hrubý zisk po mesiacoch (tržby mínus všetky náklady vrátane nárokov na výplaty). Čiara nula je hranica — pod ňou mesiac zožral viac, než priniesol. Tržby bez tejto krivky nehovoria nič." /></H3>
         <Klik kam={() => onNavigate("vzas")} onNavigate="VZAS">
           <LineChart
-            data={MES_LAB.map((l, i) => ({ label: l, values: [p.hrubyZisk[i]] }))}
+            data={mesiaceSDatami().map((l, i) => ({ label: l, values: [p.hrubyZisk[i]] }))}
             series={[{ name: "Hrubý zisk", color: C.green }]}
             refLine={{ value: 0, label: "nula", color: C.red }}
             height={190} fmt={kcK} autoY alignEnd
@@ -390,7 +399,7 @@ export function useExtraGrafy({
         <H3><Info label="Príjmy vs. náklady" text="Obe krivky vedľa seba. Zaujímavá nie je ich výška, ale medzera medzi nimi — a či sa rozširuje alebo zužuje." /></H3>
         <Klik kam={() => onNavigate("vzas")} onNavigate="VZAS">
           <LineChart
-            data={MES_LAB.map((l, i) => ({ label: l, values: [p.prijmy[i], p.celkoveNaklady[i]] }))}
+            data={mesiaceSDatami().map((l, i) => ({ label: l, values: [p.prijmy[i], p.celkoveNaklady[i]] }))}
             series={[{ name: "Príjmy", color: C.green }, { name: "Náklady", color: C.red }]}
             height={190} fmt={kcK} autoY alignEnd
           />
@@ -403,7 +412,7 @@ export function useExtraGrafy({
         <H3><Info label="Kumulovaný prebytok" text="Súčet všetkých ziskov a strát od januára 2025. Ukazuje, čo firma za celý čas naozaj vytvorila — jeden dobrý mesiac nezmaže pol roka v mínuse." /></H3>
         <Klik kam={() => onNavigate("vzas")} onNavigate="VZAS → Cashflow">
           <LineChart
-            data={MES_LAB.map((l, i) => ({ label: l, values: [p.hrubyZisk.slice(0, i + 1).reduce((a, v) => a + v, 0)] }))}
+            data={mesiaceSDatami().map((l, i) => ({ label: l, values: [p.hrubyZisk.slice(0, i + 1).reduce((a, v) => a + v, 0)] }))}
             series={[{ name: "Kumulovaný zisk", color: C.accent }]}
             refLine={{ value: 0, label: "nula", color: C.red }}
             height={190} fmt={kcK} autoY alignEnd
@@ -417,7 +426,7 @@ export function useExtraGrafy({
         <H3><Info label="Dlh voči trénerom" text="Kumulovaný rozdiel medzi nárokom (Fix + variabil) a tým, čo si tréner reálne vybral. Kladné číslo = firma dlží trénerovi." /></H3>
         <Klik kam={() => onNavigate("vzas")} onNavigate="VZAS → Mzdy">
           <LineChart
-            data={MES_LAB.map((l, i) => ({ label: l, values: [j.cumDebt[i], t.cumDebt[i]] }))}
+            data={mesiaceSDatami().map((l, i) => ({ label: l, values: [j.cumDebt[i], t.cumDebt[i]] }))}
             series={[{ name: "Jerry", color: C.accent }, { name: "Terezka", color: C.accentLight }]}
             height={190} fmt={kcK} autoY alignEnd
           />
@@ -430,7 +439,7 @@ export function useExtraGrafy({
         <H3><Info label="Dlh voči Jarkovi" text="Zostatok investorského dlhu po mesiacoch — vklady nahor, splátky nadol. Splácané je aj tréningami a zľavou na členstvo, nielen peniazmi." /></H3>
         <Klik kam={() => onNavigate("vzas")} onNavigate="VZAS → Dlhy">
           <LineChart
-            data={MES_LAB.map((l, i) => ({ label: l, values: [jarek.stav[i]] }))}
+            data={mesiaceSDatami().map((l, i) => ({ label: l, values: [jarek.stav[i]] }))}
             series={[{ name: "Zostatok dlhu", color: C.orange }]}
             refLine={{ value: 0, label: "splatené", color: C.green }}
             height={190} fmt={kcK} autoY alignEnd
@@ -439,15 +448,29 @@ export function useExtraGrafy({
       </Card>
     );
 
-    const kvartaly = QUARTERS.filter((q) => q.idx.length).map((q) => ({
-      label: q.label,
-      value: q.idx.reduce((a, i) => a + (p.prijmy[i] || 0), 0),
-    }));
+    // Kvartál, ktorý ešte neskončil, sa nesmie postaviť vedľa hotových ako
+    // rovnocenný stĺpec — vyzeral by ako prepad. Buď je celý pokrytý dátami,
+    // alebo je označený ako neúplný; kvartál bez jediného plného mesiaca sa
+    // nekreslí vôbec.
+    const poslednyIdx = poslednyMesiacSDatami();
+    const kvartaly = QUARTERS
+      .filter((q) => q.idx.length && q.idx[0] <= poslednyIdx)
+      .map((q) => {
+        const cely = q.idx[q.idx.length - 1] <= poslednyIdx;
+        return {
+          label: cely ? q.label : `${q.label} *`,
+          value: q.idx.reduce((a, i) => a + (i <= poslednyIdx ? p.prijmy[i] || 0 : 0), 0),
+        };
+      });
+    const kvartalNeuplny = kvartaly.some((k) => k.label.endsWith("*"));
     nodes.kvartaly = (
       <Card style={{ marginBottom: 0, height: "100%" }}>
         <H3><Info label="Kvartálne tržby" text="Tržby po kvartáloch — sezónnosť, ktorú mesačný graf rozdrobí. Posledný kvartál býva neúplný, kým sa neskončí." /></H3>
         <Klik kam={() => onNavigate("vysledky", "kvartalne")} onNavigate="Výsledky">
           {kvartaly.length ? <ValueBars data={kvartaly} color={C.accent} fmt={kcK} height={170} alignEnd /> : <Empty>Zatiaľ bez dát.</Empty>}
+          {kvartalNeuplny && (
+            <div style={{ fontSize: 11, color: C.textDim, marginTop: 6 }}>* kvartál ešte neskončil — obsahuje len uzavreté mesiace</div>
+          )}
         </Klik>
       </Card>
     );
@@ -456,7 +479,12 @@ export function useExtraGrafy({
     // spraviť z dobrého roka neúspech. Preto sa prepočítajú na uplynulé mesiace.
     const rok = new Date().toISOString().slice(0, 4);
     const ciel = VZAS_TARGETS_BY_YEAR[rok] || VZAS_TARGETS_BY_YEAR["2026"];
-    const idxRok = VZAS_MONTHS.map((m, i) => (m.startsWith(rok) ? i : -1)).filter((i) => i >= 0);
+    // Len uplynulé mesiace roka. Predtým sa počítali všetky, ktoré sú v poli —
+    // vrátane prázdnych dopredu. Cieľ sa tak delil na viac mesiacov, než koľko
+    // reálne prebehlo, a plnenie vychádzalo nižšie, než v skutočnosti bolo.
+    const idxRok = VZAS_MONTHS
+      .map((m, i) => (m.startsWith(rok) ? i : -1))
+      .filter((i) => i >= 0 && i <= poslednyMesiacSDatami());
     const trzbyRok = idxRok.reduce((a, i) => a + p.prijmy[i], 0);
     const zisksRok = idxRok.reduce((a, i) => a + p.hrubyZisk[i], 0);
     const marzaRok = trzbyRok > 0 ? (zisksRok / trzbyRok) * 100 : 0;
@@ -519,7 +547,10 @@ export function useExtraGrafy({
       else if (s.sessionType === "ONLINE") online++;
       else offline++;
     }
-    const mesiaceHod = [...mesHodiny.entries()].sort((a, b) => a[0].localeCompare(b[0])).slice(-18);
+    // Len plné mesiace — rozrobený by ukázal hodiny za pár dní ako mesačné.
+    const plne = (m: Map<string, unknown>) =>
+      [...m.entries()].filter(([mk]) => !kotva.plny || mk <= kotva.plny).sort((a, b) => a[0].localeCompare(b[0]));
+    const mesiaceHod = (plne(mesHodiny) as [string, { Jerry: number; Terezka: number }][]).slice(-18);
 
     nodes.hodinyMes = (
       <Card style={{ marginBottom: 0, height: "100%" }}>
@@ -539,7 +570,7 @@ export function useExtraGrafy({
         <H3><Info label="Počet sedení / mesiac" text="Objem práce v kusoch. Padá skôr než tržby — balíčky sa platia dopredu, takže pokles sedení je predzvesť poklesu peňazí o mesiac či dva neskôr." /></H3>
         <Klik kam={() => onNavigate("financie", "cashflow")} onNavigate="Financie">
           <ValueBars
-            data={[...mesSedenia.entries()].sort((a, b) => a[0].localeCompare(b[0])).slice(-18).map(([mk, n]) => ({ label: monthLabel(mk), value: n }))}
+            data={(plne(mesSedenia) as [string, number][]).slice(-18).map(([mk, n]) => ({ label: monthLabel(mk), value: n }))}
             color={C.accent} fmt={(n) => String(Math.round(n))} height={170} alignEnd
           />
         </Klik>
@@ -647,7 +678,13 @@ export function useExtraGrafy({
         const k = c.firstSession.slice(0, 7);
         m.set(k, [...(m.get(k) || []), c]);
       }
-      return [...m.entries()].sort((a, b) => b[0].localeCompare(a[0])).slice(1, 7);
+      // Predtým sa slepo zahodil najnovší mesiac („ten beží"). Keď PTminder
+      // mešká, zahodil sa uzavretý mesiac a bežiaci zostal. Teraz rozhoduje
+      // kotva dát, nie poradie.
+      return [...m.entries()]
+        .filter(([mk]) => !kotva.plny || mk <= kotva.plny)
+        .sort((a, b) => b[0].localeCompare(a[0]))
+        .slice(0, 6);
     })();
     nodes.prezitie = (
       <Card style={{ marginBottom: 0, height: "100%" }}>

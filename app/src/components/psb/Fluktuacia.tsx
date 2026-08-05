@@ -1,6 +1,6 @@
 import { Fragment, useMemo, useState } from "react";
 
-import type { ClientAgg } from "../../lib/psb/compute";
+import { kotvaDat, type ClientAgg } from "../../lib/psb/compute";
 import { fmtCZK, monthKey, monthLabel } from "../../lib/psb/format";
 import { ZDROJE } from "./Klienti";
 import { C, mix, S } from "../../lib/psb/theme";
@@ -78,8 +78,12 @@ export function tokyKlientov(data: PSBData, clients: Record<string, ClientAgg>, 
     .map(([k, v]) => [k, { prislo: v.prisli.length, odislo: v.odisli.length, prisli: v.prisli, odisli: v.odisli }] as const)
     .sort((a, b) => a[0].localeCompare(b[0]));
 
+  // Uzavretý mesiac sa riadi KOTVOU DÁT, nie kalendárom. Keď PTminder nie je
+  // nahratý mesiac dozadu, kalendárne „uzavretý" mesiac je v dátach prázdny —
+  // a nula príchodov by sa čítala ako „nikto neprišiel" namiesto „nevieme".
   const beziaci = new Date().toISOString().slice(0, 7);
-  const uzavrete = mesacne.filter(([mk]) => mk < beziaci);
+  const plny = kotvaDat(data).plny || beziaci;
+  const uzavrete = mesacne.filter(([mk]) => mk <= plny);
   const prichodove = uzavrete.slice(-12);
   const zrele = kotva
     ? new Date(Date.parse(kotva) - hranicaDni * DEN).toISOString().slice(0, 7)
