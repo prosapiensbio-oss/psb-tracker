@@ -500,6 +500,15 @@ export function Dashboard({
     return Object.entries(map).sort((a, b) => a[0].localeCompare(b[0]));
   }, [data.sessions]);
 
+  // Posledný týždeň býva useknutý: dáta z PTmindera končia v piatok, takže
+  // sobota a nedeľa v ňom chýbajú. V grafe zostáva (aktuálna záťaž je zmyslom
+  // tejto karty), ale z priemeru a z „najľahšieho týždňa" sa vyhadzuje — inak
+  // by rozrobený týždeň vyhrával oboje a Ø by klesalo s každým importom.
+  const poslednyTyzdenNeuplny = useMemo(
+    () => !!kotva.den && new Date(`${kotva.den}T00:00:00Z`).getUTCDay() !== 0,
+    [kotva],
+  );
+
   const weeklyHours = useMemo(() => {
     const maIneho = weekRows.some(([, v]) => v.iny > 0);
     const series = trainer === "all"
@@ -522,7 +531,8 @@ export function Dashboard({
 
   // Ø / max / min weekly hours (basis follows the trainer pill: "all" = PSB total per week).
   const weekStats = useMemo(() => {
-    const pts = weekRows
+    const zdroj = poslednyTyzdenNeuplny ? weekRows.slice(0, -1) : weekRows;
+    const pts = zdroj
       .map(([k, v]) => ({
         label: weekLabel(k),
         h: trainer === "all" ? v.Jerry + v.Terezka + v.iny : trainer === "Jerry" ? v.Jerry : v.Terezka,
@@ -537,7 +547,7 @@ export function Dashboard({
       if (p.h < min.h) min = p;
     }
     return { avg: sum / pts.length, max, min, n: pts.length };
-  }, [weekRows, trainer]);
+  }, [weekRows, trainer, poslednyTyzdenNeuplny]);
 
   // Priemerné týždenné hodiny každého trénera zvlášť — počíta sa len z týždňov,
   // v ktorých daný tréner naozaj trénoval, inak by dovolenka jedného stiahla
@@ -756,6 +766,12 @@ export function Dashboard({
           </div>
         ) : (
           <Empty>Nahraj Payroll by Session.</Empty>
+        )}
+        {poslednyTyzdenNeuplny && weeklyHours.data.length > 0 && (
+          <div style={{ fontSize: 11, color: C.orange, marginTop: 6, lineHeight: 1.5 }}>
+            Posledný stĺpec je rozrobený týždeň — dáta končia {fmtDMY(kotva.den)}. Do priemeru ani do
+            najľahšieho týždňa sa nepočíta.
+          </div>
         )}
         {weekStats && (
           // Pri „Obaja" hovorí max a min o štúdiu ako celku a nedá sa s tým nič
