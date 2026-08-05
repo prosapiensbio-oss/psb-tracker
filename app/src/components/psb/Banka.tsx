@@ -166,13 +166,18 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
   const suhrn = useMemo(() => {
     if (!nahlad) return null;
     const nove = nahlad.filter((r) => !r.uzMame && !r.zamknuty && r.suma !== 0);
-    const vyd = nove.filter((r) => r.suma < 0);
+    // Výdavky = prevádzka. Výplaty sa z nich vyčleňujú: majú vlastnú kategóriu
+    // a keby sa počítali aj sem, súčet by tvrdil, že štúdio minulo aj to, čo si
+    // vzali tréneri.
+    const vyd = nove.filter((r) => r.suma < 0 && !r.kategoria.startsWith("vyplaty"));
+    const vypl = nove.filter((r) => r.kategoria.startsWith("vyplaty"));
     return {
       spolu: nahlad.length,
       nove: nove.length,
       uzMame: nahlad.filter((r) => r.uzMame).length,
       zamknute: nahlad.filter((r) => r.zamknuty).length,
       vydavky: vyd.reduce((a, r) => a + r.suma, 0),
+      vyplaty: vypl.reduce((a, r) => a + r.suma, 0),
       prijmy: nove.filter((r) => r.suma > 0).reduce((a, r) => a + r.suma, 0),
       nezaradene: vyd.filter((r) => !r.kategoria).length,
     };
@@ -241,9 +246,9 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
             {([
               ["vsetko", `Všetko (${nahlad.length})`, C.textMuted],
-              ["vydaje", `Výdavky ${fmtCZK(Math.abs(suhrn.vydavky))} (${nahlad.filter((r) => r.suma < 0).length})`, C.orange],
+              ["vydaje", `Výdavky ${fmtCZK(Math.abs(suhrn.vydavky))} (${nahlad.filter((r) => r.suma < 0 && !r.kategoria.startsWith("vyplaty")).length})`, C.orange],
               ["prijmy", `Príjmy ${fmtCZK(suhrn.prijmy)} (${nahlad.filter((r) => r.suma > 0).length})`, C.green],
-              ["vyplaty", `Výplaty (${nahlad.filter((r) => r.kategoria.startsWith("vyplaty")).length})`, C.blue],
+              ["vyplaty", `Výplaty ${fmtCZK(Math.abs(suhrn.vyplaty))} (${nahlad.filter((r) => r.kategoria.startsWith("vyplaty")).length})`, C.blue],
               ["nezaradene", `Nezaradené (${suhrn.nezaradene})`, suhrn.nezaradene ? C.orange : C.textDim],
             ] as const).map(([id, lbl, farba]) => (
               <button key={id} onClick={() => setFilter((f) => (f === id ? "vsetko" : id))}
@@ -301,7 +306,10 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
                 {nahlad.map((r, i) => [r, i] as const)
                   .filter(([r]) =>
                     filter === "vsetko" ? true
-                    : filter === "vydaje" ? r.suma < 0
+                    // Výplata je zvláštna kategória, nie prevádzkový výdavok —
+                    // keby bola v oboch, súčet výdavkov by tvrdil, že štúdio
+                    // minulo aj to, čo si vzali tréneri.
+                    : filter === "vydaje" ? r.suma < 0 && !r.kategoria.startsWith("vyplaty")
                     : filter === "prijmy" ? r.suma > 0
                     : filter === "vyplaty" ? r.kategoria.startsWith("vyplaty")
                     : r.suma < 0 && !r.kategoria)
