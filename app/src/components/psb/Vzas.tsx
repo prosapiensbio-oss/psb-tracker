@@ -849,6 +849,14 @@ function DebtBox({ p }: { p: DebtPerson }) {
             )}
           </div>
         )}
+        {/* Opačné znamienko: tréner si vybral viac, než mal nárok. Otázka
+            „koľko hodín" tu nedáva zmysel — dlh je na druhej strane. */}
+        {!dlzi && p.dlh !== 0 && (
+          <div style={{ marginTop: 9, marginLeft: 14, paddingTop: 8, borderTop: `1px solid ${mix(C.border, 60)}`, fontSize: 11.5, color: C.textDim, lineHeight: 1.5 }}>
+            Vybraté je o {fmtCZK(Math.abs(p.dlh))} viac, než bol nárok — dlh je na opačnej strane, firma nedlží nič.
+            Pri {p.hodinyTeraz.toFixed(0)} h / mes. ({naTyzden(p.hodinyTeraz).toFixed(1)} h/týž.) sa to samo vyrovnáva.
+          </div>
+        )}
       </div>
       {open && (
         <div style={{ fontSize: 12, color: C.textMuted, marginTop: 8, marginLeft: 14, lineHeight: 1.5 }}>
