@@ -1,6 +1,7 @@
 // All derived analytics for the PSB Tracker. Pure functions over PSBData —
 // no browser globals. Reused across every module.
 import { daysBetween, fmtDMY, monthKey, monthLabel, monthsBetween, normName, quarterKey, quarterLabel, weekKey, weekLabel } from "./format";
+import { BARTER_KLIENTI } from "./vzas";
 import type {
   PackageRow,
   PaymentRow,
@@ -842,6 +843,23 @@ export function deriveRegister(
         "udaje|",
       );
     }
+  }
+
+  // Barterové členstvo je vzdaná tržba, nie darček — a keď na jeho započítanie
+  // nikto neupozorní, ticho zmizne z Jarkovho dlhu. Appka to zachytí v mesiaci,
+  // keď členstvo začalo; započítanie prebehne samo, toto je len na overenie.
+  for (const p of data.packages) {
+    if (!BARTER_KLIENTI.includes(p.client) || !p.payment || !p.validFrom) continue;
+    const mk = p.validFrom.slice(0, 7);
+    if (mk < "2026-07") continue;
+    add(
+      `barter|${p.client}|${mk}`,
+      "Rozhodnutie",
+      "blue",
+      `${p.client}: nové členstvo za ${Math.round(p.payment).toLocaleString("sk-SK")} Kč`,
+      `Členstvo začalo ${fmtDMY(p.validFrom)} a nie je zaplatené — appka ho započítala ako vzdanú tržbu, teda splátku Jarkovho dlhu. Skontroluj sumu vo VZAS → Jarek dlh.`,
+      30,
+    );
   }
 
   for (const c of sixM) {

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { nastavHodinyZTrackera, nastavNakladyZFio } from "../../lib/psb/vzas";
+import { BARTER_KLIENTI, nastavHodinyZTrackera, nastavJarekZTrackera, nastavNakladyZFio } from "../../lib/psb/vzas";
 
 import {
   checkSession,
@@ -244,6 +244,18 @@ export function PSBApp() {
     }
     if (nastavHodinyZTrackera(podlaMesiaca)) setFioTik((x) => x + 1);
   }, [data.sessions]);
+
+  // Barterové členstvá (Sofia) sa započítavajú ako splátka Jarkovho dlhu —
+  // cenu balíčka vie PTminder, takže sa neprepisuje ručne.
+  useEffect(() => {
+    const podlaMesiaca: Record<string, number> = {};
+    for (const p of data.packages) {
+      if (!BARTER_KLIENTI.includes(p.client) || !p.payment || !p.validFrom) continue;
+      const mk = p.validFrom.slice(0, 7);
+      podlaMesiaca[mk] = (podlaMesiaca[mk] || 0) + p.payment;
+    }
+    if (nastavJarekZTrackera(podlaMesiaca)) setFioTik((x) => x + 1);
+  }, [data.packages]);
 
   // Náklady z banky sa načítajú raz pre celú appku — model je modulový, takže
   // ich potrebuje aj dlaždica Zisk na dashboarde, nielen obrazovka VZAS.

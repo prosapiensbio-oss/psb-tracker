@@ -409,6 +409,33 @@ const PRVY_MESIAC_Z_FIO = "2026-07";
  * nich. Starsie mesiace zostavaju z Excelu — su overene a dva razy opravene
  * proti PTminderu.
  */
+/**
+ * Barterové členstvá ako splátka Jarkovho dlhu.
+ *
+ * Sofia trénuje od januára 2025 (59 sedení) a nezaplatila ani korunu — jej
+ * členstvo je barter proti Jarkovmu dlhu. PTminder pritom vie, koľko ten
+ * balíček stál (payment_czk), takže sa to nemusí prepisovať ručne: keď jej
+ * začne nové členstvo, cena sa započíta ako vzdaná tržba v mesiaci, keď
+ * platnosť začala.
+ *
+ * Zapisuje sa len od júla 2026 — staršie mesiace sú v Exceli a sú overené.
+ */
+export function nastavJarekZTrackera(splatky: Record<string, number>): boolean {
+  const rad = JAREK_SPLATKY["Sofia (vzdaná tržba)"];
+  if (!rad) return false;
+  dorovnaj(rad);
+  let zmena = false;
+  for (const [mk, suma] of Object.entries(splatky)) {
+    const i = VZAS_MONTHS.indexOf(mk as (typeof VZAS_MONTHS)[number]);
+    if (i < 0 || mk < PRVY_MESIAC_Z_FIO) continue;
+    if (Math.abs(rad[i] - suma) > 0.5) { rad[i] = suma; zmena = true; }
+  }
+  return zmena;
+}
+
+/** Klienti, ktorých členstvo je barter proti Jarkovmu dlhu, nie tržba. */
+export const BARTER_KLIENTI = ["Sofia Resnerová"];
+
 export function nastavHodinyZTrackera(hodiny: Record<string, { jerry: number; terezka: number }>): boolean {
   let zmena = false;
   for (const [mk, h] of Object.entries(hodiny)) {
