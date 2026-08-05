@@ -304,7 +304,12 @@ export function nastavVyplaty(ulozene?: Partial<Record<PersonKey, VyplatyKategor
     const maNove = !!nove && Object.keys(nove).length > 0;
     const zdroj = maNove ? nove : VYPLATY_ZO_ZDROJAKU[key];
     const ciel = SALARY[key].personal;
+    // Riadok „Z banky" nepochádza ani z Excelu, ani z ručných úprav — plní ho
+    // import z Fio. Bez tejto výnimky ho načítanie uložených nastavení zmazalo
+    // a výplaty za júl zmizli, hoci v banke boli.
+    const zBanky = ciel[Z_BANKY] ? [...ciel[Z_BANKY]] : null;
     for (const k of Object.keys(ciel)) delete ciel[k];
+    if (zBanky) ciel[Z_BANKY] = zBanky;
     for (const [k, v] of Object.entries(zdroj)) {
       // Kategórie, ktoré sa medzitým presunuli do spoločných výdavkov, sa z
       // uložených nastavení zahadzujú. Bez toho by sa po presune počítali
@@ -326,10 +331,13 @@ export function nastavVyplaty(ulozene?: Partial<Record<PersonKey, VyplatyKategor
 }
 
 /** Aktuálny stav v tvare, v akom sa ukladá do databázy. */
-export const vyplatyNaUlozenie = (): Record<PersonKey, VyplatyKategorie> => ({
-  jerry: Object.fromEntries(Object.entries(SALARY.jerry.personal).map(([k, v]) => [k, [...v]])),
-  terezka: Object.fromEntries(Object.entries(SALARY.terezka.personal).map(([k, v]) => [k, [...v]])),
-});
+export const vyplatyNaUlozenie = (): Record<PersonKey, VyplatyKategorie> => {
+  // „Z banky" sa neukladá: pri ďalšom otvorení ho znova naplní import a
+  // uložená kópia by sa s ním časom rozišla.
+  const bez = (o: VyplatyKategorie) =>
+    Object.fromEntries(Object.entries(o).filter(([k]) => k !== Z_BANKY).map(([k, v]) => [k, [...v]]));
+  return { jerry: bez(SALARY.jerry.personal), terezka: bez(SALARY.terezka.personal) };
+};
 
 // Shared household spending — summed, then split /2 into each founder's
 // "Poslané". Only tracked from 2026; in 2025 each founder's payout went to
@@ -441,6 +449,13 @@ export function nastavNakladyZFio(
     for (const v of Object.values(SPOLOCNE)) v[i] = 0;
 
     for (const [kat, suma] of Object.entries(podlaKategorie)) {
+      // Splátka Jarkovi je v Exceli na dvoch miestach naraz: ako náklad v P&L
+      // a ako zníženie dlhu. Z banky príde raz, takže sa musí zapísať na obe —
+      // inak by dlh stál na mieste, hoci sa spláca.
+      if (kat === "fixne.prevadzka.splatkaJarek") {
+        const rad = JAREK_SPLATKY["Fix splátka (P&L náklad)"];
+        if (rad) { dorovnaj(rad); rad[i] = suma; }
+      }
       if (kat.startsWith("spolocne.")) {
         const meno = kat.slice("spolocne.".length);
         if (SPOLOCNE[meno]) { SPOLOCNE[meno][i] = suma; zmena = true; }

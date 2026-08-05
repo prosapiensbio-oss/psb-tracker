@@ -207,6 +207,24 @@ function Prehlad({ data, focus, trainer, onTrainer }: { data: PSBData; focus?: N
     };
   }, [rows]);
 
+  // Súčet odrobených hodín podľa trénera za zvolené obdobie. Priemer na týždeň
+  // nestačí na otázku „koľko kto odrobil minulý mesiac" — a to je otázka, ktorá
+  // sa pýta pri kontrole výplat. Mzdové hodiny sú bez úvodných: tie sa platia
+  // zvlášť a do mzdy nevstupujú.
+  const hodinyPodlaTrenera = useMemo(() => {
+    const from = range?.from, to = range?.to;
+    const m: Record<string, { vsetky: number; mzdove: number; sedeni: number }> = {};
+    for (const s of data.sessions) {
+      if (from && s.date < from) continue;
+      if (to && s.date > to + "T23:59:59.999Z") continue;
+      const e = (m[s.sessionTrainer] ||= { vsetky: 0, mzdove: 0, sedeni: 0 });
+      e.vsetky += s.duration / 60;
+      e.sedeni++;
+      if (s.sessionType !== "UVODNE") e.mzdove += s.duration / 60;
+    }
+    return Object.entries(m).sort((a, b) => b[1].vsetky - a[1].vsetky);
+  }, [data.sessions, range]);
+
   const zoneColor = (hours: number) => {
     const { lo, hi } = periodZone(period);
     if (hours >= lo && hours <= hi) return C.green;
@@ -267,6 +285,31 @@ function Prehlad({ data, focus, trainer, onTrainer }: { data: PSBData; focus?: N
           <StatCard value={`${summary.avgH.toFixed(1)}h`} label={`Ø hodín / ${period === "week" ? "týždeň" : period === "quarter" ? "kvartál" : "mesiac"}`} />
           <StatCard value={summary.avgScore.toFixed(1)} label="Ø skóre (1–10)" color={summary.avgScore >= 7 ? C.green : summary.avgScore >= 4 ? C.orange : C.red} />
           <StatCard value={fmtCZK(summary.avgCzk)} label="Ø CZK / sedenie" />
+        </div>
+      )}
+
+      {/* Kto koľko odrobil za zvolené obdobie — na overenie mzdových hodín. */}
+      {hodinyPodlaTrenera.length > 0 && range && (
+        <div style={{ marginBottom: 14, padding: "11px 13px", borderRadius: 11, border: `1px solid ${C.border}`, background: mix(C.accent, 4) }}>
+          <div style={{ fontSize: 11.5, color: C.textMuted, marginBottom: 8 }}>
+            <Info
+              label="Odrobené hodiny za zvolené obdobie"
+              text="Mzdové hodiny sú bez úvodných tréningov — tie sa platia zvlášť a do mzdy nevstupujú. Presne tieto čísla idú do VZAS → J&T Výplaty pre mesiace od júla 2026."
+            />
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 10 }}>
+            {hodinyPodlaTrenera.map(([tren, h]) => (
+              <div key={tren} style={{ background: C.track, borderRadius: 9, padding: "8px 11px" }}>
+                <div style={{ fontSize: 12, color: C.textMuted }}>{tren}</div>
+                <div style={{ fontSize: 19, fontWeight: 700, color: C.text, fontVariantNumeric: "tabular-nums" }}>
+                  {h.mzdove.toFixed(1)} h
+                </div>
+                <div style={{ fontSize: 11, color: C.textDim, marginTop: 2 }}>
+                  {h.sedeni} sedení · {h.vsetky.toFixed(1)} h vrátane úvodných
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
