@@ -8,7 +8,7 @@ import { C, MEMBERSHIP_COLORS, mix } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import {
   byCommitment, commitmentTotal, computeKpis, jarekCalc, kpiDefs, KPI_GROUP_LABELS, nastavPrijmyZTrackera,
-  pnlCalc, QUARTERS, salaryCalc, VZAS_MONTH_LABELS, VZAS_MONTHS, VZAS_TARGETS_BY_YEAR,
+  pnlCalc, QUARTERS, salaryCalc, VZAS_MONTH_LABELS, VZAS_MONTHS, VZAS_TARGETS_BY_YEAR, vzasVerzia,
   type KpiGroup, type KpiOverrides,
 } from "../../lib/psb/vzas";
 import { kpiFmt } from "./Vzas";
@@ -288,7 +288,9 @@ export function useExtraGrafy({
     const t = salaryCalc("terezka");
     const be = VZAS_MONTHS.map((_, i) => p.bezVyplat[i] + j.narok[i] + t.narok[i] + p.matyas[i]);
     return { p, j, t, be, jarek: jarekCalc() };
-  }, [data]);
+    // Verzia modelu: importy menia rady mimo Reactu, bez nej by karty ukazovali
+    // stav spred načítania nákladov z banky.
+  }, [data, vzasVerzia()]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toky = useMemo(() => tokyKlientov(data, clients), [data, clients]);
 

@@ -4,7 +4,8 @@ import { monthlyFinance, predictCash, predictEarnings, type ClientAgg } from "..
 import { fetchBtcReserve, type BtcPlatba } from "../../lib/psb/client";
 import { fmtCZK, monthLabel, normName } from "../../lib/psb/format";
 import { ObdobieCtx } from "../../lib/psb/obdobie";
-import { C, S } from "../../lib/psb/theme";
+import { C, mix, S } from "../../lib/psb/theme";
+import { pravidelneNaklady, predikciaNakladov, vzasVerzia } from "../../lib/psb/vzas";
 import type { PSBData } from "../../lib/psb/types";
 import type { NavFocus } from "./App";
 import { BarRow, Card, Empty, H3, Info, LineChart, Select, SortTh, StatCard, SubTabs, TableWrap, useSort, ValueBars } from "./ui";
@@ -495,6 +496,8 @@ function Predikcia({ data, clients }: { data: PSBData; clients: Record<string, C
         {!hasData && <Empty>Nahraj Payroll + Packages & Memberships CSV pre predikciu.</Empty>}
       </Card>
 
+      <PredikciaZisku prijmyOdhad={pred.scenarios.realistic} mesiac={monthsCovered} />
+
       {hasData && (
         <Card>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 8 }}>
@@ -541,5 +544,69 @@ function Predikcia({ data, clients }: { data: PSBData; clients: Record<string, C
         </Card>
       )}
     </>
+  );
+}
+
+// ── Predikcia nákladov, výplat a zisku ──────────────────────────────────────
+//
+// Tržby sa dajú predpovedať z konkrétnych klientov — príjem má meno a dátum.
+// Náklady také nie sú, a to je dôvod, prečo tu doteraz neboli: nájom a
+// aplikácie sa opakujú, ale nový notebook sa predvídať nedá. Preto sa nepočíta
+// priemer (jeden mesiac s vybavením za 48 000 by zdvihol odhad na celý rok),
+// ale MEDIÁN posledných šiestich mesiacov — ten výkyv ignoruje.
+function PredikciaZisku({ prijmyOdhad, mesiac }: { prijmyOdhad: number; mesiac: string }) {
+  const [otvorene, setOtvorene] = useState(false);
+  const p = useMemo(() => predikciaNakladov(1), [vzasVerzia()]); // eslint-disable-line react-hooks/exhaustive-deps
+  const pravidelne = useMemo(() => pravidelneNaklady(), [vzasVerzia()]); // eslint-disable-line react-hooks/exhaustive-deps
+  if (!p.mesiace.length || !p.zaklad) return null;
+  const m = p.mesiace[0];
+  const zisk = prijmyOdhad - m.naklady - m.vyplaty;
+
+  return (
+    <Card>
+      <H3>
+        <Info
+          label={`Predikcia nákladov a zisku — ${mesiac}`}
+          text="Náklady a výplaty sa odhadujú z mediánu posledných šiestich mesiacov, nie z priemeru: jeden mesiac s väčším nákupom by priemer zdvihol na celý rok, medián ho ignoruje. Tržby prichádzajú z realistického scenára hore, ktorý pozná konkrétnych klientov a ich obnovy. Odhad zisku je teda presný natoľko, nakoľko je typický nasledujúci mesiac."
+        />
+      </H3>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, margin: "14px 0 6px" }}>
+        <StatCard value={fmtCZK(prijmyOdhad)} label="Tržby (realistický)" color={C.green} />
+        <StatCard value={fmtCZK(m.naklady)} label="Prevádzkové náklady" color={C.orange} />
+        <StatCard value={fmtCZK(m.vyplaty)} label="Výplaty" color={C.blue} />
+        <StatCard value={fmtCZK(zisk)} label="Odhad zisku" color={zisk >= 0 ? C.green : C.red} />
+      </div>
+      <div style={{ fontSize: 11.5, color: C.textDim, lineHeight: 1.55, marginTop: 4 }}>
+        Medián z {p.zaklad} {p.zaklad === 1 ? "mesiaca" : p.zaklad < 5 ? "mesiacov" : "mesiacov"} — nie priemer, aby jeden väčší nákup neposunul odhad na celý rok.
+        {zisk < 0 && <> Pri týchto nákladoch a tržbách by mesiac skončil v strate.</>}
+      </div>
+
+      <button
+        onClick={() => setOtvorene((o) => !o)}
+        style={{ marginTop: 10, background: "none", border: "none", color: C.textDim, fontSize: 12, cursor: "pointer", padding: 0 }}
+      >
+        {otvorene ? "▲ skryť" : "▼"} z čoho sa odhad skladá ({pravidelne.length} pravidelných položiek)
+      </button>
+      {otvorene && (
+        <div style={{ marginTop: 8 }}>
+          <div style={{ fontSize: 11.5, color: C.textDim, marginBottom: 8, lineHeight: 1.5 }}>
+            Položky, ktoré sa objavili aspoň v štyroch zo šiestich mesiacov. Zvyšok do celkových nákladov
+            dopĺňajú jednorazové veci, ktoré sa predvídať nedajú — preto je odhad nákladov vždy opatrnejší než odhad tržieb.
+          </div>
+          {pravidelne.slice(0, 14).map((r) => (
+            <div key={r.label} style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "4px 0", borderBottom: `1px solid ${mix(C.border, 40)}`, fontSize: 12 }}>
+              <span style={{ color: C.textMuted, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.label}</span>
+              <span style={{ color: C.text, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+                {fmtCZK(r.median)} <span style={{ color: C.textDim, fontSize: 11 }}>{r.mesiacov}/6</span>
+              </span>
+            </div>
+          ))}
+          <div style={{ fontSize: 11.5, color: C.textMuted, marginTop: 8 }}>
+            Pravidelné spolu <b style={{ color: C.orange }}>{fmtCZK(pravidelne.reduce((a, r) => a + r.median, 0))}</b>
+            {" "}z odhadovaných {fmtCZK(m.naklady)} — rozdiel sú nepravidelné nákupy.
+          </div>
+        </div>
+      )}
+    </Card>
   );
 }

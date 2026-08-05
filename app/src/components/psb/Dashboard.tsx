@@ -16,7 +16,7 @@ import {
 } from "../../lib/psb/compute";
 import { fmtCZK, fmtDMY, monthLabel, weekKey, weekLabel } from "../../lib/psb/format";
 import { C, mix, S, badge, btn } from "../../lib/psb/theme";
-import { nastavPrijmyZTrackera, pnlCalc, VZAS_MONTHS } from "../../lib/psb/vzas";
+import { nastavPrijmyZTrackera, pnlCalc, poslednyMesiacSDatami, vzasVerzia, VZAS_MONTHS } from "../../lib/psb/vzas";
 import {
   centerBody, GrafyKniznica, MiniStat, SEKCIE, useExtraGrafy, VYCHODZIE, WIDGETS,
   type SekciaId, type WidgetMeta,
@@ -416,9 +416,13 @@ export function Dashboard({
     for (const m of monthlyFinance(data)) cash[m.month] = m.cash;
     nastavPrijmyZTrackera(cash);
     const p = pnlCalc();
-    const i = VZAS_MONTHS.length - 1;
+    // Posledný mesiac, o ktorom appka niečo vie — nie posledný v zozname.
+    // Mesiace rastú dopredu, takže ten posledný býva prázdny.
+    const i = poslednyMesiacSDatami();
     return { mesiac: VZAS_MONTHS[i] as string, v: p.hrubyZisk[i] };
-  }, [data]);
+    // `vzasVerzia()` je tu zámerne: model sa mení mimo Reactu (import z banky),
+    // takže bez nej by dlaždica ukazovala zisk spočítaný pred načítaním nákladov.
+  }, [data, vzasVerzia()]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Rast a strata v malom — Ø príchody/odchody za rok + posledné mesiace.
   // Odchod „dozrieva": posledné ~2 mesiace sa ešte nedá povedať, kto odišiel,

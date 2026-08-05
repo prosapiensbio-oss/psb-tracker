@@ -364,6 +364,7 @@ export function nastavVyplaty(ulozene?: Partial<Record<PersonKey, VyplatyKategor
     if (maNove) zmena = true;
   }
   VYPLATY_SU_UPRAVENE = zmena;
+  if (zmena) oznacZmenu();
   return zmena;
 }
 
@@ -474,6 +475,7 @@ export function nastavJarekZTrackera(splatky: Record<string, number>): boolean {
     if (i < 0 || mk < PRVY_MESIAC_Z_FIO) continue;
     if (Math.abs(rad[i] - suma) > 0.5) { rad[i] = suma; zmena = true; }
   }
+  if (zmena) oznacZmenu();
   return zmena;
 }
 
@@ -505,6 +507,7 @@ export function nastavBtcVyplaty(
     zapis("terezka", RIADOK_BTC, v.terezka);
     if (v.jerryFp) zapis("jerry", RIADOK_FP, v.jerryFp);
   }
+  if (zmena) oznacZmenu();
   return zmena;
 }
 
@@ -519,6 +522,7 @@ export function nastavHodinyZTrackera(hodiny: Record<string, { jerry: number; te
       if (Math.abs(rad[i] - v) > 0.05) { rad[i] = v; zmena = true; }
     }
   }
+  if (zmena) oznacZmenu();
   return zmena;
 }
 
@@ -585,8 +589,20 @@ export function nastavNakladyZFio(
     }
   }
   NAKLADY_Z_FIO = mesiace.sort();
+  if (zmena) oznacZmenu();
   return zmena;
 }
+
+// Verzia modelu.
+//
+// Rady v tomto module sú mutovateľné a importy ich prepisujú po načítaní.
+// React o tom nevie: komponent, ktorý má výsledok v `useMemo` so závislosťou
+// na dátach z PTmindera, si po dopočítaní nákladov z banky ponechá staré
+// číslo. Presne to sa stalo dlaždici Zisk. Preto verzia — každý setter ju
+// zvýši a konzumenti ju dajú do závislostí.
+let _verzia = 0;
+export const vzasVerzia = () => _verzia;
+const oznacZmenu = () => { _verzia++; };
 
 export let PRIJMY_SU_ZIVE = false;
 export function nastavPrijmyZTrackera(cashPodlaMesiaca: Record<string, number>): boolean {
@@ -598,6 +614,7 @@ export function nastavPrijmyZTrackera(cashPodlaMesiaca: Record<string, number>):
   });
   VZAS_MONTHS.forEach((_, i) => { PRIJMY[i] = PRIJMY_PTMINDER[i] + PRIJMY_INE[i]; });
   PRIJMY_SU_ZIVE = true;
+  oznacZmenu();
   return zmena;
 }
 
@@ -1013,6 +1030,90 @@ export const VZAS_TARGETS_BY_YEAR: Record<string, YearTargets> = {
   "2026": { rocneTrzby: 2300000, marzaPct: 12, hodinyJerry: 90, hodinyTerezka: 80 },
 };
 export const VZAS_TARGETS = VZAS_TARGETS_BY_YEAR["2026"]; // medzikrok 12–15 %, dlhodobo 20 %
+
+// ── Predikcia nákladov, výplat a zisku ──────────────────────────────────────
+//
+// Tržby sa predpovedajú z konkrétnych klientov (kto má kedy obnovu) — to je
+// presné, lebo príjem má meno a dátum. Náklady také nie sú: nájom, aplikácie a
+// telefón sa opakujú, ale nový notebook sa nedá predvídať. Preto sa predpovedá
+// z toho, čo bolo — a rozlišuje sa, čo je pravidelné a čo jednorazové.
+//
+// Vedome sa NEPOUŽÍVA priemer všetkého: jeden mesiac s vybavením za 48 000 by
+// zdvihol odhad na celý rok. Berie sa MEDIÁN posledných mesiacov, ktorý taký
+// výkyv ignoruje, a jednorazové položky sa uvádzajú zvlášť.
+export type PredikciaMesiac = {
+  mesiac: string;
+  naklady: number;
+  vyplaty: number;
+  prijmy: number;
+  zisk: number;
+};
+
+const median = (xs: number[]): number => {
+  const a = xs.filter((x) => Number.isFinite(x)).sort((x, y) => x - y);
+  if (!a.length) return 0;
+  const m = Math.floor(a.length / 2);
+  return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
+};
+
+/**
+ * Odhad na `horizont` mesiacov dopredu.
+ * `prijmyOdhad` prichádza z predikcie tržieb (predictCash) — tá pozná mená.
+ */
+export function predikciaNakladov(horizont = 3, prijmyOdhad: Record<string, number> = {}): {
+  mesiace: PredikciaMesiac[];
+  zaklad: number;
+  medianNaklady: number;
+  medianVyplaty: number;
+} {
+  const p = pnlCalc();
+  const posledny = poslednyMesiacSDatami();
+  // Šesť mesiacov dozadu, ale len tie, ktoré naozaj majú náklady.
+  const okno: number[] = [];
+  for (let i = posledny; i >= 0 && okno.length < 6; i--) if (p.bezVyplat[i] > 0) okno.unshift(i);
+
+  const medianNaklady = median(okno.map((i) => p.bezVyplat[i]));
+  const medianVyplaty = median(okno.map((i) => p.vyplatySpolu[i]));
+
+  const mesiace: PredikciaMesiac[] = [];
+  for (let k = 1; k <= horizont; k++) {
+    const idx = posledny + k;
+    const mk = idx < VZAS_MONTHS.length
+      ? VZAS_MONTHS[idx]
+      : (() => {
+          const [r, m] = VZAS_MONTHS[VZAS_MONTHS.length - 1].split("-").map(Number);
+          const celkom = m + (idx - (VZAS_MONTHS.length - 1));
+          const rok = r + Math.floor((celkom - 1) / 12);
+          return `${rok}-${String(((celkom - 1) % 12) + 1).padStart(2, "0")}`;
+        })();
+    const prijmy = prijmyOdhad[mk] ?? 0;
+    mesiace.push({
+      mesiac: mk,
+      naklady: medianNaklady,
+      vyplaty: medianVyplaty,
+      prijmy,
+      zisk: prijmy - medianNaklady - medianVyplaty,
+    });
+  }
+  return { mesiace, zaklad: okno.length, medianNaklady, medianVyplaty };
+}
+
+/** Položky, ktoré sa opakujú každý mesiac — z nich sa dá skladať fixný základ. */
+export function pravidelneNaklady(): { label: string; median: number; mesiacov: number }[] {
+  const posledny = poslednyMesiacSDatami();
+  const okno: number[] = [];
+  for (let i = posledny; i >= 0 && okno.length < 6; i--) okno.unshift(i);
+  const out: { label: string; median: number; mesiacov: number }[] = [];
+  for (const sek of Object.values(PNL))
+    for (const sub of Object.values(sek.subcategories))
+      for (const item of Object.values(sub.items)) {
+        const hodnoty = okno.map((i) => item.values[i]);
+        const nenulove = hodnoty.filter((v) => v > 0).length;
+        // „Pravidelné" = aspoň v štyroch zo šiestich mesiacov.
+        if (nenulove >= 4) out.push({ label: `${sub.label} · ${item.label}`, median: median(hodnoty), mesiacov: nenulove });
+      }
+  return out.sort((a, b) => b.median - a.median);
+}
 
 // ── KPI ──────────────────────────────────────────────────────────────────────
 // Jerry's own KPI sheets, now computed from data instead of retyped by hand.
