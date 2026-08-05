@@ -71,6 +71,9 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
   // Výplaty vyplatené v bitcoine. Na bankovom výpise nie sú — odišli z BTC
   // appky — takže bez nich vyzerá mesiac, akoby si nikto nič nevzal. Sú len na
   // pozretie: zapisuje sa výpis, nie cudzia databáza.
+  // Označené riadky — pri polročnom výpise je päťsto pohybov a zaraďovať ich
+  // po jednom je nepoužiteľné. Kľúčom je index v náhľade.
+  const [oznacene, setOznacene] = useState<Set<number>>(new Set());
   const [btcVyplaty, setBtcVyplaty] = useState<BtcVyplata[] | null>(null);
   useEffect(() => {
     if (!nahlad || btcVyplaty) return;
@@ -136,6 +139,42 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
   // nikdy nebude — ale v P&L patrí. Bez tohto by sa mesiac zaraďoval z banky a
   // potom by sa musel ručne dorovnávať v Exceli, čiže presne to, čo appka mala
   // zrušiť. Riadok dostane vlastné ID, aby sa dal rozpoznať a nezdvojil sa.
+  const prepni = (i: number) =>
+    setOznacene((p) => {
+      const n = new Set(p);
+      if (n.has(i)) n.delete(i); else n.add(i);
+      return n;
+    });
+  /** Označí všetky riadky s tou istou protistranou — dvanásť platieb
+   *  Anthropicu za pol roka sa tak zaradí jedným klikom. */
+  const oznacRovnake = (protistrana: string) => {
+    const kluc = protistrana.trim().toLowerCase();
+    if (!kluc) return;
+    setOznacene((p) => {
+      const n = new Set(p);
+      nahlad?.forEach((r, i) => {
+        if (r.protistrana.trim().toLowerCase() === kluc) n.add(i);
+      });
+      return n;
+    });
+  };
+  const zaradOznacene = (kategoria: string) => {
+    setNahlad((n) => n && n.map((r, i) => (oznacene.has(i) ? { ...r, kategoria } : r)));
+    setOznacene(new Set());
+  };
+
+  // Riadky, ktoré sú práve zobrazené — používa ich tabuľka aj zaškrtnutie
+  // v hlavičke, aby „označiť všetky" znamenalo naozaj to, čo je vidieť.
+  const viditelne = (nahlad || []).map((r, i) => [r, i] as const).filter(([r]) =>
+    filter === "vsetko" ? true
+    // Výplata je zvláštna kategória, nie prevádzkový výdavok — keby bola
+    // v oboch, súčet výdavkov by tvrdil, že štúdio minulo aj to, čo si
+    // vzali tréneri.
+    : filter === "vydaje" ? r.suma < 0 && !r.kategoria.startsWith("vyplaty")
+    : filter === "prijmy" ? r.suma > 0
+    : filter === "vyplaty" ? r.kategoria.startsWith("vyplaty")
+    : r.suma < 0 && !r.kategoria);
+
   const pridajRucne = () => {
     const dnes = new Date().toISOString().slice(0, 10);
     setNahlad((n) => [
@@ -260,6 +299,26 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
               </button>
             ))}
           </div>
+          {oznacene.size > 0 && (
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 10, padding: "9px 12px", borderRadius: 9, background: mix(C.accent, 10), border: `1px solid ${mix(C.accent, 32)}` }}>
+              <span style={{ fontSize: 12.5, color: C.text, fontWeight: 600 }}>Označených {oznacene.size}</span>
+              <span style={{ fontSize: 12, color: C.textMuted }}>→ zaradiť naraz:</span>
+              <select value="" onChange={(e) => e.target.value && zaradOznacene(e.target.value)}
+                style={{ background: C.bg, color: C.text, border: `1px solid ${mix(C.accent, 45)}`, borderRadius: 7, fontSize: 12, padding: "5px 7px", maxWidth: 280, cursor: "pointer" }}>
+                <option value="">— vyber kategóriu —</option>
+                {[...new Set(KAT.map((k) => k.skupina))].filter(Boolean).map((sk) => (
+                  <optgroup key={sk} label={sk}>
+                    {KAT.filter((k) => k.skupina === sk).map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
+                  </optgroup>
+                ))}
+              </select>
+              <button onClick={() => setOznacene(new Set())}
+                style={{ background: "none", border: "none", color: C.textDim, fontSize: 12, cursor: "pointer" }}>zrušiť výber</button>
+            </div>
+          )}
+          <div style={{ fontSize: 11.5, color: C.textDim, marginBottom: 8, lineHeight: 1.5 }}>
+            Klik na meno protistrany označí všetky jej pohyby naraz — dvanásť platieb Anthropicu za pol roka zaradíš jedným výberom.
+          </div>
           <div style={{ marginBottom: 8 }}>
             <button onClick={pridajRucne}
               style={{ padding: "5px 12px", borderRadius: 8, fontSize: 12, cursor: "pointer", border: `1px dashed ${mix(C.accent, 45)}`, background: "transparent", color: C.accentLight }}>
@@ -297,24 +356,31 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
             <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 640 }}>
               <thead>
                 <tr style={{ borderBottom: `2px solid ${mix(C.accent, 35)}` }}>
+                  <th style={{ ...S.th, width: 28 }}>
+                    <input
+                      type="checkbox"
+                      title="Označiť všetky riadky, ktoré sú práve zobrazené"
+                      checked={viditelne.length > 0 && viditelne.every(([, i]) => oznacene.has(i))}
+                      onChange={(e) => setOznacene((p) => {
+                        const n = new Set(p);
+                        viditelne.forEach(([, i]) => (e.target.checked ? n.add(i) : n.delete(i)));
+                        return n;
+                      })}
+                      style={{ accentColor: C.accent, cursor: "pointer" }}
+                    />
+                  </th>
                   {["Dátum", "Suma", "Protistrana / popis", "Kategória"].map((h) => (
                     <th key={h} style={{ ...S.th, textAlign: h === "Suma" ? "right" : "left" }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {nahlad.map((r, i) => [r, i] as const)
-                  .filter(([r]) =>
-                    filter === "vsetko" ? true
-                    // Výplata je zvláštna kategória, nie prevádzkový výdavok —
-                    // keby bola v oboch, súčet výdavkov by tvrdil, že štúdio
-                    // minulo aj to, čo si vzali tréneri.
-                    : filter === "vydaje" ? r.suma < 0 && !r.kategoria.startsWith("vyplaty")
-                    : filter === "prijmy" ? r.suma > 0
-                    : filter === "vyplaty" ? r.kategoria.startsWith("vyplaty")
-                    : r.suma < 0 && !r.kategoria)
-                  .map(([r, i]) => (
-                  <tr key={i} style={{ opacity: r.uzMame || r.zamknuty ? 0.45 : 1 }}>
+                {viditelne.map(([r, i]) => (
+                  <tr key={i} style={{ opacity: r.uzMame || r.zamknuty ? 0.45 : 1, background: oznacene.has(i) ? mix(C.accent, 7) : undefined }}>
+                    <td style={{ ...S.td, textAlign: "center", padding: "3px 4px" }}>
+                      <input type="checkbox" checked={oznacene.has(i)} onChange={() => prepni(i)}
+                        style={{ accentColor: C.accent, cursor: "pointer" }} />
+                    </td>
                     <td style={{ ...S.td, whiteSpace: "nowrap", fontSize: 12 }}>
                       {r.id.startsWith("rucne:") ? (
                         <input type="date" value={r.datum}
@@ -334,7 +400,15 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
                         <input value={r.protistrana} placeholder="Komu / za čo (napr. Jarek splátka)"
                           onChange={(e) => setNahlad((n) => n && n.map((x, j) => (j === i ? { ...x, protistrana: e.target.value } : x)))}
                           style={{ width: "100%", maxWidth: 300, background: C.bg, border: `1px solid ${r.protistrana ? C.border : mix(C.orange, 40)}`, borderRadius: 5, color: C.text, fontSize: 11.5, padding: "3px 6px" }} />
-                      ) : <div style={{ color: C.text }}>{r.protistrana || "—"}</div>}
+                      ) : (
+                        <div
+                          onClick={() => oznacRovnake(r.protistrana)}
+                          title={r.protistrana ? `Označiť všetky pohyby „${r.protistrana}"` : undefined}
+                          style={{ color: C.text, cursor: r.protistrana ? "pointer" : "default" }}
+                        >
+                          {r.protistrana || "—"}
+                        </div>
+                      )}
                       {r.poznamka && r.poznamka !== r.protistrana && (
                         <div style={{ color: C.textDim, fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 340 }}>{r.poznamka}</div>
                       )}
