@@ -16,45 +16,69 @@
 /** Jeden vizuálny riadok stránky — text zložený zľava doprava. */
 export type PdfRiadok = { strana: number; y: number; text: string };
 
-const inflate = async (data: Uint8Array): Promise<Uint8Array | null> => {
-  for (const format of ["deflate", "deflate-raw"] as const) {
+// Dekompresia po kúskoch, nie naraz.
+//
+// Chrome je pri DecompressionStream prísnejší než Node: keď za zlib dátami
+// nasledujú prebytočné bajty — a v PDF za nimi býva CR/LF pred „endstream" —
+// vyhodí chybu. Node ju prehltne. Preto sa číta prúdovo a chyba na konci sa
+// ignoruje: to, čo dovtedy prišlo, je platné a je to celý obsah streamu.
+// Bez tohto parser fungoval pri vývoji a v prehliadači mlčky nevrátil nič.
+const inflate = async (data: Uint8Array): Promise<string | null> => {
+  // Prvá obrana: odrež koncové biele znaky, ktoré do zlib dát nepatria.
+  let koniec = data.length;
+  while (koniec > 0 && (data[koniec - 1] === 10 || data[koniec - 1] === 13 || data[koniec - 1] === 32)) koniec--;
+  const cisté = data.subarray(0, koniec);
+  if (cisté.length < 2) return null;
+  // 0x78 = zlib hlavička. Čokoľvek iné je nekomprimovaný alebo iný filter.
+  const format = cisté[0] === 0x78 ? "deflate" : "deflate-raw";
+  try {
+    const ds = new DecompressionStream(format);
+    const stream = new Blob([cisté as BlobPart]).stream().pipeThrough(ds);
+    const reader = stream.getReader();
+    const kusy: Uint8Array[] = [];
     try {
-      const ds = new DecompressionStream(format);
-      const stream = new Blob([data as BlobPart]).stream().pipeThrough(ds);
-      return new Uint8Array(await new Response(stream).arrayBuffer());
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (value) kusy.push(value as Uint8Array);
+      }
     } catch {
-      /* skús ďalší formát */
+      /* prebytočné bajty na konci — to, čo prišlo, stačí */
     }
+    if (!kusy.length) return null;
+    let dlzka = 0;
+    for (const k of kusy) dlzka += k.length;
+    const spolu = new Uint8Array(dlzka);
+    let o = 0;
+    for (const k of kusy) { spolu.set(k, o); o += k.length; }
+    return new TextDecoder("latin1").decode(spolu);
+  } catch {
+    return null;
   }
-  return null;
 };
 
 /** Nájde všetky `stream … endstream` bloky a rozbalí tie, ktoré sa rozbaliť dajú. */
 async function streamy(bajty: Uint8Array): Promise<string[]> {
+  // Hľadá sa v latin1 podobe súboru: jeden bajt = jeden znak, takže indexy
+  // sedia s bajtovým poľom, a indexOf je natívne rýchly. Pôvodné ručné
+  // porovnávanie bajtov bolo kvadratické a pri polmegabajtovom PDF zbytočne
+  // pomalé.
+  const text = new TextDecoder("latin1").decode(bajty);
   const out: string[] = [];
-  const zaciatok = new TextEncoder().encode("stream");
-  const koniec = new TextEncoder().encode("endstream");
-  const najdi = (ihla: Uint8Array, od: number): number => {
-    vonku: for (let i = od; i <= bajty.length - ihla.length; i++) {
-      for (let j = 0; j < ihla.length; j++) if (bajty[i + j] !== ihla[j]) continue vonku;
-      return i;
-    }
-    return -1;
-  };
   let i = 0;
-  while (i < bajty.length) {
-    const a = najdi(zaciatok, i);
+  for (;;) {
+    const a = text.indexOf("stream", i);
     if (a < 0) break;
-    let s = a + zaciatok.length;
-    // Za slovom „stream" je CRLF alebo LF.
-    if (bajty[s] === 13) s++;
-    if (bajty[s] === 10) s++;
-    const b = najdi(koniec, s);
+    // „endstream" obsahuje „stream" — za skutočným začiatkom musí byť zlom riadku.
+    let s = a + 6;
+    if (text.charCodeAt(s) === 13) s++;
+    if (text.charCodeAt(s) === 10) s++;
+    else if (s === a + 6) { i = a + 6; continue; }
+    const b = text.indexOf("endstream", s);
     if (b < 0) break;
-    const surove = bajty.subarray(s, b);
-    const rozbalene = await inflate(surove);
-    if (rozbalene) out.push(new TextDecoder("latin1").decode(rozbalene));
-    i = b + koniec.length;
+    const rozbalene = await inflate(bajty.subarray(s, b));
+    if (rozbalene) out.push(rozbalene);
+    i = b + 9;
   }
   return out;
 }

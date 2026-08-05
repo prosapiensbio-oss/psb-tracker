@@ -35,7 +35,11 @@ const REPORTS: { key: keyof PSBData; label: string; path: string }[] = [
 
 const BANKA_ZDROJ = {
   label: "Fio banka — pohyby",
-  path: "Fio → Výpisy a reporty › Pohyby na všech účtech (CSV), alebo text z internetbankingu",
+  path: "Fio → Výpisy a reporty › Výpis z účtu (CSV) — ten má ID operácií aj kontrolné súčty, na rozdiel od „Vyhledané pohyby“",
+};
+const FAKTURY_ZDROJ = {
+  label: "Faktúry z Alzy (PDF)",
+  path: "Alza → Môj účet › Objednávky › Faktúra (PDF). Doklad sa rozpíše na položky a každá dostane vlastnú kategóriu — granule pre Ahsoku, drogéria do štúdia, zvyšok súkromné. Aj viac faktúr naraz.",
 };
 
 // Marketingové zdroje. Zatiaľ sa len ukladajú — obrazovka Marketing beží na
@@ -88,6 +92,13 @@ function UploadCard({ data, missing, actions }: { data: PSBData; missing: typeof
   const [bankaStav, setBankaStav] = useState<{ pocet: number; posledny: string } | null>(null);
   const [faktury, setFaktury] = useState<Faktura[]>([]);
   const [fakturaChyba, setFakturaChyba] = useState<{ meno: string; dovod: string; ukazka: string[] }[]>([]);
+  const [fakturyNahrate, setFakturyNahrate] = useState(0);
+  useEffect(() => {
+    void fetch("/api/faktury", { credentials: "same-origin" })
+      .then((r) => r.json())
+      .then((j: { polozky?: unknown[] }) => setFakturyNahrate((j.polozky || []).length))
+      .catch(() => {});
+  }, []);
   useEffect(() => {
     void fetch("/api/fio", { credentials: "same-origin" })
       .then((r) => r.json())
@@ -344,6 +355,14 @@ function UploadCard({ data, missing, actions }: { data: PSBData; missing: typeof
             <strong style={{ color: C.text }}>{BANKA_ZDROJ.label}</strong>
             {bankaInfo && <span style={{ color: C.accentLight, fontWeight: 500 }}> · {bankaInfo}</span>}
             <br /><span style={{ color: C.textDim }}>{BANKA_ZDROJ.path}</span>
+          </span>
+        </div>
+        <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 5, display: "flex", gap: 8, marginTop: 2 }}>
+          <span style={{ color: fakturyNahrate ? C.green : C.textDim, flexShrink: 0 }}>{fakturyNahrate ? "✓" : "·"}</span>
+          <span>
+            <strong style={{ color: C.text }}>{FAKTURY_ZDROJ.label}</strong>
+            {fakturyNahrate > 0 && <span style={{ color: C.accentLight, fontWeight: 500 }}> · {fakturyNahrate} položiek</span>}
+            <br /><span style={{ color: C.textDim }}>{FAKTURY_ZDROJ.path}</span>
           </span>
         </div>
         <div style={{ fontSize: 12, color: C.textMuted, fontWeight: 600, margin: "12px 0 8px" }}>Marketing a web:</div>
