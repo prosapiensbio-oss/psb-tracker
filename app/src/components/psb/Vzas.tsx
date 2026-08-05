@@ -4,7 +4,7 @@ import { fetchBtcReserve, fetchMonthNotes, fetchVzasSettings, fetchWeekEntries, 
 import { monthlyFinance, predictCash, ZONE_HI, type CapacityRow, type ClientAgg, type RegisterItem, type SixMRow } from "../../lib/psb/compute";
 import { fmtCZK, fmtDMY, monthLabel } from "../../lib/psb/format";
 import { ObdobieCtx } from "../../lib/psb/obdobie";
-import { nastavPnlBunku, nastavPnlOverrides, nastavPrijmyZTrackera, nastavVyplaty, pnlJeOpravena, pnlOverridesNaUlozenie, pnlPovodnaHodnota, poslednyMesiacSDatami, vyplatyNaUlozenie } from "../../lib/psb/vzas";
+import { PRVY_MESIAC_Z_FIO, nastavPnlBunku, nastavPnlOverrides, nastavPrijmyZTrackera, nastavVyplaty, pnlJeOpravena, pnlOverridesNaUlozenie, pnlPovodnaHodnota, poslednyMesiacSDatami, vyplatyNaUlozenie } from "../../lib/psb/vzas";
 import { rozpisPre, type PohybZaBunku } from "../../lib/psb/rozpis";
 import { C, mix, S } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
@@ -277,6 +277,8 @@ function BunkaDetail({ kat, mesiac, hodnota, onZavri, onZmena }: {
   };
 
   const sucet = pohyby.reduce((a: number, p: PohybZaBunku) => a + p.suma, 0);
+  const zExcelu = mesiac < PRVY_MESIAC_Z_FIO;
+  const rozdielSBankou = Math.round(Math.abs(Math.abs(hodnota) - sucet));
   return (
     <div style={{ padding: "10px 14px 12px", fontSize: 12 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
@@ -322,6 +324,22 @@ function BunkaDetail({ kat, mesiac, hodnota, onZavri, onZmena }: {
         </div>
       )}
 
+      {/* Mesiace do jún 2026 berú číslo z Excelu, hoci pohyby z banky appka
+          MÁ — tak sme sa dohodli, aby sa dali oboje porovnať. Zatajiť ich a
+          napísať „appka ich nemá" bola lož; ukázať ich vedľa excelového čísla
+          je presne tá kontrola, kvôli ktorej sa tie mesiace nahrávali. */}
+      {zExcelu && pohyby.length > 0 && (
+        <div style={{ background: mix(C.orange, 9), border: `1px solid ${mix(C.orange, 30)}`, borderRadius: 8, padding: "8px 10px", marginBottom: 9, fontSize: 11.5, lineHeight: 1.55 }}>
+          <b style={{ color: C.text }}>Toto číslo je z Excelu, nie z banky.</b> Mesiace do jún 2026 sa z importu zámerne
+          neprepisujú, aby sa dali porovnať. Dole je {pohyby.length} {pohyby.length === 1 ? "pohyb" : pohyby.length < 5 ? "pohyby" : "pohybov"} z banky
+          zaradených do tejto kategórie — do čísla nad nimi sa nepočítajú.
+          <div style={{ marginTop: 5, color: rozdielSBankou === 0 ? C.green : C.orange }}>
+            Excel {fmtCZK(Math.abs(hodnota))} · banka {fmtCZK(sucet)} ·{" "}
+            {rozdielSBankou === 0 ? "sedí do koruny" : <b>rozdiel {fmtCZK(rozdielSBankou)}</b>}
+          </div>
+        </div>
+      )}
+
       {pohyby.length ? (
         <>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -342,7 +360,7 @@ function BunkaDetail({ kat, mesiac, hodnota, onZavri, onZmena }: {
           </table>
           {/* Keď sa rozpis nerovná číslu nad ním, je to buď ručná oprava, alebo
               chyba v párovaní faktúr — a jedno aj druhé treba vidieť hneď. */}
-          {Math.abs(sucet - hodnota) > 1 && (
+          {!zExcelu && Math.abs(sucet - hodnota) > 1 && (
             <div style={{ fontSize: 11.5, color: C.orange, marginTop: 7 }}>
               Rozpis dáva {fmtCZK(sucet)}, v tabuľke je {fmtCZK(hodnota)}
               {opravena ? " — číslo je ručne opravené." : ` — rozdiel ${fmtCZK(Math.abs(sucet - hodnota))} nesedí, pozri Údaje → Zapísané pohyby.`}
@@ -351,8 +369,8 @@ function BunkaDetail({ kat, mesiac, hodnota, onZavri, onZmena }: {
         </>
       ) : (
         <div style={{ fontSize: 11.5, color: C.textDim, lineHeight: 1.5 }}>
-          {mesiac < "2026-07"
-            ? "Mesiac je z Excelu — jednotlivé pohyby za ním appka nemá, len súčet. Opraviť sa dá."
+          {zExcelu
+            ? "Číslo je z Excelu. Bankové pohyby za tento mesiac appka má, ale do tejto kategórie z nich nie je zaradený ani jeden — buď sa platilo v hotovosti, alebo pohyb sedí inde. Pozri Údaje → Zapísané pohyby."
             : "Za týmto číslom nie je žiadny zapísaný pohyb z banky."}
         </div>
       )}
@@ -612,7 +630,7 @@ function PnlTab() {
 
       <Card>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
-          <H3><Info text="Mesačný výkaz ziskov a strát za 18 mesiacov (jan 2025 – jún 2026). Klikni na kategóriu pre rozklad na položky. Hrubý zisk = Celkové príjmy − Celkové náklady (vrátane výplat). Riadky, ktoré existovali len v jednom roku (MultiBox, Freelo, Bonus na Finančák… v 2025; Štát, Telefón… v 2026), sú samostatné — zlúčením by sa stratilo, že sa zmenila samotná nákladová základňa." label="VZAS — mesačný P&L" /></H3>
+          <H3><Info text="P&L je skratka z anglického Profit and Loss — po našom výkaz ziskov a strát, alebo jednoducho: čo prišlo, čo odišlo a čo z toho zostalo. Jeden stĺpec = jeden mesiac. Klikni na kategóriu pre rozklad na položky, na samotné číslo pre pohyby, z ktorých vzniklo. Hrubý zisk = Celkové príjmy − Celkové náklady (vrátane výplat). Riadky, ktoré existovali len v jednom roku (MultiBox, Freelo, Bonus na Finančák… v 2025; Štát, Telefón… v 2026), sú samostatné — zlúčením by sa stratilo, že sa zmenila samotná nákladová základňa." label="Zisky a straty po mesiacoch (P&L)" /></H3>
           <div style={{ display: "flex", gap: 4 }}>
             {([["fixvar", "Fix / Variabilné"], ["zavaznost", "Záväzné / Voliteľné"]] as const).map(([id, lbl]) => (
               <button key={id} onClick={() => setLens(id)}
@@ -686,8 +704,8 @@ function PnlTab() {
         <div style={{ fontSize: 11, color: C.textDim, marginTop: 10 }}>
           Klikni na podčiarknuté číslo — ukáže pohyby, z ktorých vzniklo, a dá sa opraviť. Oprava prežije import z banky
           a dá sa kedykoľvek vrátiť na pôvodné.{" "}
-          Zdroj: VZAS 2025 + VZAS 2026 (Excel), jan 2025 – jún 2026. Každý mesiac sedí na Excel do koruny.
-          Júl 2026 pribudne až s prvým importom z Fia — tržby zaň síce v Trackeri sú, ale náklady zatiaľ nikde, takže by mesiac klamal.
+          Náklady do jún 2026 sú z Excelu; od júla 2026 z importu Fio. Pohyby z banky za jan–jún appka má tiež, ale do
+          čísel ich zámerne nezapočítava — po rozkliknutí sú vidieť vedľa excelového čísla, aby sa dali porovnať.
         </div>
       </Card>
     </>
@@ -2638,7 +2656,7 @@ export function Vzas({ sub, onSub, data }: { sub: string; onSub: (s: string) => 
     <>
       <SubTabs
         tabs={[
-          { id: "pnl", label: "VZAS P&L" },
+          { id: "pnl", label: "Zisky a straty" },
           { id: "vyplaty", label: "J&T Výplaty" },
           { id: "cashflow", label: "Cashflow" },
           { id: "jarek", label: "Jarek dlh" },

@@ -442,7 +442,7 @@ export const PRIJMY: Vals = PRIJMY_PTMINDER.map((v, i) => v + PRIJMY_INE[i]);
 // zároveň by sa stratila možnosť oboje porovnať.
 export let NAKLADY_Z_FIO: string[] = [];
 /** Prvý mesiac, ktorý Excel nemá — od neho vyššie plnia dáta importy. */
-const PRVY_MESIAC_Z_FIO = "2026-07";
+export const PRVY_MESIAC_Z_FIO = "2026-07";
 
 /** Riadok „Z banky" v osobných výplatách — pre mesiace, ktoré Excel nemá. */
 /**
