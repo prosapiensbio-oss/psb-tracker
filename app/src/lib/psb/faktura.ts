@@ -47,6 +47,14 @@ const datumISO = (s: string): string => {
 // a to je jediné, ktoré P&L zaujíma.
 const CHVOST = /\s(\d+)\s+(-?[\d\s]+,\d{2})\s+(-?[\d\s]+,\d{2})\s+(-?[\d\s]+,\d{2})\s+(\d+)\s+(-?[\d\s]+,\d{2})\s+(\d+)\s*(?:[A-Z]{2,3})?\s*$/;
 
+/** Prečo sa doklad nepodarilo prečítať — aby to appka vedela povedať nahlas. */
+export function precoNieFaktura(riadky: PdfRiadok[]): string | null {
+  if (!riadky.length) return "z PDF sa nedal vytiahnuť žiadny text (je to zrejme sken alebo obrázok)";
+  const spojene = riadky.map((r) => r.text).join(" ");
+  if (!/faktura|faktúra|daňový doklad/i.test(spojene)) return "v texte nie je slovo „faktúra“ ani „daňový doklad“";
+  return "text sa prečítal, ale nenašiel sa v ňom ani jeden riadok položky v očakávanom tvare";
+}
+
 export function parseFaktura(riadky: PdfRiadok[]): Faktura | null {
   const text = riadky.map((r) => r.text);
   const spojene = text.join(" ");

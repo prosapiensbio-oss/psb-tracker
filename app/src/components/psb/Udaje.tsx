@@ -8,7 +8,7 @@ import type { IngestResult } from "../../lib/psb/db.server";
 import type { Actions } from "./App";
 import { BankovyImport } from "./Banka";
 import { FakturyNahlad } from "./Faktury";
-import { parseFaktura, type Faktura } from "../../lib/psb/faktura";
+import { parseFaktura, precoNieFaktura, type Faktura } from "../../lib/psb/faktura";
 import { maTextovuVrstvu, pdfRiadky } from "../../lib/psb/pdftext";
 import { ThemeSwitch } from "./ThemeSwitch";
 import { Uzavierky } from "./Uzavierky";
@@ -87,6 +87,7 @@ function UploadCard({ data, missing, actions }: { data: PSBData; missing: typeof
   // Stav bankových pohybov sa nedá prečítať z PSBData — má vlastnú tabuľku.
   const [bankaStav, setBankaStav] = useState<{ pocet: number; posledny: string } | null>(null);
   const [faktury, setFaktury] = useState<Faktura[]>([]);
+  const [fakturaChyba, setFakturaChyba] = useState<{ meno: string; dovod: string; ukazka: string[] }[]>([]);
   useEffect(() => {
     void fetch("/api/fio", { credentials: "same-origin" })
       .then((r) => r.json())
@@ -188,16 +189,31 @@ function UploadCard({ data, missing, actions }: { data: PSBData; missing: typeof
     const noveFaktury: Faktura[] = [];
     for (const f of pdfka) {
       let precitane = false;
+      let dovod = "";
+      let ukazka: string[] = [];
       try {
         const riadky = await pdfRiadky(await f.arrayBuffer());
+        ukazka = riadky.slice(0, 6).map((r) => r.text);
         if (maTextovuVrstvu(riadky)) {
           const fa = parseFaktura(riadky);
           if (fa) { noveFaktury.push(fa); precitane = true; }
+          else dovod = precoNieFaktura(riadky) || "";
+        } else {
+          dovod = precoNieFaktura(riadky) || "";
         }
-      } catch {
-        /* nevadí — skúsi sa Jarvis */
+      } catch (e) {
+        dovod = `čítanie PDF spadlo (${e instanceof Error ? e.message : String(e)})`;
       }
-      if (!precitane) await citajPdf(f);
+      if (precitane) continue;
+      // Doklad, ktorý VYZERÁ ako faktúra, ale nedal sa rozpísať, sa neposiela
+      // Jarvisovi — ten by ho čítal ako marketingovú zostavu a odpovedal by
+      // hláškou o CSV, ktorá s faktúrou nemá nič spoločné. Radšej sa povie,
+      // čo presne zlyhalo, nech sa to dá opraviť.
+      if (dovod && !/nie je slovo/.test(dovod)) {
+        setFakturaChyba((p) => [...p, { meno: f.name, dovod, ukazka }]);
+        continue;
+      }
+      await citajPdf(f);
     }
     if (noveFaktury.length) setFaktury((p) => [...p, ...noveFaktury]);
     if (bankove.length) setBankovyText(bankove.join("\n"));
@@ -257,6 +273,21 @@ function UploadCard({ data, missing, actions }: { data: PSBData; missing: typeof
       {bankovyText && (
         <div style={{ marginTop: 12 }}>
           <BankovyImport vstup={bankovyText} onHotovo={() => { setBankovyText(""); void actions.refresh(); }} />
+        </div>
+      )}
+      {fakturaChyba.length > 0 && (
+        <div style={{ marginTop: 12, padding: "10px 13px", borderRadius: 9, background: mix(C.orange, 8), border: `1px solid ${mix(C.orange, 28)}`, fontSize: 12.5, color: C.text, lineHeight: 1.55 }}>
+          {fakturaChyba.map((ch, i) => (
+            <div key={i} style={{ marginBottom: i < fakturaChyba.length - 1 ? 8 : 0 }}>
+              <b>{ch.meno}</b> — faktúru sa nepodarilo rozpísať: {ch.dovod}.
+              {ch.ukazka.length > 0 && (
+                <div style={{ marginTop: 5, fontFamily: "ui-monospace, monospace", fontSize: 10.5, color: C.textDim, whiteSpace: "pre-wrap" }}>
+                  {ch.ukazka.slice(0, 4).join("\n")}
+                </div>
+              )}
+            </div>
+          ))}
+          <button onClick={() => setFakturaChyba([])} style={{ marginTop: 6, background: "none", border: "none", color: C.textDim, fontSize: 12, cursor: "pointer" }}>zavrieť</button>
         </div>
       )}
       {faktury.length > 0 && (
