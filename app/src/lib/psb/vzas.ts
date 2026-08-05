@@ -17,18 +17,30 @@ export const VZAS_MONTHS = [
   "2025-01", "2025-02", "2025-03", "2025-04", "2025-05", "2025-06",
   "2025-07", "2025-08", "2025-09", "2025-10", "2025-11", "2025-12",
   "2026-01", "2026-02", "2026-03", "2026-04", "2026-05", "2026-06",
+  // Júl 2026 ďalej: Excel končí júnom, tieto mesiace plní import z Fio.
+  "2026-07",
 ] as const;
 export const VZAS_MONTH_LABELS = [
   "Jan 25", "Feb 25", "Mar 25", "Apr 25", "Máj 25", "Jún 25",
   "Júl 25", "Aug 25", "Sep 25", "Okt 25", "Nov 25", "Dec 25",
   "Jan 26", "Feb 26", "Mar 26", "Apr 26", "Máj 26", "Jún 26",
+  "Júl 26",
 ] as const;
 const N = VZAS_MONTHS.length;
+
+// Všetky rady v tomto súbore sú prepis Excelu, ktorý končí júnom 2026. Keď
+// pribudne mesiac, musia sa dorovnať nulami — inak by index nového mesiaca bol
+// `undefined` a každý súčet by skončil ako NaN. Dopĺňa sa na jednom mieste,
+// nie ručne v štyridsiatich poliach.
+function dorovnaj(v: number[]): number[] {
+  while (v.length < N) v.push(0);
+  return v;
+}
 
 // Index ranges the UI offers as period presets.
 export const YEAR_IDX: Record<string, number[]> = {
   "2025": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
-  "2026": [12, 13, 14, 15, 16, 17],
+  "2026": [12, 13, 14, 15, 16, 17, 18],
 };
 export const QUARTERS: { id: string; label: string; idx: number[] }[] = [
   { id: "2025q1", label: "Q1 25", idx: [0, 1, 2] },
@@ -37,6 +49,7 @@ export const QUARTERS: { id: string; label: string; idx: number[] }[] = [
   { id: "2025q4", label: "Q4 25", idx: [9, 10, 11] },
   { id: "2026q1", label: "Q1 26", idx: [12, 13, 14] },
   { id: "2026q2", label: "Q2 26", idx: [15, 16, 17] },
+  { id: "2026q3", label: "Q3 26", idx: [18] },
 ];
 export const yearOf = (i: number) => VZAS_MONTHS[i].slice(0, 4);
 
@@ -137,6 +150,12 @@ export const PNL: Record<"fixne" | "variabilne", VzasSection> = {
     },
   },
 };
+
+// Dorovnanie všetkých radov po pridaní mesiaca. Musí bežať skôr, než sa
+// čokoľvek počíta — preto hneď za definíciou PNL a pred mzdovým modelom.
+for (const sek of Object.values(PNL))
+  for (const sub of Object.values(sek.subcategories))
+    for (const item of Object.values(sub.items)) dorovnaj(item.values);
 
 // ── salary model ─────────────────────────────────────────────────────────────
 export type PersonKey = "jerry" | "terezka";
@@ -334,15 +353,22 @@ export const SPOLOCNE: Record<string, Vals> = {
 // Matyáš — employee for all of 2025 and jan–mar 2026 (no entitlement/debt
 // logic, just a payroll cost). The prototype omitted him, which understated
 // Výplaty (and so overstated profit).
-export const MATYAS: Vals = [3200, 2720, 4320, 5120, 2560, 2860, 3840, 2880, 3180, 3520, 4160, 2560, 2310, 2890, 3700, 0, 0, 0];
+export const MATYAS: Vals = dorovnaj([3200, 2720, 4320, 5120, 2560, 2860, 3840, 2880, 3180, 3520, 4160, 2560, 2310, 2890, 3700, 0, 0, 0]);
+
+// Dorovnanie zvyšku radov (spoločné výdavky, mzdové hodiny a osobné položky).
+for (const v of Object.values(SPOLOCNE)) dorovnaj(v);
+for (const k of ["jerry", "terezka"] as PersonKey[]) {
+  dorovnaj(SALARY[k].hours);
+  for (const v of Object.values(SALARY[k].personal)) dorovnaj(v);
+}
 
 // Monthly income. PRIJMY = what the Excel calls "Tržby/Príjmy spolu" and is the
 // basis of Hrubý zisk: PTminder revenue plus the rare non-training income.
 // (The Excel's own "Mesačné výsledky" sheet lists only the PTminder figure next
 // to a profit computed from the total — which is why jan/feb 2025 look
 // inconsistent there. Here both lines are visible.)
-export const PRIJMY_PTMINDER: Vals = [166417, 219349, 170952, 105775, 189237, 133560, 190118.5, 153946.5, 134345, 145895.5, 180407, 168836, 149933, 221660, 122285.5, 245495, 221560, 180850];
-export const PRIJMY_INE: Vals = [14000, 34000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 500, 180, 0, 0, 0, 0, 0];
+export const PRIJMY_PTMINDER: Vals = dorovnaj([166417, 219349, 170952, 105775, 189237, 133560, 190118.5, 153946.5, 134345, 145895.5, 180407, 168836, 149933, 221660, 122285.5, 245495, 221560, 180850]);
+export const PRIJMY_INE: Vals = dorovnaj([14000, 34000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 500, 180, 0, 0, 0, 0, 0]);
 export const PRIJMY: Vals = PRIJMY_PTMINDER.map((v, i) => v + PRIJMY_INE[i]);
 
 // Tržby z PTmindera boli doteraz PREPÍSANÉ z Excelu — druhý zdroj pravdy o
@@ -356,6 +382,66 @@ export const PRIJMY: Vals = PRIJMY_PTMINDER.map((v, i) => v + PRIJMY_INE[i]);
 // Júl a august tu zámerne NIE SÚ: pridať mesiac len s tržbami by znamenalo
 // P&L, kde zisk = tržby, lebo náklady (nula) ešte neexistujú. Vymyslený zisk
 // je horší než chýbajúci mesiac. Mesiace pribudnú s nákladmi z Fio.
+// ── Náklady z banky ─────────────────────────────────────────────────────────
+//
+// Excel končí júnom 2026. Od júla je zdrojom pravdy o nákladoch Fio — rovnako
+// ako je PTminder zdrojom pravdy o tržbách. Zapisujú sa len mesiace, ktoré v
+// Exceli nie sú: prepísať historické mesiace bankou by zahodilo rok práce a
+// zároveň by sa stratila možnosť oboje porovnať.
+export let NAKLADY_Z_FIO: string[] = [];
+const PRVY_MESIAC_Z_FIO = "2026-07";
+
+/** Riadok „Z banky" v osobných výplatách — pre mesiace, ktoré Excel nemá. */
+const Z_BANKY = "Z banky";
+
+/**
+ * `sumy` = { "2026-07": { "fixne.apps.adobe": 464, … } } — kladné čísla.
+ * `vyplaty` = { "2026-07": { jerry: 40000, terezka: 12000 } }.
+ *
+ * Bez výplat by zisk za nový mesiac vyšiel o celé mzdy vyšší, než je — a to je
+ * presne tá chyba, ktorú má appka odstraňovať, nie vyrábať.
+ */
+export function nastavNakladyZFio(
+  sumy: Record<string, Record<string, number>>,
+  vyplaty: Record<string, { jerry: number; terezka: number }> = {},
+): boolean {
+  let zmena = false;
+  const mesiace: string[] = [];
+  for (const [mk, podlaKategorie] of Object.entries(sumy)) {
+    const i = VZAS_MONTHS.indexOf(mk as (typeof VZAS_MONTHS)[number]);
+    if (i < 0 || mk < PRVY_MESIAC_Z_FIO) continue;
+    mesiace.push(mk);
+    // Mesiac sa najprv vynuluje, aby opakovaný import nesčítaval.
+    for (const sek of Object.values(PNL))
+      for (const sub of Object.values(sek.subcategories))
+        for (const item of Object.values(sub.items)) item.values[i] = 0;
+    for (const v of Object.values(SPOLOCNE)) v[i] = 0;
+
+    for (const [kat, suma] of Object.entries(podlaKategorie)) {
+      if (kat.startsWith("spolocne.")) {
+        const meno = kat.slice("spolocne.".length);
+        if (SPOLOCNE[meno]) { SPOLOCNE[meno][i] = suma; zmena = true; }
+        continue;
+      }
+      const [sekK, subK, itemK] = kat.split(".");
+      const item = (PNL as Record<string, VzasSection>)[sekK]?.subcategories?.[subK]?.items?.[itemK];
+      if (item) { item.values[i] = suma; zmena = true; }
+    }
+  }
+  for (const [mk, v] of Object.entries(vyplaty)) {
+    const i = VZAS_MONTHS.indexOf(mk as (typeof VZAS_MONTHS)[number]);
+    if (i < 0 || mk < PRVY_MESIAC_Z_FIO) continue;
+    for (const [k, suma] of [["jerry", v.jerry], ["terezka", v.terezka]] as const) {
+      const per = SALARY[k as PersonKey].personal;
+      if (!per[Z_BANKY]) per[Z_BANKY] = Array.from({ length: N }, () => 0);
+      dorovnaj(per[Z_BANKY]);
+      if (per[Z_BANKY][i] !== suma) { per[Z_BANKY][i] = suma; zmena = true; }
+    }
+  }
+  NAKLADY_Z_FIO = mesiace.sort();
+  return zmena;
+}
+
 export let PRIJMY_SU_ZIVE = false;
 export function nastavPrijmyZTrackera(cashPodlaMesiaca: Record<string, number>): boolean {
   let zmena = !PRIJMY_SU_ZIVE;
@@ -405,6 +491,12 @@ export const RECORDED_DEBT: Record<PersonKey, { pozicka: Vals; splatka: Vals }> 
 // debt each time. 2026: list price 91 000 → he pays 80 % (72 800), and the
 // remaining 18 200 comes off the debt. Confirmed by Jerry 2026-07-31; the
 // 54 600 Kč cash payment on 23.6. plus this 18 200 is exactly that 72 800.
+// Dorovnanie dlhových záznamov.
+for (const k of ["jerry", "terezka"] as PersonKey[]) {
+  dorovnaj(RECORDED_DEBT[k].pozicka);
+  dorovnaj(RECORDED_DEBT[k].splatka);
+}
+
 export const JAREK_ZLAVA_ROCNE = 18200; // 20 % z 91 000, obnova 2026
 export const JAREK_OBNOVA = { datum: "2026-06-23", platba: 54600, mesiacIdx: 17 };
 
@@ -417,7 +509,9 @@ export const JAREK_SPLATKY: Record<string, Vals> = {
 // Money in from the investor. The jan 2025 figure is the balance carried over
 // from 2024 (the Excel cell says "ZOSTATOK 2024"), not a fresh deposit; the
 // 300 000 in feb 2025 is the real second injection.
-export const JAREK_VKLADY: Vals = [126040.34, 300000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+for (const v of Object.values(JAREK_SPLATKY)) dorovnaj(v);
+
+export const JAREK_VKLADY: Vals = dorovnaj([126040.34, 300000, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 export const vSum = (a: Vals): number => a.reduce((x, y) => x + (y || 0), 0);

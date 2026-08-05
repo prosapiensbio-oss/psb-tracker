@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { nastavNakladyZFio } from "../../lib/psb/vzas";
+
 import {
   checkSession,
   fetchData,
@@ -229,11 +231,43 @@ export function PSBApp() {
   // hlási sa až prepad o ≥30 % a len pri aspoň štyroch mesiacoch dát — menej
   // je šum, nie signál.
   const [webMetriky, setWebMetriky] = useState<{ gsc: { m: string; kliky: number }[]; ga4: { m: string; udalosti: number }[] }>({ gsc: [], ga4: [] });
+  // Náklady z banky sa načítajú raz pre celú appku — model je modulový, takže
+  // ich potrebuje aj dlaždica Zisk na dashboarde, nielen obrazovka VZAS.
+  const [, setFioTik] = useState(0);
   useEffect(() => {
     void fetch("/api/marketing", { credentials: "same-origin" })
       .then((r) => r.json())
       .then((j: { gscMesacne?: { m: string; kliky: number }[]; ga4?: { m: string; udalosti: number }[] }) =>
         setWebMetriky({ gsc: j.gscMesacne || [], ga4: j.ga4 || [] }))
+      .catch(() => {});
+  }, []);
+
+  // Náklady od júla 2026 tečú z banky — Excel končí júnom. Sčítajú sa výdavky
+  // podľa kategórie a mesiaca a zapíšu sa do P&L; staršie mesiace zostávajú
+  // z Excelu, aby sa dali oboje porovnať.
+  useEffect(() => {
+    void fetch("/api/fio", { credentials: "same-origin" })
+      .then((r) => r.json())
+      .then((j: { pohyby?: { datum: string; suma: number; kategoria: string }[] }) => {
+        const sumy: Record<string, Record<string, number>> = {};
+        const vyplaty: Record<string, { jerry: number; terezka: number }> = {};
+        for (const p of j.pohyby || []) {
+          if (p.suma >= 0 || !p.kategoria || p.kategoria === "mimo") continue;
+          const mk = String(p.datum).slice(0, 7);
+          if (p.kategoria.startsWith("vyplaty")) {
+            const v = (vyplaty[mk] ||= { jerry: 0, terezka: 0 });
+            // Výplata bez určenia a spoločná sa delí na polovicu — inak by celá
+            // pristála jednému a dlh druhého by sa rozišiel s realitou.
+            if (p.kategoria === "vyplaty.jerry") v.jerry += -p.suma;
+            else if (p.kategoria === "vyplaty.terezka") v.terezka += -p.suma;
+            else { v.jerry += -p.suma / 2; v.terezka += -p.suma / 2; }
+            continue;
+          }
+          (sumy[mk] ||= {});
+          sumy[mk][p.kategoria] = (sumy[mk][p.kategoria] || 0) + -p.suma;
+        }
+        if (nastavNakladyZFio(sumy, vyplaty)) setFioTik((x) => x + 1);
+      })
       .catch(() => {});
   }, []);
 
