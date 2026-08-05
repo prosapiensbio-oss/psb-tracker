@@ -155,6 +155,8 @@ function Row({ label, values, depth = 0, bold = false, color, children, showAvg 
   noteFor?: (col: number) => string | undefined;
 }) {
   const [open, setOpen] = useState(false);
+  /** Ktorý stĺpec má práve rozbalenú poznámku. */
+  const [poznamka, setPoznamka] = useState<number | null>(null);
   const hasKids = !!children;
   const fs = depth === 0 ? 13 : 12;
   const cell = { textAlign: "right" as const, padding: "6px 10px", fontSize: fs, fontWeight: bold ? 600 : 400, fontVariantNumeric: "tabular-nums" as const, borderBottom: `1px solid ${mix(C.border, 55)}`, whiteSpace: "nowrap" as const };
@@ -168,15 +170,41 @@ function Row({ label, values, depth = 0, bold = false, color, children, showAvg 
         {values.map((v, i) => {
           const n = noteFor?.(i);
           return (
-            <td key={i} title={n} style={{ ...cell, color: color || (v < 0 ? C.red : C.textMuted), cursor: n ? "help" : undefined }}>
+            // Poznámka visela na natívnom `title`. Kurzor sa zmenil na otáznik,
+            // ale text sa neukázal — natívny tooltip má oneskorenie a v tabuľke
+            // s desiatkami buniek sa naň nedá spoľahnúť. Teraz sa gulička dá
+            // kliknúť a poznámka sa rozbalí pod číslom.
+            <td key={i} style={{ ...cell, color: color || (v < 0 ? C.red : C.textMuted), position: "relative" }}>
               {money(v)}
-              {n && <span style={{ color: C.accent, fontSize: 9, verticalAlign: "super", marginLeft: 2 }}>●</span>}
+              {n && (
+                <span
+                  onClick={(e) => { e.stopPropagation(); setPoznamka(poznamka === i ? null : i); }}
+                  title="Ukázať poznámku"
+                  style={{ color: poznamka === i ? C.accentLight : C.accent, fontSize: 10, verticalAlign: "super", marginLeft: 3, cursor: "pointer" }}
+                >
+                  ●
+                </span>
+              )}
             </td>
           );
         })}
         <td style={{ ...cell, color: color || (vSum(values) < 0 ? C.red : C.text), borderLeft: `1px solid ${C.border}`, fontWeight: 600 }}>{money(vSum(values))}</td>
         {showAvg && <td style={{ ...cell, color: C.textMuted }}>{money(avg(values))}</td>}
       </tr>
+      {poznamka !== null && noteFor?.(poznamka) && (
+        <tr>
+          <td colSpan={values.length + (showAvg ? 3 : 2)} style={{ padding: "7px 12px 9px", background: mix(C.accent, 6), borderBottom: `1px solid ${mix(C.border, 55)}` }}>
+            {/* Bez názvu mesiaca zámerne: `poznamka` je pozícia stĺpca v
+                zobrazenom rozsahu, nie index mesiaca — pri zapnutom filtri
+                obdobia by tu bol nesprávny mesiac. Ktorý stĺpec to je, je
+                vidieť z rozsvietenej guličky. */}
+            <span style={{ fontSize: 11.5, color: C.textMuted, lineHeight: 1.5 }}>
+              {noteFor(poznamka)}
+              <button onClick={() => setPoznamka(null)} style={{ marginLeft: 8, background: "none", border: "none", color: C.textDim, fontSize: 11, cursor: "pointer" }}>zavrieť</button>
+            </span>
+          </td>
+        </tr>
+      )}
       {open && children}
     </>
   );

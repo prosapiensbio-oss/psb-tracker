@@ -4,6 +4,7 @@ import { fmtCZK } from "../../lib/psb/format";
 import { sediSucet, type Faktura } from "../../lib/psb/faktura";
 import { C, mix, S } from "../../lib/psb/theme";
 import { kategorieZoznam } from "./Banka";
+import { VyberKategorie } from "./VyberKategorie";
 import { Card, H3, Info, TableWrap } from "./ui";
 
 // Rozpis faktúr — náhľad pred zápisom, rovnako ako pri banke.
@@ -218,20 +219,14 @@ export function FakturyNahlad({
                         ) : fmtCZK(p.cena)}
                       </td>
                       <td style={{ ...S.td, padding: "3px 6px" }}>
-                        <select
-                          value={p.kategoria}
-                          onChange={(e) => uprav(fi, pi, { kategoria: e.target.value })}
-                          style={{ background: p.kategoria ? C.cardHover : mix(C.orange, 12), color: C.text, border: `1px solid ${p.kategoria ? C.border : mix(C.orange, 40)}`, borderRadius: 6, fontSize: 11.5, padding: "3px 5px", maxWidth: 250, cursor: "pointer" }}
-                        >
-                          {[...new Set(KAT.map((k) => k.skupina))].map((sk) =>
-                            sk === ""
-                              ? KAT.filter((k) => k.skupina === "").map((k) => <option key={k.value} value={k.value}>{k.label}</option>)
-                              : (
-                                <optgroup key={sk} label={sk}>
-                                  {KAT.filter((k) => k.skupina === sk).map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
-                                </optgroup>
-                              ))}
-                        </select>
+                        <VyberKategorie
+                          hodnota={p.kategoria}
+                          pocetOznacenych={oznacene.has(kluc(fi, pi)) ? oznacene.size : 0}
+                          onZmena={(kat) => {
+                            if (oznacene.has(kluc(fi, pi)) && oznacene.size > 1) { nastavVsetkymOznacenym(kat); return; }
+                            uprav(fi, pi, { kategoria: kat });
+                          }}
+                        />
                       </td>
                       <td style={{ ...S.td, padding: "3px 4px" }}>
                         <button onClick={() => zmazPolozku(fi, pi)} title="Zmazať položku"

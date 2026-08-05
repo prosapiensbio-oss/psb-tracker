@@ -5,6 +5,7 @@ import { fmtCZK } from "../../lib/psb/format";
 import { MIMO_PNL, VYPLATY, VYPLATY_DELENE, VYPLATY_JERRY, VYPLATY_TEREZKA, type FioRiadok } from "../../lib/psb/fio";
 import { C, mix, S } from "../../lib/psb/theme";
 import { PNL, SPOLOCNE, VZAS_MONTHS } from "../../lib/psb/vzas";
+import { VyberKategorie } from "./VyberKategorie";
 import { Card, H3, Info, TableWrap } from "./ui";
 
 // Import bankového výpisu — s náhľadom, nie naslepo.
@@ -15,7 +16,7 @@ import { Card, H3, Info, TableWrap } from "./ui";
 // z výpisu pochopila, ku každému riadku sa dá kategória prepnúť a až potom sa
 // zapisuje. Čo Jerry zaradí, to si appka zapamätá ako pravidlo.
 
-type Nahlad = FioRiadok & { uzMame?: boolean; zamknuty?: boolean };
+type Nahlad = FioRiadok & { uzMame?: boolean; zamknuty?: boolean; vlastnaPoznamka?: string };
 
 export type Kat = { value: string; label: string; skupina: string };
 
@@ -189,7 +190,13 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
     setBusy(true);
     // Rozrobený ručný riadok (bez sumy) sa nezapisuje — inak by v databáze
     // pristála nula, ktorá sa tvári ako pohyb.
-    const naZapis = nahlad.filter((r) => !r.uzMame && !r.zamknuty && r.suma !== 0);
+    const naZapis = nahlad
+      .filter((r) => !r.uzMame && !r.zamknuty && r.suma !== 0)
+      // Vlastná poznámka sa pripojí k textu z banky — v jednom poli, nech
+      // nepribúda ďalší stĺpec v databáze kvôli vete.
+      .map((r) => (r.vlastnaPoznamka?.trim()
+        ? { ...r, poznamka: `${r.poznamka}${r.poznamka ? " · " : ""}${r.vlastnaPoznamka.trim()}` }
+        : r));
     const r = await fetch("/api/fio", {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ akcia: "zapis", riadky: naZapis }),
@@ -412,26 +419,30 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
                       {r.poznamka && r.poznamka !== r.protistrana && (
                         <div style={{ color: C.textDim, fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 340 }}>{r.poznamka}</div>
                       )}
+                      {/* Vlastná poznámka. Text z banky často nepovie, čo to
+                          bolo — „Nákup: MOTMOT Company" nepovie, či to bola
+                          kniha alebo kávovar. O pol roka to už nikto nevie. */}
+                      <input
+                        value={r.vlastnaPoznamka || ""}
+                        onChange={(e) => setNahlad((n) => n && n.map((x, j) => (j === i ? { ...x, vlastnaPoznamka: e.target.value } : x)))}
+                        placeholder="+ poznámka"
+                        style={{ marginTop: 2, width: "100%", maxWidth: 340, background: "transparent", border: "none", borderBottom: `1px dashed ${mix(C.border, 80)}`, color: C.accentLight, fontSize: 11, padding: "1px 0" }}
+                      />
                       {r.uzMame && <span style={{ fontSize: 10, color: C.textDim }}>už v databáze</span>}
                       {r.zamknuty && <span style={{ fontSize: 10, color: C.red }}> · uzavretý mesiac</span>}
                     </td>
                     <td style={S.td}>
                       {r.suma < 0 || r.id.startsWith("rucne:") ? (
-                        <select
-                          value={r.kategoria}
-                          onChange={(e) => setNahlad((n) => n && n.map((x, j) => (j === i ? { ...x, kategoria: e.target.value } : x)))}
-                          style={{ background: r.kategoria ? C.cardHover : mix(C.orange, 12), color: C.text, border: `1px solid ${r.kategoria ? C.border : mix(C.orange, 40)}`, borderRadius: 6, fontSize: 11.5, padding: "3px 5px", maxWidth: 260, cursor: "pointer" }}
-                        >
-                          {/* Zoskupené, nech sa v päťdesiatich možnostiach dá nájsť tá jedna. */}
-                          {[...new Set(KAT.map((k) => k.skupina))].map((sk) =>
-                            sk === ""
-                              ? KAT.filter((k) => k.skupina === "").map((k) => <option key={k.value} value={k.value}>{k.label}</option>)
-                              : (
-                                <optgroup key={sk} label={sk}>
-                                  {KAT.filter((k) => k.skupina === sk).map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
-                                </optgroup>
-                              ))}
-                        </select>
+                        <VyberKategorie
+                          hodnota={r.kategoria}
+                          pocetOznacenych={oznacene.has(i) ? oznacene.size : 0}
+                          // Keď je riadok označený, zmena platí pre celý výber —
+                          // človek nemusí ísť očami hore do panelu a späť.
+                          onZmena={(kat) => {
+                            if (oznacene.has(i) && oznacene.size > 1) { zaradOznacene(kat); return; }
+                            setNahlad((n) => n && n.map((x, j) => (j === i ? { ...x, kategoria: kat } : x)));
+                          }}
+                        />
                       ) : (
                         <span style={{ fontSize: 11.5, color: C.textDim }}>príjem — len kontrola</span>
                       )}

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { fmtCZK, fmtDMY } from "../../lib/psb/format";
 import { C, mix, S } from "../../lib/psb/theme";
 import { kategorieZoznam } from "./Banka";
+import { VyberKategorie } from "./VyberKategorie";
 import { Card, Empty, H3, Info, TableWrap } from "./ui";
 
 // Čo je už zapísané — a možnosť to prehodiť.
@@ -53,8 +54,10 @@ export function BankaUlozene() {
     return true;
   });
 
-  const zmen = async (kategoria: string) => {
-    const zmeny = pohyby.filter((p) => oznacene.has(p.kluc)).map((p) => ({ kluc: p.kluc, kategoria, datum: p.datum }));
+  /** Bez `kluce` sa mení celý označený výber; s nimi len tie riadky. */
+  const zmen = async (kategoria: string, kluce?: string[]) => {
+    const vyber = kluce ? new Set(kluce) : oznacene;
+    const zmeny = pohyby.filter((p) => vyber.has(p.kluc)).map((p) => ({ kluc: p.kluc, kategoria, datum: p.datum }));
     if (!zmeny.length) return;
     setBusy(true);
     const r = await fetch("/api/fio", {
@@ -64,7 +67,7 @@ export function BankaUlozene() {
     setBusy(false);
     if (r.ok) {
       setSprava(`Prehodené: ${r.zmenene}${r.zamknute ? `, ${r.zamknute} odmietnutých (uzavretý mesiac)` : ""}.`);
-      setOznacene(new Set());
+      if (!kluce) setOznacene(new Set());
       nacitaj();
       setTimeout(() => setSprava(""), 5000);
     } else setSprava("Zmena sa nepodarila.");
@@ -169,8 +172,12 @@ export function BankaUlozene() {
                         <div style={{ color: C.textDim, fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 320 }}>{p.poznamka}</div>
                       )}
                     </td>
-                    <td style={{ ...S.td, fontSize: 11.5, color: p.kategoria ? C.textMuted : C.orange }}>
-                      {KAT.find((k) => k.value === p.kategoria)?.label || (p.kategoria || "— bez kategórie —")}
+                    <td style={{ ...S.td, padding: "3px 6px" }}>
+                      <VyberKategorie
+                        hodnota={p.kategoria}
+                        pocetOznacenych={oznacene.has(p.kluc) ? oznacene.size : 0}
+                        onZmena={(kat) => void zmen(kat, oznacene.has(p.kluc) && oznacene.size > 1 ? undefined : [p.kluc])}
+                      />
                     </td>
                   </tr>
                 ))}
