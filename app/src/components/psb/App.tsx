@@ -274,7 +274,25 @@ export function PSBApp() {
   useEffect(() => {
     void fetch("/api/fio", { credentials: "same-origin" })
       .then((r) => r.json())
-      .then((j: { pohyby?: { datum: string; suma: number; kategoria: string }[] }) => {
+      .then(async (j: { pohyby?: { datum: string; suma: number; kategoria: string; protistrana?: string }[] }) => {
+        // Faktúry ROZPISUJÚ bankový pohyb, nenahrádzajú ho. Nákup z Alzy je
+        // v banke ako jedna suma a na faktúre ako trinásť položiek — keby sa
+        // pripočítalo oboje, náklad by bol dvojnásobný. Preto sa spárovaný
+        // pohyb do P&L nezapočíta a namiesto neho idú položky faktúry.
+        type FaPol = { faktura: string; dodavatel: string; datum: string; cena: number; kategoria: string };
+        const fa: FaPol[] = await fetch("/api/faktury", { credentials: "same-origin" })
+          .then((r) => r.json())
+          .then((x: { polozky?: FaPol[] }) => x.polozky || [])
+          .catch(() => [] as FaPol[]);
+        const doklady = new Map<string, { datum: string; celkom: number; polozky: FaPol[] }>();
+        for (const p of fa) {
+          const e = doklady.get(p.faktura) || { datum: p.datum, celkom: 0, polozky: [] as FaPol[] };
+          e.celkom += p.cena;
+          e.polozky.push(p);
+          doklady.set(p.faktura, e);
+        }
+        const pouzite = new Set<string>();
+
         const sumy: Record<string, Record<string, number>> = {};
         const vyplaty: Record<string, { jerry: number; terezka: number }> = {};
         for (const p of j.pohyby || []) {
@@ -289,6 +307,24 @@ export function PSBApp() {
             else { v.jerry += -p.suma / 2; v.terezka += -p.suma / 2; }
             continue;
           }
+          // Sedí tento pohyb na niektorý doklad? Suma do koruny, dátum do
+          // siedmich dní — karta sa zúčtuje o pár dní neskôr než nákup.
+          let rozpisany = false;
+          for (const [cislo, d] of doklady) {
+            if (pouzite.has(cislo)) continue;
+            if (Math.abs(d.celkom + p.suma) > 1) continue;
+            const rozdiel = Math.abs(Date.parse(p.datum) - Date.parse(d.datum)) / 86400000;
+            if (rozdiel > 7) continue;
+            pouzite.add(cislo);
+            for (const pol of d.polozky) {
+              if (!pol.kategoria || pol.kategoria === "mimo" || pol.kategoria.startsWith("vyplaty")) continue;
+              (sumy[mk] ||= {});
+              sumy[mk][pol.kategoria] = (sumy[mk][pol.kategoria] || 0) + pol.cena;
+            }
+            rozpisany = true;
+            break;
+          }
+          if (rozpisany) continue;
           (sumy[mk] ||= {});
           sumy[mk][p.kategoria] = (sumy[mk][p.kategoria] || 0) + -p.suma;
         }

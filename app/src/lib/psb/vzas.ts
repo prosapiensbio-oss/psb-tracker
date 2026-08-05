@@ -13,19 +13,35 @@
 // and that change is the single most important thing that ever happened to this
 // company's numbers. A 6-month window starts after it and so cannot show it.
 
-export const VZAS_MONTHS = [
-  "2025-01", "2025-02", "2025-03", "2025-04", "2025-05", "2025-06",
-  "2025-07", "2025-08", "2025-09", "2025-10", "2025-11", "2025-12",
-  "2026-01", "2026-02", "2026-03", "2026-04", "2026-05", "2026-06",
-  // Júl 2026 ďalej: Excel končí júnom, tieto mesiace plní import z Fio.
-  "2026-07",
-] as const;
-export const VZAS_MONTH_LABELS = [
-  "Jan 25", "Feb 25", "Mar 25", "Apr 25", "Máj 25", "Jún 25",
-  "Júl 25", "Aug 25", "Sep 25", "Okt 25", "Nov 25", "Dec 25",
-  "Jan 26", "Feb 26", "Mar 26", "Apr 26", "Máj 26", "Jún 26",
-  "Júl 26",
-] as const;
+// Mesiace rastú samy až po dnešok.
+//
+// Boli natvrdo po jún 2026 a keď prišiel júl, jednoducho nemal kam pristáť:
+// tržby aj náklady sa nahrali, ale VZAS o tom mesiaci nevedel. Rovnaká chyba
+// by sa opakovala každý mesiac. Excel končí júnom 2026 — všetko po ňom plnia
+// importy (PTminder, Fio), takže stačí, aby mesiac existoval.
+const POSLEDNY_Z_EXCELU = "2026-06";
+const MESIACE_SK = ["Jan", "Feb", "Mar", "Apr", "Máj", "Jún", "Júl", "Aug", "Sep", "Okt", "Nov", "Dec"];
+
+function vygenerujMesiace(): { keys: string[]; labels: string[] } {
+  const keys: string[] = [];
+  const labels: string[] = [];
+  const dnes = new Date();
+  // O mesiac dopredu, nech je kam zapísať aj rozbehnutý mesiac.
+  const koniec = `${dnes.getFullYear()}-${String(dnes.getMonth() + 1).padStart(2, "0")}`;
+  let r = 2025, m = 1;
+  for (;;) {
+    const k = `${r}-${String(m).padStart(2, "0")}`;
+    keys.push(k);
+    labels.push(`${MESIACE_SK[m - 1]} ${String(r).slice(2)}`);
+    if (k >= koniec) break;
+    if (++m > 12) { m = 1; r++; }
+    if (keys.length > 240) break; // poistka proti nekonečnu
+  }
+  return { keys, labels };
+}
+const _M = vygenerujMesiace();
+export const VZAS_MONTHS: string[] = _M.keys;
+export const VZAS_MONTH_LABELS: string[] = _M.labels;
 const N = VZAS_MONTHS.length;
 
 // Všetky rady v tomto súbore sú prepis Excelu, ktorý končí júnom 2026. Keď
@@ -38,19 +54,29 @@ function dorovnaj(v: number[]): number[] {
 }
 
 // Index ranges the UI offers as period presets.
-export const YEAR_IDX: Record<string, number[]> = {
-  "2025": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
-  "2026": [12, 13, 14, 15, 16, 17, 18],
-};
-export const QUARTERS: { id: string; label: string; idx: number[] }[] = [
-  { id: "2025q1", label: "Q1 25", idx: [0, 1, 2] },
-  { id: "2025q2", label: "Q2 25", idx: [3, 4, 5] },
-  { id: "2025q3", label: "Q3 25", idx: [6, 7, 8] },
-  { id: "2025q4", label: "Q4 25", idx: [9, 10, 11] },
-  { id: "2026q1", label: "Q1 26", idx: [12, 13, 14] },
-  { id: "2026q2", label: "Q2 26", idx: [15, 16, 17] },
-  { id: "2026q3", label: "Q3 26", idx: [18] },
-];
+// Roky a kvartály sa odvodzujú z mesiacov, nie z ručného zoznamu. Boli natvrdo
+// a pri každom novom mesiaci sa museli dopisovať — čo znamená, že sa jeden deň
+// zabudnú a filter ticho vynechá časť roka.
+export const YEAR_IDX: Record<string, number[]> = (() => {
+  const out: Record<string, number[]> = {};
+  VZAS_MONTHS.forEach((m, i) => (out[m.slice(0, 4)] ||= []).push(i));
+  return out;
+})();
+export const QUARTERS: { id: string; label: string; idx: number[] }[] = (() => {
+  const mapa = new Map<string, number[]>();
+  VZAS_MONTHS.forEach((m, i) => {
+    const rok = m.slice(0, 4);
+    const q = Math.floor((Number(m.slice(5, 7)) - 1) / 3) + 1;
+    const kluc = `${rok}q${q}`;
+    if (!mapa.has(kluc)) mapa.set(kluc, []);
+    mapa.get(kluc)!.push(i);
+  });
+  return [...mapa.entries()].map(([id, idx]) => ({
+    id,
+    label: `Q${id.slice(-1)} ${id.slice(2, 4)}`,
+    idx,
+  }));
+})();
 export const yearOf = (i: number) => VZAS_MONTHS[i].slice(0, 4);
 
 export type Vals = number[]; // one value per month, length N
@@ -397,6 +423,7 @@ export const PRIJMY: Vals = PRIJMY_PTMINDER.map((v, i) => v + PRIJMY_INE[i]);
 // Exceli nie sú: prepísať historické mesiace bankou by zahodilo rok práce a
 // zároveň by sa stratila možnosť oboje porovnať.
 export let NAKLADY_Z_FIO: string[] = [];
+/** Prvý mesiac, ktorý Excel nemá — od neho vyššie plnia dáta importy. */
 const PRVY_MESIAC_Z_FIO = "2026-07";
 
 /** Riadok „Z banky" v osobných výplatách — pre mesiace, ktoré Excel nemá. */
@@ -426,7 +453,7 @@ export function nastavJarekZTrackera(splatky: Record<string, number>): boolean {
   dorovnaj(rad);
   let zmena = false;
   for (const [mk, suma] of Object.entries(splatky)) {
-    const i = VZAS_MONTHS.indexOf(mk as (typeof VZAS_MONTHS)[number]);
+    const i = VZAS_MONTHS.indexOf(mk);
     if (i < 0 || mk < PRVY_MESIAC_Z_FIO) continue;
     if (Math.abs(rad[i] - suma) > 0.5) { rad[i] = suma; zmena = true; }
   }
@@ -439,7 +466,7 @@ export const BARTER_KLIENTI = ["Sofia Resnerová"];
 export function nastavHodinyZTrackera(hodiny: Record<string, { jerry: number; terezka: number }>): boolean {
   let zmena = false;
   for (const [mk, h] of Object.entries(hodiny)) {
-    const i = VZAS_MONTHS.indexOf(mk as (typeof VZAS_MONTHS)[number]);
+    const i = VZAS_MONTHS.indexOf(mk);
     if (i < 0 || mk < PRVY_MESIAC_Z_FIO) continue;
     for (const [k, v] of [["jerry", h.jerry], ["terezka", h.terezka]] as const) {
       const rad = SALARY[k as PersonKey].hours;
@@ -466,7 +493,7 @@ export function nastavNakladyZFio(
   let zmena = false;
   const mesiace: string[] = [];
   for (const [mk, podlaKategorie] of Object.entries(sumy)) {
-    const i = VZAS_MONTHS.indexOf(mk as (typeof VZAS_MONTHS)[number]);
+    const i = VZAS_MONTHS.indexOf(mk);
     if (i < 0 || mk < PRVY_MESIAC_Z_FIO) continue;
     mesiace.push(mk);
     // Mesiac sa najprv vynuluje, aby opakovaný import nesčítaval.
@@ -494,7 +521,7 @@ export function nastavNakladyZFio(
     }
   }
   for (const [mk, v] of Object.entries(vyplaty)) {
-    const i = VZAS_MONTHS.indexOf(mk as (typeof VZAS_MONTHS)[number]);
+    const i = VZAS_MONTHS.indexOf(mk);
     if (i < 0 || mk < PRVY_MESIAC_Z_FIO) continue;
     for (const [k, suma] of [["jerry", v.jerry], ["terezka", v.terezka]] as const) {
       const per = SALARY[k as PersonKey].personal;
