@@ -7,6 +7,9 @@ import type { PSBData } from "../../lib/psb/types";
 import type { IngestResult } from "../../lib/psb/db.server";
 import type { Actions } from "./App";
 import { BankovyImport } from "./Banka";
+import { FakturyNahlad } from "./Faktury";
+import { parseFaktura, type Faktura } from "../../lib/psb/faktura";
+import { maTextovuVrstvu, pdfRiadky } from "../../lib/psb/pdftext";
 import { ThemeSwitch } from "./ThemeSwitch";
 import { Uzavierky } from "./Uzavierky";
 import { Card, H3, Info } from "./ui";
@@ -83,6 +86,7 @@ function UploadCard({ data, missing, actions }: { data: PSBData; missing: typeof
   const [bankovyText, setBankovyText] = useState("");
   // Stav bankových pohybov sa nedá prečítať z PSBData — má vlastnú tabuľku.
   const [bankaStav, setBankaStav] = useState<{ pocet: number; posledny: string } | null>(null);
+  const [faktury, setFaktury] = useState<Faktura[]>([]);
   useEffect(() => {
     void fetch("/api/fio", { credentials: "same-origin" })
       .then((r) => r.json())
@@ -177,7 +181,25 @@ function UploadCard({ data, missing, actions }: { data: PSBData; missing: typeof
       else files.push({ filename: f.name, text });
     }
     setNeCsv(neCsv);
-    for (const f of pdfka) await citajPdf(f);
+    // PDF má dve podoby a stoja úplne inak. Faktúra nesie textovú vrstvu —
+    // prečíta sa priamo v prehliadači, presne a zadarmo. Mesačná zostava z
+    // Metricoolu je vykreslená do grafiky a tú vie prečítať len Jarvis.
+    // Preto sa najprv skúsi text; Jarvis je až druhá voľba.
+    const noveFaktury: Faktura[] = [];
+    for (const f of pdfka) {
+      let precitane = false;
+      try {
+        const riadky = await pdfRiadky(await f.arrayBuffer());
+        if (maTextovuVrstvu(riadky)) {
+          const fa = parseFaktura(riadky);
+          if (fa) { noveFaktury.push(fa); precitane = true; }
+        }
+      } catch {
+        /* nevadí — skúsi sa Jarvis */
+      }
+      if (!precitane) await citajPdf(f);
+    }
+    if (noveFaktury.length) setFaktury((p) => [...p, ...noveFaktury]);
     if (bankove.length) setBankovyText(bankove.join("\n"));
     if (files.length) {
       const res = await actions.ingest(files);
@@ -235,6 +257,15 @@ function UploadCard({ data, missing, actions }: { data: PSBData; missing: typeof
       {bankovyText && (
         <div style={{ marginTop: 12 }}>
           <BankovyImport vstup={bankovyText} onHotovo={() => { setBankovyText(""); void actions.refresh(); }} />
+        </div>
+      )}
+      {faktury.length > 0 && (
+        <div style={{ marginTop: 12 }}>
+          <FakturyNahlad
+            faktury={faktury}
+            onZmena={(i, f) => setFaktury((p) => p.map((x, j) => (j === i ? f : x)))}
+            onHotovo={() => setFaktury([])}
+          />
         </div>
       )}
       {uploadResult && (

@@ -31,6 +31,7 @@ import { Route as ApiLeadsRouteImport } from './routes/api/leads'
 import { Route as ApiJarvisMemoryRouteImport } from './routes/api/jarvis-memory'
 import { Route as ApiIngestRouteImport } from './routes/api/ingest'
 import { Route as ApiFioRouteImport } from './routes/api/fio'
+import { Route as ApiFakturyRouteImport } from './routes/api/faktury'
 import { Route as ApiExportRouteImport } from './routes/api/export'
 import { Route as ApiDataRouteImport } from './routes/api/data'
 import { Route as ApiClientNotesRouteImport } from './routes/api/client-notes'
@@ -150,6 +151,11 @@ const ApiFioRoute = ApiFioRouteImport.update({
   path: '/api/fio',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiFakturyRoute = ApiFakturyRouteImport.update({
+  id: '/api/faktury',
+  path: '/api/faktury',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiExportRoute = ApiExportRouteImport.update({
   id: '/api/export',
   path: '/api/export',
@@ -203,6 +209,7 @@ export interface FileRoutesByFullPath {
   '/api/client-notes': typeof ApiClientNotesRoute
   '/api/data': typeof ApiDataRoute
   '/api/export': typeof ApiExportRoute
+  '/api/faktury': typeof ApiFakturyRoute
   '/api/fio': typeof ApiFioRoute
   '/api/ingest': typeof ApiIngestRoute
   '/api/jarvis-memory': typeof ApiJarvisMemoryRoute
@@ -235,6 +242,7 @@ export interface FileRoutesByTo {
   '/api/client-notes': typeof ApiClientNotesRoute
   '/api/data': typeof ApiDataRoute
   '/api/export': typeof ApiExportRoute
+  '/api/faktury': typeof ApiFakturyRoute
   '/api/fio': typeof ApiFioRoute
   '/api/ingest': typeof ApiIngestRoute
   '/api/jarvis-memory': typeof ApiJarvisMemoryRoute
@@ -268,6 +276,7 @@ export interface FileRoutesById {
   '/api/client-notes': typeof ApiClientNotesRoute
   '/api/data': typeof ApiDataRoute
   '/api/export': typeof ApiExportRoute
+  '/api/faktury': typeof ApiFakturyRoute
   '/api/fio': typeof ApiFioRoute
   '/api/ingest': typeof ApiIngestRoute
   '/api/jarvis-memory': typeof ApiJarvisMemoryRoute
@@ -302,6 +311,7 @@ export interface FileRouteTypes {
     | '/api/client-notes'
     | '/api/data'
     | '/api/export'
+    | '/api/faktury'
     | '/api/fio'
     | '/api/ingest'
     | '/api/jarvis-memory'
@@ -334,6 +344,7 @@ export interface FileRouteTypes {
     | '/api/client-notes'
     | '/api/data'
     | '/api/export'
+    | '/api/faktury'
     | '/api/fio'
     | '/api/ingest'
     | '/api/jarvis-memory'
@@ -366,6 +377,7 @@ export interface FileRouteTypes {
     | '/api/client-notes'
     | '/api/data'
     | '/api/export'
+    | '/api/faktury'
     | '/api/fio'
     | '/api/ingest'
     | '/api/jarvis-memory'
@@ -399,6 +411,7 @@ export interface RootRouteChildren {
   ApiClientNotesRoute: typeof ApiClientNotesRoute
   ApiDataRoute: typeof ApiDataRoute
   ApiExportRoute: typeof ApiExportRoute
+  ApiFakturyRoute: typeof ApiFakturyRoute
   ApiFioRoute: typeof ApiFioRoute
   ApiIngestRoute: typeof ApiIngestRoute
   ApiJarvisMemoryRoute: typeof ApiJarvisMemoryRoute
@@ -576,6 +589,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiFioRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/faktury': {
+      id: '/api/faktury'
+      path: '/api/faktury'
+      fullPath: '/api/faktury'
+      preLoaderRoute: typeof ApiFakturyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/export': {
       id: '/api/export'
       path: '/api/export'
@@ -647,6 +667,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiClientNotesRoute: ApiClientNotesRoute,
   ApiDataRoute: ApiDataRoute,
   ApiExportRoute: ApiExportRoute,
+  ApiFakturyRoute: ApiFakturyRoute,
   ApiFioRoute: ApiFioRoute,
   ApiIngestRoute: ApiIngestRoute,
   ApiJarvisMemoryRoute: ApiJarvisMemoryRoute,

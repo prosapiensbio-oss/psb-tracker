@@ -17,7 +17,7 @@ import { Card, H3, Info, TableWrap } from "./ui";
 
 type Nahlad = FioRiadok & { uzMame?: boolean; zamknuty?: boolean };
 
-type Kat = { value: string; label: string; skupina: string };
+export type Kat = { value: string; label: string; skupina: string };
 
 // Položka je „živá", keď v tomto roku niečo mala. Zoznam mal cez päťdesiat
 // možností vrátane MultiBoxu a Freela, ktoré sa v 2026 nepoužívajú — a v
@@ -28,8 +28,9 @@ const ziveOd = VZAS_MONTHS.findIndex((m) => m.startsWith(String(new Date().getFu
 const jeZiva = (values: number[]) =>
   ziveOd < 0 || values.slice(ziveOd).some((v) => v !== 0);
 
-/** Cieľové kategórie: P&L + spoločné výdavky + dva koše mimo neho. */
-function kategorie(): Kat[] {
+/** Cieľové kategórie: P&L + spoločné výdavky + dva koše mimo neho.
+ *  Zdieľané s rozpisom faktúr — jeden zoznam, aby sa nerozišli. */
+export function kategorieZoznam(): Kat[] {
   const zive: Kat[] = [{ value: "", label: "— nezaradené —", skupina: "" }];
   const stare: Kat[] = [];
   for (const [sekKey, sek] of Object.entries(PNL)) {
@@ -82,7 +83,7 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
   const [chyba, setChyba] = useState<{ chyba: string; ukazka: string[] } | null>(null);
   const [vysledok, setVysledok] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const KAT = useMemo(kategorie, []);
+  const KAT = useMemo(kategorieZoznam, []);
 
   // Náhľad sa načíta hneď, ako príde nový text — komponent sa objaví až vtedy,
   // keď používateľ pustí bankový výpis do uploadu.
