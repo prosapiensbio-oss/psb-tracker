@@ -33,9 +33,15 @@ export const Route = createFileRoute("/api/btc-reserve")({
         // ?platby=1 pridá zoznam bitcoinových platieb klientov na krížovú
         // kontrolu proti PTminderu. Podpis je ten istý — parameter nie je
         // súčasťou podpisovanej správy, lebo nič neodomyká, len rozširuje odpoveď.
-        const chcePlatby = new URL(request.url).searchParams.get("platby") === "1";
-        const zaklad = `${SOURCE}?exp=${exp}&sig=${sig}`;
-        return Response.json({ ok: true, url: chcePlatby ? `${zaklad}&platby=1` : zaklad });
+        const q = new URL(request.url).searchParams;
+        const chcePlatby = q.get("platby") === "1";
+        // ?vyplaty=1 pridá výbery, ktoré sú výplatou zakladateľa — časť výplat
+        // neodíde z účtu, ale z bitcoinu, a pri importe z banky by chýbali.
+        const chceVyplaty = q.get("vyplaty") === "1";
+        let url = `${SOURCE}?exp=${exp}&sig=${sig}`;
+        if (chcePlatby) url += "&platby=1";
+        if (chceVyplaty) url += "&vyplaty=1";
+        return Response.json({ ok: true, url });
       },
     },
   },

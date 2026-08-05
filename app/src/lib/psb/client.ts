@@ -124,6 +124,9 @@ export async function saveVzasSetting(key: string, value: unknown): Promise<bool
 
 export type BtcPlatba = { klient: string | null; datum: string; sats: number; czk: number | null };
 
+/** Výplata zakladateľa vyplatená v bitcoine — z appky PSB Bitcoin. */
+export type BtcVyplata = { datum: string; sats: number; czk: number | null; poznamka: string; kto: "jerry" | "terezka" | "" };
+
 export type BtcReserve = {
   sats: number;
   czk: number | null;
@@ -132,14 +135,16 @@ export type BtcReserve = {
   goalSats: number | null;
   generatedAt: string;
   platby?: BtcPlatba[];
+  vyplaty?: BtcVyplata[];
 };
 
 // Two hops on purpose: our server signs a short-lived URL (it holds the shared
 // token), the browser then calls the Bitcoin app directly. Worker-to-worker
 // calls inside the platform time out, so this is the path that works.
-export async function fetchBtcReserve(sPlatbami = false): Promise<BtcReserve | null> {
+export async function fetchBtcReserve(sPlatbami = false, sVyplatami = false): Promise<BtcReserve | null> {
   try {
-    const r = await fetch(`/api/btc-reserve${sPlatbami ? "?platby=1" : ""}`);
+    const q = [sPlatbami ? "platby=1" : "", sVyplatami ? "vyplaty=1" : ""].filter(Boolean).join("&");
+    const r = await fetch(`/api/btc-reserve${q ? `?${q}` : ""}`);
     if (!r.ok) return null;
     const j = (await r.json()) as { ok?: boolean; url?: string };
     if (!j.ok || !j.url) return null;

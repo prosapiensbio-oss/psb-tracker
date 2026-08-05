@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
+import { fetchBtcReserve, type BtcVyplata } from "../../lib/psb/client";
 import { fmtCZK } from "../../lib/psb/format";
 import { MIMO_PNL, VYPLATY, VYPLATY_DELENE, VYPLATY_JERRY, VYPLATY_TEREZKA, type FioRiadok } from "../../lib/psb/fio";
 import { C, mix, S } from "../../lib/psb/theme";
@@ -66,6 +67,18 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
   // Príjmy a výdavky vedľa seba v jednej tabuľke sa zle prechádzajú — zaraďujú
   // sa hlavne výdavky, príjmy sú len kontrola proti PTminderu.
   const [filter, setFilter] = useState<"vsetko" | "vydaje" | "prijmy" | "vyplaty" | "nezaradene">("vsetko");
+  // Výplaty vyplatené v bitcoine. Na bankovom výpise nie sú — odišli z BTC
+  // appky — takže bez nich vyzerá mesiac, akoby si nikto nič nevzal. Sú len na
+  // pozretie: zapisuje sa výpis, nie cudzia databáza.
+  const [btcVyplaty, setBtcVyplaty] = useState<BtcVyplata[] | null>(null);
+  useEffect(() => {
+    if (!nahlad || btcVyplaty) return;
+    void fetchBtcReserve(false, true).then((r) => setBtcVyplaty(r?.vyplaty || []));
+  }, [nahlad, btcVyplaty]);
+  // Len mesiace, ktoré sú v tomto výpise — inak by sa ukázal celý rok.
+  const btcVMesiaci = (btcVyplaty || []).filter(
+    (v) => !!nahlad?.some((r) => r.datum.slice(0, 7) === v.datum.slice(0, 7)),
+  );
   const [chyba, setChyba] = useState<{ chyba: string; ukazka: string[] } | null>(null);
   const [vysledok, setVysledok] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -255,6 +268,25 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
             {suhrn.zamknute > 0 && <><b style={{ color: C.red }}>{suhrn.zamknute} v uzavretom mesiaci</b> · </>}
             Príjmy sa zapisujú tiež, ale slúžia len na kontrolu proti PTminderu — tržby sa z banky nikdy nepočítajú.
           </div>
+          {filter === "vyplaty" && btcVMesiaci.length > 0 && (
+            <div style={{ marginBottom: 10, padding: "10px 12px", borderRadius: 9, background: mix(C.orange, 8), border: `1px solid ${mix(C.orange, 26)}` }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: C.text, marginBottom: 6 }}>
+                Výplaty v bitcoine za toto obdobie ({btcVMesiaci.length}) — na výpise z banky nie sú
+              </div>
+              {btcVMesiaci.map((v, i) => (
+                <div key={i} style={{ display: "flex", gap: 10, alignItems: "baseline", fontSize: 12, padding: "3px 0", borderBottom: i < btcVMesiaci.length - 1 ? `1px solid ${mix(C.border, 40)}` : "none" }}>
+                  <span style={{ color: C.textDim, minWidth: 74, fontVariantNumeric: "tabular-nums" }}>{v.datum}</span>
+                  <span style={{ color: C.text, minWidth: 62 }}>{v.kto === "jerry" ? "Jerry" : v.kto === "terezka" ? "Terezka" : "—"}</span>
+                  <span style={{ color: C.orange, fontVariantNumeric: "tabular-nums", minWidth: 74, textAlign: "right" }}>{v.czk != null ? fmtCZK(v.czk) : "—"}</span>
+                  <span style={{ color: C.textDim, flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v.poznamka}</span>
+                </div>
+              ))}
+              <div style={{ fontSize: 11, color: C.textDim, marginTop: 7, lineHeight: 1.5 }}>
+                Spolu <b style={{ color: C.orange }}>{fmtCZK(btcVMesiaci.reduce((a, v) => a + (v.czk || 0), 0))}</b> ·
+                z appky PSB Bitcoin, len na pozretie. Do VZAS ich zapíšeš v Mzdy → kategória „BTC“.
+              </div>
+            </div>
+          )}
           <TableWrap>
             <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 640 }}>
               <thead>
