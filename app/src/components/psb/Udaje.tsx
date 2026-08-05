@@ -189,14 +189,14 @@ function UploadCard({ data, missing, actions }: { data: PSBData; missing: typeof
 
   return (
     <Card>
-      <div onClick={() => setOpen((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+      {/* Zóna na pretiahnutie je dôvod, prečo sa na túto obrazovku chodí —
+          nesmie byť schovaná za rozbaľovaním. Zbalí sa až to, čo sa číta raz:
+          návod a zoznam potrebných CSV. */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
         <div style={{ ...S.h3, marginBottom: 0 }}>Upload CSV</div>
         {missing.length > 0 && <span style={{ ...badge("orange"), fontSize: 10 }}>{missing.length} chýba</span>}
-        <span style={{ marginLeft: "auto", fontSize: 12, color: C.textDim }}>{open ? "▲" : "▼ rozbaliť"}</span>
       </div>
-      <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 4 }}>Nahrať sa dá aj pretiahnutím do Jarvisa (📎 vpravo dole).</div>
-      {open && (
-      <div style={{ marginTop: 12 }}>
+      <div>
       <div
         role="button"
         tabIndex={0}
@@ -246,7 +246,12 @@ function UploadCard({ data, missing, actions }: { data: PSBData; missing: typeof
           ))}
         </div>
       )}
-      <div style={{ marginTop: 14, padding: 12, background: mix(C.accent, 6), borderRadius: 8 }}>
+      <div onClick={() => setOpen((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginTop: 14, fontSize: 12, color: C.textDim }}>
+        <span>{open ? "▲ skryť" : "▼"} zoznam potrebných CSV a kde ich nájsť</span>
+        <span style={{ marginLeft: "auto" }}>Nahrať sa dá aj pretiahnutím do Jarvisa (📎 vpravo dole).</span>
+      </div>
+      {open && (
+      <div style={{ marginTop: 10, padding: 12, background: mix(C.accent, 6), borderRadius: 8 }}>
         <div style={{ fontSize: 12, color: C.textMuted, fontWeight: 600, marginBottom: 8 }}>Potrebné CSV (kde ich nájdeš · aktuálnosť):</div>
         {REPORTS.map((r) => {
           const arr = (data[r.key] as { date?: string }[]) || [];
@@ -305,8 +310,8 @@ function UploadCard({ data, missing, actions }: { data: PSBData; missing: typeof
           Rovnaký súbor nič nezduplikuje.
         </div>
       </div>
-      </div>
       )}
+      </div>
     </Card>
   );
 }

@@ -552,6 +552,8 @@ function PersonCard({ pk, idx, onZmena }: { pk: PersonKey; idx: number[]; onZmen
     onZmena?.();
   };
   const konecny = c.cumDebt[c.cumDebt.length - 1];
+  /** Posledný mesiac v zobrazenom rozsahu — hlavička hovorí o ňom. */
+  const posledny = idx.length ? idx[idx.length - 1] : MONTHS.length - 1;
   const cell = { textAlign: "right" as const, padding: "5px 8px", fontSize: 12, fontVariantNumeric: "tabular-nums" as const, whiteSpace: "nowrap" as const };
   const lbl = { ...S.td, fontSize: 12, color: C.textMuted, ...sticky() } as const;
   const detailBtn = (on: boolean, fn: () => void) => (
@@ -569,14 +571,19 @@ function PersonCard({ pk, idx, onZmena }: { pk: PersonKey; idx: number[]; onZmen
           <span style={{ display: "inline-block", width: 15, color: C.textDim, fontSize: 9 }}>{open ? "▼" : "▶"}</span>
           {s.label}
         </div>
+        {/* V hlavičke stál priemer hodín za osemnásť mesiacov a kumulovaný dlh.
+            Priemer nehovorí o tom, ako sa robí teraz, a dlh sa mesiac po
+            mesiaci takmer nehýbe — obe patria do tabuľky nižšie, nie na prvý
+            pohľad. Posledný uzavretý mesiac je to, čo človek hľadá: koľko
+            odrobil a koľko si vzal. */}
         <div style={{ display: "flex", gap: 20 }}>
           <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: 11, color: C.textMuted }}>Ø hodín / mes.</div>
-            <div style={{ fontSize: 15, fontWeight: 600, color: C.text, fontVariantNumeric: "tabular-nums" }}>{avg(money2(s.hours)).toFixed(1)} h</div>
+            <div style={{ fontSize: 11, color: C.textMuted }}>Hodín {MONTHS[posledny]}</div>
+            <div style={{ fontSize: 15, fontWeight: 600, color: C.text, fontVariantNumeric: "tabular-nums" }}>{s.hours[posledny].toFixed(1)} h</div>
           </div>
           <div style={{ textAlign: "right" }}>
-            <div style={{ fontSize: 11, color: C.textMuted }}>Kumulovaný dlh</div>
-            <div style={{ fontSize: 18, fontWeight: 700, color: signColor(konecny), fontVariantNumeric: "tabular-nums" }}>{fmtCZK(konecny)}</div>
+            <div style={{ fontSize: 11, color: C.textMuted }}>Výplata {MONTHS[posledny]}</div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: C.text, fontVariantNumeric: "tabular-nums" }}>{fmtCZK(c.poslane[posledny])}</div>
           </div>
         </div>
       </div>
@@ -647,7 +654,13 @@ function PersonCard({ pk, idx, onZmena }: { pk: PersonKey; idx: number[]; onZmen
               </tr>
               {poslaneOpen && (
                 <>
-                  {Object.entries(s.personal).map(([k, vals]) => (
+                  {Object.entries(s.personal)
+                    // Riadok bez pohybu v zobrazenom období sa nekreslí — dáta
+                    // zostávajú (držia rok 2025), len neprekážajú v tabuľke za
+                    // 2026. V režime úprav sa ukáže všetko, inak by sa nedalo
+                    // upraviť to, čo je práve skryté.
+                    .filter(([, vals]) => uprava || idx.some((i) => vals[i] !== 0))
+                    .map(([k, vals]) => (
                     <tr key={k}>
                       <td style={{ ...lbl, paddingLeft: uprava ? 8 : 24, fontSize: 11 }}>
                         {uprava ? (

@@ -264,6 +264,12 @@ const VYPLATY_ZO_ZDROJAKU: Record<PersonKey, VyplatyKategorie> = {
 export let VYPLATY_SU_UPRAVENE = false;
 /** Kategórie presunuté z osobných výplat do SPOLOCNE — v uložených dátach sa ignorujú. */
 const PRESUNUTE_DO_SPOLOCNYCH = new Set(["Nájom 2"]);
+// Kategórie, ktoré držia rok 2025 a nesmú zmiznúť ani vtedy, keď ich niekto
+// odškrtne. Nový systém výplat ich nepoužíva a v tabuľkách za 2026 nemajú čo
+// robiť — ale ich sumy sú súčasťou nákladov roku 2025 a bez nich by tamojší
+// zisk vyskočil o 58 600 Kč. Preto sa vždy doplnia zo zdrojáku; z pohľadu sa
+// strácajú tým, že riadok bez pohybu v zobrazenom období sa nekreslí.
+const HISTORICKE = new Set(["Úvodné tréningy (2025)", "Extra (2025)"]);
 
 /** Zapíše upravené kategórie do modelu. Prázdny vstup = návrat k zdrojáku. */
 export function nastavVyplaty(ulozene?: Partial<Record<PersonKey, VyplatyKategorie>>): boolean {
@@ -286,6 +292,13 @@ export function nastavVyplaty(ulozene?: Partial<Record<PersonKey, VyplatyKategor
       // dvakrát — raz osobne a raz ako polovica spoločného nákladu.
       if (PRESUNUTE_DO_SPOLOCNYCH.has(k)) { zmena = true; continue; }
       ciel[k] = Array.from({ length: N }, (_, i) => Number(v?.[i]) || 0);
+    }
+    // Chýbajúce historické kategórie sa doplnia zo zdrojáku — ich zmazanie by
+    // ticho prepísalo náklady roku 2025.
+    if (maNove) {
+      for (const h of HISTORICKE) {
+        if (!ciel[h] && VYPLATY_ZO_ZDROJAKU[key][h]) ciel[h] = [...VYPLATY_ZO_ZDROJAKU[key][h]];
+      }
     }
     if (maNove) zmena = true;
   }
