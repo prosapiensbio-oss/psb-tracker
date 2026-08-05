@@ -104,7 +104,11 @@ export function nezhodySExcelom(
   for (const [mesiac, podlaKategorie] of Object.entries(podlaMesiaca)) {
     if (mesiac >= doMesiaca) continue;
     for (const [kat, banka] of Object.entries(podlaKategorie)) {
-      if (kat.startsWith("vyplaty") || kat === "mimo" || banka <= 0) continue;
+      // Spoločné výdavky sa s bankou nezrovnajú nikdy: potraviny, Ahsoka a
+      // pomôcky sa z polovice platia v hotovosti, takže banka o nich vie len
+      // časť. Hlásiť to ako nezhodu znamená zaplniť register šumom a
+      // vytlačiť z prvých miest to, čo je naozaj chyba (Štát Jerry mar 26).
+      if (kat.startsWith("vyplaty") || kat.startsWith("spolocne.") || kat === "mimo" || banka <= 0) continue;
       const excel = excelHodnota(kat, mesiac);
       if (excel === undefined) continue;
       const rozdiel = Math.round(Math.abs(Math.abs(excel) - banka));

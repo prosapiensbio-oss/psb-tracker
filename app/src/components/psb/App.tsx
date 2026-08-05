@@ -398,9 +398,11 @@ export function PSBApp() {
         title: n.druh === "chyba"
           ? `${meno}: v ${monthLabel(n.mesiac)} nedorazil`
           : `${meno}: v ${monthLabel(n.mesiac)} výrazne nižší`,
+        // Rozbalený register ukazuje detail, nie titulok — bez mena na jeho
+        // začiatku sa z položky nedá zistiť, ČO vlastne chýba.
         detail: n.druh === "chyba"
-          ? `Platilo sa ${n.zMesiacov} z posledných 4 mesiacov, obvykle ${Math.round(n.obvykle).toLocaleString("cs-CZ")} Kč — za ${monthLabel(n.mesiac)} v banke nie je nič. Buď je pohyb zaradený inde, platilo sa v hotovosti, alebo faktúra nie je uhradená. Zisk za ten mesiac je zatiaľ o túto sumu vyšší, než bude.`
-          : `Obvykle ${Math.round(n.obvykle).toLocaleString("cs-CZ")} Kč, teraz ${Math.round(n.teraz).toLocaleString("cs-CZ")} Kč. Buď je časť zaradená inde, alebo sa platilo menej.`,
+          ? `${meno} — platilo sa ${n.zMesiacov} zo 4 predošlých mesiacov, obvykle ${Math.round(n.obvykle).toLocaleString("cs-CZ")} Kč, ale za ${monthLabel(n.mesiac)} v banke nie je nič. Buď je pohyb zaradený inde, platilo sa v hotovosti, alebo faktúra nie je uhradená. Zisk za ten mesiac je zatiaľ o túto sumu vyšší, než bude.`
+          : `${meno} — obvykle ${Math.round(n.obvykle).toLocaleString("cs-CZ")} Kč, za ${monthLabel(n.mesiac)} len ${Math.round(n.teraz).toLocaleString("cs-CZ")} Kč. Buď je časť zaradená inde, alebo sa platilo menej.`,
         acked: !!ack[key], note: ack[key]?.note,
         priority: n.druh === "chyba" ? 3 : 7, client: "vzas|pnl",
       });
