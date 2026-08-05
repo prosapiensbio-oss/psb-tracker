@@ -65,7 +65,7 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
   const [bezId, setBezId] = useState(0);
   // Príjmy a výdavky vedľa seba v jednej tabuľke sa zle prechádzajú — zaraďujú
   // sa hlavne výdavky, príjmy sú len kontrola proti PTminderu.
-  const [smer, setSmer] = useState<"vsetko" | "vydaje" | "prijmy">("vydaje");
+  const [filter, setFilter] = useState<"vsetko" | "vydaje" | "prijmy" | "vyplaty" | "nezaradene">("vsetko");
   const [chyba, setChyba] = useState<{ chyba: string; ukazka: string[] } | null>(null);
   const [vysledok, setVysledok] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -118,10 +118,25 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
     setBezId(Number(r.bezId) || 0);
   };
 
+  // Hotovosť. Jarkov dlh sa spláca prevažne v hotovosti a taká platba na výpise
+  // nikdy nebude — ale v P&L patrí. Bez tohto by sa mesiac zaraďoval z banky a
+  // potom by sa musel ručne dorovnávať v Exceli, čiže presne to, čo appka mala
+  // zrušiť. Riadok dostane vlastné ID, aby sa dal rozpoznať a nezdvojil sa.
+  const pridajRucne = () => {
+    const dnes = new Date().toISOString().slice(0, 10);
+    setNahlad((n) => [
+      { id: `rucne:${dnes}:${Math.random().toString(36).slice(2, 9)}`, datum: dnes, suma: 0,
+        protistrana: "", poznamka: "hotovosť — dopísané ručne", typ: "Hotovosť", kategoria: "" },
+      ...(n || []),
+    ]);
+  };
+
   const zapis = async () => {
     if (!nahlad) return;
     setBusy(true);
-    const naZapis = nahlad.filter((r) => !r.uzMame && !r.zamknuty);
+    // Rozrobený ručný riadok (bez sumy) sa nezapisuje — inak by v databáze
+    // pristála nula, ktorá sa tvári ako pohyb.
+    const naZapis = nahlad.filter((r) => !r.uzMame && !r.zamknuty && r.suma !== 0);
     const r = await fetch("/api/fio", {
       method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ akcia: "zapis", riadky: naZapis }),
@@ -136,7 +151,7 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
 
   const suhrn = useMemo(() => {
     if (!nahlad) return null;
-    const nove = nahlad.filter((r) => !r.uzMame && !r.zamknuty);
+    const nove = nahlad.filter((r) => !r.uzMame && !r.zamknuty && r.suma !== 0);
     const vyd = nove.filter((r) => r.suma < 0);
     return {
       spolu: nahlad.length,
@@ -206,31 +221,39 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
               Zapísať {suhrn.nove} pohybov
             </button>
           </div>
-          <div style={{ fontSize: 12.5, color: C.textMuted, marginBottom: 10, lineHeight: 1.6 }}>
-            Výdavky <b style={{ color: C.orange }}>{fmtCZK(Math.abs(suhrn.vydavky))}</b> ·
-            príjmy <b style={{ color: C.green }}>{fmtCZK(suhrn.prijmy)}</b>
-            {suhrn.uzMame > 0 && <> · {suhrn.uzMame} už v databáze</>}
-            {suhrn.zamknute > 0 && <> · <b style={{ color: C.red }}>{suhrn.zamknute} v uzavretom mesiaci</b></>}
-            {suhrn.nezaradene > 0 && <> · <b style={{ color: C.orange }}>{suhrn.nezaradene} nezaradených</b></>}
-            <br />
-            <span style={{ color: C.textDim }}>
-              Príjmy sa zapisujú tiež, ale slúžia len na kontrolu proti PTminderu — tržby sa z banky nikdy nepočítajú.
-            </span>
-          </div>
-          {/* Zaraďujú sa hlavne výdavky; príjmy sú kontrola proti PTminderu.
-              V jednej tabuľke sa striedali a prechádzať sa to dalo zle. */}
-          <div style={{ display: "flex", gap: 4, marginBottom: 10, flexWrap: "wrap" }}>
-            {([["vydaje", `Výdavky (${nahlad.filter((r) => r.suma < 0).length})`],
-               ["prijmy", `Príjmy (${nahlad.filter((r) => r.suma > 0).length})`],
-               ["vsetko", `Všetko (${nahlad.length})`]] as const).map(([id, lbl]) => (
-              <button key={id} onClick={() => setSmer(id)}
-                style={{ padding: "5px 13px", borderRadius: 8, fontSize: 12, cursor: "pointer",
-                  border: `1px solid ${smer === id ? C.accent : C.border}`,
-                  background: smer === id ? mix(C.accent, 12) : "transparent",
-                  color: smer === id ? C.accentLight : C.textMuted }}>
+          {/* Súhrn JE filter. Boli tu obe veci vedľa seba — čísla nad tabuľkou a
+              zvlášť tlačidlá na filtrovanie — a hovorili to isté dvakrát.
+              Klik na číslo ukáže práve tie riadky; druhý klik filter zruší. */}
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+            {([
+              ["vsetko", `Všetko (${nahlad.length})`, C.textMuted],
+              ["vydaje", `Výdavky ${fmtCZK(Math.abs(suhrn.vydavky))} (${nahlad.filter((r) => r.suma < 0).length})`, C.orange],
+              ["prijmy", `Príjmy ${fmtCZK(suhrn.prijmy)} (${nahlad.filter((r) => r.suma > 0).length})`, C.green],
+              ["vyplaty", `Výplaty (${nahlad.filter((r) => r.kategoria.startsWith("vyplaty")).length})`, C.blue],
+              ["nezaradene", `Nezaradené (${suhrn.nezaradene})`, suhrn.nezaradene ? C.orange : C.textDim],
+            ] as const).map(([id, lbl, farba]) => (
+              <button key={id} onClick={() => setFilter((f) => (f === id ? "vsetko" : id))}
+                style={{ padding: "6px 12px", borderRadius: 8, fontSize: 12, cursor: "pointer", whiteSpace: "nowrap",
+                  border: `1px solid ${filter === id ? farba : C.border}`,
+                  background: filter === id ? mix(farba, 14) : "transparent",
+                  color: filter === id ? farba : C.textMuted }}>
                 {lbl}
               </button>
             ))}
+          </div>
+          <div style={{ marginBottom: 8 }}>
+            <button onClick={pridajRucne}
+              style={{ padding: "5px 12px", borderRadius: 8, fontSize: 12, cursor: "pointer", border: `1px dashed ${mix(C.accent, 45)}`, background: "transparent", color: C.accentLight }}>
+              + hotovostná platba
+            </button>
+            <span style={{ fontSize: 11.5, color: C.textDim, marginLeft: 8 }}>
+              Čo sa platilo v hotovosti, na výpise nie je — napríklad splátka Jarkovi.
+            </span>
+          </div>
+          <div style={{ fontSize: 12, color: C.textDim, marginBottom: 10, lineHeight: 1.6 }}>
+            {suhrn.uzMame > 0 && <>{suhrn.uzMame} už v databáze · </>}
+            {suhrn.zamknute > 0 && <><b style={{ color: C.red }}>{suhrn.zamknute} v uzavretom mesiaci</b> · </>}
+            Príjmy sa zapisujú tiež, ale slúžia len na kontrolu proti PTminderu — tržby sa z banky nikdy nepočítajú.
           </div>
           <TableWrap>
             <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 640 }}>
@@ -243,13 +266,34 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
               </thead>
               <tbody>
                 {nahlad.map((r, i) => [r, i] as const)
-                  .filter(([r]) => smer === "vsetko" || (smer === "vydaje" ? r.suma < 0 : r.suma > 0))
+                  .filter(([r]) =>
+                    filter === "vsetko" ? true
+                    : filter === "vydaje" ? r.suma < 0
+                    : filter === "prijmy" ? r.suma > 0
+                    : filter === "vyplaty" ? r.kategoria.startsWith("vyplaty")
+                    : r.suma < 0 && !r.kategoria)
                   .map(([r, i]) => (
                   <tr key={i} style={{ opacity: r.uzMame || r.zamknuty ? 0.45 : 1 }}>
-                    <td style={{ ...S.td, whiteSpace: "nowrap", fontSize: 12 }}>{r.datum}</td>
-                    <td style={{ ...S.td, textAlign: "right", whiteSpace: "nowrap", color: r.suma < 0 ? C.text : C.green, fontVariantNumeric: "tabular-nums" }}>{fmtCZK(r.suma)}</td>
+                    <td style={{ ...S.td, whiteSpace: "nowrap", fontSize: 12 }}>
+                      {r.id.startsWith("rucne:") ? (
+                        <input type="date" value={r.datum}
+                          onChange={(e) => setNahlad((n) => n && n.map((x, j) => (j === i ? { ...x, datum: e.target.value } : x)))}
+                          style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 5, color: C.text, fontSize: 11.5, padding: "2px 4px", colorScheme: "dark" }} />
+                      ) : r.datum}
+                    </td>
+                    <td style={{ ...S.td, textAlign: "right", whiteSpace: "nowrap", color: r.suma < 0 ? C.text : C.green, fontVariantNumeric: "tabular-nums" }}>
+                      {r.id.startsWith("rucne:") ? (
+                        <input type="number" value={r.suma || ""} placeholder="-1000"
+                          onChange={(e) => setNahlad((n) => n && n.map((x, j) => (j === i ? { ...x, suma: Number(e.target.value) || 0 } : x)))}
+                          style={{ width: 92, textAlign: "right", background: C.bg, border: `1px solid ${r.suma ? C.border : mix(C.orange, 40)}`, borderRadius: 5, color: C.text, fontSize: 11.5, padding: "2px 5px" }} />
+                      ) : fmtCZK(r.suma)}
+                    </td>
                     <td style={{ ...S.td, fontSize: 12 }}>
-                      <div style={{ color: C.text }}>{r.protistrana || "—"}</div>
+                      {r.id.startsWith("rucne:") ? (
+                        <input value={r.protistrana} placeholder="Komu / za čo (napr. Jarek splátka)"
+                          onChange={(e) => setNahlad((n) => n && n.map((x, j) => (j === i ? { ...x, protistrana: e.target.value } : x)))}
+                          style={{ width: "100%", maxWidth: 300, background: C.bg, border: `1px solid ${r.protistrana ? C.border : mix(C.orange, 40)}`, borderRadius: 5, color: C.text, fontSize: 11.5, padding: "3px 6px" }} />
+                      ) : <div style={{ color: C.text }}>{r.protistrana || "—"}</div>}
                       {r.poznamka && r.poznamka !== r.protistrana && (
                         <div style={{ color: C.textDim, fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 340 }}>{r.poznamka}</div>
                       )}
@@ -257,7 +301,7 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
                       {r.zamknuty && <span style={{ fontSize: 10, color: C.red }}> · uzavretý mesiac</span>}
                     </td>
                     <td style={S.td}>
-                      {r.suma < 0 ? (
+                      {r.suma < 0 || r.id.startsWith("rucne:") ? (
                         <select
                           value={r.kategoria}
                           onChange={(e) => setNahlad((n) => n && n.map((x, j) => (j === i ? { ...x, kategoria: e.target.value } : x)))}
