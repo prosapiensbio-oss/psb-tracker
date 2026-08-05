@@ -28,6 +28,9 @@ export function BankaUlozene() {
   const [oznacene, setOznacene] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState<"vsetko" | "nezaradene" | "vyplaty">("vsetko");
   const [hladat, setHladat] = useState("");
+  // Filter mesiaca. Pri sedemsto pohyboch je "ukáž mi júl" najčastejšia otázka
+  // vôbec — bez neho sa musí scrollovať cez pol roka.
+  const [mesiac, setMesiac] = useState("");
   const [busy, setBusy] = useState(false);
   const [sprava, setSprava] = useState("");
   const KAT = useMemo(kategorieZoznam, []);
@@ -44,7 +47,9 @@ export function BankaUlozene() {
   };
   useEffect(nacitaj, []);
 
+  const mesiace = [...new Set(pohyby.map((p) => String(p.datum).slice(0, 7)))].sort().reverse();
   const viditelne = pohyby.filter((p) => {
+    if (mesiac && String(p.datum).slice(0, 7) !== mesiac) return false;
     if (filter === "nezaradene" && p.kategoria) return false;
     if (filter === "vyplaty" && !p.kategoria.startsWith("vyplaty")) return false;
     if (hladat.trim()) {
@@ -107,6 +112,11 @@ export function BankaUlozene() {
                   background: filter === id ? mix(C.accent, 12) : "transparent",
                   color: filter === id ? C.accentLight : C.textMuted }}>{lbl}</button>
             ))}
+            <select value={mesiac} onChange={(e) => setMesiac(e.target.value)}
+              style={{ padding: "6px 9px", borderRadius: 8, border: `1px solid ${mesiac ? C.accent : C.border}`, background: C.bg, color: mesiac ? C.accentLight : C.textMuted, fontSize: 12, cursor: "pointer" }}>
+              <option value="">Všetky mesiace</option>
+              {mesiace.map((m) => <option key={m} value={m}>{m}</option>)}
+            </select>
             <input value={hladat} onChange={(e) => setHladat(e.target.value)} placeholder="Hľadať v protistrane…"
               style={{ flex: "1 1 180px", minWidth: 0, padding: "6px 10px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 12 }} />
           </div>

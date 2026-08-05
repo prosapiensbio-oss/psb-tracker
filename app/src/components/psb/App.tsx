@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { nastavNakladyZFio } from "../../lib/psb/vzas";
+import { nastavHodinyZTrackera, nastavNakladyZFio } from "../../lib/psb/vzas";
 
 import {
   checkSession,
@@ -231,6 +231,20 @@ export function PSBApp() {
   // hlási sa až prepad o ≥30 % a len pri aspoň štyroch mesiacoch dát — menej
   // je šum, nie signál.
   const [webMetriky, setWebMetriky] = useState<{ gsc: { m: string; kliky: number }[]; ga4: { m: string; udalosti: number }[] }>({ gsc: [], ga4: [] });
+  // Mzdové hodiny pre mesiace, ktoré Excel nemá — priamo z PTmindera, bez
+  // úvodných tréningov (tie sa platia zvlášť a do mzdových hodín nepatria).
+  useEffect(() => {
+    const podlaMesiaca: Record<string, { jerry: number; terezka: number }> = {};
+    for (const s of data.sessions) {
+      if (s.sessionType === "UVODNE") continue;
+      const mk = s.date.slice(0, 7);
+      const e = (podlaMesiaca[mk] ||= { jerry: 0, terezka: 0 });
+      if (s.sessionTrainer === "Jerry") e.jerry += s.duration / 60;
+      else if (s.sessionTrainer === "Terezka") e.terezka += s.duration / 60;
+    }
+    if (nastavHodinyZTrackera(podlaMesiaca)) setFioTik((x) => x + 1);
+  }, [data.sessions]);
+
   // Náklady z banky sa načítajú raz pre celú appku — model je modulový, takže
   // ich potrebuje aj dlaždica Zisk na dashboarde, nielen obrazovka VZAS.
   const [, setFioTik] = useState(0);

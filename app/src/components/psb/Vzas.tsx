@@ -2419,7 +2419,15 @@ export function Vzas({ sub, onSub, data }: { sub: string; onSub: (s: string) => 
           </div>
         </>
       )}
-      {sub === "vyplaty" && <SalaryTab />}
+      {sub === "vyplaty" && (
+        <>
+          <SalaryTab />
+          {/* Aj tu: výplaty sú riadky v banke, nie abstraktné číslo. */}
+          <div style={{ marginTop: 14 }}>
+            <BankaUlozene />
+          </div>
+        </>
+      )}
       {sub === "cashflow" && <CashflowTab />}
       {sub === "jarek" && <JarekTab />}
       {sub === "nakupy" && <Nakupy />}

@@ -392,6 +392,29 @@ export let NAKLADY_Z_FIO: string[] = [];
 const PRVY_MESIAC_Z_FIO = "2026-07";
 
 /** Riadok „Z banky" v osobných výplatách — pre mesiace, ktoré Excel nemá. */
+/**
+ * Mzdové hodiny pre mesiace, ktoré Excel nemá — z PTmindera.
+ *
+ * Bez nich má nový mesiac nula hodín, takže nárok je len fix a dlh sa rozíde
+ * s realitou. Platí pravidlo potvrdené Jerrym 2026-07-31: uvodne treningy do
+ * mzdovych hodin NEPATRIA (platia sa zvlast), takze sem prichadzaju uz bez
+ * nich. Starsie mesiace zostavaju z Excelu — su overene a dva razy opravene
+ * proti PTminderu.
+ */
+export function nastavHodinyZTrackera(hodiny: Record<string, { jerry: number; terezka: number }>): boolean {
+  let zmena = false;
+  for (const [mk, h] of Object.entries(hodiny)) {
+    const i = VZAS_MONTHS.indexOf(mk as (typeof VZAS_MONTHS)[number]);
+    if (i < 0 || mk < PRVY_MESIAC_Z_FIO) continue;
+    for (const [k, v] of [["jerry", h.jerry], ["terezka", h.terezka]] as const) {
+      const rad = SALARY[k as PersonKey].hours;
+      dorovnaj(rad);
+      if (Math.abs(rad[i] - v) > 0.05) { rad[i] = v; zmena = true; }
+    }
+  }
+  return zmena;
+}
+
 const Z_BANKY = "Z banky";
 
 /**
