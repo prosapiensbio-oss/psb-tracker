@@ -323,7 +323,7 @@ function UploadCard({ data, missing, actions }: { data: PSBData; missing: typeof
         </div>
       )}
       <div onClick={() => setOpen((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginTop: 14, fontSize: 12, color: C.textDim }}>
-        <span>{open ? "▲ skryť" : "▼"} zoznam potrebných CSV a kde ich nájsť</span>
+        <span>{open ? "▲ skryť" : "▼"} zoznam potrebných CSV a zapísané pohyby</span>
         <span style={{ marginLeft: "auto" }}>Nahrať sa dá aj pretiahnutím do Jarvisa (📎 vpravo dole).</span>
       </div>
       {open && (
@@ -393,14 +393,13 @@ function UploadCard({ data, missing, actions }: { data: PSBData; missing: typeof
           členstvá klientov) — nahraj všetky, každý nesie niečo iné a ten posledný má aj platnosť členstva.
           Rovnaký súbor nič nezduplikuje.
         </div>
+        {/* Aj zapísané pohyby patria sem dnu: prezerajú sa občas a pri oprave,
+            nie pri každom nahrávaní. Na obrazovku sa chodí nahrávať. */}
+        <div style={{ marginTop: 14 }}>
+          <BankaUlozene />
+        </div>
       </div>
       )}
-      {/* Až na koniec: čo je zapísané, sa prezerá občas a pri oprave, nie pri
-          každom nahrávaní. Hore bránilo výhľadu na to, kvôli čomu sa sem
-          chodí. Vlastnú kartu si otvorí samo, keď treba. */}
-      <div style={{ marginTop: 14 }}>
-        <BankaUlozene />
-      </div>
       </div>
     </Card>
   );
