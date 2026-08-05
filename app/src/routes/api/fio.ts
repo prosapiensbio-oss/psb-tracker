@@ -37,14 +37,14 @@ export const Route = createFileRoute("/api/fio")({
         if (!DB) return Response.json({ ok: false, pohyby: [], pravidla: [] });
         try {
           const [t, p] = await Promise.all([
-            DB.prepare("SELECT date, amount_czk, counterparty, note, typ, category FROM fio_transactions ORDER BY date DESC LIMIT 500").all(),
+            DB.prepare("SELECT date, amount_czk, counterparty, note, typ, category, dedup_key FROM fio_transactions ORDER BY date DESC LIMIT 2000").all(),
             DB.prepare("SELECT text_pattern, category FROM vzas_rules WHERE active = 1 ORDER BY priority").all(),
           ]);
           return Response.json({
             ok: true,
             pohyby: (t.results as Record<string, unknown>[]).map((r) => ({
               datum: r.date, suma: r.amount_czk, protistrana: r.counterparty,
-              poznamka: r.note, typ: r.typ, kategoria: r.category,
+              poznamka: r.note, typ: r.typ, kategoria: r.category, kluc: r.dedup_key,
             })),
             pravidla: (p.results as Record<string, unknown>[]).map((r) => ({ vzor: r.text_pattern, kategoria: r.category })),
           });
@@ -57,7 +57,7 @@ export const Route = createFileRoute("/api/fio")({
         if (!(await isAuthed(request))) return unauthorized();
         const { DB } = bindings();
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });
-        let b: { akcia?: string; text?: string; riadky?: FioRiadok[] };
+        let b: { akcia?: string; text?: string; riadky?: FioRiadok[]; zmeny?: { kluc: string; kategoria: string; datum?: string }[] };
         try { b = (await request.json()) as typeof b; }
         catch { return Response.json({ ok: false, error: "bad_request" }, { status: 400 }); }
 
@@ -149,6 +149,35 @@ export const Route = createFileRoute("/api/fio")({
             actor: await currentUser(request) || undefined,
           });
           return Response.json({ ok: true, pridane, preskocene, zamknute, pravidla: naucene.size });
+        }
+
+        // Úprava kategórie po zápise. Náhľad bol dôkladný, ale po zápise sa už
+        // nedalo nič zmeniť — jeden nesprávny klik bol trvalý a človek sa potom
+        // právom bojí zapísať čokoľvek, čo si nie je istý.
+        if (b.akcia === "kategoria") {
+          const zmeny = Array.isArray(b.zmeny) ? b.zmeny.slice(0, 2000) : [];
+          if (!zmeny.length) return Response.json({ ok: false, error: "no_rows" }, { status: 400 });
+          const zamky = await zamknuteMesiace(DB);
+          const stmts = [];
+          let zmenene = 0, zamknute = 0;
+          for (const z of zmeny) {
+            const kluc = String(z.kluc || "");
+            if (!kluc) continue;
+            if (z.datum && jeZamknuty(zamky, String(z.datum))) { zamknute++; continue; }
+            stmts.push(
+              DB.prepare("UPDATE fio_transactions SET category = ?2 WHERE dedup_key = ?1")
+                .bind(kluc, String(z.kategoria || "")),
+            );
+            zmenene++;
+          }
+          if (stmts.length) await DB.batch(stmts);
+          await audit(DB, {
+            action: "uprava-banka",
+            predmet: `${zmenene} pohybov`,
+            neu: zmeny[0]?.kategoria || "(vyprázdnené)",
+            actor: await currentUser(request) || undefined,
+          });
+          return Response.json({ ok: true, zmenene, zamknute });
         }
 
         return Response.json({ ok: false, error: "unknown_action" }, { status: 400 });

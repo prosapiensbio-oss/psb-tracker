@@ -7,6 +7,7 @@ import type { PSBData } from "../../lib/psb/types";
 import type { IngestResult } from "../../lib/psb/db.server";
 import type { Actions } from "./App";
 import { BankovyImport } from "./Banka";
+import { BankaUlozene } from "./BankaUlozene";
 import { FakturyNahlad } from "./Faktury";
 import { parseFaktura, precoNieFaktura, type Faktura } from "../../lib/psb/faktura";
 import { maTextovuVrstvu, pdfRiadky } from "../../lib/psb/pdftext";
@@ -301,6 +302,9 @@ function UploadCard({ data, missing, actions }: { data: PSBData; missing: typeof
           <button onClick={() => setFakturaChyba([])} style={{ marginTop: 6, background: "none", border: "none", color: C.textDim, fontSize: 12, cursor: "pointer" }}>zavrieť</button>
         </div>
       )}
+      <div style={{ marginTop: 12 }}>
+        <BankaUlozene />
+      </div>
       {faktury.length > 0 && (
         <div style={{ marginTop: 12 }}>
           <FakturyNahlad
