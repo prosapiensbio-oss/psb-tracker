@@ -61,6 +61,7 @@ import {
 } from "../../lib/psb/vzas";
 import { Card, Empty, H3, Info, LineChart, Select, StatCard, SubTabs, useScrollEnd } from "./ui";
 import { tokyKlientov } from "./Fluktuacia";
+import { BankaUlozene } from "./BankaUlozene";
 import { Nakupy } from "./Nakupy";
 import { Report } from "./Report";
 
@@ -2406,10 +2407,16 @@ export function Vzas({ sub, onSub, data }: { sub: string; onSub: (s: string) => 
       {sub === "pnl" && (
         <>
           <div style={{ fontSize: 11.5, color: C.textDim, margin: "0 0 10px", lineHeight: 1.5 }}>
-            Tržby (PTminder) idú živé z nahratých platieb — už sa neprepisujú z Excelu.
-            Júl a august pribudnú spolu s nákladmi z Fio: mesiac len s tržbami by ukazoval zisk, ktorý neexistuje.
+            Tržby idú živé z PTmindera, náklady od júla 2026 z Fio — mesiace do júna zostávajú z Excelu,
+            aby sa dali oboje porovnať. Jednotlivé pohyby za mesiace z banky nájdeš nižšie
+            v <b style={{ color: C.textMuted }}>Zapísané pohyby</b>, kde sa dá prehodiť kategória aj dopísať poznámka.
           </div>
           <PnlTab />
+          {/* Pohyby patria k P&L: sú to riadky, z ktorých sú tie súčty poskladané.
+              V Údajoch boli schované za rozbaľovačom a nedali sa nájsť. */}
+          <div style={{ marginTop: 14 }}>
+            <BankaUlozene />
+          </div>
         </>
       )}
       {sub === "vyplaty" && <SalaryTab />}
