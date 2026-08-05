@@ -246,7 +246,9 @@ function BtcKontrola({ data }: { data: PSBData }) {
 // nie schovaný do názvu záložky.
 function Trzby({ monthly, data, clients, focusMonth, onClearFocus }: { monthly: Monthly; data: PSBData; clients: Record<string, ClientAgg>; focusMonth?: string | null; onClearFocus?: () => void }) {
   const [rezim, setRezim] = useState<"prijate" | "vyfakturovane">("prijate");
-  const { sort, toggle, sorted } = useSort({ key: "month", dir: "asc" });
+  // Najnovší mesiac hore — človek chce vidieť, kde je teraz, nie kde bol
+  // pred rokom. Zoradenie sa dá kliknutím na hlavičku obrátiť.
+  const { sort, toggle, sorted } = useSort({ key: "month", dir: "desc" });
   const w = useMonthWindow();
   const withMom = useMemo(
     () =>
@@ -381,7 +383,9 @@ function Trzby({ monthly, data, clients, focusMonth, onClearFocus }: { monthly: 
 }
 
 function Sedenia({ monthly }: { monthly: Monthly }) {
-  const { sort, toggle, sorted } = useSort({ key: "month", dir: "asc" });
+  // Najnovší mesiac hore — človek chce vidieť, kde je teraz, nie kde bol
+  // pred rokom. Zoradenie sa dá kliknutím na hlavičku obrátiť.
+  const { sort, toggle, sorted } = useSort({ key: "month", dir: "desc" });
   const w = useMonthWindow();
   const view = useMemo(() => windowFilter(monthly, w.win, w.from, w.to), [monthly, w.win, w.from, w.to]);
   const rows = sorted(

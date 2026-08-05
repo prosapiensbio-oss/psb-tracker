@@ -5,6 +5,7 @@ import { jeBankovyVypis } from "../../lib/psb/fio";
 import { C, mix, S, badge, btn } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import type { AssistantChat } from "./Assistant";
+import { Zosit } from "./Zosit";
 import type { IngestResult } from "../../lib/psb/db.server";
 import type { Actions } from "./App";
 import { BankovyImport } from "./Banka";
@@ -59,6 +60,9 @@ export function Udaje({ data, actions, chat }: { data: PSBData; actions: Actions
   return (
     <>
       <UploadCard data={data} missing={missing} actions={actions} chat={chat} />
+
+      {/* Zošit je zdroj dát ako každý iný — patrí sem, medzi nahrávanie. */}
+      <Zosit onZapisane={() => void actions.refresh()} />
 
       <Uzavierky />
 
@@ -172,7 +176,11 @@ function UploadCard({ data, missing, actions, chat }: { data: PSBData; missing: 
   // Fotka ide Jarvisovi s inštrukciou, nie ako holý obrázok — bez nej by sa
   // spýtal „čo s tým?" a Jerry by musel vysvetľovať to isté pri každej fotke.
   const posliFotkyJarvisovi = async (fotky: File[]) => {
-    if (!chat) { setPdfStav("Fotku vie prečítať Jarvis — otvor ho vpravo dole a pretiahni ju doňho."); return; }
+    // Odpoveď v chate sa nedá skontrolovať riadok po riadku ani potvrdiť, a
+    // sú to peniaze. Fotka zošita má vlastnú kartu s náhľadom hneď nižšie —
+    // sem sa dostane len to, čo si používateľ pretiahne do zóny na CSV.
+    setPdfStav("Na fotku zošita je karta „Zošit — hotovostné platby“ nižšie: prepíše riadky do tabuľky, kde sa dajú opraviť a potom zapísať. Tadiaľto ide fotka len Jarvisovi do rozhovoru.");
+    if (!chat) return;
     const url = (f: File) => new Promise<string>((res, rej) => {
       const r = new FileReader();
       r.onload = () => res(String(r.result));
@@ -245,10 +253,16 @@ function UploadCard({ data, missing, actions, chat }: { data: PSBData; missing: 
         dovod = `čítanie PDF spadlo (${e instanceof Error ? e.message : String(e)})`;
       }
       if (precitane) continue;
-      // Doklad, ktorý VYZERÁ ako faktúra, ale nedal sa rozpísať, sa neposiela
-      // Jarvisovi — ten by ho čítal ako marketingovú zostavu a odpovedal by
-      // hláškou o CSV, ktorá s faktúrou nemá nič spoločné. Radšej sa povie,
-      // čo presne zlyhalo, nech sa to dá opraviť.
+      // PDF BEZ textovej vrstvy nemôže byť faktúra, ktorú vieme rozpísať —
+      // ale môže to byť čokoľvek, čo prečíta Jarvis: mesačná zostava z
+      // Metricoolu (tá je celá vykreslená do grafiky), sken, fotka dokladu.
+      // Odmietnuť ho hláškou „faktúru sa nepodarilo rozpísať" bola chyba:
+      // Jerry nahral Metricool a appka mu odpovedala o faktúre, ktorú
+      // nenahrával, a súbor zahodila. Ide Jarvisovi.
+      if (!ukazka.length) { await citajPdf(f); continue; }
+      // Doklad, ktorý VYZERÁ ako faktúra (text sa prečítal, len rozpis
+      // nesedel), sa Jarvisovi neposiela — ten by ho čítal ako marketingovú
+      // zostavu a odpovedal hláškou o CSV. Radšej sa povie, čo zlyhalo.
       if (dovod && !/nie je slovo/.test(dovod)) {
         setFakturaChyba((p) => [...p, { meno: f.name, dovod, ukazka }]);
         continue;

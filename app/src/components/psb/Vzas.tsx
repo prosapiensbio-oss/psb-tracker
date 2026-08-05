@@ -1464,7 +1464,9 @@ function CashflowTab() {
               </tr>
             </thead>
             <tbody>
-              {idx.map((i) => (
+              {/* Najnovší mesiac hore. Kumulatívny stĺpec zostáva počítaný
+                  chronologicky — je to súčet od začiatku, nie od vrchu tabuľky. */}
+              {[...idx].reverse().map((i) => (
                 <tr key={i}>
                   <td style={{ padding: "7px 10px", fontSize: 12.5, color: C.text, borderBottom: `1px solid ${mix(C.border, 55)}` }}>{MONTHS[i]}</td>
                   <td style={{ ...cell, color: C.green }}>{money(p.prijmy[i])}</td>

@@ -468,7 +468,8 @@ function Analyza({ data }: { data: PSBData }) {
   const [win, setWin] = useState("all");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const { sort, toggle, sorted } = useSort({ key: "month", dir: "asc" });
+  // Najnovší mesiac hore, rovnako ako v ostatných mesačných tabuľkách.
+  const { sort, toggle, sorted } = useSort({ key: "month", dir: "desc" });
 
   const filtered = useMemo(() => {
     let lo = 0;
