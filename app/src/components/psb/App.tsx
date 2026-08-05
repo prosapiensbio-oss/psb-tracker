@@ -41,6 +41,7 @@ import { Udaje } from "./Udaje";
 import { HladanieKlienta } from "./Hladanie";
 import { ZapisButton } from "./Zapis";
 import { ritualy as spocitajRitualy } from "../../lib/psb/rituals";
+import { nastavRozpis, pridajDoRozpisu, type PohybZaBunku } from "../../lib/psb/rozpis";
 
 export type Actions = {
   setOverride: (name: string, key: keyof ClientOverride, value: unknown) => void;
@@ -295,12 +296,12 @@ export function PSBApp() {
   useEffect(() => {
     void fetch("/api/fio", { credentials: "same-origin" })
       .then((r) => r.json())
-      .then(async (j: { pohyby?: { datum: string; suma: number; kategoria: string; protistrana?: string }[] }) => {
+      .then(async (j: { pohyby?: { datum: string; suma: number; kategoria: string; protistrana?: string; poznamka?: string }[] }) => {
         // Faktúry ROZPISUJÚ bankový pohyb, nenahrádzajú ho. Nákup z Alzy je
         // v banke ako jedna suma a na faktúre ako trinásť položiek — keby sa
         // pripočítalo oboje, náklad by bol dvojnásobný. Preto sa spárovaný
         // pohyb do P&L nezapočíta a namiesto neho idú položky faktúry.
-        type FaPol = { faktura: string; dodavatel: string; datum: string; cena: number; kategoria: string };
+        type FaPol = { faktura: string; dodavatel: string; datum: string; cena: number; kategoria: string; nazov?: string };
         const fa: FaPol[] = await fetch("/api/faktury", { credentials: "same-origin" })
           .then((r) => r.json())
           .then((x: { polozky?: FaPol[] }) => x.polozky || [])
@@ -316,6 +317,9 @@ export function PSBApp() {
 
         const sumy: Record<string, Record<string, number>> = {};
         const vyplaty: Record<string, { jerry: number; terezka: number }> = {};
+        // Rozpis sa plní pri tom istom prechode ako súčty — inak by sa to, čo
+        // tabuľka ukáže po rozkliknutí, mohlo rozísť s číslom nad ním.
+        const rozpis: Record<string, PohybZaBunku[]> = {};
         for (const p of j.pohyby || []) {
           if (p.suma >= 0 || !p.kategoria || p.kategoria === "mimo") continue;
           const mk = String(p.datum).slice(0, 7);
@@ -341,6 +345,11 @@ export function PSBApp() {
               if (!pol.kategoria || pol.kategoria === "mimo" || pol.kategoria.startsWith("vyplaty")) continue;
               (sumy[mk] ||= {});
               sumy[mk][pol.kategoria] = (sumy[mk][pol.kategoria] || 0) + pol.cena;
+              pridajDoRozpisu(rozpis, mk, pol.kategoria, {
+                datum: String(pol.datum).slice(0, 10),
+                popis: `${pol.dodavatel ? `${pol.dodavatel} — ` : ""}${pol.nazov || "položka faktúry"}`,
+                suma: pol.cena, zdroj: "faktura", doklad: cislo,
+              });
             }
             rozpisany = true;
             break;
@@ -348,8 +357,17 @@ export function PSBApp() {
           if (rozpisany) continue;
           (sumy[mk] ||= {});
           sumy[mk][p.kategoria] = (sumy[mk][p.kategoria] || 0) + -p.suma;
+          pridajDoRozpisu(rozpis, mk, p.kategoria, {
+            datum: String(p.datum).slice(0, 10),
+            // Protistrana je meno, poznámka je text platby — spolu dávajú riadok,
+            // v ktorom sa Jerry vie orientovať bez otvárania banky.
+            popis: [p.protistrana, p.poznamka].filter(Boolean).join(" · ") || "bankový pohyb",
+            suma: -p.suma, zdroj: "banka",
+          });
         }
+        nastavRozpis(rozpis);
         if (nastavNakladyZFio(sumy, vyplaty)) setFioTik((x) => x + 1);
+        else setFioTik((x) => x + 1); // rozpis pribudol aj bez zmeny súm
       })
       .catch(() => {});
   }, []);

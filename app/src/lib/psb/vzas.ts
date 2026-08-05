@@ -589,9 +589,96 @@ export function nastavNakladyZFio(
     }
   }
   NAKLADY_Z_FIO = mesiace.sort();
+  // Import mesiac vynuloval a prepísal — ručné opravy treba nasadiť znova,
+  // inak by zmizli pri každom načítaní stránky.
+  pouziOverrides();
   if (zmena) oznacZmenu();
   return zmena;
 }
+
+
+// ── ručné opravy jednotlivých buniek P&L ─────────────────────────────────────
+//
+// Mesiace do jún 2026 sú z Excelu a sú v kóde. Keď sa v nich nájde chyba (a
+// pri porovnaní s bankou sa našli tri), doteraz sa dala opraviť len úpravou
+// zdrojáku a nasadením. To je neúmerné na preklep v jednom čísle.
+//
+// Oprava sa ukladá ako prekrytie (kategória + mesiac → suma), nie ako zmena
+// pôvodného radu. Pôvodné číslo tak zostáva k dispozícii — dá sa povedať „z
+// Excelu 12 000, opravené na 10 500" a oprava sa dá zrušiť. A keďže import z
+// Fia mesiac vynuluje a prepíše, prekrytia sa PO KAŽDOM importe nasadzujú
+// znova; bez toho by ručná oprava zmizla pri najbližšom načítaní stránky.
+export type PnlOverrides = Record<string, Record<string, number>>;
+let PNL_OVERRIDES: PnlOverrides = {};
+
+/** Pôvodné hodnoty pred prvým prekrytím — aby sa dalo vrátiť späť. */
+const PNL_POVODNE: Record<string, number> = {};
+
+function pnlItem(kat: string): { values: Vals } | null {
+  if (kat.startsWith("spolocne.")) {
+    const meno = kat.slice("spolocne.".length);
+    return SPOLOCNE[meno] ? { values: SPOLOCNE[meno] } : null;
+  }
+  const [sekK, subK, itemK] = kat.split(".");
+  return (PNL as Record<string, VzasSection>)[sekK]?.subcategories?.[subK]?.items?.[itemK] ?? null;
+}
+
+function pouziOverrides(): void {
+  for (const [kat, podlaMesiaca] of Object.entries(PNL_OVERRIDES)) {
+    const item = pnlItem(kat);
+    if (!item) continue;
+    dorovnaj(item.values);
+    for (const [mk, suma] of Object.entries(podlaMesiaca)) {
+      const i = VZAS_MONTHS.indexOf(mk);
+      if (i < 0) continue;
+      const kluc = `${kat}|${mk}`;
+      if (!(kluc in PNL_POVODNE)) PNL_POVODNE[kluc] = item.values[i];
+      item.values[i] = suma;
+    }
+  }
+}
+
+/** Pôvodná hodnota bunky pred ručnou opravou (undefined = nie je opravená). */
+export function pnlPovodnaHodnota(kat: string, mesiac: string): number | undefined {
+  return PNL_POVODNE[`${kat}|${mesiac}`];
+}
+
+export const pnlJeOpravena = (kat: string, mesiac: string) => PNL_OVERRIDES[kat]?.[mesiac] !== undefined;
+
+/** Načítanie uložených opráv pri štarte. */
+export function nastavPnlOverrides(o: PnlOverrides): boolean {
+  if (!o || typeof o !== "object") return false;
+  PNL_OVERRIDES = o;
+  pouziOverrides();
+  oznacZmenu();
+  return true;
+}
+
+/** Jedna oprava. `suma === null` opravu zruší a vráti pôvodné číslo. */
+export function nastavPnlBunku(kat: string, mesiac: string, suma: number | null): boolean {
+  const item = pnlItem(kat);
+  const i = VZAS_MONTHS.indexOf(mesiac);
+  if (!item || i < 0) return false;
+  dorovnaj(item.values);
+  if (suma === null) {
+    const povodna = PNL_POVODNE[`${kat}|${mesiac}`];
+    if (povodna !== undefined) item.values[i] = povodna;
+    delete PNL_POVODNE[`${kat}|${mesiac}`];
+    if (PNL_OVERRIDES[kat]) {
+      delete PNL_OVERRIDES[kat][mesiac];
+      if (!Object.keys(PNL_OVERRIDES[kat]).length) delete PNL_OVERRIDES[kat];
+    }
+  } else {
+    (PNL_OVERRIDES[kat] ||= {})[mesiac] = suma;
+    const kluc = `${kat}|${mesiac}`;
+    if (!(kluc in PNL_POVODNE)) PNL_POVODNE[kluc] = item.values[i];
+    item.values[i] = suma;
+  }
+  oznacZmenu();
+  return true;
+}
+
+export const pnlOverridesNaUlozenie = (): PnlOverrides => PNL_OVERRIDES;
 
 // Verzia modelu.
 //

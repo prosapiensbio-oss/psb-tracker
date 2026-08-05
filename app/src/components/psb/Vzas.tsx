@@ -2,9 +2,10 @@ import { Fragment, useContext, useEffect, useMemo, useState, type ReactNode } fr
 
 import { fetchBtcReserve, fetchMonthNotes, fetchVzasSettings, fetchWeekEntries, saveMonthNote, saveVzasSetting, type BtcReserve, type MonthNote, type WeekEntry } from "../../lib/psb/client";
 import { monthlyFinance, predictCash, ZONE_HI, type CapacityRow, type ClientAgg, type RegisterItem, type SixMRow } from "../../lib/psb/compute";
-import { fmtCZK } from "../../lib/psb/format";
+import { fmtCZK, fmtDMY, monthLabel } from "../../lib/psb/format";
 import { ObdobieCtx } from "../../lib/psb/obdobie";
-import { nastavPrijmyZTrackera, nastavVyplaty, poslednyMesiacSDatami, vyplatyNaUlozenie } from "../../lib/psb/vzas";
+import { nastavPnlBunku, nastavPnlOverrides, nastavPrijmyZTrackera, nastavVyplaty, pnlJeOpravena, pnlOverridesNaUlozenie, pnlPovodnaHodnota, poslednyMesiacSDatami, vyplatyNaUlozenie } from "../../lib/psb/vzas";
+import { rozpisPre, type PohybZaBunku } from "../../lib/psb/rozpis";
 import { C, mix, S } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import {
@@ -158,14 +159,20 @@ function MonthHead({ idx, first = "Položka", showAvg = true }: { idx: number[];
   );
 }
 
-function Row({ label, values, depth = 0, bold = false, color, children, showAvg = true, noteFor }: {
+function Row({ label, values, depth = 0, bold = false, color, children, showAvg = true, noteFor, bunka, onZmena }: {
   label: ReactNode; values: Vals; depth?: number; bold?: boolean; color?: string; children?: ReactNode; showAvg?: boolean;
   // Per-cell hover text (what that purchase actually was), by column position.
   noteFor?: (col: number) => string | undefined;
+  // Identita bunky: bez nej je číslo len číslo. S ňou sa dá rozkliknúť na
+  // pohyby, ktoré ho tvoria, a opraviť ho.
+  bunka?: (col: number) => { kat: string; mesiac: string } | undefined;
+  onZmena?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   /** Ktorý stĺpec má práve rozbalenú poznámku. */
   const [poznamka, setPoznamka] = useState<number | null>(null);
+  /** Ktorý stĺpec má rozkliknutý rozpis. */
+  const [rozklik, setRozklik] = useState<number | null>(null);
   const hasKids = !!children;
   const fs = depth === 0 ? 13 : 12;
   const cell = { textAlign: "right" as const, padding: "6px 10px", fontSize: fs, fontWeight: bold ? 600 : 400, fontVariantNumeric: "tabular-nums" as const, borderBottom: `1px solid ${mix(C.border, 55)}`, whiteSpace: "nowrap" as const };
@@ -178,13 +185,27 @@ function Row({ label, values, depth = 0, bold = false, color, children, showAvg 
         </td>
         {values.map((v, i) => {
           const n = noteFor?.(i);
+          const b = bunka?.(i);
+          const opravena = !!b && pnlJeOpravena(b.kat, b.mesiac);
           return (
             // Poznámka visela na natívnom `title`. Kurzor sa zmenil na otáznik,
             // ale text sa neukázal — natívny tooltip má oneskorenie a v tabuľke
             // s desiatkami buniek sa naň nedá spoľahnúť. Teraz sa gulička dá
             // kliknúť a poznámka sa rozbalí pod číslom.
             <td key={i} style={{ ...cell, color: color || (v < 0 ? C.red : C.textMuted), position: "relative" }}>
-              {money(v)}
+              {b ? (
+                <span
+                  onClick={(e) => { e.stopPropagation(); setRozklik(rozklik === i ? null : i); }}
+                  title="Rozkliknúť — čo je za týmto číslom"
+                  style={{
+                    cursor: "pointer",
+                    borderBottom: `1px dotted ${opravena ? C.orange : mix(C.accent, 55)}`,
+                    color: opravena ? C.orange : undefined,
+                  }}
+                >
+                  {money(v)}
+                </span>
+              ) : money(v)}
               {n && (
                 <span
                   onClick={(e) => { e.stopPropagation(); setPoznamka(poznamka === i ? null : i); }}
@@ -214,8 +235,128 @@ function Row({ label, values, depth = 0, bold = false, color, children, showAvg 
           </td>
         </tr>
       )}
+      {rozklik !== null && bunka?.(rozklik) && (
+        <tr>
+          <td colSpan={values.length + (showAvg ? 3 : 2)} style={{ padding: 0, background: mix(C.accent, 5), borderBottom: `1px solid ${mix(C.border, 55)}` }}>
+            <BunkaDetail
+              {...bunka(rozklik)!}
+              hodnota={values[rozklik]}
+              onZavri={() => setRozklik(null)}
+              onZmena={onZmena}
+            />
+          </td>
+        </tr>
+      )}
       {open && children}
     </>
+  );
+}
+
+// Čo je za číslom — a možnosť ho opraviť.
+//
+// Dve otázky, ktoré tabuľka doteraz nevedela zodpovedať, majú spoločnú
+// odpoveď na jednom mieste: „z čoho to je" (pohyby z banky alebo položky
+// faktúry) a „a čo keď je to zle" (oprava, ktorá prežije import).
+function BunkaDetail({ kat, mesiac, hodnota, onZavri, onZmena }: {
+  kat: string; mesiac: string; hodnota: number; onZavri: () => void; onZmena?: () => void;
+}) {
+  const pohyby = rozpisPre(mesiac, kat);
+  const povodna = pnlPovodnaHodnota(kat, mesiac);
+  const opravena = pnlJeOpravena(kat, mesiac);
+  const [uprava, setUprava] = useState(false);
+  const [text, setText] = useState(String(Math.round(hodnota)));
+  const [uklada, setUklada] = useState(false);
+
+  const uloz = async (nova: number | null) => {
+    setUklada(true);
+    nastavPnlBunku(kat, mesiac, nova);
+    await saveVzasSetting("pnl_overrides", pnlOverridesNaUlozenie());
+    setUklada(false);
+    setUprava(false);
+    onZmena?.();
+  };
+
+  const sucet = pohyby.reduce((a: number, p: PohybZaBunku) => a + p.suma, 0);
+  return (
+    <div style={{ padding: "10px 14px 12px", fontSize: 12 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
+        <span style={{ color: C.textMuted }}>
+          <b style={{ color: C.text }}>{monthLabel(mesiac)}</b> · {kat.split(".").pop()} ·{" "}
+          <b style={{ color: C.text }}>{fmtCZK(hodnota)}</b>
+          {opravena && povodna !== undefined && (
+            <span style={{ color: C.orange }}> · ručne opravené (z Excelu {fmtCZK(povodna)})</span>
+          )}
+        </span>
+        <span style={{ display: "flex", gap: 8 }}>
+          {!uprava && (
+            <button onClick={() => { setText(String(Math.round(hodnota))); setUprava(true); }}
+              style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 6, padding: "3px 9px", color: C.accentLight, fontSize: 11.5, cursor: "pointer" }}>
+              Opraviť sumu
+            </button>
+          )}
+          {opravena && !uprava && (
+            <button onClick={() => void uloz(null)} disabled={uklada}
+              style={{ background: "none", border: `1px solid ${mix(C.orange, 45)}`, borderRadius: 6, padding: "3px 9px", color: C.orange, fontSize: 11.5, cursor: "pointer" }}>
+              Vrátiť pôvodné
+            </button>
+          )}
+          <button onClick={onZavri} style={{ background: "none", border: "none", color: C.textDim, fontSize: 11.5, cursor: "pointer" }}>zavrieť</button>
+        </span>
+      </div>
+
+      {uprava && (
+        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 10, flexWrap: "wrap" }}>
+          <input
+            value={text}
+            onChange={(e) => setText(e.target.value.replace(/[^\d-]/g, ""))}
+            onKeyDown={(e) => { if (e.key === "Enter") void uloz(Number(text) || 0); if (e.key === "Escape") setUprava(false); }}
+            autoFocus
+            style={{ width: 130, padding: "5px 8px", borderRadius: 6, border: `1px solid ${C.accent}`, background: C.bg, color: C.text, fontSize: 12.5, fontVariantNumeric: "tabular-nums" }}
+          />
+          <span style={{ color: C.textDim, fontSize: 11.5 }}>CZK</span>
+          <button onClick={() => void uloz(Number(text) || 0)} disabled={uklada}
+            style={{ background: C.accentBg, border: `1px solid ${C.accent}`, borderRadius: 6, padding: "4px 12px", color: C.accentLight, fontSize: 11.5, cursor: "pointer" }}>
+            {uklada ? "Ukladám…" : "Uložiť"}
+          </button>
+          <button onClick={() => setUprava(false)} style={{ background: "none", border: "none", color: C.textDim, fontSize: 11.5, cursor: "pointer" }}>zrušiť</button>
+        </div>
+      )}
+
+      {pohyby.length ? (
+        <>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <tbody>
+              {pohyby.map((pb: PohybZaBunku, k: number) => (
+                <tr key={k} style={{ borderTop: `1px solid ${mix(C.border, 45)}` }}>
+                  <td style={{ padding: "4px 8px 4px 0", color: C.textDim, fontSize: 11.5, whiteSpace: "nowrap", width: 84 }}>{fmtDMY(pb.datum)}</td>
+                  <td style={{ padding: "4px 8px", color: C.text, fontSize: 11.5 }}>
+                    {pb.popis}
+                    {pb.zdroj === "faktura" && (
+                      <span style={{ color: C.accentLight, fontSize: 10.5, marginLeft: 6 }}>faktúra {pb.doklad}</span>
+                    )}
+                  </td>
+                  <td style={{ padding: "4px 0 4px 8px", textAlign: "right", color: C.text, fontSize: 11.5, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{fmtCZK(pb.suma)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {/* Keď sa rozpis nerovná číslu nad ním, je to buď ručná oprava, alebo
+              chyba v párovaní faktúr — a jedno aj druhé treba vidieť hneď. */}
+          {Math.abs(sucet - hodnota) > 1 && (
+            <div style={{ fontSize: 11.5, color: C.orange, marginTop: 7 }}>
+              Rozpis dáva {fmtCZK(sucet)}, v tabuľke je {fmtCZK(hodnota)}
+              {opravena ? " — číslo je ručne opravené." : ` — rozdiel ${fmtCZK(Math.abs(sucet - hodnota))} nesedí, pozri Údaje → Zapísané pohyby.`}
+            </div>
+          )}
+        </>
+      ) : (
+        <div style={{ fontSize: 11.5, color: C.textDim, lineHeight: 1.5 }}>
+          {mesiac < "2026-07"
+            ? "Mesiac je z Excelu — jednotlivé pohyby za ním appka nemá, len súčet. Opraviť sa dá."
+            : "Za týmto číslom nie je žiadny zapísaný pohyb z banky."}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -422,6 +563,17 @@ function CommitmentTable({ idx }: { idx: number[] }) {
 
 // ── VZAS 2026 (P&L) ──────────────────────────────────────────────────────────
 function PnlTab() {
+  // Opravy jednotlivých buniek žijú v databáze a zapisujú sa priamo do modelu.
+  // `tik` je len na prekreslenie — čísla sedia v module, ktorý číta desať miest.
+  const [, tik] = useState(0);
+  useEffect(() => {
+    void fetchVzasSettings().then((n) => {
+      const ulozene = n["pnl_overrides"];
+      if (ulozene && typeof ulozene === "object") {
+        if (nastavPnlOverrides(ulozene as never)) tik((x) => x + 1);
+      }
+    }).catch(() => {});
+  }, []);
   const p = pnlCalc();
   const r = useRange();
   const [mode, setMode] = useState<"avg" | "sum">("avg"); // default: priemer
@@ -480,7 +632,9 @@ function PnlTab() {
                 <Row key={k} label={g.label} values={pick(sumItems(g.items), i)}>
                   {Object.entries(g.items).map(([ik, it]) => (
                     <Row key={ik} label={it.label} values={pick(it.values, i)} depth={1}
-                      noteFor={(col) => itemNote(`fixne.${k}.${ik}`, i[col])} />
+                      noteFor={(col) => itemNote(`fixne.${k}.${ik}`, i[col])}
+                      bunka={(col) => ({ kat: `fixne.${k}.${ik}`, mesiac: VZAS_MONTHS[i[col]] })}
+                      onZmena={() => tik((x) => x + 1)} />
                   ))}
                 </Row>
               ))}
@@ -491,7 +645,9 @@ function PnlTab() {
                 <Row key={k} label={g.label} values={pick(sumItems(g.items), i)}>
                   {Object.entries(g.items).map(([ik, it]) => (
                     <Row key={ik} label={it.label} values={pick(it.values, i)} depth={1}
-                      noteFor={(col) => itemNote(`variabilne.${k}.${ik}`, i[col])} />
+                      noteFor={(col) => itemNote(`variabilne.${k}.${ik}`, i[col])}
+                      bunka={(col) => ({ kat: `variabilne.${k}.${ik}`, mesiac: VZAS_MONTHS[i[col]] })}
+                      onZmena={() => tik((x) => x + 1)} />
                   ))}
                 </Row>
               ))}
@@ -528,6 +684,8 @@ function PnlTab() {
         </ScrollX>
         )}
         <div style={{ fontSize: 11, color: C.textDim, marginTop: 10 }}>
+          Klikni na podčiarknuté číslo — ukáže pohyby, z ktorých vzniklo, a dá sa opraviť. Oprava prežije import z banky
+          a dá sa kedykoľvek vrátiť na pôvodné.{" "}
           Zdroj: VZAS 2025 + VZAS 2026 (Excel), jan 2025 – jún 2026. Každý mesiac sedí na Excel do koruny.
           Júl 2026 pribudne až s prvým importom z Fia — tržby zaň síce v Trackeri sú, ale náklady zatiaľ nikde, takže by mesiac klamal.
         </div>
