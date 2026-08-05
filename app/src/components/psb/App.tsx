@@ -15,6 +15,7 @@ import {
   fetchBtcReserve,
 } from "../../lib/psb/client";
 import {
+  kotvaDat,
   capacityByTrainer,
   monthlyFinance,
   deriveClients,
@@ -43,6 +44,7 @@ import { ZapisButton } from "./Zapis";
 import { ritualy as spocitajRitualy } from "../../lib/psb/rituals";
 import { nastavRozpis, pridajDoRozpisu, type PohybZaBunku } from "../../lib/psb/rozpis";
 import { chybajuceNaklady, nezhodySExcelom, type BankovyMesiac } from "../../lib/psb/kontrolaNakladov";
+import { MKT_MESACNE } from "../../lib/psb/marketing";
 
 export type Actions = {
   setOverride: (name: string, key: keyof ClientOverride, value: unknown) => void;
@@ -91,6 +93,7 @@ export function PSBApp() {
   const [trackerSection, setTrackerSection] = useState("treningy");
   const [vzasSub, setVzasSub] = useState("pnl");
   const [vysledkySub, setVysledkySub] = useState("kvartalne");
+  const [vysledkyFocus, setVysledkyFocus] = useState<NavFocus | null>(null);
   const [marketingSub, setMarketingSub] = useState("lievik");
   // Filter trénera a obdobia žije tu, nie na každej obrazovke zvlášť.
   //
@@ -195,6 +198,7 @@ export function PSBApp() {
     if (tab === "treningy" && focus) setTreningyFocus(focus);
     if (tab === "financie" && focus) setFinancieFocus(focus);
     if (tab === "klienti" && focus) setKlientiFocus(focus);
+    if (tab === "vysledky" && focus) setVysledkyFocus(focus);
   }, []);
 
   // `silent` keeps the full-screen "Načítavam…" away on background refreshes —
@@ -464,7 +468,25 @@ export function PSBApp() {
   // ďalšie položky — nie ako samostatná karta. Register je jediné miesto, kam
   // sa človek pozerá, keď hľadá „čo mám spraviť"; druhý zoznam vedľa neho by
   // znamenal dve miesta na tú istú otázku.
-  const rituals = useMemo(() => spocitajRitualy(new Date(), zapisy.weeks, zapisy.mesiace), [zapisy]);
+  // Čo za uzatváraný mesiac ešte chýba. Odpovedať na otázky mesiaca nad
+  // neúplnými číslami znamená písať odpoveď, ktorú bude treba prepísať —
+  // pripomienka preto čaká a dovtedy hovorí, čo doplniť.
+  const chybajuceDoklady = useMemo(() => {
+    const dnes = new Date();
+    const min = new Date(dnes.getFullYear(), dnes.getMonth() - 1, 1);
+    const mk = `${min.getFullYear()}-${String(min.getMonth() + 1).padStart(2, "0")}`;
+    const chybaju: string[] = [];
+    const k = kotvaDat(data);
+    if (!k.plny || k.plny < mk) chybaju.push("PTminder (sedenia a platby)");
+    if (!bankaSumy[mk]) chybaju.push("výpis z Fio");
+    if (!MKT_MESACNE.some((r) => r.m === mk)) chybaju.push("Metricool");
+    return { mesiac: mk, chybaju };
+  }, [data, bankaSumy]);
+
+  const rituals = useMemo(
+    () => spocitajRitualy(new Date(), zapisy.weeks, zapisy.mesiace, chybajuceDoklady),
+    [zapisy, chybajuceDoklady],
+  );
   const registerAll = useMemo(() => {
     const ack = data.anomalyAck || {};
     const extra = rituals
@@ -478,7 +500,7 @@ export function PSBApp() {
         acked: !!ack[`zapis|${r.id}`],
         // Cieľ navigácie sa vezie v `client` — register nemá vlastné pole na
         // odkaz a zaviesť ho kvôli trom položkám by bolo viac kódu než úžitku.
-        client: `${r.ciel.tab}|${r.ciel.sub || ""}`,
+        client: `${r.ciel.tab}|${r.ciel.sub || ""}${r.ciel.mesiac ? `|${r.ciel.mesiac}` : ""}`,
         priority: r.druh === "tyzden" ? 5 : r.druh === "mesiac" ? 6 : 40,
       }));
     return [...extra, ...kontrolaBanky, ...zmenyMetrik, ...register].sort((a, b) => a.priority - b.priority);
@@ -663,8 +685,8 @@ export function PSBApp() {
 
         {active === "marketing" && <Marketing data={data} clients={clients} leads={data.leads} chat={chat} sub={marketingSub} onSub={setMarketingSub} onKlient={(m) => navigate("klienti", undefined, { client: m, nonce: Date.now() })} />}
         {active === "vzas" && <Vzas sub={vzasSub} onSub={setVzasSub} data={data} />}
-        {active === "vysledky" && <Vysledky data={data} onNavigate={navigate} clients={clients} sixM={sixM} capacity={capacity} register={register} sub={vysledkySub} onSub={setVysledkySub} />}
-        {active === "udaje" && <Udaje data={data} actions={actions} />}
+        {active === "vysledky" && <Vysledky data={data} onNavigate={navigate} clients={clients} sixM={sixM} capacity={capacity} register={register} sub={vysledkySub} onSub={setVysledkySub} focus={vysledkyFocus} />}
+        {active === "udaje" && <Udaje data={data} actions={actions} chat={chat} />}
       </div>
       <div style={{ ...S.h3, textAlign: "center", color: C.textDim, fontSize: 11, padding: "8px 0 24px", fontWeight: 400 }}>
         ProSapiens Biomechanic · interný nástroj · nezdieľať externe

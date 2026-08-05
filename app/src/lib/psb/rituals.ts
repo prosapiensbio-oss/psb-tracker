@@ -21,7 +21,7 @@ export type Ritual = {
   nadpis: string;
   detail: string;
   /** Kam to zapísať — dvojica pre navigáciu. */
-  ciel: { tab: string; sub?: string };
+  ciel: { tab: string; sub?: string; mesiac?: string };
   /** true = práve teraz je čas to spraviť a nie je to spravené */
   splatne: boolean;
   /** true = už je to za dané obdobie vyplnené */
@@ -40,6 +40,8 @@ export function ritualy(
   dnes: Date,
   weeks: Record<string, Record<string, string>>,
   monthNotes: Record<string, { note?: string; answers?: Record<string, string> }>,
+  /** Čo ešte nie je nahraté — pripomienka na zápis čaká, kým je zoznam prázdny. */
+  doklady?: { chybaju: string[] },
 ): Ritual[] {
   const out: Ritual[] = [];
   const den = denVTyzdni(dnes);
@@ -73,14 +75,24 @@ export function ritualy(
   const mk = mesiacKluc(minuly);
   const zapis = monthNotes[mk];
   const maMesiac = !!(zapis && ((zapis.note || "").trim() || Object.values(zapis.answers || {}).some((v) => String(v).trim())));
+  // Odpovedať na otázky mesiaca má zmysel až nad úplnými číslami. Kým chýba
+  // banka alebo PTminder, odpoveď by sa písala k neúplnému mesiacu a musela by
+  // sa prepisovať — pripomienka preto čaká, kým sú doklady nahraté, a dovtedy
+  // hovorí, čo chýba. Bez `doklady` (staré volania) sa správa ako predtým.
+  const chybaju = doklady?.chybaju ?? [];
+  const mozeZapisovat = chybaju.length === 0;
   out.push({
     id: `mesiac-${mk}`,
     druh: "mesiac",
     nadpis: "Mesačná uzávierka",
     detail: maMesiac
       ? `Mesiac ${mk} je zapísaný.`
-      : `Mesiac ${mk} ešte nemá zápis — otázky mesiaca a poznámku. Potom sa dá zamknúť.`,
-    ciel: { tab: "vysledky", sub: "mesacne" },
+      : mozeZapisovat
+        ? `Mesiac ${mk} má nahraté všetky doklady, ale nie sú zodpovedané otázky mesiaca. Klik otvorí rovno ne.`
+        : `Mesiac ${mk} ešte nemá zápis. Najprv treba doplniť: ${chybaju.join(", ")}.`,
+    ciel: mozeZapisovat
+      ? { tab: "vysledky", sub: "mesacne", mesiac: mk }
+      : { tab: "udaje" },
     splatne: !maMesiac,
     hotove: maMesiac,
   });

@@ -440,7 +440,9 @@ export function Dashboard({
     const t = tokyKlientov(data, clients);
     const bezici = new Date().toISOString().slice(0, 7);
     const zrele = t.kotva ? new Date(Date.parse(t.kotva) - 60 * 86400000).toISOString().slice(0, 7) : bezici;
-    const posledne = t.mesacne.filter(([mk]) => mk < bezici).slice(-3)
+    // Najnovší mesiac hore — čítať zoznam zdola nahor je proti zvyku a pri
+    // troch riadkoch sa to nedá zachrániť ani nadpisom.
+    const posledne = t.mesacne.filter(([mk]) => mk < bezici).slice(-3).reverse()
       .map(([mk, v]) => ({ mk, prislo: v.prislo, odislo: mk < zrele ? v.odislo : null }));
     return { prisloMes: t.prisloMes, odisloMes: t.odisloMes, posledne };
   }, [data, clients]);
@@ -1078,7 +1080,7 @@ export function Dashboard({
         {visible.length ? (
           // Content-height, capped at ~3 rows then scrolls; grows only as items appear. Expanded: full list.
           <div style={registerExpanded ? { overflowY: "visible" } : { maxHeight: 192, overflowY: "auto", paddingRight: 2 }}>
-            {visible.map((r) => <RegisterRow key={r.key} item={r} actions={actions} onNavigate={onNavigate} />)}
+            {visible.map((r) => <RegisterRow key={r.key} item={r} actions={actions} onNavigate={onNavigate} chat={assistantChat} />)}
           </div>
         ) : (
           <div style={{ fontSize: 12.5, color: C.textMuted, padding: "2px 2px 4px" }}>Žiadne skryté položky.</div>
@@ -1275,7 +1277,10 @@ function CapacityCard({ capacity, trainer, onNavigate }: { capacity: CapacityRow
 
 const linkBtn = { background: "none", border: "none", color: C.accentLight, cursor: "pointer", fontSize: 12, padding: 0 } as const;
 
-function RegisterRow({ item, actions, onNavigate }: { item: RegisterItem; actions: Actions; onNavigate: (tab: string, sub?: string, focus?: NavFocus) => void }) {
+function RegisterRow({ item, actions, onNavigate, chat }: { item: RegisterItem; actions: Actions; onNavigate: (tab: string, sub?: string, focus?: NavFocus) => void; chat?: AssistantChat }) {
+  /** Otvorené okienko odpovede pre túto položku. */
+  const [odpoved, setOdpoved] = useState(false);
+  const [text, setText] = useState("");
   const jump = item.category === "6M" ? "6m" : item.category === "Kapacita" ? "treningy" : "klienti";
   const jeRozhodnutie = item.category === "Rozhodnutie";
   // Niektoré položky nemajú klienta, majú miesto, kam sa ide pozrieť —
@@ -1283,9 +1288,12 @@ function RegisterRow({ item, actions, onNavigate }: { item: RegisterItem; action
   // zvislej čiary, nie kategória: chýbajúci nájom je anomália rovnako ako
   // mlčiaci klient, ale otvoriť treba VZAS, nie kartu klienta.
   const zapisCiel = (item.client || "").includes("|") ? item.client!.split("|") : null;
+  // Tretí diel cieľa je mesiac: „vysledky|mesacne|2026-07" otvorí obrazovku
+  // AJ rozroluje otázky toho mesiaca. Doviesť človeka k tabuľke a nechať ho
+  // hľadať riadok je polovičná práca — pripomienka má viesť až k písaniu.
   const openItem = () =>
     zapisCiel
-      ? onNavigate(zapisCiel[0], zapisCiel[1] || undefined)
+      ? onNavigate(zapisCiel[0], zapisCiel[1] || undefined, zapisCiel[2] ? { month: zapisCiel[2], nonce: Date.now() } : undefined)
       : onNavigate(jump, undefined, item.client ? { client: item.client, nonce: Date.now() } : undefined);
   // Otázka „je toto duch?" sa dá zodpovedať rovno tu. Odpoveď sa uloží ku
   // klientovi, takže sa už nepýta znova — a duchov konečne vieme spočítať.
@@ -1308,6 +1316,25 @@ function RegisterRow({ item, actions, onNavigate }: { item: RegisterItem; action
     actions.setOverride(item.client, "status" as never, "Neaktívny");
   };
   const odpovedzPauza = () => { if (item.client) actions.setOverride(item.client, "status" as never, "Pauza"); };
+
+  // Odpoveď ide Jarvisovi aj s položkou, ktorej sa týka. Bez toho by musel
+  // Jerry prepisovať kontext, ktorý appka už pozná — a práve to je dôvod,
+  // prečo sa takéto veci nikdy nezapíšu.
+  const posliJarvisovi = () => {
+    if (!chat || !text.trim()) return;
+    chat.setFloatingOpen(true);
+    void chat.ask(
+      `Toto je odpoveď na položku z registra „Na čo sa pozrieť“.\n\n` +
+      `Položka (${item.category}): ${item.detail}\n\n` +
+      `Moja odpoveď: ${text.trim()}\n\n` +
+      `Ak z toho vyplýva konkrétna úprava v dátach, sprav ju. Ak ti chýba informácia, spýtaj sa — nehádaj.`,
+    );
+    // Položka sa označí ako vybavená až Jarvisovou úpravou, nie odoslaním —
+    // odoslať otázku nie je to isté ako vyriešiť ju.
+    setText("");
+    setOdpoved(false);
+  };
+
   return (
     <div style={{ padding: "9px 11px", marginBottom: 5, borderRadius: 8, background: item.acked ? C.track : item.tone === "red" ? C.redBg : item.tone === "blue" ? C.blueBg : C.orangeBg, opacity: item.acked ? 0.6 : 1 }}>
       <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, flexWrap: "wrap" }}>
@@ -1321,6 +1348,15 @@ function RegisterRow({ item, actions, onNavigate }: { item: RegisterItem; action
             </>
           )}
           {!item.acked && !jeRozhodnutie && <button onClick={openItem} style={linkBtn}>Otvoriť →</button>}
+          {/* „Otvoriť" ťa prepne na miesto, ale odpoveď na otázku typu „prečo
+              chýba nájom" tam nikde nezapíšeš. Odpovedať sa dá rovno tu —
+              text ide Jarvisovi aj s tým, čoho sa týka, takže nemusíš
+              vysvetľovať kontext, ktorý appka už pozná. */}
+          {chat && !item.acked && (
+            <button onClick={() => setOdpoved((o) => !o)} style={{ ...linkBtn, color: odpoved ? C.accentLight : C.accent }}>
+              {odpoved ? "Zavrieť" : "Odpovedať"}
+            </button>
+          )}
           {item.acked ? (
             <button onClick={() => actions.ackAnomaly(item.key, "", false)} style={linkBtn}>Vrátiť</button>
           ) : (
@@ -1328,6 +1364,35 @@ function RegisterRow({ item, actions, onNavigate }: { item: RegisterItem; action
           )}
         </div>
       </div>
+
+      {odpoved && chat && (
+        <div style={{ marginTop: 9, paddingTop: 9, borderTop: `1px solid ${mix(C.border, 70)}` }}>
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); posliJarvisovi(); }
+              if (e.key === "Escape") setOdpoved(false);
+            }}
+            autoFocus
+            rows={3}
+            placeholder="Napíš, ako to je — napr. „nájom sa platil v hotovosti 28.7., dopíš ho do júla“."
+            style={{ width: "100%", padding: "7px 9px", borderRadius: 7, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 12.5, fontFamily: "inherit", resize: "vertical" }}
+          />
+          <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6, flexWrap: "wrap" }}>
+            <button
+              onClick={posliJarvisovi}
+              disabled={!text.trim()}
+              style={{ background: text.trim() ? C.accentBg : "transparent", border: `1px solid ${text.trim() ? C.accent : C.border}`, borderRadius: 7, padding: "5px 13px", color: text.trim() ? C.accentLight : C.textDim, fontSize: 12, cursor: text.trim() ? "pointer" : "default" }}
+            >
+              Poslať Jarvisovi
+            </button>
+            <span style={{ fontSize: 11, color: C.textDim }}>
+              Jarvis dostane aj to, čoho sa to týka — kontext písať nemusíš. ⌘/Ctrl+Enter odošle.
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

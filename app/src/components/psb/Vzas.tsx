@@ -2150,13 +2150,25 @@ function Vyhlad({ data, clients }: { data: PSBData; clients: Record<string, Clie
   );
 }
 
-function MesacneTab({ data, clients }: { data: PSBData; clients: Record<string, ClientAgg> }) {
+function MesacneTab({ data, clients, focus }: { data: PSBData; clients: Record<string, ClientAgg>; focus?: { month?: string; nonce?: number } | null }) {
   const p = pnlCalc();
   const r = useRange();
   const [metric, setMetric] = useState("prijmy");
   const [openNote, setOpenNote] = useState<number | null>(null);
   const [notes, setNotes] = useState<Record<string, MonthNote>>({});
   useEffect(() => { fetchMonthNotes().then(setNotes); }, []);
+  // Preklik z registra: rozroluj rovno otázky toho mesiaca a odscrolluj k nim.
+  // Doviesť človeka k tabuľke a nechať ho hľadať riadok je polovičná práca.
+  useEffect(() => {
+    if (!focus?.month) return;
+    const i = VZAS_MONTHS.indexOf(focus.month);
+    if (i < 0) return;
+    setOpenNote(i);
+    // Riadok sa vykreslí až po prekreslení, preto až v ďalšom snímku.
+    requestAnimationFrame(() => {
+      document.getElementById(`mesiac-${focus.month}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
+    });
+  }, [focus?.month, focus?.nonce]); // eslint-disable-line react-hooks/exhaustive-deps
   const idx = r.idx;
   const seriesFor = (k: string): Vals =>
     k === "prijmy" ? p.prijmy : k === "naklady" ? p.celkoveNaklady : k === "zisk" ? p.hrubyZisk : p.marza;
@@ -2239,8 +2251,12 @@ function MesacneTab({ data, clients }: { data: PSBData; clients: Record<string, 
               </tr>
             </thead>
             <tbody>
-              {idx.map((i, n) => {
-                const prev = n > 0 ? p.hrubyZisk[idx[n - 1]] : null;
+              {/* Najnovší mesiac hore. Porovnanie „oproti minulému" sa pritom
+                  musí brať z CHRONOLOGICKÉHO suseda, nie z riadku nad ním —
+                  po otočení poradia by inak ukazovalo opačné znamienko. */}
+              {[...idx].reverse().map((i) => {
+                const chrono = idx.indexOf(i);
+                const prev = chrono > 0 ? p.hrubyZisk[idx[chrono - 1]] : null;
                 const nKey = monthKeyOf(i);
                 const hasNote = !!(
                   notes[nKey]?.note ||
@@ -2250,7 +2266,7 @@ function MesacneTab({ data, clients }: { data: PSBData; clients: Record<string, 
                 );
                 return (
                   <Fragment key={i}>
-                  <tr>
+                  <tr id={`mesiac-${nKey}`}>
                     <td onClick={() => setOpenNote(openNote === i ? null : i)}
                       style={{ padding: "7px 10px", fontSize: 12.5, color: C.text, borderBottom: `1px solid ${mix(C.border, 55)}`, cursor: "pointer", whiteSpace: "nowrap" }}>
                       <span style={{ display: "inline-block", width: 14, color: C.textDim, fontSize: 9 }}>{openNote === i ? "▼" : "▶"}</span>
@@ -2701,10 +2717,12 @@ export function Vzas({ sub, onSub, data }: { sub: string; onSub: (s: string) => 
 // cashflow, dlhy), kým Výsledky odpovedajú na inú otázku — ako mi to ide voči
 // tomu, čo som si predsavzal. KPI a Ciele už dávno nie sú len o peniazoch.
 export function Vysledky({
-  data, onNavigate, clients, sixM, capacity, register, sub, onSub,
+  data, onNavigate, clients, sixM, capacity, register, sub, onSub, focus,
 }: {
   data: PSBData;
   onNavigate?: (tab: string) => void;
+  /** Preklik z registra: otvor tento mesiac aj s otázkami. */
+  focus?: { month?: string; nonce?: number } | null;
   clients: Record<string, ClientAgg>;
   sixM: SixMRow[];
   capacity: CapacityRow[];
@@ -2727,7 +2745,7 @@ export function Vysledky({
         onChange={setSub}
       />
       {sub === "kvartalne" && <KvartalneTab />}
-      {sub === "mesacne" && <MesacneTab data={data} clients={clients} />}
+      {sub === "mesacne" && <MesacneTab data={data} clients={clients} focus={focus} />}
       {sub === "kpi" && <KpiTab data={data} onNavigate={onNavigate} />}
       {sub === "ciele" && <CieleTab data={data} />}
       {sub === "report" && <Report data={data} clients={clients} sixM={sixM} capacity={capacity} register={register} />}

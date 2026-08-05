@@ -4,6 +4,7 @@ import { fmtDMY } from "../../lib/psb/format";
 import { jeBankovyVypis } from "../../lib/psb/fio";
 import { C, mix, S, badge, btn } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
+import type { AssistantChat } from "./Assistant";
 import type { IngestResult } from "../../lib/psb/db.server";
 import type { Actions } from "./App";
 import { BankovyImport } from "./Banka";
@@ -53,11 +54,11 @@ const MARKETING_ZDROJE: { druh: string; label: string; path: string }[] = [
   { druh: "gsc", label: "Google Search Console", path: "Search Console → Výsledky vyhľadávania › Exportovať › CSV. Stiahne sa ZIP — rozbaľ ho a nahraj tri súbory: Graf.csv (kliky po dňoch), Dopyty.csv (na čo ťa ľudia našli), Strany.csv (ktorý článok ťahá). Krajiny, Zariadenia a Filtre appka zatiaľ nepoužíva." },
 ];
 
-export function Udaje({ data, actions }: { data: PSBData; actions: Actions }) {
+export function Udaje({ data, actions, chat }: { data: PSBData; actions: Actions; chat?: AssistantChat }) {
   const missing = REPORTS.filter((r) => (data[r.key] as unknown[]).length === 0);
   return (
     <>
-      <UploadCard data={data} missing={missing} actions={actions} />
+      <UploadCard data={data} missing={missing} actions={actions} chat={chat} />
 
       <Uzavierky />
 
@@ -78,7 +79,7 @@ export function Udaje({ data, actions }: { data: PSBData; actions: Actions }) {
   );
 }
 
-function UploadCard({ data, missing, actions }: { data: PSBData; missing: typeof REPORTS; actions: Actions }) {
+function UploadCard({ data, missing, actions, chat }: { data: PSBData; missing: typeof REPORTS; actions: Actions ; chat?: AssistantChat }) {
   const [uploadResult, setUploadResult] = useState<IngestResult[] | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -168,6 +169,28 @@ function UploadCard({ data, missing, actions }: { data: PSBData; missing: typeof
     }
   };
 
+  // Fotka ide Jarvisovi s inštrukciou, nie ako holý obrázok — bez nej by sa
+  // spýtal „čo s tým?" a Jerry by musel vysvetľovať to isté pri každej fotke.
+  const posliFotkyJarvisovi = async (fotky: File[]) => {
+    if (!chat) { setPdfStav("Fotku vie prečítať Jarvis — otvor ho vpravo dole a pretiahni ju doňho."); return; }
+    const url = (f: File) => new Promise<string>((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => res(String(r.result));
+      r.onerror = rej;
+      r.readAsDataURL(f);
+    });
+    const urls = await Promise.all(fotky.slice(0, 4).map(url));
+    chat.setAttach((a) => [...a, ...urls].slice(0, 4));
+    chat.setFloatingOpen(true);
+    void chat.ask(
+      "Toto je fotka zošita s hotovostnými platbami. Prepíš z nej všetky riadky " +
+      "(dátum, meno, suma, poznámka) a ukáž mi ich ako tabuľku na potvrdenie — " +
+      "nezapisuj nič, kým to nepotvrdím. Pri číslach, ktoré sa nedajú prečítať isto, " +
+      "to povedz nahlas a nehádaj.",
+    );
+    setPdfStav(`${fotky.length === 1 ? "Fotka je" : "Fotky sú"} u Jarvisa — prepíše ich a dá ti ich potvrdiť.`);
+  };
+
   const handleFiles = async (fileList: FileList | null) => {
     if (!fileList || !fileList.length) return;
     setBusy(true);
@@ -175,6 +198,7 @@ function UploadCard({ data, missing, actions }: { data: PSBData; missing: typeof
     const bankove: string[] = [];
     const neCsv: { meno: string; pripona: string }[] = [];
     const pdfka: File[] = [];
+    const fotky: File[] = [];
     for (const f of Array.from(fileList)) {
       // PDF, XLSX ani ZIP sa nedajú prečítať ako text. Doteraz sa aj tak
       // poslali na server a ten odpovedal „Súbor je príliš veľký" — pravda o
@@ -185,6 +209,10 @@ function UploadCard({ data, missing, actions }: { data: PSBData; missing: typeof
       // prečíta ich vrátane grafov. Jedno miesto na nahrávanie, ako to má byť:
       // človek nemá riešiť, ktorý formát appka zvláda.
       if (pripona === "pdf") { pdfka.push(f); continue; }
+      // Fotka zošita. Hotovostné platby sa zapisujú rukou a doteraz nemali ako
+      // doraziť — appka fotku odmietla ako „neznámy formát". Prečítať rukopis
+      // vie len Jarvis, tak k nemu ide rovno, aj s tým, čo z nej má vytiahnuť.
+      if (["jpg", "jpeg", "png", "heic", "webp"].includes(pripona)) { fotky.push(f); continue; }
       if (["xlsx", "xls", "zip", "pptx", "docx"].includes(pripona)) {
         neCsv.push({ meno: f.name, pripona });
         continue;
@@ -227,6 +255,7 @@ function UploadCard({ data, missing, actions }: { data: PSBData; missing: typeof
       }
       await citajPdf(f);
     }
+    if (fotky.length) await posliFotkyJarvisovi(fotky);
     if (noveFaktury.length) setFaktury((p) => [...p, ...noveFaktury]);
     if (bankove.length) setBankovyText(bankove.join("\n"));
     if (files.length) {
@@ -257,7 +286,7 @@ function UploadCard({ data, missing, actions }: { data: PSBData; missing: typeof
         style={{ ...S.upload, borderColor: dragOver ? C.accent : `${mix(C.accent, 33)}`, background: dragOver ? C.accentBg : "transparent" }}
       >
         <div style={{ fontSize: 24, marginBottom: 6 }}>⬆</div>
-        <div style={{ color: C.text }}>{busy ? "Spracúvam…" : "Pretiahni CSV súbory sem alebo klikni"}</div>
+        <div style={{ color: C.text }}>{busy ? "Spracúvam…" : "Pretiahni sem CSV, PDF alebo fotku zošita — alebo klikni"}</div>
         <div style={{ fontSize: 12, color: C.textDim, marginTop: 6 }}>
           PTminder aj bankový výpis z Fio. Typ rozpozná sám; duplicity preskočí, históriu zachová.
           Bankový výpis sa najprv ukáže na kontrolu.
@@ -281,7 +310,7 @@ function UploadCard({ data, missing, actions }: { data: PSBData; missing: typeof
           <button onClick={() => setNeCsv([])} style={{ marginLeft: 8, background: "none", border: "none", color: C.textDim, fontSize: 12, cursor: "pointer" }}>rozumiem</button>
         </div>
       )}
-      <input ref={inputRef} type="file" accept=".csv,.txt,.pdf" multiple style={{ display: "none" }} onChange={(e) => { void handleFiles(e.target.files); e.target.value = ""; }} />
+      <input ref={inputRef} type="file" accept=".csv,.txt,.pdf,image/*" multiple style={{ display: "none" }} onChange={(e) => { void handleFiles(e.target.files); e.target.value = ""; }} />
       {/* Bez podmienky na `bankovyText`: komponent sa musí objaviť aj vtedy,
           keď žiadny súbor práve nepribudol, ale v prehliadači zostalo
           rozrobené zaraďovanie. Ak nemá ani vstup ani rozrobené, nevykreslí
