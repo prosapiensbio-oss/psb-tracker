@@ -304,9 +304,6 @@ function UploadCard({ data, missing, actions }: { data: PSBData; missing: typeof
           <button onClick={() => setFakturaChyba([])} style={{ marginTop: 6, background: "none", border: "none", color: C.textDim, fontSize: 12, cursor: "pointer" }}>zavrieť</button>
         </div>
       )}
-      <div style={{ marginTop: 12 }}>
-        <BankaUlozene />
-      </div>
       {faktury.length > 0 && (
         <div style={{ marginTop: 12 }}>
           <FakturyNahlad
@@ -398,6 +395,12 @@ function UploadCard({ data, missing, actions }: { data: PSBData; missing: typeof
         </div>
       </div>
       )}
+      {/* Až na koniec: čo je zapísané, sa prezerá občas a pri oprave, nie pri
+          každom nahrávaní. Hore bránilo výhľadu na to, kvôli čomu sa sem
+          chodí. Vlastnú kartu si otvorí samo, keď treba. */}
+      <div style={{ marginTop: 14 }}>
+        <BankaUlozene />
+      </div>
       </div>
     </Card>
   );
