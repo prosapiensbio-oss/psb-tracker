@@ -1,7 +1,7 @@
 import { Fragment, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { fetchBtcReserve, fetchMonthNotes, fetchVzasSettings, fetchWeekEntries, saveMonthNote, saveVzasSetting, type BtcReserve, type MonthNote, type WeekEntry } from "../../lib/psb/client";
-import { monthlyFinance, predictCash, type CapacityRow, type ClientAgg, type RegisterItem, type SixMRow } from "../../lib/psb/compute";
+import { monthlyFinance, predictCash, ZONE_HI, type CapacityRow, type ClientAgg, type RegisterItem, type SixMRow } from "../../lib/psb/compute";
 import { fmtCZK } from "../../lib/psb/format";
 import { ObdobieCtx } from "../../lib/psb/obdobie";
 import { nastavPrijmyZTrackera, nastavVyplaty, poslednyMesiacSDatami, vyplatyNaUlozenie } from "../../lib/psb/vzas";
@@ -777,13 +777,42 @@ function PersonCard({ pk, idx, onZmena }: { pk: PersonKey; idx: number[]; onZmen
   );
 }
 
-type DebtPerson = { k: PersonKey; label: string; slope: number; dlh: number; narokAvg: number; poslaneAvg: number; months: number | null; over: number };
+type DebtPerson = {
+  k: PersonKey; label: string; slope: number; dlh: number; narokAvg: number; poslaneAvg: number;
+  months: number | null; over: number;
+  /** Ø odrobených hodín za mesiac pod dnešným modelom. */
+  hodinyTeraz: number;
+  /** Koľko hodín mesačne by bolo treba, aby bol dlh nula do N mesiacov. */
+  hodinyNa: (mesiacov: number) => number;
+};
+
+// Hodiny za mesiac sa zle predstavujú. Týždeň je jednotka, v ktorej si človek
+// plánuje prácu, a zdravá zóna (24–34 h) je definovaná týždenne — až po
+// prepočte je vidieť, či je cieľ vôbec ľudsky možný.
+// „O 14 mesiacov" si nikto nevie predstaviť; „okolo okt 27" áno.
+function mesiacOdTeraz(zaMesiacov: number): string {
+  const i = poslednyMesiacSDatami() + zaMesiacov;
+  if (i < MONTHS.length) return MONTHS[i];
+  // Za koncom tabuľky sa mesiac dopočíta z posledného známeho.
+  const posl = VZAS_MONTHS[VZAS_MONTHS.length - 1];
+  const [r, m] = posl.split("-").map(Number);
+  const d = new Date(Date.UTC(r, m - 1 + (i - (VZAS_MONTHS.length - 1)), 1));
+  return `${["jan","feb","mar","apr","máj","jún","júl","aug","sep","okt","nov","dec"][d.getUTCMonth()]} ${String(d.getUTCFullYear()).slice(2)}`;
+}
+
+const TYZDNOV = 52 / 12;
+const naTyzden = (h: number) => h / TYZDNOV;
 
 // Collapsed to the headline (name + balance + direction); the "what it would
 // take" sentence is one click away.
 function DebtBox({ p }: { p: DebtPerson }) {
   const [open, setOpen] = useState(false);
   const rastie = p.slope < 0;
+  // Dlh voči trénerovi je záporné číslo (firma dlží). Keď je kladný, tréner si
+  // vybral viac, než mal nárok — vtedy nemá zmysel pýtať sa na hodiny.
+  const dlzi = p.dlh < 0;
+  const h12 = p.hodinyNa(12);
+  const nadZonou = naTyzden(h12) > ZONE_HI;
   return (
     <div style={{ background: C.card, border: `1px solid ${rastie ? mix(C.red, 45) : mix(C.green, 40)}`, borderRadius: 12, padding: "12px 14px" }}>
       <div onClick={() => setOpen(!open)} style={{ cursor: "pointer" }}>
@@ -797,6 +826,29 @@ function DebtBox({ p }: { p: DebtPerson }) {
         <div style={{ fontSize: 12.5, color: rastie ? C.red : C.green, marginTop: 5, fontWeight: 600, marginLeft: 14 }}>
           {rastie ? "▼ dlh rastie" : "▲ dlh klesá"} o {fmtCZK(Math.abs(p.slope))} / mes.
         </div>
+        {/* Číslo, kvôli ktorému sa na túto kartu človek pozerá: koľko hodín.
+            Bolo schované v tabuľke pod dvoma rozbaľovačmi naraz, takže ho v
+            praxi nikto nevidel. Zostatok bez tohto čísla je len konštatovanie. */}
+        {dlzi && (
+          <div style={{ marginTop: 9, marginLeft: 14, paddingTop: 8, borderTop: `1px solid ${mix(C.border, 60)}` }}>
+            <div style={{ fontSize: 12.5, color: C.text, lineHeight: 1.5 }}>
+              Splatiť do roka: <b style={{ color: nadZonou ? C.orange : C.accentLight }}>{h12.toFixed(0)} h / mes.</b>{" "}
+              <span style={{ color: C.textDim }}>({naTyzden(h12).toFixed(1)} h/týž.)</span>
+            </div>
+            <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 3, lineHeight: 1.5 }}>
+              Teraz {p.hodinyTeraz.toFixed(0)} h / mes. ({naTyzden(p.hodinyTeraz).toFixed(1)} h/týž.) ·{" "}
+              {h12 > p.hodinyTeraz
+                ? <>treba <b style={{ color: C.text }}>+{(h12 - p.hodinyTeraz).toFixed(0)} h</b> mesačne</>
+                : <span style={{ color: C.green }}>súčasné tempo stačí</span>}
+            </div>
+            {nadZonou && (
+              <div style={{ fontSize: 11.5, color: C.orange, marginTop: 4, lineHeight: 1.5 }}>
+                To je nad zdravou zónou (24–34 h/týž.) — samotnými hodinami sa to za rok splatiť nedá.
+                Druhá páka je nižší výber: −{fmtCZK((h12 - p.hodinyTeraz) * SALARY[p.k].hourlyRate)} mesačne.
+              </div>
+            )}
+          </div>
+        )}
       </div>
       {open && (
         <div style={{ fontSize: 12, color: C.textMuted, marginTop: 8, marginLeft: 14, lineHeight: 1.5 }}>
@@ -804,7 +856,8 @@ function DebtBox({ p }: { p: DebtPerson }) {
             <>Pri tomto tempe sa <b style={{ color: C.red }}>nesplatí nikdy</b>. Aby prestal rásť, mesačný výber musí klesnúť
               na <b>{fmtCZK(p.narokAvg)}</b> — teraz je o <b style={{ color: C.red }}>{fmtCZK(p.over)}</b> vyšší.</>
           ) : (
-            <>Pri tomto tempe splatené o <b style={{ color: C.green }}>~{p.months} mesiacov</b>. Výber sa drží
+            <>Pri tomto tempe splatené o <b style={{ color: C.green }}>~{p.months} mesiacov</b>
+              {p.months != null && <> — teda okolo <b style={{ color: C.green }}>{mesiacOdTeraz(p.months)}</b></>}. Výber sa drží
               pod nárokom ({fmtCZK(p.poslaneAvg)} vs {fmtCZK(p.narokAvg)}).</>
           )}
         </div>
@@ -829,13 +882,21 @@ function DebtTrendCard({ idx }: { idx: number[] }) {
     const narokAvg = avg(pick(c.narok, use));
     const poslaneAvg = avg(pick(c.poslane, use));
     const months = slope > 0 ? Math.ceil(Math.abs(dlh) / slope) : null;
-    return { k, label: SALARY[k].label, c, slope, dlh, narokAvg, poslaneAvg, months, over: poslaneAvg - narokAvg };
+    const s = SALARY[k];
+    const hodinyTeraz = avg(pick(s.hours, use));
+    // Potrebný nárok = súčasný výber + mesačná splátka. Z neho späť na hodiny
+    // cez ten istý vzorec, akým sa nárok počíta v tabuľke mzdy.
+    const hodinyNa = (mesiacov: number) => {
+      const splatka = mesiacov > 0 ? Math.abs(Math.min(0, dlh)) / mesiacov : 0;
+      return s.hoursThreshold + Math.max(0, poslaneAvg + splatka - s.fix) / s.hourlyRate;
+    };
+    return { k, label: s.label, c, slope, dlh, narokAvg, poslaneAvg, months, over: poslaneAvg - narokAvg, hodinyTeraz, hodinyNa };
   });
   return (
     <Card>
       <H3 onClick={() => setOpen(!open)}>
         <span style={{ display: "inline-block", width: 15, color: C.textDim, fontSize: 9 }}>{open ? "▼" : "▶"}</span>
-        <Info text="Zostatok dlhu sám o sebe nestačí — dôležitý je smer. Ø rozdiel za mesiac je sklon: kladný = dlh sa spláca, záporný = rastie. Strop je suma, pod ktorou musí mesačný výber zostať, aby dlh prestal rásť (= priemerný nárok). Smer aj scenáre sa rátajú len z mesiacov pod dnešným modelom (od sep 2025) — pôžička z éry 70/30 bola rozhodnutie, nie výstup vzorca." label="Kam smeruje dlh" />
+        <Info text="Zostatok dlhu sám o sebe nestačí — dôležitý je smer, a hlavne odpoveď na otázku KOĽKO HODÍN. Pod menom každého trénera je hodinový cieľ na splatenie do roka, prepočítaný aj na týždeň. Nárok = Fix 27 000 + (hodiny − 60) × 850, takže z požadovanej splátky sa dá spočítať späť počet hodín. Ø rozdiel za mesiac je sklon: kladný = dlh sa spláca, záporný = rastie. Strop je suma, pod ktorou musí mesačný výber zostať, aby dlh prestal rásť (= priemerný nárok). Smer aj scenáre sa rátajú len z mesiacov pod dnešným modelom (od sep 2025) — pôžička z éry 70/30 bola rozhodnutie, nie výstup vzorca." label="Kam smeruje dlh" />
       </H3>
       {open && (
       <LineChart
@@ -877,6 +938,7 @@ function DebtTrendCard({ idx }: { idx: number[] }) {
                 { label: "Zastaviť rast dlhu", extra: 0 },
                 { label: "Splatiť celý dlh do 24 mes.", extra: 24 },
                 { label: "Splatiť celý dlh do 12 mes.", extra: 12 },
+                { label: "Splatiť celý dlh do 6 mes.", extra: 6 },
               ].map((sc) => (
                 <tr key={sc.label}>
                   <td style={{ ...S.td, fontSize: 12.5, color: C.text }}>{sc.label}</td>
@@ -889,11 +951,18 @@ function DebtTrendCard({ idx }: { idx: number[] }) {
                     const needH = s.hoursThreshold + Math.max(0, needNarok - s.fix) / s.hourlyRate;
                     const dH = needH - nowH;
                     const done = dH <= 0;
+                    // Nad zdravou zónou to už nie je plán, je to prianie —
+                    // treba to povedať, nie to len zafarbiť na červeno.
+                    const nemozne = naTyzden(needH) > ZONE_HI;
                     return (
-                      <td key={p.k} style={{ ...S.td, textAlign: "right", fontSize: 12.5, fontVariantNumeric: "tabular-nums", color: done ? C.green : dH <= 10 ? C.orange : C.red }}>
+                      <td key={p.k} style={{ ...S.td, textAlign: "right", fontSize: 12.5, fontVariantNumeric: "tabular-nums", color: done ? C.green : nemozne ? C.red : dH <= 10 ? C.orange : C.orange }}>
                         {done ? "✓ už spĺňa" : (
                           <>
-                            {needH.toFixed(0)} h <span style={{ color: C.textDim, fontSize: 11 }}>(+{dH.toFixed(0)} h / alebo −{fmtCZK(dH * s.hourlyRate)})</span>
+                            {needH.toFixed(0)} h <span style={{ color: C.textDim, fontSize: 11 }}>({naTyzden(needH).toFixed(1)} h/týž.)</span>
+                            <div style={{ color: C.textDim, fontSize: 11, fontWeight: 400 }}>
+                              +{dH.toFixed(0)} h alebo −{fmtCZK(dH * s.hourlyRate)} / mes.
+                              {nemozne && <div style={{ color: C.red }}>nad zdravou zónou</div>}
+                            </div>
                           </>
                         )}
                       </td>
