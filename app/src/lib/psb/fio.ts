@@ -34,8 +34,8 @@ export type FioRiadok = {
   kategoria: string;
 };
 
-/** Kontrolné súčty z hlavičky výpisu — na overenie, že import nič nestratil. */
-export type FioKontrola = { prijmy: number; vydaje: number; obdobie: string };
+/** Kontrolné súčty z hlavičiek výpisov — na overenie, že import nič nestratil. */
+export type FioKontrola = { prijmy: number; vydaje: number; obdobie: string; vypisov: number };
 
 export type FioParse =
   | { ok: true; riadky: FioRiadok[]; hlavicka: string[]; kontrola?: FioKontrola }
@@ -45,19 +45,35 @@ export type FioParse =
 // Sú to čísla od banky, teda nezávislá kontrola toho, čo parser prečítal —
 // keď sa súčet riadkov s nimi nezhoduje, niečo vypadlo a je to vidieť hneď,
 // nie o tri mesiace v P&L.
+//
+// Pri viacerých výpisoch naraz sa hlavičky SČÍTAVAJÚ. Predtým sa čítala len tá
+// prvá, takže po nahratí siedmich mesiacov appka porovnávala pol roka pohybov
+// proti súčtu jedného mesiaca a hlásila nezhodu, hoci boli dáta v poriadku.
 function kontrolneSucty(riadky: string[]): FioKontrola | undefined {
   const cislo = (r: string) => {
     const m = r.match(/([+-]?[\d\s.,]+)\s*CZK/);
     return m ? fioSuma(m[1]) : NaN;
   };
-  let prijmy = NaN, vydaje = NaN, obdobie = "";
-  for (const r of riadky.slice(0, 12)) {
+  let prijmy = 0, vydaje = 0, vypisov = 0;
+  const obdobia: string[] = [];
+  for (const r of riadky) {
     const low = r.toLowerCase();
-    if (low.includes("suma příjmů") || low.includes("suma prijmu")) prijmy = cislo(r);
-    else if (low.includes("suma výdajů") || low.includes("suma vydaju")) vydaje = cislo(r);
-    else if (low.includes("období") || low.includes("obdobi")) obdobie = r.replace(/"/g, "").replace(/^[^:]*:\s*/, "").trim();
+    if (low.includes("suma příjmů") || low.includes("suma prijmu")) {
+      const v = cislo(r);
+      if (Number.isFinite(v)) { prijmy += v; vypisov++; }
+    } else if (low.includes("suma výdajů") || low.includes("suma vydaju")) {
+      const v = cislo(r);
+      if (Number.isFinite(v)) vydaje += v;
+    } else if (low.includes("období") || low.includes("obdobi")) {
+      const o = r.replace(/"/g, "").replace(/^[^:]*:\s*/, "").trim();
+      if (o) obdobia.push(o);
+    }
   }
-  return Number.isFinite(prijmy) && Number.isFinite(vydaje) ? { prijmy, vydaje, obdobie } : undefined;
+  if (!vypisov) return undefined;
+  // „01.01.2026 - 31.01.2026" × 7 → od prvého po posledný, nie zoznam siedmich.
+  const prve = obdobia[0]?.split("-")[0]?.trim() || "";
+  const posledne = obdobia[obdobia.length - 1]?.split("-").pop()?.trim() || "";
+  return { prijmy, vydaje, obdobie: obdobia.length > 1 ? `${prve} – ${posledne}` : obdobia[0] || "", vypisov };
 }
 
 const oddelovac = (riadok: string): string => {
@@ -260,7 +276,9 @@ export function parseFio(text: string, pravidla: { vzor: string; kategoria: stri
   // takže sem spadne — ale rozdeliť sa nedá, lebo stĺpce neexistujú. Vtedy to
   // nie je chyba súboru, len zle uhádnutý režim.
   if (!out.length) return parseFioText(text, pravidla);
-  return { ok: true, riadky: out, hlavicka, kontrola: kontrolneSucty(riadky.slice(0, iHlavicka)) };
+  // Celý text, nie len blok pred prvou hlavičkou — pri viacerých nahratých
+  // výpisoch sú ďalšie hlavičky uprostred.
+  return { ok: true, riadky: out, hlavicka, kontrola: kontrolneSucty(riadky) };
 }
 
 

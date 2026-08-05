@@ -63,7 +63,7 @@ export function kategorieZoznam(): Kat[] {
 export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: () => void }) {
   const [nahlad, setNahlad] = useState<Nahlad[] | null>(null);
   // Kontrola z hlavičky výpisu (súčty od banky) + koľko riadkov nemá ID operácie.
-  const [kontrola, setKontrola] = useState<{ prijmy: number; vydaje: number; obdobie: string; precitanePrijmy: number; precitaneVydaje: number; sedi: boolean | null } | null>(null);
+  const [kontrola, setKontrola] = useState<{ prijmy: number; vydaje: number; obdobie: string; vypisov: number; precitanePrijmy: number; precitaneVydaje: number; sedi: boolean | null } | null>(null);
   const [bezId, setBezId] = useState(0);
   // Príjmy a výdavky vedľa seba v jednej tabuľke sa zle prechádzajú — zaraďujú
   // sa hlavne výdavky, príjmy sú len kontrola proti PTminderu.
@@ -256,8 +256,8 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
               <span style={{ width: 9, height: 9, borderRadius: 999, background: kontrola.sedi ? C.green : C.red, flexShrink: 0 }} />
               <span>
                 {kontrola.sedi
-                  ? <>Sedí s výpisom za <b>{kontrola.obdobie}</b> — príjmy {fmtCZK(kontrola.prijmy)}, výdavky {fmtCZK(kontrola.vydaje)}.</>
-                  : <>Nesedí s hlavičkou výpisu: banka hlási príjmy {fmtCZK(kontrola.prijmy)} a výdavky {fmtCZK(kontrola.vydaje)}, ja som prečítal {fmtCZK(kontrola.precitanePrijmy)} a {fmtCZK(kontrola.precitaneVydaje)}. Niečo sa nenačítalo — nezapisuj to.</>}
+                  ? <>Sedí {kontrola.vypisov > 1 ? <>so všetkými <b>{kontrola.vypisov}</b> výpismi</> : "s výpisom"} za <b>{kontrola.obdobie}</b> — príjmy {fmtCZK(kontrola.prijmy)}, výdavky {fmtCZK(kontrola.vydaje)}.</>
+                  : <>Nesedí s hlavičkou {kontrola.vypisov > 1 ? `${kontrola.vypisov} výpisov` : "výpisu"}: banka hlási príjmy {fmtCZK(kontrola.prijmy)} a výdavky {fmtCZK(kontrola.vydaje)}, ja som prečítal {fmtCZK(kontrola.precitanePrijmy)} a {fmtCZK(kontrola.precitaneVydaje)}. Niečo sa nenačítalo — nezapisuj to.</>}
               </span>
             </div>
           )}
