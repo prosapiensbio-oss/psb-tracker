@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { BARTER_KLIENTI, nastavBtcVyplaty, nastavHodinyZTrackera, nastavJarekZTrackera, nastavNakladyZFio } from "../../lib/psb/vzas";
+import { BARTER_KLIENTI, PRVY_MESIAC_Z_FIO, nastavBtcVyplaty, nastavHodinyZTrackera, nastavJarekZTrackera, nastavNakladyZFio, nazovKategorie, pnlHodnota } from "../../lib/psb/vzas";
 
 import {
   checkSession,
@@ -23,7 +23,7 @@ import {
 } from "../../lib/psb/compute";
 import { buildAiContext } from "../../lib/psb/aiContext";
 import { Assistant, useAssistantChat } from "./Assistant";
-import { normName } from "../../lib/psb/format";
+import { monthLabel, normName } from "../../lib/psb/format";
 import { ObdobieCtx } from "../../lib/psb/obdobie";
 import { C, S, tab } from "../../lib/psb/theme";
 import type { ClientOverride, PSBData } from "../../lib/psb/types";
@@ -42,6 +42,7 @@ import { HladanieKlienta } from "./Hladanie";
 import { ZapisButton } from "./Zapis";
 import { ritualy as spocitajRitualy } from "../../lib/psb/rituals";
 import { nastavRozpis, pridajDoRozpisu, type PohybZaBunku } from "../../lib/psb/rozpis";
+import { chybajuceNaklady, nezhodySExcelom, type BankovyMesiac } from "../../lib/psb/kontrolaNakladov";
 
 export type Actions = {
   setOverride: (name: string, key: keyof ClientOverride, value: unknown) => void;
@@ -282,6 +283,7 @@ export function PSBApp() {
   // Náklady z banky sa načítajú raz pre celú appku — model je modulový, takže
   // ich potrebuje aj dlaždica Zisk na dashboarde, nielen obrazovka VZAS.
   const [, setFioTik] = useState(0);
+  const [bankaSumy, setBankaSumy] = useState<BankovyMesiac>({});
   useEffect(() => {
     void fetch("/api/marketing", { credentials: "same-origin" })
       .then((r) => r.json())
@@ -366,11 +368,63 @@ export function PSBApp() {
           });
         }
         nastavRozpis(rozpis);
+        // Sumy si drží aj React — register z nich robí kontrolu „čo nedorazilo"
+        // a „čo nesedí s Excelom". Bez toho by o nich vedel len model.
+        setBankaSumy(sumy);
         if (nastavNakladyZFio(sumy, vyplaty)) setFioTik((x) => x + 1);
         else setFioTik((x) => x + 1); // rozpis pribudol aj bez zmeny súm
       })
       .catch(() => {});
   }, []);
+
+  // Kontroly nad bankovými sumami. Register je jediné miesto, kam sa človek
+  // pozerá, keď hľadá „čo mám spraviť" — ďalšia karta vedľa neho by znamenala
+  // dve miesta na tú istú otázku.
+  const kontrolaBanky = useMemo(() => {
+    const out: typeof register = [];
+    const ack = data.anomalyAck || {};
+    const mesiace = Object.keys(bankaSumy).sort();
+    if (!mesiace.length) return out;
+    const posledny = mesiace[mesiace.length - 1];
+
+    // (1) Pravidelný náklad, ktorý nedorazil. Toto je jediná kontrola v appke,
+    // ktorá sa pozerá na to, čo v dátach NIE JE — a preto ako jediná vie
+    // zachytiť nezaplatený nájom.
+    for (const n of chybajuceNaklady(bankaSumy, posledny)) {
+      const key = `naklad|${n.kluc}`;
+      const meno = nazovKategorie(n.kategoria);
+      out.push({
+        key, category: "Anomália", tone: n.druh === "chyba" ? "red" : "orange",
+        title: n.druh === "chyba"
+          ? `${meno}: v ${monthLabel(n.mesiac)} nedorazil`
+          : `${meno}: v ${monthLabel(n.mesiac)} výrazne nižší`,
+        detail: n.druh === "chyba"
+          ? `Platilo sa ${n.zMesiacov} z posledných 4 mesiacov, obvykle ${Math.round(n.obvykle).toLocaleString("cs-CZ")} Kč — za ${monthLabel(n.mesiac)} v banke nie je nič. Buď je pohyb zaradený inde, platilo sa v hotovosti, alebo faktúra nie je uhradená. Zisk za ten mesiac je zatiaľ o túto sumu vyšší, než bude.`
+          : `Obvykle ${Math.round(n.obvykle).toLocaleString("cs-CZ")} Kč, teraz ${Math.round(n.teraz).toLocaleString("cs-CZ")} Kč. Buď je časť zaradená inde, alebo sa platilo menej.`,
+        acked: !!ack[key], note: ack[key]?.note,
+        priority: n.druh === "chyba" ? 3 : 7, client: "vzas|pnl",
+      });
+    }
+
+    // (2) Excel vs. banka za mesiace, ktoré import neprepisuje. Doteraz sa dal
+    // rozdiel nájsť len rozkliknutím jednej bunky po druhej — sto klikov,
+    // ktoré nikto neurobí. Zhrnú sa do JEDNEJ položky: register má povedať, že
+    // je čo riešiť, nie vysypať štyridsať riadkov.
+    const nezhody = nezhodySExcelom(bankaSumy, pnlHodnota, PRVY_MESIAC_Z_FIO);
+    if (nezhody.length) {
+      const key = `nezhody|${PRVY_MESIAC_Z_FIO}|${nezhody.length}`;
+      const top = nezhody.slice(0, 3)
+        .map((n) => `${nazovKategorie(n.kategoria)} ${monthLabel(n.mesiac)}: Excel ${Math.round(n.excel).toLocaleString("cs-CZ")} vs banka ${Math.round(n.banka).toLocaleString("cs-CZ")}`)
+        .join(" · ");
+      out.push({
+        key, category: "Zmena", tone: "orange",
+        title: `Excel a banka sa rozchádzajú v ${nezhody.length} ${nezhody.length === 1 ? "položke" : nezhody.length < 5 ? "položkách" : "položkách"}`,
+        detail: `Mesiace do jún 2026 berú číslo z Excelu, banka slúži na kontrolu. Najväčšie rozdiely — ${top}. Celý zoznam je vo VZAS → Zisky a straty, klikom na číslo.`,
+        acked: !!ack[key], note: ack[key]?.note, priority: 9, client: "vzas|pnl",
+      });
+    }
+    return out;
+  }, [bankaSumy, data.anomalyAck]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const zmenyMetrik = useMemo(() => {
     const ack = data.anomalyAck || {};
@@ -425,10 +479,12 @@ export function PSBApp() {
         client: `${r.ciel.tab}|${r.ciel.sub || ""}`,
         priority: r.druh === "tyzden" ? 5 : r.druh === "mesiac" ? 6 : 40,
       }));
-    return [...extra, ...zmenyMetrik, ...register].sort((a, b) => a.priority - b.priority);
-  }, [rituals, register, zmenyMetrik, data.anomalyAck]);
+    return [...extra, ...kontrolaBanky, ...zmenyMetrik, ...register].sort((a, b) => a.priority - b.priority);
+  }, [rituals, register, kontrolaBanky, zmenyMetrik, data.anomalyAck]);
 
-  const aiContext = useMemo(() => buildAiContext(data, clients, sixM, capacity, register), [data, clients, sixM, capacity, register]);
+  // Jarvis dostáva CELÝ register vrátane kontrol nad bankou — inak by nevedel
+  // o chýbajúcom nájme a na otázku „čo mi uniká" by odpovedal, že nič.
+  const aiContext = useMemo(() => buildAiContext(data, clients, sixM, capacity, registerAll), [data, clients, sixM, capacity, registerAll]);
 
   const actions = useMemo<Actions>(
     () => ({

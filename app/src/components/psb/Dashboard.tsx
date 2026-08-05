@@ -1278,9 +1278,11 @@ const linkBtn = { background: "none", border: "none", color: C.accentLight, curs
 function RegisterRow({ item, actions, onNavigate }: { item: RegisterItem; actions: Actions; onNavigate: (tab: string, sub?: string, focus?: NavFocus) => void }) {
   const jump = item.category === "6M" ? "6m" : item.category === "Kapacita" ? "treningy" : "klienti";
   const jeRozhodnutie = item.category === "Rozhodnutie";
-  // Pripomienka zápisu nesie cieľ v sebe (klient|tab|sub) — nemá klienta, má
-  // miesto, kam sa ide písať.
-  const zapisCiel = item.category === "Zápis" || item.category === "Zmena" ? (item.client || "").split("|") : null;
+  // Niektoré položky nemajú klienta, majú miesto, kam sa ide pozrieť —
+  // nesú ho v `client` ako „tab|podzáložka". Rozhoduje o tom prítomnosť
+  // zvislej čiary, nie kategória: chýbajúci nájom je anomália rovnako ako
+  // mlčiaci klient, ale otvoriť treba VZAS, nie kartu klienta.
+  const zapisCiel = (item.client || "").includes("|") ? item.client!.split("|") : null;
   const openItem = () =>
     zapisCiel
       ? onNavigate(zapisCiel[0], zapisCiel[1] || undefined)

@@ -1,0 +1,116 @@
+// Náklad, ktorý zmizol — a nezhoda s Excelom.
+//
+// Všetky doterajšie kontroly appky sa pozerajú na to, ČO V DÁTACH JE: klient,
+// ktorý nechodí, mesiac, ktorý nesedí, číslo, ktoré kleslo. Nájom, ktorý sa
+// nezaplatil, tak nemá ako vyskočiť — nie je tam nič, na čo by sa dalo
+// pozrieť. Presne preto zostal júl 2026 bez nájmu štúdia neviditeľný, hoci
+// išlo o 29 250 Kč a o tú istú sumu nadhodnotený zisk.
+//
+// Ticho je informácia. Kto platil šesť mesiacov po sebe a siedmy nie, je buď
+// chyba v zaradení, alebo neuhradená faktúra — a oboje treba vedieť hneď, nie
+// pri ročnej uzávierke.
+
+export type BankovyMesiac = Record<string, Record<string, number>>; // mesiac → kategória → suma
+
+export type NalezNakladu = {
+  kluc: string;
+  kategoria: string;
+  mesiac: string;
+  /** Koľko sa platievalo (medián predošlých mesiacov). */
+  obvykle: number;
+  /** Koľko je teraz. */
+  teraz: number;
+  /** Z koľkých mesiacov sa pravidelnosť odvodila. */
+  zMesiacov: number;
+  druh: "chyba" | "kleslo";
+};
+
+const median = (v: number[]): number => {
+  if (!v.length) return 0;
+  const s = [...v].sort((a, b) => a - b);
+  const m = s.length >> 1;
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+};
+
+/**
+ * Pravidelné náklady, ktoré v poslednom uzavretom mesiaci nedorazili.
+ *
+ * „Pravidelný" = objavil sa aspoň v troch zo štyroch predošlých mesiacov.
+ * Tri sú minimum, pri ktorom sa dá hovoriť o zvyku a nie o zhode náhod;
+ * štvormesačné okno drží kontrolu citlivú na to, čo platí teraz, a nie na
+ * predplatné zrušené vlani.
+ *
+ * Prah 2 000 Kč zámerne: appka, ktorá hlási chýbajúce 200 Kč za doménu,
+ * naučí človeka register preskakovať — a s ním aj chýbajúci nájom.
+ */
+export function chybajuceNaklady(
+  podlaMesiaca: BankovyMesiac,
+  poslednyMesiac: string,
+  prah = 2000,
+): NalezNakladu[] {
+  const mesiace = Object.keys(podlaMesiaca).sort();
+  const koniec = mesiace.indexOf(poslednyMesiac);
+  if (koniec < 3) return [];
+  const predosle = mesiace.slice(Math.max(0, koniec - 4), koniec);
+  if (predosle.length < 3) return [];
+
+  const out: NalezNakladu[] = [];
+  const vsetkyKategorie = new Set<string>();
+  for (const m of predosle) for (const k of Object.keys(podlaMesiaca[m] || {})) vsetkyKategorie.add(k);
+
+  for (const kat of vsetkyKategorie) {
+    // Výplaty a súkromné nákupy sem nepatria: kolíšu zo svojej podstaty a
+    // hlásiť „tento mesiac si si vybral menej" nie je nález, je to šum.
+    if (kat.startsWith("vyplaty") || kat === "mimo" || kat.startsWith("spolocne.")) continue;
+    const sumy = predosle.map((m) => podlaMesiaca[m]?.[kat] ?? 0);
+    const kolkokrat = sumy.filter((s) => s > 0).length;
+    if (kolkokrat < 3) continue;
+    const obvykle = median(sumy.filter((s) => s > 0));
+    if (obvykle < prah) continue;
+    const teraz = podlaMesiaca[poslednyMesiac]?.[kat] ?? 0;
+    if (teraz === 0) out.push({ kluc: `chyba|${kat}|${poslednyMesiac}`, kategoria: kat, mesiac: poslednyMesiac, obvykle, teraz, zMesiacov: kolkokrat, druh: "chyba" });
+    else if (teraz < obvykle * 0.5) out.push({ kluc: `kleslo|${kat}|${poslednyMesiac}`, kategoria: kat, mesiac: poslednyMesiac, obvykle, teraz, zMesiacov: kolkokrat, druh: "kleslo" });
+  }
+  return out.sort((a, b) => b.obvykle - a.obvykle);
+}
+
+export type NezhodaSExcelom = {
+  kluc: string;
+  kategoria: string;
+  mesiac: string;
+  excel: number;
+  banka: number;
+  rozdiel: number;
+};
+
+/**
+ * Kde sa excelové číslo rozchádza s bankou.
+ *
+ * Platí len pre mesiace, ktoré import zámerne neprepisuje (do jún 2026) — tam
+ * stoja dva nezávislé zdroje vedľa seba a rozdiel medzi nimi je zistenie.
+ *
+ * Kategórie BEZ jediného bankového pohybu sa preskakujú: platilo sa v
+ * hotovosti alebo pohyb sedí inde, a hlásiť to ako nezhodu by znamenalo
+ * vyrobiť desiatky falošných poplachov. Nezhoda je len tam, kde banka niečo
+ * vie a hovorí niečo iné než Excel.
+ */
+export function nezhodySExcelom(
+  podlaMesiaca: BankovyMesiac,
+  excelHodnota: (kategoria: string, mesiac: string) => number | undefined,
+  doMesiaca: string,
+  prah = 1000,
+): NezhodaSExcelom[] {
+  const out: NezhodaSExcelom[] = [];
+  for (const [mesiac, podlaKategorie] of Object.entries(podlaMesiaca)) {
+    if (mesiac >= doMesiaca) continue;
+    for (const [kat, banka] of Object.entries(podlaKategorie)) {
+      if (kat.startsWith("vyplaty") || kat === "mimo" || banka <= 0) continue;
+      const excel = excelHodnota(kat, mesiac);
+      if (excel === undefined) continue;
+      const rozdiel = Math.round(Math.abs(Math.abs(excel) - banka));
+      if (rozdiel < prah) continue;
+      out.push({ kluc: `nezhoda|${kat}|${mesiac}`, kategoria: kat, mesiac, excel: Math.abs(excel), banka, rozdiel });
+    }
+  }
+  return out.sort((a, b) => b.rozdiel - a.rozdiel);
+}

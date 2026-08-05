@@ -597,6 +597,34 @@ export function nastavNakladyZFio(
 }
 
 
+// Preklad kategórie na to, čo z nej vidí človek.
+//
+// „fixne.prevadzka.najom" je kľúč pre stroj. Register, ktorý povie „chýba
+// fixne.prevadzka.najom", je horší než žiadny — človek ho preskočí, lebo mu
+// nič nehovorí. Meno a hodnotu vie povedať len tento modul, tak to robí on.
+export function nazovKategorie(kat: string): string {
+  if (kat.startsWith("spolocne.")) return `Spoločné · ${kat.slice("spolocne.".length)}`;
+  const [sekK, subK, itemK] = kat.split(".");
+  const sek = (PNL as Record<string, VzasSection>)[sekK];
+  const sub = sek?.subcategories?.[subK];
+  const item = sub?.items?.[itemK];
+  if (!item) return kat;
+  return sub ? `${sub.label} · ${item.label}` : item.label;
+}
+
+/** Hodnota v P&L za danú kategóriu a mesiac (undefined = taká položka neexistuje). */
+export function pnlHodnota(kat: string, mesiac: string): number | undefined {
+  const i = VZAS_MONTHS.indexOf(mesiac);
+  if (i < 0) return undefined;
+  if (kat.startsWith("spolocne.")) {
+    const rad = SPOLOCNE[kat.slice("spolocne.".length)];
+    return rad ? rad[i] : undefined;
+  }
+  const [sekK, subK, itemK] = kat.split(".");
+  const item = (PNL as Record<string, VzasSection>)[sekK]?.subcategories?.[subK]?.items?.[itemK];
+  return item ? item.values[i] : undefined;
+}
+
 // ── ručné opravy jednotlivých buniek P&L ─────────────────────────────────────
 //
 // Mesiace do jún 2026 sú z Excelu a sú v kóde. Keď sa v nich nájde chyba (a
