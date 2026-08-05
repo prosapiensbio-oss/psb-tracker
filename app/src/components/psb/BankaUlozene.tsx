@@ -55,9 +55,10 @@ export function BankaUlozene() {
   });
 
   /** Bez `kluce` sa mení celý označený výber; s nimi len tie riadky. */
-  const zmen = async (kategoria: string, kluce?: string[]) => {
+  const zmen = async (kategoria: string, kluce?: string[], poznamka?: string) => {
     const vyber = kluce ? new Set(kluce) : oznacene;
-    const zmeny = pohyby.filter((p) => vyber.has(p.kluc)).map((p) => ({ kluc: p.kluc, kategoria, datum: p.datum }));
+    const zmeny = pohyby.filter((p) => vyber.has(p.kluc))
+      .map((p) => ({ kluc: p.kluc, kategoria, datum: p.datum, ...(poznamka !== undefined ? { poznamka } : {}) }));
     if (!zmeny.length) return;
     setBusy(true);
     const r = await fetch("/api/fio", {
@@ -168,9 +169,17 @@ export function BankaUlozene() {
                     <td style={{ ...S.td, fontSize: 12 }}>
                       <div onClick={() => oznacRovnake(p.protistrana)} title={`Označiť všetky pohyby „${p.protistrana}"`}
                         style={{ color: C.text, cursor: "pointer" }}>{p.protistrana || "—"}</div>
-                      {p.poznamka && p.poznamka !== p.protistrana && (
-                        <div style={{ color: C.textDim, fontSize: 11, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 320 }}>{p.poznamka}</div>
-                      )}
+                      {/* Poznámka sa dá dopísať aj po zápise — text z banky
+                          často nepovie, čo to bolo, a o pol roka si to už
+                          nikto nepamätá. Ukladá sa pri opustení poľa. */}
+                      <input
+                        defaultValue={p.poznamka || ""}
+                        onBlur={(e) => {
+                          if (e.target.value !== (p.poznamka || "")) void zmen(p.kategoria, [p.kluc], e.target.value);
+                        }}
+                        placeholder="+ poznámka"
+                        style={{ marginTop: 2, width: "100%", maxWidth: 320, background: "transparent", border: "none", borderBottom: `1px dashed ${mix(C.border, 80)}`, color: p.poznamka ? C.textDim : C.accentLight, fontSize: 11, padding: "1px 0" }}
+                      />
                     </td>
                     <td style={{ ...S.td, padding: "3px 6px" }}>
                       <VyberKategorie

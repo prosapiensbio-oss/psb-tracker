@@ -18,6 +18,8 @@ import { Card, H3, Info, TableWrap } from "./ui";
 
 type Nahlad = FioRiadok & { uzMame?: boolean; zamknuty?: boolean; vlastnaPoznamka?: string };
 
+const NAHLAD_KEY = "psb-banka-nahlad";
+
 export type Kat = { value: string; label: string; skupina: string };
 
 // Položka je „živá", keď v tomto roku niečo mala. Zoznam mal cez päťdesiat
@@ -62,7 +64,32 @@ export function kategorieZoznam(): Kat[] {
 }
 
 export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: () => void }) {
-  const [nahlad, setNahlad] = useState<Nahlad[] | null>(null);
+  const [nahlad, setNahladRaw] = useState<Nahlad[] | null>(null);
+  // Rozrobené zaraďovanie prežije prepnutie obrazovky aj obnovenie stránky.
+  // Prejsť päťsto pohybov je práca na hodinu a stratiť ju kliknutím inam je
+  // dôvod, prečo sa taká práca nikdy nedokončí.
+  const [historia, setHistoria] = useState<Nahlad[][]>([]);
+  /** Zapíše nový stav, uloží ho a odloží predchádzajúci pre krok späť. */
+  const setNahlad = (fn: Nahlad[] | null | ((p: Nahlad[] | null) => Nahlad[] | null), bezHistorie = false) =>
+    setNahladRaw((prev) => {
+      const next = typeof fn === "function" ? fn(prev) : fn;
+      if (!bezHistorie && prev) setHistoria((h) => [...h.slice(-29), prev]);
+      try {
+        if (next) localStorage.setItem(NAHLAD_KEY, JSON.stringify(next));
+        else localStorage.removeItem(NAHLAD_KEY);
+      } catch {
+        /* plná pamäť prehliadača nesmie zhodiť zaraďovanie */
+      }
+      return next;
+    });
+  const spat = () =>
+    setHistoria((h) => {
+      if (!h.length) return h;
+      const predch = h[h.length - 1];
+      setNahladRaw(predch);
+      try { localStorage.setItem(NAHLAD_KEY, JSON.stringify(predch)); } catch { /* ignore */ }
+      return h.slice(0, -1);
+    });
   // Kontrola z hlavičky výpisu (súčty od banky) + koľko riadkov nemá ID operácie.
   const [kontrola, setKontrola] = useState<{ prijmy: number; vydaje: number; obdobie: string; vypisov: number; precitanePrijmy: number; precitaneVydaje: number; sedi: boolean | null } | null>(null);
   const [bezId, setBezId] = useState(0);
@@ -92,7 +119,17 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
   // Náhľad sa načíta hneď, ako príde nový text — komponent sa objaví až vtedy,
   // keď používateľ pustí bankový výpis do uploadu.
   useEffect(() => {
-    if (vstup && vstup.trim().length > 20) void nacitajNahlad(vstup);
+    if (vstup && vstup.trim().length > 20) { void nacitajNahlad(vstup); return; }
+    // Bez nového vstupu sa obnoví to, čo zostalo rozrobené.
+    try {
+      const ulozene = localStorage.getItem(NAHLAD_KEY);
+      if (ulozene) {
+        const p = JSON.parse(ulozene) as Nahlad[];
+        if (Array.isArray(p) && p.length) setNahladRaw(p);
+      }
+    } catch {
+      /* ignore */
+    }
   }, [vstup]);
 
   const nacitajNahlad = async (obsah: string) => {
@@ -167,7 +204,11 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
   // Riadky, ktoré sú práve zobrazené — používa ich tabuľka aj zaškrtnutie
   // v hlavičke, aby „označiť všetky" znamenalo naozaj to, čo je vidieť.
   const viditelne = (nahlad || []).map((r, i) => [r, i] as const).filter(([r]) =>
-    filter === "vsetko" ? true
+    // Ručne pridaný riadok má na začiatku nulovú sumu, takže by pri filtri
+    // „Výdavky" ani „Nezaradené" neprešiel a tlačidlo by vyzeralo, že nič
+    // nespravilo. Preto je vždy vidieť.
+    r.id.startsWith("rucne:") ? true
+    : filter === "vsetko" ? true
     // Výplata je zvláštna kategória, nie prevádzkový výdavok — keby bola
     // v oboch, súčet výdavkov by tvrdil, že štúdio minulo aj to, čo si
     // vzali tréneri.
@@ -203,6 +244,7 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
     }).then((x) => x.json()).catch(() => ({ ok: false }));
     setBusy(false);
     if (r.ok) {
+      setHistoria([]);
       setVysledok(`Zapísané: ${r.pridane} pohybov${r.preskocene ? `, ${r.preskocene} už v databáze bolo` : ""}${r.zamknute ? `, ${r.zamknute} odmietnutých (uzavretý mesiac)` : ""}. Naučených pravidiel: ${r.pravidla}.`);
       setNahlad(null);
       onHotovo?.();
@@ -228,6 +270,11 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
       nezaradene: vyd.filter((r) => !r.kategoria).length,
     };
   }, [nahlad]);
+
+  // Prázdny komponent sa nevykresľuje — obrazovka Údaje ho renderuje vždy,
+  // aby vedel obnoviť rozrobené zaraďovanie, ale keď nie je čo ukázať, nemá
+  // tam visieť prázdna karta.
+  if (!vstup && !nahlad && !busy && !chyba && !vysledok) return null;
 
   return (
     <>
@@ -281,6 +328,15 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
         <Card>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
             <H3><Info text="Toto sa zapíše. Riadky, ktoré v databáze už sú, aj riadky z uzavretých mesiacov sú vylúčené — zapisuje sa len to, čo je naozaj nové." label={`Náhľad — ${suhrn.nove} nových pohybov`} /></H3>
+            <button onClick={spat} disabled={!historia.length}
+              title="Vrátiť poslednú zmenu"
+              style={{ padding: "8px 12px", borderRadius: 8, border: `1px solid ${C.border}`, background: "transparent", color: historia.length ? C.textMuted : C.textDim, fontSize: 12.5, cursor: historia.length ? "pointer" : "default", opacity: historia.length ? 1 : 0.5 }}>
+              ↶ Späť{historia.length ? ` (${historia.length})` : ""}
+            </button>
+            <button onClick={() => { if (confirm("Zahodiť rozrobené zaraďovanie? Zapísané pohyby zostanú.")) { setNahlad(null); setHistoria([]); } }}
+              style={{ padding: "8px 12px", borderRadius: 8, border: `1px solid ${C.border}`, background: "transparent", color: C.textDim, fontSize: 12.5, cursor: "pointer" }}>
+              Zahodiť
+            </button>
             <button onClick={() => void zapis()} disabled={busy || suhrn.nove === 0}
               style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: suhrn.nove ? C.accent : C.border, color: C.onAccent, fontSize: 12.5, fontWeight: 600, cursor: suhrn.nove ? "pointer" : "default" }}>
               Zapísať {suhrn.nove} pohybov

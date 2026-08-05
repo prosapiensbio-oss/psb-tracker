@@ -282,11 +282,13 @@ function UploadCard({ data, missing, actions }: { data: PSBData; missing: typeof
         </div>
       )}
       <input ref={inputRef} type="file" accept=".csv,.txt,.pdf" multiple style={{ display: "none" }} onChange={(e) => { void handleFiles(e.target.files); e.target.value = ""; }} />
-      {bankovyText && (
-        <div style={{ marginTop: 12 }}>
-          <BankovyImport vstup={bankovyText} onHotovo={() => { setBankovyText(""); void actions.refresh(); }} />
-        </div>
-      )}
+      {/* Bez podmienky na `bankovyText`: komponent sa musí objaviť aj vtedy,
+          keď žiadny súbor práve nepribudol, ale v prehliadači zostalo
+          rozrobené zaraďovanie. Ak nemá ani vstup ani rozrobené, nevykreslí
+          sa sám od seba. */}
+      <div style={{ marginTop: 12 }}>
+        <BankovyImport vstup={bankovyText} onHotovo={() => { setBankovyText(""); void actions.refresh(); }} />
+      </div>
       {fakturaChyba.length > 0 && (
         <div style={{ marginTop: 12, padding: "10px 13px", borderRadius: 9, background: mix(C.orange, 8), border: `1px solid ${mix(C.orange, 28)}`, fontSize: 12.5, color: C.text, lineHeight: 1.55 }}>
           {fakturaChyba.map((ch, i) => (

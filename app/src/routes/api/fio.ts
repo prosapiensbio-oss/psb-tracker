@@ -57,7 +57,7 @@ export const Route = createFileRoute("/api/fio")({
         if (!(await isAuthed(request))) return unauthorized();
         const { DB } = bindings();
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });
-        let b: { akcia?: string; text?: string; riadky?: FioRiadok[]; zmeny?: { kluc: string; kategoria: string; datum?: string }[] };
+        let b: { akcia?: string; text?: string; riadky?: FioRiadok[]; zmeny?: { kluc: string; kategoria: string; datum?: string; poznamka?: string }[] };
         try { b = (await request.json()) as typeof b; }
         catch { return Response.json({ ok: false, error: "bad_request" }, { status: 400 }); }
 
@@ -164,9 +164,13 @@ export const Route = createFileRoute("/api/fio")({
             const kluc = String(z.kluc || "");
             if (!kluc) continue;
             if (z.datum && jeZamknuty(zamky, String(z.datum))) { zamknute++; continue; }
+            // Poznámka je voliteľná — keď nepríde, kategória sa mení sama.
             stmts.push(
-              DB.prepare("UPDATE fio_transactions SET category = ?2 WHERE dedup_key = ?1")
-                .bind(kluc, String(z.kategoria || "")),
+              z.poznamka === undefined
+                ? DB.prepare("UPDATE fio_transactions SET category = ?2 WHERE dedup_key = ?1")
+                    .bind(kluc, String(z.kategoria || ""))
+                : DB.prepare("UPDATE fio_transactions SET category = ?2, note = ?3 WHERE dedup_key = ?1")
+                    .bind(kluc, String(z.kategoria || ""), String(z.poznamka || "").slice(0, 400)),
             );
             zmenene++;
           }
