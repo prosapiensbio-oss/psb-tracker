@@ -635,6 +635,24 @@ export type SalaryCalc = {
 // Rozdiel = Nárok − Poslané  (kladný = firma dlží trénerovi)
 // Kumulovaný dlh(N) = dlh(N−1) + Rozdiel(N)   ← per brief §06
 // Pred sep 2025 nárok neexistoval, takže Rozdiel = Splátka − Pôžička zo záznamov.
+/**
+ * Posledný mesiac, o ktorom appka niečo vie.
+ *
+ * Mesiace rastú dopredu, aby mali nové dáta kam pristáť — ale mesiac, do
+ * ktorého sa ešte nič nenahralo, nesmie nič ovplyvniť. Bez tohto sa v ňom
+ * počítal nárok bez odrobených hodín a bez výplaty, takže dlh firmy voči
+ * trénerom rástol o celý fix za mesiac, ktorý sa ešte nestal.
+ */
+export function poslednyMesiacSDatami(): number {
+  for (let i = VZAS_MONTHS.length - 1; i >= 0; i--) {
+    const maHodiny = SALARY.jerry.hours[i] > 0 || SALARY.terezka.hours[i] > 0;
+    const maPrijem = PRIJMY[i] > 0;
+    const maNaklad = sumSection(PNL.fixne)[i] > 0 || sumSection(PNL.variabilne)[i] > 0;
+    if (maHodiny || maPrijem || maNaklad) return i;
+  }
+  return VZAS_MONTHS.length - 1;
+}
+
 export function salaryCalc(key: PersonKey): SalaryCalc {
   const s = SALARY[key];
   const rec = RECORDED_DEBT[key];
@@ -648,6 +666,7 @@ export function salaryCalc(key: PersonKey): SalaryCalc {
   const rozdiel: Vals = [];
   const cumDebt: Vals = [];
 
+  const posledny = poslednyMesiacSDatami();
   for (let i = 0; i < N; i++) {
     const era = eraAt(i);
     const modelled = era.kind === "fixvar";
@@ -655,7 +674,11 @@ export function salaryCalc(key: PersonKey): SalaryCalc {
     const v = modelled ? (s.hours[i] - era.hoursThreshold) * era.hourlyRate : 0;
     variabil.push(v);
     narok.push(modelled ? era.fix + v : poslane[i]);
-    rozdiel.push(modelled ? narok[i] - poslane[i] : rec.splatka[i] - rec.pozicka[i]);
+    // Mesiac, ktorý ešte nenastal (alebo doňho nič nepribudlo), dlh nehýbe.
+    // Inak by nárok bez odrobených hodín a bez výplaty pripísal firme dlh
+    // za mesiac, ktorý sa nestal.
+    const prazdny = i > posledny;
+    rozdiel.push(prazdny ? 0 : modelled ? narok[i] - poslane[i] : rec.splatka[i] - rec.pozicka[i]);
     cumDebt.push((i === 0 ? DEBT_START : cumDebt[i - 1]) + rozdiel[i]);
   }
   return { variabil, narok, hasModel, personalTotal, spolocneHalf: half, poslane, rozdiel, cumDebt };

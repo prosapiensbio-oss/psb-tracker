@@ -4,7 +4,7 @@ import { fetchBtcReserve, fetchMonthNotes, fetchVzasSettings, fetchWeekEntries, 
 import { monthlyFinance, predictCash, type CapacityRow, type ClientAgg, type RegisterItem, type SixMRow } from "../../lib/psb/compute";
 import { fmtCZK } from "../../lib/psb/format";
 import { ObdobieCtx } from "../../lib/psb/obdobie";
-import { nastavPrijmyZTrackera, nastavVyplaty, vyplatyNaUlozenie } from "../../lib/psb/vzas";
+import { nastavPrijmyZTrackera, nastavVyplaty, poslednyMesiacSDatami, vyplatyNaUlozenie } from "../../lib/psb/vzas";
 import { C, mix, S } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import {
@@ -93,15 +93,23 @@ function useRange(initial = "2026") {
   const [from, setFrom] = useState(0);
   const [to, setTo] = useState(MONTHS.length - 1);
   const idx = useMemo(() => {
-    if (YEAR_IDX[win]) return YEAR_IDX[win];
-    if (win === "last6") return ALL_IDX.slice(-6);
-    if (win === "last12") return ALL_IDX.slice(-12);
+    // Mesiace rastú dopredu, aby mali nové dáta kam pristáť — ale prázdny
+    // mesiac sa nezobrazuje. Hlavička karty mzdy potom ukazovala „Hodín Aug 26:
+    // 0" namiesto júla, ktorý je posledný, o ktorom appka niečo vie.
+    const posledny = poslednyMesiacSDatami();
+    const orez = (a: number[]) => {
+      const bez = a.filter((i) => i <= posledny);
+      return bez.length ? bez : a;
+    };
+    if (YEAR_IDX[win]) return orez(YEAR_IDX[win]);
+    if (win === "last6") return orez(ALL_IDX).slice(-6);
+    if (win === "last12") return orez(ALL_IDX).slice(-12);
     if (win === "custom") {
       const lo = Math.min(from, to);
       const hi = Math.max(from, to);
       return Array.from({ length: hi - lo + 1 }, (_, i) => lo + i);
     }
-    return ALL_IDX;
+    return orez(ALL_IDX);
   }, [win, from, to]);
   return { win, setWin, from, setFrom, to, setTo, idx };
 }
