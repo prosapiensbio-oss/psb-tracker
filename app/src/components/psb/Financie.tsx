@@ -558,7 +558,20 @@ function PredikciaZisku({ prijmyOdhad, mesiac }: { prijmyOdhad: number; mesiac: 
   const [otvorene, setOtvorene] = useState(false);
   const p = useMemo(() => predikciaNakladov(1), [vzasVerzia()]); // eslint-disable-line react-hooks/exhaustive-deps
   const pravidelne = useMemo(() => pravidelneNaklady(), [vzasVerzia()]); // eslint-disable-line react-hooks/exhaustive-deps
-  if (!p.mesiace.length || !p.zaklad) return null;
+  // Karta sa nikdy nestratí bez vysvetlenia. Keď nie je z čoho počítať, povie
+  // to — prázdne miesto na obrazovke vyzerá ako chyba appky, aj keď je to len
+  // chýbajúci vstup.
+  if (!p.mesiace.length || !p.zaklad) {
+    return (
+      <Card>
+        <H3>Predikcia nákladov a zisku</H3>
+        <Empty>
+          Zatiaľ nie je z čoho počítať — treba aspoň jeden mesiac s nákladmi.
+          Nahraj bankový výpis v Údajoch a odhad sa objaví sám.
+        </Empty>
+      </Card>
+    );
+  }
   const m = p.mesiace[0];
   const zisk = prijmyOdhad - m.naklady - m.vyplaty;
 
