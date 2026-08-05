@@ -466,6 +466,17 @@ function Predikcia({ data, clients }: { data: PSBData; clients: Record<string, C
     monthlyRevenue: (c) => c.monthlyRevenue,
     confidence: (c) => c.confidence,
   });
+  // Očakávané odrobené hodiny podľa trénera — z tempa klientov (sedení za
+  // mesiac). Sedenie je hodina, takže tempo je priamo počet hodín. Slúži na
+  // odhad výplat: mzda nie je fixný náklad, závisí od odrobených hodín.
+  const hodinyOdhad = useMemo(() => {
+    const out = { jerry: 0, terezka: 0 };
+    for (const c of pred.perClient) {
+      if (c.trainer === "Jerry") out.jerry += c.burnRate;
+      else if (c.trainer === "Terezka") out.terezka += c.burnRate;
+    }
+    return out;
+  }, [pred.perClient]);
   const hasData = pred.perClient.length > 0;
   const monthsCovered = pred.months.length ? monthLabel(pred.months[0].month) : "budúci mesiac";
 
@@ -487,16 +498,40 @@ function Predikcia({ data, clients }: { data: PSBData; clients: Record<string, C
           </div>
         </div>
 
+        {/* Tri scenáre sú JEDNA predikcia v troch pásmach — líšia sa len tým,
+            koľkým klientom sa verí obnova. Run-rate je iná veličina (tempo, nie
+            predpoveď), preto stojí zvlášť pod nimi a nie ako štvrtý scenár:
+            postavený vedľa nich vyzeral ako ďalší odhad a mýlil. */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, margin: "14px 0 6px" }}>
-          <StatCard value={fmtCZK(pred.scenarios.optimistic)} label={`Optimistický · ${monthsCovered}`} color={C.green} />
-          <StatCard value={fmtCZK(pred.scenarios.realistic)} label={`Realistický · ${monthsCovered}`} color={C.accentLight} />
           <StatCard value={fmtCZK(pred.scenarios.negative)} label={`Negatívny · ${monthsCovered}`} color={C.orange} />
+          <StatCard value={fmtCZK(pred.scenarios.realistic)} label={`Realistický · ${monthsCovered}`} color={C.accentLight} />
+          <StatCard value={fmtCZK(pred.scenarios.optimistic)} label={`Optimistický · ${monthsCovered}`} color={C.green} />
+        </div>
+        {hasData && (
+          <div style={{ fontSize: 11.5, color: C.textDim, lineHeight: 1.55, margin: "2px 0 12px" }}>
+            Tri čísla, jedna predikcia. Rovnaké tempo klientov, líši sa len viera v obnovu:
+            negatívny −20 %, optimistický +15 %. <b style={{ color: C.accentLight }}>Realistický ({fmtCZK(pred.scenarios.realistic)})</b> je
+            ten, ktorý ide ďalej do zisku pod týmto.
+          </div>
+        )}
+
+        <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 12, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, alignItems: "center" }}>
           <StatCard value={fmtCZK(pred.monthlyRunRate)} label={<Info text="Run-rate = koľko mesačne hodí portfólio, ak klienti chodia ako TERAZ. Tempo sa berie z posledných 90 dní, cena z reálne zaplatených sedení (sedenia za 0 Kč sa počítajú do práce, nie do tržieb). Pred vážením dôverou obnovy. POZOR na rozdiel oproti priemeru posledných 3 mesiacov: ten obsahuje aj klientov, ktorí medzitým prestali chodiť. K 2. 8. 2026 to bolo 15 klientov a 26 736 Kč mesačne — presne o toľko je run-rate nižší. Nie je to pesimizmus modelu, je to odchod, ktorý sa už stal." label="Očak. mesačný run-rate" />} color={C.blue} />
+          {hasData && (
+            <div style={{ fontSize: 11.5, color: C.textDim, lineHeight: 1.55 }}>
+              Nie je to štvrtý scenár. Run-rate hovorí, čo portfólio hádže <b>dnes</b>, keby nikto
+              neodišiel — preto býva {pred.monthlyRunRate > pred.scenarios.optimistic ? "vyšší" : "porovnateľný"} než
+              optimistický odhad, ktorý už odpočítava riziko neobnovenia.
+              {pred.monthlyRunRate > pred.scenarios.optimistic && (
+                <> Rozdiel <b>{fmtCZK(pred.monthlyRunRate - pred.scenarios.optimistic)}</b> je cena rizika, že sa balíčky neobnovia.</>
+              )}
+            </div>
+          )}
         </div>
         {!hasData && <Empty>Nahraj Payroll + Packages & Memberships CSV pre predikciu.</Empty>}
       </Card>
 
-      <PredikciaZisku prijmyOdhad={pred.scenarios.realistic} mesiac={monthsCovered} />
+      <PredikciaZisku prijmyOdhad={pred.scenarios.realistic} mesiac={monthsCovered} hodiny={hodinyOdhad} />
 
       {hasData && (
         <Card>
@@ -554,9 +589,9 @@ function Predikcia({ data, clients }: { data: PSBData; clients: Record<string, C
 // aplikácie sa opakujú, ale nový notebook sa predvídať nedá. Preto sa nepočíta
 // priemer (jeden mesiac s vybavením za 48 000 by zdvihol odhad na celý rok),
 // ale MEDIÁN posledných šiestich mesiacov — ten výkyv ignoruje.
-function PredikciaZisku({ prijmyOdhad, mesiac }: { prijmyOdhad: number; mesiac: string }) {
+function PredikciaZisku({ prijmyOdhad, mesiac, hodiny }: { prijmyOdhad: number; mesiac: string; hodiny: { jerry: number; terezka: number } }) {
   const [otvorene, setOtvorene] = useState(false);
-  const p = useMemo(() => predikciaNakladov(1), [vzasVerzia()]); // eslint-disable-line react-hooks/exhaustive-deps
+  const p = useMemo(() => predikciaNakladov(1, {}, hodiny), [vzasVerzia(), hodiny]); // eslint-disable-line react-hooks/exhaustive-deps
   const pravidelne = useMemo(() => pravidelneNaklady(), [vzasVerzia()]); // eslint-disable-line react-hooks/exhaustive-deps
   // Karta sa nikdy nestratí bez vysvetlenia. Keď nie je z čoho počítať, povie
   // to — prázdne miesto na obrazovke vyzerá ako chyba appky, aj keď je to len
@@ -586,12 +621,23 @@ function PredikciaZisku({ prijmyOdhad, mesiac }: { prijmyOdhad: number; mesiac: 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, margin: "14px 0 6px" }}>
         <StatCard value={fmtCZK(prijmyOdhad)} label="Tržby (realistický)" color={C.green} />
         <StatCard value={fmtCZK(m.naklady)} label="Prevádzkové náklady" color={C.orange} />
-        <StatCard value={fmtCZK(m.vyplaty)} label="Výplaty" color={C.blue} />
+        <StatCard
+          value={fmtCZK(m.vyplaty)}
+          label={<Info
+            text={p.vyplatyZHodin
+              ? `Nárok oboch trénerov pri očakávaných hodinách (Jerry ${hodiny.jerry.toFixed(0)} h, Terezka ${hodiny.terezka.toFixed(0)} h) podľa mzdového modelu — nie medián. Mzda nie je fixný náklad: rastie a klesá s odrobenými hodinami.`
+              : "Medián posledných mesiacov — tempo klientov sa nedá odhadnúť, tak sa berie história."}
+            label="Výplaty" />}
+          color={C.blue}
+        />
         <StatCard value={fmtCZK(zisk)} label="Odhad zisku" color={zisk >= 0 ? C.green : C.red} />
       </div>
       <div style={{ fontSize: 11.5, color: C.textDim, lineHeight: 1.55, marginTop: 4 }}>
-        Medián z {p.zaklad} {p.zaklad === 1 ? "mesiaca" : p.zaklad < 5 ? "mesiacov" : "mesiacov"} — nie priemer, aby jeden väčší nákup neposunul odhad na celý rok.
-        {zisk < 0 && <> Pri týchto nákladoch a tržbách by mesiac skončil v strate.</>}
+        Náklady: medián z {p.zaklad} mesiacov — nie priemer, aby jeden väčší nákup neposunul odhad na celý rok.
+        {p.vyplatyZHodin
+          ? <> Výplaty: nárok pri očakávaných {(hodiny.jerry + hodiny.terezka).toFixed(0)} hodinách, nie priemer z minulosti.</>
+          : <> Výplaty: medián z histórie.</>}
+        {zisk < 0 && <> <b style={{ color: C.red }}>Pri týchto tržbách by mesiac skončil v strate.</b></>}
       </div>
 
       <button

@@ -1060,11 +1060,20 @@ const median = (xs: number[]): number => {
  * Odhad na `horizont` mesiacov dopredu.
  * `prijmyOdhad` prichádza z predikcie tržieb (predictCash) — tá pozná mená.
  */
-export function predikciaNakladov(horizont = 3, prijmyOdhad: Record<string, number> = {}): {
+export function predikciaNakladov(
+  horizont = 3,
+  prijmyOdhad: Record<string, number> = {},
+  /** Očakávané odrobené hodiny — z tempa klientov. Bez nich sa výplaty
+   *  odhadujú z mediánu, čo je horšie: mzda nie je fixný náklad, rastie a
+   *  klesá s hodinami, takže medián z mesiacov so silnejšími tržbami vyrobí
+   *  stratu aj tam, kde by žiadna nebola. */
+  hodinyOdhad?: { jerry: number; terezka: number },
+): {
   mesiace: PredikciaMesiac[];
   zaklad: number;
   medianNaklady: number;
   medianVyplaty: number;
+  vyplatyZHodin: boolean;
 } {
   const p = pnlCalc();
   const posledny = poslednyMesiacSDatami();
@@ -1073,7 +1082,18 @@ export function predikciaNakladov(horizont = 3, prijmyOdhad: Record<string, numb
   for (let i = posledny; i >= 0 && okno.length < 6; i--) if (p.bezVyplat[i] > 0) okno.unshift(i);
 
   const medianNaklady = median(okno.map((i) => p.bezVyplat[i]));
-  const medianVyplaty = median(okno.map((i) => p.vyplatySpolu[i]));
+  // Mzda nie je fixný náklad — je to nárok, ktorý rastie s odrobenými
+  // hodinami. Keď poznáme očakávané hodiny, počíta sa z modelu; medián je
+  // až záloha pre prípad, že tempo klientov nepoznáme.
+  const era = eraAt(posledny);
+  // Rovnaký vzorec, aký počíta nárok v tabuľke VZAS (fix + (hodiny − prah) ×
+  // sadzba, bez orezania na nulu) — inak by predikcia a tabuľka za ten istý
+  // mesiac hlásili dve rôzne čísla.
+  const narokZa = (h: number) => era.fix + (h - era.hoursThreshold) * era.hourlyRate;
+  const zHodin = hodinyOdhad && era.kind === "fixvar"
+    ? narokZa(hodinyOdhad.jerry) + narokZa(hodinyOdhad.terezka)
+    : null;
+  const medianVyplaty = zHodin ?? median(okno.map((i) => p.vyplatySpolu[i]));
 
   const mesiace: PredikciaMesiac[] = [];
   for (let k = 1; k <= horizont; k++) {
@@ -1095,7 +1115,7 @@ export function predikciaNakladov(horizont = 3, prijmyOdhad: Record<string, numb
       zisk: prijmy - medianNaklady - medianVyplaty,
     });
   }
-  return { mesiace, zaklad: okno.length, medianNaklady, medianVyplaty };
+  return { mesiace, zaklad: okno.length, medianNaklady, medianVyplaty, vyplatyZHodin: zHodin != null };
 }
 
 /** Položky, ktoré sa opakujú každý mesiac — z nich sa dá skladať fixný základ. */
