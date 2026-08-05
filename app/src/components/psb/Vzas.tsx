@@ -331,8 +331,9 @@ function BunkaDetail({ kat, mesiac, hodnota, onZavri, onZmena }: {
       {zExcelu && pohyby.length > 0 && (
         <div style={{ background: mix(C.orange, 9), border: `1px solid ${mix(C.orange, 30)}`, borderRadius: 8, padding: "8px 10px", marginBottom: 9, fontSize: 11.5, lineHeight: 1.55 }}>
           <b style={{ color: C.text }}>Toto číslo je z Excelu, nie z banky.</b> Mesiace do jún 2026 sa z importu zámerne
-          neprepisujú, aby sa dali porovnať. Dole je {pohyby.length} {pohyby.length === 1 ? "pohyb" : pohyby.length < 5 ? "pohyby" : "pohybov"} z banky
-          zaradených do tejto kategórie — do čísla nad nimi sa nepočítajú.
+          neprepisujú, aby sa dali porovnať. Dole {pohyby.length === 1 ? "je" : "sú"} {pohyby.length}{" "}
+          {pohyby.length === 1 ? "pohyb zaradený" : pohyby.length < 5 ? "pohyby zaradené" : "pohybov zaradených"} z banky
+          do tejto kategórie — do čísla nad nimi sa nepočítajú.
           <div style={{ marginTop: 5, color: rozdielSBankou === 0 ? C.green : C.orange }}>
             Excel {fmtCZK(Math.abs(hodnota))} · banka {fmtCZK(sucet)} ·{" "}
             {rozdielSBankou === 0 ? "sedí do koruny" : <b>rozdiel {fmtCZK(rozdielSBankou)}</b>}
