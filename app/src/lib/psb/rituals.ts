@@ -74,7 +74,19 @@ export function ritualy(
   const minuly = new Date(dnes.getFullYear(), dnes.getMonth() - 1, 1);
   const mk = mesiacKluc(minuly);
   const zapis = monthNotes[mk];
-  const maMesiac = !!(zapis && ((zapis.note || "").trim() || Object.values(zapis.answers || {}).some((v) => String(v).trim())));
+  // Mesiac je zapísaný, keď naň odpovedal ČLOVEK.
+  //
+  // Fakty, ktoré do poznámky zapíše Jarvis cez kroniku ("Radek Baláž sa stal
+  // majiteľom priestoru"), sú užitočné, ale nie sú uzávierka — a keďže sa
+  // ukladajú do toho istého poľa, jeden takýto riadok by pripomienku zhasol a
+  // Jerry by otázky mesiaca nikdy nezodpovedal. Kronikové riadky sa preto
+  // z kontroly vynímajú podľa podpisu, ktorý si za sebou nechávajú.
+  const ludskaPoznamka = (zapis?.note || "")
+    .split("\n")
+    .filter((r) => !/\(zapísal Jarvis \d{4}-\d{2}-\d{2}\)\s*$/.test(r.trim()))
+    .join("")
+    .trim();
+  const maMesiac = !!(zapis && (ludskaPoznamka || Object.values(zapis.answers || {}).some((v) => String(v).trim())));
   // Odpovedať na otázky mesiaca má zmysel až nad úplnými číslami. Kým chýba
   // banka alebo PTminder, odpoveď by sa písala k neúplnému mesiacu a musela by
   // sa prepisovať — pripomienka preto čaká, kým sú doklady nahraté, a dovtedy
