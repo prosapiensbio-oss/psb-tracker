@@ -1325,9 +1325,14 @@ function RegisterRow({ item, actions, onNavigate, chat }: { item: RegisterItem; 
     chat.setFloatingOpen(true);
     void chat.ask(
       `Toto je odpoveď na položku z registra „Na čo sa pozrieť“.\n\n` +
-      `Položka (${item.category}): ${item.detail}\n\n` +
+      `key: ${item.key}\n` +
+      `Položka (${item.category}): ${item.title}\n` +
+      `Detail: ${item.detail}\n\n` +
       `Moja odpoveď: ${text.trim()}\n\n` +
-      `Ak z toho vyplýva konkrétna úprava v dátach, sprav ju. Ak ti chýba informácia, spýtaj sa — nehádaj.`,
+      `Ten key vyššie je presný — použi ho, nehľadaj ho v dátach a nevymýšľaj si iný. ` +
+      `Keď je odpoveďou, že položka nie je chyba a má sa uzavrieť, pridaj na koniec ` +
+      `ack-anomaly blok s týmto key a s mojou odpoveďou ako poznámkou. ` +
+      `Keď z odpovede vyplýva aj úprava dát, navrhni ju. Ak ti chýba informácia, spýtaj sa — nehádaj.`,
     );
     // Položka sa označí ako vybavená až Jarvisovou úpravou, nie odoslaním —
     // odoslať otázku nie je to isté ako vyriešiť ju.

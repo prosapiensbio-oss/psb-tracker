@@ -288,6 +288,7 @@ export function PSBApp() {
   // ich potrebuje aj dlaždica Zisk na dashboarde, nielen obrazovka VZAS.
   const [, setFioTik] = useState(0);
   const [bankaSumy, setBankaSumy] = useState<BankovyMesiac>({});
+  const [hotovostMesiace, setHotovostMesiace] = useState<Set<string>>(new Set());
   useEffect(() => {
     void fetch("/api/marketing", { credentials: "same-origin" })
       .then((r) => r.json())
@@ -302,7 +303,7 @@ export function PSBApp() {
   useEffect(() => {
     void fetch("/api/fio", { credentials: "same-origin" })
       .then((r) => r.json())
-      .then(async (j: { pohyby?: { datum: string; suma: number; kategoria: string; protistrana?: string; poznamka?: string }[] }) => {
+      .then(async (j: { pohyby?: { datum: string; suma: number; kategoria: string; protistrana?: string; poznamka?: string; typ?: string }[] }) => {
         // Faktúry ROZPISUJÚ bankový pohyb, nenahrádzajú ho. Nákup z Alzy je
         // v banke ako jedna suma a na faktúre ako trinásť položiek — keby sa
         // pripočítalo oboje, náklad by bol dvojnásobný. Preto sa spárovaný
@@ -372,6 +373,11 @@ export function PSBApp() {
           });
         }
         nastavRozpis(rozpis);
+        // Zošit sa pozná podľa typu pohybu — mesiac netreba pýtať, vyplýva z
+        // dátumov, ktoré sa pri prepise potvrdzujú.
+        setHotovostMesiace(new Set(
+          (j.pohyby || []).filter((x) => x.typ === "hotovosť").map((x) => String(x.datum).slice(0, 7)),
+        ));
         // Sumy si drží aj React — register z nich robí kontrolu „čo nedorazilo"
         // a „čo nesedí s Excelom". Bez toho by o nich vedel len model.
         setBankaSumy(sumy);
@@ -480,8 +486,11 @@ export function PSBApp() {
     if (!k.plny || k.plny < mk) chybaju.push("PTminder (sedenia a platby)");
     if (!bankaSumy[mk]) chybaju.push("výpis z Fio");
     if (!MKT_MESACNE.some((r) => r.m === mk)) chybaju.push("Metricool");
+    // Bez zošita chýba hotovosť — a s ňou časť nákladov aj výplat. Mesiac,
+    // ktorý sa uzavrie bez nej, vyzerá ziskovejší, než bol.
+    if (!hotovostMesiace.has(mk)) chybaju.push("zošit (hotovostné platby)");
     return { mesiac: mk, chybaju };
-  }, [data, bankaSumy]);
+  }, [data, bankaSumy, hotovostMesiace]);
 
   const rituals = useMemo(
     () => spocitajRitualy(new Date(), zapisy.weeks, zapisy.mesiace, chybajuceDoklady),

@@ -40,6 +40,7 @@ export function Zosit({ onZapisane }: { onZapisane?: () => void }) {
   const [stav, setStav] = useState("");
   const [vysledok, setVysledok] = useState<string | null>(null);
   const [rok, setRok] = useState(String(new Date().getFullYear()));
+  const [nadZonou, setNadZonou] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const nacitaj = async (files: FileList | null) => {
@@ -123,14 +124,30 @@ export function Zosit({ onZapisane }: { onZapisane?: () => void }) {
         />
       </H3>
 
+      {/* Pretiahnutie je pri fotke prirodzenejšie než dialóg na výber súboru —
+          fotka býva už otvorená vedľa. Klik zostáva pre mobil, kde sa ťahať
+          nedá a `capture` otvorí rovno fotoaparát. */}
+      <div
+        onDragOver={(e) => { e.preventDefault(); setNadZonou(true); }}
+        onDragLeave={() => setNadZonou(false)}
+        onDrop={(e) => { e.preventDefault(); setNadZonou(false); void nacitaj(e.dataTransfer.files); }}
+        onClick={() => !busy && inputRef.current?.click()}
+        style={{
+          border: `2px dashed ${nadZonou ? C.accent : C.border}`,
+          background: nadZonou ? mix(C.accent, 10) : "transparent",
+          borderRadius: 10, padding: "14px 16px", textAlign: "center",
+          cursor: busy ? "default" : "pointer", marginBottom: 10,
+        }}
+      >
+        <div style={{ fontSize: 13, color: C.text }}>
+          {busy ? "Čítam rukopis…" : riadky ? "Pretiahni sem ďalšiu stranu — alebo klikni" : "Pretiahni sem fotku strany zošita — alebo klikni"}
+        </div>
+        <div style={{ fontSize: 11, color: C.textDim, marginTop: 4 }}>
+          Aj viac strán naraz. Riadky sa pripoja k tým, čo už máš v náhľade.
+        </div>
+      </div>
+
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 10 }}>
-        <button
-          onClick={() => inputRef.current?.click()}
-          disabled={busy}
-          style={{ background: C.accentBg, border: `1px solid ${C.accent}`, borderRadius: 8, padding: "7px 14px", color: C.accentLight, fontSize: 12.5, cursor: busy ? "default" : "pointer" }}
-        >
-          {busy ? "Pracujem…" : riadky ? "Pridať ďalšiu stranu" : "Odfoť / vyber stranu zošita"}
-        </button>
         <label style={{ fontSize: 11.5, color: C.textDim, display: "flex", alignItems: "center", gap: 6 }}>
           Rok
           <input

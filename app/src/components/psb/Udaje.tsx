@@ -96,6 +96,7 @@ function UploadCard({ data, missing, actions, chat }: { data: PSBData; missing: 
   const [bankovyText, setBankovyText] = useState("");
   // Stav bankových pohybov sa nedá prečítať z PSBData — má vlastnú tabuľku.
   const [bankaStav, setBankaStav] = useState<{ pocet: number; posledny: string } | null>(null);
+  const [zositStav, setZositStav] = useState<{ pocet: number; posledny: string } | null>(null);
   const [faktury, setFaktury] = useState<Faktura[]>([]);
   const [fakturaChyba, setFakturaChyba] = useState<{ meno: string; dovod: string; ukazka: string[] }[]>([]);
   const [fakturyNahrate, setFakturyNahrate] = useState(0);
@@ -109,12 +110,15 @@ function UploadCard({ data, missing, actions, chat }: { data: PSBData; missing: 
     void fetch("/api/fio", { credentials: "same-origin" })
       .then((r) => r.json())
       .then((j) => {
-        const p = (j.pohyby || []) as { datum: string }[];
+        const p = (j.pohyby || []) as { datum: string; typ?: string }[];
         setBankaStav({ pocet: p.length, posledny: p.reduce((m, x) => (x.datum > m ? x.datum : m), "") });
+        const h = p.filter((x) => x.typ === "hotovosť");
+        setZositStav({ pocet: h.length, posledny: h.reduce((m, x) => (x.datum > m ? x.datum : m), "") });
       })
-      .catch(() => setBankaStav({ pocet: 0, posledny: "" }));
+      .catch(() => { setBankaStav({ pocet: 0, posledny: "" }); setZositStav({ pocet: 0, posledny: "" }); });
   }, [bankovyText]);
   const bankaNahrata = (bankaStav?.pocet || 0) > 0;
+  const zositNahraty = (zositStav?.pocet || 0) > 0;
   const bankaInfo = bankaStav?.posledny ? `dáta do ${fmtDMY(bankaStav.posledny)}` : "";
   const [surove, setSurove] = useState<{ druh: string; pocet: number; posledny: string }[]>([]);
   useEffect(() => {
@@ -300,7 +304,7 @@ function UploadCard({ data, missing, actions, chat }: { data: PSBData; missing: 
         style={{ ...S.upload, borderColor: dragOver ? C.accent : `${mix(C.accent, 33)}`, background: dragOver ? C.accentBg : "transparent" }}
       >
         <div style={{ fontSize: 24, marginBottom: 6 }}>⬆</div>
-        <div style={{ color: C.text }}>{busy ? "Spracúvam…" : "Pretiahni sem CSV, PDF alebo fotku zošita — alebo klikni"}</div>
+        <div style={{ color: C.text }}>{busy ? "Spracúvam…" : "Pretiahni CSV alebo PDF súbory sem alebo klikni"}</div>
         <div style={{ fontSize: 12, color: C.textDim, marginTop: 6 }}>
           PTminder aj bankový výpis z Fio. Typ rozpozná sám; duplicity preskočí, históriu zachová.
           Bankový výpis sa najprv ukáže na kontrolu.
@@ -401,6 +405,14 @@ function UploadCard({ data, missing, actions, chat }: { data: PSBData; missing: 
             <strong style={{ color: C.text }}>{BANKA_ZDROJ.label}</strong>
             {bankaInfo && <span style={{ color: C.accentLight, fontWeight: 500 }}> · {bankaInfo}</span>}
             <br /><span style={{ color: C.textDim }}>{BANKA_ZDROJ.path}</span>
+          </span>
+        </div>
+        <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 5, display: "flex", gap: 8, marginTop: 2 }}>
+          <span style={{ color: zositNahraty ? C.green : C.orange, flexShrink: 0 }}>{zositNahraty ? "✓" : "✗"}</span>
+          <span>
+            <strong style={{ color: C.text }}>Zošit — hotovostné platby</strong>
+            {zositStav?.posledny && <span style={{ color: C.accentLight, fontWeight: 500 }}> · {zositStav.pocet} riadkov, dáta do {fmtDMY(zositStav.posledny)}</span>}
+            <br /><span style={{ color: C.textDim }}>Odfoť stranu zošita do karty „Zošit — hotovostné platby“ hore. Bez neho chýba hotovosť, a s ňou časť nákladov aj výplat — mesiac potom vyzerá ziskovejší, než bol.</span>
           </span>
         </div>
         <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 5, display: "flex", gap: 8, marginTop: 2 }}>
