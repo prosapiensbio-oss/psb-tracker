@@ -27,6 +27,27 @@ type Riadok = {
   vypnuty?: boolean;
 };
 
+// Dátum sa zobrazuje ako v zošite: „14.5." Rok je hore vo vlastnom poli a
+// opakovať ho v každom riadku je šum — pri tridsiatich riadkoch to je tridsať
+// zbytočných čísel medzi tými, ktoré treba naozaj skontrolovať.
+//
+// Vnútri sa ale drží celý ISO dátum: zapisuje sa do rovnakej tabuľky ako
+// bankové pohyby a tam neúplný dátum nemá čo robiť.
+const naDenMesiac = (iso: string) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  return m ? `${Number(m[3])}.${Number(m[2])}.` : iso;
+};
+
+/** „14.5." + rok → ISO. Vracia null, keď sa to nedá prečítať. */
+const zDenMesiac = (text: string, rok: string): string | null => {
+  const m = /^\s*(\d{1,2})\s*\.\s*(\d{1,2})\s*\.?\s*$/.exec(text);
+  if (!m) return null;
+  const d = Number(m[1]);
+  const mes = Number(m[2]);
+  if (d < 1 || d > 31 || mes < 1 || mes > 12) return null;
+  return `${rok}-${String(mes).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+};
+
 const dataUrl = (f: File) => new Promise<string>((res, rej) => {
   const r = new FileReader();
   r.onload = () => res(String(r.result));
@@ -45,6 +66,8 @@ export function Zosit({ onZapisane }: { onZapisane?: () => void }) {
   // hľadá posledný zápis — obe sa hodia, tak nech sa dá prepnúť. Nemení to
   // dáta, len pohľad; zapisuje sa vždy všetko označené.
   const [odNajstarsich, setOdNajstarsich] = useState(true);
+  /** Rozpísaný text v poli dátumu — kým sa nedá prečítať, ISO sa nemení. */
+  const [denMesiac, setDenMesiac] = useState<Record<number, string>>({});
   const inputRef = useRef<HTMLInputElement>(null);
 
   const nacitaj = async (files: FileList | null) => {
@@ -222,11 +245,27 @@ export function Zosit({ onZapisane }: { onZapisane?: () => void }) {
                         style={{ accentColor: C.accent, cursor: "pointer" }}
                       />
                     </td>
-                    <td style={{ padding: "5px 8px" }}>
+                    <td style={{ padding: "5px 8px", whiteSpace: "nowrap" }}>
                       <input
-                        value={r.datum} onChange={(e) => uprav(i, { datum: e.target.value })}
-                        style={{ width: 108, padding: "4px 6px", borderRadius: 5, border: `1px solid ${r.isty ? C.border : mix(C.orange, 45)}`, background: C.bg, color: C.text, fontSize: 12 }}
+                        value={denMesiac[i] ?? naDenMesiac(r.datum)}
+                        onChange={(e) => {
+                          const t = e.target.value;
+                          setDenMesiac((p) => ({ ...p, [i]: t }));
+                          // Prepíše sa len keď sa dátum dá prečítať — inak by
+                          // sa pri písaní „1" stratil zvyšok riadku.
+                          const iso = zDenMesiac(t, r.datum.slice(0, 4) || rok);
+                          if (iso) uprav(i, { datum: iso });
+                        }}
+                        onBlur={() => setDenMesiac((p) => { const n = { ...p }; delete n[i]; return n; })}
+                        placeholder="14.5."
+                        style={{ width: 62, padding: "4px 6px", borderRadius: 5, border: `1px solid ${zDenMesiac(denMesiac[i] ?? naDenMesiac(r.datum), rok) ? (r.isty ? C.border : mix(C.orange, 45)) : C.red}`, background: C.bg, color: C.text, fontSize: 12, textAlign: "center" }}
                       />
+                      {/* Rok sa ukáže LEN keď sedí iný než nastavený hore —
+                          napríklad pri prelome roka. Vtedy je to jediná vec,
+                          ktorá riadok odlišuje, a schovať ju by bola chyba. */}
+                      {r.datum.slice(0, 4) !== rok && (
+                        <span style={{ fontSize: 11, color: C.orange, marginLeft: 5 }}>{r.datum.slice(0, 4)}</span>
+                      )}
                     </td>
                     <td style={{ padding: "5px 8px" }}>
                       <input
