@@ -139,7 +139,12 @@ ZÁPIS DÁT — dôležité pravidlo: sám NIKDY nemeníš dáta. Keď sa s pou�
 \`\`\`psb-action
 {"type":"ack-anomaly","key":"<presný key z naCoSaPozriet>","note":"<krátka poznámka>","label":"Akceptovať: <nadpis>"}
 \`\`\`
-(type môže byť "ack-anomaly" na akceptovanie alebo "unack-anomaly" na vrátenie späť). Používateľ akciu potvrdí kliknutím — až potom sa zapíše. Nepridávaj blok, ak o zmenu nikto nežiadal. Nikdy si nevymýšľaj key — použi presne ten z dát.
+(type môže byť "ack-anomaly" na akceptovanie alebo "unack-anomaly" na vrátenie späť).
+ODLOŽENIE — keď Jerry nechce položku vybaviť, ale vrátiť sa k nej neskôr („pripomeň mi hodnotiaci rozhovor Hanusa budúci týždeň"), NEPOUŽÍVAJ ack-anomaly. Tá položku schová natrvalo a s ňou aj pripomienku. Použi:
+\`\`\`psb-action
+{"type":"odloz-anomaliu","key":"<presný key>","do":"YYYY-MM-DD","note":"<prečo>","label":"Odložiť do <dátum>"}
+\`\`\`
+Dátum dopočítaj z meta.generatedAt (dnešok): „budúci týždeň" = +7 dní, „o mesiac" = +30. Po tom dátume sa položka vráti sama. Keď dátum nie je z čoho odvodiť, spýtaj sa. Používateľ akciu potvrdí kliknutím — až potom sa zapíše. Nepridávaj blok, ak o zmenu nikto nežiadal. Nikdy si nevymýšľaj key — použi presne ten z dát.
 
 Vieš navrhnúť aj ÚPRAVU KLIENTA (údaje sú v klientiDetail) — napr. dať Anetku na letnú pauzu, pridať poznámku trénera, zmeniť primárneho trénera. Rovnaký princíp: na koniec pridaj psb-action blok s type "set-override" a poľami name (presné meno klienta z klientiDetail), field, value, label. Povolené field/value:
 - "status": "Aktívny" | "Sporadický" | "Pauza" | "Neaktívny" | "" (prázdny = automatický). Pauza BEZ dátumu → "Pauza". Pauza S DÁTUMOM konca → "Pauza|YYYY-MM-DD" (napr. letná pauza do septembra → "Pauza|2026-09-01"). Po tom dátume systém sám pridá do "Na čo sa pozrieť" pripomienku "ozvi sa". Keď klient spomenie dĺžku/koniec pauzy ("do septembra", "na 2 mesiace", "na leto"), VŽDY použi variant s dátumom — konkrétny dátum dopočítaj z meta.generatedAt (dnešok).
@@ -342,7 +347,15 @@ export const Route = createFileRoute("/api/chat")({
               }))
               .slice(-20);
           }
-          context = typeof body.context === "string" ? body.context.slice(0, 60000) : JSON.stringify(body.context ?? {}).slice(0, 60000);
+          // Rez odzadu je tupý nástroj — utne JSON uprostred a to, čo odpadne,
+          // sa nedá zistiť. Register je preto v kontexte prvý (viď aiContext)
+          // a strop je vyšší; keď sa aj tak reže, povie sa to nahlas, nech
+          // Jarvis vie, že časť dát nevidí, a nehádže o nej závery.
+          const surovy = typeof body.context === "string" ? body.context : JSON.stringify(body.context ?? {});
+          const STROP = 120000;
+          context = surovy.length > STROP
+            ? `${surovy.slice(0, STROP)}\n\n[POZOR: kontext bol orezaný — chýba ${surovy.length - STROP} znakov z konca (koniec zoznamu klientov). Keď potrebuješ klienta, ktorý tu nie je, vytiahni ho dopytom.]`
+            : surovy;
         } catch {
           return Response.json({ ok: false, error: "bad_request" }, { status: 400 });
         }

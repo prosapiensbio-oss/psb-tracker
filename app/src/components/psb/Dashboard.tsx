@@ -1281,6 +1281,13 @@ function RegisterRow({ item, actions, onNavigate, chat }: { item: RegisterItem; 
   /** Otvorené okienko odpovede pre túto položku. */
   const [odpoved, setOdpoved] = useState(false);
   const [text, setText] = useState("");
+  const [odlozit, setOdlozit] = useState(false);
+
+  const odloz = (dni: number) => {
+    const d = new Date(Date.now() + dni * 86400000).toISOString().slice(0, 10);
+    actions.ackAnomaly(item.key, `odlozene|${d}|`, true);
+    setOdlozit(false);
+  };
   const jump = item.category === "6M" ? "6m" : item.category === "Kapacita" ? "treningy" : "klienti";
   const jeRozhodnutie = item.category === "Rozhodnutie";
   // Niektoré položky nemajú klienta, majú miesto, kam sa ide pozrieť —
@@ -1362,6 +1369,14 @@ function RegisterRow({ item, actions, onNavigate, chat }: { item: RegisterItem; 
               {odpoved ? "Zavrieť" : "Odpovedať"}
             </button>
           )}
+          {/* „Skryť" znamenalo navždy — jediná možnosť, ako sa zbaviť veci,
+              ktorá práve nie je na rade, bola zabudnúť na ňu. Odloženie ju
+              vráti samo. */}
+          {!item.acked && (
+            <button onClick={() => setOdlozit((o) => !o)} style={{ ...linkBtn, color: odlozit ? C.accentLight : C.textMuted }}>
+              {odlozit ? "Zavrieť" : "Odložiť"}
+            </button>
+          )}
           {item.acked ? (
             <button onClick={() => actions.ackAnomaly(item.key, "", false)} style={linkBtn}>Vrátiť</button>
           ) : (
@@ -1369,6 +1384,18 @@ function RegisterRow({ item, actions, onNavigate, chat }: { item: RegisterItem; 
           )}
         </div>
       </div>
+
+      {odlozit && (
+        <div style={{ marginTop: 9, paddingTop: 9, borderTop: `1px solid ${mix(C.border, 70)}`, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <span style={{ fontSize: 12, color: C.textMuted }}>Pripomenúť o:</span>
+          {[["3 dni", 3], ["týždeň", 7], ["2 týždne", 14], ["mesiac", 30]].map(([lbl, dni]) => (
+            <button key={String(lbl)} onClick={() => odloz(Number(dni))}
+              style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 7, padding: "4px 11px", color: C.accentLight, fontSize: 12, cursor: "pointer" }}>
+              {lbl}
+            </button>
+          ))}
+        </div>
+      )}
 
       {odpoved && chat && (
         <div style={{ marginTop: 9, paddingTop: 9, borderTop: `1px solid ${mix(C.border, 70)}` }}>

@@ -397,6 +397,24 @@ export function PSBApp() {
   // Kontroly nad bankovými sumami. Register je jediné miesto, kam sa človek
   // pozerá, keď hľadá „čo mám spraviť" — ďalšia karta vedľa neho by znamenala
   // dve miesta na tú istú otázku.
+  // Odloženie („pripomeň mi to o týždeň") nie je to isté ako vybavenie.
+  // Appka poznala len „skryť navždy", takže odložiť sa dalo iba tak, že vec
+  // zmizla — a s ňou aj pripomienka. Odložená položka sa vráti sama.
+  //
+  // Skladuje sa v tom istom poli ako poznámka k akceptácii, s predponou
+  // „odlozene|DÁTUM|" — vlastnú tabuľku by si to nezaslúžilo a migrácia
+  // existujúcich zápisov by bola drahšia než tento prefix.
+  const stavPolozky = useCallback((key: string) => {
+    const z = (data.anomalyAck || {})[key];
+    if (!z) return { acked: false, note: undefined as string | undefined };
+    const m = /^odlozene\|(\d{4}-\d{2}-\d{2})\|?([\s\S]*)$/.exec(z.note || "");
+    if (!m) return { acked: true, note: z.note };
+    const dnes = new Date().toISOString().slice(0, 10);
+    // Dátum už prešiel → položka sa vracia medzi živé, aj s poznámkou prečo.
+    if (m[1] <= dnes) return { acked: false, note: `odložené na ${m[1]}${m[2] ? ` — ${m[2]}` : ""}`, vratene: true };
+    return { acked: true, note: `odložené do ${m[1]}${m[2] ? ` — ${m[2]}` : ""}` };
+  }, [data.anomalyAck]);
+
   const kontrolaBanky = useMemo(() => {
     const out: typeof register = [];
     const ack = data.anomalyAck || {};
@@ -420,7 +438,7 @@ export function PSBApp() {
         detail: n.druh === "chyba"
           ? `${meno} — platilo sa ${n.zMesiacov} zo 4 predošlých mesiacov, obvykle ${Math.round(n.obvykle).toLocaleString("cs-CZ")} Kč, ale za ${monthLabel(n.mesiac)} v banke nie je nič. Buď je pohyb zaradený inde, platilo sa v hotovosti, alebo faktúra nie je uhradená. Zisk za ten mesiac je zatiaľ o túto sumu vyšší, než bude.`
           : `${meno} — obvykle ${Math.round(n.obvykle).toLocaleString("cs-CZ")} Kč, za ${monthLabel(n.mesiac)} len ${Math.round(n.teraz).toLocaleString("cs-CZ")} Kč. Buď je časť zaradená inde, alebo sa platilo menej.`,
-        acked: !!ack[key], note: ack[key]?.note,
+        ...stavPolozky(key),
         priority: n.druh === "chyba" ? 3 : 7, client: "vzas|pnl",
       });
     }
@@ -439,7 +457,7 @@ export function PSBApp() {
         key, category: "Zmena", tone: "orange",
         title: `Excel a banka sa rozchádzajú v ${nezhody.length} ${nezhody.length === 1 ? "položke" : nezhody.length < 5 ? "položkách" : "položkách"}`,
         detail: `Mesiace do jún 2026 berú číslo z Excelu, banka slúži na kontrolu. Najväčšie rozdiely — ${top}. Celý zoznam je vo VZAS → Zisky a straty, klikom na číslo.`,
-        acked: !!ack[key], note: ack[key]?.note, priority: 9, client: "vzas|pnl",
+        ...stavPolozky(key), priority: 9, client: "vzas|pnl",
       });
     }
     return out;
@@ -460,7 +478,7 @@ export function PSBApp() {
           key, category: "Zmena", tone: "orange",
           title: `${nazov} klesli`,
           detail: `${nazov} za ${posledny.m}: ${Math.round(posledny.v).toLocaleString("cs-CZ")} — o ${Math.round((1 - posledny.v / zaklad) * 100)} % pod priemerom predošlých 3 mesiacov`,
-          acked: !!ack[key], note: ack[key]?.note, priority: 8, client: ciel,
+          ...stavPolozky(key), priority: 8, client: ciel,
         });
       }
     };
@@ -513,7 +531,7 @@ export function PSBApp() {
         tone: (r.druh === "kvartal" ? "blue" : "orange") as "blue" | "orange",
         title: r.nadpis,
         detail: `${r.nadpis} — ${r.detail}`,
-        acked: !!ack[`zapis|${r.id}`],
+        ...stavPolozky(`zapis|${r.id}`),
         // Cieľ navigácie sa vezie v `client` — register nemá vlastné pole na
         // odkaz a zaviesť ho kvôli trom položkám by bolo viac kódu než úžitku.
         client: `${r.ciel.tab}|${r.ciel.sub || ""}${r.ciel.mesiac ? `|${r.ciel.mesiac}` : ""}`,

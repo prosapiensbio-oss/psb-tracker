@@ -9,7 +9,7 @@ import { C, mix } from "../../lib/psb/theme";
 import type { Actions } from "./App";
 
 type ParsedAction = {
-  type: "ack-anomaly" | "unack-anomaly" | "set-override" | "zapis-zaver" | "vyhodnot-zaver" | "novy-ciel" | "kronika";
+  type: "ack-anomaly" | "unack-anomaly" | "set-override" | "zapis-zaver" | "vyhodnot-zaver" | "novy-ciel" | "kronika" | "odloz-anomaliu";
   label: string;
   done?: boolean;
   key?: string;
@@ -68,6 +68,8 @@ function parseActions(raw: string): { text: string; actions: ParsedAction[] } {
           actions.push({ type: "novy-ciel", label, data: o });
         } else if (o?.type === "kronika" && typeof o.fakt === "string" && /^\d{4}-\d{2}$/.test(String(o.mesiac))) {
           actions.push({ type: "kronika", label, data: o });
+        } else if (o?.type === "odloz-anomaliu" && typeof o.key === "string" && /^\d{4}-\d{2}-\d{2}$/.test(String(o.do))) {
+          actions.push({ type: "odloz-anomaliu", key: o.key, label, data: o });
         }
       } catch {
         /* ignore malformed */
@@ -250,6 +252,10 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
       else if (a.type === "zapis-zaver" && a.data) void saveZaver(a.data);
       else if (a.type === "vyhodnot-zaver" && a.data) {
         void vyhodnotZaver(String(a.data.id || ""), String(a.data.stav || "otvoreny"), String(a.data.vysledok || ""));
+      } else if (a.type === "odloz-anomaliu" && a.data) {
+        // Odloženie sa ukladá ako akceptácia s poznámkou „odlozene|DÁTUM|…".
+        // Register ju do toho dátumu skrýva a potom vráti späť medzi živé.
+        actions.ackAnomaly(a.key || "", `odlozene|${String(a.data.do)}|${String(a.data.note || "")}`, true);
       } else if (a.type === "kronika" && a.data) {
         // Fakt o vývoji PSB sa PRIPÍSAVA k poznámke mesiaca, neprepisuje ju.
         // Poznámka mesiaca je jediné miesto, ktoré appka drží v čase — o rok

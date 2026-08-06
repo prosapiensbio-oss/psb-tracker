@@ -170,6 +170,19 @@ export function buildAiContext(
     }));
 
   return {
+    // Register je PRVÝ zámerne. Kontext sa na serveri reže na pevnú dĺžku a
+    // rez ide odzadu — kým bol register posledný, pri 60+ klientoch z neho
+    // nezostalo nič a Jarvis na „zruš to upozornenie o nájme" odpovedal, že
+    // ho nenašiel. Malé a dôležité veci patria dopredu, dlhé zoznamy dozadu.
+    naCoSaPozriet: register.map((r) => ({
+      key: r.key,
+      kategoria: r.category,
+      zavaznost: r.tone === "red" ? "vysoká" : r.tone === "orange" ? "stredná" : "nízka",
+      nadpis: r.title,
+      detail: r.detail,
+      akceptovane: r.acked,
+      poznamka: r.note || null,
+    })),
     meta: {
       generatedAt: new Date().toISOString().slice(0, 10),
       note: "Súhrnné čísla sú za OBOCH trénerov spolu (Jerry + Terezka), ak nie je uvedené inak. Rozpisy po trénerovi máš v zarobky.mesacne (jerry/terezka), tyzdennePodlaTrenera a kapacita.podlaTrenera. Detail každého klienta (aj editovateľné polia) je v klientiDetail.",
@@ -200,14 +213,5 @@ export function buildAiContext(
     },
     sixM: { spolu: sixM.length, podlaFazy: sixMPhases, poznamka: "6M proces: Obnova 1.–6. mesiac, Integrácia 7.–18., Udržateľnosť 19.+" },
     klientiDetail,
-    naCoSaPozriet: register.map((r) => ({
-      key: r.key,
-      kategoria: r.category,
-      zavaznost: r.tone === "red" ? "vysoká" : r.tone === "orange" ? "stredná" : "nízka",
-      nadpis: r.title,
-      detail: r.detail,
-      akceptovane: r.acked,
-      poznamka: r.note || null,
-    })),
   };
 }
