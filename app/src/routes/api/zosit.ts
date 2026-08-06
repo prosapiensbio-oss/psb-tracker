@@ -109,7 +109,11 @@ export const Route = createFileRoute("/api/zosit")({
             poznamka: r.poznamka ? String(r.poznamka).slice(0, 120) : "",
             isty: r.isty !== false,
           }))
-          .sort((a, b2) => b2.datum.localeCompare(a.datum));
+          // Chronologicky, ako je to na papieri. Náhľad sa číta proti zošitu
+          // riadok po riadku — obrátené poradie sťažuje presne tú kontrolu,
+          // kvôli ktorej náhľad existuje. (Hotové tabuľky v appke majú
+          // najnovšie hore; tu je to naopak zámerne.)
+          .sort((a, b2) => a.datum.localeCompare(b2.datum));
         return Response.json({ ok: true, riadky: cisté, zahodenych: riadky.length - cisté.length });
       },
     },

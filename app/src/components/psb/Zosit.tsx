@@ -41,6 +41,10 @@ export function Zosit({ onZapisane }: { onZapisane?: () => void }) {
   const [vysledok, setVysledok] = useState<string | null>(null);
   const [rok, setRok] = useState(String(new Date().getFullYear()));
   const [nadZonou, setNadZonou] = useState(false);
+  // Poradie riadkov. Chronologicky sa to kontroluje proti papieru, opačne sa
+  // hľadá posledný zápis — obe sa hodia, tak nech sa dá prepnúť. Nemení to
+  // dáta, len pohľad; zapisuje sa vždy všetko označené.
+  const [odNajstarsich, setOdNajstarsich] = useState(true);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const nacitaj = async (files: FileList | null) => {
@@ -112,6 +116,11 @@ export function Zosit({ onZapisane }: { onZapisane?: () => void }) {
     }
   };
 
+  // Dôležité: triedi sa POHĽAD, nie pole. Každý riadok si nesie pôvodný index,
+  // takže úprava zapíše tam, kam patrí, aj keď je poradie prehodené.
+  const zoradene = riadky
+    ? riadky.map((r, i) => ({ r, i })).sort((a, b) => (odNajstarsich ? 1 : -1) * a.r.datum.localeCompare(b.r.datum))
+    : [];
   const neisté = riadky?.filter((r) => !r.isty && !r.vypnuty).length ?? 0;
   const spolu = riadky?.filter((r) => !r.vypnuty).reduce((a, r) => a + r.suma, 0) ?? 0;
 
@@ -184,12 +193,22 @@ export function Zosit({ onZapisane }: { onZapisane?: () => void }) {
               <thead>
                 <tr style={{ borderBottom: `2px solid ${mix(C.accent, 35)}` }}>
                   {["", "Dátum", "Popis", "Suma", "Kategória"].map((h, i) => (
-                    <th key={i} style={{ textAlign: i === 3 ? "right" : "left", padding: "7px 8px", fontSize: 11, color: C.textMuted, fontWeight: 600 }}>{h}</th>
+                    <th key={i} style={{ textAlign: i === 3 ? "right" : "left", padding: "7px 8px", fontSize: 11, color: C.textMuted, fontWeight: 600 }}>
+                      {i === 1 ? (
+                        <button
+                          onClick={() => setOdNajstarsich((o) => !o)}
+                          title="Prepnúť poradie"
+                          style={{ background: "none", border: "none", padding: 0, color: C.accentLight, fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+                        >
+                          Dátum {odNajstarsich ? "↑" : "↓"}
+                        </button>
+                      ) : h}
+                    </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {riadky.map((r, i) => (
+                {zoradene.map(({ r, i }) => (
                   <tr key={i} style={{
                     background: r.vypnuty ? "transparent" : r.isty ? "transparent" : mix(C.orange, 8),
                     opacity: r.vypnuty ? 0.4 : 1,
