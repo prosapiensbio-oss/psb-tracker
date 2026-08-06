@@ -4,7 +4,7 @@ import { fetchBtcReserve, fetchMonthNotes, fetchVzasSettings, fetchWeekEntries, 
 import { monthlyFinance, predictCash, ZONE_HI, type CapacityRow, type ClientAgg, type RegisterItem, type SixMRow } from "../../lib/psb/compute";
 import { fmtCZK, fmtDMY, monthLabel } from "../../lib/psb/format";
 import { ObdobieCtx } from "../../lib/psb/obdobie";
-import { PRVY_MESIAC_Z_FIO, nastavPnlBunku, nastavPnlOverrides, nastavPrijmyZTrackera, nastavVyplaty, pnlJeOpravena, pnlOverridesNaUlozenie, pnlPovodnaHodnota, poslednyMesiacSDatami, vyplatyNaUlozenie } from "../../lib/psb/vzas";
+import { PRVY_MESIAC_Z_FIO, nastavPnlBunku, nastavPnlOverrides, nastavZmenyKategorii, vzasVerzia, premenujKategoriu, presunKategoriu, pridajKategoriu, skupinyPnl, zmenyKategoriiNaUlozenie, nastavPrijmyZTrackera, nastavVyplaty, pnlJeOpravena, pnlOverridesNaUlozenie, pnlPovodnaHodnota, poslednyMesiacSDatami, vyplatyNaUlozenie } from "../../lib/psb/vzas";
 import { rozpisPre, type PohybZaBunku } from "../../lib/psb/rozpis";
 import { C, mix, S } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
@@ -580,6 +580,113 @@ function CommitmentTable({ idx }: { idx: number[] }) {
   );
 }
 
+// Správa kategórií P&L.
+//
+// Štruktúra pochádza z Excelu a osemnásť mesiacov histórie na nej stojí, takže
+// nová služba alebo preklep v názve doteraz znamenali zmenu zdrojáku. Zmeny sa
+// ukladajú ako vrstva nad kódom: kľúč položky sa nemení, takže historické
+// čísla ostávajú aj po premenovaní či presune.
+function SpravaKategorii({ onZmena }: { onZmena: () => void }) {
+  const [otvorene, setOtvorene] = useState(false);
+  const [novy, setNovy] = useState({ skupina: "", label: "" });
+  const skupiny = useMemo(() => skupinyPnl(), []);
+
+  const uloz = async () => {
+    await saveVzasSetting("pnl_kategorie", zmenyKategoriiNaUlozenie());
+    onZmena();
+  };
+
+  const polozky = useMemo(() => {
+    const out: { kat: string; label: string; skupina: string }[] = [];
+    for (const [sekK, sek] of Object.entries(PNL)) {
+      for (const [subK, sub] of Object.entries(sek.subcategories)) {
+        for (const [itemK, it] of Object.entries(sub.items)) {
+          out.push({ kat: `${sekK}.${subK}.${itemK}`, label: it.label, skupina: `${sekK}.${subK}` });
+        }
+      }
+    }
+    return out;
+  }, [vzasVerzia()]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <Card>
+      <H3 onClick={() => setOtvorene(!otvorene)}>
+        <span style={{ display: "inline-block", width: 15, color: C.textDim, fontSize: 9 }}>{otvorene ? "\u25bc" : "\u25b6"}</span>
+        <Info
+          label="Správa kategórií"
+          text="Premenovanie, presun medzi skupinami a pridanie novej položky. Kľúč položky sa nemení, takže historické čísla ostávajú — premenovaná položka si nesie svojich osemnásť mesiacov so sebou. Zmeny sú vrstva nad pôvodnou štruktúrou; premenovanie sa vráti prepísaním názvu naspäť."
+        />
+      </H3>
+
+      {otvorene && (
+        <>
+          <div style={{ display: "flex", gap: 8, alignItems: "flex-end", flexWrap: "wrap", padding: "10px 0 14px", borderBottom: `1px solid ${mix(C.border, 60)}`, marginBottom: 10 }}>
+            <label style={{ fontSize: 11.5, color: C.textDim, display: "flex", flexDirection: "column", gap: 3 }}>
+              Nová položka — kam
+              <Select value={novy.skupina || skupiny[0]?.hodnota || ""} onChange={(v) => setNovy((n) => ({ ...n, skupina: v }))}
+                options={skupiny.map((x) => ({ value: x.hodnota, label: x.label }))} />
+            </label>
+            <label style={{ fontSize: 11.5, color: C.textDim, display: "flex", flexDirection: "column", gap: 3 }}>
+              Názov
+              <input value={novy.label} onChange={(e) => setNovy((n) => ({ ...n, label: e.target.value }))}
+                placeholder="napr. Účtovníčka"
+                style={{ width: 190, padding: "5px 8px", borderRadius: 6, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 12.5 }} />
+            </label>
+            <button
+              onClick={() => {
+                const [sek, sub] = (novy.skupina || skupiny[0]?.hodnota || "").split(".");
+                if (pridajKategoriu(sek, sub, novy.label)) { setNovy({ skupina: novy.skupina, label: "" }); void uloz(); }
+              }}
+              disabled={!novy.label.trim()}
+              style={{ background: novy.label.trim() ? C.accentBg : "transparent", border: `1px solid ${novy.label.trim() ? C.accent : C.border}`, borderRadius: 7, padding: "6px 14px", color: novy.label.trim() ? C.accentLight : C.textDim, fontSize: 12.5, cursor: novy.label.trim() ? "pointer" : "default" }}
+            >
+              Pridať
+            </button>
+            <span style={{ fontSize: 11, color: C.textDim, flex: 1, minWidth: 210, lineHeight: 1.5 }}>
+              Nová položka začína na nule vo všetkých mesiacoch. Naplní sa importom z banky (keď jej priradíš pohyby) alebo klikom na číslo v tabuľke.
+            </span>
+          </div>
+
+          <ScrollX>
+            <table style={{ ...tableStyle, minWidth: 560 }}>
+              <thead>
+                <tr style={{ borderBottom: `2px solid ${mix(C.accent, 35)}` }}>
+                  {["Názov", "Skupina", "Kľúč"].map((h) => (
+                    <th key={h} style={{ textAlign: "left", padding: "7px 9px", fontSize: 11, color: C.textMuted, fontWeight: 600 }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {polozky.map((x) => (
+                  <tr key={x.kat} style={{ borderBottom: `1px solid ${mix(C.border, 50)}` }}>
+                    <td style={{ padding: "4px 9px" }}>
+                      <input
+                        defaultValue={x.label}
+                        onBlur={(e) => { if (e.target.value.trim() !== x.label) { premenujKategoriu(x.kat, e.target.value); void uloz(); } }}
+                        style={{ width: 200, padding: "4px 7px", borderRadius: 5, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 12.5 }}
+                      />
+                    </td>
+                    <td style={{ padding: "4px 9px" }}>
+                      <Select value={x.skupina} onChange={(v) => { if (v !== x.skupina) { presunKategoriu(x.kat, v); void uloz(); } }}
+                        options={skupiny.map((g) => ({ value: g.hodnota, label: g.label }))} />
+                    </td>
+                    <td style={{ padding: "4px 9px", fontSize: 11, color: C.textDim, fontFamily: "monospace" }}>{x.kat}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </ScrollX>
+          <div style={{ fontSize: 11, color: C.textDim, marginTop: 9, lineHeight: 1.5 }}>
+            Kľúč vpravo sa nemení nikdy — podľa neho sa priraďujú pohyby z banky a podľa neho sedia historické čísla.
+            Mazanie tu zámerne nie je: položka s osemnástimi mesiacmi histórie by ním prišla o čísla, ktoré sedia na Excel.
+            Nepoužívanú nechaj na nule, v tabuľke sa ukáže ako pomlčka.
+          </div>
+        </>
+      )}
+    </Card>
+  );
+}
+
 // ── VZAS 2026 (P&L) ──────────────────────────────────────────────────────────
 function PnlTab() {
   // Opravy jednotlivých buniek žijú v databáze a zapisujú sa priamo do modelu.
@@ -590,6 +697,10 @@ function PnlTab() {
       const ulozene = n["pnl_overrides"];
       if (ulozene && typeof ulozene === "object") {
         if (nastavPnlOverrides(ulozene as never)) tik((x) => x + 1);
+      }
+      const kat = n["pnl_kategorie"];
+      if (kat && typeof kat === "object") {
+        if (nastavZmenyKategorii(kat as never)) tik((x) => x + 1);
       }
     }).catch(() => {});
   }, []);
@@ -709,6 +820,8 @@ function PnlTab() {
           čísel ich zámerne nezapočítava — po rozkliknutí sú vidieť vedľa excelového čísla, aby sa dali porovnať.
         </div>
       </Card>
+
+      <SpravaKategorii onZmena={() => tik((x) => x + 1)} />
     </>
   );
 }

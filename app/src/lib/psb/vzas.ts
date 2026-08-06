@@ -597,6 +597,115 @@ export function nastavNakladyZFio(
 }
 
 
+// ── správa kategórií ─────────────────────────────────────────────────────────
+//
+// Štruktúra P&L je v kóde, lebo pochádza z Excelu a osemnásť mesiacov histórie
+// na nej stojí. Pridať novú položku alebo premenovať existujúcu preto doteraz
+// znamenalo zmenu zdrojáku a nasadenie — neúmerné na to, že štúdio si raz za
+// čas kúpi novú službu.
+//
+// Zmeny sa ukladajú ako VRSTVA nad kódom, nie ako prepis: pôvodná štruktúra
+// zostáva a zmeny sa dajú vrátiť. Historické hodnoty sa pri premenovaní ani
+// presune nestrácajú, lebo kľúč položky (`fixne.apps.adobe`) sa nemení —
+// mení sa len to, ako sa volá a kde je zaradená.
+export type ZmenyKategorii = {
+  /** kľúč → nový názov */
+  premenovane?: Record<string, string>;
+  /** kľúč → "sekcia.skupina", kam sa má presunúť */
+  presunute?: Record<string, string>;
+  /** nové položky: kľúč → { sekcia, skupina, label } */
+  pridane?: Record<string, { sekcia: string; skupina: string; label: string }>;
+};
+
+let ZMENY_KATEGORII: ZmenyKategorii = {};
+
+function pouziZmenyKategorii(): void {
+  const z = ZMENY_KATEGORII;
+  // Nové položky najprv — premenovanie aj presun môžu platiť aj na ne.
+  for (const [kat, def] of Object.entries(z.pridane || {})) {
+    const [sekK, subK, itemK] = kat.split(".");
+    const sub = (PNL as Record<string, VzasSection>)[sekK]?.subcategories?.[subK];
+    if (!sub || sub.items[itemK]) continue;
+    sub.items[itemK] = { label: def.label, values: Array.from({ length: N }, () => 0) };
+  }
+  for (const [kat, label] of Object.entries(z.premenovane || {})) {
+    const item = pnlItem(kat);
+    if (item && "label" in item) (item as VzasItem).label = label;
+  }
+  for (const [kat, ciel] of Object.entries(z.presunute || {})) {
+    const [sekK, subK, itemK] = kat.split(".");
+    const zdroj = (PNL as Record<string, VzasSection>)[sekK]?.subcategories?.[subK];
+    const [cielSek, cielSub] = ciel.split(".");
+    const cielova = (PNL as Record<string, VzasSection>)[cielSek]?.subcategories?.[cielSub];
+    const item = zdroj?.items?.[itemK];
+    if (!zdroj || !cielova || !item || zdroj === cielova) continue;
+    cielova.items[itemK] = item;
+    delete zdroj.items[itemK];
+  }
+}
+
+export function nastavZmenyKategorii(z: ZmenyKategorii): boolean {
+  if (!z || typeof z !== "object") return false;
+  ZMENY_KATEGORII = z;
+  pouziZmenyKategorii();
+  oznacZmenu();
+  return true;
+}
+
+export const zmenyKategoriiNaUlozenie = (): ZmenyKategorii => ZMENY_KATEGORII;
+
+/** Premenovanie. Prázdny názov premenovanie zruší. */
+export function premenujKategoriu(kat: string, novyNazov: string): boolean {
+  const item = pnlItem(kat);
+  if (!item) return false;
+  ZMENY_KATEGORII.premenovane ||= {};
+  if (novyNazov.trim()) ZMENY_KATEGORII.premenovane[kat] = novyNazov.trim();
+  else delete ZMENY_KATEGORII.premenovane[kat];
+  pouziZmenyKategorii();
+  oznacZmenu();
+  return true;
+}
+
+/** Presun do inej skupiny. `ciel` = "sekcia.skupina". */
+export function presunKategoriu(kat: string, ciel: string): boolean {
+  const [cielSek, cielSub] = ciel.split(".");
+  if (!(PNL as Record<string, VzasSection>)[cielSek]?.subcategories?.[cielSub]) return false;
+  ZMENY_KATEGORII.presunute ||= {};
+  ZMENY_KATEGORII.presunute[kat] = ciel;
+  pouziZmenyKategorii();
+  oznacZmenu();
+  return true;
+}
+
+/** Nová položka. Vracia kľúč, alebo null keď sa nedá založiť. */
+export function pridajKategoriu(sekcia: string, skupina: string, label: string): string | null {
+  const sub = (PNL as Record<string, VzasSection>)[sekcia]?.subcategories?.[skupina];
+  if (!sub || !label.trim()) return null;
+  // Kľúč z názvu: bez diakritiky, bez medzier. Kolízie sa rozlíšia číslom —
+  // dve položky s rovnakým kľúčom by zdieľali jeden rad čísel.
+  const zaklad = label.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9]/g, "").replace(/^(.)/, (m) => m.toLowerCase()) || "polozka";
+  let itemK = zaklad;
+  for (let i = 2; sub.items[itemK]; i++) itemK = `${zaklad}${i}`;
+  const kat = `${sekcia}.${skupina}.${itemK}`;
+  ZMENY_KATEGORII.pridane ||= {};
+  ZMENY_KATEGORII.pridane[kat] = { sekcia, skupina, label: label.trim() };
+  pouziZmenyKategorii();
+  oznacZmenu();
+  return kat;
+}
+
+/** Zoznam skupín, kam sa dá presúvať — pre rozbaľovačku. */
+export function skupinyPnl(): { hodnota: string; label: string }[] {
+  const out: { hodnota: string; label: string }[] = [];
+  for (const [sekK, sek] of Object.entries(PNL)) {
+    for (const [subK, sub] of Object.entries(sek.subcategories)) {
+      out.push({ hodnota: `${sekK}.${subK}`, label: `${sek.label} · ${sub.label}` });
+    }
+  }
+  return out;
+}
+
 // Preklad kategórie na to, čo z nej vidí človek.
 //
 // „fixne.prevadzka.najom" je kľúč pre stroj. Register, ktorý povie „chýba

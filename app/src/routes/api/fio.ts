@@ -175,6 +175,45 @@ export const Route = createFileRoute("/api/fio")({
             zmenene++;
           }
           if (stmts.length) await DB.batch(stmts);
+
+          // Zaradenie sa MUSÍ naučiť ako pravidlo.
+          //
+          // Pravidlá sa dovtedy učili len pri importe, takže keď Jerry (alebo
+          // Jarvis) preradil pohyb dodatočne, appka na to pri ďalšom výpise
+          // zabudla a spýtala sa znova. To je presne to, čo malo učenie
+          // odstrániť — rozhodnutie, ktoré človek raz spravil, sa nemá pýtať
+          // druhýkrát.
+          //
+          // Vzor sa berie z protistrany toho istého pohybu; tú v tele požiadavky
+          // nemáme, tak sa dotiahne z databázy.
+          const kluce = zmeny.map((z) => String(z.kluc || "")).filter(Boolean);
+          if (kluce.length) {
+            const otazniky = kluce.map((_, i) => `?${i + 1}`).join(",");
+            const rs = await DB.prepare(
+              `SELECT dedup_key, counterparty FROM fio_transactions WHERE dedup_key IN (${otazniky})`,
+            ).bind(...kluce).all().catch(() => ({ results: [] as Record<string, unknown>[] }));
+            const podlaKluca = new Map(
+              (rs.results as Record<string, unknown>[]).map((r) => [String(r.dedup_key), String(r.counterparty || "")]),
+            );
+            const naucene = new Map<string, string>();
+            for (const z of zmeny) {
+              const kat = String(z.kategoria || "");
+              const vzor = (podlaKluca.get(String(z.kluc || "")) || "").trim();
+              // Prázdna kategória pravidlo neruší, len sa neučí — vyprázdnenie
+              // je „neviem", nie „patrí nikam".
+              if (kat && vzor.length >= 3) naucene.set(vzor.toLowerCase(), kat);
+            }
+            const kedy = new Date().toISOString();
+            for (const [vzor, kategoria] of naucene) {
+              await DB.prepare("DELETE FROM vzas_rules WHERE text_pattern = ?1 AND created_by IN ('import','uprava')")
+                .bind(vzor).run().catch(() => {});
+              await DB.prepare(
+                `INSERT INTO vzas_rules (id, counterparty, merchant, text_pattern, category, priority, hit_count, active, created_by, created_at)
+                 VALUES (?1, NULL, NULL, ?2, ?3, 40, 0, 1, 'uprava', ?4)`,
+              ).bind(uid(), vzor, kategoria, kedy).run().catch(() => {});
+            }
+          }
+
           await audit(DB, {
             action: "uprava-banka",
             predmet: `${zmenene} pohybov`,
