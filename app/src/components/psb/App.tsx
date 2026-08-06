@@ -725,7 +725,7 @@ export function PSBApp() {
       <div style={{ ...S.h3, textAlign: "center", color: C.textDim, fontSize: 11, padding: "8px 0 24px", fontWeight: 400 }}>
         ProSapiens Biomechanic · interný nástroj · nezdieľať externe
       </div>
-      <Assistant chat={chat} onClientClick={onClientClick} />
+      <Assistant chat={chat} onClientClick={onClientClick} onNavigate={(tab, sub) => navigate(tab, sub)} />
     </div>
     </ObdobieCtx.Provider>
   );

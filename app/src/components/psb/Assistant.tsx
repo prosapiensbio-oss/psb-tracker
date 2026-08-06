@@ -7,9 +7,10 @@ import {
 } from "../../lib/psb/client";
 import { C, mix } from "../../lib/psb/theme";
 import type { Actions } from "./App";
+import { nastavPnlBunku, pnlOverridesNaUlozenie } from "../../lib/psb/vzas";
 
 type ParsedAction = {
-  type: "ack-anomaly" | "unack-anomaly" | "set-override" | "zapis-zaver" | "vyhodnot-zaver" | "novy-ciel" | "kronika" | "odloz-anomaliu";
+  type: "ack-anomaly" | "unack-anomaly" | "set-override" | "zapis-zaver" | "vyhodnot-zaver" | "novy-ciel" | "kronika" | "odloz-anomaliu" | "uprav-pnl";
   label: string;
   done?: boolean;
   key?: string;
@@ -70,6 +71,8 @@ function parseActions(raw: string): { text: string; actions: ParsedAction[] } {
           actions.push({ type: "kronika", label, data: o });
         } else if (o?.type === "odloz-anomaliu" && typeof o.key === "string" && /^\d{4}-\d{2}-\d{2}$/.test(String(o.do))) {
           actions.push({ type: "odloz-anomaliu", key: o.key, label, data: o });
+        } else if (o?.type === "uprav-pnl" && typeof o.kategoria === "string" && /^\d{4}-\d{2}$/.test(String(o.mesiac)) && Number.isFinite(Number(o.suma))) {
+          actions.push({ type: "uprav-pnl", label, data: o });
         }
       } catch {
         /* ignore malformed */
@@ -81,9 +84,18 @@ function parseActions(raw: string): { text: string; actions: ParsedAction[] } {
 }
 
 // Minimal formatter: **bold**, `code`, «clickable client name», and newlines.
-function fmt(text: string, onClientClick?: (name: string) => void) {
+function fmt(text: string, onClientClick?: (name: string) => void, onNavigate?: (tab: string, sub?: string) => void) {
   return text.split("\n").map((line, i) => {
-    const parts = line.split(/(\*\*[^*]+\*\*|`[^`]+`|«[^»]+»)/g).map((p, j) => {
+    const parts = line.split(/(\*\*[^*]+\*\*|`[^`]+`|«[^»]+»|⟦[^⟧]+⟧)/g).map((p, j) => {
+      // ⟦text|tab|podzáložka⟧ — odkaz na miesto v appke. „Kde to nájdem"
+      // je najčastejšia otázka a popis cesty slovami ju nerieši: človek si
+      // aj tak musí naklikať štyri obrazovky.
+      if (p.startsWith("⟦") && p.endsWith("⟧")) {
+        const [txt, tab, sub] = p.slice(1, -1).split("|");
+        return onNavigate && tab
+          ? <button key={j} onClick={() => onNavigate(tab, sub || undefined)} style={{ background: mix(C.accent, 14), border: `1px solid ${mix(C.accent, 45)}`, borderRadius: 6, padding: "1px 7px", margin: "0 1px", color: C.accentLight, fontWeight: 600, cursor: "pointer", fontSize: "inherit", fontFamily: "inherit" }}>{txt} →</button>
+          : <strong key={j}>{txt}</strong>;
+      }
       if (p.startsWith("**") && p.endsWith("**")) return <strong key={j}>{p.slice(2, -2)}</strong>;
       if (p.startsWith("`") && p.endsWith("`")) return <code key={j} style={{ background: mix(C.accent, 14), padding: "1px 4px", borderRadius: 4, fontSize: 12 }}>{p.slice(1, -1)}</code>;
       if (p.startsWith("«") && p.endsWith("»")) {
@@ -252,6 +264,14 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
       else if (a.type === "zapis-zaver" && a.data) void saveZaver(a.data);
       else if (a.type === "vyhodnot-zaver" && a.data) {
         void vyhodnotZaver(String(a.data.id || ""), String(a.data.stav || "otvoreny"), String(a.data.vysledok || ""));
+      } else if (a.type === "uprav-pnl" && a.data) {
+        // Rovnaká cesta, akou opravu zapíše človek klikom na číslo v tabuľke —
+        // prekrytie, nie prepis pôvodného radu, takže sa dá vrátiť a prežije
+        // import z banky.
+        const d = a.data;
+        if (nastavPnlBunku(String(d.kategoria), String(d.mesiac), Number(d.suma))) {
+          void saveVzasSetting("pnl_overrides", pnlOverridesNaUlozenie());
+        }
       } else if (a.type === "odloz-anomaliu" && a.data) {
         // Odloženie sa ukladá ako akceptácia s poznámkou „odlozene|DÁTUM|…".
         // Register ju do toho dátumu skrýva a potom vráti späť medzi živé.
@@ -307,7 +327,7 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
 
 // ── The conversation UI (messages + input) — used by both the floating panel and
 // the inline widget. Each instance has its own scroll/refs/drag state. ──────────
-export function ChatConversation({ chat, autoFocus, onClientClick }: { chat: AssistantChat; autoFocus?: boolean; onClientClick?: (name: string) => void }) {
+export function ChatConversation({ chat, autoFocus, onClientClick, onNavigate }: { chat: AssistantChat; autoFocus?: boolean; onClientClick?: (name: string) => void; onNavigate?: (tab: string, sub?: string) => void }) {
   const { msgs, input, setInput, busy, stav, deep, setDeep, pending, setPending, attach, setAttach, ask, runAction, confirmImport, handleIncoming } = chat;
   const [drag, setDrag] = useState(false);
   // Autoscroll drží odpoveď na očiach LEN vtedy, keď je človek dole. Keď si
@@ -364,7 +384,7 @@ export function ChatConversation({ chat, autoFocus, onClientClick }: { chat: Ass
                   {m.images.map((src, k) => <img key={k} src={src} alt="" style={{ maxWidth: 150, maxHeight: 150, borderRadius: 8, display: "block" }} />)}
                 </div>
               ) : null}
-              {fmt(m.text, m.role === "assistant" ? onClientClick : undefined)}
+              {fmt(m.text, m.role === "assistant" ? onClientClick : undefined, m.role === "assistant" ? onNavigate : undefined)}
             </div>
             {m.actions?.map((a, ai) => (
               <button key={ai} disabled={a.done} onClick={() => runAction(mi, ai)} style={{ marginTop: 6, display: "block", width: "100%", textAlign: "left", padding: "8px 11px", borderRadius: 9, cursor: a.done ? "default" : "pointer", fontSize: 12.5, fontWeight: 600, border: `1px solid ${a.done ? C.border : C.accent}`, background: a.done ? "transparent" : mix(C.accent, 14), color: a.done ? C.textDim : C.accentLight }}>
@@ -513,7 +533,7 @@ function ChatHistoryRow({ c, current, onOpen, onArchive, onDelete, archiveTitle,
 }
 
 // Inline version for a Dashboard widget — same conversation as the floating panel.
-export function AssistantInline({ chat, onClientClick }: { chat: AssistantChat; onClientClick?: (name: string) => void }) {
+export function AssistantInline({ chat, onClientClick, onNavigate }: { chat: AssistantChat; onClientClick?: (name: string) => void; onNavigate?: (tab: string, sub?: string) => void }) {
   // Collapsible: expanded = fixed 460 (conversation scrolls inside, doesn't grow);
   // collapsed = just the header (one line). Persisted.
   const [collapsed, setCollapsed] = useState(false);
@@ -523,13 +543,13 @@ export function AssistantInline({ chat, onClientClick }: { chat: AssistantChat; 
   return (
     <div style={{ marginBottom: 0, ...(collapsed ? {} : { height: 460 }), display: "flex", flexDirection: "column", overflow: "hidden", background: C.card, border: `1px solid ${C.border}`, borderRadius: 12 }}>
       <ChatHeader chat={chat} extra={triangle} />
-      {!collapsed && <ChatConversation chat={chat} onClientClick={onClientClick} />}
+      {!collapsed && <ChatConversation chat={chat} onClientClick={onClientClick} onNavigate={onNavigate} />}
     </div>
   );
 }
 
 // Floating bottom-right panel (resizable). Open state lives in the shared chat.
-export function Assistant({ chat, onClientClick }: { chat: AssistantChat; onClientClick?: (name: string) => void }) {
+export function Assistant({ chat, onClientClick, onNavigate }: { chat: AssistantChat; onClientClick?: (name: string) => void; onNavigate?: (tab: string, sub?: string) => void }) {
   const open = chat.floatingOpen;
   const setOpen = chat.setFloatingOpen;
   const [size, setSize] = useState<{ w: number; h: number }>({ w: 400, h: 620 });
@@ -571,7 +591,7 @@ export function Assistant({ chat, onClientClick }: { chat: AssistantChat; onClie
         <svg width={12} height={12} viewBox="0 0 12 12" fill="none" stroke={C.textDim} strokeWidth={1.5} strokeLinecap="round" aria-hidden="true"><path d="M11 1 1 11M6.5 1 1 6.5M11 5.5 5.5 11" /></svg>
       </div>
       <ChatHeader chat={chat} extra={<button onClick={() => setOpen(false)} title="Zavrieť" style={iconBtn}>✕</button>} />
-      <ChatConversation chat={chat} autoFocus={open} onClientClick={onClientClick} />
+      <ChatConversation chat={chat} autoFocus={open} onClientClick={onClientClick} onNavigate={onNavigate} />
     </div>
   );
 }

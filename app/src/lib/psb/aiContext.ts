@@ -4,6 +4,7 @@
 // the alerts. Where a card recomputes something (zones, weekly hours, capacity
 // util, top KPIs), we mirror that exact logic below rather than reuse a
 // deprecated field (e.g. capacity.effHours is reference-only, NOT what the card shows).
+import { PNL, VZAS_MONTHS } from "./vzas";
 import {
   monthlyFinance,
   predictEarnings,
@@ -138,6 +139,25 @@ export function buildAiContext(
 
   // Per-client detail (compact) — lets the assistant reason about and edit a
   // specific client (status, note, trainer…). Sorted by most recent session.
+  // Posledných 12 mesiacov stačí — staršie sa nemenia a zabrali by miesto,
+  // ktoré potrebuje zoznam klientov.
+  const pnlMesiace = VZAS_MONTHS.slice(-12);
+  const pnlPolozky: Record<string, Record<string, number>> = {};
+  for (const [sekK, sek] of Object.entries(PNL)) {
+    for (const [subK, sub] of Object.entries(sek.subcategories)) {
+      for (const [itemK, item] of Object.entries(sub.items)) {
+        const kluc = `${sekK}.${subK}.${itemK}`;
+        const podlaMesiaca: Record<string, number> = {};
+        pnlMesiace.forEach((mk) => {
+          const i = VZAS_MONTHS.indexOf(mk);
+          const v = Math.round(item.values[i] || 0);
+          if (v !== 0) podlaMesiaca[mk] = v;
+        });
+        if (Object.keys(podlaMesiaca).length) pnlPolozky[`${kluc}|${sub.label} · ${item.label}`] = podlaMesiaca;
+      }
+    }
+  }
+
   const klientiDetail = clientList
     .slice()
     .sort((a, b) => (b.lastSession || "").localeCompare(a.lastSession || ""))
@@ -212,6 +232,11 @@ export function buildAiContext(
       podlaModality: dist((c) => c.modality),
     },
     sixM: { spolu: sixM.length, podlaFazy: sixMPhases, poznamka: "6M proces: Obnova 1.–6. mesiac, Integrácia 7.–18., Udržateľnosť 19.+" },
+    // P&L po položkách za posledných 12 mesiacov. Bez toho Jarvis na otázku
+    // „ktorá aplikácia stála v apríli 780?" nemá kde hľadať: hodnoty P&L žijú
+    // v module (z Excelu + z importu), nie v databáze, takže ich nevytiahne ani
+    // dopytom. Kľúč je presne ten, ktorým sa bunka aj opravuje.
+    pnlPolozky,
     klientiDetail,
   };
 }
