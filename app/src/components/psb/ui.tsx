@@ -23,8 +23,8 @@ export function useScrollEnd<T extends HTMLElement>(enabled: boolean, dep: unkno
   return ref;
 }
 
-export function Card({ children, style }: { children: ReactNode; style?: CSSProperties }) {
-  return <div style={{ ...S.card, ...style }}>{children}</div>;
+export function Card({ children, style, id }: { children: ReactNode; style?: CSSProperties; id?: string }) {
+  return <div style={{ ...S.card, ...style }} id={id}>{children}</div>;
 }
 
 export function StatCard({

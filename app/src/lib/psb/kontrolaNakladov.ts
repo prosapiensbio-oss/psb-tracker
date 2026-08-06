@@ -205,3 +205,54 @@ export function dvojiteZapisy(
   }
   return out.sort((a, b) => b.spolu - a.spolu);
 }
+
+
+// ── kontrola príjmov ─────────────────────────────────────────────────────────
+//
+// Tržby počíta appka z PTmindera a z banky ich zámerne nikdy neberie — inak by
+// sa tá istá platba počítala dvakrát. Lenže tým sa aj stráca jediná možnosť
+// PTminder skontrolovať: keď sa niekomu zabudne zapísať platba, appka o tom
+// nevie, lebo sa pozerá len na PTminder.
+//
+// Táto kontrola postaví oba zdroje vedľa seba. Nie je to alarm na každú
+// korunu — nie všetko, čo príde na účet, je tržba (vklad od investora, vratky,
+// preplatky) — takže sa hlási až rozdiel, ktorý niečo znamená.
+
+export type NezhodaPrijmov = {
+  kluc: string;
+  mesiac: string;
+  banka: number;
+  ptminder: number;
+  rozdiel: number;
+  /** true = na účte prišlo VIAC než hovorí PTminder (chýbajúca platba). */
+  bankaViac: boolean;
+};
+
+export function nezhodyPrijmov(
+  /** mesiac → súčet príchodzích pohybov (banka + zošit), bez tých v koši „mimo". */
+  bankaPrijmy: Record<string, number>,
+  /** mesiac → tržby z PTmindera. */
+  ptminder: Record<string, number>,
+  /** Do koľkých mesiacov spätne. Staršie sa už aj tak neopravujú. */
+  odMesiaca = "2026-01",
+  prahKc = 3000,
+  prahPct = 0.05,
+): NezhodaPrijmov[] {
+  const out: NezhodaPrijmov[] = [];
+  for (const [mesiac, banka] of Object.entries(bankaPrijmy)) {
+    if (mesiac < odMesiaca) continue;
+    const pt = ptminder[mesiac] || 0;
+    // Mesiac bez PTmindera nie je nezhoda, len nenahratý mesiac — na to je
+    // vlastná kontrola a hlásiť to tu druhýkrát by bol šum.
+    if (!pt) continue;
+    const rozdiel = Math.round(banka - pt);
+    const abs = Math.abs(rozdiel);
+    if (abs < prahKc || abs / pt < prahPct) continue;
+    out.push({
+      kluc: `prijmy|${mesiac}`,
+      mesiac, banka: Math.round(banka), ptminder: Math.round(pt),
+      rozdiel: abs, bankaViac: rozdiel > 0,
+    });
+  }
+  return out.sort((a, b) => b.rozdiel - a.rozdiel);
+}

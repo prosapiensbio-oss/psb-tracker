@@ -544,7 +544,7 @@ function Predikcia({ data, clients }: { data: PSBData; clients: Record<string, C
       <PredikciaZisku prijmyOdhad={pred.scenarios.realistic} mesiac={monthsCovered} hodiny={hodinyOdhad} />
 
       {hasData && (
-        <Card>
+        <Card id="tempo-klienta">
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 8 }}>
             <H3>Detail podľa klienta</H3>
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>

@@ -93,9 +93,23 @@ function fmt(text: string, onClientClick?: (name: string) => void, onNavigate?: 
       // je najčastejšia otázka a popis cesty slovami ju nerieši: človek si
       // aj tak musí naklikať štyri obrazovky.
       if (p.startsWith("⟦") && p.endsWith("⟧")) {
-        const [txt, tab, sub] = p.slice(1, -1).split("|");
+        const [txt, tab, sub, kotva] = p.slice(1, -1).split("|");
+        // Štvrtá časť je kotva na konkrétnu kartu. Doviesť človeka na
+        // obrazovku a nechať ho hľadať tabuľku medzi desiatimi kartami je
+        // polovičná práca — presne to Jerry vytkol pri tempe klienta.
+        const chod = () => {
+          onNavigate!(tab, sub || undefined);
+          if (!kotva) return;
+          let pokus = 0;
+          const trafit = () => {
+            const el = document.getElementById(kotva);
+            if (el) { el.scrollIntoView({ block: "start", behavior: "smooth" }); return; }
+            if (pokus++ < 20) requestAnimationFrame(trafit);
+          };
+          requestAnimationFrame(trafit);
+        };
         return onNavigate && tab
-          ? <button key={j} onClick={() => onNavigate(tab, sub || undefined)} style={{ background: mix(C.accent, 14), border: `1px solid ${mix(C.accent, 45)}`, borderRadius: 6, padding: "1px 7px", margin: "0 1px", color: C.accentLight, fontWeight: 600, cursor: "pointer", fontSize: "inherit", fontFamily: "inherit" }}>{txt} →</button>
+          ? <button key={j} onClick={chod} style={{ background: mix(C.accent, 14), border: `1px solid ${mix(C.accent, 45)}`, borderRadius: 6, padding: "1px 7px", margin: "0 1px", color: C.accentLight, fontWeight: 600, cursor: "pointer", fontSize: "inherit", fontFamily: "inherit" }}>{txt} →</button>
           : <strong key={j}>{txt}</strong>;
       }
       if (p.startsWith("**") && p.endsWith("**")) return <strong key={j}>{p.slice(2, -2)}</strong>;

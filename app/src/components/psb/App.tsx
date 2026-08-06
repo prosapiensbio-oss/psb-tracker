@@ -43,7 +43,7 @@ import { HladanieKlienta } from "./Hladanie";
 import { ZapisButton } from "./Zapis";
 import { ritualy as spocitajRitualy } from "../../lib/psb/rituals";
 import { nastavRozpis, pridajDoRozpisu, type PohybZaBunku } from "../../lib/psb/rozpis";
-import { chybajuceNaklady, dvojiteZapisy, nezhodySExcelom, type BankovyMesiac, type Pohyb } from "../../lib/psb/kontrolaNakladov";
+import { chybajuceNaklady, dvojiteZapisy, nezhodyPrijmov, nezhodySExcelom, type BankovyMesiac, type Pohyb } from "../../lib/psb/kontrolaNakladov";
 import { MKT_MESACNE } from "../../lib/psb/marketing";
 
 export type Actions = {
@@ -294,6 +294,7 @@ export function PSBApp() {
   const [, setFioTik] = useState(0);
   const [bankaSumy, setBankaSumy] = useState<BankovyMesiac>({});
   const [bankaPohyby, setBankaPohyby] = useState<Record<string, Record<string, Pohyb[]>>>({});
+  const [bankaPrijmy, setBankaPrijmy] = useState<Record<string, number>>({});
   const [hotovostMesiace, setHotovostMesiace] = useState<Set<string>>(new Set());
   useEffect(() => {
     void fetch("/api/marketing", { credentials: "same-origin" })
@@ -338,7 +339,18 @@ export function PSBApp() {
         // Rozpis sa plní pri tom istom prechode ako súčty — inak by sa to, čo
         // tabuľka ukáže po rozkliknutí, mohlo rozísť s číslom nad ním.
         const rozpis: Record<string, PohybZaBunku[]> = {};
+        const prijmyBanka: Record<string, number> = {};
         for (const p of j.pohyby || []) {
+          // Príchodzie pohyby sa do nákladov nerátajú, ale sčítať ich treba —
+          // sú jediné nezávislé svedectvo o tom, čo naozaj prišlo, a jediný
+          // spôsob, ako skontrolovať PTminder.
+          if (p.suma > 0) {
+            if (p.kategoria !== "mimo") {
+              const mkP = String(p.datum).slice(0, 7);
+              prijmyBanka[mkP] = (prijmyBanka[mkP] || 0) + p.suma;
+            }
+            continue;
+          }
           if (p.suma >= 0 || !p.kategoria || p.kategoria === "mimo") continue;
           const mk = String(p.datum).slice(0, 7);
           if (p.kategoria.startsWith("vyplaty")) {
@@ -401,6 +413,7 @@ export function PSBApp() {
         // a „čo nesedí s Excelom". Bez toho by o nich vedel len model.
         setBankaSumy(sumy);
         setBankaPohyby(pohybyPodla);
+        setBankaPrijmy(prijmyBanka);
         if (nastavNakladyZFio(sumy, vyplaty)) setFioTik((x) => x + 1);
         else setFioTik((x) => x + 1); // rozpis pribudol aj bez zmeny súm
       })
@@ -472,6 +485,23 @@ export function PSBApp() {
       });
     }
 
+    // (1c) Čo prišlo na účet vs. čo hovorí PTminder. Tržby sa z banky nikdy
+    // nepočítajú, takže bez tejto kontroly by zabudnutá platba v PTminderi
+    // nemala ako vyjsť najavo.
+    const ptPodlaMesiaca: Record<string, number> = {};
+    for (const m of monthlyFinance(data)) ptPodlaMesiaca[m.month] = m.cash;
+    for (const n of nezhodyPrijmov(bankaPrijmy, ptPodlaMesiaca)) {
+      const key = `prijmy|${n.mesiac}`;
+      out.push({
+        key, category: "Zmena", tone: "orange",
+        title: `${monthLabel(n.mesiac)}: banka a PTminder sa v príjmoch líšia o ${n.rozdiel.toLocaleString("cs-CZ")} Kč`,
+        detail: n.bankaViac
+          ? `Za ${monthLabel(n.mesiac)} prišlo na účet a v hotovosti ${n.banka.toLocaleString("cs-CZ")} Kč, ale PTminder hlási tržby ${n.ptminder.toLocaleString("cs-CZ")} Kč — o ${n.rozdiel.toLocaleString("cs-CZ")} Kč MENEJ. Buď chýba platba v PTminderi, alebo časť príjmu nie je tržba (vklad, vratka, preplatok) a patrí do koša „mimo".`
+          : `Za ${monthLabel(n.mesiac)} hlási PTminder tržby ${n.ptminder.toLocaleString("cs-CZ")} Kč, ale na účet a v hotovosti prišlo len ${n.banka.toLocaleString("cs-CZ")} Kč — o ${n.rozdiel.toLocaleString("cs-CZ")} Kč menej. Buď časť platieb ešte nedorazila, alebo prišli inou cestou (BTC, barter), alebo chýba zošit.`,
+        ...stavPolozky(key), priority: 6, client: "udaje|",
+      });
+    }
+
     // (2) Excel vs. banka za mesiace, ktoré import neprepisuje. Doteraz sa dal
     // rozdiel nájsť len rozkliknutím jednej bunky po druhej — sto klikov,
     // ktoré nikto neurobí. Zhrnú sa do JEDNEJ položky: register má povedať, že
@@ -490,7 +520,7 @@ export function PSBApp() {
       });
     }
     return out;
-  }, [bankaSumy, bankaPohyby, data.anomalyAck]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [bankaSumy, bankaPohyby, bankaPrijmy, data.anomalyAck]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const zmenyMetrik = useMemo(() => {
     const ack = data.anomalyAck || {};

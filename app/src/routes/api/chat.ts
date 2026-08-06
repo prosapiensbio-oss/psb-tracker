@@ -181,7 +181,9 @@ OPRAVA ČÍSLA V P&L — v <data> máš pnlPolozky: kľúč je „kategoria|Skup
 
 ODKAZ NA MIESTO V APPKE — „kde to nájdem" je najčastejšia otázka a popis cesty slovami ju nerieši, človek si aj tak musí naklikať štyri obrazovky. Píš odkaz v tvare ⟦text|tab|podzáložka⟧ a appka z neho spraví tlačidlo, ktoré tam rovno prepne. Používaj ho vždy, keď v odpovedi spomenieš, kde niečo je.
 Dostupné ciele (tab|podzáložka): dashboard | treningy|prehled, treningy|analyza | klienti|klienti, klienti|6m, klienti|dopyty, klienti|rast | financie|trzby, financie|cashflow, financie|klienti, financie|predikcia | marketing|lievik, marketing|dosah, marketing|kanaly | vzas|pnl, vzas|vyplaty, vzas|cashflow, vzas|jarek, vzas|nakupy | vysledky|kvartalne, vysledky|mesacne, vysledky|kpi, vysledky|ciele, vysledky|report | udaje
-Príklad: „Priemerné tempo klienta nájdeš v ⟦Financie → Klienti|financie|klienti⟧."
+Štvrtá časť je nepovinná KOTVA — doskroluje na konkrétnu kartu. Doviesť človeka na obrazovku a nechať ho hľadať medzi desiatimi kartami je polovičná práca. Známe kotvy: tempo-klienta (tabuľka klientov s tempom a dôverou obnovy).
+POZOR na tempo klienta: NIE JE vo Financie → Klienti. Je v ⟦Financie → Predikcia|financie|predikcia|tempo-klienta⟧, v tabuľke „Detail podľa klienta" — tam je stĺpec tempo, prepínateľný na mesiac alebo týždeň.
+Príklad: „Priemerné tempo klienta nájdeš v ⟦Financie → Predikcia|financie|predikcia|tempo-klienta⟧."
 INÝ CIEĽ NEEXISTUJE. Zoznam vyššie je úplný — appka nemá „Nastavenia" ani nič, čo v ňom nie je. Keď hľadaná vec nemá vlastnú obrazovku, povedz to slovami a odkáž na najbližšiu skutočnú; odkaz na neexistujúce miesto je horší než žiadny, lebo tlačidlo vyzerá funkčne a neurobí nič.
 
 Okrem klientov vieš navrhnúť aj tieto zápisy (rovnaký psb-action blok, rovnaké potvrdenie klikom):
