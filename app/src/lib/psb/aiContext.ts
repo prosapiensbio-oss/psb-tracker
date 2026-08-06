@@ -4,7 +4,7 @@
 // the alerts. Where a card recomputes something (zones, weekly hours, capacity
 // util, top KPIs), we mirror that exact logic below rather than reuse a
 // deprecated field (e.g. capacity.effHours is reference-only, NOT what the card shows).
-import { PNL, VZAS_MONTHS } from "./vzas";
+import { PNL, VZAS_MONTHS, pnlCalc, poslednyMesiacSDatami } from "./vzas";
 import {
   monthlyFinance,
   predictEarnings,
@@ -142,6 +142,20 @@ export function buildAiContext(
   // Posledných 12 mesiacov stačí — staršie sa nemenia a zabrali by miesto,
   // ktoré potrebuje zoznam klientov.
   const pnlMesiace = VZAS_MONTHS.slice(-12);
+  const _p = pnlCalc();
+  const pnlSuhrn: Record<string, Record<string, number>> = {};
+  for (const mk of pnlMesiace) {
+    const idx = VZAS_MONTHS.indexOf(mk);
+    if (idx < 0 || idx > poslednyMesiacSDatami()) continue;
+    pnlSuhrn[mk] = {
+      prijmy: Math.round(_p.prijmy[idx] || 0),
+      naklady_bez_vyplat: Math.round(_p.bezVyplat[idx] || 0),
+      vyplaty_poslane: Math.round(_p.vyplatySpolu[idx] || 0),
+      naklady_spolu: Math.round(_p.celkoveNaklady[idx] || 0),
+      hruby_zisk: Math.round(_p.hrubyZisk[idx] || 0),
+      marza_pct: Math.round((_p.marza[idx] || 0) * 10) / 10,
+    };
+  }
   const pnlPolozky: Record<string, Record<string, number>> = {};
   for (const [sekK, sek] of Object.entries(PNL)) {
     for (const [subK, sub] of Object.entries(sek.subcategories)) {
