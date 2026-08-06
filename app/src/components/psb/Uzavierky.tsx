@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
+import { monthLabel } from "../../lib/psb/format";
+import type { AssistantChat } from "./Assistant";
 import { fetchKonta, fetchPeriods, setPeriodLock, ulozKonto, type AuditRiadok, type Konto, type Obdobie } from "../../lib/psb/client";
 import { C, mix } from "../../lib/psb/theme";
 import { Card, Empty, H3, Info } from "./ui";
@@ -131,7 +133,11 @@ function Konta() {
   );
 }
 
-export function Uzavierky() {
+export function Uzavierky({ prekazky, chat }: {
+  /** Čo za daný mesiac ešte nie je hotové. Prázdne pole = dá sa zamknúť. */
+  prekazky?: (mesiac: string) => string[];
+  chat?: AssistantChat;
+} = {}) {
   const [obdobia, setObdobia] = useState<Obdobie[]>([]);
   const [log, setLog] = useState<AuditRiadok[]>([]);
   const [nacitava, setNacitava] = useState(true);
@@ -164,12 +170,30 @@ export function Uzavierky() {
     return out.reverse();
   }, [dnesMesiac]);
 
+  // Zamknúť sa dá až vtedy, keď je mesiac naozaj hotový.
+  //
+  // Zámok znamená „toto číslo už nikto nezmení" — a keď sa zamkne mesiac s
+  // nenahratým dokladom alebo nevysvetlenou anomáliou, tá chyba v ňom zostane
+  // navždy a bude sa tváriť ako overená. Odomknúť sa dá, ale nikto sa
+  // nevracia k mesiacu, ktorý vyzerá uzavretý.
+  //
+  // Odmietnutie nestačí — musí povedať ČO chýba, inak je to hádanka.
   const prepni = async (m: string, na: boolean) => {
+    if (na && prekazky) {
+      const chyba = prekazky(m);
+      if (chyba.length) {
+        setBrani({ mesiac: m, zoznam: chyba });
+        return;
+      }
+    }
     setPrebieha(m);
     await setPeriodLock(m, na);
     nacitaj();
     setPrebieha(null);
   };
+
+  /** Mesiac, ktorý sa Jerry pokúsil zamknúť predčasne, a čo mu chýba. */
+  const [brani, setBrani] = useState<{ mesiac: string; zoznam: string[] } | null>(null);
 
   const pocetZamknutych = obdobia.filter((o) => o.locked).length;
 
@@ -191,6 +215,35 @@ export function Uzavierky() {
           Stiahni si ju pred prvým importom z banky a nechaj ju mimo appky.
           {pocetZamknutych > 0 && <> Zamknutých mesiacov: <b style={{ color: C.text }}>{pocetZamknutych}</b>.</>}
         </div>
+
+        {brani && (
+          <div style={{ background: mix(C.orange, 10), border: `1px solid ${mix(C.orange, 35)}`, borderRadius: 9, padding: "11px 13px", marginBottom: 12 }}>
+            <div style={{ fontSize: 13, color: C.text, fontWeight: 600, marginBottom: 6 }}>
+              {monthLabel(brani.mesiac)} sa ešte nedá zamknúť
+            </div>
+            <ul style={{ margin: "0 0 8px", paddingLeft: 18, fontSize: 12.5, color: C.textMuted, lineHeight: 1.6 }}>
+              {brani.zoznam.map((x) => <li key={x}>{x}</li>)}
+            </ul>
+            <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+              {chat && (
+                <button
+                  onClick={() => {
+                    chat.setFloatingOpen(true);
+                    void chat.ask(
+                      `Chcem zamknúť ${brani.mesiac}, ale appka hlási, že to ešte nejde. Chýba: ${brani.zoznam.join("; ")}. ` +
+                      `Prejdi to so mnou — čo z toho viem vyriešiť hneď a čo potrebuje moje rozhodnutie? Ak niečo vieš zapísať sám, navrhni to.`,
+                    );
+                    setBrani(null);
+                  }}
+                  style={{ background: C.accentBg, border: `1px solid ${C.accent}`, borderRadius: 7, padding: "5px 13px", color: C.accentLight, fontSize: 12.5, cursor: "pointer" }}
+                >
+                  Prejsť to s Jarvisom
+                </button>
+              )}
+              <button onClick={() => setBrani(null)} style={{ background: "none", border: "none", color: C.textDim, fontSize: 12, cursor: "pointer" }}>zavrieť</button>
+            </div>
+          </div>
+        )}
 
         {nacitava ? (
           <div style={{ fontSize: 12.5, color: C.textDim }}>Načítavam…</div>

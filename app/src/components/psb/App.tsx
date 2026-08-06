@@ -468,7 +468,7 @@ export function PSBApp() {
         detail: `${meno} — za ${monthLabel(d.mesiac)} sú zapísané ${d.pohyby.length} platby (${d.pohyby.map((x) => `${fmtDMY(x.datum)} ${Math.round(x.suma).toLocaleString("cs-CZ")} Kč${x.hotovost ? " zo zošita" : " z banky"}`).join(", ")}), spolu ${Math.round(d.spolu).toLocaleString("cs-CZ")} Kč. Inokedy tam býva jedna.` +
           (zdroje ? " Jedna je z banky a jedna zo zošita — vyzerá to, že ten istý výdavok dorazil dvoma cestami." : "") +
           " Ak je to naozaj dvakrát, oprav to v Údaje → Zapísané pohyby (kategória mimo ten pohyb vylúči).",
-        ...stavPolozky(key), priority: 2, client: "udaje",
+        ...stavPolozky(key), priority: 2, client: "udaje|",
       });
     }
 
@@ -574,6 +574,28 @@ export function PSBApp() {
   // `vzasVerzia()` je v závislostiach zámerne: P&L sa napĺňa importom z banky
   // MIMO Reactu, takže bez nej by Jarvis dostal súhrn spočítaný ešte pred
   // načítaním nákladov — a odpovedal by na zisk z prázdnych čísel.
+  // Čo bráni zamknutiu daného mesiaca. Jedno miesto, z ktorého číta aj
+  // pripomienka na uzávierku, aj samotný zámok — dva rôzne zoznamy toho, čo
+  // je „hotové", by sa časom rozišli.
+  const prekazkyZamku = useCallback((mk: string): string[] => {
+    const out: string[] = [];
+    const k = kotvaDat(data);
+    if (!k.plny || k.plny < mk) out.push("PTminder nie je nahratý po koniec mesiaca");
+    if (!bankaSumy[mk]) out.push("chýba výpis z Fio");
+    if (!MKT_MESACNE.some((r) => r.m === mk) && !kanalyMesiace.includes(mk)) out.push("chýba Metricool");
+    if (!hotovostMesiace.has(mk)) out.push("chýba zošit (hotovostné platby)");
+    const z = zapisy.mesiace?.[mk];
+    const odpovedane = Object.values(z?.answers || {}).some((v) => String(v).trim());
+    if (!odpovedane) out.push("nie sú zodpovedané otázky mesiaca");
+    // Anomálie za ten mesiac, ktoré nikto nevybavil. Register ich rieši ako
+    // celok; tu sa pozeráme len na tie, ktoré nesú mesiac v kľúči.
+    const ack = data.anomalyAck || {};
+    const nevybavene = registerAll.filter((r) => r.key.includes(mk) && !r.acked).length;
+    if (nevybavene) out.push(`${nevybavene} nevysvetlených upozornení za tento mesiac`);
+    void ack;
+    return out;
+  }, [data, bankaSumy, kanalyMesiace, hotovostMesiace, zapisy, registerAll]);
+
   const aiContext = useMemo(
     () => buildAiContext(data, clients, sixM, capacity, registerAll),
     [data, clients, sixM, capacity, registerAll, vzasVerzia()], // eslint-disable-line react-hooks/exhaustive-deps
@@ -755,7 +777,7 @@ export function PSBApp() {
         {active === "marketing" && <Marketing data={data} clients={clients} leads={data.leads} chat={chat} sub={marketingSub} onSub={setMarketingSub} onKlient={(m) => navigate("klienti", undefined, { client: m, nonce: Date.now() })} />}
         {active === "vzas" && <Vzas sub={vzasSub} onSub={setVzasSub} data={data} />}
         {active === "vysledky" && <Vysledky data={data} onNavigate={navigate} clients={clients} sixM={sixM} capacity={capacity} register={register} sub={vysledkySub} onSub={setVysledkySub} focus={vysledkyFocus} />}
-        {active === "udaje" && <Udaje data={data} actions={actions} chat={chat} />}
+        {active === "udaje" && <Udaje data={data} actions={actions} chat={chat} prekazky={prekazkyZamku} />}
       </div>
       <div style={{ ...S.h3, textAlign: "center", color: C.textDim, fontSize: 11, padding: "8px 0 24px", fontWeight: 400 }}>
         ProSapiens Biomechanic · interný nástroj · nezdieľať externe

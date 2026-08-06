@@ -2063,8 +2063,10 @@ const PEOPLE: PersonKey[] = ["jerry", "terezka"];
 
 // Numbers say what happened; the note says why. Opens with an auto-computed
 // "what was different" list so the answer usually doesn't have to be recalled.
-function MonthNoteRow({ mi, colSpan, notes, onSaved }: {
+function MonthNoteRow({ mi, colSpan, notes, onSaved, kotva }: {
   mi: number; colSpan: number; notes: Record<string, MonthNote>; onSaved: (n: MonthNote) => void;
+  /** id pre doskrolovanie z registra. */
+  kotva?: string;
 }) {
   const key = monthKeyOf(mi);
   const existing = notes[key];
@@ -2094,7 +2096,7 @@ function MonthNoteRow({ mi, colSpan, notes, onSaved }: {
   };
 
   return (
-    <tr>
+    <tr id={kotva}>
       <td colSpan={colSpan} style={{ padding: "14px 16px", background: mix(C.accent, 5), borderBottom: `1px solid ${mix(C.border, 55)}` }}>
         {devs.length > 0 && (
           <div style={{ marginBottom: 14 }}>
@@ -2279,10 +2281,19 @@ function MesacneTab({ data, clients, focus }: { data: PSBData; clients: Record<s
     const i = VZAS_MONTHS.indexOf(focus.month);
     if (i < 0) return;
     setOpenNote(i);
-    // Riadok sa vykreslí až po prekreslení, preto až v ďalšom snímku.
-    requestAnimationFrame(() => {
-      document.getElementById(`mesiac-${focus.month}`)?.scrollIntoView({ block: "center", behavior: "smooth" });
-    });
+    // Riadok sa vykreslí až po prekreslení — a `requestAnimationFrame` bol
+    // priskoro: rozbalený blok s otázkami vzniká až v ďalšom cykle a scroll
+    // trafil prázdne miesto, takže obrazovka zostala hore. Skúša sa preto
+    // niekoľkokrát a mieri na OTÁZKY, nie na riadok mesiaca — hore v tabuľke
+    // je stále vidieť, o ktorý mesiac ide, dole je to, čo treba vyplniť.
+    let pokus = 0;
+    const trafit = () => {
+      const ciel = document.getElementById(`otazky-${focus.month}`)
+        || document.getElementById(`mesiac-${focus.month}`);
+      if (ciel) { ciel.scrollIntoView({ block: "center", behavior: "smooth" }); return; }
+      if (pokus++ < 20) requestAnimationFrame(trafit);
+    };
+    requestAnimationFrame(trafit);
   }, [focus?.month, focus?.nonce]); // eslint-disable-line react-hooks/exhaustive-deps
   const idx = r.idx;
   const seriesFor = (k: string): Vals =>
@@ -2395,7 +2406,7 @@ function MesacneTab({ data, clients, focus }: { data: PSBData; clients: Record<s
                     <td style={{ ...cell, color: prev == null ? C.textDim : signColor(p.hrubyZisk[i] - prev), borderLeft: `1px solid ${C.border}` }}>{prev == null ? "—" : pctStr(pct(p.hrubyZisk[i], prev))}</td>
                   </tr>
                   {openNote === i && (
-                    <MonthNoteRow mi={i} colSpan={6} notes={notes}
+                    <MonthNoteRow mi={i} colSpan={6} notes={notes} kotva={`otazky-${nKey}`}
                       onSaved={(nn) => setNotes((prevN) => ({ ...prevN, [nn.month]: nn }))} />
                   )}
                   </Fragment>

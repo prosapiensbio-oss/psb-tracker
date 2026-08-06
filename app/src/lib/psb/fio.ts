@@ -140,8 +140,13 @@ const SEED: [RegExp, string][] = [
   // Poradie je dôležité: konkrétny človek pred všeobecnou výplatou.
   // „Jerry stat" je odvod štátu za Jerryho, nie jeho výplata — má v P&L
   // vlastný riadok a bez tohto pravidla by skončil vo výplatách.
-  [/jerry\s*stat|stat\s*jerry/i, "fixne.prevadzka.statJerry"],
-  [/(zdravotka|socialka|sociálka|zdravotná|zdravotna).*(teré|tere)|teré?zia.*zdravotka/i, "fixne.prevadzka.statTerezka"],
+  // ŠTÁT JE VYŠŠIA KARTA NEŽ MENO. „Jerry vyplata stat" aj „Jerry vyplata
+  // socialka" sú odvody štátu, nie výplata — slová sú od seba oddelené, takže
+  // pôvodné pravidlo (jerry hneď vedľa stat) ich nechytilo a spadli medzi
+  // výplaty. Štyri platby za 39 267 Kč. Odvod sa preto hľadá KDEKOĽVEK v texte
+  // a až potom rozhoduje, o koho ide.
+  [/(stat|štát|socialka|sociálka|zdravotka|zdravotná|zdravotna|opsvz|ossz).*(teré|tere|zaťkov|zatkov)|(teré|tere|zaťkov|zatkov).*(stat|štát|socialka|sociálka|zdravotka)/i, "fixne.prevadzka.statTerezka"],
+  [/\b(stat|štát|socialka|sociálka|zdravotka|zdravotná|zdravotna|opsvz|ossz)\b/i, "fixne.prevadzka.statJerry"],
   [/(zaťkov|zatkov|terézia|terezia)/i, VYPLATY_TEREZKA],
   [/jerry/i, VYPLATY_JERRY],
   [/vyplata|výplata/i, VYPLATY],
