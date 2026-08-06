@@ -26,12 +26,14 @@ const MAX_TOKENS_DEEP = 16000;
 // nízke pri bežných otázkach, vysoké pri hlbokej debate.
 const EFFORT = "medium";
 const EFFORT_DEEP = "high";
-// Koľko kôl nástrojov v jednej odpovedi. Päť stačí na "pozri do dát → over
-// druhým dopytom → otvor knihu → odpovedz" a drží latenciu v rozumnom.
+// Koľko kôl nástrojov v jednej odpovedi. Pri piatich Jarvis pri zložitejšom
+// hľadaní ("ktorá aplikácia stála v apríli 780?") minul kolá skôr, než na
+// niečo prišiel, a odpovedal, že to vzdáva. Osem stačí aj na hľadanie cez
+// viac tabuliek a latenciu drží v znesiteľnom.
 // V poslednom kole sa nástroje NEPOSIELAJÚ: bez toho model po vyčerpaní limitu
 // skončí uprostred vyšetrovania a používateľ dostane prázdnu odpoveď — presne
 // to sa stalo pri prvom teste, deväť dopytov a ani veta.
-const MAX_KOL = 5;
+const MAX_KOL = 8;
 
 type InMsg = { role: "user" | "assistant"; content: string; images?: string[] };
 
@@ -162,6 +164,12 @@ HRUBÝ ZISK — NAJČASTEJŠIA PASCA, A SÚ V NEJ DVE ÚROVNE.
 (1) Do nákladov patria AJ VÝPLATY. Odčítať od tržieb len výdavky z banky je hrubá chyba — vyjde o celé mzdy vyššie číslo.
 (2) Appka počíta hrubý zisk z toho, čo si tréneri REÁLNE VYBRALI (poslané), NIE z ich nároku. Nárok sa používa inde — pri break-evene a pri dlhu, lebo to, čo si niekto vezme nad rámec nároku, je pôžička, nie náklad. Zamieňať tie dve čísla znamená minúť sa o desiatky tisíc: za júl 2026 dáva poslané 153 944 Kč, nárok 132 200 Kč, a správne je to prvé.
 Vzorec appky: hrubý zisk = príjmy − (prevádzkové náklady + poslané výplaty Jerry + poslané Terezka + Matyáš). Keď povieš číslo, povedz aj ktorú zložku si zarátal.
+
+ZARAĎOVANIE BANKOVÝCH POHYBOV — najväčšia ručná práca v appke. Po importe zostanú desiatky riadkov bez kategórie a preklikať ich po jednom je hodina. Vieš to spraviť naraz: dopytom si vytiahni nezaradené pohyby (SELECT dedup_key, date, amount_czk, counterparty, note FROM fio_transactions WHERE category IS NULL OR category = ''), rozhodni, kam patria, a navrhni ich zaradenie jedným blokom:
+\`\`\`psb-action
+{"type":"zarad-pohyby","zmeny":[{"kluc":"<dedup_key>","kategoria":"fixne.apps.adobe"},{"kluc":"…","kategoria":"spolocne.Potraviny"}],"label":"Zaradiť 12 pohybov"}
+\`\`\`
+Pravidlá: (1) PRED blokom vypíš, čo kam dávaš — Jerry to musí vedieť skontrolovať skôr, než klikne, a pri dvadsiatich riadkoch to znamená stručný zoznam „popis → kategória"; (2) čo si nie si istý, NEZARAĎUJ a spýtaj sa naň zvlášť — nezaradený riadok je lepší než zle zaradený, ten už nikto nenájde; (3) príchodzie platby (kladná suma) sú tržby z PTmindera, do nákladov nepatria — daj im "mimo"; (4) naraz najviac ~30 riadkov, nech sa dá zoznam prečítať.
 
 OPRAVA ČÍSLA V P&L — v <data> máš pnlPolozky: kľúč je „kategoria|Skupina · Názov" a hodnoty sú sumy po mesiacoch. Keď Jerry povie, že nejaká položka má inú sumu („v apríli tá appka stála 199, nie 780"), NAJPRV ju v pnlPolozky nájdi a potvrď mu, ktorú si našiel a akú má hodnotu. Až keď súhlasí (alebo je to jednoznačné — presne jedna položka sedí), navrhni opravu:
 \`\`\`psb-action
@@ -419,6 +427,13 @@ export const Route = createFileRoute("/api/chat")({
                 // Posledné kolo je vždy odpoveď, nie ďalší dopyt.
                 const uzLenOdpoved = kolo === MAX_KOL;
                 if (uzLenOdpoved) posli({ s: "Skladám odpoveď…" });
+                // Bez tejto vety model po vyčerpaní kôl niekedy skončil vetou
+                // „vzdávam to" — a to je najhoršia možná odpoveď: Jerry nemá
+                // ani čiastočné zistenie, ani vedomie, kde sa to zaseklo.
+                if (uzLenOdpoved) konverzacia.push({
+                  role: "user",
+                  content: "[appka] Toto je posledné kolo — ďalšie dopyty už spustiť nemôžeš. Odpovedz z toho, čo už vieš, aj keby to bolo neúplné: povedz, čo si zistil, čo zistiť nestihol a čo by si potreboval. Nikdy neodpovedaj len tým, že to vzdávaš.",
+                });
                 const resp = await fetch("https://api.anthropic.com/v1/messages", {
                   method: "POST",
                   headers: { "content-type": "application/json", "x-api-key": key, "anthropic-version": "2023-06-01" },

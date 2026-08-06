@@ -10,7 +10,7 @@ import type { Actions } from "./App";
 import { nastavPnlBunku, pnlOverridesNaUlozenie } from "../../lib/psb/vzas";
 
 type ParsedAction = {
-  type: "ack-anomaly" | "unack-anomaly" | "set-override" | "zapis-zaver" | "vyhodnot-zaver" | "novy-ciel" | "kronika" | "odloz-anomaliu" | "uprav-pnl";
+  type: "ack-anomaly" | "unack-anomaly" | "set-override" | "zapis-zaver" | "vyhodnot-zaver" | "novy-ciel" | "kronika" | "odloz-anomaliu" | "uprav-pnl" | "zarad-pohyby";
   label: string;
   done?: boolean;
   key?: string;
@@ -21,7 +21,7 @@ type ParsedAction = {
   // zapis-zaver / vyhodnot-zaver / novy-ciel
   data?: Record<string, unknown>;
 };
-type Msg = { role: "user" | "assistant"; text: string; actions?: ParsedAction[]; images?: string[] };
+type Msg = { role: "user" | "assistant"; text: string; actions?: ParsedAction[]; images?: string[]; systemova?: boolean };
 type SavedChat = { id: string; title: string; messages: Msg[]; updatedAt: number; archived?: boolean };
 
 const CHATS_KEY = "psb-ai-chats";
@@ -73,6 +73,8 @@ function parseActions(raw: string): { text: string; actions: ParsedAction[] } {
           actions.push({ type: "odloz-anomaliu", key: o.key, label, data: o });
         } else if (o?.type === "uprav-pnl" && typeof o.kategoria === "string" && /^\d{4}-\d{2}$/.test(String(o.mesiac)) && Number.isFinite(Number(o.suma))) {
           actions.push({ type: "uprav-pnl", label, data: o });
+        } else if (o?.type === "zarad-pohyby" && Array.isArray(o.zmeny) && o.zmeny.length) {
+          actions.push({ type: "zarad-pohyby", label, data: o });
         }
       } catch {
         /* ignore malformed */
@@ -253,6 +255,15 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
     }
   }
 
+  // Čo sa po kliknutí naozaj stalo — späť do rozhovoru.
+  //
+  // Jarvis navrhol zápis, Jerry klikol, a Jarvis o tom nemal tušenie. Na
+  // otázku „a je to zapísané?" nevedel odpovedať a v ďalšom kole ponúkal to
+  // isté znova. Správa ide do histórie, takže ju v ďalšom kole vidí — a Jerry
+  // vidí potvrdenie, že klik niečo urobil.
+  const oznamVysledok = (text: string) =>
+    setMsgs((m) => [...m, { role: "user", text: `[appka] ${text}`, systemova: true }]);
+
   function runAction(mi: number, ai: number) {
     setMsgs((prev) => {
       const next = prev.map((m) => ({ ...m, actions: m.actions ? m.actions.map((a) => ({ ...a })) : undefined }));
@@ -264,6 +275,25 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
       else if (a.type === "zapis-zaver" && a.data) void saveZaver(a.data);
       else if (a.type === "vyhodnot-zaver" && a.data) {
         void vyhodnotZaver(String(a.data.id || ""), String(a.data.stav || "otvoreny"), String(a.data.vysledok || ""));
+      } else if (a.type === "zarad-pohyby" && a.data) {
+        // Zaradenie bankových pohybov do kategórií. Toto je najväčšia ručná
+        // práca v celej appke — 174 nezaradených riadkov po prvom importe — a
+        // zároveň jediná, ktorú Jarvis vie spraviť naraz: kľúče si vytiahne
+        // dopytom, kategórie vie a rozhodnutie vidí Jerry pred kliknutím.
+        const zmeny = (a.data.zmeny as { kluc: string; kategoria: string }[]) || [];
+        void fetch("/api/fio", {
+          method: "POST", credentials: "same-origin",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ akcia: "kategoria", zmeny }),
+        })
+          .then((r) => r.json())
+          .then((j: { ok?: boolean; zmenene?: number; zamknute?: number }) => {
+            oznamVysledok(j.ok
+              ? `Zaradených ${j.zmenene ?? 0} pohybov${j.zamknute ? `, ${j.zamknute} preskočených (zamknutý mesiac)` : ""}.`
+              : "Zaradenie pohybov zlyhalo.");
+            void actions.refresh();
+          })
+          .catch(() => oznamVysledok("Zaradenie pohybov zlyhalo — spojenie."));
       } else if (a.type === "uprav-pnl" && a.data) {
         // Rovnaká cesta, akou opravu zapíše človek klikom na číslo v tabuľke —
         // prekrytie, nie prepis pôvodného radu, takže sa dá vrátiť a prežije
@@ -308,6 +338,9 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
         });
       }
       a.done = true;
+      // Oznam sa posiela mimo tejto aktualizácie stavu — vnorené setMsgs by
+      // sa počas prebiehajúcej aktualizácie stratilo.
+      setTimeout(() => oznamVysledok(`Vykonané: ${a.label}`), 0);
       return next;
     });
   }
@@ -377,8 +410,12 @@ export function ChatConversation({ chat, autoFocus, onClientClick, onNavigate }:
         {msgs.map((m, mi) => (
           // Skip the empty assistant placeholder before the first streamed token ("Rozmýšľam…" covers it).
           m.role === "assistant" && !m.text && !m.images && !m.actions?.length ? null : (
-          <div key={mi} style={{ alignSelf: m.role === "user" ? "flex-end" : "flex-start", maxWidth: "88%" }}>
-            <div style={{ background: m.role === "user" ? C.accent : mix(C.text, 7), color: m.role === "user" ? C.onAccent : C.text, padding: "9px 12px", borderRadius: 12, fontSize: 13, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>
+          <div key={mi} style={{ alignSelf: m.systemova ? "center" : m.role === "user" ? "flex-end" : "flex-start", maxWidth: m.systemova ? "100%" : "88%" }}>
+            {/* Oznam appky nie je ničia replika — nesmie vyzerať ako Jerryho
+                správa, ale musí byť v histórii, aby ho Jarvis videl. */}
+            <div style={m.systemova
+              ? { background: "transparent", color: C.textDim, padding: "2px 0", fontSize: 11.5, textAlign: "center" as const, fontStyle: "italic" as const }
+              : { background: m.role === "user" ? C.accent : mix(C.text, 7), color: m.role === "user" ? C.onAccent : C.text, padding: "9px 12px", borderRadius: 12, fontSize: 13, lineHeight: 1.5, whiteSpace: "pre-wrap" as const }}>
               {m.images?.length ? (
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: m.text ? 8 : 0 }}>
                   {m.images.map((src, k) => <img key={k} src={src} alt="" style={{ maxWidth: 150, maxHeight: 150, borderRadius: 8, display: "block" }} />)}
