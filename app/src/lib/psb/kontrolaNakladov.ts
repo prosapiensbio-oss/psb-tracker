@@ -152,17 +152,20 @@ export function dvojiteZapisy(
   const out: DvojityZapis[] = [];
   const mesiace = Object.keys(podlaMesiaca).sort();
   // Koľko pohybov mala kategória v ktorom mesiaci — z toho sa určí zvyk.
-  const pocty: Record<string, number[]> = {};
+  // Kľúčom MUSÍ byť mesiac, nie poradie: kategória v niektorých mesiacoch
+  // chýba, takže index do zoznamu počtov nesedí s indexom do zoznamu mesiacov.
+  // Prvá verzia to mala poľom a kontrola preto nenašla nič.
+  const pocty: Record<string, Record<string, number>> = {};
   for (const m of mesiace) {
     for (const [kat, p] of Object.entries(podlaMesiaca[m] || {})) {
-      (pocty[kat] ||= []).push(p.length);
+      (pocty[kat] ||= {})[m] = p.length;
     }
   }
   for (const m of mesiace) {
     for (const [kat, p] of Object.entries(podlaMesiaca[m] || {})) {
       if (p.length < 2) continue;
       if (kat.startsWith("vyplaty") || kat === "mimo" || kat.startsWith("spolocne.")) continue;
-      const ostatne = (pocty[kat] || []).filter((_, i) => mesiace[i] !== m);
+      const ostatne = Object.entries(pocty[kat] || {}).filter(([mk]) => mk !== m).map(([, n]) => n);
       // Aspoň tri iné mesiace na porovnanie, inak sa o zvyku nedá hovoriť.
       if (ostatne.length < 3) continue;
       const maxInde = Math.max(...ostatne);
