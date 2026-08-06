@@ -587,12 +587,18 @@ export function PSBApp() {
     const z = zapisy.mesiace?.[mk];
     const odpovedane = Object.values(z?.answers || {}).some((v) => String(v).trim());
     if (!odpovedane) out.push("nie sú zodpovedané otázky mesiaca");
-    // Anomálie za ten mesiac, ktoré nikto nevybavil. Register ich rieši ako
-    // celok; tu sa pozeráme len na tie, ktoré nesú mesiac v kľúči.
-    const ack = data.anomalyAck || {};
-    const nevybavene = registerAll.filter((r) => r.key.includes(mk) && !r.acked).length;
-    if (nevybavene) out.push(`${nevybavene} nevysvetlených upozornení za tento mesiac`);
-    void ack;
+    // Nevybavené upozornenia za ten mesiac — MENOM, nie počtom.
+    //
+    // Prvá verzia hlásila „2 nevysvetlené upozornenia" a Jarvis sa musel pýtať,
+    // ktoré to sú. Vedieť to mal: register má v kontexte celý. Lenže počet
+    // sa z neho spätne odvodiť nedá, a tak hádal. Čo appka už spočítala,
+    // nemá nikoho nútiť odvodzovať znova.
+    //
+    // Pripomienka na uzávierku sa vynecháva — jej kľúč tiež obsahuje mesiac,
+    // takže sa počítala druhýkrát pod iným menom hneď vedľa „nie sú
+    // zodpovedané otázky mesiaca".
+    const nevybavene = registerAll.filter((r) => r.key.includes(mk) && !r.acked && r.category !== "Zápis");
+    for (const r of nevybavene) out.push(`nevysvetlené upozornenie „${r.title}" (key: ${r.key})`);
     return out;
   }, [data, bankaSumy, kanalyMesiace, hotovostMesiace, zapisy, registerAll]);
 
