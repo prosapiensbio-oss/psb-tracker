@@ -179,28 +179,22 @@ function UploadCard({ data, missing, actions, chat }: { data: PSBData; missing: 
 
   // Fotka ide Jarvisovi s inštrukciou, nie ako holý obrázok — bez nej by sa
   // spýtal „čo s tým?" a Jerry by musel vysvetľovať to isté pri každej fotke.
+  // Fotka pretiahnutá do zóny pre CSV sa NEPOSIELA Jarvisovi.
+  //
+  // Pôvodne sa poslala aj s inštrukciou, ale príloha sa nastavovala do stavu a
+  // správa odchádzala v tom istom kroku — stav sa nestihol prejaviť a Jarvis
+  // dostal holý text. Odpovedal „nevidím žiadnu fotku", čo znelo ako jeho
+  // chyba a bola moja.
+  //
+  // Opravovať to načasovaním by bolo krehké a hlavne zbytočné: zošit má odvtedy
+  // vlastnú kartu s náhľadom, kde sa riadky dajú skontrolovať a opraviť pred
+  // zápisom. Chat na to je horšie miesto — odpoveď sa nedá prejsť riadok po
+  // riadku ani potvrdiť.
   const posliFotkyJarvisovi = async (fotky: File[]) => {
-    // Odpoveď v chate sa nedá skontrolovať riadok po riadku ani potvrdiť, a
-    // sú to peniaze. Fotka zošita má vlastnú kartu s náhľadom hneď nižšie —
-    // sem sa dostane len to, čo si používateľ pretiahne do zóny na CSV.
-    setPdfStav("Na fotku zošita je karta „Zošit — hotovostné platby“ nižšie: prepíše riadky do tabuľky, kde sa dajú opraviť a potom zapísať. Tadiaľto ide fotka len Jarvisovi do rozhovoru.");
-    if (!chat) return;
-    const url = (f: File) => new Promise<string>((res, rej) => {
-      const r = new FileReader();
-      r.onload = () => res(String(r.result));
-      r.onerror = rej;
-      r.readAsDataURL(f);
-    });
-    const urls = await Promise.all(fotky.slice(0, 4).map(url));
-    chat.setAttach((a) => [...a, ...urls].slice(0, 4));
-    chat.setFloatingOpen(true);
-    void chat.ask(
-      "Toto je fotka zošita s hotovostnými platbami. Prepíš z nej všetky riadky " +
-      "(dátum, meno, suma, poznámka) a ukáž mi ich ako tabuľku na potvrdenie — " +
-      "nezapisuj nič, kým to nepotvrdím. Pri číslach, ktoré sa nedajú prečítať isto, " +
-      "to povedz nahlas a nehádaj.",
+    setPdfStav(
+      `${fotky.length === 1 ? "Fotka patrí" : "Fotky patria"} do karty „Zošit — hotovostné platby“ nižšie na tejto obrazovke. ` +
+      "Prepíše riadky do tabuľky, kde ich skontroluješ a opravíš, a až potom sa zapíšu.",
     );
-    setPdfStav(`${fotky.length === 1 ? "Fotka je" : "Fotky sú"} u Jarvisa — prepíše ich a dá ti ich potvrdiť.`);
   };
 
   const handleFiles = async (fileList: FileList | null) => {
