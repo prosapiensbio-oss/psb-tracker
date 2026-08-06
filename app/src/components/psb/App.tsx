@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { BARTER_KLIENTI, PRVY_MESIAC_Z_FIO, nastavBtcVyplaty, nastavHodinyZTrackera, nastavJarekZTrackera, nastavNakladyZFio, nazovKategorie, pnlHodnota } from "../../lib/psb/vzas";
+import { BARTER_KLIENTI, PRVY_MESIAC_Z_FIO, vzasVerzia, nastavBtcVyplaty, nastavHodinyZTrackera, nastavJarekZTrackera, nastavNakladyZFio, nazovKategorie, pnlHodnota } from "../../lib/psb/vzas";
 
 import {
   checkSession,
@@ -571,7 +571,13 @@ export function PSBApp() {
 
   // Jarvis dostáva CELÝ register vrátane kontrol nad bankou — inak by nevedel
   // o chýbajúcom nájme a na otázku „čo mi uniká" by odpovedal, že nič.
-  const aiContext = useMemo(() => buildAiContext(data, clients, sixM, capacity, registerAll), [data, clients, sixM, capacity, registerAll]);
+  // `vzasVerzia()` je v závislostiach zámerne: P&L sa napĺňa importom z banky
+  // MIMO Reactu, takže bez nej by Jarvis dostal súhrn spočítaný ešte pred
+  // načítaním nákladov — a odpovedal by na zisk z prázdnych čísel.
+  const aiContext = useMemo(
+    () => buildAiContext(data, clients, sixM, capacity, registerAll),
+    [data, clients, sixM, capacity, registerAll, vzasVerzia()], // eslint-disable-line react-hooks/exhaustive-deps
+  );
 
   const actions = useMemo<Actions>(
     () => ({

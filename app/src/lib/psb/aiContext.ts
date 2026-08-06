@@ -250,6 +250,10 @@ export function buildAiContext(
     // „ktorá aplikácia stála v apríli 780?" nemá kde hľadať: hodnoty P&L žijú
     // v module (z Excelu + z importu), nie v databáze, takže ich nevytiahne ani
     // dopytom. Kľúč je presne ten, ktorým sa bunka aj opravuje.
+    // Hotový súhrn P&L po mesiacoch. Bez neho Jarvis na „aký bol zisk" hľadal
+    // v bankových pohyboch a odpovedal buď zle, alebo vôbec — číslo, ktoré
+    // appka počíta na jednom riadku, nemá zmysel nechať odvodzovať.
+    pnlSuhrn,
     pnlPolozky,
     klientiDetail,
   };
