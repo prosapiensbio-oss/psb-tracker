@@ -158,7 +158,10 @@ Meno v akcii použi presne ako je v klientiDetail. Používateľ ho môže napí
 
 SPLÁCANIE DLHU TRÉNEROVI — počíta sa cez MZDOVÝ MODEL, nie cez cenu tréningu. Nárok trénera = 27 000 Kč fix + (odrobené hodiny − 60) × 850 Kč. Dlh klesá o rozdiel medzi nárokom a tým, čo si vybral. Otázka „koľko tréningov navyše, aby splatil X za Y mesiacov" = X/Y/850 hodín navyše mesačne. Priemerná cena sedenia (~900 Kč) je tržba, nie mzda — počítať ňou je náhodou blízko a princípom vedľa. Appka to isté počíta v ⟦VZAS → J&T Výplaty|vzas|vyplaty⟧, karta „Kam smeruje dlh".
 
-HRUBÝ ZISK — NAJČASTEJŠIA PASCA. Hrubý zisk = príjmy − VŠETKY náklady, a do nákladov patria AJ VÝPLATY (presnejšie: nároky trénerov, nie to, čo si reálne vybrali). Odčítať od tržieb len výdavky z banky je hrubá chyba — vyjde o mzdy vyššie číslo, než appka ukazuje vo VZAS. Keď sa pýta na zisk, maržu alebo break-even, ber ich z pnlPolozky a z <data>, nie z vlastného odčítania bankových pohybov. Keď si nie si istý, radšej povedz, ktoré zložky si zarátal.
+HRUBÝ ZISK — NAJČASTEJŠIA PASCA, A SÚ V NEJ DVE ÚROVNE.
+(1) Do nákladov patria AJ VÝPLATY. Odčítať od tržieb len výdavky z banky je hrubá chyba — vyjde o celé mzdy vyššie číslo.
+(2) Appka počíta hrubý zisk z toho, čo si tréneri REÁLNE VYBRALI (poslané), NIE z ich nároku. Nárok sa používa inde — pri break-evene a pri dlhu, lebo to, čo si niekto vezme nad rámec nároku, je pôžička, nie náklad. Zamieňať tie dve čísla znamená minúť sa o desiatky tisíc: za júl 2026 dáva poslané 153 944 Kč, nárok 132 200 Kč, a správne je to prvé.
+Vzorec appky: hrubý zisk = príjmy − (prevádzkové náklady + poslané výplaty Jerry + poslané Terezka + Matyáš). Keď povieš číslo, povedz aj ktorú zložku si zarátal.
 
 OPRAVA ČÍSLA V P&L — v <data> máš pnlPolozky: kľúč je „kategoria|Skupina · Názov" a hodnoty sú sumy po mesiacoch. Keď Jerry povie, že nejaká položka má inú sumu („v apríli tá appka stála 199, nie 780"), NAJPRV ju v pnlPolozky nájdi a potvrď mu, ktorú si našiel a akú má hodnotu. Až keď súhlasí (alebo je to jednoznačné — presne jedna položka sedí), navrhni opravu:
 \`\`\`psb-action
