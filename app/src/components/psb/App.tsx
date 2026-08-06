@@ -24,7 +24,7 @@ import {
 } from "../../lib/psb/compute";
 import { buildAiContext } from "../../lib/psb/aiContext";
 import { Assistant, useAssistantChat } from "./Assistant";
-import { monthLabel, normName } from "../../lib/psb/format";
+import { fmtDMY, monthLabel, normName } from "../../lib/psb/format";
 import { ObdobieCtx } from "../../lib/psb/obdobie";
 import { C, S, tab } from "../../lib/psb/theme";
 import type { ClientOverride, PSBData } from "../../lib/psb/types";
@@ -43,7 +43,7 @@ import { HladanieKlienta } from "./Hladanie";
 import { ZapisButton } from "./Zapis";
 import { ritualy as spocitajRitualy } from "../../lib/psb/rituals";
 import { nastavRozpis, pridajDoRozpisu, type PohybZaBunku } from "../../lib/psb/rozpis";
-import { chybajuceNaklady, nezhodySExcelom, type BankovyMesiac } from "../../lib/psb/kontrolaNakladov";
+import { chybajuceNaklady, dvojiteZapisy, nezhodySExcelom, type BankovyMesiac, type Pohyb } from "../../lib/psb/kontrolaNakladov";
 import { MKT_MESACNE } from "../../lib/psb/marketing";
 
 export type Actions = {
@@ -293,6 +293,7 @@ export function PSBApp() {
   // ich potrebuje aj dlaždica Zisk na dashboarde, nielen obrazovka VZAS.
   const [, setFioTik] = useState(0);
   const [bankaSumy, setBankaSumy] = useState<BankovyMesiac>({});
+  const [bankaPohyby, setBankaPohyby] = useState<Record<string, Record<string, Pohyb[]>>>({});
   const [hotovostMesiace, setHotovostMesiace] = useState<Set<string>>(new Set());
   useEffect(() => {
     void fetch("/api/marketing", { credentials: "same-origin" })
@@ -330,6 +331,9 @@ export function PSBApp() {
         const pouzite = new Set<string>();
 
         const sumy: Record<string, Record<string, number>> = {};
+        // Súčty nestačia na kontrolu dvojitého zápisu — tá potrebuje vedieť,
+        // koľko pohybov za tým číslom stojí a odkiaľ prišli.
+        const pohybyPodla: Record<string, Record<string, Pohyb[]>> = {};
         const vyplaty: Record<string, { jerry: number; terezka: number }> = {};
         // Rozpis sa plní pri tom istom prechode ako súčty — inak by sa to, čo
         // tabuľka ukáže po rozkliknutí, mohlo rozísť s číslom nad ním.
@@ -388,6 +392,7 @@ export function PSBApp() {
         // Sumy si drží aj React — register z nich robí kontrolu „čo nedorazilo"
         // a „čo nesedí s Excelom". Bez toho by o nich vedel len model.
         setBankaSumy(sumy);
+        setBankaPohyby(pohybyPodla);
         if (nastavNakladyZFio(sumy, vyplaty)) setFioTik((x) => x + 1);
         else setFioTik((x) => x + 1); // rozpis pribudol aj bez zmeny súm
       })
@@ -443,6 +448,22 @@ export function PSBApp() {
       });
     }
 
+    // (1b) Ten istý výdavok dvoma cestami — z banky aj zo zošita. Vyzerá
+    // úplne normálne z oboch strán a nájde sa len tak, že sa niekto pozrie.
+    for (const d of dvojiteZapisy(bankaPohyby)) {
+      const key = `dvojity|${d.kluc}`;
+      const meno = nazovKategorie(d.kategoria);
+      const zdroje = d.pohyby.some((x) => x.hotovost) && d.pohyby.some((x) => !x.hotovost);
+      out.push({
+        key, category: "Anomália", tone: "red",
+        title: `${meno}: ${d.pohyby.length} platby v ${monthLabel(d.mesiac)}`,
+        detail: `${meno} — za ${monthLabel(d.mesiac)} sú zapísané ${d.pohyby.length} platby (${d.pohyby.map((x) => `${fmtDMY(x.datum)} ${Math.round(x.suma).toLocaleString("cs-CZ")} Kč${x.hotovost ? " zo zošita" : " z banky"}`).join(", ")}), spolu ${Math.round(d.spolu).toLocaleString("cs-CZ")} Kč. Inokedy tam býva jedna.` +
+          (zdroje ? " Jedna je z banky a jedna zo zošita — vyzerá to, že ten istý výdavok dorazil dvoma cestami." : "") +
+          " Ak je to naozaj dvakrát, oprav to v Údaje → Zapísané pohyby (kategória mimo ten pohyb vylúči).",
+        ...stavPolozky(key), priority: 2, client: "udaje",
+      });
+    }
+
     // (2) Excel vs. banka za mesiace, ktoré import neprepisuje. Doteraz sa dal
     // rozdiel nájsť len rozkliknutím jednej bunky po druhej — sto klikov,
     // ktoré nikto neurobí. Zhrnú sa do JEDNEJ položky: register má povedať, že
@@ -461,7 +482,7 @@ export function PSBApp() {
       });
     }
     return out;
-  }, [bankaSumy, data.anomalyAck]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [bankaSumy, bankaPohyby, data.anomalyAck]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const zmenyMetrik = useMemo(() => {
     const ack = data.anomalyAck || {};

@@ -118,3 +118,65 @@ export function nezhodySExcelom(
   }
   return out.sort((a, b) => b.rozdiel - a.rozdiel);
 }
+
+
+// ── dvojitý zápis ────────────────────────────────────────────────────────────
+//
+// Ten istý výdavok vie doraziť dvoma cestami: z banky aj zo zošita. Splátka
+// Jarkovi za júl 2026 tak vyšla 12 000 Kč namiesto 6 000 — a keďže tá kategória
+// znižuje aj dlh, mýlili sa naraz náklady aj dlh. Nikto by si toho nevšimol,
+// lebo obe čísla vyzerajú úplne normálne; našlo sa to len tým, že sa niekto
+// ručne pozrel.
+//
+// Pravidlo je jednoduché a zámerne úzke: kategória, ktorá historicky chodí
+// NAJVIAC RAZ za mesiac, ich zrazu má viac. Nájom, splátka, poistka, štát —
+// tam je druhý pohyb v mesiaci podozrivý. Potraviny alebo apps sa takto
+// nekontrolujú, tam je desať pohybov normálnych.
+
+export type Pohyb = { datum: string; suma: number; hotovost: boolean; popis: string };
+
+export type DvojityZapis = {
+  kluc: string;
+  kategoria: string;
+  mesiac: string;
+  pohyby: Pohyb[];
+  spolu: number;
+  /** Koľko takých pohybov býva za mesiac inokedy (typicky 1). */
+  obvykle: number;
+};
+
+export function dvojiteZapisy(
+  podlaMesiaca: Record<string, Record<string, Pohyb[]>>,
+  prah = 2000,
+): DvojityZapis[] {
+  const out: DvojityZapis[] = [];
+  const mesiace = Object.keys(podlaMesiaca).sort();
+  // Koľko pohybov mala kategória v ktorom mesiaci — z toho sa určí zvyk.
+  const pocty: Record<string, number[]> = {};
+  for (const m of mesiace) {
+    for (const [kat, p] of Object.entries(podlaMesiaca[m] || {})) {
+      (pocty[kat] ||= []).push(p.length);
+    }
+  }
+  for (const m of mesiace) {
+    for (const [kat, p] of Object.entries(podlaMesiaca[m] || {})) {
+      if (p.length < 2) continue;
+      if (kat.startsWith("vyplaty") || kat === "mimo" || kat.startsWith("spolocne.")) continue;
+      const ostatne = (pocty[kat] || []).filter((_, i) => mesiace[i] !== m);
+      // Aspoň tri iné mesiace na porovnanie, inak sa o zvyku nedá hovoriť.
+      if (ostatne.length < 3) continue;
+      const maxInde = Math.max(...ostatne);
+      if (maxInde > 1) continue;                       // viac pohybov je tu bežné
+      const spolu = p.reduce((a, x) => a + x.suma, 0);
+      if (spolu < prah) continue;
+      // Najsilnejší signál: jeden z banky, druhý zo zošita. Ale hlási sa aj
+      // dvojica z jedného zdroja — dvakrát zaplatený nájom je rovnaký problém.
+      out.push({
+        kluc: `dvojity|${kat}|${m}`,
+        kategoria: kat, mesiac: m, pohyby: p, spolu,
+        obvykle: Math.max(1, Math.round(ostatne.reduce((a, x) => a + x, 0) / ostatne.length)),
+      });
+    }
+  }
+  return out.sort((a, b) => b.spolu - a.spolu);
+}
