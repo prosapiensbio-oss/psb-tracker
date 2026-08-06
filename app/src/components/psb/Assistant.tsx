@@ -2,14 +2,14 @@ import { type CSSProperties, Fragment, useEffect, useRef, useState } from "react
 
 import type { AiContext } from "../../lib/psb/aiContext";
 import {
-  deleteJarvisChat, fetchJarvisMemory, fetchVzasSettings, saveJarvisChat,
+  deleteJarvisChat, fetchJarvisMemory, fetchMonthNotes, fetchVzasSettings, saveJarvisChat, saveMonthNote,
   saveVzasSetting, saveZaver, sendChat, vyhodnotZaver,
 } from "../../lib/psb/client";
 import { C, mix } from "../../lib/psb/theme";
 import type { Actions } from "./App";
 
 type ParsedAction = {
-  type: "ack-anomaly" | "unack-anomaly" | "set-override" | "zapis-zaver" | "vyhodnot-zaver" | "novy-ciel";
+  type: "ack-anomaly" | "unack-anomaly" | "set-override" | "zapis-zaver" | "vyhodnot-zaver" | "novy-ciel" | "kronika";
   label: string;
   done?: boolean;
   key?: string;
@@ -66,6 +66,8 @@ function parseActions(raw: string): { text: string; actions: ParsedAction[] } {
           actions.push({ type: "vyhodnot-zaver", label, data: o });
         } else if (o?.type === "novy-ciel" && typeof o.nazov === "string") {
           actions.push({ type: "novy-ciel", label, data: o });
+        } else if (o?.type === "kronika" && typeof o.fakt === "string" && /^\d{4}-\d{2}$/.test(String(o.mesiac))) {
+          actions.push({ type: "kronika", label, data: o });
         }
       } catch {
         /* ignore malformed */
@@ -248,6 +250,23 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
       else if (a.type === "zapis-zaver" && a.data) void saveZaver(a.data);
       else if (a.type === "vyhodnot-zaver" && a.data) {
         void vyhodnotZaver(String(a.data.id || ""), String(a.data.stav || "otvoreny"), String(a.data.vysledok || ""));
+      } else if (a.type === "kronika" && a.data) {
+        // Fakt o vývoji PSB sa PRIPÍSAVA k poznámke mesiaca, neprepisuje ju.
+        // Poznámka mesiaca je jediné miesto, ktoré appka drží v čase — o rok
+        // sa dá odpovedať „kedy sa Radek stal majiteľom priestoru" len vtedy,
+        // keď to niekde má dátum. Rozhovor s Jarvisom taký dátum nemá.
+        const d = a.data;
+        const mes = String(d.mesiac || "");
+        const fakt = String(d.fakt || "").trim();
+        if (mes && fakt) {
+          void fetchMonthNotes().then((n) => {
+            const stara = n[mes]?.note || "";
+            const dnes = new Date().toISOString().slice(0, 10);
+            const riadok = `• ${fakt} (zapísal Jarvis ${dnes})`;
+            if (stara.includes(fakt)) return; // to isté dvakrát nie
+            void saveMonthNote(mes, [stara, riadok].filter(Boolean).join("\n"), n[mes]?.answers || {}, "jarvis");
+          });
+        }
       } else if (a.type === "novy-ciel" && a.data) {
         // Ciele žijú v jednom JSON kľúči — načítaj, pridaj, ulož späť.
         const d = a.data;

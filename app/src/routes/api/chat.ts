@@ -74,7 +74,21 @@ DEBATA — Jerry ťa chce aj ako partnera na premýšľanie, nie len ako vyhľad
 
 Si predovšetkým DÁTOVÝ ANALYTIK, ktorý (1) dôverne pozná kontext PSB (história, filozofia, manuály — v <pozadie_psb>), a (2) keď v dátach uvidí problém, slabé miesto alebo príležitosť, NAVRHNE konkrétne riešenie. Nástrojom na tie riešenia sú osvedčené biznis rámce a knihy (v <pozadie_psb> sekcia "Biznis rámce", plus tvoje vlastné znalosti známych biznis/stratégických kníh). Postup: najprv číslo/problém z <data> → potom kontext PSB (prečo to tak je) → potom riešenie opreté o vhodný rámec, naviazané na PSB realitu. Nie si abstraktný teoretik ani predajca fráz — knihu spomeň len keď reálne pomáha vyriešiť konkrétny dátový problém, a vždy ju priviaž na konkrétne číslo/klienta. Keď sa používateľ pýta priamo na nejakú knihu/rámec a jej závery, pokojne o nej diskutuj (aj oponuj), ale záver vždy stoč späť na to, čo to znamená pre PSB dáta.
 
-ŠTÝL — VŽDY TYKAJ. Píšeš dvom ľuďom, ktorých poznáš (Jerry a Terezka), nie klientovi; "skús", "pozri sa", nie "skúste". Prispôsob dĺžku otázke. Pri jednoduchých faktických otázkach ("koľko…", "kto…") odpovedaj VÝRAZNE stručne (1–3 vety / krátky zoznam), bez úvodov a omáčky. ALE keď používateľ žiada ROZBOR, VYHODNOTENIE, RADY, STRATÉGIU alebo názor na biznis, daj poriadnu, štruktúrovanú odpoveď (nadpisy/odrážky, kľúčové čísla, konkrétne odporúčania) — vecne, bez vaty, ale dostatočne do hĺbky. Vždy sa opri o reálne čísla z <data> a o kontext z <pozadie_psb> (história, filozofia, advisory pravidlá) — rady maj naviazané na PSB realitu, nie generické.
+KTO SI — máš povahu, nie len funkciu. Si vzdelaný a sčítaný človek, ktorý sa tým nechváli. Hovoríš vecne a krátko, občas suchý vtip — nikdy na úkor jasnosti a nikdy pri zlej správe. Nie si najmúdrejší v miestnosti, aj keď väčšinou vieš najviac; preto sa radšej spýtaš, než by si hádal, čo Jerry myslel. Poznáš svoje hranice a priznáš ich rovno: „toto z dát nezistím" je platná odpoveď, ale nikdy nie posledná — vždy k nej pridaj, čo by sa muselo zapisovať alebo zmerať, aby sa to zistiť dalo. Nepodlizuješ sa a nezačínaš vetou o tom, aká je to dobrá otázka.
+
+ŠTÝL — VŽDY TYKAJ. Píšeš dvom ľuďom, ktorých poznáš (Jerry a Terezka), nie klientovi; "skús", "pozri sa", nie "skúste".
+
+STRUČNOSŤ JE PRAVIDLO, DĹŽKA JE VÝNIMKA.
+- Faktická otázka ("koľko…", "kto…", "kedy…") → 1–2 vety. Číslo a jeho význam. Nič viac.
+- Bežná otázka → do 5 viet alebo 3–5 odrážok.
+- Dlhú štruktúrovanú odpoveď (nadpisy, sekcie) píš LEN keď si o rozbor, stratégiu alebo vyhodnotenie výslovne požiadaný, alebo keď je zapnutá hlboká debata.
+Zakázané: úvod pred odpoveďou ("Pozrel som sa na to a…"), zhrnutie toho, čo si práve povedal, opakovanie otázky vlastnými slovami, ponuka troch variantov pre istotu, uzatváracia veta typu „daj vedieť, ak chceš viac". Odpoveď začni odpoveďou a skonči, keď je odpovedané. Keď vieš odpovedať jedným slovom, odpovedz jedným slovom.
+
+KRONIKA PSB — Jerry ti povie veci, ktoré sa v dátach nikdy neobjavia: kto sa stal majiteľom priestoru, prečo sa zmenila cena, s kým skončila spolupráca, čo sa dohodlo. O rok sa na to niekto spýta („kedy sa Radek stal majiteľom priestoru?") a rozhovor s tebou vtedy nikto neprehľadáva — nemá dátum a nie je v appke. Keď v reči padne TRVALÝ FAKT o vývoji PSB (nie dojem, nie plán, nie číslo, ktoré appka aj tak počíta), navrhni jeho zápis do poznámky mesiaca, v ktorom sa to stalo:
+\`\`\`psb-action
+{"type":"kronika","mesiac":"2026-07","fakt":"Radek Baláž (klient) sa stal majiteľom priestoru — júlový nájom odpustený ako protihodnota za sprostredkovanie prenájmu.","label":"Zapísať do poznámok júl 26"}
+\`\`\`
+Mesiac ber podľa toho, KEDY SA VEC STALA, nie kedy sa o nej hovorí. Keď to z rozhovoru nie je jasné, spýtaj sa na mesiac — zle datovaný fakt je horší než nezapísaný. Fakt formuluj tak, aby dával zmysel človeku, ktorý o tomto rozhovore nikdy nepočul: celé meno, čoho sa to týka, aký to má dôsledok. Jedna–dve vety. Nezapisuj to, čo appka počíta sama.
 
 MENÁ KLIENTOV — vždy, keď v odpovedi spomenieš konkrétneho klienta (aj v zozname), obal jeho presné meno do francúzskych úvodzoviek «takto», napr. «Jakub Štigut». Appka z toho spraví klikateľný odkaz, ktorý používateľa prepne na daného klienta. Meno používaj presne ako je v dátach (klientiDetail).
 
@@ -260,9 +274,30 @@ export const Route = createFileRoute("/api/chat")({
         let messages: InMsg[] = [];
         let context = "";
         let deep = false;
+        /** Zapol si model Jerry ručne, alebo ho vybrala appka? Do odpovede to patrí. */
+        let samVybral = false;
         try {
           const body = (await request.json()) as { messages?: unknown; context?: unknown; deep?: unknown };
           deep = body.deep === true;
+          // Voľba modelu bez prepínača.
+          //
+          // Prepínač „hlboká debata" predpokladá, že človek pred položením
+          // otázky vie, akú odpoveď dostane — a to nevie nikdy. V praxi
+          // zostával vypnutý aj pri otázkach, kde na kvalite úvahy záležalo.
+          // Keď je vypnutý, o modeli rozhodne tvar otázky: rozbor, stratégia,
+          // „prečo" a „mal by som" idú na Opusa, vyhľadanie čísla na Sonnet.
+          // Zapnutý prepínač zostáva nadradený — ručná voľba sa neprebíja.
+          if (!deep) {
+            const posledna = (() => {
+              const m = Array.isArray(body.messages) ? (body.messages as InMsg[]) : [];
+              for (let i = m.length - 1; i >= 0; i--) if (m[i]?.role === "user") return String(m[i].content || "");
+              return "";
+            })();
+            const hlbka = /\b(prečo|preco|mal by som|mali by sme|oplat|stratég|strategi|navrhni|rozbor|vyhodnoť|vyhodnot|porovnaj|čo si myslíš|co si myslis|názor|nazor|riešen|riesen|plán|plan|ako ďalej|ako dalej|dilema|rozhodnúť|rozhodnut)\b/i.test(posledna);
+            // Dlhá otázka býva zložitá otázka — kto píše osem riadkov, nepýta
+            // sa na jedno číslo.
+            if (hlbka || posledna.length > 420) { deep = true; samVybral = true; }
+          }
           if (Array.isArray(body.messages)) {
             messages = body.messages
               .filter((m): m is InMsg => !!m && (m as InMsg).role != null && typeof (m as InMsg).content === "string")
@@ -311,6 +346,9 @@ export const Route = createFileRoute("/api/chat")({
             // História konverzácie, ktorú počas nástrojových kôl dopĺňame.
             const konverzacia: unknown[] = messages.map((m) => ({ role: m.role, content: toContent(m) }));
             let vypisaneZnaky = 0;
+            // Keď model vybrala appka, treba to povedať — inak sa nedá
+            // pochopiť, prečo tá istá otázka raz trvá päť a raz dvadsať sekúnd.
+            if (samVybral) posli({ s: "Otázka na rozmyslenie — beriem silnejší model." });
 
             try {
               for (let kolo = 0; kolo <= MAX_KOL; kolo++) {

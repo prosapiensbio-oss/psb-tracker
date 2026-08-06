@@ -238,6 +238,11 @@ export function PSBApp() {
   // hlási sa až prepad o ≥30 % a len pri aspoň štyroch mesiacoch dát — menej
   // je šum, nie signál.
   const [webMetriky, setWebMetriky] = useState<{ gsc: { m: string; kliky: number }[]; ga4: { m: string; udalosti: number }[] }>({ gsc: [], ga4: [] });
+  // Marketing má dva nezávislé zdroje: CSV exporty z Metricoolu (príspevok po
+  // príspevku → MKT_MESACNE) a mesačnú zostavu v PDF, ktorú prečíta Jarvis
+  // (→ kanaly_mesiace). Kontrola dokladov pozerala len na prvý, takže hlásila
+  // „chýba Metricool" aj keď bola nahratá zostava. Stačí ktorýkoľvek.
+  const [kanalyMesiace, setKanalyMesiace] = useState<string[]>([]);
   // Mzdové hodiny pre mesiace, ktoré Excel nemá — priamo z PTmindera, bez
   // úvodných tréningov (tie sa platia zvlášť a do mzdových hodín nepatria).
   useEffect(() => {
@@ -292,8 +297,10 @@ export function PSBApp() {
   useEffect(() => {
     void fetch("/api/marketing", { credentials: "same-origin" })
       .then((r) => r.json())
-      .then((j: { gscMesacne?: { m: string; kliky: number }[]; ga4?: { m: string; udalosti: number }[] }) =>
-        setWebMetriky({ gsc: j.gscMesacne || [], ga4: j.ga4 || [] }))
+      .then((j: { gscMesacne?: { m: string; kliky: number }[]; ga4?: { m: string; udalosti: number }[]; kanaly?: { mesiac: string }[] }) => {
+        setWebMetriky({ gsc: j.gscMesacne || [], ga4: j.ga4 || [] });
+        setKanalyMesiace([...new Set((j.kanaly || []).map((k) => String(k.mesiac)))]);
+      })
       .catch(() => {});
   }, []);
 
@@ -485,12 +492,12 @@ export function PSBApp() {
     const k = kotvaDat(data);
     if (!k.plny || k.plny < mk) chybaju.push("PTminder (sedenia a platby)");
     if (!bankaSumy[mk]) chybaju.push("výpis z Fio");
-    if (!MKT_MESACNE.some((r) => r.m === mk)) chybaju.push("Metricool");
+    if (!MKT_MESACNE.some((r) => r.m === mk) && !kanalyMesiace.includes(mk)) chybaju.push("Metricool");
     // Bez zošita chýba hotovosť — a s ňou časť nákladov aj výplat. Mesiac,
     // ktorý sa uzavrie bez nej, vyzerá ziskovejší, než bol.
     if (!hotovostMesiace.has(mk)) chybaju.push("zošit (hotovostné platby)");
     return { mesiac: mk, chybaju };
-  }, [data, bankaSumy, hotovostMesiace]);
+  }, [data, bankaSumy, hotovostMesiace, kanalyMesiace]);
 
   const rituals = useMemo(
     () => spocitajRitualy(new Date(), zapisy.weeks, zapisy.mesiace, chybajuceDoklady),
