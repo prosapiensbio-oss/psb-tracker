@@ -167,6 +167,9 @@ Používateľ ti môže priložiť aj OBRÁZOK (screenshot). Popíš/rozober, č
 
 const SCHEMA_DB = `sessions(id, date, time, client_name, session_trainer, session_name, session_type, duration_min, price_czk)
   session_type: OFFLINE | ONLINE | UVODNE. date je ISO text s časom, na porovnanie roka použi substr(date,1,4).
+  POZOR NA MZDOVÉ HODINY: do mzdy trénera sa rátajú len OFFLINE a ONLINE — ÚVODNÉ NIE, tie sa platia zvlášť.
+  „Koľko hodín odrobila Terezka v júli" = SUM(duration_min)/60 WHERE session_type <> 'UVODNE'. Bez tejto podmienky
+  vyjde o úvodné viac než ukazuje appka vo VZAS → J&T Výplaty, a to je číslo, podľa ktorého sa počíta nárok aj dlh.
 payments(id, date, client_name, amount_czk, payment_method)   payment_method: bank | cash | other
 packages(id, client_name, client_status, package_name, sessions_remaining, sessions_total, added, valid_from, valid_to, payment_czk, kind)  — MOMENTKA aktuálneho stavu, nie história; valid_to = skutočný koniec platnosti členstva, payment_czk = koľko klient za tento balíček reálne zaplatil (nesie jeho zľavy), kind = package | membership
 client_overrides(name, status, special_rate, special_rate_note, trainer_note, contract_signed, primary_trainer, bitcoin, duch, zdroj, zdroj_kto)  — zdroj: referencia|reklama|instagram|google|fp|offline|ai|ine; zdroj_kto = meno odporúčateľa
