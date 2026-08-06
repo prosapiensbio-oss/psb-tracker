@@ -261,7 +261,15 @@ export function PSBApp() {
   // bankovom výpise nie sú, takže bez nich by mesiac vyzeral, akoby si tréner
   // vzal menej, než naozaj vzal.
   useEffect(() => {
-    void fetchBtcReserve(false, true).then((r) => {
+    void fetchBtcReserve(true, true).then((r) => {
+      // Platby klientov v bitcoine sú TRŽBA, ktorá cez účet nikdy neprejde.
+      // Bez nich kontrola príjmov hlásila, že za júl chýba 132 000 Kč — a
+      // pritom 130 000 z toho prišlo v BTC.
+      if (r?.platby?.length) {
+        const bt: Record<string, number> = {};
+        for (const x of r.platby) bt[String(x.datum).slice(0, 7)] = (bt[String(x.datum).slice(0, 7)] || 0) + (x.czk || 0);
+        setBtcPrijmy(bt);
+      }
       if (!r?.vyplaty?.length) return;
       const podlaMesiaca: Record<string, { jerry: number; terezka: number; jerryFp: number }> = {};
       for (const v of r.vyplaty) {
@@ -295,6 +303,7 @@ export function PSBApp() {
   const [bankaSumy, setBankaSumy] = useState<BankovyMesiac>({});
   const [bankaPohyby, setBankaPohyby] = useState<Record<string, Record<string, Pohyb[]>>>({});
   const [bankaPrijmy, setBankaPrijmy] = useState<Record<string, number>>({});
+  const [btcPrijmy, setBtcPrijmy] = useState<Record<string, number>>({});
   const [hotovostMesiace, setHotovostMesiace] = useState<Set<string>>(new Set());
   useEffect(() => {
     void fetch("/api/marketing", { credentials: "same-origin" })
@@ -490,14 +499,17 @@ export function PSBApp() {
     // nemala ako vyjsť najavo.
     const ptPodlaMesiaca: Record<string, number> = {};
     for (const m of monthlyFinance(data)) ptPodlaMesiaca[m.month] = m.cash;
-    for (const n of nezhodyPrijmov(bankaPrijmy, ptPodlaMesiaca)) {
+    // Banka + zošit + BTC. Tri cesty, ktorými peniaze reálne prídu.
+    const prijmySpolu: Record<string, number> = { ...bankaPrijmy };
+    for (const [mk, v] of Object.entries(btcPrijmy)) prijmySpolu[mk] = (prijmySpolu[mk] || 0) + v;
+    for (const n of nezhodyPrijmov(prijmySpolu, ptPodlaMesiaca)) {
       const key = `prijmy|${n.mesiac}`;
       out.push({
         key, category: "Zmena", tone: "orange",
         title: `${monthLabel(n.mesiac)}: banka a PTminder sa v príjmoch líšia o ${n.rozdiel.toLocaleString("cs-CZ")} Kč`,
         detail: n.bankaViac
-          ? `Za ${monthLabel(n.mesiac)} prišlo na účet a v hotovosti ${n.banka.toLocaleString("cs-CZ")} Kč, ale PTminder hlási tržby ${n.ptminder.toLocaleString("cs-CZ")} Kč — o ${n.rozdiel.toLocaleString("cs-CZ")} Kč MENEJ. Buď chýba platba v PTminderi, alebo časť príjmu nie je tržba (vklad, vratka, preplatok) a patrí do koša „mimo".`
-          : `Za ${monthLabel(n.mesiac)} hlási PTminder tržby ${n.ptminder.toLocaleString("cs-CZ")} Kč, ale na účet a v hotovosti prišlo len ${n.banka.toLocaleString("cs-CZ")} Kč — o ${n.rozdiel.toLocaleString("cs-CZ")} Kč menej. Buď časť platieb ešte nedorazila, alebo prišli inou cestou (BTC, barter), alebo chýba zošit.`,
+          ? `Za ${monthLabel(n.mesiac)} prišlo tromi cestami (účet + zošit + BTC) ${n.banka.toLocaleString("cs-CZ")} Kč, ale PTminder hlási tržby ${n.ptminder.toLocaleString("cs-CZ")} Kč — o ${n.rozdiel.toLocaleString("cs-CZ")} Kč MENEJ. Buď chýba platba v PTminderi, alebo časť príjmu nie je tržba (vklad, vratka, preplatok) a patrí do koša „mimo".`
+          : `Za ${monthLabel(n.mesiac)} hlási PTminder tržby ${n.ptminder.toLocaleString("cs-CZ")} Kč, ale tromi cestami (účet + zošit + BTC) prišlo len ${n.banka.toLocaleString("cs-CZ")} Kč — o ${n.rozdiel.toLocaleString("cs-CZ")} Kč menej. Buď časť platieb ešte nedorazila, alebo prišla ďalšou cestou, o ktorej appka nevie, alebo je to barter.`,
         ...stavPolozky(key), priority: 6, client: "udaje|",
       });
     }
@@ -520,7 +532,7 @@ export function PSBApp() {
       });
     }
     return out;
-  }, [bankaSumy, bankaPohyby, bankaPrijmy, data.anomalyAck]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [bankaSumy, bankaPohyby, bankaPrijmy, btcPrijmy, data.anomalyAck]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const zmenyMetrik = useMemo(() => {
     const ack = data.anomalyAck || {};
