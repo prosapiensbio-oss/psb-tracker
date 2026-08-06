@@ -382,6 +382,14 @@ export function PSBApp() {
             popis: [p.protistrana, p.poznamka].filter(Boolean).join(" · ") || "bankový pohyb",
             suma: -p.suma, zdroj: "banka",
           });
+          // Aj jednotlivé pohyby, nielen súčet — kontrola dvojitého zápisu
+          // potrebuje vedieť, koľko ich za tým číslom stojí a odkiaľ prišli.
+          ((pohybyPodla[mk] ||= {})[p.kategoria] ||= []).push({
+            datum: String(p.datum).slice(0, 10),
+            suma: -p.suma,
+            hotovost: p.typ === "hotovosť",
+            popis: [p.protistrana, p.poznamka].filter(Boolean).join(" · ") || "",
+          });
         }
         nastavRozpis(rozpis);
         // Zošit sa pozná podľa typu pohybu — mesiac netreba pýtať, vyplýva z
