@@ -199,7 +199,13 @@ export function PSBApp() {
     if (tab === "financie" && focus) setFinancieFocus(focus);
     if (tab === "klienti" && focus) setKlientiFocus(focus);
     if (tab === "vysledky" && focus) setVysledkyFocus(focus);
-  }, []);
+    // Zápisy mesiaca sa načítavajú raz pri štarte, ale odpovede na otázky sa
+    // ukladajú v inom komponente s vlastným stavom. Kto vyplní otázky a prejde
+    // do Údajov zamknúť mesiac, narazil by na zámok tvrdiaci, že otázky
+    // chýbajú — appka by ho poslala späť robiť, čo práve dokončil. Obnoviť
+    // pri príchode na Údaje je lacné a rieši presne tento prechod.
+    if (tab === "udaje") void nacitajZapisy();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // `silent` keeps the full-screen "Načítavam…" away on background refreshes —
   // it unmounts the whole tree, which threw the user out of whatever sub-tab

@@ -130,6 +130,9 @@ export function Zosit({ onZapisane }: { onZapisane?: () => void }) {
         (j.zamknute ? ` · ${j.zamknute} v zamknutom mesiaci` : ""),
       );
       setRiadky(null);
+      // Rozpísané dátumy sú kľúčované indexom riadku — ďalšia dávka by ich
+      // zdedila a riadok č. 3 by ukazoval dátum z riadku č. 3 minulej strany.
+      setDenMesiac({});
       setStav("");
       onZapisane?.();
     } catch (e) {
@@ -298,7 +301,7 @@ export function Zosit({ onZapisane }: { onZapisane?: () => void }) {
               Zapísať {riadky.filter((r) => !r.vypnuty).length} riadkov
             </button>
             <button
-              onClick={() => { setRiadky(null); setStav(""); }}
+              onClick={() => { setRiadky(null); setDenMesiac({}); setStav(""); }}
               style={{ background: "none", border: "none", color: C.textDim, fontSize: 12, cursor: "pointer" }}
             >
               Zahodiť
