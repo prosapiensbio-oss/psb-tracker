@@ -367,6 +367,10 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
   // rebríček.
   const clientNames = useMemo(() => Object.keys(clients).sort((a, b) => a.localeCompare(b)), [clients]);
   const [showInactive, setShowInactive] = useState(false);
+  // „Kto nemá zapísané, odkiaľ prišiel" — jediné miesto, kde sa marketing
+  // spája s peniazmi, a doteraz sa dalo dopĺňať len tak, že človek prechádzal
+  // celý zoznam a hádal, ktorému chýba. Filter z toho robí odškrtávací zoznam.
+  const [lenBezZdroja, setLenBezZdroja] = useState(false);
   const [kpiWin, setKpiWin] = useState("all");
   const [kpiFrom, setKpiFrom] = useState("");
   const [kpiTo, setKpiTo] = useState("");
@@ -374,6 +378,11 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
   const { sort, toggle, sorted } = useSort({ key: "name", dir: "asc" });
 
   const all = useMemo(() => Object.values(clients), [clients]);
+
+  const pocetNeaktivnych = useMemo(() => all.filter((c) => c.status === "Neaktívny").length, [all]);
+  // Počíta sa zo VŠETKÝCH klientov vrátane neaktívnych — inak by tlačidlo
+  // hlásilo menšie číslo, než koľko sa po jeho stlačení objaví.
+  const pocetBezZdroja = useMemo(() => all.filter((c) => !c.zdroj).length, [all]);
 
   // Package-type filter options built from the real memberships in the data.
   const typeOptions = useMemo(() => {
@@ -426,6 +435,7 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
     if (typeF.startsWith("grp:")) arr = arr.filter((c) => c.clientType === typeF.slice(4));
     else if (typeF.startsWith("m:")) arr = arr.filter((c) => c.membership === typeF.slice(2));
     if (modalityF !== "all") arr = arr.filter((c) => c.modality === modalityF);
+    if (lenBezZdroja) arr = arr.filter((c) => !c.zdroj);
     if (nameSearch.trim()) {
       const q = normName(nameSearch);
       arr = arr.filter((c) => normName(c.name).includes(q));
@@ -444,7 +454,7 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
       bitcoin: (c) => (c.bitcoin ? 1 : 0),
       zdroj: (c) => c.zdroj || "zzz",
     });
-  }, [baseList, membershipF, typeF, modalityF, nameSearch, sorted, focusClient, all]);
+  }, [baseList, membershipF, typeF, modalityF, lenBezZdroja, nameSearch, sorted, focusClient, all]);
 
   const donut = useMemo(
     () => SEGMENTS.map((s) => ({ label: s, value: list.filter((c) => c.segment === s).length, color: segColor(s) })),
@@ -537,10 +547,32 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
             { value: "Jerry", label: "Jerry" },
             { value: "Terezka", label: "Terezka" },
           ]} />
-          <label style={{ fontSize: 12, color: C.textMuted, display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
-            <input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} style={{ accentColor: C.accent }} />
-            Aj neaktívnych
-          </label>
+          {/* Bolo to zaškrtávacie políčko medzi ostatnými filtrami a Jerry ho
+              nenašiel — hľadal neaktívnych klientov a nevedel, ako sa k nim
+              dostať. Ako tlačidlo s počtom je aj vidieť, aj povie, koľko ich je. */}
+          <button
+            onClick={() => setShowInactive((v) => !v)}
+            style={{
+              padding: "5px 12px", borderRadius: 16, fontSize: 12, cursor: "pointer",
+              border: `1px solid ${showInactive ? C.accent : C.border}`,
+              background: showInactive ? C.accentBg : "transparent",
+              color: showInactive ? C.accentLight : C.textMuted,
+            }}
+          >
+            {showInactive ? "✓ " : "+ "}{pocetNeaktivnych} neaktívnych
+          </button>
+          <button
+            onClick={() => { setLenBezZdroja((v) => !v); if (!lenBezZdroja) setShowInactive(true); }}
+            title="Klienti, pri ktorých nie je zapísané, odkiaľ prišli"
+            style={{
+              padding: "5px 12px", borderRadius: 16, fontSize: 12, cursor: "pointer",
+              border: `1px solid ${lenBezZdroja ? C.orange : C.border}`,
+              background: lenBezZdroja ? mix(C.orange, 12) : "transparent",
+              color: lenBezZdroja ? C.orange : C.textMuted,
+            }}
+          >
+            {lenBezZdroja ? "✓ " : ""}bez zdroja ({pocetBezZdroja})
+          </button>
           <div style={{ marginLeft: "auto", display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
             <span style={{ fontSize: 11, color: C.textDim }}>Obdobie štatistík:</span>
             <Select value={kpiWin} onChange={setKpiWin} options={KPI_WINDOWS.map((w) => ({ value: w.value, label: w.label }))} />
