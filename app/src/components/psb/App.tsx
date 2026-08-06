@@ -354,10 +354,17 @@ export function PSBApp() {
           // sú jediné nezávislé svedectvo o tom, čo naozaj prišlo, a jediný
           // spôsob, ako skontrolovať PTminder.
           if (p.suma > 0) {
-            if (p.kategoria !== "mimo") {
-              const mkP = String(p.datum).slice(0, 7);
-              prijmyBanka[mkP] = (prijmyBanka[mkP] || 0) + p.suma;
-            }
+            // VŠETKY príchodzie pohyby, bez ohľadu na kategóriu.
+            //
+            // Pôvodne som vynechával kôš „mimo" v domnienke, že sa tým dá
+            // kontrola umlčať. To bolo naopak: pri VÝDAVKU znamená „mimo"
+            // súkromný nákup, ktorý do P&L nepatrí, ale pri PRÍJME znamená
+            // „toto je duplicita PTmindera, nerátaj to druhýkrát ako tržbu".
+            // Peniaze na účet aj tak prišli. Keď Jerry tých 31 júlových
+            // platieb zaradil, kontrola prestala vidieť banku úplne a ohlásila
+            // dieru 181 962 Kč, ktorá neexistuje.
+            const mkP = String(p.datum).slice(0, 7);
+            prijmyBanka[mkP] = (prijmyBanka[mkP] || 0) + p.suma;
             continue;
           }
           if (p.suma >= 0 || !p.kategoria || p.kategoria === "mimo") continue;
