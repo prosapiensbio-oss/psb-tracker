@@ -233,8 +233,18 @@ export function nezhodyPrijmov(
   bankaPrijmy: Record<string, number>,
   /** mesiac → tržby z PTmindera. */
   ptminder: Record<string, number>,
-  /** Do koľkých mesiacov spätne. Staršie sa už aj tak neopravujú. */
-  odMesiaca = "2026-01",
+  /**
+   * Odkedy má kontrola zmysel.
+   *
+   * Do júna 2026 sa príjmy takto nikdy nesledovali — bankové výpisy sa
+   * nahrali spätne, zošit len za jún a júl a BTC appka nebeží od začiatku.
+   * Rozdiely 14–43 tisíc za jan–máj sú preto skôr neúplnosť zdrojov než
+   * chýbajúce platby, a nikto ich už spätne nedohľadá. Šesť trvalých
+   * upozornení, ktoré sa nedajú vyriešiť, naučí človeka register preskakovať.
+   *
+   * Od júla je zber úplný a kontrola dáva zmysel: júl sedí na 0,7 %.
+   */
+  odMesiaca = "2026-07",
   prahKc = 3000,
   prahPct = 0.05,
 ): NezhodaPrijmov[] {
