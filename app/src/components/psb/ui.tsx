@@ -749,3 +749,22 @@ export function Icon({ name, size = 17 }: { name: string; size?: number }) {
     </svg>
   );
 }
+
+// Tréner ako klikateľné pilulky — rovnaký vzhľad ako na dashboarde. Jeden
+// klik namiesto rozbaľovačky: prepína sa často a tri možnosti sa zmestia.
+export function TrenerPills({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const moznosti: [string, string][] = [["all", "Obaja"], ["Jerry", "Jerry"], ["Terezka", "Terezka"]];
+  return (
+    <div style={{ display: "flex", gap: 5 }}>
+      {moznosti.map(([v, lbl]) => (
+        <button key={v} onClick={() => onChange(v)}
+          style={{ padding: "5px 12px", borderRadius: 16, fontSize: 12, cursor: "pointer",
+            border: `1px solid ${value === v ? C.accent : C.border}`,
+            background: value === v ? C.accentBg : "transparent",
+            color: value === v ? C.accentLight : C.textMuted }}>
+          {lbl}
+        </button>
+      ))}
+    </div>
+  );
+}

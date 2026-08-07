@@ -19,8 +19,10 @@ export const OBDOBIA_STD = [
   { value: "all", label: "Celé obdobie" },
   { value: "2026", label: "2026" },
   { value: "2025", label: "2025" },
-  { value: "12m", label: "Posledných 12 mes." },
   { value: "6m", label: "Posledných 6 mes." },
+  { value: "3m", label: "Posledné 3 mes." },
+  { value: "1m", label: "Posledný mesiac" },
+  { value: "custom", label: "Vlastné" },
 ];
 
 export function obdobieOd(hodnota: string): { od: string; do_: string } {
@@ -28,15 +30,20 @@ export function obdobieOd(hodnota: string): { od: string; do_: string } {
   const iso = (d: Date) => d.toISOString().slice(0, 10);
   if (hodnota === "2026") return { od: "2026-01-01", do_: "2026-12-31" };
   if (hodnota === "2025") return { od: "2025-01-01", do_: "2025-12-31" };
-  if (hodnota === "12m") return { od: iso(new Date(dnes.getTime() - 365 * 86400000)), do_: iso(dnes) };
   if (hodnota === "6m") return { od: iso(new Date(dnes.getTime() - 183 * 86400000)), do_: iso(dnes) };
+  if (hodnota === "3m") return { od: iso(new Date(dnes.getTime() - 92 * 86400000)), do_: iso(dnes) };
+  if (hodnota === "1m") return { od: iso(new Date(dnes.getTime() - 31 * 86400000)), do_: iso(dnes) };
   return { od: "0000-01-01", do_: "9999-12-31" };
 }
 
 export function Referencie({ data, clients, onKlient }: { data: PSBData; clients: Record<string, ClientAgg>; onKlient?: (m: string) => void }) {
   const [obdobie, setObdobie] = useState("all");
+  const [vlastneOd, setVlastneOd] = useState("");
+  const [vlastneDo, setVlastneDo] = useState("");
   const r = useMemo(() => {
-    const { od, do_ } = obdobieOd(obdobie);
+    const { od, do_ } = obdobie === "custom"
+      ? { od: vlastneOd || "0000-01-01", do_: vlastneDo || "9999-12-31" }
+      : obdobieOd(obdobie);
     const vsetci = Object.values(clients);
     const zRef = vsetci.filter((c) => c.zdroj === "referencia");
     // Tržba len z platieb VO ZVOLENOM OBDOBÍ — zoznam odporúčateľov zostáva
@@ -74,14 +81,23 @@ export function Referencie({ data, clients, onKlient }: { data: PSBData; clients
     };
   // `obdobie` v závislostiach je CELÝ filter — bez neho sa memo neprepočíta
   // a prepínač nerobí nič. Presne to sa stalo v prvej verzii.
-  }, [clients, data.payments, obdobie]);
+  }, [clients, data.payments, obdobie, vlastneOd, vlastneDo]);
 
   return (
     <>
       <Card>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <H3><Info text="Najsilnejší kanál PSB. Podiel je z klientov, ktorí majú vyplnený zdroj — nie zo všetkých, lebo pri zvyšku sa jednoducho nevie. Tržba sa počíta z platieb vo zvolenom období; kto koho priviedol sa obdobím nemení." label="Referenčný motor" /></H3>
-          <Select value={obdobie} onChange={setObdobie} options={OBDOBIA_STD} />
+          <span style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+            <Select value={obdobie} onChange={setObdobie} options={OBDOBIA_STD} />
+            {obdobie === "custom" && (
+              <>
+                <input type="date" value={vlastneOd} onChange={(e) => setVlastneOd(e.target.value)} style={{ padding: "5px 8px", borderRadius: 7, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 12, colorScheme: "dark" }} />
+                <span style={{ color: C.textDim }}>–</span>
+                <input type="date" value={vlastneDo} onChange={(e) => setVlastneDo(e.target.value)} style={{ padding: "5px 8px", borderRadius: 7, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 12, colorScheme: "dark" }} />
+              </>
+            )}
+          </span>
         </div>
         <div style={{ display: "flex", gap: 22, flexWrap: "wrap", margin: "10px 0 6px" }}>
           <div>

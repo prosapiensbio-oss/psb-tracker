@@ -53,12 +53,14 @@ type Monthly = ReturnType<typeof monthlyFinance>;
 // Rovnaké hodnoty ako vo VZAS, aby sa dali zdieľať. Predtým tu bolo „3/6/12"
 // a vo VZAS „last6/last12/2025/2026" — tie isté otázky v dvoch jazykoch, takže
 // sa nedalo prepnúť obdobie raz pre všetky peniaze.
+// Štandard rodiny P — rovnaký zoznam ako vo zvyšku Peňazí.
 const RANGE_OPTS = [
   { value: "all", label: "Celé obdobie" },
   { value: "2026", label: "2026" },
   { value: "2025", label: "2025" },
   { value: "last6", label: "Posledných 6 mes." },
-  { value: "last12", label: "Posledných 12 mes." },
+  { value: "last3", label: "Posledné 3 mes." },
+  { value: "last1", label: "Posledný mesiac" },
   { value: "custom", label: "Vlastné" },
 ];
 
@@ -70,7 +72,9 @@ function windowFilter<T extends { month: string }>(arr: T[], win: string, from: 
     return arr.filter((m) => m.month >= lo && m.month <= hi);
   }
   if (win === "last6") return arr.slice(-6);
-  if (win === "last12") return arr.slice(-12);
+  if (win === "last3") return arr.slice(-3);
+  if (win === "last1") return arr.slice(-1);
+  if (win === "last12") return arr.slice(-12); // legacy
   if (/^\d{4}$/.test(win)) return arr.filter((r) => r.month.startsWith(win));
   return arr;
 }

@@ -11,7 +11,7 @@ import type { Actions, NavFocus } from "./App";
 import { Dennik } from "./Dennik";
 import { RastAStrata } from "./Fluktuacia";
 import { SixMTracker } from "./SixM";
-import { Badge, Card, Donut, Empty, H3, Info, Modal, Select, SortTh, StatCard, SubTabs, TableWrap, useSort } from "./ui";
+import { Badge, Card, Donut, Empty, H3, Info, Modal, Select, SortTh, StatCard, SubTabs, TableWrap, TrenerPills, useSort } from "./ui";
 
 const segTone = (s: string) => (s === "Anchor" ? "green" : s === "Stabilný" ? "orange" : "red");
 const segColor = (s: string) => (s === "Anchor" ? C.green : s === "Stabilný" ? C.orange : C.red);
@@ -556,37 +556,7 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
       {/* Filtre + KPI úplne hore */}
       <Card>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginBottom: 14 }}>
-          <Select value={fTrainer} onChange={(v) => { setFTrainer(v); if (v === "all") setFSegment("all"); }} options={[
-            { value: "all", label: "Obaja tréneri" },
-            { value: "Jerry", label: "Jerry" },
-            { value: "Terezka", label: "Terezka" },
-          ]} />
-          {/* Bolo to zaškrtávacie políčko medzi ostatnými filtrami a Jerry ho
-              nenašiel — hľadal neaktívnych klientov a nevedel, ako sa k nim
-              dostať. Ako tlačidlo s počtom je aj vidieť, aj povie, koľko ich je. */}
-          <button
-            onClick={() => setShowInactive((v) => !v)}
-            style={{
-              padding: "5px 12px", borderRadius: 16, fontSize: 12, cursor: "pointer",
-              border: `1px solid ${showInactive ? C.accent : C.border}`,
-              background: showInactive ? C.accentBg : "transparent",
-              color: showInactive ? C.accentLight : C.textMuted,
-            }}
-          >
-            {showInactive ? "✓ " : "+ "}{pocetNeaktivnych} neaktívnych
-          </button>
-          <button
-            onClick={() => { setLenBezZdroja((v) => !v); if (!lenBezZdroja) setShowInactive(true); }}
-            title="Klienti, pri ktorých nie je zapísané, odkiaľ prišli"
-            style={{
-              padding: "5px 12px", borderRadius: 16, fontSize: 12, cursor: "pointer",
-              border: `1px solid ${lenBezZdroja ? C.orange : C.border}`,
-              background: lenBezZdroja ? mix(C.orange, 12) : "transparent",
-              color: lenBezZdroja ? C.orange : C.textMuted,
-            }}
-          >
-            {lenBezZdroja ? "✓ " : ""}bez zdroja ({pocetBezZdroja})
-          </button>
+          <TrenerPills value={fTrainer} onChange={(v) => { setFTrainer(v); if (v === "all") setFSegment("all"); }} />
           <div style={{ marginLeft: "auto", display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
             <span style={{ fontSize: 11, color: C.textDim }}>Obdobie štatistík:</span>
             <Select value={kpiWin} onChange={setKpiWin} options={KPI_WINDOWS.map((w) => ({ value: w.value, label: w.label }))} />
@@ -688,6 +658,28 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
                 { value: "Offline", label: "Prevažne Offline" },
                 { value: "Online", label: "Prevažne Online" },
               ]} />
+              {/* Presunuté z horných filtrov k tabuľke (Jerryho pokyn):
+                  neaktívni a bez zdroja menia OBSAH TEJTO tabuľky, tak patria
+                  k nej — hore menili aj KPI a koláče, čo mätie. */}
+              <button
+                onClick={() => setShowInactive((v) => !v)}
+                style={{ padding: "5px 12px", borderRadius: 16, fontSize: 12, cursor: "pointer",
+                  border: `1px solid ${showInactive ? C.accent : C.border}`,
+                  background: showInactive ? C.accentBg : "transparent",
+                  color: showInactive ? C.accentLight : C.textMuted }}
+              >
+                {showInactive ? "✓ " : "+ "}{pocetNeaktivnych} neaktívnych
+              </button>
+              <button
+                onClick={() => { setLenBezZdroja((v) => !v); if (!lenBezZdroja) setShowInactive(true); }}
+                title="Klienti, pri ktorých nie je zapísané, odkiaľ prišli"
+                style={{ padding: "5px 12px", borderRadius: 16, fontSize: 12, cursor: "pointer",
+                  border: `1px solid ${lenBezZdroja ? C.orange : C.border}`,
+                  background: lenBezZdroja ? mix(C.orange, 12) : "transparent",
+                  color: lenBezZdroja ? C.orange : C.textMuted }}
+              >
+                {lenBezZdroja ? "✓ " : ""}bez zdroja ({pocetBezZdroja})
+              </button>
               {membershipF && (
                 <button onClick={() => setMembershipF("")} style={{ background: C.accentBg, border: `1px solid ${C.accent}`, borderRadius: 6, padding: "6px 10px", color: C.accentLight, fontSize: 12, cursor: "pointer", whiteSpace: "nowrap" }}>Balíček: {membershipF} ✕</button>
               )}

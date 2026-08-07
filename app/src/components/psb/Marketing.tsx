@@ -96,13 +96,16 @@ function Vysvetli({ chat, titul, filter, vyrez }: { chat?: AssistantChat; titul:
 //
 // A ešte niečo: pri 2–7 reels mesačne je rozdiel medzi 4 a 6 náhoda, nie trend.
 // Preto sa nikde nezačína jedným mesiacom — najkratšie okno sú tri.
+// Štandard rodiny M — rovnaké poradie ako v Peniazoch, len s krátkymi oknami
+// navrchu (marketing sa číta v mesiacoch, nie rokoch).
 const OBDOBIA = [
-  { value: "3m", label: "Posledné 3 mesiace" },
-  { value: "6m", label: "Posledných 6 mesiacov" },
-  { value: "12m", label: "Posledných 12 mesiacov" },
+  { value: "all", label: "Celé obdobie" },
   { value: "2026", label: "2026" },
   { value: "2025", label: "2025" },
-  { value: "all", label: "Celé obdobie (18 mes.)" },
+  { value: "6m", label: "Posledných 6 mes." },
+  { value: "3m", label: "Posledné 3 mes." },
+  { value: "1m", label: "Posledný mesiac" },
+  { value: "custom", label: "Vlastné" },
 ];
 
 // Vráti zoznam mesiacov "YYYY-MM", ktoré do okna patria.
@@ -110,15 +113,32 @@ function oknoMesiacov(obdobie: string, vsetky: string[]): string[] {
   const zoradene = [...new Set(vsetky)].sort();
   if (obdobie === "all") return zoradene;
   if (obdobie === "2025" || obdobie === "2026") return zoradene.filter((m) => m.startsWith(obdobie));
-  const n = obdobie === "3m" ? 3 : obdobie === "6m" ? 6 : 12;
+  if (obdobie.startsWith("custom:")) {
+    const [od, doM] = obdobie.slice(7).split("|");
+    return zoradene.filter((m) => (!od || m >= od) && (!doM || m <= doM));
+  }
+  const n = obdobie === "1m" ? 1 : obdobie === "3m" ? 3 : obdobie === "6m" ? 6 : 12;
   return zoradene.slice(-n);
 }
 
 function ObdobieBar({ hodnota, onChange, poznamka }: { hodnota: string; onChange: (v: string) => void; poznamka?: string }) {
+  // „Vlastné" nesie rozsah priamo v hodnote ("custom:2026-01|2026-04") —
+  // ObdobieBar používa päť kariet a stav rozsahu by inak musela držať každá.
+  const jeCustom = hodnota === "custom" || hodnota.startsWith("custom:");
+  const [od, doM] = hodnota.startsWith("custom:") ? hodnota.slice(7).split("|") : ["", ""];
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
       {poznamka && <span style={{ fontSize: 11, color: C.textDim }}>{poznamka}</span>}
-      <Select value={hodnota} onChange={onChange} options={OBDOBIA} />
+      <Select value={jeCustom ? "custom" : hodnota} onChange={(v) => onChange(v === "custom" ? "custom:|" : v)} options={OBDOBIA} />
+      {jeCustom && (
+        <>
+          <input type="month" value={od} onChange={(e) => onChange(`custom:${e.target.value}|${doM}`)}
+            style={{ padding: "5px 8px", borderRadius: 7, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 12, colorScheme: "dark" }} />
+          <span style={{ color: C.textDim }}>–</span>
+          <input type="month" value={doM} onChange={(e) => onChange(`custom:${od}|${e.target.value}`)}
+            style={{ padding: "5px 8px", borderRadius: 7, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 12, colorScheme: "dark" }} />
+        </>
+      )}
     </div>
   );
 }

@@ -7,7 +7,7 @@ import { C, mix, S } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import type { NavFocus } from "./App";
 import { SessionTrend } from "./SessionTrend";
-import { Card, Donut, Empty, H3, Info, LineChart, Select, SortTh, StatCard, SubTabs, TableWrap, Toolbar, useSort } from "./ui";
+import { Card, Donut, Empty, H3, Info, LineChart, Select, SortTh, StatCard, SubTabs, TableWrap, Toolbar, TrenerPills, useSort } from "./ui";
 
 const PEOPLE = [
   { key: "jerry", label: "Jerry" },
@@ -131,9 +131,11 @@ function Prehlad({ data, focus, trainer, onTrainer }: { data: PSBData; focus?: N
   }, [focus?.nonce]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const range = useMemo(() => {
-    if (period === "custom") return { from, to };
-    const days = Number(win);
-    if (days > 0) return { from: new Date(Date.now() - days * 86400000).toISOString().slice(0, 10) };
+    if (period === "custom" || win === "custom") return { from, to };
+    // Roky ako pevné hranice, okná ako posun od dneška. Štandard rodiny T.
+    if (win === "2026" || win === "2025") return { from: `${win}-01-01`, to: `${win}-12-31` };
+    const dni: Record<string, number> = { "6m": 183, "3m": 92, "1m": 31, "1t": 7 };
+    if (dni[win]) return { from: new Date(Date.now() - dni[win] * 86400000).toISOString().slice(0, 10) };
     return undefined;
   }, [period, from, to, win]);
 
@@ -274,20 +276,20 @@ function Prehlad({ data, focus, trainer, onTrainer }: { data: PSBData; focus?: N
           { value: "quarter", label: "Kvartál" },
           { value: "custom", label: "Vlastné obdobie" },
         ]} />
-        <Select value={trainerF} onChange={setTrainerF} options={[
-          { value: "all", label: "Obaja tréneri" },
-          { value: "Jerry", label: "Jerry" },
-          { value: "Terezka", label: "Terezka" },
-        ]} />
+        <TrenerPills value={trainerF} onChange={setTrainerF} />
         {period !== "custom" && (
           <Select value={win} onChange={setWin} options={[
-            { value: "all", label: "Celá história" },
-            { value: "365", label: "Posledný rok" },
-            { value: "180", label: "Posledných 6 mes." },
-            { value: "90", label: "Posledný kvartál" },
+            { value: "all", label: "Celé obdobie" },
+            { value: "2026", label: "2026" },
+            { value: "2025", label: "2025" },
+            { value: "6m", label: "Posledných 6 mes." },
+            { value: "3m", label: "Posledné 3 mes." },
+            { value: "1m", label: "Posledný mesiac" },
+            { value: "1t", label: "Posledný týždeň" },
+            { value: "custom", label: "Vlastné" },
           ]} />
         )}
-        {period === "custom" && (
+        {(period === "custom" || win === "custom") && (
           <>
             <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} style={{ ...S.select, colorScheme: "dark" }} />
             <span style={{ color: C.textDim }}>–</span>
@@ -455,12 +457,16 @@ function Prehlad({ data, focus, trainer, onTrainer }: { data: PSBData; focus?: N
   );
 }
 
+// Štandard rodiny T — roky nemajú days, hranice sa počítajú z hodnoty.
 const WINDOWS = [
   { value: "all", label: "Celé obdobie", days: 0 },
-  { value: "7", label: "Posledný týždeň", days: 7 },
-  { value: "30", label: "Posledný mesiac", days: 30 },
-  { value: "90", label: "Posledný kvartál", days: 90 },
-  { value: "custom", label: "Vlastné obdobie", days: -1 },
+  { value: "2026", label: "2026", days: 0 },
+  { value: "2025", label: "2025", days: 0 },
+  { value: "6m", label: "Posledných 6 mes.", days: 183 },
+  { value: "3m", label: "Posledné 3 mes.", days: 92 },
+  { value: "1m", label: "Posledný mesiac", days: 31 },
+  { value: "1t", label: "Posledný týždeň", days: 7 },
+  { value: "custom", label: "Vlastné", days: -1 },
 ];
 
 function Analyza({ data }: { data: PSBData }) {
@@ -477,6 +483,10 @@ function Analyza({ data }: { data: PSBData }) {
     if (win === "custom") {
       lo = from ? new Date(from).getTime() : 0;
       hi = to ? new Date(to).getTime() + 86400000 : Infinity;
+    } else if (win === "2026" || win === "2025") {
+      // Rok = pevné hranice, nie posun od dneška.
+      lo = Date.parse(`${win}-01-01`);
+      hi = Date.parse(`${win}-12-31`) + 86400000;
     } else {
       const days = Number(WINDOWS.find((w) => w.value === win)?.days || 0);
       if (days > 0) lo = Date.now() - days * 86400000;
@@ -521,11 +531,7 @@ function Analyza({ data }: { data: PSBData }) {
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
           <H3>Pomer typov sedení</H3>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <Select value={trainerF} onChange={setTrainerF} options={[
-              { value: "all", label: "Obaja" },
-              { value: "Jerry", label: "Jerry" },
-              { value: "Terezka", label: "Terezka" },
-            ]} />
+            <TrenerPills value={trainerF} onChange={setTrainerF} />
             <Select value={win} onChange={setWin} options={WINDOWS.map((w) => ({ value: w.value, label: w.label }))} />
             {win === "custom" && (
               <>

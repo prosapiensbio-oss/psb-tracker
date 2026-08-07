@@ -77,12 +77,15 @@ const pctStr = (v: number | null) => (v == null ? "—" : `${v > 0 ? "▲" : v <
 
 // ── period filter shared by the tabs ─────────────────────────────────────────
 const ALL_IDX = MONTHS.map((_, i) => i);
+// Štandard rodiny P (peniaze, jednotka mesiac) — rovnaké možnosti v celej
+// rodine, odsúhlasené Jerrym 2026-08-07.
 const RANGES = [
-  { value: "all", label: "Celé obdobie (18 mes.)" },
-  { value: "2026", label: "2026 (jan–jún)" },
-  { value: "2025", label: "2025 (celý rok)" },
+  { value: "all", label: "Celé obdobie" },
+  { value: "2026", label: "2026" },
+  { value: "2025", label: "2025" },
   { value: "last6", label: "Posledných 6 mes." },
-  { value: "last12", label: "Posledných 12 mes." },
+  { value: "last3", label: "Posledné 3 mes." },
+  { value: "last1", label: "Posledný mesiac" },
   { value: "custom", label: "Vlastné" },
 ];
 
@@ -106,7 +109,9 @@ function useRange(initial = "2026") {
     };
     if (YEAR_IDX[win]) return orez(YEAR_IDX[win]);
     if (win === "last6") return orez(ALL_IDX).slice(-6);
-    if (win === "last12") return orez(ALL_IDX).slice(-12);
+    if (win === "last3") return orez(ALL_IDX).slice(-3);
+    if (win === "last1") return orez(ALL_IDX).slice(-1);
+    if (win === "last12") return orez(ALL_IDX).slice(-12); // legacy uložené hodnoty
     if (win === "custom") {
       const lo = Math.min(from, to);
       const hi = Math.max(from, to);
