@@ -410,12 +410,18 @@ function skupinaFaktur(
   ciel: number,
   tolerancia: number,
 ): string[] | null {
-  // Jedna faktúra je najčastejší prípad — skúsi sa prvá a najlacnejšie.
+  // Rozhoduje ODCHÝLKA, až potom počet faktúr.
+  //
+  // Prvá verzia uprednostňovala menšiu skupinu a mýlila sa: platba 2 588 Kč
+  // z 25. 7. si vybrala dvojicu 359 + 2 202 (odchýlka 27) namiesto správnej
+  // trojice 2 202 + 175 + 199 (odchýlka 12), lebo dvojica je „menšia".
+  // Tá 359 pritom patrila k inej platbe, ktorá potom zostala nespárovaná.
+  // Suma je tvrdý údaj, počet dokladov je len tvar objednávky.
   let najlepsia: { cisla: string[]; odchylka: number } | null = null;
   const zvaz = (cisla: string[], sucet: number) => {
     const odchylka = Math.abs(sucet - ciel);
     if (odchylka > tolerancia) return;
-    if (!najlepsia || cisla.length < najlepsia.cisla.length || (cisla.length === najlepsia.cisla.length && odchylka < najlepsia.odchylka)) {
+    if (!najlepsia || odchylka < najlepsia.odchylka - 0.005 || (Math.abs(odchylka - najlepsia.odchylka) <= 0.005 && cisla.length < najlepsia.cisla.length)) {
       najlepsia = { cisla, odchylka };
     }
   };
