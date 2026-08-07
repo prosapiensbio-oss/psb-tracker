@@ -62,7 +62,7 @@ import {
   type PersonKey,
   type Vals,
 } from "../../lib/psb/vzas";
-import { Card, Empty, H3, Info, LineChart, Select, StatCard, SubTabs, useScrollEnd } from "./ui";
+import { Card, Empty, H3, Info, LineChart, Select, StatCard, SubTabs, useScrollEnd, ValueBars } from "./ui";
 import { tokyKlientov } from "./Fluktuacia";
 import { BankaUlozene } from "./BankaUlozene";
 import { Nakupy } from "./Nakupy";
@@ -1819,7 +1819,7 @@ function JarekTab() {
 }
 
 // ── Kvartálne výsledky ───────────────────────────────────────────────────────
-function KvartalneTab() {
+function KvartalneTab({ data, clients }: { data: PSBData; clients: Record<string, ClientAgg> }) {
   const p = pnlCalc();
   const [openQ, setOpenQ] = useState<string | null>(null);
   const quarters = QUARTERS;
@@ -1832,7 +1832,28 @@ function KvartalneTab() {
     const zisk = prijmy - naklady;
     return { prijmy, fix, varN, vypl, naklady, zisk, marza: prijmy > 0 ? (zisk / prijmy) * 100 : 0 };
   };
-  const a = quarters.map((q) => ({ ...q, ...agg(q.idx) }));
+  // Prevádzkové čísla ku kvartálom — hodiny, sedenia, noví klienti. P&L
+  // hovorí o peniazoch, ale kvartál sa nedá vyhodnotiť bez toho, koľko práce
+  // za ním stálo a či rástla základňa (Jerryho požiadavka 2026-08-07).
+  const prevadzka = (idx: number[]) => {
+    const mesiaceQ = new Set(idx.map((i) => VZAS_MONTHS[i]));
+    let hodiny = 0, hodinyJ = 0, hodinyT = 0, sedenia = 0;
+    for (const sx of data.sessions) {
+      if (!mesiaceQ.has(sx.date.slice(0, 7))) continue;
+      const h = sx.duration / 60;
+      hodiny += h; sedenia++;
+      if (sx.sessionTrainer === "Jerry") hodinyJ += h;
+      else if (sx.sessionTrainer === "Terezka") hodinyT += h;
+    }
+    const novi = Object.values(clients).filter((c) => c.firstSession && mesiaceQ.has(c.firstSession.slice(0, 7))).length;
+    return { hodiny, hodinyJ, hodinyT, sedenia, novi };
+  };
+  const a = quarters.map((q) => ({ ...q, ...agg(q.idx), ...prevadzka(q.idx) }));
+
+  // Neúplný kvartál sa v grafoch označí — tri stĺpce, z ktorých jeden má za
+  // sebou len mesiac, nie sú porovnanie ale pasca (kotva-dat pravidlo).
+  const poslednyIdx = poslednyMesiacSDatami();
+  const qLabel = (q: (typeof a)[0]) => q.idx[q.idx.length - 1] > poslednyIdx ? `${q.label} *` : q.label;
   const cur = a[a.length - 1];
   const prev = a[a.length - 2];
   const d = { prijmy: pct(cur.prijmy, prev.prijmy), naklady: pct(cur.naklady, prev.naklady), zisk: pct(cur.zisk, prev.zisk), marza: cur.marza - prev.marza };
@@ -1843,8 +1864,37 @@ function KvartalneTab() {
   const cell = { textAlign: "right" as const, padding: "8px 10px", fontSize: 13, fontVariantNumeric: "tabular-nums" as const, whiteSpace: "nowrap" as const };
   const sub = { ...cell, fontSize: 11, color: C.textDim, padding: "4px 10px" };
 
+  const grafy: { nazov: string; farba: string; hodnota: (q: (typeof a)[0]) => number; fmt: (n: number) => string; info: string }[] = [
+    { nazov: "Tržby", farba: C.green, hodnota: (q) => q.prijmy, fmt: (n: number) => `${Math.round(n / 1000)}k`, info: "Príjmy za kvartál. Sezónnosť, ktorú mesačný graf rozdrobí — leto a Vianoce vidno tu." },
+    { nazov: "Hrubý zisk", farba: C.accent, hodnota: (q) => q.zisk, fmt: (n: number) => `${Math.round(n / 1000)}k`, info: "Čo z kvartálu zostalo po všetkých nákladoch vrátane výplat. Tržby bez tohto riadku nehovoria nič." },
+    { nazov: "Odrobené hodiny", farba: C.blue, hodnota: (q) => q.hodiny, fmt: (n) => `${Math.round(n)}h`, info: "Koľko práce za kvartálom stálo. Zisk, ktorý rastie rýchlejšie než hodiny, je zdravý rast; zisk rastúci len s hodinami je len viac driny." },
+    { nazov: "Noví klienti", farba: C.orange, hodnota: (q) => q.novi, fmt: (n) => String(Math.round(n)), info: "Kto mal v kvartáli prvé sedenie. Základňa, z ktorej budú tržby o kvartál-dva." },
+  ];
+
   return (
     <>
+      {/* Kvartál v grafoch — štyri pohľady vedľa seba. Číslo v tabuľke povie
+          stav, stĺpce vedľa seba povedia príbeh. */}
+      <Card>
+        <H3><Info text="Kvartálne trendy. Hviezdička = kvartál ešte nie je celý (obsahuje len uzavreté mesiace) — neporovnávaj ho s hotovými." label="Kvartály v grafoch" /></H3>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16, marginTop: 8 }}>
+          {grafy.map((g) => (
+            <div key={g.nazov}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: C.text, marginBottom: 5 }}>
+                <Info text={g.info} label={g.nazov} />
+              </div>
+              <ValueBars data={a.map((q) => ({ label: qLabel(q), value: g.hodnota(q) }))} color={g.farba} fmt={g.fmt} height={130} alignEnd />
+            </div>
+          ))}
+        </div>
+        <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginTop: 10, fontSize: 11.5, color: C.textMuted }}>
+          <span>Bežiaci kvartál: <b style={{ color: C.text }}>{Math.round(cur.hodiny)} h</b> (Jerry {Math.round(cur.hodinyJ)} · Terezka {Math.round(cur.hodinyT)})</span>
+          <span><b style={{ color: C.text }}>{cur.sedenia}</b> sedení</span>
+          <span><b style={{ color: C.text }}>{cur.novi}</b> nových klientov</span>
+          <span>tržba na hodinu: <b style={{ color: C.text }}>{cur.hodiny > 0 ? fmtCZK(Math.round(cur.prijmy / cur.hodiny)) : "—"}</b></span>
+        </div>
+      </Card>
+
       <Card>
         <H3><Info text="Rovnakých šesť mesiacov o rok neskôr — jediné poctivé porovnanie, keď z 2026 zatiaľ existuje len polrok. Celý rok 2025 je vedľa pre kontext." label="H1 2025 vs H1 2026" /></H3>
         <ScrollX>
@@ -2905,7 +2955,7 @@ export function Vysledky({
         value={sub}
         onChange={setSub}
       />
-      {sub === "kvartalne" && <KvartalneTab />}
+      {sub === "kvartalne" && <KvartalneTab data={data} clients={clients} />}
       {sub === "mesacne" && <MesacneTab data={data} clients={clients} focus={focus} />}
       {sub === "kpi" && <KpiTab data={data} onNavigate={onNavigate} />}
       {sub === "ciele" && <CieleTab data={data} />}

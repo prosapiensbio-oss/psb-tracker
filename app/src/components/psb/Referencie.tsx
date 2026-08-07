@@ -72,7 +72,9 @@ export function Referencie({ data, clients, onKlient }: { data: PSBData; clients
       // nevie, odkiaľ prišli. Percento z neznámeho základu je klamstvo.
       trzbaZnamych: vsetci.filter((c) => c.zdroj).reduce((a, c) => a + trzbaKlienta(c.name), 0),
     };
-  }, [clients, data.payments]);
+  // `obdobie` v závislostiach je CELÝ filter — bez neho sa memo neprepočíta
+  // a prepínač nerobí nič. Presne to sa stalo v prvej verzii.
+  }, [clients, data.payments, obdobie]);
 
   return (
     <>

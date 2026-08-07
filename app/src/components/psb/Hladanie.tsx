@@ -54,7 +54,11 @@ export function HladanieKlienta({
   const najdeneDopyty = useMemo(() => {
     const t = normName(q.trim());
     if (t.length < 2) return [];
-    return leads.filter((l) => l.name && normName(l.name).includes(t)).slice(0, 3);
+    // Dopyt sa skryje, keď už existuje KLIENT s tým istým menom — dopyt je
+    // predfáza a keď sa z človeka stal klient, ukazovať oboje mätie („prečo
+    // je tam dopyt ozval sa, keď už chodí?" — Jerry pri Janovi Královi).
+    const menaKlientov = new Set(Object.keys(clients).map((m) => normName(m)));
+    return leads.filter((l) => l.name && normName(l.name).includes(t) && !menaKlientov.has(normName(l.name))).slice(0, 3);
   }, [q, leads]);
 
   useEffect(() => setI(0), [q]);

@@ -352,7 +352,7 @@ export const ZDROJE = [
   { value: "ine", label: "Iné" },
 ];
 
-export function Klienti({ clients, capacity, actions, focus, leads, trainer, onTrainer, sixM, sub, onSub, data }: { clients: Record<string, ClientAgg>; capacity: CapacityRow[]; actions: Actions; focus?: NavFocus | null; leads: Lead[]; trainer: string; onTrainer: (t: string) => void; sixM: SixMRow[]; sub: string; onSub: (s: string) => void; data: PSBData }) {
+export function Klienti({ clients, capacity, actions, focus, leads, trainer, onTrainer, sixM, sub, onSub, data, btcSatsKlienti = {} }: { clients: Record<string, ClientAgg>; capacity: CapacityRow[]; actions: Actions; focus?: NavFocus | null; leads: Lead[]; trainer: string; onTrainer: (t: string) => void; sixM: SixMRow[]; sub: string; onSub: (s: string) => void; data: PSBData; btcSatsKlienti?: Record<string, number> }) {
   const [focusClient, setFocusClient] = useState<string | null>(null);
   useEffect(() => {
     if (focus?.client) setFocusClient(focus.client);
@@ -418,12 +418,22 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
 
   const membershipDonut = useMemo(() => {
     const counts: Record<string, number> = {};
+    // Pri vybranom klientovi ukáž len JEHO balíček — koláč všetkých vedľa
+    // profilu jedného človeka je šum a mätie (Jerryho postreh).
+    if (focusClient) {
+      const c = all.find((x) => normName(x.name) === normName(focusClient));
+      if (c) {
+        const b = membershipBucket(c.membership);
+        if (b) counts[b] = 1;
+      }
+      return MEMBERSHIP_ORDER.filter((k) => counts[k]).map((k) => ({ label: k, value: counts[k], color: MEMBERSHIP_COLORS[k] }));
+    }
     for (const c of baseList) {
       const b = membershipBucket(c.membership);
       counts[b] = (counts[b] || 0) + 1;
     }
     return MEMBERSHIP_ORDER.filter((k) => counts[k]).map((k) => ({ label: k, value: counts[k], color: MEMBERSHIP_COLORS[k] }));
-  }, [baseList]);
+  }, [baseList, focusClient, all]);
 
   const list = useMemo(() => {
     // A click-through from the Dashboard focuses one client — show only them (even if inactive).
@@ -520,14 +530,10 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
           { id: "klienti", label: "Klienti" },
           { id: "6m", label: "6M proces" },
           { id: "dopyty", label: "Dopyty" },
-          // Fluktuácia je druhá polovica rovnice rastu a doteraz sa nemerala
-          // vôbec. Patrí ku klientom, nie do marketingu — odchod nie je
-          // marketingová udalosť.
-          { id: "rast", label: "Rast a strata" },
-          // Referencie bývali v Marketingu, ale odporúčanie je vzťah medzi
-          // klientmi — „komu poďakovať" je otázka o ľuďoch, nie o kanáloch.
-          // (Jerryho postreh 2026-08-07.)
+          // Referencie hneď za Dopytmi — poradie rozpráva cestu klienta:
+          // kto sa ozval → kto ho poslal → kto prišiel a odišiel.
           { id: "referencie", label: "Referencie" },
+          { id: "rast", label: "Rast a strata" },
         ]}
         value={sub}
         onChange={setSub}
@@ -663,7 +669,7 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
           klienta doteraz doviedlo len k riadku tabuľky a zvyšok si človek
           skladal z piatich obrazoviek. */}
       {focusClient && clients[focusClient] && (
-        <KlientProfil meno={focusClient} data={data} clients={clients} onZavri={() => setFocusClient(null)} />
+        <KlientProfil meno={focusClient} data={data} clients={clients} btcSats={btcSatsKlienti[normName(focusClient)]} onZavri={() => setFocusClient(null)} />
       )}
 
       <Card>

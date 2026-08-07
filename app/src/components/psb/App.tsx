@@ -292,8 +292,15 @@ export function PSBApp() {
       // pritom 130 000 z toho prišlo v BTC.
       if (r?.platby?.length) {
         const bt: Record<string, number> = {};
-        for (const x of r.platby) bt[String(x.datum).slice(0, 7)] = (bt[String(x.datum).slice(0, 7)] || 0) + (x.czk || 0);
+        const podlaKlienta: Record<string, number> = {};
+        for (const x of r.platby) {
+          bt[String(x.datum).slice(0, 7)] = (bt[String(x.datum).slice(0, 7)] || 0) + (x.czk || 0);
+          // Sats po klientoch — profil ukáže, koľko kto celkovo zaplatil v BTC.
+          // Meno sa normalizuje, appky sa líšia v diakritike.
+          if (x.klient) podlaKlienta[normName(x.klient)] = (podlaKlienta[normName(x.klient)] || 0) + (x.sats || 0);
+        }
         setBtcPrijmy(bt);
+        setBtcSatsKlienti(podlaKlienta);
       }
       if (!r?.vyplaty?.length) return;
       const podlaMesiaca: Record<string, { jerry: number; terezka: number; jerryFp: number }> = {};
@@ -329,6 +336,7 @@ export function PSBApp() {
   const [bankaPohyby, setBankaPohyby] = useState<Record<string, Record<string, Pohyb[]>>>({});
   const [bankaPrijmy, setBankaPrijmy] = useState<Record<string, number>>({});
   const [btcPrijmy, setBtcPrijmy] = useState<Record<string, number>>({});
+  const [btcSatsKlienti, setBtcSatsKlienti] = useState<Record<string, number>>({});
   const [hotovostMesiace, setHotovostMesiace] = useState<Set<string>>(new Set());
   useEffect(() => {
     void fetch("/api/marketing", { credentials: "same-origin" })
@@ -849,7 +857,7 @@ export function PSBApp() {
               })}
             </div>
             {trackerSection === "treningy" && <Treningy data={data} clients={clients} sub={treningySub} onSub={setTreningySub} focus={treningyFocus} trainer={trainer} onTrainer={setTrainer} />}
-            {trackerSection === "klienti" && <Klienti clients={clients} capacity={capacity} actions={actions} focus={klientiFocus} leads={data.leads} trainer={trainer} onTrainer={setTrainer} sixM={sixM} sub={klientiSub} onSub={setKlientiSub} data={data} />}
+            {trackerSection === "klienti" && <Klienti clients={clients} capacity={capacity} actions={actions} focus={klientiFocus} leads={data.leads} trainer={trainer} onTrainer={setTrainer} sixM={sixM} sub={klientiSub} onSub={setKlientiSub} data={data} btcSatsKlienti={btcSatsKlienti} />}
               </>
         )}
 

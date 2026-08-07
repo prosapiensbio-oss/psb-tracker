@@ -53,11 +53,13 @@ function Porovnanie({ label, hodnota, priemer, fmt, vyssieLepsie = true }: {
   );
 }
 
-export function KlientProfil({ meno, data, clients, onZavri }: {
+export function KlientProfil({ meno, data, clients, onZavri, btcSats }: {
   meno: string;
   data: PSBData;
   clients: Record<string, ClientAgg>;
   onZavri: () => void;
+  /** Koľko satov klient celkovo zaplatil (z appky PSB Bitcoin). */
+  btcSats?: number;
 }) {
   const c = clients[meno];
 
@@ -88,12 +90,35 @@ export function KlientProfil({ meno, data, clients, onZavri }: {
     const priemery = {
       tempo: avg((x) => tempo90(x)),
       dochadzka: avg((x) => x.attendance * 100),
-      cena: avg((x) => x.avgPrice),
+      cena: avg((x) => {
+        const z = data.payments.filter((pp) => pp.client === x.name).reduce((a, pp) => a + pp.amount, 0);
+        return x.totalHours > 0 ? z / x.totalHours : 0;
+      }),
       zaplatene: avg((x) => data.payments.filter((pp) => pp.client === x.name).reduce((a, pp) => a + pp.amount, 0)),
     };
 
     const dniTicha = c.lastSession ? Math.round((Date.now() - Date.parse(c.lastSession)) / DEN) : null;
-    return { platby, zaplatene, mesacne, priemery, dniTicha, tempo: tempo90(c) };
+
+    // Ø cena = ZAPLATENÉ / ODTRÉNOVANÉ HODINY. Payrollové `avgPrice` delí
+    // interné ceny sedení počtom sedení a pri balíčkových klientoch vyjde
+    // nezmysel (Jan Kral: 547 Kč pri reálnych 1 450/h). Klienta zaujíma,
+    // koľko ho hodina naozaj stojí.
+    const cenaHodiny = c.totalHours > 0 ? zaplatene / c.totalHours : 0;
+
+    // Tempo míňania balíčkov: Ø dní medzi nákupmi (platby aspoň 7 dní od
+    // seba — bližšie sú doplnky, nie nový balíček) a odhad, o koľko týždňov
+    // minie aktuálny zostatok pri terajšom tempe.
+    const kupy = [...platby].reverse().map((x) => Date.parse(x.date));
+    const medzery: number[] = [];
+    for (let i = 1; i < kupy.length; i++) {
+      const d = (kupy[i] - kupy[i - 1]) / DEN;
+      if (d >= 7) medzery.push(d);
+    }
+    const priemMedzera = medzery.length ? medzery.reduce((a, b) => a + b, 0) / medzery.length : null;
+    const t90 = tempo90(c);
+    const minieO = c.packageRemaining > 0 && t90 > 0 ? (c.packageRemaining / t90) * 4.33 : null;
+
+    return { platby, zaplatene, mesacne, priemery, dniTicha, tempo: t90, cenaHodiny, priemMedzera, minieO };
   }, [c, data, clients, meno]);
 
   if (!c || !p) return null;
@@ -116,13 +141,13 @@ export function KlientProfil({ meno, data, clients, onZavri }: {
         <span style={{ fontSize: 11.5, color: stavFarba, fontWeight: 600 }}>{c.status}</span>
         <span style={{ fontSize: 11.5, color: C.textMuted }}>{c.segment} · {c.primaryTrainer || "?"} · {c.modality}</span>
         {c.zdroj && (
-          <span style={{ fontSize: 11.5, color: C.textDim }}>
-            prišiel cez: {c.zdroj}{c.zdrojKto ? ` (${c.zdrojKto})` : ""}
+          <span style={{ fontSize: 12, fontWeight: 700, color: C.accentLight, background: mix(C.accent, 14), border: `1px solid ${mix(C.accent, 45)}`, borderRadius: 9, padding: "2px 10px" }}>
+            prišiel cez: {c.zdroj}{c.zdrojKto ? ` · ${c.zdrojKto}` : ""}
           </span>
         )}
         <span style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
           {c.is6m && <span style={{ fontSize: 10.5, color: C.accentLight, border: `1px solid ${mix(C.accent, 45)}`, borderRadius: 8, padding: "1px 7px" }}>6M</span>}
-          {c.bitcoin && <span style={{ fontSize: 10.5, color: C.orange }}>₿ platí v BTC</span>}
+          {c.bitcoin && <span style={{ fontSize: 10.5, color: C.orange }}>₿ platí v BTC{btcSats ? ` · zaplatil ${btcSats.toLocaleString("cs-CZ")} sats` : ""}</span>}
           {c.specialRate && <span title={c.specialRateNote} style={{ fontSize: 10.5, color: C.orange, cursor: c.specialRateNote ? "help" : "default" }}>špeciálna sadzba</span>}
           {!c.contractSigned && <span style={{ fontSize: 10.5, color: C.red }}>bez zmluvy</span>}
           <button onClick={onZavri} style={{ background: "none", border: "none", color: C.textDim, fontSize: 12, cursor: "pointer" }}>zavrieť ×</button>
@@ -135,16 +160,22 @@ export function KlientProfil({ meno, data, clients, onZavri }: {
         {stat("Posledné", c.lastSession ? `${fmtDMY(c.lastSession)}${p.dniTicha != null ? ` (${p.dniTicha} d)` : ""}` : "—",
           p.dniTicha != null && p.dniTicha > 21 ? C.orange : undefined,
           "Posledné sedenie a koľko dní odvtedy ubehlo.")}
-        {stat("Sedení", `${c.sessionCount} (${Math.round(c.totalHours)} h)`)}
+        {/* Zátvorka s hodinami len keď sa líšia od počtu — pri hodinových
+            sedeniach je „4 (4 h)" to isté číslo dvakrát. */}
+        {stat("Sedení", Math.round(c.totalHours) === c.sessionCount ? String(c.sessionCount) : `${c.sessionCount} (${Math.round(c.totalHours)} h)`)}
         {stat("Tempo", `${burnRate.toFixed(1)}/mes · ${(burnRate / 4.33).toFixed(1)}/týž`, undefined,
           "Priemerný počet sedení za mesiac a za týždeň z posledných 90 dní.")}
         {stat("Dochádzka", `${Math.round(c.attendance * 100)} %`,
           c.attendance >= 0.7 ? C.green : c.attendance >= 0.4 ? undefined : C.orange,
           "Podiel týždňov z posledných 18, v ktorých klient reálne trénoval.")}
         {stat("Zaplatené spolu", fmtCZK(p.zaplatene), C.green)}
-        {stat("Ø cena sedenia", fmtCZK(Math.round(c.avgPrice)))}
+        {stat("Ø cena hodiny", fmtCZK(Math.round(p.cenaHodiny)), undefined, "Zaplatené spolu delené odtrénovanými hodinami — koľko klienta hodina naozaj stojí, vrátane zliav a bonusov.")}
         {stat("Balíček", c.packageTotal ? `${c.packageRemaining}/${c.packageTotal}` : (c.lenDoplnky ? "len členstvo" : "—"), undefined,
           c.membership ? `${c.membership}${c.packageValidTo ? ` · platí do ${fmtDMY(c.packageValidTo)}` : ""}` : undefined)}
+        {p.priemMedzera != null && stat("Ø medzi nákupmi", `${Math.round(p.priemMedzera)} dní`, undefined,
+          "Priemerný odstup medzi platbami (platby menej než 7 dní od seba sa rátajú ako doplnky k tej istej kúpe). Hovorí, ako často klient reálne obnovuje.")}
+        {p.minieO != null && stat("Zostatok minie o", `~${p.minieO.toFixed(0)} týž.`, p.minieO <= 2 ? C.orange : undefined,
+          "Zostávajúce hodiny balíčka delené súčasným tempom — kedy príde ďalší nákup, ak bude chodiť ako teraz.")}
       </div>
 
       {c.trainerNote && (
@@ -161,7 +192,7 @@ export function KlientProfil({ meno, data, clients, onZavri }: {
           </div>
           <Porovnanie label="Tempo (sedení / mes.)" hodnota={burnRate} priemer={p.priemery.tempo} fmt={(n) => n.toFixed(1)} />
           <Porovnanie label="Dochádzka" hodnota={c.attendance * 100} priemer={p.priemery.dochadzka} fmt={(n) => `${Math.round(n)} %`} />
-          <Porovnanie label="Ø cena sedenia" hodnota={c.avgPrice} priemer={p.priemery.cena} fmt={(n) => fmtCZK(Math.round(n))} />
+          <Porovnanie label="Ø cena hodiny" hodnota={p.cenaHodiny} priemer={p.priemery.cena} fmt={(n) => fmtCZK(Math.round(n))} />
           <Porovnanie label="Zaplatené celkovo" hodnota={p.zaplatene} priemer={p.priemery.zaplatene} fmt={(n) => fmtCZK(Math.round(n))} />
         </div>
 
