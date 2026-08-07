@@ -22,19 +22,24 @@ import { Card, Empty, H3, Info, Select, TableWrap } from "./ui";
 // vysvetlenie pod lievikom.
 const pct = (a: number, b: number) => (b > 0 && a <= b ? Math.round((a / b) * 100) : null);
 
+// Štandard rodiny M — rovnaký zoznam ako vo zvyšku Marketingu.
 const OBDOBIA = [
+  { value: "all", label: "Celé obdobie" },
+  { value: "2026", label: "2026" },
+  { value: "2025", label: "2025" },
+  { value: "6", label: "Posledných 6 mes." },
+  { value: "3", label: "Posledné 3 mes." },
   { value: "1", label: "Posledný mesiac" },
-  { value: "3", label: "Posledné 3 mesiace" },
-  { value: "6", label: "Posledných 6 mesiacov" },
-  { value: "12", label: "Posledných 12 mesiacov" },
 ];
 
 const zdrojLabel = (z: string) => ZDROJE.find((x) => x.value === z)?.label || (z ? z : "nevyplnené");
 
 /** Mesiace v okne, od najstaršieho. Kotva je posledný mesiac s dátami, nie dnešok. */
-function oknoMesiacov(data: PSBData, n: number): string[] {
+function oknoMesiacov(data: PSBData, okno: string): string[] {
   const vsetky = [...new Set(data.sessions.map((s) => monthKey(s.date)))].filter(Boolean).sort();
-  return vsetky.slice(-n);
+  if (okno === "all") return vsetky;
+  if (okno === "2025" || okno === "2026") return vsetky.filter((m) => m.startsWith(okno));
+  return vsetky.slice(-Number(okno));
 }
 
 type Kroky = { dopyty: number; uvodne: number; klienti: number; trzba: number };
@@ -95,7 +100,7 @@ export function Lievik({ data, clients }: { data: PSBData; clients: Record<strin
       .catch(() => {});
   }, []);
 
-  const mesiace = useMemo(() => oknoMesiacov(data, Number(okno)), [data, okno]);
+  const mesiace = useMemo(() => oknoMesiacov(data, okno), [data, okno]);
   const k = useMemo(() => krokyZa(data, clients, mesiace), [data, clients, mesiace]);
 
   // Rozpad podľa zdroja — len klienti, ktorí v období začali.
