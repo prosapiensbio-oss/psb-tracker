@@ -988,10 +988,11 @@ function skupinaFaktur(
         label: "Otázky mesiaca",
         hotovo: odpovedane > 0,
         detail: odpovedane > 0 ? `${odpovedane} zodpovedaných` : "žiadna odpoveď",
-        tab: "vzas",
-        sub: "trzby",
-        // Bez mesiaca „Vybaviť" dopadlo na tabuľku tržieb a človek musel sám
-        // nájsť riadok a rozkliknúť otázky. Focus ho otvorí a doskroluje.
+        // Otázky mesiaca žijú vo Výsledky → Mesačné, nie v Peniazoch. Prvá
+        // verzia mierila na tabuľku tržieb: správna obrazovka na pohľad, ale
+        // nie tá, kde sa odpovedá. Focus riadok rozbalí a doskroluje k otázkam.
+        tab: "vysledky",
+        sub: "mesacne",
         focus: { month: mk, nonce: Date.now() },
       },
       {
