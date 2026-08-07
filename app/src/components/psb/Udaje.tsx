@@ -46,9 +46,13 @@ const FAKTURY_ZDROJ = {
 };
 
 // Marketingové zdroje. Zatiaľ sa len ukladajú — obrazovka Marketing beží na
-// jednorazovom exporte spracovanom ručne. V zozname sú napriek tomu, lebo
-// hrozba nie je zobrazenie, ale strata: Metricoolu v novembri prepadnú staršie
-// príspevky a čo sa nestiahne dovtedy, už nezískame.
+// jednorazovom exporte spracovanom ručne.
+//
+// POZOR na „november": dlho tu stálo, že Metricoolu v novembri prepadnú
+// staršie príspevky. Bol to omyl v pochopení — Jerry novembrom myslel, že
+// vtedy DÔJDE NAPLÁNOVANÝ OBSAH (natočený a naplánovaný v decembri 2025,
+// publikuje sa automaticky). Termín teda nepatrí sťahovaniu dát, ale výrobe
+// nového obsahu. Stiahnuť staré CSV má stále zmysel, len bez paniky.
 const MARKETING_ZDROJE: { druh: string; label: string; path: string }[] = [
   { druh: "metricool", label: "Metricool — príspevky, reels, stories", path: "Dve cesty, obe sem. (1) Analytics › Export › CSV — tri súbory instagram-posts, instagram-reels, instagram-stories; z nich má appka Instagram príspevok po príspevku. (2) Mesačná zostava v PDF — tú appka prečítať nevie (čísla sú vykreslené do grafov), tak ju prečíta Jarvis a vytiahne z nej všetky kanály naraz vrátane Facebooku, TikToku a Meta Ads. Stačí ju sem pretiahnuť. PPTX a XLSX nie." },
   { druh: "ga4", label: "Google Analytics 4", path: "GA4 → Prehľady › Prehľad stavu prehľadov › Stiahnuť CSV (jeden súbor za mesiac)" },
@@ -434,8 +438,9 @@ function UploadCard({ data, missing, actions, chat }: { data: PSBData; missing: 
         })}
         <div style={{ fontSize: 11, color: C.textDim, marginTop: 6, lineHeight: 1.5, padding: "8px 10px", borderRadius: 7, background: mix(C.orange, 8) }}>
           Nahratý mesiac prepíše čísla v obrazovke Marketing; mesiace, ktoré si nenahral, bežia ďalej na
-          jednorazovom prepise. <strong style={{ color: C.text }}>V novembri Metricoolu prepadnú staršie príspevky</strong> —
-          čo sa nestiahne dovtedy, už nebude odkiaľ vziať.
+          jednorazovom prepise. <strong style={{ color: C.text }}>V novembri dôjde naplánovaný obsah</strong> —
+          to, čo sa natočilo a naplánovalo v decembri 2025, sa dovtedy minie. Nový content treba mať natočený,
+          nastrihaný a naplánovaný skôr.
         </div>
         <div style={{ fontSize: 11, color: C.textDim, marginTop: 8, lineHeight: 1.5 }}>
           Packages report dáva PTminder v štyroch pohľadoch (šablóny balíčkov, šablóny členstiev, balíčky klientov,

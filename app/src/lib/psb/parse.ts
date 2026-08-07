@@ -145,8 +145,9 @@ export function detectCSVType(text: string): CSVType | null {
   if (h.includes("name,payment,duration")) return "cennik";
 
   // Marketingové exporty. Zatiaľ sa neparsujú do obrazoviek — ukladajú sa tak,
-  // ako prišli. Dôvod je termín, nie lenivosť: v novembri Metricoolu prepadnú
-  // staršie príspevky a spracovanie sa dá dorobiť kedykoľvek, dáta nie.
+  // ako prišli: spracovanie sa dá dorobiť kedykoľvek, surové dáta nie.
+  // (Pôvodná zmienka o novembri bola omyl — november je termín výroby nového
+  // obsahu, nie prepadnutia dát; viď Udaje.tsx.)
   // Metricool sa poznáva podľa NÁZVOV stĺpcov, nie podľa ich poradia.
   //
   // Pôvodne sa hľadal presný začiatok hlavičky („id,url,image,title,date") a
