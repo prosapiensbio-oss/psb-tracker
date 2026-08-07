@@ -55,15 +55,42 @@ export const Route = createFileRoute("/api/faktury")({
 
         const now = new Date().toISOString();
         const actor = (await currentUser(request)) || undefined;
+
+        // Čo z týchto dokladov už v databáze je.
+        //
+        // Kľúč proti duplicitám niesol PORADIE V RÁMCI NAHRÁVANIA. Tá istá
+        // faktúra nahratá znova, ale v inej dávke, dostala iné poradie, iný
+        // kľúč — a prešla ako nová položka. Náklad by sa tichodvojil, presne
+        // toho sa Jerry bál. Poradie v dávke nie je vlastnosť faktúry.
+        //
+        // Teraz sa porovnáva OBSAH: doklad + názov + suma. Dva rovnaké kusy na
+        // jednom doklade prežijú, lebo sa počítajú — vloží sa len toľko, o koľko
+        // je v nahrávanej dávke viac než v databáze.
+        const cisla = [...new Set(polozky.map((x) => String(x.faktura || "")).filter(Boolean))];
+        const uz = new Map<string, number>();
+        if (cisla.length) {
+          const existuje = await DB.prepare(
+            `SELECT faktura, nazov, cena_czk FROM faktura_polozky WHERE faktura IN (${cisla.map(() => "?").join(",")})`,
+          ).bind(...cisla).all<{ faktura: string; nazov: string; cena_czk: number }>();
+          for (const r of existuje.results || []) {
+            const k = `${r.faktura}|${String(r.nazov).trim().slice(0, 60)}|${r.cena_czk}`;
+            uz.set(k, (uz.get(k) || 0) + 1);
+          }
+        }
+
         const stmts = [];
         let pridane = 0;
+        let preskocene = 0;
+        const vDavke = new Map<string, number>();
         for (const p of polozky) {
           const nazov = String(p.nazov || "").trim().slice(0, 200);
           if (!nazov || !p.cena) continue;
-          // Kľúč drží doklad + názov + suma. Tá istá faktúra nahratá dvakrát sa
-          // nezdvojí, ale dva rovnaké kusy na jednom doklade prežijú (líšia sa
-          // poradím, ktoré je súčasťou kľúča).
-          const kluc = `${p.faktura}|${nazov.slice(0, 60)}|${p.cena}|${pridane}`;
+          const obsah = `${p.faktura}|${nazov.slice(0, 60)}|${p.cena}`;
+          const poradie = vDavke.get(obsah) || 0;
+          vDavke.set(obsah, poradie + 1);
+          // Toľkýto rovnaký kus už v databáze je → nevkladať.
+          if (poradie < (uz.get(obsah) || 0)) { preskocene++; continue; }
+          const kluc = `${obsah}|${poradie}`;
           stmts.push(
             DB.prepare(
               `INSERT OR IGNORE INTO faktura_polozky
@@ -98,10 +125,10 @@ export const Route = createFileRoute("/api/faktury")({
         await audit(DB, {
           action: "import-faktura",
           predmet: `${polozky[0]?.dodavatel || "faktúra"} · ${polozky[0]?.faktura || ""}`,
-          neu: `${pridane} položiek, ${naucene.size} pravidiel`,
+          neu: `${pridane} položiek${preskocene ? `, ${preskocene} už bolo nahratých` : ""}, ${naucene.size} pravidiel`,
           actor,
         });
-        return Response.json({ ok: true, pridane, pravidla: naucene.size });
+        return Response.json({ ok: true, pridane, preskocene, pravidla: naucene.size });
       },
     },
   },
