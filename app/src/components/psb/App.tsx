@@ -678,11 +678,21 @@ function skupinaFaktur(
         // Ktoré výbery z peňaženky nenašli doklad — zoznam sa plní priamo pri
         // párovaní, nie dodatočným hľadaním. Predtým sa to skúšalo znova a
         // s inou logikou, takže výsledky sa mohli rozísť.
-        setBtcBezDokladu(bezDokladu);
+        // Do zoznamu idú aj RUČNE spárované platby. Bez nich sa raz potvrdené
+        // spárovanie nedalo opraviť: Jerry pripol k platbe z 25. 7. len jednu
+        // z troch faktúr, zvyšné dve zostali nezapočítané a obrazovka hlásila
+        // „niet čo párovať", lebo tá platba doklad formálne mala.
+        const rucneNakupy = Object.keys(btcParovanie)
+          .map((id) => Object.values(btcNakupy).flat().find((x) => String(x.id) === id))
+          .filter((x): x is BtcNakup => !!x && String(x.datum).slice(0, 7) >= PRVY_MESIAC_Z_FIO);
+        setBtcBezDokladu([...bezDokladu, ...rucneNakupy].sort((a, b) => String(b.datum).localeCompare(String(a.datum))));
         // Doklady, ktoré nikto nepoužil — ponuka pre ručné spárovanie.
+        // Do ponuky patria aj doklady, ktoré drží niektorý ručný pár — inak by
+        // sa z už potvrdeného spárovania nedalo nič odobrať ani doplniť.
+        const drziRucne = new Set(Object.values(btcParovanie).flat());
         setVolneFaktury(
           [...doklady.entries()]
-            .filter(([c]) => !pouzite.has(c))
+            .filter(([c]) => !pouzite.has(c) || drziRucne.has(c))
             .map(([c, d]) => ({ cislo: c, datum: d.datum, celkom: Math.round(d.celkom * 100) / 100, dodavatel: d.polozky[0]?.dodavatel || "" }))
             .sort((a, b) => b.datum.localeCompare(a.datum)),
         );

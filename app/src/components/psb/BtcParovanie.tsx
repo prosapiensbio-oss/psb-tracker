@@ -44,6 +44,7 @@ export function BtcParovanie({
     [vyber, faktury],
   );
 
+  const bezDokladu = platby.filter((p) => !(parovanie[String(p.id)] || []).length);
   if (!platby.length) {
     return (
       <Card>
@@ -55,7 +56,7 @@ export function BtcParovanie({
 
   return (
     <Card>
-      <H3><Info text="Automatika páruje podľa sumy, lenže koruny sa z bitcoinu odvodzujú kurzom a platobná brána si berie spread — tri a pol percenta rozdielu je bežné. Tu rozhodneš ty a tvoje rozhodnutie sa pamätá; automatika sa doň už nemieša. Faktúra zostáva zdrojom pravdy o sume aj kategóriách." label={`Platby bitcoinom bez dokladu (${platby.length})`} /></H3>
+      <H3><Info text="Automatika páruje podľa sumy, lenže koruny sa z bitcoinu odvodzujú kurzom a platobná brána si berie spread — tri a pol percenta rozdielu je bežné. Tu rozhodneš ty a tvoje rozhodnutie sa pamätá; automatika sa doň už nemieša. Faktúra zostáva zdrojom pravdy o sume aj kategóriách." label={`Platby bitcoinom — doklady (${bezDokladu.length} bez dokladu)`} /></H3>
       <div style={{ fontSize: 11.5, color: C.textDim, margin: "4px 0 12px", lineHeight: 1.55 }}>
         Kým platba nemá doklad, jej náklad v P&L chýba a zisk za ten mesiac je o toľko vyšší, než bol.
         Ak to bol súkromný nákup, nechaj to tak — do výkazu ani nepatrí.
@@ -76,7 +77,9 @@ export function BtcParovanie({
               <span style={{ fontSize: 13.5, color: C.orange, fontWeight: 700, minWidth: 92 }}>{fmtCZK(p.czk || 0)}</span>
               <span style={{ fontSize: 11.5, color: C.textDim, flex: 1, minWidth: 120 }}>{p.poznamka || "bez poznámky"}</span>
               {zvolene.length > 0 && !jeOtvorena && (
-                <span style={{ fontSize: 11.5, color: C.green }}>✓ spárované ({zvolene.length})</span>
+                <span style={{ fontSize: 11.5, color: C.green }}>
+                  ✓ ručne spárované ({zvolene.length}{zvolene.length === 1 ? " faktúra" : zvolene.length < 5 ? " faktúry" : " faktúr"})
+                </span>
               )}
               <button
                 onClick={() => (jeOtvorena ? setOtvorena(null) : otvor(p))}
