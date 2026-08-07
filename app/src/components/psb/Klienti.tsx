@@ -22,11 +22,16 @@ const statusTone = (s: string) =>
 const SEGMENTS = ["Anchor", "Stabilný", "Sporadický"] as const;
 const shortPkg = (m: string) => m.replace(/^OFF - /, "").replace(/^ON - /, "ON ").replace(" hodín offline", "h").replace("hodina offline", "h");
 
+// Štandard rodiny T (roky chronologicky, potom okná od najdlhšieho).
 const KPI_WINDOWS = [
-  { value: "all", label: "Celá história", days: 0 },
-  { value: "30", label: "Posledný mesiac", days: 30 },
-  { value: "90", label: "Posledný kvartál", days: 90 },
-  { value: "custom", label: "Vlastné obdobie", days: -1 },
+  { value: "all", label: "Celé obdobie", days: 0 },
+  { value: "2025", label: "2025", days: 0 },
+  { value: "2026", label: "2026", days: 0 },
+  { value: "6m", label: "Posledných 6 mes.", days: 183 },
+  { value: "3m", label: "Posledné 3 mes.", days: 92 },
+  { value: "1m", label: "Posledný mesiac", days: 31 },
+  { value: "1t", label: "Posledný týždeň", days: 7 },
+  { value: "custom", label: "Vlastné", days: -1 },
 ];
 
 // Kanály presne tak, ako to Jerry popísal: „IG DM, hlavne maily z webového
@@ -483,6 +488,9 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
       lo = kpiFrom ? new Date(kpiFrom).getTime() : 0;
       hi = kpiTo ? new Date(kpiTo).getTime() + 86400000 : Infinity;
       scoped = !!(kpiFrom || kpiTo);
+    } else if (kpiWin === "2025" || kpiWin === "2026") {
+      lo = Date.parse(`${kpiWin}-01-01`);
+      hi = Date.parse(`${kpiWin}-12-31`) + 86400000;
     } else if (preset && preset.days > 0) {
       lo = Date.now() - preset.days * 86400000;
     }

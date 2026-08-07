@@ -81,8 +81,8 @@ const ALL_IDX = MONTHS.map((_, i) => i);
 // rodine, odsúhlasené Jerrym 2026-08-07.
 const RANGES = [
   { value: "all", label: "Celé obdobie" },
-  { value: "2026", label: "2026" },
   { value: "2025", label: "2025" },
+  { value: "2026", label: "2026" },
   { value: "last6", label: "Posledných 6 mes." },
   { value: "last3", label: "Posledné 3 mes." },
   { value: "last1", label: "Posledný mesiac" },

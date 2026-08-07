@@ -100,8 +100,8 @@ function Vysvetli({ chat, titul, filter, vyrez }: { chat?: AssistantChat; titul:
 // navrchu (marketing sa číta v mesiacoch, nie rokoch).
 const OBDOBIA = [
   { value: "all", label: "Celé obdobie" },
-  { value: "2026", label: "2026" },
   { value: "2025", label: "2025" },
+  { value: "2026", label: "2026" },
   { value: "6m", label: "Posledných 6 mes." },
   { value: "3m", label: "Posledné 3 mes." },
   { value: "1m", label: "Posledný mesiac" },

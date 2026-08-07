@@ -25,8 +25,8 @@ const pct = (a: number, b: number) => (b > 0 && a <= b ? Math.round((a / b) * 10
 // Štandard rodiny M — rovnaký zoznam ako vo zvyšku Marketingu.
 const OBDOBIA = [
   { value: "all", label: "Celé obdobie" },
-  { value: "2026", label: "2026" },
   { value: "2025", label: "2025" },
+  { value: "2026", label: "2026" },
   { value: "6", label: "Posledných 6 mes." },
   { value: "3", label: "Posledné 3 mes." },
   { value: "1", label: "Posledný mesiac" },
