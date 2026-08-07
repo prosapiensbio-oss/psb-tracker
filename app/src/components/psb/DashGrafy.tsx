@@ -11,7 +11,7 @@ import {
   pnlCalc, QUARTERS, salaryCalc, VZAS_MONTH_LABELS, VZAS_MONTHS, VZAS_TARGETS_BY_YEAR, vzasVerzia,
   type KpiGroup, type KpiOverrides, poslednyMesiacSDatami,} from "../../lib/psb/vzas";
 import { kpiFmt } from "./Vzas";
-import { kotvaDat, monthlyFinance } from "../../lib/psb/compute";
+import { doPlnehoMesiaca, kotvaDat, monthlyFinance } from "../../lib/psb/compute";
 import type { KanalRiadok } from "./Kanaly";
 import { ZDROJE } from "./Klienti";
 import { tokyKlientov } from "./Fluktuacia";
@@ -108,6 +108,27 @@ export const WIDGETS: WidgetMeta[] = [
   { id: "web", label: "Web (GA4)", span: 1, sekcia: "marketing", popis: "Noví návštevníci a kľúčové udalosti po mesiacoch.", doma: "Marketing → Dosah" },
   { id: "vyhladavanie", label: "Vyhľadávanie (Search Console)", span: 1, sekcia: "marketing", popis: "Kliky z Googlu a miera prekliku po mesiacoch.", doma: "Marketing → Dosah" },
   { id: "kanaly", label: "Kanály — mesačný súhrn", span: 1, sekcia: "marketing", popis: "Facebook, TikTok, YouTube a ďalšie z mesačnej zostavy.", doma: "Marketing → Dosah" },
+
+  // Doplnené 2026-08-07 na Jerryho pokyn „dopln fakt všetky, aj tie čo sú len
+  // zvýraznené čísla". Karty bez grafu sú rovnocenné — súhrn P&L alebo cena
+  // sedenia je číslo, ktoré sa číta rýchlejšie než akákoľvek krivka.
+  { id: "pnlSuhrn", label: "Súhrn P&L", span: 1, sekcia: "peniaze", popis: "Príjmy, náklady, hrubý zisk a marža — priemer na mesiac.", doma: "Peniaze → Zisky a straty" },
+  { id: "naklady", label: "Fixné vs. variabilné", span: 1, sekcia: "peniaze", popis: "Z čoho sa skladajú náklady a ktorá časť rastie.", doma: "Peniaze → Zisky a straty" },
+  { id: "runRate", label: "Run-rate a odhad zisku", span: 1, sekcia: "peniaze", popis: "Tempo posledných troch mesiacov prepočítané na rok.", doma: "Peniaze → Predikcia" },
+  { id: "h1", label: "H1 2025 vs. H1 2026", span: 1, sekcia: "peniaze", popis: "Prvý polrok proti prvému polroku — rast bez sezónnosti.", doma: "Výsledky" },
+
+  { id: "cenaSedenia", label: "Ø cena sedenia", span: 1, sekcia: "vytazenie", popis: "Koľko priemerne prinesie jedno odtrénované sedenie.", doma: "Peniaze → Sedenia & cena" },
+  { id: "narocnost", label: "Náročnosť týždňov", span: 1, sekcia: "vytazenie", popis: "Vlastné hodnotenie 1–10 z týždenných zápisov — predstih pred vyhorením.", doma: "Tréningy → Prehľad" },
+  { id: "suhrnSedeni", label: "Súhrn sedení", span: 1, sekcia: "vytazenie", popis: "Offline, online a úvodné v kusoch za posledný rok.", doma: "Tréningy → Analýza" },
+
+  { id: "segmenty", label: "Segmenty klientov", span: 1, sekcia: "klienti", popis: "Koľko je Anchorov, Stabilných a Sporadických — na kom firma stojí.", doma: "Klienti" },
+  { id: "dochadzka", label: "Dochádzka", span: 1, sekcia: "klienti", popis: "Priemerná dochádzka a koľko ľudí je pod hranicou.", doma: "Klienti" },
+  { id: "referencny", label: "Referenčný motor", span: 1, sekcia: "klienti", popis: "Koľko klientov prišlo na odporúčanie a čo priniesli.", doma: "Klienti → Referencie" },
+  { id: "zdrojeKlientov", label: "Odkiaľ klienti prišli", span: 1, sekcia: "klienti", popis: "Rozdelenie aktívnych klientov podľa zdroja.", doma: "Klienti" },
+
+  { id: "cenaUvodneho", label: "Čo stojí úvodný", span: 1, sekcia: "marketing", popis: "Marketingové náklady delené počtom úvodných tréningov.", doma: "Marketing → Lievik" },
+  { id: "ltvZdroj", label: "Hodnota klienta (LTV)", span: 1, sekcia: "marketing", popis: "Koľko klient priemerne zaplatí za celý čas spolupráce.", doma: "Klienti → Rast a strata" },
+  { id: "kohortyDopytov", label: "Kohorty dopytov", span: 1, sekcia: "marketing", popis: "Z koľkých dopytov daného mesiaca sa nakoniec stali klienti.", doma: "Marketing → Lievik" },
 
   // ── Výsledky (KPI) ─────────────────────────────────────────────────────────
   { id: "kpiPeniaze", label: `KPI ${KPI_ROK} — Peniaze`, span: 1, sekcia: "vysledky", popis: "Tržby, marža, odstup od break-evenu, rezerva v mesiacoch.", doma: "Výsledky → KPI" },
@@ -306,7 +327,7 @@ export function useExtraGrafy({
   // ── Dáta z API, len keď je príslušná karta zapnutá ──────────────────────────
   const [weeks, setWeeks] = useState<Record<string, Record<string, unknown>> | null>(null);
   useEffect(() => {
-    if (!aktivne.has("zrusene") || weeks) return;
+    if (!(aktivne.has("zrusene") || aktivne.has("narocnost")) || weeks) return;
     void fetchWeekEntries().then((w) => setWeeks(w as never));
   }, [aktivne, weeks]);
 
@@ -535,6 +556,87 @@ export function useExtraGrafy({
                 value={`${(beAvg > 0 ? (btc.czk || 0) / beAvg : 0).toFixed(1)}`}
                 color={(beAvg > 0 ? (btc.czk || 0) / beAvg : 0) >= 3 ? C.green : (beAvg > 0 ? (btc.czk || 0) / beAvg : 0) >= 1 ? C.orange : C.red}
               />
+            </div>
+          )}
+        </Klik>
+      </Card>
+    );
+
+    // ── Doplnené karty: peniaze ──────────────────────────────────────────────
+    const labs = mesiaceSDatami();
+    const nMes = labs.length;
+    const priem = (v: number[]) => (nMes ? v.slice(0, nMes).reduce((a, b) => a + b, 0) / nMes : 0);
+
+    nodes.pnlSuhrn = (
+      <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column" }}>
+        <H3><Info label="Súhrn P&L" text="Príjmy, náklady, hrubý zisk a marža — priemer na mesiac za celé obdobie s dátami. Náklady zahŕňajú NÁROKY na výplaty, nie to, čo si tréner reálne vzal. Marža: cieľ 12–15 % ako medzikrok, dlhodobo 20 %." /></H3>
+        <Klik kam={() => onNavigate("vzas", "pnl")} onNavigate="Peniaze → Zisky a straty">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}>
+            <MiniStat label="Príjmy · Ø / mes." value={fmtCZK(priem(p.prijmy))} color={C.green} />
+            <MiniStat label="Náklady · Ø / mes." value={fmtCZK(priem(p.celkoveNaklady))} color={C.red} />
+            <MiniStat label="Hrubý zisk · Ø / mes." value={fmtCZK(priem(p.hrubyZisk))} color={priem(p.hrubyZisk) >= 0 ? C.green : C.red} />
+            <MiniStat label="Marža" value={`${priem(p.marza).toFixed(1)} %`} color={priem(p.marza) >= 15 ? C.green : priem(p.marza) >= 0 ? C.orange : C.red} />
+          </div>
+        </Klik>
+      </Card>
+    );
+
+    nodes.naklady = (
+      <Card style={{ marginBottom: 0, height: "100%" }}>
+        <H3><Info label="Fixné vs. variabilné" text="Fixné náklady bežia, aj keď sa netrénuje (nájom, aplikácie, účtovníctvo). Variabilné rastú s prevádzkou. Výplaty sú v oboch prípadoch mimo — tie sú vlastná kategória. Keď rastú fixné rýchlejšie než tržby, break-even sa dvíha a nedá sa to odtrénovať." /></H3>
+        <Klik kam={() => onNavigate("vzas", "pnl")} onNavigate="Peniaze → Zisky a straty">
+          <LineChart
+            data={labs.map((l, i) => ({ label: l, values: [p.fixneTotal[i], p.varTotal[i]] }))}
+            series={[{ name: "Fixné", color: C.orange }, { name: "Variabilné", color: C.blue }]}
+            height={190} fmt={kcK} autoY alignEnd
+          />
+        </Klik>
+      </Card>
+    );
+
+    // Run-rate = tempo posledných troch mesiacov s dátami prepočítané na rok.
+    // Nie priemer za celé obdobie — ten hovorí o minulosti, run-rate o tom,
+    // ako to beží TERAZ.
+    const idx3 = Array.from({ length: Math.min(3, posl + 1) }, (_, k) => posl - Math.min(3, posl + 1) + 1 + k);
+    const rrTrzby = idx3.reduce((a, i) => a + p.prijmy[i], 0) / (idx3.length || 1);
+    const rrNaklady = idx3.reduce((a, i) => a + p.celkoveNaklady[i], 0) / (idx3.length || 1);
+    nodes.runRate = (
+      <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column" }}>
+        <H3><Info label="Run-rate a odhad zisku" text="Tempo posledných troch mesiacov s dátami prepočítané na mesiac a na rok. Nie je to predikcia z balíčkov (tá je v Predikcii) — je to jednoduchá otázka: keby to takto bežalo ďalej, koľko by z toho bolo za rok? Priemer za celé obdobie hovorí o minulosti, run-rate o tom, ako to beží teraz." /></H3>
+        <Klik kam={() => onNavigate("vzas", "predikcia")} onNavigate="Peniaze → Predikcia">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}>
+            <MiniStat label="Tržby · run-rate / mes." value={fmtCZK(rrTrzby)} color={C.green} />
+            <MiniStat label="Zisk · run-rate / mes." value={fmtCZK(rrTrzby - rrNaklady)} color={rrTrzby - rrNaklady >= 0 ? C.green : C.red} />
+            <MiniStat label="Tržby · ročné tempo" value={fmtCZK(rrTrzby * 12)} />
+            <MiniStat label="Zisk · ročné tempo" value={fmtCZK((rrTrzby - rrNaklady) * 12)} color={rrTrzby - rrNaklady >= 0 ? undefined : C.red} />
+          </div>
+        </Klik>
+      </Card>
+    );
+
+    // H1 proti H1. Porovnávať posledný polrok s predošlým je pri sezónnom
+    // biznise klam — leto a jeseň sa nedajú porovnať. Rovnaké mesiace áno.
+    const polrok = (rok: string) => {
+      const idx = VZAS_MONTHS.map((m, i) => [m, i] as const).filter(([m]) => m.startsWith(rok) && m.slice(5) <= "06").map(([, i]) => i).filter((i) => i <= posl);
+      return {
+        n: idx.length,
+        trzby: idx.reduce((a, i) => a + p.prijmy[i], 0),
+        zisk: idx.reduce((a, i) => a + p.hrubyZisk[i], 0),
+      };
+    };
+    const h25 = polrok("2025");
+    const h26 = polrok("2026");
+    const rast = h25.trzby > 0 ? ((h26.trzby - h25.trzby) / h25.trzby) * 100 : 0;
+    nodes.h1 = (
+      <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column" }}>
+        <H3><Info label="H1 2025 vs. H1 2026" text="Prvý polrok proti prvému polroku. Porovnávať posledný polrok s predošlým je pri sezónnom biznise klam — leto a jeseň sa nedajú porovnať. Rovnaké mesiace áno: to, čo zostane, je skutočný rast." /></H3>
+        <Klik kam={() => onNavigate("vysledky")} onNavigate="Výsledky">
+          {h26.n === 0 ? <Empty>Rok 2026 ešte nemá prvý polrok uzavretý.</Empty> : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}>
+              <MiniStat label={`Tržby H1 2025 (${h25.n} mes.)`} value={fmtCZK(h25.trzby)} />
+              <MiniStat label={`Tržby H1 2026 (${h26.n} mes.)`} value={fmtCZK(h26.trzby)} color={C.green} />
+              <MiniStat label="Rast tržieb" value={`${rast > 0 ? "+" : ""}${rast.toFixed(0)} %`} color={rast >= 0 ? C.green : C.red} />
+              <MiniStat label="Zisk H1 2026" value={fmtCZK(h26.zisk)} color={h26.zisk >= 0 ? C.green : C.red} />
             </div>
           )}
         </Klik>
@@ -906,6 +1008,216 @@ export function useExtraGrafy({
         </Card>
       );
     }
+
+    // ── Doplnené karty: vyťaženie ────────────────────────────────────────────
+    const finMes = doPlnehoMesiaca(monthlyFinance(data), kotva, (m) => m.month);
+    nodes.cenaSedenia = (
+      <Card style={{ marginBottom: 0, height: "100%" }}>
+        <H3><Info label="Ø cena sedenia" text="Prijaté peniaze delené počtom odtrénovaných sedení v tom mesiaci. Je to jediná páka, ktorá dvíha tržby bez toho, aby dvíhala odrobené hodiny — a v dvojčlennom štúdiu je to dôležitejšie než počet klientov, lebo hodín je konečne veľa. Mesiac, v ktorom prišla veľká predplatba, vyskočí; krivku treba čítať ako trend, nie ako cenník." /></H3>
+        <Klik kam={() => onNavigate("vzas", "sedenia")} onNavigate="Peniaze → Sedenia & cena">
+          <LineChart
+            data={finMes.slice(-18).map((m) => ({ label: monthLabel(m.month), values: [m.sessions > 0 ? m.cash / m.sessions : 0] }))}
+            series={[{ name: "Ø CZK / sedenie", color: C.accent }]}
+            height={190} fmt={(n) => `${Math.round(n)}`} autoY alignEnd
+          />
+        </Klik>
+      </Card>
+    );
+
+    // Náročnosť: nízke číslo je dobré. Rastúca krivka pri rastúcich hodinách je
+    // varovanie skôr, než sa to prejaví na výkone.
+    const skore = { jerry: [] as number[], terezka: [] as number[] };
+    if (weeks) {
+      for (const e of Object.values(weeks)) {
+        for (const os of ["jerry", "terezka"] as const) {
+          const v = Number((e as Record<string, unknown>)[`${os}_score`]);
+          if (v > 0) skore[os].push(v);
+        }
+      }
+    }
+    const priemSkore = (a: number[]) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0);
+    const farbaSkore = (v: number) => (v === 0 ? undefined : v <= 4 ? C.green : v <= 7 ? C.orange : C.red);
+    nodes.narocnost = (
+      <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column" }}>
+        <H3><Info label="Náročnosť týždňov" text="Vlastné hodnotenie 1–10 z týždenných zápisov (rovnaká logika ako RPE, ktoré ako tréneri používate denne): 1 = ľahký týždeň, 10 = veľmi ťažký. NÍZKE číslo je dobré. Zadáva sa v Tréningy → Prehľad vedľa odtrénovaných hodín. Rastúce hodnotenie pri rastúcich hodinách je varovanie skôr, než sa vyhorenie prejaví na výkone alebo na klientoch." /></H3>
+        <Klik kam={() => onNavigate("treningy", "prehled")} onNavigate="Tréningy → Prehľad">
+          {weeks === null ? <div style={{ fontSize: 12.5, color: C.textDim }}>Načítavam…</div>
+            : !skore.jerry.length && !skore.terezka.length ? <Empty>Zatiaľ žiadne týždenné hodnotenia náročnosti.</Empty> : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}>
+              <MiniStat label={`Jerry · Ø (${skore.jerry.length} týž.)`} value={`${priemSkore(skore.jerry).toFixed(1)} / 10`} color={farbaSkore(priemSkore(skore.jerry))} />
+              <MiniStat label={`Terezka · Ø (${skore.terezka.length} týž.)`} value={`${priemSkore(skore.terezka).toFixed(1)} / 10`} color={farbaSkore(priemSkore(skore.terezka))} />
+              <MiniStat label="Jerry · najťažší týždeň" value={skore.jerry.length ? `${Math.max(...skore.jerry)} / 10` : "—"} />
+              <MiniStat label="Terezka · najťažší týždeň" value={skore.terezka.length ? `${Math.max(...skore.terezka)} / 10` : "—"} />
+            </div>
+          )}
+        </Klik>
+      </Card>
+    );
+
+    const sedeniaRok = data.sessions.filter((x) => Date.parse(x.date) >= Date.now() - 365 * 86400000);
+    // Online sedenie je ONLINE aj TRUECOACH — sú to dva názvy pre to isté
+    // (TrueCoach je aplikácia, cez ktorú online tréning beží).
+    const poctyTypov = {
+      offline: sedeniaRok.filter((x) => x.sessionType === "OFFLINE").length,
+      online: sedeniaRok.filter((x) => x.sessionType === "ONLINE" || x.sessionType === "TRUECOACH").length,
+      uvodne: sedeniaRok.filter((x) => x.sessionType === "UVODNE").length,
+    };
+    nodes.suhrnSedeni = (
+      <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column" }}>
+        <H3><Info label="Súhrn sedení" text="Počty sedení za posledných 12 mesiacov podľa typu. Úvodný tréning je iná položka než bežné sedenie — je to náklad na získanie klienta, nie tržba, a preto sa počíta zvlášť." /></H3>
+        <Klik kam={() => onNavigate("treningy", "analyza")} onNavigate="Tréningy → Analýza">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}>
+            <MiniStat label="Spolu (12 mes.)" value={String(sedeniaRok.length)} color={C.accent} />
+            <MiniStat label="Offline" value={String(poctyTypov.offline)} />
+            <MiniStat label="Online" value={String(poctyTypov.online)} color={C.blue} />
+            <MiniStat label="Úvodné" value={String(poctyTypov.uvodne)} color={C.orange} />
+          </div>
+        </Klik>
+      </Card>
+    );
+
+    // ── Doplnené karty: klienti ──────────────────────────────────────────────
+    const aktivni = Object.values(clients).filter((c) => c.status !== "Neaktívny");
+    const segPocty = { Anchor: 0, "Stabilný": 0, "Sporadický": 0 } as Record<string, number>;
+    for (const c of aktivni) if (segPocty[c.segment] !== undefined) segPocty[c.segment]++;
+    nodes.segmenty = (
+      <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column" }}>
+        <H3><Info label="Segmenty klientov" text="Anchor chodí aspoň 84 % týždňov, Stabilný aspoň 50 %, Sporadický menej — z posledných 18 týždňov. Anchori sú základ, na ktorom firma stojí: sú predvídateľní, chodia aj v lete a odporúčajú ďalej. Klesajúci počet Anchorov je varovanie aj vtedy, keď celkový počet klientov rastie." /></H3>
+        <Klik kam={() => onNavigate("klienti")} onNavigate="Klienti">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}>
+            <MiniStat label="Anchor" value={String(segPocty.Anchor)} color={C.green} />
+            <MiniStat label="Stabilný" value={String(segPocty["Stabilný"])} color={C.accent} />
+            <MiniStat label="Sporadický" value={String(segPocty["Sporadický"])} color={C.orange} />
+            <MiniStat label="Aktívnych spolu" value={String(aktivni.length)} />
+          </div>
+        </Klik>
+      </Card>
+    );
+
+    const priemDoch = aktivni.length ? (aktivni.reduce((a, c) => a + c.attendance, 0) / aktivni.length) * 100 : 0;
+    const podPolovicou = aktivni.filter((c) => c.attendance < 0.5).length;
+    nodes.dochadzka = (
+      <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column" }}>
+        <H3><Info label="Dochádzka" text="Podiel týždňov s aspoň jedným tréningom za posledných 18 týždňov, priemer cez aktívnych klientov. Dochádzka je mechanizmus za udržaním: kto chodí dvakrát týždenne, odchádza podstatne menej než ten, kto chodí raz za čas. Preto je pokles dochádzky varovanie skôr, než sa niekto naozaj odhlási." /></H3>
+        <Klik kam={() => onNavigate("klienti")} onNavigate="Klienti">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}>
+            <MiniStat label="Ø dochádzka" value={`${priemDoch.toFixed(0)} %`} color={priemDoch >= 70 ? C.green : priemDoch >= 50 ? C.orange : C.red} />
+            <MiniStat label="Pod 50 %" value={String(podPolovicou)} color={podPolovicou > aktivni.length * 0.25 ? C.red : C.orange} />
+            <MiniStat label="Anchor (≥84 %)" value={String(segPocty.Anchor)} color={C.green} />
+            <MiniStat label="Aktívnych" value={String(aktivni.length)} />
+          </div>
+        </Klik>
+      </Card>
+    );
+
+    // Referenčný motor: klienti, ktorí prišli na odporúčanie. Najlacnejší kanál,
+    // aký firma má — nestojí nič a konvertuje najlepšie.
+    const zRef = Object.values(clients).filter((c) => (c.zdroj || "").toLowerCase().includes("refer") || (c.zdroj || "").toLowerCase().includes("odporu"));
+    const refTrzba = zRef.reduce((a, c) => a + c.totalPrice, 0);
+    const vsetciSoZdrojom = Object.values(clients).filter((c) => c.zdroj);
+    nodes.referencny = (
+      <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column" }}>
+        <H3><Info label="Referenčný motor" text="Klienti, ktorí prišli na odporúčanie iného klienta. Najlacnejší kanál, aký firma má — nestojí nič a konvertuje lepšie než čokoľvek platené, lebo človek prichádza už s dôverou. Podiel na všetkých so zapísaným zdrojom hovorí, či motor beží, alebo či firma stojí na reklame." /></H3>
+        <Klik kam={() => onNavigate("klienti", "referencie")} onNavigate="Klienti → Referencie">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}>
+            <MiniStat label="Z odporúčania" value={String(zRef.length)} color={C.green} />
+            <MiniStat label="Podiel (so zdrojom)" value={vsetciSoZdrojom.length ? `${((zRef.length / vsetciSoZdrojom.length) * 100).toFixed(0)} %` : "—"} color={C.accent} />
+            <MiniStat label="Priniesli spolu" value={fmtCZK(refTrzba)} />
+            <MiniStat label="Ø na klienta" value={zRef.length ? fmtCZK(refTrzba / zRef.length) : "—"} />
+          </div>
+        </Klik>
+      </Card>
+    );
+
+    const podlaZdrojaD = new Map<string, number>();
+    for (const c of aktivni) podlaZdrojaD.set(c.zdroj || "", (podlaZdrojaD.get(c.zdroj || "") || 0) + 1);
+    const zdrojRiadkyD = [...podlaZdrojaD.entries()].sort((a, b) => b[1] - a[1]).slice(0, 7);
+    nodes.zdrojeKlientov = (
+      <Card style={{ marginBottom: 0, height: "100%" }}>
+        <H3><Info label="Odkiaľ klienti prišli" text="Rozdelenie AKTÍVNYCH klientov podľa zapísaného zdroja. Toto je jediné miesto, kde sa marketing spája s peniazmi — bez neho je každé číslo o návratnosti kanála odhad. Prázdny zdroj sa dá doplniť v Klientoch cez ✎, ale len krátko po začiatku: o pol roka si už nikto nespomenie." /></H3>
+        <Klik kam={() => onNavigate("klienti")} onNavigate="Klienti">
+          {zdrojRiadkyD.length === 0 ? <Empty>Zatiaľ nie je vyplnený žiadny zdroj.</Empty> : (
+            <div>
+              {zdrojRiadkyD.map(([z, n]) => (
+                <BarRow key={z || "prazdne"} label={z ? (ZDROJE.find((x) => x.value === z)?.label || z) : "nevyplnené"} value={n} max={zdrojRiadkyD[0][1]} color={z ? C.accent : C.textDim} sub={`${n}`} />
+              ))}
+            </div>
+          )}
+        </Klik>
+      </Card>
+    );
+
+    // ── Doplnené karty: marketing ────────────────────────────────────────────
+    const mkt12 = MKT_MESACNE.slice(-12);
+    const spend12 = mkt12.reduce((a, m) => a + (m.spend || 0), 0);
+    const uvodne12 = new Set(sedeniaRok.filter((x) => x.sessionType === "UVODNE").map((x) => `${x.client}|${x.date}`)).size;
+    const novi12 = Object.values(clients).filter((c) => c.firstSession && Date.parse(c.firstSession) >= Date.now() - 365 * 86400000).length;
+    nodes.cenaUvodneho = (
+      <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column" }}>
+        <H3><Info label="Čo stojí úvodný" text="Marketingové výdaje za posledných 12 mesiacov delené počtom úvodných tréningov a počtom nových klientov. Druhé číslo je to podstatné: úvodný, ktorý sa nezmenil na klienta, je zaplatená hodina bez tržby. Ráta sa len z toho, čo je v Metricoole zapísané ako výdaj — organický dosah tu nie je a nedá sa oceniť." /></H3>
+        <Klik kam={() => onNavigate("marketing", "lievik")} onNavigate="Marketing → Lievik">
+          {spend12 === 0 ? <Empty>Za posledný rok nie sú zapísané žiadne marketingové výdaje.</Empty> : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}>
+              <MiniStat label="Výdaje (12 mes.)" value={fmtCZK(spend12)} color={C.orange} />
+              <MiniStat label="Úvodných" value={String(uvodne12)} />
+              <MiniStat label="Cena za úvodný" value={uvodne12 ? fmtCZK(spend12 / uvodne12) : "—"} color={C.accent} />
+              <MiniStat label="Cena za klienta" value={novi12 ? fmtCZK(spend12 / novi12) : "—"} color={C.accent} />
+            </div>
+          )}
+        </Klik>
+      </Card>
+    );
+
+    // LTV: koľko klient zaplatí za celý čas spolupráce. Strop na to, koľko sa
+    // oplatí minúť na jeho získanie.
+    const odisliD = Object.values(clients).filter((c) => c.status === "Neaktívny" && c.totalPrice > 0);
+    const ltvOdislych = odisliD.length ? odisliD.reduce((a, c) => a + c.totalPrice, 0) / odisliD.length : 0;
+    const mesiacovSpolu = odisliD.length
+      ? odisliD.reduce((a, c) => a + Math.max(1, (Date.parse(c.lastSession) - Date.parse(c.firstSession)) / (30 * 86400000)), 0) / odisliD.length
+      : 0;
+    nodes.ltvZdroj = (
+      <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column" }}>
+        <H3><Info label="Hodnota klienta (LTV)" text="Koľko klient priemerne zaplatí za celý čas spolupráce a ako dlho vydrží. Ráta sa z ODÍDENÝCH klientov — u tých, čo stále chodia, sa nedá povedať, koľko ešte zaplatia, a priemer by bol nepravdivo nízky. LTV je strop na to, koľko sa oplatí minúť na získanie jedného klienta." /></H3>
+        <Klik kam={() => onNavigate("klienti", "rast")} onNavigate="Klienti → Rast a strata">
+          {odisliD.length === 0 ? <Empty>Zatiaľ nie sú odídení klienti s platbami.</Empty> : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}>
+              <MiniStat label="Ø hodnota klienta" value={fmtCZK(ltvOdislych)} color={C.green} />
+              <MiniStat label="Ø dĺžka spolupráce" value={`${mesiacovSpolu.toFixed(1)} mes.`} color={mesiacovSpolu >= 12 ? C.green : mesiacovSpolu >= 6 ? C.orange : C.red} />
+              <MiniStat label="Z koľkých odídených" value={String(odisliD.length)} />
+              <MiniStat label="Ø / mesiac spolupráce" value={mesiacovSpolu > 0 ? fmtCZK(ltvOdislych / mesiacovSpolu) : "—"} />
+            </div>
+          )}
+        </Klik>
+      </Card>
+    );
+
+    // Kohorty dopytov: z dopytov KTORÉHO mesiaca sa stali klienti. Priradenie
+    // podľa mena — dopyt a klient sa spájajú menom, nič iné spoločné nemajú.
+    const menaKlientov = new Set(Object.values(clients).map((c) => c.name.trim().toLowerCase()));
+    const dopytyPodlaMes = new Map<string, { n: number; z: number }>();
+    for (const l of data.leads || []) {
+      const mk = (l.date || "").slice(0, 7);
+      if (!mk) continue;
+      const e = dopytyPodlaMes.get(mk) || { n: 0, z: 0 };
+      e.n++;
+      if (menaKlientov.has((l.name || "").trim().toLowerCase())) e.z++;
+      dopytyPodlaMes.set(mk, e);
+    }
+    const kohortyD = [...dopytyPodlaMes.entries()].sort((a, b) => a[0].localeCompare(b[0])).slice(-12);
+    nodes.kohortyDDopytov = (
+      <Card style={{ marginBottom: 0, height: "100%" }}>
+        <H3><Info label="Kohorty dopytov" text="Z koľkých dopytov daného mesiaca sa nakoniec stali klienti. Dopyt a klient sa spájajú menom — ak je meno zapísané inak, dvojica sa nenájde a konverzia vyzerá horšie, než bola. Posledné dva mesiace čítaj opatrne: časť ľudí sa ešte len rozhoduje." /></H3>
+        <Klik kam={() => onNavigate("marketing", "lievik")} onNavigate="Marketing → Lievik">
+          {kohortyD.length === 0 ? <Empty>Zatiaľ žiadne zapísané dopyty.</Empty> : (
+            <LineChart
+              data={kohortyD.map(([mk, v]) => ({ label: monthLabel(mk), values: [v.n, v.z] }))}
+              series={[{ name: "Dopyty", color: C.blue }, { name: "Stali sa klientmi", color: C.green }]}
+              height={190} fmt={(n) => String(Math.round(n))} autoY alignEnd
+            />
+          )}
+        </Klik>
+      </Card>
+    );
 
     return nodes;
   }, [vzas, toky, data, clients, weeks, btc, btcStav, kanaly, mktTik, kpiOverrides, kpiSkryte, onNavigate]);
