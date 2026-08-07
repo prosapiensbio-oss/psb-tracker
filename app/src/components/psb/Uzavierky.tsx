@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { monthLabel } from "../../lib/psb/format";
 import type { AssistantChat } from "./Assistant";
-import type { KrokUzavierky } from "./App";
+import type { KrokUzavierky, NavFocus } from "./App";
 import { SpravaMesiaca } from "./SpravaMesiaca";
 import { fetchKonta, fetchPeriods, setPeriodLock, ulozKonto, type AuditRiadok, type Konto, type Obdobie } from "../../lib/psb/client";
 import { C, mix } from "../../lib/psb/theme";
@@ -142,7 +142,7 @@ export function Uzavierky({ prekazky, kroky, podklady, onNavigate, chat }: {
   kroky?: (mesiac: string) => KrokUzavierky[];
   /** Všetko, čo appka o mesiaci vie — vstup pre mesačnú správu. */
   podklady?: (mesiac: string) => string;
-  onNavigate?: (tab: string, sub?: string) => void;
+  onNavigate?: (tab: string, sub?: string, focus?: NavFocus) => void;
   chat?: AssistantChat;
 } = {}) {
   const [obdobia, setObdobia] = useState<Obdobie[]>([]);
@@ -216,6 +216,25 @@ export function Uzavierky({ prekazky, kroky, podklady, onNavigate, chat }: {
 
   /** Mesiac, ktorý sa práve zamkol — spustí návrh mesačnej správy. */
   const [zamknuty, setZamknuty] = useState<string | null>(null);
+  const [hromadne, setHromadne] = useState(false);
+
+  // Staršie mesiace zamknúť naraz, TAK AKO SÚ.
+  //
+  // Excel do júna 2026 je hotová história — prekontrolovať ju šesťkrát po
+  // riadku by nič nezmenilo, lebo z nej sa už neúčtuje. Zámok tu neznamená
+  // „overil som to", ale „ďalej sa toho nedotýkam"; podmienka šiestich krokov
+  // sa preto zámerne preskakuje a v audite zostane, kedy sa to stalo.
+  // Bežiaci mesiac a ten, ktorý sa práve rieši, sa nezamykajú.
+  const staršie = useMemo(
+    () => mesiace.filter((m) => !zamky.get(m)?.locked && (!naRade || m < naRade)),
+    [mesiace, zamky, naRade],
+  );
+  const zamkniStaršie = async () => {
+    setHromadne(true);
+    for (const m of staršie) await setPeriodLock(m, true);
+    nacitaj();
+    setHromadne(false);
+  };
 
   return (
     <>
@@ -239,7 +258,7 @@ export function Uzavierky({ prekazky, kroky, podklady, onNavigate, chat }: {
                 <span style={{ color: k.hotovo ? C.textDim : C.orange, flex: 1, minWidth: 140, lineHeight: 1.45 }}>{k.detail}</span>
                 {!k.hotovo && onNavigate && k.tab && (
                   <button
-                    onClick={() => onNavigate(k.tab as string, k.sub)}
+                    onClick={() => onNavigate(k.tab as string, k.sub, k.focus)}
                     style={{ background: "none", border: `1px solid ${mix(C.accent, 40)}`, borderRadius: 7, padding: "3px 10px", color: C.accentLight, fontSize: 11.5, cursor: "pointer", whiteSpace: "nowrap" }}
                   >
                     Vybaviť →
@@ -270,6 +289,23 @@ export function Uzavierky({ prekazky, kroky, podklady, onNavigate, chat }: {
               </span>
             )}
           </div>
+
+          {staršie.length > 0 && (
+            <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${mix(C.border, 50)}`, display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+              <button
+                onClick={() => void zamkniStaršie()}
+                disabled={hromadne}
+                style={{ padding: "6px 14px", borderRadius: 8, fontSize: 12, cursor: hromadne ? "wait" : "pointer", border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted }}
+              >
+                {hromadne ? "Zamykám…" : `🔒 Zamknúť starších ${staršie.length} mesiacov naraz`}
+              </button>
+              <span style={{ fontSize: 11, color: C.textDim, flex: 1, minWidth: 220, lineHeight: 1.5 }}>
+                {staršie[staršie.length - 1] && label(staršie[staršie.length - 1])} – {label(staršie[0])}, tak ako sú.
+                Šesť krokov sa pri nich nekontroluje: história z Excelu sa už nemení a zámok tu znamená
+                „ďalej sa toho nedotýkam", nie „prekontroloval som to". Odomknúť sa dá kedykoľvek.
+              </span>
+            </div>
+          )}
         </Card>
       )}
 

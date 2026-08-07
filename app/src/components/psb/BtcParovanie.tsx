@@ -45,24 +45,50 @@ export function BtcParovanie({
   );
 
   const bezDokladu = platby.filter((p) => !(parovanie[String(p.id)] || []).length);
-  if (!platby.length) {
+  const sparovane = platby.filter((p) => (parovanie[String(p.id)] || []).length);
+  // Vybavené veci nemajú visieť na obrazovke. Zoznam ukazuje to, čo čaká;
+  // spárované sú za jedným klikom, aby sa dali opraviť, keby niečo nesedelo.
+  const [ukazHotove, setUkazHotove] = useState(false);
+  const viditelne = ukazHotove ? platby : bezDokladu;
+  if (!bezDokladu.length && !ukazHotove) {
     return (
       <Card>
-        <H3><Info text="Výbery z bitcoinovej peňaženky, ku ktorým sa nenašla faktúra. Náklad z faktúry sa do P&L dostane len vtedy, keď sa vie, čím sa zaplatilo — a pri bitcoine to automatika podľa sumy nezvládne vždy, lebo kurz sa hýbe a platobná brána si berie spread." label="Platby bitcoinom bez dokladu" /></H3>
-        <Empty>Každá platba z peňaženky má svoju faktúru. Niet čo párovať.</Empty>
+        <H3><Info text="Výbery z bitcoinovej peňaženky, ku ktorým sa nenašla faktúra. Náklad z faktúry sa do P&L dostane len vtedy, keď sa vie, čím sa zaplatilo — a pri bitcoine to automatika podľa sumy nezvládne vždy, lebo kurz sa hýbe a platobná brána si berie spread." label="Platby bitcoinom" /></H3>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", fontSize: 12.5, color: C.textMuted }}>
+          <span style={{ color: C.green }}>✓</span>
+          Každá platba z peňaženky má svoj doklad.
+          {sparovane.length > 0 && (
+            <button
+              onClick={() => setUkazHotove(true)}
+              style={{ background: "none", border: "none", color: C.textDim, fontSize: 11.5, cursor: "pointer", padding: 0 }}
+            >
+              Ukázať ručne spárované ({sparovane.length})
+            </button>
+          )}
+        </div>
       </Card>
     );
   }
 
   return (
     <Card>
-      <H3><Info text="Automatika páruje podľa sumy, lenže koruny sa z bitcoinu odvodzujú kurzom a platobná brána si berie spread — tri a pol percenta rozdielu je bežné. Tu rozhodneš ty a tvoje rozhodnutie sa pamätá; automatika sa doň už nemieša. Faktúra zostáva zdrojom pravdy o sume aj kategóriách." label={`Platby bitcoinom — doklady (${bezDokladu.length} bez dokladu)`} /></H3>
-      <div style={{ fontSize: 11.5, color: C.textDim, margin: "4px 0 12px", lineHeight: 1.55 }}>
-        Kým platba nemá doklad, jej náklad v P&L chýba a zisk za ten mesiac je o toľko vyšší, než bol.
-        Ak to bol súkromný nákup, nechaj to tak — do výkazu ani nepatrí.
+      <H3><Info text="Automatika páruje podľa sumy, lenže koruny sa z bitcoinu odvodzujú kurzom a platobná brána si berie spread — tri a pol percenta rozdielu je bežné. Tu rozhodneš ty a tvoje rozhodnutie sa pamätá; automatika sa doň už nemieša. Faktúra zostáva zdrojom pravdy o sume aj kategóriách." label={`Platby bitcoinom bez dokladu (${bezDokladu.length})`} /></H3>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap", margin: "4px 0 12px" }}>
+        <span style={{ fontSize: 11.5, color: C.textDim, lineHeight: 1.55, flex: 1, minWidth: 200 }}>
+          Kým platba nemá doklad, jej náklad v P&L chýba a zisk za ten mesiac je o toľko vyšší, než bol.
+          Ak to bol súkromný nákup, nechaj to tak — do výkazu ani nepatrí.
+        </span>
+        {sparovane.length > 0 && (
+          <button
+            onClick={() => setUkazHotove((v) => !v)}
+            style={{ background: "none", border: "none", color: C.accentLight, fontSize: 11.5, cursor: "pointer", whiteSpace: "nowrap" }}
+          >
+            {ukazHotove ? "Skryť spárované" : `Ukázať ručne spárované (${sparovane.length})`}
+          </button>
+        )}
       </div>
 
-      {platby.map((p) => {
+      {viditelne.map((p) => {
         const zvolene = parovanie[String(p.id)] || [];
         const jeOtvorena = otvorena === p.id;
         // Kandidáti: čo je v okne mesiaca okolo platby. Širšie než automatika,

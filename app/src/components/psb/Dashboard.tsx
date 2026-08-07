@@ -1660,7 +1660,17 @@ function RegisterRow({ item, actions, onNavigate, chat }: { item: RegisterItem; 
   // hľadať riadok je polovičná práca — pripomienka má viesť až k písaniu.
   const openItem = () =>
     zapisCiel
-      ? onNavigate(zapisCiel[0], zapisCiel[1] || undefined, zapisCiel[2] ? { month: zapisCiel[2], nonce: Date.now() } : undefined)
+      ? onNavigate(
+          zapisCiel[0],
+          zapisCiel[1] || undefined,
+          // Tretie pole je buď mesiac, alebo týždeň (predpona „t:"). Bez neho
+          // klik dopadol na zoznam a človek si riadok hľadal sám.
+          zapisCiel[2]?.startsWith("t:")
+            ? { week: weekLabel(zapisCiel[2].slice(2)), nonce: Date.now() }
+            : zapisCiel[2]
+              ? { month: zapisCiel[2], nonce: Date.now() }
+              : undefined,
+        )
       : onNavigate(jump, undefined, item.client ? { client: item.client, nonce: Date.now() } : undefined);
   // Otázka „je toto duch?" sa dá zodpovedať rovno tu. Odpoveď sa uloží ku
   // klientovi, takže sa už nepýta znova — a duchov konečne vieme spočítať.

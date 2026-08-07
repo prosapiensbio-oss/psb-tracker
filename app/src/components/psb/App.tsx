@@ -66,6 +66,8 @@ export type KrokUzavierky = {
   detail: string;
   tab?: string;
   sub?: string;
+  /** Čo na cieľovej obrazovke otvoriť — inak človek dopadne na zoznam. */
+  focus?: NavFocus;
 };
 
 export type NavFocus = {
@@ -98,6 +100,9 @@ const TABS = [
   // ktorými blúdil aj Jarvis. Id zostáva „vzas" — visia na ňom uložené
   // rozloženia, register aj odkazy.
   { id: "vzas", label: "Peniaze", icon: "wallet" },
+  // Bitcoin je odkaz von, nie obsah — ale v hlavičke stojí tam, kam patrí
+  // významom: hneď za peniazmi, lebo je to ich časť.
+  { id: "btc-odkaz", label: "Bitcoin", icon: "bitcoin", odkaz: true },
   { id: "vysledky", label: "Výsledky", icon: "calendar" },
   // Údaje sú posledné a zámerne mimo príbehu: nie je to pohľad na štúdio, je to
   // obsluha appky — nahrávanie, uzávierky, audit, kontá, záloha, vzhľad, reset.
@@ -738,7 +743,15 @@ function skupinaFaktur(
   const kontrolaBanky = useMemo(() => {
     const out: typeof register = [];
     const ack = data.anomalyAck || {};
-    const mesiace = Object.keys(bankaSumy).sort();
+    // Posledný UZAVRETÝ mesiac, nie posledný v dátach.
+    //
+    // Siedmeho augusta hlásila appka „za aug 26 nedorazil nájom" — a pritom
+    // august ešte len začal a nájom sa platí okolo desiateho. Kontrola sa
+    // pozerala na posledný mesiac v banke, čo je vždy ten rozbehnutý. Rovnaká
+    // rodina chýb ako kotva dát: kód, ktorý predpokladá, že mesiac s dátami je
+    // mesiac hotový.
+    const beziaci = new Date().toISOString().slice(0, 7);
+    const mesiace = Object.keys(bankaSumy).filter((m) => m < beziaci).sort();
     if (!mesiace.length) return out;
     const posledny = mesiace[mesiace.length - 1];
 
@@ -910,7 +923,7 @@ function skupinaFaktur(
         ...stavPolozky(`zapis|${r.id}`),
         // Cieľ navigácie sa vezie v `client` — register nemá vlastné pole na
         // odkaz a zaviesť ho kvôli trom položkám by bolo viac kódu než úžitku.
-        client: `${r.ciel.tab}|${r.ciel.sub || ""}${r.ciel.mesiac ? `|${r.ciel.mesiac}` : ""}`,
+        client: `${r.ciel.tab}|${r.ciel.sub || ""}${r.ciel.mesiac ? `|${r.ciel.mesiac}` : r.ciel.tyzden ? `|t:${r.ciel.tyzden}` : ""}`,
         priority: r.druh === "tyzden" ? 5 : r.druh === "mesiac" ? 6 : 40,
       }));
     return [...extra, ...kontrolaBanky, ...zmenyMetrik, ...register].sort((a, b) => a.priority - b.priority);
@@ -977,6 +990,9 @@ function skupinaFaktur(
         detail: odpovedane > 0 ? `${odpovedane} zodpovedaných` : "žiadna odpoveď",
         tab: "vzas",
         sub: "trzby",
+        // Bez mesiaca „Vybaviť" dopadlo na tabuľku tržieb a človek musel sám
+        // nájsť riadok a rozkliknúť otázky. Focus ho otvorí a doskroluje.
+        focus: { month: mk, nonce: Date.now() },
       },
       {
         id: "upozornenia",
@@ -1209,32 +1225,31 @@ function skupinaFaktur(
           margin: "0 auto",
         }}
       >
-        {TABS.map((t) => (
-          <button key={t.id} style={{ ...tab(active === t.id), display: "inline-flex", alignItems: "center", gap: 7 }} onClick={() => setActive(t.id)}>
-            <Icon name={t.icon} /> {t.label}
-          </button>
-        ))}
+        {TABS.map((t) =>
+          t.odkaz ? (
+            <a
+              key={t.id}
+              href="/api/sso?prejst=1"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Otvoriť bitcoinovú evidenciu v novej karte (prihlási sa sama)"
+              style={{ ...tab(false), display: "inline-flex", alignItems: "center", gap: 7, textDecoration: "none" }}
+            >
+              <Icon name={t.icon} /> {t.label}
+              <span style={{ fontSize: 11, opacity: 0.7 }}>↗</span>
+            </a>
+          ) : (
+            <button key={t.id} style={{ ...tab(active === t.id), display: "inline-flex", alignItems: "center", gap: 7 }} onClick={() => setActive(t.id)}>
+              <Icon name={t.icon} /> {t.label}
+            </button>
+          ),
+        )}
         {/* Bitcoin žije vo vlastnej appke (prosapiens-btc) a táto karta tam
             len vedie — nie je to obsah Kokpitu. Otvára sa v NOVEJ karte
             prehliadača zámerne: BTC appka má vlastné prihlásenie a keby sa
             Kokpit zavrel, človek by po návrate prišiel o rozpracovaný stav
             (filtre, rozbalený register, návrh uzávierky).
             Šípka ↗ je jediné miesto v hlavičke, ktoré hovorí „toto vedie von". */}
-        {/* Obyčajný odkaz na serverovú trasu, ktorá presmeruje — nie
-            JavaScript, ktorý otvára okno. Prvá verzia otvárala prázdnu kartu
-            a nič sa v nej neobjavilo: `window.open(url, "_blank", "noopener")`
-            vracia null, takže sa nebolo čoho chytiť, a druhý pokus už bol
-            mimo kliknutia a prehliadač ho zablokoval. */}
-        <a
-          href="/api/sso?prejst=1"
-          target="_blank"
-          rel="noopener noreferrer"
-          title="Otvoriť bitcoinovú evidenciu v novej karte (prihlási sa sama)"
-          style={{ ...tab(false), display: "inline-flex", alignItems: "center", gap: 7, textDecoration: "none" }}
-        >
-          <Icon name="bitcoin" /> Bitcoin
-          <span style={{ fontSize: 11, opacity: 0.7 }}>↗</span>
-        </a>
       </nav>
       <div style={{ padding: 16, maxWidth: 1200, margin: "0 auto" }}>
         {active === "dashboard" && (

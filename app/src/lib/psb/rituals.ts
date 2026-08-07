@@ -21,7 +21,7 @@ export type Ritual = {
   nadpis: string;
   detail: string;
   /** Kam to zapísať — dvojica pre navigáciu. */
-  ciel: { tab: string; sub?: string; mesiac?: string };
+  ciel: { tab: string; sub?: string; mesiac?: string; tyzden?: string };
   /** true = práve teraz je čas to spraviť a nie je to spravené */
   splatne: boolean;
   /** true = už je to za dané obdobie vyplnené */
@@ -60,7 +60,8 @@ export function ritualy(
     detail: vyplneny
       ? "Tento týždeň je zapísaný."
       : "Náročnosť týždňa a iné hodiny — kým to máš v hlave. V pondelok si to už nikto nepamätá.",
-    ciel: { tab: "treningy", sub: "prehled" },
+    // Bez týždňa dopadol klik na zoznam a človek si musel nájsť riadok sám.
+    ciel: { tab: "treningy", sub: "prehled", tyzden: tw },
     splatne: !vyplneny && den >= 5,
     hotove: vyplneny,
   });
