@@ -93,7 +93,8 @@ export function PSBApp() {
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState("dashboard");
   const [trackerSection, setTrackerSection] = useState("treningy");
-  const [vzasSub, setVzasSub] = useState("pnl");
+  // Tržby, nie P&L: Peniaze sa otvárajú na tom, čo Jerry sleduje denne.
+  const [vzasSub, setVzasSub] = useState("trzby");
   const [vysledkySub, setVysledkySub] = useState("kvartalne");
   const [vysledkyFocus, setVysledkyFocus] = useState<NavFocus | null>(null);
   const [marketingSub, setMarketingSub] = useState("lievik");

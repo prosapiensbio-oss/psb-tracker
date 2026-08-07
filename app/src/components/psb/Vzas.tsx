@@ -2788,6 +2788,29 @@ function CieleTab({ data }: { data: PSBData }) {
 }
 
 // ── module shell ─────────────────────────────────────────────────────────────
+// Kategorizácia Peňazí: štyri otázky, ktoré si človek kladie, v poradí
+// príbehu — čo prišlo → čo z toho zostalo → komu čo dlžíme → čo kupujeme.
+const SEKCIE_PENIAZE = [
+  { id: "sk-trzby", label: "Tržby", listy: [
+    { id: "trzby", label: "Po mesiacoch" },
+    { id: "sedenia", label: "Sedenia & cena" },
+    { id: "predikcia", label: "Predikcia" },
+  ] },
+  { id: "sk-zisky", label: "Zisky", listy: [
+    { id: "pnl", label: "Zisky a straty" },
+    { id: "cashflow", label: "Cashflow" },
+  ] },
+  { id: "sk-dlhy", label: "Dlhy & výplaty", listy: [
+    { id: "vyplaty", label: "J&T Výplaty" },
+    { id: "jarek", label: "Jarek dlh" },
+  ] },
+  { id: "sk-nakupy", label: "Nákupy", listy: [
+    { id: "nakupy", label: "Nákupy" },
+  ] },
+];
+const sekciaPre = (list: string) =>
+  (SEKCIE_PENIAZE.find((x) => x.listy.some((l) => l.id === list)) || SEKCIE_PENIAZE[0]).id;
+
 export function Vzas({ sub, onSub, data, clients, focus }: { sub: string; onSub: (s: string) => void; data: PSBData; clients: Record<string, ClientAgg>; focus?: NavFocus | null }) {
   // Tržby do VZAS tečú živé z PTmindera — excelový prepis sa nahradí pri
   // každom otvorení. `tik` len prekreslí strom po mutácii modulových polí.
@@ -2799,23 +2822,24 @@ export function Vzas({ sub, onSub, data, clients, focus }: { sub: string; onSub:
   }, [data]);
   return (
     <>
+      {/* Dve úrovne namiesto ôsmich pilulí v jednom rade. Osem plochých
+          položiek je stena — oko ju číta celú pri každom prepnutí. Sekcie
+          hovoria Jerryho jazykom (Tržby / Zisky / Dlhy / Nákupy) a listy
+          si nechávajú PÔVODNÉ id, takže každý uložený aj Jarvisov odkaz
+          (vzas|pnl, vzas|predikcia…) trafí presne tam, kam mieril. */}
       <SubTabs
-        tabs={[
-          // Poradie rozpráva príbeh: čo prišlo → čo príde → čo zostalo →
-          // komu čo dlžíme. Prevádzkové peniaze z PTmindera vpredu,
-          // účtovníctvo za nimi.
-          { id: "trzby", label: "Tržby" },
-          { id: "sedenia", label: "Sedenia & cena" },
-          { id: "predikcia", label: "Predikcia" },
-          { id: "pnl", label: "Zisky a straty" },
-          { id: "vyplaty", label: "J&T Výplaty" },
-          { id: "cashflow", label: "Cashflow" },
-          { id: "jarek", label: "Jarek dlh" },
-          { id: "nakupy", label: "Nákupy" },
-        ]}
-        value={sub}
-        onChange={onSub}
+        tabs={SEKCIE_PENIAZE.map((x) => ({ id: x.id, label: x.label }))}
+        value={sekciaPre(sub)}
+        onChange={(id) => onSub(SEKCIE_PENIAZE.find((x) => x.id === id)!.listy[0].id)}
       />
+      {(() => {
+        const sekcia = SEKCIE_PENIAZE.find((x) => x.id === sekciaPre(sub))!;
+        // Sekcia s jediným listom druhý riadok nepotrebuje — bol by to
+        // jeden osamelý pill s tým istým menom.
+        return sekcia.listy.length > 1 ? (
+          <SubTabs tabs={sekcia.listy} value={sub} onChange={onSub} />
+        ) : null;
+      })()}
       {["trzby", "sedenia", "predikcia"].includes(sub) && (
         <FinancieObsah data={data} clients={clients} focus={focus} sub={sub} onSub={onSub} />
       )}
