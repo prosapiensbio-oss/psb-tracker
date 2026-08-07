@@ -691,7 +691,9 @@ export function PSBApp() {
     const z = zapisy.mesiace?.[mk];
     const odpovedane = Object.values(z?.answers || {}).filter((v) => String(v).trim()).length;
     const nevybavene = registerAll.filter((r) => r.key.includes(mk) && !r.acked && r.category !== "Zápis");
-    const pohybovMes = (bankaPohyby[mk] || []).length;
+    // bankaPohyby[mesiac] je mapa KATEGÓRIA → pohyby, nie pole. `.length` na
+    // nej dávalo „undefined pohybov v mesiaci"; treba spočítať cez kategórie.
+    const pohybovMes = Object.values(bankaPohyby[mk] || {}).reduce((a, v) => a + v.length, 0);
     return [
       {
         id: "ptminder",
@@ -704,7 +706,7 @@ export function PSBApp() {
         id: "fio",
         label: "Výpis z Fio",
         hotovo: !!bankaSumy[mk],
-        detail: bankaSumy[mk] ? `${pohybovMes} pohybov v mesiaci` : "chýba výpis",
+        detail: bankaSumy[mk] ? (pohybovMes ? `${pohybovMes} pohybov, všetky zaradené` : "nahratý") : "chýba výpis",
         tab: "udaje",
       },
       {
