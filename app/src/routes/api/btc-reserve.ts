@@ -38,9 +38,14 @@ export const Route = createFileRoute("/api/btc-reserve")({
         // ?vyplaty=1 pridá výbery, ktoré sú výplatou zakladateľa — časť výplat
         // neodíde z účtu, ale z bitcoinu, a pri importe z banky by chýbali.
         const chceVyplaty = q.get("vyplaty") === "1";
+        // ?nakupy=1 pridá výbery, ktoré NIE sú výplatou — nákupy platené
+        // bitcoinom. Neodídu z účtu, takže import z Fio ich nevidí a do P&L
+        // sa doteraz nemali ako dostať.
+        const chceNakupy = q.get("nakupy") === "1";
         let url = `${SOURCE}?exp=${exp}&sig=${sig}`;
         if (chcePlatby) url += "&platby=1";
         if (chceVyplaty) url += "&vyplaty=1";
+        if (chceNakupy) url += "&nakupy=1";
         return Response.json({ ok: true, url });
       },
     },

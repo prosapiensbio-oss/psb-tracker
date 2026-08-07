@@ -136,14 +136,25 @@ export type BtcReserve = {
   generatedAt: string;
   platby?: BtcPlatba[];
   vyplaty?: BtcVyplata[];
+  nakupy?: BtcNakup[];
+};
+
+/** Nákup zaplatený bitcoinom — prevádzkový náklad, ktorý neprejde cez účet. */
+export type BtcNakup = {
+  /** Id z knihy BTC appky — stabilný kľúč, prežije zmenu poznámky. */
+  id: number;
+  datum: string;
+  sats: number;
+  czk: number | null;
+  poznamka: string;
 };
 
 // Two hops on purpose: our server signs a short-lived URL (it holds the shared
 // token), the browser then calls the Bitcoin app directly. Worker-to-worker
 // calls inside the platform time out, so this is the path that works.
-export async function fetchBtcReserve(sPlatbami = false, sVyplatami = false): Promise<BtcReserve | null> {
+export async function fetchBtcReserve(sPlatbami = false, sVyplatami = false, sNakupmi = false): Promise<BtcReserve | null> {
   try {
-    const q = [sPlatbami ? "platby=1" : "", sVyplatami ? "vyplaty=1" : ""].filter(Boolean).join("&");
+    const q = [sPlatbami ? "platby=1" : "", sVyplatami ? "vyplaty=1" : "", sNakupmi ? "nakupy=1" : ""].filter(Boolean).join("&");
     const r = await fetch(`/api/btc-reserve${q ? `?${q}` : ""}`);
     if (!r.ok) return null;
     const j = (await r.json()) as { ok?: boolean; url?: string };

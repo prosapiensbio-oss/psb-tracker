@@ -13,6 +13,7 @@ import {
   saveAnomaly,
   saveOverride,
   fetchBtcReserve,
+  type BtcNakup,
 } from "../../lib/psb/client";
 import {
   kotvaDat,
@@ -309,7 +310,7 @@ export function PSBApp() {
   // bankovom výpise nie sú, takže bez nich by mesiac vyzeral, akoby si tréner
   // vzal menej, než naozaj vzal.
   useEffect(() => {
-    void fetchBtcReserve(true, true).then((r) => {
+    void fetchBtcReserve(true, true, true).then((r) => {
       // Platby klientov v bitcoine sú TRŽBA, ktorá cez účet nikdy neprejde.
       // Bez nich kontrola príjmov hlásila, že za júl chýba 132 000 Kč — a
       // pritom 130 000 z toho prišlo v BTC.
@@ -324,6 +325,23 @@ export function PSBApp() {
         }
         setBtcPrijmy(bt);
         setBtcSatsKlienti(podlaKlienta);
+      }
+      // Nákupy platené bitcoinom sa do P&L NEPÍŠU.
+      //
+      // Prvá verzia ich tam písala ako náklad — bola zlá. Jerry nahráva faktúry
+      // (Alza a spol.) do Kokpitu a do bitcoinovej knihy zapisuje výpis
+      // z peňaženky. Ten istý nákup teda existuje dvakrát: raz ako doklad, raz
+      // ako výber. Doklad je náklad, výber je len spôsob úhrady — importovať
+      // oboje znamená zaplatiť to v P&L dvakrát.
+      //
+      // Je to tá istá logika, akú už má appka pri PLATBÁCH klientov: zdrojom
+      // pravdy o tržbách je PTminder, bitcoinová kniha len ukazuje, či platba
+      // naozaj dorazila. Pri nákladoch je zdrojom pravdy faktúra a kniha
+      // ukazuje, či a čím sa zaplatilo.
+      if (r?.nakupy?.length) {
+        const zoznam: Record<string, BtcNakup[]> = {};
+        for (const x of r.nakupy) (zoznam[String(x.datum).slice(0, 7)] ||= []).push(x);
+        setBtcNakupy(zoznam);
       }
       if (!r?.vyplaty?.length) return;
       const podlaMesiaca: Record<string, { jerry: number; terezka: number; jerryFp: number }> = {};
@@ -357,6 +375,10 @@ export function PSBApp() {
   const [, setFioTik] = useState(0);
   const [bankaSumy, setBankaSumy] = useState<BankovyMesiac>({});
   const [bankaPohyby, setBankaPohyby] = useState<Record<string, Record<string, Pohyb[]>>>({});
+  /** Nákupy z BTC po mesiacoch — pre rozpis bunky aj pre kontrolu dvojitého zápisu. */
+  const [btcNakupy, setBtcNakupy] = useState<Record<string, BtcNakup[]>>({});
+  /** Výbery z BTC peňaženky, ku ktorým sa nenašla faktúra — náklad chýba v P&L. */
+  const [btcBezDokladu, setBtcBezDokladu] = useState<BtcNakup[]>([]);
   const [bankaPrijmy, setBankaPrijmy] = useState<Record<string, number>>({});
   const [btcPrijmy, setBtcPrijmy] = useState<Record<string, number>>({});
   const [btcSatsKlienti, setBtcSatsKlienti] = useState<Record<string, number>>({});
@@ -475,6 +497,55 @@ export function PSBApp() {
             popis: [p.protistrana, p.poznamka].filter(Boolean).join(" · ") || "",
           });
         }
+        // ── Faktúry zaplatené bitcoinom ──────────────────────────────────
+        //
+        // Až doteraz sa náklad z faktúry dostal do P&L jedine tak, že sa
+        // faktúra spárovala s BANKOVÝM pohybom. Faktúra zaplatená z peňaženky
+        // žiadny bankový pohyb nemá — takže sa nikdy nenavštívila a jej náklad
+        // do výkazu nedorazil. Doklad v appke bol, číslo v P&L nie.
+        //
+        // Zdrojom pravdy zostáva FAKTÚRA (má položky aj kategórie); výber
+        // z peňaženky je len dôkaz, že sa zaplatilo, a kedy. Preto sa páruje
+        // rovnako ako bankový pohyb, len s väčšou toleranciou: suma v Kč sa
+        // prepočítava kurzom v čase transakcie, takže na korunu sedieť nemusí.
+        for (const zoznam of Object.values(btcNakupy)) {
+          for (const nakup of zoznam) {
+            const czk = nakup.czk || 0;
+            if (!czk) continue;
+            const mk = String(nakup.datum).slice(0, 7);
+            if (mk < PRVY_MESIAC_Z_FIO) continue;
+            for (const [cislo, d] of doklady) {
+              if (pouzite.has(cislo)) continue;
+              const tolerancia = Math.max(50, d.celkom * 0.02);
+              if (Math.abs(d.celkom - czk) > tolerancia) continue;
+              if (Math.abs(Date.parse(nakup.datum) - Date.parse(d.datum)) / 86400000 > 7) continue;
+              pouzite.add(cislo);
+              for (const pol of d.polozky) {
+                if (!pol.kategoria || pol.kategoria === "mimo" || pol.kategoria.startsWith("vyplaty")) continue;
+                (sumy[mk] ||= {});
+                sumy[mk][pol.kategoria] = (sumy[mk][pol.kategoria] || 0) + pol.cena;
+                pridajDoRozpisu(rozpis, mk, pol.kategoria, {
+                  datum: String(nakup.datum).slice(0, 10),
+                  popis: `${pol.nazov || d.polozky[0]?.dodavatel || "položka"} · zaplatené bitcoinom`,
+                  suma: pol.cena, zdroj: "faktura", doklad: cislo,
+                });
+              }
+              break;
+            }
+          }
+        }
+        // Ktoré výbery z peňaženky nenašli doklad — na kontrolu v registri.
+        setBtcBezDokladu(
+          Object.values(btcNakupy).flat().filter((x) => {
+            const czk = x.czk || 0;
+            if (!czk || String(x.datum).slice(0, 7) < PRVY_MESIAC_Z_FIO) return false;
+            return ![...doklady.entries()].some(([c, d]) =>
+              pouzite.has(c) &&
+              Math.abs(d.celkom - czk) <= Math.max(50, d.celkom * 0.02) &&
+              Math.abs(Date.parse(x.datum) - Date.parse(d.datum)) / 86400000 <= 7);
+          }),
+        );
+
         nastavRozpis(rozpis);
         // Zošit sa pozná podľa typu pohybu — mesiac netreba pýtať, vyplýva z
         // dátumov, ktoré sa pri prepise potvrdzujú.
@@ -490,7 +561,7 @@ export function PSBApp() {
         else setFioTik((x) => x + 1); // rozpis pribudol aj bez zmeny súm
       })
       .catch(() => {});
-  }, []);
+  }, [btcNakupy]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Kontroly nad bankovými sumami. Register je jediné miesto, kam sa človek
   // pozerá, keď hľadá „čo mám spraviť" — ďalšia karta vedľa neho by znamenala
@@ -538,6 +609,26 @@ export function PSBApp() {
           : `${meno} — obvykle ${Math.round(n.obvykle).toLocaleString("cs-CZ")} Kč, za ${monthLabel(n.mesiac)} len ${Math.round(n.teraz).toLocaleString("cs-CZ")} Kč. Buď je časť zaradená inde, alebo sa platilo menej.`,
         ...stavPolozky(key),
         priority: n.druh === "chyba" ? 3 : 7, client: "vzas|pnl",
+      });
+    }
+
+    // (1a2) Výber z bitcoinovej peňaženky bez faktúry.
+    //
+    // Náklad sa do P&L dostane z FAKTÚRY, nie z výberu — výber je len dôkaz
+    // úhrady. Keď k výberu doklad nie je, náklad vo výkaze chýba a zisk je
+    // o tú sumu vyšší, než v skutočnosti bol. Alebo to bol súkromný nákup
+    // a potom je všetko v poriadku — to appka rozhodnúť nevie, preto sa pýta.
+    const bezDokladuPodlaMes: Record<string, BtcNakup[]> = {};
+    for (const x of btcBezDokladu) (bezDokladuPodlaMes[String(x.datum).slice(0, 7)] ||= []).push(x);
+    for (const [mk, zoznam] of Object.entries(bezDokladuPodlaMes)) {
+      const spolu = zoznam.reduce((a, x) => a + (x.czk || 0), 0);
+      if (spolu < 500) continue; // drobné nemá zmysel naháňať
+      const key = `btcbezdokladu|${mk}`;
+      out.push({
+        key, category: "Anomália", tone: "orange",
+        title: `${zoznam.length}× platba bitcoinom bez faktúry v ${monthLabel(mk)} — ${Math.round(spolu).toLocaleString("cs-CZ")} Kč`,
+        detail: `Z bitcoinovej peňaženky odišlo ${Math.round(spolu).toLocaleString("cs-CZ")} Kč v ${zoznam.length} platbách (${zoznam.slice(0, 4).map((x) => `${fmtDMY(x.datum)} ${Math.round(x.czk || 0).toLocaleString("cs-CZ")} Kč${x.poznamka ? ` — ${x.poznamka}` : ""}`).join(", ")}${zoznam.length > 4 ? ` a ďalších ${zoznam.length - 4}` : ""}), ale nenašla sa k nim faktúra. Cez účet neprešli, takže import z Fio ich nevidel — ak to boli firemné nákupy, ten náklad v P&L chýba a zisk za ${monthLabel(mk)} je o toľko vyšší, než bol. Nahraj doklad v Údajoch a spáruje sa sám. Ak to bol súkromný nákup, odklepni.`,
+        ...stavPolozky(key), priority: 4, client: "udaje|",
       });
     }
 
@@ -595,7 +686,7 @@ export function PSBApp() {
       });
     }
     return out;
-  }, [bankaSumy, bankaPohyby, bankaPrijmy, btcPrijmy, data.anomalyAck]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [bankaSumy, bankaPohyby, bankaPrijmy, btcPrijmy, btcBezDokladu, data.anomalyAck]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const zmenyMetrik = useMemo(() => {
     const ack = data.anomalyAck || {};
