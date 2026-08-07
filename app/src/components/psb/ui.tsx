@@ -694,6 +694,35 @@ export function LineChart({
       {data.map((d, i) => (i % labelStep === 0 || i === n - 1) && (
         <text key={i} x={x(i)} y={height - 6} textAnchor="middle" fontSize={9} fill={C.textDim}>{d.label}</text>
       ))}
+      {/* Čísla priamo pri bodoch. Samotná krivka povie smer, ale nie veľkosť —
+          a „malovravné" bolo presne to slovo. Pri riedkom grafe (do 8 bodov,
+          typicky predikcia) sa popíšu všetky; inak len POSLEDNÝ bod, lebo
+          osemnásť čísel cez seba je horšie než žiadne. Zvyšok povie súhrn pod
+          grafom a bublina pri prejdení myšou. */}
+      {!hover && series.map((s, si) => {
+        const body = data
+          .map((d, i) => ({ i, v: d.values[si] }))
+          .filter((b) => Number.isFinite(b.v) && (n <= 8 || b.i === n - 1));
+        return body.map(({ i, v }) => {
+          // Keď sa dve krivky na konci stretnú, popisky by ležali na sebe —
+          // ten nižší sa posunie pod bod.
+          const kolizia = si > 0 && series.some((_, sj) => sj < si && Math.abs(y(data[i].values[sj] ?? 0) - y(v)) < 13);
+          return (
+            <text
+              key={`${si}-${i}`}
+              x={x(i)}
+              y={kolizia ? y(v) + 15 : y(v) - 8}
+              textAnchor={i === n - 1 && n > 1 ? "end" : "middle"}
+              fontSize={10}
+              fontWeight={700}
+              fill={s.color}
+              pointerEvents="none"
+            >
+              {fmt(v)}
+            </text>
+          );
+        });
+      })}
       {hover && (() => {
         const d = data[hover.i];
         const s = series[hover.si];
@@ -717,13 +746,34 @@ export function LineChart({
   return (
     <div>
       {pointWidth ? <div ref={scrollRef} style={{ overflowX: "auto" }}>{svg}</div> : svg}
+      {/* Súhrn každej krivky v číslach: kde sme, aký je priemer a aké boli
+          krajnosti. Legenda samotná hovorí len to, ktorá farba je ktorá. */}
       <div style={{ display: "flex", gap: 14, marginTop: 6, flexWrap: "wrap" }}>
-        {series.map((s) => (
-          <span key={s.name} style={{ fontSize: 11, color: C.textMuted }}>
-            <span style={{ display: "inline-block", width: 14, height: 3, background: s.color, borderRadius: 2, marginRight: 5, verticalAlign: "middle" }} />
-            {s.name}
-          </span>
-        ))}
+        {series.map((s, si) => {
+          const v = data.map((d) => d.values[si]).filter((x2) => Number.isFinite(x2));
+          const posl = v.length ? v[v.length - 1] : null;
+          const max = v.length ? Math.max(...v) : null;
+          const min = v.length ? Math.min(...v) : null;
+          const priem = v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
+          const mesiacMax = max !== null ? data[data.findIndex((d) => d.values[si] === max)]?.label : "";
+          const mesiacMin = min !== null ? data[data.findIndex((d) => d.values[si] === min)]?.label : "";
+          return (
+            <span key={s.name} style={{ fontSize: 11, color: C.textMuted, display: "inline-flex", alignItems: "baseline", gap: 5, flexWrap: "wrap" }}>
+              <span style={{ display: "inline-block", width: 14, height: 3, background: s.color, borderRadius: 2, verticalAlign: "middle" }} />
+              <span style={{ color: C.text }}>{s.name}</span>
+              {posl !== null && (
+                <>
+                  <span style={{ color: s.color, fontWeight: 700 }}>{fmt(posl)}</span>
+                  {v.length > 1 && (
+                    <span style={{ color: C.textDim, fontSize: 10.5 }}>
+                      · Ø {fmt(priem as number)} · max {fmt(max as number)}{mesiacMax ? ` (${mesiacMax})` : ""} · min {fmt(min as number)}{mesiacMin ? ` (${mesiacMin})` : ""}
+                    </span>
+                  )}
+                </>
+              )}
+            </span>
+          );
+        })}
         {zone && <span style={{ fontSize: 11, color: C.green }}>▬ Zdravá zóna {zone.lo}–{zone.hi}{zone.unit ?? "h"}</span>}
         {onPoint && <span style={{ fontSize: 11, color: C.textDim }}>Klik na bod = detail obdobia dole</span>}
       </div>
