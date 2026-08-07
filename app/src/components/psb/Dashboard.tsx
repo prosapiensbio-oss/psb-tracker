@@ -22,14 +22,14 @@ import { nastavPrijmyZTrackera, pnlCalc, poslednyMesiacSDatami, salaryCalc, vzas
 import { fetchBtcReserve } from "../../lib/psb/client";
 import { PrehladPanel, useZmenyOdMinule, type Pristroj, type Zmena } from "./Prehlad";
 import {
-  centerBody, GrafyKniznica, MiniStat, SEKCIE, useExtraGrafy, VYCHODZIE, WIDGETS,
+  centerBody, GrafyKniznica, MiniStat, OBDOBIA_DASH, SEKCIE, useExtraGrafy, VYCHODZIE, WIDGETS,
   type SekciaId, type WidgetMeta,
 } from "./DashGrafy";
 import { tokyKlientov } from "./Fluktuacia";
 import type { PSBData } from "../../lib/psb/types";
 import type { Actions, NavFocus } from "./App";
 import type { AssistantChat } from "./Assistant";
-import { Card, Donut, Empty, H3, Info, ValueBars, ZoneBars } from "./ui";
+import { Card, Donut, Empty, H3, Info, Select, ValueBars, ZoneBars } from "./ui";
 
 const catTone = (c: RegisterItem["category"]) =>
   c === "6M" ? "accent" : c === "Kapacita" || c === "Rozhodnutie" || c === "Zápis" ? "blue" : "orange";  // „Zmena" padá do orange — je to výstraha, nie informácia
@@ -383,6 +383,27 @@ export function Dashboard({
   // dashboard mal cez dva metre výšky — kto chcel marketing, skroloval cez
   // peniaze, vyťaženie aj klientov. Kotvy to neriešili: doskrolovali, ale
   // obrazovka zostala plná všetkého ostatného.
+  // Filter obdobia pre grafy pod panelom. Panel prístrojov hore ho zámerne
+  // NEPOČÚVA: prístroj má vždy hovoriť o tom, ako to je teraz. Kokpit, ktorý
+  // sa dá prepnúť na „ukáž mi rok 2025", už nie je kokpit, ale archív.
+  const [obdobie, setObdobie] = useState<string>(() => {
+    try {
+      return localStorage.getItem("psb-dash-obdobie") || "all";
+    } catch {
+      return "all";
+    }
+  });
+  const zvolObdobie = (v: string) => {
+    // „Vlastné" nesie rozsah priamo v hodnote (custom:od|do). Výber z
+    // rozbaľovačky ho založí prázdny, úprava dátumov ho posiela už hotový.
+    const h = v === "custom" ? "custom:|" : v;
+    setObdobie(h);
+    try {
+      localStorage.setItem("psb-dash-obdobie", h);
+    } catch {
+      /* ignore */
+    }
+  };
   const [sekcia, setSekcia] = useState<SekciaId>(() => {
     try {
       const u = localStorage.getItem("psb-dash-sekcia");
@@ -1020,7 +1041,7 @@ export function Dashboard({
     () => new Set(WIDGETS.map((w) => w.id).filter((id) => !layout.hidden.includes(id))),
     [layout.hidden],
   );
-  const extraNodes = useExtraGrafy({ data, clients, aktivne, onNavigate, kpiSkryte: layout.kpiSkryte });
+  const extraNodes = useExtraGrafy({ data, clients, aktivne, onNavigate, kpiSkryte: layout.kpiSkryte, obdobie });
 
   const nodes: Record<string, ReactNode> = {
     ...extraNodes,
@@ -1458,6 +1479,25 @@ export function Dashboard({
               </button>
             );
           })}
+          <div style={{ marginLeft: "auto", display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+            <span style={{ fontSize: 11, color: C.textDim }}>Obdobie grafov:</span>
+            <Select
+              value={obdobie.startsWith("custom") ? "custom" : obdobie}
+              onChange={zvolObdobie}
+              options={OBDOBIA_DASH}
+            />
+            {obdobie.startsWith("custom") && (
+              <>
+                <input type="month" value={obdobie.slice(7).split("|")[0] || ""}
+                  onChange={(e) => zvolObdobie(`custom:${e.target.value}|${obdobie.slice(7).split("|")[1] || ""}`)}
+                  style={{ padding: "5px 8px", borderRadius: 7, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 12, colorScheme: "dark" }} />
+                <span style={{ color: C.textDim }}>–</span>
+                <input type="month" value={obdobie.slice(7).split("|")[1] || ""}
+                  onChange={(e) => zvolObdobie(`custom:${obdobie.slice(7).split("|")[0] || ""}|${e.target.value}`)}
+                  style={{ padding: "5px 8px", borderRadius: 7, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 12, colorScheme: "dark" }} />
+              </>
+            )}
+          </div>
         </div>
       )}
 

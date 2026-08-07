@@ -11,7 +11,7 @@ import {
   pnlCalc, QUARTERS, salaryCalc, VZAS_MONTH_LABELS, VZAS_MONTHS, VZAS_TARGETS_BY_YEAR, vzasVerzia,
   type KpiGroup, type KpiOverrides, poslednyMesiacSDatami,} from "../../lib/psb/vzas";
 import { kpiFmt } from "./Vzas";
-import { doPlnehoMesiaca, kotvaDat, monthlyFinance } from "../../lib/psb/compute";
+import { doPlnehoMesiaca, kotvaDat, monthlyFinance, predictCash, predictEarnings } from "../../lib/psb/compute";
 import type { KanalRiadok } from "./Kanaly";
 import { ZDROJE } from "./Klienti";
 import { tokyKlientov } from "./Fluktuacia";
@@ -32,10 +32,14 @@ import { BarRow, Card, Donut, Empty, H3, Info, LineChart, Modal, ValueBars } fro
 // kartu vedie tam, kde sa s číslom dá pracovať.
 
 export type SekciaId = "peniaze" | "vytazenie" | "klienti" | "marketing" | "vysledky";
+// Poradie podľa Jerryho (2026-08-07): vyťaženie → klienti → peniaze →
+// marketing → výsledky. Je to poradie príčiny a následku, nie dôležitosti —
+// odrobené hodiny vyrobia klientov, klienti vyrobia peniaze. Peniaze sú
+// výsledok tých dvoch a v paneli prístrojov hore sú aj tak prvé.
 export const SEKCIE: { id: SekciaId; label: string; popis: string }[] = [
-  { id: "peniaze", label: "Peniaze", popis: "Zarábame? A vydržíme?" },
   { id: "vytazenie", label: "Vyťaženie", popis: "Koľko robíme a koľko ešte zvládneme." },
   { id: "klienti", label: "Klienti", popis: "Pribúdajú, alebo len rotujú?" },
+  { id: "peniaze", label: "Peniaze", popis: "Zarábame? A vydržíme?" },
   { id: "marketing", label: "Marketing", popis: "Odkiaľ chodia noví ľudia." },
   { id: "vysledky", label: "Výsledky", popis: "KPI proti cieľom — každé číslo sa dá vypnúť zvlášť." },
 ];
@@ -112,6 +116,9 @@ export const WIDGETS: WidgetMeta[] = [
   // Doplnené 2026-08-07 na Jerryho pokyn „dopln fakt všetky, aj tie čo sú len
   // zvýraznené čísla". Karty bez grafu sú rovnocenné — súhrn P&L alebo cena
   // sedenia je číslo, ktoré sa číta rýchlejšie než akákoľvek krivka.
+  { id: "breakEven", label: "Tržby vs. break-even", span: 1, sekcia: "peniaze", vychodzi: true, popis: "Kde je zelená pod oranžovou, mesiac nezarobil ani na vlastnú prevádzku.", doma: "Peniaze → Zisky a straty" },
+  { id: "predikciaTrzieb", label: "Predikcia tržieb", span: 1, sekcia: "peniaze", vychodzi: true, popis: "Tri mesiace dopredu s pásmom istoty — od zaručeného po optimistický.", doma: "Peniaze → Predikcia" },
+  { id: "predikciaScen", label: "Scenáre na 3 mesiace", span: 1, sekcia: "peniaze", popis: "Zaručené z balíčkov, realistický a negatívny scenár.", doma: "Peniaze → Predikcia" },
   { id: "pnlSuhrn", label: "Súhrn P&L", span: 1, sekcia: "peniaze", popis: "Príjmy, náklady, hrubý zisk a marža — priemer na mesiac.", doma: "Peniaze → Zisky a straty" },
   { id: "naklady", label: "Fixné vs. variabilné", span: 1, sekcia: "peniaze", popis: "Z čoho sa skladajú náklady a ktorá časť rastie.", doma: "Peniaze → Zisky a straty" },
   { id: "runRate", label: "Run-rate a odhad zisku", span: 1, sekcia: "peniaze", popis: "Tempo posledných troch mesiacov prepočítané na rok.", doma: "Peniaze → Predikcia" },
@@ -292,10 +299,48 @@ const MES_LAB = VZAS_MONTHS.map((_, i) => VZAS_MONTH_LABELS[i]);
 // hlásil prepad, ktorý sa nestal. Grafy preto končia posledným mesiacom, o
 // ktorom model niečo vie.
 const mesiaceSDatami = () => MES_LAB.slice(0, poslednyMesiacSDatami() + 1);
+
+/**
+ * Štandard rodiny P, rovnaký ako všade inde v appke.
+ * „Vlastné" nesie rozsah priamo v hodnote (`custom:2026-01|2026-04`).
+ */
+export const OBDOBIA_DASH = [
+  { value: "all", label: "Celé obdobie" },
+  { value: "2025", label: "2025" },
+  { value: "2026", label: "2026" },
+  { value: "6m", label: "Posledných 6 mes." },
+  { value: "3m", label: "Posledné 3 mes." },
+  { value: "1m", label: "Posledný mesiac" },
+  { value: "custom", label: "Vlastné" },
+];
+
+/**
+ * Hranice okna ako kľúče mesiacov. Horná hranica je vždy najviac posledný
+ * PLNÝ mesiac — filter nesmie vrátiť rozrobený mesiac, ktorý by v grafe
+ * vyzeral ako prepad. Rok, ktorý ešte beží, sa preto oreže.
+ */
+export function hraniceObdobia(obdobie: string, poslMK: string): { od: string; do_: string } {
+  const posun = (n: number) => {
+    const [y, m] = poslMK.split("-").map(Number);
+    return new Date(Date.UTC(y, m - 1 - (n - 1), 1)).toISOString().slice(0, 7);
+  };
+  if (obdobie.startsWith("custom:")) {
+    const [a, b] = obdobie.slice(7).split("|");
+    return { od: a || "0000-01", do_: b && b < poslMK ? b : poslMK };
+  }
+  if (obdobie === "2025" || obdobie === "2026") {
+    const koniec = `${obdobie}-12`;
+    return { od: `${obdobie}-01`, do_: koniec < poslMK ? koniec : poslMK };
+  }
+  if (obdobie === "6m") return { od: posun(6), do_: poslMK };
+  if (obdobie === "3m") return { od: posun(3), do_: poslMK };
+  if (obdobie === "1m") return { od: posun(1), do_: poslMK };
+  return { od: "0000-01", do_: poslMK };
+}
 const kcK = (n: number) => `${Math.round(n / 1000)}k`;
 
 export function useExtraGrafy({
-  data, clients, aktivne, onNavigate, kpiSkryte = [],
+  data, clients, aktivne, onNavigate, kpiSkryte = [], obdobie = "all",
 }: {
   data: PSBData;
   clients: Record<string, ClientAgg>;
@@ -303,6 +348,8 @@ export function useExtraGrafy({
   aktivne: Set<string>;
   onNavigate: (tab: string, sub?: string) => void;
   kpiSkryte?: string[];
+  /** Filter obdobia z hlavičky dashboardu (štandard rodiny P). */
+  obdobie?: string;
 }): Record<string, ReactNode> {
   // Živé tržby do VZAS pred každým výpočtom (idempotentné, rovnako ako pri Zisku).
   const vzas = useMemo(() => {
@@ -372,6 +419,17 @@ export function useExtraGrafy({
   return useMemo(() => {
     const { p, j, t, be, jarek } = vzas;
 
+    // Okno filtra obdobia. `idxOkno` sú indexy do VZAS_MONTHS, `vMes` je to
+    // isté pre grafy, ktoré rátajú z kľúčov mesiacov (tržby, hodiny, dosah).
+    // Jedno miesto pre obe podoby — inak by tá istá voľba znamenala na dvoch
+    // kartách iný rozsah.
+    const poslI = poslednyMesiacSDatami();
+    const { od: odMK, do_: doMK } = hraniceObdobia(obdobie, VZAS_MONTHS[poslI] || "9999-12");
+    const idxOkno = VZAS_MONTHS.map((m, i) => [m, i] as const)
+      .filter(([m, i]) => i <= poslI && m >= odMK && m <= doMK)
+      .map(([, i]) => i);
+    const vMes = (mk: string) => mk >= odMK && mk <= doMK;
+
     // ── Peniaze ──────────────────────────────────────────────────────────────
     // Posledných šesť mesiacov S DÁTAMI, nie posledných šesť slotov v poli.
     // VZAS má mesiace nadopred, takže sa do priemeru počítal aj rozrobený
@@ -415,7 +473,7 @@ export function useExtraGrafy({
         <H3><Info label="Pásmo zisku" text="Hrubý zisk po mesiacoch (tržby mínus všetky náklady vrátane nárokov na výplaty). Čiara nula je hranica — pod ňou mesiac zožral viac, než priniesol. Tržby bez tejto krivky nehovoria nič." /></H3>
         <Klik kam={() => onNavigate("vzas")} onNavigate="VZAS">
           <LineChart
-            data={mesiaceSDatami().map((l, i) => ({ label: l, values: [p.hrubyZisk[i]] }))}
+            data={idxOkno.map((i) => ({ label: MES_LAB[i], values: [p.hrubyZisk[i]] }))}
             series={[{ name: "Hrubý zisk", color: C.green }]}
             refLine={{ value: 0, label: "nula", color: C.red }}
             height={190} fmt={kcK} autoY alignEnd
@@ -429,7 +487,7 @@ export function useExtraGrafy({
         <H3><Info label="Príjmy vs. náklady" text="Obe krivky vedľa seba. Zaujímavá nie je ich výška, ale medzera medzi nimi — a či sa rozširuje alebo zužuje." /></H3>
         <Klik kam={() => onNavigate("vzas")} onNavigate="VZAS">
           <LineChart
-            data={mesiaceSDatami().map((l, i) => ({ label: l, values: [p.prijmy[i], p.celkoveNaklady[i]] }))}
+            data={idxOkno.map((i) => ({ label: MES_LAB[i], values: [p.prijmy[i], p.celkoveNaklady[i]] }))}
             series={[{ name: "Príjmy", color: C.green }, { name: "Náklady", color: C.red }]}
             height={190} fmt={kcK} autoY alignEnd
           />
@@ -442,7 +500,7 @@ export function useExtraGrafy({
         <H3><Info label="Kumulovaný prebytok" text="Súčet všetkých ziskov a strát od januára 2025. Ukazuje, čo firma za celý čas naozaj vytvorila — jeden dobrý mesiac nezmaže pol roka v mínuse." /></H3>
         <Klik kam={() => onNavigate("vzas")} onNavigate="VZAS → Cashflow">
           <LineChart
-            data={mesiaceSDatami().map((l, i) => ({ label: l, values: [p.hrubyZisk.slice(0, i + 1).reduce((a, v) => a + v, 0)] }))}
+            data={idxOkno.map((i) => ({ label: MES_LAB[i], values: [p.hrubyZisk.slice(0, i + 1).reduce((a, v) => a + v, 0)] }))}
             series={[{ name: "Kumulovaný zisk", color: C.accent }]}
             refLine={{ value: 0, label: "nula", color: C.red }}
             height={190} fmt={kcK} autoY alignEnd
@@ -456,7 +514,7 @@ export function useExtraGrafy({
         <H3><Info label="Dlh voči trénerom" text="Kumulovaný rozdiel medzi nárokom (Fix + variabil) a tým, čo si tréner reálne vybral. Kladné číslo = firma dlží trénerovi." /></H3>
         <Klik kam={() => onNavigate("vzas")} onNavigate="VZAS → Mzdy">
           <LineChart
-            data={mesiaceSDatami().map((l, i) => ({ label: l, values: [j.cumDebt[i], t.cumDebt[i]] }))}
+            data={idxOkno.map((i) => ({ label: MES_LAB[i], values: [j.cumDebt[i], t.cumDebt[i]] }))}
             series={[{ name: "Jerry", color: C.accent }, { name: "Terezka", color: C.accentLight }]}
             height={190} fmt={kcK} autoY alignEnd
           />
@@ -469,7 +527,7 @@ export function useExtraGrafy({
         <H3><Info label="Dlh voči Jarkovi" text="Zostatok investorského dlhu po mesiacoch — vklady nahor, splátky nadol. Splácané je aj tréningami a zľavou na členstvo, nielen peniazmi." /></H3>
         <Klik kam={() => onNavigate("vzas")} onNavigate="VZAS → Dlhy">
           <LineChart
-            data={mesiaceSDatami().map((l, i) => ({ label: l, values: [jarek.stav[i]] }))}
+            data={idxOkno.map((i) => ({ label: MES_LAB[i], values: [jarek.stav[i]] }))}
             series={[{ name: "Zostatok dlhu", color: C.orange }]}
             refLine={{ value: 0, label: "splatené", color: C.green }}
             height={190} fmt={kcK} autoY alignEnd
@@ -564,15 +622,67 @@ export function useExtraGrafy({
 
     // ── Doplnené karty: peniaze ──────────────────────────────────────────────
     const labs = mesiaceSDatami();
-    const nMes = labs.length;
-    const priem = (v: number[]) => (nMes ? v.slice(0, nMes).reduce((a, b) => a + b, 0) / nMes : 0);
+    const predikcia = predictCash(data, clients, 3);
+    const predEarn = predictEarnings(data, clients);
+    // Priemer aj súčet rátajú cez OKNO FILTRA, nie cez celé obdobie — inak by
+    // sa filter prepol a karta by ukazovala to isté číslo.
+    const nMes = idxOkno.length;
+    const priem = (v: number[]) => (nMes ? idxOkno.reduce((a, i) => a + v[i], 0) / nMes : 0);
 
     // Marža sa NESMIE počítať ako priemer mesačných percent — slabý mesiac
     // s malými tržbami by mal v priemere rovnakú váhu ako rekordný a výsledok
     // je nižší než skutočnosť (3,3 % namiesto 8,0 %). Správne je súčet ziskov
     // delený súčtom tržieb.
-    const sucet = (v: number[]) => v.slice(0, nMes).reduce((a, b) => a + b, 0);
+    const sucet = (v: number[]) => idxOkno.reduce((a, i) => a + v[i], 0);
     const marzaSpolu = sucet(p.prijmy) > 0 ? (sucet(p.hrubyZisk) / sucet(p.prijmy)) * 100 : 0;
+    nodes.breakEven = (
+      <Card style={{ marginBottom: 0, height: "100%" }}>
+        <H3><Info label="Tržby vs. break-even" text="Zelená sú tržby, oranžová je bod, kde firma pokryje prevádzku aj NÁROKY na výplaty. Kde je zelená pod oranžovou, mesiac nezarobil ani na vlastnú prevádzku — a to, čo si tréner v takom mesiaci vezme, je pôžička, nie mzda. Break-even sa hýbe: rastie s fixnými nákladmi a s odrobenými hodinami (nárok na výplatu je ich funkcia)." /></H3>
+        <Klik kam={() => onNavigate("vzas", "pnl")} onNavigate="Peniaze → Zisky a straty">
+          <LineChart
+            data={idxOkno.map((i) => ({ label: MES_LAB[i], values: [p.prijmy[i], be[i]] }))}
+            series={[{ name: "Tržby", color: C.green }, { name: "Break-even", color: C.orange }]}
+            height={190} fmt={kcK} autoY alignEnd
+          />
+          <div style={{ fontSize: 10.5, color: C.textDim, marginTop: 5 }}>
+            Pod break-even: <b style={{ color: C.red }}>{idxOkno.filter((i) => p.prijmy[i] < be[i]).length}</b> z {nMes} mesiacov.
+          </div>
+        </Klik>
+      </Card>
+    );
+
+    // Predikcia s pásmom istoty. Jedno číslo by predstieralo presnosť, ktorú
+    // model nemá — spodná hranica je to, čo je zaplatené v balíčkoch, horná
+    // ráta s tým, že si klienti dokúpia ako doteraz.
+    nodes.predikciaTrzieb = (
+      <Card style={{ marginBottom: 0, height: "100%" }}>
+        <H3><Info label="Predikcia tržieb" text="Tri mesiace dopredu. Spodná hranica je opatrný odhad (blízko toho, čo je už zaplatené v balíčkoch), horná ráta s tým, že si klienti dokupujú ako doteraz. Stredná krivka je najpravdepodobnejší priebeh. Jedno číslo by predstieralo presnosť, ktorú model nemá — preto pásmo. Model berie tempo z posledných 90 dní, takže klienti, čo prestali chodiť, ho ťahajú dole správne." /></H3>
+        <Klik kam={() => onNavigate("vzas", "predikcia")} onNavigate="Peniaze → Predikcia">
+          {predikcia.months.length === 0 ? <Empty>Na predikciu zatiaľ nie je dosť dát.</Empty> : (
+            <LineChart
+              data={predikcia.months.map((m) => ({ label: monthLabel(m.month), values: [m.lo, m.expected, m.hi] }))}
+              series={[{ name: "Opatrne", color: C.textDim }, { name: "Očakávané", color: C.blue }, { name: "Optimisticky", color: C.green }]}
+              height={190} fmt={kcK} autoY alignEnd
+            />
+          )}
+        </Klik>
+      </Card>
+    );
+
+    nodes.predikciaScen = (
+      <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column" }}>
+        <H3><Info label="Scenáre na 3 mesiace" text="Zaručené = peniaze, ktoré sú už zaplatené v balíčkoch a klientom zostáva ich odchodiť; tie prídu, aj keby sa nič nepredalo. Realistický ráta s obvyklým dokupovaním, negatívny s tým, že časť klientov odíde. Run-rate je mesačné tempo portfólia, ak klienti chodia ako TERAZ — nie priemer za posledné mesiace, ten obsahuje aj ľudí, ktorí medzitým prestali chodiť." /></H3>
+        <Klik kam={() => onNavigate("vzas", "predikcia")} onNavigate="Peniaze → Predikcia">
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}>
+            <MiniStat label="Zaručené (3 mes.)" value={fmtCZK(predEarn.guaranteedTotal)} color={C.textMuted} />
+            <MiniStat label="Realistický (3 mes.)" value={fmtCZK(predEarn.scenarios.realistic)} color={C.blue} />
+            <MiniStat label="Optimistický" value={fmtCZK(predEarn.scenarios.optimistic)} color={C.green} />
+            <MiniStat label="Run-rate / mes." value={fmtCZK(predEarn.monthlyRunRate)} color={C.accent} />
+          </div>
+        </Klik>
+      </Card>
+    );
+
     nodes.pnlSuhrn = (
       <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column" }}>
         <H3><Info label="Súhrn P&L" text="Príjmy, náklady, hrubý zisk a marža — priemer na mesiac za CELÉ obdobie s dátami. Na obrazovke Peniaze → Zisky a straty vidíš to isté, ale za obdobie, ktoré si tam nastavíš — preto sa čísla líšia; obdobie je napísané pod nadpisom tejto karty. Náklady zahŕňajú NÁROKY na výplaty, nie to, čo si tréner reálne vzal. Marža sa počíta ako celkový zisk delený celkovými tržbami, nie ako priemer mesačných percent — inak by slabý mesiac vážil rovnako ako rekordný. Cieľ 12–15 % ako medzikrok, dlhodobo 20 %." /></H3>
@@ -580,7 +690,7 @@ export function useExtraGrafy({
             obrazovkách líši a nedá sa zistiť prečo — to je presne to, čo
             Jerryho vyviedlo z miery pri rezerve. */}
         <div style={{ fontSize: 10.5, color: C.textDim, margin: "-6px 0 8px" }}>
-          {labs[0]} – {labs[nMes - 1]} · {nMes} mesiacov
+          {MES_LAB[idxOkno[0]]} – {MES_LAB[idxOkno[nMes - 1]]} · {nMes} {nMes === 1 ? "mesiac" : nMes < 5 ? "mesiace" : "mesiacov"}
         </div>
         <Klik kam={() => onNavigate("vzas", "pnl")} onNavigate="Peniaze → Zisky a straty">
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}>
@@ -598,7 +708,7 @@ export function useExtraGrafy({
         <H3><Info label="Fixné vs. variabilné" text="Fixné náklady bežia, aj keď sa netrénuje (nájom, aplikácie, účtovníctvo). Variabilné rastú s prevádzkou. Výplaty sú v oboch prípadoch mimo — tie sú vlastná kategória. Keď rastú fixné rýchlejšie než tržby, break-even sa dvíha a nedá sa to odtrénovať." /></H3>
         <Klik kam={() => onNavigate("vzas", "pnl")} onNavigate="Peniaze → Zisky a straty">
           <LineChart
-            data={labs.map((l, i) => ({ label: l, values: [p.fixneTotal[i], p.varTotal[i]] }))}
+            data={idxOkno.map((i) => ({ label: MES_LAB[i], values: [p.fixneTotal[i], p.varTotal[i]] }))}
             series={[{ name: "Fixné", color: C.orange }, { name: "Variabilné", color: C.blue }]}
             height={190} fmt={kcK} autoY alignEnd
           />
@@ -672,7 +782,7 @@ export function useExtraGrafy({
     }
     // Len plné mesiace — rozrobený by ukázal hodiny za pár dní ako mesačné.
     const plne = (m: Map<string, unknown>) =>
-      [...m.entries()].filter(([mk]) => !kotva.plny || mk <= kotva.plny).sort((a, b) => a[0].localeCompare(b[0]));
+      [...m.entries()].filter(([mk]) => (!kotva.plny || mk <= kotva.plny) && vMes(mk)).sort((a, b) => a[0].localeCompare(b[0]));
     const mesiaceHod = (plne(mesHodiny) as [string, { Jerry: number; Terezka: number }][]).slice(-18);
 
     nodes.hodinyMes = (
@@ -905,7 +1015,7 @@ export function useExtraGrafy({
       </Card>
     );
 
-    const ig = MKT_MESACNE.slice(-12);
+    const ig = (MKT_MESACNE.slice(-12)).filter((r) => vMes(r.m));
     nodes.dosahIG = (
       <Card style={{ marginBottom: 0, height: "100%" }}>
         <H3><Info label="Dosah Instagramu" text="Zobrazenia a dosah po mesiacoch z Metricoolu. Dosah = koľko rôznych ľudí príspevky videlo, zobrazenia = koľkokrát sa zobrazili. Dáta pribúdajú s importom CSV v Údajoch." /></H3>
@@ -921,7 +1031,7 @@ export function useExtraGrafy({
       </Card>
     );
 
-    const ga4 = GA4_MESACNE.filter((r) => !r.chyba).slice(-12);
+    const ga4 = (GA4_MESACNE.filter((r) => !r.chyba).slice(-12)).filter((r) => vMes(r.m));
     nodes.web = (
       <Card style={{ marginBottom: 0, height: "100%" }}>
         <H3><Info label="Web (GA4)" text="Noví návštevníci webu a kľúčové udalosti (odoslaný formulár, klik na kontakt) po mesiacoch. Mesiace bez merania sú vynechané — diera nie je nula." /></H3>
@@ -937,7 +1047,7 @@ export function useExtraGrafy({
       </Card>
     );
 
-    const gsc = GSC_MESACNE.slice(-12);
+    const gsc = (GSC_MESACNE.slice(-12)).filter((r) => vMes(r.m));
     nodes.vyhladavanie = (
       <Card style={{ marginBottom: 0, height: "100%" }}>
         <H3><Info label="Vyhľadávanie (Search Console)" text="Kliky z Googlu po mesiacoch. Toto je jediný kanál, kde ľudia hľadajú sami — rastie pomaly, ale neplatí sa zaň." /></H3>
@@ -1022,7 +1132,7 @@ export function useExtraGrafy({
     }
 
     // ── Doplnené karty: vyťaženie ────────────────────────────────────────────
-    const finMes = doPlnehoMesiaca(monthlyFinance(data), kotva, (m) => m.month);
+    const finMes = doPlnehoMesiaca(monthlyFinance(data), kotva, (m) => m.month).filter((m) => vMes(m.month));
     nodes.cenaSedenia = (
       <Card style={{ marginBottom: 0, height: "100%" }}>
         <H3><Info label="Ø cena sedenia" text="Prijaté peniaze delené počtom odtrénovaných sedení v tom mesiaci. Je to jediná páka, ktorá dvíha tržby bez toho, aby dvíhala odrobené hodiny — a v dvojčlennom štúdiu je to dôležitejšie než počet klientov, lebo hodín je konečne veľa. Mesiac, v ktorom prišla veľká predplatba, vyskočí; krivku treba čítať ako trend, nie ako cenník." /></H3>
@@ -1215,7 +1325,7 @@ export function useExtraGrafy({
       if (menaKlientov.has((l.name || "").trim().toLowerCase())) e.z++;
       dopytyPodlaMes.set(mk, e);
     }
-    const kohortyD = [...dopytyPodlaMes.entries()].sort((a, b) => a[0].localeCompare(b[0])).slice(-12);
+    const kohortyD = [...dopytyPodlaMes.entries()].filter(([mk]) => vMes(mk)).sort((a, b) => a[0].localeCompare(b[0])).slice(-12);
     nodes.kohortyDDopytov = (
       <Card style={{ marginBottom: 0, height: "100%" }}>
         <H3><Info label="Kohorty dopytov" text="Z koľkých dopytov daného mesiaca sa nakoniec stali klienti. Dopyt a klient sa spájajú menom — ak je meno zapísané inak, dvojica sa nenájde a konverzia vyzerá horšie, než bola. Posledné dva mesiace čítaj opatrne: časť ľudí sa ešte len rozhoduje." /></H3>
