@@ -434,7 +434,11 @@ export function Dashboard({
     const t = salaryCalc("terezka");
     // Break-even ráta s NÁROKOM trénerov, nie s tým, čo si reálne vzali — čo si
     // niekto vezme navyše, je pôžička, nie náklad.
-    const be = p.bezVyplat[i] + j.narok[i] + t.narok[i] + p.matyas[i];
+    const beZa = (k: number) => p.bezVyplat[k] + j.narok[k] + t.narok[k] + p.matyas[k];
+    const be = beZa(i);
+    const od6 = Math.max(0, i - 5);
+    const idx6 = Array.from({ length: i - od6 + 1 }, (_, k) => od6 + k);
+    const bePriem = idx6.reduce((a, k) => a + beZa(k), 0) / idx6.length;
     const od = Math.max(0, i - 11);
     return {
       mesiac: VZAS_MONTHS[i] as string,
@@ -442,6 +446,7 @@ export function Dashboard({
       rad: p.hrubyZisk.slice(od, i + 1),
       predch: i > 0 ? p.hrubyZisk[i - 1] : null,
       be,
+      bePriem,
       prijmy: p.prijmy[i],
       odstupPct: be > 0 ? ((p.prijmy[i] - be) / be) * 100 : null,
     };
@@ -557,7 +562,9 @@ export function Dashboard({
         : undefined,
       vysvetlenie: "Hrubý zisk za posledný mesiac s kompletnými nákladmi: tržby mínus všetko vrátane NÁROKOV na výplaty (nie toho, čo si tréner reálne vzal). Pruh pod číslom je tržba proti break-evenu — zvislá čiarka je bod, kde firma pokryje prevádzku aj nároky. Zdravý odstup je 20 % a viac; pod tým stačí jeden slabý mesiac na stratu a presne to sa v 2025 stalo päťkrát.",
       seria: zisk?.rad,
-      zmenaPct: zisk && zisk.predch ? ((zisk.v - zisk.predch) / Math.abs(zisk.predch)) * 100 : null,
+      // Percento proti takmer nulovej základni vyrobí „▲ 1958 %", čo nie je
+      // informácia, ale delenie malým číslom. Pod 10 000 Kč sa trend nekreslí.
+      zmenaPct: zisk && zisk.predch && Math.abs(zisk.predch) >= 10000 ? ((zisk.v - zisk.predch) / Math.abs(zisk.predch)) * 100 : null,
       kotva: zisk ? { hodnota: zisk.prijmy, ciel: zisk.be, cielLabel: `tržby ${fmtCZK(zisk.prijmy)} · break-even ${fmtCZK(zisk.be)}` } : undefined,
       kam: () => onNavigate("vzas", "pnl"),
     };
@@ -663,26 +670,38 @@ export function Dashboard({
       kam: () => onNavigate("marketing", "lievik"),
     });
 
-    const h = stats.weekHours;
+    // Posledný týždeň v dátach býva useknutý — PTminder končí v piatok, takže
+    // sobota a nedeľa v ňom chýbajú. Prístroj hlásil „37 h, pod zónou" za tri
+    // odtrénované dni. Berie sa preto posledný CELÝ týždeň.
+    const hodinyTyzdna = (r: (typeof weekRows)[number]) =>
+      trainer === "all" ? r[1].Jerry + r[1].Terezka + r[1].iny : trainer === "Jerry" ? r[1].Jerry : r[1].Terezka;
+    const useknuty = !!kotva.den && new Date(`${kotva.den}T00:00:00Z`).getUTCDay() !== 0;
+    const uplne = useknuty ? weekRows.slice(0, -1) : weekRows;
+    const poslTyzden = uplne[uplne.length - 1];
+    const h = poslTyzden ? hodinyTyzdna(poslTyzden) : 0;
     varovne.push({
       id: "hodiny",
       label: "Hodiny / týždeň",
       hodnota: `${h.toFixed(0)} h`,
-      podnadpis: stats.lastWeek ? `týž. ${weekLabel(stats.lastWeek)}` : undefined,
+      podnadpis: poslTyzden ? `týž. ${weekLabel(poslTyzden[0])}` : undefined,
       pasmo: h === 0 ? "nevie" : h < zonaLo ? "pozor" : h > zonaHi ? "zle" : "ok",
       poznamka: h === 0 ? undefined : h > zonaHi ? "nad zónou — riziko vyhorenia" : h < zonaLo ? "pod zónou" : `zóna ${zonaLo}–${zonaHi} h`,
       vysvetlenie: `Odtrénované hodiny za posledný týždeň. Zdravá zóna je ${ZONE_LO}–${ZONE_HI} h na trénera — pod ňou sa nezarobí, nad ňou sa vyhorí. Pri „Obaja“ sa zóna zdvojnásobuje, lebo dlaždica sčítava oboch. V dvojčlennom štúdiu je toto zároveň vyťaženosť: hodiny sú aj celý príjem, aj celý strop.`,
-      seria: weekRows.slice(-12).map(([, v]) => (trainer === "all" ? v.Jerry + v.Terezka + v.iny : trainer === "Jerry" ? v.Jerry : v.Terezka)),
+      seria: uplne.slice(-12).map(hodinyTyzdna),
       kam: () => onNavigate("treningy"),
     });
 
+    // Rezerva sa delí PRIEMERNÝM break-evenom za pol roka, nie tým z posledného
+    // mesiaca. Júl mal break-even o tretinu vyšší než zvyčajne (výplaty za
+    // rekordný mesiac), takže rezerva vychádzala na 0,9 mesiaca namiesto 1,2 —
+    // runway sa neplánuje podľa najdrahšieho mesiaca.
     const rez = btc?.czk ?? null;
-    const mesRez = rez !== null && zisk && zisk.be > 0 ? rez / zisk.be : null;
+    const mesRez = rez !== null && zisk && zisk.bePriem > 0 ? rez / zisk.bePriem : null;
     varovne.push({
       id: "rezerva",
       label: "Rezerva",
       hodnota: mesRez === null ? "—" : `${mesRez.toFixed(1)} mes.`,
-      podnadpis: rez !== null ? fmtCZK(rez) : "načítava sa",
+      podnadpis: rez !== null ? `${fmtCZK(rez)} v BTC` : "načítava sa",
       pasmo: mesRez === null ? "nevie" : mesRez < 1 ? "zle" : mesRez < 3 ? "pozor" : "ok",
       poznamka: mesRez !== null && mesRez < 3 ? "cieľ sú 3 mesiace" : undefined,
       vysvetlenie: "Koľko mesiacov by firma ustála bez jedinej tržby — bitcoinová rezerva delená break-evenom. Tvoj cieľ „120 000 Kč+“ je v korunách; toto je to isté číslo prepočítané na čas, čo je jediné, čo v zlom mesiaci rozhoduje.",
