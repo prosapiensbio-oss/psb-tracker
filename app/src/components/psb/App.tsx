@@ -436,10 +436,21 @@ export function PSBApp() {
  * väčšia objednávka sa rozpadne zriedka a kombinácií by inak boli tisíce.
  */
 function skupinaFaktur(
-  kandidati: { cislo: string; celkom: number; odstup?: number }[],
+  kandidati: { cislo: string; celkom: number; datum: string; dodavatel: string }[],
   ciel: number,
   tolerancia: number,
 ): string[] | null {
+  // Skupina smie vzniknúť LEN z jednej objednávky: rovnaký dodávateľ, rovnaký
+  // deň. To je totiž jediné, čo rozdelená objednávka naozaj znamená — Alza
+  // rozseká jeden nákup podľa skladov, nie naprieč týždňami a obchodmi.
+  //
+  // Bez tohto pravidla vznikajú náhodné súčty. Bankový pohyb 759 Kč z 27. 7.
+  // si takto vzal faktúry 399 Kč z 1. 8. a 359 Kč z 21. 7. — dokopy 758 Kč,
+  // do koruny presne, a pritom spolu nemajú nič. Tá 399 patrila platbe
+  // bitcoinom a tá zostala bez dokladu. Pri dvoch stovkách pohybov a hŕstke
+  // faktúr je taká zhoda skôr pravidlom než výnimkou.
+  const jednaObjednavka = (c: typeof kandidati) =>
+    c.length < 2 || c.every((x) => x.datum === c[0].datum && x.dodavatel === c[0].dodavatel);
   // Rozhoduje ODCHÝLKA, až potom počet faktúr.
   //
   // Prvá verzia uprednostňovala menšiu skupinu a mýlila sa: platba 2 588 Kč
@@ -448,25 +459,25 @@ function skupinaFaktur(
   // Tá 359 pritom patrila k inej platbe, ktorá potom zostala nespárovaná.
   // Suma je tvrdý údaj, počet dokladov je len tvar objednávky.
   let najlepsia: { cisla: string[]; odchylka: number } | null = null;
-  const zvaz = (cisla: string[], sucet: number) => {
+  const zvaz = (polozky: typeof kandidati, sucet: number) => {
     const odchylka = Math.abs(sucet - ciel);
     if (odchylka > tolerancia) return;
+    if (!jednaObjednavka(polozky)) return;
+    const cisla = polozky.map((x) => x.cislo);
     if (!najlepsia || odchylka < najlepsia.odchylka - 0.005 || (Math.abs(odchylka - najlepsia.odchylka) <= 0.005 && cisla.length < najlepsia.cisla.length)) {
       najlepsia = { cisla, odchylka };
     }
   };
   const n = Math.min(kandidati.length, 12);
+  const K = kandidati;
   for (let i = 0; i < n; i++) {
-    zvaz([kandidati[i].cislo], kandidati[i].celkom);
+    zvaz([K[i]], K[i].celkom);
     for (let j = i + 1; j < n; j++) {
-      zvaz([kandidati[i].cislo, kandidati[j].cislo], kandidati[i].celkom + kandidati[j].celkom);
+      zvaz([K[i], K[j]], K[i].celkom + K[j].celkom);
       for (let k = j + 1; k < n; k++) {
-        zvaz([kandidati[i].cislo, kandidati[j].cislo, kandidati[k].cislo], kandidati[i].celkom + kandidati[j].celkom + kandidati[k].celkom);
+        zvaz([K[i], K[j], K[k]], K[i].celkom + K[j].celkom + K[k].celkom);
         for (let l = k + 1; l < n; l++) {
-          zvaz(
-            [kandidati[i].cislo, kandidati[j].cislo, kandidati[k].cislo, kandidati[l].cislo],
-            kandidati[i].celkom + kandidati[j].celkom + kandidati[k].celkom + kandidati[l].celkom,
-          );
+          zvaz([K[i], K[j], K[k], K[l]], K[i].celkom + K[j].celkom + K[k].celkom + K[l].celkom);
         }
       }
     }
@@ -547,7 +558,7 @@ function skupinaFaktur(
           let rozpisany = false;
           const kandidatiB = [...doklady.entries()]
             .filter(([c, d]) => !pouzite.has(c) && Math.abs(Date.parse(p.datum) - Date.parse(d.datum)) / 86400000 <= 7)
-            .map(([c, d]) => ({ cislo: c, celkom: d.celkom }));
+            .map(([c, d]) => ({ cislo: c, celkom: d.celkom, datum: d.datum, dodavatel: d.polozky[0]?.dodavatel || "" }));
           const skupinaB = skupinaFaktur(kandidatiB, -p.suma, 1);
           for (const cislo of skupinaB || []) {
             const d = doklady.get(cislo);
@@ -644,7 +655,7 @@ function skupinaFaktur(
             // pokryť viac faktúr — Alza rozdelí objednávku podľa skladov.
             const kandidati = [...doklady.entries()]
               .filter(([c, d]) => !pouzite.has(c) && Math.abs(Date.parse(nakup.datum) - Date.parse(d.datum)) / 86400000 <= 7)
-              .map(([c, d]) => ({ cislo: c, celkom: d.celkom, odstup: Math.abs(Date.parse(nakup.datum) - Date.parse(d.datum)) / 86400000 }));
+              .map(([c, d]) => ({ cislo: c, celkom: d.celkom, datum: d.datum, dodavatel: d.polozky[0]?.dodavatel || "" }));
             const skupina = skupinaFaktur(kandidati, czk, Math.max(50, czk * 0.02));
             if (!skupina) { bezDokladu.push(nakup); continue; }
             for (const cislo of skupina) {
