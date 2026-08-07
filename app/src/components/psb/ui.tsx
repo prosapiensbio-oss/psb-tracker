@@ -768,3 +768,69 @@ export function TrenerPills({ value, onChange }: { value: string; onChange: (v: 
     </div>
   );
 }
+
+// ── Prístroje kokpitu ────────────────────────────────────────────────────────
+// Tufteho sparkline: tvar krivky bez osí, mierky a mriežky. Nemá sa z neho dať
+// odčítať hodnota — na to je číslo vedľa. Má sa z neho dať za pol sekundy
+// prečítať smer.
+export function Sparkline({ values, color, height = 22, width = 68 }: { values: number[]; color: string; height?: number; width?: number }) {
+  const v = values.filter((x) => Number.isFinite(x));
+  if (v.length < 2) return <div style={{ width, height }} />;
+  const lo = Math.min(...v);
+  const hi = Math.max(...v);
+  const rozpatie = hi - lo || 1;
+  const x = (i: number) => (i / (v.length - 1)) * (width - 2) + 1;
+  const y = (n: number) => height - 2 - ((n - lo) / rozpatie) * (height - 4);
+  const d = v.map((n, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(n).toFixed(1)}`).join(" ");
+  const posledny = v.length - 1;
+  return (
+    <svg width={width} height={height} style={{ display: "block", overflow: "visible" }} aria-hidden>
+      <path d={d} fill="none" stroke={color} strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" opacity={0.75} />
+      <circle cx={x(posledny)} cy={y(v[posledny])} r={2.2} fill={color} />
+    </svg>
+  );
+}
+
+/**
+ * Zmena oproti minulému obdobiu. `dobreHore` obracia farbu tam, kde je rast
+ * zlý (náklady, odchody) — bez toho by červená znamenala raz „pozor" a raz
+ * „výborne" a prestala by čokoľvek znamenať.
+ */
+export function Trend({ zmenaPct, dobreHore = true, tiche = false }: { zmenaPct: number | null; dobreHore?: boolean; tiche?: boolean }) {
+  if (zmenaPct === null || !Number.isFinite(zmenaPct)) return null;
+  const zaokruhlene = Math.round(zmenaPct);
+  // Pod 3 % je to šum, nie trend — šípka by predstierala pohyb, ktorý sa
+  // v ďalšom mesiaci otočí späť.
+  if (Math.abs(zaokruhlene) < 3) {
+    return <span style={{ fontSize: 11, color: C.textDim, whiteSpace: "nowrap" }}>≈ bez zmeny</span>;
+  }
+  const hore = zaokruhlene > 0;
+  const dobre = hore === dobreHore;
+  const farba = tiche ? C.textMuted : dobre ? C.green : C.orange;
+  return (
+    <span style={{ fontSize: 11, color: farba, whiteSpace: "nowrap", fontWeight: 600 }}>
+      {hore ? "▲" : "▼"} {Math.abs(zaokruhlene)} %
+    </span>
+  );
+}
+
+/**
+ * Bullet graph (Stephen Few) — náhrada za ručičkové budíky. Merací pruh,
+ * zvislá značka cieľa a podklad v odtieňoch jednej farby. Zaberie riadok
+ * namiesto štvorca a povie to isté: kde sme, kam sme mali dôjsť.
+ */
+export function BulletGraph({ hodnota, ciel, max, farba, label }: { hodnota: number; ciel: number; max?: number; farba: string; label?: string }) {
+  const strop = max ?? (Math.max(hodnota, ciel) * 1.15 || 1);
+  const pct = (n: number) => `${Math.max(0, Math.min(100, (n / strop) * 100))}%`;
+  return (
+    <div style={{ width: "100%" }}>
+      <div style={{ position: "relative", height: 9, borderRadius: 3, background: mix(C.textDim, 14), overflow: "visible" }}>
+        <div style={{ position: "absolute", inset: 0, width: pct(ciel), background: mix(C.textDim, 10), borderRadius: 3 }} />
+        <div style={{ position: "absolute", top: 2, bottom: 2, left: 0, width: pct(Math.max(0, hodnota)), background: farba, borderRadius: 2 }} />
+        {/* Značka cieľa: kolmá čiarka, nie ďalší pruh — nemá súťažiť s meraním. */}
+        <div style={{ position: "absolute", top: -2, bottom: -2, left: pct(ciel), width: 2, background: C.text, opacity: 0.75, borderRadius: 1 }} />
+      </div>
+      {label && <div style={{ fontSize: 10, color: C.textDim, marginTop: 3 }}>{label}</div>}
+    </div>
+  );
+}

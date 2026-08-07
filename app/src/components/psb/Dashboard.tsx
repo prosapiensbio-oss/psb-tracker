@@ -18,7 +18,9 @@ import {
 } from "../../lib/psb/compute";
 import { fmtCZK, fmtDMY, monthLabel, weekKey, weekLabel } from "../../lib/psb/format";
 import { C, mix, S, badge, btn } from "../../lib/psb/theme";
-import { nastavPrijmyZTrackera, pnlCalc, poslednyMesiacSDatami, vzasVerzia, VZAS_MONTHS } from "../../lib/psb/vzas";
+import { nastavPrijmyZTrackera, pnlCalc, poslednyMesiacSDatami, salaryCalc, vzasVerzia, VZAS_MONTHS } from "../../lib/psb/vzas";
+import { fetchBtcReserve } from "../../lib/psb/client";
+import { PrehladPanel, useZmenyOdMinule, type Pristroj, type Zmena } from "./Prehlad";
 import {
   centerBody, GrafyKniznica, MiniStat, SEKCIE, useExtraGrafy, VYCHODZIE, WIDGETS,
   type SekciaId, type WidgetMeta,
@@ -27,7 +29,7 @@ import { tokyKlientov } from "./Fluktuacia";
 import type { PSBData } from "../../lib/psb/types";
 import type { Actions, NavFocus } from "./App";
 import type { AssistantChat } from "./Assistant";
-import { Card, Donut, Empty, H3, Info, StatCard, StatGrid, ValueBars, ZoneBars } from "./ui";
+import { Card, Donut, Empty, H3, Info, ValueBars, ZoneBars } from "./ui";
 
 const catTone = (c: RegisterItem["category"]) =>
   c === "6M" ? "accent" : c === "Kapacita" || c === "Rozhodnutie" || c === "Zápis" ? "blue" : "orange";  // „Zmena" padá do orange — je to výstraha, nie informácia
@@ -428,7 +430,21 @@ export function Dashboard({
     // Posledný mesiac, o ktorom appka niečo vie — nie posledný v zozname.
     // Mesiace rastú dopredu, takže ten posledný býva prázdny.
     const i = poslednyMesiacSDatami();
-    return { mesiac: VZAS_MONTHS[i] as string, v: p.hrubyZisk[i] };
+    const j = salaryCalc("jerry");
+    const t = salaryCalc("terezka");
+    // Break-even ráta s NÁROKOM trénerov, nie s tým, čo si reálne vzali — čo si
+    // niekto vezme navyše, je pôžička, nie náklad.
+    const be = p.bezVyplat[i] + j.narok[i] + t.narok[i] + p.matyas[i];
+    const od = Math.max(0, i - 11);
+    return {
+      mesiac: VZAS_MONTHS[i] as string,
+      v: p.hrubyZisk[i],
+      rad: p.hrubyZisk.slice(od, i + 1),
+      predch: i > 0 ? p.hrubyZisk[i - 1] : null,
+      be,
+      prijmy: p.prijmy[i],
+      odstupPct: be > 0 ? ((p.prijmy[i] - be) / be) * 100 : null,
+    };
     // `vzasVerzia()` je tu zámerne: model sa mení mimo Reactu (import z banky),
     // takže bez nej by dlaždica ukazovala zisk spočítaný pred načítaním nákladov.
   }, [data, vzasVerzia()]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -506,6 +522,208 @@ export function Dashboard({
   // sobota a nedeľa v ňom chýbajú. V grafe zostáva (aktuálna záťaž je zmyslom
   // tejto karty), ale z priemeru a z „najľahšieho týždňa" sa vyhadzuje — inak
   // by rozrobený týždeň vyhrával oboje a Ø by klesalo s každým importom.
+  // Rezerva sa ťahá vždy — je to jeden z ôsmich prístrojov, nie voliteľná karta.
+  const [btc, setBtc] = useState<{ czk: number | null } | null>(null);
+  useEffect(() => {
+    void fetchBtcReserve().then((r) => setBtc(r));
+  }, []);
+
+  // ── Deväť prístrojov ───────────────────────────────────────────────────────
+  // Výber a prahy stoja na rešerši (2026-08-07): Few (5–9 čísel, každé s
+  // referenciou), Two-Brain (~15 000 posilňovní — zisk pred tržbou, churn,
+  // dĺžka spolupráce), HFA 2025 (retencia), a štúdie o odmlčaní klientov
+  // (14+ dní bez tréningu = šesťnásobná pravdepodobnosť odchodu, 48 % vs 8 %).
+  //
+  // Delia sa na dve pásma. „Ako to dopadlo" sú uzavreté čísla — už sa nedajú
+  // ovplyvniť. „Čo sa chystá" sú predstihové: keď sa pokazia, na peniazoch to
+  // ešte nevidno, ale už je rozhodnuté. Miešať ich do jednej mriežky znamená,
+  // že sa nedá rozoznať, kde má ešte zmysel zasahovať.
+  const pristroje = useMemo(() => {
+    const mesiace = doPlnehoMesiaca(monthlyFinance(data), kotva, (m) => m.month);
+    const cashRad = mesiace.slice(-12).map((m) => m.cash);
+    const predchCash = mesiace.length > 1 ? mesiace[mesiace.length - 2].cash : null;
+
+    // ── KOTVA: zisk. Jediné číslo, ktoré hovorí, či mesiac dával zmysel.
+    // Pruh pod ním ukazuje, o čo išlo: tržby proti break-evenu.
+    const kotvaP: Pristroj = {
+      id: "zisk",
+      label: "Zisk",
+      hodnota: zisk ? fmtCZK(zisk.v) : "—",
+      podnadpis: zisk ? monthLabel(zisk.mesiac) : "čaká na P&L",
+      pasmo: !zisk ? "nevie" : zisk.v < 0 ? "zle" : zisk.odstupPct !== null && zisk.odstupPct < 20 ? "pozor" : "ok",
+      poznamka: !zisk ? undefined
+        : zisk.v < 0 ? "mesiac zožral viac, než priniesol"
+        : zisk.odstupPct !== null && zisk.odstupPct < 20 ? "tesne — jeden slabý mesiac = strata"
+        : undefined,
+      vysvetlenie: "Hrubý zisk za posledný mesiac s kompletnými nákladmi: tržby mínus všetko vrátane NÁROKOV na výplaty (nie toho, čo si tréner reálne vzal). Pruh pod číslom je tržba proti break-evenu — zvislá čiarka je bod, kde firma pokryje prevádzku aj nároky. Zdravý odstup je 20 % a viac; pod tým stačí jeden slabý mesiac na stratu a presne to sa v 2025 stalo päťkrát.",
+      seria: zisk?.rad,
+      zmenaPct: zisk && zisk.predch ? ((zisk.v - zisk.predch) / Math.abs(zisk.predch)) * 100 : null,
+      kotva: zisk ? { hodnota: zisk.prijmy, ciel: zisk.be, cielLabel: `tržby ${fmtCZK(zisk.prijmy)} · break-even ${fmtCZK(zisk.be)}` } : undefined,
+      kam: () => onNavigate("vzas", "pnl"),
+    };
+
+    // ── ČO UŽ DOPADLO ────────────────────────────────────────────────────────
+    const vysledok: Pristroj[] = [];
+
+    vysledok.push({
+      id: "trzby",
+      label: "Tržby",
+      hodnota: fmtCZK(stats.monthCash),
+      podnadpis: stats.lastMonth ? monthLabel(stats.lastMonth) : undefined,
+      pasmo: "ok",
+      vysvetlenie: "Peniaze, ktoré reálne prišli za posledný uzavretý mesiac (účet + hotovosť + BTC). Nie hodnota odtrénovaných sedení — tá je iné číslo a je v Peniazoch → Sedenia & cena.",
+      seria: cashRad,
+      zmenaPct: predchCash ? ((stats.monthCash - predchCash) / predchCash) * 100 : null,
+      kam: () => onNavigate("vzas", "trzby"),
+    });
+
+    // Odchody v percentách, nie v kusoch. Percento sa dá porovnať s odvetvím,
+    // kus nie. Pásma: pod 3 % špička, do 5 % v poriadku, nad 7 % poplach.
+    const churn = stats.active > 0 ? (toky.odisloMes / stats.active) * 100 : null;
+    vysledok.push({
+      id: "churn",
+      label: "Odchody",
+      hodnota: churn === null ? "—" : `${churn.toFixed(1)} %`,
+      podnadpis: `Ø ${toky.odisloMes.toFixed(1)} klienta / mes.`,
+      pasmo: churn === null ? "nevie" : churn > 7 ? "zle" : churn > 5 ? "pozor" : "ok",
+      poznamka: churn === null ? undefined : churn <= 3 ? "špičkové (pod 3 %)" : churn <= 5 ? "v norme (do 5 %)" : "nad odvetvím",
+      dobreHore: false,
+      vysvetlenie: "Koľko percent klientov odíde za mesiac — priemer za posledný rok. Odvetvové pásma: pod 3 % špička, 3–5 % zdravé, nad 7 % poplach. Percento sa dá porovnať s inými štúdiami, samotný počet odídených nie. Odchod „dozrieva“ — posledné dva mesiace sa ešte nedajú spoľahlivo počítať.",
+      kam: () => onNavigate("klienti", "rast"),
+    });
+
+    const cisty = toky.prisloMes - toky.odisloMes;
+    vysledok.push({
+      id: "klienti",
+      label: "Aktívni klienti",
+      hodnota: String(stats.active),
+      podnadpis: `čistý rast ${cisty >= 0 ? "+" : ""}${cisty.toFixed(1)} / mes.`,
+      pasmo: cisty < -0.5 ? "zle" : cisty < 0 ? "pozor" : "ok",
+      poznamka: cisty < 0 ? "odchádza viac, než prichádza" : undefined,
+      vysvetlenie: "Počet aktívnych klientov a priemerný čistý rast za mesiac (prišlo mínus odišlo). Samotný počet je márnivé číslo — dôležitý je smer. Klesajúci čistý rast sa v tržbách prejaví až o dva-tri mesiace neskôr.",
+      kam: () => onNavigate("klienti"),
+    });
+
+    // ── ČO SA CHYSTÁ ─────────────────────────────────────────────────────────
+    const varovne: Pristroj[] = [];
+
+    const odhad = trzbyOdhad?.expected ?? null;
+    const beRef = zisk?.be ?? null;
+    varovne.push({
+      id: "odhad",
+      label: "Odhad tržieb",
+      hodnota: odhad === null ? "—" : fmtCZK(odhad),
+      podnadpis: trzbyOdhad ? monthLabel(trzbyOdhad.month) : undefined,
+      pasmo: odhad === null || beRef === null ? "nevie" : odhad < beRef ? "zle" : odhad < beRef * 1.2 ? "pozor" : "ok",
+      poznamka: odhad !== null && beRef !== null && odhad < beRef ? "pod break-even" : "z rozchodených balíčkov",
+      vysvetlenie: "Koľko peňazí príde budúci mesiac podľa zostatkov balíčkov a tempa klientov. Porovnáva sa s break-evenom — odhad pod ním znamená stratový mesiac, ak sa nič nepredá.",
+      kam: () => onNavigate("vzas", "predikcia"),
+    });
+
+    // Odmlčaní klienti — najdrahšie číslo v appke. 14 dní nie je náhodné:
+    // klient bez tréningu 14+ dní odchádza šesťkrát častejšie (48 % vs 8 %).
+    // Meria sa PODIELOM z aktívnych, nie počtom — pri 20 klientoch je päť
+    // odmlčaných katastrofa, pri 60 bežný týždeň.
+    const ohrozeni = Object.values(clients).filter((c) => {
+      if (c.status !== "Aktívny" || !matchT(c.primaryTrainer)) return false;
+      if (c.segment !== "Anchor" && c.segment !== "Stabilný") return false;
+      return (Date.now() - Date.parse(c.lastSession)) / 86400000 >= 14;
+    });
+    const podiel = stats.active > 0 ? (ohrozeni.length / stats.active) * 100 : 0;
+    varovne.push({
+      id: "ohrozeni",
+      label: "Odmlčaní",
+      hodnota: String(ohrozeni.length),
+      podnadpis: ohrozeni.length ? `${podiel.toFixed(0)} % aktívnych · 14+ dní` : "nikto sa neodmlčal",
+      pasmo: !ohrozeni.length ? "ok" : podiel > 25 ? "zle" : podiel > 15 ? "pozor" : "ok",
+      poznamka: ohrozeni.length ? ohrozeni.slice(0, 2).map((c) => c.name.split(" ")[0]).join(", ") + (ohrozeni.length > 2 ? ` +${ohrozeni.length - 2}` : "") : undefined,
+      dobreHore: false,
+      vysvetlenie: "Pravidelní klienti (Anchor alebo Stabilný), ktorí 14 a viac dní netrénovali. Hranica 14 dní nie je odhad: klient, ktorý toľko vynechá, odchádza zhruba šesťkrát častejšie než ten, čo chodí (48 % vs 8 %). Zdravé je do 15 % aktívnych, nad 25 % je to poplach. Kým je odmlčaný, dá sa ešte získať späť — potom už len ťažko.",
+      kam: () => onNavigate("klienti"),
+    });
+
+    const dopytyRad = (() => {
+      const m: Record<string, number> = {};
+      for (const l of data.leads || []) {
+        const k = (l.date || "").slice(0, 7);
+        if (k) m[k] = (m[k] || 0) + 1;
+      }
+      return Object.entries(m).sort((a, b) => a[0].localeCompare(b[0])).filter(([k]) => k <= (kotva.plny || "9999")).slice(-12).map(([, v]) => v);
+    })();
+    const priemDopyty = dopytyRad.length > 3 ? dopytyRad.slice(0, -1).reduce((a, b) => a + b, 0) / (dopytyRad.length - 1) : null;
+    varovne.push({
+      id: "dopyty",
+      label: "Dopyty",
+      hodnota: String(lievikMes.dopyty),
+      podnadpis: `${monthLabel(lievikMes.mes)} · ${lievikMes.novi} nových`,
+      pasmo: priemDopyty === null ? "nevie" : lievikMes.dopyty < priemDopyty * 0.5 ? "zle" : lievikMes.dopyty < priemDopyty * 0.8 ? "pozor" : "ok",
+      poznamka: priemDopyty === null ? undefined : `Ø ${priemDopyty.toFixed(1)} / mes.`,
+      vysvetlenie: "Nové dopyty za posledný uzavretý mesiac a koľko z nich sa stalo klientmi. Dopyty predbiehajú tržby o dva až tri mesiace — keď klesnú, na peniazoch to ešte nevidno, ale už je rozhodnuté.",
+      seria: dopytyRad,
+      kam: () => onNavigate("marketing", "lievik"),
+    });
+
+    const h = stats.weekHours;
+    varovne.push({
+      id: "hodiny",
+      label: "Hodiny / týždeň",
+      hodnota: `${h.toFixed(0)} h`,
+      podnadpis: stats.lastWeek ? `týž. ${weekLabel(stats.lastWeek)}` : undefined,
+      pasmo: h === 0 ? "nevie" : h < zonaLo ? "pozor" : h > zonaHi ? "zle" : "ok",
+      poznamka: h === 0 ? undefined : h > zonaHi ? "nad zónou — riziko vyhorenia" : h < zonaLo ? "pod zónou" : `zóna ${zonaLo}–${zonaHi} h`,
+      vysvetlenie: `Odtrénované hodiny za posledný týždeň. Zdravá zóna je ${ZONE_LO}–${ZONE_HI} h na trénera — pod ňou sa nezarobí, nad ňou sa vyhorí. Pri „Obaja“ sa zóna zdvojnásobuje, lebo dlaždica sčítava oboch. V dvojčlennom štúdiu je toto zároveň vyťaženosť: hodiny sú aj celý príjem, aj celý strop.`,
+      seria: weekRows.slice(-12).map(([, v]) => (trainer === "all" ? v.Jerry + v.Terezka + v.iny : trainer === "Jerry" ? v.Jerry : v.Terezka)),
+      kam: () => onNavigate("treningy"),
+    });
+
+    const rez = btc?.czk ?? null;
+    const mesRez = rez !== null && zisk && zisk.be > 0 ? rez / zisk.be : null;
+    varovne.push({
+      id: "rezerva",
+      label: "Rezerva",
+      hodnota: mesRez === null ? "—" : `${mesRez.toFixed(1)} mes.`,
+      podnadpis: rez !== null ? fmtCZK(rez) : "načítava sa",
+      pasmo: mesRez === null ? "nevie" : mesRez < 1 ? "zle" : mesRez < 3 ? "pozor" : "ok",
+      poznamka: mesRez !== null && mesRez < 3 ? "cieľ sú 3 mesiace" : undefined,
+      vysvetlenie: "Koľko mesiacov by firma ustála bez jedinej tržby — bitcoinová rezerva delená break-evenom. Tvoj cieľ „120 000 Kč+“ je v korunách; toto je to isté číslo prepočítané na čas, čo je jediné, čo v zlom mesiaci rozhoduje.",
+      kam: () => onNavigate("vzas", "trzby"),
+    });
+
+    return { kotva: kotvaP, vysledok, varovne };
+  }, [data, clients, stats, zisk, trzbyOdhad, toky, lievikMes, weekRows, btc, kotva, trainer, zonaLo, zonaHi, onNavigate]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Čerstvosť dát. Tichý dashboard nad tri týždne starým exportom vyzerá presne
+  // ako tichý dashboard nad dobrými dátami — a to je najhorší možný stav
+  // prístroja. Preto je zastaranosť sama o sebe výstraha.
+  const cerstvost = useMemo(() => {
+    if (!kotva.den) return { text: "—", zastarane: true };
+    const dni = (Date.now() - Date.parse(kotva.den)) / 86400000;
+    return { text: fmtDMY(kotva.den), zastarane: dni > 10 };
+  }, [kotva]);
+
+  // Snapshot pre „čo sa zmenilo od minule". Ukladajú sa len holé čísla, nie
+  // celý stav — porovnáva sa to, čo sa dá vyjadriť jednou vetou.
+  const snapHodnoty = useMemo(
+    () => ({ trzby: stats.monthCash, klienti: stats.active, dopyty: lievikMes.dopyty, novi: lievikMes.novi, zisk: zisk?.v ?? 0 }),
+    [stats.monthCash, stats.active, lievikMes.dopyty, lievikMes.novi, zisk],
+  );
+  const odMinule = useZmenyOdMinule(snapHodnoty, !!stats.lastMonth);
+  const zmeny = useMemo<Zmena[]>(() => {
+    if (!odMinule) return [];
+    const p = odMinule.predtym;
+    const out: Zmena[] = [];
+    const pridaj = (kluc: string, label: string, fmt: (n: number) => string, dobreHore = true) => {
+      const z = p[kluc];
+      const na = snapHodnoty[kluc as keyof typeof snapHodnoty];
+      if (typeof z === "number" && typeof na === "number" && z !== na) out.push({ label, z, na, fmt, dobreHore });
+    };
+    pridaj("trzby", "tržby", (n) => fmtCZK(Math.abs(n)));
+    pridaj("klienti", "klienti", (n) => String(Math.abs(n)));
+    pridaj("dopyty", "dopyty", (n) => String(Math.abs(n)));
+    pridaj("novi", "noví", (n) => String(Math.abs(n)));
+    return out;
+  }, [odMinule, snapHodnoty]);
+
   const poslednyTyzdenNeuplny = useMemo(
     () => !!kotva.den && new Date(`${kotva.den}T00:00:00Z`).getUTCDay() !== 0,
     [kotva],
@@ -652,8 +870,15 @@ export function Dashboard({
   const register = registerVsetky.filter(patriTrenerovi);
   const open = register.filter((r) => !r.acked);
   const acked = register.filter((r) => r.acked);
+  // Triáž. Register mal 25 rozbalených položiek cez celú šírku obrazovky a
+  // z toho 14 bolo „X dní bez tréningu" — čo je dôležité raz, nie
+  // štrnásťkrát. Červené sú veci, kde sa niečo pokazí, ak sa nič nespraví;
+  // zvyšok je pracovný zoznam a ten nemá byť prvé, čo človek na dashboarde
+  // uvidí. Bez triáže bol panel presne to, čomu sa v kabíne hovorí zahltenie
+  // výstrahami: keď svieti všetko, nesvieti nič.
+  const kriticke = open.filter((r) => r.tone === "red");
+  const bezne = open.filter((r) => r.tone !== "red");
   // "Ukázať skryté" swaps to the hidden/accepted items only (so it's obvious they appeared).
-  const visible = showAcked ? acked : open;
 
   // Click-through helpers: focus one week in Tréningy → Prehľad / one month in Financie → Zárobky.
   const openWeek = (weekLabelStr: string) => onNavigate("treningy", "prehled", { week: weekLabelStr, trainer, nonce: Date.now() });
@@ -1040,53 +1265,87 @@ export function Dashboard({
   // Keď je prázdny, nie je to karta s nadpisom a vetou — je to tenký tmavý pás
   // so zeleným bodom. Pokoj má vyzerať ako pokoj: v kokpite zhasnutá kontrolka
   // nezaberá pol palubovky.
-  const registerPanel = visible.length === 0 && !showAcked ? (
-    <div
-      style={{
-        display: "flex", alignItems: "center", gap: 10, marginBottom: 12,
-        padding: "10px 14px", borderRadius: 10,
-        background: mix(C.green, 6), border: `1px solid ${mix(C.green, 20)}`,
-      }}
-    >
-      <span style={{ width: 8, height: 8, borderRadius: "50%", background: C.green, flex: "0 0 auto" }} />
-      <span style={{ fontSize: 12.5, color: C.textMuted }}>Nič nevyžaduje pozornosť.</span>
-      {acked.length > 0 && (
-        <button onClick={() => setShowAcked(true)} style={{ marginLeft: "auto", background: "none", border: "none", color: C.textDim, fontSize: 11.5, cursor: "pointer" }}>
-          Ukázať skryté ({acked.length})
-        </button>
-      )}
-    </div>
+  // Register podľa leteckého ECAM: tri úrovne, prísne poradie, a čo nevyžaduje
+  // zásah, nesmie ísť tým istým kanálom ako to, čo ho vyžaduje. Predtým tu
+  // bolo 25 rovnako vyzerajúcich riadkov, z toho 14× „X dní bez tréningu" a
+  // 6× pripomienka zľavy za odporúčanie — a to sa človek naučí ignorovať ako
+  // celok, vrátane tej jednej veci, čo naozaj horela.
+  //
+  // Normy pre správu výstrah (EEMUA 191 / ISA-18.2) hovoria o rozdelení
+  // ~80 % nízka / 15 % stredná / 5 % vysoká priorita. Preto sa červené
+  // ukazujú vždy, zvyšok je za jedným klikom.
+  const VIDITELNYCH = 5;
+  const registerPanel = showAcked ? (
+    <Card style={{ marginBottom: 12 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
+        <H3><Info text="Položky, ktoré si skryl. Vrátiť sa dajú tlačidlom pri každej." label={`Skryté (${acked.length})`} /></H3>
+        <button onClick={() => setShowAcked(false)} style={{ background: "none", border: "none", color: C.accentLight, fontSize: 12, cursor: "pointer" }}>← Späť na aktívne</button>
+      </div>
+      {acked.length
+        ? acked.map((r) => <RegisterRow key={r.key} item={r} actions={actions} onNavigate={onNavigate} chat={assistantChat} />)
+        : <div style={{ fontSize: 12.5, color: C.textMuted }}>Žiadne skryté položky.</div>}
+    </Card>
+  ) : open.length === 0 ? (
+    // Nič nevyžaduje pozornosť → panel nerenderuje NIČ. Zelený pás „všetko je
+    // v poriadku" je rozsvietená kontrolka normálneho stavu; stavový riadok
+    // nad prístrojmi to už povedal jednou vetou drobným písmom.
+    acked.length ? (
+      <button onClick={() => setShowAcked(true)} style={{ background: "none", border: "none", color: C.textDim, fontSize: 11.5, cursor: "pointer", padding: 0 }}>
+        Ukázať skryté ({acked.length})
+      </button>
+    ) : null
   ) : (
     <Card style={{ marginBottom: 12 }}>
-
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
-          <H3>
-            <Info
-              text="Zoznam vecí na akciu: 6M upozornenia, kapacita, klienti čo prestali chodiť, koniec pauzy. Skryť ich odstráni zo zoznamu (vieš ich vrátiť cez „Ukázať skryté“). Debatovať o nich vieš aj s AI asistentom."
-              label={`Na čo sa pozrieť (${open.length})`}
-            />
-          </H3>
-          <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-            {visible.length > 3 && (
-              <button onClick={() => setRegisterExpanded((v) => !v)} style={{ background: "none", border: "none", color: C.accentLight, fontSize: 12, cursor: "pointer", fontWeight: 500 }}>
-                {registerExpanded ? "Zbaliť" : `Rozbaliť všetky (${visible.length})`}
-              </button>
-            )}
-            {(acked.length > 0 || showAcked) && (
-              <button onClick={() => setShowAcked((v) => !v)} style={{ background: "none", border: "none", color: C.textDim, fontSize: 12, cursor: "pointer" }}>
-                {showAcked ? "← Späť na aktívne" : `Ukázať skryté (${acked.length})`}
-              </button>
-            )}
-          </div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
+        <H3>
+          <Info
+            text="Zoznam vecí na akciu. Červené sú tie, kde sa niečo pokazí, ak sa nič nespraví — tie sú vidieť vždy. Zvyšok je pracovný zoznam a je za jedným klikom, aby dôležité veci nezanikli v množstve bežných. Debatovať o nich vieš aj s Jarvisom."
+            label={kriticke.length ? `Vyžaduje akciu (${kriticke.length})` : `Na čo sa pozrieť (${bezne.length})`}
+          />
+        </H3>
+        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+          {acked.length > 0 && (
+            <button onClick={() => setShowAcked(true)} style={{ background: "none", border: "none", color: C.textDim, fontSize: 12, cursor: "pointer" }}>
+              Skryté ({acked.length})
+            </button>
+          )}
         </div>
-        {visible.length ? (
-          // Content-height, capped at ~3 rows then scrolls; grows only as items appear. Expanded: full list.
-          <div style={registerExpanded ? { overflowY: "visible" } : { maxHeight: 192, overflowY: "auto", paddingRight: 2 }}>
-            {visible.map((r) => <RegisterRow key={r.key} item={r} actions={actions} onNavigate={onNavigate} chat={assistantChat} />)}
-          </div>
-        ) : (
-          <div style={{ fontSize: 12.5, color: C.textMuted, padding: "2px 2px 4px" }}>Žiadne skryté položky.</div>
-        )}
+      </div>
+
+      {kriticke.slice(0, VIDITELNYCH).map((r) => (
+        <RegisterRow key={r.key} item={r} actions={actions} onNavigate={onNavigate} chat={assistantChat} />
+      ))}
+      {kriticke.length > VIDITELNYCH && !registerExpanded && (
+        <div style={{ fontSize: 11.5, color: C.orange, padding: "4px 2px" }}>
+          …a ďalších {kriticke.length - VIDITELNYCH} naliehavých
+        </div>
+      )}
+
+      {registerExpanded && (
+        <>
+          {kriticke.slice(VIDITELNYCH).map((r) => (
+            <RegisterRow key={r.key} item={r} actions={actions} onNavigate={onNavigate} chat={assistantChat} />
+          ))}
+          {bezne.length > 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "12px 0 6px" }}>
+              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.1, textTransform: "uppercase", color: C.textDim }}>Bežný zoznam</span>
+              <div style={{ flex: 1, height: 1, background: mix(C.border, 50) }} />
+            </div>
+          )}
+          {bezne.map((r) => (
+            <RegisterRow key={r.key} item={r} actions={actions} onNavigate={onNavigate} chat={assistantChat} />
+          ))}
+        </>
+      )}
+
+      {(bezne.length > 0 || kriticke.length > VIDITELNYCH) && (
+        <button
+          onClick={() => setRegisterExpanded((v) => !v)}
+          style={{ marginTop: 6, background: "none", border: "none", color: C.accentLight, fontSize: 12, cursor: "pointer", padding: "2px 0", fontWeight: 500 }}
+        >
+          {registerExpanded ? "Zbaliť" : `Zobraziť aj bežný zoznam (${bezne.length + Math.max(0, kriticke.length - VIDITELNYCH)})`}
+        </button>
+      )}
     </Card>
   );
 
@@ -1094,10 +1353,19 @@ export function Dashboard({
 
   return (
     <>
-      {registerPanel}
+      <PrehladPanel
+        kotva={pristroje.kotva}
+        vysledok={pristroje.vysledok}
+        varovne={pristroje.varovne}
+        zmeny={zmeny}
+        zmenyTs={odMinule?.ts ?? null}
+        vyzaduju={{ kritickych: kriticke.length }}
+        registerPanel={registerPanel}
+        cerstvost={cerstvost}
+        vpravo={<TrainerPills value={trainer} onChange={onTrainer} />}
+      />
 
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
-        <TrainerPills value={trainer} onChange={onTrainer} />
+      <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           {arranging && (
             <button onClick={layout.reset} style={{ ...btn("ghost"), fontSize: 12, padding: "6px 12px" }}>Obnoviť rozloženie</button>
@@ -1159,35 +1427,6 @@ export function Dashboard({
         </div>
       )}
 
-      <StatGrid>
-        <StatCard value={stats.active} label="Aktívnych klientov" onClick={() => onNavigate("klienti")} />
-        <StatCard
-          value={`${stats.weekHours.toFixed(0)}h`}
-          label={stats.lastWeek ? `Odrobené (týž. ${weekLabel(stats.lastWeek)})` : "Týždenné hodiny"}
-          // Farba znamená odchýlku, nie „toto je karta". Keď svietilo všetko,
-          // nesvietilo nič — v kokpite je zelená rovnako informácia ako červená
-          // len vtedy, keď nie je všade.
-          color={
-            stats.weekHours === 0 ? undefined
-              : stats.weekHours < zonaLo ? C.orange
-              : stats.weekHours > zonaHi ? C.red
-              : undefined
-          }
-          onClick={() => onNavigate("treningy")}
-        />
-        <StatCard
-          value={zisk ? fmtCZK(zisk.v) : "—"}
-          label={zisk ? `Zisk ${monthLabel(zisk.mesiac)}` : "Zisk (čaká na P&L)"}
-          color={zisk && zisk.v < 0 ? C.red : undefined}
-          onClick={() => onNavigate("vzas")}
-        />
-        <StatCard
-          value={trzbyOdhad ? fmtCZK(trzbyOdhad.expected) : "—"}
-          label={trzbyOdhad ? `Odhad tržieb ${monthLabel(trzbyOdhad.month)}` : "Odhad tržieb"}
-          color={C.blue}
-          onClick={() => onNavigate("vzas", "predikcia")}
-        />
-      </StatGrid>
 
       {SEKCIE.map((s) => {
         const ids = shown.filter((id) => WIDGETS.find((w) => w.id === id)?.sekcia === s.id);
