@@ -13,6 +13,8 @@ import {
   saveAnomaly,
   saveOverride,
   fetchBtcReserve,
+  fetchVzasSettings,
+  saveVzasSetting,
   type BtcNakup,
 } from "../../lib/psb/client";
 import {
@@ -379,6 +381,34 @@ export function PSBApp() {
   const [btcNakupy, setBtcNakupy] = useState<Record<string, BtcNakup[]>>({});
   /** Výbery z BTC peňaženky, ku ktorým sa nenašla faktúra — náklad chýba v P&L. */
   const [btcBezDokladu, setBtcBezDokladu] = useState<BtcNakup[]>([]);
+  /**
+   * Ručne potvrdené páry: id výberu z knihy → čísla faktúr.
+   *
+   * Automatika páruje podľa sumy, lenže suma v Kč sa z bitcoinu odvodzuje
+   * kurzom a platobná brána si berie spread — 3,5 % rozdiel je bežný, nie
+   * chyba. Žiadna tolerancia to nespraví spoľahlivo: úzka nenájde nič, široká
+   * spáruje nesprávne. Preto posledné slovo má človek a jeho rozhodnutie sa
+   * pamätá; automatika sa doň už nemieša.
+   */
+  const [btcParovanie, setBtcParovanie] = useState<Record<string, string[]>>({});
+  /** Faktúry, ktoré zatiaľ nemajú platbu — ponuka pri ručnom párovaní. */
+  const [volneFaktury, setVolneFaktury] = useState<{ cislo: string; datum: string; celkom: number; dodavatel: string }[]>([]);
+  useEffect(() => {
+    void fetchVzasSettings().then((st) => {
+      const p = st["btc_parovanie"];
+      if (p && typeof p === "object") setBtcParovanie(p as Record<string, string[]>);
+    });
+  }, []);
+  /** Uloží pár a hneď prepočíta náklady. */
+  const sparujBtc = useCallback((idVyberu: number, faktury: string[]) => {
+    setBtcParovanie((prev) => {
+      const next = { ...prev };
+      if (faktury.length) next[String(idVyberu)] = faktury;
+      else delete next[String(idVyberu)];
+      void saveVzasSetting("btc_parovanie", next);
+      return next;
+    });
+  }, []);
   const [bankaPrijmy, setBankaPrijmy] = useState<Record<string, number>>({});
   const [btcPrijmy, setBtcPrijmy] = useState<Record<string, number>>({});
   const [btcSatsKlienti, setBtcSatsKlienti] = useState<Record<string, number>>({});
@@ -566,6 +596,31 @@ function skupinaFaktur(
         // rovnako ako bankový pohyb, len s väčšou toleranciou: suma v Kč sa
         // prepočítava kurzom v čase transakcie, takže na korunu sedieť nemusí.
         const bezDokladu: BtcNakup[] = [];
+        // Ručne potvrdené páry sa spracujú PRVÉ a ich faktúry sa zamknú —
+        // automatika ich potom nemá ako priradiť inam.
+        const rucne = new Set<string>();
+        for (const [idStr, cisla] of Object.entries(btcParovanie)) {
+          const nak = Object.values(btcNakupy).flat().find((x) => String(x.id) === idStr);
+          if (!nak) continue;
+          const mk = String(nak.datum).slice(0, 7);
+          if (mk < PRVY_MESIAC_Z_FIO) continue;
+          rucne.add(idStr);
+          for (const cislo of cisla) {
+            const d = doklady.get(cislo);
+            if (!d || pouzite.has(cislo)) continue;
+            pouzite.add(cislo);
+            for (const pol of d.polozky) {
+              if (!pol.kategoria || pol.kategoria === "mimo" || pol.kategoria.startsWith("vyplaty")) continue;
+              (sumy[mk] ||= {});
+              sumy[mk][pol.kategoria] = (sumy[mk][pol.kategoria] || 0) + pol.cena;
+              pridajDoRozpisu(rozpis, mk, pol.kategoria, {
+                datum: String(nak.datum).slice(0, 10),
+                popis: `${pol.nazov || pol.dodavatel || "položka"} · zaplatené bitcoinom (spárované ručne)`,
+                suma: pol.cena, zdroj: "faktura", doklad: cislo,
+              });
+            }
+          }
+        }
         // CHRONOLOGICKY, od najstaršej platby.
         //
         // Kniha vracia platby od najnovšej a v tomto poradí sa aj párovali —
@@ -582,6 +637,7 @@ function skupinaFaktur(
           for (const nakup of vsetkyNakupy) {
             const czk = nakup.czk || 0;
             if (!czk) continue;
+            if (rucne.has(String(nakup.id))) continue; // človek už rozhodol
             const mk = String(nakup.datum).slice(0, 7);
             if (mk < PRVY_MESIAC_Z_FIO) continue;
             // Kandidáti: nepoužité doklady v okne ±7 dní. Jedna platba môže
@@ -612,6 +668,13 @@ function skupinaFaktur(
         // párovaní, nie dodatočným hľadaním. Predtým sa to skúšalo znova a
         // s inou logikou, takže výsledky sa mohli rozísť.
         setBtcBezDokladu(bezDokladu);
+        // Doklady, ktoré nikto nepoužil — ponuka pre ručné spárovanie.
+        setVolneFaktury(
+          [...doklady.entries()]
+            .filter(([c]) => !pouzite.has(c))
+            .map(([c, d]) => ({ cislo: c, datum: d.datum, celkom: Math.round(d.celkom * 100) / 100, dodavatel: d.polozky[0]?.dodavatel || "" }))
+            .sort((a, b) => b.datum.localeCompare(a.datum)),
+        );
 
         nastavRozpis(rozpis);
         // Zošit sa pozná podľa typu pohybu — mesiac netreba pýtať, vyplýva z
@@ -628,7 +691,7 @@ function skupinaFaktur(
         else setFioTik((x) => x + 1); // rozpis pribudol aj bez zmeny súm
       })
       .catch(() => {});
-  }, [btcNakupy]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [btcNakupy, btcParovanie]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Kontroly nad bankovými sumami. Register je jediné miesto, kam sa človek
   // pozerá, keď hľadá „čo mám spraviť" — ďalšia karta vedľa neho by znamenala
@@ -1194,7 +1257,7 @@ function skupinaFaktur(
         {active === "marketing" && <Marketing data={data} clients={clients} leads={data.leads} chat={chat} sub={marketingSub} onSub={setMarketingSub} onKlient={(m) => navigate("klienti", undefined, { client: m, nonce: Date.now() })} />}
         {active === "vzas" && <Vzas sub={vzasSub} onSub={setVzasSub} data={data} clients={clients} focus={vzasFocus} />}
         {active === "vysledky" && <Vysledky data={data} onNavigate={navigate} clients={clients} sixM={sixM} capacity={capacity} register={register} sub={vysledkySub} onSub={setVysledkySub} focus={vysledkyFocus} />}
-        {active === "udaje" && <Udaje data={data} actions={actions} chat={chat} prekazky={prekazkyZamku} kroky={krokyZamku} podklady={podkladyMesiaca} onNavigate={navigate} />}
+        {active === "udaje" && <Udaje data={data} actions={actions} chat={chat} prekazky={prekazkyZamku} kroky={krokyZamku} podklady={podkladyMesiaca} onNavigate={navigate} btc={{ platby: btcBezDokladu, faktury: volneFaktury, parovanie: btcParovanie, onSparuj: sparujBtc }} />}
       </div>
       <div style={{ ...S.h3, textAlign: "center", color: C.textDim, fontSize: 11, padding: "8px 0 24px", fontWeight: 400 }}>
         ProSapiens Biomechanic · interný nástroj · nezdieľať externe
