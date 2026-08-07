@@ -200,6 +200,29 @@ function ZmenyRiadok({ ts, zmeny }: { ts: number; zmeny: Zmena[] }) {
   );
 }
 
+/**
+ * Počet stĺpcov. Obe pásma majú päť dlaždíc (kotva zaberá dve), takže na
+ * širokom displeji vyjde každé pásmo na jeden riadok — to je celý zmysel
+ * „tesného zhluku": oko sa medzi prístrojmi pohybuje v malom oblúku a vracia
+ * sa ku kotve, nie blúdi po ploche. Pri auto-fit sa štvrtá dlaždica lámala
+ * na vlastný riadok a zhluk sa rozpadol.
+ */
+function useStlpce() {
+  const [n, setN] = useState(5);
+  useEffect(() => {
+    const q = [
+      [window.matchMedia("(min-width: 1120px)"), 5],
+      [window.matchMedia("(min-width: 840px)"), 3],
+      [window.matchMedia("(min-width: 560px)"), 2],
+    ] as [MediaQueryList, number][];
+    const uprav = () => setN(q.find(([m]) => m.matches)?.[1] ?? 1);
+    uprav();
+    q.forEach(([m]) => m.addEventListener("change", uprav));
+    return () => q.forEach(([m]) => m.removeEventListener("change", uprav));
+  }, []);
+  return n;
+}
+
 function Pasmo({ titulok, popis, deti }: { titulok: string; popis: string; deti: ReactNode }) {
   return (
     <div style={{ marginBottom: 10 }}>
@@ -241,6 +264,7 @@ export function PrehladPanel({
    *  vyzerá presne ako tichý dashboard nad dobrými — preto je to výstraha. */
   cerstvost: { text: string; zastarane: boolean };
 }) {
+  const stlpce = useStlpce();
   const vsetky = [kotva, ...vysledok, ...varovne];
   const mimo = vsetky.filter((p) => p.pasmo === "pozor" || p.pasmo === "zle");
   const zle = mimo.filter((p) => p.pasmo === "zle");
@@ -284,15 +308,11 @@ export function PrehladPanel({
         titulok="Ako to dopadlo"
         popis="uzavreté čísla — už sa nedajú ovplyvniť"
         deti={
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(168px, 1fr))", gap: 9, alignItems: "stretch" }}>
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(${stlpce}, minmax(0,1fr))`, gap: 9, alignItems: "stretch" }}>
             {/* Kotva zaberá dva stĺpce a je vľavo hore — tam, kde oko začína
                 čítať, a kam sa medzi prístrojmi vracia (letecké „basic T"). */}
-            <div style={{ gridColumn: "span 2", minWidth: 0, display: "flex" }}>
-              <div style={{ flex: 1, minWidth: 0, display: "flex" }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <Dlazdica p={kotva} velka />
-                </div>
-              </div>
+            <div style={{ gridColumn: `span ${Math.min(2, stlpce)}`, minWidth: 0, display: "flex", flexDirection: "column" }}>
+              <Dlazdica p={kotva} velka />
             </div>
             {vysledok.map((p) => <Dlazdica key={p.id} p={p} />)}
           </div>
@@ -303,7 +323,7 @@ export function PrehladPanel({
         titulok="Čo sa chystá"
         popis="tu sa dá ešte zasiahnuť"
         deti={
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(158px, 1fr))", gap: 9 }}>
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(${stlpce}, minmax(0,1fr))`, gap: 9, alignItems: "stretch" }}>
             {varovne.map((p) => <Dlazdica key={p.id} p={p} />)}
           </div>
         }
