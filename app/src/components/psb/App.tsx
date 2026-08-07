@@ -406,7 +406,7 @@ export function PSBApp() {
  * väčšia objednávka sa rozpadne zriedka a kombinácií by inak boli tisíce.
  */
 function skupinaFaktur(
-  kandidati: { cislo: string; celkom: number }[],
+  kandidati: { cislo: string; celkom: number; odstup?: number }[],
   ciel: number,
   tolerancia: number,
 ): string[] | null {
@@ -566,8 +566,20 @@ function skupinaFaktur(
         // rovnako ako bankový pohyb, len s väčšou toleranciou: suma v Kč sa
         // prepočítava kurzom v čase transakcie, takže na korunu sedieť nemusí.
         const bezDokladu: BtcNakup[] = [];
-        for (const zoznam of Object.values(btcNakupy)) {
-          for (const nakup of zoznam) {
+        // CHRONOLOGICKY, od najstaršej platby.
+        //
+        // Kniha vracia platby od najnovšej a v tomto poradí sa aj párovali —
+        // platba z 1. augusta si tak stihla vziať faktúry z 25. júla (sú v okne
+        // ±7 dní), júlová platba potom siahla po faktúre z 21. 7. a tá
+        // najstaršia zostala bez dokladu. Reťaz posunutých priradení.
+        //
+        // Od najstaršej to nenastane: každá platba si najprv nájde svoje
+        // vlastné doklady a ďalšia berie až to, čo naozaj zostalo.
+        const vsetkyNakupy = Object.values(btcNakupy).flat()
+          .slice()
+          .sort((a, b) => String(a.datum).localeCompare(String(b.datum)));
+        {
+          for (const nakup of vsetkyNakupy) {
             const czk = nakup.czk || 0;
             if (!czk) continue;
             const mk = String(nakup.datum).slice(0, 7);
@@ -576,7 +588,7 @@ function skupinaFaktur(
             // pokryť viac faktúr — Alza rozdelí objednávku podľa skladov.
             const kandidati = [...doklady.entries()]
               .filter(([c, d]) => !pouzite.has(c) && Math.abs(Date.parse(nakup.datum) - Date.parse(d.datum)) / 86400000 <= 7)
-              .map(([c, d]) => ({ cislo: c, celkom: d.celkom }));
+              .map(([c, d]) => ({ cislo: c, celkom: d.celkom, odstup: Math.abs(Date.parse(nakup.datum) - Date.parse(d.datum)) / 86400000 }));
             const skupina = skupinaFaktur(kandidati, czk, Math.max(50, czk * 0.02));
             if (!skupina) { bezDokladu.push(nakup); continue; }
             for (const cislo of skupina) {
