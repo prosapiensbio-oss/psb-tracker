@@ -19,6 +19,7 @@ import { Route as ApiVzasStatusRouteImport } from './routes/api/vzas-status'
 import { Route as ApiVzasSettingsRouteImport } from './routes/api/vzas-settings'
 import { Route as ApiVzasNotesRouteImport } from './routes/api/vzas-notes'
 import { Route as ApiUsersRouteImport } from './routes/api/users'
+import { Route as ApiSpravaRouteImport } from './routes/api/sprava'
 import { Route as ApiSessionRouteImport } from './routes/api/session'
 import { Route as ApiResetRouteImport } from './routes/api/reset'
 import { Route as ApiRawUploadsRouteImport } from './routes/api/raw-uploads'
@@ -90,6 +91,11 @@ const ApiVzasNotesRoute = ApiVzasNotesRouteImport.update({
 const ApiUsersRoute = ApiUsersRouteImport.update({
   id: '/api/users',
   path: '/api/users',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSpravaRoute = ApiSpravaRouteImport.update({
+  id: '/api/sprava',
+  path: '/api/sprava',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSessionRoute = ApiSessionRouteImport.update({
@@ -229,6 +235,7 @@ export interface FileRoutesByFullPath {
   '/api/raw-uploads': typeof ApiRawUploadsRoute
   '/api/reset': typeof ApiResetRoute
   '/api/session': typeof ApiSessionRoute
+  '/api/sprava': typeof ApiSpravaRoute
   '/api/users': typeof ApiUsersRoute
   '/api/vzas-notes': typeof ApiVzasNotesRoute
   '/api/vzas-settings': typeof ApiVzasSettingsRoute
@@ -263,6 +270,7 @@ export interface FileRoutesByTo {
   '/api/raw-uploads': typeof ApiRawUploadsRoute
   '/api/reset': typeof ApiResetRoute
   '/api/session': typeof ApiSessionRoute
+  '/api/sprava': typeof ApiSpravaRoute
   '/api/users': typeof ApiUsersRoute
   '/api/vzas-notes': typeof ApiVzasNotesRoute
   '/api/vzas-settings': typeof ApiVzasSettingsRoute
@@ -298,6 +306,7 @@ export interface FileRoutesById {
   '/api/raw-uploads': typeof ApiRawUploadsRoute
   '/api/reset': typeof ApiResetRoute
   '/api/session': typeof ApiSessionRoute
+  '/api/sprava': typeof ApiSpravaRoute
   '/api/users': typeof ApiUsersRoute
   '/api/vzas-notes': typeof ApiVzasNotesRoute
   '/api/vzas-settings': typeof ApiVzasSettingsRoute
@@ -334,6 +343,7 @@ export interface FileRouteTypes {
     | '/api/raw-uploads'
     | '/api/reset'
     | '/api/session'
+    | '/api/sprava'
     | '/api/users'
     | '/api/vzas-notes'
     | '/api/vzas-settings'
@@ -368,6 +378,7 @@ export interface FileRouteTypes {
     | '/api/raw-uploads'
     | '/api/reset'
     | '/api/session'
+    | '/api/sprava'
     | '/api/users'
     | '/api/vzas-notes'
     | '/api/vzas-settings'
@@ -402,6 +413,7 @@ export interface FileRouteTypes {
     | '/api/raw-uploads'
     | '/api/reset'
     | '/api/session'
+    | '/api/sprava'
     | '/api/users'
     | '/api/vzas-notes'
     | '/api/vzas-settings'
@@ -437,6 +449,7 @@ export interface RootRouteChildren {
   ApiRawUploadsRoute: typeof ApiRawUploadsRoute
   ApiResetRoute: typeof ApiResetRoute
   ApiSessionRoute: typeof ApiSessionRoute
+  ApiSpravaRoute: typeof ApiSpravaRoute
   ApiUsersRoute: typeof ApiUsersRoute
   ApiVzasNotesRoute: typeof ApiVzasNotesRoute
   ApiVzasSettingsRoute: typeof ApiVzasSettingsRoute
@@ -516,6 +529,13 @@ declare module '@tanstack/react-router' {
       path: '/api/users'
       fullPath: '/api/users'
       preLoaderRoute: typeof ApiUsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/sprava': {
+      id: '/api/sprava'
+      path: '/api/sprava'
+      fullPath: '/api/sprava'
+      preLoaderRoute: typeof ApiSpravaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/session': {
@@ -701,6 +721,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiRawUploadsRoute: ApiRawUploadsRoute,
   ApiResetRoute: ApiResetRoute,
   ApiSessionRoute: ApiSessionRoute,
+  ApiSpravaRoute: ApiSpravaRoute,
   ApiUsersRoute: ApiUsersRoute,
   ApiVzasNotesRoute: ApiVzasNotesRoute,
   ApiVzasSettingsRoute: ApiVzasSettingsRoute,

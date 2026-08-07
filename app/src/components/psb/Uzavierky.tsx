@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 
 import { monthLabel } from "../../lib/psb/format";
 import type { AssistantChat } from "./Assistant";
+import type { KrokUzavierky } from "./App";
+import { SpravaMesiaca } from "./SpravaMesiaca";
 import { fetchKonta, fetchPeriods, setPeriodLock, ulozKonto, type AuditRiadok, type Konto, type Obdobie } from "../../lib/psb/client";
 import { C, mix } from "../../lib/psb/theme";
 import { Card, Empty, H3, Info } from "./ui";
@@ -133,9 +135,14 @@ function Konta() {
   );
 }
 
-export function Uzavierky({ prekazky, chat }: {
+export function Uzavierky({ prekazky, kroky, podklady, onNavigate, chat }: {
   /** Čo za daný mesiac ešte nie je hotové. Prázdne pole = dá sa zamknúť. */
   prekazky?: (mesiac: string) => string[];
+  /** To isté ako kroky s fajkami — pre kokpit uzávierky. */
+  kroky?: (mesiac: string) => KrokUzavierky[];
+  /** Všetko, čo appka o mesiaci vie — vstup pre mesačnú správu. */
+  podklady?: (mesiac: string) => string;
+  onNavigate?: (tab: string, sub?: string) => void;
   chat?: AssistantChat;
 } = {}) {
   const [obdobia, setObdobia] = useState<Obdobie[]>([]);
@@ -190,6 +197,10 @@ export function Uzavierky({ prekazky, chat }: {
     await setPeriodLock(m, na);
     nacitaj();
     setPrebieha(null);
+    // Zamknutie je jediný okamih, keď je o mesiaci známe všetko naraz. Preto
+    // sa práve tu ponúkne mesačná správa — o týždeň by si už nikto nepamätal,
+    // prečo boli čísla také, aké boli.
+    if (na) setZamknuty(m);
   };
 
   /** Mesiac, ktorý sa Jerry pokúsil zamknúť predčasne, a čo mu chýba. */
@@ -197,8 +208,75 @@ export function Uzavierky({ prekazky, chat }: {
 
   const pocetZamknutych = obdobia.filter((o) => o.locked).length;
 
+  // Mesiac, ktorý je na rade: najnovší skončený a ešte nezamknutý.
+  const naRade = useMemo(() => mesiace.find((m) => !zamky.get(m)?.locked) || null, [mesiace, zamky]);
+  const krokyNaRade = naRade && kroky ? kroky(naRade) : null;
+  const hotovych = krokyNaRade ? krokyNaRade.filter((k) => k.hotovo).length : 0;
+  const vsetkoHotove = !!krokyNaRade && hotovych === krokyNaRade.length;
+
+  /** Mesiac, ktorý sa práve zamkol — spustí návrh mesačnej správy. */
+  const [zamknuty, setZamknuty] = useState<string | null>(null);
+
   return (
     <>
+      {/* Kokpit uzávierky — šesť krokov na jednom mieste, s fajkami.
+          Nahrádza stav, keď sa dalo zistiť, čo mesiacu chýba, jedine pokusom
+          o zamknutie. */}
+      {krokyNaRade && naRade && (
+        <Card>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+            <H3><Info text="Šesť vecí, ktoré musia byť hotové, kým sa mesiac zamkne. Zámok znamená „toto číslo už nikto nezmení“ — keď sa zamkne mesiac s nenahratým dokladom alebo nevysvetlenou anomáliou, tá chyba v ňom zostane navždy a bude sa tváriť ako overená. Uzávierku vieš robiť na etapy: sem sa vrátiš a vidíš, kde si." label={`Uzávierka ${monthLabel(naRade)}`} /></H3>
+            <span style={{ fontSize: 12.5, fontWeight: 700, color: vsetkoHotove ? C.green : C.textMuted }}>
+              {hotovych} zo {krokyNaRade.length} hotovo
+            </span>
+          </div>
+
+          <div style={{ marginBottom: 12 }}>
+            {krokyNaRade.map((k) => (
+              <div key={k.id} style={{ display: "flex", alignItems: "baseline", gap: 10, padding: "7px 2px", borderBottom: `1px solid ${mix(C.border, 45)}`, fontSize: 12.5, flexWrap: "wrap" }}>
+                <span style={{ color: k.hotovo ? C.green : C.orange, fontWeight: 700, width: 14, flexShrink: 0 }}>{k.hotovo ? "✓" : "✗"}</span>
+                <span style={{ color: C.text, fontWeight: 600, minWidth: 150 }}>{k.label}</span>
+                <span style={{ color: k.hotovo ? C.textDim : C.orange, flex: 1, minWidth: 140, lineHeight: 1.45 }}>{k.detail}</span>
+                {!k.hotovo && onNavigate && k.tab && (
+                  <button
+                    onClick={() => onNavigate(k.tab as string, k.sub)}
+                    style={{ background: "none", border: `1px solid ${mix(C.accent, 40)}`, borderRadius: 7, padding: "3px 10px", color: C.accentLight, fontSize: 11.5, cursor: "pointer", whiteSpace: "nowrap" }}
+                  >
+                    Vybaviť →
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <button
+              onClick={() => vsetkoHotove && void prepni(naRade, true)}
+              disabled={!vsetkoHotove || prebieha === naRade}
+              title={vsetkoHotove ? "Zamknúť mesiac" : "Najprv doplň chýbajúce kroky"}
+              style={{
+                padding: "8px 18px", borderRadius: 9, fontSize: 13, fontWeight: 600,
+                cursor: vsetkoHotove ? "pointer" : "not-allowed",
+                border: `1px solid ${vsetkoHotove ? mix(C.green, 55) : C.border}`,
+                background: vsetkoHotove ? mix(C.green, 14) : "transparent",
+                color: vsetkoHotove ? C.green : C.textDim,
+              }}
+            >
+              🔒 Zamknúť {monthLabel(naRade)}
+            </button>
+            {!vsetkoHotove && (
+              <span style={{ fontSize: 11.5, color: C.textDim }}>
+                Chýba {krokyNaRade.length - hotovych}× — zámok sa odomkne, keď bude šesť fajok.
+              </span>
+            )}
+          </div>
+        </Card>
+      )}
+
+      {zamknuty && podklady && (
+        <SpravaMesiaca mesiac={zamknuty} podklady={podklady(zamknuty)} onZavri={() => setZamknuty(null)} />
+      )}
+
       <Card>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <H3><Info text="Uzavretý mesiac sa nedá prepísať importom — riadky, ktoré doň patria, sa preskočia a upload o tom povie. Zamykaj až po tom, čo mesiac skontroluješ; odomknúť sa dá kedykoľvek a zostane po tom záznam v audite. Bežiaci mesiac sa zamknúť nedá, dáta doň ešte pribúdajú (uzávierka je prvý víkend nasledujúceho mesiaca)." label="Uzavreté mesiace" /></H3>

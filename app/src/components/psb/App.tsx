@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { BARTER_KLIENTI, PRVY_MESIAC_Z_FIO, vzasVerzia, nastavBtcVyplaty, nastavHodinyZTrackera, nastavJarekZTrackera, nastavNakladyZFio, nazovKategorie, pnlHodnota } from "../../lib/psb/vzas";
+import { BARTER_KLIENTI, PRVY_MESIAC_Z_FIO, vzasVerzia, nastavBtcVyplaty, nastavHodinyZTrackera, nastavJarekZTrackera, nastavNakladyZFio, nazovKategorie, pnlHodnota, pnlOverridesNaUlozenie } from "../../lib/psb/vzas";
 
 import {
   checkSession,
@@ -54,6 +54,17 @@ export type Actions = {
 };
 
 // Deep-link from Dashboard click-throughs: focus one week (Tréningy → Prehľad) or one month (Financie → Zárobky).
+/** Jeden krok mesačnej uzávierky. */
+export type KrokUzavierky = {
+  id: string;
+  label: string;
+  hotovo: boolean;
+  /** Krátka veta o stave — „658 pohybov" alebo „chýba výpis". */
+  detail: string;
+  tab?: string;
+  sub?: string;
+};
+
 export type NavFocus = {
   week?: string; month?: string; client?: string; trainer?: string; nonce?: number;
   /** Klik na dlaždicu, ktorá hovorí o SKUPINE ľudí (napr. „11 odmlčaných“),
@@ -666,16 +677,142 @@ export function PSBApp() {
   // Čo bráni zamknutiu daného mesiaca. Jedno miesto, z ktorého číta aj
   // pripomienka na uzávierku, aj samotný zámok — dva rôzne zoznamy toho, čo
   // je „hotové", by sa časom rozišli.
+  /**
+   * Šesť krokov uzávierky ako STAV, nie ako odmietnutie.
+   *
+   * Predtým sa ten istý zoznam počítal len vtedy, keď Jerry klikol na zámok,
+   * a vrátil sa ako veta „nedá sa, lebo…". To znamená, že sa dalo zistiť, čo
+   * chýba, jedine pokusom o zamknutie — ako keby pilot robil predletovú
+   * kontrolu tak, že sa pokúsi vzlietnuť a lietadlo mu povie, čo zabudol.
+   * Teraz je to zoznam krokov s fajkami, ktorý sa dá pozerať kedykoľvek.
+   */
+  const krokyZamku = useCallback((mk: string): KrokUzavierky[] => {
+    const k = kotvaDat(data);
+    const z = zapisy.mesiace?.[mk];
+    const odpovedane = Object.values(z?.answers || {}).filter((v) => String(v).trim()).length;
+    const nevybavene = registerAll.filter((r) => r.key.includes(mk) && !r.acked && r.category !== "Zápis");
+    const pohybovMes = (bankaPohyby[mk] || []).length;
+    return [
+      {
+        id: "ptminder",
+        label: "PTminder",
+        hotovo: !!k.plny && k.plny >= mk,
+        detail: k.den ? `nahratý po ${fmtDMY(k.den)}` : "nič nie je nahraté",
+        tab: "udaje",
+      },
+      {
+        id: "fio",
+        label: "Výpis z Fio",
+        hotovo: !!bankaSumy[mk],
+        detail: bankaSumy[mk] ? `${pohybovMes} pohybov v mesiaci` : "chýba výpis",
+        tab: "udaje",
+      },
+      {
+        id: "zosit",
+        label: "Zošit (hotovosť)",
+        hotovo: hotovostMesiace.has(mk),
+        detail: hotovostMesiace.has(mk) ? "nahratý" : "chýba — nahraj fotku zošita",
+        tab: "udaje",
+      },
+      {
+        id: "metricool",
+        label: "Metricool",
+        hotovo: MKT_MESACNE.some((r) => r.m === mk) || kanalyMesiace.includes(mk),
+        detail: MKT_MESACNE.some((r) => r.m === mk) || kanalyMesiace.includes(mk) ? "nahratý" : "chýba export",
+        tab: "udaje",
+      },
+      {
+        id: "otazky",
+        label: "Otázky mesiaca",
+        hotovo: odpovedane > 0,
+        detail: odpovedane > 0 ? `${odpovedane} zodpovedaných` : "žiadna odpoveď",
+        tab: "vzas",
+        sub: "trzby",
+      },
+      {
+        id: "upozornenia",
+        label: "Upozornenia mesiaca",
+        hotovo: nevybavene.length === 0,
+        detail: nevybavene.length
+          ? nevybavene.map((r) => r.title).join(" · ")
+          : "všetky vysvetlené",
+        tab: "dashboard",
+      },
+    ];
+  }, [data, bankaSumy, bankaPohyby, kanalyMesiace, hotovostMesiace, zapisy, registerAll]);
+
+  /**
+   * Všetko, čo appka o mesiaci vie, ako text pre mesačnú správu.
+   *
+   * Zámerne sem ide aj to, čo sa v appke inde „spotrebuje": vysvetlenia
+   * z registra (tie sa odkliknú a zmiznú), odpovede na otázky mesiaca a ručné
+   * opravy v P&L. Presne tie dôvody o rok chýbajú, keď sa človek pozrie na
+   * číslo a nevie, prečo je také.
+   */
+  const podkladyMesiaca = useCallback((mk: string): string => {
+    const r: string[] = [];
+    const kc = (n: number | undefined) => (n === undefined ? "—" : `${Math.round(n).toLocaleString("sk-SK")} Kč`);
+    const predch = (() => {
+      const [y, m] = mk.split("-").map(Number);
+      return new Date(Date.UTC(y, m - 2, 1)).toISOString().slice(0, 7);
+    })();
+
+    r.push("== ČÍSLA ==");
+    r.push(`Tržby: ${kc(pnlHodnota("prijmy", mk))} (predchádzajúci mesiac ${kc(pnlHodnota("prijmy", predch))})`);
+    r.push(`Celkové náklady: ${kc(pnlHodnota("celkoveNaklady", mk))}`);
+    r.push(`Hrubý zisk: ${kc(pnlHodnota("hrubyZisk", mk))}`);
+
+    const sedeniaMes = data.sessions.filter((x) => x.date.slice(0, 7) === mk);
+    const hodinyMes = sedeniaMes.reduce((a, x) => a + x.duration / 60, 0);
+    r.push(`Odtrénované: ${sedeniaMes.length} sedení, ${Math.round(hodinyMes)} hodín`);
+    const noviMes = Object.values(clients).filter((c) => (c.firstSession || "").slice(0, 7) === mk);
+    r.push(`Noví klienti: ${noviMes.length}${noviMes.length ? ` (${noviMes.map((c) => c.name).join(", ")})` : ""}`);
+    const dopytyMes = (data.leads || []).filter((l) => (l.date || "").slice(0, 7) === mk).length;
+    r.push(`Dopyty: ${dopytyMes}`);
+    r.push(`Aktívnych klientov teraz: ${Object.values(clients).filter((c) => c.status !== "Neaktívny").length}`);
+
+    // Ručné opravy v P&L — čo sa v mesiaci prepísalo oproti importu a prečo.
+    const opravy = Object.entries(pnlOverridesNaUlozenie())
+      .filter(([, m]) => (m as Record<string, number>)[mk] !== undefined)
+      .map(([kat, m]) => `${nazovKategorie(kat)}: ${kc((m as Record<string, number>)[mk])}`);
+    if (opravy.length) {
+      r.push("", "== RUČNÉ OPRAVY V P&L ==");
+      for (const o of opravy) r.push(`- ${o}`);
+    }
+
+    // Vysvetlenia z registra — vybavené aj nevybavené, aj s poznámkou.
+    const polozky = registerAll.filter((x) => x.key.includes(mk));
+    if (polozky.length) {
+      r.push("", "== UPOZORNENIA MESIACA ==");
+      for (const x of polozky) {
+        const pozn = (x.note || "").replace(/^odlozene\|[^|]*\|/, "").trim();
+        r.push(`- ${x.title}${x.acked ? " [vybavené]" : " [NEVYBAVENÉ]"}${pozn ? ` — vysvetlenie: ${pozn}` : ""}`);
+      }
+    }
+
+    // Odpovede na otázky mesiaca — Jerryho vlastné slová o tom, čo sa dialo.
+    const odp = zapisy.mesiace?.[mk]?.answers || {};
+    const odpText = Object.entries(odp).filter(([, v]) => String(v).trim());
+    if (odpText.length) {
+      r.push("", "== ODPOVEDE NA OTÁZKY MESIACA ==");
+      for (const [otazka, v] of odpText) r.push(`- ${otazka}: ${String(v).trim()}`);
+    }
+
+    const stara = zapisy.mesiace?.[mk]?.note;
+    if (stara) {
+      r.push("", "== ČO UŽ JE V KRONIKE (neopakuj to) ==", String(stara).slice(0, 2000));
+    }
+    return r.join("\n");
+  }, [data, clients, registerAll, zapisy]);
+
+  // Textová podoba pre zámok a pre Jarvisa — jeden zdroj, dve podoby.
   const prekazkyZamku = useCallback((mk: string): string[] => {
     const out: string[] = [];
-    const k = kotvaDat(data);
-    if (!k.plny || k.plny < mk) out.push("PTminder nie je nahratý po koniec mesiaca");
-    if (!bankaSumy[mk]) out.push("chýba výpis z Fio");
-    if (!MKT_MESACNE.some((r) => r.m === mk) && !kanalyMesiace.includes(mk)) out.push("chýba Metricool");
-    if (!hotovostMesiace.has(mk)) out.push("chýba zošit (hotovostné platby)");
-    const z = zapisy.mesiace?.[mk];
-    const odpovedane = Object.values(z?.answers || {}).some((v) => String(v).trim());
-    if (!odpovedane) out.push("nie sú zodpovedané otázky mesiaca");
+    for (const kr of krokyZamku(mk)) {
+      if (kr.hotovo) continue;
+      if (kr.id === "upozornenia") continue; // vypíšu sa nižšie menom aj s kľúčom
+      out.push(`${kr.label}: ${kr.detail}`);
+    }
     // Nevybavené upozornenia za ten mesiac — MENOM, nie počtom.
     //
     // Prvá verzia hlásila „2 nevysvetlené upozornenia" a Jarvis sa musel pýtať,
@@ -689,7 +826,7 @@ export function PSBApp() {
     const nevybavene = registerAll.filter((r) => r.key.includes(mk) && !r.acked && r.category !== "Zápis");
     for (const r of nevybavene) out.push(`nevysvetlené upozornenie „${r.title}" (key: ${r.key})`);
     return out;
-  }, [data, bankaSumy, kanalyMesiace, hotovostMesiace, zapisy, registerAll]);
+  }, [krokyZamku, registerAll]);
 
   const aiContext = useMemo(
     () => buildAiContext(data, clients, sixM, capacity, registerAll),
@@ -871,7 +1008,7 @@ export function PSBApp() {
         {active === "marketing" && <Marketing data={data} clients={clients} leads={data.leads} chat={chat} sub={marketingSub} onSub={setMarketingSub} onKlient={(m) => navigate("klienti", undefined, { client: m, nonce: Date.now() })} />}
         {active === "vzas" && <Vzas sub={vzasSub} onSub={setVzasSub} data={data} clients={clients} focus={vzasFocus} />}
         {active === "vysledky" && <Vysledky data={data} onNavigate={navigate} clients={clients} sixM={sixM} capacity={capacity} register={register} sub={vysledkySub} onSub={setVysledkySub} focus={vysledkyFocus} />}
-        {active === "udaje" && <Udaje data={data} actions={actions} chat={chat} prekazky={prekazkyZamku} />}
+        {active === "udaje" && <Udaje data={data} actions={actions} chat={chat} prekazky={prekazkyZamku} kroky={krokyZamku} podklady={podkladyMesiaca} onNavigate={navigate} />}
       </div>
       <div style={{ ...S.h3, textAlign: "center", color: C.textDim, fontSize: 11, padding: "8px 0 24px", fontWeight: 400 }}>
         ProSapiens Biomechanic · interný nástroj · nezdieľať externe

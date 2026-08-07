@@ -7,7 +7,7 @@ import type { PSBData } from "../../lib/psb/types";
 import type { AssistantChat } from "./Assistant";
 import { Zosit } from "./Zosit";
 import type { IngestResult } from "../../lib/psb/db.server";
-import type { Actions } from "./App";
+import type { Actions, KrokUzavierky} from "./App";
 import { BankovyImport } from "./Banka";
 import { BankaUlozene } from "./BankaUlozene";
 import { FakturyNahlad } from "./Faktury";
@@ -59,7 +59,7 @@ const MARKETING_ZDROJE: { druh: string; label: string; path: string }[] = [
   { druh: "gsc", label: "Google Search Console", path: "Search Console → Výsledky vyhľadávania › Exportovať › CSV. Stiahne sa ZIP — rozbaľ ho a nahraj tri súbory: Graf.csv (kliky po dňoch), Dopyty.csv (na čo ťa ľudia našli), Strany.csv (ktorý článok ťahá). Krajiny, Zariadenia a Filtre appka zatiaľ nepoužíva." },
 ];
 
-export function Udaje({ data, actions, chat, prekazky }: { data: PSBData; actions: Actions; chat?: AssistantChat; prekazky?: (mesiac: string) => string[] }) {
+export function Udaje({ data, actions, chat, prekazky, kroky, podklady, onNavigate }: { data: PSBData; actions: Actions; chat?: AssistantChat; prekazky?: (mesiac: string) => string[]; kroky?: (mesiac: string) => KrokUzavierky[]; podklady?: (mesiac: string) => string; onNavigate?: (tab: string, sub?: string) => void }) {
   const missing = REPORTS.filter((r) => (data[r.key] as unknown[]).length === 0);
   return (
     <>
@@ -68,7 +68,7 @@ export function Udaje({ data, actions, chat, prekazky }: { data: PSBData; action
       {/* Zošit je zdroj dát ako každý iný — patrí sem, medzi nahrávanie. */}
       <Zosit onZapisane={() => void actions.refresh()} />
 
-      <Uzavierky prekazky={prekazky} chat={chat} />
+      <Uzavierky prekazky={prekazky} kroky={kroky} podklady={podklady} onNavigate={onNavigate} chat={chat} />
 
       <Card>
         <H3>
