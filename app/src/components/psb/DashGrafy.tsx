@@ -567,15 +567,27 @@ export function useExtraGrafy({
     const nMes = labs.length;
     const priem = (v: number[]) => (nMes ? v.slice(0, nMes).reduce((a, b) => a + b, 0) / nMes : 0);
 
+    // Marža sa NESMIE počítať ako priemer mesačných percent — slabý mesiac
+    // s malými tržbami by mal v priemere rovnakú váhu ako rekordný a výsledok
+    // je nižší než skutočnosť (3,3 % namiesto 8,0 %). Správne je súčet ziskov
+    // delený súčtom tržieb.
+    const sucet = (v: number[]) => v.slice(0, nMes).reduce((a, b) => a + b, 0);
+    const marzaSpolu = sucet(p.prijmy) > 0 ? (sucet(p.hrubyZisk) / sucet(p.prijmy)) * 100 : 0;
     nodes.pnlSuhrn = (
       <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column" }}>
-        <H3><Info label="Súhrn P&L" text="Príjmy, náklady, hrubý zisk a marža — priemer na mesiac za celé obdobie s dátami. Náklady zahŕňajú NÁROKY na výplaty, nie to, čo si tréner reálne vzal. Marža: cieľ 12–15 % ako medzikrok, dlhodobo 20 %." /></H3>
+        <H3><Info label="Súhrn P&L" text="Príjmy, náklady, hrubý zisk a marža — priemer na mesiac za CELÉ obdobie s dátami. Na obrazovke Peniaze → Zisky a straty vidíš to isté, ale za obdobie, ktoré si tam nastavíš — preto sa čísla líšia; obdobie je napísané pod nadpisom tejto karty. Náklady zahŕňajú NÁROKY na výplaty, nie to, čo si tréner reálne vzal. Marža sa počíta ako celkový zisk delený celkovými tržbami, nie ako priemer mesačných percent — inak by slabý mesiac vážil rovnako ako rekordný. Cieľ 12–15 % ako medzikrok, dlhodobo 20 %." /></H3>
+        {/* Obdobie priamo na karte. Bez neho sa to isté číslo na dvoch
+            obrazovkách líši a nedá sa zistiť prečo — to je presne to, čo
+            Jerryho vyviedlo z miery pri rezerve. */}
+        <div style={{ fontSize: 10.5, color: C.textDim, margin: "-6px 0 8px" }}>
+          {labs[0]} – {labs[nMes - 1]} · {nMes} mesiacov
+        </div>
         <Klik kam={() => onNavigate("vzas", "pnl")} onNavigate="Peniaze → Zisky a straty">
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}>
             <MiniStat label="Príjmy · Ø / mes." value={fmtCZK(priem(p.prijmy))} color={C.green} />
             <MiniStat label="Náklady · Ø / mes." value={fmtCZK(priem(p.celkoveNaklady))} color={C.red} />
             <MiniStat label="Hrubý zisk · Ø / mes." value={fmtCZK(priem(p.hrubyZisk))} color={priem(p.hrubyZisk) >= 0 ? C.green : C.red} />
-            <MiniStat label="Marža" value={`${priem(p.marza).toFixed(1)} %`} color={priem(p.marza) >= 15 ? C.green : priem(p.marza) >= 0 ? C.orange : C.red} />
+            <MiniStat label="Marža za obdobie" value={`${marzaSpolu.toFixed(1)} %`} color={marzaSpolu >= 15 ? C.green : marzaSpolu >= 0 ? C.orange : C.red} />
           </div>
         </Klik>
       </Card>
