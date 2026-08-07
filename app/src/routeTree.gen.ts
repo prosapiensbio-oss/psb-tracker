@@ -19,6 +19,7 @@ import { Route as ApiVzasStatusRouteImport } from './routes/api/vzas-status'
 import { Route as ApiVzasSettingsRouteImport } from './routes/api/vzas-settings'
 import { Route as ApiVzasNotesRouteImport } from './routes/api/vzas-notes'
 import { Route as ApiUsersRouteImport } from './routes/api/users'
+import { Route as ApiSsoRouteImport } from './routes/api/sso'
 import { Route as ApiSpravaRouteImport } from './routes/api/sprava'
 import { Route as ApiSessionRouteImport } from './routes/api/session'
 import { Route as ApiResetRouteImport } from './routes/api/reset'
@@ -91,6 +92,11 @@ const ApiVzasNotesRoute = ApiVzasNotesRouteImport.update({
 const ApiUsersRoute = ApiUsersRouteImport.update({
   id: '/api/users',
   path: '/api/users',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSsoRoute = ApiSsoRouteImport.update({
+  id: '/api/sso',
+  path: '/api/sso',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSpravaRoute = ApiSpravaRouteImport.update({
@@ -236,6 +242,7 @@ export interface FileRoutesByFullPath {
   '/api/reset': typeof ApiResetRoute
   '/api/session': typeof ApiSessionRoute
   '/api/sprava': typeof ApiSpravaRoute
+  '/api/sso': typeof ApiSsoRoute
   '/api/users': typeof ApiUsersRoute
   '/api/vzas-notes': typeof ApiVzasNotesRoute
   '/api/vzas-settings': typeof ApiVzasSettingsRoute
@@ -271,6 +278,7 @@ export interface FileRoutesByTo {
   '/api/reset': typeof ApiResetRoute
   '/api/session': typeof ApiSessionRoute
   '/api/sprava': typeof ApiSpravaRoute
+  '/api/sso': typeof ApiSsoRoute
   '/api/users': typeof ApiUsersRoute
   '/api/vzas-notes': typeof ApiVzasNotesRoute
   '/api/vzas-settings': typeof ApiVzasSettingsRoute
@@ -307,6 +315,7 @@ export interface FileRoutesById {
   '/api/reset': typeof ApiResetRoute
   '/api/session': typeof ApiSessionRoute
   '/api/sprava': typeof ApiSpravaRoute
+  '/api/sso': typeof ApiSsoRoute
   '/api/users': typeof ApiUsersRoute
   '/api/vzas-notes': typeof ApiVzasNotesRoute
   '/api/vzas-settings': typeof ApiVzasSettingsRoute
@@ -344,6 +353,7 @@ export interface FileRouteTypes {
     | '/api/reset'
     | '/api/session'
     | '/api/sprava'
+    | '/api/sso'
     | '/api/users'
     | '/api/vzas-notes'
     | '/api/vzas-settings'
@@ -379,6 +389,7 @@ export interface FileRouteTypes {
     | '/api/reset'
     | '/api/session'
     | '/api/sprava'
+    | '/api/sso'
     | '/api/users'
     | '/api/vzas-notes'
     | '/api/vzas-settings'
@@ -414,6 +425,7 @@ export interface FileRouteTypes {
     | '/api/reset'
     | '/api/session'
     | '/api/sprava'
+    | '/api/sso'
     | '/api/users'
     | '/api/vzas-notes'
     | '/api/vzas-settings'
@@ -450,6 +462,7 @@ export interface RootRouteChildren {
   ApiResetRoute: typeof ApiResetRoute
   ApiSessionRoute: typeof ApiSessionRoute
   ApiSpravaRoute: typeof ApiSpravaRoute
+  ApiSsoRoute: typeof ApiSsoRoute
   ApiUsersRoute: typeof ApiUsersRoute
   ApiVzasNotesRoute: typeof ApiVzasNotesRoute
   ApiVzasSettingsRoute: typeof ApiVzasSettingsRoute
@@ -529,6 +542,13 @@ declare module '@tanstack/react-router' {
       path: '/api/users'
       fullPath: '/api/users'
       preLoaderRoute: typeof ApiUsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/sso': {
+      id: '/api/sso'
+      path: '/api/sso'
+      fullPath: '/api/sso'
+      preLoaderRoute: typeof ApiSsoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/sprava': {
@@ -722,6 +742,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiResetRoute: ApiResetRoute,
   ApiSessionRoute: ApiSessionRoute,
   ApiSpravaRoute: ApiSpravaRoute,
+  ApiSsoRoute: ApiSsoRoute,
   ApiUsersRoute: ApiUsersRoute,
   ApiVzasNotesRoute: ApiVzasNotesRoute,
   ApiVzasSettingsRoute: ApiVzasSettingsRoute,

@@ -393,6 +393,51 @@ export function PSBApp() {
       .catch(() => {});
   }, []);
 
+/**
+ * Ktoré faktúry dokopy tvoria jednu platbu.
+ *
+ * Jeden nákup sa často rozpadne na viac dokladov — Alza rozdelí objednávku
+ * podľa skladov a z 2 588 Kč zaplatených naraz sú tri faktúry (2 202 + 175 +
+ * 199). Párovanie jedna platba = jedna faktúra ich nikdy nenájde a náklad
+ * zostane mimo výkazu.
+ *
+ * Hľadá sa najmenšia skupina, ktorá sa do tolerancie trafí. Prehľadáva sa
+ * úplne, ale len medzi dokladmi v okne ±7 dní a najviac po štvoriciach —
+ * väčšia objednávka sa rozpadne zriedka a kombinácií by inak boli tisíce.
+ */
+function skupinaFaktur(
+  kandidati: { cislo: string; celkom: number }[],
+  ciel: number,
+  tolerancia: number,
+): string[] | null {
+  // Jedna faktúra je najčastejší prípad — skúsi sa prvá a najlacnejšie.
+  let najlepsia: { cisla: string[]; odchylka: number } | null = null;
+  const zvaz = (cisla: string[], sucet: number) => {
+    const odchylka = Math.abs(sucet - ciel);
+    if (odchylka > tolerancia) return;
+    if (!najlepsia || cisla.length < najlepsia.cisla.length || (cisla.length === najlepsia.cisla.length && odchylka < najlepsia.odchylka)) {
+      najlepsia = { cisla, odchylka };
+    }
+  };
+  const n = Math.min(kandidati.length, 12);
+  for (let i = 0; i < n; i++) {
+    zvaz([kandidati[i].cislo], kandidati[i].celkom);
+    for (let j = i + 1; j < n; j++) {
+      zvaz([kandidati[i].cislo, kandidati[j].cislo], kandidati[i].celkom + kandidati[j].celkom);
+      for (let k = j + 1; k < n; k++) {
+        zvaz([kandidati[i].cislo, kandidati[j].cislo, kandidati[k].cislo], kandidati[i].celkom + kandidati[j].celkom + kandidati[k].celkom);
+        for (let l = k + 1; l < n; l++) {
+          zvaz(
+            [kandidati[i].cislo, kandidati[j].cislo, kandidati[k].cislo, kandidati[l].cislo],
+            kandidati[i].celkom + kandidati[j].celkom + kandidati[k].celkom + kandidati[l].celkom,
+          );
+        }
+      }
+    }
+  }
+  return najlepsia ? (najlepsia as { cisla: string[] }).cisla : null;
+}
+
   // Náklady od júla 2026 tečú z banky — Excel končí júnom. Sčítajú sa výdavky
   // podľa kategórie a mesiaca a zapíšu sa do P&L; staršie mesiace zostávajú
   // z Excelu, aby sa dali oboje porovnať.
@@ -458,12 +503,19 @@ export function PSBApp() {
           }
           // Sedí tento pohyb na niektorý doklad? Suma do koruny, dátum do
           // siedmich dní — karta sa zúčtuje o pár dní neskôr než nákup.
+          //
+          // Aj tu môže jedna platba pokrývať VIAC faktúr: Alza rozdelí
+          // objednávku podľa skladov a z jedného stiahnutia z karty sú tri
+          // doklady. Tolerancia zostáva korunová — skupina, ktorá dá presne
+          // zaplatenú sumu, je takmer isto tá správna.
           let rozpisany = false;
-          for (const [cislo, d] of doklady) {
-            if (pouzite.has(cislo)) continue;
-            if (Math.abs(d.celkom + p.suma) > 1) continue;
-            const rozdiel = Math.abs(Date.parse(p.datum) - Date.parse(d.datum)) / 86400000;
-            if (rozdiel > 7) continue;
+          const kandidatiB = [...doklady.entries()]
+            .filter(([c, d]) => !pouzite.has(c) && Math.abs(Date.parse(p.datum) - Date.parse(d.datum)) / 86400000 <= 7)
+            .map(([c, d]) => ({ cislo: c, celkom: d.celkom }));
+          const skupinaB = skupinaFaktur(kandidatiB, -p.suma, 1);
+          for (const cislo of skupinaB || []) {
+            const d = doklady.get(cislo);
+            if (!d) continue;
             pouzite.add(cislo);
             for (const pol of d.polozky) {
               if (!pol.kategoria || pol.kategoria === "mimo" || pol.kategoria.startsWith("vyplaty")) continue;
@@ -476,7 +528,6 @@ export function PSBApp() {
               });
             }
             rozpisany = true;
-            break;
           }
           if (rozpisany) continue;
           (sumy[mk] ||= {});
@@ -508,17 +559,23 @@ export function PSBApp() {
         // z peňaženky je len dôkaz, že sa zaplatilo, a kedy. Preto sa páruje
         // rovnako ako bankový pohyb, len s väčšou toleranciou: suma v Kč sa
         // prepočítava kurzom v čase transakcie, takže na korunu sedieť nemusí.
+        const bezDokladu: BtcNakup[] = [];
         for (const zoznam of Object.values(btcNakupy)) {
           for (const nakup of zoznam) {
             const czk = nakup.czk || 0;
             if (!czk) continue;
             const mk = String(nakup.datum).slice(0, 7);
             if (mk < PRVY_MESIAC_Z_FIO) continue;
-            for (const [cislo, d] of doklady) {
-              if (pouzite.has(cislo)) continue;
-              const tolerancia = Math.max(50, d.celkom * 0.02);
-              if (Math.abs(d.celkom - czk) > tolerancia) continue;
-              if (Math.abs(Date.parse(nakup.datum) - Date.parse(d.datum)) / 86400000 > 7) continue;
+            // Kandidáti: nepoužité doklady v okne ±7 dní. Jedna platba môže
+            // pokryť viac faktúr — Alza rozdelí objednávku podľa skladov.
+            const kandidati = [...doklady.entries()]
+              .filter(([c, d]) => !pouzite.has(c) && Math.abs(Date.parse(nakup.datum) - Date.parse(d.datum)) / 86400000 <= 7)
+              .map(([c, d]) => ({ cislo: c, celkom: d.celkom }));
+            const skupina = skupinaFaktur(kandidati, czk, Math.max(50, czk * 0.02));
+            if (!skupina) { bezDokladu.push(nakup); continue; }
+            for (const cislo of skupina) {
+              const d = doklady.get(cislo);
+              if (!d) continue;
               pouzite.add(cislo);
               for (const pol of d.polozky) {
                 if (!pol.kategoria || pol.kategoria === "mimo" || pol.kategoria.startsWith("vyplaty")) continue;
@@ -526,25 +583,17 @@ export function PSBApp() {
                 sumy[mk][pol.kategoria] = (sumy[mk][pol.kategoria] || 0) + pol.cena;
                 pridajDoRozpisu(rozpis, mk, pol.kategoria, {
                   datum: String(nakup.datum).slice(0, 10),
-                  popis: `${pol.nazov || d.polozky[0]?.dodavatel || "položka"} · zaplatené bitcoinom`,
+                  popis: `${pol.nazov || pol.dodavatel || "položka"} · zaplatené bitcoinom${skupina.length > 1 ? ` (${skupina.length} faktúry naraz)` : ""}`,
                   suma: pol.cena, zdroj: "faktura", doklad: cislo,
                 });
               }
-              break;
             }
           }
         }
-        // Ktoré výbery z peňaženky nenašli doklad — na kontrolu v registri.
-        setBtcBezDokladu(
-          Object.values(btcNakupy).flat().filter((x) => {
-            const czk = x.czk || 0;
-            if (!czk || String(x.datum).slice(0, 7) < PRVY_MESIAC_Z_FIO) return false;
-            return ![...doklady.entries()].some(([c, d]) =>
-              pouzite.has(c) &&
-              Math.abs(d.celkom - czk) <= Math.max(50, d.celkom * 0.02) &&
-              Math.abs(Date.parse(x.datum) - Date.parse(d.datum)) / 86400000 <= 7);
-          }),
-        );
+        // Ktoré výbery z peňaženky nenašli doklad — zoznam sa plní priamo pri
+        // párovaní, nie dodatočným hľadaním. Predtým sa to skúšalo znova a
+        // s inou logikou, takže výsledky sa mohli rozísť.
+        setBtcBezDokladu(bezDokladu);
 
         nastavRozpis(rozpis);
         // Zošit sa pozná podľa typu pohybu — mesiac netreba pýtať, vyplýva z
@@ -1069,16 +1118,29 @@ export function PSBApp() {
             Kokpit zavrel, človek by po návrate prišiel o rozpracovaný stav
             (filtre, rozbalený register, návrh uzávierky).
             Šípka ↗ je jediné miesto v hlavičke, ktoré hovorí „toto vedie von". */}
-        <a
-          href={BTC_APP}
-          target="_blank"
-          rel="noopener noreferrer"
-          title="Otvoriť bitcoinovú evidenciu v novej karte"
-          style={{ ...tab(false), display: "inline-flex", alignItems: "center", gap: 7, textDecoration: "none" }}
+        <button
+          onClick={() => {
+            // Okno sa otvorí HNEĎ, ešte pred dopytom na podpis. Keby sa čakalo
+            // na odpoveď a otváralo až potom, prehliadač by to vyhodnotil ako
+            // vyskakovacie okno bez kliknutia a zablokoval by ho.
+            const w = window.open("about:blank", "_blank", "noopener");
+            void fetch("/api/sso?vytvor=1", { credentials: "same-origin" })
+              .then((r) => r.json())
+              .then((j: { ok?: boolean; url?: string }) => {
+                const kam = j.ok && j.url ? j.url : BTC_APP;
+                if (w) w.location.replace(kam);
+                else window.open(kam, "_blank", "noopener");
+              })
+              // Keď sa podpis nepodarí, karta sa otvorí aspoň bez prihlásenia —
+              // horšie než prejsť rovno je len neprejsť vôbec.
+              .catch(() => { if (w) w.location.replace(BTC_APP); });
+          }}
+          title="Otvoriť bitcoinovú evidenciu v novej karte (prihlási sa sama)"
+          style={{ ...tab(false), display: "inline-flex", alignItems: "center", gap: 7 }}
         >
           <Icon name="bitcoin" /> Bitcoin
           <span style={{ fontSize: 11, opacity: 0.7 }}>↗</span>
-        </a>
+        </button>
       </nav>
       <div style={{ padding: 16, maxWidth: 1200, margin: "0 auto" }}>
         {active === "dashboard" && (
