@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { saveLead } from "../../lib/psb/client";
+import { fetchVzasSettings, saveLead, saveVzasSetting } from "../../lib/psb/client";
 import type { Ritual } from "../../lib/psb/rituals";
 import { Dennik } from "./Dennik";
 import { SOURCES } from "./Klienti";
@@ -42,6 +42,26 @@ export function ZapisButton({
   const [dopytBusy, setDopytBusy] = useState(false);
   const [dopytOk, setDopytOk] = useState("");
   const [poznMeno, setPoznMeno] = useState("");
+  // Kampaň / akcia — vlajka do marketingových grafov. Pomenované po ľudsky:
+  // „značka" nehovorí nič o tom, aký typ informácie sa čaká.
+  const [akciaText, setAkciaText] = useState("");
+  const [akciaDatum, setAkciaDatum] = useState(() => new Date().toISOString().slice(0, 10));
+  const [akciaBusy, setAkciaBusy] = useState(false);
+  const [akciaOk, setAkciaOk] = useState("");
+  const ulozAkciu = () => {
+    const t = akciaText.trim();
+    if (!t || akciaBusy) return;
+    setAkciaBusy(true);
+    void fetchVzasSettings().then((st) => {
+      const zoz = Array.isArray(st["mkt_znacky"]) ? (st["mkt_znacky"] as Record<string, unknown>[]) : [];
+      zoz.push({ id: `z${Date.now().toString(36)}`, datum: akciaDatum, text: t });
+      return saveVzasSetting("mkt_znacky", zoz);
+    }).then(() => {
+      setAkciaText("");
+      setAkciaOk(t);
+      setTimeout(() => setAkciaOk(""), 4000);
+    }).finally(() => setAkciaBusy(false));
+  };
   // Platné meno = existujúci klient. Voľný text sa neukladá — zápis bez
   // klienta nemá kam patriť a preklep by ho stratil.
   const vybranyKlient = klienti.find((k) => k.meno === poznMeno);
@@ -122,6 +142,31 @@ export function ZapisButton({
             </div>
             {dopytOk && <div style={{ fontSize: 11.5, color: C.green, marginTop: 6 }}>Zapísané: {dopytOk}. Detail doplníš v Klienti → Dopyty.</div>}
           </form>
+
+          {/* Kampaň / akcia — druhý najčastejší ručný zápis. Ide priamo do
+              grafu „Čo som robil" ako vlajka ⚑, žiadna navigácia. */}
+          <div style={{ marginBottom: 14, padding: "11px 13px", borderRadius: 10, border: `1px solid ${mix(C.orange, 28)}`, background: mix(C.orange, 5) }}>
+            <div style={{ fontSize: 12.5, fontWeight: 600, color: C.text, marginBottom: 3 }}>⚑ Kampaň / akcia v marketingu</div>
+            <div style={{ fontSize: 11, color: C.textDim, marginBottom: 8, lineHeight: 1.5 }}>
+              Jednou vetou, čo sa práve spustilo, vypnulo alebo zmenilo — reklama, nový formát obsahu, pauza,
+              kolaborácia. Ukáže sa ako vlajka v grafe Marketing → Čo som robil, aby o pol roka bolo vidieť,
+              prečo čísla vyzerali tak, ako vyzerali.
+            </div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              <input type="date" value={akciaDatum} onChange={(e) => setAkciaDatum(e.target.value)}
+                style={{ padding: "7px 9px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 12.5 }} />
+              <input
+                value={akciaText} onChange={(e) => setAkciaText(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); ulozAkciu(); } }}
+                placeholder="napr. spustená Meta kampaň na reel o kolene"
+                style={{ flex: "2 1 200px", minWidth: 0, padding: "7px 10px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 13 }} />
+              <button onClick={ulozAkciu} disabled={!akciaText.trim() || akciaBusy}
+                style={{ padding: "7px 14px", borderRadius: 8, border: `1px solid ${akciaText.trim() ? C.orange : C.border}`, background: akciaText.trim() ? mix(C.orange, 14) : "transparent", color: akciaText.trim() ? C.orange : C.textDim, fontSize: 12.5, fontWeight: 600, cursor: akciaText.trim() ? "pointer" : "default" }}>
+                {akciaBusy ? "Ukladám…" : "Uložiť"}
+              </button>
+            </div>
+            {akciaOk && <div style={{ fontSize: 11.5, color: C.green, marginTop: 6 }}>⚑ Zapísané: {akciaOk}</div>}
+          </div>
 
           {/* Denník klienta — rovnaký princíp ako dopyt: meno + text, bez
               navigácie. Zápisy sa PRIDÁVAJÚ a nikdy nemažú — poznámky v čase

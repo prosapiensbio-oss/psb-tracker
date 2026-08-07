@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { C, mix, S } from "../../lib/psb/theme";
-import { Card, Empty, H3, Info, Select, TableWrap } from "./ui";
+import { Card, Empty, H3, Info, Select, TableWrap, ValueBars } from "./ui";
 
 // Všetky kanály, nie len Instagram.
 //
@@ -78,17 +78,134 @@ export function Kanaly() {
     );
   }
 
+  // ── výber toho, na čom záleží ──────────────────────────────────────────────
+  //
+  // Zostava má ~160 metrík a väčšina z nich je šum (Followers by city, Post
+  // reactions…). Človek, ktorý im nerozumie, v tom zozname nenájde nič — a
+  // človek, ktorý im rozumie, tam nepotrebuje chodiť. Preto hore stojí osem
+  // čísel, ktoré pre PSB naozaj niečo znamenajú, každé s vysvetlením po
+  // ľudsky, a celý zoznam je zbalený dole pre kontrolu.
+  //
+  // Hľadá sa bez ohľadu na veľkosť písmen — zostava má duplicitné varianty
+  // („Story exits" aj „Story Exits") z dvoch čítaní PDF.
+  const hodnotaM = (kanal: string, metrika: string): number | null => {
+    const r = vMesiaci.find((x) => x.kanal === kanal && x.metrika.toLowerCase() === metrika.toLowerCase());
+    return r ? r.hodnota : null;
+  };
+  const igSled = hodnotaM("Instagram", "Followers");
+  const igPrir = hodnotaM("Instagram", "Followers balance");
+  const igViews = hodnotaM("Instagram", "Views");
+  const igReel = hodnotaM("Instagram", "Avg reach per reel");
+  const igSaved = hodnotaM("Instagram", "Saved");
+  const igShares = hodnotaM("Instagram", "Shares");
+  const adsSpent = hodnotaM("Meta Ads", "Spent");
+  const adsClicks = hodnotaM("Meta Ads", "Clicks");
+  const webVisitors = hodnotaM("Web", "Visitors");
+  const konkSled = hodnotaM("Konkurencia", "Followers");
+
+  // Trend vybranej metriky po mesiacoch. Dnes je nahratý jeden mesiac, takže
+  // graf ukáže jeden stĺpec — ale s každou ďalšou zostavou rastie sám a práve
+  // na to tu je: o pol roka toto bude hlavný pohľad a tabuľka len poznámka.
+  const TREND_METRIKY: { id: string; label: string; kanal: string; metrika: string }[] = [
+    { id: "sled", label: "Sledovatelia IG", kanal: "Instagram", metrika: "Followers" },
+    { id: "views", label: "Videnia IG", kanal: "Instagram", metrika: "Views" },
+    { id: "reel", label: "Ø dosah reelu", kanal: "Instagram", metrika: "Avg reach per reel" },
+    { id: "ads", label: "Reklama Kč", kanal: "Meta Ads", metrika: "Spent" },
+    { id: "web", label: "Návštevníci webu", kanal: "Web", metrika: "Visitors" },
+  ];
+  const [trendId, setTrendId] = useState("sled");
+  const trendCfg = TREND_METRIKY.find((t) => t.id === trendId)!;
+  const trendData = useMemo(() => {
+    const podla = new Map<string, number>();
+    for (const r of riadky) {
+      if (r.kanal === trendCfg.kanal && r.metrika.toLowerCase() === trendCfg.metrika.toLowerCase()) {
+        podla.set(r.mesiac, r.hodnota);
+      }
+    }
+    return [...podla.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([m, v]) => ({ label: m, value: v }));
+  }, [riadky, trendCfg]);
+
+  const [celyZoznam, setCelyZoznam] = useState(false);
+  // Duplicitné varianty tej istej metriky (dve čítania PDF) — v plnom zozname
+  // sa nechá tá s vyššou hodnotou, druhá je podmnožina.
+  const skupinyBezDup = useMemo(() => skupiny.map(([kanal, rs]) => {
+    const podla = new Map<string, KanalRiadok>();
+    for (const r of rs) {
+      const k = r.metrika.toLowerCase();
+      const uz = podla.get(k);
+      if (!uz || Math.abs(r.hodnota) > Math.abs(uz.hodnota)) podla.set(k, r);
+    }
+    return [kanal, [...podla.values()]] as [string, KanalRiadok[]];
+  }), [skupiny]);
+  const pocetVsetkych = skupinyBezDup.reduce((a, [, rs]) => a + rs.length, 0);
+
+  const stat = (label: string, hodnota: string, vysvetlenie: string, farba?: string) => (
+    <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 12px" }}>
+      <div style={{ fontSize: 19, fontWeight: 700, color: farba || C.text, fontVariantNumeric: "tabular-nums" }}>{hodnota}</div>
+      <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>
+        <Info text={vysvetlenie} label={label} />
+      </div>
+    </div>
+  );
+
   return (
     <Card>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-        <H3><Info text="Mesačné čísla za všetky kanály z Metricoolu. Zmena je oproti predošlému mesiacu tak, ako ju uvádza zostava — appka ju neprepočítava, aby sa nelíšila od toho, čo vidíš v Metricoole. Instagram je tu v súhrne; príspevok po príspevku je v ostatných kartách, ktoré čítajú CSV export." label="Kanály — mesačný súhrn" /></H3>
+        <H3><Info text="Osem čísel, na ktorých pre PSB záleží — vybrané zo ~160 metrík mesačnej zostavy Metricoolu. Celý zoznam je dole v rozbaľovači, keby bolo treba niečo dohľadať. Zmena je oproti predošlému mesiacu tak, ako ju uvádza zostava." label="Kanály — mesačný súhrn" /></H3>
         {mesiace.length > 1 && (
           <Select value={mesiac} onChange={setMesiac} options={mesiace.map((m) => ({ value: m, label: m }))} />
         )}
       </div>
 
-      <div style={{ marginTop: 12 }}>
-        {skupiny.map(([kanal, rs]) => (
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, margin: "12px 0" }}>
+        {igSled != null && stat("Sledovatelia IG", `${cislo(igSled)}${igPrir != null ? ` (${igPrir >= 0 ? "+" : ""}${cislo(igPrir)})` : ""}`,
+          "Koľko ľudí odoberá váš Instagram; v zátvorke prírastok za mesiac. Rastie pomaly a to je v poriadku — dôležitejšie je, KTO to je, než koľko ich je.", C.accentLight)}
+        {igViews != null && stat("Videnia IG", cislo(igViews),
+          "Koľkokrát niekto videl váš obsah za mesiac (všetky formáty spolu). Skáče podľa toho, či niektorý reel chytil algoritmus — jeden mesiac nič neznamená, trend áno.")}
+        {igReel != null && stat("Ø dosah reelu", cislo(igReel),
+          "Koľko ľudí v priemere zasiahne jeden reel. Toto je vaša „výrobná kvalita\u201d — nezávisí od počtu publikovaní, len od toho, či obsah funguje.")}
+        {(igSaved != null || igShares != null) && stat("Uloženia + zdieľania", cislo((igSaved || 0) + (igShares || 0)),
+          "Najsilnejší signál zo všetkých: obsah, ktorý si ľudia ODKLADAJÚ a POSIELAJÚ známym. Desať uložení znamená viac než sto lajkov — lajk je zdvorilosť, uloženie je úmysel.", C.green)}
+        {adsSpent != null && stat("Reklama", `${cislo(Math.round(adsSpent))} Kč`,
+          adsClicks ? `Minuté na Meta Ads za mesiac. Priniesla ${cislo(adsClicks)} klikov, teda ~${(adsSpent / adsClicks).toFixed(1)} Kč za klik. Klik ešte nie je klient — spojenie s klientmi ukazuje lievik dopytov.` : "Minuté na Meta Ads za mesiac.", C.orange)}
+        {webVisitors != null && stat("Návštevníci webu", cislo(webVisitors),
+          "Ľudí na webe za mesiac (z Metricoolu; presnejšie čísla má GA4 v karte Dosah). Web je miesto, kam reklama aj Instagram posielajú — keď rastie obsah a web nie, niekde po ceste sa strácajú.")}
+        {konkSled != null && stat("Konkurencia — sledovatelia", cislo(konkSled),
+          "Sledovatelia sledovanej konkurencie. Nie je to súper, je to mierka: keď rastú rovnako rýchlo ako vy, hýbe sa trh, nie vy.", C.textDim)}
+      </div>
+
+      {/* Trend po mesiacoch — s jednou zostavou jeden stĺpec, s každou ďalšou
+          rastie sám. */}
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 6 }}>
+        <span style={{ fontSize: 11, color: C.textDim }}>Trend:</span>
+        {TREND_METRIKY.map((t) => (
+          <button key={t.id} onClick={() => setTrendId(t.id)}
+            style={{ padding: "4px 11px", borderRadius: 14, border: `1px solid ${trendId === t.id ? C.accent : C.border}`, background: trendId === t.id ? C.accentBg : "transparent", color: trendId === t.id ? C.accentLight : C.textMuted, fontSize: 11.5, cursor: "pointer" }}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+      {trendData.length ? (
+        <ValueBars data={trendData} color={trendId === "ads" ? C.orange : C.accent}
+          fmt={(n) => (n >= 10000 ? `${Math.round(n / 1000)}k` : cislo(Math.round(n)))} height={150} alignEnd />
+      ) : (
+        <Empty>Táto metrika v nahratých zostavách nie je.</Empty>
+      )}
+      {trendData.length === 1 && (
+        <div style={{ fontSize: 11, color: C.textDim, marginTop: 2 }}>
+          Zatiaľ jedna zostava — graf porastie s každým ďalším mesiacom sám.
+        </div>
+      )}
+
+      {/* Celý zoznam — zbalený. Kontrola, nie čítanie. */}
+      <div onClick={() => setCelyZoznam((v) => !v)}
+        style={{ marginTop: 14, fontSize: 12.5, color: C.textMuted, cursor: "pointer", userSelect: "none" }}>
+        <span style={{ display: "inline-block", width: 14, color: C.textDim, fontSize: 9 }}>{celyZoznam ? "\u25bc" : "\u25b6"}</span>
+        Všetky metriky zo zostavy ({pocetVsetkych})
+      </div>
+      {celyZoznam && (
+      <div style={{ marginTop: 10 }}>
+        {skupinyBezDup.map(([kanal, rs]) => (
           <div key={kanal} style={{ marginBottom: 16 }}>
             <div style={{ fontSize: 12.5, fontWeight: 700, color: C.accentLight, padding: "4px 0 6px", borderBottom: `1px solid ${mix(C.accent, 30)}` }}>
               {kanal}
@@ -108,7 +225,7 @@ export function Kanaly() {
                     <td style={S.td}>{r.metrika}</td>
                     <td style={{ ...S.td, textAlign: "right", fontWeight: 600, color: C.text, fontVariantNumeric: "tabular-nums" }}>{cislo(r.hodnota)}</td>
                     <td style={{ ...S.td, textAlign: "right", color: farbaZmeny(r.zmena), fontVariantNumeric: "tabular-nums" }}>
-                      {r.zmena == null ? "—" : `${sipka(r.zmena)} ${r.zmena.toFixed(1)} %`}
+                      {r.zmena == null ? "\u2014" : `${sipka(r.zmena)} ${r.zmena.toFixed(1)} %`}
                     </td>
                     <td style={{ ...S.td, color: C.textDim, fontSize: 11.5 }}>{r.poznamka}</td>
                   </tr>
@@ -117,12 +234,12 @@ export function Kanaly() {
             </TableWrap>
           </div>
         ))}
+        <div style={{ fontSize: 11, color: C.textDim, marginTop: 4, lineHeight: 1.55 }}>
+          Zdroj: mesačná zostava Metricoolu prečítaná Claudom. Duplicitné varianty metrík (dve čítania PDF) sú
+          zlúčené — nechala sa vyššia hodnota.
+        </div>
       </div>
-
-      <div style={{ fontSize: 11, color: C.textDim, marginTop: 4, lineHeight: 1.55 }}>
-        Zdroj: mesačná zostava Metricoolu prečítaná Claudom. Čísla vytlačené v zostave sú presné; čo je v nej len
-        nakreslené v grafe, je odhad — preto tu nie sú vedľa čísel z CSV exportu, ktoré sú presné vždy.
-      </div>
+      )}
     </Card>
   );
 }

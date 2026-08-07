@@ -217,10 +217,10 @@ function ZnackyBlok({ znacky, uloz, okno }: { znacky: MktZnacka[]; uloz: (z: Mkt
   return (
     <div style={{ marginTop: 10 }}>
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-        <span style={{ fontSize: 11, color: C.textDim }}>⚑ značky udalostí</span>
+        <span style={{ fontSize: 11, color: C.textDim }}>⚑ kampane & akcie — čo v tom čase bežalo</span>
         <button onClick={() => setPridavam((v) => !v)}
           style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 6, padding: "2px 9px", color: C.accentLight, fontSize: 11, cursor: "pointer" }}>
-          {pridavam ? "zavrieť" : "+ značka"}
+          {pridavam ? "zavrieť" : "+ kampaň / akcia"}
         </button>
       </div>
       {pridavam && (
