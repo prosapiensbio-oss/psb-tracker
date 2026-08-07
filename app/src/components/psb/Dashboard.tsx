@@ -22,7 +22,7 @@ import { nastavPrijmyZTrackera, pnlCalc, poslednyMesiacSDatami, salaryCalc, vzas
 import { fetchBtcReserve } from "../../lib/psb/client";
 import { PrehladPanel, useZmenyOdMinule, type Pristroj, type Zmena } from "./Prehlad";
 import {
-  centerBody, GrafyKniznica, MiniStat, OBDOBIA_DASH, SEKCIE, useExtraGrafy, VYCHODZIE, WIDGETS,
+  centerBody, GrafyKniznica, hraniceObdobia, MiniStat, OBDOBIA_DASH, SEKCIE, useExtraGrafy, VYCHODZIE, WIDGETS,
   type SekciaId, type WidgetMeta,
 } from "./DashGrafy";
 import { tokyKlientov } from "./Fluktuacia";
@@ -794,8 +794,21 @@ export function Dashboard({
     [kotva],
   );
 
+  // Filter obdobia platí aj na týždenné grafy. Bez toho sa na Vyťažení — a to
+  // je teraz prvá sekcia — dal filter prepnúť a nezmenilo sa nič, čo z neho
+  // robilo ozdobu. Týždeň patrí do okna podľa mesiaca, v ktorom začína.
+  const okno = useMemo(
+    () => hraniceObdobia(obdobie, kotva.plny || new Date().toISOString().slice(0, 7)),
+    [obdobie, kotva.plny],
+  );
+  const vOkne = (mk: string) => mk >= okno.od && mk <= okno.do_;
+  const oknoTyzdnov = useMemo(
+    () => weekRows.filter(([k]) => vOkne(k.slice(0, 7))),
+    [weekRows, okno], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
   const weeklyHours = useMemo(() => {
-    const maIneho = weekRows.some(([, v]) => v.iny > 0);
+    const maIneho = oknoTyzdnov.some(([, v]) => v.iny > 0);
     const series = trainer === "all"
       ? [
           { name: "Jerry", color: C.accent },
@@ -805,14 +818,14 @@ export function Dashboard({
       : [{ name: trainer, color: C.accent }];
     return {
       series,
-      data: weekRows.map(([k, v]) => ({
+      data: oknoTyzdnov.map(([k, v]) => ({
         label: weekLabel(k),
         values: trainer === "all"
           ? (maIneho ? [v.Jerry, v.Terezka, v.iny] : [v.Jerry, v.Terezka])
           : [trainer === "Jerry" ? v.Jerry : v.Terezka],
       })),
     };
-  }, [weekRows, trainer]);
+  }, [oknoTyzdnov, trainer]);
 
   // Ø / max / min weekly hours (basis follows the trainer pill: "all" = PSB total per week).
   const weekStats = useMemo(() => {
@@ -854,7 +867,7 @@ export function Dashboard({
   const zones = useMemo(() => {
     let zdrava = 0, pod = 0, nad = 0;
     const trainers = trainer === "all" ? (["Jerry", "Terezka"] as const) : [trainer];
-    for (const [, v] of weekRows) {
+    for (const [, v] of oknoTyzdnov) {
       for (const t of trainers) {
         const h = (v as Record<string, number>)[t];
         if (!h) continue;
@@ -864,7 +877,7 @@ export function Dashboard({
       }
     }
     return { zdrava, pod, nad, total: zdrava + pod + nad };
-  }, [weekRows, trainer]);
+  }, [oknoTyzdnov, trainer]);
 
   // Value of a month in the chosen earnings mode. "prijate" (cash) is studio-level
   // (payments aren't attributed to a trainer), so it ignores the trainer pill.
@@ -874,8 +887,12 @@ export function Dashboard({
   const earnings = useMemo(() => {
     // Po posledný plný mesiac — rozrobený mesiac kreslil stĺpec pri zemi
     // a graf hlásil prepad. Predpoveď za ním nasleduje ako samostatný stĺpec.
-    const months = doPlnehoMesiaca(monthlyFinance(data), kotva, (m) => m.month);
+    const months = doPlnehoMesiaca(monthlyFinance(data), kotva, (m) => m.month).filter((m) => vOkne(m.month));
     const bars: { label: string; value: number; forecast?: boolean }[] = months.map((m) => ({ label: monthLabel(m.month), value: monthVal(m) }));
+    // Predpoveď dáva zmysel len vtedy, keď okno siaha po súčasnosť. Pri pohľade
+    // na rok 2025 by stĺpec „august 2026" visel vo vzduchu.
+    const doSucasnosti = okno.do_ >= (kotva.plny || "0000-00");
+    if (!doSucasnosti) return bars;
     const pred = predictEarnings(data, clients, { excludeSpecial: false });
     const next2 = pred.months.slice(0, 1);
     if (earnMode === "prijate") {
@@ -890,12 +907,15 @@ export function Dashboard({
       for (const pm of next2) bars.push({ label: monthLabel(pm.month), value: Math.round(pm.guaranteed + pm.expected), forecast: true });
     }
     return bars;
-  }, [data, clients, trainer, earnMode, kotva]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [data, clients, trainer, earnMode, kotva, okno]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Ø / max / min monthly earnings over ACTUAL months (forecast excluded), following the trainer pill + mode.
   // Len plné mesiace: rozrobený mesiac bol vždy „min" a kazil aj priemer.
   const earningStats = useMemo(() => {
+    // Ø / max / min musia platiť pre to isté okno ako stĺpce nad nimi — inak
+    // by graf ukazoval rok 2025 a priemer pod ním celú históriu.
     const pts = doPlnehoMesiaca(monthlyFinance(data), kotva, (m) => m.month)
+      .filter((m) => vOkne(m.month))
       .map((m) => ({ key: m.month, label: monthLabel(m.month), v: monthVal(m) }))
       .filter((p) => p.v > 0);
     if (!pts.length) return null;
@@ -907,7 +927,7 @@ export function Dashboard({
       if (p.v < min.v) min = p;
     }
     return { avg: sum / pts.length, max, min, n: pts.length };
-  }, [data, trainer, earnMode, kotva]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [data, trainer, earnMode, kotva, okno]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sixMPhases = useMemo(() => {
     const f = sixM.filter((c) => matchT(c.primaryTrainer));
@@ -1090,7 +1110,7 @@ export function Dashboard({
     zony: (
       <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column" }}>
         <H3>
-          <Info text="Koľko trénerských týždňov padlo do zdravej zóny (24–34h), pod ňu alebo nad ňu — za celé obdobie." label="Týždne v zdravej zóne" />
+          <Info text="Koľko trénerských týždňov padlo do zdravej zóny (24–34h), pod ňu alebo nad ňu. Rešpektuje filter obdobia nad grafmi — pri „Celé obdobie“ je to celá história." label="Týždne v zdravej zóne" />
         </H3>
         <div
           style={{ ...centerBody, cursor: zones.total ? "pointer" : "default" }}
