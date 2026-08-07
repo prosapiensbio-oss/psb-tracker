@@ -352,7 +352,16 @@ export function useExtraGrafy({
     const { p, j, t, be, jarek } = vzas;
 
     // ── Peniaze ──────────────────────────────────────────────────────────────
-    const idx6 = Array.from({ length: Math.min(6, VZAS_MONTHS.length) }, (_, k) => VZAS_MONTHS.length - Math.min(6, VZAS_MONTHS.length) + k);
+    // Posledných šesť mesiacov S DÁTAMI, nie posledných šesť slotov v poli.
+    // VZAS má mesiace nadopred, takže sa do priemeru počítal aj rozrobený
+    // (a prázdny) august — break-even tým klesol o desatinu a „mesiace
+    // prevádzky z rezervy" vychádzali na 1,2 namiesto 1,0. Tá istá rodina
+    // chýb ako kotvaDat: kód, ktorý predpokladá, že dáta siahajú tam, kam
+    // siaha kalendár. Dotýkalo sa to všetkých štyroch čísel v „Zdravie firmy"
+    // aj karty bitcoinovej rezervy.
+    const posl = poslednyMesiacSDatami();
+    const dlzka = Math.min(6, posl + 1);
+    const idx6 = Array.from({ length: dlzka }, (_, k) => posl - dlzka + 1 + k);
     const beAvg = idx6.reduce((a, i) => a + be[i], 0) / idx6.length;
     const prAvg = idx6.reduce((a, i) => a + p.prijmy[i], 0) / idx6.length;
     const rezerva = beAvg > 0 ? ((prAvg - beAvg) / beAvg) * 100 : 0;

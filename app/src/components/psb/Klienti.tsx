@@ -359,8 +359,12 @@ export const ZDROJE = [
 
 export function Klienti({ clients, capacity, actions, focus, leads, trainer, onTrainer, sixM, sub, onSub, data, btcSatsKlienti = {} }: { clients: Record<string, ClientAgg>; capacity: CapacityRow[]; actions: Actions; focus?: NavFocus | null; leads: Lead[]; trainer: string; onTrainer: (t: string) => void; sixM: SixMRow[]; sub: string; onSub: (s: string) => void; data: PSBData; btcSatsKlienti?: Record<string, number> }) {
   const [focusClient, setFocusClient] = useState<string | null>(null);
+  const [skupina, setSkupina] = useState<{ label: string; mena: string[] } | null>(null);
   useEffect(() => {
     if (focus?.client) setFocusClient(focus.client);
+    // Skupina a jeden klient sa vylučujú — otvoriť oboje naraz by znamenalo
+    // dva filtre, ktoré si protirečia.
+    if (focus?.skupina) { setSkupina(focus.skupina); setFocusClient(null); }
   }, [focus?.nonce]); // eslint-disable-line react-hooks/exhaustive-deps
   const fTrainer = trainer;
   const setFTrainer = onTrainer;
@@ -448,6 +452,13 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
     }
     // Table-only filters (name search + package type + modality + package bucket from the donut).
     let arr = baseList;
+    // Skupina z dashboardu ide cez `all`, nie cez baseList — dlaždica hovorí
+    // o konkrétnych ľuďoch a tí sa nesmú stratiť tým, že je práve zapnutý
+    // filter trénera alebo skryté neaktívne.
+    if (skupina) {
+      const set = new Set(skupina.mena.map(normName));
+      arr = all.filter((c) => set.has(normName(c.name)));
+    }
     if (membershipF) arr = arr.filter((c) => membershipBucket(c.membership) === membershipF);
     if (typeF.startsWith("grp:")) arr = arr.filter((c) => c.clientType === typeF.slice(4));
     else if (typeF.startsWith("m:")) arr = arr.filter((c) => c.membership === typeF.slice(2));
@@ -471,7 +482,7 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
       bitcoin: (c) => (c.bitcoin ? 1 : 0),
       zdroj: (c) => c.zdroj || "zzz",
     });
-  }, [baseList, membershipF, typeF, modalityF, lenBezZdroja, nameSearch, sorted, focusClient, all]);
+  }, [baseList, membershipF, typeF, modalityF, lenBezZdroja, nameSearch, sorted, focusClient, all, skupina]);
 
   const donut = useMemo(
     () => SEGMENTS.map((s) => ({ label: s, value: list.filter((c) => c.segment === s).length, color: segColor(s) })),
@@ -656,6 +667,10 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
           {focusClient ? (
             <button onClick={() => setFocusClient(null)} style={{ background: C.accentBg, border: `1px solid ${C.accent}`, borderRadius: 6, padding: "5px 10px", color: C.accentLight, fontSize: 12, cursor: "pointer", fontWeight: 600 }}>
               Vybraný klient: {focusClient} ✕ (zobraziť všetkých)
+            </button>
+          ) : skupina ? (
+            <button onClick={() => setSkupina(null)} style={{ background: mix(C.orange, 12), border: `1px solid ${C.orange}`, borderRadius: 6, padding: "5px 10px", color: C.orange, fontSize: 12, cursor: "pointer", fontWeight: 600 }}>
+              {skupina.label} ({skupina.mena.length}) ✕ (zobraziť všetkých)
             </button>
           ) : (
             <>

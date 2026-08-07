@@ -379,6 +379,26 @@ export function Dashboard({
   const [earnMode, setEarnMode] = useState<"vyfakturovane" | "prijate">("prijate");
   const [arranging, setArranging] = useState(false);
   const [kniznica, setKniznica] = useState(false);
+  // Grafy sa zobrazujú po jednej sekcii. Predtým boli všetky štyri pod sebou a
+  // dashboard mal cez dva metre výšky — kto chcel marketing, skroloval cez
+  // peniaze, vyťaženie aj klientov. Kotvy to neriešili: doskrolovali, ale
+  // obrazovka zostala plná všetkého ostatného.
+  const [sekcia, setSekcia] = useState<SekciaId>(() => {
+    try {
+      const u = localStorage.getItem("psb-dash-sekcia");
+      return (SEKCIE.some((x) => x.id === u) ? u : "peniaze") as SekciaId;
+    } catch {
+      return "peniaze";
+    }
+  });
+  const zvolSekciu = (id: SekciaId) => {
+    setSekcia(id);
+    try {
+      localStorage.setItem("psb-dash-sekcia", id);
+    } catch {
+      /* ignore */
+    }
+  };
   const layout = useDashLayout();
   const cols = useDashColumns();
   const telefon = useTelefon();
@@ -645,8 +665,13 @@ export function Dashboard({
       pasmo: !ohrozeni.length ? "ok" : podiel > 25 ? "zle" : podiel > 15 ? "pozor" : "ok",
       poznamka: ohrozeni.length ? ohrozeni.slice(0, 2).map((c) => c.name.split(" ")[0]).join(", ") + (ohrozeni.length > 2 ? ` +${ohrozeni.length - 2}` : "") : undefined,
       dobreHore: false,
-      vysvetlenie: "Pravidelní klienti (Anchor alebo Stabilný), ktorí 14 a viac dní netrénovali. Hranica 14 dní nie je odhad: klient, ktorý toľko vynechá, odchádza zhruba šesťkrát častejšie než ten, čo chodí (48 % vs 8 %). Zdravé je do 15 % aktívnych, nad 25 % je to poplach. Kým je odmlčaný, dá sa ešte získať späť — potom už len ťažko.",
-      kam: () => onNavigate("klienti"),
+      vysvetlenie: "Pravidelní klienti (Anchor alebo Stabilný), ktorí 14 a viac dní netrénovali. Hranica 14 dní nie je odhad: klient, ktorý toľko vynechá, odchádza zhruba šesťkrát častejšie než ten, čo chodí (48 % vs 8 %). Zdravé je do 15 % aktívnych, nad 25 % je to poplach. Kým je odmlčaný, dá sa ešte získať späť — potom už len ťažko. Klik otvorí zoznam presne týchto ľudí.",
+      // Klik otvorí Klientov LEN s týmito ľuďmi. Doviesť na zoznam všetkých a
+      // nechať človeka hľadať tých jedenásť je presne tá práca, ktorú mala
+      // dlaždica ušetriť.
+      kam: ohrozeni.length
+        ? () => onNavigate("klienti", undefined, { skupina: { label: "Odmlčaní 14+ dní", mena: ohrozeni.map((c) => c.name) }, nonce: Date.now() })
+        : () => onNavigate("klienti"),
     });
 
     const dopytyRad = (() => {
@@ -1409,24 +1434,32 @@ export function Dashboard({
         </div>
       </div>
 
-      {/* Kotvy sekcií vo vlastnom riadku — klik zroluje, nič neprepína ani
-          nefiltruje. Vedľa prepínača trénerov splývali s ním do jedného pásu,
-          hoci robia niečo úplne iné. Sekcia, ktorá nemá zapnutý ani jeden graf,
-          tu nie je — kotva do prázdna je len sklamanie. */}
-      <div style={{ display: "flex", gap: 2, alignItems: "center", flexWrap: "wrap", marginBottom: 12, paddingBottom: 2 }}>
-        {SEKCIE.filter((s) => WIDGETS.some((w) => w.sekcia === s.id && !layout.hidden.includes(w.id))).map((s, i) => (
-          <span key={s.id} style={{ display: "inline-flex", alignItems: "center" }}>
-            {i > 0 && <span style={{ color: mix(C.textDim, 70), fontSize: 11, margin: "0 3px" }}>·</span>}
-            <button
-              onClick={() => document.getElementById(`sekcia-${s.id}`)?.scrollIntoView({ behavior: "smooth", block: "start" })}
-              title={s.popis}
-              style={{ background: "none", border: "none", color: C.textMuted, fontSize: 12.5, cursor: "pointer", padding: "3px 7px" }}
-            >
-              {s.label}
-            </button>
-          </span>
-        ))}
-      </div>
+      {/* Prepínač sekcií. Pri usporadúvaní sa vypína — presúvať karty medzi
+          sekciami, z ktorých je vidieť len jedna, sa nedá. */}
+      {!arranging && (
+        <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginBottom: 12 }}>
+          {SEKCIE.map((sk) => {
+            const pocet = WIDGETS.filter((w) => w.sekcia === sk.id && !layout.hidden.includes(w.id)).length;
+            const aktivna = sekcia === sk.id;
+            return (
+              <button
+                key={sk.id}
+                onClick={() => zvolSekciu(sk.id)}
+                title={sk.popis}
+                style={{
+                  padding: "6px 14px", borderRadius: 18, fontSize: 12.5, cursor: "pointer",
+                  border: `1px solid ${aktivna ? C.accent : C.border}`,
+                  background: aktivna ? C.accentBg : "transparent",
+                  color: aktivna ? C.accentLight : pocet ? C.textMuted : C.textDim,
+                  fontWeight: aktivna ? 600 : 400,
+                }}
+              >
+                {sk.label} <span style={{ color: aktivna ? mix(C.accentLight, 70) : C.textDim, fontSize: 11 }}>{pocet}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {kniznica && (
         <GrafyKniznica
@@ -1447,9 +1480,16 @@ export function Dashboard({
       )}
 
 
-      {SEKCIE.map((s) => {
+      {SEKCIE.filter((s) => arranging || s.id === sekcia).map((s) => {
         const ids = shown.filter((id) => WIDGETS.find((w) => w.id === id)?.sekcia === s.id);
-        if (!ids.length) return null;
+        if (!ids.length) {
+          // Prázdna sekcia by po prepnutí nechala bielu plochu bez vysvetlenia.
+          return arranging ? null : (
+            <div key={s.id} style={{ padding: "18px 14px", borderRadius: 10, border: `1px dashed ${mix(C.border, 80)}`, color: C.textMuted, fontSize: 12.5 }}>
+              V tejto sekcii nemáš zapnutý žiadny graf. Zapni si ich cez <strong style={{ color: C.text }}>▦ Grafy</strong>.
+            </div>
+          );
+        }
         return (
           // scrollMarginTop nechá pri zrolovaní hlavičku sekcie pod lepiacim headerom.
           <div key={s.id} id={`sekcia-${s.id}`} style={{ scrollMarginTop: 64, marginBottom: 14 }}>

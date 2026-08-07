@@ -54,7 +54,14 @@ export type Actions = {
 };
 
 // Deep-link from Dashboard click-throughs: focus one week (Tréningy → Prehľad) or one month (Financie → Zárobky).
-export type NavFocus = { week?: string; month?: string; client?: string; trainer?: string; nonce?: number };
+export type NavFocus = {
+  week?: string; month?: string; client?: string; trainer?: string; nonce?: number;
+  /** Klik na dlaždicu, ktorá hovorí o SKUPINE ľudí (napr. „11 odmlčaných“),
+   *  otvorí Klientov len s nimi. Predtým doviedol na zoznam všetkých a človek
+   *  si tých jedenásť musel nájsť sám — čo je presne tá práca, ktorú mala
+   *  dlaždica ušetriť. */
+  skupina?: { label: string; mena: string[] };
+};
 
 // Five top-level areas, each answering a different question, left to right as a
 // story: what is happening now → the work → where the next client comes from →
