@@ -35,7 +35,6 @@ import { Login } from "./Login";
 import { Dashboard } from "./Dashboard";
 import { Treningy } from "./Treningy";
 import { Klienti } from "./Klienti";
-import { Financie } from "./Financie";
 import { Marketing } from "./Marketing";
 import { Vysledky, Vzas } from "./Vzas";
 import { Udaje } from "./Udaje";
@@ -68,7 +67,11 @@ const TABS = [
   // z PTmindera, 6M.
   { id: "tracker", label: "Prevádzka", icon: "activity" },
   { id: "marketing", label: "Marketing", icon: "activity" },
-  { id: "vzas", label: "VZAS", icon: "wallet" },
+  // „Peniaze" = zlúčené bývalé Prevádzka→Financie + VZAS. Dohodnuté „po
+  // Fio": jedna záložka pre všetky peniaze namiesto dvoch miest, medzi
+  // ktorými blúdil aj Jarvis. Id zostáva „vzas" — visia na ňom uložené
+  // rozloženia, register aj odkazy.
+  { id: "vzas", label: "Peniaze", icon: "wallet" },
   { id: "vysledky", label: "Výsledky", icon: "calendar" },
   // Údaje sú posledné a zámerne mimo príbehu: nie je to pohľad na štúdio, je to
   // obsluha appky — nahrávanie, uzávierky, audit, kontá, záloha, vzhľad, reset.
@@ -80,7 +83,6 @@ const TABS = [
 const TRACKER_SECTIONS = [
   { id: "treningy", label: "Tréningy", icon: "calendar" },
   { id: "klienti", label: "Klienti", icon: "userCheck" },
-  { id: "financie", label: "Financie", icon: "wallet" },
 ];
 const TRACKER_IDS = TRACKER_SECTIONS.map((s) => s.id);
 
@@ -108,10 +110,9 @@ export function PSBApp() {
   // vedieť, či je to vyplnené, skôr než tam človek príde.
   const [zapisy, setZapisy] = useState<{ weeks: Record<string, Record<string, string>>; mesiace: Record<string, { note?: string; answers?: Record<string, string> }> }>({ weeks: {}, mesiace: {} });
   const [treningySub, setTreningySub] = useState("prehled");
-  const [financieSub, setFinancieSub] = useState("trzby");
   const [klientiSub, setKlientiSub] = useState("klienti");
   const [treningyFocus, setTreningyFocus] = useState<NavFocus | null>(null);
-  const [financieFocus, setFinancieFocus] = useState<NavFocus | null>(null);
+  const [vzasFocus, setVzasFocus] = useState<NavFocus | null>(null);
   const [klientiFocus, setKlientiFocus] = useState<NavFocus | null>(null);
 
   // Kde som — v adrese, nie len v hlave appky.
@@ -124,7 +125,7 @@ export function PSBApp() {
   // Formát je #zalozka/podzalozka, napr. #tracker/klienti alebo #vzas/jarek.
   const cestaZoStavu = () => {
     if (active === "tracker") {
-      const pod = trackerSection === "treningy" ? treningySub : trackerSection === "financie" ? financieSub : trackerSection === "klienti" ? klientiSub : "";
+      const pod = trackerSection === "treningy" ? treningySub : trackerSection === "klienti" ? klientiSub : "";
       return `#tracker/${trackerSection}${pod ? `/${pod}` : ""}`;
     }
     if (active === "vzas") return `#vzas/${vzasSub}`;
@@ -141,7 +142,7 @@ export function PSBApp() {
     if (zal === "tracker" && pod && TRACKER_IDS.includes(pod)) {
       setTrackerSection(pod);
       if (pod === "treningy" && pod2) setTreningySub(pod2);
-      if (pod === "financie" && pod2) setFinancieSub(pod2);
+      if (pod === "financie" && pod2) { setActive("vzas"); setVzasSub(pod2 === "klienti" ? "predikcia" : pod2); }
       if (pod === "klienti" && pod2) setKlientiSub(pod2);
     }
     if (zal === "vzas" && pod) setVzasSub(pod);
@@ -177,6 +178,18 @@ export function PSBApp() {
       setKlientiSub("6m");
       return;
     }
+    // Bývalá sekcia Prevádzka → Financie žije v Peniazoch. Staré odkazy
+    // (register, dashboard, Jarvisove ciele, uložené hash cesty) sa nemažú —
+    // mapujú sa. „klienti" bývala štvrtá podzáložka Financií a jej obsah
+    // (tempo a hodnota klientov) je dnes v Predikcii; „cashflow" vo Financiách
+    // nikdy neexistoval, ale dva odkazy naň mierili.
+    if (tab === "financie") {
+      const mapa: Record<string, string> = { trzby: "trzby", sedenia: "sedenia", predikcia: "predikcia", klienti: "predikcia", cashflow: "trzby" };
+      setActive("vzas");
+      setVzasSub(mapa[sub || ""] || "trzby");
+      if (focus) setVzasFocus(focus);
+      return;
+    }
     if (TRACKER_IDS.includes(tab)) {
       setActive("tracker");
       setTrackerSection(tab);
@@ -184,7 +197,6 @@ export function PSBApp() {
       setActive(tab);
     }
     if (tab === "treningy" && sub) setTreningySub(sub);
-    if (tab === "financie" && sub) setFinancieSub(sub);
     if (tab === "klienti" && sub) setKlientiSub(sub);
     // Podzáložka Výsledkov sa nikdy nenastavovala — pripomienka „Mesačná
     // uzávierka" tak doviedla človeka na Kvartálne a vyzeralo to, že klik
@@ -196,7 +208,6 @@ export function PSBApp() {
     // zameranie sa nastavilo do podzáložky, ktorú nevidno — a nič sa nestalo.
     if (tab === "klienti" && !sub && focus?.client) setKlientiSub("klienti");
     if (tab === "treningy" && focus) setTreningyFocus(focus);
-    if (tab === "financie" && focus) setFinancieFocus(focus);
     if (tab === "klienti" && focus) setKlientiFocus(focus);
     if (tab === "vysledky" && focus) setVysledkyFocus(focus);
     // Zápisy mesiaca sa načítavajú raz pri štarte, ale odpovede na otázky sa
@@ -831,12 +842,11 @@ export function PSBApp() {
             </div>
             {trackerSection === "treningy" && <Treningy data={data} clients={clients} sub={treningySub} onSub={setTreningySub} focus={treningyFocus} trainer={trainer} onTrainer={setTrainer} />}
             {trackerSection === "klienti" && <Klienti clients={clients} capacity={capacity} actions={actions} focus={klientiFocus} leads={data.leads} trainer={trainer} onTrainer={setTrainer} sixM={sixM} sub={klientiSub} onSub={setKlientiSub} data={data} />}
-            {trackerSection === "financie" && <Financie data={data} clients={clients} focus={financieFocus} sub={financieSub} onSub={setFinancieSub} />}
               </>
         )}
 
         {active === "marketing" && <Marketing data={data} clients={clients} leads={data.leads} chat={chat} sub={marketingSub} onSub={setMarketingSub} onKlient={(m) => navigate("klienti", undefined, { client: m, nonce: Date.now() })} />}
-        {active === "vzas" && <Vzas sub={vzasSub} onSub={setVzasSub} data={data} />}
+        {active === "vzas" && <Vzas sub={vzasSub} onSub={setVzasSub} data={data} clients={clients} focus={vzasFocus} />}
         {active === "vysledky" && <Vysledky data={data} onNavigate={navigate} clients={clients} sixM={sixM} capacity={capacity} register={register} sub={vysledkySub} onSub={setVysledkySub} focus={vysledkyFocus} />}
         {active === "udaje" && <Udaje data={data} actions={actions} chat={chat} prekazky={prekazkyZamku} />}
       </div>

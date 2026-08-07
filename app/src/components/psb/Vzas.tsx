@@ -1,6 +1,7 @@
 import { Fragment, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { fetchBtcReserve, fetchMonthNotes, fetchVzasSettings, fetchWeekEntries, saveMonthNote, saveVzasSetting, type BtcReserve, type MonthNote, type WeekEntry } from "../../lib/psb/client";
+import { FinancieObsah } from "./Financie";
 import { monthlyFinance, predictCash, ZONE_HI, type CapacityRow, type ClientAgg, type RegisterItem, type SixMRow } from "../../lib/psb/compute";
 import { fmtCZK, fmtDMY, monthLabel } from "../../lib/psb/format";
 import { ObdobieCtx } from "../../lib/psb/obdobie";
@@ -8,6 +9,7 @@ import { PRVY_MESIAC_Z_FIO, nastavPnlBunku, nastavPnlOverrides, nastavZmenyKateg
 import { rozpisPre, type PohybZaBunku } from "../../lib/psb/rozpis";
 import { C, mix, S } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
+import type { NavFocus } from "./App";
 import {
   CURRENT_ERA,
   DEBT_CHECKPOINT_2026,
@@ -2786,7 +2788,7 @@ function CieleTab({ data }: { data: PSBData }) {
 }
 
 // ── module shell ─────────────────────────────────────────────────────────────
-export function Vzas({ sub, onSub, data }: { sub: string; onSub: (s: string) => void; data: PSBData }) {
+export function Vzas({ sub, onSub, data, clients, focus }: { sub: string; onSub: (s: string) => void; data: PSBData; clients: Record<string, ClientAgg>; focus?: NavFocus | null }) {
   // Tržby do VZAS tečú živé z PTmindera — excelový prepis sa nahradí pri
   // každom otvorení. `tik` len prekreslí strom po mutácii modulových polí.
   const [, tik] = useState(0);
@@ -2799,6 +2801,12 @@ export function Vzas({ sub, onSub, data }: { sub: string; onSub: (s: string) => 
     <>
       <SubTabs
         tabs={[
+          // Poradie rozpráva príbeh: čo prišlo → čo príde → čo zostalo →
+          // komu čo dlžíme. Prevádzkové peniaze z PTmindera vpredu,
+          // účtovníctvo za nimi.
+          { id: "trzby", label: "Tržby" },
+          { id: "sedenia", label: "Sedenia & cena" },
+          { id: "predikcia", label: "Predikcia" },
           { id: "pnl", label: "Zisky a straty" },
           { id: "vyplaty", label: "J&T Výplaty" },
           { id: "cashflow", label: "Cashflow" },
@@ -2808,6 +2816,9 @@ export function Vzas({ sub, onSub, data }: { sub: string; onSub: (s: string) => 
         value={sub}
         onChange={onSub}
       />
+      {["trzby", "sedenia", "predikcia"].includes(sub) && (
+        <FinancieObsah data={data} clients={clients} focus={focus} sub={sub} onSub={onSub} />
+      )}
       {sub === "pnl" && (
         <>
           <div style={{ fontSize: 11.5, color: C.textDim, margin: "0 0 10px", lineHeight: 1.5 }}>

@@ -657,7 +657,7 @@ export function Dashboard({
 
   // Click-through helpers: focus one week in Tréningy → Prehľad / one month in Financie → Zárobky.
   const openWeek = (weekLabelStr: string) => onNavigate("treningy", "prehled", { week: weekLabelStr, trainer, nonce: Date.now() });
-  const openMonth = (monthKey: string) => onNavigate("financie", undefined, { month: monthKey, trainer, nonce: Date.now() });
+  const openMonth = (monthKey: string) => onNavigate("vzas", "trzby", { month: monthKey, trainer, nonce: Date.now() });
 
   // Widget bodies, keyed by id — rendered in the user's saved order below.
   // Clients down to their last session (or 0) on their active package — renewal cues.
@@ -860,7 +860,9 @@ export function Dashboard({
           </div>
         </div>
         {earnings.length ? (
-          <div onClick={() => onNavigate("financie", "cashflow")} style={{ cursor: "pointer" }} title="Otvoriť Financie → Cashflow">
+          // Mierilo na Financie → Cashflow — podzáložku, ktorá nikdy
+          // neexistovala; klik prepol obrazovku a nechal prázdny obsah.
+          <div onClick={() => onNavigate("vzas", "trzby")} style={{ cursor: "pointer" }} title="Otvoriť Peniaze → Tržby">
             <Zbalitelny telefon={telefon} popis={`${earnings.length} mesiacov`}>
               <ValueBars data={earnings} color={earnMode === "prijate" ? C.blue : C.accent} forecastColor={C.blue} fmt={(n) => `${Math.round(n / 1000)}k`} height={180} alignEnd />
             </Zbalitelny>
@@ -1183,7 +1185,7 @@ export function Dashboard({
           value={trzbyOdhad ? fmtCZK(trzbyOdhad.expected) : "—"}
           label={trzbyOdhad ? `Odhad tržieb ${monthLabel(trzbyOdhad.month)}` : "Odhad tržieb"}
           color={C.blue}
-          onClick={() => onNavigate("financie", "predikcia")}
+          onClick={() => onNavigate("vzas", "predikcia")}
         />
       </StatGrid>
 

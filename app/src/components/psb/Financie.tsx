@@ -12,7 +12,13 @@ import { BarRow, Card, Empty, H3, Info, LineChart, Select, SortTh, StatCard, Sub
 
 const MAX_SESSIONS_MONTH = 260;
 
-export function Financie({ data, clients, focus, sub, onSub }: { data: PSBData; clients: Record<string, ClientAgg>; focus?: NavFocus | null; sub: string; onSub: (s: string) => void }) {
+// Obsah bývalej obrazovky Prevádzka → Financie. Záložky už kreslí VZAS
+// („Peniaze") — dve finančné obrazovky boli dohodnuté na zlúčenie „po Fio,
+// keď bude jasné, kde ktoré číslo býva". Fio je hotové a jasné je: tržby a
+// predikcie z PTmindera bývajú TU, účtovníctvo (P&L, výplaty, dlhy) vo
+// zvyšku VZAS. Jedna záložka Peniaze namiesto dvoch miest, medzi ktorými
+// blúdil aj Jarvis.
+export function FinancieObsah({ data, clients, focus, sub, onSub }: { data: PSBData; clients: Record<string, ClientAgg>; focus?: NavFocus | null; sub: string; onSub: (s: string) => void }) {
   const setSub = onSub;
   const [focusMonth, setFocusMonth] = useState<string | null>(null);
   // Po posledný plný mesiac. Rozrobený mesiac tu robil najväčšiu škodu:
@@ -32,15 +38,6 @@ export function Financie({ data, clients, focus, sub, onSub }: { data: PSBData; 
 
   return (
     <>
-      <SubTabs
-        tabs={[
-          { id: "trzby", label: "Peniaze po mesiacoch" },
-          { id: "sedenia", label: "Sedenia & cena" },
-          { id: "predikcia", label: "Predikcia" },
-        ]}
-        value={sub}
-        onChange={setSub}
-      />
       {sub === "trzby" && <Trzby monthly={monthly} data={data} clients={clients} focusMonth={focusMonth} onClearFocus={() => setFocusMonth(null)} />}
       {sub === "sedenia" && <Sedenia monthly={monthly} />}
       {sub === "predikcia" && <Predikcia data={data} clients={clients} />}

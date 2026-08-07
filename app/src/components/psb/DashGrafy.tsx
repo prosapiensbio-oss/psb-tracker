@@ -568,7 +568,9 @@ export function useExtraGrafy({
     nodes.sedeniaMes = (
       <Card style={{ marginBottom: 0, height: "100%" }}>
         <H3><Info label="Počet sedení / mesiac" text="Objem práce v kusoch. Padá skôr než tržby — balíčky sa platia dopredu, takže pokles sedení je predzvesť poklesu peňazí o mesiac či dva neskôr." /></H3>
-        <Klik kam={() => onNavigate("financie", "cashflow")} onNavigate="Financie">
+        {/* Druhý odkaz na neexistujúci financie|cashflow — karta je o sedeniach,
+        tak vedie na Sedenia & cena. */}
+        <Klik kam={() => onNavigate("vzas", "sedenia")} onNavigate="Peniaze → Sedenia & cena">
           <ValueBars
             data={(plne(mesSedenia) as [string, number][]).slice(-18).map(([mk, n]) => ({ label: monthLabel(mk), value: n }))}
             color={C.accent} fmt={(n) => String(Math.round(n))} height={170} alignEnd
