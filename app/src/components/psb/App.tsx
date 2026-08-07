@@ -1118,29 +1118,21 @@ function skupinaFaktur(
             Kokpit zavrel, človek by po návrate prišiel o rozpracovaný stav
             (filtre, rozbalený register, návrh uzávierky).
             Šípka ↗ je jediné miesto v hlavičke, ktoré hovorí „toto vedie von". */}
-        <button
-          onClick={() => {
-            // Okno sa otvorí HNEĎ, ešte pred dopytom na podpis. Keby sa čakalo
-            // na odpoveď a otváralo až potom, prehliadač by to vyhodnotil ako
-            // vyskakovacie okno bez kliknutia a zablokoval by ho.
-            const w = window.open("about:blank", "_blank", "noopener");
-            void fetch("/api/sso?vytvor=1", { credentials: "same-origin" })
-              .then((r) => r.json())
-              .then((j: { ok?: boolean; url?: string }) => {
-                const kam = j.ok && j.url ? j.url : BTC_APP;
-                if (w) w.location.replace(kam);
-                else window.open(kam, "_blank", "noopener");
-              })
-              // Keď sa podpis nepodarí, karta sa otvorí aspoň bez prihlásenia —
-              // horšie než prejsť rovno je len neprejsť vôbec.
-              .catch(() => { if (w) w.location.replace(BTC_APP); });
-          }}
+        {/* Obyčajný odkaz na serverovú trasu, ktorá presmeruje — nie
+            JavaScript, ktorý otvára okno. Prvá verzia otvárala prázdnu kartu
+            a nič sa v nej neobjavilo: `window.open(url, "_blank", "noopener")`
+            vracia null, takže sa nebolo čoho chytiť, a druhý pokus už bol
+            mimo kliknutia a prehliadač ho zablokoval. */}
+        <a
+          href="/api/sso?prejst=1"
+          target="_blank"
+          rel="noopener noreferrer"
           title="Otvoriť bitcoinovú evidenciu v novej karte (prihlási sa sama)"
-          style={{ ...tab(false), display: "inline-flex", alignItems: "center", gap: 7 }}
+          style={{ ...tab(false), display: "inline-flex", alignItems: "center", gap: 7, textDecoration: "none" }}
         >
           <Icon name="bitcoin" /> Bitcoin
           <span style={{ fontSize: 11, opacity: 0.7 }}>↗</span>
-        </button>
+        </a>
       </nav>
       <div style={{ padding: 16, maxWidth: 1200, margin: "0 auto" }}>
         {active === "dashboard" && (

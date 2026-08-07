@@ -51,11 +51,23 @@ export const Route = createFileRoute("/api/sso")({
         const q = new URL(request.url).searchParams;
 
         // ── Odchod do knihy ────────────────────────────────────────────────
-        if (q.get("vytvor") === "1") {
-          if (!(await isAuthed(request))) return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
+        //
+        // `prejst=1` rovno PRESMERUJE. Prvá verzia vracala odkaz a prehliadač
+        // ho mal otvoriť JavaScriptom — otvorila sa prázdna karta a nič sa
+        // nestalo. Dôvod: `window.open(url, "_blank", "noopener")` vracia
+        // podľa špecifikácie null, takže sa nebolo čoho chytiť, a druhé
+        // otvorenie už bolo mimo kliknutia, takže ho prehliadač zablokoval.
+        // Obyčajný odkaz na túto trasu tento problém nemá vôbec.
+        if (q.get("vytvor") === "1" || q.get("prejst") === "1") {
+          if (!(await isAuthed(request))) {
+            return q.get("prejst") === "1"
+              ? Response.redirect(BTC_APP, 302)
+              : Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
+          }
           const exp = Date.now() + TTL_MS;
           const sig = await sign(token, `sso-btc=${exp}`);
-          return Response.json({ ok: true, url: `${BTC_APP}/?sso=1&exp=${exp}&sig=${sig}` });
+          const url = `${BTC_APP}/?sso=1&exp=${exp}&sig=${sig}`;
+          return q.get("prejst") === "1" ? Response.redirect(url, 302) : Response.json({ ok: true, url });
         }
 
         // ── Príchod z knihy ────────────────────────────────────────────────
