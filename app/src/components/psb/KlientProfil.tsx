@@ -1,0 +1,199 @@
+import { useMemo } from "react";
+
+import { type ClientAgg } from "../../lib/psb/compute";
+import { fmtCZK, fmtDMY, monthLabel } from "../../lib/psb/format";
+import { C, mix } from "../../lib/psb/theme";
+import type { PSBData } from "../../lib/psb/types";
+import { Card, Info, ValueBars } from "./ui";
+
+// Profil klienta — všetko o jednom človeku na jednej obrazovke.
+//
+// Jerryho zadanie doslova: „všetko všetko všetko". Dáta o klientovi boli
+// roztrúsené po piatich obrazovkách — platby vo Financiách, dochádzka v
+// tabuľke, balíček v karte, poznámka v ✎ — a vyhľadávanie človeka dovedno
+// len k riadku tabuľky. Otázka „ako na tom Novák vlastne je?" si vyžadovala
+// päť klikov a skladanie v hlave.
+//
+// Porovnanie s priemerom je tu preto, lebo číslo bez mierky nič nehovorí:
+// tempo 2,1 sedenia mesačne je málo alebo veľa len oproti tomu, ako chodia
+// ostatní.
+
+const DEN = 86400000;
+
+// Tempo z posledných 90 dní — rovnaké okno, aké používa predikcia. Počíta sa
+// tu nanovo, lebo ClientAgg tempo nenesie (žije až vo výstupe predikcie).
+const tempo90 = (c: ClientAgg): number => {
+  const od = Date.now() - 90 * DEN;
+  const n = c.sessions.filter((s) => Date.parse(s.date) >= od).length;
+  return n / 3; // sedení za mesiac
+};
+
+function Porovnanie({ label, hodnota, priemer, fmt, vyssieLepsie = true }: {
+  label: string; hodnota: number; priemer: number; fmt: (n: number) => string; vyssieLepsie?: boolean;
+}) {
+  const max = Math.max(hodnota, priemer, 0.0001);
+  const lepsi = vyssieLepsie ? hodnota >= priemer : hodnota <= priemer;
+  const riadok = (meno: string, v: number, farba: string, hrubsi: boolean) => (
+    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+      <span style={{ width: 62, fontSize: 10.5, color: C.textDim, textAlign: "right" }}>{meno}</span>
+      <div style={{ flex: 1, height: hrubsi ? 14 : 10, background: C.track, borderRadius: 7, overflow: "hidden" }}>
+        <div style={{ width: `${Math.max(2, (v / max) * 100)}%`, height: "100%", background: farba, borderRadius: 7 }} />
+      </div>
+      <span style={{ width: 74, fontSize: 11.5, color: hrubsi ? C.text : C.textMuted, fontVariantNumeric: "tabular-nums", fontWeight: hrubsi ? 600 : 400 }}>{fmt(v)}</span>
+    </div>
+  );
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 3 }}>{label}</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+        {riadok("klient", hodnota, lepsi ? C.green : C.orange, true)}
+        {riadok("Ø ostatní", priemer, mix(C.accent, 55), false)}
+      </div>
+    </div>
+  );
+}
+
+export function KlientProfil({ meno, data, clients, onZavri }: {
+  meno: string;
+  data: PSBData;
+  clients: Record<string, ClientAgg>;
+  onZavri: () => void;
+}) {
+  const c = clients[meno];
+
+  const p = useMemo(() => {
+    if (!c) return null;
+    const platby = data.payments
+      .filter((x) => x.client === meno)
+      .sort((a, b) => b.date.localeCompare(a.date));
+    const zaplatene = platby.reduce((a, x) => a + x.amount, 0);
+
+    // Sedenia po mesiacoch — posledných 12, aby graf niečo hovoril aj pri
+    // dlhoročnom klientovi.
+    const podlaMesiaca = new Map<string, number>();
+    for (const s of c.sessions) {
+      const mk = s.date.slice(0, 7);
+      podlaMesiaca.set(mk, (podlaMesiaca.get(mk) || 0) + 1);
+    }
+    const mesacne = [...podlaMesiaca.entries()].sort((a, b) => a[0].localeCompare(b[0])).slice(-12)
+      .map(([mk, n]) => ({ label: monthLabel(mk), value: n }));
+
+    // Priemer sa ráta z AKTÍVNYCH klientov — porovnávať sa s duchmi a
+    // odídenými by každého robilo hviezdou.
+    const aktivni = Object.values(clients).filter((x) => x.status !== "Neaktívny" && x.name !== meno);
+    const avg = (f: (x: ClientAgg) => number) => {
+      const v = aktivni.map(f).filter((n) => Number.isFinite(n) && n > 0);
+      return v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0;
+    };
+    const priemery = {
+      tempo: avg((x) => tempo90(x)),
+      dochadzka: avg((x) => x.attendance * 100),
+      cena: avg((x) => x.avgPrice),
+      zaplatene: avg((x) => data.payments.filter((pp) => pp.client === x.name).reduce((a, pp) => a + pp.amount, 0)),
+    };
+
+    const dniTicha = c.lastSession ? Math.round((Date.now() - Date.parse(c.lastSession)) / DEN) : null;
+    return { platby, zaplatene, mesacne, priemery, dniTicha, tempo: tempo90(c) };
+  }, [c, data, clients, meno]);
+
+  if (!c || !p) return null;
+
+  const stat = (label: string, hodnota: string, farba?: string, info?: string) => (
+    <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 9, padding: "8px 11px", minWidth: 118 }}>
+      <div style={{ fontSize: 15.5, fontWeight: 700, color: farba || C.text, fontVariantNumeric: "tabular-nums" }}>{hodnota}</div>
+      <div style={{ fontSize: 10.5, color: C.textMuted, marginTop: 1 }}>{info ? <Info text={info} label={label} /> : label}</div>
+    </div>
+  );
+
+  const stavFarba = c.status === "Aktívny" ? C.green : c.status === "Neaktívny" ? C.red : C.orange;
+  const burnRate = p.tempo;
+
+  return (
+    <Card style={{ border: `1px solid ${mix(C.accent, 45)}` }}>
+      {/* hlavička */}
+      <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 18, fontWeight: 700, color: C.text }}>{c.name}</span>
+        <span style={{ fontSize: 11.5, color: stavFarba, fontWeight: 600 }}>{c.status}</span>
+        <span style={{ fontSize: 11.5, color: C.textMuted }}>{c.segment} · {c.primaryTrainer || "?"} · {c.modality}</span>
+        {c.zdroj && (
+          <span style={{ fontSize: 11.5, color: C.textDim }}>
+            prišiel cez: {c.zdroj}{c.zdrojKto ? ` (${c.zdrojKto})` : ""}
+          </span>
+        )}
+        <span style={{ marginLeft: "auto", display: "flex", gap: 8, alignItems: "center" }}>
+          {c.is6m && <span style={{ fontSize: 10.5, color: C.accentLight, border: `1px solid ${mix(C.accent, 45)}`, borderRadius: 8, padding: "1px 7px" }}>6M</span>}
+          {c.bitcoin && <span style={{ fontSize: 10.5, color: C.orange }}>₿ platí v BTC</span>}
+          {c.specialRate && <span title={c.specialRateNote} style={{ fontSize: 10.5, color: C.orange, cursor: c.specialRateNote ? "help" : "default" }}>špeciálna sadzba</span>}
+          {!c.contractSigned && <span style={{ fontSize: 10.5, color: C.red }}>bez zmluvy</span>}
+          <button onClick={onZavri} style={{ background: "none", border: "none", color: C.textDim, fontSize: 12, cursor: "pointer" }}>zavrieť ×</button>
+        </span>
+      </div>
+
+      {/* kľúčové čísla */}
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
+        {stat("Prvé sedenie", c.firstSession ? fmtDMY(c.firstSession) : "—")}
+        {stat("Posledné", c.lastSession ? `${fmtDMY(c.lastSession)}${p.dniTicha != null ? ` (${p.dniTicha} d)` : ""}` : "—",
+          p.dniTicha != null && p.dniTicha > 21 ? C.orange : undefined,
+          "Posledné sedenie a koľko dní odvtedy ubehlo.")}
+        {stat("Sedení", `${c.sessionCount} (${Math.round(c.totalHours)} h)`)}
+        {stat("Tempo", `${burnRate.toFixed(1)}/mes · ${(burnRate / 4.33).toFixed(1)}/týž`, undefined,
+          "Priemerný počet sedení za mesiac a za týždeň z posledných 90 dní.")}
+        {stat("Dochádzka", `${Math.round(c.attendance * 100)} %`,
+          c.attendance >= 0.7 ? C.green : c.attendance >= 0.4 ? undefined : C.orange,
+          "Podiel týždňov z posledných 18, v ktorých klient reálne trénoval.")}
+        {stat("Zaplatené spolu", fmtCZK(p.zaplatene), C.green)}
+        {stat("Ø cena sedenia", fmtCZK(Math.round(c.avgPrice)))}
+        {stat("Balíček", c.packageTotal ? `${c.packageRemaining}/${c.packageTotal}` : (c.lenDoplnky ? "len členstvo" : "—"), undefined,
+          c.membership ? `${c.membership}${c.packageValidTo ? ` · platí do ${fmtDMY(c.packageValidTo)}` : ""}` : undefined)}
+      </div>
+
+      {c.trainerNote && (
+        <div style={{ marginTop: 10, fontSize: 12, color: C.textMuted, background: mix(C.accent, 6), borderRadius: 8, padding: "8px 11px", lineHeight: 1.5 }}>
+          <b style={{ color: C.text }}>Poznámka trénera:</b> {c.trainerNote}
+        </div>
+      )}
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 18, marginTop: 14 }}>
+        {/* porovnanie s priemerom */}
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: C.text, marginBottom: 8 }}>
+            <Info text="Porovnanie s priemerom AKTÍVNYCH klientov (bez tohto klienta). Číslo bez mierky nič nehovorí — tempo 2,1 je málo alebo veľa len oproti tomu, ako chodia ostatní." label="Oproti ostatným" />
+          </div>
+          <Porovnanie label="Tempo (sedení / mes.)" hodnota={burnRate} priemer={p.priemery.tempo} fmt={(n) => n.toFixed(1)} />
+          <Porovnanie label="Dochádzka" hodnota={c.attendance * 100} priemer={p.priemery.dochadzka} fmt={(n) => `${Math.round(n)} %`} />
+          <Porovnanie label="Ø cena sedenia" hodnota={c.avgPrice} priemer={p.priemery.cena} fmt={(n) => fmtCZK(Math.round(n))} />
+          <Porovnanie label="Zaplatené celkovo" hodnota={p.zaplatene} priemer={p.priemery.zaplatene} fmt={(n) => fmtCZK(Math.round(n))} />
+        </div>
+
+        {/* sedenia po mesiacoch */}
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: C.text, marginBottom: 8 }}>Sedenia po mesiacoch</div>
+          {p.mesacne.length ? (
+            <ValueBars data={p.mesacne} color={C.accent} fmt={(n) => String(Math.round(n))} height={120} alignEnd />
+          ) : (
+            <div style={{ fontSize: 12, color: C.textDim }}>Zatiaľ žiadne sedenia.</div>
+          )}
+        </div>
+
+        {/* história platieb */}
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 700, color: C.text, marginBottom: 8 }}>
+            História platieb ({p.platby.length})
+          </div>
+          {p.platby.length ? (
+            <div style={{ maxHeight: 190, overflowY: "auto" }}>
+              {p.platby.map((x, i) => (
+                <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: 12, padding: "3px 2px", borderBottom: `1px solid ${mix(C.border, 45)}` }}>
+                  <span style={{ color: C.textDim }}>{fmtDMY(x.date)}</span>
+                  <span style={{ color: C.text, fontVariantNumeric: "tabular-nums" }}>{fmtCZK(x.amount)}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ fontSize: 12, color: C.textDim }}>Žiadne platby — barter alebo platí inak.</div>
+          )}
+        </div>
+      </div>
+    </Card>
+  );
+}

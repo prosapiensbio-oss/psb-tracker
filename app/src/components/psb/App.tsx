@@ -184,6 +184,13 @@ export function PSBApp() {
     // mapujú sa. „klienti" bývala štvrtá podzáložka Financií a jej obsah
     // (tempo a hodnota klientov) je dnes v Predikcii; „cashflow" vo Financiách
     // nikdy neexistoval, ale dva odkazy naň mierili.
+    // Referencie sa presťahovali z Marketingu ku klientom.
+    if (tab === "marketing" && sub === "referencie") {
+      setActive("tracker");
+      setTrackerSection("klienti");
+      setKlientiSub("referencie");
+      return;
+    }
     if (tab === "financie") {
       const mapa: Record<string, string> = { trzby: "trzby", sedenia: "sedenia", predikcia: "predikcia", klienti: "predikcia", cashflow: "trzby" };
       setActive("vzas");

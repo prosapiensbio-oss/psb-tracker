@@ -26,7 +26,7 @@ import {
 } from "../../lib/psb/marketing";
 import { KATEGORIE_HOOKOV, MKT_OBSAH } from "../../lib/psb/marketing-obsah";
 import { Algoritmus } from "./Algoritmus";
-import { AkoMeratReklamu, Kohorta, Lievik, Naklady, Referencie } from "./MarketingLievik";
+import { AkoMeratReklamu, Kohorta, Lievik, Naklady } from "./MarketingLievik";
 import { Kanaly } from "./Kanaly";
 import { C, mix, S } from "../../lib/psb/theme";
 import type { AssistantChat } from "./Assistant";
@@ -791,7 +791,6 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient }: 
         tabs={[
           { id: "lievik", label: "Odkiaľ prišli klienti" },
           { id: "naklady", label: "Čo to stálo" },
-          { id: "referencie", label: "Referencie" },
           { id: "dosah", label: "Dosah a obsah" },
           { id: "algoritmus", label: "Algoritmus" },
         ]}
@@ -830,7 +829,6 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient }: 
         </>
       )}
       {sub === "naklady" && (<><Naklady data={data} clients={clients} /><AkoMeratReklamu /></>)}
-      {sub === "referencie" && <Referencie data={data} clients={clients} onKlient={onKlient} />}
       {sub === "dosah" && (
         <>
           <Kanaly />

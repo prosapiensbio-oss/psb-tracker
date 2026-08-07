@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import { duchOdpoved, membershipBucket, MEMBERSHIP_ORDER, TRAINERS, type CapacityRow, type ClientAgg, type SixMRow } from "../../lib/psb/compute";
 import { fmtCZK, fmtDate, normName } from "../../lib/psb/format";
 import { C, MEMBERSHIP_COLORS, mix, S } from "../../lib/psb/theme";
+import { KlientProfil } from "./KlientProfil";
+import { Referencie } from "./Referencie";
 import { saveLead } from "../../lib/psb/client";
 import type { Lead, PSBData } from "../../lib/psb/types";
 import type { Actions, NavFocus } from "./App";
@@ -522,11 +524,17 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
           // vôbec. Patrí ku klientom, nie do marketingu — odchod nie je
           // marketingová udalosť.
           { id: "rast", label: "Rast a strata" },
+          // Referencie bývali v Marketingu, ale odporúčanie je vzťah medzi
+          // klientmi — „komu poďakovať" je otázka o ľuďoch, nie o kanáloch.
+          // (Jerryho postreh 2026-08-07.)
+          { id: "referencie", label: "Referencie" },
         ]}
         value={sub}
         onChange={setSub}
       />
-      {sub === "rast" ? (
+      {sub === "referencie" ? (
+        <Referencie data={data} clients={clients} onKlient={(m) => { setFocusClient(m); onSub("klienti"); }} />
+      ) : sub === "rast" ? (
         <RastAStrata
           data={data}
           clients={clients}
@@ -650,6 +658,13 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
           )}
         </Card>
       </div>
+
+      {/* Profil 360 — všetko o vybranom človeku na jednom mieste. Vyhľadanie
+          klienta doteraz doviedlo len k riadku tabuľky a zvyšok si človek
+          skladal z piatich obrazoviek. */}
+      {focusClient && clients[focusClient] && (
+        <KlientProfil meno={focusClient} data={data} clients={clients} onZavri={() => setFocusClient(null)} />
+      )}
 
       <Card>
         <H3><Info text="Všetci klienti podľa filtrov. Hľadaj podľa mena, filtruj typ balíčka a modalitu, alebo klikni na výsek v koláči „Klienti podľa balíčka“ hore." label="Všetci klienti" /></H3>
