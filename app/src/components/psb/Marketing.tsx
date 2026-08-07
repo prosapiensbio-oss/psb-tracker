@@ -1,6 +1,7 @@
+import { fetchVzasSettings, saveVzasSetting } from "../../lib/psb/client";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
-import { fmtCZK } from "../../lib/psb/format";
+import { fmtDMY, fmtCZK } from "../../lib/psb/format";
 import {
   GA4_MESACNE,
   GSC_DOPYTY,
@@ -180,11 +181,95 @@ function SortTable<T extends Record<string, any>>({ riadky, stlpce, minWidth = 4
   );
 }
 
+// ── Značky udalostí ──────────────────────────────────────────────────────────
+//
+// Jerryho zadanie z júla: „do každého grafu pridať informáciu, čo som robil".
+// Graf dosahu ukáže špičku v máji, ale nepovie prečo — o tri mesiace už nikto
+// nevie, či vtedy bežala reklama, vyšiel silný reel, alebo bola pauza. Značka
+// je zápis „tu sa stalo toto" a kreslí sa ako vlajka nad mesiacom, aby čísla
+// a ich príčiny stáli vedľa seba. Bez toho sa z grafov nedá učiť, čo funguje.
+//
+// Ukladajú sa do vzas_settings (kľúč mkt_znacky) — je ich pár za rok, vlastná
+// tabuľka by bola viac kódu než úžitku. Zapísať ich vie aj Jarvis (akcia
+// mkt-znacka), takže „spustili sme kampaň" z rozhovoru skončí rovno v grafe.
+export type MktZnacka = { id: string; datum: string; text: string };
+
+function useZnacky() {
+  const [znacky, setZnacky] = useState<MktZnacka[]>([]);
+  useEffect(() => {
+    void fetchVzasSettings().then((n: Record<string, unknown>) => {
+      const z = n["mkt_znacky"];
+      if (Array.isArray(z)) setZnacky(z as MktZnacka[]);
+    }).catch(() => {});
+  }, []);
+  const uloz = async (nove: MktZnacka[]) => {
+    setZnacky(nove);
+    await saveVzasSetting("mkt_znacky", nove);
+  };
+  return { znacky, uloz };
+}
+
+function ZnackyBlok({ znacky, uloz, okno }: { znacky: MktZnacka[]; uloz: (z: MktZnacka[]) => Promise<void>; okno: string[] }) {
+  const [pridavam, setPridavam] = useState(false);
+  const [datum, setDatum] = useState(() => new Date().toISOString().slice(0, 10));
+  const [text, setText] = useState("");
+  const vOkne = znacky.filter((z) => okno.includes(z.datum.slice(0, 7))).sort((a, b) => b.datum.localeCompare(a.datum));
+  return (
+    <div style={{ marginTop: 10 }}>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        <span style={{ fontSize: 11, color: C.textDim }}>⚑ značky udalostí</span>
+        <button onClick={() => setPridavam((v) => !v)}
+          style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 6, padding: "2px 9px", color: C.accentLight, fontSize: 11, cursor: "pointer" }}>
+          {pridavam ? "zavrieť" : "+ značka"}
+        </button>
+      </div>
+      {pridavam && (
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 7 }}>
+          <input type="date" value={datum} onChange={(e) => setDatum(e.target.value)}
+            style={{ padding: "4px 7px", borderRadius: 6, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 12 }} />
+          <input value={text} onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && text.trim()) { void uloz([...znacky, { id: `z${Date.now().toString(36)}`, datum, text: text.trim() }]); setText(""); setPridavam(false); } }}
+            placeholder="napr. spustená Meta kampaň na reel o kolene"
+            style={{ flex: 1, minWidth: 220, padding: "4px 8px", borderRadius: 6, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 12 }} />
+          <button
+            onClick={() => { if (text.trim()) { void uloz([...znacky, { id: `z${Date.now().toString(36)}`, datum, text: text.trim() }]); setText(""); setPridavam(false); } }}
+            disabled={!text.trim()}
+            style={{ background: text.trim() ? C.accentBg : "transparent", border: `1px solid ${text.trim() ? C.accent : C.border}`, borderRadius: 6, padding: "4px 12px", color: text.trim() ? C.accentLight : C.textDim, fontSize: 12, cursor: text.trim() ? "pointer" : "default" }}>
+            Uložiť
+          </button>
+        </div>
+      )}
+      {vOkne.length > 0 && (
+        <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 3 }}>
+          {vOkne.map((z) => (
+            <div key={z.id} style={{ fontSize: 11.5, color: C.textMuted, display: "flex", gap: 7, alignItems: "baseline" }}>
+              <span style={{ color: C.orange }}>⚑</span>
+              <span style={{ color: C.textDim, whiteSpace: "nowrap" }}>{fmtDMY(z.datum)}</span>
+              <span style={{ flex: 1 }}>{z.text}</span>
+              <button onClick={() => void uloz(znacky.filter((x) => x.id !== z.id))} title="Zmazať značku"
+                style={{ background: "none", border: "none", color: C.textDim, fontSize: 11, cursor: "pointer" }}>×</button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Čo som robil ─────────────────────────────────────────────────────────────
 function CoSomRobil({ chat }: { chat?: AssistantChat }) {
   const [metrika, setMetrika] = useState<"obsah" | "views" | "dosah" | "spend">("obsah");
   const [obdobie, setObdobie] = useState("3m");
   const okno = oknoMesiacov(obdobie, MKT_MESACNE.map((r) => r.m));
+  const { znacky, uloz } = useZnacky();
+  // Vlajka nesie všetky značky daného mesiaca naraz — dve udalosti v jednom
+  // mesiaci sú jedna vlajka s dvoma riadkami v tooltipe, nie dve vlajky.
+  const znackaPre = (lbl: string) => {
+    const mk = MKT_MESACNE.find((r) => label(r.m) === lbl)?.m;
+    if (!mk) return undefined;
+    const zoz = znacky.filter((z) => z.datum.slice(0, 7) === mk);
+    return zoz.length ? zoz.map((z) => `${fmtDMY(z.datum)} — ${z.text}`).join("\n") : undefined;
+  };
   const data = MKT_MESACNE.filter((r) => okno.includes(r.m));
   const hodnota = (r: (typeof MKT_MESACNE)[0]) =>
     metrika === "obsah" ? r.reels + r.posty : metrika === "views" ? r.views : metrika === "dosah" ? r.dosah : r.spend;
@@ -214,7 +299,9 @@ function CoSomRobil({ chat }: { chat?: AssistantChat }) {
         fmt={(n) => (metrika === "spend" ? `${Math.round(n / 100) / 10}k` : metrika === "obsah" ? String(n) : `${Math.round(n / 1000)}k`)}
         height={170}
         alignEnd
+        znacka={znackaPre}
       />
+      <ZnackyBlok znacky={znacky} uloz={uloz} okno={okno} />
       {/* Mesačná tabuľka impresií tu bola a je preč. Podľa nej sa nikdy
           nespravilo rozhodnutie — bol to výkaz. Namiesto nej porovnanie s
           benchmarkom, lebo „405 videní" samo o sebe neznamená nič a „405 pri

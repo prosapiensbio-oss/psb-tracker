@@ -552,6 +552,7 @@ export function ValueBars({
   fmt,
   height = 170,
   alignEnd = false,
+  znacka,
 }: {
   data: { label: string; value: number; forecast?: boolean }[];
   color: string;
@@ -559,6 +560,9 @@ export function ValueBars({
   fmt: (n: number) => string;
   height?: number;
   alignEnd?: boolean;
+  /** Text značky (udalosti) pre daný stĺpec — vlajka nad ním s tooltipom.
+   *  Graf hovorí ČO sa stalo s číslami; značka PREČO — „tu bežala kampaň". */
+  znacka?: (label: string) => string | undefined;
 }) {
   const plotH = height - 40;
   const max = Math.max(1, ...data.map((d) => d.value));
@@ -569,6 +573,9 @@ export function ValueBars({
     <div ref={scrollRef} style={{ display: "flex", gap: 8, alignItems: "flex-end", height, overflowX: "auto", paddingBottom: 4 }}>
       {data.map((d, i) => (
         <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", flex: "0 0 54px" }}>
+          {znacka?.(d.label) ? (
+            <div title={znacka(d.label)} style={{ fontSize: 11, lineHeight: 1, marginBottom: 2, cursor: "help", color: C.orange }}>⚑</div>
+          ) : null}
           <div style={{ fontSize: 10.5, color: d.forecast ? C.textDim : C.textMuted, marginBottom: 3, whiteSpace: "nowrap" }}>{fmt(d.value)}</div>
           <div
             title={`${d.label}: ${fmt(d.value)}`}

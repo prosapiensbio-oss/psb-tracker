@@ -10,7 +10,7 @@ import type { Actions } from "./App";
 import { nastavPnlBunku, pnlOverridesNaUlozenie } from "../../lib/psb/vzas";
 
 type ParsedAction = {
-  type: "ack-anomaly" | "unack-anomaly" | "set-override" | "zapis-zaver" | "vyhodnot-zaver" | "novy-ciel" | "kronika" | "odloz-anomaliu" | "uprav-pnl" | "zarad-pohyby";
+  type: "ack-anomaly" | "unack-anomaly" | "set-override" | "zapis-zaver" | "vyhodnot-zaver" | "novy-ciel" | "kronika" | "odloz-anomaliu" | "uprav-pnl" | "zarad-pohyby" | "mkt-znacka";
   label: string;
   done?: boolean;
   key?: string;
@@ -75,6 +75,8 @@ function parseActions(raw: string): { text: string; actions: ParsedAction[] } {
           actions.push({ type: "uprav-pnl", label, data: o });
         } else if (o?.type === "zarad-pohyby" && Array.isArray(o.zmeny) && o.zmeny.length) {
           actions.push({ type: "zarad-pohyby", label, data: o });
+        } else if (o?.type === "mkt-znacka" && typeof o.text === "string" && /^\d{4}-\d{2}-\d{2}$/.test(String(o.datum))) {
+          actions.push({ type: "mkt-znacka", label, data: o });
         }
       } catch {
         /* ignore malformed */
@@ -308,6 +310,15 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
             void actions.refresh();
           })
           .catch(() => oznamVysledok("Zaradenie pohybov zlyhalo — spojenie."));
+      } else if (a.type === "mkt-znacka" && a.data) {
+        // Značka do marketingových grafov — „tu bežala kampaň". Rovnaký sklad
+        // ako pri cieľoch: jeden JSON kľúč, žiadna vlastná tabuľka.
+        const d = a.data;
+        void fetchVzasSettings().then((st) => {
+          const zoz = Array.isArray(st["mkt_znacky"]) ? (st["mkt_znacky"] as Record<string, unknown>[]) : [];
+          zoz.push({ id: `z${Date.now().toString(36)}`, datum: String(d.datum), text: String(d.text).slice(0, 160) });
+          void saveVzasSetting("mkt_znacky", zoz).then(() => oznamVysledok(`Značka zapísaná: ${String(d.text).slice(0, 60)}`));
+        });
       } else if (a.type === "uprav-pnl" && a.data) {
         // Rovnaká cesta, akou opravu zapíše človek klikom na číslo v tabuľke —
         // prekrytie, nie prepis pôvodného radu, takže sa dá vrátiť a prežije
