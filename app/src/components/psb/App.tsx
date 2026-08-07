@@ -78,6 +78,11 @@ export type NavFocus = {
 // story: what is happening now → the work → where the next client comes from →
 // the money → how it is going against the plan. Marketing and Výsledky used to
 // live inside Tracker and VZAS; both answer questions their host did not.
+/** Druhá appka — bitcoinová evidencia. Kokpit z nej už ťahá rezervu
+ *  (podpísaným odkazom cez /api/btc-reserve); táto konštanta je to isté
+ *  miesto pre ľudí. */
+export const BTC_APP = "https://prosapiens-btc.higgsfield.app";
+
 const TABS = [
   { id: "dashboard", label: "Dashboard", icon: "home" },
   // Appka sa volá Tracker a záložka tiež — na otázku „kde to je" sa nedalo
@@ -967,6 +972,22 @@ export function PSBApp() {
             <Icon name={t.icon} /> {t.label}
           </button>
         ))}
+        {/* Bitcoin žije vo vlastnej appke (prosapiens-btc) a táto karta tam
+            len vedie — nie je to obsah Kokpitu. Otvára sa v NOVEJ karte
+            prehliadača zámerne: BTC appka má vlastné prihlásenie a keby sa
+            Kokpit zavrel, človek by po návrate prišiel o rozpracovaný stav
+            (filtre, rozbalený register, návrh uzávierky).
+            Šípka ↗ je jediné miesto v hlavičke, ktoré hovorí „toto vedie von". */}
+        <a
+          href={BTC_APP}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Otvoriť bitcoinovú evidenciu v novej karte"
+          style={{ ...tab(false), display: "inline-flex", alignItems: "center", gap: 7, textDecoration: "none" }}
+        >
+          <Icon name="bitcoin" /> Bitcoin
+          <span style={{ fontSize: 11, opacity: 0.7 }}>↗</span>
+        </a>
       </nav>
       <div style={{ padding: 16, maxWidth: 1200, margin: "0 auto" }}>
         {active === "dashboard" && (
