@@ -30,6 +30,14 @@ const poradieKanala = (k: string) => {
 const sipka = (z: number | null) => (z == null ? "" : z > 1 ? "▲" : z < -1 ? "▼" : "►");
 const farbaZmeny = (z: number | null) => (z == null ? C.textDim : z > 1 ? C.green : z < -1 ? C.red : C.textMuted);
 
+const TREND_METRIKY: { id: string; label: string; kanal: string; metrika: string }[] = [
+  { id: "sled", label: "Sledovatelia IG", kanal: "Instagram", metrika: "Followers" },
+  { id: "views", label: "Videnia IG", kanal: "Instagram", metrika: "Views" },
+  { id: "reel", label: "Ø dosah reelu", kanal: "Instagram", metrika: "Avg reach per reel" },
+  { id: "ads", label: "Reklama Kč", kanal: "Meta Ads", metrika: "Spent" },
+  { id: "web", label: "Návštevníci webu", kanal: "Web", metrika: "Visitors" },
+];
+
 export function Kanaly() {
   const [riadky, setRiadky] = useState<KanalRiadok[]>([]);
   const [mesiac, setMesiac] = useState("");
@@ -54,6 +62,34 @@ export function Kanaly() {
     for (const r of vMesiaci) m.set(r.kanal, [...(m.get(r.kanal) || []), r]);
     return [...m.entries()].sort((a, b) => poradieKanala(a[0]) - poradieKanala(b[0]) || a[0].localeCompare(b[0]));
   }, [vMesiaci]);
+
+  // HOOKY PRED PODMIENENÝMI RETURNMI. Prvá verzia ich mala až za nimi a
+  // appka sa zložila celá: pri načítavaní sa hooky nevolali, po načítaní
+  // pribudli — React na zmenu počtu hookov odpovedá pádom, nie varovaním.
+  const [trendId, setTrendId] = useState("sled");
+  const trendCfg = TREND_METRIKY.find((t) => t.id === trendId)!;
+  const trendData = useMemo(() => {
+    const podla = new Map<string, number>();
+    for (const r of riadky) {
+      if (r.kanal === trendCfg.kanal && r.metrika.toLowerCase() === trendCfg.metrika.toLowerCase()) {
+        podla.set(r.mesiac, r.hodnota);
+      }
+    }
+    return [...podla.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([m, v]) => ({ label: m, value: v }));
+  }, [riadky, trendCfg]);
+
+  const [celyZoznam, setCelyZoznam] = useState(false);
+  // Duplicitné varianty tej istej metriky (dve čítania PDF) — v plnom zozname
+  // sa nechá tá s vyššou hodnotou, druhá je podmnožina.
+  const skupinyBezDup = useMemo(() => skupiny.map(([kanal, rs]) => {
+    const podla = new Map<string, KanalRiadok>();
+    for (const r of rs) {
+      const k = r.metrika.toLowerCase();
+      const uz = podla.get(k);
+      if (!uz || Math.abs(r.hodnota) > Math.abs(uz.hodnota)) podla.set(k, r);
+    }
+    return [kanal, [...podla.values()]] as [string, KanalRiadok[]];
+  }), [skupiny]);
 
   if (nacitava) return <Card><div style={{ fontSize: 12.5, color: C.textDim }}>Načítavam…</div></Card>;
 
@@ -106,37 +142,6 @@ export function Kanaly() {
   // Trend vybranej metriky po mesiacoch. Dnes je nahratý jeden mesiac, takže
   // graf ukáže jeden stĺpec — ale s každou ďalšou zostavou rastie sám a práve
   // na to tu je: o pol roka toto bude hlavný pohľad a tabuľka len poznámka.
-  const TREND_METRIKY: { id: string; label: string; kanal: string; metrika: string }[] = [
-    { id: "sled", label: "Sledovatelia IG", kanal: "Instagram", metrika: "Followers" },
-    { id: "views", label: "Videnia IG", kanal: "Instagram", metrika: "Views" },
-    { id: "reel", label: "Ø dosah reelu", kanal: "Instagram", metrika: "Avg reach per reel" },
-    { id: "ads", label: "Reklama Kč", kanal: "Meta Ads", metrika: "Spent" },
-    { id: "web", label: "Návštevníci webu", kanal: "Web", metrika: "Visitors" },
-  ];
-  const [trendId, setTrendId] = useState("sled");
-  const trendCfg = TREND_METRIKY.find((t) => t.id === trendId)!;
-  const trendData = useMemo(() => {
-    const podla = new Map<string, number>();
-    for (const r of riadky) {
-      if (r.kanal === trendCfg.kanal && r.metrika.toLowerCase() === trendCfg.metrika.toLowerCase()) {
-        podla.set(r.mesiac, r.hodnota);
-      }
-    }
-    return [...podla.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([m, v]) => ({ label: m, value: v }));
-  }, [riadky, trendCfg]);
-
-  const [celyZoznam, setCelyZoznam] = useState(false);
-  // Duplicitné varianty tej istej metriky (dve čítania PDF) — v plnom zozname
-  // sa nechá tá s vyššou hodnotou, druhá je podmnožina.
-  const skupinyBezDup = useMemo(() => skupiny.map(([kanal, rs]) => {
-    const podla = new Map<string, KanalRiadok>();
-    for (const r of rs) {
-      const k = r.metrika.toLowerCase();
-      const uz = podla.get(k);
-      if (!uz || Math.abs(r.hodnota) > Math.abs(uz.hodnota)) podla.set(k, r);
-    }
-    return [kanal, [...podla.values()]] as [string, KanalRiadok[]];
-  }), [skupiny]);
   const pocetVsetkych = skupinyBezDup.reduce((a, [, rs]) => a + rs.length, 0);
 
   const stat = (label: string, hodnota: string, vysvetlenie: string, farba?: string) => (
