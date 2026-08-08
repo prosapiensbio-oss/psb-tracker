@@ -1,5 +1,6 @@
 import { Fragment, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
+import { PlatobneKanaly } from "./PlatobneKanaly";
 import { fetchBtcReserve, fetchMonthNotes, fetchVzasSettings, fetchWeekEntries, saveMonthNote, saveVzasSetting, type BtcReserve, type MonthNote, type WeekEntry } from "../../lib/psb/client";
 import { FinancieObsah } from "./Financie";
 import { monthlyFinance, predictCash, ZONE_HI, type CapacityRow, type ClientAgg, type RegisterItem, type SixMRow } from "../../lib/psb/compute";
@@ -2992,7 +2993,7 @@ const SEKCIE_PENIAZE = [
 const sekciaPre = (list: string) =>
   (SEKCIE_PENIAZE.find((x) => x.listy.some((l) => l.id === list)) || SEKCIE_PENIAZE[0]).id;
 
-export function Vzas({ sub, onSub, data, clients, focus }: { sub: string; onSub: (s: string) => void; data: PSBData; clients: Record<string, ClientAgg>; focus?: NavFocus | null }) {
+export function Vzas({ sub, onSub, data, clients, focus, onNavigate }: { sub: string; onSub: (s: string) => void; data: PSBData; clients: Record<string, ClientAgg>; focus?: NavFocus | null; onNavigate?: (tab: string, sub?: string, focus?: NavFocus) => void }) {
   // Tržby do VZAS tečú živé z PTmindera — excelový prepis sa nahradí pri
   // každom otvorení. `tik` len prekreslí strom po mutácii modulových polí.
   const [, tik] = useState(0);
@@ -3023,6 +3024,11 @@ export function Vzas({ sub, onSub, data, clients, focus }: { sub: string; onSub:
       })()}
       {["trzby", "sedenia", "predikcia"].includes(sub) && (
         <FinancieObsah data={data} clients={clients} focus={focus} sub={sub} onSub={onSub} />
+      )}
+      {/* Čím klienti platia — patrí k tržbám, lebo hovorí o tom, akou cestou
+          tie tržby prišli. Klik na výsek otvorí tých klientov v Prevádzke. */}
+      {sub === "trzby" && onNavigate && (
+        <PlatobneKanaly clients={clients} onNavigate={onNavigate} />
       )}
       {sub === "pnl" && (
         <>
