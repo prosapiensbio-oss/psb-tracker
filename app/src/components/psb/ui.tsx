@@ -711,11 +711,19 @@ export function LineChart({
             <text
               key={`${si}-${i}`}
               x={x(i)}
-              y={kolizia ? y(v) + 15 : y(v) - 8}
+              y={kolizia ? y(v) + 16 : y(v) - 9}
               textAnchor={i === n - 1 && n > 1 ? "end" : "middle"}
-              fontSize={10}
-              fontWeight={700}
+              fontSize={12}
+              fontWeight={800}
               fill={s.color}
+              // Obrys vo farbe karty, vykreslený POD textom. Bez neho čísla
+              // splývali s krivkou aj s mriežkou a boli „nevýrazné" — a číslo,
+              // ktoré sa musí hľadať, je horšie než žiadne. Halo ho oddelí od
+              // čohokoľvek pod ním bez toho, aby pribudol ďalší tvar.
+              stroke={C.card}
+              strokeWidth={3.5}
+              strokeLinejoin="round"
+              style={{ paintOrder: "stroke" }}
               pointerEvents="none"
             >
               {fmt(v)}
@@ -763,7 +771,7 @@ export function LineChart({
               <span style={{ color: C.text }}>{s.name}</span>
               {posl !== null && (
                 <>
-                  <span style={{ color: s.color, fontWeight: 700 }}>{fmt(posl)}</span>
+                  <span style={{ color: s.color, fontWeight: 800, fontSize: 13 }}>{fmt(posl)}</span>
                   {v.length > 1 && (
                     <span style={{ color: C.textDim, fontSize: 10.5 }}>
                       · Ø {fmt(priem as number)} · max {fmt(max as number)}{mesiacMax ? ` (${mesiacMax})` : ""} · min {fmt(min as number)}{mesiacMin ? ` (${mesiacMin})` : ""}

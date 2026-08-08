@@ -1445,7 +1445,18 @@ export function Dashboard({
         zmeny={zmeny}
         zmenyTs={odMinule?.ts ?? null}
         vyzaduju={{ kritickych: kriticke.length }}
-        registerPanel={registerPanel}
+        registerPanel={
+          <>
+            {registerPanel}
+            {/* Koniec balíčka je pripnutý hneď za registrom, nie v mriežke.
+                Je to jediná karta, ktorá hovorí o PENIAZOCH, čo sa dajú získať
+                zajtra — kto má dochodené hodiny, ten buď kúpi ďalší balíček,
+                alebo odíde. V mriežke sa dala presunúť, skryť aj prepnúť preč
+                prepínačom sekcií, a tým sa dala prehliadnuť práve vtedy, keď
+                na nej najviac záležalo. */}
+            {nodes.koniecBalicka}
+          </>
+        }
         cerstvost={cerstvost}
         vpravo={<TrainerPills value={trainer} onChange={onTrainer} />}
       />

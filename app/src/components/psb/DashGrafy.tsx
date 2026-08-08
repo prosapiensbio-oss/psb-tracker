@@ -99,7 +99,6 @@ export const WIDGETS: WidgetMeta[] = [
   // ── Klienti ────────────────────────────────────────────────────────────────
   { id: "rastStrata", label: "Rast a strata klientov", span: 1, sekcia: "klienti", vychodzi: true, popis: "Prišlo, odišlo a čistý rast za mesiac.", doma: "Klienti → Rast a strata" },
   { id: "6m", label: "6M klienti podľa fázy", span: 1, sekcia: "klienti", vychodzi: true, popis: "Obnova, integrácia, udržateľnosť — kde v procese ľudia sú.", doma: "Klienti → 6M proces" },
-  { id: "koniecBalicka", label: "Blíži sa koniec balíčka", span: 1, sekcia: "klienti", vychodzi: true, popis: "Komu dochádzajú hodiny — najbližší predaj.", doma: "Klienti" },
   { id: "balicky", label: "Klienti podľa balíčka", span: 1, sekcia: "klienti", popis: "Rozdelenie podľa členstva — na čom stojí príjem.", doma: "Klienti" },
   { id: "kdeTecie", label: "Kde to tečie", span: 1, sekcia: "klienti", popis: "Ako dlho vydržali tí, čo odišli — odchod v prvých mesiacoch má inú príčinu než po roku.", doma: "Klienti → Rast a strata" },
   { id: "prezitie", label: "Kto vydrží (kohorty)", span: 1, sekcia: "klienti", popis: "Koľko z každého mesiaca príchodov je tu po 3, 6 a 12 mesiacoch.", doma: "Klienti → Rast a strata" },
