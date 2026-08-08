@@ -22,7 +22,7 @@ import { bindings } from "../../lib/bindings.server";
 // Správy sú pre každý smer INÉ (`sso-kokpit=` vs `sso-btc=`) a obe sa líšia od
 // `exp=` použitého pri rezerve. Podpis z jedného účelu tak nejde použiť na
 // druhý — inak by odkaz na čítanie rezervy odomykal appku.
-const BTC_APP = "https://prosapiens-btc.higgsfield.app";
+const BTC_APP = "https://btc.prosapiensbio.workers.dev";
 const TTL_MS = 60_000;
 
 const hex = (buf: ArrayBuffer) =>

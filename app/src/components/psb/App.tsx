@@ -86,7 +86,7 @@ export type NavFocus = {
 /** Druhá appka — bitcoinová evidencia. Kokpit z nej už ťahá rezervu
  *  (podpísaným odkazom cez /api/btc-reserve); táto konštanta je to isté
  *  miesto pre ľudí. */
-export const BTC_APP = "https://prosapiens-btc.higgsfield.app";
+export const BTC_APP = "https://btc.prosapiensbio.workers.dev";
 
 const TABS = [
   { id: "dashboard", label: "Dashboard", icon: "home" },
@@ -1255,7 +1255,23 @@ function skupinaFaktur(
     );
   }
 
-  if (!authed) return <Login onSuccess={() => { setAuthed(true); void checkSession().then((s) => setKtoSom(s.user)); void load(); }} />;
+  // Po prihlásení sa stránka NAČÍTA ZNOVA, nie prepne stavom.
+  //
+  // Efekty v tomto komponente bežia už pri prvom vykreslení — teda aj vtedy,
+  // keď je pred nimi prihlasovacia obrazovka. Bez cookie vrátia všetky 401
+  // (banka, faktúry, marketing, nastavenia, bitcoin) a keďže majú prázdne
+  // závislosti, po prihlásení sa už nikdy nezopakujú. Prepnutie stavom teda
+  // vpustí človeka dnu do appky, ktorá má polovicu dát prázdnu: júl bez
+  // nákladov, rezerva bez bitcoinu, uzávierka hlásiaca „chýba výpis".
+  //
+  // Na Higgsfielde to nikdy nevyskočilo, lebo tam bola cookie stále platná a
+  // prihlasovacia obrazovka sa nezobrazila. Objavilo sa to až pri prvom
+  // prihlásení na Cloudflare.
+  //
+  // Reload je zámerne hrubý nástroj: dovoľuje pribudnúť ďalšiemu efektu bez
+  // toho, aby si naň niekto musel spomenúť. Zoznam závislostí by sa raz
+  // zabudol doplniť a chyba by sa vrátila v tichosti.
+  if (!authed) return <Login onSuccess={() => window.location.reload()} />;
 
   const logout = async () => {
     await apiLogout();

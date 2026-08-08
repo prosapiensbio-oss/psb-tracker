@@ -1,0 +1,42 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+
+  // ── DEPLOY CONFIG PRE VLASTNÝ CLOUDFLARE ÚČET ────────────────────
+  // wrangler.jsonc vedľa je Higgsfieldov build/dev súbor — ten sa pri ich
+  // nasadení prepisuje a jeho `name` aj binding id sú len zástupné hodnoty.
+  // Tento súbor je naopak ten pravý: mená a id sú skutočné a nasadzuje sa
+  // ním na účet prosapiensbio@gmail.com:
+  //
+  //   bunx wrangler deploy -c wrangler.psb.jsonc
+  //
+  // Oba súbory zostávajú vedľa seba zámerne, kým beží stará appka na
+  // Higgsfielde — až keď bude nová overená, ten druhý zmizne.
+  // Meno workera je zároveň adresa: kokpit.<účet>.workers.dev. Cieľ je
+  // kokpit.prosapiens.cz — na to musí byť zóna prosapiens.cz na Cloudflare.
+  "name": "kokpit",
+  "main": "dist/server/server.js",
+  "compatibility_date": "2025-05-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+
+  // Statické súbory sa servírujú priamo, všetko ostatné (vrátane "/") padá
+  // na SSR Worker. run_worker_first zapnuté BYŤ NESMIE — Worker nemá trasu
+  // na /assets/* a vracal by na ne 404.
+  "assets": {
+    "directory": "./dist/client",
+    "binding": "ASSETS",
+    "not_found_handling": "none"
+  },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_id": "5f34fff3-d3a3-44f2-a68d-57d9f6151749"
+    }
+  ],
+
+  // Tajomstvá (PSB_PASSWORD, PSB_SESSION_SECRET, ANTHROPIC_API_KEY,
+  // BTC_RESERVE_TOKEN) tu nie sú a nikdy tu byť nesmú — nastavujú sa cez
+  // `wrangler secret put` a žijú len na Cloudflare.
+  "vars": { "HF_ENV": "prod", "APP_SLUG": "kokpit" }
+}

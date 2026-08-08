@@ -8,7 +8,7 @@ import { bindings } from "../../lib/bindings.server";
 // it mints a short-lived HMAC signature and hands back a URL the BROWSER can
 // call. The shared token never leaves this server, and the link expires in a
 // minute, so a copied URL is worthless almost immediately.
-const SOURCE = "https://prosapiens-btc.higgsfield.app/api/reserve";
+const SOURCE = "https://btc.prosapiensbio.workers.dev/api/reserve";
 const TTL_MS = 60_000;
 
 const hex = (buf: ArrayBuffer) =>
