@@ -156,6 +156,34 @@ export function KlientProfil({ meno, data, clients, onZavri, btcSats }: {
 
       {/* kľúčové čísla */}
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>
+        {/* Narodeniny s vekom a s tým, koľko dní ostáva — samotný dátum by
+            človek musel prepočítavať a práve preto by to nerobil. Blízke
+            narodeniny sa zvýraznia, nech ich netreba hľadať. */}
+        {c.narodeniny && (() => {
+          const md = c.narodeniny.slice(5);
+          const dnesISO = new Date().toISOString().slice(0, 10);
+          const dnes = Date.parse(`${dnesISO}T00:00:00Z`);
+          const rok = Number(dnesISO.slice(0, 4));
+          // Najbližší výskyt: tento rok, a keď už bol, tak budúci.
+          const dni = [rok, rok + 1]
+            .map((r) => Math.round((Date.parse(`${r}-${md}T00:00:00Z`) - dnes) / 86400000))
+            .filter((n) => n >= 0)
+            .sort((a, b) => a - b)[0];
+          // Vek DNES: rozdiel rokov mínus jeden, ak tohtoročné narodeniny ešte neboli.
+          const narodeny = Number(c.narodeniny.slice(0, 4));
+          const uzMal = md <= dnesISO.slice(5);
+          const vek = Number.isFinite(narodeny) && narodeny > 1900 ? rok - narodeny - (uzMal ? 0 : 1) : null;
+          const casti = [fmtDMY(c.narodeniny)];
+          if (vek !== null) casti.push(`${vek} r.`);
+          if (dni === 0) casti.push("DNES");
+          else if (dni !== undefined) casti.push(`o ${dni} dní`);
+          return stat(
+            "Narodeniny",
+            casti.join(" · "),
+            dni !== undefined && dni <= 7 ? C.orange : undefined,
+            "Dátum narodenia z PTmindera. Appka pripomenie týždeň, tri dni a deň pred — a v deň samotný.",
+          );
+        })()}
         {stat("Prvé sedenie", c.firstSession ? fmtDMY(c.firstSession) : "—")}
         {stat("Posledné", c.lastSession ? `${fmtDMY(c.lastSession)}${p.dniTicha != null ? ` (${p.dniTicha} d)` : ""}` : "—",
           p.dniTicha != null && p.dniTicha > 21 ? C.orange : undefined,

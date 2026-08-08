@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { ClientAgg } from "../../lib/psb/compute";
 import type { Lead } from "../../lib/psb/types";
-import { normName } from "../../lib/psb/format";
+import { normName, fmtDMY} from "../../lib/psb/format";
 import { C, mix } from "../../lib/psb/theme";
 
 // Hľadanie klienta odkiaľkoľvek.
@@ -38,7 +38,18 @@ export function HladanieKlienta({
     // Hľadá sa aj v mene odporúčateľa — „kto priviedol Petra" je rovnako častá
     // otázka ako „kde je Peter" a odpoveď je klient, ktorého Peter poslal.
     return Object.values(clients)
-      .filter((c) => normName(c.name).includes(t) || normName(c.zdrojKto || "").includes(t))
+      // Hľadá sa aj podľa dátumu narodenia: „6.6." nájde všetkých, čo majú
+      // vtedy narodeniny, „1988" celý ročník. Dátum sa porovnáva v oboch
+      // podobách — ako sa píše (6.6.1988) aj ako sa ukladá (1988-06-06).
+      .filter((c) => {
+        if (normName(c.name).includes(t) || normName(c.zdrojKto || "").includes(t)) return true;
+        if (!c.narodeniny) return false;
+        const d = c.narodeniny;                    // 1988-06-06
+        const [r, m, den] = d.split("-");
+        const ludsky = `${Number(den)}.${Number(m)}.${r}`; // 6.6.1988
+        const hladane = t.replace(/\s/g, "");
+        return d.includes(hladane) || ludsky.includes(hladane);
+      })
       // Aktívni hore a v rámci nich ten, kto tu bol naposledy — pri hľadaní
       // klienta ide skoro vždy o toho, s ktorým sa práve niečo rieši.
       .sort((a, b) => {
@@ -151,6 +162,9 @@ export function HladanieKlienta({
               <span style={{ fontSize: 10.5, color: C.textDim }}>
                 {c.status === "Neaktívny" ? "neaktívny · " : ""}{c.membership || "bez balíčka"} · {c.primaryTrainer || "—"}
                 {c.zdrojKto && normName(c.zdrojKto).includes(normName(q.trim())) && !normName(c.name).includes(normName(q.trim())) ? ` · odporučil(a): ${c.zdrojKto}` : ""}
+                {/* Dátum sa ukáže len vtedy, keď je dôvodom nálezu — inak by
+                    v zozname pribudol stĺpec, ktorý nikto nehľadal. */}
+                {c.narodeniny && !normName(c.name).includes(normName(q.trim())) ? ` · nar. ${fmtDMY(c.narodeniny)}` : ""}
               </span>
             </button>
           ))}
