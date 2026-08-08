@@ -1605,7 +1605,7 @@ function CashflowTab() {
 
 /** Skutočný stav peňazí. Účet z výpisu, hotovosť ručne, bitcoin z druhej appky. */
 type StavPenazi = { hotovost: number; datum: string };
-type FioZostatok = { suma: number; datum: string };
+type FioZostatok = { suma: number; datum: string; rucne?: boolean };
 
 /**
  * Koľko firma má. Nie koľko by teoreticky mohla mať.
@@ -1626,27 +1626,43 @@ function KamOdisliCard() {
   const [res, setRes] = useState<BtcReserve | null>(null);
   const [fio, setFio] = useState<FioZostatok | null>(null);
   const [stav, setStav] = useState<StavPenazi | null>(null);
-  const [uprava, setUprava] = useState(false);
+  const [uprava, setUprava] = useState<"" | "hotovost" | "ucet">("");
   const [hotTxt, setHotTxt] = useState("");
+  const [fioTxt, setFioTxt] = useState("");
+  const [fioDatum, setFioDatum] = useState("");
 
   useEffect(() => { fetchBtcReserve().then(setRes); }, []);
   useEffect(() => {
     void fetchVzasSettings().then((st) => {
       const f = st["fio_zostatok"] as FioZostatok | undefined;
-      if (f && typeof f.suma === "number") setFio(f);
+      if (f && typeof f.suma === "number") { setFio(f); setFioTxt(String(f.suma)); setFioDatum(f.datum); }
       const v = st["stav_penazi"] as StavPenazi | undefined;
       if (v && typeof v.hotovost === "number") { setStav(v); setHotTxt(String(v.hotovost)); }
     });
   }, []);
 
+  const cislo = (t: string) => Math.round(Number(t.replace(/\s/g, "").replace(",", ".")) || 0);
+
   const ulozHotovost = async () => {
-    const v: StavPenazi = {
-      hotovost: Math.round(Number(hotTxt.replace(/\s/g, "").replace(",", ".")) || 0),
-      datum: new Date().toISOString().slice(0, 10),
-    };
+    const v: StavPenazi = { hotovost: cislo(hotTxt), datum: new Date().toISOString().slice(0, 10) };
     setStav(v);
-    setUprava(false);
+    setUprava("");
     await saveVzasSetting("stav_penazi", v);
+  };
+
+  // Účet sa dopĺňa sám z hlavičky výpisu, ale len pri BUDÚCICH importoch —
+  // staršie výpisy sa nahrali ešte pred tým, než to appka vedela čítať. Aby
+  // človek nemusel čakať na ďalší mesiac, dá sa zostatok opísať aj ručne;
+  // najbližší import ho prepíše číslom od banky.
+  const ulozUcet = async () => {
+    const v: FioZostatok = {
+      suma: cislo(fioTxt),
+      datum: fioDatum || new Date().toISOString().slice(0, 10),
+      rucne: true,
+    };
+    setFio(v);
+    setUprava("");
+    await saveVzasSetting("fio_zostatok", v);
   };
 
   const btc = res?.czk ?? 0;
@@ -1679,7 +1695,7 @@ function KamOdisliCard() {
         {riadok(
           "Na účte Fio", naUcte, fio ? C.text : C.textDim,
           "Konečný zostatok z hlavičky výpisu z Fia. Doplní sa sám pri importe — appka ho inak nemá odkiaľ vedieť, výpis obsahuje pohyby, nie stav účtu.",
-          fio ? `k ${fmtDMY(fio.datum)}` : "nahraj výpis z Fia",
+          fio ? `k ${fmtDMY(fio.datum)}${fio.rucne ? " · ručne" : " · z výpisu"}` : "zatiaľ nezapísané",
         )}
         {riadok(
           "Hotovosť", hotovost, stav ? C.text : C.textDim,
@@ -1699,7 +1715,7 @@ function KamOdisliCard() {
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
-        {uprava ? (
+        {uprava === "hotovost" ? (
           <>
             <label style={{ fontSize: 11.5, color: C.textMuted }}>
               Hotovosť dnes (Kč)
@@ -1709,12 +1725,34 @@ function KamOdisliCard() {
             <button onClick={() => void ulozHotovost()} style={{ padding: "7px 15px", borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: "pointer", border: `1px solid ${mix(C.green, 55)}`, background: mix(C.green, 13), color: C.green }}>
               Uložiť
             </button>
-            <button onClick={() => setUprava(false)} style={{ background: "none", border: "none", color: C.textDim, fontSize: 12, cursor: "pointer" }}>Zrušiť</button>
+            <button onClick={() => setUprava("")} style={{ background: "none", border: "none", color: C.textDim, fontSize: 12, cursor: "pointer" }}>Zrušiť</button>
+          </>
+        ) : uprava === "ucet" ? (
+          <>
+            <label style={{ fontSize: 11.5, color: C.textMuted }}>
+              Zostatok na účte (Kč)
+              <input value={fioTxt} onChange={(e) => setFioTxt(e.target.value)} inputMode="numeric"
+                style={{ ...S.input, display: "block", marginTop: 4, width: 140 }} />
+            </label>
+            <label style={{ fontSize: 11.5, color: C.textMuted }}>
+              Ku dňu
+              <input type="date" value={fioDatum} onChange={(e) => setFioDatum(e.target.value)}
+                style={{ ...S.input, display: "block", marginTop: 4, width: 150, colorScheme: "dark" }} />
+            </label>
+            <button onClick={() => void ulozUcet()} style={{ padding: "7px 15px", borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: "pointer", border: `1px solid ${mix(C.green, 55)}`, background: mix(C.green, 13), color: C.green }}>
+              Uložiť
+            </button>
+            <button onClick={() => setUprava("")} style={{ background: "none", border: "none", color: C.textDim, fontSize: 12, cursor: "pointer" }}>Zrušiť</button>
           </>
         ) : (
-          <button onClick={() => setUprava(true)} style={{ background: "none", border: `1px solid ${mix(C.accent, 40)}`, borderRadius: 7, padding: "4px 12px", color: C.accentLight, fontSize: 12, cursor: "pointer" }}>
-            {stav ? "Prepísať hotovosť" : "Zapísať hotovosť"}
-          </button>
+          <>
+            <button onClick={() => setUprava("ucet")} style={{ background: "none", border: `1px solid ${mix(C.accent, 40)}`, borderRadius: 7, padding: "4px 12px", color: C.accentLight, fontSize: 12, cursor: "pointer" }}>
+              {fio ? "Prepísať účet" : "Zapísať účet"}
+            </button>
+            <button onClick={() => setUprava("hotovost")} style={{ background: "none", border: `1px solid ${mix(C.accent, 40)}`, borderRadius: 7, padding: "4px 12px", color: C.accentLight, fontSize: 12, cursor: "pointer" }}>
+              {stav ? "Prepísať hotovosť" : "Zapísať hotovosť"}
+            </button>
+          </>
         )}
         {/* Zastarané číslo je horšie než chýbajúce: tvári sa ako stav a nie je ním. */}
         {fio && staryFio > 40 && (
@@ -1723,9 +1761,9 @@ function KamOdisliCard() {
         {stav && staraHotovost > 40 && (
           <span style={{ fontSize: 11.5, color: C.orange }}>Hotovosť je zapísaná pred viac než mesiacom.</span>
         )}
-        {!fio && (
-          <span style={{ fontSize: 11.5, color: C.textDim }}>Účet sa doplní po ďalšom importe výpisu z Fia.</span>
-        )}
+        <span style={{ fontSize: 11.5, color: C.textDim, flex: 1, minWidth: 200 }}>
+          Účet sa doplní sám pri najbližšom importe výpisu z Fia — dovtedy sa dá opísať z internetbankingu.
+        </span>
       </div>
     </Card>
   );

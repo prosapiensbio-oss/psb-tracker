@@ -1022,7 +1022,15 @@ function skupinaFaktur(
         detail: nevybavene.length
           ? nevybavene.map((r) => r.title).join(" · ")
           : "všetky vysvetlené",
-        tab: "dashboard",
+        // Kam viesť: tam, kde sa TO KONKRÉTNE upozornenie rieši, nie na
+        // dashboard. Každá položka registra si svoj cieľ nesie v `client`
+        // (napr. „udaje|" pri platbe bez faktúry); klik na dashboard človeka
+        // len vysypal medzi dvadsať iných riadkov a hľadal si to sám.
+        ...(() => {
+          const c = nevybavene[0]?.client || "";
+          const [t, sub] = c.includes("|") ? c.split("|") : ["", ""];
+          return t ? { tab: t, sub: sub || undefined } : { tab: "dashboard" };
+        })(),
       },
     ];
   }, [data, bankaSumy, bankaPohyby, kanalyMesiace, hotovostMesiace, zapisy, registerAll, stavHotovosti]);
