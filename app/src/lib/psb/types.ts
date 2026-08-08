@@ -70,6 +70,8 @@ export type ClientOverride = {
   zdroj?: string;
   /** Pri referencii: kto konkrétne ho poslal. */
   zdrojKto?: string;
+  /** Dátum narodenia (YYYY-MM-DD). PTminder ho neexportuje, dopĺňa sa ručne. */
+  narodeniny?: string;
 };
 
 export type UploadLogEntry = {

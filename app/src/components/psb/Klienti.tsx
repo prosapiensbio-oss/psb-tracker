@@ -842,6 +842,22 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
           {editC.specialRate && (
             <input style={{ ...S.input, marginBottom: 14 }} placeholder="Dôvod špeciálnej sadzby" defaultValue={editC.specialRateNote} onBlur={(e) => actions.setOverride(editC.name, "specialRateNote", e.target.value)} />
           )}
+          {/* Narodeniny. PTminder ich neexportuje, takže sa dopĺňajú tu — a keď
+              sú vyplnené, appka pripomenie týždeň, tri dni, deň pred a v deň
+              samotný. Rok je voliteľný v tom zmysle, že sa dá zadať aj
+              nesprávny, ale keď je správny, pripomienka povie aj vek. */}
+          <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4, marginTop: 4 }}>Narodeniny</div>
+          <input
+            type="date"
+            defaultValue={editC.narodeniny}
+            onChange={(e) => actions.setOverride(editC.name, "narodeniny", e.target.value)}
+            style={{ ...S.input, marginBottom: 4, colorScheme: "dark" }}
+          />
+          <div style={{ fontSize: 11.5, color: C.textDim, marginBottom: 14, lineHeight: 1.5 }}>
+            {editC.narodeniny
+              ? "Pripomenie sa týždeň, tri dni a deň pred — a v deň samotný. Každá pripomienka sa dá skryť zvlášť."
+              : "Keď doplníš, appka pripomenie narodeniny týždeň dopredu, potom tri dni, deň pred a v deň samotný."}
+          </div>
           <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4, marginTop: 4 }}>Odkiaľ sa o nás dozvedel</div>
           <Select
             value={editC.zdroj}

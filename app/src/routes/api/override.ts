@@ -17,6 +17,7 @@ const ALLOWED = new Set<keyof ClientOverride>([
   "duch",
   "zdroj",
   "zdrojKto",
+  "narodeniny",
 ]);
 
 export const Route = createFileRoute("/api/override")({

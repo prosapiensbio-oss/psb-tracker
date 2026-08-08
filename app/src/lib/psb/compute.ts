@@ -107,6 +107,8 @@ export type ClientAgg = {
   packageValidTo: string;
   zdroj: string;
   zdrojKto: string;
+  /** Dátum narodenia (YYYY-MM-DD), prázdne = nevyplnené. */
+  narodeniny: string;
   clientType: "6M Predplatné" | "Balíček";
   is6m: boolean;
   membership: string; // current product from Packages report (e.g. "OFF - 6h S viazanostou")
@@ -166,6 +168,7 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
         packageValidTo: "",
         zdroj: "",
         zdrojKto: "",
+        narodeniny: "",
         clientType: "Balíček",
         is6m: false,
         membership: "",
@@ -252,6 +255,7 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
     c.duch = ov?.duch || "";
     c.zdroj = ov?.zdroj || "";
     c.zdrojKto = ov?.zdrojKto || "";
+    c.narodeniny = ov?.narodeniny || "";
     c.is6m = sixMSet.has(c.name);
     c.clientType = c.is6m ? "6M Predplatné" : "Balíček";
     c.serviceCount = serviceCounts[c.name] || 0;
@@ -730,6 +734,44 @@ export function deriveAnomalies(data: PSBData, clients: Record<string, ClientAgg
       push(`zdroj|${c.name}`, "blue", "Chýba zdroj",
         `${c.name}: nový klient bez zdroja — dopíš, odkiaľ prišiel, kým sa to vie`, c.name);
     }
+  }
+
+  // ── Narodeniny ───────────────────────────────────────────────────────────
+  //
+  // Pripomienka sa OPAKUJE: 7 dní pred, 3 dni pred, deň pred a v deň samotný.
+  // Každý stupeň má vlastný kľúč, takže odloženie toho prvého neumlčí ďalšie —
+  // presne o to ide. Pripomienka týždeň dopredu je na to, aby sa dal kúpiť
+  // darček; pripomienka v deň je na to, aby sa naň nezabudlo.
+  //
+  // Kľúč nesie ROK, nie celý dátum: inak by odloženie z minulého roka umlčalo
+  // aj tie tohtoročné a narodeniny by sa ohlásili raz za život.
+  for (const c of Object.values(clients)) {
+    if (!c.narodeniny || c.status === "Neaktívny") continue;
+    const md = c.narodeniny.slice(5); // MM-DD
+    if (!/^\d{2}-\d{2}$/.test(md)) continue;
+    const rok = now.getUTCFullYear();
+    // Narodeniny v decembri a dnešok v januári: najbližší výskyt je vlani.
+    const kandidati = [rok - 1, rok, rok + 1].map((r) => Date.parse(`${r}-${md}T00:00:00Z`));
+    const dnesUTC = Date.parse(`${now.toISOString().slice(0, 10)}T00:00:00Z`);
+    const najblizsie = kandidati
+      .map((t) => ({ t, dni: Math.round((t - dnesUTC) / 86400000) }))
+      .filter((x) => x.dni >= 0)
+      .sort((a, b) => a.dni - b.dni)[0];
+    if (!najblizsie) continue;
+    const { dni } = najblizsie;
+    const stupen = dni === 0 ? 0 : dni <= 1 ? 1 : dni <= 3 ? 3 : dni <= 7 ? 7 : null;
+    if (stupen === null) continue;
+    const vek = c.narodeniny.length >= 10 ? rok - Number(c.narodeniny.slice(0, 4)) : null;
+    const kolky = vek !== null && dni === 0 ? ` — má ${vek}` : vek !== null ? ` (bude mať ${vek})` : "";
+    push(
+      `narodeniny|${c.name}|${new Date(najblizsie.t).getUTCFullYear()}|${stupen}`,
+      dni === 0 ? "orange" : "blue",
+      "Narodeniny",
+      dni === 0
+        ? `${c.name} má dnes narodeniny${kolky} — nezabudni zagratulovať`
+        : `${c.name} má narodeniny ${dni === 1 ? "zajtra" : `o ${dni} dní`} (${fmtDMY(c.narodeniny)})${kolky}`,
+      c.name,
+    );
   }
 
   for (const c of Object.values(clients)) {
