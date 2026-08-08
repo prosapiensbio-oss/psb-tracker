@@ -1636,6 +1636,16 @@ function KamOdisliCard() {
     void fetchVzasSettings().then((st) => {
       const f = st["fio_zostatok"] as FioZostatok | undefined;
       if (f && typeof f.suma === "number") { setFio(f); setFioTxt(String(f.suma)); setFioDatum(f.datum); }
+      else {
+        // Prvá verzia karty ukladala účet spolu s hotovosťou do `stav_penazi`.
+        // Kto si ho vtedy zapísal, nemá oň prísť len preto, že sa presťahoval
+        // do vlastného kľúča.
+        const stary = st["stav_penazi"] as { fio?: number; datum?: string } | undefined;
+        if (stary && typeof stary.fio === "number" && stary.fio > 0) {
+          const v: FioZostatok = { suma: stary.fio, datum: stary.datum || new Date().toISOString().slice(0, 10), rucne: true };
+          setFio(v); setFioTxt(String(v.suma)); setFioDatum(v.datum);
+        }
+      }
       const v = st["stav_penazi"] as StavPenazi | undefined;
       if (v && typeof v.hotovost === "number") { setStav(v); setHotTxt(String(v.hotovost)); }
     });

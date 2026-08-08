@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { fetchBtcReserve, type BtcVyplata, saveVzasSetting} from "../../lib/psb/client";
-import { fmtCZK } from "../../lib/psb/format";
+import { fmtCZK, fmtDMY} from "../../lib/psb/format";
 import { MIMO_PNL, VYPLATY, VYPLATY_DELENE, VYPLATY_JERRY, VYPLATY_TEREZKA, type FioRiadok } from "../../lib/psb/fio";
 import { C, mix, S } from "../../lib/psb/theme";
 import { PNL, SPOLOCNE, VZAS_MONTHS } from "../../lib/psb/vzas";
@@ -319,6 +319,16 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
                   ? <>Sedí {kontrola.vypisov > 1 ? <>so všetkými <b>{kontrola.vypisov}</b> výpismi</> : "s výpisom"} za <b>{kontrola.obdobie}</b> — príjmy {fmtCZK(kontrola.prijmy)}, výdavky {fmtCZK(kontrola.vydaje)}.</>
                   : <>Nesedí s hlavičkou {kontrola.vypisov > 1 ? `${kontrola.vypisov} výpisov` : "výpisu"}: banka hlási príjmy {fmtCZK(kontrola.prijmy)} a výdavky {fmtCZK(kontrola.vydaje)}, ja som prečítal {fmtCZK(kontrola.precitanePrijmy)} a {fmtCZK(kontrola.precitaneVydaje)}. Niečo sa nenačítalo — nezapisuj to.</>}
               </span>
+              {/* Konečný zostatok viditeľne v náhľade. Keď sa nenájde, je to
+                  hneď vidieť — prvá verzia ho ticho nenašla (Fio píše „Koncový
+                  stav", nie „zůstatek") a vyzeralo to, že import nič nespravil. */}
+              {typeof kontrola.zostatok === "number" ? (
+                <span style={{ color: C.textMuted }}>
+                  · Stav účtu k {kontrola.zostatokKu ? fmtDMY(kontrola.zostatokKu) : "?"}: <b style={{ color: C.text }}>{fmtCZK(kontrola.zostatok)}</b>
+                </span>
+              ) : (
+                <span style={{ color: C.textDim }}>· stav účtu sa v hlavičke nenašiel</span>
+              )}
             </div>
           )}
           {bezId > 0 && (

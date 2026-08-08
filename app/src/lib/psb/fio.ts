@@ -80,11 +80,18 @@ function kontrolneSucty(riadky: string[]): FioKontrola | undefined {
       const koniec = ddmmyyyy(r.split("-").pop() || "");
       if (koniec && koniec > poslednyKoniec) poslednyKoniec = koniec;
     }
-    if (low.includes("konečný zůstatek") || low.includes("konecny zustatek") || low.includes("koncový zostatok")) {
+    // Fio píše doslova: „Koncový stav účtu k 31.07.2026: 38222,52 CZK".
+    // Prvá verzia hľadala slovo „zůstatek", ktoré tam nie je — a keďže sa nič
+    // nedialo ticho, vyzeralo to, že import zlyhal. Preto široký záber na
+    // koreň slova a povinné vylúčenie riadku „Počáteční stav".
+    if (/koncov|konečn|konecn/.test(low) && /stav|zůstat|zustat|zostat/.test(low) && !/počáteč|pocatec|počiatoč/.test(low)) {
       const v = cislo(r);
-      if (Number.isFinite(v) && (!zostatokKu || poslednyKoniec >= zostatokKu)) {
+      // Dátum je v tom istom riadku („k 31.07.2026"), takže sa nemusí
+      // odvodzovať z obdobia — a je presnejší.
+      const kDatum = ddmmyyyy((/\bk\s+(\d{1,2}\.\s*\d{1,2}\.\s*\d{4})/.exec(r) || [])[1] || "") || poslednyKoniec;
+      if (Number.isFinite(v) && (!zostatokKu || kDatum >= zostatokKu)) {
         zostatok = v;
-        zostatokKu = poslednyKoniec;
+        zostatokKu = kDatum;
       }
     }
     if (low.includes("suma příjmů") || low.includes("suma prijmu")) {
