@@ -31,6 +31,7 @@ import { Route as ApiMarketingRouteImport } from './routes/api/marketing'
 import { Route as ApiLogoutRouteImport } from './routes/api/logout'
 import { Route as ApiLoginRouteImport } from './routes/api/login'
 import { Route as ApiLeadsRouteImport } from './routes/api/leads'
+import { Route as ApiKalendarRouteImport } from './routes/api/kalendar'
 import { Route as ApiJarvisMemoryRouteImport } from './routes/api/jarvis-memory'
 import { Route as ApiIngestRouteImport } from './routes/api/ingest'
 import { Route as ApiFioRouteImport } from './routes/api/fio'
@@ -154,6 +155,11 @@ const ApiLeadsRoute = ApiLeadsRouteImport.update({
   path: '/api/leads',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiKalendarRoute = ApiKalendarRouteImport.update({
+  id: '/api/kalendar',
+  path: '/api/kalendar',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiJarvisMemoryRoute = ApiJarvisMemoryRouteImport.update({
   id: '/api/jarvis-memory',
   path: '/api/jarvis-memory',
@@ -231,6 +237,7 @@ export interface FileRoutesByFullPath {
   '/api/fio': typeof ApiFioRoute
   '/api/ingest': typeof ApiIngestRoute
   '/api/jarvis-memory': typeof ApiJarvisMemoryRoute
+  '/api/kalendar': typeof ApiKalendarRoute
   '/api/leads': typeof ApiLeadsRoute
   '/api/login': typeof ApiLoginRoute
   '/api/logout': typeof ApiLogoutRoute
@@ -267,6 +274,7 @@ export interface FileRoutesByTo {
   '/api/fio': typeof ApiFioRoute
   '/api/ingest': typeof ApiIngestRoute
   '/api/jarvis-memory': typeof ApiJarvisMemoryRoute
+  '/api/kalendar': typeof ApiKalendarRoute
   '/api/leads': typeof ApiLeadsRoute
   '/api/login': typeof ApiLoginRoute
   '/api/logout': typeof ApiLogoutRoute
@@ -304,6 +312,7 @@ export interface FileRoutesById {
   '/api/fio': typeof ApiFioRoute
   '/api/ingest': typeof ApiIngestRoute
   '/api/jarvis-memory': typeof ApiJarvisMemoryRoute
+  '/api/kalendar': typeof ApiKalendarRoute
   '/api/leads': typeof ApiLeadsRoute
   '/api/login': typeof ApiLoginRoute
   '/api/logout': typeof ApiLogoutRoute
@@ -342,6 +351,7 @@ export interface FileRouteTypes {
     | '/api/fio'
     | '/api/ingest'
     | '/api/jarvis-memory'
+    | '/api/kalendar'
     | '/api/leads'
     | '/api/login'
     | '/api/logout'
@@ -378,6 +388,7 @@ export interface FileRouteTypes {
     | '/api/fio'
     | '/api/ingest'
     | '/api/jarvis-memory'
+    | '/api/kalendar'
     | '/api/leads'
     | '/api/login'
     | '/api/logout'
@@ -414,6 +425,7 @@ export interface FileRouteTypes {
     | '/api/fio'
     | '/api/ingest'
     | '/api/jarvis-memory'
+    | '/api/kalendar'
     | '/api/leads'
     | '/api/login'
     | '/api/logout'
@@ -451,6 +463,7 @@ export interface RootRouteChildren {
   ApiFioRoute: typeof ApiFioRoute
   ApiIngestRoute: typeof ApiIngestRoute
   ApiJarvisMemoryRoute: typeof ApiJarvisMemoryRoute
+  ApiKalendarRoute: typeof ApiKalendarRoute
   ApiLeadsRoute: typeof ApiLeadsRoute
   ApiLoginRoute: typeof ApiLoginRoute
   ApiLogoutRoute: typeof ApiLogoutRoute
@@ -628,6 +641,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiLeadsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/kalendar': {
+      id: '/api/kalendar'
+      path: '/api/kalendar'
+      fullPath: '/api/kalendar'
+      preLoaderRoute: typeof ApiKalendarRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/jarvis-memory': {
       id: '/api/jarvis-memory'
       path: '/api/jarvis-memory'
@@ -731,6 +751,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiFioRoute: ApiFioRoute,
   ApiIngestRoute: ApiIngestRoute,
   ApiJarvisMemoryRoute: ApiJarvisMemoryRoute,
+  ApiKalendarRoute: ApiKalendarRoute,
   ApiLeadsRoute: ApiLeadsRoute,
   ApiLoginRoute: ApiLoginRoute,
   ApiLogoutRoute: ApiLogoutRoute,

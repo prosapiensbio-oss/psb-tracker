@@ -40,6 +40,7 @@ import { Treningy } from "./Treningy";
 import { Klienti } from "./Klienti";
 import { Marketing } from "./Marketing";
 import { Vysledky, Vzas } from "./Vzas";
+import { Kalendar } from "./Kalendar";
 import { Udaje } from "./Udaje";
 import { HladanieKlienta } from "./Hladanie";
 import { ZapisButton } from "./Zapis";
@@ -103,6 +104,12 @@ const TABS = [
   // Bitcoin je odkaz von, nie obsah — ale v hlavičke stojí tam, kam patrí
   // významom: hneď za peniazmi, lebo je to ich časť.
   { id: "btc-odkaz", label: "Bitcoin", icon: "bitcoin", odkaz: true },
+  // Kalendár je predbežná vrstva medzi dvoma nedeľnými exportmi z PTmindera —
+  // hovorí, čo sa CHYSTÁ a čo sa práve zmenilo. Stojí pred Výsledkami zámerne:
+  // je to pohľad dopredu, kým Výsledky sú pohľad späť. A je to vlastná karta,
+  // nie riadok v Prevádzke, aby bolo na prvý pohľad jasné, že tieto čísla sú
+  // predpoveď a nie zápis.
+  { id: "kalendar", label: "Kalendár", icon: "calendar" },
   { id: "vysledky", label: "Výsledky", icon: "calendar" },
   // Údaje sú posledné a zámerne mimo príbehu: nie je to pohľad na štúdio, je to
   // obsluha appky — nahrávanie, uzávierky, audit, kontá, záloha, vzhľad, reset.
@@ -1381,6 +1388,8 @@ function skupinaFaktur(
 
         {active === "marketing" && <Marketing data={data} clients={clients} leads={data.leads} chat={chat} sub={marketingSub} onSub={setMarketingSub} onKlient={(m) => navigate("klienti", undefined, { client: m, nonce: Date.now() })} />}
         {active === "vzas" && <Vzas sub={vzasSub} onSub={setVzasSub} data={data} clients={clients} focus={vzasFocus} onNavigate={navigate} />}
+        {active === "kalendar" && <Kalendar clients={clients} />}
+
         {active === "vysledky" && <Vysledky data={data} onNavigate={navigate} clients={clients} sixM={sixM} capacity={capacity} register={register} sub={vysledkySub} onSub={setVysledkySub} focus={vysledkyFocus} />}
         {active === "udaje" && <Udaje data={data} actions={actions} chat={chat} prekazky={prekazkyZamku} kroky={krokyZamku} podklady={podkladyMesiaca} onNavigate={navigate} btc={{ platby: [...btcBezDokladu, ...btcSparovane], faktury: volneFaktury, parovanie: btcParovanie, onSparuj: sparujBtc }} />}
       </div>
