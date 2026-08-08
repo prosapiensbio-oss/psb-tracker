@@ -422,6 +422,8 @@ export function PSBApp() {
   }, []);
   const [bankaPrijmy, setBankaPrijmy] = useState<Record<string, number>>({});
   const [btcPrijmy, setBtcPrijmy] = useState<Record<string, number>>({});
+  /** Príjmy rozdelené podľa cesty — účet vs hotovosť. BTC je zvlášť. */
+  const [prijmyKanaly, setPrijmyKanaly] = useState<{ ucet: Record<string, number>; hotovost: Record<string, number> }>({ ucet: {}, hotovost: {} });
   const [btcSatsKlienti, setBtcSatsKlienti] = useState<Record<string, number>>({});
   const [hotovostMesiace, setHotovostMesiace] = useState<Set<string>>(new Set());
   useEffect(() => {
@@ -530,6 +532,8 @@ function skupinaFaktur(
         // tabuľka ukáže po rozkliknutí, mohlo rozísť s číslom nad ním.
         const rozpis: Record<string, PohybZaBunku[]> = {};
         const prijmyBanka: Record<string, number> = {};
+        const prijmyUcet: Record<string, number> = {};
+        const prijmyHotovost: Record<string, number> = {};
         for (const p of j.pohyby || []) {
           // Príchodzie pohyby sa do nákladov nerátajú, ale sčítať ich treba —
           // sú jediné nezávislé svedectvo o tom, čo naozaj prišlo, a jediný
@@ -546,6 +550,11 @@ function skupinaFaktur(
             // dieru 181 962 Kč, ktorá neexistuje.
             const mkP = String(p.datum).slice(0, 7);
             prijmyBanka[mkP] = (prijmyBanka[mkP] || 0) + p.suma;
+            // Rovnaké peniaze, ale rozdelené podľa CESTY. Kontrola príjmov
+            // potrebuje súčet, koláč platobných kanálov a Jarvis potrebujú
+            // vedieť, čím to prišlo — hotovosť má inú réžiu než prevod.
+            if (p.typ === "hotovosť") prijmyHotovost[mkP] = (prijmyHotovost[mkP] || 0) + p.suma;
+            else prijmyUcet[mkP] = (prijmyUcet[mkP] || 0) + p.suma;
             continue;
           }
           if (p.suma >= 0 || !p.kategoria || p.kategoria === "mimo") continue;
@@ -725,6 +734,7 @@ function skupinaFaktur(
         setBankaSumy(sumy);
         setBankaPohyby(pohybyPodla);
         setBankaPrijmy(prijmyBanka);
+        setPrijmyKanaly({ ucet: prijmyUcet, hotovost: prijmyHotovost });
         if (nastavNakladyZFio(sumy, vyplaty)) setFioTik((x) => x + 1);
         else setFioTik((x) => x + 1); // rozpis pribudol aj bez zmeny súm
       })
@@ -1131,8 +1141,8 @@ function skupinaFaktur(
   }, [krokyZamku, registerAll]);
 
   const aiContext = useMemo(
-    () => buildAiContext(data, clients, sixM, capacity, registerAll),
-    [data, clients, sixM, capacity, registerAll, vzasVerzia()], // eslint-disable-line react-hooks/exhaustive-deps
+    () => buildAiContext(data, clients, sixM, capacity, registerAll, { ...prijmyKanaly, btc: btcPrijmy }),
+    [data, clients, sixM, capacity, registerAll, prijmyKanaly, btcPrijmy, vzasVerzia()], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   const actions = useMemo<Actions>(

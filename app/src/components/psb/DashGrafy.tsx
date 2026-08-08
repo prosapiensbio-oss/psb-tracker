@@ -15,6 +15,7 @@ import { doPlnehoMesiaca, kotvaDat, monthlyFinance, predictCash, predictEarnings
 import type { KanalRiadok } from "./Kanaly";
 import { ZDROJE } from "./Klienti";
 import { tokyKlientov } from "./Fluktuacia";
+import { PlatobneKanaly } from "./PlatobneKanaly";
 import { BarRow, Card, Donut, Empty, H3, Info, LineChart, Modal, ValueBars } from "./ui";
 
 // Knižnica grafov.
@@ -130,6 +131,7 @@ export const WIDGETS: WidgetMeta[] = [
   { id: "segmenty", label: "Segmenty klientov", span: 1, sekcia: "klienti", popis: "Koľko je Anchorov, Stabilných a Sporadických — na kom firma stojí.", doma: "Klienti" },
   { id: "dochadzka", label: "Dochádzka", span: 1, sekcia: "klienti", popis: "Priemerná dochádzka a koľko ľudí je pod hranicou.", doma: "Klienti" },
   { id: "referencny", label: "Referenčný motor", span: 1, sekcia: "klienti", popis: "Koľko klientov prišlo na odporúčanie a čo priniesli.", doma: "Klienti → Referencie" },
+  { id: "platobneKanaly", label: "Čím klienti platia", span: 1, sekcia: "klienti", popis: "Účet, hotovosť a bitcoin — koľko tržieb ide ktorou cestou.", doma: "Peniaze → Po mesiacoch" },
   { id: "zdrojeKlientov", label: "Odkiaľ klienti prišli", span: 1, sekcia: "klienti", popis: "Rozdelenie aktívnych klientov podľa zdroja.", doma: "Klienti" },
 
   { id: "cenaUvodneho", label: "Čo stojí úvodný", span: 1, sekcia: "marketing", popis: "Marketingové náklady delené počtom úvodných tréningov.", doma: "Marketing → Lievik" },
@@ -345,7 +347,7 @@ export function useExtraGrafy({
   clients: Record<string, ClientAgg>;
   /** Zapnuté karty — dáta z API sa ťahajú len pre ne. */
   aktivne: Set<string>;
-  onNavigate: (tab: string, sub?: string) => void;
+  onNavigate: (tab: string, sub?: string, focus?: { skupina?: { label: string; mena: string[] }; nonce?: number }) => void;
   kpiSkryte?: string[];
   /** Filter obdobia z hlavičky dashboardu (štandard rodiny P). */
   obdobie?: string;
@@ -1253,6 +1255,10 @@ export function useExtraGrafy({
     const podlaZdrojaD = new Map<string, number>();
     for (const c of aktivni) podlaZdrojaD.set(c.zdroj || "", (podlaZdrojaD.get(c.zdroj || "") || 0) + 1);
     const zdrojRiadkyD = [...podlaZdrojaD.entries()].sort((a, b) => b[1] - a[1]).slice(0, 7);
+    // Karta si dáta ťahá sama (banka + BTC appka), takže v mriežke funguje
+    // rovnako ako na svojej domovskej obrazovke.
+    nodes.platobneKanaly = <PlatobneKanaly clients={clients} onNavigate={onNavigate} />;
+
     nodes.zdrojeKlientov = (
       <Card style={{ marginBottom: 0, height: "100%" }}>
         <H3><Info label="Odkiaľ klienti prišli" text="Rozdelenie AKTÍVNYCH klientov podľa zapísaného zdroja. Toto je jediné miesto, kde sa marketing spája s peniazmi — bez neho je každé číslo o návratnosti kanála odhad. Prázdny zdroj sa dá doplniť v Klientoch cez ✎, ale len krátko po začiatku: o pol roka si už nikto nespomenie." /></H3>

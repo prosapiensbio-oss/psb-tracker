@@ -31,6 +31,8 @@ export function buildAiContext(
   sixM: SixMRow[],
   capacity: CapacityRow[],
   register: RegisterItem[],
+  /** Príjmy podľa cesty, po mesiacoch. Bez nich Jarvis nevie, čím sa platí. */
+  kanaly?: { ucet: Record<string, number>; hotovost: Record<string, number>; btc: Record<string, number> },
 ) {
   const clientList = Object.values(clients);
 
@@ -217,6 +219,27 @@ export function buildAiContext(
       akceptovane: r.acked,
       poznamka: r.note || null,
     })),
+    // ── Čím klienti platia ────────────────────────────────────────────────
+    // Tri cesty s rôznou réžiou: účet, hotovosť, bitcoin. Bitcoin je pätina
+    // tržieb a bez tohto rozdelenia by Jarvis na otázku „koľko chodí v BTC"
+    // odpovedal, že nevie — hoci to appka počíta.
+    platobneKanaly: (() => {
+      if (!kanaly) return null;
+      const sucet = (r: Record<string, number>) => Object.values(r).reduce((a, b) => a + b, 0);
+      const u = sucet(kanaly.ucet), h = sucet(kanaly.hotovost), b = sucet(kanaly.btc);
+      const spolu = u + h + b;
+      const pct = (x: number) => (spolu > 0 ? Math.round((x / spolu) * 1000) / 10 : 0);
+      return {
+        poznamka: "Za celé obdobie s dátami. Percentá sú z PEŇAZÍ, nie z počtu klientov — jeden človek môže platiť viacerými cestami. Rozpis aj graf sú v Peniaze → Po mesiacoch, karta „Čím klienti platia“.",
+        ucetCzk: Math.round(u), ucetPct: pct(u),
+        hotovostCzk: Math.round(h), hotovostPct: pct(h),
+        bitcoinCzk: Math.round(b), bitcoinPct: pct(b),
+        spoluCzk: Math.round(spolu),
+        poMesiacoch: [...new Set([...Object.keys(kanaly.ucet), ...Object.keys(kanaly.hotovost), ...Object.keys(kanaly.btc)])]
+          .sort().slice(-12)
+          .map((m) => ({ m, ucet: Math.round(kanaly.ucet[m] || 0), hotovost: Math.round(kanaly.hotovost[m] || 0), btc: Math.round(kanaly.btc[m] || 0) })),
+      };
+    })(),
     meta: {
       generatedAt: new Date().toISOString().slice(0, 10),
       note: "Súhrnné čísla sú za OBOCH trénerov spolu (Jerry + Terezka), ak nie je uvedené inak. Rozpisy po trénerovi máš v zarobky.mesacne (jerry/terezka), tyzdennePodlaTrenera a kapacita.podlaTrenera. Detail každého klienta (aj editovateľné polia) je v klientiDetail.",
