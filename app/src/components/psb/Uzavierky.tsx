@@ -244,7 +244,7 @@ export function Uzavierky({ prekazky, kroky, podklady, onNavigate, chat }: {
       {krokyNaRade && naRade && (
         <Card>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
-            <H3><Info text="Šesť vecí, ktoré musia byť hotové, kým sa mesiac zamkne. Zámok znamená „toto číslo už nikto nezmení“ — keď sa zamkne mesiac s nenahratým dokladom alebo nevysvetlenou anomáliou, tá chyba v ňom zostane navždy a bude sa tváriť ako overená. Uzávierku vieš robiť na etapy: sem sa vrátiš a vidíš, kde si." label={`Uzávierka ${monthLabel(naRade)}`} /></H3>
+            <H3><Info text="Čo musí byť hotové, kým sa mesiac zamkne. Zámok znamená „toto číslo už nikto nezmení“ — keď sa zamkne mesiac s nenahratým dokladom alebo nevysvetlenou anomáliou, tá chyba v ňom zostane navždy a bude sa tváriť ako overená. Uzávierku vieš robiť na etapy: sem sa vrátiš a vidíš, kde si." label={`Uzávierka ${monthLabel(naRade)}`} /></H3>
             <span style={{ fontSize: 12.5, fontWeight: 700, color: vsetkoHotove ? C.green : C.textMuted }}>
               {hotovych} zo {krokyNaRade.length} hotovo
             </span>
@@ -285,7 +285,7 @@ export function Uzavierky({ prekazky, kroky, podklady, onNavigate, chat }: {
             </button>
             {!vsetkoHotove && (
               <span style={{ fontSize: 11.5, color: C.textDim }}>
-                Chýba {krokyNaRade.length - hotovych}× — zámok sa odomkne, keď bude šesť fajok.
+                Chýba {krokyNaRade.length - hotovych}× — zámok sa odomkne, keď bude fajka pri každom kroku.
               </span>
             )}
           </div>
@@ -301,7 +301,7 @@ export function Uzavierky({ prekazky, kroky, podklady, onNavigate, chat }: {
               </button>
               <span style={{ fontSize: 11, color: C.textDim, flex: 1, minWidth: 220, lineHeight: 1.5 }}>
                 {staršie[staršie.length - 1] && label(staršie[staršie.length - 1])} – {label(staršie[0])}, tak ako sú.
-                Šesť krokov sa pri nich nekontroluje: história z Excelu sa už nemení a zámok tu znamená
+                Kroky sa pri nich nekontrolujú: história z Excelu sa už nemení a zámok tu znamená
                 „ďalej sa toho nedotýkam", nie „prekontroloval som to". Odomknúť sa dá kedykoľvek.
               </span>
             </div>
