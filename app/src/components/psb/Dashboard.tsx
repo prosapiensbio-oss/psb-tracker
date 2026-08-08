@@ -19,7 +19,7 @@ import {
 import { fmtCZK, fmtDMY, monthLabel, weekKey, weekLabel } from "../../lib/psb/format";
 import { C, mix, S, badge, btn } from "../../lib/psb/theme";
 import { nastavPrijmyZTrackera, pnlCalc, poslednyMesiacSDatami, salaryCalc, vzasVerzia, VZAS_MONTHS } from "../../lib/psb/vzas";
-import { fetchBtcReserve } from "../../lib/psb/client";
+import { fetchBtcReserve, fetchVzasSettings } from "../../lib/psb/client";
 import { PrehladPanel, useZmenyOdMinule, type Pristroj, type Zmena } from "./Prehlad";
 import {
   centerBody, GrafyKniznica, hraniceObdobia, MiniStat, OBDOBIA_DASH, SEKCIE, useExtraGrafy, VYCHODZIE, WIDGETS,
@@ -573,6 +573,16 @@ export function Dashboard({
   useEffect(() => {
     void fetchBtcReserve().then((r) => setBtc(r));
   }, []);
+  // Skutočný stav účtu a hotovosti, zapísaný ručne v Peniaze → Cashflow.
+  // Bez neho hovorila dlaždica Rezerva len o bitcoine — a to je časť majetku,
+  // nie majetok. Runway sa neplánuje z jednej zásuvky.
+  const [stavPenazi, setStavPenazi] = useState<{ fio: number; hotovost: number; datum: string } | null>(null);
+  useEffect(() => {
+    void fetchVzasSettings().then((st) => {
+      const v = st["stav_penazi"] as { fio: number; hotovost: number; datum: string } | undefined;
+      if (v && typeof v.fio === "number") setStavPenazi(v);
+    });
+  }, []);
 
   // ── Deväť prístrojov ───────────────────────────────────────────────────────
   // Výber a prahy stoja na rešerši (2026-08-07): Few (5–9 čísel, každé s
@@ -741,21 +751,27 @@ export function Dashboard({
     // mesiaca. Júl mal break-even o tretinu vyšší než zvyčajne (výplaty za
     // rekordný mesiac), takže rezerva vychádzala na 0,9 mesiaca namiesto 1,2 —
     // runway sa neplánuje podľa najdrahšieho mesiaca.
+    // Rezerva = VŠETKO, čo firma má: účet + hotovosť + bitcoin. Kým nie je
+    // zapísaný stav účtu a hotovosti, ostáva len bitcoin a dlaždica to povie —
+    // inak by tvrdila, že firma vydrží mesiac, hoci má na účte ďalších sto tisíc.
     const rez = btc?.czk ?? null;
-    const mesRez = rez !== null && zisk && zisk.bePriem > 0 ? rez / zisk.bePriem : null;
+    const majetok = stavPenazi ? (rez ?? 0) + stavPenazi.fio + stavPenazi.hotovost : rez;
+    const mesRez = majetok !== null && zisk && zisk.bePriem > 0 ? majetok / zisk.bePriem : null;
     varovne.push({
       id: "rezerva",
       label: "Rezerva",
       hodnota: mesRez === null ? "—" : `${mesRez.toFixed(1)} mes.`,
-      podnadpis: rez !== null ? `${fmtCZK(rez)} v BTC` : "načítava sa",
+      podnadpis: majetok === null ? "načítava sa"
+        : stavPenazi ? `${fmtCZK(majetok)} — účet, hotovosť aj BTC`
+        : `${fmtCZK(majetok)} — zatiaľ len BTC`,
       pasmo: mesRez === null ? "nevie" : mesRez < 1 ? "zle" : mesRez < 3 ? "pozor" : "ok",
       poznamka: mesRez !== null && mesRez < 3 ? "cieľ sú 3 mesiace" : undefined,
-      vysvetlenie: "Koľko mesiacov by firma ustála bez jedinej tržby — bitcoinová rezerva delená break-evenom. Tvoj cieľ „120 000 Kč+“ je v korunách; toto je to isté číslo prepočítané na čas, čo je jediné, čo v zlom mesiaci rozhoduje.",
-      kam: () => onNavigate("vzas", "trzby"),
+      vysvetlenie: "Koľko mesiacov by firma ustála bez jedinej tržby — všetko, čo má (účet + hotovosť + bitcoin), delené priemerným break-evenom za pol roka. Stav účtu a hotovosti sa zapisuje ručne v Peniaze → Cashflow, karta „Kde tie peniaze sú“; Fio dáva len výpis pohybov, nie aktuálny zostatok. Kým zapísaný nie je, ráta sa len bitcoin a číslo je nižšie než skutočnosť. Tvoj cieľ „120 000 Kč+“ je v korunách; toto je to isté prepočítané na čas, čo je jediné, čo v zlom mesiaci rozhoduje.",
+      kam: () => onNavigate("vzas", "cashflow"),
     });
 
     return { kotva: kotvaP, vysledok, varovne };
-  }, [data, clients, stats, zisk, trzbyOdhad, toky, lievikMes, weekRows, btc, kotva, trainer, zonaLo, zonaHi, onNavigate]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [data, clients, stats, zisk, trzbyOdhad, toky, lievikMes, weekRows, btc, stavPenazi, kotva, trainer, zonaLo, zonaHi, onNavigate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Čerstvosť dát. Tichý dashboard nad tri týždne starým exportom vyzerá presne
   // ako tichý dashboard nad dobrými dátami — a to je najhorší možný stav
