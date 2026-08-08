@@ -2183,7 +2183,10 @@ function MonthNoteRow({ mi, colSpan, notes, onSaved, kotva }: {
               <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 5 }}>
                 {q.q}
               </div>
-                              // One box per founder, stacked; the placeholder says whose it is.
+                {/* Jedno pole na každého, pod sebou; kto je kto, povie šedý
+                    text v poli. Predtým to bol riadkový komentár `//` priamo
+                    v JSX — a ten sa nevykreslí ako komentár, ale ako TEXT.
+                    Visel tak nad každou otázkou v appke. */}
                 <div style={{ display: "grid", gap: 6 }}>
                   {PEOPLE.map((pk) => (
                     <textarea
