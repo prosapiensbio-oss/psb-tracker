@@ -31,8 +31,6 @@ export function buildAiContext(
   sixM: SixMRow[],
   capacity: CapacityRow[],
   register: RegisterItem[],
-  /** Príjmy podľa cesty, po mesiacoch. Bez nich Jarvis nevie, čím sa platí. */
-  kanaly?: { ucet: Record<string, number>; hotovost: Record<string, number>; btc: Record<string, number> },
 ) {
   const clientList = Object.values(clients);
 
@@ -224,20 +222,35 @@ export function buildAiContext(
     // tržieb a bez tohto rozdelenia by Jarvis na otázku „koľko chodí v BTC"
     // odpovedal, že nevie — hoci to appka počíta.
     platobneKanaly: (() => {
-      if (!kanaly) return null;
-      const sucet = (r: Record<string, number>) => Object.values(r).reduce((a, b) => a + b, 0);
-      const u = sucet(kanaly.ucet), h = sucet(kanaly.hotovost), b = sucet(kanaly.btc);
-      const spolu = u + h + b;
+      // Z PTmindera (payment_method), nie z bankových pohybov. Revízia našla,
+      // že banková verzia miešala okná: výpisy siahajú len po január 2026,
+      // BTC kniha po júl 2025 — percentá z nezlučiteľných období. PTminder
+      // pokrýva celú históriu a nesie presné meno pri každej platbe.
+      const podla: Record<string, { czk: number; mena: Set<string>; poMes: Record<string, number> }> = {};
+      for (const pl of data.payments) {
+        if (!pl.client) continue;
+        const m = pl.method || "bank";
+        const e = (podla[m] ||= { czk: 0, mena: new Set(), poMes: {} });
+        e.czk += pl.amount;
+        e.mena.add(pl.client);
+        const mk = pl.date.slice(0, 7);
+        e.poMes[mk] = (e.poMes[mk] || 0) + pl.amount;
+      }
+      const spolu = Object.values(podla).reduce((a, e) => a + e.czk, 0);
       const pct = (x: number) => (spolu > 0 ? Math.round((x / spolu) * 1000) / 10 : 0);
+      const rad = (m: string) => {
+        const e = podla[m];
+        return e ? { czk: Math.round(e.czk), pct: pct(e.czk), klientov: e.mena.size } : { czk: 0, pct: 0, klientov: 0 };
+      };
       return {
-        poznamka: "Za celé obdobie s dátami. Percentá sú z PEŇAZÍ, nie z počtu klientov — jeden človek môže platiť viacerými cestami. Rozpis aj graf sú v Peniaze → Po mesiacoch, karta „Čím klienti platia“.",
-        ucetCzk: Math.round(u), ucetPct: pct(u),
-        hotovostCzk: Math.round(h), hotovostPct: pct(h),
-        bitcoinCzk: Math.round(b), bitcoinPct: pct(b),
+        poznamka: "Zdroj: PTminder (payment_method), celá história. „other“ je v praxi bitcoin — v roku 2026 sedí s BTC appkou na percentá; rok 2025 v BTC appke chýba. Percentá sú z PEŇAZÍ; klient platiaci dvoma cestami je v počtoch oboch kanálov. Graf: Peniaze → Po mesiacoch, karta „Čím klienti platia“.",
+        ucet: rad("bank"),
+        hotovost: rad("cash"),
+        bitcoin: rad("other"),
         spoluCzk: Math.round(spolu),
-        poMesiacoch: [...new Set([...Object.keys(kanaly.ucet), ...Object.keys(kanaly.hotovost), ...Object.keys(kanaly.btc)])]
+        poslednych12: [...new Set(data.payments.filter((x) => x.client).map((x) => x.date.slice(0, 7)))]
           .sort().slice(-12)
-          .map((m) => ({ m, ucet: Math.round(kanaly.ucet[m] || 0), hotovost: Math.round(kanaly.hotovost[m] || 0), btc: Math.round(kanaly.btc[m] || 0) })),
+          .map((m) => ({ m, ucet: Math.round(podla.bank?.poMes[m] || 0), hotovost: Math.round(podla.cash?.poMes[m] || 0), btc: Math.round(podla.other?.poMes[m] || 0) })),
       };
     })(),
     meta: {

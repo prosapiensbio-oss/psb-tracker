@@ -422,8 +422,6 @@ export function PSBApp() {
   }, []);
   const [bankaPrijmy, setBankaPrijmy] = useState<Record<string, number>>({});
   const [btcPrijmy, setBtcPrijmy] = useState<Record<string, number>>({});
-  /** Príjmy rozdelené podľa cesty — účet vs hotovosť. BTC je zvlášť. */
-  const [prijmyKanaly, setPrijmyKanaly] = useState<{ ucet: Record<string, number>; hotovost: Record<string, number> }>({ ucet: {}, hotovost: {} });
   const [btcSatsKlienti, setBtcSatsKlienti] = useState<Record<string, number>>({});
   const [hotovostMesiace, setHotovostMesiace] = useState<Set<string>>(new Set());
   useEffect(() => {
@@ -523,6 +521,30 @@ function skupinaFaktur(
         }
         const pouzite = new Set<string>();
 
+        /**
+         * Jedna položka faktúry → správna kopa.
+         *
+         * Revízia našla, že položky s kategóriou `vyplaty.*` sa vo VŠETKÝCH
+         * troch párovacích slučkách ticho zahadzovali — neboli náklad, neboli
+         * výplata, neboli nič. Terezkina kozmetika na júlových faktúrach
+         * (1 242,27 Kč) tak zmizla z výkazu úplne: zisk bol o toľko vyšší
+         * a jej vybraté o toľko nižšie. Nákup osobnej veci na firemnú kartu
+         * je pritom výplata v naturáliách a patrí do „poslané".
+         */
+        const zapocitajPolozku = (mk: string, pol: FaPol, popis: string, doklad: string) => {
+          if (!pol.kategoria || pol.kategoria === "mimo") return;
+          if (pol.kategoria.startsWith("vyplaty")) {
+            const v = (vyplaty[mk] ||= { jerry: 0, terezka: 0 });
+            if (pol.kategoria === "vyplaty.jerry") v.jerry += pol.cena;
+            else if (pol.kategoria === "vyplaty.terezka") v.terezka += pol.cena;
+            else { v.jerry += pol.cena / 2; v.terezka += pol.cena / 2; }
+            return;
+          }
+          (sumy[mk] ||= {});
+          sumy[mk][pol.kategoria] = (sumy[mk][pol.kategoria] || 0) + pol.cena;
+          pridajDoRozpisu(rozpis, mk, pol.kategoria, { datum: String(pol.datum).slice(0, 10), popis, suma: pol.cena, zdroj: "faktura", doklad });
+        };
+
         const sumy: Record<string, Record<string, number>> = {};
         // Súčty nestačia na kontrolu dvojitého zápisu — tá potrebuje vedieť,
         // koľko pohybov za tým číslom stojí a odkiaľ prišli.
@@ -532,8 +554,6 @@ function skupinaFaktur(
         // tabuľka ukáže po rozkliknutí, mohlo rozísť s číslom nad ním.
         const rozpis: Record<string, PohybZaBunku[]> = {};
         const prijmyBanka: Record<string, number> = {};
-        const prijmyUcet: Record<string, number> = {};
-        const prijmyHotovost: Record<string, number> = {};
         for (const p of j.pohyby || []) {
           // Príchodzie pohyby sa do nákladov nerátajú, ale sčítať ich treba —
           // sú jediné nezávislé svedectvo o tom, čo naozaj prišlo, a jediný
@@ -550,11 +570,6 @@ function skupinaFaktur(
             // dieru 181 962 Kč, ktorá neexistuje.
             const mkP = String(p.datum).slice(0, 7);
             prijmyBanka[mkP] = (prijmyBanka[mkP] || 0) + p.suma;
-            // Rovnaké peniaze, ale rozdelené podľa CESTY. Kontrola príjmov
-            // potrebuje súčet, koláč platobných kanálov a Jarvis potrebujú
-            // vedieť, čím to prišlo — hotovosť má inú réžiu než prevod.
-            if (p.typ === "hotovosť") prijmyHotovost[mkP] = (prijmyHotovost[mkP] || 0) + p.suma;
-            else prijmyUcet[mkP] = (prijmyUcet[mkP] || 0) + p.suma;
             continue;
           }
           if (p.suma >= 0 || !p.kategoria || p.kategoria === "mimo") continue;
@@ -584,16 +599,7 @@ function skupinaFaktur(
             const d = doklady.get(cislo);
             if (!d) continue;
             pouzite.add(cislo);
-            for (const pol of d.polozky) {
-              if (!pol.kategoria || pol.kategoria === "mimo" || pol.kategoria.startsWith("vyplaty")) continue;
-              (sumy[mk] ||= {});
-              sumy[mk][pol.kategoria] = (sumy[mk][pol.kategoria] || 0) + pol.cena;
-              pridajDoRozpisu(rozpis, mk, pol.kategoria, {
-                datum: String(pol.datum).slice(0, 10),
-                popis: `${pol.dodavatel ? `${pol.dodavatel} — ` : ""}${pol.nazov || "položka faktúry"}`,
-                suma: pol.cena, zdroj: "faktura", doklad: cislo,
-              });
-            }
+            for (const pol of d.polozky) zapocitajPolozku(mk, pol, `${pol.dodavatel ? `${pol.dodavatel} — ` : ""}${pol.nazov || "položka faktúry"}`, cislo);
             rozpisany = true;
           }
           if (rozpisany) continue;
@@ -640,16 +646,7 @@ function skupinaFaktur(
             const d = doklady.get(cislo);
             if (!d || pouzite.has(cislo)) continue;
             pouzite.add(cislo);
-            for (const pol of d.polozky) {
-              if (!pol.kategoria || pol.kategoria === "mimo" || pol.kategoria.startsWith("vyplaty")) continue;
-              (sumy[mk] ||= {});
-              sumy[mk][pol.kategoria] = (sumy[mk][pol.kategoria] || 0) + pol.cena;
-              pridajDoRozpisu(rozpis, mk, pol.kategoria, {
-                datum: String(nak.datum).slice(0, 10),
-                popis: `${pol.nazov || pol.dodavatel || "položka"} · zaplatené bitcoinom (spárované ručne)`,
-                suma: pol.cena, zdroj: "faktura", doklad: cislo,
-              });
-            }
+            for (const pol of d.polozky) zapocitajPolozku(mk, pol, `${pol.nazov || pol.dodavatel || "položka"} · zaplatené bitcoinom (spárované ručne)`, cislo);
           }
         }
         // CHRONOLOGICKY, od najstaršej platby.
@@ -682,16 +679,7 @@ function skupinaFaktur(
               const d = doklady.get(cislo);
               if (!d) continue;
               pouzite.add(cislo);
-              for (const pol of d.polozky) {
-                if (!pol.kategoria || pol.kategoria === "mimo" || pol.kategoria.startsWith("vyplaty")) continue;
-                (sumy[mk] ||= {});
-                sumy[mk][pol.kategoria] = (sumy[mk][pol.kategoria] || 0) + pol.cena;
-                pridajDoRozpisu(rozpis, mk, pol.kategoria, {
-                  datum: String(nakup.datum).slice(0, 10),
-                  popis: `${pol.nazov || pol.dodavatel || "položka"} · zaplatené bitcoinom${skupina.length > 1 ? ` (${skupina.length} faktúry naraz)` : ""}`,
-                  suma: pol.cena, zdroj: "faktura", doklad: cislo,
-                });
-              }
+              for (const pol of d.polozky) zapocitajPolozku(mk, pol, `${pol.nazov || pol.dodavatel || "položka"} · zaplatené bitcoinom${skupina.length > 1 ? ` (${skupina.length} faktúry naraz)` : ""}`, cislo);
             }
           }
         }
@@ -734,7 +722,6 @@ function skupinaFaktur(
         setBankaSumy(sumy);
         setBankaPohyby(pohybyPodla);
         setBankaPrijmy(prijmyBanka);
-        setPrijmyKanaly({ ucet: prijmyUcet, hotovost: prijmyHotovost });
         if (nastavNakladyZFio(sumy, vyplaty)) setFioTik((x) => x + 1);
         else setFioTik((x) => x + 1); // rozpis pribudol aj bez zmeny súm
       })
@@ -1141,8 +1128,8 @@ function skupinaFaktur(
   }, [krokyZamku, registerAll]);
 
   const aiContext = useMemo(
-    () => buildAiContext(data, clients, sixM, capacity, registerAll, { ...prijmyKanaly, btc: btcPrijmy }),
-    [data, clients, sixM, capacity, registerAll, prijmyKanaly, btcPrijmy, vzasVerzia()], // eslint-disable-line react-hooks/exhaustive-deps
+    () => buildAiContext(data, clients, sixM, capacity, registerAll),
+    [data, clients, sixM, capacity, registerAll, vzasVerzia()], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   const actions = useMemo<Actions>(

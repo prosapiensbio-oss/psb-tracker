@@ -3028,7 +3028,7 @@ export function Vzas({ sub, onSub, data, clients, focus, onNavigate }: { sub: st
       {/* Čím klienti platia — patrí k tržbám, lebo hovorí o tom, akou cestou
           tie tržby prišli. Klik na výsek otvorí tých klientov v Prevádzke. */}
       {sub === "trzby" && onNavigate && (
-        <PlatobneKanaly clients={clients} onNavigate={onNavigate} />
+        <PlatobneKanaly data={data} clients={clients} onNavigate={onNavigate} />
       )}
       {sub === "pnl" && (
         <>

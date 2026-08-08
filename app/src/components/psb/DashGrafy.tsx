@@ -1257,7 +1257,7 @@ export function useExtraGrafy({
     const zdrojRiadkyD = [...podlaZdrojaD.entries()].sort((a, b) => b[1] - a[1]).slice(0, 7);
     // Karta si dáta ťahá sama (banka + BTC appka), takže v mriežke funguje
     // rovnako ako na svojej domovskej obrazovke.
-    nodes.platobneKanaly = <PlatobneKanaly clients={clients} onNavigate={onNavigate} />;
+    nodes.platobneKanaly = <PlatobneKanaly data={data} clients={clients} onNavigate={onNavigate} />;
 
     nodes.zdrojeKlientov = (
       <Card style={{ marginBottom: 0, height: "100%" }}>
