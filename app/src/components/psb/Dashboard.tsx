@@ -659,7 +659,7 @@ export function Dashboard({
       pasmo: cisty < -0.5 ? "zle" : cisty < 0 ? "pozor" : "ok",
       poznamka: cisty < 0 ? "odchádza viac, než prichádza" : undefined,
       vysvetlenie: "Počet aktívnych klientov a priemerný čistý rast za mesiac (prišlo mínus odišlo). Samotný počet je márnivé číslo — dôležitý je smer. Klesajúci čistý rast sa v tržbách prejaví až o dva-tri mesiace neskôr.",
-      kam: () => onNavigate("klienti"),
+      kam: () => onNavigate("klienti", "klienti"),
     });
 
     // ── ČO SA CHYSTÁ ─────────────────────────────────────────────────────────
@@ -702,7 +702,7 @@ export function Dashboard({
       // dlaždica ušetriť.
       kam: ohrozeni.length
         ? () => onNavigate("klienti", undefined, { skupina: { label: "Odmlčaní 14+ dní", mena: ohrozeni.map((c) => c.name) }, nonce: Date.now() })
-        : () => onNavigate("klienti"),
+        : () => onNavigate("klienti", "klienti"),
     });
 
     const dopytyRad = (() => {
@@ -1603,7 +1603,7 @@ export function Dashboard({
   );
 }
 
-function CapacityCard({ capacity, trainer, onNavigate }: { capacity: CapacityRow[]; trainer: string; onNavigate: (t: string) => void }) {
+function CapacityCard({ capacity, trainer, onNavigate }: { capacity: CapacityRow[]; trainer: string; onNavigate: (t: string, sub?: string) => void }) {
   const jerry = capacity.find((c) => c.trainer === "Jerry");
   const terezka = capacity.find((c) => c.trainer === "Terezka");
 
@@ -1637,7 +1637,7 @@ function CapacityCard({ capacity, trainer, onNavigate }: { capacity: CapacityRow
             label={`Kapacita & vyťaženie — ${name}`}
           />
         </H3>
-        <button onClick={() => onNavigate("klienti")} style={{ ...linkBtn, fontSize: 12 }}>Detail →</button>
+        <button onClick={() => onNavigate("klienti", "klienti")} style={{ ...linkBtn, fontSize: 12 }}>Detail →</button>
       </div>
       <div style={{ display: "flex", gap: 20, alignItems: "center", flex: 1, marginTop: 8, flexWrap: "wrap" }}>
         <div>

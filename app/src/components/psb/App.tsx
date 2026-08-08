@@ -237,6 +237,15 @@ export function PSBApp() {
     }
     if (tab === "treningy" && sub) setTreningySub(sub);
     if (tab === "klienti" && sub) setKlientiSub(sub);
+    // Revízia 2026-08-08: PENIAZE tu chýbali úplne. Sub sa nastavoval pre
+    // tréningy, klientov, výsledky aj marketing — ale nie pre vzas, takže
+    // KAŽDÝ odkaz do Peňazí (dlaždica Zisk → P&L, Rezerva → Cashflow, kroky
+    // uzávierky, Jarvisove ⟦odkazy⟧) pristál na naposledy otvorenej
+    // podzáložke a vyzeralo to, že klik nefunguje. To isté s focusom —
+    // nastavoval sa len v legacy vetve „financie", takže klik na „Max · júl"
+    // v grafe tržieb mesiac nikdy neotvoril.
+    if (tab === "vzas" && sub) setVzasSub(sub);
+    if (tab === "vzas" && focus) setVzasFocus(focus);
     // Podzáložka Výsledkov sa nikdy nenastavovala — pripomienka „Mesačná
     // uzávierka" tak doviedla človeka na Kvartálne a vyzeralo to, že klik
     // nefunguje. Rovnaká mechanika ako pri ostatných, len chýbala.
@@ -245,7 +254,10 @@ export function PSBApp() {
     // Fokus na klienta má zmysel len v zozname klientov. Keď bol človek práve
     // v Dopytoch alebo v Raste a strate a klikol na meno vo vyhľadávaní,
     // zameranie sa nastavilo do podzáložky, ktorú nevidno — a nič sa nestalo.
-    if (tab === "klienti" && !sub && focus?.client) setKlientiSub("klienti");
+    // …a SKUPINA (dlaždica Odmlčaní, koláč platieb) rovnako: filter žije
+    // v zozname klientov, takže bez vynútenia podzáložky sa čip nastavil
+    // v pozadí a človek pozeral na Rast a stratu bez známky filtra.
+    if (tab === "klienti" && !sub && (focus?.client || focus?.skupina)) setKlientiSub("klienti");
     if (tab === "treningy" && focus) setTreningyFocus(focus);
     if (tab === "klienti" && focus) setKlientiFocus(focus);
     if (tab === "vysledky" && focus) setVysledkyFocus(focus);
