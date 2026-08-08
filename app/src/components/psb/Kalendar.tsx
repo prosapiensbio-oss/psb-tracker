@@ -31,6 +31,58 @@ const TYPY = [
   { value: "netrening", label: "Iné (poznámka, úloha)" },
 ];
 
+/**
+ * Návrh, čo daný názov v kalendári znamená.
+ *
+ * Jerry píše udalosti podľa pravidla: bežný klient je krstné meno ALEBO
+ * priezvisko, úvodný tréning je slovo „úvodný" a celé meno, Guillermo je
+ * „guillermo". Pravidlo sa dá čítať strojom — appka teda nemá čakať, kým jej
+ * dvadsať mien naklikáš, ale má ich navrhnúť a nechať si ich potvrdiť.
+ *
+ * Navrhuje, NEROZHODUJE. „Michal" môžu byť dvaja a „Katka" je prezývka ku
+ * „Kateřina", ktorú z mena odvodiť nejde. Tichý omyl v mene by pritom viedol
+ * k tomu, že sa hodina pripíše cudziemu balíčku — to je horšie než jedno kliknutie.
+ */
+const bezDiakritiky = (s: string) =>
+  s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+
+export function navrhni(
+  nazov: string,
+  clients: Record<string, ClientAgg>,
+): { typ: string; kandidati: string[] } {
+  const holy = bezDiakritiky(nazov);
+
+  if (/guillermo/.test(holy)) return { typ: "guillermo", kandidati: [] };
+
+  const uvodny = /\buvodn/.test(holy);
+  // Pri úvodnom sa slovo odreže — zvyšok je meno, ktoré Jerry píše celé.
+  const hladane = uvodny ? holy.replace(/\buvodn\w*\b/g, "").trim() : holy;
+  if (!hladane) return { typ: uvodny ? "uvodny" : "trening", kandidati: [] };
+
+  const kusy = hladane.split(/[\s.,-]+/).filter((x) => x.length > 1);
+  const skore: { meno: string; bod: number }[] = [];
+
+  for (const [meno, c] of Object.entries(clients)) {
+    const casti = bezDiakritiky(meno).split(/\s+/).filter(Boolean);
+    let bod = 0;
+    // Celé meno („Uvodny Hana Nováková") — najsilnejší signál.
+    if (casti.length && kusy.length >= 2 && kusy.every((k) => casti.some((c2) => c2.startsWith(k)))) bod += 6;
+    // Jedno slovo, ktoré presne sedí na krstné meno alebo priezvisko.
+    else if (kusy.length === 1 && casti.includes(kusy[0])) bod += 4;
+    // „Jan K" — krstné meno sedí, druhý kus je začiatok priezviska.
+    else if (kusy.length === 2 && casti[0] === kusy[0] && casti.slice(1).some((c2) => c2.startsWith(kusy[1]))) bod += 5;
+    if (!bod) continue;
+    // Kto stále chodí a trénuje s Jerrym, je pravdepodobnejší než niekto,
+    // kto odišiel pred rokom — ale nikoho to nevylučuje.
+    if (c.status !== "Neaktívny") bod += 2;
+    if (c.primaryTrainer === "Jerry") bod += 1;
+    skore.push({ meno, bod });
+  }
+
+  skore.sort((a, b) => b.bod - a.bod || a.meno.localeCompare(b.meno, "sk"));
+  return { typ: uvodny ? "uvodny" : "trening", kandidati: skore.slice(0, 4).map((x) => x.meno) };
+}
+
 const den = (s: string) => {
   const d = new Date(`${s}:00Z`);
   const DNI = ["Ne", "Po", "Ut", "St", "Št", "Pi", "So"];
@@ -108,7 +160,7 @@ export function Kalendar({ clients }: { clients: Record<string, ClientAgg> }) {
       )}
 
       {stav.nezname.length > 0 && (
-        <Mapovanie nezname={stav.nezname} mena={menaKlientov} onHotovo={nacitaj} />
+        <Mapovanie nezname={stav.nezname} mena={menaKlientov} clients={clients} onHotovo={nacitaj} />
       )}
 
       {pripojene && <Zmeny zmeny={stav.zmeny} onHotovo={nacitaj} />}
@@ -211,15 +263,30 @@ function Pripojenie({ zdroje, onZmena }: { zdroje: Zdroj[]; onZmena: () => Promi
  * a „Natalia" u Terezky sú dvaja rôzni ľudia a jedno pravidlo pre oboch by ich
  * ticho zlialo do jedného klienta.
  */
-function Mapovanie({ nezname, mena, onHotovo }: { nezname: Nezname[]; mena: string[]; onHotovo: () => Promise<void> }) {
+function Mapovanie({ nezname, mena, clients, onHotovo }: { nezname: Nezname[]; mena: string[]; clients: Record<string, ClientAgg>; onHotovo: () => Promise<void> }) {
   const [vyber, setVyber] = useState<Record<string, { klient: string; typ: string }>>({});
   const [uklada, setUklada] = useState("");
 
+  // Návrhy sa počítajú z názvu — Jerryho pravidlo (krstné meno alebo
+  // priezvisko, „úvodný + celé meno", „guillermo") je čitateľné strojom.
+  const navrhy = useMemo(() => {
+    const m: Record<string, { typ: string; kandidati: string[] }> = {};
+    for (const n of nezname) m[`${n.nazov}|${n.trener}`] = navrhni(n.nazov, clients);
+    return m;
+  }, [nezname, clients]);
+  const stav = (k: string) => vyber[k] || { klient: navrhy[k]?.kandidati[0] || "", typ: navrhy[k]?.typ || "trening" };
+  const jednoznacne = nezname.filter((n) => {
+    const k = `${n.nazov}|${n.trener}`;
+    return (navrhy[k]?.kandidati.length === 1 && !vyber[k]) || navrhy[k]?.typ === "guillermo";
+  }).length;
+
   const uloz = async (n: Nezname) => {
     const k = `${n.nazov}|${n.trener}`;
-    const v = vyber[k] || { klient: "", typ: "trening" };
+    const v = stav(k);
     const trening = v.typ === "trening" || v.typ === "uvodny";
-    if (trening && !v.klient) return;
+    // Meno musí sedieť na klienta v Trackeri. Preklep by inak založil väzbu na
+    // niekoho, kto neexistuje, a hodiny by sa tichom pripísali nikam.
+    if (trening && !mena.includes(v.klient)) return;
     setUklada(k);
     await posli({ akcia: "mapuj", nazov: n.nazov, trener: n.trener, typ: v.typ, klient: trening ? v.klient : null });
     setUklada("");
@@ -236,16 +303,22 @@ function Mapovanie({ nezname, mena, onHotovo }: { nezname: Nezname[]; mena: stri
       </H3>
       <div style={{ fontSize: 11.5, color: C.textDim, margin: "6px 0 12px", lineHeight: 1.5 }}>
         Zoradené podľa toho, ako často sa vyskytujú — hore je práca, ktorá sa najviac oplatí.
+        {jednoznacne > 0 && <> Pri {jednoznacne} z nich appka pozná odpoveď jednoznačne — stačí potvrdiť.</>}
       </div>
       {nezname.map((n) => {
         const k = `${n.nazov}|${n.trener}`;
-        const v = vyber[k] || { klient: "", typ: "trening" };
+        const v = stav(k);
+        const navrh = navrhy[k];
         const trening = v.typ === "trening" || v.typ === "uvodny";
         return (
           <div key={k} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "9px 0", borderBottom: `1px solid ${mix(C.border, 55)}` }}>
             <div style={{ minWidth: 150 }}>
               <div style={{ fontSize: 13.5, fontWeight: 700, color: C.text }}>{n.nazov}</div>
-              <div style={{ fontSize: 11, color: C.textDim }}>{n.trener} · {n.pocet}× · najbližšie {den(n.najblizsi)}</div>
+              <div style={{ fontSize: 11, color: C.textDim }}>
+                {n.pocet}× · najbližšie {den(n.najblizsi)}
+                {navrh && navrh.kandidati.length > 1 && <span style={{ color: C.orange }}> · {navrh.kandidati.length} možností</span>}
+                {navrh && trening && !navrh.kandidati.length && <span style={{ color: C.orange }}> · nepoznám</span>}
+              </div>
             </div>
             <Select
               value={v.typ}
@@ -253,21 +326,51 @@ function Mapovanie({ nezname, mena, onHotovo }: { nezname: Nezname[]; mena: stri
               options={TYPY}
             />
             {trening && (
-              <Select
-                value={v.klient}
-                onChange={(c) => setVyber({ ...vyber, [k]: { ...v, klient: c } })}
-                options={[{ value: "", label: "Vyber klienta…" }, ...mena.map((m) => ({ value: m, label: m }))]}
-              />
+              <>
+                {/* Sto šestnásť mien v rolete sa nedá prejsť očami. Písanie
+                    filtruje priebežne — a keď appka niekoho navrhla, meno už
+                    v poli stojí a stačí ho potvrdiť. */}
+                <input
+                  list={`kl-${n.trener}-${n.nazov}`}
+                  value={v.klient}
+                  onChange={(e) => setVyber({ ...vyber, [k]: { ...v, klient: e.target.value } })}
+                  placeholder="píš meno…"
+                  style={{
+                    flex: "1 1 190px", minWidth: 170, padding: "7px 10px", borderRadius: 8, fontSize: 12.5,
+                    border: `1px solid ${v.klient && !mena.includes(v.klient) ? C.orange : C.border}`,
+                    background: C.bg, color: C.text,
+                  }}
+                />
+                <datalist id={`kl-${n.trener}-${n.nazov}`}>
+                  {mena.map((m) => <option key={m} value={m} />)}
+                </datalist>
+                {/* Ďalšie možnosti na jeden klik — pri „Michal" alebo „Jan K"
+                    ich býva viac a preklikať sa k nim je rýchlejšie než písať. */}
+                {navrh && navrh.kandidati.length > 1 && navrh.kandidati.slice(0, 3).map((kand) => (
+                  kand === v.klient ? null : (
+                    <button
+                      key={kand}
+                      onClick={() => setVyber({ ...vyber, [k]: { ...v, klient: kand } })}
+                      style={{
+                        padding: "4px 9px", borderRadius: 6, fontSize: 11.5, cursor: "pointer",
+                        border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted,
+                      }}
+                    >
+                      {kand}
+                    </button>
+                  )
+                ))}
+              </>
             )}
             <button
               onClick={() => void uloz(n)}
-              disabled={uklada === k || (trening && !v.klient)}
+              disabled={uklada === k || (trening && !mena.includes(v.klient))}
               style={{
                 padding: "6px 13px", borderRadius: 8, fontSize: 12, fontWeight: 600,
-                cursor: trening && !v.klient ? "not-allowed" : "pointer",
+                cursor: trening && !mena.includes(v.klient) ? "not-allowed" : "pointer",
                 border: `1px solid ${mix(C.green, 45)}`,
-                background: trening && !v.klient ? "transparent" : mix(C.green, 12),
-                color: trening && !v.klient ? C.textDim : C.green,
+                background: trening && !mena.includes(v.klient) ? "transparent" : mix(C.green, 12),
+                color: trening && !mena.includes(v.klient) ? C.textDim : C.green,
               }}
             >
               {uklada === k ? "…" : "Potvrdiť"}
