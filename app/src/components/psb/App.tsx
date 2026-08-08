@@ -396,12 +396,16 @@ export function PSBApp() {
    * pamätá; automatika sa doň už nemieša.
    */
   const [btcParovanie, setBtcParovanie] = useState<Record<string, string[]>>({});
+  /** Posledný zapísaný stav hotovosti — jeden z krokov uzávierky. */
+  const [stavHotovosti, setStavHotovosti] = useState<{ hotovost: number; datum: string } | null>(null);
   /** Faktúry, ktoré zatiaľ nemajú platbu — ponuka pri ručnom párovaní. */
   const [volneFaktury, setVolneFaktury] = useState<{ cislo: string; datum: string; celkom: number; dodavatel: string }[]>([]);
   useEffect(() => {
     void fetchVzasSettings().then((st) => {
       const p = st["btc_parovanie"];
       if (p && typeof p === "object") setBtcParovanie(p as Record<string, string[]>);
+      const h = st["stav_penazi"] as { hotovost: number; datum: string } | undefined;
+      if (h && typeof h.hotovost === "number") setStavHotovosti(h);
     });
   }, []);
   /** Uloží pár a hneď prepočíta náklady. */
@@ -996,6 +1000,22 @@ function skupinaFaktur(
         focus: { month: mk, nonce: Date.now() },
       },
       {
+        // Stav hotovosti k uzávierke. Zošit hovorí, čo cez obálku pretieklo;
+        // toto hovorí, čo v nej zostalo — a bez toho sa nedá povedať, koľko
+        // firma naozaj má. Účet sa doplní sám z výpisu, bitcoin z druhej
+        // appky; hotovosť je jediné číslo, ktoré musí opísať človek.
+        id: "hotovostStav",
+        label: "Stav hotovosti",
+        hotovo: !!stavHotovosti && stavHotovosti.datum >= mk,
+        detail: stavHotovosti
+          ? (stavHotovosti.datum >= mk
+              ? `${Math.round(stavHotovosti.hotovost).toLocaleString("cs-CZ")} Kč k ${fmtDMY(stavHotovosti.datum)}`
+              : `naposledy ${fmtDMY(stavHotovosti.datum)} — prepíš na koniec mesiaca`)
+          : "nezapísaný — spočítaj obálku",
+        tab: "vzas",
+        sub: "cashflow",
+      },
+      {
         id: "upozornenia",
         label: "Upozornenia mesiaca",
         hotovo: nevybavene.length === 0,
@@ -1005,7 +1025,7 @@ function skupinaFaktur(
         tab: "dashboard",
       },
     ];
-  }, [data, bankaSumy, bankaPohyby, kanalyMesiace, hotovostMesiace, zapisy, registerAll]);
+  }, [data, bankaSumy, bankaPohyby, kanalyMesiace, hotovostMesiace, zapisy, registerAll, stavHotovosti]);
 
   /**
    * Všetko, čo appka o mesiaci vie, ako text pre mesačnú správu.

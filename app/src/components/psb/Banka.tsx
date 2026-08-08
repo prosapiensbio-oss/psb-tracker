@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { fetchBtcReserve, type BtcVyplata } from "../../lib/psb/client";
+import { fetchBtcReserve, type BtcVyplata, saveVzasSetting} from "../../lib/psb/client";
 import { fmtCZK } from "../../lib/psb/format";
 import { MIMO_PNL, VYPLATY, VYPLATY_DELENE, VYPLATY_JERRY, VYPLATY_TEREZKA, type FioRiadok } from "../../lib/psb/fio";
 import { C, mix, S } from "../../lib/psb/theme";
@@ -91,7 +91,7 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
       return h.slice(0, -1);
     });
   // Kontrola z hlavičky výpisu (súčty od banky) + koľko riadkov nemá ID operácie.
-  const [kontrola, setKontrola] = useState<{ prijmy: number; vydaje: number; obdobie: string; vypisov: number; precitanePrijmy: number; precitaneVydaje: number; sedi: boolean | null } | null>(null);
+  const [kontrola, setKontrola] = useState<{ prijmy: number; vydaje: number; obdobie: string; vypisov: number; precitanePrijmy: number; precitaneVydaje: number; sedi: boolean | null; zostatok?: number; zostatokKu?: string } | null>(null);
   const [bezId, setBezId] = useState(0);
   // Príjmy a výdavky vedľa seba v jednej tabuľke sa zle prechádzajú — zaraďujú
   // sa hlavne výdavky, príjmy sú len kontrola proti PTminderu.
@@ -244,6 +244,12 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
     }).then((x) => x.json()).catch(() => ({ ok: false }));
     setBusy(false);
     if (r.ok) {
+      // Konečný zostatok z hlavičky výpisu → stav účtu. Fio ho tam dáva a je
+      // to jediný autoritatívny zdroj: výpis obsahuje pohyby, nie stav účtu,
+      // takže bez tohto by ho človek musel opisovať z internetbankingu ručne.
+      if (typeof kontrola?.zostatok === "number" && kontrola.zostatokKu) {
+        void saveVzasSetting("fio_zostatok", { suma: Math.round(kontrola.zostatok), datum: kontrola.zostatokKu });
+      }
       setHistoria([]);
       setVysledok(`Zapísané: ${r.pridane} pohybov${r.preskocene ? `, ${r.preskocene} už v databáze bolo` : ""}${r.zamknute ? `, ${r.zamknute} odmietnutých (uzavretý mesiac)` : ""}. Naučených pravidiel: ${r.pravidla}.`);
       setNahlad(null);

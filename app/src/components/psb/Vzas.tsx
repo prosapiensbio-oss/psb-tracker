@@ -1567,7 +1567,7 @@ function CashflowTab() {
         </div>
       </Card>
 
-      <KamOdisliCard cum={cum[cum.length - 1]} />
+      <KamOdisliCard />
 
       <Card>
         <H3>Mesačný tok</H3>
@@ -1603,43 +1603,44 @@ function CashflowTab() {
   );
 }
 
-// "Kumulovaný prebytok 124 360" reads like a bank balance, and it is not one —
-// Jerry's first reaction to it was "toto fakt nemám". The money is real, it just
-// left the account by routes the P&L never shows: the founders' own loans and
-// the bitcoin that clients paid in and nobody ever converted back to CZK. This
-// card names those routes instead of leaving him to guess.
-/** Skutočný stav peňazí, zapísaný ručne. BTC sa dopĺňa samo z druhej appky. */
-type StavPenazi = { fio: number; hotovost: number; datum: string };
+/** Skutočný stav peňazí. Účet z výpisu, hotovosť ručne, bitcoin z druhej appky. */
+type StavPenazi = { hotovost: number; datum: string };
+type FioZostatok = { suma: number; datum: string };
 
-function KamOdisliCard({ cum }: { cum: number }) {
-  const [open, setOpen] = useState(false);
+/**
+ * Koľko firma má. Nie koľko by teoreticky mohla mať.
+ *
+ * Táto karta pôvodne skladala „malo by zostať" z prevádzkového prebytku, vkladu
+ * od Jarka a pôžičiek zakladateľom. Jerry to zhrnul presne: čo Jarek vložil vo
+ * februári 2025, už neexistuje, a prevádzkový prebytok neexistuje tiež — to
+ * nie sú peniaze, to je súčet minulých tokov. Číslo vyzeralo ako zostatok,
+ * a zostatok to nebol; vypočítať si teoretické peniaze a potom hádať, prečo
+ * nesedia so skutočnými, nie je evidencia.
+ *
+ * Zostali tri skutočné čísla:
+ *   • účet — konečný zostatok z NAJNOVŠIEHO výpisu z Fia (číslo od banky),
+ *   • hotovosť — koľko je fyzicky v obálke; opisuje sa pri uzávierke,
+ *   • bitcoin — prepočítaný kurzom z druhej appky.
+ */
+function KamOdisliCard() {
   const [res, setRes] = useState<BtcReserve | null>(null);
-  useEffect(() => { fetchBtcReserve().then(setRes); }, []);
-
-  // Skutočný stav: koľko naozaj leží na účte a v hotovosti.
-  //
-  // Karta doteraz vedela povedať len „malo by zostať" a sama dodávala, že keď
-  // toľko na účte nie je, rozdiel je v pohyboch, ktoré appka nevidí. To bola
-  // pravda, ale nepoužiteľná — chýbajúci rozdiel nikto nepoznal. Dve čísla
-  // opísané z účtu a z obálky ho premenia na merateľnú sumu a z tejto karty
-  // sa stane inventúra namiesto odhadu.
+  const [fio, setFio] = useState<FioZostatok | null>(null);
   const [stav, setStav] = useState<StavPenazi | null>(null);
   const [uprava, setUprava] = useState(false);
-  const [fioTxt, setFioTxt] = useState("");
   const [hotTxt, setHotTxt] = useState("");
+
+  useEffect(() => { fetchBtcReserve().then(setRes); }, []);
   useEffect(() => {
     void fetchVzasSettings().then((st) => {
+      const f = st["fio_zostatok"] as FioZostatok | undefined;
+      if (f && typeof f.suma === "number") setFio(f);
       const v = st["stav_penazi"] as StavPenazi | undefined;
-      if (v && typeof v.fio === "number") {
-        setStav(v);
-        setFioTxt(String(v.fio));
-        setHotTxt(String(v.hotovost));
-      }
+      if (v && typeof v.hotovost === "number") { setStav(v); setHotTxt(String(v.hotovost)); }
     });
   }, []);
-  const ulozStav = async () => {
+
+  const ulozHotovost = async () => {
     const v: StavPenazi = {
-      fio: Math.round(Number(fioTxt.replace(/\s/g, "").replace(",", ".")) || 0),
       hotovost: Math.round(Number(hotTxt.replace(/\s/g, "").replace(",", ".")) || 0),
       datum: new Date().toISOString().slice(0, 10),
     };
@@ -1647,107 +1648,85 @@ function KamOdisliCard({ cum }: { cum: number }) {
     setUprava(false);
     await saveVzasSetting("stav_penazi", v);
   };
-  const j = salaryCalc("jerry");
-  const t = salaryCalc("terezka");
-  const pozicky = Math.abs(Math.min(0, j.cumDebt[j.cumDebt.length - 1])) + Math.abs(Math.min(0, t.cumDebt[t.cumDebt.length - 1]));
+
   const btc = res?.czk ?? 0;
-  const vklad = vSum(JAREK_VKLADY) - JAREK_VKLADY[0]; // jan 25 je zostatok z 2024, nie nový vklad
-  const zvysok = cum + vklad - pozicky - btc;
-  const riadok = (label: string, val: number, farba: string, info: string) => (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "8px 0", borderBottom: `1px solid ${mix(C.border, 55)}` }}>
-      <span style={{ fontSize: 12.5, color: C.textMuted }}><Info text={info} label={label} /></span>
-      <b style={{ fontSize: 14, color: farba, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{val >= 0 ? "+" : "−"} {fmtCZK(Math.abs(val))}</b>
+  const naUcte = fio?.suma ?? 0;
+  const hotovost = stav?.hotovost ?? 0;
+  const spolu = naUcte + hotovost + btc;
+  const staryFio = fio ? (Date.now() - Date.parse(fio.datum)) / 86400000 : 0;
+  const staraHotovost = stav ? (Date.now() - Date.parse(stav.datum)) / 86400000 : 0;
+
+  const riadok = (label: string, val: number, farba: string, info: string, poznamka?: string) => (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "9px 0", borderBottom: `1px solid ${mix(C.border, 55)}` }}>
+      <span style={{ fontSize: 12.5, color: C.textMuted }}>
+        <Info text={info} label={label} />
+        {poznamka && <span style={{ color: C.textDim, fontSize: 11, marginLeft: 6 }}>{poznamka}</span>}
+      </span>
+      <b style={{ fontSize: 14, color: farba, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>{fmtCZK(val)}</b>
     </div>
   );
 
   return (
     <Card>
-      <H3 onClick={() => setOpen(!open)}>
-        <span style={{ display: "inline-block", width: 15, color: C.textDim, fontSize: 9 }}>{open ? "▼" : "▶"}</span>
-        <Info text="Prevádzkový prebytok nie je zostatok na účte. Táto tabuľka ukazuje, kadiaľ z firmy odišiel — a čo by teoreticky malo zostať. Presný zostatok povie až import z Fia." label="Kde tie peniaze sú" />
+      <H3>
+        <Info
+          text="Tri skutočné čísla, nič dopočítané. Účet je konečný zostatok z najnovšieho výpisu z Fia — číslo od banky, nie súčet pohybov. Hotovosť sa opisuje z obálky pri uzávierke. Bitcoin sa prepočítava kurzom sám. Predtým tu bol teoretický rozklad („prevádzkový prebytok“, „vklad od Jarka“), ktorý vyzeral ako zostatok, ale zostatok to nebol — tie peniaze dávno nie sú."
+          label="Kde tie peniaze sú"
+        />
       </H3>
-      {!open && (
-        <div style={{ fontSize: 12.5, color: C.textMuted }}>
-          Malo by zostať <b style={{ color: signColor(zvysok) }}>{fmtCZK(zvysok)}</b> — rozklad po kliknutí.
-        </div>
-      )}
-      {open && (<>
-      <div style={{ marginTop: 6 }}>
-        {riadok("Prevádzkový prebytok (od jan 25)", cum, C.green, "Súčet mesačných tokov: príjmy mínus všetky výdavky vrátane výplat.")}
-        {riadok("Vklad od Jarka (feb 25)", vklad, C.green, "Peniaze, ktoré prišli do firmy, ale nie sú tržbou — preto ich P&L nevidí. Januárová suma sa nepočíta, to je zostatok prenesený z 2024.")}
-        {riadok("Pôžičky zakladateľom", -pozicky, C.red, "Presne to, čomu appka hovorí „kumulovaný dlh“ — peniaze, ktoré si vy dvaja vybrali nad rámec nároku. Z firmy odišli, ale nie sú nákladom, takže v P&L ich nevidno.")}
-        {riadok("Leží v bitcoine", -btc, C.orange, "Klientske platby v BTC sú v tržbách v korunách, ale koruny z nich nikdy neboli — sedia v satoshi. Načítané z BTC appky.")}
-      </div>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "12px 0 2px", borderTop: `2px solid ${mix(C.accent, 45)}`, marginTop: 4 }}>
-        <span style={{ fontSize: 13.5, fontWeight: 700, color: C.text }}>Malo by zostať</span>
-        <b style={{ fontSize: 17, color: signColor(zvysok), fontVariantNumeric: "tabular-nums" }}>{fmtCZK(zvysok)}</b>
-      </div>
-      {/* ── Skutočný stav ─────────────────────────────────────────────── */}
-      <div style={{ marginTop: 16, paddingTop: 12, borderTop: `1px solid ${mix(C.border, 60)}` }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
-          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.8, textTransform: "uppercase", color: C.textDim }}>
-            Skutočný stav {stav && !uprava && <span style={{ textTransform: "none", letterSpacing: 0, fontWeight: 400 }}>· zapísané {fmtDMY(stav.datum)}</span>}
-          </span>
-          {!uprava && (
-            <button onClick={() => setUprava(true)} style={{ background: "none", border: `1px solid ${mix(C.accent, 40)}`, borderRadius: 7, padding: "3px 11px", color: C.accentLight, fontSize: 11.5, cursor: "pointer" }}>
-              {stav ? "Prepísať" : "Zapísať stav"}
-            </button>
-          )}
-        </div>
 
+      <div style={{ marginTop: 4 }}>
+        {riadok(
+          "Na účte Fio", naUcte, fio ? C.text : C.textDim,
+          "Konečný zostatok z hlavičky výpisu z Fia. Doplní sa sám pri importe — appka ho inak nemá odkiaľ vedieť, výpis obsahuje pohyby, nie stav účtu.",
+          fio ? `k ${fmtDMY(fio.datum)}` : "nahraj výpis z Fia",
+        )}
+        {riadok(
+          "Hotovosť", hotovost, stav ? C.text : C.textDim,
+          "Koľko je fyzicky v obálke. Zošit hovorí, čo cez ňu pretieklo; toto hovorí, čo v nej zostalo. Zapisuje sa raz za mesiac pri uzávierke.",
+          stav ? `k ${fmtDMY(stav.datum)}` : "zatiaľ nezapísané",
+        )}
+        {riadok(
+          "V bitcoine", btc, C.orange,
+          "Hodnota bitcoinovej rezervy podľa aktuálneho kurzu, načítaná z BTC appky. Prepočítava sa sama.",
+          "aktuálny kurz",
+        )}
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "12px 0 2px", borderTop: `2px solid ${mix(C.accent, 45)}`, marginTop: 4 }}>
+        <span style={{ fontSize: 13.5, fontWeight: 700, color: C.text }}>Firma má spolu</span>
+        <b style={{ fontSize: 19, color: C.accentLight, fontVariantNumeric: "tabular-nums" }}>{fmtCZK(spolu)}</b>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12, flexWrap: "wrap" }}>
         {uprava ? (
-          <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
+          <>
             <label style={{ fontSize: 11.5, color: C.textMuted }}>
-              Na účte Fio (Kč)
-              <input value={fioTxt} onChange={(e) => setFioTxt(e.target.value)} inputMode="numeric"
-                style={{ ...S.input, display: "block", marginTop: 4, width: 130 }} />
-            </label>
-            <label style={{ fontSize: 11.5, color: C.textMuted }}>
-              Hotovosť (Kč)
+              Hotovosť dnes (Kč)
               <input value={hotTxt} onChange={(e) => setHotTxt(e.target.value)} inputMode="numeric"
                 style={{ ...S.input, display: "block", marginTop: 4, width: 130 }} />
             </label>
-            <button onClick={() => void ulozStav()} style={{ padding: "7px 15px", borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: "pointer", border: `1px solid ${mix(C.green, 55)}`, background: mix(C.green, 13), color: C.green }}>
+            <button onClick={() => void ulozHotovost()} style={{ padding: "7px 15px", borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: "pointer", border: `1px solid ${mix(C.green, 55)}`, background: mix(C.green, 13), color: C.green }}>
               Uložiť
             </button>
             <button onClick={() => setUprava(false)} style={{ background: "none", border: "none", color: C.textDim, fontSize: 12, cursor: "pointer" }}>Zrušiť</button>
-          </div>
-        ) : stav ? (
-          <>
-            {riadok("Na účte Fio", stav.fio, C.text, "Zostatok opísaný z internetbankingu. Appka ho sama nezistí — Fio dáva len výpis pohybov, nie aktuálny stav.")}
-            {riadok("Hotovosť", stav.hotovost, C.text, "Koľko je fyzicky v obálke. Zošit hovorí, čo cez ňu pretieklo; toto hovorí, čo v nej zostalo.")}
-            {riadok("V bitcoine", btc, C.orange, "Načítané z BTC appky podľa aktuálneho kurzu. Prepočítava sa samo.")}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, padding: "12px 0 2px", borderTop: `2px solid ${mix(C.accent, 45)}`, marginTop: 4 }}>
-              <span style={{ fontSize: 13.5, fontWeight: 700, color: C.text }}>Firma má spolu</span>
-              <b style={{ fontSize: 17, color: C.accentLight, fontVariantNumeric: "tabular-nums" }}>{fmtCZK(stav.fio + stav.hotovost + btc)}</b>
-            </div>
-            {/* Rozdiel je to, o čo tu celý čas ide: model proti realite. */}
-            {(() => {
-              const skutocne = stav.fio + stav.hotovost;
-              const rozdiel = skutocne - zvysok;
-              const velky = Math.abs(rozdiel) > Math.max(5000, Math.abs(zvysok) * 0.1);
-              const stary = (Date.now() - Date.parse(stav.datum)) / 86400000 > 30;
-              return (
-                <div style={{ fontSize: 11.5, color: C.textMuted, marginTop: 10, lineHeight: 1.6 }}>
-                  Model hovorí <b style={{ color: C.text }}>{fmtCZK(zvysok)}</b>, na účte a v hotovosti je{" "}
-                  <b style={{ color: C.text }}>{fmtCZK(skutocne)}</b> — rozdiel{" "}
-                  <b style={{ color: velky ? C.orange : C.green }}>{rozdiel >= 0 ? "+" : "−"}{fmtCZK(Math.abs(rozdiel))}</b>.
-                  {velky
-                    ? " To je to, čo appka nevidí: dane a odvody platené mimo, zostatok prenesený z 2024, alebo nezaradený pohyb. Stojí za to nájsť to — nie je to chyba čísla, je to chýbajúci záznam."
-                    : " Model sedí s realitou; nič podstatné appke neuniká."}
-                  {stary && <> <b style={{ color: C.orange }}>Zápis je starší než mesiac</b> — prepíš ho, inak porovnávaš dnešok so starým stavom.</>}
-                </div>
-              );
-            })()}
           </>
         ) : (
-          <div style={{ fontSize: 11.5, color: C.textMuted, lineHeight: 1.6 }}>
-            Zapíš, koľko je na účte a v hotovosti, a z tejto karty sa stane inventúra: uvidíš, či model sedí s realitou,
-            a rozdiel bude konkrétna suma namiesto vety „niečo appka nevidí". Bitcoin sa doplní sám.
-          </div>
+          <button onClick={() => setUprava(true)} style={{ background: "none", border: `1px solid ${mix(C.accent, 40)}`, borderRadius: 7, padding: "4px 12px", color: C.accentLight, fontSize: 12, cursor: "pointer" }}>
+            {stav ? "Prepísať hotovosť" : "Zapísať hotovosť"}
+          </button>
+        )}
+        {/* Zastarané číslo je horšie než chýbajúce: tvári sa ako stav a nie je ním. */}
+        {fio && staryFio > 40 && (
+          <span style={{ fontSize: 11.5, color: C.orange }}>Výpis z Fia je starší než mesiac — nahraj nový.</span>
+        )}
+        {stav && staraHotovost > 40 && (
+          <span style={{ fontSize: 11.5, color: C.orange }}>Hotovosť je zapísaná pred viac než mesiacom.</span>
+        )}
+        {!fio && (
+          <span style={{ fontSize: 11.5, color: C.textDim }}>Účet sa doplní po ďalšom importe výpisu z Fia.</span>
         )}
       </div>
-      </>)}
     </Card>
   );
 }

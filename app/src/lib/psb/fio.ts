@@ -35,7 +35,20 @@ export type FioRiadok = {
 };
 
 /** Kontrolné súčty z hlavičiek výpisov — na overenie, že import nič nestratil. */
-export type FioKontrola = { prijmy: number; vydaje: number; obdobie: string; vypisov: number };
+export type FioKontrola = {
+  prijmy: number; vydaje: number; obdobie: string; vypisov: number;
+  /** Konečný zostatok z NAJNOVŠIEHO výpisu a deň, ku ktorému platí.
+   *  Fio ho dáva v hlavičke; appka ho inak nemá odkiaľ vedieť — výpis
+   *  obsahuje pohyby, nie stav účtu. */
+  zostatok?: number;
+  zostatokKu?: string;
+};
+
+/** „31.07.2026" → „2026-07-31". Vracia prázdny reťazec, keď to nie je dátum. */
+function ddmmyyyy(t: string): string {
+  const m = /(\d{1,2})\.\s*(\d{1,2})\.\s*(\d{4})/.exec(t || "");
+  return m ? `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}` : "";
+}
 
 export type FioParse =
   | { ok: true; riadky: FioRiadok[]; hlavicka: string[]; kontrola?: FioKontrola }
@@ -56,8 +69,24 @@ function kontrolneSucty(riadky: string[]): FioKontrola | undefined {
   };
   let prijmy = 0, vydaje = 0, vypisov = 0;
   const obdobia: string[] = [];
+  // Konečný zostatok sa berie z výpisu s NAJNESKORŠÍM koncom obdobia — pri
+  // nahratí siedmich mesiacov naraz platí ten posledný, nie ten prvý v poradí.
+  let zostatok: number | undefined;
+  let zostatokKu = "";
+  let poslednyKoniec = "";
   for (const r of riadky) {
     const low = r.toLowerCase();
+    if (low.includes("období") || low.includes("obdobi")) {
+      const koniec = ddmmyyyy(r.split("-").pop() || "");
+      if (koniec && koniec > poslednyKoniec) poslednyKoniec = koniec;
+    }
+    if (low.includes("konečný zůstatek") || low.includes("konecny zustatek") || low.includes("koncový zostatok")) {
+      const v = cislo(r);
+      if (Number.isFinite(v) && (!zostatokKu || poslednyKoniec >= zostatokKu)) {
+        zostatok = v;
+        zostatokKu = poslednyKoniec;
+      }
+    }
     if (low.includes("suma příjmů") || low.includes("suma prijmu")) {
       const v = cislo(r);
       if (Number.isFinite(v)) { prijmy += v; vypisov++; }
@@ -73,7 +102,10 @@ function kontrolneSucty(riadky: string[]): FioKontrola | undefined {
   // „01.01.2026 - 31.01.2026" × 7 → od prvého po posledný, nie zoznam siedmich.
   const prve = obdobia[0]?.split("-")[0]?.trim() || "";
   const posledne = obdobia[obdobia.length - 1]?.split("-").pop()?.trim() || "";
-  return { prijmy, vydaje, obdobie: obdobia.length > 1 ? `${prve} – ${posledne}` : obdobia[0] || "", vypisov };
+  return {
+    prijmy, vydaje, obdobie: obdobia.length > 1 ? `${prve} – ${posledne}` : obdobia[0] || "", vypisov,
+    zostatok, zostatokKu: zostatokKu || ddmmyyyy(posledne) || undefined,
+  };
 }
 
 const oddelovac = (riadok: string): string => {
