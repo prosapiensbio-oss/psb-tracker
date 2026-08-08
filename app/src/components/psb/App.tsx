@@ -208,6 +208,10 @@ export function PSBApp() {
       setActive("tracker");
       setTrackerSection("klienti");
       setKlientiSub("6m");
+      // Revízia 2026-08-08: skorý return zahadzoval focus — register „Lukáš:
+      // 5. mesiac" otvoril 6M zoznam, ale Lukáša v ňom nezvýraznil a človek
+      // ho hľadal sám medzi dvadsiatimi menami.
+      if (focus) setKlientiFocus(focus);
       return;
     }
     // Bývalá sekcia Prevádzka → Financie žije v Peniazoch. Staré odkazy
