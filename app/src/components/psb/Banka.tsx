@@ -93,6 +93,7 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
   // Kontrola z hlavičky výpisu (súčty od banky) + koľko riadkov nemá ID operácie.
   const [kontrola, setKontrola] = useState<{ prijmy: number; vydaje: number; obdobie: string; vypisov: number; precitanePrijmy: number; precitaneVydaje: number; sedi: boolean | null; zostatok?: number; zostatokKu?: string } | null>(null);
   const [bezId, setBezId] = useState(0);
+  const [potvrdZahodit, setPotvrdZahodit] = useState(false);
   // Príjmy a výdavky vedľa seba v jednej tabuľke sa zle prechádzajú — zaraďujú
   // sa hlavne výdavky, príjmy sú len kontrola proti PTminderu.
   const [filter, setFilter] = useState<"vsetko" | "vydaje" | "prijmy" | "vyplaty" | "nezaradene">("vsetko");
@@ -169,8 +170,18 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
     setBusy(false);
     if (!r.ok) { setChyba({ chyba: r.chyba || "Neznáma chyba", ukazka: r.ukazka || [] }); setNahlad(null); return; }
     setNahlad(r.riadky as Nahlad[]);
-    setKontrola((r.kontrola as typeof kontrola) ?? null);
+    const k = (r.kontrola as typeof kontrola) ?? null;
+    setKontrola(k);
     setBezId(Number(r.bezId) || 0);
+    // Stav účtu sa ukladá HNEĎ po prečítaní výpisu, nie až po zápise pohybov.
+    //
+    // Jerry nahral júlový výpis druhýkrát: každý pohyb už v databáze bol,
+    // takže nebolo čo zapísať, tlačidlo „Zapísať" ostalo neaktívne — a s ním
+    // sa nikdy nespustilo ani uloženie zostatku. Zostatok je pritom údaj
+    // z hlavičky, ktorý so zápisom pohybov nemá nič spoločné.
+    if (typeof k?.zostatok === "number" && k.zostatokKu) {
+      void saveVzasSetting("fio_zostatok", { suma: Math.round(k.zostatok), datum: k.zostatokKu });
+    }
   };
 
   // Hotovosť. Jarkov dlh sa spláca prevažne v hotovosti a taká platba na výpise
@@ -244,12 +255,6 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
     }).then((x) => x.json()).catch(() => ({ ok: false }));
     setBusy(false);
     if (r.ok) {
-      // Konečný zostatok z hlavičky výpisu → stav účtu. Fio ho tam dáva a je
-      // to jediný autoritatívny zdroj: výpis obsahuje pohyby, nie stav účtu,
-      // takže bez tohto by ho človek musel opisovať z internetbankingu ručne.
-      if (typeof kontrola?.zostatok === "number" && kontrola.zostatokKu) {
-        void saveVzasSetting("fio_zostatok", { suma: Math.round(kontrola.zostatok), datum: kontrola.zostatokKu });
-      }
       setHistoria([]);
       setVysledok(`Zapísané: ${r.pridane} pohybov${r.preskocene ? `, ${r.preskocene} už v databáze bolo` : ""}${r.zamknute ? `, ${r.zamknute} odmietnutých (uzavretý mesiac)` : ""}. Naučených pravidiel: ${r.pravidla}.`);
       setNahlad(null);
@@ -349,13 +354,24 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
               style={{ padding: "8px 12px", borderRadius: 8, border: `1px solid ${C.border}`, background: "transparent", color: historia.length ? C.textMuted : C.textDim, fontSize: 12.5, cursor: historia.length ? "pointer" : "default", opacity: historia.length ? 1 : 0.5 }}>
               ↶ Späť{historia.length ? ` (${historia.length})` : ""}
             </button>
-            <button onClick={() => { if (confirm("Zahodiť rozrobené zaraďovanie? Zapísané pohyby zostanú.")) { setNahlad(null); setHistoria([]); } }}
-              style={{ padding: "8px 12px", borderRadius: 8, border: `1px solid ${C.border}`, background: "transparent", color: C.textDim, fontSize: 12.5, cursor: "pointer" }}>
-              Zahodiť
+            {/* Vlastné potvrdenie, nie confirm().
+                Systémové okno prehliadač v tejto appke potlačí, takže klik na
+                „Zahodiť" nerobil NIČ — a človek zostal s náhľadom, ktorý
+                prežije aj obnovenie stránky, a bez cesty von. Dva kliky robia
+                to isté a fungujú vždy. */}
+            <button
+              onClick={() => {
+                if (potvrdZahodit) { setNahlad(null); setHistoria([]); setPotvrdZahodit(false); }
+                else setPotvrdZahodit(true);
+              }}
+              onBlur={() => setPotvrdZahodit(false)}
+              title="Zapísané pohyby zostanú, zahodí sa len rozrobené zaraďovanie"
+              style={{ padding: "8px 12px", borderRadius: 8, border: `1px solid ${potvrdZahodit ? C.red : C.border}`, background: potvrdZahodit ? mix(C.red, 12) : "transparent", color: potvrdZahodit ? C.red : C.textDim, fontSize: 12.5, cursor: "pointer" }}>
+              {potvrdZahodit ? "Naozaj zahodiť?" : "Zahodiť"}
             </button>
             <button onClick={() => void zapis()} disabled={busy || suhrn.nove === 0}
               style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: suhrn.nove ? C.accent : C.border, color: C.onAccent, fontSize: 12.5, fontWeight: 600, cursor: suhrn.nove ? "pointer" : "default" }}>
-              Zapísať {suhrn.nove} pohybov
+              {suhrn.nove ? `Zapísať ${suhrn.nove} pohybov` : "Niet čo zapísať"}
             </button>
           </div>
           {/* Súhrn JE filter. Boli tu obe veci vedľa seba — čísla nad tabuľkou a
