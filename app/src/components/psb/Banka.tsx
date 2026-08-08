@@ -369,10 +369,24 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
               style={{ padding: "8px 12px", borderRadius: 8, border: `1px solid ${potvrdZahodit ? C.red : C.border}`, background: potvrdZahodit ? mix(C.red, 12) : "transparent", color: potvrdZahodit ? C.red : C.textDim, fontSize: 12.5, cursor: "pointer" }}>
               {potvrdZahodit ? "Naozaj zahodiť?" : "Zahodiť"}
             </button>
-            <button onClick={() => void zapis()} disabled={busy || suhrn.nove === 0}
-              style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: suhrn.nove ? C.accent : C.border, color: C.onAccent, fontSize: 12.5, fontWeight: 600, cursor: suhrn.nove ? "pointer" : "default" }}>
-              {suhrn.nove ? `Zapísať ${suhrn.nove} pohybov` : "Niet čo zapísať"}
-            </button>
+            {/* Keď niet čo zapísať, tlačidlo nesmie len zošednúť s nápisom
+                „Niet čo zapísať" — to je slepá ulička: vyzerá ako akcia,
+                nereaguje a človek nevie, čo ďalej. Ponúkne teda to, čo v tej
+                chvíli naozaj dáva zmysel: zavrieť náhľad. Potvrdenie netreba,
+                lebo sa nemá čo stratiť — všetky riadky sú už v databáze. */}
+            {suhrn.nove === 0 ? (
+              <button
+                onClick={() => { setNahlad(null); setHistoria([]); setPotvrdZahodit(false); }}
+                title="Všetky pohyby z tohto výpisu už v databáze sú"
+                style={{ padding: "8px 16px", borderRadius: 8, border: `1px solid ${mix(C.green, 55)}`, background: mix(C.green, 13), color: C.green, fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>
+                ✓ Hotovo — zavrieť náhľad
+              </button>
+            ) : (
+              <button onClick={() => void zapis()} disabled={busy}
+                style={{ padding: "8px 16px", borderRadius: 8, border: "none", background: C.accent, color: C.onAccent, fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>
+                Zapísať {suhrn.nove} pohybov
+              </button>
+            )}
           </div>
           {/* Súhrn JE filter. Boli tu obe veci vedľa seba — čísla nad tabuľkou a
               zvlášť tlačidlá na filtrovanie — a hovorili to isté dvakrát.
