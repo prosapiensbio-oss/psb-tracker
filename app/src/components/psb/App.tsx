@@ -386,6 +386,8 @@ export function PSBApp() {
   const [btcNakupy, setBtcNakupy] = useState<Record<string, BtcNakup[]>>({});
   /** Výbery z BTC peňaženky, ku ktorým sa nenašla faktúra — náklad chýba v P&L. */
   const [btcBezDokladu, setBtcBezDokladu] = useState<BtcNakup[]>([]);
+  /** Platby s ručne potvrdeným párom — patria na obrazovku párovania, nie medzi výstrahy. */
+  const [btcSparovane, setBtcSparovane] = useState<BtcNakup[]>([]);
   /**
    * Ručne potvrdené páry: id výberu z knihy → čísla faktúr.
    *
@@ -687,14 +689,20 @@ function skupinaFaktur(
         // Ktoré výbery z peňaženky nenašli doklad — zoznam sa plní priamo pri
         // párovaní, nie dodatočným hľadaním. Predtým sa to skúšalo znova a
         // s inou logikou, takže výsledky sa mohli rozísť.
-        // Do zoznamu idú aj RUČNE spárované platby. Bez nich sa raz potvrdené
-        // spárovanie nedalo opraviť: Jerry pripol k platbe z 25. 7. len jednu
-        // z troch faktúr, zvyšné dve zostali nezapočítané a obrazovka hlásila
-        // „niet čo párovať", lebo tá platba doklad formálne mala.
+        // POZOR na rozdiel: `btcBezDokladu` je zoznam platieb, ktoré doklad
+        // naozaj nemajú — z neho sa robí upozornenie a podmienka uzávierky.
+        // Ručne spárované idú zvlášť: na obrazovku párovania patria (inak sa
+        // raz potvrdený pár nedá opraviť), ale medzi „bez faktúry" nie.
+        //
+        // Prvá verzia ich zlievala do jedného poľa a uzávierka potom hlásila
+        // „2× platba bez faktúry", hoci tá istá obrazovka o riadok nižšie
+        // tvrdila, že každá platba svoj doklad má. Dva protichodné údaje
+        // z jedného zdroja sú horšie než jeden chýbajúci.
         const rucneNakupy = Object.keys(btcParovanie)
           .map((id) => Object.values(btcNakupy).flat().find((x) => String(x.id) === id))
           .filter((x): x is BtcNakup => !!x && String(x.datum).slice(0, 7) >= PRVY_MESIAC_Z_FIO);
-        setBtcBezDokladu([...bezDokladu, ...rucneNakupy].sort((a, b) => String(b.datum).localeCompare(String(a.datum))));
+        setBtcBezDokladu(bezDokladu);
+        setBtcSparovane(rucneNakupy.sort((a, b) => String(b.datum).localeCompare(String(a.datum))));
         // Doklady, ktoré nikto nepoužil — ponuka pre ručné spárovanie.
         // Do ponuky patria aj doklady, ktoré drží niektorý ručný pár — inak by
         // sa z už potvrdeného spárovania nedalo nič odobrať ani doplniť.
@@ -1322,7 +1330,7 @@ function skupinaFaktur(
         {active === "marketing" && <Marketing data={data} clients={clients} leads={data.leads} chat={chat} sub={marketingSub} onSub={setMarketingSub} onKlient={(m) => navigate("klienti", undefined, { client: m, nonce: Date.now() })} />}
         {active === "vzas" && <Vzas sub={vzasSub} onSub={setVzasSub} data={data} clients={clients} focus={vzasFocus} />}
         {active === "vysledky" && <Vysledky data={data} onNavigate={navigate} clients={clients} sixM={sixM} capacity={capacity} register={register} sub={vysledkySub} onSub={setVysledkySub} focus={vysledkyFocus} />}
-        {active === "udaje" && <Udaje data={data} actions={actions} chat={chat} prekazky={prekazkyZamku} kroky={krokyZamku} podklady={podkladyMesiaca} onNavigate={navigate} btc={{ platby: btcBezDokladu, faktury: volneFaktury, parovanie: btcParovanie, onSparuj: sparujBtc }} />}
+        {active === "udaje" && <Udaje data={data} actions={actions} chat={chat} prekazky={prekazkyZamku} kroky={krokyZamku} podklady={podkladyMesiaca} onNavigate={navigate} btc={{ platby: [...btcBezDokladu, ...btcSparovane], faktury: volneFaktury, parovanie: btcParovanie, onSparuj: sparujBtc }} />}
       </div>
       <div style={{ ...S.h3, textAlign: "center", color: C.textDim, fontSize: 11, padding: "8px 0 24px", fontWeight: 400 }}>
         ProSapiens Biomechanic · interný nástroj · nezdieľať externe
