@@ -243,7 +243,7 @@ export function buildAiContext(
         return e ? { czk: Math.round(e.czk), pct: pct(e.czk), klientov: e.mena.size } : { czk: 0, pct: 0, klientov: 0 };
       };
       return {
-        poznamka: "Zdroj: PTminder (payment_method), celá história. „other“ je v praxi bitcoin — v roku 2026 sedí s BTC appkou na percentá; rok 2025 v BTC appke chýba. Percentá sú z PEŇAZÍ; klient platiaci dvoma cestami je v počtoch oboch kanálov. Graf: Peniaze → Po mesiacoch, karta „Čím klienti platia“.",
+        poznamka: "Zdroj: PTminder (payment_method), celá história. Kanál „Bitcoin“ = metóda other — v roku 2026 sedí s BTC appkou na percentá; rok 2025 v BTC appke chýba (kniha platí až od 31.7.2025). Percentá sú z PEŇAZÍ; klient platiaci dvoma cestami je v počtoch oboch kanálov. Graf: Peniaze → Po mesiacoch, karta „Čím klienti platia“.",
         ucet: rad("bank"),
         hotovost: rad("cash"),
         bitcoin: rad("other"),

@@ -22,7 +22,8 @@ import { OBDOBIA_DASH, hraniceObdobia } from "./DashGrafy";
  * peniaze naozaj prišli (kontrola príjmov v registri).
  *
  * „other" je v praxi bitcoin: v roku 2026 sedí s BTC knihou na percentá.
- * Rok 2025 v BTC knihe chýba (389 tisíc bez náprotivku), preto opatrný názov.
+ * Rok 2025 v BTC knihe chýba (389 tisíc bez náprotivku) — kniha ale platí až
+ * od 31.7.2025 a Jerry rok 2025 neriešil, preto rovno názov „Bitcoin".
  *
  * KOLÁČ UKAZUJE PENIAZE. Klient platiaci dvoma cestami je v počtoch oboch
  * kanálov — počty sa preto nesčítavajú na počet klientov a sú vedľa ako
@@ -32,7 +33,7 @@ import { OBDOBIA_DASH, hraniceObdobia } from "./DashGrafy";
 const METODY = [
   { id: "bank", label: "Účet", farba: C.accent },
   { id: "cash", label: "Hotovosť", farba: C.blue },
-  { id: "other", label: "Bitcoin (other)", farba: C.orange },
+  { id: "other", label: "Bitcoin", farba: C.orange },
 ] as const;
 
 export function PlatobneKanaly({

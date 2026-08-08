@@ -1987,8 +1987,11 @@ function KvartalneTab({ data, clients }: { data: PSBData; clients: Record<string
   const prev = a[a.length - 2];
   const d = { prijmy: pct(cur.prijmy, prev.prijmy), naklady: pct(cur.naklady, prev.naklady), zisk: pct(cur.zisk, prev.zisk), marza: cur.marza - prev.marza };
   // Like for like: the same six months a year apart, plus the full 2025 for context.
+  // POZOR: YEAR_IDX["2026"] rastie s kalendárom — keď júl dostal dáta z Fia,
+  // "H1" by ticho zhltol siedmy mesiac a porovnanie by klamalo. Preto natvrdo
+  // prvých šesť mesiacov roka, nie celý ročný index.
   const h1_25 = agg([0, 1, 2, 3, 4, 5]);
-  const h1_26 = agg(YEAR_IDX["2026"]);
+  const h1_26 = agg(YEAR_IDX["2026"].slice(0, 6));
   const rok25 = agg(YEAR_IDX["2025"]);
   const cell = { textAlign: "right" as const, padding: "8px 10px", fontSize: 13, fontVariantNumeric: "tabular-nums" as const, whiteSpace: "nowrap" as const };
   const sub = { ...cell, fontSize: 11, color: C.textDim, padding: "4px 10px" };
@@ -2079,7 +2082,8 @@ function KvartalneTab({ data, clients }: { data: PSBData; clients: Record<string
             <thead>
               <tr style={{ borderBottom: `2px solid ${mix(C.accent, 35)}` }}>
                 <th style={{ textAlign: "left", padding: "8px 10px", fontSize: 11, color: C.textMuted, fontWeight: 600, minWidth: 150 }}>Položka</th>
-                {a.map((q) => <th key={q.id} style={{ ...cell, fontSize: 11, color: C.textMuted, fontWeight: 600 }}>{q.label}</th>)}
+                {/* qLabel — hviezdička na neúplnom kvartáli platí aj tu, nie len v grafoch. */}
+                {a.map((q) => <th key={q.id} style={{ ...cell, fontSize: 11, color: C.textMuted, fontWeight: 600 }}>{qLabel(q)}</th>)}
                 <th style={{ ...cell, fontSize: 11, color: C.textMuted, fontWeight: 600, borderLeft: `1px solid ${C.border}` }}>Zmena</th>
               </tr>
             </thead>

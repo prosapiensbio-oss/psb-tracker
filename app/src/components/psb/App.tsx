@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { BARTER_KLIENTI, PRVY_MESIAC_Z_FIO, vzasVerzia, nastavBtcVyplaty, nastavHodinyZTrackera, nastavJarekZTrackera, nastavNakladyZFio, nazovKategorie, pnlHodnota, pnlOverridesNaUlozenie } from "../../lib/psb/vzas";
+import { BARTER_KLIENTI, PRVY_MESIAC_Z_FIO, vzasVerzia, nastavBtcVyplaty, nastavHodinyZTrackera, nastavJarekZTrackera, nastavNakladyZFio, nastavPnlOverrides, nastavPrijmyZTrackera, nastavVyplaty, nastavZmenyKategorii, nazovKategorie, pnlHodnota, pnlOverridesNaUlozenie } from "../../lib/psb/vzas";
 
 import {
   checkSession,
@@ -329,6 +329,17 @@ export function PSBApp() {
     if (nastavHodinyZTrackera(podlaMesiaca)) setFioTik((x) => x + 1);
   }, [data.sessions]);
 
+  // Živé tržby z PTmindera do P&L — CENTRÁLNE. Pôvodne to volali len
+  // Dashboard, DashGrafy a karta Peniaze; keď sa appka otvorila rovno na
+  // Výsledkoch (pamätá si poslednú kartu), júl mal v kvartáloch tržby 0.
+  // Funkcia, ktorá sa spúšťa len ako vedľajší účinok návštevy inej karty,
+  // zlyhá presne vtedy, keď tú kartu nikto nenavštívi.
+  useEffect(() => {
+    const cash: Record<string, number> = {};
+    for (const m of monthlyFinance(data)) cash[m.month] = m.cash;
+    if (nastavPrijmyZTrackera(cash)) setFioTik((x) => x + 1);
+  }, [data]);
+
   // Výplaty v bitcoine. Časť výplaty neodíde z účtu, ale z BTC rezervy — na
   // bankovom výpise nie sú, takže bez nich by mesiac vyzeral, akoby si tréner
   // vzal menej, než naozaj vzal.
@@ -424,6 +435,18 @@ export function PSBApp() {
       if (p && typeof p === "object") setBtcParovanie(p as Record<string, string[]>);
       const h = st["stav_penazi"] as { hotovost: number; datum: string } | undefined;
       if (h && typeof h.hotovost === "number") setStavHotovosti(h);
+      // Uložené opravy P&L, kategórie a mzdové nastavenia patria do modelu
+      // CENTRÁLNE — pôvodne ich načítavali až karty Peniaze→P&L a Mzdy pri
+      // svojom otvorení, takže Kvartálne otvorené rovno po štarte počítalo
+      // bez Jerryho opráv. Rovnaká trieda chyby ako tržby nižšie.
+      let zmena = false;
+      const o = st["pnl_overrides"];
+      if (o && typeof o === "object" && nastavPnlOverrides(o as never)) zmena = true;
+      const kat = st["pnl_kategorie"];
+      if (kat && typeof kat === "object" && nastavZmenyKategorii(kat as never)) zmena = true;
+      const sal = st["salary_personal"];
+      if (sal && typeof sal === "object" && nastavVyplaty(sal as never)) zmena = true;
+      if (zmena) setFioTik((x) => x + 1);
     });
   }, []);
   /** Uloží pár a hneď prepočíta náklady. */
