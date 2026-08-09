@@ -551,7 +551,10 @@ export function Dashboard({
   const trzbyOdhad = useMemo(() => {
     const cash = predictCash(data, clients, 1);
     return cash.months[0] || null;
-  }, [data, clients]);
+    // `kalendar` je v závislostiach zámerne: objednané hodiny sa do predikcie
+    // dostávajú modulovou cestou (nastavObjednaneZKalendara), takže bez tejto
+    // závislosti by sa číslo prepočítalo až pri ďalšej zmene dát — teda niekedy.
+  }, [data, clients, kalendar]);
 
   // All weeks (chronological) — the chart scrolls horizontally.
   const weekRows = useMemo(() => {
@@ -678,7 +681,7 @@ export function Dashboard({
       podnadpis: trzbyOdhad ? monthLabel(trzbyOdhad.month) : undefined,
       pasmo: odhad === null || beRef === null ? "nevie" : odhad < beRef ? "zle" : odhad < beRef * 1.2 ? "pozor" : "ok",
       poznamka: odhad !== null && beRef !== null && odhad < beRef ? "pod break-even" : "z rozchodených balíčkov",
-      vysvetlenie: "Koľko peňazí príde budúci mesiac podľa zostatkov balíčkov a tempa klientov. Porovnáva sa s break-evenom — odhad pod ním znamená stratový mesiac, ak sa nič nepredá.",
+      vysvetlenie: "Koľko peňazí príde budúci mesiac podľa zostatkov balíčkov a tempa klientov — vrátane toho, čo je objednané v Google Kalendári. Kto má dohodnutý termín, počíta sa ako aktívny, aj keď ho história odpísala. Porovnáva sa s break-evenom: odhad pod ním znamená stratový mesiac, ak sa nič nepredá.",
       kam: () => onNavigate("vzas", "predikcia"),
     });
 

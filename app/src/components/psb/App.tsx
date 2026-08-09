@@ -21,6 +21,7 @@ import {
   kotvaDat,
   capacityByTrainer,
   monthlyFinance,
+  nastavObjednaneZKalendara,
   deriveClients,
   deriveRegister,
   deriveSixM,
@@ -479,7 +480,18 @@ export function PSBApp() {
     void fetch("/api/kalendar", { credentials: "same-origin" })
       .then((r) => r.json())
       .then((j: { ok?: boolean; udalosti?: KalUdalost[] }) => {
-        if (j.ok && Array.isArray(j.udalosti)) setKalUdalosti(j.udalosti);
+        if (!j.ok || !Array.isArray(j.udalosti)) return;
+        setKalUdalosti(j.udalosti);
+        // Objednané hodiny idú do predikcie tržieb — centrálne, aby dashboard,
+        // grafy, Financie aj VZAS počítali z toho istého.
+        const dnes = new Date().toISOString().slice(0, 10);
+        const objednane: Record<string, number> = {};
+        for (const u of j.udalosti) {
+          if ((u.typ !== "trening" && u.typ !== "uvodny") || !u.klient) continue;
+          if (u.zaciatok.slice(0, 10) < dnes) continue;
+          objednane[u.klient] = (objednane[u.klient] || 0) + 1;
+        }
+        if (nastavObjednaneZKalendara(objednane)) setFioTik((x) => x + 1);
       })
       .catch(() => {});
   }, []);

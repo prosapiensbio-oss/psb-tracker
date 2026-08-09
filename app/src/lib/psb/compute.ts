@@ -1065,6 +1065,21 @@ const nextMonthKeys = (n: number, poslednyZDat?: string): string[] => {
 // Jarkových 40 %, Dominikinu pätnástku — bez toho, aby ich model musel poznať.
 export type CashPred = { month: string; expected: number; lo: number; hi: number };
 
+/**
+ * Koľko hodín má klient objednaných dopredu v Google Kalendári.
+ *
+ * Žije to ako modulová premenná a nie ako parameter zámerne: predictCash volá
+ * šesť miest (dashboard, grafy, Financie, VZAS) a keby si kalendár podávalo len
+ * jedno z nich, appka by na dvoch obrazovkách ukazovala dve rôzne predikcie.
+ * Napĺňa sa CENTRÁLNE v App.tsx — tá istá lekcia ako pri tržbách z PTmindera.
+ */
+let OBJEDNANE: Record<string, number> = {};
+export function nastavObjednaneZKalendara(m: Record<string, number>): boolean {
+  const zmena = JSON.stringify(m) !== JSON.stringify(OBJEDNANE);
+  OBJEDNANE = m;
+  return zmena;
+}
+
 export function predictCash(
   data: PSBData,
   clients: Record<string, ClientAgg>,
@@ -1081,8 +1096,12 @@ export function predictCash(
   const mesiacKluc = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 
   for (const c of Object.values(clients)) {
-    if (c.status === "Neaktívny") continue;
-    if (duchOdpoved(c) === "ano") continue;   // potvrdený duch už nezaplatí
+    // Kalendár môže poprieť to, čo si appka myslí podľa PTmindera: kto má
+    // dohodnutý termín, neodišiel — nech si o ňom história myslí čokoľvek.
+    // Predikcia bez tejto opravy odpisovala ľudí, ktorí zajtra prídu.
+    const objednane = OBJEDNANE[c.name] || 0;
+    if (c.status === "Neaktívny" && !objednane) continue;
+    if (duchOdpoved(c) === "ano" && !objednane) continue;   // potvrdený duch už nezaplatí
     const platby = data.payments
       .filter((p) => p.client === c.name && p.amount > 0)
       .sort((a, b) => a.date.localeCompare(b.date));
@@ -1094,7 +1113,10 @@ export function predictCash(
     // Tempo v hodinách za týždeň z posledných 90 dní. Bez neho sa nedá povedať
     // nič — klient bez tréningov v poslednom štvrťroku nekupuje ďalší balíček.
     const sedeni90 = c.sessions.filter((x) => daysBetween(x.date, teraz) <= 90).length;
-    const tempoTyzdenne = sedeni90 / 13;
+    // Objednané hodiny sú tempo, ktoré ešte nie je v histórii. Rozpočítavajú sa
+    // na dva týždne — ďalej dopredu kalendár nesiaha spoľahlivo (opakované
+    // udalosti o mesiac sú zvyk, nie plán).
+    const tempoTyzdenne = Math.max(sedeni90 / 13, objednane / 2);
     if (tempoTyzdenne <= 0.05) continue;
 
     // Koľko hodín si naposledy kúpil — z ceny, nie z názvu balíčka. Názov je
