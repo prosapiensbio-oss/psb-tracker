@@ -115,6 +115,14 @@ export function Kalendar({ clients, data }: { clients: Record<string, ClientAgg>
   const [sprava, setSprava] = useState("");
   const [pracuje, setPracuje] = useState(false);
   const [upravovana, setUpravovana] = useState<KalUdalost | null>(null);
+  /**
+   * Filter trénera platí na CELÚ kartu, nie len na mriežku.
+   *
+   * Keď si Jerry prepne na seba, nemá zmysel, aby mu pod týždňom ďalej svietili
+   * Terezkine zrušenia, jej chýbajúce zápisy a jej balíčky. Prepínač je jeden a
+   * drží ho tento komponent; karty dostávajú už prefiltrované dáta.
+   */
+  const [trener, setTrener] = useState("all");
 
   const nacitaj = useCallback(async () => {
     const r = await fetch("/api/kalendar", { credentials: "same-origin" });
@@ -141,6 +149,8 @@ export function Kalendar({ clients, data }: { clients: Record<string, ClientAgg>
   if (!stav) return <Card><Empty>Načítavam…</Empty></Card>;
 
   const pripojene = stav.zdroje.length > 0;
+  const udalostiF = trener === "all" ? stav.udalosti : stav.udalosti.filter((u) => u.trener === trener);
+  const zmenyF = trener === "all" ? stav.zmeny : stav.zmeny.filter((z) => z.trener === trener);
 
   return (
     <>
@@ -151,7 +161,7 @@ export function Kalendar({ clients, data }: { clients: Record<string, ClientAgg>
           práve to pripojenie. */}
       {!pripojene && <Pripojenie zdroje={stav.zdroje} onZmena={nacitaj} />}
 
-      {pripojene && <Tyzden udalosti={stav.udalosti} onKlik={setUpravovana} />}
+      {pripojene && <Tyzden udalosti={udalostiF} onKlik={setUpravovana} trener={trener} onTrener={setTrener} />}
 
       {upravovana && (
         <UpravaUdalosti
@@ -162,10 +172,10 @@ export function Kalendar({ clients, data }: { clients: Record<string, ClientAgg>
           onHotovo={async () => { setUpravovana(null); await nacitaj(); }}
         />
       )}
-      {pripojene && <Zmeny zmeny={stav.zmeny} onHotovo={nacitaj} />}
-      {pripojene && <Kontrola udalosti={stav.udalosti} data={data} />}
-      {pripojene && <Balicky udalosti={stav.udalosti} clients={clients} />}
-      {pripojene && <Navrat udalosti={stav.udalosti} clients={clients} />}
+      {pripojene && <Zmeny zmeny={zmenyF} onHotovo={nacitaj} />}
+      {pripojene && <Kontrola udalosti={udalostiF} data={data} />}
+      {pripojene && <Balicky udalosti={udalostiF} clients={clients} />}
+      {pripojene && <Navrat udalosti={udalostiF} clients={clients} />}
 
       {stav.nezname.length > 0 && (
         <Mapovanie nezname={stav.nezname} mena={menaKlientov} clients={clients} onHotovo={nacitaj} />
@@ -503,11 +513,8 @@ function Zmeny({ zmeny, onHotovo }: { zmeny: Zmena[]; onHotovo: () => Promise<vo
  * večer, nemá pozerať na prázdny pás od polnoci. Späť sa dá ísť len po dnešok —
  * história patrí do PTmindera, tu je reč o tom, čo sa chystá.
  */
-function Tyzden({ udalosti, onKlik }: { udalosti: KalUdalost[]; onKlik: (u: KalUdalost) => void }) {
+function Tyzden({ udalosti, onKlik, trener, onTrener }: { udalosti: KalUdalost[]; onKlik: (u: KalUdalost) => void; trener: string; onTrener: (t: string) => void }) {
   const [posun, setPosun] = useState(0);
-  // „all" je tá istá hodnota, akú používa zvyšok appky — filter trénera má
-  // všade rovnaké mená, inak by sa uložené voľby medzi kartami rozišli.
-  const [trener, setTrener] = useState("all");
 
   // Pondelok ako začiatok týždňa — tak to má Jerry aj v Google Kalendári.
   const pondelok = useMemo(() => {
@@ -528,9 +535,7 @@ function Tyzden({ udalosti, onKlik }: { udalosti: KalUdalost[]; onKlik: (u: KalU
     [pondelok],
   );
 
-  const vTyzdni = udalosti.filter(
-    (u) => dni.includes(u.zaciatok.slice(0, 10)) && (trener === "all" || u.trener === trener),
-  );
+  const vTyzdni = udalosti.filter((u) => dni.includes(u.zaciatok.slice(0, 10)));
   const minuty = (s: string) => Number(s.slice(11, 13)) * 60 + Number(s.slice(14, 16));
 
   // Rozsah podľa skutočných hodín, s hodinou rezervy na oboch koncoch.
@@ -564,7 +569,7 @@ function Tyzden({ udalosti, onKlik }: { udalosti: KalUdalost[]; onKlik: (u: KalU
           />
         </H3>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-          <TrenerPills value={trener} onChange={setTrener} />
+          <TrenerPills value={trener} onChange={onTrener} />
           <button onClick={() => setPosun(posun - 1)} disabled={posun <= 0}
             style={{ padding: "4px 10px", borderRadius: 7, fontSize: 13, cursor: posun <= 0 ? "not-allowed" : "pointer", border: `1px solid ${C.border}`, background: "transparent", color: posun <= 0 ? C.textDim : C.textMuted }}>←</button>
           <span style={{ fontSize: 12.5, color: C.text, fontWeight: 600, minWidth: 96, textAlign: "center" }}>
