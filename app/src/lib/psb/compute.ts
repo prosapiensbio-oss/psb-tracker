@@ -312,7 +312,12 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
     // Tvrdiť o ňom „0 z 3 hodín" je nepravda o produkte, ktorý si kúpil.
     c.lenDoplnky = skutocne.length === 0 && packs.length > 0;
     c.packageRemaining = active?.remaining ?? 0;
-    c.packageTotal = active?.total ?? 0;
+    // Starý import vedel zapísať balíček ako 0/0, hoci názov hovorí „6h" —
+    // Hanus potom svietil s odznakom bez menovateľa. Keď export total nedal,
+    // vezme sa z názvu; kto číslo v názve nemá, zostáva na nule a karta
+    // o ňom mlčí ako doteraz.
+    const totalZNazvu = Number(/(\d+)\s*h/i.exec(active?.package || "")?.[1] || 0);
+    c.packageTotal = (active?.total || totalZNazvu) ?? 0;
     c.packageStatus = active?.status || "";
     c.membership = active?.package || "";
     c.packageValidTo = active?.validTo || "";

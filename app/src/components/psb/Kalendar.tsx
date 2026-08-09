@@ -911,7 +911,7 @@ export function Balicky({ udalosti, clients, style, onKlient, matchTrener, child
     <Card style={style}>
       <H3>
         <Info
-          text="Zostatok v balíčku podľa PTmindera mínus to, čo už je objednané v Google Kalendári. Odznak je stav PO objednaných hodinách: 1/6 znamená, že po dohodnutých termínoch mu zostane jedna hodina, −2/6 že má dohodnuté dve hodiny navyše oproti zaplateným. Ukazuje, s kým sa oplatí hovoriť o pokračovaní, kým ho ešte vidíš na hodine. Klienti s paušálnym členstvom sa nezobrazujú — tí v exporte stoja navždy na 0/N a žiadny balíček im nedochádza. Mení sa podľa prepínača trénera."
+          text="Odznak je zostatok PRESNE ako v PTminderi. Šípka v texte hovorí, čo s ním spravia objednané termíny z Google Kalendára: obj. 2 → v mínuse o 2 h znamená, že po dohodnutých hodinách bude klient trénovať na dlh. Ukazuje, s kým sa oplatí hovoriť o pokračovaní, kým ho ešte vidíš na hodine. Klienti s paušálnym členstvom sa nezobrazujú — tí v exporte stoja navždy na 0/N a žiadny balíček im nedochádza. Mení sa podľa prepínača trénera."
           label={`Balíček dojde po objednaných hodinách (${riadky.length})`}
         />
       </H3>
@@ -924,14 +924,17 @@ export function Balicky({ udalosti, clients, style, onKlient, matchTrener, child
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 8 }}>
           {riadky.map((r) => (
             <div key={r.meno} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 10px", background: mix(C.text, 4), border: `1px solid ${C.border}`, borderRadius: 9, minWidth: 0 }}>
+              {/* Odznak = STAV Z PTMINDERA, presne to číslo, ktoré Jerry vidí
+                  v PTminderi — žiadna projekcia. Prvá verzia ukazovala zostatok
+                  PO objednaných („−2/17") a proti PTminderu vyzerala ako chyba;
+                  Jerry ju trikrát čítal ako zlé dáta. Projekcia (mínus) je
+                  v texte vedľa, farba sa ňou riadi ďalej. */}
               <span style={{
                 fontSize: 10.5, fontWeight: 700, minWidth: 40, padding: "2px 6px", borderRadius: 6, textAlign: "center", flexShrink: 0,
                 color: r.po <= 0 ? C.red : C.orange,
                 background: mix(r.po <= 0 ? C.red : C.orange, 12),
               }}>
-                {/* Mínus je iná správa než nula: „0" znamená dochodí presne,
-                    „−2" znamená, že už má dohodnuté hodiny, ktoré nemá zaplatené. */}
-                {r.po < 0 ? `−${-r.po}` : r.po}{r.spolu ? `/${r.spolu}` : ""}
+                {r.zostava}{r.spolu ? `/${r.spolu}` : ""}
               </span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 {onKlient ? (
@@ -946,9 +949,8 @@ export function Balicky({ udalosti, clients, style, onKlient, matchTrener, child
                   <span style={{ fontSize: 12.5, color: C.text, fontWeight: 600, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.meno}</span>
                 )}
                 <span style={{ fontSize: 11, color: C.textDim, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {r.spolu ? `PTminder ${r.zostava} z ${r.spolu}` : "balíček dochodený"}
-                  {r.kusov ? ` · obj. ${r.kusov}` : " · bez termínu"}
-                  {r.po < 0 ? ` · mínus ${-r.po} h` : ""}
+                  {r.kusov ? `obj. ${r.kusov}` : "bez termínu"}
+                  {r.po < 0 ? ` → v mínuse o ${-r.po} h` : ` → zostane ${r.po}`}
                 </span>
               </div>
             </div>
