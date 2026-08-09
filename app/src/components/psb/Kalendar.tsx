@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { ClientAgg } from "../../lib/psb/compute";
 import { C, mix } from "../../lib/psb/theme";
-import { Card, Empty, H3, Info, Select } from "./ui";
+import { Card, Empty, H3, Info, Select, TrenerPills } from "./ui";
 
 /**
  * Kalendár — čo sa chystá a čo sa práve zmenilo.
@@ -489,6 +489,9 @@ function Zmeny({ zmeny, onHotovo }: { zmeny: Zmena[]; onHotovo: () => Promise<vo
  */
 function Tyzden({ udalosti }: { udalosti: Udalost[] }) {
   const [posun, setPosun] = useState(0);
+  // „all" je tá istá hodnota, akú používa zvyšok appky — filter trénera má
+  // všade rovnaké mená, inak by sa uložené voľby medzi kartami rozišli.
+  const [trener, setTrener] = useState("all");
 
   // Pondelok ako začiatok týždňa — tak to má Jerry aj v Google Kalendári.
   const pondelok = useMemo(() => {
@@ -509,7 +512,9 @@ function Tyzden({ udalosti }: { udalosti: Udalost[] }) {
     [pondelok],
   );
 
-  const vTyzdni = udalosti.filter((u) => dni.includes(u.zaciatok.slice(0, 10)));
+  const vTyzdni = udalosti.filter(
+    (u) => dni.includes(u.zaciatok.slice(0, 10)) && (trener === "all" || u.trener === trener),
+  );
   const minuty = (s: string) => Number(s.slice(11, 13)) * 60 + Number(s.slice(14, 16));
 
   // Rozsah podľa skutočných hodín, s hodinou rezervy na oboch koncoch.
@@ -542,7 +547,8 @@ function Tyzden({ udalosti }: { udalosti: Udalost[] }) {
             label="Týždeň"
           />
         </H3>
-        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <TrenerPills value={trener} onChange={setTrener} />
           <button onClick={() => setPosun(posun - 1)} disabled={posun <= 0}
             style={{ padding: "4px 10px", borderRadius: 7, fontSize: 13, cursor: posun <= 0 ? "not-allowed" : "pointer", border: `1px solid ${C.border}`, background: "transparent", color: posun <= 0 ? C.textDim : C.textMuted }}>←</button>
           <span style={{ fontSize: 12.5, color: C.text, fontWeight: 600, minWidth: 96, textAlign: "center" }}>
@@ -557,7 +563,13 @@ function Tyzden({ udalosti }: { udalosti: Udalost[] }) {
         {trening.length} tréningov · {Math.round(hodinSpolu)} h · predbežné
       </div>
 
-      {!vTyzdni.length && <Empty>V tomto týždni nie je nič — alebo kalendár siaha len dva týždne dopredu.</Empty>}
+      {!vTyzdni.length && (
+        <Empty>
+          {trener === "all"
+            ? "V tomto týždni nie je nič — alebo kalendár siaha len dva týždne dopredu."
+            : `${trener} tu nemá nič — buď v tomto týždni netrénuje, alebo jeho kalendár ešte nie je pripojený.`}
+        </Empty>
+      )}
 
       {vTyzdni.length > 0 && (
         <ScrollX>
