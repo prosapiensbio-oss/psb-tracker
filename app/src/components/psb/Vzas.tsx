@@ -4,7 +4,7 @@ import { PlatobneKanaly } from "./PlatobneKanaly";
 import { fetchBtcReserve, fetchMonthNotes, fetchVzasSettings, fetchWeekEntries, saveMonthNote, saveVzasSetting, type BtcReserve, type MonthNote, type WeekEntry } from "../../lib/psb/client";
 import { FinancieObsah } from "./Financie";
 import { GuillermoKarta } from "./Kalendar";
-import { monthlyFinance, predictCash, ZONE_HI, type CapacityRow, type ClientAgg, type RegisterItem, type SixMRow } from "../../lib/psb/compute";
+import { objednaneVerzia, monthlyFinance, predictCash, ZONE_HI, type CapacityRow, type ClientAgg, type RegisterItem, type SixMRow } from "../../lib/psb/compute";
 import { fmtCZK, fmtDMY, monthLabel } from "../../lib/psb/format";
 import { ObdobieCtx } from "../../lib/psb/obdobie";
 import { PRVY_MESIAC_Z_FIO, nastavPnlBunku, nastavPnlOverrides, nastavZmenyKategorii, vzasVerzia, premenujKategoriu, presunKategoriu, pridajKategoriu, skupinyPnl, zmenyKategoriiNaUlozenie, nastavPrijmyZTrackera, nastavVyplaty, pnlJeOpravena, pnlOverridesNaUlozenie, pnlPovodnaHodnota, poslednyMesiacSDatami, vyplatyNaUlozenie } from "../../lib/psb/vzas";
@@ -2441,7 +2441,8 @@ function Vyhlad({ data, clients }: { data: PSBData; clients: Record<string, Clie
     const cash = predictCash(data, clients, 1);
     const toky = tokyKlientov(data, clients, 60);
     return { odhad: cash.months[0], odislo: toky.odisloMes };
-  }, [data, clients]);
+    // objednaneVerzia: kalendár chodí async, bez nej by výhľad rátal bez neho.
+  }, [data, clients, objednaneVerzia()]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!v.odhad) return null;
   return (
     <Card>

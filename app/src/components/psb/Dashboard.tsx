@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 
-import {
+import { objednaneVerzia,
   doPlnehoMesiaca,
   kotvaDat,
   monthlyFinance,
@@ -979,7 +979,7 @@ export function Dashboard({
       for (const pm of next2) bars.push({ label: monthLabel(pm.month), value: Math.round(pm.guaranteed + pm.expected), forecast: true });
     }
     return bars;
-  }, [data, clients, trainer, earnMode, kotva, okno]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [data, clients, trainer, earnMode, kotva, okno, objednaneVerzia()]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Ø / max / min monthly earnings over ACTUAL months (forecast excluded), following the trainer pill + mode.
   // Len plné mesiace: rozrobený mesiac bol vždy „min" a kazil aj priemer.

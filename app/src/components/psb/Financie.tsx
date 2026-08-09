@@ -1,6 +1,6 @@
 import { useContext, useEffect, useMemo, useState } from "react";
 
-import { kotvaDat, monthlyFinance, predictCash, predictEarnings, type ClientAgg } from "../../lib/psb/compute";
+import { objednaneVerzia, kotvaDat, monthlyFinance, predictCash, predictEarnings, type ClientAgg } from "../../lib/psb/compute";
 import { fetchBtcReserve, type BtcPlatba } from "../../lib/psb/client";
 import { fmtCZK, monthLabel, normName } from "../../lib/psb/format";
 import { ObdobieCtx } from "../../lib/psb/obdobie";
@@ -286,7 +286,9 @@ function Trzby({ monthly, data, clients, focusMonth, onClearFocus }: { monthly: 
   // Predikcia z obnov členstiev — priemery zostávajú ako porovnanie, ale hlavné
   // číslo je teraz bodový odhad: kto má kedy skončiť členstvo a koľko naposledy
   // zaplatil.
-  const cashPred = useMemo(() => predictCash(data, clients, 1), [data, clients]);
+  // `objednaneVerzia()` v deps: predikcia číta objednané hodiny z kalendára,
+  // ktoré prídu async — bez verzie by obrazovka počítala bez nich.
+  const cashPred = useMemo(() => predictCash(data, clients, 1), [data, clients, objednaneVerzia()]); // eslint-disable-line react-hooks/exhaustive-deps
   const buduci = cashPred.months[0];
 
   return (

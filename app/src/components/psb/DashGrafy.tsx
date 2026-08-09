@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 
 import { fetchBtcReserve, fetchVzasSettings, fetchWeekEntries } from "../../lib/psb/client";
-import { membershipBucket, type ClientAgg } from "../../lib/psb/compute";
+import { objednaneVerzia, membershipBucket, type ClientAgg } from "../../lib/psb/compute";
 import { fmtCZK, monthLabel } from "../../lib/psb/format";
 import { GA4_MESACNE, GSC_MESACNE, MKT_MESACNE, nastavMarketingZImportu, nastavWebZImportu, type Ga4Mesiac, type GscDopyt, type GscMesiac, type GscStrana, type MktKus, type MktMesiac } from "../../lib/psb/marketing";
 import { C, MEMBERSHIP_COLORS, mix } from "../../lib/psb/theme";
@@ -364,7 +364,7 @@ export function useExtraGrafy({
     return { p, j, t, be, jarek: jarekCalc() };
     // Verzia modelu: importy menia rady mimo Reactu, bez nej by karty ukazovali
     // stav spred načítania nákladov z banky.
-  }, [data, vzasVerzia()]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [data, vzasVerzia(), objednaneVerzia()]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toky = useMemo(() => tokyKlientov(data, clients), [data, clients]);
 

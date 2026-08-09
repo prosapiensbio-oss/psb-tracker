@@ -1074,9 +1074,18 @@ export type CashPred = { month: string; expected: number; lo: number; hi: number
  * Napĺňa sa CENTRÁLNE v App.tsx — tá istá lekcia ako pri tržbách z PTmindera.
  */
 let OBJEDNANE: Record<string, number> = {};
+// Verzia — rovnaký dôvod ako vzasVerzia: OBJEDNANE sa plní async fetchom mimo
+// Reactu, takže useMemo s deps [data, clients] sa o zmene nedozvie. Revízia
+// našla štyri predikcie (Financie → Predikcia, Výhľad vo Výsledkoch, stĺpec
+// prognózy v Zárobkoch, graf predikcie v knižnici), ktoré počítali BEZ
+// objednaných hodín, kým ich náhodou neprepočítalo niečo iné — typicky import
+// z Fio, ktorý dobehne o pár stoviek milisekúnd neskôr a chybu maskuje.
+let OBJEDNANE_VERZIA = 0;
+export const objednaneVerzia = () => OBJEDNANE_VERZIA;
 export function nastavObjednaneZKalendara(m: Record<string, number>): boolean {
   const zmena = JSON.stringify(m) !== JSON.stringify(OBJEDNANE);
   OBJEDNANE = m;
+  if (zmena) OBJEDNANE_VERZIA++;
   return zmena;
 }
 
