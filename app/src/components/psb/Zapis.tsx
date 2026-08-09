@@ -26,6 +26,7 @@ export function ZapisButton({
   onNavigate,
   onRefresh,
   klienti = [],
+  onDennikZapis,
 }: {
   ritualy: Ritual[];
   onNavigate: (tab: string, sub?: string) => void;
@@ -35,6 +36,8 @@ export function ZapisButton({
   /** Po uložení dopytu sa musia dotiahnuť dáta — inak ho hľadanie a lievik
    *  neuvidia až do ďalšieho otvorenia appky. */
   onRefresh?: () => void;
+  /** Zápis do denníka spracuje Jarvis na pozadí — pripomienky bez chatu. */
+  onDennikZapis?: (meno: string, text: string) => Promise<string | null>;
 }) {
   const [open, setOpen] = useState(false);
   const [dopytMeno, setDopytMeno] = useState("");
@@ -48,6 +51,7 @@ export function ZapisButton({
   const [akciaDatum, setAkciaDatum] = useState(() => new Date().toISOString().slice(0, 10));
   const [akciaBusy, setAkciaBusy] = useState(false);
   const [akciaOk, setAkciaOk] = useState("");
+  const [akciaOtvorena, setAkciaOtvorena] = useState(false);
   const ulozAkciu = () => {
     const t = akciaText.trim();
     if (!t || akciaBusy) return;
@@ -143,29 +147,41 @@ export function ZapisButton({
             {dopytOk && <div style={{ fontSize: 11.5, color: C.green, marginTop: 6 }}>Zapísané: {dopytOk}. Detail doplníš v Klienti → Dopyty.</div>}
           </form>
 
-          {/* Kampaň / akcia — druhý najčastejší ručný zápis. Ide priamo do
-              grafu „Čo som robil" ako vlajka ⚑, žiadna navigácia. */}
-          <div style={{ marginBottom: 14, padding: "11px 13px", borderRadius: 10, border: `1px solid ${mix(C.orange, 28)}`, background: mix(C.orange, 5) }}>
-            <div style={{ fontSize: 12.5, fontWeight: 600, color: C.text, marginBottom: 3 }}>⚑ Kampaň / akcia v marketingu</div>
-            <div style={{ fontSize: 11, color: C.textDim, marginBottom: 8, lineHeight: 1.5 }}>
-              Jednou vetou, čo sa práve spustilo, vypnulo alebo zmenilo — reklama, nový formát obsahu, pauza,
-              kolaborácia. Ukáže sa ako vlajka v grafe Marketing → Čo som robil, aby o pol roka bolo vidieť,
-              prečo čísla vyzerali tak, ako vyzerali.
-            </div>
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              <input type="date" value={akciaDatum} onChange={(e) => setAkciaDatum(e.target.value)}
-                style={{ padding: "7px 9px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 12.5 }} />
-              <input
-                value={akciaText} onChange={(e) => setAkciaText(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); ulozAkciu(); } }}
-                placeholder="napr. spustená Meta kampaň na reel o kolene"
-                style={{ flex: "2 1 200px", minWidth: 0, padding: "7px 10px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 13 }} />
-              <button onClick={ulozAkciu} disabled={!akciaText.trim() || akciaBusy}
-                style={{ padding: "7px 14px", borderRadius: 8, border: `1px solid ${akciaText.trim() ? C.orange : C.border}`, background: akciaText.trim() ? mix(C.orange, 14) : "transparent", color: akciaText.trim() ? C.orange : C.textDim, fontSize: 12.5, fontWeight: 600, cursor: akciaText.trim() ? "pointer" : "default" }}>
-                {akciaBusy ? "Ukladám…" : "Uložiť"}
-              </button>
-            </div>
-            {akciaOk && <div style={{ fontSize: 11.5, color: C.green, marginTop: 6 }}>⚑ Zapísané: {akciaOk}</div>}
+          {/* Kampaň / akcia — za rozklikom (Jerry, 9. 8.): otvorené majú byť
+              len dva najčastejšie zápisy, dopyt a denník. Kampaň sa píše
+              párkrát do mesiaca — zbalená hlavička úplne stačí a panel je
+              o obrazovku kratší. */}
+          <div style={{ marginBottom: 14, borderRadius: 10, border: `1px solid ${mix(C.orange, 28)}`, background: mix(C.orange, 5) }}>
+            <button
+              onClick={() => setAkciaOtvorena((o) => !o)}
+              style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", padding: "11px 13px", background: "none", border: "none", cursor: "pointer", textAlign: "left" }}
+            >
+              <span style={{ fontSize: 12.5, fontWeight: 600, color: C.text, flex: 1 }}>⚑ Kampaň / akcia v marketingu</span>
+              <span style={{ color: C.textDim, fontSize: 12 }}>{akciaOtvorena ? "▾" : "▸"}</span>
+            </button>
+            {akciaOtvorena && (
+              <div style={{ padding: "0 13px 11px" }}>
+                <div style={{ fontSize: 11, color: C.textDim, marginBottom: 8, lineHeight: 1.5 }}>
+                  Jednou vetou, čo sa práve spustilo, vypnulo alebo zmenilo — reklama, nový formát obsahu, pauza,
+                  kolaborácia. Ukáže sa ako vlajka v grafe Marketing → Čo som robil, aby o pol roka bolo vidieť,
+                  prečo čísla vyzerali tak, ako vyzerali.
+                </div>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  <input type="date" value={akciaDatum} onChange={(e) => setAkciaDatum(e.target.value)}
+                    style={{ padding: "7px 9px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 12.5 }} />
+                  <input
+                    value={akciaText} onChange={(e) => setAkciaText(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); ulozAkciu(); } }}
+                    placeholder="napr. spustená Meta kampaň na reel o kolene"
+                    style={{ flex: "2 1 200px", minWidth: 0, padding: "7px 10px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 13 }} />
+                  <button onClick={ulozAkciu} disabled={!akciaText.trim() || akciaBusy}
+                    style={{ padding: "7px 14px", borderRadius: 8, border: `1px solid ${akciaText.trim() ? C.orange : C.border}`, background: akciaText.trim() ? mix(C.orange, 14) : "transparent", color: akciaText.trim() ? C.orange : C.textDim, fontSize: 12.5, fontWeight: 600, cursor: akciaText.trim() ? "pointer" : "default" }}>
+                    {akciaBusy ? "Ukladám…" : "Uložiť"}
+                  </button>
+                </div>
+              </div>
+            )}
+            {akciaOk && <div style={{ fontSize: 11.5, color: C.green, padding: "0 13px 9px" }}>⚑ Zapísané: {akciaOk}</div>}
           </div>
 
           {/* Denník klienta — rovnaký princíp ako dopyt: meno + text, bez
@@ -191,7 +207,7 @@ export function ZapisButton({
                       Stála poznámka: <span style={{ color: C.textMuted }}>{vybranyKlient.poznamka}</span>
                     </div>
                   )}
-                  <Dennik meno={vybranyKlient.meno} limit={3} />
+                  <Dennik meno={vybranyKlient.meno} limit={3} onNovyZapis={onDennikZapis} />
                 </>
               ) : (
                 <div style={{ fontSize: 11.5, color: C.textDim }}>Vyber klienta zo zoznamu — potom sa ukáže jeho denník.</div>

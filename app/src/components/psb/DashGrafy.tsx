@@ -672,12 +672,15 @@ export function useExtraGrafy({
 
     nodes.predikciaScen = (
       <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column" }}>
-        <H3><Info label="Scenáre na 3 mesiace" text="Zaručené = peniaze, ktoré sú už zaplatené v balíčkoch a klientom zostáva ich odchodiť; tie prídu, aj keby sa nič nepredalo. Realistický ráta s obvyklým dokupovaním, negatívny s tým, že časť klientov odíde. Run-rate je mesačné tempo portfólia, ak klienti chodia ako TERAZ — nie priemer za posledné mesiace, ten obsahuje aj ľudí, ktorí medzitým prestali chodiť." /></H3>
+        <H3><Info label="Scenáre na 3 mesiace" text="Súčet troch mesiacov z modelu obnov (rovnaké číslo ako Predikcia a dlaždica na Kokpite): opatrný ráta len s istejšími obnovami, optimistický s vyššou vierou v obnovu. Run-rate je mesačné tempo portfólia, ak klienti chodia ako TERAZ — nie priemer za posledné mesiace, ten obsahuje aj ľudí, ktorí medzitým prestali chodiť." /></H3>
         <Klik kam={() => onNavigate("vzas", "predikcia")} onNavigate="Peniaze → Predikcia">
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}>
-            <MiniStat label="Zaručené (3 mes.)" value={fmtCZK(predEarn.guaranteedTotal)} color={C.textMuted} />
-            <MiniStat label="Realistický (3 mes.)" value={fmtCZK(predEarn.scenarios.realistic)} color={C.blue} />
-            <MiniStat label="Optimistický" value={fmtCZK(predEarn.scenarios.optimistic)} color={C.green} />
+            {/* Jeden model tržieb (Jerry, 9. 8.): sumy z predictCash — to isté
+                číslo ako dlaždica, obrazovka Predikcia aj Jarvis. Z
+                predictEarnings zostáva len run-rate (tempo, nie predpoveď). */}
+            <MiniStat label="Opatrný (3 mes.)" value={fmtCZK(predikcia.months.reduce((a, m) => a + m.lo, 0))} color={C.textMuted} />
+            <MiniStat label="Realistický (3 mes.)" value={fmtCZK(predikcia.months.reduce((a, m) => a + m.expected, 0))} color={C.blue} />
+            <MiniStat label="Optimistický" value={fmtCZK(predikcia.months.reduce((a, m) => a + m.hi, 0))} color={C.green} />
             <MiniStat label="Run-rate / mes." value={fmtCZK(predEarn.monthlyRunRate)} color={C.accent} />
           </div>
         </Klik>

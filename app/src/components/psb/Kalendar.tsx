@@ -175,9 +175,10 @@ export function Kalendar({ clients, data }: { clients: Record<string, ClientAgg>
       )}
       {pripojene && <Zmeny zmeny={zmenyF} onHotovo={nacitaj} />}
       {pripojene && <Kontrola udalosti={udalostiF} data={data} />}
-      {/* Balíčky sa presunuli na Kokpit — sem sa chodí pozerať, čo sa zmenilo
-          v kalendári, nie komu treba zavolať. */}
-      {pripojene && <Navrat udalosti={udalostiF} clients={clients} />}
+      {/* Balíčky aj „Odpísaní, ale majú termín" sa zliali na Kokpit (Jerry,
+          9. 8.): dlaždica Odmlčaní sama vynecháva ľudí s budúcim termínom,
+          takže táto karta hovorila to isté druhýkrát. Sem sa chodí pozerať,
+          čo sa v kalendári zmenilo, nie komu treba zavolať. */}
 
       {stav.nezname.length > 0 && (
         <Mapovanie nezname={stav.nezname} mena={menaKlientov} clients={clients} onHotovo={nacitaj} />
@@ -917,95 +918,48 @@ export function Balicky({ udalosti, clients, style, onKlient, matchTrener, child
       {!riadky.length ? (
         <Empty>Nikomu balíček po objednaných hodinách nedochádza 🌿</Empty>
       ) : (
-        riadky.map((r) => (
-          <div key={r.meno} style={{ display: "flex", gap: 10, alignItems: "baseline", padding: "8px 0", borderBottom: `1px solid ${mix(C.border, 50)}`, flexWrap: "wrap" }}>
-            <span style={{
-              fontSize: 11.5, fontWeight: 700, minWidth: 44, padding: "2px 7px", borderRadius: 6, textAlign: "center",
-              color: r.po <= 0 ? C.red : C.orange,
-              background: mix(r.po <= 0 ? C.red : C.orange, 12),
-            }}>
-              {/* Mínus je iná správa než nula: „0" znamená dochodí presne,
-                  „−2" znamená, že už má dohodnuté hodiny, ktoré nemá zaplatené. */}
-              {r.po < 0 ? `−${-r.po}` : r.po}{r.spolu ? `/${r.spolu}` : ""}
-            </span>
-            {onKlient ? (
-              <button
-                onClick={() => onKlient(r.meno)}
-                title={`Otvoriť profil — ${r.meno}`}
-                style={{ background: "none", border: "none", padding: 0, fontSize: 13, color: C.text, fontWeight: 600, cursor: "pointer", textAlign: "left" }}
-              >
-                {r.meno}
-              </button>
-            ) : (
-              <span style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>{r.meno}</span>
-            )}
-            <span style={{ fontSize: 11.5, color: C.textDim }}>
-              {r.spolu ? `teraz ${r.zostava} z ${r.spolu}` : "balíček dochodený"}
-              {r.kusov ? ` · objednané ${r.kusov}` : " · a v kalendári žiadny ďalší termín"}
-              {r.po < 0 ? ` · v mínuse o ${-r.po} ${-r.po === 1 ? "hodinu" : -r.po < 5 ? "hodiny" : "hodín"}` : ""}
-            </span>
-          </div>
-        ))
+        /* Tri stĺpce namiesto jedného dlhého — sedemnásť riadkov pod sebou
+           znamenalo rolovať cez pol obrazovky; v mriežke je celý zoznam
+           viditeľný naraz a poradie (najväčší mínus prvý) číta po riadkoch. */
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 8 }}>
+          {riadky.map((r) => (
+            <div key={r.meno} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 10px", background: mix(C.text, 4), border: `1px solid ${C.border}`, borderRadius: 9, minWidth: 0 }}>
+              <span style={{
+                fontSize: 10.5, fontWeight: 700, minWidth: 40, padding: "2px 6px", borderRadius: 6, textAlign: "center", flexShrink: 0,
+                color: r.po <= 0 ? C.red : C.orange,
+                background: mix(r.po <= 0 ? C.red : C.orange, 12),
+              }}>
+                {/* Mínus je iná správa než nula: „0" znamená dochodí presne,
+                    „−2" znamená, že už má dohodnuté hodiny, ktoré nemá zaplatené. */}
+                {r.po < 0 ? `−${-r.po}` : r.po}{r.spolu ? `/${r.spolu}` : ""}
+              </span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                {onKlient ? (
+                  <button
+                    onClick={() => onKlient(r.meno)}
+                    title={`Otvoriť profil — ${r.meno}`}
+                    style={{ background: "none", border: "none", padding: 0, fontSize: 12.5, color: C.text, fontWeight: 600, cursor: "pointer", textAlign: "left", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "100%" }}
+                  >
+                    {r.meno}
+                  </button>
+                ) : (
+                  <span style={{ fontSize: 12.5, color: C.text, fontWeight: 600, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.meno}</span>
+                )}
+                <span style={{ fontSize: 11, color: C.textDim, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {r.spolu ? `PTminder ${r.zostava} z ${r.spolu}` : "balíček dochodený"}
+                  {r.kusov ? ` · obj. ${r.kusov}` : " · bez termínu"}
+                  {r.po < 0 ? ` · mínus ${-r.po} h` : ""}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
       )}
       {children}
     </Card>
   );
 }
 
-/** Koho model odpísal a kalendár hovorí opak — oprava predikcie tržieb. */
-function Navrat({ udalosti, clients }: { udalosti: KalUdalost[]; clients: Record<string, ClientAgg> }) {
-  const riadky = useMemo(() => {
-    const dnes = new Date().toISOString().slice(0, 10);
-    const buduce: Record<string, string[]> = {};
-    for (const u of udalosti) {
-      if ((u.typ !== "trening" && u.typ !== "uvodny") || !u.klient) continue;
-      if (u.zaciatok.slice(0, 10) < dnes) continue;
-      (buduce[u.klient] ||= []).push(u.zaciatok);
-    }
-    return Object.entries(buduce)
-      .map(([meno, terminy]) => {
-        const c = clients[meno];
-        if (!c) return null;
-        const ticho = c.lastSession
-          ? Math.floor((Date.parse(dnes) - Date.parse(c.lastSession.slice(0, 10))) / 86400000)
-          : null;
-        // Odpísaný = appka ho má za neaktívneho, alebo mlčí 14+ dní (tá istá
-        // hranica, akou dashboard meria odmlčaných).
-        const odpisany = c.status === "Neaktívny" || (ticho !== null && ticho >= 14);
-        if (!odpisany) return null;
-        return { meno, terminy: terminy.sort(), ticho, status: c.status };
-      })
-      .filter((x): x is NonNullable<typeof x> => !!x)
-      .sort((a, b) => a.terminy[0].localeCompare(b.terminy[0]));
-  }, [udalosti, clients]);
-
-  return (
-    <Card>
-      <H3>
-        <Info
-          text="Appka ich podľa PTmindera považuje za odídených alebo odmlčaných, ale v kalendári majú dohodnutý termín. Odhad tržieb s nimi nepočíta, hoci by mal — preto sú tu zvlášť, a nie potichu prirátaní: kalendár je predpoveď, nie zápis, a číslo v peniazoch má vždy vedieť, odkiaľ pochádza."
-          label={`Odpísaní, ale majú termín (${riadky.length})`}
-        />
-      </H3>
-      {!riadky.length ? (
-        <Empty>Nikto taký — koho appka počíta za aktívneho, ten aj chodí.</Empty>
-      ) : (
-        riadky.map((r) => (
-          <div key={r.meno} style={{ display: "flex", gap: 10, alignItems: "baseline", padding: "8px 0", borderBottom: `1px solid ${mix(C.border, 50)}`, flexWrap: "wrap" }}>
-            <span style={{ fontSize: 13, color: C.text, fontWeight: 600, minWidth: 150 }}>{r.meno}</span>
-            <span style={{ fontSize: 11.5, color: C.orange }}>
-              {r.status === "Neaktívny" ? "neaktívny" : `${r.ticho} dní ticho`}
-            </span>
-            <span style={{ fontSize: 11.5, color: C.textMuted }}>
-              najbližšie {den(r.terminy[0])} {cas(r.terminy[0])}
-              {r.terminy.length > 1 ? ` · ďalších ${r.terminy.length - 1}` : ""}
-            </span>
-          </div>
-        ))
-      )}
-    </Card>
-  );
-}
 
 /**
  * Účet u Guillerma.

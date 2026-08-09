@@ -1,4 +1,5 @@
 import { type CSSProperties, Fragment, useEffect, useRef, useState } from "react";
+import { fmtDMY } from "../../lib/psb/format";
 
 import type { AiContext } from "../../lib/psb/aiContext";
 import {
@@ -398,7 +399,49 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
     setMsgs((m) => [...m, { role: "assistant", text: `**Import hotový.**\n${summary}\n\nDáta som obnovil — spýtaj sa ma na čokoľvek z nových čísel.` }]);
   }
 
-  return { msgs, setMsgs, input, setInput, busy, stav, deep, setDeep, pending, setPending, attach, setAttach, ask, runAction, confirmImport, handleIncoming, floatingOpen, setFloatingOpen, chats, chatId, newChat, openChat, deleteChat, archiveChat };
+  /**
+   * Zápis z denníka klienta spracuje Jarvis NA POZADÍ — bez otvárania chatu.
+   *
+   * Jerry (9. 8.): „keď do denníka napíšem, že niekto niekam ide a chcem
+   * pripomienku, nemusím to ešte špecificky písať Jarvisovi." Denník je
+   * miesto, kde sa taká veta píše prirodzene; nútiť človeka povedať ju
+   * druhýkrát inde je presne tá práca, ktorú má appka robiť za neho.
+   *
+   * Automaticky sa vykoná LEN zapis-zaver (pripomienka s termínom overenia
+   * do registra) — nič, čo by menilo dáta klienta. Čokoľvek iné model
+   * navrhne, sa ticho ignoruje; kto chce viac, otvorí chat.
+   */
+  async function spracujDennik(meno: string, zapis: string): Promise<string | null> {
+    const dnes = new Date().toISOString().slice(0, 10);
+    const res = await sendChat(
+      [{
+        role: "user",
+        content:
+          `Zápis z denníka klienta «${meno}» (${dnes}):\n„${zapis}“\n\n` +
+          `Ak zo zápisu vyplýva úloha alebo pripomienka do budúcnosti (napr. „o dva týždne sa mu ozvať", ` +
+          `„v septembri rieši predĺženie"), pridaj psb-action blok zapis-zaver: tema = meno klienta a vec, ` +
+          `zaver = čo sa deje, overit = čo treba spraviť, overitDo = konkrétny dátum odvodený zo zápisu. ` +
+          `Ak zo zápisu žiadna budúca úloha nevyplýva, nepridávaj nič. ` +
+          `Mimo action blokov odpovedz najviac jednou krátkou vetou.`,
+      }],
+      context,
+      undefined,
+      false,
+    );
+    if (!res.ok) return null;
+    const { actions: acts } = parseActions(res.reply);
+    const zavery = acts.filter((a) => a.type === "zapis-zaver" && a.data);
+    for (const a of zavery) await saveZaver(a.data as never).catch(() => {});
+    if (!zavery.length) return null;
+    return zavery
+      .map((a) => {
+        const d = a.data as Record<string, unknown>;
+        return `Jarvis si zapísal pripomienku: ${String(d.overit || d.zaver || "").slice(0, 120)}${d.overitDo ? ` (${fmtDMY(String(d.overitDo))})` : ""}`;
+      })
+      .join(" · ");
+  }
+
+  return { msgs, setMsgs, input, setInput, busy, stav, deep, setDeep, pending, setPending, attach, setAttach, ask, runAction, confirmImport, handleIncoming, floatingOpen, setFloatingOpen, chats, chatId, newChat, openChat, deleteChat, archiveChat, spracujDennik };
 }
 
 // ── The conversation UI (messages + input) — used by both the floating panel and

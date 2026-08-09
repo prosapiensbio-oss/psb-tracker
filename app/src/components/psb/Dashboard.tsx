@@ -698,9 +698,22 @@ export function Dashboard({
     // klient bez tréningu 14+ dní odchádza šesťkrát častejšie (48 % vs 8 %).
     // Meria sa PODIELOM z aktívnych, nie počtom — pri 20 klientoch je päť
     // odmlčaných katastrofa, pri 60 bežný týždeň.
+    //
+    // Kalendár má právo veta: kto má dohodnutý budúci termín, nie je odmlčaný
+    // — je na dovolenke, po operácii, alebo len platí obmesiac. Toto bývala
+    // samostatná karta „Odpísaní, ale majú termín" v Kalendári a s touto
+    // dlaždicou sa prekrývala do protirečenia: jedna kázala volať, druhá
+    // vedľa hovorila „netreba, príde v pondelok". Jedna otázka, jedna karta.
+    const dnesKal = new Date().toISOString().slice(0, 10);
+    const maBuduciTermin = new Set(
+      kalendar
+        .filter((u) => (u.typ === "trening" || u.typ === "uvodny") && u.klient && u.zaciatok.slice(0, 10) >= dnesKal)
+        .map((u) => u.klient as string),
+    );
     const ohrozeni = Object.values(clients).filter((c) => {
       if (c.status !== "Aktívny" || !matchT(c.primaryTrainer)) return false;
       if (c.segment !== "Anchor" && c.segment !== "Stabilný") return false;
+      if (maBuduciTermin.has(c.name)) return false;
       return (Date.now() - Date.parse(c.lastSession)) / 86400000 >= 14;
     });
     const podiel = stats.active > 0 ? (ohrozeni.length / stats.active) * 100 : 0;
@@ -712,7 +725,7 @@ export function Dashboard({
       pasmo: !ohrozeni.length ? "ok" : podiel > 25 ? "zle" : podiel > 15 ? "pozor" : "ok",
       poznamka: ohrozeni.length ? ohrozeni.slice(0, 2).map((c) => c.name.split(" ")[0]).join(", ") + (ohrozeni.length > 2 ? ` +${ohrozeni.length - 2}` : "") : undefined,
       dobreHore: false,
-      vysvetlenie: "Pravidelní klienti (Anchor alebo Stabilný), ktorí 14 a viac dní netrénovali. Hranica 14 dní nie je odhad: klient, ktorý toľko vynechá, odchádza zhruba šesťkrát častejšie než ten, čo chodí (48 % vs 8 %). Zdravé je do 15 % aktívnych, nad 25 % je to poplach. Kým je odmlčaný, dá sa ešte získať späť — potom už len ťažko. Klik otvorí zoznam presne týchto ľudí.",
+      vysvetlenie: "Pravidelní klienti (Anchor alebo Stabilný), ktorí 14 a viac dní netrénovali A nemajú v Google Kalendári žiadny budúci termín. Kto termín má, sa neráta — je na dovolenke či po operácii, nie na odchode. Hranica 14 dní nie je odhad: klient, ktorý toľko vynechá, odchádza zhruba šesťkrát častejšie než ten, čo chodí (48 % vs 8 %). Zdravé je do 15 % aktívnych, nad 25 % je to poplach. Kým je odmlčaný, dá sa ešte získať späť — potom už len ťažko. Klik otvorí zoznam presne týchto ľudí.",
       // Klik otvorí Klientov LEN s týmito ľuďmi. Doviesť na zoznam všetkých a
       // nechať človeka hľadať tých jedenásť je presne tá práca, ktorú mala
       // dlaždica ušetriť.
@@ -1737,6 +1750,15 @@ function RegisterRow({ item, actions, onNavigate, chat }: { item: RegisterItem; 
   // prečo sa takéto veci nikdy nezapíšu.
   const posliJarvisovi = () => {
     if (!chat || !text.trim()) return;
+    // Odpoveď sa zapíše HNEĎ, deterministicky — nie až Jarvisovou akciou.
+    //
+    // 9. 8. sa presne tu stratila odpoveď o Danovi Kouřilovi: Jerry ju
+    // odoslal, stream sa nedokončil, ack nevznikol a položka ticho zostala
+    // otvorená. Zápis odpovede je účtovníctvo a účtovníctvo nesmie závisieť
+    // od toho, či dobehne odpoveď jazykového modelu. Položka sa uzavrie
+    // s odpoveďou ako poznámkou; keby sa ukázalo, že sa uzavrieť nemala,
+    // „Vrátiť" ju otvorí späť a poznámka zostáva.
+    actions.ackAnomaly(item.key, `odpoveď: ${text.trim()}`, true);
     chat.setFloatingOpen(true);
     void chat.ask(
       `Toto je odpoveď na položku z registra „Na čo sa pozrieť“.\n\n` +
@@ -1744,13 +1766,12 @@ function RegisterRow({ item, actions, onNavigate, chat }: { item: RegisterItem; 
       `Položka (${item.category}): ${item.title}\n` +
       `Detail: ${item.detail}\n\n` +
       `Moja odpoveď: ${text.trim()}\n\n` +
-      `Ten key vyššie je presný — použi ho, nehľadaj ho v dátach a nevymýšľaj si iný. ` +
-      `Keď je odpoveďou, že položka nie je chyba a má sa uzavrieť, pridaj na koniec ` +
-      `ack-anomaly blok s týmto key a s mojou odpoveďou ako poznámkou. ` +
-      `Keď z odpovede vyplýva aj úprava dát, navrhni ju. Ak ti chýba informácia, spýtaj sa — nehádaj.`,
+      `Odpoveď je už zapísaná k položke a položka je uzavretá — NEZAPISUJ ju znova ` +
+      `a neposielaj ack-anomaly. Tvoja práca je nadstavba: ak z odpovede vyplýva ` +
+      `pripomienka do budúcnosti, zapíš záver (zapis-zaver s termínom overenia); ` +
+      `ak vyplýva úprava dát, navrhni ju; ak nevyplýva nič, len krátko potvrď. ` +
+      `Ak ti chýba informácia, spýtaj sa — nehádaj.`,
     );
-    // Položka sa označí ako vybavená až Jarvisovou úpravou, nie odoslaním —
-    // odoslať otázku nie je to isté ako vyriešiť ju.
     setText("");
     setOdpoved(false);
   };

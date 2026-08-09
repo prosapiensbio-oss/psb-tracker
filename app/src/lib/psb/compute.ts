@@ -287,7 +287,27 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
     const jeDoplnok = (p: string) => /doplnenie|za protokol|členství/i.test(p || "");
     const skutocne = packs.filter((p) => !jeDoplnok(p.package));
     const zdroj = skutocne.length ? skutocne : packs;
-    const active = zdroj.slice().sort((a, b) => b.remaining - a.remaining || b.total - a.total)[0];
+    // Ktorý riadok je AKTUÁLNY balíček: rozhoduje platnosť a dátum, nie zostatok.
+    //
+    // Pôvodné „ber ten s najväčším zostatkom" malo preskočiť dochodené
+    // historické riadky (nový 6/6 vedľa starého 0/6) — lenže Lenka mala
+    // v exporte starý balíček 2/17 vedľa aktuálneho 0/18 a pravidlo vybralo
+    // ten starý: PTminder ukazoval 0, karta tvrdila 2. Zostatok nehovorí,
+    // ktorý balíček je ten živý — hovorí to platnosť.
+    //
+    // Poradie: balíček platný DNES pred neplatným → novší valid_from (potom
+    // added) pred starším → a až pri riadkoch úplne bez dátumov (starý formát
+    // exportu) zostáva pôvodná heuristika zostatku. Tú ambiguitu vyrieši až
+    // nový upload — dnešný export dátumy nesie.
+    const dnesPack = new Date().toISOString().slice(0, 10);
+    const platnyDnes = (p: typeof zdroj[number]) =>
+      !!p.validFrom && !!p.validTo && p.validFrom <= dnesPack && dnesPack <= p.validTo ? 1 : 0;
+    const datumPack = (p: typeof zdroj[number]) => p.validFrom || p.added || "";
+    const active = zdroj.slice().sort((a, b) =>
+      platnyDnes(b) - platnyDnes(a) ||
+      datumPack(b).localeCompare(datumPack(a)) ||
+      b.remaining - a.remaining || b.total - a.total,
+    )[0];
     // Klient, ktorý má LEN doplnky, nemá evidovaný balíček — má členstvo.
     // Tvrdiť o ňom „0 z 3 hodín" je nepravda o produkte, ktorý si kúpil.
     c.lenDoplnky = skutocne.length === 0 && packs.length > 0;

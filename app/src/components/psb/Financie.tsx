@@ -470,6 +470,13 @@ function Predikcia({ data, clients }: { data: PSBData; clients: Record<string, C
   const [trainerF, setTrainerF] = useState("all");
   const { sort, toggle, sorted } = useSort({ key: "monthlyRevenue", dir: "desc" });
   const pred = useMemo(() => predictEarnings(data, clients, { excludeSpecial, horizon }), [data, clients, excludeSpecial, horizon]);
+  // JEDEN model tržieb pre celú appku (Jerry, 9. 8.): obnovy z balíčkov +
+  // objednané hodiny z kalendára — to isté číslo, čo ukazuje dlaždica Odhad
+  // tržieb na Kokpite. Scenárové čísla z predictEarnings tu stáli vedľa neho
+  // a september mal zrazu dve rôzne hodnoty; predictEarnings ďalej slúži len
+  // run-rate a tabuľke Detail podľa klienta (tempo, cena, dôvera).
+  const cashP = useMemo(() => predictCash(data, clients, 1), [data, clients, objednaneVerzia()]); // eslint-disable-line react-hooks/exhaustive-deps
+  const cashM = cashP.months[0];
   const perClientF = useMemo(() => (trainerF === "all" ? pred.perClient : pred.perClient.filter((c) => c.trainer === trainerF)), [pred.perClient, trainerF]);
   const rows = sorted(perClientF, {
     name: (c) => c.name,
@@ -499,7 +506,7 @@ function Predikcia({ data, clients }: { data: PSBData; clients: Record<string, C
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
           <H3>
             <Info
-              text="Odhad príjmu z reálnej histórie na budúce mesiace. Očakávaný mesačný príjem klienta = ako často chodí × priemerná cena sedenia, vážené dôverou obnovy podľa segmentu. Optimistický/realistický/negatívny = horné/stredné/dolné pásmo dôvery."
+              text="Model obnov členstiev: pre každého klienta sa z tempa (posledných 90 dní + objednané v kalendári) a zostatku spočíta, KEDY dochodí zaplatené hodiny, a vtedy sa čaká platba vo výške tej poslednej, vážená dôverou obnovy. Negatívny/realistický/optimistický = pásma dôvery. Jediný model tržieb v appke — rovnaké číslo ukazuje Kokpit."
               label={`Predikcia tržieb — ${monthsCovered}`}
             />
           </H3>
@@ -516,15 +523,16 @@ function Predikcia({ data, clients }: { data: PSBData; clients: Record<string, C
             predpoveď), preto stojí zvlášť pod nimi a nie ako štvrtý scenár:
             postavený vedľa nich vyzeral ako ďalší odhad a mýlil. */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, margin: "14px 0 6px" }}>
-          <StatCard value={fmtCZK(pred.scenarios.negative)} label={`Negatívny · ${monthsCovered}`} color={C.orange} />
-          <StatCard value={fmtCZK(pred.scenarios.realistic)} label={`Realistický · ${monthsCovered}`} color={C.accentLight} />
-          <StatCard value={fmtCZK(pred.scenarios.optimistic)} label={`Optimistický · ${monthsCovered}`} color={C.green} />
+          <StatCard value={fmtCZK(cashM?.lo ?? 0)} label={`Negatívny · ${monthsCovered}`} color={C.orange} />
+          <StatCard value={fmtCZK(cashM?.expected ?? 0)} label={`Realistický · ${monthsCovered}`} color={C.accentLight} />
+          <StatCard value={fmtCZK(cashM?.hi ?? 0)} label={`Optimistický · ${monthsCovered}`} color={C.green} />
         </div>
         {hasData && (
           <div style={{ fontSize: 11.5, color: C.textDim, lineHeight: 1.55, margin: "2px 0 12px" }}>
-            Tri čísla, jedna predikcia. Rovnaké tempo klientov, líši sa len viera v obnovu:
-            negatívny −20 %, optimistický +15 %. <b style={{ color: C.accentLight }}>Realistický ({fmtCZK(pred.scenarios.realistic)})</b> je
-            ten, ktorý ide ďalej do zisku pod týmto.
+            Tri čísla, jedna predikcia — model obnov: kto kedy dochodí zaplatené hodiny
+            (vrátane objednaného v kalendári) a koľko naposledy zaplatil. Pásma sa líšia len
+            vierou v obnovu: negatívny −20 %, optimistický +15 %. <b style={{ color: C.accentLight }}>Realistický ({fmtCZK(cashM?.expected ?? 0)})</b> je
+            to isté číslo ako dlaždica Odhad tržieb na Kokpite a ide ďalej do zisku pod týmto.
           </div>
         )}
 
@@ -533,10 +541,10 @@ function Predikcia({ data, clients }: { data: PSBData; clients: Record<string, C
           {hasData && (
             <div style={{ fontSize: 11.5, color: C.textDim, lineHeight: 1.55 }}>
               Nie je to štvrtý scenár. Run-rate hovorí, čo portfólio hádže <b>dnes</b>, keby nikto
-              neodišiel — preto býva {pred.monthlyRunRate > pred.scenarios.optimistic ? "vyšší" : "porovnateľný"} než
-              optimistický odhad, ktorý už odpočítava riziko neobnovenia.
-              {pred.monthlyRunRate > pred.scenarios.optimistic && (
-                <> Rozdiel <b>{fmtCZK(pred.monthlyRunRate - pred.scenarios.optimistic)}</b> je cena rizika, že sa balíčky neobnovia.</>
+              neodišiel — preto býva {pred.monthlyRunRate > (cashM?.expected ?? 0) ? "vyšší" : "porovnateľný"} než
+              realistický odhad, ktorý už odpočítava riziko neobnovenia.
+              {pred.monthlyRunRate > (cashM?.expected ?? 0) && (
+                <> Rozdiel <b>{fmtCZK(pred.monthlyRunRate - (cashM?.expected ?? 0))}</b> je cena rizika, že sa balíčky neobnovia.</>
               )}
             </div>
           )}
@@ -544,7 +552,7 @@ function Predikcia({ data, clients }: { data: PSBData; clients: Record<string, C
         {!hasData && <Empty>Nahraj Payroll + Packages & Memberships CSV pre predikciu.</Empty>}
       </Card>
 
-      <PredikciaZisku prijmyOdhad={pred.scenarios.realistic} mesiac={monthsCovered} hodiny={hodinyOdhad} />
+      <PredikciaZisku prijmyOdhad={cashM?.expected ?? 0} mesiac={monthsCovered} hodiny={hodinyOdhad} />
 
       {hasData && (
         <Card id="tempo-klienta">

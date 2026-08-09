@@ -357,7 +357,7 @@ export const ZDROJE = [
   { value: "ine", label: "Iné" },
 ];
 
-export function Klienti({ clients, capacity, actions, focus, leads, trainer, onTrainer, sixM, sub, onSub, data, btcSatsKlienti = {} }: { clients: Record<string, ClientAgg>; capacity: CapacityRow[]; actions: Actions; focus?: NavFocus | null; leads: Lead[]; trainer: string; onTrainer: (t: string) => void; sixM: SixMRow[]; sub: string; onSub: (s: string) => void; data: PSBData; btcSatsKlienti?: Record<string, number> }) {
+export function Klienti({ clients, capacity, actions, focus, leads, trainer, onTrainer, sixM, sub, onSub, data, btcSatsKlienti = {}, onDennikZapis }: { clients: Record<string, ClientAgg>; capacity: CapacityRow[]; actions: Actions; focus?: NavFocus | null; leads: Lead[]; trainer: string; onTrainer: (t: string) => void; sixM: SixMRow[]; sub: string; onSub: (s: string) => void; data: PSBData; btcSatsKlienti?: Record<string, number>; onDennikZapis?: (meno: string, text: string) => Promise<string | null> }) {
   const [focusClient, setFocusClient] = useState<string | null>(null);
   const [skupina, setSkupina] = useState<{ label: string; mena: string[] } | null>(null);
   useEffect(() => {
@@ -883,7 +883,7 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
           <textarea style={{ ...S.input, minHeight: 70, resize: "vertical", marginBottom: 14 }} defaultValue={editC.trainerNote} onBlur={(e) => actions.setOverride(editC.name, "trainerNote", e.target.value)} />
           <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 6 }}>Denník — príbeh klienta v čase (pridáva sa, nemaže)</div>
           <div style={{ marginBottom: 14 }}>
-            <Dennik meno={editC.name} limit={4} />
+            <Dennik meno={editC.name} limit={4} onNovyZapis={onDennikZapis} />
           </div>
           <button onClick={() => setEdit(null)} style={{ background: C.accent, color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontSize: 13, width: "100%" }}>Hotovo</button>
         </Modal>

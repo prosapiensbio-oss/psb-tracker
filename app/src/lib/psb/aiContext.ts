@@ -7,7 +7,7 @@
 import { PNL, VZAS_MONTHS, pnlCalc, poslednyMesiacSDatami } from "./vzas";
 import {
   monthlyFinance,
-  predictEarnings,
+  predictEarnings, predictCash,
   sessionAnalysisPSB,
   TARGET_H,
   ZONE_HI,
@@ -97,6 +97,11 @@ export function buildAiContext(
   const earnMax = revVals.length ? r0(Math.max(...revVals)) : 0;
   const earnMin = revVals.length ? r0(Math.min(...revVals)) : 0;
   const pred = predictEarnings(data, clients, { excludeSpecial: false, horizon: 3 });
+  // Jeden model tržieb (Jerry, 9. 8.): Jarvis musí hovoriť to isté číslo ako
+  // dlaždica na Kokpite a obrazovka Predikcia — teda model obnov z balíčkov
+  // + kalendár, nie scenáre z predictEarnings.
+  const cashPred3 = predictCash(data, clients, 3);
+  const cashSum = (k: "expected" | "lo" | "hi") => cashPred3.months.reduce((a, m) => a + m[k], 0);
 
   // ── Session trend ──
   const trend = sessionAnalysisPSB(data.sessions).map((m) => ({ mesiac: monthLabel(m.month), celkovo: m.total, offline: m.offline, online: m.onlineTc, uvodne: m.uvodne }));
@@ -270,7 +275,8 @@ export function buildAiContext(
       maxMesacne: earnMax,
       minMesacne: earnMin,
       poznamka: "Vyfakturované zárobky = hodnota odtrénovaných sedení (Payroll by Session). Ø/max/min len z reálnych mesiacov, bez odhadu.",
-      odhad3mes: { optimisticky: r0(pred.scenarios.optimistic), realisticky: r0(pred.scenarios.realistic), negativny: r0(pred.scenarios.negative), mesacnyRunRate: r0(pred.monthlyRunRate) },
+      odhadBuduciMesiac: cashPred3.months[0] ? { mesiac: monthLabel(cashPred3.months[0].month), realisticky: r0(cashPred3.months[0].expected), negativny: r0(cashPred3.months[0].lo), optimisticky: r0(cashPred3.months[0].hi) } : null,
+      odhad3mes: { optimisticky: r0(cashSum("hi")), realisticky: r0(cashSum("expected")), negativny: r0(cashSum("lo")), mesacnyRunRate: r0(pred.monthlyRunRate) },
     },
     sedeniaTrend: { mesacne: trend, priemerMesacne: trendAvg },
     tempo: { priemerSedeniMes: tempoAvg, poznamka: "Priemerný počet sedení klienta za mesiac (z histórie)." },

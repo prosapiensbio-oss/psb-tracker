@@ -16,11 +16,18 @@ import { C, mix } from "../../lib/psb/theme";
 
 export type DennikZapis = { id: string; note: string; autor: string; kedy: string };
 
-export function Dennik({ meno, limit = 4 }: { meno: string; limit?: number }) {
+export function Dennik({ meno, limit = 4, onNovyZapis }: {
+  meno: string;
+  limit?: number;
+  /** Zápis po uložení spracuje Jarvis na pozadí (pripomienky) — vracia
+   *  jednu vetu o tom, čo si zapísal, alebo null, keď nič nevyplynulo. */
+  onNovyZapis?: (meno: string, text: string) => Promise<string | null>;
+}) {
   const [zapisy, setZapisy] = useState<DennikZapis[]>([]);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [vsetky, setVsetky] = useState(false);
+  const [jarvisOznam, setJarvisOznam] = useState("");
 
   const nacitaj = (m: string) => {
     void fetch(`/api/client-notes?name=${encodeURIComponent(m)}`, { credentials: "same-origin" })
@@ -40,7 +47,20 @@ export function Dennik({ meno, limit = 4 }: { meno: string; limit?: number }) {
       body: JSON.stringify({ name: meno, note: t }),
     })
       .then((r) => r.json())
-      .then((j: { ok?: boolean }) => { if (j.ok) { setText(""); nacitaj(meno); } })
+      .then((j: { ok?: boolean }) => {
+        if (!j.ok) return;
+        setText("");
+        nacitaj(meno);
+        // Jarvis číta zápis na pozadí — „Dan ide na operáciu, o 2 týždne sa
+        // ozvať" sa nemusí písať druhýkrát do chatu. Ukladanie zápisu na
+        // odpovedi modelu NEZÁVISÍ: zápis už je v denníku, toto je nadstavba.
+        if (onNovyZapis) {
+          setJarvisOznam("Jarvis číta zápis…");
+          void onNovyZapis(meno, t)
+            .then((o) => setJarvisOznam(o || ""))
+            .catch(() => setJarvisOznam(""));
+        }
+      })
       .finally(() => setBusy(false));
   };
 
@@ -64,6 +84,11 @@ export function Dennik({ meno, limit = 4 }: { meno: string; limit?: number }) {
         </button>
       </div>
 
+      {jarvisOznam && (
+        <div style={{ fontSize: 11.5, color: jarvisOznam.endsWith("…") ? C.textDim : C.green, marginTop: 6 }}>
+          {jarvisOznam}
+        </div>
+      )}
       {zapisy.length > 0 && (
         <div style={{ marginTop: 8 }}>
           {videne.map((z) => (
