@@ -42,6 +42,7 @@ import { Klienti } from "./Klienti";
 import { Marketing } from "./Marketing";
 import { Vysledky, Vzas } from "./Vzas";
 import { Kalendar, type KalUdalost } from "./Kalendar";
+import { tokyKlientov } from "./Fluktuacia";
 import { Udaje } from "./Udaje";
 import { HladanieKlienta } from "./Hladanie";
 import { ZapisButton } from "./Zapis";
@@ -934,6 +935,33 @@ function skupinaFaktur(
         ...stavPolozky(key), priority: 9, client: "vzas|pnl",
       });
     }
+    // ── Odchody bez dôvodu ────────────────────────────────────────────────
+    //
+    // Appka vidí, že človek prestal chodiť. Nevidí prečo — a to je jediná vec,
+    // ktorú sa nedá dopočítať a o rok už ani spýtať. Kým dôvod chýba, položka
+    // visí v registri; keď sa vo Fluktuácii doplní, zmizne sama.
+    //
+    // Pýta sa len na uzavreté mesiace. Kto stíchol tento mesiac, sa ešte môže
+    // vrátiť a otázka „prečo odišiel" by bola predčasná — presne ten omyl, na
+    // ktorý sme narazili pri anomáliách bežiaceho mesiaca.
+    {
+      const beziaci = new Date().toISOString().slice(0, 7);
+      const toky = tokyKlientov(data, clients).mesacne;
+      for (const [mk, v] of toky) {
+        if (mk >= beziaci || !v.odisli.length) continue;
+        const odpovede = zapisy.mesiace?.[mk]?.answers || {};
+        const bezDovodu = v.odisli.filter((meno) => !(odpovede[`odchod__${meno}`] || "").trim());
+        if (!bezDovodu.length) continue;
+        const key = `odchody|${mk}`;
+        out.push({
+          key, category: "Rozhodnutie", tone: "orange",
+          title: `${monthLabel(mk)}: ${bezDovodu.length === 1 ? "odišiel klient" : `odišli ${bezDovodu.length} klienti`} a nevieme prečo`,
+          detail: `${bezDovodu.join(", ")} — ${bezDovodu.length === 1 ? "prestal" : "prestali"} chodiť v ${monthLabel(mk)} a dôvod nikde nie je. Dôvod je jediná vec, ktorú appka o odchode nezistí, a o rok sa naň už nikto nespýta. Doplň ho v Klienti → Fluktuácia, po rozkliknutí mesiaca.`,
+          ...stavPolozky(key), priority: 5, client: "klienti|rast",
+        });
+      }
+    }
+
     // ── Koho dnes uvidíš a čo mu treba povedať ────────────────────────────
     //
     // Všetky tieto veci appka vedela už včera — narodeniny, dochádzajúci
@@ -984,7 +1012,7 @@ function skupinaFaktur(
     }
 
     return out;
-  }, [bankaSumy, bankaPohyby, bankaPrijmy, btcPrijmy, btcBezDokladu, data.anomalyAck, kalUdalosti, clients, sixM]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [bankaSumy, bankaPohyby, bankaPrijmy, btcPrijmy, btcBezDokladu, data.anomalyAck, kalUdalosti, clients, sixM, zapisy]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const zmenyMetrik = useMemo(() => {
     const ack = data.anomalyAck || {};
