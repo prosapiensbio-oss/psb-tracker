@@ -1423,10 +1423,6 @@ function SalaryTab() {
 
   return (
     <>
-      {/* Guillermo stojí pred výplatami zámerne: sú to Jerryho osobné peniaze
-          v tom istom zmysle ako výplata, len idú Josému a nie na jeho účet.
-          V Kalendári by to bola evidencia sedení; tu je to riadok jeho čerpania. */}
-      <GuillermoKarta />
       <Card>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <div onClick={() => setChartOpen(!chartOpen)} style={{ fontSize: 15, fontWeight: 700, color: C.text, cursor: "pointer" }}>
@@ -1508,6 +1504,10 @@ function SalaryTab() {
           </ScrollX>
         )}
       </Card>
+
+      {/* Guillermo až za spoločnými výdavkami: je to Jerryho osobné čerpanie,
+          nie prvá vec, ktorú chce na tejto obrazovke vidieť. */}
+      <GuillermoKarta />
 
       <DebtTrendCard idx={idx} />
 

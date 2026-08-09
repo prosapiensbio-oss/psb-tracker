@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { fetchBtcReserve, type BtcVyplata } from "../../lib/psb/client";
 import type { ClientAgg } from "../../lib/psb/compute";
 import type { PSBData } from "../../lib/psb/types";
 import { C, mix } from "../../lib/psb/theme";
@@ -948,53 +949,66 @@ function Navrat({ udalosti, clients }: { udalosti: KalUdalost[]; clients: Record
  * Účet u Guillerma.
  *
  * Nie sú to „predplatené hodiny", ale účet, ktorý ide oboma smermi: Jerry platí
- * dopredu v dávkach a medzi platbami padá do mínusu — v júli bol päť sedení
- * pozadu, po platbe tri dopredu. Zostatok teda musí vedieť byť záporný.
+ * dopredu v dávkach a medzi platbami padá do mínusu.
+ *
+ * Ručne sa zadáva JEDINÁ vec — koľko sedení daná platba kúpila. Platby si appka
+ * ťahá sama z bitcoinovej knihy (výbery „FP spain"), lebo tam ich Jerry aj tak
+ * zapisuje; prepisovať sumu druhýkrát by znamenalo dva zdroje o tom istom.
+ * A koľko sedení za tie peniaze bolo, sa z výberu vyčítať nedá — kurz aj cena
+ * sa menia a delenie by len tvorilo presné čísla bez opory.
  *
  * KOTVA. Kalendár siaha dva týždne dozadu, takže sedenia od februára v ňom nie
- * sú a nikdy nebudú. Bez pevného bodu by karta ukazovala nezmysel (0 zaplatených
- * mínus jedno videné = −1). Preto sa raz zapíše stav k dátumu a od neho appka
- * počíta ďalej: plus zaplatené, mínus odtrénované po tom dni.
- *
- * Čerpanie sa nezadáva ručne — hovorí ho kalendár. Dva zdroje o tej istej veci
- * by sa raz rozišli a nikto by nevedel, ktorý platí.
- *
- * Karta si dáta načítava sama, aby mohla stáť kdekoľvek — býva v Peniazoch pri
- * výplatách, lebo sú to Jerryho osobné peniaze, nie náklad firmy.
+ * sú. Bez pevného bodu by karta ukazovala nezmysel, preto sa raz zapíše stav
+ * k dátumu a od neho sa počíta ďalej.
  */
 export function GuillermoKarta() {
   const [zaznamy, setZaznamy] = useState<Guillermo[]>([]);
   const [udalosti, setUdalosti] = useState<KalUdalost[]>([]);
-  const [otvorene, setOtvorene] = useState(false);
-  const [druh, setDruh] = useState<"nakup" | "zostatok">("nakup");
+  const [platby, setPlatby] = useState<BtcVyplata[]>([]);
+  const [kotvaOtvorena, setKotvaOtvorena] = useState(false);
   const [datum, setDatum] = useState(new Date().toISOString().slice(0, 10));
-  const [sedeni, setSedeni] = useState("");
-  const [suma, setSuma] = useState("");
-  const [uklada, setUklada] = useState(false);
+  const [stav, setStav] = useState("");
+  const [sedeni, setSedeni] = useState<Record<string, string>>({});
+  const [uklada, setUklada] = useState("");
 
   const nacitaj = useCallback(async () => {
     const r = await fetch("/api/kalendar", { credentials: "same-origin" });
     const j = (await r.json()) as { ok?: boolean; guillermo?: Guillermo[]; udalosti?: KalUdalost[] };
     if (j.ok) { setZaznamy(j.guillermo || []); setUdalosti(j.udalosti || []); }
+    const btc = await fetchBtcReserve(false, true, false);
+    // „FP spain" aj staršie „Jerry vyplata fp" — ten istý človek, iný zápis.
+    setPlatby((btc?.vyplaty || []).filter((v) => /fp\s*spain|vyplata fp|fpspain/i.test(v.poznamka || "")));
   }, []);
   useEffect(() => { void nacitaj(); }, [nacitaj]);
 
   const dnes = new Date().toISOString().slice(0, 10);
-  // Najnovšia kotva rozhoduje — staršie zápisy sú už v nej započítané.
   const kotva = zaznamy.filter((z) => z.druh === "zostatok").sort((a, b) => b.datum.localeCompare(a.datum))[0] || null;
   const odKedy = kotva?.datum || "0000-00-00";
-  const kupene = zaznamy.filter((z) => z.druh === "nakup" && z.datum > odKedy).reduce((a, z) => a + z.hodiny, 0);
+  const nakupy = zaznamy.filter((z) => z.druh === "nakup");
+  const kupene = nakupy.filter((z) => z.datum > odKedy).reduce((a, z) => a + z.hodiny, 0);
   const odtrenovane = udalosti.filter((u) => u.typ === "guillermo" && u.zaciatok.slice(0, 10) > odKedy && u.zaciatok.slice(0, 10) <= dnes).length;
   const zostatok = (kotva?.hodiny ?? 0) + kupene - odtrenovane;
-  const zaplatene = zaznamy.filter((z) => z.druh === "nakup" && z.suma_czk).reduce((a, z) => a + (z.suma_czk || 0), 0);
 
-  const uloz = async () => {
-    const n = Number(sedeni);
-    if (!Number.isFinite(n) || (druh === "nakup" && n <= 0)) return;
-    setUklada(true);
-    await posli({ akcia: "guillermo-pridaj", druh, datum, sedeni: n, suma: suma ? Number(suma) : null });
-    setUklada(false);
-    setSedeni(""); setSuma("");
+  // Platba, ku ktorej ešte nikto nepovedal, koľko sedení kúpila.
+  const zaradene = new Set(nakupy.map((z) => z.datum));
+  const cakajuce = platby.filter((v) => String(v.datum).slice(0, 10) > odKedy && !zaradene.has(String(v.datum).slice(0, 10)));
+
+  const ulozKotvu = async () => {
+    const n = Number(stav);
+    if (!Number.isFinite(n)) return;
+    setUklada("kotva");
+    await posli({ akcia: "guillermo-pridaj", druh: "zostatok", datum, sedeni: n });
+    setUklada(""); setStav(""); setKotvaOtvorena(false);
+    await nacitaj();
+  };
+
+  const ulozPlatbu = async (v: BtcVyplata) => {
+    const den = String(v.datum).slice(0, 10);
+    const n = Number(sedeni[den]);
+    if (!(n > 0)) return;
+    setUklada(den);
+    await posli({ akcia: "guillermo-pridaj", druh: "nakup", datum: den, sedeni: n, suma: v.czk ?? null, poznamka: v.poznamka });
+    setUklada("");
     await nacitaj();
   };
 
@@ -1003,69 +1017,91 @@ export function GuillermoKarta() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         <H3>
           <Info
-            text="Účet u Guillerma (Functional Patterns Spain). Sú to Jerryho osobné peniaze, nie náklad firmy — do P&L to nezasahuje. Platí sa dopredu v dávkach a medzi platbami sa účet dostáva do mínusu, preto môže byť zostatok záporný. Čerpanie hovorí kalendár: každá udalosť označená ako Guillermo je jedno sedenie. Keďže kalendár siaha len dva týždne dozadu, počíta sa od zapísaného zostatku k dátumu."
+            text="Účet u Guillerma (Functional Patterns Spain). Jerryho osobné peniaze, nie náklad firmy — do P&L to nezasahuje. Platby si appka ťahá z bitcoinovej knihy (výbery „FP spain“); ručne zadávaš jedinú vec — koľko sedení tá platba kúpila. Čerpanie hovorí kalendár: každá udalosť označená ako Guillermo je jedno sedenie."
             label="Guillermo"
           />
         </H3>
-        <button onClick={() => setOtvorene(!otvorene)} style={{ background: "none", border: "none", color: C.textDim, fontSize: 12.5, cursor: "pointer" }}>
-          {otvorene ? "skryť" : "zapísať"}
+        <button onClick={() => setKotvaOtvorena(!kotvaOtvorena)} style={{ background: "none", border: "none", color: C.textDim, fontSize: 12.5, cursor: "pointer" }}>
+          {kotvaOtvorena ? "skryť" : "opraviť stav"}
         </button>
       </div>
 
-      {!kotva && (
+      {!kotva ? (
         <div style={{ fontSize: 12, color: C.orange, margin: "8px 0 0", lineHeight: 1.55 }}>
-          Zatiaľ nie je od čoho počítať. Zapíš <b>stav k dátumu</b> — napríklad „+3 k 29. 7. 2026" podľa
-          správy Josému — a odvtedy si to appka povedie sama.
+          Zatiaľ nie je od čoho počítať. Klikni na <b>opraviť stav</b> a zapíš, koľko sedení si mal
+          k danému dňu — napríklad „+3 k 29. 7. 2026" podľa správy Josému.
         </div>
-      )}
-
-      {kotva && (
+      ) : (
         <div style={{ display: "flex", gap: 18, flexWrap: "wrap", margin: "10px 0 4px", alignItems: "baseline" }}>
           <div>
             <div style={{ fontSize: 24, fontWeight: 700, color: zostatok < 0 ? C.red : zostatok === 0 ? C.orange : C.green }}>
               {zostatok > 0 ? "+" : ""}{zostatok}
             </div>
             <div style={{ fontSize: 11.5, color: C.textDim }}>
-              {zostatok < 0 ? `${-zostatok} sedení dlžíš` : zostatok === 0 ? "vyrovnané" : "sedení dopredu"}
+              {zostatok < 0 ? `${-zostatok} sedení dlžíš` : zostatok === 0 ? "vyrovnané — čas zaplatiť" : "sedení dopredu"}
             </div>
           </div>
           <div style={{ fontSize: 12, color: C.textMuted, lineHeight: 1.7 }}>
             od {kotva.datum.split("-").reverse().join(". ")} bolo {kotva.hodiny > 0 ? "+" : ""}{kotva.hodiny}
             {kupene ? ` · pribudlo ${kupene}` : ""} · odtrénované {odtrenovane}
-            {zaplatene ? <><br />zaplatené {Math.round(zaplatene).toLocaleString("cs-CZ")} Kč</> : null}
           </div>
         </div>
       )}
 
-      {otvorene && (
+      {zostatok <= 0 && kotva && (
+        <div style={{ fontSize: 12, color: C.orange, marginTop: 8, padding: "8px 11px", borderRadius: 8, background: mix(C.orange, 10), lineHeight: 1.55 }}>
+          Predplatené sedenia došli. Pošli Josému platbu a zapíš ju v bitcoinovej knihe ako
+          „FP spain" — appka ju tu potom sama ponúkne a ty len doplníš, koľko sedení kúpila.
+        </div>
+      )}
+
+      {cakajuce.length > 0 && (
+        <div style={{ marginTop: 12, paddingTop: 10, borderTop: `1px solid ${C.border}` }}>
+          <div style={{ fontSize: 11, color: C.textDim, marginBottom: 8, textTransform: "uppercase", letterSpacing: 0.3 }}>
+            Platby z bitcoinovej knihy — koľko sedení kúpili?
+          </div>
+          {cakajuce.map((v) => {
+            const den = String(v.datum).slice(0, 10);
+            return (
+              <div key={den} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "5px 0" }}>
+                <span style={{ fontSize: 12.5, color: C.text, minWidth: 92 }}>{den.split("-").reverse().join(". ")}</span>
+                <span style={{ fontSize: 12.5, color: C.textMuted, minWidth: 90 }}>
+                  {v.czk ? `${Math.round(v.czk).toLocaleString("cs-CZ")} Kč` : `${v.sats.toLocaleString("cs-CZ")} sats`}
+                </span>
+                <input value={sedeni[den] || ""} onChange={(e) => setSedeni({ ...sedeni, [den]: e.target.value })}
+                  placeholder="sedení" style={{ width: 92, padding: "6px 9px", borderRadius: 7, fontSize: 12.5, border: `1px solid ${C.border}`, background: C.bg, color: C.text }} />
+                <button onClick={() => void ulozPlatbu(v)} disabled={uklada === den || !(Number(sedeni[den]) > 0)}
+                  style={{ padding: "6px 12px", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: Number(sedeni[den]) > 0 ? "pointer" : "not-allowed",
+                    border: `1px solid ${mix(C.green, 45)}`, background: Number(sedeni[den]) > 0 ? mix(C.green, 12) : "transparent", color: Number(sedeni[den]) > 0 ? C.green : C.textDim }}>
+                  {uklada === den ? "…" : "Zapísať"}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {kotvaOtvorena && (
         <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.border}`, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-          <Select value={druh} onChange={(v) => setDruh(v as "nakup" | "zostatok")}
-            options={[{ value: "nakup", label: "Zaplatené sedenia" }, { value: "zostatok", label: "Stav k dátumu" }]} />
+          <span style={{ fontSize: 12, color: C.textMuted }}>Stav k dátumu:</span>
           <input type="date" value={datum} onChange={(e) => setDatum(e.target.value)}
             style={{ padding: "7px 10px", borderRadius: 8, fontSize: 12.5, border: `1px solid ${C.border}`, background: C.bg, color: C.text }} />
-          <input value={sedeni} onChange={(e) => setSedeni(e.target.value)}
-            placeholder={druh === "zostatok" ? "stav (aj -5)" : "koľko sedení"}
+          <input value={stav} onChange={(e) => setStav(e.target.value)} placeholder="napr. 3 alebo -5"
             style={{ width: 120, padding: "7px 10px", borderRadius: 8, fontSize: 12.5, border: `1px solid ${C.border}`, background: C.bg, color: C.text }} />
-          {druh === "nakup" && (
-            <input value={suma} onChange={(e) => setSuma(e.target.value)} placeholder="suma v Kč"
-              style={{ width: 110, padding: "7px 10px", borderRadius: 8, fontSize: 12.5, border: `1px solid ${C.border}`, background: C.bg, color: C.text }} />
-          )}
-          <button onClick={() => void uloz()} disabled={uklada || sedeni.trim() === ""}
-            style={{ padding: "7px 15px", borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: sedeni.trim() ? "pointer" : "not-allowed",
-              border: `1px solid ${mix(C.green, 45)}`, background: sedeni.trim() ? mix(C.green, 12) : "transparent", color: sedeni.trim() ? C.green : C.textDim }}>
-            {uklada ? "…" : "Zapísať"}
+          <button onClick={() => void ulozKotvu()} disabled={uklada === "kotva" || stav.trim() === ""}
+            style={{ padding: "7px 15px", borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: stav.trim() ? "pointer" : "not-allowed",
+              border: `1px solid ${mix(C.green, 45)}`, background: stav.trim() ? mix(C.green, 12) : "transparent", color: stav.trim() ? C.green : C.textDim }}>
+            {uklada === "kotva" ? "…" : "Zapísať"}
           </button>
         </div>
       )}
 
-      {zaznamy.length > 0 && (
+      {nakupy.length > 0 && (
         <div style={{ marginTop: 12 }}>
-          {zaznamy.map((z) => (
-            <div key={z.id} style={{ display: "flex", gap: 10, alignItems: "baseline", padding: "6px 0", borderBottom: `1px solid ${mix(C.border, 45)}`, flexWrap: "wrap" }}>
+          {nakupy.map((z) => (
+            <div key={z.id} style={{ display: "flex", gap: 10, alignItems: "baseline", padding: "5px 0", borderBottom: `1px solid ${mix(C.border, 45)}`, flexWrap: "wrap" }}>
               <span style={{ fontSize: 12, color: C.textMuted, minWidth: 82 }}>{z.datum.split("-").reverse().join(". ")}</span>
-              <span style={{ fontSize: 12.5, color: z.druh === "zostatok" ? C.blue : C.text, fontWeight: 600 }}>
-                {z.druh === "zostatok" ? `stav ${z.hodiny > 0 ? "+" : ""}${z.hodiny}` : `+${z.hodiny} sedení`}
-              </span>
+              <span style={{ fontSize: 12.5, color: C.text, fontWeight: 600 }}>+{z.hodiny} sedení</span>
               {z.suma_czk ? <span style={{ fontSize: 12, color: C.textMuted }}>{Math.round(z.suma_czk).toLocaleString("cs-CZ")} Kč</span> : null}
               <button onClick={async () => { await posli({ akcia: "guillermo-zmaz", id: z.id }); await nacitaj(); }}
                 style={{ marginLeft: "auto", background: "none", border: "none", color: C.textDim, fontSize: 11.5, cursor: "pointer" }}>
