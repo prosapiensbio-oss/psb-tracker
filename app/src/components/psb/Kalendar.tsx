@@ -898,12 +898,14 @@ function Balicky({ udalosti, clients }: { udalosti: KalUdalost[]; clients: Recor
               color: r.po <= 0 ? C.red : C.orange,
               background: mix(r.po <= 0 ? C.red : C.orange, 12),
             }}>
-              {r.po <= 0 ? "0" : r.po}{r.spolu ? `/${r.spolu}` : ""}
+              {/* Mínus je iná správa než nula: „0" znamená dochodí presne,
+                  „−2" znamená, že už má dohodnuté hodiny, ktoré nemá zaplatené. */}
+              {r.po < 0 ? `−${-r.po}` : r.po}{r.spolu ? `/${r.spolu}` : ""}
             </span>
             <span style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>{r.meno}</span>
             <span style={{ fontSize: 11.5, color: C.textDim }}>
               {r.spolu ? `teraz ${r.zostava} z ${r.spolu}` : "balíček dochodený"} · objednané {r.kusov}
-              {r.po < 0 ? ` · o ${-r.po} viac, než má` : ""}
+              {r.po < 0 ? ` · v mínuse o ${-r.po} ${-r.po === 1 ? "hodinu" : -r.po < 5 ? "hodiny" : "hodín"}` : ""}
             </span>
           </div>
         ))
