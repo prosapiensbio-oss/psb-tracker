@@ -141,7 +141,19 @@ export function Kalendar({ clients }: { clients: Record<string, ClientAgg> }) {
 
   return (
     <>
-      <Pripojenie zdroje={stav.zdroje} onZmena={nacitaj} />
+      {/* Poradie kariet nesie prioritu: hore je to, na čo sa človek pozerá
+          každý deň (týždeň), potom to, čo si pýta odpoveď (zmeny, nové mená),
+          a celkom dole obsluha (sťahovanie, pripojenie). Kým kalendár
+          pripojený nie je, obráti sa to — vtedy je jediná zmysluplná vec
+          práve to pripojenie. */}
+      {!pripojene && <Pripojenie zdroje={stav.zdroje} onZmena={nacitaj} />}
+
+      {pripojene && <Tyzden udalosti={stav.udalosti} />}
+      {pripojene && <Zmeny zmeny={stav.zmeny} onHotovo={nacitaj} />}
+
+      {stav.nezname.length > 0 && (
+        <Mapovanie nezname={stav.nezname} mena={menaKlientov} clients={clients} onHotovo={nacitaj} />
+      )}
 
       {pripojene && (
         <Card>
@@ -167,12 +179,7 @@ export function Kalendar({ clients }: { clients: Record<string, ClientAgg> }) {
         </Card>
       )}
 
-      {stav.nezname.length > 0 && (
-        <Mapovanie nezname={stav.nezname} mena={menaKlientov} clients={clients} onHotovo={nacitaj} />
-      )}
-
-      {pripojene && <Zmeny zmeny={stav.zmeny} onHotovo={nacitaj} />}
-      {pripojene && <Tyzden udalosti={stav.udalosti} />}
+      {pripojene && <Pripojenie zdroje={stav.zdroje} onZmena={nacitaj} />}
     </>
   );
 }
