@@ -18,7 +18,7 @@ import {
 } from "../../lib/psb/compute";
 import { fmtCZK, fmtDMY, monthLabel, weekKey, weekLabel } from "../../lib/psb/format";
 import { C, mix, S, badge, btn } from "../../lib/psb/theme";
-import type { KalUdalost } from "./Kalendar";
+import { Balicky, type KalUdalost } from "./Kalendar";
 import { nastavPrijmyZTrackera, pnlCalc, poslednyMesiacSDatami, salaryCalc, vzasVerzia, VZAS_MONTHS } from "../../lib/psb/vzas";
 import { fetchBtcReserve, fetchVzasSettings } from "../../lib/psb/client";
 import { PrehladPanel, useZmenyOdMinule, type Pristroj, type Zmena } from "./Prehlad";
@@ -1033,33 +1033,16 @@ export function Dashboard({
   const openMonth = (monthKey: string) => onNavigate("vzas", "trzby", { month: monthKey, trainer, nonce: Date.now() });
 
   // Widget bodies, keyed by id — rendered in the user's saved order below.
-  // Clients down to their last session (or 0) on their active package — renewal cues.
-  // Balíček sa končí dvoma spôsobmi a doteraz sme videli len jeden.
+  // Končiace PLATNOSTI členstiev — druhá polovica karty „koniec balíčka".
   //
-  // Hodiny dôjdu (0/6) — to karta ukazovala. Ale členstvo má aj PLATNOSŤ a tá
-  // vyprší nezávisle od toho, koľko hodín zostalo: klient s 3/6 hodinami, ktorému
-  // o týždeň končí členstvo, potrebuje ozvanie rovnako naliehavo — a v starej
-  // karte nebol. Naopak človek, ktorý si práve dokúpil ďalší balíček, tam ostával
-  // svietiť na 0/6, hoci už dávno nič nekončí.
-  //
-  // Preto teraz: došli hodiny ALEBO platnosť končí do 21 dní. Dvadsaťjeden dní
-  // preto, že členstvá sa obnovujú na mesiac — kratšie okno by nedávalo čas sa
-  // ozvať, dlhšie by kartu zaplavilo ľuďmi, ktorí ešte majú pokoj.
-  //
-  // A tretí rozdiel, ktorý PTminder nevie: čo je už OBJEDNANÉ. Klient s tromi
-  // hodinami a tromi termínmi v kalendári nie je „3/6, má pokoj" — je na nule
-  // a o desať dní na mínuse. Zostatok sa preto porovnáva až po odčítaní toho,
-  // čo je nabookované; kto nemá v kalendári nič, sa počíta ako doteraz.
-  const packageEnding = useMemo(() => {
+  // Prvú polovicu (dochádzajúce hodiny) počíta zoznam z Kalendára: ten vie, čo
+  // je objednané, a to je pravdivejšie než momentka z posledného exportu.
+  // Platnosť ale kalendár nevie a končí nezávisle od hodín: klient s piatimi
+  // hodinami a desiatimi dňami ich nestihne minúť a o tri príde. Preto tu.
+  const platnostKonci = useMemo(() => {
     const dnes = new Date().toISOString().slice(0, 10);
     const dni = (d: string) => Math.round((Date.parse(d) - Date.parse(dnes)) / 86400000);
     const ack = data.anomalyAck || {};
-    const objednaneKal: Record<string, number> = {};
-    for (const u of kalendar) {
-      if (u.typ !== "trening" || !u.klient) continue;
-      if (u.zaciatok.slice(0, 10) < dnes) continue;
-      objednaneKal[u.klient] = (objednaneKal[u.klient] || 0) + 1;
-    }
     return Object.values(clients)
       .filter((c) => c.status !== "Neaktívny" && c.status !== "Pauza" && matchT(c.primaryTrainer))
       .filter((c) => !ack[`balicek|${c.name}`])
@@ -1069,20 +1052,9 @@ export function Dashboard({
       .filter((c) => !c.lenDoplnky)
       .map((c) => {
         const doKonca = c.packageValidTo ? dni(c.packageValidTo) : null;
-        // Prah podľa toho, ako často klient reálne chodí.
-        //
-        // Anna Kadličkova chodí raz za týždeň. Pri prahu „zostávajú 3 hodiny"
-        // by na ňu karta svietila tri týždne — a to je presne to, čo z 33
-        // upozornení robí tapetu. Kto chodí častejšie než raz týždenne, minie
-        // dve hodiny za týždeň, takže má zmysel ozvať sa pri dvoch. Kto chodí
-        // menej často, má zmysel až pri poslednej.
-        // Frekvencia z POSLEDNÝCH 8 TÝŽDŇOV, nie za celý život klienta.
-        //
-        // Anna Kadličkova má za 47 týždňov 38 sedení, čo je 0,81 týždenne — lenže
-        // v tom priemere sú Vianoce, dovolenka aj rozbeh. Posledné mesiace chodí
-        // raz týždenne a podľa toho sa má počítať, či zostávajúce hodiny stihne
-        // minúť. Celoživotný priemer podhodnotí tempo a appka potom hlási stratu
-        // hodín tam, kde žiadna nebude.
+        // Frekvencia z POSLEDNÝCH 8 TÝŽDŇOV, nie za celý život klienta: v
+        // celoživotnom priemere sú Vianoce, dovolenka aj rozbeh, a ten potom
+        // hlási stratu hodín tam, kde žiadna nebude.
         const odkedy = Date.parse(dnes) - 8 * 7 * 86400000;
         const nedavne = c.sessions.filter((x) => Date.parse(x.date) >= odkedy).length;
         const tyzdnov = c.firstSession && c.lastSession
@@ -1090,43 +1062,23 @@ export function Dashboard({
           : 1;
         // Klient s krátkou históriou nemá dosť nedávnych dát — vtedy platí celoživotný priemer.
         const frekvencia = tyzdnov >= 8 ? nedavne / 8 : c.sessionCount / tyzdnov;
-        const prah = frekvencia > 1 ? 2 : 1;
-        const objednane = objednaneKal[c.name] || 0;
-        const poObjednanych = c.packageRemaining - objednane;
-        const hodinyDosli = c.packageTotal > 0 && poObjednanych <= prah;
-        // Platnosť sa hlási len vtedy, keď z nej niečo VYPLÝVA.
-        //
-        // Anna Kadličkova má 3 hodiny a členstvo do 24. 8. Pri jednom tréningu
-        // týždenne ich do vtedy stihne minúť — nič sa nedeje a upozornenie je
-        // šum. Klient s piatimi hodinami a desiatimi dňami ich nestihne a o tri
-        // hodiny príde; to je vec, o ktorej treba vedieť.
-        //
-        // Posledný týždeň sa hlási vždy, bez ohľadu na hodiny: koniec členstva
-        // je sám o sebe moment, kedy sa rieši ďalší balíček.
+        // Platnosť sa hlási len vtedy, keď z nej niečo VYPLÝVA. Kto zostávajúce
+        // hodiny do konca členstva stihne minúť, nemá o čom vedieť; tolerancia
+        // jednej hodiny, lebo prísť o pol hodiny nie je dôvod na upozornenie.
+        // Posledný týždeň sa hlási vždy: koniec členstva je sám o sebe moment,
+        // kedy sa rieši ďalší balíček.
         const tyzdnovDoKonca = doKonca !== null ? doKonca / 7 : 0;
-        // Tolerancia jednej hodiny: prísť o pol hodiny nie je dôvod na
-        // upozornenie, prísť o dve je.
         const stihneMinut = frekvencia > 0
           ? frekvencia * tyzdnovDoKonca >= c.packageRemaining - 1
           : false;
-        const platnostKonci =
+        const konci =
           doKonca !== null && doKonca > -60 &&
           (doKonca <= 7 || (doKonca <= 21 && !stihneMinut));
-        return { c, doKonca, hodinyDosli, platnostKonci, prah, frekvencia, objednane, poObjednanych };
+        return { c, doKonca, frekvencia, konci };
       })
-      .filter((x) => x.hodinyDosli || x.platnostKonci)
-      // Najprv došlé hodiny (predaj, ktorý sa dá spraviť dnes), potom končiace
-      // členstvá; v rámci skupiny podľa naliehavosti. Jeden porovnávač, nie dva
-      // reťazené — dva by sa prebili a zoradilo by to presne naopak.
-      .sort((a, b) => {
-        if (a.hodinyDosli !== b.hodinyDosli) return a.hodinyDosli ? -1 : 1;
-        // Kto je v mínuse, ide prvý — trénuje na dlh a vie sa to už dnes.
-        if (a.hodinyDosli && a.poObjednanych !== b.poObjednanych) return a.poObjednanych - b.poObjednanych;
-        const ka = a.doKonca ?? (a.poObjednanych <= 0 ? -1 : 21);
-        const kb = b.doKonca ?? (b.poObjednanych <= 0 ? -1 : 21);
-        return ka - kb || a.c.name.localeCompare(b.c.name);
-      });
-  }, [clients, trainer, data.anomalyAck, kalendar]); // eslint-disable-line react-hooks/exhaustive-deps
+      .filter((x) => x.konci)
+      .sort((a, b) => (a.doKonca ?? 21) - (b.doKonca ?? 21) || a.c.name.localeCompare(b.c.name));
+  }, [clients, trainer, data.anomalyAck]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Mená, ktoré si niekto odložil — aby sa dali vrátiť jedným klikom.
   const odlozene = Object.keys(data.anomalyAck || {})
@@ -1345,57 +1297,39 @@ export function Dashboard({
         </div>
       </Card>
     ),
+    // Zoznam sa presunul z Kalendára sem: rozhoduje ZOSTATOK PO OBJEDNANÝCH
+    // hodinách, nie momentka z posledného exportu. Pod ním zostáva druhá,
+    // menšia sekcia — končiace platnosti členstiev. Tie kalendár nevie: klient
+    // s tromi hodinami a členstvom do budúceho týždňa o hodiny príde, aj keď
+    // mu podľa zostatku nič nedochádza.
     koniecBalicka: (
-      <Card style={{ marginBottom: 0, height: "100%" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-        <H3>
-          <Info text="Klienti, ktorým sa balíček končí — po započítaní toho, čo už majú objednané v Google Kalendári. Odznak je zostatok PO objednaných hodinách: −2/6 znamená, že má dohodnuté dva tréningy navyše oproti zaplateným. Prah sa riadi tým, ako často kto chodí: kto chodí viac než raz týždenne, objaví sa pri posledných dvoch hodinách, kto chodí menej, až pri poslednej — inak by na neho karta svietila tri týždne. Druhý dôvod je platnosť členstva do 21 dní; tá končí nezávisle od hodín a kalendár o nej nevie. Čas poslať ponuku na obnovu. Mení sa podľa prepínača trénera." label="Blíži sa koniec balíčka" />
-        </H3>
-        {odlozene.length > 0 && (
-          <button
-            onClick={() => odlozene.forEach((n) => actions.ackAnomaly(`balicek|${n}`, "", false))}
-            style={{ background: "none", border: "none", color: C.textDim, fontSize: 11.5, cursor: "pointer" }}
-          >
-            Vrátiť odložené ({odlozene.length})
-          </button>
-        )}
-        </div>
-        {packageEnding.length ? (
-          <>
-          {/* Dva dôvody, dva nadpisy. Predtým to bol jeden zoznam a človek
-              čítal odznak „3/8" ako „zostávajú tri hodiny, prečo tu je?" —
-              pritom Vaško je tam za končiace členstvo, nie za hodiny. */}
-          {(["hodiny", "platnost"] as const).map((skupina) => {
-            const riadky = packageEnding.filter((x) => (skupina === "hodiny" ? x.hodinyDosli : !x.hodinyDosli));
-            if (!riadky.length) return null;
-            return (
-              <div key={skupina} style={{ marginBottom: 10 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.8, textTransform: "uppercase", color: C.textDim, margin: "2px 0 6px" }}>
-                  {skupina === "hodiny"
-                    ? `Hodiny dochádzajú vrátane objednaných (${riadky.length})`
-                    : `Končí platnosť členstva (${riadky.length})`}
-                </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 8 }}>
-                  {riadky.map(({ c, doKonca, hodinyDosli, frekvencia, objednane, poObjednanych }) => {
-              const naliehave = (doKonca !== null && doKonca <= 7) || poObjednanych <= 0;
-              const vMinuse = poObjednanych < 0;
-              // Dôvod má hovoriť, PREČO tu klient je. Predtým sa ukazovala
-              // platnosť vždy, keď existoval dátum — aj u klienta s 0/6, ktorý
-              // je v zozname kvôli dochodeným hodinám, nie kvôli členstvu.
-              const dovod = hodinyDosli
-                ? objednane
-                  ? `zostáva ${c.packageRemaining} z ${c.packageTotal} · objednané ${objednane}${vMinuse ? ` — trénuje o ${-poObjednanych} hodín viac, než má zaplatené` : " — po nich je na nule"}`
-                  : `zostáva ${c.packageRemaining} z ${c.packageTotal} — čas na ďalší balíček`
-                : doKonca === null ? `${c.packageRemaining}/${c.packageTotal} hodín`
-                : doKonca < 0 ? `platnosť vypršala ${fmtDMY(c.packageValidTo)}`
-                : doKonca === 0 ? "platnosť končí dnes"
-                : `platnosť do ${fmtDMY(c.packageValidTo)} · ${doKonca} ${doKonca < 5 ? "dni" : "dní"} · hodiny nestihne minúť`;
-              return (
+      <Balicky
+        udalosti={kalendar.filter((u) => matchT(u.trener))}
+        clients={clients}
+        matchTrener={matchT}
+        style={{ marginBottom: 0, height: "100%" }}
+        onKlient={(meno) => onNavigate("klienti", undefined, { client: meno, nonce: Date.now() })}
+      >
+        {platnostKonci.length > 0 && (
+          <div style={{ marginTop: 14 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.8, textTransform: "uppercase", color: C.textDim, margin: "2px 0 6px" }}>
+                <Info text="Členstvo má vlastnú platnosť a tá vyprší nezávisle od toho, koľko hodín zostalo. Klient s piatimi hodinami a desiatimi dňami ich nestihne minúť a o tri príde — o tom treba vedieť. Posledný týždeň sa hlási vždy, dlhšie okno len vtedy, keď hodiny podľa tempa nestihne minúť." label={`Končí platnosť členstva (${platnostKonci.length})`} />
+              </div>
+              {odlozene.length > 0 && (
+                <button
+                  onClick={() => odlozene.forEach((n) => actions.ackAnomaly(`balicek|${n}`, "", false))}
+                  style={{ background: "none", border: "none", color: C.textDim, fontSize: 11.5, cursor: "pointer" }}
+                >
+                  Vrátiť odložené ({odlozene.length})
+                </button>
+              )}
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 8 }}>
+              {platnostKonci.map(({ c, doKonca, frekvencia }) => (
                 <div key={c.name} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 10px", background: mix(C.text, 4), border: `1px solid ${C.border}`, borderRadius: 9, width: "100%", minWidth: 0 }}>
-                  {/* Odznak hovorí, koľko hodín zostane PO objednaných termínoch.
-                      Mínus sa ukazuje ako mínus — „−2" je iná správa než „0". */}
-                  <span style={{ ...badge(naliehave ? "red" : "orange"), fontSize: 10, flexShrink: 0 }}>
-                    {c.packageTotal > 0 ? `${vMinuse ? "−" : ""}${Math.abs(poObjednanych)}/${c.packageTotal}` : "—"}
+                  <span style={{ ...badge(doKonca !== null && doKonca <= 7 ? "red" : "orange"), fontSize: 10, flexShrink: 0 }}>
+                    {c.packageTotal > 0 ? `${c.packageRemaining}/${c.packageTotal}` : "—"}
                   </span>
                   <button
                     onClick={() => onNavigate("klienti", undefined, { client: c.name, nonce: Date.now() })}
@@ -1404,12 +1338,13 @@ export function Dashboard({
                   >
                     <span style={{ fontSize: 13, color: C.text, fontWeight: 500, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</span>
                     <span style={{ fontSize: 11, color: C.textDim, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {dovod}
+                      {doKonca === null ? `${c.packageRemaining}/${c.packageTotal} hodín`
+                        : doKonca < 0 ? `platnosť vypršala ${fmtDMY(c.packageValidTo)}`
+                        : doKonca === 0 ? "platnosť končí dnes"
+                        : `platnosť do ${fmtDMY(c.packageValidTo)} · ${doKonca} ${doKonca < 5 ? "dni" : "dní"} · hodiny nestihne minúť`}
                     </span>
                   </button>
-                  {/* Odložiť, nie zmazať: klient, ktorý má pauzu alebo sa už
-                      ozval, nemá svietiť — ale keď si kúpi ďalší balíček, karta
-                      sa mu vráti sama. Vrátiť sa dá cez „Ukázať odložené". */}
+                  {/* Odložiť, nie zmazať: keď si kúpi ďalšie členstvo, karta sa mu vráti sama. */}
                   <button
                     onClick={() => actions.ackAnomaly(`balicek|${c.name}`, "odložené z karty")}
                     title="Odložiť — už to riešim alebo má pauzu"
@@ -1418,17 +1353,11 @@ export function Dashboard({
                     ×
                   </button>
                 </div>
-              );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-          </>
-        ) : (
-          <Empty>Nikomu sa balíček nekončí 🌿</Empty>
+              ))}
+            </div>
+          </div>
         )}
-      </Card>
+      </Balicky>
     ),
   };
 

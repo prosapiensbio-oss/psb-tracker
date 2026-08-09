@@ -175,7 +175,8 @@ export function Kalendar({ clients, data }: { clients: Record<string, ClientAgg>
       )}
       {pripojene && <Zmeny zmeny={zmenyF} onHotovo={nacitaj} />}
       {pripojene && <Kontrola udalosti={udalostiF} data={data} />}
-      {pripojene && <Balicky udalosti={udalostiF} clients={clients} />}
+      {/* Balíčky sa presunuli na Kokpit — sem sa chodí pozerať, čo sa zmenilo
+          v kalendári, nie komu treba zavolať. */}
       {pripojene && <Navrat udalosti={udalostiF} clients={clients} />}
 
       {stav.nezname.length > 0 && (
@@ -853,8 +854,24 @@ function Kontrola({ udalosti, data }: { udalosti: KalUdalost[]; data: PSBData })
   );
 }
 
-/** Balíčky po započítaní toho, čo je už objednané — nie po poslednom exporte. */
-function Balicky({ udalosti, clients }: { udalosti: KalUdalost[]; clients: Record<string, ClientAgg> }) {
+/**
+ * Balíčky po započítaní toho, čo je už objednané — nie po poslednom exporte.
+ *
+ * Karta žije na Kokpite, nie v Kalendári: je to vec, ktorá si pýta akciu dnes
+ * (ozvať sa, kým klienta ešte vidíš na hodine), a tie patria na prvú obrazovku.
+ * Kalendár je miesto, kde sa dáta zbierajú; Kokpit je miesto, kde sa konajú.
+ */
+export function Balicky({ udalosti, clients, style, onKlient, matchTrener, children }: {
+  udalosti: KalUdalost[];
+  clients: Record<string, ClientAgg>;
+  style?: React.CSSProperties;
+  /** Klik na meno — na Kokpite otvára profil klienta. */
+  onKlient?: (meno: string) => void;
+  /** Prepínač trénera na Kokpite — týka sa klientov bez termínu v kalendári. */
+  matchTrener?: (t: string) => boolean;
+  /** Doplnková sekcia pod zoznamom (na Kokpite končiace platnosti členstiev). */
+  children?: React.ReactNode;
+}) {
   const riadky = useMemo(() => {
     const dnes = new Date().toISOString().slice(0, 10);
     const objednane: Record<string, number> = {};
@@ -862,6 +879,15 @@ function Balicky({ udalosti, clients }: { udalosti: KalUdalost[]; clients: Recor
       if (u.typ !== "trening" || !u.klient) continue;
       if (u.zaciatok.slice(0, 10) < dnes) continue;
       objednane[u.klient] = (objednane[u.klient] || 0) + 1;
+    }
+    // Kto má hodiny dochodené a v kalendári NIČ, je najurgentnejší telefonát zo
+    // všetkých — a práve on by z kalendárového zoznamu vypadol, lebo nemá čo
+    // odčítať. Preto sa dopĺňa s nulou objednaných.
+    for (const c of Object.values(clients)) {
+      if (objednane[c.name] !== undefined) continue;
+      if (c.status === "Neaktívny" || c.status === "Pauza" || c.lenDoplnky) continue;
+      if (matchTrener && !matchTrener(c.primaryTrainer)) continue;
+      if (c.packageTotal > 0 && c.packageRemaining <= 0) objednane[c.name] = 0;
     }
     return Object.entries(objednane)
       .map(([meno, kusov]) => {
@@ -877,19 +903,19 @@ function Balicky({ udalosti, clients }: { udalosti: KalUdalost[]; clients: Recor
         return { meno, kusov, zostava: c.packageRemaining, spolu: c.packageTotal, po: c.packageRemaining - kusov };
       })
       .filter((x): x is NonNullable<typeof x> => !!x && x.po <= 1)
-      .sort((a, b) => a.po - b.po);
-  }, [udalosti, clients]);
+      .sort((a, b) => a.po - b.po || a.meno.localeCompare(b.meno));
+  }, [udalosti, clients, matchTrener]);
 
   return (
-    <Card>
+    <Card style={style}>
       <H3>
         <Info
-          text="Zostatok v balíčku podľa PTmindera mínus to, čo už je objednané v kalendári. Ukazuje, komu balíček dojde v najbližších dňoch — teda s kým sa oplatí hovoriť o pokračovaní, kým ho ešte vidíš na hodine."
+          text="Zostatok v balíčku podľa PTmindera mínus to, čo už je objednané v Google Kalendári. Odznak je stav PO objednaných hodinách: 1/6 znamená, že po dohodnutých termínoch mu zostane jedna hodina, −2/6 že má dohodnuté dve hodiny navyše oproti zaplateným. Ukazuje, s kým sa oplatí hovoriť o pokračovaní, kým ho ešte vidíš na hodine. Klienti s paušálnym členstvom sa nezobrazujú — tí v exporte stoja navždy na 0/N a žiadny balíček im nedochádza. Mení sa podľa prepínača trénera."
           label={`Balíček dojde po objednaných hodinách (${riadky.length})`}
         />
       </H3>
       {!riadky.length ? (
-        <Empty>Nikomu balíček po objednaných hodinách nedochádza.</Empty>
+        <Empty>Nikomu balíček po objednaných hodinách nedochádza 🌿</Empty>
       ) : (
         riadky.map((r) => (
           <div key={r.meno} style={{ display: "flex", gap: 10, alignItems: "baseline", padding: "8px 0", borderBottom: `1px solid ${mix(C.border, 50)}`, flexWrap: "wrap" }}>
@@ -902,14 +928,26 @@ function Balicky({ udalosti, clients }: { udalosti: KalUdalost[]; clients: Recor
                   „−2" znamená, že už má dohodnuté hodiny, ktoré nemá zaplatené. */}
               {r.po < 0 ? `−${-r.po}` : r.po}{r.spolu ? `/${r.spolu}` : ""}
             </span>
-            <span style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>{r.meno}</span>
+            {onKlient ? (
+              <button
+                onClick={() => onKlient(r.meno)}
+                title={`Otvoriť profil — ${r.meno}`}
+                style={{ background: "none", border: "none", padding: 0, fontSize: 13, color: C.text, fontWeight: 600, cursor: "pointer", textAlign: "left" }}
+              >
+                {r.meno}
+              </button>
+            ) : (
+              <span style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>{r.meno}</span>
+            )}
             <span style={{ fontSize: 11.5, color: C.textDim }}>
-              {r.spolu ? `teraz ${r.zostava} z ${r.spolu}` : "balíček dochodený"} · objednané {r.kusov}
+              {r.spolu ? `teraz ${r.zostava} z ${r.spolu}` : "balíček dochodený"}
+              {r.kusov ? ` · objednané ${r.kusov}` : " · a v kalendári žiadny ďalší termín"}
               {r.po < 0 ? ` · v mínuse o ${-r.po} ${-r.po === 1 ? "hodinu" : -r.po < 5 ? "hodiny" : "hodín"}` : ""}
             </span>
           </div>
         ))
       )}
+      {children}
     </Card>
   );
 }
