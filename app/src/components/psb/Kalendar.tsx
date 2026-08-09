@@ -289,16 +289,18 @@ function Mapovanie({ nezname, mena, clients, onHotovo }: { nezname: Nezname[]; m
   /**
    * Kedy sa dá potvrdiť.
    *
-   * Bežný tréning musí sedieť na klienta v Trackeri — preklep by hodiny pripísal
-   * neexistujúcemu človeku. Úvodný tréning je ale PRÁVE TEN prípad, keď klient
-   * ešte neexistuje: Roman Pavlík príde na úvodný a klientom sa stane až potom,
-   * čo v nedeľu dorazí export z PTmindera. Meno sa preto uloží tak, ako ho Jerry
-   * napísal, a spáruje sa samo, keď sa v Trackeri objaví.
+   * Meno stačí napísať — nemusí byť v Trackeri. Pôvodne to musel byť existujúci
+   * klient a bolo to zle: Roman Pavlík prišiel na úvodný a hneď nato mal bežný
+   * tréning, pričom klientom sa stane až po nedeľnom exporte z PTmindera. Prísna
+   * podmienka tak zablokovala presne toho človeka, kvôli ktorému kalendár čítame
+   * — nového záujemcu.
+   *
+   * Riziko preklepu zostáva, ale je viditeľné: neznáme meno má oranžový rám a
+   * pod ním vetu, že klientom ešte nie je. Tichá blokáda je horšia než varovanie,
+   * ktoré človek vidí.
    */
   const daSa = (v: { klient: string; typ: string }) =>
-    v.typ === "trening" ? mena.includes(v.klient)
-      : v.typ === "uvodny" ? v.klient.trim().length >= 3
-        : true;
+    v.typ === "trening" || v.typ === "uvodny" ? v.klient.trim().length >= 3 : true;
   const jednoznacne = nezname.filter((n) => {
     const k = `${n.nazov}|${n.trener}`;
     return (navrhy[k]?.kandidati.length === 1 && !vyber[k]) || navrhy[k]?.typ === "guillermo";
@@ -366,7 +368,7 @@ function Mapovanie({ nezname, mena, clients, onHotovo }: { nezname: Nezname[]; m
                 <datalist id={`kl-${n.trener}-${n.nazov}`}>
                   {mena.map((m) => <option key={m} value={m} />)}
                 </datalist>
-                {v.typ === "uvodny" && !mena.includes(v.klient) && v.klient.trim().length >= 3 && (
+                {!mena.includes(v.klient) && v.klient.trim().length >= 3 && (
                   <span style={{ fontSize: 11, color: C.textDim, flexBasis: "100%" }}>
                     Zatiaľ nie je klientom — uloží sa tak, ako si ho napísal, a spáruje sa sám,
                     keď sa objaví v PTminderi.
