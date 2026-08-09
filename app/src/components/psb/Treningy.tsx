@@ -69,19 +69,13 @@ function WeekEnergyRow({ weekKeyIso, colSpan, entry, onSave }: {
                   <input type="number" min={0} max={120} value={draft[wkHours(p.key)] ?? ""}
                     onChange={(e) => set(wkHours(p.key), e.target.value)} placeholder="napr. 8" style={{ ...field, width: 78 }} />
                 </label>
-                {/* Per trainer: a cancellation belongs to whoever's client dropped
-                    out, and it is deleted from the calendar, so nothing can
-                    recover it later — it has to be logged when it happens. */}
-                <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 7 }}>
-                  {([["zrusene", "Zrušené", "koľko jeho tréningov klienti tento týždeň zrušili"],
-                     ["presunute", "Presunuté", "koľko sa ich presunulo na iný termín"]] as const).map(([k, lbl, hint]) => (
-                    <label key={k} style={{ fontSize: 11.5, color: C.textMuted, display: "flex", alignItems: "center", gap: 5 }} title={hint}>
-                      {lbl}
-                      <input type="number" min={0} max={99} value={draft[`${p.key}_${k}`] ?? ""}
-                        onChange={(e) => set(`${p.key}_${k}`, e.target.value)} placeholder="0" style={{ ...field, width: 58 }} />
-                    </label>
-                  ))}
-                </div>
+                {/* Kolónky „Zrušené" a „Presunuté" tu boli preto, že zrušený
+                    tréning sa z kalendára zmaže a neskôr sa už nedá obnoviť —
+                    musel sa zapísať, keď sa to stalo. Snímky kalendára (od
+                    8/2026) ten dôvod zrušili: appka si pamätá, ako týždeň
+                    vyzeral ráno a ako večer, takže zrušenie aj presun zachytí
+                    sama a ešte sa aj spýta prečo. Dvakrát to isté ručne
+                    prepisovať nemá zmysel. Staré zápisy zostávajú v štatistike. */}
                 <input value={draft[wkNote(p.key)] ?? ""} onChange={(e) => set(wkNote(p.key), e.target.value)}
                   placeholder="jedna veta…" style={{ ...field, width: "100%" }} />
               </div>
@@ -339,12 +333,12 @@ function Prehlad({ data, focus, trainer, onTrainer }: { data: PSBData; focus?: N
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10 }}>
             <StatCard
               value={String(logged.zrusene)}
-              label={<Info text={`Jerry ${logged.per.jerry.zrusene} · Terezka ${logged.per.terezka.zrusene}`} label="Zrušené tréningy" />}
+              label={<Info text={`Jerry ${logged.per.jerry.zrusene} · Terezka ${logged.per.terezka.zrusene}. Ručný zápis skončil v auguste 2026 — zrušenia odvtedy zachytáva Kalendár zo snímok, aj s dôvodom.`} label="Zrušené tréningy" />}
               color={C.red}
             />
             <StatCard
               value={String(logged.presunute)}
-              label={<Info text={`Jerry ${logged.per.jerry.presunute} · Terezka ${logged.per.terezka.presunute}`} label="Presunuté" />}
+              label={<Info text={`Jerry ${logged.per.jerry.presunute} · Terezka ${logged.per.terezka.presunute}. Ručný zápis skončil v auguste 2026 — presuny odvtedy zachytáva Kalendár zo snímok.`} label="Presunuté" />}
               color={C.orange}
             />
             <StatCard value={String(uvodne)} label="Úvodné tréningy" color={C.accentLight} />
