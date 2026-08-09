@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { ClientAgg } from "../../lib/psb/compute";
 import { C, mix } from "../../lib/psb/theme";
-import { Card, Empty, H3, Info, Select, TrenerPills } from "./ui";
+import { Card, Empty, H3, Info, Modal, Select, TrenerPills } from "./ui";
 
 /**
  * Kalendár — čo sa chystá a čo sa práve zmenilo.
@@ -112,6 +112,7 @@ export function Kalendar({ clients }: { clients: Record<string, ClientAgg> }) {
   const [chyba, setChyba] = useState("");
   const [sprava, setSprava] = useState("");
   const [pracuje, setPracuje] = useState(false);
+  const [upravovana, setUpravovana] = useState<Udalost | null>(null);
 
   const nacitaj = useCallback(async () => {
     const r = await fetch("/api/kalendar", { credentials: "same-origin" });
@@ -148,7 +149,17 @@ export function Kalendar({ clients }: { clients: Record<string, ClientAgg> }) {
           práve to pripojenie. */}
       {!pripojene && <Pripojenie zdroje={stav.zdroje} onZmena={nacitaj} />}
 
-      {pripojene && <Tyzden udalosti={stav.udalosti} />}
+      {pripojene && <Tyzden udalosti={stav.udalosti} onKlik={setUpravovana} />}
+
+      {upravovana && (
+        <UpravaUdalosti
+          udalost={upravovana}
+          mena={menaKlientov}
+          clients={clients}
+          onZavri={() => setUpravovana(null)}
+          onHotovo={async () => { setUpravovana(null); await nacitaj(); }}
+        />
+      )}
       {pripojene && <Zmeny zmeny={stav.zmeny} onHotovo={nacitaj} />}
 
       {stav.nezname.length > 0 && (
@@ -487,7 +498,7 @@ function Zmeny({ zmeny, onHotovo }: { zmeny: Zmena[]; onHotovo: () => Promise<vo
  * večer, nemá pozerať na prázdny pás od polnoci. Späť sa dá ísť len po dnešok —
  * história patrí do PTmindera, tu je reč o tom, čo sa chystá.
  */
-function Tyzden({ udalosti }: { udalosti: Udalost[] }) {
+function Tyzden({ udalosti, onKlik }: { udalosti: Udalost[]; onKlik: (u: Udalost) => void }) {
   const [posun, setPosun] = useState(0);
   // „all" je tá istá hodnota, akú používa zvyšok appky — filter trénera má
   // všade rovnaké mená, inak by sa uložené voľby medzi kartami rozišli.
@@ -615,21 +626,23 @@ function Tyzden({ udalosti }: { udalosti: Udalost[] }) {
                     const vyska = Math.max(18, ((minuty(u.koniec) - minuty(u.zaciatok)) / 60) * VYSKA - 2);
                     const f = farba(u);
                     return (
-                      <div
+                      <button
                         key={`${u.uid}|${u.trener}`}
-                        title={`${cas(u.zaciatok)}–${cas(u.koniec)} · ${u.nazov}${u.klient ? ` → ${u.klient}` : ""} · ${u.trener}`}
+                        onClick={() => onKlik(u)}
+                        title={`${cas(u.zaciatok)}–${cas(u.koniec)} · ${u.nazov}${u.klient ? ` → ${u.klient}` : ""} · ${u.trener} — klikni na úpravu`}
                         style={{
                           position: "absolute", top, left: 2, right: 2, height: vyska,
                           borderRadius: 5, padding: "2px 4px", overflow: "hidden",
                           background: mix(f, 16), borderLeft: `3px solid ${f}`,
-                          fontSize: 10.5, lineHeight: 1.25, color: C.text,
+                          border: "none", borderLeftStyle: "solid", textAlign: "left", cursor: "pointer",
+                          fontSize: 10.5, lineHeight: 1.25, color: C.text, fontFamily: "inherit",
                         }}
                       >
                         <div style={{ fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                           {u.klient || u.nazov}{!u.klient && u.typ !== "sukromne" && u.typ !== "netrening" && <span style={{ color: C.orange }}> ?</span>}
                         </div>
                         {vyska > 30 && <div style={{ color: C.textDim, fontSize: 10 }}>{cas(u.zaciatok)}</div>}
-                      </div>
+                      </button>
                     );
                   })}
                 </div>
@@ -647,5 +660,118 @@ function Tyzden({ udalosti }: { udalosti: Udalost[] }) {
         ))}
       </div>
     </Card>
+  );
+}
+
+/**
+ * Oprava toho, čo appka o udalosti usúdila.
+ *
+ * Mení sa PRAVIDLO, nie jeden výskyt: „Gazo" v Jerryho kalendári znamená vždy
+ * toho istého človeka, takže oprava platí na všetky jeho hodiny — minulé aj
+ * budúce. Opravovať každý týždeň zvlášť by znamenalo tú istú chybu prepisovať
+ * donekonečna.
+ *
+ * Je to napísané aj na obrazovke. Kto opravuje meno, má vedieť, čoho sa to týka
+ * — inak by čakal zmenu jednej dlaždice a prekvapilo by ho, že sa prekreslil
+ * celý mesiac.
+ */
+function UpravaUdalosti({
+  udalost, mena, clients, onZavri, onHotovo,
+}: {
+  udalost: Udalost;
+  mena: string[];
+  clients: Record<string, ClientAgg>;
+  onZavri: () => void;
+  onHotovo: () => Promise<void>;
+}) {
+  const navrh = useMemo(() => navrhni(udalost.nazov, clients), [udalost.nazov, clients]);
+  const [klient, setKlient] = useState(udalost.klient || "");
+  const [typ, setTyp] = useState(udalost.typ || navrh.typ);
+  const [uklada, setUklada] = useState(false);
+
+  const sMenom = typ === "trening" || typ === "uvodny";
+  const daSa = sMenom ? klient.trim().length >= 3 : true;
+
+  const uloz = async () => {
+    if (!daSa) return;
+    setUklada(true);
+    await posli({
+      akcia: "mapuj", nazov: udalost.nazov, trener: udalost.trener,
+      typ, klient: sMenom ? klient.trim() : null,
+    });
+    setUklada(false);
+    await onHotovo();
+  };
+
+  return (
+    <Modal title="Upraviť udalosť" onClose={onZavri}>
+      <div style={{ fontSize: 12.5, color: C.textMuted, lineHeight: 1.6, marginBottom: 12 }}>
+        V kalendári stojí <b style={{ color: C.text }}>„{udalost.nazov}"</b> ·{" "}
+        {den(udalost.zaciatok)} {cas(udalost.zaciatok)}–{cas(udalost.koniec)} · {udalost.trener}
+      </div>
+
+      <label style={{ fontSize: 11.5, color: C.textMuted, display: "block", marginBottom: 5 }}>Čo to je</label>
+      <Select value={typ} onChange={setTyp} options={TYPY} />
+
+      {sMenom && (
+        <>
+          <label style={{ fontSize: 11.5, color: C.textMuted, display: "block", margin: "12px 0 5px" }}>Klient</label>
+          <input
+            list="uprava-klienti"
+            value={klient}
+            onChange={(e) => setKlient(e.target.value)}
+            placeholder="píš meno…"
+            style={{
+              width: "100%", padding: "8px 11px", borderRadius: 8, fontSize: 13,
+              border: `1px solid ${klient && !mena.includes(klient) ? C.orange : C.border}`,
+              background: C.bg, color: C.text,
+            }}
+          />
+          <datalist id="uprava-klienti">
+            {mena.map((m) => <option key={m} value={m} />)}
+          </datalist>
+          {klient.trim().length >= 3 && !mena.includes(klient) && (
+            <div style={{ fontSize: 11, color: C.textDim, marginTop: 6 }}>
+              Zatiaľ nie je klientom — uloží sa tak, ako ho napíšeš, a spáruje sa sám,
+              keď sa objaví v PTminderi.
+            </div>
+          )}
+          {navrh.kandidati.length > 0 && (
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
+              {navrh.kandidati.filter((k) => k !== klient).slice(0, 3).map((k) => (
+                <button key={k} onClick={() => setKlient(k)}
+                  style={{ padding: "4px 10px", borderRadius: 6, fontSize: 11.5, cursor: "pointer", border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted }}>
+                  {k}
+                </button>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      <div style={{ fontSize: 11, color: C.textDim, margin: "14px 0 12px", lineHeight: 1.55 }}>
+        Oprava platí na <b>všetky udalosti s týmto názvom</b> u tohto trénera — minulé aj budúce.
+        Rovnaký názov u druhého trénera zostáva nedotknutý, lebo to nemusí byť ten istý človek.
+      </div>
+
+      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+        <button
+          onClick={() => void uloz()}
+          disabled={uklada || !daSa}
+          style={{
+            padding: "8px 18px", borderRadius: 9, fontSize: 13, fontWeight: 600,
+            cursor: daSa ? "pointer" : "not-allowed",
+            border: `1px solid ${mix(C.green, 50)}`,
+            background: daSa ? mix(C.green, 12) : "transparent",
+            color: daSa ? C.green : C.textDim,
+          }}
+        >
+          {uklada ? "Ukladám…" : "Uložiť"}
+        </button>
+        <button onClick={onZavri} style={{ background: "none", border: "none", color: C.textDim, fontSize: 12.5, cursor: "pointer" }}>
+          Zrušiť
+        </button>
+      </div>
+    </Modal>
   );
 }
