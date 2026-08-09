@@ -791,9 +791,23 @@ function UpravaUdalosti({
 function Kontrola({ udalosti, data }: { udalosti: KalUdalost[]; data: PSBData }) {
   const chybajuce = useMemo(() => {
     const dnes = new Date().toISOString().slice(0, 10);
-    // Kľúč meno|deň. PTminder pozná presné meno klienta, kalendár ho má cez
-    // naučené mapovanie — takže sa porovnáva to isté, nie text z kalendára.
-    const sedenia = new Set(data.sessions.map((x) => `${x.client}|${x.date.slice(0, 10)}`));
+    /**
+     * Porovnanie znáša dve odchýlky, ktoré overenie na skutočných dátach
+     * odhalilo — obe hlásili chýbajúci zápis tam, kde zápis existoval:
+     *
+     * 1. DIAKRITIKA. PTminder má „Zuzana Spoligova", v kalendári stálo
+     *    „Zuzana Spoligová". Pri úvodných sa meno píše voľne (klient ešte
+     *    v Trackeri nie je), takže sa presná zhoda spoľahnúť nedá.
+     * 2. DEŇ VEDĽA. Markéta mala v kalendári 30. 7. a v PTminderi 31. 7. —
+     *    hodina sa presunula a kalendár sa neopravil. Tolerancia ±1 deň to
+     *    zmieri; dvakrát za dva dni ten istý klient netrénuje.
+     *
+     * Radšej zmlčať hraničný prípad než hlásiť poplach, ktorý sa po overení
+     * ukáže ako nič — karta, ktorá kričí zbytočne, sa prestane čítať.
+     */
+    const hola = (x: string) => x.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+    const posun = (d: string, o: number) => new Date(Date.parse(`${d}T00:00:00Z`) + o * 86400000).toISOString().slice(0, 10);
+    const sedenia = new Set(data.sessions.map((x) => `${hola(x.client)}|${x.date.slice(0, 10)}`));
     return udalosti
       .filter((u) => {
         if (u.typ !== "trening" && u.typ !== "uvodny") return false;
@@ -801,7 +815,8 @@ function Kontrola({ udalosti, data }: { udalosti: KalUdalost[]; data: PSBData })
         const d = u.zaciatok.slice(0, 10);
         // Dnešok sa nekontroluje — hodina ešte prebieha a zápis príde neskôr.
         if (d >= dnes) return false;
-        return !sedenia.has(`${u.klient}|${d}`);
+        const k = hola(u.klient);
+        return ![-1, 0, 1].some((o) => sedenia.has(`${k}|${posun(d, o)}`));
       })
       .sort((a, b) => b.zaciatok.localeCompare(a.zaciatok));
   }, [udalosti, data.sessions]);
@@ -852,6 +867,13 @@ function Balicky({ udalosti, clients }: { udalosti: KalUdalost[]; clients: Recor
       .map(([meno, kusov]) => {
         const c = clients[meno];
         if (!c || c.packageTotal == null || c.packageRemaining == null) return null;
+        // Kto má len „doplnenie členstva" alebo „za protokol", nemá balíček —
+        // má paušál a v exporte stojí navždy na 0/N. Tvrdiť mu, že mu dochádzajú
+        // hodiny, je nepravda o produkte, ktorý si kúpil; presne táto zámena
+        // kedysi rozsvietila 40 zo 73 klientov. Rovnako klient bez akéhokoľvek
+        // balíčka v PTminderi (0 z 0) — tam sa nedá povedať nič, tak sa mlčí.
+        if (c.lenDoplnky) return null;
+        if (!c.packageTotal && !c.membership) return null;
         return { meno, kusov, zostava: c.packageRemaining, spolu: c.packageTotal, po: c.packageRemaining - kusov };
       })
       .filter((x): x is NonNullable<typeof x> => !!x && x.po <= 1)
@@ -876,11 +898,11 @@ function Balicky({ udalosti, clients }: { udalosti: KalUdalost[]; clients: Recor
               color: r.po <= 0 ? C.red : C.orange,
               background: mix(r.po <= 0 ? C.red : C.orange, 12),
             }}>
-              {r.po <= 0 ? "0" : r.po}/{r.spolu}
+              {r.po <= 0 ? "0" : r.po}{r.spolu ? `/${r.spolu}` : ""}
             </span>
             <span style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>{r.meno}</span>
             <span style={{ fontSize: 11.5, color: C.textDim }}>
-              teraz {r.zostava} z {r.spolu} · objednané {r.kusov}
+              {r.spolu ? `teraz ${r.zostava} z ${r.spolu}` : "balíček dochodený"} · objednané {r.kusov}
               {r.po < 0 ? ` · o ${-r.po} viac, než má` : ""}
             </span>
           </div>
