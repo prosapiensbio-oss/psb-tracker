@@ -395,7 +395,14 @@ export function PSBApp() {
         // „FP spain" nie je bežná výplata — v Exceli má vlastný riadok.
         if (/fp\s*spain/i.test(v.poznamka)) e.jerryFp += czk;
         else if (v.kto === "terezka") e.terezka += czk;
-        else e.jerry += czk;
+        else if (v.kto === "jerry") e.jerry += czk;
+        // Poznámka bez mena („Vyplata") sa delí na polovicu — ROVNAKO ako
+        // neurčená výplata z banky o pár riadkov nižšie. Predtým padla celá
+        // Jerrymu, takže tá istá neurčitosť sa v dvoch zdrojoch čítala
+        // dvoma spôsobmi a dlhy sa líšili podľa toho, ktorou cestou peniaz
+        // odišiel. V knihe je zatiaľ jediná taká (jún 2026, 997 Kč — mesiac
+        // z Excelu, ten sa importom neprepisuje), takže sa tým nič nehýbe.
+        else { e.jerry += czk / 2; e.terezka += czk / 2; }
       }
       if (nastavBtcVyplaty(podlaMesiaca)) setFioTik((x) => x + 1);
     }).catch(() => {});
@@ -595,6 +602,22 @@ function skupinaFaktur(
           e.celkom += p.cena;
           e.polozky.push(p);
           doklady.set(p.faktura, e);
+        }
+        // Položka bez kategórie dedí prevažujúcu kategóriu svojho dokladu.
+        //
+        // Alza píše zľavy a dopravu ako samostatné riadky („Sleva 15 % k
+        // položce…", −104,85 Kč) a tie pri kategorizácii ľahko zostanú prázdne.
+        // Zahodiť ich znamená zapísať tovar za cenu PRED zľavou: augustové
+        // faktúry tak boli v P&L o 145 Kč drahšie, než koľko z peňaženky
+        // naozaj odišlo. Zľava patrí k tovaru, ktorý zlacnela — teda do jeho
+        // kategórie. Doklad, ktorý nemá kategorizované vôbec nič, sa nemení:
+        // tam nie je od čoho dediť a mlčať je čestnejšie než hádať.
+        for (const d of doklady.values()) {
+          const vahy: Record<string, number> = {};
+          for (const p of d.polozky) if (p.kategoria && p.kategoria !== "mimo") vahy[p.kategoria] = (vahy[p.kategoria] || 0) + Math.abs(p.cena);
+          const hlavna = Object.entries(vahy).sort((a, b) => b[1] - a[1])[0]?.[0];
+          if (!hlavna) continue;
+          for (const p of d.polozky) if (!p.kategoria) p.kategoria = hlavna;
         }
         const pouzite = new Set<string>();
 

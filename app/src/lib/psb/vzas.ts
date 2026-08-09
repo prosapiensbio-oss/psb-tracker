@@ -962,6 +962,15 @@ export function salaryCalc(key: PersonKey): SalaryCalc {
   const cumDebt: Vals = [];
 
   const posledny = poslednyMesiacSDatami();
+  // Bežiaci kalendárny mesiac dlh NEHÝBE — z rovnakého dôvodu ako mesiac
+  // prázdny, len z opačnej strany. Deviaty deň augusta má Jerry 27 hodín,
+  // takže vzorec dáva nárok 27 000 + (27 − 60) × 850 = −1 050: variabil je
+  // nedočerpaný, výplaty ešte neodišli, a rozdiel z takého torza posúval
+  // Terezkin zobrazený dlh o ~12 000 Kč oproti stavu ku koncu júla. Nárok
+  // z polovice mesiaca nie je nižší nárok — je to polovica čísla. Kumulovaný
+  // dlh preto vždy znamená „stav ku koncu posledného UZAVRETÉHO mesiaca";
+  // bežiaci mesiac sa doň započíta prvý deň toho nasledujúceho.
+  const bezici = VZAS_MONTHS.indexOf(`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}`);
   for (let i = 0; i < N; i++) {
     const era = eraAt(i);
     const modelled = era.kind === "fixvar";
@@ -972,7 +981,7 @@ export function salaryCalc(key: PersonKey): SalaryCalc {
     // Mesiac, ktorý ešte nenastal (alebo doňho nič nepribudlo), dlh nehýbe.
     // Inak by nárok bez odrobených hodín a bez výplaty pripísal firme dlh
     // za mesiac, ktorý sa nestal.
-    const prazdny = i > posledny;
+    const prazdny = i > posledny || (bezici >= 0 && i >= bezici);
     rozdiel.push(prazdny ? 0 : modelled ? narok[i] - poslane[i] : rec.splatka[i] - rec.pozicka[i]);
     cumDebt.push((i === 0 ? DEBT_START : cumDebt[i - 1]) + rozdiel[i]);
   }

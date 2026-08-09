@@ -472,9 +472,18 @@ export function Dashboard({
     for (const m of monthlyFinance(data)) cash[m.month] = m.cash;
     nastavPrijmyZTrackera(cash);
     const p = pnlCalc();
-    // Posledný mesiac, o ktorom appka niečo vie — nie posledný v zozname.
-    // Mesiace rastú dopredu, takže ten posledný býva prázdny.
-    const i = poslednyMesiacSDatami();
+    // Posledný UZAVRETÝ mesiac, o ktorom appka niečo vie — nie posledný
+    // s dátami. Deviateho augusta mal august tržby 36 965 (PTminder chodí
+    // priebežne) a náklady 2 810 (dve BTC faktúry), takže „mesiac s dátami"
+    // bol august a dlaždica hlásila zisk 34 155 — tržbu bežiaceho mesiaca
+    // prezlečenú za zisk, presne to, čo tento komentár od začiatku zakazuje.
+    // Rovnaká rodina chýb ako kotva dát: mesiac s dátami ešte nie je mesiac
+    // hotový. Bežiaci mesiac sa preskočí; keby náhodou VŠETKY dáta ležali
+    // v ňom (čerstvá inštalácia), vezme sa posledný s dátami ako núdza.
+    let i = poslednyMesiacSDatami();
+    const beziaciMk = new Date().toISOString().slice(0, 7);
+    while (i > 0 && (VZAS_MONTHS[i] as string) >= beziaciMk) i--;
+    if ((VZAS_MONTHS[i] as string) >= beziaciMk) i = poslednyMesiacSDatami();
     const j = salaryCalc("jerry");
     const t = salaryCalc("terezka");
     // Break-even ráta s NÁROKOM trénerov, nie s tým, čo si reálne vzali — čo si
