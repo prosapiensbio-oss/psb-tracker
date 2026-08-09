@@ -3,6 +3,7 @@ import { Fragment, useContext, useEffect, useMemo, useState, type ReactNode } fr
 import { PlatobneKanaly } from "./PlatobneKanaly";
 import { fetchBtcReserve, fetchMonthNotes, fetchVzasSettings, fetchWeekEntries, saveMonthNote, saveVzasSetting, type BtcReserve, type MonthNote, type WeekEntry } from "../../lib/psb/client";
 import { FinancieObsah } from "./Financie";
+import { GuillermoKarta } from "./Kalendar";
 import { monthlyFinance, predictCash, ZONE_HI, type CapacityRow, type ClientAgg, type RegisterItem, type SixMRow } from "../../lib/psb/compute";
 import { fmtCZK, fmtDMY, monthLabel } from "../../lib/psb/format";
 import { ObdobieCtx } from "../../lib/psb/obdobie";
@@ -1422,6 +1423,10 @@ function SalaryTab() {
 
   return (
     <>
+      {/* Guillermo stojí pred výplatami zámerne: sú to Jerryho osobné peniaze
+          v tom istom zmysle ako výplata, len idú Josému a nie na jeho účet.
+          V Kalendári by to bola evidencia sedení; tu je to riadok jeho čerpania. */}
+      <GuillermoKarta />
       <Card>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <div onClick={() => setChartOpen(!chartOpen)} style={{ fontSize: 15, fontWeight: 700, color: C.text, cursor: "pointer" }}>

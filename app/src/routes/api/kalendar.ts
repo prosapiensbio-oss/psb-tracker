@@ -239,12 +239,16 @@ export const Route = createFileRoute("/api/kalendar")({
         if (akcia === "guillermo-pridaj") {
           const datum = String(b.datum || "").slice(0, 10);
           const sedeni = Number(b.sedeni || 0);
-          if (!/^\d{4}-\d{2}-\d{2}$/.test(datum) || !(sedeni > 0)) {
+          // „zostatok" je kotva: stav účtu k danému dňu, od ktorého sa ďalej
+          // počíta. Bez nej sa zostatok nedá zistiť — kalendár siaha dva týždne
+          // dozadu a februárové sedenia v ňom nikdy nebudú.
+          const druh = b.druh === "zostatok" ? "zostatok" : "nakup";
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(datum) || !Number.isFinite(sedeni) || (druh === "nakup" && sedeni <= 0)) {
             return Response.json({ ok: false, error: "Chýba dátum alebo počet sedení." });
           }
           await DB.prepare(
-            "INSERT INTO guillermo_hodiny (id, datum, druh, hodiny, ucastnik, suma_czk, zdroj, poznamka, created_at) VALUES (?,?,'nakup',?,'Jerry',?,'rucne',?,?)",
-          ).bind(uid(), datum, sedeni, b.suma ? Number(b.suma) : null, b.poznamka ? String(b.poznamka) : null, teraz()).run();
+            "INSERT INTO guillermo_hodiny (id, datum, druh, hodiny, ucastnik, suma_czk, zdroj, poznamka, created_at) VALUES (?,?,?,?,'Jerry',?,'rucne',?,?)",
+          ).bind(uid(), datum, druh, sedeni, b.suma ? Number(b.suma) : null, b.poznamka ? String(b.poznamka) : null, teraz()).run();
           return Response.json({ ok: true });
         }
 
