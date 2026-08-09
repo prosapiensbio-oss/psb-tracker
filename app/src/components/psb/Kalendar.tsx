@@ -19,9 +19,9 @@ import { Card, Empty, H3, Info, Modal, Select, TrenerPills } from "./ui";
 type Zdroj = { id: string; trener: string; aktivny: number; posledne_ok: string | null; posledna_chyba: string | null };
 type Zmena = { id: string; kedy: string; trener: string; uid: string; druh: string; nazov: string | null; klient: string | null; pred: string | null; po: string | null };
 type Mapa = { nazov: string; trener: string; klient: string | null; typ: string };
-type Udalost = { uid: string; trener: string; zaciatok: string; koniec: string; nazov: string; klient: string | null; typ: string | null };
+export type KalUdalost = { uid: string; trener: string; zaciatok: string; koniec: string; nazov: string; klient: string | null; typ: string | null };
 type Nezname = { nazov: string; trener: string; pocet: number; najblizsi: string };
-type Stav = { zdroje: Zdroj[]; zmeny: Zmena[]; mapovanie: Mapa[]; udalosti: Udalost[]; nezname: Nezname[] };
+type Stav = { zdroje: Zdroj[]; zmeny: Zmena[]; mapovanie: Mapa[]; udalosti: KalUdalost[]; nezname: Nezname[] };
 
 const TYPY = [
   { value: "trening", label: "Tréning klienta" },
@@ -112,7 +112,7 @@ export function Kalendar({ clients }: { clients: Record<string, ClientAgg> }) {
   const [chyba, setChyba] = useState("");
   const [sprava, setSprava] = useState("");
   const [pracuje, setPracuje] = useState(false);
-  const [upravovana, setUpravovana] = useState<Udalost | null>(null);
+  const [upravovana, setUpravovana] = useState<KalUdalost | null>(null);
 
   const nacitaj = useCallback(async () => {
     const r = await fetch("/api/kalendar", { credentials: "same-origin" });
@@ -498,7 +498,7 @@ function Zmeny({ zmeny, onHotovo }: { zmeny: Zmena[]; onHotovo: () => Promise<vo
  * večer, nemá pozerať na prázdny pás od polnoci. Späť sa dá ísť len po dnešok —
  * história patrí do PTmindera, tu je reč o tom, čo sa chystá.
  */
-function Tyzden({ udalosti, onKlik }: { udalosti: Udalost[]; onKlik: (u: Udalost) => void }) {
+function Tyzden({ udalosti, onKlik }: { udalosti: KalUdalost[]; onKlik: (u: KalUdalost) => void }) {
   const [posun, setPosun] = useState(0);
   // „all" je tá istá hodnota, akú používa zvyšok appky — filter trénera má
   // všade rovnaké mená, inak by sa uložené voľby medzi kartami rozišli.
@@ -541,7 +541,7 @@ function Tyzden({ udalosti, onKlik }: { udalosti: Udalost[]; onKlik: (u: Udalost
   const hodinSpolu = trening.reduce((a, u) => a + (minuty(u.koniec) - minuty(u.zaciatok)) / 60, 0);
 
   // Farba nesie typ, nie meno — rovnako, ako si Jerry farbí Google Kalendár.
-  const farba = (u: Udalost) =>
+  const farba = (u: KalUdalost) =>
     u.typ === "uvodny" ? C.blue
       : u.typ === "guillermo" ? C.green
         : u.typ === "sukromne" || u.typ === "netrening" ? C.textDim
@@ -678,7 +678,7 @@ function Tyzden({ udalosti, onKlik }: { udalosti: Udalost[]; onKlik: (u: Udalost
 function UpravaUdalosti({
   udalost, mena, clients, onZavri, onHotovo,
 }: {
-  udalost: Udalost;
+  udalost: KalUdalost;
   mena: string[];
   clients: Record<string, ClientAgg>;
   onZavri: () => void;

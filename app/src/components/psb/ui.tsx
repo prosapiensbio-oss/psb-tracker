@@ -477,7 +477,9 @@ export function ZoneBars({
   stacked = false,
   alignEnd = false,
 }: {
-  data: { label: string; values: number[] }[];
+  /** `forecast` = odhad, nie odtrénované — kreslí sa priehľadne a prerušovane,
+   *  aby sa nedal prečítať ako fakt. */
+  data: { label: string; values: number[]; forecast?: boolean }[];
   series: { name: string; color: string }[];
   zone?: { lo: number; hi: number; unit?: string };
   height?: number;
@@ -520,13 +522,14 @@ export function ZoneBars({
                       width: stacked ? 20 : 9,
                       height: `${(v / max) * plotH}px`,
                       minHeight: v > 0 ? 2 : 0,
-                      background: series[j]?.color,
+                      background: d.forecast ? mix(series[j]?.color ?? C.accent, 30) : series[j]?.color,
+                      border: d.forecast ? `1px dashed ${mix(series[j]?.color ?? C.accent, 70)}` : undefined,
                       borderRadius: stacked ? 0 : "3px 3px 0 0",
                     }}
                   />
                 ))}
               </div>
-              <div style={{ fontSize: 10, color: C.textDim, marginTop: 4, whiteSpace: "nowrap" }}>{d.label}</div>
+              <div style={{ fontSize: 10, color: d.forecast ? C.blue : C.textDim, marginTop: 4, whiteSpace: "nowrap" }}>{d.label}</div>
             </div>
           ))}
         </div>
@@ -613,7 +616,9 @@ export function LineChart({
   onPoint,
   autoY = false,
 }: {
-  data: { label: string; values: number[] }[];
+  /** `forecast` = odhad, nie odtrénované — kreslí sa priehľadne a prerušovane,
+   *  aby sa nedal prečítať ako fakt. */
+  data: { label: string; values: number[]; forecast?: boolean }[];
   series: { name: string; color: string }[];
   zone?: { lo: number; hi: number; unit?: string };
   refLine?: { value: number; label?: string; color?: string };

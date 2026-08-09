@@ -18,6 +18,7 @@ import {
 } from "../../lib/psb/compute";
 import { fmtCZK, fmtDMY, monthLabel, weekKey, weekLabel } from "../../lib/psb/format";
 import { C, mix, S, badge, btn } from "../../lib/psb/theme";
+import type { KalUdalost } from "./Kalendar";
 import { nastavPrijmyZTrackera, pnlCalc, poslednyMesiacSDatami, salaryCalc, vzasVerzia, VZAS_MONTHS } from "../../lib/psb/vzas";
 import { fetchBtcReserve, fetchVzasSettings } from "../../lib/psb/client";
 import { PrehladPanel, useZmenyOdMinule, type Pristroj, type Zmena } from "./Prehlad";
@@ -360,6 +361,7 @@ export function Dashboard({
   onClientClick,
   trainer,
   onTrainer,
+  kalendar,
 }: {
   data: PSBData;
   clients: Record<string, ClientAgg>;
@@ -372,6 +374,8 @@ export function Dashboard({
   onClientClick: (name: string) => void;
   trainer: string;
   onTrainer: (t: string) => void;
+  /** Udalosti z Google Kalendára — predbežná vrstva, nikdy nie zápis. */
+  kalendar: KalUdalost[];
 }) {
   const [showAcked, setShowAcked] = useState(false);
   const [registerExpanded, setRegisterExpanded] = useState(false);
@@ -832,16 +836,56 @@ export function Dashboard({
           ...(maIneho ? [{ name: "Matyáš", color: C.textDim }] : []),
         ]
       : [{ name: trainer, color: C.accent }];
-    return {
-      series,
-      data: oknoTyzdnov.map(([k, v]) => ({
-        label: weekLabel(k),
-        values: trainer === "all"
-          ? (maIneho ? [v.Jerry, v.Terezka, v.iny] : [v.Jerry, v.Terezka])
-          : [trainer === "Jerry" ? v.Jerry : v.Terezka],
-      })),
-    };
-  }, [oknoTyzdnov, trainer]);
+    const skutocne = oknoTyzdnov.map(([k, v]) => ({
+      label: weekLabel(k),
+      values: trainer === "all"
+        ? (maIneho ? [v.Jerry, v.Terezka, v.iny] : [v.Jerry, v.Terezka])
+        : [trainer === "Jerry" ? v.Jerry : v.Terezka],
+    }));
+
+    /**
+     * Jeden stĺpec navyše: kam smeruje TENTO týždeň.
+     *
+     * Posledný skutočný stĺpec je rozrobený — ukazuje len to, čo sa do dnešného
+     * dňa stihlo odtrénovať, takže v pondelok vyzerá týždeň ako katastrofa.
+     * Kalendár pozná celý týždeň vrátane zvyšku, a to je to jediné číslo, ktoré
+     * v stredu naozaj niečo hovorí.
+     *
+     * Je to ODHAD, preto ⌁ a nie ďalší rovnocenný stĺpec: do priemeru, maxima
+     * ani minima nevstupuje — tie počítajú s odtrénovaným, nie s objednaným.
+     */
+    const p2 = (n: number) => String(n).padStart(2, "0");
+    const dnesD = new Date();
+    dnesD.setHours(0, 0, 0, 0);
+    dnesD.setDate(dnesD.getDate() - ((dnesD.getDay() + 6) % 7)); // pondelok
+    const pondelokIso = `${dnesD.getFullYear()}-${p2(dnesD.getMonth() + 1)}-${p2(dnesD.getDate())}`;
+    const koniecIso = new Date(dnesD.getTime() + 6 * 86400000).toISOString().slice(0, 10);
+
+    const tyz = { Jerry: 0, Terezka: 0, iny: 0 };
+    let maKalendar = false;
+    for (const u of kalendar) {
+      if (u.typ === "sukromne" || u.typ === "netrening" || u.typ === "guillermo") continue;
+      const d = u.zaciatok.slice(0, 10);
+      if (d < pondelokIso || d > koniecIso) continue;
+      maKalendar = true;
+      const h = (Date.parse(`${u.koniec}:00Z`) - Date.parse(`${u.zaciatok}:00Z`)) / 3600000;
+      if (u.trener === "Jerry") tyz.Jerry += h;
+      else if (u.trener === "Terezka") tyz.Terezka += h;
+      else tyz.iny += h;
+    }
+
+    const odhad = maKalendar
+      ? [{
+          label: `${weekLabel(pondelokIso)} ⌁`,
+          forecast: true,
+          values: trainer === "all"
+            ? (maIneho ? [tyz.Jerry, tyz.Terezka, tyz.iny] : [tyz.Jerry, tyz.Terezka])
+            : [trainer === "Jerry" ? tyz.Jerry : tyz.Terezka],
+        }]
+      : [];
+
+    return { series, data: [...skutocne, ...odhad], odhadov: odhad.length };
+  }, [oknoTyzdnov, trainer, kalendar]);
 
   // Ø / max / min weekly hours (basis follows the trainer pill: "all" = PSB total per week).
   const weekStats = useMemo(() => {
@@ -1094,6 +1138,12 @@ export function Dashboard({
           </div>
         ) : (
           <Empty>Nahraj Payroll by Session.</Empty>
+        )}
+        {weeklyHours.odhadov > 0 && (
+          <div style={{ fontSize: 11, color: C.blue, marginTop: 6, lineHeight: 1.5 }}>
+            Posledný stĺpec (⌁) je tento týždeň podľa Google Kalendára — čo je objednané, nie čo sa
+            odtrénovalo. Do priemeru, maxima ani minima sa nepočíta.
+          </div>
         )}
         {poslednyTyzdenNeuplny && weeklyHours.data.length > 0 && (
           <div style={{ fontSize: 11, color: C.orange, marginTop: 6, lineHeight: 1.5 }}>

@@ -40,7 +40,7 @@ import { Treningy } from "./Treningy";
 import { Klienti } from "./Klienti";
 import { Marketing } from "./Marketing";
 import { Vysledky, Vzas } from "./Vzas";
-import { Kalendar } from "./Kalendar";
+import { Kalendar, type KalUdalost } from "./Kalendar";
 import { Udaje } from "./Udaje";
 import { HladanieKlienta } from "./Hladanie";
 import { ZapisButton } from "./Zapis";
@@ -466,6 +466,24 @@ export function PSBApp() {
       return next;
     });
   }, []);
+  /**
+   * Udalosti z Google Kalendára — predbežná vrstva pre grafy.
+   *
+   * Načítava sa TU, nie v karte Kalendár: predikcie ich potrebujú aj vtedy, keď
+   * na tú kartu nikto nešiel. Je to tá istá lekcia ako pri tržbách — čo sa
+   * spúšťa len ako vedľajší účinok návštevy obrazovky, chýba presne vtedy, keď
+   * tú obrazovku nikto neotvorí.
+   */
+  const [kalUdalosti, setKalUdalosti] = useState<KalUdalost[]>([]);
+  useEffect(() => {
+    void fetch("/api/kalendar", { credentials: "same-origin" })
+      .then((r) => r.json())
+      .then((j: { ok?: boolean; udalosti?: KalUdalost[] }) => {
+        if (j.ok && Array.isArray(j.udalosti)) setKalUdalosti(j.udalosti);
+      })
+      .catch(() => {});
+  }, []);
+
   const [bankaPrijmy, setBankaPrijmy] = useState<Record<string, number>>({});
   const [btcPrijmy, setBtcPrijmy] = useState<Record<string, number>>({});
   const [btcSatsKlienti, setBtcSatsKlienti] = useState<Record<string, number>>({});
@@ -1349,7 +1367,7 @@ function skupinaFaktur(
       </nav>
       <div style={{ padding: 16, maxWidth: 1200, margin: "0 auto" }}>
         {active === "dashboard" && (
-          <Dashboard trainer={trainer} onTrainer={setTrainer} data={data} clients={clients} register={registerAll} sixM={sixM} capacity={capacity} actions={actions} onNavigate={navigate} assistantChat={chat} onClientClick={onClientClick} />
+          <Dashboard trainer={trainer} onTrainer={setTrainer} data={data} clients={clients} kalendar={kalUdalosti} register={registerAll} sixM={sixM} capacity={capacity} actions={actions} onNavigate={navigate} assistantChat={chat} onClientClick={onClientClick} />
         )}
 
         {active === "tracker" && (
