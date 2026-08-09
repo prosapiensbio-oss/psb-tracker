@@ -151,11 +151,12 @@ export const Route = createFileRoute("/api/kalendar")({
         if (!(await isAuthed(request))) return unauthorized();
         const { od, do_ } = okno();
 
-        const [zdroje, zmeny, mapovanie, udalosti] = await Promise.all([
+        const [zdroje, zmeny, mapovanie, udalosti, guillermo] = await Promise.all([
           DB.prepare("SELECT id, trener, aktivny, posledne_ok, posledna_chyba FROM kal_zdroje ORDER BY trener").all(),
           DB.prepare("SELECT id, kedy, trener, uid, druh, nazov, klient, pred, po, vysvetlene, poznamka FROM kal_zmeny WHERE vysvetlene = 0 ORDER BY kedy DESC LIMIT 60").all(),
           DB.prepare("SELECT nazov, trener, klient, typ FROM kal_mapovanie ORDER BY trener, nazov").all(),
           DB.prepare("SELECT uid, trener, zaciatok, koniec, nazov, klient, typ FROM kal_udalosti WHERE zmizla_at IS NULL AND zaciatok >= ? AND zaciatok <= ? ORDER BY zaciatok").bind(od, do_).all(),
+          DB.prepare("SELECT id, datum, druh, hodiny, suma_czk, poznamka FROM guillermo_hodiny ORDER BY datum DESC").all(),
         ]);
 
         // Názvy, ktoré appka ešte nepozná — to je práca, ktorú treba odklikať.
@@ -175,6 +176,7 @@ export const Route = createFileRoute("/api/kalendar")({
           zmeny: zmeny.results || [],
           mapovanie: mapovanie.results || [],
           udalosti: udalosti.results || [],
+          guillermo: guillermo.results || [],
           nezname: Object.values(nezname).sort((a, b) => b.pocet - a.pocet),
         });
       },
@@ -229,6 +231,25 @@ export const Route = createFileRoute("/api/kalendar")({
           // prejavilo až pri ďalšom stiahnutí a človek by mal pocit, že sa nič nestalo.
           await DB.prepare("UPDATE kal_udalosti SET klient = ?, typ = ? WHERE nazov = ? AND trener = ?")
             .bind(klient, typ, nazov, trener).run();
+          return Response.json({ ok: true });
+        }
+
+        // Guillermo: nákup sedení. Čerpanie sa neeviduje ručne — to hovorí
+        // kalendár, a dva zdroje o tej istej veci by sa raz rozišli.
+        if (akcia === "guillermo-pridaj") {
+          const datum = String(b.datum || "").slice(0, 10);
+          const sedeni = Number(b.sedeni || 0);
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(datum) || !(sedeni > 0)) {
+            return Response.json({ ok: false, error: "Chýba dátum alebo počet sedení." });
+          }
+          await DB.prepare(
+            "INSERT INTO guillermo_hodiny (id, datum, druh, hodiny, ucastnik, suma_czk, zdroj, poznamka, created_at) VALUES (?,?,'nakup',?,'Jerry',?,'rucne',?,?)",
+          ).bind(uid(), datum, sedeni, b.suma ? Number(b.suma) : null, b.poznamka ? String(b.poznamka) : null, teraz()).run();
+          return Response.json({ ok: true });
+        }
+
+        if (akcia === "guillermo-zmaz") {
+          await DB.prepare("DELETE FROM guillermo_hodiny WHERE id = ?").bind(String(b.id || "")).run();
           return Response.json({ ok: true });
         }
 

@@ -22,7 +22,8 @@ type Zmena = { id: string; kedy: string; trener: string; uid: string; druh: stri
 type Mapa = { nazov: string; trener: string; klient: string | null; typ: string };
 export type KalUdalost = { uid: string; trener: string; zaciatok: string; koniec: string; nazov: string; klient: string | null; typ: string | null };
 type Nezname = { nazov: string; trener: string; pocet: number; najblizsi: string };
-type Stav = { zdroje: Zdroj[]; zmeny: Zmena[]; mapovanie: Mapa[]; udalosti: KalUdalost[]; nezname: Nezname[] };
+type Guillermo = { id: string; datum: string; druh: string; hodiny: number; suma_czk: number | null; poznamka: string | null };
+type Stav = { zdroje: Zdroj[]; zmeny: Zmena[]; mapovanie: Mapa[]; udalosti: KalUdalost[]; nezname: Nezname[]; guillermo: Guillermo[] };
 
 const TYPY = [
   { value: "trening", label: "Tréning klienta" },
@@ -118,7 +119,7 @@ export function Kalendar({ clients, data }: { clients: Record<string, ClientAgg>
   const nacitaj = useCallback(async () => {
     const r = await fetch("/api/kalendar", { credentials: "same-origin" });
     const j = (await r.json()) as { ok: boolean } & Stav;
-    if (j.ok) setStav({ zdroje: j.zdroje, zmeny: j.zmeny, mapovanie: j.mapovanie, udalosti: j.udalosti, nezname: j.nezname });
+    if (j.ok) setStav({ zdroje: j.zdroje, zmeny: j.zmeny, mapovanie: j.mapovanie, udalosti: j.udalosti, nezname: j.nezname, guillermo: j.guillermo || [] });
   }, []);
 
   useEffect(() => { void nacitaj(); }, [nacitaj]);
@@ -165,6 +166,7 @@ export function Kalendar({ clients, data }: { clients: Record<string, ClientAgg>
       {pripojene && <Kontrola udalosti={stav.udalosti} data={data} />}
       {pripojene && <Balicky udalosti={stav.udalosti} clients={clients} />}
       {pripojene && <Navrat udalosti={stav.udalosti} clients={clients} />}
+      {pripojene && <GuillermoKarta udalosti={stav.udalosti} zaznamy={stav.guillermo} onHotovo={nacitaj} />}
 
       {stav.nezname.length > 0 && (
         <Mapovanie nezname={stav.nezname} mena={menaKlientov} clients={clients} onHotovo={nacitaj} />
@@ -933,6 +935,118 @@ function Navrat({ udalosti, clients }: { udalosti: KalUdalost[]; clients: Record
             </span>
           </div>
         ))
+      )}
+    </Card>
+  );
+}
+
+/**
+ * Účet u Guillerma.
+ *
+ * Nie je to „predplatené hodiny", ale účet, ktorý sa hýbe oboma smermi: Jerry
+ * platí dopredu v dávkach (3 sedenia vo februári, 6 v apríli, 8 v júli) a medzi
+ * platbami sa dostáva do mínusu — v júli bol päť sedení pozadu. Zostatok teda
+ * musí vedieť byť záporný, inak by karta klamala presne vtedy, keď je najviac
+ * potrebná.
+ *
+ * Čerpanie sa nezadáva ručne — hovorí ho kalendár. Dva zdroje o tej istej veci
+ * by sa raz rozišli a nikto by nevedel, ktorý platí.
+ */
+function GuillermoKarta({
+  udalosti, zaznamy, onHotovo,
+}: {
+  udalosti: KalUdalost[];
+  zaznamy: Guillermo[];
+  onHotovo: () => Promise<void>;
+}) {
+  const [otvorene, setOtvorene] = useState(false);
+  const [datum, setDatum] = useState(new Date().toISOString().slice(0, 10));
+  const [sedeni, setSedeni] = useState("");
+  const [suma, setSuma] = useState("");
+  const [uklada, setUklada] = useState(false);
+
+  const kupene = zaznamy.filter((z) => z.druh === "nakup").reduce((a, z) => a + z.hodiny, 0);
+  // Kalendár siaha len dva týždne dozadu, takže staršie sedenia v ňom nie sú.
+  // Preto sa čerpá len to, čo appka naozaj videla — a je to napísané.
+  const odtrenovane = udalosti.filter((u) => u.typ === "guillermo" && u.zaciatok.slice(0, 10) <= new Date().toISOString().slice(0, 10)).length;
+  const zostatok = kupene - odtrenovane;
+  const zaplatene = zaznamy.filter((z) => z.druh === "nakup" && z.suma_czk).reduce((a, z) => a + (z.suma_czk || 0), 0);
+  const zaSedenie = kupene > 0 && zaplatene > 0 ? Math.round(zaplatene / kupene) : null;
+
+  const uloz = async () => {
+    const n = Number(sedeni);
+    if (!(n > 0)) return;
+    setUklada(true);
+    await posli({ akcia: "guillermo-pridaj", datum, sedeni: n, suma: suma ? Number(suma) : null });
+    setUklada(false);
+    setSedeni(""); setSuma("");
+    await onHotovo();
+  };
+
+  return (
+    <Card>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <H3>
+          <Info
+            text="Účet u Guillerma. Platíš dopredu v dávkach a medzi platbami sa dostávaš do mínusu — zostatok preto môže byť aj záporný. Čerpanie hovorí kalendár: každá udalosť označená ako Guillermo je jedno sedenie. Nákupy zadávaš ty, lebo o nich vie len správa v Messengeri."
+            label="Guillermo"
+          />
+        </H3>
+        <button onClick={() => setOtvorene(!otvorene)} style={{ background: "none", border: "none", color: C.textDim, fontSize: 12.5, cursor: "pointer" }}>
+          {otvorene ? "skryť" : "pridať platbu"}
+        </button>
+      </div>
+
+      <div style={{ display: "flex", gap: 18, flexWrap: "wrap", margin: "10px 0 4px", alignItems: "baseline" }}>
+        <div>
+          <div style={{ fontSize: 24, fontWeight: 700, color: zostatok < 0 ? C.red : zostatok === 0 ? C.orange : C.green }}>
+            {zostatok > 0 ? "+" : ""}{zostatok}
+          </div>
+          <div style={{ fontSize: 11.5, color: C.textDim }}>
+            {zostatok < 0 ? `${-zostatok} sedení dlžíš` : zostatok === 0 ? "vyrovnané" : "sedení dopredu"}
+          </div>
+        </div>
+        <div style={{ fontSize: 12, color: C.textMuted, lineHeight: 1.7 }}>
+          zaplatené {kupene} sedení{zaplatene ? ` · ${Math.round(zaplatene).toLocaleString("cs-CZ")} Kč` : ""}
+          {zaSedenie ? ` · ${zaSedenie.toLocaleString("cs-CZ")} Kč za sedenie` : ""}
+          <br />
+          odtrénované {odtrenovane} <span style={{ color: C.textDim }}>(len to, čo appka videla v kalendári)</span>
+        </div>
+      </div>
+
+      {otvorene && (
+        <div style={{ marginTop: 12, paddingTop: 12, borderTop: `1px solid ${C.border}`, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <input type="date" value={datum} onChange={(e) => setDatum(e.target.value)}
+            style={{ padding: "7px 10px", borderRadius: 8, fontSize: 12.5, border: `1px solid ${C.border}`, background: C.bg, color: C.text }} />
+          <input value={sedeni} onChange={(e) => setSedeni(e.target.value)} placeholder="koľko sedení"
+            style={{ width: 110, padding: "7px 10px", borderRadius: 8, fontSize: 12.5, border: `1px solid ${C.border}`, background: C.bg, color: C.text }} />
+          <input value={suma} onChange={(e) => setSuma(e.target.value)} placeholder="suma v Kč"
+            style={{ width: 110, padding: "7px 10px", borderRadius: 8, fontSize: 12.5, border: `1px solid ${C.border}`, background: C.bg, color: C.text }} />
+          <button onClick={() => void uloz()} disabled={uklada || !(Number(sedeni) > 0)}
+            style={{ padding: "7px 15px", borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: Number(sedeni) > 0 ? "pointer" : "not-allowed",
+              border: `1px solid ${mix(C.green, 45)}`, background: Number(sedeni) > 0 ? mix(C.green, 12) : "transparent", color: Number(sedeni) > 0 ? C.green : C.textDim }}>
+            {uklada ? "…" : "Pridať"}
+          </button>
+          <div style={{ fontSize: 11, color: C.textDim, flexBasis: "100%" }}>
+            Sumu ber z bitcoinového výberu „FP spain" — v Kč, ako ho appka zapísala.
+          </div>
+        </div>
+      )}
+
+      {zaznamy.length > 0 && (
+        <div style={{ marginTop: 12 }}>
+          {zaznamy.map((z) => (
+            <div key={z.id} style={{ display: "flex", gap: 10, alignItems: "baseline", padding: "6px 0", borderBottom: `1px solid ${mix(C.border, 45)}`, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 12, color: C.textMuted, minWidth: 82 }}>{z.datum.split("-").reverse().join(". ")}</span>
+              <span style={{ fontSize: 12.5, color: C.text, fontWeight: 600 }}>+{z.hodiny} sedení</span>
+              {z.suma_czk ? <span style={{ fontSize: 12, color: C.textMuted }}>{Math.round(z.suma_czk).toLocaleString("cs-CZ")} Kč</span> : null}
+              <button onClick={async () => { await posli({ akcia: "guillermo-zmaz", id: z.id }); await onHotovo(); }}
+                style={{ marginLeft: "auto", background: "none", border: "none", color: C.textDim, fontSize: 11.5, cursor: "pointer" }}>
+                zmazať
+              </button>
+            </div>
+          ))}
+        </div>
       )}
     </Card>
   );
