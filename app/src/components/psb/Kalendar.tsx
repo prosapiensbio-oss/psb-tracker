@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { ClientAgg } from "../../lib/psb/compute";
+import type { PSBData } from "../../lib/psb/types";
 import { C, mix } from "../../lib/psb/theme";
 import { Card, Empty, H3, Info, Modal, Select, TrenerPills } from "./ui";
 
@@ -107,7 +108,7 @@ async function posli(telo: Record<string, unknown>) {
   return (await r.json()) as { ok: boolean; error?: string; vysledky?: Record<string, { ok: boolean; zmien?: number; udalosti?: number; chyba?: string; prveStiahnutie?: boolean }> };
 }
 
-export function Kalendar({ clients }: { clients: Record<string, ClientAgg> }) {
+export function Kalendar({ clients, data }: { clients: Record<string, ClientAgg>; data: PSBData }) {
   const [stav, setStav] = useState<Stav | null>(null);
   const [chyba, setChyba] = useState("");
   const [sprava, setSprava] = useState("");
@@ -161,6 +162,9 @@ export function Kalendar({ clients }: { clients: Record<string, ClientAgg> }) {
         />
       )}
       {pripojene && <Zmeny zmeny={stav.zmeny} onHotovo={nacitaj} />}
+      {pripojene && <Kontrola udalosti={stav.udalosti} data={data} />}
+      {pripojene && <Balicky udalosti={stav.udalosti} clients={clients} />}
+      {pripojene && <Navrat udalosti={stav.udalosti} clients={clients} />}
 
       {stav.nezname.length > 0 && (
         <Mapovanie nezname={stav.nezname} mena={menaKlientov} clients={clients} onHotovo={nacitaj} />
@@ -773,5 +777,163 @@ function UpravaUdalosti({
         </button>
       </div>
     </Modal>
+  );
+}
+
+/** Tréningy z kalendára, ktoré sú preč a v PTminderi po nich nič nezostalo. */
+function Kontrola({ udalosti, data }: { udalosti: KalUdalost[]; data: PSBData }) {
+  const chybajuce = useMemo(() => {
+    const dnes = new Date().toISOString().slice(0, 10);
+    // Kľúč meno|deň. PTminder pozná presné meno klienta, kalendár ho má cez
+    // naučené mapovanie — takže sa porovnáva to isté, nie text z kalendára.
+    const sedenia = new Set(data.sessions.map((x) => `${x.client}|${x.date.slice(0, 10)}`));
+    return udalosti
+      .filter((u) => {
+        if (u.typ !== "trening" && u.typ !== "uvodny") return false;
+        if (!u.klient) return false;
+        const d = u.zaciatok.slice(0, 10);
+        // Dnešok sa nekontroluje — hodina ešte prebieha a zápis príde neskôr.
+        if (d >= dnes) return false;
+        return !sedenia.has(`${u.klient}|${d}`);
+      })
+      .sort((a, b) => b.zaciatok.localeCompare(a.zaciatok));
+  }, [udalosti, data.sessions]);
+
+  return (
+    <Card>
+      <H3>
+        <Info
+          text="Hodina bola v kalendári, prebehla — a v PTminderi po nej nie je zápis. Buď sa klient neukázal, alebo sa zabudlo zapísať. To druhé je priamo nevyfakturovaný peniaz. Kontrola má zmysel až po nedeľnom exporte: dovtedy PTminder o poslednom týždni nevie."
+          label={`Chýba v PTminderi (${chybajuce.length})`}
+        />
+      </H3>
+      {!chybajuce.length ? (
+        <Empty>Každá odtrénovaná hodina z kalendára má v PTminderi svoj zápis.</Empty>
+      ) : (
+        <>
+          <div style={{ fontSize: 11.5, color: C.textDim, margin: "6px 0 10px", lineHeight: 1.5 }}>
+            Zoradené od najnovšieho. Ak export ešte neprišiel, posledný týždeň tu bude celý — to je
+            v poriadku, skutočnosť dorazí v nedeľu.
+          </div>
+          {chybajuce.slice(0, 25).map((u) => (
+            <div key={`${u.uid}|${u.trener}`} style={{ display: "flex", gap: 10, alignItems: "baseline", padding: "7px 0", borderBottom: `1px solid ${mix(C.border, 50)}`, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 12.5, color: C.textMuted, minWidth: 92 }}>{den(u.zaciatok)} {cas(u.zaciatok)}</span>
+              <span style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>{u.klient}</span>
+              <span style={{ fontSize: 11.5, color: C.textDim }}>{u.trener}{u.typ === "uvodny" ? " · úvodný" : ""}</span>
+            </div>
+          ))}
+          {chybajuce.length > 25 && (
+            <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 8 }}>…a ďalších {chybajuce.length - 25}.</div>
+          )}
+        </>
+      )}
+    </Card>
+  );
+}
+
+/** Balíčky po započítaní toho, čo je už objednané — nie po poslednom exporte. */
+function Balicky({ udalosti, clients }: { udalosti: KalUdalost[]; clients: Record<string, ClientAgg> }) {
+  const riadky = useMemo(() => {
+    const dnes = new Date().toISOString().slice(0, 10);
+    const objednane: Record<string, number> = {};
+    for (const u of udalosti) {
+      if (u.typ !== "trening" || !u.klient) continue;
+      if (u.zaciatok.slice(0, 10) < dnes) continue;
+      objednane[u.klient] = (objednane[u.klient] || 0) + 1;
+    }
+    return Object.entries(objednane)
+      .map(([meno, kusov]) => {
+        const c = clients[meno];
+        if (!c || c.packageTotal == null || c.packageRemaining == null) return null;
+        return { meno, kusov, zostava: c.packageRemaining, spolu: c.packageTotal, po: c.packageRemaining - kusov };
+      })
+      .filter((x): x is NonNullable<typeof x> => !!x && x.po <= 1)
+      .sort((a, b) => a.po - b.po);
+  }, [udalosti, clients]);
+
+  return (
+    <Card>
+      <H3>
+        <Info
+          text="Zostatok v balíčku podľa PTmindera mínus to, čo už je objednané v kalendári. Ukazuje, komu balíček dojde v najbližších dňoch — teda s kým sa oplatí hovoriť o pokračovaní, kým ho ešte vidíš na hodine."
+          label={`Balíček dojde po objednaných hodinách (${riadky.length})`}
+        />
+      </H3>
+      {!riadky.length ? (
+        <Empty>Nikomu balíček po objednaných hodinách nedochádza.</Empty>
+      ) : (
+        riadky.map((r) => (
+          <div key={r.meno} style={{ display: "flex", gap: 10, alignItems: "baseline", padding: "8px 0", borderBottom: `1px solid ${mix(C.border, 50)}`, flexWrap: "wrap" }}>
+            <span style={{
+              fontSize: 11.5, fontWeight: 700, minWidth: 44, padding: "2px 7px", borderRadius: 6, textAlign: "center",
+              color: r.po <= 0 ? C.red : C.orange,
+              background: mix(r.po <= 0 ? C.red : C.orange, 12),
+            }}>
+              {r.po <= 0 ? "0" : r.po}/{r.spolu}
+            </span>
+            <span style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>{r.meno}</span>
+            <span style={{ fontSize: 11.5, color: C.textDim }}>
+              teraz {r.zostava} z {r.spolu} · objednané {r.kusov}
+              {r.po < 0 ? ` · o ${-r.po} viac, než má` : ""}
+            </span>
+          </div>
+        ))
+      )}
+    </Card>
+  );
+}
+
+/** Koho model odpísal a kalendár hovorí opak — oprava predikcie tržieb. */
+function Navrat({ udalosti, clients }: { udalosti: KalUdalost[]; clients: Record<string, ClientAgg> }) {
+  const riadky = useMemo(() => {
+    const dnes = new Date().toISOString().slice(0, 10);
+    const buduce: Record<string, string[]> = {};
+    for (const u of udalosti) {
+      if ((u.typ !== "trening" && u.typ !== "uvodny") || !u.klient) continue;
+      if (u.zaciatok.slice(0, 10) < dnes) continue;
+      (buduce[u.klient] ||= []).push(u.zaciatok);
+    }
+    return Object.entries(buduce)
+      .map(([meno, terminy]) => {
+        const c = clients[meno];
+        if (!c) return null;
+        const ticho = c.lastSession
+          ? Math.floor((Date.parse(dnes) - Date.parse(c.lastSession.slice(0, 10))) / 86400000)
+          : null;
+        // Odpísaný = appka ho má za neaktívneho, alebo mlčí 14+ dní (tá istá
+        // hranica, akou dashboard meria odmlčaných).
+        const odpisany = c.status === "Neaktívny" || (ticho !== null && ticho >= 14);
+        if (!odpisany) return null;
+        return { meno, terminy: terminy.sort(), ticho, status: c.status };
+      })
+      .filter((x): x is NonNullable<typeof x> => !!x)
+      .sort((a, b) => a.terminy[0].localeCompare(b.terminy[0]));
+  }, [udalosti, clients]);
+
+  return (
+    <Card>
+      <H3>
+        <Info
+          text="Appka ich podľa PTmindera považuje za odídených alebo odmlčaných, ale v kalendári majú dohodnutý termín. Odhad tržieb s nimi nepočíta, hoci by mal — preto sú tu zvlášť, a nie potichu prirátaní: kalendár je predpoveď, nie zápis, a číslo v peniazoch má vždy vedieť, odkiaľ pochádza."
+          label={`Odpísaní, ale majú termín (${riadky.length})`}
+        />
+      </H3>
+      {!riadky.length ? (
+        <Empty>Nikto taký — koho appka počíta za aktívneho, ten aj chodí.</Empty>
+      ) : (
+        riadky.map((r) => (
+          <div key={r.meno} style={{ display: "flex", gap: 10, alignItems: "baseline", padding: "8px 0", borderBottom: `1px solid ${mix(C.border, 50)}`, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 13, color: C.text, fontWeight: 600, minWidth: 150 }}>{r.meno}</span>
+            <span style={{ fontSize: 11.5, color: C.orange }}>
+              {r.status === "Neaktívny" ? "neaktívny" : `${r.ticho} dní ticho`}
+            </span>
+            <span style={{ fontSize: 11.5, color: C.textMuted }}>
+              najbližšie {den(r.terminy[0])} {cas(r.terminy[0])}
+              {r.terminy.length > 1 ? ` · ďalších ${r.terminy.length - 1}` : ""}
+            </span>
+          </div>
+        ))
+      )}
+    </Card>
   );
 }
