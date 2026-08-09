@@ -49,15 +49,18 @@ const bezDiakritiky = (s: string) =>
 export function navrhni(
   nazov: string,
   clients: Record<string, ClientAgg>,
-): { typ: string; kandidati: string[] } {
+): { typ: string; kandidati: string[]; meno: string } {
   const holy = bezDiakritiky(nazov);
 
-  if (/guillermo/.test(holy)) return { typ: "guillermo", kandidati: [] };
+  if (/guillermo/.test(holy)) return { typ: "guillermo", kandidati: [], meno: "" };
 
   const uvodny = /\buvodn/.test(holy);
   // Pri úvodnom sa slovo odreže — zvyšok je meno, ktoré Jerry píše celé.
+  // Meno sa berie z PÔVODNÉHO názvu (s diakritikou a veľkými písmenami), lebo
+  // pri úvodnom človek ešte nie je klientom a toto meno je jediné, čo o ňom máme.
+  const meno = uvodny ? nazov.replace(/[uúUÚ]vodn\S*/g, "").replace(/\s+/g, " ").trim() : "";
   const hladane = uvodny ? holy.replace(/\buvodn\w*\b/g, "").trim() : holy;
-  if (!hladane) return { typ: uvodny ? "uvodny" : "trening", kandidati: [] };
+  if (!hladane) return { typ: uvodny ? "uvodny" : "trening", kandidati: [], meno };
 
   const kusy = hladane.split(/[\s.,-]+/).filter((x) => x.length > 1);
   const skore: { meno: string; bod: number }[] = [];
@@ -80,7 +83,7 @@ export function navrhni(
   }
 
   skore.sort((a, b) => b.bod - a.bod || a.meno.localeCompare(b.meno, "sk"));
-  return { typ: uvodny ? "uvodny" : "trening", kandidati: skore.slice(0, 4).map((x) => x.meno) };
+  return { typ: uvodny ? "uvodny" : "trening", kandidati: skore.slice(0, 4).map((x) => x.meno), meno };
 }
 
 const den = (s: string) => {
@@ -270,11 +273,32 @@ function Mapovanie({ nezname, mena, clients, onHotovo }: { nezname: Nezname[]; m
   // Návrhy sa počítajú z názvu — Jerryho pravidlo (krstné meno alebo
   // priezvisko, „úvodný + celé meno", „guillermo") je čitateľné strojom.
   const navrhy = useMemo(() => {
-    const m: Record<string, { typ: string; kandidati: string[] }> = {};
+    const m: Record<string, { typ: string; kandidati: string[]; meno: string }> = {};
     for (const n of nezname) m[`${n.nazov}|${n.trener}`] = navrhni(n.nazov, clients);
     return m;
   }, [nezname, clients]);
-  const stav = (k: string) => vyber[k] || { klient: navrhy[k]?.kandidati[0] || "", typ: navrhy[k]?.typ || "trening" };
+  const stav = (k: string) => {
+    if (vyber[k]) return vyber[k];
+    const n = navrhy[k];
+    // Pri úvodnom je predvyplnené meno z názvu, nie klient zo zoznamu — ten
+    // človek ešte klientom nie je.
+    const klient = n?.typ === "uvodny" ? (n.kandidati[0] || n.meno || "") : (n?.kandidati[0] || "");
+    return { klient, typ: n?.typ || "trening" };
+  };
+
+  /**
+   * Kedy sa dá potvrdiť.
+   *
+   * Bežný tréning musí sedieť na klienta v Trackeri — preklep by hodiny pripísal
+   * neexistujúcemu človeku. Úvodný tréning je ale PRÁVE TEN prípad, keď klient
+   * ešte neexistuje: Roman Pavlík príde na úvodný a klientom sa stane až potom,
+   * čo v nedeľu dorazí export z PTmindera. Meno sa preto uloží tak, ako ho Jerry
+   * napísal, a spáruje sa samo, keď sa v Trackeri objaví.
+   */
+  const daSa = (v: { klient: string; typ: string }) =>
+    v.typ === "trening" ? mena.includes(v.klient)
+      : v.typ === "uvodny" ? v.klient.trim().length >= 3
+        : true;
   const jednoznacne = nezname.filter((n) => {
     const k = `${n.nazov}|${n.trener}`;
     return (navrhy[k]?.kandidati.length === 1 && !vyber[k]) || navrhy[k]?.typ === "guillermo";
@@ -283,12 +307,10 @@ function Mapovanie({ nezname, mena, clients, onHotovo }: { nezname: Nezname[]; m
   const uloz = async (n: Nezname) => {
     const k = `${n.nazov}|${n.trener}`;
     const v = stav(k);
-    const trening = v.typ === "trening" || v.typ === "uvodny";
-    // Meno musí sedieť na klienta v Trackeri. Preklep by inak založil väzbu na
-    // niekoho, kto neexistuje, a hodiny by sa tichom pripísali nikam.
-    if (trening && !mena.includes(v.klient)) return;
+    const sMenom = v.typ === "trening" || v.typ === "uvodny";
+    if (!daSa(v)) return;
     setUklada(k);
-    await posli({ akcia: "mapuj", nazov: n.nazov, trener: n.trener, typ: v.typ, klient: trening ? v.klient : null });
+    await posli({ akcia: "mapuj", nazov: n.nazov, trener: n.trener, typ: v.typ, klient: sMenom ? v.klient.trim() : null });
     setUklada("");
     await onHotovo();
   };
@@ -344,6 +366,12 @@ function Mapovanie({ nezname, mena, clients, onHotovo }: { nezname: Nezname[]; m
                 <datalist id={`kl-${n.trener}-${n.nazov}`}>
                   {mena.map((m) => <option key={m} value={m} />)}
                 </datalist>
+                {v.typ === "uvodny" && !mena.includes(v.klient) && v.klient.trim().length >= 3 && (
+                  <span style={{ fontSize: 11, color: C.textDim, flexBasis: "100%" }}>
+                    Zatiaľ nie je klientom — uloží sa tak, ako si ho napísal, a spáruje sa sám,
+                    keď sa objaví v PTminderi.
+                  </span>
+                )}
                 {/* Ďalšie možnosti na jeden klik — pri „Michal" alebo „Jan K"
                     ich býva viac a preklikať sa k nim je rýchlejšie než písať. */}
                 {navrh && navrh.kandidati.length > 1 && navrh.kandidati.slice(0, 3).map((kand) => (
@@ -364,13 +392,13 @@ function Mapovanie({ nezname, mena, clients, onHotovo }: { nezname: Nezname[]; m
             )}
             <button
               onClick={() => void uloz(n)}
-              disabled={uklada === k || (trening && !mena.includes(v.klient))}
+              disabled={uklada === k || !daSa(v)}
               style={{
                 padding: "6px 13px", borderRadius: 8, fontSize: 12, fontWeight: 600,
-                cursor: trening && !mena.includes(v.klient) ? "not-allowed" : "pointer",
+                cursor: daSa(v) ? "pointer" : "not-allowed",
                 border: `1px solid ${mix(C.green, 45)}`,
-                background: trening && !mena.includes(v.klient) ? "transparent" : mix(C.green, 12),
-                color: trening && !mena.includes(v.klient) ? C.textDim : C.green,
+                background: daSa(v) ? mix(C.green, 12) : "transparent",
+                color: daSa(v) ? C.green : C.textDim,
               }}
             >
               {uklada === k ? "…" : "Potvrdiť"}
