@@ -1,7 +1,8 @@
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 
 import { kotvaDat, type ClientAgg } from "../../lib/psb/compute";
-import { fmtCZK, monthKey, monthLabel } from "../../lib/psb/format";
+import { fetchMonthNotes, saveMonthNote } from "../../lib/psb/client";
+import { fmtCZK, fmtDMY, monthKey, monthLabel } from "../../lib/psb/format";
 import { ZDROJE } from "./Klienti";
 import { C, mix, S } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
@@ -114,7 +115,7 @@ export function RastAStrata({ data, clients, onKlient }: { data: PSBData; client
     <>
       <Card>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-          <H3><Info text="Rast = príchody mínus odchody. Odchod sa nedá zistiť, len usúdiť — nikto nezavolá, že končí, len prestane chodiť. Hranica ticha je preto konvencia; dôležité je, aby bola stále rovnaká. Klient na dohodnutej pauze sa neráta ako odídený. Čas sa počíta od posledného dňa v dátach, nie od dneška — inak by tri mesiace bez uploadu spravili z celého štúdia odídených." label="Rast a strata" /></H3>
+          <H3><Info text="Rast = príchody mínus odchody. Odchod sa nedá zistiť, len usúdiť — nikto nezavolá, že končí, len prestane chodiť. Hranica ticha je preto konvencia; dôležité je, aby bola stále rovnaká. Klient na dohodnutej pauze sa neráta ako odídený. Čas sa počíta od posledného dňa v dátach, nie od dneška — inak by tri mesiace bez uploadu spravili z celého štúdia odídených." label="Fluktuácia" /></H3>
           <Select value={hranica} onChange={setHranica} options={HRANICE} />
         </div>
 
@@ -195,6 +196,9 @@ export function RastAStrata({ data, clients, onKlient }: { data: PSBData; client
                             <Zoznam nadpis="Prišli" mena={v.prisli} farba={C.green} onKlient={onKlient} clients={clients} />
                             <Zoznam nadpis="Odišli" mena={v.odisli} farba={C.red} onKlient={onKlient} clients={clients} />
                           </div>
+                          {v.odisli.length > 0 && (
+                            <DovodyOdchodu mesiac={mk} mena={v.odisli} clients={clients} />
+                          )}
                         </td>
                       </tr>
                     )}
@@ -439,6 +443,85 @@ function Zoznam({ nadpis, mena, farba, onKlient, clients }: {
           );
         })}
       </div>
+    </div>
+  );
+}
+
+
+/**
+ * Prečo prestali chodiť.
+ *
+ * Dôvod je jediná vec, ktorú appka o odchode nezistí — vidí posledný tréning,
+ * segment aj balíček, ale nie to, či človek odišiel k inému trénerovi, zranil
+ * sa, alebo prestal veriť. Doteraz sa na to pýtala mesačná otázka, kde bolo
+ * treba najprv prepísať mená, ktoré appka aj tak vie. Tu je otázka pri
+ * konkrétnom človeku a jednou vetou je vybavená.
+ *
+ * Ukladá sa k mesiacu, v ktorom odišiel — tam sa naň totiž budeš pozerať, keď
+ * sa raz spýtaš „prečo bol máj taký zlý".
+ */
+function DovodyOdchodu({ mesiac, mena, clients }: { mesiac: string; mena: string[]; clients: Record<string, ClientAgg> }) {
+  const [odpovede, setOdpovede] = useState<Record<string, string>>({});
+  const [pisem, setPisem] = useState<Record<string, string>>({});
+  const [uklada, setUklada] = useState("");
+
+  useEffect(() => {
+    void fetchMonthNotes().then((n) => setOdpovede(n[mesiac]?.answers || {}));
+  }, [mesiac]);
+
+  const uloz = async (meno: string) => {
+    const k = `odchod__${meno}`;
+    const text = (pisem[meno] ?? "").trim();
+    if (!text) return;
+    setUklada(meno);
+    const n = await fetchMonthNotes();
+    const doterajsie = n[mesiac]?.answers || {};
+    const nove = { ...doterajsie, [k]: text };
+    await saveMonthNote(mesiac, n[mesiac]?.note || "", nove, "jerry");
+    setOdpovede(nove);
+    setPisem({ ...pisem, [meno]: "" });
+    setUklada("");
+  };
+
+  return (
+    <div style={{ borderTop: `1px solid ${mix(C.border, 60)}`, paddingTop: 10, marginTop: 4 }}>
+      <div style={{ fontSize: 11, color: C.textDim, marginBottom: 8, letterSpacing: 0.3, textTransform: "uppercase" }}>
+        Prečo prestali chodiť
+      </div>
+      {mena.map((meno) => {
+        const ulozene = odpovede[`odchod__${meno}`];
+        const c = clients[meno];
+        return (
+          <div key={meno} style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap", padding: "5px 0" }}>
+            <span style={{ fontSize: 12.5, color: C.text, fontWeight: 600, minWidth: 150 }}>{meno}</span>
+            <span style={{ fontSize: 11, color: C.textDim, minWidth: 110 }}>
+              {c?.lastSession ? `naposledy ${fmtDMY(c.lastSession)}` : ""}
+            </span>
+            {ulozene ? (
+              <span style={{ fontSize: 12.5, color: C.textMuted, flex: 1 }}>
+                {ulozene}{" "}
+                <button onClick={() => setOdpovede({ ...odpovede, [`odchod__${meno}`]: "" })}
+                  style={{ background: "none", border: "none", color: C.textDim, fontSize: 11, cursor: "pointer" }}>
+                  zmeniť
+                </button>
+              </span>
+            ) : (
+              <>
+                <input
+                  value={pisem[meno] || ""}
+                  onChange={(e) => setPisem({ ...pisem, [meno]: e.target.value })}
+                  placeholder="prečo prestal chodiť?"
+                  style={{ flex: "1 1 240px", padding: "5px 9px", borderRadius: 7, fontSize: 12, border: `1px solid ${C.border}`, background: C.bg, color: C.text }}
+                />
+                <button onClick={() => void uloz(meno)} disabled={uklada === meno || !(pisem[meno] || "").trim()}
+                  style={{ padding: "5px 11px", borderRadius: 7, fontSize: 11.5, cursor: "pointer", border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted }}>
+                  {uklada === meno ? "…" : "Uložiť"}
+                </button>
+              </>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

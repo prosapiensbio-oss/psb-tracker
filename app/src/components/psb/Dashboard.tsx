@@ -1261,10 +1261,10 @@ export function Dashboard({
         <H3>
           <Info
             text="Prišiel = prvé sedenie v mesiaci, odišiel = posledné sedenie a odvtedy ticho. Posledné ~2 mesiace odchod ešte „nedozrel“ — namiesto čísla je „?“, nula by klamala. Klik otvorí plnú verziu s menami."
-            label="Rast a strata klientov"
+            label="Fluktuácia klientov"
           />
         </H3>
-        <div style={{ ...centerBody, cursor: "pointer" }} onClick={() => onNavigate("klienti", "rast")} title="Otvoriť Klienti → Rast a strata">
+        <div style={{ ...centerBody, cursor: "pointer" }} onClick={() => onNavigate("klienti", "rast")} title="Otvoriť Klienti → Fluktuácia">
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 8 }}>
             <MiniStat label="Prišlo Ø / mes." value={`+${toky.prisloMes.toFixed(1)}`} color={C.green} />
             <MiniStat label="Odišlo Ø / mes." value={`−${toky.odisloMes.toFixed(1)}`} color={C.red} />
@@ -1285,7 +1285,7 @@ export function Dashboard({
               </div>
             ))}
           </div>
-          <div style={{ fontSize: 11, color: C.textDim, marginTop: 8 }}>Mená a detail → Klienti → Rast a strata</div>
+          <div style={{ fontSize: 11, color: C.textDim, marginTop: 8 }}>Mená a detail → Klienti → Fluktuácia</div>
         </div>
       </Card>
     ),

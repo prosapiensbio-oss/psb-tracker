@@ -552,7 +552,7 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
           // Referencie hneď za Dopytmi — poradie rozpráva cestu klienta:
           // kto sa ozval → kto ho poslal → kto prišiel a odišiel.
           { id: "referencie", label: "Referencie" },
-          { id: "rast", label: "Rast a strata" },
+          { id: "rast", label: "Fluktuácia" },
         ]}
         value={sub}
         onChange={setSub}

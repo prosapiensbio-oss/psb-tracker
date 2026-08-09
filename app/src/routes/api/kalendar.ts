@@ -71,12 +71,12 @@ async function snimka(DB: D1Database, z: Zdroj) {
   }
 
   const prikazy: D1PreparedStatement[] = [];
+  // Zmeny sa najprv nazbierajú a až potom zapíšu — treba ich vidieť naraz, aby
+  // sa dalo spárovať zrušenie s pridaním (to je posun, nie dve udalosti).
+  const surove: { druh: string; u: string; nazov: string; klient: string | null; pred: string | null; po: string | null }[] = [];
   const zmena = (druh: string, u: string, nazov: string, klient: string | null, pred: string | null, po: string | null) =>
-    prikazy.push(DB.prepare(
-      "INSERT INTO kal_zmeny (id, kedy, trener, uid, druh, nazov, klient, pred, po) VALUES (?,?,?,?,?,?,?,?,?)",
-    ).bind(uid(), kedy, z.trener, u, druh, nazov, klient, pred, po));
+    surove.push({ druh, u, nazov, klient, pred, po });
 
-  let zmien = 0;
   const videne = new Set<string>();
 
   for (const u of udalosti) {
@@ -90,13 +90,13 @@ async function snimka(DB: D1Database, z: Zdroj) {
       prikazy.push(DB.prepare(
         "INSERT OR REPLACE INTO kal_udalosti (uid, trener, zaciatok, koniec, nazov, klient, typ, prvy_raz, naposledy, zmizla_at) VALUES (?,?,?,?,?,?,?,?,?,NULL)",
       ).bind(u.uid, z.trener, u.zaciatok, u.koniec, u.nazov, klient, typ, kedy, kedy));
-      if (!prveStiahnutie) { zmena("pridane", u.uid, u.nazov, klient, null, u.zaciatok); zmien++; }
+      if (!prveStiahnutie) zmena("pridane", u.uid, u.nazov, klient, null, u.zaciatok);
       continue;
     }
 
-    if (s.zaciatok !== u.zaciatok) { zmena("posunute", u.uid, u.nazov, klient, s.zaciatok, u.zaciatok); zmien++; }
-    else if (s.nazov !== u.nazov) { zmena("premenovane", u.uid, u.nazov, klient, s.nazov, u.nazov); zmien++; }
-    else if (s.zmizla_at) { zmena("pridane", u.uid, u.nazov, klient, null, u.zaciatok); zmien++; }
+    if (s.zaciatok !== u.zaciatok) zmena("posunute", u.uid, u.nazov, klient, s.zaciatok, u.zaciatok);
+    else if (s.nazov !== u.nazov) zmena("premenovane", u.uid, u.nazov, klient, s.nazov, u.nazov);
+    else if (s.zmizla_at) zmena("pridane", u.uid, u.nazov, klient, null, u.zaciatok);
 
     prikazy.push(DB.prepare(
       "UPDATE kal_udalosti SET zaciatok = ?, koniec = ?, nazov = ?, klient = ?, typ = ?, naposledy = ?, zmizla_at = NULL WHERE uid = ? AND trener = ?",
@@ -110,7 +110,51 @@ async function snimka(DB: D1Database, z: Zdroj) {
     prikazy.push(DB.prepare("UPDATE kal_udalosti SET zmizla_at = ? WHERE uid = ? AND trener = ?").bind(kedy, s.uid, z.trener));
     if (s.typ === "sukromne" || s.typ === "netrening") continue;
     zmena("zrusene", s.uid, s.nazov, s.klient, s.zaciatok, null);
+  }
+
+  /**
+   * Dve zmeny, ktoré sú v skutočnosti jedna.
+   *
+   * Keď Jerry presunie hodinu, Google často nepošle zmenený čas, ale zruší
+   * pôvodnú udalosť a vytvorí novú. Appka to videla ako „zrušené Robin Martin"
+   * a hneď pod tým „pridané Robin Martin" — a pýtala sa dvakrát na to isté.
+   * Ak sedí ten istý človek a ten istý deň, je to posun.
+   */
+  const paruj = () => {
+    const von: typeof surove = [];
+    const pouzite = new Set<number>();
+    surove.forEach((a, i) => {
+      if (pouzite.has(i) || a.druh !== "zrusene") return;
+      const j = surove.findIndex((b, k) =>
+        !pouzite.has(k) && b.druh === "pridane" &&
+        (b.klient || b.nazov) === (a.klient || a.nazov) &&
+        (b.po || "").slice(0, 10) === (a.pred || "").slice(0, 10));
+      if (j < 0) return;
+      pouzite.add(i); pouzite.add(j);
+      von.push({ ...a, druh: "posunute", po: surove[j].po });
+    });
+    surove.forEach((x, i) => { if (!pouzite.has(i)) von.push(x); });
+    return von;
+  };
+
+  /**
+   * Pýtame sa len na to, čo už prebehlo.
+   *
+   * Dohodnutý tréning na budúci štvrtok nie je udalosť na vysvetlenie — Jerry
+   * si ho práve dohodol. Zmysel kontroly je opačný: hodina, ktorá spred dvoch
+   * dní zmizla a nikto nevie prečo. Budúcnosť je plán, minulosť je otázka.
+   */
+  const dnesDen = kedy.slice(0, 10);
+  const spatne = (x: (typeof surove)[number]) =>
+    ((x.pred || x.po || "").slice(0, 10)) <= dnesDen;
+
+  let zmien = 0;
+  for (const x of paruj()) {
+    if (!spatne(x)) continue;
     zmien++;
+    prikazy.push(DB.prepare(
+      "INSERT INTO kal_zmeny (id, kedy, trener, uid, druh, nazov, klient, pred, po) VALUES (?,?,?,?,?,?,?,?,?)",
+    ).bind(uid(), kedy, z.trener, x.u, x.druh, x.nazov, x.klient, x.pred, x.po));
   }
 
   prikazy.push(DB.prepare("UPDATE kal_zdroje SET posledne_ok = ?, posledna_chyba = NULL WHERE id = ?").bind(kedy, z.id));

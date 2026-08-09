@@ -98,12 +98,12 @@ export const WIDGETS: WidgetMeta[] = [
   { id: "zrusene", label: "Zrušené a presunuté", span: 1, sekcia: "vytazenie", popis: "Stratená kapacita z týždenných zápisov, po trénerovi.", doma: "Tréningy" },
 
   // ── Klienti ────────────────────────────────────────────────────────────────
-  { id: "rastStrata", label: "Rast a strata klientov", span: 1, sekcia: "klienti", vychodzi: true, popis: "Prišlo, odišlo a čistý rast za mesiac.", doma: "Klienti → Rast a strata" },
+  { id: "rastStrata", label: "Fluktuácia klientov", span: 1, sekcia: "klienti", vychodzi: true, popis: "Prišlo, odišlo a čistý rast za mesiac.", doma: "Klienti → Fluktuácia" },
   { id: "6m", label: "6M klienti podľa fázy", span: 1, sekcia: "klienti", vychodzi: true, popis: "Obnova, integrácia, udržateľnosť — kde v procese ľudia sú.", doma: "Klienti → 6M proces" },
   { id: "balicky", label: "Klienti podľa balíčka", span: 1, sekcia: "klienti", popis: "Rozdelenie podľa členstva — na čom stojí príjem.", doma: "Klienti" },
-  { id: "kdeTecie", label: "Kde to tečie", span: 1, sekcia: "klienti", popis: "Ako dlho vydržali tí, čo odišli — odchod v prvých mesiacoch má inú príčinu než po roku.", doma: "Klienti → Rast a strata" },
-  { id: "prezitie", label: "Kto vydrží (kohorty)", span: 1, sekcia: "klienti", popis: "Koľko z každého mesiaca príchodov je tu po 3, 6 a 12 mesiacoch.", doma: "Klienti → Rast a strata" },
-  { id: "hodnotaZdroj", label: "Čo klient prinesie podľa zdroja", span: 1, sekcia: "klienti", popis: "Priemerná tržba na klienta podľa toho, odkiaľ prišiel.", doma: "Klienti → Rast a strata" },
+  { id: "kdeTecie", label: "Kde to tečie", span: 1, sekcia: "klienti", popis: "Ako dlho vydržali tí, čo odišli — odchod v prvých mesiacoch má inú príčinu než po roku.", doma: "Klienti → Fluktuácia" },
+  { id: "prezitie", label: "Kto vydrží (kohorty)", span: 1, sekcia: "klienti", popis: "Koľko z každého mesiaca príchodov je tu po 3, 6 a 12 mesiacoch.", doma: "Klienti → Fluktuácia" },
+  { id: "hodnotaZdroj", label: "Čo klient prinesie podľa zdroja", span: 1, sekcia: "klienti", popis: "Priemerná tržba na klienta podľa toho, odkiaľ prišiel.", doma: "Klienti → Fluktuácia" },
 
   // ── Marketing ──────────────────────────────────────────────────────────────
   { id: "lievik", label: "Lievik — tento mesiac", span: 1, sekcia: "marketing", vychodzi: true, popis: "Dopyty → úvodné → noví klienti v bežiacom mesiaci.", doma: "Marketing → Lievik" },
@@ -135,7 +135,7 @@ export const WIDGETS: WidgetMeta[] = [
   { id: "zdrojeKlientov", label: "Odkiaľ klienti prišli", span: 1, sekcia: "klienti", popis: "Rozdelenie aktívnych klientov podľa zdroja.", doma: "Klienti" },
 
   { id: "cenaUvodneho", label: "Čo stojí úvodný", span: 1, sekcia: "marketing", popis: "Marketingové náklady delené počtom úvodných tréningov.", doma: "Marketing → Lievik" },
-  { id: "ltvZdroj", label: "Hodnota klienta (LTV)", span: 1, sekcia: "marketing", popis: "Koľko klient priemerne zaplatí za celý čas spolupráce.", doma: "Klienti → Rast a strata" },
+  { id: "ltvZdroj", label: "Hodnota klienta (LTV)", span: 1, sekcia: "marketing", popis: "Koľko klient priemerne zaplatí za celý čas spolupráce.", doma: "Klienti → Fluktuácia" },
   { id: "kohortyDopytov", label: "Kohorty dopytov", span: 1, sekcia: "marketing", popis: "Z koľkých dopytov daného mesiaca sa nakoniec stali klienti.", doma: "Marketing → Lievik" },
 
   // ── Výsledky (KPI) ─────────────────────────────────────────────────────────

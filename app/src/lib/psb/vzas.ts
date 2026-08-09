@@ -1104,11 +1104,20 @@ export const monthKeyOf = (i: number) => VZAS_MONTHS[i];
 // unanswered five months out of six. "energy" renders as a slider plus a
 // non-training hours field — the model only pays for training hours, so
 // without that second number an energy score can't be read honestly.
+// Prepracované 2026-08-09 po analýze Jerryho vlastných odpovedí od februára
+// 2025. Vyšlo z nich, že píše o štyroch veciach, ktoré appka nevie: prečo bol
+// mesiac iný (Amerika, Ahsoka), aké rozhodnutie sa urobilo a čo spravilo
+// (konsolidácia, nové členstvá), čo mesiac zachránilo alebo pokazilo na
+// poslednú chvíľu, a čo zostalo nedokončené.
+//
+// Otázka „pribudol alebo odišiel niekto z klientov" vypadla: appka to vie
+// z fluktuácie a Jerry bol nútený prepisovať fakt, aby sa dostal k dôvodu.
+// Dôvody odchodov sa pýtajú tam, kde tí ľudia sú — vo Fluktuácii, po jednom.
 export const MONTH_QUESTIONS: { id: string; q: string }[] = [
   { id: "stalo", q: "Čo zásadné sa tento mesiac stalo?" },
   { id: "jednorazove", q: "Čo z tržieb aj výdavkov bolo jednorazové a čo sa bude opakovať?" },
-  { id: "klienti", q: "Pribudol alebo odišiel niekto z klientov? Prečo?" },
-  { id: "buduci", q: "Čo už teraz viem o budúcom mesiaci?" },
+  { id: "rozhodnutia", q: "Čo sme sa tento mesiac rozhodli zmeniť — a čo to zatiaľ urobilo?" },
+  { id: "buduci", q: "Čo prechádza do ďalšieho mesiaca?" },
 ];
 // Every question is answered by both founders; the answers live under
 // "<id>__jerry" / "<id>__terezka" in the same JSON blob.
