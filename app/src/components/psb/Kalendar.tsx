@@ -93,6 +93,11 @@ const den = (s: string) => {
 };
 const cas = (s: string) => s.slice(11, 16);
 
+/** Vodorovné rolovanie pre mriežku — na telefóne sa sedem dní inak nezmestí. */
+const ScrollX = ({ children }: { children: React.ReactNode }) => (
+  <div style={{ overflowX: "auto", paddingBottom: 4 }}>{children}</div>
+);
+
 async function posli(telo: Record<string, unknown>) {
   const r = await fetch("/api/kalendar", {
     method: "POST", credentials: "same-origin",
@@ -464,44 +469,164 @@ function Zmeny({ zmeny, onHotovo }: { zmeny: Zmena[]; onHotovo: () => Promise<vo
   );
 }
 
-/** Čo je objednané. Dva týždne dopredu — ďalej je opakovanie zvykom, nie plánom. */
+/**
+ * Týždeň tak, ako ho Jerry pozná z Google Kalendára — mriežka, nie zoznam.
+ *
+ * Zoznam po dňoch hovoril, ČO je objednané, ale nie KEDY: nebolo z neho vidieť
+ * diery medzi hodinami, dvojité obsadenie ani to, že piatok je prázdny. Mriežka
+ * to ukáže bez čítania, lebo tvar dňa je v nej priamo vidieť.
+ *
+ * Rozsah hodín sa počíta z dát, nie natvrdo: kto trénuje od siedmej do ôsmej
+ * večer, nemá pozerať na prázdny pás od polnoci. Späť sa dá ísť len po dnešok —
+ * história patrí do PTmindera, tu je reč o tom, čo sa chystá.
+ */
 function Tyzden({ udalosti }: { udalosti: Udalost[] }) {
-  const dnes = new Date().toISOString().slice(0, 10);
-  const buduce = udalosti.filter((u) => u.zaciatok.slice(0, 10) >= dnes && u.typ !== "sukromne" && u.typ !== "netrening");
-  const podlaDna: Record<string, Udalost[]> = {};
-  for (const u of buduce) (podlaDna[u.zaciatok.slice(0, 10)] ||= []).push(u);
+  const [posun, setPosun] = useState(0);
 
-  const hodin = buduce.reduce((a, u) => a + (Date.parse(`${u.koniec}:00Z`) - Date.parse(`${u.zaciatok}:00Z`)) / 3600000, 0);
+  // Pondelok ako začiatok týždňa — tak to má Jerry aj v Google Kalendári.
+  const pondelok = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    const doPondelka = (d.getDay() + 6) % 7;
+    d.setDate(d.getDate() - doPondelka + posun * 7);
+    return d;
+  }, [posun]);
+
+  const dni = useMemo(
+    () => Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(pondelok);
+      d.setDate(d.getDate() + i);
+      const p2 = (n: number) => String(n).padStart(2, "0");
+      return `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
+    }),
+    [pondelok],
+  );
+
+  const vTyzdni = udalosti.filter((u) => dni.includes(u.zaciatok.slice(0, 10)));
+  const minuty = (s: string) => Number(s.slice(11, 13)) * 60 + Number(s.slice(14, 16));
+
+  // Rozsah podľa skutočných hodín, s hodinou rezervy na oboch koncoch.
+  const od = vTyzdni.length ? Math.max(0, Math.floor(Math.min(...vTyzdni.map((u) => minuty(u.zaciatok))) / 60) - 1) : 7;
+  const doH = vTyzdni.length ? Math.min(24, Math.ceil(Math.max(...vTyzdni.map((u) => minuty(u.koniec))) / 60) + 1) : 20;
+  const hodin = Math.max(1, doH - od);
+  const VYSKA = 46; // px na hodinu
+
+  const dnesIso = new Date().toISOString().slice(0, 10);
+  const DNI_SK = ["Po", "Ut", "St", "Št", "Pi", "So", "Ne"];
+
+  const trening = vTyzdni.filter((u) => u.typ !== "sukromne" && u.typ !== "netrening");
+  const hodinSpolu = trening.reduce((a, u) => a + (minuty(u.koniec) - minuty(u.zaciatok)) / 60, 0);
+
+  // Farba nesie typ, nie meno — rovnako, ako si Jerry farbí Google Kalendár.
+  const farba = (u: Udalost) =>
+    u.typ === "uvodny" ? C.blue
+      : u.typ === "guillermo" ? C.green
+        : u.typ === "sukromne" || u.typ === "netrening" ? C.textDim
+          : u.trener === "Terezka" ? C.blue : C.accent;
+
+  const popisTyzdna = `${pondelok.getDate()}. ${pondelok.getMonth() + 1}. – ${new Date(pondelok.getTime() + 6 * 86400000).getDate()}. ${new Date(pondelok.getTime() + 6 * 86400000).getMonth() + 1}.`;
 
   return (
     <Card>
-      <H3><Info text="Čo je v kalendári objednané odteraz dva týždne dopredu. Je to predpoveď, nie zápis — skutočnosť napíše až nedeľný export z PTmindera." label="Objednané dopredu" /></H3>
-      <div style={{ fontSize: 12, color: C.textMuted, margin: "4px 0 12px" }}>
-        {buduce.length} tréningov · {Math.round(hodin)} h · predbežné
-      </div>
-      {!buduce.length && <Empty>Dopredu nie je nič — alebo sa kalendár ešte nestiahol.</Empty>}
-      {Object.entries(podlaDna).sort().map(([d, zoznam]) => (
-        <div key={d} style={{ display: "flex", gap: 10, padding: "7px 0", borderBottom: `1px solid ${mix(C.border, 45)}`, alignItems: "baseline", flexWrap: "wrap" }}>
-          <div style={{ minWidth: 78, fontSize: 12.5, fontWeight: 700, color: C.textMuted }}>{den(`${d}T00:00`)}</div>
-          <div style={{ flex: 1, display: "flex", gap: 7, flexWrap: "wrap" }}>
-            {zoznam.sort((a, b) => a.zaciatok.localeCompare(b.zaciatok)).map((u) => (
-              <span
-                key={`${u.uid}|${u.trener}`}
-                title={`${u.trener} · ${u.nazov}`}
-                style={{
-                  fontSize: 11.5, padding: "3px 8px", borderRadius: 6,
-                  background: mix(u.trener === "Jerry" ? C.accent : C.blue, 12),
-                  border: `1px solid ${mix(u.trener === "Jerry" ? C.accent : C.blue, 35)}`,
-                  color: C.text, whiteSpace: "nowrap",
-                }}
-              >
-                {cas(u.zaciatok)} {u.klient || u.nazov}
-                {!u.klient && <span style={{ color: C.orange }}> ?</span>}
-              </span>
-            ))}
-          </div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
+        <H3>
+          <Info
+            text="Týždeň tak, ako ho vidíš v Google Kalendári. Je to predpoveď, nie zápis — skutočnosť napíše až nedeľný export z PTmindera. Súkromné udalosti sú sivé a do počtu hodín sa nerátajú."
+            label="Týždeň"
+          />
+        </H3>
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <button onClick={() => setPosun(posun - 1)} disabled={posun <= 0}
+            style={{ padding: "4px 10px", borderRadius: 7, fontSize: 13, cursor: posun <= 0 ? "not-allowed" : "pointer", border: `1px solid ${C.border}`, background: "transparent", color: posun <= 0 ? C.textDim : C.textMuted }}>←</button>
+          <span style={{ fontSize: 12.5, color: C.text, fontWeight: 600, minWidth: 96, textAlign: "center" }}>
+            {posun === 0 ? "tento týždeň" : popisTyzdna}
+          </span>
+          <button onClick={() => setPosun(posun + 1)} disabled={posun >= 2}
+            style={{ padding: "4px 10px", borderRadius: 7, fontSize: 13, cursor: posun >= 2 ? "not-allowed" : "pointer", border: `1px solid ${C.border}`, background: "transparent", color: posun >= 2 ? C.textDim : C.textMuted }}>→</button>
         </div>
-      ))}
+      </div>
+
+      <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 10 }}>
+        {trening.length} tréningov · {Math.round(hodinSpolu)} h · predbežné
+      </div>
+
+      {!vTyzdni.length && <Empty>V tomto týždni nie je nič — alebo kalendár siaha len dva týždne dopredu.</Empty>}
+
+      {vTyzdni.length > 0 && (
+        <ScrollX>
+          <div style={{ minWidth: 620 }}>
+            {/* Hlavička dní */}
+            <div style={{ display: "grid", gridTemplateColumns: "42px repeat(7, 1fr)", gap: 3, marginBottom: 3 }}>
+              <div />
+              {dni.map((d, i) => {
+                const jeDnes = d === dnesIso;
+                return (
+                  <div key={d} style={{
+                    textAlign: "center", fontSize: 11.5, padding: "3px 0", borderRadius: 6,
+                    fontWeight: jeDnes ? 700 : 600,
+                    color: jeDnes ? C.accentLight : C.textMuted,
+                    background: jeDnes ? mix(C.accent, 12) : "transparent",
+                  }}>
+                    {DNI_SK[i]} {Number(d.slice(8, 10))}.
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Mriežka */}
+            <div style={{ display: "grid", gridTemplateColumns: "42px repeat(7, 1fr)", gap: 3 }}>
+              <div style={{ position: "relative", height: hodin * VYSKA }}>
+                {Array.from({ length: hodin }, (_, i) => (
+                  <div key={i} style={{ position: "absolute", top: i * VYSKA - 6, right: 4, fontSize: 10.5, color: C.textDim }}>
+                    {String(od + i).padStart(2, "0")}:00
+                  </div>
+                ))}
+              </div>
+              {dni.map((d) => (
+                <div key={d} style={{
+                  position: "relative", height: hodin * VYSKA, borderRadius: 7,
+                  background: d === dnesIso ? mix(C.accent, 5) : mix(C.border, 14),
+                  overflow: "hidden",
+                }}>
+                  {Array.from({ length: hodin }, (_, i) => (
+                    <div key={i} style={{ position: "absolute", top: i * VYSKA, left: 0, right: 0, borderTop: `1px solid ${mix(C.border, 40)}` }} />
+                  ))}
+                  {vTyzdni.filter((u) => u.zaciatok.slice(0, 10) === d).map((u) => {
+                    const top = ((minuty(u.zaciatok) - od * 60) / 60) * VYSKA;
+                    const vyska = Math.max(18, ((minuty(u.koniec) - minuty(u.zaciatok)) / 60) * VYSKA - 2);
+                    const f = farba(u);
+                    return (
+                      <div
+                        key={`${u.uid}|${u.trener}`}
+                        title={`${cas(u.zaciatok)}–${cas(u.koniec)} · ${u.nazov}${u.klient ? ` → ${u.klient}` : ""} · ${u.trener}`}
+                        style={{
+                          position: "absolute", top, left: 2, right: 2, height: vyska,
+                          borderRadius: 5, padding: "2px 4px", overflow: "hidden",
+                          background: mix(f, 16), borderLeft: `3px solid ${f}`,
+                          fontSize: 10.5, lineHeight: 1.25, color: C.text,
+                        }}
+                      >
+                        <div style={{ fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {u.klient || u.nazov}{!u.klient && u.typ !== "sukromne" && u.typ !== "netrening" && <span style={{ color: C.orange }}> ?</span>}
+                        </div>
+                        {vyska > 30 && <div style={{ color: C.textDim, fontSize: 10 }}>{cas(u.zaciatok)}</div>}
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          </div>
+        </ScrollX>
+      )}
+
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 10, fontSize: 11, color: C.textDim }}>
+        {[["Tréning", C.accent], ["Úvodný", C.blue], ["Guillermo", C.green], ["Súkromné", C.textDim]].map(([l, f]) => (
+          <span key={String(l)} style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+            <span style={{ width: 9, height: 9, borderRadius: 2, background: String(f) }} /> {l}
+          </span>
+        ))}
+      </div>
     </Card>
   );
 }
