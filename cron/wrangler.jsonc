@@ -6,6 +6,8 @@
   "main": "src/index.ts",
   "compatibility_date": "2025-05-01",
   "observability": { "enabled": true },
+  // 4:00 a 18:00 UTC = snímky kalendára (6:00 a 20:00 v Prahe).
+  // 2:00 UTC = nočná záloha, keď sa do databázy nepíše.
   "triggers": { "crons": ["0 4 * * *", "0 18 * * *"] },
   // Priame prepojenie na Kokpit. Cez verejnú adresu to nejde — worker volajúci
   // *.workers.dev iného workera dostane 404.

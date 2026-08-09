@@ -11,7 +11,7 @@
  */
 type Env = { KOKPIT: Fetcher; KAL_CRON_TOKEN: string };
 
-const zavolaj = (env: Env) =>
+const zavolaj = (env: Env, cesta = "/api/kalendar?cron=1") =>
   env.KOKPIT.fetch(
     // Adresa musí byť SKUTOČNÁ, hoci požiadavka ide prepojením a von nikdy
     // nejde: appka je SSR a na neznámy host odpovedá 404, nie svojou trasou.
@@ -24,7 +24,7 @@ export default {
   async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
     ctx.waitUntil(
       zavolaj(env).then(
-        (r) => console.log(`snímka kalendára: HTTP ${r.status}`),
+        async (r) => console.log(`snímka kalendára: HTTP ${r.status} ${(await r.text()).slice(0, 200)}`),
         (e) => console.error("snímka kalendára zlyhala:", e),
       ),
     );

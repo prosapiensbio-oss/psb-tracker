@@ -28,6 +28,18 @@
     "not_found_handling": "none"
   },
 
+  // ŽIADNE ÚLOŽISKO NA ZÁLOHY — a je to zámer, nie opomenutie.
+  //
+  // Vlastná nočná záloha (dump všetkých tabuliek do KV) zhodila appku: na
+  // voľnom pláne má worker 10 ms procesorového času na požiadavku a prepis
+  // 5 000 riadkov do 2,5 MB JSON-u ho prekročí o rády. Opakované pokusy
+  // zaškrtili celý worker a Kokpit vracal 503.
+  //
+  // D1 má pritom vlastné Time Travel: bod obnovy za posledných 30 dní, zadarmo
+  // a bez jediného riadku kódu. Presne to, pred čím má záloha chrániť (zlý
+  // import, nešťastné mazanie), rieši lepšie než čokoľvek, čo by sme napísali.
+  // Kópia mimo Cloudflare zostáva ručným stiahnutím v Údajoch.
+
   "d1_databases": [
     {
       "binding": "DB",
