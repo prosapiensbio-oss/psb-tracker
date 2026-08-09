@@ -37,6 +37,24 @@ const relTime = (ts: number) => {
   return `${d.getDate()}.${d.getMonth() + 1}.`;
 };
 
+/**
+ * Nedokončená odpoveď sa prizná, nie zamlčí.
+ *
+ * ask() vloží prázdnu asistentovu správu a autosave ju o sekundu a pol uloží.
+ * Keď sa stream nedokončí (prerušené spojenie, zavretie appky uprostred),
+ * prázdna správa zostane v histórii navždy — a s ňou sa stratí aj akcia,
+ * ktorú mal Jarvis vykonať. Presne takto sa 9. 8. stratila odpoveď na
+ * položku registra o Danovi Kouřilovi: Jerry odpovedal, odpoveď zmizla,
+ * ack sa nezapísal a položka ticho zostala otvorená. Chyba, ktorá nič
+ * nepovie, je horšia než tá, čo spadne — tak nech niečo povie.
+ */
+const opravStratene = (msgs: Msg[]): Msg[] =>
+  msgs.map((m, i) =>
+    m.role === "assistant" && !m.text?.trim() && !m.actions?.length && i === msgs.length - 1
+      ? { ...m, text: "⚠ Táto odpoveď sa nedokončila — spojenie sa prerušilo skôr, než dorazila. Ak z nej mal vzniknúť zápis (ack, záver…), nevznikol. Pošli otázku alebo odpoveď znova." }
+      : m,
+  );
+
 function fileToDataUrl(f: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const r = new FileReader();
@@ -172,7 +190,7 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
       if (Array.isArray(raw) && raw.length) {
         setChats(raw);
         const recent = raw.filter((c: SavedChat) => !c.archived).sort((a: SavedChat, b: SavedChat) => b.updatedAt - a.updatedAt)[0];
-        if (recent) { setChatId(recent.id); setMsgs(recent.messages || []); }
+        if (recent) { setChatId(recent.id); setMsgs(opravStratene(recent.messages || [])); }
       }
     } catch { /* ignore */ }
     void fetchJarvisMemory().then(({ chats: db }) => {
@@ -187,7 +205,7 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
       setMsgs((m) => {
         if (m.length) return m;
         if (recent) setChatId(recent.id);
-        return recent?.messages || [];
+        return opravStratene(recent?.messages || []);
       });
     });
     return () => { zivy = false; };
@@ -218,7 +236,7 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
     try { localStorage.setItem(CHATS_KEY, JSON.stringify(next)); } catch { /* ignore */ }
   };
   const newChat = () => { setChatId(newId()); setMsgs([]); setInput(""); setAttach([]); };
-  const openChat = (id: string) => { const c = chats.find((x) => x.id === id); if (c) { setChatId(id); setMsgs(c.messages || []); } };
+  const openChat = (id: string) => { const c = chats.find((x) => x.id === id); if (c) { setChatId(id); setMsgs(opravStratene(c.messages || [])); } };
   const deleteChat = (id: string) => { persistChats(chats.filter((c) => c.id !== id)); void deleteJarvisChat(id); if (id === chatId) newChat(); };
   const archiveChat = (id: string) => {
     const next = chats.map((c) => (c.id === id ? { ...c, archived: !c.archived } : c));
