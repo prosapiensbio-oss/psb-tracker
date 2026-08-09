@@ -125,9 +125,30 @@ export const Route = createFileRoute("/api/kalendar")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        if (!(await isAuthed(request))) return unauthorized();
         const { DB } = bindings();
         if (!DB) return Response.json({ ok: false, error: "no_db" });
+        const q0 = new URL(request.url).searchParams;
+
+        // ── Spustenie z plánovača ─────────────────────────────────────────
+        //
+        // Sťahovanie ráno a večer nemôže čakať na to, kým niekto otvorí appku —
+        // zmysel snímok je práve v tom, že ich robí stroj v rovnaký čas. Cron
+        // beží vo vlastnom workeri (nemá session) a preukazuje sa tajomstvom,
+        // ktoré obe strany zdieľajú. Je to ten istý princíp ako pri bitcoinovej
+        // rezerve: po drôte ide dôkaz, nie heslo.
+        if (q0.get("cron") === "1") {
+          const token = (bindings() as { KAL_CRON_TOKEN?: string }).KAL_CRON_TOKEN;
+          const dany = request.headers.get("x-cron-token") || "";
+          if (!token || token.length !== dany.length || token !== dany) {
+            return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
+          }
+          const zdroje = ((await DB.prepare("SELECT id, trener, url, aktivny FROM kal_zdroje WHERE aktivny = 1").all()).results || []) as unknown as Zdroj[];
+          const vysledky: Record<string, unknown> = {};
+          for (const z of zdroje) vysledky[z.trener] = await snimka(DB, z);
+          return Response.json({ ok: true, vysledky });
+        }
+
+        if (!(await isAuthed(request))) return unauthorized();
         const { od, do_ } = okno();
 
         const [zdroje, zmeny, mapovanie, udalosti] = await Promise.all([

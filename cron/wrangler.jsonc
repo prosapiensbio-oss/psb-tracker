@@ -1,0 +1,13 @@
+{
+  // Plánovač snímok kalendára. Časy sú v UTC: 4:00 a 18:00 UTC = 6:00 a 20:00
+  // v Prahe (letný čas). Ráno pred prvým tréningom, večer po poslednom —
+  // presne tie dva okamihy, medzi ktorými sa deň v kalendári mení.
+  "name": "kokpit-cron",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-05-01",
+  "observability": { "enabled": true },
+  "triggers": { "crons": ["0 4 * * *", "0 18 * * *"] },
+  // Priame prepojenie na Kokpit. Cez verejnú adresu to nejde — worker volajúci
+  // *.workers.dev iného workera dostane 404.
+  "services": [{ "binding": "KOKPIT", "service": "kokpit" }]
+}

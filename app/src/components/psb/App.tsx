@@ -934,8 +934,57 @@ function skupinaFaktur(
         ...stavPolozky(key), priority: 9, client: "vzas|pnl",
       });
     }
+    // ── Koho dnes uvidíš a čo mu treba povedať ────────────────────────────
+    //
+    // Všetky tieto veci appka vedela už včera — narodeniny, dochádzajúci
+    // balíček, piaty mesiac. Chýbal jediný údaj: KEDY toho človeka naozaj
+    // stretneš. Ten prináša kalendár, a tým sa z evidencie stáva pripomienka
+    // v okamihu, keď sa s ňou dá niečo spraviť.
+    //
+    // Zámerne len na dnešok. Zoznam „tento týždeň" by sa čítal ako plán a
+    // strácal by naliehavosť; toto je veta, ktorú si prečítaš ráno a večer je
+    // buď vybavená, alebo prepadla.
+    {
+      const dnesIso = new Date().toISOString().slice(0, 10);
+      const dnesne = kalUdalosti
+        .filter((u) => u.zaciatok.slice(0, 10) === dnesIso && u.klient && (u.typ === "trening" || u.typ === "uvodny"))
+        .sort((a, b) => a.zaciatok.localeCompare(b.zaciatok));
+      for (const u of dnesne) {
+        const c = clients[u.klient as string];
+        if (!c) continue;
+        const dovody: string[] = [];
+
+        if (c.narodeniny) {
+          const [, m, d] = c.narodeniny.split("-");
+          if (m && d && `${m}-${d}` === dnesIso.slice(5)) dovody.push("má dnes narodeniny");
+        }
+        if (c.packageRemaining != null && c.packageTotal != null && c.packageRemaining <= 1) {
+          dovody.push(
+            c.packageRemaining <= 0
+              ? "balíček má vyčerpaný — dnes je posledná hodina, ktorú mu appka pozná"
+              : "v balíčku mu zostáva posledná hodina",
+          );
+        }
+        // 6M: upozornenie si nesie sám riadok procesu — netreba ho odvodzovať
+        // z fázy a mesiaca druhýkrát a inak než Prevádzka.
+        const s6 = sixM.find((x) => x.client === u.klient);
+        if (s6?.alert) dovody.push(s6.alert.replace(/^⚠️\s*/, "").toLowerCase());
+        if (s6 && !s6.contractSigned) dovody.push("nemá podpísanú zmluvu");
+        if (u.typ === "uvodny") dovody.push("je to úvodný tréning — po ňom sa rozhoduje o pokračovaní");
+
+        if (!dovody.length) continue;
+        const key = `dnes|${dnesIso}|${u.klient}`;
+        out.push({
+          key, category: "6M", tone: "blue",
+          title: `${u.zaciatok.slice(11, 16)} ${u.klient}: ${dovody[0]}`,
+          detail: `Dnes o ${u.zaciatok.slice(11, 16)} máš tréning s ${u.klient}. ${dovody.map((x) => x[0].toUpperCase() + x.slice(1)).join(". ")}.`,
+          ...stavPolozky(key), priority: 1, client: `klienti|klienti`,
+        });
+      }
+    }
+
     return out;
-  }, [bankaSumy, bankaPohyby, bankaPrijmy, btcPrijmy, btcBezDokladu, data.anomalyAck]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [bankaSumy, bankaPohyby, bankaPrijmy, btcPrijmy, btcBezDokladu, data.anomalyAck, kalUdalosti, clients, sixM]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const zmenyMetrik = useMemo(() => {
     const ack = data.anomalyAck || {};
