@@ -24,7 +24,10 @@ export function useScrollEnd<T extends HTMLElement>(enabled: boolean, dep: unkno
 }
 
 export function Card({ children, style, id }: { children: ReactNode; style?: CSSProperties; id?: string }) {
-  return <div style={{ ...S.card, ...style }} id={id}>{children}</div>;
+  // `psb-card` je jediné miesto, kde sa karty dajú chytiť naraz. Paleta
+  // „Živé sklo" na ňu vešia blur a väčší radius (styles.css); klasické palety
+  // triedu ignorujú. Vďaka tomu je nový vzhľad vec CSS, nie prepisu kariet.
+  return <div className="psb-card" style={{ ...S.card, ...style }} id={id}>{children}</div>;
 }
 
 export function StatCard({
@@ -86,8 +89,8 @@ export function Badge({ tone, children }: { tone: Parameters<typeof badge>[0]; c
 export function H2({ children }: { children: ReactNode }) {
   return <div style={S.h2}>{children}</div>;
 }
-export function H3({ children, onClick }: { children: ReactNode; onClick?: () => void }) {
-  return <div style={{ ...S.h3, ...(onClick ? { cursor: "pointer" } : {}) }} onClick={onClick}>{children}</div>;
+export function H3({ children, onClick, style }: { children: ReactNode; onClick?: () => void; style?: CSSProperties }) {
+  return <div style={{ ...S.h3, ...(onClick ? { cursor: "pointer" } : {}), ...style }} onClick={onClick}>{children}</div>;
 }
 
 export function Select({

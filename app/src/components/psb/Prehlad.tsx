@@ -1,4 +1,5 @@
 import { type ReactNode, useEffect, useMemo, useState } from "react";
+import { fmtCZK } from "../../lib/psb/format";
 import { C, mix } from "../../lib/psb/theme";
 import { BulletGraph, Info, Sparkline, Trend } from "./ui";
 
@@ -246,6 +247,8 @@ export function PrehladPanel({
   zmenyTs,
   vyzaduju,
   registerPanel,
+  uzavrety,
+  onUzavrety,
   vpravo,
   cerstvost,
 }: {
@@ -259,6 +262,9 @@ export function PrehladPanel({
   zmenyTs: number | null;
   vyzaduju: { kritickych: number };
   registerPanel: ReactNode;
+  /** Uzavretý mesiac ako tenký riadok — vysvedčenie, nie prístroj. */
+  uzavrety?: { mesiac: string; zisk: number; trzby: number; be: number } | null;
+  onUzavrety?: () => void;
   vpravo?: ReactNode;
   /** Dáta k dátumu + či nie sú zastarané. Tichý dashboard nad starými dátami
    *  vyzerá presne ako tichý dashboard nad dobrými — preto je to výstraha. */
@@ -305,8 +311,8 @@ export function PrehladPanel({
       </div>
 
       <Pasmo
-        titulok="Ako to dopadlo"
-        popis="uzavreté čísla — už sa nedajú ovplyvniť"
+        titulok="Ako to ide"
+        popis="bežiaci mesiac — dá sa ešte ovplyvniť"
         deti={
           <div style={{ display: "grid", gridTemplateColumns: `repeat(${stlpce}, minmax(0,1fr))`, gap: 9, alignItems: "stretch" }}>
             {/* Kotva zaberá dva stĺpce a je vľavo hore — tam, kde oko začína
@@ -328,6 +334,30 @@ export function PrehladPanel({
           </div>
         }
       />
+
+      {/* Uzavretý mesiac. Jeden riadok namiesto dvoch veľkých kariet: číslo,
+          ktoré sa už nedá ovplyvniť, nemá zaberať štvrtinu prístrojovej dosky
+          — ale ani zmiznúť, lebo je to vysvedčenie za celý mesiac. */}
+      {uzavrety && (
+        <button
+          onClick={onUzavrety}
+          style={{
+            display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap",
+            width: "100%", textAlign: "left", cursor: onUzavrety ? "pointer" : "default",
+            background: "none", border: "none", padding: "2px 0 10px", margin: 0,
+          }}
+        >
+          <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: 0.6, textTransform: "uppercase", color: C.textDim }}>
+            {uzavrety.mesiac} uzavretý
+          </span>
+          <span style={{ fontSize: 13, color: C.textMuted }}>
+            zisk <b style={{ color: uzavrety.zisk >= 0 ? C.text : C.red, fontWeight: 700 }}>{fmtCZK(uzavrety.zisk)}</b>
+            {" · "}tržby <b style={{ color: C.text, fontWeight: 700 }}>{fmtCZK(uzavrety.trzby)}</b>
+            {" · "}break-even {fmtCZK(uzavrety.be)}
+          </span>
+          {onUzavrety && <span style={{ fontSize: 12, color: C.textDim }}>→</span>}
+        </button>
+      )}
 
       {zmenyTs !== null && <ZmenyRiadok ts={zmenyTs} zmeny={zmeny} />}
 

@@ -458,8 +458,15 @@ export function Dashboard({
     // nedelia na trénera (platba v PTminderi trénera nemá), takže prepínač
     // trénera na tejto karte nič nerobí a nemá predstierať, že áno.
     const monthCash = lastMonth ? lastMonth.cash : 0;
+    // Bežiaci mesiac zvlášť. Import z PTmindera chodí TÝŽDENNE, takže tržba za
+    // rozbehnutý mesiac je živé číslo, ktoré sa dá sledovať — na rozdiel od
+    // zisku, kde náklady pribudnú z Fio až raz mesačne (Jerry, 10. 8.).
+    const beziaciMk = new Date().toISOString().slice(0, 7);
+    const vsetkyMes = monthlyFinance(data);
+    const beziaci = vsetkyMes.find((m) => m.month === beziaciMk);
+    const beziaciCash = beziaci ? beziaci.cash : 0;
     const sixMCount = sixM.filter((c) => matchT(c.primaryTrainer)).length;
-    return { active, weekHours, lastWeek, monthCash, lastMonth: lastMonth?.month, sixMCount };
+    return { active, weekHours, lastWeek, monthCash, lastMonth: lastMonth?.month, sixMCount, beziaciCash, beziaciMk };
   }, [clients, data, sixM, trainer, kotva]);
 
   // Zisk za posledný mesiac, ktorý má kompletný P&L — teda aj náklady.
@@ -557,6 +564,10 @@ export function Dashboard({
   // Predikcia tržieb na najbližší mesiac — podľa Jerryho „to najdôležitejšie
   // číslo, aké appka počíta". Doteraz bola schovaná vo Financiách → Predikcia a
   // na dashboarde nebola vôbec.
+  // Predikcia sa počíta RAZ a použijú ju dve dlaždice: odhad na ďalší mesiac
+  // a „čaká sa ešte" v tržbách za bežiaci mesiac. Dve volania toho istého
+  // modelu by sa raz rozišli v parametroch a nikto by si nevšimol prečo.
+  const cashPredMes = useMemo(() => predictCash(data, clients, 2), [data, clients, kalendar]); // eslint-disable-line react-hooks/exhaustive-deps
   const trzbyOdhad = useMemo(() => {
     const cash = predictCash(data, clients, 1);
     return cash.months[0] || null;
@@ -585,9 +596,12 @@ export function Dashboard({
   // tejto karty), ale z priemeru a z „najľahšieho týždňa" sa vyhadzuje — inak
   // by rozrobený týždeň vyhrával oboje a Ø by klesalo s každým importom.
   // Rezerva sa ťahá vždy — je to jeden z ôsmich prístrojov, nie voliteľná karta.
-  const [btc, setBtc] = useState<{ czk: number | null } | null>(null);
+  const [btc, setBtc] = useState<{ czk: number | null; platby?: { klient: string | null; datum: string; czk: number | null }[] } | null>(null);
   useEffect(() => {
-    void fetchBtcReserve().then((r) => setBtc(r));
+    // `platby=1` navyše: z nich sa počíta, koľko klientov platí bitcoinom
+    // a aký podiel tržieb to je. Jerry (10. 8.) chcel jedno číslo — a ukázalo
+    // sa, že nie je okrajové: v júli to bolo 41 % tržieb.
+    void fetchBtcReserve(true).then((r) => setBtc(r as never));
   }, []);
   // Skutočný stav účtu a hotovosti, zapísaný ručne v Peniaze → Cashflow.
   // Bez neho hovorila dlaždica Rezerva len o bitcoine — a to je časť majetku,
@@ -615,63 +629,47 @@ export function Dashboard({
     const cashRad = mesiace.slice(-12).map((m) => m.cash);
     const predchCash = mesiace.length > 1 ? mesiace[mesiace.length - 2].cash : null;
 
-    // ── KOTVA: zisk. Jediné číslo, ktoré hovorí, či mesiac dával zmysel.
-    // Pruh pod ním ukazuje, o čo išlo: tržby proti break-evenu.
+    // ── KOTVA: tržby za BEŽIACI mesiac (Jerry, 10. 8.) ──────────────────────
+    //
+    // Kotvou bol zisk za uzavretý mesiac — najdôležitejšie číslo v podniku,
+    // ale také, s ktorým sa už nedá nič spraviť. Kokpit má ukazovať to, čo sa
+    // ešte dá ovplyvniť, a platby chodia z PTmindera týždenne, takže tržba
+    // rozbehnutého mesiaca je živá. Zisk zostáva — v tenkom riadku pod
+    // prístrojmi, lebo náklady z banky prídu raz mesačne a živý zisk by bola
+    // vymyslenina (9. 8. takto ukázal august ako 34 155 Kč).
+    const dnesIso2 = new Date().toISOString().slice(0, 10);
+    const cakaSa = cashPredMes?.perClient
+      ? cashPredMes.perClient.filter((x) => x.kedy === stats.beziaciMk).reduce((a, x) => a + x.suma * x.confidence, 0)
+      : 0;
     const kotvaP: Pristroj = {
-      id: "zisk",
-      label: "Zisk",
-      hodnota: zisk ? fmtCZK(zisk.v) : "—",
-      podnadpis: zisk ? monthLabel(zisk.mesiac) : "čaká na P&L",
-      pasmo: !zisk ? "nevie" : zisk.v < 0 ? "zle" : zisk.odstupPct !== null && zisk.odstupPct < 20 ? "pozor" : "ok",
-      poznamka: !zisk ? undefined
-        : zisk.v < 0 ? "mesiac zožral viac, než priniesol"
-        : zisk.odstupPct !== null && zisk.odstupPct < 20 ? "tesne — jeden slabý mesiac = strata"
+      id: "trzbyTeraz",
+      label: "Tržby tento mesiac",
+      hodnota: fmtCZK(stats.beziaciCash),
+      podnadpis: `${monthLabel(stats.beziaciMk)} · k ${Number(dnesIso2.slice(8, 10))}. dňu`,
+      pasmo: "ok",
+      poznamka: cakaSa > 0 ? `čaká sa ešte ~${fmtCZK(cakaSa)}` : undefined,
+      vysvetlenie: "Peniaze, ktoré v tomto mesiaci UŽ prišli (účet + hotovosť + BTC) — aktualizuje sa s každým importom z PTmindera, takže sa dá sledovať priebežne. Pruh ukazuje, kam to smeruje: kde je dnes a kde bude, ak dobehnú aj očakávané obnovy. Zisk sa takto ukázať nedá — náklady chodia z banky raz mesačne a rozbehnutý mesiac by vyzeral ako rekordný. Uzavretý mesiac je v riadku pod prístrojmi.",
+      seria: cashRad,
+      kotva: cakaSa > 0
+        ? { hodnota: stats.beziaciCash, ciel: stats.beziaciCash + cakaSa, cielLabel: `prišlo ${fmtCZK(stats.beziaciCash)} · s očakávanými obnovami ~${fmtCZK(stats.beziaciCash + cakaSa)}` }
         : undefined,
-      vysvetlenie: "Hrubý zisk za posledný mesiac s kompletnými nákladmi: tržby mínus všetko vrátane NÁROKOV na výplaty (nie toho, čo si tréner reálne vzal). Pruh pod číslom je tržba proti break-evenu — zvislá čiarka je bod, kde firma pokryje prevádzku aj nároky. Zdravý odstup je 20 % a viac; pod tým stačí jeden slabý mesiac na stratu a presne to sa v 2025 stalo päťkrát.",
-      seria: zisk?.rad,
-      // Percento proti takmer nulovej základni vyrobí „▲ 1958 %", čo nie je
-      // informácia, ale delenie malým číslom. Pod 10 000 Kč sa trend nekreslí.
-      zmenaPct: zisk && zisk.predch && Math.abs(zisk.predch) >= 10000 ? ((zisk.v - zisk.predch) / Math.abs(zisk.predch)) * 100 : null,
-      kotva: zisk ? { hodnota: zisk.prijmy, ciel: zisk.be, cielLabel: `tržby ${fmtCZK(zisk.prijmy)} · break-even ${fmtCZK(zisk.be)}` } : undefined,
-      kam: () => onNavigate("vzas", "pnl"),
+      kam: () => onNavigate("vzas", "trzby"),
     };
 
     // ── ČO UŽ DOPADLO ────────────────────────────────────────────────────────
     const vysledok: Pristroj[] = [];
 
-    vysledok.push({
-      id: "trzby",
-      label: "Tržby",
-      hodnota: fmtCZK(stats.monthCash),
-      podnadpis: stats.lastMonth ? monthLabel(stats.lastMonth) : undefined,
-      pasmo: "ok",
-      vysvetlenie: "Peniaze, ktoré reálne prišli za posledný uzavretý mesiac (účet + hotovosť + BTC). Nie hodnota odtrénovaných sedení — tá je iné číslo a je v Peniazoch → Sedenia & cena.",
-      seria: cashRad,
-      zmenaPct: predchCash ? ((stats.monthCash - predchCash) / predchCash) * 100 : null,
-      kam: () => onNavigate("vzas", "trzby"),
-    });
-
-    // Odchody v percentách, nie v kusoch. Percento sa dá porovnať s odvetvím,
-    // kus nie. Pásma: pod 3 % špička, do 5 % v poriadku, nad 7 % poplach.
-    const churn = stats.active > 0 ? (toky.odisloMes / stats.active) * 100 : null;
-    vysledok.push({
-      id: "churn",
-      label: "Odchody",
-      hodnota: churn === null ? "—" : `${churn.toFixed(1)} %`,
-      podnadpis: `Ø ${toky.odisloMes.toFixed(1)} klienta / mes.`,
-      pasmo: churn === null ? "nevie" : churn > 7 ? "zle" : churn > 5 ? "pozor" : "ok",
-      poznamka: churn === null ? undefined : churn <= 3 ? "špičkové (pod 3 %)" : churn <= 5 ? "v norme (do 5 %)" : "nad odvetvím",
-      dobreHore: false,
-      vysvetlenie: "Koľko percent klientov odíde za mesiac — priemer za posledný rok. Odvetvové pásma: pod 3 % špička, 3–5 % zdravé, nad 7 % poplach. Percento sa dá porovnať s inými štúdiami, samotný počet odídených nie. Odchod „dozrieva“ — posledné dva mesiace sa ešte nedajú spoľahlivo počítať.",
-      kam: () => onNavigate("klienti", "rast"),
-    });
-
+    // ODCHODY sa z Kokpitu vypustili (Jerry, 10. 8.): „neviem, čo mám z toho,
+    // že viem, koľko ľudí odchádza." Je to zaostávajúci ukazovateľ — kým ho
+    // uvidíš, rozhodnutie, ktoré ho spôsobilo, je tri mesiace staré. Žije
+    // ďalej v Klienti → Fluktuácia a vo Výsledkoch, kde znie otázka „zabralo
+    // to, čo sme zmenili?".
     const cisty = toky.prisloMes - toky.odisloMes;
     vysledok.push({
       id: "klienti",
       label: "Aktívni klienti",
       hodnota: String(stats.active),
-      podnadpis: `čistý rast ${cisty >= 0 ? "+" : ""}${cisty.toFixed(1)} / mes.`,
+      podnadpis: `čistý rast ${cisty >= 0 ? "+" : ""}${cisty.toFixed(1)} / mes. · Ø ${toky.prisloMes.toFixed(1)} nových`,
       pasmo: cisty < -0.5 ? "zle" : cisty < 0 ? "pozor" : "ok",
       poznamka: cisty < 0 ? "odchádza viac, než prichádza" : undefined,
       vysvetlenie: "Počet aktívnych klientov a priemerný čistý rast za mesiac (prišlo mínus odišlo). Samotný počet je márnivé číslo — dôležitý je smer. Klesajúci čistý rast sa v tržbách prejaví až o dva-tri mesiace neskôr.",
@@ -783,6 +781,18 @@ export function Dashboard({
     // Rezerva = VŠETKO, čo firma má: účet + hotovosť + bitcoin. Kým nie je
     // zapísaný stav účtu a hotovosti, ostáva len bitcoin a dlaždica to povie —
     // inak by tvrdila, že firma vydrží mesiac, hoci má na účte ďalších sto tisíc.
+    // Podiel bitcoinu na tržbách za posledný UZAVRETÝ mesiac. Nie za celú
+    // históriu: podiel sa mení a číslo má hovoriť o dnešku. Klienti sa počítajú
+    // za posledný rok — kto zaplatil raz vlani, dnes „neplatí v BTC".
+    const btcPodiel = (() => {
+      const platby = btc?.platby;
+      if (!platby?.length || !stats.lastMonth || !stats.monthCash) return null;
+      const rok = new Date(Date.now() - 365 * 86400000).toISOString().slice(0, 10);
+      const klientov = new Set(platby.filter((x) => x.klient && x.datum >= rok).map((x) => x.klient)).size;
+      const zaMesiac = platby.filter((x) => x.datum.slice(0, 7) === stats.lastMonth).reduce((a, x) => a + (x.czk || 0), 0);
+      if (!klientov) return null;
+      return { klientov, pct: Math.round((zaMesiac / stats.monthCash) * 100) };
+    })();
     const rez = btc?.czk ?? null;
     const majetok = stavPenazi ? (rez ?? 0) + stavPenazi.fio + stavPenazi.hotovost : rez;
     const mesRez = majetok !== null && zisk && zisk.bePriem > 0 ? majetok / zisk.bePriem : null;
@@ -794,12 +804,19 @@ export function Dashboard({
         : stavPenazi ? `${fmtCZK(majetok)} — účet, hotovosť aj BTC`
         : `${fmtCZK(majetok)} — zatiaľ len BTC`,
       pasmo: mesRez === null ? "nevie" : mesRez < 1 ? "zle" : mesRez < 3 ? "pozor" : "ok",
-      poznamka: mesRez !== null && mesRez < 3 ? "cieľ sú 3 mesiace" : undefined,
+      poznamka: btcPodiel
+        ? `${btcPodiel.klientov} ${btcPodiel.klientov === 1 ? "klient platí" : btcPodiel.klientov < 5 ? "klienti platia" : "klientov platí"} v BTC · ${btcPodiel.pct} % tržieb`
+        : mesRez !== null && mesRez < 3 ? "cieľ sú 3 mesiace" : undefined,
       vysvetlenie: "Koľko mesiacov by firma ustála bez jedinej tržby — všetko, čo má (účet + hotovosť + bitcoin), delené priemerným break-evenom za pol roka. Stav účtu a hotovosti sa zapisuje ručne v Peniaze → Cashflow, karta „Kde tie peniaze sú“; Fio dáva len výpis pohybov, nie aktuálny zostatok. Kým zapísaný nie je, ráta sa len bitcoin a číslo je nižšie než skutočnosť. Tvoj cieľ „120 000 Kč+“ je v korunách; toto je to isté prepočítané na čas, čo je jediné, čo v zlom mesiaci rozhoduje.",
       kam: () => onNavigate("vzas", "cashflow"),
     });
 
-    return { kotva: kotvaP, vysledok, varovne };
+    // Tenký riadok pod prístrojmi: uzavretý mesiac. Nie dlaždica — je to
+    // vysvedčenie, nie prístroj.
+    const uzavrety = zisk
+      ? { mesiac: monthLabel(zisk.mesiac), zisk: zisk.v, trzby: zisk.prijmy, be: zisk.be }
+      : null;
+    return { kotva: kotvaP, vysledok, varovne, uzavrety };
   }, [data, clients, stats, zisk, trzbyOdhad, toky, lievikMes, weekRows, btc, stavPenazi, kotva, trainer, zonaLo, zonaHi, onNavigate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Čerstvosť dát. Tichý dashboard nad tri týždne starým exportom vyzerá presne
@@ -1485,6 +1502,8 @@ export function Dashboard({
         zmeny={zmeny}
         zmenyTs={odMinule?.ts ?? null}
         vyzaduju={{ kritickych: kriticke.length }}
+        uzavrety={pristroje.uzavrety}
+        onUzavrety={() => onNavigate("vzas", "pnl")}
         registerPanel={
           <>
             {registerPanel}

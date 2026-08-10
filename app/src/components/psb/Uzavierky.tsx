@@ -147,6 +147,7 @@ export function Uzavierky({ prekazky, kroky, podklady, onNavigate, chat }: {
 } = {}) {
   const [obdobia, setObdobia] = useState<Obdobie[]>([]);
   const [log, setLog] = useState<AuditRiadok[]>([]);
+  const [auditOtvoreny, setAuditOtvoreny] = useState(false);
   const [nacitava, setNacitava] = useState(true);
   const [prebieha, setPrebieha] = useState<string | null>(null);
 
@@ -391,9 +392,21 @@ export function Uzavierky({ prekazky, kroky, podklady, onNavigate, chat }: {
         )}
       </Card>
 
+      {/* Audit je zbalený (Jerry, 10. 8.). Je to poistka, nie čítanie: otvára
+          sa vtedy, keď sa niečo hľadá, a dovtedy len zaberal pol obrazovky
+          Údajov riadkami, ktoré nikto nečíta. Rozbalený stav si stránka
+          nepamätá zámerne — východzí stav má byť zbalený. */}
       <Card>
-        <H3><Info text="Každá zmena v appke necháva riadok: čo sa zmenilo, z čoho na čo a kedy. Zobrazuje sa posledných 200 záznamov. Existuje preto, aby sa pri peniazoch dalo dohľadať, kto čo prepísal — do importu z banky bolo možné zmeniť čokoľvek bez stopy." label="Audit — posledné zmeny" /></H3>
-        {log.length === 0 ? (
+        <button
+          onClick={() => setAuditOtvoreny((o) => !o)}
+          style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left" }}
+        >
+          <H3 style={{ marginBottom: 0 }}>
+            <Info text="Každá zmena v appke necháva riadok: čo sa zmenilo, z čoho na čo a kedy. Zobrazuje sa posledných 200 záznamov. Existuje preto, aby sa pri peniazoch dalo dohľadať, kto čo prepísal — do importu z banky bolo možné zmeniť čokoľvek bez stopy." label={`Audit — posledné zmeny${log.length ? ` (${log.length})` : ""}`} />
+          </H3>
+          <span style={{ marginLeft: "auto", color: C.textDim, fontSize: 12 }}>{auditOtvoreny ? "skryť ▾" : "zobraziť ▸"}</span>
+        </button>
+        {!auditOtvoreny ? null : log.length === 0 ? (
           <Empty>Zatiaľ žiadne zmeny. Prvá zmena po nasadení sa objaví tu.</Empty>
         ) : (
           <div style={{ maxHeight: 420, overflowY: "auto", marginTop: 8 }}>
