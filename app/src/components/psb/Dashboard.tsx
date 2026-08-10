@@ -97,6 +97,18 @@ const HIDDEN_KEY = "psb-dash-hidden";
 const WIDTH_KEY = "psb-dash-width";
 const KNOWN_KEY = "psb-dash-known";
 const KPI_KEY = "psb-dash-kpi";
+/**
+ * Verzia východzej zostavy kariet.
+ *
+ * Uložené rozloženie v prehliadači prebíja východzie nastavenie — a to je
+ * správne, kým si ho človek sám poskladal. Lenže 10. 8. sa východzia zostava
+ * prerobila od základu (zlúčené karty, zóny presunuté do grafu hodín) a Jerry
+ * by z toho videl starú zostavu plus pár nových kariet navrch. Zmena verzie
+ * teda uložené rozloženie RAZ zahodí a nastaví novú zostavu; kto si potom
+ * niečo prepne, ostane mu to.
+ */
+const LAYOUT_VER_KEY = "psb-dash-ver";
+const LAYOUT_VER = "2026-08-10";
 
 function useDashLayout() {
   const [order, setOrder] = useState<string[]>(DEFAULT_ORDER);
@@ -107,6 +119,11 @@ function useDashLayout() {
 
   useEffect(() => {
     try {
+      // Nová východzia zostava → uložené rozloženie sa raz zahodí.
+      if (localStorage.getItem(LAYOUT_VER_KEY) !== LAYOUT_VER) {
+        for (const k of [ORDER_KEY, HIDDEN_KEY, WIDTH_KEY, KNOWN_KEY]) localStorage.removeItem(k);
+        localStorage.setItem(LAYOUT_VER_KEY, LAYOUT_VER);
+      }
       const o = JSON.parse(localStorage.getItem(ORDER_KEY) || "null");
       if (Array.isArray(o)) {
         const known = o.filter((id: string) => DEFAULT_ORDER.includes(id));
@@ -679,6 +696,69 @@ export function Dashboard({
       kam: () => onNavigate("klienti", "klienti"),
     });
 
+    // Posledný týždeň v dátach býva useknutý — PTminder končí v piatok, takže
+    // sobota a nedeľa v ňom chýbajú. Prístroj hlásil „37 h, pod zónou" za tri
+    // odtrénované dni. Berie sa preto posledný CELÝ týždeň.
+    const hodinyTyzdna = (r: (typeof weekRows)[number]) =>
+      trainer === "all" ? r[1].Jerry + r[1].Terezka + r[1].iny : trainer === "Jerry" ? r[1].Jerry : r[1].Terezka;
+    const useknuty = !!kotva.den && new Date(`${kotva.den}T00:00:00Z`).getUTCDay() !== 0;
+    const uplne = useknuty ? weekRows.slice(0, -1) : weekRows;
+    const poslTyzden = uplne[uplne.length - 1];
+    const h = poslTyzden ? hodinyTyzdna(poslTyzden) : 0;
+    // TENTO týždeň z kalendára, nie minulý z PTmindera (Jerry, 10. 8.).
+    //
+    // Prístroj hovoril, koľko sa odtrénovalo v poslednom UZAVRETOM týždni —
+    // číslo pravdivé, ale mŕtve: s minulým týždňom sa už nedá nič spraviť.
+    // Kalendár vie, čo je nachystané na tento, a to je vec, do ktorej sa dá
+    // ešte zasiahnuť. Porovnanie s minulým týždňom (tiež z kalendára, aby sa
+    // porovnávalo rovnaké s rovnakým) hovorí, ktorým smerom to ide.
+    const pondelok = (d: Date) => {
+      const x = new Date(d);
+      x.setHours(0, 0, 0, 0);
+      x.setDate(x.getDate() - ((x.getDay() + 6) % 7));
+      return x;
+    };
+    const tenPondelok = pondelok(new Date());
+    const minPondelok = new Date(tenPondelok.getTime() - 7 * 86400000);
+    const hodinyZKal = (od: Date, do_: Date) =>
+      kalendar
+        .filter((u) => (u.typ === "trening" || u.typ === "uvodny") && matchT(u.trener))
+        .filter((u) => {
+          const t = Date.parse(u.zaciatok);
+          return t >= od.getTime() && t < do_.getTime();
+        })
+        .reduce((a, u) => {
+          const min = (Date.parse(u.koniec) - Date.parse(u.zaciatok)) / 60000;
+          // Udalosť bez konca (alebo s nezmyselnou dĺžkou) sa počíta ako hodina —
+          // v kalendári stojí jeden tréning za jeden riadok.
+          return a + (min > 5 && min < 300 ? min / 60 : 1);
+        }, 0);
+    const hTento = hodinyZKal(tenPondelok, new Date(tenPondelok.getTime() + 7 * 86400000));
+    const hMinuly = hodinyZKal(minPondelok, tenPondelok);
+    const maKal = kalendar.length > 0;
+    // Bez kalendára zostáva pôvodné číslo z PTmindera — appka bez pripojeného
+    // kalendára nesmie stratiť prístroj, len ukáže to, čo vie.
+    const hZobraz = maKal ? hTento : h;
+    const zmenaTyzdna = maKal && hMinuly > 0 ? ((hTento - hMinuly) / hMinuly) * 100 : null;
+    // Bezici tyzden patri medzi 'ako to ide', nie medzi 'co sa chysta':
+    // je to teraz, nie vyhlad (Jerry, 10. 8.).
+    vysledok.push({
+      id: "hodiny",
+      label: "Hodiny / týždeň",
+      hodnota: `${hZobraz.toFixed(0)} h`,
+      podnadpis: maKal
+        ? `tento týždeň · nachystané v kalendári`
+        : poslTyzden ? `týž. ${weekLabel(poslTyzden[0])} · odtrénované` : undefined,
+      pasmo: hZobraz === 0 ? "nevie" : hZobraz < zonaLo ? "pozor" : hZobraz > zonaHi ? "zle" : "ok",
+      poznamka: hZobraz === 0 ? undefined
+        : zmenaTyzdna !== null
+          ? `${zmenaTyzdna >= 0 ? "+" : ""}${zmenaTyzdna.toFixed(0)} % oproti minulému týždňu (${hMinuly.toFixed(0)} h)`
+          : hZobraz > zonaHi ? "nad zónou — riziko vyhorenia" : hZobraz < zonaLo ? "pod zónou" : `zóna ${zonaLo}–${zonaHi} h`,
+      vysvetlenie: `Koľko hodín je na TENTO týždeň nachystaných v Google Kalendári — vrátane toho, čo sa už odtrénovalo. Porovnanie je s minulým týždňom z toho istého zdroja, aby sa porovnávalo rovnaké s rovnakým. Zdravá zóna je ${ZONE_LO}–${ZONE_HI} h na trénera; pri „Obaja“ sa zdvojnásobuje, lebo dlaždica sčítava oboch. Keď kalendár pripojený nie je, ukazuje sa posledný uzavretý týždeň z PTmindera. Krivka pod číslom je história odtrénovaných týždňov.`,
+      seria: uplne.slice(-12).map(hodinyTyzdna),
+      kam: () => onNavigate("kalendar"),
+    });
+
     // ── ČO SA CHYSTÁ ─────────────────────────────────────────────────────────
     const varovne: Pristroj[] = [];
 
@@ -754,67 +834,6 @@ export function Dashboard({
       vysvetlenie: "Nové dopyty za posledný uzavretý mesiac a koľko z nich sa stalo klientmi. Dopyty predbiehajú tržby o dva až tri mesiace — keď klesnú, na peniazoch to ešte nevidno, ale už je rozhodnuté.",
       seria: dopytyRad,
       kam: () => onNavigate("marketing", "lievik"),
-    });
-
-    // Posledný týždeň v dátach býva useknutý — PTminder končí v piatok, takže
-    // sobota a nedeľa v ňom chýbajú. Prístroj hlásil „37 h, pod zónou" za tri
-    // odtrénované dni. Berie sa preto posledný CELÝ týždeň.
-    const hodinyTyzdna = (r: (typeof weekRows)[number]) =>
-      trainer === "all" ? r[1].Jerry + r[1].Terezka + r[1].iny : trainer === "Jerry" ? r[1].Jerry : r[1].Terezka;
-    const useknuty = !!kotva.den && new Date(`${kotva.den}T00:00:00Z`).getUTCDay() !== 0;
-    const uplne = useknuty ? weekRows.slice(0, -1) : weekRows;
-    const poslTyzden = uplne[uplne.length - 1];
-    const h = poslTyzden ? hodinyTyzdna(poslTyzden) : 0;
-    // TENTO týždeň z kalendára, nie minulý z PTmindera (Jerry, 10. 8.).
-    //
-    // Prístroj hovoril, koľko sa odtrénovalo v poslednom UZAVRETOM týždni —
-    // číslo pravdivé, ale mŕtve: s minulým týždňom sa už nedá nič spraviť.
-    // Kalendár vie, čo je nachystané na tento, a to je vec, do ktorej sa dá
-    // ešte zasiahnuť. Porovnanie s minulým týždňom (tiež z kalendára, aby sa
-    // porovnávalo rovnaké s rovnakým) hovorí, ktorým smerom to ide.
-    const pondelok = (d: Date) => {
-      const x = new Date(d);
-      x.setHours(0, 0, 0, 0);
-      x.setDate(x.getDate() - ((x.getDay() + 6) % 7));
-      return x;
-    };
-    const tenPondelok = pondelok(new Date());
-    const minPondelok = new Date(tenPondelok.getTime() - 7 * 86400000);
-    const hodinyZKal = (od: Date, do_: Date) =>
-      kalendar
-        .filter((u) => (u.typ === "trening" || u.typ === "uvodny") && matchT(u.trener))
-        .filter((u) => {
-          const t = Date.parse(u.zaciatok);
-          return t >= od.getTime() && t < do_.getTime();
-        })
-        .reduce((a, u) => {
-          const min = (Date.parse(u.koniec) - Date.parse(u.zaciatok)) / 60000;
-          // Udalosť bez konca (alebo s nezmyselnou dĺžkou) sa počíta ako hodina —
-          // v kalendári stojí jeden tréning za jeden riadok.
-          return a + (min > 5 && min < 300 ? min / 60 : 1);
-        }, 0);
-    const hTento = hodinyZKal(tenPondelok, new Date(tenPondelok.getTime() + 7 * 86400000));
-    const hMinuly = hodinyZKal(minPondelok, tenPondelok);
-    const maKal = kalendar.length > 0;
-    // Bez kalendára zostáva pôvodné číslo z PTmindera — appka bez pripojeného
-    // kalendára nesmie stratiť prístroj, len ukáže to, čo vie.
-    const hZobraz = maKal ? hTento : h;
-    const zmenaTyzdna = maKal && hMinuly > 0 ? ((hTento - hMinuly) / hMinuly) * 100 : null;
-    varovne.push({
-      id: "hodiny",
-      label: "Hodiny / týždeň",
-      hodnota: `${hZobraz.toFixed(0)} h`,
-      podnadpis: maKal
-        ? `tento týždeň · nachystané v kalendári`
-        : poslTyzden ? `týž. ${weekLabel(poslTyzden[0])} · odtrénované` : undefined,
-      pasmo: hZobraz === 0 ? "nevie" : hZobraz < zonaLo ? "pozor" : hZobraz > zonaHi ? "zle" : "ok",
-      poznamka: hZobraz === 0 ? undefined
-        : zmenaTyzdna !== null
-          ? `${zmenaTyzdna >= 0 ? "+" : ""}${zmenaTyzdna.toFixed(0)} % oproti minulému týždňu (${hMinuly.toFixed(0)} h)`
-          : hZobraz > zonaHi ? "nad zónou — riziko vyhorenia" : hZobraz < zonaLo ? "pod zónou" : `zóna ${zonaLo}–${zonaHi} h`,
-      vysvetlenie: `Koľko hodín je na TENTO týždeň nachystaných v Google Kalendári — vrátane toho, čo sa už odtrénovalo. Porovnanie je s minulým týždňom z toho istého zdroja, aby sa porovnávalo rovnaké s rovnakým. Zdravá zóna je ${ZONE_LO}–${ZONE_HI} h na trénera; pri „Obaja“ sa zdvojnásobuje, lebo dlaždica sčítava oboch. Keď kalendár pripojený nie je, ukazuje sa posledný uzavretý týždeň z PTmindera. Krivka pod číslom je história odtrénovaných týždňov.`,
-      seria: uplne.slice(-12).map(hodinyTyzdna),
-      kam: () => onNavigate("kalendar"),
     });
 
     // Rezerva sa delí PRIEMERNÝM break-evenom za pol roka, nie tým z posledného
@@ -1220,6 +1239,7 @@ export function Dashboard({
           // spraviť — užitočnejšie je, ako sa tá práca delí medzi dvoch ľudí.
           // Keď je vybraný jeden tréner, delenie nemá zmysel a vracia sa max/min,
           // lebo vtedy je to jeho vlastný najťažší a najľahší týždeň.
+          <>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 8, marginTop: 10 }}>
             <MiniStat label={`Ø / týždeň (${weekStats.n})`} value={`${weekStats.avg.toFixed(1)}h`} onClick={() => onNavigate("treningy", "prehled")} />
             {trainer === "all" ? (
@@ -1234,6 +1254,17 @@ export function Dashboard({
               </>
             )}
           </div>
+          {/* Zóny rovno pod priemermi (Jerry, 10. 8.) — dovtedy to bol
+              samostatný koláč vedľa. Otázka „koľko robíme" a „bolo to zdravé"
+              je jedna otázka a odpoveď na ňu má byť na jednom mieste. */}
+          {zones.total > 0 && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 8, marginTop: 8 }}>
+              <MiniStat label="V zdravej zóne" value={`${zones.zdrava} · ${Math.round((zones.zdrava / zones.total) * 100)} %`} color={C.green} />
+              <MiniStat label="Pod zónou" value={`${zones.pod} · ${Math.round((zones.pod / zones.total) * 100)} %`} color={C.red} />
+              <MiniStat label="Nad zónou" value={`${zones.nad} · ${Math.round((zones.nad / zones.total) * 100)} %`} color={C.orange} />
+            </div>
+          )}
+          </>
         )}
       </Card>
     ),
