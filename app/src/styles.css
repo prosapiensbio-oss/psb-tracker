@@ -313,6 +313,14 @@
 /* Sklo. Trieda je na zdieľanom komponente Card, takže sa aplikuje na všetky
  * karty naraz — vrátane tých, ktoré ešte len vzniknú.
  * -webkit- prefix je povinný, inak Safari neukáže blur vôbec (bod 04). */
+/* Kontajner appky musí byť v skle PRIEHĽADNÝ, inak prekryje mesh a z celého
+ * efektu zostane len zmena farieb (presne to sa stalo pri prvom nasadení).
+ * Rovnako <body>: jeho background-color je var(--c-bg) zo spoločného pravidla. */
+:root[data-psb-theme^="sklo"] body,
+:root[data-psb-theme^="sklo"] .psb-app {
+  background: transparent;
+}
+
 :root[data-psb-theme^="sklo"] .psb-card {
   /* Poradie je naopak, než by človek čakal, a je to zámer: minifikátor
      (lightningcss) považuje neprefixovanú vlastnosť za nadmnožinu prefixovanej

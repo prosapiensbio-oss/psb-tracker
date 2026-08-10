@@ -408,12 +408,15 @@ export function Dashboard({
       /* ignore */
     }
   };
+  // Východzia sekcia grafov je VYŤAŽENIE (Jerry, 10. 8.). Odrobené hodiny sú
+  // preňho najdôležitejší graf a zároveň jediný, ktorý hovorí o najbližších
+  // dňoch; peniaze sa čítajú raz mesačne pri uzávierke.
   const [sekcia, setSekcia] = useState<SekciaId>(() => {
     try {
       const u = localStorage.getItem("psb-dash-sekcia");
-      return (SEKCIE.some((x) => x.id === u) ? u : "peniaze") as SekciaId;
+      return (SEKCIE.some((x) => x.id === u) ? u : "vytazenie") as SekciaId;
     } catch {
-      return "peniaze";
+      return "vytazenie";
     }
   });
   const zvolSekciu = (id: SekciaId) => {

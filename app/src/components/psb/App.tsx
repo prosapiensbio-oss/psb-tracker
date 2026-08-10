@@ -1436,7 +1436,11 @@ function skupinaFaktur(
 
   return (
     <ObdobieCtx.Provider value={{ obdobie, setObdobie }}>
-    <div style={{ minHeight: "100dvh", background: C.bg, color: C.text }}>
+    {/* `psb-app` existuje kvôli palete Živé sklo: mesh sa kreslí na <body>
+        a tento kontajner ho svojím nepriehľadným pozadím prekryl — appka
+        potom vyzerala len ako iné farby, nie ako sklo. V klasických paletách
+        trieda nič nerobí. */}
+    <div className="psb-app" style={{ minHeight: "100dvh", background: C.bg, color: C.text }}>
       <div style={{ padding: "16px 16px 0", display: "flex", alignItems: "center", gap: 12, maxWidth: 1200, margin: "0 auto", flexWrap: "wrap" }}>
         {/* Logo je zároveň cesta domov — najstarší weborý zvyk a jediné miesto,
             kde ho každý hľadá inštinktívne. */}
