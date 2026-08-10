@@ -428,6 +428,12 @@ export function Dashboard({
   // Východzia sekcia grafov je VYŤAŽENIE (Jerry, 10. 8.). Odrobené hodiny sú
   // preňho najdôležitejší graf a zároveň jediný, ktorý hovorí o najbližších
   // dňoch; peniaze sa čítajú raz mesačne pri uzávierke.
+  // Sekcia bez jedinej karty sa nekreslí. Prepínač, v ktorom polovica tlačidiel
+  // neukáže nič, je zoznam sľubov — a človek si ho odvykne prekliknúť celý.
+  const sekcieSKartami = useMemo(
+    () => SEKCIE.filter((sk) => WIDGETS.some((w) => w.sekcia === sk.id)),
+    [],
+  );
   const [sekcia, setSekcia] = useState<SekciaId>(() => {
     try {
       const u = localStorage.getItem("psb-dash-sekcia");
@@ -1635,7 +1641,7 @@ export function Dashboard({
           sekciami, z ktorých je vidieť len jedna, sa nedá. */}
       {!arranging && (
         <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginBottom: 12 }}>
-          {SEKCIE.map((sk) => {
+          {sekcieSKartami.map((sk) => {
             const pocet = WIDGETS.filter((w) => w.sekcia === sk.id && !layout.hidden.includes(w.id)).length;
             const aktivna = sekcia === sk.id;
             return (
@@ -1696,7 +1702,7 @@ export function Dashboard({
       )}
 
 
-      {SEKCIE.filter((s) => arranging || s.id === sekcia).map((s) => {
+      {sekcieSKartami.filter((s) => arranging || s.id === sekcia).map((s) => {
         const ids = shown.filter((id) => WIDGETS.find((w) => w.id === id)?.sekcia === s.id);
         if (!ids.length) {
           // Prázdna sekcia by po prepnutí nechala bielu plochu bez vysvetlenia.

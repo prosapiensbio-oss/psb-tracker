@@ -32,7 +32,7 @@ import { BarRow, Card, Donut, Empty, H3, Info, LineChart, Modal, ValueBars } fro
 // svojich domovských obrazovkách (jedna aritmetika, jedna pravda). Klik na
 // kartu vedie tam, kde sa s číslom dá pracovať.
 
-export type SekciaId = "peniaze" | "vytazenie" | "klienti" | "marketing" | "vysledky";
+export type SekciaId = "peniaze" | "vytazenie" | "klienti" | "marketing";
 // Poradie podľa Jerryho (2026-08-07): vyťaženie → klienti → peniaze →
 // marketing → výsledky. Je to poradie príčiny a následku, nie dôležitosti —
 // odrobené hodiny vyrobia klientov, klienti vyrobia peniaze. Peniaze sú
@@ -42,7 +42,6 @@ export const SEKCIE: { id: SekciaId; label: string; popis: string }[] = [
   { id: "klienti", label: "Klienti", popis: "Pribúdajú, alebo len rotujú?" },
   { id: "peniaze", label: "Peniaze", popis: "Zarábame? A vydržíme?" },
   { id: "marketing", label: "Marketing", popis: "Odkiaľ chodia noví ľudia." },
-  { id: "vysledky", label: "Výsledky", popis: "KPI proti cieľom — každé číslo sa dá vypnúť zvlášť." },
 ];
 
 // KPI sa neberú ako jeden veľký graf, ale ako štyri karty podľa skupín z
@@ -53,10 +52,11 @@ const KPI_ROK = (() => {
   return r === "2025" ? "2025" : "2026";
 })();
 export const KPI_KARTY: { id: string; group: KpiGroup }[] = [
-  { id: "kpiPeniaze", group: "peniaze" },
-  { id: "kpiLievik", group: "lievik" },
-  { id: "kpiKapacita", group: "kapacita" },
-  { id: "kpiCena", group: "cena" },
+  // KPI karty (Peniaze, Lievik, Kapacita, Cena) sa z knižnice dashboardu
+  // odstránili spolu so sekciou Výsledky (Jerry, 10. 8.). Neboli prázdne —
+  // boli DUPLIKÁTOM obrazovky Výsledky → KPI, kde žijú v plnej podobe aj
+  // s cieľmi a možnosťou vypnúť jednotlivé riadky. Dva vstupy do tej istej
+  // veci znamenajú dve miesta, ktoré sa raz rozídu.
 ];
 /** Definície KPI pre knižnicu (bez hodnôt — tie potrebujú dáta). */
 export const kpiVSkupine = (g: KpiGroup) => kpiDefs(KPI_ROK).filter((d) => d.group === g);
@@ -145,11 +145,11 @@ export const WIDGETS: WidgetMeta[] = [
   { id: "ltvZdroj", label: "Hodnota klienta (LTV)", span: 1, sekcia: "marketing", vychodzi: true, popis: "Koľko klient priemerne zaplatí za celý čas spolupráce.", doma: "Klienti → Fluktuácia" },
   { id: "kohortyDopytov", label: "Kohorty dopytov", span: 1, sekcia: "marketing", popis: "Z koľkých dopytov daného mesiaca sa nakoniec stali klienti.", doma: "Marketing → Lievik" },
 
-  // ── Výsledky (KPI) ─────────────────────────────────────────────────────────
-  { id: "kpiPeniaze", label: `KPI ${KPI_ROK} — Peniaze`, span: 1, sekcia: "vysledky", popis: "Tržby, marža, odstup od break-evenu, rezerva v mesiacoch.", doma: "Výsledky → KPI" },
-  { id: "kpiLievik", label: `KPI ${KPI_ROK} — Lievik`, span: 1, sekcia: "vysledky", popis: "Úvodné tréningy a úspešnosť po úvodnom.", doma: "Výsledky → KPI" },
-  { id: "kpiKapacita", label: `KPI ${KPI_ROK} — Kapacita a klienti`, span: 1, sekcia: "vysledky", popis: "Aktívni klienti, odtrénované hodiny, dĺžka spolupráce.", doma: "Výsledky → KPI" },
-  { id: "kpiCena", label: `KPI ${KPI_ROK} — Cena a mix`, span: 1, sekcia: "vysledky", popis: "Hodinovka, hodnota klienta, online podiel, marketing z tržieb.", doma: "Výsledky → KPI" },
+  // KPI karty (Peniaze, Lievik, Kapacita, Cena) sa z knižnice dashboardu
+  // odstránili spolu so sekciou Výsledky (Jerry, 10. 8.). Neboli prázdne —
+  // boli DUPLIKÁTOM obrazovky Výsledky → KPI, kde žijú v plnej podobe aj
+  // s cieľmi a s možnosťou vypnúť jednotlivé riadky. Dva vstupy do tej istej
+  // veci znamenajú dve miesta, ktoré sa raz rozídu.
 ];
 
 export const VYCHODZIE = new Set(WIDGETS.filter((w) => w.vychodzi).map((w) => w.id));
