@@ -984,12 +984,18 @@ export function Balicky({ udalosti, clients, sedenia = [], onObnov, style, onKli
                   PO objednaných („−2/17") a proti PTminderu vyzerala ako chyba;
                   Jerry ju trikrát čítal ako zlé dáta. Projekcia (mínus) je
                   v texte vedľa, farba sa ňou riadi ďalej. */}
+              {/* Odznak = koľko má TERAZ. Je to zostatok z PTmindera mínus
+                  hodiny, ktoré sa už odtrénovali a do exportu sa ešte
+                  nedostali — teda číslo, na ktorom PTminder bude po najbližšom
+                  importe. Nie je to projekcia z objednávok: tú nesie text
+                  vedľa. Rozdiel je podstatný — odtrénovaná hodina sa STALA,
+                  objednaná sa ešte stať nemusí. */}
               <span style={{
                 fontSize: 10.5, fontWeight: 700, minWidth: 40, padding: "2px 6px", borderRadius: 6, textAlign: "center", flexShrink: 0,
                 color: r.po <= 0 ? C.red : C.orange,
                 background: mix(r.po <= 0 ? C.red : C.orange, 12),
               }}>
-                {r.zostava}{r.spolu ? `/${r.spolu}` : ""}
+                {Math.max(0, r.zostava - r.uz)}{r.spolu ? `/${r.spolu}` : ""}
               </span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 {onKlient ? (
@@ -1010,8 +1016,9 @@ export function Balicky({ udalosti, clients, sedenia = [], onObnov, style, onKli
                     ňu má appka v exporte. Kto platnosť zapísanú nemá, má
                     riadok kratší; vymýšľať sa nedá. */}
                 <span style={{ fontSize: 11, color: C.textDim, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {r.uz ? `odtrénované ${r.uz}` : r.kusov ? `obj. ${r.kusov}` : "bez termínu"}
-                  {r.uz && r.kusov ? ` · obj. ${r.kusov}` : ""}
+                  {r.uz ? `${r.uz} h odtrénovaná, v PTminderi ešte nie` : null}
+                  {r.uz && r.kusov ? " · " : null}
+                  {r.kusov ? `obj. ${r.kusov}` : r.uz ? null : "bez termínu"}
                   {r.platnostDo ? ` · platnosť do ${fmtDMY(r.platnostDo)}` : ""}
                 </span>
               </div>
