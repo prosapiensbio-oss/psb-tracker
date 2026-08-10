@@ -18,7 +18,7 @@ import { objednaneVerzia,
 } from "../../lib/psb/compute";
 import { fmtCZK, fmtDMY, monthLabel, weekKey, weekLabel } from "../../lib/psb/format";
 import { C, mix, S, badge, btn } from "../../lib/psb/theme";
-import { Balicky, type KalUdalost } from "./Kalendar";
+import { Balicky, odtrenovaneMimoExportu, type KalUdalost } from "./Kalendar";
 import { nastavPrijmyZTrackera, pnlCalc, poslednyMesiacSDatami, salaryCalc, vzasVerzia, VZAS_MONTHS } from "../../lib/psb/vzas";
 import { fetchBtcReserve, fetchVzasSettings } from "../../lib/psb/client";
 import { PrehladPanel, useZmenyOdMinule, type Pristroj, type Zmena } from "./Prehlad";
@@ -1164,6 +1164,10 @@ export function Dashboard({
     const dnes = new Date().toISOString().slice(0, 10);
     const dni = (d: string) => Math.round((Date.parse(d) - Date.parse(dnes)) / 86400000);
     const ack = data.anomalyAck || {};
+    // Zostatok po hodinách, ktoré už prebehli, ale export ich ešte nevidel —
+    // ten istý helper ako Balíčky. Kadličková mala v Balíčkoch 2/6 a tu 3/6:
+    // dve čísla pre tú istú klientku na jednej obrazovke.
+    const odtren = odtrenovaneMimoExportu(kalendar, data.sessions);
     return Object.values(clients)
       .filter((c) => c.status !== "Neaktívny" && c.status !== "Pauza" && matchT(c.primaryTrainer))
       .filter((c) => !ack[`balicek|${c.name}`])
@@ -1189,17 +1193,18 @@ export function Dashboard({
         // Posledný týždeň sa hlási vždy: koniec členstva je sám o sebe moment,
         // kedy sa rieši ďalší balíček.
         const tyzdnovDoKonca = doKonca !== null ? doKonca / 7 : 0;
+        const zostava = Math.max(0, c.packageRemaining - (odtren[c.name] || 0));
         const stihneMinut = frekvencia > 0
-          ? frekvencia * tyzdnovDoKonca >= c.packageRemaining - 1
+          ? frekvencia * tyzdnovDoKonca >= zostava - 1
           : false;
         const konci =
           doKonca !== null && doKonca > -60 &&
           (doKonca <= 7 || (doKonca <= 21 && !stihneMinut));
-        return { c, doKonca, frekvencia, konci };
+        return { c, doKonca, frekvencia, konci, zostava };
       })
       .filter((x) => x.konci)
       .sort((a, b) => (a.doKonca ?? 21) - (b.doKonca ?? 21) || a.c.name.localeCompare(b.c.name));
-  }, [clients, trainer, data.anomalyAck]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [clients, trainer, data.anomalyAck, kalendar, data.sessions]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Mená, ktoré si niekto odložil — aby sa dali vrátiť jedným klikom.
   const odlozene = Object.keys(data.anomalyAck || {})
@@ -1473,10 +1478,10 @@ export function Dashboard({
               )}
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 8 }}>
-              {platnostKonci.map(({ c, doKonca, frekvencia }) => (
+              {platnostKonci.map(({ c, doKonca, frekvencia, zostava }) => (
                 <div key={c.name} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 10px", background: mix(C.text, 4), border: `1px solid ${C.border}`, borderRadius: 9, width: "100%", minWidth: 0 }}>
                   <span style={{ ...badge(doKonca !== null && doKonca <= 7 ? "red" : "orange"), fontSize: 10, flexShrink: 0 }}>
-                    {c.packageTotal > 0 ? `${c.packageRemaining}/${c.packageTotal}` : "—"}
+                    {c.packageTotal > 0 ? `${zostava}/${c.packageTotal}` : "—"}
                   </span>
                   <button
                     onClick={() => onNavigate("klienti", undefined, { client: c.name, nonce: Date.now() })}
@@ -1485,7 +1490,7 @@ export function Dashboard({
                   >
                     <span style={{ fontSize: 13, color: C.text, fontWeight: 500, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</span>
                     <span style={{ fontSize: 11, color: C.textDim, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {doKonca === null ? `${c.packageRemaining}/${c.packageTotal} hodín`
+                      {doKonca === null ? `${zostava}/${c.packageTotal} hodín`
                         : doKonca < 0 ? `platnosť vypršala ${fmtDMY(c.packageValidTo)}`
                         : doKonca === 0 ? "platnosť končí dnes"
                         : `platnosť do ${fmtDMY(c.packageValidTo)} · ${doKonca} ${doKonca < 5 ? "dni" : "dní"} · hodiny nestihne minúť`}

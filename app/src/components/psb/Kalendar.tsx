@@ -857,6 +857,36 @@ function Kontrola({ udalosti, data }: { udalosti: KalUdalost[]; data: PSBData })
 }
 
 /**
+ * Hodiny, ktoré už prebehli podľa kalendára, ale v PTminderi ešte nie sú.
+ *
+ * Vytiahnuté z karty Balíčky, lebo tú istú otázku kladie aj sekcia „Končí
+ * platnosť členstva": Kadličková mala v Balíčkoch 2/6 (po odtrénovanej
+ * hodine) a o pár riadkov nižšie 3/6 (holá momentka z exportu) — dve rôzne
+ * čísla pre tú istú klientku na jednej obrazovke. Porovnáva sa bez
+ * diakritiky a s toleranciou ±1 deň, rovnako ako „Chýba v PTminderi".
+ */
+export function odtrenovaneMimoExportu(
+  udalosti: KalUdalost[],
+  sedenia: { client: string; date: string }[],
+): Record<string, number> {
+  const teraz = new Date();
+  const dnes = teraz.toISOString().slice(0, 10);
+  const hola = (x: string) => x.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+  const posun = (d: string, o: number) => new Date(Date.parse(`${d}T00:00:00Z`) + o * 86400000).toISOString().slice(0, 10);
+  const zapisane = new Set(sedenia.map((x) => `${hola(x.client)}|${x.date.slice(0, 10)}`));
+  const out: Record<string, number> = {};
+  for (const u of udalosti) {
+    if (u.typ !== "trening" || !u.klient) continue;
+    const den = u.zaciatok.slice(0, 10);
+    if (den > dnes || (den === dnes && Date.parse(u.zaciatok) > teraz.getTime())) continue;
+    const k = hola(u.klient);
+    if ([-1, 0, 1].some((o) => zapisane.has(`${k}|${posun(den, o)}`))) continue;
+    out[u.klient] = (out[u.klient] || 0) + 1;
+  }
+  return out;
+}
+
+/**
  * Balíčky po započítaní toho, čo je už objednané — nie po poslednom exporte.
  *
  * Karta žije na Kokpite, nie v Kalendári: je to vec, ktorá si pýta akciu dnes
@@ -899,23 +929,16 @@ export function Balicky({ udalosti, clients, sedenia = [], onObnov, style, onKli
      * a hodina sa vráti sama. Účtovníctvo tak zostáva na PTminderi; kalendár
      * je len predbežná vrstva medzi dvoma nedeľnými exportmi.
      */
-    const hola = (x: string) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
-    const posun = (d: string, o: number) => new Date(Date.parse(`${d}T00:00:00Z`) + o * 86400000).toISOString().slice(0, 10);
-    const zapisane = new Set(sedenia.map((x) => `${hola(x.client)}|${x.date.slice(0, 10)}`));
     const objednane: Record<string, number> = {};
-    const odtrenovane: Record<string, number> = {};
+    // Odtrénované-ale-neexportované ráta spoločný helper hore — tie isté
+    // čísla číta aj sekcia „Končí platnosť členstva" na Kokpite.
+    const odtrenovane = odtrenovaneMimoExportu(udalosti, sedenia);
     for (const u of udalosti) {
       if (u.typ !== "trening" || !u.klient) continue;
       const den = u.zaciatok.slice(0, 10);
       if (den > dnes || (den === dnes && Date.parse(u.zaciatok) > teraz.getTime())) {
         objednane[u.klient] = (objednane[u.klient] || 0) + 1;
-        continue;
       }
-      // Už prebehol. Ak ho PTminder má, je v zostatku zarátaný; ak nie, treba
-      // ho odčítať ručne, inak appka tvrdí, že hodina ešte čaká.
-      const k = hola(u.klient);
-      if ([-1, 0, 1].some((o) => zapisane.has(`${k}|${posun(den, o)}`))) continue;
-      odtrenovane[u.klient] = (odtrenovane[u.klient] || 0) + 1;
     }
     for (const meno of Object.keys(odtrenovane)) if (objednane[meno] === undefined) objednane[meno] = 0;
     // Kto má hodiny dochodené a v kalendári NIČ, je najurgentnejší telefonát zo
