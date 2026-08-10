@@ -46,6 +46,10 @@ export type Pristroj = {
   kam?: () => void;
   /** Kotviaci prístroj: väčší, vľavo hore, s pruhom proti cieľu. */
   kotva?: { hodnota: number; ciel: number; cielLabel: string };
+  /** Druhý pohľad na to isté číslo (Jerry, 10. 8.): „očakávané obnovy 129k
+   *  chcem veľké ako 36 965, alebo si to prepínať." Dva mini-taby v hlavičke;
+   *  voľba sa pamätá per prístroj. */
+  prepinac?: { label: string; hodnota: string; podnadpis?: string; poznamka?: string };
 };
 
 const farbaPasma = (p: Pasmo) => (p === "zle" ? C.red : p === "pozor" ? C.orange : p === "nevie" ? C.textDim : C.text);
@@ -68,8 +72,35 @@ function Znacka({ pasmo }: { pasmo: Pasmo }) {
 
 function Dlazdica({ p, velka }: { p: Pristroj; velka?: boolean }) {
   const [hover, setHover] = useState(false);
+  // Voľba pohľadu sa pamätá per prístroj — kto si prepne na očakávané
+  // tržby, nájde ich tam aj zajtra.
+  const [alt, setAlt] = useState(() => {
+    try { return localStorage.getItem(`psb-pristroj-alt-${p.id}`) === "1"; } catch { return false; }
+  });
+  const prepni = (naAlt: boolean) => {
+    setAlt(naAlt);
+    try { localStorage.setItem(`psb-pristroj-alt-${p.id}`, naAlt ? "1" : "0"); } catch { /* súkromný režim */ }
+  };
+  const ukazAlt = !!p.prepinac && alt;
+  const hodnota = ukazAlt ? p.prepinac!.hodnota : p.hodnota;
+  const podnadpis = ukazAlt ? (p.prepinac!.podnadpis ?? p.podnadpis) : p.podnadpis;
+  const poznamka = ukazAlt ? (p.prepinac!.poznamka ?? p.poznamka) : p.poznamka;
   const mimo = p.pasmo === "pozor" || p.pasmo === "zle";
   const farba = farbaPasma(p.pasmo);
+  const tab = (text: string, jeAlt: boolean) => (
+    <button
+      onClick={(e) => { e.stopPropagation(); prepni(jeAlt); }}
+      style={{
+        background: "none", border: "none", padding: 0, cursor: "pointer",
+        fontSize: velka ? 11.5 : 10.5, fontWeight: 700, letterSpacing: 0.7, textTransform: "uppercase",
+        color: ukazAlt === jeAlt ? C.text : C.textDim,
+        borderBottom: ukazAlt === jeAlt ? `2px solid ${mix(C.accent, 80)}` : "2px solid transparent",
+        whiteSpace: "nowrap",
+      }}
+    >
+      {text}
+    </button>
+  );
   return (
     <div
       onClick={p.kam}
@@ -92,9 +123,16 @@ function Dlazdica({ p, velka }: { p: Pristroj; velka?: boolean }) {
       }}
     >
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 6, marginBottom: velka ? 5 : 3 }}>
-        <span style={{ fontSize: velka ? 11.5 : 10.5, fontWeight: 700, letterSpacing: 0.7, textTransform: "uppercase", color: C.textDim, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-          {p.label}
-        </span>
+        {p.prepinac ? (
+          <span style={{ display: "flex", gap: 10, minWidth: 0, overflow: "hidden" }}>
+            {tab(p.label, false)}
+            {tab(p.prepinac.label, true)}
+          </span>
+        ) : (
+          <span style={{ fontSize: velka ? 11.5 : 10.5, fontWeight: 700, letterSpacing: 0.7, textTransform: "uppercase", color: C.textDim, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+            {p.label}
+          </span>
+        )}
         <span style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
           <Znacka pasmo={p.pasmo} />
           <Info text={p.vysvetlenie} />
@@ -103,8 +141,8 @@ function Dlazdica({ p, velka }: { p: Pristroj; velka?: boolean }) {
 
       <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 8 }}>
         <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: velka ? 34 : 21, fontWeight: 700, color: farba, lineHeight: 1.1, whiteSpace: "nowrap" }}>{p.hodnota}</div>
-          {p.podnadpis && <div style={{ fontSize: velka ? 11.5 : 10.5, color: C.textDim, marginTop: 2 }}>{p.podnadpis}</div>}
+          <div style={{ fontSize: velka ? 34 : 21, fontWeight: 700, color: farba, lineHeight: 1.1, whiteSpace: "nowrap" }}>{hodnota}</div>
+          {podnadpis && <div style={{ fontSize: velka ? 11.5 : 10.5, color: C.textDim, marginTop: 2 }}>{podnadpis}</div>}
         </div>
         {/* Krivka je informácia, nie výzva — v norme neutrálna, farebná až keď
             prístroj vybočí. Jantárová na každom grafe znamenala, že sa oranžová
@@ -122,8 +160,8 @@ function Dlazdica({ p, velka }: { p: Pristroj; velka?: boolean }) {
 
       <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: velka ? 8 : 6, flexWrap: "wrap" }}>
         {p.zmenaPct !== undefined && <Trend zmenaPct={p.zmenaPct ?? null} dobreHore={p.dobreHore ?? true} tiche={!mimo} />}
-        {p.poznamka && (
-          <span style={{ fontSize: 10.5, color: mimo ? farba : C.textDim, lineHeight: 1.35 }}>{p.poznamka}</span>
+        {poznamka && (
+          <span style={{ fontSize: 10.5, color: mimo ? farba : C.textDim, lineHeight: 1.35 }}>{poznamka}</span>
         )}
       </div>
     </div>

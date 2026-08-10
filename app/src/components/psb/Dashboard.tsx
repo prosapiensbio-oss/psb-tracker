@@ -693,6 +693,17 @@ export function Dashboard({
       kotva: cakaSa > 0
         ? { hodnota: stats.beziaciCash, ciel: stats.beziaciCash + cakaSa, cielLabel: `prišlo ${fmtCZK(stats.beziaciCash)} · s očakávanými obnovami ~${fmtCZK(stats.beziaciCash + cakaSa)}` }
         : undefined,
+      // Druhý pohľad (Jerry, 10. 8.): očakávané tržby chcel veľké, nie malým
+      // písmom pod pruhom. Prepínač namiesto druhej dlaždice — je to to isté
+      // číslo z druhej strany.
+      prepinac: cakaSa > 0
+        ? {
+            label: "Očakávané",
+            hodnota: `~${fmtCZK(stats.beziaciCash + cakaSa)}`,
+            podnadpis: `${monthLabel(stats.beziaciMk)} · ak dobehnú obnovy`,
+            poznamka: `prišlo ${fmtCZK(stats.beziaciCash)} · čaká sa ~${fmtCZK(cakaSa)}`,
+          }
+        : undefined,
       kam: () => onNavigate("vzas", "trzby"),
     };
 

@@ -498,7 +498,7 @@ export function useExtraGrafy({
 
     nodes.zdravieFirmy = (
       <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column" }}>
-        <H3><Info label="Zdravie firmy" text="Štyri čísla za posledných 6 mesiacov P&L. Break-even ráta s NÁROKOM trénerov (nie s tým, čo si reálne vzali) — to, čo si niekto vezme navyše, je pôžička, nie náklad. Rezerva pod 20 % znamená, že jeden slabý mesiac stačí na stratu. Pozor: karta Tržby vs. break-even ráta tie isté pomery za obdobie zvolené vo filtri hore — preto sa čísla môžu líšiť." /></H3>
+        <H3><Info label="Zdravie firmy" text="Štyri čísla za posledných 6 uzavretých mesiacov P&L. Break-even ráta s NÁROKOM trénerov (nie s tým, čo si reálne vzali) — to, čo si niekto vezme navyše, je pôžička, nie náklad. Rezerva pod 20 % znamená, že jeden slabý mesiac stačí na stratu. Mzdy z tržieb bývajú len tu — jedno číslo, jeden domov." /></H3>
         <Klik kam={() => onNavigate("vzas")} onNavigate="VZAS → Zdravie firmy">
           {/* Okno priamo na kartě, nie len v Info: „Mzdy z tržieb 51 %" tu
               a „60 %" na break-even karte vyzerali ako chyba, kým sa človek
@@ -692,28 +692,15 @@ export function useExtraGrafy({
             series={[{ name: "Tržby", color: C.green }, { name: "Break-even", color: C.orange }]}
             height={190} fmt={kcK} autoY alignEnd
           />
-          {/* Dve čísla k tomu grafu (Jerry, 10. 8.): koľko z tržieb spotrebujú
-              mzdy a koľko mesiacov bolo pod break-evenom. Prvé hovorí, prečo
-              je break-even tam, kde je — mzda nie je fixný náklad, rastie
-              s odrobenými hodinami.
-              Mzdy = NÁROK, nie poslané (Jerry, 10. 8.): poslané obsahuje aj
-              „pôžičky" nad nárok a karta tak ukazovala 60 % tam, kde Zdravie
-              firmy 51 % — dve čísla pre tú istú vec. Rovnaký čitateľ ako
-              break-even čiara; zvyšný rozdiel je už len okno (filter obdobia
-              vs. posledných 6 mes.) a to je napísané na oboch kartách. */}
+          {/* „Mzdy z tržieb" tu bývali tiež — s iným oknom a iným čitateľom
+              než v Zdraví firmy, takže tá istá vec mala na jednej obrazovke
+              51 % aj 60 %. Jerry (10. 8.): „mzdy z tržieb sú strašne mätúce."
+              Číslo má jeden domov: Zdravie firmy. Tu zostáva len to, čo graf
+              vie povedať sám — koľko mesiacov bolo pod čiarou. */}
           <div style={{ fontSize: 10.5, color: C.textDim, marginTop: 8 }}>
             za zvolené obdobie · {MES_LAB[idxOkno[0]]} – {MES_LAB[idxOkno[nMes - 1]]}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8, marginTop: 6 }}>
-            <MiniStat
-              label="Mzdy (nárok) z tržieb"
-              value={(() => {
-                const trz = idxOkno.reduce((a, i) => a + p.prijmy[i], 0);
-                const narok = idxOkno.reduce((a, i) => a + j.narok[i] + t.narok[i] + p.matyas[i], 0);
-                return trz > 0 ? `${((narok / trz) * 100).toFixed(0)} %` : "—";
-              })()}
-              color={idxOkno.reduce((a, i) => a + j.narok[i] + t.narok[i] + p.matyas[i], 0) / Math.max(1, idxOkno.reduce((a, i) => a + p.prijmy[i], 0)) > 0.55 ? C.red : C.textMuted}
-            />
             <MiniStat
               label="Mesiacov pod break-even"
               value={`${idxOkno.filter((i) => p.prijmy[i] < be[i]).length} z ${nMes}`}

@@ -567,6 +567,9 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
           // obchádza všetky filtre vrátane „zobraziť neaktívnych", takže sa
           // otvorí aj ten, kto v bežnom zozname nie je.
           onKlient={(m) => { setFocusClient(m); onSub("klienti"); }}
+          // Klik na POČET v kohortách či zdrojoch otvorí zoznam len s tými
+          // ľuďmi — rovnaká skupina ako z dlaždice Odmlčaní na Kokpite.
+          onSkupina={(label, mena) => { setSkupina({ label, mena }); setFocusClient(null); onSub("klienti"); }}
         />
       ) :
        sub === "6m" ? <SixMTracker sixM={sixM} actions={actions} trainer={trainer} onTrainer={onTrainer} /> :

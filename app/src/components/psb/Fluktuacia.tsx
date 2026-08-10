@@ -97,7 +97,7 @@ export function tokyKlientov(data: PSBData, clients: Record<string, ClientAgg>, 
   };
 }
 
-export function RastAStrata({ data, clients, onKlient }: { data: PSBData; clients: Record<string, ClientAgg>; onKlient?: (meno: string) => void }) {
+export function RastAStrata({ data, clients, onKlient, onSkupina }: { data: PSBData; clients: Record<string, ClientAgg>; onKlient?: (meno: string) => void; onSkupina?: (label: string, mena: string[]) => void }) {
   const [hranica, setHranica] = useState("60");
   // Rozbalený mesiac. Bublina pod myšou tu bola prvá a bola to chyba: na
   // dotykovom displeji neexistuje a mená sa z nej nedali otvoriť.
@@ -218,8 +218,8 @@ export function RastAStrata({ data, clients, onKlient }: { data: PSBData; client
       </Card>
 
       <KdeTecie odisli={odisli} onKlient={onKlient} />
-      <Prezitie zoznam={zoznam} />
-      <HodnotaPodlaZdroja zoznam={zoznam} />
+      <Prezitie zoznam={zoznam} onSkupina={onSkupina} />
+      <HodnotaPodlaZdroja zoznam={zoznam} onSkupina={onSkupina} />
     </>
   );
 }
@@ -286,7 +286,7 @@ function KdeTecie({ odisli, onKlient }: { odisli: Klient[]; onKlient?: (m: strin
 }
 
 // ── 3. Prežitie kohorty ──────────────────────────────────────────────────────
-function Prezitie({ zoznam }: { zoznam: Klient[] }) {
+function Prezitie({ zoznam, onSkupina }: { zoznam: Klient[]; onSkupina?: (label: string, mena: string[]) => void }) {
   const riadky = useMemo(() => {
     const m = new Map<string, Klient[]>();
     for (const c of zoznam) {
@@ -299,6 +299,7 @@ function Prezitie({ zoznam }: { zoznam: Klient[] }) {
       .map(([mk, cs]) => ({
         mk,
         n: cs.length,
+        mena: cs.map((c) => c.name),
         // „Ešte tu po X mesiacoch" = jeho posledné sedenie je aspoň X mesiacov
         // po prvom. Nie „je aktívny dnes" — to by pri starých kohortách meralo
         // len to, koľko času odvtedy prešlo.
@@ -339,7 +340,13 @@ function Prezitie({ zoznam }: { zoznam: Klient[] }) {
               {riadky.map((r) => (
                 <tr key={r.mk}>
                   <td style={S.td}>{monthLabel(r.mk)}</td>
-                  <td style={{ ...S.td, textAlign: "right", fontWeight: 600, color: C.text }}>{r.n}</td>
+                  {/* Klik na počet otvorí tých konkrétnych ľudí v zozname
+                      klientov (Jerry, 10. 8.) — číslo bez akcie je len číslo. */}
+                  <td
+                    style={{ ...S.td, textAlign: "right", fontWeight: 600, color: C.text, cursor: onSkupina ? "pointer" : undefined, textDecoration: onSkupina ? "underline dotted" : undefined }}
+                    title={onSkupina ? "Otvoriť klientov tejto kohorty" : undefined}
+                    onClick={onSkupina ? () => onSkupina(`Prišli ${monthLabel(r.mk)}`, r.mena) : undefined}
+                  >{r.n}</td>
                   <td style={{ ...S.td, textAlign: "right", color: C.textDim }}>{r.sixM || "—"}</td>
                   <td style={{ ...S.td, textAlign: "right", color: C.accentLight }}>{bunka(r.m3, r.n, r.mk, 3)}</td>
                   <td style={{ ...S.td, textAlign: "right", color: C.textMuted }}>{bunka(r.m6, r.n, r.mk, 6)}</td>
@@ -359,7 +366,7 @@ function Prezitie({ zoznam }: { zoznam: Klient[] }) {
 }
 
 // ── 4. Hodnota klienta podľa zdroja ──────────────────────────────────────────
-function HodnotaPodlaZdroja({ zoznam }: { zoznam: Klient[] }) {
+function HodnotaPodlaZdroja({ zoznam, onSkupina }: { zoznam: Klient[]; onSkupina?: (label: string, mena: string[]) => void }) {
   const riadky = useMemo(() => {
     const m = new Map<string, Klient[]>();
     for (const c of zoznam) m.set(c.zdroj || "", [...(m.get(c.zdroj || "") || []), c]);
@@ -367,6 +374,7 @@ function HodnotaPodlaZdroja({ zoznam }: { zoznam: Klient[] }) {
       .map(([z, cs]) => ({
         z,
         n: cs.length,
+        mena: cs.map((c) => c.name),
         zivot: Math.round(cs.reduce((a, c) => a + c._zivot, 0) / cs.length),
         sedeni: Math.round((cs.reduce((a, c) => a + c.sessionCount, 0) / cs.length) * 10) / 10,
         trzba: Math.round(cs.reduce((a, c) => a + c._trzba, 0) / cs.length),
@@ -393,7 +401,11 @@ function HodnotaPodlaZdroja({ zoznam }: { zoznam: Klient[] }) {
           {riadky.map((r) => (
             <tr key={r.z || "—"}>
               <td style={S.td}>{zdrojLabel(r.z)}</td>
-              <td style={{ ...S.td, textAlign: "right", color: C.text }}>{r.n}</td>
+              <td
+                style={{ ...S.td, textAlign: "right", color: C.text, cursor: onSkupina ? "pointer" : undefined, textDecoration: onSkupina ? "underline dotted" : undefined }}
+                title={onSkupina ? "Otvoriť klientov z tohto zdroja" : undefined}
+                onClick={onSkupina ? () => onSkupina(`Zdroj: ${zdrojLabel(r.z)}`, r.mena) : undefined}
+              >{r.n}</td>
               <td style={{ ...S.td, textAlign: "right", color: C.textMuted }}>{r.aktivnych}</td>
               <td style={{ ...S.td, textAlign: "right", color: C.textMuted }}>{r.zivot}</td>
               <td style={{ ...S.td, textAlign: "right", color: C.textMuted }}>{r.sedeni}</td>
