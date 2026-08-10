@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 
 import { objednaneVerzia,
@@ -23,7 +23,7 @@ import { nastavPrijmyZTrackera, pnlCalc, poslednyMesiacSDatami, salaryCalc, vzas
 import { fetchBtcReserve, fetchVzasSettings } from "../../lib/psb/client";
 import { PrehladPanel, useZmenyOdMinule, type Pristroj, type Zmena } from "./Prehlad";
 import {
-  centerBody, GrafyKniznica, hraniceObdobia, MiniStat, OBDOBIA_DASH, SEKCIE, useExtraGrafy, VYCHODZIE, WIDGETS,
+  centerBody, GrafyKniznica, HLAVNE, hraniceObdobia, MiniStat, OBDOBIA_DASH, SEKCIE, useExtraGrafy, VYCHODZIE, WIDGETS,
   type SekciaId, type WidgetMeta,
 } from "./DashGrafy";
 import { tokyKlientov } from "./Fluktuacia";
@@ -88,10 +88,17 @@ function TrainerPills({ value, onChange }: { value: string; onChange: (v: string
 // presunie na koniec alebo skryje. Inline chat zmizol úplne: Jarvis je stále
 // o klik ďaleko cez plávajúce tlačidlo a dve okná toho istého chatu vedľa seba
 // boli len dve miesta, kde hľadať tú istú konverzáciu.
-const DEFAULT_ORDER = WIDGETS.map((w) => w.id);
+/**
+ * Východzie poradie: HLAVNÉ grafy v Jerryho poradí, potom celá knižnica.
+ *
+ * Predtým to bolo poradie zápisu v registri — teda poradie, v akom karty
+ * historicky pribúdali, čo nie je poradie, v akom sa čítajú. Hlavné grafy
+ * teraz stoja navrchu aj v režime Usporiadať.
+ */
+const DEFAULT_ORDER = [...HLAVNE, ...WIDGETS.map((w) => w.id).filter((id) => !HLAVNE.includes(id))];
 const DEFAULT_WIDTH: Record<string, number> = Object.fromEntries(WIDGETS.map((w) => [w.id, w.span]));
-/** Vypnuté hneď po inštalácii = všetko, čo nie je vo východzej zostave. */
-const DEFAULT_HIDDEN = WIDGETS.filter((w) => !w.vychodzi).map((w) => w.id);
+/** Vypnuté hneď po inštalácii = všetko, čo nie je medzi hlavnými. */
+const DEFAULT_HIDDEN = WIDGETS.map((w) => w.id).filter((id) => !VYCHODZIE.has(id));
 const ORDER_KEY = "psb-dash-order";
 const HIDDEN_KEY = "psb-dash-hidden";
 const WIDTH_KEY = "psb-dash-width";
@@ -108,7 +115,19 @@ const KPI_KEY = "psb-dash-kpi";
  * niečo prepne, ostane mu to.
  */
 const LAYOUT_VER_KEY = "psb-dash-ver";
-const LAYOUT_VER = "2026-08-10";
+// 2026-08-10b: hlavné grafy sa presťahovali z localStorage do kódu (HLAVNE) aj
+// so šírkami. Nová východzia zostava je presne tá, ktorú mal Jerry poskladanú,
+// takže toto zahodenie nič nestratí — len ju dostane na každý prehliadač.
+const LAYOUT_VER = "2026-08-10b";
+
+/**
+ * Zapnuté karty navrch, vypnuté pod ne — poradie v rámci oboch skupín ostáva.
+ * Sekcie sa filtrujú z toho istého poľa, takže to platí aj vnútri sekcie.
+ */
+const zoradPodlaZobrazenia = (poradie: string[], skryte: string[]) => [
+  ...poradie.filter((id) => !skryte.includes(id)),
+  ...poradie.filter((id) => skryte.includes(id)),
+];
 
 function useDashLayout() {
   const [order, setOrder] = useState<string[]>(DEFAULT_ORDER);
@@ -125,11 +144,15 @@ function useDashLayout() {
         localStorage.setItem(LAYOUT_VER_KEY, LAYOUT_VER);
       }
       const o = JSON.parse(localStorage.getItem(ORDER_KEY) || "null");
-      if (Array.isArray(o)) {
-        const known = o.filter((id: string) => DEFAULT_ORDER.includes(id));
-        // Append any widget added in a later version that the saved order predates.
-        setOrder([...known, ...DEFAULT_ORDER.filter((id) => !known.includes(id))]);
-      }
+      // Poradie sa dorovná až po načítaní skrytých (nižšie) — bez nich sa nedá
+      // povedať, čo je „zapnuté navrchu".
+      const ulozenePoradie: string[] | null = Array.isArray(o)
+        ? (() => {
+            const known = o.filter((id: string) => DEFAULT_ORDER.includes(id));
+            // Append any widget added in a later version that the saved order predates.
+            return [...known, ...DEFAULT_ORDER.filter((id) => !known.includes(id))];
+          })()
+        : null;
       // Graf, ktorý appka pozná až od dnešnej verzie, sa nesmie objaviť sám —
       // inak by po nasadení knižnice vyskočilo na dashboard dvadsať nových
       // kariet. Preto zoznam „už videných" ID: čo v ňom nie je a nie je vo
@@ -147,6 +170,7 @@ function useDashLayout() {
       setHidden(dalej);
       localStorage.setItem(HIDDEN_KEY, JSON.stringify(dalej));
       localStorage.setItem(KNOWN_KEY, JSON.stringify(DEFAULT_ORDER));
+      if (ulozenePoradie) setOrder(zoradPodlaZobrazenia(ulozenePoradie, dalej));
 
       const kp = JSON.parse(localStorage.getItem(KPI_KEY) || "null");
       if (Array.isArray(kp)) setKpiSkryte(kp);
@@ -209,12 +233,22 @@ function useDashLayout() {
     next.splice(at, 0, dragId);
     persistOrder(next);
   };
-  const toggleHide = (id: string) =>
-    persistHidden((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+  const toggleHide = (id: string) => {
+    const next = hidden.includes(id) ? hidden.filter((x) => x !== id) : [...hidden, id];
+    persistHidden(next);
+    // Zapnuté karty držia poradie pred vypnutými (Jerry, 10. 8.: „keď dám
+    // usporiadať, nech sú tie zobrazené navrchu a pod nimi všetky ostatné").
+    // Zoraďuje sa v ULOŽENOM poradí, nie až pri kreslení: keby sa poradie
+    // zobrazovalo inak, než je uložené, šípky ↑ ↓ by hýbali niečím iným, než
+    // čo je pod nimi vidieť.
+    persistOrder(zoradPodlaZobrazenia(order, next));
+  };
   /** Zapnúť/vypnúť celú sekciu naraz — z knižnice grafov. */
   const sekciaVsetko = (sekcia: SekciaId, zapnut: boolean) => {
     const ids = WIDGETS.filter((w) => w.sekcia === sekcia).map((w) => w.id);
-    persistHidden((p) => (zapnut ? p.filter((x) => !ids.includes(x)) : [...new Set([...p, ...ids])]));
+    const next = zapnut ? hidden.filter((x) => !ids.includes(x)) : [...new Set([...hidden, ...ids])];
+    persistHidden(next);
+    persistOrder(zoradPodlaZobrazenia(order, next));
   };
   const setWidth = (id: string, w: 1 | 2) => persistWidths({ ...widths, [id]: w });
   const toggleKpi = (id: string) =>
@@ -691,7 +725,7 @@ export function Dashboard({
       vysvetlenie: "Peniaze, ktoré v tomto mesiaci UŽ prišli (účet + hotovosť + BTC) — aktualizuje sa s každým importom z PTmindera, takže sa dá sledovať priebežne. Pruh ukazuje, kam to smeruje: kde je dnes a kde bude, ak dobehnú aj očakávané obnovy. Zisk sa takto ukázať nedá — náklady chodia z banky raz mesačne a rozbehnutý mesiac by vyzeral ako rekordný. Uzavretý mesiac je v riadku pod prístrojmi.",
       seria: cashRad,
       kotva: cakaSa > 0
-        ? { hodnota: stats.beziaciCash, ciel: stats.beziaciCash + cakaSa, cielLabel: `prišlo ${fmtCZK(stats.beziaciCash)} · s očakávanými obnovami ~${fmtCZK(stats.beziaciCash + cakaSa)}` }
+        ? { hodnota: stats.beziaciCash, ciel: stats.beziaciCash + cakaSa }
         : undefined,
       // Druhý pohľad (Jerry, 10. 8.): očakávané tržby chcel veľké, nie malým
       // písmom pod pruhom. Prepínač namiesto druhej dlaždice — je to to isté
@@ -1752,13 +1786,27 @@ export function Dashboard({
               <div style={{ flex: 1, height: 1, background: mix(C.border, 55) }} />
             </div>
             <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, minmax(0,1fr))`, gridAutoFlow: "row dense", gap: 12, alignItems: "stretch" }}>
-              {ids.map((id) => {
+              {ids.map((id, i) => {
                 const meta = WIDGETS.find((w) => w.id === id);
                 if (!meta) return null;
+                // Čiara medzi zapnutými a vypnutými kartami. Bez nej vyzerá
+                // zoznam v režime Usporiadať ako jedna kopa a nie je vidieť,
+                // kde končí to, čo je naozaj na ploche.
+                const prvyVypnuty = arranging && layout.hidden.includes(id) && (i === 0 || !layout.hidden.includes(ids[i - 1]));
                 return (
-                  <WidgetShell key={id} meta={meta} cols={cols} arranging={arranging} isHidden={layout.hidden.includes(id)} layout={layout}>
-                    {nodes[id]}
-                  </WidgetShell>
+                  <Fragment key={id}>
+                    {prvyVypnuty && (
+                      <div style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 10, margin: "6px 0 2px" }}>
+                        <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: C.textDim }}>
+                          vypnuté — nie sú na ploche
+                        </span>
+                        <div style={{ flex: 1, height: 1, borderTop: `1px dashed ${mix(C.border, 90)}` }} />
+                      </div>
+                    )}
+                    <WidgetShell meta={meta} cols={cols} arranging={arranging} isHidden={layout.hidden.includes(id)} layout={layout}>
+                      {nodes[id]}
+                    </WidgetShell>
+                  </Fragment>
                 );
               })}
             </div>

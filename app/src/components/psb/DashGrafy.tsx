@@ -75,8 +75,9 @@ export type WidgetMeta = {
   label: string;
   span: 1 | 2;
   sekcia: SekciaId;
-  /** Východzia zostava — čo je v kokpite hneď po otvorení. */
-  vychodzi?: boolean;
+  /** Východziu zostavu určuje zoznam HLAVNE nižšie — nie príznak tu.
+   *  Dva zdroje pravdy o tom istom sa raz rozídu; poradie hlavných kariet
+   *  sa navyše v zozname dá prečítať na jednom mieste. */
   popis: string;
   /** Domovská obrazovka grafu (kam vedie klik). */
   doma?: string;
@@ -90,12 +91,12 @@ export const WIDGETS: WidgetMeta[] = [
   // Jerry po pozretí rozobral späť (10. 8.): pôvodné grafy boli lepšie a stačí
   // im doplniť čísla. Zisky a náklady a Marketing sa naopak osvedčili —
   // odhad oproti skutočnosti a tri marketingové otázky patria na jednu kartu.
-  { id: "ziskyNaklady", label: "Zisky a náklady", span: 2, sekcia: "zisky", vychodzi: true, popis: "Skutočnosť za obdobie vedľa odhadu na ďalší mesiac.", doma: "Peniaze → Predikcia" },
-  { id: "marketingSuhrn", label: "Marketing", span: 2, sekcia: "marketing", vychodzi: true, popis: "Lievik, dosah Instagramu a čo klient prinesie podľa zdroja.", doma: "Marketing → Lievik" },
+  { id: "ziskyNaklady", label: "Zisky a náklady", span: 2, sekcia: "zisky", popis: "Skutočnosť za obdobie vedľa odhadu na ďalší mesiac.", doma: "Peniaze → Predikcia" },
+  { id: "marketingSuhrn", label: "Marketing", span: 2, sekcia: "marketing", popis: "Lievik, dosah Instagramu a čo klient prinesie podľa zdroja.", doma: "Marketing → Lievik" },
   // ── Peniaze ────────────────────────────────────────────────────────────────
-  { id: "zarobky", label: "Mesačné tržby", span: 1, sekcia: "peniaze", vychodzi: true, popis: "Prijaté platby po mesiacoch + odhad ďalších dvoch.", doma: "Financie" },
-  { id: "zdravieFirmy", label: "Zdravie firmy", span: 1, sekcia: "peniaze", vychodzi: true, popis: "Break-even, rezerva nad ním, podiel miezd, koľko sa dá škrtnúť.", doma: "VZAS" },
-  { id: "pasmoZisku", label: "Pásmo zisku", span: 1, sekcia: "zisky", popis: "Hrubý zisk po mesiacoch — kedy firma zarábala a kedy nie.", doma: "VZAS" },
+  { id: "zarobky", label: "Mesačné tržby", span: 2, sekcia: "peniaze", popis: "Prijaté platby po mesiacoch + odhad ďalších dvoch.", doma: "Financie" },
+  { id: "zdravieFirmy", label: "Zdravie firmy", span: 1, sekcia: "peniaze", popis: "Break-even, rezerva nad ním, podiel miezd, koľko sa dá škrtnúť.", doma: "VZAS" },
+  { id: "pasmoZisku", label: "Pásmo zisku", span: 2, sekcia: "zisky", popis: "Hrubý zisk po mesiacoch — kedy firma zarábala a kedy nie.", doma: "VZAS" },
   { id: "prijmyNaklady", label: "Príjmy vs. náklady", span: 1, sekcia: "zisky", popis: "Obe krivky vedľa seba — kde sa rozchádzajú.", doma: "VZAS" },
   { id: "prebytok", label: "Kumulovaný prebytok", span: 1, sekcia: "zisky", popis: "Súčet ziskov a strát od začiatku — čo firma reálne vytvorila.", doma: "VZAS" },
   { id: "dlhTreneri", label: "Dlh voči trénerom", span: 1, sekcia: "peniaze", popis: "Kumulovaný rozdiel medzi nárokom a poslaným, Jerry aj Terezka.", doma: "VZAS → Mzdy" },
@@ -105,16 +106,16 @@ export const WIDGETS: WidgetMeta[] = [
   { id: "btc", label: "Bitcoinová rezerva", span: 1, sekcia: "peniaze", popis: "Hodnota rezervy a koľko mesiacov prevádzky pokryje.", doma: "VZAS → Rezerva" },
 
   // ── Vyťaženie ──────────────────────────────────────────────────────────────
-  { id: "hodiny", label: "Odrobené hodiny / týždeň", span: 1, sekcia: "vytazenie", vychodzi: true, popis: "Týždenné hodiny so zdravou zónou 24–34 h.", doma: "Tréningy" },
+  { id: "hodiny", label: "Odrobené hodiny / týždeň", span: 2, sekcia: "vytazenie", popis: "Týždenné hodiny so zdravou zónou 24–34 h.", doma: "Tréningy" },
   { id: "zony", label: "Týždne v zdravej zóne", span: 1, sekcia: "vytazenie", popis: "Koľko týždňov padlo do zóny, pod ňu a nad ňu.", doma: "Tréningy" },
-  { id: "kapacita", label: "Kapacita & vyťaženie", span: 1, sekcia: "vytazenie", vychodzi: true, popis: "Koľko klientov ešte zvládnete pri zdravom týždni.", doma: "Klienti" },
+  { id: "kapacita", label: "Kapacita & vyťaženie", span: 1, sekcia: "vytazenie", popis: "Koľko klientov ešte zvládnete pri zdravom týždni.", doma: "Klienti" },
   { id: "hodinyMes", label: "Hodiny po mesiacoch", span: 1, sekcia: "vytazenie", popis: "Dlhší horizont než týždne — sezónnosť práce a vyhorenie.", doma: "Výsledky" },
   { id: "sedeniaMes", label: "Počet sedení / mesiac", span: 1, sekcia: "vytazenie", popis: "Objem práce v kusoch — predstih pred tržbami.", doma: "Financie" },
   { id: "typySedeni", label: "Pomer typov sedení", span: 1, sekcia: "vytazenie", popis: "Offline, online a úvodné — z čoho sa skladá prevádzka.", doma: "Tréningy" },
   { id: "zrusene", label: "Zrušené a presunuté", span: 1, sekcia: "vytazenie", popis: "Stratená kapacita z týždenných zápisov, po trénerovi.", doma: "Tréningy" },
 
   // ── Klienti ────────────────────────────────────────────────────────────────
-  { id: "rastStrata", label: "Fluktuácia klientov", span: 1, sekcia: "vytazenie", vychodzi: true, popis: "Prišlo, odišlo a čistý rast za mesiac.", doma: "Klienti → Fluktuácia" },
+  { id: "rastStrata", label: "Fluktuácia klientov", span: 1, sekcia: "vytazenie", popis: "Prišlo, odišlo a čistý rast za mesiac.", doma: "Klienti → Fluktuácia" },
   { id: "6m", label: "6M klienti podľa fázy", span: 1, sekcia: "vytazenie", popis: "Obnova, integrácia, udržateľnosť — kde v procese ľudia sú.", doma: "Klienti → 6M proces" },
   { id: "balicky", label: "Klienti podľa balíčka", span: 1, sekcia: "vytazenie", popis: "Rozdelenie podľa členstva — na čom stojí príjem.", doma: "Klienti" },
   { id: "kdeTecie", label: "Kde to tečie", span: 1, sekcia: "vytazenie", popis: "Ako dlho vydržali tí, čo odišli — odchod v prvých mesiacoch má inú príčinu než po roku.", doma: "Klienti → Fluktuácia" },
@@ -132,7 +133,7 @@ export const WIDGETS: WidgetMeta[] = [
   // Doplnené 2026-08-07 na Jerryho pokyn „dopln fakt všetky, aj tie čo sú len
   // zvýraznené čísla". Karty bez grafu sú rovnocenné — súhrn P&L alebo cena
   // sedenia je číslo, ktoré sa číta rýchlejšie než akákoľvek krivka.
-  { id: "breakEven", label: "Tržby vs. break-even", span: 1, sekcia: "peniaze", vychodzi: true, popis: "Kde je zelená pod oranžovou, mesiac nezarobil ani na vlastnú prevádzku.", doma: "Peniaze → Zisky a straty" },
+  { id: "breakEven", label: "Tržby vs. break-even", span: 2, sekcia: "peniaze", popis: "Kde je zelená pod oranžovou, mesiac nezarobil ani na vlastnú prevádzku.", doma: "Peniaze → Zisky a straty" },
   { id: "predikciaTrzieb", label: "Predikcia tržieb", span: 1, sekcia: "zisky", popis: "Tri mesiace dopredu s pásmom istoty — od zaručeného po optimistický.", doma: "Peniaze → Predikcia" },
   { id: "predikciaScen", label: "Scenáre na 3 mesiace", span: 1, sekcia: "zisky", popis: "Zaručené z balíčkov, realistický a negatívny scenár.", doma: "Peniaze → Predikcia" },
   { id: "pnlSuhrn", label: "Súhrn P&L", span: 1, sekcia: "zisky", popis: "Príjmy, náklady, hrubý zisk a marža — priemer na mesiac.", doma: "Peniaze → Zisky a straty" },
@@ -140,7 +141,7 @@ export const WIDGETS: WidgetMeta[] = [
   { id: "runRate", label: "Run-rate a odhad zisku", span: 1, sekcia: "zisky", popis: "Tempo posledných troch mesiacov prepočítané na rok.", doma: "Peniaze → Predikcia" },
   { id: "h1", label: "H1 2025 vs. H1 2026", span: 1, sekcia: "zisky", popis: "Prvý polrok proti prvému polroku — rast bez sezónnosti.", doma: "Výsledky" },
 
-  { id: "cenaSedenia", label: "Ø cena sedenia", span: 1, sekcia: "vytazenie", vychodzi: true, popis: "Koľko priemerne prinesie jedno odtrénované sedenie.", doma: "Peniaze → Sedenia & cena" },
+  { id: "cenaSedenia", label: "Ø cena sedenia", span: 2, sekcia: "vytazenie", popis: "Koľko priemerne prinesie jedno odtrénované sedenie.", doma: "Peniaze → Sedenia & cena" },
   { id: "narocnost", label: "Náročnosť týždňov", span: 1, sekcia: "vytazenie", popis: "Vlastné hodnotenie 1–10 z týždenných zápisov — predstih pred vyhorením.", doma: "Tréningy → Prehľad" },
   { id: "suhrnSedeni", label: "Súhrn sedení", span: 1, sekcia: "vytazenie", popis: "Offline, online a úvodné v kusoch za posledný rok.", doma: "Tréningy → Analýza" },
 
@@ -150,8 +151,8 @@ export const WIDGETS: WidgetMeta[] = [
   { id: "platobneKanaly", label: "Čím klienti platia", span: 1, sekcia: "peniaze", popis: "Účet, hotovosť a bitcoin — koľko tržieb ide ktorou cestou.", doma: "Peniaze → Po mesiacoch" },
   { id: "zdrojeKlientov", label: "Odkiaľ klienti prišli", span: 1, sekcia: "marketing", popis: "Rozdelenie aktívnych klientov podľa zdroja.", doma: "Klienti" },
 
-  { id: "cenaUvodneho", label: "Čo stojí úvodný", span: 1, sekcia: "marketing", vychodzi: true, popis: "Marketingové náklady delené počtom úvodných tréningov.", doma: "Marketing → Lievik" },
-  { id: "ltvZdroj", label: "Hodnota klienta (LTV)", span: 1, sekcia: "marketing", vychodzi: true, popis: "Koľko klient priemerne zaplatí za celý čas spolupráce.", doma: "Klienti → Fluktuácia" },
+  { id: "cenaUvodneho", label: "Čo stojí úvodný", span: 1, sekcia: "marketing", popis: "Marketingové náklady delené počtom úvodných tréningov.", doma: "Marketing → Lievik" },
+  { id: "ltvZdroj", label: "Hodnota klienta (LTV)", span: 1, sekcia: "marketing", popis: "Koľko klient priemerne zaplatí za celý čas spolupráce.", doma: "Klienti → Fluktuácia" },
   { id: "kohortyDopytov", label: "Kohorty dopytov", span: 1, sekcia: "marketing", popis: "Z koľkých dopytov daného mesiaca sa nakoniec stali klienti.", doma: "Marketing → Lievik" },
 
   // KPI karty (Peniaze, Lievik, Kapacita, Cena) sa z knižnice dashboardu
@@ -161,7 +162,33 @@ export const WIDGETS: WidgetMeta[] = [
   // veci znamenajú dve miesta, ktoré sa raz rozídu.
 ];
 
-export const VYCHODZIE = new Set(WIDGETS.filter((w) => w.vychodzi).map((w) => w.id));
+/**
+ * HLAVNÉ GRAFY — Jerryho zostava z 10. 8. 2026, zapísaná do kódu.
+ *
+ * Dovtedy žilo rozloženie len v localStorage jedného prehliadača: stačilo
+ * otvoriť Kokpit na inom počítači alebo vymazať dáta stránky a bola z toho
+ * cudzia plocha. Teraz je táto trinástka VÝCHODZÍ stav — v poradí, v akom si
+ * ju Jerry poskladal, aj so šírkami (dvojstĺpcové karty sú tu span 2).
+ *
+ * Poradie v tomto poli určuje poradie na ploche aj v režime Usporiadať, kde
+ * hlavné grafy stoja navrchu a ostatné pod nimi. Kto si niečo prehodí, uloží
+ * sa mu to ako doteraz — toto je len začiatok, nie zámok.
+ *
+ * Keď sa zostava zmení, treba zmeniť aj LAYOUT_VER v Dashboard.tsx; inak nový
+ * východzí stav uvidia len tí, čo appku otvárajú prvýkrát.
+ */
+export const HLAVNE: string[] = [
+  // Peniaze najprv — tržby, break-even, zdravie.
+  "zarobky", "breakEven", "zdravieFirmy",
+  // Zisky a náklady: skutočnosť + odhad, potom pásmo zisku.
+  "ziskyNaklady", "pasmoZisku",
+  // Vyťaženie: hodiny, kapacita, fluktuácia, ekonomika hodiny.
+  "hodiny", "kapacita", "rastStrata", "cenaSedenia", "suhrnSedeni",
+  // Marketing: súhrn, čo stojí klient, čo prinesie.
+  "marketingSuhrn", "cenaUvodneho", "ltvZdroj",
+];
+
+export const VYCHODZIE = new Set(HLAVNE);
 
 // ── Zdieľané drobnosti (Dashboard ich používa tiež) ──────────────────────────
 export const centerBody: CSSProperties = { flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" };
@@ -254,7 +281,7 @@ export function GrafyKniznica({
                     <span style={{ flex: 1, minWidth: 0 }}>
                       <span style={{ display: "block", fontSize: 13, fontWeight: 600, color: zapnute ? C.text : C.textMuted }}>
                         {w.label}
-                        {w.vychodzi && <span style={{ fontSize: 10, color: C.textDim, fontWeight: 400 }}> · východzí</span>}
+                        {VYCHODZIE.has(w.id) && <span style={{ fontSize: 10, color: mix(C.accent, 85), fontWeight: 600 }}> · hlavný</span>}
                       </span>
                       <span style={{ display: "block", fontSize: 11.5, color: C.textDim, marginTop: 2, lineHeight: 1.45 }}>
                         {w.popis}{w.doma && <span style={{ color: mix(C.textDim, 80) }}> · doma v: {w.doma}</span>}
@@ -297,7 +324,7 @@ export function GrafyKniznica({
       })}
 
       <button onClick={onReset} style={{ ...maliBtn, width: "100%", padding: "8px 12px", fontSize: 12 }}>
-        Vrátiť východziu zostavu ({VYCHODZIE.size} grafov)
+        Vrátiť hlavné grafy ({VYCHODZIE.size}) — aj poradie a šírky
       </button>
     </Modal>
   );
@@ -1267,20 +1294,29 @@ export function useExtraGrafy({
       </Card>
     );
 
+    // Sedenia za ZVOLENÉ obdobie, nie natvrdo za posledných 365 dní (Jerry,
+    // 10. 8.: „na súhrn sedení nefunguje časový filter"). Filter v hlavičke
+    // platí na všetky karty; jedna, ktorá ho ticho ignoruje, je horšia než
+    // žiadny filter — človek prepne rok a verí číslu, ktoré sa nezmenilo.
+    const sedeniaOkno = data.sessions.filter((x) => vMes(x.date.slice(0, 7)));
+    const oknoLabel = obdobie === "all" ? "celé obdobie" : `${monthLabel(odMK)} – ${monthLabel(doMK)}`;
+    // Cena za úvodný ráta z posledných 12 mesiacov bez ohľadu na filter —
+    // je to referenčné číslo do textu, nie karta.
     const sedeniaRok = data.sessions.filter((x) => Date.parse(x.date) >= Date.now() - 365 * 86400000);
     // Online sedenie je ONLINE aj TRUECOACH — sú to dva názvy pre to isté
     // (TrueCoach je aplikácia, cez ktorú online tréning beží).
     const poctyTypov = {
-      offline: sedeniaRok.filter((x) => x.sessionType === "OFFLINE").length,
-      online: sedeniaRok.filter((x) => x.sessionType === "ONLINE" || x.sessionType === "TRUECOACH").length,
-      uvodne: sedeniaRok.filter((x) => x.sessionType === "UVODNE").length,
+      offline: sedeniaOkno.filter((x) => x.sessionType === "OFFLINE").length,
+      online: sedeniaOkno.filter((x) => x.sessionType === "ONLINE" || x.sessionType === "TRUECOACH").length,
+      uvodne: sedeniaOkno.filter((x) => x.sessionType === "UVODNE").length,
     };
     nodes.suhrnSedeni = (
       <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column" }}>
-        <H3><Info label="Súhrn sedení" text="Počty sedení za posledných 12 mesiacov podľa typu. Úvodný tréning je iná položka než bežné sedenie — je to náklad na získanie klienta, nie tržba, a preto sa počíta zvlášť." /></H3>
+        <H3><Info label="Súhrn sedení" text="Počty sedení podľa typu za obdobie zvolené vo filtri hore. Úvodný tréning je iná položka než bežné sedenie — je to náklad na získanie klienta, nie tržba, a preto sa počíta zvlášť." /></H3>
         <Klik kam={() => onNavigate("treningy", "analyza")} onNavigate="Tréningy → Analýza">
+          <div style={{ fontSize: 10.5, color: C.textDim, marginBottom: 6 }}>{oknoLabel}</div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}>
-            <MiniStat label="Spolu (12 mes.)" value={String(sedeniaRok.length)} color={C.accent} />
+            <MiniStat label="Spolu" value={String(sedeniaOkno.length)} color={C.accent} />
             <MiniStat label="Offline" value={String(poctyTypov.offline)} />
             <MiniStat label="Online" value={String(poctyTypov.online)} color={C.blue} />
             <MiniStat label="Úvodné" value={String(poctyTypov.uvodne)} color={C.orange} />
@@ -1379,20 +1415,33 @@ export function useExtraGrafy({
 
     // LTV: koľko klient zaplatí za celý čas spolupráce. Strop na to, koľko sa
     // oplatí minúť na jeho získanie.
-    const odisliD = Object.values(clients).filter((c) => c.status === "Neaktívny" && c.totalPrice > 0);
-    const ltvOdislych = odisliD.length ? odisliD.reduce((a, c) => a + c.totalPrice, 0) / odisliD.length : 0;
-    const mesiacovSpolu = odisliD.length
-      ? odisliD.reduce((a, c) => a + Math.max(1, (Date.parse(c.lastSession) - Date.parse(c.firstSession)) / (30 * 86400000)), 0) / odisliD.length
+    //
+    // VŠETCI klienti, nie len odídení (Jerry, 10. 8.). Verzia „len odídení"
+    // dávala 10 515 Kč — číslo pravdivé, ale odpovedajúce na inú otázku:
+    // odídení sú z definície tí, ktorým spolupráca skončila, a medzi nimi je
+    // veľa ľudí, čo prišli raz-dvakrát. Priemer cez nich meria, ako vyzerá
+    // ODCHOD, nie ako vyzerá klient. Hranica ≥3 sedenia vyhadzuje skúšajúcich
+    // (jeden úvodný tréning nie je spolupráca) — rovnaká definícia ako KPI
+    // „Hodnota klienta", takže obe miesta ukazujú to isté číslo.
+    //
+    // Cena za to je vedomá: kto ešte chodí, zaplatí aj ďalej, takže LTV je
+    // podhodnotené, nie nafúknuté. Ako strop na marketing je to bezpečná
+    // strana chyby.
+    const ltvKlienti = Object.values(clients).filter((c) => c.sessionCount >= 3 && c.totalPrice > 0);
+    const stalePlatia = ltvKlienti.filter((c) => c.status !== "Neaktívny").length;
+    const ltvOdislych = ltvKlienti.length ? ltvKlienti.reduce((a, c) => a + c.totalPrice, 0) / ltvKlienti.length : 0;
+    const mesiacovSpolu = ltvKlienti.length
+      ? ltvKlienti.reduce((a, c) => a + Math.max(1, (Date.parse(c.lastSession) - Date.parse(c.firstSession)) / (30.44 * 86400000)), 0) / ltvKlienti.length
       : 0;
     nodes.ltvZdroj = (
       <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column" }}>
-        <H3><Info label="Hodnota klienta (LTV) — odídení" text="Koľko klient priemerne zaplatí za celý čas spolupráce a ako dlho vydrží. Ráta sa LEN z ODÍDENÝCH klientov — u tých, čo stále chodia, sa nedá povedať, koľko ešte zaplatia. Pozor na rozdiel oproti KPI „Hodnota klienta“: to ráta VŠETKÝCH s ≥3 sedeniami vrátane aktívnych, preto je vyššie (~27 000 Kč / 8+ mes.). Toto číslo je opatrnejší strop na to, koľko sa oplatí minúť na získanie klienta." /></H3>
+        <H3><Info label="Hodnota klienta (LTV)" text="Koľko klient priemerne zaplatí za celý čas spolupráce a ako dlho vydrží. Ráta sa zo VŠETKÝCH klientov s aspoň tromi sedeniami — aj z tých, čo stále chodia. Kto prišiel raz na úvodný a nevrátil sa, sa neráta: to nie je spolupráca, to je nákup skúšky. Keďže polovica z nich ešte chodí a zaplatí aj ďalej, skutočná hodnota je o niečo vyššia než toto číslo — ako strop na marketing je to bezpečná strana chyby. Je to tá istá definícia ako KPI „Hodnota klienta“, takže obe miesta ukazujú to isté." /></H3>
         <Klik kam={() => onNavigate("klienti", "rast")} onNavigate="Klienti → Rast a strata">
-          {odisliD.length === 0 ? <Empty>Zatiaľ nie sú odídení klienti s platbami.</Empty> : (
+          {ltvKlienti.length === 0 ? <Empty>Zatiaľ nie sú klienti s tromi a viac sedeniami.</Empty> : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}>
-              <MiniStat label="Ø hodnota (len odídení)" value={fmtCZK(ltvOdislych)} color={C.green} />
+              <MiniStat label="Ø hodnota klienta" value={fmtCZK(ltvOdislych)} color={C.green} />
               <MiniStat label="Ø dĺžka spolupráce" value={`${mesiacovSpolu.toFixed(1)} mes.`} color={mesiacovSpolu >= 12 ? C.green : mesiacovSpolu >= 6 ? C.orange : C.red} />
-              <MiniStat label="Z koľkých odídených" value={String(odisliD.length)} />
+              <MiniStat label="Z koľkých klientov" value={`${ltvKlienti.length}${stalePlatia ? ` · ${stalePlatia} ešte chodí` : ""}`} />
               <MiniStat label="Ø / mesiac spolupráce" value={mesiacovSpolu > 0 ? fmtCZK(ltvOdislych / mesiacovSpolu) : "—"} />
             </div>
           )}

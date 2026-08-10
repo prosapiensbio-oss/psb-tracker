@@ -45,7 +45,7 @@ export type Pristroj = {
   dobreHore?: boolean;
   kam?: () => void;
   /** Kotviaci prístroj: väčší, vľavo hore, s pruhom proti cieľu. */
-  kotva?: { hodnota: number; ciel: number; cielLabel: string };
+  kotva?: { hodnota: number; ciel: number };
   /** Druhý pohľad na to isté číslo (Jerry, 10. 8.): „očakávané obnovy 129k
    *  chcem veľké ako 36 965, alebo si to prepínať." Dva mini-taby v hlavičke;
    *  voľba sa pamätá per prístroj. */
@@ -154,7 +154,11 @@ function Dlazdica({ p, velka }: { p: Pristroj; velka?: boolean }) {
 
       {p.kotva && (
         <div style={{ marginTop: 10 }}>
-          <BulletGraph hodnota={p.kotva.hodnota} ciel={p.kotva.ciel} farba={mimo ? farba : mix(C.accent, 80)} label={p.kotva.cielLabel} />
+          {/* Bez popisu pod pruhom (Jerry, 10. 8.): odkedy má dlaždica
+              prepínač, hovorí ten istý riadok tretíkrát to isté — veľké
+              číslo, popisok pruhu a poznámka pod ním. Pruh sám ukazuje, kde
+              sme voči cieľu; čísla sú v hlavičke a v poznámke. */}
+          <BulletGraph hodnota={p.kotva.hodnota} ciel={p.kotva.ciel} farba={mimo ? farba : mix(C.accent, 80)} />
         </div>
       )}
 

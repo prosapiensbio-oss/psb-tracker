@@ -775,7 +775,11 @@ export function LineChart({
     <div>
       {pointWidth ? <div ref={scrollRef} style={{ overflowX: "auto" }}>{svg}</div> : svg}
       {/* Súhrn každej krivky v číslach: kde sme, aký je priemer a aké boli
-          krajnosti. Legenda samotná hovorí len to, ktorá farba je ktorá. */}
+          krajnosti. Legenda samotná hovorí len to, ktorá farba je ktorá.
+          Pri JEDNEJ krivke s vlastnými číslami vedľa grafu (bezSuhrnu) sa
+          nekreslí vôbec: jedna farba sa nemá s čím pomýliť a „Ø CZK / sedenie
+          1457" hovorilo to isté, čo dlaždica o dva centimetre vpravo. */}
+      {!(bezSuhrnu && series.length === 1) && (
       <div style={{ display: "flex", gap: 14, marginTop: 6, flexWrap: "wrap" }}>
         {series.map((s, si) => {
           const v = data.map((d) => d.values[si]).filter((x2) => Number.isFinite(x2));
@@ -805,6 +809,7 @@ export function LineChart({
         {zone && <span style={{ fontSize: 11, color: C.green }}>▬ Zdravá zóna {zone.lo}–{zone.hi}{zone.unit ?? "h"}</span>}
         {onPoint && <span style={{ fontSize: 11, color: C.textDim }}>Klik na bod = detail obdobia dole</span>}
       </div>
+      )}
     </div>
   );
 }
