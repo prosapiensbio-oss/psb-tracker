@@ -111,6 +111,8 @@ export type ClientAgg = {
   narodeniny: string;
   clientType: "6M Predplatné" | "Balíček";
   is6m: boolean;
+  /** Ručná oprava príslušnosti k 6M: "" = appka rozhoduje, "ano" / "nie". */
+  v6m: string;
   membership: string; // current product from Packages report (e.g. "OFF - 6h S viazanostou")
   modality: "Offline" | "Online";
   serviceCount: number;
@@ -129,6 +131,15 @@ export function sixMClientSet(data: PSBData): Set<string> {
   const set = new Set<string>();
   for (const s of data.services) if (s.is6m) set.add(s.client);
   for (const p of data.packages) if (/s viazanost/i.test(p.package)) set.add(p.client);
+  // Ručná oprava má posledné slovo. Pravidlo hore je správne a zostáva
+  // (balíček „S viazanostou" a platba 6 990 Kč SÚ 6M členstvo — Jerry to
+  // potvrdil 9. 8. 2026), ale odvodenie je stále len odvodenie: klient si
+  // môže viazanosť kúpiť a do procesu nevstúpiť. Preto override, nie výnimka
+  // v pravidle — pravidlo zostáva čitateľné a výnimky sú vidieť ako výnimky.
+  for (const [meno, ov] of Object.entries(data.clientOverrides || {})) {
+    if (ov?.v6m === "nie") set.delete(meno);
+    else if (ov?.v6m === "ano") set.add(meno);
+  }
   return set;
 }
 
@@ -171,6 +182,7 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
         narodeniny: "",
         clientType: "Balíček",
         is6m: false,
+        v6m: "",
         membership: "",
         modality: "Offline",
         serviceCount: 0,
@@ -256,6 +268,7 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
     c.zdroj = ov?.zdroj || "";
     c.zdrojKto = ov?.zdrojKto || "";
     c.narodeniny = ov?.narodeniny || "";
+    c.v6m = String(ov?.v6m || "");
     c.is6m = sixMSet.has(c.name);
     c.clientType = c.is6m ? "6M Predplatné" : "Balíček";
     c.serviceCount = serviceCounts[c.name] || 0;

@@ -858,6 +858,30 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
               ? "Pripomenie sa týždeň, tri dni a deň pred — a v deň samotný. Každá pripomienka sa dá skryť zvlášť."
               : "Keď doplníš, appka pripomenie narodeniny týždeň dopredu, potom tri dni, deň pred a v deň samotný."}
           </div>
+          {/* 6M proces — ručná oprava odvodenia.
+              Pravidlo („S viazanostou" + 6 990 Kč = 6M) je správne a zostáva;
+              toto je výnimka pre prípad, keď si klient viazanosť kúpil, ale do
+              procesu nevstúpil — alebo naopak. Tri stavy zámerne: prázdno
+              znamená „nikto sa nevyjadril", nie „nie". Prepínač riadi všetko
+              naraz: zoznam 6M, fázy, pripomienku na zmluvu aj hodnotiaci
+              rozhovor v 5. mesiaci. */}
+          <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4, marginTop: 4 }}>6M proces</div>
+          <Select
+            value={editC.v6m || ""}
+            onChange={(v) => actions.setOverride(editC.name, "v6m", v)}
+            options={[
+              { value: "", label: `Podľa dát — ${editC.is6m ? "je v 6M" : "nie je v 6M"}` },
+              { value: "ano", label: "Je v 6M procese (aj keď to z dát nevyplýva)" },
+              { value: "nie", label: "Nie je v 6M procese (aj keď to dáta tvrdia)" },
+            ]}
+          />
+          <div style={{ fontSize: 11.5, color: C.textDim, margin: "6px 0 14px", lineHeight: 1.5 }}>
+            {editC.v6m === "nie"
+              ? "Ručne mimo 6M — nebude v zozname 6M ani v pripomienkach (zmluva, 5. mesiac)."
+              : editC.v6m === "ano"
+                ? "Ručne v 6M — appka mu bude počítať fázy aj pripomienky."
+                : "Appka to odvodzuje z balíčka a platieb: balíček s viazanosťou a 6 990 Kč mesačne = 6M."}
+          </div>
           <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4, marginTop: 4 }}>Odkiaľ sa o nás dozvedel</div>
           <Select
             value={editC.zdroj}

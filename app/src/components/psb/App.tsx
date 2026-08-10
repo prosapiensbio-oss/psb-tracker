@@ -1031,12 +1031,13 @@ function skupinaFaktur(
         // z fázy a mesiaca druhýkrát a inak než Prevádzka.
         const s6 = sixM.find((x) => x.client === u.klient);
         if (s6?.alert) dovody.push(s6.alert.replace(/^⚠️\s*/, "").toLowerCase());
-        // Nepodpísaná zmluva sem NEPATRÍ. Denné upozornenie má povedať, čo na
-        // tej hodine spraviť inak — narodeniny, posledná hodina, hodnotiaci
-        // rozhovor. Zmluva je papierovačka: opakovala by sa pri každom jednom
-        // tréningu, kým niekto neklikne fajku, a keďže fajku má 5 klientov zo
-        // 119, znamenalo to trvalý šum pri každom človeku s viazanosťou.
-        // Zostáva tam, kde sa dá vybaviť — v zozname 6M vedľa tej fajky.
+        // Nepodpísaná zmluva ZOSTÁVA (Jerry, 9. 8.) — je to vec, ktorú treba
+        // vybaviť práve vtedy, keď človeka vidíš. Šum, na ktorý sa sťažoval,
+        // nerobila samotná pripomienka, ale to, že vyskočila aj u niekoho, kto
+        // v 6M procese nie je. Na to je prepínač na karte klienta; keď ho tam
+        // označíš ako mimo 6M, zmizne aj táto veta. A keď obťažuje inak,
+        // umlčí ju „Nehlásiť" pre toho klienta.
+        if (s6 && !s6.contractSigned) dovody.push("nemá podpísanú zmluvu");
         if (u.typ === "uvodny") dovody.push("je to úvodný tréning — po ňom sa rozhoduje o pokračovaní");
 
         if (!dovody.length) continue;

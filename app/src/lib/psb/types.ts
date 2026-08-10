@@ -72,6 +72,8 @@ export type ClientOverride = {
   zdrojKto?: string;
   /** Dátum narodenia (YYYY-MM-DD). PTminder ho neexportuje, dopĺňa sa ručne. */
   narodeniny?: string;
+  /** Ručná oprava príslušnosti k 6M: "" = appka rozhoduje, "ano" / "nie". */
+  v6m?: string;
 };
 
 export type UploadLogEntry = {

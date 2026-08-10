@@ -1,0 +1,17 @@
+-- Ručná oprava príslušnosti k 6M procesu.
+--
+-- Príslušnosť sa odvodzuje z dát a to pravidlo je správne: balíček
+-- „S viazanostou" a mesačná platba 6 990 Kč SÚ 6M členstvo (Jerry to potvrdil
+-- 9. 8. 2026 — pravidlo zostáva). Lenže odvodenie je stále len odvodenie:
+-- klient si môže kúpiť viazanosť a do procesu nevstúpiť, alebo doň vstúpiť
+-- bez toho, aby to export zachytil.
+--
+-- Preto override, nie zmena pravidla. Tri stavy:
+--   ''     — appka rozhoduje sama (východzí stav, nič sa nemení)
+--   'nie'  — nie je v 6M, aj keď to dáta tvrdia
+--   'ano'  — je v 6M, aj keď to z dát nevyplýva
+--
+-- Text, nie 0/1: prázdna hodnota musí znamenať „nikto sa nevyjadril", nie
+-- „nie". Toto je tá istá lekcia ako pri otázke na ducha — nula a nezodpovedané
+-- sú dve rôzne veci a zliať ich znamená stratiť informáciu, ktorú už niekto dal.
+ALTER TABLE client_overrides ADD COLUMN v6m TEXT NOT NULL DEFAULT '';
