@@ -314,8 +314,13 @@
  * karty naraz — vrátane tých, ktoré ešte len vzniknú.
  * -webkit- prefix je povinný, inak Safari neukáže blur vôbec (bod 04). */
 :root[data-psb-theme^="sklo"] .psb-card {
-  backdrop-filter: blur(20px);
+  /* Poradie je naopak, než by človek čakal, a je to zámer: minifikátor
+     (lightningcss) považuje neprefixovanú vlastnosť za nadmnožinu prefixovanej
+     a pri poradí „unprefixed, potom -webkit-" tú prvú ZAHODIL — v nasadenom
+     CSS zostalo len -webkit-, čím by Firefox o blur prišiel. Overené na
+     nasadenom súbore, nie odhadnuté. */
   -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
   border-radius: 20px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
 }
