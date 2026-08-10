@@ -40,7 +40,7 @@ import { Dashboard } from "./Dashboard";
 import { Treningy } from "./Treningy";
 import { Klienti } from "./Klienti";
 import { Marketing } from "./Marketing";
-import { Vysledky, Vzas } from "./Vzas";
+import { VYSLEDKY_LISTY, Vysledky, Vzas } from "./Vzas";
 import { Kalendar, type KalUdalost } from "./Kalendar";
 import { tokyKlientov } from "./Fluktuacia";
 import { Udaje } from "./Udaje";
@@ -92,33 +92,30 @@ export type NavFocus = {
 export const BTC_APP = "https://btc.prosapiensbio.workers.dev";
 
 const TABS = [
-  { id: "dashboard", label: "Dashboard", icon: "home" },
-  // Appka sa volá Tracker a záložka tiež — na otázku „kde to je" sa nedalo
-  // odpovedať bez vysvetľovania. Obsah je prevádzka: tréningy, klienti, peniaze
-  // z PTmindera, 6M.
-  { id: "tracker", label: "Prevádzka", icon: "activity" },
-  { id: "marketing", label: "Marketing", icon: "activity" },
-  // „Peniaze" = zlúčené bývalé Prevádzka→Financie + VZAS. Dohodnuté „po
-  // Fio": jedna záložka pre všetky peniaze namiesto dvoch miest, medzi
-  // ktorými blúdil aj Jarvis. Id zostáva „vzas" — visia na ňom uložené
-  // rozloženia, register aj odkazy.
-  { id: "vzas", label: "Peniaze", icon: "wallet" },
-  // Bitcoin je odkaz von, nie obsah — ale v hlavičke stojí tam, kam patrí
-  // významom: hneď za peniazmi, lebo je to ich časť.
-  { id: "btc-odkaz", label: "Bitcoin", icon: "bitcoin", odkaz: true },
-  // Kalendár je predbežná vrstva medzi dvoma nedeľnými exportmi z PTmindera —
-  // hovorí, čo sa CHYSTÁ a čo sa práve zmenilo. Stojí pred Výsledkami zámerne:
-  // je to pohľad dopredu, kým Výsledky sú pohľad späť. A je to vlastná karta,
-  // nie riadok v Prevádzke, aby bolo na prvý pohľad jasné, že tieto čísla sú
-  // predpoveď a nie zápis.
+  // ── Šesť záložiek namiesto ôsmich (Jerry, 10. 8. 2026) ────────────────────
+  //
+  // Triedené podľa toho, ako často tam človek chodí, nie podľa oblastí:
+  // denne Kokpit a Kalendár, týždenne Klienti, mesačne Peniaze a Mesiac.
+  //
+  // Vnútorné `id` zostávajú NEZMENENÉ, hoci sa nápisy menia. Visia na nich
+  // adresy (#vzas/pnl), cieľové odkazy v registri, Jarvisove ⟦odkazy⟧ aj
+  // uložené rozloženia — premenovať id znamená potichu odpojiť desiatky
+  // miest. Nápis je vec, ktorú vidí človek; id je vec, ktorú vidí kód.
+  { id: "dashboard", label: "Kokpit", icon: "home" },
   { id: "kalendar", label: "Kalendár", icon: "calendar" },
-  { id: "vysledky", label: "Výsledky", icon: "calendar" },
-  // Údaje sú posledné a zámerne mimo príbehu: nie je to pohľad na štúdio, je to
-  // obsluha appky — nahrávanie, uzávierky, audit, kontá, záloha, vzhľad, reset.
-  // Predtým to viselo pod Dashboardom, kde to pod aktuálnou situáciou nemá čo
-  // robiť; uzávierky prišli z VZAS, lebo nie sú o peniazoch, ale o dátach.
-  { id: "udaje", label: "Údaje", icon: "upload" },
+  // Obsahom je prevádzka — tréningy, klienti, 6M, fluktuácia — ale všetko
+  // sú to ľudia, tak sa to tak aj volá.
+  { id: "tracker", label: "Klienti", icon: "userCheck" },
+  { id: "vzas", label: "Peniaze", icon: "wallet" },
+  { id: "marketing", label: "Marketing", icon: "activity" },
+  // Mesiac = mesačný rituál na jednom mieste: nahrať dáta, zavrieť mesiac,
+  // pozrieť výsledky, napísať správu. Boli to dve záložky (Údaje a Výsledky)
+  // a robili sa striedavo v jednom sedení.
+  { id: "mesiac", label: "Mesiac", icon: "upload" },
 ];
+
+/** Staré adresy tabov → nové. Nikdy sa nemažú (pravidlo z 10. 8.). */
+const TAB_ALIAS: Record<string, string> = { vysledky: "mesiac", udaje: "mesiac" };
 
 const TRACKER_SECTIONS = [
   { id: "treningy", label: "Tréningy", icon: "calendar" },
@@ -149,6 +146,8 @@ export function PSBApp() {
   const [trackerSection, setTrackerSection] = useState("treningy");
   // Tržby, nie P&L: Peniaze sa otvárajú na tom, čo Jerry sleduje denne.
   const [vzasSub, setVzasSub] = useState("trzby");
+  /** Ktorá polovica Mesiaca je otvorená: dáta a uzávierka, alebo výsledky. */
+  const [mesiacSub, setMesiacSub] = useState<"udaje" | "vysledky">("udaje");
   const [vysledkySub, setVysledkySub] = useState("kvartalne");
   const [vysledkyFocus, setVysledkyFocus] = useState<NavFocus | null>(null);
   const [marketingSub, setMarketingSub] = useState("lievik");
@@ -184,7 +183,7 @@ export function PSBApp() {
       return `#tracker/${trackerSection}${pod ? `/${pod}` : ""}`;
     }
     if (active === "vzas") return `#vzas/${vzasSub}`;
-    if (active === "vysledky") return `#vysledky/${vysledkySub}`;
+    if (active === "mesiac") return mesiacSub === "udaje" ? "#udaje" : `#vysledky/${vysledkySub}`;
     if (active === "marketing") return `#marketing/${marketingSub}`;
     return `#${active}`;
   };
@@ -192,8 +191,10 @@ export function PSBApp() {
   const nastavZCesty = useCallback((hash: string) => {
     const [zal, pod, pod2] = hash.replace(/^#\/?/, "").split("/").filter(Boolean);
     if (!zal) return;
-    if (!TABS.some((t) => t.id === zal)) return;
-    setActive(zal);
+    if (!TABS.some((t) => t.id === zal) && !TAB_ALIAS[zal]) return;
+    setActive(TAB_ALIAS[zal] || zal);
+    if (zal === "udaje") setMesiacSub("udaje");
+    if (zal === "vysledky") setMesiacSub("vysledky");
     if (zal === "tracker" && pod && TRACKER_IDS.includes(pod)) {
       setTrackerSection(pod);
       if (pod === "treningy" && pod2) setTreningySub(pod2);
@@ -260,7 +261,12 @@ export function PSBApp() {
       setActive("tracker");
       setTrackerSection(tab);
     } else {
-      setActive(tab);
+      // Staré id („vysledky", „udaje") vedú na Mesiac a rovno na tú správnu
+      // polovicu. Odkazy z registra, Jarvisa aj uložené adresy tak fungujú
+      // ďalej — presmerovanie, nie mazanie.
+      setActive(TAB_ALIAS[tab] || tab);
+      if (tab === "udaje") setMesiacSub("udaje");
+      if (tab === "vysledky") setMesiacSub("vysledky");
     }
     if (tab === "treningy" && sub) setTreningySub(sub);
     if (tab === "klienti" && sub) setKlientiSub(sub);
@@ -1486,25 +1492,26 @@ function skupinaFaktur(
           margin: "0 auto",
         }}
       >
-        {TABS.map((t) =>
-          t.odkaz ? (
-            <a
-              key={t.id}
-              href="/api/sso?prejst=1"
-              target="_blank"
-              rel="noopener noreferrer"
-              title="Otvoriť bitcoinovú evidenciu v novej karte (prihlási sa sama)"
-              style={{ ...tab(false), display: "inline-flex", alignItems: "center", gap: 7, textDecoration: "none" }}
-            >
-              <Icon name={t.icon} /> {t.label}
-              <span style={{ fontSize: 11, opacity: 0.7 }}>↗</span>
-            </a>
-          ) : (
-            <button key={t.id} style={{ ...tab(active === t.id), display: "inline-flex", alignItems: "center", gap: 7 }} onClick={() => setActive(t.id)}>
-              <Icon name={t.icon} /> {t.label}
-            </button>
-          ),
-        )}
+        {TABS.map((t) => (
+          <button key={t.id} style={{ ...tab(active === t.id), display: "inline-flex", alignItems: "center", gap: 7 }} onClick={() => setActive(t.id)}>
+            <Icon name={t.icon} /> {t.label}
+          </button>
+        ))}
+        {/* Bitcoin nie je záložka, je to odkaz do druhej appky — a odkaz
+            v rade záložiek vyzerá ako obsah, ktorý tam nie je. Stojí preto
+            napravo, oddelene, a otvára sa v NOVEJ karte: BTC appka má vlastné
+            prihlásenie a keby sa Kokpit zavrel, prišiel by človek o rozrobený
+            stav (filtre, rozbalený register, návrh uzávierky). */}
+        <a
+          href="/api/sso?prejst=1"
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Otvoriť bitcoinovú evidenciu v novej karte (prihlási sa sama)"
+          style={{ ...tab(false), marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 7, textDecoration: "none", flexShrink: 0 }}
+        >
+          <Icon name="bitcoin" /> Bitcoin
+          <span style={{ fontSize: 11, opacity: 0.7 }}>↗</span>
+        </a>
         {/* Bitcoin žije vo vlastnej appke (prosapiens-btc) a táto karta tam
             len vedie — nie je to obsah Kokpitu. Otvára sa v NOVEJ karte
             prehliadača zámerne: BTC appka má vlastné prihlásenie a keby sa
@@ -1555,8 +1562,37 @@ function skupinaFaktur(
         {active === "vzas" && <Vzas sub={vzasSub} onSub={setVzasSub} data={data} clients={clients} focus={vzasFocus} onNavigate={navigate} />}
         {active === "kalendar" && <Kalendar clients={clients} data={data} />}
 
-        {active === "vysledky" && <Vysledky data={data} onNavigate={navigate} clients={clients} sixM={sixM} capacity={capacity} register={register} sub={vysledkySub} onSub={setVysledkySub} focus={vysledkyFocus} />}
-        {active === "udaje" && <Udaje data={data} actions={actions} chat={chat} prekazky={prekazkyZamku} kroky={krokyZamku} podklady={podkladyMesiaca} onNavigate={navigate} btc={{ platby: [...btcBezDokladu, ...btcSparovane], faktury: volneFaktury, parovanie: btcParovanie, onSparuj: sparujBtc }} />}
+        {/* MESIAC — mesačný rituál na jednom mieste. Prvá podzáložka je to,
+            čím sa začína (nahrať dáta, zavrieť mesiac), zvyšok je to, čím sa
+            končí (pozrieť výsledky, napísať správu). Boli to dve záložky a
+            robili sa striedavo v jednom sedení. */}
+        {active === "mesiac" && (
+          <>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
+              {[{ id: "udaje", label: "Dáta a uzávierka" }, ...VYSLEDKY_LISTY].map((l) => {
+                const on = l.id === "udaje" ? mesiacSub === "udaje" : mesiacSub !== "udaje" && vysledkySub === l.id;
+                return (
+                  <button
+                    key={l.id}
+                    onClick={() => { if (l.id === "udaje") setMesiacSub("udaje"); else { setMesiacSub("vysledky"); setVysledkySub(l.id); } }}
+                    style={{
+                      padding: "6px 14px", borderRadius: 20, fontSize: 12.5, cursor: "pointer",
+                      border: `1px solid ${on ? C.accent : C.border}`,
+                      background: on ? C.accentBg : "transparent",
+                      color: on ? C.accentLight : C.textMuted,
+                    }}
+                  >
+                    {l.label}
+                  </button>
+                );
+              })}
+            </div>
+            {mesiacSub === "udaje"
+              ? <Udaje data={data} actions={actions} chat={chat} prekazky={prekazkyZamku} kroky={krokyZamku} podklady={podkladyMesiaca} onNavigate={navigate} btc={{ platby: [...btcBezDokladu, ...btcSparovane], faktury: volneFaktury, parovanie: btcParovanie, onSparuj: sparujBtc }} />
+              : <Vysledky data={data} onNavigate={navigate} clients={clients} sixM={sixM} capacity={capacity} register={register} sub={vysledkySub} onSub={setVysledkySub} focus={vysledkyFocus} skryVlastneTaby />}
+          </>
+        )}
+
       </div>
       <div style={{ ...S.h3, textAlign: "center", color: C.textDim, fontSize: 11, padding: "8px 0 24px", fontWeight: 400 }}>
         ProSapiens Biomechanic · interný nástroj · nezdieľať externe

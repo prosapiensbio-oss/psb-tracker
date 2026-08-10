@@ -3074,8 +3074,18 @@ export function Vzas({ sub, onSub, data, clients, focus, onNavigate }: { sub: st
 // Výsledky stojí vedľa VZAS, nie v ňom: VZAS je účtovná pravda (P&L, výplaty,
 // cashflow, dlhy), kým Výsledky odpovedajú na inú otázku — ako mi to ide voči
 // tomu, čo som si predsavzal. KPI a Ciele už dávno nie sú len o peniazoch.
+/** Podzáložky Výsledkov. Exportované, aby ich záložka Mesiac nemusela mať
+ *  vlastnú kópiu — dva zoznamy tých istých obrazoviek sa raz rozídu. */
+export const VYSLEDKY_LISTY = [
+  { id: "kvartalne", label: "Kvartálne" },
+  { id: "mesacne", label: "Mesačné" },
+  { id: "kpi", label: "KPI" },
+  { id: "ciele", label: "Ciele" },
+  { id: "report", label: "Report" },
+];
+
 export function Vysledky({
-  data, onNavigate, clients, sixM, capacity, register, sub, onSub, focus,
+  data, onNavigate, clients, sixM, capacity, register, sub, onSub, skryVlastneTaby, focus,
 }: {
   data: PSBData;
   onNavigate?: (tab: string) => void;
@@ -3087,11 +3097,13 @@ export function Vysledky({
   register: RegisterItem[];
   sub: string;
   onSub: (s: string) => void;
+  /** V záložke Mesiac je riadok podzáložiek spoločný — tento sa skryje. */
+  skryVlastneTaby?: boolean;
 }) {
   const setSub = onSub;
   return (
     <>
-      <SubTabs
+      {!skryVlastneTaby && <SubTabs
         tabs={[
           { id: "kvartalne", label: "Kvartálne" },
           { id: "mesacne", label: "Mesačné" },
@@ -3101,7 +3113,7 @@ export function Vysledky({
         ]}
         value={sub}
         onChange={setSub}
-      />
+      />}
       {sub === "kvartalne" && <KvartalneTab data={data} clients={clients} />}
       {sub === "mesacne" && <MesacneTab data={data} clients={clients} focus={focus} />}
       {sub === "kpi" && <KpiTab data={data} onNavigate={onNavigate} />}
