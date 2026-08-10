@@ -38,13 +38,14 @@ export type SekciaId = "peniaze" | "zisky" | "vytazenie" | "klienti" | "marketin
 // odrobené hodiny vyrobia klientov, klienti vyrobia peniaze. Peniaze sú
 // výsledok tých dvoch a v paneli prístrojov hore sú aj tak prvé.
 export const SEKCIE: { id: SekciaId; label: string; popis: string }[] = [
-  // Názvy sú Jerryho (10. 8.) a nie sú kozmetika: kategória sa volá podľa
-  // OTÁZKY, na ktorú odpovedá, nie podľa oblasti. „Peniaze" je oblasť,
-  // „Peniaze v čase" je otázka, či to ide hore alebo dole.
-  { id: "vytazenie", label: "Vyťaženie a ekonomika hodiny", popis: "Koľko robíme, koľko ešte zvládneme a čo z hodiny máme." },
-  { id: "peniaze", label: "Peniaze v čase", popis: "Tržby proti break-evenu — ide to hore alebo dole?" },
-  { id: "zisky", label: "Zisky a náklady", popis: "Čo z tržieb zostane a čo sa čaká ďalší mesiac." },
-  { id: "marketing", label: "Marketing / lievik", popis: "Odkiaľ ľudia chodia a čo za nich platíme." },
+  // Krátke názvy (Jerry, 10. 8.). Dlhé varianty („Vyťaženie a ekonomika
+  // hodiny", „Peniaze v čase") vydržali jednu iteráciu: v riadku pilulek nad
+  // grafmi sa z nich stal odsek a prepínač prestal byť prepínačom. Čo tam je,
+  // hovorí popis pod nadpisom sekcie — nadpis má len rozlišovať.
+  { id: "vytazenie", label: "Vyťaženie", popis: "Koľko robíme, koľko ešte zvládneme a čo z hodiny máme." },
+  { id: "peniaze", label: "Peniaze", popis: "Tržby proti break-evenu — ide to hore alebo dole?" },
+  { id: "zisky", label: "Zisky / náklady", popis: "Čo z tržieb zostane a čo sa čaká ďalší mesiac." },
+  { id: "marketing", label: "Marketing", popis: "Odkiaľ ľudia chodia a čo za nich platíme." },
   { id: "klienti", label: "Klienti", popis: "Kto chodí, kto odchádza a čo prinesie." },
 ];
 
