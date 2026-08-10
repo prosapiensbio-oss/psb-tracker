@@ -907,6 +907,17 @@ export type RegisterItem = {
   note?: string;
   priority: number; // lower = more important
   client?: string; // client this item is about → "Otvoriť" focuses them in Klienti
+  /**
+   * Rodina položky — čo znamená „už mi toto nehlás".
+   *
+   * Kľúč jednej položky nesie dátum alebo mesiac (`odchody|2026-07`,
+   * `dnes|2026-08-09|Jan Kral`), takže „Skryť" umlčalo presne jeden deň
+   * a zajtra bola vec späť. Rodina je ten istý kľúč bez premenlivej časti,
+   * takže sa dá umlčať CELÝ druh upozornenia pre daného klienta či kategóriu.
+   * Kto rodinu nemá, sa umlčať nedá — a to je zámer: pri niektorých veciach
+   * (chýbajúci nájom) je ticho horšie než otrava.
+   */
+  rodina?: string;
 };
 
 const toneRank: Record<string, number> = { red: 0, orange: 1, blue: 2 };
@@ -927,6 +938,7 @@ export function deriveRegister(
     detail: string,
     basePriority: number,
     client?: string,
+    rodina?: string,
   ) =>
     items.push({
       key,
@@ -934,10 +946,14 @@ export function deriveRegister(
       tone,
       title,
       detail,
-      acked: !!ack[key],
-      note: ack[key]?.note,
+      // Umlčaná rodina = umlčaná položka. Kontroluje sa tu, nie v komponente:
+      // register čítajú tri miesta (Kokpit, Jarvisov kontext, mesačná správa)
+      // a umlčanie musí platiť vo všetkých rovnako.
+      acked: !!ack[key] || (!!rodina && !!ack[`mute|${rodina}`]),
+      note: ack[key]?.note || (rodina ? ack[`mute|${rodina}`]?.note : undefined),
       priority: basePriority + toneRank[tone],
       client,
+      rodina,
     });
 
   // Staré dáta klamú ticho — a to je horší druh klamstva než chýbajúce číslo.
@@ -991,7 +1007,7 @@ export function deriveRegister(
     const tone = c.alertTone === "red" ? "red" : "orange";
     // Meno patrí do textu, nie len do titulku — v registri sa zobrazuje detail
     // a bez mena sa nedalo zistiť, koho sa to týka.
-    add(`sixm|${c.client}|${c.phase}|${c.monthInPhase}`, "6M", tone, `${c.client} — 6M`, `${c.client}: ${c.alert}`, 0, c.client);
+    add(`sixm|${c.client}|${c.phase}|${c.monthInPhase}`, "6M", tone, `${c.client} — 6M`, `${c.client}: ${c.alert}`, 0, c.client, `sixm|${c.client}`);
   }
   // Capacity signal uses the SAME real-hours utilisation the capacity card and the
   // assistant show (util = tighter of typical→29h / busy→34h), NOT the reference-only

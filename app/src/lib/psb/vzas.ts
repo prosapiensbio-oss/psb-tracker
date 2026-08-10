@@ -444,6 +444,18 @@ export let NAKLADY_Z_FIO: string[] = [];
 /** Prvý mesiac, ktorý Excel nemá — od neho vyššie plnia dáta importy. */
 export const PRVY_MESIAC_Z_FIO = "2026-07";
 
+/**
+ * Od ktorého mesiaca sa appka pýta na veci z minulosti.
+ *
+ * Jerry (9. 8. 2026): „čo sa stalo pred júlom už nechcem riešiť." Dôvod
+ * odchodu spred roka si nikto verne nespomenie a vymyslený dôvod je horší
+ * než chýbajúci — register mal osem takých mesiacov naraz, teda osem
+ * položiek, ktoré sa nedali vybaviť, len prehliadať. Zámerne samostatná
+ * konštanta, nie PRVY_MESIAC_Z_FIO: tá hovorí, odkiaľ tečú dáta z banky,
+ * a raz sa môže pohnúť z iného dôvodu než tento.
+ */
+export const PRVY_MESIAC_OTAZOK = "2026-07";
+
 /** Riadok „Z banky" v osobných výplatách — pre mesiace, ktoré Excel nemá. */
 /**
  * Mzdové hodiny pre mesiace, ktoré Excel nemá — z PTmindera.

@@ -1806,10 +1806,28 @@ function RegisterRow({ item, actions, onNavigate, chat }: { item: RegisterItem; 
               {odlozit ? "Zavrieť" : "Odložiť"}
             </button>
           )}
+          {/* „Nehlásiť" umlčí CELÝ druh upozornenia, nie jeden dátum.
+              Skryť rieši jednu položku — lenže kľúč nesie dátum („dnes|
+              2026-08-09|Jan Kral"), takže tá istá vec bola zajtra späť
+              a Skryť vyzeralo, že nefunguje. Toto je odpoveď na „niektoré
+              sú irelevantné": povieš to raz a je ticho. Vrátiť sa dá
+              v Skrytých. Položky bez rodiny (chýbajúci nájom, staré dáta)
+              tlačidlo nemajú zámerne — tam je ticho horšie než otrava. */}
           {item.acked ? (
-            <button onClick={() => actions.ackAnomaly(item.key, "", false)} style={linkBtn}>Vrátiť</button>
+            <button onClick={() => { actions.ackAnomaly(item.key, "", false); if (item.rodina) actions.ackAnomaly(`mute|${item.rodina}`, "", false); }} style={linkBtn}>Vrátiť</button>
           ) : (
-            <button onClick={() => actions.ackAnomaly(item.key, "skryté")} style={{ ...linkBtn, color: C.textDim }}>Skryť</button>
+            <>
+              <button onClick={() => actions.ackAnomaly(item.key, "skryté")} style={{ ...linkBtn, color: C.textDim }}>Skryť</button>
+              {item.rodina && (
+                <button
+                  onClick={() => actions.ackAnomaly(`mute|${item.rodina}`, "nehlásiť tento druh")}
+                  title="Už mi tento druh upozornenia nehlás — ani zajtra, ani o mesiac"
+                  style={{ ...linkBtn, color: C.textDim }}
+                >
+                  Nehlásiť
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>

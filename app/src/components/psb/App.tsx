@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { BARTER_KLIENTI, PRVY_MESIAC_Z_FIO, vzasVerzia, nastavBtcVyplaty, nastavHodinyZTrackera, nastavJarekZTrackera, nastavNakladyZFio, nastavPnlOverrides, nastavPrijmyZTrackera, nastavVyplaty, nastavZmenyKategorii, nazovKategorie, pnlHodnota, pnlOverridesNaUlozenie } from "../../lib/psb/vzas";
+import { BARTER_KLIENTI, PRVY_MESIAC_OTAZOK, PRVY_MESIAC_Z_FIO, vzasVerzia, nastavBtcVyplaty, nastavHodinyZTrackera, nastavJarekZTrackera, nastavNakladyZFio, nastavPnlOverrides, nastavPrijmyZTrackera, nastavVyplaty, nastavZmenyKategorii, nazovKategorie, pnlHodnota, pnlOverridesNaUlozenie } from "../../lib/psb/vzas";
 
 import {
   checkSession,
@@ -838,15 +838,20 @@ function skupinaFaktur(
   // Skladuje sa v tom istom poli ako poznámka k akceptácii, s predponou
   // „odlozene|DÁTUM|" — vlastnú tabuľku by si to nezaslúžilo a migrácia
   // existujúcich zápisov by bola drahšia než tento prefix.
-  const stavPolozky = useCallback((key: string) => {
+  const stavPolozky = useCallback((key: string, rodina?: string) => {
+    // Umlčaná rodina prebíja všetko: „už mi toto nehlás" platí na celý druh
+    // upozornenia, nie na jeden dátum. Bez toho sa vec vrátila zajtra s novým
+    // kľúčom a Skryť pôsobilo, akoby nefungovalo.
+    const mute = rodina ? (data.anomalyAck || {})[`mute|${rodina}`] : undefined;
+    if (mute) return { acked: true, note: mute.note || "nehlásiť", rodina };
     const z = (data.anomalyAck || {})[key];
-    if (!z) return { acked: false, note: undefined as string | undefined };
+    if (!z) return { acked: false, note: undefined as string | undefined, rodina };
     const m = /^odlozene\|(\d{4}-\d{2}-\d{2})\|?([\s\S]*)$/.exec(z.note || "");
-    if (!m) return { acked: true, note: z.note };
+    if (!m) return { acked: true, note: z.note, rodina };
     const dnes = new Date().toISOString().slice(0, 10);
     // Dátum už prešiel → položka sa vracia medzi živé, aj s poznámkou prečo.
-    if (m[1] <= dnes) return { acked: false, note: `odložené na ${m[1]}${m[2] ? ` — ${m[2]}` : ""}`, vratene: true };
-    return { acked: true, note: `odložené do ${m[1]}${m[2] ? ` — ${m[2]}` : ""}` };
+    if (m[1] <= dnes) return { acked: false, note: `odložené na ${m[1]}${m[2] ? ` — ${m[2]}` : ""}`, vratene: true, rodina };
+    return { acked: true, note: `odložené do ${m[1]}${m[2] ? ` — ${m[2]}` : ""}`, rodina };
   }, [data.anomalyAck]);
 
   const kontrolaBanky = useMemo(() => {
@@ -880,7 +885,7 @@ function skupinaFaktur(
         detail: n.druh === "chyba"
           ? `${meno} — platilo sa ${n.zMesiacov} zo 4 predošlých mesiacov, obvykle ${Math.round(n.obvykle).toLocaleString("cs-CZ")} Kč, ale za ${monthLabel(n.mesiac)} v banke nie je nič. Buď je pohyb zaradený inde, platilo sa v hotovosti, alebo faktúra nie je uhradená. Zisk za ten mesiac je zatiaľ o túto sumu vyšší, než bude.`
           : `${meno} — obvykle ${Math.round(n.obvykle).toLocaleString("cs-CZ")} Kč, za ${monthLabel(n.mesiac)} len ${Math.round(n.teraz).toLocaleString("cs-CZ")} Kč. Buď je časť zaradená inde, alebo sa platilo menej.`,
-        ...stavPolozky(key),
+        ...stavPolozky(key, `naklad|${n.kategoria}`),
         priority: n.druh === "chyba" ? 3 : 7, client: "vzas|pnl",
       });
     }
@@ -901,7 +906,7 @@ function skupinaFaktur(
         key, category: "Anomália", tone: "orange",
         title: `${zoznam.length}× platba bitcoinom bez faktúry v ${monthLabel(mk)} — ${Math.round(spolu).toLocaleString("cs-CZ")} Kč`,
         detail: `Z bitcoinovej peňaženky odišlo ${Math.round(spolu).toLocaleString("cs-CZ")} Kč v ${zoznam.length} platbách (${zoznam.slice(0, 4).map((x) => `${fmtDMY(x.datum)} ${Math.round(x.czk || 0).toLocaleString("cs-CZ")} Kč${x.poznamka ? ` — ${x.poznamka}` : ""}`).join(", ")}${zoznam.length > 4 ? ` a ďalších ${zoznam.length - 4}` : ""}), ale nenašla sa k nim faktúra. Cez účet neprešli, takže import z Fio ich nevidel — ak to boli firemné nákupy, ten náklad v P&L chýba a zisk za ${monthLabel(mk)} je o toľko vyšší, než bol. Nahraj doklad v Údajoch a spáruje sa sám. Ak to bol súkromný nákup, odklepni.`,
-        ...stavPolozky(key), priority: 4, client: "udaje|",
+        ...stavPolozky(key, "btcbezdokladu"), priority: 4, client: "udaje|",
       });
     }
 
@@ -917,7 +922,7 @@ function skupinaFaktur(
         detail: `${meno} — za ${monthLabel(d.mesiac)} sú zapísané ${d.pohyby.length} platby (${d.pohyby.map((x) => `${fmtDMY(x.datum)} ${Math.round(x.suma).toLocaleString("cs-CZ")} Kč${x.hotovost ? " zo zošita" : " z banky"}`).join(", ")}), spolu ${Math.round(d.spolu).toLocaleString("cs-CZ")} Kč. Inokedy tam býva jedna.` +
           (zdroje ? " Jedna je z banky a jedna zo zošita — vyzerá to, že ten istý výdavok dorazil dvoma cestami." : "") +
           " Ak je to naozaj dvakrát, oprav to v Údaje → Zapísané pohyby (kategória mimo ten pohyb vylúči).",
-        ...stavPolozky(key), priority: 2, client: "udaje|",
+        ...stavPolozky(key, `dvojity|${d.kategoria}`), priority: 2, client: "udaje|",
       });
     }
 
@@ -967,11 +972,17 @@ function skupinaFaktur(
     // Pýta sa len na uzavreté mesiace. Kto stíchol tento mesiac, sa ešte môže
     // vrátiť a otázka „prečo odišiel" by bola predčasná — presne ten omyl, na
     // ktorý sme narazili pri anomáliách bežiaceho mesiaca.
+    //
+    // A pýta sa len na mesiace OD PRVÉHO ŽIVÉHO (júl 2026). Jerry: „čo sa stalo
+    // pred júlom už nechcem riešiť." Je to správne rozhodnutie, nie lenivosť:
+    // dôvod odchodu spred roka si nikto verne nespomenie a vymyslený dôvod je
+    // horší než chýbajúci. Register mal pritom osem takých mesiacov naraz —
+    // osem položiek, ktoré sa nedali vybaviť, len prehliadať.
     {
       const beziaci = new Date().toISOString().slice(0, 7);
       const toky = tokyKlientov(data, clients).mesacne;
       for (const [mk, v] of toky) {
-        if (mk >= beziaci || !v.odisli.length) continue;
+        if (mk < PRVY_MESIAC_OTAZOK || mk >= beziaci || !v.odisli.length) continue;
         const odpovede = zapisy.mesiace?.[mk]?.answers || {};
         const bezDovodu = v.odisli.filter((meno) => !(odpovede[`odchod__${meno}`] || "").trim());
         if (!bezDovodu.length) continue;
@@ -980,7 +991,7 @@ function skupinaFaktur(
           key, category: "Rozhodnutie", tone: "orange",
           title: `${monthLabel(mk)}: ${bezDovodu.length === 1 ? "odišiel klient" : `odišli ${bezDovodu.length} klienti`} a nevieme prečo`,
           detail: `${bezDovodu.join(", ")} — ${bezDovodu.length === 1 ? "prestal" : "prestali"} chodiť v ${monthLabel(mk)} a dôvod nikde nie je. Dôvod je jediná vec, ktorú appka o odchode nezistí, a o rok sa naň už nikto nespýta. Doplň ho v Klienti → Fluktuácia, po rozkliknutí mesiaca.`,
-          ...stavPolozky(key), priority: 5, client: "klienti|rast",
+          ...stavPolozky(key, "odchody"), priority: 5, client: "klienti|rast",
         });
       }
     }
@@ -1020,7 +1031,12 @@ function skupinaFaktur(
         // z fázy a mesiaca druhýkrát a inak než Prevádzka.
         const s6 = sixM.find((x) => x.client === u.klient);
         if (s6?.alert) dovody.push(s6.alert.replace(/^⚠️\s*/, "").toLowerCase());
-        if (s6 && !s6.contractSigned) dovody.push("nemá podpísanú zmluvu");
+        // Nepodpísaná zmluva sem NEPATRÍ. Denné upozornenie má povedať, čo na
+        // tej hodine spraviť inak — narodeniny, posledná hodina, hodnotiaci
+        // rozhovor. Zmluva je papierovačka: opakovala by sa pri každom jednom
+        // tréningu, kým niekto neklikne fajku, a keďže fajku má 5 klientov zo
+        // 119, znamenalo to trvalý šum pri každom človeku s viazanosťou.
+        // Zostáva tam, kde sa dá vybaviť — v zozname 6M vedľa tej fajky.
         if (u.typ === "uvodny") dovody.push("je to úvodný tréning — po ňom sa rozhoduje o pokračovaní");
 
         if (!dovody.length) continue;
@@ -1029,7 +1045,7 @@ function skupinaFaktur(
           key, category: "6M", tone: "blue",
           title: `${u.zaciatok.slice(11, 16)} ${u.klient}: ${dovody[0]}`,
           detail: `Dnes o ${u.zaciatok.slice(11, 16)} máš tréning s ${u.klient}. ${dovody.map((x) => x[0].toUpperCase() + x.slice(1)).join(". ")}.`,
-          ...stavPolozky(key), priority: 1, client: `klienti|klienti`,
+          ...stavPolozky(key, `dnes|${u.klient}`), priority: 1, client: `klienti|klienti`,
         });
       }
     }
