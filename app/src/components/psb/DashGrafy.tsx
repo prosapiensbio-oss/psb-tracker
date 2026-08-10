@@ -487,8 +487,14 @@ export function useExtraGrafy({
 
     nodes.zdravieFirmy = (
       <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column" }}>
-        <H3><Info label="Zdravie firmy" text="Štyri čísla za posledných 6 mesiacov P&L. Break-even ráta s NÁROKOM trénerov (nie s tým, čo si reálne vzali) — to, čo si niekto vezme navyše, je pôžička, nie náklad. Rezerva pod 20 % znamená, že jeden slabý mesiac stačí na stratu." /></H3>
+        <H3><Info label="Zdravie firmy" text="Štyri čísla za posledných 6 mesiacov P&L. Break-even ráta s NÁROKOM trénerov (nie s tým, čo si reálne vzali) — to, čo si niekto vezme navyše, je pôžička, nie náklad. Rezerva pod 20 % znamená, že jeden slabý mesiac stačí na stratu. Pozor: karta Tržby vs. break-even ráta tie isté pomery za obdobie zvolené vo filtri hore — preto sa čísla môžu líšiť." /></H3>
         <Klik kam={() => onNavigate("vzas")} onNavigate="VZAS → Zdravie firmy">
+          {/* Okno priamo na kartě, nie len v Info: „Mzdy z tržieb 51 %" tu
+              a „60 %" na break-even karte vyzerali ako chyba, kým sa človek
+              nedočítal, že jedno je 6 mesiacov a druhé filter obdobia. */}
+          <div style={{ fontSize: 10.5, color: C.textDim, marginBottom: 6 }}>
+            posledných {idx6.length} mes. · {MES_LAB[idx6[0]]} – {MES_LAB[idx6[idx6.length - 1]]}
+          </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}>
             <MiniStat label="Break-even / mes." value={fmtCZK(beAvg)} color={C.orange} />
             <MiniStat label="Rezerva nad ním" value={`${rezerva > 0 ? "+" : ""}${rezerva.toFixed(1)} %`} color={rezerva >= 20 ? C.green : rezerva >= 0 ? C.orange : C.red} />
@@ -678,12 +684,24 @@ export function useExtraGrafy({
           {/* Dve čísla k tomu grafu (Jerry, 10. 8.): koľko z tržieb spotrebujú
               mzdy a koľko mesiacov bolo pod break-evenom. Prvé hovorí, prečo
               je break-even tam, kde je — mzda nie je fixný náklad, rastie
-              s odrobenými hodinami. */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8, marginTop: 8 }}>
+              s odrobenými hodinami.
+              Mzdy = NÁROK, nie poslané (Jerry, 10. 8.): poslané obsahuje aj
+              „pôžičky" nad nárok a karta tak ukazovala 60 % tam, kde Zdravie
+              firmy 51 % — dve čísla pre tú istú vec. Rovnaký čitateľ ako
+              break-even čiara; zvyšný rozdiel je už len okno (filter obdobia
+              vs. posledných 6 mes.) a to je napísané na oboch kartách. */}
+          <div style={{ fontSize: 10.5, color: C.textDim, marginTop: 8 }}>
+            za zvolené obdobie · {MES_LAB[idxOkno[0]]} – {MES_LAB[idxOkno[nMes - 1]]}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8, marginTop: 6 }}>
             <MiniStat
-              label="Mzdy z tržieb"
-              value={priem(p.prijmy) > 0 ? `${((priem(p.vyplatySpolu) / priem(p.prijmy)) * 100).toFixed(0)} %` : "—"}
-              color={priem(p.vyplatySpolu) / Math.max(1, priem(p.prijmy)) > 0.55 ? C.red : C.textMuted}
+              label="Mzdy (nárok) z tržieb"
+              value={(() => {
+                const trz = idxOkno.reduce((a, i) => a + p.prijmy[i], 0);
+                const narok = idxOkno.reduce((a, i) => a + j.narok[i] + t.narok[i] + p.matyas[i], 0);
+                return trz > 0 ? `${((narok / trz) * 100).toFixed(0)} %` : "—";
+              })()}
+              color={idxOkno.reduce((a, i) => a + j.narok[i] + t.narok[i] + p.matyas[i], 0) / Math.max(1, idxOkno.reduce((a, i) => a + p.prijmy[i], 0)) > 0.55 ? C.red : C.textMuted}
             />
             <MiniStat
               label="Mesiacov pod break-even"
@@ -991,8 +1009,13 @@ export function useExtraGrafy({
                 </span>
               );
               return (
-                <div key={mk} style={{ display: "flex", fontSize: 12, padding: "5px 2px", borderBottom: `1px solid ${mix(C.border, 40)}`, fontVariantNumeric: "tabular-nums" }}>
-                  <span style={{ flex: 1, color: C.textMuted }}>{monthLabel(mk)}</span>
+                <div
+                  key={mk}
+                  style={{ display: "flex", fontSize: 12, padding: "5px 2px", borderBottom: `1px solid ${mix(C.border, 40)}`, fontVariantNumeric: "tabular-nums", cursor: "pointer" }}
+                  title="Otvoriť klientov tejto kohorty"
+                  onClick={(e) => { e.stopPropagation(); onNavigate("klienti", undefined, { skupina: { label: `Prišli ${monthLabel(mk)}`, mena: cs.map((c) => c.name) }, nonce: Date.now() }); }}
+                >
+                  <span style={{ flex: 1, color: C.textMuted, textDecoration: "underline dotted" }}>{monthLabel(mk)}</span>
                   <span style={{ width: 34, textAlign: "right", color: C.text }}>{cs.length}</span>
                   {bunka(90, C.green, 34)}
                   {bunka(180, C.accentLight, 34)}
@@ -1015,18 +1038,20 @@ export function useExtraGrafy({
           z: z ? ZDROJE.find((x) => x.value === z)?.label || z : "nevyplnené",
           n: cs.length,
           trzba: Math.round(cs.reduce((a, c) => a + c._trzba, 0) / cs.length),
+          mena: cs.map((c) => c.name),
         }))
         .sort((a, b) => b.trzba - a.trzba)
         .slice(0, 6);
     })();
     nodes.hodnotaZdroj = (
       <Card style={{ marginBottom: 0, height: "100%" }}>
-        <H3><Info label="Čo klient prinesie podľa zdroja" text="Priemerná tržba na klienta za celý čas, čo chodí, podľa toho odkiaľ prišiel. Toto je číslo, proti ktorému má zmysel držať cenu za získaného klienta. Pozor: zdroj sa zapisuje až od júna 2025, staršie mená sedia v „nevyplnené“." /></H3>
+        <H3><Info label="Čo klient prinesie podľa zdroja" text="Priemerná tržba na klienta za celý čas, čo chodí, podľa toho odkiaľ prišiel (všetci klienti — aj tí, čo stále chodia). Toto je číslo, proti ktorému má zmysel držať cenu za získaného klienta. Klik na riadok otvorí tých konkrétnych ľudí. Pozor: zdroj sa zapisuje až od júna 2025, staršie mená sedia v „nevyplnené“." /></H3>
         <Klik kam={() => onNavigate("klienti", "rast")} onNavigate="Klienti → Rast a strata">
           <div style={{ marginTop: 8 }}>
             {podlaZdroja.map((r) => (
               <BarRow key={r.z} label={r.z} value={r.trzba} max={Math.max(1, ...podlaZdroja.map((x) => x.trzba))}
-                color={C.accent} sub={`${fmtCZK(r.trzba)} · ${r.n} kl.`} />
+                color={C.accent} sub={`${fmtCZK(r.trzba)} · ${r.n} kl.`}
+                onClick={() => onNavigate("klienti", undefined, { skupina: { label: `Zdroj: ${r.z}`, mena: r.mena }, nonce: Date.now() })} />
             ))}
           </div>
         </Klik>
@@ -1035,12 +1060,15 @@ export function useExtraGrafy({
 
     // ── Marketing ────────────────────────────────────────────────────────────
     const konv = (() => {
-      const m = new Map<string, { dopyty: number; klienti: number }>();
-      const menaKlientov = new Set(Object.values(clients).filter((c) => c.firstSession).map((c) => c.name.toLowerCase().trim()));
+      const m = new Map<string, { dopyty: number; klienti: number; mena: string[] }>();
+      // lower → kanonické meno, aby klik otvoril klienta pod menom, pod ktorým
+      // ho pozná zoznam Klientov (dopyt máva iné veľké písmená či medzery).
+      const menaKlientov = new Map(Object.values(clients).filter((c) => c.firstSession).map((c) => [c.name.toLowerCase().trim(), c.name]));
       for (const l of data.leads || []) {
-        const e = m.get(l.source) || { dopyty: 0, klienti: 0 };
+        const e = m.get(l.source) || { dopyty: 0, klienti: 0, mena: [] };
         e.dopyty++;
-        if (menaKlientov.has((l.name || "").toLowerCase().trim())) e.klienti++;
+        const kanonicke = menaKlientov.get((l.name || "").toLowerCase().trim());
+        if (kanonicke) { e.klienti++; e.mena.push(kanonicke); }
         m.set(l.source, e);
       }
       return [...m.entries()].map(([z, v]) => ({ z, ...v })).sort((a, b) => b.dopyty - a.dopyty);
@@ -1054,7 +1082,8 @@ export function useExtraGrafy({
               {konv.map((r) => (
                 <BarRow key={r.z} label={r.z} value={r.klienti} max={Math.max(1, ...konv.map((x) => x.dopyty))}
                   color={r.klienti > 0 ? C.green : C.red}
-                  sub={`${r.klienti} z ${r.dopyty}${r.dopyty ? ` · ${Math.round((r.klienti / r.dopyty) * 100)} %` : ""}`} />
+                  sub={`${r.klienti} z ${r.dopyty}${r.dopyty ? ` · ${Math.round((r.klienti / r.dopyty) * 100)} %` : ""}`}
+                  onClick={r.mena.length ? () => onNavigate("klienti", undefined, { skupina: { label: `Z dopytov: ${r.z}`, mena: r.mena }, nonce: Date.now() }) : undefined} />
               ))}
             </div>
           ) : <Empty>Zatiaľ žiadne zapísané dopyty.</Empty>}
@@ -1359,11 +1388,11 @@ export function useExtraGrafy({
       : 0;
     nodes.ltvZdroj = (
       <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column" }}>
-        <H3><Info label="Hodnota klienta (LTV)" text="Koľko klient priemerne zaplatí za celý čas spolupráce a ako dlho vydrží. Ráta sa z ODÍDENÝCH klientov — u tých, čo stále chodia, sa nedá povedať, koľko ešte zaplatia, a priemer by bol nepravdivo nízky. LTV je strop na to, koľko sa oplatí minúť na získanie jedného klienta." /></H3>
+        <H3><Info label="Hodnota klienta (LTV) — odídení" text="Koľko klient priemerne zaplatí za celý čas spolupráce a ako dlho vydrží. Ráta sa LEN z ODÍDENÝCH klientov — u tých, čo stále chodia, sa nedá povedať, koľko ešte zaplatia. Pozor na rozdiel oproti KPI „Hodnota klienta“: to ráta VŠETKÝCH s ≥3 sedeniami vrátane aktívnych, preto je vyššie (~27 000 Kč / 8+ mes.). Toto číslo je opatrnejší strop na to, koľko sa oplatí minúť na získanie klienta." /></H3>
         <Klik kam={() => onNavigate("klienti", "rast")} onNavigate="Klienti → Rast a strata">
           {odisliD.length === 0 ? <Empty>Zatiaľ nie sú odídení klienti s platbami.</Empty> : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}>
-              <MiniStat label="Ø hodnota klienta" value={fmtCZK(ltvOdislych)} color={C.green} />
+              <MiniStat label="Ø hodnota (len odídení)" value={fmtCZK(ltvOdislych)} color={C.green} />
               <MiniStat label="Ø dĺžka spolupráce" value={`${mesiacovSpolu.toFixed(1)} mes.`} color={mesiacovSpolu >= 12 ? C.green : mesiacovSpolu >= 6 ? C.orange : C.red} />
               <MiniStat label="Z koľkých odídených" value={String(odisliD.length)} />
               <MiniStat label="Ø / mesiac spolupráce" value={mesiacovSpolu > 0 ? fmtCZK(ltvOdislych / mesiacovSpolu) : "—"} />
@@ -1422,7 +1451,20 @@ export function useExtraGrafy({
     // Oddelené opticky aj slovom: odhad má zmysel len oproti skutočnosti, ale
     // nesmie s ňou splynúť — presne to vyrobilo zmätok pri dvoch modeloch
     // predikcie, keď september mal dve rôzne čísla.
-    const pred1 = predikciaNakladov(1, {}, undefined);
+    // Odhad hodín z tempa klientov — ROVNAKO ako obrazovka Peniaze → Predikcia.
+    // Bez neho by výplaty išli z mediánu minulých mesiacov a tá istá vec by tu
+    // a tam ukazovala dve rôzne čísla; mzda nie je fixný náklad, rastie
+    // s hodinami. (Presne táto nezrovnalosť tu bola: karta rátala medián,
+    // obrazovka nárok z hodín.)
+    const hodinyOdhadZN = (() => {
+      const out = { jerry: 0, terezka: 0 };
+      for (const c of predEarn.perClient) {
+        if (c.trainer === "Jerry") out.jerry += c.burnRate;
+        else if (c.trainer === "Terezka") out.terezka += c.burnRate;
+      }
+      return out;
+    })();
+    const pred1 = predikciaNakladov(1, {}, hodinyOdhadZN);
     const predM = pred1.mesiace[0];
     nodes.ziskyNaklady = (
       <Card style={{ marginBottom: 0, height: "100%" }}>
@@ -1551,23 +1593,43 @@ function CenaZaKlienta({
     { id: "2026" as const, label: "2026" },
     { id: "2025" as const, label: "2025" },
   ];
+  // „1 mesiac" NIE JE kalendárny mesiac — je to posledných 30 dní po dňoch.
+  // Kalendárne okno bolo v prvej dekáde mesiaca prázdne (bežiaci mesiac ešte
+  // nemá import, minulý už vypadol) a karta hlásila „nie sú dáta" napriek
+  // tomu, že úvodné tréningy aj noví klienti reálne boli.
+  const dnes = Date.now();
+  const od30 = dnes - 30 * 86400000;
   const vOkne = (mk: string) => {
     if (okno === "2026" || okno === "2025") return mk.startsWith(okno);
-    const n = okno === "1m" ? 1 : 3;
     const od = new Date();
-    od.setMonth(od.getMonth() - n);
+    od.setMonth(od.getMonth() - 3);
     return mk >= od.toISOString().slice(0, 7);
   };
-  const spend = MKT_MESACNE.filter((m) => vOkne(m.m)).reduce((a, m) => a + (m.spend || 0), 0);
+  const vOkneDatum = (d: string) => {
+    if (!d) return false;
+    if (okno === "1m") { const t = Date.parse(d); return t >= od30 && t <= dnes; }
+    return vOkne(d.slice(0, 7));
+  };
+  // Výdaje sú v Metricoole len po mesiacoch. Pre 30-dňové okno sa berú
+  // pomerne podľa počtu dní mesiaca v okne — je to odhad a Info to hovorí.
+  const spend = okno === "1m"
+    ? Math.round(MKT_MESACNE.reduce((a, m) => {
+        const zac = Date.parse(`${m.m}-01`);
+        const dniMes = new Date(Number(m.m.slice(0, 4)), Number(m.m.slice(5, 7)), 0).getDate();
+        const kon = zac + dniMes * 86400000;
+        const dni = Math.max(0, (Math.min(kon, dnes) - Math.max(zac, od30)) / 86400000);
+        return a + (m.spend || 0) * (dni / dniMes);
+      }, 0))
+    : MKT_MESACNE.filter((m) => vOkne(m.m)).reduce((a, m) => a + (m.spend || 0), 0);
   const uvodne = new Set(
-    data.sessions.filter((x) => x.sessionType === "UVODNE" && vOkne(x.date.slice(0, 7))).map((x) => `${x.client}|${x.date}`),
+    data.sessions.filter((x) => x.sessionType === "UVODNE" && vOkneDatum(x.date)).map((x) => `${x.client}|${x.date}`),
   ).size;
-  const novi = Object.values(clients).filter((c) => c.firstSession && vOkne(c.firstSession.slice(0, 7))).length;
+  const novi = Object.values(clients).filter((c) => c.firstSession && vOkneDatum(c.firstSession)).length;
 
   return (
     <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-        <H3><Info label="Čo stojí úvodný a klient" text="Marketingové výdaje za zvolené obdobie delené počtom úvodných tréningov a počtom nových klientov z toho istého obdobia. Druhé číslo je to podstatné: úvodný, ktorý sa nezmenil na klienta, je zaplatená hodina bez tržby. Porovnávaj ho s hodnotou klienta (LTV) — keď sa priblížia, reklama prestáva dávať zmysel. Ráta sa len z toho, čo je v Metricoole zapísané ako výdaj; organický dosah tu nie je a nedá sa oceniť." /></H3>
+        <H3><Info label="Čo stojí úvodný a klient" text="Marketingové výdaje za zvolené obdobie delené počtom úvodných tréningov a počtom nových klientov z toho istého obdobia. „1 mesiac“ = posledných 30 dní po dňoch; výdaje sú v Metricoole len mesačné, tak sa berú pomerne podľa dní — je to odhad. Druhé číslo je to podstatné: úvodný, ktorý sa nezmenil na klienta, je zaplatená hodina bez tržby. Porovnávaj ho s hodnotou klienta (LTV) — keď sa priblížia, reklama prestáva dávať zmysel. Ráta sa len z toho, čo je v Metricoole zapísané ako výdaj; organický dosah tu nie je a nedá sa oceniť." /></H3>
         <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
           {OKNA.map((o) => (
             <button
@@ -1586,12 +1648,15 @@ function CenaZaKlienta({
         </div>
       </div>
       <Klik kam={() => onNavigate("marketing", "lievik")} onNavigate="Marketing → Lievik">
-        {spend === 0 ? <Empty>Za zvolené obdobie nie sú zapísané žiadne marketingové výdaje.</Empty> : (
+        {spend === 0 && uvodne === 0 && novi === 0 ? <Empty>Za zvolené obdobie nie sú zapísané žiadne výdaje, úvodné ani noví klienti.</Empty> : (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}>
-            <MiniStat label="Výdaje na reklamu" value={fmtCZK(spend)} color={C.orange} />
+            {/* Nula výdajov už kartu neskrýva — úvodné a nových klientov okno
+                má aj vtedy, keď spend za tie dni ešte nie je nahratý. Ceny sú
+                vtedy „—", nie nula: nezaplatené nie je zadarmo, je nezmerané. */}
+            <MiniStat label="Výdaje na reklamu" value={spend ? fmtCZK(spend) : "—"} color={C.orange} />
             <MiniStat label="Úvodných" value={String(uvodne)} />
-            <MiniStat label="Cena za úvodný" value={uvodne ? fmtCZK(spend / uvodne) : "—"} color={C.accent} />
-            <MiniStat label="Cena za klienta" value={novi ? fmtCZK(spend / novi) : "—"} color={C.accent} />
+            <MiniStat label="Cena za úvodný" value={spend && uvodne ? fmtCZK(spend / uvodne) : "—"} color={C.accent} />
+            <MiniStat label="Cena za klienta" value={spend && novi ? fmtCZK(spend / novi) : "—"} color={C.accent} />
           </div>
         )}
       </Klik>

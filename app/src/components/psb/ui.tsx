@@ -175,19 +175,27 @@ export function BarRow({
   max,
   color,
   sub,
+  onClick,
 }: {
   label: string;
   value: number;
   max: number;
   color: string;
   sub?: string;
+  /** Klik na riadok (napr. „6 kl." pri zdroji) otvorí tých konkrétnych ľudí.
+   *  stopPropagation, lebo riadky bývajú vnútri karty, ktorá má vlastný cieľ. */
+  onClick?: () => void;
 }) {
   const w = max > 0 ? Math.max(1, (value / max) * 100) : 0;
   return (
-    <div style={{ marginBottom: 8 }}>
+    <div
+      style={{ marginBottom: 8, cursor: onClick ? "pointer" : undefined }}
+      onClick={onClick ? (e) => { e.stopPropagation(); onClick(); } : undefined}
+      title={onClick ? "Otvoriť týchto klientov" : undefined}
+    >
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 3 }}>
         <span style={{ color: C.textMuted }}>{label}</span>
-        <span style={{ color: C.textMuted }}>{sub}</span>
+        <span style={{ color: onClick ? C.text : C.textMuted, textDecoration: onClick ? "underline dotted" : undefined }}>{sub}</span>
       </div>
       <div style={{ height: 14, background: C.track, borderRadius: 4 }}>
         <div style={{ width: `${w}%`, height: "100%", background: color, borderRadius: 4, minWidth: 2 }} />

@@ -664,8 +664,22 @@ export function Dashboard({
     // prístrojmi, lebo náklady z banky prídu raz mesačne a živý zisk by bola
     // vymyslenina (9. 8. takto ukázal august ako 34 155 Kč).
     const dnesIso2 = new Date().toISOString().slice(0, 10);
+    // „Čaká sa" = obnovy, ktorých termín padne do KONCA TOHTO mesiaca.
+    //
+    // Prvá verzia filtrovala perClient podľa `kedy === bežiaci mesiac` — a to
+    // je vždy prázdne: mesačné kľúče predikcie začínajú mesiacom PO poslednom
+    // mesiaci s platbami, takže bežiaci mesiac medzi nimi nikdy nie je a
+    // obnova z 20. augusta sa účtuje septembru. Riadok „čaká sa ešte" sa tak
+    // nikdy nezobrazil — tichá nula, presne ten druh chyby, čo nič nepovie.
+    // `tyzdnov` je skutočná vzdialenosť obnovy v týždňoch, tak sa počíta z nej.
+    const dniDoKonca = (() => {
+      const t = new Date();
+      return new Date(t.getFullYear(), t.getMonth() + 1, 0).getDate() - t.getDate();
+    })();
     const cakaSa = cashPredMes?.perClient
-      ? cashPredMes.perClient.filter((x) => x.kedy === stats.beziaciMk).reduce((a, x) => a + x.suma * x.confidence, 0)
+      ? cashPredMes.perClient
+          .filter((x) => x.tyzdnov * 7 <= dniDoKonca)
+          .reduce((a, x) => a + x.suma * x.confidence, 0)
       : 0;
     const kotvaP: Pristroj = {
       id: "trzbyTeraz",

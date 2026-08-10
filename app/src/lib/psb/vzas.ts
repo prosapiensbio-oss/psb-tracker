@@ -1675,7 +1675,11 @@ export function computeKpis(year: string, sessions: SessionLike[], payments: Pay
     const window = def.id === "rezervaMes" ? "dnes, z BTC appky"
       : def.id === "marketingPct" ? vzasWindow
       : def.id === "marza" || def.id === "rezerva" ? vzasWindow
-      : def.id === "dlzka" || def.id === "ltv" ? "celá história"
+      // „celá história" samo nestačilo: karta Hodnota klienta (LTV) ráta len
+      // ODÍDENÝCH a ukazuje ~10 500 Kč / 4,4 mes., toto ráta všetkých s ≥3
+      // sedeniami (aj aktívnych, tí ešte platia) — preto je číslo vyššie.
+      // Dve rôzne otázky, dve rôzne čísla; bez popisu to vyzeralo ako chyba.
+      : def.id === "dlzka" || def.id === "ltv" ? "celá história · všetci s ≥3 sedeniami (aj aktívni)"
       : dataWindow;
     const extra = def.id === "rezerva" ? `${Math.round(rezervaKc).toLocaleString("sk-SK")} Kč / mes. nad break-even`
       : def.id === "dlzka" ? "mesiacov"
