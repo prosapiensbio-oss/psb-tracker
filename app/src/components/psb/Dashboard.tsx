@@ -1133,7 +1133,19 @@ export function Dashboard({
     () => new Set(WIDGETS.map((w) => w.id).filter((id) => !layout.hidden.includes(id))),
     [layout.hidden],
   );
-  const extraNodes = useExtraGrafy({ data, clients, aktivne, onNavigate, kpiSkryte: layout.kpiSkryte, obdobie });
+  // Vyťaženie počíta Dashboard (potrebuje ho aj pre prístroje) a zlúčená karta
+  // ho dostáva ako vstup — počítať to dvakrát znamená dve pravdy o tom istom.
+  const vytazenieVstup = useMemo(() => ({
+    graf: weeklyHours.data.length
+      ? <ZoneBars data={weeklyHours.data} series={weeklyHours.series} zone={{ lo: ZONE_LO, hi: ZONE_HI }} height={150} alignEnd />
+      : <Empty>Nahraj Payroll by Session.</Empty>,
+    zonaPct: zones.total ? Math.round((zones.zdrava / zones.total) * 100) : null,
+    tyzdnov: zones.total,
+    priemerH: weekStats ? weekStats.avg : null,
+    kapacitaPct: capacity.length ? Math.round(capacity.reduce((a, c) => a + c.util, 0) / capacity.length) : null,
+    zvladneEste: capacity.length ? capacity.reduce((a, c) => a + c.canTake, 0) : null,
+  }), [weeklyHours, zones, weekStats, capacity]);
+  const extraNodes = useExtraGrafy({ data, clients, aktivne, onNavigate, kpiSkryte: layout.kpiSkryte, obdobie, vytazenie: vytazenieVstup });
 
   const nodes: Record<string, ReactNode> = {
     ...extraNodes,
