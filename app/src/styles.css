@@ -313,12 +313,23 @@
 /* Sklo. Trieda je na zdieľanom komponente Card, takže sa aplikuje na všetky
  * karty naraz — vrátane tých, ktoré ešte len vzniknú.
  * -webkit- prefix je povinný, inak Safari neukáže blur vôbec (bod 04). */
-/* Kontajner appky musí byť v skle PRIEHĽADNÝ, inak prekryje mesh a z celého
- * efektu zostane len zmena farieb (presne to sa stalo pri prvom nasadení).
- * Rovnako <body>: jeho background-color je var(--c-bg) zo spoločného pravidla. */
+/* Pozadie kontajnera appky patrí do CSS, NIE do inline štýlu.
+ *
+ * Prvý pokus nechal na tom divi `style={{ background: C.bg }}` a pridal len
+ * CSS pravidlo s `transparent` — lenže inline štýl prebije akékoľvek pravidlo
+ * okrem !important, takže mesh zostal prekrytý a appka vyzerala len
+ * prefarbená. Druhý pokus o tú istú vec; tentoraz je pozadie na jednom mieste.
+ *
+ * <body> má od Quanty triedu `bg-q-background-primary` (background-color
+ * z ich premennej) — preto sa prepisuje aj tá. */
+.psb-app {
+  background: var(--c-bg);
+}
+
 :root[data-psb-theme^="sklo"] body,
 :root[data-psb-theme^="sklo"] .psb-app {
   background: transparent;
+  background-color: transparent;
 }
 
 :root[data-psb-theme^="sklo"] .psb-card {
