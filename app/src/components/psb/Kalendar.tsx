@@ -863,9 +863,14 @@ function Kontrola({ udalosti, data }: { udalosti: KalUdalost[]; data: PSBData })
  * (ozvať sa, kým klienta ešte vidíš na hodine), a tie patria na prvú obrazovku.
  * Kalendár je miesto, kde sa dáta zbierajú; Kokpit je miesto, kde sa konajú.
  */
-export function Balicky({ udalosti, clients, style, onKlient, matchTrener, children }: {
+export function Balicky({ udalosti, clients, sedenia = [], onObnov, style, onKlient, matchTrener, children }: {
   udalosti: KalUdalost[];
   clients: Record<string, ClientAgg>;
+  /** Zápisy z PTmindera — podľa nich sa pozná, ktorý tréning z kalendára
+   *  už JE zapísaný a ktorý sa odtrénoval, ale do exportu sa ešte nedostal. */
+  sedenia?: { client: string; date: string }[];
+  /** Tvrdé obnovenie: stiahne kalendár a načíta dáta odznova. */
+  onObnov?: () => Promise<void>;
   style?: React.CSSProperties;
   /** Klik na meno — na Kokpite otvára profil klienta. */
   onKlient?: (meno: string) => void;
@@ -874,14 +879,45 @@ export function Balicky({ udalosti, clients, style, onKlient, matchTrener, child
   /** Doplnková sekcia pod zoznamom (na Kokpite končiace platnosti členstiev). */
   children?: React.ReactNode;
 }) {
+  const [obnovujem, setObnovujem] = useState(false);
   const riadky = useMemo(() => {
-    const dnes = new Date().toISOString().slice(0, 10);
+    const teraz = new Date();
+    const dnes = teraz.toISOString().slice(0, 10);
+    /**
+     * Zostatok v PTminderi je pravda k poslednému importu, nie k tejto minúte.
+     *
+     * Jerry (10. 8., 19:08): „mal som teraz tréning s Annou o 18:00, ostáva jej
+     * 3/6" — hodina sa odtrénovala, ale export z PTmindera príde až v nedeľu,
+     * takže appka ju ešte nevidí. Kalendár ju vidí. Preto sa od zostatku
+     * odčítavajú DVE veci: hodiny už odtrénované (v kalendári sú v minulosti
+     * a v PTminderi zatiaľ nie sú) a hodiny objednané dopredu.
+     *
+     * Porovnáva sa bez diakritiky a s toleranciou ±1 deň — tá istá logika ako
+     * v karte „Chýba v PTminderi", lebo je to tá istá otázka.
+     *
+     * Keď klient tréning zrušil a Jerry ho z kalendára vymaže, udalosť zmizne
+     * a hodina sa vráti sama. Účtovníctvo tak zostáva na PTminderi; kalendár
+     * je len predbežná vrstva medzi dvoma nedeľnými exportmi.
+     */
+    const hola = (x: string) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+    const posun = (d: string, o: number) => new Date(Date.parse(`${d}T00:00:00Z`) + o * 86400000).toISOString().slice(0, 10);
+    const zapisane = new Set(sedenia.map((x) => `${hola(x.client)}|${x.date.slice(0, 10)}`));
     const objednane: Record<string, number> = {};
+    const odtrenovane: Record<string, number> = {};
     for (const u of udalosti) {
       if (u.typ !== "trening" || !u.klient) continue;
-      if (u.zaciatok.slice(0, 10) < dnes) continue;
-      objednane[u.klient] = (objednane[u.klient] || 0) + 1;
+      const den = u.zaciatok.slice(0, 10);
+      if (den > dnes || (den === dnes && Date.parse(u.zaciatok) > teraz.getTime())) {
+        objednane[u.klient] = (objednane[u.klient] || 0) + 1;
+        continue;
+      }
+      // Už prebehol. Ak ho PTminder má, je v zostatku zarátaný; ak nie, treba
+      // ho odčítať ručne, inak appka tvrdí, že hodina ešte čaká.
+      const k = hola(u.klient);
+      if ([-1, 0, 1].some((o) => zapisane.has(`${k}|${posun(den, o)}`))) continue;
+      odtrenovane[u.klient] = (odtrenovane[u.klient] || 0) + 1;
     }
+    for (const meno of Object.keys(odtrenovane)) if (objednane[meno] === undefined) objednane[meno] = 0;
     // Kto má hodiny dochodené a v kalendári NIČ, je najurgentnejší telefonát zo
     // všetkých — a práve on by z kalendárového zoznamu vypadol, lebo nemá čo
     // odčítať. Preto sa dopĺňa s nulou objednaných.
@@ -902,20 +938,38 @@ export function Balicky({ udalosti, clients, style, onKlient, matchTrener, child
         // balíčka v PTminderi (0 z 0) — tam sa nedá povedať nič, tak sa mlčí.
         if (c.lenDoplnky) return null;
         if (!c.packageTotal && !c.membership) return null;
-        return { meno, kusov, zostava: c.packageRemaining, spolu: c.packageTotal, po: c.packageRemaining - kusov, platnostDo: c.packageValidTo || "" };
+        const uz = odtrenovane[meno] || 0;
+        return { meno, kusov, uz, zostava: c.packageRemaining, spolu: c.packageTotal, po: c.packageRemaining - kusov - uz, platnostDo: c.packageValidTo || "" };
       })
       .filter((x): x is NonNullable<typeof x> => !!x && x.po <= 1)
       .sort((a, b) => a.po - b.po || a.meno.localeCompare(b.meno));
-  }, [udalosti, clients, matchTrener]);
+  }, [udalosti, clients, matchTrener, sedenia]);
 
   return (
     <Card style={style}>
-      <H3>
-        <Info
-          text="Odznak je zostatok PRESNE ako v PTminderi. Šípka v texte hovorí, čo s ním spravia objednané termíny z Google Kalendára: obj. 2 → v mínuse o 2 h znamená, že po dohodnutých hodinách bude klient trénovať na dlh. Ukazuje, s kým sa oplatí hovoriť o pokračovaní, kým ho ešte vidíš na hodine. Klienti s paušálnym členstvom sa nezobrazujú — tí v exporte stoja navždy na 0/N a žiadny balíček im nedochádza. Mení sa podľa prepínača trénera."
-          label={`Balíček dojde po objednaných hodinách (${riadky.length})`}
-        />
-      </H3>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <H3>
+          <Info
+            text="Odznak je zostatok PRESNE ako v PTminderi — to číslo, ktoré vidíš v ňom. Text pod menom hovorí, čo s ním spraví kalendár: odtrénované sú hodiny, ktoré už prebehli, ale do nedeľného exportu sa ešte nedostali; obj. sú dohodnuté termíny dopredu. PTminder je účtovníctvo, kalendár len predbežná vrstva medzi dvoma exportmi — preto sa zrušený tréning vráti sám, len čo ho z kalendára vymažeš. Klienti s paušálnym členstvom sa nezobrazujú: tí stoja v exporte navždy na 0/N. Mení sa podľa prepínača trénera."
+            label={`Balíček dojde po objednaných hodinách (${riadky.length})`}
+          />
+        </H3>
+        {/* Tvrdé obnovenie. Kalendár sa sťahuje sám (cron ráno a večer), ale
+            keď práve dotrénuješ, chceš to vidieť hneď — nie o dvanásť hodín. */}
+        {onObnov && (
+          <button
+            onClick={() => { setObnovujem(true); void onObnov().finally(() => setObnovujem(false)); }}
+            disabled={obnovujem}
+            title="Stiahnuť kalendár teraz a prepočítať zostatky"
+            style={{
+              padding: "4px 11px", borderRadius: 8, fontSize: 11.5, cursor: obnovujem ? "wait" : "pointer",
+              border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted,
+            }}
+          >
+            {obnovujem ? "Sťahujem…" : "↻ Obnoviť"}
+          </button>
+        )}
+      </div>
       {!riadky.length ? (
         <Empty>Nikomu balíček po objednaných hodinách nedochádza 🌿</Empty>
       ) : (
@@ -956,7 +1010,8 @@ export function Balicky({ udalosti, clients, style, onKlient, matchTrener, child
                     ňu má appka v exporte. Kto platnosť zapísanú nemá, má
                     riadok kratší; vymýšľať sa nedá. */}
                 <span style={{ fontSize: 11, color: C.textDim, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {r.kusov ? `obj. ${r.kusov}` : "bez termínu"}
+                  {r.uz ? `odtrénované ${r.uz}` : r.kusov ? `obj. ${r.kusov}` : "bez termínu"}
+                  {r.uz && r.kusov ? ` · obj. ${r.kusov}` : ""}
                   {r.platnostDo ? ` · platnosť do ${fmtDMY(r.platnostDo)}` : ""}
                 </span>
               </div>

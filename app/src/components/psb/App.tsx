@@ -57,6 +57,8 @@ export type Actions = {
   ingest: (files: { filename: string; text: string }[]) => Promise<IngestResult[]>;
   reset: () => Promise<void>;
   refresh: () => Promise<void>;
+  /** Tvrdé obnovenie kalendára: stiahne ho teraz a prepočíta zostatky. */
+  obnovKalendar: () => Promise<void>;
 };
 
 // Deep-link from Dashboard click-throughs: focus one week (Tréningy → Prehľad) or one month (Financie → Zárobky).
@@ -1390,6 +1392,29 @@ function skupinaFaktur(
         await load();
       },
       refresh: () => load(true),
+      // Stiahne kalendár TERAZ a hneď načíta jeho udalosti aj dáta z PTmindera.
+      // Cron beží ráno a večer; toto je pre chvíľu, keď človek práve dotrénoval
+      // a chce vidieť zostatok bez čakania do večera.
+      obnovKalendar: async () => {
+        await fetch("/api/kalendar", {
+          method: "POST", credentials: "same-origin",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ akcia: "stiahni" }),
+        }).catch(() => {});
+        const j = await fetch("/api/kalendar", { credentials: "same-origin" }).then((r) => r.json()).catch(() => null);
+        if (j?.ok && Array.isArray(j.udalosti)) {
+          setKalUdalosti(j.udalosti);
+          const dnesK = new Date().toISOString().slice(0, 10);
+          const obj: Record<string, number> = {};
+          for (const u of j.udalosti as KalUdalost[]) {
+            if ((u.typ !== "trening" && u.typ !== "uvodny") || !u.klient) continue;
+            if (u.zaciatok.slice(0, 10) < dnesK) continue;
+            obj[u.klient] = (obj[u.klient] || 0) + 1;
+          }
+          if (nastavObjednaneZKalendara(obj)) setFioTik((x) => x + 1);
+        }
+        await load(true);
+      },
     }),
     [load],
   );

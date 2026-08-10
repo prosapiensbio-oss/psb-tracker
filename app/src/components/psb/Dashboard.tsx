@@ -1437,6 +1437,8 @@ export function Dashboard({
       <Balicky
         udalosti={kalendar.filter((u) => matchT(u.trener))}
         clients={clients}
+        sedenia={data.sessions}
+        onObnov={actions.obnovKalendar}
         matchTrener={matchT}
         style={{ marginBottom: 0, height: "100%" }}
         onKlient={(meno) => onNavigate("klienti", undefined, { client: meno, nonce: Date.now() })}
