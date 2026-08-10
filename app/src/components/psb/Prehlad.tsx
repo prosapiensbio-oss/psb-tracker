@@ -38,6 +38,10 @@ export type Pristroj = {
   pasmo: Pasmo;
   /** Jedna veta pod číslom: prečo je to mimo, alebo aké je pásmo. */
   poznamka?: string;
+  /** Poznámka, ktorá hovorí o konkrétnych ľuďoch („čaká sa ~92 750"), vie
+   *  otvoriť ich zoznam. Vlastný cieľ, nie ten z dlaždice — dlaždica vedie na
+   *  tržby, poznámka na tých, od ktorých tie tržby majú prísť. */
+  poznamkaKam?: () => void;
   vysvetlenie: string;
   seria?: number[];
   zmenaPct?: number | null;
@@ -49,7 +53,7 @@ export type Pristroj = {
   /** Druhý pohľad na to isté číslo (Jerry, 10. 8.): „očakávané obnovy 129k
    *  chcem veľké ako 36 965, alebo si to prepínať." Dva mini-taby v hlavičke;
    *  voľba sa pamätá per prístroj. */
-  prepinac?: { label: string; hodnota: string; podnadpis?: string; poznamka?: string };
+  prepinac?: { label: string; hodnota: string; podnadpis?: string; poznamka?: string; poznamkaKam?: () => void };
 };
 
 const farbaPasma = (p: Pasmo) => (p === "zle" ? C.red : p === "pozor" ? C.orange : p === "nevie" ? C.textDim : C.text);
@@ -85,6 +89,7 @@ function Dlazdica({ p, velka }: { p: Pristroj; velka?: boolean }) {
   const hodnota = ukazAlt ? p.prepinac!.hodnota : p.hodnota;
   const podnadpis = ukazAlt ? (p.prepinac!.podnadpis ?? p.podnadpis) : p.podnadpis;
   const poznamka = ukazAlt ? (p.prepinac!.poznamka ?? p.poznamka) : p.poznamka;
+  const poznamkaKam = ukazAlt ? (p.prepinac!.poznamkaKam ?? p.poznamkaKam) : p.poznamkaKam;
   const mimo = p.pasmo === "pozor" || p.pasmo === "zle";
   const farba = farbaPasma(p.pasmo);
   const tab = (text: string, jeAlt: boolean) => (
@@ -164,9 +169,21 @@ function Dlazdica({ p, velka }: { p: Pristroj; velka?: boolean }) {
 
       <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: velka ? 8 : 6, flexWrap: "wrap" }}>
         {p.zmenaPct !== undefined && <Trend zmenaPct={p.zmenaPct ?? null} dobreHore={p.dobreHore ?? true} tiche={!mimo} />}
-        {poznamka && (
+        {poznamka && (poznamkaKam ? (
+          <button
+            onClick={(e) => { e.stopPropagation(); poznamkaKam(); }}
+            title="Otvoriť klientov, ktorých sa to týka"
+            style={{
+              background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left",
+              fontSize: 10.5, color: mimo ? farba : C.textMuted, lineHeight: 1.35,
+              textDecoration: "underline dotted", textUnderlineOffset: 2,
+            }}
+          >
+            {poznamka} →
+          </button>
+        ) : (
           <span style={{ fontSize: 10.5, color: mimo ? farba : C.textDim, lineHeight: 1.35 }}>{poznamka}</span>
-        )}
+        ))}
       </div>
     </div>
   );

@@ -710,18 +710,30 @@ export function Dashboard({
       const t = new Date();
       return new Date(t.getFullYear(), t.getMonth() + 1, 0).getDate() - t.getDate();
     })();
-    const cakaSa = cashPredMes?.perClient
-      ? cashPredMes.perClient
-          .filter((x) => x.tyzdnov * 7 <= dniDoKonca)
-          .reduce((a, x) => a + x.suma * x.confidence, 0)
-      : 0;
+    // Kto sa do konca mesiaca chystá platiť. Zoznam a suma sú z JEDNÉHO
+    // filtra — keby sa počítali zvlášť, raz by sa rozišli a klik by otvoril
+    // iných ľudí, než z ktorých je poskladané číslo nad ním.
+    const cakaSaKlienti = (cashPredMes?.perClient || []).filter((x) => x.tyzdnov * 7 <= dniDoKonca);
+    const cakaSa = cakaSaKlienti.reduce((a, x) => a + x.suma * x.confidence, 0);
+    // Klik na „čaká sa" otvorí tých ľudí (Jerry, 10. 8.): suma hovorí KOĽKO,
+    // ale zavolať sa dá len konkrétnemu človeku. Zoradení podľa toho, kto má
+    // obnovu najbližšie — to je poradie, v akom má zmysel ich obvolávať.
+    const otvorCakajucich = () =>
+      onNavigate("klienti", undefined, {
+        skupina: {
+          label: `Čaká sa platba do konca ${monthLabel(stats.beziaciMk)}`,
+          mena: [...cakaSaKlienti].sort((a, b) => a.tyzdnov - b.tyzdnov).map((x) => x.name),
+        },
+        nonce: Date.now(),
+      });
     const kotvaP: Pristroj = {
       id: "trzbyTeraz",
       label: "Tržby tento mesiac",
       hodnota: fmtCZK(stats.beziaciCash),
       podnadpis: `${monthLabel(stats.beziaciMk)} · k ${Number(dnesIso2.slice(8, 10))}. dňu`,
       pasmo: "ok",
-      poznamka: cakaSa > 0 ? `čaká sa ešte ~${fmtCZK(cakaSa)}` : undefined,
+      poznamka: cakaSa > 0 ? `čaká sa ešte ~${fmtCZK(cakaSa)} od ${cakaSaKlienti.length} klientov` : undefined,
+      poznamkaKam: cakaSaKlienti.length ? () => otvorCakajucich() : undefined,
       vysvetlenie: "Peniaze, ktoré v tomto mesiaci UŽ prišli (účet + hotovosť + BTC) — aktualizuje sa s každým importom z PTmindera, takže sa dá sledovať priebežne. Pruh ukazuje, kam to smeruje: kde je dnes a kde bude, ak dobehnú aj očakávané obnovy. Zisk sa takto ukázať nedá — náklady chodia z banky raz mesačne a rozbehnutý mesiac by vyzeral ako rekordný. Uzavretý mesiac je v riadku pod prístrojmi.",
       seria: cashRad,
       kotva: cakaSa > 0
@@ -735,7 +747,8 @@ export function Dashboard({
             label: "Očakávané",
             hodnota: `~${fmtCZK(stats.beziaciCash + cakaSa)}`,
             podnadpis: `${monthLabel(stats.beziaciMk)} · ak dobehnú obnovy`,
-            poznamka: `prišlo ${fmtCZK(stats.beziaciCash)} · čaká sa ~${fmtCZK(cakaSa)}`,
+            poznamka: `prišlo ${fmtCZK(stats.beziaciCash)} · čaká sa ~${fmtCZK(cakaSa)} od ${cakaSaKlienti.length} klientov`,
+            poznamkaKam: cakaSaKlienti.length ? () => otvorCakajucich() : undefined,
           }
         : undefined,
       kam: () => onNavigate("vzas", "trzby"),
