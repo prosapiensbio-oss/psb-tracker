@@ -1499,9 +1499,11 @@ export function useExtraGrafy({
             <Klik kam={() => onNavigate("klienti", "rast")} onNavigate="Klienti → Fluktuácia">
               {!zdrojeTop.length ? <Empty>Zdroje sa zapisujú od júna 2025.</Empty> : (
                 <div>
+                  {/* Pruhy sú informácia, nie výzva — jantárová je vyhradená
+                      pre to, na čo sa dá kliknúť. */}
                   {zdrojeTop.map((r) => (
                     <BarRow key={r.z} label={r.z} value={r.trzba} max={Math.max(1, ...zdrojeTop.map((x) => x.trzba))}
-                      color={C.accent} sub={`${fmtCZK(r.trzba)} · ${r.n} kl.`} />
+                      color={mix(C.textMuted, 45)} sub={`${fmtCZK(r.trzba)} · ${r.n} kl.`} />
                   ))}
                 </div>
               )}

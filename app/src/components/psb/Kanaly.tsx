@@ -145,7 +145,7 @@ export function Kanaly() {
   const pocetVsetkych = skupinyBezDup.reduce((a, [, rs]) => a + rs.length, 0);
 
   const stat = (label: string, hodnota: string, vysvetlenie: string, farba?: string) => (
-    <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 12px" }}>
+    <div className="psb-card" style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 12px" }}>
       <div style={{ fontSize: 19, fontWeight: 700, color: farba || C.text, fontVariantNumeric: "tabular-nums" }}>{hodnota}</div>
       <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>
         <Info text={vysvetlenie} label={label} />
