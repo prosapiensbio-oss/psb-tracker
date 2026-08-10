@@ -765,16 +765,56 @@ export function Dashboard({
     const uplne = useknuty ? weekRows.slice(0, -1) : weekRows;
     const poslTyzden = uplne[uplne.length - 1];
     const h = poslTyzden ? hodinyTyzdna(poslTyzden) : 0;
+    // TENTO týždeň z kalendára, nie minulý z PTmindera (Jerry, 10. 8.).
+    //
+    // Prístroj hovoril, koľko sa odtrénovalo v poslednom UZAVRETOM týždni —
+    // číslo pravdivé, ale mŕtve: s minulým týždňom sa už nedá nič spraviť.
+    // Kalendár vie, čo je nachystané na tento, a to je vec, do ktorej sa dá
+    // ešte zasiahnuť. Porovnanie s minulým týždňom (tiež z kalendára, aby sa
+    // porovnávalo rovnaké s rovnakým) hovorí, ktorým smerom to ide.
+    const pondelok = (d: Date) => {
+      const x = new Date(d);
+      x.setHours(0, 0, 0, 0);
+      x.setDate(x.getDate() - ((x.getDay() + 6) % 7));
+      return x;
+    };
+    const tenPondelok = pondelok(new Date());
+    const minPondelok = new Date(tenPondelok.getTime() - 7 * 86400000);
+    const hodinyZKal = (od: Date, do_: Date) =>
+      kalendar
+        .filter((u) => (u.typ === "trening" || u.typ === "uvodny") && matchT(u.trener))
+        .filter((u) => {
+          const t = Date.parse(u.zaciatok);
+          return t >= od.getTime() && t < do_.getTime();
+        })
+        .reduce((a, u) => {
+          const min = (Date.parse(u.koniec) - Date.parse(u.zaciatok)) / 60000;
+          // Udalosť bez konca (alebo s nezmyselnou dĺžkou) sa počíta ako hodina —
+          // v kalendári stojí jeden tréning za jeden riadok.
+          return a + (min > 5 && min < 300 ? min / 60 : 1);
+        }, 0);
+    const hTento = hodinyZKal(tenPondelok, new Date(tenPondelok.getTime() + 7 * 86400000));
+    const hMinuly = hodinyZKal(minPondelok, tenPondelok);
+    const maKal = kalendar.length > 0;
+    // Bez kalendára zostáva pôvodné číslo z PTmindera — appka bez pripojeného
+    // kalendára nesmie stratiť prístroj, len ukáže to, čo vie.
+    const hZobraz = maKal ? hTento : h;
+    const zmenaTyzdna = maKal && hMinuly > 0 ? ((hTento - hMinuly) / hMinuly) * 100 : null;
     varovne.push({
       id: "hodiny",
       label: "Hodiny / týždeň",
-      hodnota: `${h.toFixed(0)} h`,
-      podnadpis: poslTyzden ? `týž. ${weekLabel(poslTyzden[0])}` : undefined,
-      pasmo: h === 0 ? "nevie" : h < zonaLo ? "pozor" : h > zonaHi ? "zle" : "ok",
-      poznamka: h === 0 ? undefined : h > zonaHi ? "nad zónou — riziko vyhorenia" : h < zonaLo ? "pod zónou" : `zóna ${zonaLo}–${zonaHi} h`,
-      vysvetlenie: `Odtrénované hodiny za posledný týždeň. Zdravá zóna je ${ZONE_LO}–${ZONE_HI} h na trénera — pod ňou sa nezarobí, nad ňou sa vyhorí. Pri „Obaja“ sa zóna zdvojnásobuje, lebo dlaždica sčítava oboch. V dvojčlennom štúdiu je toto zároveň vyťaženosť: hodiny sú aj celý príjem, aj celý strop.`,
+      hodnota: `${hZobraz.toFixed(0)} h`,
+      podnadpis: maKal
+        ? `tento týždeň · nachystané v kalendári`
+        : poslTyzden ? `týž. ${weekLabel(poslTyzden[0])} · odtrénované` : undefined,
+      pasmo: hZobraz === 0 ? "nevie" : hZobraz < zonaLo ? "pozor" : hZobraz > zonaHi ? "zle" : "ok",
+      poznamka: hZobraz === 0 ? undefined
+        : zmenaTyzdna !== null
+          ? `${zmenaTyzdna >= 0 ? "+" : ""}${zmenaTyzdna.toFixed(0)} % oproti minulému týždňu (${hMinuly.toFixed(0)} h)`
+          : hZobraz > zonaHi ? "nad zónou — riziko vyhorenia" : hZobraz < zonaLo ? "pod zónou" : `zóna ${zonaLo}–${zonaHi} h`,
+      vysvetlenie: `Koľko hodín je na TENTO týždeň nachystaných v Google Kalendári — vrátane toho, čo sa už odtrénovalo. Porovnanie je s minulým týždňom z toho istého zdroja, aby sa porovnávalo rovnaké s rovnakým. Zdravá zóna je ${ZONE_LO}–${ZONE_HI} h na trénera; pri „Obaja“ sa zdvojnásobuje, lebo dlaždica sčítava oboch. Keď kalendár pripojený nie je, ukazuje sa posledný uzavretý týždeň z PTmindera. Krivka pod číslom je história odtrénovaných týždňov.`,
       seria: uplne.slice(-12).map(hodinyTyzdna),
-      kam: () => onNavigate("treningy"),
+      kam: () => onNavigate("kalendar"),
     });
 
     // Rezerva sa delí PRIEMERNÝM break-evenom za pol roka, nie tým z posledného

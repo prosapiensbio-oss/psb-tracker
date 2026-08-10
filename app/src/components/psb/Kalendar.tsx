@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { fmtDMY } from "../../lib/psb/format";
 
 import { fetchBtcReserve, type BtcVyplata } from "../../lib/psb/client";
 import type { ClientAgg } from "../../lib/psb/compute";
@@ -901,7 +902,7 @@ export function Balicky({ udalosti, clients, style, onKlient, matchTrener, child
         // balíčka v PTminderi (0 z 0) — tam sa nedá povedať nič, tak sa mlčí.
         if (c.lenDoplnky) return null;
         if (!c.packageTotal && !c.membership) return null;
-        return { meno, kusov, zostava: c.packageRemaining, spolu: c.packageTotal, po: c.packageRemaining - kusov };
+        return { meno, kusov, zostava: c.packageRemaining, spolu: c.packageTotal, po: c.packageRemaining - kusov, platnostDo: c.packageValidTo || "" };
       })
       .filter((x): x is NonNullable<typeof x> => !!x && x.po <= 1)
       .sort((a, b) => a.po - b.po || a.meno.localeCompare(b.meno));
@@ -948,9 +949,15 @@ export function Balicky({ udalosti, clients, style, onKlient, matchTrener, child
                 ) : (
                   <span style={{ fontSize: 12.5, color: C.text, fontWeight: 600, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.meno}</span>
                 )}
+                {/* Namiesto projekcie („→ v mínuse o 4 h") stojí DÁTUM, dokedy
+                    členstvo platí (Jerry, 10. 8.: „to mi príde irelevantné,
+                    daj tam radšej dátum"). Projekcia hovorila, čo sa stane
+                    s hodinami, ale otázka pri obnove je kedy — a odpoveď na
+                    ňu má appka v exporte. Kto platnosť zapísanú nemá, má
+                    riadok kratší; vymýšľať sa nedá. */}
                 <span style={{ fontSize: 11, color: C.textDim, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {r.kusov ? `obj. ${r.kusov}` : "bez termínu"}
-                  {r.po < 0 ? ` → v mínuse o ${-r.po} h` : ` → zostane ${r.po}`}
+                  {r.platnostDo ? ` · platnosť do ${fmtDMY(r.platnostDo)}` : ""}
                 </span>
               </div>
             </div>
