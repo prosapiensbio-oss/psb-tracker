@@ -32,12 +32,17 @@ import { BarRow, Card, Donut, Empty, H3, Info, LineChart, Modal, ValueBars } fro
 // svojich domovských obrazovkách (jedna aritmetika, jedna pravda). Klik na
 // kartu vedie tam, kde sa s číslom dá pracovať.
 
-export type SekciaId = "peniaze" | "zisky" | "vytazenie" | "klienti" | "marketing";
+export type SekciaId = "peniaze" | "zisky" | "vytazenie" | "marketing";
 // Poradie podľa Jerryho (2026-08-07): vyťaženie → klienti → peniaze →
 // marketing → výsledky. Je to poradie príčiny a následku, nie dôležitosti —
 // odrobené hodiny vyrobia klientov, klienti vyrobia peniaze. Peniaze sú
 // výsledok tých dvoch a v paneli prístrojov hore sú aj tak prvé.
 export const SEKCIE: { id: SekciaId; label: string; popis: string }[] = [
+  // Sekcia Klienti zrušená (Jerry, 10. 8.) — jej desať kariet sa rozdelilo
+  // podľa otázky, na ktorú odpovedajú: správanie a dochádzka k Vyťaženiu,
+  // získavanie a hodnota podľa zdroja k Marketingu, spôsob platby k Peniazom.
+  // Nič sa nezmazalo, len sa to prestalo tváriť ako vlastná téma.
+  //
   // Krátke názvy (Jerry, 10. 8.). Dlhé varianty („Vyťaženie a ekonomika
   // hodiny", „Peniaze v čase") vydržali jednu iteráciu: v riadku pilulek nad
   // grafmi sa z nich stal odsek a prepínač prestal byť prepínačom. Čo tam je,
@@ -46,7 +51,6 @@ export const SEKCIE: { id: SekciaId; label: string; popis: string }[] = [
   { id: "peniaze", label: "Peniaze", popis: "Tržby proti break-evenu — ide to hore alebo dole?" },
   { id: "zisky", label: "Zisky / náklady", popis: "Čo z tržieb zostane a čo sa čaká ďalší mesiac." },
   { id: "marketing", label: "Marketing", popis: "Odkiaľ ľudia chodia a čo za nich platíme." },
-  { id: "klienti", label: "Klienti", popis: "Kto chodí, kto odchádza a čo prinesie." },
 ];
 
 // KPI sa neberú ako jeden veľký graf, ale ako štyri karty podľa skupín z
@@ -111,11 +115,11 @@ export const WIDGETS: WidgetMeta[] = [
 
   // ── Klienti ────────────────────────────────────────────────────────────────
   { id: "rastStrata", label: "Fluktuácia klientov", span: 1, sekcia: "vytazenie", vychodzi: true, popis: "Prišlo, odišlo a čistý rast za mesiac.", doma: "Klienti → Fluktuácia" },
-  { id: "6m", label: "6M klienti podľa fázy", span: 1, sekcia: "klienti", popis: "Obnova, integrácia, udržateľnosť — kde v procese ľudia sú.", doma: "Klienti → 6M proces" },
-  { id: "balicky", label: "Klienti podľa balíčka", span: 1, sekcia: "klienti", popis: "Rozdelenie podľa členstva — na čom stojí príjem.", doma: "Klienti" },
-  { id: "kdeTecie", label: "Kde to tečie", span: 1, sekcia: "klienti", popis: "Ako dlho vydržali tí, čo odišli — odchod v prvých mesiacoch má inú príčinu než po roku.", doma: "Klienti → Fluktuácia" },
-  { id: "prezitie", label: "Kto vydrží (kohorty)", span: 1, sekcia: "klienti", popis: "Koľko z každého mesiaca príchodov je tu po 3, 6 a 12 mesiacoch.", doma: "Klienti → Fluktuácia" },
-  { id: "hodnotaZdroj", label: "Čo klient prinesie podľa zdroja", span: 1, sekcia: "klienti", popis: "Priemerná tržba na klienta podľa toho, odkiaľ prišiel.", doma: "Klienti → Fluktuácia" },
+  { id: "6m", label: "6M klienti podľa fázy", span: 1, sekcia: "vytazenie", popis: "Obnova, integrácia, udržateľnosť — kde v procese ľudia sú.", doma: "Klienti → 6M proces" },
+  { id: "balicky", label: "Klienti podľa balíčka", span: 1, sekcia: "vytazenie", popis: "Rozdelenie podľa členstva — na čom stojí príjem.", doma: "Klienti" },
+  { id: "kdeTecie", label: "Kde to tečie", span: 1, sekcia: "vytazenie", popis: "Ako dlho vydržali tí, čo odišli — odchod v prvých mesiacoch má inú príčinu než po roku.", doma: "Klienti → Fluktuácia" },
+  { id: "prezitie", label: "Kto vydrží (kohorty)", span: 1, sekcia: "vytazenie", popis: "Koľko z každého mesiaca príchodov je tu po 3, 6 a 12 mesiacoch.", doma: "Klienti → Fluktuácia" },
+  { id: "hodnotaZdroj", label: "Čo klient prinesie podľa zdroja", span: 1, sekcia: "marketing", popis: "Priemerná tržba na klienta podľa toho, odkiaľ prišiel.", doma: "Klienti → Fluktuácia" },
 
   // ── Marketing ──────────────────────────────────────────────────────────────
   { id: "lievik", label: "Lievik — tento mesiac", span: 1, sekcia: "marketing", popis: "Dopyty → úvodné → noví klienti v bežiacom mesiaci.", doma: "Marketing → Lievik" },
@@ -140,11 +144,11 @@ export const WIDGETS: WidgetMeta[] = [
   { id: "narocnost", label: "Náročnosť týždňov", span: 1, sekcia: "vytazenie", popis: "Vlastné hodnotenie 1–10 z týždenných zápisov — predstih pred vyhorením.", doma: "Tréningy → Prehľad" },
   { id: "suhrnSedeni", label: "Súhrn sedení", span: 1, sekcia: "vytazenie", popis: "Offline, online a úvodné v kusoch za posledný rok.", doma: "Tréningy → Analýza" },
 
-  { id: "segmenty", label: "Segmenty klientov", span: 1, sekcia: "klienti", popis: "Koľko je Anchorov, Stabilných a Sporadických — na kom firma stojí.", doma: "Klienti" },
-  { id: "dochadzka", label: "Dochádzka", span: 1, sekcia: "klienti", popis: "Priemerná dochádzka a koľko ľudí je pod hranicou.", doma: "Klienti" },
-  { id: "referencny", label: "Referenčný motor", span: 1, sekcia: "klienti", popis: "Koľko klientov prišlo na odporúčanie a čo priniesli.", doma: "Klienti → Referencie" },
-  { id: "platobneKanaly", label: "Čím klienti platia", span: 1, sekcia: "klienti", popis: "Účet, hotovosť a bitcoin — koľko tržieb ide ktorou cestou.", doma: "Peniaze → Po mesiacoch" },
-  { id: "zdrojeKlientov", label: "Odkiaľ klienti prišli", span: 1, sekcia: "klienti", popis: "Rozdelenie aktívnych klientov podľa zdroja.", doma: "Klienti" },
+  { id: "segmenty", label: "Segmenty klientov", span: 1, sekcia: "vytazenie", popis: "Koľko je Anchorov, Stabilných a Sporadických — na kom firma stojí.", doma: "Klienti" },
+  { id: "dochadzka", label: "Dochádzka", span: 1, sekcia: "vytazenie", popis: "Priemerná dochádzka a koľko ľudí je pod hranicou.", doma: "Klienti" },
+  { id: "referencny", label: "Referenčný motor", span: 1, sekcia: "marketing", popis: "Koľko klientov prišlo na odporúčanie a čo priniesli.", doma: "Klienti → Referencie" },
+  { id: "platobneKanaly", label: "Čím klienti platia", span: 1, sekcia: "peniaze", popis: "Účet, hotovosť a bitcoin — koľko tržieb ide ktorou cestou.", doma: "Peniaze → Po mesiacoch" },
+  { id: "zdrojeKlientov", label: "Odkiaľ klienti prišli", span: 1, sekcia: "marketing", popis: "Rozdelenie aktívnych klientov podľa zdroja.", doma: "Klienti" },
 
   { id: "cenaUvodneho", label: "Čo stojí úvodný", span: 1, sekcia: "marketing", vychodzi: true, popis: "Marketingové náklady delené počtom úvodných tréningov.", doma: "Marketing → Lievik" },
   { id: "ltvZdroj", label: "Hodnota klienta (LTV)", span: 1, sekcia: "marketing", vychodzi: true, popis: "Koľko klient priemerne zaplatí za celý čas spolupráce.", doma: "Klienti → Fluktuácia" },
