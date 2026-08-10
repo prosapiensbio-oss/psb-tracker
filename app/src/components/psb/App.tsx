@@ -127,6 +127,20 @@ const TRACKER_SECTIONS = [
 const TRACKER_IDS = TRACKER_SECTIONS.map((s) => s.id);
 
 export function PSBApp() {
+  // Zvolená paleta sa musí nasadiť pri ŠTARTE appky.
+  //
+  // Doteraz to robil až komponent prepínača — a ten žije len na obrazovke
+  // Údaje. Kým tam človek nezašiel, appka bežala vo východzej palete, a po
+  // načítaní stránky sa vrátila späť: vyzeralo to, že sa výber neuloží, hoci
+  // v localStorage celý čas bol. Nastavenie vzhľadu nesmie závisieť od toho,
+  // ktorú obrazovku si otvoril.
+  useEffect(() => {
+    try {
+      const ulozena = localStorage.getItem("psb-theme");
+      if (ulozena) document.documentElement.setAttribute("data-psb-theme", ulozena);
+    } catch { /* prehliadač bez localStorage — zostane východzia paleta */ }
+  }, []);
+
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [ktoSom, setKtoSom] = useState<string | null>(null);
   const [data, setData] = useState<PSBData>(EMPTY_DATA);

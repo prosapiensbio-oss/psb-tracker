@@ -612,6 +612,9 @@ export function LineChart({
   series,
   zone,
   refLine,
+  /** Skryje čísla pod grafom (Ø, max, min). Pre karty, ktoré tie isté čísla
+   *  ukazujú vedľa grafu — dvakrát to isté je šum, nie dôraz. */
+  bezSuhrnu = false,
   height = 200,
   fmt = (n: number) => String(Math.round(n)),
   pointWidth,
@@ -625,6 +628,7 @@ export function LineChart({
   series: { name: string; color: string }[];
   zone?: { lo: number; hi: number; unit?: string };
   refLine?: { value: number; label?: string; color?: string };
+  bezSuhrnu?: boolean;
   height?: number;
   fmt?: (n: number) => string;
   pointWidth?: number; // if set, chart is a fixed-width scroller (points don't squeeze)
@@ -780,7 +784,7 @@ export function LineChart({
               {posl !== null && (
                 <>
                   <span style={{ color: s.color, fontWeight: 800, fontSize: 13 }}>{fmt(posl)}</span>
-                  {v.length > 1 && (
+                  {v.length > 1 && !bezSuhrnu && (
                     <span style={{ color: C.textDim, fontSize: 10.5 }}>
                       · Ø {fmt(priem as number)} · max {fmt(max as number)}{mesiacMax ? ` (${mesiacMax})` : ""} · min {fmt(min as number)}{mesiacMin ? ` (${mesiacMin})` : ""}
                     </span>

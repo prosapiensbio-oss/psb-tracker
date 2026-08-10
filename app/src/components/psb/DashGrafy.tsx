@@ -32,16 +32,20 @@ import { BarRow, Card, Donut, Empty, H3, Info, LineChart, Modal, ValueBars } fro
 // svojich domovských obrazovkách (jedna aritmetika, jedna pravda). Klik na
 // kartu vedie tam, kde sa s číslom dá pracovať.
 
-export type SekciaId = "peniaze" | "vytazenie" | "klienti" | "marketing";
+export type SekciaId = "peniaze" | "zisky" | "vytazenie" | "klienti" | "marketing";
 // Poradie podľa Jerryho (2026-08-07): vyťaženie → klienti → peniaze →
 // marketing → výsledky. Je to poradie príčiny a následku, nie dôležitosti —
 // odrobené hodiny vyrobia klientov, klienti vyrobia peniaze. Peniaze sú
 // výsledok tých dvoch a v paneli prístrojov hore sú aj tak prvé.
 export const SEKCIE: { id: SekciaId; label: string; popis: string }[] = [
-  { id: "vytazenie", label: "Vyťaženie", popis: "Koľko robíme a koľko ešte zvládneme." },
-  { id: "klienti", label: "Klienti", popis: "Pribúdajú, alebo len rotujú?" },
-  { id: "peniaze", label: "Peniaze", popis: "Zarábame? A vydržíme?" },
-  { id: "marketing", label: "Marketing", popis: "Odkiaľ chodia noví ľudia." },
+  // Názvy sú Jerryho (10. 8.) a nie sú kozmetika: kategória sa volá podľa
+  // OTÁZKY, na ktorú odpovedá, nie podľa oblasti. „Peniaze" je oblasť,
+  // „Peniaze v čase" je otázka, či to ide hore alebo dole.
+  { id: "vytazenie", label: "Vyťaženie a ekonomika hodiny", popis: "Koľko robíme, koľko ešte zvládneme a čo z hodiny máme." },
+  { id: "peniaze", label: "Peniaze v čase", popis: "Tržby proti break-evenu — ide to hore alebo dole?" },
+  { id: "zisky", label: "Zisky a náklady", popis: "Čo z tržieb zostane a čo sa čaká ďalší mesiac." },
+  { id: "marketing", label: "Marketing / lievik", popis: "Odkiaľ ľudia chodia a čo za nich platíme." },
+  { id: "klienti", label: "Klienti", popis: "Kto chodí, kto odchádza a čo prinesie." },
 ];
 
 // KPI sa neberú ako jeden veľký graf, ale ako štyri karty podľa skupín z
@@ -81,14 +85,14 @@ export const WIDGETS: WidgetMeta[] = [
   // Jerry po pozretí rozobral späť (10. 8.): pôvodné grafy boli lepšie a stačí
   // im doplniť čísla. Zisky a náklady a Marketing sa naopak osvedčili —
   // odhad oproti skutočnosti a tri marketingové otázky patria na jednu kartu.
-  { id: "ziskyNaklady", label: "Zisky a náklady", span: 2, sekcia: "peniaze", vychodzi: true, popis: "Skutočnosť za obdobie vedľa odhadu na ďalší mesiac.", doma: "Peniaze → Predikcia" },
+  { id: "ziskyNaklady", label: "Zisky a náklady", span: 2, sekcia: "zisky", vychodzi: true, popis: "Skutočnosť za obdobie vedľa odhadu na ďalší mesiac.", doma: "Peniaze → Predikcia" },
   { id: "marketingSuhrn", label: "Marketing", span: 2, sekcia: "marketing", vychodzi: true, popis: "Lievik, dosah Instagramu a čo klient prinesie podľa zdroja.", doma: "Marketing → Lievik" },
   // ── Peniaze ────────────────────────────────────────────────────────────────
   { id: "zarobky", label: "Mesačné tržby", span: 1, sekcia: "peniaze", vychodzi: true, popis: "Prijaté platby po mesiacoch + odhad ďalších dvoch.", doma: "Financie" },
   { id: "zdravieFirmy", label: "Zdravie firmy", span: 1, sekcia: "peniaze", vychodzi: true, popis: "Break-even, rezerva nad ním, podiel miezd, koľko sa dá škrtnúť.", doma: "VZAS" },
-  { id: "pasmoZisku", label: "Pásmo zisku", span: 1, sekcia: "peniaze", popis: "Hrubý zisk po mesiacoch — kedy firma zarábala a kedy nie.", doma: "VZAS" },
-  { id: "prijmyNaklady", label: "Príjmy vs. náklady", span: 1, sekcia: "peniaze", popis: "Obe krivky vedľa seba — kde sa rozchádzajú.", doma: "VZAS" },
-  { id: "prebytok", label: "Kumulovaný prebytok", span: 1, sekcia: "peniaze", popis: "Súčet ziskov a strát od začiatku — čo firma reálne vytvorila.", doma: "VZAS" },
+  { id: "pasmoZisku", label: "Pásmo zisku", span: 1, sekcia: "zisky", popis: "Hrubý zisk po mesiacoch — kedy firma zarábala a kedy nie.", doma: "VZAS" },
+  { id: "prijmyNaklady", label: "Príjmy vs. náklady", span: 1, sekcia: "zisky", popis: "Obe krivky vedľa seba — kde sa rozchádzajú.", doma: "VZAS" },
+  { id: "prebytok", label: "Kumulovaný prebytok", span: 1, sekcia: "zisky", popis: "Súčet ziskov a strát od začiatku — čo firma reálne vytvorila.", doma: "VZAS" },
   { id: "dlhTreneri", label: "Dlh voči trénerom", span: 1, sekcia: "peniaze", popis: "Kumulovaný rozdiel medzi nárokom a poslaným, Jerry aj Terezka.", doma: "VZAS → Mzdy" },
   { id: "dlhJarek", label: "Dlh voči Jarkovi", span: 1, sekcia: "peniaze", popis: "Zostatok investorského dlhu a tempo splácania.", doma: "VZAS → Dlhy" },
   { id: "kvartaly", label: "Kvartálne tržby", span: 1, sekcia: "peniaze", popis: "Tržby a marža po kvartáloch — sezónnosť na jeden pohľad.", doma: "Výsledky" },
@@ -124,12 +128,12 @@ export const WIDGETS: WidgetMeta[] = [
   // zvýraznené čísla". Karty bez grafu sú rovnocenné — súhrn P&L alebo cena
   // sedenia je číslo, ktoré sa číta rýchlejšie než akákoľvek krivka.
   { id: "breakEven", label: "Tržby vs. break-even", span: 1, sekcia: "peniaze", vychodzi: true, popis: "Kde je zelená pod oranžovou, mesiac nezarobil ani na vlastnú prevádzku.", doma: "Peniaze → Zisky a straty" },
-  { id: "predikciaTrzieb", label: "Predikcia tržieb", span: 1, sekcia: "peniaze", popis: "Tri mesiace dopredu s pásmom istoty — od zaručeného po optimistický.", doma: "Peniaze → Predikcia" },
-  { id: "predikciaScen", label: "Scenáre na 3 mesiace", span: 1, sekcia: "peniaze", popis: "Zaručené z balíčkov, realistický a negatívny scenár.", doma: "Peniaze → Predikcia" },
-  { id: "pnlSuhrn", label: "Súhrn P&L", span: 1, sekcia: "peniaze", popis: "Príjmy, náklady, hrubý zisk a marža — priemer na mesiac.", doma: "Peniaze → Zisky a straty" },
-  { id: "naklady", label: "Fixné vs. variabilné", span: 1, sekcia: "peniaze", popis: "Z čoho sa skladajú náklady a ktorá časť rastie.", doma: "Peniaze → Zisky a straty" },
-  { id: "runRate", label: "Run-rate a odhad zisku", span: 1, sekcia: "peniaze", popis: "Tempo posledných troch mesiacov prepočítané na rok.", doma: "Peniaze → Predikcia" },
-  { id: "h1", label: "H1 2025 vs. H1 2026", span: 1, sekcia: "peniaze", popis: "Prvý polrok proti prvému polroku — rast bez sezónnosti.", doma: "Výsledky" },
+  { id: "predikciaTrzieb", label: "Predikcia tržieb", span: 1, sekcia: "zisky", popis: "Tri mesiace dopredu s pásmom istoty — od zaručeného po optimistický.", doma: "Peniaze → Predikcia" },
+  { id: "predikciaScen", label: "Scenáre na 3 mesiace", span: 1, sekcia: "zisky", popis: "Zaručené z balíčkov, realistický a negatívny scenár.", doma: "Peniaze → Predikcia" },
+  { id: "pnlSuhrn", label: "Súhrn P&L", span: 1, sekcia: "zisky", popis: "Príjmy, náklady, hrubý zisk a marža — priemer na mesiac.", doma: "Peniaze → Zisky a straty" },
+  { id: "naklady", label: "Fixné vs. variabilné", span: 1, sekcia: "zisky", popis: "Z čoho sa skladajú náklady a ktorá časť rastie.", doma: "Peniaze → Zisky a straty" },
+  { id: "runRate", label: "Run-rate a odhad zisku", span: 1, sekcia: "zisky", popis: "Tempo posledných troch mesiacov prepočítané na rok.", doma: "Peniaze → Predikcia" },
+  { id: "h1", label: "H1 2025 vs. H1 2026", span: 1, sekcia: "zisky", popis: "Prvý polrok proti prvému polroku — rast bez sezónnosti.", doma: "Výsledky" },
 
   { id: "cenaSedenia", label: "Ø cena sedenia", span: 1, sekcia: "vytazenie", vychodzi: true, popis: "Koľko priemerne prinesie jedno odtrénované sedenie.", doma: "Peniaze → Sedenia & cena" },
   { id: "narocnost", label: "Náročnosť týždňov", span: 1, sekcia: "vytazenie", popis: "Vlastné hodnotenie 1–10 z týždenných zápisov — predstih pred vyhorením.", doma: "Tréningy → Prehľad" },
@@ -1187,7 +1191,7 @@ export function useExtraGrafy({
               <LineChart
                 data={cenaRad.map((x) => ({ label: monthLabel(x.mk), values: [x.v] }))}
                 series={[{ name: "Ø CZK / sedenie", color: C.accent }]}
-                height={190} fmt={(n) => `${Math.round(n)}`} autoY alignEnd
+                height={190} fmt={(n) => `${Math.round(n)}`} autoY alignEnd bezSuhrnu
               />
             </Klik>
           </div>
