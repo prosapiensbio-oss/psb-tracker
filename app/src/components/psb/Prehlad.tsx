@@ -106,8 +106,11 @@ function Dlazdica({ p, velka }: { p: Pristroj; velka?: boolean }) {
           <div style={{ fontSize: velka ? 34 : 21, fontWeight: 700, color: farba, lineHeight: 1.1, whiteSpace: "nowrap" }}>{p.hodnota}</div>
           {p.podnadpis && <div style={{ fontSize: velka ? 11.5 : 10.5, color: C.textDim, marginTop: 2 }}>{p.podnadpis}</div>}
         </div>
+        {/* Krivka je informácia, nie výzva — v norme neutrálna, farebná až keď
+            prístroj vybočí. Jantárová na každom grafe znamenala, že sa oranžová
+            stala tapetou a „pozri sem" prestalo fungovať. */}
         {p.seria && p.seria.length > 1 && (
-          <Sparkline values={p.seria} color={mimo ? farba : mix(C.accent, 65)} width={velka ? 108 : 68} height={velka ? 32 : 22} />
+          <Sparkline values={p.seria} color={mimo ? farba : mix(C.textMuted, 55)} width={velka ? 108 : 68} height={velka ? 32 : 22} />
         )}
       </div>
 

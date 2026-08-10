@@ -221,8 +221,13 @@
   --c-textDim: #867f68;
   --c-red: #e2604a;
   --c-redBg: #e2604a22;
-  --c-orange: #e2a25e;
-  --c-orangeBg: #e2a25e22;
+  /* Varovná farba je zámerne SVETLEJŠIA než akcent. Špecifikácia ponúka
+     #e2a25e, lenže ten je od jantárového akcentu #e2914e na oko nerozoznateľný
+     — „na hrane" potom vyzeralo rovnako ako „klikni sem". #f0c26e je hodnota
+     z tej istej špecifikácie (warn pre stredný režim) a vedľa akcentu je jasne
+     iná. Tri signály, tri farby: jantárová klikateľné, žltá sleduj, červená rieš. */
+  --c-orange: #f0c26e;
+  --c-orangeBg: #f0c26e22;
   --c-green: #a8c46e;
   --c-greenBg: #a8c46e22;
   --c-blue: #7fa8c4;
