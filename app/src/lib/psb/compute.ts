@@ -910,6 +910,18 @@ export function deriveAnomalies(data: PSBData, clients: Record<string, ClientAgg
 // ── unified "na čo sa pozrieť" register ──────────────────────────────────────
 // One prioritised, actionable list merging 6M alerts, capacity warnings and
 // anomalies. Each item can be accepted (with a note) or hidden via anomalyAck.
+/**
+ * Rodina z kľúča — to isté bez dátumu, mesiaca a počtu.
+ *
+ * `odchody|2026-07` → `odchody`, `dnes|2026-08-10|Jan` → `dnes|Jan`,
+ * `nezhody|2026-07|7` → `nezhody`. Holé číslo sa zahadzuje spolu s dátumom:
+ * býva to počet položiek a ten sa mení, takže by sa umlčaná vec pri ôsmich
+ * rozdieloch vrátila ako nová. Mená a kategórie zostávajú — umlčať sa má
+ * druh veci, nie všetko naraz.
+ */
+export const rodinaZKluca = (key: string) =>
+  key.split("|").filter((x) => !/^\d{4}-\d{2}(-\d{2})?$/.test(x) && !/^\d+$/.test(x)).join("|") || key;
+
 export type RegisterItem = {
   key: string;
   category: "6M" | "Kapacita" | "Anomália" | "Rozhodnutie" | "Zápis" | "Zmena";
@@ -943,6 +955,15 @@ export function deriveRegister(
 ): RegisterItem[] {
   const ack = data.anomalyAck || {};
   const items: RegisterItem[] = [];
+  /**
+   * Rodina odvodená z kľúča: to isté bez dátumu a mesiaca.
+   *
+   * `odchody|2026-07` → `odchody`, `dnes|2026-08-10|Jan` → `dnes|Jan`.
+   * Vďaka tomu má rodinu KAŽDÁ položka a „Nehlásiť" sa dá použiť všade —
+   * Jerry (10. 8.) to chcel na všetkých. Pôvodne som ho niektorým zámerne
+   * nedal („pri nezaplatenom nájme je ticho horšie než otrava"), lenže to je
+   * jeho rozhodnutie, nie moje: appka má poslúchať, nie prehovárať.
+   */
   const add = (
     key: string,
     category: RegisterItem["category"],
@@ -962,11 +983,11 @@ export function deriveRegister(
       // Umlčaná rodina = umlčaná položka. Kontroluje sa tu, nie v komponente:
       // register čítajú tri miesta (Kokpit, Jarvisov kontext, mesačná správa)
       // a umlčanie musí platiť vo všetkých rovnako.
-      acked: !!ack[key] || (!!rodina && !!ack[`mute|${rodina}`]),
-      note: ack[key]?.note || (rodina ? ack[`mute|${rodina}`]?.note : undefined),
+      acked: !!ack[key] || !!ack[`mute|${rodina ?? rodinaZKluca(key)}`],
+      note: ack[key]?.note || ack[`mute|${rodina ?? rodinaZKluca(key)}`]?.note,
       priority: basePriority + toneRank[tone],
       client,
-      rodina,
+      rodina: rodina ?? rodinaZKluca(key),
     });
 
   // Staré dáta klamú ticho — a to je horší druh klamstva než chýbajúce číslo.

@@ -17,7 +17,7 @@ import {
   saveVzasSetting,
   type BtcNakup,
 } from "../../lib/psb/client";
-import {
+import { rodinaZKluca,
   kotvaDat,
   capacityByTrainer,
   monthlyFinance,
@@ -858,7 +858,10 @@ function skupinaFaktur(
   // Skladuje sa v tom istom poli ako poznámka k akceptácii, s predponou
   // „odlozene|DÁTUM|" — vlastnú tabuľku by si to nezaslúžilo a migrácia
   // existujúcich zápisov by bola drahšia než tento prefix.
-  const stavPolozky = useCallback((key: string, rodina?: string) => {
+  const stavPolozky = useCallback((key: string, rodinaVstup?: string) => {
+    // Bez zadanej rodiny sa odvodí z kľúča (to isté bez dátumu/mesiaca), takže
+    // „Nehlásiť" má KAŽDÁ položka — Jerry, 10. 8.
+    const rodina = rodinaVstup ?? rodinaZKluca(key);
     // Umlčaná rodina prebíja všetko: „už mi toto nehlás" platí na celý druh
     // upozornenia, nie na jeden dátum. Bez toho sa vec vrátila zajtra s novým
     // kľúčom a Skryť pôsobilo, akoby nefungovalo.

@@ -1929,15 +1929,13 @@ function RegisterRow({ item, actions, onNavigate, chat }: { item: RegisterItem; 
           ) : (
             <>
               <button onClick={() => actions.ackAnomaly(item.key, "skryté")} style={{ ...linkBtn, color: C.textDim }}>Skryť</button>
-              {item.rodina && (
-                <button
-                  onClick={() => actions.ackAnomaly(`mute|${item.rodina}`, "nehlásiť tento druh")}
-                  title="Už mi tento druh upozornenia nehlás — ani zajtra, ani o mesiac"
-                  style={{ ...linkBtn, color: C.textDim }}
-                >
-                  Nehlásiť
-                </button>
-              )}
+              <button
+                onClick={() => actions.ackAnomaly(`mute|${item.rodina || item.key}`, "nehlásiť tento druh")}
+                title="Už mi tento druh upozornenia nehlás — ani zajtra, ani o mesiac"
+                style={{ ...linkBtn, color: C.textDim }}
+              >
+                Nehlásiť
+              </button>
             </>
           )}
         </div>
