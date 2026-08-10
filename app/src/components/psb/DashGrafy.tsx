@@ -454,7 +454,16 @@ export function useExtraGrafy({
     // isté pre grafy, ktoré rátajú z kľúčov mesiacov (tržby, hodiny, dosah).
     // Jedno miesto pre obe podoby — inak by tá istá voľba znamenala na dvoch
     // kartách iný rozsah.
-    const poslI = poslednyMesiacSDatami();
+    // Posledný UZAVRETÝ mesiac, nie posledný s dátami — rovnaká kotva ako
+    // dlaždica zisku. Desiateho augusta mal august tržby 37k a break-even
+    // −11k (dva BTC dobropisy), takže „Tržby vs. break-even" kreslil august
+    // ako mesiac pod čiarou a „Zdravie firmy" priemerovalo desať dní ako
+    // celý mesiac. Bežiaci mesiac sa preskočí; keby všetky dáta ležali v ňom
+    // (čerstvá inštalácia), vezme sa posledný s dátami ako núdza.
+    let poslI = poslednyMesiacSDatami();
+    const beziaciMk = new Date().toISOString().slice(0, 7);
+    while (poslI > 0 && (VZAS_MONTHS[poslI] as string) >= beziaciMk) poslI--;
+    if ((VZAS_MONTHS[poslI] as string) >= beziaciMk) poslI = poslednyMesiacSDatami();
     const { od: odMK, do_: doMK } = hraniceObdobia(obdobie, VZAS_MONTHS[poslI] || "9999-12");
     const idxOkno = VZAS_MONTHS.map((m, i) => [m, i] as const)
       .filter(([m, i]) => i <= poslI && m >= odMK && m <= doMK)
@@ -469,7 +478,9 @@ export function useExtraGrafy({
     // chýb ako kotvaDat: kód, ktorý predpokladá, že dáta siahajú tam, kam
     // siaha kalendár. Dotýkalo sa to všetkých štyroch čísel v „Zdravie firmy"
     // aj karty bitcoinovej rezervy.
-    const posl = poslednyMesiacSDatami();
+    // `poslI` je už ukotvený na posledný UZAVRETÝ mesiac (vyššie) — šesťka
+    // sa ráta od neho, nie od posledného mesiaca s hocijakými dátami.
+    const posl = poslI;
     const dlzka = Math.min(6, posl + 1);
     const idx6 = Array.from({ length: dlzka }, (_, k) => posl - dlzka + 1 + k);
     const beAvg = idx6.reduce((a, i) => a + be[i], 0) / idx6.length;
