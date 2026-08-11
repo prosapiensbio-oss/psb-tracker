@@ -4,6 +4,7 @@ import type { D1Database, D1PreparedStatement } from "@cloudflare/workers-types"
 import { isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 import { citajIcal } from "../../lib/psb/ical";
+import { ohlasitZmenu } from "../../lib/psb/kalendarZmeny";
 
 // Kalendár — predbežný obraz týždňa medzi dvoma exportmi z PTmindera.
 //
@@ -137,20 +138,13 @@ async function snimka(DB: D1Database, z: Zdroj) {
     return von;
   };
 
-  /**
-   * Pýtame sa len na to, čo už prebehlo.
-   *
-   * Dohodnutý tréning na budúci štvrtok nie je udalosť na vysvetlenie — Jerry
-   * si ho práve dohodol. Zmysel kontroly je opačný: hodina, ktorá spred dvoch
-   * dní zmizla a nikto nevie prečo. Budúcnosť je plán, minulosť je otázka.
-   */
+  // Ktoré zmeny sa hlásia, rozhoduje `ohlasitZmenu` — pravidlo žije vo
+  // vlastnom module, lebo sa dá zlomiť ticho a je otestované.
   const dnesDen = kedy.slice(0, 10);
-  const spatne = (x: (typeof surove)[number]) =>
-    ((x.pred || x.po || "").slice(0, 10)) <= dnesDen;
 
   let zmien = 0;
   for (const x of paruj()) {
-    if (!spatne(x)) continue;
+    if (!ohlasitZmenu(x.druh, x.pred, x.po, dnesDen)) continue;
     zmien++;
     prikazy.push(DB.prepare(
       "INSERT INTO kal_zmeny (id, kedy, trener, uid, druh, nazov, klient, pred, po) VALUES (?,?,?,?,?,?,?,?,?)",
