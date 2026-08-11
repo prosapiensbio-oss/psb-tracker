@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { CSSProperties, ReactNode } from "react";
 
 import { C, mix, S, badge } from "../../lib/psb/theme";
@@ -252,7 +253,13 @@ export function MiniBars({
 }
 
 export function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
-  return (
+  // Portál do <body> z toho istého dôvodu ako pri vysvetlivkách: predok
+  // s `backdrop-filter` (každá sklenená karta) sa stáva obalovým blokom pre
+  // `position: fixed`, takže modál otvorený zvnútra karty by sa neroztiahol
+  // na obrazovku, ale na kartu. Dnes je každý modál renderovaný mimo kariet,
+  // takže to nikde nesvieti — ale je to pasca, ktorá čaká na prvého, kto
+  // otvorí okno z karty. Portál ju zavrie natrvalo.
+  const okno = (
     <div
       onClick={onClose}
       style={{
@@ -289,11 +296,25 @@ export function Modal({ title, onClose, children }: { title: string; onClose: ()
       </div>
     </div>
   );
+  return typeof document === "undefined" ? okno : createPortal(okno, document.body);
 }
 
 // ── Info tooltip (hover explanation) ─────────────────────────────────────────
 // Uses viewport-fixed positioning measured on hover, so the bubble never gets
 // clipped by a scrollable table/card (which overflow:auto would otherwise cut).
+//
+// A KRESLÍ SA CEZ PORTÁL DO <body>. Bez neho prestal fungovať v deň, keď
+// pribudlo sklo (Jerry, 11. 8.: „vysvetlivky sa objavujú na pozadí, prípadne
+// vôbec"). Dôvod je v CSS a je zákerný: prvok s `backdrop-filter` sa stáva
+// OBALOVÝM BLOKOM pre potomkov s `position: fixed` — presne ako `transform`.
+// Sklenená karta (.psb-card má blur(20px)) tým pádom bublinu:
+//   • posunula — súradnice z getBoundingClientRect() sú voči oknu, ale
+//     prehliadač ich zrátal voči karte, takže skončila inde,
+//   • orezala — karta si zároveň otvorila vlastný stacking context, takže
+//     zIndex 1000 platil len vnútri nej a ďalšia karta ju prekryla,
+//   • a v rolovacej tabuľke ju schovala úplne.
+// Portál do <body> vyradí všetkých predkov z hry — bublina je znovu voči oknu
+// a žiadna budúca zmena vzhľadu jej to nemôže vziať.
 export function Info({ text, label }: { text: string; label?: ReactNode }) {
   const [pos, setPos] = useState<{ left: number; top: number; above: boolean } | null>(null);
   const ref = useRef<HTMLSpanElement>(null);
@@ -335,14 +356,16 @@ export function Info({ text, label }: { text: string; label?: ReactNode }) {
       >
         i
       </span>
-      {pos && (
+      {pos && typeof document !== "undefined" && createPortal(
         <span
           style={{
             position: "fixed",
             left: pos.left,
             top: pos.top,
             transform: pos.above ? "translateY(-100%)" : "none",
-            zIndex: 1000,
+            // Nad modálom (999) aj nad Jarvisom (60) — vysvetlivka je vždy to,
+            // čo je práve pod myšou, takže patrí úplne navrch.
+            zIndex: 1200,
             width: W,
             background: "#0A110C",
             border: `1px solid ${mix(C.accent, 45)}`,
@@ -358,7 +381,8 @@ export function Info({ text, label }: { text: string; label?: ReactNode }) {
           }}
         >
           {text}
-        </span>
+        </span>,
+        document.body,
       )}
     </span>
   );

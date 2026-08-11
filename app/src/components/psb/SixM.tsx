@@ -4,7 +4,7 @@ import type { SixMRow } from "../../lib/psb/compute";
 import { fmtDate } from "../../lib/psb/format";
 import { C, S } from "../../lib/psb/theme";
 import type { Actions } from "./App";
-import { Badge, Card, Donut, Empty, H2, H3, Info, StatCard, StatGrid, TableWrap } from "./ui";
+import { Badge, Card, Donut, Empty, H2, H3, Info, Modal, StatCard, StatGrid, TableWrap } from "./ui";
 
 const phaseTone = (p: string) => (p === "Obnova" ? "green" : p === "Integrácia" ? "orange" : "bark");
 
@@ -161,28 +161,28 @@ export function SixMTracker({ sixM, actions, trainer, onTrainer }: { sixM: SixMR
   );
 }
 
+// Vlastný modál tu bol kópiou zdieľaného Modalu — a kópia sa neopraví, keď sa
+// opraví originál. Pri skle to bolo presne vidieť: zdieľaný Modal dostal
+// nepriehľadnú plochu a silnejšie stmavenie, tento zostal priesvitný.
 function NoteModal({ client, value, onSave, onClose }: { client: string; value: string; onSave: (v: string) => void; onClose: () => void }) {
   const [text, setText] = useState(value);
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "#000a", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999, padding: 16 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ ...S.card, maxWidth: 420, width: "100%", marginBottom: 0 }}>
-        <div style={{ ...S.h3, marginBottom: 12 }}>{client} — poznámka trénera</div>
-        <div style={{ fontSize: 11, color: C.textDim, marginBottom: 8 }}>Poznámka sa nikdy neprepíše uploadom CSV.</div>
-        <textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          style={{ ...S.input, minHeight: 90, resize: "vertical", marginBottom: 12 }}
-          placeholder="Napr. výsledok hodnotiaceho rozhovoru v 5. mesiaci…"
-        />
-        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: C.textMuted, cursor: "pointer", fontSize: 13 }}>
-            Zrušiť
-          </button>
-          <button onClick={() => { onSave(text); onClose(); }} style={{ background: C.accent, color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontSize: 13 }}>
-            Uložiť
-          </button>
-        </div>
+    <Modal title={`${client} — poznámka trénera`} onClose={onClose}>
+      <div style={{ fontSize: 11, color: C.textDim, marginBottom: 8 }}>Poznámka sa nikdy neprepíše uploadom CSV.</div>
+      <textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        style={{ ...S.input, minHeight: 90, resize: "vertical", marginBottom: 12 }}
+        placeholder="Napr. výsledok hodnotiaceho rozhovoru v 5. mesiaci…"
+      />
+      <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+        <button onClick={onClose} style={{ background: "none", border: "none", color: C.textMuted, cursor: "pointer", fontSize: 13 }}>
+          Zrušiť
+        </button>
+        <button onClick={() => { onSave(text); onClose(); }} style={{ background: C.accent, color: C.onAccent, border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontSize: 13 }}>
+          Uložiť
+        </button>
       </div>
-    </div>
+    </Modal>
   );
 }
