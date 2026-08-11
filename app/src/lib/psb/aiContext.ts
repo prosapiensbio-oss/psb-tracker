@@ -353,7 +353,8 @@ export function buildAiContext(
         instagramDo: poslednyMkt,
         vyhladavanieDo: poslednyGsc,
         webDo: poslednyGa4,
-        poznamka: "Rady končia týmito mesiacmi. Mesiac, ktorý v rade NIE JE, znamená „ešte nenahraté“ — NIKDY nie nulu a nikdy nie prepad. Novšie čísla bývajú v databáze skôr než tu: over ich dopytom do kanaly_mesiace (Posts/Reels/Stories/Views po mesiacoch) alebo mkt_prispevky, kým o poslednom mesiaci čokoľvek tvrdíš.",
+        neuplneMesiace: MKT_MESACNE.filter((m) => m.neuplny).map((m) => ({ m: m.m, chybaKusov: m.chybaKusov ?? null })),
+        poznamka: "Rady končia týmito mesiacmi. Mesiac, ktorý v rade NIE JE, znamená „ešte nenahraté“ — NIKDY nie nulu a nikdy nie prepad. Mesiac uvedený v „neuplneMesiace“ má nahratú len ČASŤ príspevkov: jeho čísla sú dolná hranica, nie výsledok, a nesmie sa z nich čítať pokles. Pri oboch prípadoch to povedz nahlas a ponúkni, že sa doplní export z Metricoolu.",
       },
       instagramMesacne: MKT_MESACNE,
       // Retencia. Watch time je jediné pole v exporte, ktoré hovorí, ako dlho

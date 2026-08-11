@@ -45,6 +45,25 @@ export const Route = createFileRoute("/api/marketing")({
             DB.prepare("SELECT * FROM gsc_strany ORDER BY kliky DESC LIMIT 40").all().catch(() => ({ results: [] })),
             DB.prepare("SELECT mesiac, kanal, metrika, hodnota, zmena, poznamka FROM kanaly_mesiace ORDER BY mesiac DESC, kanal, metrika").all().catch(() => ({ results: [] })),
           ]);
+          // Mesiac, z ktorého je nahratá len časť, sa nesmie tváriť ako hotový.
+          // 11. 8.: doplnili sme 18 mesiacov exportov, ale júl 2026 v priečinku
+          // nebol — ostali z neho 3 reely z jedného skoršieho nahratia. Rad by
+          // odrazu ukazoval júl ako prepad zo 6 reelov na 3 a z 60 stories na
+          // nulu, hoci Metricool za júl hlási 7 reelov, 1 post a 64 stories.
+          // Mesačná zostava (kanaly_mesiace) je nezávislý druhý zápis tej istej
+          // skutočnosti — keď hlási viac obsahu, než máme riadkov, mesiac je
+          // NEÚPLNÝ a povie sa to nahlas.
+          const zostava: Record<string, { reels: number; posty: number; stories: number }> = {};
+          for (const r of kan.results as Record<string, unknown>[]) {
+            const mk = String(r.mesiac), kanal = String(r.kanal), metrika = String(r.metrika);
+            if (kanal !== "Instagram") continue;
+            const e = (zostava[mk] ||= { reels: 0, posty: 0, stories: 0 });
+            const v = Number(r.hodnota) || 0;
+            if (metrika === "Reels") e.reels = v;
+            else if (metrika === "Posts") e.posty = v;
+            else if (metrika === "Stories") e.stories = v;
+          }
+
           return Response.json({
             ok: true,
             mesacne: (mes.results as Record<string, unknown>[]).map((r) => ({
@@ -59,6 +78,12 @@ export const Route = createFileRoute("/api/marketing")({
               spend: Number(r.spend) || 0,
               viewRate: Math.round((Number(r.view_rate) || 0) * 10) / 10,
               watchTime: Math.round(Number(r.watch_time) || 0),
+              ...(() => {
+                const z = zostava[String(r.mesiac)];
+                if (!z) return {};
+                const chyba = (z.reels - (Number(r.reels) || 0)) + (z.posty - (Number(r.posty) || 0)) + (z.stories - (Number(r.stories) || 0));
+                return chyba > 0 ? { neuplny: true, chybaKusov: chyba } : {};
+              })(),
             })),
             top: (top.results as Record<string, unknown>[]).map((r) => ({
               m: r.mesiac, typ: r.druh, hook: r.hook,

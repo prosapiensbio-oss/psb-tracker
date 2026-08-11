@@ -21,6 +21,13 @@ export type MktMesiac = {
   viewRate: number;
   /** Ø čas sledovania reelu v milisekundách (Metricool). 0 = nemeralo sa. */
   watchTime?: number;
+  /**
+   * Mesiac, z ktorého je nahratá len časť príspevkov — mesačná zostava hlási
+   * viac obsahu, než máme riadkov. Čísla za taký mesiac sú DOLNÁ hranica,
+   * nie výsledok, a nesmie sa z nich čítať prepad.
+   */
+  neuplny?: boolean;
+  chybaKusov?: number;
 };
 
 export type MktKus = { m: string; typ: "reel" | "post"; hook: string; views: number; ulozenia: number; viewRate: number; watchTime?: number };
