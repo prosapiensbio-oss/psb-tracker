@@ -6,6 +6,11 @@
 // deprecated field (e.g. capacity.effHours is reference-only, NOT what the card shows).
 import { PNL, VZAS_MONTHS, pnlCalc, poslednyMesiacSDatami } from "./vzas";
 import {
+  GA4_MESACNE, GSC_DOPYTY, GSC_LOKALNE, GSC_MESACNE, GSC_PRILEZITOSTI, GSC_STRANY,
+  MKT_CLANKY, MKT_MESACNE,
+} from "./marketing";
+import { MKT_OBSAH } from "./marketing-obsah";
+import {
   cenaZaSedenie,
   kotvaDat,
   monthlyFinance,
@@ -246,6 +251,83 @@ export function buildAiContext(
     };
   })();
 
+  // ── Marketing ─────────────────────────────────────────────────────────────
+  //
+  // Jarvis má byť plánovač marketingu, nie len účtovník tréningov — a na plán
+  // nestačia knihy, treba čísla, proti ktorým sa plán meria. Preto sem ide
+  // všetko, z čoho sa dá rozhodnúť, ale AGREGOVANE: 130 príspevkov po jednom
+  // by zabralo miesto, ktoré potrebuje zoznam klientov, a stejne sa z nich
+  // číta len „ktorý typ háku funguje".
+  //
+  // Čo sa zámerne NEPOSIELA: surové kanály z Metricoolu (163 riadkov, jediný
+  // mesiac — na trend nestačia) a celé znenie kníh (tie sú v <pozadie_psb>).
+  const marketing = (() => {
+    const r2 = (n: number) => Math.round(n * 100) / 100;
+
+    // Obsah po kategórii háku — „čo funguje" sa neurčuje z videní, ale
+    // z uložení a zdieľaní: videnie je algoritmus, uloženie je človek.
+    const podlaHooku: Record<string, { kusov: number; ulozenia: number; videnia: number; zdielania: number; vr: number }> = {};
+    for (const o of MKT_OBSAH) {
+      const e = (podlaHooku[o.k] ||= { kusov: 0, ulozenia: 0, videnia: 0, zdielania: 0, vr: 0 });
+      e.kusov++; e.ulozenia += o.u; e.videnia += o.v; e.zdielania += o.z; e.vr += o.vr;
+    }
+    const hooky = Object.entries(podlaHooku)
+      .map(([kategoria, e]) => ({
+        kategoria, kusov: e.kusov,
+        ulozeniaNaKus: r2(e.ulozenia / e.kusov),
+        videniaNaKus: r0(e.videnia / e.kusov),
+        zdielaniaNaKus: r2(e.zdielania / e.kusov),
+        viewRate: r2(e.vr / e.kusov),
+      }))
+      .sort((a, b) => b.ulozeniaNaKus - a.ulozeniaNaKus);
+
+    const zoradene = [...MKT_OBSAH].sort((a, b) => b.u + b.z - (a.u + a.z));
+    const kus = (o: (typeof MKT_OBSAH)[number]) => ({ m: o.m, format: o.f, kategoria: o.k, hook: o.h.slice(0, 90), ulozenia: o.u, videnia: o.v, zdielania: o.z, viewRate: o.vr });
+
+    // Zdroje klientov — jediné miesto, kde sa marketing dotýka peňazí.
+    const zdroje: Record<string, number> = {};
+    for (const c of clientList) if (c.zdroj) zdroje[c.zdroj] = (zdroje[c.zdroj] || 0) + 1;
+    const dopytyZdroje: Record<string, number> = {};
+    for (const l of data.leads || []) if (l.source) dopytyZdroje[l.source] = (dopytyZdroje[l.source] || 0) + 1;
+
+    // Náklady na marketing z P&L, po mesiacoch, aj ako % z tržieb.
+    const mkt = PNL.fixne?.subcategories?.marketing;
+    const naklady: Record<string, number> = {};
+    if (mkt) {
+      for (const item of Object.values(mkt.items)) {
+        VZAS_MONTHS.forEach((mk, i) => {
+          const v = Math.round(item.values[i] || 0);
+          if (v) naklady[mk] = (naklady[mk] || 0) + v;
+        });
+      }
+    }
+
+    return {
+      poznamka: "Rozhoduje sa z ULOŽENÍ a ZDIEĽANÍ, nie z videní — videnie je algoritmus, uloženie je človek. Obsah je agregovaný po kategórii háku; jednotlivé kusy sú len v najlepších/najhorších. Kanály z Metricoolu (Threads, TikTok, Konkurencia) sú v databáze len za jeden mesiac, na trend nestačia — keď ich treba, vytiahni ich dopytom z kanaly_mesiace. Obrazovka: Marketing.",
+      instagramMesacne: MKT_MESACNE,
+      obsahPodlaHooku: hooky,
+      obsahNajlepsie: zoradene.slice(0, 10).map(kus),
+      obsahNajhorsie: zoradene.slice(-5).map(kus),
+      web: { poznamka: "GA4, návštevnosť webu podľa zdroja.", mesacne: GA4_MESACNE },
+      vyhladavanie: {
+        poznamka: "Google Search Console. „prilezitosti“ = veľa zobrazení, takmer žiadne kliky — téma, na ktorú sa už zobrazujeme, ale nikto neklikne; tam je najlacnejší obsah.",
+        mesacne: GSC_MESACNE,
+        topDopyty: GSC_DOPYTY.slice(0, 20),
+        prilezitosti: GSC_PRILEZITOSTI,
+        lokalne: GSC_LOKALNE.slice(0, 8),
+        topStrany: GSC_STRANY.slice(0, 12),
+      },
+      clanky: MKT_CLANKY.slice(0, 15),
+      zdrojeKlientov: {
+        poznamka: "Odkiaľ prišli KLIENTI (nie dopyty). Vyplnené ručne pri úvodnom tréningu; klienti bez zdroja sa nezapočítavajú.",
+        klienti: zdroje,
+        dopyty: dopytyZdroje,
+        bezZdroja: clientList.filter((c) => !c.zdroj).length,
+      },
+      naklady: { poznamka: "Marketingové položky z P&L (Facebook, Google, MultiBox, Offline).", poMesiacoch: naklady },
+    };
+  })();
+
   const klientiDetail = clientList
     .slice()
     .sort((a, b) => (b.lastSession || "").localeCompare(a.lastSession || ""))
@@ -372,6 +454,7 @@ export function buildAiContext(
     },
     sixM: { spolu: sixM.length, podlaFazy: sixMPhases, poznamka: "6M proces: Obnova 1.–6. mesiac, Integrácia 7.–18., Udržateľnosť 19.+" },
     kalendar: kalendarBlok,
+    marketing,
     // P&L po položkách za posledných 12 mesiacov. Bez toho Jarvis na otázku
     // „ktorá aplikácia stála v apríli 780?" nemá kde hľadať: hodnoty P&L žijú
     // v module (z Excelu + z importu), nie v databáze, takže ich nevytiahne ani

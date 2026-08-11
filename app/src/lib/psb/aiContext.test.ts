@@ -176,3 +176,46 @@ describe("kalendár v kontexte", () => {
     expect(ctx().kalendar).toBeNull();
   });
 });
+
+// ── Marketing ────────────────────────────────────────────────────────────────
+//
+// Jarvis má byť plánovač marketingu — na to potrebuje čísla, nie len knihy.
+// Dva testy: že tam tie čísla naozaj sú, a že sa nezmestili na úkor klientov.
+describe("marketing v kontexte", () => {
+  test("obsah je agregovaný po kategórii háku a zoradený podľa uložení", () => {
+    const m = ctx().marketing;
+    expect(m.obsahPodlaHooku.length).toBeGreaterThan(0);
+    for (let i = 1; i < m.obsahPodlaHooku.length; i++) {
+      expect(m.obsahPodlaHooku[i - 1].ulozeniaNaKus).toBeGreaterThanOrEqual(m.obsahPodlaHooku[i].ulozeniaNaKus);
+    }
+    // Najlepší kus musí mať aspoň toľko uložení + zdieľaní ako najhorší.
+    const naj = m.obsahNajlepsie[0], hor = m.obsahNajhorsie[m.obsahNajhorsie.length - 1];
+    expect(naj.ulozenia + naj.zdielania).toBeGreaterThanOrEqual(hor.ulozenia + hor.zdielania);
+  });
+
+  test("marketing je PRED zoznamom klientov — rez odzadu smie brať len klientov", () => {
+    // Server reže kontext odzadu (chat.ts, STROP). Poradie kľúčov v JSONe je
+    // poradie zápisu, takže čo je vzadu, to odpadne prvé. Klienti sa dajú
+    // dotiahnuť dopytom, marketingová agregácia nie.
+    const kluce = Object.keys(ctx());
+    expect(kluce.indexOf("marketing")).toBeLessThan(kluce.indexOf("klientiDetail"));
+    expect(kluce.indexOf("naCoSaPozriet")).toBe(0);
+  });
+
+  test("celý kontext sa zmestí pod serverový strop 180 000 znakov", () => {
+    // Vzorka je malá, tak sa meria to, čo NERASTIE s počtom klientov:
+    // marketing, kalendár a P&L. Keď táto pevná časť prekročí 60 kB, na
+    // 119 klientov už strop nevyjde a začnú miznúť zo zoznamu.
+    const c = ctx() as Record<string, unknown>;
+    const pevne = ["marketing", "pnlPolozky", "pnlSuhrn", "zarobky", "sedeniaTrend", "tyzdennePodlaTrenera"]
+      .reduce((a, k) => a + JSON.stringify(c[k] ?? null).length, 0);
+    expect(pevne).toBeLessThan(60000);
+  });
+
+  test("zdroje klientov vedia, koľkým chýba — inak sa percentá čítajú zle", () => {
+    const z = ctx().marketing.zdrojeKlientov;
+    // Vzorkový klient zdroj nemá, takže musí byť započítaný medzi chýbajúce.
+    expect(z.bezZdroja).toBe(1);
+    expect(Object.keys(z.klienti)).toHaveLength(0);
+  });
+});
