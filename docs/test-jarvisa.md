@@ -133,9 +133,27 @@ zamykajú bez toho, aby sa musel platiť ďalší beh.
 
 ### Čo Jarvis stále nevidí
 
-Marketing (dosah, kanály, náklady na reklamu), kroky mesačnej uzávierky
-a dopyty. Na marketing si vie väčšinu dotiahnuť dopytom do databázy, uzávierku
-a dopyty nie.
+Kroky mesačnej uzávierky. Marketing dostal 11. 8. vlastný kľúč (viď nižšie),
+dopyty sú v ňom agregované podľa zdroja — jednotlivý dopyt si vytiahne dopytom.
+
+### Marketing a plánovanie (11. 8., druhé kolo)
+
+Marketing bol posledná veľká diera: Jarvis mal knihy, ale nie čísla, proti
+ktorým sa plán meria. Pribudol kľúč `marketing` (~16 kB) a **plánovací režim** —
+Jarvis udáva smer, texty píše samostatný Claude Project podľa zadania, ktoré
+Jarvis vyrobí (`ZADANIE PRE CLAUDE PROJECT` v systémovom prompte).
+
+Nález z prvého behu plánovacieho režimu: **zoradený zoznam sám o sebe záver
+nenesie.** Jarvis prečítal rebríček kategórií háku odzadu a do plánu napísal
+„dôraz na Edukácia a Klientsky príbeh — najlepšie uloženia", pritom sú na
+rebríčku posledné dve. Odvtedy sa poradie píše číslom a zhrnutie (kto vedie
+v uloženiach, kto v zdieľaniach, a pozor na malý počet kusov) **počíta appka**.
+Je to to isté pravidlo ako „nesčituj z hlavy": záver, ktorý sa dá spočítať, sa
+nenechá odvodzovať.
+
+Strop kontextu sa zdvihol zo 120 000 na 180 000 znakov — s marketingom sedel
+kontext na 124 kB a začal by rezať zoznam klientov. Test stráži, že `marketing`
+je v poradí kľúčov PRED `klientiDetail`, lebo rez ide odzadu.
 
 ### Poznámka k zapisovacím akciám
 
