@@ -37,15 +37,24 @@ export const Route = createFileRoute("/api/vzas-notes")({
         }
         const month = typeof body.month === "string" ? body.month.slice(0, 7) : "";
         if (!/^\d{4}-\d{2}$/.test(month)) return Response.json({ ok: false, error: "bad_month" }, { status: 400 });
-        const note = typeof body.note === "string" ? body.note.slice(0, 8000) : "";
+        // Rovnaká poistka ako vo vzas-settings (nález z testu Jarvisa 11. 8.):
+        // ticho odrezaný JSON sa uloží nevalidný a pri ďalšom čítaní z neho
+        // nezostane nič. Poznámka mesiaca je jediné miesto, kde appka drží
+        // históriu rozhodnutí („kedy sa Radek stal majiteľom priestoru") a
+        // akcia `kronika` do nej PRIPÍSAVA — takže rastie sama od seba.
+        const note = typeof body.note === "string" ? body.note : "";
         const answers = body.answers && typeof body.answers === "object" ? body.answers : {};
+        const answersJson = JSON.stringify(answers);
+        if (note.length > 8000 || answersJson.length > 12000) {
+          return Response.json({ ok: false, error: "too_large", poznamka: note.length, odpovede: answersJson.length }, { status: 413 });
+        }
         await DB.prepare(
           `INSERT INTO vzas_month_notes (month, note, answers, updated_by, updated_at)
            VALUES (?,?,?,?,?)
            ON CONFLICT(month) DO UPDATE SET note=excluded.note, answers=excluded.answers,
              updated_by=excluded.updated_by, updated_at=excluded.updated_at`,
         )
-          .bind(month, note, JSON.stringify(answers).slice(0, 12000), body.actor ?? null, new Date().toISOString())
+          .bind(month, note, answersJson, body.actor ?? null, new Date().toISOString())
           .run();
         return Response.json({ ok: true });
       },
