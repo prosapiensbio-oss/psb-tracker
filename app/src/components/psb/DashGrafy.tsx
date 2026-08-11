@@ -194,7 +194,16 @@ export const VYCHODZIE = new Set(HLAVNE);
 // ── Zdieľané drobnosti (Dashboard ich používa tiež) ──────────────────────────
 export const centerBody: CSSProperties = { flex: 1, display: "flex", flexDirection: "column", justifyContent: "center" };
 
-export function MiniStat({ label, value, color, onClick }: { label: ReactNode; value: string; color?: string; onClick?: () => void }) {
+export function MiniStat({ label, value, pod, color, onClick }: {
+  label: ReactNode;
+  value: string;
+  /** Druhé, drobné číslo na VLASTNOM riadku pod popisom — to isté meranie
+   *  v inej jednotke (percento hlavné, koruny pod ním). Lepené za popis
+   *  bodkou sa čítalo ako súčasť názvu, nie ako číslo. */
+  pod?: ReactNode;
+  color?: string;
+  onClick?: () => void;
+}) {
   return (
     <div
       onClick={onClick}
@@ -209,6 +218,11 @@ export function MiniStat({ label, value, color, onClick }: { label: ReactNode; v
         {label}
         {onClick && <span style={{ color: C.textDim }}>→</span>}
       </div>
+      {pod != null && (
+        <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 2, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+          {pod}
+        </div>
+      )}
     </div>
   );
 }
@@ -774,7 +788,7 @@ export function useExtraGrafy({
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}>
                   <MiniStat label="Klientov" value={String(btcPlatby.teraz.klientov)} color={C.accent} />
-                  <MiniStat label={<>Prijaté <span style={{ color: C.textDim }}>· {sats(btcPlatby.teraz.sats)}</span></>} value={fmtCZK(btcPlatby.teraz.czk)} color={C.orange} />
+                  <MiniStat label="Prijaté" value={fmtCZK(btcPlatby.teraz.czk)} pod={sats(btcPlatby.teraz.sats)} color={C.orange} />
                   <MiniStat
                     label="Podiel na tržbách"
                     value={pctTrzieb(btcPlatby.teraz.czk, btcPlatby.trzbyMes) === null ? "—" : `${pctTrzieb(btcPlatby.teraz.czk, btcPlatby.trzbyMes)!.toFixed(0)} %`}
@@ -790,8 +804,9 @@ export function useExtraGrafy({
                       mesiacmi aj s čímkoľvek iným; koruny hovoria len o tom,
                       koľko toho v danom mesiaci prišlo. */}
                   <MiniStat
-                    label={<>Zhodnotenie {btcPlatby.dnesMesiac !== null && <span style={{ color: C.textDim }}>· {btcPlatby.dnesMesiac - btcPlatby.teraz.czk >= 0 ? "+" : ""}{fmtCZK(btcPlatby.dnesMesiac - btcPlatby.teraz.czk)}</span>}</>}
+                    label="Zhodnotenie"
                     value={btcPlatby.zhodMesPct === null ? "—" : `${btcPlatby.zhodMesPct >= 0 ? "+" : ""}${btcPlatby.zhodMesPct.toFixed(1)} %`}
+                    pod={btcPlatby.dnesMesiac === null ? undefined : `${btcPlatby.dnesMesiac - btcPlatby.teraz.czk >= 0 ? "+" : ""}${fmtCZK(btcPlatby.dnesMesiac - btcPlatby.teraz.czk)}`}
                     color={(btcPlatby.zhodMesPct ?? 0) >= 0 ? C.green : C.red}
                   />
                 </div>
@@ -806,20 +821,22 @@ export function useExtraGrafy({
                     label="Podiel na tržbách"
                     value={pctTrzieb(btcPlatby.czkSpolu, btcPlatby.trzbySpolu) === null ? "—" : `${pctTrzieb(btcPlatby.czkSpolu, btcPlatby.trzbySpolu)!.toFixed(0)} %`}
                   />
-                  <MiniStat label={<>Prijaté spolu <span style={{ color: C.textDim }}>· {sats(btcPlatby.satsSpolu)}</span></>} value={fmtCZK(btcPlatby.czkSpolu)} color={C.orange} />
+                  <MiniStat label="Prijaté spolu" value={fmtCZK(btcPlatby.czkSpolu)} pod={sats(btcPlatby.satsSpolu)} color={C.orange} />
                   <MiniStat
-                    label={<>Rezerva dnes {btcPlatby.rezervaSats !== null && <span style={{ color: C.textDim }}>· {sats(btcPlatby.rezervaSats)}</span>}</>}
+                    label="Rezerva dnes"
                     value={btc?.czk == null ? "—" : fmtCZK(btc.czk)}
+                    pod={btcPlatby.rezervaSats === null ? undefined : sats(btcPlatby.rezervaSats)}
                   />
                   {/* Zhodnotenie CELÉHO PORTFÓLIA, nie klientskych platieb —
                       to isté číslo, aké svieti v bitcoinovej appke.
-                      Vedú KORUNY (Jerry, 11. 8.), percento je pri nich drobným:
-                      pri zhodnotení rozhoduje, o koľko peňazí ide, nie o koľko
-                      percent — na rozdiel od mesačnej zmeny, kde je to naopak. */}
+                      Vedie PERCENTO, koruny sú drobným na vlastnom riadku pod
+                      popisom (Jerry, 11. 8.). Rovnaké poradie ako v BTC appke,
+                      takže sa dajú porovnať pohľadom. */}
                   <MiniStat
-                    label={<>Zhodnotenie portfólia {btcPlatby.zhodLifePct !== null && <span style={{ color: C.textDim }}>· {btcPlatby.zhodLifePct >= 0 ? "+" : ""}{btcPlatby.zhodLifePct.toFixed(2)} %</span>}</>}
-                    value={btcPlatby.zhodLifeCzk === null ? "—" : `${btcPlatby.zhodLifeCzk >= 0 ? "+" : ""}${fmtCZK(btcPlatby.zhodLifeCzk)}`}
-                    color={(btcPlatby.zhodLifeCzk ?? 0) >= 0 ? C.green : C.red}
+                    label="Zhodnotenie portfólia"
+                    value={btcPlatby.zhodLifePct === null ? "—" : `${btcPlatby.zhodLifePct >= 0 ? "+" : ""}${btcPlatby.zhodLifePct.toFixed(2)} %`}
+                    pod={btcPlatby.zhodLifeCzk === null ? undefined : `${btcPlatby.zhodLifeCzk >= 0 ? "+" : ""}${fmtCZK(btcPlatby.zhodLifeCzk)}`}
+                    color={(btcPlatby.zhodLifePct ?? 0) >= 0 ? C.green : C.red}
                   />
                 </div>
               </div>
