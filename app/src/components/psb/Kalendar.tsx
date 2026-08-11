@@ -90,8 +90,17 @@ export function navrhni(
   return { typ: uvodny ? "uvodny" : "trening", kandidati: skore.slice(0, 4).map((x) => x.meno), meno };
 }
 
-const den = (s: string) => {
-  const d = new Date(`${s}:00Z`);
+/**
+ * Deň v tvare „Ut 11.8.". Znesie oba tvary, ktoré sa v zmenách vyskytujú:
+ * skrátený z rozdielu kalendára (`2026-08-11T17:00`) aj plné ISO. Pri
+ * nezmyselnom vstupe vráti prázdno — nie „undefined NaN.NaN.", ako to raz
+ * spravil ručný zápis, ktorý uložil plné ISO. Nečitateľný dátum je chyba;
+ * dátum, ktorý sa tvári ako text, je horšia chyba.
+ */
+export const den = (s: string) => {
+  if (!s) return "";
+  const d = new Date(/\dT\d{2}:\d{2}$/.test(s) ? `${s}:00Z` : s);
+  if (Number.isNaN(d.getTime())) return "";
   const DNI = ["Ne", "Po", "Ut", "St", "Št", "Pi", "So"];
   return `${DNI[d.getUTCDay()]} ${d.getUTCDate()}.${d.getUTCMonth() + 1}.`;
 };

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { odtrenovaneMimoExportu, type KalUdalost } from "./Kalendar";
+import { den, odtrenovaneMimoExportu, type KalUdalost } from "./Kalendar";
 
 /**
  * Hodiny medzi dvoma nedeľnými exportmi z PTmindera.
@@ -31,7 +31,8 @@ const udalost = (klient: string, zaciatok: string, extra: Partial<KalUdalost> = 
 /** Dátum v minulosti/budúcnosti voči TERAZ, aby test nezostarol. */
 const predDnami = (n: number) => new Date(Date.now() - n * 86400000).toISOString();
 const oDni = (n: number) => new Date(Date.now() + n * 86400000).toISOString();
-const den = (iso: string) => iso.slice(0, 10);
+/** Len dátumová časť ISO — pomocník testu, nech sa nepletie s importovaným den(). */
+const denISO = (iso: string) => iso.slice(0, 10);
 
 describe("odtrenovaneMimoExportu", () => {
   test("prebehnutý tréning, ktorý PTminder nemá, sa počíta", () => {
@@ -43,7 +44,7 @@ describe("odtrenovaneMimoExportu", () => {
     const kedy = predDnami(1);
     const out = odtrenovaneMimoExportu(
       [udalost("Anna Kadličkova", kedy)],
-      [{ client: "Anna Kadličkova", date: den(kedy) }],
+      [{ client: "Anna Kadličkova", date: denISO(kedy) }],
     );
     expect(out["Anna Kadličkova"]).toBeUndefined();
   });
@@ -53,7 +54,7 @@ describe("odtrenovaneMimoExportu", () => {
     const kedy = predDnami(2);
     const out = odtrenovaneMimoExportu(
       [udalost("Zuzana Špoligová", kedy)],
-      [{ client: "Zuzana Spoligova", date: den(kedy) }],
+      [{ client: "Zuzana Spoligova", date: denISO(kedy) }],
     );
     expect(out["Zuzana Špoligová"]).toBeUndefined();
   });
@@ -62,7 +63,7 @@ describe("odtrenovaneMimoExportu", () => {
     // Markétina hodina sa presunula o deň a karta hlásila chýbajúci zápis.
     const out = odtrenovaneMimoExportu(
       [udalost("Marketa Lozias", predDnami(3))],
-      [{ client: "Marketa Lozias", date: den(predDnami(2)) }],
+      [{ client: "Marketa Lozias", date: denISO(predDnami(2)) }],
     );
     expect(out["Marketa Lozias"]).toBeUndefined();
   });
@@ -70,7 +71,7 @@ describe("odtrenovaneMimoExportu", () => {
   test("posun o dva dni už tá istá hodina nie je", () => {
     const out = odtrenovaneMimoExportu(
       [udalost("Marketa Lozias", predDnami(5))],
-      [{ client: "Marketa Lozias", date: den(predDnami(2)) }],
+      [{ client: "Marketa Lozias", date: denISO(predDnami(2)) }],
     );
     expect(out["Marketa Lozias"]).toBe(1);
   });
@@ -108,5 +109,26 @@ describe("odtrenovaneMimoExportu", () => {
     // Nie je čo „vracať" — funkcia číta aktuálny kalendár, takže hodina sa
     // vráti sama. Toto je poistka, že sa niekto nepokúsi zaviesť pamäť.
     expect(Object.keys(odtrenovaneMimoExportu([], []))).toHaveLength(0);
+  });
+});
+
+/**
+ * Formátovač dátumu v zmenách. Vznikol z chyby, ktorú urobil ručný zápis:
+ * uložil plné ISO, `den()` k nemu prilepil `:00Z`, dostal Invalid Date
+ * a na karte sa objavilo „zrušený tréning undefined NaN.NaN.".
+ * Dátum, ktorý sa tvári ako text, je horší než chýbajúci dátum.
+ */
+describe("den", () => {
+  test("skrátený tvar z rozdielu kalendára", () => {
+    expect(den("2026-08-11T17:00")).toBe("Ut 11.8.");
+  });
+
+  test("plné ISO (tvar, ktorý ukladal ručný zápis)", () => {
+    expect(den("2026-08-10T00:00:00.000Z")).toBe("Po 10.8.");
+  });
+
+  test("nezmysel vráti prázdno, nie NaN", () => {
+    expect(den("nezmysel")).toBe("");
+    expect(den("")).toBe("");
   });
 });

@@ -335,8 +335,11 @@ export const Route = createFileRoute("/api/kalendar")({
             // Zrušenie nesie pôvodný termín v `pred`, náhrada nový v `po` —
             // rovnaká konvencia ako pri automatickom rozdiele, aby to karta
             // vedela vypísať bez vetvenia navyše.
-            druh === "zrusene" ? `${kedy}T00:00:00.000Z` : null,
-            druh === "nahrada" ? `${kedy}T00:00:00.000Z` : null,
+            // Rovnaký tvar ako ukladá automatický rozdiel (`YYYY-MM-DDTHH:MM`),
+            // inak ho formátovač dátumu nerozparsuje. Ručný zápis nemá čas,
+            // takže 00:00 — karta ho pri ručných zázname aj tak nevypisuje.
+            druh === "zrusene" ? `${kedy}T00:00` : null,
+            druh === "nahrada" ? `${kedy}T00:00` : null,
             0,
             poznamka || null,
             null,
