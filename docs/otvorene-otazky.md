@@ -1,63 +1,105 @@
-# Otvorené otázky na Jerryho
+# Otvorené úlohy a otázky
 
-Veci, na ktoré som sa pýtal a odpoveď zatiaľ nie je. Nie je to zoznam úloh —
-sú to rozhodnutia, ktoré nie sú moje. Keď na niektorú odpovieš, riadok zmizne
-a zmena ide do kódu.
-
-Stav k 11. 8. 2026.
+Stav k 11. 8. 2026, večer. Dva zoznamy: čo sa má postaviť a na čo čakám odpoveď.
+Keď na otázku odpovieš, riadok zmizne a zmena ide do kódu.
 
 ---
 
-## 1 · Spustiť `uprav-pnl` naostro?
+## A · Úlohy — čo zostáva postaviť
 
+Poradie je zámerné: bez jednotky sa dvojka nemá o čo oprieť a trojka nemá čo merať.
+
+### 1. Dopyty, ktoré sa naozaj vedú
+Stav, dôvod straty a väzba na kampaň. Dnes má všetkých 37 dopytov od januára
+stav „nový" — nikdy sa ani jeden neposunul. Dvanásť z nich netrénovalo a nikto
+nevie prečo.
+
+**Bez tohto sa reklama nedá vyhodnotiť.** Je to vedro, do ktorého by sa lialo.
+
+### 2. Konverzia a ekonomika do kontextu Jarvisa
+Dopyt → trénoval → zostal, po zdrojoch, nad ROVNAKÝM obdobím. Plus marginálna
+marža a strop ceny za dopyt.
+
+Súčasne opraviť mínu, ktorú som tam sám nechal: vedľa seba sú `klienti` po
+zdrojoch (celá história) a `dopyty` po zdrojoch (len od januára 2026). Jarvis
+si z toho vypočíta „Instagram: 23 klientov z 12 dopytov = 190 % konverzia".
+
+### 3. Meta Marketing API — len čítanie
+Výdavok a výsledky po kampaniach do Kokpitu. Dá cenu za dopyt automaticky.
+**Čaká na otázku B5** — appku a token musíš vytvoriť ty.
+
+### 4. Obsah → dopyt
+Ku každému dopytu, čo vyšlo v predchádzajúcich dvoch týždňoch. Toto je tá
+analýza obsahu, ktorá slúži cieľu — nie „ktorý hák má uloženia", ale „po čom
+nám niekto napísal".
+
+### 5. Rozhodovacia obrazovka kampaní
+Kampaň → výdavok → dopyty → klienti → cena za klienta, proti stropu 2 200 Kč.
+Jediné miesto na svete, kde sa to dá zobraziť — Meta nevie, kto sa stal
+klientom. Stavia sa až po 1 a 3.
+
+### 6. Instagram Graph API
+Metriky po príspevkoch samé, bez ručného exportu. Po dnešnom doplnení Metricoolu
+klesla priorita — export funguje, len je ručný.
+
+---
+
+## B · Otázky — čakám na teba
+
+### B1 · Spustiť `uprav-pnl` naostro?
 Pri teste Jarvisa som zapisovacie akcie preveril čítaním celej cesty, ale
 nespustil — prostredie mi zablokovalo zápis do živej appky a `uprav-pnl` mení
-reálne čísla v P&L.
+reálne čísla v P&L. Spravil by som to na jednej položke, ktorú presne vrátim
+späť, a ukázal by som ti pred aj po.
 
-**Otázka:** chceš, aby som ju spustil naozaj? Spravil by som to na jednej
-položke, ktorú presne vrátim späť, a ukázal by som ti pred aj po.
+Práve v tejto ceste som našiel dve chyby čítaním (chýbajúci zámok mesiaca,
+tichý orez JSONu). Tretiu by odhalil až beh.
 
-**Prečo to nie je zbytočné:** práve v tejto ceste som našiel dve chyby čítaním
-(chýbajúci zámok mesiaca, tichý orez JSONu). Tretiu by odhalil až beh.
+### B2 · Sviežosť dát z PTmindera — 10 alebo 8 dní?
+Appka pýta nový export, keď sú dáta staršie než 10 dní. Exportuješ raz týždenne,
+takže 10 dní znamená, že jeden vynechaný týždeň nikto nezbadá. Pri 8 sa ozve
+hneď po prvom vynechanom týždni.
 
----
+### B3 · Kroky mesačnej uzávierky do Jarvisa?
+Posledná vec, ktorú po dnešku nevidí. Nevie odpovedať na „čo mi ešte chýba do
+uzávierky júla". Je to tá istá práca ako kalendár — asi hodina.
 
-## 2 · Sviežosť dát z PTmindera — 10 alebo 8 dní?
+### B4 · Naďa Khamaziuk — rok narodenia 2036
+V exporte z PTmindera má budúci rok. Prepíše sa v ⟦Klienti⟧ (✎ pri klientovi),
+ručná hodnota má prednosť pred exportom. Je to tvoj údaj, nie môj odhad.
 
-Appka pýta nový export, keď sú dáta staršie než 10 dní. Ty exportuješ raz
-týždenne, takže 10 dní znamená, že jeden vynechaný týždeň nikto nezbadá.
+### B5 · Meta for Developers — vytvoríš appku a token?
+Potrebné pre úlohu A3. Poviem presne, čo naklikať. **Token nikdy neposielaj
+cez chat** — ani mne; vkladá sa priamo do nastavení.
 
-**Otázka:** znížiť prah na 8 dní? Pri 8 sa ozve hneď po prvom vynechanom
-týždni; pri 10 až po druhom.
-
----
-
-## 3 · Kroky mesačnej uzávierky do Jarvisa?
-
-Jediná vec, ktorú Jarvis po doplnení kalendára a marketingu stále nevidí. Dnes
-nevie odpovedať na „čo mi ešte chýba do uzávierky júla".
-
-**Otázka:** doplniť ich rovnako ako kalendár? Je to tá istá práca — asi hodina.
-
----
-
-## 4 · Naďa Khamaziuk — rok narodenia 2036
-
-V exporte z PTmindera má budúci rok. Ručná hodnota má prednosť pred exportom,
-takže sa to dá prepísať v ⟦Klienti⟧ (✎ pri klientovi) — ale je to tvoj údaj,
-nie môj odhad.
+### B6 · Export júla 2026 z Metricoolu
+V priečinku končia exporty júnom. Z júla mám 3 reely, ale Metricool hlási 7
+reelov, 1 post a 64 stories — appka ten mesiac označuje ako neúplný (chýba 69
+kusov). Keď júl vyexportuješ a nahráš, príznak zmizne sám.
 
 ---
 
-## 5 · Odložené na neskôr (tvoje rozhodnutie, nie moja otázka)
+## C · Odložené tebou — nie sú to otázky
 
-Tieto si odložil vedome, sú tu len preto, aby sa nezabudli:
+Sú tu len preto, aby sa nezabudli:
 
-- **Mobilná appka s push notifikáciami** — 3. fáza. Časť P&L sa dnes počíta na
-  klientovi, čo notifikácie komplikuje.
+- **Veľké chatovacie okno v Marketingu** namiesto Claude Projectu — povedal si
+  „nerieš teraz", obava z tokenov z API.
+- **Púšťanie reklám priamo z Kokpitu** — odhováral som ťa; Meta mení rozhranie
+  rýchlejšie, než by sme ho stíhali dobiehať.
+- **Mobilná appka s push notifikáciami** — 3. fáza.
 - **Klientsky prístup** (klient vidí svoje tempo) — nápad, nie plán.
 - **Export uzávierky do PDF** pre účtovníčku.
 - **Google Calendar API na zrušené tréningy** — dnes to appka sleduje cez
-  rozdiel dvoch stiahnutí iCal, čo funguje od 31. 7. 2026.
-- **Vlastná doména** — appka beží na `workers.dev` a funguje; doména je
-  kozmetika, nie podmienka.
+  rozdiel dvoch stiahnutí iCal, funguje od 31. 7. 2026.
+- **Vlastná doména** — appka beží na `workers.dev` a funguje.
+
+---
+
+## D · Tvoja úloha, nie moja
+
+**Fáza 1 reklamného testu: ~6 000 Kč na 4–6 týždňov.** Cieľom nie je zarobiť,
+ale zistiť, čo u teba stojí jeden dopyt. Zastavovacie pravidlo: keď je po
+6 000 Kč cena dopytu nad 2 200, problém nie je kanál, ale ponuka alebo kreatíva.
+
+Má zmysel až po úlohe 1 — inak sa výsledok nedá zmerať.
