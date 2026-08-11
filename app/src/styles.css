@@ -113,9 +113,13 @@
 }
 
 /* ── PSB Tracker palettes ────────────────────────────────────────────────────
- * Three themes in the same "forest" language, switchable at runtime via
- * data-psb-theme on <html>. Default = Tmavý. */
-:root,
+ * Six themes in the same "forest" language, switchable at runtime via
+ * data-psb-theme on <html>.
+ *
+ * VÝCHODZIA je „Živé sklo · Tmavý" (nižšie), nie táto Klasika. Nastavuje sa
+ * holým :root pri sklo palete, nie tu — takže platí ešte pred načítaním JS
+ * a nový prehliadač nezabliká starým vzhľadom. Klasika sa zapne až vtedy,
+ * keď si ju niekto vyberie. */
 :root[data-psb-theme="dark"] {
   --c-bg: #1a1e16;           /* tmavý mach */
   --c-card: #252b1f;         /* lesná pôda */
@@ -203,6 +207,8 @@
  * jediná a vedomá: --c-card a --c-border držia SKLENENÉ rgba hodnoty, takže
  * zdedený komponent Card je sklenený sám od seba a nemusí sa prepisovať
  * štyristo miest v kóde. */
+/* Holé :root = východzí stav (bez uloženej voľby, aj pred hydratáciou). */
+:root,
 :root[data-psb-theme="sklo"] {
   --c-bg: #14180f;
   --c-mesh1: #4a5c2e;
@@ -302,6 +308,7 @@
  * nesmie preblikávať (bod 03 špecifikácie). `fixed` preto, že pri dlhej
  * stránke by sa gradient inak roztiahol na celú výšku a škvrny by sa zmenšili
  * na nepoznanie. */
+:root:not([data-psb-theme]) body::before,
 :root[data-psb-theme^="sklo"] body::before {
   content: "";
   position: fixed;
@@ -331,12 +338,19 @@
   background: var(--c-bg);
 }
 
+/* Aj `html`: jeho pozadie sa propaguje na plátno stránky a prekrylo by mesh,
+   ktorý sedí na body::before. Rovnaká oprava ako v bitcoinovej appke. */
+:root:not([data-psb-theme]),
+:root[data-psb-theme^="sklo"],
+:root:not([data-psb-theme]) body,
+:root:not([data-psb-theme]) .psb-app,
 :root[data-psb-theme^="sklo"] body,
 :root[data-psb-theme^="sklo"] .psb-app {
   background: transparent;
   background-color: transparent;
 }
 
+:root:not([data-psb-theme]) .psb-card,
 :root[data-psb-theme^="sklo"] .psb-card {
   /* Poradie je naopak, než by človek čakal, a je to zámer: minifikátor
      (lightningcss) považuje neprefixovanú vlastnosť za nadmnožinu prefixovanej

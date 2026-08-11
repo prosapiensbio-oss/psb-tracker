@@ -2015,8 +2015,9 @@ function RegisterRow({ item, actions, onNavigate, chat }: { item: RegisterItem; 
               2026-08-09|Jan Kral"), takže tá istá vec bola zajtra späť
               a Skryť vyzeralo, že nefunguje. Toto je odpoveď na „niektoré
               sú irelevantné": povieš to raz a je ticho. Vrátiť sa dá
-              v Skrytých. Položky bez rodiny (chýbajúci nájom, staré dáta)
-              tlačidlo nemajú zámerne — tam je ticho horšie než otrava. */}
+              v Skrytých. Od 10. 8. ho majú VŠETKY položky (Jerry: „nehlásiť
+              mi daj na všetky udalosti") — položka bez rodiny sa umlčí podľa
+              vlastného kľúča. */}
           {item.acked ? (
             <button onClick={() => { actions.ackAnomaly(item.key, "", false); if (item.rodina) actions.ackAnomaly(`mute|${item.rodina}`, "", false); }} style={linkBtn}>Vrátiť</button>
           ) : (

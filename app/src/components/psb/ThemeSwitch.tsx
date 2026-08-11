@@ -10,22 +10,33 @@ const THEMES = [
   { id: "light", label: "Stredný", rodina: "Klasika" },
   { id: "mid", label: "Svetlý", rodina: "Klasika" },
   // „Živé sklo" — mesh pozadie + sklenené karty, jantárový akcent.
-  // Zatiaľ dobrovoľné: kým nie sú prekreslené všetky obrazovky, musí sa dať
-  // vrátiť jedným klikom.
   { id: "sklo", label: "Tmavý", rodina: "Živé sklo" },
   { id: "sklo-stredny", label: "Stredný", rodina: "Živé sklo" },
   { id: "sklo-svetly", label: "Svetlý", rodina: "Živé sklo" },
 ];
 const RODINY = ["Klasika", "Živé sklo"];
 
+/**
+ * Východzia téma. Sklo, nie Klasika (Jerry, 11. 8.).
+ *
+ * Do 11. 8. bola východzia „dark" a sklo sa zapínalo len tým, že si ho niekto
+ * raz vybral — čiže žilo v localStorage jedného prehliadača. Nový prehliadač,
+ * mobil, iný počítač alebo vymazané dáta stránky = starý vzhľad, hoci Jerry
+ * 10. 8. povedal „nový vzhľad má byť na všetkých obrazovkách". Bitcoinová
+ * appka pritom mala sklo natvrdo pre každého, takže si tie dve appky
+ * odporovali. Rovnaká rodina chýb ako rozloženie grafov, čo žilo iba
+ * v prehliadači: čo má byť východzie, patrí do kódu.
+ */
+export const VYCHODZIA_TEMA = "sklo";
+
 // Swaps the CSS-variable palette on <html data-psb-theme>. Persists the choice.
 export function ThemeSwitch() {
-  const [theme, setTheme] = useState("dark");
+  const [theme, setTheme] = useState(VYCHODZIA_TEMA);
 
   useEffect(() => {
-    let saved = "dark";
+    let saved = VYCHODZIA_TEMA;
     try {
-      saved = localStorage.getItem("psb-theme") || "dark";
+      saved = localStorage.getItem("psb-theme") || VYCHODZIA_TEMA;
     } catch {
       /* ignore */
     }

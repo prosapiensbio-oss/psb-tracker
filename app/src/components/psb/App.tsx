@@ -43,6 +43,7 @@ import { Marketing } from "./Marketing";
 import { VYSLEDKY_LISTY, Vysledky, Vzas } from "./Vzas";
 import { Kalendar, type KalUdalost } from "./Kalendar";
 import { tokyKlientov } from "./Fluktuacia";
+import { VYCHODZIA_TEMA } from "./ThemeSwitch";
 import { Udaje } from "./Udaje";
 import { HladanieKlienta } from "./Hladanie";
 import { ZapisButton } from "./Zapis";
@@ -133,11 +134,16 @@ export function PSBApp() {
   // načítaní stránky sa vrátila späť: vyzeralo to, že sa výber neuloží, hoci
   // v localStorage celý čas bol. Nastavenie vzhľadu nesmie závisieť od toho,
   // ktorú obrazovku si otvoril.
+  //
+  // Bez uloženej voľby sa nastaví VYCHODZIA_TEMA (sklo), nie to, čo je v CSS
+  // ako `:root` — inak by nový prehliadač či mobil ukázal starý vzhľad.
   useEffect(() => {
     try {
       const ulozena = localStorage.getItem("psb-theme");
-      if (ulozena) document.documentElement.setAttribute("data-psb-theme", ulozena);
-    } catch { /* prehliadač bez localStorage — zostane východzia paleta */ }
+      document.documentElement.setAttribute("data-psb-theme", ulozena || VYCHODZIA_TEMA);
+    } catch {
+      document.documentElement.setAttribute("data-psb-theme", VYCHODZIA_TEMA);
+    }
   }, []);
 
   const [authed, setAuthed] = useState<boolean | null>(null);
