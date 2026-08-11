@@ -279,7 +279,7 @@ function ZnackyBlok({ znacky, uloz, okno }: { znacky: MktZnacka[]; uloz: (z: Mkt
 // ── Čo som robil ─────────────────────────────────────────────────────────────
 function CoSomRobil({ chat }: { chat?: AssistantChat }) {
   const [metrika, setMetrika] = useState<"obsah" | "views" | "dosah" | "spend">("obsah");
-  const [obdobie, setObdobie] = useState("3m");
+  const [obdobie, setObdobie] = useState("2026");
   const okno = oknoMesiacov(obdobie, MKT_MESACNE.map((r) => r.m));
   const { znacky, uloz } = useZnacky();
   // Vlajka nesie všetky značky daného mesiaca naraz — dve udalosti v jednom
@@ -467,7 +467,7 @@ function PodlaHooku({ okno }: { okno: string[] }) {
 // ── Čo fungovalo ─────────────────────────────────────────────────────────────
 function CoFungovalo({ chat }: { chat?: AssistantChat }) {
   // Otázka znie „čo funguje TERAZ", nie „čo kedy fungovalo" — preto 90 dní.
-  const [obdobie, setObdobie] = useState("3m");
+  const [obdobie, setObdobie] = useState("2026");
   const okno = oknoMesiacov(obdobie, MKT_MESACNE.map((r) => r.m));
   const vyber = MKT_TOP.filter((k) => okno.includes(k.m));
   const vyrez = () =>
@@ -683,7 +683,7 @@ function CoFungovaloWeb({ rok, chat }: { rok: string; chat?: AssistantChat }) {
 // je vidieť rozdiel medzi tým, čo prináša čitateľov, a tým, čo prináša klientov.
 function Vyhladavanie({ chat }: { chat?: AssistantChat }) {
   // SEO sa hýbe pomaly — na kratšom okne než rok je to šum.
-  const [obdobie, setObdobie] = useState("12m");
+  const [obdobie, setObdobie] = useState("2026");
   const okno = oknoMesiacov(obdobie, GSC_MESACNE.map((r) => r.m));
   const data = GSC_MESACNE.filter((r) => okno.includes(r.m));
   const kliky = data.reduce((a, r) => a + r.kliky, 0);

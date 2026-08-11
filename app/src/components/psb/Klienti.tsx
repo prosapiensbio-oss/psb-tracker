@@ -382,7 +382,7 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
   // spája s peniazmi, a doteraz sa dalo dopĺňať len tak, že človek prechádzal
   // celý zoznam a hádal, ktorému chýba. Filter z toho robí odškrtávací zoznam.
   const [lenBezZdroja, setLenBezZdroja] = useState(false);
-  const [kpiWin, setKpiWin] = useState("all");
+  const [kpiWin, setKpiWin] = useState("2026");
   const [kpiFrom, setKpiFrom] = useState("");
   const [kpiTo, setKpiTo] = useState("");
   const [edit, setEdit] = useState<string | null>(null);
@@ -505,19 +505,31 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
     } else if (preset && preset.days > 0) {
       lo = Date.now() - preset.days * 86400000;
     }
-    let hours = 0, paid = 0, paidN = 0, clientsWithSess = 0;
+    let hours = 0, sedeni = 0, clientsWithSess = 0;
     for (const c of list) {
       const sess = scoped ? c.sessions.filter((s) => { const t = new Date(s.date).getTime(); return t >= lo && t <= hi; }) : c.sessions;
       if (sess.length) clientsWithSess++;
-      for (const s of sess) {
-        hours += s.duration / 60;
-        if (s.price > 0) { paid += s.price; paidN++; }
-      }
+      sedeni += sess.length;
+      for (const s of sess) hours += s.duration / 60;
+    }
+    // Ø cena sedenia = PRIJATÉ PENIAZE ÷ sedenia, rovnako ako na Kokpite
+    // a v Peniazoch. Predtým sa tu rátal priemer ceny zapísanej pri sedení
+    // BEZ nulových — vyšlo 1 046 Kč tam, kde Tréningy hlásili 844 a Kokpit
+    // 1 015. Nulová cena nie je tréning zadarmo, je to sedenie kryté
+    // balíčkom; vyhodiť ho z menovateľa znamená stratiť pätinu odrobenej
+    // práce a cenu nadhodnotiť.
+    const menaList = new Set(list.map((c) => normName(c.name)));
+    let cash = 0;
+    for (const p of data.payments) {
+      if (!p.client || !menaList.has(normName(p.client))) continue;
+      const t = new Date(p.date).getTime();
+      if (scoped && (t < lo || t > hi)) continue;
+      cash += p.amount;
     }
     const denom = (scoped ? clientsWithSess : list.length) || 1;
     const att = list.length ? (list.reduce((a, c) => a + c.attendance, 0) / list.length) * 100 : 0;
-    return { count: list.length, activeInWin: clientsWithSess, att, hpc: hours / denom, avg: paidN ? paid / paidN : 0, scoped };
-  }, [list, kpiWin, kpiFrom, kpiTo]);
+    return { count: list.length, activeInWin: clientsWithSess, att, hpc: hours / denom, avg: sedeni ? cash / sedeni : 0, scoped };
+  }, [list, kpiWin, kpiFrom, kpiTo, data.payments]);
 
   const cell = (t: string, seg: string) => {
     const active = fTrainer === t && fSegment === seg;
@@ -600,7 +612,7 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
           <StatCard value={kpis.scoped ? kpis.activeInWin : kpis.count} label={<Info text="Počet klientov, ktorí prešli aktuálnymi filtrami. V časovom okne = koľko z nich reálne chodilo v danom období." label={kpis.scoped ? "Chodilo v období" : "Klientov vo výbere"} />} />
           <StatCard value={`${kpis.att.toFixed(0)}%`} label={<Info text="Priemerný podiel týždňov, v ktorých mal klient aspoň jeden tréning, za posledných 18 týždňov. Vždy 18 týž., nezávisí od filtra času." label="Ø dochádzka" />} />
           <StatCard value={kpis.hpc.toFixed(1)} label={<Info text="Priemerný počet odtrénovaných hodín na klienta za zvolené obdobie (alebo celú históriu)." label={`Ø hodín/klient${kpis.scoped ? " (obd.)" : ""}`} />} />
-          <StatCard value={fmtCZK(kpis.avg)} label={<Info text="Priemerná cena zaplateného sedenia za zvolené obdobie (bezplatné sedenia sa nepočítajú)." label="Ø CZK/sedenie" />} />
+          <StatCard value={fmtCZK(kpis.avg)} label={<Info text="Prijaté peniaze delené počtom odtrénovaných sedení za zvolené obdobie, pre klientov v tomto zozname. Rovnaká definícia ako „Ø cena sedenia“ na Kokpite a v Peniazoch. Neráta sa z ceny zapísanej pri sedení: tá je pri 19 % sedení nulová, lebo platba visí na balíčku." label="Ø CZK/sedenie" />} />
         </div>
       </Card>
 

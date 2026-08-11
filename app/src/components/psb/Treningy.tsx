@@ -111,7 +111,7 @@ function Prehlad({ data, focus, trainer, onTrainer }: { data: PSBData; focus?: N
   const setTrainerF = onTrainer;
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
-  const [win, setWin] = useState("all"); // days window over history
+  const [win, setWin] = useState("2026"); // days window over history
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const { sort, toggle, sorted } = useSort({ key: "period", dir: "desc" });
 
@@ -215,7 +215,15 @@ function Prehlad({ data, focus, trainer, onTrainer }: { data: PSBData; focus?: N
     return {
       avgH: rows.reduce((a, g) => a + g.total.hours, 0) / n,
       avgScore: rows.reduce((a, g) => a + g.score, 0) / n,
-      avgCzk: rows.reduce((a, g) => a + (g.total.sessions ? g.total.revenue / g.total.sessions : 0), 0) / n,
+      // Súčet ÷ súčet, nie priemer pomerov po riadkoch: týždeň s dvomi
+      // sedeniami nemá vážiť ako týždeň s tridsiatimi. Pozor, je to cena
+      // ZAPÍSANÁ PRI SEDENÍ — pri 19 % sedení je nulová (platba visí na
+      // balíčku), takže je nižšia než „Ø cena sedenia" z prijatých peňazí.
+      // Preto sa aj volá inak; obe čísla sú správne, len na inú otázku.
+      avgCzk: (() => {
+        const sed = rows.reduce((a, g) => a + g.total.sessions, 0);
+        return sed ? rows.reduce((a, g) => a + g.total.revenue, 0) / sed : 0;
+      })(),
     };
   }, [rows]);
 
@@ -296,7 +304,7 @@ function Prehlad({ data, focus, trainer, onTrainer }: { data: PSBData; focus?: N
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 10, marginBottom: 14 }}>
           <StatCard value={`${summary.avgH.toFixed(1)}h`} label={`Ø hodín / ${period === "week" ? "týždeň" : period === "quarter" ? "kvartál" : "mesiac"}`} />
           <StatCard value={summary.avgScore.toFixed(1)} label="Ø skóre (1–10)" color={summary.avgScore >= 7 ? C.green : summary.avgScore >= 4 ? C.orange : C.red} />
-          <StatCard value={fmtCZK(summary.avgCzk)} label="Ø CZK / sedenie" />
+          <StatCard value={fmtCZK(summary.avgCzk)} label={<Info text="Cena ZAPÍSANÁ pri sedení, sčítaná a delená počtom sedení. Je nižšia než „Ø cena sedenia“ na Kokpite a v Peniazoch — tá ráta z prijatých peňazí. Rozdiel je v tom, že pri 19 % sedení je cena v PTminderi nulová, lebo platba visí na balíčku; tu tie nuly priemer stláčajú, tam sa platba za balíček započíta. Toto číslo hovorí „koľko je odtrénované ocenené v PTminderi“, to druhé „koľko peňazí prišlo na hodinu“." label="Ø zapísané / sedenie" />} />
         </div>
       )}
 
@@ -396,7 +404,7 @@ function Prehlad({ data, focus, trainer, onTrainer }: { data: PSBData; focus?: N
             <SortTh label="Spolu h" sortKey="total" sort={sort} onSort={toggle} align="right" />
             <SortTh label="Sedení" sortKey="sessions" sort={sort} onSort={toggle} align="right" />
             <SortTh label="Zárobky" sortKey="revenue" sort={sort} onSort={toggle} align="right" />
-            <SortTh label="CZK/sed." sortKey="czk" sort={sort} onSort={toggle} align="right" />
+            <SortTh label="Zapísané/sed." sortKey="czk" sort={sort} onSort={toggle} align="right" />
             <SortTh label="Skóre" sortKey="score" sort={sort} onSort={toggle} align="right" info="Blízkosť k stredu zdravej zóny (29h/týž) na trénera. 10 = ideál." />
           </tr>
         </thead>

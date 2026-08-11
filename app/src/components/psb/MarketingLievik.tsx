@@ -89,7 +89,7 @@ function Krok({ cislo, popis, farba, konverzia }: { cislo: string; popis: string
 }
 
 export function Lievik({ data, clients }: { data: PSBData; clients: Record<string, ClientAgg> }) {
-  const [okno, setOkno] = useState("3");
+  const [okno, setOkno] = useState("2026");
   const [web, setWeb] = useState<{ ga4: { m: string; udalosti: number }[]; dopyty: { dopyt: string; kliky: number }[] }>({ ga4: [], dopyty: [] });
 
   useEffect(() => {

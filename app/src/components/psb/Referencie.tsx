@@ -37,7 +37,7 @@ export function obdobieOd(hodnota: string): { od: string; do_: string } {
 }
 
 export function Referencie({ data, clients, onKlient }: { data: PSBData; clients: Record<string, ClientAgg>; onKlient?: (m: string) => void }) {
-  const [obdobie, setObdobie] = useState("all");
+  const [obdobie, setObdobie] = useState("2026");
   const [vlastneOd, setVlastneOd] = useState("");
   const [vlastneDo, setVlastneDo] = useState("");
   const r = useMemo(() => {

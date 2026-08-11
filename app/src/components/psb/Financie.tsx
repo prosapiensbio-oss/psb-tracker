@@ -81,7 +81,7 @@ function windowFilter<T extends { month: string }>(arr: T[], win: string, from: 
 
 function useMonthWindow() {
   const zdielane = useContext(ObdobieCtx);
-  const [localWin, setLocalWin] = useState("all");
+  const [localWin, setLocalWin] = useState("2026");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   // Obdobie je spoločné pre celú appku; hranice pri „Vlastné" zostávajú lokálne
@@ -391,16 +391,20 @@ function Sedenia({ monthly }: { monthly: Monthly }) {
   const { sort, toggle, sorted } = useSort({ key: "month", dir: "desc" });
   const w = useMonthWindow();
   const view = useMemo(() => windowFilter(monthly, w.win, w.from, w.to), [monthly, w.win, w.from, w.to]);
+  // Ø cena sedenia = PRIJATÉ PENIAZE ÷ sedenia, nie cena zapísaná pri sedení
+  // (tá je pri 19 % sedení nulová — platba visí na balíčku). Rovnaká definícia
+  // ako na Kokpite, v Klientoch aj v Tréningoch; do 11. 8. tu bola iná
+  // a tá istá vec ukazovala na štyroch obrazovkách štyri čísla.
   const rows = sorted(
-    view.map((m) => ({ ...m, perSess: m.sessions ? m.revenue / m.sessions : 0, util: (m.sessions / MAX_SESSIONS_MONTH) * 100 })),
+    view.map((m) => ({ ...m, perSess: m.sessions ? m.cash / m.sessions : 0, util: (m.sessions / MAX_SESSIONS_MONTH) * 100 })),
     { month: (m) => m.month, sessions: (m) => m.sessions, revenue: (m) => m.revenue, perSess: (m) => m.perSess, util: (m) => m.util },
   );
   const chart = view.map((m) => ({ label: monthLabel(m.month), value: m.sessions }));
   // Súhrn za zvolené obdobie.
   const sessTotal = view.reduce((a, m) => a + m.sessions, 0);
-  const revTotal = view.reduce((a, m) => a + m.revenue, 0);
+  const cashTotal = view.reduce((a, m) => a + m.cash, 0);
   const avgSess = view.length ? sessTotal / view.length : 0;
-  const perSessAll = sessTotal ? revTotal / sessTotal : 0;
+  const perSessAll = sessTotal ? cashTotal / sessTotal : 0;
   const avgUtil = view.length ? view.reduce((a, m) => a + (m.sessions / MAX_SESSIONS_MONTH) * 100, 0) / view.length : 0;
   return (
     <>
@@ -415,7 +419,7 @@ function Sedenia({ monthly }: { monthly: Monthly }) {
       {view.length > 0 && (
         <Card>
           <H3>
-            <Info text="Súhrn za zvolené obdobie (podľa filtra vpravo hore): spolu sedení, priemer na mesiac, priemerná cena za sedenie (zárobky ÷ sedenia) a priemerné využitie kapacity (z max. 260 sedení/mes. pre 2 trénerov)." label="Súhrn sedení (za zvolené obdobie)" />
+            <Info text="Súhrn za zvolené obdobie (podľa filtra vpravo hore): spolu sedení, priemer na mesiac, priemerná cena za sedenie (PRIJATÉ PENIAZE ÷ sedenia — nie cena zapísaná pri sedení, tá je pri 19 % sedení nulová, lebo platba visí na balíčku) a priemerné využitie kapacity (z max. 260 sedení/mes. pre 2 trénerov)." label="Súhrn sedení (za zvolené obdobie)" />
           </H3>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, margin: "12px 0 6px" }}>
             <StatCard value={String(sessTotal)} label={`Sedení spolu · ${view.length} mes.`} color={C.accentLight} />
@@ -423,7 +427,7 @@ function Sedenia({ monthly }: { monthly: Monthly }) {
             <StatCard value={fmtCZK(perSessAll)} label="Ø CZK / sedenie" color={C.blue} />
             <StatCard value={`${avgUtil.toFixed(0)} %`} label="Ø využitie kapacity" color={C.green} />
           </div>
-          <div style={{ fontSize: 11, color: C.textDim, marginTop: 4 }}>Zárobky spolu za obdobie: {fmtCZK(revTotal)}</div>
+          <div style={{ fontSize: 11, color: C.textDim, marginTop: 4 }}>Prijaté spolu za obdobie: {fmtCZK(cashTotal)}</div>
         </Card>
       )}
       <Card>

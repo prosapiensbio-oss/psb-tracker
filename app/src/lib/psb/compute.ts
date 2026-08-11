@@ -705,6 +705,47 @@ export function doPlnehoMesiaca<T>(rows: T[], k: Kotva, mk: (r: T) => string): T
   return k.plny ? rows.filter((r) => mk(r) <= k.plny) : rows;
 }
 
+/**
+ * Ø CENA ZA SEDENIE — jediné miesto, kde sa počíta. (Jerry, 11. 8.)
+ *
+ * Appka to donedávna rátala na štyri spôsoby a ukazovala štyri čísla:
+ *   • Klienti  1046 Kč — cena zapísaná pri sedení, BEZ nulových
+ *   • Tréningy  844 Kč — cena zapísaná pri sedení, VRÁTANE nulových
+ *   • Kokpit   1015 Kč — prijaté peniaze, nevážený priemer mesiacov
+ *   • Peniaze   ~844  — cena pri sedení, vážene
+ *
+ * Rozdiel nie je v zaokrúhľovaní, ale v tom, že 661 z 3 416 sedení (19,4 %)
+ * má v PTminderi cenu 0 — a je to tak rovnomerne každý rok (20 % / 19 %).
+ * Nie sú to tréningy zadarmo: je to sedenie kryté balíčkom, kde platba visí
+ * na balíčku, nie na riadku sedenia. Priemer z ceny pri sedení preto cenu
+ * podhodnocuje o ~200 Kč, a keď sa nuly vyhodia, zase nadhodnocuje, lebo
+ * z menovateľa zmizne pätina odrobenej práce.
+ *
+ * Jediná definícia, ktorá o tú pätinu nepríde, je PRIJATÉ PENIAZE delené
+ * ODTRÉNOVANÝMI SEDENIAMI — platba za balíček sa v nej započíta. Váži sa
+ * súčtami, nie priemerom mesačných pomerov: mesiac s piatimi sedeniami nemá
+ * mať rovnakú váhu ako mesiac so stopäťdesiatimi.
+ *
+ * Pozor na jednu vlastnosť, ktorá je vlastnosť a nie chyba: predplatba
+ * dorazí v jednom mesiaci a sedenia sa odchodia v ďalších, takže KRÁTKE okno
+ * skáče. Cez celý rok sa to vyrovná.
+ */
+export function cenaZaSedenie(
+  data: PSBData,
+  vObdobi: (mk: string) => boolean,
+  /** Normalizované mená — obmedzí výpočet na skupinu klientov. */
+  klienti?: Set<string>,
+): { czk: number; sedeni: number; cash: number } {
+  const patri = (meno: string) => !klienti || klienti.has(normName(meno));
+  let sedeni = 0;
+  for (const s of data.sessions) if (vObdobi(monthKey(s.date)) && patri(s.client)) sedeni++;
+  let cash = 0;
+  // Riadky bez klienta sú súhrnné riadky reportu, nie platby — do tržieb
+  // nepatria (rovnaké pravidlo ako monthlyFinance).
+  for (const p of data.payments) if (p.client && vObdobi(monthKey(p.date)) && patri(p.client)) cash += p.amount;
+  return { czk: sedeni ? cash / sedeni : 0, sedeni, cash };
+}
+
 export function monthlyFinance(data: PSBData): FinanceMonth[] {
   const map: Record<string, FinanceMonth> = {};
   const get = (mk: string) =>

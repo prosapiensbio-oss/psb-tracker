@@ -11,7 +11,7 @@ import {
   pnlCalc, QUARTERS, salaryCalc, VZAS_MONTH_LABELS, VZAS_MONTHS, VZAS_TARGETS_BY_YEAR, vzasVerzia,
   type KpiGroup, type KpiOverrides, poslednyMesiacSDatami, predikciaNakladov,} from "../../lib/psb/vzas";
 import { kpiFmt } from "./Vzas";
-import { doPlnehoMesiaca, kotvaDat, monthlyFinance, predictCash, predictEarnings } from "../../lib/psb/compute";
+import { cenaZaSedenie, doPlnehoMesiaca, kotvaDat, monthlyFinance, predictCash, predictEarnings } from "../../lib/psb/compute";
 import type { KanalRiadok } from "./Kanaly";
 import { ZDROJE } from "./Klienti";
 import { tokyKlientov } from "./Fluktuacia";
@@ -104,6 +104,7 @@ export const WIDGETS: WidgetMeta[] = [
   { id: "kvartaly", label: "Kvartálne tržby", span: 1, sekcia: "peniaze", popis: "Tržby a marža po kvartáloch — sezónnosť na jeden pohľad.", doma: "Výsledky" },
   { id: "ciele", label: "Ciele roka", span: 1, sekcia: "peniaze", popis: "Tržby a marža proti cieľu 2026, prepočítané na uplynulé mesiace.", doma: "Výsledky" },
   { id: "btc", label: "Bitcoinová rezerva", span: 1, sekcia: "peniaze", popis: "Hodnota rezervy a koľko mesiacov prevádzky pokryje.", doma: "VZAS → Rezerva" },
+  { id: "btcPlatby", label: "Platby v bitcoine", span: 2, sekcia: "peniaze", popis: "Kto platí v BTC, koľko v korunách aj satoshi, podiel na tržbách a zhodnotenie.", doma: "Bitcoinová evidencia" },
 
   // ── Vyťaženie ──────────────────────────────────────────────────────────────
   { id: "hodiny", label: "Odrobené hodiny / týždeň", span: 2, sekcia: "vytazenie", popis: "Týždenné hodiny so zdravou zónou 24–34 h.", doma: "Tréningy" },
@@ -178,8 +179,8 @@ export const WIDGETS: WidgetMeta[] = [
  * východzí stav uvidia len tí, čo appku otvárajú prvýkrát.
  */
 export const HLAVNE: string[] = [
-  // Peniaze najprv — tržby, break-even, zdravie.
-  "zarobky", "breakEven", "zdravieFirmy",
+  // Peniaze najprv — tržby, break-even, zdravie, bitcoinové platby.
+  "zarobky", "breakEven", "zdravieFirmy", "btcPlatby",
   // Zisky a náklady: skutočnosť + odhad, potom pásmo zisku.
   "ziskyNaklady", "pasmoZisku",
   // Vyťaženie: hodiny, kapacita, fluktuácia, ekonomika hodiny.
@@ -438,11 +439,13 @@ export function useExtraGrafy({
 
   // Rezervu potrebuje aj KPI „rezerva v mesiacoch prevádzky", nielen karta BTC.
   const chceKpi = KPI_KARTY.some((k) => aktivne.has(k.id));
-  const [btc, setBtc] = useState<{ czk: number | null; sats: number } | null>(null);
+  const [btc, setBtc] = useState<{ czk: number | null; sats: number; rateCzkPerBtc?: number | null; platby?: { klient: string | null; datum: string; sats: number; czk: number | null }[] } | null>(null);
   const [btcStav, setBtcStav] = useState<"load" | "ok" | "err">("load");
   useEffect(() => {
-    if (!(aktivne.has("btc") || chceKpi) || btc) return;
-    void fetchBtcReserve().then((r) => { setBtc(r); setBtcStav(r ? "ok" : "err"); });
+    if (!(aktivne.has("btc") || aktivne.has("btcPlatby") || chceKpi) || btc) return;
+    // Platby sa ťahajú len keď ich niekto chce vidieť — je to druhá appka
+    // za podpísaným odkazom, nie lacný lokálny výpočet.
+    void fetchBtcReserve(aktivne.has("btcPlatby")).then((r) => { setBtc(r); setBtcStav(r ? "ok" : "err"); });
   }, [aktivne, chceKpi, btc]);
 
   // Ciele, ktoré si Jerry posunul, žijú v DB — bez nich by karta merala proti
@@ -689,6 +692,138 @@ export function useExtraGrafy({
                 value={`${(beAvg > 0 ? (btc.czk || 0) / beAvg : 0).toFixed(1)}`}
                 color={(beAvg > 0 ? (btc.czk || 0) / beAvg : 0) >= 3 ? C.green : (beAvg > 0 ? (btc.czk || 0) / beAvg : 0) >= 1 ? C.orange : C.red}
               />
+            </div>
+          )}
+        </Klik>
+      </Card>
+    );
+
+    // ── Platby v bitcoine (Jerry, 11. 8.) ────────────────────────────────────
+    //
+    // Nahrádza vetu „9 klientov platí v BTC · 42 % tržieb", ktorá miešala dve
+    // okná: klientov rátala za rok, percentá za mesiac. Tu má každé číslo
+    // napísané, za aké obdobie platí.
+    //
+    // Zhodnotenie: satoshi sa nemíňajú, ležia v rezerve. Klient zaplatil
+    // v korunách sumu X a firma dostala N satoshi; dnes tých N satoshi stojí
+    // niečo iné. Rozdiel je zisk alebo strata z DRŽANIA, nie z podnikania —
+    // preto nie je v P&L a preto je tu zvlášť.
+    const btcPlatby = (() => {
+      const platby = btc?.platby;
+      if (!platby?.length) return null;
+      const kurz = btc?.rateCzkPerBtc ?? null;              // Kč za 1 BTC
+      const satsNaCzk = (s: number) => (kurz ? (s / 1e8) * kurz : null);
+      const posl = kotva.plny || "";                        // posledný UZAVRETÝ mesiac
+      if (!posl) return null;
+      const predch = (() => {
+        const [r, m] = posl.split("-").map(Number);
+        return m === 1 ? `${r - 1}-12` : `${r}-${String(m - 1).padStart(2, "0")}`;
+      })();
+      const zaMesiac = (mk: string) => {
+        const p = platby.filter((x) => x.datum.slice(0, 7) === mk);
+        return {
+          klientov: new Set(p.filter((x) => x.klient).map((x) => x.klient)).size,
+          czk: p.reduce((a, x) => a + (x.czk || 0), 0),
+          sats: p.reduce((a, x) => a + (x.sats || 0), 0),
+        };
+      };
+      const teraz = zaMesiac(posl);
+      const minuly = zaMesiac(predch);
+      // Tržby za ten istý mesiac z tej istej kotvy ako všade inde.
+      const trzbyMes = monthlyFinance(data).find((m) => m.month === posl)?.cash || 0;
+      const trzbySpolu = monthlyFinance(data).reduce((a, m) => a + m.cash, 0);
+      const czkSpolu = platby.reduce((a, x) => a + (x.czk || 0), 0);
+      const satsSpolu = platby.reduce((a, x) => a + (x.sats || 0), 0);
+      const dnesSpolu = satsNaCzk(satsSpolu);
+      const dnesMesiac = satsNaCzk(teraz.sats);
+      // Rad na graf: koruny po mesiacoch, posledných 12 uzavretých.
+      const podlaMes = new Map<string, { czk: number; sats: number }>();
+      for (const x of platby) {
+        const mk = x.datum.slice(0, 7);
+        if (mk > posl) continue;
+        const e = podlaMes.get(mk) || { czk: 0, sats: 0 };
+        e.czk += x.czk || 0;
+        e.sats += x.sats || 0;
+        podlaMes.set(mk, e);
+      }
+      const rad = [...podlaMes.entries()].sort((a, b) => a[0].localeCompare(b[0])).slice(-12);
+      return {
+        posl, predch, teraz, minuly, trzbyMes, trzbySpolu, czkSpolu, satsSpolu,
+        dnesSpolu, dnesMesiac, kurz, rad,
+        klientovSpolu: new Set(platby.filter((x) => x.klient).map((x) => x.klient)).size,
+      };
+    })();
+    const pctTrzieb = (czk: number, trzby: number) => (trzby > 0 ? (czk / trzby) * 100 : null);
+    const zmenaPct = (teraz: number, predtym: number) => (predtym > 0 ? ((teraz - predtym) / predtym) * 100 : null);
+    const sats = (n: number) => `${Math.round(n).toLocaleString("sk-SK")} sats`;
+    nodes.btcPlatby = (
+      <Card style={{ marginBottom: 0, height: "100%" }}>
+        <H3><Info label="Platby v bitcoine" text="Klienti, ktorí platia bitcoinom, za POSLEDNÝ UZAVRETÝ mesiac aj za celú históriu. Koruny sú to, čo klient zaplatil v deň platby; satoshi je to, čo firme reálne pribudlo do rezervy. Zhodnotenie porovnáva, čo tie satoshi stoja dnes, s tým, koľko za ne klient vtedy zaplatil — je to zisk alebo strata z DRŽANIA, nie z podnikania, preto nie je v P&L. Bežiaci mesiac sa neráta: nie je dochodený ani doplatený." /></H3>
+        <Klik kam={() => onNavigate("vzas", "cashflow")} onNavigate="Peniaze → Cashflow">
+          {btcStav === "load" && <div style={{ fontSize: 12.5, color: C.textDim }}>Načítavam z BTC appky…</div>}
+          {btcStav === "err" && <Empty>BTC appka je nedostupná — skús to o chvíľu.</Empty>}
+          {btcStav === "ok" && !btcPlatby && <Empty>Zatiaľ žiadne bitcoinové platby.</Empty>}
+          {btcStav === "ok" && btcPlatby && (
+            <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.2fr) minmax(0,1fr)", gap: 14, alignItems: "start" }}>
+              <div style={{ minWidth: 0 }}>
+                <LineChart
+                  data={btcPlatby.rad.map(([mk, v]) => ({ label: monthLabel(mk), values: [v.czk] }))}
+                  series={[{ name: "Prijaté v BTC", color: C.orange }]}
+                  height={190} fmt={kcK} autoY alignEnd bezSuhrnu
+                />
+                <div style={{ fontSize: 10.5, color: C.textDim, marginTop: 6 }}>
+                  po mesiacoch, posledný uzavretý {monthLabel(btcPlatby.posl)}
+                </div>
+              </div>
+              <div style={{ display: "grid", gap: 8 }}>
+                <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", color: C.textDim }}>
+                  {monthLabel(btcPlatby.posl)}
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}>
+                  <MiniStat label="Klientov" value={String(btcPlatby.teraz.klientov)} color={C.accent} />
+                  <MiniStat label="Prijaté" value={fmtCZK(btcPlatby.teraz.czk)} color={C.orange} />
+                  <MiniStat label="V satoshi" value={sats(btcPlatby.teraz.sats)} />
+                  <MiniStat
+                    label="Podiel na tržbách"
+                    value={pctTrzieb(btcPlatby.teraz.czk, btcPlatby.trzbyMes) === null ? "—" : `${pctTrzieb(btcPlatby.teraz.czk, btcPlatby.trzbyMes)!.toFixed(0)} %`}
+                  />
+                  <MiniStat
+                    label={`Oproti ${monthLabel(btcPlatby.predch)}`}
+                    value={zmenaPct(btcPlatby.teraz.czk, btcPlatby.minuly.czk) === null ? "—"
+                      : `${zmenaPct(btcPlatby.teraz.czk, btcPlatby.minuly.czk)! >= 0 ? "+" : ""}${zmenaPct(btcPlatby.teraz.czk, btcPlatby.minuly.czk)!.toFixed(0)} %`}
+                    color={(zmenaPct(btcPlatby.teraz.czk, btcPlatby.minuly.czk) ?? 0) >= 0 ? C.green : C.red}
+                  />
+                  <MiniStat
+                    label="Zhodnotenie za mesiac"
+                    value={btcPlatby.dnesMesiac === null ? "—"
+                      : `${btcPlatby.dnesMesiac - btcPlatby.teraz.czk >= 0 ? "+" : ""}${fmtCZK(btcPlatby.dnesMesiac - btcPlatby.teraz.czk)}`}
+                    color={btcPlatby.dnesMesiac !== null && btcPlatby.dnesMesiac - btcPlatby.teraz.czk >= 0 ? C.green : C.red}
+                  />
+                </div>
+                <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", color: C.textDim, marginTop: 4 }}>
+                  celá história
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}>
+                  <MiniStat label="Klientov spolu" value={String(btcPlatby.klientovSpolu)} color={C.accent} />
+                  <MiniStat
+                    label="Podiel na tržbách"
+                    value={pctTrzieb(btcPlatby.czkSpolu, btcPlatby.trzbySpolu) === null ? "—" : `${pctTrzieb(btcPlatby.czkSpolu, btcPlatby.trzbySpolu)!.toFixed(0)} %`}
+                  />
+                  <MiniStat label="Prijaté spolu" value={fmtCZK(btcPlatby.czkSpolu)} color={C.orange} />
+                  <MiniStat label="Satoshi spolu" value={sats(btcPlatby.satsSpolu)} />
+                  <MiniStat
+                    label="Zhodnotenie lifetime"
+                    value={btcPlatby.dnesSpolu === null ? "—"
+                      : `${btcPlatby.dnesSpolu - btcPlatby.czkSpolu >= 0 ? "+" : ""}${fmtCZK(btcPlatby.dnesSpolu - btcPlatby.czkSpolu)}`}
+                    color={btcPlatby.dnesSpolu !== null && btcPlatby.dnesSpolu - btcPlatby.czkSpolu >= 0 ? C.green : C.red}
+                  />
+                  <MiniStat
+                    label="Dnešná hodnota"
+                    value={btcPlatby.dnesSpolu === null ? "—" : fmtCZK(btcPlatby.dnesSpolu)}
+                    color={C.green}
+                  />
+                </div>
+              </div>
             </div>
           )}
         </Klik>
@@ -1238,12 +1373,16 @@ export function useExtraGrafy({
     // prehliadali, hoci práve ony sú odpoveď: kde sme dnes a kde bolo dno.
     const cenaRad = finMes.slice(-18).map((m) => ({ mk: m.month, v: m.sessions > 0 ? m.cash / m.sessions : 0 })).filter((x) => x.v > 0);
     const cenaTeraz = cenaRad.length ? cenaRad[cenaRad.length - 1] : null;
-    const cenaPriem = cenaRad.length ? cenaRad.reduce((a, x) => a + x.v, 0) / cenaRad.length : 0;
+    // „Ø za obdobie" je VÁŽENÝ priemer (spolu ÷ spolu), nie priemer mesačných
+    // pomerov. Nevážene mal mesiac s piatimi sedeniami rovnakú váhu ako mesiac
+    // so stopäťdesiatimi — a práve to bol jeden z dôvodov, prečo tá istá vec
+    // vychádzala na štyroch obrazovkách štyrikrát inak.
+    const cenaPriem = cenaZaSedenie(data, vMes).czk;
     const cenaMax = cenaRad.length ? cenaRad.reduce((a, x) => (x.v > a.v ? x : a)) : null;
     const cenaMin = cenaRad.length ? cenaRad.reduce((a, x) => (x.v < a.v ? x : a)) : null;
     nodes.cenaSedenia = (
       <Card style={{ marginBottom: 0, height: "100%" }}>
-        <H3><Info label="Ø cena sedenia" text="Prijaté peniaze delené počtom odtrénovaných sedení v tom mesiaci. Je to jediná páka, ktorá dvíha tržby bez toho, aby dvíhala odrobené hodiny — a v dvojčlennom štúdiu je to dôležitejšie než počet klientov, lebo hodín je konečne veľa. Mesiac, v ktorom prišla veľká predplatba, vyskočí; krivku treba čítať ako trend, nie ako cenník." /></H3>
+        <H3><Info label="Ø cena sedenia" text="Prijaté peniaze delené počtom odtrénovaných sedení. Krivka je po mesiacoch, „Ø za obdobie“ je vážený priemer za celé okno (spolu ÷ spolu) — rovnaká definícia ako v Klientoch, Tréningoch aj Peniazoch. Zámerne sa NEráta z ceny zapísanej pri sedení: pri 19 % sedení je nulová, lebo platba visí na balíčku, a priemer z nej cenu podhodnotí o vyše dvesto korún. Je to jediná páka, ktorá dvíha tržby bez toho, aby dvíhala odrobené hodiny. Mesiac, v ktorom prišla veľká predplatba, vyskočí — krivku čítaj ako trend, nie ako cenník." /></H3>
         <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.5fr) minmax(0,1fr)", gap: 14, alignItems: "start" }}>
           <div style={{ minWidth: 0 }}>
             <Klik kam={() => onNavigate("vzas", "sedenia")} onNavigate="Peniaze → Sedenia & cena">
@@ -1633,7 +1772,7 @@ function CenaZaKlienta({
   clients: Record<string, ClientAgg>;
   onNavigate: (tab: string, sub?: string) => void;
 }) {
-  const [okno, setOkno] = useState<"1m" | "3m" | "2026" | "2025">("3m");
+  const [okno, setOkno] = useState<"1m" | "3m" | "2026" | "2025">("2026");
   const OKNA = [
     { id: "1m" as const, label: "1 mesiac" },
     { id: "3m" as const, label: "3 mesiace" },

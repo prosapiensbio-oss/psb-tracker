@@ -441,11 +441,20 @@ export function Dashboard({
   // Filter obdobia pre grafy pod panelom. Panel prístrojov hore ho zámerne
   // NEPOČÚVA: prístroj má vždy hovoriť o tom, ako to je teraz. Kokpit, ktorý
   // sa dá prepnúť na „ukáž mi rok 2025", už nie je kokpit, ale archív.
+  // Východzie obdobie je 2026 (Jerry, 11. 8.: „nech všetko zobrazuje od roku
+  // 2026"). Uložená voľba prebíja — ale RAZ sa zahodí, inak by ten, kto mal
+  // uložené „Celé obdobie", novú východziu hodnotu nikdy neuvidel. Rovnaká
+  // poistka ako pri rozložení kariet.
   const [obdobie, setObdobie] = useState<string>(() => {
     try {
-      return localStorage.getItem("psb-dash-obdobie") || "all";
+      if (localStorage.getItem("psb-dash-obdobie-ver") !== "2026") {
+        localStorage.setItem("psb-dash-obdobie-ver", "2026");
+        localStorage.setItem("psb-dash-obdobie", "2026");
+        return "2026";
+      }
+      return localStorage.getItem("psb-dash-obdobie") || "2026";
     } catch {
-      return "all";
+      return "2026";
     }
   });
   const zvolObdobie = (v: string) => {
@@ -656,11 +665,12 @@ export function Dashboard({
   // tejto karty), ale z priemeru a z „najľahšieho týždňa" sa vyhadzuje — inak
   // by rozrobený týždeň vyhrával oboje a Ø by klesalo s každým importom.
   // Rezerva sa ťahá vždy — je to jeden z ôsmich prístrojov, nie voliteľná karta.
-  const [btc, setBtc] = useState<{ czk: number | null; platby?: { klient: string | null; datum: string; czk: number | null }[] } | null>(null);
+  const [btc, setBtc] = useState<{ czk: number | null; rateCzkPerBtc?: number | null; platby?: { klient: string | null; datum: string; sats: number; czk: number | null }[] } | null>(null);
   useEffect(() => {
-    // `platby=1` navyše: z nich sa počíta, koľko klientov platí bitcoinom
-    // a aký podiel tržieb to je. Jerry (10. 8.) chcel jedno číslo — a ukázalo
-    // sa, že nie je okrajové: v júli to bolo 41 % tržieb.
+    // `platby=1` navyše: z nich žije karta „Platby v bitcoine" v sekcii
+    // Peniaze — kto, koľko, v satoshi aj v korunách, a čo tie satoshi za ten
+    // čas spravili. Kurz sa berie z tej istej odpovede, aby sa zhodnotenie
+    // rátalo proti rovnakému číslu ako v bitcoinovej appke.
     void fetchBtcReserve(true).then((r) => setBtc(r as never));
   }, []);
   // Skutočný stav účtu a hotovosti, zapísaný ručne v Peniaze → Cashflow.
@@ -921,18 +931,12 @@ export function Dashboard({
     // Rezerva = VŠETKO, čo firma má: účet + hotovosť + bitcoin. Kým nie je
     // zapísaný stav účtu a hotovosti, ostáva len bitcoin a dlaždica to povie —
     // inak by tvrdila, že firma vydrží mesiac, hoci má na účte ďalších sto tisíc.
-    // Podiel bitcoinu na tržbách za posledný UZAVRETÝ mesiac. Nie za celú
-    // históriu: podiel sa mení a číslo má hovoriť o dnešku. Klienti sa počítajú
-    // za posledný rok — kto zaplatil raz vlani, dnes „neplatí v BTC".
-    const btcPodiel = (() => {
-      const platby = btc?.platby;
-      if (!platby?.length || !stats.lastMonth || !stats.monthCash) return null;
-      const rok = new Date(Date.now() - 365 * 86400000).toISOString().slice(0, 10);
-      const klientov = new Set(platby.filter((x) => x.klient && x.datum >= rok).map((x) => x.klient)).size;
-      const zaMesiac = platby.filter((x) => x.datum.slice(0, 7) === stats.lastMonth).reduce((a, x) => a + (x.czk || 0), 0);
-      if (!klientov) return null;
-      return { klientov, pct: Math.round((zaMesiac / stats.monthCash) * 100) };
-    })();
+    // Riadok „9 klientov platí v BTC · 42 % tržieb" je preč (Jerry, 11. 8.).
+    // Miešal dve okná v jednej vete: klientov rátal za posledný ROK, percentá
+    // za posledný uzavretý MESIAC — takže dve čísla vedľa seba hovorili
+    // o dvoch rôznych obdobiach a nedalo sa z nich nič usúdiť. Celá téma má
+    // teraz vlastnú kartu „Platby v bitcoine" v sekcii Peniaze, kde je každé
+    // číslo pri svojom období.
     const rez = btc?.czk ?? null;
     const majetok = stavPenazi ? (rez ?? 0) + stavPenazi.fio + stavPenazi.hotovost : rez;
     const mesRez = majetok !== null && zisk && zisk.bePriem > 0 ? majetok / zisk.bePriem : null;
@@ -944,9 +948,7 @@ export function Dashboard({
         : stavPenazi ? `${fmtCZK(majetok)} — účet, hotovosť aj BTC`
         : `${fmtCZK(majetok)} — zatiaľ len BTC`,
       pasmo: mesRez === null ? "nevie" : mesRez < 1 ? "zle" : mesRez < 3 ? "pozor" : "ok",
-      poznamka: btcPodiel
-        ? `${btcPodiel.klientov} ${btcPodiel.klientov === 1 ? "klient platí" : btcPodiel.klientov < 5 ? "klienti platia" : "klientov platí"} v BTC · ${btcPodiel.pct} % tržieb`
-        : mesRez !== null && mesRez < 3 ? "cieľ sú 3 mesiace" : undefined,
+      poznamka: mesRez !== null && mesRez < 3 ? "cieľ sú 3 mesiace" : undefined,
       vysvetlenie: "Koľko mesiacov by firma ustála bez jedinej tržby — všetko, čo má (účet + hotovosť + bitcoin), delené priemerným break-evenom za pol roka. Stav účtu a hotovosti sa zapisuje ručne v Peniaze → Cashflow, karta „Kde tie peniaze sú“; Fio dáva len výpis pohybov, nie aktuálny zostatok. Kým zapísaný nie je, ráta sa len bitcoin a číslo je nižšie než skutočnosť. Tvoj cieľ „120 000 Kč+“ je v korunách; toto je to isté prepočítané na čas, čo je jediné, čo v zlom mesiaci rozhoduje.",
       kam: () => onNavigate("vzas", "cashflow"),
     });

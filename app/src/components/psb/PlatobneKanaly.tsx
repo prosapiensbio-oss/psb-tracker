@@ -45,7 +45,7 @@ export function PlatobneKanaly({
   clients: Record<string, ClientAgg>;
   onNavigate: (tab: string, sub?: string, focus?: { skupina?: { label: string; mena: string[] }; nonce?: number }) => void;
 }) {
-  const [obdobie, setObdobie] = useState("12m");
+  const [obdobie, setObdobie] = useState("2026");
 
   const kanaly = useMemo(() => {
     const platby = data.payments.filter((p) => p.client);
