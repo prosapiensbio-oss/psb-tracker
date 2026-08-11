@@ -11,7 +11,7 @@ import {
   pnlCalc, QUARTERS, salaryCalc, VZAS_MONTH_LABELS, VZAS_MONTHS, VZAS_TARGETS_BY_YEAR, vzasVerzia,
   type KpiGroup, type KpiOverrides, poslednyMesiacSDatami, predikciaNakladov,} from "../../lib/psb/vzas";
 import { kpiFmt } from "./Vzas";
-import { cenaZaSedenie, doPlnehoMesiaca, kotvaDat, monthlyFinance, predictCash, predictEarnings } from "../../lib/psb/compute";
+import { cenaZaSedenie, doPlnehoMesiaca, najdiKlienta, kotvaDat, monthlyFinance, predictCash, predictEarnings } from "../../lib/psb/compute";
 import type { KanalRiadok } from "./Kanaly";
 import { ZDROJE } from "./Klienti";
 import { tokyKlientov } from "./Fluktuacia";
@@ -94,31 +94,31 @@ export const WIDGETS: WidgetMeta[] = [
   { id: "ziskyNaklady", label: "Zisky a náklady", span: 2, sekcia: "zisky", popis: "Skutočnosť za obdobie vedľa odhadu na ďalší mesiac.", doma: "Peniaze → Predikcia" },
   { id: "marketingSuhrn", label: "Marketing", span: 2, sekcia: "marketing", popis: "Lievik, dosah Instagramu a čo klient prinesie podľa zdroja.", doma: "Marketing → Lievik" },
   // ── Peniaze ────────────────────────────────────────────────────────────────
-  { id: "zarobky", label: "Mesačné tržby", span: 2, sekcia: "peniaze", popis: "Prijaté platby po mesiacoch + odhad ďalších dvoch.", doma: "Financie" },
-  { id: "zdravieFirmy", label: "Zdravie firmy", span: 1, sekcia: "peniaze", popis: "Break-even, rezerva nad ním, podiel miezd, koľko sa dá škrtnúť.", doma: "VZAS" },
-  { id: "pasmoZisku", label: "Pásmo zisku", span: 2, sekcia: "zisky", popis: "Hrubý zisk po mesiacoch — kedy firma zarábala a kedy nie.", doma: "VZAS" },
-  { id: "prijmyNaklady", label: "Príjmy vs. náklady", span: 1, sekcia: "zisky", popis: "Obe krivky vedľa seba — kde sa rozchádzajú.", doma: "VZAS" },
-  { id: "prebytok", label: "Kumulovaný prebytok", span: 1, sekcia: "zisky", popis: "Súčet ziskov a strát od začiatku — čo firma reálne vytvorila.", doma: "VZAS" },
-  { id: "dlhTreneri", label: "Dlh voči trénerom", span: 1, sekcia: "peniaze", popis: "Kumulovaný rozdiel medzi nárokom a poslaným, Jerry aj Terezka.", doma: "VZAS → Mzdy" },
-  { id: "dlhJarek", label: "Dlh voči Jarkovi", span: 1, sekcia: "peniaze", popis: "Zostatok investorského dlhu a tempo splácania.", doma: "VZAS → Dlhy" },
-  { id: "kvartaly", label: "Kvartálne tržby", span: 1, sekcia: "peniaze", popis: "Tržby a marža po kvartáloch — sezónnosť na jeden pohľad.", doma: "Výsledky" },
-  { id: "ciele", label: "Ciele roka", span: 1, sekcia: "peniaze", popis: "Tržby a marža proti cieľu 2026, prepočítané na uplynulé mesiace.", doma: "Výsledky" },
-  { id: "btc", label: "Bitcoinová rezerva", span: 1, sekcia: "peniaze", popis: "Hodnota rezervy a koľko mesiacov prevádzky pokryje.", doma: "VZAS → Rezerva" },
+  { id: "zarobky", label: "Mesačné tržby", span: 2, sekcia: "peniaze", popis: "Prijaté platby po mesiacoch + odhad ďalších dvoch.", doma: "Peniaze → Tržby" },
+  { id: "zdravieFirmy", label: "Zdravie firmy", span: 1, sekcia: "peniaze", popis: "Break-even, rezerva nad ním, podiel miezd, koľko sa dá škrtnúť.", doma: "Peniaze" },
+  { id: "pasmoZisku", label: "Pásmo zisku", span: 2, sekcia: "zisky", popis: "Hrubý zisk po mesiacoch — kedy firma zarábala a kedy nie.", doma: "Peniaze" },
+  { id: "prijmyNaklady", label: "Príjmy vs. náklady", span: 1, sekcia: "zisky", popis: "Obe krivky vedľa seba — kde sa rozchádzajú.", doma: "Peniaze" },
+  { id: "prebytok", label: "Kumulovaný prebytok", span: 1, sekcia: "zisky", popis: "Súčet ziskov a strát od začiatku — čo firma reálne vytvorila.", doma: "Peniaze" },
+  { id: "dlhTreneri", label: "Dlh voči trénerom", span: 1, sekcia: "peniaze", popis: "Kumulovaný rozdiel medzi nárokom a poslaným, Jerry aj Terezka.", doma: "Peniaze → Mzdy" },
+  { id: "dlhJarek", label: "Dlh voči Jarkovi", span: 1, sekcia: "peniaze", popis: "Zostatok investorského dlhu a tempo splácania.", doma: "Peniaze → Dlhy" },
+  { id: "kvartaly", label: "Kvartálne tržby", span: 1, sekcia: "peniaze", popis: "Tržby a marža po kvartáloch — sezónnosť na jeden pohľad.", doma: "Mesiac → Výsledky" },
+  { id: "ciele", label: "Ciele roka", span: 1, sekcia: "peniaze", popis: "Tržby a marža proti cieľu 2026, prepočítané na uplynulé mesiace.", doma: "Mesiac → Výsledky" },
+  { id: "btc", label: "Bitcoinová rezerva", span: 1, sekcia: "peniaze", popis: "Hodnota rezervy a koľko mesiacov prevádzky pokryje.", doma: "Peniaze → Rezerva" },
   { id: "btcPlatby", label: "Platby v bitcoine", span: 2, sekcia: "peniaze", popis: "Kto platí v BTC, koľko v korunách aj satoshi, podiel na tržbách a zhodnotenie.", doma: "Bitcoinová evidencia" },
 
   // ── Vyťaženie ──────────────────────────────────────────────────────────────
-  { id: "hodiny", label: "Odrobené hodiny / týždeň", span: 2, sekcia: "vytazenie", popis: "Týždenné hodiny so zdravou zónou 24–34 h.", doma: "Tréningy" },
-  { id: "zony", label: "Týždne v zdravej zóne", span: 1, sekcia: "vytazenie", popis: "Koľko týždňov padlo do zóny, pod ňu a nad ňu.", doma: "Tréningy" },
-  { id: "kapacita", label: "Kapacita & vyťaženie", span: 1, sekcia: "vytazenie", popis: "Koľko klientov ešte zvládnete pri zdravom týždni.", doma: "Klienti" },
-  { id: "hodinyMes", label: "Hodiny po mesiacoch", span: 1, sekcia: "vytazenie", popis: "Dlhší horizont než týždne — sezónnosť práce a vyhorenie.", doma: "Výsledky" },
-  { id: "sedeniaMes", label: "Počet sedení / mesiac", span: 1, sekcia: "vytazenie", popis: "Objem práce v kusoch — predstih pred tržbami.", doma: "Financie" },
-  { id: "typySedeni", label: "Pomer typov sedení", span: 1, sekcia: "vytazenie", popis: "Offline, online a úvodné — z čoho sa skladá prevádzka.", doma: "Tréningy" },
-  { id: "zrusene", label: "Zrušené a presunuté", span: 1, sekcia: "vytazenie", popis: "Stratená kapacita z týždenných zápisov, po trénerovi.", doma: "Tréningy" },
+  { id: "hodiny", label: "Odrobené hodiny / týždeň", span: 2, sekcia: "vytazenie", popis: "Týždenné hodiny so zdravou zónou 24–34 h.", doma: "Klienti → Tréningy" },
+  { id: "zony", label: "Týždne v zdravej zóne", span: 1, sekcia: "vytazenie", popis: "Koľko týždňov padlo do zóny, pod ňu a nad ňu.", doma: "Klienti → Tréningy" },
+  { id: "kapacita", label: "Kapacita & vyťaženie", span: 1, sekcia: "vytazenie", popis: "Koľko klientov ešte zvládnete pri zdravom týždni.", doma: "Klienti → Klienti" },
+  { id: "hodinyMes", label: "Hodiny po mesiacoch", span: 1, sekcia: "vytazenie", popis: "Dlhší horizont než týždne — sezónnosť práce a vyhorenie.", doma: "Mesiac → Výsledky" },
+  { id: "sedeniaMes", label: "Počet sedení / mesiac", span: 1, sekcia: "vytazenie", popis: "Objem práce v kusoch — predstih pred tržbami.", doma: "Peniaze → Tržby" },
+  { id: "typySedeni", label: "Pomer typov sedení", span: 1, sekcia: "vytazenie", popis: "Offline, online a úvodné — z čoho sa skladá prevádzka.", doma: "Klienti → Tréningy" },
+  { id: "zrusene", label: "Zrušené a presunuté", span: 1, sekcia: "vytazenie", popis: "Stratená kapacita z týždenných zápisov, po trénerovi.", doma: "Klienti → Tréningy" },
 
   // ── Klienti ────────────────────────────────────────────────────────────────
   { id: "rastStrata", label: "Fluktuácia klientov", span: 1, sekcia: "vytazenie", popis: "Prišlo, odišlo a čistý rast za mesiac.", doma: "Klienti → Fluktuácia" },
   { id: "6m", label: "6M klienti podľa fázy", span: 1, sekcia: "vytazenie", popis: "Obnova, integrácia, udržateľnosť — kde v procese ľudia sú.", doma: "Klienti → 6M proces" },
-  { id: "balicky", label: "Klienti podľa balíčka", span: 1, sekcia: "vytazenie", popis: "Rozdelenie podľa členstva — na čom stojí príjem.", doma: "Klienti" },
+  { id: "balicky", label: "Klienti podľa balíčka", span: 1, sekcia: "vytazenie", popis: "Rozdelenie podľa členstva — na čom stojí príjem.", doma: "Klienti → Klienti" },
   { id: "kdeTecie", label: "Kde to tečie", span: 1, sekcia: "vytazenie", popis: "Ako dlho vydržali tí, čo odišli — odchod v prvých mesiacoch má inú príčinu než po roku.", doma: "Klienti → Fluktuácia" },
   { id: "prezitie", label: "Kto vydrží (kohorty)", span: 1, sekcia: "vytazenie", popis: "Koľko z každého mesiaca príchodov je tu po 3, 6 a 12 mesiacoch.", doma: "Klienti → Fluktuácia" },
   { id: "hodnotaZdroj", label: "Čo klient prinesie podľa zdroja", span: 1, sekcia: "marketing", popis: "Priemerná tržba na klienta podľa toho, odkiaľ prišiel.", doma: "Klienti → Fluktuácia" },
@@ -140,17 +140,17 @@ export const WIDGETS: WidgetMeta[] = [
   { id: "pnlSuhrn", label: "Súhrn P&L", span: 1, sekcia: "zisky", popis: "Príjmy, náklady, hrubý zisk a marža — priemer na mesiac.", doma: "Peniaze → Zisky a straty" },
   { id: "naklady", label: "Fixné vs. variabilné", span: 1, sekcia: "zisky", popis: "Z čoho sa skladajú náklady a ktorá časť rastie.", doma: "Peniaze → Zisky a straty" },
   { id: "runRate", label: "Run-rate a odhad zisku", span: 1, sekcia: "zisky", popis: "Tempo posledných troch mesiacov prepočítané na rok.", doma: "Peniaze → Predikcia" },
-  { id: "h1", label: "H1 2025 vs. H1 2026", span: 1, sekcia: "zisky", popis: "Prvý polrok proti prvému polroku — rast bez sezónnosti.", doma: "Výsledky" },
+  { id: "h1", label: "H1 2025 vs. H1 2026", span: 1, sekcia: "zisky", popis: "Prvý polrok proti prvému polroku — rast bez sezónnosti.", doma: "Mesiac → Výsledky" },
 
   { id: "cenaSedenia", label: "Ø cena sedenia", span: 2, sekcia: "vytazenie", popis: "Koľko priemerne prinesie jedno odtrénované sedenie.", doma: "Peniaze → Sedenia & cena" },
-  { id: "narocnost", label: "Náročnosť týždňov", span: 1, sekcia: "vytazenie", popis: "Vlastné hodnotenie 1–10 z týždenných zápisov — predstih pred vyhorením.", doma: "Tréningy → Prehľad" },
-  { id: "suhrnSedeni", label: "Súhrn sedení", span: 1, sekcia: "vytazenie", popis: "Offline, online a úvodné v kusoch za posledný rok.", doma: "Tréningy → Analýza" },
+  { id: "narocnost", label: "Náročnosť týždňov", span: 1, sekcia: "vytazenie", popis: "Vlastné hodnotenie 1–10 z týždenných zápisov — predstih pred vyhorením.", doma: "Klienti → Tréningy → Prehľad" },
+  { id: "suhrnSedeni", label: "Súhrn sedení", span: 1, sekcia: "vytazenie", popis: "Offline, online a úvodné v kusoch za zvolené obdobie.", doma: "Klienti → Tréningy → Analýza" },
 
-  { id: "segmenty", label: "Segmenty klientov", span: 1, sekcia: "vytazenie", popis: "Koľko je Anchorov, Stabilných a Sporadických — na kom firma stojí.", doma: "Klienti" },
-  { id: "dochadzka", label: "Dochádzka", span: 1, sekcia: "vytazenie", popis: "Priemerná dochádzka a koľko ľudí je pod hranicou.", doma: "Klienti" },
+  { id: "segmenty", label: "Segmenty klientov", span: 1, sekcia: "vytazenie", popis: "Koľko je Anchorov, Stabilných a Sporadických — na kom firma stojí.", doma: "Klienti → Klienti" },
+  { id: "dochadzka", label: "Dochádzka", span: 1, sekcia: "vytazenie", popis: "Priemerná dochádzka a koľko ľudí je pod hranicou.", doma: "Klienti → Klienti" },
   { id: "referencny", label: "Referenčný motor", span: 1, sekcia: "marketing", popis: "Koľko klientov prišlo na odporúčanie a čo priniesli.", doma: "Klienti → Referencie" },
   { id: "platobneKanaly", label: "Čím klienti platia", span: 1, sekcia: "peniaze", popis: "Účet, hotovosť a bitcoin — koľko tržieb ide ktorou cestou.", doma: "Peniaze → Po mesiacoch" },
-  { id: "zdrojeKlientov", label: "Odkiaľ klienti prišli", span: 1, sekcia: "marketing", popis: "Rozdelenie aktívnych klientov podľa zdroja.", doma: "Klienti" },
+  { id: "zdrojeKlientov", label: "Odkiaľ klienti prišli", span: 1, sekcia: "marketing", popis: "Rozdelenie aktívnych klientov podľa zdroja.", doma: "Klienti → Klienti" },
 
   { id: "cenaUvodneho", label: "Čo stojí úvodný", span: 1, sekcia: "marketing", popis: "Marketingové náklady delené počtom úvodných tréningov.", doma: "Marketing → Lievik" },
   { id: "ltvZdroj", label: "Hodnota klienta (LTV)", span: 1, sekcia: "marketing", popis: "Koľko klient priemerne zaplatí za celý čas spolupráce.", doma: "Klienti → Fluktuácia" },
@@ -529,7 +529,7 @@ export function useExtraGrafy({
     nodes.zdravieFirmy = (
       <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column" }}>
         <H3><Info label="Zdravie firmy" text="Štyri čísla za posledných 6 uzavretých mesiacov P&L. Break-even ráta s NÁROKOM trénerov (nie s tým, čo si reálne vzali) — to, čo si niekto vezme navyše, je pôžička, nie náklad. Rezerva pod 20 % znamená, že jeden slabý mesiac stačí na stratu. Mzdy z tržieb bývajú len tu — jedno číslo, jeden domov." /></H3>
-        <Klik kam={() => onNavigate("vzas")} onNavigate="VZAS → Zdravie firmy">
+        <Klik kam={() => onNavigate("vzas")} onNavigate="Peniaze → Zdravie firmy">
           {/* Okno priamo na kartě, nie len v Info: „Mzdy z tržieb 51 %" tu
               a „60 %" na break-even karte vyzerali ako chyba, kým sa človek
               nedočítal, že jedno je 6 mesiacov a druhé filter obdobia. */}
@@ -549,7 +549,7 @@ export function useExtraGrafy({
     nodes.pasmoZisku = (
       <Card style={{ marginBottom: 0, height: "100%" }}>
         <H3><Info label="Pásmo zisku" text="Hrubý zisk po mesiacoch (tržby mínus všetky náklady vrátane nárokov na výplaty). Čiara nula je hranica — pod ňou mesiac zožral viac, než priniesol. Tržby bez tejto krivky nehovoria nič." /></H3>
-        <Klik kam={() => onNavigate("vzas")} onNavigate="VZAS">
+        <Klik kam={() => onNavigate("vzas")} onNavigate="Peniaze">
           <LineChart
             data={idxOkno.map((i) => ({ label: MES_LAB[i], values: [p.hrubyZisk[i]] }))}
             series={[{ name: "Hrubý zisk", color: C.green }]}
@@ -563,7 +563,7 @@ export function useExtraGrafy({
     nodes.prijmyNaklady = (
       <Card style={{ marginBottom: 0, height: "100%" }}>
         <H3><Info label="Príjmy vs. náklady" text="Obe krivky vedľa seba. Zaujímavá nie je ich výška, ale medzera medzi nimi — a či sa rozširuje alebo zužuje." /></H3>
-        <Klik kam={() => onNavigate("vzas")} onNavigate="VZAS">
+        <Klik kam={() => onNavigate("vzas")} onNavigate="Peniaze">
           <LineChart
             data={idxOkno.map((i) => ({ label: MES_LAB[i], values: [p.prijmy[i], p.celkoveNaklady[i]] }))}
             series={[{ name: "Príjmy", color: C.green }, { name: "Náklady", color: C.red }]}
@@ -576,7 +576,7 @@ export function useExtraGrafy({
     nodes.prebytok = (
       <Card style={{ marginBottom: 0, height: "100%" }}>
         <H3><Info label="Kumulovaný prebytok" text="Súčet všetkých ziskov a strát od januára 2025. Ukazuje, čo firma za celý čas naozaj vytvorila — jeden dobrý mesiac nezmaže pol roka v mínuse." /></H3>
-        <Klik kam={() => onNavigate("vzas")} onNavigate="VZAS → Cashflow">
+        <Klik kam={() => onNavigate("vzas")} onNavigate="Peniaze → Cashflow">
           <LineChart
             data={idxOkno.map((i) => ({ label: MES_LAB[i], values: [p.hrubyZisk.slice(0, i + 1).reduce((a, v) => a + v, 0)] }))}
             series={[{ name: "Kumulovaný zisk", color: C.accent }]}
@@ -590,7 +590,7 @@ export function useExtraGrafy({
     nodes.dlhTreneri = (
       <Card style={{ marginBottom: 0, height: "100%" }}>
         <H3><Info label="Dlh voči trénerom" text="Kumulovaný rozdiel medzi nárokom (Fix + variabil) a tým, čo si tréner reálne vybral. Kladné číslo = firma dlží trénerovi." /></H3>
-        <Klik kam={() => onNavigate("vzas")} onNavigate="VZAS → Mzdy">
+        <Klik kam={() => onNavigate("vzas")} onNavigate="Peniaze → Mzdy">
           <LineChart
             data={idxOkno.map((i) => ({ label: MES_LAB[i], values: [j.cumDebt[i], t.cumDebt[i]] }))}
             series={[{ name: "Jerry", color: C.accent }, { name: "Terezka", color: C.accentLight }]}
@@ -603,7 +603,7 @@ export function useExtraGrafy({
     nodes.dlhJarek = (
       <Card style={{ marginBottom: 0, height: "100%" }}>
         <H3><Info label="Dlh voči Jarkovi" text="Zostatok investorského dlhu po mesiacoch — vklady nahor, splátky nadol. Splácané je aj tréningami a zľavou na členstvo, nielen peniazmi." /></H3>
-        <Klik kam={() => onNavigate("vzas")} onNavigate="VZAS → Dlhy">
+        <Klik kam={() => onNavigate("vzas")} onNavigate="Peniaze → Dlhy">
           <LineChart
             data={idxOkno.map((i) => ({ label: MES_LAB[i], values: [jarek.stav[i]] }))}
             series={[{ name: "Zostatok dlhu", color: C.orange }]}
@@ -632,7 +632,7 @@ export function useExtraGrafy({
     nodes.kvartaly = (
       <Card style={{ marginBottom: 0, height: "100%" }}>
         <H3><Info label="Kvartálne tržby" text="Tržby po kvartáloch — sezónnosť, ktorú mesačný graf rozdrobí. Posledný kvartál býva neúplný, kým sa neskončí." /></H3>
-        <Klik kam={() => onNavigate("vysledky", "kvartalne")} onNavigate="Výsledky">
+        <Klik kam={() => onNavigate("vysledky", "kvartalne")} onNavigate="Mesiac → Výsledky">
           {kvartaly.length ? <ValueBars data={kvartaly} color={C.accent} fmt={kcK} height={170} alignEnd /> : <Empty>Zatiaľ bez dát.</Empty>}
           {kvartalNeuplny && (
             <div style={{ fontSize: 11, color: C.textDim, marginTop: 6 }}>* kvartál ešte neskončil — obsahuje len uzavreté mesiace</div>
@@ -658,7 +658,7 @@ export function useExtraGrafy({
     nodes.ciele = (
       <Card style={{ marginBottom: 0, height: "100%" }}>
         <H3><Info label={`Ciele ${rok}`} text="Tržby a marža proti ročnému cieľu. Cieľ tržieb je prepočítaný na počet mesiacov, ktoré rok zatiaľ má — inak by aj skvelý rok vyzeral v marci na 25 %." /></H3>
-        <Klik kam={() => onNavigate("vysledky", "ciele")} onNavigate="Výsledky → Ciele">
+        <Klik kam={() => onNavigate("vysledky", "ciele")} onNavigate="Mesiac → Výsledky → Ciele">
           <div style={{ marginTop: 6 }}>
             <BarRow
               label={`Tržby (${idxRok.length} mes.)`} value={trzbyRok} max={Math.max(cielKMes, trzbyRok)}
@@ -681,7 +681,7 @@ export function useExtraGrafy({
     nodes.btc = (
       <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column" }}>
         <H3><Info label="Bitcoinová rezerva" text="Načítava sa priamo z appky PSB Bitcoin (len na čítanie). Nie je to príjem ani náklad — je to majetok, preto nie je v P&L. Mesiace prevádzky rátajú s break-even vrátane nárokov na výplaty." /></H3>
-        <Klik kam={() => onNavigate("vzas")} onNavigate="VZAS → Rezerva">
+        <Klik kam={() => onNavigate("vzas")} onNavigate="Peniaze → Rezerva">
           {btcStav === "load" && <div style={{ fontSize: 12.5, color: C.textDim }}>Načítavam z BTC appky…</div>}
           {btcStav === "err" && <Empty>BTC appka je nedostupná — skús to o chvíľu.</Empty>}
           {btcStav === "ok" && btc && (
@@ -965,7 +965,7 @@ export function useExtraGrafy({
     nodes.h1 = (
       <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column" }}>
         <H3><Info label="H1 2025 vs. H1 2026" text="Prvý polrok proti prvému polroku. Porovnávať posledný polrok s predošlým je pri sezónnom biznise klam — leto a jeseň sa nedajú porovnať. Rovnaké mesiace áno: to, čo zostane, je skutočný rast." /></H3>
-        <Klik kam={() => onNavigate("vysledky")} onNavigate="Výsledky">
+        <Klik kam={() => onNavigate("vysledky")} onNavigate="Mesiac → Výsledky">
           {h26.n === 0 ? <Empty>Rok 2026 ešte nemá prvý polrok uzavretý.</Empty> : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}>
               <MiniStat label={`Tržby H1 2025 (${h25.n} mes.)`} value={fmtCZK(h25.trzby)} />
@@ -1209,13 +1209,15 @@ export function useExtraGrafy({
     // ── Marketing ────────────────────────────────────────────────────────────
     const konv = (() => {
       const m = new Map<string, { dopyty: number; klienti: number; mena: string[] }>();
-      // lower → kanonické meno, aby klik otvoril klienta pod menom, pod ktorým
-      // ho pozná zoznam Klientov (dopyt máva iné veľké písmená či medzery).
-      const menaKlientov = new Map(Object.values(clients).filter((c) => c.firstSession).map((c) => [c.name.toLowerCase().trim(), c.name]));
+      // najdiKlienta, nie holé lowercase: dopyt píše Jerry z hlavy a klient
+      // prichádza z PTmindera — diakritika ani preklep („Prochadzka") nesmú
+      // konverziu skryť. Vracia kanonické meno, aby klik otvoril klienta pod
+      // menom, pod ktorým ho pozná zoznam Klientov.
+      const menaKlientov = Object.values(clients).filter((c) => c.firstSession).map((c) => c.name);
       for (const l of data.leads || []) {
         const e = m.get(l.source) || { dopyty: 0, klienti: 0, mena: [] };
         e.dopyty++;
-        const kanonicke = menaKlientov.get((l.name || "").toLowerCase().trim());
+        const kanonicke = najdiKlienta(menaKlientov, l.name || "");
         if (kanonicke) { e.klienti++; e.mena.push(kanonicke); }
         m.set(l.source, e);
       }
@@ -1325,7 +1327,7 @@ export function useExtraGrafy({
               text="Počítané z dát v Kokpite, nie prepisované ručne. Ročné ciele sú prepočítané na uplynulé mesiace — polrok proti celoročnému cieľu by vyzeral ako zaostávanie, aj keby si bol na pláne. Ktoré riadky tu chceš, vyberáš v knižnici grafov; cieľ sa posúva vo Výsledkoch."
             />
           </H3>
-          <Klik kam={() => onNavigate("vysledky", "kpi")} onNavigate="Výsledky → KPI">
+          <Klik kam={() => onNavigate("vysledky", "kpi")} onNavigate="Mesiac → Výsledky → KPI">
             {riadky.length === 0 ? (
               <Empty>{vsetkyVSkupine ? "Všetky riadky tejto skupiny sú v knižnici odškrtnuté." : "Zatiaľ bez dát."}</Empty>
             ) : (
@@ -1577,15 +1579,16 @@ export function useExtraGrafy({
     );
 
     // Kohorty dopytov: z dopytov KTORÉHO mesiaca sa stali klienti. Priradenie
-    // podľa mena — dopyt a klient sa spájajú menom, nič iné spoločné nemajú.
-    const menaKlientov = new Set(Object.values(clients).map((c) => c.name.trim().toLowerCase()));
+    // podľa mena cez najdiKlienta (presne, potom fuzzy) — dopyt píše Jerry
+    // z hlavy a diakritika či preklep nesmú konverziu skryť.
+    const menaKlientovVsetky = Object.values(clients).map((c) => c.name);
     const dopytyPodlaMes = new Map<string, { n: number; z: number }>();
     for (const l of data.leads || []) {
       const mk = (l.date || "").slice(0, 7);
       if (!mk) continue;
       const e = dopytyPodlaMes.get(mk) || { n: 0, z: 0 };
       e.n++;
-      if (menaKlientov.has((l.name || "").trim().toLowerCase())) e.z++;
+      if (najdiKlienta(menaKlientovVsetky, l.name || "")) e.z++;
       dopytyPodlaMes.set(mk, e);
     }
     const kohortyD = [...dopytyPodlaMes.entries()].filter(([mk]) => vMes(mk)).sort((a, b) => a[0].localeCompare(b[0])).slice(-12);

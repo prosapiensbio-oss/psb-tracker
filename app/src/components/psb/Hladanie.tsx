@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { ClientAgg } from "../../lib/psb/compute";
 import type { Lead } from "../../lib/psb/types";
+import { najdiKlienta } from "../../lib/psb/compute";
 import { normName, fmtDMY} from "../../lib/psb/format";
 import { C, mix } from "../../lib/psb/theme";
 
@@ -68,9 +69,11 @@ export function HladanieKlienta({
     // Dopyt sa skryje, keď už existuje KLIENT s tým istým menom — dopyt je
     // predfáza a keď sa z človeka stal klient, ukazovať oboje mätie („prečo
     // je tam dopyt ozval sa, keď už chodí?" — Jerry pri Janovi Královi).
-    const menaKlientov = new Set(Object.keys(clients).map((m) => normName(m)));
-    return leads.filter((l) => l.name && normName(l.name).includes(t) && !menaKlientov.has(normName(l.name))).slice(0, 3);
-  }, [q, leads]);
+    // najdiKlienta (presne, potom fuzzy) — inak dopyt „Prochadzka" visel
+    // vo výsledkoch vedľa klienta „Procházka" ako dva rôzni ľudia.
+    const mena = Object.keys(clients);
+    return leads.filter((l) => l.name && normName(l.name).includes(t) && !najdiKlienta(mena, l.name)).slice(0, 3);
+  }, [q, leads, clients]);
 
   useEffect(() => setI(0), [q]);
 

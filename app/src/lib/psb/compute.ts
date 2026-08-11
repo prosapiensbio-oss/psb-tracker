@@ -724,15 +724,41 @@ export function doPlnehoMesiaca<T>(rows: T[], k: Kotva, mk: (r: T) => string): T
 // kontrola bitcoinových platieb, aby sa dal PTminder opraviť pri zdroji.
 
 /**
- * Párovací kľúč mena medzi appkami: prvých 5 znakov priezviska + 3 mena,
- * bez diakritiky. Prežije „Procházka/Prochadzka" aj „Tomaš/Tomáš".
- * Rovnaká logika, akú používa kontrola bitcoinových platieb v Peniazoch.
+ * Párovací kľúč mena medzi dvoma zdrojmi zápisu: prvých 5 znakov priezviska
+ * + 3 mena, bez diakritiky. Prežije „Procházka/Prochadzka" aj „Tomaš/Tomáš".
+ * Používa ho párovanie BTC knihy s PTminderom aj párovanie dopytov
+ * s klientmi — všade, kde to isté meno písali dvaja ľudia dvakrát.
  */
-export const btcKluc = (m: string) => {
+export const menoKluc = (m: string) => {
   const n = normName(m).split(" ").filter(Boolean);
   const priez = n[n.length - 1] || "";
   return `${priez.slice(0, 5)}|${(n[0] || "").slice(0, 3)}`;
 };
+
+/**
+ * Nájde klienta podľa mena zapísaného DRUHÝM človekom (dopyt, BTC kniha).
+ *
+ * Dva stupne, zámerne v tomto poradí:
+ *   1. presná zhoda po normName — keď existuje, fuzzy sa vôbec neskúša;
+ *   2. fuzzy menoKluc, ale LEN ak kľúč patrí práve jednému klientovi.
+ *      Pri kolízii (dvaja klienti s rovnakým kľúčom) sa radšej nenájde nič —
+ *      falošná zhoda je horšia než diera, hlavne tam, kde sa podľa výsledku
+ *      ZAPISUJE (auto-doplnenie zdroja z dopytu).
+ *
+ * Vzniklo z Prochádzku: „Prochadzka" (dopyt/PTminder) vs „Procházka" (BTC
+ * kniha) prežili normName ako dve mená a konverzia dopytov ho nevidela.
+ */
+export function najdiKlienta(
+  mena: string[],
+  hladane: string,
+): string | null {
+  if (!hladane) return null;
+  const n = normName(hladane);
+  for (const m of mena) if (normName(m) === n) return m;
+  const k = menoKluc(hladane);
+  const kandidati = mena.filter((m) => menoKluc(m) === k);
+  return kandidati.length === 1 ? kandidati[0] : null;
+}
 
 /** Platba z BTC knihy, ako ju vracia /api/btc-reserve?platby=1. */
 export type BtcKnihaPlatba = { klient: string | null; datum: string; sats?: number; czk: number | null };
@@ -756,12 +782,12 @@ export function btcOznacenia(payments: PaymentRow[], btcPlatby: BtcKnihaPlatba[]
   const btcPodlaKluca = new Map<string, { t: number; czk: number }[]>();
   for (const b of btcPlatby) {
     if (!b.klient || b.czk == null) continue;
-    const k = btcKluc(b.klient);
+    const k = menoKluc(b.klient);
     if (!btcPodlaKluca.has(k)) btcPodlaKluca.set(k, []);
     btcPodlaKluca.get(k)!.push({ t: Date.parse(b.datum), czk: b.czk });
   }
   const sparovana = (p: PaymentRow) => {
-    const kandidati = btcPodlaKluca.get(btcKluc(p.client));
+    const kandidati = btcPodlaKluca.get(menoKluc(p.client));
     if (!kandidati) return false;
     const t = Date.parse(p.date);
     return kandidati.some((b) =>

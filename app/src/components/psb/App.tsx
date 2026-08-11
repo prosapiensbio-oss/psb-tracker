@@ -18,7 +18,8 @@ import {
   type BtcNakup,
 } from "../../lib/psb/client";
 import { rodinaZKluca,
-  btcKluc,
+  najdiKlienta,
+  menoKluc,
   kotvaDat,
   capacityByTrainer,
   monthlyFinance,
@@ -389,14 +390,14 @@ export function PSBApp() {
       if (r?.platby?.length) {
         const bt: Record<string, number> = {};
         // Sats po klientoch — profil ukáže, koľko kto celkovo zaplatil v BTC.
-        // Kľúčom je btcKluc, nie normName: „Procházka" (BTC kniha) vs
+        // Kľúčom je menoKluc, nie normName: „Procházka" (BTC kniha) vs
         // „Prochadzka" (PTminder) prežije normName ako dve rôzne mená
         // a klientov profil by jeho satoshi nikdy neukázal. Fuzzy kľúč
         // (priezvisko-5 + meno-3) spojí obe podoby.
         const podlaKluca: Record<string, number> = {};
         for (const x of r.platby) {
           bt[String(x.datum).slice(0, 7)] = (bt[String(x.datum).slice(0, 7)] || 0) + (x.czk || 0);
-          if (x.klient) podlaKluca[btcKluc(x.klient)] = (podlaKluca[btcKluc(x.klient)] || 0) + (x.sats || 0);
+          if (x.klient) podlaKluca[menoKluc(x.klient)] = (podlaKluca[menoKluc(x.klient)] || 0) + (x.sats || 0);
         }
         setBtcPrijmy(bt);
         setBtcSatsKlienti(podlaKluca);
@@ -1439,10 +1440,14 @@ function skupinaFaktur(
       instagram_osobny: "instagram", google: "google", web: "web", mail: "web",
       telefon: "ine", ine: "ine",
     };
-    const podlaNorm = new Map(Object.values(clients).map((c) => [normName(c.name), c]));
+    // najdiKlienta: presná zhoda, potom fuzzy — ale fuzzy len pri JEDNOM
+    // kandidátovi, lebo tu sa podľa výsledku ZAPISUJE zdroj do overrides
+    // a falošná zhoda by označkovala cudzieho klienta.
+    const menaVsetkych = Object.values(clients).map((c) => c.name);
     for (const l of data.leads) {
       if (!l.name) continue;
-      const c = podlaNorm.get(normName(l.name));
+      const meno = najdiKlienta(menaVsetkych, l.name);
+      const c = meno ? clients[meno] : undefined;
       if (!c || c.zdroj) continue;
       actions.setOverride(c.name, "zdroj", MAPA[l.source] || "ine");
       if (l.source === "referencia" && l.referrer && !c.zdrojKto) actions.setOverride(c.name, "zdrojKto", l.referrer);

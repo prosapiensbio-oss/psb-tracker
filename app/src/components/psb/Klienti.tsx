@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { btcKluc, duchOdpoved, membershipBucket, MEMBERSHIP_ORDER, TRAINERS, type CapacityRow, type ClientAgg, type SixMRow } from "../../lib/psb/compute";
+import { menoKluc, najdiKlienta, duchOdpoved, membershipBucket, MEMBERSHIP_ORDER, TRAINERS, type CapacityRow, type ClientAgg, type SixMRow } from "../../lib/psb/compute";
 import { fmtCZK, fmtDate, normName } from "../../lib/psb/format";
 import { C, MEMBERSHIP_COLORS, mix, S } from "../../lib/psb/theme";
 import { KlientProfil } from "./KlientProfil";
@@ -119,12 +119,10 @@ function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Record<st
     [clients],
   );
   // A referred person who already shows up as a client = the referral worked.
-  const clientByNorm = useMemo(() => {
-    const m: Record<string, string> = {};
-    for (const n of Object.keys(clients)) m[normName(n)] = n;
-    return m;
-  }, [clients]);
-  const converted = (l: Lead) => !!(l.name && clientByNorm[normName(l.name)]);
+  // najdiKlienta (presne, potom fuzzy) — dopyt písaný z hlavy nesmie stratiť
+  // konverziu na diakritike či preklepe. Rovnaká rodina chýb ako Prochádzka.
+  const menaKlientovAll = useMemo(() => Object.keys(clients), [clients]);
+  const converted = (l: Lead) => !!(l.name && najdiKlienta(menaKlientovAll, l.name));
 
   const save = async (l: Partial<Lead> & { id?: string; remove?: boolean }) => {
     setBusy(true);
@@ -146,7 +144,7 @@ function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Record<st
     for (const l of leads) c[l.status] = (c[l.status] || 0) + 1;
     const konv = leads.filter(converted).length;
     return { total: leads.length, dohodnuty: c.dohodnuty || 0, neodpisal: c.neodpisal || 0, konv };
-  }, [leads, clientByNorm]);
+  }, [leads, menaKlientovAll]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const bySource = useMemo(() => {
     const m: Record<string, { n: number; klient: number }> = {};
@@ -156,7 +154,7 @@ function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Record<st
       if (converted(l)) e.klient++;
     }
     return m;
-  }, [leads, clientByNorm]);
+  }, [leads, menaKlientovAll]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const inputStyle = { ...S.select, width: "100%", minWidth: 0 } as const;
   const REFERRER_LIST = "psb-referrers";
@@ -672,10 +670,10 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
       {/* Profil 360 — všetko o vybranom človeku na jednom mieste. Vyhľadanie
           klienta doteraz doviedlo len k riadku tabuľky a zvyšok si človek
           skladal z piatich obrazoviek.
-          btcSatsKlienti je kľúčované fuzzy kľúčom (btcKluc), nie normName —
+          btcSatsKlienti je kľúčované fuzzy kľúčom (menoKluc), nie normName —
           inak „Prochadzka" z PTmindera nenájde „Procházku" z BTC knihy. */}
       {focusClient && clients[focusClient] && (
-        <KlientProfil meno={focusClient} data={data} clients={clients} btcSats={btcSatsKlienti[btcKluc(focusClient)]} onZavri={() => setFocusClient(null)} />
+        <KlientProfil meno={focusClient} data={data} clients={clients} btcSats={btcSatsKlienti[menoKluc(focusClient)]} onZavri={() => setFocusClient(null)} />
       )}
 
       <Card>
