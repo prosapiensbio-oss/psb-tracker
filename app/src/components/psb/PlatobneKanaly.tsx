@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import type { ClientAgg } from "../../lib/psb/compute";
+import { btcOznacenia, type BtcKnihaPlatba, type ClientAgg } from "../../lib/psb/compute";
+import { fetchBtcReserve } from "../../lib/psb/client";
 import { fmtCZK } from "../../lib/psb/format";
 import type { PSBData } from "../../lib/psb/types";
 import { C, mix } from "../../lib/psb/theme";
@@ -47,6 +48,16 @@ export function PlatobneKanaly({
 }) {
   const [obdobie, setObdobie] = useState("2026");
 
+  // BTC kniha ako zdroj pravdy o bitcoinových platbách (poistka z 11. 8.).
+  // Kaňovský zaplatil 1. 7. bitcoinom, ale v PTminderi bol klik „bank" —
+  // a tento koláč ho radil do banky. Metóda z PTmindera sa preto podriaďuje
+  // BTC knihe: čo sa s ňou spáruje, JE bitcoin, nech je klik akýkoľvek.
+  const [btcPlatby, setBtcPlatby] = useState<BtcKnihaPlatba[]>([]);
+  useEffect(() => {
+    void fetchBtcReserve(true).then((r) => { if (r?.platby) setBtcPlatby(r.platby); });
+  }, []);
+  const { jeBtc } = useMemo(() => btcOznacenia(data.payments, btcPlatby), [data.payments, btcPlatby]);
+
   const kanaly = useMemo(() => {
     const platby = data.payments.filter((p) => p.client);
     const posledny = platby.reduce((m, p) => (p.date.slice(0, 7) > m ? p.date.slice(0, 7) : m), "");
@@ -63,7 +74,9 @@ export function PlatobneKanaly({
     for (const p of platby) {
       const mk = p.date.slice(0, 7);
       if (mk < od || mk > doM) continue;
-      const e = (podla[p.method || "bank"] ||= { czk: 0, mena: new Set() });
+      // Bitcoin rozhoduje BTC kniha, nie klik pri zápise v PTminderi.
+      const metoda = jeBtc(p) ? "other" : (p.method || "bank");
+      const e = (podla[metoda] ||= { czk: 0, mena: new Set() });
       e.czk += p.amount;
       // Meno z PTmindera nemusí sedieť na diakritiku agregátu — ale agregáty
       // vznikajú z tých istých exportov, takže tu je zhoda presná.
@@ -72,7 +85,7 @@ export function PlatobneKanaly({
     return METODY
       .map((m) => ({ ...m, czk: podla[m.id]?.czk || 0, mena: podla[m.id]?.mena || new Set<string>() }))
       .filter((m) => m.czk > 0);
-  }, [data.payments, obdobie]);
+  }, [data.payments, obdobie, jeBtc]);
 
   if (!kanaly.length) {
     return (

@@ -1,6 +1,6 @@
 import { useContext, useEffect, useMemo, useState } from "react";
 
-import { objednaneVerzia, kotvaDat, monthlyFinance, predictCash, predictEarnings, type ClientAgg } from "../../lib/psb/compute";
+import { btcOznacenia, objednaneVerzia, kotvaDat, monthlyFinance, predictCash, predictEarnings, type ClientAgg } from "../../lib/psb/compute";
 import { fetchBtcReserve, type BtcPlatba } from "../../lib/psb/client";
 import { fmtCZK, monthLabel, normName } from "../../lib/psb/format";
 import { ObdobieCtx } from "../../lib/psb/obdobie";
@@ -204,9 +204,15 @@ function BtcKontrola({ data }: { data: PSBData }) {
     return { sedi, nesedi, ciastocne, spolu: btc.length };
   }, [platby, data.payments]);
 
+  // Poistka z 11. 8.: platba, ktorá sa spáruje s BTC knihou, ale v PTminderi
+  // má „bank" alebo „cash" (Kaňovský 1. 7. — klik pri zápise). Štatistiky si
+  // ju preraďujú samy, ale zdroj má byť opravený pri zdroji — preto sa tu
+  // hlási, kým ju Jerry v PTminderi nepreklikne na other.
+  const zleOznacene = useMemo(() => btcOznacenia(data.payments, platby).zleOznacene, [data.payments, platby]);
+
   return (
     <Card>
-      <H3><Info text="Porovnáva bitcoinové platby zapísané v appke prosapiens-btc s platbami v PTminderi. Zdrojom pravdy o tržbách zostáva PTminder — toto je len kontrola, či niečo nechýba. Tolerancia sú 4 dni a 400 Kč: kurz medzi okamihom platby a prepočtom sa vždy trochu líši. Rozdiel nemusí znamenať chybu — do uzávierky (prvý víkend nasledujúceho mesiaca) nemusí byť platba ešte zapísaná." label="Kontrola bitcoinových platieb" /></H3>
+      <H3><Info text="Porovnáva bitcoinové platby zapísané v appke prosapiens-btc s platbami v PTminderi. Zdrojom pravdy o tržbách zostáva PTminder — toto je len kontrola, či niečo nechýba. Tolerancia sú 4 dni a 400 Kč: kurz medzi okamihom platby a prepočtom sa vždy trochu líši. Rozdiel nemusí znamenať chybu — do uzávierky (prvý víkend nasledujúceho mesiaca) nemusí byť platba ešte zapísaná. Platby označené v PTminderi ako účet/hotovosť, ktoré sa spárujú s BTC knihou, štatistiky preraďujú na bitcoin samy — tu sa hlásia, aby sa dal PTminder opraviť pri zdroji." label="Kontrola bitcoinových platieb" /></H3>
       {stav === "nacitava" && <div style={{ fontSize: 12.5, color: C.textDim, padding: "6px 0" }}>Načítavam z BTC appky…</div>}
       {stav === "chyba" && <Empty>BTC appka neodpovedala. Skús obnoviť stránku.</Empty>}
       {stav === "hotovo" && (
@@ -224,6 +230,15 @@ function BtcKontrola({ data }: { data: PSBData }) {
             </div>
           ) : (
             <div style={{ fontSize: 12.5, color: C.textMuted, marginTop: 8 }}>Všetky bitcoinové platby sedia s PTminderom 🌿</div>
+          )}
+          {zleOznacene.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 10 }}>
+              {zleOznacene.map((z, i) => (
+                <div key={i} style={{ padding: "8px 11px", borderRadius: 8, background: C.orangeBg, fontSize: 12.5, color: C.text, lineHeight: 1.5 }}>
+                  «{z.meno}» {fmtCZK(z.suma)} z {z.datum} — prišla bitcoinom, ale v PTminderi je označená ako {z.metoda === "bank" ? "účet" : "hotovosť"}. Štatistiky ju už rátajú ako bitcoin; preklikni ju v PTminderi na „other", nech sedí aj zdroj.
+                </div>
+              ))}
+            </div>
           )}
           {porovnanie.ciastocne.length > 0 && (
             <div style={{ fontSize: 12, color: C.textDim, marginTop: 10, lineHeight: 1.55 }}>

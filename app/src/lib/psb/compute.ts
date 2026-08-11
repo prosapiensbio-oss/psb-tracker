@@ -705,6 +705,76 @@ export function doPlnehoMesiaca<T>(rows: T[], k: Kotva, mk: (r: T) => string): T
   return k.plny ? rows.filter((r) => mk(r) <= k.plny) : rows;
 }
 
+// ── Bitcoinové platby: párovanie a poistky ───────────────────────────────────
+//
+// Dva nálezy z 11. 8., obidva rovnakého druhu — dve appky, dva zápisy tej
+// istej skutočnosti, žiadna poistka medzi nimi:
+//
+//   1. Kaňovský 1. 7.: v BTC knihe platba 12 503 Kč, v PTminderi ten istý
+//      deň 12 464 Kč označených ako „bank". Klik pri zápise v PTminderi —
+//      a všetko, čo číta payment_method, ho radilo do banky.
+//   2. „Procházka" (BTC kniha) vs „Prochadzka" (PTminder) — normName
+//      nechá „prochazka" vs „prochadzka", takže párovanie po mene zlyhá
+//      a klientov profil neukáže jeho satoshi.
+//
+// Poistka namiesto jednorazovej opravy: BTC KNIHA JE ZDROJ PRAVDY o tom, čo
+// prišlo bitcoinom. Metóda z PTmindera sa jej podriaďuje — platba, ktorá sa
+// spáruje s riadkom BTC knihy, JE bitcoinová bez ohľadu na klik pri zápise.
+// Nesúlady sa neopravujú potichu: vracajú sa ako zoznam, ktorý ukazuje
+// kontrola bitcoinových platieb, aby sa dal PTminder opraviť pri zdroji.
+
+/**
+ * Párovací kľúč mena medzi appkami: prvých 5 znakov priezviska + 3 mena,
+ * bez diakritiky. Prežije „Procházka/Prochadzka" aj „Tomaš/Tomáš".
+ * Rovnaká logika, akú používa kontrola bitcoinových platieb v Peniazoch.
+ */
+export const btcKluc = (m: string) => {
+  const n = normName(m).split(" ").filter(Boolean);
+  const priez = n[n.length - 1] || "";
+  return `${priez.slice(0, 5)}|${(n[0] || "").slice(0, 3)}`;
+};
+
+/** Platba z BTC knihy, ako ju vracia /api/btc-reserve?platby=1. */
+export type BtcKnihaPlatba = { klient: string | null; datum: string; sats?: number; czk: number | null };
+
+/**
+ * Ktoré PTminder platby v skutočnosti prišli bitcoinom.
+ *
+ * Vracia `jeBtc` (rozhodnutie pre konkrétny riadok platby) a `zleOznacene` —
+ * platby, ktoré sa spárovali s BTC knihou, ale v PTminderi majú „bank" alebo
+ * „cash". Tolerancie sú rovnaké ako v kontrole platieb: ±10 dní (zápis
+ * v PTminderi a pohyb v bitcoine sa bežne líšia o pár dní) a 400 Kč alebo
+ * 3 % (kurz medzi okamihom platby a prepočtom).
+ */
+export function btcOznacenia(payments: PaymentRow[], btcPlatby: BtcKnihaPlatba[]): {
+  jeBtc: (p: PaymentRow) => boolean;
+  zleOznacene: { meno: string; datum: string; suma: number; metoda: string }[];
+} {
+  const OKNO_DNI = 10;
+  const TOL_KC = 400;
+  const TOL_PCT = 0.03;
+  const btcPodlaKluca = new Map<string, { t: number; czk: number }[]>();
+  for (const b of btcPlatby) {
+    if (!b.klient || b.czk == null) continue;
+    const k = btcKluc(b.klient);
+    if (!btcPodlaKluca.has(k)) btcPodlaKluca.set(k, []);
+    btcPodlaKluca.get(k)!.push({ t: Date.parse(b.datum), czk: b.czk });
+  }
+  const sparovana = (p: PaymentRow) => {
+    const kandidati = btcPodlaKluca.get(btcKluc(p.client));
+    if (!kandidati) return false;
+    const t = Date.parse(p.date);
+    return kandidati.some((b) =>
+      Math.abs(b.t - t) / 86400000 <= OKNO_DNI &&
+      Math.abs(b.czk - p.amount) <= Math.max(TOL_KC, b.czk * TOL_PCT));
+  };
+  const jeBtc = (p: PaymentRow) => p.method === "other" || (!!p.client && sparovana(p));
+  const zleOznacene = payments
+    .filter((p) => p.client && p.method !== "other" && sparovana(p))
+    .map((p) => ({ meno: p.client, datum: p.date.slice(0, 10), suma: p.amount, metoda: p.method }));
+  return { jeBtc, zleOznacene };
+}
+
 /**
  * Ø CENA ZA SEDENIE — jediné miesto, kde sa počíta. (Jerry, 11. 8.)
  *

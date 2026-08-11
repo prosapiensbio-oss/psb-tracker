@@ -736,20 +736,17 @@ export function useExtraGrafy({
       const satsSpolu = platby.reduce((a, x) => a + (x.sats || 0), 0);
       const dnesSpolu = satsNaCzk(satsSpolu);
       const dnesMesiac = satsNaCzk(teraz.sats);
-      // Rad na graf: koruny po mesiacoch, posledných 12 uzavretých.
-      const podlaMes = new Map<string, { czk: number; sats: number }>();
-      for (const x of platby) {
-        const mk = x.datum.slice(0, 7);
-        if (mk > posl) continue;
-        const e = podlaMes.get(mk) || { czk: 0, sats: 0 };
-        e.czk += x.czk || 0;
-        e.sats += x.sats || 0;
-        podlaMes.set(mk, e);
-      }
-      const rad = [...podlaMes.entries()].sort((a, b) => a[0].localeCompare(b[0])).slice(-12);
+      // Zhodnotenie v PERCENTÁCH je hlavné číslo — koruny sú pri ňom drobné.
+      // Percento sa dá porovnať naprieč mesiacmi aj proti čomukoľvek inému;
+      // koruny hovoria len o objeme, ktorý v tom mesiaci náhodou prišiel.
+      const pct = (dnes: number | null, vtedy: number) =>
+        dnes === null || vtedy <= 0 ? null : ((dnes - vtedy) / vtedy) * 100;
+      const odkedy = platby.map((x) => x.datum.slice(0, 7)).sort()[0] || posl;
       return {
         posl, predch, teraz, minuly, trzbyMes, trzbySpolu, czkSpolu, satsSpolu,
-        dnesSpolu, dnesMesiac, kurz, rad,
+        dnesSpolu, dnesMesiac, kurz, odkedy,
+        zhodMesPct: pct(dnesMesiac, teraz.czk),
+        zhodLifePct: pct(dnesSpolu, czkSpolu),
         klientovSpolu: new Set(platby.filter((x) => x.klient).map((x) => x.klient)).size,
       };
     })();
@@ -764,25 +761,14 @@ export function useExtraGrafy({
           {btcStav === "err" && <Empty>BTC appka je nedostupná — skús to o chvíľu.</Empty>}
           {btcStav === "ok" && !btcPlatby && <Empty>Zatiaľ žiadne bitcoinové platby.</Empty>}
           {btcStav === "ok" && btcPlatby && (
-            <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.2fr) minmax(0,1fr)", gap: 14, alignItems: "start" }}>
-              <div style={{ minWidth: 0 }}>
-                <LineChart
-                  data={btcPlatby.rad.map(([mk, v]) => ({ label: monthLabel(mk), values: [v.czk] }))}
-                  series={[{ name: "Prijaté v BTC", color: C.orange }]}
-                  height={190} fmt={kcK} autoY alignEnd bezSuhrnu
-                />
-                <div style={{ fontSize: 10.5, color: C.textDim, marginTop: 6 }}>
-                  po mesiacoch, posledný uzavretý {monthLabel(btcPlatby.posl)}
-                </div>
-              </div>
-              <div style={{ display: "grid", gap: 8 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16, alignItems: "start" }}>
+              <div style={{ display: "grid", gap: 8, minWidth: 0 }}>
                 <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", color: C.textDim }}>
-                  {monthLabel(btcPlatby.posl)}
+                  {monthLabel(btcPlatby.posl)} · posledný uzavretý
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}>
                   <MiniStat label="Klientov" value={String(btcPlatby.teraz.klientov)} color={C.accent} />
-                  <MiniStat label="Prijaté" value={fmtCZK(btcPlatby.teraz.czk)} color={C.orange} />
-                  <MiniStat label="V satoshi" value={sats(btcPlatby.teraz.sats)} />
+                  <MiniStat label={<>Prijaté <span style={{ color: C.textDim }}>· {sats(btcPlatby.teraz.sats)}</span></>} value={fmtCZK(btcPlatby.teraz.czk)} color={C.orange} />
                   <MiniStat
                     label="Podiel na tržbách"
                     value={pctTrzieb(btcPlatby.teraz.czk, btcPlatby.trzbyMes) === null ? "—" : `${pctTrzieb(btcPlatby.teraz.czk, btcPlatby.trzbyMes)!.toFixed(0)} %`}
@@ -793,15 +779,20 @@ export function useExtraGrafy({
                       : `${zmenaPct(btcPlatby.teraz.czk, btcPlatby.minuly.czk)! >= 0 ? "+" : ""}${zmenaPct(btcPlatby.teraz.czk, btcPlatby.minuly.czk)!.toFixed(0)} %`}
                     color={(zmenaPct(btcPlatby.teraz.czk, btcPlatby.minuly.czk) ?? 0) >= 0 ? C.green : C.red}
                   />
+                  {/* Zhodnotenie vedie PERCENTO (Jerry, 11. 8.) — koruny sú
+                      pri ňom drobným písmom. Percento sa dá porovnať medzi
+                      mesiacmi aj s čímkoľvek iným; koruny hovoria len o tom,
+                      koľko toho v danom mesiaci prišlo. */}
                   <MiniStat
-                    label="Zhodnotenie za mesiac"
-                    value={btcPlatby.dnesMesiac === null ? "—"
-                      : `${btcPlatby.dnesMesiac - btcPlatby.teraz.czk >= 0 ? "+" : ""}${fmtCZK(btcPlatby.dnesMesiac - btcPlatby.teraz.czk)}`}
-                    color={btcPlatby.dnesMesiac !== null && btcPlatby.dnesMesiac - btcPlatby.teraz.czk >= 0 ? C.green : C.red}
+                    label={<>Zhodnotenie {btcPlatby.dnesMesiac !== null && <span style={{ color: C.textDim }}>· {btcPlatby.dnesMesiac - btcPlatby.teraz.czk >= 0 ? "+" : ""}{fmtCZK(btcPlatby.dnesMesiac - btcPlatby.teraz.czk)}</span>}</>}
+                    value={btcPlatby.zhodMesPct === null ? "—" : `${btcPlatby.zhodMesPct >= 0 ? "+" : ""}${btcPlatby.zhodMesPct.toFixed(1)} %`}
+                    color={(btcPlatby.zhodMesPct ?? 0) >= 0 ? C.green : C.red}
                   />
                 </div>
-                <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", color: C.textDim, marginTop: 4 }}>
-                  celá história
+              </div>
+              <div style={{ display: "grid", gap: 8, minWidth: 0 }}>
+                <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", color: C.textDim }}>
+                  celá história · od {monthLabel(btcPlatby.odkedy)}
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}>
                   <MiniStat label="Klientov spolu" value={String(btcPlatby.klientovSpolu)} color={C.accent} />
@@ -809,18 +800,15 @@ export function useExtraGrafy({
                     label="Podiel na tržbách"
                     value={pctTrzieb(btcPlatby.czkSpolu, btcPlatby.trzbySpolu) === null ? "—" : `${pctTrzieb(btcPlatby.czkSpolu, btcPlatby.trzbySpolu)!.toFixed(0)} %`}
                   />
-                  <MiniStat label="Prijaté spolu" value={fmtCZK(btcPlatby.czkSpolu)} color={C.orange} />
-                  <MiniStat label="Satoshi spolu" value={sats(btcPlatby.satsSpolu)} />
-                  <MiniStat
-                    label="Zhodnotenie lifetime"
-                    value={btcPlatby.dnesSpolu === null ? "—"
-                      : `${btcPlatby.dnesSpolu - btcPlatby.czkSpolu >= 0 ? "+" : ""}${fmtCZK(btcPlatby.dnesSpolu - btcPlatby.czkSpolu)}`}
-                    color={btcPlatby.dnesSpolu !== null && btcPlatby.dnesSpolu - btcPlatby.czkSpolu >= 0 ? C.green : C.red}
-                  />
+                  <MiniStat label={<>Prijaté spolu <span style={{ color: C.textDim }}>· {sats(btcPlatby.satsSpolu)}</span></>} value={fmtCZK(btcPlatby.czkSpolu)} color={C.orange} />
                   <MiniStat
                     label="Dnešná hodnota"
                     value={btcPlatby.dnesSpolu === null ? "—" : fmtCZK(btcPlatby.dnesSpolu)}
-                    color={C.green}
+                  />
+                  <MiniStat
+                    label={<>Zhodnotenie lifetime {btcPlatby.dnesSpolu !== null && <span style={{ color: C.textDim }}>· {btcPlatby.dnesSpolu - btcPlatby.czkSpolu >= 0 ? "+" : ""}{fmtCZK(btcPlatby.dnesSpolu - btcPlatby.czkSpolu)}</span>}</>}
+                    value={btcPlatby.zhodLifePct === null ? "—" : `${btcPlatby.zhodLifePct >= 0 ? "+" : ""}${btcPlatby.zhodLifePct.toFixed(1)} %`}
+                    color={(btcPlatby.zhodLifePct ?? 0) >= 0 ? C.green : C.red}
                   />
                 </div>
               </div>

@@ -18,6 +18,7 @@ import {
   type BtcNakup,
 } from "../../lib/psb/client";
 import { rodinaZKluca,
+  btcKluc,
   kotvaDat,
   capacityByTrainer,
   monthlyFinance,
@@ -387,15 +388,18 @@ export function PSBApp() {
       // pritom 130 000 z toho prišlo v BTC.
       if (r?.platby?.length) {
         const bt: Record<string, number> = {};
-        const podlaKlienta: Record<string, number> = {};
+        // Sats po klientoch — profil ukáže, koľko kto celkovo zaplatil v BTC.
+        // Kľúčom je btcKluc, nie normName: „Procházka" (BTC kniha) vs
+        // „Prochadzka" (PTminder) prežije normName ako dve rôzne mená
+        // a klientov profil by jeho satoshi nikdy neukázal. Fuzzy kľúč
+        // (priezvisko-5 + meno-3) spojí obe podoby.
+        const podlaKluca: Record<string, number> = {};
         for (const x of r.platby) {
           bt[String(x.datum).slice(0, 7)] = (bt[String(x.datum).slice(0, 7)] || 0) + (x.czk || 0);
-          // Sats po klientoch — profil ukáže, koľko kto celkovo zaplatil v BTC.
-          // Meno sa normalizuje, appky sa líšia v diakritike.
-          if (x.klient) podlaKlienta[normName(x.klient)] = (podlaKlienta[normName(x.klient)] || 0) + (x.sats || 0);
+          if (x.klient) podlaKluca[btcKluc(x.klient)] = (podlaKluca[btcKluc(x.klient)] || 0) + (x.sats || 0);
         }
         setBtcPrijmy(bt);
-        setBtcSatsKlienti(podlaKlienta);
+        setBtcSatsKlienti(podlaKluca);
       }
       // Nákupy platené bitcoinom sa do P&L NEPÍŠU.
       //

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { duchOdpoved, membershipBucket, MEMBERSHIP_ORDER, TRAINERS, type CapacityRow, type ClientAgg, type SixMRow } from "../../lib/psb/compute";
+import { btcKluc, duchOdpoved, membershipBucket, MEMBERSHIP_ORDER, TRAINERS, type CapacityRow, type ClientAgg, type SixMRow } from "../../lib/psb/compute";
 import { fmtCZK, fmtDate, normName } from "../../lib/psb/format";
 import { C, MEMBERSHIP_COLORS, mix, S } from "../../lib/psb/theme";
 import { KlientProfil } from "./KlientProfil";
@@ -671,9 +671,11 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
 
       {/* Profil 360 — všetko o vybranom človeku na jednom mieste. Vyhľadanie
           klienta doteraz doviedlo len k riadku tabuľky a zvyšok si človek
-          skladal z piatich obrazoviek. */}
+          skladal z piatich obrazoviek.
+          btcSatsKlienti je kľúčované fuzzy kľúčom (btcKluc), nie normName —
+          inak „Prochadzka" z PTmindera nenájde „Procházku" z BTC knihy. */}
       {focusClient && clients[focusClient] && (
-        <KlientProfil meno={focusClient} data={data} clients={clients} btcSats={btcSatsKlienti[normName(focusClient)]} onZavri={() => setFocusClient(null)} />
+        <KlientProfil meno={focusClient} data={data} clients={clients} btcSats={btcSatsKlienti[btcKluc(focusClient)]} onZavri={() => setFocusClient(null)} />
       )}
 
       <Card>
