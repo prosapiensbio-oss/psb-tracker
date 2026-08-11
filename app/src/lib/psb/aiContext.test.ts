@@ -188,6 +188,12 @@ describe("marketing v kontexte", () => {
     for (let i = 1; i < m.obsahPodlaHooku.length; i++) {
       expect(m.obsahPodlaHooku[i - 1].ulozeniaNaKus).toBeGreaterThanOrEqual(m.obsahPodlaHooku[i].ulozeniaNaKus);
     }
+    // Poradie musí byť napísané číslom, nie len naznačené zoradením: model
+    // zoznam raz prečítal odzadu a označil dve NAJHORŠIE kategórie za
+    // najlepšie. Rovnako zhrnutie — záver, ktorý sa dá spočítať, sa počíta.
+    expect(m.obsahPodlaHooku[0].poradie).toContain("1.");
+    expect(m.obsahZhrnutie).toContain(m.obsahPodlaHooku[0].kategoria);
+    expect(m.obsahZhrnutie).toContain(m.obsahPodlaHooku[m.obsahPodlaHooku.length - 1].kategoria);
     // Najlepší kus musí mať aspoň toľko uložení + zdieľaní ako najhorší.
     const naj = m.obsahNajlepsie[0], hor = m.obsahNajhorsie[m.obsahNajhorsie.length - 1];
     expect(naj.ulozenia + naj.zdielania).toBeGreaterThanOrEqual(hor.ulozenia + hor.zdielania);

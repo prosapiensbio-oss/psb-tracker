@@ -279,7 +279,17 @@ export function buildAiContext(
         zdielaniaNaKus: r2(e.zdielania / e.kusov),
         viewRate: r2(e.vr / e.kusov),
       }))
-      .sort((a, b) => b.ulozeniaNaKus - a.ulozeniaNaKus);
+      .sort((a, b) => b.ulozeniaNaKus - a.ulozeniaNaKus)
+      // Poradie sa dopisuje číslom zámerne. Zoradený zoznam model prečítal
+      // naopak (11. 8.: „dôraz na Edukácia a Klientsky príbeh — najlepšie
+      // uloženia", pritom sú na rebríčku posledné dve). Záver, ktorý sa dá
+      // spočítať, sa nemá nechať odvodzovať — to je to isté pravidlo ako
+      // „nesčituj z hlavy".
+      .map((h, i, pole) => ({ poradie: `${i + 1}. z ${pole.length} podľa uložení na kus`, ...h }));
+    const podlaZdielani = [...hooky].sort((a, b) => b.zdielaniaNaKus - a.zdielaniaNaKus);
+    const zhrnutieHookov = hooky.length
+      ? `Najviac ULOŽENÍ na kus má „${hooky[0].kategoria}" (${hooky[0].ulozeniaNaKus}), najmenej „${hooky[hooky.length - 1].kategoria}" (${hooky[hooky.length - 1].ulozeniaNaKus}). Najviac ZDIEĽANÍ má „${podlaZdielani[0].kategoria}" (${podlaZdielani[0].zdielaniaNaKus}). Pozor na počet kusov: kategória s pár kusmi môže viesť náhodou — „${hooky[0].kategoria}" ich má ${hooky[0].kusov}.`
+      : "Zatiaľ žiadny obsah.";
 
     const zoradene = [...MKT_OBSAH].sort((a, b) => b.u + b.z - (a.u + a.z));
     const kus = (o: (typeof MKT_OBSAH)[number]) => ({ m: o.m, format: o.f, kategoria: o.k, hook: o.h.slice(0, 90), ulozenia: o.u, videnia: o.v, zdielania: o.z, viewRate: o.vr });
@@ -305,6 +315,7 @@ export function buildAiContext(
     return {
       poznamka: "Rozhoduje sa z ULOŽENÍ a ZDIEĽANÍ, nie z videní — videnie je algoritmus, uloženie je človek. Obsah je agregovaný po kategórii háku; jednotlivé kusy sú len v najlepších/najhorších. Kanály z Metricoolu (Threads, TikTok, Konkurencia) sú v databáze len za jeden mesiac, na trend nestačia — keď ich treba, vytiahni ich dopytom z kanaly_mesiace. Obrazovka: Marketing.",
       instagramMesacne: MKT_MESACNE,
+      obsahZhrnutie: zhrnutieHookov,
       obsahPodlaHooku: hooky,
       obsahNajlepsie: zoradene.slice(0, 10).map(kus),
       obsahNajhorsie: zoradene.slice(-5).map(kus),
