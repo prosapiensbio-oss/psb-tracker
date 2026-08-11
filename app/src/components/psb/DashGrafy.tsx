@@ -1120,7 +1120,13 @@ export function useExtraGrafy({
     // 30." Karta existuje preto, že voľné miesta samy o sebe k akcii nevedú —
     // rozpočet na reklamu sa počíta z tohto čísla, nie z nich.
     {
-      const z = ziskavanieKlientov(data, vytazenie?.zvladneEste ?? 0);
+      // Toky z KANONICKÉHO zdroja o pár riadkov vyššie (tokyKlientov), nie
+      // vlastný výpočet: prvá verzia si ich rátala po svojom a dlaždica hore
+      // hlásila „+0,4 / mes.", kým karta pod ňou „+0,75".
+      const z = ziskavanieKlientov(
+        { prisloMes: toky.prisloMes, odisloMes: toky.odisloMes, aktivnych: toky.zoznam.filter((c) => !c._odisiel).length },
+        vytazenie?.zvladneEste ?? 0,
+      );
       const zaPolRoka = z.trebaZiskat(6);
       nodes.ziskavanie = (
         <Card style={{ marginBottom: 0, height: "100%" }}>
@@ -1140,8 +1146,7 @@ export function useExtraGrafy({
                   <MiniStat label="Odchod" value={`${z.odchodMes}/mes`} color={C.red} />
                 </div>
                 <div style={{ fontSize: 11.5, color: C.textDim, lineHeight: 1.5 }}>
-                  Priemer za {z.obdobie.mesiacov} mesiacov ({monthLabel(z.obdobie.od)} – {monthLabel(z.obdobie.do)}) ·
-                  chodí {z.aktivnych} klientov · za rok treba {z.trebaZiskat(12)}
+                  Priemer za posledných 12 uzavretých mesiacov · chodí {z.aktivnych} klientov · za rok treba {z.trebaZiskat(12)}
                 </div>
               </div>
             )}

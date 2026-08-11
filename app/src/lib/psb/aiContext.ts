@@ -13,6 +13,7 @@ import { MKT_OBSAH } from "./marketing-obsah";
 import {
   cenaZaSedenie,
   kotvaDat,
+  tokyKlientov,
   ziskavanieKlientov,
   monthlyFinance,
   predictEarnings, predictCash,
@@ -257,16 +258,19 @@ export function buildAiContext(
   // Toto je číslo, z ktorého sa počíta rozpočet na reklamu — a je to iné číslo
   // než „koľko mám voľných miest". Bez neho Jarvis plánoval na statických 18
   // miestach a vychádzali mu polovičné rozpočty.
-  const zisk = ziskavanieKlientov(data, capacity.reduce((a, c) => a + c.canTake, 0));
+  const toky = tokyKlientov(data, clients);
+  const zisk = ziskavanieKlientov(
+    { prisloMes: toky.prisloMes, odisloMes: toky.odisloMes, aktivnych: toky.zoznam.filter((c) => !c._odisiel).length },
+    capacity.reduce((a, c) => a + c.canTake, 0),
+  );
   const dopytySpolu = (data.leads || []).length;
   const ziskavanie = {
-    poznamka: "Voľné miesta sú statické, klientela je prietok: kým zapĺňaš, tečie. Počet klientov, ktorých treba ZÍSKAŤ = voľné miesta + odchod × mesiace. Odchod sa počíta z TICHA (posledná hodina viac než 60 dní dozadu), nie zo zrušenia. Posledné dva mesiace preto vždy vyzerajú bez odchodov — ticho ešte nedozrelo; priemer sa berie z 12 mesiacov. Ráta sa len s klientmi, čo mali 5+ sedení. Obrazovka: Kokpit, karta „Koľko klientov naozaj treba“.",
+    poznamka: "Voľné miesta sú statické, klientela je prietok: kým zapĺňaš, tečie. Počet klientov, ktorých treba ZÍSKAŤ = voľné miesta + odchod × mesiace. Odchod sa počíta z TICHA (posledná hodina viac než 60 dní dozadu), nie zo zrušenia. Priemer za posledných 12 UZAVRETÝCH mesiacov; mesiace, kde ticho ešte nedozrelo, sa do odchodu nerátajú. Sú to tie isté čísla, aké ukazuje obrazovka Rast a strata — jeden zdroj. Obrazovka: Kokpit, karta „Koľko klientov naozaj treba“.",
     aktivnych: zisk.aktivnych,
     volnychMiest: zisk.volnychMiest,
     odchodMes: zisk.odchodMes,
     prichodMes: zisk.prichodMes,
     cistyMes: zisk.cistyMes,
-    obdobie: zisk.obdobie,
     mesiacovNaZaplnenie: zisk.mesiacovNaZaplnenie,
     trebaZiskat: { za6mes: zisk.trebaZiskat(6), za12mes: zisk.trebaZiskat(12) },
     dopytovSpolu: dopytySpolu,

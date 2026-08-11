@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 
-import { kotvaDat, type ClientAgg } from "../../lib/psb/compute";
+import { kotvaDat, tokyKlientov, type ClientAgg, type KlientTok } from "../../lib/psb/compute";
 import { fetchMonthNotes, saveMonthNote } from "../../lib/psb/client";
 import { fmtCZK, fmtDMY, monthKey, monthLabel } from "../../lib/psb/format";
 import { ZDROJE } from "./Klienti";
@@ -31,71 +31,11 @@ const HRANICE = [
 
 const zdrojLabel = (z: string) => ZDROJE.find((x) => x.value === z)?.label || (z ? z : "nevyplnené");
 
-type Klient = ClientAgg & { _zivot: number; _odisiel: boolean; _trzba: number };
-
-function pripravKlientov(data: PSBData, clients: Record<string, ClientAgg>, hranicaDni: number) {
-  const kotva = data.sessions.reduce((m, s) => (s.date > m ? s.date : m), "");
-  const kotvaMs = kotva ? Date.parse(kotva) : Date.now();
-  const trzbaPodla = new Map<string, number>();
-  for (const p of data.payments) {
-    if (!p.client) continue;
-    trzbaPodla.set(p.client, (trzbaPodla.get(p.client) || 0) + p.amount);
-  }
-  const zoznam: Klient[] = Object.values(clients)
-    .filter((c) => c.firstSession && c.lastSession)
-    .map((c) => {
-      const ticho = (kotvaMs - Date.parse(c.lastSession)) / DEN;
-      // Dohodnutá pauza nie je odchod. Keď sa skončí a klient nepríde, spadne
-      // sem sám — ale kým beží, tvrdiť o ňom, že odišiel, je nepravda.
-      const naPauze = !!(c.pauseUntil && Date.parse(c.pauseUntil) >= kotvaMs);
-      return {
-        ...c,
-        _zivot: Math.round((Date.parse(c.lastSession) - Date.parse(c.firstSession)) / DEN),
-        _odisiel: ticho > hranicaDni && !naPauze,
-        _trzba: trzbaPodla.get(c.name) || 0,
-      };
-    });
-  return { zoznam, kotva };
-}
-
-/**
- * Mesačné toky klientov — jediné miesto, kde sa počítajú. Číta ich obrazovka
- * Rast a strata aj výhľad v Mesačných výsledkoch; dve kópie tej istej
- * aritmetiky by sa časom rozišli presne tak, ako sa rozišli tržby s Excelom.
- */
-export function tokyKlientov(data: PSBData, clients: Record<string, ClientAgg>, hranicaDni = 60) {
-  const { zoznam, kotva } = pripravKlientov(data, clients, hranicaDni);
-  const m = new Map<string, { prisli: string[]; odisli: string[] }>();
-  const daj = (k: string) => {
-    const e = m.get(k) || { prisli: [], odisli: [] };
-    m.set(k, e);
-    return e;
-  };
-  for (const c of zoznam) {
-    daj(monthKey(c.firstSession)).prisli.push(c.name);
-    if (c._odisiel) daj(monthKey(c.lastSession)).odisli.push(c.name);
-  }
-  const mesacne = [...m.entries()]
-    .map(([k, v]) => [k, { prislo: v.prisli.length, odislo: v.odisli.length, prisli: v.prisli, odisli: v.odisli }] as const)
-    .sort((a, b) => a[0].localeCompare(b[0]));
-
-  // Uzavretý mesiac sa riadi KOTVOU DÁT, nie kalendárom. Keď PTminder nie je
-  // nahratý mesiac dozadu, kalendárne „uzavretý" mesiac je v dátach prázdny —
-  // a nula príchodov by sa čítala ako „nikto neprišiel" namiesto „nevieme".
-  const beziaci = new Date().toISOString().slice(0, 7);
-  const plny = kotvaDat(data).plny || beziaci;
-  const uzavrete = mesacne.filter(([mk]) => mk <= plny);
-  const prichodove = uzavrete.slice(-12);
-  const zrele = kotva
-    ? new Date(Date.parse(kotva) - hranicaDni * DEN).toISOString().slice(0, 7)
-    : beziaci;
-  const odchodove = uzavrete.filter(([mk]) => mk < zrele).slice(-12);
-  return {
-    zoznam, kotva, mesacne,
-    prisloMes: prichodove.length ? prichodove.reduce((a, [, v]) => a + v.prislo, 0) / prichodove.length : 0,
-    odisloMes: odchodove.length ? odchodove.reduce((a, [, v]) => a + v.odislo, 0) / odchodove.length : 0,
-  };
-}
+// `pripravKlientov` a `tokyKlientov` sa 11. 8. presťahovali do compute.ts:
+// potrebuje ich aj kontext Jarvisa a knižnica nesmie závisieť od komponentu.
+// Re-export tu ostáva, aby staré importy z tohto súboru fungovali ďalej.
+export { tokyKlientov, type KlientTok } from "../../lib/psb/compute";
+type Klient = KlientTok;
 
 export function RastAStrata({ data, clients, onKlient, onSkupina }: { data: PSBData; clients: Record<string, ClientAgg>; onKlient?: (meno: string) => void; onSkupina?: (label: string, mena: string[]) => void }) {
   const [hranica, setHranica] = useState("60");

@@ -595,7 +595,7 @@ export function Dashboard({
     // troch riadkoch sa to nedá zachrániť ani nadpisom.
     const posledne = t.mesacne.filter(([mk]) => mk < bezici).slice(-3).reverse()
       .map(([mk, v]) => ({ mk, prislo: v.prislo, odislo: mk < zrele ? v.odislo : null }));
-    return { prisloMes: t.prisloMes, odisloMes: t.odisloMes, posledne };
+    return { prisloMes: t.prisloMes, odisloMes: t.odisloMes, aktivnych: t.zoznam.filter((c) => !c._odisiel).length, posledne };
   }, [data, clients]);
 
   // Lievik: dopyty → úvodné → noví klienti za posledný PLNÝ mesiac.
