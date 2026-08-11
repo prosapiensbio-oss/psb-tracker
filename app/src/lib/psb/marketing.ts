@@ -19,9 +19,11 @@ export type MktMesiac = {
   zdielania: number;
   spend: number;
   viewRate: number;
+  /** Ø čas sledovania reelu v milisekundách (Metricool). 0 = nemeralo sa. */
+  watchTime?: number;
 };
 
-export type MktKus = { m: string; typ: "reel" | "post"; hook: string; views: number; ulozenia: number; viewRate: number };
+export type MktKus = { m: string; typ: "reel" | "post"; hook: string; views: number; ulozenia: number; viewRate: number; watchTime?: number };
 
 export let MKT_MESACNE: MktMesiac[] = [
   { m: "2025-01", reels: 3, posty: 1, stories: 16, views: 3430, dosah: 3178, ulozenia: 9, zdielania: 5, spend: 700, viewRate: 34.4 },

@@ -356,6 +356,21 @@ export function buildAiContext(
         poznamka: "Rady končia týmito mesiacmi. Mesiac, ktorý v rade NIE JE, znamená „ešte nenahraté“ — NIKDY nie nulu a nikdy nie prepad. Novšie čísla bývajú v databáze skôr než tu: over ich dopytom do kanaly_mesiace (Posts/Reels/Stories/Views po mesiacoch) alebo mkt_prispevky, kým o poslednom mesiaci čokoľvek tvrdíš.",
       },
       instagramMesacne: MKT_MESACNE,
+      // Retencia. Watch time je jediné pole v exporte, ktoré hovorí, ako dlho
+      // človek video VYDRŽAL — uloženie hovorí len to, že sa mu páčilo. Pre
+      // reklamu je to dôležitejšie: reklama nepotrebuje uloženie, potrebuje
+      // udržať pozornosť. Doplnené 11. 8. z 18 mesiacov exportov, ktoré do
+      // appky dovtedy nikto nenahral.
+      retencia: (() => {
+        const s = MKT_MESACNE.filter((m) => (m.watchTime || 0) > 0);
+        if (!s.length) return null;
+        const priem = s.reduce((a, m) => a + (m.watchTime || 0), 0) / s.length;
+        return {
+          poznamka: "Ø čas sledovania reelu v SEKUNDÁCH. Rozhoduje o tom, či hák drží — a je to lepší predpoklad pre reklamu než uloženia. Pozor: krátke video môže mať vysoký čas aj pri malom dosahu; vždy k tomu pozri view rate a počet videní.",
+          priemerSek: Math.round((priem / 1000) * 10) / 10,
+          poMesiacoch: s.map((m) => ({ m: m.m, sek: Math.round(((m.watchTime || 0) / 1000) * 10) / 10, reels: m.reels, viewRate: m.viewRate })),
+        };
+      })(),
       obsahZhrnutie: zhrnutieHookov,
       obsahPodlaHooku: hooky,
       obsahNajlepsie: zoradene.slice(0, 10).map(kus),

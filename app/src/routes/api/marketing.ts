@@ -30,11 +30,12 @@ export const Route = createFileRoute("/api/marketing")({
                       SUM(views) AS views, SUM(dosah) AS dosah,
                       SUM(ulozenia) AS ulozenia, SUM(zdielania) AS zdielania,
                       SUM(spend) AS spend,
-                      AVG(CASE WHEN druh = 'reel' AND view_rate > 0 THEN view_rate END) AS view_rate
+                      AVG(CASE WHEN druh = 'reel' AND view_rate > 0 THEN view_rate END) AS view_rate,
+                      AVG(CASE WHEN druh = 'reel' AND watch_time > 0 THEN watch_time END) AS watch_time
                  FROM mkt_prispevky GROUP BY mesiac ORDER BY mesiac`,
             ).all(),
             DB.prepare(
-              `SELECT mesiac, druh, hook, views, ulozenia, view_rate
+              `SELECT mesiac, druh, hook, views, ulozenia, view_rate, watch_time
                  FROM mkt_prispevky WHERE druh <> 'story'
                 ORDER BY ulozenia DESC, views DESC LIMIT 12`,
             ).all(),
@@ -57,11 +58,12 @@ export const Route = createFileRoute("/api/marketing")({
               zdielania: Number(r.zdielania) || 0,
               spend: Number(r.spend) || 0,
               viewRate: Math.round((Number(r.view_rate) || 0) * 10) / 10,
+              watchTime: Math.round(Number(r.watch_time) || 0),
             })),
             top: (top.results as Record<string, unknown>[]).map((r) => ({
               m: r.mesiac, typ: r.druh, hook: r.hook,
               views: Number(r.views) || 0, ulozenia: Number(r.ulozenia) || 0,
-              viewRate: Number(r.view_rate) || 0,
+              viewRate: Number(r.view_rate) || 0, watchTime: Number(r.watch_time) || 0,
             })),
             ga4: (ga4.results as Record<string, unknown>[]).map((r) => ({
               m: r.mesiac, novi: Number(r.novi) || 0,

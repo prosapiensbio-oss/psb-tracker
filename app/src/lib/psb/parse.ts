@@ -443,6 +443,14 @@ export type MktPrispevok = {
   lajky: number;
   spend: number;
   viewRate: number;
+  /**
+   * Priemerný čas sledovania reelu v MILISEKUNDÁCH (Metricool: „Avg Watch
+   * Time"). Jediná vec v celom exporte, ktorá hovorí o RETENCII — uloženie
+   * povie, že sa niekomu príspevok páčil, watch time povie, ako dlho ho
+   * vydržal pozerať. Pri reklame je to dôležitejšie: reklama nepotrebuje
+   * uloženie, potrebuje udržať pozornosť. Pri postoch a stories je 0.
+   */
+  watchTime: number;
 };
 
 const cislo = (s: string | undefined): number => {
@@ -495,6 +503,7 @@ export function parseMetricool(text: string): MktPrispevok[] {
   const iLajk = col("likes (organic)", "likes");
   const iSpend = col("spend");
   const iVr = col("% view rate (+3 secs)");
+  const iWt = col("avg watch time (organic)", "avg watch time");
 
   const out: MktPrispevok[] = [];
   for (const r of rows.slice(1)) {
@@ -519,6 +528,7 @@ export function parseMetricool(text: string): MktPrispevok[] {
       lajky: Math.round(cislo(at(r, iLajk))),
       spend: cislo(at(r, iSpend)),
       viewRate: cislo(at(r, iVr)),
+      watchTime: Math.round(cislo(at(r, iWt))),
     });
   }
   return out;

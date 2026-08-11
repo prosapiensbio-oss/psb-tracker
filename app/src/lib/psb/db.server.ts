@@ -216,11 +216,11 @@ export async function ingest(DB: D1Database, filename: string, text: string, act
         const now = new Date().toISOString();
         const stmts = prispevky.map((x) =>
           DB.prepare(
-            `INSERT INTO mkt_prispevky (id, druh, datum, mesiac, url, hook, views, dosah, ulozenia, zdielania, komentare, lajky, spend, view_rate, updated_at)
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15)
+            `INSERT INTO mkt_prispevky (id, druh, datum, mesiac, url, hook, views, dosah, ulozenia, zdielania, komentare, lajky, spend, view_rate, watch_time, updated_at)
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16)
              ON CONFLICT(id) DO UPDATE SET druh=?2, datum=?3, mesiac=?4, url=?5, hook=?6, views=?7, dosah=?8,
-               ulozenia=?9, zdielania=?10, komentare=?11, lajky=?12, spend=?13, view_rate=?14, updated_at=?15`,
-          ).bind(x.id, x.druh, x.datum, x.mesiac, x.url, x.hook, x.views, x.dosah, x.ulozenia, x.zdielania, x.komentare, x.lajky, x.spend, x.viewRate, now),
+               ulozenia=?9, zdielania=?10, komentare=?11, lajky=?12, spend=?13, view_rate=?14, watch_time=?15, updated_at=?16`,
+          ).bind(x.id, x.druh, x.datum, x.mesiac, x.url, x.hook, x.views, x.dosah, x.ulozenia, x.zdielania, x.komentare, x.lajky, x.spend, x.viewRate, x.watchTime, now),
         );
         for (let i = 0; i < stmts.length; i += 40) await DB.batch(stmts.slice(i, i + 40));
         added = prispevky.length;
