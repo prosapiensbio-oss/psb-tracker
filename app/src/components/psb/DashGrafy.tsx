@@ -812,11 +812,14 @@ export function useExtraGrafy({
                     value={btc?.czk == null ? "—" : fmtCZK(btc.czk)}
                   />
                   {/* Zhodnotenie CELÉHO PORTFÓLIA, nie klientskych platieb —
-                      to isté číslo, aké svieti v bitcoinovej appke. */}
+                      to isté číslo, aké svieti v bitcoinovej appke.
+                      Vedú KORUNY (Jerry, 11. 8.), percento je pri nich drobným:
+                      pri zhodnotení rozhoduje, o koľko peňazí ide, nie o koľko
+                      percent — na rozdiel od mesačnej zmeny, kde je to naopak. */}
                   <MiniStat
-                    label={<>Zhodnotenie portfólia {btcPlatby.zhodLifeCzk !== null && <span style={{ color: C.textDim }}>· {btcPlatby.zhodLifeCzk >= 0 ? "+" : ""}{fmtCZK(btcPlatby.zhodLifeCzk)}</span>}</>}
-                    value={btcPlatby.zhodLifePct === null ? "—" : `${btcPlatby.zhodLifePct >= 0 ? "+" : ""}${btcPlatby.zhodLifePct.toFixed(2)} %`}
-                    color={(btcPlatby.zhodLifePct ?? 0) >= 0 ? C.green : C.red}
+                    label={<>Zhodnotenie portfólia {btcPlatby.zhodLifePct !== null && <span style={{ color: C.textDim }}>· {btcPlatby.zhodLifePct >= 0 ? "+" : ""}{btcPlatby.zhodLifePct.toFixed(2)} %</span>}</>}
+                    value={btcPlatby.zhodLifeCzk === null ? "—" : `${btcPlatby.zhodLifeCzk >= 0 ? "+" : ""}${fmtCZK(btcPlatby.zhodLifeCzk)}`}
+                    color={(btcPlatby.zhodLifeCzk ?? 0) >= 0 ? C.green : C.red}
                   />
                 </div>
               </div>
