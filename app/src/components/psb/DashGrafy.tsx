@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 
-import { fetchBtcReserve, fetchVzasSettings, fetchWeekEntries } from "../../lib/psb/client";
+import { fetchBtcReserve, fetchVzasSettings, fetchWeekEntries, type BtcReserve } from "../../lib/psb/client";
 import { objednaneVerzia, membershipBucket, type ClientAgg } from "../../lib/psb/compute";
 import { fmtCZK, monthLabel } from "../../lib/psb/format";
 import { GA4_MESACNE, GSC_MESACNE, MKT_MESACNE, nastavMarketingZImportu, nastavWebZImportu, type Ga4Mesiac, type GscDopyt, type GscMesiac, type GscStrana, type MktKus, type MktMesiac } from "../../lib/psb/marketing";
@@ -439,7 +439,7 @@ export function useExtraGrafy({
 
   // Rezervu potrebuje aj KPI „rezerva v mesiacoch prevádzky", nielen karta BTC.
   const chceKpi = KPI_KARTY.some((k) => aktivne.has(k.id));
-  const [btc, setBtc] = useState<{ czk: number | null; sats: number; rateCzkPerBtc?: number | null; platby?: { klient: string | null; datum: string; sats: number; czk: number | null }[] } | null>(null);
+  const [btc, setBtc] = useState<BtcReserve | null>(null);
   const [btcStav, setBtcStav] = useState<"load" | "ok" | "err">("load");
   useEffect(() => {
     if (!(aktivne.has("btc") || aktivne.has("btcPlatby") || chceKpi) || btc) return;
@@ -737,8 +737,6 @@ export function useExtraGrafy({
       const dnesSpolu = satsNaCzk(satsSpolu);
       const dnesMesiac = satsNaCzk(teraz.sats);
       // Zhodnotenie v PERCENTÁCH je hlavné číslo — koruny sú pri ňom drobné.
-      // Percento sa dá porovnať naprieč mesiacmi aj proti čomukoľvek inému;
-      // koruny hovoria len o objeme, ktorý v tom mesiaci náhodou prišiel.
       const pct = (dnes: number | null, vtedy: number) =>
         dnes === null || vtedy <= 0 ? null : ((dnes - vtedy) / vtedy) * 100;
       const odkedy = platby.map((x) => x.datum.slice(0, 7)).sort()[0] || posl;
@@ -746,7 +744,15 @@ export function useExtraGrafy({
         posl, predch, teraz, minuly, trzbyMes, trzbySpolu, czkSpolu, satsSpolu,
         dnesSpolu, dnesMesiac, kurz, odkedy,
         zhodMesPct: pct(dnesMesiac, teraz.czk),
-        zhodLifePct: pct(dnesSpolu, czkSpolu),
+        // Zhodnotenie lifetime NEráta Kokpit — berie ho hotové z bitcoinovej
+        // appky (Jerry, 11. 8.: „prečo mi BTC app ukazuje −3 % a appka −8 %").
+        // Sú to dve rôzne otázky: moje staré číslo meralo, čo by dnes stálo
+        // všetko, čo klienti kedy zaplatili, keby to nikdy neodišlo; BTC appka
+        // meria, čo sa stalo s tým, čo ešte DRŽÍ — a výbery si svoju časť
+        // nákupnej ceny odnesú. Zdroj pravdy o bitcoine je BTC appka.
+        zhodLifeCzk: btc?.zhodnotenieCzk ?? null,
+        zhodLifePct: btc?.zhodnoteniePct ?? null,
+        rezervaSats: btc?.sats ?? null,
         klientovSpolu: new Set(platby.filter((x) => x.klient).map((x) => x.klient)).size,
       };
     })();
@@ -755,7 +761,7 @@ export function useExtraGrafy({
     const sats = (n: number) => `${Math.round(n).toLocaleString("sk-SK")} sats`;
     nodes.btcPlatby = (
       <Card style={{ marginBottom: 0, height: "100%" }}>
-        <H3><Info label="Platby v bitcoine" text="Klienti, ktorí platia bitcoinom, za POSLEDNÝ UZAVRETÝ mesiac aj za celú históriu. Koruny sú to, čo klient zaplatil v deň platby; satoshi je to, čo firme reálne pribudlo do rezervy. Zhodnotenie porovnáva, čo tie satoshi stoja dnes, s tým, koľko za ne klient vtedy zaplatil — je to zisk alebo strata z DRŽANIA, nie z podnikania, preto nie je v P&L. Bežiaci mesiac sa neráta: nie je dochodený ani doplatený." /></H3>
+        <H3><Info label="Platby v bitcoine" text="Klienti, ktorí platia bitcoinom, za POSLEDNÝ UZAVRETÝ mesiac aj za celú históriu. Koruny sú to, čo klient zaplatil v deň platby; satoshi je to, čo firme reálne pribudlo do rezervy. Bežiaci mesiac sa neráta: nie je dochodený ani doplatený. „Zhodnotenie portfólia“ je to isté číslo, aké svieti v bitcoinovej appke ako Zhodnocení (lifetime) — počíta ho ONA a týka sa CELEJ rezervy, ktorú firma dnes drží, nie len klientskych platieb. Preto sa nedá zrátať z čísel nad ním: časť satoshi už odišla na výplaty a nákupy a odniesla si svoju časť nákupnej ceny. Je to zisk či strata z DRŽANIA, nie z podnikania — preto nie je v P&L." /></H3>
         <Klik kam={() => onNavigate("vzas", "cashflow")} onNavigate="Peniaze → Cashflow">
           {btcStav === "load" && <div style={{ fontSize: 12.5, color: C.textDim }}>Načítavam z BTC appky…</div>}
           {btcStav === "err" && <Empty>BTC appka je nedostupná — skús to o chvíľu.</Empty>}
@@ -802,12 +808,14 @@ export function useExtraGrafy({
                   />
                   <MiniStat label={<>Prijaté spolu <span style={{ color: C.textDim }}>· {sats(btcPlatby.satsSpolu)}</span></>} value={fmtCZK(btcPlatby.czkSpolu)} color={C.orange} />
                   <MiniStat
-                    label="Dnešná hodnota"
-                    value={btcPlatby.dnesSpolu === null ? "—" : fmtCZK(btcPlatby.dnesSpolu)}
+                    label={<>Rezerva dnes {btcPlatby.rezervaSats !== null && <span style={{ color: C.textDim }}>· {sats(btcPlatby.rezervaSats)}</span>}</>}
+                    value={btc?.czk == null ? "—" : fmtCZK(btc.czk)}
                   />
+                  {/* Zhodnotenie CELÉHO PORTFÓLIA, nie klientskych platieb —
+                      to isté číslo, aké svieti v bitcoinovej appke. */}
                   <MiniStat
-                    label={<>Zhodnotenie lifetime {btcPlatby.dnesSpolu !== null && <span style={{ color: C.textDim }}>· {btcPlatby.dnesSpolu - btcPlatby.czkSpolu >= 0 ? "+" : ""}{fmtCZK(btcPlatby.dnesSpolu - btcPlatby.czkSpolu)}</span>}</>}
-                    value={btcPlatby.zhodLifePct === null ? "—" : `${btcPlatby.zhodLifePct >= 0 ? "+" : ""}${btcPlatby.zhodLifePct.toFixed(1)} %`}
+                    label={<>Zhodnotenie portfólia {btcPlatby.zhodLifeCzk !== null && <span style={{ color: C.textDim }}>· {btcPlatby.zhodLifeCzk >= 0 ? "+" : ""}{fmtCZK(btcPlatby.zhodLifeCzk)}</span>}</>}
+                    value={btcPlatby.zhodLifePct === null ? "—" : `${btcPlatby.zhodLifePct >= 0 ? "+" : ""}${btcPlatby.zhodLifePct.toFixed(2)} %`}
                     color={(btcPlatby.zhodLifePct ?? 0) >= 0 ? C.green : C.red}
                   />
                 </div>

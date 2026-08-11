@@ -134,6 +134,16 @@ export type BtcReserve = {
   rateUpdatedAt: string | null;
   goalSats: number | null;
   generatedAt: string;
+  /** Nákupný základ drženého BTC (vážený priemer) — ráta ho BTC appka. */
+  nakupnaHodnota?: number | null;
+  /**
+   * Zhodnotenie CELÉHO PORTFÓLIA, presne to číslo, aké svieti v bitcoinovej
+   * appke ako „Zhodnocení (lifetime)". Kokpit si ho zámerne NEráta sám: keď
+   * si ho rátal (z toho, čo klienti kedy zaplatili), vyšlo −8,5 % tam, kde
+   * BTC appka hlásila −3,76 % — dve čísla s jedným menom.
+   */
+  zhodnotenieCzk?: number | null;
+  zhodnoteniePct?: number | null;
   platby?: BtcPlatba[];
   vyplaty?: BtcVyplata[];
   nakupy?: BtcNakup[];
