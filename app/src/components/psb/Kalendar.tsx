@@ -20,7 +20,7 @@ import { Card, Empty, H3, Info, Modal, Select, TrenerPills } from "./ui";
  */
 
 type Zdroj = { id: string; trener: string; aktivny: number; posledne_ok: string | null; posledna_chyba: string | null };
-type Zmena = { id: string; kedy: string; trener: string; uid: string; druh: string; nazov: string | null; klient: string | null; pred: string | null; po: string | null };
+type Zmena = { id: string; kedy: string; trener: string; uid: string; druh: string; nazov: string | null; klient: string | null; pred: string | null; po: string | null; poznamka?: string | null };
 type Mapa = { nazov: string; trener: string; klient: string | null; typ: string };
 export type KalUdalost = { uid: string; trener: string; zaciatok: string; koniec: string; nazov: string; klient: string | null; typ: string | null };
 type Nezname = { nazov: string; trener: string; pocet: number; najblizsi: string };
@@ -586,9 +586,13 @@ function Zmeny({ zmeny, onHotovo, mena }: { zmeny: Zmena[]; onHotovo: () => Prom
             <span style={{ fontSize: 13, color: C.text }}>{popis(z)}</span>
             <span style={{ fontSize: 11, color: C.textDim, marginLeft: "auto" }}>{z.trener} · zbadané {z.kedy.slice(5, 16).replace("T", " ")}</span>
           </div>
+          {/* Dôvod napísaný pri ručnom zápise — nech nie je písaný do prázdna. */}
+          {z.poznamka && (
+            <div style={{ fontSize: 11.5, color: C.textMuted, marginTop: 4, fontStyle: "italic" }}>„{z.poznamka}"</div>
+          )}
           <div style={{ display: "flex", gap: 8, marginTop: 7, flexWrap: "wrap" }}>
             <input
-              value={pisem[z.id] || ""}
+              value={pisem[z.id] ?? z.poznamka ?? ""}
               onChange={(e) => setPisem({ ...pisem, [z.id]: e.target.value })}
               placeholder="prečo? (klient zrušil, presunuli sme, chyba v zápise…)"
               style={{ flex: "1 1 260px", padding: "6px 10px", borderRadius: 7, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 12 }}

@@ -316,9 +316,11 @@ export const Route = createFileRoute("/api/kalendar")({
           const klient = String(b.klient || "").trim();
           if (!klient) return Response.json({ ok: false, error: "chýba klient" }, { status: 400 });
           const kedy = String(b.datum || "").slice(0, 10) || teraz().slice(0, 10);
-          // Poznámka napísaná rovno pri zápise JE vysvetlenie — pýtať sa naň
-          // druhýkrát cez „Vybavené" by bola zbytočná obrátka. Bez poznámky
-          // zostane riadok v zozname ako pripomienka, že ju treba doplniť.
+          // Ručný zápis zostáva VIDITEĽNÝ (vysvetlene = 0), aj keď k nemu Jerry
+          // rovno napísal dôvod. Prvá verzia ho brala ako vybavený a riadok
+          // hneď zmizol zo zoznamu — človek niečo zapísal a nič sa nestalo,
+          // presne to ticho, ktoré appka nemá robiť. Poznámka sa uloží a karta
+          // ju vypíše; „Vybavené" si klikne sám, keď to bude naozaj vybavené.
           const poznamka = String(b.poznamka || "").trim();
           await DB.prepare(
             "INSERT INTO kal_zmeny (id, kedy, trener, uid, druh, nazov, klient, pred, po, vysvetlene, poznamka, odpovedane_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
@@ -335,9 +337,9 @@ export const Route = createFileRoute("/api/kalendar")({
             // vedela vypísať bez vetvenia navyše.
             druh === "zrusene" ? `${kedy}T00:00:00.000Z` : null,
             druh === "nahrada" ? `${kedy}T00:00:00.000Z` : null,
-            poznamka ? 1 : 0,
+            0,
             poznamka || null,
-            poznamka ? teraz() : null,
+            null,
           ).run();
           return Response.json({ ok: true });
         }
