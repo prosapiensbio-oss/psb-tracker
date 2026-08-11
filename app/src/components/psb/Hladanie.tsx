@@ -136,7 +136,7 @@ export function HladanieKlienta({
         <div
           style={{
             position: "absolute", top: "calc(100% + 4px)", right: 0, left: 0, zIndex: 40,
-            background: C.card, border: `1px solid ${C.border}`, borderRadius: 9,
+            background: C.surface, border: `1px solid ${C.border}`, borderRadius: 9,
             boxShadow: "0 10px 28px rgba(0,0,0,0.35)", overflow: "hidden",
           }}
         >

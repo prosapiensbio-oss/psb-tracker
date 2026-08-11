@@ -63,7 +63,7 @@ export function VyberKategorie({
       {otvorene && (
         <div style={{
           position: "absolute", zIndex: 40, top: "calc(100% + 3px)", left: 0, width: Math.max(sirka, 260),
-          background: C.card, border: `1px solid ${mix(C.accent, 40)}`, borderRadius: 9,
+          background: C.surface, border: `1px solid ${mix(C.accent, 40)}`, borderRadius: 9,
           boxShadow: "0 10px 28px rgba(0,0,0,.45)", padding: 7,
         }}>
           {pocetOznacenych > 1 && (

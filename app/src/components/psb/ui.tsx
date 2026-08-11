@@ -258,7 +258,13 @@ export function Modal({ title, onClose, children }: { title: string; onClose: ()
       style={{
         position: "fixed",
         inset: 0,
-        background: "#000a",
+        // Silnejšie stmavenie a jemné rozostrenie pozadia (Jerry, 11. 8.).
+        // Pri #000a presvitala obrazovka a text modálu sa prekrýval s textom
+        // pod ním. Hlavnú prácu robí nepriehľadná plocha panela nižšie; toto
+        // je druhá vrstva, aby okno jasne vystúpilo dopredu.
+        background: "#000d",
+        backdropFilter: "blur(3px)",
+        WebkitBackdropFilter: "blur(3px)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -268,7 +274,15 @@ export function Modal({ title, onClose, children }: { title: string; onClose: ()
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{ ...S.card, maxWidth: 440, width: "100%", marginBottom: 0, maxHeight: "90vh", overflowY: "auto" }}
+        style={{
+          ...S.card,
+          // NIE C.card: tá je pod sklenenými paletami priesvitná (6 % bielej)
+          // a obrazovka pod modálom cez ňu presvitala. Modál je plocha, pod
+          // ktorou sa nemá čítať — musí byť nepriehľadný.
+          background: C.surface,
+          boxShadow: "0 24px 64px rgba(0,0,0,.55)",
+          maxWidth: 440, width: "100%", marginBottom: 0, maxHeight: "90vh", overflowY: "auto",
+        }}
       >
         <div style={{ ...S.h3, marginBottom: 14 }}>{title}</div>
         {children}

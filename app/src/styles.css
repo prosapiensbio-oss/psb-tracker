@@ -123,6 +123,7 @@
 :root[data-psb-theme="dark"] {
   --c-bg: #1a1e16;           /* tmavý mach */
   --c-card: #252b1f;         /* lesná pôda */
+  --c-surface: #252b1f;      /* nepriehľadná plocha — modály, pripnuté bunky */
   --c-cardHover: #2f3627;
   --c-border: #6b8c4230;
   --c-accent: #6b8c42;       /* listová zeleň */
@@ -148,6 +149,7 @@
 :root[data-psb-theme="mid"] {
   --c-bg: #ddd8c6;           /* suchý mach na slnku */
   --c-card: #ece9de;         /* svetlý lišajník */
+  --c-surface: #ece9de;
   --c-cardHover: #e3e0d2;
   --c-border: #c8c2ae;       /* suchý list */
   --c-accent: #5e7c38;
@@ -173,6 +175,7 @@
 :root[data-psb-theme="light"] {
   --c-bg: #343d2c;           /* podvečerný mach */
   --c-card: #424b38;         /* tieň pod korunou */
+  --c-surface: #424b38;
   --c-cardHover: #4c563f;
   --c-border: #566048;       /* lišajník na kôre */
   --c-accent: #7ba24c;
@@ -217,6 +220,7 @@
   --c-base1: #14180f;
   --c-base2: #1c2216;
   --c-card: rgba(255, 255, 255, 0.06);
+  --c-surface: #1e2418;
   --c-cardHover: rgba(255, 255, 255, 0.1);
   --c-border: rgba(255, 255, 255, 0.12);
   --c-accent: #e2914e;
@@ -252,6 +256,7 @@
   --c-base1: #2e3624;
   --c-base2: #3a4530;
   --c-card: rgba(255, 255, 255, 0.16);
+  --c-surface: #38422d;
   --c-cardHover: rgba(255, 255, 255, 0.22);
   --c-border: rgba(255, 255, 255, 0.28);
   --c-accent: #f0a55e;
@@ -282,6 +287,7 @@
   --c-base1: #f6f7ee;
   --c-base2: #f2f4e8;
   --c-card: rgba(255, 255, 255, 0.55);
+  --c-surface: #fbfcf5;
   --c-cardHover: rgba(255, 255, 255, 0.75);
   --c-border: rgba(255, 255, 255, 0.9);
   --c-accent: #b5691f;

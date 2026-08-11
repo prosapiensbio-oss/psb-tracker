@@ -542,7 +542,7 @@ export function ChatConversation({ chat, autoFocus, onClientClick, onNavigate }:
         <button
           onClick={naKoniec}
           title="Skočiť na koniec odpovede"
-          style={{ position: "absolute", right: 14, bottom: 74, zIndex: 3, height: 30, padding: "0 12px", borderRadius: 999, border: `1px solid ${C.border}`, background: C.card, color: C.textMuted, fontSize: 12, cursor: "pointer", boxShadow: "0 3px 10px rgba(0,0,0,.28)", display: "flex", alignItems: "center", gap: 6 }}
+          style={{ position: "absolute", right: 14, bottom: 74, zIndex: 3, height: 30, padding: "0 12px", borderRadius: 999, border: `1px solid ${C.border}`, background: C.surface, color: C.textMuted, fontSize: 12, cursor: "pointer", boxShadow: "0 3px 10px rgba(0,0,0,.28)", display: "flex", alignItems: "center", gap: 6 }}
         >
           ↓ {busy ? "Píše sa" : "Na koniec"}
         </button>
@@ -614,7 +614,7 @@ function ChatHeader({ chat, extra }: { chat: AssistantChat; extra?: React.ReactN
       {showHistory && (
         <>
           <div onClick={() => setShowHistory(false)} style={{ position: "fixed", inset: 0, zIndex: 3 }} />
-          <div style={{ position: "absolute", top: "100%", right: 8, marginTop: 4, width: 280, maxHeight: 360, overflowY: "auto", background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: "0 10px 30px rgba(0,0,0,.4)", zIndex: 4, padding: 6 }}>
+          <div style={{ position: "absolute", top: "100%", right: 8, marginTop: 4, width: 280, maxHeight: 360, overflowY: "auto", background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, boxShadow: "0 10px 30px rgba(0,0,0,.4)", zIndex: 4, padding: 6 }}>
             <div style={{ fontSize: 11, color: C.textDim, padding: "4px 8px 6px", fontWeight: 600 }}>Nedávne chaty</div>
             {active.length === 0 && <div style={{ fontSize: 12, color: C.textDim, padding: "4px 8px 8px" }}>Zatiaľ žiadne uložené chaty.</div>}
             {active.map((c) => (

@@ -148,11 +148,16 @@ function RangeBar({ r, extra }: { r: Range; extra?: ReactNode }) {
 // With 18 columns the label column scrolls out of sight, and a row of numbers
 // with no name is useless — so the first column is pinned. mix() is
 // transparent-based, so a pinned cell needs an opaque base under the tint.
+//
+// C.surface, nie C.card (Jerry, 11. 8.): pod sklenenými paletami je karta
+// priesvitná a rolujúce čísla podliezali pod názvy položiek — „Prevádzka"
+// sedelo cez „56 275" a nedalo sa prečítať ani jedno. Pripnutá bunka je
+// plocha, POD ktorou sa nemá čítať; priesvitná byť nesmie.
 const sticky = (tint?: string) => ({
   position: "sticky" as const,
   left: 0,
   zIndex: 1,
-  backgroundColor: C.card,
+  backgroundColor: C.surface,
   ...(tint ? { backgroundImage: `linear-gradient(${tint}, ${tint})` } : {}),
 });
 

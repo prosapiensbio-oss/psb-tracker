@@ -8,6 +8,15 @@ export const mix = (v: string, pct: number) => `color-mix(in srgb, ${v} ${pct}%,
 export const C = {
   bg: "var(--c-bg)",
   card: "var(--c-card)",
+  /**
+   * NEPRIEHĽADNÁ plocha. Karta (`card`) je pod sklenenými paletami priesvitná
+   * — 6 % bielej nad mesh pozadím — a to je presne to, čo z nej robí sklo.
+   * Lenže plocha, POD ktorou leží text, ktorý sa nemá čítať (modál nad
+   * obrazovkou, pripnutý stĺpec nad rolujúcimi číslami), priesvitná byť
+   * nesmie: písmená sa preložia cez seba a nečitateľné sú obe vrstvy.
+   * Sklo funguje nad plochou, nie nad textom.
+   */
+  surface: "var(--c-surface)",
   cardHover: "var(--c-cardHover)",
   border: "var(--c-border)",
   accent: "var(--c-accent)",
