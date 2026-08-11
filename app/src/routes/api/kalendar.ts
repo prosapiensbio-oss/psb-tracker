@@ -301,6 +301,47 @@ export const Route = createFileRoute("/api/kalendar")({
           return Response.json({ ok: true });
         }
 
+        // Ručne zapísaná zmena (Jerry, 11. 8.). Automatický rozdiel vidí len to,
+        // čo sa medzi dvoma stiahnutiami zmenilo V KALENDÁRI — takže zrušenie,
+        // o ktorom sa Jerry dozvie telefonicky a v kalendári ho nechá stáť,
+        // alebo náhrada dohodnutá mimo kalendára, mu uniknú. Toto je zadné
+        // vrátka: to isté miesto, tá istá tabuľka, len zdroj je človek.
+        // `uid` má predponu `rucne-`, aby sa dalo odlíšiť od kalendárovej
+        // udalosti — a nikdy sa netrafí do skutočného uid z iCal.
+        if (akcia === "zmena-rucne") {
+          const druh = String(b.druh || "");
+          if (druh !== "zrusene" && druh !== "nahrada") {
+            return Response.json({ ok: false, error: "druh musí byť zrusene alebo nahrada" }, { status: 400 });
+          }
+          const klient = String(b.klient || "").trim();
+          if (!klient) return Response.json({ ok: false, error: "chýba klient" }, { status: 400 });
+          const kedy = String(b.datum || "").slice(0, 10) || teraz().slice(0, 10);
+          // Poznámka napísaná rovno pri zápise JE vysvetlenie — pýtať sa naň
+          // druhýkrát cez „Vybavené" by bola zbytočná obrátka. Bez poznámky
+          // zostane riadok v zozname ako pripomienka, že ju treba doplniť.
+          const poznamka = String(b.poznamka || "").trim();
+          await DB.prepare(
+            "INSERT INTO kal_zmeny (id, kedy, trener, uid, druh, nazov, klient, pred, po, vysvetlene, poznamka, odpovedane_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+          ).bind(
+            uid(),
+            teraz(),
+            String(b.trener || ""),
+            `rucne-${uid()}`,
+            druh,
+            klient,
+            klient,
+            // Zrušenie nesie pôvodný termín v `pred`, náhrada nový v `po` —
+            // rovnaká konvencia ako pri automatickom rozdiele, aby to karta
+            // vedela vypísať bez vetvenia navyše.
+            druh === "zrusene" ? `${kedy}T00:00:00.000Z` : null,
+            druh === "nahrada" ? `${kedy}T00:00:00.000Z` : null,
+            poznamka ? 1 : 0,
+            poznamka || null,
+            poznamka ? teraz() : null,
+          ).run();
+          return Response.json({ ok: true });
+        }
+
         if (akcia === "vysvetli") {
           await DB.prepare("UPDATE kal_zmeny SET vysvetlene = 1, poznamka = ?, odpovedane_at = ? WHERE id = ?")
             .bind(b.poznamka ? String(b.poznamka) : null, teraz(), String(b.id || "")).run();

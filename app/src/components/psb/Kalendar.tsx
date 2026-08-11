@@ -174,7 +174,7 @@ export function Kalendar({ clients, data }: { clients: Record<string, ClientAgg>
           onHotovo={async () => { setUpravovana(null); await nacitaj(); }}
         />
       )}
-      {pripojene && <Zmeny zmeny={zmenyF} onHotovo={nacitaj} />}
+      {pripojene && <Zmeny zmeny={zmenyF} onHotovo={nacitaj} mena={menaKlientov} />}
       {pripojene && <Kontrola udalosti={udalostiF} data={data} />}
       {/* Balíčky aj „Odpísaní, ale majú termín" sa zliali na Kokpit (Jerry,
           9. 8.): dlaždica Odmlčaní sama vynecháva ľudí s budúcim termínom,
@@ -455,30 +455,130 @@ function Mapovanie({ nezname, mena, clients, onHotovo }: { nezname: Nezname[]; m
 }
 
 /** Rozdiely medzi snímkami — materiál na otázky typu „prečo zmizla tá hodina". */
-function Zmeny({ zmeny, onHotovo }: { zmeny: Zmena[]; onHotovo: () => Promise<void> }) {
+function Zmeny({ zmeny, onHotovo, mena }: { zmeny: Zmena[]; onHotovo: () => Promise<void>; mena: string[] }) {
   const [pisem, setPisem] = useState<Record<string, string>>({});
+  const [obnovujem, setObnovujem] = useState(false);
+  const [pridavam, setPridavam] = useState(false);
+  const [uklada, setUklada] = useState(false);
+  const [novy, setNovy] = useState({
+    druh: "zrusene" as "zrusene" | "nahrada",
+    klient: "",
+    datum: new Date().toISOString().slice(0, 10),
+    trener: "",
+    poznamka: "",
+  });
 
   const popis = (z: Zmena) => {
     const kto = z.klient || z.nazov || "udalosť";
+    // Ručne zapísané nesú uid s predponou `rucne-` — vetu treba inú, lebo
+    // „zmizol z kalendára" by pri telefonickom zrušení klamalo.
+    const rucne = z.uid.startsWith("rucne-");
+    if (rucne) {
+      return z.druh === "nahrada"
+        ? `${kto} — náhrada dohodnutá na ${z.po ? den(z.po) : "?"} (zapísané ručne)`
+        : `${kto} — zrušený tréning ${z.pred ? den(z.pred) : ""} (zapísané ručne)`;
+    }
     if (z.druh === "zrusene") return `${kto} — zmizol tréning z ${z.pred ? `${den(z.pred)} ${cas(z.pred)}` : "kalendára"}`;
     if (z.druh === "posunute") return `${kto} — presun z ${z.pred ? `${den(z.pred)} ${cas(z.pred)}` : "?"} na ${z.po ? `${den(z.po)} ${cas(z.po)}` : "?"}`;
     if (z.druh === "pridane") return `${kto} — pribudol tréning ${z.po ? `${den(z.po)} ${cas(z.po)}` : ""}`;
     return `${kto} — zmena názvu z „${z.pred}" na „${z.po}"`;
   };
-  const farba = (d: string) => (d === "zrusene" ? C.red : d === "posunute" ? C.orange : d === "pridane" ? C.green : C.textMuted);
+  const farba = (d: string) => (d === "zrusene" ? C.red : d === "posunute" ? C.orange : d === "pridane" ? C.green : d === "nahrada" ? C.blue : C.textMuted);
+
+  const hlavicka = (
+    // Obnoviť a Zapísať ručne priamo v hlavičke karty (Jerry, 11. 8.).
+    // „Stiahnuť kalendár teraz" existovalo, ale až celkom dole pri obsluhe —
+    // a človek, ktorý sa práve pozerá na prázdny zoznam zmien, potrebuje
+    // stiahnutie presne TU, nie o dve obrazovky nižšie.
+    <div style={{ display: "flex", gap: 8, alignItems: "center", marginLeft: "auto", flexWrap: "wrap" }}>
+      <button
+        onClick={async () => { setObnovujem(true); try { await posli({ akcia: "stiahni" }); await onHotovo(); } finally { setObnovujem(false); } }}
+        disabled={obnovujem}
+        title="Stiahnuť kalendár teraz a prepočítať rozdiely"
+        style={{ padding: "5px 12px", borderRadius: 7, fontSize: 12, cursor: obnovujem ? "wait" : "pointer", border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted }}
+      >
+        {obnovujem ? "Sťahujem…" : "↻ Obnoviť"}
+      </button>
+      <button
+        onClick={() => setPridavam((p) => !p)}
+        title="Zapísať zrušenie alebo náhradu, ktorú kalendár nezachytil"
+        style={{ padding: "5px 12px", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer", border: `1px solid ${mix(C.accent, 45)}`, background: mix(C.accent, 10), color: C.accentLight }}
+      >
+        {pridavam ? "Zavrieť" : "+ Zrušenie / náhrada"}
+      </button>
+    </div>
+  );
+
+  const formular = pridavam && (
+    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", marginTop: 10, padding: "10px 12px", borderRadius: 9, background: mix(C.accent, 5), border: `1px solid ${mix(C.accent, 22)}` }}>
+      <select
+        value={novy.druh}
+        onChange={(e) => setNovy({ ...novy, druh: e.target.value as "zrusene" | "nahrada" })}
+        style={{ padding: "6px 9px", borderRadius: 7, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 12 }}
+      >
+        <option value="zrusene">Zrušený tréning</option>
+        <option value="nahrada">Náhrada</option>
+      </select>
+      <input
+        list="psb-kal-klienti"
+        value={novy.klient}
+        onChange={(e) => setNovy({ ...novy, klient: e.target.value })}
+        placeholder="klient"
+        style={{ flex: "1 1 180px", padding: "6px 10px", borderRadius: 7, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 12 }}
+      />
+      <datalist id="psb-kal-klienti">{mena.map((m) => <option key={m} value={m} />)}</datalist>
+      <input
+        type="date"
+        value={novy.datum}
+        onChange={(e) => setNovy({ ...novy, datum: e.target.value })}
+        style={{ padding: "5px 8px", borderRadius: 7, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 12, colorScheme: "dark" }}
+      />
+      <input
+        value={novy.poznamka}
+        onChange={(e) => setNovy({ ...novy, poznamka: e.target.value })}
+        placeholder="prečo? (nepovinné)"
+        style={{ flex: "1 1 200px", padding: "6px 10px", borderRadius: 7, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 12 }}
+      />
+      <button
+        disabled={!novy.klient.trim() || uklada}
+        onClick={async () => {
+          setUklada(true);
+          try {
+            // Zapíše sa zmena a hneď aj vysvetlenie, ak ho Jerry napísal —
+            // ručný zápis je sám o sebe odpoveď, nemá zmysel pýtať sa naň znova.
+            await posli({ akcia: "zmena-rucne", druh: novy.druh, klient: novy.klient.trim(), datum: novy.datum, trener: novy.trener, poznamka: novy.poznamka });
+            setNovy({ ...novy, klient: "", poznamka: "" });
+            setPridavam(false);
+            await onHotovo();
+          } finally { setUklada(false); }
+        }}
+        style={{ padding: "6px 14px", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: novy.klient.trim() ? "pointer" : "default", opacity: novy.klient.trim() ? 1 : 0.5, border: `1px solid ${C.accent}`, background: C.accentBg, color: C.accentLight }}
+      >
+        {uklada ? "Ukladám…" : "Zapísať"}
+      </button>
+    </div>
+  );
 
   if (!zmeny.length) {
     return (
       <Card>
-        <H3><Info text="Rozdiel medzi posledným a predchádzajúcim stiahnutím kalendára. Zrušenia a presuny sa tu objavia aj vtedy, keď na ne zabudneš — a keď ich vysvetlíš, zápis zostane." label="Zmeny v kalendári" /></H3>
-        <Empty>Od posledného stiahnutia sa nič nezmenilo.</Empty>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <H3 style={{ marginBottom: 0 }}><Info text="Rozdiel medzi posledným a predchádzajúcim stiahnutím kalendára. Zrušenia a presuny sa tu objavia aj vtedy, keď na ne zabudneš — a keď ich vysvetlíš, zápis zostane. Čo kalendár nevidel (zrušenie po telefóne, náhrada dohodnutá mimo), zapíšeš tlačidlom vpravo." label="Zmeny v kalendári" /></H3>
+          {hlavicka}
+        </div>
+        {formular}
+        {!pridavam && <Empty>Od posledného stiahnutia sa nič nezmenilo.</Empty>}
       </Card>
     );
   }
 
   return (
     <Card>
-      <H3><Info text="Rozdiel medzi posledným a predchádzajúcim stiahnutím kalendára. Vysvetlenie sa uloží — o rok bude pri tom mesiaci vidieť, prečo hodina zmizla." label={`Zmeny v kalendári (${zmeny.length})`} /></H3>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", marginBottom: 6 }}>
+        <H3 style={{ marginBottom: 0 }}><Info text="Rozdiel medzi posledným a predchádzajúcim stiahnutím kalendára. Vysvetlenie sa uloží — o rok bude pri tom mesiaci vidieť, prečo hodina zmizla. Čo kalendár nevidel, zapíšeš tlačidlom vpravo." label={`Zmeny v kalendári (${zmeny.length})`} /></H3>
+        {hlavicka}
+      </div>
+      {formular}
       {zmeny.map((z) => (
         <div key={z.id} style={{ padding: "10px 0", borderBottom: `1px solid ${mix(C.border, 55)}` }}>
           <div style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
