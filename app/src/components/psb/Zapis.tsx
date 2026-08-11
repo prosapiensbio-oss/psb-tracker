@@ -169,10 +169,43 @@ export function ZapisButton({
             {dopytOk && <div style={{ fontSize: 11.5, color: C.green, marginTop: 6 }}>Zapísané: {dopytOk}. Detail doplníš v Klienti → Dopyty.</div>}
           </form>
 
+          {/* Denník klienta — rovnaký princíp ako dopyt: meno + text, bez
+              navigácie. Zápisy sa PRIDÁVAJÚ a nikdy nemažú — poznámky v čase
+              nie sú smetisko, sú príbeh klienta (Jerryho formulácia, a je
+              správna: „marec: rameno prestalo bolieť" sa nedá zrekonštruovať
+              z ničoho iného). Stála poznámka na fakty žije na karte klienta. */}
+          {klienti.length > 0 && (
+            <div style={{ marginBottom: 14, padding: "11px 13px", borderRadius: 10, border: `1px solid ${mix(C.accent, 30)}`, background: mix(C.accent, 5) }}>
+              <div style={{ fontSize: 12.5, fontWeight: 600, color: C.text, marginBottom: 8 }}>Denník klienta — čo sa stalo</div>
+              <input
+                value={poznMeno} list="zapis-klienti" placeholder="Klient — začni písať"
+                onChange={(e) => setPoznMeno(e.target.value)}
+                style={{ width: "100%", marginBottom: 6, padding: "7px 10px", borderRadius: 8, border: `1px solid ${vybranyKlient ? mix(C.green, 50) : C.border}`, background: C.bg, color: C.text, fontSize: 13 }}
+              />
+              <datalist id="zapis-klienti">
+                {klienti.map((k) => <option key={k.meno} value={k.meno} />)}
+              </datalist>
+              {vybranyKlient ? (
+                <>
+                  {vybranyKlient.poznamka && (
+                    <div style={{ fontSize: 11.5, color: C.textDim, margin: "2px 0 8px", lineHeight: 1.5 }}>
+                      Stála poznámka: <span style={{ color: C.textMuted }}>{vybranyKlient.poznamka}</span>
+                    </div>
+                  )}
+                  <Dennik meno={vybranyKlient.meno} limit={3} onNovyZapis={onDennikZapis} />
+                </>
+              ) : (
+                <div style={{ fontSize: 11.5, color: C.textDim }}>Vyber klienta zo zoznamu — potom sa ukáže jeho denník.</div>
+              )}
+            </div>
+          )}
+
           {/* Kampaň / akcia — za rozklikom (Jerry, 9. 8.): otvorené majú byť
               len dva najčastejšie zápisy, dopyt a denník. Kampaň sa píše
               párkrát do mesiaca — zbalená hlavička úplne stačí a panel je
-              o obrazovku kratší. */}
+              o obrazovku kratší.
+              A od 11. 8. stojí AŽ POD denníkom: poradie v paneli má kopírovať
+              to, ako často sa jednotlivé zápisy píšu, nie ako vznikali. */}
           <div style={{ marginBottom: 14, borderRadius: 10, border: `1px solid ${mix(C.orange, 28)}`, background: mix(C.orange, 5) }}>
             <button
               onClick={() => setAkciaOtvorena((o) => !o)}
@@ -205,37 +238,6 @@ export function ZapisButton({
             )}
             {akciaOk && <div style={{ fontSize: 11.5, color: C.green, padding: "0 13px 9px" }}>⚑ Zapísané: {akciaOk}</div>}
           </div>
-
-          {/* Denník klienta — rovnaký princíp ako dopyt: meno + text, bez
-              navigácie. Zápisy sa PRIDÁVAJÚ a nikdy nemažú — poznámky v čase
-              nie sú smetisko, sú príbeh klienta (Jerryho formulácia, a je
-              správna: „marec: rameno prestalo bolieť" sa nedá zrekonštruovať
-              z ničoho iného). Stála poznámka na fakty žije na karte klienta. */}
-          {klienti.length > 0 && (
-            <div style={{ marginBottom: 14, padding: "11px 13px", borderRadius: 10, border: `1px solid ${mix(C.accent, 30)}`, background: mix(C.accent, 5) }}>
-              <div style={{ fontSize: 12.5, fontWeight: 600, color: C.text, marginBottom: 8 }}>Denník klienta — čo sa stalo</div>
-              <input
-                value={poznMeno} list="zapis-klienti" placeholder="Klient — začni písať"
-                onChange={(e) => setPoznMeno(e.target.value)}
-                style={{ width: "100%", marginBottom: 6, padding: "7px 10px", borderRadius: 8, border: `1px solid ${vybranyKlient ? mix(C.green, 50) : C.border}`, background: C.bg, color: C.text, fontSize: 13 }}
-              />
-              <datalist id="zapis-klienti">
-                {klienti.map((k) => <option key={k.meno} value={k.meno} />)}
-              </datalist>
-              {vybranyKlient ? (
-                <>
-                  {vybranyKlient.poznamka && (
-                    <div style={{ fontSize: 11.5, color: C.textDim, margin: "2px 0 8px", lineHeight: 1.5 }}>
-                      Stála poznámka: <span style={{ color: C.textMuted }}>{vybranyKlient.poznamka}</span>
-                    </div>
-                  )}
-                  <Dennik meno={vybranyKlient.meno} limit={3} onNovyZapis={onDennikZapis} />
-                </>
-              ) : (
-                <div style={{ fontSize: 11.5, color: C.textDim }}>Vyber klienta zo zoznamu — potom sa ukáže jeho denník.</div>
-              )}
-            </div>
-          )}
           <div style={{ display: "grid", gap: 8 }}>
             {polozky.map((p) => (
               <button
