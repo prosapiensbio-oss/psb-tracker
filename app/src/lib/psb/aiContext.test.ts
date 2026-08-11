@@ -218,6 +218,16 @@ describe("marketing v kontexte", () => {
     expect(pevne).toBeLessThan(60000);
   });
 
+  test("marketing má kotvu — chýbajúci mesiac sa nesmie čítať ako nula", () => {
+    // Nález 11. 8., druhý toho dňa z tej istej rodiny: MKT_MESACNE končilo
+    // júnom, júl bol len v databáze, a Jarvis z toho vyrobil „v júli spadol
+    // obsah na nulu" — pritom júl mal 7 reelov a 64 stories, najviac za rok.
+    const k = ctx().marketing.kotva;
+    expect(k.instagramDo).toBe("2026-06");
+    expect(k.poznamka).toContain("NIE JE");
+    expect(k.poznamka).toContain("nenahraté");
+  });
+
   test("zdroje klientov vedia, koľkým chýba — inak sa percentá čítajú zle", () => {
     const z = ctx().marketing.zdrojeKlientov;
     // Vzorkový klient zdroj nemá, takže musí byť započítaný medzi chýbajúce.

@@ -312,8 +312,24 @@ export function buildAiContext(
       }
     }
 
+    // Kotva marketingových dát. 11. 8.: MKT_MESACNE končilo júnom, júlové
+    // čísla boli len v databáze (kanaly_mesiace, mkt_prispevky) — a Jarvis
+    // z chýbajúceho riadku vyrobil tvrdenie „v júli spadol obsah na nulu",
+    // hoci júl bol s 32 kusmi najsilnejší mesiac v roku. Chýbajúci mesiac
+    // NIE JE nula. Tá istá rodina chýb ako kotva dát pri tržbách, len na
+    // druhom konci appky.
+    const poslednyMkt = MKT_MESACNE.length ? MKT_MESACNE[MKT_MESACNE.length - 1].m : null;
+    const poslednyGsc = GSC_MESACNE.length ? GSC_MESACNE[GSC_MESACNE.length - 1].m : null;
+    const poslednyGa4 = GA4_MESACNE.length ? GA4_MESACNE[GA4_MESACNE.length - 1].m : null;
+
     return {
       poznamka: "Rozhoduje sa z ULOŽENÍ a ZDIEĽANÍ, nie z videní — videnie je algoritmus, uloženie je človek. Obsah je agregovaný po kategórii háku; jednotlivé kusy sú len v najlepších/najhorších. Kanály z Metricoolu (Threads, TikTok, Konkurencia) sú v databáze len za jeden mesiac, na trend nestačia — keď ich treba, vytiahni ich dopytom z kanaly_mesiace. Obrazovka: Marketing.",
+      kotva: {
+        instagramDo: poslednyMkt,
+        vyhladavanieDo: poslednyGsc,
+        webDo: poslednyGa4,
+        poznamka: "Rady končia týmito mesiacmi. Mesiac, ktorý v rade NIE JE, znamená „ešte nenahraté“ — NIKDY nie nulu a nikdy nie prepad. Novšie čísla bývajú v databáze skôr než tu: over ich dopytom do kanaly_mesiace (Posts/Reels/Stories/Views po mesiacoch) alebo mkt_prispevky, kým o poslednom mesiaci čokoľvek tvrdíš.",
+      },
       instagramMesacne: MKT_MESACNE,
       obsahZhrnutie: zhrnutieHookov,
       obsahPodlaHooku: hooky,
