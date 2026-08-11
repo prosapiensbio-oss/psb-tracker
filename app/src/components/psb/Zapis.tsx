@@ -42,6 +42,8 @@ export function ZapisButton({
   const [open, setOpen] = useState(false);
   const [dopytMeno, setDopytMeno] = useState("");
   const [dopytZdroj, setDopytZdroj] = useState("reklama");
+  /** Kedy sa človek OZVAL, nie kedy si to zapísal — z toho počíta lievik. */
+  const [dopytDatum, setDopytDatum] = useState(() => new Date().toISOString().slice(0, 10));
   const [dopytBusy, setDopytBusy] = useState(false);
   const [dopytOk, setDopytOk] = useState("");
   const [poznMeno, setPoznMeno] = useState("");
@@ -112,17 +114,29 @@ export function ZapisButton({
 
       {open && (
         <Modal title="Čo chceš zapísať" onClose={() => setOpen(false)}>
-          {/* Najčastejší zápis rovno tu, bez navigácie. Dopyt je meno + zdroj;
-              všetko ostatné sa dá doplniť neskôr v Dopytoch. Rozcestník nižšie
-              zostáva pre zápisy, ktoré potrebujú vlastnú obrazovku. */}
+          {/* Najčastejší zápis rovno tu, bez navigácie. Dopyt je meno + zdroj
+              + DÁTUM; všetko ostatné sa dá doplniť neskôr v Dopytoch.
+              Rozcestník nižšie zostáva pre zápisy, ktoré potrebujú vlastnú
+              obrazovku.
+
+              Dátum tu pribudol 11. 8. (Jerry: „ak je dátum dôležitý, musí byť
+              aj v + Zápis"). Predtým sa bral dnešok natvrdo — na zdroj klienta
+              to nemá vplyv, ale lievik z toho počíta „Ø dní do úvodného" a
+              kohorty dopytov. Kto si dopyty odklikal naraz na konci mesiaca,
+              dostal všetky s jedným dátumom a obe čísla boli nezmysel.
+              Predvyplnený je dnešok, takže bežný priebežný zápis je rovnako
+              rýchly ako predtým. */}
           <form
             onSubmit={(e) => {
               e.preventDefault();
               const m = dopytMeno.trim();
               if (!m || dopytBusy) return;
               setDopytBusy(true);
-              void saveLead({ date: new Date().toISOString().slice(0, 10), name: m, source: dopytZdroj as never, status: "novy", referrer: "", note: "" })
-                .then(() => { setDopytMeno(""); setDopytOk(m); onRefresh?.(); setTimeout(() => setDopytOk(""), 4000); })
+              void saveLead({ date: dopytDatum || new Date().toISOString().slice(0, 10), name: m, source: dopytZdroj as never, status: "novy", referrer: "", note: "" })
+                // Dátum sa po uložení ZÁMERNE nevracia na dnešok: kto dopisuje
+                // viac dopytov z jedného dňa, nastaví ho raz. Meno sa maže,
+                // dátum a zdroj zostávajú — to je poradie, v akom sa to píše.
+                .then(() => { setDopytMeno(""); setDopytOk(`${m} · ${dopytDatum.split("-").reverse().map(Number).join(".")}.`); onRefresh?.(); setTimeout(() => setDopytOk(""), 4000); })
                 .finally(() => setDopytBusy(false));
             }}
             style={{ marginBottom: 14, padding: "11px 13px", borderRadius: 10, border: `1px solid ${mix(C.accent, 30)}`, background: mix(C.accent, 5) }}
@@ -132,6 +146,14 @@ export function ZapisButton({
               <input
                 value={dopytMeno} onChange={(e) => setDopytMeno(e.target.value)} placeholder="Meno"
                 style={{ flex: "2 1 140px", minWidth: 0, padding: "7px 10px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 13 }}
+              />
+              <input
+                type="date"
+                value={dopytDatum}
+                onChange={(e) => setDopytDatum(e.target.value)}
+                max={new Date().toISOString().slice(0, 10)}
+                title="Kedy sa ozval — nie kedy to zapisuješ. Z toho sa počíta lievik."
+                style={{ flex: "0 1 132px", minWidth: 0, padding: "6px 8px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 12.5, colorScheme: "dark" }}
               />
               <select
                 value={dopytZdroj} onChange={(e) => setDopytZdroj(e.target.value)}
