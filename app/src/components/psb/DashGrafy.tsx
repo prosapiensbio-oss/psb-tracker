@@ -11,7 +11,7 @@ import {
   pnlCalc, QUARTERS, salaryCalc, VZAS_MONTH_LABELS, VZAS_MONTHS, VZAS_TARGETS_BY_YEAR, vzasVerzia,
   type KpiGroup, type KpiOverrides, poslednyMesiacSDatami, predikciaNakladov,} from "../../lib/psb/vzas";
 import { kpiFmt } from "./Vzas";
-import { cenaZaSedenie, doPlnehoMesiaca, najdiKlienta, kotvaDat, monthlyFinance, predictCash, predictEarnings } from "../../lib/psb/compute";
+import { cenaZaSedenie, doPlnehoMesiaca, najdiKlienta, kotvaDat, monthlyFinance, predictCash, predictEarnings, ziskavanieKlientov } from "../../lib/psb/compute";
 import type { KanalRiadok } from "./Kanaly";
 import { ZDROJE } from "./Klienti";
 import { tokyKlientov } from "./Fluktuacia";
@@ -110,6 +110,7 @@ export const WIDGETS: WidgetMeta[] = [
   { id: "hodiny", label: "Odrobené hodiny / týždeň", span: 2, sekcia: "vytazenie", popis: "Týždenné hodiny so zdravou zónou 24–34 h.", doma: "Klienti → Tréningy" },
   { id: "zony", label: "Týždne v zdravej zóne", span: 1, sekcia: "vytazenie", popis: "Koľko týždňov padlo do zóny, pod ňu a nad ňu.", doma: "Klienti → Tréningy" },
   { id: "kapacita", label: "Kapacita & vyťaženie", span: 1, sekcia: "vytazenie", popis: "Koľko klientov ešte zvládnete pri zdravom týždni.", doma: "Klienti → Klienti" },
+  { id: "ziskavanie", label: "Koľko klientov naozaj treba", span: 1, sekcia: "vytazenie", popis: "Voľné miesta plus tí, čo medzitým odídu — číslo, z ktorého sa počíta rozpočet na reklamu.", doma: "Klienti → Rast" },
   { id: "hodinyMes", label: "Hodiny po mesiacoch", span: 1, sekcia: "vytazenie", popis: "Dlhší horizont než týždne — sezónnosť práce a vyhorenie.", doma: "Mesiac → Výsledky" },
   { id: "sedeniaMes", label: "Počet sedení / mesiac", span: 1, sekcia: "vytazenie", popis: "Objem práce v kusoch — predstih pred tržbami.", doma: "Peniaze → Tržby" },
   { id: "typySedeni", label: "Pomer typov sedení", span: 1, sekcia: "vytazenie", popis: "Offline, online a úvodné — z čoho sa skladá prevádzka.", doma: "Klienti → Tréningy" },
@@ -184,7 +185,7 @@ export const HLAVNE: string[] = [
   // Zisky a náklady: skutočnosť + odhad, potom pásmo zisku.
   "ziskyNaklady", "pasmoZisku",
   // Vyťaženie: hodiny, kapacita, fluktuácia, ekonomika hodiny.
-  "hodiny", "kapacita", "rastStrata", "cenaSedenia", "suhrnSedeni",
+  "hodiny", "kapacita", "ziskavanie", "rastStrata", "cenaSedenia", "suhrnSedeni",
   // Marketing: súhrn, čo stojí klient, čo prinesie.
   "marketingSuhrn", "cenaUvodneho", "ltvZdroj",
 ];
@@ -1113,6 +1114,41 @@ export function useExtraGrafy({
         </Klik>
       </Card>
     );
+
+    // Deravé vedro. Jerry, 11. 8.: „mám síce 18 voľných, ale koľko ľudí odíde
+    // za ten čas, čo to zapĺňam? 18 potrebujem teraz, ale skutočne potrebujem
+    // 30." Karta existuje preto, že voľné miesta samy o sebe k akcii nevedú —
+    // rozpočet na reklamu sa počíta z tohto čísla, nie z nich.
+    {
+      const z = ziskavanieKlientov(data, vytazenie?.zvladneEste ?? 0);
+      const zaPolRoka = z.trebaZiskat(6);
+      nodes.ziskavanie = (
+        <Card style={{ marginBottom: 0, height: "100%" }}>
+          <H3><Info label="Koľko klientov naozaj treba" text="Voľné miesta sú statické číslo, klientela je prietok — kým zapĺňaš, tečie. Preto počet klientov, ktorých treba ZÍSKAŤ, nie je počet voľných miest, ale voľné miesta + odchod × počet mesiacov. Odchod sa počíta z TICHA (posledná hodina viac než 60 dní dozadu), nie zo zrušenia — klienti neodhlasujú, prestanú chodiť. Dôsledok: posledné dva mesiace vždy vyzerajú bez odchodov, lebo ticho ešte nestihlo dozrieť; preto sa priemer berie z 12 mesiacov. Ráta sa len s klientmi, ktorí mali aspoň 5 sedení — kto prišiel raz a zmizol, nikdy nebol klient." /></H3>
+          <Klik kam={() => onNavigate("klienti", "rast")} onNavigate="Klienti → Rast">
+            {!z.aktivnych ? <Empty>Zatiaľ málo dát na výpočet odchodu.</Empty> : (
+              <div style={{ display: "grid", gap: 10 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}>
+                  <MiniStat label="Treba získať za pol roka" value={String(zaPolRoka)} pod={`voľných ${z.volnychMiest} + ${Math.round(z.odchodMes * 6)} odíde`} color={C.accent} />
+                  <MiniStat
+                    label="Pri dnešnom tempe plno o"
+                    value={z.mesiacovNaZaplnenie === null ? "nikdy" : `${z.mesiacovNaZaplnenie} mes.`}
+                    pod={`čistý prírastok ${z.cistyMes > 0 ? "+" : ""}${z.cistyMes}/mes`}
+                    color={z.mesiacovNaZaplnenie === null || z.mesiacovNaZaplnenie > 12 ? C.red : C.green}
+                  />
+                  <MiniStat label="Príchod" value={`${z.prichodMes}/mes`} color={C.green} />
+                  <MiniStat label="Odchod" value={`${z.odchodMes}/mes`} color={C.red} />
+                </div>
+                <div style={{ fontSize: 11.5, color: C.textDim, lineHeight: 1.5 }}>
+                  Priemer za {z.obdobie.mesiacov} mesiacov ({monthLabel(z.obdobie.od)} – {monthLabel(z.obdobie.do)}) ·
+                  chodí {z.aktivnych} klientov · za rok treba {z.trebaZiskat(12)}
+                </div>
+              </div>
+            )}
+          </Klik>
+        </Card>
+      );
+    }
 
     // ── Klienti ──────────────────────────────────────────────────────────────
     const balicky = new Map<string, number>();

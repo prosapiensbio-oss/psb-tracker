@@ -13,6 +13,7 @@ import { MKT_OBSAH } from "./marketing-obsah";
 import {
   cenaZaSedenie,
   kotvaDat,
+  ziskavanieKlientov,
   monthlyFinance,
   predictEarnings, predictCash,
   sessionAnalysisPSB,
@@ -251,6 +252,26 @@ export function buildAiContext(
     };
   })();
 
+  // ── Získavanie klientov (deravé vedro) ────────────────────────────────────
+  //
+  // Toto je číslo, z ktorého sa počíta rozpočet na reklamu — a je to iné číslo
+  // než „koľko mám voľných miest". Bez neho Jarvis plánoval na statických 18
+  // miestach a vychádzali mu polovičné rozpočty.
+  const zisk = ziskavanieKlientov(data, capacity.reduce((a, c) => a + c.canTake, 0));
+  const dopytySpolu = (data.leads || []).length;
+  const ziskavanie = {
+    poznamka: "Voľné miesta sú statické, klientela je prietok: kým zapĺňaš, tečie. Počet klientov, ktorých treba ZÍSKAŤ = voľné miesta + odchod × mesiace. Odchod sa počíta z TICHA (posledná hodina viac než 60 dní dozadu), nie zo zrušenia. Posledné dva mesiace preto vždy vyzerajú bez odchodov — ticho ešte nedozrelo; priemer sa berie z 12 mesiacov. Ráta sa len s klientmi, čo mali 5+ sedení. Obrazovka: Kokpit, karta „Koľko klientov naozaj treba“.",
+    aktivnych: zisk.aktivnych,
+    volnychMiest: zisk.volnychMiest,
+    odchodMes: zisk.odchodMes,
+    prichodMes: zisk.prichodMes,
+    cistyMes: zisk.cistyMes,
+    obdobie: zisk.obdobie,
+    mesiacovNaZaplnenie: zisk.mesiacovNaZaplnenie,
+    trebaZiskat: { za6mes: zisk.trebaZiskat(6), za12mes: zisk.trebaZiskat(12) },
+    dopytovSpolu: dopytySpolu,
+  };
+
   // ── Marketing ─────────────────────────────────────────────────────────────
   //
   // Jarvis má byť plánovač marketingu, nie len účtovník tréningov — a na plán
@@ -481,6 +502,7 @@ export function buildAiContext(
     },
     sixM: { spolu: sixM.length, podlaFazy: sixMPhases, poznamka: "6M proces: Obnova 1.–6. mesiac, Integrácia 7.–18., Udržateľnosť 19.+" },
     kalendar: kalendarBlok,
+    ziskavanie,
     marketing,
     // P&L po položkách za posledných 12 mesiacov. Bez toho Jarvis na otázku
     // „ktorá aplikácia stála v apríli 780?" nemá kde hľadať: hodnoty P&L žijú

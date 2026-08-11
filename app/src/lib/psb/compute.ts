@@ -1539,3 +1539,95 @@ export function predictEarnings(
   perClient.sort((a, b) => b.monthlyRevenue - a.monthlyRevenue);
   return { months: monthsArr, guaranteedTotal, monthlyRunRate, scenarios, perClient };
 }
+
+// ── Získavanie klientov: deravé vedro ────────────────────────────────────────
+//
+// Jerry, 11. 8.: „mám síce 18 voľných, ale koľko ľudí odíde za ten čas, čo to
+// zapĺňam? 18 potrebujem teraz, ale skutočne potrebujem 30."
+//
+// Mal pravdu a je to jediná úvaha, ktorá z voľnej kapacity spraví rozpočet.
+// Voľné miesta sú statické číslo; klientela je prietok. Kým zapĺňaš, tečie —
+// takže počet klientov, ktorých treba ZÍSKAŤ, nie je počet voľných miest, ale
+//
+//     voľné miesta + odchod × počet mesiacov.
+//
+// Pri PSB (aug 25 – júl 26) je odchod 1,8 a príchod 2,6 mesačne, teda čistý
+// prírastok 0,75. Zaplniť 18 miest týmto tempom trvá 24 mesiacov; za pol roka
+// to chce 29 klientov, nie 18. To je ten istý rozdiel ako medzi „koľko mi
+// chýba" a „koľko musím nakúpiť".
+//
+// ODCHOD sa definuje tichom, nie zrušením — klienti neodhlasujú, prestanú
+// chodiť. Preto: kto má poslednú hodinu viac než `tichoDni` pred kotvou, je
+// preč, a počíta sa do mesiaca svojej POSLEDNEJ hodiny. Dôsledok, s ktorým
+// treba rátať: posledné dva mesiace vždy vyzerajú bez odchodov, lebo ticho
+// ešte nestihlo dozrieť. Preto sa priemer berie z 12 mesiacov, nie z posledných.
+export type Ziskavanie = {
+  /** Klienti, ktorí ešte chodia (5+ sedení, ticho kratšie než tichoDni). */
+  aktivnych: number;
+  odchodMes: number;
+  prichodMes: number;
+  cistyMes: number;
+  /** Odkedy dokedy sa priemery počítali. */
+  obdobie: { od: string; do: string; mesiacov: number };
+  volnychMiest: number;
+  /** Mesiacov na zaplnenie pri dnešnom tempe; null = pri zápornom prírastku sa nezaplní nikdy. */
+  mesiacovNaZaplnenie: number | null;
+  /** Koľko klientov treba ZÍSKAŤ, aby bolo plno o N mesiacov (vrátane tých, čo medzitým odídu). */
+  trebaZiskat: (mesiacov: number) => number;
+};
+
+export function ziskavanieKlientov(
+  data: { sessions: { client: string; date: string }[] },
+  volnychMiest: number,
+  opts: { minSedeni?: number; tichoDni?: number; oknoMesiacov?: number } = {},
+): Ziskavanie {
+  const minSedeni = opts.minSedeni ?? 5;
+  const tichoDni = opts.tichoDni ?? 60;
+  const okno = opts.oknoMesiacov ?? 12;
+
+  const kotva = kotvaDat(data as { sessions: { date: string }[] });
+  const perKlient: Record<string, { prve: string; posledne: string; n: number }> = {};
+  for (const s of data.sessions) {
+    const d = s.date.slice(0, 10);
+    const e = (perKlient[s.client] ||= { prve: d, posledne: d, n: 0 });
+    e.n++;
+    if (d < e.prve) e.prve = d;
+    if (d > e.posledne) e.posledne = d;
+  }
+
+  // Okno končí posledným PLNÝM mesiacom — rozrobený mesiac by ťahal príchod
+  // nadol rovnako, ako ťahal priemer tržieb.
+  const doM = kotva.plny || kotva.mesiac;
+  const odM = doM ? posunMesiac(doM, -(okno - 1)) : "";
+
+  let aktivnych = 0, prisli = 0, odisli = 0;
+  for (const [, e] of Object.entries(perKlient)) {
+    if (e.n < minSedeni) continue;
+    const preč = kotva.den ? daysBetween(e.posledne, kotva.den) > tichoDni : false;
+    if (!preč) aktivnych++;
+    const mP = e.prve.slice(0, 7), mO = e.posledne.slice(0, 7);
+    if (odM && mP >= odM && mP <= doM) prisli++;
+    if (preč && odM && mO >= odM && mO <= doM) odisli++;
+  }
+
+  const odchodMes = odisli / okno;
+  const prichodMes = prisli / okno;
+  const cistyMes = prichodMes - odchodMes;
+  return {
+    aktivnych,
+    odchodMes: Math.round(odchodMes * 100) / 100,
+    prichodMes: Math.round(prichodMes * 100) / 100,
+    cistyMes: Math.round(cistyMes * 100) / 100,
+    obdobie: { od: odM, do: doM, mesiacov: okno },
+    volnychMiest,
+    mesiacovNaZaplnenie: cistyMes > 0 ? Math.ceil(volnychMiest / cistyMes) : null,
+    trebaZiskat: (mesiacov: number) => Math.ceil(volnychMiest + odchodMes * mesiacov),
+  };
+}
+
+/** Posun mesiaca "YYYY-MM" o N (aj záporne). */
+function posunMesiac(mk: string, n: number): string {
+  const [r, m] = mk.split("-").map(Number);
+  const t = r * 12 + (m - 1) + n;
+  return `${Math.floor(t / 12)}-${String((t % 12) + 1).padStart(2, "0")}`;
+}

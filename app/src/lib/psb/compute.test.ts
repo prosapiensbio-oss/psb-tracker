@@ -6,6 +6,7 @@ import {
   kotvaDat,
   menoKluc,
   najdiKlienta,
+  ziskavanieKlientov,
   rodinaZKluca,
 } from "./compute";
 import { EMPTY_DATA } from "./types";
@@ -206,5 +207,78 @@ describe("rodinaZKluca", () => {
   test("kľúč zložený len z dátumu sa nezmaže na prázdno", () => {
     // Prázdna rodina by umlčala všetko — radšej nech je kľúčom sám seba.
     expect(rodinaZKluca("2026-08-09")).toBe("2026-08-09");
+  });
+});
+
+// ── Deravé vedro ─────────────────────────────────────────────────────────────
+//
+// Jerryho námietka z 11. 8.: „18 potrebujem teraz, ale skutočne potrebujem 30."
+// Voľné miesta sú statické číslo, klientela je prietok — kým zapĺňaš, tečie.
+describe("ziskavanieKlientov", () => {
+  /** i = 0 → 2025-07 … i = 11 → 2026-06. Okno má presne 12 mesiacov. */
+  const MES = (i: number) => {
+    const t = 2025 * 12 + 6 + i;
+    return `${Math.floor(t / 12)}-${String((t % 12) + 1).padStart(2, "0")}`;
+  };
+
+  // Dvaja prídu a jeden odíde každý mesiac. Odídení majú prvé sedenie PRED
+  // oknom, inak by sa počítali aj ako príchod.
+  const vzorka = (): PSBData => {
+    const s: SessionRow[] = [];
+    for (let i = 0; i < 12; i++) {
+      for (const k of ["a", "b"]) {
+        const meno = `Prisiel ${i}${k}`;
+        // Päť sedení hneď v prvom mesiaci — inak by sa klient, ktorý prišiel
+        // v poslednom mesiaci okna, nestihol dostať cez hranicu 5 sedení
+        // a vzorka by tichým spôsobom stratila príchody.
+        for (let d = 1; d <= 5; d++) s.push(sedenie(meno, `${MES(i)}-0${d}`, 0));
+        for (let j = i; j < 12; j++) s.push(sedenie(meno, `${MES(j)}-15`, 0));
+        s.push(sedenie(meno, "2026-06-30", 0));
+      }
+      const odch = `Odisiel ${i}`;
+      s.push(sedenie(odch, "2025-01-10", 0));
+      for (let k = 0; k < 4; k++) s.push(sedenie(odch, `${MES(i)}-0${k + 1}`, 0));
+    }
+    return { ...EMPTY_DATA, sessions: s };
+  };
+
+  test("odchod sa počíta z TICHA, nie zo zrušenia", () => {
+    const z = ziskavanieKlientov(vzorka(), 18);
+    expect(z.prichodMes).toBe(2);
+    // Desať z dvanástich: kto odišiel v posledných dvoch mesiacoch, ešte
+    // nestihol stíchnuť na 60 dní. Je to vlastnosť, nie chyba — ale znamená,
+    // že čerstvé mesiace vždy vyzerajú bez odchodov.
+    expect(z.odchodMes).toBeCloseTo(0.83, 2);
+    expect(z.cistyMes).toBeCloseTo(1.17, 2);
+  });
+
+  test("treba získať VIAC než je voľných miest — to je celý zmysel", () => {
+    const z = ziskavanieKlientov(vzorka(), 18);
+    expect(z.trebaZiskat(6)).toBe(23);   // 18 + 0,83 × 6
+    expect(z.trebaZiskat(12)).toBe(28);  // 18 + 10
+    expect(z.trebaZiskat(0)).toBe(18);   // nikdy menej než voľné miesta
+  });
+
+  test("pri nulovom alebo zápornom prírastku sa nezaplní nikdy", () => {
+    const s: SessionRow[] = [];
+    for (let i = 0; i < 12; i++) {
+      const meno = `X${i}`;
+      s.push(sedenie(meno, "2025-01-10", 0));
+      for (let k = 0; k < 4; k++) s.push(sedenie(meno, `${MES(i)}-0${k + 1}`, 0));
+    }
+    // Klient, ktorý drží kotvu na konci júna a neprišiel v okne.
+    s.push(sedenie("Stary", "2025-01-01", 0));
+    for (let k = 0; k < 3; k++) s.push(sedenie("Stary", `2026-06-1${k}`, 0));
+    s.push(sedenie("Stary", "2026-06-30", 0));
+
+    const z = ziskavanieKlientov({ ...EMPTY_DATA, sessions: s }, 18);
+    expect(z.prichodMes).toBe(0);
+    expect(z.cistyMes).toBeLessThan(0);
+    expect(z.mesiacovNaZaplnenie).toBeNull();
+  });
+
+  test("okno končí posledným PLNÝM mesiacom, nie rozrobeným", () => {
+    const z = ziskavanieKlientov(vzorka(), 18);
+    expect(z.obdobie).toEqual({ od: "2025-07", do: "2026-06", mesiacov: 12 });
   });
 });
