@@ -40,10 +40,15 @@ export const Route = createFileRoute("/api/jarvis-memory")({
           ).all();
           return Response.json({
             ok: true,
-            chats: (ch.results as Row[]).map((r) => ({
-              id: r.id, title: r.title, archived: !!r.archived, updatedAt: Date.parse(String(r.updated_at)) || Date.now(),
-              messages: JSON.parse(String(r.messages || "[]")),
-            })),
+            // Každý chat sa parsuje SÁM. Kým bol JSON.parse v spoločnom try,
+            // jeden poškodený riadok znamenal prázdny zoznam chatov AJ záverov
+            // — pamäť Jarvisa vyzerala, že sa vymazala. Pokazený chat teraz
+            // stratí seba, nie zvyšok.
+            chats: (ch.results as Row[]).map((r) => {
+              let messages: unknown = [];
+              try { messages = JSON.parse(String(r.messages || "[]")); } catch { messages = []; }
+              return { id: r.id, title: r.title, archived: !!r.archived, updatedAt: Date.parse(String(r.updated_at)) || Date.now(), messages };
+            }),
             zavery: (zv.results as Row[]).map((r) => ({
               id: r.id, datum: r.datum, tema: r.tema, zaver: r.zaver, preco: r.preco,
               overit: r.overit, overitDo: r.overit_do, vysledok: r.vysledok, stav: r.stav, chatId: r.chat_id,
@@ -71,10 +76,17 @@ export const Route = createFileRoute("/api/jarvis-memory")({
           // Obrázky sa do pamäte neukladajú — base64 by tabuľku roztrhlo a na
           // nadviazanie rozhovoru nie sú potrebné.
           const msgs = Array.isArray(b.messages) ? (b.messages as Row[]).map((m) => ({ role: m.role, text: m.text })) : [];
+          // Keď je chat pridlhý, zahoď NAJSTARŠIE správy — nerež JSON uprostred
+          // (nález z testu Jarvisa 11. 8.). `.slice(0, 400_000)` uložil nevalidný
+          // JSON a čítanie chatov robí JSON.parse v jednom spoločnom try: jeden
+          // taký riadok zhodil celú odpoveď a z appky zmizli VŠETKY chaty aj
+          // všetky závery naraz. Radšej kratšia história než žiadna.
+          let ulozene = msgs;
+          while (ulozene.length > 1 && JSON.stringify(ulozene).length > 400_000) ulozene = ulozene.slice(1);
           await DB.prepare(
             `INSERT INTO jarvis_chats (id, title, messages, archived, updated_at) VALUES (?1, ?2, ?3, ?4, ?5)
              ON CONFLICT(id) DO UPDATE SET title = ?2, messages = ?3, archived = ?4, updated_at = ?5`,
-          ).bind(id, s(b.title, 120) || "Nový chat", JSON.stringify(msgs).slice(0, 400_000), b.archived ? 1 : 0, now).run();
+          ).bind(id, s(b.title, 120) || "Nový chat", JSON.stringify(ulozene).slice(0, 400_000), b.archived ? 1 : 0, now).run();
           return Response.json({ ok: true });
         }
 
