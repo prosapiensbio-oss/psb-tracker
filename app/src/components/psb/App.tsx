@@ -1192,6 +1192,39 @@ function skupinaFaktur(
     // bankaPohyby[mesiac] je mapa KATEGÓRIA → pohyby, nie pole. `.length` na
     // nej dávalo „undefined pohybov v mesiaci"; treba spočítať cez kategórie.
     const pohybovMes = Object.values(bankaPohyby[mk] || {}).reduce((a, v) => a + v.length, 0);
+    /**
+     * Kto mal v tomto mesiaci úvodný tréning a nemá zapísaný zdroj.
+     *
+     * Zdroj sa plní SÁM z dopytov: zapíšeš dopyt so zdrojom, a keď z človeka
+     * bude klient, appka mu ho doplní. Za apríl–júl 2026 to vyšlo na sto
+     * percent, takže tento krok bude väčšinou hneď odškrtnutý.
+     *
+     * Zmysel má pre ten jeden prípad, ktorý prekĺzne: človek, čo prišiel bez
+     * zapísaného dopytu (Zuzana Spoligova, úvodný v auguste). Bez tejto
+     * kontroly sa o ňom nedozvieš nikdy — v marketingu proste ticho spadne
+     * do „nevyplnené" a skreslí porovnanie zdrojov.
+     *
+     * Anamnéza tu ZÁMERNE nie je podmienkou. Bola jednorazovým dobehnutím
+     * histórie (46 zo 47 v auguste 2026); ako mesačný rituál by pridala prácu
+     * za informáciu, ktorú appka už má.
+     */
+    const bezZdroja = (() => {
+      const uvodniVMesiaci = new Set(
+        data.sessions
+          .filter((s) => s.sessionType === "UVODNE" && s.date.slice(0, 7) === mk)
+          .map((s) => s.client),
+      );
+      const mena = Object.values(clients).map((c) => c.name);
+      const chyba: string[] = [];
+      for (const meno of uvodniVMesiaci) {
+        const kanonicke = najdiKlienta(mena, meno);
+        const c = kanonicke ? clients[kanonicke] : undefined;
+        // Kto v Klientoch vôbec nie je (jednorazový úvodný), zdroj mať nemôže —
+        // hlásiť ho by bola otrava bez akcie.
+        if (c && !c.zdroj) chyba.push(c.name);
+      }
+      return chyba.sort((a, b) => a.localeCompare(b, "sk"));
+    })();
     return [
       {
         id: "ptminder",
@@ -1220,6 +1253,17 @@ function skupinaFaktur(
         hotovo: MKT_MESACNE.some((r) => r.m === mk) || kanalyMesiace.includes(mk),
         detail: MKT_MESACNE.some((r) => r.m === mk) || kanalyMesiace.includes(mk) ? "nahratý" : "chýba export",
         tab: "udaje",
+      },
+      {
+        id: "zdroje",
+        label: "Odkiaľ prišli",
+        hotovo: bezZdroja.length === 0,
+        detail: bezZdroja.length === 0
+          ? "všetci úvodní majú zdroj"
+          : `${bezZdroja.length}× chýba zdroj: ${bezZdroja.slice(0, 4).join(", ")}${bezZdroja.length > 4 ? "…" : ""}`,
+        tab: "tracker",
+        sub: "klienti",
+        focus: bezZdroja.length ? { skupina: { label: `Úvodný ${mk} bez zdroja`, mena: bezZdroja }, nonce: Date.now() } : undefined,
       },
       {
         id: "otazky",
@@ -1267,7 +1311,7 @@ function skupinaFaktur(
         })(),
       },
     ];
-  }, [data, bankaSumy, bankaPohyby, kanalyMesiace, hotovostMesiace, zapisy, registerAll, stavHotovosti]);
+  }, [data, clients, bankaSumy, bankaPohyby, kanalyMesiace, hotovostMesiace, zapisy, registerAll, stavHotovosti]);
 
   /**
    * Všetko, čo appka o mesiaci vie, ako text pre mesačnú správu.

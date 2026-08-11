@@ -59,6 +59,12 @@ const MARKETING_ZDROJE: { druh: string; label: string; path: string }[] = [
   { druh: "metricool", label: "Metricool — príspevky, reels, stories", path: "Dve cesty, obe sem. (1) Analytics › Export › CSV — tri súbory instagram-posts, instagram-reels, instagram-stories; z nich má appka Instagram príspevok po príspevku. (2) Mesačná zostava v PDF — tú appka prečítať nevie (čísla sú vykreslené do grafov), tak ju prečíta Jarvis a vytiahne z nej všetky kanály naraz vrátane Facebooku, TikToku a Meta Ads. Stačí ju sem pretiahnuť. PPTX a XLSX nie." },
   { druh: "ga4", label: "Google Analytics 4", path: "GA4 → Prehľady › Prehľad stavu prehľadov › Stiahnuť CSV (jeden súbor za mesiac)" },
   { druh: "gsc", label: "Google Search Console", path: "Search Console → Výsledky vyhľadávania › Exportovať › CSV. Stiahne sa ZIP — rozbaľ ho a nahraj tri súbory: Graf.csv (kliky po dňoch), Dopyty.csv (na čo ťa ľudia našli), Strany.csv (ktorý článok ťahá). Krajiny, Zariadenia a Filtre appka zatiaľ nepoužíva." },
+  // Anamnéza je tu NEPOVINNE a zámerne posledná. Zdroj klienta sa dnes plní sám
+  // z dopytov (za apríl–júl 2026 na sto percent), takže mesačne ju netreba —
+  // tlačidlo je tu na dobehnutie histórie, keby sa niekedy nazbierali ľudia bez
+  // zapísaného dopytu. Pri prestavbe obrazovky vypadlo, hoci parser aj serverová
+  // časť celý čas fungovali.
+  { druh: "anamneza", label: "Anamnéza — len zdroj klienta (nepovinné)", path: "Google Forms → Odpovede › Exportovať do Sheets › Súbor › Stiahnuť › CSV. Appka z celého formulára berie JEDINÉ pole: „Jak jste se o nás dozvěděli?“ (plus meno toho, kto klienta poslal). Zdravotná časť sa neukladá vôbec — nie je na ňu v appke dôvod a bola by to najcitlivejšia vec v databáze. Mesačne to netreba: zdroj sa plní sám zo zapísaných dopytov." },
 ];
 
 export function Udaje({ data, actions, chat, prekazky, kroky, podklady, onNavigate, btc }: { data: PSBData; actions: Actions; chat?: AssistantChat; prekazky?: (mesiac: string) => string[]; kroky?: (mesiac: string) => KrokUzavierky[]; podklady?: (mesiac: string) => string; onNavigate?: (tab: string, sub?: string, focus?: NavFocus) => void; btc?: { platby: BtcNakup[]; faktury: { cislo: string; datum: string; celkom: number; dodavatel: string }[]; parovanie: Record<string, string[]>; onSparuj: (id: number, f: string[]) => void } }) {
