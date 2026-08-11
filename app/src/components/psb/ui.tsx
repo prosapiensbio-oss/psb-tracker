@@ -656,6 +656,7 @@ export function ValueBars({
 export function LineChart({
   data,
   series,
+  znacky,
   zone,
   refLine,
   /** Skryje čísla pod grafom (Ø, max, min). Pre karty, ktoré tie isté čísla
@@ -672,6 +673,18 @@ export function LineChart({
    *  aby sa nedal prečítať ako fakt. */
   data: { label: string; values: number[]; forecast?: boolean }[];
   series: { name: string; color: string }[];
+  /**
+   * ANOTÁCIE — „čo v tom čase bežalo" priamo pri krivke.
+   *
+   * Graf sám povie IBA to, že v marci klesol dosah. Nepovie, či vtedy bežala
+   * kampaň, vyšiel silný reel, alebo bola pauza — a bez toho sa z neho nedá
+   * naučiť, čo funguje. Vlajka je zápis „tu sa stalo toto"; kreslí sa nad
+   * bod, ku ktorému patrí, aby číslo a jeho príčina stáli vedľa seba.
+   *
+   * `index` je poradie bodu v `data`, nie dátum — mapovanie dátumu na bod
+   * pozná volajúci (mesačné grafy inak než týždenné).
+   */
+  znacky?: { index: number; text: string }[];
   zone?: { lo: number; hi: number; unit?: string };
   refLine?: { value: number; label?: string; color?: string };
   bezSuhrnu?: boolean;
@@ -725,6 +738,30 @@ export function LineChart({
       {[0, 0.5, 1].map((f) => (
         <text key={f} x={padL - 6} y={y(lo + span * f) + 3} textAnchor="end" fontSize={9} fill={C.textDim}>{fmt(lo + span * f)}</text>
       ))}
+      {/* Vlajky kampaní. Kreslia sa PRED krivkami, aby ich krivka prekryla,
+          nie naopak — anotácia je kontext, nie hlavná informácia. Text sedí
+          na zvislej čiare a je otočený, lebo vodorovne by sa pri viacerých
+          značkách za sebou prekrýval; pri okraji grafu sa zarovná dovnútra,
+          aby nevytiekol von. */}
+      {znacky?.filter((z) => z.index >= 0 && z.index < n).map((z, k) => {
+        const zx = x(z.index);
+        const priKraji = zx > padL + plotW - 40;
+        return (
+          <g key={`${z.index}-${k}`} opacity={0.75}>
+            <line x1={zx} y1={padT} x2={zx} y2={padT + plotH} stroke={C.accent} strokeWidth={1} strokeDasharray="3 3" />
+            <polygon points={`${zx},${padT} ${zx + 7},${padT + 3.5} ${zx},${padT + 7}`} fill={C.accent} />
+            <text
+              x={priKraji ? zx - 4 : zx + 4}
+              y={padT + 11}
+              fontSize={8.5}
+              fill={C.accentLight}
+              textAnchor={priKraji ? "end" : "start"}
+            >
+              {z.text.length > 26 ? `${z.text.slice(0, 25)}…` : z.text}
+            </text>
+          </g>
+        );
+      })}
       {series.map((s, si) => (
         <g key={s.name}>
           <polyline points={data.map((d, i) => `${x(i)},${y(d.values[si] ?? 0)}`).join(" ")} fill="none" stroke={s.color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />

@@ -478,6 +478,19 @@ export function useExtraGrafy({
   const [kanaly, setKanaly] = useState<KanalRiadok[]>([]);
   const [mktTik, setMktTik] = useState(0);
   const chceMkt = aktivne.has("dosahIG") || aktivne.has("web") || aktivne.has("vyhladavanie") || aktivne.has("kanaly");
+  // Značky kampaní pre anotácie v krivkách. Ležia v tom istom úložisku ako
+  // v Marketingu (vzas_settings → mkt_znacky), takže to, čo Jerry zapíše cez
+  // + Zápis alebo cez Jarvisa, sa objaví aj tu — jeden zápis, dve miesta.
+  const [znackyMkt, setZnackyMkt] = useState<{ datum: string; text: string }[]>([]);
+  useEffect(() => {
+    if (!chceMkt && !aktivne.has("marketingSuhrn") && !aktivne.has("kohortyDopytov")) return;
+    void fetchVzasSettings()
+      .then((n: Record<string, unknown>) => {
+        const z = n["mkt_znacky"];
+        if (Array.isArray(z)) setZnackyMkt(z as { datum: string; text: string }[]);
+      })
+      .catch(() => {});
+  }, [chceMkt, aktivne]);
   useEffect(() => {
     if (!chceMkt || mktTik) return;
     void fetch("/api/marketing", { credentials: "same-origin" })
@@ -1269,6 +1282,28 @@ export function useExtraGrafy({
       </Card>
     );
 
+    /**
+     * Značky → indexy bodov v grafe. Volajúci pozná mesiace svojej série,
+     * LineChart pozná len poradie bodov — mapovanie patrí sem.
+     *
+     * Viac značiek v jednom mesiaci = JEDNA vlajka s textami oddelenými
+     * bodkou. Dve vlajky nad tým istým bodom by sa prekryli a ani jedna by
+     * sa nedala prečítať.
+     */
+    const znackyPre = (mesiace: string[]) => {
+      if (!znackyMkt.length) return undefined;
+      const podlaMes = new Map<string, string[]>();
+      for (const z of znackyMkt) {
+        const mk = (z.datum || "").slice(0, 7);
+        if (!mk) continue;
+        podlaMes.set(mk, [...(podlaMes.get(mk) || []), z.text]);
+      }
+      const out = mesiace
+        .map((mk, index) => ({ index, text: (podlaMes.get(mk) || []).join(" · ") }))
+        .filter((z) => z.text);
+      return out.length ? out : undefined;
+    };
+
     const ig = (MKT_MESACNE.slice(-12)).filter((r) => vMes(r.m));
     nodes.dosahIG = (
       <Card style={{ marginBottom: 0, height: "100%" }}>
@@ -1277,6 +1312,7 @@ export function useExtraGrafy({
           {ig.length ? (
             <LineChart
               data={ig.map((r) => ({ label: monthLabel(r.m), values: [r.views, r.dosah] }))}
+              znacky={znackyPre(ig.map((r) => r.m))}
               series={[{ name: "Zobrazenia", color: C.accent }, { name: "Dosah", color: C.blue }]}
               height={190} fmt={(n) => (n >= 1000 ? `${Math.round(n / 1000)}k` : String(Math.round(n)))} alignEnd
             />
@@ -1293,6 +1329,7 @@ export function useExtraGrafy({
           {ga4.length ? (
             <LineChart
               data={ga4.map((r) => ({ label: monthLabel(r.m), values: [r.novi, r.udalosti] }))}
+              znacky={znackyPre(ga4.map((r) => r.m))}
               series={[{ name: "Noví návštevníci", color: C.accent }, { name: "Kľúčové udalosti", color: C.green }]}
               height={190} fmt={(n) => String(Math.round(n))} alignEnd
             />
@@ -1627,6 +1664,7 @@ export function useExtraGrafy({
           {kohortyD.length === 0 ? <Empty>Zatiaľ žiadne zapísané dopyty.</Empty> : (
             <LineChart
               data={kohortyD.map(([mk, v]) => ({ label: monthLabel(mk), values: [v.n, v.z] }))}
+              znacky={znackyPre(kohortyD.map(([mk]) => mk))}
               series={[{ name: "Dopyty", color: C.blue }, { name: "Stali sa klientmi", color: C.green }]}
               height={190} fmt={(n) => String(Math.round(n))} autoY alignEnd
             />
