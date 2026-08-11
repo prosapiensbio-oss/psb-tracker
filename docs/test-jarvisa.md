@@ -97,3 +97,49 @@ skry všetky o nechodení
 
 Formulácia: koľko klientov · 10 nápadov na obsah · „jakub stigut" (diakritika) ·
 najhorší mesiac
+
+---
+
+## Výsledok behu 11. 8. 2026 (39 otázok)
+
+Pravda ku každému číslu ťahaná z D1, nie odhadovaná. **Faktografia 9/9 do
+koruny** — vrátane mzdových hodín (Jerry 99, Terezka 110), nárokov na výplatu
+za päť mesiacov a podielu BTC v júli (119 310 Kč). Editačné otázky prešli tým,
+že Jarvis **odmietol vymýšľať**: pri štyroch z piatich najprv zistil, že vec už
+je hotová alebo neexistuje, a spýtal sa. Akčné bloky mali vždy presný `key`
+z kontextu.
+
+Priemerná dĺžka 63 slov (kritérium ≤ 60): faktografia 26, navigácia 30 —
+prekročenie ťahá rozbor (121) a formulácia (112), kde je to na mieste.
+
+### Čo sa našlo a opravilo
+
+| Nález | Ako sa prejavil |
+|---|---|
+| **Kontext ignoroval kotvu dát** | „posledný mesiac" = rozrobený august (48 595 Kč) namiesto júla (199 463 Kč); priemer, minimum aj maximum počítali s jedenástimi dňami |
+| **Cena za sedenie stará definícia** | `paidAvg` namiesto prijaté ÷ sedenia — appka a Jarvis hovorili iné číslo |
+| **Kalendár nebol v kontexte** | na „kde vidím zrušené tréningy" odpovedal, že to appka nesleduje — mala ich 18 |
+| **`/api/kalendar` vracal len nevybavené** | z 18 zrušení videl 1; schránka nie je história |
+| **`prevadzka.md` tvrdila, že storno sa neeviduje** | znalosť zaostala za appkou o dva týždne |
+| **`/api/vzas-settings` ticho rezal na 20 000 znakov** | nevalidný JSON → pri ďalšom zápise sa prepíše prázdnym; obeť: všetky ciele alebo všetky opravy P&L naraz |
+| **`vzas-notes` to isté** | poznámka mesiaca rastie sama, `kronika` do nej pripisuje |
+| **`jarvis-memory` to isté + spoločný `try`** | jeden poškodený chat schoval VŠETKY chaty aj závery |
+| **`uprav-pnl` nekontroloval zámok** | import z banky zamknutý mesiac odmietne, oprava P&L nie |
+| **Prompt: názvy kľúčov v odpovedi** | „pole priemCenaSedenia" |
+| **Prompt: sčítanie z hlavy** | 9 761 + 9 984 = „19 635" (správne 19 745), pričom správny súčet bol v tej istej vete kontextu |
+
+Poistkou je `app/src/lib/psb/aiContext.test.ts` — 9 testov, ktoré tie nálezy
+zamykajú bez toho, aby sa musel platiť ďalší beh.
+
+### Čo Jarvis stále nevidí
+
+Marketing (dosah, kanály, náklady na reklamu), kroky mesačnej uzávierky
+a dopyty. Na marketing si vie väčšinu dotiahnuť dopytom do databázy, uzávierku
+a dopyty nie.
+
+### Poznámka k zapisovacím akciám
+
+Beh 11. 8. akcie **nespúšťal** — sú preverené čítaním kódu po celej ceste
+(blok → handler → endpoint → tabuľka) a dôkazom, že tou cestou už reálne
+zápisy prešli (`jarvis_zavery` má riadok napísaný Jarvisom). Skutočné
+spustenie proti živej databáze je vec, ktorú treba potvrdiť ručne.
