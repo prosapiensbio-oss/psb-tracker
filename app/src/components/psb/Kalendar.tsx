@@ -20,7 +20,7 @@ import { Card, Empty, H3, Info, Modal, Select, TrenerPills } from "./ui";
  */
 
 type Zdroj = { id: string; trener: string; aktivny: number; posledne_ok: string | null; posledna_chyba: string | null };
-type Zmena = { id: string; kedy: string; trener: string; uid: string; druh: string; nazov: string | null; klient: string | null; pred: string | null; po: string | null; poznamka?: string | null };
+export type Zmena = { id: string; kedy: string; trener: string; uid: string; druh: string; nazov: string | null; klient: string | null; pred: string | null; po: string | null; poznamka?: string | null };
 type Mapa = { nazov: string; trener: string; klient: string | null; typ: string };
 export type KalUdalost = { uid: string; trener: string; zaciatok: string; koniec: string; nazov: string; klient: string | null; typ: string | null };
 type Nezname = { nazov: string; trener: string; pocet: number; najblizsi: string };

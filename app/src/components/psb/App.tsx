@@ -43,7 +43,7 @@ import { Treningy } from "./Treningy";
 import { Klienti } from "./Klienti";
 import { Marketing } from "./Marketing";
 import { VYSLEDKY_LISTY, Vysledky, Vzas } from "./Vzas";
-import { Kalendar, type KalUdalost } from "./Kalendar";
+import { Kalendar, type KalUdalost, type Zmena as KalZmena } from "./Kalendar";
 import { tokyKlientov } from "./Fluktuacia";
 import { VYCHODZIA_TEMA } from "./ThemeSwitch";
 import { Udaje } from "./Udaje";
@@ -517,12 +517,18 @@ export function PSBApp() {
    * tú obrazovku nikto neotvorí.
    */
   const [kalUdalosti, setKalUdalosti] = useState<KalUdalost[]>([]);
+  // Zmeny v kalendári si App drží kvôli Jarvisovi. Test 11. 8.: na „kde vidím
+  // zrušené tréningy" odpovedal, že ich appka nesleduje — pritom ich sleduje
+  // od 31. 7. a v tej chvíli ich mala v databáze 18. Nevidel ich, lebo
+  // kalendár si sťahovala len obrazovka Kalendár, do kontextu nešiel.
+  const [kalZmeny, setKalZmeny] = useState<KalZmena[]>([]);
   useEffect(() => {
     void fetch("/api/kalendar", { credentials: "same-origin" })
       .then((r) => r.json())
-      .then((j: { ok?: boolean; udalosti?: KalUdalost[] }) => {
+      .then((j: { ok?: boolean; udalosti?: KalUdalost[]; zmeny?: KalZmena[] }) => {
         if (!j.ok || !Array.isArray(j.udalosti)) return;
         setKalUdalosti(j.udalosti);
+        if (Array.isArray(j.zmeny)) setKalZmeny(j.zmeny);
         // Objednané hodiny idú do predikcie tržieb — centrálne, aby dashboard,
         // grafy, Financie aj VZAS počítali z toho istého.
         const dnes = new Date().toISOString().slice(0, 10);
@@ -1401,8 +1407,8 @@ function skupinaFaktur(
   }, [krokyZamku, registerAll]);
 
   const aiContext = useMemo(
-    () => buildAiContext(data, clients, sixM, capacity, registerAll),
-    [data, clients, sixM, capacity, registerAll, vzasVerzia()], // eslint-disable-line react-hooks/exhaustive-deps
+    () => buildAiContext(data, clients, sixM, capacity, registerAll, { udalosti: kalUdalosti, zmeny: kalZmeny }),
+    [data, clients, sixM, capacity, registerAll, kalUdalosti, kalZmeny, vzasVerzia()], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   const actions = useMemo<Actions>(
@@ -1459,6 +1465,7 @@ function skupinaFaktur(
         const j = await fetch("/api/kalendar", { credentials: "same-origin" }).then((r) => r.json()).catch(() => null);
         if (j?.ok && Array.isArray(j.udalosti)) {
           setKalUdalosti(j.udalosti);
+          if (Array.isArray(j.zmeny)) setKalZmeny(j.zmeny as KalZmena[]);
           const dnesK = new Date().toISOString().slice(0, 10);
           const obj: Record<string, number> = {};
           for (const u of j.udalosti as KalUdalost[]) {

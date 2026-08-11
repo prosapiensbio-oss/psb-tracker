@@ -163,11 +163,21 @@ Nie je to chyba. Sú to:
 
 ## 7. Zrušené tréningy a neúčasť
 
-**Storno sa nikde neeviduje.** Keď klient nepríde alebo zruší na poslednú
+**V PTminderi sa storno neeviduje.** Keď klient nepríde alebo zruší na poslednú
 chvíľu, zapíše sa to **ako keby tréning prebehol**. Dôsledok pre čítanie dát:
 „odrobené hodiny" obsahujú aj neodchodené hodiny a vyťaženie je mierne
 nadhodnotené. Tréningy sa dohadujú v Google kalendári; do PTmindera sa raz
 týždenne prepíše finálny stav.
+
+**Appka to však sleduje — od 31. 7. 2026.** Kalendár sa sťahuje každý večer a
+rozdiel oproti predchádzajúcemu stiahnutiu sa ukladá: zrušené, posunuté aj
+dopísané hodiny sú v **Kalendár → Zmeny v kalendári**, čo kalendár nezachytil
+sa dopĺňa ručne tlačidlom *+ Zrušenie / náhrada*. V kontexte je to pod kľúčom
+`kalendar`. Preto:
+
+- „koľko sa mi tento týždeň zrušilo" **odpovedať sa dá** — z `kalendar.zmeny`;
+- za mesiace **pred 31. 7. 2026 odpoveď neexistuje** a nie je to nula;
+- nikdy netvrdiť, že appka zrušené tréningy nesleduje.
 
 ---
 

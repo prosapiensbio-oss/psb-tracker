@@ -6,6 +6,8 @@
 // deprecated field (e.g. capacity.effHours is reference-only, NOT what the card shows).
 import { PNL, VZAS_MONTHS, pnlCalc, poslednyMesiacSDatami } from "./vzas";
 import {
+  cenaZaSedenie,
+  kotvaDat,
   monthlyFinance,
   predictEarnings, predictCash,
   sessionAnalysisPSB,
@@ -17,7 +19,7 @@ import {
   type RegisterItem,
   type SixMRow,
 } from "./compute";
-import { monthLabel, weekKey, weekLabel } from "./format";
+import { monthLabel, normName, weekKey, weekLabel } from "./format";
 import type { PSBData } from "./types";
 
 const r1 = (n: number) => Math.round(n * 10) / 10;
@@ -25,12 +27,19 @@ const r0 = (n: number) => Math.round(n);
 
 export type AiContext = ReturnType<typeof buildAiContext>;
 
+/** Kalendár — len to, čo z neho Jarvis potrebuje. Zámerne nie celý typ z Kalendár.tsx. */
+export type KalendarPreAi = {
+  udalosti: { zaciatok: string; klient: string | null; trener: string; typ: string | null }[];
+  zmeny: { kedy: string; druh: string; klient: string | null; nazov: string | null; pred: string | null; po: string | null; trener: string; poznamka?: string | null }[];
+};
+
 export function buildAiContext(
   data: PSBData,
   clients: Record<string, ClientAgg>,
   sixM: SixMRow[],
   capacity: CapacityRow[],
   register: RegisterItem[],
+  kalendar?: KalendarPreAi,
 ) {
   const clientList = Object.values(clients);
 
@@ -82,17 +91,29 @@ export function buildAiContext(
   const weekHours = data.sessions.filter((s) => weekKey(s.date) === lastWeek).reduce((a, s) => a + s.duration / 60, 0);
 
   const fin = monthlyFinance(data);
-  const lastMonth = fin[fin.length - 1];
+  // Kotva dát (11. 8. — test Jarvisa). `fin` končí BEŽIACIM mesiacom, nie
+  // posledným plným. Kým sa tu bral posledný riadok ako „posledný mesiac",
+  // Jarvis na „koľko sme zarobili minulý mesiac" odpovedal jedenástimi dňami
+  // augusta (48 595 Kč) namiesto júla (199 463 Kč) — a rovnaký rozrobený
+  // mesiac padal aj do priemeru, minima a maxima. Appka sama sa tejto chybe
+  // vyhýba cez kotvaDat(); kontext o nej dovtedy nevedel.
+  const kotva = kotvaDat(data);
+  const plny = fin.filter((m) => !kotva.plny || m.month <= kotva.plny);
+  const lastMonth = plny[plny.length - 1];
+  const beziaci = kotva.ciastocny ? fin.find((m) => m.month === kotva.mesiac) : undefined;
   const kpi = {
     aktivnychKlientov: clientList.filter((c) => c.status !== "Neaktívny").length,
-    odrobeneTentoTyzden: { hodiny: r0(weekHours), tyzden: lastWeek ? weekLabel(lastWeek) : null },
-    zarobkyPoslednyMesiac: lastMonth ? { mesiac: monthLabel(lastMonth.month), czk: r0(lastMonth.revenue) } : null,
+    // Vedome NIE „tento týždeň": PTminder sa prepisuje raz týždenne, takže
+    // posledný týždeň s dátami je spravidla ten minulý. Názov klamal.
+    odrobenePoslednyUplnyTyzden: { hodiny: r0(weekHours), tyzden: lastWeek ? weekLabel(lastWeek) : null },
+    zarobkyPoslednyPlnyMesiac: lastMonth ? { mesiac: monthLabel(lastMonth.month), czk: r0(lastMonth.revenue) } : null,
     klientov6M: sixM.length,
   };
 
   // ── Earnings ──
-  const finActual = fin.map((m) => ({ mesiac: monthLabel(m.month), vyfakturovane: r0(m.revenue), prijateTrzby: r0(m.cash), jerry: r0(m.byTrainer["Jerry"]?.revenue || 0), terezka: r0(m.byTrainer["Terezka"]?.revenue || 0), sedeni: m.sessions }));
-  const revVals = fin.map((m) => m.revenue).filter((v) => v > 0);
+  const finActual = fin.map((m) => ({ mesiac: monthLabel(m.month), vyfakturovane: r0(m.revenue), prijateTrzby: r0(m.cash), jerry: r0(m.byTrainer["Jerry"]?.revenue || 0), terezka: r0(m.byTrainer["Terezka"]?.revenue || 0), sedeni: m.sessions, ...(m.month === kotva.mesiac && kotva.ciastocny ? { rozrobeny: true } : {}) }));
+  // Priemer/min/max LEN z plných mesiacov — jedenásť dní augusta nie je mesiac.
+  const revVals = plny.map((m) => m.revenue).filter((v) => v > 0);
   const earnAvg = revVals.length ? r0(revVals.reduce((a, b) => a + b, 0) / revVals.length) : 0;
   const earnMax = revVals.length ? r0(Math.max(...revVals)) : 0;
   const earnMin = revVals.length ? r0(Math.min(...revVals)) : 0;
@@ -104,8 +125,10 @@ export function buildAiContext(
   const cashSum = (k: "expected" | "lo" | "hi") => cashPred3.months.reduce((a, m) => a + m[k], 0);
 
   // ── Session trend ──
-  const trend = sessionAnalysisPSB(data.sessions).map((m) => ({ mesiac: monthLabel(m.month), celkovo: m.total, offline: m.offline, online: m.onlineTc, uvodne: m.uvodne }));
-  const trendAvg = trend.length ? r1(trend.reduce((a, b) => a + b.celkovo, 0) / trend.length) : 0;
+  const trendRaw = sessionAnalysisPSB(data.sessions);
+  const trend = trendRaw.map((m) => ({ mesiac: monthLabel(m.month), celkovo: m.total, offline: m.offline, online: m.onlineTc, uvodne: m.uvodne, ...(m.month === kotva.mesiac && kotva.ciastocny ? { rozrobeny: true } : {}) }));
+  const trendPlne = trendRaw.filter((m) => !kotva.plny || m.month <= kotva.plny);
+  const trendAvg = trendPlne.length ? r1(trendPlne.reduce((a, b) => a + b.total, 0) / trendPlne.length) : 0;
 
   // ── Tempo + dôvera (same averaging as the dashboard cards) ──
   const pc = pred.perClient;
@@ -177,6 +200,52 @@ export function buildAiContext(
     }
   }
 
+  // Ø cena sedenia po klientovi — jedným prechodom, nie `cenaZaSedenie` na
+  // každého zo 119 klientov (to je 119× celá história cez normName). Že to
+  // dáva to isté číslo ako kanonická funkcia, drží test v aiContext.test.ts.
+  const cenaPoKlientovi: Record<string, { cash: number; sedeni: number }> = {};
+  const bunka = (meno: string) => (cenaPoKlientovi[normName(meno)] ||= { cash: 0, sedeni: 0 });
+  for (const s of data.sessions) bunka(s.client).sedeni++;
+  for (const p of data.payments) if (p.client) bunka(p.client).cash += p.amount;
+
+  // ── Kalendár ──────────────────────────────────────────────────────────────
+  //
+  // PTminder je účtovníctvo, kalendár je predpoveď — a Jarvis dovtedy videl len
+  // to prvé. Preto na „koľko sa mi tento týždeň zrušilo" nevedel odpovedať a na
+  // „kde vidím zrušené tréningy" dokonca tvrdil, že to appka nesleduje.
+  //
+  // Ide sem len rozumné okno: zmeny za posledných 30 dní a objednané hodiny do
+  // konca budúceho týždňa. Celý kalendár by zabral miesto, ktoré potrebuje
+  // zoznam klientov.
+  const kalendarBlok = (() => {
+    if (!kalendar) return null;
+    const dnes = new Date().toISOString().slice(0, 10);
+    const posun = (d: number) => new Date(Date.now() + d * 86400000).toISOString().slice(0, 10);
+    const od = posun(-30), doKedy = posun(14);
+    const den = (z: { pred: string | null; po: string | null; kedy: string }) => (z.pred || z.po || z.kedy || "").slice(0, 10);
+
+    const zmeny = kalendar.zmeny
+      .filter((z) => den(z) >= od)
+      .sort((a, b) => den(b).localeCompare(den(a)))
+      .map((z) => ({ den: den(z), druh: z.druh, klient: z.klient || z.nazov, trener: z.trener, vysvetlene: !!z.poznamka, poznamka: z.poznamka || null }));
+
+    const zrusene = zmeny.filter((z) => z.druh === "zrusene");
+    const objednane = kalendar.udalosti
+      .filter((u) => (u.typ === "trening" || u.typ === "uvodny") && u.zaciatok.slice(0, 10) >= dnes && u.zaciatok.slice(0, 10) <= doKedy)
+      .map((u) => ({ den: u.zaciatok.slice(0, 10), klient: u.klient, trener: u.trener, typ: u.typ }))
+      .sort((a, b) => a.den.localeCompare(b.den));
+
+    return {
+      poznamka: "Zdroj: Google Kalendár, rozdiel medzi dvoma stiahnutiami. Sleduje sa od 31. 7. 2026 — na skoršie mesiace odpoveď NEEXISTUJE, nie je to „nula“. Kalendár je predpoveď, PTminder je účtovníctvo: objednaná hodina nie je tržba. Obrazovka: Kalendár → Zmeny v kalendári.",
+      zmenyOd: od,
+      zruseneSpolu: zrusene.length,
+      zruseneNevysvetlene: zrusene.filter((z) => !z.vysvetlene).length,
+      zmeny,
+      objednaneDo: doKedy,
+      objednane,
+    };
+  })();
+
   const klientiDetail = clientList
     .slice()
     .sort((a, b) => (b.lastSession || "").localeCompare(a.lastSession || ""))
@@ -202,7 +271,12 @@ export function buildAiContext(
       poznamkaTrenera: c.trainerNote || null,
       pocetSedeni: c.sessionCount,
       hodinySpolu: r1(c.totalHours),
-      priemCenaSedenia: r0(c.paidAvg),
+      // Jedna definícia pre celú appku (11. 8.). Predtým tu bol `c.paidAvg` —
+      // priemer z ceny ZAPÍSANEJ pri sedení, kým Klienti, Tréningy aj graf na
+      // Kokpite už dávno počítajú prijaté peniaze ÷ odtrénované sedenia. Pri
+      // 19 % sedení je zapísaná cena nulová (platba visí na balíčku), takže
+      // Jarvis hovoril o dvesto korún nižšie číslo než obrazovka vedľa neho.
+      priemCenaSedenia: (() => { const b = cenaPoKlientovi[normName(c.name)]; return b && b.sedeni ? r0(b.cash / b.sedeni) : 0; })(),
       dochadzkaPct: r0(c.attendance * 100),
       prveSedenie: c.firstSession || null,
       posledneSedenie: c.lastSession || null,
@@ -262,23 +336,32 @@ export function buildAiContext(
       generatedAt: new Date().toISOString().slice(0, 10),
       note: "Súhrnné čísla sú za OBOCH trénerov spolu (Jerry + Terezka), ak nie je uvedené inak. Rozpisy po trénerovi máš v zarobky.mesacne (jerry/terezka), tyzdennePodlaTrenera a kapacita.podlaTrenera. Detail každého klienta (aj editovateľné polia) je v klientiDetail.",
       totalClients: clientList.length,
+      kotvaDat: {
+        poslednyDenSDatami: kotva.den,
+        poslednyPlnyMesiac: kotva.plny,
+        beziaciMesiac: kotva.ciastocny ? kotva.mesiac : null,
+        poznamka: "Dáta z PTmindera končia dňom poslednyDenSDatami — nie dneškom. Mesiac označený príznakom rozrobeny je napočítaný len po tento deň; NIKDY ho neporovnávaj s plnými mesiacmi, nedávaj ho do priemerov a nenazývaj ho „minulý mesiac“. Otázky typu „koľko sme zarobili minulý mesiac“ sa týkajú poslednyPlnyMesiac.",
+      },
     },
+    beziaciMesiac: beziaci
+      ? { mesiac: monthLabel(beziaci.month), doDna: kotva.den, vyfakturovane: r0(beziaci.revenue), prijateTrzby: r0(beziaci.cash), sedeni: beziaci.sessions, poznamka: "Rozrobený mesiac — čiastkový súčet, nie výsledok." }
+      : null,
     kpi,
     tyzdenneHodiny,
     tyzdennePodlaTrenera,
     zdravaZona,
     kapacita: { spolu: capSpolu, podlaTrenera: capPerTrainer },
     zarobky: {
-      poslednyMesiac: lastMonth ? { mesiac: monthLabel(lastMonth.month), revenue: r0(lastMonth.revenue), sedeni: lastMonth.sessions } : null,
+      poslednyPlnyMesiac: lastMonth ? { mesiac: monthLabel(lastMonth.month), revenue: r0(lastMonth.revenue), sedeni: lastMonth.sessions } : null,
       mesacne: finActual,
       priemerMesacne: earnAvg,
       maxMesacne: earnMax,
       minMesacne: earnMin,
-      poznamka: "Vyfakturované zárobky = hodnota odtrénovaných sedení (Payroll by Session). Ø/max/min len z reálnych mesiacov, bez odhadu.",
+      poznamka: "Vyfakturované zárobky = hodnota odtrénovaných sedení (Payroll by Session). Ø/max/min LEN z plných mesiacov — rozrobený mesiac (mesacne[].rozrobeny) je z nich vynechaný, inak by sa z jedenástich dní stal „najhorší mesiac“.",
       odhadBuduciMesiac: cashPred3.months[0] ? { mesiac: monthLabel(cashPred3.months[0].month), realisticky: r0(cashPred3.months[0].expected), negativny: r0(cashPred3.months[0].lo), optimisticky: r0(cashPred3.months[0].hi) } : null,
       odhad3mes: { optimisticky: r0(cashSum("hi")), realisticky: r0(cashSum("expected")), negativny: r0(cashSum("lo")), mesacnyRunRate: r0(pred.monthlyRunRate) },
     },
-    sedeniaTrend: { mesacne: trend, priemerMesacne: trendAvg },
+    sedeniaTrend: { mesacne: trend, priemerMesacne: trendAvg, poznamka: "Ø len z plných mesiacov (rozrobený vynechaný)." },
     tempo: { priemerSedeniMes: tempoAvg, poznamka: "Priemerný počet sedení klienta za mesiac (z histórie)." },
     doveraObnovy: { priemerPct: confAvg, poznamka: "Priemerná pravdepodobnosť obnovy naprieč klientmi, vážená segmentom." },
     klienti: {
@@ -288,6 +371,7 @@ export function buildAiContext(
       podlaModality: dist((c) => c.modality),
     },
     sixM: { spolu: sixM.length, podlaFazy: sixMPhases, poznamka: "6M proces: Obnova 1.–6. mesiac, Integrácia 7.–18., Udržateľnosť 19.+" },
+    kalendar: kalendarBlok,
     // P&L po položkách za posledných 12 mesiacov. Bez toho Jarvis na otázku
     // „ktorá aplikácia stála v apríli 780?" nemá kde hľadať: hodnoty P&L žijú
     // v module (z Excelu + z importu), nie v databáze, takže ich nevytiahne ani

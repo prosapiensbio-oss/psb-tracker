@@ -3,7 +3,7 @@ import { fmtDMY } from "../../lib/psb/format";
 
 import type { AiContext } from "../../lib/psb/aiContext";
 import {
-  deleteJarvisChat, fetchJarvisMemory, fetchMonthNotes, fetchVzasSettings, saveJarvisChat, saveMonthNote,
+  deleteJarvisChat, fetchJarvisMemory, fetchMonthNotes, fetchPeriods, fetchVzasSettings, saveJarvisChat, saveMonthNote,
   saveVzasSetting, saveZaver, sendChat, vyhodnotZaver,
 } from "../../lib/psb/client";
 import { C, mix } from "../../lib/psb/theme";
@@ -342,10 +342,24 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
         // Rovnaká cesta, akou opravu zapíše človek klikom na číslo v tabuľke —
         // prekrytie, nie prepis pôvodného radu, takže sa dá vrátiť a prežije
         // import z banky.
+        //
+        // Zámok mesiaca sa kontroluje TU (nález z testu Jarvisa 11. 8.):
+        // import z banky aj zaradenie pohybov zamknutý mesiac odmietnu na
+        // serveri, ale P&L override išiel do `vzas_settings` — kľúč-hodnota,
+        // ktorá o mesiacoch nič nevie. Jarvis tak vedel prepísať zisk už
+        // uzavretého mesiaca a uzávierka o tom nevedela.
         const d = a.data;
-        if (nastavPnlBunku(String(d.kategoria), String(d.mesiac), Number(d.suma))) {
-          void saveVzasSetting("pnl_overrides", pnlOverridesNaUlozenie());
-        }
+        const mes = String(d.mesiac);
+        void fetchPeriods().then(({ periods }) => {
+          if (periods.some((p) => p.month === mes && p.locked)) {
+            oznamVysledok(`${mes} je uzavretý mesiac — oprava P&L sa nezapísala. Najprv ho odomkni v Mesiac → Uzávierka.`);
+            return;
+          }
+          if (nastavPnlBunku(String(d.kategoria), mes, Number(d.suma))) {
+            void saveVzasSetting("pnl_overrides", pnlOverridesNaUlozenie())
+              .then((ok) => oznamVysledok(ok ? `P&L ${mes} opravené: ${String(d.kategoria)} → ${Number(d.suma)} Kč.` : "Oprava P&L sa neuložila."));
+          }
+        });
       } else if (a.type === "odloz-anomaliu" && a.data) {
         // Odloženie sa ukladá ako akceptácia s poznámkou „odlozene|DÁTUM|…".
         // Register ju do toho dátumu skrýva a potom vráti späť medzi živé.

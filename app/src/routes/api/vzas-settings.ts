@@ -37,7 +37,17 @@ export const Route = createFileRoute("/api/vzas-settings")({
         }
         const key = typeof body.key === "string" ? body.key.slice(0, 64) : "";
         if (!/^[a-z0-9_]+$/.test(key)) return Response.json({ ok: false, error: "bad_key" }, { status: 400 });
-        const value = JSON.stringify(body.value ?? null).slice(0, 20000);
+        // Radšej odmietnuť než ticho odrezať (nález z testu Jarvisa 11. 8.).
+        // `.slice(0, 20000)` reže JSON uprostred reťazca — uloží sa nevalidný
+        // JSON, GET ho neparsne a vráti holý string, `Array.isArray` je false,
+        // kód si založí prázdne pole a NASLEDUJÚCI zápis to prepíše. Inými
+        // slovami: jedno prekročenie limitu = ticho zmazané všetky ciele alebo
+        // všetky opravy P&L, bez jedinej hlášky. Tu ide o `ciele` (dnes 4,3 kB
+        // a rastie), `pnl_overrides` aj `mkt_znacky`.
+        const value = JSON.stringify(body.value ?? null);
+        if (value.length > 20000) {
+          return Response.json({ ok: false, error: "too_large", limit: 20000, velkost: value.length }, { status: 413 });
+        }
         const stare = await DB.prepare("SELECT value FROM vzas_settings WHERE key = ?1").bind(key).first<{ value: string }>();
         await audit(DB, { action: "nastavenie", predmet: key, old: stare?.value, neu: value, actor: await currentUser(request) || undefined });
         await DB.prepare(
