@@ -189,9 +189,15 @@ export const Route = createFileRoute("/api/kalendar")({
         if (!(await isAuthed(request))) return unauthorized();
         const { od, do_ } = okno();
 
-        const [zdroje, zmeny, mapovanie, udalosti, guillermo] = await Promise.all([
+        const [zdroje, zmeny, zmenyHistoria, mapovanie, udalosti, guillermo] = await Promise.all([
           DB.prepare("SELECT id, trener, aktivny, posledne_ok, posledna_chyba FROM kal_zdroje ORDER BY trener").all(),
           DB.prepare("SELECT id, kedy, trener, uid, druh, nazov, klient, pred, po, vysvetlene, poznamka FROM kal_zmeny WHERE vysvetlene = 0 ORDER BY kedy DESC LIMIT 60").all(),
+          // Karta „Zmeny v kalendári" je schránka — ukazuje len to, čo ešte
+          // čaká na odpoveď (vysvetlene = 0). Pre Jarvisa to nestačí: na
+          // otázku „koľko sa mi tento týždeň zrušilo" je vysvetlené zrušenie
+          // stále zrušenie. Preto druhý, širší rad — celá história zmien,
+          // z ktorej sa dá počítať.
+          DB.prepare("SELECT kedy, trener, druh, nazov, klient, pred, po, vysvetlene, poznamka FROM kal_zmeny ORDER BY kedy DESC LIMIT 300").all(),
           DB.prepare("SELECT nazov, trener, klient, typ FROM kal_mapovanie ORDER BY trener, nazov").all(),
           DB.prepare("SELECT uid, trener, zaciatok, koniec, nazov, klient, typ FROM kal_udalosti WHERE zmizla_at IS NULL AND zaciatok >= ? AND zaciatok <= ? ORDER BY zaciatok").bind(od, do_).all(),
           DB.prepare("SELECT id, datum, druh, hodiny, suma_czk, poznamka FROM guillermo_hodiny ORDER BY datum DESC").all(),
@@ -212,6 +218,7 @@ export const Route = createFileRoute("/api/kalendar")({
           ok: true,
           zdroje: zdroje.results || [],
           zmeny: zmeny.results || [],
+          zmenyHistoria: zmenyHistoria.results || [],
           mapovanie: mapovanie.results || [],
           udalosti: udalosti.results || [],
           guillermo: guillermo.results || [],

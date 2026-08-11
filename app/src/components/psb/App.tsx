@@ -525,10 +525,10 @@ export function PSBApp() {
   useEffect(() => {
     void fetch("/api/kalendar", { credentials: "same-origin" })
       .then((r) => r.json())
-      .then((j: { ok?: boolean; udalosti?: KalUdalost[]; zmeny?: KalZmena[] }) => {
+      .then((j: { ok?: boolean; udalosti?: KalUdalost[]; zmenyHistoria?: KalZmena[] }) => {
         if (!j.ok || !Array.isArray(j.udalosti)) return;
         setKalUdalosti(j.udalosti);
-        if (Array.isArray(j.zmeny)) setKalZmeny(j.zmeny);
+        if (Array.isArray(j.zmenyHistoria)) setKalZmeny(j.zmenyHistoria);
         // Objednané hodiny idú do predikcie tržieb — centrálne, aby dashboard,
         // grafy, Financie aj VZAS počítali z toho istého.
         const dnes = new Date().toISOString().slice(0, 10);
@@ -1465,7 +1465,7 @@ function skupinaFaktur(
         const j = await fetch("/api/kalendar", { credentials: "same-origin" }).then((r) => r.json()).catch(() => null);
         if (j?.ok && Array.isArray(j.udalosti)) {
           setKalUdalosti(j.udalosti);
-          if (Array.isArray(j.zmeny)) setKalZmeny(j.zmeny as KalZmena[]);
+          if (Array.isArray(j.zmenyHistoria)) setKalZmeny(j.zmenyHistoria as KalZmena[]);
           const dnesK = new Date().toISOString().slice(0, 10);
           const obj: Record<string, number> = {};
           for (const u of j.udalosti as KalUdalost[]) {
