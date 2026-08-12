@@ -121,6 +121,7 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
       zdroj: String(r.zdroj || ""),
       zdrojKto: String(r.zdroj_kto || ""),
       narodeniny: String(r.narodeniny || ""),
+      prvyKontakt: String(r.prvy_kontakt || ""),
       v6m: String(r.v6m || ""),
     };
   }
@@ -417,6 +418,7 @@ export async function setOverride(
     zdroj: "zdroj",
     zdrojKto: "zdroj_kto",
     narodeniny: "narodeniny",
+    prvyKontakt: "prvy_kontakt",
     v6m: "v6m",
   };
   const col = colMap[key as string];

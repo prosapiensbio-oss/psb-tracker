@@ -627,6 +627,23 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
               ? "Pripomenie sa týždeň, tri dni a deň pred — a v deň samotný. Každá pripomienka sa dá skryť zvlášť."
               : "Keď doplníš, appka pripomenie narodeniny týždeň dopredu, potom tri dni, deň pred a v deň samotný."}
           </div>
+          {/* Vrátil sa po pauze.
+              Dáta z PTmindera siahajú do januára 2025. Kto chodil predtým,
+              odišiel a vrátil sa, vyzerá v appke ako nový klient — a od
+              septembra sa podľa počtu nových klientov meria, čo priniesla
+              reklama. Návrat reklama nepriniesla, tak sa do príchodov neráta. */}
+          <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4, marginTop: 4 }}>Prvý úvodný tréning</div>
+          <input
+            type="date"
+            defaultValue={editC.prvyKontakt}
+            onChange={(e) => actions.setOverride(editC.name, "prvyKontakt", e.target.value)}
+            style={{ ...S.input, marginBottom: 4, colorScheme: "dark" }}
+          />
+          <div style={{ fontSize: 11.5, color: C.textDim, marginBottom: 14, lineHeight: 1.5 }}>
+            {editC.vratenie
+              ? `Vrátil sa po pauze — prvýkrát ${fmtDMY(editC.prvyKontakt)}, znova ${fmtDMY(editC.firstSession)}. Do počtu nových klientov sa neráta.`
+              : "Vyplň, len keď klient chodil už PRED januárom 2025 a vrátil sa. Dovtedy ho appka počíta ako nového a skresľuje tým, čo priniesla reklama."}
+          </div>
           {/* 6M proces — ručná oprava odvodenia.
               Pravidlo („S viazanostou" + 6 990 Kč = 6M) je správne a zostáva;
               toto je výnimka pre prípad, keď si klient viazanosť kúpil, ale do

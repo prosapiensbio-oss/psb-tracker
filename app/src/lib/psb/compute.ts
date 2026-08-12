@@ -109,6 +109,13 @@ export type ClientAgg = {
   zdrojKto: string;
   /** Dátum narodenia (YYYY-MM-DD), prázdne = nevyplnené. */
   narodeniny: string;
+  /**
+   * Prvý kontakt, keď je skorší než prvé sedenie v dátach — klient, ktorý sa
+   * vrátil po pauze. Prázdne = appka rozhoduje sama.
+   */
+  prvyKontakt: string;
+  /** Vrátil sa po pauze, teda NIE je nový klient. */
+  vratenie: boolean;
   clientType: "6M Predplatné" | "Balíček";
   is6m: boolean;
   /** Ručná oprava príslušnosti k 6M: "" = appka rozhoduje, "ano" / "nie". */
@@ -180,6 +187,8 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
         zdroj: "",
         zdrojKto: "",
         narodeniny: "",
+        prvyKontakt: "",
+        vratenie: false,
         clientType: "Balíček",
         is6m: false,
         v6m: "",
@@ -268,6 +277,11 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
     c.zdroj = ov?.zdroj || "";
     c.zdrojKto = ov?.zdrojKto || "";
     c.narodeniny = ov?.narodeniny || "";
+    // Vrátenie sa nepočíta ako príchod nového klienta — od septembra sa podľa
+    // počtu nových klientov meria, čo priniesla reklama, a návrat po pauze
+    // reklama nepriniesla.
+    c.prvyKontakt = ov?.prvyKontakt || "";
+    c.vratenie = !!(c.prvyKontakt && c.firstSession && c.prvyKontakt.slice(0, 10) < c.firstSession.slice(0, 10));
     c.v6m = String(ov?.v6m || "");
     c.is6m = sixMSet.has(c.name);
     c.clientType = c.is6m ? "6M Predplatné" : "Balíček";
@@ -1601,7 +1615,9 @@ export function tokyKlientov(data: PSBData, clients: Record<string, ClientAgg>, 
     return e;
   };
   for (const c of zoznam) {
-    daj(monthKey(c.firstSession)).prisli.push(c.name);
+    // Kto sa vrátil po pauze, nie je príchod. Bez toho by sa návrat počítal
+    // ako nový klient a od septembra by nafukoval to, čo priniesla reklama.
+    if (!c.vratenie) daj(monthKey(c.firstSession)).prisli.push(c.name);
     if (c._odisiel) daj(monthKey(c.lastSession)).odisli.push(c.name);
   }
   const mesacne = [...m.entries()]

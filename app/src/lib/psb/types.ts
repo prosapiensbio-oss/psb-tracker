@@ -99,6 +99,13 @@ export type ClientOverride = {
   zdrojKto?: string;
   /** Dátum narodenia (YYYY-MM-DD). PTminder ho neexportuje, dopĺňa sa ručne. */
   narodeniny?: string;
+  /**
+   * Dátum PRVÉHO kontaktu, keď je skorší než prvé sedenie v dátach.
+   *
+   * Klient, čo sa vrátil po rokoch, nie je nový klient — a od septembra sa
+   * podľa počtu nových klientov meria, čo priniesla reklama.
+   */
+  prvyKontakt?: string;
   /** Ručná oprava príslušnosti k 6M: "" = appka rozhoduje, "ano" / "nie". */
   v6m?: string;
 };

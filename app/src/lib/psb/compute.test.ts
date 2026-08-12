@@ -250,3 +250,20 @@ describe("ziskavanieKlientov", () => {
     expect(ziskavanieKlientov(toky(1.0, 1.8), 18).mesiacovNaZaplnenie).toBeNull();
   });
 });
+
+// ── Návrat po pauze nie je nový klient ───────────────────────────────────────
+//
+// Kateřina Stoklásková: úvodný 14. 11. 2022, vrátila sa 19. 2. 2026. Dáta
+// z PTmindera siahajú do januára 2025, takže ju appka videla ako nového
+// klienta. V bežných číslach je to jedno — ale od septembra 2026 sa podľa
+// počtu nových klientov meria, čo priniesla reklama, a návrat po pauze
+// reklama nepriniesla.
+describe("ziskavanieKlientov — vrátenie sa neráta ako príchod", () => {
+  test("príchod je o jedného nižší, keď je klient označený ako návrat", () => {
+    const beznavratu = ziskavanieKlientov({ prisloMes: 2, odisloMes: 1, aktivnych: 50 }, 10);
+    const snavratom = ziskavanieKlientov({ prisloMes: 1.92, odisloMes: 1, aktivnych: 50 }, 10);
+    expect(beznavratu.cistyMes).toBeGreaterThan(snavratom.cistyMes);
+    // A hlavne: potrebné získanie sa tým NEZMENŠÍ — voľné miesta ostávajú.
+    expect(snavratom.trebaZiskat(6)).toBe(beznavratu.trebaZiskat(6));
+  });
+});

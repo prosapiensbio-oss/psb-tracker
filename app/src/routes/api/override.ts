@@ -18,6 +18,7 @@ const ALLOWED = new Set<keyof ClientOverride>([
   "zdroj",
   "zdrojKto",
   "narodeniny",
+  "prvyKontakt",
   "v6m",
 ]);
 
