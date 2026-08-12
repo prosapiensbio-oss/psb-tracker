@@ -642,6 +642,7 @@ export function buildAiContext(
         }
       : null,
     ziskavanie,
+    ekonomikaDopytu,
     marketing,
     // P&L po položkách za posledných 12 mesiacov. Bez toho Jarvis na otázku
     // „ktorá aplikácia stála v apríli 780?" nemá kde hľadať: hodnoty P&L žijú
