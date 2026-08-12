@@ -96,6 +96,18 @@ export const Route = createFileRoute("/api/meta")({
         if (!(await isAuthed(request))) return unauthorized();
         const { DB } = bindings();
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });
+        // Príspevky sa pýtajú zvlášť: je ich stovky a obrazovka s kampaňami
+        // ich nepotrebuje. Jedna odpoveď so všetkým by bola pri každom otvorení
+        // Marketingu pol megabajtu za nič.
+        if (new URL(request.url).searchParams.get("co") === "instagram") {
+          const p = await DB.prepare(
+            `SELECT id, datum, mesiac, typ, permalink, hook, kategoria,
+                    dosah, ulozenia, zdielania, komentare, lajky, videnia
+               FROM ig_prispevky ORDER BY datum DESC`,
+          ).all();
+          return Response.json({ ok: true, prispevky: p.results });
+        }
+
         const n = await nacitajNastavenie(DB);
         const kampane = await DB.prepare(
           `SELECT id, mesiac, nazov, ciel, spend, impressions, clicks, vysledky

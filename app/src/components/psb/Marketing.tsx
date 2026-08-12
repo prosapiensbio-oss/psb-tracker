@@ -28,6 +28,7 @@ import { KATEGORIE_HOOKOV, MKT_OBSAH } from "../../lib/psb/marketing-obsah";
 import { Dopyty } from "./Dopyty";
 import { Kampane } from "./Kampane";
 import { MarketingVrch } from "./MarketingVrch";
+import { ObsahZive } from "./ObsahZive";
 import { Algoritmus } from "./Algoritmus";
 import { AkoMeratReklamu, Kohorta, Lievik, Naklady } from "./MarketingLievik";
 import { Kanaly } from "./Kanaly";
@@ -838,6 +839,9 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
         onChange={setSub}
       />
 
+      {/* Živé z Graph API hore, ručná tabuľka s view rate pod tým — kým sa
+          obe nezhodnú na tom istom poradí kategórií, platia obe. */}
+      {sub === "dosah" && <ObsahZive />}
       {sub === "dosah" && (
       <Card>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
