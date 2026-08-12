@@ -651,6 +651,10 @@ function NapojenieMeta() {
           onClick={() => void posli({ akcia: "kampane", od: "2025-01-01" }, "Kampane stiahnuté.")}>
           Stiahnuť kampane od 2025
         </button>
+        <button disabled={robim || !stav.maToken || !ig} style={btn}
+          onClick={() => void posli({ akcia: "instagram" }, "Instagramové príspevky stiahnuté.")}>
+          Stiahnuť Instagram
+        </button>
       </div>
 
       {hlaska && <div style={{ fontSize: 11.5, color: C.textMuted, lineHeight: 1.5, marginTop: 4 }}>{hlaska}</div>}

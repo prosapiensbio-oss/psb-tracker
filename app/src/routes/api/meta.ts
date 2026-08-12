@@ -96,13 +96,18 @@ export const Route = createFileRoute("/api/meta")({
         const { DB } = bindings();
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });
         const n = await nacitajNastavenie(DB);
+        const kampane = await DB.prepare(
+          `SELECT id, mesiac, nazov, ciel, spend, impressions, clicks, vysledky
+             FROM mkt_kampane ORDER BY mesiac DESC, spend DESC`,
+        ).all();
         // Token sa nevracia ani skrátený — len či existuje.
         return Response.json({
           ok: true,
           maToken: !!n.token,
           adAccount: n.adAccount,
           igUser: n.igUser,
-          kampani: ((await DB.prepare("SELECT COUNT(*) n FROM mkt_kampane").first<{ n: number }>())?.n) ?? 0,
+          kampane: kampane.results,
+          kampani: kampane.results.length,
           igPrispevkov: ((await DB.prepare("SELECT COUNT(*) n FROM ig_prispevky").first<{ n: number }>())?.n) ?? 0,
         });
       },
@@ -181,6 +186,72 @@ export const Route = createFileRoute("/api/meta")({
               // Surová odpoveď celá. Výklad sa mení, dáta nie — a druhýkrát sa
               // už z API ťahať nedá, staré kampane sa spätne neprepočítajú.
               JSON.stringify(akcie.map((a) => [a.action_type, Number(a.value) || 0])),
+            );
+          });
+          for (let i = 0; i < stmts.length; i += 40) await DB.batch(stmts.slice(i, i + 40));
+          return Response.json({ ok: true, riadkov: stmts.length });
+        }
+
+        // Instagramové príspevky aj s metrikami. Koniec ručného exportu
+        // z Metricoolu — ten sa musel raz mesačne stiahnuť, nahrať a keď sa
+        // zabudlo, obrazovka tvrdila, že mesiac bol prázdny.
+        if (akcia === "instagram") {
+          if (!n.igUser) return Response.json({ ok: false, error: "chyba_ig_ucet" }, { status: 400 });
+          const POLIA = "id,timestamp,media_type,permalink,caption,like_count,comments_count";
+          // Metriky sa expandujú do toho istého volania — inak by to bol jeden
+          // dotaz na príspevok a Worker má subrequesty spočítané.
+          //
+          // Bohatšia sada sa skúša prvá a pri chybe sa spadne na užšiu: Meta
+          // metriky medzi verziami premenúva (`plays` → `views`) a jedna
+          // neznáma metrika zhodí CELÉ volanie, nielen svoj stĺpec.
+          const SADY = [
+            "insights.metric(reach,saved,shares,views,total_interactions)",
+            "insights.metric(reach,saved,shares)",
+          ];
+          let cesta = "";
+          let prva: { ok: boolean; data?: unknown; chyba?: string } = { ok: false };
+          for (const sada of SADY) {
+            cesta = `${n.igUser}/media?limit=100&fields=${POLIA},${sada}`;
+            prva = await graph(cesta, n.token);
+            if (prva.ok) break;
+          }
+          if (!prva.ok) return Response.json({ ok: false, error: prva.chyba }, { status: 502 });
+
+          type Media = Record<string, unknown> & {
+            insights?: { data?: { name: string; values?: { value: number }[] }[] };
+          };
+          const vsetky: Media[] = [];
+          let odpoved = prva.data as { data?: Media[]; paging?: { next?: string } };
+          // Šesť strán = 600 príspevkov. Strop je tu preto, aby sa Worker
+          // nezacyklil na chybnom `paging`, nie preto, že by ich bolo viac.
+          for (let strana = 0; strana < 6; strana++) {
+            vsetky.push(...(odpoved.data || []));
+            const dalej = odpoved.paging?.next;
+            if (!dalej || vsetky.length >= 600) break;
+            try {
+              const r = await fetch(dalej);
+              const j = (await r.json()) as typeof odpoved & { error?: unknown };
+              if (!r.ok || j.error) break;
+              odpoved = j;
+            } catch { break; }
+          }
+
+          const cislo = (m: Media, meno: string) =>
+            m.insights?.data?.find((x) => x.name === meno)?.values?.[0]?.value ?? 0;
+
+          const stmts = vsetky.map((m) => {
+            const datum = String(m.timestamp || "").slice(0, 10);
+            return DB.prepare(
+              `INSERT INTO ig_prispevky (id,datum,mesiac,typ,permalink,hook,dosah,ulozenia,zdielania,komentare,lajky,videnia,watch_time,updated_at)
+               VALUES (?1,?2,?3,?4,?5,'',?6,?7,?8,?9,?10,?11,0,?12)
+               ON CONFLICT(id) DO UPDATE SET dosah=?6, ulozenia=?7, zdielania=?8,
+                 komentare=?9, lajky=?10, videnia=?11, updated_at=?12`,
+            ).bind(
+              String(m.id || ""), datum, datum.slice(0, 7),
+              String(m.media_type || ""), String(m.permalink || ""),
+              cislo(m, "reach"), cislo(m, "saved"), cislo(m, "shares"),
+              Number(m.comments_count) || 0, Number(m.like_count) || 0,
+              cislo(m, "views"), now,
             );
           });
           for (let i = 0; i < stmts.length; i += 40) await DB.batch(stmts.slice(i, i + 40));
