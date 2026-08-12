@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 
 import { KATEGORIE } from "../../lib/psb/hook";
 import { monthLabel } from "../../lib/psb/format";
-import { OBDOBIA_OBSAH, mesiaceVOkne } from "../../lib/psb/obdobia";
+import { OBDOBIA_OBSAH, vOknePodlaDna } from "../../lib/psb/obdobia";
 import { C, mix, S } from "../../lib/psb/theme";
-import { Card, Empty, H3, Info, RolovaciaTabulka, Select } from "./ui";
+import { Card, Empty, FilterObdobia, H3, Info, RolovaciaTabulka } from "./ui";
 
 /**
  * Čo fungovalo — zo živých dát Instagram Graph API.
@@ -53,9 +53,10 @@ export function ObsahZive() {
   }, []);
 
   const vObdobi = useMemo(() => {
-    // Okno sa počíta z mesiacov, ktoré v dátach naozaj sú — nie od kalendára.
-    const okno = new Set(mesiaceVOkne(obdobie, prispevky.map((p) => p.mesiac)));
-    return prispevky.filter((p) => okno.has(p.mesiac));
+    // Príspevky majú presný dátum, takže sa dá filtrovať aj na dni — kotvou je
+    // najnovší príspevok, nie dnešok.
+    const patri = vOknePodlaDna(obdobie, prispevky.map((p) => p.datum));
+    return prispevky.filter((p) => patri(p.datum));
   }, [prispevky, obdobie]);
 
   const podlaKategorie = useMemo(() => {
@@ -72,9 +73,25 @@ export function ObsahZive() {
       .sort((a, b) => b.dosah - a.dosah);
   }, [vObdobi]);
 
-  const najlepsie = useMemo(
-    () => [...vObdobi].sort((a, b) => (b.ulozenia + b.zdielania * 3) - (a.ulozenia + a.zdielania * 3)),
-    [vObdobi],
+  // Východzie radenie je „sila", nie dosah: dosah sa dá kúpiť, uloženie znamená,
+  // že sa k tomu niekto chce vrátiť, a zdieľanie, že to niekomu poslal. Jerry
+  // si ale môže preklikať aj jednotlivé stĺpce — pri hľadaní jedného konkrétneho
+  // príspevku je zložené číslo na nič.
+  const [radenie, setRadenie] = useState<"sila" | "dosah" | "ulozenia" | "zdielania">("sila");
+  const najlepsie = useMemo(() => {
+    const kluc = (p: Prispevok) =>
+      radenie === "sila" ? p.ulozenia + p.zdielania * 3
+        : radenie === "dosah" ? p.dosah
+        : radenie === "ulozenia" ? p.ulozenia : p.zdielania;
+    return [...vObdobi].sort((a, b) => kluc(b) - kluc(a));
+  }, [vObdobi, radenie]);
+  const hlavicka = (id: typeof radenie, text: string) => (
+    <th onClick={() => setRadenie(id)}
+      style={{ ...S.th, textAlign: "right", cursor: "pointer", userSelect: "none",
+        color: radenie === id ? C.accentLight : C.textMuted }}>
+      {text}<span style={{ marginLeft: 4, fontSize: 9, color: radenie === id ? C.accent : C.textDim }}>
+        {radenie === id ? "▼" : "↕"}</span>
+    </th>
   );
 
   if (!nacitane) return null;
@@ -97,7 +114,7 @@ export function ObsahZive() {
             text="Príspevky priamo z Instagram Graph API, zaradené podľa toho, čím začínajú. Na rozdiel od tabuľky nižšie sa aktualizuje sama pri každom stiahnutí. Dosah, uloženia aj zdieľania sú MEDIÁNY, nie priemery: jeden zaplatený reel s dosahom 13 000 by priemer kategórie posunul tak, že by hovoril o rozpočte, nie o obsahu. Zaradenie je strojové a občas sa pomýli — pri rozhodovaní, čo natáčať ďalej, to stačí, pri jednom príspevku sa pozri na text."
           />
         </H3>
-        <Select value={obdobie} onChange={setObdobie} options={OBDOBIA_OBSAH} />
+        <FilterObdobia hodnota={obdobie} onChange={setObdobie} moznosti={OBDOBIA_OBSAH} />
       </div>
 
       {bezKategorie > 0 && (
@@ -138,17 +155,18 @@ export function ObsahZive() {
         Jednotlivé príspevky — najsilnejšie hore
       </div>
       <div style={{ fontSize: 11, color: C.textDim, marginBottom: 6, lineHeight: 1.5 }}>
-        Zoradené podľa uložení a zdieľaní, nie podľa dosahu. Dosah sa dá kúpiť; uloženie znamená, že sa
-        k tomu niekto chce vrátiť, a zdieľanie, že to niekomu poslal.
+        Klikni na stĺpec a zoradíš podľa neho. Východzie je „sila“ — uloženia plus trojnásobok
+        zdieľaní, nie dosah. Dosah sa dá kúpiť; uloženie znamená, že sa k tomu niekto chce vrátiť,
+        a zdieľanie, že to niekomu poslal.
       </div>
       <RolovaciaTabulka pocet={3}>
         <thead>
           <tr>
             <th style={{ ...S.th, textAlign: "left" }}>Príspevok</th>
             <th style={{ ...S.th, textAlign: "left" }}>Typ hooku</th>
-            <th style={{ ...S.th, textAlign: "right" }}>Dosah</th>
-            <th style={{ ...S.th, textAlign: "right" }}>Uloženia</th>
-            <th style={{ ...S.th, textAlign: "right" }}>Zdieľania</th>
+            {hlavicka("dosah", "Dosah")}
+            {hlavicka("ulozenia", "Uloženia")}
+            {hlavicka("zdielania", "Zdieľania")}
           </tr>
         </thead>
         <tbody>

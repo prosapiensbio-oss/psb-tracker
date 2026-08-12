@@ -25,7 +25,7 @@ import {
   type MktMesiac,
 } from "../../lib/psb/marketing";
 import { KATEGORIE_HOOKOV, MKT_OBSAH } from "../../lib/psb/marketing-obsah";
-import { OBDOBIA, mesiaceVOkne, obdobieLabel } from "../../lib/psb/obdobia";
+import { OBDOBIA, OBDOBIA_MESACNE, mesiaceVOkne, obdobieLabel } from "../../lib/psb/obdobia";
 import { Dopyty } from "./Dopyty";
 import { Kampane } from "./Kampane";
 import { MarketingVrch } from "./MarketingVrch";
@@ -37,7 +37,7 @@ import { C, mix, S } from "../../lib/psb/theme";
 import type { AssistantChat } from "./Assistant";
 import type { ClientAgg } from "../../lib/psb/compute";
 import type { Lead, PSBData } from "../../lib/psb/types";
-import { Card, Empty, H3, Info, Select, StatCard, SubTabs, ValueBars, useRolovanie } from "./ui";
+import { Card, Empty, FilterObdobia, H3, Info, Select, StatCard, SubTabs, ValueBars, useRolovanie } from "./ui";
 
 // Marketing — skeleton. Four questions in the order Jerry asked them: what did I
 // try, what worked, what did it cost, and what should I try next. The section
@@ -104,26 +104,10 @@ function Vysvetli({ chat, titul, filter, vyrez }: { chat?: AssistantChat; titul:
 // karte niečo iné.
 const oknoMesiacov = mesiaceVOkne;
 
+// Karty tu čítajú mesačné série, takže „posledných 30 dní" v ponuke nie je —
+// viď OBDOBIA_MESACNE v lib/psb/obdobia.ts.
 function ObdobieBar({ hodnota, onChange, poznamka }: { hodnota: string; onChange: (v: string) => void; poznamka?: string }) {
-  // „Vlastné" nesie rozsah priamo v hodnote ("custom:2026-01|2026-04") —
-  // ObdobieBar používa päť kariet a stav rozsahu by inak musela držať každá.
-  const jeCustom = hodnota === "custom" || hodnota.startsWith("custom:");
-  const [od, doM] = hodnota.startsWith("custom:") ? hodnota.slice(7).split("|") : ["", ""];
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-      {poznamka && <span style={{ fontSize: 11, color: C.textDim }}>{poznamka}</span>}
-      <Select value={jeCustom ? "custom" : hodnota} onChange={(v) => onChange(v === "custom" ? "custom:|" : v)} options={OBDOBIA} />
-      {jeCustom && (
-        <>
-          <input type="month" value={od} onChange={(e) => onChange(`custom:${e.target.value}|${doM}`)}
-            style={{ padding: "5px 8px", borderRadius: 7, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 12, colorScheme: "dark" }} />
-          <span style={{ color: C.textDim }}>–</span>
-          <input type="month" value={doM} onChange={(e) => onChange(`custom:${od}|${e.target.value}`)}
-            style={{ padding: "5px 8px", borderRadius: 7, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 12, colorScheme: "dark" }} />
-        </>
-      )}
-    </div>
-  );
+  return <FilterObdobia hodnota={hodnota} onChange={onChange} moznosti={OBDOBIA_MESACNE} poznamka={poznamka} />;
 }
 
 // Sortovateľná tabuľka. Klik na hlavičku triedi; druhý klik otočí smer.

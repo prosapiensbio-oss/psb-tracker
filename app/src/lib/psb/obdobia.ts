@@ -23,7 +23,15 @@
 
 export type Obdobie = { value: string; label: string };
 
-/** Poradie je rovnaké ako v Peniazoch, len s krátkymi oknami navrchu. */
+/**
+ * Poradie je rovnaké ako v Peniazoch, len s krátkymi oknami navrchu.
+ *
+ * `30d` je jediné okno, ktoré NIE JE mesačné — počíta sa na dni. Preto je
+ * v zozname len tam, kde má karta presné dátumy (príspevky, dopyty). Na
+ * mesačných kartách (kanály, náklady) by „posledných 30 dní" tíško znamenalo
+ * „posledný mesiac" a to sú dve rôzne veci: 30 dní k 12. augustu je pol júla
+ * a pol augusta.
+ */
 export const OBDOBIA: Obdobie[] = [
   { value: "all", label: "Celé obdobie" },
   { value: "2025", label: "2025" },
@@ -31,9 +39,13 @@ export const OBDOBIA: Obdobie[] = [
   { value: "12m", label: "Posledných 12 mes." },
   { value: "6m", label: "Posledných 6 mes." },
   { value: "3m", label: "Posledné 3 mes." },
+  { value: "30d", label: "Posledných 30 dní" },
   { value: "1m", label: "Posledný mesiac" },
   { value: "custom", label: "Vlastné" },
 ];
+
+/** Karty s mesačnou zrnitosťou — bez „posledných 30 dní", to sa tam nedá. */
+export const OBDOBIA_MESACNE = OBDOBIA.filter((o) => o.value !== "30d");
 
 /** Pre karty o obsahu: bez „posledný mesiac", lebo pri 2–7 kusoch je to šum. */
 export const OBDOBIA_OBSAH = OBDOBIA.filter((o) => o.value !== "1m");
@@ -56,7 +68,34 @@ export function mesiaceVOkne(obdobie: string, vsetky: string[]): string[] {
     const [od, doM] = obdobie.slice(7).split("|");
     return zoradene.filter((m) => (!od || m >= od) && (!doM || m <= doM));
   }
+  // Na mesačnej karte sa „30 dní" nedá spraviť poctivo; berie sa posledný
+  // mesiac a karta má tú možnosť radšej vôbec neponúkať (OBDOBIA_MESACNE).
+  if (obdobie === "30d") return zoradene.slice(-1);
   // „6m" aj holé „6" — staršie karty posielali číslo bez písmena.
   const n = Number(obdobie.replace(/m$/, ""));
   return Number.isFinite(n) && n > 0 ? zoradene.slice(-n) : zoradene;
+}
+
+/**
+ * Okno pre zoznamy s presnými dátumami (príspevky, dopyty).
+ *
+ * Kotva je NAJNOVŠÍ dátum v dátach, nie dnešok — inak by týždeň bez
+ * publikovania okno utrhol a karta by tvrdila, že za 30 dní nebolo nič.
+ */
+export function vOknePodlaDna(obdobie: string, datumy: string[]): (d: string) => boolean {
+  if (!obdobie || obdobie === "all") return () => true;
+  if (/^\d{4}$/.test(obdobie)) return (d) => d.startsWith(obdobie);
+  if (obdobie.startsWith("custom:")) {
+    const [od, doD] = obdobie.slice(7).split("|");
+    // Hranice sú mesiace („2026-01"); koniec musí zahrnúť celý mesiac.
+    return (d) => (!od || d.slice(0, 7) >= od) && (!doD || d.slice(0, 7) <= doD);
+  }
+  const najnovsi = datumy.reduce((a, d) => (d > a ? d : a), "");
+  if (!najnovsi) return () => true;
+  if (obdobie === "30d") {
+    const od = new Date(Date.parse(najnovsi.slice(0, 10)) - 29 * 864e5).toISOString().slice(0, 10);
+    return (d) => d.slice(0, 10) >= od;
+  }
+  const okno = new Set(mesiaceVOkne(obdobie, datumy.map((d) => d.slice(0, 7))));
+  return (d) => okno.has(d.slice(0, 7));
 }

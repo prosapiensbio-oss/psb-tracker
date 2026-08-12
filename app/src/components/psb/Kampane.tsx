@@ -3,8 +3,9 @@ import { useEffect, useMemo, useState } from "react";
 import { fmtCZK, monthLabel } from "../../lib/psb/format";
 import { CENA_ZA_DOPYT, hodnot } from "../../lib/psb/hodnotenie";
 import { ciel, suhrnKampani, zlucKampane, type Kampan } from "../../lib/psb/kampane";
+import { OBDOBIA_MESACNE, mesiaceVOkne } from "../../lib/psb/obdobia";
 import { C, mix, S } from "../../lib/psb/theme";
-import { Card, Empty, H3, Info, RolovaciaTabulka } from "./ui";
+import { Card, Empty, FilterObdobia, H3, Info, RolovaciaTabulka } from "./ui";
 
 /**
  * Kampane z Meta Marketing API.
@@ -37,12 +38,6 @@ export function farbaCeny(skore: number): string {
   return C.red;
 }
 
-const OBDOBIA = [
-  { value: "all", label: "Celé obdobie" },
-  { value: "2026", label: "2026" },
-  { value: "2025", label: "2025" },
-];
-
 export function Kampane() {
   const [kampane, setKampane] = useState<Kampan[]>([]);
   const [obdobie, setObdobie] = useState("all");
@@ -56,10 +51,10 @@ export function Kampane() {
       .finally(() => setNacitane(true));
   }, []);
 
-  const vObdobi = useMemo(
-    () => (obdobie === "all" ? kampane : kampane.filter((k) => k.mesiac.startsWith(obdobie))),
-    [kampane, obdobie],
-  );
+  const vObdobi = useMemo(() => {
+    const okno = new Set(mesiaceVOkne(obdobie, kampane.map((k) => k.mesiac)));
+    return kampane.filter((k) => okno.has(k.mesiac));
+  }, [kampane, obdobie]);
   const podlaKampane = useMemo(() => zlucKampane(vObdobi), [vObdobi]);
   const s = useMemo(() => suhrnKampani(podlaKampane), [podlaKampane]);
   const h = hodnot(s.cena, CENA_ZA_DOPYT);
@@ -83,9 +78,7 @@ export function Kampane() {
             text="Skutočný výdavok po kampaniach priamo z Meta Marketing API — nie súčet z Metricoolu. Cieľ kampane je hneď za menom zámerne: kampaň s cieľom „dosah“ nemá ako priniesť dopyt, takže jej nula nie je zlyhanie, ale zadanie. Cena za dopyt sa počíta len z konverzií, ktoré Meta hlási ako lead alebo registráciu; prehratia videa a zobrazenia stránky sa do toho čísla nerátajú. Zoradené podľa výdavku — najdrahšie kampane sú hore, zvyšok sa roluje."
           />
         </H3>
-        <select value={obdobie} onChange={(e) => setObdobie(e.target.value)} style={{ ...S.input, width: 150, marginBottom: 0 }}>
-          {OBDOBIA.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
+        <FilterObdobia hodnota={obdobie} onChange={setObdobie} moznosti={OBDOBIA_MESACNE} />
       </div>
 
       {/* Verdikt navrchu. Bez neho je to tabuľka, z ktorej si každý prečíta,

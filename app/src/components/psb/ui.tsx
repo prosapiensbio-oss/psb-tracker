@@ -201,9 +201,9 @@ export function useRolovanie(pocet: number, zavislost?: unknown) {
     if (!el) return;
     const zmeraj = () => {
       const riadky = el.querySelectorAll<HTMLElement>("tbody tr");
-      // Krátky zoznam sa neroluje: rám okolo troch riadkov, keď sú tri, je
-      // len šum.
-      if (riadky.length <= pocet) return setVyska(undefined);
+      // `pocet = 0` znamená „ukáž všetko" (rozbalené tlačidlom). Bez tejto
+      // vetvy by sa siahalo na riadok číslo -1 a meranie by spadlo.
+      if (pocet <= 0 || riadky.length <= pocet) return setVyska(undefined);
       const hlavicka = el.querySelector("thead")?.getBoundingClientRect().height ?? 0;
       const hore = riadky[0].getBoundingClientRect().top;
       const dole = riadky[pocet - 1].getBoundingClientRect().bottom;
@@ -236,10 +236,20 @@ export function useRolovanie(pocet: number, zavislost?: unknown) {
      * hoci na holej tabuľke fungovala.
      */
     stylTabulky: { borderCollapse: "separate", borderSpacing: 0 } as CSSProperties,
-    /** Prilepená hlavička. Bez nej sa po zarolovaní nedá povedať, čo je čo. */
+    /**
+     * Prilepená hlavička. Bez nej sa po zarolovaní nedá povedať, čo je čo.
+     *
+     * Pozadie sa SKLADÁ z dvoch vrstiev a nie je to ozdoba. V sklenených
+     * témach je `--c-card` rgba(255,255,255,0.06) — takmer priehľadná. Keď sa
+     * ňou natrela hlavička, riadky pod ňou naďalej presvitali a text sa
+     * prekrýval. Preto sa najprv položí nepriehľadné `--c-bg` a až naň tieň
+     * karty: výsledok má tón karty, ale nič cez neho nevidno.
+     */
     stylTag: (
       <style href="psb-rolovacia" precedence="default">
-        {`.psb-rolovacia thead th{position:sticky;top:0;z-index:2;background:${C.card}}
+        {`.psb-rolovacia thead th{position:sticky;top:0;z-index:2;
+  background-image:linear-gradient(${C.card},${C.card});
+  background-color:${C.bg}}
 .psb-rolovacia tbody td{position:relative;z-index:0}`}
       </style>
     ),
@@ -247,14 +257,60 @@ export function useRolovanie(pocet: number, zavislost?: unknown) {
 }
 
 export function RolovaciaTabulka({ pocet = 3, children }: { pocet?: number; children: ReactNode }) {
-  const r = useRolovanie(pocet, children);
+  // Rolovanie je na to, aby karta pod tabuľkou nebola o obrazovku nižšie.
+  // Občas ale treba vidieť celok naraz — porovnať prvý riadok s posledným sa
+  // v okienku na tri riadky nedá.
+  const [cele, setCele] = useState(false);
+  const r = useRolovanie(cele ? 0 : pocet, children);
   return (
     <>
       {r.stylTag}
       <div ref={r.ref} className={r.trieda} style={r.styl}>
         <table style={{ ...S.table, ...r.stylTabulky }}>{children}</table>
       </div>
+      <button
+        onClick={() => setCele((x) => !x)}
+        style={{
+          display: "flex", alignItems: "center", gap: 5, marginTop: 6, padding: 0,
+          background: "none", border: "none", cursor: "pointer",
+          color: C.textMuted, fontSize: 11.5, fontFamily: "inherit",
+        }}>
+        <span style={{ fontSize: 9, display: "inline-block", transform: cele ? "rotate(90deg)" : "none", transition: "transform .12s" }}>▶</span>
+        {cele ? "zbaliť" : "rozbaliť celý zoznam"}
+      </button>
     </>
+  );
+}
+
+/**
+ * Prepínač obdobia — jeden pre celý Marketing.
+ *
+ * Pri „Vlastné" sa objavia dve políčka na mesiace. Bez nich bola tá možnosť
+ * v zozname, ale nedalo sa ňou nič nastaviť: rozsah sa nesie priamo v hodnote
+ * („custom:2026-01|2026-04"), takže bez políčok zostal navždy prázdny a
+ * filter sa choval, akoby bol vypnutý.
+ */
+export function FilterObdobia({ hodnota, onChange, moznosti, poznamka }: {
+  hodnota: string; onChange: (v: string) => void; moznosti: { value: string; label: string }[]; poznamka?: string;
+}) {
+  const jeCustom = hodnota === "custom" || hodnota.startsWith("custom:");
+  const [od, doM] = hodnota.startsWith("custom:") ? hodnota.slice(7).split("|") : ["", ""];
+  const pole = {
+    padding: "5px 8px", borderRadius: 7, border: `1px solid ${C.border}`,
+    background: C.bg, color: C.text, fontSize: 12, colorScheme: "dark" as const,
+  };
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+      {poznamka && <span style={{ fontSize: 11, color: C.textDim }}>{poznamka}</span>}
+      <Select value={jeCustom ? "custom" : hodnota} onChange={(v) => onChange(v === "custom" ? "custom:|" : v)} options={moznosti} />
+      {jeCustom && (
+        <>
+          <input type="month" value={od} onChange={(e) => onChange(`custom:${e.target.value}|${doM}`)} style={pole} />
+          <span style={{ color: C.textDim }}>–</span>
+          <input type="month" value={doM} onChange={(e) => onChange(`custom:${od}|${e.target.value}`)} style={pole} />
+        </>
+      )}
+    </div>
   );
 }
 

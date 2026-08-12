@@ -3,10 +3,10 @@ import { useEffect, useMemo, useState } from "react";
 import type { ClientAgg } from "../../lib/psb/compute";
 import { fmtCZK, monthKey, monthLabel, normName } from "../../lib/psb/format";
 import { ZDROJE } from "./Klienti";
-import { OBDOBIA, mesiaceVOkne } from "../../lib/psb/obdobia";
+import { OBDOBIA_MESACNE, mesiaceVOkne } from "../../lib/psb/obdobia";
 import { C, mix, S } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
-import { Card, Empty, H3, Info, RolovaciaTabulka, Select, TableWrap } from "./ui";
+import { Card, Empty, FilterObdobia, H3, Info, RolovaciaTabulka, TableWrap } from "./ui";
 
 // Marketing prestavaný podľa otázok, nie podľa kanálov.
 //
@@ -128,7 +128,7 @@ export function Lievik({ data, clients }: { data: PSBData; clients: Record<strin
       <Card>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <H3><Info text="Cesta od prvého ozvania po zaplatený balíček. Percentá sú konverzie medzi krokmi. Tržba je len z klientov, ktorí v tomto období ZAČALI — obnovy starých klientov marketing nepriviedol a do lievika nepatria." label={`Odkiaľ prišli klienti · ${obdobiePopis}`} /></H3>
-          <Select value={okno} onChange={setOkno} options={OBDOBIA} />
+          <FilterObdobia hodnota={okno} onChange={setOkno} moznosti={OBDOBIA_MESACNE} />
         </div>
 
         <div style={{ display: "flex", gap: 12, alignItems: "flex-start", flexWrap: "wrap", margin: "14px 0 4px" }}>
