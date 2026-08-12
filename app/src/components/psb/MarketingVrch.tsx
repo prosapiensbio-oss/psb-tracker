@@ -11,25 +11,33 @@ import { farbaCeny } from "./Kampane";
 import { krokyZa, oknoMesiacov } from "./MarketingLievik";
 
 /**
- * Tri čísla, ktoré rozhodujú o marketingu — na povrchu, s výkladom.
+ * Čísla, ktoré rozhodujú o marketingu — na povrchu, s výkladom pod trojuholníkom.
  *
- * PREČO TO NIE JE ĎALŠÍ VÝKAZ
+ * PREČO JE VÝKLAD ZBALENÝ
  *
- * Jerry vyslovil pravidlo, podľa ktorého sa tu meria všetko: číslo bez akcie
- * je zbytočné. Preto pri každom z tých troch nie je len hodnota, ale aj
- * odpoveď na „prečo to sledujeme" a veta o tom, či je to dobré, či je tam
- * priestor, alebo je to zle. Bez tej vety je to tabuľka, z ktorej si každý
- * prečíta, čo chce.
+ * Prvá verzia mala pri každom čísle dva odstavce natvrdo. Tri karty tak
+ * zabrali pol obrazovky textu, ktorý si Jerry prečíta raz a potom už len
+ * prekáža medzi ním a číslami. Text nezmizol — je za trojuholníkom a otvorí
+ * sa, keď treba.
  *
- * PREČO PRÁVE TIETO TRI
+ * PREČO JE PRI KAŽDOM ČÍSLE SMER
  *
- * Sú to tri po sebe idúce otázky, a keď na niektorú z nich neexistuje
- * odpoveď, ďalšie dve sú bezcenné:
+ * „43 %" samo o sebe nepovie, či je viac lepšie. Jeden riadok („čím vyššie,
+ * tým lepšie · cieľ 70 %") to vyrieši bez toho, aby si čokoľvek pamätal —
+ * a nahradil stupnicu 1–10, ktorú Jerry 12. 8. zrušil ako mätúcu.
  *
- *   1. Koľko ľudí sa ozve?          → vstup. Nič iné ho nenahradí.
- *   2. Koľko z nich zostane?        → hovorí, či je problém pred dverami
- *                                      alebo za nimi.
- *   3. Koľko stojí jeden dopyt?     → bez toho je rozpočet stávka, nie nákup.
+ * PREČO SÚ ĎALŠIE METRIKY VEDĽA A NIE POD SEBOU
+ *
+ * Prvé tri sú tri po sebe idúce otázky a keď na niektorú neexistuje odpoveď,
+ * ďalšie dve sú bezcenné:
+ *
+ *   1. Koľko ľudí sa ozve?      → vstup. Nič iné ho nenahradí.
+ *   2. Koľko z nich zostane?    → problém pred dverami alebo za nimi?
+ *   3. Koľko stojí jeden dopyt? → bez toho je rozpočet stávka, nie nákup.
+ *
+ * Ostatné sú podporné — vysvetľujú, prečo tie tri vyzerajú tak, ako vyzerajú.
+ * Preto sú za nimi v tom istom páse a treba k nim posunúť, nie ich preskočiť
+ * očami.
  *
  * PREČO JE OBDOBIE ZAKOTVENÉ
  *
@@ -43,11 +51,13 @@ type Metrika = {
   nazov: string;
   hodnota: string;
   h: Hodnotenie;
+  /** Jednoriadkový smer: kam sa má číslo hýbať a kde je méta. */
+  smer: string;
   preco: string;
   verdikt: string;
 };
 
-/** Slovný verdikt podľa skóre. Tri pásma, tak ako ich pomenoval Jerry. */
+/** Slovný verdikt podľa pásma. Tri pásma, tak ako ich pomenoval Jerry. */
 function verdikt(h: Hodnotenie, texty: { dobre: string; priestor: string; zle: string; bezDat: string }): string {
   if (h.bezDat) return texty.bezDat;
   if (h.skore >= 6.5) return texty.dobre;
@@ -57,6 +67,8 @@ function verdikt(h: Hodnotenie, texty: { dobre: string; priestor: string; zle: s
 
 export function MarketingVrch({ data, clients }: { data: PSBData; clients: Record<string, ClientAgg> }) {
   const [kampane, setKampane] = useState<Kampan[]>([]);
+  const [otvorene, setOtvorene] = useState<string | null>(null);
+
   useEffect(() => {
     void fetch("/api/meta", { credentials: "same-origin" })
       .then((r) => r.json())
@@ -67,7 +79,7 @@ export function MarketingVrch({ data, clients }: { data: PSBData; clients: Recor
   const m = useMemo<Metrika[]>(() => {
     const kotva = kotvaDat(data);
     // Bežiaci mesiac von: má napočítanú len časť dopytov a priemer by klamal.
-    const mesiace = oknoMesiacov(data, "12").filter((x) => !kotva.plny || x <= kotva.plny);
+    const mesiace = oknoMesiacov(data, "12m").filter((x) => !kotva.plny || x <= kotva.plny);
     const k = krokyZa(data, clients, mesiace);
     const mes = Math.max(1, mesiace.length);
 
@@ -77,10 +89,14 @@ export function MarketingVrch({ data, clients }: { data: PSBData; clients: Recor
     const konv = k.dopyty > 0 ? (k.klienti / k.dopyty) * 100 : null;
     const hK = hodnot(konv, KONVERZIA_DOPYTU);
 
-    // Cena za dopyt sa berie z Mety a len z kampaní, ktoré o dopyt požiadali.
-    // Priemer cez všetky kampane by miešal peniaze za dosah do ceny dopytu.
     const s = suhrnKampani(zlucKampane(kampane));
     const hC = hodnot(s.cena, CENA_ZA_DOPYT);
+
+    // Podporné čísla. Nemajú stupnicu — nie je proti čomu ich merať, ich
+    // úloha je vysvetliť tie tri hlavné.
+    const bez = { skore: 0, slovo: "priemer", bezDat: true } as Hodnotenie;
+    const uvodnych = k.uvodne / mes;
+    const naUvodny = k.dopyty > 0 ? (k.uvodne / k.dopyty) * 100 : null;
 
     return [
       {
@@ -88,10 +104,11 @@ export function MarketingVrch({ data, clients }: { data: PSBData; clients: Recor
         nazov: "Dopytov mesačne",
         hodnota: dopytovMes.toFixed(1),
         h: hD,
+        smer: "čím viac, tým lepšie · treba 10,5",
         preco: "Vstup lievika. Klientov nemôže pribudnúť viac, než koľko ľudí sa ozve — žiadne zlepšenie textu, ceny ani rýchlosti odpovede to neobíde.",
         verdikt: verdikt(hD, {
-          dobre: `Blíži sa to k ${DOPYTOV_MESACNE[3][0]} dopytom mesačne, čo je tempo na zaplnenie 18 miest za pol roka.`,
-          priestor: `Na zaplnenie 18 miest za pol roka treba ${DOPYTOV_MESACNE[3][0]} mesačne. Chýba ${Math.max(0, DOPYTOV_MESACNE[3][0] - dopytovMes).toFixed(1)} — to je diera, ktorú má zaplniť reklama.`,
+          dobre: "Blíži sa to k 10,5 dopytu mesačne, čo je tempo na zaplnenie 18 miest za pol roka.",
+          priestor: `Na zaplnenie 18 miest za pol roka treba 10,5 mesačne. Chýba ${Math.max(0, 10.5 - dopytovMes).toFixed(1)} — to je diera, ktorú má zaplniť reklama.`,
           zle: "Takmer sa nikto neozýva. Kým sa to nezmení, na ostatných číslach nezáleží.",
           bezDat: "Zatiaľ nemám dosť mesiacov na priemer.",
         }),
@@ -101,6 +118,7 @@ export function MarketingVrch({ data, clients }: { data: PSBData; clients: Recor
         nazov: "Z dopytu klient",
         hodnota: konv == null ? "—" : `${Math.round(konv)} %`,
         h: hK,
+        smer: "čím vyššie, tým lepšie · z odporúčaní 70 %",
         preco: "Hovorí, či je problém PRED dverami alebo ZA nimi. Nízka konverzia znamená, že priviesť viac ľudí je liatie vody do deravého vedra; vysoká znamená, že vedro drží a treba doň naliať viac.",
         verdikt: verdikt(hK, {
           dobre: "Vedro drží. Priviesť viac ľudí sa oplatí — to, čo sa s nimi deje potom, funguje.",
@@ -114,6 +132,7 @@ export function MarketingVrch({ data, clients }: { data: PSBData; clients: Recor
         nazov: "Cena za dopyt",
         hodnota: s.cena == null ? "—" : fmtCZK(s.cena),
         h: hC,
+        smer: "čím nižšia, tým lepšia · strop 2 200 Kč",
         preco: "Bez tohto čísla je rozpočet stávka, nie nákup. S ním sa dá povedať vetu, ktorá dnes povedať nejde: „keď mi odíde osem ľudí, za X korún si objednám dvadsať dopytov.“",
         verdikt: verdikt(hC, {
           dobre: "Pod stropom aj u klientov, čo pôjdu k Terezke. Toto sa oplatí zopakovať vo väčšom.",
@@ -124,6 +143,35 @@ export function MarketingVrch({ data, clients }: { data: PSBData; clients: Recor
             : "Reklama za 19 mesiacov o dopyt nikdy nepožiadala — všetky kampane kupovali dosah, prekliky a interakcie. Toto číslo vznikne až pri prvej kampani s cieľom „dopyt“.",
         }),
       },
+      {
+        kluc: "uvodne",
+        nazov: "Úvodných mesačne",
+        hodnota: uvodnych.toFixed(1),
+        h: bez,
+        smer: "čím viac, tým lepšie",
+        preco: "Medzičlánok medzi dopytom a klientom. Keď dopytov pribúda a úvodných nie, problém je v tom, čo sa deje po prvom kontakte — nie v reklame.",
+        verdikt: "Porovnaj s dopytmi vedľa: keď je medzi nimi veľká diera, stráca sa to pri dohadovaní termínu.",
+      },
+      {
+        kluc: "naUvodny",
+        nazov: "Dopyt → úvodný",
+        hodnota: naUvodny == null ? "—" : `${Math.round(naUvodny)} %`,
+        h: bez,
+        smer: "čím vyššie, tým lepšie",
+        preco: "Prvá polovica lievika. Toto je číslo, na ktoré má najsilnejší vplyv rýchlosť odpovede — v službách silnejší než cena aj než text reklamy.",
+        verdikt: "Keď je nízke, odpoveď hľadaj v Dopytoch: stĺpec „ozvali sme sa“ a dôvod straty.",
+      },
+      {
+        kluc: "minute",
+        nazov: "Minuté na reklamu",
+        hodnota: fmtCZK(s.spend),
+        h: bez,
+        smer: "samo o sebe ani dobré, ani zlé",
+        preco: "Bez ceny za dopyt vedľa je to len výdavok. Spolu s ňou je to jediná dvojica, z ktorej sa dá rozhodnúť o rozpočte.",
+        verdikt: s.podielNaDopyt < 20
+          ? `Z toho išlo na kampane, ktoré vôbec pýtali dopyt, len ${Math.round(s.podielNaDopyt)} %. Zvyšok kupoval videnia a interakcie.`
+          : `Na dopyt bolo namierených ${Math.round(s.podielNaDopyt)} % z toho.`,
+      },
     ];
   }, [data, clients, kampane]);
 
@@ -132,27 +180,50 @@ export function MarketingVrch({ data, clients }: { data: PSBData; clients: Recor
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         <Info
           label="Na čom to stojí"
-          text="Tri čísla, ktoré rozhodujú o marketingu, s výkladom. Farba čísla a veta pod ním hovoria, či je to dobré, či je tam priestor, alebo je to zle. Hranice nie sú z odvetvových priemerov — sú z tvojich vlastných čísel a z marketingového plánu: strop 2 200 Kč za dopyt u Terezkiných klientov, cieľ pod 1 000 Kč, 10,5 dopytu mesačne na zaplnenie 18 miest za pol roka. Počíta sa len z plných mesiacov — bežiaci mesiac má napočítanú polovicu a priemer by stiahol nadol."
+          text="Čísla, ktoré rozhodujú o marketingu. Prvé tri sú tie, na ktorých všetko stojí; za nimi vpravo sú podporné, ktoré vysvetľujú, prečo tie tri vyzerajú tak, ako vyzerajú — posuň sa k nim. Klik na trojuholník otvorí, prečo to sledujeme a ako to práve teraz stojí. Hranice nie sú z odvetvových priemerov, sú z tvojich vlastných čísel a z marketingového plánu: strop 2 200 Kč za dopyt u Terezkiných klientov, cieľ pod 1 000 Kč, 10,5 dopytu mesačne na zaplnenie 18 miest za pol roka. Počíta sa len z plných mesiacov — bežiaci mesiac má napočítanú polovicu a priemer by stiahol nadol."
         />
-        <span style={{ fontSize: 11.5, color: C.textDim }}>posledných 12 plných mesiacov</span>
+        <span style={{ fontSize: 11.5, color: C.textDim }}>posledných 12 plných mesiacov · posuň doprava, je toho viac</span>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(255px, 1fr))", gap: 12, marginTop: 12 }}>
-        {m.map((x) => (
-          <div key={x.kluc} style={{ padding: "12px 13px", borderRadius: 9, background: mix(x.h.bezDat ? C.textDim : farbaCeny(x.h.skore), 7) }}>
-            <div style={{ fontSize: 25, fontWeight: 800, color: x.h.bezDat ? C.textDim : farbaCeny(x.h.skore), fontVariantNumeric: "tabular-nums" }}>
-              {x.hodnota}
-            </div>
-            <div style={{ fontSize: 12.5, fontWeight: 600, color: C.text, marginTop: 3 }}>{x.nazov}</div>
+      <div style={{ display: "flex", gap: 12, marginTop: 12, overflowX: "auto", paddingBottom: 4 }}>
+        {m.map((x) => {
+          const farba = x.h.bezDat ? C.textDim : farbaCeny(x.h.skore);
+          const je = otvorene === x.kluc;
+          return (
+            <div key={x.kluc} style={{
+              flex: "0 0 auto", width: 236, padding: "12px 13px", borderRadius: 9,
+              background: mix(farba, 7), alignSelf: "flex-start",
+            }}>
+              <div style={{ fontSize: 25, fontWeight: 800, color: farba, fontVariantNumeric: "tabular-nums" }}>
+                {x.hodnota}
+              </div>
+              <div style={{ fontSize: 12.5, fontWeight: 600, color: C.text, marginTop: 3 }}>{x.nazov}</div>
+              <div style={{ fontSize: 11, color: C.textDim, marginTop: 2 }}>{x.smer}</div>
 
-            <div style={{ fontSize: 11.5, color: C.textMuted, lineHeight: 1.55, marginTop: 8 }}>
-              <b style={{ color: C.textDim }}>Prečo to sledujeme: </b>{x.preco}
+              <button
+                onClick={() => setOtvorene(je ? null : x.kluc)}
+                style={{
+                  display: "flex", alignItems: "center", gap: 5, marginTop: 8, padding: 0,
+                  background: "none", border: "none", cursor: "pointer",
+                  color: C.textMuted, fontSize: 11.5, fontFamily: "inherit",
+                }}>
+                <span style={{ fontSize: 9, display: "inline-block", transform: je ? "rotate(90deg)" : "none", transition: "transform .12s" }}>▶</span>
+                {je ? "skryť" : "čo to znamená"}
+              </button>
+
+              {je && (
+                <>
+                  <div style={{ fontSize: 11.5, color: C.textMuted, lineHeight: 1.55, marginTop: 8 }}>
+                    <b style={{ color: C.textDim }}>Prečo to sledujeme: </b>{x.preco}
+                  </div>
+                  <div style={{ fontSize: 11.5, color: C.text, lineHeight: 1.55, marginTop: 7, paddingTop: 7, borderTop: `1px solid ${mix(C.textDim, 22)}` }}>
+                    {x.verdikt}
+                  </div>
+                </>
+              )}
             </div>
-            <div style={{ fontSize: 11.5, color: C.text, lineHeight: 1.55, marginTop: 7, paddingTop: 7, borderTop: `1px solid ${mix(C.textDim, 22)}` }}>
-              {x.verdikt}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </Card>
   );

@@ -3,9 +3,10 @@ import { useEffect, useMemo, useState } from "react";
 import type { ClientAgg } from "../../lib/psb/compute";
 import { fmtCZK, monthKey, monthLabel, normName } from "../../lib/psb/format";
 import { ZDROJE } from "./Klienti";
+import { OBDOBIA, mesiaceVOkne } from "../../lib/psb/obdobia";
 import { C, mix, S } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
-import { Card, Empty, H3, Info, Select, TableWrap } from "./ui";
+import { Card, Empty, H3, Info, RolovaciaTabulka, Select, TableWrap } from "./ui";
 
 // Marketing prestavaný podľa otázok, nie podľa kanálov.
 //
@@ -22,24 +23,13 @@ import { Card, Empty, H3, Info, Select, TableWrap } from "./ui";
 // vysvetlenie pod lievikom.
 const pct = (a: number, b: number) => (b > 0 && a <= b ? Math.round((a / b) * 100) : null);
 
-// Štandard rodiny M — rovnaký zoznam ako vo zvyšku Marketingu.
-const OBDOBIA = [
-  { value: "all", label: "Celé obdobie" },
-  { value: "2025", label: "2025" },
-  { value: "2026", label: "2026" },
-  { value: "6", label: "Posledných 6 mes." },
-  { value: "3", label: "Posledné 3 mes." },
-  { value: "1", label: "Posledný mesiac" },
-];
+// Zoznam období je spoločný — viď lib/psb/obdobia.ts.
 
 const zdrojLabel = (z: string) => ZDROJE.find((x) => x.value === z)?.label || (z ? z : "nevyplnené");
 
 /** Mesiace v okne, od najstaršieho. Kotva je posledný mesiac s dátami, nie dnešok. */
 export function oknoMesiacov(data: PSBData, okno: string): string[] {
-  const vsetky = [...new Set(data.sessions.map((s) => monthKey(s.date)))].filter(Boolean).sort();
-  if (okno === "all") return vsetky;
-  if (okno === "2025" || okno === "2026") return vsetky.filter((m) => m.startsWith(okno));
-  return vsetky.slice(-Number(okno));
+  return mesiaceVOkne(okno, data.sessions.map((s) => monthKey(s.date)));
 }
 
 export type Kroky = { dopyty: number; uvodne: number; klienti: number; trzba: number };
@@ -237,7 +227,9 @@ export function Naklady({ data, clients }: { data: PSBData; clients: Record<stri
       const t = data.payments.filter((p) => p.client === c.name && monthKey(p.date) === m).reduce((a, p) => a + p.amount, 0);
       trzbaVMesiaci.set(m, (trzbaVMesiaci.get(m) || 0) + t);
     }
-    return [...spend.keys()].sort().map((m) => ({
+    // Najnovší mesiac hore. Zoznam rástol zdola a júl 26 — jediný mesiac,
+    // o ktorom sa reálne rozhoduje — bol na konci pod dvanástimi staršími.
+    return [...spend.keys()].sort().reverse().map((m) => ({
       mesiac: m,
       spend: spend.get(m) || 0,
       novi: noviVMesiaci.get(m) || 0,
@@ -272,7 +264,7 @@ export function Naklady({ data, clients }: { data: PSBData; clients: Record<stri
             </div>
           </div>
 
-          <TableWrap>
+          <RolovaciaTabulka pocet={3}>
             <thead>
               <tr>
                 <th style={{ ...S.th, textAlign: "left" }}>Mesiac</th>
@@ -295,7 +287,7 @@ export function Naklady({ data, clients }: { data: PSBData; clients: Record<stri
                 </tr>
               ))}
             </tbody>
-          </TableWrap>
+          </RolovaciaTabulka>
 
           <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 10, lineHeight: 1.55 }}>
             Mesiac bez nového klienta má prázdnu cenu, nie nulu — reklama v ňom nebola zadarmo, len sa nekúpila.

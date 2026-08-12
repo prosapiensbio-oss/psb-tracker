@@ -25,6 +25,7 @@ import {
   type MktMesiac,
 } from "../../lib/psb/marketing";
 import { KATEGORIE_HOOKOV, MKT_OBSAH } from "../../lib/psb/marketing-obsah";
+import { OBDOBIA, mesiaceVOkne, obdobieLabel } from "../../lib/psb/obdobia";
 import { Dopyty } from "./Dopyty";
 import { Kampane } from "./Kampane";
 import { MarketingVrch } from "./MarketingVrch";
@@ -58,8 +59,6 @@ const num = (n: number) => n.toLocaleString("sk-SK");
 function tsv(hlavicka: string[], riadky: (string | number)[][]) {
   return [hlavicka.join(" | "), ...riadky.map((r) => r.join(" | "))].join("\n");
 }
-
-const obdobieLabel = (v: string) => OBDOBIA.find((o) => o.value === v)?.label ?? v;
 
 function Vysvetli({ chat, titul, filter, vyrez }: { chat?: AssistantChat; titul: string; filter?: string; vyrez: () => string }) {
   if (!chat) return null;
@@ -100,30 +99,10 @@ function Vysvetli({ chat, titul, filter, vyrez }: { chat?: AssistantChat; titul:
 //
 // A ešte niečo: pri 2–7 reels mesačne je rozdiel medzi 4 a 6 náhoda, nie trend.
 // Preto sa nikde nezačína jedným mesiacom — najkratšie okno sú tri.
-// Štandard rodiny M — rovnaké poradie ako v Peniazoch, len s krátkymi oknami
-// navrchu (marketing sa číta v mesiacoch, nie rokoch).
-const OBDOBIA = [
-  { value: "all", label: "Celé obdobie" },
-  { value: "2025", label: "2025" },
-  { value: "2026", label: "2026" },
-  { value: "6m", label: "Posledných 6 mes." },
-  { value: "3m", label: "Posledné 3 mes." },
-  { value: "1m", label: "Posledný mesiac" },
-  { value: "custom", label: "Vlastné" },
-];
-
-// Vráti zoznam mesiacov "YYYY-MM", ktoré do okna patria.
-function oknoMesiacov(obdobie: string, vsetky: string[]): string[] {
-  const zoradene = [...new Set(vsetky)].sort();
-  if (obdobie === "all") return zoradene;
-  if (obdobie === "2025" || obdobie === "2026") return zoradene.filter((m) => m.startsWith(obdobie));
-  if (obdobie.startsWith("custom:")) {
-    const [od, doM] = obdobie.slice(7).split("|");
-    return zoradene.filter((m) => (!od || m >= od) && (!doM || m <= doM));
-  }
-  const n = obdobie === "1m" ? 1 : obdobie === "3m" ? 3 : obdobie === "6m" ? 6 : 12;
-  return zoradene.slice(-n);
-}
+// Zoznam období aj výpočet okna žijú v lib/psb/obdobia.ts — na obrazovke boli
+// tri kópie s rôznymi hodnotami a „posledných 6 mesiacov" znamenalo na každej
+// karte niečo iné.
+const oknoMesiacov = mesiaceVOkne;
 
 function ObdobieBar({ hodnota, onChange, poznamka }: { hodnota: string; onChange: (v: string) => void; poznamka?: string }) {
   // „Vlastné" nesie rozsah priamo v hodnote ("custom:2026-01|2026-04") —
@@ -180,14 +159,17 @@ function SortTable<T extends Record<string, any>>({ riadky, stlpce, minWidth = 4
     {rolovat ? rol.stylTag : null}
     <div ref={rolovat ? rol.ref : undefined} className={rolovat ? rol.trieda : undefined}
       style={rolovat ? rol.styl : { overflowX: "auto" }}>
-      <table style={{ width: "100%", borderCollapse: "collapse", minWidth }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", minWidth, ...(rolovat ? rol.stylTabulky : null) }}>
         <thead>
-          <tr style={{ borderBottom: `2px solid ${mix(C.accent, 35)}` }}>
+          {/* Pri rolovaní kreslí spodný ram hlavičky samo `th`: rám na `tr` sa
+              v režime `border-collapse: separate` nevykreslí. */}
+          <tr style={rolovat ? undefined : { borderBottom: `2px solid ${mix(C.accent, 35)}` }}>
             {stlpce.map((c) => {
               const aktivny = sort.id === c.id;
               return (
                 <th key={c.id} onClick={() => klik(c)}
-                  style={{ textAlign: c.num ? "right" : "left", padding: "8px 10px", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap", cursor: "pointer", color: aktivny ? C.accentLight : C.textMuted, userSelect: "none" }}>
+                  style={{ textAlign: c.num ? "right" : "left", padding: "8px 10px", fontSize: 11, fontWeight: 600, whiteSpace: "nowrap", cursor: "pointer", color: aktivny ? C.accentLight : C.textMuted, userSelect: "none",
+                    ...(rolovat ? { borderBottom: `2px solid ${mix(C.accent, 35)}` } : null) }}>
                   {c.info ? <Info text={c.info} label={c.label} /> : c.label}
                   <span style={{ marginLeft: 4, fontSize: 9, color: aktivny ? C.accent : C.textDim }}>
                     {aktivny ? (sort.desc ? "▼" : "▲") : "↕"}
@@ -847,10 +829,9 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
           <div>
             <H3><Info text="Instagramové čísla sa berú z nahratých Metricool exportov (Údaje → Upload CSV: posty, reels aj stories). Kým sa nič nenahrá, ukazuje sa jednorazový prepis z Metricoolu za jan 2025 – jún 2026. GA4 a Search Console sú zatiaľ stále ten jednorazový export. Prepínač rokov riadi ročné karty (web, články, návratnosť); karty o obsahu a vyhľadávaní majú vlastné okno, lebo sa hýbu inou rýchlosťou." label="Marketing" /></H3>
-            <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>
-              {vRoku.length} mesiacov {rok} · {suma("posty")} postov · {suma("reels")} reels · {num(suma("stories"))} stories · reklama {fmtCZK(suma("spend"))}
-              <span style={{ color: C.textDim }}> · spolu za 18 mes. {fmtCZK(mktSum("spend"))}</span>
-            </div>
+            {/* Súčet postov, reels a stories tu bol výkaz práce — číslo, ku
+                ktorému neexistuje akcia. Jerry ho 12. 8. zrušil. Prepínač roka
+                zostáva, riadi ročné karty nižšie. */}
           </div>
           <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
             <span style={{ fontSize: 11, color: C.textDim, marginRight: 2 }}>Rok</span>

@@ -223,20 +223,23 @@ export function useRolovanie(pocet: number, zavislost?: unknown) {
     styl: { overflowX: "auto", overflowY: vyska ? "auto" : "visible", maxHeight: vyska } as CSSProperties,
     trieda: "psb-rolovacia",
     /**
-     * Prilepená hlavička. Bez nej sa po zarolovaní nedá povedať, čo je čo.
+     * Musí ísť do `style` samotnej `<table>`, NIE do CSS triedy.
      *
-     * `border-collapse: separate` je tu nutnosť, nie vkus. Pri `collapse`
-     * prehliadač rámy zlúči do mriežky tabuľky a tá sa roluje spolu s obsahom —
-     * hlavička síce stojí, ale rámy a pozadie pod ňou preplávajú a riadky cez
-     * ňu presvitajú. Presne to Jerry videl 12. 8.
+     * `border-collapse: separate` je tu nutnosť, nie vkus: pri `collapse`
+     * prehliadač rámy zlúči do mriežky tabuľky, tá sa roluje spolu s obsahom
+     * a riadky cez prilepenú hlavičku presvitajú.
      *
-     * S `separate` musí spodný ram hlavičky nakresliť samo `th`, lebo rám na
-     * `tr` sa v tomto režime nevykreslí.
+     * A prečo inline: tabuľky v appke majú `borderCollapse: "collapse"`
+     * napísané priamo v `style` (S.table aj SortTable). Inline štýl prebije
+     * akékoľvek pravidlo z triedy, takže prvá verzia tejto opravy — CSS
+     * pravidlo `.psb-rolovacia table{…}` — v appke nespravila vôbec nič,
+     * hoci na holej tabuľke fungovala.
      */
+    stylTabulky: { borderCollapse: "separate", borderSpacing: 0 } as CSSProperties,
+    /** Prilepená hlavička. Bez nej sa po zarolovaní nedá povedať, čo je čo. */
     stylTag: (
       <style href="psb-rolovacia" precedence="default">
-        {`.psb-rolovacia table{border-collapse:separate;border-spacing:0}
-.psb-rolovacia thead th{position:sticky;top:0;z-index:2;background:${C.card};box-shadow:inset 0 -1px 0 ${C.border}}
+        {`.psb-rolovacia thead th{position:sticky;top:0;z-index:2;background:${C.card}}
 .psb-rolovacia tbody td{position:relative;z-index:0}`}
       </style>
     ),
@@ -249,7 +252,7 @@ export function RolovaciaTabulka({ pocet = 3, children }: { pocet?: number; chil
     <>
       {r.stylTag}
       <div ref={r.ref} className={r.trieda} style={r.styl}>
-        <table style={S.table}>{children}</table>
+        <table style={{ ...S.table, ...r.stylTabulky }}>{children}</table>
       </div>
     </>
   );

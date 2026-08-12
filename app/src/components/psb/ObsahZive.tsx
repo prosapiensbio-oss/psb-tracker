@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 
 import { KATEGORIE } from "../../lib/psb/hook";
 import { monthLabel } from "../../lib/psb/format";
+import { OBDOBIA_OBSAH, mesiaceVOkne } from "../../lib/psb/obdobia";
 import { C, mix, S } from "../../lib/psb/theme";
-import { Card, Empty, H3, Info, RolovaciaTabulka } from "./ui";
+import { Card, Empty, H3, Info, RolovaciaTabulka, Select } from "./ui";
 
 /**
  * Čo fungovalo — zo živých dát Instagram Graph API.
@@ -38,15 +39,9 @@ const median = (xs: number[]) => {
   return s.length % 2 ? s[(s.length - 1) / 2] : Math.round((s[s.length / 2 - 1] + s[s.length / 2]) / 2);
 };
 
-const OBDOBIA = [
-  { value: "12", label: "Posledných 12 mes." },
-  { value: "6", label: "Posledných 6 mes." },
-  { value: "all", label: "Celé obdobie" },
-];
-
 export function ObsahZive() {
   const [prispevky, setPrispevky] = useState<Prispevok[]>([]);
-  const [obdobie, setObdobie] = useState("12");
+  const [obdobie, setObdobie] = useState("12m");
   const [nacitane, setNacitane] = useState(false);
 
   useEffect(() => {
@@ -58,14 +53,9 @@ export function ObsahZive() {
   }, []);
 
   const vObdobi = useMemo(() => {
-    if (obdobie === "all" || !prispevky.length) return prispevky;
-    // Okno sa počíta od POSLEDNÉHO príspevku, nie od dneška. Keď sa mesiac
-    // nepublikovalo, kalendárne okno by ho utnulo a karta by tvrdila, že
-    // dvanásť mesiacov bolo desať.
-    const posledny = prispevky[0].mesiac;
-    const [r, m] = posledny.split("-").map(Number);
-    const od = new Date(Date.UTC(r, m - 1 - (Number(obdobie) - 1), 1)).toISOString().slice(0, 7);
-    return prispevky.filter((p) => p.mesiac >= od);
+    // Okno sa počíta z mesiacov, ktoré v dátach naozaj sú — nie od kalendára.
+    const okno = new Set(mesiaceVOkne(obdobie, prispevky.map((p) => p.mesiac)));
+    return prispevky.filter((p) => okno.has(p.mesiac));
   }, [prispevky, obdobie]);
 
   const podlaKategorie = useMemo(() => {
@@ -107,9 +97,7 @@ export function ObsahZive() {
             text="Príspevky priamo z Instagram Graph API, zaradené podľa toho, čím začínajú. Na rozdiel od tabuľky nižšie sa aktualizuje sama pri každom stiahnutí. Dosah, uloženia aj zdieľania sú MEDIÁNY, nie priemery: jeden zaplatený reel s dosahom 13 000 by priemer kategórie posunul tak, že by hovoril o rozpočte, nie o obsahu. Zaradenie je strojové a občas sa pomýli — pri rozhodovaní, čo natáčať ďalej, to stačí, pri jednom príspevku sa pozri na text."
           />
         </H3>
-        <select value={obdobie} onChange={(e) => setObdobie(e.target.value)} style={{ ...S.input, width: 180, marginBottom: 0 }}>
-          {OBDOBIA.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
+        <Select value={obdobie} onChange={setObdobie} options={OBDOBIA_OBSAH} />
       </div>
 
       {bezKategorie > 0 && (

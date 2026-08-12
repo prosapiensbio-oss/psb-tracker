@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
+import { monthLabel } from "../../lib/psb/format";
 import { C, mix, S } from "../../lib/psb/theme";
 import { Card, Empty, H3, Info, Select, TableWrap, ValueBars } from "./ui";
 
@@ -157,8 +158,10 @@ export function Kanaly() {
     <Card>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         <H3><Info text="Osem čísel, na ktorých pre PSB záleží — vybrané zo ~160 metrík mesačnej zostavy Metricoolu. Celý zoznam je dole v rozbaľovači, keby bolo treba niečo dohľadať. Zmena je oproti predošlému mesiacu tak, ako ju uvádza zostava." label="Kanály — mesačný súhrn" /></H3>
+        {/* „2026-07" je strojový zápis. V zozname sedemnástich mesiacov sa
+            v ňom nedá orientovať pohľadom — mesiac má byť čitateľný. */}
         {mesiace.length > 1 && (
-          <Select value={mesiac} onChange={setMesiac} options={mesiace.map((m) => ({ value: m, label: m }))} />
+          <Select value={mesiac} onChange={setMesiac} options={mesiace.map((m) => ({ value: m, label: monthLabel(m) }))} />
         )}
       </div>
 

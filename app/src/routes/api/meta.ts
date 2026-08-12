@@ -100,10 +100,23 @@ export const Route = createFileRoute("/api/meta")({
         // ich nepotrebuje. Jedna odpoveď so všetkým by bola pri každom otvorení
         // Marketingu pol megabajtu za nič.
         if (new URL(request.url).searchParams.get("co") === "instagram") {
+          // Text sa dopĺňa z metricoolovej tabuľky podľa DŇA publikovania.
+          //
+          // Graph API vracia `caption`, ale príspevky stiahnuté pred 12. 8.
+          // ho nemajú a reels sponzorované cez Ads ho občas nemajú vôbec.
+          // Metricool ten istý príspevok pozná — a bez tohto spojenia by
+          // v zozname stálo „(bez textu)" pri riadku, ktorého text je
+          // v susednej tabuľke na tej istej obrazovke.
+          //
+          // Páruje sa na deň, nie na presný čas: obidva zdroje uvádzajú iné
+          // pásmo a rovnaký príspevok by sa o hodinu minul.
           const p = await DB.prepare(
-            `SELECT id, datum, mesiac, typ, permalink, hook, kategoria,
-                    dosah, ulozenia, zdielania, komentare, lajky, videnia
-               FROM ig_prispevky ORDER BY datum DESC`,
+            `SELECT i.id, i.datum, i.mesiac, i.typ, i.permalink, i.kategoria,
+                    COALESCE(NULLIF(i.hook,''), (SELECT m.hook FROM mkt_prispevky m
+                       WHERE substr(m.datum,1,10) = substr(i.datum,1,10)
+                         AND m.hook <> '' ORDER BY m.views DESC LIMIT 1), '') AS hook,
+                    i.dosah, i.ulozenia, i.zdielania, i.komentare, i.lajky, i.videnia
+               FROM ig_prispevky i ORDER BY i.datum DESC`,
           ).all();
           return Response.json({ ok: true, prispevky: p.results });
         }
