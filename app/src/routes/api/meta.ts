@@ -5,6 +5,7 @@ import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import type { D1Database } from "@cloudflare/workers-types";
 
 import { bindings } from "../../lib/bindings.server";
+import { kategoriaHooku, krstneMenaKlientov } from "../../lib/psb/hook";
 
 /**
  * Meta Graph API — reklama a Instagram.
@@ -239,19 +240,35 @@ export const Route = createFileRoute("/api/meta")({
           const cislo = (m: Media, meno: string) =>
             m.insights?.data?.find((x) => x.name === meno)?.values?.[0]?.value ?? 0;
 
+          // Krstné mená klientov — bez nich sa klientsky príbeh nedá spoznať,
+          // lebo „Michal" je inak obyčajné slovo. Berú sa zo sedení: tabuľka
+          // klientov neexistuje, klient je odvodený z toho, kto trénoval.
+          const klienti = await DB.prepare("SELECT DISTINCT client FROM sessions WHERE client <> ''").all();
+          const mena = krstneMenaKlientov(((klienti.results as { client: string }[]) || []).map((r) => r.client));
+
           const stmts = vsetky.map((m) => {
             const datum = String(m.timestamp || "").slice(0, 10);
+            const text = String(m.caption || "").slice(0, 2000);
+            // `hook` je prvý riadok, `text` celý popis. Analýza obsahu číta hook,
+            // triedenie potrebuje viac — staccato sa v jednom riadku nespozná.
+            const hook = text.split("\n")[0].slice(0, 200);
             return DB.prepare(
-              `INSERT INTO ig_prispevky (id,datum,mesiac,typ,permalink,hook,dosah,ulozenia,zdielania,komentare,lajky,videnia,watch_time,updated_at)
-               VALUES (?1,?2,?3,?4,?5,'',?6,?7,?8,?9,?10,?11,0,?12)
+              `INSERT INTO ig_prispevky (id,datum,mesiac,typ,permalink,hook,dosah,ulozenia,zdielania,komentare,lajky,videnia,watch_time,text,kategoria,updated_at)
+               VALUES (?1,?2,?3,?4,?5,?13,?6,?7,?8,?9,?10,?11,0,?14,?15,?12)
                ON CONFLICT(id) DO UPDATE SET dosah=?6, ulozenia=?7, zdielania=?8,
-                 komentare=?9, lajky=?10, videnia=?11, updated_at=?12`,
+                 komentare=?9, lajky=?10, videnia=?11, hook=?13, text=?14, updated_at=?12,
+                 -- Zaradenie sa prepočíta zakaždým. Pravidlá sa budú
+                 -- upresňovať a staré príspevky sa musia opraviť s nimi; keď
+                 -- pribudne ručná oprava, bude na ňu treba vlastný príznak,
+                 -- lebo inak sa tu tíško stratí.
+                 kategoria=?15`,
             ).bind(
               String(m.id || ""), datum, datum.slice(0, 7),
               String(m.media_type || ""), String(m.permalink || ""),
               cislo(m, "reach"), cislo(m, "saved"), cislo(m, "shares"),
               Number(m.comments_count) || 0, Number(m.like_count) || 0,
               cislo(m, "views"), now,
+              hook, text, kategoriaHooku(text, mena),
             );
           });
           for (let i = 0; i < stmts.length; i += 40) await DB.batch(stmts.slice(i, i + 40));

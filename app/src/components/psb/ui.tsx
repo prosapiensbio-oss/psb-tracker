@@ -222,10 +222,22 @@ export function useRolovanie(pocet: number, zavislost?: unknown) {
     /** Ide priamo do `style` rolovacieho obalu. */
     styl: { overflowX: "auto", overflowY: vyska ? "auto" : "visible", maxHeight: vyska } as CSSProperties,
     trieda: "psb-rolovacia",
-    /** Prilepená hlavička. Bez nej sa po zarolovaní nedá povedať, čo je čo. */
+    /**
+     * Prilepená hlavička. Bez nej sa po zarolovaní nedá povedať, čo je čo.
+     *
+     * `border-collapse: separate` je tu nutnosť, nie vkus. Pri `collapse`
+     * prehliadač rámy zlúči do mriežky tabuľky a tá sa roluje spolu s obsahom —
+     * hlavička síce stojí, ale rámy a pozadie pod ňou preplávajú a riadky cez
+     * ňu presvitajú. Presne to Jerry videl 12. 8.
+     *
+     * S `separate` musí spodný ram hlavičky nakresliť samo `th`, lebo rám na
+     * `tr` sa v tomto režime nevykreslí.
+     */
     stylTag: (
       <style href="psb-rolovacia" precedence="default">
-        {`.psb-rolovacia thead th{position:sticky;top:0;z-index:1;background:${C.card}}`}
+        {`.psb-rolovacia table{border-collapse:separate;border-spacing:0}
+.psb-rolovacia thead th{position:sticky;top:0;z-index:2;background:${C.card};box-shadow:inset 0 -1px 0 ${C.border}}
+.psb-rolovacia tbody td{position:relative;z-index:0}`}
       </style>
     ),
   };
