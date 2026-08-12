@@ -35,16 +35,16 @@ const OBDOBIA = [
 const zdrojLabel = (z: string) => ZDROJE.find((x) => x.value === z)?.label || (z ? z : "nevyplnené");
 
 /** Mesiace v okne, od najstaršieho. Kotva je posledný mesiac s dátami, nie dnešok. */
-function oknoMesiacov(data: PSBData, okno: string): string[] {
+export function oknoMesiacov(data: PSBData, okno: string): string[] {
   const vsetky = [...new Set(data.sessions.map((s) => monthKey(s.date)))].filter(Boolean).sort();
   if (okno === "all") return vsetky;
   if (okno === "2025" || okno === "2026") return vsetky.filter((m) => m.startsWith(okno));
   return vsetky.slice(-Number(okno));
 }
 
-type Kroky = { dopyty: number; uvodne: number; klienti: number; trzba: number };
+export type Kroky = { dopyty: number; uvodne: number; klienti: number; trzba: number };
 
-function krokyZa(data: PSBData, clients: Record<string, ClientAgg>, mesiace: string[]): Kroky {
+export function krokyZa(data: PSBData, clients: Record<string, ClientAgg>, mesiace: string[]): Kroky {
   const v = (d: string) => mesiace.includes(monthKey(d));
   const dopyty = data.leads.filter((l) => v(l.date)).length;
   // Úvodný tréning ako UDALOSŤ, nie ako sedenie: keď niekto príde dvakrát,

@@ -27,6 +27,7 @@ import {
 import { KATEGORIE_HOOKOV, MKT_OBSAH } from "../../lib/psb/marketing-obsah";
 import { Dopyty } from "./Dopyty";
 import { Kampane } from "./Kampane";
+import { MarketingVrch } from "./MarketingVrch";
 import { Algoritmus } from "./Algoritmus";
 import { AkoMeratReklamu, Kohorta, Lievik, Naklady } from "./MarketingLievik";
 import { Kanaly } from "./Kanaly";
@@ -804,6 +805,9 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
 
   return (
     <>
+      {/* Nad záložkami, nie v jednej z nich: sú to čísla, ktoré platia bez
+          ohľadu na to, ktorú otázku si práve otváraš. */}
+      <MarketingVrch data={data} clients={clients} />
       <SubTabs
         // Poradie je poradie otázok, ktoré rozhodujú o peniazoch — nie zoznam
         // kanálov. Predtým bol prvý „Prehľad" s počtom postov a reels, čo je
