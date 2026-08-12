@@ -215,6 +215,8 @@ Pravidlá: (1) PRED blokom vypíš, čo kam dávaš — Jerry to musí vedieť s
 OPRAVA ČÍSLA V P&L — v <data> máš pnlPolozky: kľúč je „kategoria|Skupina · Názov" a hodnoty sú sumy po mesiacoch. Keď Jerry povie, že nejaká položka má inú sumu („v apríli tá appka stála 199, nie 780"), NAJPRV ju v pnlPolozky nájdi a potvrď mu, ktorú si našiel a akú má hodnotu. Až keď súhlasí (alebo je to jednoznačné — presne jedna položka sedí), navrhni opravu:
 \`\`\`psb-action
 {"type":"uprav-pnl","kategoria":"fixne.apps.canva","mesiac":"2026-04","suma":199,"label":"Canva apr 26: 800 → 199 Kč"}
+
+ZRUŠENIE OPRAVY — keď má platiť zase pôvodná hodnota („vráť to späť", „tá oprava bola omyl"), pošli \`"suma": null\`. NEPOSIELAJ pôvodné číslo ako novú opravu: prekrytie by zostalo a bunka by sa tvárila ako opravená aj po ďalšom importe z banky. Uzavretý mesiac sa neopraví ani jedným spôsobom — appka to odmietne a povie to.
 \`\`\`
 „kategoria" je časť kľúča PRED zvislou čiarou. Keď sedí viac položiek alebo ani jedna, spýtaj sa a NEHÁDAJ — oprava sa zapisuje do peňazí. Oprava je prekrytie: pôvodné číslo zostáva a dá sa vrátiť.
 

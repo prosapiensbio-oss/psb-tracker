@@ -691,9 +691,14 @@ const predchadzajuciMesiac = (mk: string) => {
 // Grafy, ktoré dostanú len `sessions`, tak nemusia kotvu počítať po svojom.
 /**
  * Po koľkých dňoch bez nového exportu z PTmindera sa dáta hlásia ako zastarané.
- * Nahráva sa v nedeľu; osem dní preto znamená „prvá vynechaná nedeľa“.
+ *
+ * Nahráva sa v nedeľu, takže osem dní by znamenalo „prvá vynechaná nedeľa“.
+ * Jerry si 11. 8. vybral desať — chce rezervu, nie budíček po jednom
+ * vynechanom týždni. Zostáva to teda na desiatich, ale už ako JEDNA konštanta:
+ * predtým bola desiatka natvrdo na dvoch miestach (register a dlaždica
+ * čerstvosti) a pri zmene by sa jedno z nich zabudlo.
  */
-export const PRAH_ZASTARANIA = 8;
+export const PRAH_ZASTARANIA = 10;
 
 export function kotvaDat(data: { sessions: { date: string }[]; payments?: { date: string }[] }): Kotva {
   let den = "";
@@ -1147,10 +1152,6 @@ export function deriveRegister(
       add(
         `data|${posledneData.slice(0, 10)}`,
         "Zápis",
-        // Osem dní, nie desať (Jerry, 11. 8.). Export sa nahráva v nedeľu, takže
-        // pri desiatich dňoch prejde jedna vynechaná nedeľa bez povšimnutia
-        // a upozornenie sa ozve až po druhej. Osem dní znamená, že po prvej
-        // vynechanej nedeli je v pondelok červené.
         dniStare >= PRAH_ZASTARANIA ? "red" : "orange",
         `Dáta z PTmindera končia ${fmtDMY(posledneData)}`,
         `Posledné nahraté sedenie je z ${fmtDMY(posledneData)}, teda spred ${dniStare} dní. Kým nenahráš nový export, dochádzka klientov klesá sama a čísla za tento mesiac sú neúplné — nula nových klientov nemusí znamenať, že nikto neprišiel.`,

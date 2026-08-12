@@ -90,7 +90,12 @@ function parseActions(raw: string): { text: string; actions: ParsedAction[] } {
           actions.push({ type: "kronika", label, data: o });
         } else if (o?.type === "odloz-anomaliu" && typeof o.key === "string" && /^\d{4}-\d{2}-\d{2}$/.test(String(o.do))) {
           actions.push({ type: "odloz-anomaliu", key: o.key, label, data: o });
-        } else if (o?.type === "uprav-pnl" && typeof o.kategoria === "string" && /^\d{4}-\d{2}$/.test(String(o.mesiac)) && Number.isFinite(Number(o.suma))) {
+        // `suma: null` je ZRUŠENIE opravy, nie chyba. Bez toho vedel Jarvis
+        // opravu iba zapísať: na „vráť to späť" poslal pôvodné číslo ako nový
+        // prekryv, takže bunka zostala navždy označená ako opravená a držala
+        // by tú hodnotu aj po novom importe z banky. Nález z ostrého testu
+        // akcie 12. 8.
+        } else if (o?.type === "uprav-pnl" && typeof o.kategoria === "string" && /^\d{4}-\d{2}$/.test(String(o.mesiac)) && (o.suma === null || Number.isFinite(Number(o.suma)))) {
           actions.push({ type: "uprav-pnl", label, data: o });
         } else if (o?.type === "zarad-pohyby" && Array.isArray(o.zmeny) && o.zmeny.length) {
           actions.push({ type: "zarad-pohyby", label, data: o });
@@ -355,9 +360,13 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
             oznamVysledok(`${mes} je uzavretý mesiac — oprava P&L sa nezapísala. Najprv ho odomkni v Mesiac → Uzávierka.`);
             return;
           }
-          if (nastavPnlBunku(String(d.kategoria), mes, Number(d.suma))) {
+          const zrusenie = d.suma === null;
+          if (nastavPnlBunku(String(d.kategoria), mes, zrusenie ? null : Number(d.suma))) {
             void saveVzasSetting("pnl_overrides", pnlOverridesNaUlozenie())
-              .then((ok) => oznamVysledok(ok ? `P&L ${mes} opravené: ${String(d.kategoria)} → ${Number(d.suma)} Kč.` : "Oprava P&L sa neuložila."));
+              .then((ok) => oznamVysledok(
+                !ok ? "Oprava P&L sa neuložila."
+                  : zrusenie ? `P&L ${mes}: oprava ${String(d.kategoria)} zrušená, platí pôvodná hodnota.`
+                  : `P&L ${mes} opravené: ${String(d.kategoria)} → ${Number(d.suma)} Kč.`));
           }
         });
       } else if (a.type === "odloz-anomaliu" && a.data) {
