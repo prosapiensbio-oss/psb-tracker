@@ -34,6 +34,21 @@ const r0 = (n: number) => Math.round(n);
 
 export type AiContext = ReturnType<typeof buildAiContext>;
 
+/**
+ * Mesačná uzávierka — kroky a prekážky pre mesiac, ktorý sa práve zatvára.
+ *
+ * Doplnené 11. 8.: Jarvis videl register aj dáta, ale nie to, čo appka od
+ * Jerryho ešte chce, aby sa mesiac dal zamknúť. Na otázku „čo mi chýba do
+ * uzávierky júla" preto nevedel odpovedať, hoci to appka má spočítané na
+ * jednom mieste (krokyZamku).
+ */
+export type UzavierkaPreAi = {
+  mesiac: string;
+  zamknuty: boolean;
+  kroky: { id: string; label: string; hotovo: boolean; detail: string }[];
+  prekazky: string[];
+};
+
 /** Kalendár — len to, čo z neho Jarvis potrebuje. Zámerne nie celý typ z Kalendár.tsx. */
 export type KalendarPreAi = {
   udalosti: { zaciatok: string; klient: string | null; trener: string; typ: string | null }[];
@@ -47,6 +62,7 @@ export function buildAiContext(
   capacity: CapacityRow[],
   register: RegisterItem[],
   kalendar?: KalendarPreAi,
+  uzavierka?: UzavierkaPreAi,
 ) {
   const clientList = Object.values(clients);
 
@@ -522,6 +538,12 @@ export function buildAiContext(
     },
     sixM: { spolu: sixM.length, podlaFazy: sixMPhases, poznamka: "6M proces: Obnova 1.–6. mesiac, Integrácia 7.–18., Udržateľnosť 19.+" },
     kalendar: kalendarBlok,
+    uzavierka: uzavierka
+      ? {
+          poznamka: "Kroky mesačnej uzávierky pre posledný plný mesiac — to, čo appka od Jerryho ešte chce, aby sa mesiac dal ZAMKNÚŤ. „prekazky“ je hotový zoznam viet; keď je prázdny, mesiac sa dá zamknúť. Neodvodzuj to z registra ani z dát, appka to má spočítané. Obrazovka: Mesiac → Uzávierka.",
+          ...uzavierka,
+        }
+      : null,
     ziskavanie,
     marketing,
     // P&L po položkách za posledných 12 mesiacov. Bez toho Jarvis na otázku

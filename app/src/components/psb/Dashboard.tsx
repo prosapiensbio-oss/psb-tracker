@@ -15,6 +15,7 @@ import { objednaneVerzia,
   type ClientAgg,
   type RegisterItem,
   type SixMRow,
+  PRAH_ZASTARANIA,
 } from "../../lib/psb/compute";
 import { fmtCZK, fmtDMY, monthLabel, weekKey, weekLabel } from "../../lib/psb/format";
 import { C, mix, S, badge, btn } from "../../lib/psb/theme";
@@ -967,7 +968,7 @@ export function Dashboard({
   const cerstvost = useMemo(() => {
     if (!kotva.den) return { text: "—", zastarane: true };
     const dni = (Date.now() - Date.parse(kotva.den)) / 86400000;
-    return { text: fmtDMY(kotva.den), zastarane: dni > 10 };
+    return { text: fmtDMY(kotva.den), zastarane: dni > PRAH_ZASTARANIA };
   }, [kotva]);
 
   // Snapshot pre „čo sa zmenilo od minule". Ukladajú sa len holé čísla, nie

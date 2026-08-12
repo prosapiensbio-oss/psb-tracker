@@ -522,6 +522,12 @@ export function PSBApp() {
   // od 31. 7. a v tej chvíli ich mala v databáze 18. Nevidel ich, lebo
   // kalendár si sťahovala len obrazovka Kalendár, do kontextu nešiel.
   const [kalZmeny, setKalZmeny] = useState<KalZmena[]>([]);
+  // Ktoré mesiace sú uzavreté. Jarvis to potrebuje vedieť, aby nenavrhoval
+  // opravy v zamknutom mesiaci a vedel povedať „júl sa už dá zamknúť".
+  const [zamknuteMesiace, setZamknuteMesiace] = useState<string[]>([]);
+  useEffect(() => {
+    void fetchPeriods().then(({ periods }) => setZamknuteMesiace(periods.filter((p) => p.locked).map((p) => p.month)));
+  }, []);
   useEffect(() => {
     void fetch("/api/kalendar", { credentials: "same-origin" })
       .then((r) => r.json())
@@ -1406,9 +1412,18 @@ function skupinaFaktur(
     return out;
   }, [krokyZamku, registerAll]);
 
+  // Uzávierka pre mesiac, ktorý sa práve zatvára — posledný PLNÝ podľa kotvy.
+  // Bežiaci mesiac sa nezatvára, takže jeho kroky by boli len šum.
+  const uzavierkaPreAi = useMemo(() => {
+    const mk = kotvaDat(data).plny;
+    if (!mk) return undefined;
+    const kroky = krokyZamku(mk).map((k) => ({ id: k.id, label: k.label, hotovo: k.hotovo, detail: k.detail }));
+    return { mesiac: mk, zamknuty: zamknuteMesiace.includes(mk), kroky, prekazky: prekazkyZamku(mk) };
+  }, [data, krokyZamku, prekazkyZamku, zamknuteMesiace]);
+
   const aiContext = useMemo(
-    () => buildAiContext(data, clients, sixM, capacity, registerAll, { udalosti: kalUdalosti, zmeny: kalZmeny }),
-    [data, clients, sixM, capacity, registerAll, kalUdalosti, kalZmeny, vzasVerzia()], // eslint-disable-line react-hooks/exhaustive-deps
+    () => buildAiContext(data, clients, sixM, capacity, registerAll, { udalosti: kalUdalosti, zmeny: kalZmeny }, uzavierkaPreAi),
+    [data, clients, sixM, capacity, registerAll, kalUdalosti, kalZmeny, uzavierkaPreAi, vzasVerzia()], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   const actions = useMemo<Actions>(
