@@ -26,6 +26,7 @@ import {
 } from "../../lib/psb/marketing";
 import { KATEGORIE_HOOKOV, MKT_OBSAH } from "../../lib/psb/marketing-obsah";
 import { Dopyty } from "./Dopyty";
+import { Kampane } from "./Kampane";
 import { Algoritmus } from "./Algoritmus";
 import { AkoMeratReklamu, Kohorta, Lievik, Naklady } from "./MarketingLievik";
 import { Kanaly } from "./Kanaly";
@@ -854,7 +855,9 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
           <CoToPrinieslo data={data} clients={clients} leads={leads} chat={chat} />
         </>
       )}
-      {sub === "naklady" && (<><Naklady data={data} clients={clients} /><AkoMeratReklamu /></>)}
+      {/* Kampane pred zmiešanou cenou: sú to skutočné čísla z Mety, kým
+          „Čo to stálo" je odhad z Metricoolu a z nových klientov v mesiaci. */}
+      {sub === "naklady" && (<><Kampane /><Naklady data={data} clients={clients} /><AkoMeratReklamu /></>)}
       {sub === "dosah" && (
         <>
           <Kanaly />
