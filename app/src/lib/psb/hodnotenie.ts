@@ -1,27 +1,22 @@
 /**
- * Stupnica 1–10 pre čísla marketingu.
+ * Hranice, podľa ktorých obrazovka rozhoduje, či je číslo dobré alebo zlé.
  *
- * PREČO VÔBEC
+ * ČÍSLO 1–10 SA NIKDE NEZOBRAZUJE
  *
- * Jerry na obrazovku pozerá pár minút mesačne. „Cena za dopyt 1 840 Kč" mu
- * sama o sebe nepovie nič — nevie, či je to dobré. Stupnica odpovedá na tú
- * otázku skôr, než ju stihne položiť.
+ * Chvíľu áno — 12. 8. bolo pri každej metrike skóre v odznaku. Jerry ho
+ * zrušil ako mätúce a mal pravdu: k „6,2" si musíš pamätať, čo znamená, a to
+ * je práca navyše za nič. Zostala z toho len farba čísla a veta pod ním.
  *
- * PREČO NIE JEDNO SKÓRE ZA CELÝ MARKETING
+ * Vnútri to skóre ale ďalej žije, lebo tá veta sa musí odniekiaľ vybrať.
+ * Rozdiel je v tom, že pásmo si drží appka a Jerry číta rovno záver.
  *
- * Priemer z ceny za dopyt, dosahu a konverzie je číslo, ktoré nič neznamená
- * a nedá sa podľa neho nič urobiť — presne to, čo Jerry o metrikách nechce
- * („číslo bez akcie"). Preto sa hodnotí každé číslo zvlášť a vždy je pri ňom
- * napísané, čo je jednotka a čo desiatka.
+ * PREČO SÚ HRANICE VYPÍSANÉ A NIE VZORCOM
  *
- * PREČO SÚ KOTVY VYPÍSANÉ A NIE VZORCOM
+ * Aby sa dali spochybniť. Keď Jerry povie „2 200 Kč za dopyt už nie je
+ * priemer, to je zle", opraví sa jedno číslo v jednom zozname.
  *
- * Aby sa dali spochybniť. Keď Jerry povie „2 200 Kč za dopyt nie je štvorka,
- * to je trojka", opraví sa jedno číslo v jednom zozname. Keby to bol vzorec
- * odvodený z priemeru, nedalo by sa hádať o ničom.
- *
- * Kotvy NIE SÚ z odvetvových benchmarkov. Sú z jeho vlastných čísel: strop
- * na dopyt u Terezky (~2 200 Kč), pri mixe (~5 700 Kč) a cieľ pod 1 000 Kč
+ * NIE SÚ z odvetvových benchmarkov. Sú z jeho vlastných čísel: strop na dopyt
+ * u Terezky (~2 200 Kč), pri mixe (~5 700 Kč) a cieľ pod 1 000 Kč
  * z marketingového plánu.
  */
 

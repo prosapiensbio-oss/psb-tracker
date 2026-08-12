@@ -5,7 +5,7 @@ import { najdiKlienta, type ClientAgg } from "../../lib/psb/compute";
 import { fmtDMY, normName } from "../../lib/psb/format";
 import { C, S } from "../../lib/psb/theme";
 import type { Lead } from "../../lib/psb/types";
-import { Card, Empty, H3, Info, Modal, Select, StatCard, TableWrap } from "./ui";
+import { Card, Empty, H3, Info, Modal, RolovaciaTabulka, Select, StatCard, TableWrap } from "./ui";
 import { SOURCES, STATUSES, statusColor } from "./Klienti";
 
 /**
@@ -75,6 +75,17 @@ export function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Re
   const [adding, setAdding] = useState(false);
   const [upravCas, setUpravCas] = useState<string | null>(null);
   const [lenCakajuci, setLenCakajuci] = useState(false);
+
+  // Najnovšie hore a v karte vidno tri. Zoznam rástol zdola a najčerstvejší
+  // dopyt — jediný, s ktorým sa reálne pracuje — končil mimo obrazovky.
+  const zoradene = useMemo(() => {
+    const zaklad = lenCakajuci
+      ? leads.filter((l) => meraSa(l) && !l.odpovedaneAt && l.status === "novy")
+      : leads;
+    // Pri dvoch dopytoch z toho istého dňa rozhoduje, kedy naozaj prišli.
+    return [...zaklad].sort((a, b) =>
+      b.date.localeCompare(a.date) || String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+  }, [leads, lenCakajuci]);
   const [uzOzvane, setUzOzvane] = useState(false);
   const zoznamRef = useRef<HTMLDivElement>(null);
   const [rychleMeno, setRychleMeno] = useState("");
@@ -237,7 +248,7 @@ export function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Re
         {!leads.length ? (
           <Empty>Zatiaľ žiadne dopyty — pridaj prvý tlačidlom vyššie.</Empty>
         ) : (
-          <TableWrap>
+          <RolovaciaTabulka pocet={3}>
             <thead>
               <tr>
                 <th style={{ ...S.th, minWidth: 118 }}>Dátum</th>
@@ -253,7 +264,7 @@ export function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Re
               </tr>
             </thead>
             <tbody>
-              {(lenCakajuci ? leads.filter((l) => meraSa(l) && !l.odpovedaneAt && l.status === "novy") : leads).map((l) => (
+              {zoradene.map((l) => (
                 <tr key={l.id}>
                   <td style={S.td}>
                     <input type="date" defaultValue={l.date} onBlur={(e) => e.target.value !== l.date && save({ ...l, date: e.target.value })}
@@ -340,7 +351,7 @@ export function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Re
                 </tr>
               ))}
             </tbody>
-          </TableWrap>
+          </RolovaciaTabulka>
         )}
         <div style={{ fontSize: 11, color: C.textDim, marginTop: 10 }}>
           Keď sa meno odporúčaného objaví medzi klientmi, v „Na čo sa pozrieť“ vyskočí pripomienka na 10 % zľavu pre toho, kto ho poslal.

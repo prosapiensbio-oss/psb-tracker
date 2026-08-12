@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { CSSProperties, ReactNode } from "react";
 
@@ -162,6 +162,84 @@ export function TableWrap({ children }: { children: ReactNode }) {
     <div style={{ overflowX: "auto" }}>
       <table style={S.table}>{children}</table>
     </div>
+  );
+}
+
+// Na serveri sa nemeria nič a `useLayoutEffect` by tam len varoval. V
+// prehliadači musí byť layoutový, inak blikne celá tabuľka a až potom sa
+// zloží na tri riadky. Voľba je na úrovni modulu, nie v tele komponentu —
+// `typeof window` sa počas behu nemení, ale v tele by to bol podmienený hook.
+const useIzomorfnyLayout = typeof window === "undefined" ? useEffect : useLayoutEffect;
+
+/**
+ * Tabuľka, z ktorej vidno prvé riadky a zvyšok sa roluje na mieste.
+ *
+ * PREČO
+ *
+ * Zoznamy v Marketingu narástli — 78 kampaní, 38 dopytov, stovky vyhľadávacích
+ * dopytov. Celý zoznam na obrazovke znamená, že sa musí rolovať CELÁ stránka
+ * a karta pod ňou je odtlačená kilometer nadol. Jerry pritom pri každom z tých
+ * zoznamov potrebuje najprv tri riadky — najnovšie alebo najsilnejšie — a až
+ * potom prípadne zvyšok.
+ *
+ * AKO
+ *
+ * Výška sa NEPOČÍTA z konštanty na riadok. Riadky majú rôznu výšku (kampaň má
+ * pod menom ešte obdobie, dopyt môže mať poznámku na dva riadky) a pevných
+ * „44 px na riadok" by raz ukázalo dva a inokedy tri a pol. Preto sa po
+ * vykreslení odmeria skutočná pozícia N-tého riadku.
+ *
+ * Hlavička ostáva prilepená hore — bez nej sa po zarolovaní nedá povedať,
+ * ktorý stĺpec je ktorý.
+ */
+export function useRolovanie(pocet: number, zavislost?: unknown) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [vyska, setVyska] = useState<number>();
+
+  useIzomorfnyLayout(() => {
+    const el = ref.current;
+    if (!el) return;
+    const zmeraj = () => {
+      const riadky = el.querySelectorAll<HTMLElement>("tbody tr");
+      // Krátky zoznam sa neroluje: rám okolo troch riadkov, keď sú tri, je
+      // len šum.
+      if (riadky.length <= pocet) return setVyska(undefined);
+      const hlavicka = el.querySelector("thead")?.getBoundingClientRect().height ?? 0;
+      const hore = riadky[0].getBoundingClientRect().top;
+      const dole = riadky[pocet - 1].getBoundingClientRect().bottom;
+      setVyska(Math.round(hlavicka + (dole - hore)) + 2);
+    };
+    zmeraj();
+    // Obsah dochádza asynchrónne (fetch) a karta sa dá zúžiť — bez sledovania
+    // by výška zamrzla na tom, čo tam bolo pri prvom vykreslení.
+    const ro = new ResizeObserver(zmeraj);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [pocet, zavislost]);
+
+  return {
+    ref,
+    /** Ide priamo do `style` rolovacieho obalu. */
+    styl: { overflowX: "auto", overflowY: vyska ? "auto" : "visible", maxHeight: vyska } as CSSProperties,
+    trieda: "psb-rolovacia",
+    /** Prilepená hlavička. Bez nej sa po zarolovaní nedá povedať, čo je čo. */
+    stylTag: (
+      <style href="psb-rolovacia" precedence="default">
+        {`.psb-rolovacia thead th{position:sticky;top:0;z-index:1;background:${C.card}}`}
+      </style>
+    ),
+  };
+}
+
+export function RolovaciaTabulka({ pocet = 3, children }: { pocet?: number; children: ReactNode }) {
+  const r = useRolovanie(pocet, children);
+  return (
+    <>
+      {r.stylTag}
+      <div ref={r.ref} className={r.trieda} style={r.styl}>
+        <table style={S.table}>{children}</table>
+      </div>
+    </>
   );
 }
 

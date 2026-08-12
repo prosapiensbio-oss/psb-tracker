@@ -35,7 +35,7 @@ import { C, mix, S } from "../../lib/psb/theme";
 import type { AssistantChat } from "./Assistant";
 import type { ClientAgg } from "../../lib/psb/compute";
 import type { Lead, PSBData } from "../../lib/psb/types";
-import { Card, Empty, H3, Info, Select, StatCard, SubTabs, ValueBars } from "./ui";
+import { Card, Empty, H3, Info, Select, StatCard, SubTabs, ValueBars, useRolovanie } from "./ui";
 
 // Marketing — skeleton. Four questions in the order Jerry asked them: what did I
 // try, what worked, what did it cost, and what should I try next. The section
@@ -151,8 +151,11 @@ function ObdobieBar({ hodnota, onChange, poznamka }: { hodnota: string; onChange
 // najprv to najväčšie, nie najmenšie.
 type Stlpec<T> = { id: keyof T & string; label: string; num?: boolean; info?: string; fmt?: (v: T[keyof T], r: T) => ReactNode; farba?: (r: T) => string | undefined };
 
-function SortTable<T extends Record<string, any>>({ riadky, stlpce, minWidth = 460, vychodzi }: {
+function SortTable<T extends Record<string, any>>({ riadky, stlpce, minWidth = 460, vychodzi, rolovat }: {
   riadky: T[]; stlpce: Stlpec<T>[]; minWidth?: number; vychodzi?: keyof T & string;
+  // Koľko riadkov nechať vidieť; zvyšok sa roluje v karte. Bez toho tlačia
+  // stovky vyhľadávacích dopytov všetko pod sebou o obrazovku nižšie.
+  rolovat?: number;
 }) {
   const [sort, setSort] = useState<{ id: string; desc: boolean }>(() => {
     const d = vychodzi ?? stlpce.find((c) => c.num)?.id ?? stlpce[0].id;
@@ -169,8 +172,13 @@ function SortTable<T extends Record<string, any>>({ riadky, stlpce, minWidth = 4
   const klik = (c: Stlpec<T>) =>
     setSort((s) => (s.id === c.id ? { id: c.id, desc: !s.desc } : { id: c.id, desc: !!c.num }));
 
+  const rol = useRolovanie(rolovat ?? 0, zoradene);
+
   return (
-    <div style={{ overflowX: "auto" }}>
+    <>
+    {rolovat ? rol.stylTag : null}
+    <div ref={rolovat ? rol.ref : undefined} className={rolovat ? rol.trieda : undefined}
+      style={rolovat ? rol.styl : { overflowX: "auto" }}>
       <table style={{ width: "100%", borderCollapse: "collapse", minWidth }}>
         <thead>
           <tr style={{ borderBottom: `2px solid ${mix(C.accent, 35)}` }}>
@@ -201,6 +209,7 @@ function SortTable<T extends Record<string, any>>({ riadky, stlpce, minWidth = 4
         </tbody>
       </table>
     </div>
+    </>
   );
 }
 
@@ -703,6 +712,7 @@ function Vyhladavanie({ chat }: { chat?: AssistantChat }) {
         vyrez={() => tsv(["dopyt", "kliky", "zobrazenia", "MP %", "pozícia"], riadky.map((r) => [r.dopyt, r.kliky, r.zobrazenia, r.ctr, r.pozicia]))} />
       </div>
       <SortTable
+        rolovat={3}
         riadky={riadky}
         stlpce={[
           { id: "dopyt", label: "Dopyt", farba: () => C.text },
@@ -767,6 +777,7 @@ function Vyhladavanie({ chat }: { chat?: AssistantChat }) {
           vyrez={() => tsv(["stránka", "kliky", "zobrazenia", "MP %", "pozícia"], (GSC_STRANY as unknown as GscStrana[]).map((r) => [r.url, r.kliky, r.zobrazenia, r.ctr, r.pozicia]))} />
         </div>
         <SortTable
+          rolovat={3}
           riadky={GSC_STRANY as unknown as GscStrana[]}
           stlpce={[
             { id: "url", label: "Stránka", farba: () => C.text },

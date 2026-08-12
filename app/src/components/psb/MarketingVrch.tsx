@@ -2,12 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 
 import { kotvaDat, type ClientAgg } from "../../lib/psb/compute";
 import { fmtCZK } from "../../lib/psb/format";
-import { CENA_ZA_DOPYT, DOPYTOV_MESACNE, KONVERZIA_DOPYTU, hodnot, type Hodnotenie, type Kotva } from "../../lib/psb/hodnotenie";
+import { CENA_ZA_DOPYT, DOPYTOV_MESACNE, KONVERZIA_DOPYTU, hodnot, type Hodnotenie } from "../../lib/psb/hodnotenie";
 import { suhrnKampani, zlucKampane, type Kampan } from "../../lib/psb/kampane";
 import { C, mix } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import { Card, Info } from "./ui";
-import { Skore, farbaSkore } from "./Kampane";
+import { farbaCeny } from "./Kampane";
 import { krokyZa, oknoMesiacov } from "./MarketingLievik";
 
 /**
@@ -45,7 +45,6 @@ type Metrika = {
   h: Hodnotenie;
   preco: string;
   verdikt: string;
-  stupnica: string;
 };
 
 /** Slovný verdikt podľa skóre. Tri pásma, tak ako ich pomenoval Jerry. */
@@ -55,9 +54,6 @@ function verdikt(h: Hodnotenie, texty: { dobre: string; priestor: string; zle: s
   if (h.skore >= 4) return texty.priestor;
   return texty.zle;
 }
-
-const popisStupnice = (kotvy: Kotva[], jednotka: (v: number) => string) =>
-  kotvy.map(([v, s]) => `${s} = ${jednotka(v)}`).join(" · ");
 
 export function MarketingVrch({ data, clients }: { data: PSBData; clients: Record<string, ClientAgg> }) {
   const [kampane, setKampane] = useState<Kampan[]>([]);
@@ -99,7 +95,6 @@ export function MarketingVrch({ data, clients }: { data: PSBData; clients: Recor
           zle: "Takmer sa nikto neozýva. Kým sa to nezmení, na ostatných číslach nezáleží.",
           bezDat: "Zatiaľ nemám dosť mesiacov na priemer.",
         }),
-        stupnica: popisStupnice(DOPYTOV_MESACNE, (v) => `${v} mesačne`),
       },
       {
         kluc: "konverzia",
@@ -113,7 +108,6 @@ export function MarketingVrch({ data, clients }: { data: PSBData; clients: Recor
           zle: "Väčšina dopytov sa stráca. Viac reklamy by tú stratu len zdražilo.",
           bezDat: "Zatiaľ nemám dopyty, z ktorých by sa dala konverzia počítať.",
         }),
-        stupnica: popisStupnice(KONVERZIA_DOPYTU, (v) => `${v} %`),
       },
       {
         kluc: "cena",
@@ -129,7 +123,6 @@ export function MarketingVrch({ data, clients }: { data: PSBData; clients: Recor
             ? "Ešte som z Mety nestiahol kampane."
             : "Reklama za 19 mesiacov o dopyt nikdy nepožiadala — všetky kampane kupovali dosah, prekliky a interakcie. Toto číslo vznikne až pri prvej kampani s cieľom „dopyt“.",
         }),
-        stupnica: popisStupnice(CENA_ZA_DOPYT, (v) => `${v} Kč`),
       },
     ];
   }, [data, clients, kampane]);
@@ -139,19 +132,16 @@ export function MarketingVrch({ data, clients }: { data: PSBData; clients: Recor
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         <Info
           label="Na čom to stojí"
-          text="Tri čísla, ktoré rozhodujú o marketingu, s výkladom. Stupnica 1–10 nie je z odvetvových priemerov — kotvy sú z tvojich vlastných čísel a z marketingového plánu (strop 2 200 Kč za dopyt u Terezkiných klientov, cieľ pod 1 000 Kč, 10,5 dopytu mesačne na zaplnenie 18 miest za pol roka). Preto sa o nich dá hádať: keď povieš, že 2 200 Kč nie je štvorka, opraví sa jedno číslo na jednom mieste. Počíta sa len z plných mesiacov — bežiaci mesiac má napočítanú polovicu a priemer by stiahol nadol."
+          text="Tri čísla, ktoré rozhodujú o marketingu, s výkladom. Farba čísla a veta pod ním hovoria, či je to dobré, či je tam priestor, alebo je to zle. Hranice nie sú z odvetvových priemerov — sú z tvojich vlastných čísel a z marketingového plánu: strop 2 200 Kč za dopyt u Terezkiných klientov, cieľ pod 1 000 Kč, 10,5 dopytu mesačne na zaplnenie 18 miest za pol roka. Počíta sa len z plných mesiacov — bežiaci mesiac má napočítanú polovicu a priemer by stiahol nadol."
         />
-        <span style={{ fontSize: 11.5, color: C.textDim }}>posledných 12 plných mesiacov · 1 = najhoršie, 10 = najlepšie</span>
+        <span style={{ fontSize: 11.5, color: C.textDim }}>posledných 12 plných mesiacov</span>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(255px, 1fr))", gap: 12, marginTop: 12 }}>
         {m.map((x) => (
-          <div key={x.kluc} style={{ padding: "12px 13px", borderRadius: 9, background: mix(x.h.bezDat ? C.textDim : farbaSkore(x.h.skore), 7) }}>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 9 }}>
-              <span style={{ fontSize: 25, fontWeight: 800, color: x.h.bezDat ? C.textDim : farbaSkore(x.h.skore), fontVariantNumeric: "tabular-nums" }}>
-                {x.hodnota}
-              </span>
-              <Skore skore={x.h.skore} bezDat={x.h.bezDat} titulok={x.stupnica} />
+          <div key={x.kluc} style={{ padding: "12px 13px", borderRadius: 9, background: mix(x.h.bezDat ? C.textDim : farbaCeny(x.h.skore), 7) }}>
+            <div style={{ fontSize: 25, fontWeight: 800, color: x.h.bezDat ? C.textDim : farbaCeny(x.h.skore), fontVariantNumeric: "tabular-nums" }}>
+              {x.hodnota}
             </div>
             <div style={{ fontSize: 12.5, fontWeight: 600, color: C.text, marginTop: 3 }}>{x.nazov}</div>
 
