@@ -239,6 +239,16 @@ export function PSBApp() {
   const navigate = useCallback((tab: string, sub?: string, focus?: NavFocus) => {
     // „6m" už nie je sekcia — je to pohľad v Klientoch. Staré odkazy (register,
     // karta na dashboarde) tým pádom vedú tam, kde 6M dnes žije.
+    // Dopyty sa 12. 8. presťahovali z Klientov do Marketingu (Jerry: „prečo sú
+    // v Klientoch, keď to súvisí s marketingom?"). Staré odkazy sa nemažú, len
+    // presmerujú — v registri, v Jarvisových cieľoch aj v uložených cestách
+    // ich je plno a odkaz, ktorý vyzerá funkčne a neurobí nič, je horší než
+    // žiadny.
+    if (tab === "klienti" && sub === "dopyty") {
+      setActive("marketing");
+      setMarketingSub("dopyty");
+      return;
+    }
     if (tab === "6m") {
       setActive("tracker");
       setTrackerSection("klienti");
@@ -1668,7 +1678,7 @@ function skupinaFaktur(
               </>
         )}
 
-        {active === "marketing" && <Marketing data={data} clients={clients} leads={data.leads} chat={chat} sub={marketingSub} onSub={setMarketingSub} onKlient={(m) => navigate("klienti", undefined, { client: m, nonce: Date.now() })} />}
+        {active === "marketing" && <Marketing data={data} clients={clients} leads={data.leads} chat={chat} sub={marketingSub} onSub={setMarketingSub} onKlient={(m) => navigate("klienti", undefined, { client: m, nonce: Date.now() })} refresh={actions.refresh} />}
         {active === "vzas" && <Vzas sub={vzasSub} onSub={setVzasSub} data={data} clients={clients} focus={vzasFocus} onNavigate={navigate} />}
         {active === "kalendar" && <Kalendar clients={clients} data={data} />}
 

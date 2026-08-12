@@ -25,6 +25,7 @@ import {
   type MktMesiac,
 } from "../../lib/psb/marketing";
 import { KATEGORIE_HOOKOV, MKT_OBSAH } from "../../lib/psb/marketing-obsah";
+import { Dopyty } from "./Dopyty";
 import { Algoritmus } from "./Algoritmus";
 import { AkoMeratReklamu, Kohorta, Lievik, Naklady } from "./MarketingLievik";
 import { Kanaly } from "./Kanaly";
@@ -778,7 +779,7 @@ function Vyhladavanie({ chat }: { chat?: AssistantChat }) {
   );
 }
 
-export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient }: { data: PSBData; clients: Record<string, ClientAgg>; leads: Lead[]; chat?: AssistantChat; sub: string; onSub: (s: string) => void; onKlient?: (m: string) => void }) {
+export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, refresh }: { data: PSBData; clients: Record<string, ClientAgg>; leads: Lead[]; chat?: AssistantChat; sub: string; onSub: (s: string) => void; onKlient?: (m: string) => void; refresh: () => Promise<void> }) {
   const setSub = onSub;
   const [rok, setRok] = useState("2026");
   // Nahraté exporty vyhrávajú nad číslami v kóde. Načíta sa raz pri otvorení;
@@ -809,6 +810,9 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient }: 
         // klientov, referencie 26; karty majú zodpovedať tomuto pomeru, nie
         // tomu, kde je najviac dát.
         tabs={[
+          // Dopyty prvé: sú vstupom lievika a jediná záložka, kde sa niečo
+          // zapisuje. Ostatné tri sú čítanie nad tým, čo tu vznikne.
+          { id: "dopyty", label: "Dopyty" },
           { id: "lievik", label: "Odkiaľ prišli klienti" },
           { id: "naklady", label: "Čo to stálo" },
           { id: "dosah", label: "Dosah a obsah" },
@@ -840,6 +844,8 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient }: 
         </div>
       </Card>
       )}
+
+      {sub === "dopyty" && <Dopyty leads={leads} clients={clients} refresh={refresh} />}
 
       {sub === "lievik" && (
         <>
