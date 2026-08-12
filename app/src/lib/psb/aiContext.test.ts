@@ -235,3 +235,64 @@ describe("marketing v kontexte", () => {
     expect(Object.keys(z.klienti)).toHaveLength(0);
   });
 });
+
+// ── Lievik a ekonomika dopytu ────────────────────────────────────────────────
+//
+// Nález z 12. 8., a bol môj: v kontexte stáli vedľa seba klienti za CELÚ
+// históriu a dopyty od januára 2026. Podiel z dvoch rôznych okien vychádza cez
+// sto percent a znie presvedčivo — Jarvis by tvrdil „Instagram konvertuje na
+// 190 %" a plánoval by podľa toho rozpočet.
+describe("lievik — konverzia nad rovnakým obdobím", () => {
+  const sLeadmi = (leads: { name: string; source: string }[], sedeniPodlaMena: Record<string, number>) => {
+    const { data } = vzorka();
+    const sessions: SessionRow[] = [];
+    for (const [meno, n] of Object.entries(sedeniPodlaMena)) {
+      for (let i = 0; i < n; i++) sessions.push(sedenie(meno, `2026-02-${String((i % 28) + 1).padStart(2, "0")}`));
+    }
+    const clients: Record<string, ClientAgg> = {};
+    for (const [meno, n] of Object.entries(sedeniPodlaMena)) {
+      clients[meno] = klient(meno, sessions.filter((s) => s.client === meno), { sessionCount: n });
+    }
+    const d: PSBData = { ...data, sessions: [...data.sessions, ...sessions], leads: leads.map((l, i) => ({
+      id: `l${i}`, date: "2026-02-01", name: l.name, source: l.source as never, referrer: "",
+      status: "novy" as never, note: "", email: "", telefon: "", kampan: "", utm: "", stranka: "",
+      odpovedaneAt: "", dovod: "", createdAt: "2026-02-01T09:00:00.000Z",
+    })) };
+    return buildAiContext(d, { ...vzorka().clients, ...clients }, [], [], []);
+  };
+
+  test("konverzia sa počíta z dopytov, nie z klientov za celú históriu", () => {
+    // Tri dopyty, dvaja z nich zostali (5+ sedení), jeden prišiel dvakrát.
+    const c = sLeadmi(
+      [{ name: "Anna Zostala", source: "instagram" }, { name: "Bob Zostal", source: "instagram" }, { name: "Cyril Zmizol", source: "instagram" }],
+      { "Anna Zostala": 8, "Bob Zostal": 6, "Cyril Zmizol": 2 },
+    );
+    expect(c.marketing.lievik.spolu).toBe(3);
+    expect(c.marketing.lievik.trenovalo).toBe(3);
+    expect(c.marketing.lievik.zostalo).toBe(2);
+    expect(c.marketing.lievik.zostaloPct).toBe(67);
+    // A NIKDY nie viac než sto percent — to bola tá pôvodná chyba.
+    expect(c.marketing.lievik.zostaloPct).toBeLessThanOrEqual(100);
+    expect(c.marketing.lievik.podlaZdroja.instagram.zostaloPct).toBe(67);
+  });
+
+  test("mená sa párujú cez diakritiku — inak konverzia vyjde nižšia", () => {
+    // „Lukáš Hanus" v dopyte a „Lukas Hanus" v PTminderi je jeden človek.
+    const c = sLeadmi([{ name: "Lukáš Hanuš", source: "google" }], { "Lukas Hanus": 9 });
+    expect(c.marketing.lievik.zostalo).toBe(1);
+  });
+
+  test("ten istý človek dvakrát v dopytoch sa počíta raz", () => {
+    const c = sLeadmi(
+      [{ name: "Anna Zostala", source: "web" }, { name: "anna zostala", source: "web" }],
+      { "Anna Zostala": 7 },
+    );
+    expect(c.marketing.lievik.spolu).toBe(1);
+  });
+
+  test("zdrojeKlientov varuje, že sa z neho konverzia počítať nesmie", () => {
+    // Text je poistka proti presne tomu deleniu, ktoré tam predtým lákalo.
+    expect(ctx().marketing.zdrojeKlientov.poznamka).toContain("NESMIE");
+    expect(ctx().marketing.zdrojeKlientov).not.toHaveProperty("dopyty");
+  });
+});

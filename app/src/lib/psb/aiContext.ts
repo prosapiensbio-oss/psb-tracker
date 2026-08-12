@@ -13,6 +13,7 @@ import { MKT_OBSAH } from "./marketing-obsah";
 import {
   cenaZaSedenie,
   kotvaDat,
+  najdiKlienta,
   tokyKlientov,
   ziskavanieKlientov,
   monthlyFinance,
@@ -292,6 +293,57 @@ export function buildAiContext(
     dopytovSpolu: dopytySpolu,
   };
 
+  /** Podiel dopytov, z ktorých sa stal klient, čo zostal (5+ sedení). */
+  const konverziaZostal = (() => {
+    const mena = clientList.map((c) => c.name);
+    const videne = new Set<string>();
+    let spolu = 0, zostal = 0;
+    for (const l of data.leads || []) {
+      const kluc = normName(l.name || "");
+      if (!kluc || videne.has(kluc)) continue;
+      videne.add(kluc);
+      spolu++;
+      const m = najdiKlienta(mena, l.name || "");
+      if (m && clients[m] && clients[m].sessionCount >= 5) zostal++;
+    }
+    return spolu ? zostal / spolu : 0;
+  })();
+
+  // ── Koľko si môžeme dovoliť zaplatiť za jeden dopyt ───────────────────────
+  //
+  // Číslo, ktorým sa riadi rozpočet na reklamu — a ktoré sa nedá odvodiť
+  // z ničoho, čo appka ukazovala predtým. Kľúčové je, že NIE JE jedno,
+  // ku ktorému trénerovi klient pôjde:
+  //
+  //   Terezkine hodiny — 850 Kč/h je náklad firmy, zo sedenia zostane rozdiel.
+  //   Jerryho hodiny   — tých istých 850 Kč je jeho vlastná výplata, z domácnosti
+  //                      neodíde. Klient na jeho kalendári má hodnotu skoro
+  //                      celého sedenia, teda rádovo štyrikrát viac.
+  //
+  // Preto sa strop počíta zvlášť a nie priemerom. Jerry to 11. 8. sformuloval
+  // sám: „mám síce 18 voľných, ale reklama sa oplatí inak podľa toho, komu
+  // toho klienta dám."
+  const ekonomikaDopytu = (() => {
+    const SADZBA = 850;              // nárok trénera nad 60 hodín
+    const cena = cenaZaSedenie(data, () => true).czk;
+    const sedeniNaKlienta = clientList.filter((c) => c.sessionCount >= 5).length
+      ? clientList.filter((c) => c.sessionCount >= 5).reduce((a, c) => a + c.sessionCount, 0) /
+        clientList.filter((c) => c.sessionCount >= 5).length
+      : 0;
+    return {
+      poznamka: "Strop = koľko sa dá zaplatiť za JEDEN dopyt a byť na nule. Počíta sa: (hodnota klienta × konverzia dopyt→zostal). Hodnota klienta je iná podľa trénera — u Terezky je 850 Kč/h náklad firmy, u Jerryho je to jeho vlastná výplata. Reálny strop je medzi tými dvoma podľa toho, komu klienti pôjdu. Cieľová cena má byť výrazne pod stropom, nie na ňom.",
+      cenaSedenia: r0(cena),
+      sedeniNaKlienta: r0(sedeniNaKlienta),
+      sadzbaTrenera: SADZBA,
+      konverziaDopytNaKlienta: Math.round(konverziaZostal * 1000) / 10,
+      hodnotaKlienta: { uTerezky: r0(Math.max(0, cena - SADZBA) * sedeniNaKlienta), uJerryho: r0(cena * sedeniNaKlienta) },
+      stropZaDopyt: {
+        uTerezky: r0(Math.max(0, cena - SADZBA) * sedeniNaKlienta * konverziaZostal),
+        uJerryho: r0(cena * sedeniNaKlienta * konverziaZostal),
+      },
+    };
+  })();
+
   // ── Marketing ─────────────────────────────────────────────────────────────
   //
   // Jarvis má byť plánovač marketingu, nie len účtovník tréningov — a na plán
@@ -403,11 +455,56 @@ export function buildAiContext(
       },
       clanky: MKT_CLANKY.slice(0, 15),
       zdrojeKlientov: {
-        poznamka: "Odkiaľ prišli KLIENTI (nie dopyty). Vyplnené ručne pri úvodnom tréningu; klienti bez zdroja sa nezapočítavajú.",
+        poznamka: "Odkiaľ prišli KLIENTI za CELÚ históriu. Vyplnené ručne pri úvodnom tréningu. POZOR: toto číslo sa NESMIE deliť počtom dopytov — dopyty sa evidujú až od januára 2026, takže by z toho vyšla nezmyselná konverzia (napr. 23 instagramových klientov ÷ 12 instagramových dopytov = 190 %). Konverzia je spočítaná v kľúči „lievik“ nad rovnakým obdobím; ber ju odtiaľ.",
         klienti: zdroje,
-        dopyty: dopytyZdroje,
         bezZdroja: clientList.filter((c) => !c.zdroj).length,
       },
+      // Lievik — jediné miesto, kde sa smie čítať konverzia.
+      //
+      // Prvá verzia mala vedľa seba klientov za celú históriu a dopyty od
+      // januára 2026. Dve rôzne okná vedľa seba sú pozvánka k nezmyslu: podiel
+      // z nich vychádza cez sto percent a znie presvedčivo.
+      //
+      // Tu sa počíta OBOJE z dopytov, teda nad tým istým obdobím, a mená sa
+      // párujú cez najdiKlienta — inak „Lukáš Hanus" z dopytu a „Lukas Hanus"
+      // z PTmindera prežijú ako dvaja ľudia a konverzia vyjde nižšia.
+      lievik: (() => {
+        const menaKlientov = clientList.map((c) => c.name);
+        const podla: Record<string, { dopytov: number; trenoval: number; zostal: number }> = {};
+        const videne = new Set<string>();
+        let spolu = 0, trenovaloS = 0, zostaloS = 0;
+        for (const l of data.leads || []) {
+          const kluc = normName(l.name || "");
+          if (!kluc || videne.has(kluc)) continue;
+          videne.add(kluc);
+          const meno = najdiKlienta(menaKlientov, l.name || "");
+          const k = meno ? clients[meno] : null;
+          const e = (podla[l.source || "ine"] ||= { dopytov: 0, trenoval: 0, zostal: 0 });
+          e.dopytov++; spolu++;
+          if (k && k.sessionCount > 0) { e.trenoval++; trenovaloS++; }
+          if (k && k.sessionCount >= 5) { e.zostal++; zostaloS++; }
+        }
+        const pct = (a: number, b: number) => (b ? Math.round((a / b) * 100) : 0);
+        // Rýchlosť odpovede — meria sa až od 12. 8. 2026, staršie dopyty
+        // odpoveď zaznamenanú nemajú a do priemeru nesmú.
+        const casy = (data.leads || [])
+          .filter((l) => l.date >= "2026-08-12" && l.odpovedaneAt)
+          .map((l) => (Date.parse(l.odpovedaneAt) - Date.parse(`${l.date}T00:00:00Z`)) / 3600000)
+          .filter((h) => Number.isFinite(h) && h >= 0)
+          .sort((a, b) => a - b);
+        return {
+          poznamka: "Dopyt → trénoval aspoň raz → zostal (5+ sedení), nad ROVNAKÝM obdobím. Toto je jediné miesto, odkiaľ sa smie brať konverzia. „zostal“ je prísnejšia a pravdivejšia miera než „trénoval“: kto prišiel dvakrát a zmizol, nikdy neobsadil miesto. Dopyty sa evidujú od januára 2026; staršie neexistujú.",
+          spolu, trenovalo: trenovaloS, zostalo: zostaloS,
+          trenovaloPct: pct(trenovaloS, spolu), zostaloPct: pct(zostaloS, spolu),
+          podlaZdroja: Object.fromEntries(Object.entries(podla).map(([z, e]) => [z, { ...e, zostaloPct: pct(e.zostal, e.dopytov) }])),
+          rychlostOdpovede: {
+            poznamka: "Medián hodín od dopytu po našu prvú odpoveď. Meria sa až od 12. 8. 2026 — staršie dopyty odpoveď zaznamenanú nemajú a nedá sa doplniť. V službách je to najsilnejšia páka na konverziu, silnejšia než cena aj než text reklamy.",
+            medianHodin: casy.length ? Math.round(casy[Math.floor(casy.length / 2)]) : null,
+            zmeranych: casy.length,
+            cakaBezOdpovede: (data.leads || []).filter((l) => l.date >= "2026-08-12" && !l.odpovedaneAt && l.status === "novy").length,
+          },
+        };
+      })(),
       naklady: { poznamka: "Marketingové položky z P&L (Facebook, Google, MultiBox, Offline).", poMesiacoch: naklady },
     };
   })();
