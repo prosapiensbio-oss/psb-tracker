@@ -55,6 +55,10 @@ function krokyZa(data: PSBData, clients: Record<string, ClientAgg>, mesiace: str
   // vždy vyšla 100 %, lebo úvodný tréning JE prvé sedenie a obe čísla by
   // počítali tých istých ľudí.
   const novi = Object.values(clients).filter((c) => {
+    // Kto sa vrátil po pauze, nie je nový klient. Bez toho vyšlo v roku 2026
+    // o jedného nového viac než úvodných tréningov — Kateřina Stoklásková mala
+    // úvodný v novembri 2022, ale dáta z PTmindera siahajú do januára 2025.
+    if (c.vratenie) return false;
     if (!c.firstSession || !v(c.firstSession)) return false;
     const zaplatil = data.payments.some((p) => p.client === c.name)
       || c.sessions.some((x) => x.sessionType !== "UVODNE" && x.price > 0);
@@ -106,7 +110,7 @@ export function Lievik({ data, clients }: { data: PSBData; clients: Record<strin
   // Rozpad podľa zdroja — len klienti, ktorí v období začali.
   const podlaZdroja = useMemo(() => {
     const m = new Map<string, { klientov: number; trzba: number }>();
-    const menaVObdobi = Object.values(clients).filter((c) => c.firstSession && mesiace.includes(monthKey(c.firstSession)));
+    const menaVObdobi = Object.values(clients).filter((c) => !c.vratenie && c.firstSession && mesiace.includes(monthKey(c.firstSession)));
     for (const c of menaVObdobi) {
       const z = c.zdroj || "";
       const e = m.get(z) || { klientov: 0, trzba: 0 };
