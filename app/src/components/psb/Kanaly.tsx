@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { monthLabel } from "../../lib/psb/format";
+import { statistiky, type Druh } from "../../lib/psb/mesiac";
+import { MesiacProfil } from "./MesiacProfil";
+import type { ClientAgg } from "../../lib/psb/compute";
+import type { PSBData } from "../../lib/psb/types";
+import type { AssistantChat } from "./Assistant";
 import { C, mix, S } from "../../lib/psb/theme";
 import { Card, Empty, H3, Info, Select, TableWrap, ValueBars } from "./ui";
 
@@ -31,15 +36,25 @@ const poradieKanala = (k: string) => {
 const sipka = (z: number | null) => (z == null ? "" : z > 1 ? "▲" : z < -1 ? "▼" : "►");
 const farbaZmeny = (z: number | null) => (z == null ? C.textDim : z > 1 ? C.green : z < -1 ? C.red : C.textMuted);
 
-const TREND_METRIKY: { id: string; label: string; kanal: string; metrika: string }[] = [
-  { id: "sled", label: "Sledovatelia IG", kanal: "Instagram", metrika: "Followers" },
-  { id: "views", label: "Videnia IG", kanal: "Instagram", metrika: "Views" },
-  { id: "reel", label: "Ø dosah reelu", kanal: "Instagram", metrika: "Avg reach per reel" },
-  { id: "ads", label: "Reklama Kč", kanal: "Meta Ads", metrika: "Spent" },
-  { id: "web", label: "Návštevníci webu", kanal: "Web", metrika: "Visitors" },
+// `druh` rozhoduje, nad čím sa počítajú štatistiky. Sledovatelia sú STAV —
+// kumulujú sa, takže „priemerný počet sledovateľov" nehovorí nič a najlepší
+// mesiac by vyšiel vždy ten posledný. Čo o nich niečo hovorí, je prírastok.
+// Ostatné sú toky: každý mesiac začínajú od nuly.
+const TREND_METRIKY: { id: string; label: string; kanal: string; metrika: string; druh: Druh; jednotka?: string; popis: string }[] = [
+  { id: "sled", label: "Sledovatelia IG", kanal: "Instagram", metrika: "Followers", druh: "stav",
+    popis: "Štatistiky sú z mesačných PRÍRASTKOV, nie z úrovne — počet sledovateľov len rastie a jeho priemer by hovoril len o tom, kedy sa meralo." },
+  { id: "views", label: "Videnia IG", kanal: "Instagram", metrika: "Views", druh: "tok",
+    popis: "Koľkokrát niekto videl obsah za mesiac. Skáče podľa toho, či nejaký reel chytil algoritmus — a podľa toho, koľko sa doplatilo za dosah." },
+  { id: "reel", label: "Ø dosah reelu", kanal: "Instagram", metrika: "Avg reach per reel", druh: "tok",
+    popis: "Výrobná kvalita: nezávisí od počtu publikovaní, len od toho, či obsah funguje." },
+  { id: "ads", label: "Reklama Kč", kanal: "Meta Ads", metrika: "Spent", druh: "tok", jednotka: " Kč",
+    popis: "Minuté na Meta Ads. Súčet za celé obdobie je to jediné číslo, ktoré tu má zmysel sčítať." },
+  { id: "web", label: "Návštevníci webu", kanal: "Web", metrika: "Visitors", druh: "tok",
+    popis: "Ľudia na webe za mesiac. Web je miesto, kam reklama aj Instagram posielajú." },
 ];
 
-export function Kanaly() {
+export function Kanaly({ data, clients, chat }: { data: PSBData; clients: Record<string, ClientAgg>; chat?: AssistantChat }) {
+  const [rozobrat, setRozobrat] = useState<string | null>(null);
   const [riadky, setRiadky] = useState<KanalRiadok[]>([]);
   const [mesiac, setMesiac] = useState("");
   const [nacitava, setNacitava] = useState(true);
@@ -78,6 +93,13 @@ export function Kanaly() {
     }
     return [...podla.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([m, v]) => ({ label: m, value: v }));
   }, [riadky, trendCfg]);
+
+  // Štatistiky vybranej metriky. Bez nich je graf pekný, ale nepovie, či je
+  // posledný stĺpec dobrý — a to je jediná otázka, ktorú pri ňom človek má.
+  const trendStat = useMemo(
+    () => statistiky(trendData.map((d) => ({ m: d.label, v: d.value })), trendCfg.druh),
+    [trendData, trendCfg.druh],
+  );
 
   const [celyZoznam, setCelyZoznam] = useState(false);
   // Duplicitné varianty tej istej metriky (dve čítania PDF) — v plnom zozname
@@ -156,6 +178,10 @@ export function Kanaly() {
 
   return (
     <Card>
+      {rozobrat && (
+        <MesiacProfil mesiac={rozobrat} kanaly={riadky} data={data} clients={clients} chat={chat}
+          onClose={() => setRozobrat(null)} />
+      )}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         <H3><Info text="Osem čísel, na ktorých pre PSB záleží — vybrané zo ~160 metrík mesačnej zostavy Metricoolu. Celý zoznam je dole v rozbaľovači, keby bolo treba niečo dohľadať. Zmena je oproti predošlému mesiacu tak, ako ju uvádza zostava." label="Kanály — mesačný súhrn" /></H3>
         {/* „2026-07" je strojový zápis. V zozname sedemnástich mesiacov sa
@@ -194,8 +220,41 @@ export function Kanaly() {
         ))}
       </div>
       {trendData.length ? (
-        <ValueBars data={trendData} color={trendId === "ads" ? C.orange : C.accent}
-          fmt={(n) => (n >= 10000 ? `${Math.round(n / 1000)}k` : cislo(Math.round(n)))} height={150} alignEnd />
+        <>
+          {/* Štatistiky nad grafom, nie pod ním: odpovedajú na otázku, ktorú
+              má človek PRI pohľade na posledný stĺpec — je to veľa alebo málo? */}
+          <div style={{ display: "flex", gap: 18, flexWrap: "wrap", marginBottom: 8, fontSize: 11.5 }}>
+            <Cifra label={trendCfg.druh === "stav" ? "Ø prírastok / mes." : "Priemer / mes."}
+              hodnota={`${cislo(Math.round(trendStat.priemer))}${trendCfg.jednotka || ""}`} />
+            {trendStat.najlepsi && (
+              <Cifra label={`Najlepší (${monthLabel(trendStat.najlepsi.m)})`} farba={C.green}
+                hodnota={`${cislo(Math.round(trendStat.najlepsi.v))}${trendCfg.jednotka || ""}`} />
+            )}
+            {trendStat.najhorsi && (
+              <Cifra label={`Najhorší (${monthLabel(trendStat.najhorsi.m)})`} farba={C.orange}
+                hodnota={`${cislo(Math.round(trendStat.najhorsi.v))}${trendCfg.jednotka || ""}`} />
+            )}
+            {trendStat.zmena != null && (
+              <Cifra label="Posledný oproti predošlému" farba={trendStat.zmena >= 0 ? C.green : C.red}
+                hodnota={`${trendStat.zmena >= 0 ? "+" : ""}${Math.round(trendStat.zmena)} %`} />
+            )}
+            {trendStat.odchylka != null && (
+              <Cifra label="Posledný oproti bežnému" farba={trendStat.odchylka >= 0 ? C.green : C.red}
+                hodnota={`${trendStat.odchylka >= 0 ? "+" : ""}${Math.round(trendStat.odchylka)} %`} />
+            )}
+            {trendCfg.druh === "tok" && trendId === "ads" && (
+              <Cifra label={`Spolu za ${trendStat.mesiacov} mes.`} hodnota={`${cislo(Math.round(trendStat.sucet))} Kč`} farba={C.orange} />
+            )}
+          </div>
+
+          <ValueBars data={trendData} color={trendId === "ads" ? C.orange : C.accent}
+            fmt={(n) => (n >= 10000 ? `${Math.round(n / 1000)}k` : cislo(Math.round(n)))} height={150} alignEnd
+            onKlik={(m) => setRozobrat(m)} />
+          <div style={{ fontSize: 11, color: C.textDim, marginTop: 4, lineHeight: 1.5 }}>
+            Klikni na stĺpec a rozoberie sa ti celý mesiac — príspevky, kampane, dopyty aj noví klienti.
+            {" "}{trendCfg.popis}
+          </div>
+        </>
       ) : (
         <Empty>Táto metrika v nahratých zostavách nie je.</Empty>
       )}
@@ -249,5 +308,14 @@ export function Kanaly() {
       </div>
       )}
     </Card>
+  );
+}
+
+function Cifra({ label, hodnota, farba }: { label: string; hodnota: string; farba?: string }) {
+  return (
+    <div>
+      <div style={{ fontWeight: 700, color: farba || C.text, fontVariantNumeric: "tabular-nums" }}>{hodnota}</div>
+      <div style={{ color: C.textDim }}>{label}</div>
+    </div>
   );
 }

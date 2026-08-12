@@ -847,7 +847,7 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
       {sub === "naklady" && (<><Kampane /><Naklady data={data} clients={clients} /><AkoMeratReklamu /></>)}
       {sub === "dosah" && (
         <>
-          <Kanaly />
+          <Kanaly data={data} clients={clients} chat={chat} />
           <CoSomRobil chat={chat} />
           <CoFungovalo chat={chat} />
           <Vyhladavanie chat={chat} />
