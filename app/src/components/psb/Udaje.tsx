@@ -8,7 +8,7 @@ import type { AssistantChat } from "./Assistant";
 import { Zosit } from "./Zosit";
 import type { IngestResult } from "../../lib/psb/db.server";
 import type { Actions, KrokUzavierky, NavFocus } from "./App";
-import type { BtcNakup } from "../../lib/psb/client";
+import { fetchVzasSettings, saveVzasSetting, type BtcNakup } from "../../lib/psb/client";
 import { BtcParovanie } from "./BtcParovanie";
 import { BankovyImport } from "./Banka";
 import { BankaUlozene } from "./BankaUlozene";
@@ -376,6 +376,7 @@ function UploadCard({ data, missing, actions, chat }: { data: PSBData; missing: 
           ))}
         </div>
       )}
+      <NapojenieWebu />
       <div onClick={() => setOpen((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginTop: 14, fontSize: 12, color: C.textDim }}>
         <span>{open ? "▲ skryť" : "▼"} zoznam potrebných CSV a zapísané pohyby</span>
         <span style={{ marginLeft: "auto" }}>Nahrať sa dá aj pretiahnutím do Jarvisa (📎 vpravo dole).</span>
@@ -481,6 +482,80 @@ function ResetButton({ onReset }: { onReset: () => Promise<void> }) {
       <span style={{ fontSize: 12, color: C.red }}>Naozaj vymazať všetky dáta?</span>
       <button onClick={() => { void onReset(); setConfirm(false); }} style={{ ...btn("danger"), fontSize: 12, padding: "6px 12px" }}>Áno</button>
       <button onClick={() => setConfirm(false)} style={{ ...btn("ghost"), fontSize: 12, padding: "6px 12px" }}>Zrušiť</button>
+    </div>
+  );
+}
+
+/**
+ * Napojenie webového formulára na dopyty.
+ *
+ * Contact Form 7 na prosapiens.cz pošle e-mail a tým to preň končí — schránka
+ * sa nedá spočítať a hlavne v nej nie je KAMPAŇ. Tento panel dá Jerrymu dve
+ * veci, ktoré potrebuje skopírovať do WordPressu: adresu a zdieľané tajomstvo.
+ *
+ * Tajomstvo generuje prehliadač a appka ho ukladá; nikde inde sa neposiela
+ * a v tomto rozhovore ani v kóde nikdy nefiguruje.
+ */
+function NapojenieWebu() {
+  const [tajne, setTajne] = useState<string>("");
+  const [stav, setStav] = useState<"load" | "ok">("load");
+  const [ukaz, setUkaz] = useState(false);
+
+  useEffect(() => {
+    void fetchVzasSettings().then((s) => {
+      setTajne(typeof s["web_lead_secret"] === "string" ? (s["web_lead_secret"] as string) : "");
+      setStav("ok");
+    });
+  }, []);
+
+  const vygeneruj = async () => {
+    // Náhoda z prehliadača, nie z kódu — takto sa hodnota nikdy neobjaví
+    // v repozitári ani v žiadnom rozhovore.
+    const b = new Uint8Array(24);
+    crypto.getRandomValues(b);
+    const nove = Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
+    await saveVzasSetting("web_lead_secret", nove);
+    setTajne(nove);
+    setUkaz(true);
+  };
+
+  const url = `${typeof location !== "undefined" ? location.origin : ""}/api/lead-web`;
+  if (stav === "load") return null;
+
+  return (
+    <div style={{ marginTop: 14, padding: 12, background: mix(C.accent, 6), borderRadius: 8 }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: C.textMuted, marginBottom: 6 }}>
+        <Info
+          label="Dopyty z webového formulára"
+          text="Contact Form 7 na webe pošle e-mail a nič neuloží. Tento panel ho napojí na appku: odoslaný formulár vytvorí dopyt v Klienti → Dopyty aj s kampaňou, z ktorej človek prišiel. Informácia o kampani žije len v adrese v momente kliknutia (utm_ parametre) — keď ju formulár nezachytí, je nenávratne preč a spojenie medzi výdavkom na reklamu a klientom sa už spätne nezostaví. Tajomstvo je náhodné heslo len pre túto jednu cestu; keby ho niekto poznal, vedel by appku zaplniť vymyslenými dopytmi. Vygeneruje ho tento prehliadač a nikde inde sa neposiela."
+        />
+      </div>
+      <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 6 }}>
+        Adresa pre WordPress: <code style={{ background: mix(C.text, 8), padding: "2px 6px", borderRadius: 4 }}>{url}</code>
+      </div>
+      {!tajne ? (
+        <button onClick={() => void vygeneruj()} style={{ fontSize: 12, padding: "6px 12px", borderRadius: 6, border: `1px solid ${C.accent}`, background: "transparent", color: C.accent, cursor: "pointer" }}>
+          Vygenerovať tajomstvo
+        </button>
+      ) : (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <code style={{ background: mix(C.text, 8), padding: "2px 6px", borderRadius: 4, fontSize: 11.5 }}>
+            {ukaz ? tajne : `${tajne.slice(0, 6)}${"•".repeat(18)}`}
+          </code>
+          <button onClick={() => setUkaz((x) => !x)} style={{ fontSize: 11.5, padding: "4px 8px", borderRadius: 6, border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted, cursor: "pointer" }}>
+            {ukaz ? "skryť" : "ukázať"}
+          </button>
+          <button onClick={() => void navigator.clipboard?.writeText(tajne)} style={{ fontSize: 11.5, padding: "4px 8px", borderRadius: 6, border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted, cursor: "pointer" }}>
+            kopírovať
+          </button>
+          <button onClick={() => void vygeneruj()} style={{ fontSize: 11.5, padding: "4px 8px", borderRadius: 6, border: `1px solid ${C.border}`, background: "transparent", color: C.textDim, cursor: "pointer" }}>
+            vygenerovať nové
+          </button>
+        </div>
+      )}
+      <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 6, lineHeight: 1.5 }}>
+        Nové tajomstvo prestane platiť pre starý snippet na webe — po jeho vygenerovaní ho treba prepísať aj tam.
+      </div>
     </div>
   );
 }
