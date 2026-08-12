@@ -27,6 +27,7 @@ import { Route as ApiRawUploadsRouteImport } from './routes/api/raw-uploads'
 import { Route as ApiPeriodsRouteImport } from './routes/api/periods'
 import { Route as ApiPdfImportRouteImport } from './routes/api/pdf-import'
 import { Route as ApiOverrideRouteImport } from './routes/api/override'
+import { Route as ApiMetaRouteImport } from './routes/api/meta'
 import { Route as ApiMarketingRouteImport } from './routes/api/marketing'
 import { Route as ApiLogoutRouteImport } from './routes/api/logout'
 import { Route as ApiLoginRouteImport } from './routes/api/login'
@@ -134,6 +135,11 @@ const ApiPdfImportRoute = ApiPdfImportRouteImport.update({
 const ApiOverrideRoute = ApiOverrideRouteImport.update({
   id: '/api/override',
   path: '/api/override',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMetaRoute = ApiMetaRouteImport.update({
+  id: '/api/meta',
+  path: '/api/meta',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiMarketingRoute = ApiMarketingRouteImport.update({
@@ -249,6 +255,7 @@ export interface FileRoutesByFullPath {
   '/api/login': typeof ApiLoginRoute
   '/api/logout': typeof ApiLogoutRoute
   '/api/marketing': typeof ApiMarketingRoute
+  '/api/meta': typeof ApiMetaRoute
   '/api/override': typeof ApiOverrideRoute
   '/api/pdf-import': typeof ApiPdfImportRoute
   '/api/periods': typeof ApiPeriodsRoute
@@ -287,6 +294,7 @@ export interface FileRoutesByTo {
   '/api/login': typeof ApiLoginRoute
   '/api/logout': typeof ApiLogoutRoute
   '/api/marketing': typeof ApiMarketingRoute
+  '/api/meta': typeof ApiMetaRoute
   '/api/override': typeof ApiOverrideRoute
   '/api/pdf-import': typeof ApiPdfImportRoute
   '/api/periods': typeof ApiPeriodsRoute
@@ -326,6 +334,7 @@ export interface FileRoutesById {
   '/api/login': typeof ApiLoginRoute
   '/api/logout': typeof ApiLogoutRoute
   '/api/marketing': typeof ApiMarketingRoute
+  '/api/meta': typeof ApiMetaRoute
   '/api/override': typeof ApiOverrideRoute
   '/api/pdf-import': typeof ApiPdfImportRoute
   '/api/periods': typeof ApiPeriodsRoute
@@ -366,6 +375,7 @@ export interface FileRouteTypes {
     | '/api/login'
     | '/api/logout'
     | '/api/marketing'
+    | '/api/meta'
     | '/api/override'
     | '/api/pdf-import'
     | '/api/periods'
@@ -404,6 +414,7 @@ export interface FileRouteTypes {
     | '/api/login'
     | '/api/logout'
     | '/api/marketing'
+    | '/api/meta'
     | '/api/override'
     | '/api/pdf-import'
     | '/api/periods'
@@ -442,6 +453,7 @@ export interface FileRouteTypes {
     | '/api/login'
     | '/api/logout'
     | '/api/marketing'
+    | '/api/meta'
     | '/api/override'
     | '/api/pdf-import'
     | '/api/periods'
@@ -481,6 +493,7 @@ export interface RootRouteChildren {
   ApiLoginRoute: typeof ApiLoginRoute
   ApiLogoutRoute: typeof ApiLogoutRoute
   ApiMarketingRoute: typeof ApiMarketingRoute
+  ApiMetaRoute: typeof ApiMetaRoute
   ApiOverrideRoute: typeof ApiOverrideRoute
   ApiPdfImportRoute: typeof ApiPdfImportRoute
   ApiPeriodsRoute: typeof ApiPeriodsRoute
@@ -624,6 +637,13 @@ declare module '@tanstack/react-router' {
       path: '/api/override'
       fullPath: '/api/override'
       preLoaderRoute: typeof ApiOverrideRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/meta': {
+      id: '/api/meta'
+      path: '/api/meta'
+      fullPath: '/api/meta'
+      preLoaderRoute: typeof ApiMetaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/marketing': {
@@ -777,6 +797,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiLoginRoute: ApiLoginRoute,
   ApiLogoutRoute: ApiLogoutRoute,
   ApiMarketingRoute: ApiMarketingRoute,
+  ApiMetaRoute: ApiMetaRoute,
   ApiOverrideRoute: ApiOverrideRoute,
   ApiPdfImportRoute: ApiPdfImportRoute,
   ApiPeriodsRoute: ApiPeriodsRoute,

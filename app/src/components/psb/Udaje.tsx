@@ -377,6 +377,7 @@ function UploadCard({ data, missing, actions, chat }: { data: PSBData; missing: 
         </div>
       )}
       <NapojenieWebu />
+      <NapojenieMeta />
       <div onClick={() => setOpen((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginTop: 14, fontSize: 12, color: C.textDim }}>
         <span>{open ? "▲ skryť" : "▼"} zoznam potrebných CSV a zapísané pohyby</span>
         <span style={{ marginLeft: "auto" }}>Nahrať sa dá aj pretiahnutím do Jarvisa (📎 vpravo dole).</span>
@@ -555,6 +556,106 @@ function NapojenieWebu() {
       )}
       <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 6, lineHeight: 1.5 }}>
         Nové tajomstvo prestane platiť pre starý snippet na webe — po jeho vygenerovaní ho treba prepísať aj tam.
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Napojenie na Meta Graph API — reklama a Instagram.
+ *
+ * Token sem Jerry vloží raz a odvtedy ho nikto nevidí: uloží sa na serveri
+ * a späť do prehliadača sa neposiela ani skrátený. Preto je pole vždy prázdne
+ * aj keď token existuje — vedľa je len informácia, či tam nejaký je.
+ */
+function NapojenieMeta() {
+  const [stav, setStav] = useState<{ maToken: boolean; adAccount: string; igUser: string; kampani: number; igPrispevkov: number } | null>(null);
+  const [token, setToken] = useState("");
+  const [ucet, setUcet] = useState("");
+  const [ig, setIg] = useState("");
+  const [hlaska, setHlaska] = useState("");
+  const [robim, setRobim] = useState(false);
+
+  const nacitaj = () => void fetch("/api/meta", { credentials: "same-origin" }).then((r) => r.json())
+    .then((j) => { if (j.ok) { setStav(j); setUcet(j.adAccount || ""); setIg(j.igUser || ""); } });
+  useEffect(nacitaj, []);
+
+  const posli = async (telo: Record<string, unknown>, hotovo: string) => {
+    setRobim(true); setHlaska("");
+    const j = await fetch("/api/meta", {
+      method: "POST", credentials: "same-origin",
+      headers: { "content-type": "application/json" }, body: JSON.stringify(telo),
+    }).then((r) => r.json()).catch(() => ({ ok: false, error: "spojenie zlyhalo" }));
+    setRobim(false);
+    setHlaska(j.ok ? hotovo : `Nepodarilo sa: ${j.error || "neznáma chyba"}`);
+    nacitaj();
+    return j;
+  };
+
+  const skuska = async () => {
+    const j = await posli({ akcia: "test" }, "");
+    if (!j.ok) return;
+    const ucty = j.reklamneUcty?.data?.data || [];
+    const strany = j.instagram?.data?.data || [];
+    const igUcty = strany.filter((s: Record<string, unknown>) => s.instagram_business_account);
+    setHlaska(
+      `Token vidí ${ucty.length} reklamných účtov` +
+      (ucty.length ? ` (${ucty.map((u: Record<string, string>) => `${u.name} · ${u.id}`).join(", ")})` : "") +
+      ` a ${igUcty.length} instagramových účtov` +
+      (igUcty.length ? ` (${igUcty.map((s: Record<string, Record<string, string>>) => `@${s.instagram_business_account.username} · ${s.instagram_business_account.id}`).join(", ")})` : "") +
+      (j.reklamneUcty?.chyba ? ` · reklama: ${j.reklamneUcty.chyba}` : "") +
+      (j.instagram?.chyba ? ` · instagram: ${j.instagram.chyba}` : ""),
+    );
+  };
+
+  if (!stav) return null;
+  const btn = { fontSize: 12, padding: "6px 12px", borderRadius: 6, border: `1px solid ${C.accent}`, background: "transparent", color: C.accent, cursor: robim ? "default" : "pointer", opacity: robim ? 0.5 : 1 } as const;
+
+  return (
+    <div style={{ marginTop: 14, padding: 12, background: mix(C.accent, 6), borderRadius: 8 }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: C.textMuted, marginBottom: 6 }}>
+        <Info
+          label="Meta — reklama a Instagram"
+          text="Ťahá výdavok a výsledky kampaní z Meta Marketing API a metriky príspevkov z Instagram Graph API. Zmysel: Ads Manager vie cenu za preklik, ale nikdy nepovie cenu za klienta, ktorý zostal pol roka — nevie, kto sa ním stal. Kokpit má oba konce. Token sa uloží na serveri a späť do prehliadača sa už nikdy neposiela, preto je pole aj po uložení prázdne. Instagramové čísla sa ukladajú zvlášť od metricoolových: merajú sa mierne inak a keby sa miešali, nedalo by sa povedať, ktorému zdroju veriť."
+        />
+      </div>
+
+      <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 8 }}>
+        Token: <b style={{ color: stav.maToken ? C.green : C.orange }}>{stav.maToken ? "uložený" : "chýba"}</b>
+        {" · "}kampaní v appke: <b style={{ color: C.text }}>{stav.kampani}</b>
+        {" · "}IG príspevkov: <b style={{ color: C.text }}>{stav.igPrispevkov}</b>
+      </div>
+
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 8 }}>
+        <input
+          type="password" value={token} onChange={(e) => setToken(e.target.value)}
+          placeholder={stav.maToken ? "vložiť nový token…" : "vlož token z Meta for Developers"}
+          style={{ ...S.input, width: 280, marginBottom: 0 }} />
+        <button disabled={robim || token.trim().length < 20} style={btn}
+          onClick={() => void posli({ akcia: "uloz-token", token: token.trim() }, "Token uložený.").then(() => setToken(""))}>
+          Uložiť token
+        </button>
+        <button disabled={robim || !stav.maToken} style={btn} onClick={() => void skuska()}>Skúška spojenia</button>
+      </div>
+
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 8 }}>
+        <input value={ucet} onChange={(e) => setUcet(e.target.value)} placeholder="reklamný účet (act_…)"
+          style={{ ...S.input, width: 190, marginBottom: 0 }} />
+        <input value={ig} onChange={(e) => setIg(e.target.value)} placeholder="instagram id"
+          style={{ ...S.input, width: 170, marginBottom: 0 }} />
+        <button disabled={robim} style={btn}
+          onClick={() => void posli({ akcia: "uloz-ucty", adAccount: ucet, igUser: ig }, "Účty uložené.")}>
+          Uložiť účty
+        </button>
+        <button disabled={robim || !stav.maToken || !ucet} style={btn}
+          onClick={() => void posli({ akcia: "kampane", od: "2025-01-01" }, "Kampane stiahnuté.")}>
+          Stiahnuť kampane od 2025
+        </button>
+      </div>
+
+      {hlaska && <div style={{ fontSize: 11.5, color: C.textMuted, lineHeight: 1.5, marginTop: 4 }}>{hlaska}</div>}
+      <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 6, lineHeight: 1.5 }}>
+        Token nikam neposielaj mailom ani v chate — vkladá sa priamo sem.
       </div>
     </div>
   );
