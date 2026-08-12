@@ -334,7 +334,7 @@ function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Record<st
                 <th style={{ ...S.th, minWidth: 130 }}>Kampaň</th>
                 <th style={{ ...S.th, minWidth: 150 }}>Stav</th>
                 <th style={{ ...S.th, minWidth: 130 }}>Ozvali sme sa</th>
-                <th style={{ ...S.th, minWidth: 150 }}>Prečo nie</th>
+                <th style={{ ...S.th, minWidth: 150 }}><Info label="Prečo nie" text="Prečo sa z dopytu nestal klient. Pole sa objaví, až keď v stĺpci Stav nastavíš „Neodpísal“ alebo „Zrušený“ — pri dopyte, ktorý ešte žije, by bol dôvod straty veštba. Ponúkajú sa hotové dôvody, aby sa tie isté veci písali rovnako a dali sa spočítať; napísať sa dá čokoľvek." /></th>
                 <th style={{ ...S.th, minWidth: 140 }}>Poznámka</th>
                 <th style={S.th} />
               </tr>
@@ -406,10 +406,16 @@ function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Record<st
                     )}
                   </td>
                   <td style={S.td}>
+                    {/* Dôvod má zmysel len pri stratenom dopyte — pri živom by
+                        to bola veštba. Lenže pomlčka sama o sebe nepovie, čo
+                        s tým: Jerry sa hneď pýtal, ako sa to vypĺňa. */}
                     {l.status === "neodpisal" || l.status === "zruseny" ? (
                       <input list={DOVODY_ID} defaultValue={l.dovod} placeholder="dôvod…"
                         onBlur={(e) => e.target.value !== l.dovod && save({ ...l, dovod: e.target.value })} style={inputStyle} />
-                    ) : <span style={{ color: C.textDim, fontSize: 12 }}>—</span>}
+                    ) : (
+                      <span title="Vyplní sa, až keď v stĺpci Stav nastavíš „Neodpísal“ alebo „Zrušený“."
+                        style={{ color: C.textDim, fontSize: 12, cursor: "help" }}>—</span>
+                    )}
                   </td>
                   <td style={S.td}>
                     <input defaultValue={l.note} placeholder="poznámka" onBlur={(e) => e.target.value !== l.note && save({ ...l, note: e.target.value })} style={inputStyle} />
