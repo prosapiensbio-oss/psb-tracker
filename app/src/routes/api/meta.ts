@@ -37,6 +37,21 @@ import { bindings } from "../../lib/bindings.server";
  */
 const V = "v21.0";
 
+/**
+ * Ktoré akcie z Mety sú dopyt.
+ *
+ * Meta vracia pod `actions` desiatky typov naraz a väčšina z nich nie je
+ * konverzia: prehratie videa, zobrazenie stránky, reakcia na príspevok.
+ * Prvá verzia sem púšťala všetko, čo začínalo `offsite_conversion`, a apríl
+ * 2025 potom hlásil 897 „výsledkov" — pritom to boli zobrazenia stránky.
+ *
+ * Preto výslovný zoznam: `lead`, `offsite_conversion.fb_pixel_lead`,
+ * `onsite_conversion.lead_grouped`, registrácie a odoslané prihlášky.
+ * Čokoľvek iné je aktivita, nie dopyt — a keby sa to počítalo dokopy,
+ * cena za dopyt by vyšla desaťkrát nižšia, než v skutočnosti je.
+ */
+const JE_DOPYT = /(^|\.)lead(_grouped)?$|complete_registration$|submit_application$/;
+
 type Nastavenie = { token: string; adAccount: string; igUser: string };
 
 async function nacitajNastavenie(DB: D1Database): Promise<Nastavenie> {
@@ -137,7 +152,7 @@ export const Route = createFileRoute("/api/meta")({
           const ucet = n.adAccount.startsWith("act_") ? n.adAccount : `act_${n.adAccount}`;
           const r = await graph(
             `${ucet}/insights?level=campaign&time_increment=monthly&limit=200` +
-            `&fields=campaign_id,campaign_name,spend,impressions,clicks,actions,date_start` +
+            `&fields=campaign_id,campaign_name,objective,spend,impressions,clicks,actions,date_start` +
             `&time_range=${encodeURIComponent(JSON.stringify({ since: od, until: doD }))}`,
             n.token,
           );
@@ -145,18 +160,20 @@ export const Route = createFileRoute("/api/meta")({
           const riadky = ((r.data as { data?: Record<string, unknown>[] }).data) || [];
           const stmts = riadky.map((x) => {
             const akcie = (x.actions as { action_type: string; value: string }[]) || [];
-            // „Výsledok" = konverzia, nie preklik. Pri lead kampaniach to Meta
-            // vracia pod viacerými menami podľa toho, ako je cieľ nastavený.
-            const vysl = akcie
-              .filter((a) => /lead|complete_registration|submit_application|offsite_conversion/.test(a.action_type))
+            const vysl = akcie.filter((a) => JE_DOPYT.test(a.action_type))
               .reduce((s, a) => s + (Number(a.value) || 0), 0);
             return DB.prepare(
-              `INSERT INTO mkt_kampane (id, mesiac, nazov, stav, spend, impressions, clicks, vysledky, updated_at)
-               VALUES (?1,?2,?3,'',?4,?5,?6,?7,?8)
-               ON CONFLICT(id, mesiac) DO UPDATE SET nazov=?3, spend=?4, impressions=?5, clicks=?6, vysledky=?7, updated_at=?8`,
+              `INSERT INTO mkt_kampane (id, mesiac, nazov, stav, spend, impressions, clicks, vysledky, ciel, akcie, updated_at)
+               VALUES (?1,?2,?3,'',?4,?5,?6,?7,?9,?10,?8)
+               ON CONFLICT(id, mesiac) DO UPDATE SET nazov=?3, spend=?4, impressions=?5, clicks=?6,
+                 vysledky=?7, ciel=?9, akcie=?10, updated_at=?8`,
             ).bind(
               String(x.campaign_id || ""), String(x.date_start || "").slice(0, 7), String(x.campaign_name || ""),
               Number(x.spend) || 0, Number(x.impressions) || 0, Number(x.clicks) || 0, vysl, now,
+              String(x.objective || ""),
+              // Surová odpoveď celá. Výklad sa mení, dáta nie — a druhýkrát sa
+              // už z API ťahať nedá, staré kampane sa spätne neprepočítajú.
+              JSON.stringify(akcie.map((a) => [a.action_type, Number(a.value) || 0])),
             );
           });
           for (let i = 0; i < stmts.length; i += 40) await DB.batch(stmts.slice(i, i + 40));
