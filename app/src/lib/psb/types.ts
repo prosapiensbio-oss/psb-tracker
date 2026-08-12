@@ -73,6 +73,14 @@ export type Lead = {
   odpovedaneAt: string;
   /** Prečo sa z dopytu nestal klient. Bez toho sa reklama nedá vyhodnotiť. */
   dovod: string;
+  /**
+   * Kedy dopyt naozaj pribudol, aj s hodinou.
+   *
+   * `date` je len deň, takže bez tohto by sa čas odpovede meral od POLNOCI:
+   * dopyt o 18:00 a odpoveď o 20:00 by vyšla ako dvadsať hodín. Pri dopytoch
+   * z webu je to presný čas odoslania formulára.
+   */
+  createdAt: string;
 };
 
 export type ClientOverride = {

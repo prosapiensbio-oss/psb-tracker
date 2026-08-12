@@ -97,6 +97,7 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
       stranka: r.stranka || "",
       odpovedaneAt: r.odpovedane_at || "",
       dovod: r.dovod || "",
+      createdAt: r.created_at || "",
     })),
     uploadLog: (log.results as any[]).map((r) => ({
       date: r.date,

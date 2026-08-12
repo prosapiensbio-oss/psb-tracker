@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { menoKluc, najdiKlienta, duchOdpoved, membershipBucket, MEMBERSHIP_ORDER, TRAINERS, type CapacityRow, type ClientAgg, type SixMRow } from "../../lib/psb/compute";
-import { fmtCZK, fmtDate, normName } from "../../lib/psb/format";
+import { fmtCZK, fmtDate, fmtDMY, normName } from "../../lib/psb/format";
 import { C, MEMBERSHIP_COLORS, mix, S } from "../../lib/psb/theme";
 import { KlientProfil } from "./KlientProfil";
 import { Referencie } from "./Referencie";
@@ -107,12 +107,40 @@ function PoleOdporucatela({ meno, hodnota, mena, onUloz }: { meno: string; hodno
   );
 }
 
+/**
+ * Odkedy sa čas odpovede počíta.
+ *
+ * `date` je len deň. Keby sa meralo od neho, počítalo by sa od POLNOCI: dopyt
+ * o 18:00 a odpoveď o 20:00 by vyšla ako dvadsať hodín. Jerry to našiel hneď
+ * pri prvom kliknutí — „za 13 hodín, ale to som ešte spal".
+ */
+const zaciatokMerania = (l: Lead): number => {
+  const zCreated = Date.parse(l.createdAt || "");
+  const zDna = Date.parse(`${l.date}T00:00:00Z`);
+  // createdAt použijeme, len keď sedí na deň dopytu — pri starých ručne
+  // zapísaných dopytoch je to čas prepísania, nie čas, keď sa človek ozval.
+  if (Number.isFinite(zCreated) && (l.createdAt || "").slice(0, 10) === l.date) return zCreated;
+  return zDna;
+};
+
+/**
+ * Odkedy sa rýchlosť odpovede vôbec meria.
+ *
+ * Tlačidlo „ozvali sme sa" vzniklo 12. 8. 2026. Pri 37 dopytoch spred toho
+ * dňa sa nedá zistiť, kedy sme sa ozvali — a dopĺňať to spätne by znamenalo
+ * vymýšľať si. Preto sa staršie dopyty do dlaždíc nerátajú a tlačidlo pri
+ * nich nie je: číslo má začínať na nule a rásť z pravdy.
+ */
+const MERANIE_OD = "2026-08-12";
+const meraSa = (l: Lead) => l.date >= MERANIE_OD;
+
 /** Za ako dlho sme sa ozvali — „za 2 h", „za 3 dni". Kratšie než dátum a čas. */
 function odpovedZa(l: Lead): string {
   if (!l.odpovedaneAt) return "";
-  const od = Date.parse(`${l.date}T00:00:00Z`), doK = Date.parse(l.odpovedaneAt);
-  if (!Number.isFinite(od) || !Number.isFinite(doK)) return "✓";
-  const h = Math.max(0, Math.round((doK - od) / 3600000));
+  const doK = Date.parse(l.odpovedaneAt);
+  if (!Number.isFinite(doK)) return "✓";
+  const h = Math.max(0, Math.round((doK - zaciatokMerania(l)) / 3600000));
+  if (h < 1) return "hneď";
   if (h < 24) return `za ${h} h`;
   const d = Math.round(h / 24);
   return `za ${d} ${d === 1 ? "deň" : d < 5 ? "dni" : "dní"}`;
@@ -132,6 +160,10 @@ const DOVODY = ["nezdvíhal telefón", "neodpísal", "cena", "vzdialenosť", "te
 function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Record<string, ClientAgg>; refresh: () => Promise<void> }) {
   const [busy, setBusy] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [upravCas, setUpravCas] = useState<string | null>(null);
+  const [lenCakajuci, setLenCakajuci] = useState(false);
+  const [uzOzvane, setUzOzvane] = useState(false);
+  const zoznamRef = useRef<HTMLDivElement>(null);
   const [rychleMeno, setRychleMeno] = useState("");
   const [rychlyZdroj, setRychlyZdroj] = useState("reklama");
   const [draft, setDraft] = useState<Partial<Lead>>({});
@@ -169,12 +201,12 @@ function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Record<st
     // zabudlo na tri týždne, by priemer roztiahol tak, že by číslo prestalo
     // hovoriť o bežnom prípade.
     const casy = leads
-      .filter((l) => l.odpovedaneAt)
-      .map((l) => (Date.parse(l.odpovedaneAt) - Date.parse(`${l.date}T00:00:00Z`)) / 3600000)
+      .filter((l) => meraSa(l) && l.odpovedaneAt)
+      .map((l) => (Date.parse(l.odpovedaneAt) - zaciatokMerania(l)) / 3600000)
       .filter((h) => Number.isFinite(h) && h >= 0)
       .sort((a, b) => a - b);
     const median = casy.length ? casy[Math.floor(casy.length / 2)] : null;
-    const bezOdpovede = leads.filter((l) => !l.odpovedaneAt && l.status === "novy").length;
+    const bezOdpovede = leads.filter((l) => meraSa(l) && !l.odpovedaneAt && l.status === "novy").length;
     return { total: leads.length, dohodnuty: c.dohodnuty || 0, neodpisal: c.neodpisal || 0, konv, median, bezOdpovede };
   }, [leads, menaKlientovAll]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -204,7 +236,7 @@ function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Record<st
               detailu, ale prvý zápis musí trvať desať sekúnd — inak sa nestane.
               Meno a zdroj stačia; dátum je dnešok a stav „ozval sa". */}
           <form
-            onSubmit={(e) => { e.preventDefault(); if (!rychleMeno.trim()) return; void save({ date: new Date().toISOString().slice(0, 10), name: rychleMeno.trim(), source: rychlyZdroj as Lead["source"], status: "novy", referrer: "", note: "" }); setRychleMeno(""); }}
+            onSubmit={(e) => { e.preventDefault(); if (!rychleMeno.trim()) return; void save({ date: new Date().toISOString().slice(0, 10), name: rychleMeno.trim(), source: rychlyZdroj as Lead["source"], status: "novy", referrer: "", note: "", odpovedaneAt: uzOzvane ? new Date().toISOString() : "" }); setRychleMeno(""); }}
             style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}
           >
             <input
@@ -212,6 +244,13 @@ function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Record<st
               style={{ ...S.select, width: 200, minWidth: 0 }}
             />
             <Select value={rychlyZdroj} onChange={setRychlyZdroj} options={SOURCES} />
+            {/* Zapisovanie dopytu a odpovedanie naň sú často jedna a tá istá
+                chvíľa — zavoláš a hneď to píšeš. Bez tohto by sa muselo
+                preklikávať do zoznamu a čas by sa nikdy nezaznamenal presne. */}
+            <label style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: C.textMuted, cursor: "pointer" }}>
+              <input type="checkbox" checked={uzOzvane} onChange={(e) => setUzOzvane(e.target.checked)} />
+              už som sa ozval
+            </label>
             <button type="submit" disabled={busy || !rychleMeno.trim()}
               style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${C.accent}`, background: C.accentBg, color: C.accentLight, fontSize: 12.5, fontWeight: 600, cursor: busy || !rychleMeno.trim() ? "default" : "pointer", opacity: busy || !rychleMeno.trim() ? 0.45 : 1 }}>
               Zapísať
@@ -232,9 +271,12 @@ function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Record<st
             value={counts.median === null ? "—" : counts.median < 24 ? `${Math.round(counts.median)} h` : `${Math.round(counts.median / 24)} dni`}
             label={<Info text="Medián času od dopytu po našu prvú odpoveď. V službách je rýchlosť odpovede najsilnejšia páka na konverziu — silnejšia než cena aj než text reklamy. Meria sa tlačidlom „ozvali sme sa“ pri dopyte; medián preto, aby jeden zabudnutý dopyt neroztiahol celé číslo." label="Ozveme sa za" />}
             color={counts.median === null ? C.textDim : counts.median <= 24 ? C.green : C.orange} />
-          <StatCard value={String(counts.bezOdpovede)}
-            label={<Info text="Dopyty v stave „ozval sa“, pri ktorých ešte nikto neklikol „ozvali sme sa“. Toto je zoznam ľudí, ktorí práve teraz čakajú." label="Čaká na odpoveď" />}
-            color={counts.bezOdpovede ? C.red : C.green} />
+          <div onClick={() => { setLenCakajuci((x) => !x); zoznamRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }}
+            style={{ cursor: "pointer" }} title="Klikni — ukáže len tých, čo čakajú">
+            <StatCard value={String(counts.bezOdpovede)}
+              label={<Info text="Dopyty od zavedenia merania, pri ktorých ešte nikto neklikol „ozvali sme sa“. Sú to ľudia, ktorí práve teraz čakajú. Klik na dlaždicu zoznam dole prefiltruje len na nich." label="Čaká na odpoveď" />}
+              color={counts.bezOdpovede ? C.red : C.green} />
+          </div>
         </div>
       </Card>
 
@@ -270,7 +312,15 @@ function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Record<st
       <datalist id={DOVODY_ID}>{DOVODY.map((d) => <option key={d} value={d} />)}</datalist>
 
       <Card>
-        <H3>Zoznam</H3>
+        <div ref={zoznamRef} style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <H3 style={{ marginBottom: 0 }}>Zoznam</H3>
+          {lenCakajuci && (
+            <button onClick={() => setLenCakajuci(false)}
+              style={{ fontSize: 11.5, padding: "3px 10px", borderRadius: 999, border: `1px solid ${C.red}`, background: "transparent", color: C.red, cursor: "pointer" }}>
+              len čakajúci na odpoveď ✕
+            </button>
+          )}
+        </div>
         {!leads.length ? (
           <Empty>Zatiaľ žiadne dopyty — pridaj prvý tlačidlom vyššie.</Empty>
         ) : (
@@ -290,7 +340,7 @@ function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Record<st
               </tr>
             </thead>
             <tbody>
-              {leads.map((l) => (
+              {(lenCakajuci ? leads.filter((l) => meraSa(l) && !l.odpovedaneAt && l.status === "novy") : leads).map((l) => (
                 <tr key={l.id}>
                   <td style={S.td}>
                     <input type="date" defaultValue={l.date} onBlur={(e) => e.target.value !== l.date && save({ ...l, date: e.target.value })}
@@ -323,13 +373,30 @@ function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Record<st
                   <td style={S.td}>
                     {/* Čas prvej odpovede jedným klikom. Keby to bolo pole na
                         vypĺňanie, nevyplní ho nikto — a práve toto číslo je
-                        v službách najsilnejšia páka na konverziu. */}
-                    {l.odpovedaneAt ? (
-                      <span style={{ fontSize: 11.5, color: C.textMuted }}>
-                        {odpovedZa(l)}
-                        <button onClick={() => save({ ...l, odpovedaneAt: "" })} title="zrušiť"
-                          style={{ background: "transparent", border: "none", color: C.textDim, cursor: "pointer", marginLeft: 4 }}>✕</button>
-                      </span>
+                        v službách najsilnejšia páka na konverziu.
+                        Zapísaný čas sa dá prepísať: Terezka zavolá o desiatej
+                        a odklikne sa to o štvrtej. Bez opravy by číslo merilo
+                        našu pozornosť, nie našu rýchlosť. */}
+                    {!meraSa(l) ? (
+                      <span title={`Rýchlosť odpovede sa meria až od ${fmtDMY(MERANIE_OD)} — pri starších dopytoch sa už nedá zistiť.`}
+                        style={{ color: C.textDim, fontSize: 12 }}>—</span>
+                    ) : l.odpovedaneAt ? (
+                      upravCas === l.id ? (
+                        <input
+                          type="datetime-local" autoFocus
+                          defaultValue={new Date(Date.parse(l.odpovedaneAt) - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}
+                          onBlur={(e) => { setUpravCas(null); if (e.target.value) save({ ...l, odpovedaneAt: new Date(e.target.value).toISOString() }); }}
+                          style={{ ...inputStyle, colorScheme: "dark" }} />
+                      ) : (
+                        <span style={{ fontSize: 11.5, color: C.textMuted }}>
+                          <button onClick={() => setUpravCas(l.id)} title="klikni a oprav čas"
+                            style={{ background: "transparent", border: "none", color: C.textMuted, cursor: "pointer", padding: 0, fontSize: 11.5, textDecoration: "underline dotted" }}>
+                            {odpovedZa(l)}
+                          </button>
+                          <button onClick={() => save({ ...l, odpovedaneAt: "" })} title="zrušiť"
+                            style={{ background: "transparent", border: "none", color: C.textDim, cursor: "pointer", marginLeft: 4 }}>✕</button>
+                        </span>
+                      )
                     ) : (
                       <button onClick={() => save({ ...l, odpovedaneAt: new Date().toISOString() })}
                         style={{ fontSize: 11.5, padding: "3px 8px", borderRadius: 6, border: `1px solid ${C.border}`,
