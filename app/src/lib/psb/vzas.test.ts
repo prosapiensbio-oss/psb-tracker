@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
 
-import { pnlCalc, poslednyMesiacSDatami, salaryCalc, VZAS_MONTHS } from "./vzas";
+import {
+  nastavPnlBunku, PNL, pnlCalc, pnlJeOpravena, pnlOverridesNaUlozenie, pnlPovodnaHodnota,
+  poslednyMesiacSDatami, salaryCalc, VZAS_MONTHS,
+} from "./vzas";
 
 /**
  * VZAS je účtovná polovica appky — 18 mesiacov P&L, mzdové éry, nároky, dlhy.
@@ -106,5 +109,53 @@ describe("pnlCalc — vnútorná konzistencia", () => {
     for (let i = 1; i < VZAS_MONTHS.length; i++) {
       expect(VZAS_MONTHS[i] > VZAS_MONTHS[i - 1]).toBe(true);
     }
+  });
+});
+
+// ── Oprava bunky P&L: cesta, ktorou zapisuje `uprav-pnl` ─────────────────────
+//
+// Toto je jediná Jarvisova akcia, ktorá mení reálne peniaze. Otestovať ju
+// naostro proti živej appke sa 11. 8. nepodarilo (prostredie zablokovalo zápis,
+// potom vypršala relácia), tak je aspoň mechanizmus pod testom — a je to tá
+// časť, kde by chyba narobila najviac škody: keby sa prepis nedal vrátiť,
+// zostalo by v P&L cudzie číslo natrvalo.
+//
+// Pravidlo, ktoré sa tu stráži: oprava je PREKRYTIE, nie prepis. Pôvodná
+// hodnota sa odloží a `null` ju vráti presne — aj po viacnásobnej oprave.
+describe("nastavPnlBunku — prekrytie, nie prepis", () => {
+  const KAT = "fixne.apps.canva";
+  const MES = VZAS_MONTHS[VZAS_MONTHS.length - 1];
+  const polozka = () => PNL.fixne.subcategories.apps.items.canva;
+  const hodnota = () => polozka().values[VZAS_MONTHS.indexOf(MES)] || 0;
+
+  test("zápis zmení hodnotu a odloží pôvodnú", () => {
+    const povodna = hodnota();
+    expect(nastavPnlBunku(KAT, MES, 199)).toBe(true);
+    expect(hodnota()).toBe(199);
+    expect(pnlPovodnaHodnota(KAT, MES)).toBe(povodna);
+    expect(pnlJeOpravena(KAT, MES)).toBe(true);
+    expect(pnlOverridesNaUlozenie()[KAT]?.[MES]).toBe(199);
+
+    // A späť — presne na pôvodnú hodnotu.
+    expect(nastavPnlBunku(KAT, MES, null)).toBe(true);
+    expect(hodnota()).toBe(povodna);
+    expect(pnlJeOpravena(KAT, MES)).toBe(false);
+    expect(pnlOverridesNaUlozenie()[KAT]?.[MES]).toBeUndefined();
+  });
+
+  test("dve opravy za sebou vrátia PÔVODNÚ hodnotu, nie tú medzitýmnu", () => {
+    // Toto je ten prípad, kvôli ktorému sa pôvodná hodnota ukladá len raz.
+    // Keby ju druhý zápis prepísal, „vrátiť späť" by skončilo na 199.
+    const povodna = hodnota();
+    nastavPnlBunku(KAT, MES, 199);
+    nastavPnlBunku(KAT, MES, 250);
+    expect(hodnota()).toBe(250);
+    nastavPnlBunku(KAT, MES, null);
+    expect(hodnota()).toBe(povodna);
+  });
+
+  test("neznáma kategória ani mesiac mimo radu nič nezapíšu", () => {
+    expect(nastavPnlBunku("fixne.apps.neexistuje", MES, 1)).toBe(false);
+    expect(nastavPnlBunku(KAT, "1999-01", 1)).toBe(false);
   });
 });
