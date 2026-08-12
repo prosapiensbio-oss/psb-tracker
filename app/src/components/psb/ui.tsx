@@ -195,6 +195,13 @@ const useIzomorfnyLayout = typeof window === "undefined" ? useEffect : useLayout
 export function useRolovanie(pocet: number, zavislost?: unknown) {
   const ref = useRef<HTMLDivElement>(null);
   const [vyska, setVyska] = useState<number>();
+  // Rolovanie je na to, aby karta pod tabuľkou nebola o obrazovku nižšie.
+  // Občas ale treba vidieť celok naraz — porovnať prvý riadok s posledným sa
+  // v okienku na tri riadky nedá. Prepínač žije tu, nie v komponentoch, aby
+  // ho mala každá rolovacia tabuľka rovnaký (aj SortTable, ktorá si obal
+  // skladá sama).
+  const [cele, setCele] = useState(false);
+  const efektivny = cele ? 0 : pocet;
 
   useIzomorfnyLayout(() => {
     const el = ref.current;
@@ -203,10 +210,10 @@ export function useRolovanie(pocet: number, zavislost?: unknown) {
       const riadky = el.querySelectorAll<HTMLElement>("tbody tr");
       // `pocet = 0` znamená „ukáž všetko" (rozbalené tlačidlom). Bez tejto
       // vetvy by sa siahalo na riadok číslo -1 a meranie by spadlo.
-      if (pocet <= 0 || riadky.length <= pocet) return setVyska(undefined);
+      if (efektivny <= 0 || riadky.length <= efektivny) return setVyska(undefined);
       const hlavicka = el.querySelector("thead")?.getBoundingClientRect().height ?? 0;
       const hore = riadky[0].getBoundingClientRect().top;
-      const dole = riadky[pocet - 1].getBoundingClientRect().bottom;
+      const dole = riadky[efektivny - 1].getBoundingClientRect().bottom;
       setVyska(Math.round(hlavicka + (dole - hore)) + 2);
     };
     zmeraj();
@@ -215,7 +222,7 @@ export function useRolovanie(pocet: number, zavislost?: unknown) {
     const ro = new ResizeObserver(zmeraj);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [pocet, zavislost]);
+  }, [efektivny, zavislost]);
 
   return {
     ref,
@@ -245,6 +252,19 @@ export function useRolovanie(pocet: number, zavislost?: unknown) {
      * prekrýval. Preto sa najprv položí nepriehľadné `--c-bg` a až naň tieň
      * karty: výsledok má tón karty, ale nič cez neho nevidno.
      */
+    /** Trojuholník pod tabuľkou. Rendruje sa vždy, aj keď sa práve neroluje. */
+    prepinac: (
+      <button
+        onClick={() => setCele((x) => !x)}
+        style={{
+          display: "flex", alignItems: "center", gap: 5, marginTop: 6, padding: 0,
+          background: "none", border: "none", cursor: "pointer",
+          color: C.textMuted, fontSize: 11.5, fontFamily: "inherit",
+        }}>
+        <span style={{ fontSize: 9, display: "inline-block", transform: cele ? "rotate(90deg)" : "none", transition: "transform .12s" }}>▶</span>
+        {cele ? "zbaliť" : "rozbaliť celý zoznam"}
+      </button>
+    ),
     stylTag: (
       <style href="psb-rolovacia" precedence="default">
         {`.psb-rolovacia thead th{position:sticky;top:0;z-index:2;
@@ -257,27 +277,14 @@ export function useRolovanie(pocet: number, zavislost?: unknown) {
 }
 
 export function RolovaciaTabulka({ pocet = 3, children }: { pocet?: number; children: ReactNode }) {
-  // Rolovanie je na to, aby karta pod tabuľkou nebola o obrazovku nižšie.
-  // Občas ale treba vidieť celok naraz — porovnať prvý riadok s posledným sa
-  // v okienku na tri riadky nedá.
-  const [cele, setCele] = useState(false);
-  const r = useRolovanie(cele ? 0 : pocet, children);
+  const r = useRolovanie(pocet, children);
   return (
     <>
       {r.stylTag}
       <div ref={r.ref} className={r.trieda} style={r.styl}>
         <table style={{ ...S.table, ...r.stylTabulky }}>{children}</table>
       </div>
-      <button
-        onClick={() => setCele((x) => !x)}
-        style={{
-          display: "flex", alignItems: "center", gap: 5, marginTop: 6, padding: 0,
-          background: "none", border: "none", cursor: "pointer",
-          color: C.textMuted, fontSize: 11.5, fontFamily: "inherit",
-        }}>
-        <span style={{ fontSize: 9, display: "inline-block", transform: cele ? "rotate(90deg)" : "none", transition: "transform .12s" }}>▶</span>
-        {cele ? "zbaliť" : "rozbaliť celý zoznam"}
-      </button>
+      {r.prepinac}
     </>
   );
 }

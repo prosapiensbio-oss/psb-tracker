@@ -55,9 +55,32 @@ export function Kampane() {
     const okno = new Set(mesiaceVOkne(obdobie, kampane.map((k) => k.mesiac)));
     return kampane.filter((k) => okno.has(k.mesiac));
   }, [kampane, obdobie]);
-  const podlaKampane = useMemo(() => zlucKampane(vObdobi), [vObdobi]);
+  // Východzie je podľa výdavku — najdrahšia kampaň je tá, o ktorej sa
+  // rozhoduje ako o prvej. Ostatné stĺpce sa dajú preklikať: pri hľadaní
+  // „kde sa nakliklo najviac" je poradie podľa peňazí na nič.
+  const [radenie, setRadenie] = useState<"spend" | "impressions" | "clicks" | "vysledky" | "cena">("spend");
+  const podlaKampane = useMemo(() => {
+    const zlucene = zlucKampane(vObdobi);
+    if (radenie === "spend") return zlucene;
+    const kluc = (k: (typeof zlucene)[number]) =>
+      radenie === "cena"
+        // Kampaň bez dopytu nemá cenu za dopyt. Nula by ju vystrelila na
+        // prvé miesto ako najlacnejšiu — pri radení patrí na koniec.
+        ? (k.vysledky > 0 ? -(k.spend / k.vysledky) : -Infinity)
+        : k[radenie];
+    return [...zlucene].sort((a, b) => kluc(b) - kluc(a));
+  }, [vObdobi, radenie]);
   const s = useMemo(() => suhrnKampani(podlaKampane), [podlaKampane]);
   const h = hodnot(s.cena, CENA_ZA_DOPYT);
+
+  const hlavicka = (id: typeof radenie, text: string) => (
+    <th onClick={() => setRadenie(id)}
+      style={{ ...S.th, textAlign: "right", cursor: "pointer", userSelect: "none",
+        color: radenie === id ? C.accentLight : C.textMuted }}>
+      {text}<span style={{ marginLeft: 4, fontSize: 9, color: radenie === id ? C.accent : C.textDim }}>
+        {radenie === id ? "▼" : "↕"}</span>
+    </th>
+  );
 
   if (!nacitane) return null;
   if (kampane.length === 0) {
@@ -75,7 +98,7 @@ export function Kampane() {
         <H3>
           <Info
             label="Kampane z Mety"
-            text="Skutočný výdavok po kampaniach priamo z Meta Marketing API — nie súčet z Metricoolu. Cieľ kampane je hneď za menom zámerne: kampaň s cieľom „dosah“ nemá ako priniesť dopyt, takže jej nula nie je zlyhanie, ale zadanie. Cena za dopyt sa počíta len z konverzií, ktoré Meta hlási ako lead alebo registráciu; prehratia videa a zobrazenia stránky sa do toho čísla nerátajú. Zoradené podľa výdavku — najdrahšie kampane sú hore, zvyšok sa roluje."
+            text="Skutočný výdavok po kampaniach priamo z Meta Marketing API — nie súčet z Metricoolu. Cieľ kampane je hneď za menom zámerne: kampaň s cieľom „dosah“ nemá ako priniesť dopyt, takže jej nula nie je zlyhanie, ale zadanie. Cena za dopyt sa počíta len z konverzií, ktoré Meta hlási ako lead alebo registráciu; prehratia videa a zobrazenia stránky sa do toho čísla nerátajú. Klikni na stĺpec a zoradíš podľa neho; východzie je podľa výdavku. Kampaň bez dopytu má pri radení podľa ceny prázdno, nie nulu — nula by ju vystrelila na prvé miesto ako najlacnejšiu."
           />
         </H3>
         <FilterObdobia hodnota={obdobie} onChange={setObdobie} moznosti={OBDOBIA_MESACNE} />
@@ -119,11 +142,11 @@ export function Kampane() {
           <tr>
             <th style={{ ...S.th, textAlign: "left" }}>Kampaň</th>
             <th style={{ ...S.th, textAlign: "left" }}>Cieľ</th>
-            <th style={{ ...S.th, textAlign: "right" }}>Minuté</th>
-            <th style={{ ...S.th, textAlign: "right" }}>Videnia</th>
-            <th style={{ ...S.th, textAlign: "right" }}>Kliky</th>
-            <th style={{ ...S.th, textAlign: "right" }}>Dopyty</th>
-            <th style={{ ...S.th, textAlign: "right" }}>Za dopyt</th>
+            {hlavicka("spend", "Minuté")}
+            {hlavicka("impressions", "Videnia")}
+            {hlavicka("clicks", "Kliky")}
+            {hlavicka("vysledky", "Dopyty")}
+            {hlavicka("cena", "Za dopyt")}
           </tr>
         </thead>
         <tbody>

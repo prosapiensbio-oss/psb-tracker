@@ -176,6 +176,7 @@ function SortTable<T extends Record<string, any>>({ riadky, stlpce, minWidth = 4
         </tbody>
       </table>
     </div>
+    {rolovat ? rol.prepinac : null}
     </>
   );
 }
@@ -551,7 +552,24 @@ function CoToPrinieslo({ data, clients, leads, chat }: { data: PSBData; clients:
 // a — čo je dôležitejšie — ČI prišli z platenej alebo organickej cesty. To je
 // jediné miesto v celej appke, kde sa tieto dve veci dajú oddeliť ešte pred tým,
 // než sa niekto ozve.
-function WebKanaly({ rok, chat }: { rok: string; chat?: AssistantChat }) {
+// Prepínač roka žije tu, nie v spoločnej hlavičke. Tá hlavička bola karta bez
+// vlastného obsahu — Jerry ju 12. 8. zrušil — a rok potrebujú len tieto dve
+// karty pod sebou. Prepínač preto stojí pri nich.
+function RokBar({ rok, onRok }: { rok: string; onRok: (r: string) => void }) {
+  return (
+    <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+      <span style={{ fontSize: 11, color: C.textDim, marginRight: 2 }}>Rok</span>
+      {["2025", "2026"].map((y) => (
+        <button key={y} onClick={() => onRok(y)}
+          style={{ padding: "5px 12px", borderRadius: 7, border: `1px solid ${rok === y ? C.accent : C.border}`, background: rok === y ? C.accentBg : "transparent", color: rok === y ? C.accentLight : C.textMuted, fontSize: 12, cursor: "pointer" }}>
+          {y}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function WebKanaly({ rok, onRok, chat }: { rok: string; onRok: (r: string) => void; chat?: AssistantChat }) {
   const vsetky = GA4_MESACNE.filter((r) => r.m.startsWith(rok));
   // Mesiace bez merania sa NEPRIEMERUJÚ — nula by tvárila, že nikto neprišiel,
   // hoci sa len nemeralo.
@@ -561,7 +579,10 @@ function WebKanaly({ rok, chat }: { rok: string; chat?: AssistantChat }) {
   if (!data.length) {
     return (
       <Card>
-        <H3><Info text="Zdroj: export „Prehľad stavu prehľadov“ z GA4." label="Web a kanály (GA4)" /></H3>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <H3><Info text="Zdroj: export „Prehľad stavu prehľadov“ z GA4." label="Web a kanály (GA4)" /></H3>
+          <RokBar rok={rok} onRok={onRok} />
+        </div>
         <Empty>Za rok {rok} nemám GA4 export — v priečinku je zatiaľ len 2025. Stačí ho dotiahnuť rovnako ako ten minuloročný.</Empty>
       </Card>
     );
@@ -591,7 +612,10 @@ function WebKanaly({ rok, chat }: { rok: string; chat?: AssistantChat }) {
     <Card>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
       <H3><Info text="Noví používatelia webu podľa toho, odkiaľ prišli. „Hlavné udalosti“ sú konverzie nastavené v GA4 — odoslaný formulár a podobne. Zdroj: export „Prehľad stavu prehľadov“." label="Web a kanály (GA4)" /></H3>
-      <Vysvetli chat={chat} titul="Web a kanály (GA4)" filter={`rok ${rok}`} vyrez={vyrez} />
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        <RokBar rok={rok} onRok={onRok} />
+        <Vysvetli chat={chat} titul="Web a kanály (GA4)" filter={`rok ${rok}`} vyrez={vyrez} />
+      </div>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, margin: "12px 0 14px" }}>
         <StatCard value={num(sum("novi"))} label={`Noví na webe ${rok}`} color={C.accent} />
@@ -808,27 +832,6 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
       {/* Živé z Graph API hore, ručná tabuľka s view rate pod tým — kým sa
           obe nezhodnú na tom istom poradí kategórií, platia obe. */}
       {sub === "dosah" && <ObsahZive />}
-      {sub === "dosah" && (
-      <Card>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-          <div>
-            <H3><Info text="Instagramové čísla sa berú z nahratých Metricool exportov (Údaje → Upload CSV: posty, reels aj stories). Kým sa nič nenahrá, ukazuje sa jednorazový prepis z Metricoolu za jan 2025 – jún 2026. GA4 a Search Console sú zatiaľ stále ten jednorazový export. Prepínač rokov riadi ročné karty (web, články, návratnosť); karty o obsahu a vyhľadávaní majú vlastné okno, lebo sa hýbu inou rýchlosťou." label="Marketing" /></H3>
-            {/* Súčet postov, reels a stories tu bol výkaz práce — číslo, ku
-                ktorému neexistuje akcia. Jerry ho 12. 8. zrušil. Prepínač roka
-                zostáva, riadi ročné karty nižšie. */}
-          </div>
-          <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-            <span style={{ fontSize: 11, color: C.textDim, marginRight: 2 }}>Rok</span>
-            {["2025", "2026"].map((y) => (
-              <button key={y} onClick={() => setRok(y)}
-                style={{ padding: "5px 12px", borderRadius: 7, border: `1px solid ${rok === y ? C.accent : C.border}`, background: rok === y ? C.accentBg : "transparent", color: rok === y ? C.accentLight : C.textMuted, fontSize: 12, cursor: "pointer" }}>
-                {y}
-              </button>
-            ))}
-          </div>
-        </div>
-      </Card>
-      )}
 
       {sub === "dopyty" && <Dopyty leads={leads} clients={clients} refresh={refresh} />}
 
@@ -848,7 +851,7 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
           <CoSomRobil chat={chat} />
           <CoFungovalo chat={chat} />
           <Vyhladavanie chat={chat} />
-          <WebKanaly rok={rok} chat={chat} />
+          <WebKanaly rok={rok} onRok={setRok} chat={chat} />
           <CoFungovaloWeb rok={rok} chat={chat} />
         </>
       )}
