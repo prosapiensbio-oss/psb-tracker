@@ -42,15 +42,22 @@ const V = "v21.0";
  *
  * Meta vracia pod `actions` desiatky typov naraz a väčšina z nich nie je
  * konverzia: prehratie videa, zobrazenie stránky, reakcia na príspevok.
- * Prvá verzia sem púšťala všetko, čo začínalo `offsite_conversion`, a apríl
- * 2025 potom hlásil 897 „výsledkov" — pritom to boli zobrazenia stránky.
  *
- * Preto výslovný zoznam: `lead`, `offsite_conversion.fb_pixel_lead`,
- * `onsite_conversion.lead_grouped`, registrácie a odoslané prihlášky.
- * Čokoľvek iné je aktivita, nie dopyt — a keby sa to počítalo dokopy,
- * cena za dopyt by vyšla desaťkrát nižšia, než v skutočnosti je.
+ * A hlavne — TÚ ISTÚ konverziu vracia niekoľkokrát pod rôznymi menami.
+ * Máj 2025, 235 registrácií, prišlo päťkrát:
+ *
+ *   complete_registration                            235
+ *   omni_complete_registration                       235
+ *   offsite_conversion.fb_pixel_complete_registration 235
+ *   offsite_complete_registration_add_meta_leads      235
+ *   offsite_complete_registration_add_20_s_calls      235
+ *
+ * Prvá verzia brala vzorku podľa konca názvu a sčítala tri z nich — mesiac
+ * potom hlásil 705 dopytov namiesto 235. Preto NIE vzorka, ale výslovný
+ * zoznam holých mien. Každý `omni_`, `offsite_` a `offsite_conversion.`
+ * variant je duplikát toho istého a musí zostať vonku.
  */
-const JE_DOPYT = /(^|\.)lead(_grouped)?$|complete_registration$|submit_application$/;
+const DOPYT = new Set(["lead", "complete_registration", "submit_application"]);
 
 type Nastavenie = { token: string; adAccount: string; igUser: string };
 
@@ -160,7 +167,7 @@ export const Route = createFileRoute("/api/meta")({
           const riadky = ((r.data as { data?: Record<string, unknown>[] }).data) || [];
           const stmts = riadky.map((x) => {
             const akcie = (x.actions as { action_type: string; value: string }[]) || [];
-            const vysl = akcie.filter((a) => JE_DOPYT.test(a.action_type))
+            const vysl = akcie.filter((a) => DOPYT.has(a.action_type))
               .reduce((s, a) => s + (Number(a.value) || 0), 0);
             return DB.prepare(
               `INSERT INTO mkt_kampane (id, mesiac, nazov, stav, spend, impressions, clicks, vysledky, ciel, akcie, updated_at)
