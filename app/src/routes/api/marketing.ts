@@ -81,7 +81,14 @@ export const Route = createFileRoute("/api/marketing")({
               ...(() => {
                 const z = zostava[String(r.mesiac)];
                 if (!z) return {};
-                const chyba = (z.reels - (Number(r.reels) || 0)) + (z.posty - (Number(r.posty) || 0)) + (z.stories - (Number(r.stories) || 0));
+                // Sčítavajú sa LEN schodky. Podpísaný súčet by dovolil, aby
+                // prebytok v jednej kategórii zakryl dieru v druhej: júl 2026
+                // mal 11 postov proti hláseniu 1 (export počíta položky
+                // karuselu zvlášť), čo by odčítalo 10 z chýbajúcich stories.
+                const schodok = (a: number, b: number) => Math.max(0, a - b);
+                const chyba = schodok(z.reels, Number(r.reels) || 0)
+                  + schodok(z.posty, Number(r.posty) || 0)
+                  + schodok(z.stories, Number(r.stories) || 0);
                 return chyba > 0 ? { neuplny: true, chybaKusov: chyba } : {};
               })(),
             })),
