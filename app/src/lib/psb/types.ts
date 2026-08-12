@@ -54,6 +54,25 @@ export type Lead = {
   referrer: string;   // existing client who sent them (source = referencia)
   status: "novy" | "neodpisal" | "dohodnuty" | "zruseny";
   note: string;
+  email: string;
+  telefon: string;
+  /** utm_campaign z odkazu v reklame — prázdne pri organickom príchode. */
+  kampan: string;
+  /** Celé utm_* v čitateľnej podobe, na dohľadanie keď kampaň nesedí. */
+  utm: string;
+  /** Adresa, na ktorej človek formulár odoslal. */
+  stranka: string;
+  /**
+   * Kedy sme sa OZVALI, nie kedy dopyt prišiel.
+   *
+   * V službách je rýchlosť odpovede najsilnejšia páka na konverziu — silnejšia
+   * než cena aj než text reklamy. Doteraz sa nemerala vôbec: všetkých 37
+   * dopytov od januára 2026 malo stav „nový" a dvanásť z nich netrénovalo bez
+   * toho, aby ktokoľvek vedel prečo.
+   */
+  odpovedaneAt: string;
+  /** Prečo sa z dopytu nestal klient. Bez toho sa reklama nedá vyhodnotiť. */
+  dovod: string;
 };
 
 export type ClientOverride = {

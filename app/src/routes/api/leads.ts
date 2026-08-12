@@ -31,10 +31,12 @@ export const Route = createFileRoute("/api/leads")({
         const source = SOURCES.includes(String(b.source)) ? String(b.source) : "ine";
         const status = STATUSES.includes(String(b.status)) ? String(b.status) : "novy";
         await DB.prepare(
-          `INSERT INTO leads (id,date,name,source,referrer,status,note,created_at)
-           VALUES (?,?,?,?,?,?,?,?)
+          `INSERT INTO leads (id,date,name,source,referrer,status,note,created_at,email,telefon,odpovedane_at,dovod)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
            ON CONFLICT(id) DO UPDATE SET date=excluded.date, name=excluded.name, source=excluded.source,
-             referrer=excluded.referrer, status=excluded.status, note=excluded.note`,
+             referrer=excluded.referrer, status=excluded.status, note=excluded.note,
+             email=excluded.email, telefon=excluded.telefon,
+             odpovedane_at=excluded.odpovedane_at, dovod=excluded.dovod`,
         )
           .bind(
             id,
@@ -45,6 +47,12 @@ export const Route = createFileRoute("/api/leads")({
             status,
             String(b.note ?? "").slice(0, 500),
             new Date().toISOString(),
+            String(b.email ?? "").slice(0, 160),
+            String(b.telefon ?? "").slice(0, 40),
+            // Kampaň ani UTM sa tu ZÁMERNE neprepisujú: zapisuje ich web pri
+            // príchode a ručná úprava dopytu by ich prepísala prázdnym.
+            typeof b.odpovedaneAt === "string" && b.odpovedaneAt ? b.odpovedaneAt.slice(0, 30) : null,
+            String(b.dovod ?? "").slice(0, 200),
           )
           .run();
         return Response.json({ ok: true, id });

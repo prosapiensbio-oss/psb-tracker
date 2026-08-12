@@ -107,6 +107,28 @@ function PoleOdporucatela({ meno, hodnota, mena, onUloz }: { meno: string; hodno
   );
 }
 
+/** Za ako dlho sme sa ozvali — „za 2 h", „za 3 dni". Kratšie než dátum a čas. */
+function odpovedZa(l: Lead): string {
+  if (!l.odpovedaneAt) return "";
+  const od = Date.parse(`${l.date}T00:00:00Z`), doK = Date.parse(l.odpovedaneAt);
+  if (!Number.isFinite(od) || !Number.isFinite(doK)) return "✓";
+  const h = Math.max(0, Math.round((doK - od) / 3600000));
+  if (h < 24) return `za ${h} h`;
+  const d = Math.round(h / 24);
+  return `za ${d} ${d === 1 ? "deň" : d < 5 ? "dni" : "dní"}`;
+}
+
+/**
+ * Dôvody, prečo sa z dopytu nestal klient.
+ *
+ * Ponuka, nie číselník — dá sa napísať čokoľvek. Zmysel je v tom, aby sa tie
+ * isté veci písali rovnako a dali sa spočítať; keby si každý písal po svojom,
+ * o pol roka sa z toho nedá prečítať nič.
+ */
+const DOVODY_ID = "psb-dovody";
+const DOVODY = ["nezdvíhal telefón", "neodpísal", "cena", "vzdialenosť", "termín nesedel",
+  "rozmyslel si to", "šiel inam", "len sa pýtal", "omyl / spam"];
+
 function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Record<string, ClientAgg>; refresh: () => Promise<void> }) {
   const [busy, setBusy] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -143,7 +165,17 @@ function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Record<st
     const c: Record<string, number> = {};
     for (const l of leads) c[l.status] = (c[l.status] || 0) + 1;
     const konv = leads.filter(converted).length;
-    return { total: leads.length, dohodnuty: c.dohodnuty || 0, neodpisal: c.neodpisal || 0, konv };
+    // Rýchlosť odpovede: medián, nie priemer. Jeden dopyt, na ktorý sa
+    // zabudlo na tri týždne, by priemer roztiahol tak, že by číslo prestalo
+    // hovoriť o bežnom prípade.
+    const casy = leads
+      .filter((l) => l.odpovedaneAt)
+      .map((l) => (Date.parse(l.odpovedaneAt) - Date.parse(`${l.date}T00:00:00Z`)) / 3600000)
+      .filter((h) => Number.isFinite(h) && h >= 0)
+      .sort((a, b) => a - b);
+    const median = casy.length ? casy[Math.floor(casy.length / 2)] : null;
+    const bezOdpovede = leads.filter((l) => !l.odpovedaneAt && l.status === "novy").length;
+    return { total: leads.length, dohodnuty: c.dohodnuty || 0, neodpisal: c.neodpisal || 0, konv, median, bezOdpovede };
   }, [leads, menaKlientovAll]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const bySource = useMemo(() => {
@@ -196,6 +228,13 @@ function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Record<st
           <StatCard value={String(counts.neodpisal)} label="Neodpísali" color={C.red} />
           <StatCard value={counts.total ? `${((counts.konv / counts.total) * 100).toFixed(0)} %` : "—"}
             label={<Info text="Podiel dopytov, ktorých meno sa už objavuje medzi klientmi v PTminderi — teda naozaj začali chodiť. Počíta sa automaticky, nezapisuje sa." label="Konverzia na klienta" />} color={C.green} />
+          <StatCard
+            value={counts.median === null ? "—" : counts.median < 24 ? `${Math.round(counts.median)} h` : `${Math.round(counts.median / 24)} dni`}
+            label={<Info text="Medián času od dopytu po našu prvú odpoveď. V službách je rýchlosť odpovede najsilnejšia páka na konverziu — silnejšia než cena aj než text reklamy. Meria sa tlačidlom „ozvali sme sa“ pri dopyte; medián preto, aby jeden zabudnutý dopyt neroztiahol celé číslo." label="Ozveme sa za" />}
+            color={counts.median === null ? C.textDim : counts.median <= 24 ? C.green : C.orange} />
+          <StatCard value={String(counts.bezOdpovede)}
+            label={<Info text="Dopyty v stave „ozval sa“, pri ktorých ešte nikto neklikol „ozvali sme sa“. Toto je zoznam ľudí, ktorí práve teraz čakajú." label="Čaká na odpoveď" />}
+            color={counts.bezOdpovede ? C.red : C.green} />
         </div>
       </Card>
 
@@ -228,6 +267,8 @@ function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Record<st
         </Card>
       )}
 
+      <datalist id={DOVODY_ID}>{DOVODY.map((d) => <option key={d} value={d} />)}</datalist>
+
       <Card>
         <H3>Zoznam</H3>
         {!leads.length ? (
@@ -240,7 +281,10 @@ function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Record<st
                 <th style={{ ...S.th, minWidth: 130 }}>Meno</th>
                 <th style={{ ...S.th, minWidth: 128 }}>Odkiaľ prišiel</th>
                 <th style={{ ...S.th, minWidth: 150 }}>Od koho</th>
+                <th style={{ ...S.th, minWidth: 130 }}>Kampaň</th>
                 <th style={{ ...S.th, minWidth: 150 }}>Stav</th>
+                <th style={{ ...S.th, minWidth: 130 }}>Ozvali sme sa</th>
+                <th style={{ ...S.th, minWidth: 150 }}>Prečo nie</th>
                 <th style={{ ...S.th, minWidth: 140 }}>Poznámka</th>
                 <th style={S.th} />
               </tr>
@@ -268,8 +312,37 @@ function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Record<st
                     ) : <span style={{ color: C.textDim, fontSize: 12 }}>—</span>}
                   </td>
                   <td style={S.td}>
+                    {l.kampan ? (
+                      <span title={l.utm || ""} style={{ fontSize: 11.5, color: C.accent }}>{l.kampan}</span>
+                    ) : <span style={{ color: C.textDim, fontSize: 12 }}>—</span>}
+                  </td>
+                  <td style={S.td}>
                     <Select value={l.status} onChange={(v) => save({ ...l, status: v as Lead["status"] })} options={STATUSES}
                       style={{ ...inputStyle, color: statusColor(l.status) }} />
+                  </td>
+                  <td style={S.td}>
+                    {/* Čas prvej odpovede jedným klikom. Keby to bolo pole na
+                        vypĺňanie, nevyplní ho nikto — a práve toto číslo je
+                        v službách najsilnejšia páka na konverziu. */}
+                    {l.odpovedaneAt ? (
+                      <span style={{ fontSize: 11.5, color: C.textMuted }}>
+                        {odpovedZa(l)}
+                        <button onClick={() => save({ ...l, odpovedaneAt: "" })} title="zrušiť"
+                          style={{ background: "transparent", border: "none", color: C.textDim, cursor: "pointer", marginLeft: 4 }}>✕</button>
+                      </span>
+                    ) : (
+                      <button onClick={() => save({ ...l, odpovedaneAt: new Date().toISOString() })}
+                        style={{ fontSize: 11.5, padding: "3px 8px", borderRadius: 6, border: `1px solid ${C.border}`,
+                          background: "transparent", color: C.accent, cursor: "pointer" }}>
+                        ozvali sme sa
+                      </button>
+                    )}
+                  </td>
+                  <td style={S.td}>
+                    {l.status === "neodpisal" || l.status === "zruseny" ? (
+                      <input list={DOVODY_ID} defaultValue={l.dovod} placeholder="dôvod…"
+                        onBlur={(e) => e.target.value !== l.dovod && save({ ...l, dovod: e.target.value })} style={inputStyle} />
+                    ) : <span style={{ color: C.textDim, fontSize: 12 }}>—</span>}
                   </td>
                   <td style={S.td}>
                     <input defaultValue={l.note} placeholder="poznámka" onBlur={(e) => e.target.value !== l.note && save({ ...l, note: e.target.value })} style={inputStyle} />
