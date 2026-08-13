@@ -93,7 +93,25 @@ export function ZapisButton({
   const vybranyKlient = klienti.find((k) => k.meno === poznMeno);
   const cakajuce = ritualy.filter((r) => r.splatne).length;
 
+  // Poradie je frekvencia, nie história: nový klient príde niekoľkokrát
+  // mesačne, rituály raz za týždeň, mesiac a kvartál.
+  //
+  // Čo tu ZÁMERNE nie je (Jerry, 13. 8. — „riadil by som sa jednoduchosťou
+  // a potrebami"):
+  //
+  // • „Čo sa stalo v marketingu" — preklik viedol na Reels & posty, kde si
+  //   značku ešte treba nájsť na grafe. Rozcestník, ktorý ťa vysype uprostred
+  //   obrazovky a nechá hľadať, je horší než žiadny. Značka v Marketingu
+  //   zostáva; sem sa vráti až vtedy, keď povedie priamo na ňu.
+  // • „Záver z debaty" — bol to odkaz na dashboard s inštrukciou „napíš
+  //   Jarvisovi". Jarvis je pritom tlačidlo na každej obrazovke, takže to
+  //   bola položka, ktorá nikam nevedie a nič neurýchli.
   const polozky: Polozka[] = [
+    {
+      nadpis: "Nový klient · úvodný tréning",
+      popis: "Otvorí anamnézu v Google Forms. Do Kokpitu sa klient dostane sám z PTmindera; odtiaľto sa berie len to, odkiaľ sa o nás dozvedel.",
+      odkaz: ANAMNEZA,
+    },
     ...ritualy.map((r) => ({
       nadpis: r.nadpis,
       popis: r.detail,
@@ -101,22 +119,6 @@ export function ZapisButton({
       sub: r.ciel.sub,
       stav: r.hotove ? ("hotove" as const) : r.splatne ? ("chyba" as const) : undefined,
     })),
-    // Dopyty sa medzitým presťahovali z Marketingu do Klientov — rozcestník
-    // ukazoval na starú adresu.
-    // Poradie je podľa toho, ako často sa to robí — nie podľa toho, kedy to
-    // vzniklo. Nový klient príde niekoľkokrát mesačne, značka v marketingu
-    // párkrát za rok, záver z debaty vtedy, keď debata bola.
-    {
-      nadpis: "Nový klient · úvodný tréning",
-      popis: "Otvorí anamnézu v Google Forms. Do Kokpitu sa klient dostane sám z PTmindera; odtiaľto sa berie len to, odkiaľ sa o nás dozvedel.",
-      odkaz: ANAMNEZA,
-    },
-    {
-      nadpis: "Čo sa stalo v marketingu",
-      popis: "Vlajka nad grafom — prednáška, spolupráca, zmena ceny, vypnutá reklama. Platené kampane si Kokpit ťahá z Mety sám; sem patrí to, o čom Meta nevie.",
-      tab: "marketing", sub: "obsah",
-    },
-    { nadpis: "Záver z debaty", popis: "Napíš Jarvisovi — záver si zapíše sám a objaví sa v registri.", tab: "dashboard" },
   ];
 
   const chod = (p: Polozka) => {
