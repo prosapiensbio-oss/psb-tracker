@@ -91,11 +91,22 @@ sa pridáva v Mete. A hlavne: kým nefunguje meranie, nie je čo optimalizovať.
 | | prečo je to na tebe |
 |---|---|
 | Token pre Conversions API v Kokpite | **nie je súrne.** WordPress už posiela Lead serverom cez PixelYourSite. Kokpitov vlastný CAPI by pridal len dopyty, ktoré neprešli webom — telefonát, správa na Instagrame |
-| **UTM do adries reklám** | `utm_campaign={{campaign.name}}` — blokuje celý reťazec kampaň → klient |
 | **Overiť doménu** v Events Manageri | DNS sa nerobilo a meta tag na webe nie je. Netreba ani jedno — postup nižšie |
-| **Septembrová kampaň s cieľom Lead** | bez toho sa nemeria nič |
 | **450 mailov** | nie je to úloha, je to možnosť. Jerry píše, len keď má čo povedať — a má pravdu. Návrh na mail musí začínať tým, čo tí ľudia dostanú, nie tým, koľko ich je |
 | Premenovať mŕtve pixely | kozmetika |
+
+### September nie je úloha, je to pripomienka
+
+Kampaň s cieľom Lead ani UTM už v tomto zozname nie sú. Sedia ako rozhodnutie
+s termínom overenia (`zv-septembrova-kampan`) a **1. 9. vyskočia samy** v registri
+„Na čo sa pozrieť" — aj s celým pokynom: cieľ `OUTCOME_LEADS`, reťazec UTM na
+vloženie do každej reklamy, overená doména a zastavovacie pravidlo pri 2 200 Kč.
+
+Dovtedy je august zámerne bez reklamy: je to jediné čisté obdobie, proti ktorému
+sa dá september porovnať. Úloha, ktorá visí na zozname tri týždne predtým, než
+sa dá spraviť, len otupuje zoznam.
+
+---
 
 ### Overenie domény bez zásahu do webu
 

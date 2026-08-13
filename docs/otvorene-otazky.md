@@ -12,9 +12,7 @@ odpovedal. Živý zoznam marketingu je v [zoznam-marketing.md](zoznam-marketing.
 
 | | |
 |---|---|
-| **UTM do adries reklám** | jediná vec, ktorá ešte blokuje reťazec kampaň → klient |
 | **Overiť doménu** v Events Manageri | meta tag na webe nie je a cez DNS sa to nerobilo. Najjednoduchšia cesta: Events Manager vydá meta tag a ten sa vloží do PixelYourSite (Meta pixel → „Verify your domain") — bez zásahu do šablóny |
-| **Septembrový test reklamy** | ~6 000 Kč na 4–6 týždňov. August je čistý mesiac (0 Kč), takže je z čoho porovnávať |
 | Dôvod straty pri 37 dopytoch | stav majú všetky „nový". Rýchlosť odpovede sa meria až od 12. 8., takže dlaždice neklamú — ale prečo dvanásti netrénovali, vie už len tvoja hlava |
 
 ---
