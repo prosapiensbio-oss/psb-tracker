@@ -32,6 +32,7 @@ import { ObsahDopyt } from "./ObsahDopyt";
 import { Mail } from "./Mail";
 import { Zadanie } from "./Zadanie";
 import { PlanObsahu } from "./PlanObsahu";
+import { KedyPublikovat } from "./KedyPublikovat";
 import { AkoMeratReklamu, Kohorta, Lievik, Naklady } from "./MarketingLievik";
 import { Kanaly } from "./Kanaly";
 import { prilezitosti, soZamerom, zhrnutieWebu, type Dopyt } from "../../lib/psb/google";
@@ -856,6 +857,9 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
               DOPYT, nie uloženia — a keby splynula, stokrát početnejšie
               uloženia by ten slabší signál prevalcovali. */}
           <ObsahZive />
+          {/* Kedy publikovať je nastavenie, nie práca — preto vlastná karta
+              a nie ďalší stĺpec v tabuľke vyššie. */}
+          <KedyPublikovat />
           <ObsahDopyt leads={leads} />
         </>
       )}

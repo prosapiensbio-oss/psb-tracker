@@ -300,8 +300,11 @@ export const Route = createFileRoute("/api/google")({
                 // rebríčky z rôznych období sa nedajú zlúčiť, lebo pozícia je
                 // priemer, nie súčet.
                 for (const [rozmer, tab, stlpec] of [["query", "gsc_dopyty", "dopyt"], ["page", "gsc_strany", "url"]] as const) {
+                  // 500 bol strop, nie počet — a hlásilo sa presne „500", čo sa
+                  // dalo čítať ako celkový počet dopytov. Search Console unesie
+                  // 25 000; 5 000 je viac, než koľko ich reálne je.
                   const r = await post(GSC(site), t.token, {
-                    startDate: od, endDate: do_, dimensions: [rozmer], rowLimit: 500,
+                    startDate: od, endDate: do_, dimensions: [rozmer], rowLimit: 5000,
                   });
                   if (!r.ok) { chyby.push(`Search Console (${rozmer}): ${r.chyba}`); continue; }
                   const riadky = gscRebricek(r.data || {});

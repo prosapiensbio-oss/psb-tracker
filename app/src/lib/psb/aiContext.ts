@@ -457,6 +457,7 @@ export function buildAiContext(
         prilezitosti: prilezitosti(GSC_DOPYTY),
         lokalne: soZamerom(GSC_DOPYTY, 8),
         topStrany: GSC_STRANY.slice(0, 12),
+        poznamkaKPlanu: "V Marketingu → Reels & posty je karta „Čo publikovať ďalej“ — počítané návrhy z týchto istých čísel. Keď sa pýta, čo publikovať, odpovedaj z „prilezitosti“ (téma, kde sa web zobrazuje a nikto neklikne — najlacnejší obsah, pozícia je už zaplatená) a z „topStrany“ (text, ktorý ľudia čítajú sami a stačí naň odkázať). Nikdy netvrdi príčinu — súbežnosť nie je dôkaz.",
       },
       clanky: MKT_CLANKY.slice(0, 15),
       zdrojeKlientov: {

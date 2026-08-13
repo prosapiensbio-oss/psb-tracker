@@ -56,10 +56,14 @@ Treba: API kľúč z MailerLite (vkladá sa v appke, nie cez chat).
 
 ## C · Viem postaviť bez teba
 
-### C1 · Hodina publikovania k príspevkom — PRIPRAVENÉ 13. 8.
-Stĺpec `cas` v `ig_prispevky` existuje a sťahovanie ho odteraz ukladá.
-Príspevky stiahnuté skôr ho prázdny majú — naplní sa pri najbližšom
-„Stiahnuť Instagram". Analýza najlepších časov sa postaví, keď bude z čoho.
+### C1 · Hodina publikovania — HOTOVÉ 13. 8.
+Karta **„Kedy publikovať"** v Reels & posty: bežný dosah podľa pásma dňa a dňa
+v týždni, z vlastných príspevkov. Medián, nie priemer. Víťaz sa vyhlási len pri
+dosť veľkej vzorke a rozdiele nad štvrtinu — inak povie, že je to jedno.
+
+Čaká už len na dáta: čas sa ukladá od 13. 8., staršie príspevky ho nemajú
+a dopočítať sa nedá. Karta sama napíše, koľko kusov čas má a koľko treba;
+naplní sa pri ďalších sťahovaniach.
 
 ### C2 · Plánovanie obsahu — HOTOVÉ 13. 8. (prvá polovica)
 Karta **„Čo publikovať ďalej"** na začiatku Reels & posty. Návrhy sa počítajú
@@ -68,8 +72,8 @@ ktoré ľudia čítajú sami; typ začiatku, ktorý bol pred dopytmi vidieť ča
 než v bežný deň; a tempo proti mesiacom s najviac dopytmi. Každý návrh nesie
 číslo, na ktorom stojí, a tlačidlo, ktoré z neho spraví zadanie pre Jarvisa.
 
-Kalendár s dátumami zatiaľ nie — bez Metricool API nemá kde brať plán a ručné
-prepisovanie termínov je práca navyše, nie úspora.
+Kalendár s dátumami sa robiť nebude: plán príspevkov by sa musel do Kokpitu
+prepisovať ručne, čo je práca navyše, nie úspora.
 
 ### C3 · Kampane z Kokpitu s poistkou
 Schválené 13. 8. **Kokpit nikdy nespustí reklamu.** Vytvorí ju v stave PAUSED,
@@ -77,9 +81,8 @@ ukáže súhrn (cieľ, publikum, denný strop, odhad ceny za dopyt proti stropu
 2 200 Kč) a odkaz do Ads Managera. Zapnutie je klik v Mete.
 
 Appka tak technicky nemá ako minúť peniaze, ani keby v nej bola chyba.
-Vyžaduje pridať oprávnenie `ads_management` — až keď sa to bude stavať.
-
-Zámerne posledné: kým nefunguje meranie, nie je čo optimalizovať.
+**Odložené na neskôr** (13. 8.) — vyžaduje oprávnenie `ads_management`, ktoré
+sa pridáva v Mete. A hlavne: kým nefunguje meranie, nie je čo optimalizovať.
 
 ---
 
@@ -114,7 +117,7 @@ a obmedzuje, čo sa z nej dá použiť na cielenie a meranie.
 
 | | |
 |---|---|
-| Metricool API | tarifa ho neobsahuje. Zrušené 13. 8. |
+| Metricool API aj kalendár termínov | tarifa API neobsahuje a ručné prepisovanie plánu nie je úspora. Zrušené 13. 8. |
 | Analýza videa (typ sandcastles.ai) | nahradené klasifikáciou hákov a „obsah → dopyt“. Zrušené 13. 8. |
 | Brand stratég, copywriting, grafika, web developer, PR | rieši Claude Project. Zrušené 13. 8. |
 
