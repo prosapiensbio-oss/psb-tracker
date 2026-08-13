@@ -8,6 +8,8 @@ import {
   najdiKlienta,
   ziskavanieKlientov,
   rodinaZKluca,
+  predictCash,
+  deriveClients,
 } from "./compute";
 import { EMPTY_DATA } from "./types";
 import type { PSBData, PaymentRow, SessionRow } from "./types";
@@ -265,5 +267,86 @@ describe("ziskavanieKlientov — vrátenie sa neráta ako príchod", () => {
     expect(beznavratu.cistyMes).toBeGreaterThan(snavratom.cistyMes);
     // A hlavne: potrebné získanie sa tým NEZMENŠÍ — voľné miesta ostávajú.
     expect(snavratom.trebaZiskat(6)).toBe(beznavratu.trebaZiskat(6));
+  });
+});
+
+/**
+ * Odhad očakávaných tržieb — dva nálezy z 13. 8. 2026.
+ *
+ * Jerry klikol na „Tržby tento mesiac · Očakávané" a v zozname pätnástich ľudí
+ * našiel jedného, kto tam nepatril, a nenašiel jedného, kto tam patriť mal.
+ */
+describe("predictCash", () => {
+  const sedenie = (client: string, date: string, sessionType: SessionRow["sessionType"], price = 1150): SessionRow =>
+    ({ date, time: "09:00", client, sessionTrainer: "Jerry", sessionName: "Tréning", sessionType, duration: 60, price });
+  const platba = (client: string, date: string, amount: number): PaymentRow =>
+    ({ date, client, amount, method: "bank" });
+  const pred = (d: Partial<PSBData>) => {
+    const data: PSBData = { ...EMPTY_DATA, ...d };
+    return predictCash(data, deriveClients(data), 3);
+  };
+  const dniDozadu = (n: number) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+  /**
+   * Horizont predpovede sa odvíja od POSLEDNEJ platby v dátach. Vzorka, kde je
+   * najnovšia platba spred pol roka, by mala celé okno v minulosti a nikto by
+   * do nej nespadol — preto do každej pribudne jedna dnešná platba.
+   */
+  const dnesnaPlatba = [platba("Kotva", dniDozadu(0), 9200)];
+  const kotvaSedenia = Array.from({ length: 8 }, (_, i) => sedenie("Kotva", dniDozadu(56 - i * 7), "OFFLINE"));
+
+  test("kto bol len na úvodnom, medzi očakávanými platbami nie je", () => {
+    // Roman Pavlík: úvodný 5. 8., jedno sedenie, jedna platba 1 100 Kč za ten
+    // úvodný. Stará podmienka ho pustila ďalej, lebo vylučovala malú platbu
+    // len vtedy, keď ich bolo VIAC než jedna.
+    const v = pred({
+      sessions: [sedenie("Roman", dniDozadu(8), "UVODNE", 1100), ...kotvaSedenia],
+      payments: [platba("Roman", dniDozadu(8), 1100), ...dnesnaPlatba],
+    });
+    expect(v.perClient.some((x) => x.name === "Roman")).toBe(false);
+  });
+
+  test("kto po úvodnom pokračoval, medzi očakávanými zostáva", () => {
+    const v = pred({
+      sessions: [
+        sedenie("Petra", dniDozadu(70), "UVODNE"),
+        ...Array.from({ length: 8 }, (_, i) => sedenie("Petra", dniDozadu(60 - i * 7), "OFFLINE")),
+        ...kotvaSedenia,
+      ],
+      payments: [platba("Petra", dniDozadu(70), 9200), ...dnesnaPlatba],
+    });
+    expect(v.perClient.some((x) => x.name === "Petra")).toBe(true);
+  });
+
+  test("nulový zostatok pri starej platbe znamená obnovu TERAZ, nie o dva mesiace", () => {
+    // Panagiotis Tsiolis: zaplatil v novembri, odvtedy odchodil všetko, export
+    // hlási nula hodín — a model ho aj tak posielal na obnovu až do októbra,
+    // lebo si z ceny balíčka dopočítal zostatok, ktorý už neexistuje.
+    const v = pred({
+      sessions: [
+        ...Array.from({ length: 6 }, (_, i) => sedenie("Panagiotis", dniDozadu(45 - i * 7), "OFFLINE", 0)),
+        ...kotvaSedenia,
+      ],
+      payments: [platba("Panagiotis", dniDozadu(260), 20550), ...dnesnaPlatba],
+    });
+    const x = v.perClient.find((p) => p.name === "Panagiotis");
+    expect(x).toBeDefined();
+    expect(x!.tyzdnov).toBeLessThan(1);
+  });
+
+  test("kto má obnovu ešte tento mesiac, v zozname JE", () => {
+    // Graf mesiacov zámerne začína budúcim mesiacom. Zoznam ľudí sa z neho
+    // plnil, takže obnova splatná dnes nemala kam spadnúť — a dashboard sa
+    // pritom pýtal práve na tento mesiac.
+    const v = pred({
+      sessions: [
+        ...Array.from({ length: 6 }, (_, i) => sedenie("Panagiotis", dniDozadu(45 - i * 7), "OFFLINE", 0)),
+        ...kotvaSedenia,
+      ],
+      payments: [platba("Panagiotis", dniDozadu(260), 20550), ...dnesnaPlatba],
+    });
+    const teraz = new Date().toISOString().slice(0, 7);
+    expect(v.perClient.find((x) => x.name === "Panagiotis")?.kedy).toBe(teraz);
+    // Graf sa nemení: mesiace v ňom začínajú až za aktuálnym.
+    expect(v.months.every((m) => m.month > teraz)).toBe(true);
   });
 });

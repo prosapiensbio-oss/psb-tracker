@@ -1424,8 +1424,18 @@ export function predictCash(
       .sort((a, b) => a.date.localeCompare(b.date));
     if (!platby.length) continue;
     const posledna = platby[platby.length - 1];
-    // Úvodný tréning nie je členstvo — nepredpovedaj podľa neho ďalšiu platbu.
-    if (posledna.amount <= 1500 && platby.length > 1) continue;
+    // Kto bol LEN na úvodnom, nemá čo obnovovať.
+    //
+    // Podmienka znela „malá platba a zároveň viac platieb" — čo je presne
+    // naopak: jediná platba za 1 100 Kč je najsilnejší znak, že to bol úvodný
+    // tréning a nič viac. Roman Pavlík (úvodný 5. 8., jedno sedenie, jedna
+    // platba) sa tak dostal medzi očakávané tržby augusta.
+    //
+    // Rozhoduje sa podľa sedení, nie podľa sumy: klient, ktorý platí po
+    // jednom tréningu, má tiež platby okolo 1 100 Kč a jeho obnovy sú
+    // skutočné. Je to tá istá definícia klienta ako v lieviku — kto prišiel
+    // druhý raz, ten sa rozhodol.
+    if (!c.sessions.some((x) => x.sessionType !== "UVODNE")) continue;
 
     // Tempo v hodinách za týždeň z posledných 90 dní. Bez neho sa nedá povedať
     // nič — klient bez tréningov v poslednom štvrťroku nekupuje ďalší balíček.
@@ -1465,9 +1475,20 @@ export function predictCash(
     //  tom, čo si kúpil rok dopredu) a jediné vodítko je, koľko si kúpil.
     const zPlatby = new Date(posledna.date);
     zPlatby.setDate(zPlatby.getDate() + Math.round((hodinyKupene / tempoTyzdenne) * 7));
+    // Nulový zostatok pri STAREJ platbe nie je momentka, je to fakt.
+    //
+    // Výnimka pre nulu vznikla kvôli klientovi, čo si práve kúpil rok dopredu
+    // a export to ešte nezachytil. Platí ale len krátko po platbe. Panagiotis
+    // Tsiolis zaplatil v novembri, odvtedy odchodil všetko a export mu ukazuje
+    // nula hodín — a model ho aj tak posielal na obnovu až do októbra, lebo
+    // z ceny balíčka si dopočítal, že mu ešte deväť hodín zostáva. Vlastná
+    // aritmetika prebila zapísaný stav.
+    const cerstvaPlatba = daysBetween(posledna.date, teraz) <= 30;
     const prvaObnova = zostatok > 0
       ? new Date(Math.max(zoZostatku.getTime(), teraz.getTime()))
-      : new Date(Math.max(zPlatby.getTime(), teraz.getTime()));
+      : cerstvaPlatba
+        ? new Date(Math.max(zPlatby.getTime(), teraz.getTime()))
+        : new Date(teraz.getTime());
 
     // Skutočný koniec platnosti z exportu má prednosť pred odhadom. Export
     // členstiev ho odteraz nesie ("30 Jun 2026 - 24 Aug 2026") a je to presne
@@ -1495,24 +1516,34 @@ export function predictCash(
     confidence *= 0.6 + 0.4 * Math.min(1, c.attendance / 0.7);
     if (daysBetween(c.lastSession, teraz) >= 30) confidence *= 0.5;   // ticho = riziko
 
+    const konfZaciatok = Math.max(0.05, Math.min(0.95, confidence));
+
+    // Najbližšia obnova sa zapíše VŽDY — aj keď vychádza na tento mesiac.
+    //
+    // Doteraz sa `perClient` plnil až vnútri mesiacov grafu, a ten zámerne
+    // začína budúcim mesiacom (predpoveď má začínať tam, kde končia dáta).
+    // Kto mal obnovu dnes, nemal kam spadnúť: dashboard sa pýtal „kto zaplatí
+    // do konca TOHTO mesiaca" a odpovedal zoznamom, v ktorom tento mesiac
+    // z princípu nebol. Panagiotis Tsiolis — nula hodín, tréning pred týždňom —
+    // v ňom preto chýbal.
+    //
+    // Graf mesiacov ostáva nedotknutý; mení sa len to, že zoznam ľudí je
+    // kompletný.
+    perClient.push({
+      name: c.name, kedy: mesiacKluc(kedyDatum), suma: posledna.amount,
+      confidence: konfZaciatok,
+      tyzdnov: Math.max(0, Math.round(((kedyDatum.getTime() - teraz.getTime()) / (7 * 86400000)) * 10) / 10),
+    });
+
     // Obnovy sa opakujú v rytme cyklu, každá ďalšia je o niečo menej istá.
     const d = new Date(kedyDatum);
-    let konf = Math.max(0.05, Math.min(0.95, confidence));
-    let prva = true;
+    let konf = konfZaciatok;
     for (let guard = 0; guard < 24; guard++) {
       const idx = keys.indexOf(mesiacKluc(d));
       if (idx >= 0) {
         months[idx].expected += posledna.amount * konf;
         months[idx].lo += posledna.amount * Math.max(0, konf - 0.2);
         months[idx].hi += posledna.amount * Math.min(1, konf + 0.15);
-        if (prva) {
-          perClient.push({
-            name: c.name, kedy: mesiacKluc(d), suma: posledna.amount,
-            confidence: konf,
-            tyzdnov: Math.max(0, Math.round(((kedyDatum.getTime() - teraz.getTime()) / (7 * 86400000)) * 10) / 10),
-          });
-          prva = false;
-        }
         konf *= 0.85;
       }
       d.setDate(d.getDate() + Math.round(cyklusTyzdnov * 7));
