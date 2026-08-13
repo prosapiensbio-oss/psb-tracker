@@ -111,6 +111,8 @@ FP COMPLIANCE — TVRDÉ PRAVIDLO, PLATÍ PRED VŠETKÝM OSTATNÝM. PSB pracuje 
 
 ČO SA NESMIE POUŽIŤ Z PREDAJNÝCH PRINCÍPOV — v <pozadie_psb> je manuál predajných princípov a v ňom index brand-konfliktov (časť X). Tie techniky FUNGUJÚ a preto sú tam napísané, ale pre PSB sú zakázané: umelá urgencia a deadliny, vymyslená vzácnosť („zostávajú 3 miesta"), zľavy ako rastový mechanizmus, maximalizácia objemu dopytov, výkonový pushovací tón, pseudovedecké nálepky, sľuby rýchlych výsledkov. Keď navrhuješ kampaň alebo obsah, prejdi ten index skôr, než odpovieš. Skutočná kapacitná hranica (~60–70 klientov) je legitímna vzácnosť; vymyslená nie.
 
+MAILING — v bloku <mailing> je stav MailerLite: koľko kontaktov, odkedy nepribudol nikto, skupiny a odoslané kampane. Tri veci, ktoré z toho platia a bez ktorých plán nedáva zmysel: (1) je to NAJLACNEJŠIE publikum PSB — kontakty stáli ~4,60 Kč za kus — a zároveň jediné, ktorému sa dá napísať zajtra bez toho, aby sa čokoľvek platilo; (2) k 13. 8. 2026 nepribudol odberateľ jedenásť mesiacov, čo znamená, že formuláre na webe do MailerLite nič neposielajú — kým to platí, každý plán stavaný na „zbieraní mailov" je plán do prázdna; (3) otvorenosť klesla zo 40 % (jún 2025) na 19,6 % (júl 2026), a to nie je o obsahu, ale o tichu — päť mailov za štrnásť mesiacov. Keď navrhuješ, čo robiť ďalej, TENTO KANÁL POROVNAJ S REKLAMOU: reklama za mesiac stojí tisíce a mailing nič. Jednotlivých odberateľov si vytiahni dopytom nad \`mail_odberatelia\`, nie z tohto zhrnutia.
+
 PLÁNOVACÍ REŽIM — toto je tvoja hlavná úloha v marketingu. Jerry ťa nechce ako pisára textov; chce ťa ako toho, kto UDÁVA SMER. Texty, captiony a scenáre potom píše samostatný Claude Project podľa zadania, ktoré vyrobíš ty. Ty rozhoduješ ČO a PREČO, Project rieši AKO to znie.
 
 Spustí sa, keď Jerry pýta plán, stratégiu, ciele, smer, „čo mám robiť budúci kvartál", „na čo sa mám sústrediť". Postup:
@@ -260,6 +262,8 @@ fio_transactions(id, date, amount_czk, counterparty, note, typ, category)  — b
 raw_uploads(id, filename, kind, bytes, uploaded_at)  — surové marketingové exporty (metricool | ga4 | gsc), obsah nečítaj cez SELECT * (je veľký), zaujímavý je len prehľad
 wishlist(id, nazov, cena, link, kupene, kupene_at, kategoria)  — nákupný zoznam náradia a kurzov
 mkt_prispevky(id, druh, datum, mesiac, url, hook, views, dosah, ulozenia, zdielania, komentare, lajky, spend, view_rate, watch_time)  — instagramové príspevky z Metricool CSV, 1 100+ riadkov od jan 2025; druh: reel | post | story. \`hook\` je prvých 300 znakov textu — dá sa v ňom hľadať cez LIKE. \`watch_time\` je Ø čas sledovania reelu v MILISEKUNDÁCH a je to jediný retenčný údaj, aký appka má: uloženie hovorí, že sa príspevok páčil, watch time hovorí, ako dlho ho človek vydržal. Pri postoch a stories je 0.
+mail_odberatelia(id, email, meno, prihlaseny, status, skupiny)  — MailerLite; \`prihlaseny\` je deň prihlásenia, \`skupiny\` sú mená oddelené „ · “
+mail_kampane(id, nazov, odoslane, prijemcov, otvorenia, prekliky, odhlasenia)  — odoslané kampane; otvorenia a prekliky sú UNIKÁTNE počty, nie celkové
 kanaly_mesiace(mesiac, kanal, metrika, hodnota, zmena)  — mesačné čísla všetkých kanálov (Facebook, TikTok, Meta Ads…) z mesačnej zostavy
 ga4_mesiace(mesiac, novi, organic_search, paid_social, direct, udalosti)  — web; udalosti = odoslané formuláre
 gsc_mesiace(mesiac, kliky, zobrazenia) · gsc_dopyty(dopyt, kliky, zobrazenia, ctr, pozicia) · gsc_strany(url, kliky, zobrazenia, ctr, pozicia)  — Google vyhľadávanie
@@ -365,6 +369,52 @@ async function spustiNastroj(name: string, input: Record<string, unknown>): Prom
  * posledného pol roka — staršia zmena algoritmu už buď zafungovala, alebo ju
  * prevalcovala ďalšia.
  */
+/**
+ * Mailing — kanál, o ktorom Jarvis doteraz nevedel nič.
+ *
+ * PREČO SA SEM PRIDÁVA
+ *
+ * 13. 8. sa napojil MailerLite a hneď z neho vypadlo, že za posledných
+ * jedenásť mesiacov nepribudol ani jeden odberateľ. 616 kontaktov je z dvoch
+ * dávok z leta 2025 a najväčšia skupina — Fascie, 335 ľudí — od októbra 2025
+ * nedostala nič. Je to najlacnejšie publikum, aké PSB má (4,60 Kč za kontakt),
+ * a plán, ktorý ho nezohľadní, je neúplný.
+ *
+ * PREČO ZHRNUTIE A NIE CELÉ RIADKY
+ *
+ * 616 e-mailov do kontextu nepatrí — sú to osobné údaje a Jarvis ich na
+ * plánovanie nepotrebuje. Ide sem tvar kanála: koľko ich je, odkedy nepribúda
+ * nikto, po skupinách, a ako dopadli kampane. Jednotlivca si v prípade potreby
+ * vytiahne dopytom.
+ */
+async function mailingKanal(): Promise<string> {
+  const { DB } = bindings();
+  if (!DB) return "";
+  try {
+    const [spolu, rad, skupiny, kampane] = await Promise.all([
+      DB.prepare("SELECT COUNT(*) n, SUM(CASE WHEN status='active' THEN 1 ELSE 0 END) a, MAX(prihlaseny) posl FROM mail_odberatelia")
+        .first<{ n: number; a: number; posl: string }>(),
+      DB.prepare("SELECT substr(prihlaseny,1,7) m, COUNT(*) n FROM mail_odberatelia WHERE prihlaseny <> '' GROUP BY m ORDER BY m DESC LIMIT 14").all(),
+      DB.prepare("SELECT skupiny, COUNT(*) n FROM mail_odberatelia WHERE skupiny <> '' GROUP BY skupiny ORDER BY n DESC LIMIT 15").all(),
+      DB.prepare("SELECT nazov, odoslane, prijemcov, otvorenia, prekliky, odhlasenia FROM mail_kampane ORDER BY odoslane DESC LIMIT 12").all(),
+    ]);
+    if (!spolu?.n) return "";
+    const r = (rs: { results: unknown[] }) => rs.results as Record<string, string | number>[];
+    return [
+      "<mailing>",
+      `MailerLite: ${spolu.n} kontaktov, z toho ${spolu.a} aktívnych. Posledné prihlásenie: ${spolu.posl || "neznáme"}.`,
+      "Prihlásení po mesiacoch (najnovšie hore): " + r(rad).map((x) => `${x.m}: ${x.n}`).join(" · "),
+      "Skupiny: " + (r(skupiny).map((x) => `${x.skupiny} (${x.n})`).join(" · ") || "nestiahnuté"),
+      "Kampane (komu | otvorilo | kliklo | odhlásilo):",
+      ...r(kampane).map((x) => `- ${x.odoslane} ${x.nazov}: ${x.prijemcov} | ${x.otvorenia} | ${x.prekliky} | ${x.odhlasenia}`),
+      "Kontext, ktorý bez toho nedáva zmysel: tieto kontakty stáli ~4,60 Kč za kus (kampane Web_Clicks_Dokumenty, jar 2025) a ani jeden sa zatiaľ nestal klientom. Keď plánuješ, ber to ako najlacnejšie publikum, aké PSB má — a ako publikum, ktoré chladne.",
+      "</mailing>",
+    ].join("\n");
+  } catch {
+    return "";
+  }
+}
+
 async function novinkyAlgoritmov(): Promise<string> {
   const { DB } = bindings();
   if (!DB) return "";
@@ -495,6 +545,7 @@ export const Route = createFileRoute("/api/chat")({
         // boli v jednom, cache by nikdy netrafila.
         const pamat = await nacitajPamat();
         const algo = await novinkyAlgoritmov();
+        const mailing = await mailingKanal();
         const system = [
           {
             type: "text",
@@ -505,6 +556,7 @@ export const Route = createFileRoute("/api/chat")({
             ? [{ type: "text", text: `<pamat_zaverov>\n${pamat}\n</pamat_zaverov>` }]
             : []),
           ...(algo ? [{ type: "text", text: algo }] : []),
+          ...(mailing ? [{ type: "text", text: mailing }] : []),
           { type: "text", text: `<data>\n${context}\n</data>` },
         ];
 
