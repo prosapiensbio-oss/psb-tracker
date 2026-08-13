@@ -111,9 +111,12 @@ export function Kanaly({ data, clients, chat }: { data: PSBData; clients: Record
     const hod = (kanal: string, metrika: string, mes: string) =>
       riadky.find((r) => r.mesiac === mes && r.kanal === kanal && r.metrika.toLowerCase() === metrika.toLowerCase())?.hodnota ?? null;
     const kanaly = [...new Set(vMesiaci.map((r) => r.kanal))]
-      // Reklama a konkurencia nie sú kanály, kde sa publikuje — porovnávať
-      // ich s Instagramom počtom príspevkov nedáva zmysel.
-      .filter((k) => !["Meta Ads", "Google Ads", "Konkurencia"].includes(k));
+      // Von ide trojica, ktorá sa s Instagramom porovnať nedá:
+      //   reklama a konkurencia — nie sú to miesta, kde sa publikuje,
+      //   web a Google Business — nie sú to siete a majú vlastnú záložku,
+      //     kde je o nich podstatne viac (GA4, Search Console).
+      // Odkedy sa záložka volá „Soc. siete", riadok Web by v nej bol votrelec.
+      .filter((k) => !["Meta Ads", "Google Ads", "Konkurencia", "Web", "Google Business"].includes(k));
     const von = kanaly.map((k) => {
       const imp = hod(k, "Impressions", mesiac);
       const impPred = predosly ? hod(k, "Impressions", predosly) : null;
@@ -226,7 +229,7 @@ export function Kanaly({ data, clients, chat }: { data: PSBData; clients: Record
           onClose={() => setRozobrat(null)} />
       )}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-        <H3><Info text="Osem čísel, na ktorých pre PSB záleží — vybrané zo ~160 metrík mesačnej zostavy Metricoolu. Celý zoznam je dole v rozbaľovači, keby bolo treba niečo dohľadať. Zmena je oproti predošlému mesiacu tak, ako ju uvádza zostava." label="Kanály — mesačný súhrn" /></H3>
+        <H3><Info text="Osem čísel, na ktorých pre PSB záleží — vybrané zo ~160 metrík mesačnej zostavy Metricoolu. Celý zoznam je dole v rozbaľovači, keby bolo treba niečo dohľadať. Zmena je oproti predošlému mesiacu tak, ako ju uvádza zostava." label="Soc. siete — mesačný súhrn" /></H3>
         {/* „2026-07" je strojový zápis. V zozname sedemnástich mesiacov sa
             v ňom nedá orientovať pohľadom — mesiac má byť čitateľný. */}
         {mesiace.length > 1 && (
@@ -254,12 +257,12 @@ export function Kanaly({ data, clients, chat }: { data: PSBData; clients: Record
       {/* ── všetky kanály vedľa seba ──────────────────────────────────── */}
       <div style={{ fontSize: 12, color: C.textMuted, fontWeight: 600, margin: "16px 0 6px" }}>
         <Info
-          label="Všetky kanály vedľa seba"
-          text="Štyri metriky, ktoré má každý kanál, za vybraný mesiac. Zoradené podľa videní — a práve preto to tu je: Facebook máva viac impresií než Instagram a z ôsmich čísel hore sa to nedalo zistiť. „Podiel“ hovorí, koľko z celkového dosahu pripadá na ten kanál; „zmena“ je oproti predošlému nahratému mesiacu. Reklama a konkurencia sú vynechané — nie sú to kanály, kde sa publikuje."
+          label="Všetky siete vedľa seba"
+          text="Štyri metriky, ktoré má každá sieť, za vybraný mesiac. Zoradené podľa videní — a práve preto to tu je: Facebook máva viac impresií než Instagram a z ôsmich čísel hore sa to nedalo zistiť. „Podiel“ hovorí, koľko z celkového dosahu sietí pripadá na tú jednu; „zmena“ je oproti predošlému nahratému mesiacu. Vynechaná je reklama a konkurencia (nepublikuje sa v nich) aj web s Google Business — tie majú vlastnú záložku Web a Google, kde je o nich podstatne viac."
         />
       </div>
       {porovnanie.riadky.length === 0 ? (
-        <Empty>Za tento mesiac nemám porovnateľné čísla.</Empty>
+        <Empty>Za tento mesiac nemám porovnateľné čísla zo sietí.</Empty>
       ) : (
         <RolovaciaTabulka pocet={4}>
           <thead>

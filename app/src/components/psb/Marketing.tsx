@@ -782,8 +782,8 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
           // pozícia v Googli mesiace — a v jednom okne sa jedno z nich vždy
           // čítalo zle. Kanály zostali zvlášť: sú jediný pohľad cez VŠETKY
           // kanály naraz a bývaju v nich rozbory mesiaca.
-          { id: "kanaly", label: "Kanály" },
-          { id: "obsah", label: "Obsah" },
+          { id: "kanaly", label: "Soc. siete" },
+          { id: "obsah", label: "Reels & posty" },
           { id: "web", label: "Web a Google" },
           // Algoritmus tu bol záložkou a Jerry ju 12. 8. zrušil: čítal ju
           // dvakrát a odvtedy nie. Dáta žijú ďalej — sťahujú sa každú noc
