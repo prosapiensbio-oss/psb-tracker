@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { monthLabel } from "../../lib/psb/format";
+import { kontrolaKanalov } from "../../lib/psb/kontrolaDat";
 import { statistiky, type Druh } from "../../lib/psb/mesiac";
 import { MesiacProfil } from "./MesiacProfil";
 import type { ClientAgg } from "../../lib/psb/compute";
@@ -55,6 +56,9 @@ const TREND_METRIKY: { id: string; label: string; kanal: string; metrika: string
 
 export function Kanaly({ data, clients, chat }: { data: PSBData; clients: Record<string, ClientAgg>; chat?: AssistantChat }) {
   const [rozobrat, setRozobrat] = useState<string | null>(null);
+  // Výdavok z Meta API — druhý nezávislý zdroj toho istého čísla ako v zostave.
+  const [vydavok, setVydavok] = useState<{ mesiac: string; spend: number }[]>([]);
+  const [kontrolaOtvorena, setKontrolaOtvorena] = useState(false);
   const [riadky, setRiadky] = useState<KanalRiadok[]>([]);
   const [mesiac, setMesiac] = useState("");
   const [nacitava, setNacitava] = useState(true);
@@ -69,6 +73,10 @@ export function Kanaly({ data, clients, chat }: { data: PSBData; clients: Record
         setNacitava(false);
       })
       .catch(() => setNacitava(false));
+    void fetch("/api/meta", { credentials: "same-origin" })
+      .then((r) => r.json())
+      .then((j: { kampane?: { mesiac: string; spend: number }[] }) => setVydavok(j.kampane || []))
+      .catch(() => {});
   }, []);
 
   const mesiace = useMemo(() => [...new Set(riadky.map((r) => r.mesiac))].sort().reverse(), [riadky]);
@@ -139,6 +147,16 @@ export function Kanaly({ data, clients, chat }: { data: PSBData; clients: Record
       predosly,
     };
   }, [riadky, vMesiaci, mesiac]);
+
+  /**
+   * Nezhody v dátach.
+   *
+   * Júlová chyba — 2 994 impresií proti 137 200 videniam — sa našla náhodou
+   * pri stavaní inej tabuľky. Toto je poistka, aby sa ďalšia nenašla nikdy.
+   * Je zabalená: väčšinou tam nič nie je a keď je, nie je to naliehavé —
+   * je to niečo, čo si treba pozrieť skôr, než sa podľa čísla rozhodne.
+   */
+  const nezhody = useMemo(() => kontrolaKanalov(riadky, vydavok), [riadky, vydavok]);
 
   // Štatistiky vybranej metriky. Bez nich je graf pekný, ale nepovie, či je
   // posledný stĺpec dobrý — a to je jediná otázka, ktorú pri ňom človek má.
@@ -253,6 +271,40 @@ export function Kanaly({ data, clients, chat }: { data: PSBData; clients: Record
         {konkSled != null && stat("Konkurencia — sledovatelia", cislo(konkSled),
           "Sledovatelia sledovanej konkurencie. Nie je to súper, je to mierka: keď rastú rovnako rýchlo ako vy, hýbe sa trh, nie vy.", C.textDim)}
       </div>
+
+      {/* ── nezhody v dátach ───────────────────────────────────────────── */}
+      {nezhody.length > 0 && (
+        <div style={{ marginTop: 14 }}>
+          <button onClick={() => setKontrolaOtvorena((v) => !v)}
+            style={{ display: "flex", alignItems: "center", gap: 7, width: "100%", padding: "9px 12px", borderRadius: 8,
+              border: `1px solid ${mix(nezhody.some((n) => n.zavaznost === "vysoka") ? C.red : C.orange, 35)}`,
+              background: mix(nezhody.some((n) => n.zavaznost === "vysoka") ? C.red : C.orange, 7),
+              color: C.text, fontFamily: "inherit", textAlign: "left", cursor: "pointer" }}>
+            <span style={{ fontSize: 9, transform: kontrolaOtvorena ? "rotate(90deg)" : "none", transition: "transform .12s", color: C.textDim }}>▶</span>
+            <span style={{ fontSize: 12.5, fontWeight: 600 }}>
+              {nezhody.length} {nezhody.length === 1 ? "číslo, ktoré nesedí" : nezhody.length < 5 ? "čísla, ktoré nesedia" : "čísel, ktoré nesedia"}
+            </span>
+            <span style={{ fontSize: 11.5, color: C.textMuted }}>
+              appka porovnala čísla, ktoré spolu musia súvisieť
+            </span>
+          </button>
+          {kontrolaOtvorena && (
+            <div style={{ marginTop: 8 }}>
+              {nezhody.map((n) => (
+                <div key={n.kluc} style={{ padding: "9px 12px", borderRadius: 8, marginBottom: 6,
+                  background: mix(n.zavaznost === "vysoka" ? C.red : C.orange, 6), lineHeight: 1.55 }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 600, color: n.zavaznost === "vysoka" ? C.red : C.text }}>{n.nadpis}</div>
+                  <div style={{ fontSize: 11.5, color: C.textMuted, marginTop: 2 }}>{n.detail}</div>
+                </div>
+              ))}
+              <div style={{ fontSize: 11, color: C.textDim, lineHeight: 1.5 }}>
+                Appka nič neopravuje sama. Nezhoda neznamená, že jedno z čísel je zlé — znamená, že si ich
+                treba pozrieť. Tichá oprava na to, čo si appka myslí, je horšia než chyba, o ktorej sa vie.
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── všetky kanály vedľa seba ──────────────────────────────────── */}
       <div style={{ fontSize: 12, color: C.textMuted, fontWeight: 600, margin: "16px 0 6px" }}>
