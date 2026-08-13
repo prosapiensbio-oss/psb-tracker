@@ -14,6 +14,9 @@ Poradie v každej časti je podľa pomeru úžitok / práca.
 | Onboarding a predajné princípy v znalostnej báze Jarvisa | 64 kB; FP compliance a index brand-konfliktov navyše vytiahnuté priamo do systémového promptu |
 | Odovzdávacie miesto medzi Jarvisom a Claude Projectom | karta na začiatku „Reels & posty“: Jarvis vyrobí zadanie → Project z neho píše. Drobný odkaz v hlavičke Marketingu zrušený, prehliadal sa |
 | MailerLite | odberatelia, skupiny a kampane; podkategória „Mailer“ |
+| GA4 + Search Console cez servisný účet | jeden kľúč, obe služby; píše do tabuliek ručného importu. GA4 property 355422977, web `https://www.prosapiens.cz/` |
+| Nemerané mesiace prežijú import | apríl a máj 2026 GA4 nemeralo; značka sa už neprepíše a Jarvis ju dostáva menovite |
+| Veta pod grafom kanálov sa počíta | bola napísaná natvrdo a tvrdila „~280 nových mesačne“ aj potom, čo to prestalo platiť |
 | Cena za dopyt počítaná z dopytov, nie z Metiných konverzií | ukazovala 20 Kč z konverzií pixelu; za 12 mesiacov nemá ani jeden dopyt zdroj „reklama“, takže je tam pomlčka a dôvod |
 | Konverzia dopyt → klient konvertuje dopyty | ukazovala 124 %, lebo delila dve rôzne skupiny ľudí |
 | Changelog Graph API v nočnom sťahovaní | + kľúčové slová `deprecat`, `breaking change`, `sunset`, `api version` |
@@ -24,7 +27,7 @@ Poradie v každej časti je podľa pomeru úžitok / práca.
 
 ## B · Viem postaviť — potrebujem prístup
 
-### B1 · Google API: Search Console + GA4 naraz
+### B1 · Google API: Search Console + GA4 naraz — HOTOVÉ 13. 8.
 Jeden účet Google Cloud, jeden servisný účet, prístup k obom nástrojom preň.
 
 - **Search Console** → koniec ručných exportov. Priamo obsluhuje otvorenú

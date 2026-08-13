@@ -444,7 +444,11 @@ export function buildAiContext(
       obsahPodlaHooku: hooky,
       obsahNajlepsie: zoradene.slice(0, 10).map(kus),
       obsahNajhorsie: zoradene.slice(-5).map(kus),
-      web: { poznamka: "GA4, návštevnosť webu podľa zdroja.", mesacne: GA4_MESACNE },
+      web: {
+        poznamka: "GA4, návštevnosť webu podľa zdroja. Mesiac s „chyba: true“ sa NEMERAL — nie je to nula a nesmie sa z neho čítať prepad; do súčtov ani priemerov nepatrí. Mesiac s „castocne: true“ má meranie rozbehnuté až v jeho priebehu, jeho číslo je dolná hranica. Search Console za tie isté mesiace ukazuje, koľko ľudí na web reálne prišlo — pri diere v GA4 odpovedaj z nej.",
+        nemeraneMesiace: GA4_MESACNE.filter((m) => m.chyba).map((m) => m.m),
+        mesacne: GA4_MESACNE,
+      },
       vyhladavanie: {
         poznamka: "Google Search Console. „prilezitosti“ = veľa zobrazení, takmer žiadne kliky — téma, na ktorú sa už zobrazujeme, ale nikto neklikne; tam je najlacnejší obsah.",
         mesacne: GSC_MESACNE,

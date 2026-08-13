@@ -270,7 +270,22 @@ export function nastavWebZImportu(
   let zmena = false;
   if (ga4.length) {
     const m = new Map(GA4_MESACNE.map((x) => [x.m, x]));
-    for (const x of ga4) m.set(x.m, x);
+    for (const x of ga4) {
+      const stary = m.get(x.m);
+      // Značky „nemerané" a „čiastočné" musia import PREŽIŤ.
+      //
+      // GA4 o sebe nevie, že nemeralo — pošle mesiac s nulami alebo ho
+      // nepošle vôbec, a v obidvoch prípadoch to vyzerá ako „nikto neprišiel".
+      // Prvá verzia importu tie značky prepísala a jún 2026 (21 ľudí za celý
+      // mesiac, meranie sa rozbehlo v jeho priebehu) sa začal počítať do
+      // priemerov ako plnohodnotný mesiac.
+      //
+      // `castocne` sa nesie ďalej vždy — je to úsudok o mesiaci, ktorý z dát
+      // vyčítať nejde. `chyba` naopak zmizne, keď import prinesie skutočné
+      // čísla: to je dôkaz, že mesiac meraný bol.
+      const chyba = stary?.chyba && x.novi === 0 ? true : undefined;
+      m.set(x.m, { ...x, ...(stary?.castocne ? { castocne: true } : {}), ...(chyba ? { chyba: true } : {}) });
+    }
     GA4_MESACNE = [...m.values()].sort((a, b) => a.m.localeCompare(b.m));
     zmena = true;
   }

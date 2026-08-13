@@ -35,6 +35,7 @@ import { Mail } from "./Mail";
 import { Zadanie } from "./Zadanie";
 import { AkoMeratReklamu, Kohorta, Lievik, Naklady } from "./MarketingLievik";
 import { Kanaly } from "./Kanaly";
+import { zhrnutieWebu } from "../../lib/psb/google";
 import { C, mix, S } from "../../lib/psb/theme";
 import type { AssistantChat } from "./Assistant";
 import type { ClientAgg } from "../../lib/psb/compute";
@@ -540,10 +541,10 @@ function WebKanaly({ rok, onRok, chat }: { rok: string; onRok: (r: string) => vo
     return (
       <Card>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-          <H3><Info text="Zdroj: export „Prehľad stavu prehľadov“ z GA4." label="Web a kanály (GA4)" /></H3>
+          <H3><Info text="Zdroj: priamo GA4 cez Analytics Data API. Sťahuje sa tlačidlom v Mesiac → Dáta a uzávierka." label="Web a kanály (GA4)" /></H3>
           <RokBar rok={rok} onRok={onRok} />
         </div>
-        <Empty>Za rok {rok} nemám GA4 export — v priečinku je zatiaľ len 2025. Stačí ho dotiahnuť rovnako ako ten minuloročný.</Empty>
+        <Empty>Za rok {rok} nemám z GA4 ani jeden meraný mesiac. Stiahni ich v Mesiac → Dáta a uzávierka → Google.</Empty>
       </Card>
     );
   }
@@ -571,7 +572,7 @@ function WebKanaly({ rok, onRok, chat }: { rok: string; onRok: (r: string) => vo
   return (
     <Card>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-      <H3><Info text="Noví používatelia webu podľa toho, odkiaľ prišli. „Hlavné udalosti“ sú konverzie nastavené v GA4 — odoslaný formulár a podobne. Zdroj: export „Prehľad stavu prehľadov“." label="Web a kanály (GA4)" /></H3>
+      <H3><Info text="Noví používatelia webu podľa toho, odkiaľ prišli. „Hlavné udalosti“ sú konverzie nastavené v GA4 — odoslaný formulár a podobne. Zdroj: priamo GA4 cez Analytics Data API, sťahuje sa v Mesiac → Dáta a uzávierka. Mesiace, v ktorých meranie nebežalo, sa do súčtov ani priemerov nepočítajú — nula by tvrdila, že nikto neprišiel." label="Web a kanály (GA4)" /></H3>
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
         <RokBar rok={rok} onRok={onRok} />
         <Vysvetli chat={chat} titul="Web a kanály (GA4)" filter={`rok ${rok}`} vyrez={vyrez} />
@@ -599,11 +600,11 @@ function WebKanaly({ rok, onRok, chat }: { rok: string; onRok: (r: string) => vo
           {castocne.length > 0 && <><b>{castocne.join(", ")}</b> je len čiastočný, meranie sa rozbehlo v priebehu mesiaca.</>}
         </div>
       )}
-      <div style={{ fontSize: 12.5, color: C.textMuted, marginTop: 14, lineHeight: 1.55 }}>
-        Platená reklama bežala len <b>apríl – júl 2025</b> a je na nej vidieť: v máji priniesla 427 nových ľudí z 1 224.
-        Odvtedy je na nule a web drží stabilných ~280 nových mesačne z vyhľadávania a priameho prístupu — to je
-        <b> základ, ktorý nezmizne, keď prestaneš platiť</b>.
-      </div>
+      {zhrnutieWebu(vsetky) && (
+        <div style={{ fontSize: 12.5, color: C.textMuted, marginTop: 14, lineHeight: 1.55 }}>
+          {zhrnutieWebu(vsetky)}
+        </div>
+      )}
     </Card>
   );
 }

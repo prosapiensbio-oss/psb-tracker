@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { ga4Mesiace, gscMesiace, gscRebricek, mesiacZGa4, narokyJwt, normProperty, normSite, odKedy } from "./google";
+import { ga4Mesiace, gscMesiace, gscRebricek, mesiacZGa4, narokyJwt, normProperty, normSite, odKedy, zhrnutieWebu } from "./google";
 
 const kanal = (mesiac: string, kanal: string, novi: number) =>
   ({ dimensionValues: [{ value: mesiac }, { value: kanal }], metricValues: [{ value: String(novi) }] });
@@ -140,5 +140,43 @@ describe("rozsah a JWT", () => {
     expect(Number(n.iat)).toBeLessThan(Math.floor(teraz / 1000));
     expect(Number(n.exp) - Number(n.iat)).toBe(3600);
     expect(n.aud).toBe("https://oauth2.googleapis.com/token");
+  });
+});
+
+describe("zhrnutie webu", () => {
+  const m = (mm: string, novi: number, paid = 0, extra = {}) => ({ m: mm, novi, paidSocial: paid, ...extra });
+
+  it("pomenuje podiel platenej reklamy aj jej najsilnejší mesiac", () => {
+    const t = zhrnutieWebu([m("2025-04", 694, 197), m("2025-05", 1224, 427), m("2025-06", 716, 231)]);
+    expect(t).toContain("855");        // 197 + 427 + 231
+    expect(t).toContain("2025-05");
+  });
+
+  it("bez reklamy to povie priamo", () => {
+    expect(zhrnutieWebu([m("2026-01", 441), m("2026-02", 380)])).toContain("ani koruna");
+  });
+
+  it("nemerané mesiace do súčtu nejdú", () => {
+    const t = zhrnutieWebu([m("2026-03", 149), m("2026-04", 0, 0, { chyba: true }), m("2026-05", 0, 0, { chyba: true })]);
+    expect(t).toContain("149");
+  });
+
+  it("čiastočný mesiac nestiahne základ", () => {
+    // Jún 2026 mal 21 ľudí, lebo sa meralo len časť mesiaca. Keby vstúpil do
+    // mediánu, „základ“ by klesol na hodnotu, ktorá nikdy neplatila.
+    const t = zhrnutieWebu([
+      m("2025-10", 315), m("2025-11", 272), m("2025-12", 350), m("2026-06", 21, 0, { castocne: true }),
+    ]);
+    expect(t).toContain("315");
+    expect(t).not.toContain("21 nových mesačne");
+  });
+
+  it("pri dvoch mesiacoch sa základ netvrdí — nie je z čoho", () => {
+    expect(zhrnutieWebu([m("2026-01", 441), m("2026-02", 380)])).not.toContain("základ");
+  });
+
+  it("prázdne obdobie nevyrobí vetu", () => {
+    expect(zhrnutieWebu([])).toBe("");
+    expect(zhrnutieWebu([m("2026-04", 0, 0, { chyba: true })])).toBe("");
   });
 });

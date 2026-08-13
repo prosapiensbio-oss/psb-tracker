@@ -198,3 +198,52 @@ export function narokyJwt(email: string, now: number): Record<string, string | n
     exp: iat + 3600,
   };
 }
+
+/**
+ * Vetа pod grafom kanálov — počítaná, nie napísaná.
+ *
+ * PREČO TO NIE JE PEVNÝ TEXT
+ *
+ * Do 13. 8. tu stálo: „web drží stabilných ~280 nových mesačne z vyhľadávania
+ * a priameho prístupu — to je základ, ktorý nezmizne, keď prestaneš platiť."
+ * V čase, keď to vzniklo, to bola pravda. V roku 2026 už nie: marec mal 149,
+ * apríl a máj sa nemerali vôbec a jún 21. Veta ale ostala a tvrdila svoje ďalej.
+ *
+ * Záver, ktorý sa nepočíta z dát, prežije dáta, ktoré ho vyvrátili. Preto sa
+ * počíta.
+ */
+export type WebMesiac = { m: string; novi: number; paidSocial: number; chyba?: boolean; castocne?: boolean };
+
+/** Medián — priemer by jeden reklamný mesiac vytiahol tak, že by neplatil pre žiadny. */
+const median = (xs: number[]): number => {
+  if (!xs.length) return 0;
+  const s = [...xs].sort((a, b) => a - b);
+  return s.length % 2 ? s[(s.length - 1) / 2] : Math.round((s[s.length / 2 - 1] + s[s.length / 2]) / 2);
+};
+
+export function zhrnutieWebu(mesiace: WebMesiac[]): string {
+  const merane = mesiace.filter((x) => !x.chyba);
+  if (!merane.length) return "";
+
+  const spolu = merane.reduce((a, x) => a + x.novi, 0);
+  const platene = merane.reduce((a, x) => a + x.paidSocial, 0);
+  const vety: string[] = [];
+
+  if (platene > 0) {
+    const najlepsi = merane.reduce((a, x) => (x.paidSocial > a.paidSocial ? x : a));
+    vety.push(
+      `Z ${spolu.toLocaleString("sk")} nových ľudí prišlo ${platene.toLocaleString("sk")} z platenej reklamy (${Math.round((platene / spolu) * 100)} %), najviac v mesiaci ${najlepsi.m} — ${najlepsi.paidSocial.toLocaleString("sk")}.`,
+    );
+  } else {
+    vety.push(`Na web nešla v tomto období ani koruna z reklamy — všetkých ${spolu.toLocaleString("sk")} nových ľudí prišlo organicky.`);
+  }
+
+  // Základ sa počíta len z mesiacov bez reklamy a bez výhrady. Čiastočný mesiac
+  // by ho stiahol dole a tváril sa pritom ako plnohodnotný.
+  const bezReklamy = merane.filter((x) => x.paidSocial === 0 && !x.castocne);
+  if (bezReklamy.length >= 3) {
+    vety.push(`Bez reklamy drží web zhruba ${median(bezReklamy.map((x) => x.novi)).toLocaleString("sk")} nových mesačne — to je základ, ktorý nezmizne, keď prestaneš platiť.`);
+  }
+
+  return vety.join(" ");
+}
