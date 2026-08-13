@@ -96,6 +96,7 @@ export const Route = createFileRoute("/api/meta")({
         if (!(await isAuthed(request))) return unauthorized();
         const { DB } = bindings();
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });
+        try {
         // Príspevky sa pýtajú zvlášť: je ich stovky a obrazovka s kampaňami
         // ich nepotrebuje. Jedna odpoveď so všetkým by bola pri každom otvorení
         // Marketingu pol megabajtu za nič.
@@ -132,8 +133,12 @@ export const Route = createFileRoute("/api/meta")({
           const mk = await DB.prepare(
             "SELECT datum, hook, dosah FROM mkt_prispevky WHERE druh IN ('reel','post') AND datum <> ''",
           ).all();
-          const klienti = await DB.prepare("SELECT DISTINCT client FROM sessions WHERE client <> ''").all();
-          const mena = krstneMenaKlientov(((klienti.results as { client: string }[]) || []).map((r) => r.client));
+          // POZOR: v D1 sa stĺpec volá `client_name`. V TypeScripte je to `client`,
+          // lebo import ho premenúva — a práve na tom sa to 12. 8. zlomilo:
+          // `SELECT DISTINCT client` hodilo „no such column", výnimka zhodila
+          // celú odpoveď a sťahovanie Instagramu tíško padalo na 500.
+          const klienti = await DB.prepare("SELECT DISTINCT client_name FROM sessions WHERE client_name <> ''").all();
+          const mena = krstneMenaKlientov(((klienti.results as { client_name: string }[]) || []).map((r) => r.client_name));
 
           type R = { datum: string; kategoria?: string; hook?: string; dosah?: number };
           const von = new Map<string, { datum: string; kategoria: string; hook: string; dosah: number; zdroj: string }>();
@@ -176,6 +181,12 @@ export const Route = createFileRoute("/api/meta")({
           kampani: kampane.results.length,
           igPrispevkov: ((await DB.prepare("SELECT COUNT(*) n FROM ig_prispevky").first<{ n: number }>())?.n) ?? 0,
         });
+        } catch (e) {
+          // Bez tohto skončí chyba v SQL ako holá päťstovka a na obrazovke
+          // ako „spojenie zlyhalo" — čo znie ako výpadok siete a pošle človeka
+          // hľadať úplne inam. Text chyby patrí tomu, kto sa pozerá.
+          return Response.json({ ok: false, error: String(e).slice(0, 300) }, { status: 500 });
+        }
       },
 
       POST: async ({ request }) => {
@@ -188,6 +199,7 @@ export const Route = createFileRoute("/api/meta")({
 
         const akcia = String(b.akcia || "");
         const now = new Date().toISOString();
+        try {
         const uloz = async (k: string, v: string) =>
           DB.prepare(
             `INSERT INTO vzas_settings (key, value, updated_at) VALUES (?1,?2,?3)
@@ -308,8 +320,12 @@ export const Route = createFileRoute("/api/meta")({
           // Krstné mená klientov — bez nich sa klientsky príbeh nedá spoznať,
           // lebo „Michal" je inak obyčajné slovo. Berú sa zo sedení: tabuľka
           // klientov neexistuje, klient je odvodený z toho, kto trénoval.
-          const klienti = await DB.prepare("SELECT DISTINCT client FROM sessions WHERE client <> ''").all();
-          const mena = krstneMenaKlientov(((klienti.results as { client: string }[]) || []).map((r) => r.client));
+          // POZOR: v D1 sa stĺpec volá `client_name`. V TypeScripte je to `client`,
+          // lebo import ho premenúva — a práve na tom sa to 12. 8. zlomilo:
+          // `SELECT DISTINCT client` hodilo „no such column", výnimka zhodila
+          // celú odpoveď a sťahovanie Instagramu tíško padalo na 500.
+          const klienti = await DB.prepare("SELECT DISTINCT client_name FROM sessions WHERE client_name <> ''").all();
+          const mena = krstneMenaKlientov(((klienti.results as { client_name: string }[]) || []).map((r) => r.client_name));
 
           const stmts = vsetky.map((m) => {
             const datum = String(m.timestamp || "").slice(0, 10);
@@ -341,6 +357,11 @@ export const Route = createFileRoute("/api/meta")({
         }
 
         return Response.json({ ok: false, error: "nezname_akcia" }, { status: 400 });
+        } catch (e) {
+          // To isté ako pri GET: chyba v SQL sa nesmie stratiť za hláškou
+          // „spojenie zlyhalo". Sťahovanie Instagramu takto tíško padalo.
+          return Response.json({ ok: false, error: String(e).slice(0, 300) }, { status: 500 });
+        }
       },
     },
   },
