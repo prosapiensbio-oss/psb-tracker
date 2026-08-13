@@ -18,6 +18,16 @@ import marketingRamce from "./marketing-ramce.md?raw";
 // Ako platformy rozhodujú o dosahu — s číslami PSB pri každom signáli. Datované
 // a zastarávajúce; appka sleduje oficiálne kanály a pripomína polročnú revíziu.
 import algoritmy from "./algoritmy.md?raw";
+// Marketingový onboarding (13. 8. 2026) — čo je značka, čo sa vyskúšalo, čo sa
+// zavrhlo a prečo. Obsahuje aj FP compliance, teda jediné tvrdé metodické
+// obmedzenie: FP sa vo verejnom obsahu NIKDY nemenuje a metodika sa neodhaľuje.
+// Bez tohto dokumentu Jarvis navrhne obsah, ktorý poruší NDA.
+import marketingOnboarding from "./marketing-onboarding.md?raw";
+// Predajné a marketingové princípy s vedeckými kotvami — a hlavne s indexom
+// miest, kde bežná predajná prax koliduje so značkou PSB (umelá urgencia,
+// vymyslená vzácnosť, zľavy ako rast). Ten index je dôležitejší než princípy
+// samotné: hovorí, čo z toho, čo „funguje", sa tu použiť NESMIE.
+import predajnePrincipy from "./predajne-principy.md?raw";
 
 export const PSB_KNOWLEDGE = `${knowledge}
 
@@ -39,4 +49,16 @@ ${marketingRamce}
 
 ---
 
-${algoritmy}`;
+${algoritmy}
+
+---
+
+# MARKETINGOVÝ ONBOARDING PSB
+
+${marketingOnboarding}
+
+---
+
+# PREDAJNÉ A MARKETINGOVÉ PRINCÍPY
+
+${predajnePrincipy}`;
