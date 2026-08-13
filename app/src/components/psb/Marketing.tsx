@@ -770,7 +770,7 @@ function Vyhladavanie({ chat }: { chat?: AssistantChat }) {
   );
 }
 
-export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, refresh }: { data: PSBData; clients: Record<string, ClientAgg>; leads: Lead[]; chat?: AssistantChat; sub: string; onSub: (s: string) => void; onKlient?: (m: string) => void; refresh: () => Promise<void> }) {
+export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, refresh, onPoznamkaStrata }: { data: PSBData; clients: Record<string, ClientAgg>; leads: Lead[]; chat?: AssistantChat; sub: string; onSub: (s: string) => void; onKlient?: (m: string) => void; refresh: () => Promise<void>; onPoznamkaStrata?: (meno: string, text: string) => void }) {
   const setSub = onSub;
   const [rok, setRok] = useState("2026");
   // Nahraté exporty vyhrávajú nad číslami v kóde. Načíta sa raz pri otvorení;
@@ -831,7 +831,7 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
 
       {sub === "lievik" && (
         <>
-          <Lievik data={data} clients={clients} />
+          <Lievik data={data} clients={clients} onPoznamka={onPoznamkaStrata} />
           <Kohorta data={data} clients={clients} />
           <CoToPrinieslo data={data} clients={clients} leads={leads} chat={chat} />
         </>

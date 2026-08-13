@@ -108,6 +108,17 @@ export type ClientOverride = {
   prvyKontakt?: string;
   /** Ručná oprava príslušnosti k 6M: "" = appka rozhoduje, "ano" / "nie". */
   v6m?: string;
+  /**
+   * Prečo človek po úvodnom tréningu už neprišiel.
+   *
+   * Osem ľudí za rok 2026 zaplatilo za úvodný a nevrátilo sa. Kým sa dôvod
+   * nezapíše v ten deň, keď je ešte v hlave, o mesiac ho nikto nezopakuje —
+   * a osem jednotlivých príbehov sa nikdy nespojí do vzorca.
+   *
+   * Zapísaný dôvod zároveň znamená „vybavené": položka z registra zmizne.
+   * Preto sa nezapisuje do `trainerNote`, ktorá je o klientovi ako takom.
+   */
+  precoNeprisiel?: string;
 };
 
 export type UploadLogEntry = {

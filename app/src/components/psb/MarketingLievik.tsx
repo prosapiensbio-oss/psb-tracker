@@ -6,7 +6,7 @@ import { ZDROJE } from "./Klienti";
 import { OBDOBIA_MESACNE, mesiaceVOkne } from "../../lib/psb/obdobia";
 import { C, mix, S } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
-import { Card, Empty, FilterObdobia, H3, Info, RolovaciaTabulka, TableWrap } from "./ui";
+import { Card, Empty, FilterObdobia, H3, Info, RolovaciaTabulka, TableWrap, enterPosle } from "./ui";
 
 // Marketing prestavaný podľa otázok, nie podľa kanálov.
 //
@@ -79,7 +79,7 @@ export type Kroky = {
      * úvodný tréning a nevrátilo sa. Kým neboli menovite vidieť, nedala sa
      * položiť ani otázka prečo.
      */
-    nepokracovali: { meno: string; datum: string; dni: number }[];
+    nepokracovali: { meno: string; datum: string; dni: number; trener: string; preco: string }[];
   };
 };
 
@@ -112,8 +112,12 @@ export function krokyZa(data: PSBData, clients: Record<string, ClientAgg>, mesia
   const uvodneSedenia = data.sessions.filter((s) => s.sessionType === "UVODNE" && v(s.date));
   // Jeden človek = jeden riadok, aj keď prišiel dvakrát. Berie sa prvý dátum.
   const uvodneMapa = new Map<string, string>();
+  const trenerUvodneho = new Map<string, string>();
   for (const s of [...uvodneSedenia].sort((a, b) => a.date.localeCompare(b.date))) {
-    if (!uvodneMapa.has(s.client)) uvodneMapa.set(s.client, s.date);
+    if (!uvodneMapa.has(s.client)) {
+      uvodneMapa.set(s.client, s.date);
+      trenerUvodneho.set(s.client, s.sessionTrainer || "");
+    }
   }
   const uvodne = uvodneMapa.size;
   const novi = Object.values(clients).filter((c) => {
@@ -158,10 +162,62 @@ export function krokyZa(data: PSBData, clients: Record<string, ClientAgg>, mesia
         .map(([meno, datum]) => ({
           meno, datum,
           dni: Math.max(0, Math.round((Date.now() - Date.parse(`${datum}T12:00:00Z`)) / 86400000)),
+          trener: trenerUvodneho.get(meno) || "",
+          preco: (clients[meno]?.precoNeprisiel || "").trim(),
         }))
         .sort((a, b) => b.datum.localeCompare(a.datum)),
     },
   };
+}
+
+/**
+ * Jeden stratený človek — a miesto, kam sa napíše prečo.
+ *
+ * Dôvod sa zapisuje v deň, keď je ešte v hlave. O mesiac ho nikto nezopakuje
+ * a osem jednotlivých príbehov sa nikdy nespojí do vzorca.
+ */
+function StrataRiadok({ x, onPoznamka }: {
+  x: { meno: string; datum: string; dni: number; trener: string; preco: string };
+  onPoznamka?: (meno: string, text: string) => void;
+}) {
+  const [text, setText] = useState(x.preco);
+  const [ulozene, setUlozene] = useState(false);
+  const uloz = () => {
+    const t = text.trim();
+    if (!onPoznamka || t === x.preco.trim()) return;
+    onPoznamka(x.meno, t);
+    setUlozene(true);
+    setTimeout(() => setUlozene(false), 2500);
+  };
+  return (
+    <div style={{ borderLeft: `2px solid ${x.preco ? C.green : mix(C.orange, 55)}`, paddingLeft: 9 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 12.5 }}>
+        <span style={{ color: C.text, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          {x.meno}
+          {x.trener && <span style={{ color: C.textDim, fontSize: 11.5 }}> · {x.trener}</span>}
+        </span>
+        <span style={{ color: C.textDim, flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>
+          úvodný {fmtDen(x.datum)} · pred {x.dni} dňami
+        </span>
+      </div>
+      {onPoznamka && (
+        <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 4 }}>
+          <input
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={enterPosle(uloz)}
+            onBlur={uloz}
+            placeholder="prečo neprišiel? (cena, vzdialenosť, termíny, nebolo to preňho…)"
+            style={{
+              flex: 1, minWidth: 0, padding: "5px 9px", borderRadius: 7,
+              border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 12,
+            }}
+          />
+          {ulozene && <span style={{ fontSize: 11, color: C.green, flexShrink: 0 }}>uložené</span>}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function Krok({ cislo, popis, farba, konverzia, onClick, aktivny, onStrata, strataAktivna }: {
@@ -221,7 +277,11 @@ function Krok({ cislo, popis, farba, konverzia, onClick, aktivny, onStrata, stra
   );
 }
 
-export function Lievik({ data, clients }: { data: PSBData; clients: Record<string, ClientAgg> }) {
+export function Lievik({ data, clients, onPoznamka }: {
+  data: PSBData; clients: Record<string, ClientAgg>;
+  /** Uloží dôvod, prečo človek po úvodnom už neprišiel. */
+  onPoznamka?: (meno: string, text: string) => void;
+}) {
   const [okno, setOkno] = useState("2026");
   /** Ktorý krok lievika má rozbalené mená. Vždy najviac jeden. */
   const [ktori, setKtori] = useState<"dopyty" | "uvodne" | "klienti" | "strata" | null>(null);
@@ -314,14 +374,24 @@ export function Lievik({ data, clients }: { data: PSBData; clients: Record<strin
                 <button onClick={() => setKtori(null)}
                   style={{ background: "none", border: "none", color: C.textDim, fontSize: 11.5, cursor: "pointer" }}>zavrieť</button>
               </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 5, maxHeight: 260, overflowY: "auto" }}>
-                {riadky.map((r, i) => (
-                  <div key={`${r.meno}-${i}`} style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 12.5 }}>
-                    <span style={{ color: C.text, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.meno}</span>
-                    <span style={{ color: C.textDim, flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>{r.vpravo}</span>
-                  </div>
-                ))}
+              <div style={{ display: "flex", flexDirection: "column", gap: ktori === "strata" ? 8 : 5, maxHeight: 320, overflowY: "auto" }}>
+                {ktori === "strata"
+                  ? k.kto.nepokracovali.map((x) => (
+                    <StrataRiadok key={x.meno} x={x} onPoznamka={onPoznamka} />
+                  ))
+                  : riadky.map((r, i) => (
+                    <div key={`${r.meno}-${i}`} style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 12.5 }}>
+                      <span style={{ color: C.text, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.meno}</span>
+                      <span style={{ color: C.textDim, flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>{r.vpravo}</span>
+                    </div>
+                  ))}
               </div>
+              {ktori === "strata" && (
+                <div style={{ fontSize: 11, color: C.textDim, marginTop: 9, lineHeight: 1.55 }}>
+                  Zapísaný dôvod znamená vybavené — položka zmizne aj z „Na čo sa pozrieť“.
+                  Osem jednotlivých príbehov sa spojí do vzorca len vtedy, keď sú zapísané.
+                </div>
+              )}
             </div>
           );
         })()}

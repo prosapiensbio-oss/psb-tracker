@@ -120,6 +120,8 @@ export type ClientAgg = {
   is6m: boolean;
   /** Ručná oprava príslušnosti k 6M: "" = appka rozhoduje, "ano" / "nie". */
   v6m: string;
+  /** Prečo po úvodnom tréningu už neprišiel. Prázdne = nikto to nezapísal. */
+  precoNeprisiel: string;
   membership: string; // current product from Packages report (e.g. "OFF - 6h S viazanostou")
   modality: "Offline" | "Online";
   serviceCount: number;
@@ -192,6 +194,7 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
         clientType: "Balíček",
         is6m: false,
         v6m: "",
+        precoNeprisiel: "",
         membership: "",
         modality: "Offline",
         serviceCount: 0,
@@ -283,6 +286,7 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
     c.prvyKontakt = ov?.prvyKontakt || "";
     c.vratenie = !!(c.prvyKontakt && c.firstSession && c.prvyKontakt.slice(0, 10) < c.firstSession.slice(0, 10));
     c.v6m = String(ov?.v6m || "");
+    c.precoNeprisiel = String(ov?.precoNeprisiel || "");
     c.is6m = sixMSet.has(c.name);
     c.clientType = c.is6m ? "6M Predplatné" : "Balíček";
     c.serviceCount = serviceCounts[c.name] || 0;
@@ -1021,6 +1025,37 @@ export function deriveAnomalies(data: PSBData, clients: Record<string, ClientAgg
         c.name,
       );
     }
+  }
+
+  // Prišiel na úvodný, zaplatil zaň a už nikdy.
+  //
+  // Osem takých bolo v roku 2026 a appka o nich mlčala: „X dní bez tréningu"
+  // sa ich netýka, lebo tá otázka platí pre klienta, ktorý mal rytmus a stratil
+  // ho. Tu žiadny rytmus nebol — bol jeden tréning a ticho.
+  //
+  // Hlási sa až po troch týždňoch: kto bol na úvodnom minulý týždeň, ešte len
+  // hľadá termín, a naháňať ho je horšie než mlčať. A zmizne, keď sa zapíše
+  // dôvod — nie preto, že sa niečo vyriešilo, ale preto, že otázka „prečo?"
+  // dostala odpoveď a druhýkrát ju klásť netreba.
+  //
+  // Horná hranica je pol roka. Bez nej by register dostal desať položiek naraz,
+  // vrátane ľudí z augusta 2025 — a na tých si už nikto nespomenie. To je tá
+  // istá chyba, akú Jerry našiel pri kontrole dát: „prečo by ma toto malo
+  // zaujímať?" Staršie prípady zostávajú v lieviku, kde sa dajú pozrieť, keď
+  // ich niekto hľadá; register je na to, čo sa dá spraviť teraz.
+  for (const c of Object.values(clients)) {
+    if (c.precoNeprisiel) continue;
+    const sedeni = c.sessions || [];
+    if (sedeni.length !== 1 || sedeni[0].sessionType !== "UVODNE") continue;
+    const dni = Math.floor(daysBetween(sedeni[0].date, new Date()));
+    if (dni < 21 || dni > 180) continue;
+    push(
+      `strata|${c.name}`,
+      "orange",
+      "Po úvodnom už neprišiel",
+      `${c.name}: úvodný pred ${dni} dňami a odvtedy nič${sedeni[0].sessionTrainer ? ` (${sedeni[0].sessionTrainer})` : ""}. Vieš prečo? Zapíš to v Marketing → Odkiaľ prišli klienti → klik na percento pri úvodných.`,
+      c.name,
+    );
   }
 
   // Rozhodnutie, ktorému prešiel termín overenia. Bez tohto by záver z debaty

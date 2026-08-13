@@ -47,7 +47,7 @@ const klient = (name: string, sessions: SessionRow[], extra: Partial<ClientAgg> 
   statusAuto: "Aktívny", status: "Aktívny", statusOverride: false,
   specialRate: false, specialRateNote: "", trainerNote: "", contractSigned: false, bitcoin: false,
   duch: "", packageValidTo: "", zdroj: "", zdrojKto: "", narodeniny: "", prvyKontakt: "", vratenie: false,
-  clientType: "Balíček", is6m: false, v6m: "", membership: "", modality: "Offline",
+  clientType: "Balíček", is6m: false, v6m: "", precoNeprisiel: "", membership: "", modality: "Offline",
   serviceCount: 0, packageRemaining: 0, packageTotal: 0, packageStatus: "", lenDoplnky: false,
   ...extra,
 });
