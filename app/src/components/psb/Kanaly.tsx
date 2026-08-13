@@ -7,7 +7,7 @@ import type { ClientAgg } from "../../lib/psb/compute";
 import type { PSBData } from "../../lib/psb/types";
 import type { AssistantChat } from "./Assistant";
 import { C, mix, S } from "../../lib/psb/theme";
-import { Card, Empty, H3, Info, Select, TableWrap, ValueBars } from "./ui";
+import { Card, Empty, H3, Info, RolovaciaTabulka, Select, TableWrap, ValueBars } from "./ui";
 
 // Všetky kanály, nie len Instagram.
 //
@@ -93,6 +93,49 @@ export function Kanaly({ data, clients, chat }: { data: PSBData; clients: Record
     }
     return [...podla.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([m, v]) => ({ label: m, value: v }));
   }, [riadky, trendCfg]);
+
+  /**
+   * Všetky kanály vedľa seba — nie len Instagram.
+   *
+   * Karta sa volá „Kanály", ale osem čísel hore aj prepínač trendu mieria
+   * takmer výhradne na Instagram. Pritom v zostave je aj Facebook, TikTok,
+   * Threads, YouTube, LinkedIn a Google Business — a Facebook má v niektorých
+   * mesiacoch VIAC impresií než Instagram. Bez tohto porovnania to nebolo
+   * vidieť nikde a celá karta tvrdila, že Instagram je jediný kanál, čo ide.
+   *
+   * Berú sa štyri metriky, ktoré má každý kanál: sledovatelia, videnia,
+   * interakcie a počet príspevkov. Zvyšok (~160 metrík) je v rozbaľovači dole.
+   */
+  const porovnanie = useMemo(() => {
+    const predosly = [...new Set(riadky.map((r) => r.mesiac))].sort().filter((m) => m < mesiac).pop() || "";
+    const hod = (kanal: string, metrika: string, mes: string) =>
+      riadky.find((r) => r.mesiac === mes && r.kanal === kanal && r.metrika.toLowerCase() === metrika.toLowerCase())?.hodnota ?? null;
+    const kanaly = [...new Set(vMesiaci.map((r) => r.kanal))]
+      // Reklama a konkurencia nie sú kanály, kde sa publikuje — porovnávať
+      // ich s Instagramom počtom príspevkov nedáva zmysel.
+      .filter((k) => !["Meta Ads", "Google Ads", "Konkurencia"].includes(k));
+    const von = kanaly.map((k) => {
+      const imp = hod(k, "Impressions", mesiac);
+      const impPred = predosly ? hod(k, "Impressions", predosly) : null;
+      const sled = hod(k, "Followers", mesiac);
+      const sledPred = predosly ? hod(k, "Followers", predosly) : null;
+      return {
+        kanal: k,
+        sledovatelia: sled,
+        prirastok: sled != null && sledPred != null ? sled - sledPred : null,
+        videnia: imp,
+        zmena: imp != null && impPred != null && impPred > 0 ? ((imp - impPred) / impPred) * 100 : null,
+        interakcie: hod(k, "Interactions", mesiac),
+        prispevkov: hod(k, "Posts", mesiac),
+      };
+    }).filter((r) => r.videnia != null || r.sledovatelia != null);
+    const spolu = von.reduce((a, r) => a + (r.videnia || 0), 0);
+    return {
+      riadky: von.sort((a, b) => (b.videnia ?? -1) - (a.videnia ?? -1)),
+      spolu,
+      predosly,
+    };
+  }, [riadky, vMesiaci, mesiac]);
 
   // Štatistiky vybranej metriky. Bez nich je graf pekný, ale nepovie, či je
   // posledný stĺpec dobrý — a to je jediná otázka, ktorú pri ňom človek má.
@@ -207,6 +250,57 @@ export function Kanaly({ data, clients, chat }: { data: PSBData; clients: Record
         {konkSled != null && stat("Konkurencia — sledovatelia", cislo(konkSled),
           "Sledovatelia sledovanej konkurencie. Nie je to súper, je to mierka: keď rastú rovnako rýchlo ako vy, hýbe sa trh, nie vy.", C.textDim)}
       </div>
+
+      {/* ── všetky kanály vedľa seba ──────────────────────────────────── */}
+      <div style={{ fontSize: 12, color: C.textMuted, fontWeight: 600, margin: "16px 0 6px" }}>
+        <Info
+          label="Všetky kanály vedľa seba"
+          text="Štyri metriky, ktoré má každý kanál, za vybraný mesiac. Zoradené podľa videní — a práve preto to tu je: Facebook máva viac impresií než Instagram a z ôsmich čísel hore sa to nedalo zistiť. „Podiel“ hovorí, koľko z celkového dosahu pripadá na ten kanál; „zmena“ je oproti predošlému nahratému mesiacu. Reklama a konkurencia sú vynechané — nie sú to kanály, kde sa publikuje."
+        />
+      </div>
+      {porovnanie.riadky.length === 0 ? (
+        <Empty>Za tento mesiac nemám porovnateľné čísla.</Empty>
+      ) : (
+        <RolovaciaTabulka pocet={4}>
+          <thead>
+            <tr>
+              <th style={{ ...S.th, textAlign: "left" }}>Kanál</th>
+              <th style={{ ...S.th, textAlign: "right" }}>Videnia</th>
+              <th style={{ ...S.th, textAlign: "right" }}>Podiel</th>
+              <th style={{ ...S.th, textAlign: "right" }}>Zmena</th>
+              <th style={{ ...S.th, textAlign: "right" }}>Sledovatelia</th>
+              <th style={{ ...S.th, textAlign: "right" }}>Interakcie</th>
+              <th style={{ ...S.th, textAlign: "right" }}>Príspevkov</th>
+            </tr>
+          </thead>
+          <tbody>
+            {porovnanie.riadky.map((r) => (
+              <tr key={r.kanal}>
+                <td style={{ ...S.td, color: C.text }}>{r.kanal}</td>
+                <td style={{ ...S.td, textAlign: "right", color: C.accentLight, fontWeight: 600 }}>
+                  {r.videnia == null ? "—" : cislo(r.videnia)}
+                </td>
+                <td style={{ ...S.td, textAlign: "right", color: C.textMuted }}>
+                  {r.videnia == null || !porovnanie.spolu ? "—" : `${Math.round((r.videnia / porovnanie.spolu) * 100)} %`}
+                </td>
+                <td style={{ ...S.td, textAlign: "right", color: farbaZmeny(r.zmena) }}>
+                  {r.zmena == null ? "—" : `${sipka(r.zmena)} ${Math.abs(Math.round(r.zmena))} %`}
+                </td>
+                <td style={{ ...S.td, textAlign: "right", color: C.textMuted }}>
+                  {r.sledovatelia == null ? "—" : cislo(r.sledovatelia)}
+                  {r.prirastok != null && r.prirastok !== 0 && (
+                    <span style={{ color: r.prirastok > 0 ? C.green : C.red, fontSize: 11 }}>
+                      {" "}({r.prirastok > 0 ? "+" : ""}{cislo(r.prirastok)})
+                    </span>
+                  )}
+                </td>
+                <td style={{ ...S.td, textAlign: "right", color: C.textMuted }}>{r.interakcie == null ? "—" : cislo(r.interakcie)}</td>
+                <td style={{ ...S.td, textAlign: "right", color: C.textMuted }}>{r.prispevkov == null ? "—" : cislo(r.prispevkov)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </RolovaciaTabulka>
+      )}
 
       {/* Trend po mesiacoch — s jednou zostavou jeden stĺpec, s každou ďalšou
           rastie sám. */}
