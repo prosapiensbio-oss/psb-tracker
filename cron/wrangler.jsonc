@@ -7,8 +7,9 @@
   "compatibility_date": "2025-05-01",
   "observability": { "enabled": true },
   // 4:00 a 18:00 UTC = snímky kalendára (6:00 a 20:00 v Prahe).
-  // 2:00 UTC = nočná záloha, keď sa do databázy nepíše.
-  "triggers": { "crons": ["0 4 * * *", "0 18 * * *"] },
+  // 3:30 UTC = novinky v algoritmoch. Raz denne a v noci: oficiálne blogy
+  // pridávajú pár správ týždenne a nikto na ne ráno nečaká.
+  "triggers": { "crons": ["0 4 * * *", "0 18 * * *", "30 3 * * *"] },
   // Priame prepojenie na Kokpit. Cez verejnú adresu to nejde — worker volajúci
   // *.workers.dev iného workera dostane 404.
   "services": [{ "binding": "KOKPIT", "service": "kokpit" }]

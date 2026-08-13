@@ -1,5 +1,5 @@
 /**
- * Plánovač snímok kalendára.
+ * Plánovač: snímky kalendára a kontrola noviniek v algoritmoch.
  *
  * Vlastný worker, lebo hlavná appka stojí na TanStack Start a jej serverový
  * vstup exportuje len `fetch` — `scheduled` sa doň nedá pridať bez zásahu do
@@ -20,8 +20,38 @@ const zavolaj = (env: Env, cesta = "/api/kalendar?cron=1") =>
     }),
   );
 
+/**
+ * Novinky v algoritmoch. Beží raz denne, nie dvakrát ako kalendár: oficiálne
+ * blogy Googlu a Mety pridávajú pár správ týždenne a častejšie ťahanie by len
+ * míňalo požiadavky.
+ *
+ * Prečo vôbec na pozadí: Jerry to na obrazovke nepotrebuje vidieť, ale Jarvis
+ * áno — pri plánovaní obsahu rozhoduje, či algoritmus práve tlačí na uloženia,
+ * zdieľania alebo na čas sledovania. Keby sa ťahalo len ručne, plán by sa
+ * opieral o pol roka staré pravidlá a nikto by to nezbadal.
+ */
+const novinky = (env: Env) =>
+  env.KOKPIT.fetch(
+    new Request("https://kokpit.prosapiensbio.workers.dev/api/algo?cron=1", {
+      method: "POST",
+      headers: { "x-cron-token": env.KAL_CRON_TOKEN, "content-type": "application/json" },
+      body: "{}",
+    }),
+  );
+
 export default {
-  async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
+  async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
+    // Podľa času spustenia sa rozhodne, čo sa má robiť — jeden worker, tri
+    // plány. `cron` je presne ten výraz, ktorý je vo wrangler.jsonc.
+    if (event.cron === "30 3 * * *") {
+      ctx.waitUntil(
+        novinky(env).then(
+          async (r) => console.log(`novinky v algoritmoch: HTTP ${r.status} ${(await r.text()).slice(0, 200)}`),
+          (e) => console.error("novinky v algoritmoch zlyhali:", e),
+        ),
+      );
+      return;
+    }
     ctx.waitUntil(
       zavolaj(env).then(
         async (r) => console.log(`snímka kalendára: HTTP ${r.status} ${(await r.text()).slice(0, 200)}`),
@@ -30,8 +60,9 @@ export default {
     );
   },
   // Ručné spustenie na overenie, že plánovač na Kokpit naozaj dosiahne.
-  async fetch(_req: Request, env: Env) {
-    const r = await zavolaj(env);
+  // `?novinky=1` skúša druhú vetvu bez čakania na 3:30 ráno.
+  async fetch(req: Request, env: Env) {
+    const r = new URL(req.url).searchParams.get("novinky") === "1" ? await novinky(env) : await zavolaj(env);
     return new Response(`Kokpit odpovedal ${r.status}: ${(await r.text()).slice(0, 300)}`, {
       status: r.ok ? 200 : 502,
     });

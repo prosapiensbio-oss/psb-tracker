@@ -30,6 +30,7 @@ import { Dopyty } from "./Dopyty";
 import { Kampane } from "./Kampane";
 import { MarketingVrch } from "./MarketingVrch";
 import { ObsahZive } from "./ObsahZive";
+import { ObsahDopyt } from "./ObsahDopyt";
 import { Algoritmus } from "./Algoritmus";
 import { AkoMeratReklamu, Kohorta, Lievik, Naklady } from "./MarketingLievik";
 import { Kanaly } from "./Kanaly";
@@ -850,6 +851,9 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
               aktualizuje sama, tá pod ňou drží view rate, ktorý API nedáva.
               Kým sa nezhodnú na tom istom poradí kategórií, platia obe. */}
           <ObsahZive />
+          {/* Hneď za tým, čo fungovalo v uloženiach — táto karta sa pýta to
+              isté, ale meria to dopytom, nie proxy metrikou. */}
+          <ObsahDopyt leads={leads} />
           <CoFungovalo chat={chat} />
           <Vyhladavanie chat={chat} />
           <WebKanaly rok={rok} onRok={setRok} chat={chat} />

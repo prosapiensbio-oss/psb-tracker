@@ -121,6 +121,39 @@ export const Route = createFileRoute("/api/meta")({
           return Response.json({ ok: true, prispevky: p.results });
         }
 
+        // Časová os obsahu pre kartu „Obsah → dopyt": Instagram API tam, kde
+        // už je, a Metricool všade inde. Kategória sa pri metricoolových
+        // riadkoch dopočíta z textu tu — inak by karta nefungovala, kým sa
+        // Instagram nestiahne nanovo, a to je väčšina histórie.
+        if (new URL(request.url).searchParams.get("co") === "obsah") {
+          const ig = await DB.prepare(
+            "SELECT datum, kategoria, hook, dosah FROM ig_prispevky WHERE datum <> ''",
+          ).all();
+          const mk = await DB.prepare(
+            "SELECT datum, hook, dosah FROM mkt_prispevky WHERE druh IN ('reel','post') AND datum <> ''",
+          ).all();
+          const klienti = await DB.prepare("SELECT DISTINCT client FROM sessions WHERE client <> ''").all();
+          const mena = krstneMenaKlientov(((klienti.results as { client: string }[]) || []).map((r) => r.client));
+
+          type R = { datum: string; kategoria?: string; hook?: string; dosah?: number };
+          const von = new Map<string, { datum: string; kategoria: string; hook: string; dosah: number; zdroj: string }>();
+          const daj = (r: R, zdroj: string, kat: string) => {
+            const den = String(r.datum).slice(0, 10);
+            const kluc = `${den}|${String(r.hook || "").slice(0, 40)}`;
+            // Ten istý príspevok je v oboch zdrojoch. Vyhráva Instagram API:
+            // má vlastnú kategóriu a presnejší dosah.
+            if (von.has(kluc) && zdroj !== "instagram") return;
+            von.set(kluc, { datum: den, kategoria: kat, hook: String(r.hook || ""), dosah: Number(r.dosah) || 0, zdroj });
+          };
+          for (const r of (ig.results as R[]) || []) {
+            daj(r, "instagram", r.kategoria || kategoriaHooku(r.hook || "", mena));
+          }
+          for (const r of (mk.results as R[]) || []) {
+            daj(r, "metricool", kategoriaHooku(r.hook || "", mena));
+          }
+          return Response.json({ ok: true, obsah: [...von.values()].sort((a, b) => b.datum.localeCompare(a.datum)) });
+        }
+
         const n = await nacitajNastavenie(DB);
         const kampane = await DB.prepare(
           `SELECT id, mesiac, nazov, ciel, spend, impressions, clicks, vysledky
