@@ -76,6 +76,29 @@ describe("hodnota mimo rádu", () => {
     expect(v.some((x) => x.kluc.includes("Views") && x.nadpis.includes("mimo rádu"))).toBe(true);
   });
 
+  it("starý výkyv sa NEHLÁSI — podľa deväť mesiacov starého čísla sa nerozhoduje", () => {
+    // Jerry, 13. 8.: „Facebook 2025-11 — prečo by ma toto malo zaujímať?"
+    // Nemalo. Dohad má zmysel len o mesiacoch, ktoré sú ešte v hre.
+    const riadky = [
+      r("2026-01", "Facebook", "Impressions", 2086),
+      ...Array.from({ length: 11 }, (_, i) => r(`2026-${String(i + 2).padStart(2, "0")}`, "Facebook", "Impressions", 25520)),
+    ];
+    expect(kontrolaKanalov(riadky, []).some((x) => x.nadpis.includes("mimo rádu"))).toBe(false);
+  });
+
+  it("starý výkyv ale medián nepokazí — rad sa počíta z celej histórie", () => {
+    // Keby sa staré mesiace zo série vyhodili, medián by sa posunul a čerstvý
+    // mesiac by sa porovnával proti skreslenej norme.
+    const riadky = [
+      r("2026-01", "Instagram", "Views", 1),
+      ...Array.from({ length: 11 }, (_, i) => r(`2026-${String(i + 2).padStart(2, "0")}`, "Instagram", "Views", 100000)),
+      r("2026-13", "Instagram", "Views", 100000),
+    ];
+    // Posledný mesiac je normálny → nič sa nehlási, hoci v rade je odľahlá
+    // hodnota z januára.
+    expect(kontrolaKanalov(riadky, []).some((x) => x.nadpis.includes("mimo rádu"))).toBe(false);
+  });
+
   it("bežný výkyv sa nehlási — v marketingu je dvojnásobok normálny", () => {
     const riadky = [...rada("Instagram", "Views", 100000), r("2026-13", "Instagram", "Views", 250000)];
     expect(kontrolaKanalov(riadky, []).some((x) => x.nadpis.includes("mimo rádu"))).toBe(false);

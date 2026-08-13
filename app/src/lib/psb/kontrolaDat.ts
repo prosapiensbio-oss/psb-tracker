@@ -77,6 +77,21 @@ const MALE_CISLA = 30;
  */
 const MAX_ODLAHLYCH = 2;
 
+/**
+ * Ako ďaleko dozadu má zmysel hlásiť DOHAD.
+ *
+ * Jerry, 13. 8.: „Facebook 2025-11 — prečo by ma toto malo zaujímať?" Nemalo.
+ * Kanál, ktorý aktívne nerobí, číslo spred deviatich mesiacov — aj keby bolo
+ * zlé, nič sa podľa neho nerozhoduje. Bola to kontrola dátovej kvality, nie
+ * upozornenie, a porušovala jeho vlastné pravidlo, že číslo bez akcie je
+ * zbytočné.
+ *
+ * Platí len na tretiu kontrolu, ktorá HÁDA. Prvé dve nehádajú — tam je
+ * nezhoda dôkaz chyby a tá sa hlási bez ohľadu na vek, lebo skresľuje aj
+ * priemery, proti ktorým sa porovnáva dnešok.
+ */
+const DOHAD_MESIACOV = 3;
+
 export function kontrolaKanalov(riadky: Riadok[], vydavokZMety: { mesiac: string; spend: number }[]): Nezhoda[] {
   const von: Nezhoda[] = [];
   const mesiace = [...new Set(riadky.map((r) => r.mesiac))].sort();
@@ -129,6 +144,8 @@ export function kontrolaKanalov(riadky: Riadok[], vydavokZMety: { mesiac: string
     const k = `${r.kanal}|${r.metrika}`;
     rady.set(k, [...(rady.get(k) || []), { m: r.mesiac, v: r.hodnota }]);
   }
+  // Posledné mesiace, o ktorých sa ešte rozhoduje.
+  const cerstve = new Set(mesiace.slice(-DOHAD_MESIACOV));
   for (const [k, rad] of rady) {
     // Pri krátkej rade nie je median na čom postaviť.
     if (rad.length < 5) continue;
@@ -138,14 +155,19 @@ export function kontrolaKanalov(riadky: Riadok[], vydavokZMety: { mesiac: string
     if (med < MALE_CISLA) continue;
     const odlahle = rad.filter((x) => x.v > 0 && (x.v > med ? x.v / med : med / x.v) >= RAD);
     if (!odlahle.length || odlahle.length > MAX_ODLAHLYCH) continue;
+    // Dohad sa hlási len o mesiacoch, o ktorých sa ešte rozhoduje. Rad sa
+    // pritom počíta z CELEJ histórie — starý výkyv medián nepokazí, len sa
+    // o ňom mlčí.
+    const cerstveOdlahle = odlahle.filter((x) => cerstve.has(x.m));
+    if (!cerstveOdlahle.length) continue;
     const [kanal, metrika] = k.split("|");
-    for (const x of odlahle) {
+    for (const x of cerstveOdlahle) {
       const nasobok = Math.round(x.v > med ? x.v / med : med / x.v);
       von.push({
         kluc: `rad|${k}|${x.m}`,
         zavaznost: "stredna",
         nadpis: `${kanal} ${x.m}: ${metrika} je mimo rádu`,
-        detail: `${cislo(x.v)} oproti bežným ${cislo(med)} — ${nasobok}× ${x.v > med ? "viac" : "menej"}. Nemusí to byť chyba; pri takomto rozdiele sa ale oplatí overiť zostavu skôr, než sa podľa toho čísla rozhodne.`,
+        detail: `${cislo(x.v)} oproti bežným ${cislo(med)} — ${nasobok}× ${x.v > med ? "viac" : "menej"}. Je to čerstvý mesiac, takže sa podľa neho ešte rozhoduje; over zostavu skôr, než sa tak stane. Ak je číslo správne, stalo sa niečo, čo stojí za pozretie samo o sebe.`,
       });
     }
   }
