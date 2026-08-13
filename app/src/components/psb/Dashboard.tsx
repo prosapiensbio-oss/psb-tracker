@@ -1588,6 +1588,13 @@ export function Dashboard({
   // ~80 % nízka / 15 % stredná / 5 % vysoká priorita. Preto sa červené
   // ukazujú vždy, zvyšok je za jedným klikom.
   const VIDITELNYCH = 5;
+  // Je panel telom otvoreného pásu, alebo stojí sám? Keď nič nevyžaduje
+  // pozornosť, pás sa nekreslí a panel je samostatná karta.
+  const telo = (registerOtvoreny || showAcked) && !(open.length === 0 && !showAcked);
+  const otvoreneTelo: CSSProperties = telo
+    ? { marginBottom: 12, borderRadius: "0 0 10px 10px", borderTop: "none", marginTop: 0 }
+    : { marginBottom: 12 };
+
   const registerPanel = showAcked ? (
     <Card style={{ marginBottom: 12 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
@@ -1608,7 +1615,7 @@ export function Dashboard({
       </button>
     ) : null
   ) : (
-    <Card style={{ marginBottom: 12 }}>
+    <Card style={otvoreneTelo}>
       {/* Nadpis tu nie je zámerne (Jerry, 13. 8.). Pás nad panelom už povedal
           „Na čo sa pozrieť · 3 vyžaduje akciu · 19 ďalších vecí"; zopakovať to
           o riadok nižšie znamená prečítať to isté dvakrát a k položkám sa
@@ -1680,8 +1687,13 @@ export function Dashboard({
         onClick={() => setRegisterOtvoreny((v) => !v)}
         style={{
           display: "flex", alignItems: "center", gap: 10, width: "100%",
-          padding: "10px 13px", borderRadius: 10, cursor: "pointer",
+          padding: "10px 13px", cursor: "pointer",
+          // Otvorený pás je hlavička jedného panelu, nie samostatné okno nad
+          // druhým. Jerry, 13. 8.: „nemôže sa to rovno rozbaliť, musia to byť
+          // dve okná?" Nemusia — spodok sa nezaobli a rám pokračuje do tela.
+          borderRadius: telo ? "10px 10px 0 0" : 10,
           border: `1px solid ${kriticke.length ? mix(C.red, 40) : C.border}`,
+          borderBottom: telo ? "none" : undefined,
           background: kriticke.length ? mix(C.red, 8) : mix(C.accent, 5),
           color: C.text, fontFamily: "inherit", textAlign: "left",
         }}>
@@ -1700,7 +1712,7 @@ export function Dashboard({
         </span>
         <span style={{ marginLeft: "auto", fontSize: 10, color: C.textDim, transform: registerOtvoreny ? "rotate(90deg)" : "none", transition: "transform .12s" }}>▶</span>
       </button>
-      {(registerOtvoreny || showAcked) && <div style={{ marginTop: 8 }}>{registerPanel}</div>}
+      {telo && registerPanel}
     </div>
   );
 
