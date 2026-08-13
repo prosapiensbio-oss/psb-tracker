@@ -18,6 +18,12 @@ const ZDROJE: { nazov: string; url: string }[] = [
   { nazov: "Meta Newsroom", url: "https://about.fb.com/news/feed/" },
   { nazov: "Facebook Developers", url: "https://developers.facebook.com/blog/feed/" },
   { nazov: "YouTube Blog", url: "https://blog.youtube/rss/" },
+  // Changelog Graph API. NIE je to o algoritme — je to o rozhraní, cez ktoré
+  // Kokpit s Metou hovorí. Práve tu sa dopredu oznamuje, ktorá verzia sa
+  // vypína a ktoré pole zaniká; bez toho sa to zistí až tak, že appka jedného
+  // rána prestane sťahovať kampane a nikto nevie prečo. Jerry na to upozornil
+  // 13. 8. — mal pravdu, len to nie je zmena algoritmu, ale zmena API.
+  { nazov: "Meta Graph API changelog", url: "https://developers.facebook.com/blog/feed/?tags=graph-api" },
 ];
 
 // Slová, ktoré v titulku znamenajú „toto sa môže týkať dosahu".
@@ -33,6 +39,9 @@ const KLUCOVE = [
   // „for you" samo o sebe chytalo vety typu „for your first Short" — musí to
   // byť názov plochy, nie predložka.
   "for you page", "for you feed", "visibility", "helpful content", "content policy",
+  // Zmeny rozhrania. Netýkajú sa dosahu, ale toho, či appka zajtra ešte
+  // dostane dáta — a to je rovnako naliehavé.
+  "deprecat", "breaking change", "sunset", "api version", "will be removed",
 ];
 
 const hash = (s: string) => {
