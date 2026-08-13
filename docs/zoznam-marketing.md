@@ -94,7 +94,8 @@ Zámerne posledné: kým nefunguje meranie, nie je čo optimalizovať.
 | **UTM do adries reklám** | `utm_campaign={{campaign.name}}` — blokuje celý reťazec kampaň → klient |
 | **Potvrdiť doménu** v Events Manageri | visí od 3. 6. |
 | **Septembrová kampaň s cieľom Lead** | bez toho sa nemeria nič |
-| **450 mailov** | najlacnejšie publikum, aké PSB má, a chladne |
+| **450 mailov** | nie je to úloha, je to možnosť. Jerry píše, len keď má čo povedať — a má pravdu. Návrh na mail musí začínať tým, čo tí ľudia dostanú, nie tým, koľko ich je |
+| **Lead na formulári v PixelYourSite** | plugin to už vie, len to nemá zapnuté — do Mety chodí iba PageView (pixel 3288091694795887). Spolu s UTM odblokuje reťazec kampaň → klient |
 | Premenovať mŕtve pixely | kozmetika |
 
 ---
