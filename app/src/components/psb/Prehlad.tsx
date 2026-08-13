@@ -309,6 +309,7 @@ export function PrehladPanel({
   zmenyTs,
   vyzaduju,
   registerPanel,
+  spodok,
   uzavrety,
   onUzavrety,
   vpravo,
@@ -324,6 +325,8 @@ export function PrehladPanel({
   zmenyTs: number | null;
   vyzaduju: { kritickych: number };
   registerPanel: ReactNode;
+  /** Karty pod prístrojmi. Register sa presunul hore, toto zostalo dole. */
+  spodok?: ReactNode;
   /** Uzavretý mesiac ako tenký riadok — vysvedčenie, nie prístroj. */
   uzavrety?: { mesiac: string; zisk: number; trzby: number; be: number } | null;
   onUzavrety?: () => void;
@@ -371,6 +374,12 @@ export function PrehladPanel({
         )}
         {vpravo}
       </div>
+
+      {/* Register hneď pod prepínačom trénera, nie na konci panela (Jerry,
+          12. 8.). Bol až za prístrojmi a za uzavretým mesiacom — teda za
+          všetkým, čo sa už stalo, hoci je jediný, kde sa ešte dá zasiahnuť.
+          Zabalený je zámerne: pás povie, či niečo horí, a rozvinie sa klikom. */}
+      {registerPanel}
 
       <Pasmo
         titulok="Ako to ide"
@@ -423,7 +432,7 @@ export function PrehladPanel({
 
       {zmenyTs !== null && <ZmenyRiadok ts={zmenyTs} zmeny={zmeny} />}
 
-      {registerPanel}
+      {spodok}
     </div>
   );
 }

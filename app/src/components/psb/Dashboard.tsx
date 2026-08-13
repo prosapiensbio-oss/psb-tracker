@@ -432,6 +432,9 @@ export function Dashboard({
 }) {
   const [showAcked, setShowAcked] = useState(false);
   const [registerExpanded, setRegisterExpanded] = useState(false);
+  // Zabalený register. Východzí stav je zavretý (Jerry, 12. 8.) — pás nad ním
+  // aj tak povie, či niečo horí, takže sa nedá prehliadnuť tým, že je zbalený.
+  const [registerOtvoreny, setRegisterOtvoreny] = useState(false);
   // "prijate" = cash received (= PTminder "Payments" / tržby) — the default; "vyfakturovane" = value of trained sessions.
   const [earnMode, setEarnMode] = useState<"vyfakturovane" | "prijate">("prijate");
   const [arranging, setArranging] = useState(false);
@@ -1659,6 +1662,47 @@ export function Dashboard({
     </Card>
   );
 
+  /**
+   * Register je zabalený za pásom (Jerry, 12. 8.).
+   *
+   * Pás NIE JE nemý nadpis. Zoznam výstrah schovaný za klik, ktorý o sebe nedá
+   * vedieť, je horší než žiadny — človek ho prestane otvárať práve vtedy, keď
+   * je v ňom niečo naliehavé. Preto pás nesie bodku vo farbe najhoršej položky
+   * a počty; text sa dá prečítať bez kliknutia a klik je len na podrobnosti.
+   *
+   * Pri prezeraní skrytých položiek sa otvára sám — inak by klik na „Skryté"
+   * neukázal nič.
+   */
+  const registerPas = (open.length === 0 && !showAcked) ? registerPanel : (
+    <div style={{ marginBottom: 12 }}>
+      <button
+        onClick={() => setRegisterOtvoreny((v) => !v)}
+        style={{
+          display: "flex", alignItems: "center", gap: 10, width: "100%",
+          padding: "10px 13px", borderRadius: 10, cursor: "pointer",
+          border: `1px solid ${kriticke.length ? mix(C.red, 40) : C.border}`,
+          background: kriticke.length ? mix(C.red, 8) : mix(C.accent, 5),
+          color: C.text, fontFamily: "inherit", textAlign: "left",
+        }}>
+        <span style={{
+          width: 9, height: 9, borderRadius: "50%", flexShrink: 0,
+          background: kriticke.length ? C.red : C.accent,
+          boxShadow: `0 0 8px ${kriticke.length ? C.red : C.accent}`,
+        }} />
+        <span style={{ fontSize: 13.5, fontWeight: 700 }}>Na čo sa pozrieť</span>
+        <span style={{ fontSize: 12, color: C.textMuted }}>
+          {kriticke.length > 0 && (
+            <b style={{ color: C.red }}>{kriticke.length} vyžaduje akciu</b>
+          )}
+          {kriticke.length > 0 && bezne.length > 0 && " · "}
+          {bezne.length > 0 && `${bezne.length} ${bezne.length === 1 ? "ďalšia vec" : bezne.length < 5 ? "ďalšie veci" : "ďalších vecí"}`}
+        </span>
+        <span style={{ marginLeft: "auto", fontSize: 10, color: C.textDim, transform: registerOtvoreny ? "rotate(90deg)" : "none", transition: "transform .12s" }}>▶</span>
+      </button>
+      {(registerOtvoreny || showAcked) && <div style={{ marginTop: 8 }}>{registerPanel}</div>}
+    </div>
+  );
+
   const shown = arranging ? layout.order : layout.order.filter((id) => !layout.hidden.includes(id));
 
   return (
@@ -1672,18 +1716,13 @@ export function Dashboard({
         vyzaduju={{ kritickych: kriticke.length }}
         uzavrety={pristroje.uzavrety}
         onUzavrety={() => onNavigate("vzas", "pnl")}
-        registerPanel={
-          <>
-            {registerPanel}
-            {/* Koniec balíčka je pripnutý hneď za registrom, nie v mriežke.
-                Je to jediná karta, ktorá hovorí o PENIAZOCH, čo sa dajú získať
-                zajtra — kto má dochodené hodiny, ten buď kúpi ďalší balíček,
-                alebo odíde. V mriežke sa dala presunúť, skryť aj prepnúť preč
-                prepínačom sekcií, a tým sa dala prehliadnuť práve vtedy, keď
-                na nej najviac záležalo. */}
-            {nodes.koniecBalicka}
-          </>
-        }
+        registerPanel={registerPas}
+        /* Koniec balíčka zostal POD prístrojmi, hoci register sa presunul nad
+           ne. Je to jediná karta, ktorá hovorí o peniazoch, čo sa dajú získať
+           zajtra — v mriežke sa dala presunúť, skryť aj prepnúť preč, a tým
+           prehliadnuť práve vtedy, keď na nej najviac záležalo. Hore ju dať
+           nemôžem: je to celá karta a odtlačila by prístroje pod okraj. */
+        spodok={nodes.koniecBalicka}
         cerstvost={cerstvost}
         vpravo={<TrainerPills value={trainer} onChange={onTrainer} />}
       />
