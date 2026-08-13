@@ -193,3 +193,29 @@ describe("kto je za číslami", () => {
     expect(k.kto.dopyty[0].meno).toBe("(bez mena)");
   });
 });
+
+describe("kto sa stratil po úvodnom", () => {
+  it("kto prišiel na úvodný a už nikdy, je v zozname strát", () => {
+    const s = [session("Petra", "2026-01-10", "UVODNE", 1100)];
+    const k = krokyZa(
+      psb({ sessions: s, payments: [payment("Petra", "2026-01-10", 1100)] }),
+      { Petra: klient("Petra", "2026-01-10", s) },
+      MES,
+    );
+    expect(k.kto.nepokracovali.map((x) => x.meno)).toEqual(["Petra"]);
+  });
+
+  it("kto sa vrátil, medzi stratami nie je", () => {
+    const s = [session("Petra", "2026-01-10", "UVODNE"), session("Petra", "2026-02-20", "OFFLINE")];
+    const k = krokyZa(psb({ sessions: s }), { Petra: klient("Petra", "2026-01-10", s) }, MES);
+    expect(k.kto.nepokracovali).toEqual([]);
+  });
+
+  it("návrat MIMO okna sa tiež ráta ako návrat", () => {
+    // Kto prišiel v januári a vrátil sa v júni, sa nestratil — len to trvalo.
+    // Keby sa pozeralo len do okna, appka by ho ohlásila ako stratu.
+    const s = [session("Petra", "2026-01-10", "UVODNE"), session("Petra", "2026-06-02", "OFFLINE")];
+    const k = krokyZa(psb({ sessions: s }), { Petra: klient("Petra", "2026-01-10", s) }, MES);
+    expect(k.kto.nepokracovali).toEqual([]);
+  });
+});

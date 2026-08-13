@@ -71,6 +71,15 @@ export type Kroky = {
     dopyty: { meno: string; datum: string; zdroj: string }[];
     uvodne: { meno: string; datum: string }[];
     klienti: { meno: string; prvy: string; zaplatil: string }[];
+    /**
+     * Kto prišiel na úvodný a už nikdy — najcennejší zoznam v lieviku.
+     *
+     * Ostatné tri hovoria, čo vyšlo. Tento hovorí, čo sa stratilo, a je to
+     * jediné miesto, kde sa dá niečo zmeniť: osem ľudí ročne zaplatilo za
+     * úvodný tréning a nevrátilo sa. Kým neboli menovite vidieť, nedala sa
+     * položiť ani otázka prečo.
+     */
+    nepokracovali: { meno: string; datum: string; dni: number }[];
   };
 };
 
@@ -141,14 +150,26 @@ export function krokyZa(data: PSBData, clients: Record<string, ClientAgg>, mesia
       klienti: novi
         .map((c) => ({ meno: c.name, prvy: c.firstSession || "", zaplatil: prvaPlatba(c.name) }))
         .sort((a, b) => b.prvy.localeCompare(a.prvy)),
+      // Mal úvodný v okne a v CELEJ histórii žiadne ďalšie sedenie. Pozerá sa
+      // mimo okna zámerne: kto prišiel v januári a vrátil sa v júni, sa
+      // nestratil — len to trvalo.
+      nepokracovali: [...uvodneMapa.entries()]
+        .filter(([meno]) => !(clients[meno]?.sessions || []).some((x) => x.sessionType !== "UVODNE"))
+        .map(([meno, datum]) => ({
+          meno, datum,
+          dni: Math.max(0, Math.round((Date.now() - Date.parse(`${datum}T12:00:00Z`)) / 86400000)),
+        }))
+        .sort((a, b) => b.datum.localeCompare(a.datum)),
     },
   };
 }
 
-function Krok({ cislo, popis, farba, konverzia, onClick, aktivny }: {
+function Krok({ cislo, popis, farba, konverzia, onClick, aktivny, onStrata, strataAktivna }: {
   cislo: string; popis: string; farba?: string; konverzia?: number | null;
   /** Bez toho je krok len číslo — s tým sa dá spýtať „ktorí?". */
   onClick?: () => void; aktivny?: boolean;
+  /** Klik na percento konverzie — ukáže, kto sa medzi týmto a ďalším krokom stratil. */
+  onStrata?: () => void; strataAktivna?: boolean;
 }) {
   const telo = (
     <>
@@ -174,12 +195,27 @@ function Krok({ cislo, popis, farba, konverzia, onClick, aktivny }: {
         <div style={{ flex: "1 1 110px", minWidth: 0 }}>{telo}</div>
       )}
       {konverzia !== undefined && (
-        <div style={{ flex: "0 0 auto", textAlign: "center", color: C.textDim, alignSelf: "center" }}>
-          <div style={{ fontSize: 16, lineHeight: 1 }}>→</div>
-          <div style={{ fontSize: 11, marginTop: 3, color: konverzia == null ? C.textDim : C.accentLight }}>
-            {konverzia == null ? "—" : `${konverzia} %`}
+        onStrata ? (
+          <button onClick={onStrata} title="Ukázať, kto sa medzi krokmi stratil"
+            style={{
+              flex: "0 0 auto", textAlign: "center", alignSelf: "center", cursor: "pointer",
+              background: strataAktivna ? mix(C.red, 10) : "transparent",
+              border: `1px solid ${strataAktivna ? mix(C.red, 35) : "transparent"}`,
+              borderRadius: 8, padding: "4px 7px", fontFamily: "inherit",
+            }}>
+            <div style={{ fontSize: 16, lineHeight: 1, color: C.textDim }}>→</div>
+            <div style={{ fontSize: 11, marginTop: 3, color: konverzia == null ? C.textDim : C.accentLight }}>
+              {konverzia == null ? "—" : `${konverzia} %`}
+            </div>
+          </button>
+        ) : (
+          <div style={{ flex: "0 0 auto", textAlign: "center", color: C.textDim, alignSelf: "center" }}>
+            <div style={{ fontSize: 16, lineHeight: 1 }}>→</div>
+            <div style={{ fontSize: 11, marginTop: 3, color: konverzia == null ? C.textDim : C.accentLight }}>
+              {konverzia == null ? "—" : `${konverzia} %`}
+            </div>
           </div>
-        </div>
+        )
       )}
     </>
   );
@@ -188,7 +224,7 @@ function Krok({ cislo, popis, farba, konverzia, onClick, aktivny }: {
 export function Lievik({ data, clients }: { data: PSBData; clients: Record<string, ClientAgg> }) {
   const [okno, setOkno] = useState("2026");
   /** Ktorý krok lievika má rozbalené mená. Vždy najviac jeden. */
-  const [ktori, setKtori] = useState<"dopyty" | "uvodne" | "klienti" | null>(null);
+  const [ktori, setKtori] = useState<"dopyty" | "uvodne" | "klienti" | "strata" | null>(null);
   const [web, setWeb] = useState<{ ga4: { m: string; udalosti: number }[]; dopyty: { dopyt: string; kliky: number }[] }>({ ga4: [], dopyty: [] });
 
   useEffect(() => {
@@ -240,7 +276,9 @@ export function Lievik({ data, clients }: { data: PSBData; clients: Record<strin
           <Krok cislo={String(k.dopyty)} popis="Dopyty" konverzia={pct(k.uvodne, k.dopyty)}
             onClick={k.dopyty ? () => setKtori(ktori === "dopyty" ? null : "dopyty") : undefined} aktivny={ktori === "dopyty"} />
           <Krok cislo={String(k.uvodne)} popis="Úvodné tréningy" konverzia={pct(k.klienti, k.uvodne)}
-            onClick={k.uvodne ? () => setKtori(ktori === "uvodne" ? null : "uvodne") : undefined} aktivny={ktori === "uvodne"} />
+            onClick={k.uvodne ? () => setKtori(ktori === "uvodne" ? null : "uvodne") : undefined} aktivny={ktori === "uvodne"}
+            onStrata={k.kto.nepokracovali.length ? () => setKtori(ktori === "strata" ? null : "strata") : undefined}
+            strataAktivna={ktori === "strata"} />
           <Krok cislo={String(k.klienti)} popis="Noví klienti" konverzia={undefined}
             onClick={k.klienti ? () => setKtori(ktori === "klienti" ? null : "klienti") : undefined} aktivny={ktori === "klienti"} />
           <div style={{ flex: "1 1 130px", minWidth: 0 }}>
@@ -252,13 +290,18 @@ export function Lievik({ data, clients }: { data: PSBData; clients: Record<strin
         {ktori && (() => {
           // Jeden zoznam pre všetky tri kroky — riadky sa líšia len stĺpcami.
           // Tri samostatné tabuľky by boli trikrát to isté a rozišli by sa.
-          const nadpisy = { dopyty: "Kto sa ozval", uvodne: "Kto prišiel na úvodný", klienti: "Kto zostal a zaplatil" };
+          const nadpisy = {
+            dopyty: "Kto sa ozval", uvodne: "Kto prišiel na úvodný",
+            klienti: "Kto zostal a zaplatil", strata: "Kto prišiel na úvodný a už nikdy",
+          };
           const riadky: { meno: string; vpravo: string }[] =
             ktori === "dopyty"
               ? k.kto.dopyty.map((x) => ({ meno: x.meno, vpravo: `${fmtDen(x.datum)}${x.zdroj ? ` · ${zdrojLabel(x.zdroj)}` : ""}` }))
               : ktori === "uvodne"
                 ? k.kto.uvodne.map((x) => ({ meno: x.meno, vpravo: `úvodný ${fmtDen(x.datum)}` }))
-                : k.kto.klienti.map((x) => ({
+                : ktori === "strata"
+                  ? k.kto.nepokracovali.map((x) => ({ meno: x.meno, vpravo: `úvodný ${fmtDen(x.datum)} · pred ${x.dni} dňami` }))
+                  : k.kto.klienti.map((x) => ({
                   meno: x.meno,
                   vpravo: `prvý tréning ${fmtDen(x.prvy)}${x.zaplatil ? ` · zaplatil ${fmtDen(x.zaplatil)}` : ""}`,
                 }));
