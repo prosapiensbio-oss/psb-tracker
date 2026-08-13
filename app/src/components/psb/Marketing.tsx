@@ -28,6 +28,7 @@ import { KATEGORIE_HOOKOV, MKT_OBSAH } from "../../lib/psb/marketing-obsah";
 import { OBDOBIA, OBDOBIA_MESACNE, mesiaceVOkne, obdobieLabel } from "../../lib/psb/obdobia";
 import { Dopyty } from "./Dopyty";
 import { Kampane } from "./Kampane";
+import { KampaneRozhodnutie } from "./KampaneRozhodnutie";
 import { MarketingVrch } from "./MarketingVrch";
 import { ObsahZive } from "./ObsahZive";
 import { ObsahDopyt } from "./ObsahDopyt";
@@ -843,7 +844,16 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
       )}
       {/* Kampane pred zmiešanou cenou: sú to skutočné čísla z Mety, kým
           „Čo to stálo" je odhad z Metricoolu a z nových klientov v mesiaci. */}
-      {sub === "naklady" && (<><Kampane /><Naklady data={data} clients={clients} /><AkoMeratReklamu /></>)}
+      {/* Poradie je poradie otázok: čo sa stalo (Kampane) → čo s tým
+          (Rozhodnutie) → zmiešaný odhad z Metricoolu (Čo to stálo). */}
+      {sub === "naklady" && (
+        <>
+          <Kampane />
+          <KampaneRozhodnutie data={data} clients={clients} leads={leads} />
+          <Naklady data={data} clients={clients} />
+          <AkoMeratReklamu />
+        </>
+      )}
       {sub === "dosah" && (
         <>
           <Kanaly data={data} clients={clients} chat={chat} />
