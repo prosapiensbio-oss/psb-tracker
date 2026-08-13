@@ -189,11 +189,11 @@ export let GSC_STRANY: GscStrana[] = [
   { url: "/predsunuta-hlava/", kliky: 90, zobrazenia: 2611, ctr: 3.45, pozicia: 5.1 },
 ];
 
-export const GSC_ZARIADENIA = [
+export let GSC_ZARIADENIA: { zariadenie: string; kliky: number; zobrazenia: number }[] = [
   { zariadenie: "Mobil", kliky: 1459, zobrazenia: 57035 },
   { zariadenie: "Stolný počítač", kliky: 861, zobrazenia: 40348 },
   { zariadenie: "Tablet", kliky: 27, zobrazenia: 1361 },
-] as const;
+];
 
 // kliky spolu 2347, z toho Česko 2057 (88 %), Slovensko 208
 
@@ -201,7 +201,8 @@ export const GSC_ZARIADENIA = [
 // Články, ktoré ľudia na webe reálne čítajú (GA4, zobrazenia stránok). Servisné
 // stránky (Domov, Služby, Kontakt…) sú vynechané — zaujíma nás obsah, nie menu.
 export type MktClanok = { rok: string; nazov: string; zobrazenia: number };
-export const MKT_CLANKY: MktClanok[] = [
+
+export let MKT_CLANKY: MktClanok[] = [
   { rok: "2025", nazov: "Fascie – Voda v nás", zobrazenia: 1829 },
   { rok: "2025", nazov: "Spiral Line (SPL) - Spiralní Línie", zobrazenia: 380 },
   { rok: "2025", nazov: "Postura – Základ fyzické i psychické rovnováhy", zobrazenia: 261 },
@@ -242,6 +243,8 @@ export let MKT_ZDROJ: "kod" | "import" = "kod";
 /** Mesiace, ktoré prišli z importu — v tabuľkách sa dajú odlíšiť od prepisu. */
 export const MKT_IMPORTOVANE = new Set<string>();
 
+import { clanky } from "./google";
+
 export function nastavMarketingZImportu(mesacne: MktMesiac[], top: MktKus[]): boolean {
   if (!mesacne.length) return false;
   // Zlučuje sa po mesiacoch, nenahrádza sa celá séria. Keby sa nahradila, jeden
@@ -266,6 +269,8 @@ export function nastavWebZImportu(
   gscMes: GscMesiac[],
   dopyty: GscDopyt[],
   strany: GscStrana[],
+  ga4Strany: { url: string; zobrazenia: number }[] = [],
+  zariadenia: { zariadenie: string; kliky: number; zobrazenia: number }[] = [],
 ): boolean {
   let zmena = false;
   if (ga4.length) {
@@ -300,5 +305,14 @@ export function nastavWebZImportu(
   // priemerná pozícia by neznamenala nič.
   if (dopyty.length) { GSC_DOPYTY = dopyty; zmena = true; }
   if (strany.length) { GSC_STRANY = strany; zmena = true; }
+  // Články a zariadenia boli do 13. 8. napísané natvrdo a import ich obchádzal
+  // — vyzerali živo a boli z jari 2025. Rok sa pri článkoch stráca (GA4 dáva
+  // rebríček za obdobie, nie po rokoch), preto ide do jedného vedra.
+  if (ga4Strany.length) {
+    MKT_CLANKY = clanky(ga4Strany.map((x) => ({ ...x, kliky: 0 })))
+      .map((x) => ({ rok: "", nazov: x.url, zobrazenia: x.zobrazenia }));
+    zmena = true;
+  }
+  if (zariadenia.length) { GSC_ZARIADENIA = zariadenia; zmena = true; }
   return zmena;
 }

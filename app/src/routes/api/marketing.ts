@@ -21,7 +21,7 @@ export const Route = createFileRoute("/api/marketing")({
         const { DB } = bindings();
         if (!DB) return Response.json({ ok: false, mesacne: [], top: [] });
         try {
-          const [mes, top, ga4, gscM, gscD, gscS, kan] = await Promise.all([
+          const [mes, top, ga4, ga4S, gscZ, gscM, gscD, gscS, kan] = await Promise.all([
             DB.prepare(
               `SELECT mesiac,
                       SUM(CASE WHEN druh = 'reel'  THEN 1 ELSE 0 END) AS reels,
@@ -40,6 +40,8 @@ export const Route = createFileRoute("/api/marketing")({
                 ORDER BY ulozenia DESC, views DESC LIMIT 12`,
             ).all(),
             DB.prepare("SELECT * FROM ga4_mesiace ORDER BY mesiac").all().catch(() => ({ results: [] })),
+            DB.prepare("SELECT * FROM ga4_strany ORDER BY zobrazenia DESC LIMIT 60").all().catch(() => ({ results: [] })),
+            DB.prepare("SELECT * FROM gsc_zariadenia").all().catch(() => ({ results: [] })),
             DB.prepare("SELECT * FROM gsc_mesiace ORDER BY mesiac").all().catch(() => ({ results: [] })),
             DB.prepare("SELECT * FROM gsc_dopyty ORDER BY kliky DESC LIMIT 60").all().catch(() => ({ results: [] })),
             DB.prepare("SELECT * FROM gsc_strany ORDER BY kliky DESC LIMIT 40").all().catch(() => ({ results: [] })),
@@ -115,6 +117,12 @@ export const Route = createFileRoute("/api/marketing")({
               url: r.url, kliky: Number(r.kliky) || 0, zobrazenia: Number(r.zobrazenia) || 0,
               ctr: Number(r.ctr) || 0, pozicia: Number(r.pozicia) || 0,
             })),
+            ga4Strany: (ga4S.results as Record<string, unknown>[]).map((r) => ({
+              url: r.url, kliky: 0, zobrazenia: Number(r.zobrazenia) || 0,
+            })),
+            gscZariadenia: (gscZ.results as Record<string, unknown>[]).map((r) => ({
+              zariadenie: r.zariadenie, kliky: Number(r.kliky) || 0, zobrazenia: Number(r.zobrazenia) || 0,
+            })),
             kanaly: (kan.results as Record<string, unknown>[]).map((r) => ({
               mesiac: r.mesiac, kanal: r.kanal, metrika: r.metrika,
               hodnota: Number(r.hodnota) || 0,
@@ -125,7 +133,7 @@ export const Route = createFileRoute("/api/marketing")({
         } catch {
           // Tabuľka ešte nie je (staršia migrácia) — obrazovka si vystačí s tým,
           // čo má v kóde.
-          return Response.json({ ok: false, mesacne: [], top: [], ga4: [], gscMesacne: [], gscDopyty: [], gscStrany: [], kanaly: [] });
+          return Response.json({ ok: false, mesacne: [], top: [], ga4: [], ga4Strany: [], gscZariadenia: [], gscMesacne: [], gscDopyty: [], gscStrany: [], kanaly: [] });
         }
       },
     },

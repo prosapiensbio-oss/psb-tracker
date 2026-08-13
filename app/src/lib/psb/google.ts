@@ -247,3 +247,111 @@ export function zhrnutieWebu(mesiace: WebMesiac[]): string {
 
   return vety.join(" ");
 }
+
+/**
+ * Odvodené pohľady na dopyty z vyhľadávania.
+ *
+ * PREČO SA POČÍTAJÚ A NIE UKLADAJÚ
+ *
+ * Do 13. 8. boli „príležitosti" aj „dopyty so zámerom kúpiť" v kóde napísané
+ * natvrdo — snímka z jari 2025, ktorú import nikdy neprepísal. Vyzerali živo
+ * a neboli. Rovnaká rodina chýb ako veta „web drží ~280 nových mesačne".
+ *
+ * Sú to pritom len dva filtre nad rebríčkom, ktorý živý JE. Uložiť ich zvlášť
+ * by znamenalo mať dve verzie toho istého a otázku, ktorá platí.
+ */
+
+export type Dopyt = { dopyt: string; kliky: number; zobrazenia: number; ctr: number; pozicia: number };
+
+/** Nad koľko zobrazení má zmysel hovoriť o premárnenej príležitosti. */
+const DOSŤ_VIDENÝ = 300;
+
+/** Miera prekliku, pod ktorou je to „vidia ma a neklikajú". */
+const NEKLIKAJÚ = 1.5;
+
+/**
+ * Kde sa zobrazuješ, ale nikto neklikne.
+ *
+ * Veľa zobrazení a takmer žiadny preklik znamená, že Google už web na tú tému
+ * ukazuje — chýba len dôvod kliknúť. Je to najlacnejší obsah, aký sa dá
+ * napísať: pozícia je zaplatená, treba doplniť titulok.
+ */
+export function prilezitosti(dopyty: Dopyt[], kolko = 10): Dopyt[] {
+  return dopyty
+    .filter((d) => d.zobrazenia >= DOSŤ_VIDENÝ && d.ctr < NEKLIKAJÚ)
+    .sort((a, b) => b.zobrazenia - a.zobrazenia)
+    .slice(0, kolko);
+}
+
+/**
+ * Slová, ktoré prezrádzajú, že človek nehľadá poučenie, ale tréning.
+ *
+ * „fascie" je téma; „osobní trenér brno" je zákazník. Zoznam je zámerne krátky
+ * a doslovný — hádať zámer zo slov sa dá len hrubo a širší zoznam by sem
+ * pustil každý druhý dopyt.
+ */
+const ZAMER_KUPIT = [
+  "trenér", "trener", "trénink", "trenink", "trénování", "osobní", "individuální",
+  "terapie", "brno", "lekce", "konzultace", "cvičení s", "hodina",
+];
+
+/** Dopyty, v ktorých je počuť zámer kúpiť — nie zvedavosť. */
+export function soZamerom(dopyty: Dopyt[], kolko = 10): Dopyt[] {
+  return dopyty
+    .filter((d) => {
+      const t = d.dopyt.toLowerCase();
+      return ZAMER_KUPIT.some((k) => t.includes(k));
+    })
+    .sort((a, b) => b.zobrazenia - a.zobrazenia)
+    .slice(0, kolko);
+}
+
+/**
+ * Servisné stránky, ktoré do rebríčka článkov nepatria.
+ *
+ * Domov a Kontakt vyhrajú vždy a nič tým nepovedia — nie sú to témy, ktoré
+ * si niekto vybral, ale dvere, ktorými prejde každý.
+ */
+const SERVISNE = [
+  "/", "/kontakt", "/kontakty", "/sluzby", "/služby", "/o-nas", "/o-mne",
+  "/cenik", "/ceník", "/uvodni-trenink", "/podekovani", "/dychani", "/blog",
+];
+
+export type Strana = { url: string; kliky: number; zobrazenia: number };
+
+/** Články, ktoré ľudia naozaj čítajú. Servisné stránky von. */
+export function clanky(strany: Strana[], kolko = 12): Strana[] {
+  return strany
+    .filter((s) => {
+      const u = s.url.replace(/^https?:\/\/[^/]+/i, "").replace(/[?#].*$/, "").toLowerCase();
+      const bez = u.endsWith("/") && u.length > 1 ? u.slice(0, -1) : u;
+      return !SERVISNE.includes(bez) && !SERVISNE.includes(`${bez}/`);
+    })
+    .sort((a, b) => b.zobrazenia - a.zobrazenia || b.kliky - a.kliky)
+    .slice(0, kolko);
+}
+
+/** Rozdelenie klikov podľa zariadenia — zo Search Console. */
+export function zariadenia(o: GscOdpoved): { zariadenie: string; kliky: number; zobrazenia: number }[] {
+  const nazov: Record<string, string> = { MOBILE: "Mobil", DESKTOP: "Stolný počítač", TABLET: "Tablet" };
+  return (o.rows || [])
+    .map((r) => ({
+      zariadenie: nazov[(r.keys?.[0] || "").toUpperCase()] || (r.keys?.[0] || "—"),
+      kliky: Math.round(r.clicks || 0),
+      zobrazenia: Math.round(r.impressions || 0),
+    }))
+    .filter((x) => x.kliky > 0 || x.zobrazenia > 0)
+    .sort((a, b) => b.kliky - a.kliky);
+}
+
+/** Stránky z GA4 — rozmer pagePath, metrika screenPageViews. */
+export function ga4Strany(o: Ga4Odpoved): Strana[] {
+  return (o.rows || [])
+    .map((r) => ({
+      url: (r.dimensionValues?.[0]?.value || "").trim(),
+      kliky: 0,
+      zobrazenia: Math.round(Number(r.metricValues?.[0]?.value) || 0),
+    }))
+    .filter((x) => x.url)
+    .sort((a, b) => b.zobrazenia - a.zobrazenia);
+}

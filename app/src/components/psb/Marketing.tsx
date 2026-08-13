@@ -5,9 +5,7 @@ import { fmtDMY, fmtCZK } from "../../lib/psb/format";
 import {
   GA4_MESACNE,
   GSC_DOPYTY,
-  GSC_LOKALNE,
   GSC_MESACNE,
-  GSC_PRILEZITOSTI,
   GSC_STRANY,
   GSC_ZARIADENIA,
   MKT_CLANKY,
@@ -35,7 +33,7 @@ import { Mail } from "./Mail";
 import { Zadanie } from "./Zadanie";
 import { AkoMeratReklamu, Kohorta, Lievik, Naklady } from "./MarketingLievik";
 import { Kanaly } from "./Kanaly";
-import { zhrnutieWebu } from "../../lib/psb/google";
+import { prilezitosti, soZamerom, zhrnutieWebu, type Dopyt } from "../../lib/psb/google";
 import { kontrolaMerania } from "../../lib/psb/kontrolaDat";
 import { C, mix, S } from "../../lib/psb/theme";
 import type { AssistantChat } from "./Assistant";
@@ -622,13 +620,18 @@ function WebKanaly({ rok, onRok, chat }: { rok: string; onRok: (r: string) => vo
 // Instagram má životnosť dva dni, článok pracuje roky. Preto patria vedľa seba:
 // jedno ukazuje, čo zaujalo teraz, druhé to, čo ťa živí ticho na pozadí.
 function CoFungovaloWeb({ rok, chat }: { rok: string; chat?: AssistantChat }) {
-  const clanky = MKT_CLANKY.filter((c) => c.rok === rok);
-  const vyrez = () => `Rok ${rok}\n` + tsv(["článok", "zobrazenia"], clanky.map((c) => [c.nazov, c.zobrazenia]));
+  // Rebríček z GA4 API je za STIAHNUTÉ OBDOBIE, nie po rokoch — riadky z neho
+  // majú prázdny rok. Kým sa dáta neťahali, boli rozdelené na 2025 a 2026
+  // a karta sa filtrovala rokom. Keď sú živé, filter by ju vyprázdnil.
+  const zive = MKT_CLANKY.some((c) => !c.rok);
+  const clanky = zive ? MKT_CLANKY : MKT_CLANKY.filter((c) => c.rok === rok);
+  const obdobie = zive ? "posledných 18 mesiacov (živé z GA4)" : `rok ${rok}`;
+  const vyrez = () => `${obdobie}\n` + tsv(["článok", "zobrazenia"], clanky.map((c) => [c.nazov, c.zobrazenia]));
   return (
     <Card>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-      <H3><Info text="Najčítanejšie články na webe podľa GA4. Servisné stránky (Domov, Služby, Kontakt) sú vynechané — zaujíma nás obsah." label="Čo fungovalo na webe" /></H3>
-      <Vysvetli chat={chat} titul="Čo fungovalo na webe" filter={`rok ${rok}`} vyrez={vyrez} />
+      <H3><Info text="Najčítanejšie stránky webu podľa GA4 — zobrazenia za stiahnuté obdobie. Servisné stránky (Domov, Kontakt, Služby, Cenník) sú vynechané: vyhrali by vždy a nič by tým nepovedali, lebo to nie sú témy, ktoré si niekto vybral, ale dvere, ktorými prejde každý." label="Čo fungovalo na webe" /></H3>
+      <Vysvetli chat={chat} titul="Čo fungovalo na webe" filter={obdobie} vyrez={vyrez} />
       </div>
       {clanky.length ? (
         <SortTable
@@ -722,13 +725,13 @@ function Vyhladavanie({ chat }: { chat?: AssistantChat }) {
       {tabulka(
         "Kde sa zobrazuješ, ale nikto neklikne",
         "Dopyty s veľa zobrazeniami a takmer nulovým preklikom. Znamená to, že Google web ukazuje, ale titulok alebo popis nezaujme — alebo je to dopyt, ktorý s tvojou službou nesúvisí a nemá zmysel oň bojovať. Toto je najlacnejšia práca v SEO: text už existuje, mení sa len nadpis.",
-        GSC_PRILEZITOSTI,
+        prilezitosti(GSC_DOPYTY as unknown as Dopyt[]),
       )}
 
       {tabulka(
         "Dopyty so zámerom kúpiť",
         "Presne tie dopyty, ktoré píše človek, čo hľadá tréning v Brne — nie encyklopédiu. Sem patria tvoji budúci klienti.",
-        GSC_LOKALNE,
+        soZamerom(GSC_DOPYTY as unknown as Dopyt[]),
       )}
 
       <Card>
@@ -763,9 +766,9 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
   useEffect(() => {
     void fetch("/api/marketing", { credentials: "same-origin" })
       .then((r) => r.json())
-      .then((j: { mesacne?: MktMesiac[]; top?: MktKus[]; ga4?: Ga4Mesiac[]; gscMesacne?: GscMesiac[]; gscDopyty?: GscDopyt[]; gscStrany?: GscStrana[] }) => {
+      .then((j: { mesacne?: MktMesiac[]; top?: MktKus[]; ga4?: Ga4Mesiac[]; gscMesacne?: GscMesiac[]; gscDopyty?: GscDopyt[]; gscStrany?: GscStrana[]; ga4Strany?: { url: string; zobrazenia: number }[]; gscZariadenia?: { zariadenie: string; kliky: number; zobrazenia: number }[] }) => {
         const a = nastavMarketingZImportu(j.mesacne || [], j.top || []);
-        const b = nastavWebZImportu(j.ga4 || [], j.gscMesacne || [], j.gscDopyty || [], j.gscStrany || []);
+        const b = nastavWebZImportu(j.ga4 || [], j.gscMesacne || [], j.gscDopyty || [], j.gscStrany || [], j.ga4Strany || [], j.gscZariadenia || []);
         if (a || b) tik((x) => x + 1);
       })
       .catch(() => {});

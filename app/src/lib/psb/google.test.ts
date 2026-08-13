@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { ga4Mesiace, gscMesiace, gscRebricek, mesiacZGa4, narokyJwt, normProperty, normSite, odKedy, zhrnutieWebu } from "./google";
+import { ga4Mesiace, gscMesiace, gscRebricek, mesiacZGa4, narokyJwt, normProperty, normSite, odKedy, prilezitosti, soZamerom, clanky, zariadenia, ga4Strany, zhrnutieWebu } from "./google";
 
 const kanal = (mesiac: string, kanal: string, novi: number) =>
   ({ dimensionValues: [{ value: mesiac }, { value: kanal }], metricValues: [{ value: String(novi) }] });
@@ -178,5 +178,65 @@ describe("zhrnutie webu", () => {
   it("prázdne obdobie nevyrobí vetu", () => {
     expect(zhrnutieWebu([])).toBe("");
     expect(zhrnutieWebu([m("2026-04", 0, 0, { chyba: true })])).toBe("");
+  });
+});
+
+describe("odvodené pohľady na vyhľadávanie", () => {
+  const d = (dopyt: string, kliky: number, zobrazenia: number, ctr: number, pozicia = 5) =>
+    ({ dopyt, kliky, zobrazenia, ctr, pozicia });
+
+  it("príležitosť je veľa videní a takmer žiadny preklik", () => {
+    const v = prilezitosti([
+      d("fasce", 2, 3959, 0.05),
+      d("anatomické vlaky", 148, 962, 15.38),   // klikajú → nie je to príležitosť
+      d("scm sval", 0, 659, 0),
+      d("okrajová téma", 0, 40, 0),             // málo videní → nestojí za obsah
+    ]);
+    expect(v.map((x) => x.dopyt)).toEqual(["fasce", "scm sval"]);
+  });
+
+  it("dopyt so zámerom kúpiť pozná trénera aj Brno", () => {
+    const v = soZamerom([
+      d("osobní trenér brno", 2, 8, 25),
+      d("fascie", 0, 5000, 0),
+      d("individuální trénink", 0, 9, 0),
+    ]);
+    expect(v.map((x) => x.dopyt)).toEqual(["individuální trénink", "osobní trenér brno"]);
+  });
+
+  it("články vynechajú servisné stránky", () => {
+    const v = clanky([
+      { url: "/", kliky: 405, zobrazenia: 9000 },
+      { url: "/kontakt/", kliky: 10, zobrazenia: 800 },
+      { url: "/spiral-line/", kliky: 120, zobrazenia: 700 },
+      { url: "https://www.prosapiens.cz/fascie/?utm=x", kliky: 90, zobrazenia: 600 },
+    ]);
+    expect(v.map((x) => x.url)).toEqual(["/spiral-line/", "https://www.prosapiens.cz/fascie/?utm=x"]);
+  });
+
+  it("zariadenia sa preložia a zoradia podľa klikov", () => {
+    const v = zariadenia({ rows: [
+      { keys: ["DESKTOP"], clicks: 861, impressions: 40348 },
+      { keys: ["MOBILE"], clicks: 1459, impressions: 57035 },
+      { keys: ["TABLET"], clicks: 0, impressions: 0 },
+    ] });
+    expect(v.map((x) => x.zariadenie)).toEqual(["Mobil", "Stolný počítač"]);
+    expect(v[0].kliky).toBe(1459);
+  });
+
+  it("stránky z GA4 idú od najčítanejšej", () => {
+    const v = ga4Strany({ rows: [
+      { dimensionValues: [{ value: "/a/" }], metricValues: [{ value: "10" }] },
+      { dimensionValues: [{ value: "/b/" }], metricValues: [{ value: "90" }] },
+      { dimensionValues: [{ value: "" }], metricValues: [{ value: "5" }] },
+    ] });
+    expect(v.map((x) => x.url)).toEqual(["/b/", "/a/"]);
+  });
+
+  it("prázdny vstup nevyrobí nič a nepadne", () => {
+    expect(prilezitosti([])).toEqual([]);
+    expect(soZamerom([])).toEqual([]);
+    expect(clanky([])).toEqual([]);
+    expect(zariadenia({})).toEqual([]);
   });
 });

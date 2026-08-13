@@ -6,10 +6,11 @@
 // deprecated field (e.g. capacity.effHours is reference-only, NOT what the card shows).
 import { PNL, VZAS_MONTHS, pnlCalc, poslednyMesiacSDatami } from "./vzas";
 import {
-  GA4_MESACNE, GSC_DOPYTY, GSC_LOKALNE, GSC_MESACNE, GSC_PRILEZITOSTI, GSC_STRANY,
+  GA4_MESACNE, GSC_DOPYTY, GSC_MESACNE, GSC_STRANY,
   MKT_CLANKY, MKT_MESACNE,
 } from "./marketing";
 import { MKT_OBSAH } from "./marketing-obsah";
+import { prilezitosti, soZamerom } from "./google";
 import {
   cenaZaSedenie,
   kotvaDat,
@@ -453,8 +454,8 @@ export function buildAiContext(
         poznamka: "Google Search Console. „prilezitosti“ = veľa zobrazení, takmer žiadne kliky — téma, na ktorú sa už zobrazujeme, ale nikto neklikne; tam je najlacnejší obsah.",
         mesacne: GSC_MESACNE,
         topDopyty: GSC_DOPYTY.slice(0, 20),
-        prilezitosti: GSC_PRILEZITOSTI,
-        lokalne: GSC_LOKALNE.slice(0, 8),
+        prilezitosti: prilezitosti(GSC_DOPYTY),
+        lokalne: soZamerom(GSC_DOPYTY, 8),
         topStrany: GSC_STRANY.slice(0, 12),
       },
       clanky: MKT_CLANKY.slice(0, 15),

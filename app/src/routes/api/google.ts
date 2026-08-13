@@ -5,7 +5,7 @@ import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 import {
-  ga4Mesiace, gscMesiace, gscRebricek, narokyJwt, normProperty, normSite, odKedy,
+  ga4Mesiace, ga4Strany, gscMesiace, gscRebricek, narokyJwt, normProperty, normSite, odKedy, zariadenia,
 } from "../../lib/psb/google";
 
 /**
@@ -261,6 +261,24 @@ export const Route = createFileRoute("/api/google")({
                   ).bind(m.mesiac, m.novi, m.organicSearch, m.paidSocial, m.organicSocial, m.direct, m.referral, m.udalosti, now).run();
                 }
                 hlasky.push(`GA4: ${riadky.length} mesiacov${udalosti.ok ? "" : " (bez kľúčových udalostí)"}`);
+
+                // Najčítanejšie stránky. Snímka za obdobie — starý rebríček sa
+                // zahodí celý, dva rebríčky z rôznych období sa zlúčiť nedajú.
+                const str = await post(GA4(property), t.token, {
+                  dateRanges: [{ startDate: od, endDate: do_ }],
+                  dimensions: [{ name: "pagePath" }], metrics: [{ name: "screenPageViews" }], limit: 300,
+                });
+                if (!str.ok) chyby.push(`GA4 (stránky): ${str.chyba}`);
+                else {
+                  const rs = ga4Strany(str.data || {});
+                  await DB.prepare("DELETE FROM ga4_strany").run();
+                  const st = rs.map((x) => DB.prepare(
+                    `INSERT INTO ga4_strany (url, zobrazenia, updated_at) VALUES (?1,?2,?3)
+                     ON CONFLICT(url) DO UPDATE SET zobrazenia=?2, updated_at=?3`,
+                  ).bind(x.url, x.zobrazenia, now));
+                  for (let i = 0; i < st.length; i += 40) await DB.batch(st.slice(i, i + 40));
+                  hlasky.push(`stránok webu: ${rs.length}`);
+                }
               }
             }
 
@@ -294,6 +312,22 @@ export const Route = createFileRoute("/api/google")({
                   ).bind(x.kluc, x.kliky, x.zobrazenia, x.ctr, x.pozicia, now));
                   for (let i = 0; i < stmts.length; i += 40) await DB.batch(stmts.slice(i, i + 40));
                   hlasky.push(`${rozmer === "query" ? "dopytov" : "strán"}: ${riadky.length}`);
+                }
+                // Podiel mobilu — jediné číslo, ktoré z toho čítame, ale bez
+                // neho by karta o zariadeniach ostala natvrdo z roku 2025.
+                const zar = await post(GSC(site), t.token, {
+                  startDate: od, endDate: do_, dimensions: ["device"], rowLimit: 10,
+                });
+                if (!zar.ok) chyby.push(`Search Console (zariadenia): ${zar.chyba}`);
+                else {
+                  const zs = zariadenia(zar.data || {});
+                  await DB.prepare("DELETE FROM gsc_zariadenia").run();
+                  for (const z of zs) {
+                    await DB.prepare(
+                      `INSERT INTO gsc_zariadenia (zariadenie, kliky, zobrazenia, updated_at) VALUES (?1,?2,?3,?4)
+                       ON CONFLICT(zariadenie) DO UPDATE SET kliky=?2, zobrazenia=?3, updated_at=?4`,
+                    ).bind(z.zariadenie, z.kliky, z.zobrazenia, now).run();
+                  }
                 }
                 hlasky.push(`Search Console: ${mes.length} mesiacov`);
               }
