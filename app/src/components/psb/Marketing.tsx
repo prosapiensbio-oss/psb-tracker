@@ -786,7 +786,7 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
           { id: "kanaly", label: "Soc. siete" },
           { id: "obsah", label: "Reels & posty" },
           { id: "web", label: "Web a Google" },
-          { id: "mail", label: "E-mail" },
+          { id: "mail", label: "Mailer" },
           // Algoritmus tu bol záložkou a Jerry ju 12. 8. zrušil: čítal ju
           // dvakrát a odvtedy nie. Dáta žijú ďalej — sťahujú sa každú noc
           // a idú Jarvisovi do kontextu, lebo pri plánovaní obsahu rozhodujú.
