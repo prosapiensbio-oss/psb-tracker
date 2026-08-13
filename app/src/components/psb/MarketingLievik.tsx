@@ -74,6 +74,26 @@ export type Kroky = {
   };
 };
 
+/**
+ * Nový klient = ten, kto po úvodnom tréningu prišiel ZNOVA.
+ *
+ * PREČO NIE „ZAPLATIL"
+ *
+ * Do 13. 8. tu stálo „má aspoň jednu platbu". Konverzia úvodný → klient vyšla
+ * z toho 100 % a Jerry sa spýtal, či to môže byť pravda. Nemohlo: úvodný
+ * tréning je PLATENÝ (1 100 Kč), takže platbu má každý, kto naň prišiel.
+ * Podmienka bola splnená okamihom, keď človek zaplatil za to, čo práve
+ * absolvoval — merala dochádzku, nie rozhodnutie pokračovať.
+ *
+ * V roku 2026 to znamenalo rozdiel medzi 35 z 35 a 27 z 35. Ôsmi ľudia majú
+ * presne jedno sedenie, jednu platbu 1 100 Kč v deň úvodného a odvtedy nič.
+ *
+ * Druhý tréning je prvý moment, kedy sa človek rozhodol na základe toho, čo
+ * zažil — a to je konverzia. Kto si kúpil balíček a ešte netrénoval, sa
+ * započíta až keď príde; radšej neskoro než nepravdivo.
+ */
+const jeKlient = (c: ClientAgg) => c.sessions.some((x) => x.sessionType !== "UVODNE");
+
 export function krokyZa(data: PSBData, clients: Record<string, ClientAgg>, mesiace: string[]): Kroky {
   const v = (d: string) => mesiace.includes(monthKey(d));
   const dopytyRiadky = data.leads.filter((l) => v(l.date));
@@ -87,19 +107,13 @@ export function krokyZa(data: PSBData, clients: Record<string, ClientAgg>, mesia
     if (!uvodneMapa.has(s.client)) uvodneMapa.set(s.client, s.date);
   }
   const uvodne = uvodneMapa.size;
-  // Nový KLIENT nie je každý, kto prišiel na úvodný tréning — je to ten, kto
-  // potom aj niečo zaplatil. Bez tohto rozlíšenia by konverzia úvodný → klient
-  // vždy vyšla 100 %, lebo úvodný tréning JE prvé sedenie a obe čísla by
-  // počítali tých istých ľudí.
   const novi = Object.values(clients).filter((c) => {
     // Kto sa vrátil po pauze, nie je nový klient. Bez toho vyšlo v roku 2026
     // o jedného nového viac než úvodných tréningov — Kateřina Stoklásková mala
     // úvodný v novembri 2022, ale dáta z PTmindera siahajú do januára 2025.
     if (c.vratenie) return false;
     if (!c.firstSession || !v(c.firstSession)) return false;
-    const zaplatil = data.payments.some((p) => p.client === c.name)
-      || c.sessions.some((x) => x.sessionType !== "UVODNE" && x.price > 0);
-    return zaplatil;
+    return jeKlient(c);
   });
   // Tržba z NOVÝCH klientov — nie celková. Celková tržba obsahuje aj obnovy
   // starých klientov a tie marketing nepriviedol.
@@ -109,9 +123,7 @@ export function krokyZa(data: PSBData, clients: Record<string, ClientAgg>, mesia
     .reduce((a, p) => a + p.amount, 0);
   // Dopyt → klient. Páruje sa podľa mena; e-mail v dopyte často chýba a
   // v klientoch nie je vôbec.
-  const platiaci = new Set(Object.values(clients)
-    .filter((c) => data.payments.some((p) => p.client === c.name) || c.sessions.some((x) => x.sessionType !== "UVODNE" && x.price > 0))
-    .map((c) => normName(c.name)));
+  const platiaci = new Set(Object.values(clients).filter(jeKlient).map((c) => normName(c.name)));
   const zDopytu = data.leads.filter((l) => v(l.date) && l.name && platiaci.has(normName(l.name))).length;
 
   const prvaPlatba = (meno: string) =>

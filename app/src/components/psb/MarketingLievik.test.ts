@@ -35,7 +35,10 @@ describe("dopyt → klient", () => {
   it("klient bez zapísaného dopytu konverziu nenafúkne", () => {
     // Presne prípad zo 124 %: dvaja platiaci klienti, jeden zapísaný dopyt.
     // Jana prišla z odporúčania a dopyt sa jej nikdy nezapísal.
-    const s = [session("Petra", "2026-01-10", "UVODNE"), session("Jana", "2026-01-12", "UVODNE")];
+    const s = [
+      session("Petra", "2026-01-10", "UVODNE"), session("Petra", "2026-01-17", "OFFLINE"),
+      session("Jana", "2026-01-12", "UVODNE"), session("Jana", "2026-01-19", "OFFLINE"),
+    ];
     const k = krokyZa(
       psb({
         leads: [lead("l1", "2026-01-05", "Petra")],
@@ -43,8 +46,8 @@ describe("dopyt → klient", () => {
         payments: [payment("Petra", "2026-01-20"), payment("Jana", "2026-01-22")],
       }),
       {
-        Petra: klient("Petra", "2026-01-10", [s[0]]),
-        Jana: klient("Jana", "2026-01-12", [s[1]]),
+        Petra: klient("Petra", "2026-01-10", [s[0], s[1]]),
+        Jana: klient("Jana", "2026-01-12", [s[2], s[3]]),
       },
       MES,
     );
@@ -56,7 +59,7 @@ describe("dopyt → klient", () => {
   });
 
   it("dopyt, z ktorého klient nebol, sa neráta", () => {
-    const s = [session("Petra", "2026-01-10", "UVODNE")];
+    const s = [session("Petra", "2026-01-10", "UVODNE"), session("Petra", "2026-01-17", "OFFLINE")];
     const k = krokyZa(
       psb({
         leads: [lead("l1", "2026-01-05", "Petra"), lead("l2", "2026-01-06", "Nikto Neprišiel")],
@@ -70,19 +73,38 @@ describe("dopyt → klient", () => {
     expect(k.zDopytu).toBe(1);
   });
 
-  it("kto prišiel na úvodný a nezaplatil, nie je konvertovaný dopyt", () => {
-    // Úvodný tréning nie je nákup. Bez tohto rozlíšenia vyjde konverzia vždy vysoká.
-    const s = [session("Petra", "2026-01-10", "UVODNE", 0)];
+  it("kto zaplatil ZA úvodný a už neprišiel, nie je klient", () => {
+    // Presne prípad, ktorý 13. 8. robil zo 100 % konverzie nezmysel: úvodný
+    // tréning je platený, takže „má platbu" spĺňal každý, kto naň prišiel.
+    // Osem ľudí v roku 2026 malo jedno sedenie, jednu platbu 1 100 Kč v deň
+    // úvodného a odvtedy nič.
+    const s = [session("Petra", "2026-01-10", "UVODNE", 1100)];
     const k = krokyZa(
-      psb({ leads: [lead("l1", "2026-01-05", "Petra")], sessions: s, payments: [] }),
+      psb({
+        leads: [lead("l1", "2026-01-05", "Petra")],
+        sessions: s,
+        payments: [payment("Petra", "2026-01-10", 1100)],
+      }),
       { Petra: klient("Petra", "2026-01-10", s) },
       MES,
     );
+    expect(k.uvodne).toBe(1);
+    expect(k.klienti).toBe(0);
     expect(k.zDopytu).toBe(0);
   });
 
+  it("druhý tréning je konverzia — vtedy sa človek rozhodol", () => {
+    const s = [session("Petra", "2026-01-10", "UVODNE", 1100), session("Petra", "2026-01-17", "OFFLINE")];
+    const k = krokyZa(
+      psb({ sessions: s, payments: [payment("Petra", "2026-01-10", 1100)] }),
+      { Petra: klient("Petra", "2026-01-10", s) },
+      MES,
+    );
+    expect(k.klienti).toBe(1);
+  });
+
   it("meno sa páruje bez ohľadu na diakritiku a veľké písmená", () => {
-    const s = [session("Tereza Nováková", "2026-01-10", "UVODNE")];
+    const s = [session("Tereza Nováková", "2026-01-10", "UVODNE"), session("Tereza Nováková", "2026-01-17", "OFFLINE")];
     const k = krokyZa(
       psb({
         leads: [lead("l1", "2026-01-05", "tereza novakova")],
