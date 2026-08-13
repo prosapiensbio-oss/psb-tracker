@@ -196,6 +196,18 @@ function SortTable<T extends Record<string, any>>({ riadky, stlpce, minWidth = 4
 // je zápis „tu sa stalo toto" a kreslí sa ako vlajka nad mesiacom, aby čísla
 // a ich príčiny stáli vedľa seba. Bez toho sa z grafov nedá učiť, čo funguje.
 //
+// ČO SEM PO NAPOJENÍ METY UŽ NEPATRÍ
+//
+// Odkedy Kokpit ťahá kampane z Marketing API (12. 8.), pozná každú platenú
+// kampaň aj s dátumami a výdavkom. Prepisovať ich sem ručne by znamenalo dve
+// verzie toho istého a otázku, ktorá platí. Ostáva presne to, o čom Meta
+// nevie a nikdy vedieť nebude: rozhodnutia („vypli sme reklamu"), veci mimo
+// Mety (prednáška, podcast, spolupráca, zmena ceny, nový web) a prestávky.
+//
+// Jediná uložená značka to ukazuje presne: „Vypnutá platená propagácia"
+// z 1. 8. Meta o vypnutí nevie — vráti prázdno, ktoré vyzerá rovnako ako
+// mesiac, na ktorý sa zabudlo.
+//
 // Ukladajú sa do vzas_settings (kľúč mkt_znacky) — je ich pár za rok, vlastná
 // tabuľka by bola viac kódu než úžitku. Zapísať ich vie aj Jarvis (akcia
 // mkt-znacka), takže „spustili sme kampaň" z rozhovoru skončí rovno v grafe.
@@ -224,10 +236,10 @@ function ZnackyBlok({ znacky, uloz, okno }: { znacky: MktZnacka[]; uloz: (z: Mkt
   return (
     <div style={{ marginTop: 10 }}>
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-        <span style={{ fontSize: 11, color: C.textDim }}>⚑ kampane & akcie — čo v tom čase bežalo</span>
+        <span style={{ fontSize: 11, color: C.textDim }}>⚑ čo sa stalo — to, o čom Meta nevie</span>
         <button onClick={() => setPridavam((v) => !v)}
           style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 6, padding: "2px 9px", color: C.accentLight, fontSize: 11, cursor: "pointer" }}>
-          {pridavam ? "zavrieť" : "+ kampaň / akcia"}
+          {pridavam ? "zavrieť" : "+ čo sa stalo"}
         </button>
       </div>
       {pridavam && (
@@ -236,7 +248,7 @@ function ZnackyBlok({ znacky, uloz, okno }: { znacky: MktZnacka[]; uloz: (z: Mkt
             style={{ padding: "4px 7px", borderRadius: 6, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 12 }} />
           <input value={text} onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter" && text.trim()) { void uloz([...znacky, { id: `z${Date.now().toString(36)}`, datum, text: text.trim() }]); setText(""); setPridavam(false); } }}
-            placeholder="napr. spustená Meta kampaň na reel o kolene"
+            placeholder="napr. prednáška v Brne · vypnutá reklama · zmena ceny · spolupráca"
             style={{ flex: 1, minWidth: 220, padding: "4px 8px", borderRadius: 6, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 12 }} />
           <button
             onClick={() => { if (text.trim()) { void uloz([...znacky, { id: `z${Date.now().toString(36)}`, datum, text: text.trim() }]); setText(""); setPridavam(false); } }}

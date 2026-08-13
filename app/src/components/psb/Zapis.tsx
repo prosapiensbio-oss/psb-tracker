@@ -103,12 +103,20 @@ export function ZapisButton({
     })),
     // Dopyty sa medzitým presťahovali z Marketingu do Klientov — rozcestník
     // ukazoval na starú adresu.
-    { nadpis: "Záver z debaty", popis: "Napíš Jarvisovi — záver si zapíše sám a objaví sa v registri.", tab: "dashboard" },
+    // Poradie je podľa toho, ako často sa to robí — nie podľa toho, kedy to
+    // vzniklo. Nový klient príde niekoľkokrát mesačne, značka v marketingu
+    // párkrát za rok, záver z debaty vtedy, keď debata bola.
     {
       nadpis: "Nový klient · úvodný tréning",
       popis: "Otvorí anamnézu v Google Forms. Do Kokpitu sa klient dostane sám z PTmindera; odtiaľto sa berie len to, odkiaľ sa o nás dozvedel.",
       odkaz: ANAMNEZA,
     },
+    {
+      nadpis: "Čo sa stalo v marketingu",
+      popis: "Vlajka nad grafom — prednáška, spolupráca, zmena ceny, vypnutá reklama. Platené kampane si Kokpit ťahá z Mety sám; sem patrí to, o čom Meta nevie.",
+      tab: "marketing", sub: "obsah",
+    },
+    { nadpis: "Záver z debaty", popis: "Napíš Jarvisovi — záver si zapíše sám a objaví sa v registri.", tab: "dashboard" },
   ];
 
   const chod = (p: Polozka) => {
