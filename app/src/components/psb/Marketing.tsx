@@ -31,7 +31,6 @@ import { Kampane } from "./Kampane";
 import { MarketingVrch } from "./MarketingVrch";
 import { ObsahZive } from "./ObsahZive";
 import { ObsahDopyt } from "./ObsahDopyt";
-import { Algoritmus } from "./Algoritmus";
 import { AkoMeratReklamu, Kohorta, Lievik, Naklady } from "./MarketingLievik";
 import { Kanaly } from "./Kanaly";
 import { C, mix, S } from "../../lib/psb/theme";
@@ -824,7 +823,10 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
           { id: "lievik", label: "Odkiaľ prišli klienti" },
           { id: "naklady", label: "Čo to stálo" },
           { id: "dosah", label: "Dosah a obsah" },
-          { id: "algoritmus", label: "Algoritmus" },
+          // Algoritmus tu bol záložkou a Jerry ju 12. 8. zrušil: čítal ju
+          // dvakrát a odvtedy nie. Dáta žijú ďalej — sťahujú sa každú noc
+          // a idú Jarvisovi do kontextu, lebo pri plánovaní obsahu rozhodujú.
+          // Karta sa dá vrátiť jedným riadkom, keby ju predsa chcel vidieť.
         ]}
         value={sub}
         onChange={setSub}
@@ -860,7 +862,6 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
           <CoFungovaloWeb rok={rok} chat={chat} />
         </>
       )}
-      {sub === "algoritmus" && <Algoritmus />}
     </>
   );
 }

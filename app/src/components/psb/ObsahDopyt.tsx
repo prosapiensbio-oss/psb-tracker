@@ -38,12 +38,18 @@ export function ObsahDopyt({ leads }: { leads: Lead[] }) {
   const [obsah, setObsah] = useState<Obsah[]>([]);
   const [obdobie, setObdobie] = useState("all");
   const [nacitane, setNacitane] = useState(false);
+  // Prázdna karta má povedať, ČI zlyhalo načítanie, alebo naozaj nie sú dáta.
+  // Prvá verzia chybu prehltla a vyzeralo to, akoby chýbali príspevky.
+  const [chyba, setChyba] = useState("");
 
   useEffect(() => {
     void fetch("/api/meta?co=obsah", { credentials: "same-origin" })
-      .then((r) => r.json())
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`server odpovedal ${r.status}`);
+        return r.json();
+      })
       .then((j: { obsah?: Obsah[] }) => setObsah(j.obsah || []))
-      .catch(() => {})
+      .catch((e) => setChyba(String(e?.message || e).slice(0, 120)))
       .finally(() => setNacitane(true));
   }, []);
 
@@ -72,7 +78,11 @@ export function ObsahDopyt({ leads }: { leads: Lead[] }) {
     return (
       <Card>
         <H3><Info label="Po čom nám niekto napísal" text="Spája dopyty s obsahom, ktorý vyšiel v predchádzajúcich dvoch týždňoch." /></H3>
-        <Empty>Nemám žiadny obsah s dátumom — nahraj Metricool alebo stiahni Instagram.</Empty>
+        <Empty>
+          {chyba
+            ? `Nepodarilo sa načítať obsah: ${chyba}. Skús obnoviť stránku (Cmd + Shift + R).`
+            : "Nemám žiadny príspevok s textom — bez textu sa nedá zaradiť. Nahraj Metricool alebo stiahni Instagram."}
+        </Empty>
       </Card>
     );
   }

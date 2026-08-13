@@ -145,11 +145,18 @@ export const Route = createFileRoute("/api/meta")({
             if (von.has(kluc) && zdroj !== "instagram") return;
             von.set(kluc, { datum: den, kategoria: kat, hook: String(r.hook || ""), dosah: Number(r.dosah) || 0, zdroj });
           };
+          // Príspevok bez textu a bez uloženej kategórie sa PRESKOČÍ.
+          //
+          // Zaradiť ho by znamenalo poslať ho do „Edukácie" — tam padne každý
+          // prázdny reťazec — a 265 príspevkov stiahnutých pred 12. 8. text
+          // nemá. Edukácia by tým narástla na 342 kusov a bola by pred
+          // každým dopytom aj pred každým dňom. Neznáme nie je edukácia.
           for (const r of (ig.results as R[]) || []) {
-            daj(r, "instagram", r.kategoria || kategoriaHooku(r.hook || "", mena));
+            const kat = r.kategoria || (r.hook ? kategoriaHooku(r.hook, mena) : "");
+            if (kat) daj(r, "instagram", kat);
           }
           for (const r of (mk.results as R[]) || []) {
-            daj(r, "metricool", kategoriaHooku(r.hook || "", mena));
+            if (r.hook) daj(r, "metricool", kategoriaHooku(r.hook, mena));
           }
           return Response.json({ ok: true, obsah: [...von.values()].sort((a, b) => b.datum.localeCompare(a.datum)) });
         }
