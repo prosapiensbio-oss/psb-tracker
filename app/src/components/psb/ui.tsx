@@ -408,7 +408,12 @@ export function MiniBars({
   );
 }
 
-export function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+export function Modal({ title, onClose, children, sirka = 440 }: {
+  title: string; onClose: () => void; children: ReactNode;
+  /** Šírka panela. Východzích 440 px sedí na potvrdenia a krátke formuláre;
+   *  rozbory, kde sú tabuľky vedľa seba, potrebujú celú obrazovku. */
+  sirka?: number | string;
+}) {
   // Portál do <body> z toho istého dôvodu ako pri vysvetlivkách: predok
   // s `backdrop-filter` (každá sklenená karta) sa stáva obalovým blokom pre
   // `position: fixed`, takže modál otvorený zvnútra karty by sa neroztiahol
@@ -432,7 +437,7 @@ export function Modal({ title, onClose, children }: { title: string; onClose: ()
         alignItems: "center",
         justifyContent: "center",
         zIndex: 999,
-        padding: 16,
+        padding: 12,
       }}
     >
       <div
@@ -444,7 +449,7 @@ export function Modal({ title, onClose, children }: { title: string; onClose: ()
           // ktorou sa nemá čítať — musí byť nepriehľadný.
           background: C.surface,
           boxShadow: "0 24px 64px rgba(0,0,0,.55)",
-          maxWidth: 440, width: "100%", marginBottom: 0, maxHeight: "90vh", overflowY: "auto",
+          maxWidth: sirka, width: "100%", marginBottom: 0, maxHeight: "92vh", overflowY: "auto",
         }}
       >
         <div style={{ ...S.h3, marginBottom: 14 }}>{title}</div>

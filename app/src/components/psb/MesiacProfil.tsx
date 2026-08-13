@@ -161,8 +161,10 @@ export function MesiacProfil({ mesiac, kanaly, data, clients, chat, onClose }: {
     ].join("\n"));
   };
 
+  // Široké okno zámerne: rozbor má vedľa seba dlaždice aj dve tabuľky a
+  // v stĺpci na 440 px by sa rolovalo cez tri obrazovky.
   return (
-    <Modal title={`Mesiac ${monthLabel(mesiac)}`} onClose={onClose}>
+    <Modal title={`Mesiac ${monthLabel(mesiac)}`} onClose={onClose} sirka="min(1240px, 97vw)">
       {/* ── čísla mesiaca proti bežnému ─────────────────────────────────── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(148px, 1fr))", gap: 10 }}>
         {metriky.filter((m) => m.hodnota != null).map((m) => (
@@ -203,10 +205,14 @@ export function MesiacProfil({ mesiac, kanaly, data, clients, chat, onClose }: {
         </button>
       )}
 
-      {/* ── kampane ─────────────────────────────────────────────────────── */}
+      {/* Kampane a príspevky vedľa seba. Pod sebou zaberali dve obrazovky
+          a pritom sa čítajú spolu — „čo sme pustili a čo sme za to zaplatili".
+          Pri úzkom okne sa mriežka sama zloží pod seba. */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(470px, 1fr))", gap: 18, alignItems: "start" }}>
+      <div>
       <Nadpis>Kampane ({kampaneMes.length})</Nadpis>
       {kampaneMes.length === 0 ? <Nic>V tomto mesiaci nebežala žiadna kampaň.</Nic> : (
-        <RolovaciaTabulka pocet={3}>
+        <RolovaciaTabulka pocet={5}>
           <thead>
             <tr>
               <th style={{ ...S.th, textAlign: "left" }}>Kampaň</th>
@@ -230,10 +236,11 @@ export function MesiacProfil({ mesiac, kanaly, data, clients, chat, onClose }: {
         </RolovaciaTabulka>
       )}
 
-      {/* ── príspevky ───────────────────────────────────────────────────── */}
+      </div>
+      <div>
       <Nadpis>Príspevky na Instagrame ({prispevky.length})</Nadpis>
       {prispevky.length === 0 ? <Nic>Za tento mesiac nemám z Instagram API žiadny príspevok.</Nic> : (
-        <RolovaciaTabulka pocet={3}>
+        <RolovaciaTabulka pocet={5}>
           <thead>
             <tr>
               <th style={{ ...S.th, textAlign: "left" }}>Príspevok</th>
@@ -246,9 +253,12 @@ export function MesiacProfil({ mesiac, kanaly, data, clients, chat, onClose }: {
           <tbody>
             {prispevky.map((p) => (
               <tr key={p.id}>
-                <td style={{ ...S.td, color: C.text, maxWidth: 300 }}>
-                  <a href={p.permalink} target="_blank" rel="noreferrer" style={{ color: C.text, textDecoration: "none" }}>
-                    {p.hook || "(bez textu)"}
+                <td style={{ ...S.td, color: C.text, maxWidth: 420 }}>
+                  {/* Sto znakov stačí na rozpoznanie príspevku. Celý text
+                      roztiahol riadok na tri a tabuľka sa nedala prečítať. */}
+                  <a href={p.permalink} target="_blank" rel="noreferrer" title={p.hook}
+                    style={{ color: C.text, textDecoration: "none" }}>
+                    {p.hook ? (p.hook.length > 100 ? `${p.hook.slice(0, 100)}…` : p.hook) : "(bez textu)"}
                   </a>
                   <div style={{ fontSize: 10.5, color: C.textDim }}>{p.datum} · {p.typ}</div>
                 </td>
@@ -261,6 +271,9 @@ export function MesiacProfil({ mesiac, kanaly, data, clients, chat, onClose }: {
           </tbody>
         </RolovaciaTabulka>
       )}
+
+      </div>
+      </div>
 
       {/* ── dopyty a klienti ────────────────────────────────────────────── */}
       <Nadpis>Dopyty ({lievik.dopyty.length}) a noví klienti ({lievik.novi.length})</Nadpis>
@@ -290,7 +303,9 @@ function Dlazdica({ label, hodnota, odchylka, farba }: { label: string; hodnota:
       <div style={{ fontSize: 19, fontWeight: 700, color: farba || C.text, fontVariantNumeric: "tabular-nums" }}>{hodnota}</div>
       <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>{label}</div>
       {odchylka != null && Math.abs(odchylka) >= 1 && (
-        <div style={{ fontSize: 11, marginTop: 3, color: dobre ? C.green : C.orange }}>
+        // Rast zelený, pokles ČERVENÝ. Oranžová znamenala „pozor", nie „horšie",
+        // a pri poklese to čítal ako varovanie namiesto výsledku.
+        <div style={{ fontSize: 11, marginTop: 3, color: dobre ? C.green : C.red }}>
           {dobre ? "▲" : "▼"} {Math.abs(Math.round(odchylka))} % oproti bežnému mesiacu
         </div>
       )}
