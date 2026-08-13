@@ -195,6 +195,7 @@ const useIzomorfnyLayout = typeof window === "undefined" ? useEffect : useLayout
 export function useRolovanie(pocet: number, zavislost?: unknown) {
   const ref = useRef<HTMLDivElement>(null);
   const [vyska, setVyska] = useState<number>();
+  const [skrytych, setSkrytych] = useState(0);
   // Rolovanie je na to, aby karta pod tabuľkou nebola o obrazovku nižšie.
   // Občas ale treba vidieť celok naraz — porovnať prvý riadok s posledným sa
   // v okienku na tri riadky nedá. Prepínač žije tu, nie v komponentoch, aby
@@ -210,11 +211,12 @@ export function useRolovanie(pocet: number, zavislost?: unknown) {
       const riadky = el.querySelectorAll<HTMLElement>("tbody tr");
       // `pocet = 0` znamená „ukáž všetko" (rozbalené tlačidlom). Bez tejto
       // vetvy by sa siahalo na riadok číslo -1 a meranie by spadlo.
-      if (efektivny <= 0 || riadky.length <= efektivny) return setVyska(undefined);
+      if (efektivny <= 0 || riadky.length <= efektivny) { setSkrytych(0); return setVyska(undefined); }
       const hlavicka = el.querySelector("thead")?.getBoundingClientRect().height ?? 0;
       const hore = riadky[0].getBoundingClientRect().top;
       const dole = riadky[efektivny - 1].getBoundingClientRect().bottom;
       setVyska(Math.round(hlavicka + (dole - hore)) + 2);
+      setSkrytych(riadky.length - efektivny);
     };
     zmeraj();
     // Obsah dochádza asynchrónne (fetch) a karta sa dá zúžiť — bez sledovania
@@ -227,7 +229,19 @@ export function useRolovanie(pocet: number, zavislost?: unknown) {
   return {
     ref,
     /** Ide priamo do `style` rolovacieho obalu. */
-    styl: { overflowX: "auto", overflowY: vyska ? "auto" : "visible", maxHeight: vyska } as CSSProperties,
+    /**
+     * `overflowY: hidden`, NIE `auto`.
+     *
+     * Kým sa tabuľka rolovala vnútri, chytala koliesko myši: Jerry roloval
+     * stránku, kurzor mu prešiel cez tabuľku a stránka zastala, lebo sa začala
+     * rolovať tabuľka. To je pasca, ktorú nespôsobí nič, čo človek urobí
+     * zámerne — a nedá sa z nej vycúvať inak než odtiahnutím myši bokom.
+     *
+     * Zvyšok riadkov je za tlačidlom „rozbaliť". Stratí sa tým možnosť
+     * prezrieť celý zoznam bez posunutia stránky; to je lacnejšia cena než
+     * rolovanie, ktoré sa zasekáva.
+     */
+    styl: { overflowX: "auto", overflowY: vyska ? "hidden" : "visible", maxHeight: vyska } as CSSProperties,
     trieda: "psb-rolovacia",
     /**
      * Musí ísť do `style` samotnej `<table>`, NIE do CSS triedy.
@@ -262,7 +276,7 @@ export function useRolovanie(pocet: number, zavislost?: unknown) {
           color: C.textMuted, fontSize: 11.5, fontFamily: "inherit",
         }}>
         <span style={{ fontSize: 9, display: "inline-block", transform: cele ? "rotate(90deg)" : "none", transition: "transform .12s" }}>▶</span>
-        {cele ? "zbaliť" : "rozbaliť celý zoznam"}
+        {cele ? "zbaliť" : `rozbaliť celý zoznam${skrytych > 0 ? ` (+${skrytych})` : ""}`}
       </button>
     ),
     stylTag: (
