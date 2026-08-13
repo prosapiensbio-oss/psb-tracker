@@ -25,9 +25,14 @@ const pct = (a: number, b: number) => (b > 0 && a <= b ? Math.round((a / b) * 10
 
 // Zoznam období je spoločný — viď lib/psb/obdobia.ts.
 
-/** „2026-08-11" → „11. 8." — v zozname mien je rok šum. */
+/**
+ * „2026-08-11" → „11. 8." — v zozname mien je rok šum.
+ *
+ * Dátumy zo sedení chodia ako celé ISO („2026-08-06T00:00:00.000Z"), nie ako
+ * holý deň. Prvá verzia to nečakala a vypísala celý reťazec aj s časom a Z.
+ */
 const fmtDen = (d: string) => {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d);
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(d || "");
   return m ? `${Number(m[3])}. ${Number(m[2])}.` : d || "—";
 };
 
@@ -161,7 +166,9 @@ export function krokyZa(data: PSBData, clients: Record<string, ClientAgg>, mesia
         .filter(([meno]) => !(clients[meno]?.sessions || []).some((x) => x.sessionType !== "UVODNE"))
         .map(([meno, datum]) => ({
           meno, datum,
-          dni: Math.max(0, Math.round((Date.now() - Date.parse(`${datum}T12:00:00Z`)) / 86400000)),
+          // Dátum môže prísť ako celé ISO — pripojiť k nemu ďalší čas vyrobí
+          // neplatný dátum a z neho „pred NaN dňami".
+          dni: Math.max(0, Math.round((Date.now() - Date.parse(`${datum.slice(0, 10)}T12:00:00Z`)) / 86400000)),
           trener: trenerUvodneho.get(meno) || "",
           preco: (clients[meno]?.precoNeprisiel || "").trim(),
         }))
@@ -176,12 +183,24 @@ export function krokyZa(data: PSBData, clients: Record<string, ClientAgg>, mesia
  * Dôvod sa zapisuje v deň, keď je ešte v hlave. O mesiac ho nikto nezopakuje
  * a osem jednotlivých príbehov sa nikdy nespojí do vzorca.
  */
+/**
+ * Dokedy sa návrat po úvodnom ešte dá čakať.
+ *
+ * Tá istá hranica, akú používa register (compute.ts). Dve rôzne čísla by
+ * znamenali, že appka sa na jednej obrazovke pýta a na druhej mlčí.
+ */
+const DNI_NA_NAVRAT = 21;
+
 function StrataRiadok({ x, onPoznamka }: {
   x: { meno: string; datum: string; dni: number; trener: string; preco: string };
   onPoznamka?: (meno: string, text: string) => void;
 }) {
   const [text, setText] = useState(x.preco);
   const [ulozene, setUlozene] = useState(false);
+  // Kto bol na úvodnom pred pár dňami, ešte len hľadá termín. Pýtať sa naňho
+  // „prečo neprišiel" je predčasné — a zapísaný dôvod by ho navyše umlčal
+  // v registri skôr, než sa vôbec stihol vrátiť.
+  const cerstvy = x.dni < DNI_NA_NAVRAT && !x.preco;
   const uloz = () => {
     const t = text.trim();
     if (!onPoznamka || t === x.preco.trim()) return;
@@ -190,7 +209,7 @@ function StrataRiadok({ x, onPoznamka }: {
     setTimeout(() => setUlozene(false), 2500);
   };
   return (
-    <div style={{ borderLeft: `2px solid ${x.preco ? C.green : mix(C.orange, 55)}`, paddingLeft: 9 }}>
+    <div style={{ borderLeft: `2px solid ${x.preco ? C.green : x.dni < DNI_NA_NAVRAT ? mix(C.text, 25) : mix(C.orange, 55)}`, paddingLeft: 9 }}>
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 12.5 }}>
         <span style={{ color: C.text, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {x.meno}
@@ -200,7 +219,11 @@ function StrataRiadok({ x, onPoznamka }: {
           úvodný {fmtDen(x.datum)} · pred {x.dni} dňami
         </span>
       </div>
-      {onPoznamka && (
+      {cerstvy ? (
+        <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 3 }}>
+          Ešte môže prísť — na termín býva pár týždňov. Dôvod sa pýta až po {DNI_NA_NAVRAT} dňoch.
+        </div>
+      ) : onPoznamka && (
         <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 4 }}>
           <input
             value={text}

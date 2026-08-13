@@ -219,3 +219,19 @@ describe("kto sa stratil po úvodnom", () => {
     expect(k.kto.nepokracovali).toEqual([]);
   });
 });
+
+describe("dátumy zo sedení chodia ako celé ISO", () => {
+  it("dni sa spočítajú aj z ISO s časom — nie NaN", () => {
+    const s = [{ ...session("Petra", "2026-01-10", "UVODNE"), date: "2026-01-10T00:00:00.000Z" }];
+    const k = krokyZa(psb({ sessions: s }), { Petra: klient("Petra", "2026-01-10", s) }, ["2026-01"]);
+    const x = k.kto.nepokracovali[0];
+    expect(Number.isFinite(x.dni)).toBe(true);
+    expect(x.dni).toBeGreaterThan(0);
+  });
+
+  it("tréner úvodného sa nesie so záznamom", () => {
+    const s = [{ ...session("Petra", "2026-01-10", "UVODNE"), sessionTrainer: "Terezka" }];
+    const k = krokyZa(psb({ sessions: s }), { Petra: klient("Petra", "2026-01-10", s) }, MES);
+    expect(k.kto.nepokracovali[0].trener).toBe("Terezka");
+  });
+});
