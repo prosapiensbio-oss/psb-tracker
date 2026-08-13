@@ -46,9 +46,6 @@ import { krokyZa, oknoMesiacov } from "./MarketingLievik";
  * v tejto appke opakovala už pri grafoch aj pri cene sedenia.
  */
 
-/** Claude Project, ktorý z Jarvisovho zadania vyrába captiony a scenáre. */
-const CLAUDE_PROJECT = "https://claude.ai/cowork/project/019cce4d-b3a1-7147-bbbb-15dbb2aa0008";
-
 type Metrika = {
   kluc: string;
   nazov: string;
