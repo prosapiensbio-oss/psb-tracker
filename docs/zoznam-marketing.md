@@ -16,6 +16,7 @@ Poradie v každej časti je podľa pomeru úžitok / práca.
 | MailerLite | odberatelia, skupiny a kampane; podkategória „Mailer“ |
 | GA4 + Search Console cez servisný účet | jeden kľúč, obe služby; píše do tabuliek ručného importu. GA4 property 355422977, web `https://www.prosapiens.cz/` |
 | Nemerané mesiace prežijú import | apríl a máj 2026 GA4 nemeralo; značka sa už neprepíše a Jarvis ju dostáva menovite |
+| Lead na ďakovnej stránke hlási Mete Lead, nie ViewContent | udalosť bola nastavená a zapnutá od 12. 8., ale posielala sa ako `ViewContent`. Jeden rozbaľovací zoznam — preto Events Manager nikdy nevidel Lead |
 | Strážca merania: web beží, ale GA4 ho nemeria | porovnáva GA4 proti Search Console; hlási, len keď jedno drží a druhé spadne o rád |
 | Veta pod grafom kanálov sa počíta | bola napísaná natvrdo a tvrdila „~280 nových mesačne“ aj potom, čo to prestalo platiť |
 | Cena za dopyt počítaná z dopytov, nie z Metiných konverzií | ukazovala 20 Kč z konverzií pixelu; za 12 mesiacov nemá ani jeden dopyt zdroj „reklama“, takže je tam pomlčka a dôvod |
@@ -50,17 +51,6 @@ Potvrdené: **MailerLite**, nie mailer.com.
 
 Treba: API kľúč z MailerLite (vkladá sa v appke, nie cez chat).
 
-### B3 · Metricool API — len fronta naplánovaných príspevkov
-**Oprava predchádzajúceho odporúčania.** Graph API dáva, čo sa STALO.
-Nedáva, čo je NAPLÁNOVANÉ — a to Metricool vie ako jediný.
-
-Odporúčané rozdelenie:
-- **Naplánované príspevky** → z Metricoolu, ak to tarif dovolí.
-- **Najlepšie časy** → dopočítať z vlastných dát (hodina publikovania verzus
-  dosah). Presnejšie než odporúčanie Metricoolu, lebo je to o tomto publiku.
-  Vyžaduje uložiť pri príspevku aj hodinu — dnes sa ukladá len dátum.
-
-Treba: potvrdiť, či tarif obsahuje API.
 
 ---
 
@@ -90,33 +80,32 @@ Zámerne posledné: kým nefunguje meranie, nie je čo optimalizovať.
 
 | | prečo je to na tebe |
 |---|---|
-| **Token pre Conversions API** | Kokpit má funkciu hotovú a nečinnú |
+| Token pre Conversions API v Kokpite | **nie je súrne.** WordPress už posiela Lead serverom cez PixelYourSite. Kokpitov vlastný CAPI by pridal len dopyty, ktoré neprešli webom — telefonát, správa na Instagrame |
 | **UTM do adries reklám** | `utm_campaign={{campaign.name}}` — blokuje celý reťazec kampaň → klient |
-| **Potvrdiť doménu** v Events Manageri | visí od 3. 6. |
+| **Potvrdiť doménu** v Events Manageri | na webe nie je overovací meta tag; ak si overoval cez DNS, je to hotové a stačí mi povedať |
 | **Septembrová kampaň s cieľom Lead** | bez toho sa nemeria nič |
 | **450 mailov** | nie je to úloha, je to možnosť. Jerry píše, len keď má čo povedať — a má pravdu. Návrh na mail musí začínať tým, čo tí ľudia dostanú, nie tým, koľko ich je |
-| **Lead na formulári v PixelYourSite** | plugin to už vie, len to nemá zapnuté — do Mety chodí iba PageView (pixel 3288091694795887). Spolu s UTM odblokuje reťazec kampaň → klient |
 | Premenovať mŕtve pixely | kozmetika |
 
 ---
 
 ## E · Rozhodnuté, že sa nerobí
 
-- **Brand stratég** — funguje bez toho.
-- **Copywriter, grafik a video v Kokpite** — výroba žije v Claude Projecte,
-  Higgsfielde a Canve. Kokpit dodáva zadanie a meranie.
-- **Web developer** — WordPress je WordPress.
-- **PR** — nemá dosť objemu na to, aby to bola rola.
-- **Metricool ako zdroj výsledkov** — Graph API je priamejší. Metricool
-  zostáva len na to, čo API nedáva (plán, TikTok, Threads).
+| | |
+|---|---|
+| Metricool API | tarifa ho neobsahuje. Zrušené 13. 8. |
+| Analýza videa (typ sandcastles.ai) | nahradené klasifikáciou hákov a „obsah → dopyt“. Zrušené 13. 8. |
+| Brand stratég, copywriting, grafika, web developer, PR | rieši Claude Project. Zrušené 13. 8. |
+
 
 ---
 
 ## Poradie, ktoré navrhujem
 
-1. **MailerLite** — odomkne meranie formulára na `/dychani`, teda prvú položku
-   tvojho vlastného zoznamu otvorených úloh.
-2. **Google API** (Search Console + GA4) — koniec ručných exportov a konečne
-   vidno, kde ľudia odpadávajú.
+MailerLite aj Google API sú od 13. 8. hotové. Zostáva:
+
+1. **UTM do adries reklám** — jediná vec, ktorá ešte blokuje reťazec kampaň → klient.
+   Lead na ďakovnej stránke už Mete chodí správne.
+2. **Živé dáta do troch kariet na Web a Google**, ktoré ešte ukazujú rok 2025.
 3. **Hodina publikovania + plánovanie obsahu.**
-4. **Kampane s poistkou** — až keď meranie funguje.
+4. **Kampane s poistkou** — až keď septembrový test ukáže cenu za dopyt.
