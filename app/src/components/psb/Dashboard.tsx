@@ -1609,20 +1609,17 @@ export function Dashboard({
     ) : null
   ) : (
     <Card style={{ marginBottom: 12 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
-        <H3>
-          <Info
-            text="Zoznam vecí na akciu. Červené sú tie, kde sa niečo pokazí, ak sa nič nespraví — tie sú vidieť vždy. Zvyšok je pracovný zoznam a je za jedným klikom, aby dôležité veci nezanikli v množstve bežných. Debatovať o nich vieš aj s Jarvisom."
-            label={kriticke.length ? `Vyžaduje akciu (${kriticke.length})` : `Na čo sa pozrieť (${bezne.length})`}
-          />
-        </H3>
-        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-          {acked.length > 0 && (
-            <button onClick={() => setShowAcked(true)} style={{ background: "none", border: "none", color: C.textDim, fontSize: 12, cursor: "pointer" }}>
-              Skryté ({acked.length})
-            </button>
-          )}
-        </div>
+      {/* Nadpis tu nie je zámerne (Jerry, 13. 8.). Pás nad panelom už povedal
+          „Na čo sa pozrieť · 3 vyžaduje akciu · 19 ďalších vecí"; zopakovať to
+          o riadok nižšie znamená prečítať to isté dvakrát a k položkám sa
+          dostať o kus neskôr. Ostáva len to, čo pás nemá — skryté položky. */}
+      <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 12, marginBottom: 6 }}>
+        {acked.length > 0 && (
+          <button onClick={() => setShowAcked(true)} style={{ background: "none", border: "none", color: C.textDim, fontSize: 12, cursor: "pointer" }}>
+            Skryté ({acked.length})
+          </button>
+        )}
+        <Info text="Zoznam vecí na akciu. Červené sú tie, kde sa niečo pokazí, ak sa nič nespraví — tie stoja hore a sú vidieť vždy. Bežný zoznam je pod nimi za jedným klikom, aby dôležité veci nezanikli v množstve ostatných; keď nič naliehavé nie je, ukáže sa rovno. Debatovať o ktorejkoľvek položke vieš aj s Jarvisom cez „Odpovedať“." />
       </div>
 
       {kriticke.slice(0, VIDITELNYCH).map((r) => (
@@ -1634,12 +1631,16 @@ export function Dashboard({
         </div>
       )}
 
-      {registerExpanded && (
+      {/* Druhý klik má zmysel len vtedy, keď je nad čím — teda keď hore stoja
+          veci vyžadujúce akciu a bežný zoznam by ich prevalcoval. Keď žiadne
+          nie sú, schovávať bežné za ďalší klik znamená, že Jerry klikne dvakrát
+          a nič sa nedozvie. */}
+      {(registerExpanded || kriticke.length === 0) && (
         <>
           {kriticke.slice(VIDITELNYCH).map((r) => (
             <RegisterRow key={r.key} item={r} actions={actions} onNavigate={onNavigate} chat={assistantChat} />
           ))}
-          {bezne.length > 0 && (
+          {bezne.length > 0 && kriticke.length > 0 && (
             <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "12px 0 6px" }}>
               <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.1, textTransform: "uppercase", color: C.textDim }}>Bežný zoznam</span>
               <div style={{ flex: 1, height: 1, background: mix(C.border, 50) }} />
@@ -1651,7 +1652,7 @@ export function Dashboard({
         </>
       )}
 
-      {(bezne.length > 0 || kriticke.length > VIDITELNYCH) && (
+      {kriticke.length > 0 && (bezne.length > 0 || kriticke.length > VIDITELNYCH) && (
         <button
           onClick={() => setRegisterExpanded((v) => !v)}
           style={{ marginTop: 6, background: "none", border: "none", color: C.accentLight, fontSize: 12, cursor: "pointer", padding: "2px 0", fontWeight: 500 }}
