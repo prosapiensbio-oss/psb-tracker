@@ -777,7 +777,14 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
           { id: "dopyty", label: "Dopyty" },
           { id: "lievik", label: "Odkiaľ prišli klienti" },
           { id: "naklady", label: "Čo to stálo" },
-          { id: "dosah", label: "Dosah a obsah" },
+          // „Dosah a obsah" bola jedna záložka zlepená z dvoch obrazoviek:
+          // Instagram a vyhľadávanie. Hýbu sa inou rýchlosťou — reel žije dni,
+          // pozícia v Googli mesiace — a v jednom okne sa jedno z nich vždy
+          // čítalo zle. Kanály zostali zvlášť: sú jediný pohľad cez VŠETKY
+          // kanály naraz a bývaju v nich rozbory mesiaca.
+          { id: "kanaly", label: "Kanály" },
+          { id: "obsah", label: "Obsah" },
+          { id: "web", label: "Web a Google" },
           // Algoritmus tu bol záložkou a Jerry ju 12. 8. zrušil: čítal ju
           // dvakrát a odvtedy nie. Dáta žijú ďalej — sťahujú sa každú noc
           // a idú Jarvisovi do kontextu, lebo pri plánovaní obsahu rozhodujú.
@@ -807,9 +814,10 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
           <AkoMeratReklamu />
         </>
       )}
-      {sub === "dosah" && (
+      {sub === "kanaly" && <Kanaly data={data} clients={clients} chat={chat} />}
+
+      {sub === "obsah" && (
         <>
-          <Kanaly data={data} clients={clients} chat={chat} />
           <CoSomRobil chat={chat} />
           {/* Živé z Graph API hneď za tým, čo sa publikovalo, a pred ručnou
               tabuľkou. Obe odpovedajú na tú istú otázku z dvoch strán: táto sa
@@ -823,6 +831,11 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
               uloženia by ten slabší signál prevalcovali. */}
           <ObsahZive />
           <ObsahDopyt leads={leads} />
+        </>
+      )}
+
+      {sub === "web" && (
+        <>
           <Vyhladavanie chat={chat} />
           <WebKanaly rok={rok} onRok={setRok} chat={chat} />
           <CoFungovaloWeb rok={rok} chat={chat} />

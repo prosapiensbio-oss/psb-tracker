@@ -120,6 +120,9 @@ const TABS = [
   { id: "mesiac", label: "Mesiac", icon: "upload" },
 ];
 
+/** Staré podzáložky Marketingu → nové. Nikdy sa nemažú. */
+const MKT_ALIAS: Record<string, string> = { algoritmus: "kanaly", dosah: "obsah" };
+
 /** Staré adresy tabov → nové. Nikdy sa nemažú (pravidlo z 10. 8.). */
 const TAB_ALIAS: Record<string, string> = { vysledky: "mesiac", udaje: "mesiac" };
 
@@ -214,9 +217,9 @@ export function PSBApp() {
     }
     if (zal === "vzas" && pod) setVzasSub(pod);
     if (zal === "vysledky" && pod) setVysledkySub(pod);
-    // Algoritmus prestal byť záložkou; starý odkaz sa nemaže, len presmeruje
-    // (pravidlo z 10. 8. — staré adresy nikdy nekončia prázdnou obrazovkou).
-    if (zal === "marketing" && pod) setMarketingSub(pod === "algoritmus" ? "dosah" : pod);
+    // Staré adresy sa nemažú, len presmerujú (pravidlo z 10. 8.).
+    // „algoritmus" prestal byť záložkou, „dosah" sa rozdelil na tri.
+    if (zal === "marketing" && pod) setMarketingSub(MKT_ALIAS[pod] || pod);
   }, []);
 
   // Pri štarte a pri tlačidle späť čítame z adresy.
@@ -306,7 +309,7 @@ export function PSBApp() {
     // uzávierka" tak doviedla človeka na Kvartálne a vyzeralo to, že klik
     // nefunguje. Rovnaká mechanika ako pri ostatných, len chýbala.
     if (tab === "vysledky" && sub) setVysledkySub(sub);
-    if (tab === "marketing" && sub) setMarketingSub(sub === "algoritmus" ? "dosah" : sub);
+    if (tab === "marketing" && sub) setMarketingSub(MKT_ALIAS[sub] || sub);
     // Fokus na klienta má zmysel len v zozname klientov. Keď bol človek práve
     // v Dopytoch alebo v Raste a strate a klikol na meno vo vyhľadávaní,
     // zameranie sa nastavilo do podzáložky, ktorú nevidno — a nič sa nestalo.

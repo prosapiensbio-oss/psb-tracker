@@ -1349,7 +1349,7 @@ export function useExtraGrafy({
     nodes.dosahIG = (
       <Card style={{ marginBottom: 0, height: "100%" }}>
         <H3><Info label="Dosah Instagramu" text="Zobrazenia a dosah po mesiacoch z Metricoolu. Dosah = koľko rôznych ľudí príspevky videlo, zobrazenia = koľkokrát sa zobrazili. Dáta pribúdajú s importom CSV v Údajoch." /></H3>
-        <Klik kam={() => onNavigate("marketing", "dosah")} onNavigate="Marketing → Dosah">
+        <Klik kam={() => onNavigate("marketing", "obsah")} onNavigate="Marketing → Obsah">
           {ig.length ? (
             <LineChart
               data={ig.map((r) => ({ label: monthLabel(r.m), values: [r.views, r.dosah] }))}
@@ -1366,7 +1366,7 @@ export function useExtraGrafy({
     nodes.web = (
       <Card style={{ marginBottom: 0, height: "100%" }}>
         <H3><Info label="Web (GA4)" text="Noví návštevníci webu a kľúčové udalosti (odoslaný formulár, klik na kontakt) po mesiacoch. Mesiace bez merania sú vynechané — diera nie je nula." /></H3>
-        <Klik kam={() => onNavigate("marketing", "dosah")} onNavigate="Marketing → Dosah">
+        <Klik kam={() => onNavigate("marketing", "web")} onNavigate="Marketing → Web a Google">
           {ga4.length ? (
             <LineChart
               data={ga4.map((r) => ({ label: monthLabel(r.m), values: [r.novi, r.udalosti] }))}
@@ -1383,7 +1383,7 @@ export function useExtraGrafy({
     nodes.vyhladavanie = (
       <Card style={{ marginBottom: 0, height: "100%" }}>
         <H3><Info label="Vyhľadávanie (Search Console)" text="Kliky z Googlu po mesiacoch. Toto je jediný kanál, kde ľudia hľadajú sami — rastie pomaly, ale neplatí sa zaň." /></H3>
-        <Klik kam={() => onNavigate("marketing", "dosah")} onNavigate="Marketing → Dosah">
+        <Klik kam={() => onNavigate("marketing", "web")} onNavigate="Marketing → Web a Google">
           {gsc.length ? (
             <ValueBars data={gsc.map((r) => ({ label: monthLabel(r.m), value: r.kliky }))} color={C.blue} fmt={(n) => String(Math.round(n))} height={170} alignEnd />
           ) : <Empty>Nahraj export zo Search Console.</Empty>}
@@ -1403,7 +1403,7 @@ export function useExtraGrafy({
     nodes.kanaly = (
       <Card style={{ marginBottom: 0, height: "100%" }}>
         <H3><Info label="Kanály — mesačný súhrn" text="Dosah/zobrazenia všetkých kanálov (Facebook, TikTok, YouTube, Threads…) z poslednej nahratej mesačnej zostavy Metricoolu. Facebook má často viac impresií než Instagram — bez tohto to nie je vidieť." /></H3>
-        <Klik kam={() => onNavigate("marketing", "dosah")} onNavigate="Marketing → Dosah">
+        <Klik kam={() => onNavigate("marketing", "kanaly")} onNavigate="Marketing → Kanály">
           {kanalySucet.length ? (
             <div style={{ marginTop: 8 }}>
               <div style={{ fontSize: 11, color: C.textDim, marginBottom: 6 }}>{monthLabel(poslednyKanalMes)}</div>
