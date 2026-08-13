@@ -829,10 +829,6 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
         onChange={setSub}
       />
 
-      {/* Živé z Graph API hore, ručná tabuľka s view rate pod tým — kým sa
-          obe nezhodnú na tom istom poradí kategórií, platia obe. */}
-      {sub === "dosah" && <ObsahZive />}
-
       {sub === "dopyty" && <Dopyty leads={leads} clients={clients} refresh={refresh} />}
 
       {sub === "lievik" && (
@@ -849,6 +845,11 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
         <>
           <Kanaly data={data} clients={clients} chat={chat} />
           <CoSomRobil chat={chat} />
+          {/* Živé z Graph API hneď za tým, čo sa publikovalo, a pred ručnou
+              tabuľkou. Obe odpovedajú na tú istú otázku z dvoch strán: táto sa
+              aktualizuje sama, tá pod ňou drží view rate, ktorý API nedáva.
+              Kým sa nezhodnú na tom istom poradí kategórií, platia obe. */}
+          <ObsahZive />
           <CoFungovalo chat={chat} />
           <Vyhladavanie chat={chat} />
           <WebKanaly rok={rok} onRok={setRok} chat={chat} />
