@@ -10,9 +10,17 @@ import { bindings } from "../../lib/bindings.server";
  * PREČO TO STOJÍ ZA TO
  *
  * Formulár na /dychani zbiera maily, nie dopyty, a od júla sa o ňom vie, že má
- * vysoké zobrazenia a nula odoslaní. Kampaň naň minula 1 804 Kč. Odpoveď na
- * otázku, či je naozaj rozbitý, nie je v Kokpite ani v Mete — je tu: keď
- * funguje, pribúdajú odberatelia.
+ * vysoké zobrazenia a nula odoslaní. Kampaň naň minula 1 804 Kč.
+ *
+ * POZOR NA JEDEN UNÁHLENÝ ZÁVER
+ *
+ * Že od 3. 9. 2025 nepribudol odberateľ, NEZNAMENÁ, že je formulár rozbitý.
+ * Jerry, 13. 8.: od vtedy nebežala žiadna akcia, ktorá by o mail požiadala.
+ * Prázdny prírastok pri nulovej akcii je očakávaný výsledok, nie porucha —
+ * a diagnóza „rozbité" by poslala hľadať chybu tam, kde žiadna nie je.
+ *
+ * Táto obrazovka teda meria, či akcia, KTORÁ BEŽÍ, prináša maily. Bez akcie
+ * nemeria nič.
  *
  * TOKEN NEOPÚŠŤA SERVER
  *
