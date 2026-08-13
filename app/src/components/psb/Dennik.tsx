@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { fmtDMY } from "../../lib/psb/format";
 import { C, mix } from "../../lib/psb/theme";
+import { enterPosle } from "./ui";
 
 // Denník klienta — príbeh v čase, nie prepisovateľné pole.
 //
@@ -73,7 +74,7 @@ export function Dennik({ meno, limit = 4, onNovyZapis }: {
           value={text} onChange={(e) => setText(e.target.value)}
           placeholder="Nový zápis do denníka — čo sa stalo, ako sa má…"
           rows={2}
-          onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); pridaj(); } }}
+          onKeyDown={enterPosle(pridaj)}
           style={{ flex: 1, minWidth: 0, resize: "vertical", padding: "7px 10px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 12.5, lineHeight: 1.5 }}
         />
         <button

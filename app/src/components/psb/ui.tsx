@@ -1175,3 +1175,30 @@ export function BulletGraph({ hodnota, ciel, max, farba, label }: { hodnota: num
     </div>
   );
 }
+
+/**
+ * Enter odošle, Shift+Enter urobí nový riadok.
+ *
+ * PREČO TO JE NA JEDNOM MIESTE
+ *
+ * Polí, kde sa niečo potvrdzuje alebo odpovedá, je v appke šesť a každé
+ * vzniklo inokedy: jedno malo Enter, dve Cmd+Enter, jedno nič. Jerry, 13. 8.:
+ * „chcem aby to fungovalo na to, že stlačím enter." Kým to bolo rozpísané
+ * v každom súbore zvlášť, rozišlo sa to znova pri siedmom poli.
+ *
+ * KDE SA TO NEPOUŽÍVA
+ *
+ * Tam, kde je text dokument, nie správa — mesačná správa a voľná poznámka
+ * k mesiacu. V nich je nový riadok bežnejší než odoslanie a Enter, ktorý
+ * uloží uprostred vety, je horší než tlačidlo navyše.
+ *
+ * `isComposing` je kvôli diakritike: pri skladaní znaku mŕtvym klávesom
+ * prehliadač pošle Enter, ktorý patrí klávesnici, nie nám.
+ */
+export function enterPosle(akcia: () => void) {
+  return (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    if (e.key !== "Enter" || e.shiftKey || e.nativeEvent.isComposing) return;
+    e.preventDefault();
+    akcia();
+  };
+}

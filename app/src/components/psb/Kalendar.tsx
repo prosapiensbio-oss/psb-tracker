@@ -604,6 +604,7 @@ function Zmeny({ zmeny, onHotovo, mena }: { zmeny: Zmena[]; onHotovo: () => Prom
               value={pisem[z.id] ?? z.poznamka ?? ""}
               onChange={(e) => setPisem({ ...pisem, [z.id]: e.target.value })}
               placeholder="prečo? (klient zrušil, presunuli sme, chyba v zápise…)"
+              onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); void (async () => { await posli({ akcia: "vysvetli", id: z.id, poznamka: pisem[z.id] || "" }); await onHotovo(); })(); } }}
               style={{ flex: "1 1 260px", padding: "6px 10px", borderRadius: 7, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 12 }}
             />
             <button

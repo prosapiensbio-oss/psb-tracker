@@ -2089,7 +2089,7 @@ function RegisterRow({ item, actions, onNavigate, chat }: { item: RegisterItem; 
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); posliJarvisovi(); }
+              if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); posliJarvisovi(); }
               if (e.key === "Escape") setOdpoved(false);
             }}
             autoFocus
@@ -2106,7 +2106,7 @@ function RegisterRow({ item, actions, onNavigate, chat }: { item: RegisterItem; 
               Poslať Jarvisovi
             </button>
             <span style={{ fontSize: 11, color: C.textDim }}>
-              Jarvis dostane aj to, čoho sa to týka — kontext písať nemusíš. ⌘/Ctrl+Enter odošle.
+              Jarvis dostane aj to, čoho sa to týka — kontext písať nemusíš. Enter odošle, Shift+Enter urobí nový riadok.
             </span>
           </div>
         </div>
