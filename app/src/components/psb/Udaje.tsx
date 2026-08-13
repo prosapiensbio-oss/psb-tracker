@@ -378,6 +378,7 @@ function UploadCard({ data, missing, actions, chat }: { data: PSBData; missing: 
       )}
       <NapojenieWebu />
       <NapojenieMeta />
+      <NapojenieMailer />
       <div onClick={() => setOpen((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginTop: 14, fontSize: 12, color: C.textDim }}>
         <span>{open ? "▲ skryť" : "▼"} zoznam potrebných CSV a zapísané pohyby</span>
         <span style={{ marginLeft: "auto" }}>Nahrať sa dá aj pretiahnutím do Jarvisa (📎 vpravo dole).</span>
@@ -568,6 +569,73 @@ function NapojenieWebu() {
  * a späť do prehliadača sa neposiela ani skrátený. Preto je pole vždy prázdne
  * aj keď token existuje — vedľa je len informácia, či tam nejaký je.
  */
+/**
+ * MailerLite.
+ *
+ * Prečo to má vlastný panel a nie riadok pri Mete: je to iný kanál a iná
+ * otázka. Meta hovorí, koľko stál dosah; toto hovorí, či formulár na
+ * /dychani vôbec zbiera maily — a to sa od júla nevie.
+ */
+function NapojenieMailer() {
+  const [stav, setStav] = useState<{ maToken: boolean; odberatelia: unknown[]; kampane: unknown[] } | null>(null);
+  const [token, setToken] = useState("");
+  const [hlaska, setHlaska] = useState("");
+  const [robim, setRobim] = useState(false);
+
+  const nacitaj = () => void fetch("/api/mailer", { credentials: "same-origin" })
+    .then((r) => r.json()).then((j) => { if (j.ok) setStav(j); }).catch(() => {});
+  useEffect(nacitaj, []);
+
+  const posli = async (telo: Record<string, unknown>, hotovo: string) => {
+    setRobim(true); setHlaska("");
+    const j = await fetch("/api/mailer", {
+      method: "POST", credentials: "same-origin",
+      headers: { "content-type": "application/json" }, body: JSON.stringify(telo),
+    }).then((r) => r.json()).catch(() => ({ ok: false, error: "spojenie zlyhalo" }));
+    setRobim(false);
+    setHlaska(j.ok ? (j.sprava || hotovo) : `Nepodarilo sa: ${j.error || "neznáma chyba"}`);
+    nacitaj();
+    return j;
+  };
+
+  if (!stav) return null;
+  const btn = { fontSize: 12, padding: "6px 12px", borderRadius: 6, border: `1px solid ${C.accent}`, background: "transparent", color: C.accent, cursor: robim ? "default" : "pointer", opacity: robim ? 0.5 : 1 } as const;
+
+  return (
+    <div style={{ marginTop: 14, padding: 12, background: mix(C.accent, 6), borderRadius: 8 }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: C.textMuted, marginBottom: 6 }}>
+        <Info
+          label="MailerLite — odberatelia a kampane"
+          text="Ťahá odberateľov aj s dátumom prihlásenia a odoslané kampane s otvorenosťou. Zmysel: formulár na /dychani zbiera MAILY, nie dopyty — takže otázka „funguje?“ znie „pribúdajú odberatelia?“, a odpoveď nie je nikde inde. Otvorenia a prekliky sa berú ako UNIKÁTNE počty; celkové by pri jednom človeku, čo si mail otvoril päťkrát, tvrdili, že záujem je päťnásobný. Token sa uloží na serveri a späť do prehliadača sa už neposiela."
+        />
+      </div>
+      <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 8 }}>
+        Token: <b style={{ color: stav.maToken ? C.green : C.orange }}>{stav.maToken ? "uložený" : "chýba"}</b>
+        {" · "}odberateľov: <b style={{ color: C.text }}>{stav.odberatelia?.length ?? 0}</b>
+        {" · "}kampaní: <b style={{ color: C.text }}>{stav.kampane?.length ?? 0}</b>
+      </div>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+        <input type="password" value={token} onChange={(e) => setToken(e.target.value)}
+          placeholder={stav.maToken ? "vložiť nový token…" : "token z MailerLite → Integrations → API"}
+          style={{ ...S.input, width: 280, marginBottom: 0 }} />
+        <button disabled={robim || token.trim().length < 20} style={btn}
+          onClick={() => void posli({ akcia: "uloz-token", token: token.trim() }, "Token uložený.").then(() => setToken(""))}>
+          Uložiť token
+        </button>
+        <button disabled={robim || !stav.maToken} style={btn}
+          onClick={() => void posli({ akcia: "test" }, "")}>Skúška spojenia</button>
+        <button disabled={robim || !stav.maToken} style={btn}
+          onClick={() => void posli({ akcia: "stiahni" }, "Stiahnuté.")}>Stiahnuť odberateľov a kampane</button>
+      </div>
+      {hlaska && <div style={{ fontSize: 11.5, color: C.textMuted, lineHeight: 1.5, marginTop: 6 }}>{hlaska}</div>}
+      <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 6, lineHeight: 1.5 }}>
+        Token nájdeš v MailerLite → <b style={{ color: C.textMuted }}>Integrations → API → Create new API token</b>.
+        Nechaj „All IPs allowed“ — Kokpit beží na Cloudflare a nemá pevnú IP adresu.
+      </div>
+    </div>
+  );
+}
+
 function NapojenieMeta() {
   const [stav, setStav] = useState<{ maToken: boolean; maCapi: boolean; pixelId: string; adAccount: string; igUser: string; kampani: number; igPrispevkov: number } | null>(null);
   const [token, setToken] = useState("");

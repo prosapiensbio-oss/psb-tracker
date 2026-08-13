@@ -31,6 +31,7 @@ import { Kampane } from "./Kampane";
 import { MarketingVrch } from "./MarketingVrch";
 import { ObsahZive } from "./ObsahZive";
 import { ObsahDopyt } from "./ObsahDopyt";
+import { Mail } from "./Mail";
 import { AkoMeratReklamu, Kohorta, Lievik, Naklady } from "./MarketingLievik";
 import { Kanaly } from "./Kanaly";
 import { C, mix, S } from "../../lib/psb/theme";
@@ -785,6 +786,7 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
           { id: "kanaly", label: "Soc. siete" },
           { id: "obsah", label: "Reels & posty" },
           { id: "web", label: "Web a Google" },
+          { id: "mail", label: "E-mail" },
           // Algoritmus tu bol záložkou a Jerry ju 12. 8. zrušil: čítal ju
           // dvakrát a odvtedy nie. Dáta žijú ďalej — sťahujú sa každú noc
           // a idú Jarvisovi do kontextu, lebo pri plánovaní obsahu rozhodujú.
@@ -833,6 +835,8 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
           <ObsahDopyt leads={leads} />
         </>
       )}
+
+      {sub === "mail" && <Mail clients={clients} leads={leads} />}
 
       {sub === "web" && (
         <>

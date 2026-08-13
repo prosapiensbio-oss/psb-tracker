@@ -29,6 +29,7 @@ import { Route as ApiPdfImportRouteImport } from './routes/api/pdf-import'
 import { Route as ApiOverrideRouteImport } from './routes/api/override'
 import { Route as ApiMetaRouteImport } from './routes/api/meta'
 import { Route as ApiMarketingRouteImport } from './routes/api/marketing'
+import { Route as ApiMailerRouteImport } from './routes/api/mailer'
 import { Route as ApiLogoutRouteImport } from './routes/api/logout'
 import { Route as ApiLoginRouteImport } from './routes/api/login'
 import { Route as ApiLeadsRouteImport } from './routes/api/leads'
@@ -147,6 +148,11 @@ const ApiMarketingRoute = ApiMarketingRouteImport.update({
   path: '/api/marketing',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiMailerRoute = ApiMailerRouteImport.update({
+  id: '/api/mailer',
+  path: '/api/mailer',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiLogoutRoute = ApiLogoutRouteImport.update({
   id: '/api/logout',
   path: '/api/logout',
@@ -254,6 +260,7 @@ export interface FileRoutesByFullPath {
   '/api/leads': typeof ApiLeadsRoute
   '/api/login': typeof ApiLoginRoute
   '/api/logout': typeof ApiLogoutRoute
+  '/api/mailer': typeof ApiMailerRoute
   '/api/marketing': typeof ApiMarketingRoute
   '/api/meta': typeof ApiMetaRoute
   '/api/override': typeof ApiOverrideRoute
@@ -293,6 +300,7 @@ export interface FileRoutesByTo {
   '/api/leads': typeof ApiLeadsRoute
   '/api/login': typeof ApiLoginRoute
   '/api/logout': typeof ApiLogoutRoute
+  '/api/mailer': typeof ApiMailerRoute
   '/api/marketing': typeof ApiMarketingRoute
   '/api/meta': typeof ApiMetaRoute
   '/api/override': typeof ApiOverrideRoute
@@ -333,6 +341,7 @@ export interface FileRoutesById {
   '/api/leads': typeof ApiLeadsRoute
   '/api/login': typeof ApiLoginRoute
   '/api/logout': typeof ApiLogoutRoute
+  '/api/mailer': typeof ApiMailerRoute
   '/api/marketing': typeof ApiMarketingRoute
   '/api/meta': typeof ApiMetaRoute
   '/api/override': typeof ApiOverrideRoute
@@ -374,6 +383,7 @@ export interface FileRouteTypes {
     | '/api/leads'
     | '/api/login'
     | '/api/logout'
+    | '/api/mailer'
     | '/api/marketing'
     | '/api/meta'
     | '/api/override'
@@ -413,6 +423,7 @@ export interface FileRouteTypes {
     | '/api/leads'
     | '/api/login'
     | '/api/logout'
+    | '/api/mailer'
     | '/api/marketing'
     | '/api/meta'
     | '/api/override'
@@ -452,6 +463,7 @@ export interface FileRouteTypes {
     | '/api/leads'
     | '/api/login'
     | '/api/logout'
+    | '/api/mailer'
     | '/api/marketing'
     | '/api/meta'
     | '/api/override'
@@ -492,6 +504,7 @@ export interface RootRouteChildren {
   ApiLeadsRoute: typeof ApiLeadsRoute
   ApiLoginRoute: typeof ApiLoginRoute
   ApiLogoutRoute: typeof ApiLogoutRoute
+  ApiMailerRoute: typeof ApiMailerRoute
   ApiMarketingRoute: typeof ApiMarketingRoute
   ApiMetaRoute: typeof ApiMetaRoute
   ApiOverrideRoute: typeof ApiOverrideRoute
@@ -653,6 +666,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiMarketingRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/mailer': {
+      id: '/api/mailer'
+      path: '/api/mailer'
+      fullPath: '/api/mailer'
+      preLoaderRoute: typeof ApiMailerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/logout': {
       id: '/api/logout'
       path: '/api/logout'
@@ -796,6 +816,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiLeadsRoute: ApiLeadsRoute,
   ApiLoginRoute: ApiLoginRoute,
   ApiLogoutRoute: ApiLogoutRoute,
+  ApiMailerRoute: ApiMailerRoute,
   ApiMarketingRoute: ApiMarketingRoute,
   ApiMetaRoute: ApiMetaRoute,
   ApiOverrideRoute: ApiOverrideRoute,
