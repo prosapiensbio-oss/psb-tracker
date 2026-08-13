@@ -5,6 +5,7 @@ import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import type { D1Database } from "@cloudflare/workers-types";
 
 import { bindings } from "../../lib/bindings.server";
+import { posliLead } from "../../lib/psb/capi";
 import { kategoriaHooku, krstneMenaKlientov } from "../../lib/psb/hook";
 
 /**
@@ -175,6 +176,14 @@ export const Route = createFileRoute("/api/meta")({
         return Response.json({
           ok: true,
           maToken: !!n.token,
+          // Token pre Conversions API sa — rovnako ako ten prvý — nevracia
+          // ani skrátený. Pixel áno: je to verejné číslo, stojí v kóde webu.
+          maCapi: !!(await DB.prepare("SELECT value FROM vzas_settings WHERE key = 'meta_capi_token'").first()),
+          pixelId: await (async () => {
+            const r = await DB.prepare("SELECT value FROM vzas_settings WHERE key = 'meta_pixel_id'").first<{ value: string }>();
+            if (!r?.value) return "";
+            try { return String(JSON.parse(r.value)); } catch { return r.value; }
+          })(),
           adAccount: n.adAccount,
           igUser: n.igUser,
           kampane: kampane.results,
@@ -213,6 +222,36 @@ export const Route = createFileRoute("/api/meta")({
           // Do auditu ide len fakt, že sa token zmenil — nikdy jeho hodnota.
           await audit(DB, { action: "nastavenie", predmet: "meta_token", neu: "token nastavený", actor: await currentUser(request) || undefined });
           return Response.json({ ok: true });
+        }
+
+        if (akcia === "uloz-capi") {
+          const t = String(b.capiToken || "").trim();
+          if (t && t.length < 20) return Response.json({ ok: false, error: "token_prilis_kratky" }, { status: 400 });
+          if (t) await uloz("meta_capi_token", t);
+          await uloz("meta_pixel_id", String(b.pixelId || "").trim());
+          await audit(DB, { action: "nastavenie", predmet: "meta_capi", neu: t ? "token pre Conversions API nastavený" : "pixel nastavený", actor: await currentUser(request) || undefined });
+          return Response.json({ ok: true });
+        }
+
+        // Skúšobná udalosť. Bez nej sa dá zistiť, či CAPI funguje, až keď
+        // niekto naozaj odošle formulár — a to je zlý moment na hľadanie chyby.
+        if (akcia === "skuska-capi") {
+          const r = await DB.prepare(
+            "SELECT key, value FROM vzas_settings WHERE key IN ('meta_capi_token','meta_pixel_id')",
+          ).all();
+          const m: Record<string, string> = {};
+          for (const x of (r.results as { key: string; value: string }[]) || []) {
+            try { m[x.key] = String(JSON.parse(x.value)); } catch { m[x.key] = x.value; }
+          }
+          const v = await posliLead(m.meta_pixel_id, m.meta_capi_token, {
+            id: `skuska-${Date.now()}`,
+            email: "skuska@prosapiens.cz",
+            telefon: "",
+            stranka: "https://www.prosapiens.cz/uvodni-trenink/",
+          }, String(b.testKod || "") || undefined);
+          return v.ok
+            ? Response.json({ ok: true, sprava: "Skúšobný Lead odoslaný — pozri Events Manager → Test events." })
+            : Response.json({ ok: false, error: v.chyba }, { status: 502 });
         }
 
         if (akcia === "uloz-ucty") {

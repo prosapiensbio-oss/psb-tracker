@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { audit } from "../../lib/psb/audit.server";
+import { posliLead } from "../../lib/psb/capi";
 import { bindings } from "../../lib/bindings.server";
 
 /**
@@ -120,14 +121,45 @@ export const Route = createFileRoute("/api/lead-web")({
           )
           .run();
 
+        // ── ohlásenie Mete ────────────────────────────────────────────────
+        //
+        // Až tu, po zápise. Dopyt je v Kokpite bez ohľadu na to, či sa hlásenie
+        // podarí — radšej dopyt bez konverzie než konverzia bez dopytu.
+        //
+        // K 13. 8. 2026 nemal pixel ani jednu funkčnú konverziu: sedem vlastných
+        // visí na mŕtvom pixeli a tá jediná na živom nedostala nikdy žiadnu
+        // udalosť. Toto je prvá cesta, ktorou sa Meta o dopyte naozaj dozvie —
+        // a ide zo servera, takže funguje aj pri odmietnutých cookies.
+        let capi = "";
+        const nast = await DB.prepare(
+          "SELECT key, value FROM vzas_settings WHERE key IN ('meta_capi_token','meta_pixel_id')",
+        ).all();
+        const m: Record<string, string> = {};
+        for (const r of (nast.results as { key: string; value: string }[]) || []) {
+          try { m[r.key] = String(JSON.parse(r.value)); } catch { m[r.key] = r.value; }
+        }
+        if (m.meta_capi_token && m.meta_pixel_id) {
+          const v = await posliLead(m.meta_pixel_id, m.meta_capi_token, {
+            id: kluc,
+            email, telefon,
+            stranka: kus(b.page ?? b.stranka, 300),
+            // `_fbc` a `_fbp` posiela web, ak ich vie prečítať z cookies.
+            fbc: kus(b.fbc, 200) || undefined,
+            fbp: kus(b.fbp, 200) || undefined,
+            ip: request.headers.get("cf-connecting-ip") || undefined,
+            userAgent: kus(b.userAgent ?? request.headers.get("user-agent"), 300) || undefined,
+          });
+          capi = v.ok ? " · nahlásené Mete" : ` · Mete sa nenahlásilo: ${v.chyba}`;
+        }
+
         await audit(DB, {
           action: "dopyt-z-webu",
           predmet: kluc,
-          neu: [meno, email, utmCampaign].filter(Boolean).join(" · ").slice(0, 300),
+          neu: ([meno, email, utmCampaign].filter(Boolean).join(" · ") + capi).slice(0, 300),
           actor: "web",
         });
 
-        return Response.json({ ok: true, id: kluc });
+        return Response.json({ ok: true, id: kluc, meta: capi.trim() });
       },
     },
   },

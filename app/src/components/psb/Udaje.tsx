@@ -569,15 +569,17 @@ function NapojenieWebu() {
  * aj keď token existuje — vedľa je len informácia, či tam nejaký je.
  */
 function NapojenieMeta() {
-  const [stav, setStav] = useState<{ maToken: boolean; adAccount: string; igUser: string; kampani: number; igPrispevkov: number } | null>(null);
+  const [stav, setStav] = useState<{ maToken: boolean; maCapi: boolean; pixelId: string; adAccount: string; igUser: string; kampani: number; igPrispevkov: number } | null>(null);
   const [token, setToken] = useState("");
   const [ucet, setUcet] = useState("");
   const [ig, setIg] = useState("");
+  const [capiToken, setCapiToken] = useState("");
+  const [pixelId, setPixelId] = useState("");
   const [hlaska, setHlaska] = useState("");
   const [robim, setRobim] = useState(false);
 
   const nacitaj = () => void fetch("/api/meta", { credentials: "same-origin" }).then((r) => r.json())
-    .then((j) => { if (j.ok) { setStav(j); setUcet(j.adAccount || ""); setIg(j.igUser || ""); } });
+    .then((j) => { if (j.ok) { setStav(j); setUcet(j.adAccount || ""); setIg(j.igUser || ""); setPixelId(j.pixelId || ""); } });
   useEffect(nacitaj, []);
 
   const posli = async (telo: Record<string, unknown>, hotovo: string) => {
@@ -655,6 +657,40 @@ function NapojenieMeta() {
           onClick={() => void posli({ akcia: "instagram" }, "Instagramové príspevky stiahnuté.")}>
           Stiahnuť Instagram
         </button>
+      </div>
+
+      {/* ── Conversions API ────────────────────────────────────────────────
+          Iná vec než token vyššie a iný token. Ten hore ČÍTA kampane; tento
+          PÍŠE konverzie. K 13. 8. 2026 nemal pixel ani jednu funkčnú
+          konverziu — sedem vlastných visí na mŕtvom pixeli a tá jediná na
+          živom nedostala nikdy žiadnu udalosť. */}
+      <div style={{ borderTop: `1px solid ${mix(C.border, 60)}`, marginTop: 12, paddingTop: 12 }}>
+        <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 8 }}>
+          <Info
+            label="Ohlásiť dopyt Mete (Conversions API)"
+            text="Keď na webe niekto odošle formulár, Kokpit to rovno ohlási Mete ako udalosť Lead — zo servera, takže to funguje aj vtedy, keď človek odmietne cookies a pixel sa vôbec nenačíta. Posiela sa ODTLAČOK e-mailu a telefónu (SHA-256), nie samotné údaje; meno sa neposiela vôbec. E-mail je najsilnejší identifikátor, aký existuje — kvalita spárovania pixela bola 5,1/10 práve preto, že s návštevami nechodil žiadny."
+          />
+          {" · "}stav: <b style={{ color: stav.maCapi ? C.green : C.orange }}>{stav.maCapi ? "zapnuté" : "vypnuté"}</b>
+        </div>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+          <input value={pixelId} onChange={(e) => setPixelId(e.target.value)} placeholder="ID pixela (Dataset ID)"
+            style={{ ...S.input, width: 200, marginBottom: 0 }} />
+          <input type="password" value={capiToken} onChange={(e) => setCapiToken(e.target.value)}
+            placeholder={stav.maCapi ? "vložiť nový token…" : "token pre Conversions API"}
+            style={{ ...S.input, width: 250, marginBottom: 0 }} />
+          <button disabled={robim || !pixelId.trim()} style={btn}
+            onClick={() => void posli({ akcia: "uloz-capi", capiToken: capiToken.trim(), pixelId: pixelId.trim() }, "Uložené.").then(() => setCapiToken(""))}>
+            Uložiť
+          </button>
+          <button disabled={robim || !stav.maCapi} style={btn}
+            onClick={() => void posli({ akcia: "skuska-capi" }, "Skúšobný Lead odoslaný — pozri v Events Manager → Test events.")}>
+            Poslať skúšobný Lead
+          </button>
+        </div>
+        <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 6, lineHeight: 1.5 }}>
+          Token nájdeš v Events Manager → tvoj pixel → Nastavenia → Conversions API → <b style={{ color: C.textMuted }}>Generate access token</b>.
+          ID pixela je tam hore ako Dataset ID.
+        </div>
       </div>
 
       {hlaska && <div style={{ fontSize: 11.5, color: C.textMuted, lineHeight: 1.5, marginTop: 4 }}>{hlaska}</div>}
