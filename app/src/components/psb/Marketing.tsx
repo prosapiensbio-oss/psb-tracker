@@ -28,7 +28,6 @@ import { KATEGORIE_HOOKOV, MKT_OBSAH } from "../../lib/psb/marketing-obsah";
 import { OBDOBIA, OBDOBIA_MESACNE, mesiaceVOkne, obdobieLabel } from "../../lib/psb/obdobia";
 import { Dopyty } from "./Dopyty";
 import { Kampane } from "./Kampane";
-import { KampaneRozhodnutie } from "./KampaneRozhodnutie";
 import { MarketingVrch } from "./MarketingVrch";
 import { ObsahZive } from "./ObsahZive";
 import { ObsahDopyt } from "./ObsahDopyt";
@@ -446,51 +445,6 @@ function PodlaHooku({ okno }: { okno: string[] }) {
 }
 
 // ── Čo fungovalo ─────────────────────────────────────────────────────────────
-function CoFungovalo({ chat }: { chat?: AssistantChat }) {
-  // Otázka znie „čo funguje TERAZ", nie „čo kedy fungovalo" — preto 90 dní.
-  const [obdobie, setObdobie] = useState("2026");
-  const okno = oknoMesiacov(obdobie, MKT_MESACNE.map((r) => r.m));
-  const vyber = MKT_TOP.filter((k) => okno.includes(k.m));
-  const vyrez = () =>
-    tsv(["mesiac", "typ", "hook (prvá veta)", "uloženia", "videnia", "view rate"],
-      vyber.map((k) => [label(k.m), k.typ, k.hook, k.ulozenia, k.views, k.viewRate ? `${k.viewRate} %` : "—"]));
-  return (
-    <Card>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-        <H3><Info text="Rebríček podľa ULOŽENÍ, nie lajkov. Uloženie znamená „toto si chcem nechať“ a je zo všetkých metrík najbližšie k zámeru; lajk nehovorí nič." label="Čo fungovalo" /></H3>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-          <ObdobieBar hodnota={obdobie} onChange={setObdobie} />
-          <Vysvetli chat={chat} titul="Čo fungovalo" filter={obdobieLabel(obdobie)} vyrez={vyrez} />
-        </div>
-      </div>
-      {!vyber.length && <Empty>V tomto okne nemám žiadny príspevok v rebríčku — skús dlhšie obdobie.</Empty>}
-      <div style={{ marginTop: 4 }}>
-        {vyber.map((k, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 0", borderBottom: `1px solid ${mix(C.border, 55)}`, flexWrap: "wrap" }}>
-            <span style={{ fontSize: 11, color: C.textDim, width: 52, flex: "0 0 auto" }}>{label(k.m)}</span>
-            <span style={{ fontSize: 10, padding: "1px 7px", borderRadius: 999, border: `1px solid ${C.border}`, color: C.textMuted, flex: "0 0 auto" }}>{k.typ}</span>
-            <span style={{ flex: "1 1 260px", minWidth: 200, fontSize: 12.5, color: C.text }}>{k.hook}</span>
-            <span style={{ fontSize: 12.5, color: C.accentLight, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}>{k.ulozenia} uložení</span>
-            <span style={{ fontSize: 11.5, color: C.textDim, fontVariantNumeric: "tabular-nums", minWidth: 96, textAlign: "right" }}>
-              {num(k.views)} videní{k.viewRate > 0 && ` · ${k.viewRate} %`}
-            </span>
-          </div>
-        ))}
-      </div>
-      {/* Veta „štyri z ôsmich sú klientske príbehy" tu bola natvrdo a viazala
-          sa na starý statický rebríček — od chvíle, keď top plní databáza z
-          nahratých exportov, by klamala. Interpretáciu robí Jarvis nad živými
-          dátami cez „Vysvetli mi to". */}
-      <div style={{ marginTop: 12, padding: "10px 14px", borderRadius: 10, background: mix(C.blue, 10), border: `1px solid ${mix(C.blue, 30)}`, color: C.text, fontSize: 12.5, lineHeight: 1.55 }}>
-        <b>Čo z týchto dát POVEDAŤ NEJDE:</b> či obsah priniesol klientov. Medzi príspevkom a úvodným tréningom nie je
-        žiadne spojenie — odpoveď dáva len dopyt a pole „odkiaľ prišiel“. Na to je záložka <b>Odkiaľ prišli klienti</b>.
-      </div>
-      <div style={{ marginTop: 16 }}>
-        <PodlaHooku okno={okno} />
-      </div>
-    </Card>
-  );
-}
 
 // ── Čo to prinieslo ──────────────────────────────────────────────────────────
 function CoToPrinieslo({ data, clients, leads, chat }: { data: PSBData; clients: Record<string, ClientAgg>; leads: Lead[]; chat?: AssistantChat }) {
@@ -844,12 +798,11 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
       )}
       {/* Kampane pred zmiešanou cenou: sú to skutočné čísla z Mety, kým
           „Čo to stálo" je odhad z Metricoolu a z nových klientov v mesiaci. */}
-      {/* Poradie je poradie otázok: čo sa stalo (Kampane) → čo s tým
-          (Rozhodnutie) → zmiešaný odhad z Metricoolu (Čo to stálo). */}
+      {/* Jedna karta o kampaniach, nie dve. Boli dve — „čo sa stalo" a „čo
+          s tým" — a obe mali stĺpec „Dopyty" s iným významom. */}
       {sub === "naklady" && (
         <>
-          <Kampane />
-          <KampaneRozhodnutie data={data} clients={clients} leads={leads} />
+          <Kampane data={data} clients={clients} leads={leads} />
           <Naklady data={data} clients={clients} />
           <AkoMeratReklamu />
         </>
@@ -862,11 +815,14 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
               tabuľkou. Obe odpovedajú na tú istú otázku z dvoch strán: táto sa
               aktualizuje sama, tá pod ňou drží view rate, ktorý API nedáva.
               Kým sa nezhodnú na tom istom poradí kategórií, platia obe. */}
+          {/* Dve karty o obsahu, nie tri. Ručná tabuľka „Čo fungovalo" merala
+              to isté z jarného zatriedenia a držala sa kvôli jedinému stĺpcu
+              (view rate); ten sa teraz doťahuje z Metricoolu rovno sem.
+              „Po čom nám niekto napísal" zostáva samostatná zámerne: meria
+              DOPYT, nie uloženia — a keby splynula, stokrát početnejšie
+              uloženia by ten slabší signál prevalcovali. */}
           <ObsahZive />
-          {/* Hneď za tým, čo fungovalo v uloženiach — táto karta sa pýta to
-              isté, ale meria to dopytom, nie proxy metrikou. */}
           <ObsahDopyt leads={leads} />
-          <CoFungovalo chat={chat} />
           <Vyhladavanie chat={chat} />
           <WebKanaly rok={rok} onRok={setRok} chat={chat} />
           <CoFungovaloWeb rok={rok} chat={chat} />

@@ -7,18 +7,18 @@ import { C, mix, S } from "../../lib/psb/theme";
 import { Card, Empty, FilterObdobia, H3, Info, RolovaciaTabulka } from "./ui";
 
 /**
- * Čo fungovalo — zo živých dát Instagram Graph API.
+ * Čo fungovalo — obsah podľa toho, čím začína.
  *
- * PREČO POPRI STAREJ TABUĽKE A NIE MIESTO NEJ
+ * PREČO JE TO JEDNA KARTA A NIE DVE
  *
- * Ručná tabuľka (`marketing-obsah.ts`) drží 114 príspevkov z jan 2025 – jún
- * 2026 a má stĺpec, ktorý API nedáva: view rate, teda koľko ľudí pozeralo
- * aspoň tri sekundy. Zahodiť ju by znamenalo prísť o jediné číslo, ktoré
- * hovorí o pozornosti.
+ * Vedľa stála ručná tabuľka (`marketing-obsah.ts`): 114 príspevkov
+ * zatriedených v jari, tie isté kategórie, ten istý rebríček. Držala sa kvôli
+ * jedinému stĺpcu — view rate, teda koľko ľudí vydrží aspoň tri sekundy.
+ * Graph API ho nedáva.
  *
- * Táto karta odpovedá na tú istú otázku z druhého konca: aktualizuje sa sama
- * a siaha po dnešok. Keď sa raz obe zhodnú na tom istom poradí kategórií,
- * ručná sa môže zahodiť.
+ * Dá sa ale dotiahnuť z Metricoolu podľa dňa publikovania, rovnako ako text.
+ * Tým dôvod na druhú kartu zanikol: jedna otázka, jedna odpoveď, a odpoveď,
+ * ktorá sa aktualizuje sama.
  *
  * PREČO NIE PRIEMER ZO VŠETKÉHO
  *
@@ -31,6 +31,8 @@ type Prispevok = {
   id: string; datum: string; mesiac: string; typ: string; permalink: string;
   hook: string; kategoria: string;
   dosah: number; ulozenia: number; zdielania: number; komentare: number; lajky: number; videnia: number;
+  /** Z Metricoolu podľa dňa — Graph API ich nedáva. Pri postoch sú nulové. */
+  viewRate: number; watchTime: number;
 };
 
 const median = (xs: number[]) => {
@@ -63,13 +65,20 @@ export function ObsahZive() {
     const m = new Map<string, Prispevok[]>();
     for (const p of vObdobi) m.set(p.kategoria || "—", [...(m.get(p.kategoria || "—") || []), p]);
     return [...m.entries()]
-      .map(([k, ps]) => ({
-        kategoria: k,
-        ks: ps.length,
-        dosah: median(ps.map((p) => p.dosah)),
-        ulozenia: median(ps.map((p) => p.ulozenia)),
-        zdielania: median(ps.map((p) => p.zdielania)),
-      }))
+      .map(([k, ps]) => {
+        // Pozornosť sa meria len tam, kde sa dá — pri postoch je view rate
+        // nula a priemerovať ju k reelom by ju tíško stlačilo.
+        const sVR = ps.filter((p) => p.viewRate > 0);
+        return {
+          kategoria: k,
+          ks: ps.length,
+          dosah: median(ps.map((p) => p.dosah)),
+          ulozenia: median(ps.map((p) => p.ulozenia)),
+          zdielania: median(ps.map((p) => p.zdielania)),
+          viewRate: sVR.length ? median(sVR.map((p) => p.viewRate)) : 0,
+          zVR: sVR.length,
+        };
+      })
       .sort((a, b) => b.dosah - a.dosah);
   }, [vObdobi]);
 
@@ -98,7 +107,7 @@ export function ObsahZive() {
   if (!prispevky.length) {
     return (
       <Card>
-        <H3><Info label="Čo fungovalo (živé z Instagramu)" text="Napĺňa sa v Mesiac → Dáta a uzávierka → Meta → Stiahnuť Instagram." /></H3>
+        <H3><Info label="Čo fungovalo" text="Napĺňa sa v Mesiac → Dáta a uzávierka → Meta → Stiahnuť Instagram." /></H3>
         <Empty>Ešte som z Instagramu nestiahol žiadny príspevok.</Empty>
       </Card>
     );
@@ -110,8 +119,8 @@ export function ObsahZive() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         <H3>
           <Info
-            label="Čo fungovalo (živé z Instagramu)"
-            text="Príspevky priamo z Instagram Graph API, zaradené podľa toho, čím začínajú. Na rozdiel od tabuľky nižšie sa aktualizuje sama pri každom stiahnutí. Dosah, uloženia aj zdieľania sú MEDIÁNY, nie priemery: jeden zaplatený reel s dosahom 13 000 by priemer kategórie posunul tak, že by hovoril o rozpočte, nie o obsahu. Zaradenie je strojové a občas sa pomýli — pri rozhodovaní, čo natáčať ďalej, to stačí, pri jednom príspevku sa pozri na text."
+            label="Čo fungovalo"
+            text="Príspevky priamo z Instagram Graph API, zaradené podľa toho, čím začínajú. Aktualizuje sa sama pri každom stiahnutí. View rate sa doťahuje z Metricoolu podľa dňa publikovania — Graph API ho nedáva. Dosah, uloženia aj zdieľania sú MEDIÁNY, nie priemery: jeden zaplatený reel s dosahom 13 000 by priemer kategórie posunul tak, že by hovoril o rozpočte, nie o obsahu. Zaradenie je strojové a občas sa pomýli — pri rozhodovaní, čo natáčať ďalej, to stačí, pri jednom príspevku sa pozri na text."
           />
         </H3>
         <FilterObdobia hodnota={obdobie} onChange={setObdobie} moznosti={OBDOBIA_OBSAH} />
@@ -136,6 +145,9 @@ export function ObsahZive() {
             <th style={{ ...S.th, textAlign: "right" }}>Medián dosahu</th>
             <th style={{ ...S.th, textAlign: "right" }}>Medián uložení</th>
             <th style={{ ...S.th, textAlign: "right" }}>Medián zdieľaní</th>
+            <th style={{ ...S.th, textAlign: "right" }}>
+              <Info label="Ø view rate" text="Koľko % divákov vydrží aspoň tri sekundy. Jediné číslo o POZORNOSTI, ktoré appka má — uloženie hovorí, že sa príspevok páčil, view rate hovorí, či ho vôbec niekto pozeral. Pri postoch sa nemeria, takže sa počíta len z reelov; číslo v zátvorke hovorí, z koľkých." />
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -146,6 +158,10 @@ export function ObsahZive() {
               <td style={{ ...S.td, textAlign: "right", color: C.accentLight, fontWeight: 600 }}>{r.dosah.toLocaleString("sk")}</td>
               <td style={{ ...S.td, textAlign: "right", color: C.textMuted }}>{r.ulozenia}</td>
               <td style={{ ...S.td, textAlign: "right", color: C.textMuted }}>{r.zdielania}</td>
+              <td style={{ ...S.td, textAlign: "right", color: r.viewRate ? C.text : C.textDim }}>
+                {r.viewRate ? `${r.viewRate.toFixed(1)} %` : "—"}
+                {r.zVR > 0 && <span style={{ color: C.textDim, fontSize: 11 }}> ({r.zVR})</span>}
+              </td>
             </tr>
           ))}
         </tbody>

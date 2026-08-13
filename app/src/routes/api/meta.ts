@@ -112,12 +112,24 @@ export const Route = createFileRoute("/api/meta")({
           //
           // Páruje sa na deň, nie na presný čas: obidva zdroje uvádzajú iné
           // pásmo a rovnaký príspevok by sa o hodinu minul.
+          // `view_rate` a `watch_time` sa doťahujú z Metricoolu podľa DŇA.
+          //
+          // Graph API ich nedáva a sú to jediné čísla, ktoré hovoria o
+          // POZORNOSTI — koľko ľudí vydržalo aspoň tri sekundy. Kým sa
+          // doťahovali z inej karty, existovala vedľa tejto druhá tabuľka
+          // s tými istými kategóriami len kvôli jednému stĺpcu.
           const p = await DB.prepare(
             `SELECT i.id, i.datum, i.mesiac, i.typ, i.permalink, i.kategoria,
                     COALESCE(NULLIF(i.hook,''), (SELECT m.hook FROM mkt_prispevky m
                        WHERE substr(m.datum,1,10) = substr(i.datum,1,10)
                          AND m.hook <> '' ORDER BY m.views DESC LIMIT 1), '') AS hook,
-                    i.dosah, i.ulozenia, i.zdielania, i.komentare, i.lajky, i.videnia
+                    i.dosah, i.ulozenia, i.zdielania, i.komentare, i.lajky, i.videnia,
+                    COALESCE((SELECT m.view_rate FROM mkt_prispevky m
+                       WHERE substr(m.datum,1,10) = substr(i.datum,1,10)
+                         AND m.view_rate > 0 ORDER BY m.views DESC LIMIT 1), 0) AS viewRate,
+                    COALESCE((SELECT m.watch_time FROM mkt_prispevky m
+                       WHERE substr(m.datum,1,10) = substr(i.datum,1,10)
+                         AND m.watch_time > 0 ORDER BY m.views DESC LIMIT 1), 0) AS watchTime
                FROM ig_prispevky i ORDER BY i.datum DESC`,
           ).all();
           return Response.json({ ok: true, prispevky: p.results });
