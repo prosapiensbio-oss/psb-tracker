@@ -19,7 +19,27 @@ import { Modal } from "./ui";
 // človeka dovedie tam, kde sa to naozaj píše, nech je jeden zápis na jednom
 // mieste a nie na dvoch.
 
-type Polozka = { nadpis: string; popis: string; tab: string; sub?: string; stav?: "chyba" | "hotove" };
+type Polozka = {
+  nadpis: string; popis: string; stav?: "chyba" | "hotove";
+  /** Kam v appke. Prázdne pri položke, ktorá vedie von. */
+  tab?: string; sub?: string;
+  /** Adresa mimo Kokpitu — otvorí sa v novej karte. */
+  odkaz?: string;
+};
+
+/**
+ * Anamnéza je Google Forms a v Kokpite zámerne nie je.
+ *
+ * Zdravotná časť by bola najcitlivejšia vec v celej databáze a appka z nej
+ * nepotrebuje nič — berie sa z nej jediné pole, „Jak jste se o nás dozvěděli",
+ * a to až pri ročnom importe. Postaviť ju znova v Kokpite by znamenalo zbierať
+ * a skladovať diagnózy bez toho, aby na to bol dôvod.
+ *
+ * Čo chýbalo, bola cesta k nej. Pri novom klientovi si ju človek musel nájsť
+ * v záložkách — a rozcestník, ktorý pozná všetko okrem tej jednej veci, čo sa
+ * robí pri každom novom klientovi, nie je rozcestník.
+ */
+const ANAMNEZA = "https://docs.google.com/forms/d/e/1FAIpQLScNbp8yLutGZAZqUIM3TqfOaI5IacAIBimsJnRhRV1pYF53rg/viewform";
 
 export function ZapisButton({
   ritualy,
@@ -84,10 +104,22 @@ export function ZapisButton({
     // Dopyty sa medzitým presťahovali z Marketingu do Klientov — rozcestník
     // ukazoval na starú adresu.
     { nadpis: "Záver z debaty", popis: "Napíš Jarvisovi — záver si zapíše sám a objaví sa v registri.", tab: "dashboard" },
+    {
+      nadpis: "Nový klient · úvodný tréning",
+      popis: "Otvorí anamnézu v Google Forms. Do Kokpitu sa klient dostane sám z PTmindera; odtiaľto sa berie len to, odkiaľ sa o nás dozvedel.",
+      odkaz: ANAMNEZA,
+    },
   ];
 
   const chod = (p: Polozka) => {
-    onNavigate(p.tab, p.sub);
+    if (p.odkaz) {
+      // `noopener` je tu preto, aby otvorená stránka nemala prístup k oknu
+      // Kokpitu — pri cudzej doméne to platí bez ohľadu na to, čia je.
+      window.open(p.odkaz, "_blank", "noopener,noreferrer");
+      setOpen(false);
+      return;
+    }
+    if (p.tab) onNavigate(p.tab, p.sub);
     setOpen(false);
   };
 
@@ -256,7 +288,9 @@ export function ZapisButton({
                 </span>
                 {p.stav === "hotove" && <span style={{ fontSize: 11, color: C.green, flexShrink: 0 }}>hotové</span>}
                 {p.stav === "chyba" && <span style={{ fontSize: 11, color: C.accentLight, flexShrink: 0 }}>teraz</span>}
-                <span style={{ color: C.textDim, flexShrink: 0 }}>→</span>
+                {/* Šípka von hovorí, že sa opúšťa Kokpit — inak by človek čakal
+                    ďalšiu obrazovku appky a dostal cudziu kartu. */}
+                <span style={{ color: C.textDim, flexShrink: 0 }}>{p.odkaz ? "↗" : "→"}</span>
               </button>
             ))}
           </div>
