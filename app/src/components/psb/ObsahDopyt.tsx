@@ -34,9 +34,24 @@ type Obsah = { datum: string; kategoria: string; hook: string; dosah: number; zd
 
 const OKNO = 14;
 
+/**
+ * Zdroje, ktoré obsah nespôsobil.
+ *
+ * Dopyt z odporúčania priviedol ČLOVEK. Nejaký príspevok pred ním vyšiel tak
+ * či tak — publikuje sa 5–7 mesačne — takže sa správa presne ako náhodný deň
+ * a ťahá každú kategóriu k základu. Pri 37 dopytoch je desať odporúčaní dosť
+ * na to, aby prekryli slabý signál.
+ *
+ * Nie je to ale jednoznačné: komu ťa niekto odporučí, ten si často otvorí
+ * profil a až potom napíše — vtedy obsah rolu má. Preto sa dajú zapnúť späť
+ * a nie sú vyhodené natvrdo.
+ */
+const ZDROJE_BEZ_OBSAHU = ["referencia"];
+
 export function ObsahDopyt({ leads }: { leads: Lead[] }) {
   const [obsah, setObsah] = useState<Obsah[]>([]);
   const [obdobie, setObdobie] = useState("all");
+  const [ajOdporucania, setAjOdporucania] = useState(false);
   const [nacitane, setNacitane] = useState(false);
   // Prázdna karta má povedať, ČI zlyhalo načítanie, alebo naozaj nie sú dáta.
   // Prvá verzia chybu prehltla a vyzeralo to, akoby chýbali príspevky.
@@ -55,7 +70,14 @@ export function ObsahDopyt({ leads }: { leads: Lead[] }) {
 
   const vObdobi = useMemo(() => {
     const patri = vOknePodlaDna(obdobie, leads.map((l) => l.date));
-    return leads.filter((l) => l.date && patri(l.date));
+    return leads.filter((l) => l.date && patri(l.date)
+      && (ajOdporucania || !ZDROJE_BEZ_OBSAHU.includes(l.source)));
+  }, [leads, obdobie, ajOdporucania]);
+
+  // Koľko odporúčaní práve nepočítame — nech je vidieť, čo prepínač robí.
+  const odporucani = useMemo(() => {
+    const patri = vOknePodlaDna(obdobie, leads.map((l) => l.date));
+    return leads.filter((l) => l.date && patri(l.date) && ZDROJE_BEZ_OBSAHU.includes(l.source)).length;
   }, [leads, obdobie]);
 
   const v = useMemo(() => obsahPredDopytmi(vObdobi, obsah, OKNO), [vObdobi, obsah]);
@@ -96,7 +118,14 @@ export function ObsahDopyt({ leads }: { leads: Lead[] }) {
             text={`Ku každému dopytu obsah, ktorý vyšiel v predchádzajúcich ${OKNO} dňoch. Stĺpec „pred dopytmi" hovorí, pri koľkých % dopytov tá kategória v okne bola; stĺpec „pred bežným dňom" to isté pri náhodnom dni toho istého obdobia. Rozhoduje ich ROZDIEL — bez neho by vyhrala kategória, ktorá vychádza najčastejšie, nie tá, ktorá niečo spôsobí. A ani rozdiel nie je dôkaz: obsah pred dopytom mohol s tým dopytom nesúvisieť vôbec.`}
           />
         </H3>
-        <FilterObdobia hodnota={obdobie} onChange={setObdobie} moznosti={OBDOBIA_OBSAH} />
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 11.5, color: C.textMuted, cursor: "pointer" }}
+            title="Dopyt z odporúčania priviedol človek, nie príspevok — v priemere sa správa ako náhodný deň a rozdiely stláča k nule. Zapni, ak chceš vidieť, či obsah aspoň potvrdzuje odporúčanie.">
+            <input type="checkbox" checked={ajOdporucania} onChange={(e) => setAjOdporucania(e.target.checked)} />
+            počítať aj odporúčania{odporucani > 0 && ` (${odporucani})`}
+          </label>
+          <FilterObdobia hodnota={obdobie} onChange={setObdobie} moznosti={OBDOBIA_OBSAH} />
+        </div>
       </div>
 
       {v.riadky.length === 0 ? (
@@ -105,6 +134,9 @@ export function ObsahDopyt({ leads }: { leads: Lead[] }) {
         <>
           <div style={{ fontSize: 12, color: C.textDim, margin: "10px 0 8px" }}>
             {v.dopytov} dopytov · základ počítaný z {v.dniZakladu} dní · okno {OKNO} dní
+            {!ajOdporucania && odporucani > 0 && (
+              <span style={{ color: C.textMuted }}> · {odporucani} odporúčaní nepočítaných</span>
+            )}
           </div>
 
           <RolovaciaTabulka pocet={5}>
