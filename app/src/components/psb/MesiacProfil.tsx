@@ -158,7 +158,7 @@ export function MesiacProfil({ mesiac, kanaly, data, clients, chat, onClose }: {
       "Zaujíma ma, čo sa v ňom podľa teba stalo a prečo: ktorý obsah alebo ktorá kampaň podľa všetkého pohla dosahom, či sa to prenieslo do dopytov, a kde sa reťaz pretrhla.",
       "Rob domnienky, ale označ ich ako domnienky. Kde je vzorka malá (pár dopytov), povedz rovno, že sa z toho nedá usudzovať.",
       "Na záver jedna veta: čo by som mal v podobnom mesiaci urobiť inak.",
-    ].join("\n"));
+    ].join("\n"), `Rozober mi mesiac ${monthLabel(mesiac)}.`);
   };
 
   // Široké okno zámerne: rozbor má vedľa seba dlaždice aj dve tabuľky a

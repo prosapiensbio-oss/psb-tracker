@@ -39,7 +39,7 @@ export function Zadanie({ chat }: { chat?: AssistantChat }) {
       "takže všetky čísla a mená v ňom musia byť vypísané, nie odkázané.",
       "",
       "Skontroluj ho proti FP pravidlám a proti indexu brand-konfliktov skôr, než mi ho dáš.",
-    ].join("\n"));
+    ].join("\n"), "Vyrob mi zadanie pre Claude Project na najbližší obsah.");
   };
 
   return (

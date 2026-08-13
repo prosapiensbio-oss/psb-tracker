@@ -22,7 +22,19 @@ type ParsedAction = {
   // zapis-zaver / vyhodnot-zaver / novy-ciel
   data?: Record<string, unknown>;
 };
-type Msg = { role: "user" | "assistant"; text: string; actions?: ParsedAction[]; images?: string[]; systemova?: boolean };
+type Msg = {
+  role: "user" | "assistant"; text: string; actions?: ParsedAction[]; images?: string[]; systemova?: boolean;
+  /**
+   * Čo sa má v rozhovore UKÁZAŤ namiesto `text`.
+   *
+   * Tlačidlá typu „Vysvetli mi to" posielajú Jarvisovi celý výrez obrazovky —
+   * tabuľku, filter, kontext — a Jerry potom v rozhovore videl tridsať riadkov
+   * čísel, ktoré si sám neposlal a nechcel čítať. Model ich vidieť MUSÍ (aj pri
+   * doplňujúcej otázke), používateľ nie. Preto sa posiela `text` a zobrazuje
+   * `zobrazit`.
+   */
+  zobrazit?: string;
+};
 type SavedChat = { id: string; title: string; messages: Msg[]; updatedAt: number; archived?: boolean };
 
 const CHATS_KEY = "psb-ai-chats";
@@ -266,11 +278,11 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
     }
   }
 
-  async function ask(question: string) {
+  async function ask(question: string, zobrazit?: string) {
     const q = question.trim();
     if ((!q && !attach.length) || busy) return;
     const imgs = attach.length ? attach : undefined;
-    const history: Msg[] = [...msgs, { role: "user", text: q || "Pozri tento obrázok.", images: imgs }];
+    const history: Msg[] = [...msgs, { role: "user", text: q || "Pozri tento obrázok.", images: imgs, zobrazit }];
     // Add the user message + an empty assistant placeholder that fills as the answer streams.
     setMsgs([...history, { role: "assistant", text: "" }]);
     setInput("");
@@ -530,7 +542,7 @@ export function ChatConversation({ chat, autoFocus, onClientClick, onNavigate }:
                   {m.images.map((src, k) => <img key={k} src={src} alt="" style={{ maxWidth: 150, maxHeight: 150, borderRadius: 8, display: "block" }} />)}
                 </div>
               ) : null}
-              {fmt(m.text, m.role === "assistant" ? onClientClick : undefined, m.role === "assistant" ? onNavigate : undefined)}
+              {fmt(m.zobrazit ?? m.text, m.role === "assistant" ? onClientClick : undefined, m.role === "assistant" ? onNavigate : undefined)}
             </div>
             {m.actions?.map((a, ai) => (
               <button key={ai} disabled={a.done} onClick={() => runAction(mi, ai)} style={{ marginTop: 6, display: "block", width: "100%", textAlign: "left", padding: "8px 11px", borderRadius: 9, cursor: a.done ? "default" : "pointer", fontSize: 12.5, fontWeight: 600, border: `1px solid ${a.done ? C.border : C.accent}`, background: a.done ? "transparent" : mix(C.accent, 14), color: a.done ? C.textDim : C.accentLight }}>

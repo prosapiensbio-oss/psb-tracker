@@ -80,6 +80,9 @@ function Vysvetli({ chat, titul, filter, vyrez }: { chat?: AssistantChat; titul:
       ]
         .filter(Boolean)
         .join("\n"),
+      // V rozhovore stačí veta. Výrez ide modelu, nie na obrazovku — Jerry ho
+      // videl na karte pred sekundou a v chate je z neho len stena čísel.
+      `Vysvetli mi kartu „${titul}"${filter ? ` — ${filter}` : ""}.`,
     );
   };
   return (

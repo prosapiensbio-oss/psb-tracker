@@ -32,7 +32,28 @@ export function oknoMesiacov(data: PSBData, okno: string): string[] {
   return mesiaceVOkne(okno, data.sessions.map((s) => monthKey(s.date)));
 }
 
-export type Kroky = { dopyty: number; uvodne: number; klienti: number; trzba: number };
+export type Kroky = {
+  dopyty: number; uvodne: number; klienti: number; trzba: number;
+  /**
+   * Dopyty, z ktorých sa STAL platiaci klient.
+   *
+   * PREČO NESTAČÍ `klienti / dopyty`
+   *
+   * 13. 8. ukazoval vrchný pásik „Z dopytu klient 124 %". Konverzia nad sto
+   * percent nie je možná a nebola to chyba počítania — boli to dve rôzne
+   * skupiny ľudí. `klienti` sú VŠETCI noví platiaci, aj tí, čo prišli
+   * z odporúčania a dopyt sa im nikdy nezapísal; `dopyty` sú len zapísané
+   * dopyty. Podiel dvoch nesúvisiacich množín nemeria nič.
+   *
+   * Tu sa konvertujú DOPYTY, nie klienti: pre každý dopyt v okne sa pozrie, či
+   * z toho človeka klient napokon bol. Také číslo je zhora ohraničené stovkou
+   * a znamená presne to, čo je nad ním napísané.
+   *
+   * Čerstvé dopyty ho ťahajú dole — kto sa ozval minulý mesiac, ešte nemusel
+   * stihnúť zaplatiť. Okno preto končí posledným plným mesiacom (kotva dát).
+   */
+  zDopytu: number;
+};
 
 export function krokyZa(data: PSBData, clients: Record<string, ClientAgg>, mesiace: string[]): Kroky {
   const v = (d: string) => mesiace.includes(monthKey(d));
@@ -60,7 +81,14 @@ export function krokyZa(data: PSBData, clients: Record<string, ClientAgg>, mesia
   const trzba = data.payments
     .filter((p) => p.client && menaNovych.has(p.client) && v(p.date))
     .reduce((a, p) => a + p.amount, 0);
-  return { dopyty, uvodne, klienti: novi.length, trzba };
+  // Dopyt → klient. Páruje sa podľa mena; e-mail v dopyte často chýba a
+  // v klientoch nie je vôbec.
+  const platiaci = new Set(Object.values(clients)
+    .filter((c) => data.payments.some((p) => p.client === c.name) || c.sessions.some((x) => x.sessionType !== "UVODNE" && x.price > 0))
+    .map((c) => normName(c.name)));
+  const zDopytu = data.leads.filter((l) => v(l.date) && l.name && platiaci.has(normName(l.name))).length;
+
+  return { dopyty, uvodne, klienti: novi.length, trzba, zDopytu };
 }
 
 function Krok({ cislo, popis, farba, konverzia }: { cislo: string; popis: string; farba?: string; konverzia?: number | null }) {

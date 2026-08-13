@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { kotvaDat, type ClientAgg } from "../../lib/psb/compute";
-import { fmtCZK } from "../../lib/psb/format";
+import { fmtCZK, monthKey } from "../../lib/psb/format";
 import { CENA_ZA_DOPYT, DOPYTOV_MESACNE, KONVERZIA_DOPYTU, hodnot, type Hodnotenie } from "../../lib/psb/hodnotenie";
 import { suhrnKampani, zlucKampane, type Kampan } from "../../lib/psb/kampane";
 import { C, mix } from "../../lib/psb/theme";
@@ -86,11 +86,28 @@ export function MarketingVrch({ data, clients }: { data: PSBData; clients: Recor
     const dopytovMes = k.dopyty / mes;
     const hD = hodnot(dopytovMes, DOPYTOV_MESACNE);
 
-    const konv = k.dopyty > 0 ? (k.klienti / k.dopyty) * 100 : null;
+    // Konvertujú sa DOPYTY, nie klienti — inak vyjde nad sto percent, lebo
+    // klienti z odporúčaní nemajú zapísaný dopyt. Viď krokyZa.
+    const konv = k.dopyty > 0 ? (k.zDopytu / k.dopyty) * 100 : null;
     const hK = hodnot(konv, KONVERZIA_DOPYTU);
 
+    // ── cena za dopyt ────────────────────────────────────────────────────────
+    //
+    // Až do 13. 8. tu bolo `spend / konverzie z Mety` a vychádzalo 20 Kč. Znelo
+    // to ako mimoriadny úspech a bolo to porovnávané so stropom 2 200 Kč za
+    // klienta. Lenže Metina „konverzia" je čokoľvek, čo si pixel odklikol —
+    // pri týchto kampaniach hlavne stiahnutia dokumentu. Za tých istých 12
+    // mesiacov nemá v Kokpite ani JEDEN dopyt zdroj „reklama" ani UTM.
+    //
+    // Číslo, ktoré by viedlo k nákupu ďalšej reklamy, sa nesmie počítať z inej
+    // veličiny, než akú sľubuje jeho nadpis. Menovateľ je preto dopyt zapísaný
+    // v Kokpite; kým reklama žiadny neprivedie, je tu pomlčka — a tá je
+    // pravdivá odpoveď, nie chýbajúca.
     const s = suhrnKampani(zlucKampane(kampane));
-    const hC = hodnot(s.cena, CENA_ZA_DOPYT);
+    const zReklamy = data.leads.filter((l) =>
+      mesiace.includes(monthKey(l.date)) && (l.source === "reklama" || !!l.kampan?.trim())).length;
+    const cenaZaDopyt = zReklamy > 0 ? s.spend / zReklamy : null;
+    const hC = hodnot(cenaZaDopyt, CENA_ZA_DOPYT);
 
     // Podporné čísla. Nemajú stupnicu — nie je proti čomu ich merať, ich
     // úloha je vysvetliť tie tri hlavné.
@@ -130,7 +147,7 @@ export function MarketingVrch({ data, clients }: { data: PSBData; clients: Recor
       {
         kluc: "cena",
         nazov: "Cena za dopyt",
-        hodnota: s.cena == null ? "—" : fmtCZK(s.cena),
+        hodnota: cenaZaDopyt == null ? "—" : fmtCZK(cenaZaDopyt),
         h: hC,
         smer: "čím nižšia, tým lepšia · strop 2 200 Kč",
         preco: "Bez tohto čísla je rozpočet stávka, nie nákup. S ním sa dá povedať vetu, ktorá dnes povedať nejde: „keď mi odíde osem ľudí, za X korún si objednám dvadsať dopytov.“",
@@ -140,7 +157,7 @@ export function MarketingVrch({ data, clients }: { data: PSBData; clients: Recor
           zle: "Nad stropom 2 200 Kč — klient, ktorý pôjde k Terezke, sa z toho nezaplatí.",
           bezDat: kampane.length === 0
             ? "Ešte som z Mety nestiahol kampane."
-            : "Reklama za 19 mesiacov o dopyt nikdy nepožiadala — všetky kampane kupovali dosah, prekliky a interakcie. Toto číslo vznikne až pri prvej kampani s cieľom „dopyt“.",
+            : `Za ${mes} mesiacov nemá ani jeden dopyt v Kokpite zdroj „reklama“ ani UTM — ${fmtCZK(s.spend)} teda zatiaľ nekúpilo žiadny dopyt, ktorý by som vedel doložiť. Meta hlási ${s.dopyty} konverzií, ale to sú prekliky a stiahnutia dokumentu, nie ľudia, čo napísali. Číslo vznikne, keď do odkazu v reklame pribudnú UTM parametre a spustí sa kampaň s cieľom „dopyt“.`,
         }),
       },
       {

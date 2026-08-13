@@ -12,7 +12,10 @@ Poradie v každej časti je podľa pomeru úžitok / práca.
 | | |
 |---|---|
 | Onboarding a predajné princípy v znalostnej báze Jarvisa | 64 kB; FP compliance a index brand-konfliktov navyše vytiahnuté priamo do systémového promptu |
-| Tlačidlo na Claude Project | v hlavičke Marketingu |
+| Odovzdávacie miesto medzi Jarvisom a Claude Projectom | karta na začiatku „Reels & posty“: Jarvis vyrobí zadanie → Project z neho píše. Drobný odkaz v hlavičke Marketingu zrušený, prehliadal sa |
+| MailerLite | odberatelia, skupiny a kampane; podkategória „Mailer“ |
+| Cena za dopyt počítaná z dopytov, nie z Metiných konverzií | ukazovala 20 Kč z konverzií pixelu; za 12 mesiacov nemá ani jeden dopyt zdroj „reklama“, takže je tam pomlčka a dôvod |
+| Konverzia dopyt → klient konvertuje dopyty | ukazovala 124 %, lebo delila dve rôzne skupiny ľudí |
 | Changelog Graph API v nočnom sťahovaní | + kľúčové slová `deprecat`, `breaking change`, `sunset`, `api version` |
 | Ohlásenie dopytu Mete cez Conversions API | čaká len na token |
 | Obsah → dopyt, rozbor mesiaca, kampane od koruny po klienta | |
