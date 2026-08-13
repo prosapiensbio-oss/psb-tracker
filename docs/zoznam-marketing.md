@@ -82,10 +82,24 @@ Zámerne posledné: kým nefunguje meranie, nie je čo optimalizovať.
 |---|---|
 | Token pre Conversions API v Kokpite | **nie je súrne.** WordPress už posiela Lead serverom cez PixelYourSite. Kokpitov vlastný CAPI by pridal len dopyty, ktoré neprešli webom — telefonát, správa na Instagrame |
 | **UTM do adries reklám** | `utm_campaign={{campaign.name}}` — blokuje celý reťazec kampaň → klient |
-| **Potvrdiť doménu** v Events Manageri | na webe nie je overovací meta tag; ak si overoval cez DNS, je to hotové a stačí mi povedať |
+| **Overiť doménu** v Events Manageri | DNS sa nerobilo a meta tag na webe nie je. Netreba ani jedno — postup nižšie |
 | **Septembrová kampaň s cieľom Lead** | bez toho sa nemeria nič |
 | **450 mailov** | nie je to úloha, je to možnosť. Jerry píše, len keď má čo povedať — a má pravdu. Návrh na mail musí začínať tým, čo tí ľudia dostanú, nie tým, koľko ich je |
 | Premenovať mŕtve pixely | kozmetika |
+
+### Overenie domény bez zásahu do webu
+
+Na webe beží PixelYourSite a ten má na to vlastné pole. Netreba DNS ani úpravu
+šablóny — plugin vloží tag do hlavičky každej stránky sám.
+
+1. **Events Manager** → Nastavenia → Overenie domény → `prosapiens.cz`
+2. Zvoľ spôsob **meta tag** a skopíruj celý riadok `<meta name="facebook-domain-verification" …>`
+3. **WordPress** → PixelYourSite → Nástenka → v karte *Meta pixel* je pole
+   **„Verify your domain"** (je prázdne, overené 13. 8.) → vlož ho tam
+4. **Save Changes**, potom v Events Manageri **Overiť**
+
+Prečo to treba: bez overenej domény Meta neverí, že stránka patrí tebe,
+a obmedzuje, čo sa z nej dá použiť na cielenie a meranie.
 
 ---
 
