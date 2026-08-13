@@ -141,3 +141,33 @@ describe("dopyt → klient", () => {
     expect(k.zDopytu).toBe(0);
   });
 });
+
+describe("kto je za číslami", () => {
+  it("dopyty, úvodné aj klienti nesú mená a dátumy", () => {
+    const s = [session("Petra", "2026-01-10", "UVODNE"), session("Petra", "2026-01-20", "OFFLINE")];
+    const k = krokyZa(
+      psb({
+        leads: [lead("l1", "2026-01-05", "Petra"), lead("l2", "2026-01-06", "Nikto")],
+        sessions: s,
+        payments: [payment("Petra", "2026-01-22")],
+      }),
+      { Petra: klient("Petra", "2026-01-10", s) },
+      MES,
+    );
+    expect(k.kto.dopyty.map((x) => x.meno)).toEqual(["Nikto", "Petra"]);   // od najnovšieho
+    expect(k.kto.uvodne).toEqual([{ meno: "Petra", datum: "2026-01-10" }]);
+    expect(k.kto.klienti[0]).toEqual({ meno: "Petra", prvy: "2026-01-10", zaplatil: "2026-01-22" });
+  });
+
+  it("kto prišiel na úvodný dvakrát, je v zozname raz a s prvým dátumom", () => {
+    const s = [session("Petra", "2026-02-03", "UVODNE"), session("Petra", "2026-01-10", "UVODNE")];
+    const k = krokyZa(psb({ sessions: s }), {}, MES);
+    expect(k.uvodne).toBe(1);
+    expect(k.kto.uvodne).toEqual([{ meno: "Petra", datum: "2026-01-10" }]);
+  });
+
+  it("dopyt bez mena sa nestratí, len sa označí", () => {
+    const k = krokyZa(psb({ leads: [lead("l1", "2026-01-05", "")] }), {}, MES);
+    expect(k.kto.dopyty[0].meno).toBe("(bez mena)");
+  });
+});

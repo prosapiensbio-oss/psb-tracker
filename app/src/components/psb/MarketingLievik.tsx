@@ -25,6 +25,12 @@ const pct = (a: number, b: number) => (b > 0 && a <= b ? Math.round((a / b) * 10
 
 // Zoznam období je spoločný — viď lib/psb/obdobia.ts.
 
+/** „2026-08-11" → „11. 8." — v zozname mien je rok šum. */
+const fmtDen = (d: string) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d);
+  return m ? `${Number(m[3])}. ${Number(m[2])}.` : d || "—";
+};
+
 const zdrojLabel = (z: string) => ZDROJE.find((x) => x.value === z)?.label || (z ? z : "nevyplnené");
 
 /** Mesiace v okne, od najstaršieho. Kotva je posledný mesiac s dátami, nie dnešok. */
@@ -53,14 +59,34 @@ export type Kroky = {
    * stihnúť zaplatiť. Okno preto končí posledným plným mesiacom (kotva dát).
    */
   zDopytu: number;
+  /**
+   * Kto presne za tými číslami je.
+   *
+   * Jerry, 13. 8.: „keď kliknem na úvodný tréning 3, napíše mi, kto presne to
+   * je." Číslo bez mien sa nedá overiť ani použiť — pri troch ľuďoch je otázka
+   * „ktorí?" prvá, ktorá napadne, a doteraz sa na ňu dalo odpovedať len
+   * preklikaním Klientov.
+   */
+  kto: {
+    dopyty: { meno: string; datum: string; zdroj: string }[];
+    uvodne: { meno: string; datum: string }[];
+    klienti: { meno: string; prvy: string; zaplatil: string }[];
+  };
 };
 
 export function krokyZa(data: PSBData, clients: Record<string, ClientAgg>, mesiace: string[]): Kroky {
   const v = (d: string) => mesiace.includes(monthKey(d));
-  const dopyty = data.leads.filter((l) => v(l.date)).length;
+  const dopytyRiadky = data.leads.filter((l) => v(l.date));
+  const dopyty = dopytyRiadky.length;
   // Úvodný tréning ako UDALOSŤ, nie ako sedenie: keď niekto príde dvakrát,
   // stále je to jeden človek na začiatku cesty.
-  const uvodne = new Set(data.sessions.filter((s) => s.sessionType === "UVODNE" && v(s.date)).map((s) => s.client)).size;
+  const uvodneSedenia = data.sessions.filter((s) => s.sessionType === "UVODNE" && v(s.date));
+  // Jeden človek = jeden riadok, aj keď prišiel dvakrát. Berie sa prvý dátum.
+  const uvodneMapa = new Map<string, string>();
+  for (const s of [...uvodneSedenia].sort((a, b) => a.date.localeCompare(b.date))) {
+    if (!uvodneMapa.has(s.client)) uvodneMapa.set(s.client, s.date);
+  }
+  const uvodne = uvodneMapa.size;
   // Nový KLIENT nie je každý, kto prišiel na úvodný tréning — je to ten, kto
   // potom aj niečo zaplatil. Bez tohto rozlíšenia by konverzia úvodný → klient
   // vždy vyšla 100 %, lebo úvodný tréning JE prvé sedenie a obe čísla by
@@ -88,16 +114,53 @@ export function krokyZa(data: PSBData, clients: Record<string, ClientAgg>, mesia
     .map((c) => normName(c.name)));
   const zDopytu = data.leads.filter((l) => v(l.date) && l.name && platiaci.has(normName(l.name))).length;
 
-  return { dopyty, uvodne, klienti: novi.length, trzba, zDopytu };
+  const prvaPlatba = (meno: string) =>
+    data.payments.filter((p) => p.client === meno).map((p) => p.date).sort()[0] || "";
+
+  return {
+    dopyty, uvodne, klienti: novi.length, trzba, zDopytu,
+    kto: {
+      dopyty: dopytyRiadky
+        .map((l) => ({ meno: l.name || "(bez mena)", datum: l.date, zdroj: l.source || "" }))
+        .sort((a, b) => b.datum.localeCompare(a.datum)),
+      uvodne: [...uvodneMapa.entries()]
+        .map(([meno, datum]) => ({ meno, datum }))
+        .sort((a, b) => b.datum.localeCompare(a.datum)),
+      klienti: novi
+        .map((c) => ({ meno: c.name, prvy: c.firstSession || "", zaplatil: prvaPlatba(c.name) }))
+        .sort((a, b) => b.prvy.localeCompare(a.prvy)),
+    },
+  };
 }
 
-function Krok({ cislo, popis, farba, konverzia }: { cislo: string; popis: string; farba?: string; konverzia?: number | null }) {
+function Krok({ cislo, popis, farba, konverzia, onClick, aktivny }: {
+  cislo: string; popis: string; farba?: string; konverzia?: number | null;
+  /** Bez toho je krok len číslo — s tým sa dá spýtať „ktorí?". */
+  onClick?: () => void; aktivny?: boolean;
+}) {
+  const telo = (
+    <>
+      <div style={{ fontSize: 26, fontWeight: 800, color: farba || C.text, lineHeight: 1.1, fontVariantNumeric: "tabular-nums" }}>{cislo}</div>
+      <div style={{ fontSize: 11.5, color: onClick ? C.accentLight : C.textMuted, marginTop: 3 }}>
+        {popis}{onClick && <span style={{ fontSize: 9, marginLeft: 5, opacity: 0.8 }}>{aktivny ? "▾" : "▸"}</span>}
+      </div>
+    </>
+  );
   return (
     <>
-      <div style={{ flex: "1 1 110px", minWidth: 0 }}>
-        <div style={{ fontSize: 26, fontWeight: 800, color: farba || C.text, lineHeight: 1.1, fontVariantNumeric: "tabular-nums" }}>{cislo}</div>
-        <div style={{ fontSize: 11.5, color: C.textMuted, marginTop: 3 }}>{popis}</div>
-      </div>
+      {onClick ? (
+        <button onClick={onClick} title="Ukázať mená"
+          style={{
+            flex: "1 1 110px", minWidth: 0, textAlign: "left", cursor: "pointer",
+            background: aktivny ? mix(C.accent, 8) : "transparent",
+            border: `1px solid ${aktivny ? mix(C.accent, 35) : "transparent"}`,
+            borderRadius: 8, padding: "4px 8px", margin: "-4px -8px", fontFamily: "inherit",
+          }}>
+          {telo}
+        </button>
+      ) : (
+        <div style={{ flex: "1 1 110px", minWidth: 0 }}>{telo}</div>
+      )}
       {konverzia !== undefined && (
         <div style={{ flex: "0 0 auto", textAlign: "center", color: C.textDim, alignSelf: "center" }}>
           <div style={{ fontSize: 16, lineHeight: 1 }}>→</div>
@@ -112,6 +175,8 @@ function Krok({ cislo, popis, farba, konverzia }: { cislo: string; popis: string
 
 export function Lievik({ data, clients }: { data: PSBData; clients: Record<string, ClientAgg> }) {
   const [okno, setOkno] = useState("2026");
+  /** Ktorý krok lievika má rozbalené mená. Vždy najviac jeden. */
+  const [ktori, setKtori] = useState<"dopyty" | "uvodne" | "klienti" | null>(null);
   const [web, setWeb] = useState<{ ga4: { m: string; udalosti: number }[]; dopyty: { dopyt: string; kliky: number }[] }>({ ga4: [], dopyty: [] });
 
   useEffect(() => {
@@ -160,14 +225,51 @@ export function Lievik({ data, clients }: { data: PSBData; clients: Record<strin
         </div>
 
         <div style={{ display: "flex", gap: 12, alignItems: "flex-start", flexWrap: "wrap", margin: "14px 0 4px" }}>
-          <Krok cislo={String(k.dopyty)} popis="Dopyty" konverzia={pct(k.uvodne, k.dopyty)} />
-          <Krok cislo={String(k.uvodne)} popis="Úvodné tréningy" konverzia={pct(k.klienti, k.uvodne)} />
-          <Krok cislo={String(k.klienti)} popis="Noví klienti" konverzia={undefined} />
+          <Krok cislo={String(k.dopyty)} popis="Dopyty" konverzia={pct(k.uvodne, k.dopyty)}
+            onClick={k.dopyty ? () => setKtori(ktori === "dopyty" ? null : "dopyty") : undefined} aktivny={ktori === "dopyty"} />
+          <Krok cislo={String(k.uvodne)} popis="Úvodné tréningy" konverzia={pct(k.klienti, k.uvodne)}
+            onClick={k.uvodne ? () => setKtori(ktori === "uvodne" ? null : "uvodne") : undefined} aktivny={ktori === "uvodne"} />
+          <Krok cislo={String(k.klienti)} popis="Noví klienti" konverzia={undefined}
+            onClick={k.klienti ? () => setKtori(ktori === "klienti" ? null : "klienti") : undefined} aktivny={ktori === "klienti"} />
           <div style={{ flex: "1 1 130px", minWidth: 0 }}>
             <div style={{ fontSize: 26, fontWeight: 800, color: C.accentLight, lineHeight: 1.1, fontVariantNumeric: "tabular-nums" }}>{fmtCZK(k.trzba)}</div>
             <div style={{ fontSize: 11.5, color: C.textMuted, marginTop: 3 }}>Tržba od nových</div>
           </div>
         </div>
+
+        {ktori && (() => {
+          // Jeden zoznam pre všetky tri kroky — riadky sa líšia len stĺpcami.
+          // Tri samostatné tabuľky by boli trikrát to isté a rozišli by sa.
+          const nadpisy = { dopyty: "Kto sa ozval", uvodne: "Kto prišiel na úvodný", klienti: "Kto zostal a zaplatil" };
+          const riadky: { meno: string; vpravo: string }[] =
+            ktori === "dopyty"
+              ? k.kto.dopyty.map((x) => ({ meno: x.meno, vpravo: `${fmtDen(x.datum)}${x.zdroj ? ` · ${zdrojLabel(x.zdroj)}` : ""}` }))
+              : ktori === "uvodne"
+                ? k.kto.uvodne.map((x) => ({ meno: x.meno, vpravo: `úvodný ${fmtDen(x.datum)}` }))
+                : k.kto.klienti.map((x) => ({
+                  meno: x.meno,
+                  vpravo: `prvý tréning ${fmtDen(x.prvy)}${x.zaplatil ? ` · zaplatil ${fmtDen(x.zaplatil)}` : ""}`,
+                }));
+          return (
+            <div style={{ marginTop: 12, padding: "10px 13px", borderRadius: 9, background: mix(C.text, 4), border: `1px solid ${C.border}` }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <span style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", color: C.textMuted }}>
+                  {nadpisy[ktori]} ({riadky.length})
+                </span>
+                <button onClick={() => setKtori(null)}
+                  style={{ background: "none", border: "none", color: C.textDim, fontSize: 11.5, cursor: "pointer" }}>zavrieť</button>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 5, maxHeight: 260, overflowY: "auto" }}>
+                {riadky.map((r, i) => (
+                  <div key={`${r.meno}-${i}`} style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 12.5 }}>
+                    <span style={{ color: C.text, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.meno}</span>
+                    <span style={{ color: C.textDim, flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>{r.vpravo}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
 
         {chybajuDopyty && (
           <div style={{ marginTop: 12, padding: "10px 13px", borderRadius: 9, background: mix(C.orange, 8), border: `1px solid ${mix(C.orange, 26)}`, fontSize: 12.5, color: C.text, lineHeight: 1.55 }}>
