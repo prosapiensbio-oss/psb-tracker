@@ -91,7 +91,6 @@ sa pridáva v Mete. A hlavne: kým nefunguje meranie, nie je čo optimalizovať.
 | | prečo je to na tebe |
 |---|---|
 | Token pre Conversions API v Kokpite | **nie je súrne.** WordPress už posiela Lead serverom cez PixelYourSite. Kokpitov vlastný CAPI by pridal len dopyty, ktoré neprešli webom — telefonát, správa na Instagrame |
-| **Overiť doménu** v Events Manageri | DNS sa nerobilo a meta tag na webe nie je. Netreba ani jedno — postup nižšie |
 | **450 mailov** | nie je to úloha, je to možnosť. Jerry píše, len keď má čo povedať — a má pravdu. Návrh na mail musí začínať tým, čo tí ľudia dostanú, nie tým, koľko ich je |
 | Premenovať mŕtve pixely | kozmetika |
 
@@ -108,20 +107,16 @@ sa dá spraviť, len otupuje zoznam.
 
 ---
 
-### Overenie domény bez zásahu do webu
+### Doména JE overená (13. 8.)
 
-Na webe beží PixelYourSite a ten má na to vlastné pole. Netreba DNS ani úpravu
-šablóny — plugin vloží tag do hlavičky každej stránky sám.
+`prosapiens.cz` má v Business Settings zelený štítok *Verified*. Neupravuj kvôli
+tomu nič v DNS ani na webe.
 
-1. **Events Manager** → Nastavenia → Overenie domény → `prosapiens.cz`
-2. Zvoľ spôsob **meta tag** a skopíruj celý riadok `<meta name="facebook-domain-verification" …>`
-3. **WordPress** → PixelYourSite → Nástenka → v karte *Meta pixel* je pole
-   **„Verify your domain"** (je prázdne, overené 13. 8.) → vlož ho tam
-4. **Save Changes**, potom v Events Manageri **Overiť**
-
-Prečo to treba: bez overenej domény Meta neverí, že stránka patrí tebe,
-a obmedzuje, čo sa z nej dá použiť na cielenie a meranie.
-
+Pozor na úsudok, ktorý ma pomýlil: na stránke nie je meta tag a v DNS nie je
+TXT záznam — z toho som usúdil, že overená nie je. Meta má ale TRI spôsoby
+overenia a ten tretí, nahratie HTML súboru, zvonku vidieť nejde. Overenie navyše
+ostáva platné aj potom, čo dôkaz zo stránky zmizne. Neprítomnosť dvoch z troch
+dôkazov nie je dôkaz neprítomnosti.
 ---
 
 ## E · Rozhodnuté, že sa nerobí
