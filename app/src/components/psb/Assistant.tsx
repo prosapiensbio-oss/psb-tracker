@@ -455,8 +455,15 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
           `Zápis z denníka klienta «${meno}» (${dnes}):\n„${zapis}“\n\n` +
           `Ak zo zápisu vyplýva úloha alebo pripomienka do budúcnosti (napr. „o dva týždne sa mu ozvať", ` +
           `„v septembri rieši predĺženie"), pridaj psb-action blok zapis-zaver: tema = meno klienta a vec, ` +
-          `zaver = čo sa deje, overit = čo treba spraviť, overitDo = konkrétny dátum odvodený zo zápisu. ` +
-          `Ak zo zápisu žiadna budúca úloha nevyplýva, nepridávaj nič. ` +
+          `zaver = čo sa deje, overit = čo treba spraviť, overitDo = konkrétny dátum odvodený zo zápisu.\n\n` +
+          `A ak zo zápisu vyplýva, že klient nejaký čas NEPRÍDE — operácia, dovolenka, ` +
+          `„príde až v septembri", zranenie, sťahovanie — pridaj NAVYŠE blok set-override ` +
+          `s field "status" a value "Pauza|YYYY-MM-DD", kde dátum je koniec tej neprítomnosti. ` +
+          `Pri rozsahu („vráti sa o 1 až 2 týždne") ber ten NESKORŠÍ koniec: predčasne ukončená ` +
+          `pauza sa sama pripomenie, priskoro zrátaný klient ticho nafúkne odhad tržieb. ` +
+          `Bez tohto zostane informácia len v texte a odhad počíta s peniazmi od človeka, ` +
+          `o ktorom vieme, že nepríde.\n\n` +
+          `Ak zo zápisu nevyplýva ani jedno, nepridávaj nič. ` +
           `Mimo action blokov odpovedz najviac jednou krátkou vetou.`,
       }],
       context,
@@ -467,13 +474,34 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
     const { actions: acts } = parseActions(res.reply);
     const zavery = acts.filter((a) => a.type === "zapis-zaver" && a.data);
     for (const a of zavery) await saveZaver(a.data as never).catch(() => {});
-    if (!zavery.length) return null;
-    return zavery
-      .map((a) => {
+
+    // Pauza sa zapisuje BEZ potvrdenia, na rozdiel od bežných návrhov Jarvisa.
+    //
+    // Je to jediná akcia z denníka, ktorú si Jerry práve vypýtal vetou v texte
+    // („príde až v septembri") — pýtať sa naňho druhýkrát cez tlačidlo by
+    // znamenalo to isté povedať dvakrát. A cena omylu je malá: pauza sa dá
+    // zrušiť jedným klikom v karte klienta a po termíne sa sama pripomenie.
+    const pauzy = acts.filter((a) => {
+      const d = (a.data || {}) as Record<string, unknown>;
+      return a.type === "set-override" && d.field === "status" && String(d.value || "").startsWith("Pauza");
+    });
+    for (const a of pauzy) {
+      const d = a.data as Record<string, unknown>;
+      try { actions.setOverride(String(d.name || meno), "status", String(d.value)); } catch { /* nech to nezhodí zápis */ }
+    }
+
+    if (!zavery.length && !pauzy.length) return null;
+    return [
+      ...pauzy.map((a) => {
+        const d = a.data as Record<string, unknown>;
+        const do_ = String(d.value || "").split("|")[1];
+        return `Zapnutá pauza${do_ ? ` do ${fmtDMY(do_)}` : ""} — do odhadu tržieb sa dovtedy nepočíta.`;
+      }),
+      ...zavery.map((a) => {
         const d = a.data as Record<string, unknown>;
         return `Jarvis si zapísal pripomienku: ${String(d.overit || d.zaver || "").slice(0, 120)}${d.overitDo ? ` (${fmtDMY(String(d.overitDo))})` : ""}`;
-      })
-      .join(" · ");
+      }),
+    ].join(" · ");
   }
 
   return { msgs, setMsgs, input, setInput, busy, stav, deep, setDeep, pending, setPending, attach, setAttach, ask, runAction, confirmImport, handleIncoming, floatingOpen, setFloatingOpen, chats, chatId, newChat, openChat, deleteChat, archiveChat, spracujDennik };

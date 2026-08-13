@@ -1419,6 +1419,17 @@ export function predictCash(
     const objednane = OBJEDNANE[c.name] || 0;
     if (c.status === "Neaktívny" && !objednane) continue;
     if (duchOdpoved(c) === "ano" && !objednane) continue;   // potvrdený duch už nezaplatí
+    // Dohodnutá pauza je to najsilnejšie, čo o budúcnosti vieme — je to jediná
+    // informácia, ktorú appka nedopočítala, ale dostala od človeka. Kým beží,
+    // klient nemíňa hodiny, a teda ani nekupuje ďalšie.
+    //
+    // Po skončení pauzy sa počíta ďalej: register vtedy ohlási „ozvi sa"
+    // a odhad má opäť čo predpovedať. Klient s dohodnutým termínom v kalendári
+    // je výnimka — kto má termín, tomu pauza fakticky skončila.
+    if (c.status === "Pauza" && !objednane) {
+      const trva = !c.pauseUntil || daysBetween(c.pauseUntil, teraz) < 0;
+      if (trva) continue;
+    }
     const platby = data.payments
       .filter((p) => p.client === c.name && p.amount > 0)
       .sort((a, b) => a.date.localeCompare(b.date));

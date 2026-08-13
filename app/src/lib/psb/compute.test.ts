@@ -333,6 +333,38 @@ describe("predictCash", () => {
     expect(x!.tyzdnov).toBeLessThan(1);
   });
 
+  test("klient na dohodnutej pauze sa do odhadu neráta", () => {
+    // Dan Kouřil ide 14. 8. na operáciu, Martin Špok príde až v septembri.
+    // Obaja to majú napísané v denníku — a odhad s ich peniazmi aj tak počítal,
+    // lebo pauzu nikto nezapol a predpoveď ju ani nepozerala.
+    const zaklad = {
+      sessions: [
+        ...Array.from({ length: 8 }, (_, i) => sedenie("Dan", dniDozadu(60 - i * 7), "OFFLINE")),
+        ...kotvaSedenia,
+      ],
+      payments: [platba("Dan", dniDozadu(70), 9200), ...dnesnaPlatba],
+    };
+    expect(pred(zaklad).perClient.some((x) => x.name === "Dan")).toBe(true);
+
+    const naPauze = pred({
+      ...zaklad,
+      clientOverrides: { Dan: { status: `Pauza|${new Date(Date.now() + 20 * 86400000).toISOString().slice(0, 10)}` } },
+    });
+    expect(naPauze.perClient.some((x) => x.name === "Dan")).toBe(false);
+  });
+
+  test("po skončení pauzy sa počíta ďalej", () => {
+    const v = pred({
+      sessions: [
+        ...Array.from({ length: 8 }, (_, i) => sedenie("Dan", dniDozadu(60 - i * 7), "OFFLINE")),
+        ...kotvaSedenia,
+      ],
+      payments: [platba("Dan", dniDozadu(70), 9200), ...dnesnaPlatba],
+      clientOverrides: { Dan: { status: `Pauza|${dniDozadu(5)}` } },
+    });
+    expect(v.perClient.some((x) => x.name === "Dan")).toBe(true);
+  });
+
   test("kto má obnovu ešte tento mesiac, v zozname JE", () => {
     // Graf mesiacov zámerne začína budúcim mesiacom. Zoznam ľudí sa z neho
     // plnil, takže obnova splatná dnes nemala kam spadnúť — a dashboard sa
