@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { kontrolaKanalov, type Riadok } from "./kontrolaDat";
+import { kontrolaKanalov, kontrolaMerania, type MeranieMesiac, type Riadok } from "./kontrolaDat";
 
 const r = (mesiac: string, kanal: string, metrika: string, hodnota: number): Riadok =>
   ({ mesiac, kanal, metrika, hodnota });
@@ -127,5 +127,55 @@ describe("poradie", () => {
       r("2026-07", "Meta Ads", "Spent", 3000),
     ], [{ mesiac: "2026-07", spend: 4796 }]);
     expect(v[0].zavaznost).toBe("vysoka");
+  });
+});
+
+describe("strážca merania", () => {
+  const rada12 = (novi: number): MeranieMesiac[] => Array.from({ length: 12 }, (_, i) => ({ m: `2026-${String(i + 1).padStart(2, "0")}`, novi }));
+  const gsc12 = (kliky: number) => Array.from({ length: 12 }, (_, i) => ({ m: `2026-${String(i + 1).padStart(2, "0")}`, kliky }));
+
+  it("nájde presne to, čo sa dialo od marca 2026", () => {
+    // Search Console drží, GA4 spadlo na nulu.
+    const ga4 = rada12(300); ga4[3].novi = 0;
+    const v = kontrolaMerania(ga4, gsc12(235));
+    expect(v).toHaveLength(1);
+    expect(v[0].nadpis).toContain("GA4 ho nemeria");
+    expect(v[0].zavaznost).toBe("vysoka");
+  });
+
+  it("mesiac, ktorý v GA4 vôbec nie je, je rovnaká správa", () => {
+    const ga4 = rada12(300).filter((x) => x.m !== "2026-04");
+    expect(kontrolaMerania(ga4, gsc12(235)).some((x) => x.kluc === "meranie|2026-04")).toBe(true);
+  });
+
+  it("už označený nemeraný mesiac sa nehlási druhýkrát", () => {
+    const ga4 = rada12(300); ga4[3] = { m: "2026-04", novi: 0, chyba: true };
+    expect(kontrolaMerania(ga4, gsc12(235))).toEqual([]);
+  });
+
+  it("čiastočný mesiac sa tiež nehlási — vie sa o ňom", () => {
+    const ga4 = rada12(300); ga4[3] = { m: "2026-04", novi: 21, castocne: true };
+    expect(kontrolaMerania(ga4, gsc12(235))).toEqual([]);
+  });
+
+  it("keď spadnú OBIDVA zdroje, nie je to chyba merania", () => {
+    // Web mal slabý mesiac. To je správa o webe, nie o skripte.
+    const ga4 = rada12(300); ga4[3].novi = 10;
+    const gsc = gsc12(235); gsc[3].kliky = 12;
+    expect(kontrolaMerania(ga4, gsc)).toEqual([]);
+  });
+
+  it("bežný pokles sa nehlási — polovica nie je rád", () => {
+    const ga4 = rada12(300); ga4[3].novi = 150;
+    expect(kontrolaMerania(ga4, gsc12(235))).toEqual([]);
+  });
+
+  it("krátka história sa nekontroluje", () => {
+    expect(kontrolaMerania([{ m: "2026-01", novi: 300 }], [{ m: "2026-01", kliky: 235 }])).toEqual([]);
+  });
+
+  it("malé čísla sa nekontrolujú — tam je výkyv normálny", () => {
+    const ga4 = rada12(8); ga4[3].novi = 0;
+    expect(kontrolaMerania(ga4, gsc12(235))).toEqual([]);
   });
 });

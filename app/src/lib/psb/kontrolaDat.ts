@@ -174,3 +174,70 @@ export function kontrolaKanalov(riadky: Riadok[], vydavokZMety: { mesiac: string
 
   return von.sort((a, b) => (a.zavaznost === b.zavaznost ? a.kluc.localeCompare(b.kluc) : a.zavaznost === "vysoka" ? -1 : 1));
 }
+
+/**
+ * Strážca merania: beží web, ale prestal sa merať?
+ *
+ * PREČO TO VZNIKLO
+ *
+ * Od marca do júna 2026 nenameralo GA4 na webe takmer nič, hoci Search Console
+ * za tie isté mesiace hlásil 235 klikov mesačne — najlepšie čísla, aké web mal.
+ * Merací kód prestal fungovať a nikto si to päť mesiacov nevšimol. Nevšimol by
+ * si to ani teraz, keby sa obidva zdroje prvýkrát neocitli vedľa seba.
+ *
+ * Prečo to zlyhalo, sa už nedozvieme a nepotrebujeme — tie mesiace sú
+ * označené za nemerané a nič sa z nich nerozhoduje. Dôležité je, aby sa to
+ * nabudúce neopakovalo POTICHU.
+ *
+ * PREČO PRÁVE TIETO DVA ZDROJE
+ *
+ * Sú na sebe nezávislé. Search Console počíta Google na svojej strane, GA4
+ * počíta skript na stránke. Keď sa rozídu, chyba je takmer isto v tom
+ * druhom — na návštevnosť webu Kokpit iné potvrdenie nemá.
+ *
+ * ČO TO NEROBÍ
+ *
+ * Nehlási bežný pokles. Kliky a noví používatelia nie sú to isté číslo a ich
+ * pomer kolíše. Hlási sa len prípad, keď jedno drží a druhé spadne o rád —
+ * teda to, čo sa nedá vysvetliť správaním ľudí, len prestatým meraním.
+ */
+
+export type MeranieMesiac = { m: string; novi: number; chyba?: boolean; castocne?: boolean };
+
+/** Podiel mediánu, pod ktorým sa GA4 považuje za spadnuté. */
+const SPADNUTE = 0.2;
+
+/** Podiel mediánu, nad ktorým sa Search Console považuje za bežiace. */
+const BEZI = 0.5;
+
+export function kontrolaMerania(
+  ga4: MeranieMesiac[],
+  gsc: { m: string; kliky: number }[],
+): Nezhoda[] {
+  // Mesiace, o ktorých sa už vie, sa nehlásia znova — sú označené v appke.
+  const znameDiery = new Set(ga4.filter((x) => x.chyba || x.castocne).map((x) => x.m));
+  const merane = ga4.filter((x) => !x.chyba && !x.castocne);
+  if (merane.length < 5 || gsc.length < 5) return [];
+
+  const medGa4 = median(merane.map((x) => x.novi));
+  const medGsc = median(gsc.map((x) => x.kliky));
+  if (medGa4 < MALE_CISLA || medGsc < 5) return [];
+
+  const von: Nezhoda[] = [];
+  for (const g of gsc) {
+    if (znameDiery.has(g.m)) continue;
+    if (g.kliky < medGsc * BEZI) continue;           // web sám mal slabý mesiac
+    const a = ga4.find((x) => x.m === g.m);
+    // Chýbajúci mesiac je rovnaká správa ako mesiac s nulou: GA4 nemá nič,
+    // Search Console má návštevy.
+    const novi = a && !a.chyba ? a.novi : 0;
+    if (novi >= medGa4 * SPADNUTE) continue;
+    von.push({
+      kluc: `meranie|${g.m}`,
+      zavaznost: "vysoka",
+      nadpis: `${g.m}: web beží, ale GA4 ho nemeria`,
+      detail: `Search Console hlási ${cislo(g.kliky)} klikov (bežne ${cislo(medGsc)}), GA4 ${a ? cislo(novi) : "žiadny riadok"} nových (bežne ${cislo(medGa4)}). Ľudia na web chodia — nemeria sa. Skontroluj merací kód: na webe ho vkladá plugin PixelYourSite (GA4 → Google Analytics) a môže ho blokovať súhlas s cookies. Kým sa to nespraví, tento mesiac označ za nemeraný, nech sa nepočíta ako prepad.`,
+    });
+  }
+  return von;
+}

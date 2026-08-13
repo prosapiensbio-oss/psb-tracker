@@ -16,6 +16,7 @@ Poradie v každej časti je podľa pomeru úžitok / práca.
 | MailerLite | odberatelia, skupiny a kampane; podkategória „Mailer“ |
 | GA4 + Search Console cez servisný účet | jeden kľúč, obe služby; píše do tabuliek ručného importu. GA4 property 355422977, web `https://www.prosapiens.cz/` |
 | Nemerané mesiace prežijú import | apríl a máj 2026 GA4 nemeralo; značka sa už neprepíše a Jarvis ju dostáva menovite |
+| Strážca merania: web beží, ale GA4 ho nemeria | porovnáva GA4 proti Search Console; hlási, len keď jedno drží a druhé spadne o rád |
 | Veta pod grafom kanálov sa počíta | bola napísaná natvrdo a tvrdila „~280 nových mesačne“ aj potom, čo to prestalo platiť |
 | Cena za dopyt počítaná z dopytov, nie z Metiných konverzií | ukazovala 20 Kč z konverzií pixelu; za 12 mesiacov nemá ani jeden dopyt zdroj „reklama“, takže je tam pomlčka a dôvod |
 | Konverzia dopyt → klient konvertuje dopyty | ukazovala 124 %, lebo delila dve rôzne skupiny ľudí |

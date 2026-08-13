@@ -36,6 +36,7 @@ import { Zadanie } from "./Zadanie";
 import { AkoMeratReklamu, Kohorta, Lievik, Naklady } from "./MarketingLievik";
 import { Kanaly } from "./Kanaly";
 import { zhrnutieWebu } from "../../lib/psb/google";
+import { kontrolaMerania } from "../../lib/psb/kontrolaDat";
 import { C, mix, S } from "../../lib/psb/theme";
 import type { AssistantChat } from "./Assistant";
 import type { ClientAgg } from "../../lib/psb/compute";
@@ -532,6 +533,9 @@ function RokBar({ rok, onRok }: { rok: string; onRok: (r: string) => void }) {
 
 function WebKanaly({ rok, onRok, chat }: { rok: string; onRok: (r: string) => void; chat?: AssistantChat }) {
   const vsetky = GA4_MESACNE.filter((r) => r.m.startsWith(rok));
+  // Strážca beží nad celou radou, nie nad vybraným rokom — diera na prelome
+  // rokov by inak zmizla medzi dvomi filtrami.
+  const straz = kontrolaMerania(GA4_MESACNE, GSC_MESACNE).filter((n) => n.kluc.includes(rok));
   // Mesiace bez merania sa NEPRIEMERUJÚ — nula by tvárila, že nikto neprišiel,
   // hoci sa len nemeralo.
   const data = vsetky.filter((r) => !r.chyba);
@@ -594,6 +598,11 @@ function WebKanaly({ rok, onRok, chat }: { rok: string; onRok: (r: string) => vo
           </div>
         ))}
       </div>
+      {straz.map((n) => (
+        <div key={n.kluc} style={{ marginTop: 12, padding: "10px 14px", borderRadius: 10, background: mix(C.red, 10), border: `1px solid ${mix(C.red, 35)}`, fontSize: 12.5, color: C.text, lineHeight: 1.55 }}>
+          <b>{n.nadpis}</b><br />{n.detail}
+        </div>
+      ))}
       {(diery.length > 0 || castocne.length > 0) && (
         <div style={{ marginTop: 12, padding: "10px 14px", borderRadius: 10, background: mix(C.orange, 10), border: `1px solid ${mix(C.orange, 30)}`, fontSize: 12.5, color: C.text, lineHeight: 1.55 }}>
           {diery.length > 0 && <><b>{diery.join(" a ")}</b> chýba — GA4 bolo odpojené, takže to nie je nula, ale diera. Do súčtov a priemerov sa nezapočítava. </>}
