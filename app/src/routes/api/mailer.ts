@@ -135,12 +135,24 @@ export const Route = createFileRoute("/api/mailer")({
           }
 
           if (b.akcia === "stiahni") {
-            // Skupiny sa načítajú raz a priradia podľa id — inak by to bolo
-            // jedno volanie na odberateľa.
+            // Skupiny sa NEDAJÚ vyčítať zo zoznamu odberateľov — MailerLite ich
+            // tam neposiela (prvá verzia to skúšala a všetkých 616 zostalo bez
+            // skupiny). Jediná cesta je opačná: prejsť skupiny a pri každej si
+            // vypýtať jej odberateľov. Je to zopár volaní navyše a stoja za to:
+            // skupina hovorí, z ktorého magnetu človek prišiel, a bez toho je
+            // odberateľ len mail bez pôvodu.
             const g = await volaj("/groups?limit=100", token);
-            const menoSkupiny = new Map<string, string>();
+            const skupinyOdberatela = new Map<string, string[]>();
             for (const x of ((g.data?.data as Record<string, unknown>[]) || [])) {
-              menoSkupiny.set(String(x.id), String(x.name || ""));
+              const meno = String(x.name || "");
+              if (!meno) continue;
+              const cl = await vsetky(`/groups/${x.id}/subscribers?limit=500`, token, 6);
+              if (!cl.ok) continue;
+              for (const c of cl.riadky) {
+                const id = String(c.id || "");
+                if (!id) continue;
+                skupinyOdberatela.set(id, [...(skupinyOdberatela.get(id) || []), meno]);
+              }
             }
 
             const o = await vsetky("/subscribers?limit=500", token);
@@ -149,8 +161,7 @@ export const Route = createFileRoute("/api/mailer")({
             if (!k.ok) return Response.json({ ok: false, error: k.chyba }, { status: 502 });
 
             const stmtsO = o.riadky.map((x) => {
-              const sk = ((x.groups as Record<string, unknown>[]) || [])
-                .map((s) => menoSkupiny.get(String(s.id)) || String(s.name || "")).filter(Boolean).join(" · ");
+              const sk = (skupinyOdberatela.get(String(x.id)) || []).join(" · ");
               const f = (x.fields || {}) as Record<string, unknown>;
               return DB.prepare(
                 `INSERT INTO mail_odberatelia (id,email,meno,prihlaseny,status,skupiny,updated_at)
