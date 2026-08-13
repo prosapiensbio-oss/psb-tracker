@@ -1,0 +1,144 @@
+import { describe, expect, it } from "bun:test";
+
+import { ga4Mesiace, gscMesiace, gscRebricek, mesiacZGa4, narokyJwt, normProperty, normSite, odKedy } from "./google";
+
+const kanal = (mesiac: string, kanal: string, novi: number) =>
+  ({ dimensionValues: [{ value: mesiac }, { value: kanal }], metricValues: [{ value: String(novi) }] });
+
+describe("GA4 → mesiace", () => {
+  it("rozdelí kanály do stĺpcov a spočíta nových", () => {
+    const [m] = ga4Mesiace({
+      rows: [
+        kanal("202607", "Organic Search", 120),
+        kanal("202607", "Paid Social", 40),
+        kanal("202607", "Direct", 30),
+      ],
+    });
+    expect(m.mesiac).toBe("2026-07");
+    expect(m.organicSearch).toBe(120);
+    expect(m.paidSocial).toBe(40);
+    expect(m.direct).toBe(30);
+    expect(m.novi).toBe(190);
+  });
+
+  it("kanál bez vlastného stĺpca sa do nových napočíta", () => {
+    // Ručný export počítal `novi` ako súčet VŠETKÝCH kanálov. Keby sa Email
+    // zahodil, API by hlásilo menej návštevníkov než CSV za ten istý mesiac.
+    const [m] = ga4Mesiace({ rows: [kanal("202607", "Organic Search", 100), kanal("202607", "Email", 25)] });
+    expect(m.novi).toBe(125);
+    expect(m.organicSearch).toBe(100);
+  });
+
+  it("nezáleží na veľkosti písmen v názve kanála", () => {
+    const [m] = ga4Mesiace({ rows: [kanal("202607", "paid social", 40)] });
+    expect(m.paidSocial).toBe(40);
+  });
+
+  it("kľúčové udalosti sa priradia k správnemu mesiacu", () => {
+    const v = ga4Mesiace(
+      { rows: [kanal("202606", "Direct", 10), kanal("202607", "Direct", 20)] },
+      { rows: [{ dimensionValues: [{ value: "202607" }], metricValues: [{ value: "3" }] }] },
+    );
+    expect(v.find((x) => x.mesiac === "2026-06")!.udalosti).toBe(0);
+    expect(v.find((x) => x.mesiac === "2026-07")!.udalosti).toBe(3);
+  });
+
+  it("chýbajúce kľúčové udalosti nie sú chyba", () => {
+    const v = ga4Mesiace({ rows: [kanal("202607", "Direct", 10)] });
+    expect(v[0].udalosti).toBe(0);
+  });
+
+  it("mesiace idú od najstaršieho", () => {
+    const v = ga4Mesiace({ rows: [kanal("202607", "Direct", 1), kanal("202601", "Direct", 1)] });
+    expect(v.map((x) => x.mesiac)).toEqual(["2026-01", "2026-07"]);
+  });
+
+  it("prázdna odpoveď nie je pád", () => {
+    expect(ga4Mesiace({})).toEqual([]);
+  });
+
+  it("mesiac v inom tvare sa preskočí, nie prevezme", () => {
+    expect(mesiacZGa4("2026-07")).toBe("");
+    expect(mesiacZGa4("202607")).toBe("2026-07");
+    expect(ga4Mesiace({ rows: [kanal("(other)", "Direct", 5)] })).toEqual([]);
+  });
+});
+
+describe("Search Console", () => {
+  it("dni sa zlúčia na mesiace", () => {
+    const v = gscMesiace({
+      rows: [
+        { keys: ["2026-07-01"], clicks: 3, impressions: 100 },
+        { keys: ["2026-07-15"], clicks: 2, impressions: 50 },
+        { keys: ["2026-08-01"], clicks: 1, impressions: 10 },
+      ],
+    });
+    expect(v).toEqual([
+      { mesiac: "2026-07", kliky: 5, zobrazenia: 150 },
+      { mesiac: "2026-08", kliky: 1, zobrazenia: 10 },
+    ]);
+  });
+
+  it("CTR sa prepočíta na percentá a pozícia zaokrúhli", () => {
+    const [r] = gscRebricek({ rows: [{ keys: ["fascie"], clicks: 4, impressions: 108, ctr: 0.037, position: 12.44 }] });
+    expect(r.kluc).toBe("fascie");
+    expect(r.ctr).toBe(3.7);
+    expect(r.pozicia).toBe(12.4);
+  });
+
+  it("rebríček je zoradený podľa klikov", () => {
+    const v = gscRebricek({
+      rows: [
+        { keys: ["b"], clicks: 1, impressions: 500 },
+        { keys: ["a"], clicks: 9, impressions: 20 },
+      ],
+    });
+    expect(v.map((x) => x.kluc)).toEqual(["a", "b"]);
+  });
+
+  it("riadok bez kľúča sa zahodí", () => {
+    expect(gscRebricek({ rows: [{ keys: [""], clicks: 5 }] })).toEqual([]);
+  });
+});
+
+describe("adresa webu", () => {
+  it("holá doména znamená doménové vlastníctvo", () => {
+    expect(normSite("prosapiens.cz")).toBe("sc-domain:prosapiens.cz");
+    expect(normSite("www.prosapiens.cz")).toBe("sc-domain:prosapiens.cz");
+  });
+
+  it("predponové vlastníctvo si nechá protokol a dostane lomítko", () => {
+    expect(normSite("https://prosapiens.cz")).toBe("https://prosapiens.cz/");
+    expect(normSite("https://prosapiens.cz/")).toBe("https://prosapiens.cz/");
+  });
+
+  it("hotový sc-domain sa nechá tak", () => {
+    expect(normSite("sc-domain:prosapiens.cz")).toBe("sc-domain:prosapiens.cz");
+  });
+});
+
+describe("GA4 property", () => {
+  it("prijme holé číslo aj celú cestu", () => {
+    expect(normProperty("123456789")).toBe("123456789");
+    expect(normProperty("properties/123456789")).toBe("123456789");
+  });
+
+  it("meracie ID G-XXXX nie je property — to je iné číslo", () => {
+    expect(normProperty("G-ABC123")).toBe("");
+  });
+});
+
+describe("rozsah a JWT", () => {
+  it("odKedy vráti prvý deň mesiaca pred N mesiacmi vrátane tohto", () => {
+    expect(odKedy(new Date("2026-08-13T00:00:00Z"), 12)).toBe("2025-09-01");
+    expect(odKedy(new Date("2026-08-13T00:00:00Z"), 1)).toBe("2026-08-01");
+  });
+
+  it("iat je v minulosti — hodiny Cloudflare a Google nie sú tie isté", () => {
+    const teraz = 1_760_000_000_000;
+    const n = narokyJwt("sa@projekt.iam.gserviceaccount.com", teraz);
+    expect(Number(n.iat)).toBeLessThan(Math.floor(teraz / 1000));
+    expect(Number(n.exp) - Number(n.iat)).toBe(3600);
+    expect(n.aud).toBe("https://oauth2.googleapis.com/token");
+  });
+});

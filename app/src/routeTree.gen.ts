@@ -37,6 +37,7 @@ import { Route as ApiLeadWebRouteImport } from './routes/api/lead-web'
 import { Route as ApiKalendarRouteImport } from './routes/api/kalendar'
 import { Route as ApiJarvisMemoryRouteImport } from './routes/api/jarvis-memory'
 import { Route as ApiIngestRouteImport } from './routes/api/ingest'
+import { Route as ApiGoogleRouteImport } from './routes/api/google'
 import { Route as ApiFioRouteImport } from './routes/api/fio'
 import { Route as ApiFakturyRouteImport } from './routes/api/faktury'
 import { Route as ApiExportRouteImport } from './routes/api/export'
@@ -188,6 +189,11 @@ const ApiIngestRoute = ApiIngestRouteImport.update({
   path: '/api/ingest',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiGoogleRoute = ApiGoogleRouteImport.update({
+  id: '/api/google',
+  path: '/api/google',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiFioRoute = ApiFioRouteImport.update({
   id: '/api/fio',
   path: '/api/fio',
@@ -253,6 +259,7 @@ export interface FileRoutesByFullPath {
   '/api/export': typeof ApiExportRoute
   '/api/faktury': typeof ApiFakturyRoute
   '/api/fio': typeof ApiFioRoute
+  '/api/google': typeof ApiGoogleRoute
   '/api/ingest': typeof ApiIngestRoute
   '/api/jarvis-memory': typeof ApiJarvisMemoryRoute
   '/api/kalendar': typeof ApiKalendarRoute
@@ -293,6 +300,7 @@ export interface FileRoutesByTo {
   '/api/export': typeof ApiExportRoute
   '/api/faktury': typeof ApiFakturyRoute
   '/api/fio': typeof ApiFioRoute
+  '/api/google': typeof ApiGoogleRoute
   '/api/ingest': typeof ApiIngestRoute
   '/api/jarvis-memory': typeof ApiJarvisMemoryRoute
   '/api/kalendar': typeof ApiKalendarRoute
@@ -334,6 +342,7 @@ export interface FileRoutesById {
   '/api/export': typeof ApiExportRoute
   '/api/faktury': typeof ApiFakturyRoute
   '/api/fio': typeof ApiFioRoute
+  '/api/google': typeof ApiGoogleRoute
   '/api/ingest': typeof ApiIngestRoute
   '/api/jarvis-memory': typeof ApiJarvisMemoryRoute
   '/api/kalendar': typeof ApiKalendarRoute
@@ -376,6 +385,7 @@ export interface FileRouteTypes {
     | '/api/export'
     | '/api/faktury'
     | '/api/fio'
+    | '/api/google'
     | '/api/ingest'
     | '/api/jarvis-memory'
     | '/api/kalendar'
@@ -416,6 +426,7 @@ export interface FileRouteTypes {
     | '/api/export'
     | '/api/faktury'
     | '/api/fio'
+    | '/api/google'
     | '/api/ingest'
     | '/api/jarvis-memory'
     | '/api/kalendar'
@@ -456,6 +467,7 @@ export interface FileRouteTypes {
     | '/api/export'
     | '/api/faktury'
     | '/api/fio'
+    | '/api/google'
     | '/api/ingest'
     | '/api/jarvis-memory'
     | '/api/kalendar'
@@ -497,6 +509,7 @@ export interface RootRouteChildren {
   ApiExportRoute: typeof ApiExportRoute
   ApiFakturyRoute: typeof ApiFakturyRoute
   ApiFioRoute: typeof ApiFioRoute
+  ApiGoogleRoute: typeof ApiGoogleRoute
   ApiIngestRoute: typeof ApiIngestRoute
   ApiJarvisMemoryRoute: typeof ApiJarvisMemoryRoute
   ApiKalendarRoute: typeof ApiKalendarRoute
@@ -722,6 +735,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiIngestRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/google': {
+      id: '/api/google'
+      path: '/api/google'
+      fullPath: '/api/google'
+      preLoaderRoute: typeof ApiGoogleRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/fio': {
       id: '/api/fio'
       path: '/api/fio'
@@ -809,6 +829,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiExportRoute: ApiExportRoute,
   ApiFakturyRoute: ApiFakturyRoute,
   ApiFioRoute: ApiFioRoute,
+  ApiGoogleRoute: ApiGoogleRoute,
   ApiIngestRoute: ApiIngestRoute,
   ApiJarvisMemoryRoute: ApiJarvisMemoryRoute,
   ApiKalendarRoute: ApiKalendarRoute,

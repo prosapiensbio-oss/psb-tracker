@@ -379,6 +379,7 @@ function UploadCard({ data, missing, actions, chat }: { data: PSBData; missing: 
       <NapojenieWebu />
       <NapojenieMeta />
       <NapojenieMailer />
+      <NapojenieGoogle />
       <div onClick={() => setOpen((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginTop: 14, fontSize: 12, color: C.textDim }}>
         <span>{open ? "▲ skryť" : "▼"} zoznam potrebných CSV a zapísané pohyby</span>
         <span style={{ marginLeft: "auto" }}>Nahrať sa dá aj pretiahnutím do Jarvisa (📎 vpravo dole).</span>
@@ -631,6 +632,105 @@ function NapojenieMailer() {
       <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 6, lineHeight: 1.5 }}>
         Token nájdeš v MailerLite → <b style={{ color: C.textMuted }}>Integrations → API → Create new API token</b>.
         Nechaj „All IPs allowed“ — Kokpit beží na Cloudflare a nemá pevnú IP adresu.
+      </div>
+    </div>
+  );
+}
+
+/**
+ * GA4 a Search Console cez jeden servisný účet.
+ *
+ * PREČO JE TO JEDEN PANEL A NIE DVA
+ *
+ * Je to jeden kľúč z jedného Google Cloud projektu. Dva panely by tvrdili, že
+ * sú to dve napojenia, a Jerry by hľadal dva kľúče.
+ *
+ * PREČO SÚ TU DVE POLÍČKA NAVYŠE
+ *
+ * Kľúč sám o sebe nevie, ktorý web má čítať — property ID a adresu webu treba
+ * povedať zvlášť. A prístup sa udeľuje ešte na dvoch ďalších miestach: v GA4
+ * a v Search Console. Preto je pod tlačidlami napísaný celý postup vrátane
+ * e-mailu servisného účtu, ktorý sa tam vkladá.
+ */
+function NapojenieGoogle() {
+  const [stav, setStav] = useState<{ maKluc: boolean; email: string; property: string; site: string; ga4Mesiacov: number; gscMesiacov: number } | null>(null);
+  const [kluc, setKluc] = useState("");
+  const [property, setProperty] = useState("");
+  const [site, setSite] = useState("");
+  const [hlaska, setHlaska] = useState("");
+  const [robim, setRobim] = useState(false);
+
+  const nacitaj = () => void fetch("/api/google", { credentials: "same-origin" })
+    .then((r) => r.json())
+    .then((j) => { if (j.ok) { setStav(j); setProperty(j.property || ""); setSite(j.site || ""); } })
+    .catch(() => {});
+  useEffect(nacitaj, []);
+
+  const posli = async (telo: Record<string, unknown>, hotovo: string) => {
+    setRobim(true); setHlaska("");
+    const j = await fetch("/api/google", {
+      method: "POST", credentials: "same-origin",
+      headers: { "content-type": "application/json" }, body: JSON.stringify(telo),
+    }).then((r) => r.json()).catch(() => ({ ok: false, error: "spojenie zlyhalo" }));
+    setRobim(false);
+    setHlaska(j.ok ? (j.sprava || hotovo) : `Nepodarilo sa: ${j.error || "neznáma chyba"}`);
+    nacitaj();
+    return j;
+  };
+
+  if (!stav) return null;
+  const btn = { fontSize: 12, padding: "6px 12px", borderRadius: 6, border: `1px solid ${C.accent}`, background: "transparent", color: C.accent, cursor: robim ? "default" : "pointer", opacity: robim ? 0.5 : 1 } as const;
+
+  return (
+    <div style={{ marginTop: 14, padding: 12, background: mix(C.accent, 6), borderRadius: 8 }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: C.textMuted, marginBottom: 6 }}>
+        <Info
+          label="Google — GA4 a Search Console"
+          text="Dve polovice tej istej otázky: Search Console hovorí, na čo sa ľudia pýtajú SKÔR, než prídu na web, GA4 hovorí, čo urobili potom. Obidve idú cez jeden servisný účet, takže napojenie je jedno. Píše do tých istých tabuliek ako doterajší ručný import CSV — kľúčom je mesiac, takže nový sťah ten istý mesiac prepíše, nepripočíta. Kľúč sa uloží na serveri a späť do prehliadača sa už neposiela."
+        />
+      </div>
+      <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 8 }}>
+        Kľúč: <b style={{ color: stav.maKluc ? C.green : C.orange }}>{stav.maKluc ? "uložený" : "chýba"}</b>
+        {" · "}GA4: <b style={{ color: C.text }}>{stav.ga4Mesiacov}</b> mes.
+        {" · "}Search Console: <b style={{ color: C.text }}>{stav.gscMesiacov}</b> mes.
+      </div>
+
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "flex-start" }}>
+        <textarea value={kluc} onChange={(e) => setKluc(e.target.value)}
+          placeholder={stav.maKluc ? "vložiť nový kľúč (celý JSON)…" : "sem vlož celý obsah JSON súboru zo servisného účtu"}
+          style={{ ...S.input, width: 360, height: 58, marginBottom: 0, fontFamily: "ui-monospace, monospace", fontSize: 11 }} />
+        <button disabled={robim || kluc.trim().length < 50} style={btn}
+          onClick={() => void posli({ akcia: "uloz-kluc", kluc: kluc.trim() }, "Kľúč uložený.").then(() => setKluc(""))}>
+          Uložiť kľúč
+        </button>
+      </div>
+
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginTop: 8 }}>
+        <input value={property} onChange={(e) => setProperty(e.target.value)}
+          placeholder="GA4 property ID (číslo)" style={{ ...S.input, width: 190, marginBottom: 0 }} />
+        <input value={site} onChange={(e) => setSite(e.target.value)}
+          placeholder="adresa webu, napr. prosapiens.cz" style={{ ...S.input, width: 230, marginBottom: 0 }} />
+        <button disabled={robim} style={btn}
+          onClick={() => void posli({ akcia: "uloz-ciele", property, site }, "Uložené.")}>Uložiť</button>
+        <button disabled={robim || !stav.maKluc} style={btn}
+          onClick={() => void posli({ akcia: "test" }, "")}>Skúška spojenia</button>
+        <button disabled={robim || !stav.maKluc} style={btn}
+          onClick={() => void posli({ akcia: "stiahni", mesiacov: 18 }, "Stiahnuté.")}>Stiahnuť 18 mesiacov</button>
+      </div>
+
+      {hlaska && <div style={{ fontSize: 11.5, color: C.textMuted, lineHeight: 1.5, marginTop: 6 }}>{hlaska}</div>}
+
+      <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 8, lineHeight: 1.6 }}>
+        <b style={{ color: C.textMuted }}>Postup:</b> v Google Cloud zapni <b style={{ color: C.textMuted }}>Google Analytics Data API</b> (nie
+        „Google Analytics API“ — tá je stará a GA4 dáta neposiela) a <b style={{ color: C.textMuted }}>Google Search Console API</b>.
+        Potom IAM → Service Accounts → vytvor účet → Keys → Add key → JSON, a ten súbor vlož sem.
+        {stav.email && (
+          <>
+            {" "}Nakoniec ten istý e-mail — <b style={{ color: C.textMuted, userSelect: "all" }}>{stav.email}</b> — pridaj ako
+            čitateľa v GA4 (Admin → Property access management) aj v Search Console (Nastavenia → Používatelia a povolenia).
+            Bez toho vráti Google 403 aj s platným kľúčom.
+          </>
+        )}
       </div>
     </div>
   );
