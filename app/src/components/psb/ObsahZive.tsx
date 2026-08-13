@@ -172,9 +172,12 @@ export function ObsahZive() {
         <tbody>
           {najlepsie.map((p) => (
             <tr key={p.id}>
-              <td style={{ ...S.td, color: C.text, maxWidth: 320 }}>
-                <a href={p.permalink} target="_blank" rel="noreferrer" style={{ color: C.text, textDecoration: "none" }}>
-                  {p.hook || "(bez textu)"}
+              <td style={{ ...S.td, color: C.text, maxWidth: 420 }}>
+                {/* Sto znakov stačí na rozpoznanie príspevku; celý text visí
+                    v tooltipe. Rovnaká hranica ako v rozbore mesiaca. */}
+                <a href={p.permalink} target="_blank" rel="noreferrer" title={p.hook}
+                  style={{ color: C.text, textDecoration: "none" }}>
+                  {p.hook ? (p.hook.length > 100 ? `${p.hook.slice(0, 100)}…` : p.hook) : "(bez textu)"}
                 </a>
                 <div style={{ fontSize: 10.5, color: C.textDim }}>{p.datum} · {p.typ}</div>
               </td>
