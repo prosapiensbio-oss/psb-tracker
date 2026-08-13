@@ -1084,6 +1084,30 @@ export function deriveAnomalies(data: PSBData, clients: Record<string, ClientAgg
 export const rodinaZKluca = (key: string) =>
   key.split("|").filter((x) => !/^\d{4}-\d{2}(-\d{2})?$/.test(x) && !/^\d+$/.test(x)).join("|") || key;
 
+/**
+ * Patrí položka registra vybranému trénerovi?
+ *
+ * V knižnici a nie v obrazovke preto, že sa to už raz tíško pomýlilo: filter
+ * čítal pole `client`, ktoré pri časti položiek nesie cieľ prekliku
+ * („klienti|rast"), nie meno klienta — a Jerry preto videl pripomienky ku
+ * klientkam, ktoré trénuje Terezka. Chyba, ktorú nevidno inak než tak, že
+ * si niekto všimne cudzie meno na svojom zozname.
+ */
+export function patriTrenerovi(
+  r: Pick<RegisterItem, "category" | "title" | "client" | "oKom">,
+  clients: Record<string, Pick<ClientAgg, "primaryTrainer">>,
+  trener: string,
+): boolean {
+  if (!trener || trener === "all") return true;
+  // Kapacita je o trénerovi, nie o klientovi — pozná sa podľa nadpisu.
+  if (r.category === "Kapacita") return r.title.startsWith(trener);
+  const meno = r.oKom || r.client;
+  if (!meno) return true;
+  const c = clients[meno];
+  // Neznáme meno zostáva obom: radšej upozornenie navyše než stratené.
+  return !c || c.primaryTrainer === trener;
+}
+
 export type RegisterItem = {
   key: string;
   category: "6M" | "Kapacita" | "Anomália" | "Rozhodnutie" | "Zápis" | "Zmena";
@@ -1094,6 +1118,18 @@ export type RegisterItem = {
   note?: string;
   priority: number; // lower = more important
   client?: string; // client this item is about → "Otvoriť" focuses them in Klienti
+  /**
+   * O KOHO ide — výhradne na triedenie podľa trénera.
+   *
+   * Pole `client` sa časom preťažilo: pri niektorých položkách nesie meno
+   * klienta, pri iných cieľ prekliku („klienti|rast", „udaje|"). Filter podľa
+   * trénera z toho nevedel poznať, koho sa vec týka, a všetko s cieľom
+   * prekliku ukazoval obom. Jerry tak videl pripomienky ku klientkam, ktoré
+   * trénuje Terezka.
+   *
+   * `oKom` je jednoznačné: meno klienta, alebo nič. Cieľ prekliku sem nepatrí.
+   */
+  oKom?: string;
   /**
    * Rodina položky — čo znamená „už mi toto nehlás".
    *

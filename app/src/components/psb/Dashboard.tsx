@@ -16,6 +16,7 @@ import { objednaneVerzia,
   type RegisterItem,
   type SixMRow,
   PRAH_ZASTARANIA,
+  patriTrenerovi,
 } from "../../lib/psb/compute";
 import { fmtCZK, fmtDMY, monthLabel, weekKey, weekLabel } from "../../lib/psb/format";
 import { C, mix, S, badge, btn } from "../../lib/psb/theme";
@@ -1190,14 +1191,7 @@ export function Dashboard({
   //
   // Položka bez klienta (kapacita, zápisy) zostáva vždy: kapacita jedného
   // trénera sa týka oboch a pripomienka zápisu tiež.
-  const patriTrenerovi = (r: RegisterItem) => {
-    if (trainer === "all") return true;
-    if (r.category === "Kapacita") return r.title.startsWith(trainer);
-    if (!r.client) return true;
-    const c = clients[r.client];
-    return !c || c.primaryTrainer === trainer;
-  };
-  const register = registerVsetky.filter(patriTrenerovi);
+  const register = registerVsetky.filter((r) => patriTrenerovi(r, clients, trainer));
   const open = register.filter((r) => !r.acked);
   const acked = register.filter((r) => r.acked);
   // Triáž. Register mal 25 rozbalených položiek cez celú šírku obrazovky a

@@ -1047,13 +1047,30 @@ function skupinaFaktur(
         const odpovede = zapisy.mesiace?.[mk]?.answers || {};
         const bezDovodu = v.odisli.filter((meno) => !(odpovede[`odchod__${meno}`] || "").trim());
         if (!bezDovodu.length) continue;
-        const key = `odchody|${mk}`;
-        out.push({
-          key, category: "Rozhodnutie", tone: "orange",
-          title: `${monthLabel(mk)}: ${bezDovodu.length === 1 ? "odišiel klient" : `odišli ${bezDovodu.length} klienti`} a nevieme prečo`,
-          detail: `${bezDovodu.join(", ")} — ${bezDovodu.length === 1 ? "prestal" : "prestali"} chodiť v ${monthLabel(mk)} a dôvod nikde nie je. Dôvod je jediná vec, ktorú appka o odchode nezistí, a o rok sa naň už nikto nespýta. Doplň ho v Klienti → Fluktuácia, po rozkliknutí mesiaca.`,
-          ...stavPolozky(key, "odchody"), priority: 5, client: "klienti|rast",
-        });
+        // Jedna položka na TRÉNERA, nie na mesiac.
+        //
+        // Predtým to bol jeden riadok so všetkými menami — a Jerry v ňom
+        // čítal mená klientok, ktoré trénuje Terezka. Meno v texte sa filtrom
+        // orezať nedá; orezať sa dá len položka, takže musí byť rozdelená už
+        // pri vzniku. Kto nemá určeného trénera, ostáva v spoločnej skupine.
+        const podlaTrenera = new Map<string, string[]>();
+        for (const meno of bezDovodu) {
+          const t = clients[meno]?.primaryTrainer;
+          const k = t === "Jerry" || t === "Terezka" ? t : "";
+          podlaTrenera.set(k, [...(podlaTrenera.get(k) || []), meno]);
+        }
+        for (const [trener, mena] of podlaTrenera) {
+          const key = `odchody|${mk}${trener ? `|${trener}` : ""}`;
+          out.push({
+            key, category: "Rozhodnutie", tone: "orange",
+            title: `${monthLabel(mk)}: ${mena.length === 1 ? "odišiel klient" : `odišli ${mena.length} klienti`} a nevieme prečo${trener ? ` (${trener})` : ""}`,
+            detail: `${mena.join(", ")} — ${mena.length === 1 ? "prestal" : "prestali"} chodiť v ${monthLabel(mk)} a dôvod nikde nie je. Dôvod je jediná vec, ktorú appka o odchode nezistí, a o rok sa naň už nikto nespýta. Doplň ho v Klienti → Fluktuácia, po rozkliknutí mesiaca.`,
+            ...stavPolozky(key, "odchody"), priority: 5, client: "klienti|rast",
+            // Filter podľa trénera potrebuje meno, nie cieľ prekliku. Stačí
+            // jedno — všetci v skupine majú toho istého trénera.
+            oKom: mena[0],
+          });
+        }
       }
     }
 
@@ -1108,6 +1125,7 @@ function skupinaFaktur(
           title: `${u.zaciatok.slice(11, 16)} ${u.klient}: ${dovody[0]}`,
           detail: `Dnes o ${u.zaciatok.slice(11, 16)} máš tréning s ${u.klient}. ${dovody.map((x) => x[0].toUpperCase() + x.slice(1)).join(". ")}.`,
           ...stavPolozky(key, `dnes|${u.klient}`), priority: 1, client: `klienti|klienti`,
+          oKom: u.klient as string,
         });
       }
     }
