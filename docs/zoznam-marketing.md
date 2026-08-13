@@ -56,13 +56,20 @@ Treba: API kľúč z MailerLite (vkladá sa v appke, nie cez chat).
 
 ## C · Viem postaviť bez teba
 
-### C1 · Hodina publikovania k príspevkom
-Malá zmena (`ig_prispevky` + jedno pole pri sťahovaní), odomkne analýzu
-najlepších časov z vlastných dát. Predpoklad pre B3.
+### C1 · Hodina publikovania k príspevkom — PRIPRAVENÉ 13. 8.
+Stĺpec `cas` v `ig_prispevky` existuje a sťahovanie ho odteraz ukladá.
+Príspevky stiahnuté skôr ho prázdny majú — naplní sa pri najbližšom
+„Stiahnuť Instagram". Analýza najlepších časov sa postaví, keď bude z čoho.
 
-### C2 · Plánovanie obsahu
-Kalendár: dátum, formát, téma, ktorý dokument sa ním propaguje — a vedľa toho,
-čo z podobného obsahu zaberalo. Stavia sa až po B1–B3, aby mal z čoho čerpať.
+### C2 · Plánovanie obsahu — HOTOVÉ 13. 8. (prvá polovica)
+Karta **„Čo publikovať ďalej"** na začiatku Reels & posty. Návrhy sa počítajú
+zo štyroch zdrojov: témy, na ktoré sa web zobrazuje a nikto neklikne; články,
+ktoré ľudia čítajú sami; typ začiatku, ktorý bol pred dopytmi vidieť častejšie
+než v bežný deň; a tempo proti mesiacom s najviac dopytmi. Každý návrh nesie
+číslo, na ktorom stojí, a tlačidlo, ktoré z neho spraví zadanie pre Jarvisa.
+
+Kalendár s dátumami zatiaľ nie — bez Metricool API nemá kde brať plán a ručné
+prepisovanie termínov je práca navyše, nie úspora.
 
 ### C3 · Kampane z Kokpitu s poistkou
 Schválené 13. 8. **Kokpit nikdy nespustí reklamu.** Vytvorí ju v stave PAUSED,

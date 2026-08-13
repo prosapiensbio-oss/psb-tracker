@@ -31,6 +31,7 @@ import { ObsahZive } from "./ObsahZive";
 import { ObsahDopyt } from "./ObsahDopyt";
 import { Mail } from "./Mail";
 import { Zadanie } from "./Zadanie";
+import { PlanObsahu } from "./PlanObsahu";
 import { AkoMeratReklamu, Kohorta, Lievik, Naklady } from "./MarketingLievik";
 import { Kanaly } from "./Kanaly";
 import { prilezitosti, soZamerom, zhrnutieWebu, type Dopyt } from "../../lib/psb/google";
@@ -840,6 +841,9 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
           {/* Odovzdávacie miesto hore: obsah sa začína rozhodnutím, nie
               rebríčkom. Rebríčky sú pod ním a slúžia mu. */}
           <Zadanie chat={chat} />
+          {/* Návrhy hneď za odovzdávacím miestom: prvá karta hovorí AKO sa
+              zadanie odovzdá, druhá ČO do neho dať. Rebríčky sú pod nimi. */}
+          <PlanObsahu data={data} chat={chat} />
           <CoSomRobil chat={chat} />
           {/* Živé z Graph API hneď za tým, čo sa publikovalo, a pred ručnou
               tabuľkou. Obe odpovedajú na tú istú otázku z dvoch strán: táto sa

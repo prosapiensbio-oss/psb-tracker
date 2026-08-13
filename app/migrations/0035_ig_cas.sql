@@ -1,0 +1,11 @@
+-- Hodina publikovania príspevku.
+--
+-- Instagram Graph API `timestamp` nesie celý čas aj s posunom, ale ukladal sa
+-- z neho len dátum. Bez hodiny sa nedá odpovedať na otázku „kedy publikovať",
+-- ktorá je pritom jediná vec z celého merania obsahu, ktorú má Jerry úplne
+-- v rukách — nestojí nič a nemení sa tým, čo hovorí.
+--
+-- Prázdne pole znamená „príspevok stiahnutý pred touto zmenou", nie polnoc.
+-- Analýza časov preto počíta len z tých, ktoré čas majú, a nahlas povie,
+-- koľko ich je.
+ALTER TABLE ig_prispevky ADD COLUMN cas TEXT NOT NULL DEFAULT '';

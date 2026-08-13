@@ -380,15 +380,18 @@ export const Route = createFileRoute("/api/meta")({
 
           const stmts = vsetky.map((m) => {
             const datum = String(m.timestamp || "").slice(0, 10);
+            // Hodina publikovania. Meta posiela ISO čas s posunom
+            // („2026-08-11T18:04:23+0000"); berieme HH:MM tak, ako prišiel.
+            const cas = String(m.timestamp || "").slice(11, 16);
             const text = String(m.caption || "").slice(0, 2000);
             // `hook` je prvý riadok, `text` celý popis. Analýza obsahu číta hook,
             // triedenie potrebuje viac — staccato sa v jednom riadku nespozná.
             const hook = text.split("\n")[0].slice(0, 200);
             return DB.prepare(
-              `INSERT INTO ig_prispevky (id,datum,mesiac,typ,permalink,hook,dosah,ulozenia,zdielania,komentare,lajky,videnia,watch_time,text,kategoria,updated_at)
-               VALUES (?1,?2,?3,?4,?5,?13,?6,?7,?8,?9,?10,?11,0,?14,?15,?12)
+              `INSERT INTO ig_prispevky (id,datum,mesiac,typ,permalink,hook,dosah,ulozenia,zdielania,komentare,lajky,videnia,watch_time,text,kategoria,cas,updated_at)
+               VALUES (?1,?2,?3,?4,?5,?13,?6,?7,?8,?9,?10,?11,0,?14,?15,?16,?12)
                ON CONFLICT(id) DO UPDATE SET dosah=?6, ulozenia=?7, zdielania=?8,
-                 komentare=?9, lajky=?10, videnia=?11, hook=?13, text=?14, updated_at=?12,
+                 komentare=?9, lajky=?10, videnia=?11, hook=?13, text=?14, updated_at=?12, cas=?16,
                  -- Zaradenie sa prepočíta zakaždým. Pravidlá sa budú
                  -- upresňovať a staré príspevky sa musia opraviť s nimi; keď
                  -- pribudne ručná oprava, bude na ňu treba vlastný príznak,
@@ -400,7 +403,7 @@ export const Route = createFileRoute("/api/meta")({
               cislo(m, "reach"), cislo(m, "saved"), cislo(m, "shares"),
               Number(m.comments_count) || 0, Number(m.like_count) || 0,
               cislo(m, "views"), now,
-              hook, text, kategoriaHooku(text, mena),
+              hook, text, kategoriaHooku(text, mena), cas,
             );
           });
           for (let i = 0; i < stmts.length; i += 40) await DB.batch(stmts.slice(i, i + 40));
