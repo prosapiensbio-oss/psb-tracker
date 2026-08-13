@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
 import type { ClientAgg } from "../../lib/psb/compute";
-import type { Lead, PSBData, Payment, Session } from "../../lib/psb/types";
+import type { Lead, PaymentRow, PSBData, SessionRow } from "../../lib/psb/types";
 import { krokyZa } from "./MarketingLievik";
 
 /**
@@ -16,13 +16,13 @@ const lead = (id: string, date: string, name: string): Lead => ({
   email: "", telefon: "", kampan: "", utm: "", stranka: "",
 } as Lead);
 
-const session = (client: string, date: string, sessionType: string, price = 900): Session =>
-  ({ id: `s-${client}-${date}`, date, client, sessionType, price } as Session);
+const session = (client: string, date: string, sessionType: SessionRow["sessionType"], price = 900): SessionRow =>
+  ({ date, time: "09:00", client, sessionTrainer: "Jerry", sessionName: "Tréning", sessionType, duration: 60, price });
 
-const payment = (client: string, date: string, amount = 5000): Payment =>
-  ({ id: `p-${client}-${date}`, date, client, amount } as Payment);
+const payment = (client: string, date: string, amount = 5000): PaymentRow =>
+  ({ date, client, amount, method: "bank" });
 
-const klient = (name: string, firstSession: string, sessions: Session[]): ClientAgg =>
+const klient = (name: string, firstSession: string, sessions: SessionRow[]): ClientAgg =>
   ({ name, firstSession, sessions, vratenie: false } as ClientAgg);
 
 /** Prázdny dataset, do ktorého sa dopĺňa len to, na čom v teste záleží. */
