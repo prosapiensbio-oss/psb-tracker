@@ -503,6 +503,27 @@ export function buildAiContext(
           spolu, trenovalo: trenovaloS, zostalo: zostaloS,
           trenovaloPct: pct(trenovaloS, spolu), zostaloPct: pct(zostaloS, spolu),
           podlaZdroja: Object.fromEntries(Object.entries(podla).map(([z, e]) => [z, { ...e, zostaloPct: pct(e.zostal, e.dopytov) }])),
+          // Kto prišiel na úvodný a už nikdy — vrátane dôvodu, ak ho niekto
+          // zapísal. Obrazovka to vie od 13. 8., Jarvis až od 14. 8.: na otázku
+          // „prečo nám ľudia po úvodnom nezostávajú" odpovedal, že nevie, hoci
+          // odpovede boli v databáze.
+          poUvodnomNikdy: (() => {
+            const von = clientList
+              .filter((c) => (c.sessions || []).length === 1 && c.sessions[0]?.sessionType === "UVODNE")
+              .map((c) => ({
+                meno: c.name,
+                uvodny: (c.sessions[0]?.date || "").slice(0, 10),
+                trener: c.sessions[0]?.sessionTrainer || c.primaryTrainer || null,
+                preco: c.precoNeprisiel || null,
+              }))
+              .sort((a, b) => b.uvodny.localeCompare(a.uvodny));
+            return {
+              poznamka: "Prišli na úvodný tréning, zaplatili zaň (1 100 Kč) a nikdy sa nevrátili. `preco` je zapisané ručne v Marketing → Odkiaľ prišli klienti; `null` znamená, že to nikto nezapísal — nie že dôvod neexistuje. Keď sa dôvody opakujú, je to jediná vec z celého lievika, s ktorou sa dá niečo urobiť.",
+              spolu: von.length,
+              bezDovodu: von.filter((x) => !x.preco).length,
+              ludia: von.slice(0, 20),
+            };
+          })(),
           rychlostOdpovede: {
             poznamka: "Medián hodín od dopytu po našu prvú odpoveď. Meria sa až od 12. 8. 2026 — staršie dopyty odpoveď zaznamenanú nemajú a nedá sa doplniť. V službách je to najsilnejšia páka na konverziu, silnejšia než cena aj než text reklamy.",
             medianHodin: casy.length ? Math.round(casy[Math.floor(casy.length / 2)]) : null,
@@ -538,6 +559,11 @@ export function buildAiContext(
       specialnaSadzba: c.specialRate,
       pozn_specialnaSadzba: c.specialRateNote || null,
       poznamkaTrenera: c.trainerNote || null,
+      // Prečo po úvodnom tréningu už neprišiel. Jarvis bez toho odpovedal na
+      // „prečo nám ľudia po úvodnom nezostávajú" tak, že nevie — hoci odpovede
+      // sú zapísané. Pole vzniklo 13. 8. a do kontextu sa dostalo až 14. 8.,
+      // keď Jerry povedal, že staviam veci izolovane.
+      precoNeprisiel: c.precoNeprisiel || null,
       pocetSedeni: c.sessionCount,
       hodinySpolu: r1(c.totalHours),
       // Jedna definícia pre celú appku (11. 8.). Predtým tu bol `c.paidAvg` —
