@@ -53,7 +53,9 @@ záver odporuje tomu, čo Jerry hovorí zo skúsenosti.
 - **Register nesmie svietiť celý.** Keď svieti všetko, nesvieti nič —
   zoskupuj a obmedzuj vek toho, čo sa hlási.
 - **Slovenské úvodzovky v TS reťazcoch** rozbijú build, keď je zatváracia
-  ASCII. Používaj `“` alebo sa im v kóde vyhni.
+  ASCII. Používaj `“` alebo sa im v kóde vyhni. Platí to aj v JSX atribútoch
+  (`text="… „X" …"`) — tam to ASCII `"` ukončí atribút. Stalo sa to 14. 8.
+  trikrát za jeden deň.
 - **Spätné apostrofy v SYSTEM šablóne** v `routes/api/chat.ts` rozbijú build —
   je to template literal. Escapuj ich alebo píš názvy tabuliek bez nich.
 - **Meno klienta je v siedmich tabuľkách** a v troch z nich aj v `dedup_key`.

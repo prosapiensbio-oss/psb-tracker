@@ -32,6 +32,7 @@ import { ObsahDopyt } from "./ObsahDopyt";
 import { Mail } from "./Mail";
 import { Zadanie } from "./Zadanie";
 import { PlanObsahu } from "./PlanObsahu";
+import { Napady } from "./Napady";
 import { KedyPublikovat } from "./KedyPublikovat";
 import { AkoMeratReklamu, Kohorta, Lievik, Naklady } from "./MarketingLievik";
 import { Kanaly } from "./Kanaly";
@@ -857,6 +858,9 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
           {/* Návrhy hneď za odovzdávacím miestom: prvá karta hovorí AKO sa
               zadanie odovzdá, druhá ČO do neho dať. Rebríčky sú pod nimi. */}
           <PlanObsahu data={data} chat={chat} />
+          {/* Nápady hneď za návrhmi z dát. Jedna karta vie, čo ľudia hľadali,
+              druhá čo sa nahlas spýtali — nie je to duplicita. */}
+          <Napady chat={chat} />
           <CoSomRobil chat={chat} />
           {/* Živé z Graph API hneď za tým, čo sa publikovalo, a pred ručnou
               tabuľkou. Obe odpovedajú na tú istú otázku z dvoch strán: táto sa

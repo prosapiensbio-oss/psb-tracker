@@ -5,7 +5,7 @@ import type { Ritual } from "../../lib/psb/rituals";
 import { Dennik } from "./Dennik";
 import { SOURCES } from "./Klienti";
 import { C, mix } from "../../lib/psb/theme";
-import { Modal } from "./ui";
+import { Modal, enterPosle } from "./ui";
 
 // „+ Zápis" — jedno tlačidlo na všetko, čo sa do appky píše ručne.
 //
@@ -18,6 +18,75 @@ import { Modal } from "./ui";
 // čo za toto obdobie ešte chýba. Nie je to formulár — je to rozcestník, ktorý
 // človeka dovedie tam, kde sa to naozaj píše, nech je jeden zápis na jednom
 // mieste a nie na dvoch.
+
+/**
+ * Marketingový nápad — jedna veta, kým je v hlave.
+ *
+ * PREČO TO JE V „+ ZÁPIS" A NIE V MARKETINGU
+ *
+ * Najcennejší nápad je otázka, ktorú klient položí počas tréningu. Vtedy nikto
+ * neotvára Marketing a nehľadá kartu — buď to zapíše na jeden riadok hneď,
+ * alebo to do večera zabudne. Obchádzka na inú obrazovku takú vetu spoľahlivo
+ * zabije.
+ *
+ * PREČO JE ZDROJ POLE, A NIE DOHAD
+ *
+ * „Otázka klienta" a „môj nápad" sú dve rôzne veci a Jarvis s nimi má pracovať
+ * inak: otázka je jazyk, ktorým ľudia o svojom tele naozaj hovoria, a ten sa
+ * vymyslieť nedá. Vlastný nápad je hypotéza.
+ */
+function NapadBox() {
+  const [text, setText] = useState("");
+  const [zdroj, setZdroj] = useState("otazka_klienta");
+  const [ok, setOk] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const uloz = async () => {
+    const t = text.trim();
+    if (t.length < 3 || busy) return;
+    setBusy(true);
+    const j = await fetch("/api/napady", {
+      method: "POST", credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ text: t, zdroj }),
+    }).then((r) => r.json()).catch(() => ({ ok: false }));
+    setBusy(false);
+    if (!j.ok) { setOk(""); return; }
+    setText("");
+    setOk(t.slice(0, 60));
+    setTimeout(() => setOk(""), 4000);
+  };
+
+  return (
+    <div style={{ marginBottom: 14, padding: "11px 13px", borderRadius: 10, border: `1px solid ${mix(C.accent, 24)}`, background: mix(C.accent, 4) }}>
+      <div style={{ fontSize: 12.5, fontWeight: 600, color: C.text, marginBottom: 3 }}>Marketingový nápad</div>
+      <div style={{ fontSize: 11, color: C.textDim, marginBottom: 8, lineHeight: 1.5 }}>
+        Čokoľvek, z čoho môže byť obsah. Najlepšie otázky, ktoré ti klienti kladú počas tréningu —
+        to je jazyk, ktorým o svojom tele naozaj hovoria, a ten sa vymyslieť nedá.
+        Jarvis ich pozná: navrhne, čo z toho publikovať, alebo povie, že to nie je téma.
+      </div>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+        <input
+          value={text} onChange={(e) => setText(e.target.value)}
+          onKeyDown={enterPosle(() => void uloz())}
+          placeholder="napr. „prečo ma bolí krížom, keď robím drepy?“"
+          style={{ flex: "1 1 240px", minWidth: 0, padding: "7px 10px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 13 }}
+        />
+        <select value={zdroj} onChange={(e) => setZdroj(e.target.value)}
+          style={{ flex: "0 1 150px", padding: "7px 8px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 12.5 }}>
+          <option value="otazka_klienta">otázka klienta</option>
+          <option value="vlastny">môj nápad</option>
+          <option value="ine">iné</option>
+        </select>
+        <button onClick={() => void uloz()} disabled={busy || text.trim().length < 3}
+          style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${C.accent}`, background: C.accentBg, color: C.accentLight, fontSize: 12.5, fontWeight: 600, cursor: busy || text.trim().length < 3 ? "default" : "pointer", opacity: busy || text.trim().length < 3 ? 0.45 : 1, fontFamily: "inherit" }}>
+          Zapísať
+        </button>
+      </div>
+      {ok && <div style={{ fontSize: 11.5, color: C.green, marginTop: 6 }}>⚑ Zapísané: {ok}</div>}
+    </div>
+  );
+}
 
 type Polozka = {
   nadpis: string; popis: string; stav?: "chyba" | "hotove";
@@ -280,6 +349,8 @@ export function ZapisButton({
             )}
             {akciaOk && <div style={{ fontSize: 11.5, color: C.green, padding: "0 13px 9px" }}>⚑ Zapísané: {akciaOk}</div>}
           </div>
+
+          <NapadBox />
           <div style={{ display: "grid", gap: 8 }}>
             {polozky.map((p) => (
               <button

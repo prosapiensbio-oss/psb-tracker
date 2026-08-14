@@ -532,6 +532,12 @@ export function buildAiContext(
           },
         };
       })(),
+      // Nápady sa do kontextu nelejú celé — je ich potenciálne stovky a Jarvis
+      // si ich vytiahne dopytom, keď ich treba. Tu je len to, či vôbec sú, aby
+      // vedel, že sa má pozrieť.
+      napady: {
+        poznamka: "Surové nápady na obsah z + Zápis sú v tabuľke mkt_napady — vytiahni si ich dopytom (stav = 'novy'), keď sa rieši, čo publikovať. Otázky klientov (zdroj = 'otazka_klienta') sú najcennejšie: je to jazyk, ktorým ľudia o svojom probléme naozaj hovoria.",
+      },
       naklady: { poznamka: "Marketingové položky z P&L (Facebook, Google, MultiBox, Offline).", poMesiacoch: naklady },
     };
   })();

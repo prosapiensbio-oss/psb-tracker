@@ -28,6 +28,7 @@ import { Route as ApiPremenujRouteImport } from './routes/api/premenuj'
 import { Route as ApiPeriodsRouteImport } from './routes/api/periods'
 import { Route as ApiPdfImportRouteImport } from './routes/api/pdf-import'
 import { Route as ApiOverrideRouteImport } from './routes/api/override'
+import { Route as ApiNapadyRouteImport } from './routes/api/napady'
 import { Route as ApiMetaRouteImport } from './routes/api/meta'
 import { Route as ApiMarketingRouteImport } from './routes/api/marketing'
 import { Route as ApiMailerRouteImport } from './routes/api/mailer'
@@ -143,6 +144,11 @@ const ApiPdfImportRoute = ApiPdfImportRouteImport.update({
 const ApiOverrideRoute = ApiOverrideRouteImport.update({
   id: '/api/override',
   path: '/api/override',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiNapadyRoute = ApiNapadyRouteImport.update({
+  id: '/api/napady',
+  path: '/api/napady',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiMetaRoute = ApiMetaRouteImport.update({
@@ -276,6 +282,7 @@ export interface FileRoutesByFullPath {
   '/api/mailer': typeof ApiMailerRoute
   '/api/marketing': typeof ApiMarketingRoute
   '/api/meta': typeof ApiMetaRoute
+  '/api/napady': typeof ApiNapadyRoute
   '/api/override': typeof ApiOverrideRoute
   '/api/pdf-import': typeof ApiPdfImportRoute
   '/api/periods': typeof ApiPeriodsRoute
@@ -318,6 +325,7 @@ export interface FileRoutesByTo {
   '/api/mailer': typeof ApiMailerRoute
   '/api/marketing': typeof ApiMarketingRoute
   '/api/meta': typeof ApiMetaRoute
+  '/api/napady': typeof ApiNapadyRoute
   '/api/override': typeof ApiOverrideRoute
   '/api/pdf-import': typeof ApiPdfImportRoute
   '/api/periods': typeof ApiPeriodsRoute
@@ -361,6 +369,7 @@ export interface FileRoutesById {
   '/api/mailer': typeof ApiMailerRoute
   '/api/marketing': typeof ApiMarketingRoute
   '/api/meta': typeof ApiMetaRoute
+  '/api/napady': typeof ApiNapadyRoute
   '/api/override': typeof ApiOverrideRoute
   '/api/pdf-import': typeof ApiPdfImportRoute
   '/api/periods': typeof ApiPeriodsRoute
@@ -405,6 +414,7 @@ export interface FileRouteTypes {
     | '/api/mailer'
     | '/api/marketing'
     | '/api/meta'
+    | '/api/napady'
     | '/api/override'
     | '/api/pdf-import'
     | '/api/periods'
@@ -447,6 +457,7 @@ export interface FileRouteTypes {
     | '/api/mailer'
     | '/api/marketing'
     | '/api/meta'
+    | '/api/napady'
     | '/api/override'
     | '/api/pdf-import'
     | '/api/periods'
@@ -489,6 +500,7 @@ export interface FileRouteTypes {
     | '/api/mailer'
     | '/api/marketing'
     | '/api/meta'
+    | '/api/napady'
     | '/api/override'
     | '/api/pdf-import'
     | '/api/periods'
@@ -532,6 +544,7 @@ export interface RootRouteChildren {
   ApiMailerRoute: typeof ApiMailerRoute
   ApiMarketingRoute: typeof ApiMarketingRoute
   ApiMetaRoute: typeof ApiMetaRoute
+  ApiNapadyRoute: typeof ApiNapadyRoute
   ApiOverrideRoute: typeof ApiOverrideRoute
   ApiPdfImportRoute: typeof ApiPdfImportRoute
   ApiPeriodsRoute: typeof ApiPeriodsRoute
@@ -683,6 +696,13 @@ declare module '@tanstack/react-router' {
       path: '/api/override'
       fullPath: '/api/override'
       preLoaderRoute: typeof ApiOverrideRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/napady': {
+      id: '/api/napady'
+      path: '/api/napady'
+      fullPath: '/api/napady'
+      preLoaderRoute: typeof ApiNapadyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/meta': {
@@ -860,6 +880,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMailerRoute: ApiMailerRoute,
   ApiMarketingRoute: ApiMarketingRoute,
   ApiMetaRoute: ApiMetaRoute,
+  ApiNapadyRoute: ApiNapadyRoute,
   ApiOverrideRoute: ApiOverrideRoute,
   ApiPdfImportRoute: ApiPdfImportRoute,
   ApiPeriodsRoute: ApiPeriodsRoute,
