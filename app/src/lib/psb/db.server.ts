@@ -123,6 +123,7 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
       narodeniny: String(r.narodeniny || ""),
       prvyKontakt: String(r.prvy_kontakt || ""),
       v6m: String(r.v6m || ""),
+      precoNeprisiel: String(r.preco_neprisiel || ""),
     };
   }
   for (const r of acks.results as any[]) {
@@ -420,6 +421,7 @@ export async function setOverride(
     narodeniny: "narodeniny",
     prvyKontakt: "prvy_kontakt",
     v6m: "v6m",
+    precoNeprisiel: "preco_neprisiel",
   };
   const col = colMap[key as string];
   if (!col) return;

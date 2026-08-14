@@ -65,12 +65,21 @@ export async function ingestFiles(
   return j.results ?? [];
 }
 
+/**
+ * Vráti, či zápis naozaj prešiel.
+ *
+ * Doteraz vracala `void` a chyba sa strácala. 13. 8. to stálo celý večer
+ * vypisovania dôvodov: stĺpec v databáze neexistoval, API vracalo `bad_field`,
+ * obrazovka aj tak ukázala novú hodnotu (optimistický zápis) a po načítaní
+ * stránky bola preč. Tichý neúspech je horší než hlasitá chyba.
+ */
 export async function saveOverride(
   name: string,
   key: keyof ClientOverride,
   value: unknown,
-): Promise<void> {
-  await post("/api/override", { name, key, value });
+): Promise<boolean> {
+  const r = await post("/api/override", { name, key, value });
+  return r.ok;
 }
 
 export async function saveAnomaly(key: string, note: string, ack = true): Promise<void> {

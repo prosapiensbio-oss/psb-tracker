@@ -56,7 +56,8 @@ import { chybajuceNaklady, dvojiteZapisy, nezhodyPrijmov, nezhodySExcelom, type 
 import { MKT_MESACNE } from "../../lib/psb/marketing";
 
 export type Actions = {
-  setOverride: (name: string, key: keyof ClientOverride, value: unknown) => void;
+  /** Vráti `false`, keď zápis na serveri neprešiel — obrazovka to nesmie zamlčať. */
+  setOverride: (name: string, key: keyof ClientOverride, value: unknown) => Promise<boolean>;
   ackAnomaly: (key: string, note: string, ack?: boolean) => void;
   ingest: (files: { filename: string; text: string }[]) => Promise<IngestResult[]>;
   reset: () => Promise<void>;
@@ -1462,7 +1463,7 @@ function skupinaFaktur(
 
   const actions = useMemo<Actions>(
     () => ({
-      setOverride: (name, key, value) => {
+      setOverride: async (name, key, value) => {
         // Resolve to the real client name (diacritics/case/whitespace-insensitive)
         // so an AI-proposed "Jakub Stigut" still edits "Jakub Štigut".
         const all = clientsRef.current;
@@ -1477,7 +1478,7 @@ function skupinaFaktur(
           ...prev,
           clientOverrides: { ...prev.clientOverrides, [canonical]: { ...prev.clientOverrides[canonical], [key]: value } },
         }));
-        void saveOverride(canonical, key, value);
+        return saveOverride(canonical, key, value);
       },
       ackAnomaly: (key, note, ack = true) => {
         setData((prev) => {

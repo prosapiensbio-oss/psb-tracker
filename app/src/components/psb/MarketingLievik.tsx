@@ -193,7 +193,7 @@ const DNI_NA_NAVRAT = 21;
 
 function StrataRiadok({ x, onPoznamka }: {
   x: { meno: string; datum: string; dni: number; trener: string; preco: string };
-  onPoznamka?: (meno: string, text: string) => void;
+  onPoznamka?: (meno: string, text: string) => Promise<boolean | void> | boolean | void;
 }) {
   const [text, setText] = useState(x.preco);
   const [ulozene, setUlozene] = useState(false);
@@ -204,9 +204,14 @@ function StrataRiadok({ x, onPoznamka }: {
   const uloz = () => {
     const t = text.trim();
     if (!onPoznamka || t === x.preco.trim()) return;
-    onPoznamka(x.meno, t);
-    setUlozene(true);
-    setTimeout(() => setUlozene(false), 2500);
+    // „Uložené" sa smie ukázať až vtedy, keď zápis naozaj prešiel. Prvá verzia
+    // to hlásila hneď po kliknutí a 13. 8. klamala celý večer: stĺpec v
+    // databáze neexistoval, API vracalo `bad_field` a dôvody sa strácali.
+    void Promise.resolve(onPoznamka(x.meno, t)).then((ok) => {
+      if (ok === false) return;
+      setUlozene(true);
+      setTimeout(() => setUlozene(false), 2500);
+    });
   };
   return (
     <div style={{ borderLeft: `2px solid ${x.preco ? C.green : x.dni < DNI_NA_NAVRAT ? mix(C.text, 25) : mix(C.orange, 55)}`, paddingLeft: 9 }}>
@@ -302,8 +307,8 @@ function Krok({ cislo, popis, farba, konverzia, onClick, aktivny, onStrata, stra
 
 export function Lievik({ data, clients, onPoznamka }: {
   data: PSBData; clients: Record<string, ClientAgg>;
-  /** Uloží dôvod, prečo človek po úvodnom už neprišiel. */
-  onPoznamka?: (meno: string, text: string) => void;
+  /** Uloží dôvod, prečo človek po úvodnom už neprišiel. `false` = neuložilo sa. */
+  onPoznamka?: (meno: string, text: string) => Promise<boolean | void> | boolean | void;
 }) {
   const [okno, setOkno] = useState("2026");
   /** Ktorý krok lievika má rozbalené mená. Vždy najviac jeden. */
