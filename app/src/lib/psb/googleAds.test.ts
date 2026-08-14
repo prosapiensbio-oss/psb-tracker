@@ -250,3 +250,27 @@ describe("dôvod chyby sa nesmie zahodiť", () => {
     expect(chybaZOdpovede(null, "", 502)).toContain("bez tela odpovede");
   });
 });
+
+describe("mena sa nesmie napísať natvrdo", () => {
+  const m = { mesiac: "2022-03", naklad: 1847.04, kliky: 7970, zobrazenia: 276000, konverzie: 0 };
+
+  test("eurový účet sa nehlási v korunách", () => {
+    // Účet 793-327-0125 fakturuje v EUR, manažér je v CZK. Napísané „Kč" by
+    // z 1 847 € urobilo 1 847 Kč — omyl 25-násobný, a číslo by vyzeralo
+    // úplne vierohodne.
+    const s = zhrnutieAds([m], "EUR");
+    expect(s).toContain("€");
+    expect(s).not.toContain("Kč");
+  });
+
+  test("korunový účet v korunách", () => {
+    expect(zhrnutieAds([m], "CZK")).toContain("Kč");
+  });
+
+  test("neznáma mena radšej bez jednotky než s nesprávnou", () => {
+    const s = zhrnutieAds([m], "");
+    expect(s).not.toContain("Kč");
+    expect(s).not.toContain("€");
+    expect(s).toContain("1847");
+  });
+});

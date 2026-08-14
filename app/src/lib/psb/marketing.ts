@@ -339,12 +339,21 @@ export let GADS_KAMPANE: GadsKampan[] = [];
 export let GADS_DOPYTY: GadsDopyt[] = [];
 
 /**
+ * Mena účtu inzerenta — prázdna, kým sa nestiahne.
+ *
+ * Účet 793-327-0125 fakturuje v EURÁCH, hoci manažérsky účet je vedený
+ * v korunách. Natvrdo napísané „Kč" by z 1 847 € urobilo 1 847 Kč — omyl
+ * dvadsaťpäťnásobný, a pritom by číslo vyzeralo úplne vierohodne.
+ */
+export let GADS_VALUTA = "";
+
+/**
  * Google Ads z API.
  *
  * Prázdne pole neprepisuje to, čo už je: keď stiahnutie čiastočne zlyhá,
  * polovica dát by ticho zmizla a obrazovka by tvrdila, že sa nič nedeje.
  */
-export function nastavAdsZImportu(kampane: GadsKampan[], dopyty: GadsDopyt[]): boolean {
+export function nastavAdsZImportu(kampane: GadsKampan[], dopyty: GadsDopyt[], valuta = ""): boolean {
   let zmena = false;
   if (kampane.length) {
     GADS_KAMPANE = [...kampane].sort((a, b) => a.mesiac.localeCompare(b.mesiac));
@@ -354,5 +363,6 @@ export function nastavAdsZImportu(kampane: GadsKampan[], dopyty: GadsDopyt[]): b
     GADS_DOPYTY = [...dopyty].sort((a, b) => b.zobrazenia - a.zobrazenia);
     zmena = true;
   }
+  if (valuta) GADS_VALUTA = valuta;
   return zmena;
 }

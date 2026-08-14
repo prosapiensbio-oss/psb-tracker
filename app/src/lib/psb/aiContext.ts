@@ -10,6 +10,7 @@ import {
   MKT_CLANKY, MKT_MESACNE,
   GADS_DOPYTY,
   GADS_KAMPANE,
+  GADS_VALUTA,
 } from "./marketing";
 import { MKT_OBSAH } from "./marketing-obsah";
 import { prilezitosti, soZamerom } from "./google";
@@ -472,7 +473,9 @@ export function buildAiContext(
         mesacne: adsMesiace(GADS_KAMPANE),
         kampane: GADS_KAMPANE.slice(0, 30),
         hladaneVyrazy: GADS_DOPYTY.slice(0, 40),
-        zhrnutie: zhrnutieAds(adsMesiace(GADS_KAMPANE)),
+        zhrnutie: zhrnutieAds(adsMesiace(GADS_KAMPANE), GADS_VALUTA),
+        valuta: GADS_VALUTA || "neznáma — nestiahlo sa",
+        poznamkaKMene: "Náklad je v mene ÚČTU INZERENTA, ktorá je EUR — nie v korunách. Keď to prepočítavaš na koruny alebo porovnávaš s Metou (31 452 Kč) či s P&L, VŽDY to najprv preveď kurzom a povedz, aký kurz si použil. Manažérsky účet je vedený v korunách a preto v Google Ads ukazuje pri tomto účte nulu — to nie je chyba dát.",
         objemHladania: "NIE JE k dispozícii. Plánovač kľúčových slov blokuje token na úrovni „prieskumník“; žiadosť o Basic bola podaná 14. 8. 2026. Ak sa Jerry pýta na objem hľadania, povedz, že sa čaká na Google, a NEODHADUJ ho — Search Console meria len tam, kde sa web už zobrazil, takže z nej sa objem dopytu vyčítať nedá.",
       },
       clanky: MKT_CLANKY.slice(0, 15),

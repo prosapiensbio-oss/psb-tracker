@@ -42,7 +42,19 @@ import {
  * dopyt — tabuľky ani obrazovka sa prestavovať nebudú.
  */
 
-const MESIACOV = 40;   // aj kampaň z mája 2023 má padnúť do rozsahu
+/**
+ * Ako hlboko do minulosti ťahať.
+ *
+ * Pôvodne 40 mesiacov, čo vyzeralo bohato — a bolo by to minulo väčšinu
+ * peňazí. Účet 793-327-0125 začal inzerovať v auguste 2021 a podľa grafu
+ * padli najväčšie výdaje do 2021–2022; 40 mesiacov dozadu z augusta 2026 je
+ * apríl 2023, teda až ZA nimi. Je to tá istá rodina chýb ako predpoklad, že
+ * dáta siahajú tam, kam siaha kalendár.
+ *
+ * 72 mesiacov pokrýva celú históriu účtu s rezervou. Google si výkon kampaní
+ * drží bez limitu, hľadané výrazy nie — tie budú aj tak len za posledné roky.
+ */
+const MESIACOV = 72;
 
 type Hlavicky = Record<string, string>;
 

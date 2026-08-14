@@ -16,6 +16,7 @@ import {
   nastavMarketingZImportu,
   GADS_DOPYTY,
   GADS_KAMPANE,
+  GADS_VALUTA,
   nastavAdsZImportu,
   type GadsDopyt,
   type GadsKampan,
@@ -569,6 +570,9 @@ function RokBar({ rok, onRok }: { rok: string; onRok: (r: string) => void }) {
 function GoogleAdsKarta({ chat }: { chat?: AssistantChat }) {
   const mesiace = adsMesiace(GADS_KAMPANE);
   const straz = kontrolaAds(mesiace);
+  // Mena z účtu, nie natvrdo. Kým sa nestiahne, radšej bez jednotky než
+  // s nesprávnou — číslo bez meny sa dá doplniť, číslo v zlej mene klame.
+  const mena = GADS_VALUTA === "CZK" ? "Kč" : GADS_VALUTA === "EUR" ? "€" : GADS_VALUTA;
   const cpc = cenaZaKlik(mesiace);
   const vyrazy = GADS_DOPYTY.slice(0, 12);
 
@@ -600,7 +604,7 @@ function GoogleAdsKarta({ chat }: { chat?: AssistantChat }) {
       </H3>
 
       <div style={{ fontSize: 12, color: C.textMuted, marginTop: 6, lineHeight: 1.6 }}>
-        {zhrnutieAds(mesiace, "CZK")}
+        {zhrnutieAds(mesiace, GADS_VALUTA)}
       </div>
 
       {straz.map((n) => (
@@ -624,11 +628,11 @@ function GoogleAdsKarta({ chat }: { chat?: AssistantChat }) {
           {mesiace.filter((m) => m.naklad > 0 || m.kliky > 0).map((m) => (
             <tr key={m.mesiac} style={{ borderTop: `1px solid ${mix(C.text, 10)}`, textAlign: "right" }}>
               <td style={{ textAlign: "left", padding: "4px 6px", color: C.text }}>{label(m.mesiac)}</td>
-              <td style={{ padding: "4px 6px", color: C.text }}>{Math.round(m.naklad)} Kč</td>
+              <td style={{ padding: "4px 6px", color: C.text }}>{Math.round(m.naklad)} {mena}</td>
               <td style={{ padding: "4px 6px", color: C.text }}>{m.kliky}</td>
               <td style={{ padding: "4px 6px", color: C.textMuted }}>{m.zobrazenia}</td>
               <td style={{ padding: "4px 6px", color: C.textMuted }}>
-                {m.kliky > 0 ? `${Math.round((m.naklad / m.kliky) * 100) / 100} Kč` : "—"}
+                {m.kliky > 0 ? `${Math.round((m.naklad / m.kliky) * 100) / 100} ${mena}`.trim() : "—"}
               </td>
             </tr>
           ))}
@@ -916,10 +920,10 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
   useEffect(() => {
     void fetch("/api/marketing", { credentials: "same-origin" })
       .then((r) => r.json())
-      .then((j: { mesacne?: MktMesiac[]; top?: MktKus[]; ga4?: Ga4Mesiac[]; gscMesacne?: GscMesiac[]; gscDopyty?: GscDopyt[]; gscStrany?: GscStrana[]; ga4Strany?: { url: string; zobrazenia: number }[]; gscZariadenia?: { zariadenie: string; kliky: number; zobrazenia: number }[]; gadsKampane?: GadsKampan[]; gadsDopyty?: GadsDopyt[] }) => {
+      .then((j: { mesacne?: MktMesiac[]; top?: MktKus[]; ga4?: Ga4Mesiac[]; gscMesacne?: GscMesiac[]; gscDopyty?: GscDopyt[]; gscStrany?: GscStrana[]; ga4Strany?: { url: string; zobrazenia: number }[]; gscZariadenia?: { zariadenie: string; kliky: number; zobrazenia: number }[]; gadsKampane?: GadsKampan[]; gadsDopyty?: GadsDopyt[]; gadsValuta?: string }) => {
         const a = nastavMarketingZImportu(j.mesacne || [], j.top || []);
         const b = nastavWebZImportu(j.ga4 || [], j.gscMesacne || [], j.gscDopyty || [], j.gscStrany || [], j.ga4Strany || [], j.gscZariadenia || []);
-        const bAds = nastavAdsZImportu(j.gadsKampane || [], j.gadsDopyty || []);
+        const bAds = nastavAdsZImportu(j.gadsKampane || [], j.gadsDopyty || [], j.gadsValuta || "");
         if (a || b || bAds) tik((x) => x + 1);
       })
       .catch(() => {});

@@ -21,7 +21,7 @@ export const Route = createFileRoute("/api/marketing")({
         const { DB } = bindings();
         if (!DB) return Response.json({ ok: false, mesacne: [], top: [] });
         try {
-          const [mes, top, ga4, ga4S, gscZ, gscM, gscD, gscS, kan, gadsK, gadsD] = await Promise.all([
+          const [mes, top, ga4, ga4S, gscZ, gscM, gscD, gscS, kan, gadsK, gadsD, gadsV] = await Promise.all([
             DB.prepare(
               `SELECT mesiac,
                       SUM(CASE WHEN druh = 'reel'  THEN 1 ELSE 0 END) AS reels,
@@ -50,6 +50,10 @@ export const Route = createFileRoute("/api/marketing")({
             // v `adsMesiace()`, aby súčet a rozpad nemohli tvrdiť rôzne veci.
             DB.prepare("SELECT campaign_id, nazov, typ, stav, mesiac, naklad, kliky, zobrazenia, konverzie FROM gads_kampane ORDER BY mesiac").all().catch(() => ({ results: [] })),
             DB.prepare("SELECT mesiac, dopyt, kliky, zobrazenia, naklad, konverzie FROM gads_dopyty ORDER BY zobrazenia DESC LIMIT 200").all().catch(() => ({ results: [] })),
+            // Mena účtu INZERENTA, nie manažéra. Účet 793-327-0125 fakturuje
+            // v eurách, kým manažér je vedený v korunách — natvrdo napísané
+            // „Kč" by z 1 847 € urobilo 1 847 Kč, čiže omyl 25-násobný.
+            DB.prepare("SELECT valuta FROM gads_ucty WHERE je_manager = 0 AND valuta <> '' LIMIT 1").first<{ valuta: string }>().catch(() => null),
           ]);
           // Mesiac, z ktorého je nahratá len časť, sa nesmie tváriť ako hotový.
           // 11. 8.: doplnili sme 18 mesiacov exportov, ale júl 2026 v priečinku
@@ -127,6 +131,7 @@ export const Route = createFileRoute("/api/marketing")({
             gscZariadenia: (gscZ.results as Record<string, unknown>[]).map((r) => ({
               zariadenie: r.zariadenie, kliky: Number(r.kliky) || 0, zobrazenia: Number(r.zobrazenia) || 0,
             })),
+            gadsValuta: gadsV?.valuta || "",
             gadsKampane: (gadsK.results as Record<string, unknown>[]).map((r) => ({
               campaignId: String(r.campaign_id), nazov: String(r.nazov || ""),
               typ: String(r.typ || ""), stav: String(r.stav || ""), mesiac: String(r.mesiac),
@@ -148,7 +153,7 @@ export const Route = createFileRoute("/api/marketing")({
         } catch {
           // Tabuľka ešte nie je (staršia migrácia) — obrazovka si vystačí s tým,
           // čo má v kóde.
-          return Response.json({ ok: false, mesacne: [], top: [], ga4: [], ga4Strany: [], gscZariadenia: [], gscMesacne: [], gscDopyty: [], gscStrany: [], kanaly: [], gadsKampane: [], gadsDopyty: [] });
+          return Response.json({ ok: false, mesacne: [], top: [], ga4: [], ga4Strany: [], gscZariadenia: [], gscMesacne: [], gscDopyty: [], gscStrany: [], kanaly: [], gadsKampane: [], gadsDopyty: [], gadsValuta: "" });
         }
       },
     },

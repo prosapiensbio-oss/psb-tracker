@@ -301,6 +301,12 @@ export function cenaZaKlik(mesiace: AdsMesiac[]): number | null {
  * záver „Google nefunguje" — a to je presne ten druh omylu, ktorý nás pri
  * Mete stál devätnásť mesiacov.
  */
+/**
+ * Značka meny. Účet inzerenta fakturuje v eurách, manažér je v korunách —
+ * jedna napísaná jednotka by z 1 847 € urobila 1 847 Kč.
+ */
+const ZNACKA: Record<string, string> = { CZK: "Kč", EUR: "€", USD: "$" };
+
 export function zhrnutieAds(mesiace: AdsMesiac[], valuta = ""): string {
   const aktivne = mesiace.filter((m) => m.naklad > 0 || m.kliky > 0);
   if (aktivne.length === 0) return "Za sledované obdobie sa v Google Ads nič neutratilo.";
@@ -309,7 +315,7 @@ export function zhrnutieAds(mesiace: AdsMesiac[], valuta = ""): string {
   const kliky = aktivne.reduce((a, m) => a + m.kliky, 0);
   const konverzie = aktivne.reduce((a, m) => a + m.konverzie, 0);
   const cpc = cenaZaKlik(aktivne);
-  const mena = valuta === "CZK" ? "Kč" : valuta || "";
+  const mena = ZNACKA[valuta] ?? valuta ?? "";
 
   const casti = [
     `${aktivne.length} ${aktivne.length === 1 ? "mesiac" : aktivne.length < 5 ? "mesiace" : "mesiacov"} s výdajom`,
