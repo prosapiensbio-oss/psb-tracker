@@ -197,6 +197,14 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
    * debata o peniazoch. Preto sa ukládá spolu so správami.
    */
   const [kategoria, setKategoria] = useState("");
+  /**
+   * Prerušenie rozpísanej odpovede.
+   *
+   * Drží sa v ref a nie v state, lebo `ask` ho musí prepísať a prečítať v tom
+   * istom priebehu — cez state by čítal starú hodnotu a zastavovalo by sa
+   * predošlé volanie.
+   */
+  const abortRef = useRef<AbortController | null>(null);
   useEffect(() => {
     try { if (localStorage.getItem("psb-ai-open") === "1") setFloatingOpen(true); } catch { /* ignore */ }
   }, []);
@@ -280,6 +288,9 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
    * pôvodnú aj opravenú verziu a odpovedal na zmes. Jerry o to požiadal spolu
    * s cmd+Z: keď sa pri zápise sekne, nemá ako cúvnuť.
    */
+  /** Zastaví rozpísanú odpoveď. Text, ktorý už prišiel, zostáva. */
+  const zastav = () => abortRef.current?.abort();
+
   const upravSpravu = (index: number, text: string) => {
     if (busy) return;
     const t = text.trim();
@@ -344,6 +355,8 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
     setInput("");
     setAttach([]);
     setBusy(true);
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
     const setLast = (patch: Msg) => setMsgs((m) => { const n = m.slice(); n[n.length - 1] = patch; return n; });
     const res = await sendChat(
       history.map((m) => ({ role: m.role, content: m.text, images: m.images })),
@@ -353,12 +366,23 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
       deep,
       setStav,
       kategoria,
+      ctrl.signal,
     );
+    abortRef.current = null;
     setBusy(false);
     setStav("");
     if (res.ok) {
       const { text, actions: acts } = parseActions(res.reply);
       setLast({ role: "assistant", text: text || "…", actions: acts.length ? acts : undefined });
+    } else if (res.error === "zastavene") {
+      // Rozpísaný text NEPREPISUJEME — je to prerušenie, nie zahodenie.
+      // Prázdnu odpoveď by ale bublina nechala visieť naprázdno.
+      setMsgs((m) => {
+        const n = m.slice();
+        const p = n[n.length - 1];
+        n[n.length - 1] = { role: "assistant", text: p?.text ? `${p.text}\n\n— zastavené —` : "— zastavené —" };
+        return n;
+      });
     } else {
       setLast({ role: "assistant", text: errorText(res.error) });
     }
@@ -561,13 +585,13 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
     ].join(" · ");
   }
 
-  return { msgs, setMsgs, input, setInput, busy, stav, deep, setDeep, pending, setPending, attach, setAttach, ask, runAction, confirmImport, handleIncoming, floatingOpen, setFloatingOpen, kategoria, setKategoria, chats, chatId, newChat, upravSpravu, presunChat, openChat, deleteChat, archiveChat, spracujDennik };
+  return { msgs, setMsgs, input, setInput, busy, stav, deep, setDeep, pending, setPending, attach, setAttach, ask, runAction, confirmImport, handleIncoming, floatingOpen, setFloatingOpen, kategoria, setKategoria, chats, chatId, newChat, upravSpravu, presunChat, zastav, openChat, deleteChat, archiveChat, spracujDennik };
 }
 
 // ── The conversation UI (messages + input) — used by both the floating panel and
 // the inline widget. Each instance has its own scroll/refs/drag state. ──────────
 export function ChatConversation({ chat, autoFocus, onClientClick, onNavigate }: { chat: AssistantChat; autoFocus?: boolean; onClientClick?: (name: string) => void; onNavigate?: (tab: string, sub?: string) => void }) {
-  const { msgs, input, setInput, busy, stav, deep, setDeep, pending, setPending, attach, setAttach, ask, runAction, confirmImport, handleIncoming, upravSpravu } = chat;
+  const { msgs, input, setInput, busy, stav, deep, setDeep, pending, setPending, attach, setAttach, ask, runAction, confirmImport, handleIncoming, upravSpravu, zastav } = chat;
   // Ktorá odoslaná otázka sa práve prepisuje. Zámerne len jedna — dve
   // rozpísané opravy naraz by sa navzájom prepísali pri odoslaní.
   const [upravujem, setUpravujem] = useState<number | null>(null);
@@ -752,9 +776,25 @@ export function ChatConversation({ chat, autoFocus, onClientClick, onNavigate }:
           rows={1}
           style={{ flex: 1, resize: "none", maxHeight: 120, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: "9px 11px", color: C.text, fontSize: 13, outline: "none", fontFamily: "inherit", lineHeight: 1.4 }}
         />
-        <button onClick={() => ask(input)} disabled={busy || (!input.trim() && !attach.length)} style={{ width: 38, height: 38, borderRadius: 10, border: "none", cursor: busy || (!input.trim() && !attach.length) ? "default" : "pointer", background: input.trim() || attach.length ? C.accent : C.border, color: C.onAccent, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }} aria-label="Odoslať">
-          <Send />
-        </button>
+        {/*
+          Počas písania odpovede je z tlačidla STOP.
+          Zvláštne tlačidlo vedľa by bolo dve veci na jednom mieste a jedna
+          z nich by bola vždy vypnutá; takto je tam vždy tá, ktorá má zmysel.
+        */}
+        {busy ? (
+          <button
+            onClick={zastav}
+            title="Zastaviť odpoveď. To, čo už napísal, zostane."
+            style={{ width: 38, height: 38, borderRadius: 10, border: `1px solid ${C.border}`, cursor: "pointer", background: mix(C.text, 8), color: C.text, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, padding: 0 }}
+            aria-label="Zastaviť"
+          >
+            <span style={{ width: 11, height: 11, borderRadius: 2, background: C.text, display: "block" }} />
+          </button>
+        ) : (
+          <button onClick={() => ask(input)} disabled={!input.trim() && !attach.length} style={{ width: 38, height: 38, borderRadius: 10, border: "none", cursor: !input.trim() && !attach.length ? "default" : "pointer", background: input.trim() || attach.length ? C.accent : C.border, color: C.onAccent, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }} aria-label="Odoslať">
+            <Send />
+          </button>
+        )}
       </div>
     </div>
   );

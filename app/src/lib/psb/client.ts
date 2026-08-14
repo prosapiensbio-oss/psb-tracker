@@ -3,11 +3,12 @@ import type { ClientOverride, Lead, PSBData } from "./types";
 import { EMPTY_DATA } from "./types";
 import type { IngestResult } from "./db.server";
 
-async function post(url: string, body: unknown) {
+async function post(url: string, body: unknown, signal?: AbortSignal) {
   const r = await fetch(url, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
+    signal,
   });
   return r;
 }
@@ -227,9 +228,12 @@ export async function sendChat(
   // Zameranie rozhovoru (marketing | peniaze | klienti | prázdne = všetko).
   // Nezužuje dáta — mení, čo Jarvis čita prvé a aké pravidlá preň platia.
   kategoria?: string,
+  // Zastavenie odpovede. Rozpísaný text zostáva — je to prerušenie, nie
+  // zahodenie: často je práve prvá veta to, na čo sa Jerry pýtal.
+  signal?: AbortSignal,
 ): Promise<ChatResult> {
   try {
-    const r = await post("/api/chat", { messages, context, deep: !!deep, kategoria: kategoria || "" });
+    const r = await post("/api/chat", { messages, context, deep: !!deep, kategoria: kategoria || "" }, signal);
     // Errors (no_key, api_error…) come back as JSON; a successful answer streams as
     // Server-Sent Events (text/event-stream) — `data: {"t":"…"}` frames, then `[DONE]`.
     if ((r.headers.get("content-type") || "").includes("application/json")) {
@@ -276,6 +280,10 @@ export async function sendChat(
     }
     return { ok: true, reply: full };
   } catch (e) {
+    // Prerušenie používateľom nie je porucha siete. Rozpísaná odpoveď je už
+    // v správach (písal ju onDelta), takže stačí povedať, že sa zastavila —
+    // často je práve prvá veta to, na čo sa Jerry pýtal.
+    if ((e as { name?: string })?.name === "AbortError") return { ok: false, error: "zastavene" };
     return { ok: false, error: "network", detail: String(e) };
   }
 }
