@@ -224,30 +224,60 @@ describe("podozrivo dokonalé čísla", () => {
   });
 });
 
-describe("Google Ads bez merania konverzií", () => {
-  const m = (naklad: number, kliky: number, konverzie = 0) =>
-    ({ mesiac: "2023-05", naklad, kliky, konverzie });
+describe("Google Ads: konverzie verzus skutoční klienti", () => {
+  const m = (mesiac: string, naklad: number, kliky: number, konverzie = 0) =>
+    ({ mesiac, naklad, kliky, konverzie });
 
-  it("platené kliky bez konverzií sa ohlásia", () => {
-    const v = kontrolaAds([m(1080, 494)]);
-    expect(v).toHaveLength(1);
+  it("konverzie mnohonásobne nad počtom klientov sa ohlásia", () => {
+    // Skutočný prípad: Search_UvodniTrenink_03_2025, 437 EUR, 299 konverzií,
+    // a za to isté obdobie začalo 16 klientov zo všetkých kanálov spolu.
+    // Nula by nikoho nezviedla; 1,46 EUR za konverziu áno.
+    const v = kontrolaAds(
+      [m("2025-03", 200, 300, 150), m("2025-04", 237, 346, 149)],
+      { "2025-03": 8, "2025-04": 8 },
+      "2025-01",
+    );
+    const n = v.find((x) => x.kluc === "gads|konverzie-vs-klienti");
+    expect(n).toBeDefined();
+    expect(n!.nadpis).toContain("299");
+    expect(n!.nadpis).toContain("16");
+    // Nesmie tvrdiť, že reklama nefungovala — to z toho nevyplýva.
+    expect(n!.detail).toContain("neznamená, že reklama nefungovala");
+  });
+
+  it("primeraný počet konverzií mlčí", () => {
+    const v = kontrolaAds([m("2025-03", 200, 300, 12)], { "2025-03": 10 }, "2025-01");
+    expect(v.filter((x) => x.kluc === "gads|konverzie-vs-klienti")).toEqual([]);
+  });
+
+  it("nula konverzií pri stovkách klikov sa stále hlási", () => {
+    const v = kontrolaAds([m("2025-03", 200, 300, 0)], { "2025-03": 10 }, "2025-01");
     expect(v[0].nadpis).toContain("nemeral konverzie");
-    // Kľúčové je, že to NEHOVORÍ „reklama nefungovala".
-    expect(v[0].detail).toContain("neboli v Google Ads nastavené");
+    expect(v[0].detail).toContain("NEMOŽNO");
   });
 
-  it("s konverziami mlčí", () => {
-    expect(kontrolaAds([m(1080, 494, 12)])).toEqual([]);
+  it("kampane pred začiatkom dát o klientoch sa hlásia ako NEOVERITEĽNÉ", () => {
+    // 558 z 857 konverzií bežalo v 2023–2024, dáta z PTmindera začínajú 2025.
+    // Mlčanie by sa čítalo ako „skontrolované, v poriadku".
+    const v = kontrolaAds(
+      [m("2023-12", 379, 1574, 307), m("2024-01", 112, 184, 22)],
+      { "2025-03": 8 },
+      "2025-01",
+    );
+    const n = v.find((x) => x.kluc === "gads|neoveritelne");
+    expect(n).toBeDefined();
+    expect(n!.zavaznost).toBe("stredna");
+    expect(n!.detail).toContain("nikdy mať nebudeme");
+    // Za staré obdobie sa NESMIE počítať pomer — nie je s čím.
+    expect(v.filter((x) => x.kluc === "gads|konverzie-vs-klienti")).toEqual([]);
   });
 
-  it("pri malej vzorke mlčí", () => {
-    // Pri dvadsiatich klikoch je nula konverzií úplne normálna a upozornenie
-    // by len svietilo.
-    expect(kontrolaAds([m(50, 20)])).toEqual([]);
+  it("malá vzorka mlčí", () => {
+    expect(kontrolaAds([m("2025-03", 50, 20, 2)], { "2025-03": 1 }, "2025-01")).toEqual([]);
   });
 
   it("bez výdaja mlčí", () => {
-    expect(kontrolaAds([m(0, 0)])).toEqual([]);
-    expect(kontrolaAds([])).toEqual([]);
+    expect(kontrolaAds([m("2025-03", 0, 0, 0)], {}, "2025-01")).toEqual([]);
+    expect(kontrolaAds([], {}, "2025-01")).toEqual([]);
   });
 });

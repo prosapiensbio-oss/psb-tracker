@@ -45,7 +45,7 @@ export type AiContext = ReturnType<typeof buildAiContext>;
  *
  * Doplnené 11. 8.: Jarvis videl register aj dáta, ale nie to, čo appka od
  * Jerryho ešte chce, aby sa mesiac dal zamknúť. Na otázku „čo mi chýba do
- * uzávierky júla" preto nevedel odpovedať, hoci to appka má spočítané na
+ * uzávierky júla“ preto nevedel odpovedať, hoci to appka má spočítané na
  * jednom mieste (krokyZamku).
  */
 export type UzavierkaPreAi = {
@@ -121,8 +121,8 @@ export function buildAiContext(
 
   const fin = monthlyFinance(data);
   // Kotva dát (11. 8. — test Jarvisa). `fin` končí BEŽIACIM mesiacom, nie
-  // posledným plným. Kým sa tu bral posledný riadok ako „posledný mesiac",
-  // Jarvis na „koľko sme zarobili minulý mesiac" odpovedal jedenástimi dňami
+  // posledným plným. Kým sa tu bral posledný riadok ako „posledný mesiac“,
+  // Jarvis na „koľko sme zarobili minulý mesiac“ odpovedal jedenástimi dňami
   // augusta (48 595 Kč) namiesto júla (199 463 Kč) — a rovnaký rozrobený
   // mesiac padal aj do priemeru, minima a maxima. Appka sama sa tejto chybe
   // vyhýba cez kotvaDat(); kontext o nej dovtedy nevedel.
@@ -132,7 +132,7 @@ export function buildAiContext(
   const beziaci = kotva.ciastocny ? fin.find((m) => m.month === kotva.mesiac) : undefined;
   const kpi = {
     aktivnychKlientov: clientList.filter((c) => c.status !== "Neaktívny").length,
-    // Vedome NIE „tento týždeň": PTminder sa prepisuje raz týždenne, takže
+    // Vedome NIE „tento týždeň“: PTminder sa prepisuje raz týždenne, takže
     // posledný týždeň s dátami je spravidla ten minulý. Názov klamal.
     odrobenePoslednyUplnyTyzden: { hodiny: r0(weekHours), tyzden: lastWeek ? weekLabel(lastWeek) : null },
     zarobkyPoslednyPlnyMesiac: lastMonth ? { mesiac: monthLabel(lastMonth.month), czk: r0(lastMonth.revenue) } : null,
@@ -240,8 +240,8 @@ export function buildAiContext(
   // ── Kalendár ──────────────────────────────────────────────────────────────
   //
   // PTminder je účtovníctvo, kalendár je predpoveď — a Jarvis dovtedy videl len
-  // to prvé. Preto na „koľko sa mi tento týždeň zrušilo" nevedel odpovedať a na
-  // „kde vidím zrušené tréningy" dokonca tvrdil, že to appka nesleduje.
+  // to prvé. Preto na „koľko sa mi tento týždeň zrušilo“ nevedel odpovedať a na
+  // „kde vidím zrušené tréningy“ dokonca tvrdil, že to appka nesleduje.
   //
   // Ide sem len rozumné okno: zmeny za posledných 30 dní a objednané hodiny do
   // konca budúceho týždňa. Celý kalendár by zabral miesto, ktoré potrebuje
@@ -278,7 +278,7 @@ export function buildAiContext(
   // ── Získavanie klientov (deravé vedro) ────────────────────────────────────
   //
   // Toto je číslo, z ktorého sa počíta rozpočet na reklamu — a je to iné číslo
-  // než „koľko mám voľných miest". Bez neho Jarvis plánoval na statických 18
+  // než „koľko mám voľných miest“. Bez neho Jarvis plánoval na statických 18
   // miestach a vychádzali mu polovičné rozpočty.
   const toky = tokyKlientov(data, clients);
   const zisk = ziskavanieKlientov(
@@ -355,14 +355,14 @@ export function buildAiContext(
   // nestačia knihy, treba čísla, proti ktorým sa plán meria. Preto sem ide
   // všetko, z čoho sa dá rozhodnúť, ale AGREGOVANE: 130 príspevkov po jednom
   // by zabralo miesto, ktoré potrebuje zoznam klientov, a stejne sa z nich
-  // číta len „ktorý typ háku funguje".
+  // číta len „ktorý typ háku funguje“.
   //
   // Čo sa zámerne NEPOSIELA: surové kanály z Metricoolu (163 riadkov, jediný
   // mesiac — na trend nestačia) a celé znenie kníh (tie sú v <pozadie_psb>).
   const marketing = (() => {
     const r2 = (n: number) => Math.round(n * 100) / 100;
 
-    // Obsah po kategórii háku — „čo funguje" sa neurčuje z videní, ale
+    // Obsah po kategórii háku — „čo funguje“ sa neurčuje z videní, ale
     // z uložení a zdieľaní: videnie je algoritmus, uloženie je človek.
     const podlaHooku: Record<string, { kusov: number; ulozenia: number; videnia: number; zdielania: number; vr: number }> = {};
     for (const o of MKT_OBSAH) {
@@ -380,13 +380,13 @@ export function buildAiContext(
       .sort((a, b) => b.ulozeniaNaKus - a.ulozeniaNaKus)
       // Poradie sa dopisuje číslom zámerne. Zoradený zoznam model prečítal
       // naopak (11. 8.: „dôraz na Edukácia a Klientsky príbeh — najlepšie
-      // uloženia", pritom sú na rebríčku posledné dve). Záver, ktorý sa dá
+      // uloženia“, pritom sú na rebríčku posledné dve). Záver, ktorý sa dá
       // spočítať, sa nemá nechať odvodzovať — to je to isté pravidlo ako
-      // „nesčituj z hlavy".
+      // „nesčituj z hlavy“.
       .map((h, i, pole) => ({ poradie: `${i + 1}. z ${pole.length} podľa uložení na kus`, ...h }));
     const podlaZdielani = [...hooky].sort((a, b) => b.zdielaniaNaKus - a.zdielaniaNaKus);
     const zhrnutieHookov = hooky.length
-      ? `Najviac ULOŽENÍ na kus má „${hooky[0].kategoria}" (${hooky[0].ulozeniaNaKus}), najmenej „${hooky[hooky.length - 1].kategoria}" (${hooky[hooky.length - 1].ulozeniaNaKus}). Najviac ZDIEĽANÍ má „${podlaZdielani[0].kategoria}" (${podlaZdielani[0].zdielaniaNaKus}). Pozor na počet kusov: kategória s pár kusmi môže viesť náhodou — „${hooky[0].kategoria}" ich má ${hooky[0].kusov}.`
+      ? `Najviac ULOŽENÍ na kus má „${hooky[0].kategoria}“ (${hooky[0].ulozeniaNaKus}), najmenej „${hooky[hooky.length - 1].kategoria}“ (${hooky[hooky.length - 1].ulozeniaNaKus}). Najviac ZDIEĽANÍ má „${podlaZdielani[0].kategoria}“ (${podlaZdielani[0].zdielaniaNaKus}). Pozor na počet kusov: kategória s pár kusmi môže viesť náhodou — „${hooky[0].kategoria}“ ich má ${hooky[0].kusov}.`
       : "Zatiaľ žiadny obsah.";
 
     const zoradene = [...MKT_OBSAH].sort((a, b) => b.u + b.z - (a.u + a.z));
@@ -412,7 +412,7 @@ export function buildAiContext(
 
     // Kotva marketingových dát. 11. 8.: MKT_MESACNE končilo júnom, júlové
     // čísla boli len v databáze (kanaly_mesiace, mkt_prispevky) — a Jarvis
-    // z chýbajúceho riadku vyrobil tvrdenie „v júli spadol obsah na nulu",
+    // z chýbajúceho riadku vyrobil tvrdenie „v júli spadol obsah na nulu“,
     // hoci júl bol s 32 kusmi najsilnejší mesiac v roku. Chýbajúci mesiac
     // NIE JE nula. Tá istá rodina chýb ako kotva dát pri tržbách, len na
     // druhom konci appky.
@@ -476,6 +476,9 @@ export function buildAiContext(
         zhrnutie: zhrnutieAds(adsMesiace(GADS_KAMPANE), GADS_VALUTA),
         valuta: GADS_VALUTA || "neznáma — nestiahlo sa",
         poznamkaKMene: "Náklad je v mene ÚČTU INZERENTA, ktorá je EUR — nie v korunách. Keď to prepočítavaš na koruny alebo porovnávaš s Metou (31 452 Kč) či s P&L, VŽDY to najprv preveď kurzom a povedz, aký kurz si použil. Manažérsky účet je vedený v korunách a preto v Google Ads ukazuje pri tomto účte nulu — to nie je chyba dát.",
+        konverziePozor: "Hlásené konverzie z Google Ads NIE SÚ klienti. Kampaň Search_UvodniTrenink_03_2025 hlásila 299 konverzií za 437 EUR (marec–júl 2025) a za to isté obdobie začalo trénovať 16 klientov zo VŠETKÝCH kanálov spolu, z toho z Googlu jeden. Konverzná akcia meria niečo iné než klienta. NIKDY neuvádzaj cenu za konverziu z Google Ads ako cenu za klienta a nikdy podľa nej neodporúčaj budget. Zároveň z toho NEVYVODZUJ, že reklama nefungovala — z pokazenej metriky sa nedá vyvodiť ani úspech, ani neúspech.",
+        overitelnostPozor: "Dáta o klientoch (PTminder) začínajú v roku 2025. Kampane z 2023–2024 sú 558 z 857 konverzií a nemajú s čím byť porovnané — nikdy mať nebudú. Keď sa o nich Jerry spýta, povedz, že sa overiť NEDAJÚ, nie že boli neúspešné.",
+        coDopytyHovoria: "Hľadané výrazy sú takmer výhradne informačné („cviky na záda“ 3413 zobrazení, „zdravotni cviceni“ 1322, „joga na bolavá záda“ 1191) — ľudia hľadajúci cvik zadarmo, nie trenéra. Komerčné miestne dopyty sú za 2,5 roka platenej reklamy nepatrné („osobní trenér brno“ 141 zobrazení, „trener brno“ 164, „fitness brno“ 299), čo POTVRDZUJE to isté, čo hovorí Search Console organicky. Z toho vyplýva, že platené hľadanie na získavanie klientov pre PSB zmysel nemá; hodnota týchto 16 587 dopytov je v OBSAHU — sú to presné slová, ktorými ľudia opisujú svoj problém.",
         objemHladania: "NIE JE k dispozícii. Plánovač kľúčových slov blokuje token na úrovni „prieskumník“; žiadosť o Basic bola podaná 14. 8. 2026. Ak sa Jerry pýta na objem hľadania, povedz, že sa čaká na Google, a NEODHADUJ ho — Search Console meria len tam, kde sa web už zobrazil, takže z nej sa objem dopytu vyčítať nedá.",
       },
       clanky: MKT_CLANKY.slice(0, 15),
@@ -491,7 +494,7 @@ export function buildAiContext(
       // z nich vychádza cez sto percent a znie presvedčivo.
       //
       // Tu sa počíta OBOJE z dopytov, teda nad tým istým obdobím, a mená sa
-      // párujú cez najdiKlienta — inak „Lukáš Hanus" z dopytu a „Lukas Hanus"
+      // párujú cez najdiKlienta — inak „Lukáš Hanus“ z dopytu a „Lukas Hanus“
       // z PTmindera prežijú ako dvaja ľudia a konverzia vyjde nižšia.
       lievik: (() => {
         const menaKlientov = clientList.map((c) => c.name);
@@ -524,7 +527,7 @@ export function buildAiContext(
           podlaZdroja: Object.fromEntries(Object.entries(podla).map(([z, e]) => [z, { ...e, zostaloPct: pct(e.zostal, e.dopytov) }])),
           // Kto prišiel na úvodný a už nikdy — vrátane dôvodu, ak ho niekto
           // zapísal. Obrazovka to vie od 13. 8., Jarvis až od 14. 8.: na otázku
-          // „prečo nám ľudia po úvodnom nezostávajú" odpovedal, že nevie, hoci
+          // „prečo nám ľudia po úvodnom nezostávajú“ odpovedal, že nevie, hoci
           // odpovede boli v databáze.
           poUvodnomNikdy: (() => {
             const von = clientList
@@ -585,7 +588,7 @@ export function buildAiContext(
       pozn_specialnaSadzba: c.specialRateNote || null,
       poznamkaTrenera: c.trainerNote || null,
       // Prečo po úvodnom tréningu už neprišiel. Jarvis bez toho odpovedal na
-      // „prečo nám ľudia po úvodnom nezostávajú" tak, že nevie — hoci odpovede
+      // „prečo nám ľudia po úvodnom nezostávajú“ tak, že nevie — hoci odpovede
       // sú zapísané. Pole vzniklo 13. 8. a do kontextu sa dostalo až 14. 8.,
       // keď Jerry povedal, že staviam veci izolovane.
       precoNeprisiel: c.precoNeprisiel || null,
@@ -605,7 +608,7 @@ export function buildAiContext(
   return {
     // Register je PRVÝ zámerne. Kontext sa na serveri reže na pevnú dĺžku a
     // rez ide odzadu — kým bol register posledný, pri 60+ klientoch z neho
-    // nezostalo nič a Jarvis na „zruš to upozornenie o nájme" odpovedal, že
+    // nezostalo nič a Jarvis na „zruš to upozornenie o nájme“ odpovedal, že
     // ho nenašiel. Malé a dôležité veci patria dopredu, dlhé zoznamy dozadu.
     naCoSaPozriet: register.map((r) => ({
       key: r.key,
@@ -618,7 +621,7 @@ export function buildAiContext(
     })),
     // ── Čím klienti platia ────────────────────────────────────────────────
     // Tri cesty s rôznou réžiou: účet, hotovosť, bitcoin. Bitcoin je pätina
-    // tržieb a bez tohto rozdelenia by Jarvis na otázku „koľko chodí v BTC"
+    // tržieb a bez tohto rozdelenia by Jarvis na otázku „koľko chodí v BTC“
     // odpovedal, že nevie — hoci to appka počíta.
     platobneKanaly: (() => {
       // Z PTmindera (payment_method), nie z bankových pohybov. Revízia našla,
@@ -702,10 +705,10 @@ export function buildAiContext(
     ekonomikaDopytu,
     marketing,
     // P&L po položkách za posledných 12 mesiacov. Bez toho Jarvis na otázku
-    // „ktorá aplikácia stála v apríli 780?" nemá kde hľadať: hodnoty P&L žijú
+    // „ktorá aplikácia stála v apríli 780?“ nemá kde hľadať: hodnoty P&L žijú
     // v module (z Excelu + z importu), nie v databáze, takže ich nevytiahne ani
     // dopytom. Kľúč je presne ten, ktorým sa bunka aj opravuje.
-    // Hotový súhrn P&L po mesiacoch. Bez neho Jarvis na „aký bol zisk" hľadal
+    // Hotový súhrn P&L po mesiacoch. Bez neho Jarvis na „aký bol zisk“ hľadal
     // v bankových pohyboch a odpovedal buď zle, alebo vôbec — číslo, ktoré
     // appka počíta na jednom riadku, nemá zmysel nechať odvodzovať.
     pnlSuhrn,

@@ -243,38 +243,99 @@ export function kontrolaMerania(
 }
 
 /**
- * Google Ads platí, ale nemeria konverzie.
+ * Hlásené konverzie z Google Ads verzus klienti, ktorí naozaj začali.
  *
- * PREČO TO NIE JE DROBNOSŤ
+ * PREČO NESTAČÍ HLADAŤ NULU
  *
- * Kampaň so stovkami klikov a nulou konverzií skoro nikdy neznamená, že nikto
- * nekonvertoval — znamená, že sa to nemeralo. Rozdiel je celý: prvé čítanie
- * vedie k záveru „Google nefunguje, zruš to", druhé k „zapni meranie a potom
- * sa rozhodni". Presne tento omyl nás pri Mete stál devätnásť mesiacov
- * a 31 452 Kč, o ktorých sa doteraz nedá povedať, čo priniesli.
+ * Prvá verzia tohto strážcu sa ozvala, len keď boli konverzie NULA. To je
+ * pravý opak toho, čo je nebezpečné. Nula je podozrivá na prvý pohľad —
+ * nikoho nezvedie. Naopak kampaň `Search_UvodniTrenink_03_2025` hlásila
+ * 299 konverzií za 437 €, čo je 1,46 € za konverziu a vyzeralo by to ako
+ * najlepší kanál v histórii firmy. Za to isté obdobie začalo trénovať
+ * 16 klientov a z Googlu prišel jeden. Rozdiel je devätnásťnásobný.
  *
- * Hlási sa až od `DOST_KLIKOV` — pri dvadsiatich klikoch je nula konverzií
- * úplne normálna a upozornenie by len svietilo.
+ * PREČO SA POROVNÁVA S CELOU FIRMOU A NIE S PRIPÍSANÝMI KLIENTAMI
+ *
+ * Pripísanie je slabé — zdroj sa vypisuje ručne a „google" môže znamenať aj
+ * organické hľadanie. Ale nemusíme vedieť, KTORÍ klienti prišli z reklamy,
+ * aby sme videli, že definícia konverzie je pokazená: keď Google hlási
+ * 299 konverzií a firma za to isté obdobie získala 16 klientov zo VŠETKÝCH
+ * kanálov spolu, nesedí to bez ohľadu na pripísanie. Tento test sa nedá
+ * obísť chýbajúcim zdrojom.
+ *
+ * PREČO SA HLÁSI AJ TO, ČO SA OVERIŤ NEDÁ
+ *
+ * Kampane z 2023–2024 padajú pred začiatok dát z PTmindera (2025), takže
+ * 558 z 857 konverzií nemá s čím porovnať a nikdy mať nebude. Mlčanie by sa
+ * čítalo ako „skontrolované, v poriadku" — preto sa to povie nahlas ako
+ * NEOVERITEĽNÉ. Prázdna odpoveď nie je dôkaz.
  */
-const DOST_KLIKOV = 100;
+
+/** Koľkonásobok počtu klientov ešte môže byť legitímna definícia konverzie. */
+const KONVERZIE_NA_KLIENTA = 3;
+
+/** Pod týmto počtom klientov je pomer náhoda, nie signál. */
+const DOST_KLIENTOV = 5;
 
 export function kontrolaAds(
   mesiace: { mesiac: string; naklad: number; kliky: number; konverzie: number }[],
+  novychKlientov: Record<string, number>,
+  odKedyKlienti: string,
 ): Nezhoda[] {
   const platene = mesiace.filter((m) => m.naklad > 0);
   if (!platene.length) return [];
-  const kliky = platene.reduce((a, m) => a + m.kliky, 0);
-  const konverzie = platene.reduce((a, m) => a + m.konverzie, 0);
-  const naklad = platene.reduce((a, m) => a + m.naklad, 0);
-  if (kliky < DOST_KLIKOV || konverzie > 0) return [];
 
-  return [{
-    kluc: "gads|bez-konverzii",
-    zavaznost: "vysoka",
-    nadpis: "Google Ads platil, ale nemeral konverzie",
-    detail: `Za ${platene.length} ${platene.length === 1 ? "mesiac" : "mesiacov"} sa utratilo ${cislo(Math.round(naklad))} Kč a prišlo ${cislo(kliky)} klikov — a ani jedna konverzia. To takmer isto neznamená, že nikto nekonvertoval, ale že konverzie neboli v Google Ads nastavené. Kým to tak je, o tejto reklame sa nedá povedať, či zarobila alebo nie — presne ako pri Mete. Rozhodnutie „Google nefunguje" z týchto čísel urobiť NEMOŽNO.`,
-  }];
+  const von: Nezhoda[] = [];
+  const overitelne = odKedyKlienti ? platene.filter((m) => m.mesiac >= odKedyKlienti) : [];
+  const staré = odKedyKlienti ? platene.filter((m) => m.mesiac < odKedyKlienti) : platene;
+
+  // ── 1 · čo sa overiť DÁ ────────────────────────────────────────────────
+  if (overitelne.length) {
+    const konverzie = overitelne.reduce((a, m) => a + m.konverzie, 0);
+    const naklad = overitelne.reduce((a, m) => a + m.naklad, 0);
+    const klienti = overitelne.reduce((a, m) => a + (novychKlientov[m.mesiac] || 0), 0);
+    const kliky = overitelne.reduce((a, m) => a + m.kliky, 0);
+
+    if (konverzie === 0 && kliky >= 100) {
+      von.push({
+        kluc: "gads|bez-konverzii",
+        zavaznost: "vysoka",
+        nadpis: "Google Ads platil, ale nemeral konverzie",
+        detail: `Za ${overitelne.length} ${overitelne.length === 1 ? "mesiac" : "mesiacov"} prišlo ${cislo(kliky)} klikov a ani jedna konverzia. To takmer isto neznamená, že nikto nekonvertoval, ale že konverzie neboli nastavené. Kým je to tak, o tejto reklame sa nedá povedať, či zarobila — rozhodnutie „Google nefunguje" z toho urobiť NEMOŽNO.`,
+      });
+    } else if (
+      konverzie > DOST_KLIENTOV
+      && konverzie > Math.max(klienti * KONVERZIE_NA_KLIENTA, klienti + DOST_KLIENTOV)
+    ) {
+      const nasobok = klienti > 0 ? Math.round(konverzie / klienti) : null;
+      von.push({
+        kluc: "gads|konverzie-vs-klienti",
+        zavaznost: "vysoka",
+        nadpis: `Google hlási ${cislo(Math.round(konverzie))} konverzií, klientov pribudlo ${cislo(klienti)}`,
+        detail: `Za ${overitelne.length} ${overitelne.length === 1 ? "mesiac" : "mesiacov"} platenej reklamy (${Math.round(naklad)} v mene účtu) hlási Google ${cislo(Math.round(konverzie))} konverzií. Za to isté obdobie začalo trénovať ${cislo(klienti)} nových klientov — zo VŠETKÝCH kanálov spolu, nie len z reklamy${nasobok ? `, čiže ${nasobok}× menej` : ""}. To neznamená, že reklama nefungovala; znamená, že konverzná akcia meria niečo iné než klienta (najčastejšie zobrazenie stránky). Skontroluj v Google Ads → Ciele, čo je nastavené ako konverzia, a či je značka overená. Kým to nesedí, cena za konverziu je nepoužiteľné číslo a NESMIE sa podľa nej rozhodovať o budgete.`,
+      });
+    }
+  }
+
+  // ── 2 · čo sa overiť NEDÁ, a treba to vedieť ───────────────────────────
+  //
+  // „stredna" zámerne, nie „vysoka": nie je čo spraviť, ale nesmie to
+  // vyzerať, že sa to skontrolovalo a bolo v poriadku. Obrazovka to podľa
+  // kľúča vykreslí tichšie.
+  const konverzieStare = staré.reduce((a, m) => a + m.konverzie, 0);
+  if (staré.length && konverzieStare > DOST_KLIENTOV) {
+    const naklad = staré.reduce((a, m) => a + m.naklad, 0);
+    von.push({
+      kluc: "gads|neoveritelne",
+      zavaznost: "stredna",
+      nadpis: `${cislo(Math.round(konverzieStare))} konverzií z reklamy sa overiť nedá`,
+      detail: `Kampane z ${staré[0].mesiac} – ${staré[staré.length - 1].mesiac} (${Math.round(naklad)} v mene účtu) bežali pred začiatkom dát o klientoch (${odKedyKlienti}). Nemáme s čím ich porovnať a nikdy mať nebudeme. Nie je to chyba, ktorú treba opraviť — je to hranica toho, čo sa dá zistiť, a nemá sa vydávať za „skontrolované".`,
+    });
+  }
+
+  return von;
 }
+
 /**
  * Podozrivo dokonalé čísla — appka spochybňuje samu seba.
  *

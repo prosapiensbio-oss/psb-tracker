@@ -567,9 +567,23 @@ function RokBar({ rok, onRok }: { rok: string; onRok: (r: string) => void }) {
  * naozaj píšu do Googlu, keď ich niečo bolí — a to je jediný dôkaz o dopyte,
  * ktorý máme kúpený vlastnými peniazmi, nie odhadnutý.
  */
-function GoogleAdsKarta({ chat }: { chat?: AssistantChat }) {
+function GoogleAdsKarta({ clients, chat }: { clients: Record<string, ClientAgg>; chat?: AssistantChat }) {
   const mesiace = adsMesiace(GADS_KAMPANE);
-  const straz = kontrolaAds(mesiace);
+  // Noví klienti po mesiacoch — z prvého sedenia, teda z toho istého zdroja,
+  // z ktorého sa počíta všetko ostatné. Slúži na to, aby appka vedela
+  // pochybovať o konverziách, ktoré jej Google nahlási.
+  const { novych, odKedy: odKedyKlienti } = useMemo(() => {
+    const n: Record<string, number> = {};
+    let najstarsi = "";
+    for (const c of Object.values(clients)) {
+      const m = (c.firstSession || "").slice(0, 7);
+      if (!/^\d{4}-\d{2}$/.test(m)) continue;
+      n[m] = (n[m] || 0) + 1;
+      if (!najstarsi || m < najstarsi) najstarsi = m;
+    }
+    return { novych: n, odKedy: najstarsi };
+  }, [clients]);
+  const straz = kontrolaAds(mesiace, novych, odKedyKlienti);
   // Mena z účtu, nie natvrdo. Kým sa nestiahne, radšej bez jednotky než
   // s nesprávnou — číslo bez meny sa dá doplniť, číslo v zlej mene klame.
   const mena = GADS_VALUTA === "CZK" ? "Kč" : GADS_VALUTA === "EUR" ? "€" : GADS_VALUTA;
@@ -608,7 +622,11 @@ function GoogleAdsKarta({ chat }: { chat?: AssistantChat }) {
       </div>
 
       {straz.map((n) => (
-        <div key={n.kluc} style={{ marginTop: 10, padding: 10, borderLeft: `2px solid ${C.orange}`, background: mix(C.orange, 8), borderRadius: 6 }}>
+        <div key={n.kluc} style={{
+          marginTop: 10, padding: 10, borderRadius: 6,
+          borderLeft: `2px solid ${n.kluc === "gads|neoveritelne" ? mix(C.text, 25) : C.orange}`,
+          background: n.kluc === "gads|neoveritelne" ? mix(C.text, 4) : mix(C.orange, 8),
+        }}>
           <div style={{ fontSize: 12.5, fontWeight: 600, color: C.text }}>{n.nadpis}</div>
           <div style={{ fontSize: 11.5, color: C.textMuted, marginTop: 3, lineHeight: 1.55 }}>{n.detail}</div>
         </div>
@@ -1026,7 +1044,7 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
         <>
           <Vyhladavanie chat={chat} />
           <WebKanaly rok={rok} onRok={setRok} chat={chat} />
-          <GoogleAdsKarta chat={chat} />
+          <GoogleAdsKarta clients={clients} chat={chat} />
           <CoFungovaloWeb rok={rok} chat={chat} />
         </>
       )}
