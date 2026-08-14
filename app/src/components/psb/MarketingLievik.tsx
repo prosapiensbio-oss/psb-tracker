@@ -313,6 +313,8 @@ export function Lievik({ data, clients, onPoznamka }: {
   const [okno, setOkno] = useState("2026");
   /** Ktorý krok lievika má rozbalené mená. Vždy najviac jeden. */
   const [ktori, setKtori] = useState<"dopyty" | "uvodne" | "klienti" | "strata" | null>(null);
+  /** Ukázať aj tých, ktorým už niekto dôvod zapísal. */
+  const [vybavene, setVybavene] = useState(false);
   const [web, setWeb] = useState<{ ga4: { m: string; udalosti: number }[]; dopyty: { dopyt: string; kliky: number }[] }>({ ga4: [], dopyty: [] });
 
   useEffect(() => {
@@ -397,16 +399,24 @@ export function Lievik({ data, clients, onPoznamka }: {
             <div style={{ marginTop: 12, padding: "10px 13px", borderRadius: 9, background: mix(C.text, 4), border: `1px solid ${C.border}` }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                 <span style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", color: C.textMuted }}>
-                  {nadpisy[ktori]} ({riadky.length})
+                  {nadpisy[ktori]} ({ktori === "strata"
+                    ? `${k.kto.nepokracovali.filter((x) => !x.preco).length} z ${k.kto.nepokracovali.length}`
+                    : riadky.length})
                 </span>
                 <button onClick={() => setKtori(null)}
                   style={{ background: "none", border: "none", color: C.textDim, fontSize: 11.5, cursor: "pointer" }}>zavrieť</button>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: ktori === "strata" ? 8 : 5, maxHeight: 320, overflowY: "auto" }}>
                 {ktori === "strata"
-                  ? k.kto.nepokracovali.map((x) => (
-                    <StrataRiadok key={x.meno} x={x} onPoznamka={onPoznamka} />
-                  ))
+                  ? k.kto.nepokracovali
+                    // Zapísaný dôvod znamená vybavené — riadok zmizne.
+                    // Počet nad zoznamom ale musí ostať pravdivý (toľko ľudí
+                    // naozaj nepokračovalo), preto sa vybavené dajú vrátiť
+                    // jedným klikom, nie sú zmazané.
+                    .filter((x) => vybavene || !x.preco)
+                    .map((x) => (
+                      <StrataRiadok key={x.meno} x={x} onPoznamka={onPoznamka} />
+                    ))
                   : riadky.map((r, i) => (
                     <div key={`${r.meno}-${i}`} style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 12.5 }}>
                       <span style={{ color: C.text, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.meno}</span>
@@ -414,12 +424,26 @@ export function Lievik({ data, clients, onPoznamka }: {
                     </div>
                   ))}
               </div>
-              {ktori === "strata" && (
-                <div style={{ fontSize: 11, color: C.textDim, marginTop: 9, lineHeight: 1.55 }}>
-                  Zapísaný dôvod znamená vybavené — položka zmizne aj z „Na čo sa pozrieť“.
-                  Osem jednotlivých príbehov sa spojí do vzorca len vtedy, keď sú zapísané.
-                </div>
-              )}
+              {ktori === "strata" && (() => {
+                const hotovych = k.kto.nepokracovali.filter((x) => !!x.preco).length;
+                const zostava = k.kto.nepokracovali.length - hotovych;
+                return (
+                  <div style={{ fontSize: 11, color: C.textDim, marginTop: 9, lineHeight: 1.55 }}>
+                    {zostava === 0
+                      ? "Všetky dôvody sú zapísané. Jarvis ich má a vie z nich odpovedať, keď sa spýtaš, prečo ľudia po úvodnom nezostávajú."
+                      : "Zapísaný dôvod znamená vybavené — riadok zmizne aj z „Na čo sa pozrieť“."}
+                    {hotovych > 0 && (
+                      <>
+                        {" "}
+                        <button onClick={() => setVybavene((v) => !v)}
+                          style={{ background: "none", border: "none", padding: 0, color: C.accentLight, fontSize: 11, cursor: "pointer", fontFamily: "inherit", textDecoration: "underline" }}>
+                          {vybavene ? `skryť vybavené (${hotovych})` : `ukázať aj vybavené (${hotovych})`}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           );
         })()}
