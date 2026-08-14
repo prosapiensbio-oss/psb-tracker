@@ -3,6 +3,7 @@
 import { daysBetween, fmtDMY, monthKey, monthLabel, monthsBetween, normName, quarterKey, quarterLabel, weekKey, weekLabel } from "./format";
 import { BARTER_KLIENTI } from "./vzas";
 import type {
+  Lead,
   PackageRow,
   PaymentRow,
   PSBData,
@@ -1129,11 +1130,15 @@ export const rodinaZKluca = (key: string) =>
  * si niekto všimne cudzie meno na svojom zozname.
  */
 export function patriTrenerovi(
-  r: Pick<RegisterItem, "category" | "title" | "client" | "oKom">,
+  r: Pick<RegisterItem, "category" | "title" | "client" | "oKom" | "trener">,
   clients: Record<string, Pick<ClientAgg, "primaryTrainer">>,
   trener: string,
 ): boolean {
   if (!trener || trener === "all") return true;
+  // Priame priradenie vyhráva. Sú veci, ktoré nie sú o klientovi, a predsa
+  // patria jednému človeku — prvý kontakt s dopytom je Terezkina práca a
+  // zmena v kalendári patrí tomu, komu sa v kalendári stala.
+  if (r.trener) return r.trener === trener;
   // Kapacita je o trénerovi, nie o klientovi — pozná sa podľa nadpisu.
   if (r.category === "Kapacita") return r.title.startsWith(trener);
   const meno = r.oKom || r.client;
@@ -1153,6 +1158,13 @@ export type RegisterItem = {
   note?: string;
   priority: number; // lower = more important
   client?: string; // client this item is about → "Otvoriť" focuses them in Klienti
+  /**
+   * Komu položka patrí, keď to z klienta nevyplýva.
+   *
+   * Dopyt ešte nie je klient a zmena v kalendári nemusí mať meno — bez tohto
+   * poľa by obe skončili u oboch trénerov a filter by neznamenal nič.
+   */
+  trener?: string;
   /**
    * O KOHO ide — výhradne na triedenie podľa trénera.
    *
@@ -1816,4 +1828,97 @@ export function ziskavanieKlientov(
     mesiacovNaZaplnenie: cistyMes > 0 ? Math.ceil(volnychMiest / cistyMes) : null,
     trebaZiskat: (mesiacov: number) => Math.ceil(volnychMiest + toky.odisloMes * mesiacov),
   };
+}
+
+/**
+ * Nezapísané veci — jedno miesto pre všetko, čo čaká na vetu od človeka.
+ *
+ * PREČO TO VZNIKLO
+ *
+ * Jerry, 14. 8.: „na viacerých miestach mám rôzne zápisy — presuny, zrušenia
+ * tréningov, dopyty, kto prišiel na úvodný a už nikdy — a chcel by som, aby
+ * sa to rovnako zobrazovalo na dashboarde."
+ *
+ * Mal pravdu, že to bolo rozsypané. Dôvod straty pri dopyte sa dal zapísať
+ * len v Marketingu, nevysvetlené zrušenie len v Kalendári, a ani o jednom
+ * appka nikde nepovedala, že čaká. Kto na tú obrazovku nezašiel, nevedel.
+ *
+ * PREČO SÚ ZHRNUTÉ A NIE PO JEDNOM
+ *
+ * Dvanásť dopytov ako dvanásť riadkov by register zaplavilo a tie naozaj
+ * naliehavé veci by v ňom zanikli — to je presne chyba, ktorú Jerry vytkol
+ * pri anomáliách („keď svieti všetko, nesvieti nič"). Jeden riadok s počtom
+ * a odkazom stačí: práca sa aj tak robí na tej obrazovke, nie tu.
+ *
+ * KOMU PATRIA
+ *
+ * Dopyty vždy Terezke — prvý kontakt s človekom je jej práca a ona jediná
+ * vie, kto je kto. Zmeny v kalendári tomu, komu sa v kalendári stali.
+ */
+export type NezapisaneVstup = {
+  leads: Pick<Lead, "name" | "date" | "dovod">[];
+  /** Mená klientov — dopyt, z ktorého klient vznikol, sa nerieši. */
+  menaKlientov: string[];
+  /** Nevysvetlené zmeny z kalendára (`vysvetlene = 0`). */
+  zmeny: { druh: string; trener: string }[];
+};
+
+const DRUH_SLOVOM: Record<string, string> = {
+  zrusene: "zrušené", posunute: "posunuté", pridane: "pridané", premenovane: "premenované",
+};
+
+export function nezapisaneDoRegistra(v: NezapisaneVstup): Omit<RegisterItem, "acked" | "note">[] {
+  const von: Omit<RegisterItem, "acked" | "note">[] = [];
+
+  // ── dopyty bez odpovede prečo ────────────────────────────────────────────
+  const otvorene = v.leads.filter((l) => {
+    const meno = String(l.name || "").trim();
+    if (!meno) return false;
+    if (String(l.dovod || "").trim()) return false;
+    if (najdiKlienta(v.menaKlientov, meno)) return false;   // stal sa klientom
+    return !maTermin(meno);                                  // má dohodnutý termín
+  });
+  if (otvorene.length) {
+    const najstarsi = [...otvorene].sort((a, b) => String(a.date).localeCompare(String(b.date)))[0];
+    von.push({
+      key: "dopyt|nevyriesene",
+      category: "Zápis",
+      tone: "orange",
+      trener: "Terezka",
+      title: `Dopyty bez odpovede prečo (${otvorene.length})`,
+      detail: `${otvorene.length} ${otvorene.length === 1 ? "dopyt, z ktorého" : "dopytov, z ktorých"} sa nestal klient a nikto nezapísal prečo. Najstarší je ${najstarsi.name} z ${String(najstarsi.date).slice(8, 10)}. ${Number(String(najstarsi.date).slice(5, 7))}. Zapisuje sa v Marketing → Dopyty, prepínač „len nevyriešené".`,
+      client: "marketing|dopyty",
+      priority: 12,
+    });
+  }
+
+  // ── zmeny v kalendári bez vysvetlenia ────────────────────────────────────
+  const podlaTrenera = new Map<string, Record<string, number>>();
+  for (const z of v.zmeny) {
+    const t = z.trener || "";
+    const m = podlaTrenera.get(t) || {};
+    m[z.druh] = (m[z.druh] || 0) + 1;
+    podlaTrenera.set(t, m);
+  }
+  for (const [trener, druhy] of podlaTrenera) {
+    const spolu = Object.values(druhy).reduce((a, n) => a + n, 0);
+    const rozpis = Object.entries(druhy)
+      .sort((a, b) => b[1] - a[1])
+      .map(([d, n]) => `${n}× ${DRUH_SLOVOM[d] || d}`)
+      .join(", ");
+    von.push({
+      key: `kalendar|zmeny|${trener || "bez"}`,
+      category: "Zmena",
+      tone: "orange",
+      // Zmena bez trénera (zdroj sa nedal určiť) zostáva obom — radšej
+      // upozornenie navyše než stratené.
+      trener: trener || undefined,
+      title: `Zmeny v kalendári bez vysvetlenia (${spolu})`,
+      detail: `${rozpis}. Bez dôvodu sa nedá povedať, či to bolo zrušenie klientom, presun po dohode, alebo chyba v zápise — a práve to rozhoduje, či ide o stratu. Vysvetľuje sa v Kalendári.`,
+      client: "kalendar|",
+      priority: 11,
+    });
+  }
+
+  return von;
 }

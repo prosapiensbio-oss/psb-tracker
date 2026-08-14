@@ -12,6 +12,8 @@ import {
   deriveClients,
   maTermin,
   nastavObjednaneZKalendara,
+  nezapisaneDoRegistra,
+  patriTrenerovi,
 } from "./compute";
 import { EMPTY_DATA } from "./types";
 import type { PSBData, PaymentRow, SessionRow } from "./types";
@@ -412,5 +414,101 @@ describe("maTermin", () => {
   test("prázdne meno nespáruje kohokoľvek", () => {
     nastavObjednaneZKalendara({ "Jana Antonická": 1 });
     expect(maTermin("  ")).toBe(false);
+  });
+});
+
+/**
+ * Nezapísané veci na jednom mieste.
+ *
+ * Jerry, 14. 8.: zápisy sú rozsypané po troch obrazovkách a dashboard o nich
+ * mlčí. Dopyty patria Terezke — prvý kontakt je jej práca.
+ */
+describe("nezapisaneDoRegistra", () => {
+  const dopyt = (name: string, date: string, dovod = "") => ({ name, date, dovod });
+
+  test("dopyty bez dôvodu idú Terezke, nie obom", () => {
+    nastavObjednaneZKalendara({});
+    const v = nezapisaneDoRegistra({
+      leads: [dopyt("Jana Antonická", "2026-07-27"), dopyt("Karolína Frk", "2026-02-07")],
+      menaKlientov: [], zmeny: [],
+    });
+    const d = v.find((x) => x.key === "dopyt|nevyriesene")!;
+    expect(d.trener).toBe("Terezka");
+    expect(d.title).toContain("(2)");
+    expect(d.detail).toContain("Karolína Frk");   // najstarší
+  });
+
+  test("kto sa stal klientom alebo má termín, sa nepočíta", () => {
+    nastavObjednaneZKalendara({ "Terezie Pehalová": 1 });
+    const v = nezapisaneDoRegistra({
+      leads: [
+        dopyt("Lucie Podolová", "2026-08-04"),      // klient
+        dopyt("Terezie Pehalová", "2026-07-27"),    // má termín
+        dopyt("Jana Antonická", "2026-07-27"),      // naozaj otvorený
+      ],
+      menaKlientov: ["Lucie Podolova"],             // bez diakritiky, ako v PTminderi
+      zmeny: [],
+    });
+    expect(v.find((x) => x.key === "dopyt|nevyriesene")!.title).toContain("(1)");
+  });
+
+  test("vyplnený dôvod položku zavrie", () => {
+    nastavObjednaneZKalendara({});
+    const v = nezapisaneDoRegistra({
+      leads: [dopyt("Jana Antonická", "2026-07-27", "nezdvíhala telefón")],
+      menaKlientov: [], zmeny: [],
+    });
+    expect(v.some((x) => x.key === "dopyt|nevyriesene")).toBe(false);
+  });
+
+  test("zmeny v kalendári sa delia podľa trénera", () => {
+    const v = nezapisaneDoRegistra({
+      leads: [], menaKlientov: [],
+      zmeny: [
+        { druh: "zrusene", trener: "Terezka" },
+        { druh: "pridane", trener: "Terezka" },
+        { druh: "pridane", trener: "Terezka" },
+        { druh: "zrusene", trener: "Jerry" },
+      ],
+    });
+    const t = v.find((x) => x.key === "kalendar|zmeny|Terezka")!;
+    const j = v.find((x) => x.key === "kalendar|zmeny|Jerry")!;
+    expect(t.trener).toBe("Terezka");
+    expect(t.title).toContain("(3)");
+    expect(t.detail).toContain("2× pridané");
+    expect(j.title).toContain("(1)");
+  });
+
+  test("zmena bez trénera zostáva obom", () => {
+    const v = nezapisaneDoRegistra({
+      leads: [], menaKlientov: [], zmeny: [{ druh: "zrusene", trener: "" }],
+    });
+    expect(v[0].trener).toBeUndefined();
+  });
+
+  test("keď nie je čo zapísať, register sa nezaťaží", () => {
+    expect(nezapisaneDoRegistra({ leads: [], menaKlientov: [], zmeny: [] })).toEqual([]);
+  });
+});
+
+describe("patriTrenerovi — priame priradenie", () => {
+  const bez = {} as Record<string, { primaryTrainer: string }>;
+
+  test("položka s trénerom patrí len jemu", () => {
+    const r = { category: "Zápis" as const, title: "Dopyty", trener: "Terezka" };
+    expect(patriTrenerovi(r, bez, "Terezka")).toBe(true);
+    expect(patriTrenerovi(r, bez, "Jerry")).toBe(false);
+  });
+
+  test("pri pohlade na oboch trenerov sa nefiltruje nic", () => {
+    const r = { category: "Zápis" as const, title: "Dopyty", trener: "Terezka" };
+    expect(patriTrenerovi(r, bez, "all")).toBe(true);
+  });
+
+  test("bez trénera rozhoduje klient, ako doteraz", () => {
+    const clients = { "Eva Doležalova": { primaryTrainer: "Jerry" } };
+    const r = { category: "Anomália" as const, title: "x", client: "Eva Doležalova" };
+    expect(patriTrenerovi(r, clients, "Jerry")).toBe(true);
+    expect(patriTrenerovi(r, clients, "Terezka")).toBe(false);
   });
 });

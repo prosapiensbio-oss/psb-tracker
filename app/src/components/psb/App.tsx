@@ -28,6 +28,7 @@ import { rodinaZKluca,
   deriveClients,
   deriveRegister,
   deriveSixM,
+  nezapisaneDoRegistra,
 } from "../../lib/psb/compute";
 import { buildAiContext } from "../../lib/psb/aiContext";
 import { Assistant, useAssistantChat } from "./Assistant";
@@ -539,6 +540,8 @@ export function PSBApp() {
   // od 31. 7. a v tej chvíli ich mala v databáze 18. Nevidel ich, lebo
   // kalendár si sťahovala len obrazovka Kalendár, do kontextu nešiel.
   const [kalZmeny, setKalZmeny] = useState<KalZmena[]>([]);
+  /** Zmeny, ktoré ešte nikto nevysvetlil — `vysvetlene = 0`. */
+  const [kalNevysvetlene, setKalNevysvetlene] = useState<KalZmena[]>([]);
   // Ktoré mesiace sú uzavreté. Jarvis to potrebuje vedieť, aby nenavrhoval
   // opravy v zamknutom mesiaci a vedel povedať „júl sa už dá zamknúť".
   const [zamknuteMesiace, setZamknuteMesiace] = useState<string[]>([]);
@@ -548,10 +551,13 @@ export function PSBApp() {
   useEffect(() => {
     void fetch("/api/kalendar", { credentials: "same-origin" })
       .then((r) => r.json())
-      .then((j: { ok?: boolean; udalosti?: KalUdalost[]; zmenyHistoria?: KalZmena[] }) => {
+      .then((j: { ok?: boolean; udalosti?: KalUdalost[]; zmenyHistoria?: KalZmena[]; zmeny?: KalZmena[] }) => {
         if (!j.ok || !Array.isArray(j.udalosti)) return;
         setKalUdalosti(j.udalosti);
         if (Array.isArray(j.zmenyHistoria)) setKalZmeny(j.zmenyHistoria);
+        // Nevysvetlené zmeny idú do registra — dovtedy o nich vedel len ten,
+        // kto sám zašiel do Kalendára.
+        if (Array.isArray(j.zmeny)) setKalNevysvetlene(j.zmeny);
         // Objednané hodiny idú do predikcie tržieb — centrálne, aby dashboard,
         // grafy, Financie aj VZAS počítali z toho istého.
         const dnes = new Date().toISOString().slice(0, 10);
@@ -1195,6 +1201,18 @@ function skupinaFaktur(
     () => spocitajRitualy(new Date(), zapisy.weeks, zapisy.mesiace, chybajuceDoklady),
     [zapisy, chybajuceDoklady],
   );
+  // Veci, ktoré čakajú na vetu od človeka — dopyty bez dôvodu a nevysvetlené
+  // zmeny v kalendári. Sú v jednom rade s ostatnými, aby sa na dashboarde
+  // nemuselo hľadať na troch obrazovkách.
+  const nezapisane = useMemo(
+    () => nezapisaneDoRegistra({
+      leads: data.leads || [],
+      menaKlientov: Object.keys(clients),
+      zmeny: kalNevysvetlene.map((z) => ({ druh: z.druh, trener: z.trener })),
+    }).map((r: ReturnType<typeof nezapisaneDoRegistra>[number]) => ({ ...r, ...stavPolozky(r.key) })),
+    [data.leads, clients, kalNevysvetlene, stavPolozky],
+  );
+
   const registerAll = useMemo(() => {
     const ack = data.anomalyAck || {};
     const extra = rituals
@@ -1211,8 +1229,8 @@ function skupinaFaktur(
         client: `${r.ciel.tab}|${r.ciel.sub || ""}${r.ciel.mesiac ? `|${r.ciel.mesiac}` : r.ciel.tyzden ? `|t:${r.ciel.tyzden}` : ""}`,
         priority: r.druh === "tyzden" ? 5 : r.druh === "mesiac" ? 6 : 40,
       }));
-    return [...extra, ...kontrolaBanky, ...zmenyMetrik, ...register].sort((a, b) => a.priority - b.priority);
-  }, [rituals, register, kontrolaBanky, zmenyMetrik, data.anomalyAck]);
+    return [...extra, ...nezapisane, ...kontrolaBanky, ...zmenyMetrik, ...register].sort((a, b) => a.priority - b.priority);
+  }, [rituals, register, kontrolaBanky, zmenyMetrik, nezapisane, data.anomalyAck]);
 
   // Jarvis dostáva CELÝ register vrátane kontrol nad bankou — inak by nevedel
   // o chýbajúcom nájme a na otázku „čo mi uniká" by odpovedal, že nič.
