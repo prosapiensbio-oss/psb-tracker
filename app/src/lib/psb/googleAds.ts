@@ -94,14 +94,23 @@ export function mesiacZo(s: unknown): string {
 // Preklep v GAQL vráti prázdno s HTTP 200 — a prázdna odpoveď nie je dôkaz,
 // že sa nič nedeje.
 
-/** Výkon kampaní po mesiacoch. Mesiace sa z toho derivujú, nedopytujú zvlášť. */
-export function gaqlKampane(od: string): string {
+/**
+ * Výkon kampaní po mesiacoch. Mesiace sa z toho derivujú, nedopytujú zvlášť.
+ *
+ * ROZSAH MUSÍ BYŤ KONEČNÝ — OBA KONCE
+ *
+ * `WHERE segments.date >= '...'` Google odmietne s
+ * `EXPECTED_FILTERS_ON_DATE_RANGE`: pri dopyte, ktorý siaha na `segments.month`,
+ * chce ohraničenie z oboch strán, nie len od kedy. Stálo to 14. 8. 2026 dva
+ * neúspešné sťahy, z toho jeden preto, že sa dôvod zahodil na „HTTP 400".
+ */
+export function gaqlKampane(od: string, poKedy: string): string {
   return [
     "SELECT campaign.id, campaign.name, campaign.advertising_channel_type,",
     "campaign.status, segments.month, metrics.impressions, metrics.clicks,",
     "metrics.cost_micros, metrics.conversions",
     "FROM campaign",
-    `WHERE segments.date >= '${od}'`,
+    `WHERE segments.date BETWEEN '${od}' AND '${poKedy}'`,
   ].join(" ");
 }
 
@@ -112,12 +121,12 @@ export function gaqlKampane(od: string): string {
  * existuje len pre kampane vo vyhľadávaní. Display alebo Smart kampaň nevráti
  * ani riadok, hoci minula tie isté peniaze.
  */
-export function gaqlDopyty(od: string): string {
+export function gaqlDopyty(od: string, poKedy: string): string {
   return [
     "SELECT search_term_view.search_term, segments.month, metrics.impressions,",
     "metrics.clicks, metrics.cost_micros, metrics.conversions",
     "FROM search_term_view",
-    `WHERE segments.date >= '${od}'`,
+    `WHERE segments.date BETWEEN '${od}' AND '${poKedy}'`,
   ].join(" ");
 }
 

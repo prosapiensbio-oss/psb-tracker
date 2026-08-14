@@ -64,15 +64,25 @@ describe("mesiac zo segmentu", () => {
 
 describe("GAQL", () => {
   test("dopyt na kampane nesie dátum aj metriky", () => {
-    const q = gaqlKampane("2025-01-01");
+    const q = gaqlKampane("2025-01-01", "2026-08-14");
     expect(q).toContain("FROM campaign");
-    expect(q).toContain("2025-01-01");
     expect(q).toContain("metrics.cost_micros");
     expect(q).toContain("segments.month");
   });
 
+  test("rozsah dátumov je ohraničený z OBOCH strán", () => {
+    // Otvorený rozsah (`>= od`) Google odmietne s
+    // EXPECTED_FILTERS_ON_DATE_RANGE. Stálo to dva neúspešné sťahy.
+    for (const q of [gaqlKampane("2020-08-01", "2026-08-14"), gaqlDopyty("2020-08-01", "2026-08-14")]) {
+      expect(q).toContain("BETWEEN");
+      expect(q).toContain("2020-08-01");
+      expect(q).toContain("2026-08-14");
+      expect(q).not.toContain(">=");
+    }
+  });
+
   test("dopyt na hľadané výrazy ide do search_term_view", () => {
-    expect(gaqlDopyty("2025-01-01")).toContain("FROM search_term_view");
+    expect(gaqlDopyty("2025-01-01", "2026-08-14")).toContain("FROM search_term_view");
   });
 });
 

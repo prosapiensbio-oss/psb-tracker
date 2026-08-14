@@ -199,6 +199,9 @@ export const Route = createFileRoute("/api/google-ads")({
 
           // ── stiahnutie ────────────────────────────────────────────────
           const od = odKedy(new Date(), MESIACOV);
+          // Koniec rozsahu je dnes. Google chce ohraničenie z OBOCH strán —
+          // otvorený rozsah odmietne s EXPECTED_FILTERS_ON_DATE_RANGE.
+          const poKedy = new Date().toISOString().slice(0, 10);
           const teraz = new Date().toISOString();
 
           // Účty sa objavia samy. Prepisovanie ID z hlavy bolo pri Mete
@@ -234,7 +237,7 @@ export const Route = createFileRoute("/api/google-ads")({
           const chyby: string[] = [];
 
           for (const cid of ciel) {
-            const rk = await dopyt(cid, gaqlKampane(od), h);
+            const rk = await dopyt(cid, gaqlKampane(od, poKedy), h);
             if (!rk.ok) { chyby.push(`kampane ${cid}: ${rk.chyba}`); continue; }
             const kampane = adsKampane(adsRiadky(rk.data));
             if (kampane.length) {
@@ -256,7 +259,7 @@ export const Route = createFileRoute("/api/google-ads")({
             // Hľadané výrazy existujú len pre kampane vo vyhľadávaní. Prázdno
             // tu neznamená, že ľudia nič nehľadali — Display kampaň nevráti
             // ani riadok, hoci minula tie isté peniaze.
-            const rd = await dopyt(cid, gaqlDopyty(od), h);
+            const rd = await dopyt(cid, gaqlDopyty(od, poKedy), h);
             if (!rd.ok) { chyby.push(`hľadané výrazy ${cid}: ${rd.chyba}`); continue; }
             const vyrazy = adsDopyty(adsRiadky(rd.data));
             if (vyrazy.length) {

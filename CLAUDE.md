@@ -79,3 +79,7 @@ záver odporuje tomu, čo Jerry hovorí zo skúsenosti.
 - **Token vývojára na úrovni „prieskumník" nepustí plánovač kľúčových slov.**
   Objem hľadania čaká na Basic (žiadosť podaná 14. 8. 2026). Nepíš do appky
   odhady objemu — Search Console meria len tam, kde sa web už zobrazil.
+- **GAQL chce rozsah dátumov ohraničený z OBOCH strán.** `WHERE segments.date
+  >= '...'` Google odmietne s `EXPECTED_FILTERS_ON_DATE_RANGE`; musí to byť
+  `BETWEEN od AND do`. Test na to je v `googleAds.test.ts` — otvorený rozsah
+  nespadne pri písaní, spadne až naživo.
