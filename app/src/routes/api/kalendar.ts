@@ -3,6 +3,7 @@ import type { D1Database, D1PreparedStatement } from "@cloudflare/workers-types"
 
 import { isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
+import { typZNazvu } from "../../lib/psb/kalendar";
 import { citajIcal } from "../../lib/psb/ical";
 import { ohlasitZmenu } from "../../lib/psb/kalendarZmeny";
 
@@ -84,7 +85,11 @@ async function snimka(DB: D1Database, z: Zdroj) {
     videne.add(u.uid);
     const m = mapovanie.get(u.nazov);
     const klient = m?.klient ?? null;
-    const typ = m?.typ ?? null;
+    // Naučené mapovanie vyhráva vždy; hádanie z názvu je až náhradník.
+    // Pri úvodnom je každý nový človek nový názov, teda nová práca — a to
+    // práve vtedy, keď je najmenej času. Klient sa NEHÁDA: zlé priradenie
+    // človeka je horšie než žiadne, sedenie by sa pripísalo cudziemu.
+    const typ = m?.typ ?? typZNazvu(u.nazov);
     const s = podlaUid.get(u.uid);
 
     if (!s) {
