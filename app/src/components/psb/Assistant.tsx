@@ -272,6 +272,37 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
     setChatId(newId()); setMsgs([]); setInput(""); setAttach([]);
     if (typeof nova === "string") setKategoria(nova);
   };
+  /**
+   * Oprava už odoslanej otázky.
+   *
+   * Všetko za ňou sa zahodí a otázka odíde znova. Nie je to cenzúra histórie —
+   * je to jediný spôsob, ako sa dá preklep opraviť bez toho, aby Jarvis videl
+   * pôvodnú aj opravenú verziu a odpovedal na zmes. Jerry o to požiadal spolu
+   * s cmd+Z: keď sa pri zápise sekne, nemá ako cúvnuť.
+   */
+  const upravSpravu = (index: number, text: string) => {
+    if (busy) return;
+    const t = text.trim();
+    if (!t) return;
+    void ask(t, undefined, msgs.slice(0, index));
+  };
+
+  /**
+   * Presun konverzácie do iného zamerania.
+   *
+   * Mení sa ULOŽENÝ záznam, nie len otvorený rozhovor — inak by sa presun
+   * pri zavretí okna stratil. Keď je presúvaná konverzácia práve otvorená,
+   * prepne sa aj jej živé zameranie, aby obrazovka a záznam nehovorili
+   * rôzne veci.
+   */
+  const presunChat = (id: string, nova: string) => {
+    const c = chats.find((x) => x.id === id);
+    if (!c) return;
+    persistChats(chats.map((x) => (x.id === id ? { ...x, kategoria: nova, updatedAt: Date.now() } : x)));
+    void saveJarvisChat({ id: c.id, title: c.title, messages: c.messages, archived: !!c.archived });
+    if (id === chatId) setKategoria(nova);
+  };
+
   const openChat = (id: string) => { const c = chats.find((x) => x.id === id); if (c) { setChatId(id); setMsgs(opravStratene(c.messages || [])); setKategoria(c.kategoria || ""); } };
   const deleteChat = (id: string) => { persistChats(chats.filter((c) => c.id !== id)); void deleteJarvisChat(id); if (id === chatId) newChat(); };
   const archiveChat = (id: string) => {
@@ -296,11 +327,18 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
     }
   }
 
-  async function ask(question: string, zobrazit?: string) {
+  /**
+   * `zaklad` = z akej histórie sa má vychádzať. Bez neho z aktuálnej.
+   *
+   * Potrebné na opravu odoslanej správy: prepísaná otázka musí odísť
+   * s históriou PRED ňou, nie za pôvodnou verziou. Inak by Jarvis videl obe
+   * a odpovedal na zmes.
+   */
+  async function ask(question: string, zobrazit?: string, zaklad?: Msg[]) {
     const q = question.trim();
     if ((!q && !attach.length) || busy) return;
     const imgs = attach.length ? attach : undefined;
-    const history: Msg[] = [...msgs, { role: "user", text: q || "Pozri tento obrázok.", images: imgs, zobrazit }];
+    const history: Msg[] = [...(zaklad ?? msgs), { role: "user", text: q || "Pozri tento obrázok.", images: imgs, zobrazit }];
     // Add the user message + an empty assistant placeholder that fills as the answer streams.
     setMsgs([...history, { role: "assistant", text: "" }]);
     setInput("");
@@ -523,13 +561,17 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
     ].join(" · ");
   }
 
-  return { msgs, setMsgs, input, setInput, busy, stav, deep, setDeep, pending, setPending, attach, setAttach, ask, runAction, confirmImport, handleIncoming, floatingOpen, setFloatingOpen, kategoria, setKategoria, chats, chatId, newChat, openChat, deleteChat, archiveChat, spracujDennik };
+  return { msgs, setMsgs, input, setInput, busy, stav, deep, setDeep, pending, setPending, attach, setAttach, ask, runAction, confirmImport, handleIncoming, floatingOpen, setFloatingOpen, kategoria, setKategoria, chats, chatId, newChat, upravSpravu, presunChat, openChat, deleteChat, archiveChat, spracujDennik };
 }
 
 // ── The conversation UI (messages + input) — used by both the floating panel and
 // the inline widget. Each instance has its own scroll/refs/drag state. ──────────
 export function ChatConversation({ chat, autoFocus, onClientClick, onNavigate }: { chat: AssistantChat; autoFocus?: boolean; onClientClick?: (name: string) => void; onNavigate?: (tab: string, sub?: string) => void }) {
-  const { msgs, input, setInput, busy, stav, deep, setDeep, pending, setPending, attach, setAttach, ask, runAction, confirmImport, handleIncoming } = chat;
+  const { msgs, input, setInput, busy, stav, deep, setDeep, pending, setPending, attach, setAttach, ask, runAction, confirmImport, handleIncoming, upravSpravu } = chat;
+  // Ktorá odoslaná otázka sa práve prepisuje. Zámerne len jedna — dve
+  // rozpísané opravy naraz by sa navzájom prepísali pri odoslaní.
+  const [upravujem, setUpravujem] = useState<number | null>(null);
+  const [navrh, setNavrh] = useState("");
   const [drag, setDrag] = useState(false);
   // Autoscroll drží odpoveď na očiach LEN vtedy, keď je človek dole. Keď si
   // odroluje hore a číta začiatok, streamovanie ho tam už nesmie ťahať späť —
@@ -589,8 +631,51 @@ export function ChatConversation({ chat, autoFocus, onClientClick, onNavigate }:
                   {m.images.map((src, k) => <img key={k} src={src} alt="" style={{ maxWidth: 150, maxHeight: 150, borderRadius: 8, display: "block" }} />)}
                 </div>
               ) : null}
-              {fmt(m.zobrazit ?? m.text, m.role === "assistant" ? onClientClick : undefined, m.role === "assistant" ? onNavigate : undefined)}
+              {upravujem === mi ? (
+                /*
+                  Prepisovanie odoslanej otázky. Enter odošle, Esc zruší —
+                  rovnaké ovládanie ako v hlavnom políčku, aby sa to nemuselo
+                  učiť druhýkrát.
+                */
+                <div>
+                  <textarea
+                    value={navrh}
+                    onChange={(e) => setNavrh(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") { setUpravujem(null); return; }
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        setUpravujem(null);
+                        upravSpravu(mi, navrh);
+                      }
+                    }}
+                    autoFocus
+                    rows={2}
+                    style={{ width: "100%", minWidth: 220, resize: "vertical", background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 8px", color: C.text, fontSize: 13, fontFamily: "inherit", lineHeight: 1.45, outline: "none" }}
+                  />
+                  <div style={{ display: "flex", gap: 8, marginTop: 5, justifyContent: "flex-end" }}>
+                    <button onClick={() => setUpravujem(null)} style={{ background: "none", border: "none", padding: 0, color: C.onAccent, opacity: 0.75, fontSize: 11, cursor: "pointer", fontFamily: "inherit" }}>zrušiť</button>
+                    <button onClick={() => { setUpravujem(null); upravSpravu(mi, navrh); }} style={{ background: "none", border: "none", padding: 0, color: C.onAccent, fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>odoslať znova</button>
+                  </div>
+                </div>
+              ) : (
+                fmt(m.zobrazit ?? m.text, m.role === "assistant" ? onClientClick : undefined, m.role === "assistant" ? onNavigate : undefined)
+              )}
             </div>
+            {/*
+              Opraviť sa dá len vlastná otázka a len keď Jarvis nepíše.
+              Všetko za opravenou otázkou sa zahodí — preto to musí byť
+              vedomý klik a nie omylom trafené miesto v bubline.
+            */}
+            {m.role === "user" && !m.systemova && upravujem !== mi && !busy && (
+              <button
+                onClick={() => { setUpravujem(mi); setNavrh(m.zobrazit ?? m.text); }}
+                title="Prepísať túto otázku a poslať znova. Odpovede za ňou sa zahodia."
+                style={{ display: "block", marginLeft: "auto", marginTop: 3, background: "none", border: "none", padding: 0, color: C.textDim, fontSize: 10.5, cursor: "pointer", fontFamily: "inherit" }}
+              >
+                upraviť
+              </button>
+            )}
             {m.actions?.map((a, ai) => (
               <button key={ai} disabled={a.done} onClick={() => runAction(mi, ai)} style={{ marginTop: 6, display: "block", width: "100%", textAlign: "left", padding: "8px 11px", borderRadius: 9, cursor: a.done ? "default" : "pointer", fontSize: 12.5, fontWeight: 600, border: `1px solid ${a.done ? C.border : C.accent}`, background: a.done ? "transparent" : mix(C.accent, 14), color: a.done ? C.textDim : C.accentLight }}>
                 {a.done ? `✓ Hotovo — ${a.label}` : `⚡ ${a.label}`}

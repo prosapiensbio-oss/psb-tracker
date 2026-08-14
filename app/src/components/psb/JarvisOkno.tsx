@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { C, mix } from "../../lib/psb/theme";
 import { patriDoZoznamu, ZAMERANIA } from "../../lib/psb/zamerania";
@@ -68,6 +68,18 @@ export function JarvisOkno({
   const [archivOtvoreny, setArchivOtvoreny] = useState(false);
   const [menimZameranie, setMenimZameranie] = useState(false);
 
+  /**
+   * Vstup do záložky vždy otvorí nový rozhovor.
+   *
+   * Jerry: „ked kliknem na jarvisa mala by sa vzdy začat nova konverzacia
+   * a stara by mala byt ulozena." Ukladanie riešiť netreba — deje sa samo pri
+   * každej zmene správ, takže predošlá debata je hneď prvá v zozname vľavo.
+   *
+   * Prázdny rozhovor sa nikam neukládá (`if (!msgs.length) return`), takže
+   * vstup a výstup zo záložky nezanáša zoznam prázdnymi záznamami.
+   */
+  useEffect(() => { chat.newChat(""); }, []);
+
   const zam = zameranie(chat.kategoria);
 
   const { aktivne, archiv } = useMemo(() => {
@@ -102,9 +114,15 @@ export function JarvisOkno({
           {ZAMERANIA.map((z) => (
             <button
               key={z.id || "vsetko"}
-              onClick={() => setFilter(z.id)}
+              /*
+                Prepnutie priečinka otvorí NOVÝ rozhovor v ňom.
+                Prvá verzia nechala otvorenú predošlú debatu a Jerry skončil
+                v Peniazoch a pokračoval v marketingovej konverzácii. Stará sa
+                uloží sama a je hneď prvá v zozname nižšie.
+              */
+              onClick={() => { setFilter(z.id); chat.newChat(z.id); }}
               style={chip(z.id === filter)}
-              title={z.id ? `Zobraziť rozhovory: ${z.label}` : "Zobraziť všetky rozhovory"}
+              title={z.id ? `${z.label} — otvorí nový rozhovor v tomto zameraní` : "Všetky rozhovory"}
             >
               {z.label}
             </button>
@@ -140,6 +158,8 @@ export function JarvisOkno({
               onOpen={() => chat.openChat(c.id)}
               onArchive={() => chat.archiveChat(c.id)}
               onDelete={() => chat.deleteChat(c.id)}
+              onPresun={(k) => chat.presunChat(c.id, k)}
+              teraz={c.kategoria || ""}
               archivTitle="Archivovať"
             />
           ))}
@@ -164,6 +184,8 @@ export function JarvisOkno({
                   onOpen={() => chat.openChat(c.id)}
                   onArchive={() => chat.archiveChat(c.id)}
                   onDelete={() => chat.deleteChat(c.id)}
+                  onPresun={(k) => chat.presunChat(c.id, k)}
+                  teraz={c.kategoria || ""}
                   archivTitle="Vrátiť z archívu"
                 />
               ))}
@@ -233,18 +255,21 @@ export function JarvisOkno({
 }
 
 function Riadok({
-  nazov, kedy, odznak, aktivny, dim, onOpen, onArchive, onDelete, archivTitle,
+  nazov, kedy, odznak, aktivny, dim, teraz, onOpen, onArchive, onDelete, onPresun, archivTitle,
 }: {
-  nazov: string; kedy: string; odznak?: string; aktivny: boolean; dim?: boolean;
-  onOpen: () => void; onArchive: () => void; onDelete: () => void; archivTitle: string;
+  nazov: string; kedy: string; odznak?: string; aktivny: boolean; dim?: boolean; teraz: string;
+  onOpen: () => void; onArchive: () => void; onDelete: () => void;
+  onPresun: (kategoria: string) => void; archivTitle: string;
 }) {
   const [nad, setNad] = useState(false);
+  const [presuvam, setPresuvam] = useState(false);
   const ikona = {
     background: "none", border: "none", cursor: "pointer", padding: 2,
     color: C.textDim, fontSize: 12, lineHeight: 1, fontFamily: "inherit",
   } as const;
 
   return (
+    <>
     <div
       onMouseEnter={() => setNad(true)} onMouseLeave={() => setNad(false)}
       style={{
@@ -269,12 +294,33 @@ function Riadok({
           {odznak && <span style={{ color: C.textMuted }}> · {odznak}</span>}
         </span>
       </button>
-      {nad && (
+      {(nad || presuvam) && (
         <>
+          <button onClick={() => setPresuvam((v) => !v)} title="Presunúť do iného zamerania" style={ikona}>⇄</button>
           <button onClick={onArchive} title={archivTitle} style={ikona}>▾</button>
           <button onClick={onDelete} title="Zmazať" style={ikona}>✕</button>
         </>
       )}
     </div>
+    {presuvam && (
+      <div style={{ padding: "4px 8px 8px 8px", display: "flex", flexWrap: "wrap", gap: 4 }}>
+        {ZAMERANIA.map((z) => (
+          <button
+            key={z.id || "vsetko"}
+            onClick={() => { onPresun(z.id); setPresuvam(false); }}
+            disabled={z.id === teraz}
+            style={{
+              padding: "3px 8px", borderRadius: 999, fontSize: 10.5, fontFamily: "inherit",
+              cursor: z.id === teraz ? "default" : "pointer",
+              border: `1px solid ${C.border}`, background: "transparent",
+              color: z.id === teraz ? C.textDim : C.textMuted,
+            }}
+          >
+            {z.id === teraz ? `• ${z.label}` : z.label}
+          </button>
+        ))}
+      </div>
+    )}
+    </>
   );
 }
