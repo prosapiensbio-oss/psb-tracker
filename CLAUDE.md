@@ -65,10 +65,15 @@ záver odporuje tomu, čo Jerry hovorí zo skúsenosti.
   kópia. Nový stĺpec do nej treba dopísať ručne — Jarvis má SQL prístup, ale
   nevie sa spýtať na to, o čom nevie. To bol 14. 8. celý dôvod, prečo o dôvodoch
   strát nevedel, hoci boli v databáze.
-- **`searchStream` v Google Ads vracia POLE dávok**, nie objekt s `results`.
-  Kód napísaný podľa bežného endpointu prečíta `data.results`, nájde
-  `undefined` a ohlási „žiadne dáta" pri odpovedi plnej riadkov. Rieši to
-  `adsRiadky()` — nečítaj z odpovede priamo.
+- **`searchStream` v Google Ads vracia POLE dávok**, nie objekt s `results` —
+  a to isté platí pre CHYBY. Kód napísaný podľa bežného endpointu prečíta
+  `data.results` (alebo `data.error`), nájde `undefined` a ohlási „žiadne dáta"
+  alebo „HTTP 400" pri odpovedi, ktorá presne vysvetľuje, čo je zle. Stalo sa
+  to 14. 8. 2026 pri prvom sťahu. Rieši to `adsRiadky()` a `chybaZOdpovede()` —
+  nečítaj z odpovede priamo.
+- **Nikdy nehlás len stavový kód.** Keď sa telo odpovede nedá rozobrať, ukáž
+  jeho prvých 300 znakov. Nerozobraná odpoveď je stále stopa; „HTTP 400" nie je
+  nič a pátranie sa na nej zastaví.
 - **Peniaze z Google Ads sú v mikrách.** Zabudnuté delenie miliónom vyrobí
   číslo, ktoré má správny počet číslic na to, aby vyzeralo ako suma.
 - **Token vývojára na úrovni „prieskumník" nepustí plánovač kľúčových slov.**

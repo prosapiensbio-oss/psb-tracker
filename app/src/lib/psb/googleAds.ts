@@ -154,6 +154,49 @@ export function adsRiadky(data: unknown): Record<string, unknown>[] {
 const pod = (r: Record<string, unknown>, k: string): Record<string, unknown> =>
   (r[k] || {}) as Record<string, unknown>;
 
+/**
+ * Dôvod chyby z Google Ads — a nikdy len „HTTP 400".
+ *
+ * PREČO TO MÁ VLASTNÚ FUNKCIU A TESTY
+ *
+ * 14. 8. 2026 vrátil sťah „kampane 7933270125: HTTP 400" a tým sa pátranie
+ * zastavilo. Google pritom v tele odpovede presne napísal, čo je zle — len
+ * `searchStream` balí do poľa aj CHYBY, nie len výsledky, a čítanie
+ * `data.error` na poli dá `undefined`. Zahodil som vetu, ktorá celú vec
+ * vysvetľovala.
+ *
+ * Preto sú tu tri vrstvy a štvrtá je surový text: keď sa nepodarí nič
+ * rozobrať, ukáže sa prvých 300 znakov odpovede. Nerozobraná odpoveď je stále
+ * stopa; „HTTP 400" nie je nič.
+ */
+export function chybaZOdpovede(telo: unknown, surove: string, status: number): string {
+  const prvy = Array.isArray(telo) ? telo[0] : telo;
+  const e = (prvy as { error?: Record<string, unknown> })?.error;
+
+  if (e) {
+    // Google Ads dáva skutočný dôvod až tu — `error.message` je len obal
+    // („Request contains an invalid argument.").
+    const detaily = (e.details as unknown[]) || [];
+    for (const d of detaily) {
+      const chyby = (d as { errors?: unknown[] })?.errors || [];
+      for (const ch of chyby) {
+        const zprava = (ch as { message?: unknown })?.message;
+        const kod = (ch as { errorCode?: Record<string, unknown> })?.errorCode;
+        if (zprava) {
+          // Kód sa pripája, lebo podľa neho sa dá dohľadať príčina —
+          // veta samotná býva všeobecná.
+          const kluc = kod ? Object.values(kod).filter((x) => typeof x === "string")[0] : "";
+          return `${String(zprava)}${kluc ? ` (${kluc})` : ""}`.slice(0, 400);
+        }
+      }
+    }
+    if (e.message) return String(e.message).slice(0, 400);
+  }
+
+  const t = String(surove || "").trim();
+  return t ? `HTTP ${status}: ${t.slice(0, 300)}` : `HTTP ${status} bez tela odpovede`;
+}
+
 export function adsKampane(riadky: Record<string, unknown>[]): AdsKampan[] {
   const von: AdsKampan[] = [];
   for (const r of riadky) {

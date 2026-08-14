@@ -9,8 +9,8 @@ import {
   nastavenie, servisnyUcet, ulozNastavenie, ziskajToken,
 } from "../../lib/psb/googleAuth.server";
 import {
-  adsDopyty, adsKampane, adsRiadky, adsUcty, adsUrl, gaqlDopyty, gaqlKampane,
-  gaqlUcty, normCustomer, SCOPE_ADS,
+  adsDopyty, adsKampane, adsRiadky, adsUcty, adsUrl, chybaZOdpovede, gaqlDopyty,
+  gaqlKampane, gaqlUcty, normCustomer, SCOPE_ADS,
 } from "../../lib/psb/googleAds";
 
 /**
@@ -66,17 +66,12 @@ async function volaj(url: string, h: Hlavicky, telo?: unknown): Promise<Volanie>
       body: telo === undefined ? undefined : JSON.stringify(telo),
       signal: AbortSignal.timeout(30000),
     });
-    const j = await r.json().catch(() => null);
-    if (!r.ok) {
-      // Google Ads vracia chyby v poli `error.details[].errors[].message`,
-      // a práve tam je napísané, čo presne chýba. Prvá verzia napojenia na
-      // Metu tieto vety zahadzovala a hľadanie príčiny trvalo hodiny.
-      const e = (j as { error?: Record<string, unknown> })?.error || {};
-      const detail = JSON.stringify((e as { details?: unknown }).details ?? "");
-      const vnutro = /"message":"([^"]{4,300})"/.exec(detail)?.[1];
-      const sprava = vnutro || String((e as { message?: unknown }).message || `HTTP ${r.status}`);
-      return { ok: false, chyba: sprava.slice(0, 400) };
-    }
+    // Najprv text, JSON až potom. Keby sa čítalo hneď ako JSON a parsovanie
+    // zlyhalo, telo odpovede by sa nenávratne stratilo — a s ním jediná stopa.
+    const surove = await r.text();
+    let j: unknown = null;
+    try { j = JSON.parse(surove); } catch { /* nechaj null, surové ostáva */ }
+    if (!r.ok) return { ok: false, chyba: chybaZOdpovede(j, surove, r.status) };
     return { ok: true, data: j };
   } catch (e) {
     return { ok: false, chyba: `spojenie zlyhalo: ${String(e).slice(0, 200)}` };

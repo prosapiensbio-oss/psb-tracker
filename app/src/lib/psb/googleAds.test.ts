@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import {
-  adsDopyty, adsKampane, adsMesiace, adsRiadky, adsUcty, cenaZaKlik, cislo,
+  adsDopyty, adsKampane, adsMesiace, adsRiadky, adsUcty, cenaZaKlik, chybaZOdpovede, cislo,
   gaqlDopyty, gaqlKampane, mesiacZo, mikroNaKc, normCustomer, zhrnutieAds,
 } from "./googleAds";
 
@@ -210,5 +210,43 @@ describe("zhrnutie", () => {
   test("mesiace bez výdaja sa do počtu nezapočítajú", () => {
     const s = zhrnutieAds([mesiac(1080, 494), mesiac(0, 0)], "CZK");
     expect(s).toContain("1 mesiac s výdajom");
+  });
+});
+
+describe("dôvod chyby sa nesmie zahodiť", () => {
+  test("chyba zabalená v poli sa prečíta", () => {
+    // Toto je presne to, čo 14. 8. 2026 vrátilo len „HTTP 400": searchStream
+    // balí do poľa aj chyby a `data.error` na poli je undefined.
+    const telo = [{
+      error: {
+        code: 400,
+        message: "Request contains an invalid argument.",
+        details: [{
+          errors: [{
+            errorCode: { requestError: "REQUESTED_METRICS_FOR_MANAGER" },
+            message: "Metrics cannot be requested for a manager account.",
+          }],
+        }],
+      },
+    }];
+    const v = chybaZOdpovede(telo, JSON.stringify(telo), 400);
+    expect(v).toContain("Metrics cannot be requested for a manager account.");
+    expect(v).toContain("REQUESTED_METRICS_FOR_MANAGER");
+  });
+
+  test("obalová veta sa použije, len keď nie je konkrétnejšia", () => {
+    const telo = { error: { message: "Request had invalid authentication credentials." } };
+    expect(chybaZOdpovede(telo, "", 401)).toContain("invalid authentication");
+  });
+
+  test("nerozobrateľná odpoveď ukáže surový text, nie len kód", () => {
+    // Nerozobraná odpoveď je stále stopa. „HTTP 400" nie je nič.
+    const v = chybaZOdpovede(null, "<html>Bad Request</html>", 400);
+    expect(v).toContain("Bad Request");
+    expect(v).toContain("400");
+  });
+
+  test("prázdne telo to povie rovno", () => {
+    expect(chybaZOdpovede(null, "", 502)).toContain("bez tela odpovede");
   });
 });
