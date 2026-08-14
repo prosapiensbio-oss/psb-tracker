@@ -16,6 +16,7 @@ import {
   patriTrenerovi,
 } from "./compute";
 import { EMPTY_DATA } from "./types";
+import type { Lead } from "./types";
 import type { PSBData, PaymentRow, SessionRow } from "./types";
 
 /**
@@ -424,13 +425,14 @@ describe("maTermin", () => {
  * mlčí. Dopyty patria Terezke — prvý kontakt je jej práca.
  */
 describe("nezapisaneDoRegistra", () => {
-  const dopyt = (name: string, date: string, dovod = "") => ({ name, date, dovod });
+  const dopyt = (name: string, date: string, dovod = "", status: Lead["status"] = "novy") => ({ name, date, dovod, status });
+  const DNES = "2026-08-14";
 
   test("dopyty bez dôvodu idú Terezke, nie obom", () => {
     nastavObjednaneZKalendara({});
     const v = nezapisaneDoRegistra({
       leads: [dopyt("Jana Antonická", "2026-07-27"), dopyt("Karolína Frk", "2026-02-07")],
-      menaKlientov: [], zmeny: [],
+      menaKlientov: [], zmeny: [], dnes: DNES,
     });
     const d = v.find((x) => x.key === "dopyt|nevyriesene")!;
     expect(d.trener).toBe("Terezka");
@@ -447,7 +449,7 @@ describe("nezapisaneDoRegistra", () => {
         dopyt("Jana Antonická", "2026-07-27"),      // naozaj otvorený
       ],
       menaKlientov: ["Lucie Podolova"],             // bez diakritiky, ako v PTminderi
-      zmeny: [],
+      zmeny: [], dnes: DNES,
     });
     expect(v.find((x) => x.key === "dopyt|nevyriesene")!.title).toContain("(1)");
   });
@@ -456,14 +458,14 @@ describe("nezapisaneDoRegistra", () => {
     nastavObjednaneZKalendara({});
     const v = nezapisaneDoRegistra({
       leads: [dopyt("Jana Antonická", "2026-07-27", "nezdvíhala telefón")],
-      menaKlientov: [], zmeny: [],
+      menaKlientov: [], zmeny: [], dnes: DNES,
     });
     expect(v.some((x) => x.key === "dopyt|nevyriesene")).toBe(false);
   });
 
   test("zmeny v kalendári sa delia podľa trénera", () => {
     const v = nezapisaneDoRegistra({
-      leads: [], menaKlientov: [],
+      leads: [], menaKlientov: [], dnes: DNES,
       zmeny: [
         { druh: "zrusene", trener: "Terezka" },
         { druh: "pridane", trener: "Terezka" },
@@ -481,13 +483,13 @@ describe("nezapisaneDoRegistra", () => {
 
   test("zmena bez trénera zostáva obom", () => {
     const v = nezapisaneDoRegistra({
-      leads: [], menaKlientov: [], zmeny: [{ druh: "zrusene", trener: "" }],
+      leads: [], menaKlientov: [], dnes: DNES, zmeny: [{ druh: "zrusene", trener: "" }],
     });
     expect(v[0].trener).toBeUndefined();
   });
 
   test("keď nie je čo zapísať, register sa nezaťaží", () => {
-    expect(nezapisaneDoRegistra({ leads: [], menaKlientov: [], zmeny: [] })).toEqual([]);
+    expect(nezapisaneDoRegistra({ leads: [], menaKlientov: [], zmeny: [], dnes: DNES })).toEqual([]);
   });
 });
 
@@ -510,5 +512,39 @@ describe("patriTrenerovi — priame priradenie", () => {
     const r = { category: "Anomália" as const, title: "x", client: "Eva Doležalova" };
     expect(patriTrenerovi(r, clients, "Jerry")).toBe(true);
     expect(patriTrenerovi(r, clients, "Terezka")).toBe(false);
+  });
+});
+
+describe("dohodnutý úvodný sa nerieši otázkou prečo", () => {
+  const DNES2 = "2026-08-14";
+  const d = (name: string, date: string, status: Lead["status"]) => ({ name, date, dovod: "", status });
+
+  test("čerstvo dohodnutý dopyt v zozname nie je — ešte sa rieši", () => {
+    nastavObjednaneZKalendara({});
+    const v = nezapisaneDoRegistra({
+      leads: [d("Terezie Pehalová", "2026-08-01", "dohodnuty")],
+      menaKlientov: [], zmeny: [], dnes: DNES2,
+    });
+    expect(v.some((x) => x.key === "dopyt|nevyriesene")).toBe(false);
+  });
+
+  test("dohodnutý spred mesiacov je strata so zabudnutým stavom", () => {
+    // Jaromír čanda: dohodnutý 10. 3., nikdy neprišiel. Stav hovorí o budúcnosti,
+    // ktorá už bola — a to je práve to, čo treba zapísať.
+    nastavObjednaneZKalendara({});
+    const v = nezapisaneDoRegistra({
+      leads: [d("Jaromír čanda", "2026-03-10", "dohodnuty")],
+      menaKlientov: [], zmeny: [], dnes: DNES2,
+    });
+    expect(v.find((x) => x.key === "dopyt|nevyriesene")!.title).toContain("(1)");
+  });
+
+  test("nový dopyt sa počíta bez ohľadu na vek", () => {
+    nastavObjednaneZKalendara({});
+    const v = nezapisaneDoRegistra({
+      leads: [d("Karolína Frk", "2026-08-13", "novy")],
+      menaKlientov: [], zmeny: [], dnes: DNES2,
+    });
+    expect(v.find((x) => x.key === "dopyt|nevyriesene")!.title).toContain("(1)");
   });
 });

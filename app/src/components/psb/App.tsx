@@ -1209,6 +1209,7 @@ function skupinaFaktur(
     () => nezapisaneDoRegistra({
       leads: data.leads || [],
       menaKlientov: Object.keys(clients),
+      dnes: new Date().toISOString().slice(0, 10),
       zmeny: kalNevysvetlene.map((z) => ({ druh: z.druh, trener: z.trener })),
       // Lievik za posledných 12 mesiacov — tie isté čísla, aké vidno
       // v Marketingu. Keby sa počítali zvlášť, appka by spochybňovala niečo

@@ -1857,7 +1857,9 @@ export function ziskavanieKlientov(
  * vie, kto je kto. Zmeny v kalendári tomu, komu sa v kalendári stali.
  */
 export type NezapisaneVstup = {
-  leads: Pick<Lead, "name" | "date" | "dovod">[];
+  leads: Pick<Lead, "name" | "date" | "dovod" | "status">[];
+  /** Dnešok ako ISO deň — kvôli testovateľnosti sa neberie zo systému. */
+  dnes: string;
   /** Mená klientov — dopyt, z ktorého klient vznikol, sa nerieši. */
   menaKlientov: string[];
   /** Nevysvetlené zmeny z kalendára (`vysvetlene = 0`). */
@@ -1865,6 +1867,42 @@ export type NezapisaneVstup = {
   /** Kľúčové podiely, ktoré má appka spochybniť, keď vyzerajú príliš dobre. */
   podiely?: Podiel[];
 };
+
+/**
+ * Koľko dní má dohodnutý úvodný na to, aby sa stal tréningom.
+ *
+ * Jerry, 14. 8.: „keď dám úvodný tréning, malo by sa to vymazať — veď keď je
+ * dohodnutý, prečo by som mal dopisovať, prečo neprišla."
+ *
+ * Má pravdu, kým je termín pred nami. Ale „Dohodnutý úvodný" z marca, na ktorý
+ * nikto neprišiel, nie je rozbehnutý dopyt — je to strata so zabudnutým
+ * stavom. Mesiac je hranica, po ktorej sa stav prestáva brať ako pravda o
+ * budúcnosti a začína byť tvrdením o minulosti.
+ */
+const DOHODNUTY_PLATI_DNI = 30;
+
+/**
+ * Je dopyt ešte otvorený — teda taký, pri ktorom má zmysel pýtať sa „prečo nič"?
+ *
+ * NIE, keď: sa z neho stal klient · dôvod už niekto zapísal · má termín
+ * v kalendári · je čerstvo dohodnutý.
+ */
+function zivyDopyt(
+  l: Pick<Lead, "name" | "date" | "dovod" | "status">,
+  menaKlientov: string[],
+  dnes: string,
+): boolean {
+  const meno = String(l.name || "").trim();
+  if (!meno) return false;
+  if (String(l.dovod || "").trim()) return false;
+  if (najdiKlienta(menaKlientov, meno)) return false;
+  if (maTermin(meno)) return false;
+  if (l.status === "dohodnuty") {
+    const dni = Math.floor(daysBetween(String(l.date).slice(0, 10), new Date(`${dnes}T12:00:00Z`)));
+    if (dni <= DOHODNUTY_PLATI_DNI) return false;   // ešte sa rieši
+  }
+  return true;
+}
 
 const DRUH_SLOVOM: Record<string, string> = {
   zrusene: "zrušené", posunute: "posunuté", pridane: "pridané", premenovane: "premenované",
@@ -1890,13 +1928,7 @@ export function nezapisaneDoRegistra(v: NezapisaneVstup): Omit<RegisterItem, "ac
   }
 
   // ── dopyty bez odpovede prečo ────────────────────────────────────────────
-  const otvorene = v.leads.filter((l) => {
-    const meno = String(l.name || "").trim();
-    if (!meno) return false;
-    if (String(l.dovod || "").trim()) return false;
-    if (najdiKlienta(v.menaKlientov, meno)) return false;   // stal sa klientom
-    return !maTermin(meno);                                  // má dohodnutý termín
-  });
+  const otvorene = v.leads.filter((l) => zivyDopyt(l, v.menaKlientov, v.dnes));
   if (otvorene.length) {
     const najstarsi = [...otvorene].sort((a, b) => String(a.date).localeCompare(String(b.date)))[0];
     von.push({

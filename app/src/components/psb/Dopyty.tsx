@@ -129,6 +129,28 @@ export function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Re
   const menaKlientovAll = useMemo(() => Object.keys(clients), [clients]);
   const converted = (l: Lead) => !!(l.name && najdiKlienta(menaKlientovAll, l.name));
 
+  /**
+   * Nevyriešený = pri ktorom má ešte zmysel pýtať sa „prečo z toho nič nebolo".
+   *
+   * Nie je to ten, z koho sa stal klient, ani ten, komu už niekto dôvod
+   * zapísal, ani ten, kto má termín v kalendári — a ani čerstvo dohodnutý
+   * úvodný. Jerry, 14. 8.: „keď je dohodnutý, prečo by som mal dopisovať,
+   * prečo neprišla." Po mesiaci to ale prestáva byť správa o budúcnosti.
+   *
+   * To isté pravidlo počíta aj register (`nezapisaneDoRegistra`) — dve
+   * definície toho istého by si skôr či neskôr protirečili.
+   */
+  const nevyrieseny = (l: Lead) => {
+    if (converted(l)) return false;
+    if (String(l.dovod || "").trim()) return false;
+    if (maTermin(l.name || "")) return false;
+    if (l.status === "dohodnuty") {
+      const dni = (Date.now() - Date.parse(`${String(l.date).slice(0, 10)}T12:00:00Z`)) / 86400000;
+      if (dni <= 30) return false;
+    }
+    return true;
+  };
+
   // Najnovšie hore a v karte vidno tri. Zoznam rástol zdola a najčerstvejší
   // dopyt — jediný, s ktorým sa reálne pracuje — končil mimo obrazovky.
   const zoradene = useMemo(() => {
@@ -346,7 +368,7 @@ export function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Re
         <div ref={zoznamRef} style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <H3 style={{ marginBottom: 0 }}>Zoznam</H3>
           {!lenCakajuci && (() => {
-            const kolko = leads.filter((l) => !converted(l) && !String(l.dovod || "").trim() && !maTermin(l.name || "")).length;
+            const kolko = leads.filter(nevyrieseny).length;
             if (!kolko && !lenNevyriesene) return null;
             return (
               <button onClick={() => setLenNevyriesene((v) => !v)}
@@ -464,6 +486,9 @@ export function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Re
                     ) : maTermin(l.name || "") ? (
                       <span title="V kalendári má dohodnutý termín — ešte sa nič nestratilo."
                         style={{ color: C.accentLight, fontSize: 11.5 }}>má termín</span>
+                    ) : !nevyrieseny(l) ? (
+                      <span title="Dohodnutý úvodný — rieši sa. Po mesiaci sa appka spýta znova."
+                        style={{ color: C.green, fontSize: 11.5 }}>rieši sa</span>
                     ) : (
                       /* Dva kroky namiesto jedného: doteraz sa musel najprv
                          prepnúť Stav a až potom sa objavilo pole. Pri dopyte,
