@@ -459,7 +459,7 @@ export function deriveSixM(data: PSBData, clients: Record<string, ClientAgg>): S
 export type Period = "week" | "month" | "quarter" | "custom";
 
 // Returns a sortable grouping key + a human display label per period type.
-const periodInfo = (d: string, period: Period): { key: string; label: string } => {
+export const periodInfo = (d: string, period: Period): { key: string; label: string } => {
   if (period === "week") return { key: weekKey(d), label: weekLabel(d) };
   if (period === "quarter") return { key: quarterKey(d), label: quarterLabel(quarterKey(d)) };
   return { key: monthKey(d), label: monthLabel(monthKey(d)) };

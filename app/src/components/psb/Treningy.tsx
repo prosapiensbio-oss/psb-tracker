@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useState, type CSSProperties } from "react";
 
 import { fetchWeekEntries, saveWeekEntry, type WeekEntry } from "../../lib/psb/client";
-import { groupTrainings, kotvaDat, periodZone, sessionAnalysis, TARGET_H, type ClientAgg, type Period } from "../../lib/psb/compute";
+import { groupTrainings, periodInfo, kotvaDat, periodZone, sessionAnalysis, TARGET_H, type ClientAgg, type Period, type PeriodRow } from "../../lib/psb/compute";
 import { fmtCZK, monthLabel, weekKey } from "../../lib/psb/format";
 import { C, mix, S } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
@@ -133,10 +133,35 @@ function Prehlad({ data, focus, trainer, onTrainer }: { data: PSBData; focus?: N
     return undefined;
   }, [period, from, to, win]);
 
-  const rows = useMemo(
-    () => groupTrainings(data.sessions, period, trainerF, range),
-    [data.sessions, period, trainerF, range],
-  );
+  const rows = useMemo(() => {
+    const zo = groupTrainings(data.sessions, period, trainerF, range);
+    // Prebiehajúci týždeň má riadok, aj keď v ňom ešte nie je ani jedno sedenie.
+    //
+    // Jerry, 14. 8.: „nemám nahodené tréningy z PTmindera, ale mohol by tam už
+    // vzniknúť nový týždeň a doplnil by som únavu a poznámku aj bez hodín."
+    //
+    // Náročnosť týždňa a poznámka nezávisia od exportu — závisia od toho, že si
+    // to človek pamätá. Export prichádza v nedeľu, spomienka bledne od piatku.
+    // Bez tohto riadku sa nebolo kam kliknúť a pripomienka v „+ Zápis" viedla
+    // na tabuľku, v ktorej ten týždeň nebol.
+    if (period !== "week" || range?.from || range?.to) return zo;
+    const teraz = new Date();
+    const kluc = periodInfo(teraz.toISOString(), "week");
+    if (zo.some((g) => g.key === kluc.label)) return zo;
+    // Začiatok týždňa (pondelok) ako `ts` — riadok sa tým zaradí chronologicky
+    // na správne miesto, nielen na koniec.
+    const den = (teraz.getUTCDay() + 6) % 7;
+    const pondelok = new Date(Date.UTC(teraz.getUTCFullYear(), teraz.getUTCMonth(), teraz.getUTCDate() - den));
+    const prazdny: PeriodRow = {
+      key: kluc.label,
+      ts: pondelok.getTime(),
+      total: { hours: 0, sessions: 0, clients: 0, revenue: 0 },
+      byTrainer: {},
+      score: 0,
+      recommendation: "",
+    };
+    return [...zo, prazdny];
+  }, [data.sessions, period, trainerF, range]);
   const chrono = useMemo(() => [...rows].sort((a, b) => a.ts - b.ts), [rows]);
 
   // Posledné obdobie býva rozrobené: dáta z PTmindera končia uprostred týždňa

@@ -14,6 +14,7 @@ import {
   nastavObjednaneZKalendara,
   nezapisaneDoRegistra,
   patriTrenerovi,
+  periodInfo,
 } from "./compute";
 import { EMPTY_DATA } from "./types";
 import type { Lead } from "./types";
@@ -546,5 +547,21 @@ describe("dohodnutý úvodný sa nerieši otázkou prečo", () => {
       menaKlientov: [], zmeny: [], dnes: DNES2,
     });
     expect(v.find((x) => x.key === "dopyt|nevyriesene")!.title).toContain("(1)");
+  });
+});
+
+describe("prebiehajúci týždeň má riadok aj bez sedení", () => {
+  test("periodInfo dá tomu istému týždňu ten istý kľúč", () => {
+    // Riadok pre prázdny týždeň sa páruje na existujúci podľa `label` —
+    // keby sa kľúč rozišiel, vznikol by týždeň dvakrát.
+    const a = periodInfo("2026-08-10T08:00:00.000Z", "week");
+    const b = periodInfo("2026-08-14T19:00:00.000Z", "week");
+    expect(a.label).toBe(b.label);
+  });
+
+  test("iný týždeň má iný kľúč", () => {
+    const a = periodInfo("2026-08-10T08:00:00.000Z", "week");
+    const c = periodInfo("2026-08-17T08:00:00.000Z", "week");
+    expect(a.label).not.toBe(c.label);
   });
 });
