@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 
 import { saveLead } from "../../lib/psb/client";
-import { najdiKlienta, type ClientAgg } from "../../lib/psb/compute";
+import { maTermin, najdiKlienta, type ClientAgg } from "../../lib/psb/compute";
 import { fmtDMY, normName } from "../../lib/psb/format";
 import { C, mix, S } from "../../lib/psb/theme";
 import type { Lead } from "../../lib/psb/types";
@@ -138,7 +138,8 @@ export function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Re
         // Nevyriešený = nestal sa klientom a dôvod nie je zapísaný. Stav sa
         // zámerne nekontroluje: väčšina má „nový", lebo ich nikto neposunul —
         // a práve tie treba prejsť.
-        ? leads.filter((l) => !converted(l) && !String(l.dovod || "").trim())
+        // Kto má dohodnutý termín, nie je nevyriešený — je rozbehnutý.
+        ? leads.filter((l) => !converted(l) && !String(l.dovod || "").trim() && !maTermin(l.name || ""))
         : leads;
     // Pri dvoch dopytoch z toho istého dňa rozhoduje, kedy naozaj prišli.
     return [...zaklad].sort((a, b) =>
@@ -345,7 +346,7 @@ export function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Re
         <div ref={zoznamRef} style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <H3 style={{ marginBottom: 0 }}>Zoznam</H3>
           {!lenCakajuci && (() => {
-            const kolko = leads.filter((l) => !converted(l) && !String(l.dovod || "").trim()).length;
+            const kolko = leads.filter((l) => !converted(l) && !String(l.dovod || "").trim() && !maTermin(l.name || "")).length;
             if (!kolko && !lenNevyriesene) return null;
             return (
               <button onClick={() => setLenNevyriesene((v) => !v)}
@@ -460,6 +461,9 @@ export function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Re
                     ) : converted(l) ? (
                       <span title="Tento človek sa stal klientom — nie je čo vysvetľovať."
                         style={{ color: C.green, fontSize: 11.5 }}>klient</span>
+                    ) : maTermin(l.name || "") ? (
+                      <span title="V kalendári má dohodnutý termín — ešte sa nič nestratilo."
+                        style={{ color: C.accentLight, fontSize: 11.5 }}>má termín</span>
                     ) : (
                       /* Dva kroky namiesto jedného: doteraz sa musel najprv
                          prepnúť Stav a až potom sa objavilo pole. Pri dopyte,

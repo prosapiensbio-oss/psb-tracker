@@ -10,6 +10,8 @@ import {
   rodinaZKluca,
   predictCash,
   deriveClients,
+  maTermin,
+  nastavObjednaneZKalendara,
 } from "./compute";
 import { EMPTY_DATA } from "./types";
 import type { PSBData, PaymentRow, SessionRow } from "./types";
@@ -380,5 +382,35 @@ describe("predictCash", () => {
     expect(v.perClient.find((x) => x.name === "Panagiotis")?.kedy).toBe(teraz);
     // Graf sa nemení: mesiace v ňom začínajú až za aktuálnym.
     expect(v.months.every((m) => m.month > teraz)).toBe(true);
+  });
+});
+
+/**
+ * Dopyt s dohodnutým termínom nie je stratený dopyt.
+ *
+ * Jerry, 14. 8.: „a ak majú dohodnutý úvodný tréning, mám ich tiež vymazať?"
+ * Appka sa nesmie spoliehať, že si to bude pamätať — filter „len nevyriešené"
+ * inak láka uzavrieť človeka, ktorý príde zajtra.
+ */
+describe("maTermin", () => {
+  test("bez kalendára nikto termín nemá", () => {
+    nastavObjednaneZKalendara({});
+    expect(maTermin("Jana Antonická")).toBe(false);
+  });
+
+  test("kto je v kalendári, termín má", () => {
+    nastavObjednaneZKalendara({ "Jana Antonická": 1 });
+    expect(maTermin("Jana Antonická")).toBe(true);
+  });
+
+  test("diakritika ani preklep termín nestratia", () => {
+    // Dopyt sa píše z hlavy, kalendár nesie meno z Google — rozchádzajú sa bežne.
+    nastavObjednaneZKalendara({ "Jana Antonická": 1 });
+    expect(maTermin("jana antonicka")).toBe(true);
+  });
+
+  test("prázdne meno nespáruje kohokoľvek", () => {
+    nastavObjednaneZKalendara({ "Jana Antonická": 1 });
+    expect(maTermin("  ")).toBe(false);
   });
 });

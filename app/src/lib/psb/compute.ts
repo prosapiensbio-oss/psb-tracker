@@ -1390,6 +1390,23 @@ let OBJEDNANE: Record<string, number> = {};
 // z Fio, ktorý dobehne o pár stoviek milisekúnd neskôr a chybu maskuje.
 let OBJEDNANE_VERZIA = 0;
 export const objednaneVerzia = () => OBJEDNANE_VERZIA;
+
+/**
+ * Má tento človek dohodnutý termín v kalendári?
+ *
+ * Jerry, 14. 8.: „a ak majú dohodnutý úvodný tréning, mám ich tiež vymazať?"
+ * Nemá — a hlavne sa naňho appka nesmie spoliehať, že si to bude pamätať.
+ * Filter „len nevyriešené" a tlačidlo „zapísať prečo" inak lákajú uzavrieť
+ * človeka, ktorý príde zajtra.
+ *
+ * Meno sa páruje tolerantne (`najdiKlienta`): dopyt písaný z hlavy a názov
+ * udalosti v kalendári sa v diakritike aj preklepe rozchádzajú bežne.
+ */
+export function maTermin(meno: string): boolean {
+  if (!meno.trim()) return false;
+  const kluc = najdiKlienta(Object.keys(OBJEDNANE), meno);
+  return !!(kluc && OBJEDNANE[kluc] > 0);
+}
 export function nastavObjednaneZKalendara(m: Record<string, number>): boolean {
   const zmena = JSON.stringify(m) !== JSON.stringify(OBJEDNANE);
   OBJEDNANE = m;
