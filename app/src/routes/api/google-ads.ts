@@ -18,12 +18,15 @@ import {
  *
  * PREČO TEN ISTÝ SERVISNÝ ÚČET
  *
- * Google Ads dlho servisné účty nepustil bez Workspace domény a delegovania.
- * Dnes ich vlastná dokumentácia hovorí, že stačí pridať e-mail servisného účtu
- * ako používateľa v Google Ads (Správca → Prístup a zabezpečenie). Overuje sa
- * to jediným spôsobom, ktorý je spoľahlivý: skúškou. Preto sa chyba z Googlu
- * vracia celá a neprepisuje sa na „spojenie zlyhalo" — ak servisné účty
- * nepôjdu, bude to v jej texte napísané a nebudeme hádať.
+ * Google Ads dlho servisné účty nepustil bez Workspace domény a delegovania —
+ * a pol internetu to tvrdí doteraz. Googlova vlastná dokumentácia hovorí, že
+ * stačí pridať e-mail servisného účtu ako používateľa v Google Ads
+ * (Správca → Prístup a zabezpečenie). **Overené 14. 8. 2026 skúškou:** Google
+ * ten e-mail prijal na úrovni „Iba na čítanie", typ účtu „Nespravované",
+ * bez Workspace a bez delegovania. Takže OAuth flow tu netreba.
+ *
+ * Chyba z Googlu sa aj tak vracia celá a neprepisuje sa na „spojenie zlyhalo" —
+ * keď to Google raz zmení, bude to napísané v jej texte a nebudeme hádať.
  *
  * TRI HLAVIČKY, BEZ KTORÝCH TO NEJDE
  *
