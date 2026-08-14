@@ -106,7 +106,28 @@ export type Kroky = {
  * zažil — a to je konverzia. Kto si kúpil balíček a ešte netrénoval, sa
  * započíta až keď príde; radšej neskoro než nepravdivo.
  */
-const jeKlient = (c: ClientAgg) => c.sessions.some((x) => x.sessionType !== "UVODNE");
+/**
+ * Koľko musí človek zaplatiť NAD cenu úvodného, aby to bol nákup, nie
+ * zaokrúhlenie. Pod touto hranicou nie je žiadny balíček ani členstvo.
+ */
+const NAD_UVODNY = 500;
+
+const jeKlient = (c: ClientAgg, payments: { client: string; amount: number }[]) => {
+  // Prišiel znova — najsilnejší dôkaz a jediný, ktorý platí vždy.
+  if (c.sessions.some((x) => x.sessionType !== "UVODNE")) return true;
+  // Alebo si kúpil viac než ten úvodný.
+  //
+  // Roman Pavlík: úvodný 5. 8. za 1 100 Kč, 13. 8. balíček za 7 790 Kč,
+  // druhý tréning ešte nemal. Appka ho medzi klientov nerátala, hoci
+  // rozhodnutie padlo — a padlo peniazmi, čo je jasnejšie než dochádzka.
+  //
+  // Pôvodné pravidlo znelo „má platbu" a bolo zlé preto, že úvodný tréning
+  // JE platený, takže ho spĺňal každý, kto naň prišiel. Chyba nebola v tom,
+  // že sa pozeralo na peniaze — chyba bola, že sa nepozeralo, ZA ČO.
+  const uvodny = c.sessions.find((x) => x.sessionType === "UVODNE")?.price || 0;
+  const zaplatil = payments.filter((p) => p.client === c.name).reduce((a, p) => a + p.amount, 0);
+  return zaplatil - uvodny > NAD_UVODNY;
+};
 
 export function krokyZa(data: PSBData, clients: Record<string, ClientAgg>, mesiace: string[]): Kroky {
   const v = (d: string) => mesiace.includes(monthKey(d));
@@ -131,7 +152,7 @@ export function krokyZa(data: PSBData, clients: Record<string, ClientAgg>, mesia
     // úvodný v novembri 2022, ale dáta z PTmindera siahajú do januára 2025.
     if (c.vratenie) return false;
     if (!c.firstSession || !v(c.firstSession)) return false;
-    return jeKlient(c);
+    return jeKlient(c, data.payments);
   });
   // Tržba z NOVÝCH klientov — nie celková. Celková tržba obsahuje aj obnovy
   // starých klientov a tie marketing nepriviedol.
@@ -141,7 +162,7 @@ export function krokyZa(data: PSBData, clients: Record<string, ClientAgg>, mesia
     .reduce((a, p) => a + p.amount, 0);
   // Dopyt → klient. Páruje sa podľa mena; e-mail v dopyte často chýba a
   // v klientoch nie je vôbec.
-  const platiaci = new Set(Object.values(clients).filter(jeKlient).map((c) => normName(c.name)));
+  const platiaci = new Set(Object.values(clients).filter((c) => jeKlient(c, data.payments)).map((c) => normName(c.name)));
   const zDopytu = data.leads.filter((l) => v(l.date) && l.name && platiaci.has(normName(l.name))).length;
 
   const prvaPlatba = (meno: string) =>
@@ -163,7 +184,9 @@ export function krokyZa(data: PSBData, clients: Record<string, ClientAgg>, mesia
       // mimo okna zámerne: kto prišiel v januári a vrátil sa v júni, sa
       // nestratil — len to trvalo.
       nepokracovali: [...uvodneMapa.entries()]
-        .filter(([meno]) => !(clients[meno]?.sessions || []).some((x) => x.sessionType !== "UVODNE"))
+        // Tá istá definícia ako pri klientoch — kto si kúpil balíček, sa
+        // nestratil, len ešte nestihol prísť.
+        .filter(([meno]) => clients[meno] && !jeKlient(clients[meno], data.payments))
         .map(([meno, datum]) => ({
           meno, datum,
           // Dátum môže prísť ako celé ISO — pripojiť k nemu ďalší čas vyrobí

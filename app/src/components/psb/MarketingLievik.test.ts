@@ -235,3 +235,40 @@ describe("dátumy zo sedení chodia ako celé ISO", () => {
     expect(k.kto.nepokracovali[0].trener).toBe("Terezka");
   });
 });
+
+describe("balíček je konverzia, aj keď človek ešte neprišiel", () => {
+  it("kto po úvodnom kúpil balíček, je klient", () => {
+    // Roman Pavlík: úvodný 5. 8. za 1 100 Kč, 13. 8. balíček za 7 790 Kč,
+    // druhý tréning ešte nemal. Rozhodnutie padlo peniazmi.
+    const s = [session("Roman", "2026-01-05", "UVODNE", 1100)];
+    const k = krokyZa(
+      psb({ sessions: s, payments: [payment("Roman", "2026-01-05", 1100), payment("Roman", "2026-01-13", 7790)] }),
+      { Roman: klient("Roman", "2026-01-05", s) },
+      MES,
+    );
+    expect(k.klienti).toBe(1);
+    expect(k.kto.nepokracovali).toEqual([]);
+  });
+
+  it("kto zaplatil LEN za úvodný, klient nie je", () => {
+    const s = [session("Hana", "2026-01-06", "UVODNE", 1100)];
+    const k = krokyZa(
+      psb({ sessions: s, payments: [payment("Hana", "2026-01-06", 1100)] }),
+      { Hana: klient("Hana", "2026-01-06", s) },
+      MES,
+    );
+    expect(k.klienti).toBe(0);
+    expect(k.kto.nepokracovali.map((x) => x.meno)).toEqual(["Hana"]);
+  });
+
+  it("drobný doplatok balíček nenahradí", () => {
+    // 300 Kč nad úvodný nie je nákup, je to zaokrúhlenie alebo doplatok.
+    const s = [session("Ivana", "2026-01-06", "UVODNE", 1100)];
+    const k = krokyZa(
+      psb({ sessions: s, payments: [payment("Ivana", "2026-01-06", 1400)] }),
+      { Ivana: klient("Ivana", "2026-01-06", s) },
+      MES,
+    );
+    expect(k.klienti).toBe(0);
+  });
+});

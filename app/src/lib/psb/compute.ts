@@ -1049,6 +1049,10 @@ export function deriveAnomalies(data: PSBData, clients: Record<string, ClientAgg
     if (c.precoNeprisiel) continue;
     const sedeni = c.sessions || [];
     if (sedeni.length !== 1 || sedeni[0].sessionType !== "UVODNE") continue;
+    // Kto si po úvodnom kúpil balíček, sa nestratil — len ešte nestihol
+    // prísť. Rozhodnutie padlo peniazmi. (Roman Pavlík, 13. 8.)
+    const zaplatil = data.payments.filter((p) => p.client === c.name).reduce((a, p) => a + p.amount, 0);
+    if (zaplatil - (sedeni[0].price || 0) > 500) continue;
     const dni = Math.floor(daysBetween(sedeni[0].date, new Date()));
     if (dni < 21 || dni > 180) continue;
     push(
