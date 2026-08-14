@@ -70,6 +70,40 @@ const DOVODY_ID = "psb-dovody";
 const DOVODY = ["nezdvíhal telefón", "neodpísal", "cena", "vzdialenosť", "termín nesedel",
   "rozmyslel si to", "šiel inam", "len sa pýtal", "omyl / spam"];
 
+/**
+ * Pole na dôvod straty — s vlastným stavom a viditeľným potvrdením.
+ *
+ * Predtým to bol `defaultValue` bez stavu. Každé uloženie kdekoľvek v tabuľke
+ * spustí `refresh()`, ten prekreslí celý zoznam, a rozpísaný text v inom
+ * riadku sa pri tom stratil — bez hlásky, bez stopy. Jerry vyplnil niekoľko
+ * dôvodov a v databáze skončil jediný.
+ *
+ * Preto: hodnota žije v stave, Enter aj odklik ju uložia a na sekundu sa
+ * ukáže „uložené". Zápis, o ktorom sa nedá povedať, či prešiel, je horší než
+ * žiadny.
+ */
+function DovodPole({ l, onSave }: { l: Lead; onSave: (v: string) => Promise<void> | void }) {
+  const [text, setText] = useState(l.dovod || "");
+  const [ok, setOk] = useState(false);
+  const uloz = () => {
+    const v = text.trim();
+    if (v === (l.dovod || "").trim()) return;
+    void Promise.resolve(onSave(v)).then(() => { setOk(true); setTimeout(() => setOk(false), 1800); });
+  };
+  return (
+    <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
+      <input
+        list={DOVODY_ID} value={text} placeholder="dôvod…"
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); uloz(); } }}
+        onBlur={uloz}
+        style={{ ...S.select, width: "100%", minWidth: 0 }}
+      />
+      {ok && <span style={{ fontSize: 11, color: C.green, whiteSpace: "nowrap" }}>uložené</span>}
+    </span>
+  );
+}
+
 export function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Record<string, ClientAgg>; refresh: () => Promise<void> }) {
   const [busy, setBusy] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -117,9 +151,37 @@ export function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Re
   const [draft, setDraft] = useState<Partial<Lead>>({});
 
 
-  const save = async (l: Partial<Lead> & { id?: string; remove?: boolean }) => {
+  /**
+   * Posledná zmena a spôsob, ako ju vrátiť.
+   *
+   * Jerry, 14. 8.: „ak by som hocikde pri zápise urobil chybu, nemám žiadnu
+   * možnosť Cmd+Z." V tabuľke sa píše priamo do riadkov a jedno tlačidlo ✕
+   * zmaže dopyt bez opýtania — undo tu chýbalo najviac.
+   *
+   * Drží sa CELÝ pôvodný riadok, nie len zmenené pole: vrátenie je potom
+   * obyčajný zápis toho, čo tam bolo, a funguje rovnako pri úprave aj pri
+   * zmazaní (uloženie podľa `id` zmazaný riadok obnoví).
+   */
+  const [vratit, setVratit] = useState<{ predtym: Lead; co: string } | null>(null);
+
+  const save = async (
+    l: Partial<Lead> & { id?: string; remove?: boolean },
+    /** Čo sa zmenilo — do hlášky. Bez toho by tam stálo len „uložené". */
+    co?: string,
+  ) => {
     setBusy(true);
+    const predtym = l.id ? leads.find((x) => x.id === l.id) : undefined;
     await saveLead(l);
+    await refresh();
+    setBusy(false);
+    if (predtym && co) setVratit({ predtym, co });
+  };
+
+  const vratSpat = async () => {
+    if (!vratit) return;
+    setVratit(null);
+    setBusy(true);
+    await saveLead(vratit.predtym);
     await refresh();
     setBusy(false);
   };
@@ -129,7 +191,9 @@ export function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Re
   };
   const submitAdd = async () => {
     setAdding(false);
-    await save(draft);
+    // Medzera na začiatku mena vyrobila 4. 8. dvojicu „Pavel Blecha" a
+    // „ Pavel Blecha" — dva riadky, ktoré appka považovala za dvoch ľudí.
+    await save({ ...draft, name: String(draft.name ?? "").trim() });
   };
 
   const counts = useMemo(() => {
@@ -164,6 +228,33 @@ export function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Re
 
   return (
     <>
+      {/* Pás na vrátenie. Drží sa dole nad okrajom obrazovky, aby bol vidieť
+          aj vtedy, keď je zoznam odrolovaný — chyba sa najčastejšie zbadá
+          hneď po nej, nie po návrate na vrch stránky. */}
+      {vratit && (
+        <div style={{
+          position: "fixed", left: "50%", bottom: 22, transform: "translateX(-50%)", zIndex: 60,
+          display: "flex", alignItems: "center", gap: 12, maxWidth: "92vw",
+          padding: "10px 14px", borderRadius: 10,
+          background: C.card, border: `1px solid ${mix(C.accent, 40)}`,
+          boxShadow: "0 8px 28px rgba(0,0,0,.35)",
+        }}>
+          <span style={{ fontSize: 12.5, color: C.text, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            Zmenené: {vratit.co}
+          </span>
+          <button onClick={() => void vratSpat()} disabled={busy}
+            style={{
+              fontSize: 12, fontWeight: 600, padding: "5px 12px", borderRadius: 7, whiteSpace: "nowrap",
+              border: `1px solid ${C.accent}`, background: mix(C.accent, 12), color: C.accentLight,
+              cursor: busy ? "default" : "pointer", opacity: busy ? 0.5 : 1, fontFamily: "inherit",
+            }}>
+            Vrátiť späť
+          </button>
+          <button onClick={() => setVratit(null)} title="Zavrieť"
+            style={{ background: "none", border: "none", color: C.textDim, cursor: "pointer", fontSize: 14, lineHeight: 1 }}>✕</button>
+        </div>
+      )}
+
       <datalist id={REFERRER_LIST}>
         {clientNames.map((n) => <option key={n} value={n} />)}
       </datalist>
@@ -298,7 +389,7 @@ export function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Re
               {zoradene.map((l) => (
                 <tr key={l.id}>
                   <td style={S.td}>
-                    <input type="date" defaultValue={l.date} onBlur={(e) => e.target.value !== l.date && save({ ...l, date: e.target.value })}
+                    <input type="date" defaultValue={l.date} onBlur={(e) => e.target.value !== l.date && save({ ...l, date: e.target.value }, `dátum ${l.name || "dopytu"}`)}
                       style={{ ...inputStyle, colorScheme: "dark" }} />
                   </td>
                   <td style={S.td}>
@@ -365,14 +456,7 @@ export function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Re
                         to bola veštba. Lenže pomlčka sama o sebe nepovie, čo
                         s tým: Jerry sa hneď pýtal, ako sa to vypĺňa. */}
                     {l.status === "neodpisal" || l.status === "zruseny" ? (
-                      <input list={DOVODY_ID} defaultValue={l.dovod} placeholder="dôvod…"
-                        onKeyDown={(e) => {
-                          if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
-                          e.preventDefault();
-                          const v = e.currentTarget.value;
-                          if (v !== l.dovod) void save({ ...l, dovod: v });
-                        }}
-                        onBlur={(e) => e.target.value !== l.dovod && save({ ...l, dovod: e.target.value })} style={inputStyle} />
+                      <DovodPole l={l} onSave={(v) => save({ ...l, dovod: v }, `dôvod pri ${l.name || "dopyte"}`)} />
                     ) : converted(l) ? (
                       <span title="Tento človek sa stal klientom — nie je čo vysvetľovať."
                         style={{ color: C.green, fontSize: 11.5 }}>klient</span>
@@ -383,7 +467,7 @@ export function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Re
                          veta — tak ju appka zapíše naraz. */
                       <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
                         <span style={{ color: C.textDim, fontSize: 11.5 }}>nebolo z toho nič?</span>
-                        <button onClick={() => void save({ ...l, status: "neodpisal", dovod: "" })}
+                        <button onClick={() => void save({ ...l, status: "neodpisal", dovod: "" }, `stav ${l.name || "dopytu"}`)}
                           title="Označí dopyt za stratený a otvorí pole na dôvod"
                           style={{
                             fontSize: 11, padding: "2px 8px", borderRadius: 6, cursor: "pointer",
@@ -399,7 +483,7 @@ export function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Re
                     <input defaultValue={l.note} placeholder="poznámka" onBlur={(e) => e.target.value !== l.note && save({ ...l, note: e.target.value })} style={inputStyle} />
                   </td>
                   <td style={{ ...S.td, textAlign: "right" }}>
-                    <button onClick={() => save({ id: l.id, remove: true })} title="Zmazať"
+                    <button onClick={() => save({ id: l.id, remove: true }, `zmazanie ${l.name || "dopytu"}`)} title="Zmazať"
                       style={{ background: "transparent", border: "none", color: C.textDim, cursor: "pointer", fontSize: 15 }}>✕</button>
                   </td>
                 </tr>
