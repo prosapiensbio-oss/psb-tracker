@@ -110,6 +110,77 @@ function PoleOdporucatela({ meno, hodnota, mena, onUloz }: { meno: string; hodno
   );
 }
 
+/**
+ * Premenovanie klienta — vydaj, rozvod, preklep v PTminderi.
+ *
+ * PREČO TO NIE JE OBYČAJNÉ POLE
+ *
+ * Meno klienta je v siedmich tabuľkách a v troch z nich je zapečené v kľúči,
+ * ktorým import rozoznáva už nahraté riadky. Prepísať ho na jednom mieste
+ * znamená, že najbližší export klienta založí druhýkrát. Preto to robí server
+ * naraz a preto to najprv ukáže, čoho sa to týka.
+ *
+ * PREČO JE TO ZA DVOMA KLIKMI
+ *
+ * Je to nevratná operácia nad reálnymi tréningami a platbami. Náhľad s počtami
+ * je jediná príležitosť všimnúť si, že sa premenúva niekto iný, než sa myslelo.
+ */
+function Premenovanie({ meno, onHotovo }: { meno: string; onHotovo: (nove: string) => void | Promise<void> }) {
+  const [otvorene, setOtvorene] = useState(false);
+  const [nove, setNove] = useState(meno);
+  const [nahlad, setNahlad] = useState<{ spolu: number; dotknute: Record<string, number> } | null>(null);
+  const [chyba, setChyba] = useState("");
+  const [robim, setRobim] = useState(false);
+
+  const posli = async (naozaj: boolean) => {
+    setRobim(true); setChyba("");
+    const j = await fetch("/api/premenuj", {
+      method: "POST", credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ zo: meno, na: nove.trim(), naozaj }),
+    }).then((r) => r.json()).catch(() => ({ ok: false, error: "spojenie zlyhalo" }));
+    setRobim(false);
+    if (!j.ok) { setChyba(j.error || "neznáma chyba"); setNahlad(null); return; }
+    if (j.nahlad) { setNahlad({ spolu: j.spolu, dotknute: j.dotknute }); return; }
+    await onHotovo(nove.trim());
+  };
+
+  if (!otvorene) {
+    return (
+      <button onClick={() => setOtvorene(true)}
+        style={{ background: "none", border: "none", color: C.textDim, fontSize: 11.5, cursor: "pointer", padding: 0, marginBottom: 10 }}>
+        Premenovať klienta
+      </button>
+    );
+  }
+
+  return (
+    <div style={{ padding: "10px 12px", marginBottom: 12, borderRadius: 8, background: mix(C.accent, 6), border: `1px solid ${mix(C.accent, 28)}` }}>
+      <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 7 }}>
+        Nové meno — presne tak, ako je odteraz v PTminderi. Zmení sa všade vrátane kľúčov,
+        takže sa najbližší export napojí na existujúce riadky namiesto toho, aby klienta založil druhýkrát.
+      </div>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+        <input value={nove} onChange={(e) => { setNove(e.target.value); setNahlad(null); }}
+          style={{ ...S.input, flex: "1 1 200px", marginBottom: 0 }} />
+        <button onClick={() => void posli(!!nahlad)} disabled={robim || !nove.trim() || nove.trim() === meno}
+          style={{ padding: "6px 13px", borderRadius: 7, border: `1px solid ${C.accent}`, background: nahlad ? C.accent : "transparent", color: nahlad ? C.onAccent : C.accentLight, fontSize: 12, fontWeight: 600, cursor: robim ? "default" : "pointer", opacity: robim ? 0.5 : 1, fontFamily: "inherit" }}>
+          {nahlad ? `Naozaj premenovať (${nahlad.spolu})` : "Skontrolovať"}
+        </button>
+        <button onClick={() => { setOtvorene(false); setNahlad(null); setChyba(""); setNove(meno); }}
+          style={{ background: "none", border: "none", color: C.textDim, fontSize: 12, cursor: "pointer" }}>zavrieť</button>
+      </div>
+      {nahlad && (
+        <div style={{ fontSize: 11.5, color: C.text, marginTop: 8, lineHeight: 1.6 }}>
+          Zmení sa <b>{nahlad.spolu}</b> riadkov: {Object.entries(nahlad.dotknute).map(([t, n]) => `${t} ${n}`).join(" · ")}.
+          Späť sa to dá len ďalším premenovaním.
+        </div>
+      )}
+      {chyba && <div style={{ fontSize: 11.5, color: C.red, marginTop: 8, lineHeight: 1.55 }}>{chyba}</div>}
+    </div>
+  );
+}
+
 export function Klienti({ clients, capacity, actions, focus, leads, trainer, onTrainer, sixM, sub, onSub, data, btcSatsKlienti = {}, onDennikZapis }: { clients: Record<string, ClientAgg>; capacity: CapacityRow[]; actions: Actions; focus?: NavFocus | null; leads: Lead[]; trainer: string; onTrainer: (t: string) => void; sixM: SixMRow[]; sub: string; onSub: (s: string) => void; data: PSBData; btcSatsKlienti?: Record<string, number>; onDennikZapis?: (meno: string, text: string) => Promise<string | null> }) {
   const [focusClient, setFocusClient] = useState<string | null>(null);
   const [skupina, setSkupina] = useState<{ label: string; mena: string[] } | null>(null);
@@ -559,6 +630,7 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
 
       {editC && (
         <Modal title={editC.name} onClose={() => setEdit(null)}>
+          <Premenovanie meno={editC.name} onHotovo={async (nove) => { setEdit(null); await actions.refresh(); void nove; }} />
           {editC.membership && <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 12 }}>Predplatné: <strong style={{ color: C.text }}>{editC.membership}</strong>{editC.packageTotal ? ` · zostatok ${editC.packageRemaining}/${editC.packageTotal}` : ""}</div>}
           {duchOdpoved(editC) === "ano" && (
             // Zadné vrátka. Potvrdenie ducha je rozhodnutie, nie rozsudok —

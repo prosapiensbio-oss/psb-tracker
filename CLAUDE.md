@@ -56,6 +56,9 @@ záver odporuje tomu, čo Jerry hovorí zo skúsenosti.
   ASCII. Používaj `“` alebo sa im v kóde vyhni.
 - **Spätné apostrofy v SYSTEM šablóne** v `routes/api/chat.ts` rozbijú build —
   je to template literal. Escapuj ich alebo píš názvy tabuliek bez nich.
+- **Meno klienta je v siedmich tabuľkách** a v troch z nich aj v `dedup_key`.
+  Premenovať sa smie len cez `/api/premenuj`, ktorý mení oboje naraz — inak
+  najbližší import založí klienta druhýkrát.
 - **Schéma, ktorú Jarvis dostáva** (`SCHEMA_DB` v `chat.ts`), je samostatná
   kópia. Nový stĺpec do nej treba dopísať ručne — Jarvis má SQL prístup, ale
   nevie sa spýtať na to, o čom nevie. To bol 14. 8. celý dôvod, prečo o dôvodoch
