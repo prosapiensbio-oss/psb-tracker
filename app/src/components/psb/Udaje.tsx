@@ -55,13 +55,12 @@ const FAKTURY_ZDROJ = {
 // vtedy DÔJDE NAPLÁNOVANÝ OBSAH (natočený a naplánovaný v decembri 2025,
 // publikuje sa automaticky). Termín teda nepatrí sťahovaniu dát, ale výrobe
 // nového obsahu. Stiahnuť staré CSV má stále zmysel, len bez paniky.
-const MARKETING_ZDROJE: { druh: string; label: string; path: string; cezApi?: boolean }[] = [
+const MARKETING_ZDROJE: { druh: string; label: string; path: string }[] = [
   { druh: "metricool", label: "Metricool — príspevky, reels, stories", path: "Dve cesty, obe sem. (1) Analytics › Export › CSV — tri súbory instagram-posts, instagram-reels, instagram-stories; z nich má appka Instagram príspevok po príspevku. (2) Mesačná zostava v PDF — tú appka prečítať nevie (čísla sú vykreslené do grafov), tak ju prečíta Jarvis a vytiahne z nej všetky kanály naraz vrátane Facebooku, TikToku a Meta Ads. Stačí ju sem pretiahnuť. PPTX a XLSX nie." },
-  // GA4 a Search Console idú od 13. 8. cez API (Napojenia nižšie). CSV cesta
-  // tu zostáva popísaná zámerne — keď kľúč vyprší alebo Google zmení API, je
-  // dobré vedieť, kade sa dá dáta dostať ručne. Ale nesmie svietiť ako chýbajúce.
-  { druh: "ga4", label: "Google Analytics 4", cezApi: true, path: "Ide cez API — sťahuje sa v Napojeniach nižšie. Ručná záloha: GA4 → Prehľady › Prehľad stavu prehľadov › Stiahnuť CSV." },
-  { druh: "gsc", label: "Google Search Console", cezApi: true, path: "Ide cez API — sťahuje sa v Napojeniach nižšie. Ručná záloha: Search Console → Výsledky vyhľadávania › Exportovať › CSV. Stiahne sa ZIP — rozbaľ ho a nahraj tri súbory: Graf.csv (kliky po dňoch), Dopyty.csv (na čo ťa ľudia našli), Strany.csv (ktorý článok ťahá). Krajiny, Zariadenia a Filtre appka zatiaľ nepoužíva." },
+  // GA4 a Search Console tu ZÁMERNE nie sú (Jerry, 14. 8.): od 13. 8. chodia
+  // cez API a nepovinná vec v zozname povinných je len šum. Ručná cesta cez CSV
+  // funguje ďalej — import ju stále pozná — a je popísaná v karte Napojenia,
+  // teda tam, kde ju bude niekto hľadať, keď kľúč vyprší.
   // Anamnéza je tu NEPOVINNE a zámerne posledná. Zdroj klienta sa dnes plní sám
   // z dopytov (za apríl–júl 2026 na sto percent), takže mesačne ju netreba —
   // tlačidlo je tu na dobehnutie histórie, keby sa niekedy nazbierali ľudia bez
@@ -453,10 +452,8 @@ function UploadCard({ data, missing, actions, chat }: { data: PSBData; missing: 
         {MARKETING_ZDROJE.map((m) => {
           const st = surove.find((x) => x.druh === m.druh);
           const je = (st?.pocet || 0) > 0;
-          // Čo chodí cez API, nemá svietiť ako chýbajúce CSV — inak zoznam
-          // hlási prácu, ktorú už nikto nemá robiť.
-          const znak = m.cezApi ? "→" : je ? "✓" : "✗";
-          const farba = m.cezApi ? C.accentLight : je ? C.green : C.orange;
+          const znak = je ? "✓" : "✗";
+          const farba = je ? C.green : C.orange;
           return (
             <div key={m.druh} style={{ fontSize: 12, color: C.textMuted, marginBottom: 5, display: "flex", gap: 8 }}>
               <span style={{ color: farba, flexShrink: 0 }}>{znak}</span>
@@ -739,6 +736,11 @@ function NapojenieGoogle() {
 
       {hlaska && <div style={{ fontSize: 11.5, color: C.textMuted, lineHeight: 1.5, marginTop: 6 }}>{hlaska}</div>}
 
+      <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 8, lineHeight: 1.6 }}>
+        <b style={{ color: C.textMuted }}>Keby API prestalo chodiť:</b> dáta sa dajú nahrať aj ručne ako CSV —
+        GA4 → Prehľady › Prehľad stavu prehľadov › Stiahnuť CSV, a Search Console → Výsledky vyhľadávania ›
+        Exportovať › CSV (zo ZIPu treba Graf, Dopyty a Strany). Import ich stále pozná; píšu do tých istých tabuliek.
+      </div>
       <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 8, lineHeight: 1.6 }}>
         <b style={{ color: C.textMuted }}>Postup:</b> v Google Cloud zapni <b style={{ color: C.textMuted }}>Google Analytics Data API</b> (nie
         „Google Analytics API“ — tá je stará a GA4 dáta neposiela) a <b style={{ color: C.textMuted }}>Google Search Console API</b>.
