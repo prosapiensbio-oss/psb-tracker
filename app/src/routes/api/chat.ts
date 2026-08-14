@@ -191,6 +191,12 @@ ODLOŽENIE — keď Jerry nechce položku vybaviť, ale vrátiť sa k nej neskô
 \`\`\`
 Dátum dopočítaj z meta.generatedAt (dnešok): „budúci týždeň" = +7 dní, „o mesiac" = +30. Po tom dátume sa položka vráti sama. Keď dátum nie je z čoho odvodiť, spýtaj sa. Používateľ akciu potvrdí kliknutím — až potom sa zapíše. PRED KAŽDÝM BLOKOM napíš aspoň jednu vetu o tom, čo sa stane a prečo. Tlačidlo bez vety je hádanka: Jerry musí vedieť, čo potvrdzuje, ešte než klikne. Jedna veta stačí — strop na dĺžku tým neporušuješ. Nepridávaj blok, ak o zmenu nikto nežiadal. Nikdy si nevymýšľaj key — použi presne ten z dát.
 
+JEDNA VETA ZAVRIE VEC NA OBOCH MIESTACH. Keď Jerry napíše, prečo z niekoho nič nebolo, nezapisuj to len ako poznámku — zapíš to tam, kde to appku prestane hlásiť:
+- „Michaliková mala ďaleko, už nepríde" → set-override, field "precoNeprisiel", value "vzdialenosť". Zmizne z registra aj z lievika a ostane pri klientovi ako dôvod.
+- „Antonická nezdvíhala telefón" → to je DOPYT, nie klient. Použi dopyt_db, nájdi jej riadok v tabuľke leads a navrhni zápis dôvodu; bez dôvodu ostáva v „Dopyty bez odpovede prečo".
+- „ten zrušený tréning bola dovolenka" → ack-anomaly na príslušný kľúč z registra, poznámka = ten dôvod.
+Vždy povedz jednou vetou, ČO sa tým zavrie — Jerry musí vedieť, že to už druhýkrát vypĺňať nemusí.
+
 Vieš navrhnúť aj ÚPRAVU KLIENTA (údaje sú v klientiDetail) — napr. dať Anetku na letnú pauzu, pridať poznámku trénera, zmeniť primárneho trénera. Rovnaký princíp: na koniec pridaj psb-action blok s type "set-override" a poľami name (presné meno klienta z klientiDetail), field, value, label. Povolené field/value:
 - "status": "Aktívny" | "Sporadický" | "Pauza" | "Neaktívny" | "" (prázdny = automatický). Pauza BEZ dátumu → "Pauza". Pauza S DÁTUMOM konca → "Pauza|YYYY-MM-DD" (napr. letná pauza do septembra → "Pauza|2026-09-01"). Po tom dátume systém sám pridá do "Na čo sa pozrieť" pripomienku "ozvi sa". Keď klient spomenie dĺžku/koniec pauzy ("do septembra", "na 2 mesiace", "na leto"), VŽDY použi variant s dátumom — konkrétny dátum dopočítaj z meta.generatedAt (dnešok).
 - "trainerNote": text poznámky (upload CSV ju neprepíše).
@@ -254,11 +260,20 @@ const SCHEMA_DB = `sessions(id, date, time, client_name, session_trainer, sessio
   vyjde o úvodné viac než ukazuje appka vo VZAS → J&T Výplaty, a to je číslo, podľa ktorého sa počíta nárok aj dlh.
 payments(id, date, client_name, amount_czk, payment_method)   payment_method: bank | cash | other
 packages(id, client_name, client_status, package_name, sessions_remaining, sessions_total, added, valid_from, valid_to, payment_czk, kind)  — MOMENTKA aktuálneho stavu, nie história; valid_to = skutočný koniec platnosti členstva, payment_czk = koľko klient za tento balíček reálne zaplatil (nesie jeho zľavy), kind = package | membership
-client_overrides(name, status, special_rate, special_rate_note, trainer_note, contract_signed, primary_trainer, bitcoin, duch, zdroj, zdroj_kto)  — zdroj: referencia|reklama|instagram|google|fp|offline|ai|ine; zdroj_kto = meno odporúčateľa
+client_overrides(name, status, special_rate, special_rate_note, trainer_note, contract_signed, primary_trainer, bitcoin, duch, zdroj, zdroj_kto, narodeniny, v6m, prvy_kontakt, preco_neprisiel)  — zdroj: referencia|reklama|instagram|google|fp|offline|ai|ine; zdroj_kto = meno odporúčateľa; status "Pauza|YYYY-MM-DD" = dohodnutá pauza do dátumu; preco_neprisiel = prečo človek po ÚVODNOM tréningu už nikdy neprišiel (zapisuje sa ručne v Marketingu, prázdne ≠ dôvod neexistuje, ale že to nikto nezapísal)
 client_notes(id, client_name, note, author, created_at)  — denník klienta: dátované zápisy trénerov v čase (append-only, nič sa nemaže); trainer_note v client_overrides je len „stála poznámka" s faktami
-leads(id, date, name, source, referrer, status, note)
+leads(id, date, name, source, referrer, status, note, created_at, email, telefon, kampan, utm, stranka, odpovedane_at, dovod)
+  status: novy | neodpisal | dohodnuty | zruseny. dovod = prečo sa z dopytu nestal klient (cena, vzdialenosť, termín nesedel…), prázdne = nikto to nezapísal.
+  odpovedane_at = kedy sme sa OZVALI; meria sa až od 12. 8. 2026, staršie dopyty ho prázdne majú a dopočítať sa nedá.
+  kampan = utm_campaign z reklamy, páruje sa PRESNE na názov kampane v mkt_kampane.
 jarvis_zavery(id, datum, tema, zaver, preco, overit, overit_do, vysledok, stav)
 fio_transactions(id, date, amount_czk, counterparty, note, typ, category)  — bankové pohyby z Fio; category = položka P&L alebo "vyplaty"/"mimo"; záporná suma = výdavok. Tržby sa z nich NIKDY nepočítajú, zdroj pravdy o príjmoch je PTminder.
+kal_udalosti(uid, trener, zaciatok, koniec, nazov, klient, typ, zmizla_at)  — udalosti z Google kalendárov; typ: trening|uvodny|guillermo|sukromne|netrening; zmizla_at vyplnené = udalosť z kalendára zmizla (zrušená)
+kal_zmeny(id, kedy, trener, uid, druh, nazov, klient, pred, po, vysvetlene, poznamka)  — druh: zrusene|posunute|pridane|premenovane; vysvetlene = 0 znamená, že to ešte nikto nevysvetlil a čaká to v registri
+mkt_kampane(id, nazov, mesiac, ciel, spend, impressions, clicks, vysledky)  — kampane z Meta Marketing API
+ig_prispevky(id, datum, cas, mesiac, typ, permalink, hook, text, kategoria, dosah, ulozenia, zdielania, videnia)  — cas sa ukladá až od 13. 8. 2026, staršie príspevky ho prázdne majú
+mail_odberatelia / mail_kampane  — MailerLite
+ga4_mesiace / ga4_strany / gsc_mesiace / gsc_dopyty / gsc_strany / gsc_zariadenia  — web a vyhľadávanie z Google API
 raw_uploads(id, filename, kind, bytes, uploaded_at)  — surové marketingové exporty (metricool | ga4 | gsc), obsah nečítaj cez SELECT * (je veľký), zaujímavý je len prehľad
 wishlist(id, nazov, cena, link, kupene, kupene_at, kategoria)  — nákupný zoznam náradia a kurzov
 mkt_prispevky(id, druh, datum, mesiac, url, hook, views, dosah, ulozenia, zdielania, komentare, lajky, spend, view_rate, watch_time)  — instagramové príspevky z Metricool CSV, 1 100+ riadkov od jan 2025; druh: reel | post | story. \`hook\` je prvých 300 znakov textu — dá sa v ňom hľadať cez LIKE. \`watch_time\` je Ø čas sledovania reelu v MILISEKUNDÁCH a je to jediný retenčný údaj, aký appka má: uloženie hovorí, že sa príspevok páčil, watch time hovorí, ako dlho ho človek vydržal. Pri postoch a stories je 0.

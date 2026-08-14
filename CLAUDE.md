@@ -54,3 +54,9 @@ záver odporuje tomu, čo Jerry hovorí zo skúsenosti.
   zoskupuj a obmedzuj vek toho, čo sa hlási.
 - **Slovenské úvodzovky v TS reťazcoch** rozbijú build, keď je zatváracia
   ASCII. Používaj `“` alebo sa im v kóde vyhni.
+- **Spätné apostrofy v SYSTEM šablóne** v `routes/api/chat.ts` rozbijú build —
+  je to template literal. Escapuj ich alebo píš názvy tabuliek bez nich.
+- **Schéma, ktorú Jarvis dostáva** (`SCHEMA_DB` v `chat.ts`), je samostatná
+  kópia. Nový stĺpec do nej treba dopísať ručne — Jarvis má SQL prístup, ale
+  nevie sa spýtať na to, o čom nevie. To bol 14. 8. celý dôvod, prečo o dôvodoch
+  strát nevedel, hoci boli v databáze.

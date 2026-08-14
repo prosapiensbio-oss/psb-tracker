@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { kontrolaKanalov, kontrolaMerania, type MeranieMesiac, type Riadok } from "./kontrolaDat";
+import { kontrolaKanalov, kontrolaMerania, podozriveCisla, type MeranieMesiac, type Riadok } from "./kontrolaDat";
 
 const r = (mesiac: string, kanal: string, metrika: string, hodnota: number): Riadok =>
   ({ mesiac, kanal, metrika, hodnota });
@@ -177,5 +177,49 @@ describe("strážca merania", () => {
   it("malé čísla sa nekontrolujú — tam je výkyv normálny", () => {
     const ga4 = rada12(8); ga4[3].novi = 0;
     expect(kontrolaMerania(ga4, gsc12(235))).toEqual([]);
+  });
+});
+
+describe("podozrivo dokonalé čísla", () => {
+  const p = (nazov: string, zo: number, preslo: number) =>
+    ({ nazov, zo, preslo, coOverit: "Over definíciu." });
+
+  it("nájde presne to, čo Jerry našiel očami", () => {
+    // „Po úvodnom 100 % úspešnosť" — 35 z 35. Nebola to chyba počítania,
+    // bola to chyba definície: úvodný je platený, takže platbu mal každý.
+    const v = podozriveCisla([p("Po úvodnom klient", 35, 35)]);
+    expect(v).toHaveLength(1);
+    expect(v[0].nadpis).toContain("naozaj?");
+    expect(v[0].detail).toContain("35");
+  });
+
+  it("nad sto percent je dôkaz, nie podozrenie", () => {
+    const [v] = podozriveCisla([p("Z dopytu klient", 37, 46)]);
+    expect(v.zavaznost).toBe("vysoka");
+    expect(v.nadpis).toContain("nemožných");
+  });
+
+  it("takmer všetci je podozrivé rovnako ako všetci", () => {
+    expect(podozriveCisla([p("Konverzia", 20, 19)])).toHaveLength(1);
+  });
+
+  it("bežne dobrý výsledok sa nehlási", () => {
+    // 77 % je výborné číslo a appka nemá dôvod ho spochybňovať.
+    expect(podozriveCisla([p("Po úvodnom klient", 35, 27)])).toEqual([]);
+  });
+
+  it("malá vzorka sa nekontroluje — pri troch je 100 % náhoda", () => {
+    expect(podozriveCisla([p("Konverzia", 3, 3)])).toEqual([]);
+  });
+
+  it("nula pri dosť veľkej vzorke je podozrenie z druhej strany", () => {
+    const [v] = podozriveCisla([p("Dopyt z reklamy", 20, 0)]);
+    expect(v.nadpis).toContain("0 z 20");
+    expect(v.detail).toContain("nemeria");
+  });
+
+  it("každá metrika nesie vlastný návod, čo overiť", () => {
+    const [v] = podozriveCisla([{ nazov: "X", zo: 10, preslo: 10, coOverit: "Skontroluj, čo sa počíta za klienta." }]);
+    expect(v.detail).toContain("Skontroluj, čo sa počíta za klienta.");
   });
 });

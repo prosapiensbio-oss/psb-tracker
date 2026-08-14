@@ -2,6 +2,7 @@
 // no browser globals. Reused across every module.
 import { daysBetween, fmtDMY, monthKey, monthLabel, monthsBetween, normName, quarterKey, quarterLabel, weekKey, weekLabel } from "./format";
 import { BARTER_KLIENTI } from "./vzas";
+import { podozriveCisla, type Podiel } from "./kontrolaDat";
 import type {
   Lead,
   PackageRow,
@@ -1861,6 +1862,8 @@ export type NezapisaneVstup = {
   menaKlientov: string[];
   /** Nevysvetlené zmeny z kalendára (`vysvetlene = 0`). */
   zmeny: { druh: string; trener: string }[];
+  /** Kľúčové podiely, ktoré má appka spochybniť, keď vyzerajú príliš dobre. */
+  podiely?: Podiel[];
 };
 
 const DRUH_SLOVOM: Record<string, string> = {
@@ -1869,6 +1872,22 @@ const DRUH_SLOVOM: Record<string, string> = {
 
 export function nezapisaneDoRegistra(v: NezapisaneVstup): Omit<RegisterItem, "acked" | "note">[] {
   const von: Omit<RegisterItem, "acked" | "note">[] = [];
+
+  // ── čísla, ktoré vyzerajú príliš dobre ───────────────────────────────────
+  //
+  // Jerry, 14. 8.: „to je presne tá otázka, ktorá by mala vyskočiť v Na čo sa
+  // pozrieť." Mal pravdu — „100 % úspešnosť po úvodnom" nenašiel test ani ja,
+  // našiel to on. Appka sa odteraz pýta sama.
+  for (const n of podozriveCisla(v.podiely || [])) {
+    von.push({
+      key: `podozrive|${n.kluc}`,
+      category: "Anomália",
+      tone: n.zavaznost === "vysoka" ? "red" : "orange",
+      title: n.nadpis,
+      detail: n.detail,
+      priority: n.zavaznost === "vysoka" ? 3 : 13,
+    });
+  }
 
   // ── dopyty bez odpovede prečo ────────────────────────────────────────────
   const otvorene = v.leads.filter((l) => {

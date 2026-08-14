@@ -46,6 +46,7 @@ import { Klienti } from "./Klienti";
 import { Marketing } from "./Marketing";
 import { VYSLEDKY_LISTY, Vysledky, Vzas } from "./Vzas";
 import { Kalendar, type KalUdalost, type Zmena as KalZmena } from "./Kalendar";
+import { krokyZa, oknoMesiacov } from "./MarketingLievik";
 import { tokyKlientov } from "./Fluktuacia";
 import { VYCHODZIA_TEMA } from "./ThemeSwitch";
 import { Udaje } from "./Udaje";
@@ -1209,6 +1210,24 @@ function skupinaFaktur(
       leads: data.leads || [],
       menaKlientov: Object.keys(clients),
       zmeny: kalNevysvetlene.map((z) => ({ druh: z.druh, trener: z.trener })),
+      // Lievik za posledných 12 mesiacov — tie isté čísla, aké vidno
+      // v Marketingu. Keby sa počítali zvlášť, appka by spochybňovala niečo
+      // iné, než ukazuje.
+      podiely: (() => {
+        const kotva = kotvaDat(data);
+        const mesiace = oknoMesiacov(data, "12m").filter((m) => !kotva.plny || m <= kotva.plny);
+        const k = krokyZa(data, clients, mesiace);
+        return [
+          {
+            nazov: "Po úvodnom klient", zo: k.uvodne, preslo: k.klienti,
+            coOverit: "Over, čo appka počíta za klienta: úvodný tréning je platený, takže „má platbu“ splní každý, kto naň prišiel. Klient je ten, kto prišiel ZNOVA.",
+          },
+          {
+            nazov: "Z dopytu klient", zo: k.dopyty, preslo: k.zDopytu,
+            coOverit: "Over, či sa konvertujú DOPYTY, nie klienti — klienti z odporúčaní nemajú zapísaný dopyt a podiel potom presiahne sto percent.",
+          },
+        ];
+      })(),
     }).map((r: ReturnType<typeof nezapisaneDoRegistra>[number]) => ({ ...r, ...stavPolozky(r.key) })),
     [data.leads, clients, kalNevysvetlene, stavPolozky],
   );

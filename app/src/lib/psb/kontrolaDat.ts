@@ -241,3 +241,88 @@ export function kontrolaMerania(
   }
   return von;
 }
+
+/**
+ * Podozrivo dokonalé čísla — appka spochybňuje samu seba.
+ *
+ * PREČO TO VZNIKLO
+ *
+ * 13. 8. ukazoval lievik „po úvodnom 100 % úspešnosť". Nebola to chyba
+ * počítania: úvodný tréning je platený, takže podmienka „má platbu" bola
+ * splnená okamihom, keď naň človek prišiel. Merala sa dochádzka, nie
+ * rozhodnutie pokračovať.
+ *
+ * Nenašiel to test ani ja. Našiel to Jerry otázkou „mame naozaj 100 %
+ * úspešnosť?" — a to je presne otázka, ktorú si mala položiť appka.
+ *
+ * PREČO TO NEHOVORÍ „JE TO ZLE"
+ *
+ * Sto percent MÔŽE byť pravda. Podozrivé nie je číslo, ale to, že sa nedá
+ * odlíšiť od chyby v definícii — a rozdiel medzi „všetci zostali" a „meriame
+ * to zle" rozhodne o tom, či sa podľa toho dá konať. Preto je to otázka
+ * s návodom, čo overiť, nie rozsudok.
+ *
+ * PREČO NIE KAŽDÝ PODIEL
+ *
+ * Pri troch ľuďoch je 100 % bežná náhoda. Hlási sa až od vzorky, pri ktorej
+ * by dokonalý výsledok bol prekvapením aj v dobrom podniku.
+ */
+
+export type Podiel = {
+  /** Ako sa metrika volá na obrazovke. */
+  nazov: string;
+  /** Koľko ich vstúpilo do kroku. */
+  zo: number;
+  /** Koľko ich prešlo. */
+  preslo: number;
+  /** Čo overiť, keď číslo vyzerá príliš dobre. Píše sa ku každej metrike zvlášť. */
+  coOverit: string;
+};
+
+/** Pod týmto počtom je dokonalý výsledok bežná náhoda, nie signál. */
+const DOSŤ_VZORKY = 8;
+
+/** Od tejto hranice je „takmer všetci" podozrivé rovnako ako „všetci". */
+const TAKMER_VSETCI = 0.95;
+
+export function podozriveCisla(podiely: Podiel[]): Nezhoda[] {
+  const von: Nezhoda[] = [];
+  for (const p of podiely) {
+    if (p.zo < DOSŤ_VZORKY) continue;
+    const podiel = p.preslo / p.zo;
+
+    // Nad sto percent je fyzikálne nemožné — čitateľ a menovateľ počítajú
+    // rôznych ľudí. Toto nie je podozrenie, to je dôkaz chyby.
+    if (podiel > 1) {
+      von.push({
+        kluc: `podiel|nemozne|${p.nazov}`,
+        zavaznost: "vysoka",
+        nadpis: `${p.nazov}: ${Math.round(podiel * 100)} % je nemožných`,
+        detail: `${cislo(p.preslo)} z ${cislo(p.zo)}. Podiel nad sto percent znamená, že sa delia dve rôzne skupiny ľudí — nie že sa darí. ${p.coOverit}`,
+      });
+      continue;
+    }
+
+    if (podiel >= TAKMER_VSETCI) {
+      von.push({
+        kluc: `podiel|dokonale|${p.nazov}`,
+        zavaznost: "stredna",
+        nadpis: `${p.nazov}: ${Math.round(podiel * 100)} % — naozaj?`,
+        detail: `${cislo(p.preslo)} z ${cislo(p.zo)} prešlo. Môže to byť pravda, ale nedá sa to odlíšiť od chyby v definícii — a rozdiel medzi „všetci zostali" a „meriame to zle" rozhoduje o tom, či sa podľa toho dá konať. ${p.coOverit}`,
+      });
+      continue;
+    }
+
+    // Nula pri dostatočnej vzorke je rovnaký druh podozrenia z opačnej strany:
+    // buď sa naozaj nikomu nedarí, alebo sa krok nemeria.
+    if (p.preslo === 0) {
+      von.push({
+        kluc: `podiel|nula|${p.nazov}`,
+        zavaznost: "stredna",
+        nadpis: `${p.nazov}: 0 z ${cislo(p.zo)}`,
+        detail: `Ani jeden neprešiel. Buď sa naozaj nikomu nedarí, alebo sa ten krok nemeria — a to sú dve veľmi rôzne správy. ${p.coOverit}`,
+      });
+    }
+  }
+  return von;
+}
