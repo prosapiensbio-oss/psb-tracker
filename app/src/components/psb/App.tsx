@@ -32,6 +32,7 @@ import { rodinaZKluca,
 } from "../../lib/psb/compute";
 import { buildAiContext } from "../../lib/psb/aiContext";
 import { Assistant, useAssistantChat } from "./Assistant";
+import { JarvisOkno } from "./JarvisOkno";
 import { fmtDMY, monthLabel, normName } from "../../lib/psb/format";
 import { ObdobieCtx } from "../../lib/psb/obdobie";
 import { C, S, tab } from "../../lib/psb/theme";
@@ -121,6 +122,13 @@ const TABS = [
   // pozrieť výsledky, napísať správu. Boli to dve záložky (Údaje a Výsledky)
   // a robili sa striedavo v jednom sedení.
   { id: "mesiac", label: "Mesiac", icon: "upload" },
+  // Jarvis ako záložka, nie ako panel v rohu.
+  //
+  // Panel v pravom dolnom rohu je dobrý na jednu otázku medzi prácou. Na
+  // rozobranie veci — s dokumentmi, so staršími debatami po ruke — je malý.
+  // Toto je ten istý Jarvis vo veľkom rozložení; keď je táto záložka otvorená,
+  // plávajúci panel sa skryje, aby dve okná nedržali rozchádzajúci sa stav.
+  { id: "jarvis", label: "Jarvis", icon: "sparkles" },
 ];
 
 /** Staré podzáložky Marketingu → nové. Nikdy sa nemažú. */
@@ -1744,6 +1752,14 @@ function skupinaFaktur(
         {active === "vzas" && <Vzas sub={vzasSub} onSub={setVzasSub} data={data} clients={clients} focus={vzasFocus} onNavigate={navigate} />}
         {active === "kalendar" && <Kalendar clients={clients} data={data} />}
 
+        {active === "jarvis" && (
+          <JarvisOkno
+            chat={chat}
+            onClientClick={onClientClick}
+            onNavigate={(t, sub) => navigate(t, sub)}
+          />
+        )}
+
         {/* MESIAC — mesačný rituál na jednom mieste. Prvá podzáložka je to,
             čím sa začína (nahrať dáta, zavrieť mesiac), zvyšok je to, čím sa
             končí (pozrieť výsledky, napísať správu). Boli to dve záložky a
@@ -1779,7 +1795,14 @@ function skupinaFaktur(
       <div style={{ ...S.h3, textAlign: "center", color: C.textDim, fontSize: 11, padding: "8px 0 24px", fontWeight: 400 }}>
         ProSapiens Biomechanic · interný nástroj · nezdieľať externe
       </div>
-      <Assistant chat={chat} onClientClick={onClientClick} onNavigate={(tab, sub) => navigate(tab, sub)} />
+      {/*
+        Plávajúci panel sa v záložke Jarvis skryje. Nie je to obmedzenie —
+        obidve okná zdieľajú ten istý stav, takže dve naraz by ukazovali to
+        isté dvakrát a rozišli by sa pri rolovaní a písaní.
+      */}
+      {active !== "jarvis" && (
+        <Assistant chat={chat} onClientClick={onClientClick} onNavigate={(tab2, sub) => navigate(tab2, sub)} />
+      )}
     </div>
     </ObdobieCtx.Provider>
   );

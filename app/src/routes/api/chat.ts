@@ -4,6 +4,7 @@ import { isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { PSB_KNOWLEDGE } from "../../lib/psb/knowledge";
 import { IDS_KNIH, registerKniznice, textKnihy } from "../../lib/psb/kniznica";
 import { bindings } from "../../lib/bindings.server";
+import { brief } from "../../lib/psb/zamerania";
 
 // Sonnet 5 runs every normal turn — fast enough that the answer starts well inside
 // the ~30s gateway window. "Hlboká debata" swaps in Opus for the strategic
@@ -502,8 +503,10 @@ export const Route = createFileRoute("/api/chat")({
         let deep = false;
         /** Zapol si model Jerry ručne, alebo ho vybrala appka? Do odpovede to patrí. */
         let samVybral = false;
+        let kategoria = "";
         try {
-          const body = (await request.json()) as { messages?: unknown; context?: unknown; deep?: unknown };
+          const body = (await request.json()) as { messages?: unknown; context?: unknown; deep?: unknown; kategoria?: unknown };
+          kategoria = typeof body.kategoria === "string" ? body.kategoria : "";
           deep = body.deep === true;
           // Voľba modelu bez prepínača.
           //
@@ -573,7 +576,7 @@ export const Route = createFileRoute("/api/chat")({
         const system = [
           {
             type: "text",
-            text: `${SYSTEM}\n\n<pozadie_psb>\n${PSB_KNOWLEDGE}\n</pozadie_psb>\n\n<kniznica_register>\n${registerKniznice()}\n</kniznica_register>`,
+            text: `${SYSTEM}${brief(kategoria) ? `\n\n<zameranie>\n${brief(kategoria)}\n</zameranie>` : ""}\n\n<pozadie_psb>\n${PSB_KNOWLEDGE}\n</pozadie_psb>\n\n<kniznica_register>\n${registerKniznice()}\n</kniznica_register>`,
             cache_control: { type: "ephemeral" },
           },
           ...(pamat

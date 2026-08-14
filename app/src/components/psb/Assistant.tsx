@@ -35,7 +35,7 @@ type Msg = {
    */
   zobrazit?: string;
 };
-type SavedChat = { id: string; title: string; messages: Msg[]; updatedAt: number; archived?: boolean };
+type SavedChat = { id: string; title: string; messages: Msg[]; updatedAt: number; archived?: boolean; kategoria?: string };
 
 const CHATS_KEY = "psb-ai-chats";
 const newId = () => (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2, 6));
@@ -189,6 +189,14 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
   // Whether the floating bottom-right panel is open (shared so a client-name click
   // from the inline widget can pop it open on the next tab). Persisted.
   const [floatingOpen, setFloatingOpen] = useState(false);
+  /**
+   * Zameranie rozhovoru — marketing | peniaze | klienti | "" (všetko).
+   *
+   * Drží sa tu a nie vo veľkom okne, lebo je to vlastnosť KONVERZÁCIE, nie
+   * obrazovky: keď sa vrátiš k starej debate o peniazoch, má sa otvoriť ako
+   * debata o peniazoch. Preto sa ukládá spolu so správami.
+   */
+  const [kategoria, setKategoria] = useState("");
   useEffect(() => {
     try { if (localStorage.getItem("psb-ai-open") === "1") setFloatingOpen(true); } catch { /* ignore */ }
   }, []);
@@ -238,7 +246,7 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
     let zaznam: SavedChat | null = null;
     setChats((prev) => {
       const existing = prev.find((c) => c.id === chatId);
-      zaznam = { id: chatId, title: chatTitle(msgs), messages: msgs, updatedAt: Date.now(), archived: existing?.archived };
+      zaznam = { id: chatId, title: chatTitle(msgs), messages: msgs, updatedAt: Date.now(), archived: existing?.archived, kategoria };
       const next = [zaznam, ...prev.filter((c) => c.id !== chatId)];
       try { localStorage.setItem(CHATS_KEY, JSON.stringify(next.slice(0, 50))); } catch { /* ignore */ }
       return next;
@@ -253,8 +261,18 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
     setChats(next);
     try { localStorage.setItem(CHATS_KEY, JSON.stringify(next)); } catch { /* ignore */ }
   };
-  const newChat = () => { setChatId(newId()); setMsgs([]); setInput(""); setAttach([]); };
-  const openChat = (id: string) => { const c = chats.find((x) => x.id === id); if (c) { setChatId(id); setMsgs(opravStratene(c.messages || [])); } };
+    /**
+   * Nový rozhovor si zameranie PONECHÁ.
+   *
+   * Kto práve dokončil debatu o peniazoch a klikne „nový", chce takmer vždy
+   * ďalšiu debatu o peniazoch. Vynulovanie na „všetko" by ho nútilo
+   * prepínať pri každej otázke.
+   */
+  const newChat = (nova?: string) => {
+    setChatId(newId()); setMsgs([]); setInput(""); setAttach([]);
+    if (typeof nova === "string") setKategoria(nova);
+  };
+  const openChat = (id: string) => { const c = chats.find((x) => x.id === id); if (c) { setChatId(id); setMsgs(opravStratene(c.messages || [])); setKategoria(c.kategoria || ""); } };
   const deleteChat = (id: string) => { persistChats(chats.filter((c) => c.id !== id)); void deleteJarvisChat(id); if (id === chatId) newChat(); };
   const archiveChat = (id: string) => {
     const next = chats.map((c) => (c.id === id ? { ...c, archived: !c.archived } : c));
@@ -296,6 +314,7 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
       (full) => setLast({ role: "assistant", text: full.replace(/```psb-action[\s\S]*$/, "").trimEnd() }),
       deep,
       setStav,
+      kategoria,
     );
     setBusy(false);
     setStav("");
@@ -504,7 +523,7 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
     ].join(" · ");
   }
 
-  return { msgs, setMsgs, input, setInput, busy, stav, deep, setDeep, pending, setPending, attach, setAttach, ask, runAction, confirmImport, handleIncoming, floatingOpen, setFloatingOpen, chats, chatId, newChat, openChat, deleteChat, archiveChat, spracujDennik };
+  return { msgs, setMsgs, input, setInput, busy, stav, deep, setDeep, pending, setPending, attach, setAttach, ask, runAction, confirmImport, handleIncoming, floatingOpen, setFloatingOpen, kategoria, setKategoria, chats, chatId, newChat, openChat, deleteChat, archiveChat, spracujDennik };
 }
 
 // ── The conversation UI (messages + input) — used by both the floating panel and

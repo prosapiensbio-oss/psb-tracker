@@ -1081,6 +1081,14 @@ const ICON_PATHS: Record<string, ReactNode> = {
   // Bitcoinové „B" s dvoma nožičkami — kruh naokolo by v tejto veľkosti
   // splynul s ostatnými ikonami.
   bitcoin: (<><path d="M7 5.5h6.6a3.2 3.2 0 0 1 0 6.4H7z" /><path d="M7 11.9h7.4a3.3 3.3 0 0 1 0 6.6H7z" /><path d="M9.6 5.5V3M13.4 5.5V3M9.6 21v-2.5M13.4 21v-2.5M7 5.5v13" /></>),
+  // Jarvis. Bublina rozhovoru s iskrou — samotná bublina by splynula
+  // s kalendárom a peňaženkou, samotná iskra by nepovedala, že sa tam píše.
+  sparkles: (
+    <>
+      <path d="M20.5 11.4a8.4 8.4 0 0 1-8.5 8.2 9.3 9.3 0 0 1-3.2-.55L3.5 21l1.5-4.2a7.9 7.9 0 0 1-1.5-4.6 8.4 8.4 0 0 1 8.5-8.2 8.4 8.4 0 0 1 8.5 8.2z" />
+      <path d="M12 8.2l.95 2.35L15.3 11.5l-2.35.95L12 14.8l-.95-2.35L8.7 11.5l2.35-.95z" />
+    </>
+  ),
 };
 
 export function Icon({ name, size = 17 }: { name: string; size?: number }) {

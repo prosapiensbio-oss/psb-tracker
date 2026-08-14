@@ -224,9 +224,12 @@ export async function sendChat(
   // Čo práve robí — "Pozerám do dát…", dôvod dopytu, "Otváram knihu…".
   // Prázdny reťazec = hotovo, skry.
   onStatus?: (stav: string) => void,
+  // Zameranie rozhovoru (marketing | peniaze | klienti | prázdne = všetko).
+  // Nezužuje dáta — mení, čo Jarvis čita prvé a aké pravidlá preň platia.
+  kategoria?: string,
 ): Promise<ChatResult> {
   try {
-    const r = await post("/api/chat", { messages, context, deep: !!deep });
+    const r = await post("/api/chat", { messages, context, deep: !!deep, kategoria: kategoria || "" });
     // Errors (no_key, api_error…) come back as JSON; a successful answer streams as
     // Server-Sent Events (text/event-stream) — `data: {"t":"…"}` frames, then `[DONE]`.
     if ((r.headers.get("content-type") || "").includes("application/json")) {
