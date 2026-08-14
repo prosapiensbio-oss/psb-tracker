@@ -95,6 +95,7 @@ export function Udaje({ data, actions, chat, prekazky, kroky, podklady, onNaviga
         <NapojenieMeta />
         <NapojenieMailer />
         <NapojenieGoogle />
+        <NapojenieGoogleAds />
       </Card>
 
       <Card>
@@ -756,6 +757,117 @@ function NapojenieGoogle() {
     </div>
   );
 }
+
+/**
+ * Google Ads — token vývojára a manažérsky účet.
+ *
+ * PREČO JE TO ODDELENÉ OD GA4
+ *
+ * Prihlásenie je to isté (ten istý servisný účet), ale prístup sa udeľuje na
+ * inom mieste a token vývojára je vec, ktorú GA4 nepozná. Jedna spoločná karta
+ * by na chybu v jednom hlásila „Google nefunguje" a poslala hľadať na
+ * nesprávnu stranu.
+ *
+ * ČO TU ZATIAĽ NIE JE
+ *
+ * Objem hľadania z plánovača kľúčových slov. Token na úrovni „prieskumník" ho
+ * blokuje; žiadosť o Basic je podaná 14. 8. 2026. Keď príde, pribudne dopyt —
+ * nie nová karta.
+ */
+function NapojenieGoogleAds() {
+  const [stav, setStav] = useState<{
+    maToken: boolean; manager: string; email: string;
+    kampani: number; dopytov: number;
+    ucty: { id: string; nazov: string; valuta: string; je_manager: number }[];
+  } | null>(null);
+  const [token, setToken] = useState("");
+  const [manager, setManager] = useState("");
+  const [hlaska, setHlaska] = useState("");
+  const [robim, setRobim] = useState(false);
+
+  const nacitaj = () => void fetch("/api/google-ads", { credentials: "same-origin" })
+    .then((r) => r.json())
+    .then((j) => { if (j.ok) { setStav(j); setManager(j.manager || ""); } })
+    .catch(() => {});
+  useEffect(nacitaj, []);
+
+  const posli = async (telo: Record<string, unknown>, hotovo: string) => {
+    setRobim(true); setHlaska("");
+    const j = await fetch("/api/google-ads", {
+      method: "POST", credentials: "same-origin",
+      headers: { "content-type": "application/json" }, body: JSON.stringify(telo),
+    }).then((r) => r.json()).catch(() => ({ ok: false, error: "spojenie zlyhalo" }));
+    setRobim(false);
+    // Čiastočný úspech sa hlási ako čiastočný — „stiahnuté" nad polovicou dát
+    // je horšie než chyba, lebo sa k tomu nikto nevráti.
+    const chyby = Array.isArray(j.chyby) && j.chyby.length ? ` Nepodarilo sa: ${j.chyby.join("; ")}` : "";
+    setHlaska(j.ok || j.sprava ? `${j.sprava || hotovo}${chyby}` : `Nepodarilo sa: ${j.error || "neznáma chyba"}`);
+    nacitaj();
+    return j;
+  };
+
+  if (!stav) return null;
+  const btn = { fontSize: 12, padding: "6px 12px", borderRadius: 6, border: `1px solid ${C.accent}`, background: "transparent", color: C.accent, cursor: robim ? "default" : "pointer", opacity: robim ? 0.5 : 1 } as const;
+
+  return (
+    <div style={{ marginTop: 14, padding: 12, background: mix(C.accent, 6), borderRadius: 8 }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: C.textMuted, marginBottom: 6 }}>
+        <Info
+          label="Google Ads — výkon a hľadané výrazy"
+          text="Ťahá, čo naozaj stála reklama na Googli, a hlavne SKUTOČNÉ vety, ktoré ľudia napísali do vyhľadávania predtým, než klikli. To je cennejšie než akýkoľvek odhad objemu hľadania — sú to dáta kúpené vlastnými peniazmi. Prihlasuje sa tým istým servisným účtom ako GA4, ale prístup sa udeľuje inde: v Google Ads pod Správca → Prístup a zabezpečenie. Token vývojára sa uloží na serveri a späť do prehliadača sa neposiela. Objem hľadania z plánovača kľúčových slov zatiaľ nejde — token na úrovni „prieskumník“ ho blokuje a žiadosť o Basic je podaná."
+        />
+      </div>
+      <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 8, lineHeight: 1.6 }}>
+        Token: <b style={{ color: stav.maToken ? C.green : C.orange }}>{stav.maToken ? "uložený" : "chýba"}</b>
+        {" · "}kampane: <b style={{ color: C.text }}>{stav.kampani}</b> riadkov
+        {" · "}hľadané výrazy: <b style={{ color: C.text }}>{stav.dopytov}</b>
+        {stav.email && (
+          <>
+            <br />
+            <span>Servisný účet, ktorý treba pridať v Google Ads: </span>
+            <b style={{ color: C.text, fontFamily: "ui-monospace, monospace", fontSize: 11 }}>{stav.email}</b>
+          </>
+        )}
+        {stav.ucty.length > 0 && (
+          <>
+            <br />
+            Účty: {stav.ucty.map((u) => `${u.nazov || u.id}${u.je_manager ? " (manažér)" : ""}`).join(", ")}
+          </>
+        )}
+      </div>
+
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+        <input value={token} onChange={(e) => setToken(e.target.value)} type="password"
+          placeholder={stav.maToken ? "vložiť nový token vývojára…" : "token vývojára (22 znakov)"}
+          style={{ ...S.input, width: 230, marginBottom: 0, fontFamily: "ui-monospace, monospace", fontSize: 11 }} />
+        <input value={manager} onChange={(e) => setManager(e.target.value)}
+          placeholder="manažérsky účet, napr. 410-571-5629" style={{ ...S.input, width: 230, marginBottom: 0 }} />
+        <button disabled={robim || (!token.trim() && !manager.trim())} style={btn}
+          onClick={() => void posli({ akcia: "uloz-token", token: token.trim(), manager: manager.trim() }, "Uložené.").then(() => setToken(""))}>
+          Uložiť
+        </button>
+      </div>
+
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginTop: 8 }}>
+        <button disabled={robim || !stav.maToken} style={btn}
+          onClick={() => void posli({ akcia: "test" }, "Spojenie funguje.")}>
+          Skúsiť spojenie
+        </button>
+        <button disabled={robim || !stav.maToken} style={btn}
+          onClick={() => void posli({ akcia: "stiahni" }, "Stiahnuté.")}>
+          Stiahnuť
+        </button>
+      </div>
+
+      {hlaska && (
+        <div style={{ fontSize: 11.5, color: hlaska.startsWith("Nepodarilo") ? C.orange : C.textMuted, marginTop: 8, lineHeight: 1.5 }}>
+          {hlaska}
+        </div>
+      )}
+    </div>
+  );
+}
+
 
 function NapojenieMeta() {
   const [stav, setStav] = useState<{ maToken: boolean; maCapi: boolean; pixelId: string; adAccount: string; igUser: string; kampani: number; igPrispevkov: number } | null>(null);

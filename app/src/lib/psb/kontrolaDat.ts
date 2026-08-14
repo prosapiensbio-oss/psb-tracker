@@ -243,6 +243,39 @@ export function kontrolaMerania(
 }
 
 /**
+ * Google Ads platí, ale nemeria konverzie.
+ *
+ * PREČO TO NIE JE DROBNOSŤ
+ *
+ * Kampaň so stovkami klikov a nulou konverzií skoro nikdy neznamená, že nikto
+ * nekonvertoval — znamená, že sa to nemeralo. Rozdiel je celý: prvé čítanie
+ * vedie k záveru „Google nefunguje, zruš to", druhé k „zapni meranie a potom
+ * sa rozhodni". Presne tento omyl nás pri Mete stál devätnásť mesiacov
+ * a 31 452 Kč, o ktorých sa doteraz nedá povedať, čo priniesli.
+ *
+ * Hlási sa až od `DOST_KLIKOV` — pri dvadsiatich klikoch je nula konverzií
+ * úplne normálna a upozornenie by len svietilo.
+ */
+const DOST_KLIKOV = 100;
+
+export function kontrolaAds(
+  mesiace: { mesiac: string; naklad: number; kliky: number; konverzie: number }[],
+): Nezhoda[] {
+  const platene = mesiace.filter((m) => m.naklad > 0);
+  if (!platene.length) return [];
+  const kliky = platene.reduce((a, m) => a + m.kliky, 0);
+  const konverzie = platene.reduce((a, m) => a + m.konverzie, 0);
+  const naklad = platene.reduce((a, m) => a + m.naklad, 0);
+  if (kliky < DOST_KLIKOV || konverzie > 0) return [];
+
+  return [{
+    kluc: "gads|bez-konverzii",
+    zavaznost: "vysoka",
+    nadpis: "Google Ads platil, ale nemeral konverzie",
+    detail: `Za ${platene.length} ${platene.length === 1 ? "mesiac" : "mesiacov"} sa utratilo ${cislo(Math.round(naklad))} Kč a prišlo ${cislo(kliky)} klikov — a ani jedna konverzia. To takmer isto neznamená, že nikto nekonvertoval, ale že konverzie neboli v Google Ads nastavené. Kým to tak je, o tejto reklame sa nedá povedať, či zarobila alebo nie — presne ako pri Mete. Rozhodnutie „Google nefunguje" z týchto čísel urobiť NEMOŽNO.`,
+  }];
+}
+/**
  * Podozrivo dokonalé čísla — appka spochybňuje samu seba.
  *
  * PREČO TO VZNIKLO

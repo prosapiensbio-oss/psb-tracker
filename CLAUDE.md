@@ -65,3 +65,12 @@ záver odporuje tomu, čo Jerry hovorí zo skúsenosti.
   kópia. Nový stĺpec do nej treba dopísať ručne — Jarvis má SQL prístup, ale
   nevie sa spýtať na to, o čom nevie. To bol 14. 8. celý dôvod, prečo o dôvodoch
   strát nevedel, hoci boli v databáze.
+- **`searchStream` v Google Ads vracia POLE dávok**, nie objekt s `results`.
+  Kód napísaný podľa bežného endpointu prečíta `data.results`, nájde
+  `undefined` a ohlási „žiadne dáta" pri odpovedi plnej riadkov. Rieši to
+  `adsRiadky()` — nečítaj z odpovede priamo.
+- **Peniaze z Google Ads sú v mikrách.** Zabudnuté delenie miliónom vyrobí
+  číslo, ktoré má správny počet číslic na to, aby vyzeralo ako suma.
+- **Token vývojára na úrovni „prieskumník" nepustí plánovač kľúčových slov.**
+  Objem hľadania čaká na Basic (žiadosť podaná 14. 8. 2026). Nepíš do appky
+  odhady objemu — Search Console meria len tam, kde sa web už zobrazil.

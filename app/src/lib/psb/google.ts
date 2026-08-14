@@ -188,11 +188,11 @@ export function odKedy(dnes: Date, mesiacov: number): string {
  * Google odmieta tokeny s časom v budúcnosti aj o sekundu, a hodiny na
  * Cloudflare a v Google nie sú tie isté — preto `iat` o minútu dozadu.
  */
-export function narokyJwt(email: string, now: number): Record<string, string | number> {
+export function narokyJwt(email: string, now: number, scope: string = SCOPES): Record<string, string | number> {
   const iat = Math.floor(now / 1000) - 60;
   return {
     iss: email,
-    scope: SCOPES,
+    scope,
     aud: "https://oauth2.googleapis.com/token",
     iat,
     exp: iat + 3600,

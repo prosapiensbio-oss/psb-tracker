@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { kontrolaKanalov, kontrolaMerania, podozriveCisla, type MeranieMesiac, type Riadok } from "./kontrolaDat";
+import { kontrolaAds, kontrolaKanalov, kontrolaMerania, podozriveCisla, type MeranieMesiac, type Riadok } from "./kontrolaDat";
 
 const r = (mesiac: string, kanal: string, metrika: string, hodnota: number): Riadok =>
   ({ mesiac, kanal, metrika, hodnota });
@@ -221,5 +221,33 @@ describe("podozrivo dokonalé čísla", () => {
   it("každá metrika nesie vlastný návod, čo overiť", () => {
     const [v] = podozriveCisla([{ nazov: "X", zo: 10, preslo: 10, coOverit: "Skontroluj, čo sa počíta za klienta." }]);
     expect(v.detail).toContain("Skontroluj, čo sa počíta za klienta.");
+  });
+});
+
+describe("Google Ads bez merania konverzií", () => {
+  const m = (naklad: number, kliky: number, konverzie = 0) =>
+    ({ mesiac: "2023-05", naklad, kliky, konverzie });
+
+  it("platené kliky bez konverzií sa ohlásia", () => {
+    const v = kontrolaAds([m(1080, 494)]);
+    expect(v).toHaveLength(1);
+    expect(v[0].nadpis).toContain("nemeral konverzie");
+    // Kľúčové je, že to NEHOVORÍ „reklama nefungovala".
+    expect(v[0].detail).toContain("neboli v Google Ads nastavené");
+  });
+
+  it("s konverziami mlčí", () => {
+    expect(kontrolaAds([m(1080, 494, 12)])).toEqual([]);
+  });
+
+  it("pri malej vzorke mlčí", () => {
+    // Pri dvadsiatich klikoch je nula konverzií úplne normálna a upozornenie
+    // by len svietilo.
+    expect(kontrolaAds([m(50, 20)])).toEqual([]);
+  });
+
+  it("bez výdaja mlčí", () => {
+    expect(kontrolaAds([m(0, 0)])).toEqual([]);
+    expect(kontrolaAds([])).toEqual([]);
   });
 });

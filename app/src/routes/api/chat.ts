@@ -279,6 +279,7 @@ mkt_kampane(id, nazov, mesiac, ciel, spend, impressions, clicks, vysledky)  — 
 ig_prispevky(id, datum, cas, mesiac, typ, permalink, hook, text, kategoria, dosah, ulozenia, zdielania, videnia)  — cas sa ukladá až od 13. 8. 2026, staršie príspevky ho prázdne majú
 mail_odberatelia / mail_kampane  — MailerLite
 ga4_mesiace / ga4_strany / gsc_mesiace / gsc_dopyty / gsc_strany / gsc_zariadenia  — web a vyhľadávanie z Google API
+gads_kampane / gads_dopyty / gads_ucty  — Google Ads: výkon vlastných kampaní a SKUTOČNÉ hľadané výrazy
 raw_uploads(id, filename, kind, bytes, uploaded_at)  — surové marketingové exporty (metricool | ga4 | gsc), obsah nečítaj cez SELECT * (je veľký), zaujímavý je len prehľad
 wishlist(id, nazov, cena, link, kupene, kupene_at, kategoria)  — nákupný zoznam náradia a kurzov
 mkt_prispevky(id, druh, datum, mesiac, url, hook, views, dosah, ulozenia, zdielania, komentare, lajky, spend, view_rate, watch_time)  — instagramové príspevky z Metricool CSV, 1 100+ riadkov od jan 2025; druh: reel | post | story. \`hook\` je prvých 300 znakov textu — dá sa v ňom hľadať cez LIKE. \`watch_time\` je Ø čas sledovania reelu v MILISEKUNDÁCH a je to jediný retenčný údaj, aký appka má: uloženie hovorí, že sa príspevok páčil, watch time hovorí, ako dlho ho človek vydržal. Pri postoch a stories je 0.
@@ -287,6 +288,9 @@ mail_kampane(id, nazov, odoslane, prijemcov, otvorenia, prekliky, odhlasenia)  �
 kanaly_mesiace(mesiac, kanal, metrika, hodnota, zmena)  — mesačné čísla všetkých kanálov (Facebook, TikTok, Meta Ads…) z mesačnej zostavy
 ga4_mesiace(mesiac, novi, organic_search, paid_social, direct, udalosti)  — web; udalosti = odoslané formuláre
 gsc_mesiace(mesiac, kliky, zobrazenia) · gsc_dopyty(dopyt, kliky, zobrazenia, ctr, pozicia) · gsc_strany(url, kliky, zobrazenia, ctr, pozicia)  — Google vyhľadávanie
+gads_kampane(id, campaign_id, nazov, typ, stav, mesiac, naklad, kliky, zobrazenia, konverzie)  — Google Ads po kampani a mesiaci; naklad je UŽ v korunách, nie v mikrách. Mesačný súčet sa počíta z tejto tabuľky, samostatná mesačná tabuľka NEEXISTUJE. typ je SEARCH / DISPLAY / PERFORMANCE_MAX.
+gads_dopyty(id, mesiac, dopyt, kliky, zobrazenia, naklad, konverzie)  — skutočné vety, ktoré ľudia napísali do Googlu predtým, než klikli na reklamu. Existujú len pre kampane vo vyhľadávaní: prázdno znamená Display alebo Smart kampaň, NIE že sa nehľadalo.
+gads_ucty(id, nazov, valuta, je_manager)  — účty pod manažérskym účtom, objavené cez API
 users(login, name, active, last_login)  — kontá; vzas_audit(at, actor, action, ...) — kto čo zmenil
 vzas_payments, vzas_payment_splits, vzas_periods, vzas_rules, vzas_salary_params, vzas_settings, vzas_month_notes, vzas_week_notes, anomaly_ack, services, upload_log, algo_novinky`;
 

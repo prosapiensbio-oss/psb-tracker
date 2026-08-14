@@ -5,8 +5,11 @@ import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 import {
-  ga4Mesiace, ga4Strany, gscMesiace, gscRebricek, narokyJwt, normProperty, normSite, odKedy, zariadenia,
+  ga4Mesiace, ga4Strany, gscMesiace, gscRebricek, normProperty, normSite, odKedy, zariadenia,
 } from "../../lib/psb/google";
+import {
+  nastavenie, ulozNastavenie as uloz, ziskajToken,
+} from "../../lib/psb/googleAuth.server";
 
 /**
  * GA4 a Search Console cez servisný účet.
@@ -33,57 +36,6 @@ import {
  * hlásila „spojenie zlyhalo" — pátranie po skutočnej príčine trvalo hodiny.
  */
 
-type Sluzba = { ok: true; token: string } | { ok: false; chyba: string };
-
-const base64url = (b: ArrayBuffer | Uint8Array): string => {
-  const bytes = b instanceof Uint8Array ? b : new Uint8Array(b);
-  let s = "";
-  for (const x of bytes) s += String.fromCharCode(x);
-  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-};
-
-const textB64url = (s: string): string => base64url(new TextEncoder().encode(s));
-
-/** PEM `-----BEGIN PRIVATE KEY-----` → kľúč na podpis RS256. */
-async function nacitajKluc(pem: string): Promise<CryptoKey> {
-  const telo = pem.replace(/-----(BEGIN|END) PRIVATE KEY-----/g, "").replace(/\s+/g, "");
-  const bin = atob(telo);
-  const buf = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
-  return crypto.subtle.importKey(
-    "pkcs8", buf.buffer,
-    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
-    false, ["sign"],
-  );
-}
-
-/** Servisný účet → prístupový token. Platí hodinu, nikde sa neukladá. */
-async function ziskajToken(sa: { client_email?: string; private_key?: string }): Promise<Sluzba> {
-  if (!sa.client_email || !sa.private_key) return { ok: false, chyba: "kľúč nemá client_email alebo private_key" };
-  try {
-    const hlavicka = textB64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
-    const naroky = textB64url(JSON.stringify(narokyJwt(sa.client_email, Date.now())));
-    const kluc = await nacitajKluc(sa.private_key);
-    const podpis = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", kluc, new TextEncoder().encode(`${hlavicka}.${naroky}`));
-    const jwt = `${hlavicka}.${naroky}.${base64url(podpis)}`;
-
-    const r = await fetch("https://oauth2.googleapis.com/token", {
-      method: "POST",
-      headers: { "content-type": "application/x-www-form-urlencoded" },
-      body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${encodeURIComponent(jwt)}`,
-      signal: AbortSignal.timeout(15000),
-    });
-    const j = (await r.json().catch(() => ({}))) as Record<string, unknown>;
-    if (!r.ok || !j.access_token) {
-      const d = String(j.error_description || j.error || `HTTP ${r.status}`);
-      return { ok: false, chyba: `Google odmietol kľúč: ${d.slice(0, 250)}` };
-    }
-    return { ok: true, token: String(j.access_token) };
-  } catch (e) {
-    return { ok: false, chyba: `kľúč sa nepodarilo použiť: ${String(e).slice(0, 200)}` };
-  }
-}
-
 type Volanie = { ok: boolean; data?: Record<string, unknown>; chyba?: string };
 
 async function post(url: string, token: string, telo: unknown): Promise<Volanie> {
@@ -107,19 +59,6 @@ async function post(url: string, token: string, telo: unknown): Promise<Volanie>
 
 const GA4 = (p: string) => `https://analyticsdata.googleapis.com/v1beta/properties/${p}:runReport`;
 const GSC = (s: string) => `https://searchconsole.googleapis.com/webmasters/v3/sites/${encodeURIComponent(s)}/searchAnalytics/query`;
-
-async function nastavenie(DB: D1Database, kluc: string): Promise<string> {
-  const r = await DB.prepare("SELECT value FROM vzas_settings WHERE key = ?1").bind(kluc).first<{ value: string }>();
-  if (!r?.value) return "";
-  try { return String(JSON.parse(r.value)); } catch { return r.value; }
-}
-
-async function uloz(DB: D1Database, kluc: string, hodnota: string): Promise<void> {
-  await DB.prepare(
-    `INSERT INTO vzas_settings (key, value, updated_at) VALUES (?1, ?2, ?3)
-     ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
-  ).bind(kluc, JSON.stringify(hodnota), new Date().toISOString()).run();
-}
 
 export const Route = createFileRoute("/api/google")({
   server: {

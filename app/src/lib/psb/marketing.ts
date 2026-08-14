@@ -316,3 +316,43 @@ export function nastavWebZImportu(
   if (zariadenia.length) { GSC_ZARIADENIA = zariadenia; zmena = true; }
   return zmena;
 }
+
+// ── Google Ads ────────────────────────────────────────────────────────────
+//
+// PREČO TU NIE SÚ NAPÍSANÉ ŽIADNE ČÍSLA
+//
+// GA4 a Search Console tu majú ručne vpísané mesiace z exportov, lebo tak sa
+// začínali. Google Ads takú minulosť nemá — prišli až cez API a preto sú
+// prázdne, kým sa nestiahnu. Prázdny graf je čitateľnejší než graf s číslami,
+// o ktorých nikto nevie, odkiaľ sú.
+
+export type GadsKampan = {
+  campaignId: string; nazov: string; typ: string; stav: string; mesiac: string;
+  naklad: number; kliky: number; zobrazenia: number; konverzie: number;
+};
+
+export type GadsDopyt = {
+  mesiac: string; dopyt: string; kliky: number; zobrazenia: number; naklad: number; konverzie: number;
+};
+
+export let GADS_KAMPANE: GadsKampan[] = [];
+export let GADS_DOPYTY: GadsDopyt[] = [];
+
+/**
+ * Google Ads z API.
+ *
+ * Prázdne pole neprepisuje to, čo už je: keď stiahnutie čiastočne zlyhá,
+ * polovica dát by ticho zmizla a obrazovka by tvrdila, že sa nič nedeje.
+ */
+export function nastavAdsZImportu(kampane: GadsKampan[], dopyty: GadsDopyt[]): boolean {
+  let zmena = false;
+  if (kampane.length) {
+    GADS_KAMPANE = [...kampane].sort((a, b) => a.mesiac.localeCompare(b.mesiac));
+    zmena = true;
+  }
+  if (dopyty.length) {
+    GADS_DOPYTY = [...dopyty].sort((a, b) => b.zobrazenia - a.zobrazenia);
+    zmena = true;
+  }
+  return zmena;
+}

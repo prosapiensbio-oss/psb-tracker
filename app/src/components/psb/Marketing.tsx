@@ -14,6 +14,11 @@ import {
   mktSum,
   MKT_ZDROJ,
   nastavMarketingZImportu,
+  GADS_DOPYTY,
+  GADS_KAMPANE,
+  nastavAdsZImportu,
+  type GadsDopyt,
+  type GadsKampan,
   nastavWebZImportu,
   type Ga4Mesiac,
   type GscDopyt,
@@ -37,7 +42,8 @@ import { KedyPublikovat } from "./KedyPublikovat";
 import { AkoMeratReklamu, Kohorta, Lievik, Naklady } from "./MarketingLievik";
 import { Kanaly } from "./Kanaly";
 import { prilezitosti, soZamerom, zhrnutieWebu, type Dopyt } from "../../lib/psb/google";
-import { kontrolaMerania } from "../../lib/psb/kontrolaDat";
+import { kontrolaAds, kontrolaMerania } from "../../lib/psb/kontrolaDat";
+import { adsMesiace, cenaZaKlik, zhrnutieAds } from "../../lib/psb/googleAds";
 import { C, mix, S } from "../../lib/psb/theme";
 import type { AssistantChat } from "./Assistant";
 import type { ClientAgg } from "../../lib/psb/compute";
@@ -544,6 +550,135 @@ function RokBar({ rok, onRok }: { rok: string; onRok: (r: string) => void }) {
   );
 }
 
+/**
+ * Google Ads — čo stála reklama na Googli a na čo ľudia naozaj klikali.
+ *
+ * PREČO JE TO SAMOSTATNÁ KARTA A NIE STĹPEC V TABUĽKE WEBU
+ *
+ * GA4 a Search Console merajú ten istý web tými istými mesiacmi. Google Ads
+ * merajú niečo iné: peniaze a nakúpenú pozornosť. Vliať ich do jedného radu by
+ * znamenalo, že rast klikov z reklamy bude vyzerať ako rast webu — a to je
+ * presne ten druh čísla, ktoré meria niečo iné, než tvrdí jeho nadpis.
+ *
+ * PREČO SÚ HĽADANÉ VÝRAZY DÔLEŽITEJŠIE NEŽ NÁKLAD
+ *
+ * Náklad povie, koľko sa utratilo. Hľadané výrazy povedia, čo ľudia v Brne
+ * naozaj píšu do Googlu, keď ich niečo bolí — a to je jediný dôkaz o dopyte,
+ * ktorý máme kúpený vlastnými peniazmi, nie odhadnutý.
+ */
+function GoogleAdsKarta({ chat }: { chat?: AssistantChat }) {
+  const mesiace = adsMesiace(GADS_KAMPANE);
+  const straz = kontrolaAds(mesiace);
+  const cpc = cenaZaKlik(mesiace);
+  const vyrazy = GADS_DOPYTY.slice(0, 12);
+
+  if (!mesiace.length) {
+    return (
+      <Card>
+        <H3>
+          <Info
+            label="Google Ads"
+            text="Výkon vlastných kampaní na Googli a skutočné vety, ktoré ľudia napísali do vyhľadávania predtým, než klikli. Ťahá sa cez API tým istým servisným účtom ako GA4."
+          />
+        </H3>
+        <Empty>
+          Ešte sa nestiahlo. V <b>Dáta a uzávierka → Napojenia</b> je karta „Google Ads“ —
+          vlož token vývojára a stlač Stiahnuť. Prázdna tabuľka neznamená, že sa na Googli
+          neinzerovalo; znamená, že sa to sem ešte nedostalo.
+        </Empty>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <H3>
+        <Info
+          label="Google Ads"
+          text="Náklad je už v korunách, nie v mikrách, ako to posiela Google. Mesačný súčet sa počíta z rozpadu po kampaniach, takže sa tie dve čísla nemôžu rozísť. Hľadané výrazy existujú len pre kampane vo vyhľadávaní — pri Display alebo Smart kampani je zoznam prázdny, hoci minula tie isté peniaze."
+        />
+      </H3>
+
+      <div style={{ fontSize: 12, color: C.textMuted, marginTop: 6, lineHeight: 1.6 }}>
+        {zhrnutieAds(mesiace, "CZK")}
+      </div>
+
+      {straz.map((n) => (
+        <div key={n.kluc} style={{ marginTop: 10, padding: 10, borderLeft: `2px solid ${C.orange}`, background: mix(C.orange, 8), borderRadius: 6 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 600, color: C.text }}>{n.nadpis}</div>
+          <div style={{ fontSize: 11.5, color: C.textMuted, marginTop: 3, lineHeight: 1.55 }}>{n.detail}</div>
+        </div>
+      ))}
+
+      <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 12, fontSize: 12 }}>
+        <thead>
+          <tr style={{ color: C.textDim, textAlign: "right" }}>
+            <th style={{ textAlign: "left", padding: "4px 6px", fontWeight: 500 }}>mesiac</th>
+            <th style={{ padding: "4px 6px", fontWeight: 500 }}>náklad</th>
+            <th style={{ padding: "4px 6px", fontWeight: 500 }}>kliky</th>
+            <th style={{ padding: "4px 6px", fontWeight: 500 }}>zobrazenia</th>
+            <th style={{ padding: "4px 6px", fontWeight: 500 }}>za klik</th>
+          </tr>
+        </thead>
+        <tbody>
+          {mesiace.filter((m) => m.naklad > 0 || m.kliky > 0).map((m) => (
+            <tr key={m.mesiac} style={{ borderTop: `1px solid ${mix(C.text, 10)}`, textAlign: "right" }}>
+              <td style={{ textAlign: "left", padding: "4px 6px", color: C.text }}>{label(m.mesiac)}</td>
+              <td style={{ padding: "4px 6px", color: C.text }}>{Math.round(m.naklad)} Kč</td>
+              <td style={{ padding: "4px 6px", color: C.text }}>{m.kliky}</td>
+              <td style={{ padding: "4px 6px", color: C.textMuted }}>{m.zobrazenia}</td>
+              <td style={{ padding: "4px 6px", color: C.textMuted }}>
+                {m.kliky > 0 ? `${Math.round((m.naklad / m.kliky) * 100) / 100} Kč` : "—"}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {vyrazy.length > 0 && (
+        <div style={{ marginTop: 14 }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: C.textMuted, marginBottom: 6 }}>
+            <Info
+              label="Na čo ľudia naozaj klikali"
+              text="Skutočné vety z Googlu, nie odhad. Toto je najbližšie k odpovedi na otázku, či v Brne niekto hľadá to, čo PSB robí — a je to zaplatené vlastnými peniazmi, takže sa na to dá spoľahnúť viac než na akýkoľvek odhad objemu hľadania."
+            />
+          </div>
+          {vyrazy.map((v) => (
+            <div key={`${v.mesiac}|${v.dopyt}`} style={{ display: "flex", justifyContent: "space-between", gap: 10, padding: "3px 0", fontSize: 12, borderTop: `1px solid ${mix(C.text, 8)}` }}>
+              <span style={{ color: C.text }}>{v.dopyt}</span>
+              <span style={{ color: C.textMuted, whiteSpace: "nowrap" }}>
+                {v.zobrazenia} zobr. · {v.kliky} klik{v.kliky === 1 ? "" : "ov"}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {chat && (
+        <button
+          onClick={() => {
+            chat.setFloatingOpen(true);
+            void chat.ask([
+              "Pozri sa na Google Ads v dátach (kľúč googleAds) a odpovedz na jednu otázku:",
+              "dá sa z týchto čísel povedať, či má platené hľadanie na Googli pre PSB zmysel?",
+              "",
+              "Drž sa týchto pravidiel:",
+              "1. Ak sú konverzie nula, NEROB záver, že reklama nefungovala — povedz, že sa nemerala.",
+              "2. Objem hľadania nemáme (plánovač kľúčových slov je zablokovaný). Neodhaduj ho.",
+              "3. Porovnaj cenu za klik s tým, čo vieme o Mete — 31 452 Kč za 19 mesiacov a nula doložených dopytov.",
+              "4. Ak sa z dát odpovedať NEDÁ, povedz to rovno a napíš, čo by na to bolo treba.",
+            ].join("\n"), "Má Google Ads pre PSB zmysel?");
+          }}
+          disabled={chat.busy}
+          style={{ marginTop: 12, background: "none", border: "none", padding: 0, color: C.accentLight, fontSize: 11.5, cursor: chat.busy ? "default" : "pointer", fontFamily: "inherit" }}
+        >
+          Má to zmysel? Spýtaj sa Jarvisa
+        </button>
+      )}
+    </Card>
+  );
+}
+
 function WebKanaly({ rok, onRok, chat }: { rok: string; onRok: (r: string) => void; chat?: AssistantChat }) {
   const vsetky = GA4_MESACNE.filter((r) => r.m.startsWith(rok));
   // Strážca beží nad celou radou, nie nad vybraným rokom — diera na prelome
@@ -781,10 +916,11 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
   useEffect(() => {
     void fetch("/api/marketing", { credentials: "same-origin" })
       .then((r) => r.json())
-      .then((j: { mesacne?: MktMesiac[]; top?: MktKus[]; ga4?: Ga4Mesiac[]; gscMesacne?: GscMesiac[]; gscDopyty?: GscDopyt[]; gscStrany?: GscStrana[]; ga4Strany?: { url: string; zobrazenia: number }[]; gscZariadenia?: { zariadenie: string; kliky: number; zobrazenia: number }[] }) => {
+      .then((j: { mesacne?: MktMesiac[]; top?: MktKus[]; ga4?: Ga4Mesiac[]; gscMesacne?: GscMesiac[]; gscDopyty?: GscDopyt[]; gscStrany?: GscStrana[]; ga4Strany?: { url: string; zobrazenia: number }[]; gscZariadenia?: { zariadenie: string; kliky: number; zobrazenia: number }[]; gadsKampane?: GadsKampan[]; gadsDopyty?: GadsDopyt[] }) => {
         const a = nastavMarketingZImportu(j.mesacne || [], j.top || []);
         const b = nastavWebZImportu(j.ga4 || [], j.gscMesacne || [], j.gscDopyty || [], j.gscStrany || [], j.ga4Strany || [], j.gscZariadenia || []);
-        if (a || b) tik((x) => x + 1);
+        const bAds = nastavAdsZImportu(j.gadsKampane || [], j.gadsDopyty || []);
+        if (a || b || bAds) tik((x) => x + 1);
       })
       .catch(() => {});
   }, []);
@@ -886,6 +1022,7 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
         <>
           <Vyhladavanie chat={chat} />
           <WebKanaly rok={rok} onRok={setRok} chat={chat} />
+          <GoogleAdsKarta chat={chat} />
           <CoFungovaloWeb rok={rok} chat={chat} />
         </>
       )}

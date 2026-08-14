@@ -8,9 +8,12 @@ import { PNL, VZAS_MONTHS, pnlCalc, poslednyMesiacSDatami } from "./vzas";
 import {
   GA4_MESACNE, GSC_DOPYTY, GSC_MESACNE, GSC_STRANY,
   MKT_CLANKY, MKT_MESACNE,
+  GADS_DOPYTY,
+  GADS_KAMPANE,
 } from "./marketing";
 import { MKT_OBSAH } from "./marketing-obsah";
 import { prilezitosti, soZamerom } from "./google";
+import { adsMesiace, zhrnutieAds } from "./googleAds";
 import {
   cenaZaSedenie,
   kotvaDat,
@@ -458,6 +461,19 @@ export function buildAiContext(
         lokalne: soZamerom(GSC_DOPYTY, 8),
         topStrany: GSC_STRANY.slice(0, 12),
         poznamkaKPlanu: "V Marketingu → Reels & posty je karta „Čo publikovať ďalej“ — počítané návrhy z týchto istých čísel. Keď sa pýta, čo publikovať, odpovedaj z „prilezitosti“ (téma, kde sa web zobrazuje a nikto neklikne — najlacnejší obsah, pozícia je už zaplatená) a z „topStrany“ (text, ktorý ľudia čítajú sami a stačí naň odkázať). Nikdy netvrdi príčinu — súbežnosť nie je dôkaz.",
+      },
+      // Google Ads. Prázdno tu neznamená, že sa neinzerovalo — znamená, že sa
+      // ešte nestiahlo. Rozdiel medzi tým dvojím je celý rozdiel medzi
+      // odpoveďou a nezmyslom, preto to má vlastnú poznámku.
+      googleAds: {
+        poznamka: GADS_KAMPANE.length
+          ? "Výkon vlastných kampaní na Googli. Náklad je už v mene účtu, nie v mikrách. „konverzie: 0“ pri stovkách klikov takmer isto znamená, že sa konverzie NEMERALI — nie že nikto nekonvertoval; nikdy z toho nerob záver, že Google nefunguje. Kľúč „hladaneVyrazy“ sú SKUTOČNÉ vety, ktoré ľudia napísali do Googlu predtým, než klikli — je to cennejší dôkaz o dopyte než akýkoľvek odhad objemu hľadania, lebo je zaplatený vlastnými peniazmi."
+          : "Google Ads sa ešte nestiahli. NEODPOVEDAJ, že sa na Googli neinzerovalo — v Dáta a uzávierka → Napojenia je karta „Google Ads“ a treba stlačiť Stiahnuť. Prázdna tabuľka nie je dôkaz.",
+        mesacne: adsMesiace(GADS_KAMPANE),
+        kampane: GADS_KAMPANE.slice(0, 30),
+        hladaneVyrazy: GADS_DOPYTY.slice(0, 40),
+        zhrnutie: zhrnutieAds(adsMesiace(GADS_KAMPANE)),
+        objemHladania: "NIE JE k dispozícii. Plánovač kľúčových slov blokuje token na úrovni „prieskumník“; žiadosť o Basic bola podaná 14. 8. 2026. Ak sa Jerry pýta na objem hľadania, povedz, že sa čaká na Google, a NEODHADUJ ho — Search Console meria len tam, kde sa web už zobrazil, takže z nej sa objem dopytu vyčítať nedá.",
       },
       clanky: MKT_CLANKY.slice(0, 15),
       zdrojeKlientov: {

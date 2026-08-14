@@ -21,7 +21,7 @@ export const Route = createFileRoute("/api/marketing")({
         const { DB } = bindings();
         if (!DB) return Response.json({ ok: false, mesacne: [], top: [] });
         try {
-          const [mes, top, ga4, ga4S, gscZ, gscM, gscD, gscS, kan] = await Promise.all([
+          const [mes, top, ga4, ga4S, gscZ, gscM, gscD, gscS, kan, gadsK, gadsD] = await Promise.all([
             DB.prepare(
               `SELECT mesiac,
                       SUM(CASE WHEN druh = 'reel'  THEN 1 ELSE 0 END) AS reels,
@@ -46,6 +46,10 @@ export const Route = createFileRoute("/api/marketing")({
             DB.prepare("SELECT * FROM gsc_dopyty ORDER BY kliky DESC LIMIT 60").all().catch(() => ({ results: [] })),
             DB.prepare("SELECT * FROM gsc_strany ORDER BY kliky DESC LIMIT 40").all().catch(() => ({ results: [] })),
             DB.prepare("SELECT mesiac, kanal, metrika, hodnota, zmena, poznamka FROM kanaly_mesiace ORDER BY mesiac DESC, kanal, metrika").all().catch(() => ({ results: [] })),
+            // Google Ads. Mesiace sa NEDOPYTUJÚ zvlášť — sčítajú sa z kampaní
+            // v `adsMesiace()`, aby súčet a rozpad nemohli tvrdiť rôzne veci.
+            DB.prepare("SELECT campaign_id, nazov, typ, stav, mesiac, naklad, kliky, zobrazenia, konverzie FROM gads_kampane ORDER BY mesiac").all().catch(() => ({ results: [] })),
+            DB.prepare("SELECT mesiac, dopyt, kliky, zobrazenia, naklad, konverzie FROM gads_dopyty ORDER BY zobrazenia DESC LIMIT 200").all().catch(() => ({ results: [] })),
           ]);
           // Mesiac, z ktorého je nahratá len časť, sa nesmie tváriť ako hotový.
           // 11. 8.: doplnili sme 18 mesiacov exportov, ale júl 2026 v priečinku
@@ -123,6 +127,17 @@ export const Route = createFileRoute("/api/marketing")({
             gscZariadenia: (gscZ.results as Record<string, unknown>[]).map((r) => ({
               zariadenie: r.zariadenie, kliky: Number(r.kliky) || 0, zobrazenia: Number(r.zobrazenia) || 0,
             })),
+            gadsKampane: (gadsK.results as Record<string, unknown>[]).map((r) => ({
+              campaignId: String(r.campaign_id), nazov: String(r.nazov || ""),
+              typ: String(r.typ || ""), stav: String(r.stav || ""), mesiac: String(r.mesiac),
+              naklad: Number(r.naklad) || 0, kliky: Number(r.kliky) || 0,
+              zobrazenia: Number(r.zobrazenia) || 0, konverzie: Number(r.konverzie) || 0,
+            })),
+            gadsDopyty: (gadsD.results as Record<string, unknown>[]).map((r) => ({
+              mesiac: String(r.mesiac), dopyt: String(r.dopyt),
+              kliky: Number(r.kliky) || 0, zobrazenia: Number(r.zobrazenia) || 0,
+              naklad: Number(r.naklad) || 0, konverzie: Number(r.konverzie) || 0,
+            })),
             kanaly: (kan.results as Record<string, unknown>[]).map((r) => ({
               mesiac: r.mesiac, kanal: r.kanal, metrika: r.metrika,
               hodnota: Number(r.hodnota) || 0,
@@ -133,7 +148,7 @@ export const Route = createFileRoute("/api/marketing")({
         } catch {
           // Tabuľka ešte nie je (staršia migrácia) — obrazovka si vystačí s tým,
           // čo má v kóde.
-          return Response.json({ ok: false, mesacne: [], top: [], ga4: [], ga4Strany: [], gscZariadenia: [], gscMesacne: [], gscDopyty: [], gscStrany: [], kanaly: [] });
+          return Response.json({ ok: false, mesacne: [], top: [], ga4: [], ga4Strany: [], gscZariadenia: [], gscMesacne: [], gscDopyty: [], gscStrany: [], kanaly: [], gadsKampane: [], gadsDopyty: [] });
         }
       },
     },
