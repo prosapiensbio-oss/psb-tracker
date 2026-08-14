@@ -3,7 +3,7 @@ import { useMemo, useRef, useState } from "react";
 import { saveLead } from "../../lib/psb/client";
 import { najdiKlienta, type ClientAgg } from "../../lib/psb/compute";
 import { fmtDMY, normName } from "../../lib/psb/format";
-import { C, S } from "../../lib/psb/theme";
+import { C, mix, S } from "../../lib/psb/theme";
 import type { Lead } from "../../lib/psb/types";
 import { Card, Empty, H3, Info, Modal, RolovaciaTabulka, Select, StatCard, TableWrap } from "./ui";
 import { SOURCES, STATUSES, statusColor } from "./Klienti";
@@ -75,22 +75,15 @@ export function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Re
   const [adding, setAdding] = useState(false);
   const [upravCas, setUpravCas] = useState<string | null>(null);
   const [lenCakajuci, setLenCakajuci] = useState(false);
-
-  // Najnovšie hore a v karte vidno tri. Zoznam rástol zdola a najčerstvejší
-  // dopyt — jediný, s ktorým sa reálne pracuje — končil mimo obrazovky.
-  const zoradene = useMemo(() => {
-    const zaklad = lenCakajuci
-      ? leads.filter((l) => meraSa(l) && !l.odpovedaneAt && l.status === "novy")
-      : leads;
-    // Pri dvoch dopytoch z toho istého dňa rozhoduje, kedy naozaj prišli.
-    return [...zaklad].sort((a, b) =>
-      b.date.localeCompare(a.date) || String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
-  }, [leads, lenCakajuci]);
-  const [uzOzvane, setUzOzvane] = useState(false);
-  const zoznamRef = useRef<HTMLDivElement>(null);
-  const [rychleMeno, setRychleMeno] = useState("");
-  const [rychlyZdroj, setRychlyZdroj] = useState("reklama");
-  const [draft, setDraft] = useState<Partial<Lead>>({});
+  /**
+   * Len nevyriešené — dopyty, pri ktorých sa ešte dá niečo zapísať.
+   *
+   * V zozname je 37 riadkov a väčšina z nich je hotová vec: človek sa stal
+   * klientom. Otázka „prečo z toho nič nebolo" sa týka hŕstky, ktorá sa
+   * v tabuľke stráca. Bez filtra znamená doplnenie dôvodov preklikať celý
+   * zoznam a pri každom riadku si pamätať, či ten človek náhodou netrénuje.
+   */
+  const [lenNevyriesene, setLenNevyriesene] = useState(false);
 
   const clientNames = useMemo(
     () => Object.values(clients).map((c) => c.name).sort((a, b) => a.localeCompare(b)),
@@ -101,6 +94,28 @@ export function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Re
   // konverziu na diakritike či preklepe. Rovnaká rodina chýb ako Prochádzka.
   const menaKlientovAll = useMemo(() => Object.keys(clients), [clients]);
   const converted = (l: Lead) => !!(l.name && najdiKlienta(menaKlientovAll, l.name));
+
+  // Najnovšie hore a v karte vidno tri. Zoznam rástol zdola a najčerstvejší
+  // dopyt — jediný, s ktorým sa reálne pracuje — končil mimo obrazovky.
+  const zoradene = useMemo(() => {
+    const zaklad = lenCakajuci
+      ? leads.filter((l) => meraSa(l) && !l.odpovedaneAt && l.status === "novy")
+      : lenNevyriesene
+        // Nevyriešený = nestal sa klientom a dôvod nie je zapísaný. Stav sa
+        // zámerne nekontroluje: väčšina má „nový", lebo ich nikto neposunul —
+        // a práve tie treba prejsť.
+        ? leads.filter((l) => !converted(l) && !String(l.dovod || "").trim())
+        : leads;
+    // Pri dvoch dopytoch z toho istého dňa rozhoduje, kedy naozaj prišli.
+    return [...zaklad].sort((a, b) =>
+      b.date.localeCompare(a.date) || String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
+  }, [leads, lenCakajuci, lenNevyriesene, menaKlientovAll]);
+  const [uzOzvane, setUzOzvane] = useState(false);
+  const zoznamRef = useRef<HTMLDivElement>(null);
+  const [rychleMeno, setRychleMeno] = useState("");
+  const [rychlyZdroj, setRychlyZdroj] = useState("reklama");
+  const [draft, setDraft] = useState<Partial<Lead>>({});
+
 
   const save = async (l: Partial<Lead> & { id?: string; remove?: boolean }) => {
     setBusy(true);
@@ -238,6 +253,22 @@ export function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Re
       <Card>
         <div ref={zoznamRef} style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <H3 style={{ marginBottom: 0 }}>Zoznam</H3>
+          {!lenCakajuci && (() => {
+            const kolko = leads.filter((l) => !converted(l) && !String(l.dovod || "").trim()).length;
+            if (!kolko && !lenNevyriesene) return null;
+            return (
+              <button onClick={() => setLenNevyriesene((v) => !v)}
+                title="Dopyty, z ktorých sa nestal klient a nikto nezapísal prečo"
+                style={{
+                  fontSize: 11.5, padding: "3px 10px", borderRadius: 999, cursor: "pointer",
+                  border: `1px solid ${lenNevyriesene ? C.accent : C.border}`,
+                  background: lenNevyriesene ? mix(C.accent, 12) : "transparent",
+                  color: lenNevyriesene ? C.accentLight : C.textMuted, fontFamily: "inherit",
+                }}>
+                len nevyriešené ({kolko}){lenNevyriesene ? " ✕" : ""}
+              </button>
+            );
+          })()}
           {lenCakajuci && (
             <button onClick={() => setLenCakajuci(false)}
               style={{ fontSize: 11.5, padding: "3px 10px", borderRadius: 999, border: `1px solid ${C.red}`, background: "transparent", color: C.red, cursor: "pointer" }}>
@@ -335,10 +366,33 @@ export function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Re
                         s tým: Jerry sa hneď pýtal, ako sa to vypĺňa. */}
                     {l.status === "neodpisal" || l.status === "zruseny" ? (
                       <input list={DOVODY_ID} defaultValue={l.dovod} placeholder="dôvod…"
+                        onKeyDown={(e) => {
+                          if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
+                          e.preventDefault();
+                          const v = e.currentTarget.value;
+                          if (v !== l.dovod) void save({ ...l, dovod: v });
+                        }}
                         onBlur={(e) => e.target.value !== l.dovod && save({ ...l, dovod: e.target.value })} style={inputStyle} />
+                    ) : converted(l) ? (
+                      <span title="Tento človek sa stal klientom — nie je čo vysvetľovať."
+                        style={{ color: C.green, fontSize: 11.5 }}>klient</span>
                     ) : (
-                      <span title="Vyplní sa, až keď v stĺpci Stav nastavíš „Neodpísal“ alebo „Zrušený“."
-                        style={{ color: C.textDim, fontSize: 12, cursor: "help" }}>—</span>
+                      /* Dva kroky namiesto jedného: doteraz sa musel najprv
+                         prepnúť Stav a až potom sa objavilo pole. Pri dopyte,
+                         z ktorého nikdy nič nebolo, sú obe informácie tá istá
+                         veta — tak ju appka zapíše naraz. */
+                      <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
+                        <span style={{ color: C.textDim, fontSize: 11.5 }}>nebolo z toho nič?</span>
+                        <button onClick={() => void save({ ...l, status: "neodpisal", dovod: "" })}
+                          title="Označí dopyt za stratený a otvorí pole na dôvod"
+                          style={{
+                            fontSize: 11, padding: "2px 8px", borderRadius: 6, cursor: "pointer",
+                            border: `1px solid ${mix(C.accent, 40)}`, background: mix(C.accent, 8),
+                            color: C.accentLight, fontFamily: "inherit", whiteSpace: "nowrap",
+                          }}>
+                          zapísať prečo
+                        </button>
+                      </div>
                     )}
                   </td>
                   <td style={S.td}>

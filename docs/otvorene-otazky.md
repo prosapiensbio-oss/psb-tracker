@@ -12,7 +12,7 @@ odpovedal. Živý zoznam marketingu je v [zoznam-marketing.md](zoznam-marketing.
 
 | | |
 |---|---|
-| Dôvod straty pri 37 dopytoch | stav majú všetky „nový". Rýchlosť odpovede sa meria až od 12. 8., takže dlaždice neklamú — ale prečo dvanásti netrénovali, vie už len tvoja hlava |
+| Dôvod straty pri dopytoch | Marketing → Dopyty → prepínač **len nevyriešené**. Ukáže tých, z ktorých sa nestal klient a nikto nezapísal prečo. Tlačidlo „zapísať prečo“ označí dopyt za stratený a rovno otvorí pole; Enter uloží |
 
 ---
 
