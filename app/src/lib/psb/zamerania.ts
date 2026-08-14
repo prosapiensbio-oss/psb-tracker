@@ -119,3 +119,20 @@ export const ZAMERANIA: Zameranie[] = [
 export function brief(id: string): string {
   return ZAMERANIA.find((z) => z.id === id)?.brief || "";
 }
+
+/**
+ * Patrí konverzácia do práve zobrazeného zoznamu?
+ *
+ * PREČO JE TO FUNKCIA A NIE JEDEN RIADOK V OBRAZOVKE
+ *
+ * Prvá verzia to mala inline a znamenala niečo iné: prázdny filter brala ako
+ * „nezaradené" namiesto „bez filtrovania". Jerry to našiel hneď — v „Všetko"
+ * mu chýbala konverzácia, ktorú práve viedol. Rozdiel je jedno vykričníkové
+ * znamienko a testom sa drží, lebo v obrazovke by ho nikto nevidel.
+ *
+ * `filter` prázdny = všetko. Zoznam bez filtra nemá byť ďalšia priehradka.
+ */
+export function patriDoZoznamu(kategoriaKonverzacie: string | undefined, filter: string): boolean {
+  if (!filter) return true;
+  return (kategoriaKonverzacie || "") === filter;
+}

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { brief, PRIECHOD, ZAMERANIA } from "./zamerania";
+import { brief, patriDoZoznamu, PRIECHOD, ZAMERANIA } from "./zamerania";
 
 /**
  * Zameranie je nastavenie, ktorého účinok človek nevidí priamo — a to je
@@ -97,5 +97,29 @@ describe("brief()", () => {
   test("známe zameranie vráti svoj vlastný brief", () => {
     expect(brief("peniaze")).toBe(ZAMERANIA.find((z) => z.id === "peniaze")!.brief);
     expect(brief("marketing")).not.toBe(brief("peniaze"));
+  });
+});
+
+describe("zoznam konverzácií", () => {
+  test("bez filtra sú v zozname VŠETKY konverzácie", () => {
+    // Toto je presne chyba, ktorú Jerry našiel: „Všetko" som spravil ako
+    // priehradku pre nezaradené, takže v ňom chýbala konverzácia, ktorú
+    // práve viedol.
+    expect(patriDoZoznamu("marketing", "")).toBe(true);
+    expect(patriDoZoznamu("peniaze", "")).toBe(true);
+    expect(patriDoZoznamu("", "")).toBe(true);
+    expect(patriDoZoznamu(undefined, "")).toBe(true);
+  });
+
+  test("v priečinku sú len jeho konverzácie", () => {
+    expect(patriDoZoznamu("marketing", "marketing")).toBe(true);
+    expect(patriDoZoznamu("peniaze", "marketing")).toBe(false);
+  });
+
+  test("staré rozhovory bez zamerania sa nikde nestratia", () => {
+    // Konverzácie z plávajúceho panelu vznikli pred zameraniami. Musia byť
+    // vidieť v „Všetko"; keby zmizli, vyzeralo by to ako stratená práca.
+    expect(patriDoZoznamu(undefined, "")).toBe(true);
+    expect(patriDoZoznamu(undefined, "marketing")).toBe(false);
   });
 });
