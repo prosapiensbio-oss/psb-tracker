@@ -316,6 +316,11 @@ export async function ingest(DB: D1Database, filename: string, text: string, act
       const p = normName(m).split(" ").filter(Boolean).pop() || "";
       if (p.length >= 4) podlaPriezviska.set(p, [...(podlaPriezviska.get(p) || []), m]);
     }
+    let pridaneNarodeniny = 0;
+    const maNarodeniny = new Set(
+      (await DB.prepare("SELECT name FROM client_overrides WHERE narodeniny IS NOT NULL AND narodeniny <> ''").all())
+        .results.map((r: any) => String(r.name)),
+    );
     // Čo je už vyplnené, sa neprepisuje: ručný zápis vie viac než formulár.
     const uzMa = new Set(
       (await DB.prepare("SELECT name FROM client_overrides WHERE zdroj IS NOT NULL AND zdroj <> ''").all())
@@ -329,12 +334,22 @@ export async function ingest(DB: D1Database, filename: string, text: string, act
         const kand = podlaPriezviska.get(p) || [];
         if (kand.length === 1) meno = kand[0];
       }
-      if (!meno || uzMa.has(meno)) { skipped++; continue; }
+      if (!meno) { skipped++; continue; }
+      // Narodeniny sa dopĺňajú aj klientovi, ktorý už zdroj má — sú to dve
+      // nezávislé polia a PTminder dátum narodenia neexportuje vôbec, takže
+      // formulár je jediný zdroj. Ručne vyplnené sa neprepisuje.
+      if (r.narodeniny && !maNarodeniny.has(meno)) {
+        await setOverride(DB, meno, "narodeniny", r.narodeniny);
+        maNarodeniny.add(meno);
+        pridaneNarodeniny++;
+      }
+      if (uzMa.has(meno) || !r.zdroj) { skipped++; continue; }
       await setOverride(DB, meno, "zdroj", r.zdroj);
       if (r.zdrojKto) await setOverride(DB, meno, "zdrojKto", r.zdrojKto);
       uzMa.add(meno);
       added++;
     }
+    added += pridaneNarodeniny;
   } else if (type === "cennik") {
     // Cenník nie sú pohyby — je to zoznam šablón. Ukladá sa ako nastavenie,
     // aby Jarvis aj karty vedeli aktuálne ceny bez toho, aby ich niekto

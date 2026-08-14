@@ -356,7 +356,42 @@ export const paymentKey = (r: PaymentRow) => `${r.date}|${r.client}|${r.amount}`
 //
 // Zdravotná časť anamnézy sa zámerne NEUKLADÁ. Nie je na ňu v appke dôvod a
 // bola by to najcitlivejšia vec v celej databáze.
-export type AnamnezaRiadok = { meno: string; zdroj: string; zdrojKto: string };
+export type AnamnezaRiadok = {
+  meno: string; zdroj: string; zdrojKto: string;
+  /**
+   * Dátum narodenia (ISO deň), keď ho formulár nesie.
+   *
+   * PTminder ho neexportuje vôbec a doteraz sa dopĺňal ručne po jednom.
+   * V anamnéze ho pritom každý klient vypĺňa sám — a je to jediné ďalšie pole
+   * z toho formulára, ktoré má v appke použitie (narodeniny v registri).
+   *
+   * Zdravotná časť sa naďalej neukladá vôbec.
+   */
+  narodeniny: string;
+};
+
+/**
+ * „12.3.1984", „1984-03-12", „12/03/1984" → „1984-03-12".
+ *
+ * Google Forms dátum vracia podľa toho, ako mal autor nastavené pole — raz ako
+ * text, raz ako dátum, a ľudia doň píšu všelijako. Nezrozumiteľný tvar sa radšej
+ * zahodí než uhádne: zlý rok narodenia je horší než žiadny (Naďa Khamaziuk mala
+ * v exporte 2036 a appka ju kvôli tomu považovala za dieťa).
+ */
+export function datumNarodenia(v: string): string {
+  const t = (v || "").trim();
+  if (!t) return "";
+  const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(t);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  const dmy = /^(\d{1,2})[.\/\s-]+(\d{1,2})[.\/\s-]+(\d{4})$/.exec(t);
+  if (!dmy) return "";
+  const d = Number(dmy[1]), m = Number(dmy[2]), r = Number(dmy[3]);
+  if (m < 1 || m > 12 || d < 1 || d > 31) return "";
+  // Rok v budúcnosti alebo pred 1900 je preklep, nie dátum.
+  const teraz = new Date().getFullYear();
+  if (r > teraz || r < 1900) return "";
+  return `${r}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+}
 
 // Odpovede sú voľný text z formulára a ľudia píšu, čo chcú. Preto sa mapuje na
 // pevný zoznam ZDROJE a všetko, čo vyzerá ako meno človeka, sa berie ako
@@ -410,6 +445,9 @@ export function parseAnamneza(text: string): AnamnezaRiadok[] {
   const iMeno = idx("meno");
   const iPriezvisko = idx("příjmení") >= 0 ? idx("příjmení") : idx("priezvisko");
   const iZdroj = idx("dozvěděli") >= 0 ? idx("dozvěděli") : idx("dozvedeli");
+  // Dátum narodenia: formulár ho môže mať pod viacerými názvami.
+  const iNar = ["datum narození", "dátum narodenia", "narození", "narodenia", "narozen", "birth"]
+    .map((f) => idx(f)).find((i) => i >= 0) ?? -1;
   if (iMeno < 0 || iZdroj < 0) return [];
 
   const out: AnamnezaRiadok[] = [];
@@ -417,8 +455,10 @@ export function parseAnamneza(text: string): AnamnezaRiadok[] {
     const meno = `${(r[iMeno] || "").trim()} ${(iPriezvisko >= 0 ? r[iPriezvisko] || "" : "").trim()}`.trim();
     if (!meno) continue;
     const { zdroj, kto } = zdrojZOdpovede(r[iZdroj] || "");
-    if (!zdroj) continue;
-    out.push({ meno, zdroj, zdrojKto: kto });
+    const narodeniny = iNar >= 0 ? datumNarodenia(r[iNar] || "") : "";
+    // Riadok bez zdroja má zmysel, keď nesie aspoň narodeniny — inak nie.
+    if (!zdroj && !narodeniny) continue;
+    out.push({ meno, zdroj, zdrojKto: kto, narodeniny });
   }
   return out;
 }

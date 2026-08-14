@@ -55,16 +55,19 @@ const FAKTURY_ZDROJ = {
 // vtedy DÔJDE NAPLÁNOVANÝ OBSAH (natočený a naplánovaný v decembri 2025,
 // publikuje sa automaticky). Termín teda nepatrí sťahovaniu dát, ale výrobe
 // nového obsahu. Stiahnuť staré CSV má stále zmysel, len bez paniky.
-const MARKETING_ZDROJE: { druh: string; label: string; path: string }[] = [
+const MARKETING_ZDROJE: { druh: string; label: string; path: string; cezApi?: boolean }[] = [
   { druh: "metricool", label: "Metricool — príspevky, reels, stories", path: "Dve cesty, obe sem. (1) Analytics › Export › CSV — tri súbory instagram-posts, instagram-reels, instagram-stories; z nich má appka Instagram príspevok po príspevku. (2) Mesačná zostava v PDF — tú appka prečítať nevie (čísla sú vykreslené do grafov), tak ju prečíta Jarvis a vytiahne z nej všetky kanály naraz vrátane Facebooku, TikToku a Meta Ads. Stačí ju sem pretiahnuť. PPTX a XLSX nie." },
-  { druh: "ga4", label: "Google Analytics 4", path: "GA4 → Prehľady › Prehľad stavu prehľadov › Stiahnuť CSV (jeden súbor za mesiac)" },
-  { druh: "gsc", label: "Google Search Console", path: "Search Console → Výsledky vyhľadávania › Exportovať › CSV. Stiahne sa ZIP — rozbaľ ho a nahraj tri súbory: Graf.csv (kliky po dňoch), Dopyty.csv (na čo ťa ľudia našli), Strany.csv (ktorý článok ťahá). Krajiny, Zariadenia a Filtre appka zatiaľ nepoužíva." },
+  // GA4 a Search Console idú od 13. 8. cez API (Napojenia nižšie). CSV cesta
+  // tu zostáva popísaná zámerne — keď kľúč vyprší alebo Google zmení API, je
+  // dobré vedieť, kade sa dá dáta dostať ručne. Ale nesmie svietiť ako chýbajúce.
+  { druh: "ga4", label: "Google Analytics 4", cezApi: true, path: "Ide cez API — sťahuje sa v Napojeniach nižšie. Ručná záloha: GA4 → Prehľady › Prehľad stavu prehľadov › Stiahnuť CSV." },
+  { druh: "gsc", label: "Google Search Console", cezApi: true, path: "Ide cez API — sťahuje sa v Napojeniach nižšie. Ručná záloha: Search Console → Výsledky vyhľadávania › Exportovať › CSV. Stiahne sa ZIP — rozbaľ ho a nahraj tri súbory: Graf.csv (kliky po dňoch), Dopyty.csv (na čo ťa ľudia našli), Strany.csv (ktorý článok ťahá). Krajiny, Zariadenia a Filtre appka zatiaľ nepoužíva." },
   // Anamnéza je tu NEPOVINNE a zámerne posledná. Zdroj klienta sa dnes plní sám
   // z dopytov (za apríl–júl 2026 na sto percent), takže mesačne ju netreba —
   // tlačidlo je tu na dobehnutie histórie, keby sa niekedy nazbierali ľudia bez
   // zapísaného dopytu. Pri prestavbe obrazovky vypadlo, hoci parser aj serverová
   // časť celý čas fungovali.
-  { druh: "anamneza", label: "Anamnéza — len zdroj klienta (nepovinné)", path: "Google Forms → Odpovede › Exportovať do Sheets › Súbor › Stiahnuť › CSV. Appka z celého formulára berie JEDINÉ pole: „Jak jste se o nás dozvěděli?“ (plus meno toho, kto klienta poslal). Zdravotná časť sa neukladá vôbec — nie je na ňu v appke dôvod a bola by to najcitlivejšia vec v databáze. Mesačne to netreba: zdroj sa plní sám zo zapísaných dopytov." },
+  { druh: "anamneza", label: "Anamnéza — zdroj klienta a dátum narodenia (nepovinné)", path: "Google Forms → Odpovede › Exportovať do Sheets › Súbor › Stiahnuť › CSV. Appka z celého formulára berie DVE polia: „Jak jste se o nás dozvěděli?“ (plus meno odporúčateľa) a dátum narodenia — ten PTminder neexportuje vôbec, takže formulár je jediný zdroj. Zdravotná časť sa neukladá vôbec: nie je na ňu v appke dôvod a bola by to najcitlivejšia vec v databáze. Mesačne to netreba." },
 ];
 
 export function Udaje({ data, actions, chat, prekazky, kroky, podklady, onNavigate, btc }: { data: PSBData; actions: Actions; chat?: AssistantChat; prekazky?: (mesiac: string) => string[]; kroky?: (mesiac: string) => KrokUzavierky[]; podklady?: (mesiac: string) => string; onNavigate?: (tab: string, sub?: string, focus?: NavFocus) => void; btc?: { platby: BtcNakup[]; faktury: { cislo: string; datum: string; celkom: number; dodavatel: string }[]; parovanie: Record<string, string[]>; onSparuj: (id: number, f: string[]) => void } }) {
@@ -78,6 +81,22 @@ export function Udaje({ data, actions, chat, prekazky, kroky, podklady, onNaviga
 
       {btc && <BtcParovanie platby={btc.platby} faktury={btc.faktury} parovanie={btc.parovanie} onSparuj={btc.onSparuj} />}
       <Uzavierky prekazky={prekazky} kroky={kroky} podklady={podklady} onNavigate={onNavigate} chat={chat} />
+
+      {/* Napojenia až za uzávierkou (Jerry, 14. 8.): „upload CSV nech je iba
+          o CSV." Kľúč sa vkladá raz za rok, CSV sa nahráva každý týždeň —
+          a to, čo sa robí často, patrí vyššie. */}
+      <Card>
+        <H3>
+          <Info
+            label="Napojenia — kľúče a tokeny"
+            text="Nastavuje sa raz a potom už len keď niečo prestane chodiť. Každý kľúč leží na serveri a späť do prehliadača sa nevracia ani skrátený; v odpovedi je len to, či tam je, a e-mail servisného účtu, ktorý treba vložiť do Google."
+          />
+        </H3>
+        <NapojenieWebu />
+        <NapojenieMeta />
+        <NapojenieMailer />
+        <NapojenieGoogle />
+      </Card>
 
       <Card>
         <H3>
@@ -376,10 +395,6 @@ function UploadCard({ data, missing, actions, chat }: { data: PSBData; missing: 
           ))}
         </div>
       )}
-      <NapojenieWebu />
-      <NapojenieMeta />
-      <NapojenieMailer />
-      <NapojenieGoogle />
       <div onClick={() => setOpen((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginTop: 14, fontSize: 12, color: C.textDim }}>
         <span>{open ? "▲ skryť" : "▼"} zoznam potrebných CSV a zapísané pohyby</span>
         <span style={{ marginLeft: "auto" }}>Nahrať sa dá aj pretiahnutím do Jarvisa (📎 vpravo dole).</span>
@@ -438,9 +453,13 @@ function UploadCard({ data, missing, actions, chat }: { data: PSBData; missing: 
         {MARKETING_ZDROJE.map((m) => {
           const st = surove.find((x) => x.druh === m.druh);
           const je = (st?.pocet || 0) > 0;
+          // Čo chodí cez API, nemá svietiť ako chýbajúce CSV — inak zoznam
+          // hlási prácu, ktorú už nikto nemá robiť.
+          const znak = m.cezApi ? "→" : je ? "✓" : "✗";
+          const farba = m.cezApi ? C.accentLight : je ? C.green : C.orange;
           return (
             <div key={m.druh} style={{ fontSize: 12, color: C.textMuted, marginBottom: 5, display: "flex", gap: 8 }}>
-              <span style={{ color: je ? C.green : C.orange, flexShrink: 0 }}>{je ? "✓" : "✗"}</span>
+              <span style={{ color: farba, flexShrink: 0 }}>{znak}</span>
               <span>
                 <strong style={{ color: C.text }}>{m.label}</strong>
                 {je && <span style={{ color: C.accentLight, fontWeight: 500 }}> · {st?.pocet} súborov, naposledy {fmtDMY(st?.posledny || "")}</span>}
