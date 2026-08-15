@@ -181,3 +181,37 @@ v registri. Dokumenty pozná Jarvis, evidencia nie je.
 | **Pravidlo „FP sa nemenuje" zrušené** | Jerryho rozhodnutie 15. 8.: *„FP môžeme kľudne menovať."* Prepísané v Kokpite (`chat.ts`) aj v onboardingu (§2.3 bod 1). Zostalo ako poznámka o účinnosti — menom sa PSB neodlíši, konkurencia ho používa tiež, takže obsah dál stojí na symptóme; ale zákaz to nie je. Zakázané zostáva logo/wordmark a odhaľovanie metodiky |
 | Text stránok webu v Kokpite + karta „Titulky na prepis" | 79 URL zo sitemapy, spojené so Search Console, pri každej stránke jej súčasný titulok. Jarvis má navrhovať hotové titulky sám, nie čakať na vyzvanie |
 | FP dokumenty v Jarvisovom onboardingu | Čo v nich konkrétne stojí — platnosť NDA do 13. 9. 2028, 7-dňové ohlásenie pri výnimke z mlčanlivosti, súhlas so zverejnením ≠ NDA. Vedome bez evidencie v Kokpite |
+
+## G · Audit webu 15. 8. 2026 (mimo rýchlosti)
+
+Prejdených 79 stránok zo sitemapy, 432 vnútorných odkazov, Stav webu vo
+WordPresse. Zoradené podľa toho, čo najviac stojí.
+
+### Riziko
+
+| | |
+|---|---|
+| **Zálohy zostávajú na serveri** | UpdraftPlus zálohuje (posledná 12. 8.), ale cieľ je OneDrive, ktorý vyžaduje Premium — a to vypršalo. Zálohy teda ležia tam, kde web. Pri páde servera alebo napadnutí padnú s ním. Oprava: prepnúť cieľ na Google Drive alebo Dropbox, obidva sú vo verzii zadarmo |
+| **24 pluginov neaktuálnych, 2 neaktívne** | Neaktívny plugin sa neaktualizuje, ale kód na serveri leží a dá sa cez neho útočiť. Plus 1 neaktívna šablóna a 2 neaktuálne |
+| **DMARC nie je nastavený** | SPF áno, DMARC nie. Znamená to horšiu doručiteľnosť mailov z webu (napr. upozornenie na nový dopyt) a že sa doména dá zneužiť na podvrhnuté maily |
+
+### Rozbité
+
+| | |
+|---|---|
+| **`/individualni-trenink/` vracia 404** | Odkazujú naň TRI stránky vrátane **Služby**. Človek, ktorý si na stránke služieb klikne na individuálny tréning, dostane chybovú stránku. Zo 432 vnútorných odkazov je to jediný skutočne nefunkčný |
+
+### SEO a obsah
+
+| | |
+|---|---|
+| **18 titulkov nad 60 znakov** | Google ich odsekne. Príčina je systémová: Yoast pridáva na koniec „- ProSapiens Biomechanic“, čo je 24 znakov na KAŽDEJ stránke. Skrátiť šablónu titulku = 24 znakov späť na všetkých 79 stránkach naraz |
+| **14 stránok bez meta popisu** | Medzi nimi `sluzby`, `skupinovy-trenink`, `jerry`, `terezia`, `matyas`, `dychani`. Google si druhý riadok vo výsledkoch zloží sám z textu |
+| **512 obrázkov bez alt textu** | Najhoršie `deep-front-line` (43 zo 68). Pri anatomickom obsahu je obrázkové vyhľadávanie reálny zdroj návštev a alt je jediné, čo o obrázku Googlu hovorí |
+| **68 z 79 stránok nemá práve jeden H1** | Úvodná má DEVÄŤ, `skupinovy-trenink` nula. Robí to šablóna a WPBakery |
+| **Chýba LocalBusiness schema** | Na webe je len WebSite, WebPage, BreadcrumbList a Person. Pre štúdio v Brne to je diera v lokálnom SEO: adresa, otváracie hodiny ani poloha nie sú v štruktúrovaných dátach nikde |
+
+### Overené, že problém NIE JE
+
+Žiadne duplicitné titulky · žiadny miešaný obsah (http zdroje) · žiadna
+osirelá stránka · registrácia je zatvorená a predvolená rola je Návštevník.
