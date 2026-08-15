@@ -100,3 +100,16 @@ záver odporuje tomu, čo Jerry hovorí zo skúsenosti.
 - **Skóre z Lighthouse je 0–1 a môže chýbať.** `null` a `0` sa nesmú zliať:
   nezmeraná stránka by sa tvárila ako najpomalšia na webe. To isté platí pre
   chybu — PSI vracia HTTP 200 s chybou vnútri, tak ako Google Ads.
+- **Prihlásenie wrangleru drží API token, nie `wrangler login`.** OAuth token
+  vypršal 15. 8. dvakrát za deň a obnovenie skončilo na `400 Bad Request`; nové
+  prihlásenie chce prehliadač, takže v neinteraktívnom shelli sa nasadiť nedá.
+  Token je v `~/.zshrc` ako `CLOUDFLARE_API_TOKEN`, ale môj shell ho z profilu
+  NENAČÍTA — pred nasadením ho treba pridať:
+  `eval "$(grep '^export CLOUDFLARE_API_TOKEN=' ~/.zshrc)"`.
+  Token má povolenia zo šablóny Edit Cloudflare Workers **plus Account → D1 →
+  Edit** (bez neho neprejdú migrácie).
+- **`cd` v shelli nedrží medzi príkazmi.** `bun run build`, `bunx tsc` ani
+  `wrangler deploy` sa nesmú spustiť bez `cd .../psb-tracker/app` v tom istom
+  príkaze. Z koreňa `philipjerry-web` `tsc` a testy zelené LEN preto, že
+  nekontrolovali nič, a `wrangler deploy` začal nahrávať 280 000 súborov
+  z celého Downloads. Stalo sa to 15. 8. dvakrát.
