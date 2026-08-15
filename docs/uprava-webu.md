@@ -20,6 +20,7 @@ návštevník, bez prihlásenia.
 |---|---|---|
 | ✅ **Slider Revolution vypnutý na článkoch** | 7 súborov, 546 kB z každého článku | stiahnutie troch článkov bez prihlásenia: `revslider` sa nevyskytuje ani raz; úvodná stránka slider ďalej má |
 | ✅ **Cieľ zálohovania prepnutý z OneDrive na Google Drive** | Varovanie „need UpdraftPlus Premium" zmizlo, OneDrive sa v nastavení už nespomína | prečítanie stránky UpdraftPlus po uložení: varovanie preč, Google Drive vybraný |
+| ✅ **1b · Mŕtvy odkaz „individuální trénink" opravený** | 4 výskyty na 3 stránkach prepísané na `/jak-to-funguje/` — na Službách to bola karta služby aj tlačidlo „Více informací" | stiahnutie všetkých troch stránok bez prihlásenia: `individualni-trenink` sa nevyskytuje ani raz, cieľ vracia HTTP 200 |
 
 ---
 
@@ -103,7 +104,7 @@ Jerry 15. 8.: individuálny tréning je pozostatok starého rozhrania a bol
 prerobený na **„jak to funguje"**. Stránka `/individualni-trenink/` naozaj
 neexistuje, takže nie je čo mazať — prepíšu sa tie tri odkazy, ktoré na ňu
 vedú (`sluzby`, `predsunuta-hlava`, `anterior-pelvic-tilt`) na
-`/jak-to-funguje/`. Presunuté medzi moje úlohy ako **1b**.
+`/jak-to-funguje/`. **Hotové 15. 8.** — viď tabuľka Hotové.
 
 <details><summary>pôvodné znenie otázky</summary>
 `/individualni-trenink/` vracia 404 a odkazujú naň tri stránky vrátane
