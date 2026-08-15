@@ -20,6 +20,8 @@ návštevník, bez prihlásenia.
 |---|---|---|
 | ✅ **Slider Revolution vypnutý na článkoch** | 7 súborov, 546 kB z každého článku | stiahnutie troch článkov bez prihlásenia: `revslider` sa nevyskytuje ani raz; úvodná stránka slider ďalej má |
 | ✅ **Cieľ zálohovania prepnutý z OneDrive na Google Drive** | Varovanie „need UpdraftPlus Premium" zmizlo, OneDrive sa v nastavení už nespomína | prečítanie stránky UpdraftPlus po uložení: varovanie preč, Google Drive vybraný |
+| ✅ **LocalBusiness schema na webe** | Meno, adresa, telefón, mail a logo v JSON-LD na úvodnej stránke a na Kontakte. Vložené ako snippet č. 17 v plugine Snippety, bez ďalšieho pluginu. Otváracie hodiny zámerne chýbajú — na webe nie sú | stiahnutie oboch stránok bez prihlásenia: JSON-LD sa načíta a rozparsuje, typ `LocalBusiness`, adresa Fanderlíková 70, 616 00 Brno – Žabovřesky. Na článku `arm-lines` sa nevyskytuje (má tam byť len na tých dvoch). Úvodná, Kontakt, Služby aj článok ďalej vracajú 200 |
+| ✅ **Nič neodkazuje na skryté stránky** | Prehľadaných všetkých 32 adries zo sitemapy | na `skupinovy-trenink` ani `lekce-fascialni-svoboda` nevedie ani jeden odkaz. Moje tvrdenie o karte „Skupinový trénink" na Službách bolo nesprávne — taká karta tam nie je |
 | ✅ **Zálohy chodia do Google Drivu** | Kompletná záloha z 15. 8. 20:11 (databáza, pluginy, šablóny, nahrané súbory) leží v Drive; ~4,7 GB, Drive obsadený 9,78 z 15 GB | v UpdraftPlus má riadok štítok **„Vzdálené úložiště: Google Drive"** (staršie dva majú OneDrive), a v Drive sú súbory `backup_2026-08-15…` z 20:12–20:21 |
 | ✅ **Zrušené služby stiahnuté z webu** | `skupinovy-trenink` a `lekce-fascialni-svoboda` dané do konceptu — Jerry 15. 8.: „skupinový trénink sme upustili, tento projekt nerealizujeme… rovnako lekce fasciálni svoboda". Obsah v WordPresse zostáva | zvonku obidve vracajú **404** a zmizli zo sitemapy (32 adries namiesto 34); `jak-to-funguje`, `online-trenink` a `sluzby` ďalej 200 |
 | ✅ **1b · Mŕtvy odkaz „individuální trénink" opravený** | 4 výskyty na 3 stránkach prepísané na `/jak-to-funguje/` — na Službách to bola karta služby aj tlačidlo „Více informací" | stiahnutie všetkých troch stránok bez prihlásenia: `individualni-trenink` sa nevyskytuje ani raz, cieľ vracia HTTP 200 |
@@ -61,14 +63,12 @@ Yoaste, Websupporte a modálnom okne UpdraftPlus.
 v Yoast boxe pod editorom), alebo mu ich pripravím ako jeden zoznam na jedno
 sedenie. Texty dodám ja, klik je jeho.
 
-### 3 · LocalBusiness schema
-Na webe nie je nikde. Údaje mám z kontaktnej stránky:
-ProSapiens Biomechanic · Fanderlíková 70, 616 00 Brno – Žabovřesky ·
-+420 702 147 704 · info@prosapiens.cz
+### 3 · ~~LocalBusiness schema~~ — HOTOVÉ, viď tabuľka Hotové
 
-Vloží sa ako JSON-LD cez plugin *Snippety*, ktorý na webe už je — bez ďalšieho
-pluginu. **Otváracie hodiny na webe nie sú, takže ich do schémy nedám**;
-vymyslené hodiny sú horšie než žiadne.
+Zostáva jedna vec, ktorá potrebuje Jerryho: **otváracie hodiny**. Na webe nikde
+nie sú, takže som ich do schémy nedal — vymyslené hodiny sú horšie než žiadne.
+Keď ich pošleš (napr. „Po–Pi 7:00–20:00, So 8:00–12:00"), dopíšem ich do
+snippetu a Google ich bude môcť zobraziť priamo vo výsledku.
 
 ### 4 · Alt texty
 512 obrázkov bez altu. Po dávkach podľa návštevnosti, nie podľa abecedy:
