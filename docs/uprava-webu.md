@@ -89,15 +89,20 @@ neúmerné úžitku. Preberieme, keď bude zvyšok hotový.
 
 ## Potrebujem Jerryho
 
-### H1 · Povoliť UpdraftPlus prístup do Google Drivu *(zostáva jeden klik)*
-Cieľ je prepnutý a varovanie o Premium je preč. Chýba už len povolenie:
-**Nastavení → Google Drive → „Sign in with Google" → Povoliť.** Klikal som naň
-trikrát; prihlasovacie okno Google sa cez automatizáciu nedokončí a stránka sa
-vráti späť s tou istou výzvou.
+### H1 · Spustiť testovaciu zálohu *(povolenie prešlo, chýba dôkaz)*
+Google Drive **je povolený** — Jerry dokončil „Complete setup" 15. 8., návrat
+prišel so `state=success` a výzva „Follow this link to authorize" z UpdraftPlus
+zmizla.
 
-Kým sa neklikne, zálohy sa robia, ale kópia mimo servera nevznikne. Overím to
-sám: po povolení sa v UpdraftPlus prestane zobrazovať veta „Follow this link to
-authorize access to your Google Drive account".
+**Ale to nie je dôkaz.** Že výzva zmizla, znamená len že plugin má token;
+neznamená, že súbor doletí do Drivu. Skúsil som zálohu len databázy (súbory
+odškrtnuté, „odeslat na vzdálené úložiště" zapnuté) — tlačidlo v tom okne
+cez automatizáciu nezabralo a nová záloha nevznikla. Nič sa nerozbilo, len
+chýba dôkaz.
+
+**Čo od teba treba:** UpdraftPlus → **Zálohovat nyní** → potvrdiť. Kľudne aj
+celú zálohu, len potrvá dlhšie. Potom overím sám: v zozname záloh musí pribudnúť
+dnešný riadok a v protokole musí byť odoslanie do Google Drivu bez chyby.
 
 ### H2 · ~~Kam má viesť odkaz „individuální trénink"~~ — ZODPOVEDANÉ
 Jerry 15. 8.: individuálny tréning je pozostatok starého rozhrania a bol
