@@ -374,11 +374,21 @@ export function nastavAdsZImportu(kampane: GadsKampan[], dopyty: GadsDopyt[], va
 // Ako pri Google Ads: web sa čítal cez API až od 15. 8. 2026, takže tu nie je
 // čo mať napísané ručne. Prázdno je čitateľnejšie než vymyslené.
 
+import type { PsRiadok } from "./pagespeed";
+
 export type WebStrankaUI = {
   url: string; typ: string; titulok: string; metaPopis: string; h1: string; znakov: number;
 };
 
 export let WEB_STRANKY: WebStrankaUI[] = [];
+export let WEB_RYCHLOST: PsRiadok[] = [];
+
+/** Rýchlosť stránok z PageSpeed Insights. Prázdne pole neprepisuje to, čo už je. */
+export function nastavWebRychlost(riadky: PsRiadok[]): boolean {
+  if (!riadky.length) return false;
+  WEB_RYCHLOST = riadky;
+  return true;
+}
 
 /** Stránky webu z importu. Prázdne pole neprepisuje to, čo už je. */
 export function nastavWebStranky(stranky: WebStrankaUI[]): boolean {

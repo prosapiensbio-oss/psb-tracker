@@ -97,6 +97,7 @@ export function Udaje({ data, actions, chat, prekazky, kroky, podklady, onNaviga
         <NapojenieGoogle />
         <NapojenieGoogleAds />
         <NapojenieTextWebu />
+        <NapojenieRychlost />
       </Card>
 
       <Card>
@@ -837,6 +838,89 @@ function NapojenieTextWebu() {
         Keď stránku upravíš vo WordPresse, appka to pozná z dátumu v sitemape a text
         si natiahne sama pri najbližšej kontrole — nemusíš si to pamätať. „Odznova“ je
         len na prípad, že by sa text zmenil bez toho dátumu (napríklad po zmene šablóny).
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Meranie rýchlosti stránok cez PageSpeed Insights.
+ *
+ * PREČO SA KĽÚČ PÝTA, HOCI TO IDE AJ BEZ NEHO
+ *
+ * Bez kľúča Google pustí zopár meraní z jednej adresy za hodinu a potom vráti
+ * 429. Pri dvadsiatich stránkach krát dve zariadenia sa na to narazí hneď —
+ * a hláška „HTTP 429" vyzerá ako chyba appky, nie ako obmedzenie zadarmo.
+ * Preto sa to pýta a preto to karta hovorí rovno.
+ */
+function NapojenieRychlost() {
+  const [stav, setStav] = useState<{ maKluc: boolean; stranok: number; merani: number; naposledy: string | null; ciel: number } | null>(null);
+  const [kluc, setKluc] = useState("");
+  const [hlaska, setHlaska] = useState("");
+  const [robim, setRobim] = useState(false);
+
+  const nacitaj = () => void fetch("/api/pagespeed", { credentials: "same-origin" })
+    .then((r) => r.json())
+    .then((j) => { if (j.ok) setStav(j); })
+    .catch(() => {});
+  useEffect(nacitaj, []);
+
+  const posli = async (telo: Record<string, unknown>) => {
+    setRobim(true); setHlaska("");
+    const j = await fetch("/api/pagespeed", {
+      method: "POST", credentials: "same-origin",
+      headers: { "content-type": "application/json" }, body: JSON.stringify(telo),
+    }).then((r) => r.json()).catch(() => ({ ok: false, error: "spojenie zlyhalo" }));
+    setRobim(false);
+    setHlaska(j.sprava ? j.sprava + (j.chyby?.length ? ` Nepodarilo sa: ${j.chyby.join("; ")}` : "") : (j.error || "Nepodarilo sa."));
+    setKluc("");
+    nacitaj();
+  };
+
+  const btn = { fontSize: 12, padding: "6px 12px", borderRadius: 6, border: `1px solid ${C.accent}`, background: "transparent", color: C.accent, cursor: robim ? "default" : "pointer", opacity: robim ? 0.5 : 1 } as const;
+  return (
+    <div style={{ marginTop: 14, padding: 12, background: mix(C.accent, 6), borderRadius: 8 }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: C.textMuted, marginBottom: 6 }}>
+        <Info
+          label="Rýchlosť stránok — PageSpeed Insights"
+          text="Jediná vec z technického SEO, ktorá sa nedá spočítať z textu: či človek po kliknutí niečo uvidí skôr, než mu dôjde trpezlivosť. Google si stránku naozaj otvorí v prehliadači a odsimuluje pomalé mobilné pripojenie, preto jedno meranie trvá 10–30 s a meria sa po troch. Merajú sa stránky, ktoré Google ľuďom najviac ukazuje — pri stránke s nula zobrazeniami je jej rýchlosť údaj bez akcie. Mobil aj počítač zvlášť; rozhoduje mobil."
+        />
+      </div>
+      <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 8, lineHeight: 1.6 }}>
+        Kľúč: <b style={{ color: stav?.maKluc ? C.green : C.orange }}>{stav?.maKluc ? "uložený" : "chýba"}</b>
+        {" · "}zmeraných stránok: <b style={{ color: C.text }}>{stav?.stranok ?? 0}</b> z {stav?.ciel ?? 20}
+        {stav?.naposledy && <> · naposledy {stav.naposledy.slice(0, 10)}</>}
+        {!stav?.maKluc && (
+          <>
+            <br />
+            Bez kľúča to beží tiež, ale Google po pár meraniach vráti 429. Kľúč je zadarmo:
+            Google Cloud Console → APIs &amp; Services → Credentials → Create credentials → API key,
+            a v Library zapnúť „PageSpeed Insights API". Je to ten istý projekt ako GA4.
+          </>
+        )}
+      </div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+        <input
+          type="password" value={kluc} onChange={(e) => setKluc(e.target.value)}
+          placeholder="API kľúč (vložením sa uloží na server)"
+          style={{ flex: "1 1 260px", fontSize: 12, padding: "6px 8px", borderRadius: 6, border: `1px solid ${mix(C.text, 20)}`, background: "transparent", color: C.text }}
+        />
+        <button style={btn} disabled={robim || !kluc.trim()} onClick={() => void posli({ akcia: "kluc", kluc })}>
+          Uložiť kľúč
+        </button>
+      </div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+        <button style={btn} disabled={robim} onClick={() => void posli({})}>
+          {robim ? "Meriam…" : "Zmerať ďalšie tri"}
+        </button>
+        <button style={{ ...btn, borderColor: C.textMuted, color: C.textMuted }} disabled={robim} onClick={() => void posli({ akcia: "obnov" })}>
+          Premerať odznova
+        </button>
+      </div>
+      {hlaska && <div style={{ fontSize: 12, color: C.text, marginTop: 8 }}>{hlaska}</div>}
+      <div style={{ fontSize: 12, color: C.textMuted, marginTop: 8 }}>
+        „Premerať odznova“ má zmysel po zásahu do webu — história sa nemaže, takže sa dá
+        porovnať stav pred a po. To je jediné, čo pri rýchlosti naozaj zaujíma.
       </div>
     </div>
   );

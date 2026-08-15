@@ -90,3 +90,13 @@ záver odporuje tomu, čo Jerry hovorí zo skúsenosti.
   Jarvis mal „prístup na celý web" len na papieri. Keď je tabuľka veľká na to,
   aby šla celá do kontextu, patrí do schémy s návodom, ako sa v nej hľadá
   (`WHERE text LIKE`) a s ktorou tabuľkou sa JOIN-uje.
+- **PageSpeed Insights je jediná Google služba v Kokpite bez servisného účtu.**
+  Nemá čo autorizovať — meria verejnú stránku — a chce obyčajný API kľúč
+  (`psi_api_key` vo `vzas_settings`). Bez kľúča beží, ale Google po pár
+  meraniach vráti 429; pri dvadsiatich stránkach na to narazíš hneď.
+- **Jedno meranie PSI trvá 10–30 s** (Google si stránku naozaj otvorí
+  v prehliadači). Preto sa meria po troch na klik a hlási sa, koľko zostáva —
+  dvadsať stránok krát dve zariadenia je pol hodiny a request by vypršal.
+- **Skóre z Lighthouse je 0–1 a môže chýbať.** `null` a `0` sa nesmú zliať:
+  nezmeraná stránka by sa tvárila ako najpomalšia na webe. To isté platí pre
+  chybu — PSI vracia HTTP 200 s chybou vnútri, tak ako Google Ads.

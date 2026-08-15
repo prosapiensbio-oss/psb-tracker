@@ -28,6 +28,7 @@ import { Route as ApiRawUploadsRouteImport } from './routes/api/raw-uploads'
 import { Route as ApiPremenujRouteImport } from './routes/api/premenuj'
 import { Route as ApiPeriodsRouteImport } from './routes/api/periods'
 import { Route as ApiPdfImportRouteImport } from './routes/api/pdf-import'
+import { Route as ApiPagespeedRouteImport } from './routes/api/pagespeed'
 import { Route as ApiOverrideRouteImport } from './routes/api/override'
 import { Route as ApiNapadyRouteImport } from './routes/api/napady'
 import { Route as ApiMetaRouteImport } from './routes/api/meta'
@@ -146,6 +147,11 @@ const ApiPeriodsRoute = ApiPeriodsRouteImport.update({
 const ApiPdfImportRoute = ApiPdfImportRouteImport.update({
   id: '/api/pdf-import',
   path: '/api/pdf-import',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPagespeedRoute = ApiPagespeedRouteImport.update({
+  id: '/api/pagespeed',
+  path: '/api/pagespeed',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiOverrideRoute = ApiOverrideRouteImport.update({
@@ -297,6 +303,7 @@ export interface FileRoutesByFullPath {
   '/api/meta': typeof ApiMetaRoute
   '/api/napady': typeof ApiNapadyRoute
   '/api/override': typeof ApiOverrideRoute
+  '/api/pagespeed': typeof ApiPagespeedRoute
   '/api/pdf-import': typeof ApiPdfImportRoute
   '/api/periods': typeof ApiPeriodsRoute
   '/api/premenuj': typeof ApiPremenujRoute
@@ -342,6 +349,7 @@ export interface FileRoutesByTo {
   '/api/meta': typeof ApiMetaRoute
   '/api/napady': typeof ApiNapadyRoute
   '/api/override': typeof ApiOverrideRoute
+  '/api/pagespeed': typeof ApiPagespeedRoute
   '/api/pdf-import': typeof ApiPdfImportRoute
   '/api/periods': typeof ApiPeriodsRoute
   '/api/premenuj': typeof ApiPremenujRoute
@@ -388,6 +396,7 @@ export interface FileRoutesById {
   '/api/meta': typeof ApiMetaRoute
   '/api/napady': typeof ApiNapadyRoute
   '/api/override': typeof ApiOverrideRoute
+  '/api/pagespeed': typeof ApiPagespeedRoute
   '/api/pdf-import': typeof ApiPdfImportRoute
   '/api/periods': typeof ApiPeriodsRoute
   '/api/premenuj': typeof ApiPremenujRoute
@@ -435,6 +444,7 @@ export interface FileRouteTypes {
     | '/api/meta'
     | '/api/napady'
     | '/api/override'
+    | '/api/pagespeed'
     | '/api/pdf-import'
     | '/api/periods'
     | '/api/premenuj'
@@ -480,6 +490,7 @@ export interface FileRouteTypes {
     | '/api/meta'
     | '/api/napady'
     | '/api/override'
+    | '/api/pagespeed'
     | '/api/pdf-import'
     | '/api/periods'
     | '/api/premenuj'
@@ -525,6 +536,7 @@ export interface FileRouteTypes {
     | '/api/meta'
     | '/api/napady'
     | '/api/override'
+    | '/api/pagespeed'
     | '/api/pdf-import'
     | '/api/periods'
     | '/api/premenuj'
@@ -571,6 +583,7 @@ export interface RootRouteChildren {
   ApiMetaRoute: typeof ApiMetaRoute
   ApiNapadyRoute: typeof ApiNapadyRoute
   ApiOverrideRoute: typeof ApiOverrideRoute
+  ApiPagespeedRoute: typeof ApiPagespeedRoute
   ApiPdfImportRoute: typeof ApiPdfImportRoute
   ApiPeriodsRoute: typeof ApiPeriodsRoute
   ApiPremenujRoute: typeof ApiPremenujRoute
@@ -722,6 +735,13 @@ declare module '@tanstack/react-router' {
       path: '/api/pdf-import'
       fullPath: '/api/pdf-import'
       preLoaderRoute: typeof ApiPdfImportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/pagespeed': {
+      id: '/api/pagespeed'
+      path: '/api/pagespeed'
+      fullPath: '/api/pagespeed'
+      preLoaderRoute: typeof ApiPagespeedRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/override': {
@@ -923,6 +943,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMetaRoute: ApiMetaRoute,
   ApiNapadyRoute: ApiNapadyRoute,
   ApiOverrideRoute: ApiOverrideRoute,
+  ApiPagespeedRoute: ApiPagespeedRoute,
   ApiPdfImportRoute: ApiPdfImportRoute,
   ApiPeriodsRoute: ApiPeriodsRoute,
   ApiPremenujRoute: ApiPremenujRoute,

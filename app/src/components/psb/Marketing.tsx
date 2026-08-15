@@ -7,6 +7,7 @@ import {
   GSC_DOPYTY,
   GSC_MESACNE,
   GSC_STRANY,
+  WEB_RYCHLOST,
   WEB_STRANKY,
   GSC_ZARIADENIA,
   MKT_CLANKY,
@@ -19,7 +20,7 @@ import {
   GADS_KAMPANE,
   GADS_VALUTA,
   nastavAdsZImportu,
-  nastavWebStranky,
+  nastavWebStranky, nastavWebRychlost,
   type GadsDopyt,
   type WebStrankaUI,
   type GadsKampan,
@@ -46,6 +47,7 @@ import { KedyPublikovat } from "./KedyPublikovat";
 import { AkoMeratReklamu, Kohorta, Lievik, Naklady } from "./MarketingLievik";
 import { Kanaly } from "./Kanaly";
 import { chybyNaStrankach, prilezitostiTitulkov } from "../../lib/psb/webObsah";
+import { hodnotenie, type PsRiadok } from "../../lib/psb/pagespeed";
 import { prilezitosti, soZamerom, zhrnutieWebu, type Dopyt } from "../../lib/psb/google";
 import { kontrolaAds, kontrolaMerania } from "../../lib/psb/kontrolaDat";
 import { adsMesiace, cenaZaKlik, zhrnutieAds } from "../../lib/psb/googleAds";
@@ -912,6 +914,8 @@ function Vyhladavanie({ chat }: { chat?: AssistantChat }) {
 
       <Titulky chat={chat} />
 
+      <Rychlost chat={chat} />
+
       {WEB_STRANKY.length > 0 && (() => {
         const chyby = chybyNaStrankach(WEB_STRANKY.map((s) => ({ ...s, text: "" })));
         if (!chyby.length) return null;
@@ -1004,6 +1008,75 @@ function Titulky({ chat }: { chat?: AssistantChat }) {
   );
 }
 
+/**
+ * Rýchlosť stránok.
+ *
+ * PREČO SA UKAZUJE MOBIL A POČÍTAČ VEDĽA SEBA, A NIE PRIEMER
+ *
+ * Sú to dve rôzne merania na dvoch rôznych pripojeniach a spravidla dve dosť
+ * odlišné čísla. Priemer z nich by nebol ani jedno. Rozhoduje mobil: Google
+ * indexuje podľa neho a chodí z neho väčšina ľudí — preto je vľavo.
+ *
+ * PREČO TU NIE JE SKÓRE AKO HLAVNÉ ČÍSLO
+ *
+ * „47/100" sa nedá opraviť. „Človek pozerá na neúplnú stránku 4,3 sekundy"
+ * áno — a hneď za tým stojí, čo z toho je najväčší jediný kus.
+ */
+function Rychlost({ chat }: { chat?: AssistantChat }) {
+  if (!WEB_RYCHLOST.length) return null;
+
+  const mobil = WEB_RYCHLOST.filter((r) => r.strategia === "mobile" && !r.chyba);
+  const desktop = new Map(WEB_RYCHLOST.filter((r) => r.strategia === "desktop" && !r.chyba).map((r) => [r.url, r]));
+  const zlyhane = WEB_RYCHLOST.filter((r) => r.chyba);
+
+  const riadky = mobil
+    .map((r) => ({
+      url: r.url.replace("https://www.prosapiens.cz/", ""),
+      lcp: r.lcpMs === null ? 0 : Math.round(r.lcpMs / 100) / 10,
+      lcpPc: (() => { const d = desktop.get(r.url); return d?.lcpMs == null ? 0 : Math.round(d.lcpMs / 100) / 10; })(),
+      vykon: r.vykon ?? 0,
+      seo: r.seo ?? 0,
+      co: hodnotenie(r).veta,
+      stav: hodnotenie(r).stav,
+    }))
+    .sort((a, b) => b.lcp - a.lcp);
+
+  const zle = riadky.filter((r) => r.stav === "zle").length;
+
+  return (
+    <Card>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <H3><Info label="Ako rýchlo sa stránky otvárajú" text="Merané Googlom cez PageSpeed Insights na simulovanom pomalom mobilnom pripojení — teda tak, ako to zažije človek na ceste, nie na wifi v štúdiu. „Hlavný obsah“ je najväčší prvok na obrazovke; Google berie do 2,5 s ako dobré a nad 4 s ako zlé, a je to jeden z jeho hodnotiacich faktorov. Stĺpec „mobil“ rozhoduje: podľa neho sa web indexuje." /></H3>
+        <Vysvetli chat={chat} titul="Rýchlosť stránok" filter="posledné meranie"
+          vyrez={() => tsv(["stránka", "mobil s", "počítač s", "výkon", "SEO", "čo to znamená"], riadky.map((r) => [r.url, r.lcp, r.lcpPc, r.vykon, r.seo, r.co]))} />
+      </div>
+      {zle > 0 && (
+        <div style={{ fontSize: 13, color: C.red, marginTop: 6 }}>
+          {zle === 1 ? "Jedna stránka je nad 4 sekundy" : `${zle} stránok je nad 4 sekundy`} — to je hranica, za ktorou Google hovorí „zlé“.
+        </div>
+      )}
+      <SortTable
+        rolovat={3}
+        riadky={riadky}
+        stlpce={[
+          { id: "url", label: "Stránka", farba: () => C.text },
+          { id: "lcp", label: "Mobil", num: true, info: "Za koľko sekúnd človek uvidí hlavný obsah na mobile.", fmt: (v) => `${String(v).replace(".", ",")} s`, farba: (r) => (r.lcp > 4 ? C.red : r.lcp > 2.5 ? C.orange : C.green) },
+          { id: "lcpPc", label: "Počítač", num: true, fmt: (v) => (v ? `${String(v).replace(".", ",")} s` : "—"), farba: (r) => (r.lcpPc > 4 ? C.red : r.lcpPc > 2.5 ? C.orange : C.textMuted) },
+          { id: "vykon", label: "Výkon", num: true, info: "Lighthouse skóre 0–100. Je to súhrn, nie akcia — akcia je v poslednom stĺpci.", farba: (r) => (r.vykon < 50 ? C.red : r.vykon < 90 ? C.orange : C.green) },
+          { id: "seo", label: "SEO", num: true, info: "Technické SEO stránky podľa Lighthouse: titulok, popis, čitateľnosť pre robota. Neháda kvalitu textu.", farba: (r) => (r.seo < 90 ? C.orange : C.green) },
+          { id: "co", label: "Čo to znamená" },
+        ]}
+      />
+      {zlyhane.length > 0 && (
+        <div style={{ fontSize: 12, color: C.textMuted, marginTop: 8 }}>
+          {zlyhane.length} meraní neprešlo (najčastejšie limit Googlu bez API kľúča) — tieto stránky tu nie sú
+          a nie sú tu ani ako nuly. Nezmerané a pomalé nie je to isté.
+        </div>
+      )}
+    </Card>
+  );
+}
+
 export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, refresh, onPoznamkaStrata }: { data: PSBData; clients: Record<string, ClientAgg>; leads: Lead[]; chat?: AssistantChat; sub: string; onSub: (s: string) => void; onKlient?: (m: string) => void; refresh: () => Promise<void>; onPoznamkaStrata?: (meno: string, text: string) => void }) {
   const setSub = onSub;
   const [rok, setRok] = useState("2026");
@@ -1014,11 +1087,12 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
   useEffect(() => {
     void fetch("/api/marketing", { credentials: "same-origin" })
       .then((r) => r.json())
-      .then((j: { mesacne?: MktMesiac[]; top?: MktKus[]; ga4?: Ga4Mesiac[]; gscMesacne?: GscMesiac[]; gscDopyty?: GscDopyt[]; gscStrany?: GscStrana[]; ga4Strany?: { url: string; zobrazenia: number }[]; gscZariadenia?: { zariadenie: string; kliky: number; zobrazenia: number }[]; gadsKampane?: GadsKampan[]; gadsDopyty?: GadsDopyt[]; gadsValuta?: string; webStranky?: WebStrankaUI[] }) => {
+      .then((j: { mesacne?: MktMesiac[]; top?: MktKus[]; ga4?: Ga4Mesiac[]; gscMesacne?: GscMesiac[]; gscDopyty?: GscDopyt[]; gscStrany?: GscStrana[]; ga4Strany?: { url: string; zobrazenia: number }[]; gscZariadenia?: { zariadenie: string; kliky: number; zobrazenia: number }[]; gadsKampane?: GadsKampan[]; gadsDopyty?: GadsDopyt[]; gadsValuta?: string; webStranky?: WebStrankaUI[]; webRychlost?: PsRiadok[] }) => {
         const a = nastavMarketingZImportu(j.mesacne || [], j.top || []);
         const b = nastavWebZImportu(j.ga4 || [], j.gscMesacne || [], j.gscDopyty || [], j.gscStrany || [], j.ga4Strany || [], j.gscZariadenia || []);
         const bAds = nastavAdsZImportu(j.gadsKampane || [], j.gadsDopyty || [], j.gadsValuta || "");
         nastavWebStranky(j.webStranky || []);
+        nastavWebRychlost(j.webRychlost || []);
         if (a || b || bAds) tik((x) => x + 1);
       })
       .catch(() => {});

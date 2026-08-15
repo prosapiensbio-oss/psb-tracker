@@ -21,7 +21,7 @@ export const Route = createFileRoute("/api/marketing")({
         const { DB } = bindings();
         if (!DB) return Response.json({ ok: false, mesacne: [], top: [] });
         try {
-          const [mes, top, ga4, ga4S, gscZ, gscM, gscD, gscS, kan, gadsK, gadsD, gadsV, webS] = await Promise.all([
+          const [mes, top, ga4, ga4S, gscZ, gscM, gscD, gscS, kan, gadsK, gadsD, gadsV, webS, rychlost] = await Promise.all([
             DB.prepare(
               `SELECT mesiac,
                       SUM(CASE WHEN druh = 'reel'  THEN 1 ELSE 0 END) AS reels,
@@ -57,6 +57,17 @@ export const Route = createFileRoute("/api/marketing")({
             // Text webu. Bez neho je „15 777 zobrazení, 97 klikov" číslo bez
             // akcie — s titulkom je to veta, ktorá povie, čo prepísať.
             DB.prepare("SELECT url, typ, titulok, meta_popis, h1, znakov FROM web_stranky WHERE titulok <> ''").all().catch(() => ({ results: [] })),
+            // Rýchlosť: len POSLEDNÉ meranie na stránku a zariadenie. História
+            // v tabuľke zostáva na porovnanie pred/po, ale na obrazovku patrí
+            // dnešný stav — dva riadky pre tú istú stránku by vyzerali ako
+            // rozpor, nie ako vývoj.
+            DB.prepare(
+              `SELECT r.url, r.strategia, r.vykon, r.seo, r.lcp_ms, r.cls, r.tbt_ms, r.fcp_ms,
+                      r.prilezitosti, r.chyba, r.merane_at
+                 FROM web_rychlost r
+                 JOIN (SELECT url, strategia, MAX(merane_at) m FROM web_rychlost GROUP BY url, strategia) n
+                   ON n.url = r.url AND n.strategia = r.strategia AND n.m = r.merane_at`,
+            ).all().catch(() => ({ results: [] })),
           ]);
           // Mesiac, z ktorého je nahratá len časť, sa nesmie tváriť ako hotový.
           // 11. 8.: doplnili sme 18 mesiacov exportov, ale júl 2026 v priečinku
@@ -139,6 +150,18 @@ export const Route = createFileRoute("/api/marketing")({
               metaPopis: String(r.meta_popis || ""), h1: String(r.h1 || ""),
               text: "", znakov: Number(r.znakov) || 0,
             })),
+            webRychlost: (rychlost.results as Record<string, unknown>[]).map((r) => ({
+              url: String(r.url), strategia: String(r.strategia || ""), meraneAt: String(r.merane_at || ""),
+              vykon: r.vykon === null ? null : Number(r.vykon),
+              seo: r.seo === null ? null : Number(r.seo),
+              pristupnost: null, postupy: null,
+              lcpMs: r.lcp_ms === null ? null : Number(r.lcp_ms),
+              cls: r.cls === null ? null : Number(r.cls),
+              tbtMs: r.tbt_ms === null ? null : Number(r.tbt_ms),
+              fcpMs: r.fcp_ms === null ? null : Number(r.fcp_ms),
+              prilezitosti: (() => { try { return JSON.parse(String(r.prilezitosti || "[]")); } catch { return []; } })(),
+              chyba: String(r.chyba || ""),
+            })),
             gadsValuta: gadsV?.valuta || "",
             gadsKampane: (gadsK.results as Record<string, unknown>[]).map((r) => ({
               campaignId: String(r.campaign_id), nazov: String(r.nazov || ""),
@@ -161,7 +184,7 @@ export const Route = createFileRoute("/api/marketing")({
         } catch {
           // Tabuľka ešte nie je (staršia migrácia) — obrazovka si vystačí s tým,
           // čo má v kóde.
-          return Response.json({ ok: false, mesacne: [], top: [], ga4: [], ga4Strany: [], gscZariadenia: [], gscMesacne: [], gscDopyty: [], gscStrany: [], kanaly: [], gadsKampane: [], gadsDopyty: [], gadsValuta: "", webStranky: [] });
+          return Response.json({ ok: false, mesacne: [], top: [], ga4: [], ga4Strany: [], gscZariadenia: [], gscMesacne: [], gscDopyty: [], gscStrany: [], kanaly: [], gadsKampane: [], gadsDopyty: [], gadsValuta: "", webStranky: [], webRychlost: [] });
         }
       },
     },

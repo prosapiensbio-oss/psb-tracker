@@ -11,12 +11,14 @@ import {
   GADS_DOPYTY,
   GADS_KAMPANE,
   GADS_VALUTA,
+  WEB_RYCHLOST,
   WEB_STRANKY,
 } from "./marketing";
 import { MKT_OBSAH } from "./marketing-obsah";
 import { prilezitosti, soZamerom } from "./google";
 import { adsMesiace, zhrnutieAds } from "./googleAds";
 import { chybyNaStrankach, prilezitostiTitulkov } from "./webObsah";
+import { hodnotenie } from "./pagespeed";
 import {
   cenaZaSedenie,
   kotvaDat,
@@ -496,6 +498,17 @@ export function buildAiContext(
         // popisy, odseknuté vety. Presne to, čo platené SEO nástroje predávajú
         // ako „audit", spočítané bez ďalšej služby.
         chyby: chybyNaStrankach(WEB_STRANKY.map((s) => ({ ...s, text: "" }))),
+        // Rýchlosť je jediná časť technického SEO, ktorá sa nedá spočítať
+        // z textu — preto sa meria Googlom. Veta, nie skóre: „47/100" sa nedá
+        // opraviť, „človek čaká 4,3 s" áno.
+        rychlost: WEB_RYCHLOST.length
+          ? WEB_RYCHLOST.filter((r) => !r.chyba).map((r) => ({
+              url: r.url, zariadenie: r.strategia === "mobile" ? "mobil" : "počítač",
+              vykon: r.vykon, seo: r.seo, lcpMs: r.lcpMs,
+              co: hodnotenie(r).veta, stav: hodnotenie(r).stav,
+              najvacsiZisk: r.prilezitosti.slice(0, 3),
+            }))
+          : "Rýchlosť sa ešte nemerala. NEHOVOR, že o rýchlosti webu nič nevieš — v Údajoch → Napojenia je karta „Rýchlosť stránok“ a treba stlačiť Zmerať. Meria sa 20 najviac zobrazovaných stránok, mobil aj počítač.",
         titulkyNaPrepis: prilezitostiTitulkov(
           WEB_STRANKY.map((s) => ({ ...s, text: "" })),
           GSC_STRANY.map((g) => ({ url: g.url, zobrazenia: g.zobrazenia, kliky: g.kliky })),
