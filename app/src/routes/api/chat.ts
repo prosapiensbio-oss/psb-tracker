@@ -4,6 +4,7 @@ import { isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { PSB_KNOWLEDGE } from "../../lib/psb/knowledge";
 import { IDS_KNIH, registerKniznice, textKnihy } from "../../lib/psb/kniznica";
 import { bindings } from "../../lib/bindings.server";
+import { blokyNaSpravu, type StreamBlok } from "../../lib/psb/chatBloky";
 import { brief } from "../../lib/psb/zamerania";
 
 // Sonnet 5 runs every normal turn — fast enough that the answer starts well inside
@@ -104,6 +105,14 @@ NÁSTROJE — nie si odkázaný na to, čo ti appka predpočítala. Máš dva:
 - \`dopyt_db\` — jeden read-only SQL SELECT nad reálnou databázou. POUŽI HO VŽDY, keď odpoveď potrebuje číslo, ktoré v <data> nie je, alebo keď si chceš vlastný záver overiť. Radšej dva dopyty než jeden odhad. Typické prípady: prečo má klient inú sumu než cenník, kto koho priviedol, porovnanie kanálov, história jedného klienta, kontrola vlastnej hypotézy.
 - \`otvor_knihu\` — plné poznámky ku konkrétnej knihe. V <kniznica_register> máš zoznam všetkých kníh s tým, KEDY po ktorej siahnuť; vyberáš si SÁM podľa témy, používateľ ti knihu menovať nemusí. Pravidlá výberu: (1) ROZHODNI SA PRED OTVORENÍM — musíš vedieť pomenovať, čo konkrétne v tej knihe hľadáš; keď to nevieš, neotváraj nič; (2) JEDNA kniha je štandard, MAXIMUM sú dve; (3) druhú otvor len z pomenovaného dôvodu — prvá bola o inom probléme, alebo otázka naozaj spája dve oblasti (napr. cena a udržanie); (4) NIKDY neotváraj ďalšiu knihu len preto, že prvá odpoveď znie chudobne — pri PSB je chudobná odpoveď oveľa častejšie problém chýbajúcich dát než chýbajúceho rámca, a vtedy povedz, čo by sa muselo merať; (5) knihu otváraj len keď reálne pomôže rozhodnúť, nie na ozdobu.
 Po nástroji vždy povedz, čo z neho vyšlo, a čísla ber z neho, nie z hlavy. Kôl s nástrojmi máš obmedzený počet — nepátraj donekonečna. Keď dva-tri dopyty odpoveď nedajú, povedz rovno, čo si zistil, čo sa zistiť NEDÁ a čo by sa muselo zapisovať, aby sa to dalo.
+
+HĽADANIE NA WEBE — nástroj \`web_search\`. Doteraz si nevidel nič mimo appky; toto je nová schopnosť, nie ozdoba.
+HĽADAJ, keď odpoveď závisí od niečoho, čo sa mení a v appke to nie je: ceny a nabídka konkurencie, čo sa zmenilo v Google Ads alebo Mete, článok či štúdia, na ktorú sa Jerry odvoláva, aktuálne pravidlá a termíny. Pri takej otázke hľadaj HNEĎ a nepýtaj sa najprv na zúženie, ak nie je vyslovene nejasná.
+NEHĽADAJ čísla, ktoré sú v appke. Tržby, klienti, náklady, dosah, kliky — to je \`dopyt_db\` a <data>. Web na to nemá čo povedať a odpoveď z neho by bola horšia.
+LOKALITA IDE DO DOPYTU. Nemáš nastavené miesto, takže keď je otázka o Brne alebo Česku, napíš to do dopytu sám („osobní trenér Brno cena"). Bez toho dostaneš výsledky odkiaľkoľvek.
+CO SA NIKDY NEDOSTANE DO DOPYTU: mená klientov, čokoľvek o ich zdraví, Jerryho ani Terezkine osobné údaje, a FP ani nič z jeho metodiky. Dopyt odchádza von z firmy a už sa nevráti — je to zverejnenie, nie čítanie. Keď sa bez takého údaja odpovedať nedá, povedz to a nehľadaj.
+PO HĽADANÍ povedz, čo si našiel a KDE. Bez zdroja je to tvoj názor. Keď si zdroje protirečia, napíš to namiesto výberu toho, ktorý sa ti hodí. Keď hľadanie nič nedalo, povedz to rovno — vymyslený údaj s odkazom je horší než žiadny.
+HĽADANIE JE PLATENÉ, päť za odpoveď je strop. Nepozeraj sa von zo zvedavosti; hľadaj vtedy, keď to zmení odpoveď.
 
 POČÍTAJ, NEODHADUJ — keď v <data> stoja sčítance, nesčituj ich z hlavy. Číslo, ktoré je v kontexte napísané celé, prepíš presne tak, ako tam je. (11. 8.: z dvoch platieb 9 761 + 9 984 vyšlo „19 635" namiesto 19 745, hoci správny súčet bol v tej istej vete kontextu.) Pri každom súčte, rozdiele alebo percente s viac než dvoma čísel radšej použi \`dopyt_db\`.
 
@@ -326,6 +335,32 @@ const TOOLS = [
       },
       required: ["sql"],
     },
+  },
+  /**
+   * Hľadanie na webe. Beží na Anthropicovej strane — nič sa tu nevykonáva.
+   *
+   * PREČO VERZIA _20260209
+   *
+   * Má zabudované filtrovanie výsledkov (model si ich prefiltruje kódom, kým
+   * sa dostanú do kontextu), čo šetrí tokeny aj chyby. Vyžaduje Opus 4.6+ /
+   * Sonnet 4.6+ — Kokpit beží na claude-sonnet-5 a claude-opus-5, takže sedí.
+   *
+   * `max_uses` je strop na jednu odpoveď. Každé hľadanie je platené (rádovo
+   * jeden cent), takže bez stropu by jedna zle zadaná otázka mohla utratiť
+   * desiatky hľadaní. Päť stačí na overenie faktu aj na krátky rozhľad.
+   *
+   * ÚMYSELNE TU NIE JE `user_location`
+   *
+   * Lokalizácia výsledkov by sa dala nastaviť parametrom, ale jeho presný tvar
+   * som si neoveril naživo — a zlé pole v definícii nástroja neznamená horšie
+   * výsledky, znamená HTTP 400 na každú Jerryho otázku. Lokalita ide preto
+   * pokynom v systémovej správe: keď je otázka o Brne, slovo Brno patrí do
+   * dopytu. Nulové riziko, takmer rovnaký účinok.
+   */
+  {
+    type: "web_search_20260209",
+    name: "web_search",
+    max_uses: 5,
   },
   {
     name: "otvor_knihu",
@@ -653,7 +688,9 @@ export const Route = createFileRoute("/api/chat")({
 
                 // Skladáme bloky odpovede. Pri zapnutom thinking sa MUSIA poslať
                 // späť aj thinking bloky aj s podpisom, inak ďalšie kolo spadne.
-                type Blok = { type: string; text?: string; thinking?: string; signature?: string; id?: string; name?: string; input?: unknown; _json?: string };
+                // Tvar bloku žije v `chatBloky.ts` spolu s funkciou, ktorá ho skládá —
+// dve kópie by sa pri ďalšom type bloku rozišli.
+type Blok = StreamBlok;
                 const bloky: Blok[] = [];
                 let stopReason = "";
                 const upstream = resp.body.getReader();
@@ -674,8 +711,20 @@ export const Route = createFileRoute("/api/chat")({
 
                     if (evt.type === "content_block_start") {
                       const cb = evt.content_block || {};
-                      bloky[evt.index] = { type: cb.type, text: "", thinking: "", id: cb.id, name: cb.name, _json: "" };
+                      // `_raw` je celý blok tak, ako prišiel. Serverové bloky
+                      // (hľadanie na webe) sa musia vrátiť BEZ ZMENY — nedajú
+                      // sa poskládať z častí, ktoré tu modelujeme.
+                      bloky[evt.index] = { type: cb.type, text: "", thinking: "", id: cb.id, name: cb.name, _json: "", _raw: cb };
                       if (cb.type === "tool_use") posli({ s: cb.name === "otvor_knihu" ? "Otváram knihu…" : "Pozerám do dát…" });
+                      else if (cb.type === "server_tool_use" && cb.name === "web_search") posli({ s: "Hľadám na webe…" });
+                      else if (cb.type === "web_search_tool_result") {
+                        // Chyba serverového nástroja prichádza s HTTP 200 ako
+                        // objekt v `content`, nie ako výnimka. Bez tejto vetvy
+                        // by vyzerala ako úspešné hľadanie bez výsledkov.
+                        const c = (cb.content || {}) as { error_code?: string };
+                        if (!Array.isArray(cb.content) && c.error_code) posli({ s: `Hľadanie zlyhalo: ${c.error_code}` });
+                        else posli({ s: "" });
+                      }
                     } else if (evt.type === "content_block_delta") {
                       const b = bloky[evt.index] || (bloky[evt.index] = { type: "text", text: "" });
                       const d = evt.delta || {};
@@ -692,6 +741,26 @@ export const Route = createFileRoute("/api/chat")({
                 }
 
                 const pouzite = bloky.filter((b) => b && b.type === "tool_use");
+
+                /**
+                 * `pause_turn` — odpoveď NIE JE hotová.
+                 *
+                 * Serverová smyčka hľadania má vlastný strop kôl. Keď na neho
+                 * narazí, Anthropic vráti `pause_turn` a čaká, že požiadavku
+                 * pošleme znova; on si pokračuje tam, kde skončil. Nesmie sa
+                 * pridávať žiadna správa od používateľa — server pozná stav
+                 * z posledného serverového bloku.
+                 *
+                 * Bez tejto vetvy by `break` nižšie ukončil kolo a Jerry by
+                 * dostal odseknutú odpoveď BEZ CHYBY — presne ten druh tichého
+                 * zlyhania, ktorý má appka zakázaný.
+                 */
+                if (stopReason === "pause_turn") {
+                  konverzacia.push({ role: "assistant", content: blokyNaSpravu(bloky) });
+                  posli({ s: "Pokračujem v hľadaní…" });
+                  continue;
+                }
+
                 if (stopReason !== "tool_use" || !pouzite.length) break;
 
                 // Model často napíše kus úvahy a AŽ POTOM siahne po nástroji. Tá
@@ -702,14 +771,7 @@ export const Route = createFileRoute("/api/chat")({
                 if (bloky.some((b) => b && b.type === "text" && (b.text || "").trim())) { vypisaneZnaky = 0; posli({ r: 1 }); }
 
                 // Assistant správa presne tak, ako prišla (vrátane thinking).
-                konverzacia.push({
-                  role: "assistant",
-                  content: bloky.filter(Boolean).map((b) => {
-                    if (b.type === "thinking") return { type: "thinking", thinking: b.thinking, signature: b.signature };
-                    if (b.type === "tool_use") { let inp: unknown = {}; try { inp = JSON.parse(b._json || "{}"); } catch { /* nechaj prázdne */ } return { type: "tool_use", id: b.id, name: b.name, input: inp }; }
-                    return { type: "text", text: b.text };
-                  }),
-                });
+                konverzacia.push({ role: "assistant", content: blokyNaSpravu(bloky) });
 
                 const vysledky: unknown[] = [];
                 for (const b of pouzite) {
