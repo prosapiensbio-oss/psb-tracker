@@ -88,3 +88,31 @@ describe("celé kolo s hľadaním", () => {
     expect(v[3]).toEqual({ type: "text", text: "Našel som toto." });
   });
 });
+
+describe("čítanie stránok", () => {
+  test("výsledok web_fetch ide cez _raw vrátane dokumentu", () => {
+    // web_fetch vracia dokument v content — poskládať sa nedá, musí prejsť
+    // nezmenený, inak server nemá ako spárovať, čo už prečítal.
+    const raw = {
+      type: "web_fetch_tool_result",
+      tool_use_id: "f1",
+      content: { type: "web_fetch_result", url: "https://jwtraining.cz", content: { type: "document" } },
+    };
+    expect(blokyNaSpravu([{ type: "web_fetch_tool_result", _raw: raw }])).toEqual([raw]);
+  });
+
+  test("hľadanie aj čítanie v jednej správe", () => {
+    const s1 = { type: "server_tool_use", id: "s1", name: "web_search", input: {} };
+    const r1 = { type: "web_search_tool_result", tool_use_id: "s1", content: [] };
+    const f1 = { type: "server_tool_use", id: "f1", name: "web_fetch", input: {} };
+    const r2 = { type: "web_fetch_tool_result", tool_use_id: "f1", content: {} };
+    const v = blokyNaSpravu([
+      { type: "server_tool_use", _raw: s1 },
+      { type: "web_search_tool_result", _raw: r1 },
+      { type: "server_tool_use", _raw: f1 },
+      { type: "web_fetch_tool_result", _raw: r2 },
+      { type: "text", text: "Prečítal som ich cenník." },
+    ]);
+    expect(v).toEqual([s1, r1, f1, r2, { type: "text", text: "Prečítal som ich cenník." }]);
+  });
+});
