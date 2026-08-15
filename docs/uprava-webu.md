@@ -80,10 +80,21 @@ snippetu a Google ich bude môcť zobraziť priamo vo výsledku.
 Anatomické obrázky sa opisujú tým, čo na nich je (ktorá línia, ktorý sval) —
 nie „obrázok fascie". Toto je jediná vec, ktorú Google o obrázku vie.
 
-### 5 · Zmazať neaktívne pluginy a šablónu
-2 neaktívne pluginy, 1 neaktívna šablóna. Kód leží na serveri, neaktualizuje
-sa a dá sa cez neho útočiť. **Až po tom, čo fungujú zálohy mimo servera** (H1
-nižšie) — mazanie je nezvratné.
+### 5 · Zmazať neaktívne pluginy a šablóny — ZASTAVENÉ, čaká na rozhodnutie
+Zálohy fungujú, takže krytie je. Ale keď som sa pozrel, čo tie „neaktívne
+pluginy" sú, vyšlo z toho niečo iné než drobnosť:
+
+| položka | čo to je | odporúčam |
+|---|---|---|
+| **WooCommerce** | e-shop. Vypnutý, ale v databáze zostávajú jeho tabuľky, role (*Shop manager*, *Customer*) aj prípadné produkty a objednávky | **spýtať sa Jerryho.** Zmazanie pluginu dáta z databázy nemaže, takže je to vratné preinštalovaním — ale je to jeho rozhodnutie o predaji, nie technická drobnosť |
+| **Pinterest pro WooCommerce** | doplnok k tomu istému e-shopu, bez neho nemá funkciu | zmazať |
+| **Twenty Twenty-Four** | stará predvolená šablóna WordPressu | zmazať |
+| **Twenty Twenty-Five** | aktuálna predvolená šablóna | **NEMAZAŤ.** Je to záchranná šablóna: keď sa SetupFolio alebo WPBakery po aktualizácii rozsype, WordPress prepne na ňu a web ostane čitateľný. Bez nej by pri chybe zostala biela stránka. Zoznam pôvodne hovoril „zmazať neaktívnu šablónu" — to bolo príliš stroho, jedna má zostať |
+
+**Poznámka k vykonaniu:** samotné mazanie mi bolo pri prvom pokuse zablokované
+(mazanie pluginov a šablón je nezvratná operácia, na ktorú si systém žiada
+výslovný súhlas). Keď Jerry rozhodne o WooCommerce, urobím to buď so schválením,
+alebo mu to opíšem ako dva kliky v `Pluginy → Neaktivní`.
 
 ### 6 · Aktualizovať 24 pluginov
 **Zámerne posledné a až po zálohách.** 24 aktualizácií naraz na webe s 25
