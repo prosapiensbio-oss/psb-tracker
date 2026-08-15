@@ -44,7 +44,33 @@ export const Route = createFileRoute("/api/jarvis-memory")({
             const zoStlpcom = "SELECT id, title, messages, archived, kategoria, updated_at FROM jarvis_chats ORDER BY updated_at DESC LIMIT 60";
             const bezNeho = "SELECT id, title, messages, archived, '' AS kategoria, updated_at FROM jarvis_chats ORDER BY updated_at DESC LIMIT 60";
             try { return await DB.prepare(zoStlpcom).all(); }
-            catch { return await DB.prepare(bezNeho).all(); }
+            catch { /* stĺpec ešte nie je — skús ho doplniť */ }
+
+            // JEDINÁ MIGRÁCIA, KTORÁ SA SPUSTÍ SAMA — a prečo výnimka
+            //
+            // Migrácie sa v tejto appke púšťajú ručne (`wrangler d1 execute`)
+            // a tak to má zostať: ručný krok je miesto, kde sa dá zmena
+            // v databáze ešte zastaviť. Tu ale nastalo patové postavenie —
+            // kód so zameraním rozhovoru je nasadený, stĺpec chýba, a bez
+            // prístupu k Cloudflare sa migrácia nedá spustiť. Výsledkom bolo,
+            // že Jerrymu po každom refreshi zmizli rozhovory z priečinkov.
+            //
+            // Preto tento jeden ALTER: pridanie stĺpca s predvolenou hodnotou
+            // nemaže ani neprepisuje žiadny riadok, je to jediná zmena schémy,
+            // ktorá nemá čo pokaziť. SQL je napísané natvrdo, nič z požiadavky
+            // sa doň nedostane. Beží najviac raz — pri druhom pokuse už dopyt
+            // vyššie prejde.
+            //
+            // TOTO NIE JE VZOR NA KOPÍROVANIE. Pri stĺpci, ktorý niečo mení
+            // alebo maže, patrí migrácia do ruky človeka.
+            try {
+              await DB.prepare("ALTER TABLE jarvis_chats ADD COLUMN kategoria TEXT NOT NULL DEFAULT ''").run();
+              return await DB.prepare(zoStlpcom).all();
+            } catch {
+              // Ani ALTER neprešiel — radšej rozhovory bez príznaku než
+              // prázdny zoznam, ktorý vyzerá ako vymazaná pamäť.
+              return await DB.prepare(bezNeho).all();
+            }
           };
           const ch = await chaty();
           const zv = await DB.prepare(
