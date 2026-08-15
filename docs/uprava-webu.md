@@ -19,6 +19,7 @@ návštevník, bez prihlásenia.
 | | čo sa stalo | overené ako |
 |---|---|---|
 | ✅ **Slider Revolution vypnutý na článkoch** | 7 súborov, 546 kB z každého článku | stiahnutie troch článkov bez prihlásenia: `revslider` sa nevyskytuje ani raz; úvodná stránka slider ďalej má |
+| ✅ **Cieľ zálohovania prepnutý z OneDrive na Google Drive** | Varovanie „need UpdraftPlus Premium" zmizlo, OneDrive sa v nastavení už nespomína | prečítanie stránky UpdraftPlus po uložení: varovanie preč, Google Drive vybraný |
 
 ---
 
@@ -87,15 +88,24 @@ neúmerné úžitku. Preberieme, keď bude zvyšok hotový.
 
 ## Potrebujem Jerryho
 
-### H1 · Zálohy mimo servera *(najsúrnejšie z celého zoznamu)*
-UpdraftPlus zálohuje (posledná 12. 8.), ale cieľ je **OneDrive, ktorý vyžaduje
-Premium** — a to vypršalo. Zálohy preto zostávajú na tom istom serveri ako web.
+### H1 · Povoliť UpdraftPlus prístup do Google Drivu *(zostáva jeden klik)*
+Cieľ je prepnutý a varovanie o Premium je preč. Chýba už len povolenie:
+**Nastavení → Google Drive → „Sign in with Google" → Povoliť.** Klikal som naň
+trikrát; prihlasovacie okno Google sa cez automatizáciu nedokončí a stránka sa
+vráti späť s tou istou výzvou.
 
-**Čo od teba treba:** jeden klik, ktorým povolíš prístup. Prihlásenie do Google
-alebo Dropboxu ja urobiť nemôžem a nechcem — heslá nezadávam. Nastavím všetko
-ostatné a zastavím sa presne pred tlačidlom „Authenticate".
+Kým sa neklikne, zálohy sa robia, ale kópia mimo servera nevznikne. Overím to
+sám: po povolení sa v UpdraftPlus prestane zobrazovať veta „Follow this link to
+authorize access to your Google Drive account".
 
-### H2 · Kam má viesť odkaz „individuální trénink"
+### H2 · ~~Kam má viesť odkaz „individuální trénink"~~ — ZODPOVEDANÉ
+Jerry 15. 8.: individuálny tréning je pozostatok starého rozhrania a bol
+prerobený na **„jak to funguje"**. Stránka `/individualni-trenink/` naozaj
+neexistuje, takže nie je čo mazať — prepíšu sa tie tri odkazy, ktoré na ňu
+vedú (`sluzby`, `predsunuta-hlava`, `anterior-pelvic-tilt`) na
+`/jak-to-funguje/`. Presunuté medzi moje úlohy ako **1b**.
+
+<details><summary>pôvodné znenie otázky</summary>
 `/individualni-trenink/` vracia 404 a odkazujú naň tri stránky vrátane
 **Služby**. Taká stránka na webe neexistuje — existujú `uvodni-trenink`,
 `online-trenink` a `skupinovy-trenink`, individuálny nie.
@@ -105,18 +115,27 @@ ostatné a zastavím sa presne pred tlačidlom „Authenticate".
 - **„vytvor"** → treba novú stránku o individuálnom tréningu; napíšem návrh textu a pošlem na schválenie
 - **„iné"** → povedz kam
 
+</details>
+
 ### H3 · DMARC záznam v DNS
 SPF máš, DMARC nie. Bez neho chodia maily z webu horšie (aj upozornenie na nový
 dopyt) a tvoju doménu môže hocikto použiť na podvrhnuté maily.
 
-**Čo od teba treba:** pridať u správcu domény jeden TXT záznam. Do DNS nemám
-prístup a ani si o ten prístup nežiadam.
+**Skúsil som to sám** (15. 8., Websupport → DNS → TXT → Vytvoriť nový záznam).
+Formulár Websupportu je React a **neprijal ani programové vyplnenie, ani
+skutočné písanie** — polia zostali prázdne a záznam nevznikol. Overené: v zozname
+TXT `_dmarc` nie je. SPF aj MX som skontroloval, sú nedotknuté.
 
-```
-názov:   _dmarc.prosapiens.cz
-typ:     TXT
-hodnota: v=DMARC1; p=none; rua=mailto:info@prosapiens.cz
-```
+Pri DNS druhýkrát neskúšam naslepo — je to jediné miesto, kde sa dá jedným zlým
+znakom vypnúť web aj pošta. **Vyplň tie štyri polia ručne**, formulár máš
+otvorený:
+
+| pole | hodnota |
+|---|---|
+| Pre adresu | `_dmarc` |
+| Hodnota | `v=DMARC1; p=none; rua=mailto:info@prosapiens.cz` |
+| TTL | 600 (nechať) |
+| Poznámka | nepovinné |
 
 `p=none` znamená „nič neblokuj, len mi hlás". To je správny prvý krok —
 najprv mesiac pozorovať, kto tvojím menom posiela, a až potom priťahovať.
