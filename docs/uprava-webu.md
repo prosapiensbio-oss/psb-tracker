@@ -20,6 +20,7 @@ návštevník, bez prihlásenia.
 |---|---|---|
 | ✅ **Slider Revolution vypnutý na článkoch** | 7 súborov, 546 kB z každého článku | stiahnutie troch článkov bez prihlásenia: `revslider` sa nevyskytuje ani raz; úvodná stránka slider ďalej má |
 | ✅ **Cieľ zálohovania prepnutý z OneDrive na Google Drive** | Varovanie „need UpdraftPlus Premium" zmizlo, OneDrive sa v nastavení už nespomína | prečítanie stránky UpdraftPlus po uložení: varovanie preč, Google Drive vybraný |
+| ✅ **Zrušené služby stiahnuté z webu** | `skupinovy-trenink` a `lekce-fascialni-svoboda` dané do konceptu — Jerry 15. 8.: „skupinový trénink sme upustili, tento projekt nerealizujeme… rovnako lekce fasciálni svoboda". Obsah v WordPresse zostáva | zvonku obidve vracajú **404** a zmizli zo sitemapy (32 adries namiesto 34); `jak-to-funguje`, `online-trenink` a `sluzby` ďalej 200 |
 | ✅ **1b · Mŕtvy odkaz „individuální trénink" opravený** | 4 výskyty na 3 stránkach prepísané na `/jak-to-funguje/` — na Službách to bola karta služby aj tlačidlo „Více informací" | stiahnutie všetkých troch stránok bez prihlásenia: `individualni-trenink` sa nevyskytuje ani raz, cieľ vracia HTTP 200 |
 
 ---
@@ -39,18 +40,25 @@ prehliadača nedrží navigáciu medzi sekciami. Skúsim to cez staršiu adresu
 `admin.php?page=wpseo_titles`, prípadne priamo v poli SEO titulku pri
 najzasiahnutejších článkoch.
 
-### 2 · Meta popisy pre 14 stránok
-`gdpr` · `skupinovy-trenink` · `lekce-fascialni-svoboda` · `sluzby` ·
-`obchodni-podminky` · `podekovani` · `jerry` · `terezia` · `matyas` ·
-`doporucene-pomucky` · `informace-po-uvodnim-treninku` · `dychani` (+2)
+### 2 · Meta popisy — TEXTY HOTOVÉ, VLOŽENIE NEPRECHÁDZA
+Zoznam je už len 12 stránok: `skupinovy-trenink` a `lekce-fascialni-svoboda`
+z neho vypadli, sú skryté.
 
-Rozdelené na tri dávky, aby sa dalo priebežne overovať:
-- **2a** služby a peniaze: `sluzby`, `skupinovy-trenink`, `dychani`, `lekce-fascialni-svoboda`
-- **2b** ľudia: `jerry`, `terezia`, `matyas`
-- **2c** zvyšok: `gdpr`, `obchodni-podminky`, `podekovani`, `doporucene-pomucky`, `informace-po-uvodnim-treninku`
+**Napísané a schválené (15. 8.):**
+- `sluzby` → *Diagnostika držení těla a chůze, individuální i online trénink a skupinové lekce v Brně. Úvodní lekce 60 minut za 1 100 Kč.* ⚠️ prepísať, skupinové lekce už nie sú
+- `dychani` → *Box breathing ani brániční dech nezabraly? Problém není v technice, ale ve struktuře těla. Zkrácená verze příručky o dýchání zdarma.*
 
-Popisy píšem na symptóm a ďalší krok, nie na predstavovanie. Návrh ukážem
-pred vložením len u 2a — tam sa predáva.
+**Prečo to ešte nie je na webe.** Yoastove polia sa nedajú zapísať žiadnou
+z troch ciest, ktoré som skúsil: REST API ich nevystavuje (`meta` obsahuje len
+`footnotes`), nové nastavenia Yoastu sú React a hromadný editor Yoast v tejto
+verzii už neobsahuje. Štvrtá cesta funguje do polovice: v klasickom editore
+existuje skryté pole `yoast_wpseo_metadesc`, hodnotu doň nastaviť viem, ale
+tlačidlo *Aktualizovat* sa cez automatizáciu nespustí — rovnaký problém ako pri
+Yoaste, Websupporte a modálnom okne UpdraftPlus.
+
+**Návrh:** popisy vkladá Jerry (12× kopírovať-vložiť do poľa „Meta description"
+v Yoast boxe pod editorom), alebo mu ich pripravím ako jeden zoznam na jedno
+sedenie. Texty dodám ja, klik je jeho.
 
 ### 3 · LocalBusiness schema
 Na webe nie je nikde. Údaje mám z kontaktnej stránky:
