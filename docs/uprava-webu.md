@@ -91,15 +91,41 @@ pluginy" sú, vyšlo z toho niečo iné než drobnosť:
 | **Twenty Twenty-Four** | stará predvolená šablóna WordPressu | zmazať |
 | **Twenty Twenty-Five** | aktuálna predvolená šablóna | **NEMAZAŤ.** Je to záchranná šablóna: keď sa SetupFolio alebo WPBakery po aktualizácii rozsype, WordPress prepne na ňu a web ostane čitateľný. Bez nej by pri chybe zostala biela stránka. Zoznam pôvodne hovoril „zmazať neaktívnu šablónu" — to bolo príliš stroho, jedna má zostať |
 
-**Poznámka k vykonaniu:** samotné mazanie mi bolo pri prvom pokuse zablokované
-(mazanie pluginov a šablón je nezvratná operácia, na ktorú si systém žiada
-výslovný súhlas). Keď Jerry rozhodne o WooCommerce, urobím to buď so schválením,
-alebo mu to opíšem ako dva kliky v `Pluginy → Neaktivní`.
+**Jerryho rozhodnutie 15. 8.:** *„wocommerce vymaz twenty twenty five nechaj"* —
+teda zmazať WooCommerce aj Pinterest doplnok aj Twenty Twenty-Four, ponechať
+Twenty Twenty-Five.
+
+**Prečo to nie je hotové — a v akom PORADÍ sa to musí robiť.** WooCommerce nemá
+v zozname pluginov odkaz „Smazat" vôbec a obidve zaškrtávacie políčka sú
+zablokované. Nie je to chyba oprávnení: **Pinterest pro WooCommerce deklaruje
+WooCommerce ako vyžadovaný plugin**, a WordPress od verzie 6.5 zakazuje zmazať
+plugin, na ktorom iný nainštalovaný plugin závisí. Preto:
+
+1. najprv zmazať **Pinterest pro WooCommerce** (odkaz „Smazat" v jeho riadku má)
+2. potom sa pri **WooCommerce** odkaz „Smazat" objaví sám
+
+Mne sa mazanie cez automatizáciu nedokončilo — odkaz sa prepol na „Deleting…"
+a tým to skončilo, plugin zostal. Je to piata obrazovka za dnešok, ktorá cez
+automatizáciu nedobehne (Yoast, Websupport, okno UpdraftPlus, Asset CleanUp,
+teraz mazanie pluginov).
+
+**Pre Jerryho sú to štyri kliky:** `Pluginy → Neaktivní` → pri Pinterest
+**Smazat** → potvrdiť → pri WooCommerce **Smazat** → potvrdiť.
+Šablóna: `Vzhled → Šablony` → Twenty Twenty-Four → **Smazat**. Twenty
+Twenty-Five ponechať.
 
 ### 6 · Aktualizovať 24 pluginov
-**Zámerne posledné a až po zálohách.** 24 aktualizácií naraz na webe s 25
-pluginmi je najpravdepodobnejší spôsob, ako ho dnes rozbiť. Po dávkach, po
-každej kontrola úvodnej, `sluzby` a `kontakt`.
+**Zámerne posledné a až po zálohách.** Zálohy už fungujú, takže krytie je.
+
+Overené 15. 8.: z tých 24 sú zablokované len dva (WooCommerce a Pinterest,
+z rovnakého dôvodu ako pri mazaní) — **zvyšných 22 sa aktualizovať dá**.
+
+**Ale:** aktualizácia pluginu ide vo WordPresse len cez AJAX v prehliadači,
+REST API na to nemá cestu. A práve ten AJAX mi dnes päťkrát nedobehol. Púšťať
+cez taký kanál 22 aktualizácií je zlý nápad: aktualizácia, ktorá sa zastaví
+v polovici, nechá plugin v rozbitom stave. Preto to navrhujem takto: **kliká
+Jerry po dávkach po piatich, ja po každej dávke overím zvonku** úvodnú, `sluzby`
+a `kontakt` a poviem, či ísť ďalej.
 
 ### 7 · Poriadok v H1 *(najneskôr, možno vôbec)*
 68 z 79 stránok nemá práve jeden H1; úvodná má deväť. Robí to šablóna
