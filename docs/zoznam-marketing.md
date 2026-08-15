@@ -139,3 +139,36 @@ MailerLite aj Google API sú od 13. 8. hotové. Zostáva:
 2. **Živé dáta do troch kariet na Web a Google**, ktoré ešte ukazujú rok 2025.
 3. **Hodina publikovania + plánovanie obsahu.**
 4. **Kampane s poistkou** — až keď septembrový test ukáže cenu za dopyt.
+
+---
+
+## F · Web a FP compliance (pridané 15. 8. 2026)
+
+Vzniklo z čítania štyroch FP dokumentov (NDA, FP Policy, Practitioner's
+Handbook) a z Jerryho otázok o verifikačných odkazoch a prístupe k webu.
+
+### Viem postaviť bez teba
+
+| | |
+|---|---|
+| **Text stránok webu do Kokpitu, spojený so Search Console** | Nie HTML ani CSS — text. Dnes Jarvis vie web len cez čísla (kto prišel, na čo hľadal), nie čo na stránkach STOJÍ. Po spojení s GSC riadkami sa z „2 000 zobrazení, 0 klikov" stane „…a tu je jej titulok, prepíšme ho". Chýbajúca polovica SEO práce, ktorá leží od 11. 8. |
+| **Kontrola FP compliance nad publikovaným obsahom** | Vypadne z predošlého. Teraz nič neoveruje, že to, čo je na webe, sedí s pravidlom 2.3 — ani že sa niekde nevysvetľuje metodika. Kontrola proti bodom 2.3.1–2.3.8 vrátane nového testu „hovoril o tom Naudi verejne" |
+| **Pole „zdravotnícka profesia" + „FP NDA odoslaná" na klientovi** | Celá reťaz: stĺpec a migrácia, čítanie, zápis, typ, obrazovka, Jarvis, register. Register pripomenie pri novom klientovi z tých profesií. **Čaká na Jerryho odpoveď od FP** (viď nižšie) — bez vyjasnenia rozsahu by sa evidovalo niečo, čo možno netreba |
+
+### Tvoje — mimo Kokpitu
+
+| | |
+|---|---|
+| **Spýtať sa FP na dve veci** (`FPPolicy@Functionalpatterns.com`) | (1) Pokrýva „any other health focused professional" zubára a dentálnu hygieničku? Menované profesie sú všetky z pohybu a manuálnej terapie, takže zámer môže byť „kto by metódu mohol aplikovať", nie „kto má zdravotnícke vzdelanie". (2) Smie verifikačný odkaz ísť aj na prosapiens.cz? Handbook ho predpisuje do website poľa Instagramu a pre web predpisuje ich hotovú stránku — iné umiestnenie nezakazuje, ale ani nepovoľuje |
+| **Verifikačný odkaz na stránku „Co je Functional Patterns"** | Až po odpovedi FP. Je to najnavštevovanejšia podstránka a chodia tam presne tí, čo si overujú, či si skutočný. Asymetria hrá pre PSB: konkurencia metódu menuje, PSB ju vie DOKÁZAŤ — odkaz, za ktorý ručí FP, má len certifikovaný praktik. Odkaz prezrádza len meno, kurz, platnosť a fotku |
+| **Prejsť klientov, ktorým sa posielal before/after** | Zistiť, u ktorých chýba FP NDA. Pozor na dva rôzne dokumenty: súhlas so zverejnením obsahu (ten Jerry podľa vlastných slov má) NIE JE NDA. Súhlas chráni klienta, NDA chráni metódu FP |
+| **Rozhodnúť o pravidle „FP sa nemenuje"** | Overené 15. 8.: je to positioning voľba PSB, **nie povinnosť z NDA**. Handbook v sekcii Existing Branding uvádzanie certifikácie na vlastnom webe výslovne povoľuje a dodáva na to hotový text. Pravidlo drží, kým Jerry nerozhodne inak — a rozhodnutie je jeho, nie compliance otázka |
+
+### Hotové 15. 8.
+
+| | |
+|---|---|
+| Logo a slovná značka FP zakázané v pravidlách Kokpitu | *„should not be used by practitioners for any reason"* — v 2.3 o tom dovtedy nebolo nič |
+| Test „hovoril o tom Naudi verejne?" | Overiteľné kritérium namiesto dojmu pri hraničných prípadoch |
+| Before/after má v pravidlách dve branky | Schválenie na fp.app **a** písomný súhlas klienta |
+| Zákaz vyhľadávať FP spolu s PSB odstránený | Nemal oporu v žiadnom zo štyroch dokumentov — bola to moja domnienka, dvakrát po sebe |
