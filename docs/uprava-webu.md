@@ -20,6 +20,7 @@ návštevník, bez prihlásenia.
 |---|---|---|
 | ✅ **Slider Revolution vypnutý na článkoch** | 7 súborov, 546 kB z každého článku | stiahnutie troch článkov bez prihlásenia: `revslider` sa nevyskytuje ani raz; úvodná stránka slider ďalej má |
 | ✅ **Cieľ zálohovania prepnutý z OneDrive na Google Drive** | Varovanie „need UpdraftPlus Premium" zmizlo, OneDrive sa v nastavení už nespomína | prečítanie stránky UpdraftPlus po uložení: varovanie preč, Google Drive vybraný |
+| ✅ **Zálohy chodia do Google Drivu** | Kompletná záloha z 15. 8. 20:11 (databáza, pluginy, šablóny, nahrané súbory) leží v Drive; ~4,7 GB, Drive obsadený 9,78 z 15 GB | v UpdraftPlus má riadok štítok **„Vzdálené úložiště: Google Drive"** (staršie dva majú OneDrive), a v Drive sú súbory `backup_2026-08-15…` z 20:12–20:21 |
 | ✅ **Zrušené služby stiahnuté z webu** | `skupinovy-trenink` a `lekce-fascialni-svoboda` dané do konceptu — Jerry 15. 8.: „skupinový trénink sme upustili, tento projekt nerealizujeme… rovnako lekce fasciálni svoboda". Obsah v WordPresse zostáva | zvonku obidve vracajú **404** a zmizli zo sitemapy (32 adries namiesto 34); `jak-to-funguje`, `online-trenink` a `sluzby` ďalej 200 |
 | ✅ **1b · Mŕtvy odkaz „individuální trénink" opravený** | 4 výskyty na 3 stránkach prepísané na `/jak-to-funguje/` — na Službách to bola karta služby aj tlačidlo „Více informací" | stiahnutie všetkých troch stránok bez prihlásenia: `individualni-trenink` sa nevyskytuje ani raz, cieľ vracia HTTP 200 |
 
@@ -97,7 +98,14 @@ neúmerné úžitku. Preberieme, keď bude zvyšok hotový.
 
 ## Potrebujem Jerryho
 
-### H1 · Spustiť testovaciu zálohu *(povolenie prešlo, chýba dôkaz)*
+### ~~H1 · Spustiť testovaciu zálohu~~ — HOTOVÉ, viď tabuľka Hotové
+
+**Pozor na miesto v Drive.** Jedna záloha váži ~4,7 GB a v Drive je voľných
+~5 GB. Nastavené je uchovávať 2 zálohy, čo sa práve vojde — tretia by pretiekla.
+Keď sa web zväčší, treba to riešiť: buď zaplatený Drive, alebo do Drivu posielať
+len databázu a súbory nechať na hostingu.
+
+<details><summary>pôvodné znenie (chybný záver)</summary>
 Google Drive **je povolený** — Jerry dokončil „Complete setup" 15. 8., návrat
 prišel so `state=success` a výzva „Follow this link to authorize" z UpdraftPlus
 zmizla.
@@ -108,9 +116,15 @@ odškrtnuté, „odeslat na vzdálené úložiště" zapnuté) — tlačidlo v t
 cez automatizáciu nezabralo a nová záloha nevznikla. Nič sa nerozbilo, len
 chýba dôkaz.
 
-**Čo od teba treba:** UpdraftPlus → **Zálohovat nyní** → potvrdiť. Kľudne aj
-celú zálohu, len potrvá dlhšie. Potom overím sám: v zozname záloh musí pribudnúť
-dnešný riadok a v protokole musí byť odoslanie do Google Drivu bez chyby.
+**Čo od teba treba:** UpdraftPlus → **Zálohovat nyní** → potvrdiť.
+
+**Chyba, ktorú som pri tom urobil:** vyhlásil som, že v Drive nič nie je. Hľadal
+som „updraft", ale UpdraftPlus ukladá súbory pod menom `backup_<dátum>` a do
+koreňa Drivu, nie do priečinka toho mena. Prázdny výsledok jedného hľadania som
+vydal za dôkaz neexistencie — to isté pravidlo, na ktoré mám v CLAUDE.md
+vlastný odsek, a dnes už tretíkrát.
+
+</details>
 
 ### H2 · ~~Kam má viesť odkaz „individuální trénink"~~ — ZODPOVEDANÉ
 Jerry 15. 8.: individuálny tréning je pozostatok starého rozhrania a bol
