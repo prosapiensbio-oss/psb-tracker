@@ -21,7 +21,7 @@ export const Route = createFileRoute("/api/marketing")({
         const { DB } = bindings();
         if (!DB) return Response.json({ ok: false, mesacne: [], top: [] });
         try {
-          const [mes, top, ga4, ga4S, gscZ, gscM, gscD, gscS, kan, gadsK, gadsD, gadsV] = await Promise.all([
+          const [mes, top, ga4, ga4S, gscZ, gscM, gscD, gscS, kan, gadsK, gadsD, gadsV, webS] = await Promise.all([
             DB.prepare(
               `SELECT mesiac,
                       SUM(CASE WHEN druh = 'reel'  THEN 1 ELSE 0 END) AS reels,
@@ -54,6 +54,9 @@ export const Route = createFileRoute("/api/marketing")({
             // v eurách, kým manažér je vedený v korunách — natvrdo napísané
             // „Kč" by z 1 847 € urobilo 1 847 Kč, čiže omyl 25-násobný.
             DB.prepare("SELECT valuta FROM gads_ucty WHERE je_manager = 0 AND valuta <> '' LIMIT 1").first<{ valuta: string }>().catch(() => null),
+            // Text webu. Bez neho je „15 777 zobrazení, 97 klikov" číslo bez
+            // akcie — s titulkom je to veta, ktorá povie, čo prepísať.
+            DB.prepare("SELECT url, typ, titulok, meta_popis, h1, znakov FROM web_stranky WHERE titulok <> ''").all().catch(() => ({ results: [] })),
           ]);
           // Mesiac, z ktorého je nahratá len časť, sa nesmie tváriť ako hotový.
           // 11. 8.: doplnili sme 18 mesiacov exportov, ale júl 2026 v priečinku
@@ -131,6 +134,11 @@ export const Route = createFileRoute("/api/marketing")({
             gscZariadenia: (gscZ.results as Record<string, unknown>[]).map((r) => ({
               zariadenie: r.zariadenie, kliky: Number(r.kliky) || 0, zobrazenia: Number(r.zobrazenia) || 0,
             })),
+            webStranky: (webS.results as Record<string, unknown>[]).map((r) => ({
+              url: String(r.url), typ: String(r.typ || ""), titulok: String(r.titulok || ""),
+              metaPopis: String(r.meta_popis || ""), h1: String(r.h1 || ""),
+              text: "", znakov: Number(r.znakov) || 0,
+            })),
             gadsValuta: gadsV?.valuta || "",
             gadsKampane: (gadsK.results as Record<string, unknown>[]).map((r) => ({
               campaignId: String(r.campaign_id), nazov: String(r.nazov || ""),
@@ -153,7 +161,7 @@ export const Route = createFileRoute("/api/marketing")({
         } catch {
           // Tabuľka ešte nie je (staršia migrácia) — obrazovka si vystačí s tým,
           // čo má v kóde.
-          return Response.json({ ok: false, mesacne: [], top: [], ga4: [], ga4Strany: [], gscZariadenia: [], gscMesacne: [], gscDopyty: [], gscStrany: [], kanaly: [], gadsKampane: [], gadsDopyty: [], gadsValuta: "" });
+          return Response.json({ ok: false, mesacne: [], top: [], ga4: [], ga4Strany: [], gscZariadenia: [], gscMesacne: [], gscDopyty: [], gscStrany: [], kanaly: [], gadsKampane: [], gadsDopyty: [], gadsValuta: "", webStranky: [] });
         }
       },
     },

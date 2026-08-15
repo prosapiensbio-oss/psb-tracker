@@ -153,7 +153,13 @@ Handbook) a z Jerryho otázok o verifikačných odkazoch a prístupe k webu.
 |---|---|
 | **Text stránok webu do Kokpitu, spojený so Search Console** | Nie HTML ani CSS — text. Dnes Jarvis vie web len cez čísla (kto prišel, na čo hľadal), nie čo na stránkach STOJÍ. Po spojení s GSC riadkami sa z „2 000 zobrazení, 0 klikov" stane „…a tu je jej titulok, prepíšme ho". Chýbajúca polovica SEO práce, ktorá leží od 11. 8. |
 | **Kontrola FP compliance nad publikovaným obsahom** | Vypadne z predošlého. Teraz nič neoveruje, že to, čo je na webe, sedí s pravidlom 2.3 — ani že sa niekde nevysvetľuje metodika. Kontrola proti bodom 2.3.1–2.3.8 vrátane nového testu „hovoril o tom Naudi verejne" |
-| **Pole „zdravotnícka profesia" + „FP NDA odoslaná" na klientovi** | Celá reťaz: stĺpec a migrácia, čítanie, zápis, typ, obrazovka, Jarvis, register. Register pripomenie pri novom klientovi z tých profesií. **Čaká na Jerryho odpoveď od FP** (viď nižšie) — bez vyjasnenia rozsahu by sa evidovalo niečo, čo možno netreba |
+
+**Nerobíme: evidencia klientov a ich NDA v Kokpite.** Jerry 15. 8.: *„daj nech
+jarvis pozna tie dokumenty ale nemusíme to mat explicitne v kokpite — kokpit sa
+priamo sústredí na PSB."* Bol to môj návrh, nie jeho požiadavka. Kokpit meria
+PSB — peniaze, klientov, dopyt. Povinnosť z cudzej zmluvy je vec, na ktorú sa
+Jerry spýta Jarvisa, keď ju potrebuje, nie stĺpec, ktorý mu bude svietiť
+v registri. Dokumenty pozná Jarvis, evidencia nie je.
 
 ### Tvoje — mimo Kokpitu
 

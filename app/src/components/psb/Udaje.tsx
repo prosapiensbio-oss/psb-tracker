@@ -96,6 +96,7 @@ export function Udaje({ data, actions, chat, prekazky, kroky, podklady, onNaviga
         <NapojenieMailer />
         <NapojenieGoogle />
         <NapojenieGoogleAds />
+        <NapojenieTextWebu />
       </Card>
 
       <Card>
@@ -774,6 +775,72 @@ function NapojenieGoogle() {
  * blokuje; žiadosť o Basic je podaná 14. 8. 2026. Keď príde, pribudne dopyt —
  * nie nová karta.
  */
+/**
+ * Prečítanie textu vlastného webu.
+ *
+ * PREČO TO NIE JE JEDEN KLIK A HOTOVO
+ *
+ * Web má 79 stránok a Worker má strop podžiadostí na jedno volanie. Osemdesiat
+ * fetchov ho prerazí — a zlyhalo by to v polovici, takže by v tabuľke zostala
+ * náhodná polovica webu bez toho, aby to niekto poznal. Preto sa čítanie robí
+ * po dávkach a tlačidlo hlási, koľko ešte zostáva.
+ */
+function NapojenieTextWebu() {
+  const [stav, setStav] = useState<{ vsetky: number; sText: number; naposledy: string | null } | null>(null);
+  const [hlaska, setHlaska] = useState("");
+  const [robim, setRobim] = useState(false);
+
+  const nacitaj = () => void fetch("/api/web-obsah", { credentials: "same-origin" })
+    .then((r) => r.json())
+    .then((j) => { if (j.ok) setStav(j); })
+    .catch(() => {});
+  useEffect(nacitaj, []);
+
+  const posli = async (telo: Record<string, unknown>) => {
+    setRobim(true); setHlaska("");
+    const j = await fetch("/api/web-obsah", {
+      method: "POST", credentials: "same-origin",
+      headers: { "content-type": "application/json" }, body: JSON.stringify(telo),
+    }).then((r) => r.json()).catch(() => ({ ok: false, error: "spojenie zlyhalo" }));
+    setRobim(false);
+    // Aj keď časť stránok zlyhá, zvyšok je uložený — preto sa hlási oboje.
+    setHlaska(j.sprava ? j.sprava + (j.chyby?.length ? ` Nepodarilo sa: ${j.chyby.join("; ")}` : "") : (j.error || "Nepodarilo sa."));
+    nacitaj();
+  };
+
+  const chyba = (stav?.vsetky ?? 0) - (stav?.sText ?? 0);
+  const btn = { fontSize: 12, padding: "6px 12px", borderRadius: 6, border: `1px solid ${C.accent}`, background: "transparent", color: C.accent, cursor: robim ? "default" : "pointer", opacity: robim ? 0.5 : 1 } as const;
+  return (
+    <Card>
+      <H3>Text webu</H3>
+      <div style={{ fontSize: 13, color: C.textMuted, lineHeight: 1.55, margin: "6px 0 10px" }}>
+        Kokpit o webe doteraz vedel len čísla — kto prišiel a na čo hľadal. Nevedel,
+        čo na stránkach stojí, takže sa dalo povedať „táto stránka má 15 777 zobrazení
+        a 97 klikov“ a nedalo sa povedať, čo s tým. Po prečítaní je v Marketingu →
+        Web a Google karta „Titulky na prepis“ a Jarvis vie navrhnúť konkrétny nový titulok.
+      </div>
+      <div style={{ fontSize: 12, color: C.text, marginBottom: 8 }}>
+        {stav
+          ? `${stav.sText} z ${stav.vsetky} stránok má text${chyba > 0 ? `, ${chyba} chýba` : ""}${stav.naposledy ? ` · naposledy ${stav.naposledy.slice(0, 10)}` : ""}`
+          : "Zisťujem stav…"}
+      </div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <button style={btn} disabled={robim} onClick={() => void posli({})}>
+          {chyba > 0 || !stav?.sText ? "Prečítať web" : "Skontrolovať nové stránky"}
+        </button>
+        <button style={{ ...btn, borderColor: C.textMuted, color: C.textMuted }} disabled={robim} onClick={() => void posli({ akcia: "obnov" })}>
+          Prečítať celý web odznova
+        </button>
+      </div>
+      {hlaska && <div style={{ fontSize: 12, color: C.text, marginTop: 8 }}>{hlaska}</div>}
+      <div style={{ fontSize: 12, color: C.textMuted, marginTop: 8 }}>
+        „Odznova“ je na po prepísaní titulkov — bez toho by v tabuľke zostala stará verzia
+        a Jarvis by navrhoval prepísať niečo, čo už je prepísané.
+      </div>
+    </Card>
+  );
+}
+
 function NapojenieGoogleAds() {
   const [stav, setStav] = useState<{
     maToken: boolean; manager: string; email: string;

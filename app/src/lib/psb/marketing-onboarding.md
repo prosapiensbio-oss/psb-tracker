@@ -104,6 +104,36 @@ PSB funguje v souladu s Functional Patterns. Pro marketing z toho plynou tvrdá 
 
 NDA platí. Interní dokumenty FP jsou autoritou pro metodický rámec.
 
+**Co v těch dokumentech konkrétně stojí (přečteno 15. 8. 2026).** Tohle je tu
+proto, aby se Jerry mohl na povinnosti zeptat a dostal odpověď z dokumentu, ne
+z dojmu. Vědomě to **není** evidence v Kokpitu — Kokpit měří PSB, ne plnění
+cizí smlouvy. Jerryho rozhodnutí 15. 8.: *„daj nech jarvis pozna tie dokumenty
+ale nemusíme to mat explicitne v kokpite."*
+
+- **NDA (podepsáno 13. 9. 2021, právo Havaje).** Stranou je Filip Stráňavský
+  jako *Client*, FP LLC jako držitel. Chrání *Confidential Information* —
+  cvičební techniky, koncepty, materiály, videa a jakékoli **výpisky z nich**
+  (v dokumentu *Notes*). Použití je vázané na *Activity*, tedy vlastní trénink;
+  cokoli nad to chce písemný souhlas FP. Povinnosti končí **7 let od data
+  podpisu, tedy 13. 9. 2028** — a nekončí ukončením spolupráce.
+- **Výjimky z mlčenlivosti** (čl. 2.3 NDA): informace už veřejná, informace
+  legitimně známá dřív, informace od třetí strany bez omezení, nebo vlastní
+  nezávislý vývoj. Kdo se na výjimku odvolává, nese důkaz — a musí to FP
+  **oznámit 7 dní předem**. Prakticky to znamená: „to je přece veřejně známé"
+  není argument, který by šel použít až dodatečně.
+- **Klientská NDA.** FP Policy počítá s tím, že klient z vyjmenovaných profesí
+  (trenéři, fyzioterapeuti, manuální terapeuti a další *health focused
+  professionals*) podepisuje NDA předtím, než začne trénovat. Otevřená otázka
+  směrem k FP: pokrývá to zubaře a dentální hygieničku. Vyjmenované profese
+  jsou všechny z pohybu a manuální terapie, takže záměr může být „kdo by metodu
+  mohl aplikovat", ne „kdo má zdravotnické vzdělání".
+- **Souhlas se zveřejněním ≠ NDA.** Jsou to dva různé dokumenty s opačným
+  účelem: souhlas chrání klienta, NDA chrání metodu FP. Jeden nenahrazuje druhý
+  a Jerry má podle vlastních slov ten první.
+- **Verifikační odkaz.** Handbook ho předepisuje do website pole Instagramu a
+  pro web dodává vlastní hotovou stránku. Jiné umístění nezakazuje, ale ani
+  nepovoluje — proto je to otázka na FP, ne věc k odhadnutí.
+
 ### 2.4 Jak se schvaluje každý návrh (reasoning rules)
 U každého většího návrhu projdi tři kontroly:
 1. Soulad s **identitou PSB** (positioning, cílovka, tón).

@@ -7,6 +7,7 @@ import {
   GSC_DOPYTY,
   GSC_MESACNE,
   GSC_STRANY,
+  WEB_STRANKY,
   GSC_ZARIADENIA,
   MKT_CLANKY,
   MKT_MESACNE,
@@ -18,7 +19,9 @@ import {
   GADS_KAMPANE,
   GADS_VALUTA,
   nastavAdsZImportu,
+  nastavWebStranky,
   type GadsDopyt,
+  type WebStrankaUI,
   type GadsKampan,
   nastavWebZImportu,
   type Ga4Mesiac,
@@ -42,6 +45,7 @@ import { Napady } from "./Napady";
 import { KedyPublikovat } from "./KedyPublikovat";
 import { AkoMeratReklamu, Kohorta, Lievik, Naklady } from "./MarketingLievik";
 import { Kanaly } from "./Kanaly";
+import { prilezitostiTitulkov } from "../../lib/psb/webObsah";
 import { prilezitosti, soZamerom, zhrnutieWebu, type Dopyt } from "../../lib/psb/google";
 import { kontrolaAds, kontrolaMerania } from "../../lib/psb/kontrolaDat";
 import { adsMesiace, cenaZaKlik, zhrnutieAds } from "../../lib/psb/googleAds";
@@ -906,6 +910,8 @@ function Vyhladavanie({ chat }: { chat?: AssistantChat }) {
         soZamerom(GSC_DOPYTY as unknown as Dopyt[]),
       )}
 
+      <Titulky chat={chat} />
+
       <Card>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         <H3><Info text="Ktoré stránky ťahajú návštevnosť z vyhľadávania. Klikni na hlavičku a zoradíš podľa čohokoľvek." label="Najsilnejšie stránky" /></H3>
@@ -928,6 +934,57 @@ function Vyhladavanie({ chat }: { chat?: AssistantChat }) {
   );
 }
 
+/**
+ * Titulky, ktoré Google ukazuje a nikto na ne neklikne.
+ *
+ * PREČO JE TÁTO KARTA INÁ NEŽ „Kde sa zobrazuješ, ale nikto neklikne"
+ *
+ * Tá je o DOPYTOCH: povie, na čo sa ľudia pýtali. Táto je o STRÁNKACH a má pri
+ * každej jej SÚČASNÝ titulok — teda presne to, čo sa prepisuje. Dovtedy sa dalo
+ * povedať len „15 777 zobrazení, 97 klikov", čo je číslo bez akcie.
+ */
+function Titulky({ chat }: { chat?: AssistantChat }) {
+  const riadky = prilezitostiTitulkov(
+    WEB_STRANKY.map((s) => ({ ...s, text: "" })),
+    (GSC_STRANY as unknown as GscStrana[]).map((g) => ({ url: g.url, zobrazenia: g.zobrazenia, kliky: g.kliky })),
+  );
+  if (!WEB_STRANKY.length) {
+    return (
+      <Card>
+        <H3>Titulky na prepis</H3>
+        <div style={{ fontSize: 13, color: C.textMuted, lineHeight: 1.55, marginTop: 6 }}>
+          Text webu sa ešte nestiahol. V Údajoch → Napojenia je karta „Text webu“;
+          po prečítaní tu bude pri každej stránke jej titulok a bude jasné, čo prepísať.
+        </div>
+      </Card>
+    );
+  }
+  return (
+    <Card>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <H3><Info label="Titulky na prepis" text="Stránky, ktoré Google ukazuje veľa a nikto na ne neklikne — merané proti mediánu prekliku celého webu, nie proti číslu z klobúka. Pri každej je jej súčasný titulok, takže sa dá povedať, čo prepísať. Text stránok už existuje; mení sa jedna veta." /></H3>
+        <Vysvetli chat={chat} titul="Titulky na prepis" filter="celé obdobie"
+          vyrez={() => tsv(["stránka", "titulok", "zobrazenia", "kliky", "MP %"], riadky.map((r) => [r.url, r.titulok, r.zobrazenia, r.kliky, r.ctr]))} />
+      </div>
+      {riadky.length === 0 ? (
+        <div style={{ fontSize: 13, color: C.textMuted, marginTop: 6 }}>Žiadna stránka nie je výrazne pod mediánom webu. To je dobrá správa, nie prázdna tabuľka.</div>
+      ) : (
+        <SortTable
+          rolovat={3}
+          riadky={riadky}
+          stlpce={[
+            { id: "titulok", label: "Súčasný titulok", farba: () => C.text },
+            { id: "url", label: "Stránka" },
+            { id: "zobrazenia", label: "Zobrazenia", num: true, farba: () => C.accentLight },
+            { id: "kliky", label: "Kliky", num: true },
+            { id: "ctr", label: "MP", num: true, info: "Miera prekliku = kliky ÷ zobrazenia.", fmt: (v) => `${v} %`, farba: () => C.red },
+          ]}
+        />
+      )}
+    </Card>
+  );
+}
+
 export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, refresh, onPoznamkaStrata }: { data: PSBData; clients: Record<string, ClientAgg>; leads: Lead[]; chat?: AssistantChat; sub: string; onSub: (s: string) => void; onKlient?: (m: string) => void; refresh: () => Promise<void>; onPoznamkaStrata?: (meno: string, text: string) => void }) {
   const setSub = onSub;
   const [rok, setRok] = useState("2026");
@@ -938,10 +995,11 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
   useEffect(() => {
     void fetch("/api/marketing", { credentials: "same-origin" })
       .then((r) => r.json())
-      .then((j: { mesacne?: MktMesiac[]; top?: MktKus[]; ga4?: Ga4Mesiac[]; gscMesacne?: GscMesiac[]; gscDopyty?: GscDopyt[]; gscStrany?: GscStrana[]; ga4Strany?: { url: string; zobrazenia: number }[]; gscZariadenia?: { zariadenie: string; kliky: number; zobrazenia: number }[]; gadsKampane?: GadsKampan[]; gadsDopyty?: GadsDopyt[]; gadsValuta?: string }) => {
+      .then((j: { mesacne?: MktMesiac[]; top?: MktKus[]; ga4?: Ga4Mesiac[]; gscMesacne?: GscMesiac[]; gscDopyty?: GscDopyt[]; gscStrany?: GscStrana[]; ga4Strany?: { url: string; zobrazenia: number }[]; gscZariadenia?: { zariadenie: string; kliky: number; zobrazenia: number }[]; gadsKampane?: GadsKampan[]; gadsDopyty?: GadsDopyt[]; gadsValuta?: string; webStranky?: WebStrankaUI[] }) => {
         const a = nastavMarketingZImportu(j.mesacne || [], j.top || []);
         const b = nastavWebZImportu(j.ga4 || [], j.gscMesacne || [], j.gscDopyty || [], j.gscStrany || [], j.ga4Strany || [], j.gscZariadenia || []);
         const bAds = nastavAdsZImportu(j.gadsKampane || [], j.gadsDopyty || [], j.gadsValuta || "");
+        nastavWebStranky(j.webStranky || []);
         if (a || b || bAds) tik((x) => x + 1);
       })
       .catch(() => {});

@@ -14,6 +14,7 @@ import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiZositRouteImport } from './routes/api/zosit'
 import { Route as ApiWishlistRouteImport } from './routes/api/wishlist'
+import { Route as ApiWebObsahRouteImport } from './routes/api/web-obsah'
 import { Route as ApiVzasWeeksRouteImport } from './routes/api/vzas-weeks'
 import { Route as ApiVzasStatusRouteImport } from './routes/api/vzas-status'
 import { Route as ApiVzasSettingsRouteImport } from './routes/api/vzas-settings'
@@ -75,6 +76,11 @@ const ApiZositRoute = ApiZositRouteImport.update({
 const ApiWishlistRoute = ApiWishlistRouteImport.update({
   id: '/api/wishlist',
   path: '/api/wishlist',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiWebObsahRoute = ApiWebObsahRouteImport.update({
+  id: '/api/web-obsah',
+  path: '/api/web-obsah',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiVzasWeeksRoute = ApiVzasWeeksRouteImport.update({
@@ -304,6 +310,7 @@ export interface FileRoutesByFullPath {
   '/api/vzas-settings': typeof ApiVzasSettingsRoute
   '/api/vzas-status': typeof ApiVzasStatusRoute
   '/api/vzas-weeks': typeof ApiVzasWeeksRoute
+  '/api/web-obsah': typeof ApiWebObsahRoute
   '/api/wishlist': typeof ApiWishlistRoute
   '/api/zosit': typeof ApiZositRoute
 }
@@ -348,6 +355,7 @@ export interface FileRoutesByTo {
   '/api/vzas-settings': typeof ApiVzasSettingsRoute
   '/api/vzas-status': typeof ApiVzasStatusRoute
   '/api/vzas-weeks': typeof ApiVzasWeeksRoute
+  '/api/web-obsah': typeof ApiWebObsahRoute
   '/api/wishlist': typeof ApiWishlistRoute
   '/api/zosit': typeof ApiZositRoute
 }
@@ -393,6 +401,7 @@ export interface FileRoutesById {
   '/api/vzas-settings': typeof ApiVzasSettingsRoute
   '/api/vzas-status': typeof ApiVzasStatusRoute
   '/api/vzas-weeks': typeof ApiVzasWeeksRoute
+  '/api/web-obsah': typeof ApiWebObsahRoute
   '/api/wishlist': typeof ApiWishlistRoute
   '/api/zosit': typeof ApiZositRoute
 }
@@ -439,6 +448,7 @@ export interface FileRouteTypes {
     | '/api/vzas-settings'
     | '/api/vzas-status'
     | '/api/vzas-weeks'
+    | '/api/web-obsah'
     | '/api/wishlist'
     | '/api/zosit'
   fileRoutesByTo: FileRoutesByTo
@@ -483,6 +493,7 @@ export interface FileRouteTypes {
     | '/api/vzas-settings'
     | '/api/vzas-status'
     | '/api/vzas-weeks'
+    | '/api/web-obsah'
     | '/api/wishlist'
     | '/api/zosit'
   id:
@@ -527,6 +538,7 @@ export interface FileRouteTypes {
     | '/api/vzas-settings'
     | '/api/vzas-status'
     | '/api/vzas-weeks'
+    | '/api/web-obsah'
     | '/api/wishlist'
     | '/api/zosit'
   fileRoutesById: FileRoutesById
@@ -572,6 +584,7 @@ export interface RootRouteChildren {
   ApiVzasSettingsRoute: typeof ApiVzasSettingsRoute
   ApiVzasStatusRoute: typeof ApiVzasStatusRoute
   ApiVzasWeeksRoute: typeof ApiVzasWeeksRoute
+  ApiWebObsahRoute: typeof ApiWebObsahRoute
   ApiWishlistRoute: typeof ApiWishlistRoute
   ApiZositRoute: typeof ApiZositRoute
 }
@@ -611,6 +624,13 @@ declare module '@tanstack/react-router' {
       path: '/api/wishlist'
       fullPath: '/api/wishlist'
       preLoaderRoute: typeof ApiWishlistRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/web-obsah': {
+      id: '/api/web-obsah'
+      path: '/api/web-obsah'
+      fullPath: '/api/web-obsah'
+      preLoaderRoute: typeof ApiWebObsahRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/vzas-weeks': {
@@ -916,6 +936,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiVzasSettingsRoute: ApiVzasSettingsRoute,
   ApiVzasStatusRoute: ApiVzasStatusRoute,
   ApiVzasWeeksRoute: ApiVzasWeeksRoute,
+  ApiWebObsahRoute: ApiWebObsahRoute,
   ApiWishlistRoute: ApiWishlistRoute,
   ApiZositRoute: ApiZositRoute,
 }

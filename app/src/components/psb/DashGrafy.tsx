@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from
 import { fetchBtcReserve, fetchVzasSettings, fetchWeekEntries, type BtcReserve } from "../../lib/psb/client";
 import { objednaneVerzia, membershipBucket, type ClientAgg } from "../../lib/psb/compute";
 import { fmtCZK, monthLabel } from "../../lib/psb/format";
-import { GA4_MESACNE, GSC_MESACNE, MKT_MESACNE, nastavAdsZImportu, nastavMarketingZImportu, nastavWebZImportu, type Ga4Mesiac, type GscDopyt, type GscMesiac, type GscStrana, type MktKus, type MktMesiac, type GadsDopyt, type GadsKampan } from "../../lib/psb/marketing";
+import { GA4_MESACNE, GSC_MESACNE, MKT_MESACNE, nastavAdsZImportu, nastavWebStranky, nastavMarketingZImportu, nastavWebZImportu, type Ga4Mesiac, type GscDopyt, type GscMesiac, type GscStrana, type MktKus, type MktMesiac, type GadsDopyt, type GadsKampan, type WebStrankaUI } from "../../lib/psb/marketing";
 import { C, MEMBERSHIP_COLORS, mix } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import {
@@ -496,10 +496,11 @@ export function useExtraGrafy({
     if (!chceMkt || mktTik) return;
     void fetch("/api/marketing", { credentials: "same-origin" })
       .then((r) => r.json())
-      .then((j: { mesacne?: MktMesiac[]; top?: MktKus[]; ga4?: Ga4Mesiac[]; gscMesacne?: GscMesiac[]; gscDopyty?: GscDopyt[]; gscStrany?: GscStrana[]; ga4Strany?: { url: string; zobrazenia: number }[]; gscZariadenia?: { zariadenie: string; kliky: number; zobrazenia: number }[]; kanaly?: KanalRiadok[]; gadsKampane?: GadsKampan[]; gadsDopyty?: GadsDopyt[]; gadsValuta?: string }) => {
+      .then((j: { mesacne?: MktMesiac[]; top?: MktKus[]; ga4?: Ga4Mesiac[]; gscMesacne?: GscMesiac[]; gscDopyty?: GscDopyt[]; gscStrany?: GscStrana[]; ga4Strany?: { url: string; zobrazenia: number }[]; gscZariadenia?: { zariadenie: string; kliky: number; zobrazenia: number }[]; kanaly?: KanalRiadok[]; gadsKampane?: GadsKampan[]; gadsDopyty?: GadsDopyt[]; gadsValuta?: string; webStranky?: WebStrankaUI[] }) => {
         nastavMarketingZImportu(j.mesacne || [], j.top || []);
         nastavWebZImportu(j.ga4 || [], j.gscMesacne || [], j.gscDopyty || [], j.gscStrany || [], j.ga4Strany || [], j.gscZariadenia || []);
         nastavAdsZImportu(j.gadsKampane || [], j.gadsDopyty || [], j.gadsValuta || "");
+        nastavWebStranky(j.webStranky || []);
         setKanaly(j.kanaly || []);
         setMktTik(1);
       })

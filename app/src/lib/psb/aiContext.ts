@@ -11,10 +11,12 @@ import {
   GADS_DOPYTY,
   GADS_KAMPANE,
   GADS_VALUTA,
+  WEB_STRANKY,
 } from "./marketing";
 import { MKT_OBSAH } from "./marketing-obsah";
 import { prilezitosti, soZamerom } from "./google";
 import { adsMesiace, zhrnutieAds } from "./googleAds";
+import { prilezitostiTitulkov } from "./webObsah";
 import {
   cenaZaSedenie,
   kotvaDat,
@@ -480,6 +482,20 @@ export function buildAiContext(
         overitelnostPozor: "Dáta o klientoch (PTminder) začínajú v roku 2025. Kampane z 2023–2024 sú 558 z 857 konverzií a nemajú s čím byť porovnané — nikdy mať nebudú. Keď sa o nich Jerry spýta, povedz, že sa overiť NEDAJÚ, nie že boli neúspešné.",
         coDopytyHovoria: "Hľadané výrazy sú takmer výhradne informačné („cviky na záda“ 3413 zobrazení, „zdravotni cviceni“ 1322, „joga na bolavá záda“ 1191) — ľudia hľadajúci cvik zadarmo, nie trenéra. Komerčné miestne dopyty sú za 2,5 roka platenej reklamy nepatrné („osobní trenér brno“ 141 zobrazení, „trener brno“ 164, „fitness brno“ 299), čo POTVRDZUJE to isté, čo hovorí Search Console organicky. Z toho vyplýva, že platené hľadanie na získavanie klientov pre PSB zmysel nemá; hodnota týchto 16 587 dopytov je v OBSAHU — sú to presné slová, ktorými ľudia opisujú svoj problém.",
         objemHladania: "NIE JE k dispozícii. Plánovač kľúčových slov blokuje token na úrovni „prieskumník“; žiadosť o Basic bola podaná 14. 8. 2026. Ak sa Jerry pýta na objem hľadania, povedz, že sa čaká na Google, a NEODHADUJ ho — Search Console meria len tam, kde sa web už zobrazil, takže z nej sa objem dopytu vyčítať nedá.",
+      },
+      // Text vlastného webu. Doteraz Jarvis vedel o webe len čísla — kto
+      // prišel a na čo hľadal — nie čo na stránkach STOJÍ. Preto sa dalo
+      // povedať „15 777 zobrazení, 97 klikov" a nedalo sa povedať, čo s tým.
+      webObsah: {
+        poznamka: WEB_STRANKY.length
+          ? "Titulky a popisy stránok vlastného webu, spojené so Search Console. Kľúč „titulkyNaPrepis“ sú stránky, ktoré Google ukazuje a nikto na ne neklikne — ich CTR je výrazne pod mediánom webu a je pri nich SÚČASNÝ titulok, takže sa dá povedať, čo prepísať. Keď Jerry navrhne nový titulok, píš ho ako hotový text pre <title>, nie ako radu. Text stránok tu nie je celý; keď treba obsah konkrétnej stránky, otvor ju nástrojom web_fetch."
+          : "Text webu sa ešte nestiahol. NEODPOVEDAJ, že o obsahu webu nič nevieš — v Marketingu → Web a Google je karta „Text webu“ a treba stlačiť Prečítať web. Prázdna tabuľka nie je dôkaz.",
+        stranok: WEB_STRANKY.length,
+        titulky: WEB_STRANKY.map((s) => ({ url: s.url, typ: s.typ, titulok: s.titulok, popis: s.metaPopis })).slice(0, 90),
+        titulkyNaPrepis: prilezitostiTitulkov(
+          WEB_STRANKY.map((s) => ({ ...s, text: "" })),
+          GSC_STRANY.map((g) => ({ url: g.url, zobrazenia: g.zobrazenia, kliky: g.kliky })),
+        ),
       },
       clanky: MKT_CLANKY.slice(0, 15),
       zdrojeKlientov: {

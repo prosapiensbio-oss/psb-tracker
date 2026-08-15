@@ -366,3 +366,23 @@ export function nastavAdsZImportu(kampane: GadsKampan[], dopyty: GadsDopyt[], va
   if (valuta) GADS_VALUTA = valuta;
   return zmena;
 }
+
+// ── Text webu ─────────────────────────────────────────────────────────────
+//
+// PREČO TU NIE SÚ NAPÍSANÉ ŽIADNE STRÁNKY
+//
+// Ako pri Google Ads: web sa čítal cez API až od 15. 8. 2026, takže tu nie je
+// čo mať napísané ručne. Prázdno je čitateľnejšie než vymyslené.
+
+export type WebStrankaUI = {
+  url: string; typ: string; titulok: string; metaPopis: string; h1: string; znakov: number;
+};
+
+export let WEB_STRANKY: WebStrankaUI[] = [];
+
+/** Stránky webu z importu. Prázdne pole neprepisuje to, čo už je. */
+export function nastavWebStranky(stranky: WebStrankaUI[]): boolean {
+  if (!stranky.length) return false;
+  WEB_STRANKY = [...stranky].sort((a, b) => a.url.localeCompare(b.url));
+  return true;
+}
