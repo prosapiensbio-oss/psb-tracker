@@ -260,7 +260,7 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
       return next;
     });
     const t = setTimeout(() => {
-      if (zaznam) void saveJarvisChat({ id: zaznam.id, title: zaznam.title, messages: msgs, archived: !!zaznam.archived });
+      if (zaznam) void saveJarvisChat({ id: zaznam.id, title: zaznam.title, messages: msgs, archived: !!zaznam.archived, kategoria: zaznam.kategoria || "" });
     }, 1500);
     return () => clearTimeout(t);
   }, [msgs, chatId]);
@@ -310,7 +310,7 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
     const c = chats.find((x) => x.id === id);
     if (!c) return;
     persistChats(chats.map((x) => (x.id === id ? { ...x, kategoria: nova, updatedAt: Date.now() } : x)));
-    void saveJarvisChat({ id: c.id, title: c.title, messages: c.messages, archived: !!c.archived });
+    void saveJarvisChat({ id: c.id, title: c.title, messages: c.messages, archived: !!c.archived, kategoria: nova });
     if (id === chatId) setKategoria(nova);
   };
 
@@ -320,7 +320,7 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
     const next = chats.map((c) => (c.id === id ? { ...c, archived: !c.archived } : c));
     persistChats(next);
     const c = next.find((x) => x.id === id);
-    if (c) void saveJarvisChat({ id: c.id, title: c.title, messages: c.messages, archived: !!c.archived });
+    if (c) void saveJarvisChat({ id: c.id, title: c.title, messages: c.messages, archived: !!c.archived, kategoria: c.kategoria || "" });
     if (id === chatId) newChat();
   };
 

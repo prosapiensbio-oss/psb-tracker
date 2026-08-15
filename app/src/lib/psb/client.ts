@@ -308,7 +308,7 @@ export async function fetchJarvisMemory(): Promise<{ chats: unknown[]; zavery: Z
   }
 }
 
-export async function saveJarvisChat(chat: { id: string; title: string; messages: unknown[]; archived?: boolean }) {
+export async function saveJarvisChat(chat: { id: string; title: string; messages: unknown[]; archived?: boolean; kategoria?: string }) {
   try {
     await post("/api/jarvis-memory", { akcia: "chat", ...chat });
   } catch { /* offline — localStorage kópia ostáva */ }

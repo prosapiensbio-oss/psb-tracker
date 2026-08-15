@@ -32,9 +32,21 @@ export const Route = createFileRoute("/api/jarvis-memory")({
         if (!DB) return Response.json({ ok: false, chats: [], zavery: [] });
         try {
           // 60 chatov stačí — staršie sú archív, nie pracovný materiál.
-          const ch = await DB.prepare(
-            "SELECT id, title, messages, archived, updated_at FROM jarvis_chats ORDER BY updated_at DESC LIMIT 60",
-          ).all();
+          //
+          // KÓD A DATABÁZA SA MÔŽU NA CHVÍĽU ROZÍSŤ
+          //
+          // Stĺpec `kategoria` pribudol migráciou 0039 a migrácie sa NEPÚŠŤAJÚ
+          // samy. Keby dopyt na chýbajúci stĺpec spadol, `catch` nižšie vráti
+          // prázdny zoznam chatov AJ záverov — a Jarvisova pamäť by vyzerala
+          // vymazaná. To je horšie než chýbajúci príznak, tak sa pri chybe
+          // skúsi raz bez neho.
+          const chaty = async () => {
+            const zoStlpcom = "SELECT id, title, messages, archived, kategoria, updated_at FROM jarvis_chats ORDER BY updated_at DESC LIMIT 60";
+            const bezNeho = "SELECT id, title, messages, archived, '' AS kategoria, updated_at FROM jarvis_chats ORDER BY updated_at DESC LIMIT 60";
+            try { return await DB.prepare(zoStlpcom).all(); }
+            catch { return await DB.prepare(bezNeho).all(); }
+          };
+          const ch = await chaty();
           const zv = await DB.prepare(
             "SELECT * FROM jarvis_zavery WHERE stav != 'zrusene' ORDER BY datum DESC LIMIT 200",
           ).all();
@@ -47,7 +59,7 @@ export const Route = createFileRoute("/api/jarvis-memory")({
             chats: (ch.results as Row[]).map((r) => {
               let messages: unknown = [];
               try { messages = JSON.parse(String(r.messages || "[]")); } catch { messages = []; }
-              return { id: r.id, title: r.title, archived: !!r.archived, updatedAt: Date.parse(String(r.updated_at)) || Date.now(), messages };
+              return { id: r.id, title: r.title, archived: !!r.archived, kategoria: String(r.kategoria || ""), updatedAt: Date.parse(String(r.updated_at)) || Date.now(), messages };
             }),
             zavery: (zv.results as Row[]).map((r) => ({
               id: r.id, datum: r.datum, tema: r.tema, zaver: r.zaver, preco: r.preco,
@@ -83,10 +95,27 @@ export const Route = createFileRoute("/api/jarvis-memory")({
           // všetky závery naraz. Radšej kratšia história než žiadna.
           let ulozene = msgs;
           while (ulozene.length > 1 && JSON.stringify(ulozene).length > 400_000) ulozene = ulozene.slice(1);
-          await DB.prepare(
-            `INSERT INTO jarvis_chats (id, title, messages, archived, updated_at) VALUES (?1, ?2, ?3, ?4, ?5)
-             ON CONFLICT(id) DO UPDATE SET title = ?2, messages = ?3, archived = ?4, updated_at = ?5`,
-          ).bind(id, s(b.title, 120) || "Nový chat", JSON.stringify(ulozene).slice(0, 400_000), b.archived ? 1 : 0, now).run();
+          // Zápis bez zamerania je stále zápis.
+          //
+          // Migrácia 0039 pridala `kategoria` a migrácie sa nepúšťajú samy.
+          // Keby zápis na chýbajúci stĺpec spadol, rozhovor by sa NEULOŽIL
+          // vôbec — a to je tá istá trieda chyby ako 13. 8., keď sa dôvody
+          // strát ukládali do neexistujúceho poľa a Jerry stratil večer práce.
+          // Radšej rozhovor bez príznaku než žiadny rozhovor.
+          const nazov = s(b.title, 120) || "Nový chat";
+          const telo = JSON.stringify(ulozene).slice(0, 400_000);
+          const arch = b.archived ? 1 : 0;
+          try {
+            await DB.prepare(
+              `INSERT INTO jarvis_chats (id, title, messages, archived, kategoria, updated_at) VALUES (?1, ?2, ?3, ?4, ?6, ?5)
+               ON CONFLICT(id) DO UPDATE SET title = ?2, messages = ?3, archived = ?4, kategoria = ?6, updated_at = ?5`,
+            ).bind(id, nazov, telo, arch, now, s(b.kategoria, 20)).run();
+          } catch {
+            await DB.prepare(
+              `INSERT INTO jarvis_chats (id, title, messages, archived, updated_at) VALUES (?1, ?2, ?3, ?4, ?5)
+               ON CONFLICT(id) DO UPDATE SET title = ?2, messages = ?3, archived = ?4, updated_at = ?5`,
+            ).bind(id, nazov, telo, arch, now).run();
+          }
           return Response.json({ ok: true });
         }
 

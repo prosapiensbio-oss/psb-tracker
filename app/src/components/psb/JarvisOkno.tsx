@@ -289,9 +289,21 @@ function Riadok({
         <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {nazov || "(bez názvu)"}
         </span>
-        <span style={{ fontSize: 10.5, color: C.textDim }}>
+        <span style={{ fontSize: 10.5, color: C.textDim, display: "flex", alignItems: "center", gap: 5, marginTop: 1 }}>
           {kedy}
-          {odznak && <span style={{ color: C.textMuted }}> · {odznak}</span>}
+          {/*
+            Zameranie ako farebný odznak, nie ako text za bodkou. Jerry si ho
+            vyžiadal osobitne — v spoločnom zozname je to jediná vec, podľa
+            ktorej sa dve rovnako pomenované debaty rozlíšia.
+          */}
+          {odznak && (
+            <span style={{
+              padding: "1px 6px", borderRadius: 999, fontSize: 9.5, fontWeight: 600,
+              background: mix(C.accent, 14), color: C.accentLight, whiteSpace: "nowrap",
+            }}>
+              {odznak}
+            </span>
+          )}
         </span>
       </button>
       {(nad || presuvam) && (
