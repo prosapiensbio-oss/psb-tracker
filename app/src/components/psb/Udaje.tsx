@@ -865,15 +865,54 @@ function NapojenieRychlost() {
     .catch(() => {});
   useEffect(nacitaj, []);
 
-  const posli = async (telo: Record<string, unknown>) => {
-    setRobim(true); setHlaska("");
-    const j = await fetch("/api/pagespeed", {
+  const jedna = async (telo: Record<string, unknown>) =>
+    await fetch("/api/pagespeed", {
       method: "POST", credentials: "same-origin",
       headers: { "content-type": "application/json" }, body: JSON.stringify(telo),
     }).then((r) => r.json()).catch(() => ({ ok: false, error: "spojenie zlyhalo" }));
+
+  const posli = async (telo: Record<string, unknown>) => {
+    setRobim(true); setHlaska("");
+    const j = await jedna(telo);
     setRobim(false);
     setHlaska(j.sprava ? j.sprava + (j.chyby?.length ? ` Nepodarilo sa: ${j.chyby.join("; ")}` : "") : (j.error || "Nepodarilo sa."));
     setKluc("");
+    nacitaj();
+  };
+
+  /**
+   * Zmerať všetko — dávka po dávke, kým nie je hotovo.
+   *
+   * PREČO TO ROBÍ PREHLIADAČ A NIE SERVER
+   *
+   * Dávka po troch je daná Workerom: dvadsať stránok krát dve zariadenia
+   * je pol hodiny a request by vypršal. Ale to je dôvod, prečo je po troch
+   * jedno VOLANIE — nie dôvod, prečo má trinásťkrát klikať človek. Čakanie
+   * medzi dávkami je práca pre stroj.
+   *
+   * POISTKY
+   *
+   * Cyklus sa zastaví, keď zvyšok klesne na nulu, keď volanie vráti chybu,
+   * alebo keď sa zvyšok dvakrát za sebou nezmenší — bez tej poslednej by
+   * zaseknuté meranie krútilo dokola donekonečna.
+   */
+  const zmerajVsetko = async () => {
+    setRobim(true); setHlaska("Meriam… jedno meranie trvá 10–30 s.");
+    let hotovych = 0, chybnych = 0, stoji = 0, predtym = -1;
+    for (let kolo = 0; kolo < 40; kolo++) {
+      const j = await jedna({});
+      if (!j.sprava && j.error) { setHlaska(`Zastavené: ${j.error}`); break; }
+      hotovych += Number(j.ulozene) || 0;
+      chybnych += (j.chyby?.length as number) || 0;
+      const zostava = Number(j.zostava) || 0;
+      setHlaska(`Zmerané ${hotovych}, zostáva ${zostava}…` + (chybnych ? ` (${chybnych} neprešlo)` : ""));
+      nacitaj();
+      if (zostava === 0) { setHlaska(`Hotovo — zmerané ${hotovych}.` + (chybnych ? ` ${chybnych} meraní neprešlo; nezmerané a pomalé nie je to isté, v tabuľke nie sú ako nuly.` : "")); break; }
+      stoji = zostava === predtym ? stoji + 1 : 0;
+      predtym = zostava;
+      if (stoji >= 2) { setHlaska(`Zastavené: zvyšok ${zostava} sa prestal zmenšovať. Skús to znova neskôr — Google mohol začať odmietať merania.`); break; }
+    }
+    setRobim(false);
     nacitaj();
   };
 
@@ -910,17 +949,21 @@ function NapojenieRychlost() {
         </button>
       </div>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
-        <button style={btn} disabled={robim} onClick={() => void posli({})}>
-          {robim ? "Meriam…" : "Zmerať ďalšie tri"}
+        <button style={btn} disabled={robim} onClick={() => void zmerajVsetko()}>
+          {robim ? "Meriam…" : "Zmerať, čo chýba"}
         </button>
-        <button style={{ ...btn, borderColor: C.textMuted, color: C.textMuted }} disabled={robim} onClick={() => void posli({ akcia: "obnov" })}>
+        <button style={{ ...btn, borderColor: C.textMuted, color: C.textMuted }} disabled={robim}
+          onClick={() => void posli({ akcia: "obnov" }).then(() => zmerajVsetko())}>
           Premerať odznova
         </button>
       </div>
       {hlaska && <div style={{ fontSize: 12, color: C.text, marginTop: 8 }}>{hlaska}</div>}
       <div style={{ fontSize: 12, color: C.textMuted, marginTop: 8 }}>
-        „Premerať odznova“ má zmysel po zásahu do webu — história sa nemaže, takže sa dá
-        porovnať stav pred a po. To je jediné, čo pri rýchlosti naozaj zaujíma.
+        Meranie beží dávkami po troch — to je strop jedného volania, nie práca pre teba:
+        tlačidlo dobehne až do konca samo, len nechaj okno otvorené. Trvá to zhruba
+        minútu na tri stránky. „Premerať odznova“ má zmysel po zásahu do webu — história
+        sa nemaže, takže sa dá porovnať stav pred a po. To je jediné, čo pri rýchlosti
+        naozaj zaujíma.
       </div>
     </div>
   );
