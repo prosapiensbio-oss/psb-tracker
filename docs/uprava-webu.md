@@ -21,7 +21,7 @@ návštevník, bez prihlásenia.
 | ✅ **Slider Revolution vypnutý na článkoch** | 7 súborov, 546 kB z každého článku | stiahnutie troch článkov bez prihlásenia: `revslider` sa nevyskytuje ani raz; úvodná stránka slider ďalej má |
 | ✅ **Cieľ zálohovania prepnutý z OneDrive na Google Drive** | Varovanie „need UpdraftPlus Premium" zmizlo, OneDrive sa v nastavení už nespomína | prečítanie stránky UpdraftPlus po uložení: varovanie preč, Google Drive vybraný |
 | ✅ **4a čiastočne · alt texty na `arm-lines`** | 16 obrázkov dostalo alt: štyri línie paže (SFAL, SBAL, DFAL, DBAL), úpony, rotátory ramena. Kde názov súboru neurčoval sval jednoznačne, opisujem oblasť namiesto hádania | stiahnutie stránky bez prihlásenia: **41 zo 47** obrázkov má alt (predtým 25). Zvyšných 6 sú screenshoty a jedna fotka — z názvu súboru sa obsah zistiť nedá |
-| ✅ **LocalBusiness schema na webe** | Meno, adresa, telefón, mail a logo v JSON-LD na úvodnej stránke a na Kontakte. Vložené ako snippet č. 17 v plugine Snippety, bez ďalšieho pluginu. Otváracie hodiny zámerne chýbajú — na webe nie sú | stiahnutie oboch stránok bez prihlásenia: JSON-LD sa načíta a rozparsuje, typ `LocalBusiness`, adresa Fanderlíková 70, 616 00 Brno – Žabovřesky. Na článku `arm-lines` sa nevyskytuje (má tam byť len na tých dvoch). Úvodná, Kontakt, Služby aj článok ďalej vracajú 200 |
+| ✅ **LocalBusiness schema vrátane otváracích hodín** | Meno, adresa, telefón, mail, logo a hodiny (Po–Pi 7:00–20:00, Ne 8:00–14:00) v JSON-LD na úvodnej stránke a na Kontakte. Snippet č. 17 v plugine Snippety, bez ďalšieho pluginu. Hodiny som najprv vynechal s odôvodnením, že na webe nie sú — **boli, na úvodnej pod „Kde trénujeme". Hľadal som ich len na Kontakte** | stiahnutie oboch stránok bez prihlásenia: JSON-LD sa načíta a rozparsuje, typ `LocalBusiness`, adresa Fanderlíková 70, 616 00 Brno – Žabovřesky. Na článku `arm-lines` sa nevyskytuje (má tam byť len na tých dvoch). Úvodná, Kontakt, Služby aj článok ďalej vracajú 200 |
 | ✅ **Nič neodkazuje na skryté stránky** | Prehľadaných všetkých 32 adries zo sitemapy | na `skupinovy-trenink` ani `lekce-fascialni-svoboda` nevedie ani jeden odkaz. Moje tvrdenie o karte „Skupinový trénink" na Službách bolo nesprávne — taká karta tam nie je |
 | ✅ **Zálohy chodia do Google Drivu** | Kompletná záloha z 15. 8. 20:11 (databáza, pluginy, šablóny, nahrané súbory) leží v Drive; ~4,7 GB, Drive obsadený 9,78 z 15 GB | v UpdraftPlus má riadok štítok **„Vzdálené úložiště: Google Drive"** (staršie dva majú OneDrive), a v Drive sú súbory `backup_2026-08-15…` z 20:12–20:21 |
 | ✅ **Zrušené služby stiahnuté z webu** | `skupinovy-trenink` a `lekce-fascialni-svoboda` dané do konceptu — Jerry 15. 8.: „skupinový trénink sme upustili, tento projekt nerealizujeme… rovnako lekce fasciálni svoboda". Obsah v WordPresse zostáva | zvonku obidve vracajú **404** a zmizli zo sitemapy (32 adries namiesto 34); `jak-to-funguje`, `online-trenink` a `sluzby` ďalej 200 |
@@ -109,10 +109,28 @@ a tým to skončilo, plugin zostal. Je to piata obrazovka za dnešok, ktorá cez
 automatizáciu nedobehne (Yoast, Websupport, okno UpdraftPlus, Asset CleanUp,
 teraz mazanie pluginov).
 
+**Ani Jerrymu sa to nepodarilo** (15. 8.): *„nedajú sa zmazať, dokonca som
+Pinterest aj aktualizoval, ale nedá sa to zmazať, proste to tam ostane."* Príčina
+je teda hlbšie než v poradí — pravdepodobne práva na súbory na serveri. **Ostáva
+to tak a je to prijateľné:** oba pluginy sú neaktívne a **aktualizované**, čiže
+neobsahujú známe diery. Rozdiel medzi „neaktívny a aktuálny" a „zmazaný" je malý.
+Ak by sa to raz malo dorobiť, ide to cez správcu súborov na hostingu — ale to je
+zásah do súborov webu a nie je naň dôvod.
+
+<details><summary>pôvodný postup (nefunguje)</summary>
+
 **Pre Jerryho sú to štyri kliky:** `Pluginy → Neaktivní` → pri Pinterest
 **Smazat** → potvrdiť → pri WooCommerce **Smazat** → potvrdiť.
 Šablóna: `Vzhled → Šablony` → Twenty Twenty-Four → **Smazat**. Twenty
 Twenty-Five ponechať.
+
+</details>
+
+### ~~6 · Aktualizovať 24 pluginov~~ — HOTOVÉ (Jerry, 15. 8.)
+Po aktualizácii overené zvonku: úvodná, `sluzby`, `kontakt`, `jak-to-funguje`,
+`online-trenink` aj `arm-lines` vracajú 200. Nič sa nerozsypalo.
+
+<details><summary>pôvodný plán</summary>
 
 ### 6 · Aktualizovať 24 pluginov
 **Zámerne posledné a až po zálohách.** Zálohy už fungujú, takže krytie je.
@@ -203,9 +221,7 @@ titulok — a nikde nie je prídavné meno navyše.
 Posledné dva sú krátke zámerne: sú to právne stránky, na ktoré nikto nehľadá,
 a dlhý popis by im dal váhu, ktorú mať nemajú.
 
-### H5 · Otváracie hodiny do LocalBusiness schémy
-Na webe nikde nie sú. Keď mi ich napíšeš, dopíšem ich do snippetu a Google ich
-bude môcť ukázať priamo vo výsledku vyhľadávania.
+### ~~H5 · Otváracie hodiny~~ — HOTOVÉ. Boli na úvodnej pod „Kde trénujeme".
 
 ### H6 · Skontrolovať znenie altov na jednej stránke
 Na `arm-lines` som doplnil 16 altov s anatomickými názvami. **Pozri sa na ne
