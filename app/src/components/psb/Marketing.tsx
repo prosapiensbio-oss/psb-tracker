@@ -45,7 +45,7 @@ import { Napady } from "./Napady";
 import { KedyPublikovat } from "./KedyPublikovat";
 import { AkoMeratReklamu, Kohorta, Lievik, Naklady } from "./MarketingLievik";
 import { Kanaly } from "./Kanaly";
-import { prilezitostiTitulkov } from "../../lib/psb/webObsah";
+import { chybyNaStrankach, prilezitostiTitulkov } from "../../lib/psb/webObsah";
 import { prilezitosti, soZamerom, zhrnutieWebu, type Dopyt } from "../../lib/psb/google";
 import { kontrolaAds, kontrolaMerania } from "../../lib/psb/kontrolaDat";
 import { adsMesiace, cenaZaKlik, zhrnutieAds } from "../../lib/psb/googleAds";
@@ -911,6 +911,25 @@ function Vyhladavanie({ chat }: { chat?: AssistantChat }) {
       )}
 
       <Titulky chat={chat} />
+
+      {WEB_STRANKY.length > 0 && (() => {
+        const chyby = chybyNaStrankach(WEB_STRANKY.map((s) => ({ ...s, text: "" })));
+        if (!chyby.length) return null;
+        return (
+          <Card>
+            <H3><Info label="Čo je na stránkach technicky zle" text="Spočítané z textu, ktorý už v Kokpite je — žiadny SEO nástroj ani ďalšia služba. Duplicitný titulok znamená, že si dve tvoje stránky vo výsledkoch konkurujú a Google si vyberie, ktorú ukáže. Odseknutý titulok znamená, že človek prečíta len jeho polovicu. Nie je to celý audit; je to tá časť, ktorá sa dá overiť z vlastných dát a niečo z nej vyplýva." /></H3>
+            <SortTable
+              rolovat={3}
+              riadky={chyby}
+              stlpce={[
+                { id: "druh", label: "Nález", farba: (r) => (r.druh.includes("duplicit") || r.druh.includes("chýba") ? C.red : C.textMuted) },
+                { id: "url", label: "Stránka", farba: () => C.text },
+                { id: "detail", label: "Čo to znamená" },
+              ]}
+            />
+          </Card>
+        );
+      })()}
 
       <Card>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>

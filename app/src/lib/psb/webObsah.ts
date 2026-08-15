@@ -129,6 +129,73 @@ export function typZoSitemapy(sitemapUrl: string): string {
   return "";
 }
 
+export type ChybaStranky = { url: string; druh: string; detail: string };
+
+/**
+ * Technické chyby, ktoré sa dajú nájsť v texte, čo už v tabuľke leží.
+ *
+ * PREČO SA NA TO NEPOUŽÍVA ŽIADNY SEO NÁSTROJ
+ *
+ * Toto je presne to, čo platené SEO nástroje predávajú ako „audit" — a čo sa
+ * z importovaného textu spočíta bez jedinej ďalšej služby. Nie je to celý
+ * audit; je to tá časť, ktorá sa dá overiť z vlastných dát a má akciu.
+ *
+ * Prahy nie sú náhodné:
+ *  - 60 znakov: Google titulok nad túto dĺžku vo výsledkoch odsekne. Vetu si
+ *    prečíta človek do polovice a rozhodne sa podľa nej.
+ *  - 160 znakov: to isté pri popise.
+ *  - 300 znakov textu: pod tým stránka nemá o čom byť. Nie je to pravidlo
+ *    Googlu, je to zdravý rozum — a preto sa hlási ako „skontroluj", nie „zle".
+ *
+ * Duplicitný titulok je najhorší z tých nálezov: dve stránky si vo výsledkoch
+ * konkurujú a Google si vyberie, ktorú ukáže. To rozhodnutie sa dá vziať späť
+ * jednou vetou.
+ */
+export function chybyNaStrankach(stranky: WebStranka[]): ChybaStranky[] {
+  const von: ChybaStranky[] = [];
+  const precitane = stranky.filter((s) => s.titulok || s.znakov > 0);
+
+  const podlaTitulku = new Map<string, string[]>();
+  for (const s of precitane) {
+    const t = s.titulok.trim().toLowerCase();
+    if (!t) continue;
+    podlaTitulku.set(t, [...(podlaTitulku.get(t) || []), s.url]);
+  }
+  for (const [t, urly] of podlaTitulku) {
+    if (urly.length < 2) continue;
+    for (const u of urly) {
+      von.push({
+        url: u, druh: "duplicitný titulok",
+        detail: `„${t}“ má ${urly.length} stránky — Google si vyberie, ktorú ukáže, a to rozhodnutie robí zaňho niekto iný`,
+      });
+    }
+  }
+
+  for (const s of precitane) {
+    if (!s.titulok) {
+      von.push({ url: s.url, druh: "chýba titulok", detail: "vo výsledkoch Googlu sa zobrazí, čo si Google vyberie sám" });
+    } else if (s.titulok.length > 60) {
+      von.push({ url: s.url, druh: "dlhý titulok", detail: `${s.titulok.length} znakov — Google odsekne, viditeľné bude „${s.titulok.slice(0, 60)}…“` });
+    }
+    if (!s.metaPopis) {
+      von.push({ url: s.url, druh: "chýba popis", detail: "druhý riadok vo výsledkoch si Google zloží sám z textu stránky" });
+    } else if (s.metaPopis.length > 160) {
+      von.push({ url: s.url, druh: "dlhý popis", detail: `${s.metaPopis.length} znakov, odsekne sa na 160` });
+    }
+    if (s.znakov > 0 && s.znakov < 300) {
+      von.push({ url: s.url, druh: "málo textu", detail: `${s.znakov} znakov — skontroluj, či stránka má o čom byť` });
+    }
+    if (s.titulok && s.h1 && s.titulok.toLowerCase() === s.h1.toLowerCase()) {
+      // Nie chyba, ale premárnené miesto: titulok je pre vyhľadávanie,
+      // nadpis pre človeka, ktorý už na stránke je. Môžu hovoriť dve veci.
+      von.push({ url: s.url, druh: "titulok = nadpis", detail: "dve miesta na dve rôzne vety, použité na jednu" });
+    }
+  }
+
+  const poradie = ["duplicitný titulok", "chýba titulok", "chýba popis", "dlhý titulok", "dlhý popis", "málo textu", "titulok = nadpis"];
+  return von.sort((a, b) => poradie.indexOf(a.druh) - poradie.indexOf(b.druh));
+}
+
 export type PrilezitostTitulku = {
   url: string; titulok: string; metaPopis: string;
   zobrazenia: number; kliky: number; ctr: number;

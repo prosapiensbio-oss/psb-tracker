@@ -16,7 +16,7 @@ import {
 import { MKT_OBSAH } from "./marketing-obsah";
 import { prilezitosti, soZamerom } from "./google";
 import { adsMesiace, zhrnutieAds } from "./googleAds";
-import { prilezitostiTitulkov } from "./webObsah";
+import { chybyNaStrankach, prilezitostiTitulkov } from "./webObsah";
 import {
   cenaZaSedenie,
   kotvaDat,
@@ -492,6 +492,10 @@ export function buildAiContext(
           : "Text webu sa ešte nestiahol. NEODPOVEDAJ, že o obsahu webu nič nevieš — v Marketingu → Web a Google je karta „Text webu“ a treba stlačiť Prečítať web. Prázdna tabuľka nie je dôkaz.",
         stranok: WEB_STRANKY.length,
         titulky: WEB_STRANKY.map((s) => ({ url: s.url, typ: s.typ, titulok: s.titulok, popis: s.metaPopis })).slice(0, 90),
+        // Technická kontrola z tých istých dát: duplicitné titulky, chýbajúce
+        // popisy, odseknuté vety. Presne to, čo platené SEO nástroje predávajú
+        // ako „audit", spočítané bez ďalšej služby.
+        chyby: chybyNaStrankach(WEB_STRANKY.map((s) => ({ ...s, text: "" }))),
         titulkyNaPrepis: prilezitostiTitulkov(
           WEB_STRANKY.map((s) => ({ ...s, text: "" })),
           GSC_STRANY.map((g) => ({ url: g.url, zobrazenia: g.zobrazenia, kliky: g.kliky })),

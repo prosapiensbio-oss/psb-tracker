@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import {
-  h1ZHtml, metaPopisZHtml, normUrl, prilezitostiTitulkov, sitemapUrls,
+  chybyNaStrankach, h1ZHtml, metaPopisZHtml, normUrl, prilezitostiTitulkov, sitemapUrls,
   sitemapZapisy, textZHtml, titulokZHtml, typZoSitemapy, type WebStranka,
 } from "./webObsah";
 
@@ -150,5 +150,53 @@ describe("príležitosti v titulkoch", () => {
 
   test("pri málo stránkach radšej nič než náhodný medián", () => {
     expect(prilezitostiTitulkov(stranky, gsc.slice(0, 2))).toEqual([]);
+  });
+});
+
+describe("technické chyby na stránkach", () => {
+  const st = (u: string, o: Partial<WebStranka> = {}): WebStranka => ({
+    url: u, typ: "stranka", titulok: "Titulok", metaPopis: "Popis",
+    h1: "Nadpis", text: "", znakov: 1000, ...o,
+  });
+
+  test("duplicitný titulok sa hlási na OBOCH stránkach", () => {
+    // Hlásiť len jednu by znamenalo, že sa opraví tá nesprávna.
+    const v = chybyNaStrankach([
+      st("https://x.cz/a/", { titulok: "Cvičení na záda" }),
+      st("https://x.cz/b/", { titulok: "cvičení na záda" }),   // aj pri inej velkosti pisma
+      st("https://x.cz/c/", { titulok: "Něco jiného" }),
+    ]).filter((c) => c.druh === "duplicitný titulok");
+    expect(v.map((c) => c.url).sort()).toEqual(["https://x.cz/a/", "https://x.cz/b/"]);
+  });
+
+  test("neprečítaná stránka sa nehlási ako chybná", () => {
+    // Prázdny riadok pred importom nie je chyba webu, je to chýbajúci import —
+    // a hlásiť ho ako chybu by znamenalo 79 falošných nálezov.
+    expect(chybyNaStrankach([st("https://x.cz/a/", { titulok: "", metaPopis: "", h1: "", znakov: 0 })])).toEqual([]);
+  });
+
+  test("dlhý titulok hlási, čo z neho zostane vidieť", () => {
+    const dlhy = "A".repeat(75);
+    const v = chybyNaStrankach([st("https://x.cz/a/", { titulok: dlhy })]);
+    const c = v.find((x) => x.druh === "dlhý titulok");
+    expect(c?.detail).toContain("75 znakov");
+    expect(c?.detail).toContain("A".repeat(60));
+  });
+
+  test("titulok rovnaký ako nadpis je nález, nie chyba", () => {
+    const v = chybyNaStrankach([st("https://x.cz/a/", { titulok: "To isté", h1: "to isté" })]);
+    expect(v.some((c) => c.druh === "titulok = nadpis")).toBe(true);
+  });
+
+  test("najhoršie nálezy sú prvé", () => {
+    const v = chybyNaStrankach([
+      st("https://x.cz/a/", { titulok: "Rovnaký", h1: "Rovnaký" }),
+      st("https://x.cz/b/", { titulok: "" }),
+    ]);
+    expect(v[0].druh).toBe("chýba titulok");
+  });
+
+  test("stránka bez chýb nevyrobí žiadny riadok", () => {
+    expect(chybyNaStrankach([st("https://x.cz/a/")])).toEqual([]);
   });
 });

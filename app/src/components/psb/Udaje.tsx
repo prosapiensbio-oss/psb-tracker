@@ -811,18 +811,18 @@ function NapojenieTextWebu() {
   const chyba = (stav?.vsetky ?? 0) - (stav?.sText ?? 0);
   const btn = { fontSize: 12, padding: "6px 12px", borderRadius: 6, border: `1px solid ${C.accent}`, background: "transparent", color: C.accent, cursor: robim ? "default" : "pointer", opacity: robim ? 0.5 : 1 } as const;
   return (
-    <Card>
-      <H3>Text webu</H3>
-      <div style={{ fontSize: 13, color: C.textMuted, lineHeight: 1.55, margin: "6px 0 10px" }}>
-        Kokpit o webe doteraz vedel len čísla — kto prišiel a na čo hľadal. Nevedel,
-        čo na stránkach stojí, takže sa dalo povedať „táto stránka má 15 777 zobrazení
-        a 97 klikov“ a nedalo sa povedať, čo s tým. Po prečítaní je v Marketingu →
-        Web a Google karta „Titulky na prepis“ a Jarvis vie navrhnúť konkrétny nový titulok.
+    <div style={{ marginTop: 14, padding: 12, background: mix(C.accent, 6), borderRadius: 8 }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: C.textMuted, marginBottom: 6 }}>
+        <Info
+          label="Text webu — titulky, popisy a obsah stránok"
+          text="Číta text vlastného webu zo sitemapy WordPressu. Kokpit o webe dovtedy vedel len čísla — kto prišiel a na čo hľadal — nie čo na stránkach STOJÍ, takže sa dalo povedať „15 777 zobrazení, 97 klikov“ a nedalo sa povedať, čo s tým. Po prečítaní je v Marketingu → Web a Google karta „Titulky na prepis“ a Jarvis dostane SQL prístup k celému textu, takže sa dá spýtať na hocijakú stránku. Nepotrebuje kľúč ani token: web je verejný."
+        />
       </div>
-      <div style={{ fontSize: 12, color: C.text, marginBottom: 8 }}>
-        {stav
-          ? `${stav.sText} z ${stav.vsetky} stránok má text${chyba > 0 ? `, ${chyba} chýba` : ""}${stav.naposledy ? ` · naposledy ${stav.naposledy.slice(0, 10)}` : ""}`
-          : "Zisťujem stav…"}
+      <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 8, lineHeight: 1.6 }}>
+        Stránok s textom: <b style={{ color: (stav?.sText ?? 0) > 0 ? C.green : C.orange }}>{stav?.sText ?? 0}</b>
+        {" z "}<b style={{ color: C.text }}>{stav?.vsetky ?? 0}</b>
+        {chyba > 0 && <> · chýba <b style={{ color: C.orange }}>{chyba}</b></>}
+        {stav?.naposledy && <> · naposledy {stav.naposledy.slice(0, 10)}</>}
       </div>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <button style={btn} disabled={robim} onClick={() => void posli({})}>
@@ -838,7 +838,7 @@ function NapojenieTextWebu() {
         si natiahne sama pri najbližšej kontrole — nemusíš si to pamätať. „Odznova“ je
         len na prípad, že by sa text zmenil bez toho dátumu (napríklad po zmene šablóny).
       </div>
-    </Card>
+    </div>
   );
 }
 

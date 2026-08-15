@@ -83,3 +83,10 @@ záver odporuje tomu, čo Jerry hovorí zo skúsenosti.
   >= '...'` Google odmietne s `EXPECTED_FILTERS_ON_DATE_RANGE`; musí to byť
   `BETWEEN od AND do`. Test na to je v `googleAds.test.ts` — otvorený rozsah
   nespadne pri písaní, spadne až naživo.
+- **Nový import znamená nový riadok v `SCHEMA_DB`.** Jarvis má SQL prístup, ale
+  schéma, ktorú dostáva, je samostatná kópia — bez riadku o tabuľke o nej nevie
+  a na otázku odpovie „nevidím", hoci dáta sú. Pri `web_stranky` som to 15. 8.
+  najprv vynechal: do kontextu som dal 90 titulkov a text nechal len v DB, takže
+  Jarvis mal „prístup na celý web" len na papieri. Keď je tabuľka veľká na to,
+  aby šla celá do kontextu, patrí do schémy s návodom, ako sa v nej hľadá
+  (`WHERE text LIKE`) a s ktorou tabuľkou sa JOIN-uje.
