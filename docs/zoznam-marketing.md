@@ -165,10 +165,10 @@ v registri. Dokumenty pozná Jarvis, evidencia nie je.
 
 | | |
 |---|---|
-| **Spýtať sa FP na dve veci** (`FPPolicy@Functionalpatterns.com`) | (1) Pokrýva „any other health focused professional" zubára a dentálnu hygieničku? Menované profesie sú všetky z pohybu a manuálnej terapie, takže zámer môže byť „kto by metódu mohol aplikovať", nie „kto má zdravotnícke vzdelanie". (2) Smie verifikačný odkaz ísť aj na prosapiens.cz? Handbook ho predpisuje do website poľa Instagramu a pre web predpisuje ich hotovú stránku — iné umiestnenie nezakazuje, ale ani nepovoľuje |
-| **Verifikačný odkaz na stránku „Co je Functional Patterns"** | Až po odpovedi FP. Je to najnavštevovanejšia podstránka a chodia tam presne tí, čo si overujú, či si skutočný. Asymetria hrá pre PSB: konkurencia metódu menuje, PSB ju vie DOKÁZAŤ — odkaz, za ktorý ručí FP, má len certifikovaný praktik. Odkaz prezrádza len meno, kurz, platnosť a fotku |
+| **Odoslať mail FP — text je hotový** (`FPPolicy@Functionalpatterns.com`) | Napísaný 15. 8. 2026, leží v [`docs/fp-otazka.md`](fp-otazka.md), treba len doplniť kontakt a poslať. **Termín: 22. 8. 2026** — Jerry si vypýtal pripomenutie o týždeň. Dve otázky: (1) pokrýva „any other health focused professional" zubára a dentálnu hygieničku? (2) smie verifikačný odkaz ísť aj na prosapiens.cz? |
+| **Pridať verifikačný odkaz FP na web** | Jerry rozhodol 15. 8., že sa to urobí — konkrétne umiestnenie na stránku „Co je Functional Patterns". Je to najnavštevovanejšia podstránka a chodia tam presne tí, čo si overujú, či je certifikácia pravá. Asymetria hrá pre PSB: konkurencia metódu menuje, PSB ju vie DOKÁZAŤ — odkaz, za ktorý ručí FP, má len certifikovaný praktik. Prezrádza len meno, kurz, platnosť a fotku. Poradie: mail FP → odpoveď → odkaz na web (otázka 2 sa týka presne tohto umiestnenia) |
+| **Pustiť Jarvisa na stránku „Co je Functional Patterns"** | Po natiahnutí textu webu má Jarvis titulok, popis aj obsah tejto stránky. Nechať ho navrhnúť, čo tam ešte prepísať — teraz už môže menovať FP, takže sa mení, čo tam vôbec smie stáť. Jerry si úpravy robí sám vo WordPresse; od Jarvisa chce hotové vety, nie rady |
 | **Prejsť klientov, ktorým sa posielal before/after** | Zistiť, u ktorých chýba FP NDA. Pozor na dva rôzne dokumenty: súhlas so zverejnením obsahu (ten Jerry podľa vlastných slov má) NIE JE NDA. Súhlas chráni klienta, NDA chráni metódu FP |
-| **Rozhodnúť o pravidle „FP sa nemenuje"** | Overené 15. 8.: je to positioning voľba PSB, **nie povinnosť z NDA**. Handbook v sekcii Existing Branding uvádzanie certifikácie na vlastnom webe výslovne povoľuje a dodáva na to hotový text. Pravidlo drží, kým Jerry nerozhodne inak — a rozhodnutie je jeho, nie compliance otázka |
 
 ### Hotové 15. 8.
 
@@ -178,3 +178,6 @@ v registri. Dokumenty pozná Jarvis, evidencia nie je.
 | Test „hovoril o tom Naudi verejne?" | Overiteľné kritérium namiesto dojmu pri hraničných prípadoch |
 | Before/after má v pravidlách dve branky | Schválenie na fp.app **a** písomný súhlas klienta |
 | Zákaz vyhľadávať FP spolu s PSB odstránený | Nemal oporu v žiadnom zo štyroch dokumentov — bola to moja domnienka, dvakrát po sebe |
+| **Pravidlo „FP sa nemenuje" zrušené** | Jerryho rozhodnutie 15. 8.: *„FP môžeme kľudne menovať."* Prepísané v Kokpite (`chat.ts`) aj v onboardingu (§2.3 bod 1). Zostalo ako poznámka o účinnosti — menom sa PSB neodlíši, konkurencia ho používa tiež, takže obsah dál stojí na symptóme; ale zákaz to nie je. Zakázané zostáva logo/wordmark a odhaľovanie metodiky |
+| Text stránok webu v Kokpite + karta „Titulky na prepis" | 79 URL zo sitemapy, spojené so Search Console, pri každej stránke jej súčasný titulok. Jarvis má navrhovať hotové titulky sám, nie čakať na vyzvanie |
+| FP dokumenty v Jarvisovom onboardingu | Čo v nich konkrétne stojí — platnosť NDA do 13. 9. 2028, 7-dňové ohlásenie pri výnimke z mlčanlivosti, súhlas so zverejnením ≠ NDA. Vedome bez evidencie v Kokpite |

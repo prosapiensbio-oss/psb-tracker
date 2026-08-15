@@ -91,7 +91,7 @@ Vyhýbej se klišé a přehánění: „transformuj svůj život", „revolučn�
 ### 2.3 FP compliance — nepřekročitelný metodický limit
 PSB funguje v souladu s Functional Patterns. Pro marketing z toho plynou tvrdá pravidla:
 
-1. **FP se ve veřejném obsahu nikdy nejmenuje.** Obsah vysvětluje *mechanismy a principy*, ne metodiku. (Pozn.: web historicky obsahuje stránku „Co je Functional Patterns" — to je výjimka daná strukturou webu; nový obsah, reklamy, posty a lead magnety FP nejmenují.)
+1. **Functional Patterns se smí jmenovat.** Jerry to rozhodl 15. 8. 2026 a dokumenty to nikdy nezakazovaly — bylo to vlastní positioning pravidlo, přísnější než dohoda vyžaduje. Jmenovat metodu ale není totéž jako ji vysvětlovat, a **jménem se PSB neodliší**: konkurence ho používá taky. Meno má cenu tam, kde se *dokazuje* — člověk, který už je na webu a ověřuje si, jestli je certifikace pravá; tam PSB drží asymetrii, protože verifikační odkaz, za který ručí FP, má jen certifikovaný praktik. Nemá cenu tam, kde se *přitahuje* — v reklamě a při prvním doteku je to pro člověka, který metodu nezná, prázdné slovo. Obsah proto dál stojí na **symptomu a mechanismu** (co potvrzují čísla: „padající kolena dovnitř" 2,7 % proklik, anatomické stránky 0,6 %), ne na názvu metody. Toto je volba účinnosti, ne compliance omezení.
 2. **Neodhaluj interní metodiku** — žádný cueing krok za krokem, žádná struktura výuky, žádné neveřejné technické detaily. Veřejná komunikace vysvětluje *smysl* služby, neučí metodiku.
 3. **Pracuj s principy, ne s know-how** — filozofii překládej do srozumitelného jazyka bez úniku chráněného obsahu. Principy, se kterými se pracuje veřejně: integrovaný pohyb, elastický recoil, přirozené pohybové vzorce (chůze / běh / hod), SAID princip. Vždy podložené peer-reviewed zdroji (Schleip, Wilke, Earls, Myers a další).
 4. **FP soulad má přednost před marketingovou atraktivitou.** Když je něco komunikačně silné, ale metodicky nepřesné, nepoužívej to. Upozorni a navrhni alternativu.
@@ -100,7 +100,15 @@ PSB funguje v souladu s Functional Patterns. Pro marketing z toho plynou tvrdá 
 7. **Before/after obsah má dvě branky, ne jednu.** Musí projít schválením na fp.app *a* klient musí dát předchozí písemný souhlas se zveřejněním. Bez obojího se nepublikuje.
 8. **Když si nejsi jistý, zvol konzervativní formulaci.**
 
-**Pozn. k bodu 1 (doplněno 15. 8. 2026):** pravidlo „FP se nikdy nejmenuje" je **vlastní rozhodnutí PSB, přísnější než NDA a FP Policy vyžadují.** Handbook v sekci *Existing Branding* naopak výslovně povoluje uvádět certifikaci na vlastním webu (FP dodává hotovou stránku jako tab „Functional Patterns") a post na vlastních sítích s odkazem na FP MIP; zakázané je jen *stálé* uvádění certifikace v bio nefirmovaného účtu (cross promotion policy). Pravidlo se tedy drží jako **positioning volba**, ne jako compliance povinnost — a kdyby ho Jerry chtěl změnit, není to porušení dohody. Rozhodnutí je jeho.
+**Historie bodu 1.** Do 15. 8. 2026 tu stálo „FP se ve veřejném obsahu nikdy
+nejmenuje". Po přečtení čtyř FP dokumentů se ukázalo, že to žádný z nich
+nevyžaduje: Handbook v sekci *Existing Branding* uvádění certifikace na vlastním
+webu výslovně povoluje (FP dodává hotovou stránku jako tab „Functional
+Patterns") a povoluje i post na vlastních sítích s odkazem na FP MIP. Zakázané
+je jen *stálé* uvádění certifikace v bio nefirmovaného účtu (cross promotion
+policy). Jerry pravidlo 15. 8. zrušil. Zůstalo jako doporučení o **účinnosti**,
+ne jako zákaz — a jsou dvě věci, které zákaz zůstávají: logo/wordmark a
+odhalování metodiky.
 
 NDA platí. Interní dokumenty FP jsou autoritou pro metodický rámec.
 
