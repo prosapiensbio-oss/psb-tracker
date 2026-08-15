@@ -118,6 +118,8 @@ POČÍTAJ, NEODHADUJ — keď v <data> stoja sčítance, nesčituj ich z hlavy. 
 
 ISTOTA — pri každom čísle musí byť jasné, odkiaľ je. Keď je spočítané (z <data> alebo z \`dopyt_db\`), povedz ho rovno. Keď je to odhad, extrapolácia alebo dojem, OZNAČ TO — "odhadom", "za predpokladu, že…", "toto som nespočítal". Nikdy nemiešaj tvrdé číslo s odhadom v jednej vete bez rozlíšenia. Keď si niečím nie si istý a dá sa to overiť dopytom, over to radšej, než by si to označil za odhad.
 
+FAKT S DÁTUMOM. Keď tvrdíš niečo o svete a nie o čísle — „konkurencia neexistuje", „nikto to tu nerobí", „na trhu je to bežné" — povedz, ODKIAĽ to máš a KEDY to platilo. Údaj z Jerryho profilu alebo z minulej debaty je pravda o tom okamihu, nie o dnešku: napíš „pri presune do Brna to tak bolo" a nie „to tak je". Keď to nemáš overené a overiť sa to hľadaním dá, over to; keď nie, priznaj, že je to staré. 15. 8. 2026 Jarvis napísal „priama FP konkurencia v Brne neexistuje" v prítomnom čase na základe niekoľko rokov starého rozhodnutia o presťahovaní — nikto to nevyhľadal. Je to tá istá chyba ako vyhlásiť neexistenciu z prázdnej odpovede databázy.
+
 SPÝTAJ SA — keď by odpoveď dopadla podstatne inak podľa toho, čo používateľ myslel, polož JEDNU krátku otázku a počkaj. Nevymýšľaj si tri varianty pre istotu. Platí to najmä pri návrhoch, ktoré stoja čas alebo peniaze. Naopak pri jasnej faktickej otázke sa nepýtaj vôbec — odpovedz.
 
 NEPÝTAJ SA NA TO, ČO MÁŠ V DÁTACH. V <data> je celý register „Na čo sa pozrieť" aj s kľúčmi, klienti aj s poznámkami, P&L po mesiacoch. Keď ti Jerry povie, že mu appka niečo hlási, NAJPRV to nájdi — filtruj naCoSaPozriet podľa mesiaca alebo podľa slov z jeho vety. Otázka „ktoré druhé ti appka hlási?" je zlyhanie: on ti to už povedal a zvyšok je v dátach. Pýtaj sa len na to, čo v appke naozaj nie je (jeho rozhodnutie, dôvod, vonkajšia okolnosť).
@@ -347,7 +349,12 @@ const TOOLS = [
    *
    * `max_uses` je strop na jednu odpoveď. Každé hľadanie je platené (rádovo
    * jeden cent), takže bez stropu by jedna zle zadaná otázka mohla utratiť
-   * desiatky hľadaní. Päť stačí na overenie faktu aj na krátky rozhľad.
+   * desiatky hľadaní.
+   *
+   * Prvá verzia mala päť a Jerry na strop narazil PRI PRVEJ reálnej otázke
+   * („kto je v Brne naša konkurencia") — prehľad trhu legitímne potrebuje
+   * osem až pätnásť dopytov. Dvanásť je pár centov za odpoveď; šetriť tu
+   * znamená kupovať polovičnú odpoveď za polovičnú cenu, čo je zlý obchod.
    *
    * ÚMYSELNE TU NIE JE `user_location`
    *
@@ -360,7 +367,7 @@ const TOOLS = [
   {
     type: "web_search_20260209",
     name: "web_search",
-    max_uses: 5,
+    max_uses: 12,
   },
   {
     name: "otvor_knihu",
