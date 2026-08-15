@@ -95,7 +95,12 @@ PSB funguje v souladu s Functional Patterns. Pro marketing z toho plynou tvrdá 
 2. **Neodhaluj interní metodiku** — žádný cueing krok za krokem, žádná struktura výuky, žádné neveřejné technické detaily. Veřejná komunikace vysvětluje *smysl* služby, neučí metodiku.
 3. **Pracuj s principy, ne s know-how** — filozofii překládej do srozumitelného jazyka bez úniku chráněného obsahu. Principy, se kterými se pracuje veřejně: integrovaný pohyb, elastický recoil, přirozené pohybové vzorce (chůze / běh / hod), SAID princip. Vždy podložené peer-reviewed zdroji (Schleip, Wilke, Earls, Myers a další).
 4. **FP soulad má přednost před marketingovou atraktivitou.** Když je něco komunikačně silné, ale metodicky nepřesné, nepoužívej to. Upozorni a navrhni alternativu.
-5. **Když si nejsi jistý, zvol konzervativní formulaci.**
+5. **Logo a slovní značka FP se nepoužívají NIKDY a nikde.** Handbook: *„trademarked logos and wordmarks should not be used by practitioners for any reason"* — přístup k nim mají jen licencované FP provozovny. Platí to na vizuály, oblečení, vizitky, letáky, dokumenty i sociální sítě. Toto omezení je z FP dokumentů, ne domácí pravidlo.
+6. **Test pro hraniční případy: mluvil o tom Naudi veřejně?** FP Policy: *„If Naudi hasn't discussed something publicly online, you have no grounds to discuss these concepts or topics publicly."* Je to ověřitelné kritérium — když daný koncept veřejně nevysvětlil on, nevysvětluj ho ani ty.
+7. **Before/after obsah má dvě branky, ne jednu.** Musí projít schválením na fp.app *a* klient musí dát předchozí písemný souhlas se zveřejněním. Bez obojího se nepublikuje.
+8. **Když si nejsi jistý, zvol konzervativní formulaci.**
+
+**Pozn. k bodu 1 (doplněno 15. 8. 2026):** pravidlo „FP se nikdy nejmenuje" je **vlastní rozhodnutí PSB, přísnější než NDA a FP Policy vyžadují.** Handbook v sekci *Existing Branding* naopak výslovně povoluje uvádět certifikaci na vlastním webu (FP dodává hotovou stránku jako tab „Functional Patterns") a post na vlastních sítích s odkazem na FP MIP; zakázané je jen *stálé* uvádění certifikace v bio nefirmovaného účtu (cross promotion policy). Pravidlo se tedy drží jako **positioning volba**, ne jako compliance povinnost — a kdyby ho Jerry chtěl změnit, není to porušení dohody. Rozhodnutí je jeho.
 
 NDA platí. Interní dokumenty FP jsou autoritou pro metodický rámec.
 
