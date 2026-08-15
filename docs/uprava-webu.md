@@ -20,6 +20,7 @@ návštevník, bez prihlásenia.
 |---|---|---|
 | ✅ **Slider Revolution vypnutý na článkoch** | 7 súborov, 546 kB z každého článku | stiahnutie troch článkov bez prihlásenia: `revslider` sa nevyskytuje ani raz; úvodná stránka slider ďalej má |
 | ✅ **Cieľ zálohovania prepnutý z OneDrive na Google Drive** | Varovanie „need UpdraftPlus Premium" zmizlo, OneDrive sa v nastavení už nespomína | prečítanie stránky UpdraftPlus po uložení: varovanie preč, Google Drive vybraný |
+| ✅ **4a čiastočne · alt texty na `arm-lines`** | 16 obrázkov dostalo alt: štyri línie paže (SFAL, SBAL, DFAL, DBAL), úpony, rotátory ramena. Kde názov súboru neurčoval sval jednoznačne, opisujem oblasť namiesto hádania | stiahnutie stránky bez prihlásenia: **41 zo 47** obrázkov má alt (predtým 25). Zvyšných 6 sú screenshoty a jedna fotka — z názvu súboru sa obsah zistiť nedá |
 | ✅ **LocalBusiness schema na webe** | Meno, adresa, telefón, mail a logo v JSON-LD na úvodnej stránke a na Kontakte. Vložené ako snippet č. 17 v plugine Snippety, bez ďalšieho pluginu. Otváracie hodiny zámerne chýbajú — na webe nie sú | stiahnutie oboch stránok bez prihlásenia: JSON-LD sa načíta a rozparsuje, typ `LocalBusiness`, adresa Fanderlíková 70, 616 00 Brno – Žabovřesky. Na článku `arm-lines` sa nevyskytuje (má tam byť len na tých dvoch). Úvodná, Kontakt, Služby aj článok ďalej vracajú 200 |
 | ✅ **Nič neodkazuje na skryté stránky** | Prehľadaných všetkých 32 adries zo sitemapy | na `skupinovy-trenink` ani `lekce-fascialni-svoboda` nevedie ani jeden odkaz. Moje tvrdenie o karte „Skupinový trénink" na Službách bolo nesprávne — taká karta tam nie je |
 | ✅ **Zálohy chodia do Google Drivu** | Kompletná záloha z 15. 8. 20:11 (databáza, pluginy, šablóny, nahrané súbory) leží v Drive; ~4,7 GB, Drive obsadený 9,78 z 15 GB | v UpdraftPlus má riadok štítok **„Vzdálené úložiště: Google Drive"** (staršie dva majú OneDrive), a v Drive sú súbory `backup_2026-08-15…` z 20:12–20:21 |
@@ -59,9 +60,9 @@ existuje skryté pole `yoast_wpseo_metadesc`, hodnotu doň nastaviť viem, ale
 tlačidlo *Aktualizovat* sa cez automatizáciu nespustí — rovnaký problém ako pri
 Yoaste, Websupporte a modálnom okne UpdraftPlus.
 
-**Návrh:** popisy vkladá Jerry (12× kopírovať-vložiť do poľa „Meta description"
-v Yoast boxe pod editorom), alebo mu ich pripravím ako jeden zoznam na jedno
-sedenie. Texty dodám ja, klik je jeho.
+**Texty sú napísané, všetkých desať.** Vkladajú sa v editore stránky do poľa
+**„Meta description"** v Yoast boxe pod obsahom. Presunuté do časti
+„Potrebujem Jerryho" ako H4.
 
 ### 3 · ~~LocalBusiness schema~~ — HOTOVÉ, viď tabuľka Hotové
 
@@ -144,6 +145,36 @@ vedú (`sluzby`, `predsunuta-hlava`, `anterior-pelvic-tilt`) na
 - **„iné"** → povedz kam
 
 </details>
+
+### H4 · Vložiť desať meta popisov do Yoastu
+Napísané zo skutočného textu tých stránok. Nikde nie je značka — tú nesie
+titulok — a nikde nie je prídavné meno navyše.
+
+| stránka | text do poľa „Meta description" |
+|---|---|
+| `sluzby` | Diagnostika držení těla a chůze, individuální i online trénink v Brně. Úvodní lekce 60 minut za 1 100 Kč. |
+| `dychani` | Box breathing ani brániční dech nezabraly? Problém není v technice, ale ve struktuře těla. Zkrácená verze příručky o dýchání zdarma. |
+| `jerry` | Jerry Stráňavský: od fitness center a certifikací v DNS a SM-systému k biomechanice. Proč výsledky klientů nebyly trvalé — a co to změnilo. |
+| `terezia` | Terézia: z výkonnostního volejbalu přes bolesti z jednostranného přetěžování ke studiu FTVŠ a biomechanickému tréninku v Brně. |
+| `matyas` | Matyáš: od tance na konzervatoři k zájmu o pohyb a zdraví. Co ho přivedlo k biomechanice a proč hledá i regulační stránku těla. |
+| `doporucene-pomucky` | Pomůcky pro aktivní trénink — odporové gumy, jednoručky, kettlebelly a balanční pomůcky. Co používáme ve studiu a co doporučujeme domů. |
+| `informace-po-uvodnim-treninku` | Vše, o čem jsme mluvili na úvodním tréninku, na jednom místě: délky tréninků, zázemí, individuální MFR plán a příručka ke stažení. |
+| `podekovani` | Děkujeme, ozveme se do 48 hodin. Mezitím si přečtěte, jak úvodní trénink probíhá, nebo si stáhněte protokol myofasciálního uvolňování zdarma. |
+| `gdpr` | Jak ProSapiens Biomechanic nakládá s osobními údaji klientů a návštěvníků webu. |
+| `obchodni-podminky` | Obchodní podmínky ProSapiens Biomechanic — platby, rezervace a rušení tréninků. |
+
+Posledné dva sú krátke zámerne: sú to právne stránky, na ktoré nikto nehľadá,
+a dlhý popis by im dal váhu, ktorú mať nemajú.
+
+### H5 · Otváracie hodiny do LocalBusiness schémy
+Na webe nikde nie sú. Keď mi ich napíšeš, dopíšem ich do snippetu a Google ich
+bude môcť ukázať priamo vo výsledku vyhľadávania.
+
+### H6 · Skontrolovať znenie altov na jednej stránke
+Na `arm-lines` som doplnil 16 altov s anatomickými názvami. **Pozri sa na ne
+skôr, než tým istým spôsobom prejdem ďalších ~470 obrázkov** — pri anatómii je
+nesprávny popis horší než žiadny a ty to poznáš, ja to čítam z názvov súborov.
+Stačí „sedí" alebo povedz, čo prepísať.
 
 ### H3 · DMARC záznam v DNS
 SPF máš, DMARC nie. Bez neho chodia maily z webu horšie (aj upozornenie na nový
