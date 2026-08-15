@@ -35,10 +35,36 @@ export function normUrl(u: string): string {
 
 /** Adresy zo sitemapy (aj z indexu — oboje má rovnaký tvar `<loc>`). */
 export function sitemapUrls(xml: string): string[] {
-  const von: string[] = [];
-  const re = /<loc>\s*([^<\s]+)\s*<\/loc>/gi;
+  return sitemapZapisy(xml).map((z) => z.url);
+}
+
+export type SitemapZapis = { url: string; zmenene: string };
+
+/**
+ * Adresa spolu s `lastmod`.
+ *
+ * PREČO SA TO ČÍTA
+ *
+ * Bez `lastmod` sa nedá poznať, že Jerry stránku upravil — tabuľka by držala
+ * starú kópiu textu a Jarvis by navrhoval prepísať titulok, ktorý je už
+ * prepísaný. WordPress `lastmod` pri úprave posúva sám, takže je to jediný
+ * signál, ktorý netreba nikomu pamätať. Prvá verzia tohto importu ho ignorovala
+ * a riešila to tlačidlom „prečítať odznova" — čo bola práca prehodená na
+ * človeka za niečo, čo appka vie sama.
+ */
+export function sitemapZapisy(xml: string): SitemapZapis[] {
+  const von: SitemapZapis[] = [];
+  // Blok `<url>…</url>` naraz, aby lastmod patril k správnej adrese —
+  // dva samostatné vzory by sa pri stránke bez lastmod rozišli o jeden riadok.
+  const re = /<(?:url|sitemap)\b[^>]*>([\s\S]*?)<\/(?:url|sitemap)>/gi;
   let m: RegExpExecArray | null;
-  while ((m = re.exec(String(xml || "")))) von.push(m[1]);
+  while ((m = re.exec(String(xml || "")))) {
+    const blok = m[1];
+    const u = /<loc>\s*([^<\s]+)\s*<\/loc>/i.exec(blok);
+    if (!u) continue;
+    const l = /<lastmod>\s*([^<\s]+)\s*<\/lastmod>/i.exec(blok);
+    von.push({ url: u[1], zmenene: l ? l[1] : "" });
+  }
   return von;
 }
 

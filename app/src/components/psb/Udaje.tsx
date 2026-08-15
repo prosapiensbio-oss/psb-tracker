@@ -829,13 +829,14 @@ function NapojenieTextWebu() {
           {chyba > 0 || !stav?.sText ? "Prečítať web" : "Skontrolovať nové stránky"}
         </button>
         <button style={{ ...btn, borderColor: C.textMuted, color: C.textMuted }} disabled={robim} onClick={() => void posli({ akcia: "obnov" })}>
-          Prečítať celý web odznova
+          Prečítať odznova (zvyčajne netreba)
         </button>
       </div>
       {hlaska && <div style={{ fontSize: 12, color: C.text, marginTop: 8 }}>{hlaska}</div>}
       <div style={{ fontSize: 12, color: C.textMuted, marginTop: 8 }}>
-        „Odznova“ je na po prepísaní titulkov — bez toho by v tabuľke zostala stará verzia
-        a Jarvis by navrhoval prepísať niečo, čo už je prepísané.
+        Keď stránku upravíš vo WordPresse, appka to pozná z dátumu v sitemape a text
+        si natiahne sama pri najbližšej kontrole — nemusíš si to pamätať. „Odznova“ je
+        len na prípad, že by sa text zmenil bez toho dátumu (napríklad po zmene šablóny).
       </div>
     </Card>
   );

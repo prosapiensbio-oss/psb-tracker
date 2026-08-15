@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import {
   h1ZHtml, metaPopisZHtml, normUrl, prilezitostiTitulkov, sitemapUrls,
-  textZHtml, titulokZHtml, typZoSitemapy, type WebStranka,
+  sitemapZapisy, textZHtml, titulokZHtml, typZoSitemapy, type WebStranka,
 } from "./webObsah";
 
 /**
@@ -35,6 +35,19 @@ describe("sitemapa", () => {
     expect(sitemapUrls(xml)).toEqual([
       "https://www.prosapiens.cz/a/",
       "https://www.prosapiens.cz/b/",
+    ]);
+  });
+
+  test("lastmod patrí k svojej adrese, aj keď ho jedna stránka nemá", () => {
+    // Dva samostatné vzory by sa pri stránke bez lastmod rozišli o jeden riadok
+    // a appka by potom prečítala nesprávnu stránku ako zmenenú.
+    const xml = `<urlset>
+      <url><loc>https://x.cz/a/</loc></url>
+      <url><loc>https://x.cz/b/</loc><lastmod>2026-08-15T10:00:00+00:00</lastmod></url>
+    </urlset>`;
+    expect(sitemapZapisy(xml)).toEqual([
+      { url: "https://x.cz/a/", zmenene: "" },
+      { url: "https://x.cz/b/", zmenene: "2026-08-15T10:00:00+00:00" },
     ]);
   });
 

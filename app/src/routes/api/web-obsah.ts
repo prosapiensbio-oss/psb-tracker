@@ -5,7 +5,7 @@ import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 import {
-  h1ZHtml, metaPopisZHtml, sitemapUrls, textZHtml, titulokZHtml, typZoSitemapy,
+  h1ZHtml, metaPopisZHtml, sitemapZapisy, textZHtml, titulokZHtml, typZoSitemapy,
 } from "../../lib/psb/webObsah";
 
 /**
@@ -76,8 +76,10 @@ export const Route = createFileRoute("/api/web-obsah")({
         try {
           const teraz = new Date().toISOString();
 
-          // „obnov" vynúti prečítanie celého webu odznova — po prepísaní
-          // titulkov je to jediný spôsob, ako sa nová verzia dostane dovnútra.
+          // „obnov" vynúti prečítanie celého webu odznova. Bežne to netreba:
+          // zmenu stránky poznať z `lastmod` v sitemape a text sa natiahne sám.
+          // Je to na prípad, keď sa text zmenil bez posunu `lastmod` — napríklad
+          // po zmene šablóny WordPressu, ktorá sa stránok formálne netýka.
           if (b.akcia === "obnov") {
             await DB.prepare("UPDATE web_stranky SET nacitane_at = NULL, text = ''").run();
           }
@@ -89,13 +91,22 @@ export const Route = createFileRoute("/api/web-obsah")({
             let xml = "";
             try { xml = await stiahni(ZAKLAD + s); } catch { continue; }
             const typ = typZoSitemapy(s);
-            const urly = sitemapUrls(xml);
-            for (let i = 0; i < urly.length; i += 50) {
-              const kus = urly.slice(i, i + 50);
-              await DB.batch(kus.map((u) => DB.prepare(
-                `INSERT INTO web_stranky (url, typ) VALUES (?1, ?2)
-                 ON CONFLICT(url) DO UPDATE SET typ = excluded.typ`,
-              ).bind(u, typ)) as never);
+            const zapisy = sitemapZapisy(xml);
+            for (let i = 0; i < zapisy.length; i += 50) {
+              const kus = zapisy.slice(i, i + 50);
+              // Keď sa `lastmod` posunul, stránka sa označí za neprečítanú a text
+              // sa natiahne znova. Bez toho by tu ležala stará kópia a Jarvis by
+              // navrhoval prepísať titulok, ktorý Jerry práve prepísal.
+              await DB.batch(kus.map((z) => DB.prepare(
+                `INSERT INTO web_stranky (url, typ, zmenene) VALUES (?1, ?2, ?3)
+                 ON CONFLICT(url) DO UPDATE SET
+                   typ = excluded.typ,
+                   nacitane_at = CASE WHEN ?3 <> '' AND IFNULL(web_stranky.zmenene, '') <> ?3
+                                      THEN NULL ELSE web_stranky.nacitane_at END,
+                   text = CASE WHEN ?3 <> '' AND IFNULL(web_stranky.zmenene, '') <> ?3
+                               THEN '' ELSE web_stranky.text END,
+                   zmenene = excluded.zmenene`,
+              ).bind(z.url, typ, z.zmenene)) as never);
               pribudlo += kus.length;
             }
           }
