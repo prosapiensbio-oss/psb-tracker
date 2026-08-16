@@ -80,16 +80,52 @@ export function JarvisOkno({
    */
   useEffect(() => { chat.newChat(""); }, []);
 
+  const [hladane, setHladane] = useState("");
   const zam = zameranie(chat.kategoria);
 
-  const { aktivne, archiv } = useMemo(() => {
-    const patri = (k?: string) => patriDoZoznamu(k, filter);
-    const zoradene = [...chat.chats].sort((a, b) => b.updatedAt - a.updatedAt);
-    return {
-      aktivne: zoradene.filter((c) => !c.archived && patri(c.kategoria)),
-      archiv: zoradene.filter((c) => c.archived && patri(c.kategoria)),
+  /**
+   * Hľadanie ide cez NÁZVY AJ TEXT SPRÁV.
+   *
+   * Názov je prvá Jerryho veta v rozhovore — ale hľadá sa spravidla to, čo
+   * padlo až v jeho strede („kde sme sa bavili o Google Ads"). Hľadanie len
+   * v názvoch by preto minulo väčšinu toho, čo človek naozaj hľadá.
+   *
+   * Beží v prehliadači: správy sú načítané už pri otvorení okna, takže sa
+   * nečaká na server a výsledok sa mení pri každom písmene.
+   *
+   * PRI HĽADANÍ SA ZAMERANIE IGNORUJE. Kto hľadá, nevie, v ktorom priečinku
+   * to je — a keby sa hľadalo len vo vybranom, výsledok by mlčal a nepovedal
+   * by prečo.
+   */
+  const { aktivne, archiv, najdenych } = useMemo(() => {
+    const h = hladane.trim().toLowerCase();
+    const patri = (k?: string) => (h ? true : patriDoZoznamu(k, filter));
+    const sedi = (c: typeof chat.chats[number]) => {
+      if (!h) return true;
+      if ((c.title || "").toLowerCase().includes(h)) return true;
+      return (c.messages || []).some((m) => (m.text || "").toLowerCase().includes(h));
     };
-  }, [chat.chats, filter]);
+    const zoradene = [...chat.chats].sort((a, b) => b.updatedAt - a.updatedAt);
+    const vybrane = zoradene.filter((c) => patri(c.kategoria) && sedi(c));
+    return {
+      aktivne: vybrane.filter((c) => !c.archived),
+      archiv: vybrane.filter((c) => c.archived),
+      najdenych: h ? vybrane.length : -1,
+    };
+  }, [chat.chats, filter, hladane]);
+
+  /** Kúsok správy, v ktorom sa hľadaný výraz našiel — aby bolo vidieť prečo. */
+  const uryvok = (c: typeof chat.chats[number]) => {
+    const h = hladane.trim().toLowerCase();
+    if (!h) return "";
+    if ((c.title || "").toLowerCase().includes(h)) return "";
+    const m = (c.messages || []).find((x) => (x.text || "").toLowerCase().includes(h));
+    if (!m) return "";
+    const t = m.text || "";
+    const i = t.toLowerCase().indexOf(h);
+    const od = Math.max(0, i - 34);
+    return (od > 0 ? "…" : "") + t.slice(od, i + h.length + 46).replace(/\s+/g, " ").trim() + "…";
+  };
 
   const chip = (aktivny: boolean) => ({
     padding: "5px 11px", borderRadius: 999, fontSize: 12, cursor: "pointer",
@@ -129,6 +165,34 @@ export function JarvisOkno({
           ))}
         </div>
 
+        <div style={{ margin: "10px 10px 0", position: "relative" }}>
+          <input
+            value={hladane}
+            onChange={(e) => setHladane(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Escape") setHladane(""); }}
+            placeholder="Hľadať v rozhovoroch…"
+            style={{
+              width: "100%", padding: "7px 26px 7px 10px", borderRadius: 8,
+              border: `1px solid ${C.border}`, background: "transparent", color: C.text,
+              fontSize: 12.5, fontFamily: "inherit", outline: "none",
+            }}
+          />
+          {hladane && (
+            <button
+              onClick={() => setHladane("")}
+              title="Zrušiť hľadanie (Esc)"
+              style={{ position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: C.textDim, fontSize: 12, cursor: "pointer", padding: 2, lineHeight: 1 }}
+            >✕</button>
+          )}
+        </div>
+        {najdenych >= 0 && (
+          <div style={{ padding: "6px 12px 0", fontSize: 11, color: C.textDim }}>
+            {najdenych === 0
+              ? "Nič sa nenašlo — hľadá sa v názvoch aj v texte správ."
+              : `${najdenych} ${najdenych === 1 ? "rozhovor" : najdenych < 5 ? "rozhovory" : "rozhovorov"} · hľadá sa naprieč všetkými zameraniami`}
+          </div>
+        )}
+
         <button
           onClick={() => chat.newChat(filter)}
           style={{
@@ -143,9 +207,11 @@ export function JarvisOkno({
         <div style={{ flex: 1, overflowY: "auto", padding: "0 6px 10px" }}>
           {aktivne.length === 0 && (
             <div style={{ padding: "10px 8px", fontSize: 11.5, color: C.textDim, lineHeight: 1.5 }}>
-              {filter
-                ? `V zameraní „${zameranie(filter).label}“ ešte žiadny rozhovor nie je.`
-                : "Zatiaľ žiadny rozhovor."}
+              {hladane.trim()
+                ? ""
+                : filter
+                  ? `V zameraní „${zameranie(filter).label}“ ešte žiadny rozhovor nie je.`
+                  : "Zatiaľ žiadny rozhovor."}
             </div>
           )}
           {aktivne.map((c) => (
@@ -154,6 +220,7 @@ export function JarvisOkno({
               // Odznak sa ukazuje len v spoločnom zozname — v priečinku by na
               // každom riadku svietilo to isté slovo a nič by nehovorilo.
               odznak={!filter && c.kategoria ? zameranie(c.kategoria).label : ""}
+              uryvok={uryvok(c)}
               aktivny={c.id === chat.chatId}
               onOpen={() => chat.openChat(c.id)}
               onArchive={() => chat.archiveChat(c.id)}
@@ -180,6 +247,7 @@ export function JarvisOkno({
                 <Riadok
                   key={c.id} nazov={(c as {vetva?:boolean}).vetva ? `⑂ ${c.title}` : c.title} kedy={fmtKedy(c.updatedAt)}
                   odznak={!filter && c.kategoria ? zameranie(c.kategoria).label : ""}
+                  uryvok={uryvok(c)}
                   aktivny={c.id === chat.chatId} dim
                   onOpen={() => chat.openChat(c.id)}
                   onArchive={() => chat.archiveChat(c.id)}
@@ -255,9 +323,9 @@ export function JarvisOkno({
 }
 
 function Riadok({
-  nazov, kedy, odznak, aktivny, dim, teraz, onOpen, onArchive, onDelete, onPresun, archivTitle,
+  nazov, kedy, odznak, uryvok, aktivny, dim, teraz, onOpen, onArchive, onDelete, onPresun, archivTitle,
 }: {
-  nazov: string; kedy: string; odznak?: string; aktivny: boolean; dim?: boolean; teraz: string;
+  nazov: string; kedy: string; odznak?: string; uryvok?: string; aktivny: boolean; dim?: boolean; teraz: string;
   onOpen: () => void; onArchive: () => void; onDelete: () => void;
   onPresun: (kategoria: string) => void; archivTitle: string;
 }) {
@@ -289,6 +357,16 @@ function Riadok({
         <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
           {nazov || "(bez názvu)"}
         </span>
+        {/*
+          Úryvok sa ukáže len vtedy, keď sa výraz našiel v texte správy a nie
+          v názve — inak by len zopakoval riadok nad sebou. Je to odpoveď na
+          otázku „prečo mi to tento rozhovor ponúka".
+        */}
+        {uryvok && (
+          <span style={{ display: "block", fontSize: 10.5, color: C.textDim, lineHeight: 1.4, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontStyle: "italic" }}>
+            {uryvok}
+          </span>
+        )}
         <span style={{ fontSize: 10.5, color: C.textDim, display: "flex", alignItems: "center", gap: 5, marginTop: 1 }}>
           {kedy}
           {/*
