@@ -20,7 +20,7 @@ návštevník, bez prihlásenia.
 |---|---|---|
 | ✅ **Slider Revolution vypnutý na článkoch** | 7 súborov, 546 kB z každého článku | stiahnutie troch článkov bez prihlásenia: `revslider` sa nevyskytuje ani raz; úvodná stránka slider ďalej má |
 | ✅ **Cieľ zálohovania prepnutý z OneDrive na Google Drive** | Varovanie „need UpdraftPlus Premium" zmizlo, OneDrive sa v nastavení už nespomína | prečítanie stránky UpdraftPlus po uložení: varovanie preč, Google Drive vybraný |
-| ✅ **4a čiastočne · alt texty na `arm-lines`** | 16 obrázkov dostalo alt: štyri línie paže (SFAL, SBAL, DFAL, DBAL), úpony, rotátory ramena. Kde názov súboru neurčoval sval jednoznačne, opisujem oblasť namiesto hádania | stiahnutie stránky bez prihlásenia: **41 zo 47** obrázkov má alt (predtým 25). Zvyšných 6 sú screenshoty a jedna fotka — z názvu súboru sa obsah zistiť nedá |
+| ✅ **4a · alt texty na troch najsilnejších článkoch** | Doplnených 52 altov: `arm-lines` 16, `deep-front-line` 29, `spiral-line` 7. Anatomické popisy podľa názvov súborov; kde názov neurčoval sval jednoznačne, opisujem oblasť namiesto hádania | stiahnutie zvonku: `arm-lines` **41/47**, `deep-front-line` **54/68**, `spiral-line` **32/41**. Zvyšok sú screenshoty, fotky a pozadia — pri dekoratívnom pozadí je prázdny alt správne, nie chyba |
 | ✅ **LocalBusiness schema vrátane otváracích hodín** | Meno, adresa, telefón, mail, logo a hodiny (Po–Pi 7:00–20:00, Ne 8:00–14:00) v JSON-LD na úvodnej stránke a na Kontakte. Snippet č. 17 v plugine Snippety, bez ďalšieho pluginu. Hodiny som najprv vynechal s odôvodnením, že na webe nie sú — **boli, na úvodnej pod „Kde trénujeme". Hľadal som ich len na Kontakte** | stiahnutie oboch stránok bez prihlásenia: JSON-LD sa načíta a rozparsuje, typ `LocalBusiness`, adresa Fanderlíková 70, 616 00 Brno – Žabovřesky. Na článku `arm-lines` sa nevyskytuje (má tam byť len na tých dvoch). Úvodná, Kontakt, Služby aj článok ďalej vracajú 200 |
 | ✅ **Nič neodkazuje na skryté stránky** | Prehľadaných všetkých 32 adries zo sitemapy | na `skupinovy-trenink` ani `lekce-fascialni-svoboda` nevedie ani jeden odkaz. Moje tvrdenie o karte „Skupinový trénink" na Službách bolo nesprávne — taká karta tam nie je |
 | ✅ **Zálohy chodia do Google Drivu** | Kompletná záloha z 15. 8. 20:11 (databáza, pluginy, šablóny, nahrané súbory) leží v Drive; ~4,7 GB, Drive obsadený 9,78 z 15 GB | v UpdraftPlus má riadok štítok **„Vzdálené úložiště: Google Drive"** (staršie dva majú OneDrive), a v Drive sú súbory `backup_2026-08-15…` z 20:12–20:21 |
@@ -71,11 +71,15 @@ nie sú, takže som ich do schémy nedal — vymyslené hodiny sú horšie než 
 Keď ich pošleš (napr. „Po–Pi 7:00–20:00, So 8:00–12:00"), dopíšem ich do
 snippetu a Google ich bude môcť zobraziť priamo vo výsledku.
 
-### 4 · Alt texty
-512 obrázkov bez altu. Po dávkach podľa návštevnosti, nie podľa abecedy:
-- **4a** `deep-front-line` (43), `arm-lines` (22), `spiral-line` (16)
+### 4 · Alt texty — 4a HOTOVÉ, pokračuje 4b
+- ~~**4a** `deep-front-line`, `arm-lines`, `spiral-line`~~ — 52 altov doplnených
 - **4b** `superficial-front-line` (19), `superficial-back-line` (18), `biotensegrita` (23)
 - **4c** zvyšok podľa zobrazení
+
+**Čo sa doplniť nedá a prečo to nie je chyba:** screenshoty (`Snimka-obrazovky-…`),
+fotky z fotoaparátu (`DSC04584`) a pozadia (`Background`, `Pozadi-1`). Pri
+dekoratívnom pozadí je prázdny alt **správny** — čítačka pre nevidiacich ho má
+preskočiť. Pri screenshotoch a fotkách by som musel vidieť, čo na nich je.
 
 Anatomické obrázky sa opisujú tým, čo na nich je (ktorá línia, ktorý sval) —
 nie „obrázok fascie". Toto je jediná vec, ktorú Google o obrázku vie.
