@@ -119,7 +119,10 @@ export const Route = createFileRoute("/api/web-obsah")({
 
           // 2 · text tam, kde ešte nie je. Po dávkach; zvyšok dobehne druhým klikom.
           const chybajuce = await DB.prepare(
-            `SELECT url, typ FROM web_stranky WHERE text = '' OR nacitane_at IS NULL LIMIT ?1`,
+            // Len to, čo sa ešte neskúšalo. Stránka, ktorá vráti 404 (zrušená,
+            // ale visí v sitemape), sa nižšie označí za vybavenú — inak zaberá
+            // miesto v každej dávke a „zostáva 41" nikdy neklesne na nulu.
+            `SELECT url, typ FROM web_stranky WHERE nacitane_at IS NULL LIMIT ?1`,
           ).bind(DAVKA).all<{ url: string; typ: string }>();
 
           let nacitane = 0;
@@ -127,7 +130,14 @@ export const Route = createFileRoute("/api/web-obsah")({
           for (const s of chybajuce.results || []) {
             let html = "";
             try { html = await stiahni(s.url); }
-            catch (e) { chyby.push(`${s.url.replace(ZAKLAD, "")}: ${String(e).slice(0, 60)}`); continue; }
+            catch (e) {
+              chyby.push(`${s.url.replace(ZAKLAD, "")}: ${String(e).slice(0, 60)}`);
+              // Pokus sa zapíše, text zostáva prázdny. Keď sa stránka vráti
+              // k životu, sitemapa posunie lastmod, `nacitane_at` sa vynuluje
+              // a skúsi sa znova. „Prečítať odznova" ju skúsi hneď.
+              await DB.prepare("UPDATE web_stranky SET nacitane_at = ?2 WHERE url = ?1").bind(s.url, teraz).run();
+              continue;
+            }
             const text = textZHtml(html);
             await DB.prepare(
               `UPDATE web_stranky SET titulok = ?2, meta_popis = ?3, h1 = ?4,
@@ -140,7 +150,7 @@ export const Route = createFileRoute("/api/web-obsah")({
           }
 
           const zostava = await DB.prepare(
-            "SELECT COUNT(*) n FROM web_stranky WHERE text = '' OR nacitane_at IS NULL",
+            "SELECT COUNT(*) n FROM web_stranky WHERE nacitane_at IS NULL",
           ).first<{ n: number }>().catch(() => ({ n: 0 }));
 
           await audit(DB, {

@@ -30,6 +30,7 @@ import { rodinaZKluca,
   deriveSixM,
   nezapisaneDoRegistra,
 } from "../../lib/psb/compute";
+import type { RegisterItem } from "../../lib/psb/compute";
 import { buildAiContext } from "../../lib/psb/aiContext";
 import { Assistant, useAssistantChat } from "./Assistant";
 import { JarvisOkno } from "./JarvisOkno";
@@ -585,6 +586,16 @@ export function PSBApp() {
   const [btcPrijmy, setBtcPrijmy] = useState<Record<string, number>>({});
   const [btcSatsKlienti, setBtcSatsKlienti] = useState<Record<string, number>>({});
   const [hotovostMesiace, setHotovostMesiace] = useState<Set<string>>(new Set());
+  // Kedy sa naposledy čítal text webu. Sťahovanie musí spustiť človek (nočná
+  // úloha už raz workera zhodila, je to napísané vo wrangler.jsonc), ale
+  // PAMÄTAŤ si to nemusí — po mesiaci sa pripomenie samo.
+  const [webNaposledy, setWebNaposledy] = useState<string | null>(null);
+  useEffect(() => {
+    void fetch("/api/web-obsah", { credentials: "same-origin" })
+      .then((r) => r.json())
+      .then((j: { naposledy?: string | null }) => setWebNaposledy(j?.naposledy ?? null))
+      .catch(() => {});
+  }, []);
   useEffect(() => {
     void fetch("/api/marketing", { credentials: "same-origin" })
       .then((r) => r.json())
@@ -1241,6 +1252,30 @@ function skupinaFaktur(
     [data.leads, clients, kalNevysvetlene, stavPolozky],
   );
 
+  /**
+   * Text webu je starší než mesiac.
+   *
+   * Jerry, 16. 8.: „súhlasím s tichou pripomienkou, ale daj to na 30 dní."
+   * Bez nej Jarvis odpovedá na otázky o webe zo starej kópie — a to je horšie
+   * než nevedieť, lebo to vyzerá ako odpoveď.
+   */
+  const kontrolaWebu = useMemo(() => {
+    if (!webNaposledy) return [] as RegisterItem[];
+    const dni = Math.floor((Date.now() - new Date(webNaposledy).getTime()) / 86400_000);
+    if (!Number.isFinite(dni) || dni < 30) return [] as RegisterItem[];
+    // Kľúč nesie MESIAC, nie deň: inak by sa položka po skrytí vrátila zajtra
+    // s novým kľúčom a „Skryť" by vyzeralo ako pokazené.
+    const key = `web|text|${new Date().toISOString().slice(0, 7)}`;
+    return [{
+      key, category: "Anomália" as const, tone: "blue" as const,
+      title: `Text webu sa nečítal ${dni} dní`,
+      detail: `Kópia webu v appke je z ${fmtDMY(webNaposledy.slice(0, 10))}. Nové články a prepísané titulky v nej nie sú, takže Jarvis o nich nevie a odpovedá zo starého. Údaje → Napojenia → „Prečítať web“ — nové adresy zo sitemapy pribudnú samé a text sa stiahne len tam, kde sa naozaj zmenil.`,
+      ...stavPolozky(key),
+      client: "udaje|",
+      priority: 60,
+    }];
+  }, [webNaposledy, stavPolozky]);
+
   const registerAll = useMemo(() => {
     const ack = data.anomalyAck || {};
     const extra = rituals
@@ -1257,8 +1292,8 @@ function skupinaFaktur(
         client: `${r.ciel.tab}|${r.ciel.sub || ""}${r.ciel.mesiac ? `|${r.ciel.mesiac}` : r.ciel.tyzden ? `|t:${r.ciel.tyzden}` : ""}`,
         priority: r.druh === "tyzden" ? 5 : r.druh === "mesiac" ? 6 : 40,
       }));
-    return [...extra, ...nezapisane, ...kontrolaBanky, ...zmenyMetrik, ...register].sort((a, b) => a.priority - b.priority);
-  }, [rituals, register, kontrolaBanky, zmenyMetrik, nezapisane, data.anomalyAck]);
+    return [...extra, ...nezapisane, ...kontrolaBanky, ...zmenyMetrik, ...kontrolaWebu, ...register].sort((a, b) => a.priority - b.priority);
+  }, [rituals, register, kontrolaBanky, zmenyMetrik, kontrolaWebu, nezapisane, data.anomalyAck]);
 
   // Jarvis dostáva CELÝ register vrátane kontrol nad bankou — inak by nevedel
   // o chýbajúcom nájme a na otázku „čo mi uniká" by odpovedal, že nič.

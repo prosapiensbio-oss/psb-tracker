@@ -1,5 +1,6 @@
 import { type CSSProperties, Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { fmtDMY } from "../../lib/psb/format";
+import { jePlatnyCiel, jeVonkajsiOdkaz } from "../../lib/psb/odkazy";
 
 import type { AiContext } from "../../lib/psb/aiContext";
 import {
@@ -187,7 +188,7 @@ function fmt(text: string, onClientClick?: (name: string) => void, onNavigate?: 
         // Jarvis sem 16. 8. napísal adresu instagramového príspevku namiesto
         // názvu záložky. Tlačidlo sa vykreslilo a klik viedol na neexistujúcu
         // obrazovku. Adresa je čitateľný úmysel — otvor ju, nehádaj sa s ním.
-        if (/^https?:\/\//.test(tab || "")) {
+        if (jeVonkajsiOdkaz(tab || "")) {
           return (
             <a key={j} href={tab} target="_blank" rel="noreferrer"
                style={{ background: mix(C.accent, 14), border: `1px solid ${mix(C.accent, 45)}`, borderRadius: 6, padding: "1px 7px", margin: "0 1px", color: C.accentLight, fontWeight: 600, textDecoration: "none", display: "inline-block" }}>
@@ -209,6 +210,9 @@ function fmt(text: string, onClientClick?: (name: string) => void, onNavigate?: 
           };
           requestAnimationFrame(trafit);
         };
+        // Mŕtve tlačidlo je horšie než žiadne: kto naň klikne a nič sa
+        // nestane, prestane veriť aj tým, ktoré fungujú.
+        if (!jePlatnyCiel(tab || "")) return <strong key={j}>{txt}</strong>;
         return onNavigate && tab
           ? <button key={j} onClick={chod} style={{ background: mix(C.accent, 14), border: `1px solid ${mix(C.accent, 45)}`, borderRadius: 6, padding: "1px 7px", margin: "0 1px", color: C.accentLight, fontWeight: 600, cursor: "pointer", fontSize: "inherit", fontFamily: "inherit" }}>{txt} →</button>
           : <strong key={j}>{txt}</strong>;
@@ -216,7 +220,7 @@ function fmt(text: string, onClientClick?: (name: string) => void, onNavigate?: 
       // Adresa stránky sa stane odkazom. Jerry 16. 8. klikol na názov článku
       // v odpovedi a čakal, že sa článok otvorí — čakanie je namieste, len to
       // dovtedy nemalo kam viesť.
-      if (/^https?:\/\//.test(p)) {
+      if (jeVonkajsiOdkaz(p)) {
         // Popis odkazu: holá adresa instagramového príspevku je nečitateľný
         // kód, adresa článku aspoň niečo hovorí. Preto sa IG pomenuje slovom.
         const ig = /instagram\.com\/(p|reel|reels)\//.test(p);
