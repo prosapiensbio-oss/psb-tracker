@@ -21,6 +21,8 @@ návštevník, bez prihlásenia.
 | ✅ **Slider Revolution vypnutý na článkoch** | 7 súborov, 546 kB z každého článku | stiahnutie troch článkov bez prihlásenia: `revslider` sa nevyskytuje ani raz; úvodná stránka slider ďalej má |
 | ✅ **Cieľ zálohovania prepnutý z OneDrive na Google Drive** | Varovanie „need UpdraftPlus Premium" zmizlo, OneDrive sa v nastavení už nespomína | prečítanie stránky UpdraftPlus po uložení: varovanie preč, Google Drive vybraný |
 | ✅ **4a · alt texty na troch najsilnejších článkoch** | Doplnených 52 altov: `arm-lines` 16, `deep-front-line` 29, `spiral-line` 7. Anatomické popisy podľa názvov súborov; kde názov neurčoval sval jednoznačne, opisujem oblasť namiesto hádania | stiahnutie zvonku: `arm-lines` **41/47**, `deep-front-line` **54/68**, `spiral-line` **32/41**. Zvyšok sú screenshoty, fotky a pozadia — pri dekoratívnom pozadí je prázdny alt správne, nie chyba |
+| ✅ **1 · Značka preč z titulkov článkov** | Yoast pridával na koniec „- ProSapiens Biomechanic" = 24 znakov. Snippet č. 18 ju odstraňuje **len pri príspevkoch**; na stránkach (Domů, Služby, Kontakt) zostáva, tam rozpoznateľnosť značky cenu má. Oddeľovač sa v článkoch líšil (pomlčka, en dash, em dash), preto regulárny výraz — prvá verzia štyri články prehliadla | stiahnutie všetkých 45 článkov zvonku: **nad 60 znakov ich je 5 namiesto 18**, priemerná dĺžka titulku klesla na 38 znakov, značku má v titulku už len 3 |
+| ✅ **DMARC v DNS** | `_dmarc.prosapiens.cz` → `v=DMARC1; p=none; rua=mailto:info@prosapiens.cz`. Doplnil Jerry 16. 8. Doména má teraz celú trojicu SPF + DKIM + DMARC | overené cez `dig` proti Cloudflare aj Google DNS |
 | ✅ **LocalBusiness schema vrátane otváracích hodín** | Meno, adresa, telefón, mail, logo a hodiny (Po–Pi 7:00–20:00, Ne 8:00–14:00) v JSON-LD na úvodnej stránke a na Kontakte. Snippet č. 17 v plugine Snippety, bez ďalšieho pluginu. Hodiny som najprv vynechal s odôvodnením, že na webe nie sú — **boli, na úvodnej pod „Kde trénujeme". Hľadal som ich len na Kontakte** | stiahnutie oboch stránok bez prihlásenia: JSON-LD sa načíta a rozparsuje, typ `LocalBusiness`, adresa Fanderlíková 70, 616 00 Brno – Žabovřesky. Na článku `arm-lines` sa nevyskytuje (má tam byť len na tých dvoch). Úvodná, Kontakt, Služby aj článok ďalej vracajú 200 |
 | ✅ **Nič neodkazuje na skryté stránky** | Prehľadaných všetkých 32 adries zo sitemapy | na `skupinovy-trenink` ani `lekce-fascialni-svoboda` nevedie ani jeden odkaz. Moje tvrdenie o karte „Skupinový trénink" na Službách bolo nesprávne — taká karta tam nie je |
 | ✅ **Zálohy chodia do Google Drivu** | Kompletná záloha z 15. 8. 20:11 (databáza, pluginy, šablóny, nahrané súbory) leží v Drive; ~4,7 GB, Drive obsadený 9,78 z 15 GB | v UpdraftPlus má riadok štítok **„Vzdálené úložiště: Google Drive"** (staršie dva majú OneDrive), a v Drive sú súbory `backup_2026-08-15…` z 20:12–20:21 |
@@ -32,6 +34,21 @@ návštevník, bez prihlásenia.
 ---
 
 ## Robím ja
+
+### ~~1 · Skrátiť šablónu titulkov~~ — HOTOVÉ, viď tabuľka Hotové
+
+**Zostáva päť titulkov, ktoré sú dlhé samy o sebe** — tam už značka nie je,
+je dlhá samotná veta a skrátiť ju je vecou obsahu, nie nastavenia:
+
+| stránka | znakov |
+|---|---|
+| `anterior-pelvic-tilt` | 103 |
+| `padajici-kolena-dovnitr` | 66 |
+| `prekonani-bolesti-zad-…` | 65 |
+| `rib-flare` | 63 |
+| `ploche-nohy` | 63 |
+
+<details><summary>pôvodný plán</summary>
 
 ### 1 · Skrátiť šablónu titulkov v Yoaste
 Na koniec každého titulku sa pridáva „- ProSapiens Biomechanic" = 24 znakov.
@@ -45,6 +62,12 @@ Na koniec každého titulku sa pridáva „- ProSapiens Biomechanic" = 24 znakov
 prehliadača nedrží navigáciu medzi sekciami. Skúsim to cez staršiu adresu
 `admin.php?page=wpseo_titles`, prípadne priamo v poli SEO titulku pri
 najzasiahnutejších článkoch.
+
+**Ako sa to nakoniec vyriešilo:** nie cez Yoastove nastavenia (tie sú React
+a cez automatizáciu sa neuložia), ale filtrom `wpseo_title` v plugine Snippety.
+Rovnaká cesta ako pri LocalBusiness scheme.
+
+</details>
 
 ### 2 · Meta popisy — TEXTY HOTOVÉ, VLOŽENIE NEPRECHÁDZA
 Zoznam je už len 12 stránok: `skupinovy-trenink` a `lekce-fascialni-svoboda`
