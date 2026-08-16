@@ -73,10 +73,31 @@ nie sú, takže som ich do schémy nedal — vymyslené hodiny sú horšie než 
 Keď ich pošleš (napr. „Po–Pi 7:00–20:00, So 8:00–12:00"), dopíšem ich do
 snippetu a Google ich bude môcť zobraziť priamo vo výsledku.
 
-### 4 · Alt texty — 4a HOTOVÉ, pokračuje 4b
-- ~~**4a** `deep-front-line`, `arm-lines`, `spiral-line`~~ — 52 altov doplnených
-- **4b** `superficial-front-line` (19), `superficial-back-line` (18), `biotensegrita` (23)
-- **4c** zvyšok podľa zobrazení
+### 4 · Alt texty — 4a aj 4b HOTOVÉ, 4c naráža na hranicu
+- ~~**4a** `deep-front-line`, `arm-lines`, `spiral-line`~~ — 52 altov
+- ~~**4b** anatomické a symptómové články~~ — ďalších 67 altov
+- **4c** zvyšok — **z názvov súborov sa už nedá**
+
+**Stav 16. 8.:** v 45 článkoch je 370 obrázkov, **132 má alt** (na začiatku 13).
+Zostáva 238, z toho **215 sa z názvu súboru popísať nedá** a 23 ešte áno.
+
+**Prečo to nejde ďalej rovnakou cestou.** Alt píšem z názvu súboru — a to
+funguje, keď sa súbor volá `SBL` alebo `coraco-pecmin-bicbrach-subcal`.
+Nefunguje, keď sa volá `AdobeStock_1563695645`, `hf_20260525_101500_2017e3a3`
+alebo `image-4`. Tam neviem, čo na obrázku je, a **vymyslený alt je horší než
+žiadny**: nevidiacemu klame a Googlu dáva nepravdivý údaj o obsahu.
+
+Sú tri cesty, ako dokončiť tých 215:
+1. **Pozriem sa na obrázky** — viem si ich stiahnuť a prezrieť. Je to pomalšie
+   (rádovo hodiny), ale výsledok je presný.
+2. **Jerry napíše jednou vetou, čo je na obálkach** najnavštevovanejších článkov
+   (`predsunuta-hlava`, `padajici-kolena-dovnitr`, `ploche-nohy`, `rib-flare`) —
+   tam je tých fotiek po štyroch a sú to tie s najväčším dopadom.
+3. **Nechať tak.** 36 % pokrytie je oproti 3,5 % na začiatku veľký posun a zvyšok
+   sú z väčšiny dekoratívne stockové fotky, ktoré do obrázkového vyhľadávania
+   aj tak neprinesú nič.
+
+Odporúčam 2 pre štyri najsilnejšie články a zvyšok nechať.
 
 **Čo sa doplniť nedá a prečo to nie je chyba:** screenshoty (`Snimka-obrazovky-…`),
 fotky z fotoaparátu (`DSC04584`) a pozadia (`Background`, `Pozadi-1`). Pri
