@@ -68,6 +68,27 @@ const opravStratene = (msgs: Msg[]): Msg[] =>
       : m,
   );
 
+/** Je to príloha, ktorá nie je obrázok? Podľa toho sa kreslí náhľad aj ukladá. */
+const jeDokument = (u: string) => !/^data:image\//i.test(u);
+/** Meno súboru vytiahnuté z data URL (`;name=`), ak tam je. */
+const menoPrilohy = (u: string) => {
+  const m = /^data:[^;]+;name=([^;]*);base64,/i.exec(u);
+  return m ? decodeURIComponent(m[1]) : "dokument";
+};
+/**
+ * Dokumenty sa do histórie NEUKLADAJÚ.
+ *
+ * Uloženie ide po každej správe a nesie celý rozhovor. Jedno 5 MB PDF by sa
+ * tak do databázy prepisovalo pri každej ďalšej otázke. V otvorenom okne
+ * dokument zostáva (Jarvis sa naň vie doptať), po načítaní stránky zostane
+ * v histórii len jeho meno — a to je poctivejšie než tváriť sa, že ho tam má.
+ */
+const bezDokumentov = (zoznam: Msg[]): Msg[] =>
+  zoznam.map((m) => (m.images?.some(jeDokument)
+    ? { ...m, images: m.images.filter((u) => !jeDokument(u)),
+        text: m.text + m.images.filter(jeDokument).map((u) => `\n[priložený dokument: ${menoPrilohy(u)}]`).join("") }
+    : m));
+
 function fileToDataUrl(f: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const r = new FileReader();
@@ -356,6 +377,10 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
     const arr = [...(list || [])];
     const csv = arr.filter((f) => f.name.toLowerCase().endsWith(".csv"));
     const imgs = arr.filter((f) => f.type.startsWith("image/"));
+    // PDF a textové súbory. CSV má vlastnú cestu (import do tabuliek), preto tu nie je.
+    const dokumenty = arr.filter((f) => !f.type.startsWith("image/") && !f.name.toLowerCase().endsWith(".csv")
+      && (f.type === "application/pdf" || f.type.startsWith("text/") || f.type === "application/json"
+          || /\.(pdf|txt|md|json)$/i.test(f.name)));
     if (csv.length) {
       const read = await Promise.all(csv.map(async (f) => ({ filename: f.name, text: await f.text() })));
       setPending(read);
@@ -363,6 +388,20 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
     if (imgs.length) {
       const urls = await Promise.all(imgs.slice(0, 4).map(fileToDataUrl));
       setAttach((a) => [...a, ...urls].slice(0, 4));
+    }
+    if (dokumenty.length) {
+      // Nad ~5 MB Worker požiadavku nedotiahne. Radšej to povedať hneď, než
+      // nechať človeka čakať na odpoveď, ktorá nepríde.
+      const velke = dokumenty.filter((f) => f.size > 5_000_000).map((f) => f.name);
+      const dobre = dokumenty.filter((f) => f.size <= 5_000_000).slice(0, 3);
+      const urls = await Promise.all(dobre.map(async (f) => {
+        const raw = await fileToDataUrl(f);
+        // Meno sa vloží do data URL, aby ho videl aj server: dva podobné PDF
+        // sa inak nedajú rozlíšiť.
+        return raw.replace(/^data:([^;]+);base64,/, (_x, typ) => `data:${typ};name=${encodeURIComponent(f.name)};base64,`);
+      }));
+      if (urls.length) setAttach((a) => [...a, ...urls].slice(0, 4));
+      if (velke.length) setMsgs((m) => [...m, { role: "assistant", text: `Súbor ${velke.join(", ")} je väčší než 5 MB a neprešiel by. Skús ho rozdeliť alebo poslať len tú časť, o ktorú ide.`, systemova: true }]);
     }
   }
 
@@ -820,14 +859,22 @@ export function ChatConversation({ chat, autoFocus, onClientClick, onNavigate }:
         <div style={{ borderTop: `1px solid ${C.border}`, padding: "8px 10px 0", display: "flex", gap: 6, flexWrap: "wrap" }}>
           {attach.map((src, k) => (
             <div key={k} style={{ position: "relative" }}>
+              {/* Dokument nemá čo ukázať ako náhľad — meno súboru povie viac než sivý štvorec. */}
+              {jeDokument(src) ? (
+                <div title={menoPrilohy(src)} style={{ height: 46, maxWidth: 168, display: "flex", alignItems: "center", gap: 6, padding: "0 10px", borderRadius: 6, border: `1px solid ${C.border}`, background: mix(C.text, 5), color: C.text, fontSize: 11.5 }}>
+                  <span style={{ fontSize: 14 }}>📄</span>
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{menoPrilohy(src)}</span>
+                </div>
+              ) : (
               <img src={src} alt="" style={{ width: 46, height: 46, objectFit: "cover", borderRadius: 6, display: "block", border: `1px solid ${C.border}` }} />
+              )}
               <button onClick={() => setAttach((a) => a.filter((_, j) => j !== k))} title="Odobrať" style={{ position: "absolute", top: -6, right: -6, width: 18, height: 18, borderRadius: 9, border: "none", background: C.red, color: "#fff", fontSize: 11, cursor: "pointer", lineHeight: "18px", padding: 0 }}>✕</button>
             </div>
           ))}
         </div>
       )}
       <div style={{ borderTop: attach.length ? "none" : `1px solid ${C.border}`, padding: 10, display: "flex", gap: 8, alignItems: "flex-end" }}>
-        <input ref={fileRef} type="file" accept=".csv,text/csv,image/*" multiple style={{ display: "none" }} onChange={(e) => { void handleIncoming(e.target.files); e.target.value = ""; }} />
+        <input ref={fileRef} type="file" accept=".csv,text/csv,image/*,.pdf,application/pdf,.txt,.md,.json,text/plain,text/markdown" multiple style={{ display: "none" }} onChange={(e) => { void handleIncoming(e.target.files); e.target.value = ""; }} />
         <button onClick={() => fileRef.current?.click()} title="Nahrať CSV alebo obrázok" style={{ width: 38, height: 38, borderRadius: 10, border: `1px solid ${C.border}`, cursor: "pointer", background: "transparent", color: C.textMuted, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }} aria-label="Nahrať CSV alebo obrázok">
           <svg width={17} height={17} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21.4 11.05 12.25 20.2a5 5 0 0 1-7.07-7.07l9.19-9.19a3 3 0 0 1 4.24 4.24l-8.49 8.49a1 1 0 0 1-1.41-1.41l7.78-7.78" /></svg>
         </button>
