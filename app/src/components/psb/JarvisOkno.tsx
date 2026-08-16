@@ -150,7 +150,7 @@ export function JarvisOkno({
           )}
           {aktivne.map((c) => (
             <Riadok
-              key={c.id} nazov={c.title} kedy={fmtKedy(c.updatedAt)}
+              key={c.id} nazov={(c as {vetva?:boolean}).vetva ? `⑂ ${c.title}` : c.title} kedy={fmtKedy(c.updatedAt)}
               // Odznak sa ukazuje len v spoločnom zozname — v priečinku by na
               // každom riadku svietilo to isté slovo a nič by nehovorilo.
               odznak={!filter && c.kategoria ? zameranie(c.kategoria).label : ""}
@@ -178,7 +178,7 @@ export function JarvisOkno({
               </button>
               {archivOtvoreny && archiv.map((c) => (
                 <Riadok
-                  key={c.id} nazov={c.title} kedy={fmtKedy(c.updatedAt)}
+                  key={c.id} nazov={(c as {vetva?:boolean}).vetva ? `⑂ ${c.title}` : c.title} kedy={fmtKedy(c.updatedAt)}
                   odznak={!filter && c.kategoria ? zameranie(c.kategoria).label : ""}
                   aktivny={c.id === chat.chatId} dim
                   onOpen={() => chat.openChat(c.id)}

@@ -35,7 +35,7 @@ type Msg = {
    */
   zobrazit?: string;
 };
-type SavedChat = { id: string; title: string; messages: Msg[]; updatedAt: number; archived?: boolean; kategoria?: string };
+type SavedChat = { id: string; title: string; messages: Msg[]; updatedAt: number; archived?: boolean; kategoria?: string; vetva?: boolean };
 
 const CHATS_KEY = "psb-ai-chats";
 const newId = () => (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2, 6));
@@ -205,6 +205,9 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
    * predošlé volanie.
    */
   const abortRef = useRef<AbortController | null>(null);
+  // Vetva sa pozná až pri prvom uložení nového rozhovoru — preto ref, nie state:
+  // state by sa do efektu dostal až o render neskôr a prvý zápis by ju minul.
+  const vetvaRef = useRef(false);
   useEffect(() => {
     try { if (localStorage.getItem("psb-ai-open") === "1") setFloatingOpen(true); } catch { /* ignore */ }
   }, []);
@@ -254,7 +257,8 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
     let zaznam: SavedChat | null = null;
     setChats((prev) => {
       const existing = prev.find((c) => c.id === chatId);
-      zaznam = { id: chatId, title: chatTitle(msgs), messages: msgs, updatedAt: Date.now(), archived: existing?.archived, kategoria };
+      zaznam = { id: chatId, title: chatTitle(msgs), messages: msgs, updatedAt: Date.now(), archived: existing?.archived, kategoria, vetva: existing?.vetva ?? vetvaRef.current };
+      vetvaRef.current = false;
       const next = [zaznam, ...prev.filter((c) => c.id !== chatId)];
       try { localStorage.setItem(CHATS_KEY, JSON.stringify(next.slice(0, 50))); } catch { /* ignore */ }
       return next;
@@ -290,6 +294,30 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
    */
   /** Zastaví rozpísanú odpoveď. Text, ktorý už prišiel, zostáva. */
   const zastav = () => abortRef.current?.abort();
+
+  /**
+   * Vetva rozhovoru od konkrétnej otázky.
+   *
+   * PREČO TO NIE JE TO ISTÉ ČO „UPRAVIŤ"
+   *
+   * „Upraviť" prepíše otázku a všetko za ňou ZAHODÍ — to je správne pri
+   * preklepe, ale zlé, keď sa chce Jerry vrátiť o desať správ a spýtať sa
+   * inak, pričom pôvodná niť má zostať. Doteraz mal na výber len mazať.
+   *
+   * Vetva založí NOVÝ rozhovor s históriou po tú otázku (bez nej) a text
+   * otázky vloží do políčka, aby sa dal prepísať. Pôvodný rozhovor sa
+   * nedotkne — leží v zozname vedľa.
+   */
+  const vetvi = (index: number) => {
+    if (busy) return;
+    const zaklad = msgs.slice(0, index);
+    const text = msgs[index]?.zobrazit ?? msgs[index]?.text ?? "";
+    vetvaRef.current = true;
+    setChatId(newId());
+    setMsgs(zaklad);
+    setAttach([]);
+    setInput(text);
+  };
 
   const upravSpravu = (index: number, text: string) => {
     if (busy) return;
@@ -585,13 +613,13 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
     ].join(" · ");
   }
 
-  return { msgs, setMsgs, input, setInput, busy, stav, deep, setDeep, pending, setPending, attach, setAttach, ask, runAction, confirmImport, handleIncoming, floatingOpen, setFloatingOpen, kategoria, setKategoria, chats, chatId, newChat, upravSpravu, presunChat, zastav, openChat, deleteChat, archiveChat, spracujDennik };
+  return { msgs, setMsgs, input, setInput, busy, stav, deep, setDeep, pending, setPending, attach, setAttach, ask, runAction, confirmImport, handleIncoming, floatingOpen, setFloatingOpen, kategoria, setKategoria, chats, chatId, newChat, upravSpravu, vetvi, presunChat, zastav, openChat, deleteChat, archiveChat, spracujDennik };
 }
 
 // ── The conversation UI (messages + input) — used by both the floating panel and
 // the inline widget. Each instance has its own scroll/refs/drag state. ──────────
 export function ChatConversation({ chat, autoFocus, onClientClick, onNavigate }: { chat: AssistantChat; autoFocus?: boolean; onClientClick?: (name: string) => void; onNavigate?: (tab: string, sub?: string) => void }) {
-  const { msgs, input, setInput, busy, stav, deep, setDeep, pending, setPending, attach, setAttach, ask, runAction, confirmImport, handleIncoming, upravSpravu, zastav } = chat;
+  const { msgs, input, setInput, busy, stav, deep, setDeep, pending, setPending, attach, setAttach, ask, runAction, confirmImport, handleIncoming, upravSpravu, vetvi, zastav } = chat;
   // Ktorá odoslaná otázka sa práve prepisuje. Zámerne len jedna — dve
   // rozpísané opravy naraz by sa navzájom prepísali pri odoslaní.
   const [upravujem, setUpravujem] = useState<number | null>(null);
@@ -699,6 +727,21 @@ export function ChatConversation({ chat, autoFocus, onClientClick, onNavigate }:
                 style={{ display: "block", marginLeft: "auto", marginTop: 3, background: "none", border: "none", padding: 0, color: C.textDim, fontSize: 10.5, cursor: "pointer", fontFamily: "inherit" }}
               >
                 upraviť
+              </button>
+            )}
+            {/*
+              Vetva NEMAŽE. „Upraviť" všetko za otázkou zahodí, vetva otvorí
+              druhú niť a pôvodnú nechá ležať vedľa — na to, keď sa chce Jerry
+              vrátiť o desať správ a spýtať sa inak, ale prvú odpoveď si chce
+              nechať.
+            */}
+            {m.role === "user" && !m.systemova && upravujem !== mi && !busy && (
+              <button
+                onClick={() => vetvi(mi)}
+                title="Odbočiť odtiaľto do nového rozhovoru. Pôvodný zostane nedotknutý."
+                style={{ display: "block", marginLeft: "auto", marginTop: 2, background: "none", border: "none", padding: 0, color: C.textDim, fontSize: 10.5, cursor: "pointer", fontFamily: "inherit" }}
+              >
+                ⑂ vetva
               </button>
             )}
             {/*
