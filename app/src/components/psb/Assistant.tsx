@@ -206,7 +206,11 @@ function fmt(text: string, onClientClick?: (name: string) => void, onNavigate?: 
       // v odpovedi a čakal, že sa článok otvorí — čakanie je namieste, len to
       // dovtedy nemalo kam viesť.
       if (/^https?:\/\//.test(p)) {
-        return <a key={j} href={p} target="_blank" rel="noreferrer" style={{ color: C.accentLight, textDecoration: "underline", wordBreak: "break-all" }}>{p.replace(/^https?:\/\/(www\.)?/, "")}</a>;
+        // Popis odkazu: holá adresa instagramového príspevku je nečitateľný
+        // kód, adresa článku aspoň niečo hovorí. Preto sa IG pomenuje slovom.
+        const ig = /instagram\.com\/(p|reel|reels)\//.test(p);
+        const popis = ig ? "otvoriť na Instagrame ↗" : p.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "");
+        return <a key={j} href={p} target="_blank" rel="noreferrer" style={{ color: C.accentLight, textDecoration: "underline", wordBreak: "break-word" }}>{popis}</a>;
       }
       if (p.startsWith("**") && p.endsWith("**")) return <strong key={j}>{p.slice(2, -2)}</strong>;
       if (p.startsWith("`") && p.endsWith("`")) return <code key={j} style={{ background: mix(C.accent, 14), padding: "1px 4px", borderRadius: 4, fontSize: 12 }}>{p.slice(1, -1)}</code>;
