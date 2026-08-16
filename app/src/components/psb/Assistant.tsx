@@ -1,4 +1,4 @@
-import { type CSSProperties, Fragment, useEffect, useRef, useState } from "react";
+import { type CSSProperties, Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { fmtDMY } from "../../lib/psb/format";
 
 import type { AiContext } from "../../lib/psb/aiContext";
@@ -152,8 +152,31 @@ function parseActions(raw: string): { text: string; actions: ParsedAction[] } {
   return { text, actions };
 }
 
+/**
+ * Podfarbí hľadaný výraz vnútri obyčajného textu.
+ *
+ * Rámček okolo bubliny povie, KTORÁ správa to je; v odseku na desať riadkov
+ * sa slovo aj tak hľadá očami. Preto sa značí samotná pasáž.
+ */
+function oznac(text: string, hladat: string, key: number) {
+  const h = hladat.trim();
+  if (!h) return <Fragment key={key}>{text}</Fragment>;
+  const re = new RegExp(`(${h.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`, "gi");
+  const casti = text.split(re);
+  if (casti.length < 2) return <Fragment key={key}>{text}</Fragment>;
+  return (
+    <Fragment key={key}>
+      {casti.map((c, k) =>
+        k % 2 === 1
+          ? <mark key={k} style={{ background: mix(C.accent, 42), color: "inherit", borderRadius: 3, padding: "0 2px" }}>{c}</mark>
+          : <Fragment key={k}>{c}</Fragment>,
+      )}
+    </Fragment>
+  );
+}
+
 // Minimal formatter: **bold**, `code`, «clickable client name», and newlines.
-function fmt(text: string, onClientClick?: (name: string) => void, onNavigate?: (tab: string, sub?: string) => void) {
+function fmt(text: string, onClientClick?: (name: string) => void, onNavigate?: (tab: string, sub?: string) => void, hladat?: string) {
   return text.split("\n").map((line, i) => {
     const parts = line.split(/(\*\*[^*]+\*\*|`[^`]+`|«[^»]+»|⟦[^⟧]+⟧)/g).map((p, j) => {
       // ⟦text|tab|podzáložka⟧ — odkaz na miesto v appke. „Kde to nájdem"
@@ -187,7 +210,7 @@ function fmt(text: string, onClientClick?: (name: string) => void, onNavigate?: 
           ? <button key={j} onClick={() => onClientClick(name)} style={{ background: "none", border: "none", padding: 0, margin: 0, color: C.accentLight, fontWeight: 600, cursor: "pointer", textDecoration: "underline", fontSize: "inherit", fontFamily: "inherit" }}>{name}</button>
           : <strong key={j}>{name}</strong>;
       }
-      return <Fragment key={j}>{p}</Fragment>;
+      return hladat ? oznac(p, hladat, j) : <Fragment key={j}>{p}</Fragment>;
     });
     return <div key={i} style={{ minHeight: line.trim() ? undefined : 6 }}>{parts}</div>;
   });
@@ -237,6 +260,14 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
   // Vetva sa pozná až pri prvom uložení nového rozhovoru — preto ref, nie state:
   // state by sa do efektu dostal až o render neskôr a prvý zápis by ju minul.
   const vetvaRef = useRef(false);
+  /**
+   * Výraz, ktorý sa má v otvorenom rozhovore vyznačiť.
+   *
+   * Nájsť rozhovor je len polovica práce — v debate na sto správ sa pasáž
+   * hľadá očami rovnako dlho ako predtým. Preto sa výraz nesie z hľadania
+   * až sem a správa, v ktorej je, sa podfarbí a odroluje na seba.
+   */
+  const [zvyraznit, setZvyraznit] = useState("");
   useEffect(() => {
     try { if (localStorage.getItem("psb-ai-open") === "1") setFloatingOpen(true); } catch { /* ignore */ }
   }, []);
@@ -371,7 +402,7 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
     if (id === chatId) setKategoria(nova);
   };
 
-  const openChat = (id: string) => { const c = chats.find((x) => x.id === id); if (c) { setChatId(id); setMsgs(opravStratene(c.messages || [])); setKategoria(c.kategoria || ""); } };
+  const openChat = (id: string, vyraz?: string) => { const c = chats.find((x) => x.id === id); if (c) { setChatId(id); setMsgs(opravStratene(c.messages || [])); setKategoria(c.kategoria || ""); setZvyraznit(vyraz || ""); } };
   const deleteChat = (id: string) => { persistChats(chats.filter((c) => c.id !== id)); void deleteJarvisChat(id); if (id === chatId) newChat(); };
   const archiveChat = (id: string) => {
     const next = chats.map((c) => (c.id === id ? { ...c, archived: !c.archived } : c));
@@ -672,18 +703,34 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
     ].join(" · ");
   }
 
-  return { msgs, setMsgs, input, setInput, busy, stav, deep, setDeep, pending, setPending, attach, setAttach, ask, runAction, confirmImport, handleIncoming, floatingOpen, setFloatingOpen, kategoria, setKategoria, chats, chatId, newChat, upravSpravu, vetvi, presunChat, zastav, openChat, deleteChat, archiveChat, spracujDennik };
+  return { msgs, setMsgs, input, setInput, busy, stav, deep, setDeep, pending, setPending, attach, setAttach, ask, runAction, confirmImport, handleIncoming, floatingOpen, setFloatingOpen, kategoria, setKategoria, chats, chatId, newChat, upravSpravu, vetvi, presunChat, zastav, openChat, zvyraznit, setZvyraznit, deleteChat, archiveChat, spracujDennik };
 }
 
 // ── The conversation UI (messages + input) — used by both the floating panel and
 // the inline widget. Each instance has its own scroll/refs/drag state. ──────────
 export function ChatConversation({ chat, autoFocus, onClientClick, onNavigate }: { chat: AssistantChat; autoFocus?: boolean; onClientClick?: (name: string) => void; onNavigate?: (tab: string, sub?: string) => void }) {
-  const { msgs, input, setInput, busy, stav, deep, setDeep, pending, setPending, attach, setAttach, ask, runAction, confirmImport, handleIncoming, upravSpravu, vetvi, zastav } = chat;
+  const { msgs, input, setInput, busy, stav, deep, setDeep, pending, setPending, attach, setAttach, ask, runAction, confirmImport, handleIncoming, upravSpravu, vetvi, zastav, zvyraznit, setZvyraznit } = chat;
   // Ktorá odoslaná otázka sa práve prepisuje. Zámerne len jedna — dve
   // rozpísané opravy naraz by sa navzájom prepísali pri odoslaní.
   const [upravujem, setUpravujem] = useState<number | null>(null);
   const [skopirovane, setSkopirovane] = useState<number | null>(null);
   const [navrh, setNavrh] = useState("");
+  /**
+   * Ktorá správa obsahuje hľadaný výraz. Podfarbí sa a okno na ňu odroluje.
+   * Zvýraznenie po chvíli zhasne — po prečítaní by len rušilo.
+   */
+  const najdena = useMemo(() => {
+    const h = (zvyraznit || "").trim().toLowerCase();
+    if (!h) return -1;
+    return msgs.findIndex((m) => (m.zobrazit ?? m.text ?? "").toLowerCase().includes(h));
+  }, [msgs, zvyraznit]);
+  const najdenaRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (najdena < 0) return;
+    najdenaRef.current?.scrollIntoView({ block: "center", behavior: "smooth" });
+    const t = setTimeout(() => setZvyraznit(""), 6000);
+    return () => clearTimeout(t);
+  }, [najdena, zvyraznit]);
   const [drag, setDrag] = useState(false);
   // Autoscroll drží odpoveď na očiach LEN vtedy, keď je človek dole. Keď si
   // odroluje hore a číta začiatok, streamovanie ho tam už nesmie ťahať späť —
@@ -732,7 +779,17 @@ export function ChatConversation({ chat, autoFocus, onClientClick, onNavigate }:
         {msgs.map((m, mi) => (
           // Skip the empty assistant placeholder before the first streamed token ("Rozmýšľam…" covers it).
           m.role === "assistant" && !m.text && !m.images && !m.actions?.length ? null : (
-          <div key={mi} style={{ alignSelf: m.systemova ? "center" : m.role === "user" ? "flex-end" : "flex-start", maxWidth: m.systemova ? "100%" : "88%" }}>
+          <div
+            key={mi}
+            ref={mi === najdena ? najdenaRef : undefined}
+            style={{
+              alignSelf: m.systemova ? "center" : m.role === "user" ? "flex-end" : "flex-start",
+              maxWidth: m.systemova ? "100%" : "88%",
+              // Nájdená pasáž: rámček okolo celej bubliny, nie farba textu —
+              // ten musí zostať čitateľný.
+              ...(mi === najdena ? { outline: `2px solid ${C.accent}`, outlineOffset: 3, borderRadius: 14 } : {}),
+            }}
+          >
             {/* Oznam appky nie je ničia replika — nesmie vyzerať ako Jerryho
                 správa, ale musí byť v histórii, aby ho Jarvis videl. */}
             <div style={m.systemova
@@ -771,7 +828,7 @@ export function ChatConversation({ chat, autoFocus, onClientClick, onNavigate }:
                   </div>
                 </div>
               ) : (
-                fmt(m.zobrazit ?? m.text, m.role === "assistant" ? onClientClick : undefined, m.role === "assistant" ? onNavigate : undefined)
+                fmt(m.zobrazit ?? m.text, m.role === "assistant" ? onClientClick : undefined, m.role === "assistant" ? onNavigate : undefined, mi === najdena ? zvyraznit : undefined)
               )}
             </div>
             {/*

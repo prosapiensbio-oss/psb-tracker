@@ -222,7 +222,7 @@ export function JarvisOkno({
               odznak={!filter && c.kategoria ? zameranie(c.kategoria).label : ""}
               uryvok={uryvok(c)}
               aktivny={c.id === chat.chatId}
-              onOpen={() => chat.openChat(c.id)}
+              onOpen={() => chat.openChat(c.id, hladane)}
               onArchive={() => chat.archiveChat(c.id)}
               onDelete={() => chat.deleteChat(c.id)}
               onPresun={(k) => chat.presunChat(c.id, k)}
@@ -249,7 +249,7 @@ export function JarvisOkno({
                   odznak={!filter && c.kategoria ? zameranie(c.kategoria).label : ""}
                   uryvok={uryvok(c)}
                   aktivny={c.id === chat.chatId} dim
-                  onOpen={() => chat.openChat(c.id)}
+                  onOpen={() => chat.openChat(c.id, hladane)}
                   onArchive={() => chat.archiveChat(c.id)}
                   onDelete={() => chat.deleteChat(c.id)}
                   onPresun={(k) => chat.presunChat(c.id, k)}
