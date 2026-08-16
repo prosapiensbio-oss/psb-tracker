@@ -184,6 +184,17 @@ function fmt(text: string, onClientClick?: (name: string) => void, onNavigate?: 
       // aj tak musí naklikať štyri obrazovky.
       if (p.startsWith("⟦") && p.endsWith("⟧")) {
         const [txt, tab, sub, kotva] = p.slice(1, -1).split("|");
+        // Jarvis sem 16. 8. napísal adresu instagramového príspevku namiesto
+        // názvu záložky. Tlačidlo sa vykreslilo a klik viedol na neexistujúcu
+        // obrazovku. Adresa je čitateľný úmysel — otvor ju, nehádaj sa s ním.
+        if (/^https?:\/\//.test(tab || "")) {
+          return (
+            <a key={j} href={tab} target="_blank" rel="noreferrer"
+               style={{ background: mix(C.accent, 14), border: `1px solid ${mix(C.accent, 45)}`, borderRadius: 6, padding: "1px 7px", margin: "0 1px", color: C.accentLight, fontWeight: 600, textDecoration: "none", display: "inline-block" }}>
+              {txt} ↗
+            </a>
+          );
+        }
         // Štvrtá časť je kotva na konkrétnu kartu. Doviesť človeka na
         // obrazovku a nechať ho hľadať tabuľku medzi desiatimi kartami je
         // polovičná práca — presne to Jerry vytkol pri tempe klienta.
