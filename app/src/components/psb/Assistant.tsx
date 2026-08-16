@@ -176,9 +176,9 @@ function oznac(text: string, hladat: string, key: number) {
 }
 
 // Minimal formatter: **bold**, `code`, «clickable client name», and newlines.
-function fmt(text: string, onClientClick?: (name: string) => void, onNavigate?: (tab: string, sub?: string) => void, hladat?: string) {
+function fmt(text: string, onClientClick?: (name: string) => void, onNavigate?: (tab: string, sub?: string) => void, hladat?: string, jeKlient?: (meno: string) => boolean) {
   return text.split("\n").map((line, i) => {
-    const parts = line.split(/(\*\*[^*]+\*\*|`[^`]+`|«[^»]+»|⟦[^⟧]+⟧)/g).map((p, j) => {
+    const parts = line.split(/(\*\*[^*]+\*\*|`[^`]+`|«[^»]+»|⟦[^⟧]+⟧|https?:\/\/[^\s)»,]+)/g).map((p, j) => {
       // ⟦text|tab|podzáložka⟧ — odkaz na miesto v appke. „Kde to nájdem"
       // je najčastejšia otázka a popis cesty slovami ju nerieši: človek si
       // aj tak musí naklikať štyri obrazovky.
@@ -202,10 +202,19 @@ function fmt(text: string, onClientClick?: (name: string) => void, onNavigate?: 
           ? <button key={j} onClick={chod} style={{ background: mix(C.accent, 14), border: `1px solid ${mix(C.accent, 45)}`, borderRadius: 6, padding: "1px 7px", margin: "0 1px", color: C.accentLight, fontWeight: 600, cursor: "pointer", fontSize: "inherit", fontFamily: "inherit" }}>{txt} →</button>
           : <strong key={j}>{txt}</strong>;
       }
+      // Adresa stránky sa stane odkazom. Jerry 16. 8. klikol na názov článku
+      // v odpovedi a čakal, že sa článok otvorí — čakanie je namieste, len to
+      // dovtedy nemalo kam viesť.
+      if (/^https?:\/\//.test(p)) {
+        return <a key={j} href={p} target="_blank" rel="noreferrer" style={{ color: C.accentLight, textDecoration: "underline", wordBreak: "break-all" }}>{p.replace(/^https?:\/\/(www\.)?/, "")}</a>;
+      }
       if (p.startsWith("**") && p.endsWith("**")) return <strong key={j}>{p.slice(2, -2)}</strong>;
       if (p.startsWith("`") && p.endsWith("`")) return <code key={j} style={{ background: mix(C.accent, 14), padding: "1px 4px", borderRadius: 4, fontSize: 12 }}>{p.slice(1, -1)}</code>;
       if (p.startsWith("«") && p.endsWith("»")) {
         const name = p.slice(1, -1);
+        // Bez zoznamu klientov sa správame ako doteraz; keď ho máme a meno
+        // v ňom nie je, zostane z toho obyčajný zvýraznený text.
+        if (jeKlient && !jeKlient(name)) return <strong key={j}>{name}</strong>;
         return onClientClick
           ? <button key={j} onClick={() => onClientClick(name)} style={{ background: "none", border: "none", padding: 0, margin: 0, color: C.accentLight, fontWeight: 600, cursor: "pointer", textDecoration: "underline", fontSize: "inherit", fontFamily: "inherit" }}>{name}</button>
           : <strong key={j}>{name}</strong>;
@@ -260,6 +269,22 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
   // Vetva sa pozná až pri prvom uložení nového rozhovoru — preto ref, nie state:
   // state by sa do efektu dostal až o render neskôr a prvý zápis by ju minul.
   const vetvaRef = useRef(false);
+  /**
+   * Je to naozaj meno klienta?
+   *
+   * 16. 8. Jarvis obalil do «» názov článku a appka z neho spravila odkaz na
+   * klienta — klik prehodil Jerryho na Klientov, na nikoho. Odkaz, ktorý vedie
+   * inam než sľubuje, je horší než obyčajný text, tak sa kreslí len vtedy,
+   * keď to meno v dátach naozaj je.
+   */
+  const jeKlient = useMemo(() => {
+    const mena = new Set(
+      ((context as { klientiDetail?: { meno?: string }[] }).klientiDetail || [])
+        .map((k) => (k.meno || "").trim().toLowerCase())
+        .filter(Boolean),
+    );
+    return (meno: string) => mena.has(meno.trim().toLowerCase());
+  }, [context]);
   /**
    * Výraz, ktorý sa má v otvorenom rozhovore vyznačiť.
    *
@@ -703,13 +728,13 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
     ].join(" · ");
   }
 
-  return { msgs, setMsgs, input, setInput, busy, stav, deep, setDeep, pending, setPending, attach, setAttach, ask, runAction, confirmImport, handleIncoming, floatingOpen, setFloatingOpen, kategoria, setKategoria, chats, chatId, newChat, upravSpravu, vetvi, presunChat, zastav, openChat, zvyraznit, setZvyraznit, deleteChat, archiveChat, spracujDennik };
+  return { msgs, setMsgs, input, setInput, busy, stav, deep, setDeep, pending, setPending, attach, setAttach, ask, runAction, confirmImport, handleIncoming, floatingOpen, setFloatingOpen, kategoria, setKategoria, chats, chatId, newChat, upravSpravu, vetvi, presunChat, zastav, openChat, zvyraznit, setZvyraznit, jeKlient, deleteChat, archiveChat, spracujDennik };
 }
 
 // ── The conversation UI (messages + input) — used by both the floating panel and
 // the inline widget. Each instance has its own scroll/refs/drag state. ──────────
 export function ChatConversation({ chat, autoFocus, onClientClick, onNavigate }: { chat: AssistantChat; autoFocus?: boolean; onClientClick?: (name: string) => void; onNavigate?: (tab: string, sub?: string) => void }) {
-  const { msgs, input, setInput, busy, stav, deep, setDeep, pending, setPending, attach, setAttach, ask, runAction, confirmImport, handleIncoming, upravSpravu, vetvi, zastav, zvyraznit, setZvyraznit } = chat;
+  const { msgs, input, setInput, busy, stav, deep, setDeep, pending, setPending, attach, setAttach, ask, runAction, confirmImport, handleIncoming, upravSpravu, vetvi, zastav, zvyraznit, setZvyraznit, jeKlient } = chat;
   // Ktorá odoslaná otázka sa práve prepisuje. Zámerne len jedna — dve
   // rozpísané opravy naraz by sa navzájom prepísali pri odoslaní.
   const [upravujem, setUpravujem] = useState<number | null>(null);
@@ -828,7 +853,7 @@ export function ChatConversation({ chat, autoFocus, onClientClick, onNavigate }:
                   </div>
                 </div>
               ) : (
-                fmt(m.zobrazit ?? m.text, m.role === "assistant" ? onClientClick : undefined, m.role === "assistant" ? onNavigate : undefined, mi === najdena ? zvyraznit : undefined)
+                fmt(m.zobrazit ?? m.text, m.role === "assistant" ? onClientClick : undefined, m.role === "assistant" ? onNavigate : undefined, mi === najdena ? zvyraznit : undefined, jeKlient)
               )}
             </div>
             {/*

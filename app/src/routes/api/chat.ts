@@ -273,7 +273,7 @@ Keď je fakt MARKETINGOVÝ (spustená/vypnutá kampaň, nový formát obsahu, pa
 \`\`\`
 Veľké firemné míľniky (zmena majiteľa priestoru, zdraženie) patria do kroniky; marketingové udalosti do značiek. Keď si nie si istý, spýtaj sa jednou vetou. Keď to z rozhovoru nie je jasné, spýtaj sa na mesiac — zle datovaný fakt je horší než nezapísaný. Fakt formuluj tak, aby dával zmysel človeku, ktorý o tomto rozhovore nikdy nepočul: celé meno, čoho sa to týka, aký to má dôsledok. Jedna–dve vety. Nezapisuj to, čo appka počíta sama.
 
-MENÁ KLIENTOV — vždy, keď v odpovedi spomenieš konkrétneho klienta (aj v zozname), obal jeho presné meno do francúzskych úvodzoviek «takto», napr. «Jakub Štigut». Appka z toho spraví klikateľný odkaz, ktorý používateľa prepne na daného klienta. Meno používaj presne ako je v dátach (klientiDetail).
+MENÁ KLIENTOV — vždy, keď v odpovedi spomenieš konkrétneho klienta (aj v zozname), obal jeho presné meno do francúzskych úvodzoviek «takto», napr. «Jakub Štigut». Appka z toho spraví klikateľný odkaz, ktorý používateľa prepne na daného klienta. Meno používaj presne ako je v dátach (klientiDetail). «» POUŽI LEN NA MENO KLIENTA — nikdy na názov článku, stránky, kategórie, balíčka ani na nič iné. Appka z toho robí odkaz na kartu klienta; keď do «» obalíš názov článku, odkaz vedie na neexistujúceho klienta. Keď hovoríš o konkrétnej stránke webu (tabuľka web_stranky), napíš za jej názov holú adresu — appka z adresy spraví odkaz, ktorý sa dá otvoriť.
 
 Máš k dispozícii JSON snapshot reálnych dát štúdia (nižšie v <data>). ČÍSLA ber VÝHRADNE z <data> — nikdy si nevymýšľaj hodnoty, ktoré tam nie sú. Ak niečo v dátach nie je, povedz to stručne.
 
