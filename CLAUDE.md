@@ -113,3 +113,13 @@ záver odporuje tomu, čo Jerry hovorí zo skúsenosti.
   príkaze. Z koreňa `philipjerry-web` `tsc` a testy zelené LEN preto, že
   nekontrolovali nič, a `wrangler deploy` začal nahrávať 280 000 súborov
   z celého Downloads. Stalo sa to 15. 8. dvakrát.
+- **D1 má strop ~1 MB na jednu hodnotu.** Base64 z 5 MB PDF má ~6,7 MB a do
+  riadku sa nezmestí — preto `jarvis_dokument_casti` krája po 700 000 znakoch
+  a skladá sa späť pri čítaní. Platí to pre čokoľvek veľké, čo by niekoho
+  lákalo uložiť do jedného stĺpca.
+- **Do histórie rozhovoru nepatrí obsah, len odkaz.** Rozhovor sa ukladá po
+  KAŽDEJ správe a nesie celú históriu; jedno vložené PDF by sa tak do databázy
+  prepisovalo desiatky ráz za jednu debatu. Dokumenty ležia v `jarvis_dokumenty`
+  a v správe je `psbdoc:<id>|<meno>`. Obsah drží 30 dní, potom zostane meno —
+  a Jarvis má v prompte napísané, že vtedy má povedať pravdu, nie si domyslieť,
+  čo v ňom bolo.

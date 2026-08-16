@@ -68,25 +68,33 @@ const opravStratene = (msgs: Msg[]): Msg[] =>
       : m,
   );
 
-/** Je to príloha, ktorá nie je obrázok? Podľa toho sa kreslí náhľad aj ukladá. */
-const jeDokument = (u: string) => !/^data:image\//i.test(u);
-/** Meno súboru vytiahnuté z data URL (`;name=`), ak tam je. */
+/** Je to príloha, ktorá nie je obrázok? Podľa toho sa kreslí náhľad. */
+const jeDokument = (u: string) => u.startsWith("psbdoc:") || !/^data:image\//i.test(u);
+/**
+ * Meno prílohy. Dokument je v rozhovore uložený ako `psbdoc:<id>|<meno>` —
+ * obsah leží v databáze, tu je len odkaz.
+ */
 const menoPrilohy = (u: string) => {
+  if (u.startsWith("psbdoc:")) return u.split("|")[1] || "dokument";
   const m = /^data:[^;]+;name=([^;]*);base64,/i.exec(u);
   return m ? decodeURIComponent(m[1]) : "dokument";
 };
 /**
- * Dokumenty sa do histórie NEUKLADAJÚ.
+ * Do histórie sa ukladajú ODKAZY na dokumenty, nie ich obsah.
  *
- * Uloženie ide po každej správe a nesie celý rozhovor. Jedno 5 MB PDF by sa
- * tak do databázy prepisovalo pri každej ďalšej otázke. V otvorenom okne
- * dokument zostáva (Jarvis sa naň vie doptať), po načítaní stránky zostane
- * v histórii len jeho meno — a to je poctivejšie než tváriť sa, že ho tam má.
+ * Obsah leží v tabuľke `jarvis_dokumenty` a v rozhovore je `psbdoc:<id>|<meno>`.
+ * Keby tam bolo base64, prepisovalo by sa do databázy pri každej ďalšej otázke
+ * v tej debate. Takto rozhovor prežije načítanie stránky aj s dokumentom —
+ * obsah drží 30 dní, potom zostane meno.
+ *
+ * Ak by sa uloženie do databázy nepodarilo, príloha zostane ako `data:` URL.
+ * Tú do histórie nepúšťame: radšej meno v texte než pol megabajtu v každom
+ * zápise.
  */
 const bezDokumentov = (zoznam: Msg[]): Msg[] =>
-  zoznam.map((m) => (m.images?.some(jeDokument)
-    ? { ...m, images: m.images.filter((u) => !jeDokument(u)),
-        text: m.text + m.images.filter(jeDokument).map((u) => `\n[priložený dokument: ${menoPrilohy(u)}]`).join("") }
+  zoznam.map((m) => (m.images?.some((u) => jeDokument(u) && !u.startsWith("psbdoc:"))
+    ? { ...m, images: m.images.filter((u) => !jeDokument(u) || u.startsWith("psbdoc:")),
+        text: m.text + m.images.filter((u) => jeDokument(u) && !u.startsWith("psbdoc:")).map((u) => `\n[priložený dokument: ${menoPrilohy(u)}]`).join("") }
     : m));
 
 function fileToDataUrl(f: File): Promise<string> {
@@ -396,8 +404,20 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
       const dobre = dokumenty.filter((f) => f.size <= 5_000_000).slice(0, 3);
       const urls = await Promise.all(dobre.map(async (f) => {
         const raw = await fileToDataUrl(f);
-        // Meno sa vloží do data URL, aby ho videl aj server: dva podobné PDF
-        // sa inak nedajú rozlíšiť.
+        const m = /^data:([^;]+);base64,(.*)$/.exec(raw);
+        // Uložiť rovno pri priložení. Do rozhovoru ide len odkaz — obsah drží
+        // databáza 30 dní. Keď uloženie zlyhá, pošle sa aspoň data URL:
+        // odpoveď dostane, len sa dokument po načítaní stránky stratí.
+        if (m) {
+          try {
+            const r = await fetch("/api/jarvis-dokument", {
+              method: "POST", credentials: "same-origin",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ meno: f.name, typ: m[1], data: m[2], chatId }),
+            }).then((x) => x.json());
+            if (r?.ok && r.id) return `psbdoc:${r.id}|${f.name}`;
+          } catch { /* nižšie záložná cesta */ }
+        }
         return raw.replace(/^data:([^;]+);base64,/, (_x, typ) => `data:${typ};name=${encodeURIComponent(f.name)};base64,`);
       }));
       if (urls.length) setAttach((a) => [...a, ...urls].slice(0, 4));

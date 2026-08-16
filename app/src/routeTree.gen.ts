@@ -40,6 +40,7 @@ import { Route as ApiLeadsRouteImport } from './routes/api/leads'
 import { Route as ApiLeadWebRouteImport } from './routes/api/lead-web'
 import { Route as ApiKalendarRouteImport } from './routes/api/kalendar'
 import { Route as ApiJarvisMemoryRouteImport } from './routes/api/jarvis-memory'
+import { Route as ApiJarvisDokumentRouteImport } from './routes/api/jarvis-dokument'
 import { Route as ApiIngestRouteImport } from './routes/api/ingest'
 import { Route as ApiGoogleAdsRouteImport } from './routes/api/google-ads'
 import { Route as ApiGoogleRouteImport } from './routes/api/google'
@@ -209,6 +210,11 @@ const ApiJarvisMemoryRoute = ApiJarvisMemoryRouteImport.update({
   path: '/api/jarvis-memory',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiJarvisDokumentRoute = ApiJarvisDokumentRouteImport.update({
+  id: '/api/jarvis-dokument',
+  path: '/api/jarvis-dokument',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiIngestRoute = ApiIngestRouteImport.update({
   id: '/api/ingest',
   path: '/api/ingest',
@@ -292,6 +298,7 @@ export interface FileRoutesByFullPath {
   '/api/google': typeof ApiGoogleRoute
   '/api/google-ads': typeof ApiGoogleAdsRoute
   '/api/ingest': typeof ApiIngestRoute
+  '/api/jarvis-dokument': typeof ApiJarvisDokumentRoute
   '/api/jarvis-memory': typeof ApiJarvisMemoryRoute
   '/api/kalendar': typeof ApiKalendarRoute
   '/api/lead-web': typeof ApiLeadWebRoute
@@ -338,6 +345,7 @@ export interface FileRoutesByTo {
   '/api/google': typeof ApiGoogleRoute
   '/api/google-ads': typeof ApiGoogleAdsRoute
   '/api/ingest': typeof ApiIngestRoute
+  '/api/jarvis-dokument': typeof ApiJarvisDokumentRoute
   '/api/jarvis-memory': typeof ApiJarvisMemoryRoute
   '/api/kalendar': typeof ApiKalendarRoute
   '/api/lead-web': typeof ApiLeadWebRoute
@@ -385,6 +393,7 @@ export interface FileRoutesById {
   '/api/google': typeof ApiGoogleRoute
   '/api/google-ads': typeof ApiGoogleAdsRoute
   '/api/ingest': typeof ApiIngestRoute
+  '/api/jarvis-dokument': typeof ApiJarvisDokumentRoute
   '/api/jarvis-memory': typeof ApiJarvisMemoryRoute
   '/api/kalendar': typeof ApiKalendarRoute
   '/api/lead-web': typeof ApiLeadWebRoute
@@ -433,6 +442,7 @@ export interface FileRouteTypes {
     | '/api/google'
     | '/api/google-ads'
     | '/api/ingest'
+    | '/api/jarvis-dokument'
     | '/api/jarvis-memory'
     | '/api/kalendar'
     | '/api/lead-web'
@@ -479,6 +489,7 @@ export interface FileRouteTypes {
     | '/api/google'
     | '/api/google-ads'
     | '/api/ingest'
+    | '/api/jarvis-dokument'
     | '/api/jarvis-memory'
     | '/api/kalendar'
     | '/api/lead-web'
@@ -525,6 +536,7 @@ export interface FileRouteTypes {
     | '/api/google'
     | '/api/google-ads'
     | '/api/ingest'
+    | '/api/jarvis-dokument'
     | '/api/jarvis-memory'
     | '/api/kalendar'
     | '/api/lead-web'
@@ -572,6 +584,7 @@ export interface RootRouteChildren {
   ApiGoogleRoute: typeof ApiGoogleRoute
   ApiGoogleAdsRoute: typeof ApiGoogleAdsRoute
   ApiIngestRoute: typeof ApiIngestRoute
+  ApiJarvisDokumentRoute: typeof ApiJarvisDokumentRoute
   ApiJarvisMemoryRoute: typeof ApiJarvisMemoryRoute
   ApiKalendarRoute: typeof ApiKalendarRoute
   ApiLeadWebRoute: typeof ApiLeadWebRoute
@@ -821,6 +834,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiJarvisMemoryRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/jarvis-dokument': {
+      id: '/api/jarvis-dokument'
+      path: '/api/jarvis-dokument'
+      fullPath: '/api/jarvis-dokument'
+      preLoaderRoute: typeof ApiJarvisDokumentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/ingest': {
       id: '/api/ingest'
       path: '/api/ingest'
@@ -932,6 +952,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiGoogleRoute: ApiGoogleRoute,
   ApiGoogleAdsRoute: ApiGoogleAdsRoute,
   ApiIngestRoute: ApiIngestRoute,
+  ApiJarvisDokumentRoute: ApiJarvisDokumentRoute,
   ApiJarvisMemoryRoute: ApiJarvisMemoryRoute,
   ApiKalendarRoute: ApiKalendarRoute,
   ApiLeadWebRoute: ApiLeadWebRoute,
