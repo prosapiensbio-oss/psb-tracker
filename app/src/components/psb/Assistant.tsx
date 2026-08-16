@@ -595,6 +595,7 @@ export function ChatConversation({ chat, autoFocus, onClientClick, onNavigate }:
   // Ktorá odoslaná otázka sa práve prepisuje. Zámerne len jedna — dve
   // rozpísané opravy naraz by sa navzájom prepísali pri odoslaní.
   const [upravujem, setUpravujem] = useState<number | null>(null);
+  const [skopirovane, setSkopirovane] = useState<number | null>(null);
   const [navrh, setNavrh] = useState("");
   const [drag, setDrag] = useState(false);
   // Autoscroll drží odpoveď na očiach LEN vtedy, keď je človek dole. Keď si
@@ -699,6 +700,33 @@ export function ChatConversation({ chat, autoFocus, onClientClick, onNavigate }:
               >
                 upraviť
               </button>
+            )}
+            {/*
+              Dve veci, ktoré Jerry robí s odpoveďou najčastejšie: presunie ju
+              inam a chce k nej viac. Predtým musel prvé označovať myšou
+              a druhé písať vetou.
+
+              „Rozviň" zámerne NIE JE prepínač dlhá/krátka. Prepínač je
+              rozhodnutie pred tým, než je odpoveď vidieť — a človek ho zabudne
+              vrátiť. Takto sa rozhoduje až podľa toho, čo prišlo.
+            */}
+            {m.role === "assistant" && !m.systemova && m.text && !busy && (
+              <div style={{ display: "flex", gap: 12, marginTop: 4, alignItems: "center" }}>
+                <button
+                  onClick={() => { void navigator.clipboard.writeText(m.zobrazit ?? m.text); setSkopirovane(mi); setTimeout(() => setSkopirovane((x) => (x === mi ? null : x)), 1600); }}
+                  title="Skopírovať odpoveď do schránky"
+                  style={{ background: "none", border: "none", padding: 0, color: skopirovane === mi ? C.accentLight : C.textDim, fontSize: 10.5, cursor: "pointer", fontFamily: "inherit" }}
+                >
+                  {skopirovane === mi ? "✓ skopírované" : "kopírovať"}
+                </button>
+                <button
+                  onClick={() => ask("Rozveď poslednú odpoveď: doplň kontext, čísla, z ktorých vychádza, a čo z toho plynie. Nezačínaj odznova, nadviaž.")}
+                  title="Nechať Jarvisa rozviesť túto odpoveď — kontext, čísla, čo z toho plynie"
+                  style={{ background: "none", border: "none", padding: 0, color: C.textDim, fontSize: 10.5, cursor: "pointer", fontFamily: "inherit" }}
+                >
+                  rozviň
+                </button>
+              </div>
             )}
             {m.actions?.map((a, ai) => (
               <button key={ai} disabled={a.done} onClick={() => runAction(mi, ai)} style={{ marginTop: 6, display: "block", width: "100%", textAlign: "left", padding: "8px 11px", borderRadius: 9, cursor: a.done ? "default" : "pointer", fontSize: 12.5, fontWeight: 600, border: `1px solid ${a.done ? C.border : C.accent}`, background: a.done ? "transparent" : mix(C.accent, 14), color: a.done ? C.textDim : C.accentLight }}>
