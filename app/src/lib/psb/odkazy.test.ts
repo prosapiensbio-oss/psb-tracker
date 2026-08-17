@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { CIELE, jePlatnyCiel, jeVonkajsiOdkaz } from "./odkazy";
+import { CIELE, jePlatnyCiel, jeVonkajsiOdkaz, naPlnuAdresu } from "./odkazy";
 
 describe("jeVonkajsiOdkaz", () => {
   it("pozná adresu článku aj príspevku", () => {
@@ -45,5 +45,29 @@ describe("jePlatnyCiel", () => {
 
   it("zoznam cieľov je bez duplicít", () => {
     expect(new Set(CIELE).size).toBe(CIELE.length);
+  });
+});
+
+describe("naPlnuAdresu", () => {
+  it("doplní schému adrese napísanej bez nej", () => {
+    // Presne takto Jarvis adresy píše v krátkych odpovediach.
+    expect(naPlnuAdresu("prosapiens.cz/arm-lines")).toBe("https://prosapiens.cz/arm-lines");
+    expect(naPlnuAdresu("www.prosapiens.cz/vysledky/")).toBe("https://www.prosapiens.cz/vysledky/");
+    expect(naPlnuAdresu("instagram.com/p/DYEYoOujO9w/")).toBe("https://instagram.com/p/DYEYoOujO9w/");
+  });
+
+  it("úplnú adresu nechá tak", () => {
+    expect(naPlnuAdresu("https://www.prosapiens.cz/fascia/")).toBe("https://www.prosapiens.cz/fascia/");
+  });
+
+  it("odsekne vetnú interpunkciu na konci", () => {
+    expect(naPlnuAdresu("prosapiens.cz/fascia,")).toBe("https://prosapiens.cz/fascia");
+  });
+
+  it("z bežného slova odkaz nespraví", () => {
+    // Robiť odkaz z každej bodky by vyrobilo viac škody než úžitku.
+    for (const x of ["niečo.sk", "napr.", "6M", "CTR 0,3 %", "sedenia.cz"]) {
+      expect(naPlnuAdresu(x)).toBeNull();
+    }
   });
 });

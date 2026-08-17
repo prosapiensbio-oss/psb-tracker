@@ -24,6 +24,30 @@ export function jeVonkajsiOdkaz(x: string): boolean {
 }
 
 /**
+ * Adresa napísaná bez „https://".
+ *
+ * Jarvis ju tak píše bežne — „prosapiens.cz/arm-lines", „instagram.com/p/XY"
+ * — a v krátkej odpovedi skoro vždy. Kým sa chytala len úplná adresa, polovica
+ * odkazov zostala obyčajným textom a Jerry 17. 8. 2026 hlásil, že prekliky
+ * chýbajú. Domény sú vymenované zámerne: „niečo.sk" vo vete je slovo, nie
+ * odkaz, a robiť odkaz z každej bodky by vyrobilo viac škody než úžitku.
+ */
+const DOMENY = /^(?:www\.)?(prosapiens\.cz|instagram\.com|prosapiensbio\.workers\.dev)(\/\S*)?$/i;
+
+export function jeAdresaBezSchemy(x: string): boolean {
+  const t = (x || "").trim().replace(/[.,;:]$/, "");
+  return !t.includes("://") && DOMENY.test(t);
+}
+
+/** Doplní „https://" tam, kde chýba. Vracia null, keď to adresa nie je. */
+export function naPlnuAdresu(x: string): string | null {
+  const t = (x || "").trim().replace(/[.,;:]$/, "");
+  if (jeVonkajsiOdkaz(t)) return t;
+  if (jeAdresaBezSchemy(t)) return `https://${t.replace(/^www\./i, "www.")}`;
+  return null;
+}
+
+/**
  * Ciele navigácie v appke.
  *
  * Sú tu aj STARÉ id („financie", „vysledky", „6m"), lebo ich `navigate`

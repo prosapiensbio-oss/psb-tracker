@@ -17,7 +17,7 @@ import {
 import { MKT_OBSAH } from "./marketing-obsah";
 import { prilezitosti, soZamerom } from "./google";
 import { adsMesiace, zhrnutieAds } from "./googleAds";
-import { chybyNaStrankach, prilezitostiTitulkov } from "./webObsah";
+import { chybyNaStrankach, najdiAdresuPodlaTitulku, prilezitostiTitulkov } from "./webObsah";
 import { hodnotenie } from "./pagespeed";
 import {
   cenaZaSedenie,
@@ -542,7 +542,13 @@ export function buildAiContext(
           GSC_STRANY.map((g) => ({ url: g.url, zobrazenia: g.zobrazenia, kliky: g.kliky })),
         ),
       },
-      clanky: MKT_CLANKY.slice(0, 15),
+      // Adresa ku každému článku — bez nej Jarvis vymenuje tri najčítanejšie
+      // a nedá na ne preklik (17. 8. 2026). Vymyslieť si ju nesmie, tak mu ju
+      // treba dať; keď sa nedá spárovať, je null a on povie len názov.
+      clanky: MKT_CLANKY.slice(0, 15).map((c) => ({
+        ...c,
+        url: najdiAdresuPodlaTitulku(WEB_STRANKY.map((w) => ({ url: w.url, titulok: w.titulok })), c.nazov),
+      })),
       zdrojeKlientov: {
         poznamka: "Odkiaľ prišli KLIENTI za CELÚ históriu. Vyplnené ručne pri úvodnom tréningu. POZOR: toto číslo sa NESMIE deliť počtom dopytov — dopyty sa evidujú až od januára 2026, takže by z toho vyšla nezmyselná konverzia (napr. 23 instagramových klientov ÷ 12 instagramových dopytov = 190 %). Konverzia je spočítaná v kľúči „lievik“ nad rovnakým obdobím; ber ju odtiaľ.",
         klienti: zdroje,

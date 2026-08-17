@@ -1,6 +1,6 @@
 import { type CSSProperties, Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { fmtDMY } from "../../lib/psb/format";
-import { jePlatnyCiel, jeVonkajsiOdkaz } from "../../lib/psb/odkazy";
+import { jePlatnyCiel, jeVonkajsiOdkaz, naPlnuAdresu } from "../../lib/psb/odkazy";
 
 import type { AiContext } from "../../lib/psb/aiContext";
 import {
@@ -179,7 +179,7 @@ function oznac(text: string, hladat: string, key: number) {
 // Minimal formatter: **bold**, `code`, «clickable client name», and newlines.
 function fmt(text: string, onClientClick?: (name: string) => void, onNavigate?: (tab: string, sub?: string) => void, hladat?: string, jeKlient?: (meno: string) => boolean) {
   return text.split("\n").map((line, i) => {
-    const parts = line.split(/(\*\*[^*]+\*\*|`[^`]+`|«[^»]+»|⟦[^⟧]+⟧|https?:\/\/[^\s)»,]+)/g).map((p, j) => {
+    const parts = line.split(/(\*\*[^*]+\*\*|`[^`]+`|«[^»]+»|⟦[^⟧]+⟧|(?:https?:\/\/|(?:www\.)?(?:prosapiens\.cz|instagram\.com)\/)[^\s)»"]+)/g).map((p, j) => {
       // ⟦text|tab|podzáložka⟧ — odkaz na miesto v appke. „Kde to nájdem"
       // je najčastejšia otázka a popis cesty slovami ju nerieši: človek si
       // aj tak musí naklikať štyri obrazovky.
@@ -220,12 +220,18 @@ function fmt(text: string, onClientClick?: (name: string) => void, onNavigate?: 
       // Adresa stránky sa stane odkazom. Jerry 16. 8. klikol na názov článku
       // v odpovedi a čakal, že sa článok otvorí — čakanie je namieste, len to
       // dovtedy nemalo kam viesť.
-      if (jeVonkajsiOdkaz(p)) {
+      const plna = naPlnuAdresu(p);
+      if (plna) {
         // Popis odkazu: holá adresa instagramového príspevku je nečitateľný
         // kód, adresa článku aspoň niečo hovorí. Preto sa IG pomenuje slovom.
-        const ig = /instagram\.com\/(p|reel|reels)\//.test(p);
-        const popis = ig ? "otvoriť na Instagrame ↗" : p.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "");
-        return <a key={j} href={p} target="_blank" rel="noreferrer" style={{ color: C.accentLight, textDecoration: "underline", wordBreak: "break-word" }}>{popis}</a>;
+        const ig = /instagram\.com\/(p|reel|reels)\//.test(plna);
+        // Šípka je aj pri článku, nielen pri Instagrame. Bez nej vyzerá
+        // „prosapiens.cz/arm-lines" uprostred vety ako obyčajný text a Jerry
+        // 17. 8. hlásil, že prekliky chýbajú — pritom tam boli.
+        const popis = ig
+          ? "otvoriť na Instagrame ↗"
+          : `${plna.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "")} ↗`;
+        return <a key={j} href={plna} target="_blank" rel="noreferrer" style={{ color: C.accentLight, textDecoration: "underline", fontWeight: 600, wordBreak: "break-word" }}>{popis}</a>;
       }
       if (p.startsWith("**") && p.endsWith("**")) return <strong key={j}>{p.slice(2, -2)}</strong>;
       if (p.startsWith("`") && p.endsWith("`")) return <code key={j} style={{ background: mix(C.accent, 14), padding: "1px 4px", borderRadius: 4, fontSize: 12 }}>{p.slice(1, -1)}</code>;

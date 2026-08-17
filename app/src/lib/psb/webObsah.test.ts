@@ -2,8 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import {
   chybyNaStrankach, h1ZHtml, metaPopisZHtml, normUrl, prilezitostiTitulkov, sitemapUrls,
-  sitemapZapisy, textZHtml, titulokZHtml, typZoSitemapy, type WebStranka,
-} from "./webObsah";
+  sitemapZapisy, textZHtml, titulokZHtml, typZoSitemapy, type WebStranka, najdiAdresuPodlaTitulku } from "./webObsah";
 
 /**
  * Vytiahnuť titulok z HTML funguje na deviatich stránkach a na desiatej vráti
@@ -198,5 +197,28 @@ describe("technické chyby na stránkach", () => {
 
   test("stránka bez chýb nevyrobí žiadny riadok", () => {
     expect(chybyNaStrankach([st("https://x.cz/a/")])).toEqual([]);
+  });
+});
+
+describe("najdiAdresuPodlaTitulku", () => {
+  const stranky = [
+    { url: "https://www.prosapiens.cz/fascie-voda-v-nas/", titulok: "Fascie – Voda v nás - ProSapiens Biomechanic" },
+    { url: "https://www.prosapiens.cz/spiral-line/", titulok: "Spiral Line (SPL) - Spiralní Línie - ProSapiens Biomechanic" },
+    { url: "https://www.prosapiens.cz/fascia/", titulok: "Fascia - ProSapiens Biomechanic" },
+  ];
+
+  test("nájde článok napriek značke na konci titulku aj inej pomlčke", () => {
+    expect(najdiAdresuPodlaTitulku(stranky, "Fascie - Voda v nás")).toBe("https://www.prosapiens.cz/fascie-voda-v-nas/");
+    expect(najdiAdresuPodlaTitulku(stranky, "Spiral Line (SPL) - Spiralní Línie")).toBe("https://www.prosapiens.cz/spiral-line/");
+  });
+
+  test("adresu v názve vráti rovno", () => {
+    expect(najdiAdresuPodlaTitulku(stranky, "https://www.prosapiens.cz/x/")).toBe("https://www.prosapiens.cz/x/");
+  });
+
+  test("keď sa nedá rozhodnúť, nevráti nič", () => {
+    // Falošný odkaz je horší než žiadny.
+    expect(najdiAdresuPodlaTitulku(stranky, "Neexistujúci článok")).toBeNull();
+    expect(najdiAdresuPodlaTitulku(stranky, "")).toBeNull();
   });
 });

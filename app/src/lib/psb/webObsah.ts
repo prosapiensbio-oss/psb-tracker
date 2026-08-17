@@ -247,3 +247,30 @@ export function prilezitostiTitulkov(
   }
   return von.sort((a, b) => b.zobrazenia - a.zobrazenia).slice(0, limit);
 }
+
+/**
+ * Adresa článku podľa jeho názvu.
+ *
+ * Rebríček najčítanejších článkov (z GA4) nesie len názov a počet zobrazení —
+ * adresu nie. Jarvis tak 17. 8. 2026 vymenoval tri články bez jediného odkazu,
+ * a správne: vymyslieť adresu je horšie než ju nedať. Titulky vo web_stranky
+ * majú na konci značku („… - ProSapiens Biomechanic"), preto sa porovnáva
+ * začiatok, nie celá zhoda.
+ */
+export function najdiAdresuPodlaTitulku(
+  stranky: { url: string; titulok: string }[],
+  nazov: string,
+): string | null {
+  const norm = (x: string) =>
+    (x || "").normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase()
+      .replace(/[–—]/g, "-").replace(/\s+/g, " ").trim();
+  const n = norm(nazov);
+  if (!n) return null;
+  // Keď v názve už je adresa (GA4 vracia cesty), stačí ju vrátiť.
+  if (/^https?:\/\//i.test(nazov.trim())) return nazov.trim();
+  const presna = stranky.find((s) => norm(s.titulok) === n);
+  if (presna) return presna.url;
+  const zaciatok = stranky.filter((s) => norm(s.titulok).startsWith(n));
+  // Pri dvoch kandidátoch radšej nič — falošný odkaz je horší než žiadny.
+  return zaciatok.length === 1 ? zaciatok[0].url : null;
+}

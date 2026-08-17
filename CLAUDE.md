@@ -134,6 +134,11 @@ záver odporuje tomu, čo Jerry hovorí zo skúsenosti.
   `curl -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" ".../workers/scripts/kokpit/versions?per_page=1"`.
   Niekedy treba dva pokusy. „Deploy prebehol" bez zvýšeného čísla verzie je
   nepravda — 16. 8. som na to naletel a testoval starú verziu appky.
+  A **overiť treba aj ASSETY, nielen číslo verzie**: wrangler si v `.wrangler/tmp`
+  pamätá, čo už nahral, a po prerušenom pokuse hlási „No updated asset files to
+  upload" — worker sa nasadí, ale `/assets/index-*.js` vracia 404 a v prehliadači
+  beží stará appka. Lieči to `rm -rf .wrangler/tmp` a nový deploy. Kontrola:
+  `curl -o /dev/null -w '%{http_code}' https://kokpit.prosapiensbio.workers.dev/assets/<nazov z dist/client/assets>`.
 - **D1 má strop ~1 MB na jednu hodnotu.** Base64 z 5 MB PDF má ~6,7 MB a do
   riadku sa nezmestí — preto `jarvis_dokument_casti` krája po 700 000 znakoch
   a skladá sa späť pri čítaní. Platí to pre čokoľvek veľké, čo by niekoho
