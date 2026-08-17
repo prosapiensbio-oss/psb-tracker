@@ -73,3 +73,35 @@ describe("odmena za odporúčanie", () => {
     expect(x.acked).toBe(true);
   });
 });
+
+describe("úvodný bez dopytu", () => {
+  it("upozorní, keď človek prišiel na úvodný a v dopytoch nie je", () => {
+    const [x] = pripomienkySlubov([u("2026-08-06T10:00:00Z", "Zuzana Spoligova")], [], {}, DNES)
+      .filter((i) => i.key.startsWith("bezdopytu|"));
+    expect(x.title).toContain("Úvodný bez dopytu");
+    expect(x.detail).toContain("odkiaľ prišiel");
+    expect(x.client).toBe("marketing|dopyty");
+  });
+
+  it("keď dopyt existuje, mlčí — aj pri inak písanom mene", () => {
+    // „Prochadzka" v PTminderi verzus „Procházka" v dopyte je jeden človek.
+    const v = pripomienkySlubov(
+      [u("2026-08-06T10:00:00Z", "Matej Prochadzka")],
+      [l("2026-08-01", "Matěj Procházka", "instagram")],
+      {}, DNES,
+    ).filter((i) => i.key.startsWith("bezdopytu|"));
+    expect(v).toHaveLength(0);
+  });
+
+  it("zrušený a budúci úvodný sa nepočíta", () => {
+    const zruseny = pripomienkySlubov([u("2026-08-06T10:00:00Z", "Kto", "uvodny", "2026-08-05")], [], {}, DNES);
+    const buduci = pripomienkySlubov([u("2026-09-01T10:00:00Z", "Kto")], [], {}, DNES);
+    expect(zruseny.filter((i) => i.key.startsWith("bezdopytu|"))).toHaveLength(0);
+    expect(buduci.filter((i) => i.key.startsWith("bezdopytu|"))).toHaveLength(0);
+  });
+
+  it("po 45 dňoch sa už nepripomína", () => {
+    const v = pripomienkySlubov([u("2026-06-01T10:00:00Z", "Kto")], [], {}, DNES);
+    expect(v.filter((i) => i.key.startsWith("bezdopytu|"))).toHaveLength(0);
+  });
+});

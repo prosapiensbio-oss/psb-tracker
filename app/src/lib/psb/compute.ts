@@ -2044,6 +2044,8 @@ export type UdalostPreSms = { zaciatok: string; klient: string | null; typ: stri
 const SMS_OKNO_DNI = 21;
 /** Ako ďaleko dozadu sa pripomína odmena za odporúčanie. */
 const ODMENA_OKNO_DNI = 60;
+/** Dopyt sa dá dopísať aj spätne, tak je okno dlhšie než pri SMS. */
+const DOPYT_OKNO_DNI = 45;
 
 export function pripomienkySlubov(
   udalosti: UdalostPreSms[],
@@ -2103,6 +2105,46 @@ export function pripomienkySlubov(
       priority: 12,
       // Odmenu dostáva ODPORÚČATEĽ, takže „Otvoriť" má viesť na jeho kartu.
       client: kto || l.name,
+      ...stav(key, rodina),
+    });
+  }
+
+  // ── Úvodný bez dopytu ───────────────────────────────────────────────────
+  //
+  // Jerry, 17. 8. 2026: „do budúcna by sa neexistujúce dopyty mali vynulovať."
+  // Dnes ich je jedenásť: ľudia, ktorí prišli na úvodný tréning, ale do dopytov
+  // ich nikto nezapísal — pravdepodobne prišli telefonicky alebo osobne a rovno
+  // sa im založil tréning. Nie je to účtovná chyba, je to slepé miesto: bez
+  // dopytu appka nevie, ODKIAĽ ten človek prišiel, takže lievik aj rozdelenie
+  // podľa zdroja počítajú z menšej vzorky, než akú štúdio naozaj má.
+  //
+  // Pripomienka je zámerne pri KAŽDOM úvodnom bez dopytu, nielen pri novom:
+  // dopyt sa dá dopísať aj spätne a hodnota (vieme, odkiaľ ľudia chodia)
+  // zostáva rovnaká.
+  const hranicaDopytu = den(new Date(dnes.getTime() - DOPYT_OKNO_DNI * 86400_000));
+  const menaDopytov = leads.map((l) => l.name);
+  for (const u of udalosti) {
+    if (u.typ !== "uvodny" || u.zmizlaAt) continue;
+    const d = (u.zaciatok || "").slice(0, 10);
+    if (!d || d > dnesStr || d < hranicaDopytu) continue;
+    const meno = (u.klient || "").trim();
+    if (!meno) continue;
+    // najdiKlienta znesie „Prochadzka" verzus „Procházka" — hľadá sa človek,
+    // nie presný reťazec. Prehodené písmená v priezvisku (Spoligova verzus
+    // Sopoligová) ale neznesie ani ono; taký prípad sa ohlási ako chýbajúci
+    // dopyt a je to tak lepšie než ho ticho spárovať zle.
+    if (najdiKlienta(menaDopytov, meno)) continue;
+    const key = `bezdopytu|${d}|${meno}`;
+    const rodina = "bezdopytu";
+    out.push({
+      key,
+      category: "Zápis",
+      tone: "orange",
+      title: `Úvodný bez dopytu — ${meno}`,
+      detail: `${meno} bol ${fmtDMY(d)} na úvodnom tréningu, ale v dopytoch nie je. Bez neho appka nevie, odkiaľ prišiel — a to je jediné miesto, z ktorého sa dá zistiť, čo klientov naozaj privádza. Dopíš ho v Marketing → Dopyty, stačí meno a zdroj.`,
+      priority: 11,
+      // Kategória Zápis nesie cieľ prekliku v poli client ako „tab|sub".
+      client: "marketing|dopyty",
       ...stav(key, rodina),
     });
   }
