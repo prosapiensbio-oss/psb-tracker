@@ -512,9 +512,15 @@ export function buildAiContext(
       // povedať „15 777 zobrazení, 97 klikov" a nedalo sa povedať, čo s tým.
       webObsah: {
         poznamka: WEB_STRANKY.length
-          ? "Titulky a popisy stránok vlastného webu, spojené so Search Console. Kľúč „titulkyNaPrepis“ sú stránky, ktoré Google ukazuje a nikto na ne neklikne — ich CTR je výrazne pod mediánom webu a je pri nich SÚČASNÝ titulok, takže sa dá povedať, čo prepísať. NAVRHUJ ÚPRAVY SÁM, nečakaj na vyzvanie: keď je reč o webe, o SEO alebo o tom, čo skúsiť, vytiahni najhoršie stránky a dávaj HOTOVÝ text pre <title> a meta description — nie radu, čo by sa dalo. Jerry si web postavil sám a vetu si prepíše; keď mu dáš „skús prepracovať titulok“, nedal si mu nič. Formát: pôvodný titulok → nový, a jedna veta prečo (aký symptóm alebo slovo tam pribudlo). Stavaj na symptóme, nie na anatómii — čísla PSB to potvrdzujú. Text stránok tu nie je celý; keď treba obsah konkrétnej stránky, otvor ju nástrojom web_fetch."
+          ? "Titulky a popisy stránok vlastného webu, spojené so Search Console. Kľúč „titulkyNaPrepis“ sú stránky, ktoré Google ukazuje a nikto na ne neklikne — ich CTR je výrazne pod mediánom webu a je pri nich SÚČASNÝ titulok, takže sa dá povedať, čo prepísať. NAVRHUJ ÚPRAVY SÁM, nečakaj na vyzvanie: keď je reč o webe, o SEO alebo o tom, čo skúsiť, vytiahni najhoršie stránky a dávaj HOTOVÝ text pre <title> a meta description — nie radu, čo by sa dalo. Jerry si web postavil sám a vetu si prepíše; keď mu dáš „skús prepracovať titulok“, nedal si mu nič. Formát: pôvodný titulok → nový, a jedna veta prečo (aký symptóm alebo slovo tam pribudlo). Stavaj na symptóme, nie na anatómii — čísla PSB to potvrdzujú. Text stránok tu nie je celý; keď treba obsah konkrétnej stránky, hľadaj v tabuľke web_stranky (WHERE text LIKE), a až keď tam text nie je, otvor ju nástrojom web_fetch. POZOR: „stextom“ hovorí, koľko stránok má stiahnutý text. Keď je to menej než „stranok“, sťahovanie NIE JE DOKONČENÉ — prázdny text konkrétnej stránky vtedy neznamená, že je krátka či prázdna, ale že na ňu ešte nedošlo. Povedz to tak a pošli ho na Údaje → Napojenia → Prečítať web."
           : "Text webu sa ešte nestiahol. NEODPOVEDAJ, že o obsahu webu nič nevieš — v Marketingu → Web a Google je karta „Text webu“ a treba stlačiť Prečítať web. Prázdna tabuľka nie je dôkaz.",
         stranok: WEB_STRANKY.length,
+        // Koľko stránok má naozaj stiahnutý TEXT, nie len titulok. 17. 8. 2026
+        // ich malo text 38 zo 79 a Jarvis na otázku „čo píše stránka o Lateral
+        // Line" odpovedal, že pole je prázdne a stránka je asi extrémne krátka.
+        // Pravdivé, ale nepoužiteľné: skutočný dôvod je, že sťahovanie textu
+        // beží po dávkach a nikto nedoklikal zvyšok.
+        stextom: WEB_STRANKY.filter((s) => (s.znakov || 0) > 0).length,
         titulky: WEB_STRANKY.map((s) => ({ url: s.url, typ: s.typ, titulok: s.titulok, popis: s.metaPopis })).slice(0, 90),
         // Technická kontrola z tých istých dát: duplicitné titulky, chýbajúce
         // popisy, odseknuté vety. Presne to, čo platené SEO nástroje predávajú
