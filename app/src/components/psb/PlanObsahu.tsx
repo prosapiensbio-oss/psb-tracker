@@ -117,9 +117,15 @@ export function PlanObsahu({ data, chat, onNavigate }: { data: PSBData; chat?: A
       `Prečo to navrhujem: ${n.preco}`,
       `Číslo, na ktorom to stojí: ${n.dokaz}`,
       "",
-      "Postupuj podľa pravidiel pre plánovací režim. Zadanie musí stáť samo o sebe —",
-      "Project nevidí dáta Kokpitu, takže čísla a mená v ňom musia byť vypísané.",
-      "Skontroluj ho proti FP pravidlám a proti indexu brand-konfliktov.",
+      "Drž PEVNÝ TVAR ZADANIA (docs/tvar-zadania.md) — tieto kolónky v tomto poradí:",
+      "TÉMA · PREČO PRÁVE TOTO · ČÍSLA, NA KTORÝCH TO STOJÍ · PUBLIKUM A SYMPTÓM ·",
+      "FORMÁT A DĹŽKA · JAZYK · ČO NESMIE ZAZNIEŤ · HOTOVÉ VETY · ČO CHCEM SPÄŤ.",
+      "",
+      "Kto je PSB, tón hlasu, FP pravidlá a index brand-konfliktov do zadania NEPÍŠ —",
+      "Project ich má natrvalo v kánone. Zadanie nesie len to, čo je pre tento text nové.",
+      "Pri číslach vždy uveď zdroj a dátum. Project nevidí dáta Kokpitu, takže čo",
+      "nenapíšeš, to nemá. Do zadania nepatrí meno klienta ani zdravotný detail.",
+      "Najprv over, či čísla sedia — a keď nesedia, povedz to namiesto zadania.",
     ].join("\n"), `Vyrob zadanie: ${n.co}`);
   };
 
