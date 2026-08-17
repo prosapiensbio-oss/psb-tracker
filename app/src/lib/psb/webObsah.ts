@@ -274,3 +274,34 @@ export function najdiAdresuPodlaTitulku(
   // Pri dvoch kandidátoch radšej nič — falošný odkaz je horší než žiadny.
   return zaciatok.length === 1 ? zaciatok[0].url : null;
 }
+
+/**
+ * Ktoré adresy v databáze už web nemá.
+ *
+ * Sitemapa je pravda o tom, čo web obsahuje. Keď Jerry stránku zruší, zmizne
+ * zo sitemapy — ale v `web_stranky` po nej zostal riadok navždy. 17. 8. 2026
+ * tak appka hlásila „chýba 2" donekonečna a dve mŕtve adresy sa ťahali do
+ * každej dávky: `skupinovy-trenink` a `lekce-fascialni-svoboda`, obe zrušené
+ * projekty, obe vracajúce 404.
+ *
+ * MAZAŤ SA SMIE LEN PRI ÚPLNOM ČÍTANÍ. Keď sa čo i len jedna sitemapa
+ * nestiahne, jej stránky by vyzerali ako zrušené a zmizol by z appky text
+ * polovice webu. Preto `uplne` — bez neho sa nemaže nič.
+ */
+/** Podiel riadkov, nad ktorý sa mazanie odmietne ako podozrivé. */
+const STROP_MAZANIA = 0.3;
+
+export function naZmazanie(vDb: string[], vSitemape: string[], uplne: boolean): string[] {
+  if (!uplne || !vSitemape.length) return [];
+  // Porovnáva sa aj bez „www." — `normUrl` ho zámerne necháva (spája sa cez
+  // neho so Search Console), ale keby WordPress raz vypísal sitemapu bez neho,
+  // vyzeral by celý web ako zrušený.
+  const kluc = (u: string) => normUrl(u).replace("://www.", "://");
+  const je = new Set(vSitemape.map(kluc));
+  const von = vDb.filter((u) => !je.has(kluc(u)));
+  // Poistka na nešťastie: keď sa má zmazať tretina webu a viac, niečo je
+  // inak, než si myslíme — radšej nechať dve mŕtve adresy než prísť o text
+  // päťdesiatich stránok, ktorý sa sťahoval polhodinu.
+  if (vDb.length && von.length / vDb.length > STROP_MAZANIA) return [];
+  return von;
+}

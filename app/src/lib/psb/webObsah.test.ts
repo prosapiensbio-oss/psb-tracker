@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import {
   chybyNaStrankach, h1ZHtml, metaPopisZHtml, normUrl, prilezitostiTitulkov, sitemapUrls,
-  sitemapZapisy, textZHtml, titulokZHtml, typZoSitemapy, type WebStranka, najdiAdresuPodlaTitulku } from "./webObsah";
+  sitemapZapisy, textZHtml, titulokZHtml, typZoSitemapy, type WebStranka, najdiAdresuPodlaTitulku, naZmazanie } from "./webObsah";
 
 /**
  * Vytiahnuť titulok z HTML funguje na deviatich stránkach a na desiatej vráti
@@ -220,5 +220,48 @@ describe("najdiAdresuPodlaTitulku", () => {
     // Falošný odkaz je horší než žiadny.
     expect(najdiAdresuPodlaTitulku(stranky, "Neexistujúci článok")).toBeNull();
     expect(najdiAdresuPodlaTitulku(stranky, "")).toBeNull();
+  });
+});
+
+describe("naZmazanie", () => {
+  // Skutočný prípad zo 17. 8. 2026: 79 riadkov v appke, 77 adries v sitemape.
+  const zive = Array.from({ length: 77 }, (_, i) => `https://www.prosapiens.cz/s${i}/`);
+  const vDb = [
+    ...zive,
+    "https://www.prosapiens.cz/skupinovy-trenink/",
+    "https://www.prosapiens.cz/lekce-fascialni-svoboda/",
+  ];
+  const vSitemape = zive;
+
+  test("nájde adresy, ktoré web už nemá", () => {
+    expect(naZmazanie(vDb, vSitemape, true)).toEqual([
+      "https://www.prosapiens.cz/skupinovy-trenink/",
+      "https://www.prosapiens.cz/lekce-fascialni-svoboda/",
+    ]);
+  });
+
+  test("pri neúplnom čítaní nezmaže NIČ", () => {
+    // Keď sa jedna sitemapa nestiahne, jej stránky vyzerajú ako zrušené —
+    // a zmizol by z appky text polovice webu.
+    expect(naZmazanie(vDb, vSitemape, false)).toEqual([]);
+    expect(naZmazanie(vDb, [], true)).toEqual([]);
+  });
+
+  test("rozdiel v tvare adresy (www, lomka, http) nie je dôvod na zmazanie", () => {
+    const bezWww = zive.map((u) => u.replace("://www.", "://").replace(/\/$/, ""));
+    expect(naZmazanie(bezWww, vSitemape, true)).toEqual([]);
+  });
+});
+
+describe("naZmazanie — poistky", () => {
+  test("keď by sa mala zmazať tretina webu a viac, nemaže sa nič", () => {
+    // Napr. keby sa sitemapa stiahla orezaná. Dve mŕtve adresy sú menšie zlo
+    // než stratený text päťdesiatich stránok.
+    const db = Array.from({ length: 10 }, (_, i) => `https://www.prosapiens.cz/s${i}/`);
+    expect(naZmazanie(db, db.slice(0, 6), true)).toEqual([]);
+    expect(naZmazanie(db, db.slice(0, 8), true)).toEqual([
+      "https://www.prosapiens.cz/s8/",
+      "https://www.prosapiens.cz/s9/",
+    ]);
   });
 });

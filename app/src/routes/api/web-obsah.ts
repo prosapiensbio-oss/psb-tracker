@@ -5,7 +5,7 @@ import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 import {
-  h1ZHtml, metaPopisZHtml, sitemapZapisy, textZHtml, titulokZHtml, typZoSitemapy,
+  h1ZHtml, metaPopisZHtml, naZmazanie, sitemapZapisy, textZHtml, titulokZHtml, typZoSitemapy,
 } from "../../lib/psb/webObsah";
 
 /**
@@ -87,11 +87,15 @@ export const Route = createFileRoute("/api/web-obsah")({
           // 1 · adresy zo sitemapy. Lacné a robí sa vždy, aby nová stránka
           // na webe pribudla aj bez toho, aby si to niekto pamätal.
           let pribudlo = 0;
+          const vSitemape: string[] = [];
+          let precitanychSitemap = 0;
           for (const s of SITEMAPY) {
             let xml = "";
             try { xml = await stiahni(ZAKLAD + s); } catch { continue; }
+            precitanychSitemap++;
             const typ = typZoSitemapy(s);
             const zapisy = sitemapZapisy(xml);
+            for (const z of zapisy) vSitemape.push(z.url);
             for (let i = 0; i < zapisy.length; i += 50) {
               const kus = zapisy.slice(i, i + 50);
               // Keď sa `lastmod` posunul, stránka sa označí za neprečítanú a text
@@ -115,6 +119,26 @@ export const Route = createFileRoute("/api/web-obsah")({
               { ok: false, error: "Sitemapa sa nedá prečítať — bez nej neviem, ktoré stránky web má." },
               { status: 502 },
             );
+          }
+
+          // 1b · adresy, ktoré web už nemá. Sitemapa je pravda o tom, čo web
+          // obsahuje; zrušená stránka z nej zmizne, ale riadok po nej zostával
+          // navždy a appka donekonečna hlásila „chýba 2". Maže sa LEN keď sa
+          // podarilo prečítať všetky sitemapy — a `naZmazanie` má navyše strop,
+          // aby sa pri orezanej sitemape nezmazal celý web.
+          let zmazanych = 0;
+          {
+            const vDb = await DB.prepare("SELECT url FROM web_stranky").all<{ url: string }>()
+              .catch(() => ({ results: [] as { url: string }[] }));
+            const von = naZmazanie(
+              (vDb.results || []).map((r) => r.url),
+              vSitemape,
+              precitanychSitemap === SITEMAPY.length,
+            );
+            for (const url of von) {
+              await DB.prepare("DELETE FROM web_stranky WHERE url = ?1").bind(url).run();
+              zmazanych++;
+            }
           }
 
           // 2 · text tam, kde ešte nie je. Po dávkach; zvyšok dobehne druhým klikom.
@@ -162,9 +186,9 @@ export const Route = createFileRoute("/api/web-obsah")({
           const zvysok = zostava?.n ?? 0;
           return Response.json({
             ok: chyby.length === 0,
-            sprava: `Prečítané: ${nacitane} stránok.`
+            sprava: `Prečítané: ${nacitane} stránok.${zmazanych ? ` Zrušených stránok odstránených: ${zmazanych}.` : ""}`
               + (zvysok > 0 ? ` Zostáva ${zvysok} — klikni znova, pokračuje tam, kde skončil.` : " Web je celý vnútri."),
-            chyby, nacitane, zostava: zvysok,
+            chyby, nacitane, zostava: zvysok, zmazanych,
           }, chyby.length ? { status: 207 } : undefined);
         } catch (e) {
           return Response.json({ ok: false, error: String(e).slice(0, 400) }, { status: 500 });
