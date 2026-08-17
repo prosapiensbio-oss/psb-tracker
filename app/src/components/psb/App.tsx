@@ -31,6 +31,7 @@ import { rodinaZKluca,
   nezapisaneDoRegistra,
 } from "../../lib/psb/compute";
 import type { RegisterItem } from "../../lib/psb/compute";
+import { breakEvenPriemer, spocitajRezervu } from "../../lib/psb/rezerva";
 import { buildAiContext } from "../../lib/psb/aiContext";
 import { Assistant, useAssistantChat } from "./Assistant";
 import { JarvisOkno } from "./JarvisOkno";
@@ -407,11 +408,23 @@ export function PSBApp() {
     if (nastavPrijmyZTrackera(cash)) setFioTik((x) => x + 1);
   }, [data]);
 
+  /**
+   * Rezerva pre Jarvisa.
+   *
+   * Dlaždica na Kokpite hlásila „1,2 mes. · 219 371 Kč", ale číslo žilo len
+   * v nej. Jarvis na otázku „aká je rezerva" 16. 8. odpovedal, že appka
+   * rezervu nepočíta, a ponúkol miesto nej stav pokladne. Dve odpovede na to
+   * isté, a tá horšia znela istejšie.
+   */
+  const [btcCelkom, setBtcCelkom] = useState<number | null>(null);
+  const [stavPenazi, setStavPenazi] = useState<{ fio: number; hotovost: number; datum: string } | null>(null);
+
   // Výplaty v bitcoine. Časť výplaty neodíde z účtu, ale z BTC rezervy — na
   // bankovom výpise nie sú, takže bez nich by mesiac vyzeral, akoby si tréner
   // vzal menej, než naozaj vzal.
   useEffect(() => {
     void fetchBtcReserve(true, true, true).then((r) => {
+      if (typeof r?.czk === "number") setBtcCelkom(r.czk);
       // Platby klientov v bitcoine sú TRŽBA, ktorá cez účet nikdy neprejde.
       // Bez nich kontrola príjmov hlásila, že za júl chýba 132 000 Kč — a
       // pritom 130 000 z toho prišlo v BTC.
@@ -512,6 +525,8 @@ export function PSBApp() {
       if (p && typeof p === "object") setBtcParovanie(p as Record<string, string[]>);
       const h = st["stav_penazi"] as { hotovost: number; datum: string } | undefined;
       if (h && typeof h.hotovost === "number") setStavHotovosti(h);
+      const sp = st["stav_penazi"] as { fio: number; hotovost: number; datum: string } | undefined;
+      if (sp && typeof sp.fio === "number") setStavPenazi(sp);
       // Uložené opravy P&L, kategórie a mzdové nastavenia patria do modelu
       // CENTRÁLNE — pôvodne ich načítavali až karty Peniaze→P&L a Mzdy pri
       // svojom otvorení, takže Kvartálne otvorené rovno po štarte počítalo
@@ -1538,8 +1553,12 @@ function skupinaFaktur(
   }, [data, krokyZamku, prekazkyZamku, zamknuteMesiace]);
 
   const aiContext = useMemo(
-    () => buildAiContext(data, clients, sixM, capacity, registerAll, { udalosti: kalUdalosti, zmeny: kalZmeny }, uzavierkaPreAi),
-    [data, clients, sixM, capacity, registerAll, kalUdalosti, kalZmeny, uzavierkaPreAi, vzasVerzia()], // eslint-disable-line react-hooks/exhaustive-deps
+    () => buildAiContext(data, clients, sixM, capacity, registerAll, { udalosti: kalUdalosti, zmeny: kalZmeny }, uzavierkaPreAi,
+      // Rezerva sa počíta v lib/psb/rezerva.ts — tým istým výpočtom ako
+      // dlaždica na Kokpite. Dve odpovede na to isté číslo boli 16. 8. reálny
+      // stav appky a tá horšia znela istejšie.
+      spocitajRezervu({ btcCzk: btcCelkom, stavPenazi, bePriem: breakEvenPriemer().bePriem })),
+    [data, clients, sixM, capacity, registerAll, kalUdalosti, kalZmeny, uzavierkaPreAi, btcCelkom, stavPenazi, vzasVerzia()], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   const actions = useMemo<Actions>(

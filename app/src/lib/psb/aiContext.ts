@@ -35,6 +35,7 @@ import {
   type ClientAgg,
   type RegisterItem,
   type SixMRow,
+  odmlcaniKlienti,
 } from "./compute";
 import { monthLabel, normName, weekKey, weekLabel } from "./format";
 import type { PSBData } from "./types";
@@ -65,6 +66,15 @@ export type KalendarPreAi = {
   zmeny: { kedy: string; druh: string; klient: string | null; nazov: string | null; pred: string | null; po: string | null; trener: string; poznamka?: string | null }[];
 };
 
+/** Rezerva, ako ju počíta lib/psb/rezerva.ts — to isté číslo ako dlaždica. */
+export type RezervaPreAi = {
+  majetok: number | null;
+  mesiace: number | null;
+  uplna: boolean;
+  bePriem: number | null;
+  datumStavu: string | null;
+};
+
 export function buildAiContext(
   data: PSBData,
   clients: Record<string, ClientAgg>,
@@ -73,6 +83,7 @@ export function buildAiContext(
   register: RegisterItem[],
   kalendar?: KalendarPreAi,
   uzavierka?: UzavierkaPreAi,
+  rezerva?: RezervaPreAi,
 ) {
   const clientList = Object.values(clients);
 
@@ -734,6 +745,28 @@ export function buildAiContext(
           ...uzavierka,
         }
       : null,
+    rezerva: rezerva
+      ? {
+          poznamka: "Koľko mesiacov firma ustojí BEZ JEDINEJ TRŽBY: všetko, čo má (účet + hotovosť + bitcoin), delené priemerným break-evenom za pol roka. Toto je dlaždica „Rezerva“ na Kokpite a jediné miesto, odkiaľ sa rezerva smie brať — NEPOČÍTAJ si ju sám zo stavu hotovosti a NEHOVOR, že ju appka nepočíta. Cieľ sú 3 mesiace. „uplna: false“ znamená, že stav účtu a hotovosti nikto nezapísal a ráta sa len bitcoin — číslo je vtedy NIŽŠIE než skutočnosť a treba to povedať. Zapisuje sa v Peniaze → Cashflow, karta „Kde tie peniaze sú“.",
+          mesiacov: rezerva.mesiace === null ? null : Math.round(rezerva.mesiace * 10) / 10,
+          majetokCzk: rezerva.majetok === null ? null : Math.round(rezerva.majetok),
+          uplna: rezerva.uplna,
+          priemernyBreakEven: rezerva.bePriem === null ? null : Math.round(rezerva.bePriem),
+          stavZapisanyK: rezerva.datumStavu,
+        }
+      : null,
+    odmlcani: (() => {
+      const zoznam = odmlcaniKlienti(clients, kalendar?.udalosti || []);
+      return {
+        poznamka: "Aktívni klienti zo segmentu Anchor alebo Stabilný, ktorí 14+ dní netrénovali A NEMAJÚ dohodnutý budúci termín v kalendári. Toto je dlaždica „Odmlčaní“ na Kokpite a JEDINÁ platná definícia toho slova — nepočítaj si vlastný zoznam z registra ani z posledných tréningov, register obsahuje aj iné veci (napr. otázku „je toto duch“) a vyjde ti iné číslo. 14 dní nie je náhoda: klient bez tréningu 14+ dní odchádza šesťkrát častejšie (48 % vs 8 %).",
+        spolu: zoznam.length,
+        pctAktivnych: (() => {
+          const akt = clientList.filter((c) => c.status === "Aktívny").length;
+          return akt ? Math.round((zoznam.length / akt) * 100) : 0;
+        })(),
+        klienti: zoznam,
+      };
+    })(),
     ziskavanie,
     ekonomikaDopytu,
     marketing,

@@ -1977,3 +1977,48 @@ export function nezapisaneDoRegistra(v: NezapisaneVstup): Omit<RegisterItem, "ac
 
   return von;
 }
+
+/**
+ * Odmlčaní klienti — 14+ dní bez tréningu a bez dohodnutého termínu.
+ *
+ * PREČO TU A NIE V DLAŽDICI
+ *
+ * Definícia žila len v Dashboard.tsx. Dlaždica hlásila 3 ľudí, Jarvis na tú
+ * istú otázku 17. 8. 2026 odpovedal 9 — bral ich z registra, kde sú aj otázky
+ * typu „je toto duch" a klienti mimo segmentu. Dve odpovede na jedno slovo,
+ * a človek nemá ako vedieť, ktorá platí.
+ *
+ * Prahy nie sú náhodné: klient bez tréningu 14+ dní odchádza šesťkrát častejšie
+ * (48 % vs 8 %). Kalendár má právo veta — kto má dohodnutý budúci termín, nie
+ * je odmlčaný, len platí obmesiac alebo je po operácii.
+ */
+export type OdmlcanyKlient = { meno: string; dni: number; trener: string | null; poslednySession: string };
+
+export function odmlcaniKlienti(
+  clients: Record<string, ClientAgg>,
+  udalosti: { zaciatok: string; klient: string | null; typ: string | null }[],
+  opts?: { trener?: (t: string | null | undefined) => boolean; dnes?: number },
+): OdmlcanyKlient[] {
+  const teraz = opts?.dnes ?? Date.now();
+  const den = new Date(teraz).toISOString().slice(0, 10);
+  const maTermin = new Set(
+    (udalosti || [])
+      .filter((u) => (u.typ === "trening" || u.typ === "uvodny") && u.klient && u.zaciatok.slice(0, 10) >= den)
+      .map((u) => u.klient as string),
+  );
+  const patri = opts?.trener ?? (() => true);
+  return Object.values(clients)
+    .filter((c) => {
+      if (c.status !== "Aktívny" || !patri(c.primaryTrainer)) return false;
+      if (c.segment !== "Anchor" && c.segment !== "Stabilný") return false;
+      if (maTermin.has(c.name)) return false;
+      return (teraz - Date.parse(c.lastSession)) / 86400000 >= 14;
+    })
+    .map((c) => ({
+      meno: c.name,
+      dni: Math.floor((teraz - Date.parse(c.lastSession)) / 86400000),
+      trener: c.primaryTrainer || null,
+      poslednySession: (c.lastSession || "").slice(0, 10),
+    }))
+    .sort((a, b) => b.dni - a.dni);
+}

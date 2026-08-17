@@ -17,12 +17,14 @@ import { objednaneVerzia,
   type SixMRow,
   PRAH_ZASTARANIA,
   patriTrenerovi,
+  odmlcaniKlienti,
 } from "../../lib/psb/compute";
 import { fmtCZK, fmtDMY, monthLabel, weekKey, weekLabel } from "../../lib/psb/format";
 import { C, mix, S, badge, btn } from "../../lib/psb/theme";
 import { Balicky, odtrenovaneMimoExportu, type KalUdalost } from "./Kalendar";
 import { nastavPrijmyZTrackera, pnlCalc, poslednyMesiacSDatami, salaryCalc, vzasVerzia, VZAS_MONTHS } from "../../lib/psb/vzas";
 import { fetchBtcReserve, fetchVzasSettings } from "../../lib/psb/client";
+import { spocitajRezervu } from "../../lib/psb/rezerva";
 import { PrehladPanel, useZmenyOdMinule, type Pristroj, type Zmena } from "./Prehlad";
 import {
   centerBody, GrafyKniznica, HLAVNE, hraniceObdobia, MiniStat, OBDOBIA_DASH, SEKCIE, useExtraGrafy, VYCHODZIE, WIDGETS,
@@ -878,18 +880,9 @@ export function Dashboard({
     // samostatná karta „Odpísaní, ale majú termín" v Kalendári a s touto
     // dlaždicou sa prekrývala do protirečenia: jedna kázala volať, druhá
     // vedľa hovorila „netreba, príde v pondelok". Jedna otázka, jedna karta.
-    const dnesKal = new Date().toISOString().slice(0, 10);
-    const maBuduciTermin = new Set(
-      kalendar
-        .filter((u) => (u.typ === "trening" || u.typ === "uvodny") && u.klient && u.zaciatok.slice(0, 10) >= dnesKal)
-        .map((u) => u.klient as string),
-    );
-    const ohrozeni = Object.values(clients).filter((c) => {
-      if (c.status !== "Aktívny" || !matchT(c.primaryTrainer)) return false;
-      if (c.segment !== "Anchor" && c.segment !== "Stabilný") return false;
-      if (maBuduciTermin.has(c.name)) return false;
-      return (Date.now() - Date.parse(c.lastSession)) / 86400000 >= 14;
-    });
+    // Definícia je v compute.ts — tú istú používa Jarvisov kontext. Kým žila
+    // len tu, dlaždica hlásila 3 a Jarvis na tú istú otázku 9.
+    const ohrozeni = odmlcaniKlienti(clients, kalendar, { trener: (t) => matchT(t || "") });
     const podiel = stats.active > 0 ? (ohrozeni.length / stats.active) * 100 : 0;
     varovne.push({
       id: "ohrozeni",
@@ -897,14 +890,14 @@ export function Dashboard({
       hodnota: String(ohrozeni.length),
       podnadpis: ohrozeni.length ? `${podiel.toFixed(0)} % aktívnych · 14+ dní` : "nikto sa neodmlčal",
       pasmo: !ohrozeni.length ? "ok" : podiel > 25 ? "zle" : podiel > 15 ? "pozor" : "ok",
-      poznamka: ohrozeni.length ? ohrozeni.slice(0, 2).map((c) => c.name.split(" ")[0]).join(", ") + (ohrozeni.length > 2 ? ` +${ohrozeni.length - 2}` : "") : undefined,
+      poznamka: ohrozeni.length ? ohrozeni.slice(0, 2).map((c) => c.meno.split(" ")[0]).join(", ") + (ohrozeni.length > 2 ? ` +${ohrozeni.length - 2}` : "") : undefined,
       dobreHore: false,
       vysvetlenie: "Pravidelní klienti (Anchor alebo Stabilný), ktorí 14 a viac dní netrénovali A nemajú v Google Kalendári žiadny budúci termín. Kto termín má, sa neráta — je na dovolenke či po operácii, nie na odchode. Hranica 14 dní nie je odhad: klient, ktorý toľko vynechá, odchádza zhruba šesťkrát častejšie než ten, čo chodí (48 % vs 8 %). Zdravé je do 15 % aktívnych, nad 25 % je to poplach. Kým je odmlčaný, dá sa ešte získať späť — potom už len ťažko. Klik otvorí zoznam presne týchto ľudí.",
       // Klik otvorí Klientov LEN s týmito ľuďmi. Doviesť na zoznam všetkých a
       // nechať človeka hľadať tých jedenásť je presne tá práca, ktorú mala
       // dlaždica ušetriť.
       kam: ohrozeni.length
-        ? () => onNavigate("klienti", undefined, { skupina: { label: "Odmlčaní 14+ dní", mena: ohrozeni.map((c) => c.name) }, nonce: Date.now() })
+        ? () => onNavigate("klienti", undefined, { skupina: { label: "Odmlčaní 14+ dní", mena: ohrozeni.map((c) => c.meno) }, nonce: Date.now() })
         : () => onNavigate("klienti", "klienti"),
     });
 
@@ -942,9 +935,9 @@ export function Dashboard({
     // o dvoch rôznych obdobiach a nedalo sa z nich nič usúdiť. Celá téma má
     // teraz vlastnú kartu „Platby v bitcoine" v sekcii Peniaze, kde je každé
     // číslo pri svojom období.
-    const rez = btc?.czk ?? null;
-    const majetok = stavPenazi ? (rez ?? 0) + stavPenazi.fio + stavPenazi.hotovost : rez;
-    const mesRez = majetok !== null && zisk && zisk.bePriem > 0 ? majetok / zisk.bePriem : null;
+    const r = spocitajRezervu({ btcCzk: btc?.czk ?? null, stavPenazi, bePriem: zisk?.bePriem ?? null });
+    const majetok = r.majetok;
+    const mesRez = r.mesiace;
     varovne.push({
       id: "rezerva",
       label: "Rezerva",
