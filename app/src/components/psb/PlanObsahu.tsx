@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { clanky, prilezitosti, type Dopyt as GscDopytTyp } from "../../lib/psb/google";
-import { GSC_DOPYTY, MKT_CLANKY } from "../../lib/psb/marketing";
+import { GSC_DOPYTY, MKT_CLANKY, WEB_STRANKY } from "../../lib/psb/marketing";
 import { obsahPredDopytmi, type Riadok } from "../../lib/psb/obsahDopyt";
 import { monthKey } from "../../lib/psb/format";
-import { planObsahu, type Navrh } from "../../lib/psb/planObsahu";
+import { planObsahu, type Navrh, type Vlastnik } from "../../lib/psb/planObsahu";
 import { C, mix } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import type { AssistantChat } from "./Assistant";
@@ -71,7 +71,26 @@ export function PlanObsahu({ data, chat, onNavigate }: { data: PSBData; chat?: A
       ? silne.reduce((a, [m]) => a + (poMesiacoch.get(m) || 0), 0) / silne.length
       : null;
 
+    // Kto na webe tému vlastní. Titulok je vlastníctvo, zmienka v texte nie —
+    // presne ten rozdiel našiel Jarvis 17. 8. pri „subokcipitálních svalech":
+    // Google na ne držal pozíciu 2,3, ale stránka o nich neexistovala.
+    const vlastnik = (dopyt: string): Vlastnik => {
+      const slova = dopyt.toLowerCase().split(/\s+/).filter((w) => w.length >= 5);
+      if (!slova.length) return null;
+      const sedi = (text: string) => slova.every((w) => text.toLowerCase().includes(w.slice(0, Math.max(5, w.length - 2))));
+      // Porovnáva sa proti titulku, H1 a meta popisu — celý text stránok
+      // v prehliadači nie je (leží v D1, je to megabajty). Na otázku „má web
+      // o tejto téme stránku" to stačí: keď téma nie je ani v jednom z týchto
+      // troch, vlastnú stránku nemá.
+      const vTitulku = WEB_STRANKY.find((w) => sedi(w.titulok || "") || sedi(w.h1 || ""));
+      if (vTitulku) return { url: vTitulku.url, titulok: vTitulku.titulok, druh: "titulok" };
+      const vPopise = WEB_STRANKY.find((w) => sedi(w.metaPopis || ""));
+      if (vPopise) return { url: vPopise.url, titulok: vPopise.titulok, druh: "zmienka" };
+      return null;
+    };
+
     return planObsahu({
+      vlastnik,
       prilezitosti: prilezitosti(GSC_DOPYTY as unknown as GscDopytTyp[], 5),
       clanky: clanky(MKT_CLANKY.map((c) => ({ url: c.nazov, kliky: 0, zobrazenia: c.zobrazenia })), 4)
         .map((s) => ({ nazov: s.url, zobrazenia: s.zobrazenia })),

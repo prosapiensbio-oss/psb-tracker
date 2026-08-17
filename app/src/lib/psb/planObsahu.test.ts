@@ -29,8 +29,11 @@ describe("plán obsahu", () => {
   });
 
   it("pri dobrej pozícii hovorí o dôvode kliknúť, pri zlej o pozícii", () => {
-    const [dobra] = planObsahu({ ...zaklad, prilezitosti: [p("fasce", 0, 900, 4.0)] });
-    const [zla] = planObsahu({ ...zaklad, prilezitosti: [p("fascie", 0, 900, 29.1)] });
+    // Platí len tam, kde stránka na tú tému EXISTUJE — bez nej je odpoveďou
+    // nový text, nie prepis. Preto vlastník.
+    const majitel = () => ({ url: "/fascia/", titulok: "Fascie", druh: "titulok" as const });
+    const [dobra] = planObsahu({ ...zaklad, prilezitosti: [p("fasce", 0, 900, 4.0)], vlastnik: majitel });
+    const [zla] = planObsahu({ ...zaklad, prilezitosti: [p("fascie", 0, 900, 29.1)], vlastnik: majitel });
     expect(dobra.preco).toContain("prvej strane");
     expect(zla.preco).toContain("hlboko");
   });
@@ -97,13 +100,15 @@ describe("návrh sedí na kanál, z ktorého vyšiel", () => {
   const zaklad = { clanky: [], hooky: [], prispevkovMesacne: 10, prispevkovVSilnychMesiacoch: null };
 
   it("stránka na prvej strane potrebuje titulok, nie nový obsah", () => {
-    const [n] = planObsahu({ ...zaklad, prilezitosti: [{ dopyt: "fascie", kliky: 2, zobrazenia: 900, pozicia: 4.2 }] });
+    const majitel = () => ({ url: "/fascia/", titulok: "Fascie", druh: "titulok" as const });
+    const [n] = planObsahu({ ...zaklad, prilezitosti: [{ dopyt: "fascie", kliky: 2, zobrazenia: 900, pozicia: 4.2 }], vlastnik: majitel });
     expect(n.co).toContain("Prepíš titulok");
     expect(n.co.toLowerCase()).not.toContain("reel");
   });
 
   it("hlboká pozícia potrebuje text na webe, nie reel", () => {
-    const [n] = planObsahu({ ...zaklad, prilezitosti: [{ dopyt: "rib flare", kliky: 0, zobrazenia: 400, pozicia: 18.5 }] });
+    const majitel = () => ({ url: "/rib-flare/", titulok: "Rib flare", druh: "titulok" as const });
+    const [n] = planObsahu({ ...zaklad, prilezitosti: [{ dopyt: "rib flare", kliky: 0, zobrazenia: 400, pozicia: 18.5 }], vlastnik: majitel });
     expect(n.co).toContain("článok");
     expect(n.co.toLowerCase()).not.toContain("reel");
   });
@@ -127,5 +132,46 @@ describe("návrh sedí na kanál, z ktorého vyšiel", () => {
     const navrhy = planObsahu({ ...zaklad, prilezitosti: [], clanky: [{ nazov: "Fascie", zobrazenia: 1800 }] });
     expect(navrhy[0].co).toContain("Instagram");
     expect(navrhy[0].zdroj).toBe("web");
+  });
+});
+
+describe("návrh rozlíši prepis od chýbajúcej stránky", () => {
+  // Jerryho test 17. 8. 2026: „subokcipitální svaly" — 849 zobrazení, pozícia
+  // 2,3 a na webe o tom NIE JE stránka. Návrh „prepíš titulok" tam nedáva
+  // zmysel; je to žiadosť o nový text.
+  const zaklad = { clanky: [], hooky: [], prispevkovMesacne: 10, prispevkovVSilnychMesiacoch: null };
+  const p = [{ dopyt: "subokcipitální svaly", kliky: 10, zobrazenia: 849, pozicia: 2.3 }];
+
+  it("bez vlastnej stránky navrhne novú, nie prepis", () => {
+    const [n] = planObsahu({ ...zaklad, prilezitosti: p, vlastnik: () => null });
+    expect(n.co).toContain("Napíš stránku");
+    expect(n.co).not.toContain("Prepíš");
+  });
+
+  it("keď sa téma len mihne inde, povie kde", () => {
+    const [n] = planObsahu({
+      ...zaklad, prilezitosti: p,
+      vlastnik: () => ({ url: "/superficial-back-line/", titulok: "Superficial Back Line", druh: "zmienka" }),
+    });
+    expect(n.co).toContain("Napíš stránku");
+    expect(n.preco).toContain("Superficial Back Line");
+  });
+
+  it("keď stránka tému vlastní a drží prvú stranu, navrhne prepis titulku", () => {
+    const [n] = planObsahu({
+      ...zaklad, prilezitosti: p,
+      vlastnik: () => ({ url: "/x/", titulok: "Subokcipitální svaly", druh: "titulok" }),
+    });
+    expect(n.co).toContain("Prepíš titulok");
+    expect(n.co).toContain("Subokcipitální svaly");
+  });
+
+  it("keď stránka tému vlastní, ale je hlboko, navrhne rozšírenie", () => {
+    const [n] = planObsahu({
+      ...zaklad,
+      prilezitosti: [{ ...p[0], pozicia: 22 }],
+      vlastnik: () => ({ url: "/x/", titulok: "Subokcipitální svaly", druh: "titulok" }),
+    });
+    expect(n.co).toContain("Rozšír článok");
   });
 });

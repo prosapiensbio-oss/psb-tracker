@@ -28,6 +28,15 @@
  */
 
 export type Prilezitost = { dopyt: string; kliky: number; zobrazenia: number; pozicia: number };
+
+/**
+ * Kto na webe tú tému „vlastní".
+ *
+ * `titulok` = existuje stránka, ktorá je o tom (téma má domov).
+ * `zmienka` = slovo sa v texte mihne, ale vlastnú stránku nemá.
+ * `null`    = na webe o tom nie je nič.
+ */
+export type Vlastnik = { url: string; titulok: string; druh: "titulok" | "zmienka" } | null;
 export type Clanok = { nazov: string; zobrazenia: number };
 export type HookVysledok = { kategoria: string; dopytov: number; podiel: number; podielBezne: number };
 
@@ -61,29 +70,52 @@ const cislo = (n: number) => Math.round(n).toLocaleString("sk");
  * Toto je najlacnejší obsah, aký sa dá napísať: pozícia je zaplatená rokmi
  * a chýba len dôvod kliknúť. Preto sú tieto návrhy prvé.
  */
-function zVyhladavania(p: Prilezitost[]): Navrh[] {
-  // NÁVRH MUSÍ SEDIEŤ NA KANÁL, Z KTORÉHO VYŠIEL.
+function zVyhladavania(p: Prilezitost[], vlastnik?: (dopyt: string) => Vlastnik): Navrh[] {
+  // NÁVRH MUSÍ SEDIEŤ NA KANÁL AJ NA STAV WEBU.
   //
   // Jerry, 17. 8. 2026: „odporúča mi na Google spraviť reel, ale tam reel
-  // nerobia — to by Jarvis ako odborník na marketing mal vedieť." Mal pravdu
-  // a bola to moja chyba: pôvodne tu stálo „Reel alebo článok na tému X"
-  // pri VŠETKÝCH príležitostiach zo Search Console. Reel je Instagram; na to,
-  // že sa web zobrazuje v Googli a nikto neklikne, nemá žiadny vplyv.
+  // nerobia." Reel je Instagram; na to, že sa web zobrazuje v Googli a nikto
+  // neklikne, nemá žiadny vplyv. To bola prvá polovica opravy.
   //
-  // Sú to dve rôzne diagnózy a každá má inú liečbu:
-  //   • pozícia do 10 → stránka sa UŽ ukazuje na prvej strane, chýba dôvod
-  //     kliknúť. Nový obsah nepomôže; treba prepísať titulok a popis.
-  //   • pozícia nad 10 → obsah je slabý alebo chýba. Vtedy treba text.
+  // Druhú polovicu našiel Jarvis pri Jerryho teste v ten istý deň: návrh
+  // „prepíš titulok stránky na tému subokcipitálne svaly" nedával zmysel,
+  // lebo TAKÁ STRÁNKA NEEXISTUJE — slovo sa len mihne v dvoch článkoch
+  // o líniách. Google na ňu pritom drží pozíciu 2,3 pri 849 zobrazeniach.
+  // Prepisovať titulok cudzej stránky by tému nezachránilo; toto je žiadosť
+  // o novú stránku.
+  //
+  // Tri stavy, tri rôzne práce:
+  //   • stránka o téme JE a drží sa do 10. miesta → chýba dôvod kliknúť,
+  //     prepisuje sa titulok a popis;
+  //   • stránka JE, ale hlboko → text je slabý, treba ho rozšíriť;
+  //   • stránka NIE JE → Google ukazuje zmienku alebo nič, a to je najsilnejší
+  //     signál zo všetkých: pozícia je zadarmo a obsah chýba.
   return p.slice(0, 3).map((x, i) => {
+    const kto = vlastnik ? vlastnik(x.dopyt) : null;
+    const maDomov = kto?.druh === "titulok";
     const naPrvejStrane = x.pozicia <= 10;
+    const dokaz = `${cislo(x.zobrazenia)} zobrazení, ${x.kliky} klikov, priemerná pozícia ${x.pozicia.toFixed(1)}`;
+
+    if (!maDomov) {
+      return {
+        co: `Napíš stránku na tému „${x.dopyt}"`,
+        preco: kto
+          ? `Google na túto tému web ukazuje, ale vlastnú stránku o nej nemáš — slovo sa len mihne v článku ${kto.titulok}. Pozíciu máš zadarmo, chýba obsah, ktorý by ju uniesol.`
+          : "Ľudia to hľadajú a web sa im ukazuje, hoci o tom nemáš ani stránku. Toto je najlacnejší obsah, aký sa dá napísať — dopyt je overený vopred.",
+        dokaz,
+        zdroj: "vyhľadávanie" as const,
+        poradie: 1 + i * 0.1,
+      };
+    }
+
     return {
       co: naPrvejStrane
-        ? `Prepíš titulok a popis stránky na tému „${x.dopyt}"`
-        : `Napíš alebo rozšír článok na tému „${x.dopyt}"`,
+        ? `Prepíš titulok a popis: ${kto.titulok}`
+        : `Rozšír článok ${kto.titulok} o tému „${x.dopyt}"`,
       preco: naPrvejStrane
-        ? "Google už web na túto tému ukazuje na prvej strane a ľudia aj tak neklikajú — chýba dôvod, nie pozícia. Nový príspevok na Instagrame s tým nič neurobí; rozhoduje veta vo výsledku hľadania. Hotové návrhy sú v Marketing → Web, karta Titulky na prepis."
-        : "Veľa ľudí to hľadá a web sa ukazuje, ale hlboko. Tu chýba samotný text na webe — reel to nenahradí, Google indexuje stránky.",
-      dokaz: `${cislo(x.zobrazenia)} zobrazení, ${x.kliky} klikov, priemerná pozícia ${x.pozicia.toFixed(1)}`,
+        ? "Google túto stránku na danú tému ukazuje na prvej strane a ľudia aj tak neklikajú — chýba dôvod, nie pozícia. Nový príspevok na Instagrame s tým nič neurobí; rozhoduje veta vo výsledku hľadania. Hotové návrhy sú v Marketing → Web, karta Titulky na prepis."
+        : "Stránka na túto tému existuje, ale drží sa hlboko — text je na dopyt prislabý. Reel to nenahradí, Google indexuje stránky.",
+      dokaz,
       zdroj: "vyhľadávanie" as const,
       poradie: 1 + i * 0.1,
     };
@@ -146,13 +178,15 @@ function zTempa(prispevkovMesacne: number, prispevkovVSilnychMesiacoch: number |
 
 export function planObsahu(v: {
   prilezitosti: Prilezitost[];
+  /** Kto na webe tú tému vlastní — bez toho sa nedá rozlíšiť prepis od nového textu. */
+  vlastnik?: (dopyt: string) => Vlastnik;
   clanky: Clanok[];
   hooky: HookVysledok[];
   prispevkovMesacne: number;
   prispevkovVSilnychMesiacoch: number | null;
 }): Navrh[] {
   return [
-    ...zVyhladavania(v.prilezitosti),
+    ...zVyhladavania(v.prilezitosti, v.vlastnik),
     ...zWebu(v.clanky),
     ...zObsahu(v.hooky),
     ...zTempa(v.prispevkovMesacne, v.prispevkovVSilnychMesiacoch),
