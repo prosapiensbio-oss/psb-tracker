@@ -1093,7 +1093,7 @@ function Rychlost({ chat }: { chat?: AssistantChat }) {
   );
 }
 
-export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, refresh, onPoznamkaStrata }: { data: PSBData; clients: Record<string, ClientAgg>; leads: Lead[]; chat?: AssistantChat; sub: string; onSub: (s: string) => void; onKlient?: (m: string) => void; refresh: () => Promise<void>; onPoznamkaStrata?: (meno: string, text: string) => void }) {
+export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, refresh, onPoznamkaStrata, onNavigate }: { data: PSBData; clients: Record<string, ClientAgg>; leads: Lead[]; chat?: AssistantChat; sub: string; onSub: (s: string) => void; onKlient?: (m: string) => void; refresh: () => Promise<void>; onPoznamkaStrata?: (meno: string, text: string) => void; onNavigate?: (tab: string, sub?: string) => void }) {
   const setSub = onSub;
   const [rok, setRok] = useState("2026");
   // Nahraté exporty vyhrávajú nad číslami v kóde. Načíta sa raz pri otvorení;
@@ -1197,7 +1197,7 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
           <Zadanie chat={chat} />
           {/* Návrhy hneď za odovzdávacím miestom: prvá karta hovorí AKO sa
               zadanie odovzdá, druhá ČO do neho dať. Rebríčky sú pod nimi. */}
-          <PlanObsahu data={data} chat={chat} />
+          <PlanObsahu data={data} chat={chat} onNavigate={onNavigate} />
           {/* Nápady hneď za návrhmi z dát. Jedna karta vie, čo ľudia hľadali,
               druhá čo sa nahlas spýtali — nie je to duplicita. */}
           <Napady chat={chat} />

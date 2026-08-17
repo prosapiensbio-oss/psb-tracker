@@ -89,3 +89,43 @@ describe("plán obsahu", () => {
     expect(v[3].zdroj).toBe("web");
   });
 });
+
+describe("návrh sedí na kanál, z ktorého vyšiel", () => {
+  // Jerry, 17. 8. 2026: „odporúča mi na Google spraviť reel, ale tam reel
+  // nerobia." Príležitosť zo Search Console je vec WEBU — reel na ňu nemá
+  // žiadny vplyv, lebo Google indexuje stránky, nie Instagram.
+  const zaklad = { clanky: [], hooky: [], prispevkovMesacne: 10, prispevkovVSilnychMesiacoch: null };
+
+  it("stránka na prvej strane potrebuje titulok, nie nový obsah", () => {
+    const [n] = planObsahu({ ...zaklad, prilezitosti: [{ dopyt: "fascie", kliky: 2, zobrazenia: 900, pozicia: 4.2 }] });
+    expect(n.co).toContain("Prepíš titulok");
+    expect(n.co.toLowerCase()).not.toContain("reel");
+  });
+
+  it("hlboká pozícia potrebuje text na webe, nie reel", () => {
+    const [n] = planObsahu({ ...zaklad, prilezitosti: [{ dopyt: "rib flare", kliky: 0, zobrazenia: 400, pozicia: 18.5 }] });
+    expect(n.co).toContain("článok");
+    expect(n.co.toLowerCase()).not.toContain("reel");
+  });
+
+  it("žiadny návrh z vyhľadávania neponúka reel", () => {
+    const navrhy = planObsahu({
+      ...zaklad,
+      prilezitosti: [
+        { dopyt: "a", kliky: 1, zobrazenia: 500, pozicia: 3 },
+        { dopyt: "b", kliky: 0, zobrazenia: 400, pozicia: 12 },
+        { dopyt: "c", kliky: 5, zobrazenia: 300, pozicia: 9 },
+      ],
+    });
+    for (const n of navrhy.filter((x) => x.zdroj === "vyhľadávanie")) {
+      expect(n.co.toLowerCase()).not.toContain("reel");
+      expect(n.co.toLowerCase()).not.toContain("instagram");
+    }
+  });
+
+  it("pripomenutie článku na Instagrame reelom byť SMIE — je to jeho kanál", () => {
+    const navrhy = planObsahu({ ...zaklad, prilezitosti: [], clanky: [{ nazov: "Fascie", zobrazenia: 1800 }] });
+    expect(navrhy[0].co).toContain("Instagram");
+    expect(navrhy[0].zdroj).toBe("web");
+  });
+});

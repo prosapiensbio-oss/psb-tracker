@@ -28,7 +28,7 @@ import { Card, Empty, H3, Info } from "./ui";
 
 type IgPrispevok = { datum: string; mesiac: string; kategoria: string };
 
-export function PlanObsahu({ data, chat }: { data: PSBData; chat?: AssistantChat }) {
+export function PlanObsahu({ data, chat, onNavigate }: { data: PSBData; chat?: AssistantChat; onNavigate?: (tab: string, sub?: string) => void }) {
   const [ig, setIg] = useState<IgPrispevok[]>([]);
 
   useEffect(() => {
@@ -83,7 +83,15 @@ export function PlanObsahu({ data, chat }: { data: PSBData; chat?: AssistantChat
 
   const doZadania = (n: Navrh) => {
     if (!chat) return;
-    chat.setFloatingOpen(true);
+    // Zadanie sa rieši v Jarvisovom okne, nie v rohu obrazovky.
+    //
+    // Jerry, 17. 8. 2026: „presne toto by som chcel riešiť v tom samostatnom
+    // okne — keď kliknem zadanie, tak by ma tam preplo." Malý panel je dobrý
+    // na jednu otázku medzi prácou; nad zadaním sa sedí, dopytuje a vetví,
+    // a na to je 300 pixelov v rohu málo. Rozhovor je jeden a ten istý,
+    // takže sa nič nestráca — mení sa len okno, v ktorom je vidieť.
+    if (onNavigate) { chat.zachovajOkno(); onNavigate("jarvis"); }
+    else chat.setFloatingOpen(true);
     void chat.ask([
       `Vyrob mi ZADANIE PRE CLAUDE PROJECT na tento obsah: ${n.co}`,
       "",

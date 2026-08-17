@@ -295,6 +295,17 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
   // state by sa do efektu dostal až o render neskôr a prvý zápis by ju minul.
   const vetvaRef = useRef(false);
   /**
+   * „Neotváraj prázdny rozhovor, nesiem ti hotový."
+   *
+   * Jarvisovo okno pri otvorení VŽDY začína načisto — pri kliku na záložku
+   * je to správne. Lenže 17. 8. 2026 dostala karta „Čo publikovať ďalej"
+   * tlačidlo, ktoré položí otázku a prepne do okna; okno sa medzitým otvorilo
+   * a otázku zmazalo. Kto ju posiela, si tým vypýta výnimku.
+   */
+  const zachovajRef = useRef(false);
+  const zachovajOkno = () => { zachovajRef.current = true; };
+  const spotrebujZachovaj = () => { const b = zachovajRef.current; zachovajRef.current = false; return b; };
+  /**
    * Je to naozaj meno klienta?
    *
    * 16. 8. Jarvis obalil do «» názov článku a appka z neho spravila odkaz na
@@ -753,7 +764,7 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
     ].join(" · ");
   }
 
-  return { msgs, setMsgs, input, setInput, busy, stav, deep, setDeep, pending, setPending, attach, setAttach, ask, runAction, confirmImport, handleIncoming, floatingOpen, setFloatingOpen, kategoria, setKategoria, chats, chatId, newChat, upravSpravu, vetvi, presunChat, zastav, openChat, zvyraznit, setZvyraznit, jeKlient, deleteChat, archiveChat, spracujDennik };
+  return { msgs, setMsgs, input, setInput, busy, stav, deep, setDeep, pending, setPending, attach, setAttach, ask, runAction, confirmImport, handleIncoming, floatingOpen, setFloatingOpen, kategoria, setKategoria, chats, chatId, newChat, upravSpravu, vetvi, presunChat, zastav, openChat, zvyraznit, setZvyraznit, jeKlient, zachovajOkno, spotrebujZachovaj, deleteChat, archiveChat, spracujDennik };
 }
 
 // ── The conversation UI (messages + input) — used by both the floating panel and

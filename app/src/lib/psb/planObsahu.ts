@@ -62,15 +62,32 @@ const cislo = (n: number) => Math.round(n).toLocaleString("sk");
  * a chýba len dôvod kliknúť. Preto sú tieto návrhy prvé.
  */
 function zVyhladavania(p: Prilezitost[]): Navrh[] {
-  return p.slice(0, 3).map((x, i) => ({
-    co: `Reel alebo článok na tému „${x.dopyt}"`,
-    preco: x.pozicia <= 10
-      ? "Google už web na túto tému ukazuje na prvej strane a ľudia aj tak neklikajú — chýba dôvod, nie pozícia."
-      : "Veľa ľudí to hľadá a web sa ukazuje, ale hlboko. Obsah na túto tému má kam rásť.",
-    dokaz: `${cislo(x.zobrazenia)} zobrazení, ${x.kliky} klikov, priemerná pozícia ${x.pozicia.toFixed(1)}`,
-    zdroj: "vyhľadávanie",
-    poradie: 1 + i * 0.1,
-  }));
+  // NÁVRH MUSÍ SEDIEŤ NA KANÁL, Z KTORÉHO VYŠIEL.
+  //
+  // Jerry, 17. 8. 2026: „odporúča mi na Google spraviť reel, ale tam reel
+  // nerobia — to by Jarvis ako odborník na marketing mal vedieť." Mal pravdu
+  // a bola to moja chyba: pôvodne tu stálo „Reel alebo článok na tému X"
+  // pri VŠETKÝCH príležitostiach zo Search Console. Reel je Instagram; na to,
+  // že sa web zobrazuje v Googli a nikto neklikne, nemá žiadny vplyv.
+  //
+  // Sú to dve rôzne diagnózy a každá má inú liečbu:
+  //   • pozícia do 10 → stránka sa UŽ ukazuje na prvej strane, chýba dôvod
+  //     kliknúť. Nový obsah nepomôže; treba prepísať titulok a popis.
+  //   • pozícia nad 10 → obsah je slabý alebo chýba. Vtedy treba text.
+  return p.slice(0, 3).map((x, i) => {
+    const naPrvejStrane = x.pozicia <= 10;
+    return {
+      co: naPrvejStrane
+        ? `Prepíš titulok a popis stránky na tému „${x.dopyt}"`
+        : `Napíš alebo rozšír článok na tému „${x.dopyt}"`,
+      preco: naPrvejStrane
+        ? "Google už web na túto tému ukazuje na prvej strane a ľudia aj tak neklikajú — chýba dôvod, nie pozícia. Nový príspevok na Instagrame s tým nič neurobí; rozhoduje veta vo výsledku hľadania. Hotové návrhy sú v Marketing → Web, karta Titulky na prepis."
+        : "Veľa ľudí to hľadá a web sa ukazuje, ale hlboko. Tu chýba samotný text na webe — reel to nenahradí, Google indexuje stránky.",
+      dokaz: `${cislo(x.zobrazenia)} zobrazení, ${x.kliky} klikov, priemerná pozícia ${x.pozicia.toFixed(1)}`,
+      zdroj: "vyhľadávanie" as const,
+      poradie: 1 + i * 0.1,
+    };
+  });
 }
 
 /**

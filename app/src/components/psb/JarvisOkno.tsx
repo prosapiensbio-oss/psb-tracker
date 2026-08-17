@@ -78,7 +78,10 @@ export function JarvisOkno({
    * Prázdny rozhovor sa nikam neukládá (`if (!msgs.length) return`), takže
    * vstup a výstup zo záložky nezanáša zoznam prázdnymi záznamami.
    */
-  useEffect(() => { chat.newChat(""); }, []);
+  // Načisto — okrem prípadu, keď sem niekto rozhovor priniesol (tlačidlo
+  // „Zadanie" z karty Čo publikovať ďalej). Vtedy by prázdny štart zmazal
+  // presne to, kvôli čomu sa okno otvorilo.
+  useEffect(() => { if (!chat.spotrebujZachovaj()) chat.newChat(""); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [hladane, setHladane] = useState("");
   const zam = zameranie(chat.kategoria);
