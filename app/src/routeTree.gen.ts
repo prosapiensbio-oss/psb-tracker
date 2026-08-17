@@ -32,6 +32,7 @@ import { Route as ApiPagespeedRouteImport } from './routes/api/pagespeed'
 import { Route as ApiOverrideRouteImport } from './routes/api/override'
 import { Route as ApiNapadyRouteImport } from './routes/api/napady'
 import { Route as ApiMetaRouteImport } from './routes/api/meta'
+import { Route as ApiMeraniaRouteImport } from './routes/api/merania'
 import { Route as ApiMarketingRouteImport } from './routes/api/marketing'
 import { Route as ApiMailerRouteImport } from './routes/api/mailer'
 import { Route as ApiLogoutRouteImport } from './routes/api/logout'
@@ -168,6 +169,11 @@ const ApiNapadyRoute = ApiNapadyRouteImport.update({
 const ApiMetaRoute = ApiMetaRouteImport.update({
   id: '/api/meta',
   path: '/api/meta',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMeraniaRoute = ApiMeraniaRouteImport.update({
+  id: '/api/merania',
+  path: '/api/merania',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiMarketingRoute = ApiMarketingRouteImport.update({
@@ -307,6 +313,7 @@ export interface FileRoutesByFullPath {
   '/api/logout': typeof ApiLogoutRoute
   '/api/mailer': typeof ApiMailerRoute
   '/api/marketing': typeof ApiMarketingRoute
+  '/api/merania': typeof ApiMeraniaRoute
   '/api/meta': typeof ApiMetaRoute
   '/api/napady': typeof ApiNapadyRoute
   '/api/override': typeof ApiOverrideRoute
@@ -354,6 +361,7 @@ export interface FileRoutesByTo {
   '/api/logout': typeof ApiLogoutRoute
   '/api/mailer': typeof ApiMailerRoute
   '/api/marketing': typeof ApiMarketingRoute
+  '/api/merania': typeof ApiMeraniaRoute
   '/api/meta': typeof ApiMetaRoute
   '/api/napady': typeof ApiNapadyRoute
   '/api/override': typeof ApiOverrideRoute
@@ -402,6 +410,7 @@ export interface FileRoutesById {
   '/api/logout': typeof ApiLogoutRoute
   '/api/mailer': typeof ApiMailerRoute
   '/api/marketing': typeof ApiMarketingRoute
+  '/api/merania': typeof ApiMeraniaRoute
   '/api/meta': typeof ApiMetaRoute
   '/api/napady': typeof ApiNapadyRoute
   '/api/override': typeof ApiOverrideRoute
@@ -451,6 +460,7 @@ export interface FileRouteTypes {
     | '/api/logout'
     | '/api/mailer'
     | '/api/marketing'
+    | '/api/merania'
     | '/api/meta'
     | '/api/napady'
     | '/api/override'
@@ -498,6 +508,7 @@ export interface FileRouteTypes {
     | '/api/logout'
     | '/api/mailer'
     | '/api/marketing'
+    | '/api/merania'
     | '/api/meta'
     | '/api/napady'
     | '/api/override'
@@ -545,6 +556,7 @@ export interface FileRouteTypes {
     | '/api/logout'
     | '/api/mailer'
     | '/api/marketing'
+    | '/api/merania'
     | '/api/meta'
     | '/api/napady'
     | '/api/override'
@@ -593,6 +605,7 @@ export interface RootRouteChildren {
   ApiLogoutRoute: typeof ApiLogoutRoute
   ApiMailerRoute: typeof ApiMailerRoute
   ApiMarketingRoute: typeof ApiMarketingRoute
+  ApiMeraniaRoute: typeof ApiMeraniaRoute
   ApiMetaRoute: typeof ApiMetaRoute
   ApiNapadyRoute: typeof ApiNapadyRoute
   ApiOverrideRoute: typeof ApiOverrideRoute
@@ -778,6 +791,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiMetaRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/merania': {
+      id: '/api/merania'
+      path: '/api/merania'
+      fullPath: '/api/merania'
+      preLoaderRoute: typeof ApiMeraniaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/marketing': {
       id: '/api/marketing'
       path: '/api/marketing'
@@ -961,6 +981,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiLogoutRoute: ApiLogoutRoute,
   ApiMailerRoute: ApiMailerRoute,
   ApiMarketingRoute: ApiMarketingRoute,
+  ApiMeraniaRoute: ApiMeraniaRoute,
   ApiMetaRoute: ApiMetaRoute,
   ApiNapadyRoute: ApiNapadyRoute,
   ApiOverrideRoute: ApiOverrideRoute,

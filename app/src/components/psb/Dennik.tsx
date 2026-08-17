@@ -29,6 +29,32 @@ export function Dennik({ meno, limit = 4, onNovyZapis }: {
   const [busy, setBusy] = useState(false);
   const [vsetky, setVsetky] = useState(false);
   const [jarvisOznam, setJarvisOznam] = useState("");
+  /**
+   * Bolesť 0–10 — jediné číslo, ktoré meria to, čo PSB predáva.
+   *
+   * Je tu, a nie na vlastnej obrazovke, zámerne: zapisuje sa v tej istej
+   * chvíli ako veta do denníka, teda hneď po tréningu. Samostatná obrazovka
+   * by znamenala ďalšie klikanie a rovnaký osud, aký mal denník — prázdno.
+   */
+  const [bolest, setBolest] = useState<number | null>(null);
+  const [merania, setMerania] = useState<{ datum: string; bolest: number | null }[]>([]);
+
+  const nacitajMerania = (m: string) => {
+    void fetch(`/api/merania?name=${encodeURIComponent(m)}`, { credentials: "same-origin" })
+      .then((r) => r.json())
+      .then((j: { merania?: { datum: string; bolest: number | null }[] }) => setMerania(j.merania || []))
+      .catch(() => {});
+  };
+
+  const ulozMeranie = async (hodnota: number) => {
+    setBolest(hodnota);
+    const j = await fetch("/api/merania", {
+      method: "POST", credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ klient: meno, bolest: hodnota }),
+    }).then((r) => r.json()).catch(() => ({ ok: false }));
+    if (j.ok) nacitajMerania(meno);
+  };
 
   const nacitaj = (m: string) => {
     void fetch(`/api/client-notes?name=${encodeURIComponent(m)}`, { credentials: "same-origin" })
@@ -36,7 +62,7 @@ export function Dennik({ meno, limit = 4, onNovyZapis }: {
       .then((j: { zapisy?: DennikZapis[] }) => setZapisy(j.zapisy || []))
       .catch(() => {});
   };
-  useEffect(() => { setZapisy([]); setText(""); setVsetky(false); nacitaj(meno); }, [meno]);
+  useEffect(() => { setZapisy([]); setText(""); setVsetky(false); setBolest(null); setMerania([]); nacitaj(meno); nacitajMerania(meno); }, [meno]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pridaj = () => {
     const t = text.trim();
@@ -84,6 +110,46 @@ export function Dennik({ meno, limit = 4, onNovyZapis }: {
           Pridať
         </button>
       </div>
+
+      {/*
+        Bolesť 0–10. Jedenásť čísel na klik, žiadne písanie — inak sa to
+        nezapíše, presne ako sa nezapisoval denník.
+        0 = žiadna bolesť, 10 = najhoršia predstaviteľná; je to bežná
+        stupnica z ordinácie, takže ju klient nemusí vysvetľovať.
+      */}
+      <div style={{ marginTop: 9, display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap" }}>
+        <span style={{ fontSize: 11.5, color: C.textMuted, marginRight: 2 }}>Bolesť dnes:</span>
+        {Array.from({ length: 11 }, (_, i) => (
+          <button
+            key={i}
+            onClick={() => void ulozMeranie(i)}
+            title={i === 0 ? "žiadna bolesť" : i === 10 ? "najhoršia predstaviteľná" : ""}
+            style={{
+              width: 24, height: 24, borderRadius: 6, fontSize: 11.5, cursor: "pointer", fontFamily: "inherit",
+              border: `1px solid ${bolest === i ? C.accent : C.border}`,
+              background: bolest === i ? mix(C.accent, 20) : "transparent",
+              color: bolest === i ? C.accentLight : C.textMuted,
+            }}
+          >
+            {i}
+          </button>
+        ))}
+      </div>
+
+      {merania.length > 0 && (
+        <div style={{ fontSize: 11.5, color: C.textMuted, marginTop: 6 }}>
+          {(() => {
+            const sCislom = merania.filter((m) => m.bolest !== null);
+            if (!sCislom.length) return null;
+            const prve = sCislom[sCislom.length - 1];
+            const posledne = sCislom[0];
+            if (sCislom.length === 1) return `Prvé meranie ${fmtDMY(prve.datum)}: ${prve.bolest}/10.`;
+            const rozdiel = (prve.bolest as number) - (posledne.bolest as number);
+            const smer = rozdiel > 0 ? `o ${rozdiel} menej` : rozdiel < 0 ? `o ${-rozdiel} viac` : "bez zmeny";
+            return `${fmtDMY(prve.datum)}: ${prve.bolest}/10 → ${fmtDMY(posledne.datum)}: ${posledne.bolest}/10 — ${smer} (${sCislom.length} meraní).`;
+          })()}
+        </div>
+      )}
 
       {jarvisOznam && (
         <div style={{ fontSize: 11.5, color: jarvisOznam.endsWith("…") ? C.textDim : C.green, marginTop: 6 }}>

@@ -144,6 +144,14 @@ záver odporuje tomu, čo Jerry hovorí zo skúsenosti.
   naletel a pol hodiny testoval starú verziu. Poznať sa to dá len tak, že si
   vypýtaš nový súbor: `curl -o /dev/null -w '%{http_code}' <adresa>/assets/<index-*.js z dist/client/assets>`.
   Skript to robí sám a pred každým pokusom `.wrangler/tmp` maže.
+- **Appka merala všetko okrem toho, čo PSB predáva.** Do 17. 8. 2026 vedel
+  Kokpit povedať tržby, dochádzku aj dosah, ale nie to, či sa klientovi
+  uľavilo. `klient_merania` je odpoveď: bolesť 0–10 v čase, zapisovaná jedným
+  klikom pri denníku. Fotky pred/po sú lepší dôkaz, ale majú dve brány navyše
+  (úložisko mimo D1, súhlas klienta a schválenie na fp.app) — kým sa vyriešia,
+  jedno číslo odpovedá na tú istú otázku a nepotrebuje ani jedno.
+  Pravidlo pri čítaní: „zostal rok" je vernosť, nie zlepšenie. Výsledok sa
+  smie tvrdiť len z porovnania prvého a posledného merania toho istého človeka.
 - **D1 má strop ~1 MB na jednu hodnotu.** Base64 z 5 MB PDF má ~6,7 MB a do
   riadku sa nezmestí — preto `jarvis_dokument_casti` krája po 700 000 znakoch
   a skladá sa späť pri čítaní. Platí to pre čokoľvek veľké, čo by niekoho

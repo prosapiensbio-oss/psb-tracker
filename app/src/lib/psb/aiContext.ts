@@ -850,6 +850,10 @@ export function buildAiContext(
         return null;
       }
     })(),
+    vysledkyKlientov: {
+      poznamka: "Bolesť klientov na stupnici 0–10 v čase (tabuľka klient_merania, zapisuje sa v „+ Zápis“ pri denníku). PSB predáva zmenu stavu — toto je JEDINÉ miesto v appke, ktoré ju meria; tržby a dochádzka hovoria o vernosti, nie o výsledku. Keď je meraní málo, povedz to nahlas: chýbajúce meranie NEZNAMENÁ, že sa ľudia nezlepšujú, ale že sa to nezapisovalo. Podrobnosti si vytiahni dopytom — porovnaj prvé a posledné meranie toho istého človeka.",
+      poznamkaMeranie: "Zapisuje sa jedným klikom pri zápise do denníka, teda hneď po tréningu.",
+    },
     odmlcani: (() => {
       const zoznam = odmlcaniKlienti(clients, kalendar?.udalosti || []);
       return {
