@@ -115,6 +115,7 @@ export function ZapisButton({
   onNavigate,
   onRefresh,
   klienti = [],
+  dnesTrenoval = [],
   onDennikZapis,
 }: {
   ritualy: Ritual[];
@@ -122,6 +123,8 @@ export function ZapisButton({
   /** Mená + stále poznámky — stála poznámka sa pri vybranom klientovi ukáže
    *  ako kontext, zápis ide do denníka. */
   klienti?: { meno: string; poznamka: string }[];
+  /** Koho si dnes trénoval — mená na jeden klik, aby sa meno nemuselo hľadať. */
+  dnesTrenoval?: string[];
   /** Po uložení dopytu sa musia dotiahnuť dáta — inak ho hľadanie a lievik
    *  neuvidia až do ďalšieho otvorenia appky. */
   onRefresh?: () => void;
@@ -288,6 +291,43 @@ export function ZapisButton({
           {klienti.length > 0 && (
             <div style={{ marginBottom: 14, padding: "11px 13px", borderRadius: 10, border: `1px solid ${mix(C.accent, 30)}`, background: mix(C.accent, 5) }}>
               <div style={{ fontSize: 12.5, fontWeight: 600, color: C.text, marginBottom: 8 }}>Denník klienta — čo sa stalo</div>
+              {/*
+                Mená z dnešných tréningov na jeden klik.
+
+                Denník bol prázdny nie preto, že by nebolo čo písať, ale preto,
+                že zápis začínal hľadaním mena medzi 119 klientmi. Veta „už ma
+                to v krížoch nebolí, keď sedím" má životnosť pár minút — kým ju
+                človek doklikáva, je preč.
+              */}
+              {dnesTrenoval.length > 0 && (
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8, alignItems: "center" }}>
+                  <span style={{ fontSize: 11.5, color: C.textMuted }}>Dnes si trénoval:</span>
+                  {dnesTrenoval.map((m) => {
+                    // Krstné meno stačí, kým je jediné. Dvaja Martinovia
+                    // v jednom dni by boli dva rovnaké čipy a zápis by mohol
+                    // skončiť u nesprávneho človeka — vtedy sa pridá začiatok
+                    // priezviska.
+                    const krstne = m.split(" ")[0];
+                    const dvojznacne = dnesTrenoval.filter((x) => x.split(" ")[0] === krstne).length > 1;
+                    const popis = dvojznacne ? `${krstne} ${(m.split(" ")[1] || "").slice(0, 3)}.` : krstne;
+                    return (
+                    <button
+                      key={m}
+                      onClick={() => setPoznMeno(m)}
+                      style={{
+                        padding: "4px 10px", borderRadius: 999, fontSize: 12, cursor: "pointer",
+                        fontFamily: "inherit",
+                        border: `1px solid ${poznMeno === m ? C.accent : C.border}`,
+                        background: poznMeno === m ? mix(C.accent, 16) : "transparent",
+                        color: poznMeno === m ? C.accentLight : C.textMuted,
+                      }}
+                    >
+                      {popis}
+                    </button>
+                    );
+                  })}
+                </div>
+              )}
               <input
                 value={poznMeno} list="zapis-klienti" placeholder="Klient — začni písať"
                 onChange={(e) => setPoznMeno(e.target.value)}

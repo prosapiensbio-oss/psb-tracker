@@ -31,6 +31,7 @@ import { rodinaZKluca,
   nezapisaneDoRegistra,
   pripomienkySlubov,
   pripomienkaDovodu,
+  ktoDnesTrenoval,
 } from "../../lib/psb/compute";
 import type { RegisterItem } from "../../lib/psb/compute";
 import { breakEvenPriemer, spocitajRezervu } from "../../lib/psb/rezerva";
@@ -1779,7 +1780,7 @@ function skupinaFaktur(
         </button>
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
           <HladanieKlienta clients={clients} leads={data.leads} onPick={(meno) => navigate("klienti", undefined, { client: meno, nonce: Date.now() })} onPickLead={() => navigate("klienti", "dopyty")} />
-          <ZapisButton ritualy={rituals} onNavigate={(t, sub) => { navigate(t, sub); void nacitajZapisy(); }} onRefresh={() => void actions.refresh()} klienti={zapisKlienti} onDennikZapis={chat.spracujDennik} />
+          <ZapisButton ritualy={rituals} onNavigate={(t, sub) => { navigate(t, sub); void nacitajZapisy(); }} onRefresh={() => void actions.refresh()} klienti={zapisKlienti} dnesTrenoval={ktoDnesTrenoval(kalUdalosti)} onDennikZapis={chat.spracujDennik} />
           {ktoSom && ktoSom !== "app" && (
             <span style={{ fontSize: 12, color: C.textMuted }} title="Pod týmto menom sa zapisujú zmeny do auditu">
               {ktoSom.charAt(0).toUpperCase() + ktoSom.slice(1)}

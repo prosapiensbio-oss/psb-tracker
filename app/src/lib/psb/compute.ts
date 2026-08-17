@@ -2263,3 +2263,37 @@ export function pripomienkaDovodu(
 
 /** Dôvody, ktoré sa v PSB opakujú. „Iné" sa dopíše rukou. */
 export const DOVODY_ODCHODU = ["cena", "čas", "vzdialenosť", "výsledok neprišiel", "rozmyslel si to"] as const;
+
+/**
+ * Koho si dnes trénoval — mená na jeden klik.
+ *
+ * Denník klienta je v appke od začiatku a je prázdny. Nie preto, že by nebolo
+ * čo písať, ale preto, že zápis začína hľadaním mena medzi 119 klientmi. Veta
+ * „už ma to v krížoch nebolí, keď sedím" má životnosť pár minút; kým ju človek
+ * doklikáva, je preč.
+ *
+ * Kalendár vie, kto dnes prišiel — a vie to v ten istý deň, kým PTminder
+ * chodí s odstupom. Preto sa mená berú odtiaľ.
+ *
+ * Jerry, 17. 8. 2026: „chýba jediné: spôsob, ako doň niečo napísať do 20
+ * sekúnd po tréningu."
+ */
+export function ktoDnesTrenoval(
+  udalosti: { zaciatok: string; klient: string | null; typ: string | null; zmizlaAt?: string | null }[],
+  opts?: { dnes?: Date; trener?: (t: string | null | undefined) => boolean },
+): string[] {
+  const teraz = opts?.dnes ?? new Date();
+  const den = teraz.toISOString().slice(0, 10);
+  const von: string[] = [];
+  for (const u of udalosti || []) {
+    if (u.typ !== "trening" && u.typ !== "uvodny") continue;
+    if (u.zmizlaAt) continue;
+    if ((u.zaciatok || "").slice(0, 10) !== den) continue;
+    const meno = (u.klient || "").trim();
+    // Tréning, ktorý sa ešte len chystá, do denníka nepatrí — nemá sa čo
+    // zapisovať o niečom, čo sa nestalo.
+    if (!meno || Date.parse(u.zaciatok) > teraz.getTime()) continue;
+    if (!von.includes(meno)) von.push(meno);
+  }
+  return von;
+}
