@@ -60,7 +60,7 @@ import { ZapisButton } from "./Zapis";
 import { ritualy as spocitajRitualy } from "../../lib/psb/rituals";
 import { nastavRozpis, pridajDoRozpisu, type PohybZaBunku } from "../../lib/psb/rozpis";
 import { chybajuceNaklady, dvojiteZapisy, nezhodyPrijmov, nezhodySExcelom, type BankovyMesiac, type Pohyb } from "../../lib/psb/kontrolaNakladov";
-import { MKT_MESACNE, nastavIgPrispevky } from "../../lib/psb/marketing";
+import { MKT_MESACNE, nastavIgPrispevky, nastavMarketingZImportu, nastavWebZImportu, nastavAdsZImportu, nastavWebStranky, nastavWebRychlost } from "../../lib/psb/marketing";
 
 export type Actions = {
   /** Vráti `false`, keď zápis na serveri neprešiel — obrazovka to nesmie zamlčať. */
@@ -620,6 +620,7 @@ export function PSBApp() {
   // až po prvom vykreslení a bez nej by Jarvis dostal kontext spočítaný
   // z prázdneho zoznamu — teda zo statického súboru, ktorý má nahradiť.
   const [igVerzia, setIgVerzia] = useState(0);
+  const [mktVerzia, setMktVerzia] = useState(0);
   useEffect(() => {
     void fetch("/api/meta?co=instagram", { credentials: "same-origin" })
       .then((r) => r.json())
@@ -632,9 +633,22 @@ export function PSBApp() {
   useEffect(() => {
     void fetch("/api/marketing", { credentials: "same-origin" })
       .then((r) => r.json())
-      .then((j: { gscMesacne?: { m: string; kliky: number }[]; ga4?: { m: string; udalosti: number }[]; kanaly?: { mesiac: string }[] }) => {
-        setWebMetriky({ gsc: j.gscMesacne || [], ga4: j.ga4 || [] });
-        setKanalyMesiace([...new Set((j.kanaly || []).map((k) => String(k.mesiac)))]);
+      .then((j: Record<string, never[]> & { gadsValuta?: string }) => {
+        setWebMetriky({ gsc: (j.gscMesacne as never[]) || [], ga4: (j.ga4 as never[]) || [] });
+        setKanalyMesiace([...new Set(((j.kanaly as { mesiac: string }[]) || []).map((k) => String(k.mesiac)))]);
+        // Marketingové moduly napĺňala DOTERAZ len obrazovka Marketing.
+        //
+        // Dôsledok: kto otvoril Kokpit rovno na Jarvisovi, dostal kontext bez
+        // stránok webu — 17. 8. 2026 tvrdil, že „text webu je natiahnutý na 0
+        // stránkach", hoci ich bolo 77. Neplatilo to teda podľa dát, ale podľa
+        // toho, na ktorú záložku človek predtým klikol. Appka to teraz načíta
+        // sama pri štarte a `mktVerzia` prepočíta Jarvisov kontext.
+        nastavMarketingZImportu((j.mesacne as never[]) || [], (j.top as never[]) || []);
+        nastavWebZImportu((j.ga4 as never[]) || [], (j.gscMesacne as never[]) || [], (j.gscDopyty as never[]) || [], (j.gscStrany as never[]) || [], (j.ga4Strany as never[]) || [], (j.gscZariadenia as never[]) || []);
+        nastavAdsZImportu((j.gadsKampane as never[]) || [], (j.gadsDopyty as never[]) || [], j.gadsValuta || "");
+        nastavWebStranky((j.webStranky as never[]) || []);
+        nastavWebRychlost((j.webRychlost as never[]) || []);
+        setMktVerzia((x) => x + 1);
       })
       .catch(() => {});
   }, []);
@@ -1609,7 +1623,7 @@ function skupinaFaktur(
       // dlaždica na Kokpite. Dve odpovede na to isté číslo boli 16. 8. reálny
       // stav appky a tá horšia znela istejšie.
       spocitajRezervu({ btcCzk: btcCelkom, stavPenazi, bePriem: breakEvenPriemer().bePriem })),
-    [data, clients, sixM, capacity, registerAll, kalUdalosti, kalZmeny, uzavierkaPreAi, btcCelkom, stavPenazi, igVerzia, vzasVerzia()], // eslint-disable-line react-hooks/exhaustive-deps
+    [data, clients, sixM, capacity, registerAll, kalUdalosti, kalZmeny, uzavierkaPreAi, btcCelkom, stavPenazi, igVerzia, mktVerzia, vzasVerzia()], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   const actions = useMemo<Actions>(

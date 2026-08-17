@@ -109,6 +109,18 @@ export function PlanObsahu({ data, chat, onNavigate }: { data: PSBData; chat?: A
     // na jednu otázku medzi prácou; nad zadaním sa sedí, dopytuje a vetví,
     // a na to je 300 pixelov v rohu málo. Rozhovor je jeden a ten istý,
     // takže sa nič nestráca — mení sa len okno, v ktorom je vidieť.
+    // NOVÝ rozhovor, nie pokračovanie toho, čo bolo otvorené.
+    //
+    // 17. 8. 2026 sa dve zadania prilepili do rozhovoru s názvom „Ktorá
+    // kategória hákov nám funguje najlepšie" — lebo `zachovajOkno` zabránilo
+    // oknu založiť nový a zadanie skončilo v tom, čo bolo náhodou otvorené.
+    // Nič sa nestratilo, ale nedalo sa to nájsť: názov rozhovoru sa berie
+    // z PRVEJ otázky a tá bola o niečom inom.
+    //
+    // Samotné `newChat` nestačí — nastavuje stav a `ask` beží ešte so starým
+    // zoznamom správ z uzáveru. Preto sa mu prázdna história odovzdáva rovno
+    // tretím parametrom; to je jediný spôsob, ako to platí okamžite.
+    chat.newChat("marketing");
     if (onNavigate) { chat.zachovajOkno(); onNavigate("jarvis"); }
     else chat.setFloatingOpen(true);
     void chat.ask([
@@ -126,7 +138,7 @@ export function PlanObsahu({ data, chat, onNavigate }: { data: PSBData; chat?: A
       "Pri číslach vždy uveď zdroj a dátum. Project nevidí dáta Kokpitu, takže čo",
       "nenapíšeš, to nemá. Do zadania nepatrí meno klienta ani zdravotný detail.",
       "Najprv over, či čísla sedia — a keď nesedia, povedz to namiesto zadania.",
-    ].join("\n"), `Vyrob zadanie: ${n.co}`);
+    ].join("\n"), `Vyrob zadanie: ${n.co}`, []);
   };
 
   const farba: Record<Navrh["zdroj"], string> = {
