@@ -127,21 +127,23 @@ záver odporuje tomu, čo Jerry hovorí zo skúsenosti.
   v kontexte všetkých 31 zrušených tréningov a na otázku „komu najviac"
   vymenoval trojicu po troch — prehliadol klienta so štyrmi. Rebríčky, súčty
   a poradia patria do `aiContext` ako hotové pole (`zrusenePodlaKlienta`).
-- **Nasadzuj `./scripts/nasad.sh`, nie `wrangler deploy` priamo.** Wrangler na
-  tomto stroji klame a je to zmerané (17. 8. 2026, šesť rovnakých behov za
-  sebou): dva skončili sekundu po štarte s výpisom obsahujúcim len hlavičku,
-  návratovým kódom 0 a bez nasadenia; jeden sa nasadil úspešne, ale výpis sa
-  zastavil na „Total Upload" a o úspechu nepovedal nič. Príčina: na stroji NIE
-  JE Node, wrangler ho vyžaduje (v22+) a jeho spúšťač `node_modules/.bin/wrangler`
-  má `#!/usr/bin/env node`, takže beží pod bunom — a robí
-  `.on("exit", (code) => process.exit(code ?? 0))`, čiže smrť dieťaťa na signál
-  ohlási ako ÚSPECH. **Návratový kód aj výpis sú tu bezcenné.** Skript preto
-  púšťa priamo `wrangler-dist/cli.js`, pred každým pokusom maže `.wrangler/tmp`
-  (inak wrangler tvrdí „No updated asset files" a assety nepošle, takže
-  v prehliadači beží stará appka nad novým workerom) a výsledok OVERUJE: číslo
-  verzie na Cloudflare musí stúpnuť a kontrolný `index-*.js` musí vrátiť 200.
-  Skúša až šesťkrát. Trvalá liečba je doinštalovať Node — na stroji nie je ani
-  Homebrew, takže to je na Jerryho.
+- **Nasadzuj `./scripts/nasad.sh`.** Robí build, nasadenie a OVERENIE výsledku
+  proti Cloudflare API. Priamy `wrangler deploy` funguje tiež — odkedy je na
+  stroji Node (v24.19.0, doinštalovaný 17. 8. 2026) je spoľahlivý, zmerané 6/6
+  s úplným výpisom. Predtým Node chýbal, wrangler bežal pod bunom a z toho istého
+  testu vyšlo 4/6: dva behy skončili sekundu po štarte s návratovým kódom 0
+  a bez nasadenia, jeden sa nasadil, ale výpis sa zastavil na „Total Upload".
+  Na vine bol spúšťač `node_modules/.bin/wrangler`, ktorý robí
+  `.on("exit", (code) => process.exit(code ?? 0))` — smrť dieťaťa na signál
+  ohlási ako úspech. **Ak sa Node zo stroja niekedy stratí, tá istá tichá lož
+  sa vráti**; skript to pozná a spadne späť na `bun wrangler-dist/cli.js`.
+- **Overovanie po nasadení nevynechávaj ani s Node.** Druhá pasca s runtime
+  nesúvisí: wrangler si v `.wrangler/tmp` pamätá, čo už nahral, a po prerušenom
+  pokuse hlási „No updated asset files to upload" — workera nasadí, ale assety
+  nepošle a v prehliadači beží STARÁ appka nad novým workerom. 16. 8. som na to
+  naletel a pol hodiny testoval starú verziu. Poznať sa to dá len tak, že si
+  vypýtaš nový súbor: `curl -o /dev/null -w '%{http_code}' <adresa>/assets/<index-*.js z dist/client/assets>`.
+  Skript to robí sám a pred každým pokusom `.wrangler/tmp` maže.
 - **D1 má strop ~1 MB na jednu hodnotu.** Base64 z 5 MB PDF má ~6,7 MB a do
   riadku sa nezmestí — preto `jarvis_dokument_casti` krája po 700 000 znakoch
   a skladá sa späť pri čítaní. Platí to pre čokoľvek veľké, čo by niekoho

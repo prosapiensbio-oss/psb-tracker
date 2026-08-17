@@ -4,27 +4,24 @@
 #
 # PREČO TENTO SÚBOR EXISTUJE
 #
-# `wrangler deploy` sa na tomto stroji chová nespoľahlivo a — čo je horšie —
-# klame. Merané 17. 8. 2026 na šiestich rovnakých behoch za sebou:
+# Do 17. 8. 2026 nebol na stroji Node. Wrangler ho vyžaduje (v22+) a jeho
+# spúšťač `node_modules/.bin/wrangler` má `#!/usr/bin/env node`, takže ho
+# `bunx` púšťal pod bunom. Merané na šiestich rovnakých behoch: DVA skončili
+# sekundu po štarte s výpisom obsahujúcim len hlavičku, návratovým kódom 0
+# a bez nasadenia; jeden sa nasadil, ale výpis sa zastavil na „Total Upload".
+# Spúšťač totiž robí `.on("exit", (code) => process.exit(code ?? 0))` — smrť
+# dieťaťa na signál ohlási ako ÚSPECH.
 #
-#   • dva behy skončili sekundu po štarte, výpis obsahoval len hlavičku
-#     wranglera, návratový kód 0 a NIČ sa nenasadilo;
-#   • jeden beh sa nasadil úspešne, ale výpis sa zastavil na „Total Upload"
-#     a o úspechu nepovedal nič.
+# Node je odvtedy nainštalovaný (v24.19.0) a tá istá šesťnásobná skúška dáva
+# 6/6 s úplným výpisom. Skript preto beží cez skutočný Node, keď je po ruke.
 #
-# Príčina je v tom, že na tomto stroji nie je Node. Wrangler ho vyžaduje
-# (v22+) a jeho spúšťač `node_modules/.bin/wrangler` má `#!/usr/bin/env node`,
-# takže ho `bunx` púšťa pod bunom. Ten spúšťač navyše robí toto:
-#
-#     .on("exit", (code) => process.exit(code ?? 0))
-#
-# — keď dieťa zomrie na signál (code je null), rodič ohlási ÚSPECH. Preto je
-# návratový kód pri tomto nástroji bezcenný a nedá sa naň spoľahnúť.
-#
-# Trvalá liečba je nainštalovať Node. Kým sa tak nestane, platí tu jediné
-# pravidlo: neveriť výpisu ani návratovému kódu, ale OVERIŤ VÝSLEDOK — číslo
-# verzie na Cloudflare musí stúpnuť a nový súbor appky musí byť naozaj
-# dostupný. Kým to neplatí, skúša sa znova.
+# OVEROVANIE ZOSTÁVA. Nie preto, že by Node zlyhával, ale preto, že je tu
+# druhá pasca, ktorá s Node nesúvisí: wrangler si v `.wrangler/tmp` pamätá,
+# čo už nahral, a po prerušenom pokuse hlási „No updated asset files to
+# upload" — workera nasadí, ale assety nepošle, takže v prehliadači beží
+# stará appka nad novým workerom. To sa nedá vyčítať z výpisu, len z toho,
+# či je nový súbor naozaj dostupný. A overiť výsledok je aj tak lacnejšie
+# než ho hádať.
 #
 # Použitie:
 #   ./scripts/nasad.sh              build + nasadenie + overenie
@@ -72,15 +69,24 @@ if [ -z "$kontrolny" ]; then
   exit 1
 fi
 
+# Skutočný Node, keď je; inak bun priamo na cli.js (bez klamlivého spúšťača).
+if command -v node > /dev/null 2>&1; then
+  spustac="./node_modules/.bin/wrangler"
+  runtime="node $(node -v)"
+else
+  spustac="bun node_modules/wrangler/wrangler-dist/cli.js"
+  runtime="bun (Node nie je nainštalovaný — nasadenie býva nespoľahlivé)"
+fi
+
 pred=$(verzia)
+echo "▸ runtime: $runtime"
 echo "▸ nasadzujem (verzia teraz: ${pred:-?}, kontrolný súbor: $kontrolny)"
 
 for i in $(seq 1 $pokusov); do
   # Vyrovnávacia pamäť wranglera po prerušenom pokuse tvrdí, že assety už
   # nahral — a potom ich naozaj nenahrá. Pred každým pokusom preč.
   rm -rf .wrangler/tmp
-  # Priamo cli.js, nie spúšťač: ten prekladá smrť dieťaťa na návratový kód 0.
-  bun node_modules/wrangler/wrangler-dist/cli.js deploy > /tmp/nasad-$i.log 2>&1
+  $spustac deploy > /tmp/nasad-$i.log 2>&1
 
   po=$(verzia)
   asset=$(curl -s -o /dev/null -w '%{http_code}' "$adresa/assets/$kontrolny")
