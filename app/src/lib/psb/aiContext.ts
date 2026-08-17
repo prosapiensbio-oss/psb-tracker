@@ -15,6 +15,7 @@ import {
   WEB_STRANKY,
 } from "./marketing";
 import { MKT_OBSAH } from "./marketing-obsah";
+import { IG_PRISPEVKY } from "./marketing";
 import { prilezitosti, soZamerom } from "./google";
 import { adsMesiace, zhrnutieAds } from "./googleAds";
 import { chybyNaStrankach, najdiAdresuPodlaTitulku, prilezitostiTitulkov } from "./webObsah";
@@ -401,8 +402,13 @@ export function buildAiContext(
 
     // Obsah po kategórii háku — „čo funguje“ sa neurčuje z videní, ale
     // z uložení a zdieľaní: videnie je algoritmus, uloženie je človek.
+    // JEDEN ZDROJ: živá tabuľka z Meta API. Statický súbor zostáva len ako
+    // história pre obdobie, ktoré API nedáva — čísla sa z neho už neberú.
+    const zive = IG_PRISPEVKY.length
+      ? IG_PRISPEVKY.map((p) => ({ m: p.mesiac, f: p.typ, k: p.kategoria || "Edukácia", h: p.hook, u: p.ulozenia, v: p.videnia, z: p.zdielania, vr: p.viewRate }))
+      : MKT_OBSAH;
     const podlaHooku: Record<string, { kusov: number; ulozenia: number; videnia: number; zdielania: number; vr: number }> = {};
-    for (const o of MKT_OBSAH) {
+    for (const o of zive) {
       const e = (podlaHooku[o.k] ||= { kusov: 0, ulozenia: 0, videnia: 0, zdielania: 0, vr: 0 });
       e.kusov++; e.ulozenia += o.u; e.videnia += o.v; e.zdielania += o.z; e.vr += o.vr;
     }
@@ -414,20 +420,23 @@ export function buildAiContext(
         zdielaniaNaKus: r2(e.zdielania / e.kusov),
         viewRate: r2(e.vr / e.kusov),
       }))
-      .sort((a, b) => b.ulozeniaNaKus - a.ulozeniaNaKus)
-      // Poradie sa dopisuje číslom zámerne. Zoradený zoznam model prečítal
-      // naopak (11. 8.: „dôraz na Edukácia a Klientsky príbeh — najlepšie
-      // uloženia“, pritom sú na rebríčku posledné dve). Záver, ktorý sa dá
-      // spočítať, sa nemá nechať odvodzovať — to je to isté pravidlo ako
-      // „nesčituj z hlavy“.
-      .map((h, i, pole) => ({ poradie: `${i + 1}. z ${pole.length} podľa uložení na kus`, ...h }));
-    const podlaZdielani = [...hooky].sort((a, b) => b.zdielaniaNaKus - a.zdielaniaNaKus);
+      .sort((a, b) => b.kusov - a.kusov);
+
+    // KATEGÓRIE SA UŽ NEREBRÍČKUJÚ — a je to zámer, nie opomenutie.
+    //
+    // Priemer sú DVE uloženia na príspevok. Rozdiel medzi „najlepšou" a
+    // „najhoršou" kategóriou je pol uloženia, čo pri ôsmich príspevkoch
+    // mesačne nie je signál, ale šum. Kým tu bolo poradie („1. z 5 podľa
+    // uložení"), čítalo sa ako záver a stavala sa na ňom obsahová stratégia.
+    // Zoradené je to podľa POČTU KUSOV — to je fakt o tom, čo sa publikuje,
+    // nie tvrdenie o tom, čo funguje.
+    const priemUlozeni = zive.length ? zive.reduce((a, o) => a + o.u, 0) / zive.length : 0;
     const zhrnutieHookov = hooky.length
-      ? `Najviac ULOŽENÍ na kus má „${hooky[0].kategoria}“ (${hooky[0].ulozeniaNaKus}), najmenej „${hooky[hooky.length - 1].kategoria}“ (${hooky[hooky.length - 1].ulozeniaNaKus}). Najviac ZDIEĽANÍ má „${podlaZdielani[0].kategoria}“ (${podlaZdielani[0].zdielaniaNaKus}). Pozor na počet kusov: kategória s pár kusmi môže viesť náhodou — „${hooky[0].kategoria}“ ich má ${hooky[0].kusov}.`
+      ? `Rozdelenie podľa typu úvodu, zoradené podľa počtu kusov. NEROBÍ SA Z TOHO REBRÍČEK a nehovor, že niektorá kategória „funguje najlepšie": priemer je ${r2(priemUlozeni)} uloženia na príspevok, takže rozdiel medzi kategóriami je v desatinách a pri tomto objeme je to šum, nie výsledok. Keď sa pýta, čo publikovať, ber to z DOPYTU vo vyhľadávaní (tam sú stovky zobrazení a overený záujem) alebo z konkrétnych najlepších kusov — nie z priemeru kategórie.`
       : "Zatiaľ žiadny obsah.";
 
-    const zoradene = [...MKT_OBSAH].sort((a, b) => b.u + b.z - (a.u + a.z));
-    const kus = (o: (typeof MKT_OBSAH)[number]) => ({ m: o.m, format: o.f, kategoria: o.k, hook: o.h.slice(0, 90), ulozenia: o.u, videnia: o.v, zdielania: o.z, viewRate: o.vr });
+    const zoradene = [...zive].sort((a, b) => b.u + b.z - (a.u + a.z));
+    const kus = (o: (typeof zive)[number]) => ({ m: o.m, format: o.f, kategoria: o.k, hook: o.h.slice(0, 90), ulozenia: o.u, videnia: o.v, zdielania: o.z, viewRate: o.vr });
 
     // Zdroje klientov — jediné miesto, kde sa marketing dotýka peňazí.
     const zdroje: Record<string, number> = {};

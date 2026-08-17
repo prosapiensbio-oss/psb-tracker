@@ -396,3 +396,30 @@ export function nastavWebStranky(stranky: WebStrankaUI[]): boolean {
   WEB_STRANKY = [...stranky].sort((a, b) => a.url.localeCompare(b.url));
   return true;
 }
+
+/**
+ * Príspevky z Instagramu — ŽIVÝ zdroj, jediný platný.
+ *
+ * Do 17. 8. 2026 mala appka o tom istom dva zdroje: statický súbor
+ * `marketing-obsah.ts` (114 kusov, jan 2025 – jún 2026, zaradených kedysi
+ * ručne) a túto tabuľku z Meta API (265 kusov). V rovnakom okne sa zhodli
+ * na 62 % príspevkov — pri kategórii „Vyvrátenie mýtu" hovoril súbor 33 kusov
+ * a tabuľka 13. Jarvis podľa toho ráno odporučil kategóriu, ktorá je podľa
+ * živých dát najslabšia.
+ *
+ * Statický súbor odteraz slúži už len ako história (obdobie, ktoré Meta API
+ * nedáva); čísla a kategórie sa berú odtiaľto.
+ */
+export type IgPrispevokUI = {
+  mesiac: string; typ: string; kategoria: string; hook: string;
+  ulozenia: number; videnia: number; zdielania: number; viewRate: number; permalink: string;
+};
+
+export let IG_PRISPEVKY: IgPrispevokUI[] = [];
+
+/** Prázdne pole neprepisuje to, čo už je — rovnako ako pri ostatných importoch. */
+export function nastavIgPrispevky(p: IgPrispevokUI[]): boolean {
+  if (!p.length) return false;
+  IG_PRISPEVKY = [...p].sort((a, b) => (b.mesiac || "").localeCompare(a.mesiac || ""));
+  return true;
+}

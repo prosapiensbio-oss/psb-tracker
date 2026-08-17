@@ -1,3 +1,14 @@
+// HISTÓRIA — NIE ZDROJ PRAVDY (od 17. 8. 2026).
+//
+// Čísla a kategórie sa berú zo ŽIVEJ tabuľky `ig_prispevky` (Meta API, 265
+// kusov). Tento súbor zostáva pre obdobie, ktoré API nedáva, a ako doklad
+// o tom, ako sa príspevky zaraďovali kedysi — ale do kontextu ide len vtedy,
+// keď živý zdroj ešte nie je načítaný.
+//
+// Prečo: v rovnakom okne sa obe strany zhodli na 62 % príspevkov. Pri
+// „Vyvrátení mýtu" hovoril tento súbor 33 kusov, živá tabuľka 13 — a Jarvis
+// podľa toho odporučil kategóriu, ktorá je podľa živých dát najslabšia.
+//
 // Príspevky s textom z Metricoolu (jan 2025 – jún 2026) — 114 kusov, každý
 // zaradený podľa toho, ČÍM ZAČÍNA. Hook je jediná vec, ktorá rozhoduje, či to
 // niekto dopozerá, a zároveň jediné, čo sa dá triediť: podľa hashtagov to

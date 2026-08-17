@@ -182,21 +182,25 @@ describe("kalendár v kontexte", () => {
 // Jarvis má byť plánovač marketingu — na to potrebuje čísla, nie len knihy.
 // Dva testy: že tam tie čísla naozaj sú, a že sa nezmestili na úkor klientov.
 describe("marketing v kontexte", () => {
-  test("obsah je agregovaný po kategórii háku a zoradený podľa uložení", () => {
+  test("obsah je agregovaný po kategórii háku a zoradený podľa POČTU kusov", () => {
     const m = ctx().marketing;
     expect(m.obsahPodlaHooku.length).toBeGreaterThan(0);
     for (let i = 1; i < m.obsahPodlaHooku.length; i++) {
-      expect(m.obsahPodlaHooku[i - 1].ulozeniaNaKus).toBeGreaterThanOrEqual(m.obsahPodlaHooku[i].ulozeniaNaKus);
+      expect(m.obsahPodlaHooku[i - 1].kusov).toBeGreaterThanOrEqual(m.obsahPodlaHooku[i].kusov);
     }
-    // Poradie musí byť napísané číslom, nie len naznačené zoradením: model
-    // zoznam raz prečítal odzadu a označil dve NAJHORŠIE kategórie za
-    // najlepšie. Rovnako zhrnutie — záver, ktorý sa dá spočítať, sa počíta.
-    expect(m.obsahPodlaHooku[0].poradie).toContain("1.");
-    expect(m.obsahZhrnutie).toContain(m.obsahPodlaHooku[0].kategoria);
-    expect(m.obsahZhrnutie).toContain(m.obsahPodlaHooku[m.obsahPodlaHooku.length - 1].kategoria);
     // Najlepší kus musí mať aspoň toľko uložení + zdieľaní ako najhorší.
     const naj = m.obsahNajlepsie[0], hor = m.obsahNajhorsie[m.obsahNajhorsie.length - 1];
     expect(naj.ulozenia + naj.zdielania).toBeGreaterThanOrEqual(hor.ulozenia + hor.zdielania);
+  });
+
+  test("kategórie sa NEREBRÍČKUJÚ — pri dvoch uloženiach na kus je rozdiel šum", () => {
+    // 17. 8. 2026: poradie („1. z 5 podľa uložení") sa čítalo ako záver
+    // a stavala sa na ňom obsahová stratégia, hoci rozdiel medzi prvou
+    // a poslednou kategóriou bol pol uloženia.
+    const m = ctx().marketing;
+    expect(m.obsahPodlaHooku[0]).not.toHaveProperty("poradie");
+    expect(m.obsahZhrnutie).toContain("šum");
+    expect(m.obsahZhrnutie.toLowerCase()).not.toContain("najviac uložení na kus má");
   });
 
   test("marketing je PRED zoznamom klientov — rez odzadu smie brať len klientov", () => {

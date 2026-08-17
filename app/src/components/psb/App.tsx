@@ -60,7 +60,7 @@ import { ZapisButton } from "./Zapis";
 import { ritualy as spocitajRitualy } from "../../lib/psb/rituals";
 import { nastavRozpis, pridajDoRozpisu, type PohybZaBunku } from "../../lib/psb/rozpis";
 import { chybajuceNaklady, dvojiteZapisy, nezhodyPrijmov, nezhodySExcelom, type BankovyMesiac, type Pohyb } from "../../lib/psb/kontrolaNakladov";
-import { MKT_MESACNE } from "../../lib/psb/marketing";
+import { MKT_MESACNE, nastavIgPrispevky } from "../../lib/psb/marketing";
 
 export type Actions = {
   /** Vráti `false`, keď zápis na serveri neprešiel — obrazovka to nesmie zamlčať. */
@@ -613,6 +613,22 @@ export function PSBApp() {
       .then((j: { naposledy?: string | null }) => setWebNaposledy(j?.naposledy ?? null))
       .catch(() => {});
   }, []);
+  // Príspevky z Instagramu — ŽIVÝ zdroj pre Jarvisov kontext. Dovtedy sa
+  // kategórie brali zo statického súboru, ktorý sa so živou tabuľkou zhodol
+  // na 62 % a končil júnom.
+  // `igVerzia` je v závislostiach kontextu nižšie zámerne: príspevky prídu
+  // až po prvom vykreslení a bez nej by Jarvis dostal kontext spočítaný
+  // z prázdneho zoznamu — teda zo statického súboru, ktorý má nahradiť.
+  const [igVerzia, setIgVerzia] = useState(0);
+  useEffect(() => {
+    void fetch("/api/meta?co=instagram", { credentials: "same-origin" })
+      .then((r) => r.json())
+      .then((j: { prispevky?: { mesiac: string; typ: string; kategoria: string; hook: string; ulozenia: number; videnia: number; zdielania: number; viewRate: number; permalink: string }[] }) => {
+        if (nastavIgPrispevky(j.prispevky || [])) setIgVerzia((x) => x + 1);
+      })
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
     void fetch("/api/marketing", { credentials: "same-origin" })
       .then((r) => r.json())
@@ -1593,7 +1609,7 @@ function skupinaFaktur(
       // dlaždica na Kokpite. Dve odpovede na to isté číslo boli 16. 8. reálny
       // stav appky a tá horšia znela istejšie.
       spocitajRezervu({ btcCzk: btcCelkom, stavPenazi, bePriem: breakEvenPriemer().bePriem })),
-    [data, clients, sixM, capacity, registerAll, kalUdalosti, kalZmeny, uzavierkaPreAi, btcCelkom, stavPenazi, vzasVerzia()], // eslint-disable-line react-hooks/exhaustive-deps
+    [data, clients, sixM, capacity, registerAll, kalUdalosti, kalZmeny, uzavierkaPreAi, btcCelkom, stavPenazi, igVerzia, vzasVerzia()], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   const actions = useMemo<Actions>(

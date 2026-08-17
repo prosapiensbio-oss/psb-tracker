@@ -277,6 +277,29 @@ export const Route = createFileRoute("/api/meta")({
 
         // Skúška spojenia + čo token vôbec vidí. Toto je prvá vec, ktorá sa
         // púšťa po vložení tokenu — bez nej sa hľadá chyba naslepo.
+        // Prepočet kategórií z HOOKU.
+        //
+        // Klasifikátor dostával raz celý text príspevku a inde len prvú vetu —
+        // a to je rozdiel v 15 % prípadov (merané 17. 8. 2026 na 124 kusoch).
+        // Najčastejšie tak zmizol „Klientsky príbeh" a „Staccato výpočet" do
+        // „Edukácie", lebo v dlhom texte sa forma úvodu stratí. Odteraz sa
+        // klasifikuje vždy hook; táto akcia zrovná to, čo je uložené.
+        if (akcia === "prepocitaj-kategorie") {
+          const klientiPre = await DB.prepare("SELECT DISTINCT client_name FROM sessions WHERE client_name <> ''").all();
+          const mena = krstneMenaKlientov(((klientiPre.results as { client_name: string }[]) || []).map((r) => r.client_name));
+          const rs = await DB.prepare("SELECT id, hook, text, kategoria FROM ig_prispevky").all<{ id: string; hook: string; text: string; kategoria: string }>();
+          let zmenene = 0;
+          const zmeny: Record<string, number> = {};
+          for (const r of rs.results || []) {
+            const nova = kategoriaHooku(r.hook || r.text || "", mena);
+            if (nova === r.kategoria) continue;
+            zmeny[`${r.kategoria} → ${nova}`] = (zmeny[`${r.kategoria} → ${nova}`] || 0) + 1;
+            await DB.prepare("UPDATE ig_prispevky SET kategoria = ?2 WHERE id = ?1").bind(r.id, nova).run();
+            zmenene++;
+          }
+          return Response.json({ ok: true, spolu: (rs.results || []).length, zmenene, zmeny });
+        }
+
         if (akcia === "test") {
           const ucty = await graph("me/adaccounts?fields=id,name,account_status&limit=25", n.token);
           const ig = await graph("me/accounts?fields=id,name,instagram_business_account{id,username}&limit=25", n.token);
@@ -403,7 +426,7 @@ export const Route = createFileRoute("/api/meta")({
               cislo(m, "reach"), cislo(m, "saved"), cislo(m, "shares"),
               Number(m.comments_count) || 0, Number(m.like_count) || 0,
               cislo(m, "views"), now,
-              hook, text, kategoriaHooku(text, mena), cas,
+              hook, text, kategoriaHooku(hook || text, mena), cas,
             );
           });
           for (let i = 0; i < stmts.length; i += 40) await DB.batch(stmts.slice(i, i + 40));
