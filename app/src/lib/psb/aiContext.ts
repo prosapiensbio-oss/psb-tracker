@@ -36,6 +36,7 @@ import {
   type RegisterItem,
   type SixMRow,
   odmlcaniKlienti,
+  poUvodnomNikdy,
 } from "./compute";
 import { monthLabel, normName, weekKey, weekLabel } from "./format";
 import type { PSBData } from "./types";
@@ -614,17 +615,12 @@ export function buildAiContext(
           // „prečo nám ľudia po úvodnom nezostávajú“ odpovedal, že nevie, hoci
           // odpovede boli v databáze.
           poUvodnomNikdy: (() => {
-            const von = clientList
-              .filter((c) => (c.sessions || []).length === 1 && c.sessions[0]?.sessionType === "UVODNE")
-              .map((c) => ({
-                meno: c.name,
-                uvodny: (c.sessions[0]?.date || "").slice(0, 10),
-                trener: c.sessions[0]?.sessionTrainer || c.primaryTrainer || null,
-                preco: c.precoNeprisiel || null,
-              }))
-              .sort((a, b) => b.uvodny.localeCompare(a.uvodny));
+            // Balíček a kalendár rozhodujú spolu so sedeniami — samotný export
+            // z PTmindera chodí neskoro a robí z pokračujúcich klientov
+            // stratené prípady (Roman Pavlik, 17. 8. 2026).
+            const von = poUvodnomNikdy(clients, data.packages || [], kalendar?.udalosti || []);
             return {
-              poznamka: "Prišli na úvodný tréning, zaplatili zaň (1 100 Kč) a nikdy sa nevrátili. `preco` je zapisané ručne v Marketing → Odkiaľ prišli klienti; `null` znamená, že to nikto nezapísal — nie že dôvod neexistuje. Keď sa dôvody opakujú, je to jediná vec z celého lievika, s ktorou sa dá niečo urobiť.",
+              poznamka: "Prišli na úvodný tréning, zaplatili zaň (1 100 Kč) a nikdy sa nevrátili. Kto si po úvodnom kúpil balíček alebo má v kalendári ďalší tréning, v zozname NIE JE — aj keď to v exporte z PTmindera ešte nevidno. `preco` je zapisané ručne v Marketing → Odkiaľ prišli klienti; `null` znamená, že to nikto nezapísal — nie že dôvod neexistuje. Keď sa dôvody opakujú, je to jediná vec z celého lievika, s ktorou sa dá niečo urobiť.",
               spolu: von.length,
               bezDovodu: von.filter((x) => !x.preco).length,
               ludia: von.slice(0, 20),

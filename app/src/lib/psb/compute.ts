@@ -2170,3 +2170,48 @@ export function pripomienkySlubov(
 
   return out;
 }
+
+/**
+ * Kto po úvodnom tréningu naozaj neprišiel — a kto len čaká na export.
+ *
+ * PREČO TO NESTAČÍ ČÍTAŤ ZO SEDENÍ
+ *
+ * Jerry, 17. 8. 2026: „Roman Pavlik bol minulý týždeň na platenom tréningu,
+ * dokonca zaplatil za členstvo — ako to, že ho sem radíš?" Mal pravdu.
+ * Zoznam stál na jedinej podmienke „má práve jedno sedenie a je to úvodné",
+ * lenže sedenia chodia z PTmindera s odstupom dní. Roman mal 5. 8. úvodný,
+ * 13. 8. zaplatil 7 790 Kč za balíček a v ten istý deň trénoval — appka ho
+ * napriek tomu počítala medzi tých, čo sa nevrátili, lebo ten tréning ešte
+ * nebol v exporte.
+ *
+ * Kúpený balíček a tréning v kalendári sú dôkaz pokračovania rovnako platný
+ * ako riadok v exporte — a prichádzajú skôr. Preto sa pozerá na všetky tri.
+ */
+export function poUvodnomNikdy(
+  clients: Record<string, ClientAgg>,
+  balicky: { client_name?: string; clientName?: string; sessionsRemaining?: number; sessions_remaining?: number; validTo?: string; valid_to?: string }[],
+  udalosti: { klient: string | null; zaciatok: string; typ: string | null; zmizlaAt?: string | null }[],
+): { meno: string; uvodny: string; trener: string | null; preco: string | null }[] {
+  const menoBalicka = (b: (typeof balicky)[number]) => b.client_name ?? b.clientName ?? "";
+  const sBalickom = new Set(balicky.filter((b) => menoBalicka(b)).map((b) => normName(menoBalicka(b))));
+
+  return Object.values(clients)
+    .filter((c) => (c.sessions || []).length === 1 && c.sessions[0]?.sessionType === "UVODNE")
+    .filter((c) => {
+      // Balíček = zaplatil za pokračovanie. To je rozhodnutie, nie dochádzka.
+      if (sBalickom.has(normName(c.name))) return false;
+      // Tréning v kalendári po úvodnom (nezrušený) je to isté, len skôr.
+      const uvodny = (c.sessions[0]?.date || "").slice(0, 10);
+      const pokracoval = (udalosti || []).some((u) =>
+        u.typ === "trening" && !u.zmizlaAt && u.klient &&
+        normName(u.klient) === normName(c.name) && u.zaciatok.slice(0, 10) > uvodny);
+      return !pokracoval;
+    })
+    .map((c) => ({
+      meno: c.name,
+      uvodny: (c.sessions[0]?.date || "").slice(0, 10),
+      trener: c.sessions[0]?.sessionTrainer || c.primaryTrainer || null,
+      preco: c.precoNeprisiel || null,
+    }))
+    .sort((a, b) => b.uvodny.localeCompare(a.uvodny));
+}
