@@ -24,6 +24,18 @@ const ZDROJE: { nazov: string; url: string }[] = [
   // rána prestane sťahovať kampane a nikto nevie prečo. Jerry na to upozornil
   // 13. 8. — mal pravdu, len to nie je zmena algoritmu, ale zmena API.
   { nazov: "Meta Graph API changelog", url: "https://developers.facebook.com/blog/feed/?tags=graph-api" },
+  // Google Ads. Jerry, 17. 8. 2026: „postavili sme pre Jarvisa, ako funguje
+  // algoritmus aj Meta prostredie — nemali by sme spraviť podobnú vec pre
+  // Google Ads?" Mal pravdu a je to naliehavejšie než pri Mete: reklama sa
+  // spúšťa v septembri a Kokpit z Google Ads API sťahuje kampane, takže platí
+  // oboje — mení sa, ako sa inzeruje, aj rozhranie, cez ktoré appka číta dáta.
+  //
+  // Hneď v prvom sťahu tam bola vec, ktorú Jerry potrebuje vedieť dopredu:
+  // „Google Ads language targeting changes starting September 2026".
+  { nazov: "Google Ads produkty", url: "https://blog.google/products/ads-commerce/rss/" },
+  // Vývojársky blog má atom.xml — /feeds/posts/default bez presmerovania
+  // vracia prázdno, overené 17. 8.
+  { nazov: "Google Ads API", url: "https://ads-developers.googleblog.com/atom.xml" },
 ];
 
 // Slová, ktoré v titulku znamenajú „toto sa môže týkať dosahu".
@@ -42,6 +54,14 @@ const KLUCOVE = [
   // Zmeny rozhrania. Netýkajú sa dosahu, ale toho, či appka zajtra ešte
   // dostane dáta — a to je rovnako naliehavé.
   "deprecat", "breaking change", "sunset", "api version", "will be removed",
+  // Google Ads. Zámerne úzke a bez slov ako „budget" či „targeting" samých
+  // o sebe — tie sa v marketingovom feede vyskytnú v každom druhom titulku
+  // a karta by prestala niečo znamenať. Ostávajú názvy vecí, ktoré menia,
+  // ako sa reklama nakupuje alebo meria.
+  "smart bidding", "bidding strateg", "performance max", "broad match",
+  "match type", "ad rank", "quality score", "conversion tracking",
+  "enhanced conversions", "consent mode", "keyword planner",
+  "language targeting", "policy update",
 ];
 
 const hash = (s: string) => {
