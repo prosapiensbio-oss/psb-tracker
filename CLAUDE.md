@@ -127,18 +127,21 @@ záver odporuje tomu, čo Jerry hovorí zo skúsenosti.
   v kontexte všetkých 31 zrušených tréningov a na otázku „komu najviac"
   vymenoval trojicu po troch — prehliadol klienta so štyrmi. Rebríčky, súčty
   a poradia patria do `aiContext` ako hotové pole (`zrusenePodlaKlienta`).
-- **`wrangler deploy` v tomto prostredí tichne.** Skončí s exit 0 po riadku
-  „Total Upload" a NIČ nenasadí; sandbox blokuje nahranie samotného workera.
-  Funkčný recept: `script -q /dev/null bunx wrangler deploy < /dev/null`
-  s vypnutým sandboxom, a **overiť cez API**, nie podľa výpisu:
-  `curl -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" ".../workers/scripts/kokpit/versions?per_page=1"`.
-  Niekedy treba dva pokusy. „Deploy prebehol" bez zvýšeného čísla verzie je
-  nepravda — 16. 8. som na to naletel a testoval starú verziu appky.
-  A **overiť treba aj ASSETY, nielen číslo verzie**: wrangler si v `.wrangler/tmp`
-  pamätá, čo už nahral, a po prerušenom pokuse hlási „No updated asset files to
-  upload" — worker sa nasadí, ale `/assets/index-*.js` vracia 404 a v prehliadači
-  beží stará appka. Lieči to `rm -rf .wrangler/tmp` a nový deploy. Kontrola:
-  `curl -o /dev/null -w '%{http_code}' https://kokpit.prosapiensbio.workers.dev/assets/<nazov z dist/client/assets>`.
+- **Nasadzuj `./scripts/nasad.sh`, nie `wrangler deploy` priamo.** Wrangler na
+  tomto stroji klame a je to zmerané (17. 8. 2026, šesť rovnakých behov za
+  sebou): dva skončili sekundu po štarte s výpisom obsahujúcim len hlavičku,
+  návratovým kódom 0 a bez nasadenia; jeden sa nasadil úspešne, ale výpis sa
+  zastavil na „Total Upload" a o úspechu nepovedal nič. Príčina: na stroji NIE
+  JE Node, wrangler ho vyžaduje (v22+) a jeho spúšťač `node_modules/.bin/wrangler`
+  má `#!/usr/bin/env node`, takže beží pod bunom — a robí
+  `.on("exit", (code) => process.exit(code ?? 0))`, čiže smrť dieťaťa na signál
+  ohlási ako ÚSPECH. **Návratový kód aj výpis sú tu bezcenné.** Skript preto
+  púšťa priamo `wrangler-dist/cli.js`, pred každým pokusom maže `.wrangler/tmp`
+  (inak wrangler tvrdí „No updated asset files" a assety nepošle, takže
+  v prehliadači beží stará appka nad novým workerom) a výsledok OVERUJE: číslo
+  verzie na Cloudflare musí stúpnuť a kontrolný `index-*.js` musí vrátiť 200.
+  Skúša až šesťkrát. Trvalá liečba je doinštalovať Node — na stroji nie je ani
+  Homebrew, takže to je na Jerryho.
 - **D1 má strop ~1 MB na jednu hodnotu.** Base64 z 5 MB PDF má ~6,7 MB a do
   riadku sa nezmestí — preto `jarvis_dokument_casti` krája po 700 000 znakoch
   a skladá sa späť pri čítaní. Platí to pre čokoľvek veľké, čo by niekoho
