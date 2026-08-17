@@ -911,7 +911,23 @@ function Vyhladavanie({ chat }: { chat?: AssistantChat }) {
         "Presne tie dopyty, ktoré píše človek, čo hľadá tréning v Brne — nie encyklopédiu. Sem patria tvoji budúci klienti.",
         soZamerom(GSC_DOPYTY as unknown as Dopyt[]),
       )}
+    </>
+  );
+}
 
+/**
+ * Stránky webu — či je web v poriadku.
+ *
+ * Jerry, 17. 8. 2026: „príde mi to strašne rozsiahle a ťažko sa v tom
+ * orientuje." Mal pravdu: jedna záložka „Web a Google" merala 4 785 pixelov
+ * a robila štyri rôzne práce naraz. Rez nevedie medzi „web" a „Google" —
+ * Search Console aj GA4 sú Google, ale merajú tvoj web. Vedie medzi OTÁZKAMI:
+ * „kto ma hľadá a či klikne" (Vyhľadávanie) a „sú moje stránky v poriadku"
+ * (tu). Preto sú dopyty tam a stránky sem.
+ */
+function StrankyWebu({ chat }: { chat?: AssistantChat }) {
+  return (
+    <>
       <Titulky chat={chat} />
 
       <Rychlost chat={chat} />
@@ -1126,7 +1142,13 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
           // kanály naraz a bývaju v nich rozbory mesiaca.
           { id: "kanaly", label: "Soc. siete" },
           { id: "obsah", label: "Reels & posty" },
-          { id: "web", label: "Web a Google" },
+          // „Web a Google" bola jedna záložka na 4 785 pixelov so štyrmi
+          // rôznymi prácami. Rez nevedie medzi web/Google (Search Console aj
+          // GA4 sú Google, ale merajú tvoj web), ale medzi otázkami: „kto ma
+          // hľadá a či klikne" verzus „sú moje stránky v poriadku".
+          // Id „web" zostáva pôvodné — visia na ňom odkazy z Kokpitu.
+          { id: "vyhladavanie", label: "Vyhľadávanie" },
+          { id: "web", label: "Web" },
           { id: "mail", label: "Mailer" },
           // Algoritmus tu bol záložkou a Jerry ju 12. 8. zrušil: čítal ju
           // dvakrát a odvtedy nie. Dáta žijú ďalej — sťahujú sa každú noc
@@ -1191,11 +1213,19 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
 
       {sub === "mail" && <Mail clients={clients} leads={leads} />}
 
-      {sub === "web" && (
+      {/* Vyhľadávanie = kto ma hľadá a či klikne. Google Ads sem patrí:
+          je to platené vyhľadávanie, tá istá otázka za peniaze. */}
+      {sub === "vyhladavanie" && (
         <>
           <Vyhladavanie chat={chat} />
-          <WebKanaly rok={rok} onRok={setRok} chat={chat} />
           <GoogleAdsKarta clients={clients} chat={chat} />
+        </>
+      )}
+      {/* Web = sú moje stránky v poriadku a chodí na ne niekto. */}
+      {sub === "web" && (
+        <>
+          <StrankyWebu chat={chat} />
+          <WebKanaly rok={rok} onRok={setRok} chat={chat} />
           <CoFungovaloWeb rok={rok} chat={chat} />
         </>
       )}

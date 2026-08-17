@@ -310,7 +310,7 @@ export function Kanaly({ data, clients, chat }: { data: PSBData; clients: Record
       <div style={{ fontSize: 12, color: C.textMuted, fontWeight: 600, margin: "16px 0 6px" }}>
         <Info
           label="Všetky siete vedľa seba"
-          text="Štyri metriky, ktoré má každá sieť, za vybraný mesiac. Zoradené podľa videní — a práve preto to tu je: Facebook máva viac impresií než Instagram a z ôsmich čísel hore sa to nedalo zistiť. „Podiel“ hovorí, koľko z celkového dosahu sietí pripadá na tú jednu; „zmena“ je oproti predošlému nahratému mesiacu. Vynechaná je reklama a konkurencia (nepublikuje sa v nich) aj web s Google Business — tie majú vlastnú záložku Web a Google, kde je o nich podstatne viac."
+          text="Štyri metriky, ktoré má každá sieť, za vybraný mesiac. Zoradené podľa videní — a práve preto to tu je: Facebook máva viac impresií než Instagram a z ôsmich čísel hore sa to nedalo zistiť. „Podiel“ hovorí, koľko z celkového dosahu sietí pripadá na tú jednu; „zmena“ je oproti predošlému nahratému mesiacu. Vynechaná je reklama a konkurencia (nepublikuje sa v nich) aj web s Google Business — tie majú vlastné záložky Vyhľadávanie a Web, kde je o nich podstatne viac."
         />
       </div>
       {porovnanie.riadky.length === 0 ? (

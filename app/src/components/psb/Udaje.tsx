@@ -847,7 +847,7 @@ function NapojenieTextWebu() {
       <div style={{ fontSize: 12, fontWeight: 600, color: C.textMuted, marginBottom: 6 }}>
         <Info
           label="Text webu — titulky, popisy a obsah stránok"
-          text="Číta text vlastného webu zo sitemapy WordPressu. Kokpit o webe dovtedy vedel len čísla — kto prišiel a na čo hľadal — nie čo na stránkach STOJÍ, takže sa dalo povedať „15 777 zobrazení, 97 klikov“ a nedalo sa povedať, čo s tým. Po prečítaní je v Marketingu → Web a Google karta „Titulky na prepis“ a Jarvis dostane SQL prístup k celému textu, takže sa dá spýtať na hocijakú stránku. Nepotrebuje kľúč ani token: web je verejný."
+          text="Číta text vlastného webu zo sitemapy WordPressu. Kokpit o webe dovtedy vedel len čísla — kto prišiel a na čo hľadal — nie čo na stránkach STOJÍ, takže sa dalo povedať „15 777 zobrazení, 97 klikov“ a nedalo sa povedať, čo s tým. Po prečítaní je v Marketingu → Web karta „Titulky na prepis“ a Jarvis dostane SQL prístup k celému textu, takže sa dá spýtať na hocijakú stránku. Nepotrebuje kľúč ani token: web je verejný."
         />
       </div>
       <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 8, lineHeight: 1.6 }}>

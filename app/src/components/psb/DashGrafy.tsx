@@ -1370,7 +1370,7 @@ export function useExtraGrafy({
     nodes.web = (
       <Card style={{ marginBottom: 0, height: "100%" }}>
         <H3><Info label="Web (GA4)" text="Noví návštevníci webu a kľúčové udalosti (odoslaný formulár, klik na kontakt) po mesiacoch. Mesiace bez merania sú vynechané — diera nie je nula." /></H3>
-        <Klik kam={() => onNavigate("marketing", "web")} onNavigate="Marketing → Web a Google">
+        <Klik kam={() => onNavigate("marketing", "web")} onNavigate="Marketing → Web">
           {ga4.length ? (
             <LineChart
               data={ga4.map((r) => ({ label: monthLabel(r.m), values: [r.novi, r.udalosti] }))}
@@ -1387,7 +1387,7 @@ export function useExtraGrafy({
     nodes.vyhladavanie = (
       <Card style={{ marginBottom: 0, height: "100%" }}>
         <H3><Info label="Vyhľadávanie (Search Console)" text="Kliky z Googlu po mesiacoch. Toto je jediný kanál, kde ľudia hľadajú sami — rastie pomaly, ale neplatí sa zaň." /></H3>
-        <Klik kam={() => onNavigate("marketing", "web")} onNavigate="Marketing → Web a Google">
+        <Klik kam={() => onNavigate("marketing", "vyhladavanie")} onNavigate="Marketing → Vyhľadávanie">
           {gsc.length ? (
             <ValueBars data={gsc.map((r) => ({ label: monthLabel(r.m), value: r.kliky }))} color={C.blue} fmt={(n) => String(Math.round(n))} height={170} alignEnd />
           ) : <Empty>Nahraj export zo Search Console.</Empty>}
