@@ -800,19 +800,26 @@ export function buildAiContext(
           const od = odModelu >= 0 ? odModelu : 0;
           const rozdiely = c.rozdiel.slice(od, posl + 1).filter((x) => Number.isFinite(x));
           const sklon = rozdiely.length ? rozdiely.reduce((a, b) => a + b, 0) / rozdiely.length : 0;
-          // TEMPO tu zámerne NIE JE. Karta na obrazovke ho ráta nad iným
-          // výberom mesiacov a vyšlo mi 15 165 Kč/mes. tam, kde obrazovka
-          // hlási 7 283. Kým to nesedí do koruny, je lepšie nemať číslo než
-          // mať druhé — presne to je chyba, ktorú tento kontext opravuje.
+          // TEMPO ZÁVISÍ OD OKNA — a to bola celá záhada zo 17. 8. 2026.
+          // Karta na obrazovke ráta priemer nad PRÁVE ZVOLENÝM obdobím, takže
+          // pri prepínači na „2026" hlási 7 283 Kč/mes., kým nad celou érou
+          // modelu vyjde 10 056. Ani jedno nie je zlé; zlé je povedať číslo
+          // bez toho, nad čím sa počítalo. Preto sú tu obe a pomenované.
+          const priemer = (a: number[]) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0);
+          const rok = new Date().getFullYear().toString();
+          const odRoku = VZAS_MONTHS.findIndex((m) => (m as string).startsWith(rok));
+          const rozdielyRok = odRoku >= 0 ? c.rozdiel.slice(odRoku, posl + 1).filter((x) => Number.isFinite(x)) : [];
           return {
             dlhCzk: Math.round(c.cumDebt[posl]),
             smer: sklon > 0 ? "klesá" : sklon < 0 ? "rastie" : "stojí",
+            tempoTentoRok: rozdielyRok.length ? Math.round(priemer(rozdielyRok)) : null,
+            tempoOdZmenyModelu: Math.round(sklon),
             narokPoslednyMesiac: Math.round(c.narok[posl]),
             poslanePoslednyMesiac: Math.round(c.poslane[posl]),
           };
         };
         return {
-          poznamka: "Dlh medzi trénerom a firmou podľa mzdového modelu (Nárok = fix 27 000 + (hodiny − 60) × 850; Rozdiel = Nárok − Poslané; dlh sa kumuluje). ZÁPORNÉ číslo = tréner si vybral VIAC, než mu patrilo, teda dlží firme; kladné = firma dlží jemu. Toto je karta „Kam smeruje dlh“ v Peniaze → J&T Výplaty a jediné platné miesto — NIKDY to nedopočítavaj z bankových pohybov, tam sa pod „Jerry vyplata“ mieša výplata s osobnými nákupmi a chýba hotovosť. Mesiac, ku ktorému to platí, je „kMesiacu“. TEMPO rastu či splácania (koľko Kč za mesiac) tu ZÁMERNE nie je — ráta ho karta „Kam smeruje dlh“ na obrazovke a nemáš ho ako overiť. Keď sa naň pýta, povedz smer a pošli ho na tú kartu; NEPOČÍTAJ si vlastné tempo z nároku a poslaného, vyjde iné číslo než to, ktoré vidí na obrazovke.",
+          poznamka: "Dlh medzi trénerom a firmou podľa mzdového modelu (Nárok = fix 27 000 + (hodiny − 60) × 850; Rozdiel = Nárok − Poslané; dlh sa kumuluje). ZÁPORNÉ číslo = tréner si vybral VIAC, než mu patrilo, teda dlží firme; kladné = firma dlží jemu. Toto je karta „Kam smeruje dlh“ v Peniaze → J&T Výplaty a jediné platné miesto — NIKDY to nedopočítavaj z bankových pohybov, tam sa pod „Jerry vyplata“ mieša výplata s osobnými nákupmi a chýba hotovosť. Mesiac, ku ktorému to platí, je „kMesiacu“. TEMPO (Kč za mesiac) je tu v dvoch podobách, lebo závisí od okna: „tempoTentoRok“ je priemer za tento kalendárny rok, „tempoOdZmenyModelu“ za celú éru dnešného mzdového modelu (od sep 2025). Karta na obrazovke ukazuje priemer za PRÁVE ZVOLENÉ obdobie v prepínači, takže sa s jedným z nich zhoduje podľa toho, čo má Jerry nastavené. VŽDY povedz, za aké obdobie tempo hovoríš — „rastie o X mesačne“ bez obdobia je číslo, ktoré sa nedá overiť. Vlastné tempo z nároku a poslaného NEPOČÍTAJ.",
           kMesiacu: (VZAS_MONTHS[posl] as string) || null,
           jerry: osoba("jerry"),
           terezka: osoba("terezka"),

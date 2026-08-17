@@ -5,6 +5,7 @@ import { PSB_KNOWLEDGE } from "../../lib/psb/knowledge";
 import { IDS_KNIH, registerKniznice, textKnihy } from "../../lib/psb/kniznica";
 import type { D1Database } from "@cloudflare/workers-types";
 import { bindings } from "../../lib/bindings.server";
+import { pocetOtazok } from "../../lib/psb/otazky";
 import { nacitajDokument } from "./jarvis-dokument";
 import { blokyNaSpravu, type StreamBlok } from "../../lib/psb/chatBloky";
 import { brief } from "../../lib/psb/zamerania";
@@ -770,6 +771,11 @@ export const Route = createFileRoute("/api/chat")({
         // Je toto prvá odpoveď v rozhovore? Rozveď a opravená otázka sa
         // nerátajú ako nová téma — tam sa naopak čaká hĺbka.
         const prvaOdpoved = messages.filter((m) => m.role === "assistant").length === 0;
+        const poslednaOtazka = (() => {
+          for (let i = messages.length - 1; i >= 0; i--) if (messages[i]?.role === "user") return String(messages[i].content || "");
+          return "";
+        })();
+        const viacOtazok = pocetOtazok(poslednaOtazka) >= 2;
         const pamat = await nacitajPamat();
         const algo = await novinkyAlgoritmov();
         const mailing = await mailingKanal();
@@ -790,10 +796,16 @@ export const Route = createFileRoute("/api/chat")({
           // medzi štyridsiatimi, odpovede na stratégiu mali 140–180 slov
           // namiesto 120. Toto je ten istý príkaz, ale doručený vtedy, keď
           // sa má vykonať, a ako posledná vec pred otázkou.
+          ...(viacOtazok
+            ? [{
+                type: "text",
+                text: "TÁTO SPRÁVA OBSAHUJE VIAC NEŽ JEDNU OTÁZKU. Odpovedz na VŠETKY, aj keď platí strop na dĺžku — krátka odpoveď neznamená polovičná odpoveď. Radšej skráť každú časť než jednu vynechať. Keď na niektorú odpovedať nevieš, povedz to o nej výslovne; ticho o polovici otázky vyzerá, akoby si ju prehliadol.",
+              }]
+            : []),
           ...(prvaOdpoved
             ? [{
                 type: "text",
-                text: "TERAZ JE PRVÁ ODPOVEĎ V TOMTO ROZHOVORE. Platí tvar prvej odpovede: záver jednou vetou, najviac tri body PO JEDNEJ VETE, záverečná otázka, čo rozviesť. Strop 120 slov a je to strop, nie odporúčanie. Hĺbka, čísla na podporu a odôvodnenia patria až do ďalšej odpovede — Jerry si o ne povie klikom na „Rozviň“.",
+                text: "TERAZ JE PRVÁ ODPOVEĎ V TOMTO ROZHOVORE. Rozpočet slov: úvodná veta so záverom do 30 slov, každý bod do 25 slov, najviac tri body, záverečná otázka do 15. To je 120 a je to strop, nie odporúčanie — spočítaj si to, kým odošleš. Do prvej odpovede sa NEVOJDE druhé číslo na podporu tvrdenia, meno rámca ani vysvetlenie, prečo je smer dobrý; to všetko čaká na „Rozviň“. Radšej vypusti tretí bod než predĺž prvé dva.",
               }]
             : []),
         ];

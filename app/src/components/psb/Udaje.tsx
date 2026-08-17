@@ -797,15 +797,46 @@ function NapojenieTextWebu() {
     .catch(() => {});
   useEffect(nacitaj, []);
 
+  /**
+   * Číta dávku za dávkou, kým nie je hotovo — klikáš raz.
+   *
+   * Dávka je 40 stránok, lebo dlhší request na Cloudflare vyprší. Kým sa
+   * pokračovanie nechávalo na človeka, appka stála na 38 zo 79 stránok
+   * a Jarvis na otázku o obsahu stránky odpovedal, že text nemá. Text webu
+   * je jeho jediný zdroj o tom, čo na stránkach STOJÍ — nechať ho
+   * natiahnutý na polovicu znamená nechať polovicu odpovedí nepravdivých.
+   *
+   * Poistka proti nekonečnu: keď kolo neprečíta ani jednu stránku, končí sa.
+   */
   const posli = async (telo: Record<string, unknown>) => {
     setRobim(true); setHlaska("");
-    const j = await fetch("/api/web-obsah", {
-      method: "POST", credentials: "same-origin",
-      headers: { "content-type": "application/json" }, body: JSON.stringify(telo),
-    }).then((r) => r.json()).catch(() => ({ ok: false, error: "spojenie zlyhalo" }));
+    let spolu = 0;
+    const chybySpolu: string[] = [];
+    let j: { ok?: boolean; sprava?: string; error?: string; chyby?: string[]; nacitane?: number; zostava?: number } = {};
+    for (let kolo = 0; kolo < 12; kolo++) {
+      j = await fetch("/api/web-obsah", {
+        method: "POST", credentials: "same-origin",
+        headers: { "content-type": "application/json" },
+        // „obnov" patrí len do prvého kola; v ďalších by mazalo, čo práve prišlo.
+        body: JSON.stringify(kolo === 0 ? telo : {}),
+      }).then((r) => r.json()).catch(() => ({ ok: false, error: "spojenie zlyhalo" }));
+      if (j.error) break;
+      spolu += j.nacitane ?? 0;
+      for (const c of j.chyby || []) if (!chybySpolu.includes(c)) chybySpolu.push(c);
+      const zostava = j.zostava ?? 0;
+      if (!zostava) break;
+      if (!(j.nacitane ?? 0)) break;
+      setHlaska(`Čítam… ${spolu} hotových, zostáva ${zostava}.`);
+      nacitaj();
+    }
     setRobim(false);
     // Aj keď časť stránok zlyhá, zvyšok je uložený — preto sa hlási oboje.
-    setHlaska(j.sprava ? j.sprava + (j.chyby?.length ? ` Nepodarilo sa: ${j.chyby.join("; ")}` : "") : (j.error || "Nepodarilo sa."));
+    setHlaska(
+      j.error
+        ? j.error
+        : `Prečítané: ${spolu} stránok.${(j.zostava ?? 0) > 0 ? ` Zostáva ${j.zostava} — klikni znova.` : " Web je celý vnútri."}`
+          + (chybySpolu.length ? ` Nepodarilo sa: ${chybySpolu.join("; ")}` : ""),
+    );
     nacitaj();
   };
 
