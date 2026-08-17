@@ -306,6 +306,36 @@ najprv mesiac pozorovať, kto tvojím menom posiela, a až potom priťahovať.
 
 ---
 
+## Presmerovania po zrušených stránkach — hotové 17. 8. 2026
+
+Search Console ukazovala **14 adries s 2 670 zobrazeniami, ktoré vracali 404** —
+ľudia z Googlu pristávali na chybovej stránke. Nikto to nevidel, lebo appka
+tie adresy dovtedy nekonfrontovala so skutočným stavom webu; vyšlo to najavo
+až pri záťažovom teste Jarvisa, keď dal preklik na článok a ten skončil na 404.
+
+Rieši to snippet **19 „PSB — presmerovania zrušených stránok"** (Code Snippets,
+front-end, aktívny). Beží LEN pri 404, takže keby stránka niekedy ožila,
+presmerovanie sa samo prestane používať.
+
+| adresa | zobrazení | ide na | prečo |
+|---|---|---|---|
+| `/skupinovy-trenink/` | 762 | `/jak-to-funguje/` | projekt zrušený, ľudia hľadajú tréning |
+| `/lekce-fascialni-svoboda/` | 530 | `/jak-to-funguje/` | to isté |
+| `/individualni-trenink/` | 406 | `/jak-to-funguje/` | tá istá stránka, len premenovaná |
+| `/online-analyza-drzeni-tela/` | 105 | `/online-trenink/` | najbližšia živá služba |
+| `/platba-za-online-analyzu/` | 5 | `/online-trenink/` | to isté |
+| `/galerie/` | 119 | `/vysledky/` | fotky klientov dnes žijú tam |
+| `/drevena-bezecka-draha/` | 113 | `/o-nas/` | vybavenie štúdia — **tu si najmenej istý cieľom** |
+| 7× slovenská séria „začarovaný kruh" | 630 spolu | `/blog/` | náhradu na webe nemá |
+
+Overené: každá adresa **301 na jeden skok** a cieľ vracia 200; bežné stránky
+sa nezmenili (0 presmerovaní) a neznáma adresa stále vracia poctivú 404.
+
+Najväčší zisk sú prvé tri riadky: **1 698 zobrazení mesačne**, ktoré doteraz
+končili na chybovej stránke, teraz vedú na stránku so službou.
+
+---
+
 ## Rozhodnuté, že sa nerobí
 
 | | |
