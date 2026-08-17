@@ -4,7 +4,7 @@
 // the alerts. Where a card recomputes something (zones, weekly hours, capacity
 // util, top KPIs), we mirror that exact logic below rather than reuse a
 // deprecated field (e.g. capacity.effHours is reference-only, NOT what the card shows).
-import { PNL, VZAS_MONTHS, pnlCalc, poslednyMesiacSDatami } from "./vzas";
+import { PNL, VZAS_MONTHS, pnlCalc, poslednyMesiacSDatami, salaryCalc as pnlSalary, CURRENT_ERA } from "./vzas";
 import {
   GA4_MESACNE, GSC_DOPYTY, GSC_MESACNE, GSC_STRANY,
   MKT_CLANKY, MKT_MESACNE,
@@ -755,6 +755,49 @@ export function buildAiContext(
           stavZapisanyK: rezerva.datumStavu,
         }
       : null,
+    dlhyVyplaty: (() => {
+      // Dlh trénera voči firme (alebo firmy voči trénerovi) — to isté číslo,
+      // aké ukazuje karta „Kam smeruje dlh" v Peniaze → J&T Výplaty. Ráta ho
+      // salaryCalc, teda ten istý mzdový model ako obrazovka.
+      //
+      // 17. 8. 2026 na otázku „aký mám dlh" Jarvis odpovedal, že to nevie
+      // a že „zdrojová tabuľka je prázdna" — pritom obrazovka vedľa hlásila
+      // −132 402 Kč. Skúsil to potom dopočítať z bankových pohybov, kde sa
+      // pod „Jerry vyplata" mieša výplata s topánkami. Toto je to isté zlyhanie
+      // ako pri rezerve: číslo žilo len v obrazovke.
+      try {
+        const posl = poslednyMesiacSDatami();
+        // Sklon sa ráta LEN z mesiacov pod dnešným mzdovým modelom (od sep
+        // 2025) — presne ako karta na obrazovke. Pôžička z éry 70/30 bola
+        // rozhodnutie, nie výstup vzorca, a keby sa priemerovala s dneškom,
+        // vyšlo by dvojnásobné tempo než to, čo Jerry vidí na obrazovke.
+        const odModelu = CURRENT_ERA.from;
+        const osoba = (k: "jerry" | "terezka") => {
+          const c = pnlSalary(k);
+          const od = odModelu >= 0 ? odModelu : 0;
+          const rozdiely = c.rozdiel.slice(od, posl + 1).filter((x) => Number.isFinite(x));
+          const sklon = rozdiely.length ? rozdiely.reduce((a, b) => a + b, 0) / rozdiely.length : 0;
+          // TEMPO tu zámerne NIE JE. Karta na obrazovke ho ráta nad iným
+          // výberom mesiacov a vyšlo mi 15 165 Kč/mes. tam, kde obrazovka
+          // hlási 7 283. Kým to nesedí do koruny, je lepšie nemať číslo než
+          // mať druhé — presne to je chyba, ktorú tento kontext opravuje.
+          return {
+            dlhCzk: Math.round(c.cumDebt[posl]),
+            smer: sklon > 0 ? "klesá" : sklon < 0 ? "rastie" : "stojí",
+            narokPoslednyMesiac: Math.round(c.narok[posl]),
+            poslanePoslednyMesiac: Math.round(c.poslane[posl]),
+          };
+        };
+        return {
+          poznamka: "Dlh medzi trénerom a firmou podľa mzdového modelu (Nárok = fix 27 000 + (hodiny − 60) × 850; Rozdiel = Nárok − Poslané; dlh sa kumuluje). ZÁPORNÉ číslo = tréner si vybral VIAC, než mu patrilo, teda dlží firme; kladné = firma dlží jemu. Toto je karta „Kam smeruje dlh“ v Peniaze → J&T Výplaty a jediné platné miesto — NIKDY to nedopočítavaj z bankových pohybov, tam sa pod „Jerry vyplata“ mieša výplata s osobnými nákupmi a chýba hotovosť. Mesiac, ku ktorému to platí, je „kMesiacu“. TEMPO rastu či splácania (koľko Kč za mesiac) tu ZÁMERNE nie je — ráta ho karta „Kam smeruje dlh“ na obrazovke a nemáš ho ako overiť. Keď sa naň pýta, povedz smer a pošli ho na tú kartu; NEPOČÍTAJ si vlastné tempo z nároku a poslaného, vyjde iné číslo než to, ktoré vidí na obrazovke.",
+          kMesiacu: (VZAS_MONTHS[posl] as string) || null,
+          jerry: osoba("jerry"),
+          terezka: osoba("terezka"),
+        };
+      } catch {
+        return null;
+      }
+    })(),
     odmlcani: (() => {
       const zoznam = odmlcaniKlienti(clients, kalendar?.udalosti || []);
       return {
