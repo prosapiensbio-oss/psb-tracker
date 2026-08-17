@@ -124,8 +124,13 @@ export function textZHtml(html: string, strop = 20000): string {
 
 /** Typ podľa toho, z ktorej sitemapy adresa prišla. */
 export function typZoSitemapy(sitemapUrl: string): string {
-  if (/\/page-sitemap/i.test(sitemapUrl)) return "stranka";
-  if (/\/post-sitemap/i.test(sitemapUrl)) return "clanok";
+  // Lomka na začiatku je nepovinná. Volajúci posiela holý názov súboru
+  // („post-sitemap.xml"), nie celú adresu — a kým to regex vyžadoval,
+  // vracal prázdny reťazec pri KAŽDEJ stránke. Dôsledok: appka roky nevedela
+  // rozlíšiť článok od stránky, takže karta „Pripomeň na Instagrame" ponúkla
+  // ako najlepší článok domovskú stránku (17. 8. 2026).
+  if (/(^|\/)page-sitemap/i.test(sitemapUrl)) return "stranka";
+  if (/(^|\/)post-sitemap/i.test(sitemapUrl)) return "clanok";
   return "";
 }
 

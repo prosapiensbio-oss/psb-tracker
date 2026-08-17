@@ -37,7 +37,14 @@ export type Prilezitost = { dopyt: string; kliky: number; zobrazenia: number; po
  * `null`    = na webe o tom nie je nič.
  */
 export type Vlastnik = { url: string; titulok: string; druh: "titulok" | "zmienka" } | null;
-export type Clanok = { nazov: string; zobrazenia: number };
+/**
+ * Stránka, ktorú ľudia naozaj čítajú — meraná Search Console, nie interným
+ * prehľadom. Rozdiel je podstatný: 17. 8. 2026 karta navrhla pripomenúť
+ * článok s „1 829 zobrazeniami", lenže to bolo číslo z prehľadu článkov za
+ * rok 2025, kým v Search Console má tá istá stránka 188 zobrazení a 3 kliky.
+ * Jarvis na to zadanie odmietol napísať — a mal pravdu.
+ */
+export type Clanok = { nazov: string; url?: string; kliky: number; zobrazenia: number };
 export type HookVysledok = { kategoria: string; dopytov: number; podiel: number; podielBezne: number };
 
 export type Navrh = {
@@ -129,10 +136,14 @@ function zVyhladavania(p: Prilezitost[], vlastnik?: (dopyt: string) => Vlastnik)
  * príspevok a nie napísanie nového.
  */
 function zWebu(c: Clanok[]): Navrh[] {
-  return c.slice(0, 2).map((x, i) => ({
-    co: `Pripomeň na Instagrame: ${x.nazov}`,
-    preco: "Tento text ľudia na webe čítajú sami od seba. Príspevok, ktorý naň odkáže, je hotová práca — nepíše sa nič nové.",
-    dokaz: `${cislo(x.zobrazenia)} zobrazení stránky za stiahnuté obdobie`,
+  // Rozhodujú KLIKY, nie zobrazenia. Zobrazenie znamená, že Google stránku
+  // ukázal; klik znamená, že sa niekto rozhodol ju otvoriť. Pri pripomínaní
+  // hotového textu je podstatné to druhé — pripomínať sa oplatí to, čo si
+  // ľudia naozaj vybrali.
+  return c.filter((x) => x.kliky > 0).slice(0, 2).map((x, i) => ({
+    co: `Pripomeň na Instagrame: ${x.nazov}${x.url ? ` (${x.url.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "")})` : ""}`,
+    preco: "Tento text si ľudia z Googlu sami otvárajú. Príspevok, ktorý naň odkáže, je hotová práca — nepíše sa nič nové.",
+    dokaz: `${cislo(x.kliky)} klikov z Googlu pri ${cislo(x.zobrazenia)} zobrazeniach (Search Console)`,
     zdroj: "web",
     poradie: 2 + i * 0.1,
   }));

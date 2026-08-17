@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { clanky, prilezitosti, type Dopyt as GscDopytTyp } from "../../lib/psb/google";
-import { GSC_DOPYTY, MKT_CLANKY, WEB_STRANKY } from "../../lib/psb/marketing";
+import { GSC_DOPYTY, GSC_STRANY, WEB_STRANKY } from "../../lib/psb/marketing";
 import { obsahPredDopytmi, type Riadok } from "../../lib/psb/obsahDopyt";
 import { monthKey } from "../../lib/psb/format";
 import { planObsahu, type Navrh, type Vlastnik } from "../../lib/psb/planObsahu";
@@ -92,8 +92,26 @@ export function PlanObsahu({ data, chat, onNavigate }: { data: PSBData; chat?: A
     return planObsahu({
       vlastnik,
       prilezitosti: prilezitosti(GSC_DOPYTY as unknown as GscDopytTyp[], 5),
-      clanky: clanky(MKT_CLANKY.map((c) => ({ url: c.nazov, kliky: 0, zobrazenia: c.zobrazenia })), 4)
-        .map((s) => ({ nazov: s.url, zobrazenia: s.zobrazenia })),
+      // Zo SEARCH CONSOLE, nie z interného prehľadu článkov. Ten meria iné
+      // okno a inú vec — 17. 8. 2026 tvrdil pri jednej stránke 1 829
+      // zobrazení, kým Search Console pri tej istej 188 zobrazení a 3 kliky.
+      // Titulok sa berie z web_stranky, aby v návrhu bolo meno článku a nie
+      // holá adresa; keď stránka v sitemape nie je, do návrhu nejde vôbec.
+      // Len ČLÁNKY. Domovská stránka, kontakt či cenník majú kliky tiež —
+      // 17. 8. 2026 karta ponúkla ako najlepší „článok" na pripomenutie
+      // domovskú stránku so 447 klikmi. Pripomínať na Instagrame vlastnú
+      // domovskú stránku nedáva zmysel; pripomína sa text, ktorý niečo
+      // vysvetľuje.
+      clanky: [...GSC_STRANY]
+        .filter((g) => WEB_STRANKY.some((w) => w.url === g.url && w.typ === "clanok"))
+        .sort((a, b) => b.kliky - a.kliky)
+        .slice(0, 4)
+        .map((g) => ({
+          nazov: (WEB_STRANKY.find((w) => w.url === g.url)?.titulok || g.url).replace(/ [-–|] ProSapiens Biomechanic$/, ""),
+          url: g.url,
+          kliky: g.kliky,
+          zobrazenia: g.zobrazenia,
+        })),
       hooky,
       prispevkovMesacne: teraz,
       prispevkovVSilnychMesiacoch: vSilnych,

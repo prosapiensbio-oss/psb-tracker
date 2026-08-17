@@ -7,7 +7,7 @@ const bezPevnej = (s: string) => s.replace(/\u00a0/g, " ");
 
 const p = (dopyt: string, kliky: number, zobrazenia: number, pozicia: number): Prilezitost =>
   ({ dopyt, kliky, zobrazenia, pozicia });
-const c = (nazov: string, zobrazenia: number): Clanok => ({ nazov, zobrazenia });
+const c = (nazov: string, zobrazenia: number, kliky = 20): Clanok => ({ nazov, zobrazenia, kliky });
 const h = (kategoria: string, dopytov: number, podiel: number, podielBezne: number): HookVysledok =>
   ({ kategoria, dopytov, podiel, podielBezne });
 
@@ -129,7 +129,7 @@ describe("návrh sedí na kanál, z ktorého vyšiel", () => {
   });
 
   it("pripomenutie článku na Instagrame reelom byť SMIE — je to jeho kanál", () => {
-    const navrhy = planObsahu({ ...zaklad, prilezitosti: [], clanky: [{ nazov: "Fascie", zobrazenia: 1800 }] });
+    const navrhy = planObsahu({ ...zaklad, prilezitosti: [], clanky: [{ nazov: "Fascie", zobrazenia: 1800, kliky: 42 }] });
     expect(navrhy[0].co).toContain("Instagram");
     expect(navrhy[0].zdroj).toBe("web");
   });
@@ -173,5 +173,24 @@ describe("návrh rozlíši prepis od chýbajúcej stránky", () => {
       vlastnik: () => ({ url: "/x/", titulok: "Subokcipitální svaly", druh: "titulok" }),
     });
     expect(n.co).toContain("Rozšír článok");
+  });
+});
+
+describe("pripomenutie článku stojí na klikoch, nie na zobrazeniach", () => {
+  const zaklad = { prilezitosti: [], hooky: [], prispevkovMesacne: 10, prispevkovVSilnychMesiacoch: null };
+
+  it("dôkaz hovorí o klikoch a menuje Search Console", () => {
+    // 17. 8. 2026 tu stálo „1 829 zobrazení stránky" z interného prehľadu,
+    // kým Search Console mala pri tej istej stránke 188 zobrazení a 3 kliky.
+    const [n] = planObsahu({ ...zaklad, clanky: [{ nazov: "Fascie", url: "https://www.prosapiens.cz/fascia/", kliky: 21, zobrazenia: 5761 }] });
+    expect(n.dokaz).toContain("21");
+    expect(n.dokaz).toContain("Search Console");
+    expect(n.co).toContain("prosapiens.cz/fascia");
+  });
+
+  it("stránka bez jediného kliku sa pripomínať nenavrhne", () => {
+    // Zobrazenie znamená, že ju Google ukázal; klik, že si ju niekto vybral.
+    const v = planObsahu({ ...zaklad, clanky: [{ nazov: "Nikto", kliky: 0, zobrazenia: 9000 }] });
+    expect(v.filter((x) => x.zdroj === "web")).toHaveLength(0);
   });
 });

@@ -265,3 +265,14 @@ describe("naZmazanie — poistky", () => {
     ]);
   });
 });
+
+describe("typZoSitemapy", () => {
+  test("pozná typ aj z holého názvu súboru, nielen z celej adresy", () => {
+    // Volajúci posiela „post-sitemap.xml"; kým regex vyžadoval lomku, vracal
+    // prázdno pri každej stránke a appka nevedela, čo je článok.
+    expect(typZoSitemapy("post-sitemap.xml")).toBe("clanok");
+    expect(typZoSitemapy("page-sitemap.xml")).toBe("stranka");
+    expect(typZoSitemapy("https://www.prosapiens.cz/post-sitemap.xml")).toBe("clanok");
+    expect(typZoSitemapy("nieco-ine.xml")).toBe("");
+  });
+});
