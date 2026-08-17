@@ -113,6 +113,27 @@ záver odporuje tomu, čo Jerry hovorí zo skúsenosti.
   príkaze. Z koreňa `philipjerry-web` `tsc` a testy zelené LEN preto, že
   nekontrolovali nič, a `wrangler deploy` začal nahrávať 280 000 súborov
   z celého Downloads. Stalo sa to 15. 8. dvakrát.
+- **Číslo, ktoré vidí obrazovka, musí vidieť aj Jarvis — a z toho istého výpočtu.**
+  Záťažový test 17. 8. 2026 našiel tri čísla, ktoré žili len v komponente:
+  rezerva (dlaždica 1,2 mes. / 219 371 Kč, Jarvis „appka rezervu nepočíta"),
+  odmlčaní (dlaždica 3, Jarvis 9 z registra) a dlh trénera (obrazovka
+  −132 402 Kč, Jarvis „neviem, tabuľka je prázdna" a potom odhad z banky, kde
+  sa pod „Jerry vyplata" mieša výplata s topánkami). Vždy je to tá istá chyba:
+  výpočet vo `.tsx`, ktorý sa nedostal do `aiContext`. Keď pridávaš dlaždicu
+  alebo kartu s číslom, výpočet patrí do `lib/psb/*`, obrazovka aj kontext si
+  ho volajú. Keď sa dve strany nezhodnú DO KORUNY, nedávaj do kontextu nič —
+  druhé číslo je horšie než žiadne (preto v `dlhyVyplaty` chýba tempo rastu).
+- **Čo sa dá spočítať v kontexte, nenechávaj počítať v odpovedi.** Jarvis mal
+  v kontexte všetkých 31 zrušených tréningov a na otázku „komu najviac"
+  vymenoval trojicu po troch — prehliadol klienta so štyrmi. Rebríčky, súčty
+  a poradia patria do `aiContext` ako hotové pole (`zrusenePodlaKlienta`).
+- **`wrangler deploy` v tomto prostredí tichne.** Skončí s exit 0 po riadku
+  „Total Upload" a NIČ nenasadí; sandbox blokuje nahranie samotného workera.
+  Funkčný recept: `script -q /dev/null bunx wrangler deploy < /dev/null`
+  s vypnutým sandboxom, a **overiť cez API**, nie podľa výpisu:
+  `curl -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" ".../workers/scripts/kokpit/versions?per_page=1"`.
+  Niekedy treba dva pokusy. „Deploy prebehol" bez zvýšeného čísla verzie je
+  nepravda — 16. 8. som na to naletel a testoval starú verziu appky.
 - **D1 má strop ~1 MB na jednu hodnotu.** Base64 z 5 MB PDF má ~6,7 MB a do
   riadku sa nezmestí — preto `jarvis_dokument_casti` krája po 700 000 znakoch
   a skladá sa späť pri čítaní. Platí to pre čokoľvek veľké, čo by niekoho

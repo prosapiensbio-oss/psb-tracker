@@ -280,10 +280,21 @@ export function buildAiContext(
       .sort((a, b) => a.den.localeCompare(b.den));
 
     return {
-      poznamka: "Zdroj: Google Kalendár, rozdiel medzi dvoma stiahnutiami. Sleduje sa od 31. 7. 2026 — na skoršie mesiace odpoveď NEEXISTUJE, nie je to „nula“. Kalendár je predpoveď, PTminder je účtovníctvo: objednaná hodina nie je tržba. Obrazovka: Kalendár → Zmeny v kalendári.",
+      poznamka: "Zdroj: Google Kalendár, rozdiel medzi dvoma stiahnutiami. Sleduje sa od 31. 7. 2026 — na skoršie mesiace odpoveď NEEXISTUJE, nie je to „nula“. Kalendár je predpoveď, PTminder je účtovníctvo: objednaná hodina nie je tržba. Obrazovka: Kalendár → Zmeny v kalendári. „zrusenePodlaKlienta“ je hotový rebríček zoradený od najviac zrušení — na otázku „komu najviac“ ber odtiaľ, NEPOČÍTAJ výskyty z riadkov v „zmeny“.",
       zmenyOd: od,
       zruseneSpolu: zrusene.length,
       zruseneNevysvetlene: zrusene.filter((z) => !z.vysvetlene).length,
+      // Rebríček je spočítaný TU, nie z riadkov nižšie. 17. 8. 2026 Jarvis
+      // nad 31 riadkami vyhlásil, že najviac zrušení má trojica po troch —
+      // a prehliadol Michala Knapčoka so štyrmi. Počítať výskyty očami je
+      // zbytočné riziko tam, kde sa to dá spočítať raz a správne.
+      zrusenePodlaKlienta: (() => {
+        const podla: Record<string, number> = {};
+        for (const z of zrusene) { const k = z.klient || "(bez mena)"; podla[k] = (podla[k] || 0) + 1; }
+        return Object.entries(podla)
+          .map(([klient, zruseni]) => ({ klient, zruseni }))
+          .sort((a, b) => b.zruseni - a.zruseni || a.klient.localeCompare(b.klient));
+      })(),
       zmeny,
       objednaneDo: doKedy,
       objednane,
