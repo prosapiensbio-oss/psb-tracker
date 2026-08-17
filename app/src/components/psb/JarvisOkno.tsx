@@ -115,14 +115,31 @@ export function JarvisOkno({
   }, [chat.chats, filter, hladane]);
 
   /** Kúsok správy, v ktorom sa hľadaný výraz našiel — aby bolo vidieť prečo. */
+  /**
+   * Úryvok ukazuje TEXT, nie značky.
+   *
+   * Odpoveď nesie vnútorné značky pre odkazy — ⟦Peniaze → Výplaty|vzas|vyplaty⟧,
+   * «meno klienta», **tučné**, psbdoc:<id>. V bubline sa z nich stanú tlačidlá,
+   * ale v úryvku pod výsledkom hľadania presvitali tak, ako sú, a bolo z toho
+   * nečitateľné „karta Guillermo v ⟦Peniaze → Výplaty|vzas|vypl…".
+   */
+  const ocisti = (t: string) =>
+    (t || "")
+      .replace(/⟦([^|⟧]+)(\|[^⟧]*)?⟧/g, "$1")
+      .replace(/«([^»]+)»/g, "$1")
+      .replace(/\*\*([^*]+)\*\*/g, "$1")
+      .replace(/`([^`]+)`/g, "$1")
+      .replace(/psbdoc:[^|\s]+\|/g, "");
+
   const uryvok = (c: typeof chat.chats[number]) => {
     const h = hladane.trim().toLowerCase();
     if (!h) return "";
     if ((c.title || "").toLowerCase().includes(h)) return "";
     const m = (c.messages || []).find((x) => (x.text || "").toLowerCase().includes(h));
     if (!m) return "";
-    const t = m.text || "";
+    const t = ocisti(m.text || "");
     const i = t.toLowerCase().indexOf(h);
+    if (i < 0) return "";
     const od = Math.max(0, i - 34);
     return (od > 0 ? "…" : "") + t.slice(od, i + h.length + 46).replace(/\s+/g, " ").trim() + "…";
   };
