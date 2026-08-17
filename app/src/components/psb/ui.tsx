@@ -124,15 +124,71 @@ export function Toolbar({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * Podzáložky. Voliteľne zoskupené — `skupina` na položke začína novú rodinu.
+ *
+ * Jerry, 17. 8. 2026: „teraz je v marketingu 8 podkategórií, nedá sa aj to
+ * nejako optimalizovať?" Zlučovať ich by bola chyba: Soc. siete majú jednu
+ * kartu, ale Reels & posty 3 558 pixelov, a spojením by vznikla presne tá
+ * obrazovka, ktorú sme pred hodinou rozbíjali. Problém nie je POČET, ale že
+ * osem rovnakých chipov v rade nehovorí nič o tom, čo k čomu patrí — oko
+ * musí čítať všetkých osem názvov, aby našlo ten svoj.
+ *
+ * Preto sa nemení počet, ale čitateľnosť: chipy sa zoskupia pod krátke
+ * nadpisy rodín. Kto hľadá „koľko to stálo", pozerá do rodiny Výsledok
+ * a nemusí prejsť Mailer.
+ */
 export function SubTabs({
   tabs,
   value,
   onChange,
 }: {
-  tabs: { id: string; label: string }[];
+  tabs: { id: string; label: string; skupina?: string }[];
   value: string;
   onChange: (v: string) => void;
 }) {
+  // Rodiny v poradí, v akom prišli. Bez `skupina` sa správa ako predtým.
+  const skupiny: { nazov: string; polozky: typeof tabs }[] = [];
+  for (const t of tabs) {
+    const meno = t.skupina || "";
+    const posledna = skupiny[skupiny.length - 1];
+    if (posledna && posledna.nazov === meno) posledna.polozky.push(t);
+    else skupiny.push({ nazov: meno, polozky: [t] });
+  }
+  const maSkupiny = skupiny.some((s) => s.nazov);
+
+  if (maSkupiny) {
+    return (
+      <div style={{ display: "flex", gap: 18, marginBottom: 12, flexWrap: "wrap", alignItems: "center" }}>
+        {skupiny.map((sk, i) => (
+          <div key={sk.nazov || i} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            {sk.nazov && (
+              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.6, color: C.textDim, textTransform: "uppercase", marginRight: 2 }}>
+                {sk.nazov}
+              </span>
+            )}
+            {sk.polozky.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => onChange(t.id)}
+                style={{
+                  padding: "7px 14px", borderRadius: 8,
+                  border: `1px solid ${value === t.id ? C.accent : C.border}`,
+                  cursor: "pointer", fontSize: 13, fontWeight: 500,
+                  background: value === t.id ? C.accentBg : "transparent",
+                  color: value === t.id ? C.accentLight : C.textMuted,
+                  fontFamily: "inherit",
+                }}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
       {tabs.map((t) => (

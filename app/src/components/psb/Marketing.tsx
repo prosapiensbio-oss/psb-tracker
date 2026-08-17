@@ -1124,6 +1124,12 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
           ohľadu na to, ktorú otázku si práve otváraš. */}
       <MarketingVrch data={data} clients={clients} />
       <SubTabs
+        // Osem podzáložiek v troch rodinách (Jerry, 17. 8.: „nedá sa aj to
+        // nejako optimalizovať?"). Zlučovať ich by bola chyba — Soc. siete
+        // majú jednu kartu, ale Reels & posty 3 558 pixelov a spojením by
+        // vznikla presne tá obrazovka, ktorú sme práve rozbili. Nemení sa
+        // teda počet, ale to, či sa v nich dá zorientovať očami.
+        //
         // Poradie je poradie otázok, ktoré rozhodujú o peniazoch — nie zoznam
         // kanálov. Predtým bol prvý „Prehľad" s počtom postov a reels, čo je
         // výkaz práce, nie odpoveď. Instagram priviedol za 18 mesiacov 5
@@ -1132,24 +1138,27 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
         tabs={[
           // Dopyty prvé: sú vstupom lievika a jediná záložka, kde sa niečo
           // zapisuje. Ostatné tri sú čítanie nad tým, čo tu vznikne.
-          { id: "dopyty", label: "Dopyty" },
-          { id: "lievik", label: "Odkiaľ prišli klienti" },
-          { id: "naklady", label: "Čo to stálo" },
+          { id: "dopyty", label: "Dopyty", skupina: "Výsledok" },
+          { id: "lievik", label: "Odkiaľ prišli klienti", skupina: "Výsledok" },
+          { id: "naklady", label: "Čo to stálo", skupina: "Výsledok" },
           // „Dosah a obsah" bola jedna záložka zlepená z dvoch obrazoviek:
           // Instagram a vyhľadávanie. Hýbu sa inou rýchlosťou — reel žije dni,
           // pozícia v Googli mesiace — a v jednom okne sa jedno z nich vždy
           // čítalo zle. Kanály zostali zvlášť: sú jediný pohľad cez VŠETKY
           // kanály naraz a bývaju v nich rozbory mesiaca.
-          { id: "kanaly", label: "Soc. siete" },
-          { id: "obsah", label: "Reels & posty" },
+
           // „Web a Google" bola jedna záložka na 4 785 pixelov so štyrmi
           // rôznymi prácami. Rez nevedie medzi web/Google (Search Console aj
           // GA4 sú Google, ale merajú tvoj web), ale medzi otázkami: „kto ma
           // hľadá a či klikne" verzus „sú moje stránky v poriadku".
           // Id „web" zostáva pôvodné — visia na ňom odkazy z Kokpitu.
-          { id: "vyhladavanie", label: "Vyhľadávanie" },
-          { id: "web", label: "Web" },
-          { id: "mail", label: "Mailer" },
+          { id: "vyhladavanie", label: "Vyhľadávanie", skupina: "Kde nás nájdu" },
+          { id: "web", label: "Web", skupina: "Kde nás nájdu" },
+          // Obsah nakoniec zámerne: je to práca, ktorú robíš, nie výsledok,
+          // ktorý rozhoduje. Poradie chipov je poradie otázok.
+          { id: "kanaly", label: "Soc. siete", skupina: "Čo púšťame von" },
+          { id: "obsah", label: "Reels & posty", skupina: "Čo púšťame von" },
+          { id: "mail", label: "Mailer", skupina: "Čo púšťame von" },
           // Algoritmus tu bol záložkou a Jerry ju 12. 8. zrušil: čítal ju
           // dvakrát a odvtedy nie. Dáta žijú ďalej — sťahujú sa každú noc
           // a idú Jarvisovi do kontextu, lebo pri plánovaní obsahu rozhodujú.
