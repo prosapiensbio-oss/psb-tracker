@@ -2093,7 +2093,7 @@ export function pripomienkySlubov(
       category: "Rozhodnutie",
       tone: "blue",
       title: `SMS po úvodnom — ${meno}`,
-      detail: `${meno} mal ${fmtDMY(d)} úvodný tréning. Po ňom posielame SMS — klikni na „Poslané", keď je odoslaná.`,
+      detail: `${meno} — úvodný tréning ${fmtDMY(d)}. Po ňom posielame SMS; klikni na „Poslané", keď je odoslaná.`,
       priority: 12,
       client: meno,
       ...stav(key, rodina),
@@ -2160,7 +2160,7 @@ export function pripomienkySlubov(
       category: "Zápis",
       tone: "orange",
       title: `Úvodný bez dopytu — ${meno}`,
-      detail: `${meno} bol ${fmtDMY(d)} na úvodnom tréningu, ale v dopytoch nie je. Bez neho appka nevie, odkiaľ prišiel — a to je jediné miesto, z ktorého sa dá zistiť, čo klientov naozaj privádza. Dopíš ho v Marketing → Dopyty, stačí meno a zdroj.`,
+      detail: `${meno} — úvodný tréning ${fmtDMY(d)}, ale v dopytoch tento človek nie je. Bez neho appka nevie, odkiaľ prišiel — a to je jediné miesto, z ktorého sa dá zistiť, čo klientov naozaj privádza. Dopíš ho v Marketing → Dopyty, stačí meno a zdroj.`,
       priority: 11,
       // Kategória Zápis nesie cieľ prekliku v poli client ako „tab|sub".
       client: "marketing|dopyty",
@@ -2215,3 +2215,51 @@ export function poUvodnomNikdy(
     }))
     .sort((a, b) => b.uvodny.localeCompare(a.uvodny));
 }
+
+/**
+ * Prečo sa človek po úvodnom nevrátil — otázka, kým sa na ňu dá odpovedať.
+ *
+ * Jerry, 17. 8. 2026: dôvod odchodu je jediná vec z celého lievika, s ktorou
+ * sa dá niečo urobiť — a appka ju mala pri jednom človeku z trinástich.
+ * Nie preto, že by to Jerry nevedel, ale preto, že pole na to bolo schované
+ * v Marketingu a nikto tam nechodí. Odpoveď musí prísť za dve sekundy tam,
+ * kde sa aj tak pozerá.
+ *
+ * PREČO OKNO 90 DNÍ
+ *
+ * Dôvod sa pamätá niekoľko týždňov. Pri Vojtovi Bartoňovi zo septembra už
+ * dnes nezistíš nič a otázka na neho by bola len ďalší riadok, ktorý sa
+ * odklikne bez odpovede — a tým sa register učí ignorovať.
+ */
+const DOVOD_OKNO_DNI = 90;
+
+export function pripomienkaDovodu(
+  clients: Record<string, ClientAgg>,
+  balicky: Parameters<typeof poUvodnomNikdy>[1],
+  udalosti: Parameters<typeof poUvodnomNikdy>[2],
+  ack: Record<string, { note?: string } | undefined>,
+  dnes: Date = new Date(),
+): RegisterItem[] {
+  const hranica = new Date(dnes.getTime() - DOVOD_OKNO_DNI * 86400_000).toISOString().slice(0, 10);
+  return poUvodnomNikdy(clients, balicky, udalosti)
+    .filter((c) => !c.preco && c.uvodny >= hranica)
+    .map((c) => {
+      const key = `dovod|${c.uvodny}|${c.meno}`;
+      const rodina = "dovod";
+      return {
+        key,
+        category: "Rozhodnutie" as const,
+        tone: "orange" as const,
+        title: `Prečo neprišiel znova — ${c.meno}`,
+        detail: `${c.meno} — úvodný tréning ${fmtDMY(c.uvodny)} a odvtedy nič. Vieš prečo? Jedno slovo stačí — z opakovaných dôvodov sa dá niečo urobiť, z prázdneho poľa nič.`,
+        priority: 11,
+        client: c.meno,
+        acked: !!ack[key] || !!ack[`mute|${rodina}`],
+        note: ack[key]?.note || ack[`mute|${rodina}`]?.note,
+        rodina,
+      };
+    });
+}
+
+/** Dôvody, ktoré sa v PSB opakujú. „Iné" sa dopíše rukou. */
+export const DOVODY_ODCHODU = ["cena", "čas", "vzdialenosť", "výsledok neprišiel", "rozmyslel si to"] as const;

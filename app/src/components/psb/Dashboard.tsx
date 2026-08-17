@@ -18,6 +18,7 @@ import { objednaneVerzia,
   PRAH_ZASTARANIA,
   patriTrenerovi,
   odmlcaniKlienti,
+  DOVODY_ODCHODU,
 } from "../../lib/psb/compute";
 import { fmtCZK, fmtDMY, monthLabel, weekKey, weekLabel } from "../../lib/psb/format";
 import { C, mix, S, badge, btn } from "../../lib/psb/theme";
@@ -1977,6 +1978,28 @@ function RegisterRow({ item, actions, onNavigate, chat }: { item: RegisterItem; 
   const jeSms = item.key.startsWith("sms|");
   const jeOdmena = item.key.startsWith("referral|");
   const vybav = (poznamka: string) => actions.ackAnomaly(item.key, poznamka, true);
+  /**
+   * Dôvod odchodu na jeden klik.
+   *
+   * Jerry, 17. 8. 2026. Pole `precoNeprisiel` existovalo, ale bolo v Marketingu
+   * a nikto tam nechodí — z trinástich ľudí, čo po úvodnom neprišli, ho malo
+   * vyplnené sedem, a všetkých sedem musel Jerry vylovoiť z hlavy pri debate.
+   * Otázka musí prísť tam, kde sa aj tak pozerá, a odpoveď musí trvať dve
+   * sekundy. Preto chipy, nie textové pole.
+   *
+   * Sú aj pri otázke „je toto duch?" — mesiac ticha a nevrátenie sa po úvodnom
+   * je tá istá otázka položená v inom čase.
+   */
+  const [dovodOtvoreny, setDovodOtvoreny] = useState(false);
+  const jeOtazkaDovodu = item.key.startsWith("dovod|") && !!item.client;
+  const zapisDovod = (dovod: string) => {
+    if (!item.client) return;
+    // Zapíše sa ku KLIENTOVI (tam ho číta lievik aj Jarvis) a položka sa
+    // uzavrie s tým istým slovom, aby bolo v registri vidieť, čo sa odpovedalo.
+    actions.setOverride(item.client, "precoNeprisiel" as never, dovod);
+    actions.ackAnomaly(item.key, dovod, true);
+    setDovodOtvoreny(false);
+  };
   const jeOtazkaDuch = item.key.startsWith("duch|") && !!item.client;
   // Dve odpovede, lebo mesiac ticha má v praxi presne dva významy: buď klient
   // zmizol (duch), alebo je to dohodnutá prestávka. „Pauza" nastaví stav
@@ -2034,6 +2057,11 @@ function RegisterRow({ item, actions, onNavigate, chat }: { item: RegisterItem; 
         <span style={badge(catTone(item.category))}>{item.category}</span>
         <span style={{ color: C.text }}>{item.detail}</span>
         <div style={{ marginLeft: "auto", display: "flex", gap: 10 }}>
+          {(jeOtazkaDovodu || jeOtazkaDuch) && !item.acked && (
+            <button onClick={() => setDovodOtvoreny((o) => !o)} style={{ ...linkBtn, color: dovodOtvoreny ? C.accentLight : C.accent }}>
+              {dovodOtvoreny ? "Zavrieť" : "Prečo?"}
+            </button>
+          )}
           {jeSms && !item.acked && (
             <button onClick={() => vybav("SMS poslaná")} style={{ ...linkBtn, color: C.green }}>Poslané</button>
           )}
@@ -2088,6 +2116,24 @@ function RegisterRow({ item, actions, onNavigate, chat }: { item: RegisterItem; 
           )}
         </div>
       </div>
+
+      {dovodOtvoreny && (
+        <div style={{ marginTop: 9, paddingTop: 9, borderTop: `1px solid ${mix(C.border, 70)}`, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <span style={{ fontSize: 12, color: C.textMuted }}>Prečo neprišiel:</span>
+          {DOVODY_ODCHODU.map((d) => (
+            <button key={d} onClick={() => zapisDovod(d)}
+              style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 7, padding: "4px 11px", color: C.accentLight, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+              {d}
+            </button>
+          ))}
+          {/* „Nevieme" je plnohodnotná odpoveď — je rozdiel medzi tým, že sme
+              sa nepýtali, a tým, že to nechcel povedať. */}
+          <button onClick={() => zapisDovod("nevieme — dôvod neuviedol")}
+            style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 7, padding: "4px 11px", color: C.textMuted, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+            nevieme
+          </button>
+        </div>
+      )}
 
       {odlozit && (
         <div style={{ marginTop: 9, paddingTop: 9, borderTop: `1px solid ${mix(C.border, 70)}`, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
