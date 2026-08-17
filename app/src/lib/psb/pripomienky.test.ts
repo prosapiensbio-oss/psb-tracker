@@ -40,19 +40,19 @@ describe("SMS po úvodnom", () => {
   });
 });
 
-describe("odmena za odporúčanie", () => {
-  it("pripomenie 10 % tomu, KTO odporučil — nie novému dopytu", () => {
-    const [x] = pripomienkySlubov([], [l("2026-08-04", "Dan Kouřil", "referencia", "Natalia Peckova")], {}, DNES);
-    expect(x.title).toContain("Natalia Peckova");
-    expect(x.detail).toContain("10 %");
-    expect(x.client).toBe("Natalia Peckova");
+describe("odporúčanie bez mena odporúčateľa", () => {
+  it("keď odporúčateľ ZAPÍSANÝ JE, mlčí — odmenu hlási deriveAnomalies", () => {
+    // Dvakrát to isté je len otrava. Túto duplicitu si 17. 8. 2026 všimol
+    // Jarvis pri kontrole registra.
+    const v = pripomienkySlubov([], [l("2026-08-04", "Dan Kouřil", "referencia", "Natalia Peckova")], {}, DNES);
+    expect(v.filter((i) => i.key.startsWith("odmena|"))).toHaveLength(0);
   });
 
   it("bez mena odporúčateľa žiada doplniť meno, nie dať zľavu", () => {
     const [x] = pripomienkySlubov([], [l("2026-08-04", "Dan", "referencia")], {}, DNES);
     expect(x.title).toContain("bez mena");
-    expect(x.detail).not.toContain("10 %");
     expect(x.detail).toContain("Dopíš");
+    expect(x.client).toBe("marketing|dopyty");
   });
 
   it("iný zdroj dopytu odmenu nespúšťa", () => {
@@ -69,7 +69,7 @@ describe("odmena za odporúčanie", () => {
 
   it("celá rodina sa dá umlčať naraz", () => {
     const ack = { "mute|odmena": { note: "nehlásiť" } };
-    const [x] = pripomienkySlubov([], [l("2026-08-04", "Dan", "referencia", "Natalia")], ack, DNES);
+    const [x] = pripomienkySlubov([], [l("2026-08-04", "Dan", "referencia")], ack, DNES);
     expect(x.acked).toBe(true);
   });
 });

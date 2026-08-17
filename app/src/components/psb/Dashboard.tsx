@@ -1975,7 +1975,7 @@ function RegisterRow({ item, actions, onNavigate, chat }: { item: RegisterItem; 
   // Rozdiel je v tom, že po odklepnutí zostane pri položke napísané, ČO sa
   // stalo: „SMS poslaná" je záznam, „skryté" je zametenie.
   const jeSms = item.key.startsWith("sms|");
-  const jeOdmena = item.key.startsWith("odmena|") && item.detail.includes("10 %");
+  const jeOdmena = item.key.startsWith("referral|");
   const vybav = (poznamka: string) => actions.ackAnomaly(item.key, poznamka, true);
   const jeOtazkaDuch = item.key.startsWith("duch|") && !!item.client;
   // Dve odpovede, lebo mesiac ticha má v praxi presne dva významy: buď klient

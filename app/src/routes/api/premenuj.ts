@@ -38,6 +38,16 @@ const TABULKY: { tab: string; stlpec: string; kluc: boolean }[] = [
   { tab: "client_overrides", stlpec: "name", kluc: false },
   { tab: "client_notes", stlpec: "client_name", kluc: false },
   { tab: "leads", stlpec: "name", kluc: false },
+  // Kalendár tu chýbal a bola to tichá diera. Premenovanie klienta prešlo
+  // siedmimi tabuľkami, ale meno v Google Kalendári zostalo staré — a práve
+  // z neho appka počíta pripomienku na SMS po úvodnom, upozornenie „úvodný
+  // bez dopytu", zrušené tréningy aj právo veta pri odmlčaných („má
+  // dohodnutý termín"). Klient premenovaný v Kokpite tak zostal v kalendári
+  // niekým iným. Odhalilo sa to 17. 8. 2026 na Zuzane Sopoligovej: appka ju
+  // po zlúčení stále hlásila ako úvodný bez dopytu, lebo kalendár o novom
+  // mene nevedel.
+  { tab: "kal_udalosti", stlpec: "klient", kluc: false },
+  { tab: "kal_mapovanie", stlpec: "klient", kluc: false },
 ];
 
 async function pocet(DB: D1Database, tab: string, stlpec: string, meno: string): Promise<number> {

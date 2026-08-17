@@ -1084,16 +1084,31 @@ export function deriveAnomalies(data: PSBData, clients: Record<string, ClientAgg
   // name showing up among clients IS the conversion.
   const byNorm: Record<string, string> = {};
   for (const n of Object.keys(clients)) byNorm[normName(n)] = n;
+  // Pripomienka chodí od DOPYTU, nie až od premeny na klienta.
+  //
+  // Pôvodne sa hlásila až vtedy, keď sa odporúčaný objavil medzi klientmi.
+  // Jerry 17. 8. 2026: „keď spravíme dopyt referencia, vyskočí na mňa
+  // pripomienka, že treba danému klientovi dať −10 %." Má to logiku aj mimo
+  // jeho slov: zľava sa dohaduje pri najbližšom stretnutí s odporúčateľom
+  // a to býva skôr, než odporúčaný odtrénuje päť hodín.
+  //
+  // Rozdiel medzi „už trénuje" a „zatiaľ len napísal" sa ale nezahodí — je
+  // v texte, aby sa dalo rozhodnúť, či zľavu dať hneď, alebo počkať.
+  const OKNO_ODMENY_DNI = 90;
   for (const l of data.leads || []) {
     if (l.source !== "referencia" || !l.referrer || !l.name) continue;
-    if (!byNorm[normName(l.name)]) continue;
+    const dni = (now.getTime() - Date.parse(l.date)) / 86400000;
+    // Staré odporúčania register nezaplavia; deväť naraz je to isté ako nič.
+    if (!Number.isFinite(dni) || dni < 0 || dni > OKNO_ODMENY_DNI) continue;
     const ref = clients[byNorm[normName(l.referrer)] ?? l.referrer];
+    // Odmena pre klienta, ktorý odišiel, nemá komu pomôcť.
     if (!ref || ref.status === "Neaktívny") continue;
+    const uzTrenuje = !!byNorm[normName(l.name)];
     push(
       `referral|${l.id}`,
       "orange",
       "Odmena za odporúčanie",
-      `${l.referrer} odporučil${l.name ? ` ${l.name}` : "a nového klienta"} — nezabudni na 10 % zľavu za doporučenie`,
+      `${l.referrer} odporučil ${l.name}${uzTrenuje ? ", ktorý už trénuje" : " (zatiaľ dopyt, ešte netrénuje)"} — nezabudni na 10 % zľavu za doporučenie`,
       l.referrer,
     );
   }
@@ -2085,26 +2100,30 @@ export function pripomienkySlubov(
     });
   }
 
-  // ── Odmena za odporúčanie ────────────────────────────────────────────────
+  // ── Odporúčanie bez mena odporúčateľa ───────────────────────────────────
+  //
+  // Samotnú odmenu (10 %) hlási už `deriveAnomalies` pod kľúčom `referral|`
+  // — dvakrát to isté by bola len otrava; 17. 8. 2026 som ju tu omylom
+  // postavil druhýkrát a Jarvis si toho pri kontrole registra všimol.
+  //
+  // Tu zostáva prípad, ktorý tamtá pripomienka nevie ohlásiť: dopyt prišiel
+  // cez odporúčanie, ale nikto nezapísal OD KOHO. Vtedy sa zľava nemá komu
+  // dať a nejde o zabudnutie, ale o chýbajúci údaj.
   const hranicaOdmeny = den(new Date(dnes.getTime() - ODMENA_OKNO_DNI * 86400_000));
   for (const l of leads) {
-    if (l.source !== "referencia") continue;
+    if (l.source !== "referencia" || (l.referrer || "").trim()) continue;
     const d = (l.date || "").slice(0, 10);
     if (!d || d < hranicaOdmeny) continue;
-    const kto = (l.referrer || "").trim();
     const key = `odmena|${d}|${l.name}`;
     const rodina = "odmena";
     out.push({
       key,
-      category: "Rozhodnutie",
-      tone: "blue",
-      title: kto ? `Odmena za odporúčanie — ${kto}` : `Odporúčanie bez mena — ${l.name}`,
-      detail: kto
-        ? `${l.name} prišiel ${fmtDMY(d)} na odporúčanie od ${kto}. ${kto} má za to nárok na 10 % zľavu. Klikni na „Zľava daná", keď je vybavená.`
-        : `${l.name} prišiel ${fmtDMY(d)} cez odporúčanie, ale nie je zapísané od koho — bez mena sa odmena nedá dať nikomu. Dopíš odporúčateľa v Marketing → Dopyty.`,
+      category: "Zápis",
+      tone: "orange",
+      title: `Odporúčanie bez mena — ${l.name}`,
+      detail: `${l.name} prišiel ${fmtDMY(d)} cez odporúčanie, ale nie je zapísané od koho — bez mena nemá 10 % zľavu komu dať. Dopíš odporúčateľa v Marketing → Dopyty.`,
       priority: 12,
-      // Odmenu dostáva ODPORÚČATEĽ, takže „Otvoriť" má viesť na jeho kartu.
-      client: kto || l.name,
+      client: "marketing|dopyty",
       ...stav(key, rodina),
     });
   }
