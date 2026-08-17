@@ -1971,6 +1971,12 @@ function RegisterRow({ item, actions, onNavigate, chat }: { item: RegisterItem; 
       : onNavigate(jump, undefined, item.client ? { client: item.client, nonce: Date.now() } : undefined);
   // Otázka „je toto duch?" sa dá zodpovedať rovno tu. Odpoveď sa uloží ku
   // klientovi, takže sa už nepýta znova — a duchov konečne vieme spočítať.
+  // Sľuby dané človeku majú jedno tlačidlo, ktoré ich vybaví — nie „skryť".
+  // Rozdiel je v tom, že po odklepnutí zostane pri položke napísané, ČO sa
+  // stalo: „SMS poslaná" je záznam, „skryté" je zametenie.
+  const jeSms = item.key.startsWith("sms|");
+  const jeOdmena = item.key.startsWith("odmena|") && item.detail.includes("10 %");
+  const vybav = (poznamka: string) => actions.ackAnomaly(item.key, poznamka, true);
   const jeOtazkaDuch = item.key.startsWith("duch|") && !!item.client;
   // Dve odpovede, lebo mesiac ticha má v praxi presne dva významy: buď klient
   // zmizol (duch), alebo je to dohodnutá prestávka. „Pauza" nastaví stav
@@ -2028,6 +2034,12 @@ function RegisterRow({ item, actions, onNavigate, chat }: { item: RegisterItem; 
         <span style={badge(catTone(item.category))}>{item.category}</span>
         <span style={{ color: C.text }}>{item.detail}</span>
         <div style={{ marginLeft: "auto", display: "flex", gap: 10 }}>
+          {jeSms && !item.acked && (
+            <button onClick={() => vybav("SMS poslaná")} style={{ ...linkBtn, color: C.green }}>Poslané</button>
+          )}
+          {jeOdmena && !item.acked && (
+            <button onClick={() => vybav("zľava 10 % daná")} style={{ ...linkBtn, color: C.green }}>Zľava daná</button>
+          )}
           {jeOtazkaDuch && !item.acked && (
             <>
               <button onClick={odpovedzDuch} style={{ ...linkBtn, color: C.red }}>Áno, duch</button>

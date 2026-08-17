@@ -29,6 +29,7 @@ import { rodinaZKluca,
   deriveRegister,
   deriveSixM,
   nezapisaneDoRegistra,
+  pripomienkySlubov,
 } from "../../lib/psb/compute";
 import type { RegisterItem } from "../../lib/psb/compute";
 import { breakEvenPriemer, spocitajRezervu } from "../../lib/psb/rezerva";
@@ -1291,6 +1292,23 @@ function skupinaFaktur(
     }];
   }, [webNaposledy, stavPolozky]);
 
+  /**
+   * Sľuby dané človeku: SMS po úvodnom a 10 % za odporúčanie.
+   *
+   * Jerry si ich vypýtal 17. 8. 2026. Obe majú spoločné to, že sa nedajú
+   * odvodiť zo žiadneho čísla — buď sa to spraví, alebo nie, a nikto sa
+   * nedozvie. Kalendár vie o úvodnom v ten istý deň, PTminder až o pár dní
+   * neskôr; SMS sa posiela hneď, tak sa berie kalendár.
+   */
+  const pripomienky = useMemo(
+    () => pripomienkySlubov(
+      kalUdalosti.map((u) => ({ zaciatok: u.zaciatok, klient: u.klient, typ: u.typ, zmizlaAt: (u as { zmizlaAt?: string | null }).zmizlaAt ?? null })),
+      (data.leads || []).map((l) => ({ date: l.date, name: l.name, source: l.source, referrer: l.referrer })),
+      data.anomalyAck || {},
+    ),
+    [kalUdalosti, data.leads, data.anomalyAck],
+  );
+
   const registerAll = useMemo(() => {
     const ack = data.anomalyAck || {};
     const extra = rituals
@@ -1307,8 +1325,8 @@ function skupinaFaktur(
         client: `${r.ciel.tab}|${r.ciel.sub || ""}${r.ciel.mesiac ? `|${r.ciel.mesiac}` : r.ciel.tyzden ? `|t:${r.ciel.tyzden}` : ""}`,
         priority: r.druh === "tyzden" ? 5 : r.druh === "mesiac" ? 6 : 40,
       }));
-    return [...extra, ...nezapisane, ...kontrolaBanky, ...zmenyMetrik, ...kontrolaWebu, ...register].sort((a, b) => a.priority - b.priority);
-  }, [rituals, register, kontrolaBanky, zmenyMetrik, kontrolaWebu, nezapisane, data.anomalyAck]);
+    return [...extra, ...nezapisane, ...kontrolaBanky, ...zmenyMetrik, ...kontrolaWebu, ...pripomienky, ...register].sort((a, b) => a.priority - b.priority);
+  }, [rituals, register, kontrolaBanky, zmenyMetrik, kontrolaWebu, pripomienky, nezapisane, data.anomalyAck]);
 
   // Jarvis dostáva CELÝ register vrátane kontrol nad bankou — inak by nevedel
   // o chýbajúcom nájme a na otázku „čo mi uniká" by odpovedal, že nič.

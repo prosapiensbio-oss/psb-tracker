@@ -2022,3 +2022,90 @@ export function odmlcaniKlienti(
     }))
     .sort((a, b) => b.dni - a.dni);
 }
+
+/**
+ * Dve pripomienky, ktoré appka dovtedy nevedela: SMS po úvodnom a odmena
+ * za odporúčanie.
+ *
+ * Obe si Jerry vypýtal 17. 8. 2026 a obe majú spoločné to, že ide o SĽUB DANÝ
+ * ČLOVEKU, na ktorý sa ľahko zabudne: po úvodnom tréningu chodí SMS, a kto
+ * pošle známeho, má mať 10 % zľavu. Ani jedno nie je v žiadnych dátach —
+ * stane sa to, alebo nie, a nikto sa nedozvie.
+ *
+ * PREČO Z KALENDÁRA A NIE Z PTMINDERA
+ *
+ * SMS sa posiela hneď po tréningu; export z PTmindera chodí s odstupom dní.
+ * Kalendár to vie v ten istý deň. Zrušená udalosť (`zmizla_at`) sa neráta —
+ * tréning, ktorý sa nekonal, žiadnu SMS nepotrebuje.
+ */
+export type UdalostPreSms = { zaciatok: string; klient: string | null; typ: string | null; zmizlaAt?: string | null };
+
+/** Po koľkých dňoch je pripomienka na SMS už len šum. */
+const SMS_OKNO_DNI = 21;
+/** Ako ďaleko dozadu sa pripomína odmena za odporúčanie. */
+const ODMENA_OKNO_DNI = 60;
+
+export function pripomienkySlubov(
+  udalosti: UdalostPreSms[],
+  leads: { date: string; name: string; source: string; referrer?: string }[],
+  ack: Record<string, { note?: string } | undefined>,
+  dnes: Date = new Date(),
+): RegisterItem[] {
+  const out: RegisterItem[] = [];
+  const stav = (key: string, rodina: string) => ({
+    acked: !!ack[key] || !!ack[`mute|${rodina}`],
+    note: ack[key]?.note || ack[`mute|${rodina}`]?.note,
+    rodina,
+  });
+  const den = (d: Date) => d.toISOString().slice(0, 10);
+  const dnesStr = den(dnes);
+
+  // ── SMS po úvodnom tréningu ──────────────────────────────────────────────
+  const hranicaSms = den(new Date(dnes.getTime() - SMS_OKNO_DNI * 86400_000));
+  for (const u of udalosti) {
+    if (u.typ !== "uvodny" || u.zmizlaAt) continue;
+    const d = (u.zaciatok || "").slice(0, 10);
+    // Budúci úvodný ešte SMS nepotrebuje — pripomienka príde až po ňom.
+    if (!d || d > dnesStr || d < hranicaSms) continue;
+    const meno = (u.klient || "").trim();
+    if (!meno) continue;
+    const key = `sms|${d}|${meno}`;
+    const rodina = `sms|${meno}`;
+    out.push({
+      key,
+      category: "Rozhodnutie",
+      tone: "blue",
+      title: `SMS po úvodnom — ${meno}`,
+      detail: `${meno} mal ${fmtDMY(d)} úvodný tréning. Po ňom posielame SMS — klikni na „Poslané", keď je odoslaná.`,
+      priority: 12,
+      client: meno,
+      ...stav(key, rodina),
+    });
+  }
+
+  // ── Odmena za odporúčanie ────────────────────────────────────────────────
+  const hranicaOdmeny = den(new Date(dnes.getTime() - ODMENA_OKNO_DNI * 86400_000));
+  for (const l of leads) {
+    if (l.source !== "referencia") continue;
+    const d = (l.date || "").slice(0, 10);
+    if (!d || d < hranicaOdmeny) continue;
+    const kto = (l.referrer || "").trim();
+    const key = `odmena|${d}|${l.name}`;
+    const rodina = "odmena";
+    out.push({
+      key,
+      category: "Rozhodnutie",
+      tone: "blue",
+      title: kto ? `Odmena za odporúčanie — ${kto}` : `Odporúčanie bez mena — ${l.name}`,
+      detail: kto
+        ? `${l.name} prišiel ${fmtDMY(d)} na odporúčanie od ${kto}. ${kto} má za to nárok na 10 % zľavu. Klikni na „Zľava daná", keď je vybavená.`
+        : `${l.name} prišiel ${fmtDMY(d)} cez odporúčanie, ale nie je zapísané od koho — bez mena sa odmena nedá dať nikomu. Dopíš odporúčateľa v Marketing → Dopyty.`,
+      priority: 12,
+      // Odmenu dostáva ODPORÚČATEĽ, takže „Otvoriť" má viesť na jeho kartu.
+      client: kto || l.name,
+      ...stav(key, rodina),
+    });
+  }
+
+  return out;
+}
