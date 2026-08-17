@@ -336,6 +336,35 @@ končili na chybovej stránke, teraz vedú na stránku so službou.
 
 ---
 
+## Skrátené reťaze presmerovaní — hotové 17. 8. 2026
+
+Pri kontrole predchádzajúcej úpravy sa ukázalo, že `/functional-patterns/`
+vedie cez dva skoky (`→ /funkcni-biomechanika/ → /co-je-functional-patterns/`).
+Robí to plugin **Redirection** — dve pravidlá za sebou, ako sa web postupne
+prekladal a premenúval.
+
+Prehľadanie všetkých 47 pravidiel našlo **päť takých reťazí**, nie jednu.
+Vidno ich len takto: prejdením pravidiel, nie prechádzaním adries — štyri
+z piatich totiž začínali na adresách, ktoré nie sú ani v sitemape, ani
+v Search Console.
+
+| pravidlo | prechodov predtým | teraz vedie rovno na | kliknutí |
+|---|---|---|---|
+| `/functional-patterns/` | 2 | `/co-je-functional-patterns/` | **244** |
+| `/analyza-drzani/` | 2 | `/test-postury/` | 15 |
+| `/superficial-back-line-sbl-povrchova-zadni-linie/` | 2 | `/superficial-back-line/` | 1 |
+| `/bitrilogia-2/` | 2 | `/bitrilogia-biomechanika-biohacking-bitcoin/` | 0 |
+| `/about-two/` | 2 | `/vysledky/` | 0 |
+
+Prostredné tabule sa NEMAZALI — `/funkcni-biomechanika/` aj
+`/analyza-drzeni-tela/` samostatne fungujú ďalej, lebo na ne tiež vedú odkazy
+zvonku. Skrátila sa len prvá tabuľa každej reťaze.
+
+Overené: všetkých päť ide na **jeden skok** na stránku, ktorá vracia 200,
+prostredné pravidlá fungujú samy, a v pluginu nezostala ani jedna reťaz.
+
+---
+
 ## Rozhodnuté, že sa nerobí
 
 | | |
