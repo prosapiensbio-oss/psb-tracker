@@ -261,6 +261,16 @@ export function buildAiContext(
   // Ide sem len rozumné okno: zmeny za posledných 30 dní a objednané hodiny do
   // konca budúceho týždňa. Celý kalendár by zabral miesto, ktoré potrebuje
   // zoznam klientov.
+  /**
+   * Má web tú adresu ešte v sitemape?
+   *
+   * Search Console si pamätá roky dozadu, takže jeho zoznam stránok obsahuje
+   * aj zrušené články. `web_stranky` je oproti tomu presný odraz sitemapy,
+   * teda toho, čo web NAOZAJ má.
+   */
+  const sitemapaUrl = new Set(WEB_STRANKY.map((w) => w.url.replace(/\/$/, "").toLowerCase()));
+  const vSitemapeUrl = (u: string) => sitemapaUrl.has(String(u || "").replace(/\/$/, "").toLowerCase());
+
   const kalendarBlok = (() => {
     if (!kalendar) return null;
     const dnes = new Date().toISOString().slice(0, 10);
@@ -486,7 +496,12 @@ export function buildAiContext(
         topDopyty: GSC_DOPYTY.slice(0, 20),
         prilezitosti: prilezitosti(GSC_DOPYTY),
         lokalne: soZamerom(GSC_DOPYTY, 8),
-        topStrany: GSC_STRANY.slice(0, 12),
+        // „vSitemape" hovorí, či web tú adresu ešte MÁ. Search Console
+        // ukazuje aj stránky, ktoré dávno nežijú — 17. 8. 2026 dal Jarvis
+        // odkaz na dva články s najhorším CTR a oba vracali 404, lebo adresu
+        // vzal odtiaľto. Odkaz na neexistujúcu stránku je presne to, čo
+        // odkazy majú prestať robiť.
+        topStrany: GSC_STRANY.slice(0, 12).map((g) => ({ ...g, vSitemape: vSitemapeUrl(g.url) })),
         poznamkaKPlanu: "V Marketingu → Reels & posty je karta „Čo publikovať ďalej“ — počítané návrhy z týchto istých čísel. Keď sa pýta, čo publikovať, odpovedaj z „prilezitosti“ (téma, kde sa web zobrazuje a nikto neklikne — najlacnejší obsah, pozícia je už zaplatená) a z „topStrany“ (text, ktorý ľudia čítajú sami a stačí naň odkázať). Nikdy netvrdi príčinu — súbežnosť nie je dôkaz.",
       },
       // Google Ads. Prázdno tu neznamená, že sa neinzerovalo — znamená, že sa
@@ -537,9 +552,11 @@ export function buildAiContext(
               najvacsiZisk: r.prilezitosti.slice(0, 3),
             }))
           : "Rýchlosť sa ešte nemerala. NEHOVOR, že o rýchlosti webu nič nevieš — v Údajoch → Napojenia je karta „Rýchlosť stránok“ a treba stlačiť Zmerať. Meria sa 20 najviac zobrazovaných stránok, mobil aj počítač.",
+        // Návrhy na prepis titulku sa rátajú LEN nad stránkami, ktoré web má —
+        // radiť prepísať titulok zrušenej stránky je práca navyše pre nikoho.
         titulkyNaPrepis: prilezitostiTitulkov(
           WEB_STRANKY.map((s) => ({ ...s, text: "" })),
-          GSC_STRANY.map((g) => ({ url: g.url, zobrazenia: g.zobrazenia, kliky: g.kliky })),
+          GSC_STRANY.filter((g) => vSitemapeUrl(g.url)).map((g) => ({ url: g.url, zobrazenia: g.zobrazenia, kliky: g.kliky })),
         ),
       },
       // Adresa ku každému článku — bez nej Jarvis vymenuje tri najčítanejšie
