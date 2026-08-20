@@ -56,6 +56,13 @@ záver odporuje tomu, čo Jerry hovorí zo skúsenosti.
   ASCII. Používaj `“` alebo sa im v kóde vyhni. Platí to aj v JSX atribútoch
   (`text="… „X" …"`) — tam to ASCII `"` ukončí atribút. Stalo sa to 14. 8.
   trikrát za jeden deň.
+- **wrangler.jsonc je od 9. 8. 2026 OSTRÝ config pre Workers Builds** — nie
+  Higgsfieldov placeholder (ten je preč). `wrangler.psb.jsonc` je jeho totožná
+  kópia pre ručné nasadenie; obsah oboch drž v zhode. Workers Builds sú ŽIVÉ:
+  push na main → `bun install && bun run build` → `npx wrangler deploy`
+  (root /app) → nasadené za ~2 min. POZOR: CI deploy NEMÁ stráž migrácií ani
+  testovú bránu z nasad.sh — migrácie aplikuj VŽDY pred pushom a testy pusti
+  lokálne; nasad.sh zostáva primárna cesta, buildy sú poistka.
 - **Spätné apostrofy v SYSTEM šablóne** v `routes/api/chat.ts` rozbijú build —
   je to template literal. Escapuj ich alebo píš názvy tabuliek bez nich.
 - **Meno klienta je v siedmich tabuľkách** a v troch z nich aj v `dedup_key`.
