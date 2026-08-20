@@ -20,18 +20,13 @@ webový v [uprava-webu.md](uprava-webu.md).
 
 ## B · Čaká na teba — bez termínu, ale blokuje ďalšie veci
 
-**0 · Full Access: žiadosť je VYPLNENÁ, chýba len overenie firmy**
-Stav k 20. 8. 2026 podvečer: v App Review je rozpracovaná žiadosť o *Marketing
-API Access Tier* a všetky štyri kroky sú zelené — App settings (doplnená ikona),
-Allowed usage (zdôvodnenie + podmienka 500 volaní ukázala Completed), Data
-handling (spracovatelia Cloudflare a Anthropic, zodpovedný Mgr. Philip Jerry
-Stráňavský, ČR) aj Reviewer instructions (text + tvoja nahrávka
-kokpit-fullaccess-demo.mov). **Business Verification ODOSLANÁ 20. 8. večer** (údaje presne podľa ŽR: Mgr.
-Filip Stráňavský, IČO 19126841, Přadlácká 915/18; CAPTCHA a SMS kód potvrdil
-Jerry). Čaká sa na Metu (hodiny až dni). Keď potvrdí, zostáva JEDEN klik:
-„Submit for review“ v App Review. Register to pripomenie 24. 8.
-(záver zv-full-access-verifikacia). Dovtedy appka beží plnohodnotne záložnou
-cestou (kópia obsahu namiesto pravého boostu).
+**0 · Full Access: ŽIADOSŤ ODOSLANÁ — čaká sa na Metu (do ~20 dní)**
+20. 8. večer: Business Verification prešla ešte v deň podania (údaje podľa ŽR:
+Mgr. Filip Stráňavský, IČO 19126841) a žiadosť o Marketing API Access Tier je
+odoslaná do App Review — stav „Review in progress“. Z tvojej strany NIČ
+netreba; keby Meta chcela doplnenie, príde mail. Register to pripomenie 3. 9.
+(záver zv-full-access-verifikacia). Keď schvália, appka sama prepne propagáciu
+z kópie na pravý boost. Dovtedy všetko funguje záložnou cestou.
 
 **1 · NDA pri fotkách pred/po**
 Prejsť klientov, ktorých fotky sa už niekde použili, a skontrolovať súhlasy.
