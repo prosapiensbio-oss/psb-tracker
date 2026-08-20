@@ -26,11 +26,12 @@ API Access Tier* a všetky štyri kroky sú zelené — App settings (doplnená 
 Allowed usage (zdôvodnenie + podmienka 500 volaní ukázala Completed), Data
 handling (spracovatelia Cloudflare a Anthropic, zodpovedný Mgr. Philip Jerry
 Stráňavský, ČR) aj Reviewer instructions (text + tvoja nahrávka
-kokpit-fullaccess-demo.mov). **Zostáva jediné: Business Verification** — v tej
-istej karte „Go to verification" → „Start verification" a nahrať doklad firmy
-(IČO/výpis). Keď Meta verifikáciu potvrdí (hodiny až dni), odomkne sa „Submit
-for review" a žiadosť odošleš jedným klikom. Dovtedy appka beží plnohodnotne
-záložnou cestou (kópia obsahu namiesto pravého boostu).
+kokpit-fullaccess-demo.mov). **Business Verification ODOSLANÁ 20. 8. večer** (údaje presne podľa ŽR: Mgr.
+Filip Stráňavský, IČO 19126841, Přadlácká 915/18; CAPTCHA a SMS kód potvrdil
+Jerry). Čaká sa na Metu (hodiny až dni). Keď potvrdí, zostáva JEDEN klik:
+„Submit for review“ v App Review. Register to pripomenie 24. 8.
+(záver zv-full-access-verifikacia). Dovtedy appka beží plnohodnotne záložnou
+cestou (kópia obsahu namiesto pravého boostu).
 
 **1 · NDA pri fotkách pred/po**
 Prejsť klientov, ktorých fotky sa už niekde použili, a skontrolovať súhlasy.
