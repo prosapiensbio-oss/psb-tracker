@@ -20,22 +20,17 @@ webový v [uprava-webu.md](uprava-webu.md).
 
 ## B · Čaká na teba — bez termínu, ale blokuje ďalšie veci
 
-**0 · Podať žiadosť o Full Access pre Marketing API** — TVOJA AKCIA, appka ju
-podať nemôže. Postup, podmienky aj hotový anglický text sú v
-[`meta-full-access-ziadost.md`](meta-full-access-ziadost.md); jediné, čo treba
-dorobiť, je krátka nahrávka obrazovky (Marketing → Kampaň → založiť →
-v Ads Manageri ukázať POZASTAVENÚ kampaň). Samotný Full Access už NEBLOKUJE
-nič, appka funguje aj bez neho. Propagácia príspevku ide záložnou cestou (kópia obsahu), a keď Full
-Access raz dorazí, appka sama prepne na pravý boost — kód to skúša ako prvé.
-Rozdiel je len v sociálnom dôkaze: pravý boost zdedí lajky a komentáre
-pôvodného príspevku, kópia začína od nuly. Žiada sa v App Review ako *Ads
-Management Standard Access*. **Žiadosť je pripravená vrátane textu, ktorý
-tam treba vložiť** — [`meta-full-access-ziadost.md`](meta-full-access-ziadost.md).
-Chce 500 volaní za 15 dní pri chybovosti pod 15 %; appka ich má **82 pri
-chybovosti 4,9 %**, ale väčšina z testovania — bežný deň robí ~5, takže na 500
-sa dôjde len používaním. Zvažoval som denný cron, ktorý by ich zbieral, ale
-dal by ~150 za 15 dní: problém nerieši a autorizácia by si vyžiadala refaktor,
-tak som ho nestaval.
+**0 · Full Access: žiadosť je VYPLNENÁ, chýba len overenie firmy**
+Stav k 20. 8. 2026 podvečer: v App Review je rozpracovaná žiadosť o *Marketing
+API Access Tier* a všetky štyri kroky sú zelené — App settings (doplnená ikona),
+Allowed usage (zdôvodnenie + podmienka 500 volaní ukázala Completed), Data
+handling (spracovatelia Cloudflare a Anthropic, zodpovedný Mgr. Philip Jerry
+Stráňavský, ČR) aj Reviewer instructions (text + tvoja nahrávka
+kokpit-fullaccess-demo.mov). **Zostáva jediné: Business Verification** — v tej
+istej karte „Go to verification" → „Start verification" a nahrať doklad firmy
+(IČO/výpis). Keď Meta verifikáciu potvrdí (hodiny až dni), odomkne sa „Submit
+for review" a žiadosť odošleš jedným klikom. Dovtedy appka beží plnohodnotne
+záložnou cestou (kópia obsahu namiesto pravého boostu).
 
 **1 · NDA pri fotkách pred/po**
 Prejsť klientov, ktorých fotky sa už niekde použili, a skontrolovať súhlasy.
