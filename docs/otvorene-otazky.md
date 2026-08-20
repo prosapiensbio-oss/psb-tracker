@@ -101,7 +101,7 @@ Tabuľka je prázdna a čaká. Pri najbližšom tréningu: **+ Zápis** → meno
 
 ## E · Čo zostáva mne
 
-**Nič.** Stav k 20. 8. 2026, verzia 551 (revízia podľa docs/revizny-prompt.md — 6 nálezov, všetky opravené a nasadené; jediné, čo čaká na teba z nej, je oprava ks=1 pri jednej položke faktúry — sekcia D).
+**Nič.** Stav k 20. 8. 2026, verzia 551 (revízia podľa docs/revizny-prompt.md — 6 nálezov, všetky opravené a nasadené; aj ks=1 pri položke faktúry je po tvojom odklepnutí opravený v DB).
 
 ### Hotové z tohto zoznamu
 
