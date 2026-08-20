@@ -7,8 +7,9 @@ import { GuillermoKarta } from "./Kalendar";
 import { objednaneVerzia, monthlyFinance, predictCash, ZONE_HI, type CapacityRow, type ClientAgg, type RegisterItem, type SixMRow } from "../../lib/psb/compute";
 import { fmtCZK, fmtDMY, monthLabel } from "../../lib/psb/format";
 import { ObdobieCtx } from "../../lib/psb/obdobie";
-import { PRVY_MESIAC_Z_FIO, nastavPnlBunku, nastavPnlOverrides, nastavZmenyKategorii, vzasVerzia, premenujKategoriu, presunKategoriu, pridajKategoriu, skupinyPnl, zmenyKategoriiNaUlozenie, nastavPrijmyZTrackera, nastavVyplaty, pnlJeOpravena, pnlOverridesNaUlozenie, pnlPovodnaHodnota, poslednyMesiacSDatami, vyplatyNaUlozenie } from "../../lib/psb/vzas";
+import { PRVY_MESIAC_Z_FIO, nastavPnlBunku, nastavPnlOverrides, nastavZmenyKategorii, vzasVerzia, premenujKategoriu, presunKategoriu, pridajKategoriu, skupinyPnl, zmenyKategoriiNaUlozenie, nastavPrijmyZTrackera, nastavVyplaty, pnlHodnotaOpravy, pnlJeOpravena, pnlOverridesNaUlozenie, pnlPovodnaHodnota, poslednyMesiacSDatami, vyplatyNaUlozenie } from "../../lib/psb/vzas";
 import { rozpisPre, type PohybZaBunku } from "../../lib/psb/rozpis";
+import { breakEvenRad } from "../../lib/psb/rezerva";
 import { C, mix, S } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import type { NavFocus } from "./App";
@@ -49,6 +50,7 @@ import {
   monthKeyOf,
   pnlCalc,
   salaryCalc,
+  tempoDlhu,
   spolocneHalf,
   spolocneTotal,
   sumItems,
@@ -120,7 +122,9 @@ function useRange(initial = "2026") {
       return Array.from({ length: hi - lo + 1 }, (_, i) => lo + i);
     }
     return orez(ALL_IDX);
-  }, [win, from, to]);
+      // vzasVerzia(): poslednyMesiacSDatami číta model, ktorý plnia importy
+    // mimo Reactu — bez verzie sa okno nerozšírilo o nový mesiac do reloadu.
+  }, [win, from, to, vzasVerzia()]); // eslint-disable-line react-hooks/exhaustive-deps
   return { win, setWin, from, setFrom, to, setTo, idx };
 }
 type Range = ReturnType<typeof useRange>;
@@ -173,7 +177,7 @@ function MonthHead({ idx, first = "Položka", showAvg = true }: { idx: number[];
   );
 }
 
-function Row({ label, values, depth = 0, bold = false, color, children, showAvg = true, noteFor, bunka, onZmena }: {
+function Row({ label, values, depth = 0, bold = false, color, children, showAvg = true, noteFor, bunka, onZmena, kat, otvor = false, zvyraznit = false }: {
   label: ReactNode; values: Vals; depth?: number; bold?: boolean; color?: string; children?: ReactNode; showAvg?: boolean;
   // Per-cell hover text (what that purchase actually was), by column position.
   noteFor?: (col: number) => string | undefined;
@@ -181,8 +185,15 @@ function Row({ label, values, depth = 0, bold = false, color, children, showAvg 
   // pohyby, ktoré ho tvoria, a opraviť ho.
   bunka?: (col: number) => { kat: string; mesiac: string } | undefined;
   onZmena?: () => void;
+  /** Kľúč kategórie — kvôli preklikom z registra na konkrétny riadok. */
+  kat?: string;
+  /** Rozbaľ skupinu (klik z registra mieri na položku vnútri). */
+  otvor?: boolean;
+  /** Zvýrazni riadok — na chvíľu, aby oko našlo, kam ho klik doviedol. */
+  zvyraznit?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  useEffect(() => { if (otvor) setOpen(true); }, [otvor]);
   /** Ktorý stĺpec má práve rozbalenú poznámku. */
   const [poznamka, setPoznamka] = useState<number | null>(null);
   /** Ktorý stĺpec má rozkliknutý rozpis. */
@@ -192,7 +203,8 @@ function Row({ label, values, depth = 0, bold = false, color, children, showAvg 
   const cell = { textAlign: "right" as const, padding: "6px 10px", fontSize: fs, fontWeight: bold ? 600 : 400, fontVariantNumeric: "tabular-nums" as const, borderBottom: `1px solid ${mix(C.border, 55)}`, whiteSpace: "nowrap" as const };
   return (
     <>
-      <tr onClick={() => hasKids && setOpen(!open)} style={{ background: depth === 0 ? mix(C.accent, 7) : "transparent", cursor: hasKids ? "pointer" : "default" }}>
+      <tr id={kat ? `pnl-${kat}` : undefined} onClick={() => hasKids && setOpen(!open)}
+        style={{ background: zvyraznit ? mix(C.accent, 26) : depth === 0 ? mix(C.accent, 7) : "transparent", cursor: hasKids ? "pointer" : "default", transition: "background .4s" }}>
         <td style={{ padding: "6px 10px", paddingLeft: depth * 16 + 10, fontSize: fs, fontWeight: bold ? 600 : 400, color: C.text, whiteSpace: "nowrap", borderBottom: `1px solid ${mix(C.border, 55)}`, ...sticky(depth === 0 ? mix(C.accent, 7) : undefined) }}>
           <span style={{ display: "inline-block", width: 15, color: C.textDim, fontSize: 9 }}>{hasKids ? (open ? "▼" : "▶") : ""}</span>
           {label}
@@ -281,11 +293,23 @@ function BunkaDetail({ kat, mesiac, hodnota, onZavri, onZmena }: {
   const [text, setText] = useState(String(Math.round(hodnota)));
   const [uklada, setUklada] = useState(false);
 
+  const [chyba, setChyba] = useState(false);
   const uloz = async (nova: number | null) => {
     setUklada(true);
+    setChyba(false);
+    const predtym = pnlJeOpravena(kat, mesiac) ? pnlHodnotaOpravy(kat, mesiac) : null;
     nastavPnlBunku(kat, mesiac, nova);
-    await saveVzasSetting("pnl_overrides", pnlOverridesNaUlozenie());
+    const ok = await saveVzasSetting("pnl_overrides", pnlOverridesNaUlozenie());
     setUklada(false);
+    if (!ok) {
+      // Opravená bunka v P&L je ručne prepísané číslo — keď sa neuloží,
+      // obrazovka ho aj tak ukazuje a pri ďalšom otvorení je preč. Model sa
+      // vráti do stavu pred klikom a editor zostane otvorený.
+      nastavPnlBunku(kat, mesiac, predtym);
+      setChyba(true);
+      onZmena?.();
+      return;
+    }
     setUprava(false);
     onZmena?.();
   };
@@ -335,6 +359,7 @@ function BunkaDetail({ kat, mesiac, hodnota, onZavri, onZmena }: {
             {uklada ? "Ukladám…" : "Uložiť"}
           </button>
           <button onClick={() => setUprava(false)} style={{ background: "none", border: "none", color: C.textDim, fontSize: 11.5, cursor: "pointer" }}>zrušiť</button>
+          {chyba && <span style={{ color: C.red, fontSize: 11.5 }}>nezapísalo sa — číslo je späť, skús znova</span>}
         </div>
       )}
 
@@ -480,7 +505,8 @@ function HealthCard({ idx }: { idx: number[] }) {
   const p = pnlCalc();
   const j = salaryCalc("jerry");
   const t = salaryCalc("terezka");
-  const breakEven = MONTHS.map((_, i) => p.bezVyplat[i] + j.narok[i] + t.narok[i] + p.matyas[i]);
+  // Vzorec žije v rezerva.ts — jedna definícia (do 18. 8. štyri kópie).
+  const breakEven = breakEvenRad();
   const beSel = pick(breakEven, idx);
   const prijmySel = pick(p.prijmy, idx);
   const beAvg = avg(beSel);
@@ -603,10 +629,13 @@ function CommitmentTable({ idx }: { idx: number[] }) {
 function SpravaKategorii({ onZmena }: { onZmena: () => void }) {
   const [otvorene, setOtvorene] = useState(false);
   const [novy, setNovy] = useState({ skupina: "", label: "" });
-  const skupiny = useMemo(() => skupinyPnl(), []);
+  // vzasVerzia(): štruktúru P&L menia pridané/presunuté kategórie za behu.
+  const skupiny = useMemo(() => skupinyPnl(), [vzasVerzia()]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const [chybaKat, setChybaKat] = useState(false);
   const uloz = async () => {
-    await saveVzasSetting("pnl_kategorie", zmenyKategoriiNaUlozenie());
+    const ok = await saveVzasSetting("pnl_kategorie", zmenyKategoriiNaUlozenie());
+    setChybaKat(!ok);
     onZmena();
   };
 
@@ -656,8 +685,10 @@ function SpravaKategorii({ onZmena }: { onZmena: () => void }) {
             >
               Pridať
             </button>
-            <span style={{ fontSize: 11, color: C.textDim, flex: 1, minWidth: 210, lineHeight: 1.5 }}>
-              Nová položka začína na nule vo všetkých mesiacoch. Naplní sa importom z banky (keď jej priradíš pohyby) alebo klikom na číslo v tabuľke.
+            <span style={{ fontSize: 11, color: chybaKat ? C.red : C.textDim, flex: 1, minWidth: 210, lineHeight: 1.5 }}>
+              {chybaKat
+                ? "Zmena kategórií sa NEZAPÍSALA — po načítaní stránky bude preč. Skús znova."
+                : "Nová položka začína na nule vo všetkých mesiacoch. Naplní sa importom z banky (keď jej priradíš pohyby) alebo klikom na číslo v tabuľke."}
             </span>
           </div>
 
@@ -702,7 +733,7 @@ function SpravaKategorii({ onZmena }: { onZmena: () => void }) {
 }
 
 // ── VZAS 2026 (P&L) ──────────────────────────────────────────────────────────
-function PnlTab() {
+function PnlTab({ focus }: { focus?: { month?: string; kategoria?: string; nonce?: number } | null }) {
   // Opravy jednotlivých buniek žijú v databáze a zapisujú sa priamo do modelu.
   // `tik` je len na prekreslenie — čísla sedia v module, ktorý číta desať miest.
   const [, tik] = useState(0);
@@ -720,6 +751,29 @@ function PnlTab() {
   }, []);
   const p = pnlCalc();
   const r = useRange();
+  /**
+   * Preklik z notifikácie na KONKRÉTNY riadok.
+   *
+   * „Za júl nedorazil nájom" doviedol na P&L so štyridsiatimi riadkami a
+   * štrnástimi stĺpcami — správna obrazovka, ale hľadanie od začiatku.
+   * Kategória sa teraz rozbalí, zvýrazní a odroluje k nej (revízia 18. 8.).
+   */
+  const [zvyraznene, setZvyraznene] = useState<string | null>(null);
+  useEffect(() => {
+    if (!focus?.kategoria) return;
+    setZvyraznene(focus.kategoria);
+    // Mesiac musí byť vo zvolenom okne, inak je riadok síce nájdený, ale
+    // stĺpec s číslom nie je vidieť.
+    if (focus.month) {
+      const rok = focus.month.slice(0, 4);
+      if (r.win !== rok && YEAR_IDX[rok]) r.setWin(rok);
+    }
+    const t = setTimeout(() => {
+      document.getElementById(`pnl-${focus.kategoria}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 120);
+    const z = setTimeout(() => setZvyraznene(null), 4000);
+    return () => { clearTimeout(t); clearTimeout(z); };
+  }, [focus?.kategoria, focus?.month, focus?.nonce]); // eslint-disable-line react-hooks/exhaustive-deps
   const [mode, setMode] = useState<"avg" | "sum">("avg"); // default: priemer
   const [lens, setLens] = useState<"fixvar" | "zavaznost">("fixvar");
   const i = r.idx;
@@ -773,9 +827,12 @@ function PnlTab() {
             <tbody>
               <Divider label="Fixné náklady" span={i.length + 3} />
               {Object.entries(PNL.fixne.subcategories).map(([k, g]) => (
-                <Row key={k} label={g.label} values={pick(sumItems(g.items), i)}>
+                <Row key={k} label={g.label} values={pick(sumItems(g.items), i)}
+                  otvor={!!zvyraznene && zvyraznene.startsWith(`fixne.${k}.`)}>
                   {Object.entries(g.items).map(([ik, it]) => (
                     <Row key={ik} label={it.label} values={pick(it.values, i)} depth={1}
+                      kat={`fixne.${k}.${ik}`}
+                      zvyraznit={zvyraznene === `fixne.${k}.${ik}`}
                       noteFor={(col) => itemNote(`fixne.${k}.${ik}`, i[col])}
                       bunka={(col) => ({ kat: `fixne.${k}.${ik}`, mesiac: VZAS_MONTHS[i[col]] })}
                       onZmena={() => tik((x) => x + 1)} />
@@ -786,9 +843,12 @@ function PnlTab() {
 
               <Divider label="Variabilné náklady" span={i.length + 3} />
               {Object.entries(PNL.variabilne.subcategories).map(([k, g]) => (
-                <Row key={k} label={g.label} values={pick(sumItems(g.items), i)}>
+                <Row key={k} label={g.label} values={pick(sumItems(g.items), i)}
+                  otvor={!!zvyraznene && zvyraznene.startsWith(`variabilne.${k}.`)}>
                   {Object.entries(g.items).map(([ik, it]) => (
                     <Row key={ik} label={it.label} values={pick(it.values, i)} depth={1}
+                      kat={`variabilne.${k}.${ik}`}
+                      zvyraznit={zvyraznene === `variabilne.${k}.${ik}`}
                       noteFor={(col) => itemNote(`variabilne.${k}.${ik}`, i[col])}
                       bunka={(col) => ({ kat: `variabilne.${k}.${ik}`, mesiac: VZAS_MONTHS[i[col]] })}
                       onZmena={() => tik((x) => x + 1)} />
@@ -878,18 +938,23 @@ function PersonCard({ pk, idx, onZmena }: { pk: PersonKey; idx: number[]; onZmen
     delete s.personal[kat];
     onZmena?.();
   };
+  const [chybaVyplat, setChybaVyplat] = useState(false);
   const uloz = async () => {
     setUkladam(true);
-    await saveVzasSetting("salary_personal", vyplatyNaUlozenie());
+    const ok = await saveVzasSetting("salary_personal", vyplatyNaUlozenie());
     setUkladam(false);
-    setUprava(false);
+    setChybaVyplat(!ok);
+    // Editor zostáva otvorený, kým zápis neprejde — výplaty určujú nárok
+    // aj dlh, takže „uložené" na neuloženom čísle je drahá lož.
+    if (ok) setUprava(false);
   };
   const vratPovodne = async () => {
     setUkladam(true);
     nastavVyplaty(undefined);
-    await saveVzasSetting("salary_personal", null);
+    const ok = await saveVzasSetting("salary_personal", null);
     setUkladam(false);
-    setUprava(false);
+    setChybaVyplat(!ok);
+    if (ok) setUprava(false);
     onZmena?.();
   };
   const konecny = c.cumDebt[c.cumDebt.length - 1];
@@ -1040,6 +1105,7 @@ function PersonCard({ pk, idx, onZmena }: { pk: PersonKey; idx: number[]; onZmen
                             style={{ border: "none", borderRadius: 7, background: C.accent, color: C.onAccent, fontSize: 11.5, fontWeight: 600, padding: "5px 13px", cursor: ukladam ? "default" : "pointer", opacity: ukladam ? 0.5 : 1 }}>
                             {ukladam ? "ukladám…" : "Uložiť"}
                           </button>
+                          {chybaVyplat && <span style={{ color: C.red, fontSize: 11 }}>nezapísalo sa</span>}
                           <button onClick={() => void vratPovodne()} disabled={ukladam}
                             style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 7, color: C.textDim, fontSize: 11.5, padding: "4px 11px", cursor: "pointer" }}>
                             Vrátiť pôvodné z Excelu
@@ -1188,8 +1254,8 @@ function DebtTrendCard({ idx }: { idx: number[] }) {
   const people = (["jerry", "terezka"] as const).map((k) => {
     const c = salaryCalc(k);
     const use = modelIdx.length ? modelIdx : idx;
-    const sel = pick(c.rozdiel, use);
-    const slope = avg(sel); // + = debt shrinking, − = growing
+    // Jedna definícia tempa (vzas.ts) — Jarvis číta to isté cez rovnaké okno.
+    const slope = tempoDlhu(k, idx).tempo; // + = debt shrinking, − = growing
     const dlh = c.cumDebt[c.cumDebt.length - 1];
     const narokAvg = avg(pick(c.narok, use));
     const poslaneAvg = avg(pick(c.poslane, use));
@@ -1664,11 +1730,16 @@ function KamOdisliCard() {
 
   const cislo = (t: string) => Math.round(Number(t.replace(/\s/g, "").replace(",", ".")) || 0);
 
+  // Z týchto dvoch čísel žije rezerva — dlaždica na Kokpite aj Jarvis. Tichý
+  // neúspech tu znamená, že runway sa počíta zo starého zostatku a nikto to
+  // nevie; preto sa výsledok číta a neúspech vracia obrazovku späť.
   const ulozHotovost = async () => {
+    const predtym = stav;
     const v: StavPenazi = { hotovost: cislo(hotTxt), datum: new Date().toISOString().slice(0, 10) };
     setStav(v);
     setUprava("");
-    await saveVzasSetting("stav_penazi", v);
+    const ok = await saveVzasSetting("stav_penazi", v);
+    if (!ok) { setStav(predtym); setUprava("hotovost"); }
   };
 
   // Účet sa dopĺňa sám z hlavičky výpisu, ale len pri BUDÚCICH importoch —
@@ -1676,6 +1747,7 @@ function KamOdisliCard() {
   // človek nemusel čakať na ďalší mesiac, dá sa zostatok opísať aj ručne;
   // najbližší import ho prepíše číslom od banky.
   const ulozUcet = async () => {
+    const predtym = fio;
     const v: FioZostatok = {
       suma: cislo(fioTxt),
       datum: fioDatum || new Date().toISOString().slice(0, 10),
@@ -1683,7 +1755,8 @@ function KamOdisliCard() {
     };
     setFio(v);
     setUprava("");
-    await saveVzasSetting("fio_zostatok", v);
+    const ok = await saveVzasSetting("fio_zostatok", v);
+    if (!ok) { setFio(predtym); setUprava("ucet"); }
   };
 
   const btc = res?.czk ?? 0;
@@ -1800,10 +1873,9 @@ function ReserveCard({ idx }: { idx: number[] }) {
   const [stav, setStav] = useState<"load" | "ok" | "err">("load");
   useEffect(() => { fetchBtcReserve().then((r) => { setRes(r); setStav(r ? "ok" : "err"); }); }, []);
 
-  const p = pnlCalc();
-  const j = salaryCalc("jerry");
-  const t = salaryCalc("terezka");
-  const beMes = idx.length ? idx.reduce((a, i) => a + p.bezVyplat[i] + j.narok[i] + t.narok[i] + p.matyas[i], 0) / idx.length : 0;
+  // Vzorec žije vo vzas.ts (breakEvenRad) — jedna definícia pre celú appku.
+  const beRad = breakEvenRad();
+  const beMes = idx.length ? idx.reduce((a, i) => a + beRad[i], 0) / idx.length : 0;
   const czk = res?.czk ?? 0;
   const mesiace = beMes > 0 ? czk / beMes : 0;
   const goalPct = res?.goalSats ? (res.sats / res.goalSats) * 100 : null;
@@ -2834,9 +2906,20 @@ function CieleTab({ data }: { data: PSBData }) {
     });
   }, []);
 
+  const [chybaCiela, setChybaCiela] = useState(false);
+  /**
+   * Ciele sú najväčší JSON kľúč v nastaveniach a server nad 20 kB vracia 413.
+   * Tichý neúspech tu znamená stratiť celý zoznam cieľov (revízia 18. 8.).
+   */
   const persist = (next: Goal[]) => {
+    const predtym = ciele;
     setCiele(next);
-    saveVzasSetting("ciele", next);
+    setChybaCiela(false);
+    void saveVzasSetting("ciele", next).then((ok) => {
+      if (ok) return;
+      setCiele(predtym);
+      setChybaCiela(true);
+    });
   };
   const update = (id: string, patch: Partial<Goal>) =>
     persist(ciele.map((g) => (g.id === id ? { ...g, ...patch } : g)));
@@ -2900,6 +2983,12 @@ function CieleTab({ data }: { data: PSBData }) {
           {poTermine > 0 && <> · po termíne <b style={{ color: C.red }}>{poTermine}</b></>}
           {!loaded && <span style={{ color: C.textDim }}> · načítavam…</span>}
         </div>
+        {chybaCiela && (
+          <div style={{ marginTop: 8, fontSize: 12.5, color: C.red }}>
+            Zmena sa NEZAPÍSALA — zoznam je späť v pôvodnom stave. Keď sa to opakuje, cieľov je priveľa
+            na jeden zápis (server má strop 20 kB) a treba niektoré staré zavrieť.
+          </div>
+        )}
       </Card>
 
       {zoradene.map((g) => {
@@ -3052,11 +3141,11 @@ export function Vzas({ sub, onSub, data, clients, focus, onNavigate }: { sub: st
             aby sa dali oboje porovnať. Jednotlivé pohyby za mesiace z banky nájdeš nižšie
             v <b style={{ color: C.textMuted }}>Zapísané pohyby</b>, kde sa dá prehodiť kategória aj dopísať poznámka.
           </div>
-          <PnlTab />
+          <PnlTab focus={focus} />
           {/* Pohyby patria k P&L: sú to riadky, z ktorých sú tie súčty poskladané.
               V Údajoch boli schované za rozbaľovačom a nedali sa nájsť. */}
           <div style={{ marginTop: 14 }}>
-            <BankaUlozene />
+            <BankaUlozene focus={focus} />
           </div>
         </>
       )}
@@ -3065,7 +3154,7 @@ export function Vzas({ sub, onSub, data, clients, focus, onNavigate }: { sub: st
           <SalaryTab />
           {/* Aj tu: výplaty sú riadky v banke, nie abstraktné číslo. */}
           <div style={{ marginTop: 14 }}>
-            <BankaUlozene />
+            <BankaUlozene focus={focus} />
           </div>
         </>
       )}

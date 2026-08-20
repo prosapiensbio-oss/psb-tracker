@@ -105,7 +105,12 @@ export function parseFaktura(riadky: PdfRiadok[]): Faktura | null {
     const kod = medzera > 0 && medzera <= 10 ? hlava.slice(0, medzera) : "";
     const nazov = (medzera > 0 && medzera <= 10 ? hlava.slice(medzera + 1) : hlava).trim();
     if (!nazov) continue;
-    polozky.push({ kod, nazov, ks: Number(m[1]) || 1, cena: cislo(m[6]), kategoria: "" });
+    // ks nad 100 na maloobchodnej faktúre je takmer isto zle prečítaný chvost
+    // (20. 8. 2026: chladiaca podložka dostala ks 25 531). Peniaze to nekazí —
+    // cena je celá suma riadku — ale číslo je nezmysel a Jarvis by ho mohol
+    // násobiť. Radšej 1 než lož s piatimi číslicami.
+    const ksRaw = Number(m[1]) || 1;
+    polozky.push({ kod, nazov, ks: ksRaw > 100 ? 1 : ksRaw, cena: cislo(m[6]), kategoria: "" });
   }
 
   if (!polozky.length) return null;

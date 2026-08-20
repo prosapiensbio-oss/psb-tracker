@@ -123,3 +123,20 @@ describe("zoznam konverzácií", () => {
     expect(patriDoZoznamu(undefined, "marketing")).toBe(false);
   });
 });
+
+describe("zameranie Kampaň", () => {
+  const z = ZAMERANIA.find((x) => x.id === "kampan");
+
+  test("existuje a má vlastnú rolu", () => {
+    expect(z).toBeDefined();
+    expect(z?.rola).toBe("Ten, kto pripravuje reklamu");
+  });
+
+  test("brief nesie tri veci, ktoré nesmú vypadnúť", () => {
+    // Účet, pozastavený stav a tvar tokenu. Bez ktoréhokoľvek z nich je
+    // z toho debata, ktorá skončí kampaňou v zlom účte alebo bežiacou.
+    expect(z?.brief).toContain("172897726151288");
+    expect(z?.brief).toContain("pozastavená");
+    expect(z?.brief).toContain("⟦kampan|");
+  });
+});

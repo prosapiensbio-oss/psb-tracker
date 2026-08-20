@@ -115,7 +115,7 @@ HOTOVÉ VETY, KTORÉ SA DAJÚ POUŽIŤ
 
 **Pri každom texte:**
 
-1. V Kokpite → Marketing → Reels & posty → karta **Čo publikovať ďalej** klikni
+1. V Kokpite → Marketing → **Čo publikovať** → karta **Čo publikovať ďalej** klikni
    pri návrhu na **Zadanie →**. Prepne ťa to do Jarvisovho okna a ten zadanie
    vyrobí v tomto tvare — aj s overením, či čísla naozaj sedia.
 2. Zadanie skopíruj (tlačidlo **kopírovať** pod odpoveďou) a vlož do Projectu.
@@ -132,7 +132,8 @@ znova. To je celý dôvod, prečo je kánon jeden súbor a nie dva zoznamy.
 
 ## Kruh sa uzatvára v Kokpite
 
-Keď z textu vznikne príspevok, patrí to späť: v Marketing → Reels & posty sa
-nápad označí ako **použitý**. Bez toho Kokpit nikdy nezistí, či témy z dát
+Keď z textu vznikne príspevok, patrí to späť: v Marketing → Čo publikovať sa
+nápad označí ako **použitý** a vloží sa odkaz na hotový príspevok (18. 8. 2026
+pribudlo pole naň). Bez toho Kokpit nikdy nezistí, či témy z dát
 fungujú lepšie než témy z hlavy — a karta „Čo publikovať ďalej" zostane vierou,
 nie meraním.

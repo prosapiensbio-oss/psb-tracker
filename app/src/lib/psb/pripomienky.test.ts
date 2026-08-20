@@ -15,6 +15,19 @@ describe("SMS po úvodnom", () => {
     expect(x.acked).toBe(false);
   });
 
+  it("patrí tomu, v koho kalendári tá hodina stojí", () => {
+    // Jerry, 17. 8. 2026: „komu patrí nový klient po úvodnom, je ten, v koho
+    // kalendári je tá udalosť." Odvodiť to z klienta nejde — človek po úvodnom
+    // ešte klientom nie je, meno sa nenájde a pripomienka spadne obom.
+    // Jerry tak s filtrom na seba videl SMS pre Terezkinu Janu Malinovú.
+    const [x] = pripomienkySlubov(
+      [{ ...u("2026-08-17T16:00:00Z", null), nazov: "Uvodný tréning Jana Malinová", trener: "Terezka" }],
+      [], {}, DNES,
+    );
+    expect(x.trener).toBe("Terezka");
+    expect(x.oKom).toBe("Jana Malinová");
+  });
+
   it("budúci úvodný sa nepripomína — ešte sa nekonal", () => {
     expect(pripomienkySlubov([u("2026-08-25T10:00:00Z", "Kto")], [], {}, DNES)).toHaveLength(0);
   });
@@ -38,6 +51,21 @@ describe("SMS po úvodnom", () => {
     expect(x.acked).toBe(true);
     expect(x.note).toBe("SMS poslaná");
   });
+
+  it("odložená pripomienka sa po termíne vráti medzi živé", () => {
+    // Do 17. 8. 2026 tu bol vlastný výpočet stavu, ktorý o odložení nevedel:
+    // „Odložiť o týždeň" pri SMS znamenalo navždy. Tlačidlo pritom svietilo.
+    const ack = { "sms|2026-08-11|Kto": { note: "odlozene|2026-08-14|este som nestihol" } };
+    const [x] = pripomienkySlubov([u("2026-08-11T10:00:00Z", "Kto")], [], ack, DNES);
+    expect(x.acked).toBe(false);
+    expect(x.note).toContain("este som nestihol");
+  });
+
+  it("odloženie do budúcnosti pripomienku drží skrytú", () => {
+    const ack = { "sms|2026-08-11|Kto": { note: "odlozene|2026-08-20|" } };
+    const [x] = pripomienkySlubov([u("2026-08-11T10:00:00Z", "Kto")], [], ack, DNES);
+    expect(x.acked).toBe(true);
+  });
 });
 
 describe("odporúčanie bez mena odporúčateľa", () => {
@@ -52,6 +80,8 @@ describe("odporúčanie bez mena odporúčateľa", () => {
     const [x] = pripomienkySlubov([], [l("2026-08-04", "Dan", "referencia")], {}, DNES);
     expect(x.title).toContain("bez mena");
     expect(x.detail).toContain("Dopíš");
+    // Bez mena: tento dopyt už existuje, treba ho UPRAVIŤ — predvyplniť rýchly
+    // zápis by viedlo k druhému záznamu o tom istom človeku.
     expect(x.client).toBe("marketing|dopyty");
   });
 
@@ -80,7 +110,8 @@ describe("úvodný bez dopytu", () => {
       .filter((i) => i.key.startsWith("bezdopytu|"));
     expect(x.title).toContain("Úvodný bez dopytu");
     expect(x.detail).toContain("odkiaľ prišiel");
-    expect(x.client).toBe("marketing|dopyty");
+    // Cieľ nesie aj meno — Dopyty ho predvyplnia do rýchleho zápisu.
+    expect(x.client).toBe("marketing|dopyty|Zuzana Spoligova");
   });
 
   it("keď dopyt existuje, mlčí — aj pri inak písanom mene", () => {

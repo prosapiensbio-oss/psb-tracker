@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { fmtCZK, fmtDMY } from "../../lib/psb/format";
+import { nazovKategorie } from "../../lib/psb/vzas";
 import { C, mix, S } from "../../lib/psb/theme";
 import { kategorieZoznam } from "./Banka";
 import { VyberKategorie } from "./VyberKategorie";
@@ -20,7 +21,7 @@ import { Card, Empty, H3, Info, TableWrap } from "./ui";
 type Pohyb = { datum: string; suma: number; protistrana: string; poznamka: string; typ: string; kategoria: string; kluc: string };
 type Pravidlo = { vzor: string; kategoria: string };
 
-export function BankaUlozene() {
+export function BankaUlozene({ focus }: { focus?: { month?: string; kategoria?: string; nonce?: number } | null } = {}) {
   const [pohyby, setPohyby] = useState<Pohyb[]>([]);
   const [pravidla, setPravidla] = useState<Pravidlo[]>([]);
   const [nacitane, setNacitane] = useState(false);
@@ -31,6 +32,8 @@ export function BankaUlozene() {
   // Filter mesiaca. Pri sedemsto pohyboch je "ukáž mi júl" najčastejšia otázka
   // vôbec — bez neho sa musí scrollovať cez pol roka.
   const [mesiac, setMesiac] = useState("");
+  /** Kategória z prekliku — „ukáž mi tie dva pohyby, ktoré sa zdvojili". */
+  const [ibaKat, setIbaKat] = useState("");
   const [busy, setBusy] = useState(false);
   const [sprava, setSprava] = useState("");
   const KAT = useMemo(kategorieZoznam, []);
@@ -50,6 +53,7 @@ export function BankaUlozene() {
   const mesiace = [...new Set(pohyby.map((p) => String(p.datum).slice(0, 7)))].sort().reverse();
   const viditelne = pohyby.filter((p) => {
     if (mesiac && String(p.datum).slice(0, 7) !== mesiac) return false;
+    if (ibaKat && p.kategoria !== ibaKat) return false;
     if (filter === "nezaradene" && p.kategoria) return false;
     if (filter === "vyplaty" && !p.kategoria.startsWith("vyplaty")) return false;
     if (hladat.trim()) {
@@ -89,6 +93,20 @@ export function BankaUlozene() {
     });
   };
 
+  /**
+   * Preklik z notifikácie o dvojitom zápise alebo nezhode príjmov.
+   *
+   * Karta je zabalená a pri sedemsto pohyboch je „nájdi tie dva z júla"
+   * práca na minútu. S cieľom sa otvorí, nafiltruje na mesiac a kategóriu
+   * a človek vidí presne tie riadky, o ktorých upozornenie hovorí.
+   */
+  useEffect(() => {
+    if (!focus?.month && !focus?.kategoria) return;
+    setOtvorene(true);
+    if (focus.month) setMesiac(focus.month);
+    setIbaKat(focus.kategoria || "");
+  }, [focus?.month, focus?.kategoria, focus?.nonce]);
+
   const nezaradenych = pohyby.filter((p) => !p.kategoria).length;
   if (!nacitane || !pohyby.length) return null;
 
@@ -105,6 +123,12 @@ export function BankaUlozene() {
       {otvorene && (
         <div style={{ marginTop: 12 }}>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10, alignItems: "center" }}>
+            {ibaKat && (
+              <button onClick={() => setIbaKat("")}
+                style={{ padding: "5px 10px", borderRadius: 7, border: `1px solid ${C.accent}`, background: C.accentBg, color: C.accentLight, fontSize: 12, cursor: "pointer" }}>
+                len {nazovKategorie(ibaKat)} ✕
+              </button>
+            )}
             {([["vsetko", `Všetko (${pohyby.length})`], ["nezaradene", `Bez kategórie (${nezaradenych})`], ["vyplaty", `Výplaty (${pohyby.filter((p) => p.kategoria.startsWith("vyplaty")).length})`]] as const).map(([id, lbl]) => (
               <button key={id} onClick={() => setFilter(id)}
                 style={{ padding: "5px 12px", borderRadius: 8, fontSize: 12, cursor: "pointer",

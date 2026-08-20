@@ -252,8 +252,16 @@ function Prezitie({ zoznam, onSkupina }: { zoznam: Klient[]; onSkupina?: (label:
 
   // Kohorta stará dva mesiace nemôže mať nikoho, kto vydržal tri — a „0 · 0 %"
   // by to ukázalo ako zlyhanie. Kým míľnik neprešiel, je tam pomlčka.
+  // Vek kohorty sa meria od KONCA DÁT, nie od dneška — presne ako _zivot,
+  // z ktorého sa m3/m6/m12 počítajú. Keď sa export týždeň nenahrá, kalendár
+  // míľnik prekročí skôr než dáta a bunka by ukázala „0 · 0 %" pre kohortu,
+  // ktorej tri mesiace v dátach ešte neprešli.
+  const koniecDat = useMemo(
+    () => zoznam.reduce((m, c) => Math.max(m, Date.parse(c.lastSession || "") || 0), 0) || Date.now(),
+    [zoznam],
+  );
   const bunka = (n: number, z: number, mk: string, mesiacov: number) => {
-    const vek = (Date.now() - Date.parse(`${mk}-01`)) / (30.4 * DEN);
+    const vek = (koniecDat - Date.parse(`${mk}-01`)) / (30.4 * DEN);
     if (vek < mesiacov) return "—";
     return z ? `${n} · ${Math.round((n / z) * 100)} %` : "—";
   };
@@ -429,10 +437,13 @@ function DovodyOdchodu({ mesiac, mena, clients }: { mesiac: string; mena: string
     const n = await fetchMonthNotes();
     const doterajsie = n[mesiac]?.answers || {};
     const nove = { ...doterajsie, [k]: text };
-    await saveMonthNote(mesiac, n[mesiac]?.note || "", nove, "jerry");
+    const ok = await saveMonthNote(mesiac, n[mesiac]?.note || "", nove, "jerry");
+    setUklada("");
+    // Dôvod odchodu je veta z hlavy — pri neúspechu zostáva v poli,
+    // nie vymazaná s tvárou, že je uložená.
+    if (!ok) return;
     setOdpovede(nove);
     setPisem({ ...pisem, [meno]: "" });
-    setUklada("");
   };
 
   return (

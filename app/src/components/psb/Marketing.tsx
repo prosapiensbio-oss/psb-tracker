@@ -15,27 +15,24 @@ import {
   MKT_TOP,
   mktSum,
   MKT_ZDROJ,
-  nastavMarketingZImportu,
   GADS_DOPYTY,
   GADS_KAMPANE,
   GADS_VALUTA,
-  nastavAdsZImportu,
-  nastavWebStranky, nastavWebRychlost,
   type GadsDopyt,
   type WebStrankaUI,
   type GadsKampan,
-  nastavWebZImportu,
   type Ga4Mesiac,
   type GscDopyt,
   type GscMesiac,
   type GscStrana,
   type MktKus,
   type MktMesiac,
+  obsahRiadky,
+  marketingVerzia,
 } from "../../lib/psb/marketing";
-import { KATEGORIE_HOOKOV, MKT_OBSAH } from "../../lib/psb/marketing-obsah";
+import { KATEGORIE_HOOKOV } from "../../lib/psb/marketing-obsah";
 import { OBDOBIA, OBDOBIA_MESACNE, mesiaceVOkne, obdobieLabel } from "../../lib/psb/obdobia";
 import { Dopyty } from "./Dopyty";
-import { Kampane } from "./Kampane";
 import { MarketingVrch } from "./MarketingVrch";
 import { ObsahZive } from "./ObsahZive";
 import { ObsahDopyt } from "./ObsahDopyt";
@@ -44,7 +41,9 @@ import { Zadanie } from "./Zadanie";
 import { PlanObsahu } from "./PlanObsahu";
 import { Napady } from "./Napady";
 import { KedyPublikovat } from "./KedyPublikovat";
-import { AkoMeratReklamu, Kohorta, Lievik, Naklady } from "./MarketingLievik";
+import { AkoMeratReklamu, Kohorta, Lievik } from "./MarketingLievik";
+import { PripravitKampan } from "./KampanForm";
+import { Reklama } from "./Reklama";
 import { Kanaly } from "./Kanaly";
 import { chybyNaStrankach, prilezitostiTitulkov } from "../../lib/psb/webObsah";
 import { hodnotenie, type PsRiadok } from "../../lib/psb/pagespeed";
@@ -55,7 +54,7 @@ import { C, mix, S } from "../../lib/psb/theme";
 import type { AssistantChat } from "./Assistant";
 import type { ClientAgg } from "../../lib/psb/compute";
 import type { Lead, PSBData } from "../../lib/psb/types";
-import { Card, Empty, FilterObdobia, H3, Info, Select, StatCard, SubTabs, ValueBars, useRolovanie } from "./ui";
+import { Card, Empty, FilterObdobia, H3, Hlasenie, Info, OdkazStranky, Select, StatCard, SubTabs, ValueBars, useRolovanie } from "./ui";
 
 // Marketing — skeleton. Four questions in the order Jerry asked them: what did I
 // try, what worked, what did it cost, and what should I try next. The section
@@ -124,6 +123,16 @@ function Vysvetli({ chat, titul, filter, vyrez }: { chat?: AssistantChat; titul:
 // tri kópie s rôznymi hodnotami a „posledných 6 mesiacov" znamenalo na každej
 // karte niečo iné.
 const oknoMesiacov = mesiaceVOkne;
+
+/**
+ * Skrývanie hlásení putuje z Appky, lebo zapisuje do `anomaly_ack` — tej
+ * istej tabuľky, z ktorej žije register. Karty ho len podávajú ďalej.
+ */
+type SkrytieProps = {
+  ack?: Record<string, { ackedAt?: string }>;
+  onSkry?: (kluc: string) => void;
+  onVrat?: (kluc: string) => void;
+};
 
 // Karty tu čítajú mesačné série, takže „posledných 30 dní" v ponuke nie je —
 // viď OBDOBIA_MESACNE v lib/psb/obdobia.ts.
@@ -349,10 +358,13 @@ function CoSomRobil({ chat }: { chat?: AssistantChat }) {
 // v tejto appke len číslo.
 const BENCHMARK: { metrika: string; nase: (r: (typeof MKT_MESACNE)[0][]) => number; norma: number; jednotka?: string; vyssieLepsie?: boolean; poznamka: string }[] = [
   {
-    metrika: "Videnia na reel", norma: 580, poznamka: "priemer účtov 1–5 tis. sledovateľov",
+    // Nadpis hovoril „na reel", menovateľ delil reelmi AJ postami — číslo bolo
+    // o tretinu nižšie a riadok svietil oranžovo pri hodnote nad normou.
+    // `views` v zostave sú videnia všetkého obsahu, tak nech to hovorí nadpis.
+    metrika: "Videnia na príspevok (reel + post)", norma: 580, poznamka: "norma je priemer NA REEL pri účtoch 1–5 tis. — naše číslo je prísnejšie, deli sa všetkým obsahom",
     nase: (rs) => {
-      const reels = rs.reduce((a, r) => a + r.reels, 0);
-      return reels ? Math.round(rs.reduce((a, r) => a + r.views, 0) / Math.max(1, reels + rs.reduce((a, r) => a + r.posty, 0)) ) : 0;
+      const kusov = rs.reduce((a, r) => a + r.reels + r.posty, 0);
+      return kusov ? Math.round(rs.reduce((a, r) => a + r.views, 0) / kusov) : 0;
     },
   },
   {
@@ -379,12 +391,22 @@ const BENCHMARK: { metrika: string; nase: (r: (typeof MKT_MESACNE)[0][]) => numb
 ];
 
 function Benchmark() {
-  const rs = MKT_MESACNE.slice(-3);
+  // Neúplný mesiac (nahratá len časť príspevkov) je DOLNÁ hranica, nie
+  // výsledok — z takého čísla sa nesmie čítať prepad. Jarvisov kontext tú
+  // značku rešpektuje od začiatku, benchmark nie (revízia 18. 8. 2026).
+  const uplne = MKT_MESACNE.filter((r) => !r.neuplny);
+  const rs = uplne.slice(-3);
+  const vynechane = MKT_MESACNE.slice(-3).filter((r) => r.neuplny).map((r) => r.m);
   if (!rs.length) return null;
   return (
     <div style={{ marginTop: 14 }}>
       <div style={{ fontSize: 12, fontWeight: 600, color: C.textMuted, marginBottom: 8 }}>
-        Posledné 3 mesiace oproti benchmarku
+        Posledné 3 úplné mesiace oproti benchmarku
+        {vynechane.length > 0 && (
+          <span style={{ fontWeight: 400, color: C.textDim }}>
+            {" "}· vynechané {vynechane.join(", ")} (nahratá len časť príspevkov)
+          </span>
+        )}
       </div>
       {BENCHMARK.map((b) => {
         const v = b.nase(rs);
@@ -419,7 +441,10 @@ function Benchmark() {
 // má dosť dát na záver a ktorá nie.
 function PodlaHooku({ okno }: { okno: string[] }) {
   const data = useMemo(() => {
-    const vyber = MKT_OBSAH.filter((r) => okno.includes(r.m));
+    // `obsahRiadky()` — živá tabuľka z Meta API, statický súbor len ako
+    // história. Predtým tu bol natvrdo MKT_OBSAH a Jarvis čítal živé dáta:
+    // zhoda 62 %, teda iné poradie hookov na tú istú otázku (18. 8. 2026).
+    const vyber = obsahRiadky().filter((r) => okno.includes(r.m));
     const map = new Map<string, { k: string; f: string; n: number; u: number; v: number; z: number; vr: number[] }>();
     for (const r of vyber) {
       const key = `${r.k}|${r.f}`;
@@ -480,69 +505,6 @@ function PodlaHooku({ okno }: { okno: string[] }) {
 // ── Čo fungovalo ─────────────────────────────────────────────────────────────
 
 // ── Čo to prinieslo ──────────────────────────────────────────────────────────
-function CoToPrinieslo({ data, clients, leads, chat }: { data: PSBData; clients: Record<string, ClientAgg>; leads: Lead[]; chat?: AssistantChat }) {
-  // Vlastný rok: globálny prepínač žil v hlavičke, ktorá sa zobrazuje len v
-  // Dosahu — z lievika, kde táto karta reálne je, sa rok nedal zmeniť vôbec.
-  const [rok, setRok] = useState("2026");
-  const uvodne = useMemo(
-    () => data.sessions.filter((s) => s.sessionType === "UVODNE" && s.date.slice(0, 4) === rok).length,
-    [data.sessions, rok],
-  );
-  const spend = MKT_MESACNE.filter((r) => r.m.startsWith(rok)).reduce((a, r) => a + r.spend, 0);
-  const cac = uvodne > 0 ? spend / uvodne : 0;
-  // LTV: what a settled client pays over the whole relationship.
-  const ltv = useMemo(() => {
-    const g = Object.values(clients).filter((c) => c.sessionCount >= 3);
-    return g.length ? g.reduce((a, c) => a + c.totalPrice, 0) / g.length : 0;
-  }, [clients]);
-
-  const vyrez = () =>
-    [`Rok ${rok}`, `Reklama spolu: ${Math.round(spend)} Kč`, `Úvodné tréningy: ${uvodne}`,
-      `Cena za úvodný (horný odhad): ${Math.round(cac)} Kč`, `Hodnota klienta (LTV, ≥3 sedenia): ${Math.round(ltv)} Kč`,
-      `Dopytov v lieviku: ${leads.length}`].join("\n");
-  return (
-    <Card>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-      <H3><Info text="Instagram nikdy nepovie, kto sa stal klientom. Preto sa tu porovnávajú len dve veci, ktoré vieme: koľko stála reklama a koľko úvodných tréningov reálne prišlo. Skutočnú odpoveď „odkiaľ“ dá až lievik dopytov." label="Čo to prinieslo" /></H3>
-      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-        {["2025", "2026"].map((y) => (
-          <button key={y} onClick={() => setRok(y)}
-            style={{ padding: "5px 12px", borderRadius: 7, border: `1px solid ${rok === y ? C.accent : C.border}`, background: rok === y ? C.accentBg : "transparent", color: rok === y ? C.accentLight : C.textMuted, fontSize: 12, cursor: "pointer" }}>
-            {y}
-          </button>
-        ))}
-        <Vysvetli chat={chat} titul="Čo to prinieslo" filter={`rok ${rok}`} vyrez={vyrez} />
-      </div>
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 12, margin: "12px 0 4px" }}>
-        <StatCard value={fmtCZK(spend)} label={`Reklama ${rok}`} color={C.orange} />
-        <StatCard value={String(uvodne)} label={`Úvodné tréningy ${rok}`} color={C.accent} />
-        <StatCard value={fmtCZK(cac)} label={<Info text="Reklama delená počtom úvodných tréningov. Je to horný odhad: väčšina ľudí prišla cez referencie, nie cez reklamu — takže reálna cena za klienta z reklamy je vyššia, ale aj tak rádovo pod hodnotou klienta." label="Cena za úvodný (max)" />} color={C.blue} />
-        <StatCard value={fmtCZK(ltv)} label={<Info text="Priemer za klientov s aspoň 3 sedeniami, za celú históriu." label="Hodnota klienta (LTV)" />} color={C.green} />
-      </div>
-      <div style={{ padding: "10px 14px", borderRadius: 10, background: mix(C.blue, 10), border: `1px solid ${mix(C.blue, 30)}`, fontSize: 12.5, color: C.text, lineHeight: 1.55, marginTop: 8 }}>
-        Aj keby <b>všetky</b> úvodné tréningy prišli z reklamy, získanie jedného by stálo {fmtCZK(cac)} proti hodnote klienta {fmtCZK(ltv)}.
-        Neprišli — prišli cez referencie. Ale práve preto máš priestor minúť násobne viac, než míňaš dnes.
-      </div>
-      <div style={{ marginTop: 12 }}>
-        {leads.length > 0 ? (
-          <div style={{ fontSize: 12.5, color: C.textMuted }}>Dopytov v lieviku: <b style={{ color: C.text }}>{leads.length}</b></div>
-        ) : (
-          <Empty>Lievik dopytov je zatiaľ prázdny — kým sa nezapisuje, appka nevie povedať, odkiaľ klienti chodia. Zapisuje sa v Klienti → Dopyty.</Empty>
-        )}
-      </div>
-    </Card>
-  );
-}
-
-// ── Web a kanály (GA4) ───────────────────────────────────────────────────────
-// Instagram povie, koľko ľudí obsah videlo. GA4 povie, koľko ich prišlo na web
-// a — čo je dôležitejšie — ČI prišli z platenej alebo organickej cesty. To je
-// jediné miesto v celej appke, kde sa tieto dve veci dajú oddeliť ešte pred tým,
-// než sa niekto ozve.
-// Prepínač roka žije tu, nie v spoločnej hlavičke. Tá hlavička bola karta bez
-// vlastného obsahu — Jerry ju 12. 8. zrušil — a rok potrebujú len tieto dve
-// karty pod sebou. Prepínač preto stojí pri nich.
 function RokBar({ rok, onRok }: { rok: string; onRok: (r: string) => void }) {
   return (
     <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
@@ -573,7 +535,7 @@ function RokBar({ rok, onRok }: { rok: string; onRok: (r: string) => void }) {
  * naozaj píšu do Googlu, keď ich niečo bolí — a to je jediný dôkaz o dopyte,
  * ktorý máme kúpený vlastnými peniazmi, nie odhadnutý.
  */
-function GoogleAdsKarta({ clients, chat }: { clients: Record<string, ClientAgg>; chat?: AssistantChat }) {
+function GoogleAdsKarta({ clients, chat, ack, onSkry, onVrat }: { clients: Record<string, ClientAgg>; chat?: AssistantChat } & SkrytieProps) {
   const mesiace = adsMesiace(GADS_KAMPANE);
   // Noví klienti po mesiacoch — z prvého sedenia, teda z toho istého zdroja,
   // z ktorého sa počíta všetko ostatné. Slúži na to, aby appka vedela
@@ -628,14 +590,7 @@ function GoogleAdsKarta({ clients, chat }: { clients: Record<string, ClientAgg>;
       </div>
 
       {straz.map((n) => (
-        <div key={n.kluc} style={{
-          marginTop: 10, padding: 10, borderRadius: 6,
-          borderLeft: `2px solid ${n.kluc === "gads|neoveritelne" ? mix(C.text, 25) : C.orange}`,
-          background: n.kluc === "gads|neoveritelne" ? mix(C.text, 4) : mix(C.orange, 8),
-        }}>
-          <div style={{ fontSize: 12.5, fontWeight: 600, color: C.text }}>{n.nadpis}</div>
-          <div style={{ fontSize: 11.5, color: C.textMuted, marginTop: 3, lineHeight: 1.55 }}>{n.detail}</div>
-        </div>
+        <Hlasenie key={n.kluc} {...n} ack={ack} onSkry={onSkry} onVrat={onVrat} />
       ))}
 
       <table style={{ width: "100%", borderCollapse: "collapse", marginTop: 12, fontSize: 12 }}>
@@ -707,7 +662,7 @@ function GoogleAdsKarta({ clients, chat }: { clients: Record<string, ClientAgg>;
   );
 }
 
-function WebKanaly({ rok, onRok, chat }: { rok: string; onRok: (r: string) => void; chat?: AssistantChat }) {
+function WebKanaly({ rok, onRok, chat, ack, onSkry, onVrat }: { rok: string; onRok: (r: string) => void; chat?: AssistantChat } & SkrytieProps) {
   const vsetky = GA4_MESACNE.filter((r) => r.m.startsWith(rok));
   // Strážca beží nad celou radou, nie nad vybraným rokom — diera na prelome
   // rokov by inak zmizla medzi dvomi filtrami.
@@ -775,9 +730,7 @@ function WebKanaly({ rok, onRok, chat }: { rok: string; onRok: (r: string) => vo
         ))}
       </div>
       {straz.map((n) => (
-        <div key={n.kluc} style={{ marginTop: 12, padding: "10px 14px", borderRadius: 10, background: mix(C.red, 10), border: `1px solid ${mix(C.red, 35)}`, fontSize: 12.5, color: C.text, lineHeight: 1.55 }}>
-          <b>{n.nadpis}</b><br />{n.detail}
-        </div>
+        <Hlasenie key={n.kluc} {...n} ack={ack} onSkry={onSkry} onVrat={onVrat} />
       ))}
       {(diery.length > 0 || castocne.length > 0) && (
         <div style={{ marginTop: 12, padding: "10px 14px", borderRadius: 10, background: mix(C.orange, 10), border: `1px solid ${mix(C.orange, 30)}`, fontSize: 12.5, color: C.text, lineHeight: 1.55 }}>
@@ -825,8 +778,8 @@ function CoFungovaloWeb({ rok, chat }: { rok: string; chat?: AssistantChat }) {
       )}
       <div style={{ fontSize: 12.5, color: C.textMuted, marginTop: 12, lineHeight: 1.55 }}>
         Rozdiel oproti Instagramu je v životnosti: reel má dva dni, článok pracuje roky.
-        „Fascie – Voda v nás“ mal v 2025 sám <b>1 829 zobrazení</b> — viac než všetky ostatné články dokopy —
-        a dodnes ťa drží vo vyhľadávaní.
+        (Za rok 2025 mal „Fascie – Voda v nás“ sám 1 829 zobrazení — viac než ostatné články dokopy.
+        Aktuálne poradie je v tabuľke vyššie; táto veta je poznámka k histórii, nie živé číslo.)
       </div>
     </Card>
   );
@@ -893,8 +846,8 @@ function Vyhladavanie({ chat }: { chat?: AssistantChat }) {
           alignEnd
         />
         <div style={{ fontSize: 12.5, color: C.textMuted, marginTop: 10, lineHeight: 1.55 }}>
-          Kliky z vyhľadávania <b>rastú stabilne</b> — z ~110 mesačne v lete 2025 na ~240 dnes, bez jedinej koruny za reklamu.
-          Je to najpomalší kanál, aký máš, a zároveň jediný, ktorý neprestane fungovať, keď prestaneš platiť.
+          Vyhľadávanie je najpomalší kanál, aký máš, a zároveň jediný, ktorý neprestane
+          fungovať, keď prestaneš platiť — trend čítaj z grafu nad touto vetou, nie z viet.
         </div>
       </Card>
 
@@ -943,7 +896,7 @@ function StrankyWebu({ chat }: { chat?: AssistantChat }) {
               riadky={chyby}
               stlpce={[
                 { id: "druh", label: "Nález", farba: (r) => (r.druh.includes("duplicit") || r.druh.includes("chýba") ? C.red : C.textMuted) },
-                { id: "url", label: "Stránka", farba: () => C.text },
+                { id: "url", label: "Stránka", farba: () => C.text, fmt: (v) => <OdkazStranky url={String(v)} /> },
                 { id: "detail", label: "Čo to znamená" },
               ]}
             />
@@ -961,7 +914,7 @@ function StrankyWebu({ chat }: { chat?: AssistantChat }) {
           rolovat={3}
           riadky={GSC_STRANY as unknown as GscStrana[]}
           stlpce={[
-            { id: "url", label: "Stránka", farba: () => C.text },
+            { id: "url", label: "Stránka", farba: () => C.text, fmt: (v) => <OdkazStranky url={String(v)} /> },
             { id: "kliky", label: "Kliky", num: true, farba: () => C.accentLight },
             { id: "zobrazenia", label: "Zobrazenia", num: true },
             { id: "ctr", label: "MP", num: true, info: "Miera prekliku = kliky ÷ zobrazenia.", fmt: (v) => `${v} %`, farba: (r) => (r.ctr >= 5 ? C.green : C.textMuted) },
@@ -1013,7 +966,7 @@ function Titulky({ chat }: { chat?: AssistantChat }) {
           riadky={riadky}
           stlpce={[
             { id: "titulok", label: "Súčasný titulok", farba: () => C.text },
-            { id: "url", label: "Stránka" },
+            { id: "url", label: "Stránka", fmt: (v) => <OdkazStranky url={String(v)} /> },
             { id: "zobrazenia", label: "Zobrazenia", num: true, farba: () => C.accentLight },
             { id: "kliky", label: "Kliky", num: true },
             { id: "ctr", label: "MP", num: true, info: "Miera prekliku = kliky ÷ zobrazenia.", fmt: (v) => `${v} %`, farba: () => C.red },
@@ -1075,7 +1028,7 @@ function Rychlost({ chat }: { chat?: AssistantChat }) {
         rolovat={3}
         riadky={riadky}
         stlpce={[
-          { id: "url", label: "Stránka", farba: () => C.text },
+          { id: "url", label: "Stránka", farba: () => C.text, fmt: (v) => <OdkazStranky url={String(v)} /> },
           { id: "lcp", label: "Mobil", num: true, info: "Za koľko sekúnd človek uvidí hlavný obsah na mobile.", fmt: (v) => `${String(v).replace(".", ",")} s`, farba: (r) => (r.lcp > 4 ? C.red : r.lcp > 2.5 ? C.orange : C.green) },
           { id: "lcpPc", label: "Počítač", num: true, fmt: (v) => (v ? `${String(v).replace(".", ",")} s` : "—"), farba: (r) => (r.lcpPc > 4 ? C.red : r.lcpPc > 2.5 ? C.orange : C.textMuted) },
           { id: "vykon", label: "Výkon", num: true, info: "Lighthouse skóre 0–100. Je to súhrn, nie akcia — akcia je v poslednom stĺpci.", farba: (r) => (r.vykon < 50 ? C.red : r.vykon < 90 ? C.orange : C.green) },
@@ -1093,26 +1046,24 @@ function Rychlost({ chat }: { chat?: AssistantChat }) {
   );
 }
 
-export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, refresh, onPoznamkaStrata, onNavigate }: { data: PSBData; clients: Record<string, ClientAgg>; leads: Lead[]; chat?: AssistantChat; sub: string; onSub: (s: string) => void; onKlient?: (m: string) => void; refresh: () => Promise<void>; onPoznamkaStrata?: (meno: string, text: string) => void; onNavigate?: (tab: string, sub?: string) => void }) {
+export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, refresh, onPoznamkaStrata, onNavigate, focus, onAck }: { data: PSBData; clients: Record<string, ClientAgg>; leads: Lead[]; chat?: AssistantChat; sub: string; onSub: (s: string) => void; onKlient?: (m: string) => void; refresh: () => Promise<void>; onPoznamkaStrata?: (meno: string, text: string) => void; onNavigate?: (tab: string, sub?: string) => void; focus?: { client?: string; nonce?: number } | null; onAck?: (kluc: string, zapnut: boolean, poznamka?: string) => void }) {
   const setSub = onSub;
+  // Jedno miesto, odkiaľ karty berú stav skrytia — inak by každá karta
+  // potrebovala vlastné tri propy a jedna by ich časom nedostala.
+  const skrytie: SkrytieProps = {
+    ack: data.anomalyAck,
+    onSkry: onAck ? (k) => onAck(k, true) : undefined,
+    onVrat: onAck ? (k) => onAck(k, false) : undefined,
+  };
   const [rok, setRok] = useState("2026");
   // Nahraté exporty vyhrávajú nad číslami v kóde. Načíta sa raz pri otvorení;
   // `tik` je len na to, aby sa obrazovka po výmene prekreslila — samotné dáta
   // žijú v module, lebo ich číta desať miest naprieč touto obrazovkou.
+  // Sklady plní App.tsx pri štarte jedným volaním /api/marketing — táto
+  // obrazovka ich od 19. 8. 2026 už neplní druhýkrát. `marketingVerzia()`
+  // v deps nižšie zabezpečí prekreslenie, keď dorazia.
   const [, tik] = useState(0);
-  useEffect(() => {
-    void fetch("/api/marketing", { credentials: "same-origin" })
-      .then((r) => r.json())
-      .then((j: { mesacne?: MktMesiac[]; top?: MktKus[]; ga4?: Ga4Mesiac[]; gscMesacne?: GscMesiac[]; gscDopyty?: GscDopyt[]; gscStrany?: GscStrana[]; ga4Strany?: { url: string; zobrazenia: number }[]; gscZariadenia?: { zariadenie: string; kliky: number; zobrazenia: number }[]; gadsKampane?: GadsKampan[]; gadsDopyty?: GadsDopyt[]; gadsValuta?: string; webStranky?: WebStrankaUI[]; webRychlost?: PsRiadok[] }) => {
-        const a = nastavMarketingZImportu(j.mesacne || [], j.top || []);
-        const b = nastavWebZImportu(j.ga4 || [], j.gscMesacne || [], j.gscDopyty || [], j.gscStrany || [], j.ga4Strany || [], j.gscZariadenia || []);
-        const bAds = nastavAdsZImportu(j.gadsKampane || [], j.gadsDopyty || [], j.gadsValuta || "");
-        nastavWebStranky(j.webStranky || []);
-        nastavWebRychlost(j.webRychlost || []);
-        if (a || b || bAds) tik((x) => x + 1);
-      })
-      .catch(() => {});
-  }, []);
+  useEffect(() => { tik((x) => x + 1); }, [marketingVerzia()]); // eslint-disable-line react-hooks/exhaustive-deps
   // The header used to sum all 18 months no matter which year was selected —
   // the switch looked broken because the summary never moved.
   const vRoku = MKT_MESACNE.filter((r) => r.m.startsWith(rok));
@@ -1157,50 +1108,81 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
           // Obsah nakoniec zámerne: je to práca, ktorú robíš, nie výsledok,
           // ktorý rozhoduje. Poradie chipov je poradie otázok.
           { id: "kanaly", label: "Soc. siete", skupina: "Čo púšťame von" },
+          // Rez medzi „čo idem spraviť" a „čo fungovalo".
+          //
+          // „Reels & posty" bola jedna obrazovka na 3 558 pixelov so siedmimi
+          // kartami a dvoma rôznymi prácami: hore sa PLÁNUJE (zadanie, návrhy
+          // z dát, nápady zo Zápisu), dole sa VYHODNOCUJE (čo vyšlo, ako to
+          // dopadlo, kedy publikovať, po čom sa ľudia ozvali). Sú to dve
+          // sedenia v iný deň a v jednom okne sa to hore vždy prescrollovalo.
+          // Rovnaký rez ako pri Web × Vyhľadávanie (18. 8. 2026).
+          { id: "navrhy", label: "Čo publikovať", skupina: "Čo púšťame von" },
           { id: "obsah", label: "Reels & posty", skupina: "Čo púšťame von" },
           { id: "mail", label: "Mailer", skupina: "Čo púšťame von" },
+          // Kampaň nie je záložka — je to preklik do Jarvisa. Kampaň sa
+          // pripravuje debatou (čo má dosiahnuť, kam viesť, za koľko) a tá
+          // patrí k nemu; formulár bez debaty by bol len ďalšie políčko.
+          // Jerry, 19. 8. 2026: „daj tam možnosť kliknúť na kampaň a
+          // preklikne ma to na Jarvisa na tú podkategóriu."
+          { id: "kampan", label: "Kampaň ↗", skupina: "Čo púšťame von" },
           // Algoritmus tu bol záložkou a Jerry ju 12. 8. zrušil: čítal ju
           // dvakrát a odvtedy nie. Dáta žijú ďalej — sťahujú sa každú noc
           // a idú Jarvisovi do kontextu, lebo pri plánovaní obsahu rozhodujú.
           // Karta sa dá vrátiť jedným riadkom, keby ju predsa chcel vidieť.
         ]}
         value={sub}
-        onChange={setSub}
+        onChange={(id) => {
+          if (id !== "kampan") { setSub(id); return; }
+          // Nový rozhovor, nie prepnutie zamerania rozbehnutej debaty:
+          // prepísať zameranie tomu, čo práve píšeš, je vedľajší účinok,
+          // ktorý nikto nechcel (rovnaká úvaha ako pri „zmeniť zameranie").
+          chat?.newChat("kampan");
+          // Bez tohto Jarvisova stránka pri otvorení založí ďalší rozhovor
+          // — a ten už zameranie nemá. Overené naživo 19. 8. 2026: preklik
+          // fungoval, ale otvoril „Poradcu naprieč celou firmou".
+          chat?.zachovajOkno();
+          chat?.setFloatingOpen(false);
+          onNavigate?.("jarvis");
+        }}
       />
 
-      {sub === "dopyty" && <Dopyty leads={leads} clients={clients} refresh={refresh} />}
+      {sub === "dopyty" && <Dopyty leads={leads} clients={clients} refresh={refresh} focus={focus} />}
 
       {sub === "lievik" && (
         <>
           <Lievik data={data} clients={clients} onPoznamka={onPoznamkaStrata} />
           <Kohorta data={data} clients={clients} />
-          <CoToPrinieslo data={data} clients={clients} leads={leads} chat={chat} />
         </>
       )}
-      {/* Kampane pred zmiešanou cenou: sú to skutočné čísla z Mety, kým
-          „Čo to stálo" je odhad z Metricoolu a z nových klientov v mesiaci. */}
-      {/* Jedna karta o kampaniach, nie dve. Boli dve — „čo sa stalo" a „čo
-          s tým" — a obe mali stĺpec „Dopyty" s iným významom. */}
+      {/* JEDNA karta na otázku „čo priniesla reklama".
+          Boli štyri — „Čo to prinieslo" (výdavok ÷ úvodné), „Čo to stálo"
+          (výdavok ÷ všetci noví), „Platená cesta" a „Kampane" — každá
+          s vlastným výpočtom, vlastným prepínačom obdobia a iným výsledkom.
+          Podľa nich sa pritom rozhodovalo o rozpočte (18. 8. 2026). */}
       {sub === "naklady" && (
         <>
-          <Kampane data={data} clients={clients} leads={leads} />
-          <Naklady data={data} clients={clients} />
+          <Reklama data={data} clients={clients} />
           <AkoMeratReklamu />
+          <PripravitKampan />
         </>
       )}
       {sub === "kanaly" && <Kanaly data={data} clients={clients} chat={chat} />}
 
-      {sub === "obsah" && (
+      {/* ČO PUBLIKOVAŤ — plánovanie. Poradie je poradie otázok: ako sa zadanie
+          odovzdá → čo do neho dať podľa dát → čo sa ľudia nahlas spýtali. */}
+      {sub === "navrhy" && (
         <>
-          {/* Odovzdávacie miesto hore: obsah sa začína rozhodnutím, nie
-              rebríčkom. Rebríčky sú pod ním a slúžia mu. */}
-          <Zadanie chat={chat} />
-          {/* Návrhy hneď za odovzdávacím miestom: prvá karta hovorí AKO sa
-              zadanie odovzdá, druhá ČO do neho dať. Rebríčky sú pod nimi. */}
+          <Zadanie chat={chat} nastaveneAt={data.anomalyAck?.["project|nastavene"]?.ackedAt || null} onNastavene={(hotovo) => onAck?.("project|nastavene", hotovo, "Claude Project nastavený")} />
           <PlanObsahu data={data} chat={chat} onNavigate={onNavigate} />
           {/* Nápady hneď za návrhmi z dát. Jedna karta vie, čo ľudia hľadali,
               druhá čo sa nahlas spýtali — nie je to duplicita. */}
           <Napady chat={chat} />
+        </>
+      )}
+
+      {/* REELS & POSTY — vyhodnotenie toho, čo už vyšlo. */}
+      {sub === "obsah" && (
+        <>
           <CoSomRobil chat={chat} />
           {/* Živé z Graph API hneď za tým, čo sa publikovalo, a pred ručnou
               tabuľkou. Obe odpovedajú na tú istú otázku z dvoch strán: táto sa
@@ -1227,14 +1209,14 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
       {sub === "vyhladavanie" && (
         <>
           <Vyhladavanie chat={chat} />
-          <GoogleAdsKarta clients={clients} chat={chat} />
+          <GoogleAdsKarta clients={clients} chat={chat} {...skrytie} />
         </>
       )}
       {/* Web = sú moje stránky v poriadku a chodí na ne niekto. */}
       {sub === "web" && (
         <>
           <StrankyWebu chat={chat} />
-          <WebKanaly rok={rok} onRok={setRok} chat={chat} />
+          <WebKanaly rok={rok} onRok={setRok} chat={chat} {...skrytie} />
           <CoFungovaloWeb rok={rok} chat={chat} />
         </>
       )}

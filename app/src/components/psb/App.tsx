@@ -18,7 +18,11 @@ import {
   saveVzasSetting,
   type BtcNakup,
 } from "../../lib/psb/client";
-import { rodinaZKluca,
+import { stavPolozkyRegistra,
+  parujVysvetlenia,
+  zruseneTreningy,
+  cakajuciKlienti,
+  novyKlientAkNicIne,
   najdiKlienta,
   menoKluc,
   kotvaDat,
@@ -40,7 +44,7 @@ import { Assistant, useAssistantChat } from "./Assistant";
 import { JarvisOkno } from "./JarvisOkno";
 import { fmtDMY, monthLabel, normName } from "../../lib/psb/format";
 import { ObdobieCtx } from "../../lib/psb/obdobie";
-import { C, S, tab } from "../../lib/psb/theme";
+import { C, S, mix, tab } from "../../lib/psb/theme";
 import type { ClientOverride, PSBData } from "../../lib/psb/types";
 import { EMPTY_DATA } from "../../lib/psb/types";
 import type { IngestResult } from "../../lib/psb/db.server";
@@ -61,7 +65,7 @@ import { ZapisButton } from "./Zapis";
 import { ritualy as spocitajRitualy } from "../../lib/psb/rituals";
 import { nastavRozpis, pridajDoRozpisu, type PohybZaBunku } from "../../lib/psb/rozpis";
 import { chybajuceNaklady, dvojiteZapisy, nezhodyPrijmov, nezhodySExcelom, type BankovyMesiac, type Pohyb } from "../../lib/psb/kontrolaNakladov";
-import { MKT_MESACNE, nastavIgPrispevky, nastavMarketingZImportu, nastavWebZImportu, nastavAdsZImportu, nastavWebStranky, nastavWebRychlost } from "../../lib/psb/marketing";
+import { MKT_MESACNE, nastavIgPrispevky, nastavMarketingZImportu, nastavWebZImportu, nastavAdsZImportu, nastavWebStranky, nastavWebRychlost, nastavKanaly } from "../../lib/psb/marketing";
 
 export type Actions = {
   /** Vráti `false`, keď zápis na serveri neprešiel — obrazovka to nesmie zamlčať. */
@@ -72,6 +76,15 @@ export type Actions = {
   refresh: () => Promise<void>;
   /** Tvrdé obnovenie kalendára: stiahne ho teraz a prepočíta zostatky. */
   obnovKalendar: () => Promise<void>;
+  /**
+   * Zapíše do Kalendára, že sa tréning nekonal — z ktorejkoľvek obrazovky.
+   *
+   * Jerry, 17. 8. 2026: „keď napíšem, že Josef nepríde na jednom mieste, bude
+   * o tom vedieť aj druhé miesto." Bez tohto sa odpoveď v notifikácii ukladala
+   * ako poznámka a Kalendár o nej nevedel — a naopak. Toto je ten jeden zápis,
+   * ktorý vidia obe strany: notifikácie stíchnu, Kalendár má záznam aj dôvod.
+   */
+  zapisZrusenie: (klient: string, datum: string, poznamka: string) => Promise<void>;
 };
 
 // Deep-link from Dashboard click-throughs: focus one week (Tréningy → Prehľad) or one month (Financie → Zárobky).
@@ -90,6 +103,9 @@ export type KrokUzavierky = {
 
 export type NavFocus = {
   week?: string; month?: string; client?: string; trainer?: string; nonce?: number;
+  /** Kategória v P&L („fixne.prevadzka.najom") — upozornenie o chýbajúcom
+   *  nájme má otvoriť TEN riadok, nie tabuľku so štyridsiatimi. */
+  kategoria?: string;
   /** Klik na dlaždicu, ktorá hovorí o SKUPINE ľudí (napr. „11 odmlčaných“),
    *  otvorí Klientov len s nimi. Predtým doviedol na zoznam všetkých a človek
    *  si tých jedenásť musel nájsť sám — čo je presne tá práca, ktorú mala
@@ -133,8 +149,16 @@ const TABS = [
   // rozobranie veci — s dokumentmi, so staršími debatami po ruke — je malý.
   // Toto je ten istý Jarvis vo veľkom rozložení; keď je táto záložka otvorená,
   // plávajúci panel sa skryje, aby dve okná nedržali rozchádzajúci sa stav.
+  //
+  // POZOR: v rade záložiek sa NEVYKRESĽUJE — od 17. 8. 2026 stojí o riadok
+  // vyššie, v hlavičke medzi „+ Zápis" a „Odhlásiť sa" (Jerry). V zozname
+  // zostáva, lebo naň visí adresa #jarvis, Jarvisove vlastné ⟦odkazy⟧ aj
+  // ciele z registra — a tie prechádzajú kontrolou proti TABS.
   { id: "jarvis", label: "Jarvis", icon: "sparkles" },
 ];
+
+/** Záložky, ktoré majú vlastné miesto mimo radu záložiek. */
+const MIMO_RAD = ["jarvis"];
 
 /** Staré podzáložky Marketingu → nové. Nikdy sa nemažú. */
 const MKT_ALIAS: Record<string, string> = { algoritmus: "kanaly", dosah: "obsah" };
@@ -180,6 +204,11 @@ export function PSBApp() {
   const [mesiacSub, setMesiacSub] = useState<"udaje" | "vysledky">("udaje");
   const [vysledkySub, setVysledkySub] = useState("kvartalne");
   const [vysledkyFocus, setVysledkyFocus] = useState<NavFocus | null>(null);
+  /** Marketing sa doteraz zamerať nedal — notifikácia „úvodný bez dopytu"
+   *  doviedla na zoznam dopytov a meno si musel človek napísať sám. */
+  const [marketingFocus, setMarketingFocus] = useState<NavFocus | null>(null);
+  /** Neúspešný zápis do dát — hlási sa raz pre celú appku, viď setOverride. */
+  const [chybaZapisu, setChybaZapisu] = useState("");
   const [marketingSub, setMarketingSub] = useState("lievik");
   // Filter trénera a obdobia žije tu, nie na každej obrazovke zvlášť.
   //
@@ -268,6 +297,7 @@ export function PSBApp() {
     if (tab === "klienti" && sub === "dopyty") {
       setActive("marketing");
       setMarketingSub("dopyty");
+      if (focus) setMarketingFocus(focus);
       return;
     }
     if (tab === "6m") {
@@ -326,6 +356,9 @@ export function PSBApp() {
     // nefunguje. Rovnaká mechanika ako pri ostatných, len chýbala.
     if (tab === "vysledky" && sub) setVysledkySub(sub);
     if (tab === "marketing" && sub) setMarketingSub(MKT_ALIAS[sub] || sub);
+    if (tab === "marketing" && focus) setMarketingFocus(focus);
+    // Dopyty sa presťahovali z Klientov — preklik na ne chodí oboma cestami.
+    if (tab === "klienti" && sub === "dopyty" && focus) setMarketingFocus(focus);
     // Fokus na klienta má zmysel len v zozname klientov. Keď bol človek práve
     // v Dopytoch alebo v Raste a strate a klikol na meno vo vyhľadávaní,
     // zameranie sa nastavilo do podzáložky, ktorú nevidno — a nič sa nestalo.
@@ -372,9 +405,12 @@ export function PSBApp() {
   // Latest clients for tolerant name resolution in setOverride (e.g. AI passes "Jakub Stigut" → "Jakub Štigut").
   const clientsRef = useRef(clients);
   clientsRef.current = clients;
+  // Pre návratku optimistického zápisu v ackAnomaly — akcie sú v useMemo
+  // a stav v closure by bol zastaraný.
+  const dataRef = useRef(data);
+  dataRef.current = data;
   const sixM = useMemo(() => deriveSixM(data, clients), [data, clients]);
   const capacity = useMemo(() => capacityByTrainer(clients, data.sessions), [clients, data.sessions]);
-  const register = useMemo(() => deriveRegister(data, clients, sixM, capacity), [data, clients, sixM, capacity]);
   // Metrické zmeny — „prístroj si všimne, že sa zmenili jeho čísla".
   // Ohlásenia platforiem sú hypotézy o internete; prepad vlastných klikov je
   // fakt o nás. Pravidlo: posledný uzavretý mesiac vs priemer troch pred ním,
@@ -487,14 +523,32 @@ export function PSBApp() {
 
   // Barterové členstvá (Sofia) sa započítavajú ako splátka Jarkovho dlhu —
   // cenu balíčka vie PTminder, takže sa neprepisuje ručne.
+  //
+  // RAZ VIDENÝ BARTER JE ZÁZNAM V DLHOVEJ KNIHE, NIE SNÍMKA.
+  //
+  // `data.packages` je momentka aktuálnych balíčkov: keď Sofiin balíček
+  // (20. 7. – 13. 9., 7 790 Kč) po skončení platnosti vypadne z exportu,
+  // júl by zo vstupu zmizol a setter by ho vynuloval — Jarkov dlh by SPÄTNE
+  // narástol o 7 790 Kč (revízia 19. 8. 2026). Splátka dlhu sa ale nedá
+  // „odstať": čo sa raz započítalo, je história. Preto sa videné mesiace
+  // ukladajú do vzas_settings a vstup pre setter je zjednotenie — snímka má
+  // prednosť (kým balíček v exporte JE, oprava ceny sa prenesie), uložené
+  // mesiace prežijú jej koniec. Oprava starého záznamu = ručne v nastaveniach.
   useEffect(() => {
-    const podlaMesiaca: Record<string, number> = {};
-    for (const p of data.packages) {
-      if (!BARTER_KLIENTI.includes(p.client) || !p.payment || !p.validFrom) continue;
-      const mk = p.validFrom.slice(0, 7);
-      podlaMesiaca[mk] = (podlaMesiaca[mk] || 0) + p.payment;
-    }
-    if (nastavJarekZTrackera(podlaMesiaca)) setFioTik((x) => x + 1);
+    void (async () => {
+      const podlaMesiaca: Record<string, number> = {};
+      for (const p of data.packages) {
+        if (!BARTER_KLIENTI.includes(p.client) || !p.payment || !p.validFrom) continue;
+        const mk = p.validFrom.slice(0, 7);
+        podlaMesiaca[mk] = (podlaMesiaca[mk] || 0) + p.payment;
+      }
+      const nastavenia = await fetchVzasSettings().catch(() => ({} as Record<string, unknown>));
+      const ulozene = (nastavenia["barter_jarek"] || {}) as Record<string, number>;
+      const spolu: Record<string, number> = { ...ulozene, ...podlaMesiaca };
+      const pribudlo = Object.keys(spolu).some((mk) => spolu[mk] !== ulozene[mk]);
+      if (pribudlo) void saveVzasSetting("barter_jarek", spolu);
+      if (nastavJarekZTrackera(spolu)) setFioTik((x) => x + 1);
+    })();
   }, [data.packages]);
 
   // Náklady z banky sa načítajú raz pre celú appku — model je modulový, takže
@@ -600,6 +654,64 @@ export function PSBApp() {
       .catch(() => {});
   }, []);
 
+  /**
+   * Vysvetlenie z registra sa doručí Kalendáru.
+   *
+   * Jerry odpovie „dnes zrušil, štípla ho včela" na upozornenie o dnešnom
+   * tréningu — a Kalendár sa o dva dni pýta, prečo tá hodina zmizla. Sú to
+   * dve tabuľky a nič ich nespájalo, takže tú istú vetu musel napísať dvakrát.
+   *
+   * Veta počká pod kľúčom `kalvysv|meno|dátum`, lebo v okamihu odpovede
+   * zrušenie ešte v dátach nie je — kalendár sa sťahuje ráno a večer. Tento
+   * efekt beží po každom načítaní zmien a priradí ju, keď sa objaví.
+   *
+   * Podmienky sú v `parujVysvetlenia` a sú zámerne prísne: jediná nevysvetlená
+   * zmena pre toho človeka, do týždňa od odpovede. Priradiť vetu k nesprávnemu
+   * zrušeniu je horšie než sa spýtať dvakrát — Kalendár by prestal pýtať a
+   * hodina by zostala bez dôvodu navždy.
+   */
+  useEffect(() => {
+    const { hotove, expirovane } = parujVysvetlenia(data.anomalyAck || {}, kalNevysvetlene);
+    if (!hotove.length && !expirovane.length) return;
+    // Vypršané vety sa mažú — inak by sa v tabuľke hromadili navždy.
+    for (const key of expirovane) actions.ackAnomaly(key, "", false);
+    if (!hotove.length) return;
+    void (async () => {
+      for (const h of hotove) {
+        // Veta sa z fronty maže AŽ PO potvrdenom zápise. Predtým ju zmazal aj
+        // neúspešný POST — vysvetlenie bolo preč nadobro a Kalendár sa pýtal
+        // na zmenu, ktorú Jerry už raz vysvetlil.
+        const r = await fetch("/api/kalendar", {
+          method: "POST", credentials: "same-origin",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ akcia: "vysvetli", id: h.id, poznamka: h.poznamka }),
+        }).then((x) => x.json()).catch(() => null);
+        if (r?.ok) actions.ackAnomaly(h.key, "", false);
+      }
+      const j = await fetch("/api/kalendar", { credentials: "same-origin" }).then((r) => r.json()).catch(() => null);
+      if (j?.ok && Array.isArray(j.zmeny)) setKalNevysvetlene(j.zmeny);
+      if (j?.ok && Array.isArray(j.zmenyHistoria)) setKalZmeny(j.zmenyHistoria);
+    })();
+  }, [kalNevysvetlene, data.anomalyAck]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Kalendár ide do registra spolu s dátami: bez neho appka verí len exportu
+  // z PTmindera a hlási „14 dní bez tréningu" na klienta, ktorý bol včera.
+  const register = useMemo(
+    () => deriveRegister(data, clients, sixM, capacity, { udalosti: kalUdalosti, zmeny: kalZmeny }),
+    [data, clients, sixM, capacity, kalUdalosti, kalZmeny],
+  );
+  /**
+   * Ľudia po úvodnom, ktorých export ešte nepotvrdil.
+   *
+   * Držia sa MIMO `clients` zámerne: ten zoznam živí kapacitu, 6M, lievik aj
+   * predikciu tržieb a nepotvrdený človek by ticho posunul všetky tie čísla.
+   * Obrazovka Klienti ich ukáže nad tabuľkou ako „nepotvrdená".
+   */
+  const cakajuci = useMemo(
+    () => cakajuciKlienti(clients, kalUdalosti, kalZmeny),
+    [clients, kalUdalosti, kalZmeny],
+  );
+
   const [bankaPrijmy, setBankaPrijmy] = useState<Record<string, number>>({});
   const [btcPrijmy, setBtcPrijmy] = useState<Record<string, number>>({});
   const [btcSatsKlienti, setBtcSatsKlienti] = useState<Record<string, number>>({});
@@ -649,6 +761,7 @@ export function PSBApp() {
         nastavAdsZImportu((j.gadsKampane as never[]) || [], (j.gadsDopyty as never[]) || [], j.gadsValuta || "");
         nastavWebStranky((j.webStranky as never[]) || []);
         nastavWebRychlost((j.webRychlost as never[]) || []);
+        nastavKanaly((j.kanaly as never[]) || []);
         setMktVerzia((x) => x + 1);
       })
       .catch(() => {});
@@ -947,7 +1060,7 @@ function skupinaFaktur(
             .sort((a, b) => b.datum.localeCompare(a.datum)),
         );
 
-        nastavRozpis(rozpis);
+        if (nastavRozpis(rozpis)) setFioTik((x) => x + 1);
         // Zošit sa pozná podľa typu pohybu — mesiac netreba pýtať, vyplýva z
         // dátumov, ktoré sa pri prepise potvrdzujú.
         setHotovostMesiace(new Set(
@@ -958,8 +1071,9 @@ function skupinaFaktur(
         setBankaSumy(sumy);
         setBankaPohyby(pohybyPodla);
         setBankaPrijmy(prijmyBanka);
+        // Rozpis má odteraz vlastnú verziu (nastavRozpis vyššie), takže sa
+        // netreba spoliehať na tik „pre istotu".
         if (nastavNakladyZFio(sumy, vyplaty)) setFioTik((x) => x + 1);
-        else setFioTik((x) => x + 1); // rozpis pribudol aj bez zmeny súm
       })
       .catch(() => {});
   }, [btcNakupy, btcParovanie]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -974,24 +1088,13 @@ function skupinaFaktur(
   // Skladuje sa v tom istom poli ako poznámka k akceptácii, s predponou
   // „odlozene|DÁTUM|" — vlastnú tabuľku by si to nezaslúžilo a migrácia
   // existujúcich zápisov by bola drahšia než tento prefix.
-  const stavPolozky = useCallback((key: string, rodinaVstup?: string) => {
-    // Bez zadanej rodiny sa odvodí z kľúča (to isté bez dátumu/mesiaca), takže
-    // „Nehlásiť" má KAŽDÁ položka — Jerry, 10. 8.
-    const rodina = rodinaVstup ?? rodinaZKluca(key);
-    // Umlčaná rodina prebíja všetko: „už mi toto nehlás" platí na celý druh
-    // upozornenia, nie na jeden dátum. Bez toho sa vec vrátila zajtra s novým
-    // kľúčom a Skryť pôsobilo, akoby nefungovalo.
-    const mute = rodina ? (data.anomalyAck || {})[`mute|${rodina}`] : undefined;
-    if (mute) return { acked: true, note: mute.note || "nehlásiť", rodina };
-    const z = (data.anomalyAck || {})[key];
-    if (!z) return { acked: false, note: undefined as string | undefined, rodina };
-    const m = /^odlozene\|(\d{4}-\d{2}-\d{2})\|?([\s\S]*)$/.exec(z.note || "");
-    if (!m) return { acked: true, note: z.note, rodina };
-    const dnes = new Date().toISOString().slice(0, 10);
-    // Dátum už prešiel → položka sa vracia medzi živé, aj s poznámkou prečo.
-    if (m[1] <= dnes) return { acked: false, note: `odložené na ${m[1]}${m[2] ? ` — ${m[2]}` : ""}`, vratene: true, rodina };
-    return { acked: true, note: `odložené do ${m[1]}${m[2] ? ` — ${m[2]}` : ""}`, rodina };
-  }, [data.anomalyAck]);
+  // Výpočet je v lib/psb/compute.ts, lebo ho potrebuje aj register sám a obe
+  // pripomienky. Kým žil len tu, „Odložiť" fungovalo na menšine položiek a na
+  // zvyšku znamenalo navždy — hoci tlačidlo svietilo na každom riadku.
+  const stavPolozky = useCallback(
+    (key: string, rodinaVstup?: string) => stavPolozkyRegistra(key, data.anomalyAck || {}, rodinaVstup),
+    [data.anomalyAck],
+  );
 
   const kontrolaBanky = useMemo(() => {
     const out: typeof register = [];
@@ -1025,7 +1128,10 @@ function skupinaFaktur(
           ? `${meno} — platilo sa ${n.zMesiacov} zo 4 predošlých mesiacov, obvykle ${Math.round(n.obvykle).toLocaleString("cs-CZ")} Kč, ale za ${monthLabel(n.mesiac)} v banke nie je nič. Buď je pohyb zaradený inde, platilo sa v hotovosti, alebo faktúra nie je uhradená. Zisk za ten mesiac je zatiaľ o túto sumu vyšší, než bude.`
           : `${meno} — obvykle ${Math.round(n.obvykle).toLocaleString("cs-CZ")} Kč, za ${monthLabel(n.mesiac)} len ${Math.round(n.teraz).toLocaleString("cs-CZ")} Kč. Buď je časť zaradená inde, alebo sa platilo menej.`,
         ...stavPolozky(key, `naklad|${n.kategoria}`),
-        priority: n.druh === "chyba" ? 3 : 7, client: "vzas|pnl",
+        // Cieľ nesie mesiac aj kategóriu: P&L sa otvorí, riadok rozbalí,
+        // zvýrazní a odroluje sa k nemu. Predtým to bola správna obrazovka
+        // so štyridsiatimi riadkami a hľadaním od začiatku.
+        priority: n.druh === "chyba" ? 3 : 7, client: `vzas|pnl|${n.mesiac}|${n.kategoria}`,
       });
     }
 
@@ -1061,7 +1167,11 @@ function skupinaFaktur(
         detail: `${meno} — za ${monthLabel(d.mesiac)} sú zapísané ${d.pohyby.length} platby (${d.pohyby.map((x) => `${fmtDMY(x.datum)} ${Math.round(x.suma).toLocaleString("cs-CZ")} Kč${x.hotovost ? " zo zošita" : " z banky"}`).join(", ")}), spolu ${Math.round(d.spolu).toLocaleString("cs-CZ")} Kč. Inokedy tam býva jedna.` +
           (zdroje ? " Jedna je z banky a jedna zo zošita — vyzerá to, že ten istý výdavok dorazil dvoma cestami." : "") +
           " Ak je to naozaj dvakrát, oprav to v Údaje → Zapísané pohyby (kategória mimo ten pohyb vylúči).",
-        ...stavPolozky(key, `dvojity|${d.kategoria}`), priority: 2, client: "udaje|",
+        // Cieľ nesie mesiac aj kategóriu: v P&L sa zvýrazní riadok a Zapísané
+        // pohyby pod ním sa nafiltrujú presne na tie dva pohyby, o ktorých
+        // upozornenie hovorí. Predtým to viedlo na Údaje a hľadalo sa
+        // v sedemsto riadkoch (revízia 18. 8. 2026).
+        ...stavPolozky(key, `dvojity|${d.kategoria}`), priority: 2, client: `vzas|pnl|${d.mesiac}|${d.kategoria}`,
       });
     }
 
@@ -1081,7 +1191,9 @@ function skupinaFaktur(
         detail: n.bankaViac
           ? `Za ${monthLabel(n.mesiac)} prišlo tromi cestami (účet + zošit + BTC) ${n.banka.toLocaleString("cs-CZ")} Kč, ale PTminder hlási tržby ${n.ptminder.toLocaleString("cs-CZ")} Kč — o ${n.rozdiel.toLocaleString("cs-CZ")} Kč MENEJ. Buď chýba platba v PTminderi, alebo časť príjmu nie je tržba (vklad, vratka, preplatok) a patrí do koša „mimo".`
           : `Za ${monthLabel(n.mesiac)} hlási PTminder tržby ${n.ptminder.toLocaleString("cs-CZ")} Kč, ale tromi cestami (účet + zošit + BTC) prišlo len ${n.banka.toLocaleString("cs-CZ")} Kč — o ${n.rozdiel.toLocaleString("cs-CZ")} Kč menej. Buď časť platieb ešte nedorazila, alebo prišla ďalšou cestou, o ktorej appka nevie, alebo je to barter.`,
-        ...stavPolozky(key), priority: 6, client: "udaje|",
+        // Mesiac stačí — príjmy nemajú kategóriu; Zapísané pohyby sa naň
+        // nafiltrujú a je vidieť, čo v ten mesiac naozaj prišlo.
+        ...stavPolozky(key), priority: 6, client: `vzas|pnl|${n.mesiac}`,
       });
     }
 
@@ -1164,8 +1276,14 @@ function skupinaFaktur(
     // buď vybavená, alebo prepadla.
     {
       const dnesIso = new Date().toISOString().slice(0, 10);
+      // Zrušené sa nehlási. Google Kalendár appka prečíta sama (zmiznutá
+      // udalosť sa sem vôbec nedostane), ale zrušenie zapísané ručne
+      // v Kalendári dovtedy nikto okrem Kalendára nečítal — a appka ďalej
+      // hlásila hodinu, o ktorej Jerry pred chvíľou zapísal, že sa nekoná.
+      const zruseneDnes = zruseneTreningy(kalZmeny);
       const dnesne = kalUdalosti
         .filter((u) => u.zaciatok.slice(0, 10) === dnesIso && u.klient && (u.typ === "trening" || u.typ === "uvodny"))
+        .filter((u) => !zruseneDnes.has(`${normName(u.klient as string)}|${dnesIso}`))
         .sort((a, b) => a.zaciatok.localeCompare(b.zaciatok));
       for (const u of dnesne) {
         const c = clients[u.klient as string];
@@ -1350,11 +1468,13 @@ function skupinaFaktur(
 
   const pripomienky = useMemo(
     () => pripomienkySlubov(
-      kalUdalosti.map((u) => ({ zaciatok: u.zaciatok, klient: u.klient, typ: u.typ, zmizlaAt: (u as { zmizlaAt?: string | null }).zmizlaAt ?? null })),
+      kalUdalosti.map((u) => ({ zaciatok: u.zaciatok, klient: u.klient, typ: u.typ, nazov: u.nazov, trener: u.trener, zmizlaAt: (u as { zmizlaAt?: string | null }).zmizlaAt ?? null })),
       (data.leads || []).map((l) => ({ date: l.date, name: l.name, source: l.source, referrer: l.referrer })),
       data.anomalyAck || {},
+      new Date(),
+      kalZmeny,
     ),
-    [kalUdalosti, data.leads, data.anomalyAck],
+    [kalUdalosti, kalZmeny, data.leads, data.anomalyAck],
   );
 
   const registerAll = useMemo(() => {
@@ -1373,7 +1493,12 @@ function skupinaFaktur(
         client: `${r.ciel.tab}|${r.ciel.sub || ""}${r.ciel.mesiac ? `|${r.ciel.mesiac}` : r.ciel.tyzden ? `|t:${r.ciel.tyzden}` : ""}`,
         priority: r.druh === "tyzden" ? 5 : r.druh === "mesiac" ? 6 : 40,
       }));
-    return [...extra, ...nezapisane, ...kontrolaBanky, ...zmenyMetrik, ...kontrolaWebu, ...pripomienky, ...dovody, ...register].sort((a, b) => a.priority - b.priority);
+    // Až tu, keď sú všetky zdroje pokope: „nový klient" je len konštatovanie
+    // a ustúpi úlohám o tom istom človeku (SMS, chýbajúci dopyt). Kontext
+    // o nepotvrdenom klientovi je v Klientoch, nie v treťom riadku notifikácií.
+    return novyKlientAkNicIne(
+      [...extra, ...nezapisane, ...kontrolaBanky, ...zmenyMetrik, ...kontrolaWebu, ...pripomienky, ...dovody, ...register],
+    ).sort((a, b) => a.priority - b.priority);
   }, [rituals, register, kontrolaBanky, zmenyMetrik, kontrolaWebu, pripomienky, dovody, nezapisane, data.anomalyAck]);
 
   // Jarvis dostáva CELÝ register vrátane kontrol nad bankou — inak by nevedel
@@ -1640,20 +1765,45 @@ function skupinaFaktur(
           if (hit) canonical = hit;
         }
         // Optimistic local update, then persist.
+        const predtym = dataRef.current.clientOverrides[canonical];
         setData((prev) => ({
           ...prev,
           clientOverrides: { ...prev.clientOverrides, [canonical]: { ...prev.clientOverrides[canonical], [key]: value } },
         }));
-        return saveOverride(canonical, key, value);
+        const ok = await saveOverride(canonical, key, value);
+        if (!ok) {
+          // Karta klienta má štrnásť polí a každé volá tento setter. Obaliť
+          // ich po jednom by znamenalo pätnáste miesto, na ktoré sa zabudne —
+          // preto sa neúspech hlási TU, raz pre všetkých: pole sa vráti do
+          // pôvodného stavu a appka to povie nahlas (revízia 18. 8. 2026).
+          setData((prev) => ({
+            ...prev,
+            clientOverrides: { ...prev.clientOverrides, [canonical]: predtym ?? {} },
+          }));
+          setChybaZapisu(`Zmena pri klientovi ${canonical} sa NEZAPÍSALA — hodnota je späť. Skús znova.`);
+        }
+        return ok;
       },
       ackAnomaly: (key, note, ack = true) => {
+        const predtym = dataRef.current.anomalyAck[key];
         setData((prev) => {
           const next = { ...prev, anomalyAck: { ...prev.anomalyAck } };
           if (ack) next.anomalyAck[key] = { note, ackedAt: new Date().toISOString() };
           else delete next.anomalyAck[key];
           return next;
         });
-        void saveAnomaly(key, note, ack);
+        // Optimizmus s návratkou: keď server zápis odmietne, položka sa vráti
+        // do stavu pred klikom — inak by „vybavené" vydržalo len do reloadu
+        // a napísaná odpoveď by sa stratila bez stopy.
+        void saveAnomaly(key, note, ack).then((ok) => {
+          if (ok) return;
+          setData((prev) => {
+            const next = { ...prev, anomalyAck: { ...prev.anomalyAck } };
+            if (predtym) next.anomalyAck[key] = predtym;
+            else delete next.anomalyAck[key];
+            return next;
+          });
+        });
       },
       ingest: async (files) => {
         const res = await ingestFiles(files);
@@ -1672,12 +1822,30 @@ function skupinaFaktur(
       // Stiahne kalendár TERAZ a hneď načíta jeho udalosti aj dáta z PTmindera.
       // Cron beží ráno a večer; toto je pre chvíľu, keď človek práve dotrénoval
       // a chce vidieť zostatok bez čakania do večera.
+      zapisZrusenie: async (klient, datum, poznamka) => {
+        const r = await fetch("/api/kalendar", {
+          method: "POST", credentials: "same-origin",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ akcia: "zmena-rucne", druh: "zrusene", klient, datum, poznamka }),
+        }).then((x) => x.json()).catch(() => null);
+        // Server vie vrátiť {ok:false} aj s HTTP 200 — hlásiť úspech smie až
+        // potvrdený zápis; volajúci (tlačidlo Netrénoval) na tom stavia text.
+        if (!r?.ok) throw new Error("zápis zrušenia neprešiel");
+        const j = await fetch("/api/kalendar", { credentials: "same-origin" }).then((r) => r.json()).catch(() => null);
+        if (j?.ok && Array.isArray(j.zmeny)) setKalNevysvetlene(j.zmeny);
+        if (j?.ok && Array.isArray(j.zmenyHistoria)) setKalZmeny(j.zmenyHistoria);
+      },
       obnovKalendar: async () => {
-        await fetch("/api/kalendar", {
+        // Sťahovanie je ZÁPIS (kal_udalosti/kal_zmeny). Prehltnutá chyba
+        // znamenala, že spinner zhasol nad STAROU snímkou a vyzeralo to ako
+        // „nič sa nezmenilo" (revízia 19. 8. 2026). Výnimka letí ďalej —
+        // volajúci ju cez .finally zloží a používateľ vidí, že klik zlyhal.
+        const odp = await fetch("/api/kalendar", {
           method: "POST", credentials: "same-origin",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ akcia: "stiahni" }),
-        }).catch(() => {});
+        }).then((r) => r.json() as Promise<{ ok?: boolean; error?: string }>);
+        if (odp?.ok === false) throw new Error(odp.error || "Kalendár sa nestiahol.");
         const j = await fetch("/api/kalendar", { credentials: "same-origin" }).then((r) => r.json()).catch(() => null);
         if (j?.ok && Array.isArray(j.udalosti)) {
           setKalUdalosti(j.udalosti);
@@ -1771,6 +1939,17 @@ function skupinaFaktur(
         potom vyzerala len ako iné farby, nie ako sklo. V klasických paletách
         trieda nič nerobí. */}
     <div className="psb-app" style={{ minHeight: "100dvh", color: C.text }}>
+      {/* Neúspešný zápis nesmie zapadnúť. Pás je nad všetkým, aby ho človek
+          videl aj vtedy, keď je práve inde na obrazovke. */}
+      {chybaZapisu && (
+        <div
+          onClick={() => setChybaZapisu("")}
+          title="Kliknutím zavrieš"
+          style={{ position: "sticky", top: 0, zIndex: 60, cursor: "pointer", padding: "8px 16px", background: mix(C.red, 22), borderBottom: `1px solid ${mix(C.red, 55)}`, color: C.text, fontSize: 12.5, textAlign: "center" }}
+        >
+          {chybaZapisu} <span style={{ color: C.textDim }}>· zavrieť</span>
+        </div>
+      )}
       <div style={{ padding: "16px 16px 0", display: "flex", alignItems: "center", gap: 12, maxWidth: 1200, margin: "0 auto", flexWrap: "wrap" }}>
         {/* Logo je zároveň cesta domov — najstarší weborý zvyk a jediné miesto,
             kde ho každý hľadá inštinktívne. */}
@@ -1780,7 +1959,25 @@ function skupinaFaktur(
         </button>
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
           <HladanieKlienta clients={clients} leads={data.leads} onPick={(meno) => navigate("klienti", undefined, { client: meno, nonce: Date.now() })} onPickLead={() => navigate("klienti", "dopyty")} />
-          <ZapisButton ritualy={rituals} onNavigate={(t, sub) => { navigate(t, sub); void nacitajZapisy(); }} onRefresh={() => void actions.refresh()} klienti={zapisKlienti} dnesTrenoval={ktoDnesTrenoval(kalUdalosti)} onDennikZapis={chat.spracujDennik} />
+          <ZapisButton ritualy={rituals} onNavigate={(t, sub) => { navigate(t, sub); void nacitajZapisy(); }} onRefresh={() => void actions.refresh()} klienti={zapisKlienti} dnesTrenoval={ktoDnesTrenoval(kalUdalosti, { zmeny: kalZmeny })} onDennikZapis={chat.spracujDennik} />
+          {/* Jarvis stojí vedľa „+ Zápis", nie v rade záložiek (Jerry, 17. 8.).
+              Sú to dve tlačidlá toho istého druhu: obe sa dajú stlačiť kdekoľvek
+              v appke a obe nie sú miesto, kam sa ide — sú to veci, ktoré sa
+              robia. Rad záložiek je mapa obrazoviek; toto tam robilo zmätok.
+              Tvar aj rozmery kopírujú „+ Zápis", aby dvojica držala spolu. */}
+          <button
+            onClick={() => navigate("jarvis")}
+            title="Otvoriť Jarvisa vo veľkom — s dokumentmi a staršími debatami"
+            style={{
+              display: "inline-flex", alignItems: "center", gap: 6, whiteSpace: "nowrap",
+              padding: "6px 12px", borderRadius: 8, cursor: "pointer", fontSize: 12.5, fontWeight: 600,
+              border: `1px solid ${active === "jarvis" ? mix(C.accent, 55) : C.border}`,
+              background: active === "jarvis" ? mix(C.accent, 12) : "transparent",
+              color: active === "jarvis" ? C.accentLight : C.textMuted,
+            }}
+          >
+            <Icon name="sparkles" /> Jarvis
+          </button>
           {ktoSom && ktoSom !== "app" && (
             <span style={{ fontSize: 12, color: C.textMuted }} title="Pod týmto menom sa zapisujú zmeny do auditu">
               {ktoSom.charAt(0).toUpperCase() + ktoSom.slice(1)}
@@ -1802,7 +1999,7 @@ function skupinaFaktur(
           margin: "0 auto",
         }}
       >
-        {TABS.map((t) => (
+        {TABS.filter((t) => !MIMO_RAD.includes(t.id)).map((t) => (
           <button key={t.id} style={{ ...tab(active === t.id), display: "inline-flex", alignItems: "center", gap: 7 }} onClick={() => setActive(t.id)}>
             <Icon name={t.icon} /> {t.label}
           </button>
@@ -1831,7 +2028,7 @@ function skupinaFaktur(
       </nav>
       <div style={{ padding: 16, maxWidth: 1200, margin: "0 auto" }}>
         {active === "dashboard" && (
-          <Dashboard trainer={trainer} onTrainer={setTrainer} data={data} clients={clients} kalendar={kalUdalosti} register={registerAll} sixM={sixM} capacity={capacity} actions={actions} onNavigate={navigate} assistantChat={chat} onClientClick={onClientClick} />
+          <Dashboard trainer={trainer} onTrainer={setTrainer} data={data} clients={clients} kalendar={kalUdalosti} kalZmeny={kalZmeny} register={registerAll} sixM={sixM} capacity={capacity} actions={actions} onNavigate={navigate} assistantChat={chat} onClientClick={onClientClick} />
         )}
 
         {active === "tracker" && (
@@ -1864,11 +2061,11 @@ function skupinaFaktur(
               })}
             </div>
             {trackerSection === "treningy" && <Treningy data={data} clients={clients} sub={treningySub} onSub={setTreningySub} focus={treningyFocus} trainer={trainer} onTrainer={setTrainer} />}
-            {trackerSection === "klienti" && <Klienti clients={clients} capacity={capacity} actions={actions} focus={klientiFocus} leads={data.leads} trainer={trainer} onTrainer={setTrainer} sixM={sixM} sub={klientiSub} onSub={setKlientiSub} data={data} btcSatsKlienti={btcSatsKlienti} onDennikZapis={chat.spracujDennik} />}
+            {trackerSection === "klienti" && <Klienti clients={clients} capacity={capacity} actions={actions} focus={klientiFocus} leads={data.leads} trainer={trainer} onTrainer={setTrainer} sixM={sixM} sub={klientiSub} onSub={setKlientiSub} data={data} btcSatsKlienti={btcSatsKlienti} onDennikZapis={chat.spracujDennik} cakajuci={cakajuci} />}
               </>
         )}
 
-        {active === "marketing" && <Marketing data={data} clients={clients} leads={data.leads} chat={chat} sub={marketingSub} onSub={setMarketingSub} onKlient={(m) => navigate("klienti", undefined, { client: m, nonce: Date.now() })} refresh={actions.refresh} onPoznamkaStrata={(m, t) => actions.setOverride(m, "precoNeprisiel", t)} onNavigate={navigate} />}
+        {active === "marketing" && <Marketing data={data} clients={clients} leads={data.leads} chat={chat} sub={marketingSub} onSub={setMarketingSub} focus={marketingFocus} onKlient={(m) => navigate("klienti", undefined, { client: m, nonce: Date.now() })} refresh={actions.refresh} onPoznamkaStrata={(m, t) => actions.setOverride(m, "precoNeprisiel", t)} onNavigate={navigate} onAck={(k, zapnut, poznamka) => actions.ackAnomaly(k, zapnut ? (poznamka || "skryté hlásenie") : "", zapnut)} />}
         {active === "vzas" && <Vzas sub={vzasSub} onSub={setVzasSub} data={data} clients={clients} focus={vzasFocus} onNavigate={navigate} />}
         {active === "kalendar" && <Kalendar clients={clients} data={data} />}
 

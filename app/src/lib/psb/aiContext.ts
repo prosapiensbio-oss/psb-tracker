@@ -4,7 +4,7 @@
 // the alerts. Where a card recomputes something (zones, weekly hours, capacity
 // util, top KPIs), we mirror that exact logic below rather than reuse a
 // deprecated field (e.g. capacity.effHours is reference-only, NOT what the card shows).
-import { PNL, VZAS_MONTHS, pnlCalc, poslednyMesiacSDatami, salaryCalc as pnlSalary, CURRENT_ERA } from "./vzas";
+import { PNL, VZAS_MONTHS, pnlCalc, poslednyMesiacSDatami, salaryCalc as pnlSalary, tempoDlhu, CURRENT_ERA } from "./vzas";
 import {
   GA4_MESACNE, GSC_DOPYTY, GSC_MESACNE, GSC_STRANY,
   MKT_CLANKY, MKT_MESACNE,
@@ -14,8 +14,7 @@ import {
   WEB_RYCHLOST,
   WEB_STRANKY,
 } from "./marketing";
-import { MKT_OBSAH } from "./marketing-obsah";
-import { IG_PRISPEVKY } from "./marketing";
+import { IG_PRISPEVKY, obsahRiadky } from "./marketing";
 import { prilezitosti, soZamerom } from "./google";
 import { adsMesiace, zhrnutieAds } from "./googleAds";
 import { chybyNaStrankach, najdiAdresuPodlaTitulku, prilezitostiTitulkov } from "./webObsah";
@@ -37,10 +36,14 @@ import {
   type RegisterItem,
   type SixMRow,
   odmlcaniKlienti,
+  odpovedeZRegistra,
+  vytazenieSpolu,
   poUvodnomNikdy,
+  jeKlient,
 } from "./compute";
 import { monthLabel, normName, weekKey, weekLabel } from "./format";
 import type { PSBData } from "./types";
+import { CIEL_MESIACOV, chybaDoCiela } from "./rezerva";
 
 const r1 = (n: number) => Math.round(n * 10) / 10;
 const r0 = (n: number) => Math.round(n);
@@ -90,16 +93,28 @@ export function buildAiContext(
   const clientList = Object.values(clients);
 
   // ── Weekly hours per trainer (same source as the "Odrobené hodiny/týždeň" card) ──
-  const weekMap: Record<string, { Jerry: number; Terezka: number }> = {};
+  const weekMap: Record<string, { Jerry: number; Terezka: number; iny: number }> = {};
   for (const s of data.sessions) {
     const k = weekKey(s.date);
-    const e = (weekMap[k] ||= { Jerry: 0, Terezka: 0 });
+    const e = (weekMap[k] ||= { Jerry: 0, Terezka: 0, iny: 0 });
     if (s.sessionTrainer === "Jerry") e.Jerry += s.duration / 60;
     else if (s.sessionTrainer === "Terezka") e.Terezka += s.duration / 60;
+    // Tretí tréner (Matyáš) patrí do súčtu — dlaždica ho počíta a hlavička
+    // tohto súboru sľubuje rovnaké čísla ako obrazovka.
+    else e.iny += s.duration / 60;
   }
   const weekRows = Object.entries(weekMap).sort((a, b) => a[0].localeCompare(b[0]));
 
-  const perWeekTotal = weekRows.map(([k, v]) => ({ label: weekLabel(k), h: v.Jerry + v.Terezka })).filter((p) => p.h > 0);
+  // Posledný týždeň vypadne, keď je USEKNUTÝ dátami (export končí v strede
+  // týždňa) — rovnaké pravidlo ako dlaždica. Jarvis inak ťahal priemer dole
+  // polovičným týždňom a hlásil iné číslo než obrazovka.
+  // Rovnaké pravidlo ako dlaždica (poslednyTyzdenNeuplny): týždeň je celý,
+  // až keď dáta končia nedeľou.
+  const poslednyDen = data.sessions.reduce((m, s) => (s.date > m ? s.date : m), "").slice(0, 10);
+  const useknuty = poslednyDen && new Date(`${poslednyDen}T00:00:00Z`).getUTCDay() !== 0 ? weekKey(poslednyDen) : "";
+  const perWeekTotal = weekRows
+    .filter(([k]) => k !== useknuty)
+    .map(([k, v]) => ({ label: weekLabel(k), h: v.Jerry + v.Terezka + v.iny })).filter((p) => p.h > 0);
   let wMax = perWeekTotal[0], wMin = perWeekTotal[0], wSum = 0;
   for (const p of perWeekTotal) {
     wSum += p.h;
@@ -196,7 +211,8 @@ export function buildAiContext(
     typickyTyzden: r0(avgAll),
     rusnyTyzden: r0(busyAll),
     idealSpolu: `${TARGET_H * 2}h (2×${TARGET_H}h)`,
-    vytazeniePct: r0(Math.max(avgAll / (TARGET_H * 2), busyAll / (ZONE_HI * 2)) * 100),
+    // Jedna definícia (compute.ts) — kontext mal vlastnú kópiu vzorca.
+    vytazeniePct: vytazenieSpolu(capacity) ?? 0,
     zvladneEste: capacity.reduce((a, c) => a + c.canTake, 0),
     poznamka: `Vyťaženie z reálnych hodín, "dvojitý strop": rastie kým typický týždeň (priemer) nedosiahne ideál ${TARGET_H}h ALEBO rušný týždeň (80. percentil) nenarazí na ${ZONE_HI}h — čo príde skôr. 100 % = jeden strop naplnený.`,
   };
@@ -404,9 +420,7 @@ export function buildAiContext(
     // z uložení a zdieľaní: videnie je algoritmus, uloženie je človek.
     // JEDEN ZDROJ: živá tabuľka z Meta API. Statický súbor zostáva len ako
     // história pre obdobie, ktoré API nedáva — čísla sa z neho už neberú.
-    const zive = IG_PRISPEVKY.length
-      ? IG_PRISPEVKY.map((p) => ({ m: p.mesiac, f: p.typ, k: p.kategoria || "Edukácia", h: p.hook, u: p.ulozenia, v: p.videnia, z: p.zdielania, vr: p.viewRate }))
-      : MKT_OBSAH;
+    const zive = obsahRiadky();
     const podlaHooku: Record<string, { kusov: number; ulozenia: number; videnia: number; zdielania: number; vr: number }> = {};
     for (const o of zive) {
       const e = (podlaHooku[o.k] ||= { kusov: 0, ulozenia: 0, videnia: 0, zdielania: 0, vr: 0 });
@@ -592,18 +606,23 @@ export function buildAiContext(
       // z PTmindera prežijú ako dvaja ľudia a konverzia vyjde nižšia.
       lievik: (() => {
         const menaKlientov = clientList.map((c) => c.name);
-        const podla: Record<string, { dopytov: number; trenoval: number; zostal: number }> = {};
+        const podla: Record<string, { dopytov: number; trenoval: number; klient: number; zostal: number }> = {};
         const videne = new Set<string>();
-        let spolu = 0, trenovaloS = 0, zostaloS = 0;
+        let spolu = 0, trenovaloS = 0, klientovS = 0, zostaloS = 0;
         for (const l of data.leads || []) {
           const kluc = normName(l.name || "");
           if (!kluc || videne.has(kluc)) continue;
           videne.add(kluc);
           const meno = najdiKlienta(menaKlientov, l.name || "");
           const k = meno ? clients[meno] : null;
-          const e = (podla[l.source || "ine"] ||= { dopytov: 0, trenoval: 0, zostal: 0 });
+          const e = (podla[l.source || "ine"] ||= { dopytov: 0, trenoval: 0, klient: 0, zostal: 0 });
           e.dopytov++; spolu++;
           if (k && k.sessionCount > 0) { e.trenoval++; trenovaloS++; }
+          // „klient" = JEDINÁ definícia z compute (prišiel znova alebo doplatil
+          // nad úvodný) — to isté číslo, ktoré ukazuje karta Lievik. Jarvis
+          // dovtedy poznal len „zostal (5+)" a na otázku „koľko dopytov sa
+          // stalo klientom" odpovedal iným číslom než obrazovka (19. 8. 2026).
+          if (k && jeKlient(k, data.payments)) { e.klient++; klientovS++; }
           if (k && k.sessionCount >= 5) { e.zostal++; zostaloS++; }
         }
         const pct = (a: number, b: number) => (b ? Math.round((a / b) * 100) : 0);
@@ -616,8 +635,11 @@ export function buildAiContext(
           .sort((a, b) => a - b);
         return {
           poznamka: "Dopyt → trénoval aspoň raz → zostal (5+ sedení), nad ROVNAKÝM obdobím. Toto je jediné miesto, odkiaľ sa smie brať konverzia. „zostal“ je prísnejšia a pravdivejšia miera než „trénoval“: kto prišiel dvakrát a zmizol, nikdy neobsadil miesto. Dopyty sa evidujú od januára 2026; staršie neexistujú.",
-          spolu, trenovalo: trenovaloS, zostalo: zostaloS,
-          trenovaloPct: pct(trenovaloS, spolu), zostaloPct: pct(zostaloS, spolu),
+          spolu, trenovalo: trenovaloS, klientov: klientovS, zostalo: zostaloS,
+          trenovaloPct: pct(trenovaloS, spolu),
+          // „klientovPct" je TO ISTÉ číslo ako konverzia na karte Lievik —
+          // na otázku „koľko dopytov sa stalo klientom" odpovedaj týmto.
+          klientovPct: pct(klientovS, spolu), zostaloPct: pct(zostaloS, spolu),
           podlaZdroja: Object.fromEntries(Object.entries(podla).map(([z, e]) => [z, { ...e, zostaloPct: pct(e.zostal, e.dopytov) }])),
           // Kto prišiel na úvodný a už nikdy — vrátane dôvodu, ak ho niekto
           // zapísal. Obrazovka to vie od 13. 8., Jarvis až od 14. 8.: na otázku
@@ -647,7 +669,7 @@ export function buildAiContext(
       // si ich vytiahne dopytom, keď ich treba. Tu je len to, či vôbec sú, aby
       // vedel, že sa má pozrieť.
       napady: {
-        poznamka: "Surové nápady na obsah z + Zápis sú v tabuľke mkt_napady — vytiahni si ich dopytom (stav = 'novy'), keď sa rieši, čo publikovať. Otázky klientov (zdroj = 'otazka_klienta') sú najcennejšie: je to jazyk, ktorým ľudia o svojom probléme naozaj hovoria.",
+        poznamka: "Surové nápady na obsah z + Zápis sú v tabuľke mkt_napady — vytiahni si ich dopytom (stav = 'novy'), keď sa rieši, čo publikovať. Otázky klientov (zdroj = 'otazka_klienta') sú najcennejšie: je to jazyk, ktorým ľudia o svojom probléme naozaj hovoria. Použitý nápad má v stĺpci odkaz adresu hotového príspevku a v pouzite_at deň, keď vyšiel — z toho sa dá porovnať, ako fungujú témy z tréningu oproti témam z hlavy.",
       },
       naklady: { poznamka: "Marketingové položky z P&L (Facebook, Google, MultiBox, Offline).", poMesiacoch: naklady },
     };
@@ -708,6 +730,45 @@ export function buildAiContext(
       akceptovane: r.acked,
       poznamka: r.note || null,
     })),
+    /**
+     * Čo Jarvis vie zvonku — rešerše a príručky uložené natrvalo.
+     *
+     * Posiela sa PREHĽAD, nie text: rešerš má 8 000 znakov a v kontexte každej
+     * správy by vytláčala čísla. Jarvis vidí, že vedomosť existuje a o čom je;
+     * keď ju potrebuje, vytiahne si text SQL dopytom (schéma to hovorí).
+     *
+     * `stare` je tam preto, aby o zastaranej rešerši hovoril s odstupom —
+     * benchmarky zastarajú a Meta premenúva úrovne prístupu.
+     */
+    coVieZvonku: {
+      poznamka:
+        "Overené rešerše a rozhodnutia zvonku. Keď sa otázka dotýka témy niektorej položky (pozri oCom), NAJPRV si SQL dopytom vytiahni jej text a odpoveď oprí oň. NIKDY sa neodvolávaj na dokument, ktorý si v tomto rozhovore nečítal — vety typu „podľa onboardingu“ bez vytiahnutého textu sú vymyslený zdroj a Jerry na ne už doplatil.",
+      polozky: (data.vedomosti || []).map((v) => {
+      const dni = Math.floor((Date.now() - Date.parse(v.overeneAt || "")) / 86400000);
+      const stare = !!v.obnovovatPoDnoch && Number.isFinite(dni) && dni > v.obnovovatPoDnoch;
+      return {
+        id: v.id,
+        nazov: v.nazov,
+        oCom: v.oCom,
+        zdroj: v.zdroj,
+        overeneAt: (v.overeneAt || "").slice(0, 10),
+        stareDni: Number.isFinite(dni) ? dni : null,
+        stare,
+        poznamka: stare
+          ? "Táto rešerš je staršia, než mala byť — čísla v nej ber s odstupom a povedz, že by sa mala obnoviť."
+          : "POVINNÉ: keď sa otázka dotýka témy z oCom, NAJPRV si vytiahni celý text (SELECT text FROM jarvis_vedomosti WHERE id = ...) a až potom odpovedaj. Bez neho poznáš ČO, ale nie PREČO — a PREČO býva v otázke.",
+      };
+   }),
+    },
+    /**
+     * Čo Jerry na upozornenia odpovedal — aj na tie, ktoré už zmizli.
+     *
+     * Register hovorí, čo je otvorené TERAZ. Toto je pamäť: vety, ktoré niekto
+     * napísal do okienka „Odpovedať" alebo pri vybavení položky. Dovtedy sa
+     * strácali spolu s položkou (SMS má okno 21 dní, dôvod odchodu 90) a
+     * Jarvis o nich po mesiaci nevedel — hoci sedeli v databáze.
+     */
+    pamatOdpovedi: odpovedeZRegistra(data.anomalyAck || {}),
     // ── Čím klienti platia ────────────────────────────────────────────────
     // Tri cesty s rôznou réžiou: účet, hotovosť, bitcoin. Bitcoin je pätina
     // tržieb a bez tohto rozdelenia by Jarvis na otázku „koľko chodí v BTC“
@@ -792,11 +853,16 @@ export function buildAiContext(
       : null,
     rezerva: rezerva
       ? {
-          poznamka: "Koľko mesiacov firma ustojí BEZ JEDINEJ TRŽBY: všetko, čo má (účet + hotovosť + bitcoin), delené priemerným break-evenom za pol roka. Toto je dlaždica „Rezerva“ na Kokpite a jediné miesto, odkiaľ sa rezerva smie brať — NEPOČÍTAJ si ju sám zo stavu hotovosti a NEHOVOR, že ju appka nepočíta. Cieľ sú 3 mesiace. „uplna: false“ znamená, že stav účtu a hotovosti nikto nezapísal a ráta sa len bitcoin — číslo je vtedy NIŽŠIE než skutočnosť a treba to povedať. Zapisuje sa v Peniaze → Cashflow, karta „Kde tie peniaze sú“.",
+          poznamka: "Koľko mesiacov firma ustojí BEZ JEDINEJ TRŽBY: všetko, čo má (účet + hotovosť + bitcoin), delené priemerným break-evenom za pol roka. Toto je dlaždica „Rezerva“ na Kokpite a jediné miesto, odkiaľ sa rezerva smie brať — NEPOČÍTAJ si ju sám zo stavu hotovosti a NEHOVOR, že ju appka nepočíta. Cieľ sú 3 mesiace a je v poli „cielMesiacov“. Koľko korún do neho chýba, je v poli „chybaDoCielaCzk“ — PREČÍTAJ ho, nikdy si ten rozdiel nepočítaj sám; 18. 8. 2026 si na tú istú otázku dvakrát vyrátal iné číslo. „chybaDoCielaCzk: 0“ znamená, že rezerva je nad cieľom. „uplna: false“ znamená, že stav účtu a hotovosti nikto nezapísal a ráta sa len bitcoin — číslo je vtedy NIŽŠIE než skutočnosť a treba to povedať. Zapisuje sa v Peniaze → Cashflow, karta „Kde tie peniaze sú“.",
           mesiacov: rezerva.mesiace === null ? null : Math.round(rezerva.mesiace * 10) / 10,
           majetokCzk: rezerva.majetok === null ? null : Math.round(rezerva.majetok),
           uplna: rezerva.uplna,
           priemernyBreakEven: rezerva.bePriem === null ? null : Math.round(rezerva.bePriem),
+          cielMesiacov: CIEL_MESIACOV,
+          // Spočítané tu, nie v odpovedi. 18. 8. 2026 dal Jarvis na tú istú
+          // otázku dvakrát iný rozdiel do cieľa (113 500 a 313 700 Kč) —
+          // vstupy boli rovnaké, len si to rátal v hlave.
+          chybaDoCielaCzk: chybaDoCiela(rezerva),
           stavZapisanyK: rezerva.datumStavu,
         }
       : null,
@@ -820,28 +886,26 @@ export function buildAiContext(
         const osoba = (k: "jerry" | "terezka") => {
           const c = pnlSalary(k);
           const od = odModelu >= 0 ? odModelu : 0;
-          const rozdiely = c.rozdiel.slice(od, posl + 1).filter((x) => Number.isFinite(x));
-          const sklon = rozdiely.length ? rozdiely.reduce((a, b) => a + b, 0) / rozdiely.length : 0;
-          // TEMPO ZÁVISÍ OD OKNA — a to bola celá záhada zo 17. 8. 2026.
-          // Karta na obrazovke ráta priemer nad PRÁVE ZVOLENÝM obdobím, takže
-          // pri prepínači na „2026" hlási 7 283 Kč/mes., kým nad celou érou
-          // modelu vyjde 10 056. Ani jedno nie je zlé; zlé je povedať číslo
-          // bez toho, nad čím sa počítalo. Preto sú tu obe a pomenované.
-          const priemer = (a: number[]) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0);
+          // JEDEN výpočet tempa (vzas.ts `tempoDlhu`) a to isté okno, aké má
+          // karta v predvolenom stave: tento kalendárny rok. Do 18. 8. 2026
+          // tu boli dve vlastné čísla a karta tretie — tempo totiž závisí od
+          // okna a bez neho je nezmysel. Okno sa preto posiela s číslom.
           const rok = new Date().getFullYear().toString();
-          const odRoku = VZAS_MONTHS.findIndex((m) => (m as string).startsWith(rok));
-          const rozdielyRok = odRoku >= 0 ? c.rozdiel.slice(odRoku, posl + 1).filter((x) => Number.isFinite(x)) : [];
+          const idxRok = VZAS_MONTHS
+            .map((m, i) => ((m as string).startsWith(rok) && i <= posl ? i : -1))
+            .filter((i) => i >= 0);
+          const t = tempoDlhu(k, idxRok.length ? idxRok : [od, posl]);
           return {
             dlhCzk: Math.round(c.cumDebt[posl]),
-            smer: sklon > 0 ? "klesá" : sklon < 0 ? "rastie" : "stojí",
-            tempoTentoRok: rozdielyRok.length ? Math.round(priemer(rozdielyRok)) : null,
-            tempoOdZmenyModelu: Math.round(sklon),
+            smer: t.smer,
+            tempoCzkMesacne: Math.round(t.tempo),
+            tempoOkno: t.od && t.do ? `${t.od} – ${t.do} (${t.mesiacov} mes.)` : null,
             narokPoslednyMesiac: Math.round(c.narok[posl]),
             poslanePoslednyMesiac: Math.round(c.poslane[posl]),
           };
         };
         return {
-          poznamka: "Dlh medzi trénerom a firmou podľa mzdového modelu (Nárok = fix 27 000 + (hodiny − 60) × 850; Rozdiel = Nárok − Poslané; dlh sa kumuluje). ZÁPORNÉ číslo = tréner si vybral VIAC, než mu patrilo, teda dlží firme; kladné = firma dlží jemu. Toto je karta „Kam smeruje dlh“ v Peniaze → J&T Výplaty a jediné platné miesto — NIKDY to nedopočítavaj z bankových pohybov, tam sa pod „Jerry vyplata“ mieša výplata s osobnými nákupmi a chýba hotovosť. Mesiac, ku ktorému to platí, je „kMesiacu“. TEMPO (Kč za mesiac) je tu v dvoch podobách, lebo závisí od okna: „tempoTentoRok“ je priemer za tento kalendárny rok, „tempoOdZmenyModelu“ za celú éru dnešného mzdového modelu (od sep 2025). Karta na obrazovke ukazuje priemer za PRÁVE ZVOLENÉ obdobie v prepínači, takže sa s jedným z nich zhoduje podľa toho, čo má Jerry nastavené. VŽDY povedz, za aké obdobie tempo hovoríš — „rastie o X mesačne“ bez obdobia je číslo, ktoré sa nedá overiť. Vlastné tempo z nároku a poslaného NEPOČÍTAJ.",
+          poznamka: "Dlh medzi trénerom a firmou podľa mzdového modelu (Nárok = fix 27 000 + (hodiny − 60) × 850; Rozdiel = Nárok − Poslané; dlh sa kumuluje). ZÁPORNÉ číslo = tréner si vybral VIAC, než mu patrilo, teda dlží firme; kladné = firma dlží jemu. Toto je karta „Kam smeruje dlh“ v Peniaze → J&T Výplaty a jediné platné miesto — NIKDY to nedopočítavaj z bankových pohybov, tam sa pod „Jerry vyplata“ mieša výplata s osobnými nákupmi a chýba hotovosť. Mesiac, ku ktorému to platí, je „kMesiacu“. TEMPO (tempoCzkMesacne) je priemerný mesačný pohyb dlhu a platí nad oknom v „tempoOkno“ — je to to isté okno aj ten istý výpočet, aký má karta v predvolenom stave. Tempo bez okna je nezmysel: nad rokom 2026 vyjde iné číslo než nad celou érou modelu. VŽDY povedz aj okno. Keď má Jerry v prepínači iné obdobie, karta ukáže iné číslo — vtedy sa spýtaj, nad čím ho chce. Vlastné tempo z nároku a poslaného NEPOČÍTAJ.",
           kMesiacu: (VZAS_MONTHS[posl] as string) || null,
           jerry: osoba("jerry"),
           terezka: osoba("terezka"),
@@ -876,7 +940,10 @@ export function buildAiContext(
     // Hotový súhrn P&L po mesiacoch. Bez neho Jarvis na „aký bol zisk“ hľadal
     // v bankových pohyboch a odpovedal buď zle, alebo vôbec — číslo, ktoré
     // appka počíta na jednom riadku, nemá zmysel nechať odvodzovať.
-    pnlSuhrn,
+    pnlSuhrn: {
+      poznamka: "HOTOVÝ P&L po mesiacoch — to isté číslo, aké ukazuje obrazovka Peniaze → Zisky a straty a dlaždica uzavretého mesiaca na Kokpite. Na otázku „aký bol zisk / tržby / náklady v mesiaci X“ PREČÍTAJ hruby_zisk / prijmy / naklady_spolu odtiaľto a NEPOČÍTAJ si ho sám z bankových pohybov ani z payments. 19. 8. 2026 si na „hrubý zisk júl 2026“ odpovedal 157 498 Kč — poskladal si to z banky a zabudol väčšinu výplat; obrazovka mala 133 465. Banka má pohyby, P&L má pravidlá (čo je náklad, čo výplata, čo osobné, čo barter) — bez tých pravidiel vyjde iné číslo. vyplaty_poslane sú VŠETKY poslané výplaty za mesiac (Jerry, Terezka, Matyáš, spoločné), nie len dva riadky z fio_transactions. Keď sa ťa niekto spýta, odkiaľ číslo máš, povedz: z P&L appky, kľúč pnlSuhrn.",
+      mesiace: pnlSuhrn,
+    },
     pnlPolozky,
     klientiDetail,
   };

@@ -213,11 +213,11 @@ Cold Google Ads na lokální službu jako PSB naráží na malý objem aktivně 
 **Landing page prosapiens.cz/dychani:**
 - Vyžaduje jméno + e-mail pro přístup k free PDF (uzavírá dřívější díru ve funnelu, kdy se PDF dalo stáhnout bez kontaktu).
 - Placené CTA „Získat příručku — 290 Kč" je nad free variantou (placená konverze = primární, free = sekundární).
-- Free PDF řeší i podstránka `/dychani` přes Forminator formulář (form ID 5445) s redirectem na děkovací stránku s odkazem ke stažení.
+- Free PDF řeší i podstránka `/dychani` přes Forminator formulář (form ID 5445). Poděkování s odkazem ke stažení se zobrazuje **inline na téže stránce** (behaviour-thankyou) — na děkovací stránku se nepřesměrovává, takže GA4/Pixel události vázané na děkovací stránku se u tohoto formuláře nikdy nespustí.
 
 **ManyChat delivery:** DM trigger **„DECH"** pod postem → automaticky pošle DM s odkazem na lead magnet. Pozor: free plán ManyChat funguje jen na **už publikované** posty, a trigger je vázaný na konkrétní post — každý nový dechový post potřebuje vlastní nastavení triggeru.
 
-**⚠️ Kritický nevyřešený problém:** Forminator formulář vykazuje **vysoký počet zobrazení a nula odeslání**. Konverze na landing page je rozbitá — hlavní otevřená úloha funnelu. (Dřívější hypotéza: konflikt Forminatoru s WPBakery full-width řádkem. Neuzavřeno.)
+**✅ VYŘEŠENO (ověřeno živě 20. 8. 2026):** dřívější „nula odeslání přes vysoká zobrazení" NEBYLA rozbitá konverze. Dvě skutečné příčiny: (a) formulář 5445 byl na /dychani přidán až **19. 7. 2026** — po celou dobu reklamní kampaně (1.–19. 7.) byl free PDF přímý odkaz bez sběru e-mailu, takže kliky neměly co vyplnit; (b) měření je slepé — inline poděkování nikdy nespustí události „dakovnastranka"/„Leaddakovnastranka". Formulář FUNGUJE: živý test 20. 8. prošel a existují reálná organická odeslání (28. 7., 2. 8.). Hypotéza konfliktu s WPBakery je vyvrácená. Volitelné vylepšení (nízká priorita, jen pro měření organiky): vlastní děkovací stránka /podekovani-dychani/ + samostatná událost (např. LeadMagnetDychani); NIKDY nepoužít děkovací stránku poptávek („ozveme se do 48 hodin").
 
 **Meta Ads na tento funnel:** viz 4.4.
 
@@ -265,9 +265,7 @@ Cold Google Ads na lokální službu jako PSB naráží na malý objem aktivně 
 
 **Strategie:** retargeting teplého publika (viz 3.1). Broad cold cílení se nedělá.
 
-**Aktivní kampaň:** „Traffic — Příručka Dýchání — Warm A", cíl OUTCOME_TRAFFIC, CBO ~120 Kč/den, cílení IG engageři 365 dní, CZ+SK. Optimalizace na LANDING_PAGE_VIEWS, destinace /dychani.
-- Campaign ID: `52576823609275`, ad set ID: `52576825304475`.
-- **Výkon:** kliky a CTR jsou zdravé (CTR ~2 %, CPC ~2,8–3,5 Kč). Ale konverze na formuláři = nula (tentýž problém jako 4.1). Kliky přicházejí, funnel je za nimi rozbitý.
+**Kampaň ZÁMĚRNĚ ZASTAVENA (konec července 2026):** „Traffic — Příručka Dýchání — Warm A", cíl OUTCOME_TRAFFIC, cílení IG engageři 365 dní, CZ+SK (Campaign ID: `52576823609275`). Kliky a CTR byly zdravé (CTR ~2 %, CPC 2,81 Kč), ale ekonomika nevychází: červen+červenec dohromady **2 082 Kč** na produkt za 290 Kč s ~nulovými prodeji; teplé publikum je malé (~11 tis. reach, frekvence ~3), takže se to škálováním nespraví. Reklama na příručku se NEVRACÍ — nedoporučuj její restart. Další test reklamy je dohodnutý na září 2026 s cílem OUTCOME_LEADS na poptávky (ne na příručku); srpen je záměrně čistý měsíc s 0 Kč.
 
 **Kreativy:** starší Wim Hof Reel + novější Reel o bránici (symptom-first). Nové Reely mají symptom-first hook. Thumbnaily přes Higgsfield.
 
@@ -336,6 +334,8 @@ Cold Google Ads na lokální službu jako PSB naráží na malý objem aktivně 
 
 **Červen–červenec 2026 — Meta Ads Traffic kampaň + diagnostika konverze.** Postavena Traffic kampaň na teplé publikum. Kliky zdravé (CTR ~2 %), ale **nula odeslání formuláře** — odhalen kritický konverzní problém na /dychani (4.1). Opravena hierarchie CTA (placené nad free), landing page začala vyžadovat jméno+e-mail. Přímý test prodeje do e-mailové báze: 414 → 1 prodej (0,24 %) → potvrzeno, že vlažná báze na produkt nereaguje (3.1/3.2). Data z GSC ukázala fascie jako nejsilnější téma (3.3).
 
+**Srpen 2026 — zastavení kampaně a rozuzlení „nuly odeslání".** Kampaň na příručku záměrně zastavena (ekonomika: 2 082 Kč spend vs. 290 Kč produkt, ~0 prodejů). Ověřeno živě 20. 8.: formulář 5445 funguje, organická odeslání existují (28. 7., 2. 8.); „nula" z reklamního období vznikla tím, že formulář byl přidán až 19. 7. a měření je slepé (inline poděkování, žádná děkovací stránka). Srpen = čistý měsíc 0 Kč jako baseline pro zářijový test OUTCOME_LEADS.
+
 **Červenec 2026 — symptom-first pivot.** Na základě sales-psychology podkladu (Predaj_Tereza.docx) přepsán ad copy i infografiky z mechanism-first na symptom-first (3.4). Nový Reel o bránici. Poznatek k CBO (3 kreativy → algoritmus favorizuje starou).
 
 **Červenec 2026 — strategický obrat k fasciím.** Formulován závěr: rozpor mezi premium individualizovaným positioningem a prodejem univerzálního produktu studené publice (3.2). Zvoleno: rozsáhlejší placený dokument o fasciích + free diagnostická verze jako lead magnet, čerpání z existujících článků jako organických lead-capture lievikov, monetizace teplé báze místo cold reklamy. Zavržen B2B firemní workshop (předčasný). Instagram jako autoritativní účet přijat, ale jako víceletý horizont.
@@ -349,7 +349,7 @@ Cold Google Ads na lokální službu jako PSB naráží na malý objem aktivně 
 ## ČÁST 6 — Otevřené úkoly a rizika
 
 **Otevřené úkoly (podle priority):**
-1. **Vyřešit nulové odeslání Forminatoru na /dychani** — nejvyšší priorita. Bez toho nemá smysl škálovat reklamu, protože funnel za kliky nekonvertuje.
+1. ~~Vyřešit nulové odeslání Forminatoru~~ — VYŘEŠENO 20. 8. 2026, viz 4.1 (formulář funguje; šlo o pozdě přidaný formulář + slepé měření). Zbývá jen volitelná děkovací stránka pro měření organiky.
 2. **Rozhodnout strukturu propojení fascia knihy** s content/funnel plánem (nový funnel / obsahová linka / obojí).
 3. **Dopsat fascia knihu** (v Cowork) + připravit free diagnostickou verzi.
 4. **Optimalizovat title/meta** u fascia/Anatomy Trains článků (vysoké imprese, nízký CTR).
@@ -362,7 +362,7 @@ Cold Google Ads na lokální službu jako PSB naráží na malý objem aktivně 
 - **FP compliance** — žádný veřejný obsah nesmí jmenovat FP ani odhalit metodiku (2.3).
 - **Positioning vs. produkt** — nepodkopávat premium individualizovanou pozici masovým univerzálním prodejem (3.2).
 - **Měření** — EU cookie consent podhodnocuje GA4; čísla ber s rezervou.
-- **Tracking gap** — dokud nefunguje konverze na /dychani, „úspěšné" kliky nejsou úspěch.
+- **Tracking gap** — odeslání Forminatoru na /dychani se zatím neměří v GA4/Pixelu (inline poděkování); počet odeslání je vidět jen ve wp-admin → Forminator. Kliky z případné reklamy proto nelze vyhodnotit bez děkovací stránky.
 
 ---
 

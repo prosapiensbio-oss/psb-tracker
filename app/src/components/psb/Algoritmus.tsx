@@ -98,9 +98,16 @@ export function Algoritmus() {
     setBusy(false);
   };
 
+  // Optimisticky označí hneď, ale keď server zápis neprijme, vráti stav
+  // späť — inak by novinka zmizla z obrazovky a po reloade sa vrátila ako
+  // neprečítaná, bez stopy prečo (revízia 19. 8. 2026: bol tu fetch bez
+  // čakania na odpoveď).
   const oznacPrecitane = (id: string) => {
     setNovinky((p) => p.map((n) => (n.id === id ? { ...n, precitane: true } : n)));
-    void fetch("/api/algo", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ id }) });
+    void fetch("/api/algo", { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify({ id }) })
+      .then((r) => r.json().catch(() => ({ ok: r.ok })))
+      .then((j: { ok?: boolean }) => { if (!j.ok) setNovinky((p) => p.map((n) => (n.id === id ? { ...n, precitane: false } : n))); })
+      .catch(() => setNovinky((p) => p.map((n) => (n.id === id ? { ...n, precitane: false } : n))));
   };
 
   const dniOdRevizie = Math.round((Date.now() - Date.parse(PLATI_OD)) / 86400000);

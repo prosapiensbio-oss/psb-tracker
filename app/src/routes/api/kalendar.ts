@@ -16,11 +16,20 @@ import { ohlasitZmenu } from "../../lib/psb/kalendarZmeny";
 // Čo NEROBÍ: nezapisuje do sessions ani do peňazí. V nedeľu príde export z
 // PTmindera a ten je zdroj pravdy. Kalendár je predpoveď, PTminder je zápis.
 //
-// Okno je zámerne úzke — dva týždne dozadu (aby bolo z čoho robiť rozdiel) a
-// dva dopredu. Ďalej v čase sú opakované udalosti len zvykom kalendára, nie
-// informáciou: Jerry sám hovorí, že isté je nanajvýš dva týždne.
+// Dozadu tri týždne, dopredu dva.
+//
+// Dopredu zostáva úzke okno zámerne: ďalej v čase sú opakované udalosti len
+// zvykom kalendára, nie informáciou — Jerry sám hovorí, že isté je nanajvýš
+// dva týždne.
+//
+// Dozadu to bolo tiež štrnásť dní a ukázalo sa to ako málo (Jerry, 17. 8. 2026:
+// „aby som mohol nahliadnuť aspoň tri týždne do minulosti"). Späť sa človek
+// pozerá z iného dôvodu než dopredu — dohľadať, čo sa naozaj stalo. A appka
+// odvtedy z tohto okna aj počíta: chýbajúce sedenie v PTminderi sa dá nájsť
+// len tam, kam kalendár siaha, a mesačná uzávierka sa robí prvý víkend
+// nasledujúceho mesiaca, teda o dva a viac týždňov po prvých dňoch.
 
-const DOZADU_DNI = 14;
+const DOZADU_DNI = 21;
 const DOPREDU_DNI = 14;
 
 const uid = () => crypto.randomUUID();

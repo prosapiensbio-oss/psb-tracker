@@ -162,3 +162,145 @@ záver odporuje tomu, čo Jerry hovorí zo skúsenosti.
   a v správe je `psbdoc:<id>|<meno>`. Obsah drží 30 dní, potom zostane meno —
   a Jarvis má v prompte napísané, že vtedy má povedať pravdu, nie si domyslieť,
   čo v ňom bolo.
+- **Ostré dáta majú vlastný test: `./scripts/naostro.sh`.** Jednotkové testy
+  overujú pravidlá na vymyslených dátach; tento skript stiahne produkčné D1 do
+  dočasného priečinka a spustí nad ním tie isté funkcie, ktoré beží appka —
+  a hlavne simuluje, čo sa stane PO kliknutí (netrénoval → vráti sa „prestal
+  chodiť"; export dorazí → čakajúci klienti sa potvrdia). Dvakrát takto vypadla
+  chyba, ktorú testy nevideli: klient tretieho trénera (Matyáš), ktorého
+  notifikácie nevidel ani Jerry, ani Terezka, a tri riadky o jednom človeku.
+  Skript iba číta. Keď hlási zlyhanie, over najprv kontrolu samotnú — dvakrát
+  sa mýlila ona, nie appka (natvrdo napísaný kľúč; „dve úlohy o jednom človeku"
+  označené za duplicitu).
+- **Definícia klienta je JEDNA: `jeKlient` v MarketingLievik.tsx** (prišiel
+  znova, alebo zaplatil nad úvodný viac než 500 Kč). Revízia 18. 8. 2026 našla
+  štyri mäkšie lokálne kópie („má platbu" — spĺňal ju každý, kto prišiel na
+  platený úvodný): Kampane, Platená cesta, Kohorty, dlaždica Dopyty. Všetky už
+  importujú `jeKlient`. Keď píšeš čokoľvek s „klientom" v čitateli alebo
+  menovateli, importuj ju tiež — vlastná kópia je zárodok ďalšieho „124 %".
+- **Sklady v marketing.ts majú verziu: `marketingVerzia()`.** Každý `nastav*`
+  ju zvýši. Kto číta WEB_STRANKY/GSC_*/IG_PRISPEVKY v useMemo, MUSÍ ju mať
+  v deps — inak memo zamrzne nad prázdnym skladom, keď jeho vlastný fetch
+  dobehne skôr než /api/marketing (PlanObsahu, 18. 8.).
+- **Importný setter musí mazať aj to, čo zo zdroja zmizlo.** nastavNakladyZFio
+  nuloval P&L, ale nie Jarkovu splátku a výplaty z toho istého výpisu — pohyb
+  preradený inam prestal byť nákladom, ale dlh ďalej klesal. To isté platilo
+  pre BTC výplaty a barter. Pravidlo: keď vstup nesie CELÝ obraz zdroja,
+  prejdi všetky importované mesiace a chýbajúce vynuluj (testy v vzas.test.ts).
+- **Appka beží na `kokpit.prosapiensbio.workers.dev`** — s prefixom. Adresa bez
+  neho v DNS neexistuje, takže prehliadač aj curl vrátia chybu. 18. 8. 2026 som
+  z toho na pol dňa urobil záver „prehliadač ma tam nepustí" a celú revíziu
+  overoval len cez dáta z D1, hoci sa dalo klikať. Adresa je v `scripts/nasad.sh`
+  ako `adresa=` a je jediné miesto, kde treba pozrieť.
+- **Meno klienta v Jarvisovej odpovedi má dva tvary.** `«Veronikou
+  Stoklaskovou|Veronika Stoklaskova»` — vľavo to, čo číta človek, vpravo kľúč
+  z `klientiDetail`, podľa ktorého appka nájde klienta. Bez zvislice je to
+  jedno aj druhé. Parsuje to `menoOdkazu` v `lib/psb/odkazy.ts`; kto pridá
+  ďalšie miesto, kde sa «» rozbaľuje, nech použije ju (18. 8. 2026 boli také
+  miesta dve — bublina a úryvok vo vyhľadávaní).
+- **Pravidlo v prompte, ktoré si odporuje so susednou vetou, prehrá.** „Skloňuj
+  meno" vedľa „meno používaj presne ako je v dátach" nezabralo ani raz. Zabralo
+  až prepísanie do jedného pravidla s doslovným ZLE/DOBRE príkladom. To isté
+  platilo pre dĺžku: zákaz v odseku o strope funguje, poznámka na konci nie.
+- **Po nasadení pred meraním v prehliadači daj tvrdý reload** (cmd+shift+r).
+  18. 8. som meral odpoveď vykreslenú starým bundlom a vyzeralo to ako chyba
+  v novom kóde — v odpovedi svietila surová zvislica.
+- **Čo Jarvis počíta v hlave, to raz spočíta zle.** 18. 8. 2026 dal na tú istú
+  otázku o rezerve dva rôzne rozdiely do cieľa (113 500 a 313 700 Kč) z tých
+  istých vstupov. Model je dobrý na súvislosti, nie na aritmetiku. Pravidlo:
+  keď má odpoveď obsahovať odvodené číslo, ktoré appka vie spočítať, spočítaj
+  ho v `lib/psb/` a pošli ho v kontexte hotové — s poznámkou, že si ho nemá
+  rátať sám. Vzor: `chybaDoCiela` v `rezerva.ts`, ktorý číta dlaždica aj kontext.
+- **Import, ktorý vzal len časť sveta, vyzerá presne ako ten úplný.** Oba
+  hlásia „hotovo" a číslo pridaných riadkov. 14. 8. 2026 tak prešiel export
+  balíčkov za 14 dní: appka ohlásila „+20 riadkov", riadkov malo byť 77
+  a Natália Pečková zostala na 0 hodinách, kým to Jerry o päť dní náhodou
+  nenašiel. Merge per-klient (`ingest`, vetva `packages`) je pritom správny —
+  klient mimo súboru sa nesmie zmazať. Chýbal len ten druhý pohľad: PRED
+  zápisom si odložiť, kto mal živý balíček, a po porovnaní so súborom vrátiť
+  mená tých, čo v ňom nie sú (`IngestResult.chybaju`). Keď píšeš import, ktorý
+  nesie len VÝSEK zdroja, povedz nahlas, čo v tom výseku nebolo — inak sa
+  ticho nedá odlíšiť od úplnosti.
+- **Pri revízii najprv čítaj ODPOVEDE, až potom hlás nálezy.** 19. 8. 2026
+  som ako dieru v P&L ohlásil chýbajúci júlový nájom — pritom odpoveď stála
+  v `anomaly_ack` („Radek Baláž dal júl zadarmo — nájom sa neplatil",
+  odklepnuté 6. 8.) aj v poznámke mesiaca. Vysvetlená vec nie je nález.
+  Poradie kontroly rozporu v dátach: 1. `anomaly_ack` (kľúč aj note),
+  2. `vzas_month_notes`, 3. `jarvis_zavery` — a až keď je všade ticho, je to
+  nález. Presne na toto existuje pamäť „registra": odpovede neminú, len ich
+  treba čítať.
+- **Splátka dlhu je záznam v knihe, nie snímka.** Sofiin barter sa staval zo
+  `packages` (momentka) a po vypršaní balíčka by sa už započítaný mesiac
+  ticho vynuloval — dlh by spätne narástol. Raz videný barter sa preto ukladá
+  (`vzas_settings.barter_jarek`) a vstup pre setter je zjednotenie snímky
+  s uloženým. Pravidlo „importný setter maže, čo zo zdroja zmizlo" platí len
+  pre zdroje, ktoré nesú CELÝ obraz — snímka aktuálneho stavu ho nenesie.
+
+- **Hotové číslo v kontexte bez pokynu Jarvis nepoužije.** `pnlSuhrn` so
+  ziskom po mesiacoch v kontexte BOL — a Jarvis si zisk júla aj tak poskladal
+  z banky (157 498 namiesto 133 465), lebo nič mu nehovorilo, že TO je to
+  pravé číslo. Model radšej „poctivo" počíta, než by veril kľúču, ktorý mu
+  nikto nepredstavil. Každé hotové číslo v `aiContext` potrebuje `poznamka`
+  s vetou „PREČÍTAJ, NEPOČÍTAJ" a odkazom na obrazovku — vzor je `rezerva`,
+  `dlhyVyplaty`, od 19. 8. aj `pnlSuhrn`. Bez toho je kľúč v kontexte
+  dekorácia.
+- **`pragma_table_info` v JOINe D1 odmietne (`SQLITE_AUTH`) a vráti prázdno.**
+  Stráž migrácií 19. 8. najprv „dokázala", že 25 migrácií v DB nie je — bol to
+  zamietnutý dopyt, nie chýbajúca schéma. Schéma sa číta tabuľka po tabuľke.
+  Prázdna odpoveď nie je dôkaz ani vtedy, keď ju vyrobil môj vlastný skript.
+
+- **Zo zostatku hodín sa chýbajúci import poznať NEDÁ.** 19. 8. 2026 tu pár
+  hodín žila anomália `nulahodin|` („chodí, ale má 0 hodín"). Vyzerala logicky
+  — kto chodí a platí, má mať čo míňať — a padla na tom, že PSB predáva aj
+  PAUŠÁLNE ČLENSTVÁ (GOLD/SILVER/DIAMOND/ONE). Tie v exporte stoja **navždy na
+  0/N**, takže nula hodín je pri nich normálny trvalý stav; kontrola hlásila
+  Jakuba Štiguta ako podozrenie na chýbajúci import, hoci appka aj PTminder
+  ukazovali to isté. Takých klientov je 34 zo 76. Je to presne ten bug, ktorý
+  `jeDoplnok` v `deriveClients` UŽ RAZ opravoval z druhej strany („došli hodiny"
+  u 40 zo 73 klientov, ktorým nič nekončilo) — zopakoval som ho, lebo som si
+  ten komentár neprečítal. **Príčinu chyby v dátach hľadaj tam, kde chyba
+  vzniká** (pri importe), nie dodatočnou dedukciou z čísel, ktoré na ňu
+  nestačia. A pred písaním kontroly nad balíčkami si prečítaj komentár nad
+  `jeDoplnok` — je tam napísané, prečo tieto čísla neznamenajú to, čo sa zdá.
+- **Kontrola, ktorá svieti na nesprávnych ľudí, je horšia než žiadna.** Tá istá
+  anomália hlásila v prvej verzii šesť klientov, z toho štyroch zbytočne
+  (dočerpaný balíček s bežiacou platnosťou, nováčik po úvodnej hodine — oboje
+  normálne stavy). Vyplávalo to len tak, že som si každý nález overil v D1
+  menom; testy aj `naostro.sh` boli zelené. Pri novej kontrole nad ostrými
+  dátami platí: kým nevieš o KAŽDOM náleze povedať, prečo tam je, kontrola nie
+  je hotová — a „prešlo to" nie je odpoveď. Zvyšok dorazil až Jerry pohľadom do
+  PTminderu, čo je posledná inštancia pravdy o balíčkoch.
+
+- **`(#3) capability` nemusí znamenať chýbajúce App Review.** 19. 8. 2026 sa
+  ukázalo, že Kokpit nevedel vyrobiť kreatívu z celkom inej príčiny:
+  facebooková aplikácia (App ID `1038839719119872`) stála v režime
+  **Development**. Meta to povie až pri `object_story_spec` („Ads creative post
+  was created by an app that is in development mode"), kým pri
+  `source_instagram_media_id` vráti len holé `(#3)`. Po publikovaní appky
+  (Settings → Basic doplniť Privacy policy URL + Category, potom Publish)
+  prešli bežné kreatívy hneď. **Boost hotového IG príspevku
+  (`source_instagram_media_id`) má vlastnú bránu a tú publikovanie
+  neotvorilo** — na ten treba Full Access (500 volaní/15 dní). Keď Meta
+  odmietne, over OBE veci; sú to dve rôzne brány a chyba vyzerá rovnako.
+- **App ID `1038839719119872` sa v Events Manageri tvári ako dataset.** Je to
+  aplikácia Kokpit, cez ktorú ide celé Meta API vrátane CAPI — nie zabudnutý
+  pixel. Nemazať. (19. 8. som ju omylom navrhol zmazať.)
+
+- **Reklamné kampane vznikajú len na účte `172897726151288`.** Je to jediný
+  účet, ktorý Kokpit číta. Server ho berie z konštanty `UCET_REKLAM`
+  (`lib/psb/kampanPlan.ts`), NIE z nastavenia `meta_ad_account` — nastavenie
+  sa dá prepísať v inej karte a kampaň by ticho vznikla tam, kam appka
+  nevidí. Presne to sa stalo v osobnom účte `3356679857899572`: dve zapnuté
+  kampane z januára 2023, o ktorých Kokpit nevedel.
+
+## Jarvisove zdroje pravdy nie sú len DB
+
+Jarvisov kontext skladá `chat.ts` z viacerých zdrojov a pri oprave faktu treba nájsť VŠETKY:
+`<data>` (aiContext z D1), `<pamat_zaverov>` (jarvis_zavery), `<pozadie_psb>`
+(**PSB_KNOWLEDGE v `src/lib/psb/knowledge.ts` — importuje statické .md súbory z repa,
+napr. `marketing-onboarding.md`!**), `<zameranie>` (zamerania.ts) a jarvis_vedomosti.
+20. 8. 2026 Jarvis tri razy „konfabuloval" onboarding so zastaranou diagnózou — nebola to
+konfabulácia, bol to statický marketing-onboarding.md zapečený v builde, ktorý som hľadal
+len v databáze. Prázdna odpoveď z DB nie je dôkaz, že zdroj neexistuje — grep aj repo.
+Keď sa zmení marketingový fakt, over: marketing-onboarding.md + jarvis_vedomosti +
+jarvis_zavery + pamäť Claude Projectu (cez Chrome).

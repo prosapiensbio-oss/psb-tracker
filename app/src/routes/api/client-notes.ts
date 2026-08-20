@@ -51,9 +51,16 @@ export const Route = createFileRoute("/api/client-notes")({
 
         const autor = (await currentUser(request)) || "app";
         const now = new Date().toISOString();
-        await DB.prepare(
-          "INSERT INTO client_notes (id, client_name, note, author, created_at) VALUES (?1, ?2, ?3, ?4, ?5)",
-        ).bind(uid(), name, note, autor, now).run();
+        // try/catch ako ostatné POST handlery (merania, napady): výnimka z D1
+        // by inak vyletela ako neJSON 500 a klientov r.json() by ju prehltol —
+        // zápis by zmizol úplne bez stopy (revízia 19. 8. 2026).
+        try {
+          await DB.prepare(
+            "INSERT INTO client_notes (id, client_name, note, author, created_at) VALUES (?1, ?2, ?3, ?4, ?5)",
+          ).bind(uid(), name, note, autor, now).run();
+        } catch (e) {
+          return Response.json({ ok: false, error: `Zápis sa neuložil: ${String(e).slice(0, 200)}` }, { status: 500 });
+        }
         await audit(DB, { action: "dennik-zapis", predmet: name, neu: note.slice(0, 120), actor: autor });
         return Response.json({ ok: true });
       },

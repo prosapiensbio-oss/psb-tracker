@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
+import { PripravitKampan, type NavrhKampane } from "./KampanForm";
 import { C, mix } from "../../lib/psb/theme";
 import { patriDoZoznamu, ZAMERANIA } from "../../lib/psb/zamerania";
 import { ChatConversation, type AssistantChat } from "./Assistant";
@@ -67,6 +68,19 @@ export function JarvisOkno({
   const [filter, setFilter] = useState("");
   const [archivOtvoreny, setArchivOtvoreny] = useState(false);
   const [menimZameranie, setMenimZameranie] = useState(false);
+  /**
+   * Formulár kampane sa neotvára tlačidlom, ale ZAMERANÍM.
+   *
+   * Prvá verzia (19. 8. 2026) mala v hlavičke prepínač „pripraviť kampaň" a
+   * Jerry na ňom ukázal, čo je zle: príprava kampane nie je nástroj vedľa
+   * rozhovoru, je to DRUH rozhovoru. Preto je z toho zameranie ako Marketing
+   * či Peniaze — má vlastnú rolu, vlastné pravidlá a formulár patrí k nemu.
+   *
+   * Otvorí sa aj vtedy, keď Jarvis v inom zameraní navrhne konkrétnu kampaň
+   * a Jerry na ten návrh klikne.
+   */
+  const [zNavrhu, setZNavrhu] = useState(false);
+  const [navrhKampane, setNavrhKampane] = useState<NavrhKampane | null>(null);
 
   /**
    * Vstup do záložky vždy otvorí nový rozhovor.
@@ -122,14 +136,14 @@ export function JarvisOkno({
    * Úryvok ukazuje TEXT, nie značky.
    *
    * Odpoveď nesie vnútorné značky pre odkazy — ⟦Peniaze → Výplaty|vzas|vyplaty⟧,
-   * «meno klienta», **tučné**, psbdoc:<id>. V bubline sa z nich stanú tlačidlá,
+   * «meno klienta» (aj v tvare «Richardom Matlom|Richard Matl»), **tučné**, psbdoc:<id>. V bubline sa z nich stanú tlačidlá,
    * ale v úryvku pod výsledkom hľadania presvitali tak, ako sú, a bolo z toho
    * nečitateľné „karta Guillermo v ⟦Peniaze → Výplaty|vzas|vypl…".
    */
   const ocisti = (t: string) =>
     (t || "")
       .replace(/⟦([^|⟧]+)(\|[^⟧]*)?⟧/g, "$1")
-      .replace(/«([^»]+)»/g, "$1")
+      .replace(/«([^|»]+)(\|[^»]*)?»/g, "$1")
       .replace(/\*\*([^*]+)\*\*/g, "$1")
       .replace(/`([^`]+)`/g, "$1")
       .replace(/psbdoc:[^|\s]+\|/g, "");
@@ -302,15 +316,23 @@ export function JarvisOkno({
               <div style={{ fontSize: 12.5, fontWeight: 600, color: C.text }}>{zam.rola}</div>
               <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2, lineHeight: 1.45 }}>{zam.popis}</div>
             </div>
-            <button
-              onClick={() => setMenimZameranie((v) => !v)}
-              style={{
-                background: "none", border: "none", padding: 0, color: C.accentLight,
-                fontSize: 11, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap", flexShrink: 0,
-              }}
-            >
-              {menimZameranie ? "zavrieť" : "zmeniť zameranie"}
-            </button>
+            <div style={{ display: "flex", gap: 10, alignItems: "baseline", flexShrink: 0 }}>
+              {/*
+                Príprava kampane priamo tu, lebo sa o nej najprv debatuje.
+                Jerry, 19. 8. 2026: „kampane by som chcel pripravovať aj na
+                základe rozhovoru s ním." Formulár je ten istý komponent ako
+                v Marketingu — vrátane toho, že kampaň vznikne pozastavená.
+              */}
+              <button
+                onClick={() => setMenimZameranie((v) => !v)}
+                style={{
+                  background: "none", border: "none", padding: 0, color: C.accentLight,
+                  fontSize: 11, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap",
+                }}
+              >
+                {menimZameranie ? "zavrieť" : "zmeniť zameranie"}
+              </button>
+            </div>
           </div>
 
           {menimZameranie && (
@@ -334,8 +356,15 @@ export function JarvisOkno({
           )}
         </div>
 
+        {(chat.kategoria === "kampan" || zNavrhu) && (
+          <div style={{ borderBottom: `1px solid ${C.border}`, background: mix(C.accent, 3), maxHeight: "62%", overflowY: "auto" }}>
+            <PripravitKampan akoKarta={false} navrh={navrhKampane} />
+          </div>
+        )}
+
         <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-          <ChatConversation chat={chat} autoFocus onClientClick={onClientClick} onNavigate={onNavigate} />
+          <ChatConversation chat={chat} autoFocus onClientClick={onClientClick} onNavigate={onNavigate}
+            onKampan={(n) => { setNavrhKampane(n); setZNavrhu(true); }} />
         </div>
       </div>
     </div>

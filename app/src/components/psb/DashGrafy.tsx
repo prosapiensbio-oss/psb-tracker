@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from
 import { fetchBtcReserve, fetchVzasSettings, fetchWeekEntries, type BtcReserve } from "../../lib/psb/client";
 import { objednaneVerzia, membershipBucket, type ClientAgg } from "../../lib/psb/compute";
 import { fmtCZK, monthLabel } from "../../lib/psb/format";
-import { GA4_MESACNE, GSC_MESACNE, MKT_MESACNE, nastavAdsZImportu, nastavWebStranky, nastavWebRychlost, nastavMarketingZImportu, nastavWebZImportu, type Ga4Mesiac, type GscDopyt, type GscMesiac, type GscStrana, type MktKus, type MktMesiac, type GadsDopyt, type GadsKampan, type WebStrankaUI } from "../../lib/psb/marketing";
+import { GA4_MESACNE, GSC_MESACNE, KANALY, MKT_MESACNE, marketingVerzia, type KanalRiadok } from "../../lib/psb/marketing";
 import type { PsRiadok } from "../../lib/psb/pagespeed";
 import { C, MEMBERSHIP_COLORS, mix } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
@@ -11,9 +11,10 @@ import {
   byCommitment, commitmentTotal, computeKpis, jarekCalc, kpiDefs, KPI_GROUP_LABELS, nastavPrijmyZTrackera,
   pnlCalc, QUARTERS, salaryCalc, VZAS_MONTH_LABELS, VZAS_MONTHS, VZAS_TARGETS_BY_YEAR, vzasVerzia,
   type KpiGroup, type KpiOverrides, poslednyMesiacSDatami, predikciaNakladov,} from "../../lib/psb/vzas";
+import { breakEvenRad, poslednyUzavretyIdx } from "../../lib/psb/rezerva";
 import { kpiFmt } from "./Vzas";
-import { cenaZaSedenie, doPlnehoMesiaca, najdiKlienta, kotvaDat, monthlyFinance, predictCash, predictEarnings, ziskavanieKlientov } from "../../lib/psb/compute";
-import type { KanalRiadok } from "./Kanaly";
+import { jeKlient } from "./MarketingLievik";
+import { cenaZaSedenie, doPlnehoMesiaca, najdiKlienta, kotvaDat, monthlyFinance, pocetUvodnych, predictCash, predictEarnings, ziskavanieKlientov } from "../../lib/psb/compute";
 import { ZDROJE } from "./Klienti";
 import { tokyKlientov } from "./Fluktuacia";
 import { PlatobneKanaly } from "./PlatobneKanaly";
@@ -434,7 +435,8 @@ export function useExtraGrafy({
     const p = pnlCalc();
     const j = salaryCalc("jerry");
     const t = salaryCalc("terezka");
-    const be = VZAS_MONTHS.map((_, i) => p.bezVyplat[i] + j.narok[i] + t.narok[i] + p.matyas[i]);
+    // Vzorec žije v rezerva.ts — jedna definícia (do 18. 8. štyri kópie).
+    const be = breakEvenRad();
     return { p, j, t, be, jarek: jarekCalc() };
     // Verzia modelu: importy menia rady mimo Reactu, bez nej by karty ukazovali
     // stav spred načítania nákladov z banky.
@@ -477,8 +479,12 @@ export function useExtraGrafy({
     }).catch(() => setKpiNacitane(true));
   }, [chceKpi, kpiNacitane]);
 
-  const [kanaly, setKanaly] = useState<KanalRiadok[]>([]);
-  const [mktTik, setMktTik] = useState(0);
+  // Kanály aj ostatné marketingové sklady plní App.tsx jedným volaním pri
+  // štarte — táto obrazovka si ich do 19. 8. 2026 ťahala druhýkrát sama.
+  // `mktTik` je verzia skladu: mení sa, keď dáta dorazia, a je v deps
+  // veľkého useMemo nižšie, takže sa grafy prekreslia.
+  const mktTik = marketingVerzia();
+  const kanaly = useMemo(() => KANALY, [mktTik]); // eslint-disable-line react-hooks/exhaustive-deps
   const chceMkt = aktivne.has("dosahIG") || aktivne.has("web") || aktivne.has("vyhladavanie") || aktivne.has("kanaly");
   // Značky kampaní pre anotácie v krivkách. Ležia v tom istom úložisku ako
   // v Marketingu (vzas_settings → mkt_znacky), takže to, čo Jerry zapíše cez
@@ -493,21 +499,6 @@ export function useExtraGrafy({
       })
       .catch(() => {});
   }, [chceMkt, aktivne]);
-  useEffect(() => {
-    if (!chceMkt || mktTik) return;
-    void fetch("/api/marketing", { credentials: "same-origin" })
-      .then((r) => r.json())
-      .then((j: { mesacne?: MktMesiac[]; top?: MktKus[]; ga4?: Ga4Mesiac[]; gscMesacne?: GscMesiac[]; gscDopyty?: GscDopyt[]; gscStrany?: GscStrana[]; ga4Strany?: { url: string; zobrazenia: number }[]; gscZariadenia?: { zariadenie: string; kliky: number; zobrazenia: number }[]; kanaly?: KanalRiadok[]; gadsKampane?: GadsKampan[]; gadsDopyty?: GadsDopyt[]; gadsValuta?: string; webStranky?: WebStrankaUI[]; webRychlost?: PsRiadok[] }) => {
-        nastavMarketingZImportu(j.mesacne || [], j.top || []);
-        nastavWebZImportu(j.ga4 || [], j.gscMesacne || [], j.gscDopyty || [], j.gscStrany || [], j.ga4Strany || [], j.gscZariadenia || []);
-        nastavAdsZImportu(j.gadsKampane || [], j.gadsDopyty || [], j.gadsValuta || "");
-        nastavWebStranky(j.webStranky || []);
-        nastavWebRychlost(j.webRychlost || []);
-        setKanaly(j.kanaly || []);
-        setMktTik(1);
-      })
-      .catch(() => setMktTik(1));
-  }, [chceMkt, mktTik]);
 
   return useMemo(() => {
     const { p, j, t, be, jarek } = vzas;
@@ -522,10 +513,7 @@ export function useExtraGrafy({
     // ako mesiac pod čiarou a „Zdravie firmy" priemerovalo desať dní ako
     // celý mesiac. Bežiaci mesiac sa preskočí; keby všetky dáta ležali v ňom
     // (čerstvá inštalácia), vezme sa posledný s dátami ako núdza.
-    let poslI = poslednyMesiacSDatami();
-    const beziaciMk = new Date().toISOString().slice(0, 7);
-    while (poslI > 0 && (VZAS_MONTHS[poslI] as string) >= beziaciMk) poslI--;
-    if ((VZAS_MONTHS[poslI] as string) >= beziaciMk) poslI = poslednyMesiacSDatami();
+    const poslI = poslednyUzavretyIdx();
     const { od: odMK, do_: doMK } = hraniceObdobia(obdobie, VZAS_MONTHS[poslI] || "9999-12");
     const idxOkno = VZAS_MONTHS.map((m, i) => [m, i] as const)
       .filter(([m, i]) => i <= poslI && m >= odMK && m <= doMK)
@@ -1299,7 +1287,12 @@ export function useExtraGrafy({
       // prichádza z PTmindera — diakritika ani preklep („Prochadzka") nesmú
       // konverziu skryť. Vracia kanonické meno, aby klik otvoril klienta pod
       // menom, pod ktorým ho pozná zoznam Klientov.
-      const menaKlientov = Object.values(clients).filter((c) => c.firstSession).map((c) => c.name);
+      // jeKlient, nie „má firstSession": úvodný je PLATENÝ, takže „ukázal sa
+      // na tréningu" spĺňal každý dopyt, čo naň prišiel — presne tá podmienka
+      // splniteľná automaticky, ktorú lievik opustil 18. 8. Na ostrých dátach
+      // to robilo 69 % konverzie referencií namiesto 50 % (revízia 19. 8.).
+      const menaKlientov = Object.values(clients)
+        .filter((c) => !c.vratenie && jeKlient(c, data.payments)).map((c) => c.name);
       for (const l of data.leads || []) {
         const e = m.get(l.source) || { dopyty: 0, klienti: 0, mena: [] };
         e.dopyty++;
@@ -1568,17 +1561,25 @@ export function useExtraGrafy({
     const aktivni = Object.values(clients).filter((c) => c.status !== "Neaktívny");
     const segPocty = { Anchor: 0, "Stabilný": 0, "Sporadický": 0 } as Record<string, number>;
     for (const c of aktivni) if (segPocty[c.segment] !== undefined) segPocty[c.segment]++;
+    /**
+     * Klik z karty otvorí PRESNE tú skupinu ľudí, z ktorej je číslo — nie
+     * celú obrazovku Klientov. Do 19. 8. 2026 viedli Segmenty, Dochádzka aj
+     * Referenčný motor na všetkých klientov a človek si musel tých 12
+     * Anchorov hľadať sám. Metrika, pod ktorú sa nedá kliknúť a uvidieť
+     * mená, je nebezpečná aj keď je správna.
+     */
+    const otvorSkupinu = (label: string, mena: string[]) => () =>
+      onNavigate("klienti", undefined, { skupina: { label, mena }, nonce: Date.now() });
+    const menaSeg = (seg: string) => aktivni.filter((c) => c.segment === seg).map((c) => c.name);
     nodes.segmenty = (
       <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column" }}>
         <H3><Info label="Segmenty klientov" text="Anchor chodí aspoň 84 % týždňov, Stabilný aspoň 50 %, Sporadický menej — z posledných 18 týždňov. Anchori sú základ, na ktorom firma stojí: sú predvídateľní, chodia aj v lete a odporúčajú ďalej. Klesajúci počet Anchorov je varovanie aj vtedy, keď celkový počet klientov rastie." /></H3>
-        <Klik kam={() => onNavigate("klienti")} onNavigate="Klienti">
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}>
-            <MiniStat label="Anchor" value={String(segPocty.Anchor)} color={C.green} />
-            <MiniStat label="Stabilný" value={String(segPocty["Stabilný"])} color={C.accent} />
-            <MiniStat label="Sporadický" value={String(segPocty["Sporadický"])} color={C.orange} />
-            <MiniStat label="Aktívnych spolu" value={String(aktivni.length)} />
-          </div>
-        </Klik>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}>
+          <div onClick={otvorSkupinu("Anchor — chodia aspoň 84 % týždňov", menaSeg("Anchor"))} style={{ cursor: "pointer" }} title="Otvoriť týchto ľudí"><MiniStat label="Anchor" value={String(segPocty.Anchor)} color={C.green} /></div>
+          <div onClick={otvorSkupinu("Stabilní — chodia 50–84 % týždňov", menaSeg("Stabilný"))} style={{ cursor: "pointer" }} title="Otvoriť týchto ľudí"><MiniStat label="Stabilný" value={String(segPocty["Stabilný"])} color={C.accent} /></div>
+          <div onClick={otvorSkupinu("Sporadickí — chodia menej než polovicu týždňov", menaSeg("Sporadický"))} style={{ cursor: "pointer" }} title="Otvoriť týchto ľudí"><MiniStat label="Sporadický" value={String(segPocty["Sporadický"])} color={C.orange} /></div>
+          <div onClick={otvorSkupinu("Aktívni klienti", aktivni.map((c) => c.name))} style={{ cursor: "pointer" }} title="Otvoriť týchto ľudí"><MiniStat label="Aktívnych spolu" value={String(aktivni.length)} /></div>
+        </div>
       </Card>
     );
 
@@ -1587,14 +1588,12 @@ export function useExtraGrafy({
     nodes.dochadzka = (
       <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column" }}>
         <H3><Info label="Dochádzka" text="Podiel týždňov s aspoň jedným tréningom za posledných 18 týždňov, priemer cez aktívnych klientov. Dochádzka je mechanizmus za udržaním: kto chodí dvakrát týždenne, odchádza podstatne menej než ten, kto chodí raz za čas. Preto je pokles dochádzky varovanie skôr, než sa niekto naozaj odhlási." /></H3>
-        <Klik kam={() => onNavigate("klienti")} onNavigate="Klienti">
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}>
-            <MiniStat label="Ø dochádzka" value={`${priemDoch.toFixed(0)} %`} color={priemDoch >= 70 ? C.green : priemDoch >= 50 ? C.orange : C.red} />
-            <MiniStat label="Pod 50 %" value={String(podPolovicou)} color={podPolovicou > aktivni.length * 0.25 ? C.red : C.orange} />
-            <MiniStat label="Anchor (≥84 %)" value={String(segPocty.Anchor)} color={C.green} />
-            <MiniStat label="Aktívnych" value={String(aktivni.length)} />
-          </div>
-        </Klik>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}>
+          <div onClick={otvorSkupinu("Aktívni klienti — Ø dochádzka sa ráta z nich", aktivni.map((c) => c.name))} style={{ cursor: "pointer" }} title="Otvoriť týchto ľudí"><MiniStat label="Ø dochádzka" value={`${priemDoch.toFixed(0)} %`} color={priemDoch >= 70 ? C.green : priemDoch >= 50 ? C.orange : C.red} /></div>
+          <div onClick={otvorSkupinu("Dochádzka pod 50 % (z posledných 18 týždňov)", aktivni.filter((c) => c.attendance < 0.5).map((c) => c.name))} style={{ cursor: "pointer" }} title="Otvoriť týchto ľudí"><MiniStat label="Pod 50 %" value={String(podPolovicou)} color={podPolovicou > aktivni.length * 0.25 ? C.red : C.orange} /></div>
+          <div onClick={otvorSkupinu("Anchor — chodia aspoň 84 % týždňov", menaSeg("Anchor"))} style={{ cursor: "pointer" }} title="Otvoriť týchto ľudí"><MiniStat label="Anchor (≥84 %)" value={String(segPocty.Anchor)} color={C.green} /></div>
+          <div onClick={otvorSkupinu("Aktívni klienti", aktivni.map((c) => c.name))} style={{ cursor: "pointer" }} title="Otvoriť týchto ľudí"><MiniStat label="Aktívnych" value={String(aktivni.length)} /></div>
+        </div>
       </Card>
     );
 
@@ -1606,14 +1605,12 @@ export function useExtraGrafy({
     nodes.referencny = (
       <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column" }}>
         <H3><Info label="Referenčný motor" text="Klienti, ktorí prišli na odporúčanie iného klienta. Najlacnejší kanál, aký firma má — nestojí nič a konvertuje lepšie než čokoľvek platené, lebo človek prichádza už s dôverou. Podiel na všetkých so zapísaným zdrojom hovorí, či motor beží, alebo či firma stojí na reklame." /></H3>
-        <Klik kam={() => onNavigate("klienti", "referencie")} onNavigate="Klienti → Referencie">
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}>
-            <MiniStat label="Z odporúčania" value={String(zRef.length)} color={C.green} />
-            <MiniStat label="Podiel (so zdrojom)" value={vsetciSoZdrojom.length ? `${((zRef.length / vsetciSoZdrojom.length) * 100).toFixed(0)} %` : "—"} color={C.accent} />
-            <MiniStat label="Priniesli spolu" value={fmtCZK(refTrzba)} />
-            <MiniStat label="Ø na klienta" value={zRef.length ? fmtCZK(refTrzba / zRef.length) : "—"} />
-          </div>
-        </Klik>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}>
+          <div onClick={otvorSkupinu("Prišli na odporúčanie", zRef.map((c) => c.name))} style={{ cursor: "pointer" }} title="Otvoriť týchto ľudí"><MiniStat label="Z odporúčania" value={String(zRef.length)} color={C.green} /></div>
+          <div onClick={otvorSkupinu(`Klienti so zapísaným zdrojom — menovateľ podielu (${zRef.length} z nich z odporúčania)`, vsetciSoZdrojom.map((c) => c.name))} style={{ cursor: "pointer" }} title="Otvoriť menovateľ"><MiniStat label="Podiel (so zdrojom)" value={vsetciSoZdrojom.length ? `${((zRef.length / vsetciSoZdrojom.length) * 100).toFixed(0)} %` : "—"} color={C.accent} /></div>
+          <div onClick={otvorSkupinu("Prišli na odporúčanie — súčet ich celoživotnej tržby", zRef.map((c) => c.name))} style={{ cursor: "pointer" }} title="Otvoriť týchto ľudí"><MiniStat label="Priniesli spolu" value={fmtCZK(refTrzba)} /></div>
+          <div onClick={() => onNavigate("klienti", "referencie")} style={{ cursor: "pointer" }} title="Otvoriť Klienti → Referencie"><MiniStat label="Ø na klienta" value={zRef.length ? fmtCZK(refTrzba / zRef.length) : "—"} /></div>
+        </div>
       </Card>
     );
 
@@ -1642,7 +1639,7 @@ export function useExtraGrafy({
     // ── Doplnené karty: marketing ────────────────────────────────────────────
     const mkt12 = MKT_MESACNE.slice(-12);
     const spend12 = mkt12.reduce((a, m) => a + (m.spend || 0), 0);
-    const uvodne12 = new Set(sedeniaRok.filter((x) => x.sessionType === "UVODNE").map((x) => `${x.client}|${x.date}`)).size;
+    const uvodne12 = pocetUvodnych(sedeniaRok);
     const novi12 = Object.values(clients).filter((c) => c.firstSession && Date.parse(c.firstSession) >= Date.now() - 365 * 86400000).length;
     // Vlastný prepínač obdobia (Jerry, 10. 8.): 12 mesiacov je pri reklame
     // priveľa — kampaň spred roka nevypovedá o tom, čo stojí klient dnes.
@@ -1756,7 +1753,7 @@ export function useExtraGrafy({
     const predM = pred1.mesiace[0];
     nodes.ziskyNaklady = (
       <Card style={{ marginBottom: 0, height: "100%" }}>
-        <H3><Info label="Zisky a náklady" text="Vľavo skutočnosť za zvolené obdobie, vpravo odhad na ďalší mesiac. Odhad tržieb je z obnov balíčkov a objednaného v kalendári; náklady z mediánu posledných šiestich mesiacov (nie priemeru — jeden veľký nákup by inak posunul odhad na celý rok); výplaty ako nárok pri očakávaných hodinách. Skutočnosť a odhad sú zámerne oddelené: odhad je odhad, nech vyzerá akokoľvek presne." /></H3>
+        <H3><Info label="Zisky a náklady" text="Vľavo skutočnosť za zvolené obdobie, vpravo odhad na ďalší mesiac. Odhad tržieb je z obnov balíčkov a objednaného v kalendári; náklady aj výplaty z mediánu posledných šiestich mesiacov (nie priemeru — jeden veľký nákup by inak posunul odhad na celý rok; výplaty ako medián toho, čo sa naozaj poslalo, vrátane spoločných a Matyáša). Skutočnosť a odhad sú zámerne oddelené: odhad je odhad, nech vyzerá akokoľvek presne." /></H3>
         <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)", gap: 14 }}>
           <div>
             <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: 0.6, textTransform: "uppercase", color: C.textDim, marginBottom: 6 }}>
@@ -1805,7 +1802,7 @@ export function useExtraGrafy({
     })();
     const lievikK = {
       dopyty: (data.leads || []).filter((l) => (l.date || "").slice(0, 7) === lievikMk).length,
-      uvodne: new Set(data.sessions.filter((x) => x.sessionType === "UVODNE" && x.date.slice(0, 7) === lievikMk).map((x) => x.client)).size,
+      uvodne: pocetUvodnych(data.sessions.filter((x) => x.date.slice(0, 7) === lievikMk)),
       novi: Object.values(clients).filter((c) => (c.firstSession || "").slice(0, 7) === lievikMk).length,
     };
     nodes.marketingSuhrn = (
@@ -1855,7 +1852,10 @@ export function useExtraGrafy({
     );
 
     return nodes;
-  }, [vzas, toky, data, clients, weeks, btc, btcStav, kanaly, mktTik, kpiOverrides, kpiSkryte, onNavigate, vytazenie]);
+    // `obdobie` a `znackyMkt` výslovne: obdobie sa sem dostávalo len NÁHODOU
+    // cez reťaz vytazenie→okno a značky kampaní prichádzajú z fetchu neskôr —
+    // bez nich anotácie v krivkách nevznikli až do ďalšej zmeny dát (19. 8.).
+  }, [vzas, toky, data, clients, weeks, btc, btcStav, kanaly, mktTik, kpiOverrides, kpiSkryte, onNavigate, vytazenie, obdobie, znackyMkt]);
 }
 
 
@@ -1872,7 +1872,7 @@ function CenaZaKlienta({
 }: {
   data: PSBData;
   clients: Record<string, ClientAgg>;
-  onNavigate: (tab: string, sub?: string) => void;
+  onNavigate: (tab: string, sub?: string, focus?: { skupina?: { label: string; mena: string[] }; nonce?: number }) => void;
 }) {
   const [okno, setOkno] = useState<"1m" | "3m" | "2026" | "2025">("2026");
   const OKNA = [
@@ -1909,10 +1909,17 @@ function CenaZaKlienta({
         return a + (m.spend || 0) * (dni / dniMes);
       }, 0))
     : MKT_MESACNE.filter((m) => vOkne(m.m)).reduce((a, m) => a + (m.spend || 0), 0);
-  const uvodne = new Set(
-    data.sessions.filter((x) => x.sessionType === "UVODNE" && vOkneDatum(x.date)).map((x) => `${x.client}|${x.date}`),
-  ).size;
-  const novi = Object.values(clients).filter((c) => c.firstSession && vOkneDatum(c.firstSession)).length;
+  const uvodne = pocetUvodnych(data.sessions.filter((x) => vOkneDatum(x.date)));
+  // jeKlient aj tu — bez neho „cena za klienta" delila výdavok každým, kto
+  // prišiel na platený úvodný (36 namiesto 29 v okne 2026), a bola o ~19 %
+  // nižšia než tá istá veličina na karte Reklama. Jedna definícia, jedno číslo.
+  const noviZoznam = Object.values(clients)
+    .filter((c) => c.firstSession && vOkneDatum(c.firstSession) && !c.vratenie && jeKlient(c, data.payments));
+  const novi = noviZoznam.length;
+  // Mená za „Úvodných" — tá istá množina sedení, z ktorej je číslo.
+  const uvodniMena = [...new Set(data.sessions.filter((x) => x.sessionType === "UVODNE" && vOkneDatum(x.date)).map((x) => x.client))];
+  const otvorLudi = (label: string, mena: string[]) => () =>
+    onNavigate("klienti", undefined, { skupina: { label, mena }, nonce: Date.now() });
 
   return (
     <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column" }}>
@@ -1935,19 +1942,19 @@ function CenaZaKlienta({
           ))}
         </div>
       </div>
-      <Klik kam={() => onNavigate("marketing", "lievik")} onNavigate="Marketing → Lievik">
-        {spend === 0 && uvodne === 0 && novi === 0 ? <Empty>Za zvolené obdobie nie sú zapísané žiadne výdaje, úvodné ani noví klienti.</Empty> : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}>
-            {/* Nula výdajov už kartu neskrýva — úvodné a nových klientov okno
-                má aj vtedy, keď spend za tie dni ešte nie je nahratý. Ceny sú
-                vtedy „—", nie nula: nezaplatené nie je zadarmo, je nezmerané. */}
-            <MiniStat label="Výdaje na reklamu" value={spend ? fmtCZK(spend) : "—"} color={C.orange} />
-            <MiniStat label="Úvodných" value={String(uvodne)} />
-            <MiniStat label="Cena za úvodný" value={spend && uvodne ? fmtCZK(spend / uvodne) : "—"} color={C.accent} />
-            <MiniStat label="Cena za klienta" value={spend && novi ? fmtCZK(spend / novi) : "—"} color={C.accent} />
-          </div>
-        )}
-      </Klik>
+      {spend === 0 && uvodne === 0 && novi === 0 ? <Empty>Za zvolené obdobie nie sú zapísané žiadne výdaje, úvodné ani noví klienti.</Empty> : (
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}>
+          {/* Nula výdajov už kartu neskrýva — úvodné a nových klientov okno
+              má aj vtedy, keď spend za tie dni ešte nie je nahratý. Ceny sú
+              vtedy „—", nie nula: nezaplatené nie je zadarmo, je nezmerané. */}
+          {/* Každé číslo otvorí ĽUDÍ, z ktorých je — do 19. 8. 2026 viedol
+              klik na Lievik, teda na inú obrazovku s iným oknom. */}
+          <div onClick={() => onNavigate("marketing", "naklady")} style={{ cursor: "pointer" }} title="Otvoriť Marketing → Čo to stálo"><MiniStat label="Výdaje na reklamu" value={spend ? fmtCZK(spend) : "—"} color={C.orange} /></div>
+          <div onClick={otvorLudi(`Prišli na úvodný (${OKNA.find((o) => o.id === okno)?.label})`, uvodniMena)} style={{ cursor: "pointer" }} title="Otvoriť týchto ľudí"><MiniStat label="Úvodných" value={String(uvodne)} /></div>
+          <div onClick={otvorLudi(`Menovateľ ceny za úvodný — ${uvodne} ľudí na úvodnom`, uvodniMena)} style={{ cursor: "pointer" }} title="Otvoriť menovateľ"><MiniStat label="Cena za úvodný" value={spend && uvodne ? fmtCZK(spend / uvodne) : "—"} color={C.accent} /></div>
+          <div onClick={otvorLudi(`Menovateľ ceny za klienta — ${novi} nových klientov (jeKlient)`, noviZoznam.map((c) => c.name))} style={{ cursor: "pointer" }} title="Otvoriť menovateľ"><MiniStat label="Cena za klienta" value={spend && novi ? fmtCZK(spend / novi) : "—"} color={C.accent} /></div>
+        </div>
+      )}
     </Card>
   );
 }

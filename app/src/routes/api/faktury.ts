@@ -114,21 +114,28 @@ export const Route = createFileRoute("/api/faktury")({
           const vzor = String(p.nazov || "").trim().split(/\s+/).slice(0, 3).join(" ");
           if (vzor.length >= 5 && p.kategoria) naucene.set(vzor.toLowerCase(), p.kategoria);
         }
+        // Počíta sa, čo sa NAOZAJ zapísalo — nie koľko pokusov prebehlo.
+        // Appka hlásila „naučených M pravidiel" aj vtedy, keď insert padol,
+        // a pri ďalšej Alze sa nezaradilo nič (revízia 18. 8. 2026).
+        let naucenych = 0;
         for (const [vzor, kategoria] of naucene) {
-          await DB.prepare("DELETE FROM vzas_rules WHERE text_pattern = ?1 AND created_by = 'faktura'").bind(vzor).run().catch(() => {});
-          await DB.prepare(
-            `INSERT INTO vzas_rules (id, counterparty, merchant, text_pattern, category, priority, hit_count, active, created_by, created_at)
-             VALUES (?1, NULL, NULL, ?2, ?3, 40, 0, 1, 'faktura', ?4)`,
-          ).bind(uid(), vzor, kategoria, now).run().catch(() => {});
+          try {
+            await DB.prepare("DELETE FROM vzas_rules WHERE text_pattern = ?1 AND created_by = 'faktura'").bind(vzor).run();
+            await DB.prepare(
+              `INSERT INTO vzas_rules (id, counterparty, merchant, text_pattern, category, priority, hit_count, active, created_by, created_at)
+               VALUES (?1, NULL, NULL, ?2, ?3, 40, 0, 1, 'faktura', ?4)`,
+            ).bind(uid(), vzor, kategoria, now).run();
+            naucenych++;
+          } catch { /* jedno pravidlo navyše nestojí za pád celého importu */ }
         }
 
         await audit(DB, {
           action: "import-faktura",
           predmet: `${polozky[0]?.dodavatel || "faktúra"} · ${polozky[0]?.faktura || ""}`,
-          neu: `${pridane} položiek${preskocene ? `, ${preskocene} už bolo nahratých` : ""}, ${naucene.size} pravidiel`,
+          neu: `${pridane} položiek${preskocene ? `, ${preskocene} už bolo nahratých` : ""}, ${naucenych} pravidiel`,
           actor,
         });
-        return Response.json({ ok: true, pridane, preskocene, pravidla: naucene.size });
+        return Response.json({ ok: true, pridane, preskocene, pravidla: naucenych });
       },
     },
   },

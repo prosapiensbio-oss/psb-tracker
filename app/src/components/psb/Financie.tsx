@@ -1,6 +1,6 @@
 import { useContext, useEffect, useMemo, useState } from "react";
 
-import { btcOznacenia, objednaneVerzia, kotvaDat, monthlyFinance, predictCash, predictEarnings, type ClientAgg } from "../../lib/psb/compute";
+import { btcOznacenia, menoKluc, objednaneVerzia, kotvaDat, monthlyFinance, PAROVANIE, predictCash, predictEarnings, type ClientAgg } from "../../lib/psb/compute";
 import { fetchBtcReserve, type BtcPlatba } from "../../lib/psb/client";
 import { fmtCZK, monthLabel, normName } from "../../lib/psb/format";
 import { ObdobieCtx } from "../../lib/psb/obdobie";
@@ -131,17 +131,13 @@ function BtcKontrola({ data }: { data: PSBData }) {
     // pohyb v bitcoine sa bežne líšia o niekoľko dní (Gažo — bitcoin 12. 2.,
     // zápis 4. 2.). Desať dní je stále bezpečných, lebo aj mesačný klient platí
     // s odstupom tridsiatich.
-    const OKNO_PAROVANIA = 10;
-    const TOLERANCIA_KC = 400;
-    const TOLERANCIA_PCT = 0.03;   // pri veľkých sumách rozhoduje kurz, nie koruny
-
-    // Mená sa medzi appkami líšia diakritikou aj preklepmi („Prochádzka" vs
-    // „Prochadzka"), takže presná zhoda nestačí.
-    const kluc = (m: string) => {
-      const n = normName(m).split(" ").filter(Boolean);
-      const priez = n[n.length - 1] || "";
-      return `${priez.slice(0, 5)}|${(n[0] || "").slice(0, 3)}`;
-    };
+    // Tolerancie aj kľúč mena sú v compute.ts — táto obrazovka ich mala
+    // vlastnú kópiu (rovnaké čísla, samostatný kód). Keď sa jedna zmení,
+    // druhá o tom nevie (revízia 18. 8. 2026).
+    const OKNO_PAROVANIA = PAROVANIE.oknoDni;
+    const TOLERANCIA_KC = PAROVANIE.toleranciaKc;
+    const TOLERANCIA_PCT = PAROVANIE.toleranciaPct;
+    const kluc = menoKluc;
 
     type Zhluk = { kluc: string; meno: string; od: number; suma: number };
     const zhlukni = <T,>(polozky: T[], meno: (x: T) => string, datum: (x: T) => number, suma: (x: T) => number): Zhluk[] => {
@@ -332,7 +328,7 @@ function Trzby({ monthly, data, clients, focusMonth, onClearFocus }: { monthly: 
           </H3>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, margin: "12px 0 6px" }}>
             <StatCard value={fmtCZK(totalCash)} label={`Prijaté spolu · ${view.length} mes.`} color={C.blue} />
-            <StatCard value={fmtCZK(totalCash / (view.length || 1))} label="Ø prijaté / mesiac" color={C.accent} />
+            <StatCard value={fmtCZK(totalCash / (view.length || 1))} label={`Ø prijaté / mesiac · z ${view.length} mes.`} color={C.accent} />
             <StatCard value={fmtCZK(totalRev)} label="Vyfakturované spolu" color={C.accentLight} />
           </div>
         </Card>
@@ -415,12 +411,20 @@ function Sedenia({ monthly }: { monthly: Monthly }) {
     { month: (m) => m.month, sessions: (m) => m.sessions, revenue: (m) => m.revenue, perSess: (m) => m.perSess, util: (m) => m.util },
   );
   const chart = view.map((m) => ({ label: monthLabel(m.month), value: m.sessions }));
-  // Súhrn za zvolené obdobie.
+  // Súhrn za zvolené obdobie — PRIEMERY len z UZAVRETÝCH mesiacov. Rozbehnutý
+  // august mal k 13. dňu 79 sedení a ťahal „Ø využitie" aj „Ø CZK/sedenie"
+  // nadol, akoby bol plný mesiac (revízia 19. 8. 2026, rodina kotvy dát).
+  // Súčty ("Sedení spolu", "Prijaté spolu") bežiaci mesiac obsahujú — sú to
+  // súčty za obdobie, nie hodnotenie mesiaca.
+  const beziaciMes = new Date().toISOString().slice(0, 7);
+  const uzavrete = view.filter((m) => m.month < beziaciMes);
+  const zaklad = uzavrete.length ? uzavrete : view;
   const sessTotal = view.reduce((a, m) => a + m.sessions, 0);
   const cashTotal = view.reduce((a, m) => a + m.cash, 0);
-  const avgSess = view.length ? sessTotal / view.length : 0;
-  const perSessAll = sessTotal ? cashTotal / sessTotal : 0;
-  const avgUtil = view.length ? view.reduce((a, m) => a + (m.sessions / MAX_SESSIONS_MONTH) * 100, 0) / view.length : 0;
+  const avgSess = zaklad.length ? zaklad.reduce((a, m) => a + m.sessions, 0) / zaklad.length : 0;
+  const perSessAll = zaklad.reduce((a, m) => a + m.sessions, 0)
+    ? zaklad.reduce((a, m) => a + m.cash, 0) / zaklad.reduce((a, m) => a + m.sessions, 0) : 0;
+  const avgUtil = zaklad.length ? zaklad.reduce((a, m) => a + (m.sessions / MAX_SESSIONS_MONTH) * 100, 0) / zaklad.length : 0;
   return (
     <>
       <Card>
@@ -438,11 +442,17 @@ function Sedenia({ monthly }: { monthly: Monthly }) {
           </H3>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, margin: "12px 0 6px" }}>
             <StatCard value={String(sessTotal)} label={`Sedení spolu · ${view.length} mes.`} color={C.accentLight} />
-            <StatCard value={avgSess.toFixed(0)} label="Ø sedení / mesiac" color={C.accent} />
-            <StatCard value={fmtCZK(perSessAll)} label="Ø CZK / sedenie" color={C.blue} />
-            <StatCard value={`${avgUtil.toFixed(0)} %`} label="Ø využitie kapacity" color={C.green} />
+            {/* Ø z uzavretých — rozbehnutý mesiac hodnotenie len kazí. Každý
+                priemer NESIE, z koľkých mesiacov je: to je jeho menovateľ a
+                bez neho sa nedá overiť očami proti tabuľke nižšie. */}
+            <StatCard value={avgSess.toFixed(0)} label={`Ø sedení / mesiac · z ${zaklad.length} uzavr.`} color={C.accent} />
+            <StatCard value={fmtCZK(perSessAll)} label={`Ø CZK / sedenie · z ${zaklad.length} uzavr.`} color={C.blue} />
+            <StatCard value={`${avgUtil.toFixed(0)} %`} label={`Ø využitie · z ${zaklad.length} uzavr.`} color={C.green} />
           </div>
-          <div style={{ fontSize: 11, color: C.textDim, marginTop: 4 }}>Prijaté spolu za obdobie: {fmtCZK(cashTotal)}</div>
+          <div style={{ fontSize: 11, color: C.textDim, marginTop: 4 }}>
+            Prijaté spolu za obdobie: {fmtCZK(cashTotal)}
+            {uzavrete.length !== view.length && <> · priemery sú z {zaklad.map((m) => monthLabel(m.month)).join(", ")} — bežiaci {monthLabel(beziaciMes)} je v súčtoch, ale nie v priemeroch. Riadky sú v tabuľke nižšie.</>}
+          </div>
         </Card>
       )}
       <Card>
@@ -466,7 +476,7 @@ function Sedenia({ monthly }: { monthly: Monthly }) {
                 <td style={{ ...S.td, textAlign: "right" }}>{fmtCZK(m.revenue)}</td>
                 <td style={{ ...S.td, textAlign: "right" }}>{fmtCZK(m.perSess)}</td>
                 <td style={{ ...S.td, textAlign: "right" }}>{m.util.toFixed(0)}%</td>
-                <td style={{ ...S.td, color: m.util >= 40 ? C.green : C.orange }}>{m.util >= 40 ? "Zdravá" : "Slabšia"}</td>
+                <td style={{ ...S.td, color: m.month >= beziaciMes ? C.textDim : m.util >= 40 ? C.green : C.orange }}>{m.month >= beziaciMes ? "rozbehnutý" : m.util >= 40 ? "Zdravá" : "Slabšia"}</td>
               </tr>
             ))}
           </tbody>
@@ -664,9 +674,7 @@ function PredikciaZisku({ prijmyOdhad, mesiac, hodiny }: { prijmyOdhad: number; 
         <StatCard
           value={fmtCZK(m.vyplaty)}
           label={<Info
-            text={p.vyplatyZHodin
-              ? `Nárok oboch trénerov pri očakávaných hodinách (Jerry ${hodiny.jerry.toFixed(0)} h, Terezka ${hodiny.terezka.toFixed(0)} h) podľa mzdového modelu — nie medián. Mzda nie je fixný náklad: rastie a klesá s odrobenými hodinami.`
-              : "Medián posledných mesiacov — tempo klientov sa nedá odhadnúť, tak sa berie história."}
+            text={`Medián reálne poslaných výplat z posledných ${p.zaklad} mesiacov — vrátane spoločných nákladov a Matyáša, lebo meria, čo naozaj odišlo z účtu. Do 19. 8. 2026 sa tu rátal nárok z hodín, ktorý tieto položky nemal a vychádzal o ~18 600 Kč vyššie.`}
             label="Výplaty" />}
           color={C.blue}
         />
@@ -674,9 +682,7 @@ function PredikciaZisku({ prijmyOdhad, mesiac, hodiny }: { prijmyOdhad: number; 
       </div>
       <div style={{ fontSize: 11.5, color: C.textDim, lineHeight: 1.55, marginTop: 4 }}>
         Náklady: medián z {p.zaklad} mesiacov — nie priemer, aby jeden väčší nákup neposunul odhad na celý rok.
-        {p.vyplatyZHodin
-          ? <> Výplaty: nárok pri očakávaných {(hodiny.jerry + hodiny.terezka).toFixed(0)} hodinách, nie priemer z minulosti.</>
-          : <> Výplaty: medián z histórie.</>}
+        {" "}Výplaty: medián z tých istých mesiacov.
         {zisk < 0 && <> <b style={{ color: C.red }}>Pri týchto tržbách by mesiac skončil v strate.</b></>}
       </div>
 

@@ -100,7 +100,11 @@ export const PNL: Record<"fixne" | "variabilne", VzasSection> = {
         label: "Prevádzka",
         items: {
           najom: { label: "Nájom + energie", values: [44995, 29250, 29250, 29250, 29250, 29250, 29250, 29250, 29250, 29250, 29250, 29250, 29250, 32261, 10000, 48500, 29250, 29250] },
-          splatkaJarek: { label: "Splátka Jarek", values: [0, 4000, 4000, 4000, 4000, 0, 0, 4000, 4000, 4000, 4000, 4000, 5000, 5000, 5000, 5000, 5000, 0] },
+          // Feb 2025: 8 000, nie 4 000 — P&L sa rozchádzal s dlhovou knihou
+          // (JAREK_SPLATKY nižšie), ktorá sedí na kontrolný bod DEBT_CHECKPOINT
+          // do koruny. Jerry 19. 8. 2026: „čo sa stalo feb 25 už je jedno,
+          // zapíš ako chceš" — zapísané podľa knihy, zisk 2025 klesol o 4 000.
+          splatkaJarek: { label: "Splátka Jarek", values: [0, 8000, 4000, 4000, 4000, 0, 0, 4000, 4000, 4000, 4000, 4000, 5000, 5000, 5000, 5000, 5000, 0] },
           statTerezka: { label: "Štát Terezka", values: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1595, 1595, 1595, 6048, 12264, 5832] },
           statJerry: { label: "Štát Jerry", values: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9761, 19635, 9761, 9761, 9761] },
           bonusFinancak: { label: "Bonus na Finančák", values: [0, 1218, 0, 0, 0, 0, 0, 18716, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
@@ -482,11 +486,15 @@ export function nastavJarekZTrackera(splatky: Record<string, number>): boolean {
   if (!rad) return false;
   dorovnaj(rad);
   let zmena = false;
-  for (const [mk, suma] of Object.entries(splatky)) {
-    const i = VZAS_MONTHS.indexOf(mk);
-    if (i < 0 || mk < PRVY_MESIAC_Z_FIO) continue;
+  // Vstup nesie VŠETKY barterové balíčky, takže mesiac, ktorý v ňom nie je,
+  // barter nemá — a starý zápis sa musí zmazať. Bez toho by balíček zmazaný
+  // v PTminderi splácal Jarkov dlh navždy (rovnaká rodina dier ako pri
+  // splátke z banky nižšie).
+  VZAS_MONTHS.forEach((mk, i) => {
+    if (mk < PRVY_MESIAC_Z_FIO) return;
+    const suma = splatky[mk] || 0;
     if (Math.abs(rad[i] - suma) > 0.5) { rad[i] = suma; zmena = true; }
-  }
+  });
   if (zmena) oznacZmenu();
   return zmena;
 }
@@ -506,19 +514,22 @@ export function nastavBtcVyplaty(
   data: Record<string, { jerry: number; terezka: number; jerryFp: number }>,
 ): boolean {
   let zmena = false;
-  for (const [mk, v] of Object.entries(data)) {
-    const i = VZAS_MONTHS.indexOf(mk);
-    if (i < 0 || mk < PRVY_MESIAC_Z_FIO) continue;
-    const zapis = (kto: PersonKey, riadok: string, suma: number) => {
-      const per = SALARY[kto].personal;
-      if (!per[riadok]) per[riadok] = Array.from({ length: N }, () => 0);
-      dorovnaj(per[riadok]);
-      if (Math.abs(per[riadok][i] - suma) > 0.5) { per[riadok][i] = suma; zmena = true; }
-    };
-    zapis("jerry", RIADOK_BTC, v.jerry);
-    zapis("terezka", RIADOK_BTC, v.terezka);
-    if (v.jerryFp) zapis("jerry", RIADOK_FP, v.jerryFp);
-  }
+  const zapis = (i: number, kto: PersonKey, riadok: string, suma: number) => {
+    const per = SALARY[kto].personal;
+    if (!per[riadok]) per[riadok] = Array.from({ length: N }, () => 0);
+    dorovnaj(per[riadok]);
+    if (Math.abs(per[riadok][i] - suma) > 0.5) { per[riadok][i] = suma; zmena = true; }
+  };
+  // Vstup je agregát CELEJ bitcoinovej knihy. Mesiac, ktorý v ňom nie je,
+  // výplaty z BTC nemá — starý zápis sa maže, inak by výplata zmazaná
+  // v BTC appke znižovala trénerov dlh navždy.
+  VZAS_MONTHS.forEach((mk, i) => {
+    if (mk < PRVY_MESIAC_Z_FIO) return;
+    const v = data[mk] || { jerry: 0, terezka: 0, jerryFp: 0 };
+    zapis(i, "jerry", RIADOK_BTC, v.jerry);
+    zapis(i, "terezka", RIADOK_BTC, v.terezka);
+    zapis(i, "jerry", RIADOK_FP, v.jerryFp || 0);
+  });
   if (zmena) oznacZmenu();
   return zmena;
 }
@@ -571,6 +582,15 @@ export function nastavNakladyZFio(
       for (const sub of Object.values(sek.subcategories))
         for (const item of Object.values(sub.items)) item.values[i] = 0;
     for (const v of Object.values(SPOLOCNE)) v[i] = 0;
+    // Aj Jarkova splátka a výplaty z banky — plnia sa z toho istého výpisu.
+    // Nulovala sa len P&L strana, takže pohyb preradený zo „splátka Jarek"
+    // inam prestal byť nákladom, ale dlh ďalej klesal: dve čísla z jedného
+    // pohybu a len jedno sa upratovalo.
+    { const rad = JAREK_SPLATKY["Fix splátka (P&L náklad)"]; if (rad) { dorovnaj(rad); rad[i] = 0; } }
+    for (const kto of ["jerry", "terezka"] as PersonKey[]) {
+      const per = SALARY[kto].personal;
+      if (per[RIADOK_VYPLATA]) { dorovnaj(per[RIADOK_VYPLATA]); per[RIADOK_VYPLATA][i] = 0; }
+    }
 
     for (const [kat, suma] of Object.entries(podlaKategorie)) {
       // Splátka Jarkovi je v Exceli na dvoch miestach naraz: ako náklad v P&L
@@ -602,8 +622,9 @@ export function nastavNakladyZFio(
   }
   NAKLADY_Z_FIO = mesiace.sort();
   // Import mesiac vynuloval a prepísal — ručné opravy treba nasadiť znova,
-  // inak by zmizli pri každom načítaní stránky.
-  pouziOverrides();
+  // inak by zmizli pri každom načítaní stránky. A pôvodné hodnoty sa berú
+  // z TOHTO importu, aby „zrušiť opravu" vrátilo dnešný stav, nie vlaňajší.
+  pouziOverrides(true);
   if (zmena) oznacZmenu();
   return zmena;
 }
@@ -760,7 +781,16 @@ export function pnlHodnota(kat: string, mesiac: string): number | undefined {
 export type PnlOverrides = Record<string, Record<string, number>>;
 let PNL_OVERRIDES: PnlOverrides = {};
 
-/** Pôvodné hodnoty pred prvým prekrytím — aby sa dalo vrátiť späť. */
+/**
+ * Pôvodné hodnoty pred prekrytím — aby sa dalo vrátiť späť.
+ *
+ * „Pôvodná" znamená TO, ČO BY V BUNKE BOLO BEZ OPRAVY DNES — teda hodnota
+ * z posledného importu, nie spred prvého. Do 19. 8. 2026 sa zapamätala raz
+ * (`if (!(kluc in PNL_POVODNE))`) a import ju už nikdy neobnovil: kto
+ * v júni opravil bunku a v auguste opravu zrušil, dostal späť júnový stav
+ * z Excelu, nie augustový z banky. Preto si import pred nasadením opráv
+ * pôvodné hodnoty dotknutých buniek odloží nanovo (`obnovPovodne`).
+ */
 const PNL_POVODNE: Record<string, number> = {};
 
 function pnlItem(kat: string): { values: Vals } | null {
@@ -772,7 +802,13 @@ function pnlItem(kat: string): { values: Vals } | null {
   return (PNL as Record<string, VzasSection>)[sekK]?.subcategories?.[subK]?.items?.[itemK] ?? null;
 }
 
-function pouziOverrides(): void {
+/**
+ * @param obnov — `true` po importe: bunky už nesú čerstvú hodnotu zo zdroja,
+ *   tak sa pôvodná hodnota prepíše ňou. `false` pri štarte/ručnej oprave:
+ *   bunka už môže niesť opravu (štart po reloade), tak sa pôvodná berie len
+ *   prvýkrát — inak by sa za „pôvodnú" zapamätala samotná oprava.
+ */
+function pouziOverrides(obnov = false): void {
   for (const [kat, podlaMesiaca] of Object.entries(PNL_OVERRIDES)) {
     const item = pnlItem(kat);
     if (!item) continue;
@@ -781,7 +817,7 @@ function pouziOverrides(): void {
       const i = VZAS_MONTHS.indexOf(mk);
       if (i < 0) continue;
       const kluc = `${kat}|${mk}`;
-      if (!(kluc in PNL_POVODNE)) PNL_POVODNE[kluc] = item.values[i];
+      if (obnov || !(kluc in PNL_POVODNE)) PNL_POVODNE[kluc] = item.values[i];
       item.values[i] = suma;
     }
   }
@@ -793,6 +829,9 @@ export function pnlPovodnaHodnota(kat: string, mesiac: string): number | undefin
 }
 
 export const pnlJeOpravena = (kat: string, mesiac: string) => PNL_OVERRIDES[kat]?.[mesiac] !== undefined;
+/** Hodnota ručnej opravy, alebo `null` keď bunka opravená nie je. */
+export const pnlHodnotaOpravy = (kat: string, mesiac: string): number | null =>
+  PNL_OVERRIDES[kat]?.[mesiac] ?? null;
 
 /** Načítanie uložených opráv pri štarte. */
 export function nastavPnlOverrides(o: PnlOverrides): boolean {
@@ -896,8 +935,11 @@ for (const k of ["jerry", "terezka"] as PersonKey[]) {
   dorovnaj(RECORDED_DEBT[k].splatka);
 }
 
-export const JAREK_ZLAVA_ROCNE = 18200; // 20 % z 91 000, obnova 2026
-export const JAREK_OBNOVA = { datum: "2026-06-23", platba: 54600, mesiacIdx: 17 };
+// 20 % z 91 000 — Jarkova obnova ročného členstva 23. 6. 2026 (zaplatil
+// 54 600 Kč, jún = index 17). Samotný záznam o obnove tu kedysi stál ako
+// konštanta JAREK_OBNOVA, ale nič ju nečítalo — zľava je jediné, čo z obnovy
+// vstupuje do dlhovej knihy (riadok „20 % zľava ročné" nižšie).
+export const JAREK_ZLAVA_ROCNE = 18200;
 
 export const JAREK_SPLATKY: Record<string, Vals> = {
   "Fix splátka (P&L náklad)": [0, 8000, 4000, 4000, 4000, 0, 0, 4000, 4000, 4000, 4000, 4000, 5000, 5000, 5000, 5000, 5000, 0],
@@ -1001,6 +1043,35 @@ export function salaryCalc(key: PersonKey): SalaryCalc {
 }
 
 // Stav Jarek(N) = Stav(N−1) + Splátky(N) − Vklady(N).
+/**
+ * Tempo dlhu — o koľko sa mesačne hýbe, a nad AKÝM oknom.
+ *
+ * Číslo samo osebe nič neznamená: nad rokom 2026 vyjde −7 283 Kč/mes., nad
+ * celou érou dnešného modelu −10 056. Ani jedno nie je zlé; zlé je povedať
+ * jedno z nich bez okna — a presne to sa dialo, lebo karta rátala nad
+ * zvoleným obdobím a Jarvis nad dvoma vlastnými (revízia 18. 8. 2026).
+ *
+ * Mesiace pred dnešným mzdovým modelom sa vždy vyhadzujú: pôžička z éry 70/30
+ * bola rozhodnutie, nie výstup vzorca.
+ */
+export function tempoDlhu(key: PersonKey, idx: number[]): {
+  tempo: number; mesiacov: number; od: string; do: string; smer: "rastie" | "klesá" | "stojí";
+} {
+  const c = salaryCalc(key);
+  const vModeli = idx.filter((i) => i >= CURRENT_ERA.from);
+  const pouzi = vModeli.length ? vModeli : idx;
+  const hodnoty = pouzi.map((i) => c.rozdiel[i]).filter((x) => Number.isFinite(x));
+  const tempo = hodnoty.length ? hodnoty.reduce((a, b) => a + b, 0) / hodnoty.length : 0;
+  return {
+    tempo,
+    mesiacov: pouzi.length,
+    od: VZAS_MONTHS[pouzi[0]] || "",
+    do: VZAS_MONTHS[pouzi[pouzi.length - 1]] || "",
+    // Kladný rozdiel = firma dlží menej, teda dlh trénera voči firme KLESÁ.
+    smer: tempo > 0 ? "klesá" : tempo < 0 ? "rastie" : "stojí",
+  };
+}
+
 export function jarekCalc(): { splatkySpolu: Vals; vklady: Vals; stav: Vals } {
   const splatkySpolu = vAdd(...Object.values(JAREK_SPLATKY));
   const stav: Vals = [];
@@ -1035,6 +1106,22 @@ export function pnlCalc(): PnlCalc {
   const hrubyZisk = PRIJMY.map((p, i) => p - celkoveNaklady[i]);
   const marza = PRIJMY.map((p, i) => (p > 0 ? (hrubyZisk[i] / p) * 100 : 0));
   return { fixneTotal, varTotal, bezVyplat, poslaneJerry, poslaneTerezka, matyas: MATYAS, vyplatySpolu, celkoveNaklady, prijmy: PRIJMY, hrubyZisk, marza };
+}
+
+/**
+ * Break-even po mesiacoch: náklady bez výplat + NÁROK trénerov + Matyáš.
+ *
+ * S nárokom, nie s tým, čo si tréneri reálne vzali — čo si niekto vezme
+ * navyše, je pôžička, nie náklad. Do 18. 8. 2026 žil tento vzorec v ŠIESTICH
+ * kópiách (Dashboard, DashGrafy, Vzas HealthCard, Vzas ReserveCard,
+ * computeKpis, rezerva.ts) — táto je jediná; rezerva.ts ju re-exportuje
+ * pre komponenty.
+ */
+export function breakEvenRad(): Vals {
+  const p = pnlCalc();
+  const j = salaryCalc("jerry");
+  const t = salaryCalc("terezka");
+  return VZAS_MONTHS.map((_, i) => p.bezVyplat[i] + j.narok[i] + t.narok[i] + p.matyas[i]);
 }
 
 // ── Alternative lens: commitment, not fix/variable ───────────────────────────
@@ -1315,13 +1402,17 @@ const median = (xs: number[]): number => {
  * `prijmyOdhad` prichádza z predikcie tržieb (predictCash) — tá pozná mená.
  */
 export function predikciaNakladov(
-  horizont = 3,
+  horizont = 1,
   prijmyOdhad: Record<string, number> = {},
-  /** Očakávané odrobené hodiny — z tempa klientov. Bez nich sa výplaty
-   *  odhadujú z mediánu, čo je horšie: mzda nie je fixný náklad, rastie a
-   *  klesá s hodinami, takže medián z mesiacov so silnejšími tržbami vyrobí
-   *  stratu aj tam, kde by žiadna nebola. */
-  hodinyOdhad?: { jerry: number; terezka: number },
+  /**
+   * Očakávané odrobené hodiny — od 19. 8. 2026 sa NEPOUŽÍVAJÚ na výplaty,
+   * parameter zostáva len kvôli volajúcim. Výplaty sú MEDIÁN reálne
+   * poslaných výplat (Jerryho rozhodnutie, revízia 19. 8.): nárok z hodín
+   * rátal len Jerryho a Terezku bez spoločných nákladov a Matyáša a vychádzal
+   * o 18 639 Kč/mes vyššie než to, čo sa naozaj posielalo (129 650 vs. 111 011).
+   * Medián už všetko obsahuje, lebo meria, čo odišlo z účtu.
+   */
+  _hodinyOdhad?: { jerry: number; terezka: number },
 ): {
   mesiace: PredikciaMesiac[];
   zaklad: number;
@@ -1336,18 +1427,10 @@ export function predikciaNakladov(
   for (let i = posledny; i >= 0 && okno.length < 6; i--) if (p.bezVyplat[i] > 0) okno.unshift(i);
 
   const medianNaklady = median(okno.map((i) => p.bezVyplat[i]));
-  // Mzda nie je fixný náklad — je to nárok, ktorý rastie s odrobenými
-  // hodinami. Keď poznáme očakávané hodiny, počíta sa z modelu; medián je
-  // až záloha pre prípad, že tempo klientov nepoznáme.
-  const era = eraAt(posledny);
-  // Rovnaký vzorec, aký počíta nárok v tabuľke VZAS (fix + (hodiny − prah) ×
-  // sadzba, bez orezania na nulu) — inak by predikcia a tabuľka za ten istý
-  // mesiac hlásili dve rôzne čísla.
-  const narokZa = (h: number) => era.fix + (h - era.hoursThreshold) * era.hourlyRate;
-  const zHodin = hodinyOdhad && era.kind === "fixvar"
-    ? narokZa(hodinyOdhad.jerry) + narokZa(hodinyOdhad.terezka)
-    : null;
-  const medianVyplaty = zHodin ?? median(okno.map((i) => p.vyplatySpolu[i]));
+  // Jedna definícia: medián toho, čo sa naozaj poslalo. Do 19. 8. 2026 tu
+  // bola druhá cesta (nárok z hodín), a dve obrazovky tak mohli hlásiť dve
+  // čísla pre ten istý mesiac — presne rozchod, ktorý revízia našla.
+  const medianVyplaty = median(okno.map((i) => p.vyplatySpolu[i]));
 
   const mesiace: PredikciaMesiac[] = [];
   for (let k = 1; k <= horizont; k++) {
@@ -1369,14 +1452,20 @@ export function predikciaNakladov(
       zisk: prijmy - medianNaklady - medianVyplaty,
     });
   }
-  return { mesiace, zaklad: okno.length, medianNaklady, medianVyplaty, vyplatyZHodin: zHodin != null };
+  return { mesiace, zaklad: okno.length, medianNaklady, medianVyplaty, vyplatyZHodin: false };
 }
 
 /** Položky, ktoré sa opakujú každý mesiac — z nich sa dá skladať fixný základ. */
 export function pravidelneNaklady(): { label: string; median: number; mesiacov: number }[] {
+  const p = pnlCalc();
   const posledny = poslednyMesiacSDatami();
+  // Len mesiace, ktoré NAOZAJ majú náklady — rovnako ako predikciaNakladov
+  // o pár riadkov vyššie. Revízia 19. 8. 2026: okno bralo aj bežiaci august
+  // (Fio zaň ešte neexistuje), takže medián nájmu vyšiel 19 625 Kč namiesto
+  // 29 250 a položka s tromi výskytmi nemala ako prejsť pravidlom „4 zo 6" —
+  // jeden mesiac okna nemohol byť nenulový z princípu.
   const okno: number[] = [];
-  for (let i = posledny; i >= 0 && okno.length < 6; i--) okno.unshift(i);
+  for (let i = posledny; i >= 0 && okno.length < 6; i--) if (p.bezVyplat[i] > 0) okno.unshift(i);
   const out: { label: string; median: number; mesiacov: number }[] = [];
   for (const sek of Object.values(PNL))
     for (const sub of Object.values(sek.subcategories))
@@ -1521,7 +1610,7 @@ export function kpiAdvice(id: string, c: KpiAdviceCtx): string[] {
     case "uvodne":
       return [
         "Vrch lievika. Ak je tempo nad cieľom a úspešnosť tiež, problém nie je v počte úvodných — netlač viac ľudí do dverí, ktoré fungujú.",
-        "Referencie sú tvoj najsilnejší kanál. Pripomienka na 10 % zľavu za doporučenie je v „Na čo sa pozrieť“ — to je lacnejší úvodný tréning než akákoľvek reklama.",
+        "Referencie sú tvoj najsilnejší kanál. Pripomienka na 10 % zľavu za doporučenie je medzi Notifikáciami — to je lacnejší úvodný tréning než akákoľvek reklama.",
       ];
     case "uspesnost":
       return [
@@ -1634,13 +1723,27 @@ export function computeKpis(year: string, sessions: SessionLike[], payments: Pay
   // Margin + break-even reserve come from VZAS (Excel-validated costs), so they
   // only span the months VZAS covers — jan–jún for 2026, not the full year.
   const p = pnlCalc();
-  const idx = YEAR_IDX[year] ?? [];
+  /**
+   * Rok KONČÍ posledným UZAVRETÝM mesiacom, nie kalendárom.
+   *
+   * Revízia 19. 8. 2026: okno bralo aj bežiaci august — 86 875 Kč tržieb
+   * s nulovými nákladmi (Fio za august ešte neexistuje). Marža 2026 tým
+   * vyšla 19,85 % namiesto 15,06 % a KPI „Rozdiel nad break-even" svietilo
+   * ako splnené (25 %) pri skutočných 19,6 %. Tá istá rodina chýb ako
+   * kotva dát: kód predpokladal, že dáta siahajú tam, kam siaha kalendár.
+   *
+   * Rovnaká slučka ako `poslednyUzavretyIdx` v rezerva.ts — importovať sa
+   * nedá (rezerva.ts importuje odtiaľto, bol by kruh), tak je tu inline.
+   */
+  const beziaci = new Date().toISOString().slice(0, 7);
+  const idxCele = YEAR_IDX[year] ?? [];
+  const idxUzavrete = idxCele.filter((i) => (VZAS_MONTHS[i] as string) < beziaci);
+  const idx = idxUzavrete.length ? idxUzavrete : idxCele;
   const vzasPrijmy = idx.reduce((a, i) => a + p.prijmy[i], 0);
   const vzasZisk = idx.reduce((a, i) => a + p.hrubyZisk[i], 0);
   const marza = vzasPrijmy > 0 ? (vzasZisk / vzasPrijmy) * 100 : 0;
-  const j = salaryCalc("jerry");
-  const t = salaryCalc("terezka");
-  const be = idx.reduce((a, i) => a + p.bezVyplat[i] + j.narok[i] + t.narok[i] + p.matyas[i], 0);
+  const beRad = breakEvenRad();
+  const be = idx.reduce((a, i) => a + beRad[i], 0);
   const rezerva = be > 0 ? ((vzasPrijmy - be) / be) * 100 : 0;
 
   const raw: Record<string, number> = {

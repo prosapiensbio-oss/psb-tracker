@@ -19,6 +19,7 @@ import { Route as ApiVzasWeeksRouteImport } from './routes/api/vzas-weeks'
 import { Route as ApiVzasStatusRouteImport } from './routes/api/vzas-status'
 import { Route as ApiVzasSettingsRouteImport } from './routes/api/vzas-settings'
 import { Route as ApiVzasNotesRouteImport } from './routes/api/vzas-notes'
+import { Route as ApiVedomostRouteImport } from './routes/api/vedomost'
 import { Route as ApiUsersRouteImport } from './routes/api/users'
 import { Route as ApiSsoRouteImport } from './routes/api/sso'
 import { Route as ApiSpravaRouteImport } from './routes/api/sprava'
@@ -31,6 +32,7 @@ import { Route as ApiPdfImportRouteImport } from './routes/api/pdf-import'
 import { Route as ApiPagespeedRouteImport } from './routes/api/pagespeed'
 import { Route as ApiOverrideRouteImport } from './routes/api/override'
 import { Route as ApiNapadyRouteImport } from './routes/api/napady'
+import { Route as ApiMetaMediaRouteImport } from './routes/api/meta-media'
 import { Route as ApiMetaRouteImport } from './routes/api/meta'
 import { Route as ApiMeraniaRouteImport } from './routes/api/merania'
 import { Route as ApiMarketingRouteImport } from './routes/api/marketing'
@@ -106,6 +108,11 @@ const ApiVzasNotesRoute = ApiVzasNotesRouteImport.update({
   path: '/api/vzas-notes',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiVedomostRoute = ApiVedomostRouteImport.update({
+  id: '/api/vedomost',
+  path: '/api/vedomost',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiUsersRoute = ApiUsersRouteImport.update({
   id: '/api/users',
   path: '/api/users',
@@ -164,6 +171,11 @@ const ApiOverrideRoute = ApiOverrideRouteImport.update({
 const ApiNapadyRoute = ApiNapadyRouteImport.update({
   id: '/api/napady',
   path: '/api/napady',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMetaMediaRoute = ApiMetaMediaRouteImport.update({
+  id: '/api/meta-media',
+  path: '/api/meta-media',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiMetaRoute = ApiMetaRouteImport.update({
@@ -315,6 +327,7 @@ export interface FileRoutesByFullPath {
   '/api/marketing': typeof ApiMarketingRoute
   '/api/merania': typeof ApiMeraniaRoute
   '/api/meta': typeof ApiMetaRoute
+  '/api/meta-media': typeof ApiMetaMediaRoute
   '/api/napady': typeof ApiNapadyRoute
   '/api/override': typeof ApiOverrideRoute
   '/api/pagespeed': typeof ApiPagespeedRoute
@@ -327,6 +340,7 @@ export interface FileRoutesByFullPath {
   '/api/sprava': typeof ApiSpravaRoute
   '/api/sso': typeof ApiSsoRoute
   '/api/users': typeof ApiUsersRoute
+  '/api/vedomost': typeof ApiVedomostRoute
   '/api/vzas-notes': typeof ApiVzasNotesRoute
   '/api/vzas-settings': typeof ApiVzasSettingsRoute
   '/api/vzas-status': typeof ApiVzasStatusRoute
@@ -363,6 +377,7 @@ export interface FileRoutesByTo {
   '/api/marketing': typeof ApiMarketingRoute
   '/api/merania': typeof ApiMeraniaRoute
   '/api/meta': typeof ApiMetaRoute
+  '/api/meta-media': typeof ApiMetaMediaRoute
   '/api/napady': typeof ApiNapadyRoute
   '/api/override': typeof ApiOverrideRoute
   '/api/pagespeed': typeof ApiPagespeedRoute
@@ -375,6 +390,7 @@ export interface FileRoutesByTo {
   '/api/sprava': typeof ApiSpravaRoute
   '/api/sso': typeof ApiSsoRoute
   '/api/users': typeof ApiUsersRoute
+  '/api/vedomost': typeof ApiVedomostRoute
   '/api/vzas-notes': typeof ApiVzasNotesRoute
   '/api/vzas-settings': typeof ApiVzasSettingsRoute
   '/api/vzas-status': typeof ApiVzasStatusRoute
@@ -412,6 +428,7 @@ export interface FileRoutesById {
   '/api/marketing': typeof ApiMarketingRoute
   '/api/merania': typeof ApiMeraniaRoute
   '/api/meta': typeof ApiMetaRoute
+  '/api/meta-media': typeof ApiMetaMediaRoute
   '/api/napady': typeof ApiNapadyRoute
   '/api/override': typeof ApiOverrideRoute
   '/api/pagespeed': typeof ApiPagespeedRoute
@@ -424,6 +441,7 @@ export interface FileRoutesById {
   '/api/sprava': typeof ApiSpravaRoute
   '/api/sso': typeof ApiSsoRoute
   '/api/users': typeof ApiUsersRoute
+  '/api/vedomost': typeof ApiVedomostRoute
   '/api/vzas-notes': typeof ApiVzasNotesRoute
   '/api/vzas-settings': typeof ApiVzasSettingsRoute
   '/api/vzas-status': typeof ApiVzasStatusRoute
@@ -462,6 +480,7 @@ export interface FileRouteTypes {
     | '/api/marketing'
     | '/api/merania'
     | '/api/meta'
+    | '/api/meta-media'
     | '/api/napady'
     | '/api/override'
     | '/api/pagespeed'
@@ -474,6 +493,7 @@ export interface FileRouteTypes {
     | '/api/sprava'
     | '/api/sso'
     | '/api/users'
+    | '/api/vedomost'
     | '/api/vzas-notes'
     | '/api/vzas-settings'
     | '/api/vzas-status'
@@ -510,6 +530,7 @@ export interface FileRouteTypes {
     | '/api/marketing'
     | '/api/merania'
     | '/api/meta'
+    | '/api/meta-media'
     | '/api/napady'
     | '/api/override'
     | '/api/pagespeed'
@@ -522,6 +543,7 @@ export interface FileRouteTypes {
     | '/api/sprava'
     | '/api/sso'
     | '/api/users'
+    | '/api/vedomost'
     | '/api/vzas-notes'
     | '/api/vzas-settings'
     | '/api/vzas-status'
@@ -558,6 +580,7 @@ export interface FileRouteTypes {
     | '/api/marketing'
     | '/api/merania'
     | '/api/meta'
+    | '/api/meta-media'
     | '/api/napady'
     | '/api/override'
     | '/api/pagespeed'
@@ -570,6 +593,7 @@ export interface FileRouteTypes {
     | '/api/sprava'
     | '/api/sso'
     | '/api/users'
+    | '/api/vedomost'
     | '/api/vzas-notes'
     | '/api/vzas-settings'
     | '/api/vzas-status'
@@ -607,6 +631,7 @@ export interface RootRouteChildren {
   ApiMarketingRoute: typeof ApiMarketingRoute
   ApiMeraniaRoute: typeof ApiMeraniaRoute
   ApiMetaRoute: typeof ApiMetaRoute
+  ApiMetaMediaRoute: typeof ApiMetaMediaRoute
   ApiNapadyRoute: typeof ApiNapadyRoute
   ApiOverrideRoute: typeof ApiOverrideRoute
   ApiPagespeedRoute: typeof ApiPagespeedRoute
@@ -619,6 +644,7 @@ export interface RootRouteChildren {
   ApiSpravaRoute: typeof ApiSpravaRoute
   ApiSsoRoute: typeof ApiSsoRoute
   ApiUsersRoute: typeof ApiUsersRoute
+  ApiVedomostRoute: typeof ApiVedomostRoute
   ApiVzasNotesRoute: typeof ApiVzasNotesRoute
   ApiVzasSettingsRoute: typeof ApiVzasSettingsRoute
   ApiVzasStatusRoute: typeof ApiVzasStatusRoute
@@ -698,6 +724,13 @@ declare module '@tanstack/react-router' {
       path: '/api/vzas-notes'
       fullPath: '/api/vzas-notes'
       preLoaderRoute: typeof ApiVzasNotesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/vedomost': {
+      id: '/api/vedomost'
+      path: '/api/vedomost'
+      fullPath: '/api/vedomost'
+      preLoaderRoute: typeof ApiVedomostRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/users': {
@@ -782,6 +815,13 @@ declare module '@tanstack/react-router' {
       path: '/api/napady'
       fullPath: '/api/napady'
       preLoaderRoute: typeof ApiNapadyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/meta-media': {
+      id: '/api/meta-media'
+      path: '/api/meta-media'
+      fullPath: '/api/meta-media'
+      preLoaderRoute: typeof ApiMetaMediaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/meta': {
@@ -983,6 +1023,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMarketingRoute: ApiMarketingRoute,
   ApiMeraniaRoute: ApiMeraniaRoute,
   ApiMetaRoute: ApiMetaRoute,
+  ApiMetaMediaRoute: ApiMetaMediaRoute,
   ApiNapadyRoute: ApiNapadyRoute,
   ApiOverrideRoute: ApiOverrideRoute,
   ApiPagespeedRoute: ApiPagespeedRoute,
@@ -995,6 +1036,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSpravaRoute: ApiSpravaRoute,
   ApiSsoRoute: ApiSsoRoute,
   ApiUsersRoute: ApiUsersRoute,
+  ApiVedomostRoute: ApiVedomostRoute,
   ApiVzasNotesRoute: ApiVzasNotesRoute,
   ApiVzasSettingsRoute: ApiVzasSettingsRoute,
   ApiVzasStatusRoute: ApiVzasStatusRoute,

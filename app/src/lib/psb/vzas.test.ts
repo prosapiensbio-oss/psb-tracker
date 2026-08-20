@@ -1,8 +1,9 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  JAREK_SPLATKY, nastavBtcVyplaty, nastavJarekZTrackera, nastavNakladyZFio,
   nastavPnlBunku, PNL, pnlCalc, pnlJeOpravena, pnlOverridesNaUlozenie, pnlPovodnaHodnota,
-  poslednyMesiacSDatami, salaryCalc, VZAS_MONTHS,
+  poslednyMesiacSDatami, SALARY, salaryCalc, tempoDlhu, CURRENT_ERA, VZAS_MONTHS,
 } from "./vzas";
 
 /**
@@ -154,8 +155,98 @@ describe("nastavPnlBunku — prekrytie, nie prepis", () => {
     expect(hodnota()).toBe(povodna);
   });
 
+  test("po importe vráti zrušená oprava hodnotu Z IMPORTU, nie spred neho", () => {
+    // Revízia 19. 8. 2026: pôvodná hodnota sa pamätala raz, pri prvej oprave.
+    // Kto opravil bunku v júni (Excel 5 000) a v auguste — po importe z Fio
+    // (banka 7 000) — opravu zrušil, dostal späť 5 000. Bunka bez opravy by
+    // dnes niesla 7 000; „zrušiť opravu" má vrátiť to, nie vlaňajší Excel.
+    const MES_FIO = "2026-07"; // mesiac, ktorý import z Fio prepisuje
+    const i = VZAS_MONTHS.indexOf(MES_FIO);
+    const item = PNL.fixne.subcategories.apps.items.canva;
+    const predImportom = item.values[i] || 0;
+    nastavPnlBunku(KAT, MES_FIO, 199);
+    expect(item.values[i]).toBe(199);
+    // Príde import — banka hovorí 7 000. Oprava musí prežiť (199 zostáva
+    // na obrazovke), ale PÔVODNÁ hodnota je odteraz 7 000.
+    nastavNakladyZFio({ [MES_FIO]: { [KAT]: 7000 } }, {});
+    expect(item.values[i]).toBe(199);
+    expect(pnlPovodnaHodnota(KAT, MES_FIO)).toBe(7000);
+    expect(pnlPovodnaHodnota(KAT, MES_FIO)).not.toBe(predImportom === 7000 ? -1 : predImportom);
+    nastavPnlBunku(KAT, MES_FIO, null);
+    expect(item.values[i]).toBe(7000);
+  });
+
   test("neznáma kategória ani mesiac mimo radu nič nezapíšu", () => {
     expect(nastavPnlBunku("fixne.apps.neexistuje", MES, 1)).toBe(false);
     expect(nastavPnlBunku(KAT, "1999-01", 1)).toBe(false);
+  });
+});
+
+describe("importné settery mažú aj to, čo zo zdroja zmizlo", () => {
+  // Rodina dier zo 18. 8. 2026: setter zapisoval len mesiace, ktoré prišli.
+  // Pohyb preradený inam (alebo výplata zmazaná v BTC appke) tak nechal
+  // starý zápis žiť — P&L sa opravil, dlh nie.
+  test("barter: mesiac, ktorý zo vstupu zmizol, sa vynuluje", () => {
+    const rad = JAREK_SPLATKY["Sofia (vzdaná tržba)"];
+    const i = VZAS_MONTHS.indexOf("2026-07");
+    nastavJarekZTrackera({ "2026-07": 5000 });
+    expect(rad[i]).toBe(5000);
+    nastavJarekZTrackera({});
+    expect(rad[i]).toBe(0);
+  });
+
+  test("BTC výplaty: mesiac, ktorý zo vstupu zmizol, sa vynuluje", () => {
+    const i = VZAS_MONTHS.indexOf("2026-07");
+    nastavBtcVyplaty({ "2026-07": { jerry: 10000, terezka: 2000, jerryFp: 700 } });
+    expect(SALARY.jerry.personal["BTC"][i]).toBe(10000);
+    expect(SALARY.jerry.personal["FP.Spain"][i]).toBe(700);
+    nastavBtcVyplaty({});
+    expect(SALARY.jerry.personal["BTC"][i]).toBe(0);
+    expect(SALARY.terezka.personal["BTC"][i]).toBe(0);
+    expect(SALARY.jerry.personal["FP.Spain"][i]).toBe(0);
+  });
+
+  test("náklady z Fio: prepis mesiaca vynuluje aj Jarkovu splátku a výplaty", () => {
+    const i = VZAS_MONTHS.indexOf("2026-07");
+    nastavNakladyZFio({ "2026-07": { "fixne.prevadzka.splatkaJarek": 6000 } }, { "2026-07": { jerry: 30000, terezka: 10000 } });
+    expect(JAREK_SPLATKY["Fix splátka (P&L náklad)"][i]).toBe(6000);
+    expect(SALARY.jerry.personal["Výplata"][i]).toBe(30000);
+    // Pohyb sa preradil: splátka už v imports nie je, výplaty tiež nie.
+    nastavNakladyZFio({ "2026-07": { "fixne.apps.ine": 6000 } }, {});
+    expect(JAREK_SPLATKY["Fix splátka (P&L náklad)"][i]).toBe(0);
+    expect(SALARY.jerry.personal["Výplata"][i]).toBe(0);
+    expect(SALARY.terezka.personal["Výplata"][i]).toBe(0);
+  });
+});
+
+describe("tempoDlhu — jedno tempo, vždy s oknom", () => {
+  // Do 18. 8. 2026 rátala karta priemer nad zvoleným obdobím a Jarvis dve
+  // vlastné čísla. Tempo závisí od okna, takže bez neho je to nezmysel.
+  const rokIdx = (rok: string) =>
+    VZAS_MONTHS.map((m, i) => (m.startsWith(rok) ? i : -1)).filter((i) => i >= 0);
+
+  test("vracia okno, nad ktorým počítalo", () => {
+    const t = tempoDlhu("jerry", rokIdx("2026"));
+    expect(t.mesiacov).toBeGreaterThan(0);
+    expect(t.od.startsWith("2026")).toBe(true);
+    expect(t.do.startsWith("2026")).toBe(true);
+  });
+
+  test("mesiace pred dnešným modelom sa vyhadzujú", () => {
+    // Éra 70/30 skončila v sep 2025 — pôžička z nej bola rozhodnutie,
+    // nie výstup vzorca, a do smeru nepatrí.
+    const t = tempoDlhu("jerry", rokIdx("2025"));
+    expect(VZAS_MONTHS.indexOf(t.od)).toBeGreaterThanOrEqual(CURRENT_ERA.from);
+  });
+
+  test("smer sa číta zo znamienka", () => {
+    const t = tempoDlhu("jerry", rokIdx("2026"));
+    expect(["rastie", "klesá", "stojí"]).toContain(t.smer);
+    if (t.tempo < 0) expect(t.smer).toBe("rastie");
+    if (t.tempo > 0) expect(t.smer).toBe("klesá");
+  });
+
+  test("prázdne okno nespadne", () => {
+    expect(tempoDlhu("terezka", []).mesiacov).toBe(0);
   });
 });

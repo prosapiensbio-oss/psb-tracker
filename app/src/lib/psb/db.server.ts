@@ -20,7 +20,7 @@ import { EMPTY_DATA } from "./types";
 const uid = () => crypto.randomUUID();
 
 export async function loadData(DB: D1Database): Promise<PSBData> {
-  const [sessions, services, payments, packages, overrides, acks, log, leads, zavery] = await Promise.all([
+  const [sessions, services, payments, packages, overrides, acks, log, leads, zavery, vedomosti] = await Promise.all([
     DB.prepare("SELECT * FROM sessions").all(),
     DB.prepare("SELECT * FROM services").all(),
     DB.prepare("SELECT * FROM payments").all(),
@@ -34,6 +34,12 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
     // a nikto by sa k nemu nevrátil, kým sa naň sám nespýta.
     DB.prepare("SELECT id, datum, tema, zaver, overit, overit_do, stav FROM jarvis_zavery WHERE stav = 'otvoreny'")
       .all().catch(() => ({ results: [] })),
+    // Text sa zámerne NEČÍTA — rešerš má 8 000 znakov a do kontextu každej
+    // správy nepatrí. Jarvis dostane prehľad a text si vytiahne SQL dopytom,
+    // keď ho naozaj potrebuje.
+    DB.prepare(
+      "SELECT id, nazov, o_com, zdroj, obnovovat_po_dnoch, overene_at, LENGTH(text) AS znakov FROM jarvis_vedomosti",
+    ).all().catch(() => ({ results: [] })),
   ]);
 
   const data: PSBData = {
@@ -77,6 +83,11 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
       validTo: r.valid_to || "",
       payment: r.payment_czk ?? undefined,
       kind: r.kind || "",
+    })),
+    vedomosti: (vedomosti.results as any[]).map((r) => ({
+      id: r.id, nazov: r.nazov, oCom: r.o_com || "", zdroj: r.zdroj || "",
+      obnovovatPoDnoch: Number(r.obnovovat_po_dnoch) || 0,
+      overeneAt: r.overene_at || "", znakov: Number(r.znakov) || 0,
     })),
     zavery: (zavery.results as any[]).map((r) => ({
       id: r.id, datum: r.datum, tema: r.tema, zaver: r.zaver,
@@ -136,6 +147,12 @@ export type IngestResult = {
   filename: string; type: string | null; added: number; skipped: number; error?: string;
   /** Koľko riadkov import odmietol, lebo patria do uzavretého mesiaca. */
   zamknute?: number;
+  /**
+   * Klienti, ktorí sú podľa PTminderu aktívni, ale v nahranom súbore nie sú.
+   * Import ich nechá tak, ako boli — čo je správne, ale ticho. Preto sa mená
+   * vracajú von: čiastočný export vyzerá presne ako úplný.
+   */
+  chybaju?: string[];
 };
 
 export async function ingest(DB: D1Database, filename: string, text: string, actor?: string): Promise<IngestResult> {
@@ -144,6 +161,7 @@ export async function ingest(DB: D1Database, filename: string, text: string, act
 
   let added = 0;
   let skipped = 0;
+  let chybaju: string[] = [];
   // Uzavretý mesiac sa neprepisuje. Nie varovaním — odmietnutím. Import je
   // jediná cesta, ktorou sa do appky dostávajú tréningy a platby, takže stačí
   // strážiť ju; riadky z uzamknutých mesiacov sa preskočia a povie sa o tom.
@@ -377,6 +395,60 @@ export async function ingest(DB: D1Database, filename: string, text: string, act
     // členstvo) — keby súbor s členstvami zmazal klientovi aj riadky balíčkov,
     // druhý upload by ticho zahodil dáta prvého.
     const kindInFile = rows[0]?.kind || "";
+    // ── kontrola úplnosti ────────────────────────────────────────────────
+    //
+    // 19. 8. 2026: Natália Pečková mala v appke 0 hodín, v PTminderi 5. Import
+    // z 14. 8. prebehol bez chyby a ohlásil „+20 riadkov" — lenže tých riadkov
+    // malo byť 77. Bol to export za 14 dní a ona v tom okne nemala pohyb.
+    //
+    // Merge nižšie je zámerný a správny (klient mimo súboru sa nesmie zmazať),
+    // ale má vedľajší účinok: čiastočný export vyzerá presne ako úplný. Preto
+    // sa PRED zápisom odloží, kto je podľa PTminderu aktívny, a po porovnaní
+    // so súborom sa chýbajúci vrátia von. Appka nevie, či je to chyba — vie len
+    // povedať, že sa niekto stratil, a to stačí na to, aby sa človek pozrel.
+    //
+    // Kritérium je `client_status` z PTminderu, nie zostatok hodín. Pôvodne sa
+    // hľadal „živý balíček" (zostatok > 0 alebo platnosť do budúcna) a to bolo
+    // málo: Natália mala v starých dátach len dočerpané riadky bez dátumov,
+    // takže by práve ona — jediný známy prípad — prepadla. Kto je aktívny
+    // klient, ten do úplného exportu balíčkov patrí, nech má hodín koľkokoľvek.
+    //
+    // Porovnáva sa LEN v rámci toho istého pohľadu (`kind`), a riadky starého
+    // formátu bez typu (`kind = ''`) sa do porovnania neberú vôbec. Report má
+    // pohľadov viac a klient býva len v jednom — pri prvom ostrom spustení
+    // 19. 8. tak `package` súbor ohlásil šesť „chýbajúcich", ktorí boli všetci
+    // paušáloví („Doplnenie členstva") a do package exportu ani nepatria.
+    // Cena za to je, že prvý import každého pohľadu nemá s čím porovnávať —
+    // to je správne, radšej ticho než falošný poplach.
+    // KAŽDÝ POHĽAD MÁ INÉ PRAVIDLO, koho doň PTminder vôbec dá — a kontrola
+    // musí poznať oboje, inak háda. Zmerané na ostrých dátach 19. 8. 2026:
+    //
+    //  • `package`    — 21 riadkov, z toho NULA s nulovým zostatkom. Dochodený
+    //                   balíček v tomto exporte jednoducho nie je.
+    //  • `membership` — 45 riadkov, z toho 7 s nulovým zostatkom. Paušál stojí
+    //                   na 0/N navždy, takže tu nula nič neznamená; rozhoduje
+    //                   platnosť.
+    //
+    // Bez tohto rozlíšenia hlásil package súbor šesticu ľudí s dočerpanými
+    // doplnkami (Anna Nová, Jakub Štigut, Janka Šnirychová, Jarek Heinrich,
+    // Klára Holubová, Patrik Lutonský), ktorí doň nikdy patriť nemali, a
+    // membership súbor troch, ktorým dobehla platnosť.
+    const dnesISO = new Date().toISOString().slice(0, 10);
+    // Dosadené parametre sa musia zhodovať s tým, čo dopyt naozaj obsahuje —
+    // preto sa spolu s podmienkou skladá aj ich zoznam.
+    const [patriDoExportu, param] = kindInFile === "package"
+      ? ["sessions_remaining > 0", [kindInFile]]
+      : ["(valid_to = '' OR valid_to >= ?)", [kindInFile, dnesISO]];
+    const aktivni = kindInFile
+      ? (
+        await DB.prepare(
+          `SELECT DISTINCT client_name FROM packages
+            WHERE kind = ? AND client_status = 'Active Client' AND ${patriDoExportu}`,
+        ).bind(...param).all()
+      ).results.map((r: any) => String(r.client_name))
+      : [];
+    const vSubore = new Set(clientsInFile);
+    chybaju = aktivni.filter((meno) => !vSubore.has(meno)).sort();
     const stmts = [
       ...clientsInFile.map((name) =>
         DB.prepare("DELETE FROM packages WHERE client_name = ? AND (kind = ? OR kind = '')").bind(name, kindInFile),
@@ -399,11 +471,11 @@ export async function ingest(DB: D1Database, filename: string, text: string, act
   await audit(DB, {
     action: "import",
     predmet: filename,
-    neu: `${type}: +${added} riadkov, ${skipped} duplicít${zamknutych ? `, ${zamknutych} odmietnutých (uzavretý mesiac)` : ""}`,
+    neu: `${type}: +${added} riadkov, ${skipped} duplicít${zamknutych ? `, ${zamknutych} odmietnutých (uzavretý mesiac)` : ""}${chybaju.length ? `, ${chybaju.length} aktívnych klientov v súbore chýba` : ""}`,
     actor,
   });
 
-  return { filename, type, added, skipped, zamknute: zamknutych };
+  return { filename, type, added, skipped, zamknute: zamknutych, chybaju };
 }
 
 // Zapíše JEDEN stĺpec. Nie celý riadok — a to je oprava skutočnej chyby.
@@ -416,12 +488,21 @@ export async function ingest(DB: D1Database, filename: string, text: string, act
 //
 // Názov stĺpca sa do SQL vkladá textom, ale len z pevnej mapy nižšie; hodnota
 // ide cez parameter. Kľúč mimo mapy sa zahodí ešte predtým.
+/**
+ * Zapíše JEDEN stĺpec klienta.
+ *
+ * Vracia `true` len keď D1 potvrdí zápis. Do 19. 8. 2026 vracala `void`
+ * a API nad ňou odpovedalo `ok: true` vždy — aj keby D1 padla, aj pri
+ * neznámom poli (to sa ticho preskočilo). Presne tvar, ktorý pravidlo
+ * „ticho zlyhávajúci zápis je horší než hlasitá chyba" zakazuje. Dnes padne
+ * len pri výpadku D1, ale obrazovka by vtedy ukázala „uložené" nad ničím.
+ */
 export async function setOverride(
   DB: D1Database,
   name: string,
   key: keyof ClientOverride,
   value: unknown,
-): Promise<void> {
+): Promise<boolean> {
   const colMap: Record<string, string> = {
     status: "status",
     specialRate: "special_rate",
@@ -439,18 +520,22 @@ export async function setOverride(
     precoNeprisiel: "preco_neprisiel",
   };
   const col = colMap[key as string];
-  if (!col) return;
+  if (!col) return false;
 
   let v: unknown = value;
   if (col === "special_rate" || col === "contract_signed" || col === "bitcoin") v = value ? 1 : 0;
   if ((col === "status" || col === "primary_trainer") && (value === "" || value == null)) v = null;
 
-  await DB.prepare(
+  const r = await DB.prepare(
     `INSERT INTO client_overrides (name, ${col}, updated_at) VALUES (?1, ?2, ?3)
      ON CONFLICT(name) DO UPDATE SET ${col} = ?2, updated_at = ?3`,
   )
     .bind(name, v as never, new Date().toISOString())
-    .run();
+    .run()
+    .catch(() => null);
+  // D1 pri zlyhaní hádže výnimku (tú chytá catch → null); `success` má typ
+  // `true`, takže stačí, že výsledok existuje.
+  return r !== null;
 }
 
 export async function ackAnomaly(DB: D1Database, key: string, note: string): Promise<void> {

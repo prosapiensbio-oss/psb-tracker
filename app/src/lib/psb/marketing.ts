@@ -1,3 +1,4 @@
+import { MKT_OBSAH } from "./marketing-obsah";
 // Marketing — skeleton. The numbers below are a one-off extract from Jerry's
 // Metricool exports (18 months, jan 2025 – jún 2026: 40 posts, 74 reels, 994
 // stories), so the screen has something real to show before the importer exists.
@@ -245,7 +246,21 @@ export const MKT_IMPORTOVANE = new Set<string>();
 
 import { clanky } from "./google";
 
+/**
+ * Verzia marketingových skladov — rovnaký mechanizmus ako vzasVerzia.
+ *
+ * Sklady (WEB_STRANKY, GSC_*, IG_PRISPEVKY…) sa plnia mimo Reactu a useMemo
+ * o tom nevie. App.tsx si dovtedy držal vlastné počítadlá (igVerzia,
+ * mktVerzia), ku ktorým sa deti nedostali — PlanObsahu tak vedel zamrznúť
+ * nad prázdnym WEB_STRANKY, keď jeho vlastný fetch dobehol skôr než
+ * /api/marketing (revízia 18. 8. 2026).
+ */
+let _verzia = 0;
+export const marketingVerzia = () => _verzia;
+const oznacZmenu = () => { _verzia++; };
+
 export function nastavMarketingZImportu(mesacne: MktMesiac[], top: MktKus[]): boolean {
+  oznacZmenu();
   if (!mesacne.length) return false;
   // Zlučuje sa po mesiacoch, nenahrádza sa celá séria. Keby sa nahradila, jeden
   // nahratý súbor za júl by zmazal osemnásť mesiacov histórie z grafu — a keby
@@ -272,6 +287,7 @@ export function nastavWebZImportu(
   ga4Strany: { url: string; zobrazenia: number }[] = [],
   zariadenia: { zariadenie: string; kliky: number; zobrazenia: number }[] = [],
 ): boolean {
+  oznacZmenu();
   let zmena = false;
   if (ga4.length) {
     const m = new Map(GA4_MESACNE.map((x) => [x.m, x]));
@@ -354,6 +370,7 @@ export let GADS_VALUTA = "";
  * polovica dát by ticho zmizla a obrazovka by tvrdila, že sa nič nedeje.
  */
 export function nastavAdsZImportu(kampane: GadsKampan[], dopyty: GadsDopyt[], valuta = ""): boolean {
+  oznacZmenu();
   let zmena = false;
   if (kampane.length) {
     GADS_KAMPANE = [...kampane].sort((a, b) => a.mesiac.localeCompare(b.mesiac));
@@ -383,8 +400,26 @@ export type WebStrankaUI = {
 export let WEB_STRANKY: WebStrankaUI[] = [];
 export let WEB_RYCHLOST: PsRiadok[] = [];
 
+/**
+ * Kanály (dosah/sledovatelia/… po mesiacoch z Metricoolu) — do 19. 8. 2026
+ * JEDINÁ časť odpovede /api/marketing, ktorá nemala sklad. Dôsledok: Kanaly,
+ * Reklama, DashGrafy aj MesiacProfil si ju ťahali každý sám a appka volala
+ * /api/marketing šesťkrát pri jednom otvorení — a tri obrazovky mohli mať
+ * rôzne staré čísla, lebo sa neobnovovali spolu. Teraz je to jeden sklad
+ * plnený z App.tsx, s rovnakou verziou ako všetko ostatné.
+ */
+export type KanalRiadok = { mesiac: string; kanal: string; metrika: string; hodnota: number; zmena: number | null; poznamka: string };
+export let KANALY: KanalRiadok[] = [];
+export function nastavKanaly(riadky: KanalRiadok[]): boolean {
+  oznacZmenu();
+  if (!riadky.length) return false;
+  KANALY = riadky;
+  return true;
+}
+
 /** Rýchlosť stránok z PageSpeed Insights. Prázdne pole neprepisuje to, čo už je. */
 export function nastavWebRychlost(riadky: PsRiadok[]): boolean {
+  oznacZmenu();
   if (!riadky.length) return false;
   WEB_RYCHLOST = riadky;
   return true;
@@ -392,6 +427,7 @@ export function nastavWebRychlost(riadky: PsRiadok[]): boolean {
 
 /** Stránky webu z importu. Prázdne pole neprepisuje to, čo už je. */
 export function nastavWebStranky(stranky: WebStrankaUI[]): boolean {
+  oznacZmenu();
   if (!stranky.length) return false;
   WEB_STRANKY = [...stranky].sort((a, b) => a.url.localeCompare(b.url));
   return true;
@@ -419,7 +455,27 @@ export let IG_PRISPEVKY: IgPrispevokUI[] = [];
 
 /** Prázdne pole neprepisuje to, čo už je — rovnako ako pri ostatných importoch. */
 export function nastavIgPrispevky(p: IgPrispevokUI[]): boolean {
+  oznacZmenu();
   if (!p.length) return false;
   IG_PRISPEVKY = [...p].sort((a, b) => (b.mesiac || "").localeCompare(a.mesiac || ""));
   return true;
+}
+
+
+/**
+ * Obsah po príspevkoch — JEDEN zdroj pre obrazovku aj pre Jarvisa.
+ *
+ * Živá tabuľka z Meta API, keď je; statický súbor len ako história za obdobie,
+ * ktoré API nedáva. Do 18. 8. 2026 čítala obrazovka „Typ hooku" vždy statický
+ * súbor a Jarvis živú tabuľku — zhodovali sa na 62 % príspevkov, takže na tú
+ * istú otázku („ktorý hook funguje") dávali iné poradie.
+ */
+export function obsahRiadky(): { m: string; f: string; k: string; h: string; u: number; v: number; z: number; vr: number }[] {
+  if (IG_PRISPEVKY.length) {
+    return IG_PRISPEVKY.map((p) => ({
+      m: p.mesiac, f: p.typ, k: p.kategoria || "Edukácia", h: p.hook,
+      u: p.ulozenia, v: p.videnia, z: p.zdielania, vr: p.viewRate,
+    }));
+  }
+  return MKT_OBSAH.map((r) => ({ m: r.m, f: r.f, k: r.k, h: r.h, u: r.u, v: r.v, z: r.z, vr: r.vr }));
 }

@@ -24,9 +24,25 @@ const kluc = (mesiac: string, kategoria: string) => `${mesiac}|${kategoria}`;
 
 let ROZPIS: Record<string, PohybZaBunku[]> = {};
 
-export function nastavRozpis(r: Record<string, PohybZaBunku[]>): void {
+/**
+ * Verzia skladu — rovnako ako `vzasVerzia` a `marketingVerzia`.
+ *
+ * Sklad sa plní MIMO Reactu (App.tsx po načítaní banky a faktúr), takže
+ * komponent s výsledkom v `useMemo` by si nechal starý rozpis. Dnes to drží
+ * len to, že jediný čitateľ (Vzas) číta v renderi — nezapísané pravidlo,
+ * ktoré poruší prvý pridaný `useMemo` (revízia 18. 8. 2026).
+ */
+let VERZIA = 0;
+export const rozpisVerzia = () => VERZIA;
+
+/** Vracia `true`, keď sa sklad naozaj zmenil — ako ostatné settery. */
+export function nastavRozpis(r: Record<string, PohybZaBunku[]>): boolean {
   for (const v of Object.values(r)) v.sort((a, b) => a.datum.localeCompare(b.datum));
+  const zmena = JSON.stringify(Object.keys(r).sort()) !== JSON.stringify(Object.keys(ROZPIS).sort())
+    || JSON.stringify(r) !== JSON.stringify(ROZPIS);
   ROZPIS = r;
+  if (zmena) VERZIA++;
+  return zmena;
 }
 
 export function rozpisPre(mesiac: string, kategoria: string): PohybZaBunku[] {

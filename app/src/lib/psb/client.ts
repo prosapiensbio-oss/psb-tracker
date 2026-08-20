@@ -83,8 +83,21 @@ export async function saveOverride(
   return r.ok;
 }
 
-export async function saveAnomaly(key: string, note: string, ack = true): Promise<void> {
-  await post("/api/anomaly", { key, note, ack });
+/**
+ * Vracia úspech — rovnako ako saveOverride a z rovnakého dôvodu.
+ *
+ * Revízia 18. 8. 2026: `void` tu znamenal, že odpoveď napísaná k notifikácii
+ * zmizla z obrazovky aj vtedy, keď sa zápis nepodaril — položka sa optimisticky
+ * zavrela a po reloade bola späť, ale text bol preč. saveOverride bol na
+ * boolean opravený 13. 8.; tento sused sa vtedy zabudol.
+ */
+export async function saveAnomaly(key: string, note: string, ack = true): Promise<boolean> {
+  try {
+    const r = await post("/api/anomaly", { key, note, ack });
+    return r.ok;
+  } catch {
+    return false;
+  }
 }
 
 export async function resetAll(): Promise<void> {
@@ -308,22 +321,26 @@ export async function fetchJarvisMemory(): Promise<{ chats: unknown[]; zavery: Z
   }
 }
 
-export async function saveJarvisChat(chat: { id: string; title: string; messages: unknown[]; archived?: boolean; kategoria?: string }) {
+export async function saveJarvisChat(chat: { id: string; title: string; messages: unknown[]; archived?: boolean; kategoria?: string }): Promise<boolean> {
   try {
-    await post("/api/jarvis-memory", { akcia: "chat", ...chat });
-  } catch { /* offline — localStorage kópia ostáva */ }
+    return (await post("/api/jarvis-memory", { akcia: "chat", ...chat })).ok;
+  } catch {
+    // Offline — localStorage kópia ostáva, takže sa rozhovor nestratí.
+    // Návratová hodnota to aj tak hovorí: volajúci sa smie rozhodnúť.
+    return false;
+  }
 }
 
-export async function deleteJarvisChat(id: string) {
-  try { await post("/api/jarvis-memory", { akcia: "zmaz-chat", id }); } catch { /* ignore */ }
+export async function deleteJarvisChat(id: string): Promise<boolean> {
+  try { return (await post("/api/jarvis-memory", { akcia: "zmaz-chat", id })).ok; } catch { return false; }
 }
 
-export async function saveZaver(z: Record<string, unknown>) {
-  try { await post("/api/jarvis-memory", { akcia: "zaver", ...z }); } catch { /* ignore */ }
+export async function saveZaver(z: Record<string, unknown>): Promise<boolean> {
+  try { return (await post("/api/jarvis-memory", { akcia: "zaver", ...z })).ok; } catch { return false; }
 }
 
-export async function vyhodnotZaver(id: string, stav: string, vysledok: string) {
-  try { await post("/api/jarvis-memory", { akcia: "vyhodnot", id, stav, vysledok }); } catch { /* ignore */ }
+export async function vyhodnotZaver(id: string, stav: string, vysledok: string): Promise<boolean> {
+  try { return (await post("/api/jarvis-memory", { akcia: "vyhodnot", id, stav, vysledok })).ok; } catch { return false; }
 }
 
 

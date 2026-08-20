@@ -64,15 +64,20 @@ export function Nakupy() {
   // Optimisticky lokálne, potom na server. Písanie do inputu, ktoré čaká na
   // odpoveď databázy, sa píše ako cez blato — a pri cene, ktorú človek prepisuje
   // podľa e-shopu, je to najhoršie.
+  const [chyba, setChyba] = useState("");
   const uprav = (id: string, zmena: Partial<WishPolozka>) => {
+    const predtym = polozky;
     setPolozky((prev) => prev.map((p) => (p.id === id ? { ...p, ...zmena } : p)));
     const p = { ...polozky.find((x) => x.id === id)!, ...zmena };
-    void ulozWish({ id, nazov: p.nazov, cena: p.cena, link: p.link, kupene: p.kupene, poznamka: p.poznamka, kategoria: p.kategoria });
+    void ulozWish({ id, nazov: p.nazov, cena: p.cena, link: p.link, kupene: p.kupene, poznamka: p.poznamka, kategoria: p.kategoria })
+      .then((ok) => { if (!ok) { setPolozky(predtym); setChyba("Zmena sa nezapísala — skús znova."); } else setChyba(""); });
   };
 
   const zmaz = (p: WishPolozka) => {
+    const predtym = polozky;
     setPolozky((prev) => prev.filter((x) => x.id !== p.id));
-    void ulozWish({ id: p.id, zmazat: true });
+    void ulozWish({ id: p.id, zmazat: true })
+      .then((ok) => { if (!ok) { setPolozky(predtym); setChyba("Zmazanie neprešlo — položka je späť."); } else setChyba(""); });
   };
 
   const pridaj = async (e: React.FormEvent) => {
@@ -87,6 +92,8 @@ export function Nakupy() {
   return (
     <Card>
       <H3><Info text="Zoznam z hárku vo VZAS. Zaškrtnutá položka sa presunie na koniec svojej skupiny a odráta sa zo sumy „ešte treba“. Nie je to náklad — do peňazí to vstúpi až cez banku ako bežný výdavok. Skupiny majú vlastné medzisúčty rovnako ako v Exceli." label="Nákupný zoznam" /></H3>
+
+      {chyba && <div style={{ fontSize: 12, color: C.red, marginTop: 8 }}>{chyba}</div>}
 
       <div style={{ display: "flex", gap: 18, flexWrap: "wrap", margin: "10px 0 16px" }}>
         <div>

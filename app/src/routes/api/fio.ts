@@ -130,25 +130,32 @@ export const Route = createFileRoute("/api/fio")({
             const vzor = (r.protistrana || "").trim();
             if (vzor.length >= 3 && r.kategoria) naucene.set(vzor.toLowerCase(), r.kategoria);
           }
+          // Zlyhaný zápis pravidla sa NESMIE prehltnúť: DELETE+INSERT s tichým
+          // catch znamenal, že keď DELETE prešiel a INSERT padol, naučené
+          // pravidlo zmizlo — a audit ohlásil „N pravidiel" ako uložené.
+          let pravidlaZlyhane = 0;
           for (const [vzor, kategoria] of naucene) {
             // Upsert cez DELETE+INSERT: tabuľka nemá unique na text_pattern a
             // každý ďalší import by pridal duplicitný riadok. Posledné
             // zaradenie vyhráva — keď Jerry preradí Adobe inam, staré pravidlo
             // nesmie ďalej hlasovať.
-            await DB.prepare("DELETE FROM vzas_rules WHERE text_pattern = ?1 AND created_by = 'import'").bind(vzor).run().catch(() => {});
-            await DB.prepare(
-              `INSERT INTO vzas_rules (id, counterparty, merchant, text_pattern, category, priority, hit_count, active, created_by, created_at)
-               VALUES (?1, NULL, NULL, ?2, ?3, 50, 0, 1, 'import', ?4)`,
-            ).bind(uid(), vzor, kategoria, now).run().catch(() => {});
+            const r = await DB.batch([
+              DB.prepare("DELETE FROM vzas_rules WHERE text_pattern = ?1 AND created_by = 'import'").bind(vzor),
+              DB.prepare(
+                `INSERT INTO vzas_rules (id, counterparty, merchant, text_pattern, category, priority, hit_count, active, created_by, created_at)
+                 VALUES (?1, NULL, NULL, ?2, ?3, 50, 0, 1, 'import', ?4)`,
+              ).bind(uid(), vzor, kategoria, now),
+            ]).catch(() => null);
+            if (!r) pravidlaZlyhane++;
           }
 
           await audit(DB, {
             action: "import-banka",
             predmet: `${pridane} pohybov`,
-            neu: `+${pridane}, ${preskocene} duplicít${zamknute ? `, ${zamknute} odmietnutých (uzavretý mesiac)` : ""}, ${naucene.size} pravidiel`,
+            neu: `+${pridane}, ${preskocene} duplicít${zamknute ? `, ${zamknute} odmietnutých (uzavretý mesiac)` : ""}, ${naucene.size - pravidlaZlyhane} pravidiel${pravidlaZlyhane ? ` (${pravidlaZlyhane} sa NEULOŽILO)` : ""}`,
             actor: await currentUser(request) || undefined,
           });
-          return Response.json({ ok: true, pridane, preskocene, zamknute, pravidla: naucene.size });
+          return Response.json({ ok: true, pridane, preskocene, zamknute, pravidla: naucene.size - pravidlaZlyhane, pravidlaZlyhane });
         }
 
         // Úprava kategórie po zápise. Náhľad bol dôkladný, ale po zápise sa už
@@ -205,12 +212,15 @@ export const Route = createFileRoute("/api/fio")({
             }
             const kedy = new Date().toISOString();
             for (const [vzor, kategoria] of naucene) {
-              await DB.prepare("DELETE FROM vzas_rules WHERE text_pattern = ?1 AND created_by IN ('import','uprava')")
-                .bind(vzor).run().catch(() => {});
-              await DB.prepare(
-                `INSERT INTO vzas_rules (id, counterparty, merchant, text_pattern, category, priority, hit_count, active, created_by, created_at)
-                 VALUES (?1, NULL, NULL, ?2, ?3, 40, 0, 1, 'uprava', ?4)`,
-              ).bind(uid(), vzor, kategoria, kedy).run().catch(() => {});
+              // Rovnaká zásada ako pri importe: DELETE+INSERT atomicky (batch),
+              // zlyhanie sa nesmie prehltnúť bez stopy.
+              await DB.batch([
+                DB.prepare("DELETE FROM vzas_rules WHERE text_pattern = ?1 AND created_by IN ('import','uprava')").bind(vzor),
+                DB.prepare(
+                  `INSERT INTO vzas_rules (id, counterparty, merchant, text_pattern, category, priority, hit_count, active, created_by, created_at)
+                   VALUES (?1, NULL, NULL, ?2, ?3, 40, 0, 1, 'uprava', ?4)`,
+                ).bind(uid(), vzor, kategoria, kedy),
+              ]).catch(() => null);
             }
           }
 

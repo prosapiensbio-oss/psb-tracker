@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { fmtDMY } from "../../lib/psb/format";
+import { fmtDMY, normName } from "../../lib/psb/format";
 
 import { fetchBtcReserve, type BtcVyplata } from "../../lib/psb/client";
 import type { ClientAgg } from "../../lib/psb/compute";
@@ -47,8 +47,10 @@ const TYPY = [
  * „Kateřina", ktorú z mena odvodiť nejde. Tichý omyl v mene by pritom viedol
  * k tomu, že sa hodina pripíše cudziemu balíčku — to je horšie než jedno kliknutie.
  */
-const bezDiakritiky = (s: string) =>
-  s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+// `normName` z format.ts — jedna normalizácia MENA pre celú appku. Lokálna
+// kópia tu navyše nezlučovala viacnásobné medzery, takže „Zuzana  Spoligová"
+// s dvojitou medzerou sa v jednej karte spárovala a v druhej nie (18. 8. 2026).
+const bezDiakritiky = normName;
 
 export function navrhni(
   nazov: string,
@@ -357,14 +359,19 @@ function Mapovanie({ nezname, mena, clients, onHotovo }: { nezname: Nezname[]; m
     return (navrhy[k]?.kandidati.length === 1 && !vyber[k]) || navrhy[k]?.typ === "guillermo";
   }).length;
 
+  // Server vie vrátiť {ok:false} aj s HTTP 200 — kto telo nečíta, hlási
+  // úspech aj pri odmietnutom zápise. Vzor s lokálnou chybou je ten istý
+  // ako pri zdrojoch kalendára vyššie (revízia 18. 8. 2026).
+  const [chybaUloz, setChybaUloz] = useState("");
   const uloz = async (n: Nezname) => {
     const k = `${n.nazov}|${n.trener}`;
     const v = stav(k);
     const sMenom = v.typ === "trening" || v.typ === "uvodny";
     if (!daSa(v)) return;
-    setUklada(k);
-    await posli({ akcia: "mapuj", nazov: n.nazov, trener: n.trener, typ: v.typ, klient: sMenom ? v.klient.trim() : null });
+    setUklada(k); setChybaUloz("");
+    const j = await posli({ akcia: "mapuj", nazov: n.nazov, trener: n.trener, typ: v.typ, klient: sMenom ? v.klient.trim() : null }).catch(() => ({ ok: false, error: "spojenie" }));
     setUklada("");
+    if (!j.ok) { setChybaUloz(`${n.nazov}: ${j.error || "nepodarilo sa uložiť"}`); return; }
     await onHotovo();
   };
 
@@ -380,6 +387,7 @@ function Mapovanie({ nezname, mena, clients, onHotovo }: { nezname: Nezname[]; m
         Zoradené podľa toho, ako často sa vyskytujú — hore je práca, ktorá sa najviac oplatí.
         {jednoznacne > 0 && <> Pri {jednoznacne} z nich appka pozná odpoveď jednoznačne — stačí potvrdiť.</>}
       </div>
+      {chybaUloz && <div style={{ fontSize: 12, color: C.red, marginBottom: 8 }}>{chybaUloz}</div>}
       {nezname.map((n) => {
         const k = `${n.nazov}|${n.trener}`;
         const v = stav(k);
@@ -467,7 +475,10 @@ function Mapovanie({ nezname, mena, clients, onHotovo }: { nezname: Nezname[]; m
 function Zmeny({ zmeny, onHotovo, mena }: { zmeny: Zmena[]; onHotovo: () => Promise<void>; mena: string[] }) {
   const [pisem, setPisem] = useState<Record<string, string>>({});
   const [obnovujem, setObnovujem] = useState(false);
+  const [chybaObnovy, setChybaObnovy] = useState("");
   const [pridavam, setPridavam] = useState(false);
+  const [chybaZmeny, setChybaZmeny] = useState("");
+  const [chybaVysv, setChybaVysv] = useState("");
   const [uklada, setUklada] = useState(false);
   const [novy, setNovy] = useState({
     druh: "zrusene" as "zrusene" | "nahrada",
@@ -501,13 +512,24 @@ function Zmeny({ zmeny, onHotovo, mena }: { zmeny: Zmena[]; onHotovo: () => Prom
     // stiahnutie presne TU, nie o dve obrazovky nižšie.
     <div style={{ display: "flex", gap: 8, alignItems: "center", marginLeft: "auto", flexWrap: "wrap" }}>
       <button
-        onClick={async () => { setObnovujem(true); try { await posli({ akcia: "stiahni" }); await onHotovo(); } finally { setObnovujem(false); } }}
+        onClick={async () => {
+          setObnovujem(true); setChybaObnovy("");
+          try {
+            // Sťahovanie vie zlyhať na strane Googlu (vypršaný odkaz na
+            // kalendár) a vtedy tlačidlo len prestalo točiť — vyzeralo to,
+            // že je hotovo, a zoznam zostal starý.
+            const j = await posli({ akcia: "stiahni" }).catch(() => ({ ok: false, error: "spojenie" }));
+            if (!j.ok) { setChybaObnovy(j.error || "Stiahnutie neprešlo."); return; }
+            await onHotovo();
+          } finally { setObnovujem(false); }
+        }}
         disabled={obnovujem}
         title="Stiahnuť kalendár teraz a prepočítať rozdiely"
         style={{ padding: "5px 12px", borderRadius: 7, fontSize: 12, cursor: obnovujem ? "wait" : "pointer", border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted }}
       >
         {obnovujem ? "Sťahujem…" : "↻ Obnoviť"}
       </button>
+      {chybaObnovy && <span style={{ fontSize: 11.5, color: C.red }}>{chybaObnovy}</span>}
       <button
         onClick={() => setPridavam((p) => !p)}
         title="Zapísať zrušenie alebo náhradu, ktorú kalendár nezachytil"
@@ -555,7 +577,11 @@ function Zmeny({ zmeny, onHotovo, mena }: { zmeny: Zmena[]; onHotovo: () => Prom
           try {
             // Zapíše sa zmena a hneď aj vysvetlenie, ak ho Jerry napísal —
             // ručný zápis je sám o sebe odpoveď, nemá zmysel pýtať sa naň znova.
-            await posli({ akcia: "zmena-rucne", druh: novy.druh, klient: novy.klient.trim(), datum: novy.datum, trener: novy.trener, poznamka: novy.poznamka });
+            const j = await posli({ akcia: "zmena-rucne", druh: novy.druh, klient: novy.klient.trim(), datum: novy.datum, trener: novy.trener, poznamka: novy.poznamka }).catch(() => ({ ok: false, error: "spojenie" }));
+            // Vyčistený a zavretý formulár je pre človeka potvrdenie — smie
+            // prísť až po potvrdenom zápise, inak veta zmizne bez stopy.
+            if (!j.ok) { setChybaZmeny(j.error || "Zápis neprešiel — skús znova."); return; }
+            setChybaZmeny("");
             setNovy({ ...novy, klient: "", poznamka: "" });
             setPridavam(false);
             await onHotovo();
@@ -576,6 +602,7 @@ function Zmeny({ zmeny, onHotovo, mena }: { zmeny: Zmena[]; onHotovo: () => Prom
           {hlavicka}
         </div>
         {formular}
+        {(chybaZmeny || chybaVysv) && <div style={{ fontSize: 12, color: C.red, marginBottom: 8 }}>{chybaZmeny || chybaVysv}</div>}
         {!pridavam && <Empty>Od posledného stiahnutia sa nič nezmenilo.</Empty>}
       </Card>
     );
@@ -588,6 +615,7 @@ function Zmeny({ zmeny, onHotovo, mena }: { zmeny: Zmena[]; onHotovo: () => Prom
         {hlavicka}
       </div>
       {formular}
+      {(chybaZmeny || chybaVysv) && <div style={{ fontSize: 12, color: C.red, marginBottom: 8 }}>{chybaZmeny || chybaVysv}</div>}
       {zmeny.map((z) => (
         <div key={z.id} style={{ padding: "10px 0", borderBottom: `1px solid ${mix(C.border, 55)}` }}>
           <div style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
@@ -604,11 +632,11 @@ function Zmeny({ zmeny, onHotovo, mena }: { zmeny: Zmena[]; onHotovo: () => Prom
               value={pisem[z.id] ?? z.poznamka ?? ""}
               onChange={(e) => setPisem({ ...pisem, [z.id]: e.target.value })}
               placeholder="prečo? (klient zrušil, presunuli sme, chyba v zápise…)"
-              onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); void (async () => { await posli({ akcia: "vysvetli", id: z.id, poznamka: pisem[z.id] || "" }); await onHotovo(); })(); } }}
+              onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) { e.preventDefault(); void (async () => { const j = await posli({ akcia: "vysvetli", id: z.id, poznamka: pisem[z.id] || "" }).catch(() => ({ ok: false, error: "spojenie" })); if (!j.ok) { setChybaVysv(j.error || "Vysvetlenie sa nezapísalo."); return; } setChybaVysv(""); await onHotovo(); })(); } }}
               style={{ flex: "1 1 260px", padding: "6px 10px", borderRadius: 7, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 12 }}
             />
             <button
-              onClick={async () => { await posli({ akcia: "vysvetli", id: z.id, poznamka: pisem[z.id] || "" }); await onHotovo(); }}
+              onClick={async () => { const j = await posli({ akcia: "vysvetli", id: z.id, poznamka: pisem[z.id] || "" }).catch(() => ({ ok: false, error: "spojenie" })); if (!j.ok) { setChybaVysv(j.error || "Vysvetlenie sa nezapísalo."); return; } setChybaVysv(""); await onHotovo(); }}
               style={{ padding: "6px 13px", borderRadius: 7, fontSize: 12, fontWeight: 600, cursor: "pointer", border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted }}
             >
               Vybavené
@@ -628,8 +656,15 @@ function Zmeny({ zmeny, onHotovo, mena }: { zmeny: Zmena[]; onHotovo: () => Prom
  * to ukáže bez čítania, lebo tvar dňa je v nej priamo vidieť.
  *
  * Rozsah hodín sa počíta z dát, nie natvrdo: kto trénuje od siedmej do ôsmej
- * večer, nemá pozerať na prázdny pás od polnoci. Späť sa dá ísť len po dnešok —
- * história patrí do PTmindera, tu je reč o tom, čo sa chystá.
+ * večer, nemá pozerať na prázdny pás od polnoci.
+ *
+ * DOZADU SA IDE TRI TÝŽDNE. Pôvodne sa späť nedalo vôbec („história patrí do
+ * PTmindera") a bola to zlá úvaha: PTminder ukáže, čo sa vyfakturovalo, nie
+ * čo v ten deň stálo v kalendári — a práve rozdiel medzi tým dvojím appka
+ * odteraz hlási ako chýbajúce sedenie. Bez pohľadu späť sa taká notifikácia
+ * nedá overiť. Tri týždne preto, že tak ďaleko siaha aj sťahovanie kalendára
+ * (DOZADU_DNI v api/kalendar.ts); za tou hranicou by týždeň zíval prázdnotou,
+ * ktorá vyzerá ako zrušené tréningy.
  */
 function Tyzden({ udalosti, onKlik, trener, onTrener }: { udalosti: KalUdalost[]; onKlik: (u: KalUdalost) => void; trener: string; onTrener: (t: string) => void }) {
   const [posun, setPosun] = useState(0);
@@ -688,13 +723,19 @@ function Tyzden({ udalosti, onKlik, trener, onTrener }: { udalosti: KalUdalost[]
         </H3>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           <TrenerPills value={trener} onChange={onTrener} />
-          <button onClick={() => setPosun(posun - 1)} disabled={posun <= 0}
-            style={{ padding: "4px 10px", borderRadius: 7, fontSize: 13, cursor: posun <= 0 ? "not-allowed" : "pointer", border: `1px solid ${C.border}`, background: "transparent", color: posun <= 0 ? C.textDim : C.textMuted }}>←</button>
-          <span style={{ fontSize: 12.5, color: C.text, fontWeight: 600, minWidth: 96, textAlign: "center" }}>
+          {/* Tri týždne dozadu, dva dopredu — presne tam, kam siaha stiahnutý
+              kalendár. Ďalej by týždeň zíval prázdnotou, ktorá vyzerá ako
+              zrušené tréningy. */}
+          <button onClick={() => setPosun(posun - 1)} disabled={posun <= -3}
+            style={{ padding: "4px 10px", borderRadius: 7, fontSize: 13, cursor: posun <= -3 ? "not-allowed" : "pointer", border: `1px solid ${C.border}`, background: "transparent", color: posun <= -3 ? C.textDim : C.textMuted }}>←</button>
+          <span style={{ fontSize: 12.5, color: C.text, fontWeight: 600, minWidth: 116, textAlign: "center" }}>
             {posun === 0 ? "tento týždeň" : popisTyzdna}
           </span>
           <button onClick={() => setPosun(posun + 1)} disabled={posun >= 2}
             style={{ padding: "4px 10px", borderRadius: 7, fontSize: 13, cursor: posun >= 2 ? "not-allowed" : "pointer", border: `1px solid ${C.border}`, background: "transparent", color: posun >= 2 ? C.textDim : C.textMuted }}>→</button>
+          {posun !== 0 && (
+            <button onClick={() => setPosun(0)} style={{ background: "none", border: "none", color: C.accentLight, fontSize: 12, cursor: "pointer" }}>dnes</button>
+          )}
         </div>
       </div>
 
@@ -816,18 +857,22 @@ function UpravaUdalosti({
   const [klient, setKlient] = useState(udalost.klient || "");
   const [typ, setTyp] = useState(udalost.typ || navrh.typ);
   const [uklada, setUklada] = useState(false);
+  const [chyba, setChyba] = useState("");
 
   const sMenom = typ === "trening" || typ === "uvodny";
   const daSa = sMenom ? klient.trim().length >= 3 : true;
 
   const uloz = async () => {
     if (!daSa) return;
-    setUklada(true);
-    await posli({
+    setUklada(true); setChyba("");
+    const j = await posli({
       akcia: "mapuj", nazov: udalost.nazov, trener: udalost.trener,
       typ, klient: sMenom ? klient.trim() : null,
-    });
+    }).catch(() => ({ ok: false, error: "spojenie" }));
     setUklada(false);
+    // Modal sa zatvára cez onHotovo — pri neúspechu zostáva otvorený
+    // a povie prečo, namiesto tichého zatvorenia nad nezapísaným menom.
+    if (!j.ok) { setChyba(j.error || "Nepodarilo sa uložiť."); return; }
     await onHotovo();
   };
 
@@ -883,6 +928,7 @@ function UpravaUdalosti({
       </div>
 
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+        {chyba && <div style={{ fontSize: 12, color: C.red, marginBottom: 8 }}>{chyba}</div>}
         <button
           onClick={() => void uloz()}
           disabled={uklada || !daSa}
@@ -906,37 +952,14 @@ function UpravaUdalosti({
 
 /** Tréningy z kalendára, ktoré sú preč a v PTminderi po nich nič nezostalo. */
 function Kontrola({ udalosti, data }: { udalosti: KalUdalost[]; data: PSBData }) {
-  const chybajuce = useMemo(() => {
-    const dnes = new Date().toISOString().slice(0, 10);
-    /**
-     * Porovnanie znáša dve odchýlky, ktoré overenie na skutočných dátach
-     * odhalilo — obe hlásili chýbajúci zápis tam, kde zápis existoval:
-     *
-     * 1. DIAKRITIKA. PTminder má „Zuzana Spoligova", v kalendári stálo
-     *    „Zuzana Spoligová". Pri úvodných sa meno píše voľne (klient ešte
-     *    v Trackeri nie je), takže sa presná zhoda spoľahnúť nedá.
-     * 2. DEŇ VEDĽA. Markéta mala v kalendári 30. 7. a v PTminderi 31. 7. —
-     *    hodina sa presunula a kalendár sa neopravil. Tolerancia ±1 deň to
-     *    zmieri; dvakrát za dva dni ten istý klient netrénuje.
-     *
-     * Radšej zmlčať hraničný prípad než hlásiť poplach, ktorý sa po overení
-     * ukáže ako nič — karta, ktorá kričí zbytočne, sa prestane čítať.
-     */
-    const hola = (x: string) => x.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
-    const posun = (d: string, o: number) => new Date(Date.parse(`${d}T00:00:00Z`) + o * 86400000).toISOString().slice(0, 10);
-    const sedenia = new Set(data.sessions.map((x) => `${hola(x.client)}|${x.date.slice(0, 10)}`));
-    return udalosti
-      .filter((u) => {
-        if (u.typ !== "trening" && u.typ !== "uvodny") return false;
-        if (!u.klient) return false;
-        const d = u.zaciatok.slice(0, 10);
-        // Dnešok sa nekontroluje — hodina ešte prebieha a zápis príde neskôr.
-        if (d >= dnes) return false;
-        const k = hola(u.klient);
-        return ![-1, 0, 1].some((o) => sedenia.has(`${k}|${posun(d, o)}`));
-      })
-      .sort((a, b) => b.zaciatok.localeCompare(a.zaciatok));
-  }, [udalosti, data.sessions]);
+  const chybajuce = useMemo(
+    // Tá istá logika ako v Balíčkoch (nezapisaneTreningy) — líši sa len
+    // dneškom: tu sa nekontroluje, lebo zápis zaň ešte len príde.
+    () => nezapisaneTreningy(udalosti, data.sessions, "vynechaj")
+      .slice()
+      .sort((a, b) => b.zaciatok.localeCompare(a.zaciatok)),
+    [udalosti, data.sessions],
+  );
 
   return (
     <Card>
@@ -979,23 +1002,55 @@ function Kontrola({ udalosti, data }: { udalosti: KalUdalost[]; data: PSBData })
  * čísla pre tú istú klientku na jednej obrazovke. Porovnáva sa bez
  * diakritiky a s toleranciou ±1 deň, rovnako ako „Chýba v PTminderi".
  */
+/**
+ * JADRO porovnania kalendára s exportom — jedno pre obe karty.
+ *
+ * Znáša dve odchýlky, ktoré overenie na skutočných dátach odhalilo, obe
+ * hlásili chýbajúci zápis tam, kde zápis existoval:
+ *
+ * 1. DIAKRITIKA. PTminder má „Zuzana Spoligova", kalendár „Zuzana Spoligová".
+ *    Pri úvodných sa meno píše voľne (klient ešte v Trackeri nie je).
+ * 2. DEŇ VEDĽA. Markéta mala v kalendári 30. 7. a v PTminderi 31. 7. —
+ *    hodina sa presunula a kalendár sa neopravil. Dvakrát za dva dni ten
+ *    istý klient netrénuje, takže tolerancia ±1 deň je bezpečná.
+ *
+ * DNEŠOK je jediné, v čom sa obe karty líšia, a líšia sa oprávnene:
+ *   • „prebehnute" — Balíčky: hodina, ktorá dnes už prebehla, je minutá,
+ *     nech si export myslí čokoľvek,
+ *   • „vynechaj" — „Chýba v PTminderi": dnešný zápis ešte len príde, hlásiť
+ *     ho ako chýbajúci by bol falošný poplach.
+ * Do 18. 8. 2026 bolo toto pravidlo napísané dvakrát a docstring tvrdil, že
+ * sú rovnaké — neboli.
+ */
+export function nezapisaneTreningy(
+  udalosti: KalUdalost[],
+  sedenia: { client: string; date: string }[],
+  dnesok: "prebehnute" | "vynechaj" = "prebehnute",
+): KalUdalost[] {
+  const teraz = new Date();
+  const dnes = teraz.toISOString().slice(0, 10);
+  const zapisane = new Set(sedenia.map((x) => `${normName(x.client)}|${x.date.slice(0, 10)}`));
+  const posun = (d: string, o: number) => new Date(Date.parse(`${d}T00:00:00Z`) + o * 86400000).toISOString().slice(0, 10);
+  return udalosti.filter((u) => {
+    if ((u.typ !== "trening" && u.typ !== "uvodny") || !u.klient) return false;
+    const den = u.zaciatok.slice(0, 10);
+    if (den > dnes) return false;
+    if (den === dnes) {
+      if (dnesok === "vynechaj") return false;
+      if (Date.parse(u.zaciatok) > teraz.getTime()) return false;
+    }
+    const k = normName(u.klient);
+    return ![-1, 0, 1].some((o) => zapisane.has(`${k}|${posun(den, o)}`));
+  });
+}
+
 export function odtrenovaneMimoExportu(
   udalosti: KalUdalost[],
   sedenia: { client: string; date: string }[],
 ): Record<string, number> {
-  const teraz = new Date();
-  const dnes = teraz.toISOString().slice(0, 10);
-  const hola = (x: string) => x.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
-  const posun = (d: string, o: number) => new Date(Date.parse(`${d}T00:00:00Z`) + o * 86400000).toISOString().slice(0, 10);
-  const zapisane = new Set(sedenia.map((x) => `${hola(x.client)}|${x.date.slice(0, 10)}`));
   const out: Record<string, number> = {};
-  for (const u of udalosti) {
-    if (u.typ !== "trening" || !u.klient) continue;
-    const den = u.zaciatok.slice(0, 10);
-    if (den > dnes || (den === dnes && Date.parse(u.zaciatok) > teraz.getTime())) continue;
-    const k = hola(u.klient);
-    if ([-1, 0, 1].some((o) => zapisane.has(`${k}|${posun(den, o)}`))) continue;
-    out[u.klient] = (out[u.klient] || 0) + 1;
+  for (const u of nezapisaneTreningy(udalosti, sedenia, "prebehnute")) {
+    out[u.klient as string] = (out[u.klient as string] || 0) + 1;
   }
   return out;
 }
@@ -1007,7 +1062,7 @@ export function odtrenovaneMimoExportu(
  * (ozvať sa, kým klienta ešte vidíš na hodine), a tie patria na prvú obrazovku.
  * Kalendár je miesto, kde sa dáta zbierajú; Kokpit je miesto, kde sa konajú.
  */
-export function Balicky({ udalosti, clients, sedenia = [], onObnov, style, onKlient, matchTrener, children }: {
+export function Balicky({ udalosti, clients, sedenia = [], onObnov, style, onKlient, matchTrener, children, poslednyReport }: {
   udalosti: KalUdalost[];
   clients: Record<string, ClientAgg>;
   /** Zápisy z PTmindera — podľa nich sa pozná, ktorý tréning z kalendára
@@ -1022,9 +1077,28 @@ export function Balicky({ udalosti, clients, sedenia = [], onObnov, style, onKli
   matchTrener?: (t: string) => boolean;
   /** Doplnková sekcia pod zoznamom (na Kokpite končiace platnosti členstiev). */
   children?: React.ReactNode;
+  /** Posledný import balíčkov — pri pohľade „PTminder" hovorí, k akej chvíli
+   *  ten stav platí. Bez neho je potvrdené číslo bez dátumu, čiže na nič. */
+  poslednyReport?: { date: string; filename: string } | null;
 }) {
   const [obnovujem, setObnovujem] = useState(false);
-  const riadky = useMemo(() => {
+  const [chybaObnovy, setChybaObnovy] = useState("");
+  /**
+   * Dva zdroje toho istého čísla — a rozdiel medzi nimi je celý zmysel karty.
+   *
+   * Jerry, 19. 8. 2026: „na jednej strane sa zostatok dopočítava cez google
+   * calendar a cez to, že hodina prebehla, ale na druhej strane skutočné
+   * potvrdenie prichádza po reporte z PTminderu."
+   *
+   * KALENDÁR je predbežná vrstva medzi dvoma exportmi: vie o hodine, ktorá sa
+   * odtrénovala pred hodinou, aj o tej, čo je dohodnutá na budúci týždeň.
+   * Je rýchlejší, ale je to odhad — zrušený tréning z neho treba vymazať.
+   * PTMINDER je účtovníctvo: pomalší, zato potvrdený, a platí k dátumu
+   * posledného reportu. Keď sa tie dve čísla rozídu, nie je to chyba — je to
+   * presne tá medzera, v ktorej sa 19. 8. stratilo Natálii päť hodín.
+   */
+  const [zdroj, setZdroj] = useState<"kalendar" | "ptminder">("kalendar");
+  const vsetky = useMemo(() => {
     const teraz = new Date();
     const dnes = teraz.toISOString().slice(0, 10);
     /**
@@ -1062,7 +1136,9 @@ export function Balicky({ udalosti, clients, sedenia = [], onObnov, style, onKli
       if (objednane[c.name] !== undefined) continue;
       if (c.status === "Neaktívny" || c.status === "Pauza" || c.lenDoplnky) continue;
       if (matchTrener && !matchTrener(c.primaryTrainer)) continue;
-      if (c.packageTotal > 0 && c.packageRemaining <= 0) objednane[c.name] = 0;
+      // `<= 1`, nie `<= 0`: v pohľade PTminder sa hlási aj posledná hodina,
+      // a ten, kto ju má a v kalendári nič, by sem inak nemal ako prísť.
+      if (c.packageTotal > 0 && c.packageRemaining <= 1) objednane[c.name] = 0;
     }
     return Object.entries(objednane)
       .map(([meno, kusov]) => {
@@ -1078,37 +1154,89 @@ export function Balicky({ udalosti, clients, sedenia = [], onObnov, style, onKli
         const uz = odtrenovane[meno] || 0;
         return { meno, kusov, uz, zostava: c.packageRemaining, spolu: c.packageTotal, po: c.packageRemaining - kusov - uz, platnostDo: c.packageValidTo || "" };
       })
-      .filter((x): x is NonNullable<typeof x> => !!x && x.po <= 1)
-      .sort((a, b) => a.po - b.po || a.meno.localeCompare(b.meno));
+      .filter((x): x is NonNullable<typeof x> => !!x);
   }, [udalosti, clients, matchTrener, sedenia]);
+
+  /**
+   * Filter aj poradie sa riadia zvoleným zdrojom — inak by prepínač menil
+   * čísla, ale nie zoznam, a ukazoval by ľudí, ktorým podľa daného zdroja
+   * nedochádza nič. Kalendár triedi podľa projekcie (po objednaných),
+   * PTminder podľa toho, čo naozaj stojí v poslednom reporte.
+   */
+  const riadky = useMemo(
+    () => zdroj === "ptminder"
+      ? vsetky.filter((r) => r.zostava <= 1).sort((a, b) => a.zostava - b.zostava || a.meno.localeCompare(b.meno))
+      : vsetky.filter((r) => r.po <= 1).sort((a, b) => a.po - b.po || a.meno.localeCompare(b.meno)),
+    [vsetky, zdroj],
+  );
 
   return (
     <Card style={style}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         <H3>
           <Info
-            text="Odznak je zostatok PRESNE ako v PTminderi — to číslo, ktoré vidíš v ňom. Text pod menom hovorí, čo s ním spraví kalendár: odtrénované sú hodiny, ktoré už prebehli, ale do nedeľného exportu sa ešte nedostali; obj. sú dohodnuté termíny dopredu. PTminder je účtovníctvo, kalendár len predbežná vrstva medzi dvoma exportmi — preto sa zrušený tréning vráti sám, len čo ho z kalendára vymažeš. Klienti s paušálnym členstvom sa nezobrazujú: tí stoja v exporte navždy na 0/N. Mení sa podľa prepínača trénera."
-            label={`Balíček dojde po objednaných hodinách (${riadky.length})`}
+            text={zdroj === "ptminder"
+              ? "POTVRDENÝ stav: presne to číslo, ktoré stojí v poslednom reporte z PTminderu, bez akéhokoľvek dopočítania. Hodina odtrénovaná po tom reporte tu ešte nie je — na to je pohľad Kalendár. Toto je účtovníctvo: pomalšie, zato isté. Klienti s paušálnym členstvom sa nezobrazujú: tí stoja v exporte navždy na 0/N. Mení sa podľa prepínača trénera."
+              : "PREDBEŽNÝ stav: zostatok z PTminderu mínus to, čo o ňom vie kalendár. Odznak je koľko má TERAZ (po hodinách, ktoré prebehli, ale do exportu sa ešte nedostali); text pod menom hovorí, čo s tým spravia objednané termíny. Kalendár je len vrstva medzi dvoma exportmi — zrušený tréning sa vráti sám, len čo ho z neho vymažeš. Potvrdené číslo je v pohľade PTminder. Klienti s paušálnym členstvom sa nezobrazujú: tí stoja v exporte navždy na 0/N. Mení sa podľa prepínača trénera."}
+            label={zdroj === "ptminder"
+              ? `Balíček dochádza podľa PTminderu (${riadky.length})`
+              : `Balíček dojde po objednaných hodinách (${riadky.length})`}
           />
         </H3>
-        {/* Tvrdé obnovenie. Kalendár sa sťahuje sám (cron ráno a večer), ale
-            keď práve dotrénuješ, chceš to vidieť hneď — nie o dvanásť hodín. */}
-        {onObnov && (
-          <button
-            onClick={() => { setObnovujem(true); void onObnov().finally(() => setObnovujem(false)); }}
-            disabled={obnovujem}
-            title="Stiahnuť kalendár teraz a prepočítať zostatky"
-            style={{
-              padding: "4px 11px", borderRadius: 8, fontSize: 11.5, cursor: obnovujem ? "wait" : "pointer",
-              border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted,
-            }}
-          >
-            {obnovujem ? "Sťahujem…" : "↻ Obnoviť"}
-          </button>
-        )}
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {/* Prepínač zdroja. Nie sú to dva pohľady na tú istú vec pre parádu:
+              kalendár odpovedá na „ako to vyzerá dnes", PTminder na „čo je
+              potvrdené". Keď sa rozídu, rozdiel je práve tá nezaúčtovaná
+              medzera — a tú treba vedieť prečítať, nie ju schovať. */}
+          {([["kalendar", "Kalendár"], ["ptminder", "PTminder"]] as const).map(([id, popis]) => (
+            <button
+              key={id}
+              onClick={() => setZdroj(id)}
+              title={id === "kalendar"
+                ? "Dopočítané cez kalendár — vrátane hodín, ktoré v PTminderi ešte nie sú"
+                : "Presne to, čo stojí v poslednom reporte z PTminderu"}
+              style={{
+                padding: "4px 10px", borderRadius: 8, fontSize: 11.5, cursor: "pointer",
+                border: `1px solid ${zdroj === id ? C.accent : C.border}`,
+                background: zdroj === id ? mix(C.accent, 14) : "transparent",
+                color: zdroj === id ? C.accent : C.textMuted,
+                fontWeight: zdroj === id ? 700 : 400,
+              }}
+            >
+              {popis}
+            </button>
+          ))}
+          {/* Tvrdé obnovenie patrí ku kalendáru — je to jeho zdroj. Pri pohľade
+              PTminder by tlačidlo klamalo: kalendár sa stiahne, ale číslo na
+              obrazovke sa nepohne, lebo to potvrdené mení až import reportu. */}
+          {onObnov && zdroj === "kalendar" && (
+            <button
+              onClick={() => { setObnovujem(true); setChybaObnovy(""); void onObnov().catch((e) => setChybaObnovy(String((e as Error)?.message || "Obnovenie zlyhalo."))).finally(() => setObnovujem(false)); }}
+              disabled={obnovujem}
+              title="Stiahnuť kalendár teraz a prepočítať zostatky"
+              style={{
+                padding: "4px 11px", borderRadius: 8, fontSize: 11.5, cursor: obnovujem ? "wait" : "pointer",
+                border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted,
+              }}
+            >
+              {obnovujem ? "Sťahujem…" : "↻ Obnoviť"}
+            </button>
+          )}
+        </div>
       </div>
+      {chybaObnovy && (
+        <div style={{ fontSize: 11.5, color: C.red, marginTop: 4 }}>{chybaObnovy}</div>
+      )}
+      {/* Potvrdené číslo bez dátumu je na nič — treba vedieť, ako staré je. */}
+      {zdroj === "ptminder" && (
+        <div style={{ fontSize: 11, color: C.textDim, marginTop: -2, marginBottom: 8 }}>
+          {poslednyReport
+            ? `Podľa reportu z ${fmtDMY(poslednyReport.date.slice(0, 10))}. Novší stav dostaneš ďalším importom v Mesiac → Dáta a uzávierka.`
+            : "Report z PTminderu zatiaľ v appke nie je — nahraj ho v Mesiac → Dáta a uzávierka."}
+        </div>
+      )}
       {!riadky.length ? (
-        <Empty>Nikomu balíček po objednaných hodinách nedochádza 🌿</Empty>
+        <Empty>{zdroj === "ptminder" ? "Podľa posledného reportu nikomu balíček nedochádza 🌿" : "Nikomu balíček po objednaných hodinách nedochádza 🌿"}</Empty>
       ) : (
         /* Tri stĺpce namiesto jedného dlhého — sedemnásť riadkov pod sebou
            znamenalo rolovať cez pol obrazovky; v mriežke je celý zoznam
@@ -1127,12 +1255,15 @@ export function Balicky({ udalosti, clients, sedenia = [], onObnov, style, onKli
                   importe. Nie je to projekcia z objednávok: tú nesie text
                   vedľa. Rozdiel je podstatný — odtrénovaná hodina sa STALA,
                   objednaná sa ešte stať nemusí. */}
+              {/* V pohľade PTminder sa NEODČÍTAVA nič — ani odtrénované hodiny.
+                  Je to doslovný opis reportu, aby sa dalo porovnať s PTminderom
+                  riadok po riadku bez rátania v hlave. */}
               <span style={{
                 fontSize: 10.5, fontWeight: 700, minWidth: 40, padding: "2px 6px", borderRadius: 6, textAlign: "center", flexShrink: 0,
-                color: r.po <= 0 ? C.red : C.orange,
-                background: mix(r.po <= 0 ? C.red : C.orange, 12),
+                color: (zdroj === "ptminder" ? r.zostava : r.po) <= 0 ? C.red : C.orange,
+                background: mix((zdroj === "ptminder" ? r.zostava : r.po) <= 0 ? C.red : C.orange, 12),
               }}>
-                {Math.max(0, r.zostava - r.uz)}{r.spolu ? `/${r.spolu}` : ""}
+                {zdroj === "ptminder" ? r.zostava : Math.max(0, r.zostava - r.uz)}{r.spolu ? `/${r.spolu}` : ""}
               </span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 {onKlient ? (
@@ -1152,11 +1283,23 @@ export function Balicky({ udalosti, clients, sedenia = [], onObnov, style, onKli
                     s hodinami, ale otázka pri obnove je kedy — a odpoveď na
                     ňu má appka v exporte. Kto platnosť zapísanú nemá, má
                     riadok kratší; vymýšľať sa nedá. */}
+                {/* Pri PTminderi sa kalendárové veci (odtrénované, objednané)
+                    zámerne nepíšu — to je práve to, čo v tom čísle NIE JE.
+                    Zostáva platnosť, ktorá je z toho istého reportu. */}
                 <span style={{ fontSize: 11, color: C.textDim, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {r.uz ? `${r.uz} h odtrénovaná, v PTminderi ešte nie` : null}
-                  {r.uz && r.kusov ? " · " : null}
-                  {r.kusov ? `obj. ${r.kusov}` : r.uz ? null : "bez termínu"}
-                  {r.platnostDo ? ` · platnosť do ${fmtDMY(r.platnostDo)}` : ""}
+                  {zdroj === "ptminder" ? (
+                    <>
+                      {r.platnostDo ? `platnosť do ${fmtDMY(r.platnostDo)}` : "bez zapísanej platnosti"}
+                      {r.uz || r.kusov ? ` · kalendár vie o ${[r.uz ? `${r.uz} odtrénovanej` : "", r.kusov ? `${r.kusov} objednaných` : ""].filter(Boolean).join(" a ")}` : ""}
+                    </>
+                  ) : (
+                    <>
+                      {r.uz ? `${r.uz} h odtrénovaná, v PTminderi ešte nie` : null}
+                      {r.uz && r.kusov ? " · " : null}
+                      {r.kusov ? `obj. ${r.kusov}` : r.uz ? null : "bez termínu"}
+                      {r.platnostDo ? ` · platnosť do ${fmtDMY(r.platnostDo)}` : ""}
+                    </>
+                  )}
                 </span>
               </div>
             </div>
@@ -1181,7 +1324,7 @@ export function Balicky({ udalosti, clients, sedenia = [], onObnov, style, onKli
  * A koľko sedení za tie peniaze bolo, sa z výberu vyčítať nedá — kurz aj cena
  * sa menia a delenie by len tvorilo presné čísla bez opory.
  *
- * KOTVA. Kalendár siaha dva týždne dozadu, takže sedenia od februára v ňom nie
+ * KOTVA. Kalendár siaha tri týždne dozadu, takže sedenia od februára v ňom nie
  * sú. Bez pevného bodu by karta ukazovala nezmysel, preto sa raz zapíše stav
  * k dátumu a od neho sa počíta ďalej.
  */
@@ -1217,12 +1360,15 @@ export function GuillermoKarta() {
   const zaradene = new Set(nakupy.map((z) => z.datum));
   const cakajuce = platby.filter((v) => String(v.datum).slice(0, 10) > odKedy && !zaradene.has(String(v.datum).slice(0, 10)));
 
+  const [chybaG, setChybaG] = useState("");
   const ulozKotvu = async () => {
     const n = Number(stav);
     if (!Number.isFinite(n)) return;
-    setUklada("kotva");
-    await posli({ akcia: "guillermo-pridaj", druh: "zostatok", datum, sedeni: n });
-    setUklada(""); setStav(""); setKotvaOtvorena(false);
+    setUklada("kotva"); setChybaG("");
+    const j = await posli({ akcia: "guillermo-pridaj", druh: "zostatok", datum, sedeni: n }).catch(() => ({ ok: false, error: "spojenie" }));
+    setUklada("");
+    if (!j.ok) { setChybaG(j.error || "Nepodarilo sa uložiť."); return; }
+    setStav(""); setKotvaOtvorena(false);
     await nacitaj();
   };
 
@@ -1230,9 +1376,10 @@ export function GuillermoKarta() {
     const den = String(v.datum).slice(0, 10);
     const n = Number(sedeni[den]);
     if (!(n > 0)) return;
-    setUklada(den);
-    await posli({ akcia: "guillermo-pridaj", druh: "nakup", datum: den, sedeni: n, suma: v.czk ?? null, poznamka: v.poznamka });
+    setUklada(den); setChybaG("");
+    const j = await posli({ akcia: "guillermo-pridaj", druh: "nakup", datum: den, sedeni: n, suma: v.czk ?? null, poznamka: v.poznamka }).catch(() => ({ ok: false, error: "spojenie" }));
     setUklada("");
+    if (!j.ok) { setChybaG(j.error || "Nepodarilo sa uložiť."); return; }
     await nacitaj();
   };
 
@@ -1248,6 +1395,9 @@ export function GuillermoKarta() {
         <button onClick={() => setKotvaOtvorena(!kotvaOtvorena)} style={{ background: "none", border: "none", color: C.textDim, fontSize: 12.5, cursor: "pointer" }}>
           {kotvaOtvorena ? "skryť" : "opraviť stav"}
         </button>
+      </div>
+      <div>
+        {chybaG && <div style={{ fontSize: 12, color: C.red, margin: "4px 0 8px" }}>{chybaG}</div>}
       </div>
 
       {!kotva ? (
@@ -1327,7 +1477,7 @@ export function GuillermoKarta() {
               <span style={{ fontSize: 12, color: C.textMuted, minWidth: 82 }}>{z.datum.split("-").reverse().join(". ")}</span>
               <span style={{ fontSize: 12.5, color: C.text, fontWeight: 600 }}>+{z.hodiny} sedení</span>
               {z.suma_czk ? <span style={{ fontSize: 12, color: C.textMuted }}>{Math.round(z.suma_czk).toLocaleString("cs-CZ")} Kč</span> : null}
-              <button onClick={async () => { await posli({ akcia: "guillermo-zmaz", id: z.id }); await nacitaj(); }}
+              <button onClick={async () => { const j = await posli({ akcia: "guillermo-zmaz", id: z.id }).catch(() => ({ ok: false, error: "spojenie" })); if (!j.ok) { setChybaG(j.error || "Zmazanie neprešlo."); return; } await nacitaj(); }}
                 style={{ marginLeft: "auto", background: "none", border: "none", color: C.textDim, fontSize: 11.5, cursor: "pointer" }}>
                 zmazať
               </button>

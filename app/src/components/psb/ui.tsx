@@ -2,6 +2,8 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { CSSProperties, ReactNode } from "react";
 
+import { klucSkrytia, skryteDo } from "../../lib/psb/kontrolaDat";
+import { adresaStranky } from "../../lib/psb/odkazy";
 import { C, mix, S, badge } from "../../lib/psb/theme";
 
 // Scrolls a horizontally-overflowing container to its right edge on mount/update
@@ -1265,4 +1267,100 @@ export function enterPosle(akcia: () => void) {
     e.preventDefault();
     akcia();
   };
+}
+
+/**
+ * Adresa stránky v tabuľke ako preklik.
+ *
+ * Jerry, 19. 8. 2026: „nemohli by byť tie linky preklikávacie — kliknem,
+ * otvorí sa nová karta a som tam a môžem upravovať." Dovtedy boli titulky
+ * na prepis, technické nálezy aj rýchlosť len text: appka povedala, ktorá
+ * stránka je zlá, a hľadanie tej stránky zostalo na človeku.
+ *
+ * Nová karta zámerne (`target="_blank"`): Kokpit zostane otvorený s tým
+ * zoznamom, podľa ktorého sa upravuje. `rel="noreferrer"` je poistka, aby
+ * otvorená stránka nemala prístup k tejto.
+ *
+ * Keď sa z hodnoty adresa spraviť nedá, zostane z nej obyčajný text —
+ * odkaz, ktorý vedie inam než sľubuje, je horší než žiadny.
+ */
+export function OdkazStranky({ url }: { url: string }) {
+  const ciel = adresaStranky(url);
+  if (!ciel) return <>{url}</>;
+  return (
+    <a href={ciel} target="_blank" rel="noreferrer" title={ciel}
+      style={{ color: "inherit", textDecoration: "underline", textDecorationColor: mix(C.accent, 50), textUnderlineOffset: 2 }}>
+      {url}
+    </a>
+  );
+}
+
+/**
+ * Hlásenie, ktoré sa dá zabaliť.
+ *
+ * Jerry, 19. 8. 2026: hlásenie o konverziách má osem riadkov a stojí nad
+ * tabuľkou, po ktorú prišiel. Nadpis nesie celú správu („Google hlási 299
+ * konverzií, klientov pribudlo 13"), detail hovorí, čo s tým — a ten sa dá
+ * prečítať raz.
+ *
+ * Vysoká závažnosť je otvorená, stredná zabalená. Stredná znamená „nedá sa
+ * s tým nič robiť, ale nesmie to vyzerať, že sa to skontrolovalo a bolo to
+ * v poriadku" — na to stačí nadpis.
+ *
+ * Tlačidlo skrýva na 30 dní, nie navždy: viď `skryteDo` v kontrolaDat.ts.
+ * Skryté hlásenie po sebe nechá jeden riadok — appka nikdy nepredstiera, že
+ * nič nemá.
+ */
+export function Hlasenie({ kluc, zavaznost, nadpis, detail, ack, onSkry, onVrat }: {
+  kluc: string;
+  zavaznost: "vysoka" | "stredna";
+  nadpis: string;
+  detail: string;
+  /** Záznamy z `anomaly_ack` — hľadá sa v nich `klucSkrytia(kluc)`. */
+  ack?: Record<string, { ackedAt?: string }>;
+  onSkry?: (klucAck: string) => void;
+  onVrat?: (klucAck: string) => void;
+}) {
+  const klucAck = klucSkrytia(kluc);
+  const skryte = skryteDo(ack?.[klucAck], new Date());
+  const [otvorene, setOtvorene] = useState(zavaznost === "vysoka");
+  const farba = zavaznost === "vysoka" ? C.orange : mix(C.text, 25);
+  const pozadie = zavaznost === "vysoka" ? mix(C.orange, 8) : mix(C.text, 4);
+
+  if (skryte) {
+    return (
+      <div style={{ marginTop: 10, fontSize: 11.5, color: C.textDim, display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
+        <span>{nadpis} — skryté do {skryte.toLocaleDateString("sk-SK", { day: "numeric", month: "numeric" })}.</span>
+        {onVrat && (
+          <button onClick={() => onVrat(klucAck)}
+            style={{ background: "none", border: "none", padding: 0, color: C.textMuted, fontSize: 11.5, cursor: "pointer", textDecoration: "underline", fontFamily: "inherit" }}>
+            ukázať
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ marginTop: 10, padding: 10, borderRadius: 6, borderLeft: `2px solid ${farba}`, background: pozadie }}>
+      <button onClick={() => setOtvorene((x) => !x)} aria-expanded={otvorene}
+        style={{ display: "flex", gap: 7, alignItems: "baseline", width: "100%", textAlign: "left", background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit" }}>
+        <span style={{ color: C.textDim, fontSize: 10, lineHeight: 1.6 }}>{otvorene ? "▾" : "▸"}</span>
+        <span style={{ fontSize: 12.5, fontWeight: 600, color: C.text, lineHeight: 1.45 }}>{nadpis}</span>
+      </button>
+      {otvorene && (
+        <>
+          <div style={{ fontSize: 11.5, color: C.textMuted, marginTop: 5, lineHeight: 1.55, paddingLeft: 17 }}>{detail}</div>
+          {onSkry && (
+            <div style={{ paddingLeft: 17, marginTop: 8 }}>
+              <button onClick={() => onSkry(klucAck)}
+                style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 7, padding: "4px 10px", color: C.textMuted, fontSize: 11, cursor: "pointer", fontFamily: "inherit" }}>
+                rozumiem, skry na 30 dní
+              </button>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
 }

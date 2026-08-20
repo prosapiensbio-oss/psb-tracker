@@ -142,6 +142,27 @@ export type PSBData = {
   leads: Lead[];
   /** Závery z debát s Jarvisom — do registra sa dostanú tie po termíne overenia. */
   zavery: ZaverRow[];
+  /** Vedomosti zvonku (rešerše, príručky). Text sa do kontextu neposiela — len prehľad. */
+  vedomosti: VedomostRow[];
+};
+
+/**
+ * Vedomosť zvonku — rešerš alebo príručka, ktorú Jarvis pozná.
+ *
+ * Má dobu spotreby: benchmarky zastarajú, Meta premenúva úrovne prístupu,
+ * odporúčané rozpočty sa hýbu. Keď `overene_at` zostarne o viac než
+ * `obnovovatPoDnoch`, ozve sa register — inak by sa z rešerše ticho stala
+ * povera (Jerry, 19. 8. 2026).
+ */
+export type VedomostRow = {
+  id: string;
+  nazov: string;
+  oCom: string;
+  zdroj: string;
+  obnovovatPoDnoch: number;
+  overeneAt: string;
+  /** Znakov v texte. Samotný text sa načítava až na vyžiadanie. */
+  znakov: number;
 };
 
 /** Rozhodnutie z debaty, ktoré má dátum, kedy sa má overiť, či zabralo. */
@@ -157,6 +178,7 @@ export type ZaverRow = {
 
 export const EMPTY_DATA: PSBData = {
   zavery: [],
+  vedomosti: [],
   sessions: [],
   services: [],
   payments: [],

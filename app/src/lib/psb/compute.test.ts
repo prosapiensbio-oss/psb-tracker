@@ -1,6 +1,7 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, it, test } from "bun:test";
 
 import {
+  deriveAnomalies,
   cenaZaSedenie,
   doPlnehoMesiaca,
   kotvaDat,
@@ -15,6 +16,8 @@ import {
   nezapisaneDoRegistra,
   patriTrenerovi,
   periodInfo,
+  vytazenieSpolu,
+  pocetUvodnych,
 } from "./compute";
 import { EMPTY_DATA } from "./types";
 import type { Lead } from "./types";
@@ -563,5 +566,83 @@ describe("prebiehajúci týždeň má riadok aj bez sedení", () => {
     const a = periodInfo("2026-08-10T08:00:00.000Z", "week");
     const c = periodInfo("2026-08-17T08:00:00.000Z", "week");
     expect(a.label).not.toBe(c.label);
+  });
+});
+
+describe("vytazenieSpolu — jedno číslo pre celé štúdio", () => {
+  // Revízia 18. 8. 2026: dlaždica rátala priemer utilizácií, karta Kapacita
+  // dvojitý strop nad súčtom a Jarvis to isté s inou konštantou. Tri čísla
+  // na tú istú otázku; priemer(max(...)) sa nerovná max(súčet).
+  const t = (recentWeekly: number, busyWeekly: number) => ({ recentWeekly, busyWeekly });
+
+  it("ideál oboch trénerov je 100 %", () => {
+    expect(vytazenieSpolu([t(29, 29), t(29, 29)])).toBe(100);
+  });
+
+  it("rozhoduje ten strop, ktorý sa naplní skôr", () => {
+    // Typický týždeň je nízko, ale rušné týždne už narážajú na 34 h.
+    expect(vytazenieSpolu([t(20, 34), t(20, 34)])).toBe(100);
+    // Opačne: rušné týždne pokojné, typický už na ideáli.
+    expect(vytazenieSpolu([t(29, 29), t(29, 29)])).toBe(100);
+  });
+
+  it("nerovnomerné zaťaženie sa počíta zo SÚČTU, nie ako priemer percent", () => {
+    // Jerry 40 h, Terezka 10 h: priemer utilizácií by tvrdil niečo iné než
+    // spoločný strop 58 h. Spolu je to 50 h zo 58 → 86 %.
+    expect(vytazenieSpolu([t(40, 40), t(10, 10)])).toBe(86);
+  });
+
+  it("prázdna kapacita nevracia nulu, ale nič", () => {
+    expect(vytazenieSpolu([])).toBe(null);
+  });
+
+  it("zvládne aj jedného trénera — strop je jeho vlastný", () => {
+    expect(vytazenieSpolu([t(29, 29)])).toBe(100);
+  });
+});
+
+// ── pocetUvodnych ────────────────────────────────────────────────────────────
+describe("pocetUvodnych — jedna definícia počtu ľudí na úvodnom", () => {
+  // Revízia 19. 8. 2026: tri obrazovky, tri zápisy (sedenia / mená /
+  // meno+dátum). Na ostrých dátach 62 = 62 = 62, ale stačí jeden človek,
+  // ktorý príde na úvodný druhýkrát, a čísla sa rozídu. Lievik meria ĽUDÍ.
+  test("ten istý človek na úvodnom dvakrát je v lieviku raz", () => {
+    expect(pocetUvodnych([
+      { client: "Anna", sessionType: "UVODNE" },
+      { client: "Anna", sessionType: "UVODNE" },
+      { client: "Boris", sessionType: "UVODNE" },
+    ])).toBe(2);
+  });
+  test("bežné tréningy sa nerátajú, aj keď je ich veľa", () => {
+    expect(pocetUvodnych([
+      { client: "Anna", sessionType: "OFFLINE" },
+      { client: "Anna", sessionType: "ONLINE" },
+    ])).toBe(0);
+  });
+  test("obdobie rieši volajúci — funkcia berie už vybraný zoznam", () => {
+    expect(pocetUvodnych([])).toBe(0);
+  });
+});
+
+describe("duch| sa nepýta, keď je odchod už vysvetlený pod strata|", () => {
+  const zaklad = (ack: Record<string, { note?: string; ackedAt?: string }>) => {
+    const data = {
+      sessions: [], services: [], payments: [], packages: [],
+      clientOverrides: {}, anomalyAck: ack as never, uploadLog: [], leads: [], zavery: [], vedomosti: [],
+    } as never;
+    const clients = {
+      "Leonora Test": {
+        name: "Leonora Test", status: "Aktívny", segment: "Stabilný",
+        lastSession: "2026-06-01", packageRemaining: 0, packageTotal: 6,
+      },
+    } as never;
+    return deriveAnomalies(data, clients);
+  };
+  // daysBetween(2026-06-01, dnes) je pri behu testu vždy > 30 — klientka mlčí mesiace.
+  test("bez odpovede sa duch| pýta", () => {
+    expect(zaklad({}).some((a) => a.key === "duch|Leonora Test")).toBe(true);
+  });
+  test("so zodpovedaným strata| sa duch| nepýta — vysvetlená vec nie je otázka", () => {
+    expect(zaklad({ "strata|Leonora Test": { note: "finančné dôvody" } }).some((a) => a.key === "duch|Leonora Test")).toBe(false);
   });
 });

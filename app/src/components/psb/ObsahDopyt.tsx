@@ -80,7 +80,30 @@ export function ObsahDopyt({ leads }: { leads: Lead[] }) {
     return leads.filter((l) => l.date && patri(l.date) && ZDROJE_BEZ_OBSAHU.includes(l.source)).length;
   }, [leads, obdobie]);
 
-  const v = useMemo(() => obsahPredDopytmi(vObdobi, obsah, OKNO), [vObdobi, obsah]);
+  /**
+   * Obsah sa oreže na TO ISTÉ obdobie ako dopyty (plus okno spätne).
+   *
+   * Prepínač obdobia filtroval len dopyty; základ „pred bežným dňom" sa
+   * počítal cez celú históriu publikovania. Pri voľbe „2026" tak stĺpec
+   * vľavo hovoril o roku 2026 a stĺpec vedľa o jan 2025 – dnes, takže ich
+   * rozdiel — jediné číslo, o ktorom karta tvrdí, že niečo znamená — meral
+   * aj to, ako sa medzitým zmenila skladba obsahu (revízia 18. 8. 2026).
+   *
+   * Spätné okno musí zostať: dopyt z 3. januára potrebuje príspevky z konca
+   * decembra, inak by vyšiel ako deň bez obsahu.
+   */
+  const obsahVObdobi = useMemo(() => {
+    if (!vObdobi.length) return obsah;
+    const dni = vObdobi.map((l) => l.date.slice(0, 10)).sort();
+    const odKedy = new Date(Date.parse(`${dni[0]}T00:00:00Z`) - OKNO * 86400000).toISOString().slice(0, 10);
+    const doKedy = dni[dni.length - 1];
+    return obsah.filter((p) => {
+      const d = String(p.datum).slice(0, 10);
+      return d >= odKedy && d <= doKedy;
+    });
+  }, [obsah, vObdobi]);
+
+  const v = useMemo(() => obsahPredDopytmi(vObdobi, obsahVObdobi, OKNO), [vObdobi, obsahVObdobi]);
 
   // Jednotlivé dopyty aj s tým, čo im predchádzalo — najnovšie hore.
   const podrobne = useMemo(() => {

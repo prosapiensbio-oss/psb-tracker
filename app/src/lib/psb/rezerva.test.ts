@@ -1,6 +1,7 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it, test } from "bun:test";
 
-import { spocitajRezervu } from "./rezerva";
+import { CIEL_MESIACOV, breakEvenPriemer, breakEvenRad, chybaDoCiela, poslednyUzavretyIdx, spocitajRezervu } from "./rezerva";
+import { VZAS_MONTHS } from "./vzas";
 
 describe("spocitajRezervu", () => {
   it("sčíta účet, hotovosť aj bitcoin", () => {
@@ -45,5 +46,50 @@ describe("spocitajRezervu", () => {
     });
     expect(r.majetok).toBe(61_100);
     expect(r.uplna).toBe(true);
+  });
+});
+
+describe("jeden break-even pre celú appku", () => {
+  test("breakEvenPriemer číta z breakEvenRad — žiadna vlastná kópia vzorca", () => {
+    // Do 18. 8. 2026 žil vzorec v šiestich kópiách. Tento test drží zmluvu:
+    // hodnota z priemeru musí sedieť s radom, z ktorého kreslia grafy.
+    const rad = breakEvenRad();
+    const b = breakEvenPriemer();
+    expect(b.mesiac).not.toBe(null);
+    const i = VZAS_MONTHS.indexOf(b.mesiac as string);
+    expect(b.be).toBeCloseTo(rad[i], 6);
+    const od = Math.max(0, i - 5);
+    const idx = Array.from({ length: i - od + 1 }, (_, k) => od + k);
+    expect(b.bePriem).toBeCloseTo(idx.reduce((a, k) => a + rad[k], 0) / idx.length, 6);
+  });
+
+  test("kotva je posledný UZAVRETÝ mesiac — nikdy bežiaci", () => {
+    const i = poslednyUzavretyIdx();
+    const beziaci = new Date().toISOString().slice(0, 7);
+    expect(VZAS_MONTHS[i] < beziaci || i === 0).toBe(true);
+  });
+});
+
+describe("chybaDoCiela", () => {
+  it("ráta rozdiel do troch mesiacov z priemerného break-evenu", () => {
+    // Skutočné čísla z 18. 8. 2026: 3 × 178 522 − 221 858 = 313 708.
+    // Jarvis na tú istú otázku odpovedal raz 113 500 a raz 313 700 —
+    // odteraz číslo nedostáva na počítanie, ale hotové.
+    expect(chybaDoCiela({ majetok: 221858, bePriem: 178522 })).toBe(313708);
+  });
+
+  it("nad cieľom je nula, nie záporné číslo", () => {
+    // Záporná „chýbajúca“ suma sa dá prečítať ako dlh.
+    expect(chybaDoCiela({ majetok: 600000, bePriem: 178522 })).toBe(0);
+  });
+
+  it("bez majetku alebo break-evenu nevymýšľa", () => {
+    expect(chybaDoCiela({ majetok: null, bePriem: 178522 })).toBeNull();
+    expect(chybaDoCiela({ majetok: 221858, bePriem: null })).toBeNull();
+    expect(chybaDoCiela({ majetok: 221858, bePriem: 0 })).toBeNull();
+  });
+
+  it("cieľ je jedno číslo pre dlaždicu aj Jarvisa", () => {
+    expect(CIEL_MESIACOV).toBe(3);
   });
 });

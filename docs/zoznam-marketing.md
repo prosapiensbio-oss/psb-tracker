@@ -12,7 +12,7 @@ Poradie v každej časti je podľa pomeru úžitok / práca.
 | | |
 |---|---|
 | Onboarding a predajné princípy v znalostnej báze Jarvisa | 64 kB; FP compliance a index brand-konfliktov navyše vytiahnuté priamo do systémového promptu |
-| Odovzdávacie miesto medzi Jarvisom a Claude Projectom | karta na začiatku „Reels & posty“: Jarvis vyrobí zadanie → Project z neho píše. Drobný odkaz v hlavičke Marketingu zrušený, prehliadal sa |
+| Odovzdávacie miesto medzi Jarvisom a Claude Projectom | karta na začiatku „Čo publikovať“: Jarvis vyrobí zadanie → Project z neho píše. Drobný odkaz v hlavičke Marketingu zrušený, prehliadal sa |
 | MailerLite | odberatelia, skupiny a kampane; podkategória „Mailer“ |
 | GA4 + Search Console cez servisný účet | jeden kľúč, obe služby; píše do tabuliek ručného importu. GA4 property 355422977, web `https://www.prosapiens.cz/` |
 | Nemerané mesiace prežijú import | apríl a máj 2026 GA4 nemeralo; značka sa už neprepíše a Jarvis ju dostáva menovite |
@@ -66,7 +66,7 @@ a dopočítať sa nedá. Karta sama napíše, koľko kusov čas má a koľko tre
 naplní sa pri ďalších sťahovaniach.
 
 ### C2 · Plánovanie obsahu — HOTOVÉ 13. 8. (prvá polovica)
-Karta **„Čo publikovať ďalej"** na začiatku Reels & posty. Návrhy sa počítajú
+Karta **„Čo publikovať ďalej"** v záložke Čo publikovať. Návrhy sa počítajú
 zo štyroch zdrojov: témy, na ktoré sa web zobrazuje a nikto neklikne; články,
 ktoré ľudia čítajú sami; typ začiatku, ktorý bol pred dopytmi vidieť častejšie
 než v bežný deň; a tempo proti mesiacom s najviac dopytmi. Každý návrh nesie

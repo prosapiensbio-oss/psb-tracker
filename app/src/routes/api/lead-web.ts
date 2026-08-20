@@ -103,7 +103,19 @@ export const Route = createFileRoute("/api/lead-web")({
         const dnes = new Date().toISOString().slice(0, 10);
         // Ten istý človek v ten istý deň = jeden dopyt. Dvojklik na tlačidlo
         // ani opakovaný pokus CF7 nesmie vyrobiť dva riadky.
-        const kluc = `web-${dnes}-${(email || telefon || meno).toLowerCase()}`.slice(0, 64);
+        /**
+         * Kľúč smie prísť z webu.
+         *
+         * Je to zároveň `event_id` pre Metu — a odstránenie duplicít funguje
+         * len vtedy, keď majú prehliadač a server ROVNAKÝ reťazec. Keby si
+         * ho každá strana počítala sama, stačí iné časové pásmo okolo polnoci
+         * a Meta započíta dopyt dvakrát. Tvar sa kontroluje, aby sa cez toto
+         * pole nedal podstrčiť cudzí kľúč.
+         */
+        const zWebu = kus(b.id, 64);
+        const kluc = /^web-\d{4}-\d{2}-\d{2}-.+/.test(zWebu)
+          ? zWebu
+          : `web-${dnes}-${(email || telefon || meno).toLowerCase()}`.slice(0, 64);
 
         await DB.prepare(
           `INSERT INTO leads (id,date,name,source,referrer,status,note,created_at,email,telefon,kampan,utm,stranka)
@@ -146,7 +158,11 @@ export const Route = createFileRoute("/api/lead-web")({
             // `_fbc` a `_fbp` posiela web, ak ich vie prečítať z cookies.
             fbc: kus(b.fbc, 200) || undefined,
             fbp: kus(b.fbp, 200) || undefined,
-            ip: request.headers.get("cf-connecting-ip") || undefined,
+            // WordPress volá tento endpoint zo SVOJHO servera na Kokpitov
+            // server — `cf-connecting-ip` by preto bola IP webhostingu, nie
+            // návštevníka. Web preto posiela skutočnú IP v tele; hlavička je
+            // len záloha pre volania, ktoré ju v tele nemajú.
+            ip: kus(b.ip, 45) || request.headers.get("cf-connecting-ip") || undefined,
             userAgent: kus(b.userAgent ?? request.headers.get("user-agent"), 300) || undefined,
           });
           capi = v.ok ? " · nahlásené Mete" : ` · Mete sa nenahlásilo: ${v.chyba}`;

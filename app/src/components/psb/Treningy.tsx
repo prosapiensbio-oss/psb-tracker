@@ -31,8 +31,9 @@ function WeekEnergyRow({ weekKeyIso, colSpan, entry, onSave }: {
   const set = (k: string, v: string) => setDraft((d) => ({ ...d, [k]: v }));
   const save = async () => {
     setSaving(true);
-    await saveWeekEntry(weekKeyIso, draft);
+    const ok = await saveWeekEntry(weekKeyIso, draft);
     setSaving(false);
+    if (!ok) return; // tlačidlo zostane „Uložiť" — nič sa nezapísalo
     setSaved(true);
     onSave(weekKeyIso, draft);
     setTimeout(() => setSaved(false), 2000);
@@ -236,18 +237,22 @@ function Prehlad({ data, focus, trainer, onTrainer }: { data: PSBData; focus?: N
 
   const summary = useMemo(() => {
     if (!rows.length) return null;
-    const n = rows.length;
+    // Umelý riadok bežiaceho týždňa (pridaný vyššie, aby sa dal zapísať) do
+    // priemerov nepatrí — jeho nula je vymyslená appkou, nie odtrénovaná.
+    const realne = rows.filter((g) => g.total.sessions > 0 || g.score > 0);
+    const zdroj = realne.length ? realne : rows;
+    const n = zdroj.length;
     return {
-      avgH: rows.reduce((a, g) => a + g.total.hours, 0) / n,
-      avgScore: rows.reduce((a, g) => a + g.score, 0) / n,
+      avgH: zdroj.reduce((a, g) => a + g.total.hours, 0) / n,
+      avgScore: zdroj.reduce((a, g) => a + g.score, 0) / n,
       // Súčet ÷ súčet, nie priemer pomerov po riadkoch: týždeň s dvomi
       // sedeniami nemá vážiť ako týždeň s tridsiatimi. Pozor, je to cena
       // ZAPÍSANÁ PRI SEDENÍ — pri 19 % sedení je nulová (platba visí na
       // balíčku), takže je nižšia než „Ø cena sedenia" z prijatých peňazí.
       // Preto sa aj volá inak; obe čísla sú správne, len na inú otázku.
       avgCzk: (() => {
-        const sed = rows.reduce((a, g) => a + g.total.sessions, 0);
-        return sed ? rows.reduce((a, g) => a + g.total.revenue, 0) / sed : 0;
+        const sed = zdroj.reduce((a, g) => a + g.total.sessions, 0);
+        return sed ? zdroj.reduce((a, g) => a + g.total.revenue, 0) / sed : 0;
       })(),
     };
   }, [rows]);

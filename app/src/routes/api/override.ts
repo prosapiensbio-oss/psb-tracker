@@ -60,7 +60,12 @@ export const Route = createFileRoute("/api/override")({
             }
           } catch { /* denník je poistka — jeho výpadok nesmie zablokovať uloženie */ }
         }
-        await setOverride(DB, name, key as keyof ClientOverride, value);
+        const ulozene = await setOverride(DB, name, key as keyof ClientOverride, value);
+        if (!ulozene) {
+          // Nehlásiť „uložené" nad ničím. Obrazovka dostane ok:false a ukáže
+          // červenú; dovtedy tu bolo ok:true bez ohľadu na výsledok.
+          return Response.json({ ok: false, error: "Zápis do databázy neprešiel — skús znova. Ak sa to opakuje, povedz to." }, { status: 502 });
+        }
         await audit(DB, { action: "uprava-klienta", predmet: `${name} · ${key}`, neu: value, actor: await currentUser(request) || undefined });
         return Response.json({ ok: true });
       },

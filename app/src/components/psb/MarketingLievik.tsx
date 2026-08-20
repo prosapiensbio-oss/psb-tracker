@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 
-import type { ClientAgg } from "../../lib/psb/compute";
+import { najdiKlienta, type ClientAgg } from "../../lib/psb/compute";
 import { fmtCZK, monthKey, monthLabel, normName } from "../../lib/psb/format";
 import { ZDROJE } from "./Klienti";
 import { OBDOBIA_MESACNE, mesiaceVOkne } from "../../lib/psb/obdobia";
+import { GA4_MESACNE, GSC_DOPYTY, WEB_STRANKY, marketingVerzia } from "../../lib/psb/marketing";
 import { C, mix, S } from "../../lib/psb/theme";
+import { znackovanyOdkaz, type Platforma } from "../../lib/psb/utm";
 import type { PSBData } from "../../lib/psb/types";
 import { Card, Empty, FilterObdobia, H3, Info, RolovaciaTabulka, TableWrap, enterPosle } from "./ui";
 
@@ -65,6 +67,14 @@ export type Kroky = {
    */
   zDopytu: number;
   /**
+   * Dopyty, ktoré došli na úvodný tréning. Tá istá zásada ako `zDopytu`:
+   * konvertujú sa DOPYTY, nie úvodné. `uvodne / dopyty` vyšlo 20. 8. 2026
+   * „121 %" — úvodné z odporúčaní nemajú zapísaný dopyt, takže podiel dvoch
+   * rôznych množín zase nemeral nič. Úvodný sa hľadá v celej histórii (aj po
+   * konci okna) a musí byť najskôr v deň dopytu.
+   */
+  zDopytuUvodny: number;
+  /**
    * Kto presne za tými číslami je.
    *
    * Jerry, 13. 8.: „keď kliknem na úvodný tréning 3, napíše mi, kto presne to
@@ -74,8 +84,11 @@ export type Kroky = {
    */
   kto: {
     dopyty: { meno: string; datum: string; zdroj: string }[];
+    /** Dopyty, ktoré došli na úvodný — čitateľ „Dopyt → úvodný". */
+    naUvodny: { meno: string; dopyt: string; uvodny: string }[];
     uvodne: { meno: string; datum: string }[];
-    klienti: { meno: string; prvy: string; zaplatil: string }[];
+    /** `trzbaVOkne` je ten istý súčet, z ktorého je „Tržba od nových" — jeden zdroj pre číslo aj pre zoznam. */
+    klienti: { meno: string; prvy: string; zaplatil: string; trzbaVOkne: number }[];
     /**
      * Kto prišiel na úvodný a už nikdy — najcennejší zoznam v lieviku.
      *
@@ -112,22 +125,10 @@ export type Kroky = {
  */
 const NAD_UVODNY = 500;
 
-const jeKlient = (c: ClientAgg, payments: { client: string; amount: number }[]) => {
-  // Prišiel znova — najsilnejší dôkaz a jediný, ktorý platí vždy.
-  if (c.sessions.some((x) => x.sessionType !== "UVODNE")) return true;
-  // Alebo si kúpil viac než ten úvodný.
-  //
-  // Roman Pavlík: úvodný 5. 8. za 1 100 Kč, 13. 8. balíček za 7 790 Kč,
-  // druhý tréning ešte nemal. Appka ho medzi klientov nerátala, hoci
-  // rozhodnutie padlo — a padlo peniazmi, čo je jasnejšie než dochádzka.
-  //
-  // Pôvodné pravidlo znelo „má platbu" a bolo zlé preto, že úvodný tréning
-  // JE platený, takže ho spĺňal každý, kto naň prišiel. Chyba nebola v tom,
-  // že sa pozeralo na peniaze — chyba bola, že sa nepozeralo, ZA ČO.
-  const uvodny = c.sessions.find((x) => x.sessionType === "UVODNE")?.price || 0;
-  const zaplatil = payments.filter((p) => p.client === c.name).reduce((a, p) => a + p.amount, 0);
-  return zaplatil - uvodny > NAD_UVODNY;
-};
+// Definícia žije v lib/psb/compute.ts (jedna pre obrazovku aj Jarvisov
+// kontext) — tu sa importuje a re-exportuje, nech existujúce importy fungujú.
+import { jeKlient } from "../../lib/psb/compute";
+export { jeKlient };
 
 export function krokyZa(data: PSBData, clients: Record<string, ClientAgg>, mesiace: string[]): Kroky {
   const v = (d: string) => mesiace.includes(monthKey(d));
@@ -162,23 +163,57 @@ export function krokyZa(data: PSBData, clients: Record<string, ClientAgg>, mesia
     .reduce((a, p) => a + p.amount, 0);
   // Dopyt → klient. Páruje sa podľa mena; e-mail v dopyte často chýba a
   // v klientoch nie je vôbec.
-  const platiaci = new Set(Object.values(clients).filter((c) => jeKlient(c, data.payments)).map((c) => normName(c.name)));
-  const zDopytu = data.leads.filter((l) => v(l.date) && l.name && platiaci.has(normName(l.name))).length;
+  // Párovanie cez `najdiKlienta` (presne + fuzzy), nie cez holé `normName`.
+  // „Lukáš Hanus" z dopytu a „Lukas Hanus" z PTmindera sú jeden človek; presná
+  // zhoda z nich robila dvoch a konverzia na obrazovke vychádzala nižšia než
+  // tá, ktorú počíta Jarvis. Rovnaké párovanie ako v aiContext (18. 8. 2026).
+  const menaPlatiacich = Object.values(clients).filter((c) => jeKlient(c, data.payments)).map((c) => c.name);
+  // …a klientom sa musel stať PO dopyte. Bez tejto podmienky sa ako
+  // „konverzia dopytu" počítal aj existujúci klient, ktorý vyplnil formulár
+  // znova — jeho firstSession je roky pred dopytom (revízia 19. 8. 2026).
+  const prvePodlaMena = new Map(Object.values(clients).map((c) => [normName(c.name), c.firstSession || ""]));
+  const zDopytu = data.leads.filter((l) => {
+    if (!v(l.date) || !l.name) return false;
+    const kanonicke = najdiKlienta(menaPlatiacich, l.name);
+    if (!kanonicke) return false;
+    const prve = prvePodlaMena.get(normName(kanonicke)) || "";
+    return !prve || prve >= l.date;
+  }).length;
 
   const prvaPlatba = (meno: string) =>
     data.payments.filter((p) => p.client === meno).map((p) => p.date).sort()[0] || "";
 
+  // Dopyt → úvodný. Úvodné z CELEJ histórie (dopyt z konca okna má úvodný
+  // pokojne o dva týždne neskôr — mimo okna) a úvodný musí byť najskôr v deň
+  // dopytu, inak by sa počítal existujúci klient, ktorý vyplnil formulár znova.
+  const uvodneVsetky = new Map<string, string>();
+  for (const sx of [...data.sessions].filter((x) => x.sessionType === "UVODNE").sort((a, b) => a.date.localeCompare(b.date)))
+    if (!uvodneVsetky.has(sx.client)) uvodneVsetky.set(sx.client, sx.date);
+  const menaUvodnychVsetky = [...uvodneVsetky.keys()];
+  const naUvodnyRiadky = data.leads.flatMap((l) => {
+    if (!v(l.date) || !l.name) return [];
+    const kan = najdiKlienta(menaUvodnychVsetky, l.name);
+    if (!kan) return [];
+    const datumUvodneho = (uvodneVsetky.get(kan) || "").slice(0, 10);
+    if (datumUvodneho && datumUvodneho < l.date.slice(0, 10)) return [];
+    return [{ meno: l.name, dopyt: l.date, uvodny: datumUvodneho }];
+  });
+
   return {
-    dopyty, uvodne, klienti: novi.length, trzba, zDopytu,
+    dopyty, uvodne, klienti: novi.length, trzba, zDopytu, zDopytuUvodny: naUvodnyRiadky.length,
     kto: {
       dopyty: dopytyRiadky
         .map((l) => ({ meno: l.name || "(bez mena)", datum: l.date, zdroj: l.source || "" }))
         .sort((a, b) => b.datum.localeCompare(a.datum)),
+      naUvodny: naUvodnyRiadky.sort((a, b) => b.dopyt.localeCompare(a.dopyt)),
       uvodne: [...uvodneMapa.entries()]
         .map(([meno, datum]) => ({ meno, datum }))
         .sort((a, b) => b.datum.localeCompare(a.datum)),
       klienti: novi
-        .map((c) => ({ meno: c.name, prvy: c.firstSession || "", zaplatil: prvaPlatba(c.name) }))
+        .map((c) => ({
+          meno: c.name, prvy: c.firstSession || "", zaplatil: prvaPlatba(c.name),
+          trzbaVOkne: data.payments.filter((p) => p.client === c.name && v(p.date)).reduce((a, p) => a + p.amount, 0),
+        }))
         .sort((a, b) => b.prvy.localeCompare(a.prvy)),
       // Mal úvodný v okne a v CELEJ histórii žiadne ďalšie sedenie. Pozerá sa
       // mimo okna zámerne: kto prišiel v januári a vrátil sa v júni, sa
@@ -338,15 +373,10 @@ export function Lievik({ data, clients, onPoznamka }: {
   const [ktori, setKtori] = useState<"dopyty" | "uvodne" | "klienti" | "strata" | null>(null);
   /** Ukázať aj tých, ktorým už niekto dôvod zapísal. */
   const [vybavene, setVybavene] = useState(false);
-  const [web, setWeb] = useState<{ ga4: { m: string; udalosti: number }[]; dopyty: { dopyt: string; kliky: number }[] }>({ ga4: [], dopyty: [] });
-
-  useEffect(() => {
-    void fetch("/api/marketing", { credentials: "same-origin" })
-      .then((r) => r.json())
-      .then((j: { ga4?: { m: string; udalosti: number }[]; gscDopyty?: { dopyt: string; kliky: number }[] }) =>
-        setWeb({ ga4: j.ga4 || [], dopyty: j.gscDopyty || [] }))
-      .catch(() => {});
-  }, []);
+  // GA4 a dopyty zo Search Console zo skladu — App.tsx ich načíta pri štarte.
+  // Do 19. 8. 2026 si ich táto obrazovka ťahala druhýkrát sama a mohla mať
+  // iný stav než zvyšok appky.
+  const web = useMemo(() => ({ ga4: GA4_MESACNE, dopyty: GSC_DOPYTY }), [marketingVerzia()]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const mesiace = useMemo(() => oknoMesiacov(data, okno), [data, okno]);
   const k = useMemo(() => krokyZa(data, clients, mesiace), [data, clients, mesiace]);
@@ -354,7 +384,10 @@ export function Lievik({ data, clients, onPoznamka }: {
   // Rozpad podľa zdroja — len klienti, ktorí v období začali.
   const podlaZdroja = useMemo(() => {
     const m = new Map<string, { klientov: number; trzba: number }>();
-    const menaVObdobi = Object.values(clients).filter((c) => !c.vratenie && c.firstSession && mesiace.includes(monthKey(c.firstSession)));
+    // `jeKlient` aj tu: bez neho bol čitateľ nadmnožinou menovateľa
+    // (k.klienti z krokyZa tú podmienku má), podiely sa sčítali na ~125 %
+    // a zdroj, ktorý sám presiahol k.klienti, vypísal prázdnu bunku.
+    const menaVObdobi = Object.values(clients).filter((c) => !c.vratenie && c.firstSession && mesiace.includes(monthKey(c.firstSession)) && jeKlient(c, data.payments));
     for (const c of menaVObdobi) {
       const z = c.zdroj || "";
       const e = m.get(z) || { klientov: 0, trzba: 0 };
@@ -394,10 +427,11 @@ export function Lievik({ data, clients, onPoznamka }: {
             strataAktivna={ktori === "strata"} />
           <Krok cislo={String(k.klienti)} popis="Noví klienti" konverzia={undefined}
             onClick={k.klienti ? () => setKtori(ktori === "klienti" ? null : "klienti") : undefined} aktivny={ktori === "klienti"} />
-          <div style={{ flex: "1 1 130px", minWidth: 0 }}>
-            <div style={{ fontSize: 26, fontWeight: 800, color: C.accentLight, lineHeight: 1.1, fontVariantNumeric: "tabular-nums" }}>{fmtCZK(k.trzba)}</div>
-            <div style={{ fontSize: 11.5, color: C.textMuted, marginTop: 3 }}>Tržba od nových</div>
-          </div>
+          {/* Tržba od nových je súčet platieb TÝCH ISTÝCH ľudí, čo sú v zozname
+              „Noví klienti" — klik otvorí ten istý zoznam, s tržbou pri každom.
+              Do 19. 8. 2026 jediný krok lievika bez prekliku. */}
+          <Krok cislo={fmtCZK(k.trzba)} popis="Tržba od nových" konverzia={undefined}
+            onClick={k.klienti ? () => setKtori(ktori === "klienti" ? null : "klienti") : undefined} aktivny={ktori === "klienti"} />
         </div>
 
         {ktori && (() => {
@@ -416,7 +450,7 @@ export function Lievik({ data, clients, onPoznamka }: {
                   ? k.kto.nepokracovali.map((x) => ({ meno: x.meno, vpravo: `úvodný ${fmtDen(x.datum)} · pred ${x.dni} dňami` }))
                   : k.kto.klienti.map((x) => ({
                   meno: x.meno,
-                  vpravo: `prvý tréning ${fmtDen(x.prvy)}${x.zaplatil ? ` · zaplatil ${fmtDen(x.zaplatil)}` : ""}`,
+                  vpravo: `prvý tréning ${fmtDen(x.prvy)}${x.zaplatil ? ` · zaplatil ${fmtDen(x.zaplatil)}` : ""} · ${fmtCZK(x.trzbaVOkne)}`,
                 }));
           return (
             <div style={{ marginTop: 12, padding: "10px 13px", borderRadius: 9, background: mix(C.text, 4), border: `1px solid ${C.border}` }}>
@@ -454,7 +488,7 @@ export function Lievik({ data, clients, onPoznamka }: {
                   <div style={{ fontSize: 11, color: C.textDim, marginTop: 9, lineHeight: 1.55 }}>
                     {zostava === 0
                       ? "Všetky dôvody sú zapísané. Jarvis ich má a vie z nich odpovedať, keď sa spýtaš, prečo ľudia po úvodnom nezostávajú."
-                      : "Zapísaný dôvod znamená vybavené — riadok zmizne aj z „Na čo sa pozrieť“."}
+                      : "Zapísaný dôvod znamená vybavené — riadok zmizne aj z Notifikácií."}
                     {hotovych > 0 && (
                       <>
                         {" "}
@@ -531,204 +565,62 @@ export function Lievik({ data, clients, onPoznamka }: {
 }
 
 // ── Čo to stálo ──────────────────────────────────────────────────────────────
-export function Naklady({ data, clients }: { data: PSBData; clients: Record<string, ClientAgg> }) {
-  const [kanaly, setKanaly] = useState<{ mesiac: string; kanal: string; metrika: string; hodnota: number }[]>([]);
-  useEffect(() => {
-    void fetch("/api/marketing", { credentials: "same-origin" })
-      .then((r) => r.json())
-      .then((j: { kanaly?: { mesiac: string; kanal: string; metrika: string; hodnota: number }[] }) => setKanaly(j.kanaly || []))
-      .catch(() => {});
-  }, []);
 
-  const riadky = useMemo(() => {
-    // Výdavok na reklamu podľa mesiaca: z mesačnej zostavy (Meta Ads) a
-    // z Metricool exportu (spend pri príspevkoch) — čo je k dispozícii.
-    const spend = new Map<string, number>();
-    for (const r of kanaly) {
-      if (!/spent|spend/i.test(r.metrika)) continue;
-      spend.set(r.mesiac, (spend.get(r.mesiac) || 0) + r.hodnota);
-    }
-    const noviVMesiaci = new Map<string, number>();
-    const trzbaVMesiaci = new Map<string, number>();
-    for (const c of Object.values(clients)) {
-      if (!c.firstSession) continue;
-      const m = monthKey(c.firstSession);
-      noviVMesiaci.set(m, (noviVMesiaci.get(m) || 0) + 1);
-      const t = data.payments.filter((p) => p.client === c.name && monthKey(p.date) === m).reduce((a, p) => a + p.amount, 0);
-      trzbaVMesiaci.set(m, (trzbaVMesiaci.get(m) || 0) + t);
-    }
-    // Najnovší mesiac hore. Zoznam rástol zdola a júl 26 — jediný mesiac,
-    // o ktorom sa reálne rozhoduje — bol na konci pod dvanástimi staršími.
-    return [...spend.keys()].sort().reverse().map((m) => ({
-      mesiac: m,
-      spend: spend.get(m) || 0,
-      novi: noviVMesiaci.get(m) || 0,
-      trzba: trzbaVMesiaci.get(m) || 0,
-    }));
-  }, [kanaly, clients, data.payments]);
+// „Čo to stálo" a „Platená cesta" tu boli do 18. 8. 2026. Obe odpovedali na
+// otázku „čo priniesla reklama" vlastným výpočtom — spolu so „Čo to prinieslo"
+// a „Kampane" to boli štyri karty a štyri rôzne čísla. Nahradila ich jedna:
+// components/psb/Reklama.tsx nad výpočtom v lib/psb/reklama.ts.
 
-  const spolu = riadky.reduce((a, r) => ({ spend: a.spend + r.spend, novi: a.novi + r.novi, trzba: a.trzba + r.trzba }), { spend: 0, novi: 0, trzba: 0 });
-
-  return (
-    <Card>
-      <H3><Info text="Koľko stála reklama a koľko klientov v tom mesiaci začalo. Je to ZMIEŠANÉ číslo, nie cena za klienta z reklamy: anamnéza sa nepýta, či človek prišiel z platenej alebo neplatenej cesty, takže sa nedá povedať, ktorý z tých klientov je z reklamy. Aj tak je to použiteľné — hovorí, koľko celý marketing stojí na jedného získaného klienta, a to je číslo, ktoré sa dá porovnať s cenou balíčka." label="Čo to stálo" /></H3>
-
-      {riadky.length === 0 ? (
-        <Empty>Zatiaľ nemám výdavky na reklamu. Nahraj mesačnú zostavu z Metricoolu (PDF alebo CSV).</Empty>
-      ) : (
-        <>
-          <div style={{ display: "flex", gap: 22, flexWrap: "wrap", margin: "10px 0 14px" }}>
-            <div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: C.orange, fontVariantNumeric: "tabular-nums" }}>{fmtCZK(spolu.spend)}</div>
-              <div style={{ fontSize: 11.5, color: C.textMuted }}>Reklama spolu</div>
-            </div>
-            <div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: C.text, fontVariantNumeric: "tabular-nums" }}>{spolu.novi}</div>
-              <div style={{ fontSize: 11.5, color: C.textMuted }}>Nových klientov</div>
-            </div>
-            <div>
-              <div style={{ fontSize: 22, fontWeight: 800, color: spolu.novi ? C.accentLight : C.textDim, fontVariantNumeric: "tabular-nums" }}>
-                {spolu.novi ? fmtCZK(spolu.spend / spolu.novi) : "—"}
-              </div>
-              <div style={{ fontSize: 11.5, color: C.textMuted }}>Zmiešaná cena za klienta</div>
-            </div>
-          </div>
-
-          <RolovaciaTabulka pocet={3}>
-            <thead>
-              <tr>
-                <th style={{ ...S.th, textAlign: "left" }}>Mesiac</th>
-                <th style={{ ...S.th, textAlign: "right" }}>Reklama</th>
-                <th style={{ ...S.th, textAlign: "right" }}>Nových klientov</th>
-                <th style={{ ...S.th, textAlign: "right" }}>Cena za klienta</th>
-                <th style={{ ...S.th, textAlign: "right" }}>Tržba od nich</th>
-              </tr>
-            </thead>
-            <tbody>
-              {riadky.map((r) => (
-                <tr key={r.mesiac}>
-                  <td style={S.td}>{monthLabel(r.mesiac)}</td>
-                  <td style={{ ...S.td, textAlign: "right", color: C.orange }}>{fmtCZK(r.spend)}</td>
-                  <td style={{ ...S.td, textAlign: "right" }}>{r.novi}</td>
-                  <td style={{ ...S.td, textAlign: "right", fontWeight: 600, color: r.novi ? C.text : C.textDim }}>
-                    {r.novi ? fmtCZK(r.spend / r.novi) : "—"}
-                  </td>
-                  <td style={{ ...S.td, textAlign: "right", color: C.accentLight }}>{fmtCZK(r.trzba)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </RolovaciaTabulka>
-
-          <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 10, lineHeight: 1.55 }}>
-            Mesiac bez nového klienta má prázdnu cenu, nie nulu — reklama v ňom nebola zadarmo, len sa nekúpila.
-          </div>
-
-          <PlatenaCesta data={data} clients={clients} spend={spolu.spend} />
-        </>
-      )}
-    </Card>
-  );
-}
-
-// Platená cesta zvlášť — to je jediné číslo, podľa ktorého sa dá rozhodnúť,
-// či pridať rozpočet. Zmiešaná cena za klienta na to nestačí: obsahuje aj
-// klientov z odporúčaní, ktorí by prišli aj bez reklamy.
-function PlatenaCesta({ data, clients, spend }: { data: PSBData; clients: Record<string, ClientAgg>; spend: number }) {
-  const v = useMemo(() => {
-    const dopyty = data.leads.filter((l) => l.source === "reklama");
-    const podlaNorm = new Map<string, ClientAgg>();
-    for (const c of Object.values(clients)) podlaNorm.set(normName(c.name), c);
-    let klienti = 0;
-    let trzba = 0;
-    for (const l of dopyty) {
-      const c = podlaNorm.get(normName(l.name || ""));
-      if (!c) continue;
-      const zaplatil = data.payments.some((p) => p.client === c.name) || c.sessions.some((x) => x.sessionType !== "UVODNE" && x.price > 0);
-      if (!zaplatil) continue;
-      klienti++;
-      trzba += data.payments.filter((p) => p.client === c.name).reduce((a, p) => a + p.amount, 0);
-    }
-    return { dopyty: dopyty.length, klienti, trzba };
-  }, [data.leads, data.payments, clients]);
-
-  return (
-    <div style={{ marginTop: 16, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
-      <div style={{ fontSize: 12.5, fontWeight: 600, color: C.text, marginBottom: 8 }}>
-        Platená cesta zvlášť
-      </div>
-      {v.dopyty === 0 ? (
-        <div style={{ fontSize: 12, color: C.textMuted, lineHeight: 1.6 }}>
-          Zatiaľ nie je zapísaný ani jeden dopyt so zdrojom <b style={{ color: C.text }}>Reklama (platená)</b>, takže sa nedá
-          povedať, čo reklama priniesla — len čo stála. Kým sa to nezačne zapisovať, zostáva zmiešaná cena vyššie
-          jediné, čo appka o návratnosti reklamy vie, a tá obsahuje aj klientov z odporúčaní, ktorí by prišli aj bez nej.
-        </div>
-      ) : (
-        <div style={{ display: "flex", gap: 22, flexWrap: "wrap" }}>
-          <div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: C.text, fontVariantNumeric: "tabular-nums" }}>{v.dopyty}</div>
-            <div style={{ fontSize: 11.5, color: C.textMuted }}>Dopytov z reklamy</div>
-          </div>
-          <div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: C.orange, fontVariantNumeric: "tabular-nums" }}>{fmtCZK(spend / v.dopyty)}</div>
-            <div style={{ fontSize: 11.5, color: C.textMuted }}>Cena za dopyt</div>
-          </div>
-          <div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: C.text, fontVariantNumeric: "tabular-nums" }}>{v.klienti}</div>
-            <div style={{ fontSize: 11.5, color: C.textMuted }}>Z toho klientov</div>
-          </div>
-          <div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: v.klienti ? C.accentLight : C.textDim, fontVariantNumeric: "tabular-nums" }}>
-              {v.klienti ? fmtCZK(spend / v.klienti) : "—"}
-            </div>
-            <div style={{ fontSize: 11.5, color: C.textMuted }}>Cena za klienta z reklamy</div>
-          </div>
-          <div>
-            <div style={{ fontSize: 20, fontWeight: 800, color: C.green, fontVariantNumeric: "tabular-nums" }}>{fmtCZK(v.trzba)}</div>
-            <div style={{ fontSize: 11.5, color: C.textMuted }}>Tržba z nich</div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Referenčný motor ─────────────────────────────────────────────────────────
-// ── Kohorta dopytov ──────────────────────────────────────────────────────────
-//
-// Mesačná krivka konverzie by pri štyroch úvodných mesačne bola šum. Kohorta
-// nie: „z dvanástich, čo sa ozvali v septembri, prišlo sedem a päť začalo" je
-// veta, podľa ktorej sa dá rozhodnúť o rozpočte.
-//
-// Dopyt sa páruje s klientom podľa mena bez diakritiky — nie je na to väzba v
-// databáze a robiť ju kvôli tomu by znamenalo zapisovať dopyt dvakrát. Meno
-// stačí; keď sa nespáruje, kohorta to prizná, nedopočíta.
 export function Kohorta({ data, clients }: { data: PSBData; clients: Record<string, ClientAgg> }) {
   const riadky = useMemo(() => {
     const podlaNorm = new Map<string, ClientAgg>();
     for (const c of Object.values(clients)) podlaNorm.set(normName(c.name), c);
-    const zaplatil = (c: ClientAgg) =>
-      data.payments.some((p) => p.client === c.name) || c.sessions.some((x) => x.sessionType !== "UVODNE" && x.price > 0);
+    // najdiKlienta (presne + fuzzy), nie holé normName — rovnaké párovanie
+    // ako Lievik o kartu vyššie a aiContext. Revízia 19. 8.: kohorty párovali
+    // vlastným pravidlom, takže „Lukas Hanus" z dopytu a „Lukáš Hanus"
+    // z PTmindera boli dvaja ľudia a kohorty hlásili nižšiu konverziu než
+    // Lievik na tej istej obrazovke.
+    const vsetkyMena = [...podlaNorm.values()].map((c) => c.name);
+    const najdi = (meno: string) => {
+      const kanonicke = najdiKlienta(vsetkyMena, meno);
+      return kanonicke ? podlaNorm.get(normName(kanonicke)) : undefined;
+    };
+    // Jedna definícia klienta pre celý súbor — viď jeKlient hore. Lokálna
+    // kópia tu mala mäkšie pravidlo („má platbu") a stĺpec „Začali chodiť"
+    // tak počítal aj ľudí, ktorí prišli raz na úvodný a zmizli.
+    const zaplatil = (c: ClientAgg) => jeKlient(c, data.payments);
 
-    const m = new Map<string, { dopytov: number; uvodny: number; klient: number; trzba: number; dni: number[] }>();
+    // Každý riadok kohorty si nesie mená, z ktorých vznikol — klik na mesiac
+    // ich ukáže. Bez toho bola kohorta čistá tabuľka čísel bez možnosti
+    // overiť očami, kto v nej je (revízia 19. 8. 2026).
+    type Kto = { meno: string; datum: string; uvodny: string; klient: boolean; trzba: number };
+    const m = new Map<string, { dopytov: number; uvodny: number; klient: number; trzba: number; dni: number[]; kto: Kto[] }>();
     for (const l of data.leads) {
       const mk = monthKey(l.date);
       if (!mk) continue;
-      const e = m.get(mk) || { dopytov: 0, uvodny: 0, klient: 0, trzba: 0, dni: [] };
+      const e = m.get(mk) || { dopytov: 0, uvodny: 0, klient: 0, trzba: 0, dni: [], kto: [] };
       e.dopytov++;
-      const c = podlaNorm.get(normName(l.name || ""));
+      const c = najdi(l.name || "");
+      let jeKl = false, tr = 0;
       if (c && c.firstSession) {
         e.uvodny++;
         const d = Math.round((Date.parse(c.firstSession) - Date.parse(l.date)) / 86400000);
         if (d >= 0 && d < 400) e.dni.push(d);
         if (zaplatil(c)) {
           e.klient++;
-          e.trzba += data.payments.filter((p) => p.client === c.name).reduce((a, p) => a + p.amount, 0);
+          tr = data.payments.filter((p) => p.client === c.name).reduce((a, p) => a + p.amount, 0);
+          e.trzba += tr;
+          jeKl = true;
         }
       }
+      e.kto.push({ meno: l.name || "(bez mena)", datum: l.date, uvodny: c?.firstSession || "", klient: jeKl, trzba: tr });
       m.set(mk, e);
     }
     return [...m.entries()].sort((a, b) => b[0].localeCompare(a[0])).slice(0, 12);
   }, [data.leads, data.payments, clients]);
+
+  const [otvorenaKohorta, setOtvorenaKohorta] = useState<string | null>(null);
+  const fmtDenK = (d: string) => { const [r, mm, dd] = (d || "").slice(0, 10).split("-"); return dd ? `${Number(dd)}. ${Number(mm)}. ${r}` : "—"; };
 
   return (
     <Card>
@@ -750,8 +642,10 @@ export function Kohorta({ data, clients }: { data: PSBData; clients: Record<stri
             </thead>
             <tbody>
               {riadky.map(([mk, v]) => (
-                <tr key={mk}>
-                  <td style={S.td}>{monthLabel(mk)}</td>
+                <tr key={mk} onClick={() => setOtvorenaKohorta(otvorenaKohorta === mk ? null : mk)}
+                  style={{ cursor: "pointer", background: otvorenaKohorta === mk ? mix(C.accent, 8) : undefined }}
+                  title="Klik ukáže mená v tejto kohorte">
+                  <td style={S.td}>{monthLabel(mk)} <span style={{ fontSize: 9, color: C.textDim }}>{otvorenaKohorta === mk ? "▾" : "▸"}</span></td>
                   <td style={{ ...S.td, textAlign: "right", fontWeight: 600, color: C.text }}>{v.dopytov}</td>
                   <td style={{ ...S.td, textAlign: "right" }}>
                     {v.uvodny}
@@ -769,6 +663,31 @@ export function Kohorta({ data, clients }: { data: PSBData; clients: Record<stri
               ))}
             </tbody>
           </TableWrap>
+          {otvorenaKohorta && (() => {
+            const r = riadky.find(([mk]) => mk === otvorenaKohorta);
+            if (!r) return null;
+            const [mk, v] = r;
+            return (
+              <div style={{ marginTop: 10, padding: "10px 13px", borderRadius: 9, background: mix(C.text, 4), border: `1px solid ${C.border}` }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                  <span style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", color: C.textMuted }}>
+                    Ozvali sa v {monthLabel(mk)} — {v.dopytov} dopytov · {v.uvodny} na úvodnom · {v.klient} začali chodiť
+                  </span>
+                  <button onClick={() => setOtvorenaKohorta(null)} style={{ background: "none", border: "none", color: C.textDim, fontSize: 11.5, cursor: "pointer", fontFamily: "inherit" }}>zavrieť</button>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 5, maxHeight: 300, overflowY: "auto" }}>
+                  {v.kto.map((x, i) => (
+                    <div key={`${x.meno}-${i}`} style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 12.5 }}>
+                      <span style={{ color: x.klient ? C.text : C.textMuted, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{x.meno}</span>
+                      <span style={{ color: C.textDim, flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>
+                        {fmtDenK(x.datum)}{x.uvodny ? ` · úvodný ${fmtDenK(x.uvodny)}` : " · bez úvodného"}{x.klient ? ` · klient · ${fmtCZK(x.trzba)}` : ""}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
           <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 10, lineHeight: 1.55 }}>
             Posledné mesiace budú vždy vyzerať horšie — ľudia, ktorí sa ozvali minulý týždeň, ešte nemali kedy prísť.
             Čítať sa dajú až kohorty staršie ako dva mesiace.
@@ -788,40 +707,112 @@ export function Kohorta({ data, clients }: { data: PSBData; clients: Record<stri
 // nedá overiť.
 export function AkoMeratReklamu() {
   const [kopirovane, setKopirovane] = useState("");
-  const odkaz = "https://www.prosapiens.cz/dychani/?utm_source=meta&utm_medium=paid&utm_campaign=dychani";
+  const [platforma, setPlatforma] = useState<Platforma>("meta");
+  const [stranka, setStranka] = useState("");
+  const [kampan, setKampan] = useState("");
+
+  /**
+   * Ponuka stránok. Prvá je úvodný tréning — na septembrový test sa mieri
+   * naň a hľadať ho medzi 77 adresami je zbytočná práca. Zvyšok je zoznam,
+   * ktorý appka o webe naozaj má; vypisovať adresu ručne znamená preklep.
+   */
+  const stranky = useMemo(() => {
+    const zoznam = WEB_STRANKY.map((s2) => s2.url).filter(Boolean).sort((a, b) => a.localeCompare(b));
+    const uvodny = zoznam.find((u) => /uvodni-trenink/.test(u));
+    return uvodny ? [uvodny, ...zoznam.filter((u) => u !== uvodny)] : zoznam;
+    // marketingVerzia(): WEB_STRANKY plní import mimo Reactu — bez verzie
+    // v deps memo zamrzne nad prázdnym skladom, keď človek otvorí kartu skôr,
+    // než dobehne /api/marketing (tá istá chyba ako PlanObsahu, 18. 8.).
+  }, [marketingVerzia()]); // eslint-disable-line react-hooks/exhaustive-deps
+  const ciel = stranka || stranky[0] || "";
+  const odkaz = znackovanyOdkaz(ciel, platforma, kampan);
+
   const kopiruj = async (t: string, co: string) => {
     try { await navigator.clipboard.writeText(t); setKopirovane(co); setTimeout(() => setKopirovane(""), 2000); } catch { /* bez povolenia */ }
   };
   const krok: React.CSSProperties = { fontSize: 12.5, color: C.textMuted, lineHeight: 1.65, marginBottom: 12 };
+  const prepinac = (p: Platforma, popis: string) => (
+    <button key={p} onClick={() => setPlatforma(p)}
+      style={{ padding: "5px 12px", borderRadius: 7, cursor: "pointer", fontFamily: "inherit", fontSize: 11.5,
+        border: `1px solid ${platforma === p ? C.accent : C.border}`,
+        background: platforma === p ? mix(C.accent, 14) : "transparent",
+        color: platforma === p ? C.accentLight : C.textMuted }}>
+      {popis}
+    </button>
+  );
 
   return (
     <Card>
-      <H3><Info text="Dva kroky mimo appky, bez ktorých zostane platená cesta neviditeľná. Ani jeden nie je práca na hodiny — prvý je vloženie odkazu do reklamy, druhý je iný export z GA4." label="Ako zapnúť meranie reklamy" /></H3>
+      <H3><Info text="Odkaz, ktorý povie GA4, odkiaľ človek prišiel. Bez neho ten, kto videl platený reel, vyzerá v dátach rovnako ako ten, kto nás našiel sám. Google je výnimka — značkuje si sám a namiesto odkazu potrebuje tri veci nastavené v jeho rozhraní." label="Ako zapnúť meranie reklamy" /></H3>
 
       <div style={krok}>
-        <b style={{ color: C.text }}>1. Reklamy majú viesť na značkovaný odkaz.</b><br />
-        Vtedy GA4 vie, že návšteva prišla z reklamy, aj keď to človek sám nevie povedať. Bez toho ten, kto videl
-        platený reel, napíše do anamnézy „Instagram" rovnako ako ten, kto nás našiel sám.
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 8 }}>
-          <code style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 7, padding: "6px 9px", fontSize: 11, color: C.textMuted, flex: "1 1 260px", minWidth: 0, overflowX: "auto", whiteSpace: "nowrap" }}>{odkaz}</code>
-          <button onClick={() => void kopiruj(odkaz, "odkaz")} style={{ padding: "5px 11px", borderRadius: 7, border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted, fontSize: 11.5, cursor: "pointer", whiteSpace: "nowrap" }}>
-            {kopirovane === "odkaz" ? "skopírované" : "kopírovať"}
-          </button>
+        <b style={{ color: C.text }}>1. Kde to pustíš?</b>
+        <div style={{ display: "flex", gap: 7, flexWrap: "wrap", margin: "8px 0" }}>
+          {prepinac("meta", "Meta (Facebook, Instagram)")}
+          {prepinac("google", "Google Ads")}
+          {prepinac("mail", "Mail")}
         </div>
-        <span style={{ fontSize: 11, color: C.textDim }}>
-          Časť za otáznikom sa dá meniť podľa kampane — dôležité je, aby ju mali len reklamy.
-        </span>
+
+        {platforma === "google" ? (
+          <>
+            Google si značkuje sám cez <code style={{ fontSize: 11 }}>gclid</code>, takže tu nie je čo kopírovať — ručné
+            <code style={{ fontSize: 11 }}> utm_</code> by mu automatické značkovanie prebilo a boli by z toho dva zdroje pravdy.
+            Namiesto odkazu skontroluj v Google Ads tri veci:
+            <div style={{ marginTop: 6, paddingLeft: 14, lineHeight: 1.75 }}>
+              <b style={{ color: C.text }}>a)</b> automatické značkovanie je zapnuté (Nastavenia účtu → Automatické označovanie),<br />
+              <b style={{ color: C.text }}>b)</b> účet je prepojený s GA4 (Nástroje → Prepojené účty),<br />
+              <b style={{ color: C.text }}>c)</b> konverzia je <b style={{ color: C.text }}>odoslanie formulára</b>, nie zobrazenie stránky
+              — presne takto to bolo nastavené počas kampaní 2023–25 a preto hlásili 299 konverzií na 13 klientov. Pred novým spustením to over znova.
+            </div>
+          </>
+        ) : (
+          <>
+            {platforma === "meta"
+              ? "Meta si neznačkuje nič. Bez tohto odkazu je platený návštevník v GA4 nerozoznateľný od toho, kto prišiel sám."
+              : "Mail dostane vlastný zdroj, aby sa neschoval medzi reklamu ani medzi priame návštevy."}
+          </>
+        )}
       </div>
 
+      {platforma !== "google" && (
+        <div style={krok}>
+          <b style={{ color: C.text }}>2. Kam to má viesť a ako sa to volá?</b>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "8px 0" }}>
+            <select value={ciel} onChange={(e) => setStranka(e.target.value)}
+              style={{ ...S.input, flex: "1 1 300px", minWidth: 0, fontSize: 11.5, padding: "6px 8px" }}>
+              {stranky.length === 0 && <option value="">Text webu sa ešte nestiahol</option>}
+              {stranky.map((u) => <option key={u} value={u}>{u.replace(/^https?:\/\/(www\.)?/, "")}</option>)}
+            </select>
+            <input value={kampan} onChange={(e) => setKampan(e.target.value)} placeholder="názov kampane, napr. Úvodní trénink září"
+              style={{ ...S.input, flex: "1 1 220px", minWidth: 0, fontSize: 11.5, padding: "6px 8px" }} />
+          </div>
+          <span style={{ fontSize: 11, color: C.textDim }}>
+            Názov sa v odkaze objaví ako <code style={{ fontSize: 10.5 }}>utm_campaign</code> — bez diakritiky a medzier.
+            Podľa neho ich potom appka aj GA4 vedia rozlíšiť, tak nech je pre každú kampaň iný.
+          </span>
+
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 10 }}>
+            <code style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 7, padding: "6px 9px", fontSize: 11, color: odkaz ? C.textMuted : C.textDim, flex: "1 1 260px", minWidth: 0, overflowX: "auto", whiteSpace: "nowrap" }}>
+              {odkaz || "vyber stránku"}
+            </code>
+            <button onClick={() => odkaz && void kopiruj(odkaz, "odkaz")} disabled={!odkaz}
+              style={{ padding: "5px 11px", borderRadius: 7, border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted, fontSize: 11.5, cursor: odkaz ? "pointer" : "default", opacity: odkaz ? 1 : 0.5, whiteSpace: "nowrap", fontFamily: "inherit" }}>
+              {kopirovane === "odkaz" ? "skopírované" : "kopírovať"}
+            </button>
+          </div>
+        </div>
+      )}
+
       <div style={krok}>
-        <b style={{ color: C.text }}>2. Z GA4 exportuj kľúčové udalosti PODĽA KANÁLA.</b><br />
+        <b style={{ color: C.text }}>3. Z GA4 exportuj kľúčové udalosti PODĽA KANÁLA.</b><br />
         Dnešný export dáva len súčet (18 za júl). Keď bude rozdelený po skupinách kanálov, appka uvidí, koľko
         formulárov prišlo z platenej cesty — a to je počet dopytov z reklamy bez toho, aby ho niekto zapisoval.
       </div>
 
       <div style={{ ...krok, marginBottom: 0 }}>
-        <b style={{ color: C.orange }}>3. A jedna vec, ktorá nie je o meraní.</b><br />
-        V júli išlo <b style={{ color: C.text }}>50 % rozpočtu do kampaní s cieľom „engagement"</b> a 12 % do „awareness".
+        <b style={{ color: C.orange }}>4. A jedna vec, ktorá nie je o meraní.</b><br />
+        V júli 2026 išlo <b style={{ color: C.text }}>50 % rozpočtu do kampaní s cieľom „engagement"</b> a 12 % do „awareness"
+        (živé podiely za zvolené obdobie sú na karte Kampane — toto je momentka z júla).
         Tie kupujú videnia, nie návštevy — Meta ich doručí a zadanie splní. Jediná kampaň, z ktorej mohol vzniknúť
         dopyt, bola <i>Traffic — Příručka Dýchání</i> za 1 804 Kč a mala najlacnejší klik zo všetkých (2,80 Kč).
         Kým bude väčšina rozpočtu v engagement, „spustím reklamu = klienti" nemôže platiť ani pri dokonalom meraní.

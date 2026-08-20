@@ -420,3 +420,39 @@ export function podozriveCisla(podiely: Podiel[]): Nezhoda[] {
   }
   return von;
 }
+
+// ── Skrývanie hlásení ────────────────────────────────────────────────────────
+//
+// Jerry, 19. 8. 2026: „nedalo by sa tie hlásenia dať ako baliace okná?"
+// Hlásenie o konverziách má osem riadkov a stojí nad tabuľkou, ktorú si
+// prišiel pozrieť — po tretíkrát prečítané je to prekážka, nie informácia.
+//
+// PREČO SA SKRÝVA NA 30 DNÍ A NIE NATRVALO
+//
+// „Skryť navždy" a „vyriešené" vyzerajú na obrazovke rovnako, ale znamenajú
+// opak. Konverzná akcia v Google Ads sa opraví raz a hlásenie zmizne samo,
+// lebo sa počíta z dát. Kým opravená nie je, appka to má po mesiaci pripomenúť
+// — inak by tvrdila, že je čisto, hoci sa len odklikalo.
+
+/** Na ako dlho sa hlásenie skryje. */
+export const SKRYT_DNI = 30;
+
+/** Kľúč do `anomaly_ack`. Vlastný priestor, aby sa nemiešal s registrom. */
+export function klucSkrytia(kluc: string): string {
+  return `hlasenie|${kluc}`;
+}
+
+/**
+ * Dokedy je hlásenie skryté — a či ešte je.
+ *
+ * Vracia null, keď skryté nie je (nikdy nebolo, alebo už vypršalo). Vtedy sa
+ * kreslí normálne. Prázdny alebo pokazený dátum sa berie ako neskryté: radšej
+ * ukázať zbytočne než zmlčať kvôli chybe v zápise.
+ */
+export function skryteDo(zaznam: { ackedAt?: string } | undefined, dnes: Date): Date | null {
+  if (!zaznam?.ackedAt) return null;
+  const od = new Date(zaznam.ackedAt);
+  if (Number.isNaN(od.getTime())) return null;
+  const do_ = new Date(od.getTime() + SKRYT_DNI * 24 * 3600 * 1000);
+  return do_ > dnes ? do_ : null;
+}

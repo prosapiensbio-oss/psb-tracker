@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { patriTrenerovi } from "./compute";
+import { odpovedeZRegistra, patriTrenerovi } from "./compute";
 
 const KLIENTI = {
   "Eva Doležalova": { primaryTrainer: "Terezka" },
@@ -51,9 +51,47 @@ describe("patriTrenerovi", () => {
     expect(patriTrenerovi(r, KLIENTI, "all")).toBe(true);
   });
 
+  it("klient TRETIEHO trénera zostáva obom — inak ho nevidí nikto", () => {
+    // Matyáš odtrénoval 151 hodín a je stále primárnym trénerom šiestich ľudí,
+    // ale v prepínači nie je. Jeho klienti tak prepadli medzi stoličky: dve
+    // pripomienky na zľavu za odporúčanie ležali 17. 8. 2026 neviditeľné.
+    const KLIENTI3 = { ...KLIENTI, "Natalia Peckova": { primaryTrainer: "Matyáš" } };
+    const r = polozka({ client: "Natalia Peckova" });
+    expect(patriTrenerovi(r, KLIENTI3, "Jerry")).toBe(true);
+    expect(patriTrenerovi(r, KLIENTI3, "Terezka")).toBe(true);
+  });
+
+  it("„—“ ale nie — tam sa tréner nedal určiť a hádať sa nebude", () => {
+    // Rozdiel oproti tretiemu trénerovi: „—“ neznamená niekoho iného,
+    // znamená, že sa to nevie. Ukázať to obom by bolo tiché priradenie.
+    expect(patriTrenerovi(polozka({ client: "Nikto Neznamy" }), KLIENTI, "Terezka")).toBe(false);
+  });
+
+  it("tréner z kalendára prebije neznáme meno", () => {
+    // Toto je celá oprava zo 17. 8.: nový človek po úvodnom v `clients` ešte
+    // nie je, takže pravidlo „neznáme meno zostáva obom" ho poslalo obom.
+    // Keď položka nesie trénera z kalendára, filter má z čoho rozhodnúť.
+    const r = polozka({ client: "Jana Malinová", oKom: "Jana Malinová", trener: "Terezka" });
+    expect(patriTrenerovi(r, KLIENTI, "Jerry")).toBe(false);
+    expect(patriTrenerovi(r, KLIENTI, "Terezka")).toBe(true);
+  });
+
   it("meno, ktoré appka nepozná, zostáva obom", () => {
     // Preklep alebo klient zo starých dát — stratiť upozornenie je horšie
     // než ho ukázať navyše.
     expect(patriTrenerovi(polozka({ client: "Kto To Je" }), KLIENTI, "Jerry")).toBe(true);
+  });
+});
+
+describe("stav ovládača nie je odpoveď", () => {
+  it("kľúče hlasenie| a project| sa do Jarvisovej pamäte nedostanú", () => {
+    // Inak by si Jarvis pamätal vetu „skryté hlásenie" bez toho, čoho sa
+    // týka — a tváril by sa, že na niečo odpovedal.
+    const pamat = odpovedeZRegistra({
+      "hlasenie|gads|konverzie-vs-klienti": { note: "skryté hlásenie", ackedAt: "2026-08-19T10:00:00.000Z" },
+      "project|nastavene": { note: "nastavené", ackedAt: "2026-08-19T10:00:00.000Z" },
+      "dovod|Jan Novak": { note: "odsťahoval sa", ackedAt: "2026-08-18T10:00:00.000Z" },
+    });
+    expect(pamat.map((p) => p.odpoved)).toEqual(["odsťahoval sa"]);
   });
 });

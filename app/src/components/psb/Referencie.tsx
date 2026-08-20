@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 
-import type { ClientAgg } from "../../lib/psb/compute";
+import { kotvaDat, type ClientAgg } from "../../lib/psb/compute";
+import { mesiaceVOkne } from "../../lib/psb/obdobia";
 import { fmtCZK } from "../../lib/psb/format";
 import { C, mix, S } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
@@ -25,14 +26,29 @@ export const OBDOBIA_STD = [
   { value: "custom", label: "Vlastné" },
 ];
 
-export function obdobieOd(hodnota: string): { od: string; do_: string } {
-  const dnes = new Date();
-  const iso = (d: Date) => d.toISOString().slice(0, 10);
+/**
+ * Hranice obdobia ako dátumy „YYYY-MM-DD".
+ *
+ * „6m/3m/1m" sú PLNÉ MESIACE podľa tej istej kotvy ako zvyšok appky
+ * (`mesiaceVOkne` + `kotvaDat`) — nie dni dozadu od dneška. Do 19. 8. 2026
+ * to bolo jediné miesto v appke, ktoré si „posledných 6 mesiacov" rátalo ako
+ * 183 dní: zahŕňalo bežiaci mesiac, ktorý všetko ostatné zámerne vynecháva,
+ * a 19. augusta tak ukazovalo iné okno než Lievik vedľa. Okno končí posledným
+ * PLNÝM mesiacom (kotva) — presne ako grafy.
+ */
+export function obdobieOd(hodnota: string, data: PSBData): { od: string; do_: string } {
   if (hodnota === "2026") return { od: "2026-01-01", do_: "2026-12-31" };
   if (hodnota === "2025") return { od: "2025-01-01", do_: "2025-12-31" };
-  if (hodnota === "6m") return { od: iso(new Date(dnes.getTime() - 183 * 86400000)), do_: iso(dnes) };
-  if (hodnota === "3m") return { od: iso(new Date(dnes.getTime() - 92 * 86400000)), do_: iso(dnes) };
-  if (hodnota === "1m") return { od: iso(new Date(dnes.getTime() - 31 * 86400000)), do_: iso(dnes) };
+  if (hodnota === "6m" || hodnota === "3m" || hodnota === "1m") {
+    const kotva = kotvaDat(data);
+    const vsetky = [...new Set(data.payments.map((p) => p.date.slice(0, 7)))].filter((m) => !kotva.plny || m <= kotva.plny);
+    const okno = mesiaceVOkne(hodnota, vsetky);
+    if (!okno.length) return { od: "9999-12-31", do_: "0000-01-01" }; // prázdne okno = nič nesedí
+    const posledny = okno[okno.length - 1];
+    const [r, m] = posledny.split("-").map(Number);
+    const poslednyDen = new Date(r, m, 0).getDate(); // 0. deň ďalšieho mesiaca = posledný tohto
+    return { od: `${okno[0]}-01`, do_: `${posledny}-${String(poslednyDen).padStart(2, "0")}` };
+  }
   return { od: "0000-01-01", do_: "9999-12-31" };
 }
 
@@ -43,7 +59,7 @@ export function Referencie({ data, clients, onKlient }: { data: PSBData; clients
   const r = useMemo(() => {
     const { od, do_ } = obdobie === "custom"
       ? { od: vlastneOd || "0000-01-01", do_: vlastneDo || "9999-12-31" }
-      : obdobieOd(obdobie);
+      : obdobieOd(obdobie, data);
     const vsetci = Object.values(clients);
     const zRef = vsetci.filter((c) => c.zdroj === "referencia");
     // Tržba len z platieb VO ZVOLENOM OBDOBÍ — zoznam odporúčateľov zostáva

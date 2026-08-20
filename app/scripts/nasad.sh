@@ -45,6 +45,42 @@ if [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then
   exit 1
 fi
 
+# ── Stráž migrácií ───────────────────────────────────────────────────────────
+#
+# Migrácie sa púšťajú ručne (`wrangler d1 execute --file`) a NIKTO si to
+# nezapisoval: tabuľka d1_migrations skončila pri 0024, priečinok mal 0050.
+# Presne cez túto dieru kedysi prepadlo `precoNeprisiel` — obrazovka mala
+# input, databáza nemala stĺpec (revízia 19. 8. 2026).
+#
+# Pred každým nasadením sa preto porovná priečinok s evidenciou v DB. Súbor,
+# ktorý v evidencii chýba, sa OHLÁSI a nasadenie sa ZASTAVÍ — nepúšťa sa sám,
+# lebo migrácia, ktorá už bola aplikovaná ručne, by sa spustila druhýkrát.
+# Keď si istý, že je aplikovaná, dopíš ju do evidencie:
+#   ./scripts/nasad.sh --migracia-hotova 0051_nazov.sql
+d1() {
+  node node_modules/.bin/wrangler d1 execute psb-tracker-db --remote --config wrangler.psb.jsonc --command "$1" --json 2>/dev/null
+}
+if [ "${1:-}" = "--migracia-hotova" ] && [ -n "${2:-}" ]; then
+  d1 "INSERT INTO d1_migrations (name, applied_at) VALUES ('$2', datetime('now'))" >/dev/null \
+    && echo "✓ $2 zapísaná do evidencie" || echo "✗ zápis zlyhal"
+  exit 0
+fi
+evidencia=$(d1 "SELECT name FROM d1_migrations" | grep -o '"name": "[^"]*"' | sed 's/"name": "//; s/"$//')
+chybaju=""
+for f in migrations/*.sql; do
+  n=$(basename "$f")
+  echo "$evidencia" | grep -qx "$n" || chybaju="$chybaju $n"
+done
+if [ -n "$chybaju" ]; then
+  echo "✗ Migrácie v priečinku, ale NIE v evidencii databázy:"
+  for n in $chybaju; do echo "    $n"; done
+  echo "  Ak je aplikovaná: ./scripts/nasad.sh --migracia-hotova <súbor>"
+  echo "  Ak nie je:        wrangler d1 execute psb-tracker-db --remote --config wrangler.psb.jsonc --file migrations/<súbor>"
+  echo "                    a potom --migracia-hotova."
+  exit 1
+fi
+echo "✓ migrácie: evidencia sedí s priečinkom"
+
 verzia() {
   curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
     "https://api.cloudflare.com/client/v4/accounts/$ucet/workers/scripts/$worker/versions?per_page=1" \
@@ -52,6 +88,16 @@ verzia() {
 }
 
 if [ "${1:-}" != "--bez-buildu" ]; then
+  # Testy pred buildom — 20. 8. 2026 sa nasadila zmena, ktorá rozbila 3 testy,
+  # a nikto si to nevšimol, lebo nasadenie testy nepúšťalo. Zelený build nie je
+  # dôkaz; zelené testy aspoň strážia to, čo dokumentujú.
+  echo "▸ testy…"
+  if ! bun run test > /tmp/nasad-test.log 2>&1; then
+    echo "✗ testy zlyhali — pozri /tmp/nasad-test.log"
+    tail -20 /tmp/nasad-test.log
+    exit 1
+  fi
+  echo "  testy OK ($(grep -Eo '[0-9]+ pass' /tmp/nasad-test.log | tail -1))"
   echo "▸ build…"
   if ! bun run build > /tmp/nasad-build.log 2>&1; then
     echo "✗ build zlyhal:"; tail -20 /tmp/nasad-build.log; exit 1

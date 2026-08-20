@@ -4,7 +4,12 @@ import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 
-const SOURCES = ["referencia", "mail", "web", "google", "instagram", "ine"];
+// MUSÍ sedieť so SOURCES v Klienti.tsx. Revízia 18. 8. 2026 našla, že tu tri
+// hodnoty chýbali — a keďže neznámy zdroj sa ticho prepisuje na „ine", každý
+// dopyt zapísaný ako „Reklama (platená)" sa v databáze stal „Iné". Obrazovka
+// ho pritom na okamih ukázala správne. „Reklama" pritom existuje výlučne
+// preto, aby sa dala zmerať platená cesta.
+const SOURCES = ["referencia", "reklama", "mail", "web", "google", "instagram", "instagram_osobny", "telefon", "ine"];
 const STATUSES = ["novy", "neodpisal", "dohodnuty", "zruseny"];
 
 export const Route = createFileRoute("/api/leads")({

@@ -338,3 +338,17 @@ Prihlásenie je oddelené, aby audit vedel povedať aj KTO, nielen čo a kedy.
 
 Instagram DM · **mail cez formulár na webe (najčastejšie)** · občas priamy
 telefonát · občas na osobné Instagram účty Jerryho alebo Terezky.
+
+## 19. Reklamné účty — kampane vznikajú len na jednom
+
+Reklama sa robí **výhradne v účte `172897726151288` (ProSapiens Biomechanic)**.
+Je to ten účet, ktorý Kokpit číta, a ten prepojený s Instagramom aj Facebookom.
+Zadal to Jerry 19. 8. 2026 a appka to má natvrdo: kartu *Pripraviť kampaň*
+nejde presmerovať inam ani prepísaním nastavenia.
+
+Existuje aj druhý, **osobný účet `3356679857899572`**. Kokpit ho NESLEDUJE.
+Viseli v ňom dve kampane z 29. 1. 2023 (boostnuté príspevky z Instagramu,
+`LINK_CLICKS` a `MESSAGES`, po 100 Kč/deň), zapnuté a nedoručujúce kvôli
+chybe v reklame — teda neminuli nič. Keď sa niekto pýta na výdavky za
+reklamu, čísla z tohto účtu v appke NIE SÚ; keď má pocit, že niečo chýba,
+prvá otázka je, či to nevzniklo tam.

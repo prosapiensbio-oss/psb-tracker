@@ -40,7 +40,7 @@ export const SEKCIE: { id: SekciaId; label: string; popis: string }[] = [
   { id: "treningy", label: "Tréningy a kapacita", popis: "Odtrénované hodiny, rozdelenie medzi trénerov, vyťaženie." },
   { id: "marketing", label: "Marketing", popis: "Instagram, web a vyhľadávanie — vstupy, nie výsledky." },
   { id: "dopyty", label: "Dopyty a zdroje", popis: "Odkiaľ ľudia prichádzajú a čo sa s dopytmi stalo." },
-  { id: "signaly", label: "Na čo sa pozrieť", popis: "Otvorené signály z dashboardu." },
+  { id: "signaly", label: "Notifikácie", popis: "Otvorené signály z dashboardu." },
 ];
 
 export type ReportFilter = {
@@ -309,7 +309,7 @@ export function buildReport(
   // ── Signály ────────────────────────────────────────────────────────────────
   if (chce("signaly")) {
     const otvorene = register.filter((r) => !r.acked);
-    out.push("## Na čo sa pozrieť");
+    out.push("## Notifikácie");
     out.push("");
     if (!otvorene.length) {
       out.push("*Nič otvorené — všetky signály sú vybavené.*");

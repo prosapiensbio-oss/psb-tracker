@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { clanky, prilezitosti, type Dopyt as GscDopytTyp } from "../../lib/psb/google";
-import { GSC_DOPYTY, GSC_STRANY, WEB_STRANKY } from "../../lib/psb/marketing";
+import { GSC_DOPYTY, GSC_STRANY, marketingVerzia, WEB_STRANKY } from "../../lib/psb/marketing";
 import { obsahPredDopytmi, type Riadok } from "../../lib/psb/obsahDopyt";
 import { monthKey } from "../../lib/psb/format";
 import { planObsahu, type Navrh, type Vlastnik } from "../../lib/psb/planObsahu";
@@ -116,7 +116,10 @@ export function PlanObsahu({ data, chat, onNavigate }: { data: PSBData; chat?: A
       prispevkovMesacne: teraz,
       prispevkovVSilnychMesiacoch: vSilnych,
     });
-  }, [ig, data.leads]);
+    // marketingVerzia(): WEB_STRANKY a GSC_* sa plnia mimo Reactu; keď vlastný
+    // fetch `ig` dobehol skôr než /api/marketing, memo zamrzlo nad prázdnym
+    // skladom a karta tvrdila, že web o téme nemá stránku.
+  }, [ig, data.leads, marketingVerzia()]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const doZadania = (n: Navrh) => {
     if (!chat) return;

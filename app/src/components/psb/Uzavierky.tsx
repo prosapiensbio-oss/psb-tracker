@@ -195,9 +195,13 @@ export function Uzavierky({ prekazky, kroky, podklady, onNavigate, chat }: {
       }
     }
     setPrebieha(m);
-    await setPeriodLock(m, na);
+    setChybaZamku("");
+    const ok = await setPeriodLock(m, na);
     nacitaj();
     setPrebieha(null);
+    // Zámok, ktorý neprešiel, nesmie otvoriť mesačnú správu — tá je signál
+    // „mesiac je hotový" a človek podľa nej prestane mesiac riešiť.
+    if (!ok) { setChybaZamku(`${monthLabel(m)}: ${na ? "zamknutie" : "odomknutie"} neprešlo — skús znova.`); return; }
     // Zamknutie je jediný okamih, keď je o mesiaci známe všetko naraz. Preto
     // sa práve tu ponúkne mesačná správa — o týždeň by si už nikto nepamätal,
     // prečo boli čísla také, aké boli.
@@ -218,6 +222,7 @@ export function Uzavierky({ prekazky, kroky, podklady, onNavigate, chat }: {
   /** Mesiac, ktorý sa práve zamkol — spustí návrh mesačnej správy. */
   const [zamknuty, setZamknuty] = useState<string | null>(null);
   const [hromadne, setHromadne] = useState(false);
+  const [chybaZamku, setChybaZamku] = useState("");
 
   // Staršie mesiace zamknúť naraz, TAK AKO SÚ.
   //
@@ -232,9 +237,14 @@ export function Uzavierky({ prekazky, kroky, podklady, onNavigate, chat }: {
   );
   const zamkniStaršie = async () => {
     setHromadne(true);
-    for (const m of staršie) await setPeriodLock(m, true);
+    setChybaZamku("");
+    // Pri hromadnom zamykaní zapadne neúspech jedného mesiaca najľahšie —
+    // preto sa počíta a vypíše menom.
+    const zlyhali: string[] = [];
+    for (const m of staršie) if (!(await setPeriodLock(m, true))) zlyhali.push(monthLabel(m));
     nacitaj();
     setHromadne(false);
+    if (zlyhali.length) setChybaZamku(`Nezamklo sa: ${zlyhali.join(", ")}. Skús znova.`);
   };
 
   return (
@@ -305,6 +315,7 @@ export function Uzavierky({ prekazky, kroky, podklady, onNavigate, chat }: {
                 Kroky sa pri nich nekontrolujú: história z Excelu sa už nemení a zámok tu znamená
                 „ďalej sa toho nedotýkam", nie „prekontroloval som to". Odomknúť sa dá kedykoľvek.
               </span>
+              {chybaZamku && <span style={{ fontSize: 12, color: C.red, width: "100%" }}>{chybaZamku}</span>}
             </div>
           )}
         </Card>

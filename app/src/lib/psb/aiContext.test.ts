@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, it, test } from "bun:test";
 
 import { buildAiContext } from "./aiContext";
 import { cenaZaSedenie, type ClientAgg } from "./compute";
@@ -298,5 +298,69 @@ describe("lievik — konverzia nad rovnakým obdobím", () => {
     // Text je poistka proti presne tomu deleniu, ktoré tam predtým lákalo.
     expect(ctx().marketing.zdrojeKlientov.poznamka).toContain("NESMIE");
     expect(ctx().marketing.zdrojeKlientov).not.toHaveProperty("dopyty");
+  });
+});
+
+describe("rezerva v kontexte", () => {
+  /** Rezerva z 18. 8. 2026: majetok 221 858 Kč, priemerný break-even 178 522 Kč. */
+  const rezerva = () => (buildAiContext(
+    EMPTY_DATA as PSBData, {}, [], [], [], undefined, undefined,
+    { majetok: 221858, mesiace: 1.24, uplna: true, bePriem: 178522, datumStavu: "2026-08-15" },
+  ) as { rezerva: { chybaDoCielaCzk: number | null; cielMesiacov: number; poznamka: string } }).rezerva;
+
+  test("rozdiel do cieľa dostane Jarvis spočítaný, nie na počítanie", () => {
+    // Na tú istú otázku odpovedal raz „chýba 113 500 Kč" a raz „313 700 Kč".
+    // Vstupy boli rovnaké; rátal si to v hlave. 3 × 178 522 − 221 858 = 313 708.
+    expect(rezerva().chybaDoCielaCzk).toBe(313708);
+    expect(rezerva().cielMesiacov).toBe(3);
+  });
+
+  test("poznámka mu zakazuje počítať si to sám", () => {
+    expect(rezerva().poznamka).toContain("PREČÍTAJ");
+  });
+});
+
+/**
+ * Vedomosti zvonku — rešerše, ktoré Jarvis pozná natrvalo.
+ *
+ * Jerry, 19. 8. 2026: „takéto veci sa často menia, nemohol by byť nejaký
+ * sledovač?" Vedomosť starne inak než dáta: rešerš vyzerá presvedčivo aj rok
+ * po tom, čo prestala platiť. Preto má lehotu a preto sa do kontextu posiela
+ * príznak `stare`, nie len text.
+ */
+describe("vedomosti zvonku v kontexte", () => {
+  const sVedomostou = (dniDozadu: number, obnovovatPoDnoch: number) => {
+    const data: PSBData = {
+      ...EMPTY_DATA,
+      vedomosti: [{
+        id: "test", nazov: "Test rešerš", oCom: "O čom to je.", zdroj: "web",
+        obnovovatPoDnoch,
+        overeneAt: new Date(Date.now() - dniDozadu * 86400000).toISOString(),
+        znakov: 8000,
+      }],
+    };
+    return buildAiContext(data, {}, [], [], []) as any;
+  };
+
+  it("posiela PREHĽAD, nie text — inak by rešerš vytlačila čísla z kontextu", () => {
+    const v = sVedomostou(10, 180).coVieZvonku.polozky[0];
+    expect(v.nazov).toBe("Test rešerš");
+    expect(v.oCom).toBe("O čom to je.");
+    expect(v.poznamka).toContain("SELECT text");
+  });
+
+  it("čerstvá rešerš sa neoznačuje ako stará", () => {
+    expect(sVedomostou(10, 180).coVieZvonku.polozky[0].stare).toBe(false);
+  });
+
+  it("po lehote sa označí a Jarvis dostane pokyn brať čísla s odstupom", () => {
+    const v = sVedomostou(200, 180).coVieZvonku.polozky[0];
+    expect(v.stare).toBe(true);
+    expect(v.stareDni).toBeGreaterThan(180);
+    expect(v.poznamka).toContain("odstupom");
+  });
+
+  it("register zostáva PRVÝ kľúč — kontext sa reže odzadu", () => {
+    expect(Object.keys(sVedomostou(10, 180)).indexOf("naCoSaPozriet")).toBe(0);
   });
 });

@@ -1,7 +1,7 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { saveLead } from "../../lib/psb/client";
-import { maTermin, najdiKlienta, type ClientAgg } from "../../lib/psb/compute";
+import { maTermin, najdiKlienta, objednaneVerzia, type ClientAgg } from "../../lib/psb/compute";
 import { fmtDMY, normName } from "../../lib/psb/format";
 import { C, mix, S } from "../../lib/psb/theme";
 import type { Lead } from "../../lib/psb/types";
@@ -82,13 +82,13 @@ const DOVODY = ["nezdvíhal telefón", "neodpísal", "cena", "vzdialenosť", "te
  * ukáže „uložené". Zápis, o ktorom sa nedá povedať, či prešiel, je horší než
  * žiadny.
  */
-function DovodPole({ l, onSave }: { l: Lead; onSave: (v: string) => Promise<void> | void }) {
+function DovodPole({ l, onSave }: { l: Lead; onSave: (v: string) => Promise<boolean | void> | void }) {
   const [text, setText] = useState(l.dovod || "");
   const [ok, setOk] = useState(false);
   const uloz = () => {
     const v = text.trim();
     if (v === (l.dovod || "").trim()) return;
-    void Promise.resolve(onSave(v)).then(() => { setOk(true); setTimeout(() => setOk(false), 1800); });
+    void Promise.resolve(onSave(v)).then((res) => { if (res !== false) { setOk(true); setTimeout(() => setOk(false), 1800); } });
   };
   return (
     <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
@@ -104,7 +104,7 @@ function DovodPole({ l, onSave }: { l: Lead; onSave: (v: string) => Promise<void
   );
 }
 
-export function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Record<string, ClientAgg>; refresh: () => Promise<void> }) {
+export function Dopyty({ leads, clients, refresh, focus }: { leads: Lead[]; clients: Record<string, ClientAgg>; refresh: () => Promise<void>; focus?: { client?: string; nonce?: number } | null }) {
   const [busy, setBusy] = useState(false);
   const [adding, setAdding] = useState(false);
   const [upravCas, setUpravCas] = useState<string | null>(null);
@@ -157,19 +157,33 @@ export function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Re
     const zaklad = lenCakajuci
       ? leads.filter((l) => meraSa(l) && !l.odpovedaneAt && l.status === "novy")
       : lenNevyriesene
-        // Nevyriešený = nestal sa klientom a dôvod nie je zapísaný. Stav sa
-        // zámerne nekontroluje: väčšina má „nový", lebo ich nikto neposunul —
-        // a práve tie treba prejsť.
-        // Kto má dohodnutý termín, nie je nevyriešený — je rozbehnutý.
-        ? leads.filter((l) => !converted(l) && !String(l.dovod || "").trim() && !maTermin(l.name || ""))
+        // TÁ ISTÁ funkcia ako tlačidlo nad zoznamom. Filter mal vlastnú
+        // inline kópiu bez 30-dňovej výnimky pre „dohodnutý" — tlačidlo
+        // hlásilo „len nevyriešené (7)" a otvorilo zoznam s iným počtom.
+        ? leads.filter(nevyrieseny)
         : leads;
     // Pri dvoch dopytoch z toho istého dňa rozhoduje, kedy naozaj prišli.
     return [...zaklad].sort((a, b) =>
       b.date.localeCompare(a.date) || String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
-  }, [leads, lenCakajuci, lenNevyriesene, menaKlientovAll]);
+    // objednaneVerzia(): maTermin číta OBJEDNANE, ktoré sa plní mimo Reactu
+    // až po stiahnutí kalendára — bez verzie filter ukazoval ľudí s termínom.
+  }, [leads, lenCakajuci, lenNevyriesene, menaKlientovAll, objednaneVerzia()]); // eslint-disable-line react-hooks/exhaustive-deps
   const [uzOzvane, setUzOzvane] = useState(false);
   const zoznamRef = useRef<HTMLDivElement>(null);
   const [rychleMeno, setRychleMeno] = useState("");
+  /**
+   * Preklik z notifikácie „úvodný bez dopytu — Jana Malinová".
+   *
+   * Doviedol na zoznam dopytov a meno si musel človek napísať sám — pritom ho
+   * appka v tej vete práve povedala. Predvyplní sa a pole dostane kurzor;
+   * zdroj zostáva na Jerrym, ten appka nevie (revízia 18. 8. 2026).
+   */
+  const rychleRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (!focus?.client) return;
+    setRychleMeno(focus.client);
+    rychleRef.current?.focus();
+  }, [focus?.client, focus?.nonce]);
   const [rychlyZdroj, setRychlyZdroj] = useState("reklama");
   const [draft, setDraft] = useState<Partial<Lead>>({});
 
@@ -186,6 +200,9 @@ export function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Re
    * zmazaní (uloženie podľa `id` zmazaný riadok obnoví).
    */
   const [vratit, setVratit] = useState<{ predtym: Lead; co: string } | null>(null);
+  // Zlyhaný zápis sa musí ukázať — saveLead pri chybe nehádže, vracia null,
+  // a save() ho dovtedy ignoroval: ✓ svietilo aj pri strate zmeny (20. 8. 2026).
+  const [chybaZapisu, setChybaZapisu] = useState("");
 
   const save = async (
     l: Partial<Lead> & { id?: string; remove?: boolean },
@@ -194,10 +211,17 @@ export function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Re
   ) => {
     setBusy(true);
     const predtym = l.id ? leads.find((x) => x.id === l.id) : undefined;
-    await saveLead(l);
+    const id = await saveLead(l);
     await refresh();
     setBusy(false);
+    if (id === null && !l.remove) {
+      setChybaZapisu(`Zmena${co ? ` (${co})` : ""} sa NEULOŽILA — skús znova.`);
+      setTimeout(() => setChybaZapisu(""), 8000);
+      return false;
+    }
+    setChybaZapisu("");
     if (predtym && co) setVratit({ predtym, co });
+    return true;
   };
 
   const vratSpat = async () => {
@@ -254,6 +278,9 @@ export function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Re
       {/* Pás na vrátenie. Drží sa dole nad okrajom obrazovky, aby bol vidieť
           aj vtedy, keď je zoznam odrolovaný — chyba sa najčastejšie zbadá
           hneď po nej, nie po návrate na vrch stránky. */}
+      {chybaZapisu && (
+        <div style={{ padding: "8px 12px", marginBottom: 10, borderRadius: 8, background: mix(C.red, 14), border: `1px solid ${mix(C.red, 45)}`, color: C.text, fontSize: 12.5 }}>{chybaZapisu}</div>
+      )}
       {vratit && (
         <div style={{
           position: "fixed", left: "50%", bottom: 22, transform: "translateX(-50%)", zIndex: 60,
@@ -293,6 +320,7 @@ export function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Re
             style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}
           >
             <input
+              ref={rychleRef}
               value={rychleMeno} onChange={(e) => setRychleMeno(e.target.value)} placeholder="Meno — kto sa ozval"
               style={{ ...S.select, width: 200, minWidth: 0 }}
             />
@@ -521,7 +549,7 @@ export function Dopyty({ leads, clients, refresh }: { leads: Lead[]; clients: Re
           </RolovaciaTabulka>
         )}
         <div style={{ fontSize: 11, color: C.textDim, marginTop: 10 }}>
-          Keď sa meno odporúčaného objaví medzi klientmi, v „Na čo sa pozrieť“ vyskočí pripomienka na 10 % zľavu pre toho, kto ho poslal.
+          Keď sa meno odporúčaného objaví medzi klientmi, vyskočí medzi Notifikáciami pripomienka na 10 % zľavu pre toho, kto ho poslal.
         </div>
       </Card>
 

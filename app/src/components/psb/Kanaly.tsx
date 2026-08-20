@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
+import { KANALY, marketingVerzia, type KanalRiadok } from "../../lib/psb/marketing";
+
 import { monthLabel } from "../../lib/psb/format";
 import { kontrolaKanalov } from "../../lib/psb/kontrolaDat";
 import { statistiky, type Druh } from "../../lib/psb/mesiac";
@@ -22,7 +24,9 @@ import { Card, Empty, H3, Info, RolovaciaTabulka, Select, TableWrap, ValueBars }
 // a zmena oproti minulému mesiacu, presne ako v zostave. Kým sa nič nenahrá,
 // obrazovka povie, čo treba spraviť — nepredstiera, že dáta má.
 
-export type KanalRiadok = { mesiac: string; kanal: string; metrika: string; hodnota: number; zmena: number | null; poznamka: string };
+// Typ žije v sklade (marketing.ts) — tu sa len re-exportuje, aby existujúce
+// importy z DashGrafy/MesiacProfil fungovali ďalej.
+export type { KanalRiadok } from "../../lib/psb/marketing";
 
 const cislo = (n: number) =>
   Number.isInteger(n) ? n.toLocaleString("cs-CZ") : n.toLocaleString("cs-CZ", { maximumFractionDigits: 2 });
@@ -44,7 +48,7 @@ const farbaZmeny = (z: number | null) => (z == null ? C.textDim : z > 1 ? C.gree
 const TREND_METRIKY: { id: string; label: string; kanal: string; metrika: string; druh: Druh; jednotka?: string; popis: string }[] = [
   { id: "sled", label: "Sledovatelia IG", kanal: "Instagram", metrika: "Followers", druh: "stav",
     popis: "Štatistiky sú z mesačných PRÍRASTKOV, nie z úrovne — počet sledovateľov len rastie a jeho priemer by hovoril len o tom, kedy sa meralo." },
-  { id: "views", label: "Videnia IG", kanal: "Instagram", metrika: "Views", druh: "tok",
+  { id: "views", label: "Prehratia IG", kanal: "Instagram", metrika: "Views", druh: "tok",
     popis: "Koľkokrát niekto videl obsah za mesiac. Skáče podľa toho, či nejaký reel chytil algoritmus — a podľa toho, koľko sa doplatilo za dosah." },
   { id: "reel", label: "Ø dosah reelu", kanal: "Instagram", metrika: "Avg reach per reel", druh: "tok",
     popis: "Výrobná kvalita: nezávisí od počtu publikovaní, len od toho, či obsah funguje." },
@@ -59,20 +63,17 @@ export function Kanaly({ data, clients, chat }: { data: PSBData; clients: Record
   // Výdavok z Meta API — druhý nezávislý zdroj toho istého čísla ako v zostave.
   const [vydavok, setVydavok] = useState<{ mesiac: string; spend: number }[]>([]);
   const [kontrolaOtvorena, setKontrolaOtvorena] = useState(false);
-  const [riadky, setRiadky] = useState<KanalRiadok[]>([]);
+  // Riadky sú zo skladu KANALY, ktorý plní App.tsx pri štarte — nie vlastný
+  // fetch. `marketingVerzia()` v deps: sklad sa plní mimo Reactu.
+  const riadky = useMemo(() => KANALY, [marketingVerzia()]); // eslint-disable-line react-hooks/exhaustive-deps
   const [mesiac, setMesiac] = useState("");
-  const [nacitava, setNacitava] = useState(true);
+  useEffect(() => { if (riadky.length && !mesiac) setMesiac(riadky[0].mesiac); }, [riadky, mesiac]);
+  // „Načítavam" = sklad je ešte prázdny a App.tsx fetch nedobehol. Keď dobehne
+  // a je naozaj prázdny, zobrazí sa stav „nič nenahraté" nižšie, nie večné
+  // načítavanie — preto sa verzia skladu berie ako signál dokončenia.
+  const nacitava = riadky.length === 0 && marketingVerzia() === 0;
 
   useEffect(() => {
-    void fetch("/api/marketing", { credentials: "same-origin" })
-      .then((r) => r.json())
-      .then((j: { kanaly?: KanalRiadok[] }) => {
-        const k = j.kanaly || [];
-        setRiadky(k);
-        if (k.length) setMesiac(k[0].mesiac);
-        setNacitava(false);
-      })
-      .catch(() => setNacitava(false));
     void fetch("/api/meta", { credentials: "same-origin" })
       .then((r) => r.json())
       .then((j: { kampane?: { mesiac: string; spend: number }[] }) => setVydavok(j.kampane || []))
@@ -258,8 +259,8 @@ export function Kanaly({ data, clients, chat }: { data: PSBData; clients: Record
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, margin: "12px 0" }}>
         {igSled != null && stat("Sledovatelia IG", `${cislo(igSled)}${igPrir != null ? ` (${igPrir >= 0 ? "+" : ""}${cislo(igPrir)})` : ""}`,
           "Koľko ľudí odoberá váš Instagram; v zátvorke prírastok za mesiac. Rastie pomaly a to je v poriadku — dôležitejšie je, KTO to je, než koľko ich je.", C.accentLight)}
-        {igViews != null && stat("Videnia IG", cislo(igViews),
-          "Koľkokrát niekto videl váš obsah za mesiac (všetky formáty spolu). Skáče podľa toho, či niektorý reel chytil algoritmus — jeden mesiac nič neznamená, trend áno.")}
+        {igViews != null && stat("Prehratia IG", cislo(igViews),
+          "Metrika Views: koľkokrát niekto váš obsah SKUTOČNE videl (všetky formáty spolu). Nie je to to isté ako Zobrazenia v tabuľke nižšie — tie hovoria, koľkokrát sa obsah objavil vo feede, aj keď sa naň nikto nepozrel, a bývajú rádovo iné. Skáče podľa toho, či niektorý reel chytil algoritmus; jeden mesiac nič neznamená, trend áno.")}
         {igReel != null && stat("Ø dosah reelu", cislo(igReel),
           "Koľko ľudí v priemere zasiahne jeden reel. Toto je vaša „výrobná kvalita\u201d — nezávisí od počtu publikovaní, len od toho, či obsah funguje.")}
         {(igSaved != null || igShares != null) && stat("Uloženia + zdieľania", cislo((igSaved || 0) + (igShares || 0)),
@@ -310,7 +311,7 @@ export function Kanaly({ data, clients, chat }: { data: PSBData; clients: Record
       <div style={{ fontSize: 12, color: C.textMuted, fontWeight: 600, margin: "16px 0 6px" }}>
         <Info
           label="Všetky siete vedľa seba"
-          text="Štyri metriky, ktoré má každá sieť, za vybraný mesiac. Zoradené podľa videní — a práve preto to tu je: Facebook máva viac impresií než Instagram a z ôsmich čísel hore sa to nedalo zistiť. „Podiel“ hovorí, koľko z celkového dosahu sietí pripadá na tú jednu; „zmena“ je oproti predošlému nahratému mesiacu. Vynechaná je reklama a konkurencia (nepublikuje sa v nich) aj web s Google Business — tie majú vlastné záložky Vyhľadávanie a Web, kde je o nich podstatne viac."
+          text="Štyri metriky, ktoré má každá sieť, za vybraný mesiac. Zoradené podľa zobrazení — a práve preto to tu je: Facebook máva viac impresií než Instagram a z ôsmich čísel hore sa to nedalo zistiť. „Podiel“ hovorí, koľko zo VŠETKÝCH ZOBRAZENÍ (impressions) pripadá na tú jednu sieť — nie z dosahu, ten meria iná metrika; „zmena“ je oproti predošlému nahratému mesiacu. Vynechaná je reklama a konkurencia (nepublikuje sa v nich) aj web s Google Business — tie majú vlastné záložky Vyhľadávanie a Web, kde je o nich podstatne viac."
         />
       </div>
       {porovnanie.riadky.length === 0 ? (
@@ -320,8 +321,17 @@ export function Kanaly({ data, clients, chat }: { data: PSBData; clients: Record
           <thead>
             <tr>
               <th style={{ ...S.th, textAlign: "left" }}>Kanál</th>
-              <th style={{ ...S.th, textAlign: "right" }}>Videnia</th>
-              <th style={{ ...S.th, textAlign: "right" }}>Podiel</th>
+              <th style={{ ...S.th, textAlign: "right" }}>
+                <Info
+                  text="Impressions — koľkokrát sa obsah ZOBRAZIL vo feede, aj keď sa naň nikto nepozrel. Dlaždica Prehratia IG hore meria niečo iné (metrika Views: skutočné videnia) a čísla sa preto rádovo líšia. Do 18. 8. 2026 sa oboje volalo Videnia a vyzeralo to ako rozpor v appke."
+                  label="Zobrazenia"
+                />
+              </th>
+              {/* Menovateľ podielu priamo v hlavičke — čitateľ je vedľa v riadku,
+                  súčet stĺpca bol jediné, čo sa nedalo overiť očami. */}
+              <th style={{ ...S.th, textAlign: "right" }} title={`Podiel zo všetkých ${cislo(porovnanie.spolu)} zobrazení v tabuľke`}>
+                Podiel{porovnanie.spolu ? <span style={{ fontWeight: 400, color: C.textDim }}> ÷ {cislo(porovnanie.spolu)}</span> : null}
+              </th>
               <th style={{ ...S.th, textAlign: "right" }}>Zmena</th>
               <th style={{ ...S.th, textAlign: "right" }}>Sledovatelia</th>
               <th style={{ ...S.th, textAlign: "right" }}>Interakcie</th>

@@ -53,8 +53,15 @@ export function Dennik({ meno, limit = 4, onNovyZapis }: {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ klient: meno, bolest: hodnota }),
     }).then((r) => r.json()).catch(() => ({ ok: false }));
-    if (j.ok) nacitajMerania(meno);
+    if (j.ok) { nacitajMerania(meno); return; }
+    // Zvýraznené číslo bez zápisu je presne tá lož, kvôli ktorej Jerry celý
+    // večer vypisoval dôvody do prázdna (precoNeprisiel, 13. 8.). Tlačidlo
+    // sa vráti a chyba sa povie.
+    setBolest(null);
+    setChybaMerania(String((j as { error?: string }).error || "Meranie sa nezapísalo — skús znova."));
   };
+  const [chybaMerania, setChybaMerania] = useState<string | null>(null);
+  const [chybaZapisu, setChybaZapisu] = useState<string | null>(null);
 
   const nacitaj = (m: string) => {
     void fetch(`/api/client-notes?name=${encodeURIComponent(m)}`, { credentials: "same-origin" })
@@ -68,14 +75,19 @@ export function Dennik({ meno, limit = 4, onNovyZapis }: {
     const t = text.trim();
     if (!t || busy) return;
     setBusy(true);
+    setChybaZapisu(null);
     void fetch("/api/client-notes", {
       method: "POST", credentials: "same-origin",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ name: meno, note: t }),
     })
       .then((r) => r.json())
-      .then((j: { ok?: boolean }) => {
-        if (!j.ok) return;
+      .then((j: { ok?: boolean; error?: string }) => {
+        // Ticho zlyhávajúci zápis je horší než hlasitá chyba: do 19. 8. 2026
+        // sa pri ok:false (typicky vypršaná relácia) nič nepovedalo — tlačidlo
+        // sa odblokovalo, text zostal v poli a vyzeralo to ako uložené.
+        // Merania o pár riadkov vyššie to mali správne, zápis nie.
+        if (!j.ok) { setChybaZapisu(String(j.error || "Zápis sa neuložil — skús znova (možno vypršalo prihlásenie).")); return; }
         setText("");
         nacitaj(meno);
         // Jarvis číta zápis na pozadí — „Dan ide na operáciu, o 2 týždne sa
@@ -88,6 +100,7 @@ export function Dennik({ meno, limit = 4, onNovyZapis }: {
             .catch(() => setJarvisOznam(""));
         }
       })
+      .catch(() => setChybaZapisu("Zápis sa neuložil — server neodpovedal."))
       .finally(() => setBusy(false));
   };
 
@@ -110,6 +123,9 @@ export function Dennik({ meno, limit = 4, onNovyZapis }: {
           Pridať
         </button>
       </div>
+      {chybaZapisu && (
+        <div style={{ fontSize: 11.5, color: C.red, marginTop: 6 }}>{chybaZapisu}</div>
+      )}
 
       {/*
         Bolesť 0–10. Jedenásť čísel na klik, žiadne písanie — inak sa to
@@ -122,7 +138,7 @@ export function Dennik({ meno, limit = 4, onNovyZapis }: {
         {Array.from({ length: 11 }, (_, i) => (
           <button
             key={i}
-            onClick={() => void ulozMeranie(i)}
+            onClick={() => { setChybaMerania(null); void ulozMeranie(i); }}
             title={i === 0 ? "žiadna bolesť" : i === 10 ? "najhoršia predstaviteľná" : ""}
             style={{
               width: 24, height: 24, borderRadius: 6, fontSize: 11.5, cursor: "pointer", fontFamily: "inherit",
@@ -135,6 +151,10 @@ export function Dennik({ meno, limit = 4, onNovyZapis }: {
           </button>
         ))}
       </div>
+
+      {chybaMerania && (
+        <div style={{ fontSize: 11.5, color: C.red, marginTop: 6 }}>{chybaMerania}</div>
+      )}
 
       {merania.length > 0 && (
         <div style={{ fontSize: 11.5, color: C.textMuted, marginTop: 6 }}>

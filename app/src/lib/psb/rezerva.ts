@@ -1,4 +1,4 @@
-import { pnlCalc, poslednyMesiacSDatami, salaryCalc, VZAS_MONTHS } from "./vzas";
+import { breakEvenRad, poslednyMesiacSDatami, VZAS_MONTHS } from "./vzas";
 
 /**
  * Rezerva — koľko mesiacov firma ustojí bez jedinej tržby.
@@ -14,26 +14,40 @@ import { pnlCalc, poslednyMesiacSDatami, salaryCalc, VZAS_MONTHS } from "./vzas"
  * Preto sa počíta tu a obe strany si berú to isté číslo.
  */
 
+/**
+ * Posledný UZAVRETÝ mesiac, o ktorom appka niečo vie.
+ *
+ * Nie posledný s dátami: bežiaci mesiac má tržby priebežne a náklady až
+ * s Fio, takže by z neho vyšiel nezmysel (tržba prezlečená za zisk).
+ * Bežiaci mesiac sa preskočí; keby všetky dáta ležali v ňom (čerstvá
+ * inštalácia), vezme sa posledný s dátami ako núdza.
+ *
+ * Revízia 18. 8. 2026: túto slučku mali Dashboard, DashGrafy aj rezerva
+ * každý vo vlastnej kópii — teraz je tu a všetci ju volajú.
+ */
+export function poslednyUzavretyIdx(): number {
+  let i = poslednyMesiacSDatami();
+  const beziaci = new Date().toISOString().slice(0, 7);
+  while (i > 0 && (VZAS_MONTHS[i] as string) >= beziaci) i--;
+  if ((VZAS_MONTHS[i] as string) >= beziaci) i = poslednyMesiacSDatami();
+  return i;
+}
+
+// Samotný vzorec žije vo vzas.ts (computeKpis ho potrebuje tiež a vzas.ts
+// nemôže importovať odtiaľto — bol by to kruh). Tu sa len re-exportuje,
+// aby komponenty mali jedno miesto pre všetko okolo break-evenu.
+export { breakEvenRad } from "./vzas";
+
 /** Priemerný break-even za posledných 6 UZAVRETÝCH mesiacov. */
 export function breakEvenPriemer(): { be: number | null; bePriem: number | null; mesiac: string | null } {
   try {
-    const p = pnlCalc();
-    // Posledný uzavretý mesiac, nie posledný s dátami — bežiaci mesiac má
-    // tržby priebežne a náklady až s Fio, takže by z neho vyšiel nezmysel.
-    let i = poslednyMesiacSDatami();
-    const beziaci = new Date().toISOString().slice(0, 7);
-    while (i > 0 && (VZAS_MONTHS[i] as string) >= beziaci) i--;
-    if ((VZAS_MONTHS[i] as string) >= beziaci) i = poslednyMesiacSDatami();
-    const j = salaryCalc("jerry");
-    const t = salaryCalc("terezka");
-    // Break-even ráta s NÁROKOM trénerov, nie s tým, čo si reálne vzali —
-    // čo si niekto vezme navyše, je pôžička, nie náklad.
-    const beZa = (k: number) => p.bezVyplat[k] + j.narok[k] + t.narok[k] + p.matyas[k];
+    const rad = breakEvenRad();
+    const i = poslednyUzavretyIdx();
     const od = Math.max(0, i - 5);
     const idx = Array.from({ length: i - od + 1 }, (_, k) => od + k);
     return {
-      be: beZa(i),
-      bePriem: idx.reduce((a, k) => a + beZa(k), 0) / idx.length,
+      be: rad[i],
+      bePriem: idx.reduce((a, k) => a + rad[k], 0) / idx.length,
       mesiac: (VZAS_MONTHS[i] as string) || null,
     };
   } catch {
@@ -73,4 +87,27 @@ export function spocitajRezervu(v: RezervaVstup): Rezerva {
     bePriem: v.bePriem,
     datumStavu: v.stavPenazi?.datum || null,
   };
+}
+
+/**
+ * Cieľ rezervy v mesiacoch. Jedno miesto — dlaždica, Jarvis aj karta
+ * v Peniazoch hovoria o tom istom čísle.
+ */
+export const CIEL_MESIACOV = 3;
+
+/**
+ * Koľko korún chýba do cieľa.
+ *
+ * 18. 8. 2026 sa Jerry spýtal na rezervu dvakrát a dostal dve rôzne čísla:
+ * najprv „chýba ti zhruba 113 500 Kč", o hodinu „313 700 Kč". Vstupy boli
+ * rovnaké a správne je to druhé (3 × 178 522 − 221 858 = 313 708) — model
+ * si ten rozdiel počítal v hlave a raz sa pomýlil. Odteraz ho dostane
+ * spočítaný a už len prečíta.
+ *
+ * Keď je rezerva nad cieľom, vráti 0 — nie záporné číslo, ktoré by sa dalo
+ * prečítať ako dlh.
+ */
+export function chybaDoCiela(r: Pick<Rezerva, "majetok" | "bePriem">): number | null {
+  if (r.majetok === null || r.bePriem === null || r.bePriem <= 0) return null;
+  return Math.max(0, Math.round(CIEL_MESIACOV * r.bePriem - r.majetok));
 }

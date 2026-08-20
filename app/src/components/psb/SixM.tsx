@@ -11,6 +11,14 @@ const phaseTone = (p: string) => (p === "Obnova" ? "green" : p === "Integrácia"
 export function SixMTracker({ sixM, actions, trainer, onTrainer }: { sixM: SixMRow[]; actions: Actions; trainer: string; onTrainer: (t: string) => void }) {
   const [noteFor, setNoteFor] = useState<string | null>(null);
   const setTrainer = onTrainer;
+  /**
+   * Klik na kartu fázy filtruje tabuľku nižšie na TÝCH ľudí. Do 19. 8. 2026
+   * boli štyri karty len čísla nad tabuľkou všetkých — kto chcel vidieť, kto
+   * presne je v Integrácii, musel si ich vyhľadať stĺpcom. Druhý klik filter
+   * zruší. Počty na kartách sa NEMENIA podľa filtra fázy (zostávajú za celý
+   * výber trénera), inak by karta po kliku ukazovala samu seba.
+   */
+  const [faza, setFaza] = useState<string | null>(null);
 
   const shown = useMemo(() => (trainer === "all" ? sixM : sixM.filter((c) => c.primaryTrainer === trainer)), [sixM, trainer]);
 
@@ -54,10 +62,16 @@ export function SixMTracker({ sixM, actions, trainer, onTrainer }: { sixM: SixMR
         ))}
       </div>
       <StatGrid>
-        <StatCard value={byPhase.Obnova} label="Obnova (1–6 mes.)" color={C.green} />
-        <StatCard value={byPhase.Integrácia} label="Integrácia (7–18)" color={C.orange} />
-        <StatCard value={byPhase.Udržateľnosť} label="Udržateľnosť (19+)" color={C.bark} />
-        <StatCard value={shown.length} label="Celkom 6M klientov" />
+        {([["Obnova", "Obnova (1–6 mes.)", C.green], ["Integrácia", "Integrácia (7–18)", C.orange], ["Udržateľnosť", "Udržateľnosť (19+)", C.bark]] as const).map(([id, label, farba]) => (
+          <div key={id} onClick={() => setFaza(faza === id ? null : id)}
+            title={faza === id ? "Zrušiť filter fázy" : `Ukázať v tabuľke len ${label}`}
+            style={{ cursor: "pointer", borderRadius: 10, outline: faza === id ? `2px solid ${farba}` : "none" }}>
+            <StatCard value={byPhase[id]} label={`${label}${faza === id ? " ▾" : ""}`} color={farba} />
+          </div>
+        ))}
+        <div onClick={() => setFaza(null)} style={{ cursor: faza ? "pointer" : "default" }} title={faza ? "Zrušiť filter fázy" : undefined}>
+          <StatCard value={shown.length} label="Celkom 6M klientov" />
+        </div>
       </StatGrid>
 
       <Card>
@@ -106,7 +120,7 @@ export function SixMTracker({ sixM, actions, trainer, onTrainer }: { sixM: SixMR
             </tr>
           </thead>
           <tbody>
-            {shown.map((c) => (
+            {shown.filter((c) => !faza || c.phase === faza).map((c) => (
               <tr key={c.client} style={{ background: c.alertTone === "red" ? C.redBg : c.alertTone === "orange" ? C.orangeBg : undefined }}>
                 <td style={{ ...S.td, fontWeight: 500 }}>{c.client}</td>
                 <td style={S.td}>{c.primaryTrainer}</td>

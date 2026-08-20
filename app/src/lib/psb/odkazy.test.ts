@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { CIELE, jePlatnyCiel, jeVonkajsiOdkaz, naPlnuAdresu } from "./odkazy";
+import { CIELE, adresaStranky, jePlatnyCiel, jeVonkajsiOdkaz, naPlnuAdresu } from "./odkazy";
 
 describe("jeVonkajsiOdkaz", () => {
   it("pozná adresu článku aj príspevku", () => {
@@ -69,5 +69,29 @@ describe("naPlnuAdresu", () => {
     for (const x of ["niečo.sk", "napr.", "6M", "CTR 0,3 %", "sedenia.cz"]) {
       expect(naPlnuAdresu(x)).toBeNull();
     }
+  });
+});
+
+describe("adresaStranky", () => {
+  it("celú adresu nechá tak, ako je", () => {
+    expect(adresaStranky("https://www.prosapiens.cz/fascie/")).toBe("https://www.prosapiens.cz/fascie/");
+  });
+
+  it("z holej cesty spraví adresu — tak ju drží karta o rýchlosti", () => {
+    // Tam sa doména odsekáva, aby sa tabuľka zmestila: „arm-lines/".
+    expect(adresaStranky("arm-lines/")).toBe("https://www.prosapiens.cz/arm-lines/");
+    expect(adresaStranky("/blog/")).toBe("https://www.prosapiens.cz/blog/");
+  });
+
+  it("doplní schému, keď chýba", () => {
+    expect(adresaStranky("www.prosapiens.cz/vysledky/")).toBe("https://www.prosapiens.cz/vysledky/");
+  });
+
+  it("z cudzej adresy nerobí našu podstránku", () => {
+    // Inak by odkaz viedol na prosapiens.cz/instagram.com/... — teda nikam.
+    expect(adresaStranky("instagram.com/p/DYEYoOujO9w/")).toBe("https://instagram.com/p/DYEYoOujO9w/");
+    expect(adresaStranky("example.com/x")).toBeNull();
+    expect(adresaStranky("javascript:alert(1)")).toBeNull();
+    expect(adresaStranky("")).toBeNull();
   });
 });

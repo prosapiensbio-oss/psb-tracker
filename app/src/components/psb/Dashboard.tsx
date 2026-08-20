@@ -18,14 +18,20 @@ import { objednaneVerzia,
   PRAH_ZASTARANIA,
   patriTrenerovi,
   odmlcaniKlienti,
+  trenerZOdpovede,
+  vytazenieSpolu,
+  znieAkoZrusenie,
   DOVODY_ODCHODU,
+  pocetUvodnych,
 } from "../../lib/psb/compute";
-import { fmtCZK, fmtDMY, monthLabel, weekKey, weekLabel } from "../../lib/psb/format";
+import { fmtCZK, fmtDMY, monthLabel, normName, weekKey, weekLabel } from "../../lib/psb/format";
 import { C, mix, S, badge, btn } from "../../lib/psb/theme";
 import { Balicky, odtrenovaneMimoExportu, type KalUdalost } from "./Kalendar";
+import { jeKlient } from "./MarketingLievik";
 import { nastavPrijmyZTrackera, pnlCalc, poslednyMesiacSDatami, salaryCalc, vzasVerzia, VZAS_MONTHS } from "../../lib/psb/vzas";
+import { breakEvenPriemer, poslednyUzavretyIdx } from "../../lib/psb/rezerva";
 import { fetchBtcReserve, fetchVzasSettings } from "../../lib/psb/client";
-import { spocitajRezervu } from "../../lib/psb/rezerva";
+import { CIEL_MESIACOV, chybaDoCiela, spocitajRezervu } from "../../lib/psb/rezerva";
 import { PrehladPanel, useZmenyOdMinule, type Pristroj, type Zmena } from "./Prehlad";
 import {
   centerBody, GrafyKniznica, HLAVNE, hraniceObdobia, MiniStat, OBDOBIA_DASH, SEKCIE, useExtraGrafy, VYCHODZIE, WIDGETS,
@@ -239,14 +245,28 @@ function useDashLayout() {
     persistOrder(next);
   };
   const toggleHide = (id: string) => {
-    const next = hidden.includes(id) ? hidden.filter((x) => x !== id) : [...hidden, id];
-    persistHidden(next);
-    // Zapnuté karty držia poradie pred vypnutými (Jerry, 10. 8.: „keď dám
-    // usporiadať, nech sú tie zobrazené navrchu a pod nimi všetky ostatné").
-    // Zoraďuje sa v ULOŽENOM poradí, nie až pri kreslení: keby sa poradie
-    // zobrazovalo inak, než je uložené, šípky ↑ ↓ by hýbali niečím iným, než
-    // čo je pod nimi vidieť.
-    persistOrder(zoradPodlaZobrazenia(order, next));
+    // Funkčná forma, nie `hidden` z closure: dva kliky v knižnici rýchlo za
+    // sebou (zapnúť A, hneď zapnúť B) vychádzali oba zo starého zoznamu a
+    // druhý prvý prepísal — A sa na obrazovke ukázala, ale v localStorage
+    // zostala skrytá a po reloade zmizla (revízia 19. 8. 2026, overené
+    // naživo). `persistHidden` túto formu berie presne kvôli tomu; toggleHide
+    // ju len nepoužíval.
+    setHidden((prev) => {
+      const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
+      try { localStorage.setItem(HIDDEN_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+      // Zapnuté karty držia poradie pred vypnutými (Jerry, 10. 8.: „keď dám
+      // usporiadať, nech sú tie zobrazené navrchu a pod nimi všetky ostatné").
+      // Zoraďuje sa v ULOŽENOM poradí, nie až pri kreslení: keby sa poradie
+      // zobrazovalo inak, než je uložené, šípky ↑ ↓ by hýbali niečím iným, než
+      // čo je pod nimi vidieť. Poradie sa odvodí z TOHO ISTÉHO `next` —
+      // v jednom updateri, aby sa ani ono nedalo predbehnúť.
+      setOrder((prevOrder) => {
+        const o = zoradPodlaZobrazenia(prevOrder, next);
+        try { localStorage.setItem(ORDER_KEY, JSON.stringify(o)); } catch { /* ignore */ }
+        return o;
+      });
+      return next;
+    });
   };
   /** Zapnúť/vypnúť celú sekciu naraz — z knižnice grafov. */
   const sekciaVsetko = (sekcia: SekciaId, zapnut: boolean) => {
@@ -409,6 +429,7 @@ export function Dashboard({
   data,
   clients,
   register: registerVsetky,
+  kalZmeny = [],
   sixM,
   capacity,
   actions,
@@ -422,6 +443,8 @@ export function Dashboard({
   data: PSBData;
   clients: Record<string, ClientAgg>;
   register: RegisterItem[];
+  /** Zmeny v kalendári — ručne zapísané zrušenia majú vetovať aj odmlčaných. */
+  kalZmeny?: { druh: string; klient: string | null; pred?: string | null; po?: string | null }[];
   sixM: SixMRow[];
   capacity: CapacityRow[];
   actions: Actions;
@@ -564,19 +587,13 @@ export function Dashboard({
     // Rovnaká rodina chýb ako kotva dát: mesiac s dátami ešte nie je mesiac
     // hotový. Bežiaci mesiac sa preskočí; keby náhodou VŠETKY dáta ležali
     // v ňom (čerstvá inštalácia), vezme sa posledný s dátami ako núdza.
-    let i = poslednyMesiacSDatami();
-    const beziaciMk = new Date().toISOString().slice(0, 7);
-    while (i > 0 && (VZAS_MONTHS[i] as string) >= beziaciMk) i--;
-    if ((VZAS_MONTHS[i] as string) >= beziaciMk) i = poslednyMesiacSDatami();
-    const j = salaryCalc("jerry");
-    const t = salaryCalc("terezka");
-    // Break-even ráta s NÁROKOM trénerov, nie s tým, čo si reálne vzali — čo si
-    // niekto vezme navyše, je pôžička, nie náklad.
-    const beZa = (k: number) => p.bezVyplat[k] + j.narok[k] + t.narok[k] + p.matyas[k];
-    const be = beZa(i);
-    const od6 = Math.max(0, i - 5);
-    const idx6 = Array.from({ length: i - od6 + 1 }, (_, k) => od6 + k);
-    const bePriem = idx6.reduce((a, k) => a + beZa(k), 0) / idx6.length;
+    // Kotva aj vzorec sú v lib/psb/rezerva.ts — jedna definícia pre dlaždicu,
+    // grafy, HealthCard aj Jarvisa (do 18. 8. štyri kópie).
+    const i = poslednyUzavretyIdx();
+    const { be, bePriem } = (() => {
+      const b = breakEvenPriemer();
+      return { be: b.be ?? 0, bePriem: b.bePriem ?? 0 };
+    })();
     const od = Math.max(0, i - 11);
     return {
       mesiac: VZAS_MONTHS[i] as string,
@@ -617,8 +634,13 @@ export function Dashboard({
     const mes = kotva.plny || new Date().toISOString().slice(0, 7);
     const zaMesiac = (mk: string) => {
       const dopyty = (data.leads || []).filter((l) => (l.date || "").slice(0, 7) === mk);
-      const uvodne = new Set(data.sessions.filter((s) => s.sessionType === "UVODNE" && s.date.slice(0, 7) === mk).map((s) => s.client)).size;
-      const novi = Object.values(clients).filter((c) => (c.firstSession || "").slice(0, 7) === mk).length;
+      const uvodne = pocetUvodnych(data.sessions.filter((s) => s.date.slice(0, 7) === mk));
+      // Nový klient = tá istá definícia ako v lieviku (prišiel znova alebo
+      // kúpil nad úvodný), bez vrátených. „Prvé sedenie v mesiaci" počítalo
+      // aj ľudí, čo prišli raz na úvodný a zmizli — dvojica „12 dopytov ·
+      // 14 nových" sa potom čítala ako konverzia 117 % (revízia 18. 8. 2026).
+      const novi = Object.values(clients).filter((c) =>
+        (c.firstSession || "").slice(0, 7) === mk && !c.vratenie && jeKlient(c, data.payments)).length;
       return { dopyty, uvodne, novi };
     };
     const u = zaMesiac(mes);
@@ -883,13 +905,19 @@ export function Dashboard({
     // vedľa hovorila „netreba, príde v pondelok". Jedna otázka, jedna karta.
     // Definícia je v compute.ts — tú istú používa Jarvisov kontext. Kým žila
     // len tu, dlaždica hlásila 3 a Jarvis na tú istú otázku 9.
-    const ohrozeni = odmlcaniKlienti(clients, kalendar, { trener: (t) => matchT(t || "") });
-    const podiel = stats.active > 0 ? (ohrozeni.length / stats.active) * 100 : 0;
+    const ohrozeni = odmlcaniKlienti(clients, kalendar, { trener: (t) => matchT(t || ""), zmeny: kalZmeny });
+    // Menovateľ = TÁ ISTÁ skupina, z ktorej sa dá odmlčať: aktívni so
+    // segmentom Anchor/Stabilný u zvoleného trénera. Predtým sa delilo
+    // všetkými okrem neaktívnych (aj Pauza, aj Sporadickí) — percento bolo
+    // systematicky nižšie a prahy 15/25 % sa nedali dosiahnuť.
+    const zaklad = Object.values(clients).filter((c) =>
+      c.status === "Aktívny" && (c.segment === "Anchor" || c.segment === "Stabilný") && matchT(c.primaryTrainer || "")).length;
+    const podiel = zaklad > 0 ? (ohrozeni.length / zaklad) * 100 : 0;
     varovne.push({
       id: "ohrozeni",
       label: "Odmlčaní",
       hodnota: String(ohrozeni.length),
-      podnadpis: ohrozeni.length ? `${podiel.toFixed(0)} % aktívnych · 14+ dní` : "nikto sa neodmlčal",
+      podnadpis: ohrozeni.length ? `${podiel.toFixed(0)} % stálych · 14+ dní` : "nikto sa neodmlčal",
       pasmo: !ohrozeni.length ? "ok" : podiel > 25 ? "zle" : podiel > 15 ? "pozor" : "ok",
       poznamka: ohrozeni.length ? ohrozeni.slice(0, 2).map((c) => c.meno.split(" ")[0]).join(", ") + (ohrozeni.length > 2 ? ` +${ohrozeni.length - 2}` : "") : undefined,
       dobreHore: false,
@@ -915,10 +943,14 @@ export function Dashboard({
       id: "dopyty",
       label: "Dopyty",
       hodnota: String(lievikMes.dopyty),
-      podnadpis: `${monthLabel(lievikMes.mes)} · ${lievikMes.novi} nových`,
+      // „nových KLIENTOV", nie „z nich": noví nie sú podmnožina dopytov —
+      // referencia bez zapísaného dopytu je nový klient s nulou v dopytoch.
+      // Revízia 19. 8.: 02/2026 malo 2 dopyty a 4 nových a čítalo sa to ako
+      // 200 % konverzia.
+      podnadpis: `${monthLabel(lievikMes.mes)} · ${lievikMes.novi} nových klientov`,
       pasmo: priemDopyty === null ? "nevie" : lievikMes.dopyty < priemDopyty * 0.5 ? "zle" : lievikMes.dopyty < priemDopyty * 0.8 ? "pozor" : "ok",
       poznamka: priemDopyty === null ? undefined : `Ø ${priemDopyty.toFixed(1)} / mes.`,
-      vysvetlenie: "Nové dopyty za posledný uzavretý mesiac a koľko z nich sa stalo klientmi. Dopyty predbiehajú tržby o dva až tri mesiace — keď klesnú, na peniazoch to ešte nevidno, ale už je rozhodnuté.",
+      vysvetlenie: "Nové dopyty za posledný uzavretý mesiac a vedľa toho počet nových klientov toho istého mesiaca — POZOR, nie je to podmnožina dopytov: klient z referencie často žiadny zapísaný dopyt nemá, takže nových môže byť viac než dopytov. Dopyty predbiehajú tržby o dva až tri mesiace — keď klesnú, na peniazoch to ešte nevidno, ale už je rozhodnuté.",
       seria: dopytyRad,
       kam: () => onNavigate("marketing", "lievik"),
     });
@@ -939,6 +971,7 @@ export function Dashboard({
     const r = spocitajRezervu({ btcCzk: btc?.czk ?? null, stavPenazi, bePriem: zisk?.bePriem ?? null });
     const majetok = r.majetok;
     const mesRez = r.mesiace;
+    const chyba = chybaDoCiela(r);
     varovne.push({
       id: "rezerva",
       label: "Rezerva",
@@ -947,7 +980,11 @@ export function Dashboard({
         : stavPenazi ? `${fmtCZK(majetok)} — účet, hotovosť aj BTC`
         : `${fmtCZK(majetok)} — zatiaľ len BTC`,
       pasmo: mesRez === null ? "nevie" : mesRez < 1 ? "zle" : mesRez < 3 ? "pozor" : "ok",
-      poznamka: mesRez !== null && mesRez < 3 ? "cieľ sú 3 mesiace" : undefined,
+      // Číslo bez akcie je len číslo: „1,2 mesiaca" nepovie, čo s tým.
+      // Koruny do cieľa áno — a sú spočítané tu, nie v hlave (rezerva.ts).
+      poznamka: mesRez !== null && mesRez < CIEL_MESIACOV
+        ? (chyba === null ? `cieľ sú ${CIEL_MESIACOV} mesiace` : `do ${CIEL_MESIACOV} mesiacov chýba ${fmtCZK(chyba)}`)
+        : undefined,
       vysvetlenie: "Koľko mesiacov by firma ustála bez jedinej tržby — všetko, čo má (účet + hotovosť + bitcoin), delené priemerným break-evenom za pol roka. Stav účtu a hotovosti sa zapisuje ručne v Peniaze → Cashflow, karta „Kde tie peniaze sú“; Fio dáva len výpis pohybov, nie aktuálny zostatok. Kým zapísaný nie je, ráta sa len bitcoin a číslo je nižšie než skutočnosť. Tvoj cieľ „120 000 Kč+“ je v korunách; toto je to isté prepočítané na čas, čo je jediné, čo v zlom mesiaci rozhoduje.",
       kam: () => onNavigate("vzas", "cashflow"),
     });
@@ -1212,6 +1249,18 @@ export function Dashboard({
   // je objednané, a to je pravdivejšie než momentka z posledného exportu.
   // Platnosť ale kalendár nevie a končí nezávisle od hodín: klient s piatimi
   // hodinami a desiatimi dňami ich nestihne minúť a o tri príde. Preto tu.
+  /**
+   * Kedy naposledy dorazil report s balíčkami. Karta „Balíček dojde" tým
+   * datuje svoj potvrdený pohľad — číslo z účtovníctva bez dátumu nehovorí,
+   * či je z dnešného rána alebo spred dvoch týždňov.
+   */
+  const poslednyReportBalickov = useMemo(() => {
+    const r = (data.uploadLog || [])
+      .filter((u) => u.type === "packages")
+      .sort((a, b) => (b.date || "").localeCompare(a.date || ""))[0];
+    return r ? { date: r.date, filename: r.filename } : null;
+  }, [data.uploadLog]);
+
   const platnostKonci = useMemo(() => {
     const dnes = new Date().toISOString().slice(0, 10);
     const dni = (d: string) => Math.round((Date.parse(d) - Date.parse(dnes)) / 86400000);
@@ -1278,7 +1327,9 @@ export function Dashboard({
     zonaPct: zones.total ? Math.round((zones.zdrava / zones.total) * 100) : null,
     tyzdnov: zones.total,
     priemerH: weekStats ? weekStats.avg : null,
-    kapacitaPct: capacity.length ? Math.round(capacity.reduce((a, c) => a + c.util, 0) / capacity.length) : null,
+    // Jedna definícia pre celú appku (compute.ts). Priemer utilizácií dával
+    // iné číslo než karta Kapacita o kus nižšie a tretie u Jarvisa.
+    kapacitaPct: vytazenieSpolu(capacity),
     zvladneEste: capacity.length ? capacity.reduce((a, c) => a + c.canTake, 0) : null,
   }), [weeklyHours, zones, weekStats, capacity]);
   const extraNodes = useExtraGrafy({ data, clients, aktivne, onNavigate, kpiSkryte: layout.kpiSkryte, obdobie, vytazenie: vytazenieVstup });
@@ -1511,6 +1562,7 @@ export function Dashboard({
         sedenia={data.sessions}
         onObnov={actions.obnovKalendar}
         matchTrener={matchT}
+        poslednyReport={poslednyReportBalickov}
         style={{ marginBottom: 0, height: "100%" }}
         onKlient={(meno) => onNavigate("klienti", undefined, { client: meno, nonce: Date.now() })}
       >
@@ -1596,7 +1648,7 @@ export function Dashboard({
         <button onClick={() => setShowAcked(false)} style={{ background: "none", border: "none", color: C.accentLight, fontSize: 12, cursor: "pointer" }}>← Späť na aktívne</button>
       </div>
       {acked.length
-        ? acked.map((r) => <RegisterRow key={r.key} item={r} actions={actions} onNavigate={onNavigate} chat={assistantChat} />)
+        ? acked.map((r) => <RegisterRow key={r.key} item={r} actions={actions} onNavigate={onNavigate} chat={assistantChat} clients={clients} kalendar={kalendar} />)
         : <div style={{ fontSize: 12.5, color: C.textMuted }}>Žiadne skryté položky.</div>}
     </Card>
   ) : open.length === 0 ? (
@@ -1624,7 +1676,7 @@ export function Dashboard({
       </div>
 
       {kriticke.slice(0, VIDITELNYCH).map((r) => (
-        <RegisterRow key={r.key} item={r} actions={actions} onNavigate={onNavigate} chat={assistantChat} />
+        <RegisterRow key={r.key} item={r} actions={actions} onNavigate={onNavigate} chat={assistantChat} clients={clients} kalendar={kalendar} />
       ))}
       {kriticke.length > VIDITELNYCH && !registerExpanded && (
         <div style={{ fontSize: 11.5, color: C.orange, padding: "4px 2px" }}>
@@ -1639,7 +1691,7 @@ export function Dashboard({
       {(registerExpanded || kriticke.length === 0) && (
         <>
           {kriticke.slice(VIDITELNYCH).map((r) => (
-            <RegisterRow key={r.key} item={r} actions={actions} onNavigate={onNavigate} chat={assistantChat} />
+            <RegisterRow key={r.key} item={r} actions={actions} onNavigate={onNavigate} chat={assistantChat} clients={clients} kalendar={kalendar} />
           ))}
           {bezne.length > 0 && kriticke.length > 0 && (
             <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "12px 0 6px" }}>
@@ -1648,7 +1700,7 @@ export function Dashboard({
             </div>
           )}
           {bezne.map((r) => (
-            <RegisterRow key={r.key} item={r} actions={actions} onNavigate={onNavigate} chat={assistantChat} />
+            <RegisterRow key={r.key} item={r} actions={actions} onNavigate={onNavigate} chat={assistantChat} clients={clients} kalendar={kalendar} />
           ))}
         </>
       )}
@@ -1696,7 +1748,7 @@ export function Dashboard({
           background: kriticke.length ? C.red : C.accent,
           boxShadow: `0 0 8px ${kriticke.length ? C.red : C.accent}`,
         }} />
-        <span style={{ fontSize: 13.5, fontWeight: 700 }}>Na čo sa pozrieť</span>
+        <span style={{ fontSize: 13.5, fontWeight: 700 }}>Notifikácie</span>
         <span style={{ fontSize: 12, color: C.textMuted }}>
           {kriticke.length > 0 && (
             <b style={{ color: C.red }}>{kriticke.length} vyžaduje akciu</b>
@@ -1887,7 +1939,7 @@ function CapacityCard({ capacity, trainer, onNavigate }: { capacity: CapacityRow
     avg = (jerry?.recentWeekly || 0) + (terezka?.recentWeekly || 0);
     busy = (jerry?.busyWeekly || 0) + (terezka?.busyWeekly || 0);
     canTake = (jerry?.canTake || 0) + (terezka?.canTake || 0);
-    util = Math.round(Math.max(avg / (TARGET_H * 2), busy / (BUSY * 2)) * 100);
+    util = vytazenieSpolu([jerry, terezka].filter(Boolean) as CapacityRow[]) ?? 0;
   } else {
     const c = trainer === "Jerry" ? jerry : terezka;
     name = trainer;
@@ -1935,7 +1987,29 @@ function CapacityCard({ capacity, trainer, onNavigate }: { capacity: CapacityRow
 
 const linkBtn = { background: "none", border: "none", color: C.accentLight, cursor: "pointer", fontSize: 12, padding: 0 } as const;
 
-function RegisterRow({ item, actions, onNavigate, chat }: { item: RegisterItem; actions: Actions; onNavigate: (tab: string, sub?: string, focus?: NavFocus) => void; chat?: AssistantChat }) {
+/**
+ * Meno človeka v notifikácii tučným.
+ *
+ * Jerry, 17. 8. 2026: „meno by malo byť aspoň hrubé." V zozname dvadsiatich
+ * riadkov je meno to jediné, podľa čoho sa vyberá, čo čítať ďalej — a dovtedy
+ * splývalo s vetou. Robí sa to tu, nad `detail`, aby to platilo pre VŠETKY
+ * druhy notifikácií naraz; písať tučné meno do každého textu zvlášť by
+ * znamenalo, že na polovicu sa zabudne.
+ */
+function sMenomTucne(item: RegisterItem) {
+  const meno = item.oKom || (item.client && !item.client.includes("|") ? item.client : "");
+  const i = meno ? item.detail.indexOf(meno) : -1;
+  if (i < 0) return item.detail;
+  return (
+    <>
+      {item.detail.slice(0, i)}
+      <strong style={{ fontWeight: 700 }}>{meno}</strong>
+      {item.detail.slice(i + meno.length)}
+    </>
+  );
+}
+
+function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar }: { item: RegisterItem; actions: Actions; onNavigate: (tab: string, sub?: string, focus?: NavFocus) => void; chat?: AssistantChat; clients?: Record<string, ClientAgg>; kalendar?: KalUdalost[] }) {
   /** Otvorené okienko odpovede pre túto položku. */
   const [odpoved, setOdpoved] = useState(false);
   const [text, setText] = useState("");
@@ -1963,11 +2037,21 @@ function RegisterRow({ item, actions, onNavigate, chat }: { item: RegisterItem; 
           zapisCiel[1] || undefined,
           // Tretie pole je buď mesiac, alebo týždeň (predpona „t:"). Bez neho
           // klik dopadol na zoznam a človek si riadok hľadal sám.
+          // Štvrté pole je kategória v P&L — s ňou sa otvorí konkrétny riadok
+          // a nie tabuľka, v ktorej ho treba hľadať (revízia 18. 8. 2026).
           zapisCiel[2]?.startsWith("t:")
             ? { week: weekLabel(zapisCiel[2].slice(2)), nonce: Date.now() }
-            : zapisCiel[2]
-              ? { month: zapisCiel[2], nonce: Date.now() }
-              : undefined,
+            : /^\d{4}-\d{2}$/.test(zapisCiel[2] || "")
+              ? { month: zapisCiel[2], kategoria: zapisCiel[3] || undefined, nonce: Date.now() }
+              // Tretí diel nemusí byť dátum — pri „marketing|dopyty|Meno" je to
+              // človek, ktorého má cieľová obrazovka predvyplniť.
+              : zapisCiel[2]
+                ? { client: zapisCiel[2], nonce: Date.now() }
+                // Prázdny focus s nonce = „vyčisti, čo tam zostalo". Bez toho
+                // klik na „Tereza Pehalova (nový klient)" ukázal profil
+                // NAPOSLEDY fokusovaného klienta a rámček Čakajú na
+                // potvrdenie sa vôbec nevykreslil (revízia 19. 8. 2026).
+                : { nonce: Date.now() },
         )
       : onNavigate(jump, undefined, item.client ? { client: item.client, nonce: Date.now() } : undefined);
   // Otázka „je toto duch?" sa dá zodpovedať rovno tu. Odpoveď sa uloží ku
@@ -1991,15 +2075,55 @@ function RegisterRow({ item, actions, onNavigate, chat }: { item: RegisterItem; 
    * je tá istá otázka položená v inom čase.
    */
   const [dovodOtvoreny, setDovodOtvoreny] = useState(false);
+  /**
+   * Neúspešný zápis sa povie nahlas.
+   *
+   * Chipy robili optimistický zápis a návratovú hodnotu `setOverride`
+   * zahadzovali — položka sa zavrela, karta klienta sa prekreslila a po
+   * reloade bolo prázdno. Je to presne tá chyba, kvôli ktorej Jerry raz celý
+   * večer vypisoval dôvody do niečoho, čo len vyzeralo funkčne (13. 8.).
+   */
+  const [chybaZapisu, setChybaZapisu] = useState<string | null>(null);
+  const zapis = (p: Promise<boolean>, co: string) => {
+    setChybaZapisu(null);
+    return p.then((ok) => {
+      if (!ok) setChybaZapisu(`${co} sa NEZAPÍSALO — skús znova.`);
+      return ok;
+    });
+  };
   const jeOtazkaDovodu = item.key.startsWith("dovod|") && !!item.client;
   const zapisDovod = (dovod: string) => {
     if (!item.client) return;
-    // Zapíše sa ku KLIENTOVI (tam ho číta lievik aj Jarvis) a položka sa
-    // uzavrie s tým istým slovom, aby bolo v registri vidieť, čo sa odpovedalo.
-    actions.setOverride(item.client, "precoNeprisiel" as never, dovod);
-    actions.ackAnomaly(item.key, dovod, true);
-    setDovodOtvoreny(false);
+    // Zapíše sa ku KLIENTOVI (tam ho číta lievik aj Jarvis) a AŽ POTOM sa
+    // položka uzavrie — inak by otázka zmizla aj vtedy, keď sa odpoveď
+    // nikam nezapísala, a druhýkrát by sa už nikto nespýtal.
+    void zapis(actions.setOverride(item.client, "precoNeprisiel" as never, dovod), "Dôvod").then((ok) => {
+      if (!ok) return;
+      actions.ackAnomaly(item.key, dovod, true);
+      setDovodOtvoreny(false);
+    });
   };
+  /**
+   * Nezhoda kalendára s exportom má dve odpovede a každá znamená niečo iné.
+   *
+   * „Netrénoval" nie je odškrtnutie — zapíše sa do Kalendára ako zrušený
+   * tréning, takže ho appka prestane počítať ako dôkaz, že klient chodí.
+   * Bez toho by kalendár mlčky kryl človeka, ktorý prestal chodiť.
+   *
+   * „Trénoval, chýba v exporte" je opačný prípad: odrobená hodina, ktorá nie
+   * je vyfakturovaná. Odpoveď zostáva pri položke a v pamäti odpovedí.
+   */
+  const jeNepotvrdeny = item.key.startsWith("nepotvrdene|");
+  const nepotvrdenyDatum = jeNepotvrdeny ? item.key.split("|")[1] : "";
+  const odpovedzNetrenoval = () => {
+    if (!item.client || !nepotvrdenyDatum) return;
+    // „zapísané do Kalendára" sa smie tvrdiť až po zapísaní — zapisZrusenie
+    // pri neúspechu hádže a položka vtedy zostane otvorená.
+    void actions.zapisZrusenie(item.client, nepotvrdenyDatum, "netrénoval — potvrdené z notifikácie")
+      .then(() => vybav("netrénoval — zapísané do Kalendára ako zrušený"))
+      .catch(() => {});
+  };
+
   const jeOtazkaDuch = item.key.startsWith("duch|") && !!item.client;
   // Dve odpovede, lebo mesiac ticha má v praxi presne dva významy: buď klient
   // zmizol (duch), alebo je to dohodnutá prestávka. „Pauza" nastaví stav
@@ -2008,7 +2132,9 @@ function RegisterRow({ item, actions, onNavigate, chat }: { item: RegisterItem; 
     if (!item.client) return;
     // Dátum v odpovedi viaže odpoveď na TÚTO epizódu ticha — keď sa klient
     // vráti a o rok znova stíchne, otázka sa položí znova.
-    actions.setOverride(item.client, "duch" as never, `ano|${new Date().toISOString().slice(0, 10)}`);
+    void zapis(actions.setOverride(item.client, "duch" as never, `ano|${new Date().toISOString().slice(0, 10)}`), "Odpoveď o duchovi")
+      .then((ok) => ok && actions.setOverride(item.client!, "status" as never, "Neaktívny"))
+      .then((ok) => { if (ok === false) setChybaZapisu("Stav klienta sa NEZAPÍSAL — skús znova."); });
     // A odpoveď spraví aj to, čo z nej vyplýva. Doteraz sa len zapísala: klient
     // zostal medzi aktívnymi, počítal sa do počtu klientov a jeho neminuté
     // hodiny visel v appke ako záväzok, ktorý nikto nevyužije. Potvrdiť ducha
@@ -2016,13 +2142,35 @@ function RegisterRow({ item, actions, onNavigate, chat }: { item: RegisterItem; 
     //
     // Vrátiť sa to dá vždy — v karte klienta (Klienti → ✎) je na to tlačidlo a
     // zruší oboje naraz.
-    actions.setOverride(item.client, "status" as never, "Neaktívny");
   };
-  const odpovedzPauza = () => { if (item.client) actions.setOverride(item.client, "status" as never, "Pauza"); };
+  const odpovedzPauza = () => {
+    if (item.client) void zapis(actions.setOverride(item.client, "status" as never, "Pauza"), "Pauza");
+  };
 
   // Odpoveď ide Jarvisovi aj s položkou, ktorej sa týka. Bez toho by musel
   // Jerry prepisovať kontext, ktorý appka už pozná — a práve to je dôvod,
   // prečo sa takéto veci nikdy nezapíšu.
+  /**
+   * Kto je čí klient sa zapíše rovno, nie ako návrh (Jerry, 17. 8. 2026).
+   *
+   * Podľa primárneho trénera sa filtruje celý register. Kým veta „to je
+   * klientka Terezky" končila iba ako poznámka, Jerry dostával upozornenia na
+   * klientov, ktorých netrénuje — a to je presne to, na čo sa 12. 8. sťažoval.
+   *
+   * Zapisuje sa len vtedy, keď je isté OBOJE: koho sa veta týka (položka má
+   * meno a to meno appka pozná) a koho menuje (jeden tréner, nie obaja).
+   * Falošný zápis by klienta prehodil cudziemu trénerovi a nikto by si toho
+   * nevšimol.
+   */
+  const zapisTrenera = (veta: string): string | null => {
+    const meno = item.oKom || item.client;
+    if (!meno || meno.includes("|") || !clients?.[meno]) return null;
+    const trener = trenerZOdpovede(veta);
+    if (!trener || clients[meno].primaryTrainer === trener) return null;
+    void zapis(actions.setOverride(meno, "primaryTrainer" as never, trener), "Priradenie trénera");
+    return `${meno} → tréner ${trener}`;
+  };
+
   const posliJarvisovi = () => {
     if (!chat || !text.trim()) return;
     // Odpoveď sa zapíše HNEĎ, deterministicky — nie až Jarvisovou akciou.
@@ -2033,14 +2181,35 @@ function RegisterRow({ item, actions, onNavigate, chat }: { item: RegisterItem; 
     // od toho, či dobehne odpoveď jazykového modelu. Položka sa uzavrie
     // s odpoveďou ako poznámkou; keby sa ukázalo, že sa uzavrieť nemala,
     // „Vrátiť" ju otvorí späť a poznámka zostáva.
-    actions.ackAnomaly(item.key, `odpoveď: ${text.trim()}`, true);
+    const zapisane = zapisTrenera(text.trim());
+    // Vysvetlenie zrušeného tréningu si Kalendár vyzdvihne sám — buď hneď, ak
+    // už zmenu vidí, alebo pri najbližšej synchronizácii. Bez toho sa tá istá
+    // veta písala dvakrát a druhýkrát už nikto nevedel, že to bola včela.
+    const meno = item.oKom || item.client;
+    const preKalendar = meno && !meno.includes("|") && clients?.[meno] && znieAkoZrusenie(text);
+    if (preKalendar) {
+      // Keď ten človek DNES v kalendári tréning má, zápis ide rovno tam ako
+      // zrušenie — jeden zápis, o ktorom vedia obe strany. Notifikácie o ňom
+      // stíchnu okamžite (chip v + Zápis, dnešná hodina, SMS po úvodnom)
+      // a Kalendár má záznam aj dôvod, takže sa nespýta druhýkrát.
+      const dnes = new Date().toISOString().slice(0, 10);
+      const maDnesTrening = (kalendar || []).some(
+        (u) => u.klient && normName(u.klient) === normName(meno!) && u.zaciatok.slice(0, 10) === dnes
+          && (u.typ === "trening" || u.typ === "uvodny"),
+      );
+      if (maDnesTrening) void actions.zapisZrusenie(meno!, dnes, text.trim());
+      // Inak veta počká: zrušenie sa v kalendári objaví až po synchronizácii.
+      else actions.ackAnomaly(`kalvysv|${normName(meno!)}|${dnes}`, text.trim(), true);
+    }
+    actions.ackAnomaly(item.key, `odpoveď: ${text.trim()}${zapisane ? ` · zapísané: ${zapisane}` : ""}`, true);
     chat.setFloatingOpen(true);
     void chat.ask(
-      `Toto je odpoveď na položku z registra „Na čo sa pozrieť“.\n\n` +
+      `Toto je odpoveď na notifikáciu z Kokpitu (v dátach: naCoSaPozriet).\n\n` +
       `key: ${item.key}\n` +
       `Položka (${item.category}): ${item.title}\n` +
       `Detail: ${item.detail}\n\n` +
       `Moja odpoveď: ${text.trim()}\n\n` +
+      (zapisane ? `Appka z tejto vety už sama zapísala do dát: ${zapisane}. Nenavrhuj to znova, len to jednou vetou potvrď.\n\n` : "") +
       `Odpoveď je už zapísaná k položke a položka je uzavretá — NEZAPISUJ ju znova ` +
       `a neposielaj ack-anomaly. Tvoja práca je nadstavba: ak z odpovede vyplýva ` +
       `pripomienka do budúcnosti, zapíš záver (zapis-zaver s termínom overenia); ` +
@@ -2055,7 +2224,7 @@ function RegisterRow({ item, actions, onNavigate, chat }: { item: RegisterItem; 
     <div style={{ padding: "9px 11px", marginBottom: 5, borderRadius: 8, background: item.acked ? C.track : item.tone === "red" ? C.redBg : item.tone === "blue" ? C.blueBg : C.orangeBg, opacity: item.acked ? 0.6 : 1 }}>
       <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 13, flexWrap: "wrap" }}>
         <span style={badge(catTone(item.category))}>{item.category}</span>
-        <span style={{ color: C.text }}>{item.detail}</span>
+        <span style={{ color: C.text }}>{sMenomTucne(item)}</span>
         <div style={{ marginLeft: "auto", display: "flex", gap: 10 }}>
           {(jeOtazkaDovodu || jeOtazkaDuch) && !item.acked && (
             <button onClick={() => setDovodOtvoreny((o) => !o)} style={{ ...linkBtn, color: dovodOtvoreny ? C.accentLight : C.accent }}>
@@ -2072,6 +2241,12 @@ function RegisterRow({ item, actions, onNavigate, chat }: { item: RegisterItem; 
             <>
               <button onClick={odpovedzDuch} style={{ ...linkBtn, color: C.red }}>Áno, duch</button>
               <button onClick={odpovedzPauza} style={{ ...linkBtn, color: C.blue }}>Pauza</button>
+            </>
+          )}
+          {jeNepotvrdeny && !item.acked && (
+            <>
+              <button onClick={odpovedzNetrenoval} style={{ ...linkBtn, color: C.red }}>Netrénoval</button>
+              <button onClick={() => vybav("trénoval — chýba v PTminderi, treba doplniť")} style={{ ...linkBtn, color: C.green }}>Trénoval</button>
             </>
           )}
           {!item.acked && !jeRozhodnutie && <button onClick={openItem} style={linkBtn}>Otvoriť →</button>}
@@ -2116,6 +2291,22 @@ function RegisterRow({ item, actions, onNavigate, chat }: { item: RegisterItem; 
           )}
         </div>
       </div>
+
+      {/* Čo si na to odpovedal.
+          Odpoveď sa ukladala od začiatku, ale nikde sa nezobrazovala — riadok
+          len zošedol. Sedemnásteho augusta bolo v databáze dvadsať viet, ktoré
+          appka vedela a nevedela povedať: „Radek dal júl zadarmo", „Iva je
+          klientka Terezky". Kto odpovedá do prázdna, prestane odpovedať. */}
+      {item.note && (
+        <div style={{ marginTop: 6, fontSize: 12, color: C.textMuted, display: "flex", gap: 6 }}>
+          <span style={{ color: C.textDim, flexShrink: 0 }}>↳</span>
+          <span>{item.note}</span>
+        </div>
+      )}
+
+      {chybaZapisu && (
+        <div style={{ marginTop: 6, fontSize: 12, color: C.red }}>{chybaZapisu}</div>
+      )}
 
       {dovodOtvoreny && (
         <div style={{ marginTop: 9, paddingTop: 9, borderTop: `1px solid ${mix(C.border, 70)}`, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { menoKluc, najdiKlienta, duchOdpoved, membershipBucket, MEMBERSHIP_ORDER, TRAINERS, type CapacityRow, type ClientAgg, type SixMRow } from "../../lib/psb/compute";
+import { menoKluc, najdiKlienta, duchOdpoved, membershipBucket, MEMBERSHIP_ORDER, TRAINERS, type CakajuciKlient, type CapacityRow, type ClientAgg, type SixMRow } from "../../lib/psb/compute";
 import { fmtCZK, fmtDate, fmtDMY, normName } from "../../lib/psb/format";
 import { C, MEMBERSHIP_COLORS, mix, S } from "../../lib/psb/theme";
 import { KlientProfil } from "./KlientProfil";
@@ -181,11 +181,14 @@ function Premenovanie({ meno, onHotovo }: { meno: string; onHotovo: (nove: strin
   );
 }
 
-export function Klienti({ clients, capacity, actions, focus, leads, trainer, onTrainer, sixM, sub, onSub, data, btcSatsKlienti = {}, onDennikZapis }: { clients: Record<string, ClientAgg>; capacity: CapacityRow[]; actions: Actions; focus?: NavFocus | null; leads: Lead[]; trainer: string; onTrainer: (t: string) => void; sixM: SixMRow[]; sub: string; onSub: (s: string) => void; data: PSBData; btcSatsKlienti?: Record<string, number>; onDennikZapis?: (meno: string, text: string) => Promise<string | null> }) {
+export function Klienti({ clients, capacity, actions, focus, leads, trainer, onTrainer, sixM, sub, onSub, data, btcSatsKlienti = {}, onDennikZapis, cakajuci = [] }: { clients: Record<string, ClientAgg>; capacity: CapacityRow[]; actions: Actions; focus?: NavFocus | null; leads: Lead[]; trainer: string; onTrainer: (t: string) => void; sixM: SixMRow[]; sub: string; onSub: (s: string) => void; data: PSBData; btcSatsKlienti?: Record<string, number>; onDennikZapis?: (meno: string, text: string) => Promise<string | null>; /** Ľudia po úvodnom, ktorých export ešte nepotvrdil. */ cakajuci?: CakajuciKlient[] }) {
   const [focusClient, setFocusClient] = useState<string | null>(null);
   const [skupina, setSkupina] = useState<{ label: string; mena: string[] } | null>(null);
   useEffect(() => {
     if (focus?.client) setFocusClient(focus.client);
+    // Nonce bez klienta aj skupiny = cieľ chce ČISTÝ zoznam (napr. rámček
+    // „Čakajú na potvrdenie" sa pri fokusovanom klientovi nevykresľuje).
+    if (!focus?.client && !focus?.skupina) { setFocusClient(null); setSkupina(null); }
     // Skupina a jeden klient sa vylučujú — otvoriť oboje naraz by znamenalo
     // dva filtre, ktoré si protirečia.
     if (focus?.skupina) { setSkupina(focus.skupina); setFocusClient(null); }
@@ -352,7 +355,7 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
     }
     const denom = (scoped ? clientsWithSess : list.length) || 1;
     const att = list.length ? (list.reduce((a, c) => a + c.attendance, 0) / list.length) * 100 : 0;
-    return { count: list.length, activeInWin: clientsWithSess, att, hpc: hours / denom, avg: sedeni ? cash / sedeni : 0, scoped };
+    return { count: list.length, activeInWin: clientsWithSess, att, hpc: hours / denom, avg: sedeni ? cash / sedeni : 0, scoped, sedeni, denom };
   }, [list, kpiWin, kpiFrom, kpiTo, data.payments]);
 
   const cell = (t: string, seg: string) => {
@@ -433,9 +436,14 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
         )}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 12 }}>
           <StatCard value={kpis.scoped ? kpis.activeInWin : kpis.count} label={<Info text="Počet klientov, ktorí prešli aktuálnymi filtrami. V časovom okne = koľko z nich reálne chodilo v danom období." label={kpis.scoped ? "Chodilo v období" : "Klientov vo výbere"} />} />
-          <StatCard value={`${kpis.att.toFixed(0)}%`} label={<Info text="Priemerný podiel týždňov, v ktorých mal klient aspoň jeden tréning, za posledných 18 týždňov. Vždy 18 týž., nezávisí od filtra času." label="Ø dochádzka" />} />
-          <StatCard value={kpis.hpc.toFixed(1)} label={<Info text="Priemerný počet odtrénovaných hodín na klienta za zvolené obdobie (alebo celú históriu)." label={`Ø hodín/klient${kpis.scoped ? " (obd.)" : ""}`} />} />
-          <StatCard value={fmtCZK(kpis.avg)} label={<Info text="Prijaté peniaze delené počtom odtrénovaných sedení za zvolené obdobie, pre klientov v tomto zozname. Rovnaká definícia ako „Ø cena sedenia“ na Kokpite a v Peniazoch. Neráta sa z ceny zapísanej pri sedení: tá je pri 19 % sedení nulová, lebo platba visí na balíčku." label="Ø CZK/sedenie" />} />
+          {/* Každý priemer nesie svoj MENOVATEĽ v labeli. Do 19. 8. 2026 stáli
+              vedľa seba „Ø dochádzka" (÷ všetci vo výbere) a „Ø hodín/klient"
+              (÷ len tí, čo v okne chodili) bez toho, aby to bolo vidno —
+              dva priemery, dva rôzne menovatele, jeden pás. Ľudia sú
+              v tabuľke priamo pod tým, s tými istými filtrami. */}
+          <StatCard value={`${kpis.att.toFixed(0)}%`} label={<Info text={`Priemerný podiel týždňov, v ktorých mal klient aspoň jeden tréning, za posledných 18 týždňov. Vždy 18 týž., nezávisí od filtra času. Delené VŠETKÝMI ${kpis.count} klientmi vo výbere — aj tými, čo v zvolenom okne nechodili.`} label={`Ø dochádzka · ÷ ${kpis.count}`} />} />
+          <StatCard value={kpis.hpc.toFixed(1)} label={<Info text={`Priemerný počet odtrénovaných hodín na klienta za zvolené obdobie (alebo celú históriu). Delené ${kpis.denom} klientmi — ${kpis.scoped ? "len tými, čo v okne reálne chodili" : "všetkými vo výbere"}.`} label={`Ø hodín/klient${kpis.scoped ? " (obd.)" : ""} · ÷ ${kpis.denom}`} />} />
+          <StatCard value={fmtCZK(kpis.avg)} label={<Info text={`Prijaté peniaze delené počtom odtrénovaných sedení (${kpis.sedeni}) za zvolené obdobie, pre klientov v tomto zozname. Rovnaká definícia ako „Ø cena sedenia“ na Kokpite a v Peniazoch. Neráta sa z ceny zapísanej pri sedení: tá je pri 19 % sedení nulová, lebo platba visí na balíčku.`} label={`Ø CZK/sedenie · ÷ ${kpis.sedeni} sed.`} />} />
         </div>
       </Card>
 
@@ -553,6 +561,35 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
             </>
           )}
         </div>
+
+        {/* Klienti, ktorí ešte nie sú v PTminderi.
+
+            Jerry, 17. 8. 2026: profil má vzniknúť po úvodnom tréningu z kalendára
+            a export ho má potvrdiť. Stoja NAD tabuľkou a nie v nej zámerne —
+            nemajú zostatok hodín, dochádzku ani segment a jeden riadok
+            s ôsmimi pomlčkami by vyzeral ako chyba. A hlavne: do žiadneho
+            súčtu na tejto obrazovke nevstupujú, takže počet klientov,
+            kapacita ani 6M sa nepohnú, kým to export nepotvrdí. */}
+        {cakajuci.length > 0 && !focusClient && !skupina && (
+          <div style={{ marginBottom: 12, padding: "10px 12px", borderRadius: 9, border: `1px dashed ${mix(C.accent, 45)}`, background: mix(C.accent, 7) }}>
+            <div style={{ fontSize: 12.5, fontWeight: 600, color: C.accentLight, marginBottom: 6 }}>
+              Čakajú na potvrdenie z PTmindera ({cakajuci.length})
+            </div>
+            {cakajuci.map((c) => (
+              <div key={c.meno} style={{ display: "flex", gap: 10, alignItems: "center", fontSize: 13, padding: "3px 0", flexWrap: "wrap" }}>
+                <span style={{ fontWeight: 500 }}>{c.meno}</span>
+                <Badge tone="blue">nepotvrdená</Badge>
+                <span style={{ color: C.textMuted, fontSize: 12 }}>
+                  úvodný {fmtDate(c.uvodny)}{c.trener ? ` · ${c.trener}` : ""} — z kalendára
+                </span>
+              </div>
+            ))}
+            <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 6 }}>
+              Do počtu klientov, kapacity ani 6M sa nerátajú. Po nahratí exportu (Mesiac → Údaje) sa presunú do tabuľky sami.
+            </div>
+          </div>
+        )}
+
         <TableWrap>
           <thead>
             <tr>

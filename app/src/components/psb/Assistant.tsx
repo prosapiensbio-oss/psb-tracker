@@ -1,6 +1,8 @@
 import { type CSSProperties, Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { fmtDMY } from "../../lib/psb/format";
-import { jePlatnyCiel, jeVonkajsiOdkaz, naPlnuAdresu } from "../../lib/psb/odkazy";
+import { navrhZTokenu } from "../../lib/psb/kampanPlan";
+import type { NavrhKampane } from "./KampanForm";
+import { jePlatnyCiel, jeVonkajsiOdkaz, menoOdkazu, naPlnuAdresu } from "../../lib/psb/odkazy";
 
 import type { AiContext } from "../../lib/psb/aiContext";
 import {
@@ -177,13 +179,26 @@ function oznac(text: string, hladat: string, key: number) {
 }
 
 // Minimal formatter: **bold**, `code`, «clickable client name», and newlines.
-function fmt(text: string, onClientClick?: (name: string) => void, onNavigate?: (tab: string, sub?: string) => void, hladat?: string, jeKlient?: (meno: string) => boolean) {
+function fmt(text: string, onClientClick?: (name: string) => void, onNavigate?: (tab: string, sub?: string) => void, hladat?: string, jeKlient?: (meno: string) => boolean, onKampan?: (n: NavrhKampane) => void) {
   return text.split("\n").map((line, i) => {
     const parts = line.split(/(\*\*[^*]+\*\*|`[^`]+`|«[^»]+»|⟦[^⟧]+⟧|(?:https?:\/\/|(?:www\.)?(?:prosapiens\.cz|instagram\.com)\/)[^\s)»"]+)/g).map((p, j) => {
       // ⟦text|tab|podzáložka⟧ — odkaz na miesto v appke. „Kde to nájdem"
       // je najčastejšia otázka a popis cesty slovami ju nerieši: človek si
       // aj tak musí naklikať štyri obrazovky.
       if (p.startsWith("⟦") && p.endsWith("⟧")) {
+        // ⟦kampan|cieľ|adresa|rozpočet|názov⟧ — návrh kampane z rozhovoru.
+        // Debata o tom, čo pustiť, a formulár na to boli dve obrazovky;
+        // toto je tlačidlo medzi nimi. Vyplní, nezakladá — zakladá sa až
+        // v paneli, a aj tam pozastavenú.
+        const navrh = navrhZTokenu(p.slice(1, -1));
+        if (navrh) {
+          return onKampan
+            ? <button key={j} onClick={() => onKampan(navrh)}
+                style={{ background: mix(C.accent, 14), border: `1px solid ${mix(C.accent, 45)}`, borderRadius: 6, padding: "1px 7px", margin: "0 1px", color: C.accentLight, fontWeight: 600, cursor: "pointer", fontSize: "inherit", fontFamily: "inherit" }}>
+                pripraviť kampaň: {navrh.nazov} →
+              </button>
+            : <strong key={j}>{navrh.nazov}</strong>;
+        }
         const [txt, tab, sub, kotva] = p.slice(1, -1).split("|");
         // Jarvis sem 16. 8. napísal adresu instagramového príspevku namiesto
         // názvu záložky. Tlačidlo sa vykreslilo a klik viedol na neexistujúcu
@@ -236,13 +251,21 @@ function fmt(text: string, onClientClick?: (name: string) => void, onNavigate?: 
       if (p.startsWith("**") && p.endsWith("**")) return <strong key={j}>{p.slice(2, -2)}</strong>;
       if (p.startsWith("`") && p.endsWith("`")) return <code key={j} style={{ background: mix(C.accent, 14), padding: "1px 4px", borderRadius: 4, fontSize: 12 }}>{p.slice(1, -1)}</code>;
       if (p.startsWith("«") && p.endsWith("»")) {
-        const name = p.slice(1, -1);
+        // Tvar «Richardom Matlom|Richard Matl»: vľavo to, čo sa ZOBRAZÍ,
+        // vpravo presné meno, na ktoré odkaz vedie.
+        //
+        // Bez toho musel Jarvis písať meno vždy v prvom páde a vychádzalo
+        // z toho „tréning s Richard Matl" — v každej vete, kde sa spomenie
+        // klient (18. 8. 2026). Skloňovať to za neho nevieme: slovenské
+        // priezviská sa ohýbajú rôzne a zlé skloňovanie je horšie než žiadne.
+        // Kto pád nepotrebuje, píše ako doteraz — jedna časť, žiadna zvislica.
+        const { text, meno: name } = menoOdkazu(p.slice(1, -1));
         // Bez zoznamu klientov sa správame ako doteraz; keď ho máme a meno
         // v ňom nie je, zostane z toho obyčajný zvýraznený text.
-        if (jeKlient && !jeKlient(name)) return <strong key={j}>{name}</strong>;
+        if (jeKlient && !jeKlient(name)) return <strong key={j}>{text}</strong>;
         return onClientClick
-          ? <button key={j} onClick={() => onClientClick(name)} style={{ background: "none", border: "none", padding: 0, margin: 0, color: C.accentLight, fontWeight: 600, cursor: "pointer", textDecoration: "underline", fontSize: "inherit", fontFamily: "inherit" }}>{name}</button>
-          : <strong key={j}>{name}</strong>;
+          ? <button key={j} onClick={() => onClientClick(name)} style={{ background: "none", border: "none", padding: 0, margin: 0, color: C.accentLight, fontWeight: 600, cursor: "pointer", textDecoration: "underline", fontSize: "inherit", fontFamily: "inherit" }}>{text}</button>
+          : <strong key={j}>{text}</strong>;
       }
       return hladat ? oznac(p, hladat, j) : <Fragment key={j}>{p}</Fragment>;
     });
@@ -583,10 +606,16 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
       if (!a || a.done) return prev;
       if (a.type === "ack-anomaly") actions.ackAnomaly(a.key || "", a.note || "", true);
       else if (a.type === "unack-anomaly") actions.ackAnomaly(a.key || "", "", false);
-      else if (a.type === "set-override" && a.name && a.field) actions.setOverride(a.name, a.field as never, a.value);
-      else if (a.type === "zapis-zaver" && a.data) void saveZaver(a.data);
+      else if (a.type === "set-override" && a.name && a.field) {
+        void actions.setOverride(a.name, a.field as never, a.value)
+          .then((ok) => { if (!ok) oznamVysledok(`Zápis pre ${a.name} NEPREŠIEL — skús znova.`); });
+      }
+      else if (a.type === "zapis-zaver" && a.data) {
+        void saveZaver(a.data).then((ok) => { if (!ok) oznamVysledok("Záver sa NEZAPÍSAL — skús znova."); });
+      }
       else if (a.type === "vyhodnot-zaver" && a.data) {
-        void vyhodnotZaver(String(a.data.id || ""), String(a.data.stav || "otvoreny"), String(a.data.vysledok || ""));
+        void vyhodnotZaver(String(a.data.id || ""), String(a.data.stav || "otvoreny"), String(a.data.vysledok || ""))
+          .then((ok) => { if (!ok) oznamVysledok("Vyhodnotenie sa NEZAPÍSALO — skús znova."); });
       } else if (a.type === "zarad-pohyby" && a.data) {
         // Zaradenie bankových pohybov do kategórií. Toto je najväčšia ručná
         // práca v celej appke — 174 nezaradených riadkov po prvom importe — a
@@ -613,7 +642,7 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
         void fetchVzasSettings().then((st) => {
           const zoz = Array.isArray(st["mkt_znacky"]) ? (st["mkt_znacky"] as Record<string, unknown>[]) : [];
           zoz.push({ id: `z${Date.now().toString(36)}`, datum: String(d.datum), text: String(d.text).slice(0, 160) });
-          void saveVzasSetting("mkt_znacky", zoz).then(() => oznamVysledok(`Značka zapísaná: ${String(d.text).slice(0, 60)}`));
+          void saveVzasSetting("mkt_znacky", zoz).then((ok) => oznamVysledok(ok ? `Značka zapísaná: ${String(d.text).slice(0, 60)}` : "Značka sa NEZAPÍSALA — skús znova."));
         });
       } else if (a.type === "uprav-pnl" && a.data) {
         // Rovnaká cesta, akou opravu zapíše človek klikom na číslo v tabuľke —
@@ -733,7 +762,14 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
     if (!res.ok) return null;
     const { actions: acts } = parseActions(res.reply);
     const zavery = acts.filter((a) => a.type === "zapis-zaver" && a.data);
-    for (const a of zavery) await saveZaver(a.data as never).catch(() => {});
+    // Neúspech sa NESMIE prehltnúť: záver („o 2 týždne sa ozvať") je jediná
+    // stopa, ktorú si Jarvis zo zápisu berie — keď sa neuloží a nikto to
+    // nepovie, vyzerá to ako úspech a pripomienka nikdy nepríde (19. 8. 2026).
+    let zaverovZlyhalo = 0;
+    for (const a of zavery) {
+      const ok = await saveZaver(a.data as never).catch(() => false);
+      if (!ok) zaverovZlyhalo++;
+    }
 
     // Pauza sa zapisuje BEZ potvrdenia, na rozdiel od bežných návrhov Jarvisa.
     //
@@ -752,6 +788,7 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
 
     if (!zavery.length && !pauzy.length) return null;
     return [
+      ...(zaverovZlyhalo ? [`⚠ ${zaverovZlyhalo === 1 ? "Pripomienka sa NEULOŽILA" : `${zaverovZlyhalo} pripomienky sa NEULOŽILI`} — zapíš si ju inde alebo skús zápis znova.`] : []),
       ...pauzy.map((a) => {
         const d = a.data as Record<string, unknown>;
         const do_ = String(d.value || "").split("|")[1];
@@ -769,7 +806,7 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
 
 // ── The conversation UI (messages + input) — used by both the floating panel and
 // the inline widget. Each instance has its own scroll/refs/drag state. ──────────
-export function ChatConversation({ chat, autoFocus, onClientClick, onNavigate }: { chat: AssistantChat; autoFocus?: boolean; onClientClick?: (name: string) => void; onNavigate?: (tab: string, sub?: string) => void }) {
+export function ChatConversation({ chat, autoFocus, onClientClick, onNavigate, onKampan }: { chat: AssistantChat; autoFocus?: boolean; onClientClick?: (name: string) => void; onNavigate?: (tab: string, sub?: string) => void; onKampan?: (n: NavrhKampane) => void }) {
   const { msgs, input, setInput, busy, stav, deep, setDeep, pending, setPending, attach, setAttach, ask, runAction, confirmImport, handleIncoming, upravSpravu, vetvi, zastav, zvyraznit, setZvyraznit, jeKlient } = chat;
   // Ktorá odoslaná otázka sa práve prepisuje. Zámerne len jedna — dve
   // rozpísané opravy naraz by sa navzájom prepísali pri odoslaní.
@@ -889,7 +926,7 @@ export function ChatConversation({ chat, autoFocus, onClientClick, onNavigate }:
                   </div>
                 </div>
               ) : (
-                fmt(m.zobrazit ?? m.text, m.role === "assistant" ? onClientClick : undefined, m.role === "assistant" ? onNavigate : undefined, mi === najdena ? zvyraznit : undefined, jeKlient)
+                fmt(m.zobrazit ?? m.text, m.role === "assistant" ? onClientClick : undefined, m.role === "assistant" ? onNavigate : undefined, mi === najdena ? zvyraznit : undefined, jeKlient, m.role === "assistant" ? onKampan : undefined)
               )}
             </div>
             {/*

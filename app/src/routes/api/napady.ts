@@ -32,7 +32,7 @@ export const Route = createFileRoute("/api/napady")({
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });
         try {
           const r = await DB.prepare(
-            "SELECT id, datum, text, zdroj, stav, poznamka, autor FROM mkt_napady ORDER BY datum DESC, created_at DESC LIMIT 200",
+            "SELECT id, datum, text, zdroj, stav, poznamka, autor, odkaz, pouzite_at FROM mkt_napady ORDER BY datum DESC, created_at DESC LIMIT 200",
           ).all();
           return Response.json({ ok: true, napady: r.results || [] });
         } catch {
@@ -61,12 +61,27 @@ export const Route = createFileRoute("/api/napady")({
           if (id) {
             const stav = STAVY.has(String(b.stav)) ? String(b.stav) : null;
             const poznamka = b.poznamka === undefined ? null : kus(b.poznamka, 600);
-            if (stav === null && poznamka === null) {
+            // Odkaz na hotový príspevok — tým sa kruh uzatvára. Prázdny
+            // reťazec je platná hodnota (odkaz sa dá odobrať), preto sa
+            // rozlišuje `undefined` od `""`.
+            const odkaz = b.odkaz === undefined ? null : kus(b.odkaz, 500);
+            if (stav === null && poznamka === null && odkaz === null) {
               return Response.json({ ok: false, error: "nič na zmenu" }, { status: 400 });
             }
+            // Deň použitia sa zapíše sám pri prechode na „použitý" — nikto ho
+            // nebude vypĺňať ručne a bez neho sa nedá povedať, za ako dlho sa
+            // nápad premení na obsah.
+            const pouzite = stav === "pouzity" ? new Date().toISOString().slice(0, 10) : null;
             await DB.prepare(
-              `UPDATE mkt_napady SET stav = COALESCE(?2, stav), poznamka = COALESCE(?3, poznamka) WHERE id = ?1`,
-            ).bind(id, stav, poznamka).run();
+              `UPDATE mkt_napady SET stav = COALESCE(?2, stav), poznamka = COALESCE(?3, poznamka),
+                 odkaz = COALESCE(?4, odkaz),
+                 pouzite_at = CASE WHEN ?5 IS NOT NULL AND pouzite_at = '' THEN ?5 ELSE pouzite_at END
+               WHERE id = ?1`,
+            ).bind(id, stav, poznamka, odkaz, pouzite).run().then((r) => {
+              // UPDATE s neexistujúcim id prejde „úspešne" s nulou zmien —
+              // a obrazovka by ohlásila uložené nad ničím (revízia 19. 8.).
+              if (!r.meta.changes) throw new Error("nenajdene");
+            });
             return Response.json({ ok: true, id });
           }
 

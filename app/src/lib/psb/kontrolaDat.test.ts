@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { kontrolaAds, kontrolaKanalov, kontrolaMerania, podozriveCisla, type MeranieMesiac, type Riadok } from "./kontrolaDat";
+import { klucSkrytia, kontrolaAds, kontrolaKanalov, kontrolaMerania, podozriveCisla, skryteDo, type MeranieMesiac, type Riadok } from "./kontrolaDat";
 
 const r = (mesiac: string, kanal: string, metrika: string, hodnota: number): Riadok =>
   ({ mesiac, kanal, metrika, hodnota });
@@ -279,5 +279,30 @@ describe("Google Ads: konverzie verzus skutoční klienti", () => {
   it("bez výdaja mlčí", () => {
     expect(kontrolaAds([m("2025-03", 0, 0, 0)], {}, "2025-01")).toEqual([]);
     expect(kontrolaAds([], {}, "2025-01")).toEqual([]);
+  });
+});
+
+describe("skrývanie hlásení", () => {
+  const dnes = new Date("2026-08-19T10:00:00.000Z");
+
+  it("čerstvo skryté hlásenie je skryté a vie dokedy", () => {
+    const do_ = skryteDo({ ackedAt: "2026-08-19T09:00:00.000Z" }, dnes);
+    expect(do_?.toISOString().slice(0, 10)).toBe("2026-09-18");
+  });
+
+  it("po 30 dňoch sa vráti — appka nesmie tvrdiť, že je čisto", () => {
+    // Skryté nie je vyriešené. Konverzná akcia sa opraví raz a hlásenie
+    // zmizne samo, lebo sa počíta z dát; dovtedy sa má pripomenúť.
+    expect(skryteDo({ ackedAt: "2026-07-01T09:00:00.000Z" }, dnes)).toBeNull();
+  });
+
+  it("nikdy neskryté a pokazený dátum sa kreslia normálne", () => {
+    expect(skryteDo(undefined, dnes)).toBeNull();
+    expect(skryteDo({}, dnes)).toBeNull();
+    expect(skryteDo({ ackedAt: "toto nie je dátum" }, dnes)).toBeNull();
+  });
+
+  it("kľúč má vlastný priestor, nemieša sa s registrom", () => {
+    expect(klucSkrytia("gads|neoveritelne")).toBe("hlasenie|gads|neoveritelne");
   });
 });

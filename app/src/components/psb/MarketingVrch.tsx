@@ -2,12 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 
 import { kotvaDat, type ClientAgg } from "../../lib/psb/compute";
 import { fmtCZK, monthKey } from "../../lib/psb/format";
-import { CENA_ZA_DOPYT, DOPYTOV_MESACNE, KONVERZIA_DOPYTU, hodnot, type Hodnotenie } from "../../lib/psb/hodnotenie";
+import { CENA_ZA_DOPYT, DOPYTOV_MESACNE, KONVERZIA_DOPYTU, farbaCeny, hodnot, type Hodnotenie } from "../../lib/psb/hodnotenie";
 import { suhrnKampani, zlucKampane, type Kampan } from "../../lib/psb/kampane";
 import { C, mix } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import { Card, Info } from "./ui";
-import { farbaCeny } from "./Kampane";
+
 import { krokyZa, oknoMesiacov } from "./MarketingLievik";
 
 /**
@@ -55,6 +55,17 @@ type Metrika = {
   smer: string;
   preco: string;
   verdikt: string;
+  /**
+   * Kto alebo čo za číslom stojí — mená a dátumy, z ktorých vzniklo.
+   *
+   * Bez tohto je metrika neoveriteľná očami: keď sa výpočet pokazí, číslo
+   * vyzerá normálne a nikto si nevšimne. Google Ads hlásil 299 konverzií
+   * mesiace; prišlo sa na to, až keď sa niekto pozrel na mená. Zoznam je
+   * tá istá vec, ktorú Lievik ukazuje pri kliku — nie druhý výpočet.
+   */
+  riadky: { meno: string; vpravo: string }[];
+  /** Čo zoznam obsahuje — nadpis nad ním a čitateľ/menovateľ jednou vetou. */
+  zoznamNadpis: string;
 };
 
 /** Slovný verdikt podľa pásma. Tri pásma, tak ako ich pomenoval Jerry. */
@@ -68,6 +79,8 @@ function verdikt(h: Hodnotenie, texty: { dobre: string; priestor: string; zle: s
 export function MarketingVrch({ data, clients }: { data: PSBData; clients: Record<string, ClientAgg> }) {
   const [kampane, setKampane] = useState<Kampan[]>([]);
   const [otvorene, setOtvorene] = useState<string | null>(null);
+  /** Ktorej metrike je otvorený zoznam ľudí/položiek pod číslom. */
+  const [zoznam, setZoznam] = useState<string | null>(null);
 
   useEffect(() => {
     void fetch("/api/meta", { credentials: "same-origin" })
@@ -86,6 +99,14 @@ export function MarketingVrch({ data, clients }: { data: PSBData; clients: Recor
     const dopytovMes = k.dopyty / mes;
     const hD = hodnot(dopytovMes, DOPYTOV_MESACNE);
 
+    const fmtDen = (d: string) => {
+      const [r, mm, dd] = (d || "").slice(0, 10).split("-");
+      return dd && mm ? `${Number(dd)}. ${Number(mm)}. ${r}` : d;
+    };
+    const rDopyty = k.kto.dopyty.map((x) => ({ meno: x.meno, vpravo: `${fmtDen(x.datum)}${x.zdroj ? ` · ${x.zdroj}` : ""}` }));
+    const rUvodne = k.kto.uvodne.map((x) => ({ meno: x.meno, vpravo: `úvodný ${fmtDen(x.datum)}` }));
+    const rKlienti = k.kto.klienti.map((x) => ({ meno: x.meno, vpravo: `prvý tréning ${fmtDen(x.prvy)}${x.zaplatil ? ` · zaplatil ${fmtDen(x.zaplatil)}` : ""}` }));
+
     // Konvertujú sa DOPYTY, nie klienti — inak vyjde nad sto percent, lebo
     // klienti z odporúčaní nemajú zapísaný dopyt. Viď krokyZa.
     const konv = k.dopyty > 0 ? (k.zDopytu / k.dopyty) * 100 : null;
@@ -103,7 +124,12 @@ export function MarketingVrch({ data, clients }: { data: PSBData; clients: Recor
     // veličiny, než akú sľubuje jeho nadpis. Menovateľ je preto dopyt zapísaný
     // v Kokpite; kým reklama žiadny neprivedie, je tu pomlčka — a tá je
     // pravdivá odpoveď, nie chýbajúca.
-    const s = suhrnKampani(zlucKampane(kampane));
+    // Výdavok z TOHO ISTÉHO okna ako dopyty. Kampane prichádzajú po
+    // mesiacoch, ale sčítavali sa celé (19 mesiacov histórie) a delili
+    // dopytmi z 12 — „cena za dopyt" aj „minuté na reklamu" boli nadhodnotené
+    // zhruba o polovicu a verdikt pripisoval celoživotný výdavok dvanástim
+    // mesiacom (revízia 18. 8. 2026).
+    const s = suhrnKampani(zlucKampane(kampane.filter((x) => mesiace.includes(x.mesiac))));
     const zReklamy = data.leads.filter((l) =>
       mesiace.includes(monthKey(l.date)) && (l.source === "reklama" || !!l.kampan?.trim())).length;
     const cenaZaDopyt = zReklamy > 0 ? s.spend / zReklamy : null;
@@ -113,7 +139,9 @@ export function MarketingVrch({ data, clients }: { data: PSBData; clients: Recor
     // úloha je vysvetliť tie tri hlavné.
     const bez = { skore: 0, slovo: "priemer", bezDat: true } as Hodnotenie;
     const uvodnych = k.uvodne / mes;
-    const naUvodny = k.dopyty > 0 ? (k.uvodne / k.dopyty) * 100 : null;
+    // Konvertujú sa DOPYTY, nie úvodné — `uvodne / dopyty` vyšlo 121 %,
+    // lebo úvodné z odporúčaní nemajú zapísaný dopyt (revízia 20. 8. 2026).
+    const naUvodny = k.dopyty > 0 ? (k.zDopytuUvodny / k.dopyty) * 100 : null;
 
     return [
       {
@@ -129,6 +157,8 @@ export function MarketingVrch({ data, clients }: { data: PSBData; clients: Recor
           zle: "Takmer sa nikto neozýva. Kým sa to nezmení, na ostatných číslach nezáleží.",
           bezDat: "Zatiaľ nemám dosť mesiacov na priemer.",
         }),
+        riadky: rDopyty,
+        zoznamNadpis: `Kto sa ozval — ${k.dopyty} dopytov za ${mes} mesiacov`,
       },
       {
         kluc: "konverzia",
@@ -143,6 +173,8 @@ export function MarketingVrch({ data, clients }: { data: PSBData; clients: Recor
           zle: "Väčšina dopytov sa stráca. Viac reklamy by tú stratu len zdražilo.",
           bezDat: "Zatiaľ nemám dopyty, z ktorých by sa dala konverzia počítať.",
         }),
+        riadky: rKlienti,
+        zoznamNadpis: `Kto zostal a zaplatil — ${k.zDopytu} z ${k.dopyty} dopytov (menovateľ je zoznam pri „Dopytov mesačne“)`,
       },
       {
         kluc: "cena",
@@ -159,6 +191,8 @@ export function MarketingVrch({ data, clients }: { data: PSBData; clients: Recor
             ? "Ešte som z Mety nestiahol kampane."
             : `Za ${mes} mesiacov nemá ani jeden dopyt v Kokpite zdroj „reklama“ ani UTM — ${fmtCZK(s.spend)} teda zatiaľ nekúpilo žiadny dopyt, ktorý by som vedel doložiť. Meta hlási ${s.dopyty} konverzií, ale to sú prekliky a stiahnutia dokumentu, nie ľudia, čo napísali. Číslo vznikne, keď do odkazu v reklame pribudnú UTM parametre a spustí sa kampaň s cieľom „dopyt“.`,
         }),
+        riadky: rDopyty.filter((x) => /reklama/i.test(x.vpravo)),
+        zoznamNadpis: `Dopyty so zdrojom „reklama“ za ${mes} mesiacov — menovateľ ceny (čitateľ je „Minuté na reklamu“)`,
       },
       {
         kluc: "uvodne",
@@ -168,6 +202,8 @@ export function MarketingVrch({ data, clients }: { data: PSBData; clients: Recor
         smer: "čím viac, tým lepšie",
         preco: "Medzičlánok medzi dopytom a klientom. Keď dopytov pribúda a úvodných nie, problém je v tom, čo sa deje po prvom kontakte — nie v reklame.",
         verdikt: "Porovnaj s dopytmi vedľa: keď je medzi nimi veľká diera, stráca sa to pri dohadovaní termínu.",
+        riadky: rUvodne,
+        zoznamNadpis: `Kto prišiel na úvodný — ${k.uvodne} ľudí za ${mes} mesiacov`,
       },
       {
         kluc: "naUvodny",
@@ -175,8 +211,10 @@ export function MarketingVrch({ data, clients }: { data: PSBData; clients: Recor
         hodnota: naUvodny == null ? "—" : `${Math.round(naUvodny)} %`,
         h: bez,
         smer: "čím vyššie, tým lepšie",
-        preco: "Prvá polovica lievika. Toto je číslo, na ktoré má najsilnejší vplyv rýchlosť odpovede — v službách silnejší než cena aj než text reklamy.",
+        preco: "Prvá polovica lievika: koľko zo zapísaných dopytov došlo na úvodný. Toto je číslo, na ktoré má najsilnejší vplyv rýchlosť odpovede — v službách silnejší než cena aj než text reklamy. Úvodné bez dopytu (odporúčania) sem nepatria — tie vidno pri „Úvodných mesačne“.",
         verdikt: "Keď je nízke, odpoveď hľadaj v Dopytoch: stĺpec „ozvali sme sa“ a dôvod straty.",
+        riadky: k.kto.naUvodny.map((x) => ({ meno: x.meno, vpravo: `dopyt ${fmtDen(x.dopyt)} → úvodný ${fmtDen(x.uvodny)}` })),
+        zoznamNadpis: `Čitateľ: ${k.zDopytuUvodny} dopytov, ktoré došli na úvodný · menovateľ: ${k.dopyty} dopytov (zoznam pri „Dopytov mesačne“)`,
       },
       {
         kluc: "minute",
@@ -188,6 +226,10 @@ export function MarketingVrch({ data, clients }: { data: PSBData; clients: Recor
         verdikt: s.podielNaDopyt < 20
           ? `Z toho išlo na kampane, ktoré vôbec pýtali dopyt, len ${Math.round(s.podielNaDopyt)} %. Zvyšok kupoval videnia a interakcie.`
           : `Na dopyt bolo namierených ${Math.round(s.podielNaDopyt)} % z toho.`,
+        riadky: zlucKampane(kampane.filter((x) => mesiace.includes(x.mesiac)))
+          .slice().sort((a, b) => b.spend - a.spend)
+          .map((x) => ({ meno: x.nazov, vpravo: fmtCZK(x.spend) })),
+        zoznamNadpis: `Kampane z Mety za ${mes} mesiacov, zoradené podľa výdavku`,
       },
     ];
   }, [data, clients, kampane]);
@@ -211,9 +253,19 @@ export function MarketingVrch({ data, clients }: { data: PSBData; clients: Recor
               flex: "0 0 auto", width: 236, padding: "12px 13px", borderRadius: 9,
               background: mix(farba, 7), alignSelf: "flex-start",
             }}>
-              <div style={{ fontSize: 25, fontWeight: 800, color: farba, fontVariantNumeric: "tabular-nums" }}>
-                {x.hodnota}
-              </div>
+              {/* Číslo je tlačidlo: otvorí mená, z ktorých vzniklo. Metrika,
+                  pod ktorú sa nedá kliknúť, je nebezpečná aj keď je správna —
+                  nikto si nevšimne, keď sa pokazí (revízia 19. 8. 2026). */}
+              <button
+                onClick={() => setZoznam(zoznam === x.kluc ? null : x.kluc)}
+                title={x.riadky.length ? `Ukázať, z čoho číslo vzniklo (${x.riadky.length})` : "Za týmto číslom zatiaľ nie je žiadny riadok"}
+                style={{
+                  display: "flex", alignItems: "baseline", gap: 6, padding: 0, background: "none", border: "none",
+                  cursor: "pointer", fontFamily: "inherit", textAlign: "left",
+                }}>
+                <span style={{ fontSize: 25, fontWeight: 800, color: farba, fontVariantNumeric: "tabular-nums" }}>{x.hodnota}</span>
+                <span style={{ fontSize: 10.5, color: C.textDim }}>{zoznam === x.kluc ? "▾" : "▸"} {x.riadky.length}</span>
+              </button>
               <div style={{ fontSize: 12.5, fontWeight: 600, color: C.text, marginTop: 3 }}>{x.nazov}</div>
               <div style={{ fontSize: 11, color: C.textDim, marginTop: 2 }}>{x.smer}</div>
 
@@ -242,6 +294,34 @@ export function MarketingVrch({ data, clients }: { data: PSBData; clients: Recor
           );
         })}
       </div>
+
+      {zoznam && (() => {
+        const x = m.find((y) => y.kluc === zoznam);
+        if (!x) return null;
+        return (
+          <div style={{ marginTop: 12, padding: "10px 13px", borderRadius: 9, background: mix(C.text, 4), border: `1px solid ${C.border}` }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, marginBottom: 8 }}>
+              <span style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: 0.6, textTransform: "uppercase", color: C.textMuted }}>
+                {x.zoznamNadpis}
+              </span>
+              <button onClick={() => setZoznam(null)}
+                style={{ background: "none", border: "none", color: C.textDim, fontSize: 11.5, cursor: "pointer", fontFamily: "inherit" }}>zavrieť</button>
+            </div>
+            {x.riadky.length === 0 ? (
+              <div style={{ fontSize: 12, color: C.textDim }}>Za týmto číslom nie je ani jeden riadok — presne preto je „—“ alebo nula.</div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 5, maxHeight: 320, overflowY: "auto" }}>
+                {x.riadky.map((r, i) => (
+                  <div key={`${r.meno}-${i}`} style={{ display: "flex", justifyContent: "space-between", gap: 12, fontSize: 12.5 }}>
+                    <span style={{ color: C.text, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.meno}</span>
+                    <span style={{ color: C.textDim, flexShrink: 0, fontVariantNumeric: "tabular-nums" }}>{r.vpravo}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
     </Card>
   );
 }

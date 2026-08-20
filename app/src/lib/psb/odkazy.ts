@@ -69,3 +69,46 @@ const MNOZINA = new Set<string>(CIELE);
 export function jePlatnyCiel(tab: string): boolean {
   return MNOZINA.has((tab || "").trim());
 }
+
+/**
+ * Meno klienta v odpovedi: čo sa ZOBRAZÍ a kam odkaz VEDIE.
+ *
+ * Jarvis obaľuje mená do «». Do 18. 8. 2026 musel písať meno vždy v prvom
+ * páde, lebo appka ním zároveň hľadala klienta — a vychádzalo z toho
+ * „tréning s Richard Matl" v každej vete, kde niekoho spomenul. Skloňovať
+ * za neho nevieme: slovenské priezviská sa ohýbajú rôzne a zlé skloňovanie
+ * je horšie než žiadne.
+ *
+ * Preto tvar «Richardom Matlom|Richard Matl» — vľavo veta, vpravo kľúč.
+ * Bez zvislice je to jedno aj druhé, takže staré odpovede fungujú ďalej.
+ */
+export function menoOdkazu(vnutro: string): { text: string; meno: string } {
+  const [zobrazene = "", presne] = (vnutro || "").split("|");
+  const text = zobrazene.trim();
+  return { text, meno: (presne || zobrazene).trim() };
+}
+
+/** Vlastný web. Adresy v tabuľkách sú raz celé, raz len cesta. */
+const WEB = "https://www.prosapiens.cz";
+
+/**
+ * Adresa podstránky vlastného webu — z čohokoľvek, čo je v tabuľke.
+ *
+ * Tabuľky o webe držia adresu v troch tvaroch: Search Console dáva celé
+ * `https://www.prosapiens.cz/fascie/`, karta o rýchlosti si doménu odsekáva
+ * a nechá `fascie/`, a v texte sa občas objaví `www.prosapiens.cz/fascie/`.
+ * Preklik má fungovať vo všetkých troch, inak by to bol odkaz, ktorý raz
+ * vedie a raz nie.
+ *
+ * Vracia null pri prázdnom vstupe a pri adrese na cudzí web — z tej sa
+ * podstránka nášho webu spraviť nedá a tichý odkaz inam je horší než text.
+ */
+export function adresaStranky(url: string): string | null {
+  const t = (url || "").trim();
+  if (!t) return null;
+  const plna = naPlnuAdresu(t);
+  if (plna) return plna;
+  // Cudzia doména alebo iná schéma — nie je to naša podstránka.
+  if (/^[a-z][a-z0-9+.-]*:/i.test(t) || /^(?:www\.)?[a-z0-9-]+\.[a-z]{2,}(?:\/|$)/i.test(t)) return null;
+  return `${WEB}/${t.replace(/^\/+/, "")}`;
+}

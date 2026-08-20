@@ -94,6 +94,7 @@ export function Udaje({ data, actions, chat, prekazky, kroky, podklady, onNaviga
         <NapojenieWebu />
         <NapojenieMeta />
         <NapojenieMailer />
+        <CoJarvisVieZvonku data={data} />
         <NapojenieGoogle />
         <NapojenieGoogleAds />
         <NapojenieTextWebu />
@@ -391,8 +392,31 @@ function UploadCard({ data, missing, actions, chat }: { data: PSBData; missing: 
       {uploadResult && (
         <div style={{ marginTop: 12 }}>
           {uploadResult.map((r, i) => (
-            <div key={i} style={{ padding: 9, marginBottom: 4, fontSize: 12, borderRadius: 8, background: r.error ? C.redBg : C.greenBg, color: r.error ? C.red : C.green }}>
-              {r.filename}: {r.error ? r.error : `${r.type} — pridané ${r.added}${r.skipped ? `, preskočené ${r.skipped} (duplicity)` : ""}`}
+            <div key={i}>
+              <div style={{ padding: 9, marginBottom: 4, fontSize: 12, borderRadius: 8, background: r.error ? C.redBg : C.greenBg, color: r.error ? C.red : C.green }}>
+                {r.filename}: {r.error ? r.error : `${r.type} — pridané ${r.added}${r.skipped ? `, preskočené ${r.skipped} (duplicity)` : ""}${r.zamknute ? `, ${r.zamknute} odmietnutých (uzavretý mesiac)` : ""}`}
+              </div>
+              {/*
+                Čiastočný export vyzerá presne ako úplný — obe hlásia „hotovo".
+                Rozdiel je len v tom, koho v súbore NIE JE, a to sa bez tohto
+                riadku nedozvie nikto. Preto je to varovanie, nie chyba: import
+                prebehol správne, len možno nad menším výsekom, než si myslíš.
+              */}
+              {r.chybaju && r.chybaju.length > 0 && (
+                <div style={{ padding: 9, marginBottom: 8, fontSize: 12, borderRadius: 8, background: C.orangeBg, color: C.orange }}>
+                  Pozor: {r.chybaju.length}{" "}
+                  {r.chybaju.length === 1 ? "klient má" : r.chybaju.length < 5 ? "klienti majú" : "klientov má"}{" "}
+                  v appke živý balíček, ale v tomto súbore {r.chybaju.length === 1 ? "nie je" : "nie sú"} —
+                  ich zostatky ostali nezmenené. Ak to nemá byť tak, exportuj z PTminderu širší rozsah.
+                  {/* Pri úplne čiastkovom súbore ich môže byť aj štyridsať —
+                      stena mien nikoho neinformuje, prvá desiatka stačí na to,
+                      aby bolo vidno, o aký druh ľudí ide. */}
+                  <div style={{ marginTop: 4, opacity: 0.85 }}>
+                    {r.chybaju.slice(0, 10).join(" · ")}
+                    {r.chybaju.length > 10 ? ` … a ďalších ${r.chybaju.length - 10}` : ""}
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -518,6 +542,42 @@ function ResetButton({ onReset }: { onReset: () => Promise<void> }) {
  * Tajomstvo generuje prehliadač a appka ho ukladá; nikde inde sa neposiela
  * a v tomto rozhovore ani v kóde nikdy nefiguruje.
  */
+/**
+ * Kód pre web. Jedno miesto, kde je napísaný — kto ho zmení, zmení ho tu.
+ *
+ * `wpcf7mailsent` je jediná udalosť Contact Form 7, ktorá znamená ODOSLANÉ.
+ * `wpcf7submit` sa spustí aj pri chybe validácie a klik na tlačidlo nehovorí
+ * o ničom. Na tomto rozdiele stojí, či „konverzia" v Mete znamená dopyt.
+ */
+function snippetWeb(url: string, tajne: string): string {
+  return [
+    "<script>",
+    "// PSB — dopyt z formulára do Kokpitu aj do Mety. Vlož do päty webu.",
+    "(function(){",
+    "  // UTM sa ukladá hneď pri príchode. Kto medzitým klikne inam, o kampaň už neprišiel.",
+    "  try{var q=new URLSearchParams(location.search);var u={};['utm_source','utm_medium','utm_campaign','utm_content','utm_term'].forEach(function(k){if(q.get(k))u[k]=q.get(k);});",
+    "  if(Object.keys(u).length)localStorage.setItem('psb_utm',JSON.stringify(u));}catch(e){}",
+    "  document.addEventListener('wpcf7mailsent',function(e){",
+    "    try{",
+    "      var f=(e.detail&&e.detail.inputs)||[];var v=function(n){for(var i=0;i<f.length;i++)if(f[i].name===n)return String(f[i].value||'');return '';};",
+    "      var email=(v('your-email')||v('email')).trim().toLowerCase();var tel=v('your-tel')||v('tel')||v('telefon');var meno=v('your-name')||v('meno');",
+    "      var den=new Date().toISOString().slice(0,10);",
+    "      var id=('web-'+den+'-'+(email||tel||meno).toLowerCase()).slice(0,64);",
+    "      var u={};try{u=JSON.parse(localStorage.getItem('psb_utm')||'{}');}catch(x){}",
+    "      var ck=function(n){var m=document.cookie.match('(^|;)\\s*'+n+'\\s*=\\s*([^;]+)');return m?m.pop():'';};",
+    "      if(window.fbq)fbq('track','Lead',{},{eventID:id});",
+    "      fetch('" + url + "',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({",
+    "        secret:'" + tajne + "',id:id,name:meno,email:email,telefon:tel,message:v('your-message')||v('sprava'),",
+    "        utm_source:u.utm_source||'',utm_medium:u.utm_medium||'',utm_campaign:u.utm_campaign||'',",
+    "        utm_content:u.utm_content||'',utm_term:u.utm_term||'',page:location.href,fbc:ck('_fbc'),fbp:ck('_fbp')",
+    "      })});",
+    "    }catch(err){}",
+    "  });",
+    "})();",
+    "<\/script>",
+  ].join("\n");
+}
+
 function NapojenieWebu() {
   const [tajne, setTajne] = useState<string>("");
   const [stav, setStav] = useState<"load" | "ok">("load");
@@ -578,6 +638,41 @@ function NapojenieWebu() {
       <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 6, lineHeight: 1.5 }}>
         Nové tajomstvo prestane platiť pre starý snippet na webe — po jeho vygenerovaní ho treba prepísať aj tam.
       </div>
+
+      {/* ── Hotový snippet ────────────────────────────────────────────────
+          Dovtedy dávala appka adresu a tajomstvo a kód si musel Jerry napísať
+          sám. Tri veci sa pritom dajú spraviť nenápadne zle a každá zabije
+          meranie:
+
+          1. Udalosť `Lead` sa pošle pri NAČÍTANÍ stránky alebo pri KLIKNUTÍ
+             na tlačidlo. Potom Meta hlási konverzie, ktoré nie sú dopyty —
+             presne ako Google Ads s 299 konverziami na 13 klientov.
+             `wpcf7mailsent` sa spustí až keď mail naozaj odišiel.
+          2. `event_id` v prehliadači a na serveri sa líšia, takže Meta
+             započíta jeden dopyt dvakrát.
+          3. UTM parametre sa čítajú z adresy AŽ pri odoslaní. Kto medzitým
+             klikol na inú stránku, prišiel o kampaň — preto sa ukladajú
+             hneď pri príchode. */}
+      {tajne && (
+        <div style={{ marginTop: 10 }}>
+          <div style={{ fontSize: 11.5, color: C.textMuted, marginBottom: 4 }}>
+            Hotový kód do päty webu (WordPress → Vzhľad → Editor / plugin na skripty):
+          </div>
+          <textarea
+            readOnly
+            onFocus={(e) => e.currentTarget.select()}
+            value={snippetWeb(url, ukaz ? tajne : "TAJOMSTVO-ZOBRAZ-VYSSIE")}
+            style={{ width: "100%", height: 150, background: C.bg, color: C.textMuted, border: `1px solid ${C.border}`,
+              borderRadius: 7, padding: 8, fontSize: 10.5, fontFamily: "monospace", lineHeight: 1.45 }}
+          />
+          <div style={{ fontSize: 11, color: C.textDim, marginTop: 4, lineHeight: 1.55 }}>
+            Posiela sa až po ÚSPEŠNOM odoslaní formulára, nie pri kliknutí a nie pri načítaní stránky —
+            to je rozdiel medzi konverziou a tým, že sa niekto pozrel na stránku. Pixel aj server použijú
+            rovnaké <code>event_id</code>, takže Meta započíta dopyt raz.
+            {!ukaz && " Klikni na tlačidlo ukázať vyššie, nech je v kóde aj tajomstvo."}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -596,6 +691,76 @@ function NapojenieWebu() {
  * otázka. Meta hovorí, koľko stál dosah; toto hovorí, či formulár na
  * /dychani vôbec zbiera maily — a to sa od júla nevie.
  */
+/**
+ * Čo Jarvis vie zvonku — rešerše a príručky uložené natrvalo.
+ *
+ * PREČO TO NIE SÚ „dokumenty v Jarvisovi"
+ *
+ * Tie sú prílohy k JEDNEJ debate a ich obsah sa po 30 dňoch maže, aby sa 5 MB
+ * PDF neprepisovalo do histórie pri každej správe. Vedomosť má platiť dlhšie
+ * než mesiac, tak žije inde — a preto je aj tu, nie v okne rozhovoru.
+ *
+ * Text sa načítava až na klik. V zozname stačí vedieť, ČO Jarvis pozná a AKO
+ * je to staré; osemtisíc znakov rešerše by tu inak ležalo pri každom otvorení
+ * obrazovky.
+ */
+function CoJarvisVieZvonku({ data }: { data: PSBData }) {
+  const [otvorene, setOtvorene] = useState<string>("");
+  const [text, setText] = useState<Record<string, string>>({});
+  const zoznam = data.vedomosti || [];
+  if (!zoznam.length) return null;
+
+  const otvor = (id: string) => {
+    if (otvorene === id) { setOtvorene(""); return; }
+    setOtvorene(id);
+    if (text[id]) return;
+    void fetch(`/api/vedomost?id=${encodeURIComponent(id)}`, { credentials: "same-origin" })
+      .then((r) => r.json())
+      .then((j: { vedomost?: { text?: string } }) => setText((p) => ({ ...p, [id]: j.vedomost?.text || "(text sa nenačítal)" })))
+      .catch(() => setText((p) => ({ ...p, [id]: "(text sa nenačítal)" })));
+  };
+
+  return (
+    <div style={{ marginTop: 14 }}>
+      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.8, textTransform: "uppercase", color: C.textDim, margin: "2px 0 6px" }}>
+        <Info
+          label={`Čo Jarvis vie zvonku (${zoznam.length})`}
+          text="Rešerše a príručky uložené NATRVALO — na rozdiel od dokumentov priložených k rozhovoru, ktorých obsah sa po 30 dňoch maže. Jarvis má v kontexte prehľad a text si vytiahne, keď ho potrebuje. Každá vedomosť má lehotu: keď ju prekročí, ozve sa upozornenie, že ju treba obnoviť — benchmarky a odporúčania sa menia a stará rešerš vyzerá presvedčivo aj vtedy, keď už neplatí."
+        />
+      </div>
+      {zoznam.map((v) => {
+        const dni = Math.floor((Date.now() - Date.parse(v.overeneAt || "")) / 86400000);
+        const stare = !!v.obnovovatPoDnoch && Number.isFinite(dni) && dni > v.obnovovatPoDnoch;
+        const zostava = v.obnovovatPoDnoch && Number.isFinite(dni) ? v.obnovovatPoDnoch - dni : null;
+        return (
+          <div key={v.id} style={{ padding: "8px 10px", marginBottom: 6, background: mix(C.text, 4), border: `1px solid ${stare ? C.orange : C.border}`, borderRadius: 9 }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
+              <button onClick={() => otvor(v.id)}
+                style={{ background: "none", border: "none", padding: 0, fontSize: 12.5, fontWeight: 600, color: C.text, cursor: "pointer", fontFamily: "inherit", textAlign: "left" }}>
+                {otvorene === v.id ? "▾" : "▸"} {v.nazov}
+              </button>
+              <span style={{ fontSize: 11, color: stare ? C.orange : C.textDim, marginLeft: "auto" }}>
+                {stare
+                  ? `treba obnoviť — ${dni} dní, lehota bola ${v.obnovovatPoDnoch}`
+                  : zostava !== null ? `overené ${fmtDMY((v.overeneAt || "").slice(0, 10))} · obnoviť o ${zostava} dní` : `overené ${fmtDMY((v.overeneAt || "").slice(0, 10))}`}
+              </span>
+            </div>
+            <div style={{ fontSize: 11.5, color: C.textMuted, marginTop: 3, lineHeight: 1.5 }}>{v.oCom}</div>
+            {otvorene === v.id && (
+              <>
+                {v.zdroj && <div style={{ fontSize: 11, color: C.textDim, marginTop: 6, lineHeight: 1.5 }}>Zdroj: {v.zdroj}</div>}
+                <pre style={{ marginTop: 8, padding: 10, background: mix(C.text, 3), borderRadius: 8, fontSize: 11.5, lineHeight: 1.6, color: C.textMuted, whiteSpace: "pre-wrap", wordBreak: "break-word", maxHeight: 420, overflowY: "auto", fontFamily: "inherit" }}>
+                  {text[v.id] || "načítavam…"}
+                </pre>
+              </>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function NapojenieMailer() {
   const [stav, setStav] = useState<{ maToken: boolean; odberatelia: unknown[]; kampane: unknown[] } | null>(null);
   const [token, setToken] = useState("");
@@ -1096,7 +1261,7 @@ function NapojenieGoogleAds() {
 
 
 function NapojenieMeta() {
-  const [stav, setStav] = useState<{ maToken: boolean; maCapi: boolean; pixelId: string; adAccount: string; igUser: string; kampani: number; igPrispevkov: number } | null>(null);
+  const [stav, setStav] = useState<{ maToken: boolean; tokenPlatiDo?: string; pristup?: { volani: number; chybovost: number; splna: boolean; chyba: string }; maCapi: boolean; pixelId: string; adAccount: string; igUser: string; kampani: number; igPrispevkov: number } | null>(null);
   const [token, setToken] = useState("");
   const [ucet, setUcet] = useState("");
   const [ig, setIg] = useState("");
@@ -1151,7 +1316,36 @@ function NapojenieMeta() {
 
       <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 8 }}>
         Token: <b style={{ color: stav.maToken ? C.green : C.orange }}>{stav.maToken ? "uložený" : "chýba"}</b>
+        {/* Krátky token z Graph Exploreru vyprší do hodiny a sťahovanie
+            prestane fungovať uprostred mesiaca — bez tohto riadku to nikto
+            nevidí, kým sa niečo nepokazí (19. 8. 2026). */}
+        {stav.tokenPlatiDo && (() => {
+          const bezKonca = stav.tokenPlatiDo === "bez expirácie";
+          const doKedy = bezKonca ? null : new Date(stav.tokenPlatiDo);
+          const dni = doKedy ? Math.round((doKedy.getTime() - Date.now()) / 86400000) : null;
+          const zle = dni !== null && dni < 7;
+          return (
+            <span style={{ color: bezKonca ? C.green : zle ? C.orange : C.textMuted }}>
+              {" · "}platí {bezKonca ? "bez obmedzenia" : `do ${doKedy!.toLocaleString("sk-SK", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" })}`}
+              {zle && (dni! <= 0 ? " — vyprší dnes, predĺž ho" : ` — ostáva ${dni} dní`)}
+            </span>
+          );
+        })()}
         {" · "}kampaní v appke: <b style={{ color: C.text }}>{stav.kampani}</b>
+        {/* Cesta k Full Access. Od 19. 8. je potrebný UŽ LEN na pravý boost
+            (reklama = ten istý príspevok aj s lajkami) — všetko ostatné appka
+            robí aj bez neho, takže
+            sa nedá propagovať príspevok — a bez počítadla by sa o prístup
+            dalo požiadať len odhadom (19. 8. 2026). */}
+        {stav.pristup && (
+          <div style={{ marginTop: 4, fontSize: 11.5, color: stav.pristup.splna ? C.green : C.textMuted }}>
+            Prístup k API: <b style={{ color: stav.pristup.splna ? C.green : C.text }}>{stav.pristup.volani} volaní</b> za 15 dní
+            {stav.pristup.volani > 0 && `, chybovosť ${String(stav.pristup.chybovost).replace(".", ",")} %`}
+            {stav.pristup.splna
+              ? " — podmienky na Full Access splnené, dá sa oň požiadať."
+              : ` — ${stav.pristup.chyba} Full Access treba už len na pravý boost (reklama zdedí lajky príspevku); propagácia zatiaľ beží kópiou obsahu.`}
+          </div>
+        )}
         {" · "}IG príspevkov: <b style={{ color: C.text }}>{stav.igPrispevkov}</b>
       </div>
 

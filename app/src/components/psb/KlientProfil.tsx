@@ -191,8 +191,15 @@ export function KlientProfil({ meno, data, clients, onZavri, btcSats }: {
         {/* Zátvorka s hodinami len keď sa líšia od počtu — pri hodinových
             sedeniach je „4 (4 h)" to isté číslo dvakrát. */}
         {stat("Sedení", Math.round(c.totalHours) === c.sessionCount ? String(c.sessionCount) : `${c.sessionCount} (${Math.round(c.totalHours)} h)`)}
-        {stat("Tempo", `${burnRate.toFixed(1)}/mes · ${(burnRate / 4.33).toFixed(1)}/týž`, undefined,
-          "Priemerný počet sedení za mesiac a za týždeň z posledných 90 dní.")}
+        {/* Na pauze tempo klame: v 90-dňovom okne sú mesiace, keď klient
+            zámerne nechodil, a číslo vyzerá ako spomalenie. Appka pozná len
+            „dokedy" pauza trvá, nie odkedy — tak sa okno nedá očistiť presne.
+            Preto sa pri pauze tempo NEZAMLČÍ ani nevymyslí, ale označí: je to
+            tempo z obdobia, kam pauza padá, a tak sa má čítať. */}
+        {stat("Tempo", `${burnRate.toFixed(1)}/mes · ${(burnRate / 4.33).toFixed(1)}/týž`, c.status === "Pauza" ? C.textDim : undefined,
+          c.status === "Pauza"
+            ? `Z posledných 90 dní — ale klient je NA PAUZE${c.pauseUntil ? ` (do ${fmtDMY(c.pauseUntil)})` : ""}, takže číslo zahŕňa mesiace, keď zámerne nechodil. Nie je to spomalenie; skutočné tempo uvidíš, až keď sa vráti.`
+            : "Priemerný počet sedení za mesiac a za týždeň z posledných 90 dní.")}
         {stat("Dochádzka", `${Math.round(c.attendance * 100)} %`,
           c.attendance >= 0.7 ? C.green : c.attendance >= 0.4 ? undefined : C.orange,
           "Podiel týždňov z posledných 18, v ktorých klient reálne trénoval.")}

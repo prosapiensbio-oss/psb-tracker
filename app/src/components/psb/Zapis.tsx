@@ -138,6 +138,7 @@ export function ZapisButton({
   const [dopytDatum, setDopytDatum] = useState(() => new Date().toISOString().slice(0, 10));
   const [dopytBusy, setDopytBusy] = useState(false);
   const [dopytOk, setDopytOk] = useState("");
+  const [dopytChyba, setDopytChyba] = useState("");
   const [poznMeno, setPoznMeno] = useState("");
   // Kampaň / akcia — vlajka do marketingových grafov. Pomenované po ľudsky:
   // „značka" nehovorí nič o tom, aký typ informácie sa čaká.
@@ -154,7 +155,10 @@ export function ZapisButton({
       const zoz = Array.isArray(st["mkt_znacky"]) ? (st["mkt_znacky"] as Record<string, unknown>[]) : [];
       zoz.push({ id: `z${Date.now().toString(36)}`, datum: akciaDatum, text: t });
       return saveVzasSetting("mkt_znacky", zoz);
-    }).then(() => {
+    }).then((ok) => {
+      // „⚑ Zapísané" až po zapísaní — NapadBox o sto riadkov nižšie to robí
+      // správne od začiatku, toto tlačidlo malo mäkší meter.
+      if (!ok) { setAkciaOk("✗ nezapísané — skús znova"); setTimeout(() => setAkciaOk(""), 4000); return; }
       setAkciaText("");
       setAkciaOk(t);
       setTimeout(() => setAkciaOk(""), 4000);
@@ -250,7 +254,13 @@ export function ZapisButton({
                 // Dátum sa po uložení ZÁMERNE nevracia na dnešok: kto dopisuje
                 // viac dopytov z jedného dňa, nastaví ho raz. Meno sa maže,
                 // dátum a zdroj zostávajú — to je poradie, v akom sa to píše.
-                .then(() => { setDopytMeno(""); setDopytOk(`${m} · ${dopytDatum.split("-").reverse().map(Number).join(".")}.`); onRefresh?.(); setTimeout(() => setDopytOk(""), 4000); })
+                // saveLead pri zlyhaní NEHÁDŽE, vráti null — „Zapísané" sa smie
+                // tvrdiť len pri id. Meno sa pri chybe NEMAŽE, nech sa dá
+                // skúsiť znova a dopyt sa nestratí (revízia 20. 8. 2026).
+                .then((id) => {
+                  if (id === null) { setDopytChyba(`Dopyt „${m}" sa NEULOŽIL — skús znova.`); setTimeout(() => setDopytChyba(""), 8000); return; }
+                  setDopytChyba(""); setDopytMeno(""); setDopytOk(`${m} · ${dopytDatum.split("-").reverse().map(Number).join(".")}.`); onRefresh?.(); setTimeout(() => setDopytOk(""), 4000);
+                })
                 .finally(() => setDopytBusy(false));
             }}
             style={{ marginBottom: 14, padding: "11px 13px", borderRadius: 10, border: `1px solid ${mix(C.accent, 30)}`, background: mix(C.accent, 5) }}
@@ -281,6 +291,7 @@ export function ZapisButton({
               </button>
             </div>
             {dopytOk && <div style={{ fontSize: 11.5, color: C.green, marginTop: 6 }}>Zapísané: {dopytOk}. Detail doplníš v Klienti → Dopyty.</div>}
+            {dopytChyba && <div style={{ fontSize: 11.5, color: C.red, marginTop: 6 }}>{dopytChyba}</div>}
           </form>
 
           {/* Denník klienta — rovnaký princíp ako dopyt: meno + text, bez

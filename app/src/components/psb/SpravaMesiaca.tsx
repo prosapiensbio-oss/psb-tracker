@@ -73,9 +73,12 @@ export function SpravaMesiaca({
     const stara = n[mesiac]?.note || "";
     const dnes = new Date().toISOString().slice(0, 10);
     const blok = `── Mesačná správa (${dnes}) ──\n${t}`;
-    await saveMonthNote(mesiac, [stara, blok].filter(Boolean).join("\n\n"), n[mesiac]?.answers || {}, "jarvis+jerry");
+    const ok = await saveMonthNote(mesiac, [stara, blok].filter(Boolean).join("\n\n"), n[mesiac]?.answers || {}, "jarvis+jerry");
     setUklada(false);
-    setStav("ulozene");
+    // Server vracia 413, keď poznámka prerastie limit — a poznámka rastie
+    // sama (kronika do nej pripisuje). „Uložené" na neuloženej správe by
+    // znamenalo stratiť text, ktorý sa už nedá vygenerovať rovnako.
+    setStav(ok ? "ulozene" : "chyba");
   };
 
   return (

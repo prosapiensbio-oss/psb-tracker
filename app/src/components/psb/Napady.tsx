@@ -26,6 +26,10 @@ import { Card, Empty, H3, Info } from "./ui";
 export type Napad = {
   id: string; datum: string; text: string;
   zdroj: string; stav: string; poznamka: string; autor: string;
+  /** Odkaz na hotový príspevok — tým sa kruh uzatvára. */
+  odkaz?: string;
+  /** Deň, keď z nápadu vyšiel obsah. Zapisuje sa sám pri „použité". */
+  pouzite_at?: string;
 };
 
 const ZDROJ_LABEL: Record<string, string> = {
@@ -49,12 +53,24 @@ export function Napady({ chat }: { chat?: AssistantChat }) {
     .finally(() => setNacitane(true));
   useEffect(nacitaj, []);
 
+  const [chyba, setChyba] = useState("");
+  /**
+   * Kruh sa uzatvára odkazom (Jerry, 18. 8. 2026).
+   *
+   * „Použité" bez odkazu je len odškrtnutie — appka potom nikdy nezistí, či
+   * témy zachytené pri tréningu fungujú lepšie než témy z hlavy, a to je
+   * jediný dôvod, prečo sa nápady zbierajú. Adresa sa dá preskočiť: nútiť
+   * ju by znamenalo, že sa nápad neoznačí vôbec.
+   */
+  const [pytaOdkaz, setPytaOdkaz] = useState<string | null>(null);
+  const [odkazText, setOdkazText] = useState("");
   const zmen = async (id: string, zmena: Partial<Napad>) => {
-    await fetch("/api/napady", {
+    const j = await fetch("/api/napady", {
       method: "POST", credentials: "same-origin",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ id, ...zmena }),
-    }).catch(() => {});
+    }).then((r) => r.json()).catch(() => ({ ok: false }));
+    setChyba(j?.ok ? "" : "Zmena sa nezapísala — skús znova.");
     nacitaj();
   };
 
@@ -88,6 +104,7 @@ export function Napady({ chat }: { chat?: AssistantChat }) {
 
   return (
     <Card>
+      {chyba && <div style={{ fontSize: 12, color: C.red, marginBottom: 8 }}>{chyba}</div>}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         <H3>
           <Info
@@ -121,7 +138,17 @@ export function Napady({ chat }: { chat?: AssistantChat }) {
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginTop: 4 }}>
                 <span style={{ fontSize: 11, color: C.textDim }}>
                   {ZDROJ_LABEL[n.zdroj] || n.zdroj} · {fmtDen(n.datum)}
-                  {n.stav === "pouzity" && <span style={{ color: C.green }}> · použité</span>}
+                  {n.stav === "pouzity" && (
+                    <span style={{ color: C.green }}>
+                      {" "}· použité{n.pouzite_at ? ` ${fmtDen(n.pouzite_at)}` : ""}
+                      {n.odkaz && (
+                        <>
+                          {" "}·{" "}
+                          <a href={n.odkaz} target="_blank" rel="noopener noreferrer" style={{ color: C.accentLight }}>príspevok ↗</a>
+                        </>
+                      )}
+                    </span>
+                  )}
                   {n.stav === "zamietnuty" && <span> · zamietnuté</span>}
                 </span>
                 {n.stav === "novy" && (
@@ -141,6 +168,22 @@ export function Napady({ chat }: { chat?: AssistantChat }) {
                       nie je to téma
                     </button>
                   </>
+                )}
+                {pytaOdkaz === n.id && (
+                  <span style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", width: "100%", marginTop: 4 }}>
+                    <input
+                      value={odkazText}
+                      onChange={(e) => setOdkazText(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") { void zmen(n.id, { stav: "pouzity", odkaz: odkazText.trim() }); setPytaOdkaz(null); setOdkazText(""); } }}
+                      autoFocus
+                      placeholder="Odkaz na príspevok (nepovinné, Enter potvrdí)"
+                      style={{ flex: 1, minWidth: 220, padding: "4px 8px", borderRadius: 6, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 12 }}
+                    />
+                    <button onClick={() => { void zmen(n.id, { stav: "pouzity", odkaz: odkazText.trim() }); setPytaOdkaz(null); setOdkazText(""); }}
+                      style={{ background: C.accentBg, border: `1px solid ${C.accent}`, borderRadius: 6, padding: "3px 10px", color: C.accentLight, fontSize: 11.5, cursor: "pointer" }}>
+                      označiť
+                    </button>
+                  </span>
                 )}
                 {n.stav !== "novy" && (
                   <button onClick={() => void zmen(n.id, { stav: "novy" })}

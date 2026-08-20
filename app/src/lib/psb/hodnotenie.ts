@@ -1,3 +1,4 @@
+import { C } from "./theme";
 /**
  * Hranice, podľa ktorých obrazovka rozhoduje, či je číslo dobré alebo zlé.
  *
@@ -121,3 +122,18 @@ export const KONVERZIA_DOPYTU: Kotva[] = [
   [55, 8],
   [70, 10],
 ];
+
+
+/**
+ * Farba podľa skóre — bez čísla, len signál.
+ *
+ * Žila v Kampane.tsx, ktoré 18. 8. 2026 nahradila jedna karta o reklame.
+ * Patrí sem: je to zobrazenie hodnotenia, nie vlastnosť kampane.
+ */
+export function farbaCeny(skore: number): string {
+  if (skore >= 8.5) return C.green;
+  if (skore >= 6.5) return C.accentLight;
+  if (skore >= 4.5) return C.textMuted;
+  if (skore >= 2.5) return C.orange;
+  return C.red;
+}

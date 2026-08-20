@@ -178,7 +178,10 @@ describe("kto je za číslami", () => {
     );
     expect(k.kto.dopyty.map((x) => x.meno)).toEqual(["Nikto", "Petra"]);   // od najnovšieho
     expect(k.kto.uvodne).toEqual([{ meno: "Petra", datum: "2026-01-10" }]);
-    expect(k.kto.klienti[0]).toEqual({ meno: "Petra", prvy: "2026-01-10", zaplatil: "2026-01-22" });
+    // `trzbaVOkne` je súčet Petriných platieb v okne — to isté číslo, ktoré
+    // stojí v „Tržba od nových" (od 19. 8. 2026 jeden zdroj pre číslo aj zoznam).
+    expect(k.kto.klienti[0]).toMatchObject({ meno: "Petra", prvy: "2026-01-10", zaplatil: "2026-01-22" });
+    expect(k.kto.klienti[0].trzbaVOkne).toBe(k.trzba);
   });
 
   it("kto prišiel na úvodný dvakrát, je v zozname raz a s prvým dátumom", () => {
@@ -270,5 +273,45 @@ describe("balíček je konverzia, aj keď človek ešte neprišiel", () => {
       MES,
     );
     expect(k.klienti).toBe(0);
+  });
+});
+
+describe("dopyt → úvodný (zDopytuUvodny)", () => {
+  it("úvodné bez dopytu percento nenafúknu — konvertujú sa dopyty", () => {
+    // Prípad „121 %" z 20. 8. 2026: dvaja na úvodnom, jeden zapísaný dopyt.
+    const s = [
+      session("Petra", "2026-01-10", "UVODNE"),
+      session("Jana", "2026-01-12", "UVODNE"),
+    ];
+    const k = krokyZa(
+      psb({ leads: [lead("l1", "2026-01-05", "Petra")], sessions: s }),
+      { Petra: klient("Petra", "2026-01-10", [s[0]]), Jana: klient("Jana", "2026-01-12", [s[1]]) },
+      MES,
+    );
+    expect(k.uvodne).toBe(2);
+    expect(k.dopyty).toBe(1);
+    // Staré `uvodne / dopyty` by dalo 200 %. Došiel jeden dopyt z jedného.
+    expect(k.zDopytuUvodny).toBe(1);
+    expect(k.kto.naUvodny).toEqual([{ meno: "Petra", dopyt: "2026-01-05", uvodny: "2026-01-10" }]);
+  });
+
+  it("úvodný PO konci okna sa dopytu prizná — okno obmedzuje dopyty, nie úvodné", () => {
+    const s = [session("Petra", "2026-03-03", "UVODNE")];
+    const k = krokyZa(
+      psb({ leads: [lead("l1", "2026-02-20", "Petra")], sessions: s }),
+      { Petra: klient("Petra", "2026-03-03", [s[0]]) },
+      MES,
+    );
+    expect(k.zDopytuUvodny).toBe(1);
+  });
+
+  it("existujúci klient s úvodným PRED dopytom sa neráta", () => {
+    const s = [session("Petra", "2025-11-01", "UVODNE")];
+    const k = krokyZa(
+      psb({ leads: [lead("l1", "2026-01-05", "Petra")], sessions: s }),
+      { Petra: klient("Petra", "2025-11-01", [s[0]]) },
+      MES,
+    );
+    expect(k.zDopytuUvodny).toBe(0);
   });
 });
