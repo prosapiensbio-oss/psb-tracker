@@ -390,3 +390,54 @@ export function pripravSadu(v: {
     dsa_payor: v.prijemca,
   };
 }
+
+/**
+ * Odkaz priamo na kampaň v Ads Manageri.
+ *
+ * Jerry chce po založení kampaň VIDIEŤ u Mety skôr, než ju pustí — appka mu
+ * preto dáva preklik (a tlačidlo na skopírovanie). Adresa je stabilný tvar
+ * Ads Managera: účet + predvybraná kampaň.
+ */
+export function adsManagerOdkaz(kampanId: string): string {
+  return `https://adsmanager.facebook.com/adsmanager/manage/campaigns?act=${UCET_REKLAM}&selected_campaign_ids=${encodeURIComponent(kampanId)}`;
+}
+
+/** Čo kontrolór potrebuje vedieť o kampani pred spustením — už stiahnuté z Mety. */
+export type StavKampanePredSpustenim = {
+  kampan: { id: string; accountId: string; dailyBudget?: number | null; lifetimeBudget?: number | null; stopTime?: string | null };
+  sady: { id: string; dailyBudget?: number | null; lifetimeBudget?: number | null; endTime?: string | null }[];
+  reklamy: { id: string; efektivnyStav?: string | null; maKreativu: boolean }[];
+};
+
+/**
+ * Kontrolór pred spustením. Vracia zoznam dôvodov, prečo sa spustiť NEDÁ —
+ * prázdny zoznam znamená zelenú. Zámerne je to čistá funkcia nad stiahnutými
+ * dátami: dá sa otestovať bez Mety a server ju volá tesne pred aktiváciou.
+ *
+ * Vznikol 20. 8. 2026, keď test doručovania musel spúšťať Claude ručne cez
+ * API — appka vedela kampaň len založiť. Odteraz: založiť → preklik na
+ * kontrolu očami → tlačidlo Spustiť, ktoré prejde týmto kontrolórom.
+ */
+export function skontrolujPredSpustenim(s: StavKampanePredSpustenim): string[] {
+  const chyby: string[] = [];
+  if (s.kampan.accountId && s.kampan.accountId.replace(/^act_/, "") !== UCET_REKLAM) {
+    chyby.push(`Kampaň patrí inému účtu (${s.kampan.accountId}) — Kokpit spúšťa len na účte ${UCET_REKLAM}.`);
+  }
+  if (!s.sady.length) chyby.push("Kampaň nemá žiadnu sadu reklám — nemá KOMU sa doručovať.");
+  if (!s.reklamy.length) chyby.push("Kampaň nemá žiadnu reklamu — nemá ČO sa doručovať.");
+  if (s.reklamy.some((r) => !r.maKreativu)) chyby.push("Reklama nemá kreatívu — spustila by sa prázdna.");
+  const zamietnute = s.reklamy.filter((r) => r.efektivnyStav === "DISAPPROVED");
+  if (zamietnute.length) chyby.push(`Meta reklamu zamietla (${zamietnute.map((r) => r.id).join(", ")}) — pred spustením ju treba upraviť.`);
+  // Rozpočet môže žiť na kampani (CBO) alebo na sade — stačí jedno z toho.
+  const maRozpocet = (n?: number | null) => typeof n === "number" && n > 0;
+  const kampanovy = maRozpocet(s.kampan.dailyBudget) || maRozpocet(s.kampan.lifetimeBudget);
+  const sadovy = s.sady.some((x) => maRozpocet(x.dailyBudget) || maRozpocet(x.lifetimeBudget));
+  if (!kampanovy && !sadovy) chyby.push("Kampaň ani sada nemá rozpočet — Meta by ju odmietla doručovať.");
+  // Denný rozpočet pod minimom Mety by sa vôbec neminul; halier-korunová pasca:
+  // Meta vracia rozpočty v halieroch, minimum je v korunách.
+  const denneKc = (s.kampan.dailyBudget ?? s.sady.find((x) => maRozpocet(x.dailyBudget))?.dailyBudget ?? 0) / 100;
+  if (denneKc > 0 && denneKc < MIN_DENNE_KC) chyby.push(`Denný rozpočet ${denneKc} Kč je pod minimom Mety (${MIN_DENNE_KC} Kč).`);
+  // Celkový rozpočet bez konca = kampaň, ktorá míňa donekonečna.
+  if (maRozpocet(s.kampan.lifetimeBudget) && !s.kampan.stopTime) chyby.push("Kampaň má celkový rozpočet, ale žiadny dátum konca.");
+  return chyby;
+}

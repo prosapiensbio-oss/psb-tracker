@@ -14,7 +14,7 @@ import type { Actions } from "./App";
 import { nastavPnlBunku, pnlOverridesNaUlozenie } from "../../lib/psb/vzas";
 
 type ParsedAction = {
-  type: "ack-anomaly" | "unack-anomaly" | "set-override" | "zapis-zaver" | "vyhodnot-zaver" | "novy-ciel" | "kronika" | "odloz-anomaliu" | "uprav-pnl" | "zarad-pohyby" | "mkt-znacka";
+  type: "ack-anomaly" | "unack-anomaly" | "set-override" | "zapis-zaver" | "vyhodnot-zaver" | "novy-ciel" | "kronika" | "odloz-anomaliu" | "uprav-pnl" | "zarad-pohyby" | "mkt-znacka" | "spusti-kampan" | "zastav-kampan";
   label: string;
   done?: boolean;
   key?: string;
@@ -143,6 +143,8 @@ function parseActions(raw: string): { text: string; actions: ParsedAction[] } {
           actions.push({ type: "uprav-pnl", label, data: o });
         } else if (o?.type === "zarad-pohyby" && Array.isArray(o.zmeny) && o.zmeny.length) {
           actions.push({ type: "zarad-pohyby", label, data: o });
+        } else if ((o?.type === "spusti-kampan" || o?.type === "zastav-kampan") && /^[0-9]{5,}$/.test(String(o.kampanId))) {
+          actions.push({ type: o.type, data: { kampanId: String(o.kampanId) }, label });
         } else if (o?.type === "mkt-znacka" && typeof o.text === "string" && /^\d{4}-\d{2}-\d{2}$/.test(String(o.datum))) {
           actions.push({ type: "mkt-znacka", label, data: o });
         }
@@ -635,6 +637,26 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
             void actions.refresh();
           })
           .catch(() => oznamVysledok("Zaradenie pohybov zlyhalo — spojenie."));
+      } else if ((a.type === "spusti-kampan" || a.type === "zastav-kampan") && a.data) {
+        // Spustenie kampane z chatu — Jarvis navrhne, Jerry klikne, server
+        // prejde kontrolórom (skontrolujPredSpustenim) a zapne alebo vypne
+        // všetky tri úrovne naraz. Vzniklo 20. 8. 2026 po teste doručovania,
+        // ktorý musel spúšťať Claude ručne cez API.
+        const smer = a.type;
+        void fetch("/api/meta", {
+          method: "POST", credentials: "same-origin",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ akcia: smer, kampanId: String(a.data.kampanId || "") }),
+        })
+          .then((r) => r.json())
+          .then((j: { ok?: boolean; stav?: string; nazov?: string; odkaz?: string; kontrola?: string[]; error?: string }) => {
+            if (j.ok) oznamVysledok(smer === "spusti-kampan"
+              ? `Kampaň „${j.nazov}" SPUSTENÁ (kampaň + sada + reklama). Meta ju ešte schvaľuje. Kontrola očami: ${j.odkaz}`
+              : `Kampaň „${j.nazov}" vypnutá — všetky tri úrovne POZASTAVENÉ.`);
+            else if (j.kontrola?.length) oznamVysledok(`Kontrolór kampaň NEPUSTIL: ${j.kontrola.join(" · ")}`);
+            else oznamVysledok(`Prepnutie kampane neprešlo: ${j.error || "bez dôvodu"}`);
+          })
+          .catch(() => oznamVysledok("Prepnutie kampane zlyhalo — spojenie."));
       } else if (a.type === "mkt-znacka" && a.data) {
         // Značka do marketingových grafov — „tu bežala kampaň". Rovnaký sklad
         // ako pri cieľoch: jeden JSON kľúč, žiadna vlastná tabuľka.

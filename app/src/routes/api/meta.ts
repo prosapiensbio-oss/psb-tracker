@@ -7,7 +7,7 @@ import type { D1Database } from "@cloudflare/workers-types";
 import { bindings } from "../../lib/bindings.server";
 import { posliLead } from "../../lib/psb/capi";
 import { kategoriaHooku, krstneMenaKlientov } from "../../lib/psb/hook";
-import { MIN_DENNE_KC, UCET_REKLAM, jeUcetReklam, pripravKampan, pripravSadu, stavDorucovania } from "../../lib/psb/kampanPlan";
+import { MIN_DENNE_KC, UCET_REKLAM, adsManagerOdkaz, jeUcetReklam, pripravKampan, pripravSadu, skontrolujPredSpustenim, stavDorucovania, type StavKampanePredSpustenim } from "../../lib/psb/kampanPlan";
 import { OKNO_DNI, stavPristupu } from "../../lib/psb/metaPristup";
 
 /**
@@ -870,6 +870,55 @@ export const Route = createFileRoute("/api/meta")({
          * Preto sa nedá napísať mesto do políčka a hotovo; musí sa vyhľadať.
          * Vracia sa len to, čo treba na výber: kľúč, meno, kraj a krajina.
          */
+        if (akcia === "spusti-kampan" || akcia === "zastav-kampan") {
+          /**
+           * Spustenie a vypnutie kampane — s kontrolórom pred spustením.
+           *
+           * Vzniklo 20. 8. 2026: test doručovania musel spúšťať Claude ručne
+           * cez Graph API, lebo appka vedela kampaň len založiť (POZASTAVENÚ).
+           * Odteraz: appka dá preklik do Ads Managera na kontrolu očami
+           * a tlačidlo Spustiť; server pred aktiváciou prejde kontrolórom
+           * (`skontrolujPredSpustenim`) a zapne VŠETKY TRI úrovne — kampaň,
+           * sadu aj reklamu. Pol zapnutá kampaň („Ad set off") bola presne
+           * pasca, do ktorej Jerry spadol v Ads Manageri.
+           */
+          const kampanId = String(b.kampanId || "").trim();
+          if (!/^[0-9]{5,}$/.test(kampanId)) return Response.json({ ok: false, error: "chyba_kampan" }, { status: 400 });
+          const [k, sadyR, reklamyR] = await Promise.all([
+            graph(`${kampanId}?fields=name,account_id,daily_budget,lifetime_budget,stop_time`, n.token),
+            graph(`${kampanId}/adsets?fields=id,daily_budget,lifetime_budget,end_time&limit=25`, n.token),
+            graph(`${kampanId}/ads?fields=id,effective_status,creative&limit=25`, n.token),
+          ]);
+          if (!k.ok) return Response.json({ ok: false, error: k.chyba }, { status: 502 });
+          const kd = k.data as { name?: string; account_id?: string; daily_budget?: string; lifetime_budget?: string; stop_time?: string };
+          const sd = ((sadyR.data as { data?: { id: string; daily_budget?: string; lifetime_budget?: string; end_time?: string }[] })?.data) || [];
+          const rd = ((reklamyR.data as { data?: { id: string; effective_status?: string; creative?: { id?: string } }[] })?.data) || [];
+          const cislo = (x?: string) => (x ? Number(x) : null);
+          const stavPred: StavKampanePredSpustenim = {
+            kampan: { id: kampanId, accountId: String(kd.account_id || ""), dailyBudget: cislo(kd.daily_budget), lifetimeBudget: cislo(kd.lifetime_budget), stopTime: kd.stop_time || null },
+            sady: sd.map((x) => ({ id: x.id, dailyBudget: cislo(x.daily_budget), lifetimeBudget: cislo(x.lifetime_budget), endTime: x.end_time || null })),
+            reklamy: rd.map((x) => ({ id: x.id, efektivnyStav: x.effective_status || null, maKreativu: !!x.creative?.id })),
+          };
+          if (akcia === "spusti-kampan") {
+            const chyby = skontrolujPredSpustenim(stavPred);
+            if (chyby.length) return Response.json({ ok: false, kontrola: chyby }, { status: 409 });
+          }
+          const cielovyStav = akcia === "spusti-kampan" ? "ACTIVE" : "PAUSED";
+          // Kampaň ako posledná: keby prepínanie spadlo v strede, zostane
+          // vypnutá strecha nad polozapnutými poschodiami — nič sa neminie.
+          const objekty = [...rd.map((x) => x.id), ...sd.map((x) => x.id), kampanId];
+          for (const o of objekty) {
+            const r = await graphPost(o, { status: cielovyStav }, n.token);
+            if (!r.ok) return Response.json({ ok: false, error: `Prepnutie ${o} neprešlo: ${r.chyba}` }, { status: 502 });
+          }
+          await audit(DB, {
+            action: "reklama", predmet: akcia,
+            neu: `${kd.name || kampanId} → ${cielovyStav} (${objekty.length} objektov)`,
+            actor: await currentUser(request) || undefined,
+          });
+          return Response.json({ ok: true, stav: cielovyStav, nazov: kd.name || "", odkaz: adsManagerOdkaz(kampanId), objektov: objekty.length });
+        }
+
         if (akcia === "mesta") {
           const q = String(b.q || "").trim();
           if (q.length < 2) return Response.json({ ok: true, mesta: [] });

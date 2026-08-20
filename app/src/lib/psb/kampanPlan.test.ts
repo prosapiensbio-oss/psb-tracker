@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { MIN_DENNE_KC, MIN_STROP_KC, UCET_REKLAM, jeUcetReklam, navrhNazvu, OKRUH_MAX_KM, OKRUH_MIN_KM, navrhZTokenu, pripravKampan, pripravSadu, stavDorucovania } from "./kampanPlan";
+import { MIN_DENNE_KC, MIN_STROP_KC, UCET_REKLAM, adsManagerOdkaz, jeUcetReklam, navrhNazvu, OKRUH_MAX_KM, OKRUH_MIN_KM, navrhZTokenu, pripravKampan, pripravSadu, skontrolujPredSpustenim, stavDorucovania, type StavKampanePredSpustenim } from "./kampanPlan";
 
 const zaklad = {
   nazov: "PSB 2026-09 — uvodni-trenink — navstevy",
@@ -345,5 +345,51 @@ describe("rozpočet zadaný celkovou sumou", () => {
     expect(v.ok).toBe(true);
     if (!v.ok) return;
     expect(v.varovania.join(" ")).not.toContain("bez stropu");
+  });
+});
+
+describe("adsManagerOdkaz", () => {
+  it("vedie na účet PSB s predvybranou kampaňou", () => {
+    const u = adsManagerOdkaz("52598507328475");
+    expect(u).toContain("act=172897726151288");
+    expect(u).toContain("selected_campaign_ids=52598507328475");
+  });
+});
+
+describe("skontrolujPredSpustenim", () => {
+  const zdrava: StavKampanePredSpustenim = {
+    kampan: { id: "1", accountId: "act_172897726151288", dailyBudget: 4400 },
+    sady: [{ id: "s1" }],
+    reklamy: [{ id: "r1", efektivnyStav: "PAUSED", maKreativu: true }],
+  };
+  it("zdravú kampaň pustí", () => {
+    expect(skontrolujPredSpustenim(zdrava)).toEqual([]);
+  });
+  it("cudzí účet zastaví", () => {
+    const ch = skontrolujPredSpustenim({ ...zdrava, kampan: { ...zdrava.kampan, accountId: "act_999" } });
+    expect(ch.some((c) => c.includes("inému účtu"))).toBe(true);
+  });
+  it("bez reklamy zastaví", () => {
+    expect(skontrolujPredSpustenim({ ...zdrava, reklamy: [] }).some((c) => c.includes("žiadnu reklamu"))).toBe(true);
+  });
+  it("bez kreatívy zastaví", () => {
+    const ch = skontrolujPredSpustenim({ ...zdrava, reklamy: [{ id: "r1", maKreativu: false }] });
+    expect(ch.some((c) => c.includes("kreatívu"))).toBe(true);
+  });
+  it("zamietnutú reklamu zastaví", () => {
+    const ch = skontrolujPredSpustenim({ ...zdrava, reklamy: [{ id: "r1", efektivnyStav: "DISAPPROVED", maKreativu: true }] });
+    expect(ch.some((c) => c.includes("zamietla"))).toBe(true);
+  });
+  it("bez rozpočtu zastaví, sadový rozpočet stačí", () => {
+    expect(skontrolujPredSpustenim({ ...zdrava, kampan: { id: "1", accountId: "act_172897726151288" } }).some((c) => c.includes("rozpočet"))).toBe(true);
+    expect(skontrolujPredSpustenim({ ...zdrava, kampan: { id: "1", accountId: "act_172897726151288" }, sady: [{ id: "s1", dailyBudget: 4400 }] })).toEqual([]);
+  });
+  it("denný rozpočet pod minimom zastaví (haliere!)", () => {
+    const ch = skontrolujPredSpustenim({ ...zdrava, kampan: { ...zdrava.kampan, dailyBudget: 1000 } });
+    expect(ch.some((c) => c.includes("pod minimom"))).toBe(true);
+  });
+  it("celkový rozpočet bez konca zastaví", () => {
+    const ch = skontrolujPredSpustenim({ ...zdrava, kampan: { id: "1", accountId: "act_172897726151288", lifetimeBudget: 600000, stopTime: null } });
+    expect(ch.some((c) => c.includes("dátum konca"))).toBe(true);
   });
 });

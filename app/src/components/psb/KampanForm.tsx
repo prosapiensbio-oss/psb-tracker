@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { WEB_STRANKY , marketingVerzia } from "../../lib/psb/marketing";
-import { MIN_DENNE_KC, MIN_STROP_KC, OBLASTI, OKRUH_MAX_KM, OKRUH_MIN_KM, UCET_REKLAM, navrhNazvu, pripravKampan, type CielKampane, type Oblast } from "../../lib/psb/kampanPlan";
+import { MIN_DENNE_KC, MIN_STROP_KC, OBLASTI, OKRUH_MAX_KM, OKRUH_MIN_KM, UCET_REKLAM, adsManagerOdkaz, navrhNazvu, pripravKampan, type CielKampane, type Oblast } from "../../lib/psb/kampanPlan";
 import { C, mix, S } from "../../lib/psb/theme";
 import { Card, H3, Info } from "./ui";
 
@@ -109,7 +109,8 @@ export function PripravitKampan({ akoKarta = true, navrh }: { akoKarta?: boolean
     if (navrh.dni) setDni(String(navrh.dni));
   }, [klucNavrhu]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const [hlaska, setHlaska] = useState<{ ok: boolean; text: string } | null>(null);
+  const [hlaska, setHlaska] = useState<{ ok: boolean; text: string; kampanId?: string; stav?: "PAUSED" | "ACTIVE" } | null>(null);
+  const [odkazSkopirovany, setOdkazSkopirovany] = useState(false);
   const [kampane, setKampane] = useState<{ id: string; nazov: string; stav: string; stavSad: string }[]>([]);
   const [dopytovTyzdenne, setDopytovTyzdenne] = useState<number | null>(null);
 
@@ -224,11 +225,43 @@ export function PripravitKampan({ akoKarta = true, navrh }: { akoKarta?: boolean
       setHlaska(j?.ok && j.reklamaId
         ? {
           ok: true,
+          kampanId: String(j.kampanId || ""),
+          stav: "PAUSED",
           text: j.cesta === "boost"
             ? `Hotovo a POZASTAVENÉ: kampaň ${j.kampanId}, sada ${j.sadaId}, reklama ${j.reklamaId}. Reklamou sa stal TEN ISTÝ príspevok — lajky a komentáre si nesie so sebou a zbiera ďalšie. Spustíš ju v Mete.`
             : `Hotovo a POZASTAVENÉ: kampaň ${j.kampanId}, sada ${j.sadaId}, reklama ${j.reklamaId}. Pravý boost Meta nepustila (chýba Full Access), tak appka z príspevku vzala ${j.video ? "celé video" : j.kariet > 1 ? `všetkých ${j.kariet} obrázkov` : "obrázok"} aj text a poskladala ${j.video ? "video reklamu" : j.kariet > 1 ? "karuselovú reklamu" : "rovnako vyzerajúcu reklamu"} — je ale NOVÁ, takže lajky a komentáre pôvodného príspevku nemá. Spustíš ju v Mete.`,
         }
         : { ok: false, text: `Nepodarilo sa: ${j?.chyba || j?.error || "server neodpovedal"}` });
+    } finally { setRobim(false); }
+  };
+
+  /**
+   * Spustenie priamo z Kokpitu — vzniklo 20. 8. 2026, keď test doručovania
+   * musel aktivovať Claude cez API a Jerry v Ads Manageri spadol do pasce
+   * „Ad set off" (zapol kampaň, ale sada a reklama zostali vypnuté).
+   * Server prejde kontrolórom a zapne všetky tri úrovne naraz.
+   */
+  const prepniKampan = async (smer: "spusti-kampan" | "zastav-kampan") => {
+    if (!hlaska?.kampanId) return;
+    setRobim(true);
+    try {
+      const j = await fetch("/api/meta", {
+        method: "POST", credentials: "same-origin",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ akcia: smer, kampanId: hlaska.kampanId }),
+      }).then((r) => r.json()).catch(() => null);
+      if (j?.ok) {
+        setHlaska({
+          ok: true, kampanId: hlaska.kampanId, stav: j.stav,
+          text: j.stav === "ACTIVE"
+            ? `SPUSTENÁ — kampaň, sada aj reklama (${j.objektov} objekty). Meta ju ešte schvaľuje (minúty až hodiny), potom sa začne doručovať. Vypnúť ju vieš tu alebo v Ads Manageri.`
+            : "Vypnutá — všetky tri úrovne sú POZASTAVENÉ.",
+        });
+      } else if (Array.isArray(j?.kontrola)) {
+        setHlaska({ ok: false, kampanId: hlaska.kampanId, stav: hlaska.stav, text: `Kontrolór kampaň nepustil:\n• ${j.kontrola.join("\n• ")}` });
+      } else {
+        setHlaska({ ok: false, kampanId: hlaska.kampanId, stav: hlaska.stav, text: `Neprešlo: ${j?.error || "server neodpovedal"}` });
+      }
     } finally { setRobim(false); }
   };
 
@@ -251,6 +284,8 @@ export function PripravitKampan({ akoKarta = true, navrh }: { akoKarta?: boolean
       setHlaska(j?.ok
         ? {
           ok: true,
+          kampanId: String(j.id || ""),
+          stav: "PAUSED",
           text: j.reklamaId
             ? `Hotové celé a POZASTAVENÉ: kampaň ${j.id} · sada ${j.sadaId} · reklama ${j.reklamaId}. Text aj odkaz sú v nej — chýba už len obrázok alebo video, to sa dopĺňa v Mete. Spúšťaš ju ty.`
             : j.chybaReklamy
@@ -536,7 +571,34 @@ export function PripravitKampan({ akoKarta = true, navrh }: { akoKarta?: boolean
       </button>
 
       {hlaska && (
-        <div style={{ marginTop: 8, fontSize: 12, lineHeight: 1.55, color: hlaska.ok ? C.green : C.red }}>{hlaska.text}</div>
+        <div style={{ marginTop: 8, fontSize: 12, lineHeight: 1.55, color: hlaska.ok ? C.green : C.red, whiteSpace: "pre-line" }}>{hlaska.text}</div>
+      )}
+
+      {hlaska?.kampanId && (
+        <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          <a href={adsManagerOdkaz(hlaska.kampanId)} target="_blank" rel="noreferrer"
+            style={{ fontSize: 12, color: C.accentLight, textDecoration: "underline" }}>
+            Otvoriť v Ads Manageri ↗
+          </a>
+          <button onClick={() => { void navigator.clipboard?.writeText(adsManagerOdkaz(hlaska.kampanId!)); setOdkazSkopirovany(true); setTimeout(() => setOdkazSkopirovany(false), 2000); }}
+            style={{ padding: "4px 10px", borderRadius: 6, border: `1px solid ${C.border}`, background: "transparent",
+              color: C.textMuted, fontSize: 11.5, cursor: "pointer", fontFamily: "inherit" }}>
+            {odkazSkopirovany ? "skopírované ✓" : "kopírovať odkaz"}
+          </button>
+          {hlaska.stav === "ACTIVE" ? (
+            <button onClick={() => void prepniKampan("zastav-kampan")} disabled={robim}
+              style={{ padding: "6px 12px", borderRadius: 8, border: `1px solid ${C.red}`, background: mix(C.red, 10),
+                color: C.red, fontSize: 12, fontWeight: 600, cursor: robim ? "default" : "pointer", opacity: robim ? 0.5 : 1, fontFamily: "inherit" }}>
+              {robim ? "vypínam…" : "⏸ Vypnúť kampaň"}
+            </button>
+          ) : (
+            <button onClick={() => void prepniKampan("spusti-kampan")} disabled={robim}
+              style={{ padding: "6px 12px", borderRadius: 8, border: `1px solid ${C.green}`, background: mix(C.green, 10),
+                color: C.green, fontSize: 12, fontWeight: 600, cursor: robim ? "default" : "pointer", opacity: robim ? 0.5 : 1, fontFamily: "inherit" }}>
+              {robim ? "spúšťam…" : "▶ Spustiť kampaň (po kontrole)"}
+            </button>
+          )}
+        </div>
       )}
 
       <div style={{ fontSize: 11, color: C.textDim, marginTop: 10, lineHeight: 1.6 }}>
