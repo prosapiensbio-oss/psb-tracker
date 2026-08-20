@@ -304,3 +304,11 @@ konfabulácia, bol to statický marketing-onboarding.md zapečený v builde, kto
 len v databáze. Prázdna odpoveď z DB nie je dôkaz, že zdroj neexistuje — grep aj repo.
 Keď sa zmení marketingový fakt, over: marketing-onboarding.md + jarvis_vedomosti +
 jarvis_zavery + pamäť Claude Projectu (cez Chrome).
+
+## Po commite pushni
+
+Repo MÁ origin (github.com-prosapiensbio:prosapiensbio-oss/psb-tracker, SSH
+alias funguje bez hesla). 20. 8. 2026 tam viselo 6 nepushnutých commitov
+a ja som tvrdil, že remote neexistuje — `git status` pritom písal „ahead of
+origin/main". Commit bez pushu = história len na jednom MacBooku. Po každom
+`git commit` sprav aj `git push origin main`.
