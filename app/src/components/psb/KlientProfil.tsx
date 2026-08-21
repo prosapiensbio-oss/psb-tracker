@@ -219,6 +219,30 @@ export function KlientProfil({ meno, data, clients, onZavri, btcSats }: {
         </div>
       )}
 
+      {/* Koho priviedol — druhá strana referenčného motora. Tržba z nich sa
+          ráta zo všetkých platieb, lebo profil nemá obdobie; je to odpoveď na
+          otázku „koľko tento človek PSB priniesol cez iných". */}
+      {(() => {
+        const privedeni = Object.values(clients)
+          .filter((x) => x.zdroj === "referencia" && (x.zdrojKto || "").trim() === c.name)
+          .sort((a, b) => (a.firstSession || "").localeCompare(b.firstSession || ""));
+        if (!privedeni.length) return null;
+        const trzba = data.payments.filter((pp) => privedeni.some((x) => x.name === pp.client)).reduce((a, pp) => a + pp.amount, 0);
+        return (
+          <div style={{ marginTop: 10, fontSize: 12, color: C.textMuted, background: mix(C.green, 6), border: `1px solid ${mix(C.green, 25)}`, borderRadius: 8, padding: "8px 11px", lineHeight: 1.6 }}>
+            <b style={{ color: C.text }}>Odporučil {privedeni.length} {privedeni.length === 1 ? "človeka" : privedeni.length < 5 ? "ľudí" : "ľudí"}</b>
+            <span style={{ color: C.green }}> · {fmtCZK(trzba)} od nich spolu</span>
+            <div style={{ marginTop: 4, display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {privedeni.map((x) => (
+                <span key={x.name} style={{ border: `1px solid ${C.border}`, borderRadius: 7, padding: "2px 8px", color: x.status === "Aktívny" ? C.text : C.textDim }}>
+                  {x.name}{x.firstSession ? ` · od ${fmtDMY(x.firstSession)}` : ""}{x.status !== "Aktívny" ? ` · ${x.status.toLowerCase()}` : ""}
+                </span>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 18, marginTop: 14 }}>
         {/* porovnanie s priemerom */}
         <div>

@@ -56,6 +56,8 @@ export function Referencie({ data, clients, onKlient }: { data: PSBData; clients
   const [obdobie, setObdobie] = useState("2026");
   const [vlastneOd, setVlastneOd] = useState("");
   const [vlastneDo, setVlastneDo] = useState("");
+  /** Zoradenie rebríčka: podľa počtu privedených (predvolené), alebo abecedne. */
+  const [zoradenie, setZoradenie] = useState<"pocet" | "abc">("pocet");
   const r = useMemo(() => {
     const { od, do_ } = obdobie === "custom"
       ? { od: vlastneOd || "0000-01-01", do_: vlastneDo || "9999-12-31" }
@@ -80,7 +82,9 @@ export function Referencie({ data, clients, onKlient }: { data: PSBData; clients
     }
     const rebricek = [...podlaOdporucatela.entries()]
       .map(([kto, v]) => ({ kto, ...v }))
-      .sort((a, b) => b.klienti.length - a.klienti.length || b.trzba - a.trzba);
+      .sort((a, b) => zoradenie === "abc"
+        ? a.kto.localeCompare(b.kto, "sk")
+        : (b.klienti.length - a.klienti.length || b.trzba - a.trzba));
 
     const soZdrojom = vsetci.filter((c) => c.zdroj).length;
     return {
@@ -97,7 +101,7 @@ export function Referencie({ data, clients, onKlient }: { data: PSBData; clients
     };
   // `obdobie` v závislostiach je CELÝ filter — bez neho sa memo neprepočíta
   // a prepínač nerobí nič. Presne to sa stalo v prvej verzii.
-  }, [clients, data.payments, obdobie, vlastneOd, vlastneDo]);
+  }, [clients, data.payments, obdobie, vlastneOd, vlastneDo, zoradenie]);
 
   return (
     <>
@@ -136,7 +140,17 @@ export function Referencie({ data, clients, onKlient }: { data: PSBData; clients
       </Card>
 
       <Card>
-        <H3><Info text="Kto koho priviedol. Meno odporúčateľa sa vypĺňa v karte klienta (Klienti → ✎ → Odkiaľ sa o nás dozvedel). Bez neho sa nedá odovzdať odmena za doporučenie a nedá sa ani povedať, kto je pre PSB najcennejší človek." label="Kto koho priviedol" /></H3>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <H3 style={{ marginBottom: 0 }}><Info text="Kto koho priviedol. Meno odporúčateľa sa vypĺňa v karte klienta (Klienti → ✎ → Odkiaľ sa o nás dozvedel). Bez neho sa nedá odovzdať odmena za doporučenie a nedá sa ani povedať, kto je pre PSB najcennejší človek." label="Kto koho priviedol" /></H3>
+          <span style={{ display: "flex", gap: 4 }}>
+            {([["pocet", "podľa počtu"], ["abc", "abecedne"]] as const).map(([k, l]) => (
+              <button key={k} onClick={() => setZoradenie(k)}
+                style={{ fontSize: 11.5, padding: "3px 10px", borderRadius: 7, cursor: "pointer", fontFamily: "inherit",
+                  border: `1px solid ${zoradenie === k ? C.accent : C.border}`, background: zoradenie === k ? mix(C.accent, 14) : "transparent",
+                  color: zoradenie === k ? C.accentLight : C.textMuted, fontWeight: zoradenie === k ? 700 : 500 }}>{l}</button>
+            ))}
+          </span>
+        </div>
         {r.rebricek.length === 0 ? (
           <Empty>Zatiaľ nikto nemá vyplnené meno odporúčateľa.</Empty>
         ) : (

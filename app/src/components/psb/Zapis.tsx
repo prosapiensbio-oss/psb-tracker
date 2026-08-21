@@ -134,6 +134,10 @@ export function ZapisButton({
   const [open, setOpen] = useState(false);
   const [dopytMeno, setDopytMeno] = useState("");
   const [dopytZdroj, setDopytZdroj] = useState("reklama");
+  /** Pri referencii: kto ho poslal — meno z klientov, alebo „iné" + voľný text
+   *  (odporučiť môže aj človek, ktorý u nás nikdy netrénoval). */
+  const [dopytOdKoho, setDopytOdKoho] = useState("");
+  const [dopytOdKohoIne, setDopytOdKohoIne] = useState("");
   /** Kedy sa človek OZVAL, nie kedy si to zapísal — z toho počíta lievik. */
   const [dopytDatum, setDopytDatum] = useState(() => new Date().toISOString().slice(0, 10));
   const [dopytBusy, setDopytBusy] = useState(false);
@@ -250,7 +254,8 @@ export function ZapisButton({
               const m = dopytMeno.trim();
               if (!m || dopytBusy) return;
               setDopytBusy(true);
-              void saveLead({ date: dopytDatum || new Date().toISOString().slice(0, 10), name: m, source: dopytZdroj as never, status: "novy", referrer: "", note: "" })
+              const referrer = dopytZdroj === "referencia" ? (dopytOdKoho === "__ine__" ? dopytOdKohoIne.trim() : dopytOdKoho) : "";
+              void saveLead({ date: dopytDatum || new Date().toISOString().slice(0, 10), name: m, source: dopytZdroj as never, status: "novy", referrer, note: "" })
                 // Dátum sa po uložení ZÁMERNE nevracia na dnešok: kto dopisuje
                 // viac dopytov z jedného dňa, nastaví ho raz. Meno sa maže,
                 // dátum a zdroj zostávajú — to je poradie, v akom sa to píše.
@@ -290,6 +295,25 @@ export function ZapisButton({
                 Zapísať
               </button>
             </div>
+            {dopytZdroj === "referencia" && (
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginTop: 6 }}>
+                <span style={{ fontSize: 12, color: C.textMuted }}>Od koho:</span>
+                <select
+                  value={dopytOdKoho} onChange={(e) => setDopytOdKoho(e.target.value)}
+                  style={{ flex: "1 1 180px", minWidth: 0, padding: "6px 8px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 12.5 }}
+                >
+                  <option value="" style={{ background: C.card }}>— vyber klienta —</option>
+                  {[...klienti].sort((a, b) => a.meno.localeCompare(b.meno, "sk")).map((k) => <option key={k.meno} value={k.meno} style={{ background: C.card }}>{k.meno}</option>)}
+                  <option value="__ine__" style={{ background: C.card }}>iné — nie je náš klient</option>
+                </select>
+                {dopytOdKoho === "__ine__" && (
+                  <input
+                    value={dopytOdKohoIne} onChange={(e) => setDopytOdKohoIne(e.target.value)} placeholder="meno človeka"
+                    style={{ flex: "1 1 140px", minWidth: 0, padding: "6px 10px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 12.5 }}
+                  />
+                )}
+              </div>
+            )}
             {dopytOk && <div style={{ fontSize: 11.5, color: C.green, marginTop: 6 }}>Zapísané: {dopytOk}. Detail doplníš v Klienti → Dopyty.</div>}
             {dopytChyba && <div style={{ fontSize: 11.5, color: C.red, marginTop: 6 }}>{dopytChyba}</div>}
           </form>
