@@ -1,3 +1,4 @@
+import type { NavFocus } from "./App";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { fmtDMY, normName } from "../../lib/psb/format";
 
@@ -122,7 +123,7 @@ async function posli(telo: Record<string, unknown>) {
   return (await r.json()) as { ok: boolean; error?: string; vysledky?: Record<string, { ok: boolean; zmien?: number; udalosti?: number; chyba?: string; prveStiahnutie?: boolean }> };
 }
 
-export function Kalendar({ clients, data }: { clients: Record<string, ClientAgg>; data: PSBData }) {
+export function Kalendar({ clients, data, focus }: { clients: Record<string, ClientAgg>; data: PSBData; focus?: NavFocus | null }) {
   const [stav, setStav] = useState<Stav | null>(null);
   const [chyba, setChyba] = useState("");
   const [sprava, setSprava] = useState("");
@@ -136,6 +137,27 @@ export function Kalendar({ clients, data }: { clients: Record<string, ClientAgg>
    * drží ho tento komponent; karty dostávajú už prefiltrované dáta.
    */
   const [trener, setTrener] = useState("all");
+
+  // Preklik z Dashboardu („Kalendár: 4 nevysvetlené zmeny →") prináša
+  // trénera a chce tabuľku zmien — nie vrch stránky. Rovnaký filter ako na
+  // Dashboarde, inak by Jerry klikol na svoje zmeny a uvidel Terezkine.
+  const [rolovatNaZmeny, setRolovatNaZmeny] = useState(false);
+  useEffect(() => {
+    if (!focus?.nonce) return;
+    setTrener(focus.trainer && focus.trainer !== "all" ? focus.trainer : "all");
+    setRolovatNaZmeny(true);
+  }, [focus?.nonce]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Roluje sa až keď tabuľka existuje — pri prvom otvorení sa kalendár ešte
+  // len sťahuje a `kal-zmeny` v DOM nie je (21. 8.: preklik otvoril Kalendár,
+  // ale zostal hore).
+  useEffect(() => {
+    if (!rolovatNaZmeny || !stav) return;
+    const t = setTimeout(() => {
+      const el = document.getElementById("kal-zmeny");
+      if (el) { el.scrollIntoView({ behavior: "smooth", block: "start" }); setRolovatNaZmeny(false); }
+    }, 150);
+    return () => clearTimeout(t);
+  }, [rolovatNaZmeny, stav]);
 
   const nacitaj = useCallback(async () => {
     const r = await fetch("/api/kalendar", { credentials: "same-origin" });
@@ -185,7 +207,7 @@ export function Kalendar({ clients, data }: { clients: Record<string, ClientAgg>
           onHotovo={async () => { setUpravovana(null); await nacitaj(); }}
         />
       )}
-      {pripojene && <Zmeny zmeny={zmenyF} onHotovo={nacitaj} mena={menaKlientov} />}
+      {pripojene && <div id="kal-zmeny"><Zmeny zmeny={zmenyF} onHotovo={nacitaj} mena={menaKlientov} /></div>}
       {pripojene && <Kontrola udalosti={udalostiF} data={data} />}
       {/* Balíčky aj „Odpísaní, ale majú termín" sa zliali na Kokpit (Jerry,
           9. 8.): dlaždica Odmlčaní sama vynecháva ľudí s budúcim termínom,

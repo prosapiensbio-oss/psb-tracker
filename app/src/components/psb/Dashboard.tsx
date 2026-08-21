@@ -430,6 +430,7 @@ export function Dashboard({
   clients,
   register: registerVsetky,
   kalZmeny = [],
+  kalNevysvetlene = [],
   sixM,
   capacity,
   actions,
@@ -445,6 +446,8 @@ export function Dashboard({
   register: RegisterItem[];
   /** Zmeny v kalendári — ručne zapísané zrušenia majú vetovať aj odmlčaných. */
   kalZmeny?: { druh: string; klient: string | null; pred?: string | null; po?: string | null }[];
+  /** Nevysvetlené zmeny v kalendári — tiché číslo pod notifikáciami s preklikom na tabuľku. */
+  kalNevysvetlene?: { druh: string; trener: string }[];
   sixM: SixMRow[];
   capacity: CapacityRow[];
   actions: Actions;
@@ -1762,6 +1765,37 @@ export function Dashboard({
     </div>
   );
 
+  /**
+   * Zmeny v kalendári pod notifikáciami — tiché číslo, nie položky registra.
+   *
+   * Jerry, 21. 8. 2026: „dať to na dashboard pod notifikácie ako tlačidlo,
+   * alebo do notifikácií?" Do notifikácií nie: za týždeň je zmien 5–15 a
+   * register by ich do týždňa prestal čítať. Preto jeden riadok s počtom
+   * NEVYSVETLENÝCH zmien (po vysvetlení zhasne), bez farby, s preklikom na
+   * tabuľku v Kalendári — a s tým istým trénerom, aký je zvolený tu.
+   * Jediná zmena, ktorá si notifikáciu zaslúži, je vzor (2× zrušené za 30
+   * dní) a tú robí register sám.
+   */
+  const kalNev = kalNevysvetlene.filter((z) => matchT(z.trener));
+  const kalRiadok = kalNev.length > 0 ? (() => {
+    const druhy: Record<string, number> = {};
+    for (const z of kalNev) druhy[z.druh] = (druhy[z.druh] || 0) + 1;
+    const meno: Record<string, string> = { zrusene: "zrušené", posunute: "posunuté", pridane: "pridané", premenovane: "premenované" };
+    const casti = Object.entries(druhy).map(([d, n]) => `${n} ${meno[d] || d}`).join(" · ");
+    const n = kalNev.length;
+    const slovo = n === 1 ? "nevysvetlená zmena" : n < 5 ? "nevysvetlené zmeny" : "nevysvetlených zmien";
+    return (
+      <button
+        onClick={() => onNavigate("kalendar", undefined, { trainer, nonce: Date.now() })}
+        title="Otvorí Kalendár s týmto trénerom a zroluje na tabuľku zmien"
+        style={{ ...btn("ghost"), fontSize: 12, padding: "6px 10px", marginBottom: 12, color: C.textMuted, display: "flex", gap: 6, alignItems: "center" }}
+      >
+        <span>📅 Kalendár: <b style={{ color: C.text }}>{n} {slovo}</b> — {casti}</span>
+        <span style={{ color: C.accentLight }}>→</span>
+      </button>
+    );
+  })() : null;
+
   const shown = arranging ? layout.order : layout.order.filter((id) => !layout.hidden.includes(id));
 
   return (
@@ -1775,7 +1809,7 @@ export function Dashboard({
         vyzaduju={{ kritickych: kriticke.length }}
         uzavrety={pristroje.uzavrety}
         onUzavrety={() => onNavigate("vzas", "pnl")}
-        registerPanel={registerPas}
+        registerPanel={<>{registerPas}{kalRiadok}</>}
         /* Koniec balíčka zostal POD prístrojmi, hoci register sa presunul nad
            ne. Je to jediná karta, ktorá hovorí o peniazoch, čo sa dajú získať
            zajtra — v mriežke sa dala presunúť, skryť aj prepnúť preč, a tým

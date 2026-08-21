@@ -227,6 +227,7 @@ export function PSBApp() {
   const [treningyFocus, setTreningyFocus] = useState<NavFocus | null>(null);
   const [vzasFocus, setVzasFocus] = useState<NavFocus | null>(null);
   const [klientiFocus, setKlientiFocus] = useState<NavFocus | null>(null);
+  const [kalendarFocus, setKalendarFocus] = useState<NavFocus | null>(null);
 
   // Kde som — v adrese, nie len v hlave appky.
   //
@@ -351,6 +352,9 @@ export function PSBApp() {
     // v grafe tržieb mesiac nikdy neotvoril.
     if (tab === "vzas" && sub) setVzasSub(sub);
     if (tab === "vzas" && focus) setVzasFocus(focus);
+    // Preklik z Dashboardu „Kalendár: N zmien →" nesie trénera — Kalendár sa
+    // otvorí s tým istým filtrom a zroluje na tabuľku zmien.
+    if (tab === "kalendar" && focus) setKalendarFocus(focus);
     // Podzáložka Výsledkov sa nikdy nenastavovala — pripomienka „Mesačná
     // uzávierka" tak doviedla človeka na Kvartálne a vyzeralo to, že klik
     // nefunguje. Rovnaká mechanika ako pri ostatných, len chýbala.
@@ -2034,7 +2038,7 @@ function skupinaFaktur(
       </nav>
       <div style={{ padding: 16, maxWidth: 1200, margin: "0 auto" }}>
         {active === "dashboard" && (
-          <Dashboard trainer={trainer} onTrainer={setTrainer} data={data} clients={clients} kalendar={kalUdalosti} kalZmeny={kalZmeny} register={registerAll} sixM={sixM} capacity={capacity} actions={actions} onNavigate={navigate} assistantChat={chat} onClientClick={onClientClick} />
+          <Dashboard trainer={trainer} onTrainer={setTrainer} data={data} clients={clients} kalendar={kalUdalosti} kalZmeny={kalZmeny} kalNevysvetlene={kalNevysvetlene} register={registerAll} sixM={sixM} capacity={capacity} actions={actions} onNavigate={navigate} assistantChat={chat} onClientClick={onClientClick} />
         )}
 
         {active === "tracker" && (
@@ -2073,7 +2077,7 @@ function skupinaFaktur(
 
         {active === "marketing" && <Marketing data={data} clients={clients} leads={data.leads} chat={chat} sub={marketingSub} onSub={setMarketingSub} focus={marketingFocus} onKlient={(m) => navigate("klienti", undefined, { client: m, nonce: Date.now() })} refresh={actions.refresh} onPoznamkaStrata={(m, t) => actions.setOverride(m, "precoNeprisiel", t)} onNavigate={navigate} onAck={(k, zapnut, poznamka) => actions.ackAnomaly(k, zapnut ? (poznamka || "skryté hlásenie") : "", zapnut)} />}
         {active === "vzas" && <Vzas sub={vzasSub} onSub={setVzasSub} data={data} clients={clients} focus={vzasFocus} onNavigate={navigate} />}
-        {active === "kalendar" && <Kalendar clients={clients} data={data} />}
+        {active === "kalendar" && <Kalendar clients={clients} data={data} focus={kalendarFocus} />}
 
         {active === "jarvis" && (
           <JarvisOkno
