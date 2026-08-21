@@ -1304,7 +1304,13 @@ function skupinaFaktur(
         // 6M: upozornenie si nesie sám riadok procesu — netreba ho odvodzovať
         // z fázy a mesiaca druhýkrát a inak než Prevádzka.
         const s6 = sixM.find((x) => x.client === u.klient);
-        if (s6?.alert) dovody.push(s6.alert.replace(/^⚠️\s*/, "").toLowerCase());
+        // Zodpovedaná 6M otázka sa v dennej pripomienke NEOPAKUJE. Denná
+        // pripomienka vzniká každý tréningový deň nanovo (kľúč nesie dátum),
+        // takže si „5. mesiac — hodnotiaci rozhovor" prilepila k Lukášovi
+        // Hanusovi ešte 21. 8. — jedenásť dní po tom, čo Jerry na 6M otázku
+        // odpovedal a rozhovor mal za sebou. Vysvetlená vec nie je pripomienka.
+        const sixmZodpovedane = s6 ? stavPolozky(`sixm|${s6.client}|${s6.phase}|${s6.monthInPhase}`, `sixm|${s6.client}`).acked : false;
+        if (s6?.alert && !sixmZodpovedane) dovody.push(s6.alert.replace(/^⚠️\s*/, "").toLowerCase());
         // Nepodpísaná zmluva ZOSTÁVA (Jerry, 9. 8.) — je to vec, ktorú treba
         // vybaviť práve vtedy, keď človeka vidíš. Šum, na ktorý sa sťažoval,
         // nerobila samotná pripomienka, ale to, že vyskočila aj u niekoho, kto

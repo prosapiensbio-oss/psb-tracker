@@ -319,3 +319,15 @@ alias funguje bez hesla). 20. 8. 2026 tam viselo 6 nepushnutých commitov
 a ja som tvrdil, že remote neexistuje — `git status` pritom písal „ahead of
 origin/main". Commit bez pushu = história len na jednom MacBooku. Po každom
 `git commit` sprav aj `git push origin main`.
+
+## Odpoveď platí aj pre vety, ktoré sa z nej odvodzujú
+
+21. 8. 2026: Jerry 10. 8. odpovedal na 6M otázku o Lukášovi Hanusovi
+(`sixm|Lukas Hanus|Obnova|5`) a 21. 8. mu „5. mesiac — hodnotiaci rozhovor"
+svietilo znova — nie ako 6M položka (tá bola ticho), ale prilepené k DENNEJ
+pripomienke „Dnes o 10:00 máš tréning s…", ktorá vzniká každý deň nanovo
+a brala si text z `sixM[].alert` bez pohľadu na ack. Pravidlo: keď sa text
+upozornenia SKLADÁ z iných upozornení (6M, balíček, narodeniny…), každý diel
+sa pýta na svoj vlastný ack. Inak zodpovedaná vec prežije v cudzom tele.
+Jerryho meradlo: „keď sa k niečomu vyjadrím a uzavriem to, už sa to nesmie
+zobraziť."
