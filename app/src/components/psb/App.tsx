@@ -1139,25 +1139,9 @@ function skupinaFaktur(
       });
     }
 
-    // (1a2) Výber z bitcoinovej peňaženky bez faktúry.
-    //
-    // Náklad sa do P&L dostane z FAKTÚRY, nie z výberu — výber je len dôkaz
-    // úhrady. Keď k výberu doklad nie je, náklad vo výkaze chýba a zisk je
-    // o tú sumu vyšší, než v skutočnosti bol. Alebo to bol súkromný nákup
-    // a potom je všetko v poriadku — to appka rozhodnúť nevie, preto sa pýta.
-    const bezDokladuPodlaMes: Record<string, BtcNakup[]> = {};
-    for (const x of btcBezDokladu) (bezDokladuPodlaMes[String(x.datum).slice(0, 7)] ||= []).push(x);
-    for (const [mk, zoznam] of Object.entries(bezDokladuPodlaMes)) {
-      const spolu = zoznam.reduce((a, x) => a + (x.czk || 0), 0);
-      if (spolu < 500) continue; // drobné nemá zmysel naháňať
-      const key = `btcbezdokladu|${mk}`;
-      out.push({
-        key, category: "Anomália", tone: "orange",
-        title: `${zoznam.length}× platba bitcoinom bez faktúry v ${monthLabel(mk)} — ${Math.round(spolu).toLocaleString("cs-CZ")} Kč`,
-        detail: `Z bitcoinovej peňaženky odišlo ${Math.round(spolu).toLocaleString("cs-CZ")} Kč v ${zoznam.length} platbách (${zoznam.slice(0, 4).map((x) => `${fmtDMY(x.datum)} ${Math.round(x.czk || 0).toLocaleString("cs-CZ")} Kč${x.poznamka ? ` — ${x.poznamka}` : ""}`).join(", ")}${zoznam.length > 4 ? ` a ďalších ${zoznam.length - 4}` : ""}), ale nenašla sa k nim faktúra. Cez účet neprešli, takže import z Fio ich nevidel — ak to boli firemné nákupy, ten náklad v P&L chýba a zisk za ${monthLabel(mk)} je o toľko vyšší, než bol. Nahraj doklad v Údajoch a spáruje sa sám. Ak to bol súkromný nákup, odklepni.`,
-        ...stavPolozky(key, "btcbezdokladu"), priority: 4, client: "udaje|",
-      });
-    }
+    // (1a2) Bitcoinové výbery bez faktúry sa v registri NEHLÁSIA (Jerry,
+    // 21. 8. 2026: „tento druh notifikácií ma nezaujíma"). Párovanie dokladov
+    // k platbám zostáva v Údajoch → Bitcoin, kde si ho pozrie, keď chce.
 
     // (1b) Ten istý výdavok dvoma cestami — z banky aj zo zošita. Vyzerá
     // úplne normálne z oboch strán a nájde sa len tak, že sa niekto pozrie.

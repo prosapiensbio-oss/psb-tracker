@@ -1025,39 +1025,6 @@ export function zruseneTreningy(zmeny: ZmenaVKalendari[] | undefined): Set<strin
 }
 
 /**
- * Opakované zrušenia — klient, ktorý za posledných 30 dní zrušil dva a viac
- * tréningov.
- *
- * Jerry, 21. 8. 2026, pri rozhodovaní, či majú zmeny v kalendári ísť do
- * notifikácií: väčšina zmien je informácia, nie úloha, a patrí pod tiché
- * číslo na Dashboarde. Do notifikácií patrí len vzor, ktorý niečo
- * predpovedá — a dve zrušenia za mesiac sú prvý príznak odchodu, skôr než
- * „14 dní bez tréningu" vôbec stihne nabehnúť.
- *
- * Počíta sa DEŇ tréningu (`pred`), nie deň zbadania: ručný zápis a zistenie
- * z kalendára o tom istom tréningu sú jedno zrušenie. Zrušený budúci termín
- * sa ráta tiež — zrušiť hodinu o týždeň je rovnaký signál ako zrušiť
- * včerajšiu.
- */
-export function opakovaneZrusenia(
-  zmeny: ZmenaVKalendari[] | undefined,
-  dnes: Date = new Date(),
-  oknoDni = 30,
-): { klient: string; dni: string[] }[] {
-  const od = new Date(dnes.getTime() - oknoDni * 86400000).toISOString().slice(0, 10);
-  const podla: Record<string, Set<string>> = {};
-  for (const z of zmeny || []) {
-    if (z.druh !== "zrusene" || !z.klient) continue;
-    const d = (z.pred || "").slice(0, 10);
-    if (!d || d < od) continue;
-    (podla[z.klient] ||= new Set()).add(d);
-  }
-  return Object.entries(podla)
-    .filter(([, s]) => s.size >= 2)
-    .map(([klient, s]) => ({ klient, dni: [...s].sort() }));
-}
-
-/**
  * Kedy bol klient naposledy na tréningu — podľa VŠETKÉHO, čo o tom appka vie.
  *
  * PREČO NESTAČÍ EXPORT
@@ -1606,7 +1573,6 @@ const DRUH_KLUCA: Record<string, string> = {
   prijmy: "príjmy", barter: "barterové členstvo", data: "staré dáta z PTmindera",
   web: "text webu", zapis: "chýbajúci zápis", cap: "kapacita", zaver: "záver z debaty",
   balicek: "končiaci balíček", btcbezdokladu: "bitcoin bez dokladu", odchody: "odchody klientov",
-  zrusenia: "opakované zrušenia",
 };
 
 /**
@@ -2020,25 +1986,6 @@ export function deriveRegister(
       n.klient,
       "nepotvrdene",
       { trener: n.trener, oKom: n.klient },
-    );
-  }
-
-  // Dve zrušenia za mesiac — jediná zmena v kalendári, ktorá si zaslúži
-  // notifikáciu. Ostatné zmeny sú tiché číslo na Dashboarde s preklikom.
-  // Kľúč nesie mesiac: odpoveď platí do konca mesiaca, nová dvojica zrušení
-  // v ďalšom mesiaci je nová otázka.
-  const mesiacTeraz = new Date().toISOString().slice(0, 7);
-  for (const o of opakovaneZrusenia(kal?.zmeny)) {
-    if (clients[o.klient]?.status === "Pauza") continue;
-    add(
-      `zrusenia|${o.klient}|${mesiacTeraz}`,
-      "Anomália",
-      "orange",
-      `${o.klient} — ${o.dni.length}× zrušený tréning za 30 dní`,
-      `${o.klient}: zrušené tréningy ${o.dni.map(fmtDMY).join(", ")}. Dve zrušenia za mesiac bývajú prvý príznak odchodu — ozvi sa a zisti, či je to dovolenka, alebo váhanie.`,
-      6,
-      o.klient,
-      `zrusenia|${o.klient}`,
     );
   }
 
