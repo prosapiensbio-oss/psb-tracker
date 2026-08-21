@@ -15,6 +15,12 @@ import prevadzka from "./prevadzka.md?raw";
 // hovorí, kto sú a čo nechcú, kým rámce hovoria len, ako o tom uvažovať.
 import marketingProfil from "./marketing-profil.md?raw";
 import marketingRamce from "./marketing-ramce.md?raw";
+// Register zvyšku Jerryho knižnice. Destiláty 24 kníh, ktoré sa do kontextu
+// nezmestia, ležia v `jarvis_vedomosti` pod id `kniznica-*`; tento register
+// hovorí, ktorá téma patrí ku ktorému id. Bez neho Jarvis siahne po tom, čo
+// má pred očami (statické RÁMCE), a knižnicu nikdy neotvorí — overené
+// 21. 8. 2026 dvoma živými otázkami.
+import kniznicaIndex from "./kniznica-index.md?raw";
 // Ako platformy rozhodujú o dosahu — s číslami PSB pri každom signáli. Datované
 // a zastarávajúce; appka sleduje oficiálne kanály a pripomína polročnú revíziu.
 import algoritmy from "./algoritmy.md?raw";
@@ -46,6 +52,10 @@ ${marketingProfil}
 # MARKETINGOVÉ RÁMCE (destilát)
 
 ${marketingRamce}
+
+---
+
+${kniznicaIndex}
 
 ---
 
