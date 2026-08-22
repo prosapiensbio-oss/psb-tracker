@@ -404,6 +404,14 @@ export function Dopyty({ leads, clients, refresh, focus }: { leads: Lead[]; clie
       <Card>
         <div ref={zoznamRef} style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <H3 style={{ marginBottom: 0 }}>Zoznam</H3>
+          {/* Aj tu, nielen hore pri rýchlom zápise (Jerry, 22. 8. 2026):
+              kto je v zozname a zistí, že jeden dopyt chýba, ho chce dopísať
+              odtiaľto — nie rolovať späť na začiatok obrazovky. */}
+          <button type="button" onClick={openAdd} disabled={busy} title="Nový dopyt so všetkými poľami"
+            style={{ fontSize: 11.5, padding: "3px 10px", borderRadius: 999, cursor: busy ? "default" : "pointer",
+              border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted, fontFamily: "inherit", fontWeight: 600 }}>
+            + dopyt
+          </button>
           {!lenCakajuci && (() => {
             const kolko = leads.filter(nevyrieseny).length;
             if (!kolko && !lenNevyriesene) return null;
@@ -503,8 +511,31 @@ export function Dopyty({ leads, clients, refresh, focus }: { leads: Lead[]; clie
                             style={{ background: "transparent", border: "none", color: C.textDim, cursor: "pointer", marginLeft: 4 }}>✕</button>
                         </span>
                       )
+                    ) : upravCas === l.id ? (
+                      /* Klik neorazítkuje „teraz" potichu — ponúkne dátum.
+                         Terezka robí Kokpit cez víkend (22. 8. 2026): keby
+                         tlačidlo zapisovalo okamih kliknutia, dopyt z pondelka
+                         by mal odpoveď za šesť dní, hoci volala v ten istý deň.
+                         Merali by sme pozornosť pri appke, nie rýchlosť
+                         k človeku. Predvyplnené je „teraz“, takže bežný prípad
+                         zostáva na jeden klik a Enter. */
+                      <span style={{ display: "flex", gap: 5, alignItems: "center", flexWrap: "wrap" }}>
+                        <input
+                          type="datetime-local" autoFocus
+                          defaultValue={new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}
+                          onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") setUpravCas(null); }}
+                          onBlur={(e) => { setUpravCas(null); if (e.target.value) save({ ...l, odpovedaneAt: new Date(e.target.value).toISOString() }); }}
+                          style={{ ...inputStyle, colorScheme: "dark", width: 178 }} />
+                        <button
+                          onMouseDown={(e) => { e.preventDefault(); setUpravCas(null); save({ ...l, odpovedaneAt: new Date(`${String(l.date).slice(0, 10)}T12:00`).toISOString() }); }}
+                          title="Ozvali sme sa v deň, keď dopyt prišiel (zapíše sa poludnie toho dňa)"
+                          style={{ fontSize: 11, padding: "3px 7px", borderRadius: 6, border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted, cursor: "pointer", fontFamily: "inherit" }}>
+                          v deň dopytu
+                        </button>
+                      </span>
                     ) : (
-                      <button onClick={() => save({ ...l, odpovedaneAt: new Date().toISOString() })}
+                      <button onClick={() => setUpravCas(l.id)}
+                        title="Vyber, KEDY ste sa ozvali — nie kedy to zapisuješ"
                         style={{ fontSize: 11.5, padding: "3px 8px", borderRadius: 6, border: `1px solid ${C.border}`,
                           background: "transparent", color: C.accent, cursor: "pointer" }}>
                         ozvali sme sa
