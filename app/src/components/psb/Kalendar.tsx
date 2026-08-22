@@ -385,6 +385,40 @@ function Mapovanie({ nezname, mena, clients, onHotovo }: { nezname: Nezname[]; m
     return (navrhy[k]?.kandidati.length === 1 && !vyber[k]) || navrhy[k]?.typ === "guillermo";
   }).length;
 
+  /**
+   * Zoskupenie podľa človeka, nie podľa názvu (Terezka, 22. 8. 2026).
+   *
+   * Ten istý klient chodí v kalendári pod viacerými zápismi — „Jana",
+   * „Jana M.", „Uvodný tréning Jana Malinová". Ako plochý zoznam ležali
+   * ďaleko od seba (zoradené podľa početnosti) a človek ich priraďoval
+   * jeden po druhom bez toho, aby vedel, že sú to tri mená tej istej osoby.
+   * Kľúčom je appkin NAJLEPŠÍ ODHAD človeka — teda to, čo je práve
+   * v poli mena; keď odhad nie je, riadok padne do skupiny „zatiaľ bez mena".
+   *
+   * Tréner zostáva súčasťou kľúča riadku (Natalia u Jerryho a Natalia
+   * u Terezky sú dvaja ľudia) — zoskupenie ho len zobrazí vedľa mena.
+   */
+  const skupiny = useMemo(() => {
+    const m = new Map<string, { meno: string; polozky: Nezname[]; spolu: number }>();
+    for (const n of nezname) {
+      const k = `${n.nazov}|${n.trener}`;
+      const nav = navrhy[k];
+      const odhad = (vyber[k]?.klient
+        || (nav?.typ === "uvodny" ? (nav.kandidati[0] || nav.meno) : nav?.kandidati[0])
+        || "").trim();
+      const kluc = odhad ? normName(odhad) : "";
+      const e = m.get(kluc) || { meno: odhad, polozky: [], spolu: 0 };
+      e.polozky.push(n);
+      e.spolu += n.pocet || 0;
+      if (odhad && !e.meno) e.meno = odhad;
+      m.set(kluc, e);
+    }
+    // Skupiny s viacerými zápismi hore — tam sa jedným sedením vybaví najviac.
+    return [...m.entries()]
+      .map(([kluc, v]) => ({ kluc, ...v }))
+      .sort((a, b) => (b.polozky.length - a.polozky.length) || (b.spolu - a.spolu));
+  }, [nezname, navrhy, vyber]);
+
   // Server vie vrátiť {ok:false} aj s HTTP 200 — kto telo nečíta, hlási
   // úspech aj pri odmietnutom zápise. Vzor s lokálnou chybou je ten istý
   // ako pri zdrojoch kalendára vyššie (revízia 18. 8. 2026).
@@ -410,11 +444,31 @@ function Mapovanie({ nezname, mena, clients, onHotovo }: { nezname: Nezname[]; m
         />
       </H3>
       <div style={{ fontSize: 11.5, color: C.textDim, margin: "6px 0 12px", lineHeight: 1.5 }}>
-        Zoradené podľa toho, ako často sa vyskytujú — hore je práca, ktorá sa najviac oplatí.
+        Zoskupené podľa človeka — jeden klient chodí v kalendári aj pod tromi názvami a takto sa vybavia naraz. Hore sú skupiny, kde je zápisov najviac.
         {jednoznacne > 0 && <> Pri {jednoznacne} z nich appka pozná odpoveď jednoznačne — stačí potvrdiť.</>}
       </div>
       {chybaUloz && <div style={{ fontSize: 12, color: C.red, marginBottom: 8 }}>{chybaUloz}</div>}
-      {nezname.map((n) => {
+      {skupiny.map((sk) => (
+        <div key={sk.kluc || "?"} style={{ marginBottom: 10 }}>
+          {/* Hlavičku má len skupina, ktorá naozaj spája viac zápisov —
+              pri jednom riadku by bola len šum navyše. */}
+          {(sk.polozky.length > 1 || !sk.kluc) && (
+            <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 8, marginBottom: 2 }}>
+              <span style={{ fontSize: 12.5, fontWeight: 700, color: sk.kluc ? C.accentLight : C.orange }}>
+                {sk.kluc ? sk.meno : "zatiaľ bez mena"}
+              </span>
+              <span style={{ fontSize: 11, color: C.textDim }}>
+                {sk.polozky.length} {sk.polozky.length === 1 ? "zápis" : sk.polozky.length < 5 ? "zápisy" : "zápisov"}
+                {/* Skupina bez mena NIE JE jeden človek — sú to rôzne názvy,
+                    v ktorých appka nikoho nespoznala. Veta „ten istý človek"
+                    tam bola prvú verziu a bola to lož na prvý pohľad. */}
+                {!sk.kluc
+                  ? " — appka v nich nespoznala človeka; priraď meno alebo označ ako súkromné/iné"
+                  : sk.polozky.length > 1 ? " — ten istý človek pod rôznymi názvami, dajú sa vybaviť naraz" : ""}
+              </span>
+            </div>
+          )}
+          {sk.polozky.map((n) => {
         const k = `${n.nazov}|${n.trener}`;
         const v = stav(k);
         const navrh = navrhy[k];
@@ -492,7 +546,9 @@ function Mapovanie({ nezname, mena, clients, onHotovo }: { nezname: Nezname[]; m
             </button>
           </div>
         );
-      })}
+          })}
+        </div>
+      ))}
     </Card>
   );
 }
