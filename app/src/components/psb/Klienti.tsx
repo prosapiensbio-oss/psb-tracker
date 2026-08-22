@@ -447,6 +447,17 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
         </div>
       </Card>
 
+      {/* Profil 360 — všetko o vybranom človeku na jednom mieste.
+          HORE, nie pod grafmi (Terezka, 22. 8. 2026): keď človek klikne na
+          meno, prišiel kvôli tomu človeku — koláče segmentov sú kontext,
+          ktorý počká. Predtým sa profil otvoril až pod nimi a vyzeralo to,
+          že klik nič neurobil.
+          btcSatsKlienti je kľúčované fuzzy kľúčom (menoKluc), nie normName —
+          inak „Prochadzka" z PTmindera nenájde „Procházku" z BTC knihy. */}
+      {focusClient && clients[focusClient] && (
+        <KlientProfil meno={focusClient} data={data} clients={clients} btcSats={btcSatsKlienti[menoKluc(focusClient)]} onZavri={() => setFocusClient(null)} />
+      )}
+
       <Card>
         <H3>
           <Info text="Klikni na bunku (Jerry × Anchor) a zoznam dole sa vyfiltruje na tých klientov. Klik na meno trénera = celý tréner, klik na segment = oba tréneri. „Odrob. h/týž“ = reálne odtrénované hodiny za týždeň (priemer posledných 8 týž.); zdravá zóna 24–34h." label="Kapacita & segmenty" />
@@ -499,15 +510,6 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
           )}
         </Card>
       </div>
-
-      {/* Profil 360 — všetko o vybranom človeku na jednom mieste. Vyhľadanie
-          klienta doteraz doviedlo len k riadku tabuľky a zvyšok si človek
-          skladal z piatich obrazoviek.
-          btcSatsKlienti je kľúčované fuzzy kľúčom (menoKluc), nie normName —
-          inak „Prochadzka" z PTmindera nenájde „Procházku" z BTC knihy. */}
-      {focusClient && clients[focusClient] && (
-        <KlientProfil meno={focusClient} data={data} clients={clients} btcSats={btcSatsKlienti[menoKluc(focusClient)]} onZavri={() => setFocusClient(null)} />
-      )}
 
       <Card>
         <H3><Info text="Všetci klienti podľa filtrov. Hľadaj podľa mena, filtruj typ balíčka a modalitu, alebo klikni na výsek v koláči „Klienti podľa balíčka“ hore." label="Všetci klienti" /></H3>
