@@ -402,10 +402,25 @@ export function hraniceObdobia(obdobie: string, poslMK: string): { od: string; d
 const kcK = (n: number) => `${Math.round(n / 1000)}k`;
 
 export function useExtraGrafy({
-  data, clients, aktivne, onNavigate, kpiSkryte = [], obdobie = "all", vytazenie,
+  data, clients, aktivne, onNavigate, kpiSkryte = [], obdobie = "all", vytazenie, trainer = "all",
 }: {
   data: PSBData;
   clients: Record<string, ClientAgg>;
+  /**
+   * Prepínač trénera z hlavičky Kokpitu.
+   *
+   * Do 22. 8. 2026 sem nechodil vôbec: horné prístroje sa prepli na Terezku,
+   * ale všetky karty s grafmi ďalej ukazovali firemné čísla — a nič to
+   * nenaznačovalo. Terezka si tak pri prvom použití prezerala Jerryho
+   * dochádzku ako svoju.
+   *
+   * Filtrujú sa LEN ľudia a hodiny (klienti podľa primárneho trénera,
+   * sedenia podľa toho, kto ich odtrénoval). Peniaze zostávajú firemné
+   * zámerne: nájom, softvér ani break-even sa medzi trénerov nedelia, takže
+   * „Terezkin P&L" by bolo vymyslené číslo. Karty, ktoré miešajú oboje
+   * (Zisky a náklady, Kanály), preto naďalej počítajú z celej firmy.
+   */
+  trainer?: string;
   /** Zapnuté karty — dáta z API sa ťahajú len pre ne. */
   aktivne: Set<string>;
   onNavigate: (tab: string, sub?: string, focus?: { skupina?: { label: string; mena: string[] }; nonce?: number }) => void;
@@ -427,6 +442,21 @@ export function useExtraGrafy({
     zvladneEste: number | null;
   };
 }): Record<string, ReactNode> {
+  // Neprepísať pôvodné vstupy — karty, ktoré miešajú hodiny s firemnými
+  // nákladmi, musia ďalej vidieť celok.
+  const dataAll = data;
+  const clientsAll = clients;
+  const jedenTrener = trainer !== "all" && !!trainer;
+  const clientsF = useMemo(
+    () => (jedenTrener
+      ? Object.fromEntries(Object.entries(clients).filter(([, c]) => (c.primaryTrainer || "") === trainer))
+      : clients),
+    [clients, trainer, jedenTrener],
+  );
+  const dataF = useMemo(
+    () => (jedenTrener ? { ...data, sessions: data.sessions.filter((x) => (x.sessionTrainer || "") === trainer) } : data),
+    [data, trainer, jedenTrener],
+  );
   // Živé tržby do VZAS pred každým výpočtom (idempotentné, rovnako ako pri Zisku).
   const vzas = useMemo(() => {
     const cash: Record<string, number> = {};
@@ -442,7 +472,11 @@ export function useExtraGrafy({
     // stav spred načítania nákladov z banky.
   }, [data, vzasVerzia(), objednaneVerzia()]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const toky = useMemo(() => tokyKlientov(data, clients), [data, clients]);
+  // Toky sa počítajú z VÝBERU PODĽA TRÉNERA — inak by karty postavené na nich
+  // („Čo klient prinesie podľa zdroja", Fluktuácia, Kde to tečie, Kohorty)
+  // ukazovali celú firmu aj po prepnutí na Terezku. Presne to sa 22. 8. 2026
+  // stalo: dve karty vedľa seba sa prepli a tretia nie.
+  const toky = useMemo(() => tokyKlientov(dataF, clientsF), [dataF, clientsF]);
 
   // Posledný plný mesiac. Bez neho každý mesačný graf končil rozrobeným
   // mesiacom a posledný bod padal k zemi — vyzeralo to ako prepad.
@@ -501,6 +535,11 @@ export function useExtraGrafy({
   }, [chceMkt, aktivne]);
 
   return useMemo(() => {
+    // Od tohto riadku znamenajú `data` a `clients` VÝBER PODĽA TRÉNERA.
+    // Firemné karty siahajú na `dataAll` / `clientsAll` — sú vymenované
+    // v komentári pri parametri `trainer`.
+    const data = dataF;
+    const clients = clientsF;
     const { p, j, t, be, jarek } = vzas;
 
     // Okno filtra obdobia. `idxOkno` sú indexy do VZAS_MONTHS, `vMes` je to
@@ -1418,7 +1457,7 @@ export function useExtraGrafy({
     // Rovnaké čísla ako obrazovka Výsledky → KPI (tá istá computeKpis, tie isté
     // ciele z DB) — len bez posuvníkov. Cieľ sa mení tam, kde sa o ňom
     // rozhoduje; dashboard ho ukazuje.
-    const kpis = computeKpis(KPI_ROK, data.sessions, data.payments, kpiOverrides, btc?.czk ?? null);
+    const kpis = computeKpis(KPI_ROK, dataAll.sessions, dataAll.payments, kpiOverrides, btc?.czk ?? null);
     for (const karta of KPI_KARTY) {
       const riadky = kpis.filter((k) => k.def.group === karta.group && !kpiSkryte.includes(k.def.id));
       const vsetkyVSkupine = kpis.filter((k) => k.def.group === karta.group).length;
@@ -1795,15 +1834,15 @@ export function useExtraGrafy({
     // Lievik za posledný UZAVRETÝ mesiac — rozbehnutý ukazuje prvé dni nuly
     // a nedá sa s ničím porovnať (tá istá lekcia ako pri kotve dát).
     const lievikMk = (() => {
-      const den = data.sessions.reduce((m, x) => (x.date > m ? x.date : m), "");
+      const den = dataAll.sessions.reduce((m, x) => (x.date > m ? x.date : m), "");
       const mk = den.slice(0, 7);
       const bezici = new Date().toISOString().slice(0, 7);
       return mk && mk < bezici ? mk : (() => { const d = new Date(); d.setMonth(d.getMonth() - 1); return d.toISOString().slice(0, 7); })();
     })();
     const lievikK = {
-      dopyty: (data.leads || []).filter((l) => (l.date || "").slice(0, 7) === lievikMk).length,
-      uvodne: pocetUvodnych(data.sessions.filter((x) => x.date.slice(0, 7) === lievikMk)),
-      novi: Object.values(clients).filter((c) => (c.firstSession || "").slice(0, 7) === lievikMk).length,
+      dopyty: (dataAll.leads || []).filter((l) => (l.date || "").slice(0, 7) === lievikMk).length,
+      uvodne: pocetUvodnych(dataAll.sessions.filter((x) => x.date.slice(0, 7) === lievikMk)),
+      novi: Object.values(clientsAll).filter((c) => (c.firstSession || "").slice(0, 7) === lievikMk).length,
     };
     nodes.marketingSuhrn = (
       <Card style={{ marginBottom: 0, height: "100%" }}>

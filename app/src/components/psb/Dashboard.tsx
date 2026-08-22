@@ -1336,7 +1336,7 @@ export function Dashboard({
     kapacitaPct: vytazenieSpolu(capacity),
     zvladneEste: capacity.length ? capacity.reduce((a, c) => a + c.canTake, 0) : null,
   }), [weeklyHours, zones, weekStats, capacity]);
-  const extraNodes = useExtraGrafy({ data, clients, aktivne, onNavigate, kpiSkryte: layout.kpiSkryte, obdobie, vytazenie: vytazenieVstup });
+  const extraNodes = useExtraGrafy({ data, clients, aktivne, onNavigate, kpiSkryte: layout.kpiSkryte, obdobie, vytazenie: vytazenieVstup, trainer });
 
   const nodes: Record<string, ReactNode> = {
     ...extraNodes,
