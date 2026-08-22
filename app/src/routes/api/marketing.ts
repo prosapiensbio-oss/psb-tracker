@@ -21,7 +21,7 @@ export const Route = createFileRoute("/api/marketing")({
         const { DB } = bindings();
         if (!DB) return Response.json({ ok: false, mesacne: [], top: [] });
         try {
-          const [mes, top, ga4, ga4S, gscZ, gscM, gscD, gscS, kan, gadsK, gadsD, gadsV, webS, rychlost] = await Promise.all([
+          const [mes, top, ga4, ga4S, gscZ, gscM, gscD, gscS, kan, gadsK, gadsD, gadsV, webS, rychlost, adsSpend] = await Promise.all([
             DB.prepare(
               `SELECT mesiac,
                       SUM(CASE WHEN druh = 'reel'  THEN 1 ELSE 0 END) AS reels,
@@ -68,6 +68,14 @@ export const Route = createFileRoute("/api/marketing")({
                  JOIN (SELECT url, strategia, MAX(merane_at) m FROM web_rychlost GROUP BY url, strategia) n
                    ON n.url = r.url AND n.strategia = r.strategia AND n.m = r.merane_at`,
             ).all().catch(() => ({ results: [] })),
+            // SKUTOČNÝ výdaj na reklamu — z Meta Marketing API, nie z Metricoolu.
+            //
+            // `mkt_prispevky.spend` je suma pripísaná JEDNOTLIVÝM príspevkom
+            // z Metricool exportu: pozná len boostnuté kusy, ktoré ten export
+            // obsahuje, a v mesiaci bez exportu je nula. Za 19 mesiacov dáva
+            // 18 179 Kč, kým Meta hovorí 31 454 Kč — a karta „Čo stojí úvodný"
+            // z toho počítala cenu za klienta (nájdené 22. 8. 2026).
+            DB.prepare("SELECT mesiac, SUM(spend) AS spend FROM mkt_kampane GROUP BY mesiac").all().catch(() => ({ results: [] })),
           ]);
           // Mesiac, z ktorého je nahratá len časť, sa nesmie tváriť ako hotový.
           // 11. 8.: doplnili sme 18 mesiacov exportov, ale júl 2026 v priečinku
@@ -100,6 +108,13 @@ export const Route = createFileRoute("/api/marketing")({
               ulozenia: Number(r.ulozenia) || 0,
               zdielania: Number(r.zdielania) || 0,
               spend: Number(r.spend) || 0,
+              // Výdaj podľa Mety pre ten istý mesiac. Keď mesiac v Mete nie je,
+              // pole chýba a obrazovka vie, že skutočnú sumu nepozná — to je
+              // lepšie než ticho podstrčiť neúplné číslo z Metricoolu.
+              spendAds: (() => {
+                const x = (adsSpend.results as Record<string, unknown>[]).find((a) => String(a.mesiac) === String(r.mesiac));
+                return x ? Math.round(Number(x.spend) || 0) : undefined;
+              })(),
               viewRate: Math.round((Number(r.view_rate) || 0) * 10) / 10,
               watchTime: Math.round(Number(r.watch_time) || 0),
               ...(() => {

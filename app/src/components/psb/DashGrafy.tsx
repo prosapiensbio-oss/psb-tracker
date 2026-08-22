@@ -1965,15 +1965,26 @@ function CenaZaKlienta({
   };
   // Výdaje sú v Metricoole len po mesiacoch. Pre 30-dňové okno sa berú
   // pomerne podľa počtu dní mesiaca v okne — je to odhad a Info to hovorí.
+  /**
+   * KTORÝ VÝDAJ SA TU RÁTA.
+   *
+   * `m.spend` je suma pripísaná príspevkom z Metricool exportu — pozná len
+   * boostnuté kusy z nahratého súboru a v mesiaci bez exportu je nula
+   * (júl 2026: 0 Kč, hoci Meta hlási 4 796 Kč). Za 19 mesiacov to je
+   * 18 179 Kč proti 31 454 Kč podľa Mety, takže „cena za úvodný" vychádzala
+   * o 40 % nižšia, než v skutočnosti bola. Peniaze berieme z Mety
+   * (`spendAds`), Metricool zostáva len tam, kde ide o obsah.
+   */
+  const vydaj = (m: { spend: number; spendAds?: number }) => (typeof m.spendAds === "number" ? m.spendAds : m.spend);
   const spend = okno === "1m"
     ? Math.round(MKT_MESACNE.reduce((a, m) => {
         const zac = Date.parse(`${m.m}-01`);
         const dniMes = new Date(Number(m.m.slice(0, 4)), Number(m.m.slice(5, 7)), 0).getDate();
         const kon = zac + dniMes * 86400000;
         const dni = Math.max(0, (Math.min(kon, dnes) - Math.max(zac, od30)) / 86400000);
-        return a + (m.spend || 0) * (dni / dniMes);
+        return a + (vydaj(m) || 0) * (dni / dniMes);
       }, 0))
-    : MKT_MESACNE.filter((m) => vOkne(m.m)).reduce((a, m) => a + (m.spend || 0), 0);
+    : MKT_MESACNE.filter((m) => vOkne(m.m)).reduce((a, m) => a + (vydaj(m) || 0), 0);
   const uvodne = pocetUvodnych(data.sessions.filter((x) => vOkneDatum(x.date)));
   // jeKlient aj tu — bez neho „cena za klienta" delila výdavok každým, kto
   // prišiel na platený úvodný (36 namiesto 29 v okne 2026), a bola o ~19 %
