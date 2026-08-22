@@ -208,15 +208,19 @@ export function Kalendar({ clients, data, focus }: { clients: Record<string, Cli
         />
       )}
       {pripojene && <div id="kal-zmeny"><Zmeny zmeny={zmenyF} onHotovo={nacitaj} mena={menaKlientov} /></div>}
+      {/* „Nové názvy" idú NAD „Chýba v PTminderi" (Jerry, 22. 8. 2026).
+          Je to poradie práce, nie estetika: kým sa meno z názvu udalosti
+          nepriradí človeku, tréning nemá komu patriť — a presne preto potom
+          spadne do „Chýba v PTminderi". Priradiť najprv a až potom čítať, čo
+          chýba, znamená kratší zoznam a menej otázok. */}
+      {stav.nezname.length > 0 && (
+        <Mapovanie nezname={stav.nezname} mena={menaKlientov} clients={clients} onHotovo={nacitaj} />
+      )}
       {pripojene && <Kontrola udalosti={udalostiF} data={data} />}
       {/* Balíčky aj „Odpísaní, ale majú termín" sa zliali na Kokpit (Jerry,
           9. 8.): dlaždica Odmlčaní sama vynecháva ľudí s budúcim termínom,
           takže táto karta hovorila to isté druhýkrát. Sem sa chodí pozerať,
           čo sa v kalendári zmenilo, nie komu treba zavolať. */}
-
-      {stav.nezname.length > 0 && (
-        <Mapovanie nezname={stav.nezname} mena={menaKlientov} clients={clients} onHotovo={nacitaj} />
-      )}
 
       {pripojene && (
         <Card>
