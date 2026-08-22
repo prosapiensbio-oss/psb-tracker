@@ -250,8 +250,15 @@ export async function sendChat(
     // Errors (no_key, api_error…) come back as JSON; a successful answer streams as
     // Server-Sent Events (text/event-stream) — `data: {"t":"…"}` frames, then `[DONE]`.
     if ((r.headers.get("content-type") || "").includes("application/json")) {
-      return (await r.json()) as ChatResult;
+      // Stav si nesieme so sebou: 401 (vypršaná session) vyzerá v tele
+      // odpovede ako hociktorá iná chyba, ale pre človeka je to úplne iná
+      // situácia — nemá čakať na AI, má sa prihlásiť.
+      const j = (await r.json()) as ChatResult;
+      return j.ok ? j : { ...j, status: r.status };
     }
+    // Neúspešná odpoveď BEZ JSON tela (Worker spadol, proxy vrátila HTML).
+    // Bez tejto vetvy sa z nej stal „network" a skutočný stav sa stratil.
+    if (!r.ok) return { ok: false, error: "http", status: r.status, detail: (await r.text().catch(() => "")).slice(0, 200) };
     if (!r.body) return { ok: false, error: "network" };
     const reader = r.body.getReader();
     const decoder = new TextDecoder();

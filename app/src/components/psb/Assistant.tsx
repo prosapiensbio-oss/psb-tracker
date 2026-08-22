@@ -588,7 +588,7 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
         return n;
       });
     } else {
-      setLast({ role: "assistant", text: errorText(res.error) });
+      setLast({ role: "assistant", text: errorText(res.error, res.detail, res.status) });
     }
   }
 
@@ -1244,10 +1244,23 @@ export function Assistant({ chat, onClientClick, onNavigate }: { chat: Assistant
   );
 }
 
-function errorText(err: string): string {
+/**
+ * Prečo zlyhanie, nie ŽE zlyhanie.
+ *
+ * Do 21. 8. 2026 padali všetky poruchy okrem chýbajúceho kľúča do jednej vety
+ * „Nepodarilo sa spojiť s AI". Terezka na ňu narazila pri prvom použití a
+ * hláška ju poslala čakať — pritom najpravdepodobnejšia príčina je vypršaná
+ * session, na ktorú stačí prihlásenie. Zberná veta zostáva ako posledná
+ * možnosť, ale nesie so sebou technický detail: bez neho sa príčina nedá
+ * dohľadať ani spätne.
+ */
+function errorText(err: string, detail?: string, status?: number): string {
   if (err === "no_key") return "⚠️ AI zatiaľ nie je aktivovaná — chýba API kľúč. Keď ho vložíš do nastavení appky, začnem odpovedať.";
   if (err === "api_error") return "⚠️ Model vrátil chybu (skontroluj kredit/kľúč na Anthropic konzole). Skús to prosím znova.";
-  return "⚠️ Nepodarilo sa spojiť s AI. Skús to prosím o chvíľu znova.";
+  if (err === "unauthorized" || status === 401) return "⚠️ Prihlásenie vypršalo — appka ťa odhlásila. Načítaj stránku (⌘R) a prihlás sa znova; otázka aj rozhovor zostávajú uložené.";
+  if (err === "empty" || err === "bad_request") return "⚠️ Otázka neodišla celá (prázdna alebo príliš veľká príloha). Skús ju poslať znova, prípadne bez prílohy.";
+  const dovod = [status ? `HTTP ${status}` : "", (detail || "").trim()].filter(Boolean).join(" · ");
+  return `⚠️ Nepodarilo sa spojiť s AI. Skús to prosím o chvíľu znova.${dovod ? `\n\n*Detail pre Filipa: ${dovod.slice(0, 200)}*` : ""}`;
 }
 
 const iconBtn: CSSProperties = { width: 28, height: 28, borderRadius: 7, border: "none", background: "transparent", color: C.textMuted, cursor: "pointer", fontSize: 15, display: "flex", alignItems: "center", justifyContent: "center" };
