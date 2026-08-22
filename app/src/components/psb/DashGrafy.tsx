@@ -453,10 +453,25 @@ export function useExtraGrafy({
       : clients),
     [clients, trainer, jedenTrener],
   );
-  const dataF = useMemo(
-    () => (jedenTrener ? { ...data, sessions: data.sessions.filter((x) => (x.sessionTrainer || "") === trainer) } : data),
-    [data, trainer, jedenTrener],
-  );
+  const dataF = useMemo(() => {
+    if (!jedenTrener) return data;
+    /**
+     * PLATBY SA MUSIA FILTROVAŤ SPOLU SO SEDENIAMI.
+     *
+     * Prvá verzia (22. 8. 2026) filtrovala len sedenia — a „Ø cena sedenia"
+     * potom delila CELOFIREMNÚ tržbu sedeniami jedného trénera. Vyšlo
+     * ~3 000 Kč pri Jerrym a ~2 000 pri Terezke, hoci spolu je to ~1 000.
+     * Číslo, ktoré rastie tým, že sa pozeráš na menšiu časť firmy, je
+     * vymyslené. Platba nemá trénera, má klienta — tak sa priraďuje cez
+     * primárneho trénera toho klienta.
+     */
+    const patri = (meno: string) => (clients[meno]?.primaryTrainer || "") === trainer;
+    return {
+      ...data,
+      sessions: data.sessions.filter((x) => (x.sessionTrainer || "") === trainer),
+      payments: data.payments.filter((x) => patri(x.client)),
+    };
+  }, [data, clients, trainer, jedenTrener]);
   // Živé tržby do VZAS pred každým výpočtom (idempotentné, rovnako ako pri Zisku).
   const vzas = useMemo(() => {
     const cash: Record<string, number> = {};

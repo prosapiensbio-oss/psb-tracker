@@ -403,9 +403,12 @@ function Mapovanie({ nezname, mena, clients, onHotovo }: { nezname: Nezname[]; m
     for (const n of nezname) {
       const k = `${n.nazov}|${n.trener}`;
       const nav = navrhy[k];
-      const odhad = (vyber[k]?.klient
-        || (nav?.typ === "uvodny" ? (nav.kandidati[0] || nav.meno) : nav?.kandidati[0])
-        || "").trim();
+      // POZOR: kľúč sa NESMIE počítať z toho, čo je práve napísané v poli.
+      // Prvá verzia doň brala `vyber[k]` — po každom písmene sa skupiny
+      // prepočítali, riadok dostal nový kľúč, React ho zahodil a vyrobil
+      // znova, takže input stratil kurzor po každom znaku (Jerry, 22. 8.).
+      // Zoskupenie drží NÁVRH appky, ktorý sa počas písania nemení.
+      const odhad = ((nav?.typ === "uvodny" ? (nav.kandidati[0] || nav.meno) : nav?.kandidati[0]) || "").trim();
       const kluc = odhad ? normName(odhad) : "";
       const e = m.get(kluc) || { meno: odhad, polozky: [], spolu: 0 };
       e.polozky.push(n);
@@ -417,7 +420,7 @@ function Mapovanie({ nezname, mena, clients, onHotovo }: { nezname: Nezname[]; m
     return [...m.entries()]
       .map(([kluc, v]) => ({ kluc, ...v }))
       .sort((a, b) => (b.polozky.length - a.polozky.length) || (b.spolu - a.spolu));
-  }, [nezname, navrhy, vyber]);
+  }, [nezname, navrhy]);
 
   // Server vie vrátiť {ok:false} aj s HTTP 200 — kto telo nečíta, hlási
   // úspech aj pri odmietnutom zápise. Vzor s lokálnou chybou je ten istý
