@@ -1510,6 +1510,16 @@ export function useExtraGrafy({
     // so stopäťdesiatimi — a práve to bol jeden z dôvodov, prečo tá istá vec
     // vychádzala na štyroch obrazovkách štyrikrát inak.
     const cenaPriem = cenaZaSedenie(data, vMes).czk;
+    /**
+     * Ideálna hodinovka ako čiara v grafe (Terezka, 22. 8. 2026).
+     *
+     * Krivka bez čiary hovorí len „hore/dole" — s čiarou hovorí „nad cieľom"
+     * alebo „pod cieľom", čo je jediná otázka, na ktorú tá karta má odpovedať.
+     * Číslo NIE JE nové: je to ten istý cieľ hodinovky, ktorý meria KPI
+     * „Priemerná hodinovka" (1 050 Kč, prepisovateľný v Cieľoch) — dve rôzne
+     * čísla pre tú istú vec by boli horšie než žiadne.
+     */
+    const cielHodinovky = kpiDefs(KPI_ROK, kpiOverrides).find((d) => d.id === "hodinovka")?.lo ?? null;
     const cenaMax = cenaRad.length ? cenaRad.reduce((a, x) => (x.v > a.v ? x : a)) : null;
     const cenaMin = cenaRad.length ? cenaRad.reduce((a, x) => (x.v < a.v ? x : a)) : null;
     nodes.cenaSedenia = (
@@ -1522,6 +1532,7 @@ export function useExtraGrafy({
                 data={cenaRad.map((x) => ({ label: monthLabel(x.mk), values: [x.v] }))}
                 series={[{ name: "Ø CZK / sedenie", color: C.accent }]}
                 height={190} fmt={(n) => `${Math.round(n)}`} autoY alignEnd bezSuhrnu
+                {...(cielHodinovky ? { refLine: { value: cielHodinovky, label: `cieľ ${fmtCZK(cielHodinovky)}`, color: C.green } } : {})}
               />
             </Klik>
           </div>
