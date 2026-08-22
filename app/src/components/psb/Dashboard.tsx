@@ -30,7 +30,8 @@ import { Balicky, odtrenovaneMimoExportu, type KalUdalost } from "./Kalendar";
 import { jeKlient } from "./MarketingLievik";
 import { nastavPrijmyZTrackera, pnlCalc, poslednyMesiacSDatami, salaryCalc, vzasVerzia, VZAS_MONTHS } from "../../lib/psb/vzas";
 import { breakEvenPriemer, poslednyUzavretyIdx } from "../../lib/psb/rezerva";
-import { fetchBtcReserve, fetchVzasSettings } from "../../lib/psb/client";
+import { fetchBtcReserve, fetchVzasSettings, saveLead } from "../../lib/psb/client";
+import { SOURCES } from "./Klienti";
 import { CIEL_MESIACOV, chybaDoCiela, spocitajRezervu } from "../../lib/psb/rezerva";
 import { PrehladPanel, useZmenyOdMinule, type Pristroj, type Zmena } from "./Prehlad";
 import {
@@ -2096,6 +2097,47 @@ function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar }: { i
   const jeSms = item.key.startsWith("sms|");
   const jeOdmena = item.key.startsWith("referral|");
   const vybav = (poznamka: string) => actions.ackAnomaly(item.key, poznamka, true);
+
+  /**
+   * Úvodný bez dopytu — zapíš ho rovno tu.
+   *
+   * Dopyt NEVZNIKÁ automaticky zámerne: appka pozná meno z názvu udalosti
+   * v kalendári, ale nevie ZDROJ, a dopyt bez zdroja je presne to, čo kazí
+   * lievik (68 klientov s neznámym pôvodom je dnes najväčšia diera v
+   * marketingových číslach). Chýbal len ten jeden krok medzi „appka vie, že
+   * chýba" a „je zapísaný" — Terezka 22. 8. 2026 skončila pri notifikácii,
+   * ktorá ju poslala inam. Zdroj je jediné, čo treba doplniť; meno aj dátum
+   * appka už má.
+   */
+  const jeBezDopytu = item.key.startsWith("bezdopytu|");
+  const [dopytOtvoreny, setDopytOtvoreny] = useState(false);
+  const [dopytZdroj, setDopytZdroj] = useState("");
+  const [dopytOdKoho, setDopytOdKoho] = useState("");
+  const [dopytBusy, setDopytBusy] = useState(false);
+  const [dopytChyba, setDopytChyba] = useState("");
+  const zapisDopyt = async () => {
+    const meno = item.oKom || "";
+    const datum = item.key.split("|")[1] || new Date().toISOString().slice(0, 10);
+    if (!meno || !dopytZdroj || dopytBusy) return;
+    setDopytBusy(true);
+    setDopytChyba("");
+    // saveLead vracia id, alebo null pri zlyhaní — položku smieme uzavrieť
+    // LEN pri id. Tiché „hotovo" nad nezapísaným dopytom by bola tá istá
+    // chyba, ktorá 9. 8. zjedla odpoveď o Danovi Kouřilovi.
+    const id = await saveLead({
+      date: datum, name: meno, source: dopytZdroj as never, status: "dohodnuty",
+      referrer: dopytZdroj === "referencia" ? dopytOdKoho.trim() : "",
+      note: "dopísané z notifikácie o úvodnom",
+    }).catch(() => null);
+    setDopytBusy(false);
+    if (!id) { setDopytChyba("Dopyt sa NEULOŽIL — skús znova."); return; }
+    setDopytOtvoreny(false);
+    const zdrojLabel = SOURCES.find((x) => x.value === dopytZdroj)?.label || dopytZdroj;
+    // Uzavretie položky prekreslí register; samotný dopyt sa v Marketingu
+    // objaví pri najbližšom načítaní dát. Dôležité je, že je ZAPÍSANÝ —
+    // notifikácia zmizne až po potvrdenom id, nie po kliknutí.
+    vybav(`dopyt dopísaný: ${zdrojLabel}${dopytZdroj === "referencia" && dopytOdKoho.trim() ? ` — od ${dopytOdKoho.trim()}` : ""}`);
+  };
   /**
    * Dôvod odchodu na jeden klik.
    *
@@ -2283,6 +2325,11 @@ function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar }: { i
               <button onClick={() => vybav("trénoval — chýba v PTminderi, treba doplniť")} style={{ ...linkBtn, color: C.green }}>Trénoval</button>
             </>
           )}
+          {jeBezDopytu && !item.acked && (
+            <button onClick={() => setDopytOtvoreny((o) => !o)} style={{ ...linkBtn, color: dopytOtvoreny ? C.accentLight : C.green }}>
+              {dopytOtvoreny ? "Zavrieť" : "Zapísať dopyt"}
+            </button>
+          )}
           {!item.acked && !jeRozhodnutie && <button onClick={openItem} style={linkBtn}>Otvoriť →</button>}
           {/* „Otvoriť" ťa prepne na miesto, ale odpoveď na otázku typu „prečo
               chýba nájom" tam nikde nezapíšeš. Odpovedať sa dá rovno tu —
@@ -2357,6 +2404,27 @@ function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar }: { i
             style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 7, padding: "4px 11px", color: C.textMuted, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
             nevieme
           </button>
+        </div>
+      )}
+
+      {dopytOtvoreny && (
+        <div style={{ marginTop: 9, paddingTop: 9, borderTop: `1px solid ${mix(C.border, 70)}`, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <span style={{ fontSize: 12, color: C.textMuted }}>Odkiaľ prišla/prišiel:</span>
+          {SOURCES.map((z) => (
+            <button key={z.value} onClick={() => setDopytZdroj(z.value)}
+              style={{ background: dopytZdroj === z.value ? mix(C.accent, 16) : "none", border: `1px solid ${dopytZdroj === z.value ? C.accent : C.border}`, borderRadius: 7, padding: "4px 11px", color: dopytZdroj === z.value ? C.accentLight : C.textMuted, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+              {z.label}
+            </button>
+          ))}
+          {dopytZdroj === "referencia" && (
+            <input value={dopytOdKoho} onChange={(e) => setDopytOdKoho(e.target.value)} placeholder="od koho? (meno)"
+              style={{ padding: "5px 9px", borderRadius: 7, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 12, width: 170 }} />
+          )}
+          <button onClick={() => void zapisDopyt()} disabled={!dopytZdroj || dopytBusy}
+            style={{ padding: "5px 13px", borderRadius: 7, border: `1px solid ${mix(C.green, 50)}`, background: mix(C.green, 12), color: C.green, fontSize: 12, fontWeight: 600, cursor: !dopytZdroj || dopytBusy ? "default" : "pointer", opacity: !dopytZdroj || dopytBusy ? 0.45 : 1, fontFamily: "inherit" }}>
+            {dopytBusy ? "Zapisujem…" : "Zapísať dopyt"}
+          </button>
+          {dopytChyba && <span style={{ fontSize: 12, color: C.red }}>{dopytChyba}</span>}
         </div>
       )}
 
