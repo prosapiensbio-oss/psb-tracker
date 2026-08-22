@@ -2683,7 +2683,9 @@ export function nezapisaneDoRegistra(v: NezapisaneVstup): Omit<RegisterItem, "ac
       trener: "Terezka",
       title: `Dopyty bez odpovede prečo (${otvorene.length})`,
       detail: `${otvorene.length} ${otvorene.length === 1 ? "dopyt, z ktorého" : "dopytov, z ktorých"} sa nestal klient a nikto nezapísal prečo. Najstarší je ${najstarsi.name} z ${String(najstarsi.date).slice(8, 10)}. ${Number(String(najstarsi.date).slice(5, 7))}. Zapisuje sa v Marketing → Dopyty, prepínač „len nevyriešené".`,
-      client: "marketing|dopyty",
+      // „f:" = prepínač, ktorý sa má rovno zapnúť. Klik teda otvorí presne
+      // ten zoznam, o ktorom veta hovorí, nie všetky dopyty.
+      client: "marketing|dopyty|f:nevyriesene",
       priority: 12,
     });
   }

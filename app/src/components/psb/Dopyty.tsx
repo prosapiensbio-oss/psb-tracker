@@ -104,7 +104,7 @@ function DovodPole({ l, onSave }: { l: Lead; onSave: (v: string) => Promise<bool
   );
 }
 
-export function Dopyty({ leads, clients, refresh, focus }: { leads: Lead[]; clients: Record<string, ClientAgg>; refresh: () => Promise<void>; focus?: { client?: string; nonce?: number } | null }) {
+export function Dopyty({ leads, clients, refresh, focus }: { leads: Lead[]; clients: Record<string, ClientAgg>; refresh: () => Promise<void>; focus?: { client?: string; filter?: string; nonce?: number } | null }) {
   const [busy, setBusy] = useState(false);
   const [adding, setAdding] = useState(false);
   const [upravCas, setUpravCas] = useState<string | null>(null);
@@ -184,6 +184,11 @@ export function Dopyty({ leads, clients, refresh, focus }: { leads: Lead[]; clie
     setRychleMeno(focus.client);
     rychleRef.current?.focus();
   }, [focus?.client, focus?.nonce]);
+  // Prepínač zo strany, ktorá sem poslala. Notifikácia menuje „len
+  // nevyriešené" — tak nech je zapnutý, keď sa zoznam otvorí.
+  useEffect(() => {
+    if (focus?.filter === "nevyriesene") setLenNevyriesene(true);
+  }, [focus?.filter, focus?.nonce]);
   const [rychlyZdroj, setRychlyZdroj] = useState("reklama");
   const [draft, setDraft] = useState<Partial<Lead>>({});
 
@@ -336,9 +341,13 @@ export function Dopyty({ leads, clients, refresh, focus }: { leads: Lead[]; clie
               style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${C.accent}`, background: C.accentBg, color: C.accentLight, fontSize: 12.5, fontWeight: 600, cursor: busy || !rychleMeno.trim() ? "default" : "pointer", opacity: busy || !rychleMeno.trim() ? 0.45 : 1 }}>
               Zapísať
             </button>
-            <button type="button" onClick={openAdd} disabled={busy}
-              style={{ background: "none", border: "none", color: C.textDim, fontSize: 12, cursor: "pointer" }}>
-              s detailom
+            {/* Kým sa to volalo „s detailom" a bolo sivé, Terezka ho
+                nenašla a pýtala sa, kde sa pridáva nový dopyt (22. 8. 2026).
+                Rýchly zápis vedľa stačí na bežný prípad; toto je cesta, keď
+                treba dátum, poznámku alebo odporúčateľa. */}
+            <button type="button" onClick={openAdd} disabled={busy} title="Nový dopyt so všetkými poľami"
+              style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 8, color: C.textMuted, fontSize: 12.5, fontWeight: 600, padding: "6px 12px", cursor: busy ? "default" : "pointer", fontFamily: "inherit" }}>
+              + Nový dopyt
             </button>
           </form>
         </div>

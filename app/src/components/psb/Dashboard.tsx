@@ -2076,6 +2076,8 @@ function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar }: { i
           // a nie tabuľka, v ktorej ho treba hľadať (revízia 18. 8. 2026).
           zapisCiel[2]?.startsWith("t:")
             ? { week: weekLabel(zapisCiel[2].slice(2)), nonce: Date.now() }
+            : zapisCiel[2]?.startsWith("f:")
+            ? { filter: zapisCiel[2].slice(2), nonce: Date.now() }
             : /^\d{4}-\d{2}$/.test(zapisCiel[2] || "")
               ? { month: zapisCiel[2], kategoria: zapisCiel[3] || undefined, nonce: Date.now() }
               // Tretí diel nemusí byť dátum — pri „marketing|dopyty|Meno" je to

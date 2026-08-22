@@ -111,6 +111,11 @@ export type NavFocus = {
    *  si tých jedenásť musel nájsť sám — čo je presne tá práca, ktorú mala
    *  dlaždica ušetriť. */
   skupina?: { label: string; mena: string[] };
+  /** Prepínač, ktorý sa má na cieľovej obrazovke rovno zapnúť. Notifikácia
+   *  „Dopyty bez odpovede prečo" hovorí o prepínači „len nevyriešené" — a
+   *  doviesť človeka k zoznamu, kde si ho musí zapnúť sám, je polovičná
+   *  práca (Terezka, 22. 8. 2026). */
+  filter?: string;
 };
 
 // Five top-level areas, each answering a different question, left to right as a

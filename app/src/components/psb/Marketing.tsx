@@ -1046,7 +1046,7 @@ function Rychlost({ chat }: { chat?: AssistantChat }) {
   );
 }
 
-export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, refresh, onPoznamkaStrata, onNavigate, focus, onAck }: { data: PSBData; clients: Record<string, ClientAgg>; leads: Lead[]; chat?: AssistantChat; sub: string; onSub: (s: string) => void; onKlient?: (m: string) => void; refresh: () => Promise<void>; onPoznamkaStrata?: (meno: string, text: string) => void; onNavigate?: (tab: string, sub?: string) => void; focus?: { client?: string; nonce?: number } | null; onAck?: (kluc: string, zapnut: boolean, poznamka?: string) => void }) {
+export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, refresh, onPoznamkaStrata, onNavigate, focus, onAck }: { data: PSBData; clients: Record<string, ClientAgg>; leads: Lead[]; chat?: AssistantChat; sub: string; onSub: (s: string) => void; onKlient?: (m: string) => void; refresh: () => Promise<void>; onPoznamkaStrata?: (meno: string, text: string) => void; onNavigate?: (tab: string, sub?: string) => void; focus?: { client?: string; filter?: string; nonce?: number } | null; onAck?: (kluc: string, zapnut: boolean, poznamka?: string) => void }) {
   const setSub = onSub;
   // Jedno miesto, odkiaľ karty berú stav skrytia — inak by každá karta
   // potrebovala vlastné tri propy a jedna by ich časom nedostala.
