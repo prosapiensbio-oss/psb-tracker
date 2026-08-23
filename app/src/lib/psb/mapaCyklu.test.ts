@@ -36,7 +36,7 @@ describe("mriežka", () => {
   it("rozdelí zverejnené a naplánované do správnych buniek", () => {
     const os = osMapy("2026-03", 2, 1);
     const m = mriezka(os, [kus("2026-02", 5)], [
-      { id: "a", faza: 5, mesiac: "2026-04", koncept: "k", kto: "", text: "t", zdroj: "jarvis", stav: "novy" },
+      { id: "a", faza: 5, mesiac: "2026-04", koncept: "k", kto: "", text: "t", zdroj: "jarvis", stav: "novy", hotovyText: "" },
     ]);
     expect(m.get("2026-02|5")?.vyslo).toHaveLength(1);
     expect(m.get("2026-04|5")?.plan).toHaveLength(1);
@@ -122,5 +122,20 @@ describe("zadanie pre Claude Project", () => {
     const t = zadanieProProject({ ...zaklad, faza: 0 });
     expect(t).toContain("Nezaradené");
     expect(t).not.toContain("FÁZA NÁKUPNÉHO CYKLU: 0");
+  });
+});
+
+describe("zadanie s už napísaným textom", () => {
+  const zaklad = { mesiac: "2026-10", faza: 5, koncept: "Petra a koleno", kto: "Petra" };
+
+  it("druhé kolo je ÚPRAVA, nie nový pokus od nuly", () => {
+    const t = zadanieProProject({ ...zaklad, hotovyText: "Hotový reel o kolene." });
+    expect(t).toContain("TERAJŠIA VERZIA");
+    expect(t).toContain("Hotový reel o kolene.");
+  });
+
+  it("bez hotového textu sa o terajšej verzii nezmieni", () => {
+    expect(zadanieProProject(zaklad)).not.toContain("TERAJŠIA VERZIA");
+    expect(zadanieProProject({ ...zaklad, hotovyText: "   " })).not.toContain("TERAJŠIA VERZIA");
   });
 });

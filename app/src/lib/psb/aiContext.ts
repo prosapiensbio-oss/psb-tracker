@@ -679,6 +679,7 @@ export function buildAiContext(
         zaradenieJeOdhad: "Fázy 116 príspevkov z 03/2025–08/2026 priradil model z textu háku 23. 8. 2026; starších 149 kusov má fazu 0 zámerne. Keď o rozložení hovoríš, povedz, že je to odhad — nie ručne overené zaradenie.",
         coUzVieme: "Rozloženie zverejnených bolo pri vzniku mapy 22/18/17/22/19 % — takmer rovnomerné. Nehovor Jerrymu, že mu 'chýba fáza X', kým si to neoveril dopytom; pri vzniku mapy to neplatilo a je to najlákavejší falošný nález.",
         planovanie: "Nápad s vyplneným planovane_na (RRRR-MM) a fazou > 0 je SLOT V PLÁNE na ten mesiac; nápad bez mesiaca je zásobník. Pole koncept je návrh captionu alebo popis, o čom to bude, kto je meno človeka, ktorý v tom vystupuje. Keď Jerry žiada návrhy na mesiac, pozri sa najprv dopytom, čo už na ten mesiac a fázu naplánované je, a nenavrhuj to isté.",
+        hotoveTexty: "Stĺpec hotovy_text nesie NAPÍSANÝ príspevok z Claude Projectu. Reťaz je: Kokpit drží zámer → Project napíše vety → vety sa vrátia do hotovy_text → Metricool zverejní. Slot s vyplneným hotovy_text čaká len na zverejnenie; slot v blížiacom sa mesiaci s prázdnym hotovy_text znamená, že text ešte nikto nenapísal, a to je vec, na ktorú sa oplatí upozorniť. Keď Jerry rieši, čo má rozpracované, rozlišuj tieto tri stavy: naplánované (len mesiac a fáza), premyslené (koncept) a napísané (hotovy_text).",
       },
       naklady: { poznamka: "Marketingové položky z P&L (Facebook, Google, MultiBox, Offline).", poMesiacoch: naklady },
     };

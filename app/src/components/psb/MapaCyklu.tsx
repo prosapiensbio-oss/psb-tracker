@@ -49,7 +49,7 @@ const DRUH: Record<string, string> = {
 
 type NapadRiadok = {
   id: string; text: string; stav: string; zdroj: string;
-  faza?: number; planovane_na?: string; kto?: string; koncept?: string;
+  faza?: number; planovane_na?: string; kto?: string; koncept?: string; hotovy_text?: string;
 };
 
 type Vyber =
@@ -114,6 +114,7 @@ export function MapaCyklu({ data, chat, onNavigate }: {
     .map((n) => ({
       id: n.id, faza: n.faza || 0, mesiac: n.planovane_na || "",
       koncept: n.koncept || "", kto: n.kto || "", text: n.text || "",
+      hotovyText: n.hotovy_text || "",
       zdroj: n.zdroj || "", stav: n.stav || "novy",
     })), [napady]);
 
@@ -287,15 +288,21 @@ export function MapaCyklu({ data, chat, onNavigate }: {
                               }} />
                           );
                         })}
-                        {b.plan.map((s) => (
-                          <button key={s.id} onClick={() => setVyber({ druh: "slot", slot: s })}
-                            title={s.koncept || s.text || "bez konceptu"}
-                            style={{
-                              width: 11, height: 11, borderRadius: 3, padding: 0, cursor: "pointer",
-                              background: s.koncept ? mix(f.farba, 0.55) : "transparent",
-                              border: `1.5px dashed ${f.farba}`,
-                            }} />
-                        ))}
+                        {b.plan.map((s) => {
+                          // Tri stavy, lebo plán má tri štádiá: naplánované →
+                          // premyslené → napísané. Bez toho sa z mriežky nedá
+                          // prečítať, čo je hotové na publikovanie.
+                          const hotove = !!s.hotovyText.trim();
+                          return (
+                            <button key={s.id} onClick={() => setVyber({ druh: "slot", slot: s })}
+                              title={(hotove ? "hotový text · " : "") + (s.koncept || s.text || "bez konceptu")}
+                              style={{
+                                width: 11, height: 11, borderRadius: 3, padding: 0, cursor: "pointer",
+                                background: hotove ? f.farba : s.koncept ? mix(f.farba, 0.55) : "transparent",
+                                border: hotove ? `1.5px solid ${f.farba}` : `1.5px dashed ${f.farba}`,
+                              }} />
+                          );
+                        })}
                         {buduci && (
                           <button onClick={() => setVyber({ druh: "novy", mesiac: m, faza: f.id })}
                             title={`Naplánovať do ${m}`}
@@ -323,7 +330,10 @@ export function MapaCyklu({ data, chat, onNavigate }: {
           <i style={{ width: 11, height: 11, borderRadius: 3, border: `1.5px dashed ${C.textMuted}`, display: "inline-block" }} /> naplánované, bez konceptu
         </span>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-          <i style={{ width: 11, height: 11, borderRadius: 3, background: mix(C.textMuted, 0.55), border: `1.5px dashed ${C.textMuted}`, display: "inline-block" }} /> naplánované, s konceptom
+          <i style={{ width: 11, height: 11, borderRadius: 3, background: mix(C.textMuted, 0.55), border: `1.5px dashed ${C.textMuted}`, display: "inline-block" }} /> s konceptom
+        </span>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <i style={{ width: 11, height: 11, borderRadius: 3, background: C.textMuted, border: `1.5px solid ${C.textMuted}`, display: "inline-block" }} /> text hotový
         </span>
       </div>
 
@@ -363,6 +373,7 @@ export function MapaCyklu({ data, chat, onNavigate }: {
                       {sl.koncept || sl.text || <i style={{ color: C.textDim }}>bez konceptu</i>}
                       {sl.kto && <span style={{ color: C.textDim }}> · {sl.kto}</span>}
                       {sl.zdroj === "jarvis" && <span style={{ color: C.textDim }}> · od Jarvisa</span>}
+                      {sl.hotovyText.trim() && <span style={{ color: fd?.farba }}> · text hotový</span>}
                       {mimoMapy && <span style={{ color: C.red }}> · mimo zobrazenej osi</span>}
                     </span>
                   </button>
@@ -449,6 +460,7 @@ function Panel({ vyber, os, onZavri, onUloz, onFazaPrispevku, onJarvis, onDoProj
   const slot = vyber.druh === "slot" ? vyber.slot : null;
   const [koncept, setKoncept] = useState(slot?.koncept || "");
   const [kto, setKto] = useState(slot?.kto || "");
+  const [hotovyText, setHotovyText] = useState(slot?.hotovyText || "");
   const [busy, setBusy] = useState(false);
   // Mazanie na dva kliky. Modálne potvrdenie v modáli je okno v okne;
   // prepnutý nápis je rovnako neprehliadnuteľný a o krok kratší.
@@ -510,15 +522,15 @@ function Panel({ vyber, os, onZavri, onUloz, onFazaPrispevku, onJarvis, onDoProj
   // ── Slot v pláne: nový alebo existujúci ───────────────────────────────────
   const f = FAZY.find((x) => x.id === faza);
   const zapis = async () => {
-    if (!koncept.trim() && !kto.trim()) return;
+    if (!koncept.trim() && !kto.trim() && !hotovyText.trim()) return;
     setBusy(true);
     const ok = slot
-      ? await onUloz({ id: slot.id, koncept, kto, faza, planovaneNa: mesiac })
+      ? await onUloz({ id: slot.id, koncept, kto, faza, planovaneNa: mesiac, hotovyText })
       : await onUloz({
           // Text nápadu je prvá veta konceptu — zásobník aj plán sú tá istá
           // tabuľka a nápad bez textu by v zozname nápadov svietil prázdny.
           text: koncept.trim().slice(0, 300) || `Obsah na ${mesiac}`,
-          zdroj: "vlastny", faza, planovaneNa: mesiac, kto, koncept,
+          zdroj: "vlastny", faza, planovaneNa: mesiac, kto, koncept, hotovyText,
         });
     setBusy(false);
     if (ok) onZavri();
@@ -565,18 +577,28 @@ function Panel({ vyber, os, onZavri, onUloz, onFazaPrispevku, onJarvis, onDoProj
 
       {/* Doladenie textu patrí do Projectu — ten má kánon značky, tón hlasu
           aj FP pravidlá. Kokpit drží ZÁMER, Project z neho robí vety. */}
+      {/* Hotový text až POD prekliokom do Projectu — v tomto poradí sa to aj
+          robí: zámer → Project → vety späť sem. Bez tohto poľa končili vety
+          v okne prehliadača a v pláne po nich nezostala stopa. */}
+      <label style={{ display: "block", fontSize: 11.5, color: C.textMuted, margin: "14px 0 4px" }}>
+        Hotový text {hotovyText.trim() ? `(${hotovyText.trim().length} znakov)` : "— vlož, čo vrátil Project"}
+      </label>
+      <textarea value={hotovyText} onChange={(e) => setHotovyText(e.target.value)} rows={hotovyText ? 8 : 3}
+        placeholder="sem vlož hotový príspevok, keď ho Project napíše"
+        style={{ ...vstup, resize: "vertical", lineHeight: 1.5, fontSize: 12.5 }} />
+
       <div style={{ marginTop: 10, fontSize: 11.5, color: C.textDim, lineHeight: 1.45 }}>
         <button
-          onClick={() => onDoProjectu(zadanieProProject({ mesiac, faza, koncept, kto }))}
+          onClick={() => onDoProjectu(zadanieProProject({ mesiac, faza, koncept, kto, hotovyText }))}
           style={{ background: "none", border: 0, padding: 0, color: C.accentLight, fontSize: 11.5, fontFamily: "inherit", cursor: "pointer" }}>
           doladiť text v Claude Projecte ↗
         </button>
-        {" — otvorí sa zadanie na skopírovanie."}
+        {hotovyText.trim() ? " — zadanie ponesie aj terajšiu verziu na úpravu." : " — otvorí sa zadanie na skopírovanie."}
       </div>
 
       <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap", alignItems: "center" }}>
-        <button onClick={zapis} disabled={busy || (!koncept.trim() && !kto.trim())}
-          style={{ ...tlacidlo(true), opacity: busy || (!koncept.trim() && !kto.trim()) ? 0.5 : 1 }}>
+        <button onClick={zapis} disabled={busy || (!koncept.trim() && !kto.trim() && !hotovyText.trim())}
+          style={{ ...tlacidlo(true), opacity: busy || (!koncept.trim() && !kto.trim() && !hotovyText.trim()) ? 0.5 : 1 }}>
           {slot ? "uložiť" : "naplánovať"}
         </button>
         {/* Do zásobníka, nie do koša. Nápad, ktorý ešte nechceš vyhodiť, ale

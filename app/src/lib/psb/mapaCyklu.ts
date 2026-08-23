@@ -82,6 +82,8 @@ export type SlotPlanu = {
   kto: string;
   /** Pôvodná veta nápadu. */
   text: string;
+  /** Hotové vety z Claude Projectu — to, čo naozaj pôjde von. */
+  hotovyText: string;
   zdroj: string;
   stav: string;
 };
@@ -151,7 +153,7 @@ export function tempoFaz(os: string[], vyslo: ZverejnenyKus[], kotva: string, ok
  * začiatku a tu sa naň dá zabudnúť práve preto, že sa kopíruje jedným klikom.
  */
 export function zadanieProProject(s: {
-  mesiac: string; faza: number; koncept: string; kto: string;
+  mesiac: string; faza: number; koncept: string; kto: string; hotovyText?: string;
 }): string {
   const f = FAZA_MAPA.get(s.faza);
   const riadky = [
@@ -165,6 +167,11 @@ export function zadanieProProject(s: {
     s.koncept.trim() || "(koncept nie je vyplnený)",
   ];
   if (s.kto.trim()) riadky.push("", `KTO V TOM VYSTUPUJE: ${s.kto.trim()}`);
+  // Keď text už raz vznikol, druhé kolo má byť ÚPRAVA, nie nový pokus od
+  // nuly — inak sa zahodí všetko, čo na ňom už bolo dobré.
+  if ((s.hotovyText || "").trim()) {
+    riadky.push("", "TERAJŠIA VERZIA (uprav ju, nepíš odznova):", (s.hotovyText || "").trim());
+  }
   riadky.push(
     "",
     "ČO CHCEM SPÄŤ: hotový text príspevku v češtine — hák, telo, záver.",
