@@ -12,6 +12,7 @@ import {
 import { C, mix } from "../../lib/psb/theme";
 import type { Actions } from "./App";
 import { nastavPnlBunku, pnlOverridesNaUlozenie } from "../../lib/psb/vzas";
+import { ZABER_MAPA } from "../../lib/psb/zabery";
 
 type ParsedAction = {
   type: "ack-anomaly" | "unack-anomaly" | "set-override" | "zapis-zaver" | "vyhodnot-zaver" | "novy-ciel" | "kronika" | "odloz-anomaliu" | "uprav-pnl" | "zarad-pohyby" | "mkt-znacka" | "spusti-kampan" | "zastav-kampan" | "naplanuj-obsah";
@@ -674,11 +675,16 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
             text: String(d.koncept).slice(0, 300),
             zdroj: "jarvis", faza: Number(d.faza), planovaneNa: String(d.mesiac),
             kto: String(d.kto || ""), koncept: String(d.koncept),
+            // Neznáme id sa ZAHODÍ, nezhodí celý zápis. Server ho odmieta
+            // s chybou a prepadol by aj koncept — a ten je to cenné.
+            // Nie je to tichá strata: v editore bude svietiť „zatiaľ neviem".
+            zaber: ZABER_MAPA.has(String(d.zaber || "")) ? String(d.zaber) : "",
           }),
         })
           .then((r) => r.json())
           .then((j: { ok?: boolean; error?: string }) => oznamVysledok(j.ok
             ? `Naplánované na ${String(d.mesiac)}: ${String(d.koncept).slice(0, 70)}`
+              + (d.zaber && !ZABER_MAPA.has(String(d.zaber)) ? " (záber sa nerozpoznal — vyber ho v mape)" : "")
             : `Nenaplánovalo sa: ${j.error || "bez dôvodu"}`))
           .catch(() => oznamVysledok("Naplánovanie zlyhalo — spojenie."));
       } else if (a.type === "mkt-znacka" && a.data) {

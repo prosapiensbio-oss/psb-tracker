@@ -11,6 +11,8 @@ import { C, mix } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import type { AssistantChat } from "./Assistant";
 import { Card, Donut, H3, Info, Modal, Select } from "./ui";
+import { ZaberUkazka } from "./ZaberUkazka";
+import { ZABER_MAPA, ZABERY, zaberyPreFazu } from "../../lib/psb/zabery";
 import { CLAUDE_PROJECT } from "./Zadanie";
 
 /**
@@ -50,7 +52,7 @@ const DRUH: Record<string, string> = {
 
 type NapadRiadok = {
   id: string; text: string; stav: string; zdroj: string;
-  faza?: number; planovane_na?: string; kto?: string; koncept?: string; hotovy_text?: string;
+  faza?: number; planovane_na?: string; kto?: string; koncept?: string; hotovy_text?: string; zaber?: string;
 };
 
 type Vyber =
@@ -115,7 +117,7 @@ export function MapaCyklu({ data, chat, onNavigate }: {
     .map((n) => ({
       id: n.id, faza: n.faza || 0, mesiac: n.planovane_na || "",
       koncept: n.koncept || "", kto: n.kto || "", text: n.text || "",
-      hotovyText: n.hotovy_text || "",
+      hotovyText: n.hotovy_text || "", zaber: n.zaber || "",
       zdroj: n.zdroj || "", stav: n.stav || "novy",
     })), [napady]);
 
@@ -474,6 +476,7 @@ function Panel({ vyber, os, onZavri, onUloz, onFazaPrispevku, onJarvis, onDoProj
   const [koncept, setKoncept] = useState(slot?.koncept || "");
   const [kto, setKto] = useState(slot?.kto || "");
   const [hotovyText, setHotovyText] = useState(slot?.hotovyText || "");
+  const [zaber, setZaber] = useState(slot?.zaber || "");
   const [busy, setBusy] = useState(false);
   // Mazanie na dva kliky. Modálne potvrdenie v modáli je okno v okne;
   // prepnutý nápis je rovnako neprehliadnuteľný a o krok kratší.
@@ -538,12 +541,12 @@ function Panel({ vyber, os, onZavri, onUloz, onFazaPrispevku, onJarvis, onDoProj
     if (!koncept.trim() && !kto.trim() && !hotovyText.trim()) return;
     setBusy(true);
     const ok = slot
-      ? await onUloz({ id: slot.id, koncept, kto, faza, planovaneNa: mesiac, hotovyText })
+      ? await onUloz({ id: slot.id, koncept, kto, faza, planovaneNa: mesiac, hotovyText, zaber })
       : await onUloz({
           // Text nápadu je prvá veta konceptu — zásobník aj plán sú tá istá
           // tabuľka a nápad bez textu by v zozname nápadov svietil prázdny.
           text: koncept.trim().slice(0, 300) || `Obsah na ${mesiac}`,
-          zdroj: "vlastny", faza, planovaneNa: mesiac, kto, koncept, hotovyText,
+          zdroj: "vlastny", faza, planovaneNa: mesiac, kto, koncept, hotovyText, zaber,
         });
     setBusy(false);
     if (ok) onZavri();
@@ -590,6 +593,12 @@ function Panel({ vyber, os, onZavri, onUloz, onFazaPrispevku, onJarvis, onDoProj
 
       {/* Doladenie textu patrí do Projectu — ten má kánon značky, tón hlasu
           aj FP pravidlá. Kokpit drží ZÁMER, Project z neho robí vety. */}
+      {/* ÚVODNÝ ZÁBER. Hák doteraz znamenal len prvú VETU — v reeli však
+          rozhoduje prvá sekunda OBRAZU a text sa číta až druhý. Ponuka je
+          filtrovaná na fázu: statický záber vo fáze 1 nikoho nezastaví
+          a švih vo fáze 5 pôsobí ako reklama. */}
+      <ZaberVyber faza={faza} hodnota={zaber} onZmena={setZaber} />
+
       {/* Hotový text až POD prekliokom do Projectu — v tomto poradí sa to aj
           robí: zámer → Project → vety späť sem. Bez tohto poľa končili vety
           v okne prehliadača a v pláne po nich nezostala stopa. */}
@@ -602,7 +611,7 @@ function Panel({ vyber, os, onZavri, onUloz, onFazaPrispevku, onJarvis, onDoProj
 
       <div style={{ marginTop: 10, fontSize: 11.5, color: C.textDim, lineHeight: 1.45 }}>
         <button
-          onClick={() => onDoProjectu(zadanieProProject({ mesiac, faza, koncept, kto, hotovyText }))}
+          onClick={() => onDoProjectu(zadanieProProject({ mesiac, faza, koncept, kto, hotovyText, zaber }))}
           style={{ background: "none", border: 0, padding: 0, color: C.accentLight, fontSize: 11.5, fontFamily: "inherit", cursor: "pointer" }}>
           doladiť text v Claude Projecte ↗
         </button>
@@ -834,6 +843,90 @@ function Kolace({ minulost, buducnost, vysloKusov, planKusov }: {
           } />
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Výber úvodného záberu.
+ *
+ * PREČO FILTROVANÉ PODĽA FÁZY
+ *
+ * Nie každý pohyb sedí každému publiku. Statický záber vo fáze 1 nikoho
+ * nezastaví; švih vo fáze 5 pôsobí ako reklama práve tam, kde má obsah
+ * pôsobiť ako práca. Ponuka preto ukazuje len to, čo dáva zmysel — zvyšok
+ * je za „ukázať všetky“ pre prípad, že to Jerry vidí inak.
+ */
+function ZaberVyber({ faza, hodnota, onZmena }: {
+  faza: number; hodnota: string; onZmena: (v: string) => void;
+}) {
+  const [vsetky, setVsetky] = useState(false);
+  const vhodne = zaberyPreFazu(faza);
+  const ponuka = vsetky || vhodne.length === 0 ? ZABERY : vhodne;
+  const vybrany = ZABER_MAPA.get(hodnota);
+  // Vybraný záber sa musí dať zobraziť, aj keď pre túto fázu nie je v ponuke —
+  // inak by po presune slotu do inej fázy ticho zmizol z obrazovky.
+  const mimoPonuky = !!vybrany && !ponuka.some((z) => z.id === vybrany.id);
+
+  return (
+    <div style={{ marginTop: 14 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
+        <label style={{ fontSize: 11.5, color: C.textMuted }}>
+          Úvodný záber — čo je vidieť v prvej sekunde
+        </label>
+        {!vsetky && vhodne.length > 0 && vhodne.length < ZABERY.length && (
+          <button onClick={() => setVsetky(true)}
+            style={{ background: "none", border: 0, padding: 0, color: C.textDim, fontSize: 11, fontFamily: "inherit", cursor: "pointer" }}>
+            ukázať všetky
+          </button>
+        )}
+      </div>
+
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 6 }}>
+        <button onClick={() => onZmena("")}
+          style={{
+            background: hodnota === "" ? mix(C.accent, 0.25) : "none",
+            border: `1px solid ${hodnota === "" ? C.accent : C.border}`,
+            color: hodnota === "" ? C.text : C.textMuted,
+            borderRadius: 6, padding: "5px 10px", fontSize: 11.5, fontFamily: "inherit", cursor: "pointer",
+          }}>zatiaľ neviem</button>
+        {[...ponuka, ...(mimoPonuky && vybrany ? [vybrany] : [])].map((z) => (
+          <button key={z.id} onClick={() => onZmena(z.id)}
+            style={{
+              background: hodnota === z.id ? mix(C.accent, 0.25) : "none",
+              border: `1px solid ${hodnota === z.id ? C.accent : C.border}`,
+              color: hodnota === z.id ? C.text : C.textMuted,
+              borderRadius: 6, padding: "5px 10px", fontSize: 11.5, fontFamily: "inherit", cursor: "pointer",
+            }}>
+            {z.nazov}
+            {mimoPonuky && vybrany?.id === z.id && <span style={{ color: C.textDim }}> · iná fáza</span>}
+          </button>
+        ))}
+      </div>
+
+      {vybrany && (
+        <div style={{
+          display: "flex", gap: 16, marginTop: 10, padding: 12, borderRadius: 8,
+          background: mix(C.accent, 0.05), border: `1px solid ${mix(C.border, 0.9)}`, flexWrap: "wrap",
+        }}>
+          <div style={{ flex: "0 0 auto", width: 200 }}>
+            <ZaberUkazka pohyb={vybrany.pohyb} />
+          </div>
+          <div style={{ flex: "1 1 220px", display: "flex", flexDirection: "column", gap: 7 }}>
+            <div style={{ fontSize: 12.5, color: C.text, lineHeight: 1.45 }}>{vybrany.coRobi}</div>
+            <div style={{ fontSize: 11.5, color: C.textMuted, lineHeight: 1.5 }}>
+              <b style={{ color: C.textMuted }}>Ako na to: </b>{vybrany.akoNaTo}
+            </div>
+            <div style={{ fontSize: 11.5, color: C.textDim, lineHeight: 1.45 }}>{vybrany.prePSB}</div>
+            {vybrany.zdroj && (
+              <a href={vybrany.zdroj.url} target="_blank" rel="noreferrer"
+                style={{ fontSize: 11.5, color: C.accentLight }}>
+                {vybrany.zdroj.nazov} ↗
+              </a>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

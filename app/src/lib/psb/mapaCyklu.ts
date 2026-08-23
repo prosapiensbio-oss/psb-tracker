@@ -20,6 +20,8 @@
  * by vyrobilo presnosť, ktorá tam nie je.
  */
 
+import { zaberDoZadania } from "./zabery";
+
 export type Faza = 0 | 1 | 2 | 3 | 4 | 5;
 
 export type FazaDef = {
@@ -84,6 +86,8 @@ export type SlotPlanu = {
   text: string;
   /** Hotové vety z Claude Projectu — to, čo naozaj pôjde von. */
   hotovyText: string;
+  /** Id úvodného záberu z katalógu ZABERY. */
+  zaber: string;
   zdroj: string;
   stav: string;
 };
@@ -153,7 +157,7 @@ export function tempoFaz(os: string[], vyslo: ZverejnenyKus[], kotva: string, ok
  * začiatku a tu sa naň dá zabudnúť práve preto, že sa kopíruje jedným klikom.
  */
 export function zadanieProProject(s: {
-  mesiac: string; faza: number; koncept: string; kto: string; hotovyText?: string;
+  mesiac: string; faza: number; koncept: string; kto: string; hotovyText?: string; zaber?: string;
 }): string {
   const f = FAZA_MAPA.get(s.faza);
   const riadky = [
@@ -167,6 +171,10 @@ export function zadanieProProject(s: {
     s.koncept.trim() || "(koncept nie je vyplnený)",
   ];
   if (s.kto.trim()) riadky.push("", `KTO V TOM VYSTUPUJE: ${s.kto.trim()}`);
+  // Hák nie je len veta — v reeli rozhoduje prvá sekunda obrazu. Keď je záber
+  // vybraný, Project ho má rozpísať, nie si vymyslieť vlastný.
+  const zab = zaberDoZadania(s.zaber || "");
+  if (zab) riadky.push("", zab);
   // Keď text už raz vznikol, druhé kolo má byť ÚPRAVA, nie nový pokus od
   // nuly — inak sa zahodí všetko, čo na ňom už bolo dobré.
   if ((s.hotovyText || "").trim()) {
@@ -175,6 +183,7 @@ export function zadanieProProject(s: {
   riadky.push(
     "",
     "ČO CHCEM SPÄŤ: hotový text príspevku v češtine — hák, telo, záver.",
+    ...(zab ? ["K úvodnému záberu napíš, ČO má byť v prvej sekunde vidieť a ako to nadväzuje na prvú vetu."] : []),
     "Meno klienta ani zdravotný detail do textu nedávaj; použi opis typu: klient, ktorý…",
   );
   return riadky.join("\n");

@@ -4,6 +4,7 @@ import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 import { jeFaza } from "../../lib/psb/mapaCyklu";
+import { ZABER_MAPA } from "../../lib/psb/zabery";
 
 /**
  * Marketingové nápady.
@@ -36,7 +37,7 @@ export const Route = createFileRoute("/api/napady")({
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });
         try {
           const r = await DB.prepare(
-            "SELECT id, datum, text, zdroj, stav, poznamka, autor, odkaz, pouzite_at, faza, planovane_na, kto, koncept, hotovy_text FROM mkt_napady ORDER BY datum DESC, created_at DESC LIMIT 200",
+            "SELECT id, datum, text, zdroj, stav, poznamka, autor, odkaz, pouzite_at, faza, planovane_na, kto, koncept, hotovy_text, zaber FROM mkt_napady ORDER BY datum DESC, created_at DESC LIMIT 200",
           ).all();
           return Response.json({ ok: true, napady: r.results || [] });
         } catch {
@@ -88,9 +89,15 @@ export const Route = createFileRoute("/api/napady")({
             // jednoriadkový popis. `kus` zlieva biele znaky do medzier a to
             // by z reelu urobilo jeden odsek.
             const hotovy = b.hotovyText === undefined ? null : String(b.hotovyText ?? "").trim().slice(0, 6000);
+            // Záber sa berie len z katalógu — voľný text by znamenal, že
+            // v poli skončí čokoľvek a animácia ani zadanie k nemu nič nenájdu.
+            if (b.zaber !== undefined && b.zaber !== "" && !ZABER_MAPA.has(String(b.zaber))) {
+              return Response.json({ ok: false, error: "Neznámy záber." }, { status: 400 });
+            }
+            const zaber = b.zaber === undefined ? null : String(b.zaber);
             if (stav === null && poznamka === null && odkaz === null
                 && faza === null && mesiac === null && kto === null && koncept === null
-                && hotovy === null) {
+                && hotovy === null && zaber === null) {
               return Response.json({ ok: false, error: "nič na zmenu" }, { status: 400 });
             }
             // Deň použitia sa zapíše sám pri prechode na „použitý" — nikto ho
@@ -103,9 +110,9 @@ export const Route = createFileRoute("/api/napady")({
                  pouzite_at = CASE WHEN ?5 IS NOT NULL AND pouzite_at = '' THEN ?5 ELSE pouzite_at END,
                  faza = COALESCE(?6, faza), planovane_na = COALESCE(?7, planovane_na),
                  kto = COALESCE(?8, kto), koncept = COALESCE(?9, koncept),
-                 hotovy_text = COALESCE(?10, hotovy_text)
+                 hotovy_text = COALESCE(?10, hotovy_text), zaber = COALESCE(?11, zaber)
                WHERE id = ?1`,
-            ).bind(id, stav, poznamka, odkaz, pouzite, faza, mesiac, kto, koncept, hotovy).run().then((r) => {
+            ).bind(id, stav, poznamka, odkaz, pouzite, faza, mesiac, kto, koncept, hotovy, zaber).run().then((r) => {
               // UPDATE s neexistujúcim id prejde „úspešne" s nulou zmien —
               // a obrazovka by ohlásila uložené nad ničím (revízia 19. 8.).
               if (!r.meta.changes) throw new Error("nenajdene");
@@ -135,13 +142,21 @@ export const Route = createFileRoute("/api/napady")({
           const nMesiac = b.planovaneNa === undefined ? "" : kus(b.planovaneNa, 7);
           const nKto = kus(b.kto, 120);
           const nKoncept = kus(b.koncept, 1200);
+          if (b.zaber !== undefined && b.zaber !== "" && !ZABER_MAPA.has(String(b.zaber))) {
+            return Response.json({ ok: false, error: "Neznámy záber." }, { status: 400 });
+          }
+          const nZaber = b.zaber === undefined ? "" : String(b.zaber);
+          // Aj pri ZAKLADANÍ, nielen pri úprave. Obrazovka hotový text posiela
+          // a bez tohto riadka by ho INSERT ticho zahodil — appka by ohlásila
+          // uložené nad stratou (23. 8. 2026, nájdené pri kontrole).
+          const nHotovy = String(b.hotovyText ?? "").trim().slice(0, 6000);
 
           await DB.prepare(
             `INSERT INTO mkt_napady (id, datum, text, zdroj, stav, poznamka, autor, created_at,
-                                     faza, planovane_na, kto, koncept)
-             VALUES (?1, ?2, ?3, ?4, 'novy', '', ?5, ?6, ?7, ?8, ?9, ?10)`,
+                                     faza, planovane_na, kto, koncept, zaber, hotovy_text)
+             VALUES (?1, ?2, ?3, ?4, 'novy', '', ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)`,
           ).bind(novy, datum, text, zdroj, autor, new Date().toISOString(),
-                 nFaza, nMesiac, nKto, nKoncept).run();
+                 nFaza, nMesiac, nKto, nKoncept, nZaber, nHotovy).run();
 
           await audit(DB, { action: "zapis", predmet: "marketingový nápad", neu: text.slice(0, 120), actor: autor || undefined });
           return Response.json({ ok: true, id: novy });
