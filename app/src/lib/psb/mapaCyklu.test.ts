@@ -36,7 +36,7 @@ describe("mriežka", () => {
   it("rozdelí zverejnené a naplánované do správnych buniek", () => {
     const os = osMapy("2026-03", 2, 1);
     const m = mriezka(os, [kus("2026-02", 5)], [
-      { id: "a", faza: 5, mesiac: "2026-04", koncept: "k", kto: "", text: "t", zdroj: "jarvis", stav: "novy", hotovyText: "", zaber: "" },
+      { id: "a", faza: 5, mesiac: "2026-04", koncept: "k", kto: "", text: "t", zdroj: "jarvis", stav: "novy", hotovyText: "", zaber: "", sekvencia: "" },
     ]);
     expect(m.get("2026-02|5")?.vyslo).toHaveLength(1);
     expect(m.get("2026-04|5")?.plan).toHaveLength(1);

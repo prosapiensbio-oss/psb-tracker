@@ -21,6 +21,7 @@
  */
 
 import { zaberDoZadania } from "./zabery";
+import { dlzkaDoZadania, sekvenciaDoZadania } from "./sekvencia";
 
 export type Faza = 0 | 1 | 2 | 3 | 4 | 5;
 
@@ -88,6 +89,8 @@ export type SlotPlanu = {
   hotovyText: string;
   /** Id úvodného záberu z katalógu ZABERY. */
   zaber: string;
+  /** Sekvencia záberov ako JSON (pole Krok). Prázdne = ešte nerozpísané. */
+  sekvencia: string;
   zdroj: string;
   stav: string;
 };
@@ -157,7 +160,8 @@ export function tempoFaz(os: string[], vyslo: ZverejnenyKus[], kotva: string, ok
  * začiatku a tu sa naň dá zabudnúť práve preto, že sa kopíruje jedným klikom.
  */
 export function zadanieProProject(s: {
-  mesiac: string; faza: number; koncept: string; kto: string; hotovyText?: string; zaber?: string;
+  mesiac: string; faza: number; koncept: string; kto: string;
+  hotovyText?: string; zaber?: string; sekvencia?: string;
 }): string {
   const f = FAZA_MAPA.get(s.faza);
   const riadky = [
@@ -175,6 +179,14 @@ export function zadanieProProject(s: {
   // vybraný, Project ho má rozpísať, nie si vymyslieť vlastný.
   const zab = zaberDoZadania(s.zaber || "");
   if (zab) riadky.push("", zab);
+  // Dĺžka ide do zadania VŽDY. Bez nej Project napíše text na minútu a pol
+  // a Jerry ho bude škrtať — pritom publikum PSB pozerá 12,7 sekundy.
+  const dl = dlzkaDoZadania(s.faza);
+  if (dl) riadky.push("", dl);
+  // Keď je sekvencia rozpísaná, ide do zadania celá — Project ju má
+  // pripomienkovať, nie navrhovať znova od nuly.
+  const sek = sekvenciaDoZadania(s.sekvencia || "");
+  if (sek) riadky.push("", sek);
   // Keď text už raz vznikol, druhé kolo má byť ÚPRAVA, nie nový pokus od
   // nuly — inak sa zahodí všetko, čo na ňom už bolo dobré.
   if ((s.hotovyText || "").trim()) {

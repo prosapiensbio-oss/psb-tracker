@@ -12,6 +12,7 @@ import type { PSBData } from "../../lib/psb/types";
 import type { AssistantChat } from "./Assistant";
 import { Card, Donut, H3, Info, Modal, Select } from "./ui";
 import { ZaberUkazka } from "./ZaberUkazka";
+import { Sekvencia } from "./Sekvencia";
 import { ZABER_MAPA, ZABERY, zaberyPreFazu } from "../../lib/psb/zabery";
 import { CLAUDE_PROJECT } from "./Zadanie";
 
@@ -52,7 +53,7 @@ const DRUH: Record<string, string> = {
 
 type NapadRiadok = {
   id: string; text: string; stav: string; zdroj: string;
-  faza?: number; planovane_na?: string; kto?: string; koncept?: string; hotovy_text?: string; zaber?: string;
+  faza?: number; planovane_na?: string; kto?: string; koncept?: string; hotovy_text?: string; zaber?: string; sekvencia?: string;
 };
 
 type Vyber =
@@ -117,7 +118,7 @@ export function MapaCyklu({ data, chat, onNavigate }: {
     .map((n) => ({
       id: n.id, faza: n.faza || 0, mesiac: n.planovane_na || "",
       koncept: n.koncept || "", kto: n.kto || "", text: n.text || "",
-      hotovyText: n.hotovy_text || "", zaber: n.zaber || "",
+      hotovyText: n.hotovy_text || "", zaber: n.zaber || "", sekvencia: n.sekvencia || "",
       zdroj: n.zdroj || "", stav: n.stav || "novy",
     })), [napady]);
 
@@ -477,6 +478,7 @@ function Panel({ vyber, os, onZavri, onUloz, onFazaPrispevku, onJarvis, onDoProj
   const [kto, setKto] = useState(slot?.kto || "");
   const [hotovyText, setHotovyText] = useState(slot?.hotovyText || "");
   const [zaber, setZaber] = useState(slot?.zaber || "");
+  const [sekvencia, setSekvencia] = useState(slot?.sekvencia || "");
   const [busy, setBusy] = useState(false);
   // Mazanie na dva kliky. Modálne potvrdenie v modáli je okno v okne;
   // prepnutý nápis je rovnako neprehliadnuteľný a o krok kratší.
@@ -541,12 +543,12 @@ function Panel({ vyber, os, onZavri, onUloz, onFazaPrispevku, onJarvis, onDoProj
     if (!koncept.trim() && !kto.trim() && !hotovyText.trim()) return;
     setBusy(true);
     const ok = slot
-      ? await onUloz({ id: slot.id, koncept, kto, faza, planovaneNa: mesiac, hotovyText, zaber })
+      ? await onUloz({ id: slot.id, koncept, kto, faza, planovaneNa: mesiac, hotovyText, zaber, sekvencia })
       : await onUloz({
           // Text nápadu je prvá veta konceptu — zásobník aj plán sú tá istá
           // tabuľka a nápad bez textu by v zozname nápadov svietil prázdny.
           text: koncept.trim().slice(0, 300) || `Obsah na ${mesiac}`,
-          zdroj: "vlastny", faza, planovaneNa: mesiac, kto, koncept, hotovyText, zaber,
+          zdroj: "vlastny", faza, planovaneNa: mesiac, kto, koncept, hotovyText, zaber, sekvencia,
         });
     setBusy(false);
     if (ok) onZavri();
@@ -609,9 +611,13 @@ function Panel({ vyber, os, onZavri, onUloz, onFazaPrispevku, onJarvis, onDoProj
         placeholder="sem vlož hotový príspevok, keď ho Project napíše"
         style={{ ...vstup, resize: "vertical", lineHeight: 1.5, fontSize: 12.5 }} />
 
+      {/* Rozpis záberov až POD hotovým textom: zábery sa priraďujú k VETÁM,
+          takže kým text nie je, niet čoho sa chytiť. */}
+      <Sekvencia faza={faza} hotovyText={hotovyText} hodnota={sekvencia} onZmena={setSekvencia} />
+
       <div style={{ marginTop: 10, fontSize: 11.5, color: C.textDim, lineHeight: 1.45 }}>
         <button
-          onClick={() => onDoProjectu(zadanieProProject({ mesiac, faza, koncept, kto, hotovyText, zaber }))}
+          onClick={() => onDoProjectu(zadanieProProject({ mesiac, faza, koncept, kto, hotovyText, zaber, sekvencia }))}
           style={{ background: "none", border: 0, padding: 0, color: C.accentLight, fontSize: 11.5, fontFamily: "inherit", cursor: "pointer" }}>
           doladiť text v Claude Projecte ↗
         </button>

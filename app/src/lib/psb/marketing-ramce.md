@@ -131,6 +131,40 @@ nedajú odovzdať.
 
 ---
 
+## Hook Point (Kane) — jediná kniha o prvých troch sekundách
+
+Ostatné knihy hovoria, PREČO sa myšlienka udrží. Táto hovorí, ako ju vôbec
+niekto uvidí. Doplnená 23. 8. 2026, lebo v knižnici nebolo o hookoch nič.
+
+**Trojsekundový svet.** Facebook počíta zhliadnutie od 3 sekúnd; väčšina videí
+sa k trom sekundám nedostane. Hook Point nie je nadpis — je to text, obraz,
+formát alebo osoba, ktorá zastaví pohyb palca. Hook bez obsahu je clickbait;
+obsah bez hooku nikto neuvidí. Obe polovice sú povinné.
+
+**Štyri spôsoby, ako hook postaviť:**
+1. *Rieš bolestivý bod publika*, nie svoj. Hook musí odpovedať na to, čo človek
+   chce a nevie, ako to dosiahnuť.
+2. *Prevráť očakávanie.* „Meditácia je podvod." Cieľ je prinútiť premýšľať inak,
+   nie šokovať naprázdno.
+3. *Buď konkrétny.* „Za 30 dní na milión sledovateľov" porazí „ako rásť na
+   sieťach". Číslo a rámec sú silnejšie než tvrdenie.
+4. *Popíš problém lepšie než zákazník sám.* Keď to spravíš, podvedome uverí, že
+   máš aj riešenie. Toto je pre PSB najsilnejší zo štyroch — presne to robí
+   príznak spárovaný s protiintuitívnym vysvetlením.
+
+**Testovanie je súčasť remesla, nie luxus.** Kane testoval 75 000 variant.
+Postup: vyrob 10–20 verzií hooku, meraj 3-sekundovú výdrž, ostatné zahoď.
+Jeden hook nie je pokus, je to tip.
+
+**Hooky sa opotrebúvajú.** Čo funguje dnes, o pol roka nie — konkurencia kopíruje.
+Jadro značky zostáva, hooky sa menia. Nepovažuj hotový hook za majetok.
+
+**KONFLIKT SO ZNAČKOU:** kniha pracuje aj s kontroverziou a šokom ako s legitímnym
+hookom (Kaepernick, „you're gonna die"). Pre PSB to neplatí — hype, urgencia
+a strašenie sú mimo. Zo štyroch princípov používaj hlavne 1, 3 a 4; prevrátenie
+očakávania (2) áno, ale vecné: „absencia bolesti nie je známka zdravia", nie
+„fyzioterapia ťa okráda".
+
 ## Ako tieto rámce používať v odpovediach
 
 1. Najprv číslo z dát alebo veta z marketingového profilu.

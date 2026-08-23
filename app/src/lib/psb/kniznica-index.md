@@ -3,13 +3,15 @@
 Jerry si ku každej prečítanej knihe robí poznámky. Sú destilované na rozhodovacie
 pravidlá pre PSB a rozdelené na dve miesta:
 
-**1. TU V KONTEXTE (sekcia MARKETINGOVÉ RÁMCE vyššie)** — 22 kníh o marketingu,
+**1. TU V KONTEXTE (sekcia MARKETINGOVÉ RÁMCE vyššie)** — 23 kníh o marketingu,
 značke, obsahu, cene a odporúčaniach: Referral Engine, This Is Marketing,
 Positioning, Different, StoryBrand, Stories That Stick, Contagious, They Ask You
 Answer, Content Inc, Content Chemistry, Never Lose a Customer Again, Loyalty
 Effect, Pumpkin Plan, Trusted Advisor, Impact Pricing, Value-Based Pricing,
 E-Myth, Built to Sell, Company of One, Money Models, Profit First, Measure What
-Matters. Tieto máš prečítané, netreba ich ťahať.
+Matters. A od 23. 8. 2026 aj Hook Point (Kane) — jediná kniha o prvých troch
+sekundách; siahni po nej vždy, keď sa rieši hák, úvodný záber alebo prvá veta.
+Tieto máš prečítané, netreba ich ťahať.
 
 **2. V TABUĽKE `jarvis_vedomosti`** — ďalších 24 kníh, ktoré v kontexte NIE SÚ.
 Vytiahneš ich dopytom `SELECT text FROM jarvis_vedomosti WHERE id = '...'`.
