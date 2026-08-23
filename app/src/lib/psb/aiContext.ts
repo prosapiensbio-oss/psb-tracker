@@ -671,6 +671,15 @@ export function buildAiContext(
       napady: {
         poznamka: "Surové nápady na obsah z + Zápis sú v tabuľke mkt_napady — vytiahni si ich dopytom (stav = 'novy'), keď sa rieši, čo publikovať. Otázky klientov (zdroj = 'otazka_klienta') sú najcennejšie: je to jazyk, ktorým ľudia o svojom probléme naozaj hovoria. Použitý nápad má v stĺpci odkaz adresu hotového príspevku a v pouzite_at deň, keď vyšiel — z toho sa dá porovnať, ako fungujú témy z tréningu oproti témam z hlavy.",
       },
+      // Mapa nákupného cyklu (23. 8. 2026). Rozloženie sa nedáva hotové —
+      // je to obyčajné GROUP BY, ktoré si Jarvis spraví presnejšie sám. Čo mu
+      // chýba, je VÝZNAM stĺpca `faza`; bez neho by čísla čítal ako kategórie.
+      mapaCyklu: {
+        poznamka: "Stĺpec faza v ig_prispevky a mkt_napady je fáza nákupného cyklu podľa piatich stavov uvedomenia (Eugene Schwartz): 1 = nevie o probléme, 2 = tuší problém, 3 = hľadá riešenie, 4 = vyberá dodávateľa, 5 = rozhodnutý, 0 = nezaradené. NIE JE to to isté ako kategoria (tá hovorí, AKO je príspevok urobený — Edukácia, Klientsky príbeh; fáza hovorí, KOMU je určený). Keď sa rieši, čo publikovať, plánuje sa podľa fázy, nie podľa kategórie. Obrazovka je Marketing → Návrhy → Mapa nákupného cyklu.",
+        zaradenieJeOdhad: "Fázy 116 príspevkov z 03/2025–08/2026 priradil model z textu háku 23. 8. 2026; starších 149 kusov má fazu 0 zámerne. Keď o rozložení hovoríš, povedz, že je to odhad — nie ručne overené zaradenie.",
+        coUzVieme: "Rozloženie zverejnených bolo pri vzniku mapy 22/18/17/22/19 % — takmer rovnomerné. Nehovor Jerrymu, že mu 'chýba fáza X', kým si to neoveril dopytom; pri vzniku mapy to neplatilo a je to najlákavejší falošný nález.",
+        planovanie: "Nápad s vyplneným planovane_na (RRRR-MM) a fazou > 0 je SLOT V PLÁNE na ten mesiac; nápad bez mesiaca je zásobník. Pole koncept je návrh captionu alebo popis, o čom to bude, kto je meno človeka, ktorý v tom vystupuje. Keď Jerry žiada návrhy na mesiac, pozri sa najprv dopytom, čo už na ten mesiac a fázu naplánované je, a nenavrhuj to isté.",
+      },
       naklady: { poznamka: "Marketingové položky z P&L (Facebook, Google, MultiBox, Offline).", poMesiacoch: naklady },
     };
   })();

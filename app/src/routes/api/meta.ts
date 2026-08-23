@@ -9,6 +9,7 @@ import { posliLead } from "../../lib/psb/capi";
 import { kategoriaHooku, krstneMenaKlientov } from "../../lib/psb/hook";
 import { MIN_DENNE_KC, UCET_REKLAM, adsManagerOdkaz, jeUcetReklam, pripravKampan, pripravSadu, skontrolujPredSpustenim, stavDorucovania, type StavKampanePredSpustenim } from "../../lib/psb/kampanPlan";
 import { OKNO_DNI, stavPristupu } from "../../lib/psb/metaPristup";
+import { jeFaza } from "../../lib/psb/mapaCyklu";
 
 /**
  * Meta Graph API — reklama a Instagram.
@@ -178,7 +179,7 @@ export const Route = createFileRoute("/api/meta")({
           // doťahovali z inej karty, existovala vedľa tejto druhá tabuľka
           // s tými istými kategóriami len kvôli jednému stĺpcu.
           const p = await DB.prepare(
-            `SELECT i.id, i.datum, i.mesiac, i.typ, i.permalink, i.kategoria,
+            `SELECT i.id, i.datum, i.mesiac, i.typ, i.permalink, i.kategoria, i.faza,
                     COALESCE(NULLIF(i.hook,''), (SELECT m.hook FROM mkt_prispevky m
                        WHERE substr(m.datum,1,10) = substr(i.datum,1,10)
                          AND m.hook <> '' ORDER BY m.views DESC LIMIT 1), '') AS hook,
@@ -377,6 +378,22 @@ export const Route = createFileRoute("/api/meta")({
         // Najčastejšie tak zmizol „Klientsky príbeh" a „Staccato výpočet" do
         // „Edukácie", lebo v dlhom texte sa forma úvodu stratí. Odteraz sa
         // klasifikuje vždy hook; táto akcia zrovná to, čo je uložené.
+        // Oprava zaradenia do fázy nákupného cyklu. Prvé zaradenie 116
+        // príspevkov spravil 23. 8. 2026 model z textu háku — je to odhad
+        // a Jerry ho musí vedieť prepísať jedným klikom, inak by mapa stála
+        // na čísle, ktoré nikto nepotvrdil.
+        if (akcia === "faza-prispevku") {
+          const id = String(b.id || "").slice(0, 60);
+          const faza = Number(b.faza);
+          if (!id) return Response.json({ ok: false, error: "chýba id" }, { status: 400 });
+          if (!jeFaza(faza)) return Response.json({ ok: false, error: "Neplatná fáza." }, { status: 400 });
+          const r = await DB.prepare("UPDATE ig_prispevky SET faza = ?2 WHERE id = ?1").bind(id, faza).run();
+          // UPDATE nad neexistujúcim id prejde s nulou zmien a obrazovka by
+          // ohlásila uložené nad ničím (revízia 19. 8.).
+          if (!r.meta.changes) return Response.json({ ok: false, error: "Príspevok sa nenašiel." }, { status: 404 });
+          return Response.json({ ok: true, id, faza });
+        }
+
         if (akcia === "prepocitaj-kategorie") {
           const klientiPre = await DB.prepare("SELECT DISTINCT client_name FROM sessions WHERE client_name <> ''").all();
           const mena = krstneMenaKlientov(((klientiPre.results as { client_name: string }[]) || []).map((r) => r.client_name));

@@ -14,7 +14,7 @@ import type { Actions } from "./App";
 import { nastavPnlBunku, pnlOverridesNaUlozenie } from "../../lib/psb/vzas";
 
 type ParsedAction = {
-  type: "ack-anomaly" | "unack-anomaly" | "set-override" | "zapis-zaver" | "vyhodnot-zaver" | "novy-ciel" | "kronika" | "odloz-anomaliu" | "uprav-pnl" | "zarad-pohyby" | "mkt-znacka" | "spusti-kampan" | "zastav-kampan";
+  type: "ack-anomaly" | "unack-anomaly" | "set-override" | "zapis-zaver" | "vyhodnot-zaver" | "novy-ciel" | "kronika" | "odloz-anomaliu" | "uprav-pnl" | "zarad-pohyby" | "mkt-znacka" | "spusti-kampan" | "zastav-kampan" | "naplanuj-obsah";
   label: string;
   done?: boolean;
   key?: string;
@@ -143,6 +143,11 @@ function parseActions(raw: string): { text: string; actions: ParsedAction[] } {
           actions.push({ type: "uprav-pnl", label, data: o });
         } else if (o?.type === "zarad-pohyby" && Array.isArray(o.zmeny) && o.zmeny.length) {
           actions.push({ type: "zarad-pohyby", label, data: o });
+        } else if (o?.type === "naplanuj-obsah"
+                   && /^\d{4}-\d{2}$/.test(String(o.mesiac))
+                   && Number(o.faza) >= 1 && Number(o.faza) <= 5
+                   && String(o.koncept || "").trim().length > 2) {
+          actions.push({ type: "naplanuj-obsah", label, data: o });
         } else if ((o?.type === "spusti-kampan" || o?.type === "zastav-kampan") && /^[0-9]{5,}$/.test(String(o.kampanId))) {
           actions.push({ type: o.type, data: { kampanId: String(o.kampanId) }, label });
         } else if (o?.type === "mkt-znacka" && typeof o.text === "string" && /^\d{4}-\d{2}-\d{2}$/.test(String(o.datum))) {
@@ -657,6 +662,25 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
             else oznamVysledok(`Prepnutie kampane neprešlo: ${j.error || "bez dôvodu"}`);
           })
           .catch(() => oznamVysledok("Prepnutie kampane zlyhalo — spojenie."));
+      } else if (a.type === "naplanuj-obsah" && a.data) {
+        // Jarvisov návrh sa zapíše do TEJ ISTEJ tabuľky, do ktorej píše mapa
+        // cyklu — nie do vlastného skladu. Dva zoznamy plánu by sa rozišli
+        // a Jerry by nevedel, do ktorého sa pozerá.
+        const d = a.data;
+        void fetch("/api/napady", {
+          method: "POST", credentials: "same-origin",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            text: String(d.koncept).slice(0, 300),
+            zdroj: "jarvis", faza: Number(d.faza), planovaneNa: String(d.mesiac),
+            kto: String(d.kto || ""), koncept: String(d.koncept),
+          }),
+        })
+          .then((r) => r.json())
+          .then((j: { ok?: boolean; error?: string }) => oznamVysledok(j.ok
+            ? `Naplánované na ${String(d.mesiac)}: ${String(d.koncept).slice(0, 70)}`
+            : `Nenaplánovalo sa: ${j.error || "bez dôvodu"}`))
+          .catch(() => oznamVysledok("Naplánovanie zlyhalo — spojenie."));
       } else if (a.type === "mkt-znacka" && a.data) {
         // Značka do marketingových grafov — „tu bežala kampaň". Rovnaký sklad
         // ako pri cieľoch: jeden JSON kľúč, žiadna vlastná tabuľka.

@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
+import { jeFaza } from "../../lib/psb/mapaCyklu";
 
 /**
  * Marketingové nápady.
@@ -23,6 +24,9 @@ const ZDROJE = new Set(["otazka_klienta", "vlastny", "jarvis", "ine"]);
 
 const kus = (v: unknown, max: number) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 
+/** Mesiac plánu je „YYYY-MM"; prázdny reťazec vracia slot do zásobníka. */
+const jeMesiac = (v: unknown) => v === "" || /^\d{4}-\d{2}$/.test(String(v ?? ""));
+
 export const Route = createFileRoute("/api/napady")({
   server: {
     handlers: {
@@ -32,7 +36,7 @@ export const Route = createFileRoute("/api/napady")({
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });
         try {
           const r = await DB.prepare(
-            "SELECT id, datum, text, zdroj, stav, poznamka, autor, odkaz, pouzite_at FROM mkt_napady ORDER BY datum DESC, created_at DESC LIMIT 200",
+            "SELECT id, datum, text, zdroj, stav, poznamka, autor, odkaz, pouzite_at, faza, planovane_na, kto, koncept FROM mkt_napady ORDER BY datum DESC, created_at DESC LIMIT 200",
           ).all();
           return Response.json({ ok: true, napady: r.results || [] });
         } catch {
@@ -65,7 +69,23 @@ export const Route = createFileRoute("/api/napady")({
             // reťazec je platná hodnota (odkaz sa dá odobrať), preto sa
             // rozlišuje `undefined` od `""`.
             const odkaz = b.odkaz === undefined ? null : kus(b.odkaz, 500);
-            if (stav === null && poznamka === null && odkaz === null) {
+            // Plánovacie polia. Fáza 0 znamená „vrátiť do zásobníka", preto
+            // sa nula nesmie zliať s „neposlané" — rozlišuje sa undefined.
+            // Neplatný vstup sa ODMIETA, nemlčí. Tichý fallback na "" by
+            // z preklepu v mesiaci urobil zmazanie termínu — a obrazovka by
+            // hlásila uložené nad stratou.
+            if (b.faza !== undefined && !jeFaza(Number(b.faza))) {
+              return Response.json({ ok: false, error: "Neplatná fáza." }, { status: 400 });
+            }
+            if (b.planovaneNa !== undefined && !jeMesiac(b.planovaneNa)) {
+              return Response.json({ ok: false, error: "Mesiac má tvar RRRR-MM." }, { status: 400 });
+            }
+            const faza = b.faza === undefined ? null : Number(b.faza);
+            const mesiac = b.planovaneNa === undefined ? null : kus(b.planovaneNa, 7);
+            const kto = b.kto === undefined ? null : kus(b.kto, 120);
+            const koncept = b.koncept === undefined ? null : kus(b.koncept, 1200);
+            if (stav === null && poznamka === null && odkaz === null
+                && faza === null && mesiac === null && kto === null && koncept === null) {
               return Response.json({ ok: false, error: "nič na zmenu" }, { status: 400 });
             }
             // Deň použitia sa zapíše sám pri prechode na „použitý" — nikto ho
@@ -75,9 +95,11 @@ export const Route = createFileRoute("/api/napady")({
             await DB.prepare(
               `UPDATE mkt_napady SET stav = COALESCE(?2, stav), poznamka = COALESCE(?3, poznamka),
                  odkaz = COALESCE(?4, odkaz),
-                 pouzite_at = CASE WHEN ?5 IS NOT NULL AND pouzite_at = '' THEN ?5 ELSE pouzite_at END
+                 pouzite_at = CASE WHEN ?5 IS NOT NULL AND pouzite_at = '' THEN ?5 ELSE pouzite_at END,
+                 faza = COALESCE(?6, faza), planovane_na = COALESCE(?7, planovane_na),
+                 kto = COALESCE(?8, kto), koncept = COALESCE(?9, koncept)
                WHERE id = ?1`,
-            ).bind(id, stav, poznamka, odkaz, pouzite).run().then((r) => {
+            ).bind(id, stav, poznamka, odkaz, pouzite, faza, mesiac, kto, koncept).run().then((r) => {
               // UPDATE s neexistujúcim id prejde „úspešne" s nulou zmien —
               // a obrazovka by ohlásila uložené nad ničím (revízia 19. 8.).
               if (!r.meta.changes) throw new Error("nenajdene");
@@ -94,10 +116,26 @@ export const Route = createFileRoute("/api/napady")({
           const novy = `n${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
           const autor = (await currentUser(request)) || "";
 
+          // Nápad sa dá založiť rovno ako slot v pláne (z mapy cyklu) alebo
+          // ako holá veta (z „+ Zápis"). Je to tá istá tabuľka — líši sa len
+          // tým, či má mesiac a fázu.
+          if (b.faza !== undefined && !jeFaza(Number(b.faza))) {
+            return Response.json({ ok: false, error: "Neplatná fáza." }, { status: 400 });
+          }
+          if (b.planovaneNa !== undefined && !jeMesiac(b.planovaneNa)) {
+            return Response.json({ ok: false, error: "Mesiac má tvar RRRR-MM." }, { status: 400 });
+          }
+          const nFaza = b.faza === undefined ? 0 : Number(b.faza);
+          const nMesiac = b.planovaneNa === undefined ? "" : kus(b.planovaneNa, 7);
+          const nKto = kus(b.kto, 120);
+          const nKoncept = kus(b.koncept, 1200);
+
           await DB.prepare(
-            `INSERT INTO mkt_napady (id, datum, text, zdroj, stav, poznamka, autor, created_at)
-             VALUES (?1, ?2, ?3, ?4, 'novy', '', ?5, ?6)`,
-          ).bind(novy, datum, text, zdroj, autor, new Date().toISOString()).run();
+            `INSERT INTO mkt_napady (id, datum, text, zdroj, stav, poznamka, autor, created_at,
+                                     faza, planovane_na, kto, koncept)
+             VALUES (?1, ?2, ?3, ?4, 'novy', '', ?5, ?6, ?7, ?8, ?9, ?10)`,
+          ).bind(novy, datum, text, zdroj, autor, new Date().toISOString(),
+                 nFaza, nMesiac, nKto, nKoncept).run();
 
           await audit(DB, { action: "zapis", predmet: "marketingový nápad", neu: text.slice(0, 120), actor: autor || undefined });
           return Response.json({ ok: true, id: novy });

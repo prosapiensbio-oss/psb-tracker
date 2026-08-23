@@ -38,6 +38,7 @@ import { ObsahZive } from "./ObsahZive";
 import { ObsahDopyt } from "./ObsahDopyt";
 import { Mail } from "./Mail";
 import { Zadanie } from "./Zadanie";
+import { MapaCyklu } from "./MapaCyklu";
 import { PlanObsahu } from "./PlanObsahu";
 import { Napady } from "./Napady";
 import { KedyPublikovat } from "./KedyPublikovat";
@@ -1173,6 +1174,10 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
       {sub === "navrhy" && (
         <>
           <Zadanie chat={chat} nastaveneAt={data.anomalyAck?.["project|nastavene"]?.ackedAt || null} onNastavene={(hotovo) => onAck?.("project|nastavene", hotovo, "Claude Project nastavený")} />
+          {/* Mapa je nad počítanými návrhmi zámerne: najprv treba vidieť, kam
+              sa obsah chystá, až potom čítať, čo do toho dáta odporúčajú.
+              Opačné poradie robilo z návrhov zoznam bez miesta, kam ich dať. */}
+          <MapaCyklu data={data} chat={chat} onNavigate={onNavigate} />
           <PlanObsahu data={data} chat={chat} onNavigate={onNavigate} />
           {/* Nápady hneď za návrhmi z dát. Jedna karta vie, čo ľudia hľadali,
               druhá čo sa nahlas spýtali — nie je to duplicita. */}
