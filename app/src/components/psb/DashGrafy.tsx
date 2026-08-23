@@ -14,7 +14,7 @@ import {
 import { breakEvenRad, poslednyUzavretyIdx } from "../../lib/psb/rezerva";
 import { kpiFmt } from "./Vzas";
 import { jeKlient } from "./MarketingLievik";
-import { cenaZaSedenie, doPlnehoMesiaca, najdiKlienta, kotvaDat, monthlyFinance, pocetUvodnych, predictCash, predictEarnings, ziskavanieKlientov } from "../../lib/psb/compute";
+import { cenaZaSedenie, doPlnehoMesiaca, ltvSpoluprace, najdiKlienta, kotvaDat, monthlyFinance, pocetUvodnych, predictCash, predictEarnings, ziskavanieKlientov } from "../../lib/psb/compute";
 import { ZDROJE } from "./Klienti";
 import { tokyKlientov } from "./Fluktuacia";
 import { PlatobneKanaly } from "./PlatobneKanaly";
@@ -1726,12 +1726,15 @@ export function useExtraGrafy({
     // Cena za to je vedomá: kto ešte chodí, zaplatí aj ďalej, takže LTV je
     // podhodnotené, nie nafúknuté. Ako strop na marketing je to bezpečná
     // strana chyby.
-    const ltvKlienti = Object.values(clients).filter((c) => c.sessionCount >= 3 && c.totalPrice > 0);
+    // Jedna definícia s KPI „Hodnota klienta" — ltvSpoluprace ráta zo
+    // ZAPLATENÝCH PEŇAZÍ. Predtým tu bola vlastná kópia nad `totalPrice`
+    // (súčet cien sedení), ktorá pri balíčkoch sčítava nuly: 29 597 Kč
+    // namiesto skutočných 34 969 Kč (nájdené 22. 8. 2026).
+    const ltvR = ltvSpoluprace(data.sessions, data.payments);
+    const ltvOdislych = ltvR.ltv;
+    const mesiacovSpolu = ltvR.dlzkaMes;
+    const ltvKlienti = ltvR.mena.map((m) => clients[m]).filter(Boolean);
     const stalePlatia = ltvKlienti.filter((c) => c.status !== "Neaktívny").length;
-    const ltvOdislych = ltvKlienti.length ? ltvKlienti.reduce((a, c) => a + c.totalPrice, 0) / ltvKlienti.length : 0;
-    const mesiacovSpolu = ltvKlienti.length
-      ? ltvKlienti.reduce((a, c) => a + Math.max(1, (Date.parse(c.lastSession) - Date.parse(c.firstSession)) / (30.44 * 86400000)), 0) / ltvKlienti.length
-      : 0;
     nodes.ltvZdroj = (
       <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column" }}>
         <H3><Info label="Hodnota klienta (LTV)" text="Koľko klient priemerne zaplatí za celý čas spolupráce a ako dlho vydrží. Ráta sa zo VŠETKÝCH klientov s aspoň tromi sedeniami — aj z tých, čo stále chodia. Kto prišiel raz na úvodný a nevrátil sa, sa neráta: to nie je spolupráca, to je nákup skúšky. Keďže polovica z nich ešte chodí a zaplatí aj ďalej, skutočná hodnota je o niečo vyššia než toto číslo — ako strop na marketing je to bezpečná strana chyby. Je to tá istá definícia ako KPI „Hodnota klienta“, takže obe miesta ukazujú to isté." /></H3>

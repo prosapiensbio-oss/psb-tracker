@@ -19,6 +19,7 @@
 // tržby aj náklady sa nahrali, ale VZAS o tom mesiaci nevedel. Rovnaká chyba
 // by sa opakovala každý mesiac. Excel končí júnom 2026 — všetko po ňom plnia
 // importy (PTminder, Fio), takže stačí, aby mesiac existoval.
+import { ltvSpoluprace } from "./compute";
 const POSLEDNY_Z_EXCELU = "2026-06";
 const MESIACE_SK = ["Jan", "Feb", "Mar", "Apr", "Máj", "Jún", "Júl", "Aug", "Sep", "Okt", "Nov", "Dec"];
 
@@ -1670,7 +1671,10 @@ export type KpiActual = {
 };
 
 type SessionLike = { date: string; client: string; sessionTrainer: string; sessionType: string; duration: number; price: number };
-type PaymentLike = { date: string; amount: number };
+// `client` pribudol 22. 8. 2026 kvôli LTV: hodnota klienta sa ráta z toho,
+// čo KTO zaplatil, nie z cien zapísaných pri sedeniach (tie sú pri balíčkoch
+// nulové). Volajúci posiela data.payments, kde meno je.
+type PaymentLike = { date: string; amount: number; client: string };
 
 // Everything here is derived from the Tracker's own data (PTminder), not from
 // the Excel — the Excel is an archive from 2026-07-31 on.
@@ -1707,18 +1711,10 @@ export function computeKpis(year: string, sessions: SessionLike[], payments: Pay
 
   // Tenure + LTV over the whole history (not just this year) — a one-year slice
   // would say more about the window than about the clients.
-  const span: Record<string, { first: string; last: string; czk: number; n: number }> = {};
-  for (const s of sessions) {
-    const g = (span[s.client] ||= { first: s.date, last: s.date, czk: 0, n: 0 });
-    if (s.date < g.first) g.first = s.date;
-    if (s.date > g.last) g.last = s.date;
-    g.czk += s.price;
-    g.n++;
-  }
-  const usadeni = Object.values(span).filter((g) => g.n >= 3);
-  const MES = 1000 * 60 * 60 * 24 * 30.44;
-  const dlzka = usadeni.length ? usadeni.reduce((a, g) => a + (new Date(g.last).getTime() - new Date(g.first).getTime()) / MES, 0) / usadeni.length : 0;
-  const ltv = usadeni.length ? usadeni.reduce((a, g) => a + g.czk, 0) / usadeni.length : 0;
+  // Jedna definícia pre KPI aj pre kartu na Kokpite — viď ltvSpoluprace.
+  // Dovtedy tu bola vlastná kópia, ktorá sčítavala CENY SEDENÍ (nulové pri
+  // balíčkoch) a dávala o 18 % nižšie číslo než skutočne zaplatené peniaze.
+  const { ltv, dlzkaMes: dlzka } = ltvSpoluprace(sessions, payments);
 
   // Margin + break-even reserve come from VZAS (Excel-validated costs), so they
   // only span the months VZAS covers — jan–jún for 2026, not the full year.

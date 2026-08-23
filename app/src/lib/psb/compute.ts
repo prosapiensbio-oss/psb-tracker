@@ -859,6 +859,48 @@ export const jeKlient = (c: ClientAgg, payments: { client: string; amount: numbe
  * Obdobie sa filtruje VOPRED a posiela sa sem už vybraný zoznam — funkcia
  * nevie o mesiacoch ani oknách a nemá vedieť.
  */
+/**
+ * Hodnota klienta (LTV) a dĺžka spolupráce — JEDNA definícia pre celú appku.
+ *
+ * ČO SA SČÍTAVA A PREČO NIE CENY SEDENÍ
+ *
+ * Do 22. 8. 2026 sa LTV rátalo zo `session.price`, teda z ceny zapísanej pri
+ * sedení. Lenže tá je pri 663 z 3 449 sedení (19 %) NULOVÁ — platba visí na
+ * balíčku, ktorý klient zaplatil dopredu. Appka to o pár riadkov ďalej sama
+ * hovorí pri „Ø cene sedenia", kde presne z tohto dôvodu ceny sedení odmieta.
+ * LTV tak vychádzalo 29 597 Kč, hoci tí istí klienti reálne zaplatili
+ * priemerne 34 969 Kč. Bolo to podhodnotené o 18 % — a keďže LTV je strop na
+ * to, koľko sa oplatí minúť za získanie klienta, podhodnotené LTV zbytočne
+ * zväzuje ruky marketingu.
+ *
+ * Ráta sa z PLATIEB, čo je doslovná odpoveď na otázku „koľko klient zaplatí".
+ *
+ * Hranica ≥3 sedenia vyhadzuje skúšajúcich: jeden úvodný nie je spolupráca.
+ * Počítajú sa aj tí, čo stále chodia — priemer cez odídených by meral, ako
+ * vyzerá ODCHOD, nie ako vyzerá klient. Číslo tým zostáva podhodnotené
+ * (kto chodí, zaplatí ešte), a to je pri strope na marketing bezpečná strana.
+ */
+export function ltvSpoluprace(
+  sedenia: { client: string; date: string }[],
+  platby: { client: string; amount: number }[],
+): { ltv: number; dlzkaMes: number; klientov: number; mena: string[] } {
+  const span: Record<string, { first: string; last: string; n: number }> = {};
+  for (const s of sedenia) {
+    const g = (span[s.client] ||= { first: s.date, last: s.date, n: 0 });
+    if (s.date < g.first) g.first = s.date;
+    if (s.date > g.last) g.last = s.date;
+    g.n++;
+  }
+  const zaplatil: Record<string, number> = {};
+  for (const p of platby) zaplatil[p.client] = (zaplatil[p.client] || 0) + p.amount;
+  const usadeni = Object.entries(span).filter(([meno, g]) => g.n >= 3 && (zaplatil[meno] || 0) > 0);
+  if (!usadeni.length) return { ltv: 0, dlzkaMes: 0, klientov: 0, mena: [] };
+  const MES = 1000 * 60 * 60 * 24 * 30.44;
+  const ltv = usadeni.reduce((a, [meno]) => a + (zaplatil[meno] || 0), 0) / usadeni.length;
+  const dlzkaMes = usadeni.reduce((a, [, g]) => a + Math.max(1, (Date.parse(g.last) - Date.parse(g.first)) / MES), 0) / usadeni.length;
+  return { ltv, dlzkaMes, klientov: usadeni.length, mena: usadeni.map(([m]) => m) };
+}
+
 export const pocetUvodnych = (sedenia: { client: string; sessionType: string }[]): number =>
   new Set(sedenia.filter((s) => s.sessionType === "UVODNE").map((s) => s.client)).size;
 
