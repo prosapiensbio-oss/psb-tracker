@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { kotvaDat } from "../../lib/psb/compute";
 import {
@@ -8,7 +9,7 @@ import {
 import { C, mix } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import type { AssistantChat } from "./Assistant";
-import { Card, H3, Info } from "./ui";
+import { Card, H3, Info, Modal } from "./ui";
 
 /**
  * Mapa nákupného cyklu — čo už vyšlo a čo sa chystá, v čase a vo fázach.
@@ -33,8 +34,16 @@ import { Card, H3, Info } from "./ui";
  */
 
 type IgRiadok = {
-  id: string; datum: string; mesiac: string; hook: string;
+  id: string; datum: string; mesiac: string; hook: string; typ?: string;
   kategoria: string; dosah: number; ulozenia: number; faza: number; permalink?: string;
+};
+
+/** Bublina pri prejdení bodky. Bez nej je bodka anonymná — a mriežka plná
+ *  anonymných bodiek sa nedá čítať, len obdivovať. */
+type Bublina = { x: number; y: number; kus: IgRiadok };
+
+const DRUH: Record<string, string> = {
+  VIDEO: "reel", CAROUSEL_ALBUM: "karusel", IMAGE: "obrázok",
 };
 
 type NapadRiadok = {
@@ -50,6 +59,11 @@ type Vyber =
 
 const dnesMesiac = () => new Date().toISOString().slice(0, 7);
 
+const nadpisOkna = (v: NonNullable<Vyber>) =>
+  v.druh === "vyslo" ? "Zverejnený príspevok"
+    : v.druh === "slot" ? `Plán ${v.slot.mesiac} · ${nazovFazy(v.slot.faza)}`
+      : `Naplánovať na ${v.mesiac}`;
+
 export function MapaCyklu({ data, chat, onNavigate }: {
   data: PSBData;
   chat?: AssistantChat;
@@ -59,6 +73,7 @@ export function MapaCyklu({ data, chat, onNavigate }: {
   const [napady, setNapady] = useState<NapadRiadok[]>([]);
   const [vyber, setVyber] = useState<Vyber>(null);
   const [chyba, setChyba] = useState("");
+  const [bublina, setBublina] = useState<Bublina | null>(null);
 
   const nacitaj = useCallback(() => {
     void fetch("/api/meta?co=instagram", { credentials: "same-origin" })
@@ -193,10 +208,13 @@ export function MapaCyklu({ data, chat, onNavigate }: {
       )}
 
       <div style={{ overflowX: "auto", paddingBottom: 4 }}>
-        <table style={{ borderCollapse: "collapse", minWidth: 640 }}>
+        {/* `separate` je nutnosť, nie vkus: pri `collapse` prehliadače
+              nectia z-index buniek a bodky sa kreslia NAD lepkavý stĺpec.
+              Presne to Jerry 23. 8. 2026 videl. */}
+        <table style={{ borderCollapse: "separate", borderSpacing: 0, minWidth: 640 }}>
           <thead>
             <tr>
-              <th style={{ position: "sticky", left: 0, background: C.card, zIndex: 2, minWidth: 190, width: 190 }} />
+              <th style={{ position: "sticky", left: 0, background: C.surface, zIndex: 3, minWidth: 190, width: 190 }} />
               {os.map((m) => {
                 const { mesiac, rok } = popisMesiaca(m);
                 const buduci = m > dnes;
@@ -218,9 +236,13 @@ export function MapaCyklu({ data, chat, onNavigate }: {
             {FAZY.map((f) => (
               <tr key={f.id}>
                 <th style={{
-                  position: "sticky", left: 0, background: C.card, zIndex: 1,
-                  textAlign: "left", fontWeight: 400, padding: "10px 14px 10px 0",
-                  borderTop: `1px solid ${C.border}`, verticalAlign: "top", minWidth: 190, width: 190,
+                  // C.surface, nie C.card: v sklenených paletách je --c-card
+                  // rgba(255,255,255,0.06), takže lepkavý stĺpec nezakryl nič
+                  // a text sa prekrýval s bodkami pod ním.
+                  position: "sticky", left: 0, background: C.surface, zIndex: 2,
+                  textAlign: "left", fontWeight: 400, padding: "10px 14px 10px 8px",
+                  borderTop: `1px solid ${C.border}`, borderRight: `1px solid ${C.border}`,
+                  verticalAlign: "top", minWidth: 190, width: 190,
                 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
                     <span style={{ width: 8, height: 8, borderRadius: "50%", background: f.farba, flex: "0 0 auto" }} />
@@ -242,18 +264,25 @@ export function MapaCyklu({ data, chat, onNavigate }: {
                       background: buduci ? mix(C.accent, 0.035) : "transparent",
                     }}>
                       <div style={{ display: "flex", flexWrap: "wrap", gap: 2, justifyContent: "center", alignItems: "center", minHeight: 26 }}>
-                        {b.vyslo.map((p) => (
-                          <button key={p.datum + p.hook.slice(0, 12)}
-                            onClick={() => {
-                              const cely = ig.find((x) => x.datum.slice(0, 10) === p.datum && (x.hook || "") === p.hook);
-                              if (cely) setVyber({ druh: "vyslo", kus: cely });
-                            }}
-                            title={`${p.datum} · ${p.hook.slice(0, 70)}`}
-                            style={{
-                              width: 9, height: 9, borderRadius: "50%", border: 0, padding: 0,
-                              background: f.farba, opacity: 0.85, cursor: "pointer",
-                            }} />
-                        ))}
+                        {b.vyslo.map((p) => {
+                          const cely = ig.find((x) => x.datum.slice(0, 10) === p.datum && (x.hook || "") === p.hook);
+                          const ukaz = (e: { currentTarget: HTMLElement }) => {
+                            if (!cely) return;
+                            const r = e.currentTarget.getBoundingClientRect();
+                            setBublina({ x: r.left + r.width / 2, y: r.top, kus: cely });
+                          };
+                          return (
+                            <button key={p.datum + p.hook.slice(0, 12)}
+                              onClick={() => { if (cely) { setBublina(null); setVyber({ druh: "vyslo", kus: cely }); } }}
+                              onMouseEnter={ukaz} onFocus={ukaz}
+                              onMouseLeave={() => setBublina(null)} onBlur={() => setBublina(null)}
+                              aria-label={p.hook.slice(0, 70) || p.datum}
+                              style={{
+                                width: 10, height: 10, borderRadius: "50%", border: 0, padding: 0,
+                                background: f.farba, opacity: 0.85, cursor: "pointer",
+                              }} />
+                          );
+                        })}
                         {b.plan.map((s) => (
                           <button key={s.id} onClick={() => setVyber({ druh: "slot", slot: s })}
                             title={s.koncept || s.text || "bez konceptu"}
@@ -294,15 +323,53 @@ export function MapaCyklu({ data, chat, onNavigate }: {
         </span>
       </div>
 
+      {/* Editor je MODÁLNE OKNO, nie panel pod mriežkou. Kým bol dole, Jerry
+          si po kliknutí na „+" nevšimol, že sa niečo otvorilo — pozeral sa
+          na tabuľku a zmena bola mimo zorného poľa (23. 8. 2026). */}
       {vyber && (
-        <Panel
-          vyber={vyber}
-          onZavri={() => { setVyber(null); setChyba(""); }}
-          onUloz={uloz}
-          onFazaPrispevku={ulozFazuPrispevku}
-          onJarvis={chat ? posliJarvisovi : undefined}
-        />
+        <Modal
+          title={nadpisOkna(vyber)}
+          sirka={520}
+          onClose={() => { setVyber(null); setChyba(""); }}
+        >
+          {chyba && (
+            <div style={{ background: C.redBg, color: C.red, padding: "8px 10px", borderRadius: 6, fontSize: 12.5, marginBottom: 12 }}>
+              {chyba}
+            </div>
+          )}
+          <Panel
+            vyber={vyber}
+            onZavri={() => { setVyber(null); setChyba(""); }}
+            onUloz={uloz}
+            onFazaPrispevku={ulozFazuPrispevku}
+            onJarvis={chat ? posliJarvisovi : undefined}
+          />
+        </Modal>
       )}
+
+      {/* Bublina ide PORTÁLOM do body: karta má backdrop-filter, a ten robí
+          z predka obalový blok pre position:fixed — bublina by sa inak
+          umiestňovala voči karte, nie voči obrazovke. Tá istá pasca, akú
+          rieši Modal a vysvetlivky. */}
+      {bublina && typeof document !== "undefined" && createPortal(
+        <div style={{
+          position: "fixed", left: bublina.x, top: bublina.y - 12,
+          transform: "translate(-50%, -100%)", zIndex: 9000, pointerEvents: "none",
+          background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8,
+          padding: "10px 12px", maxWidth: 320, boxShadow: "0 10px 30px rgba(0,0,0,.35)",
+        }}>
+          <div style={{ fontSize: 10.5, color: C.textDim, marginBottom: 5, letterSpacing: 0.3 }}>
+            {bublina.kus.datum.slice(0, 10)}
+            {" · "}{DRUH[bublina.kus.typ || ""] || "príspevok"}
+            {bublina.kus.kategoria ? ` · ${bublina.kus.kategoria}` : ""}
+          </div>
+          <div style={{ fontSize: 12.5, color: C.text, lineHeight: 1.45 }}>
+            {(bublina.kus.hook || "—").slice(0, 180)}
+          </div>
+          <div style={{ fontSize: 10.5, color: C.textMuted, marginTop: 6 }}>
+            dosah {bublina.kus.dosah} · {bublina.kus.ulozenia} uložení · {nazovFazy(bublina.kus.faza)}
+          </div>
+        </div>, document.body)}
     </Card>
   );
 }
@@ -326,10 +393,6 @@ function Panel({ vyber, onZavri, onUloz, onFazaPrispevku, onJarvis }: {
   const mesiac = vyber.druh === "slot" ? vyber.slot.mesiac : vyber.druh === "novy" ? vyber.mesiac : "";
   const faza = vyber.druh === "slot" ? vyber.slot.faza : vyber.druh === "novy" ? vyber.faza : vyber.kus.faza;
 
-  const ramec = {
-    marginTop: 16, padding: 16, borderRadius: 8,
-    background: mix(C.accent, 0.05), border: `1px solid ${mix(C.border, 0.9)}`,
-  } as const;
   const vstup = {
     width: "100%", background: C.bg, color: C.text, fontFamily: "inherit", fontSize: 13,
     border: `1px solid ${C.border}`, borderRadius: 6, padding: "8px 10px", boxSizing: "border-box" as const,
@@ -344,14 +407,17 @@ function Panel({ vyber, onZavri, onUloz, onFazaPrispevku, onJarvis }: {
   if (vyber.druh === "vyslo") {
     const k = vyber.kus;
     return (
-      <div style={ramec}>
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 8 }}>
-          <div style={{ fontSize: 11, color: C.textDim }}>
-            {k.datum.slice(0, 10)} · dosah {k.dosah} · {k.ulozenia} uložení · {k.kategoria || "bez kategórie"}
-          </div>
-          <button onClick={onZavri} style={{ ...tlacidlo(false), padding: "2px 8px" }}>zavrieť</button>
+      <div>
+        <div style={{ fontSize: 11, color: C.textDim, marginBottom: 8 }}>
+          {k.datum.slice(0, 10)} · {DRUH[k.typ || ""] || "príspevok"} · dosah {k.dosah} · {k.ulozenia} uložení · {k.kategoria || "bez kategórie"}
         </div>
-        <div style={{ fontSize: 13.5, color: C.text, marginBottom: 12, lineHeight: 1.5 }}>{k.hook || "—"}</div>
+        <div style={{ fontSize: 13.5, color: C.text, marginBottom: 10, lineHeight: 1.5 }}>{k.hook || "—"}</div>
+        {k.permalink && (
+          <div style={{ marginBottom: 12 }}>
+            <a href={k.permalink} target="_blank" rel="noreferrer"
+              style={{ fontSize: 11.5, color: C.accentLight }}>otvoriť na Instagrame ↗</a>
+          </div>
+        )}
         <div style={{ fontSize: 11.5, color: C.textMuted, marginBottom: 6 }}>
           Zaradené ako <b style={{ color: C.text }}>{nazovFazy(faza)}</b> — model to odhadol z háku. Oprav, ak sedí inak:
         </div>
@@ -365,6 +431,9 @@ function Panel({ vyber, onZavri, onUloz, onFazaPrispevku, onJarvis }: {
                 borderRadius: 6, padding: "5px 10px", fontSize: 11.5, fontFamily: "inherit", cursor: "pointer",
               }}>{f.nazov}</button>
           ))}
+        </div>
+        <div style={{ marginTop: 14 }}>
+          <button onClick={onZavri} style={tlacidlo(false)}>zavrieť</button>
         </div>
       </div>
     );
@@ -388,15 +457,9 @@ function Panel({ vyber, onZavri, onUloz, onFazaPrispevku, onJarvis }: {
   };
 
   return (
-    <div style={ramec}>
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 10, alignItems: "flex-start" }}>
-        <div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>
-            {mesiac} · {f?.nazov}
-          </div>
-          <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 2 }}>{f?.uloha}</div>
-        </div>
-        <button onClick={onZavri} style={{ ...tlacidlo(false), padding: "2px 8px" }}>zavrieť</button>
+    <div>
+      <div style={{ fontSize: 11.5, color: C.textDim, marginBottom: 12, lineHeight: 1.45 }}>
+        <b style={{ color: C.textMuted }}>{f?.kto}</b><br />{f?.uloha}
       </div>
 
       <label style={{ display: "block", fontSize: 11.5, color: C.textMuted, marginBottom: 4 }}>
@@ -429,6 +492,11 @@ function Panel({ vyber, onZavri, onUloz, onFazaPrispevku, onJarvis }: {
             nech navrhne Jarvis
           </button>
         )}
+        {/* Modál sa inak zatvára len klikom mimo panela a to nie je vidieť —
+            Jerryho pôvodná výhrada bola presne o tom, že si zmenu nevšimne. */}
+        <button onClick={onZavri} disabled={busy} style={{ ...tlacidlo(false), marginLeft: "auto" }}>
+          zrušiť
+        </button>
       </div>
       {slot?.text && slot.text !== koncept && (
         <div style={{ fontSize: 11, color: C.textDim, marginTop: 10 }}>
