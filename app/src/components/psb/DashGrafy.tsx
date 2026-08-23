@@ -1340,7 +1340,7 @@ export function useExtraGrafy({
     })();
     nodes.hodnotaZdroj = (
       <Card style={{ marginBottom: 0, height: "100%" }}>
-        <H3><Info label="Čo klient prinesie podľa zdroja" text="Priemerná tržba na klienta za celý čas, čo chodí, podľa toho odkiaľ prišiel (všetci klienti — aj tí, čo stále chodia). Toto je číslo, proti ktorému má zmysel držať cenu za získaného klienta. Klik na riadok otvorí tých konkrétnych ľudí. Pozor: zdroj sa zapisuje až od júna 2025, staršie mená sedia v „nevyplnené“." /></H3>
+        <H3><Info label="Čo klient prinesie podľa zdroja" text="Priemerná tržba NA JEDNÉHO klienta za celý čas, čo chodí — nie súčet za kanál. Preto môže mať „Web“ vyššie číslo než „Referencia“, hoci z webu prišli dvaja a z odporúčaní šesťdesiatdva: pri dvoch stačí jeden dlhoročný klient a priemer vyletí. Riadok s menej než piatimi klientmi je označený „málo ľudí“ — zaujímavosť, nie dôkaz. Čo priniesol celý kanál, je toto číslo krát počet klientov. Klik na riadok otvorí tých konkrétnych ľudí. Zdroj sa zapisuje až od júna 2025, staršie mená sedia v „nevyplnené“." /></H3>
         <Klik kam={() => onNavigate("klienti", "rast")} onNavigate="Klienti → Rast a strata">
           <div style={{ marginTop: 8 }}>
             {podlaZdroja.map((r) => (
@@ -1945,7 +1945,9 @@ export function useExtraGrafy({
             </Klik>
           </div>
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: 0.6, textTransform: "uppercase", color: C.textDim, marginBottom: 6 }}>Čo klient prinesie podľa zdroja</div>
+            <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: 0.6, textTransform: "uppercase", color: C.textDim, marginBottom: 6 }}>
+              <Info label="Čo klient prinesie podľa zdroja" text="Priemer NA JEDNÉHO klienta, nie súčet za kanál. Preto môže mať „Web“ vyššie číslo než „Referencia“, hoci z webu prišli dvaja ľudia a z odporúčaní šesťdesiatdva — pri dvoch stačí jeden, čo chodí tri roky, a priemer vyletí. Riadok s menej než piatimi klientmi je označený „málo ľudí“: je to zaujímavosť, nie dôkaz. Čo priniesol celý kanál, je toto číslo KRÁT počet klientov — 62 × 36 027 je iná liga než 2 × 37 929." />
+            </div>
             <Klik kam={() => onNavigate("klienti", "rast")} onNavigate="Klienti → Fluktuácia">
               {!zdrojeTop.length ? <Empty>Zdroje sa zapisujú od júna 2025.</Empty> : (
                 <div>
@@ -1953,7 +1955,7 @@ export function useExtraGrafy({
                       pre to, na čo sa dá kliknúť. */}
                   {zdrojeTop.map((r) => (
                     <BarRow key={r.z} label={r.z} value={r.trzba} max={Math.max(1, ...zdrojeTop.map((x) => x.trzba))}
-                      color={mix(C.textMuted, 45)} sub={`${fmtCZK(r.trzba)} · ${r.n} kl.`} />
+                      color={mix(C.textMuted, 45)} sub={`${fmtCZK(r.trzba)} · ${r.n} kl.${r.n < 5 ? " · málo ľudí" : ""}`} />
                   ))}
                 </div>
               )}

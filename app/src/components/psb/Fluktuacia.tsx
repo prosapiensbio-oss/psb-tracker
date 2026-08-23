@@ -333,7 +333,7 @@ function HodnotaPodlaZdroja({ zoznam, onSkupina }: { zoznam: Klient[]; onSkupina
 
   return (
     <Card>
-      <H3><Info text="Koľko klient z daného zdroja v priemere prinesie za celý čas, čo chodí. Toto je číslo, proti ktorému má zmysel držať cenu za získaného klienta: keď klient z reklamy prinesie v priemere 28 000 Kč, tisíckorunová cena za jeho získanie je dobrý obchod. A ak klient z odporúčania vydrží dlhšie než klient z reklamy, oplatí sa za odporúčanie zaplatiť viac." label="Čo klient prinesie podľa zdroja" /></H3>
+      <H3><Info text="Koľko prinesie JEDEN klient z daného zdroja za celý čas, čo chodí — nie súčet za kanál. Preto môže mať zdroj s dvomi klientmi vyššiu Ø tržbu než odporúčania so šesťdesiatimi: pri dvoch stačí jeden dlhoročný a priemer vyletí. Stĺpec „Klientov“ preto čítaj vždy spolu s „Ø tržba“; pri menej než piatich je vedľa sumy značka „málo ľudí“. Čo priniesol celý kanál, je Ø tržba krát počet klientov. Toto je číslo, proti ktorému má zmysel držať cenu za získaného klienta: keď klient z reklamy prinesie v priemere 28 000 Kč, tisíckorunová cena za jeho získanie je dobrý obchod." label="Čo klient prinesie podľa zdroja" /></H3>
       <TableWrap>
         <thead>
           <tr>
@@ -357,7 +357,12 @@ function HodnotaPodlaZdroja({ zoznam, onSkupina }: { zoznam: Klient[]; onSkupina
               <td style={{ ...S.td, textAlign: "right", color: C.textMuted }}>{r.aktivnych}</td>
               <td style={{ ...S.td, textAlign: "right", color: C.textMuted }}>{r.zivot}</td>
               <td style={{ ...S.td, textAlign: "right", color: C.textMuted }}>{r.sedeni}</td>
-              <td style={{ ...S.td, textAlign: "right", fontWeight: 600, color: C.green }}>{fmtCZK(r.trzba)}</td>
+              {/* Priemer z dvoch ľudí je náhoda, nie kanál (Jerry, 23. 8. 2026:
+                  „2 klienti web majú viac ako 62 klientov cez referencie"). */}
+              <td style={{ ...S.td, textAlign: "right", fontWeight: 600, color: C.green }}>
+                {fmtCZK(r.trzba)}
+                {r.n < 5 && <span style={{ color: C.textDim, fontWeight: 400, fontSize: 11 }}> · málo ľudí</span>}
+              </td>
             </tr>
           ))}
         </tbody>
