@@ -19,6 +19,19 @@ export type MktMesiac = {
   ulozenia: number;
   zdielania: number;
   spend: number;
+  /**
+   * Skutočný výdaj na reklamu za mesiac podľa Meta Marketing API.
+   *
+   * `spend` vyššie je suma pripísaná JEDNOTLIVÝM príspevkom z Metricool
+   * exportu — pozná len boostnuté kusy z nahratého súboru a v mesiaci bez
+   * exportu je nula (júl 2026: 0 Kč, kým Meta hlási 4 796). Za 19 mesiacov
+   * je to 18 179 Kč proti 31 454 Kč podľa Mety.
+   *
+   * PRAVIDLO: kde ide o PENIAZE (cena za úvodný, cena za klienta), platí
+   * `spendAds`; `spend` zostáva pri obsahu, kde je na mieste. Keď mesiac
+   * v Mete nie je, pole chýba — vtedy je pomlčka lepšia než neúplné číslo.
+   */
+  spendAds?: number;
   viewRate: number;
   /** Ø čas sledovania reelu v milisekundách (Metricool). 0 = nemeralo sa. */
   watchTime?: number;

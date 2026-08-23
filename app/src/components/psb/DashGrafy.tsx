@@ -1702,8 +1702,6 @@ export function useExtraGrafy({
     );
 
     // ── Doplnené karty: marketing ────────────────────────────────────────────
-    const mkt12 = MKT_MESACNE.slice(-12);
-    const spend12 = mkt12.reduce((a, m) => a + (m.spend || 0), 0);
     const uvodne12 = pocetUvodnych(sedeniaRok);
     const novi12 = Object.values(clients).filter((c) => c.firstSession && Date.parse(c.firstSession) >= Date.now() - 365 * 86400000).length;
     // Vlastný prepínač obdobia (Jerry, 10. 8.): 12 mesiacov je pri reklame
@@ -1869,6 +1867,22 @@ export function useExtraGrafy({
       dopyty: (dataAll.leads || []).filter((l) => (l.date || "").slice(0, 7) === lievikMk).length,
       uvodne: pocetUvodnych(dataAll.sessions.filter((x) => x.date.slice(0, 7) === lievikMk)),
       novi: Object.values(clientsAll).filter((c) => (c.firstSession || "").slice(0, 7) === lievikMk).length,
+      /**
+       * Cena za klienta ZA TEN ISTÝ MESIAC, aký hlási nadpis lievika.
+       *
+       * Dovtedy tu stálo `spend12 / novi12` — dvanásťmesačný priemer pod
+       * hlavičkou „Lievik · júl 26", takže tri čísla vedľa seba boli za júl
+       * a štvrté za rok. A počítalo sa z Metricoolu, ktorý za júl nemá ani
+       * korunu, hoci Meta hlási 4 796 Kč (nájdené 22. 8. 2026 pri overovaní
+       * pre Terezku). Skutočný výdaj má prednosť; keď mesiac v Mete nie je,
+       * radšej pomlčka než číslo z neúplného zdroja.
+       */
+      cenaKlienta: (() => {
+        const m = MKT_MESACNE.find((x) => x.m === lievikMk);
+        const vydaj = m ? (typeof m.spendAds === "number" ? m.spendAds : m.spend) : 0;
+        const noviM = Object.values(clientsAll).filter((c) => (c.firstSession || "").slice(0, 7) === lievikMk).length;
+        return vydaj > 0 && noviM > 0 ? vydaj / noviM : null;
+      })(),
     };
     nodes.marketingSuhrn = (
       <Card style={{ marginBottom: 0, height: "100%" }}>
@@ -1909,7 +1923,7 @@ export function useExtraGrafy({
               <MiniStat label="Dopyty" value={String(lievikK.dopyty)} color={C.blue} />
               <MiniStat label="Úvodné" value={String(lievikK.uvodne)} />
               <MiniStat label="Noví klienti" value={String(lievikK.novi)} color={C.green} />
-              <MiniStat label="Cena za klienta" value={novi12 && spend12 ? fmtCZK(spend12 / novi12) : "—"} color={C.orange} />
+              <MiniStat label="Cena za klienta" value={lievikK.cenaKlienta ? fmtCZK(lievikK.cenaKlienta) : "—"} color={C.orange} />
             </div>
           </Klik>
         </div>
