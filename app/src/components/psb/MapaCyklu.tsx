@@ -3,13 +3,14 @@ import { createPortal } from "react-dom";
 
 import { kotvaDat } from "../../lib/psb/compute";
 import {
-  FAZY, mriezka, nazovFazy, osMapy, popisMesiaca, tempoFaz, zadanieProProject,
+  FAZY, mriezka, nazovFazy, osMapy, poctyFaz, podielFaz, POMER_IDEAL,
+  popisMesiaca, tempoFaz, zadanieProProject,
   type Bunka, type SlotPlanu, type ZverejnenyKus,
 } from "../../lib/psb/mapaCyklu";
 import { C, mix } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import type { AssistantChat } from "./Assistant";
-import { Card, H3, Info, Modal, Select } from "./ui";
+import { Card, Donut, H3, Info, Modal, Select } from "./ui";
 import { CLAUDE_PROJECT } from "./Zadanie";
 
 /**
@@ -121,6 +122,11 @@ export function MapaCyklu({ data, chat, onNavigate }: {
   const bunky = useMemo(() => mriezka(os, vyslo, plan), [os, vyslo, plan]);
   const tempo = useMemo(() => tempoFaz(os, vyslo, kotva.plny || dnes, 6), [os, vyslo, kotva.plny, dnes]);
 
+  // Tri koláče: čo vyšlo, čo je naplánované, a čo by podľa nás malo byť.
+  // Prvé dva sú meranie, tretí je názor — preto má vlastné vysvetlenie.
+  const podielMinulost = useMemo(() => podielFaz(poctyFaz(vyslo)), [vyslo]);
+  const podielBuducnost = useMemo(() => podielFaz(poctyFaz(plan)), [plan]);
+
   // Nezaradené sa nezamlčiavajú: bez tejto vety by mapa vyzerala, že pokrýva
   // všetko, čo kedy vyšlo.
   const nezaradenych = ig.filter((p) => !p.faza && p.datum).length;
@@ -211,6 +217,13 @@ export function MapaCyklu({ data, chat, onNavigate }: {
           {chyba}
         </div>
       )}
+
+      <Kolace
+        minulost={podielMinulost}
+        buducnost={podielBuducnost}
+        vysloKusov={vyslo.length}
+        planKusov={plan.length}
+      />
 
       <div style={{ overflowX: "auto", paddingBottom: 4 }}>
         {/* `separate` je nutnosť, nie vkus: pri `collapse` prehliadače
@@ -731,6 +744,96 @@ function OknoKopirovania({ text, onZavri }: { text: string; onZavri: () => void 
           Schránka sa nedala použiť. Text je označený — stlač cmd+C.
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Tri koláče nad mriežkou: skutočnosť, plán a odporúčanie.
+ *
+ * PREČO TRI A NIE JEDEN S PREPÍNAČOM
+ *
+ * Otázka, na ktorú odpovedajú, je porovnávacia — „ide plán tam, kam chcem?".
+ * Prepínač by z porovnania urobil pamäťové cvičenie: človek by si musel držať
+ * v hlave, čo videl pred kliknutím.
+ *
+ * PROSTREDNÝ KOLÁČ BÝVA PRÁZDNY A JE TO V PORIADKU
+ *
+ * Plán sa napĺňa postupne. Prázdny koláč preto nehlási chybu — povie, koľko
+ * slotov zatiaľ je, aby bolo jasné, že pomer z troch kusov nič neznamená.
+ */
+/** 1 slot · 2 sloty · 5 slotov — inak na obrazovke svieti „1 sloty". */
+const mnozne = (n: number, jeden: string, malo: string, vela: string) =>
+  `${n} ${n === 1 ? jeden : n >= 2 && n <= 4 ? malo : vela}`;
+
+function Kolace({ minulost, buducnost, vysloKusov, planKusov }: {
+  minulost: Record<number, number>;
+  buducnost: Record<number, number>;
+  vysloKusov: number;
+  planKusov: number;
+}) {
+  const data = (podiely: Record<number, number>) =>
+    FAZY.map((f) => ({ label: f.nazov, value: podiely[f.id] || 0, color: f.farba }));
+
+  const kolac = (nadpis: string, spodok: string, podiely: Record<number, number>, prazdny: boolean) => (
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, minWidth: 132 }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: C.text }}>{nadpis}</div>
+      {prazdny ? (
+        <div style={{
+          width: 104, height: 104, borderRadius: "50%", border: `2px dashed ${mix(C.border, 0.9)}`,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 11, color: C.textDim, textAlign: "center", padding: 12, boxSizing: "border-box",
+        }}>
+          zatiaľ nič naplánované
+        </div>
+      ) : (
+        <Donut data={data(podiely)} size={104} thickness={20} bezLegendy />
+      )}
+      <div style={{ fontSize: 11, color: C.textDim, textAlign: "center", lineHeight: 1.35 }}>{spodok}</div>
+    </div>
+  );
+
+  // Pod tri kusy je pomer náhoda, nie smer. Radšej to povedať, než kresliť
+  // koláč, ktorý vyzerá ako záver.
+  const planMaloKusov = planKusov > 0 && planKusov < 4;
+
+  return (
+    <div style={{
+      display: "flex", gap: 26, flexWrap: "wrap", alignItems: "flex-start",
+      marginBottom: 18, paddingBottom: 16, borderBottom: `1px solid ${C.border}`,
+    }}>
+      {kolac("Čo vyšlo", mnozne(vysloKusov, "príspevok", "príspevky", "príspevkov"), minulost, vysloKusov === 0)}
+      {kolac(
+        "Čo je v pláne",
+        planKusov === 0 ? "žiadny slot" : planMaloKusov
+          ? `${mnozne(planKusov, "slot", "sloty", "slotov")} — na pomer primálo`
+          : mnozne(planKusov, "slot", "sloty", "slotov"),
+        buducnost,
+        planKusov === 0,
+      )}
+      {kolac("Kam mieriť", "odporúčanie, nie meranie", POMER_IDEAL, false)}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 5, paddingTop: 2, minWidth: 190 }}>
+        {FAZY.map((f) => (
+          <div key={f.id} style={{ display: "flex", alignItems: "center", gap: 7, fontSize: 11.5, color: C.textMuted }}>
+            <span style={{ width: 9, height: 9, borderRadius: 2, background: f.farba, flex: "0 0 auto" }} />
+            <span style={{ flex: "1 1 auto" }}>{f.nazov}</span>
+            <span style={{ color: C.textDim, fontVariantNumeric: "tabular-nums" }}>
+              {minulost[f.id]} · {planKusov ? buducnost[f.id] : "–"} · <b style={{ color: C.textMuted }}>{POMER_IDEAL[f.id]}</b> %
+            </span>
+          </div>
+        ))}
+        <div style={{ fontSize: 10.5, color: C.textDim, marginTop: 3, lineHeight: 1.4 }}>
+          vyšlo · v pláne · odporúčané
+          <Info text={
+            "Prvé dva koláče sú meranie, tretí je NÁZOR a má sa dať poraziť. Stojí na štyroch veciach: " +
+            "pyramída kupujúcich (väčšina publika nie je pripravená kúpiť), vlastné meranie PSB (najviac uložení má konkrétny príznak " +
+            "spárovaný s protiintuitívnym vysvetlením — to je fáza 2 a 3), kapacita 60–70 klientov (netreba záplavu dopytov, ale fáza 5 nesmie byť nulová: " +
+            "za 9 mesiacov prišlo z Instagramu 7 dopytov z 39) a cena dosahu vo fáze 1 (kto o probléme nevie, nemá dôvod kliknúť). " +
+            "Skutočné rozloženie za 18 mesiacov je takmer rovnomerné — vidíš ho v prvom koláči. Rozdiel oproti tretiemu je návrh na posun, nie chyba."
+          } />
+        </div>
+      </div>
     </div>
   );
 }

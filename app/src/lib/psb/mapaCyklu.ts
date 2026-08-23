@@ -179,3 +179,62 @@ export function zadanieProProject(s: {
   );
   return riadky.join("\n");
 }
+
+/**
+ * Odporúčaný pomer obsahu medzi fázami.
+ *
+ * TOTO NIE SÚ DÁTA. Zvyšné dva koláče v mape merajú skutočnosť; tento je
+ * NÁZOR a musí sa dať poraziť. Preto tu stojí, z čoho vznikol — aby sa dal
+ * prehodnotiť, keď sa niektorý z predpokladov ukáže ako nepravdivý.
+ *
+ * NA ČOM STOJÍ
+ *
+ * 1. Chet Holmes, pyramída kupujúcich: v každom publiku je zlomok ľudí
+ *    pripravených kúpiť teraz a drvivá väčšina nie. Obsah mierený len na
+ *    rozhodnutých hovorí k pár percentám a zvyšok ignoruje.
+ * 2. Vlastné meranie PSB: najsilnejší formát je konkrétny príznak spárovaný
+ *    s protiintuitívnym vysvetlením (najviac uložení a zdieľaní). To je presne
+ *    fáza 2 a 3 — pomenuj, čo človek cíti, a vysvetli, prečo doterajšie pokusy
+ *    nezabrali. Preto majú stred pyramídy najväčšiu váhu.
+ * 3. Kapacita ~60–70 klientov. PSB nepotrebuje záplavu dopytov, potrebuje tých
+ *    správnych — to drží fázu 5 nízko. Zároveň nesmie byť nulová: bez obsahu
+ *    pre rozhodnutých sa z teplého publika nestane dopyt a za 9 mesiacov
+ *    prišlo z Instagramu 7 dopytov z 39.
+ * 4. Fáza 1 je najdrahšia na dosah — človek, ktorý o probléme nevie, nemá
+ *    dôvod na príspevok kliknúť. Preto má najmenší podiel, nie najväčší,
+ *    hoci by to pyramída sama o sebe naznačovala.
+ *
+ * Skutočné rozloženie za 03/2025–08/2026 je takmer rovnomerné (26/21/20/26/23
+ * kusov zo 116). Rozdiel oproti tomuto pomeru je návrh na posun, nie chyba.
+ * Percentá sem nepíš — koláč ich počíta zaokrúhlením na súčet 100 a natvrdo
+ * napísané číslo by sa s ním rozišlo.
+ */
+export const POMER_IDEAL: Record<number, number> = {
+  1: 15, 2: 25, 3: 25, 4: 20, 5: 15,
+};
+
+/**
+ * Podiely fáz v percentách, zaokrúhlené tak, aby dávali presne 100.
+ *
+ * Naivné zaokrúhľovanie každej hodnoty zvlášť vyrobí 99 alebo 101 % a koláč,
+ * ktorý sa nerovná stovke, spochybní všetko ostatné na obrazovke. Zvyšok sa
+ * preto pridá tam, kde bolo orezanie najväčšie (najväčší zvyšok).
+ */
+export function podielFaz(pocty: Map<number, number>): Record<number, number> {
+  const spolu = FAZY.reduce((a, f) => a + (pocty.get(f.id) || 0), 0);
+  const out: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  if (!spolu) return out;
+  const presne = FAZY.map((f) => ({ id: f.id, v: ((pocty.get(f.id) || 0) * 100) / spolu }));
+  let dane = 0;
+  for (const p of presne) { out[p.id] = Math.floor(p.v); dane += out[p.id]; }
+  const podlaZvysku = [...presne].sort((a, b) => (b.v - Math.floor(b.v)) - (a.v - Math.floor(a.v)));
+  for (let i = 0; dane < 100; i++, dane++) out[podlaZvysku[i % podlaZvysku.length].id] += 1;
+  return out;
+}
+
+/** Spočíta kusy podľa fáz — spoločný vstup pre koláče. */
+export function poctyFaz(kusy: { faza: number }[]): Map<number, number> {
+  const m = new Map<number, number>(FAZY.map((f) => [f.id, 0]));
+  for (const k of kusy) if (m.has(k.faza)) m.set(k.faza, (m.get(k.faza) || 0) + 1);
+  return m;
+}

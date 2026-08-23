@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { FAZY, jeFaza, mriezka, nazovFazy, osMapy, popisMesiaca, tempoFaz, zadanieProProject } from "./mapaCyklu";
+import { FAZY, jeFaza, mriezka, nazovFazy, osMapy, popisMesiaca, tempoFaz, zadanieProProject, POMER_IDEAL, podielFaz, poctyFaz } from "./mapaCyklu";
 
 const kus = (mesiac: string, faza: number, hook = "h") => ({
   datum: `${mesiac}-05`, mesiac, faza, hook, dosah: 100, ulozenia: 1,
@@ -137,5 +137,36 @@ describe("zadanie s už napísaným textom", () => {
   it("bez hotového textu sa o terajšej verzii nezmieni", () => {
     expect(zadanieProProject(zaklad)).not.toContain("TERAJŠIA VERZIA");
     expect(zadanieProProject({ ...zaklad, hotovyText: "   " })).not.toContain("TERAJŠIA VERZIA");
+  });
+});
+
+describe("podiely fáz v koláči", () => {
+  it("dávajú presne 100 aj tam, kde sa delenie nevyjde", () => {
+    // 1/3 každej z troch fáz = 33,33 % — naivné zaokrúhlenie dá 99
+    const p = podielFaz(poctyFaz([{ faza: 1 }, { faza: 2 }, { faza: 3 }]));
+    expect(p[1] + p[2] + p[3] + p[4] + p[5]).toBe(100);
+  });
+
+  it("dávajú 100 aj pri sedmičke, kde zvyšky rozhodujú", () => {
+    const kusy = [1, 1, 1, 2, 2, 3, 4].map((faza) => ({ faza }));
+    const p = podielFaz(poctyFaz(kusy));
+    expect(Object.values(p).reduce((a, b) => a + b, 0)).toBe(100);
+    expect(p[1]).toBeGreaterThan(p[2]);
+    expect(p[5]).toBe(0);
+  });
+
+  it("prázdny vstup je samá nula, nie NaN — prázdny plán je bežný stav", () => {
+    const p = podielFaz(poctyFaz([]));
+    expect(Object.values(p)).toEqual([0, 0, 0, 0, 0]);
+  });
+
+  it("nezaradené kusy sa do pomeru nerátajú", () => {
+    const p = podielFaz(poctyFaz([{ faza: 0 }, { faza: 0 }, { faza: 4 }]));
+    expect(p[4]).toBe(100);
+  });
+
+  it("ideálny pomer dáva 100 a pokrýva všetkých päť fáz", () => {
+    expect(FAZY.reduce((a, f) => a + POMER_IDEAL[f.id], 0)).toBe(100);
+    expect(FAZY.every((f) => POMER_IDEAL[f.id] > 0)).toBe(true);
   });
 });

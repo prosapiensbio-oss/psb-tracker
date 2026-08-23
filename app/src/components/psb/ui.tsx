@@ -688,12 +688,16 @@ export function Donut({
   thickness = 26,
   centerLabel,
   onSlice,
+  bezLegendy,
 }: {
   data: { label: string; value: number; color: string }[];
   size?: number;
   thickness?: number;
   centerLabel?: ReactNode;
   onSlice?: (label: string) => void;
+  /** Vlastnú legendu vypni tam, kde je vedľa seba viac koláčov nad tými istými
+   *  kategóriami — tri rovnaké legendy vedľa seba nič nepridajú. */
+  bezLegendy?: boolean;
 }) {
   const total = data.reduce((a, d) => a + d.value, 0);
   const r = (size - thickness) / 2;
@@ -731,6 +735,7 @@ export function Donut({
           </text>
         )}
       </svg>
+      {!bezLegendy && (
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         {data.map((d) => (
           <div
@@ -746,6 +751,7 @@ export function Donut({
           </div>
         ))}
       </div>
+      )}
     </div>
   );
 }
