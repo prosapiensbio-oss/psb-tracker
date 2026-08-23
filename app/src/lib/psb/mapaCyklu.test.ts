@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { FAZY, jeFaza, mriezka, nazovFazy, osMapy, popisMesiaca, tempoFaz } from "./mapaCyklu";
+import { FAZY, jeFaza, mriezka, nazovFazy, osMapy, popisMesiaca, tempoFaz, zadanieProProject } from "./mapaCyklu";
 
 const kus = (mesiac: string, faza: number, hook = "h") => ({
   datum: `${mesiac}-05`, mesiac, faza, hook, dosah: 100, ulozenia: 1,
@@ -89,5 +89,38 @@ describe("drobnosti", () => {
   it("päť fáz má jedinečné id a farbu", () => {
     expect(new Set(FAZY.map((f) => f.id)).size).toBe(5);
     expect(new Set(FAZY.map((f) => f.farba)).size).toBe(5);
+  });
+});
+
+describe("zadanie pre Claude Project", () => {
+  const zaklad = { mesiac: "2026-10", faza: 5, koncept: "Petra a bolesť do kolena", kto: "Petra" };
+
+  it("nesie fázu, publikum aj úlohu — Project do Kokpitu nevidí", () => {
+    const t = zadanieProProject(zaklad);
+    expect(t).toContain("2026-10");
+    expect(t).toContain("Rozhodnutý");
+    expect(t).toContain("Je pripravený");
+    expect(t).toContain("Petra a bolesť do kolena");
+    expect(t).toContain("KTO V TOM VYSTUPUJE: Petra");
+  });
+
+  it("vždy pripomenie, že meno klienta do textu nepatrí", () => {
+    expect(zadanieProProject(zaklad)).toContain("Meno klienta");
+    expect(zadanieProProject({ ...zaklad, kto: "" })).toContain("Meno klienta");
+  });
+
+  it("prázdny koncept prizná, nevyrobí prázdny riadok", () => {
+    const t = zadanieProProject({ ...zaklad, koncept: "   " });
+    expect(t).toContain("(koncept nie je vyplnený)");
+  });
+
+  it("riadok o účinkujúcom vynechá, keď nikto nie je zadaný", () => {
+    expect(zadanieProProject({ ...zaklad, kto: "  " })).not.toContain("KTO V TOM VYSTUPUJE");
+  });
+
+  it("nezaradenú fázu pomenuje, nedá do textu nulu", () => {
+    const t = zadanieProProject({ ...zaklad, faza: 0 });
+    expect(t).toContain("Nezaradené");
+    expect(t).not.toContain("FÁZA NÁKUPNÉHO CYKLU: 0");
   });
 });

@@ -133,3 +133,42 @@ export function tempoFaz(os: string[], vyslo: ZverejnenyKus[], kotva: string, ok
   for (const p of vyslo) if (set.has(p.mesiac)) out.set(p.faza, (out.get(p.faza) || 0) + 1);
   return out;
 }
+
+/**
+ * Text, ktorý si Jerry skopíruje do Claude Projectu.
+ *
+ * PREČO NIE LEN KONCEPT
+ *
+ * Project nevidí do Kokpitu. Keď mu pošleš holú vetu „reel o tom, že úľava
+ * po fyziu vydrží tri dni", nevie, komu je určená ani čo má urobiť — a napíše
+ * text pre niekoho iného. Fáza, publikum a úloha sú tri riadky, ktoré z toho
+ * robia zadanie namiesto námetu.
+ *
+ * PREČO SA PRIPOMÍNA MENO KLIENTA
+ *
+ * V appke je pole „kto v tom vystupuje" a býva v ňom meno. Do textu, ktorý
+ * pôjde von, meno ani zdravotný detail nepatria — v Zadaní je to pravidlo od
+ * začiatku a tu sa naň dá zabudnúť práve preto, že sa kopíruje jedným klikom.
+ */
+export function zadanieProProject(s: {
+  mesiac: string; faza: number; koncept: string; kto: string;
+}): string {
+  const f = FAZA_MAPA.get(s.faza);
+  const riadky = [
+    `Obsah pre PSB na ${s.mesiac || "neurčený mesiac"}.`,
+    "",
+    `FÁZA NÁKUPNÉHO CYKLU: ${f?.nazov ?? nazovFazy(s.faza)}`,
+    `KTO TO ČÍTA: ${f?.kto ?? "—"}`,
+    `ČO MÁ OBSAH UROBIŤ: ${f?.uloha ?? "—"}`,
+    "",
+    "O ČOM TO BUDE:",
+    s.koncept.trim() || "(koncept nie je vyplnený)",
+  ];
+  if (s.kto.trim()) riadky.push("", `KTO V TOM VYSTUPUJE: ${s.kto.trim()}`);
+  riadky.push(
+    "",
+    "ČO CHCEM SPÄŤ: hotový text príspevku v češtine — hák, telo, záver.",
+    "Meno klienta ani zdravotný detail do textu nedávaj; použi opis typu: klient, ktorý…",
+  );
+  return riadky.join("\n");
+}

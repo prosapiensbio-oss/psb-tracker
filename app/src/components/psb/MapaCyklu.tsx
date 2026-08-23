@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 import { kotvaDat } from "../../lib/psb/compute";
 import {
-  FAZY, mriezka, nazovFazy, osMapy, popisMesiaca, tempoFaz,
+  FAZY, mriezka, nazovFazy, osMapy, popisMesiaca, tempoFaz, zadanieProProject,
   type Bunka, type SlotPlanu, type ZverejnenyKus,
 } from "../../lib/psb/mapaCyklu";
 import { C, mix } from "../../lib/psb/theme";
@@ -75,6 +75,9 @@ export function MapaCyklu({ data, chat, onNavigate }: {
   const [vyber, setVyber] = useState<Vyber>(null);
   const [chyba, setChyba] = useState("");
   const [bublina, setBublina] = useState<Bublina | null>(null);
+  // Text na skopírovanie do Projectu. Druhé okno, nie odkaz rovno von —
+  // Project nevidí do Kokpitu, takže bez zadania by dostal holú vetu.
+  const [naKopirovanie, setNaKopirovanie] = useState<string | null>(null);
 
   const nacitaj = useCallback(() => {
     void fetch("/api/meta?co=instagram", { credentials: "same-origin" })
@@ -390,7 +393,14 @@ export function MapaCyklu({ data, chat, onNavigate }: {
             onUloz={uloz}
             onFazaPrispevku={ulozFazuPrispevku}
             onJarvis={chat ? posliJarvisovi : undefined}
+            onDoProjectu={(text) => setNaKopirovanie(text)}
           />
+        </Modal>
+      )}
+
+      {naKopirovanie !== null && (
+        <Modal title="Text pre Claude Project" sirka={560} onClose={() => setNaKopirovanie(null)}>
+          <OknoKopirovania text={naKopirovanie} onZavri={() => setNaKopirovanie(null)} />
         </Modal>
       )}
 
@@ -425,7 +435,7 @@ export function MapaCyklu({ data, chat, onNavigate }: {
  * Editor vybranej bunky. Je to panel pod mriežkou, nie modálne okno —
  * pri plánovaní treba vidieť zvyšok mesiaca, inak sa píše naslepo.
  */
-function Panel({ vyber, os, onZavri, onUloz, onFazaPrispevku, onJarvis }: {
+function Panel({ vyber, os, onZavri, onUloz, onFazaPrispevku, onJarvis, onDoProjectu }: {
   vyber: NonNullable<Vyber>;
   /** Mesiace, do ktorých sa dá plánovať — pre presun slotu inam. */
   os: string[];
@@ -433,6 +443,8 @@ function Panel({ vyber, os, onZavri, onUloz, onFazaPrispevku, onJarvis }: {
   onUloz: (b: Record<string, unknown>) => Promise<boolean>;
   onFazaPrispevku: (id: string, faza: number) => void;
   onJarvis?: (mesiac: string, faza: number) => void;
+  /** Otvorí okno s hotovým zadaním na skopírovanie do Projectu. */
+  onDoProjectu: (text: string) => void;
 }) {
   const slot = vyber.druh === "slot" ? vyber.slot : null;
   const [koncept, setKoncept] = useState(slot?.koncept || "");
@@ -554,10 +566,12 @@ function Panel({ vyber, os, onZavri, onUloz, onFazaPrispevku, onJarvis }: {
       {/* Doladenie textu patrí do Projectu — ten má kánon značky, tón hlasu
           aj FP pravidlá. Kokpit drží ZÁMER, Project z neho robí vety. */}
       <div style={{ marginTop: 10, fontSize: 11.5, color: C.textDim, lineHeight: 1.45 }}>
-        <a href={CLAUDE_PROJECT} target="_blank" rel="noreferrer" style={{ color: C.accentLight }}>
+        <button
+          onClick={() => onDoProjectu(zadanieProProject({ mesiac, faza, koncept, kto }))}
+          style={{ background: "none", border: 0, padding: 0, color: C.accentLight, fontSize: 11.5, fontFamily: "inherit", cursor: "pointer" }}>
           doladiť text v Claude Projecte ↗
-        </a>
-        {" — najprv ulož, nech sa koncept nestratí."}
+        </button>
+        {" — otvorí sa zadanie na skopírovanie."}
       </div>
 
       <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap", alignItems: "center" }}>
@@ -565,6 +579,16 @@ function Panel({ vyber, os, onZavri, onUloz, onFazaPrispevku, onJarvis }: {
           style={{ ...tlacidlo(true), opacity: busy || (!koncept.trim() && !kto.trim()) ? 0.5 : 1 }}>
           {slot ? "uložiť" : "naplánovať"}
         </button>
+        {/* Do zásobníka, nie do koša. Nápad, ktorý ešte nechceš vyhodiť, ale
+            už nepatrí do konkrétneho mesiaca, inak nemal kam ísť — zostane
+            v Nápadoch bez termínu. */}
+        {slot && (
+          <button
+            onClick={async () => { setBusy(true); const ok = await onUloz({ id: slot.id, planovaneNa: "" }); setBusy(false); if (ok) onZavri(); }}
+            disabled={busy} style={tlacidlo(false)}>
+            do zásobníka
+          </button>
+        )}
         {slot && (
           <button
             onClick={async () => {
@@ -594,6 +618,95 @@ function Panel({ vyber, os, onZavri, onUloz, onFazaPrispevku, onJarvis }: {
       {slot?.text && slot.text !== koncept && (
         <div style={{ fontSize: 11, color: C.textDim, marginTop: 10 }}>
           Pôvodný nápad: {slot.text}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Medzikrok medzi Kokpitom a Claude Projectom.
+ *
+ * PREČO OKNO A NIE ROVNO ODKAZ
+ *
+ * Project nevidí do Kokpitu — nevie, komu je obsah určený ani čo má urobiť.
+ * Keby odkaz viedol rovno von, Jerry by tam prilepil holú vetu a Project by
+ * napísal text pre niekoho iného. Toto okno mu dá zadanie do schránky skôr,
+ * než odíde.
+ */
+function OknoKopirovania({ text, onZavri }: { text: string; onZavri: () => void }) {
+  const [stav, setStav] = useState<"" | "ok" | "chyba">("");
+  const pole = useRef<HTMLTextAreaElement>(null);
+
+  const kopiruj = async () => {
+    // Dve cesty, lebo tá moderná sa dá zakázať. `navigator.clipboard` chce
+    // povolenie clipboard-write a v prehliadači bez neho spadne aj pri
+    // skutočnom kliku (overené 23. 8. 2026). Výber textu + execCommand je
+    // zastaraný, ale povolenie nepotrebuje — a keď zlyhá aj on, používateľovi
+    // zostane označený text a stačí mu cmd+C.
+    try {
+      await navigator.clipboard.writeText(text);
+      setStav("ok");
+      return;
+    } catch { /* skúsi sa druhá cesta */ }
+    try {
+      const el = pole.current;
+      if (!el) throw new Error("bez poľa");
+      el.focus();
+      el.select();
+      if (!document.execCommand("copy")) throw new Error("odmietnuté");
+      setStav("ok");
+    } catch {
+      pole.current?.select();
+      setStav("chyba");
+    }
+  };
+
+  return (
+    <div>
+      <div style={{ fontSize: 12, color: C.textDim, marginBottom: 10, lineHeight: 1.5 }}>
+        Skopíruj a otvor Project — tam text vlož a dolaď. Project do Kokpitu nevidí,
+        takže čo tu nie je, to nemá.
+      </div>
+      <textarea
+        ref={pole}
+        readOnly
+        value={text}
+        rows={12}
+        onFocus={(e) => e.currentTarget.select()}
+        style={{
+          width: "100%", background: C.bg, color: C.text, fontFamily: "inherit", fontSize: 12.5,
+          border: `1px solid ${C.border}`, borderRadius: 6, padding: "10px 12px",
+          boxSizing: "border-box", resize: "vertical", lineHeight: 1.55,
+        }}
+      />
+      <div style={{ display: "flex", gap: 8, marginTop: 12, alignItems: "center", flexWrap: "wrap" }}>
+        <button onClick={kopiruj}
+          style={{
+            background: C.accent, color: "#fff", border: "none", borderRadius: 6,
+            padding: "7px 14px", fontSize: 12.5, fontFamily: "inherit", cursor: "pointer",
+          }}>
+          {stav === "ok" ? "skopírované ✓" : "skopírovať"}
+        </button>
+        <a href={CLAUDE_PROJECT} target="_blank" rel="noreferrer"
+          style={{
+            border: `1px solid ${mix(C.accent, 0.6)}`, borderRadius: 6, padding: "7px 14px",
+            fontSize: 12.5, color: C.accentLight, textDecoration: "none",
+          }}>
+          otvoriť Claude Project ↗
+        </a>
+        <button onClick={onZavri}
+          style={{
+            background: "none", color: C.textMuted, border: `1px solid ${C.border}`,
+            borderRadius: 6, padding: "7px 14px", fontSize: 12.5, fontFamily: "inherit",
+            cursor: "pointer", marginLeft: "auto",
+          }}>
+          zavrieť
+        </button>
+      </div>
+      {stav === "chyba" && (
+        <div style={{ fontSize: 11.5, color: C.red, marginTop: 8 }}>
+          Schránka sa nedala použiť. Text je označený — stlač cmd+C.
         </div>
       )}
     </div>
