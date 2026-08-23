@@ -1665,7 +1665,18 @@ export function useExtraGrafy({
     // Referenčný motor: klienti, ktorí prišli na odporúčanie. Najlacnejší kanál,
     // aký firma má — nestojí nič a konvertuje najlepšie.
     const zRef = Object.values(clients).filter((c) => (c.zdroj || "").toLowerCase().includes("refer") || (c.zdroj || "").toLowerCase().includes("odporu"));
-    const refTrzba = zRef.reduce((a, c) => a + c.totalPrice, 0);
+    // ZO ZAPLATENÝCH PEŇAZÍ, nie z cien sedení. `totalPrice` je súčet cien
+    // zapísaných pri sedeniach a tie sú pri balíčkoch nulové (19 % sedení),
+    // takže „priniesli spolu" hlásilo 2 013 560 Kč namiesto 2 233 691 —
+    // o 220 tisíc menej. Tá istá chyba ako pri LTV, štvrté miesto v poradí
+    // (22. 8. 2026). Referenčný motor je najsilnejší kanál PSB; podhodnotiť
+    // práve jeho znamená nedoceniť to, čo firmu drží.
+    const zaplatilKlient = (() => {
+      const m: Record<string, number> = {};
+      for (const p of data.payments) m[p.client] = (m[p.client] || 0) + p.amount;
+      return m;
+    })();
+    const refTrzba = zRef.reduce((a, c) => a + (zaplatilKlient[c.name] || 0), 0);
     const vsetciSoZdrojom = Object.values(clients).filter((c) => c.zdroj);
     nodes.referencny = (
       <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column" }}>
