@@ -446,7 +446,7 @@ export function Dashboard({
   clients: Record<string, ClientAgg>;
   register: RegisterItem[];
   /** Zmeny v kalendári — ručne zapísané zrušenia majú vetovať aj odmlčaných. */
-  kalZmeny?: { druh: string; klient: string | null; pred?: string | null; po?: string | null }[];
+  kalZmeny?: { druh: string; klient: string | null; trener?: string | null; pred?: string | null; po?: string | null }[];
   /** Nevysvetlené zmeny v kalendári — tiché číslo pod notifikáciami s preklikom na tabuľku. */
   kalNevysvetlene?: { druh: string; trener: string }[];
   sixM: SixMRow[];
@@ -1336,7 +1336,7 @@ export function Dashboard({
     kapacitaPct: vytazenieSpolu(capacity),
     zvladneEste: capacity.length ? capacity.reduce((a, c) => a + c.canTake, 0) : null,
   }), [weeklyHours, zones, weekStats, capacity]);
-  const extraNodes = useExtraGrafy({ data, clients, aktivne, onNavigate, kpiSkryte: layout.kpiSkryte, obdobie, vytazenie: vytazenieVstup, trainer });
+  const extraNodes = useExtraGrafy({ data, clients, aktivne, onNavigate, kpiSkryte: layout.kpiSkryte, obdobie, vytazenie: vytazenieVstup, trainer, kalZmeny });
 
   const nodes: Record<string, ReactNode> = {
     ...extraNodes,

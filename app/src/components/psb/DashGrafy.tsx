@@ -402,7 +402,7 @@ export function hraniceObdobia(obdobie: string, poslMK: string): { od: string; d
 const kcK = (n: number) => `${Math.round(n / 1000)}k`;
 
 export function useExtraGrafy({
-  data, clients, aktivne, onNavigate, kpiSkryte = [], obdobie = "all", vytazenie, trainer = "all",
+  data, clients, aktivne, onNavigate, kpiSkryte = [], obdobie = "all", vytazenie, trainer = "all", kalZmeny = [],
 }: {
   data: PSBData;
   clients: Record<string, ClientAgg>;
@@ -421,6 +421,18 @@ export function useExtraGrafy({
    * (Zisky a náklady, Kanály), preto naďalej počítajú z celej firmy.
    */
   trainer?: string;
+  /**
+   * Zmeny z kalendára — odkiaľ appka VIE o zrušeniach.
+   *
+   * Karta „Zrušené a presunuté" čítala týždenné zápisy, lenže kolónky
+   * „Zrušené"/„Presunuté" boli z formulára ODSTRÁNENÉ, keď pribudli snímky
+   * kalendára: appka si pamätá, ako týždeň vyzeral ráno a ako večer, takže
+   * zrušenie zachytí sama. Karta si to nevšimla a ďalej sa pýtala polí, ktoré
+   * sa už nedajú vyplniť — hlásila „zatiaľ žiadne zápisy", kým kalendár poznal
+   * 40 zrušení a 16 presunov (nájdené 23. 8. 2026). Prázdno nie je dôkaz, že
+   * sa nič nedialo.
+   */
+  kalZmeny?: { druh: string; klient: string | null; trener?: string | null }[];
   /** Zapnuté karty — dáta z API sa ťahajú len pre ne. */
   aktivne: Set<string>;
   onNavigate: (tab: string, sub?: string, focus?: { skupina?: { label: string; mena: string[] }; nonce?: number }) => void;
@@ -1131,7 +1143,14 @@ export function useExtraGrafy({
       </Card>
     );
 
+    // Zdroj je KALENDÁR, nie ručné zápisy (viď komentár pri `kalZmeny`).
+    // Staré týždenné zápisy sa prirátajú, aby história spred snímok nezmizla.
     const zr = { jerry: { z: 0, p: 0 }, terezka: { z: 0, p: 0 }, spolu: { z: 0, p: 0 } };
+    for (const z of kalZmeny) {
+      const kam = z.trener === "Jerry" ? zr.jerry : z.trener === "Terezka" ? zr.terezka : zr.spolu;
+      if (z.druh === "zrusene") kam.z++;
+      else if (z.druh === "posunute") kam.p++;
+    }
     if (weeks) {
       for (const e of Object.values(weeks)) {
         for (const os of ["jerry", "terezka"] as const) {
@@ -1145,10 +1164,10 @@ export function useExtraGrafy({
     const zrusenychSpolu = zr.jerry.z + zr.terezka.z + zr.spolu.z;
     nodes.zrusene = (
       <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column" }}>
-        <H3><Info label="Zrušené a presunuté" text="Z týždenných zápisov za celú históriu. Zrušený tréning je stratená kapacita — hodina, ktorú už nikto nezaplatí. Presunutý sa väčšinou vráti." /></H3>
+        <H3><Info label="Zrušené a presunuté" text="Zo snímok kalendára — appka porovnáva, ako týždeň vyzeral predtým a ako teraz, takže zrušenie aj presun zachytí sama (staršie ručné týždenné zápisy sa prirátajú). Zrušený tréning je stratená kapacita — hodina, ktorú už nikto nezaplatí. Presunutý sa väčšinou vráti." /></H3>
         <Klik kam={() => onNavigate("treningy", "prehled")} onNavigate="Tréningy">
           {weeks === null ? <div style={{ fontSize: 12.5, color: C.textDim }}>Načítavam…</div> : zrusenychSpolu + zr.jerry.p + zr.terezka.p + zr.spolu.p === 0 ? (
-            <Empty>Zatiaľ žiadne týždenné zápisy so zrušeniami.</Empty>
+            <Empty>Zatiaľ žiadne zrušenia ani presuny — kalendár ich sleduje od augusta 2026.</Empty>
           ) : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}>
               <MiniStat label="Zrušené spolu" value={String(zrusenychSpolu)} color={C.red} />
