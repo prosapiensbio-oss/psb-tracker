@@ -300,6 +300,14 @@ záver odporuje tomu, čo Jerry hovorí zo skúsenosti.
   nevidí. Presne to sa stalo v osobnom účte `3356679857899572`: dve zapnuté
   kampane z januára 2023, o ktorých Kokpit nevedel.
 
+- **`navigator.clipboard` zlyhá aj pri skutočnom kliku.** Chce povolenie
+  clipboard-write a prehliadač ho nemusí dať ani v zabezpečenom kontexte pri
+  kliku vyvolanom myšou (overené 23. 8. 2026 v mape cyklu). Kopírovanie preto
+  potrebuje dve cesty: najprv `clipboard.writeText`, po zlyhaní výber textu
+  a `document.execCommand("copy")` — a keď padne aj ten, nechať text OZNAČENÝ
+  a povedať „stlač cmd+C“. Jedna cesta znamená tlačidlo, ktoré u niekoho ticho
+  nerobí nič.
+
 ## Jarvisove zdroje pravdy nie sú len DB
 
 Jarvisov kontext skladá `chat.ts` z viacerých zdrojov a pri oprave faktu treba nájsť VŠETKY:
