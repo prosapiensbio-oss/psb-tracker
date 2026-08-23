@@ -520,12 +520,34 @@ export function Dopyty({ leads, clients, refresh, focus }: { leads: Lead[]; clie
                          k človeku. Predvyplnené je „teraz“, takže bežný prípad
                          zostáva na jeden klik a Enter. */
                       <span style={{ display: "flex", gap: 5, alignItems: "center", flexWrap: "wrap" }}>
+                        {/* ZÁPIS AŽ NA POTVRDENIE, nie na odkliknutie vedľa.
+                            Prvá verzia ukladala na `onBlur` s predvyplneným
+                            „teraz" — a stačilo otvoriť pole a kliknúť inam,
+                            aby sa dopytu ticho pripísal čas, ktorý nikto
+                            nezadal. Stalo sa to 22. 8. 2026 Lenke Divinovej
+                            pri mojom vlastnom teste. Čas odpovede je meranie;
+                            meranie sa nesmie zapísať omylom. */}
                         <input
                           type="datetime-local" autoFocus
                           defaultValue={new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16)}
-                          onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); if (e.key === "Escape") setUpravCas(null); }}
-                          onBlur={(e) => { setUpravCas(null); if (e.target.value) save({ ...l, odpovedaneAt: new Date(e.target.value).toISOString() }); }}
+                          onKeyDown={(e) => {
+                            const el = e.target as HTMLInputElement;
+                            if (e.key === "Enter" && el.value) { setUpravCas(null); save({ ...l, odpovedaneAt: new Date(el.value).toISOString() }); }
+                            if (e.key === "Escape") setUpravCas(null);
+                          }}
                           style={{ ...inputStyle, colorScheme: "dark", width: 178 }} />
+                        <button
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            const pole = (e.currentTarget.parentElement?.querySelector("input[type=datetime-local]") as HTMLInputElement | null);
+                            if (!pole?.value) return;
+                            setUpravCas(null);
+                            save({ ...l, odpovedaneAt: new Date(pole.value).toISOString() });
+                          }}
+                          title="Zapísať tento čas"
+                          style={{ fontSize: 11, padding: "3px 9px", borderRadius: 6, border: `1px solid ${mix(C.green, 45)}`, background: mix(C.green, 12), color: C.green, cursor: "pointer", fontFamily: "inherit", fontWeight: 600 }}>
+                          zapísať
+                        </button>
                         <button
                           onMouseDown={(e) => { e.preventDefault(); setUpravCas(null); save({ ...l, odpovedaneAt: new Date(`${String(l.date).slice(0, 10)}T12:00`).toISOString() }); }}
                           title="Ozvali sme sa v deň, keď dopyt prišiel (zapíše sa poludnie toho dňa)"
