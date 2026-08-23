@@ -1743,7 +1743,18 @@ export function useExtraGrafy({
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}>
               <MiniStat label="Ø hodnota klienta" value={fmtCZK(ltvOdislych)} color={C.green} />
               <MiniStat label="Ø dĺžka spolupráce" value={`${mesiacovSpolu.toFixed(1)} mes.`} color={mesiacovSpolu >= 12 ? C.green : mesiacovSpolu >= 6 ? C.orange : C.red} />
-              <MiniStat label="Z koľkých klientov" value={`${ltvKlienti.length}${stalePlatia ? ` · ${stalePlatia} ešte chodí` : ""}`} />
+              {/* Popis musí povedať, prečo sa toto číslo NEROVNÁ dlaždici
+                  „Aktívni klienti". Jerry sa na to spýtal do minúty, čo číslo
+                  uvidel (22. 8. 2026): 58 verzus 61. Nie je to spor — je to
+                  iná otázka. Do LTV patria len ľudia s aspoň tromi sedeniami,
+                  ktorí niečo zaplatili; medzi aktívnymi sú aj takí, čo prišli
+                  raz po úvodnom, a Sofia, ktorá cvičí na barter (59 sedení,
+                  0 Kč platieb). Číslo bez tejto vety vyzerá ako chyba. */}
+              <MiniStat
+                label="Z koľkých klientov"
+                value={`${ltvKlienti.length}${stalePlatia ? ` · ${stalePlatia} ešte chodí` : ""}`}
+                pod="len ≥3 sedenia a zaplatené — preto menej než aktívni"
+              />
               <MiniStat label="Ø / mesiac spolupráce" value={mesiacovSpolu > 0 ? fmtCZK(ltvOdislych / mesiacovSpolu) : "—"} />
             </div>
           )}
