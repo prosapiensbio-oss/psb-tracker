@@ -331,3 +331,20 @@ upozornenia SKLADÁ z iných upozornení (6M, balíček, narodeniny…), každý
 sa pýta na svoj vlastný ack. Inak zodpovedaná vec prežije v cudzom tele.
 Jerryho meradlo: „keď sa k niečomu vyjadrím a uzavriem to, už sa to nesmie
 zobraziť."
+
+## Ceny sedení nie sú peniaze
+
+`session.price` je cena zapísaná pri sedení a pri 663 z 3 449 sedení (19 %) je
+NULOVÁ — platba visí na balíčku zaplatenom dopredu. Kde ide o otázku „koľko
+klient zaplatil", platia PLATBY (`data.payments`), nikdy súčet cien sedení
+(`totalPrice`). 22. 8. 2026 sa to našlo na štyroch miestach naraz: LTV karta,
+KPI „Hodnota klienta", Referenčný motor (−220 tis. Kč) — a appka to pritom
+o pár riadkov ďalej sama hovorí pri „Ø cene sedenia", kde ceny sedení odmieta.
+Legitímne použitie `revenue` (súčet cien sedení) je len tam, kde je prepínač
+„prijaté vs. odtrénované" a používateľ vidí, ktoré číslo čita (Financie,
+dlaždica tržieb).
+
+Rovnaká rodina: výdaj na reklamu. `mkt_prispevky.spend` je Metricool
+(len boostnuté kusy z nahratého exportu, mesiac bez exportu = 0), `mkt_kampane`
+je Meta Marketing API a je to jediný úplný zdroj — rozdiel za 19 mesiacov je
+18 179 vs 31 454 Kč. Pole `spendAds` v MktMesiac nesie ten správny.
