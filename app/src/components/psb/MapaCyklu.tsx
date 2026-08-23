@@ -9,7 +9,8 @@ import {
 import { C, mix } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import type { AssistantChat } from "./Assistant";
-import { Card, H3, Info, Modal } from "./ui";
+import { Card, H3, Info, Modal, Select } from "./ui";
+import { CLAUDE_PROJECT } from "./Zadanie";
 
 /**
  * Mapa nákupného cyklu — čo už vyšlo a čo sa chystá, v čase a vo fázach.
@@ -323,6 +324,51 @@ export function MapaCyklu({ data, chat, onNavigate }: {
         </span>
       </div>
 
+      {/* ZOZNAM POD MRIEŽKOU — mriežka odpovedá na „kde sú diery", zoznam na
+          „čo mám vlastne rozpracované". Bodka v bunke sa nedá čítať za sebou;
+          plán sa prechádza po poriadku, nie po súradniciach. */}
+      {plan.length > 0 && (
+        <div style={{ marginTop: 18, borderTop: `1px solid ${C.border}`, paddingTop: 14 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 2 }}>
+            Plán po poradí ({plan.length})
+          </div>
+          <div style={{ fontSize: 11.5, color: C.textDim, marginBottom: 10 }}>
+            Klikni na riadok a otvorí sa ten istý editor ako z mriežky.
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+            {[...plan]
+              .sort((a, b) => a.mesiac.localeCompare(b.mesiac) || a.faza - b.faza)
+              .map((sl) => {
+                const fd = FAZY.find((x) => x.id === sl.faza);
+                // Slot naplánovaný mimo osi mapy sa MUSÍ ohlásiť. Ticho by
+                // vyzeralo ako úplnosť a Jerry by o ňom nevedel.
+                const mimoMapy = !os.includes(sl.mesiac);
+                return (
+                  <button key={sl.id} onClick={() => setVyber({ druh: "slot", slot: sl })}
+                    style={{
+                      display: "flex", gap: 10, alignItems: "baseline", textAlign: "left",
+                      background: "none", border: 0, borderRadius: 6, padding: "8px 8px 8px 0",
+                      cursor: "pointer", fontFamily: "inherit", width: "100%",
+                    }}>
+                    <span style={{
+                      fontSize: 11, color: C.textMuted, flex: "0 0 auto", width: 56,
+                      fontVariantNumeric: "tabular-nums",
+                    }}>{sl.mesiac}</span>
+                    <span style={{ flex: "0 0 auto", width: 8, height: 8, borderRadius: "50%", background: fd?.farba, marginTop: 4 }} />
+                    <span style={{ flex: "0 0 auto", width: 118, fontSize: 11, color: C.textMuted }}>{fd?.nazov}</span>
+                    <span style={{ flex: "1 1 auto", fontSize: 12.5, color: C.text, lineHeight: 1.45 }}>
+                      {sl.koncept || sl.text || <i style={{ color: C.textDim }}>bez konceptu</i>}
+                      {sl.kto && <span style={{ color: C.textDim }}> · {sl.kto}</span>}
+                      {sl.zdroj === "jarvis" && <span style={{ color: C.textDim }}> · od Jarvisa</span>}
+                      {mimoMapy && <span style={{ color: C.red }}> · mimo zobrazenej osi</span>}
+                    </span>
+                  </button>
+                );
+              })}
+          </div>
+        </div>
+      )}
+
       {/* Editor je MODÁLNE OKNO, nie panel pod mriežkou. Kým bol dole, Jerry
           si po kliknutí na „+" nevšimol, že sa niečo otvorilo — pozeral sa
           na tabuľku a zmena bola mimo zorného poľa (23. 8. 2026). */}
@@ -339,6 +385,7 @@ export function MapaCyklu({ data, chat, onNavigate }: {
           )}
           <Panel
             vyber={vyber}
+            os={os.filter((m) => m >= dnes)}
             onZavri={() => { setVyber(null); setChyba(""); }}
             onUloz={uloz}
             onFazaPrispevku={ulozFazuPrispevku}
@@ -378,8 +425,10 @@ export function MapaCyklu({ data, chat, onNavigate }: {
  * Editor vybranej bunky. Je to panel pod mriežkou, nie modálne okno —
  * pri plánovaní treba vidieť zvyšok mesiaca, inak sa píše naslepo.
  */
-function Panel({ vyber, onZavri, onUloz, onFazaPrispevku, onJarvis }: {
+function Panel({ vyber, os, onZavri, onUloz, onFazaPrispevku, onJarvis }: {
   vyber: NonNullable<Vyber>;
+  /** Mesiace, do ktorých sa dá plánovať — pre presun slotu inam. */
+  os: string[];
   onZavri: () => void;
   onUloz: (b: Record<string, unknown>) => Promise<boolean>;
   onFazaPrispevku: (id: string, faza: number) => void;
@@ -389,9 +438,16 @@ function Panel({ vyber, onZavri, onUloz, onFazaPrispevku, onJarvis }: {
   const [koncept, setKoncept] = useState(slot?.koncept || "");
   const [kto, setKto] = useState(slot?.kto || "");
   const [busy, setBusy] = useState(false);
+  // Mazanie na dva kliky. Modálne potvrdenie v modáli je okno v okne;
+  // prepnutý nápis je rovnako neprehliadnuteľný a o krok kratší.
+  const [mazem, setMazem] = useState(false);
 
-  const mesiac = vyber.druh === "slot" ? vyber.slot.mesiac : vyber.druh === "novy" ? vyber.mesiac : "";
-  const faza = vyber.druh === "slot" ? vyber.slot.faza : vyber.druh === "novy" ? vyber.faza : vyber.kus.faza;
+  const povodnyMesiac = vyber.druh === "slot" ? vyber.slot.mesiac : vyber.druh === "novy" ? vyber.mesiac : "";
+  const povodnaFaza = vyber.druh === "slot" ? vyber.slot.faza : vyber.druh === "novy" ? vyber.faza : vyber.kus.faza;
+  // Mesiac a fáza sa dajú prepísať — slot sa tým presunie do inej bunky.
+  // Bez toho by zle zaradený nápad musel ísť preč a založiť sa znova.
+  const [mesiac, setMesiac] = useState(povodnyMesiac);
+  const [faza, setFaza] = useState(povodnaFaza);
 
   const vstup = {
     width: "100%", background: C.bg, color: C.text, fontFamily: "inherit", fontSize: 13,
@@ -445,7 +501,7 @@ function Panel({ vyber, onZavri, onUloz, onFazaPrispevku, onJarvis }: {
     if (!koncept.trim() && !kto.trim()) return;
     setBusy(true);
     const ok = slot
-      ? await onUloz({ id: slot.id, koncept, kto })
+      ? await onUloz({ id: slot.id, koncept, kto, faza, planovaneNa: mesiac })
       : await onUloz({
           // Text nápadu je prvá veta konceptu — zásobník aj plán sú tá istá
           // tabuľka a nápad bez textu by v zozname nápadov svietil prázdny.
@@ -462,6 +518,26 @@ function Panel({ vyber, onZavri, onUloz, onFazaPrispevku, onJarvis }: {
         <b style={{ color: C.textMuted }}>{f?.kto}</b><br />{f?.uloha}
       </div>
 
+      {/* Presun do inej bunky. Zle zaradený nápad by sa inak musel zmazať
+          a založiť odznova — a s ním by zmizol aj text, ktorý už bol hotový. */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+        <label style={{ fontSize: 11.5, color: C.textMuted, display: "flex", flexDirection: "column", gap: 4 }}>
+          Mesiac
+          {/* Vlastný mesiac slotu je v ponuke vždy — aj keď je v minulosti.
+              Inak by select stál na hodnote, ktorú nemá, a uloženie by slot
+              ticho presunulo inam. */}
+          <Select value={mesiac} onChange={setMesiac}
+            options={[...new Set([...(povodnyMesiac ? [povodnyMesiac] : []), ...os])]
+              .sort()
+              .map((m) => ({ value: m, label: m }))} />
+        </label>
+        <label style={{ fontSize: 11.5, color: C.textMuted, display: "flex", flexDirection: "column", gap: 4, flex: "1 1 180px" }}>
+          Fáza
+          <Select value={String(faza)} onChange={(v) => setFaza(Number(v))}
+            options={FAZY.map((x) => ({ value: String(x.id), label: x.nazov }))} />
+        </label>
+      </div>
+
       <label style={{ display: "block", fontSize: 11.5, color: C.textMuted, marginBottom: 4 }}>
         O čom to bude — návrh captionu alebo popis
       </label>
@@ -475,15 +551,32 @@ function Panel({ vyber, onZavri, onUloz, onFazaPrispevku, onJarvis }: {
       <input value={kto} onChange={(e) => setKto(e.target.value)}
         placeholder="klient / Jerry / Terezka" style={vstup} />
 
+      {/* Doladenie textu patrí do Projectu — ten má kánon značky, tón hlasu
+          aj FP pravidlá. Kokpit drží ZÁMER, Project z neho robí vety. */}
+      <div style={{ marginTop: 10, fontSize: 11.5, color: C.textDim, lineHeight: 1.45 }}>
+        <a href={CLAUDE_PROJECT} target="_blank" rel="noreferrer" style={{ color: C.accentLight }}>
+          doladiť text v Claude Projecte ↗
+        </a>
+        {" — najprv ulož, nech sa koncept nestratí."}
+      </div>
+
       <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap", alignItems: "center" }}>
         <button onClick={zapis} disabled={busy || (!koncept.trim() && !kto.trim())}
           style={{ ...tlacidlo(true), opacity: busy || (!koncept.trim() && !kto.trim()) ? 0.5 : 1 }}>
           {slot ? "uložiť" : "naplánovať"}
         </button>
         {slot && (
-          <button onClick={async () => { setBusy(true); const ok = await onUloz({ id: slot.id, planovaneNa: "" }); setBusy(false); if (ok) onZavri(); }}
-            disabled={busy} style={tlacidlo(false)}>
-            vrátiť do zásobníka
+          <button
+            onClick={async () => {
+              if (!mazem) { setMazem(true); return; }
+              setBusy(true);
+              const ok = await onUloz({ id: slot.id, zmaz: true });
+              setBusy(false);
+              if (ok) onZavri(); else setMazem(false);
+            }}
+            disabled={busy}
+            style={{ ...tlacidlo(false), color: mazem ? C.red : C.textMuted, borderColor: mazem ? C.red : C.border }}>
+            {mazem ? "naozaj vymazať?" : "vymazať"}
           </button>
         )}
         {onJarvis && mesiac && (
