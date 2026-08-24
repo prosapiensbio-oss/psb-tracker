@@ -92,6 +92,8 @@ type Polozka = {
   nadpis: string; popis: string; stav?: "chyba" | "hotove";
   /** Kam v appke. Prázdne pri položke, ktorá vedie von. */
   tab?: string; sub?: string;
+  /** Pondelok týždňa (RRRR-MM-DD) — otvorí rovno jeho formulár. */
+  tyzden?: string;
   /** Adresa mimo Kokpitu — otvorí sa v novej karte. */
   odkaz?: string;
 };
@@ -119,7 +121,7 @@ export function ZapisButton({
   onDennikZapis,
 }: {
   ritualy: Ritual[];
-  onNavigate: (tab: string, sub?: string) => void;
+  onNavigate: (tab: string, sub?: string, tyzden?: string) => void;
   /** Mená + stále poznámky — stála poznámka sa pri vybranom klientovi ukáže
    *  ako kontext, zápis ide do denníka. */
   klienti?: { meno: string; poznamka: string }[];
@@ -197,6 +199,9 @@ export function ZapisButton({
       popis: r.detail,
       tab: r.ciel.tab,
       sub: r.ciel.sub,
+      // Bez týždňa dopadne klik na tabuľku a človek si musí riadok nájsť sám —
+      // presne to Jerry hlásil: pripomienka vedie „niekam okolo", nie do formulára.
+      tyzden: r.ciel.tyzden,
       stav: r.hotove ? ("hotove" as const) : r.splatne ? ("chyba" as const) : undefined,
     })),
   ];
@@ -209,7 +214,7 @@ export function ZapisButton({
       setOpen(false);
       return;
     }
-    if (p.tab) onNavigate(p.tab, p.sub);
+    if (p.tab) onNavigate(p.tab, p.sub, p.tyzden);
     setOpen(false);
   };
 

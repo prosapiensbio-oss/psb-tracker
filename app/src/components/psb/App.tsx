@@ -2003,7 +2003,10 @@ function skupinaFaktur(
         </button>
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
           <HladanieKlienta clients={clients} leads={data.leads} onPick={(meno) => navigate("klienti", undefined, { client: meno, nonce: Date.now() })} onPickLead={() => navigate("klienti", "dopyty")} />
-          <ZapisButton ritualy={rituals} onNavigate={(t, sub) => { navigate(t, sub); void nacitajZapisy(); }} onRefresh={() => void actions.refresh()} klienti={zapisKlienti} dnesTrenoval={ktoDnesTrenoval(kalUdalosti, { zmeny: kalZmeny })} onDennikZapis={chat.spracujDennik} />
+          <ZapisButton ritualy={rituals} onNavigate={(t, sub, tyzden) => {
+            navigate(t, sub, tyzden ? { week: tyzden, nonce: Date.now() } : undefined);
+            void nacitajZapisy();
+          }} onRefresh={() => void actions.refresh()} klienti={zapisKlienti} dnesTrenoval={ktoDnesTrenoval(kalUdalosti, { zmeny: kalZmeny })} onDennikZapis={chat.spracujDennik} />
           {/* Jarvis stojí vedľa „+ Zápis", nie v rade záložiek (Jerry, 17. 8.).
               Sú to dve tlačidlá toho istého druhu: obe sa dajú stlačiť kdekoľvek
               v appke a obe nie sú miesto, kam sa ide — sú to veci, ktoré sa

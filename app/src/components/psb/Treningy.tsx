@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useState, type CSSProperties } from "reac
 
 import { fetchWeekEntries, saveWeekEntry, type WeekEntry } from "../../lib/psb/client";
 import { groupTrainings, periodInfo, kotvaDat, periodZone, sessionAnalysis, TARGET_H, type ClientAgg, type Period, type PeriodRow } from "../../lib/psb/compute";
-import { fmtCZK, monthLabel, weekKey } from "../../lib/psb/format";
+import { fmtCZK, monthLabel, weekKey, weekLabel } from "../../lib/psb/format";
 import { C, mix, S } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import type { NavFocus } from "./App";
@@ -122,7 +122,15 @@ function Prehlad({ data, focus, trainer, onTrainer }: { data: PSBData; focus?: N
     setPeriod("week");
     setWin("all");
     setTrainerF(focus.trainer && focus.trainer !== "all" ? focus.trainer : "all");
-    setSelectedKey(focus.week);
+    // Týždenná pripomienka posiela PONDELOK (RRRR-MM-DD), odkazy z dashboardu
+    // posielajú štítok riadku („24.8."). Prvý treba rozbaliť, druhý zvýrazniť —
+    // preto sa rozlišujú tvarom, nie ďalším parametrom.
+    if (/^\d{4}-\d{2}-\d{2}$/.test(focus.week)) {
+      setOpenWeek(focus.week);
+      setSelectedKey(weekLabel(focus.week));
+    } else {
+      setSelectedKey(focus.week);
+    }
   }, [focus?.nonce]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const range = useMemo(() => {
@@ -145,8 +153,19 @@ function Prehlad({ data, focus, trainer, onTrainer }: { data: PSBData; focus?: N
     // to človek pamätá. Export prichádza v nedeľu, spomienka bledne od piatku.
     // Bez tohto riadku sa nebolo kam kliknúť a pripomienka v „+ Zápis" viedla
     // na tabuľku, v ktorej ten týždeň nebol.
-    if (period !== "week" || range?.from || range?.to) return zo;
+    // Riadok sa NEPRIDÁVA len pri „Celé obdobie" — pridá sa vždy, keď dnešok
+    // do zvoleného okna PATRÍ.
+    //
+    // Pôvodná podmienka ho zahodila, len čo bolo nastavené akékoľvek okno —
+    // a Jerry má štandardne „2026", takže prebiehajúci týždeň nevidel nikdy.
+    // Pripomienka v piatok tak viedla do tabuľky, v ktorej ten týždeň nebol,
+    // a do nedele, keď dorazí export, spomienka na náročnosť týždňa vyprchá.
+    // Nájdené 24. 8. 2026 — funkcia z 14. 8. bola celý čas vypnutá filtrom.
+    if (period !== "week") return zo;
     const teraz = new Date();
+    const dnesIso = teraz.toISOString().slice(0, 10);
+    if (range?.from && dnesIso < range.from) return zo;
+    if (range?.to && dnesIso > range.to) return zo;
     const kluc = periodInfo(teraz.toISOString(), "week");
     if (zo.some((g) => g.key === kluc.label)) return zo;
     // Začiatok týždňa (pondelok) ako `ts` — riadok sa tým zaradí chronologicky
