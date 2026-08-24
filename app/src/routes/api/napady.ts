@@ -22,7 +22,7 @@ import { ZABER_MAPA } from "../../lib/psb/zabery";
  */
 
 const STAVY = new Set(["novy", "pouzity", "zamietnuty"]);
-const ZDROJE = new Set(["otazka_klienta", "vlastny", "jarvis", "ine"]);
+const ZDROJE = new Set(["otazka_klienta", "vlastny", "jarvis", "ine", "inspiracia"]);
 
 const kus = (v: unknown, max: number) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 
@@ -38,7 +38,7 @@ export const Route = createFileRoute("/api/napady")({
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });
         try {
           const r = await DB.prepare(
-            "SELECT id, datum, text, zdroj, stav, poznamka, autor, odkaz, pouzite_at, faza, planovane_na, kto, koncept, hotovy_text, zaber, sekvencia, scenar, hashtagy FROM mkt_napady ORDER BY datum DESC, created_at DESC LIMIT 200",
+            "SELECT id, datum, text, zdroj, stav, poznamka, autor, odkaz, pouzite_at, faza, planovane_na, kto, koncept, hotovy_text, zaber, sekvencia, scenar, hashtagy, plan_id, inspiracia FROM mkt_napady ORDER BY datum DESC, created_at DESC LIMIT 200",
           ).all();
           return Response.json({ ok: true, napady: r.results || [] });
         } catch {
@@ -96,6 +96,9 @@ export const Route = createFileRoute("/api/napady")({
               return Response.json({ ok: false, error: "Neznámy záber." }, { status: 400 });
             }
             const zaber = b.zaber === undefined ? null : String(b.zaber);
+            // Odkaz na cudzí príspevok, ktorý nápad inšpiroval. Overuje sa len
+            // to, že je to adresa — akú sieť to je, appke jedno.
+            const inspiracia = b.inspiracia === undefined ? null : kus(b.inspiracia, 500);
             // Sekvencia chodí ako JSON pole. Overuje sa, že sa vôbec dá
             // rozobrať — uložený nerozoberateľný reťazec by obrazovku zhodil
             // až o týždeň, keď by ho niekto otvoril.
@@ -123,7 +126,7 @@ export const Route = createFileRoute("/api/napady")({
               : String(b.hashtagy ?? "").replace(/\s+/g, " ").trim().slice(0, 1200);
             if (stav === null && poznamka === null && odkaz === null
                 && faza === null && mesiac === null && kto === null && koncept === null
-                && hotovy === null && zaber === null && sekvencia === null && scenar === null && hashtagy === null) {
+                && hotovy === null && zaber === null && sekvencia === null && inspiracia === null && scenar === null && hashtagy === null) {
               return Response.json({ ok: false, error: "nič na zmenu" }, { status: 400 });
             }
             // Deň použitia sa zapíše sám pri prechode na „použitý" — nikto ho
@@ -137,11 +140,11 @@ export const Route = createFileRoute("/api/napady")({
                  faza = COALESCE(?6, faza), planovane_na = COALESCE(?7, planovane_na),
                  kto = COALESCE(?8, kto), koncept = COALESCE(?9, koncept),
                  hotovy_text = COALESCE(?10, hotovy_text), zaber = COALESCE(?11, zaber),
-                 sekvencia = COALESCE(?12, sekvencia),
+                 sekvencia = COALESCE(?12, sekvencia), inspiracia = COALESCE(?15, inspiracia),
                  scenar = COALESCE(?13, scenar), hashtagy = COALESCE(?14, hashtagy)
                WHERE id = ?1`,
             ).bind(id, stav, poznamka, odkaz, pouzite, faza, mesiac, kto, koncept, hotovy, zaber, sekvencia,
-                   scenar, hashtagy).run().then((r) => {
+                   scenar, hashtagy, inspiracia).run().then((r) => {
               // UPDATE s neexistujúcim id prejde „úspešne" s nulou zmien —
               // a obrazovka by ohlásila uložené nad ničím (revízia 19. 8.).
               if (!r.meta.changes) throw new Error("nenajdene");
@@ -179,13 +182,27 @@ export const Route = createFileRoute("/api/napady")({
           // a bez tohto riadka by ho INSERT ticho zahodil — appka by ohlásila
           // uložené nad stratou (23. 8. 2026, nájdené pri kontrole).
           const nHotovy = String(b.hotovyText ?? "").trim().slice(0, 6000);
+          const nSekvencia = (() => {
+            const raw = String(b.sekvencia ?? "");
+            if (!raw) return "";
+            try { return Array.isArray(JSON.parse(raw)) ? raw.slice(0, 8000) : ""; } catch { return ""; }
+          })();
+          const nScenar = String(b.scenar ?? "").trim().slice(0, 6000);
+          const nHashtagy = String(b.hashtagy ?? "").replace(/\s+/g, " ").trim().slice(0, 1200);
+          const nInspiracia = kus(b.inspiracia, 500);
 
           await DB.prepare(
+            // VŠETKY polia, ktoré obrazovka pri zakladaní posiela. Chýbajúci
+            // stĺpec v INSERTe neurobí chybu — hodnota sa ticho zahodí a appka
+            // ohlási uložené nad stratou. Stalo sa to 23. 8. 2026 dvakrát:
+            // najprv pri hotovy_text, potom pri scenari a sekvencii.
             `INSERT INTO mkt_napady (id, datum, text, zdroj, stav, poznamka, autor, created_at,
-                                     faza, planovane_na, kto, koncept, zaber, hotovy_text)
-             VALUES (?1, ?2, ?3, ?4, 'novy', '', ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)`,
+                                     faza, planovane_na, kto, koncept, zaber, hotovy_text,
+                                     sekvencia, scenar, hashtagy, inspiracia)
+             VALUES (?1, ?2, ?3, ?4, 'novy', '', ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)`,
           ).bind(novy, datum, text, zdroj, autor, new Date().toISOString(),
-                 nFaza, nMesiac, nKto, nKoncept, nZaber, nHotovy).run();
+                 nFaza, nMesiac, nKto, nKoncept, nZaber, nHotovy,
+                 nSekvencia, nScenar, nHashtagy, nInspiracia).run();
 
           await audit(DB, { action: "zapis", predmet: "marketingový nápad", neu: text.slice(0, 120), actor: autor || undefined });
           return Response.json({ ok: true, id: novy });

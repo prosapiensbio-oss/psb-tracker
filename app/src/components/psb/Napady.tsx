@@ -30,10 +30,13 @@ export type Napad = {
   odkaz?: string;
   /** Deň, keď z nápadu vyšiel obsah. Zapisuje sa sám pri „použité". */
   pouzite_at?: string;
+  /** Odkaz na cudzí príspevok, ktorý nápad inšpiroval. */
+  inspiracia?: string;
 };
 
 const ZDROJ_LABEL: Record<string, string> = {
   otazka_klienta: "otázka klienta", vlastny: "môj nápad", jarvis: "Jarvis", ine: "iné",
+  inspiracia: "inšpirácia zvonku",
 };
 
 const fmtDen = (d: string) => {
@@ -42,6 +45,10 @@ const fmtDen = (d: string) => {
 };
 
 export function Napady({ chat }: { chat?: AssistantChat }) {
+  // Vloženie cudzieho odkazu. Nie je to samostatná obrazovka zámerne — nápad
+  // zvonku je nápad ako každý iný, len má navyše adresu, odkiaľ prišiel.
+  const [odkazVstup, setOdkazVstup] = useState("");
+  const [ukladam, setUkladam] = useState(false);
   const [napady, setNapady] = useState<Napad[]>([]);
   const [nacitane, setNacitane] = useState(false);
   const [ajHotove, setAjHotove] = useState(false);
@@ -100,11 +107,91 @@ export function Napady({ chat }: { chat?: AssistantChat }) {
     ].join("\n"), `Posúď nápad: ${n.text.slice(0, 60)}`);
   };
 
+  /**
+   * Rozbor cudzieho príspevku.
+   *
+   * ČO JARVIS VIDIEŤ NEVIE
+   *
+   * Video neprehrá a Instagram odkaz zvonku neotvorí — oEmbed od Mety chce
+   * vlastné schválenie, ktoré appka nemá (overené 23. 8. 2026). Obrázky
+   * VIDIEŤ vie, takže rozbor stojí na snímke obrazovky. Preto sa o ňu pýta
+   * hneď v prvej vete namiesto toho, aby predstieral, že si video pozrel.
+   */
+  const rozober = (n: Napad) => {
+    if (!chat) return;
+    chat.setFloatingOpen(true);
+    void chat.ask([
+      "Našiel som cudzí príspevok, ktorý ma zaujal, a chcem z neho spraviť niečo naše.",
+      n.inspiracia ? `Odkaz: ${n.inspiracia}` : "",
+      n.text ? `Čo si o ňom pamätám: ${n.text}` : "",
+      "",
+      "DÔLEŽITÉ: ten odkaz otvoriť nevieš a video nevidíš. Nepredstieraj, že áno.",
+      "Keď som ti nepriložil snímku obrazovky, povedz mi rovno, nech ti ju pošlem —",
+      "stačí screenshot prvej sekundy a popisu. Až potom rozoberaj.",
+      "",
+      "Keď snímku máš, odpovedz takto:",
+      "1. ČO NA TOM FUNGUJE — nie čo tam je, ale prečo to zastaví palec. Pomenuj mechanizmus.",
+      "2. DÁ SA TO PRENIESŤ NA PSB? Ak nie, povedz to rovno — cudzí formát, ktorý sedí inej značke,",
+      "   je horší než žiadny. Skontroluj to proti FP pravidlám a indexu brand-konfliktov.",
+      "3. AK ÁNO: naša verzia — do ktorej fázy nákupného cyklu patrí, aký úvodný záber,",
+      "   a prvá veta po slovensky, ako ju poviem na kameru.",
+      "4. ČO Z TOHO NEBRAŤ — čo v origináli funguje im a nám by uškodilo.",
+      "",
+      "Keď je návrh konkrétny, pridaj psb-action naplanuj-obsah tak, ako to robíš inak.",
+    ].filter(Boolean).join("\n"), `Rozbor inšpirácie: ${(n.inspiracia || n.text).slice(0, 50)}`);
+  };
+
+  const vlozOdkaz = async () => {
+    const url = odkazVstup.trim();
+    if (!/^https?:\/\//i.test(url)) return;
+    setUkladam(true);
+    try {
+      const r = await fetch("/api/napady", {
+        method: "POST", credentials: "same-origin",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          // Text nápadu je zatiaľ len adresa — doplní sa pri rozbore. Prázdny
+          // text by API odmietlo a nápad by nevznikol.
+          text: `Inšpirácia: ${url}`,
+          zdroj: "inspiracia", inspiracia: url,
+        }),
+      });
+      const j = (await r.json()) as { ok?: boolean };
+      if (j.ok) { setOdkazVstup(""); nacitaj(); }
+    } catch { /* obrazovka nechá pole vyplnené, nič sa nestratí */ }
+    setUkladam(false);
+  };
+
+  const platnyOdkaz = /^https?:\/\//i.test(odkazVstup.trim());
+
   if (!nacitane) return null;
 
   return (
     <Card>
       {chyba && <div style={{ fontSize: 12, color: C.red, marginBottom: 8 }}>{chyba}</div>}
+
+      {/* Odkaz zvonku. Jarvis ho otvoriť nevie — appka ho len uloží a rozbor
+          beží zo snímky obrazovky, ktorú Jerry priloží do rozhovoru. */}
+      <div style={{ display: "flex", gap: 6, marginBottom: 12, flexWrap: "wrap" }}>
+        <input
+          value={odkazVstup}
+          onChange={(e) => setOdkazVstup(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") void vlozOdkaz(); }}
+          placeholder="vlož odkaz na cudzí reel, ktorý ťa zaujal"
+          style={{
+            flex: "1 1 240px", background: C.bg, color: C.text, fontFamily: "inherit", fontSize: 12.5,
+            border: `1px solid ${C.border}`, borderRadius: 6, padding: "7px 10px", boxSizing: "border-box",
+          }} />
+        <button onClick={() => void vlozOdkaz()} disabled={ukladam || !platnyOdkaz}
+          style={{
+            background: "none", border: `1px solid ${C.border}`, borderRadius: 6, padding: "7px 12px",
+            fontSize: 12.5, fontFamily: "inherit",
+            color: platnyOdkaz ? C.accentLight : C.textDim,
+            cursor: platnyOdkaz ? "pointer" : "default",
+          }}>
+          uložiť ako inšpiráciu
+        </button>
+      </div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         <H3>
           <Info
@@ -154,10 +241,18 @@ export function Napady({ chat }: { chat?: AssistantChat }) {
                 {n.stav === "novy" && (
                   <>
                     {chat && (
+                      <>
+                      {n.zdroj === "inspiracia" && (
+                        <button onClick={() => rozober(n)} disabled={chat.busy}
+                          style={{ background: "none", border: "none", padding: 0, color: C.accentLight, fontSize: 11.5, cursor: chat.busy ? "default" : "pointer", fontFamily: "inherit", marginRight: 10 }}>
+                          rozobrať s Jarvisom
+                        </button>
+                      )}
                       <button onClick={() => posud(n)} disabled={chat.busy}
                         style={{ background: "none", border: "none", padding: 0, color: C.accentLight, fontSize: 11.5, cursor: chat.busy ? "default" : "pointer", fontFamily: "inherit" }}>
                         Čo si o tom myslíš?
                       </button>
+                      </>
                     )}
                     <button onClick={() => void zmen(n.id, { stav: "pouzity" })}
                       style={{ background: "none", border: "none", padding: 0, color: C.textMuted, fontSize: 11.5, cursor: "pointer", fontFamily: "inherit" }}>
