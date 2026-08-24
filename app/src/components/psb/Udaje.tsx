@@ -18,6 +18,7 @@ import { maTextovuVrstvu, pdfRiadky } from "../../lib/psb/pdftext";
 import { ThemeSwitch } from "./ThemeSwitch";
 import { Uzavierky } from "./Uzavierky";
 import { Card, H3, Info } from "./ui";
+import { Konta, KontaNadpis } from "./Konta";
 
 // Údaje — jedno miesto pre všetko, čo nie je pohľad na štúdio, ale obsluha
 // appky: nahrávanie súborov, uzávierky, audit, kontá, záloha, vzhľad a reset.
@@ -99,6 +100,13 @@ export function Udaje({ data, actions, chat, prekazky, kroky, podklady, onNaviga
         <NapojenieGoogleAds />
         <NapojenieTextWebu />
         <NapojenieRychlost />
+      </Card>
+
+      {/* Kontá pred vzhľadom: kto sa prihlasuje, je prevádzková vec, farebná
+          schéma je vkus. */}
+      <Card>
+        <H3><KontaNadpis /></H3>
+        <Konta />
       </Card>
 
       <Card>
