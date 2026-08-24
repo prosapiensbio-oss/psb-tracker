@@ -1619,32 +1619,34 @@ export const rodinaZKluca = (key: string) =>
  * Odložené položky sa preskakujú: „odlozene|dátum" nie je odpoveď, je to termín.
  */
 function poslednaOdpovedRodiny(
-  ack: Record<string, { note?: string; ackedAt?: string } | undefined>,
+  ack: Record<string, { note?: string; ackedAt?: string; actor?: string } | undefined>,
   rodina: string,
   okremKluca: string,
-): { text: string; kedy: string } | undefined {
+): { text: string; kedy: string; kto?: string } | undefined {
   if (!rodina) return undefined;
-  let najlepsia: { text: string; kedy: string } | undefined;
+  let najlepsia: { text: string; kedy: string; kto?: string } | undefined;
   for (const [k, v] of Object.entries(ack)) {
     if (!v || k === okremKluca || k.startsWith("mute|")) continue;
     const text = (v.note || "").trim();
     if (!text || text.startsWith("odlozene|")) continue;
     if (rodinaZKluca(k) !== rodina) continue;
     const kedy = v.ackedAt || "";
-    if (!najlepsia || kedy > najlepsia.kedy) najlepsia = { text, kedy };
+    if (!najlepsia || kedy > najlepsia.kedy) najlepsia = { text, kedy, kto: v.actor || undefined };
   }
   return najlepsia;
 }
 
 export function stavPolozkyRegistra(
   key: string,
-  ack: Record<string, { note?: string; ackedAt?: string } | undefined>,
+  ack: Record<string, { note?: string; ackedAt?: string; actor?: string } | undefined>,
   rodinaVstup?: string,
   dnes: Date = new Date(),
 ): {
   acked: boolean; note?: string; rodina: string; vratene?: boolean;
+  /** Kto odpoveď napísal. Prázdne pri odpovediach spred 24. 8. 2026. */
+  kto?: string;
   /** Čo sa na to isté odpovedalo naposledy — pri vrátenej pripomienke. */
-  predchadzajuca?: { text: string; kedy: string };
+  predchadzajuca?: { text: string; kedy: string; kto?: string };
 } {
   const rodina = rodinaVstup ?? rodinaZKluca(key);
   // Umlčaná rodina prebíja všetko: „už mi toto nehlás" platí na celý druh
@@ -1657,7 +1659,7 @@ export function stavPolozkyRegistra(
     return predchadzajuca ? { acked: false, rodina, predchadzajuca } : { acked: false, rodina };
   }
   const m = /^odlozene\|(\d{4}-\d{2}-\d{2})\|?([\s\S]*)$/.exec(z.note || "");
-  if (!m) return { acked: true, note: z.note, rodina };
+  if (!m) return { acked: true, note: z.note, rodina, kto: z.actor || undefined };
   const den = dnes.toISOString().slice(0, 10);
   // Dátum už prešiel → položka sa vracia medzi živé, aj s poznámkou prečo.
   if (m[1] <= den) return { acked: false, note: `odložené na ${m[1]}${m[2] ? ` — ${m[2]}` : ""}`, vratene: true, rodina };
@@ -1928,8 +1930,10 @@ export type RegisterItem = {
    * (chýbajúci nájom) je ticho horšie než otrava.
    */
   rodina?: string;
+  /** Kto odpoveď napísal. Prázdne pri starších odpovediach. */
+  kto?: string;
   /** Odpoveď na to isté z minulosti — pri pripomienke, ktorá sa vrátila. */
-  predchadzajuca?: { text: string; kedy: string };
+  predchadzajuca?: { text: string; kedy: string; kto?: string };
 };
 
 /**

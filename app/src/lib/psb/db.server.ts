@@ -138,7 +138,7 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
     };
   }
   for (const r of acks.results as any[]) {
-    data.anomalyAck[r.anomaly_key] = { note: r.note || "", ackedAt: r.acked_at };
+    data.anomalyAck[r.anomaly_key] = { note: r.note || "", ackedAt: r.acked_at, actor: r.actor || "" };
   }
   return data;
 }
@@ -538,11 +538,12 @@ export async function setOverride(
   return r !== null;
 }
 
-export async function ackAnomaly(DB: D1Database, key: string, note: string): Promise<void> {
+export async function ackAnomaly(DB: D1Database, key: string, note: string, actor = ""): Promise<void> {
   await DB.prepare(
-    "INSERT INTO anomaly_ack (anomaly_key,note,acked_at) VALUES (?,?,?) ON CONFLICT(anomaly_key) DO UPDATE SET note=excluded.note, acked_at=excluded.acked_at",
+    "INSERT INTO anomaly_ack (anomaly_key,note,acked_at,actor) VALUES (?,?,?,?) "
+    + "ON CONFLICT(anomaly_key) DO UPDATE SET note=excluded.note, acked_at=excluded.acked_at, actor=excluded.actor",
   )
-    .bind(key, note, new Date().toISOString())
+    .bind(key, note, new Date().toISOString(), actor)
     .run();
 }
 

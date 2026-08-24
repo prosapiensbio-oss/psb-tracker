@@ -129,7 +129,12 @@ export type UploadLogEntry = {
   skipped: number;
 };
 
-export type AnomalyAck = { note?: string; ackedAt?: string };
+export type AnomalyAck = {
+  note?: string;
+  ackedAt?: string;
+  /** Kto odpovedal. Prázdne pri odpovediach spred 24. 8. 2026 — vtedy sa autor nezapisoval. */
+  actor?: string;
+};
 
 export type PSBData = {
   sessions: SessionRow[];

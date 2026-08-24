@@ -2383,7 +2383,12 @@ function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar }: { i
       {item.note && (
         <div style={{ marginTop: 6, fontSize: 12, color: C.textMuted, display: "flex", gap: 6 }}>
           <span style={{ color: C.textDim, flexShrink: 0 }}>↳</span>
-          <span>{item.note}</span>
+          <span>
+            {item.note}
+            {/* Meno len keď ho appka naozaj vie. Odpovede spred 24. 8. 2026
+                autora nemajú a dopísať ho spätne by bola domnienka. */}
+            {item.kto && <span style={{ color: C.textDim }}> — {item.kto}</span>}
+          </span>
         </div>
       )}
 
@@ -2399,7 +2404,9 @@ function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar }: { i
           <span>
             {/* Bez oslovenia: appka nevie, kto odpovedal — v anomaly_ack
                 nie je autor. Tvrdiť „ty si odpovedal" by bola domnienka. */}
-            {kedyStrucne(item.predchadzajuca.kedy)} sa na to odpovedalo:{" "}
+            {item.predchadzajuca.kto
+              ? `${kedyStrucne(item.predchadzajuca.kedy)} na to odpovedal${item.predchadzajuca.kto === "Terezka" ? "a" : ""} ${item.predchadzajuca.kto}: `
+              : `${kedyStrucne(item.predchadzajuca.kedy)} sa na to odpovedalo: `}
             <span style={{ color: C.textMuted }}>{item.predchadzajuca.text.replace(/^odpoveď:\s*/, "")}</span>
           </span>
         </div>

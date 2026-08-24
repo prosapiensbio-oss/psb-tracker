@@ -726,3 +726,24 @@ describe("vrátená pripomienka nesie predchádzajúcu odpoveď", () => {
     expect(s.predchadzajuca).toBeUndefined();
   });
 });
+
+describe("kto na notifikáciu odpovedal", () => {
+  it("autora nesie zodpovedaná položka", () => {
+    const s = stavPolozkyRegistra("x|1", { "x|1": { note: "hotovo", ackedAt: "2026-08-24T10:00:00Z", actor: "Terezka" } });
+    expect(s.acked).toBe(true);
+    expect(s.kto).toBe("Terezka");
+  });
+
+  it("autora nesie aj predchádzajúca odpoveď pri vrátenej pripomienke", () => {
+    const s = stavPolozkyRegistra("dnes|2026-08-24|Ana", {
+      "dnes|2026-08-23|Ana": { note: "odpoveď: vybavím", ackedAt: "2026-08-23T10:00:00Z", actor: "Jerry" },
+    });
+    expect(s.predchadzajuca?.kto).toBe("Jerry");
+  });
+
+  it("stará odpoveď bez autora zostáva bez mena — nedopĺňa sa domnienka", () => {
+    const s = stavPolozkyRegistra("x|1", { "x|1": { note: "hotovo", ackedAt: "2026-08-01T10:00:00Z" } });
+    expect(s.acked).toBe(true);
+    expect(s.kto).toBeUndefined();
+  });
+});

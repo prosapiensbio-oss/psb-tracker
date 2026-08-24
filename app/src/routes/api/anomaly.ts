@@ -24,9 +24,12 @@ export const Route = createFileRoute("/api/anomaly")({
           return Response.json({ ok: false, error: "bad_request" }, { status: 400 });
         }
         if (!key) return Response.json({ ok: false, error: "bad_field" }, { status: 400 });
-        if (ack) await ackAnomaly(DB, key, note);
+        // Autor sa berie z prihlásenia, nie z tela požiadavky — kto odpovedal,
+        // nemá byť vec toho, čo pošle prehliadač.
+        const kto = (await currentUser(request)) || "";
+        if (ack) await ackAnomaly(DB, key, note, kto);
         else await unackAnomaly(DB, key);
-        await audit(DB, { action: ack ? "skrytie-signalu" : "vratenie-signalu", predmet: key, reason: note || undefined, actor: await currentUser(request) || undefined });
+        await audit(DB, { action: ack ? "skrytie-signalu" : "vratenie-signalu", predmet: key, reason: note || undefined, actor: kto || undefined });
         return Response.json({ ok: true });
       },
     },
