@@ -2,6 +2,7 @@ import { describe, expect, it, test } from "bun:test";
 
 import {
   deriveAnomalies,
+  stavPolozkyRegistra,
   cenaZaSedenie,
   doPlnehoMesiaca,
   kotvaDat,
@@ -684,5 +685,44 @@ describe("primárny tréner podľa nedávnych sedení", () => {
       ses("Vedeny", "Jerry", den(-3)),
     ];
     expect(postav(sedenia)["Vedeny"].primaryTrainer).toBe("Terezka");
+  });
+});
+
+describe("vrátená pripomienka nesie predchádzajúcu odpoveď", () => {
+  const ack = {
+    "dnes|2026-08-23|Petra Rupova": { note: "odpoveď: poviem jej to dneska", ackedAt: "2026-08-23T11:00:00Z" },
+    "dnes|2026-08-22|Petra Rupova": { note: "odpoveď: staršia", ackedAt: "2026-08-22T09:00:00Z" },
+    "dnes|2026-08-23|Iny Klient": { note: "odpoveď: iného sa to netýka", ackedAt: "2026-08-23T12:00:00Z" },
+  };
+
+  it("nájde najnovšiu odpoveď z tej istej rodiny", () => {
+    const s = stavPolozkyRegistra("dnes|2026-08-24|Petra Rupova", ack);
+    expect(s.acked).toBe(false);
+    expect(s.predchadzajuca?.text).toBe("odpoveď: poviem jej to dneska");
+  });
+
+  it("odpoveď o inom klientovi si nepožičia", () => {
+    expect(stavPolozkyRegistra("dnes|2026-08-24|Tretia Osoba", ack).predchadzajuca).toBeUndefined();
+  });
+
+  it("odloženie nie je odpoveď", () => {
+    const s = stavPolozkyRegistra("dnes|2026-08-24|X", {
+      "dnes|2026-08-20|X": { note: "odlozene|2026-08-25|", ackedAt: "2026-08-20T10:00:00Z" },
+    });
+    expect(s.predchadzajuca).toBeUndefined();
+  });
+
+  it("na zodpovedanej položke sa predchádzajúca neukazuje — má vlastnú", () => {
+    const s = stavPolozkyRegistra("dnes|2026-08-23|Petra Rupova", ack);
+    expect(s.acked).toBe(true);
+    expect(s.predchadzajuca).toBeUndefined();
+  });
+
+  it("umlčaná rodina prebíja aj toto", () => {
+    const s = stavPolozkyRegistra("dnes|2026-08-24|Petra Rupova", {
+      ...ack, "mute|dnes|Petra Rupova": { note: "nehlásiť tento druh" },
+    });
+    expect(s.acked).toBe(true);
+    expect(s.predchadzajuca).toBeUndefined();
   });
 });

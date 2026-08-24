@@ -96,3 +96,21 @@ export const jeMesiac = (v: unknown): boolean => {
   const mes = Number(m[2]);
   return mes >= 1 && mes <= 12;
 };
+
+/**
+ * „dnes" / „včera" / „17. 8." — kedy sa niečo stalo, bez presného času.
+ *
+ * Pri vrátenej pripomienke je dôležité, či odpoveď padla včera alebo pred
+ * mesiacom; hodina a minúta by len zaberali riadok.
+ */
+export function kedyStrucne(iso: string, dnes: Date = new Date()): string {
+  const t = Date.parse(iso || "");
+  if (!Number.isFinite(t)) return "naposledy";
+  const den = (d: number) => Math.floor(d / 86400000);
+  const rozdiel = den(Date.parse(dnes.toISOString().slice(0, 10))) - den(Date.parse(new Date(t).toISOString().slice(0, 10)));
+  if (rozdiel <= 0) return "dnes";
+  if (rozdiel === 1) return "včera";
+  if (rozdiel === 2) return "predvčerom";
+  const d = new Date(t);
+  return `${d.getUTCDate()}. ${d.getUTCMonth() + 1}.`;
+}

@@ -1607,19 +1607,55 @@ export const rodinaZKluca = (key: string) =>
  * Tlačidlo pritom svieti na každom riadku. Preto je výpočet tu, v knižnici, a
  * volajú ho všetci — obrazovka, register aj pripomienky.
  */
+/**
+ * Najnovšia odpoveď na to isté z minulosti.
+ *
+ * Denné pripomienky nesú v kľúči dátum (`dnes|2026-08-24|Petra`), takže zajtra
+ * prídu ako nová položka a odpoveď z dneška sa k nim neviaže. Terezka tak
+ * odpovedala do prázdna: „poviem jej to dneska" a na druhý deň tá istá veta
+ * znova, akoby sa nič nestalo. Vec sa vracať MÁ, kým platí — ale má pri sebe
+ * niesť, čo sa na ňu naposledy povedalo.
+ *
+ * Odložené položky sa preskakujú: „odlozene|dátum" nie je odpoveď, je to termín.
+ */
+function poslednaOdpovedRodiny(
+  ack: Record<string, { note?: string; ackedAt?: string } | undefined>,
+  rodina: string,
+  okremKluca: string,
+): { text: string; kedy: string } | undefined {
+  if (!rodina) return undefined;
+  let najlepsia: { text: string; kedy: string } | undefined;
+  for (const [k, v] of Object.entries(ack)) {
+    if (!v || k === okremKluca || k.startsWith("mute|")) continue;
+    const text = (v.note || "").trim();
+    if (!text || text.startsWith("odlozene|")) continue;
+    if (rodinaZKluca(k) !== rodina) continue;
+    const kedy = v.ackedAt || "";
+    if (!najlepsia || kedy > najlepsia.kedy) najlepsia = { text, kedy };
+  }
+  return najlepsia;
+}
+
 export function stavPolozkyRegistra(
   key: string,
-  ack: Record<string, { note?: string } | undefined>,
+  ack: Record<string, { note?: string; ackedAt?: string } | undefined>,
   rodinaVstup?: string,
   dnes: Date = new Date(),
-): { acked: boolean; note?: string; rodina: string; vratene?: boolean } {
+): {
+  acked: boolean; note?: string; rodina: string; vratene?: boolean;
+  /** Čo sa na to isté odpovedalo naposledy — pri vrátenej pripomienke. */
+  predchadzajuca?: { text: string; kedy: string };
+} {
   const rodina = rodinaVstup ?? rodinaZKluca(key);
   // Umlčaná rodina prebíja všetko: „už mi toto nehlás" platí na celý druh
   // upozornenia, nie na jeden dátum.
   const mute = rodina ? ack[`mute|${rodina}`] : undefined;
   if (mute) return { acked: true, note: mute.note || "nehlásiť", rodina };
   const z = ack[key];
-  if (!z) return { acked: false, rodina };
+  if (!z) {
+    const predchadzajuca = poslednaOdpovedRodiny(ack, rodina, key);
+    return predchadzajuca ? { acked: false, rodina, predchadzajuca } : { acked: false, rodina };
+  }
   const m = /^odlozene\|(\d{4}-\d{2}-\d{2})\|?([\s\S]*)$/.exec(z.note || "");
   if (!m) return { acked: true, note: z.note, rodina };
   const den = dnes.toISOString().slice(0, 10);
@@ -1892,6 +1928,8 @@ export type RegisterItem = {
    * (chýbajúci nájom) je ticho horšie než otrava.
    */
   rodina?: string;
+  /** Odpoveď na to isté z minulosti — pri pripomienke, ktorá sa vrátila. */
+  predchadzajuca?: { text: string; kedy: string };
 };
 
 /**

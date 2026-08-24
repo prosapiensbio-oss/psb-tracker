@@ -24,7 +24,7 @@ import { objednaneVerzia,
   DOVODY_ODCHODU,
   pocetUvodnych,
 } from "../../lib/psb/compute";
-import { fmtCZK, fmtDMY, monthLabel, normName, weekKey, weekLabel } from "../../lib/psb/format";
+import { fmtCZK, fmtDMY, monthLabel, normName, weekKey, weekLabel, kedyStrucne } from "../../lib/psb/format";
 import { C, mix, S, badge, btn } from "../../lib/psb/theme";
 import { Balicky, odtrenovaneMimoExportu, type KalUdalost } from "./Kalendar";
 import { jeKlient } from "./MarketingLievik";
@@ -2384,6 +2384,24 @@ function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar }: { i
         <div style={{ marginTop: 6, fontSize: 12, color: C.textMuted, display: "flex", gap: 6 }}>
           <span style={{ color: C.textDim, flexShrink: 0 }}>↳</span>
           <span>{item.note}</span>
+        </div>
+      )}
+
+      {/* Čo sa na to isté odpovedalo naposledy.
+          Denné pripomienky nesú v kľúči dátum, takže zajtra prídu ako nová
+          položka a včerajšia odpoveď sa k nim neviaže — Terezka odpovedala
+          „poviem jej to dneska" a na druhý deň dostala tú istú vetu, akoby sa
+          nič nestalo. Vec sa vracať MÁ, kým platí; len má pri sebe niesť, čo
+          už raz zaznelo, nech nikto neodpovedá naslepo dvakrát. */}
+      {!item.note && item.predchadzajuca && (
+        <div style={{ marginTop: 6, fontSize: 12, color: C.textDim, display: "flex", gap: 6 }}>
+          <span style={{ flexShrink: 0 }}>↺</span>
+          <span>
+            {/* Bez oslovenia: appka nevie, kto odpovedal — v anomaly_ack
+                nie je autor. Tvrdiť „ty si odpovedal" by bola domnienka. */}
+            {kedyStrucne(item.predchadzajuca.kedy)} sa na to odpovedalo:{" "}
+            <span style={{ color: C.textMuted }}>{item.predchadzajuca.text.replace(/^odpoveď:\s*/, "")}</span>
+          </span>
         </div>
       )}
 
