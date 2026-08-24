@@ -20,6 +20,7 @@
  * by vyrobilo presnosť, ktorá tam nie je.
  */
 
+import { jeMesiac } from "./format";
 import { zaberDoZadania } from "./zabery";
 import { dlzkaDoZadania, sekvenciaDoZadania } from "./sekvencia";
 
@@ -59,7 +60,7 @@ export const nazovFazy = (f: number) => FAZA_MAPA.get(f)?.nazov ?? "Nezaradené"
  * nedá.
  */
 export function osMapy(kotvaMesiac: string, dozadu = 12, dopredu = 4): string[] {
-  if (!/^\d{4}-\d{2}$/.test(kotvaMesiac)) return [];
+  if (!jeMesiac(kotvaMesiac)) return [];
   const [r, m] = kotvaMesiac.split("-").map(Number);
   const out: string[] = [];
   for (let i = -dozadu + 1; i <= dopredu; i++) {

@@ -80,3 +80,19 @@ export const fmtDMY = (d: string | Date): string => {
   if (isNaN(dt.getTime())) return "";
   return `${dt.getDate()}.${dt.getMonth() + 1}.${dt.getFullYear()}`;
 };
+
+/**
+ * Je to platný mesiac vo tvare RRRR-MM?
+ *
+ * PREČO NESTAČÍ `\d{4}-\d{2}`
+ *
+ * Ten vzor pustí „2026-13" aj „2026-00" — dva číslice sú dve číslice. 23. 8.
+ * 2026 tak prešiel plán začínajúci trinástym mesiacom a appka z neho vyrobila
+ * prázdne obdobie bez jediného varovania. Mesiac musí byť 01–12.
+ */
+export const jeMesiac = (v: unknown): boolean => {
+  const m = /^(\d{4})-(\d{2})$/.exec(String(v ?? ""));
+  if (!m) return false;
+  const mes = Number(m[2]);
+  return mes >= 1 && mes <= 12;
+};

@@ -27,6 +27,7 @@ import { Route as ApiSessionRouteImport } from './routes/api/session'
 import { Route as ApiResetRouteImport } from './routes/api/reset'
 import { Route as ApiRawUploadsRouteImport } from './routes/api/raw-uploads'
 import { Route as ApiPremenujRouteImport } from './routes/api/premenuj'
+import { Route as ApiPlanyRouteImport } from './routes/api/plany'
 import { Route as ApiPeriodsRouteImport } from './routes/api/periods'
 import { Route as ApiPdfImportRouteImport } from './routes/api/pdf-import'
 import { Route as ApiPagespeedRouteImport } from './routes/api/pagespeed'
@@ -146,6 +147,11 @@ const ApiRawUploadsRoute = ApiRawUploadsRouteImport.update({
 const ApiPremenujRoute = ApiPremenujRouteImport.update({
   id: '/api/premenuj',
   path: '/api/premenuj',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPlanyRoute = ApiPlanyRouteImport.update({
+  id: '/api/plany',
+  path: '/api/plany',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPeriodsRoute = ApiPeriodsRouteImport.update({
@@ -333,6 +339,7 @@ export interface FileRoutesByFullPath {
   '/api/pagespeed': typeof ApiPagespeedRoute
   '/api/pdf-import': typeof ApiPdfImportRoute
   '/api/periods': typeof ApiPeriodsRoute
+  '/api/plany': typeof ApiPlanyRoute
   '/api/premenuj': typeof ApiPremenujRoute
   '/api/raw-uploads': typeof ApiRawUploadsRoute
   '/api/reset': typeof ApiResetRoute
@@ -383,6 +390,7 @@ export interface FileRoutesByTo {
   '/api/pagespeed': typeof ApiPagespeedRoute
   '/api/pdf-import': typeof ApiPdfImportRoute
   '/api/periods': typeof ApiPeriodsRoute
+  '/api/plany': typeof ApiPlanyRoute
   '/api/premenuj': typeof ApiPremenujRoute
   '/api/raw-uploads': typeof ApiRawUploadsRoute
   '/api/reset': typeof ApiResetRoute
@@ -434,6 +442,7 @@ export interface FileRoutesById {
   '/api/pagespeed': typeof ApiPagespeedRoute
   '/api/pdf-import': typeof ApiPdfImportRoute
   '/api/periods': typeof ApiPeriodsRoute
+  '/api/plany': typeof ApiPlanyRoute
   '/api/premenuj': typeof ApiPremenujRoute
   '/api/raw-uploads': typeof ApiRawUploadsRoute
   '/api/reset': typeof ApiResetRoute
@@ -486,6 +495,7 @@ export interface FileRouteTypes {
     | '/api/pagespeed'
     | '/api/pdf-import'
     | '/api/periods'
+    | '/api/plany'
     | '/api/premenuj'
     | '/api/raw-uploads'
     | '/api/reset'
@@ -536,6 +546,7 @@ export interface FileRouteTypes {
     | '/api/pagespeed'
     | '/api/pdf-import'
     | '/api/periods'
+    | '/api/plany'
     | '/api/premenuj'
     | '/api/raw-uploads'
     | '/api/reset'
@@ -586,6 +597,7 @@ export interface FileRouteTypes {
     | '/api/pagespeed'
     | '/api/pdf-import'
     | '/api/periods'
+    | '/api/plany'
     | '/api/premenuj'
     | '/api/raw-uploads'
     | '/api/reset'
@@ -637,6 +649,7 @@ export interface RootRouteChildren {
   ApiPagespeedRoute: typeof ApiPagespeedRoute
   ApiPdfImportRoute: typeof ApiPdfImportRoute
   ApiPeriodsRoute: typeof ApiPeriodsRoute
+  ApiPlanyRoute: typeof ApiPlanyRoute
   ApiPremenujRoute: typeof ApiPremenujRoute
   ApiRawUploadsRoute: typeof ApiRawUploadsRoute
   ApiResetRoute: typeof ApiResetRoute
@@ -780,6 +793,13 @@ declare module '@tanstack/react-router' {
       path: '/api/premenuj'
       fullPath: '/api/premenuj'
       preLoaderRoute: typeof ApiPremenujRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/plany': {
+      id: '/api/plany'
+      path: '/api/plany'
+      fullPath: '/api/plany'
+      preLoaderRoute: typeof ApiPlanyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/periods': {
@@ -1029,6 +1049,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPagespeedRoute: ApiPagespeedRoute,
   ApiPdfImportRoute: ApiPdfImportRoute,
   ApiPeriodsRoute: ApiPeriodsRoute,
+  ApiPlanyRoute: ApiPlanyRoute,
   ApiPremenujRoute: ApiPremenujRoute,
   ApiRawUploadsRoute: ApiRawUploadsRoute,
   ApiResetRoute: ApiResetRoute,

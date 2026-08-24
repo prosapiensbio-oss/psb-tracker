@@ -308,6 +308,14 @@ záver odporuje tomu, čo Jerry hovorí zo skúsenosti.
   a povedať „stlač cmd+C“. Jedna cesta znamená tlačidlo, ktoré u niekoho ticho
   nerobí nič.
 
+- **`\d{4}-\d{2}` NIE JE overenie mesiaca.** Pustí „2026-13" aj „2026-00" —
+  dve číslice sú dve číslice. 23. 8. 2026 tak cez API prešiel plán začínajúci
+  trinástym mesiacom, appka z neho vyrobila prázdne obdobie a nič nehlásila.
+  Používaj `jeMesiac()` z `lib/psb/format.ts`, ktorá kontroluje aj rozsah 01–12.
+  **Ten istý vzor je ešte na piatich miestach** (`parse.ts` ×2, `periods.ts`,
+  `sprava.ts`, `vzas-notes.ts`) — pri ďalšom zásahu do nich ho vymeň; pri
+  finančných mesiacoch to môže tichým prázdnom pokaziť viac než plán.
+
 ## Jarvisove zdroje pravdy nie sú len DB
 
 Jarvisov kontext skladá `chat.ts` z viacerých zdrojov a pri oprave faktu treba nájsť VŠETKY:

@@ -4,6 +4,7 @@ import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 import { jeFaza } from "../../lib/psb/mapaCyklu";
+import { jeMesiac as platnyMesiac } from "../../lib/psb/format";
 import { ZABER_MAPA } from "../../lib/psb/zabery";
 
 /**
@@ -26,7 +27,7 @@ const ZDROJE = new Set(["otazka_klienta", "vlastny", "jarvis", "ine"]);
 const kus = (v: unknown, max: number) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 
 /** Mesiac plánu je „YYYY-MM"; prázdny reťazec vracia slot do zásobníka. */
-const jeMesiac = (v: unknown) => v === "" || /^\d{4}-\d{2}$/.test(String(v ?? ""));
+const jeMesiac = (v: unknown) => v === "" || platnyMesiac(v);
 
 export const Route = createFileRoute("/api/napady")({
   server: {

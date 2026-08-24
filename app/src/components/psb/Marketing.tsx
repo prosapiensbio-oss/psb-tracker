@@ -38,6 +38,7 @@ import { ObsahZive } from "./ObsahZive";
 import { ObsahDopyt } from "./ObsahDopyt";
 import { Mail } from "./Mail";
 import { Zadanie } from "./Zadanie";
+import { PlanMarketingu } from "./PlanMarketingu";
 import { MapaCyklu } from "./MapaCyklu";
 import { PlanObsahu } from "./PlanObsahu";
 import { Napady } from "./Napady";
@@ -1174,6 +1175,9 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
       {sub === "navrhy" && (
         <>
           <Zadanie chat={chat} nastaveneAt={data.anomalyAck?.["project|nastavene"]?.ackedAt || null} onNastavene={(hotovo) => onAck?.("project|nastavene", hotovo, "Claude Project nastavený")} />
+          {/* Plán je NAD mapou: najprv cieľ a obdobie, potom obsah, ktorý ho
+              má naplniť. Opačné poradie robilo z obsahu samoúčel. */}
+          <PlanMarketingu data={data} clients={clients} chat={chat} onNavigate={onNavigate} />
           {/* Mapa je nad počítanými návrhmi zámerne: najprv treba vidieť, kam
               sa obsah chystá, až potom čítať, čo do toho dáta odporúčajú.
               Opačné poradie robilo z návrhov zoznam bez miesta, kam ich dať. */}
