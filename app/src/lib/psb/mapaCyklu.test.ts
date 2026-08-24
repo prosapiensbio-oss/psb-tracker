@@ -130,7 +130,7 @@ describe("zadanie s už napísaným textom", () => {
 
   it("druhé kolo je ÚPRAVA, nie nový pokus od nuly", () => {
     const t = zadanieProProject({ ...zaklad, hotovyText: "Hotový reel o kolene." });
-    expect(t).toContain("TERAJŠÍ CAPTION");
+    expect(t).toContain("TERAJŠÍ CAPTION AJ S HASHTAGMI");
     expect(t).toContain("Hotový reel o kolene.");
   });
 
@@ -138,19 +138,16 @@ describe("zadanie s už napísaným textom", () => {
     const t = zadanieProProject({ ...zaklad, scenar: "Hovorím toto.", hotovyText: "Píšem toto." });
     expect(t).toContain("TERAJŠÍ SCENÁR");
     expect(t).toContain("Hovorím toto.");
-    expect(t).toContain("TERAJŠÍ CAPTION");
+    expect(t).toContain("TERAJŠÍ CAPTION AJ S HASHTAGMI");
     expect(t).toContain("Píšem toto.");
   });
 
-  it("pýta si scenár, caption aj hashtagy — bez hashtagov sa nedá zverejniť", () => {
+  it("pýta scenár a caption AJ S HASHTAGMI ako jeden blok — kopíruje sa naraz", () => {
     const t = zadanieProProject(zaklad);
     expect(t).toContain("1. SCENÁR");
-    expect(t).toContain("2. CAPTION");
-    expect(t).toContain("3. HASHTAGY");
-  });
-
-  it("hashtagy pýta v jednom riadku — do Instagramu sa vkladajú za sebou", () => {
-    expect(zadanieProProject(zaklad)).toContain("VŠETKY NA JEDNOM RIADKU");
+    expect(t).toContain("2. CAPTION AJ S HASHTAGMI");
+    expect(t).toContain("VŠETKY NA JEDNOM RIADKU");
+    expect(t).not.toContain("3. HASHTAGY");
   });
 
   it("žiada scenár slovensky a caption česky — na kameru sa hovorí inak, než sa píše", () => {
@@ -160,10 +157,9 @@ describe("zadanie s už napísaným textom", () => {
   });
 
   it("prázdne polia nevyrobia prázdnu hlavičku", () => {
-    const t = zadanieProProject({ ...zaklad, hotovyText: "   ", scenar: "  ", hashtagy: " " });
+    const t = zadanieProProject({ ...zaklad, hotovyText: "   ", scenar: "  " });
     expect(t).not.toContain("TERAJŠÍ CAPTION");
     expect(t).not.toContain("TERAJŠÍ SCENÁR");
-    expect(t).not.toContain("TERAJŠIE HASHTAGY");
   });
 });
 

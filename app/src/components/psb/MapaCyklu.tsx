@@ -11,6 +11,7 @@ import { C, mix } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import type { AssistantChat } from "./Assistant";
 import { Card, Donut, H3, Info, Modal, Select } from "./ui";
+import { pocetHashtagov } from "../../lib/psb/sekvencia";
 import { ZaberUkazka } from "./ZaberUkazka";
 import { Sekvencia } from "./Sekvencia";
 import { ZABER_MAPA, ZABERY, zaberyPreFazu } from "../../lib/psb/zabery";
@@ -485,7 +486,21 @@ function Panel({ vyber, os, zasobnik, onZavri, onUloz, onFazaPrispevku, onJarvis
   const [zaber, setZaber] = useState(slot?.zaber || "");
   const [sekvencia, setSekvencia] = useState(slot?.sekvencia || "");
   const [scenar, setScenar] = useState(slot?.scenar || "");
-  const [hashtagy, setHashtagy] = useState(slot?.hashtagy || "");
+  const [kopirovane, setKopirovane] = useState(false);
+  const poleCaption = useRef<HTMLTextAreaElement>(null);
+
+  // Rovnaké dve cesty ako v okne pre Project: clipboard API sa dá zakázať
+  // aj pri skutočnom kliku, preto výber textu ako záloha.
+  const kopirujCaption = async () => {
+    try {
+      await navigator.clipboard.writeText(hotovyText);
+      setKopirovane(true);
+      return;
+    } catch { /* skúsi sa druhá cesta */ }
+    const el = poleCaption.current;
+    if (el) { el.focus(); el.select(); try { document.execCommand("copy"); } catch { /* zostane označené */ } }
+    setKopirovane(true);
+  };
   const [busy, setBusy] = useState(false);
   // Mazanie na dva kliky. Modálne potvrdenie v modáli je okno v okne;
   // prepnutý nápis je rovnako neprehliadnuteľný a o krok kratší.
@@ -551,12 +566,12 @@ function Panel({ vyber, os, zasobnik, onZavri, onUloz, onFazaPrispevku, onJarvis
     if (!koncept.trim() && !kto.trim() && !hotovyText.trim() && !scenar.trim()) return;
     setBusy(true);
     const ok = slot
-      ? await onUloz({ id: slot.id, koncept, kto, faza, planovaneNa: mesiac, hotovyText, zaber, sekvencia, scenar, hashtagy })
+      ? await onUloz({ id: slot.id, koncept, kto, faza, planovaneNa: mesiac, hotovyText, zaber, sekvencia, scenar })
       : await onUloz({
           // Text nápadu je prvá veta konceptu — zásobník aj plán sú tá istá
           // tabuľka a nápad bez textu by v zozname nápadov svietil prázdny.
           text: koncept.trim().slice(0, 300) || `Obsah na ${mesiac}`,
-          zdroj: "vlastny", faza, planovaneNa: mesiac, kto, koncept, hotovyText, zaber, sekvencia, scenar, hashtagy,
+          zdroj: "vlastny", faza, planovaneNa: mesiac, kto, koncept, hotovyText, zaber, sekvencia, scenar,
         });
     setBusy(false);
     if (ok) onZavri();
@@ -654,18 +669,23 @@ function Panel({ vyber, os, zasobnik, onZavri, onUloz, onFazaPrispevku, onJarvis
         placeholder="hovorené slovo — z toho sa berú vety do sekvencie"
         style={{ ...vstup, resize: "vertical", lineHeight: 1.5, fontSize: 12.5 }} />
 
-      <label style={{ display: "block", fontSize: 11.5, color: C.textMuted, margin: "12px 0 4px" }}>
-        Caption — text pod príspevok {hotovyText.trim() ? `(${hotovyText.trim().length} zn.)` : ""}
-      </label>
-      <textarea value={hotovyText} onChange={(e) => setHotovyText(e.target.value)} rows={hotovyText ? 7 : 3}
-        placeholder="popis pod príspevkom — nie je to prepis scenára"
-        style={{ ...vstup, resize: "vertical", lineHeight: 1.5, fontSize: 12.5 }} />
-
-      <label style={{ display: "block", fontSize: 11.5, color: C.textMuted, margin: "12px 0 4px" }}>
-        Hashtagy {hashtagy.trim() ? `(${hashtagy.trim().split(/\s+/).filter((x) => x.startsWith("#")).length})` : ""}
-      </label>
-      <textarea value={hashtagy} onChange={(e) => setHashtagy(e.target.value)} rows={2}
-        placeholder="#biomechanika #bolestzad …"
+      {/* CAPTION AJ S HASHTAGMI V JEDNOM POLI. Mal som ich rozdelené, lebo sa
+          menia nezávisle — z pohľadu použitia to bola chyba: do Metricoolu ide
+          celý blok jedným cmd+C a dve polia znamenali dve kopírovania. */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10, margin: "12px 0 4px" }}>
+        <label style={{ fontSize: 11.5, color: C.textMuted }}>
+          Caption + hashtagy — kopíruje sa naraz
+          {hotovyText.trim() ? ` (${hotovyText.trim().length} zn. · ${pocetHashtagov(hotovyText)} #)` : ""}
+        </label>
+        {hotovyText.trim() && (
+          <button onClick={kopirujCaption}
+            style={{ background: "none", border: 0, padding: 0, color: C.accentLight, fontSize: 11, fontFamily: "inherit", cursor: "pointer" }}>
+            {kopirovane ? "skopírované ✓" : "skopírovať"}
+          </button>
+        )}
+      </div>
+      <textarea ref={poleCaption} value={hotovyText} onChange={(e) => setHotovyText(e.target.value)} rows={hotovyText ? 9 : 3}
+        placeholder="popis pod príspevkom, hashtagy na konci po prázdnom riadku"
         style={{ ...vstup, resize: "vertical", lineHeight: 1.5, fontSize: 12.5 }} />
 
       {/* Rozpis záberov až POD hotovým textom: zábery sa priraďujú k VETÁM,
@@ -674,7 +694,7 @@ function Panel({ vyber, os, zasobnik, onZavri, onUloz, onFazaPrispevku, onJarvis
 
       <div style={{ marginTop: 10, fontSize: 11.5, color: C.textDim, lineHeight: 1.45 }}>
         <button
-          onClick={() => onDoProjectu(zadanieProProject({ mesiac, faza, koncept, kto, hotovyText, zaber, sekvencia, scenar, hashtagy }))}
+          onClick={() => onDoProjectu(zadanieProProject({ mesiac, faza, koncept, kto, hotovyText, zaber, sekvencia, scenar }))}
           style={{ background: "none", border: 0, padding: 0, color: C.accentLight, fontSize: 11.5, fontFamily: "inherit", cursor: "pointer" }}>
           doladiť text v Claude Projecte ↗
         </button>

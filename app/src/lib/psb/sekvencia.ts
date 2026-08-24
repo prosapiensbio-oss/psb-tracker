@@ -169,3 +169,13 @@ export function sekvenciaDoZadania(json: string): string {
     "Povedz, kde text a obraz nesedia, a ktorú vetu skrátiť, aby sa do svojho záberu zmestila.",
   ].join("\n");
 }
+
+/**
+ * Koľko hashtagov je v texte.
+ *
+ * Caption ich má na konci — po zlúčení polí sa nedajú spočítať z vlastného
+ * stĺpca, tak sa počítajú z textu. Zámerne to počíta len značky na hranici
+ * slova, aby „#" uprostred vety alebo v adrese nerobilo falošný počet.
+ */
+export const pocetHashtagov = (text: string) =>
+  ((text || "").match(/(?:^|\s)#[\p{L}\p{N}_]+/gu) || []).length;

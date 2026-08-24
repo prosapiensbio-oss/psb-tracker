@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 
 import { FAZY } from "./mapaCyklu";
 import {
-  DLZKA_PODLA_FAZY, dlzkaDoZadania, pocetZaberov, skontrolujSekvenciu, type Krok,
+  DLZKA_PODLA_FAZY, dlzkaDoZadania, pocetHashtagov, pocetZaberov, skontrolujSekvenciu, type Krok,
 } from "./sekvencia";
 
 const k = (zaber: string, sekund = 3): Krok => ({ zaber, co: "x", veta: "y", sekund });
@@ -80,5 +80,23 @@ describe("kontrola sekvencie", () => {
 
   it("neznámy záber kontrolu nezhodí", () => {
     expect(() => skontrolujSekvenciu([k("vymyslene"), k("najazd")], 20)).not.toThrow();
+  });
+});
+
+describe("počet hashtagov v captione", () => {
+  it("spočíta značky na konci captionu", () => {
+    expect(pocetHashtagov("Text.\n\n#bolestzad #drzenitela #biomechanika")).toBe(3);
+  });
+
+  it("nepočíta mriežku uprostred slova ani v adrese", () => {
+    expect(pocetHashtagov("cena#1 a https://x.sk/a#kotva")).toBe(0);
+  });
+
+  it("zvládne diakritiku a číslice", () => {
+    expect(pocetHashtagov("#zdravázáda #cvik2 #držení_těla")).toBe(3);
+  });
+
+  it("prázdny text je nula, nie chyba", () => {
+    expect(pocetHashtagov("")).toBe(0);
   });
 });

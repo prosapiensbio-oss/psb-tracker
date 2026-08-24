@@ -165,8 +165,7 @@ export function tempoFaz(os: string[], vyslo: ZverejnenyKus[], kotva: string, ok
  */
 export function zadanieProProject(s: {
   mesiac: string; faza: number; koncept: string; kto: string;
-  hotovyText?: string; zaber?: string; sekvencia?: string;
-  scenar?: string; hashtagy?: string;
+  hotovyText?: string; zaber?: string; sekvencia?: string; scenar?: string;
 }): string {
   const f = FAZA_MAPA.get(s.faza);
   const riadky = [
@@ -197,18 +196,14 @@ export function zadanieProProject(s: {
   if ((s.scenar || "").trim()) {
     riadky.push("", "TERAJŠÍ SCENÁR (uprav ho, nepíš odznova):", (s.scenar || "").trim());
   }
-  if ((s.hashtagy || "").trim()) {
-    riadky.push("", `TERAJŠIE HASHTAGY: ${(s.hashtagy || "").trim()}`);
-  }
   if ((s.hotovyText || "").trim()) {
-    riadky.push("", "TERAJŠÍ CAPTION (uprav ho, nepíš odznova):", (s.hotovyText || "").trim());
+    riadky.push("", "TERAJŠÍ CAPTION AJ S HASHTAGMI (uprav ho, nepíš odznova):", (s.hotovyText || "").trim());
   }
   riadky.push(
     "",
-    "ČO CHCEM SPÄŤ — TRI VECI, každú pod svoj nadpis:",
+    "ČO CHCEM SPÄŤ — DVE VECI, každú pod svoj nadpis:",
     "1. SCENÁR — čo hovorím na kameru, PO SLOVENSKY. Na kameru hovorím po slovensky, písané texty sú české; nemieš to. Hovorená veta znie inak než písaná: krátke vety, žiadne odkazy na to, čo je vidieť.",
-    "2. CAPTION — text pod príspevok, PO ČESKY. Nie je to prepis scenára ani jeho preklad; má povedať to, čo v hovorenom slove nezaznelo.",
-    "3. HASHTAGY — 8 až 12, malými písmenami, VŠETKY NA JEDNOM RIADKU za sebou oddelené medzerou (nie pod sebou). Mix témy a publika, bez metodiky a bez značkových.",
+    "2. CAPTION AJ S HASHTAGMI ako JEDEN BLOK, PO ČESKY. Nie je to prepis scenára ani jeho preklad; má povedať to, čo v hovorenom slove nezaznelo. Na konci captionu, po prázdnom riadku, pridaj 8 až 12 hashtagov malými písmenami VŠETKY NA JEDNOM RIADKU za sebou oddelené medzerou. Kopírujem to do Metricoolu jedným ťahom, takže hashtagy NEDÁVAJ ako samostatnú sekciu s vlastným nadpisom.",
     ...(zab ? ["K úvodnému záberu napíš, ČO má byť v prvej sekunde vidieť a ako to nadväzuje na prvú vetu."] : []),
     "Meno klienta ani zdravotný detail do textu nedávaj; použi opis typu: klient, ktorý…",
   );
