@@ -646,3 +646,43 @@ describe("duch| sa nepýta, keď je odchod už vysvetlený pod strata|", () => {
     expect(zaklad({ "strata|Leonora Test": { note: "finančné dôvody" } }).some((a) => a.key === "duch|Leonora Test")).toBe(false);
   });
 });
+
+
+describe("primárny tréner podľa nedávnych sedení", () => {
+  const den = (posun: number) => new Date(Date.now() + posun * 86400000).toISOString().slice(0, 10);
+  const ses = (client: string, trainer: string, date: string) => ({
+    id: `${client}-${trainer}-${date}`, date, time: "10:00", client, sessionTrainer: trainer,
+    sessionName: "x", sessionType: "1:1", durationMin: 60, price: 1000,
+  });
+
+  const postav = (sedenia: ReturnType<typeof ses>[]) =>
+    deriveClients({
+      sessions: sedenia, payments: [], packages: [], services: [], leads: [],
+      clientOverrides: {}, anomalyAck: {},
+    } as never);
+
+  it("klient, ktorý prešiel k inému trénerovi, patrí tomu novému", () => {
+    // Starý tréner má viac sedení celkovo, ale všetky dávno.
+    const sedenia = [
+      ...Array.from({ length: 20 }, (_, i) => ses("Klient", "Matyáš", den(-400 - i))),
+      ...Array.from({ length: 5 }, (_, i) => ses("Klient", "Jerry", den(-10 - i))),
+    ];
+    expect(postav(sedenia)["Klient"].primaryTrainer).toBe("Jerry");
+  });
+
+  it("keď za pol roka nikto netrénoval, platí celoživotný pomer", () => {
+    const sedenia = [
+      ...Array.from({ length: 9 }, (_, i) => ses("Spiaci", "Matyáš", den(-400 - i))),
+      ...Array.from({ length: 2 }, (_, i) => ses("Spiaci", "Jerry", den(-500 - i))),
+    ];
+    expect(postav(sedenia)["Spiaci"].primaryTrainer).toBe("Matyáš");
+  });
+
+  it("jeden zástup nedávno neprebije toho, kto klienta vedie", () => {
+    const sedenia = [
+      ...Array.from({ length: 12 }, (_, i) => ses("Vedeny", "Terezka", den(-20 - i * 5))),
+      ses("Vedeny", "Jerry", den(-3)),
+    ];
+    expect(postav(sedenia)["Vedeny"].primaryTrainer).toBe("Terezka");
+  });
+});

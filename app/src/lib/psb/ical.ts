@@ -135,6 +135,19 @@ function rozvin(u: SurovaUdalost, odMs: number, doMs: number): string[] {
  * Presunutý jednotlivý výskyt (RECURRENCE-ID) prepíše ten pôvodný, nezdvojí ho
  * — inak by appka hlásila, že tréning aj zmizol, aj pribudol.
  */
+/**
+ * Môže sa jednorazová udalosť s týmto začiatkom dotknúť okna?
+ *
+ * Rezerva 14 dní dozadu pokrýva dlhé udalosti, ktoré začali pred oknom
+ * a zasahujú doň — bez nej by viacdňová udalosť z okna vypadla.
+ */
+const REZERVA_MS = 14 * 86400000;
+function vOkne(zaciatok: string, odMs: number, doMs: number): boolean {
+  const t = Date.parse(zaciatok.length <= 10 ? `${zaciatok}T00:00:00Z` : zaciatok);
+  if (!Number.isFinite(t)) return true; // nečitateľný dátum radšej nechaj prejsť
+  return t >= odMs - REZERVA_MS && t <= doMs;
+}
+
 export function citajIcal(text: string, odMs: number, doMs: number): IcalUdalost[] {
   const riadky = spojRiadky(text);
   const surove: SurovaUdalost[] = [];
@@ -146,7 +159,19 @@ export function citajIcal(text: string, odMs: number, doMs: number): IcalUdalost
       continue;
     }
     if (r.startsWith("END:VEVENT")) {
-      if (akt && akt.uid && akt.zaciatok) surove.push(akt);
+      // ZAHOĎ HNEĎ, ČO NEMÔŽE DO OKNA SPADNÚŤ.
+      //
+      // Do 24. 8. 2026 sa do pamäte načítali všetky udalosti z kalendára
+      // (Terezka 7 998, Jerry 7 467) a filtrovalo sa až na konci — pritom do
+      // okna ich patrí okolo stotridsať. Worker na tom vyhorel s „exceeded
+      // resource limits" a keďže zomrel pred zápisom chyby, jej kalendár sa
+      // týždeň nesťahoval a nikto sa to nedozvedel.
+      //
+      // Opakované série a presunuté výskyty sa držať MUSIA aj keď začali dávno:
+      // séria z roku 2023 môže mať výskyt budúci týždeň.
+      if (akt && akt.uid && akt.zaciatok && (akt.rrule || akt.recurrenceId || vOkne(akt.zaciatok, odMs, doMs))) {
+        surove.push(akt);
+      }
       akt = null;
       continue;
     }

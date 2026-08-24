@@ -100,6 +100,8 @@ export type ClientAgg = {
   attendance: number; // 0..1 over last 18 weeks
   segment: "Anchor" | "Stabilný" | "Sporadický";
   trainers: Record<string, number>;
+  /** Sedenia za posledných 6 mesiacov — podľa nich sa určuje primárny tréner. */
+  trainersNedavno: Record<string, number>;
   primaryTrainer: string;
   primaryTrainerOverride: boolean;
   substituteCount: number;
@@ -163,6 +165,10 @@ export function sixMClientSet(data: PSBData): Set<string> {
 }
 
 export function deriveClients(data: PSBData): Record<string, ClientAgg> {
+  // Šesť mesiacov: dosť dlho na to, aby jeden zástup nerozhodol, a dosť krátko
+  // na to, aby sa zmena trénera prejavila v tej istej sezóne.
+  const hranicaNedavnych = new Date(Date.now() - 183 * 86400000).toISOString().slice(0, 10);
+
   const ref = refNow(data);
   const window = lastWeekKeys(ref);
   const map: Record<string, ClientAgg> = {};
@@ -183,6 +189,7 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
         attendance: 0,
         segment: "Sporadický",
         trainers: {},
+        trainersNedavno: {},
         primaryTrainer: "—",
         primaryTrainerOverride: false,
         substituteCount: 0,
@@ -216,6 +223,10 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
     }
     c.sessions.push(s);
     c.trainers[s.sessionTrainer] = (c.trainers[s.sessionTrainer] || 0) + 1;
+    // Aj oddelene za posledného pol roka — kto klienta trénuje TERAZ.
+    if (s.date >= hranicaNedavnych) {
+      c.trainersNedavno[s.sessionTrainer] = (c.trainersNedavno[s.sessionTrainer] || 0) + 1;
+    }
     if (s.date < c.firstSession) c.firstSession = s.date;
     if (s.date > c.lastSession) c.lastSession = s.date;
     c.totalHours += s.duration / 60;
@@ -262,8 +273,21 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
       : "Sporadický";
 
     const ov = data.clientOverrides?.[c.name];
-    const autoPrimary =
-      Object.entries(c.trainers).sort((a, b) => b[1] - a[1])[0]?.[0] || "—";
+    // PRIMÁRNY TRÉNER SA URČUJE Z POSLEDNÝCH ŠIESTICH MESIACOV.
+    //
+    // Do 24. 8. 2026 rozhodoval počet sedení za CELÝ ŽIVOT klienta a klient,
+    // ktorý prešiel k inému trénerovi, zostal navždy pripísaný tomu prvému.
+    // Natália Pečková mala 55 sedení s Matyášom (naposledy v marci) a 26
+    // s Jerrym (naposledy 19. 8.) — appka ju stále viedla ako Matyášovu,
+    // a keďže Matyáš nie je v prepínači, jej narodeniny svietili OBOM.
+    // Terezka tak dostávala upozornenia na Jerryho klientku.
+    //
+    // Keď klient za pol roka netrénoval, platí celoživotný pomer — inak by
+    // sa každý, kto má pauzu, ocitol bez trénera.
+    const nedavne = Object.entries(c.trainersNedavno).sort((a, b) => b[1] - a[1])[0]?.[0];
+    const autoPrimary = nedavne
+      || Object.entries(c.trainers).sort((a, b) => b[1] - a[1])[0]?.[0]
+      || "—";
     c.primaryTrainer = ov?.primaryTrainer || autoPrimary;
     c.primaryTrainerOverride = !!ov?.primaryTrainer;
     c.substituteCount = c.sessions.filter((s) => s.sessionTrainer !== c.primaryTrainer).length;

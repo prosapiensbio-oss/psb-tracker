@@ -120,7 +120,13 @@ async function posli(telo: Record<string, unknown>) {
     headers: { "content-type": "application/json" },
     body: JSON.stringify(telo),
   });
-  return (await r.json()) as { ok: boolean; error?: string; vysledky?: Record<string, { ok: boolean; zmien?: number; udalosti?: number; chyba?: string; prveStiahnutie?: boolean }> };
+  type Snimka = { ok: boolean; zmien?: number; udalosti?: number; chyba?: string; prveStiahnutie?: boolean };
+  return (await r.json()) as {
+    ok: boolean; error?: string;
+    /** Od 24. 8. 2026 sa sťahuje po jednom kalendári — odpoveď nesie jeden výsledok. */
+    trener?: string; vysledok?: Snimka; zostava?: string[];
+    vysledky?: Record<string, Snimka>;
+  };
 }
 
 export function Kalendar({ clients, data, focus }: { clients: Record<string, ClientAgg>; data: PSBData; focus?: NavFocus | null }) {
@@ -167,15 +173,33 @@ export function Kalendar({ clients, data, focus }: { clients: Record<string, Cli
 
   useEffect(() => { void nacitaj(); }, [nacitaj]);
 
+  /**
+   * Sťahuje sa PO JEDNOM KALENDÁRI, každý vlastnou požiadavkou.
+   *
+   * Oba naraz Cloudflare zabil na „Worker exceeded resource limits" — prvý
+   * sa stihol zapísať, druhý nie, a keďže worker zomrel pred zápisom chyby,
+   * nikto sa nedozvedel, že jeden kalendár už týždeň nechodí (24. 8. 2026).
+   */
   const stiahni = async () => {
     setPracuje(true); setChyba(""); setSprava("");
-    const j = await posli({ akcia: "stiahni" });
+    const casti: string[] = [];
+    let dalsi: string | undefined;
+    // Poistka proti cykleniu: zdrojov je pár, desať kôl je viac než dosť.
+    for (let i = 0; i < 10; i++) {
+      const j = await posli({ akcia: "stiahni", ...(dalsi ? { trener: dalsi } : {}) });
+      if (!j.ok) { setChyba(j.error || "Nepodarilo sa."); break; }
+      const v = j.vysledok;
+      const t = j.trener || "?";
+      casti.push(v?.ok
+        ? `${t}: ${v.udalosti} udalostí${v.prveStiahnutie ? " (prvé načítanie)" : `, ${v.zmien} zmien`}`
+        : `${t}: ${v?.chyba || "nepodarilo sa"}`);
+      setSprava(casti.join(" · "));
+      const zostava: string[] = Array.isArray(j.zostava) ? j.zostava : [];
+      // Berie sa len ten, ktorý sme ešte v tomto kole nespracovali.
+      dalsi = zostava.find((x) => !casti.some((c) => c.startsWith(`${x}:`)));
+      if (!dalsi) break;
+    }
     setPracuje(false);
-    if (!j.ok) { setChyba(j.error || "Nepodarilo sa."); return; }
-    const casti = Object.entries(j.vysledky || {}).map(([t, v]) =>
-      v.ok ? `${t}: ${v.udalosti} udalostí${v.prveStiahnutie ? " (prvé načítanie)" : `, ${v.zmien} zmien`}` : `${t}: ${v.chyba}`,
-    );
-    setSprava(casti.join(" · "));
     await nacitaj();
   };
 
@@ -290,11 +314,32 @@ function Pripojenie({ zdroje, onZmena }: { zdroje: Zdroj[]; onZmena: () => Promi
               <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{t}</div>
               {!z && <div style={{ fontSize: 12, color: C.textDim, marginTop: 3 }}>nepripojený</div>}
               {z && z.posledna_chyba && <div style={{ fontSize: 12, color: C.red, marginTop: 3 }}>{z.posledna_chyba}</div>}
-              {z && !z.posledna_chyba && (
-                <div style={{ fontSize: 12, color: C.green, marginTop: 3 }}>
-                  pripojený{z.posledne_ok ? ` · naposledy ${z.posledne_ok.slice(0, 16).replace("T", " ")}` : ""}
-                </div>
-              )}
+              {z && !z.posledna_chyba && (() => {
+                // ZASTARANÝ ZDROJ SA MUSÍ OHLÁSIŤ.
+                //
+                // Terezkin kalendár prestal 17. 8. 2026 chodiť a nikto sa to
+                // sedem dní nedozvedel: worker zomrel na limit skôr, než stihol
+                // zapísať chybu, takže `posledna_chyba` zostala prázdna a riadok
+                // svietil zeleno „pripojený". Appka celý ten čas ukazovala
+                // tréningy, ktoré si Terezka dávno zmazala. Zelená bez dátumu
+                // je horšia než červená s ním.
+                const hodin = z.posledne_ok
+                  ? (Date.now() - Date.parse(z.posledne_ok)) / 3600000
+                  : Infinity;
+                const zastaraný = hodin > 36;
+                return (
+                  <div style={{ fontSize: 12, color: zastaraný ? C.red : C.green, marginTop: 3, lineHeight: 1.4 }}>
+                    pripojený{z.posledne_ok ? ` · naposledy ${z.posledne_ok.slice(0, 16).replace("T", " ")}` : ""}
+                    {zastaraný && (
+                      <div style={{ marginTop: 2 }}>
+                        {Number.isFinite(hodin)
+                          ? `Nesťahoval sa ${Math.floor(hodin / 24)} dní — to, čo tu vidíš, môže byť neaktuálne.`
+                          : "Ešte sa nikdy nestiahol."}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           );
         })}

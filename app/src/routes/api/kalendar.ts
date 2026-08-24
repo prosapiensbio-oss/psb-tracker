@@ -194,10 +194,17 @@ export const Route = createFileRoute("/api/kalendar")({
           if (!token || token.length !== dany.length || token !== dany) {
             return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
           }
-          const zdroje = ((await DB.prepare("SELECT id, trener, url, aktivny FROM kal_zdroje WHERE aktivny = 1").all()).results || []) as unknown as Zdroj[];
-          const vysledky: Record<string, unknown> = {};
-          for (const z of zdroje) vysledky[z.trener] = await snimka(DB, z);
-          return Response.json({ ok: true, vysledky });
+          // Aj tu jeden zdroj na volanie — z rovnakého dôvodu ako pri ručnom
+          // sťahovaní. `trener` v query si vie plánovač vypýtať adresne;
+          // bez neho sa berie najzanedbanejší, takže sa cez ne pretočí.
+          const ziadany = q0.get("trener") || "";
+          const zdroje = ((await DB.prepare(
+            "SELECT id, trener, url, aktivny, posledne_ok FROM kal_zdroje WHERE aktivny = 1 ORDER BY COALESCE(posledne_ok, '') ASC",
+          ).all()).results || []) as unknown as (Zdroj & { posledne_ok: string | null })[];
+          if (!zdroje.length) return Response.json({ ok: true, vysledky: {} });
+          const z = ziadany ? zdroje.find((x) => x.trener === ziadany) : zdroje[0];
+          if (!z) return Response.json({ ok: false, error: "neznamy trener" }, { status: 404 });
+          return Response.json({ ok: true, vysledky: { [z.trener]: await snimka(DB, z) } });
         }
 
         if (!(await isAuthed(request))) return unauthorized();
@@ -271,12 +278,31 @@ export const Route = createFileRoute("/api/kalendar")({
           return Response.json({ ok: true });
         }
 
+        // JEDEN KALENDÁR NA POŽIADAVKU.
+        //
+        // Do 24. 8. 2026 sa v jednej požiadavke sťahovali oba a Cloudflare ju
+        // zabil na „Worker exceeded resource limits" — Jerryho kalendár (prvý
+        // v poradí) sa stihol zapísať, Terezkin nie. Worker zomrel skôr, než
+        // stihol zapísať chybu, takže `posledna_chyba` zostala prázdna a nikto
+        // sa nedozvedel, že sa jej kalendár od 17. 8. nesťahuje. Appka celý ten
+        // čas ukazovala tréningy, ktoré si už dávno zmazala.
+        //
+        // Bez `trener` sa vezme NAJZANEDBANEJŠÍ zdroj, takže opakované volania
+        // sa cez všetky pretočia a žiadny nezostane pozadu natrvalo.
         if (akcia === "stiahni") {
-          const zdroje = ((await DB.prepare("SELECT id, trener, url, aktivny FROM kal_zdroje WHERE aktivny = 1").all()).results || []) as unknown as Zdroj[];
+          const ziadany = String(b.trener || "").trim();
+          const zdroje = ((await DB.prepare(
+            "SELECT id, trener, url, aktivny, posledne_ok FROM kal_zdroje WHERE aktivny = 1 ORDER BY COALESCE(posledne_ok, '') ASC",
+          ).all()).results || []) as unknown as (Zdroj & { posledne_ok: string | null })[];
           if (!zdroje.length) return Response.json({ ok: false, error: "Nie je pripojený žiadny kalendár." });
-          const vysledky: Record<string, unknown> = {};
-          for (const z of zdroje) vysledky[z.trener] = await snimka(DB, z);
-          return Response.json({ ok: true, vysledky });
+          const z = ziadany ? zdroje.find((x) => x.trener === ziadany) : zdroje[0];
+          if (!z) return Response.json({ ok: false, error: `Kalendár trénera ${ziadany} nie je pripojený.` }, { status: 404 });
+          const vysledok = await snimka(DB, z);
+          return Response.json({
+            ok: true, trener: z.trener, vysledok,
+            // Obrazovka podľa toho vie, či má zavolať ešte raz pre ďalší kalendár.
+            zostava: zdroje.filter((x) => x.trener !== z.trener).map((x) => x.trener),
+          });
         }
 
         if (akcia === "mapuj") {

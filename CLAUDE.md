@@ -316,6 +316,25 @@ záver odporuje tomu, čo Jerry hovorí zo skúsenosti.
   `sprava.ts`, `vzas-notes.ts`) — pri ďalšom zásahu do nich ho vymeň; pri
   finančných mesiacoch to môže tichým prázdnom pokaziť viac než plán.
 
+- **Worker umiera na limit BEZ zápisu chyby.** Sťahovanie kalendárov robilo oba
+  v jednej požiadavke; Cloudflare ju zabil na „Worker exceeded resource limits"
+  a keďže worker zomrel pred zápisom, `kal_zdroje.posledna_chyba` zostala
+  prázdna a `aktivny` na 1. Terezkin kalendár tak sedem dní nechodil a obrazovka
+  celý čas svietila zeleno „pripojený" (24. 8. 2026). Ťažká práca patrí do
+  JEDNEJ požiadavky na jeden zdroj a ku každému zdroju patrí kontrola veku
+  poslednej úspešnej synchronizácie — chýbajúca chyba nie je dôkaz, že je dobre.
+- **iCal sa filtruje PRI ČÍTANÍ, nie po ňom.** `citajIcal` načítalo všetkých
+  ~8 000 udalostí do pamäte a filtrovalo na okno až na konci, hoci do okna ich
+  patrí ~130. Séria s RRULE a presunutý výskyt (RECURRENCE-ID) sa musia držať
+  aj keď začali dávno — séria z roku 2023 môže mať výskyt budúci týždeň.
+- **Primárny tréner sa ráta z POSLEDNÝCH 6 MESIACOV.** Celoživotný počet sedení
+  pripísal klienta navždy tomu, kto ho trénoval prvý: Natália Pečková mala 55
+  sedení s Matyášom (posledné v marci) a 26 s Jerrym (posledné 19. 8.) a appka
+  ju viedla ako Matyášovu. Matyáš nie je v prepínači, takže podľa pravidla
+  „klient tretieho trénera patrí obom" svietili jej narodeniny aj Terezke.
+  Bez sedení za pol roka platí celoživotný pomer, inak by klient na pauze
+  zostal bez trénera.
+
 ## Jarvisove zdroje pravdy nie sú len DB
 
 Jarvisov kontext skladá `chat.ts` z viacerých zdrojov a pri oprave faktu treba nájsť VŠETKY:
