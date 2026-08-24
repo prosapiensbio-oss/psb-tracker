@@ -206,8 +206,8 @@ export function zadanieProProject(s: {
   riadky.push(
     "",
     "ČO CHCEM SPÄŤ — TRI VECI, každú pod svoj nadpis:",
-    "1. SCENÁR — čo hovorím na kameru. Hovorená veta znie inak než písaná: krátke vety, žiadne odkazy na to, čo je vidieť.",
-    "2. CAPTION — text pod príspevok. Nie je to prepis scenára; má povedať to, čo v hovorenom slove nezaznelo.",
+    "1. SCENÁR — čo hovorím na kameru, PO SLOVENSKY. Na kameru hovorím po slovensky, písané texty sú české; nemieš to. Hovorená veta znie inak než písaná: krátke vety, žiadne odkazy na to, čo je vidieť.",
+    "2. CAPTION — text pod príspevok, PO ČESKY. Nie je to prepis scenára ani jeho preklad; má povedať to, čo v hovorenom slove nezaznelo.",
     "3. HASHTAGY — 8 až 12, malými písmenami, mix témy a publika. Bez metodiky a bez značkových.",
     ...(zab ? ["K úvodnému záberu napíš, ČO má byť v prvej sekunde vidieť a ako to nadväzuje na prvú vetu."] : []),
     "Meno klienta ani zdravotný detail do textu nedávaj; použi opis typu: klient, ktorý…",

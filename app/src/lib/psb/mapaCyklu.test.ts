@@ -149,6 +149,12 @@ describe("zadanie s už napísaným textom", () => {
     expect(t).toContain("3. HASHTAGY");
   });
 
+  it("žiada scenár slovensky a caption česky — na kameru sa hovorí inak, než sa píše", () => {
+    const t = zadanieProProject(zaklad);
+    expect(t).toContain("PO SLOVENSKY");
+    expect(t).toContain("PO ČESKY");
+  });
+
   it("prázdne polia nevyrobia prázdnu hlavičku", () => {
     const t = zadanieProProject({ ...zaklad, hotovyText: "   ", scenar: "  ", hashtagy: " " });
     expect(t).not.toContain("TERAJŠÍ CAPTION");
