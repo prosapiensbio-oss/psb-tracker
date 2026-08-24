@@ -213,26 +213,34 @@ function RiadokPlanu({ plan, data, clients, onOtvor }: { plan: PlanRiadok; data:
 
 function posliJarvisovi(chat: AssistantChat, p: Plan, onNavigate?: (tab: string, sub?: string) => void) {
   const mes = mesiacePlanu(p.od, p.do);
+  const prazdny = !p.ciel.trim() && !p.pristup.trim() && !p.metriky.length;
   chat.newChat("marketing");
   if (onNavigate) { chat.zachovajOkno(); onNavigate("jarvis"); }
   else chat.setFloatingOpen(true);
-  void chat.ask([
-    `Debatujme o marketingovom pláne „${p.nazov}" na ${p.od} – ${p.do} (${mes.length} mesiacov).`,
+
+  // Otvára sa ROZHOVOR, nie objednávka hotového plánu. Prvá verzia posielala
+  // tri otázky naraz a Jarvis na ne odpovedal sám sebe — z debaty sa stal
+  // referát. Teraz sa pýta on a zapisuje až na Jerryho slovo.
+  const riadky = [
+    prazdny
+      ? "Chcem si spraviť marketingový plán a potrebujem, aby si ho zo mňa vytiahol."
+      : `Chcem prebrať marketingový plán „${p.nazov}" a doladiť ho.`,
     "",
-    `CIEĽ: ${p.ciel || "(nie je zadaný)"}`,
-    `PREČO: ${p.preco || "(nie je zadané)"}`,
-    `METRIKY: ${p.metriky.map((m) => `${METRIKA_MAPA.get(m.kluc)?.nazov ?? m.kluc} → ${m.cielova}`).join(" · ") || "(žiadne)"}`,
-    `PRÍSTUP: ${p.pristup || "(nie je zadaný)"}`,
-    `ROZPOČET NA REKLAMU: ${p.rozpocet ? `${p.rozpocet} Kč na celé obdobie` : "žiadny"}`,
+    "Toto mám zatiaľ — je to východisko, nie rozhodnutie:",
+    p.id ? `ID PLÁNU (daj ho do zápisu, nech nevznikne druhý): ${p.id}` : "ID PLÁNU: zatiaľ žiadne, bude nový",
+    `OBDOBIE: ${p.od} – ${p.do}${mes.length ? ` (${mes.length} mes.)` : " — ešte nie je poriadne zadané"}`,
+    `CIEĽ: ${p.ciel.trim() || "(zatiaľ nič)"}`,
+    `PREČO: ${p.preco.trim() || "(zatiaľ nič)"}`,
+    `METRIKY: ${p.metriky.map((m) => `${METRIKA_MAPA.get(m.kluc)?.nazov ?? m.kluc} → ${m.cielova}`).join(" · ") || "(zatiaľ žiadne)"}`,
+    `PRÍSTUP: ${p.pristup.trim() || "(zatiaľ nič)"}`,
+    `ROZPOČET: ${p.rozpocet ? `${p.rozpocet} Kč na celé obdobie` : "(zatiaľ nič)"}`,
     "",
-    "Povedz mi tri veci, každú krátko a podloženú číslom z dát PSB:",
-    "1. Je ten cieľ na toto obdobie REÁLNY? Porovnaj s tým, čo sa dialo v rovnako dlhom období predtým.",
-    "2. Merajú tie metriky naozaj ten cieľ, alebo meriam niečo, čo sa hýbe samo?",
-    "3. Čo v prístupe chýba — a aký konkrétny obsah by som mal naplánovať do mapy cyklu, aby to vyšlo.",
-    "",
-    "Keď máš konkrétny obsahový návrh, pridaj psb-action naplanuj-obsah tak, ako to robíš inak.",
-    "Keď je cieľ podľa dát nereálny, povedz to rovno a navrhni číslo, ktoré reálne je.",
-  ].join("\n"), `Plán: ${p.nazov}`, []);
+    "Veď ten rozhovor ty. Pýtaj sa ma po jednej otázke, každú oprej o číslo z dát",
+    "a nepýtaj sa na to, čo si vieš zistiť sám. Keď mi niečo nesedí s realitou,",
+    "povedz to rovno — nechcem, aby si mi prikyvoval.",
+    "Zapíš to až vtedy, keď poviem, že sme dohodnutí.",
+  ];
+  void chat.ask(riadky.join("\n"), prazdny ? "Poďme spraviť plán" : `Plán: ${p.nazov}`, []);
 }
 
 function Editor({ plan, data, clients, onUloz, onZavri, onJarvis, onDoMapy }: {
@@ -405,7 +413,7 @@ function Editor({ plan, data, clients, onUloz, onZavri, onJarvis, onDoMapy }: {
         {onJarvis && (
           <button onClick={() => onJarvis(aktualny)} disabled={busy}
             style={{ ...tlacidlo(false), color: C.accentLight, borderColor: mix(C.accent, 0.6) }}>
-            prebrať s Jarvisom
+            opýtať sa Jarvisa
           </button>
         )}
         <button onClick={onDoMapy} disabled={busy} style={tlacidlo(false)}>

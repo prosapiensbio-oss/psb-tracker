@@ -15,7 +15,7 @@ import { nastavPnlBunku, pnlOverridesNaUlozenie } from "../../lib/psb/vzas";
 import { ZABER_MAPA } from "../../lib/psb/zabery";
 
 type ParsedAction = {
-  type: "ack-anomaly" | "unack-anomaly" | "set-override" | "zapis-zaver" | "vyhodnot-zaver" | "novy-ciel" | "kronika" | "odloz-anomaliu" | "uprav-pnl" | "zarad-pohyby" | "mkt-znacka" | "spusti-kampan" | "zastav-kampan" | "naplanuj-obsah";
+  type: "ack-anomaly" | "unack-anomaly" | "set-override" | "zapis-zaver" | "vyhodnot-zaver" | "novy-ciel" | "kronika" | "odloz-anomaliu" | "uprav-pnl" | "zarad-pohyby" | "mkt-znacka" | "spusti-kampan" | "zastav-kampan" | "naplanuj-obsah" | "uloz-plan";
   label: string;
   done?: boolean;
   key?: string;
@@ -144,6 +144,12 @@ function parseActions(raw: string): { text: string; actions: ParsedAction[] } {
           actions.push({ type: "uprav-pnl", label, data: o });
         } else if (o?.type === "zarad-pohyby" && Array.isArray(o.zmeny) && o.zmeny.length) {
           actions.push({ type: "zarad-pohyby", label, data: o });
+        } else if (o?.type === "uloz-plan"
+                   && String(o.nazov || "").trim().length > 1
+                   && /^\d{4}-(0[1-9]|1[0-2])$/.test(String(o.od))
+                   && /^\d{4}-(0[1-9]|1[0-2])$/.test(String(o.do))
+                   && String(o.ciel || "").trim().length > 2) {
+          actions.push({ type: "uloz-plan", label, data: o });
         } else if (o?.type === "naplanuj-obsah"
                    && /^\d{4}-\d{2}$/.test(String(o.mesiac))
                    && Number(o.faza) >= 1 && Number(o.faza) <= 5
@@ -663,6 +669,29 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
             else oznamVysledok(`Prepnutie kampane neprešlo: ${j.error || "bez dôvodu"}`);
           })
           .catch(() => oznamVysledok("Prepnutie kampane zlyhalo — spojenie."));
+      } else if (a.type === "uloz-plan" && a.data) {
+        // Zápis dohody z rozhovoru do plánu. Ide do TEJ ISTEJ tabuľky, ktorú
+        // píše obrazovka — plán z debaty a plán z formulára musia byť jedna vec.
+        // Keď je v bloku id, je to ÚPRAVA existujúceho plánu; bez neho nový.
+        const d = a.data;
+        const telo: Record<string, unknown> = {
+          nazov: String(d.nazov), od: String(d.od), do: String(d.do),
+          ciel: String(d.ciel || ""), preco: String(d.preco || ""),
+          pristup: String(d.pristup || ""), rozpocet: Number(d.rozpocet) || 0,
+        };
+        if (d.id) telo.id = String(d.id);
+        if (Array.isArray(d.metriky)) telo.metriky = d.metriky;
+        if (typeof d.stav === "string") telo.stav = d.stav;
+        void fetch("/api/plany", {
+          method: "POST", credentials: "same-origin",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(telo),
+        })
+          .then((r) => r.json())
+          .then((j: { ok?: boolean; error?: string }) => oznamVysledok(j.ok
+            ? `Plán zapísaný: ${String(d.nazov)} (${String(d.od)} – ${String(d.do)}). Otvor si ho v Marketing → Čo publikovať.`
+            : `Plán sa NEZAPÍSAL: ${j.error || "bez dôvodu"}`))
+          .catch(() => oznamVysledok("Zápis plánu zlyhal — spojenie."));
       } else if (a.type === "naplanuj-obsah" && a.data) {
         // Jarvisov návrh sa zapíše do TEJ ISTEJ tabuľky, do ktorej píše mapa
         // cyklu — nie do vlastného skladu. Dva zoznamy plánu by sa rozišli
