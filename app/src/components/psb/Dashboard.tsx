@@ -2404,8 +2404,11 @@ function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar }: { i
           <span>
             {/* Bez oslovenia: appka nevie, kto odpovedal — v anomaly_ack
                 nie je autor. Tvrdiť „ty si odpovedal" by bola domnienka. */}
+            {/* Bez slovesa: rod sa z mena hádať nedá. Konto Terezky sa volá
+                „Terka" a podmienka na meno „Terezka" by napísala „odpovedal
+                Terka". Dvojbodka povie to isté a nemôže sa mýliť. */}
             {item.predchadzajuca.kto
-              ? `${kedyStrucne(item.predchadzajuca.kedy)} na to odpovedal${item.predchadzajuca.kto === "Terezka" ? "a" : ""} ${item.predchadzajuca.kto}: `
+              ? `${kedyStrucne(item.predchadzajuca.kedy)} · ${item.predchadzajuca.kto}: `
               : `${kedyStrucne(item.predchadzajuca.kedy)} sa na to odpovedalo: `}
             <span style={{ color: C.textMuted }}>{item.predchadzajuca.text.replace(/^odpoveď:\s*/, "")}</span>
           </span>

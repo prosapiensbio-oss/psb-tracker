@@ -36,6 +36,7 @@ import { stavPolozkyRegistra,
   pripomienkySlubov,
   pripomienkaDovodu,
   ktoDnesTrenoval,
+  TRAINERS,
 } from "../../lib/psb/compute";
 import type { RegisterItem } from "../../lib/psb/compute";
 import { breakEvenPriemer, spocitajRezervu } from "../../lib/psb/rezerva";
@@ -221,7 +222,51 @@ export function PSBApp() {
   // vo VZAS dokonca každá záložka svoj vlastný. Prepnutie na Terezku na jednej
   // obrazovke teda neznamenalo nič na druhej a človek si musel pamätať, čo kde
   // nastavil. To je presne opak jednej pravdy na jeden údaj.
-  const [trainer, setTrainer] = useState("all");
+  /**
+   * Filter trénera sa pri prvom otvorení nastaví na TOHO, KTO JE PRIHLÁSENÝ.
+   *
+   * Kým sa všetci hlásili jedným heslom, nebolo z čoho vychádzať a „Obaja" bolo
+   * jediná možnosť. Od 24. 8. 2026 majú Jerry aj Terezka vlastné konto, takže
+   * appka vie, kto sa pozerá — a Terezke nemá zmysel otvárať Jerryho klientov.
+   *
+   * Mapuje sa cez PRIHLASOVACIE MENO, nie cez zobrazované: Terezkino konto sa
+   * volá „Terka" a porovnanie s TRAINERS („Terezka") by nesadlo.
+   *
+   * Vlastná voľba prebíja a pamätá sa — kto si raz prepne na „Obaja", nechce to
+   * robiť po každom načítaní.
+   */
+  // Uložená voľba sa PREČÍTA RAZ, pri prvom vykreslení, a drží sa v stave.
+  // Čítať ju v efekte sa nedá: efekt, ktorý voľbu ukladá, je deklarovaný vyššie,
+  // takže sa spustí prvý a zapíše „all" ešte predtým, než sa stihne zistiť, kto
+  // je prihlásený — appka sa tak vždy otvorila na „Obaja" (nájdené 24. 8. 2026).
+  const [ulozenaVolba] = useState<string | null>(() => {
+    try { return localStorage.getItem("psb-trainer"); } catch { return null; }
+  });
+  const [trainer, setTrainer] = useState(ulozenaVolba || "all");
+  useEffect(() => {
+    try { localStorage.setItem("psb-trainer", trainer); } catch { /* nevadí */ }
+  }, [trainer]);
+  // Prihlásený človek sa dozvie až z odpovede servera; keď si voľbu ešte nikto
+  // nespravil, nastaví sa podľa neho.
+  useEffect(() => {
+    let zrusene = false;
+    if (ulozenaVolba) return;
+    void fetch("/api/users", { credentials: "same-origin" })
+      .then((r) => r.json())
+      .then((j: { ja?: string; users?: { login: string; name: string }[] }) => {
+        if (zrusene || !j.ja) return;
+        const konto = (j.users || []).find((u) => u.login === j.ja || u.name === j.ja);
+        if (!konto) return;
+        // Naviazané na TRAINERS, nie na natvrdo napísanú dvojicu — pri treťom
+        // konte by zoznam v kóde nikto neaktualizoval. Porovnáva sa
+        // prihlasovacie meno malými písmenami: konto „terezka" sadne na
+        // trénerku „Terezka", hoci sa zobrazuje ako „Terka".
+        const t = TRAINERS.find((x) => x.toLowerCase() === konto.login.toLowerCase());
+        if (t) setTrainer(t);
+      })
+      .catch(() => {});
+    return () => { zrusene = true; };
+  }, [ulozenaVolba]);
   const [obdobie, setObdobie] = useState("2026");
   // Týždenné zápisy a mesačné poznámky nie sú v PSBData — majú vlastné tabuľky
   // a doteraz sa čítali až na obrazovke, kde sa píšu. Lenže pripomienka musí
