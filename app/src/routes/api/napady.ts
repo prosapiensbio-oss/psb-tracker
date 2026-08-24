@@ -113,7 +113,13 @@ export const Route = createFileRoute("/api/napady")({
             // Scenár a hashtagy: rovnako ako hotový text sa NEČISTIA cez kus() —
             // scenár má zalomenia po vetách a hashtagy po riadkoch.
             const scenar = b.scenar === undefined ? null : String(b.scenar ?? "").trim().slice(0, 6000);
-            const hashtagy = b.hashtagy === undefined ? null : String(b.hashtagy ?? "").trim().slice(0, 1200);
+            // Hashtagy sa VŽDY ukladajú v jednom riadku, nech prídu akokoľvek.
+            // Project ich raz vrátil pod sebou a do Instagramu sa vkladajú
+            // za sebou — zrovnať ich ručne po každom kole je zbytočná práca.
+            // Je to jediná normalizácia, ktorú si tu dovolím: nič sa nestráca,
+            // mení sa len biely znak medzi značkami.
+            const hashtagy = b.hashtagy === undefined ? null
+              : String(b.hashtagy ?? "").replace(/\s+/g, " ").trim().slice(0, 1200);
             if (stav === null && poznamka === null && odkaz === null
                 && faza === null && mesiac === null && kto === null && koncept === null
                 && hotovy === null && zaber === null && sekvencia === null && scenar === null && hashtagy === null) {
