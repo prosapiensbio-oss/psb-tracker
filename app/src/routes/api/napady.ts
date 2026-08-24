@@ -37,7 +37,7 @@ export const Route = createFileRoute("/api/napady")({
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });
         try {
           const r = await DB.prepare(
-            "SELECT id, datum, text, zdroj, stav, poznamka, autor, odkaz, pouzite_at, faza, planovane_na, kto, koncept, hotovy_text, zaber, sekvencia FROM mkt_napady ORDER BY datum DESC, created_at DESC LIMIT 200",
+            "SELECT id, datum, text, zdroj, stav, poznamka, autor, odkaz, pouzite_at, faza, planovane_na, kto, koncept, hotovy_text, zaber, sekvencia, scenar, hashtagy FROM mkt_napady ORDER BY datum DESC, created_at DESC LIMIT 200",
           ).all();
           return Response.json({ ok: true, napady: r.results || [] });
         } catch {
@@ -110,9 +110,13 @@ export const Route = createFileRoute("/api/napady")({
               }
               sekvencia = raw.slice(0, 8000);
             }
+            // Scenár a hashtagy: rovnako ako hotový text sa NEČISTIA cez kus() —
+            // scenár má zalomenia po vetách a hashtagy po riadkoch.
+            const scenar = b.scenar === undefined ? null : String(b.scenar ?? "").trim().slice(0, 6000);
+            const hashtagy = b.hashtagy === undefined ? null : String(b.hashtagy ?? "").trim().slice(0, 1200);
             if (stav === null && poznamka === null && odkaz === null
                 && faza === null && mesiac === null && kto === null && koncept === null
-                && hotovy === null && zaber === null && sekvencia === null) {
+                && hotovy === null && zaber === null && sekvencia === null && scenar === null && hashtagy === null) {
               return Response.json({ ok: false, error: "nič na zmenu" }, { status: 400 });
             }
             // Deň použitia sa zapíše sám pri prechode na „použitý" — nikto ho
@@ -126,9 +130,11 @@ export const Route = createFileRoute("/api/napady")({
                  faza = COALESCE(?6, faza), planovane_na = COALESCE(?7, planovane_na),
                  kto = COALESCE(?8, kto), koncept = COALESCE(?9, koncept),
                  hotovy_text = COALESCE(?10, hotovy_text), zaber = COALESCE(?11, zaber),
-                 sekvencia = COALESCE(?12, sekvencia)
+                 sekvencia = COALESCE(?12, sekvencia),
+                 scenar = COALESCE(?13, scenar), hashtagy = COALESCE(?14, hashtagy)
                WHERE id = ?1`,
-            ).bind(id, stav, poznamka, odkaz, pouzite, faza, mesiac, kto, koncept, hotovy, zaber, sekvencia).run().then((r) => {
+            ).bind(id, stav, poznamka, odkaz, pouzite, faza, mesiac, kto, koncept, hotovy, zaber, sekvencia,
+                   scenar, hashtagy).run().then((r) => {
               // UPDATE s neexistujúcim id prejde „úspešne" s nulou zmien —
               // a obrazovka by ohlásila uložené nad ničím (revízia 19. 8.).
               if (!r.meta.changes) throw new Error("nenajdene");

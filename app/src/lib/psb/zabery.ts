@@ -93,6 +93,16 @@ export const ZABERY: Zaber[] = [
     zdroj: { nazov: "Ultimate Guide to Camera Movement", url: "https://www.youtube.com/watch?v=IiyBo-qLDeM" },
   },
   {
+    id: "vysledok-hned",
+    nazov: "Výsledok hneď",
+    coRobi: "V prvej sekunde je vidieť telo, ktoré sa UŽ zmenilo — nie problém, ale jeho konec. Nepopisuje problém, dokazuje, že sa dá vyriešiť.",
+    akoNaTo: "Prvý záber je zmenený pohyb alebo postoj, bez úvodu a bez tváre: chôdza zboku, rameno v novej polohe, rebrá v pokoji. Statický alebo veľmi pomalý pohyb, aby oko malo čo čítať. Pôvodný stav ukáž až POTOM, nie naopak — obrátené poradie z toho urobí bežné pred/po.",
+    prePSB: "Doplnené 23. 8. 2026 z výskumu: z 34 635 analyzovaných klipov je najvýkonnejší typ hooku práve ukázanie výsledku v prvých dvoch sekundách. Sedí to aj na Kaneov princíp „popíš problém lepšie než zákazník“ — nič ho nepopíše presnejšie než telo, ktoré ho už nemá.",
+    fazy: [3, 4, 5],
+    pohyb: "statický",
+    zdroj: { nazov: "9 Creative Shot Ideas — Cinematic Camera Movements", url: "https://www.youtube.com/watch?v=Ky3OGTLDVO0" },
+  },
+  {
     id: "statický",
     nazov: "Statický, pohyb je v zábere",
     coRobi: "Kamera stojí. Pohybuje sa iba to, o čom hovoríš. Pôsobí to pokojne a dôveryhodne — a to je samo osebe posolstvo.",

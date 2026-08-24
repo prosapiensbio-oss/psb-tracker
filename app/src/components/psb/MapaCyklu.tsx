@@ -53,7 +53,7 @@ const DRUH: Record<string, string> = {
 
 type NapadRiadok = {
   id: string; text: string; stav: string; zdroj: string;
-  faza?: number; planovane_na?: string; kto?: string; koncept?: string; hotovy_text?: string; zaber?: string; sekvencia?: string;
+  faza?: number; planovane_na?: string; kto?: string; koncept?: string; hotovy_text?: string; zaber?: string; sekvencia?: string; scenar?: string; hashtagy?: string;
 };
 
 type Vyber =
@@ -118,7 +118,7 @@ export function MapaCyklu({ data, chat, onNavigate }: {
     .map((n) => ({
       id: n.id, faza: n.faza || 0, mesiac: n.planovane_na || "",
       koncept: n.koncept || "", kto: n.kto || "", text: n.text || "",
-      hotovyText: n.hotovy_text || "", zaber: n.zaber || "", sekvencia: n.sekvencia || "",
+      hotovyText: n.hotovy_text || "", zaber: n.zaber || "", sekvencia: n.sekvencia || "", scenar: n.scenar || "", hashtagy: n.hashtagy || "",
       zdroj: n.zdroj || "", stav: n.stav || "novy",
     })), [napady]);
 
@@ -416,6 +416,9 @@ export function MapaCyklu({ data, chat, onNavigate }: {
           <Panel
             vyber={vyber}
             os={os.filter((m) => m >= dnes)}
+            zasobnik={napady
+              .filter((n) => n.stav === "novy" && !(n.planovane_na || "") && (n.text || "").trim())
+              .map((n) => ({ id: n.id, text: n.text, zdroj: n.zdroj || "" }))}
             onZavri={() => { setVyber(null); setChyba(""); }}
             onUloz={uloz}
             onFazaPrispevku={ulozFazuPrispevku}
@@ -462,10 +465,12 @@ export function MapaCyklu({ data, chat, onNavigate }: {
  * Editor vybranej bunky. Je to panel pod mriežkou, nie modálne okno —
  * pri plánovaní treba vidieť zvyšok mesiaca, inak sa píše naslepo.
  */
-function Panel({ vyber, os, onZavri, onUloz, onFazaPrispevku, onJarvis, onDoProjectu }: {
+function Panel({ vyber, os, zasobnik, onZavri, onUloz, onFazaPrispevku, onJarvis, onDoProjectu }: {
   vyber: NonNullable<Vyber>;
   /** Mesiace, do ktorých sa dá plánovať — pre presun slotu inam. */
   os: string[];
+  /** Nápady bez termínu — dajú sa vytiahnuť do konceptu. */
+  zasobnik: { id: string; text: string; zdroj: string }[];
   onZavri: () => void;
   onUloz: (b: Record<string, unknown>) => Promise<boolean>;
   onFazaPrispevku: (id: string, faza: number) => void;
@@ -479,10 +484,13 @@ function Panel({ vyber, os, onZavri, onUloz, onFazaPrispevku, onJarvis, onDoProj
   const [hotovyText, setHotovyText] = useState(slot?.hotovyText || "");
   const [zaber, setZaber] = useState(slot?.zaber || "");
   const [sekvencia, setSekvencia] = useState(slot?.sekvencia || "");
+  const [scenar, setScenar] = useState(slot?.scenar || "");
+  const [hashtagy, setHashtagy] = useState(slot?.hashtagy || "");
   const [busy, setBusy] = useState(false);
   // Mazanie na dva kliky. Modálne potvrdenie v modáli je okno v okne;
   // prepnutý nápis je rovnako neprehliadnuteľný a o krok kratší.
   const [mazem, setMazem] = useState(false);
+  const [zasobnikOtvoreny, setZasobnikOtvoreny] = useState(false);
 
   const povodnyMesiac = vyber.druh === "slot" ? vyber.slot.mesiac : vyber.druh === "novy" ? vyber.mesiac : "";
   const povodnaFaza = vyber.druh === "slot" ? vyber.slot.faza : vyber.druh === "novy" ? vyber.faza : vyber.kus.faza;
@@ -540,15 +548,15 @@ function Panel({ vyber, os, onZavri, onUloz, onFazaPrispevku, onJarvis, onDoProj
   // ── Slot v pláne: nový alebo existujúci ───────────────────────────────────
   const f = FAZY.find((x) => x.id === faza);
   const zapis = async () => {
-    if (!koncept.trim() && !kto.trim() && !hotovyText.trim()) return;
+    if (!koncept.trim() && !kto.trim() && !hotovyText.trim() && !scenar.trim()) return;
     setBusy(true);
     const ok = slot
-      ? await onUloz({ id: slot.id, koncept, kto, faza, planovaneNa: mesiac, hotovyText, zaber, sekvencia })
+      ? await onUloz({ id: slot.id, koncept, kto, faza, planovaneNa: mesiac, hotovyText, zaber, sekvencia, scenar, hashtagy })
       : await onUloz({
           // Text nápadu je prvá veta konceptu — zásobník aj plán sú tá istá
           // tabuľka a nápad bez textu by v zozname nápadov svietil prázdny.
           text: koncept.trim().slice(0, 300) || `Obsah na ${mesiac}`,
-          zdroj: "vlastny", faza, planovaneNa: mesiac, kto, koncept, hotovyText, zaber, sekvencia,
+          zdroj: "vlastny", faza, planovaneNa: mesiac, kto, koncept, hotovyText, zaber, sekvencia, scenar, hashtagy,
         });
     setBusy(false);
     if (ok) onZavri();
@@ -580,9 +588,41 @@ function Panel({ vyber, os, onZavri, onUloz, onFazaPrispevku, onJarvis, onDoProj
         </label>
       </div>
 
-      <label style={{ display: "block", fontSize: 11.5, color: C.textMuted, marginBottom: 4 }}>
-        O čom to bude — návrh captionu alebo popis
-      </label>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
+        <label style={{ fontSize: 11.5, color: C.textMuted }}>
+          O čom to bude — návrh captionu alebo popis
+        </label>
+        {/* Zásobník je na dosah práve tu. Nápad zachytený pri tréningu je
+            najpresnejší jazyk, aký o probléme existuje — a keby sa preň
+            muselo ísť na inú obrazovku, nepoužije sa. */}
+        {zasobnik.length > 0 && (
+          <button onClick={() => setZasobnikOtvoreny((x) => !x)}
+            style={{ background: "none", border: 0, padding: 0, color: C.accentLight, fontSize: 11, fontFamily: "inherit", cursor: "pointer" }}>
+            {zasobnikOtvoreny ? "skryť nápady" : `z nápadov (${zasobnik.length})`}
+          </button>
+        )}
+      </div>
+      {zasobnikOtvoreny && (
+        <div style={{ margin: "6px 0 8px", maxHeight: 150, overflowY: "auto", display: "flex", flexDirection: "column", gap: 1 }}>
+          {zasobnik.map((n) => (
+            <button key={n.id}
+              onClick={() => {
+                // Text sa PRIDÁ, neprepíše — keď už niečo v poli je, prepis
+                // by zmazal rozpísanú myšlienku.
+                setKoncept((k) => (k.trim() ? `${k.trim()}\n${n.text}` : n.text));
+                setZasobnikOtvoreny(false);
+              }}
+              style={{
+                textAlign: "left", background: "none", border: 0, borderRadius: 5,
+                padding: "6px 8px 6px 0", fontSize: 11.5, color: C.textMuted,
+                fontFamily: "inherit", cursor: "pointer", lineHeight: 1.4,
+              }}>
+              {n.text.length > 110 ? n.text.slice(0, 110) + "…" : n.text}
+              {n.zdroj === "otazka_klienta" && <span style={{ color: C.accentLight }}> · otázka klienta</span>}
+            </button>
+          ))}
+        </div>
+      )}
       <textarea value={koncept} onChange={(e) => setKoncept(e.target.value)} rows={3}
         placeholder="napr. Petra prišla s bolesťou do kolena a odišla s vysvetlením, prečo to začalo v členku"
         style={{ ...vstup, resize: "vertical", lineHeight: 1.5 }} />
@@ -604,29 +644,46 @@ function Panel({ vyber, os, onZavri, onUloz, onFazaPrispevku, onJarvis, onDoProj
       {/* Hotový text až POD prekliokom do Projectu — v tomto poradí sa to aj
           robí: zámer → Project → vety späť sem. Bez tohto poľa končili vety
           v okne prehliadača a v pláne po nich nezostala stopa. */}
+      {/* TRI TEXTY, NIE JEDEN. Scenár sa číta pri natáčaní, caption sa kopíruje
+          do Metricoolu a hashtagy sa menia nezávisle od oboch. Kým to bolo
+          jedno pole, muselo sa pred každým použitím ručne rozstrihať. */}
       <label style={{ display: "block", fontSize: 11.5, color: C.textMuted, margin: "14px 0 4px" }}>
-        Hotový text {hotovyText.trim() ? `(${hotovyText.trim().length} znakov)` : "— vlož, čo vrátil Project"}
+        Scenár — čo hovoríš na kameru {scenar.trim() ? `(${scenar.trim().length} zn.)` : ""}
       </label>
-      <textarea value={hotovyText} onChange={(e) => setHotovyText(e.target.value)} rows={hotovyText ? 8 : 3}
-        placeholder="sem vlož hotový príspevok, keď ho Project napíše"
+      <textarea value={scenar} onChange={(e) => setScenar(e.target.value)} rows={scenar ? 7 : 3}
+        placeholder="hovorené slovo — z toho sa berú vety do sekvencie"
+        style={{ ...vstup, resize: "vertical", lineHeight: 1.5, fontSize: 12.5 }} />
+
+      <label style={{ display: "block", fontSize: 11.5, color: C.textMuted, margin: "12px 0 4px" }}>
+        Caption — text pod príspevok {hotovyText.trim() ? `(${hotovyText.trim().length} zn.)` : ""}
+      </label>
+      <textarea value={hotovyText} onChange={(e) => setHotovyText(e.target.value)} rows={hotovyText ? 7 : 3}
+        placeholder="popis pod príspevkom — nie je to prepis scenára"
+        style={{ ...vstup, resize: "vertical", lineHeight: 1.5, fontSize: 12.5 }} />
+
+      <label style={{ display: "block", fontSize: 11.5, color: C.textMuted, margin: "12px 0 4px" }}>
+        Hashtagy {hashtagy.trim() ? `(${hashtagy.trim().split(/\s+/).filter((x) => x.startsWith("#")).length})` : ""}
+      </label>
+      <textarea value={hashtagy} onChange={(e) => setHashtagy(e.target.value)} rows={2}
+        placeholder="#biomechanika #bolestzad …"
         style={{ ...vstup, resize: "vertical", lineHeight: 1.5, fontSize: 12.5 }} />
 
       {/* Rozpis záberov až POD hotovým textom: zábery sa priraďujú k VETÁM,
           takže kým text nie je, niet čoho sa chytiť. */}
-      <Sekvencia faza={faza} hotovyText={hotovyText} hodnota={sekvencia} onZmena={setSekvencia} />
+      <Sekvencia faza={faza} hotovyText={scenar || hotovyText} hodnota={sekvencia} onZmena={setSekvencia} />
 
       <div style={{ marginTop: 10, fontSize: 11.5, color: C.textDim, lineHeight: 1.45 }}>
         <button
-          onClick={() => onDoProjectu(zadanieProProject({ mesiac, faza, koncept, kto, hotovyText, zaber, sekvencia }))}
+          onClick={() => onDoProjectu(zadanieProProject({ mesiac, faza, koncept, kto, hotovyText, zaber, sekvencia, scenar, hashtagy }))}
           style={{ background: "none", border: 0, padding: 0, color: C.accentLight, fontSize: 11.5, fontFamily: "inherit", cursor: "pointer" }}>
           doladiť text v Claude Projecte ↗
         </button>
-        {hotovyText.trim() ? " — zadanie ponesie aj terajšiu verziu na úpravu." : " — otvorí sa zadanie na skopírovanie."}
+        {(hotovyText.trim() || scenar.trim()) ? " — zadanie ponesie aj terajšie verzie na úpravu." : " — otvorí sa zadanie na skopírovanie."}
       </div>
 
       <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap", alignItems: "center" }}>
-        <button onClick={zapis} disabled={busy || (!koncept.trim() && !kto.trim() && !hotovyText.trim())}
-          style={{ ...tlacidlo(true), opacity: busy || (!koncept.trim() && !kto.trim() && !hotovyText.trim()) ? 0.5 : 1 }}>
+        <button onClick={zapis} disabled={busy || (!koncept.trim() && !kto.trim() && !hotovyText.trim() && !scenar.trim())}
+          style={{ ...tlacidlo(true), opacity: busy || (!koncept.trim() && !kto.trim() && !hotovyText.trim() && !scenar.trim()) ? 0.5 : 1 }}>
           {slot ? "uložiť" : "naplánovať"}
         </button>
         {/* Do zásobníka, nie do koša. Nápad, ktorý ešte nechceš vyhodiť, ale

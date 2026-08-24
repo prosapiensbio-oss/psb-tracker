@@ -91,6 +91,10 @@ export type SlotPlanu = {
   zaber: string;
   /** Sekvencia záberov ako JSON (pole Krok). Prázdne = ešte nerozpísané. */
   sekvencia: string;
+  /** Čo Jerry HOVORÍ na kameru — iný text než popis pod príspevkom. */
+  scenar: string;
+  /** Hashtagy pod príspevok. Bez nich sa nedá zverejniť. */
+  hashtagy: string;
   zdroj: string;
   stav: string;
 };
@@ -162,6 +166,7 @@ export function tempoFaz(os: string[], vyslo: ZverejnenyKus[], kotva: string, ok
 export function zadanieProProject(s: {
   mesiac: string; faza: number; koncept: string; kto: string;
   hotovyText?: string; zaber?: string; sekvencia?: string;
+  scenar?: string; hashtagy?: string;
 }): string {
   const f = FAZA_MAPA.get(s.faza);
   const riadky = [
@@ -189,12 +194,21 @@ export function zadanieProProject(s: {
   if (sek) riadky.push("", sek);
   // Keď text už raz vznikol, druhé kolo má byť ÚPRAVA, nie nový pokus od
   // nuly — inak sa zahodí všetko, čo na ňom už bolo dobré.
+  if ((s.scenar || "").trim()) {
+    riadky.push("", "TERAJŠÍ SCENÁR (uprav ho, nepíš odznova):", (s.scenar || "").trim());
+  }
+  if ((s.hashtagy || "").trim()) {
+    riadky.push("", `TERAJŠIE HASHTAGY: ${(s.hashtagy || "").trim()}`);
+  }
   if ((s.hotovyText || "").trim()) {
-    riadky.push("", "TERAJŠIA VERZIA (uprav ju, nepíš odznova):", (s.hotovyText || "").trim());
+    riadky.push("", "TERAJŠÍ CAPTION (uprav ho, nepíš odznova):", (s.hotovyText || "").trim());
   }
   riadky.push(
     "",
-    "ČO CHCEM SPÄŤ: hotový text príspevku v češtine — hák, telo, záver.",
+    "ČO CHCEM SPÄŤ — TRI VECI, každú pod svoj nadpis:",
+    "1. SCENÁR — čo hovorím na kameru. Hovorená veta znie inak než písaná: krátke vety, žiadne odkazy na to, čo je vidieť.",
+    "2. CAPTION — text pod príspevok. Nie je to prepis scenára; má povedať to, čo v hovorenom slove nezaznelo.",
+    "3. HASHTAGY — 8 až 12, malými písmenami, mix témy a publika. Bez metodiky a bez značkových.",
     ...(zab ? ["K úvodnému záberu napíš, ČO má byť v prvej sekunde vidieť a ako to nadväzuje na prvú vetu."] : []),
     "Meno klienta ani zdravotný detail do textu nedávaj; použi opis typu: klient, ktorý…",
   );

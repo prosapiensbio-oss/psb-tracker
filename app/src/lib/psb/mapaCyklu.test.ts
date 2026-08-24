@@ -36,7 +36,7 @@ describe("mriežka", () => {
   it("rozdelí zverejnené a naplánované do správnych buniek", () => {
     const os = osMapy("2026-03", 2, 1);
     const m = mriezka(os, [kus("2026-02", 5)], [
-      { id: "a", faza: 5, mesiac: "2026-04", koncept: "k", kto: "", text: "t", zdroj: "jarvis", stav: "novy", hotovyText: "", zaber: "", sekvencia: "" },
+      { id: "a", faza: 5, mesiac: "2026-04", koncept: "k", kto: "", text: "t", zdroj: "jarvis", stav: "novy", hotovyText: "", zaber: "", sekvencia: "", scenar: "", hashtagy: "" },
     ]);
     expect(m.get("2026-02|5")?.vyslo).toHaveLength(1);
     expect(m.get("2026-04|5")?.plan).toHaveLength(1);
@@ -130,13 +130,30 @@ describe("zadanie s už napísaným textom", () => {
 
   it("druhé kolo je ÚPRAVA, nie nový pokus od nuly", () => {
     const t = zadanieProProject({ ...zaklad, hotovyText: "Hotový reel o kolene." });
-    expect(t).toContain("TERAJŠIA VERZIA");
+    expect(t).toContain("TERAJŠÍ CAPTION");
     expect(t).toContain("Hotový reel o kolene.");
   });
 
-  it("bez hotového textu sa o terajšej verzii nezmieni", () => {
-    expect(zadanieProProject(zaklad)).not.toContain("TERAJŠIA VERZIA");
-    expect(zadanieProProject({ ...zaklad, hotovyText: "   " })).not.toContain("TERAJŠIA VERZIA");
+  it("scenár a caption sú DVE veci a idú do zadania oddelene", () => {
+    const t = zadanieProProject({ ...zaklad, scenar: "Hovorím toto.", hotovyText: "Píšem toto." });
+    expect(t).toContain("TERAJŠÍ SCENÁR");
+    expect(t).toContain("Hovorím toto.");
+    expect(t).toContain("TERAJŠÍ CAPTION");
+    expect(t).toContain("Píšem toto.");
+  });
+
+  it("pýta si scenár, caption aj hashtagy — bez hashtagov sa nedá zverejniť", () => {
+    const t = zadanieProProject(zaklad);
+    expect(t).toContain("1. SCENÁR");
+    expect(t).toContain("2. CAPTION");
+    expect(t).toContain("3. HASHTAGY");
+  });
+
+  it("prázdne polia nevyrobia prázdnu hlavičku", () => {
+    const t = zadanieProProject({ ...zaklad, hotovyText: "   ", scenar: "  ", hashtagy: " " });
+    expect(t).not.toContain("TERAJŠÍ CAPTION");
+    expect(t).not.toContain("TERAJŠÍ SCENÁR");
+    expect(t).not.toContain("TERAJŠIE HASHTAGY");
   });
 });
 
