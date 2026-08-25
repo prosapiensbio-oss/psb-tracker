@@ -335,6 +335,14 @@ záver odporuje tomu, čo Jerry hovorí zo skúsenosti.
   Bez sedení za pol roka platí celoživotný pomer, inak by klient na pauze
   zostal bez trénera.
 
+- **Chýbajúci stĺpec v INSERTe nespadne — ticho mlčí.** 24. 8. 2026 som ho
+  zabudol ŠTYRIKRÁT za jeden deň (hotovy_text, zaber, scenar so sekvenciou,
+  poznamka): obrazovka hodnotu poslala, SQLite ju zahodila, appka ohlásila
+  „uložené" nad stratou. TypeScript ani testy o tom nevedia. Odteraz to stráži
+  `src/lib/psb/zapisy.test.ts` — porovná stĺpce v UPDATE a v INSERT v tom istom
+  súbore. Keď spadne, buď stĺpec do INSERTu dopíš, alebo ho pridaj do VYNIMKY
+  aj s dôvodom; zoznam výnimiek je krátky a každá v ňom má vetu, prečo tam je.
+
 ## Jarvisove zdroje pravdy nie sú len DB
 
 Jarvisov kontext skladá `chat.ts` z viacerých zdrojov a pri oprave faktu treba nájsť VŠETKY:
