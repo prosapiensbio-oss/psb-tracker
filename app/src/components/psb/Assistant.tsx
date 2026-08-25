@@ -561,10 +561,15 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
    * s históriou PRED ňou, nie za pôvodnou verziou. Inak by Jarvis videl obe
    * a odpovedal na zmes.
    */
-  async function ask(question: string, zobrazit?: string, zaklad?: Msg[]) {
+  /**
+   * @param obrazky Prílohy pripojené PROGRAMOVO (data URI), keď ich nevkladal
+   *   človek cez sponku. Cez `setAttach` to nejde: stav sa prejaví až v ďalšom
+   *   vykreslení a `ask` volané hneď za ním by videlo starú hodnotu.
+   */
+  async function ask(question: string, zobrazit?: string, zaklad?: Msg[], obrazky?: string[]) {
     const q = question.trim();
-    if ((!q && !attach.length) || busy) return;
-    const imgs = attach.length ? attach : undefined;
+    if ((!q && !attach.length && !obrazky?.length) || busy) return;
+    const imgs = obrazky?.length ? obrazky : attach.length ? attach : undefined;
     const history: Msg[] = [...(zaklad ?? msgs), { role: "user", text: q || "Pozri tento obrázok.", images: imgs, zobrazit }];
     // Add the user message + an empty assistant placeholder that fills as the answer streams.
     setMsgs([...history, { role: "assistant", text: "" }]);

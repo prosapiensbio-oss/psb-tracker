@@ -199,10 +199,10 @@ export const Route = createFileRoute("/api/napady")({
             `INSERT INTO mkt_napady (id, datum, text, zdroj, stav, poznamka, autor, created_at,
                                      faza, planovane_na, kto, koncept, zaber, hotovy_text,
                                      sekvencia, scenar, hashtagy, inspiracia)
-             VALUES (?1, ?2, ?3, ?4, 'novy', '', ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)`,
+             VALUES (?1, ?2, ?3, ?4, 'novy', ?17, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)`,
           ).bind(novy, datum, text, zdroj, autor, new Date().toISOString(),
                  nFaza, nMesiac, nKto, nKoncept, nZaber, nHotovy,
-                 nSekvencia, nScenar, nHashtagy, nInspiracia).run();
+                 nSekvencia, nScenar, nHashtagy, nInspiracia, kus(b.poznamka, 600)).run();
 
           await audit(DB, { action: "zapis", predmet: "marketingový nápad", neu: text.slice(0, 120), actor: autor || undefined });
           return Response.json({ ok: true, id: novy });

@@ -117,17 +117,27 @@ export function Napady({ chat }: { chat?: AssistantChat }) {
    * VIDIEŤ vie, takže rozbor stojí na snímke obrazovky. Preto sa o ňu pýta
    * hneď v prvej vete namiesto toho, aby predstieral, že si video pozrel.
    */
-  const rozober = (n: Napad) => {
+  const rozober = async (n: Napad) => {
     if (!chat) return;
     chat.setFloatingOpen(true);
+    // Titulný záber sa ťahá AŽ TERAZ, nie pri vkladaní: adresa obrázka
+    // z Instagramu je podpísaná a vyprší, takže uložená by o hodinu nefungovala.
+    const meta = n.inspiracia
+      ? await fetch("/api/inspiracia", {
+          method: "POST", credentials: "same-origin",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ url: n.inspiracia }),
+        }).then((x) => x.json()).catch(() => null) as { ok?: boolean; obrazok?: string; popis?: string } | null
+      : null;
+    const obrazky = meta?.ok && meta.obrazok ? [meta.obrazok] : [];
     void chat.ask([
       "Našiel som cudzí príspevok, ktorý ma zaujal, a chcem z neho spraviť niečo naše.",
       n.inspiracia ? `Odkaz: ${n.inspiracia}` : "",
       n.text ? `Čo si o ňom pamätám: ${n.text}` : "",
       "",
-      "DÔLEŽITÉ: ten odkaz otvoriť nevieš a video nevidíš. Nepredstieraj, že áno.",
-      "Keď som ti nepriložil snímku obrazovky, povedz mi rovno, nech ti ju pošlem —",
-      "stačí screenshot prvej sekundy a popisu. Až potom rozoberaj.",
+      obrazky.length
+        ? "PRILOŽENÝ OBRÁZOK JE TITULNÝ ZÁBER — teda PRVÁ SEKUNDA videa, nie jeho priebeh. Rozober z neho formát, text v obraze a kompozíciu, ale NETVRĎ, že vieš, ako sa v ňom hýbe kamera ani čo je ďalej. Keď je pohyb kamery podstatný, povedz mi, nech pošlem záznam obrazovky."
+        : "DÔLEŽITÉ: ten odkaz otvoriť nevieš a video nevidíš. Nepredstieraj, že áno. Povedz mi rovno, nech ti pošlem snímku obrazovky — stačí prvá sekunda a popis. Až potom rozoberaj.",
       "",
       "Keď snímku máš, odpovedz takto:",
       "1. ČO NA TOM FUNGUJE — nie čo tam je, ale prečo to zastaví palec. Pomenuj mechanizmus.",
@@ -138,7 +148,7 @@ export function Napady({ chat }: { chat?: AssistantChat }) {
       "4. ČO Z TOHO NEBRAŤ — čo v origináli funguje im a nám by uškodilo.",
       "",
       "Keď je návrh konkrétny, pridaj psb-action naplanuj-obsah tak, ako to robíš inak.",
-    ].filter(Boolean).join("\n"), `Rozbor inšpirácie: ${(n.inspiracia || n.text).slice(0, 50)}`);
+    ].filter(Boolean).join("\n"), `Rozbor inšpirácie: ${n.text.slice(0, 50)}`, undefined, obrazky);
   };
 
   const vlozOdkaz = async () => {
@@ -146,13 +156,36 @@ export function Napady({ chat }: { chat?: AssistantChat }) {
     if (!/^https?:\/\//i.test(url)) return;
     setUkladam(true);
     try {
+      // Metadáta najprv: keď ich Instagram vydá, nápad má rovno popis, autora
+      // a čísla namiesto holej adresy. Keď nevydá, nápad vznikne aj tak —
+      // odkaz je cennejší než nič a rozbor si vypýta snímku obrazovky.
+      const meta = await fetch("/api/inspiracia", {
+        method: "POST", credentials: "same-origin",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ url }),
+      }).then((x) => x.json()).catch(() => null) as
+        { ok?: boolean; autor?: string; popis?: string; lajky?: number | null; komentare?: number | null; datum?: string } | null;
+
+      const zhrnutie = meta?.ok && meta.popis
+        ? [
+            meta.autor ? `${meta.autor}:` : "",
+            meta.popis.replace(/\s+/g, " ").slice(0, 400),
+          ].filter(Boolean).join(" ")
+        : `Inšpirácia: ${url}`;
+      const cisla = meta?.ok
+        ? [
+            meta.datum || "",
+            meta.lajky != null ? `${meta.lajky} lajkov` : "",
+            meta.komentare != null ? `${meta.komentare} komentárov` : "",
+          ].filter(Boolean).join(" · ")
+        : "";
+
       const r = await fetch("/api/napady", {
         method: "POST", credentials: "same-origin",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          // Text nápadu je zatiaľ len adresa — doplní sa pri rozbore. Prázdny
-          // text by API odmietlo a nápad by nevznikol.
-          text: `Inšpirácia: ${url}`,
+          text: zhrnutie,
+          poznamka: cisla,
           zdroj: "inspiracia", inspiracia: url,
         }),
       });
@@ -243,7 +276,7 @@ export function Napady({ chat }: { chat?: AssistantChat }) {
                     {chat && (
                       <>
                       {n.zdroj === "inspiracia" && (
-                        <button onClick={() => rozober(n)} disabled={chat.busy}
+                        <button onClick={() => void rozober(n)} disabled={chat.busy}
                           style={{ background: "none", border: "none", padding: 0, color: C.accentLight, fontSize: 11.5, cursor: chat.busy ? "default" : "pointer", fontFamily: "inherit", marginRight: 10 }}>
                           rozobrať s Jarvisom
                         </button>

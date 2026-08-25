@@ -45,6 +45,7 @@ import { Route as ApiLeadWebRouteImport } from './routes/api/lead-web'
 import { Route as ApiKalendarRouteImport } from './routes/api/kalendar'
 import { Route as ApiJarvisMemoryRouteImport } from './routes/api/jarvis-memory'
 import { Route as ApiJarvisDokumentRouteImport } from './routes/api/jarvis-dokument'
+import { Route as ApiInspiraciaRouteImport } from './routes/api/inspiracia'
 import { Route as ApiIngestRouteImport } from './routes/api/ingest'
 import { Route as ApiGoogleAdsRouteImport } from './routes/api/google-ads'
 import { Route as ApiGoogleRouteImport } from './routes/api/google'
@@ -239,6 +240,11 @@ const ApiJarvisDokumentRoute = ApiJarvisDokumentRouteImport.update({
   path: '/api/jarvis-dokument',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiInspiraciaRoute = ApiInspiraciaRouteImport.update({
+  id: '/api/inspiracia',
+  path: '/api/inspiracia',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiIngestRoute = ApiIngestRouteImport.update({
   id: '/api/ingest',
   path: '/api/ingest',
@@ -322,6 +328,7 @@ export interface FileRoutesByFullPath {
   '/api/google': typeof ApiGoogleRoute
   '/api/google-ads': typeof ApiGoogleAdsRoute
   '/api/ingest': typeof ApiIngestRoute
+  '/api/inspiracia': typeof ApiInspiraciaRoute
   '/api/jarvis-dokument': typeof ApiJarvisDokumentRoute
   '/api/jarvis-memory': typeof ApiJarvisMemoryRoute
   '/api/kalendar': typeof ApiKalendarRoute
@@ -373,6 +380,7 @@ export interface FileRoutesByTo {
   '/api/google': typeof ApiGoogleRoute
   '/api/google-ads': typeof ApiGoogleAdsRoute
   '/api/ingest': typeof ApiIngestRoute
+  '/api/inspiracia': typeof ApiInspiraciaRoute
   '/api/jarvis-dokument': typeof ApiJarvisDokumentRoute
   '/api/jarvis-memory': typeof ApiJarvisMemoryRoute
   '/api/kalendar': typeof ApiKalendarRoute
@@ -425,6 +433,7 @@ export interface FileRoutesById {
   '/api/google': typeof ApiGoogleRoute
   '/api/google-ads': typeof ApiGoogleAdsRoute
   '/api/ingest': typeof ApiIngestRoute
+  '/api/inspiracia': typeof ApiInspiraciaRoute
   '/api/jarvis-dokument': typeof ApiJarvisDokumentRoute
   '/api/jarvis-memory': typeof ApiJarvisMemoryRoute
   '/api/kalendar': typeof ApiKalendarRoute
@@ -478,6 +487,7 @@ export interface FileRouteTypes {
     | '/api/google'
     | '/api/google-ads'
     | '/api/ingest'
+    | '/api/inspiracia'
     | '/api/jarvis-dokument'
     | '/api/jarvis-memory'
     | '/api/kalendar'
@@ -529,6 +539,7 @@ export interface FileRouteTypes {
     | '/api/google'
     | '/api/google-ads'
     | '/api/ingest'
+    | '/api/inspiracia'
     | '/api/jarvis-dokument'
     | '/api/jarvis-memory'
     | '/api/kalendar'
@@ -580,6 +591,7 @@ export interface FileRouteTypes {
     | '/api/google'
     | '/api/google-ads'
     | '/api/ingest'
+    | '/api/inspiracia'
     | '/api/jarvis-dokument'
     | '/api/jarvis-memory'
     | '/api/kalendar'
@@ -632,6 +644,7 @@ export interface RootRouteChildren {
   ApiGoogleRoute: typeof ApiGoogleRoute
   ApiGoogleAdsRoute: typeof ApiGoogleAdsRoute
   ApiIngestRoute: typeof ApiIngestRoute
+  ApiInspiraciaRoute: typeof ApiInspiraciaRoute
   ApiJarvisDokumentRoute: typeof ApiJarvisDokumentRoute
   ApiJarvisMemoryRoute: typeof ApiJarvisMemoryRoute
   ApiKalendarRoute: typeof ApiKalendarRoute
@@ -921,6 +934,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiJarvisDokumentRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/inspiracia': {
+      id: '/api/inspiracia'
+      path: '/api/inspiracia'
+      fullPath: '/api/inspiracia'
+      preLoaderRoute: typeof ApiInspiraciaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/ingest': {
       id: '/api/ingest'
       path: '/api/ingest'
@@ -1032,6 +1052,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiGoogleRoute: ApiGoogleRoute,
   ApiGoogleAdsRoute: ApiGoogleAdsRoute,
   ApiIngestRoute: ApiIngestRoute,
+  ApiInspiraciaRoute: ApiInspiraciaRoute,
   ApiJarvisDokumentRoute: ApiJarvisDokumentRoute,
   ApiJarvisMemoryRoute: ApiJarvisMemoryRoute,
   ApiKalendarRoute: ApiKalendarRoute,
