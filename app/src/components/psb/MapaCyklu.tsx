@@ -359,8 +359,17 @@ export function MapaCyklu({ data, chat, onNavigate }: {
           plán sa prechádza po poriadku, nie po súradniciach. */}
       {plan.length > 0 && (
         <div style={{ marginTop: 18, borderTop: `1px solid ${C.border}`, paddingTop: 14 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 2 }}>
-            Plán po poradí ({plan.length})
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10, flexWrap: "wrap", marginBottom: 2 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>
+              Plán po poradí ({plan.length})
+            </div>
+            {/* Natáčací list je SAMOSTATNÁ ADRESA, nie ďalšia karta: číta sa
+                pri natáčaní, kedy nikto neprepína záložky. Dá sa uložiť do
+                telefónu a funguje aj bez pripojenia. */}
+            <a href="/natacaci-list" target="_blank" rel="noreferrer"
+              style={{ fontSize: 11.5, color: C.accentLight }}>
+              natáčací list ↗
+            </a>
           </div>
           <div style={{ fontSize: 11.5, color: C.textDim, marginBottom: 10 }}>
             Klikni na riadok a otvorí sa ten istý editor ako z mriežky.

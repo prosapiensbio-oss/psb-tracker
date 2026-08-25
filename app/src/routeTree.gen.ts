@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
+import { Route as NatacaciListRouteImport } from './routes/natacaci-list'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiZositRouteImport } from './routes/api/zosit'
 import { Route as ApiWishlistRouteImport } from './routes/api/wishlist'
@@ -68,6 +69,11 @@ const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
 const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
   id: '/robots.txt',
   path: '/robots.txt',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NatacaciListRoute = NatacaciListRouteImport.update({
+  id: '/natacaci-list',
+  path: '/natacaci-list',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -313,6 +319,7 @@ const ApiAlgoRoute = ApiAlgoRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/natacaci-list': typeof NatacaciListRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/api/algo': typeof ApiAlgoRoute
@@ -365,6 +372,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/natacaci-list': typeof NatacaciListRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/api/algo': typeof ApiAlgoRoute
@@ -418,6 +426,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/natacaci-list': typeof NatacaciListRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/api/algo': typeof ApiAlgoRoute
@@ -472,6 +481,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/natacaci-list'
     | '/robots.txt'
     | '/sitemap.xml'
     | '/api/algo'
@@ -524,6 +534,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/natacaci-list'
     | '/robots.txt'
     | '/sitemap.xml'
     | '/api/algo'
@@ -576,6 +587,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/natacaci-list'
     | '/robots.txt'
     | '/sitemap.xml'
     | '/api/algo'
@@ -629,6 +641,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  NatacaciListRoute: typeof NatacaciListRoute
   RobotsDottxtRoute: typeof RobotsDottxtRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   ApiAlgoRoute: typeof ApiAlgoRoute
@@ -694,6 +707,13 @@ declare module '@tanstack/react-router' {
       path: '/robots.txt'
       fullPath: '/robots.txt'
       preLoaderRoute: typeof RobotsDottxtRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/natacaci-list': {
+      id: '/natacaci-list'
+      path: '/natacaci-list'
+      fullPath: '/natacaci-list'
+      preLoaderRoute: typeof NatacaciListRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -1037,6 +1057,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  NatacaciListRoute: NatacaciListRoute,
   RobotsDottxtRoute: RobotsDottxtRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   ApiAlgoRoute: ApiAlgoRoute,
