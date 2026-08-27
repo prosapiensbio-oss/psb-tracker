@@ -4,7 +4,7 @@
 // the alerts. Where a card recomputes something (zones, weekly hours, capacity
 // util, top KPIs), we mirror that exact logic below rather than reuse a
 // deprecated field (e.g. capacity.effHours is reference-only, NOT what the card shows).
-import { PNL, VZAS_MONTHS, pnlCalc, poslednyMesiacSDatami, salaryCalc as pnlSalary, tempoDlhu, CURRENT_ERA } from "./vzas";
+import { breakEvenRad, PNL, VZAS_MONTHS, pnlCalc, poslednyMesiacSDatami, salaryCalc as pnlSalary, tempoDlhu, CURRENT_ERA } from "./vzas";
 import {
   GA4_MESACNE, GSC_DOPYTY, GSC_MESACNE, GSC_STRANY,
   MKT_CLANKY, MKT_MESACNE,
@@ -244,6 +244,10 @@ export function buildAiContext(
       naklady_spolu: Math.round(_p.celkoveNaklady[idx] || 0),
       hruby_zisk: Math.round(_p.hrubyZisk[idx] || 0),
       marza_pct: Math.round((_p.marza[idx] || 0) * 10) / 10,
+      // Break-even KONKRÉTNEHO mesiaca — dlaždica ho pri uzavretom mesiaci
+      // ukazuje, a Jarvis 27. 8. 2026 tvrdil, že „appka nemá samostatné
+      // číslo pre júl", lebo v kontexte mal len polročný priemer.
+      break_even: Math.round(breakEvenRad()[idx] || 0),
     };
   }
   const pnlPolozky: Record<string, Record<string, number>> = {};
@@ -526,7 +530,15 @@ export function buildAiContext(
         // vzal odtiaľto. Odkaz na neexistujúcu stránku je presne to, čo
         // odkazy majú prestať robiť.
         topStrany: GSC_STRANY.slice(0, 12).map((g) => ({ ...g, vSitemape: vSitemapeUrl(g.url) })),
-        poznamkaKPlanu: "V Marketingu → Reels & posty je karta „Čo publikovať ďalej“ — počítané návrhy z týchto istých čísel. Keď sa pýta, čo publikovať, odpovedaj z „prilezitosti“ (téma, kde sa web zobrazuje a nikto neklikne — najlacnejší obsah, pozícia je už zaplatená) a z „topStrany“ (text, ktorý ľudia čítajú sami a stačí naň odkázať). Nikdy netvrdi príčinu — súbežnosť nie je dôkaz.",
+        poznamkaKPlanu: "V Marketingu → Čo publikovať je karta „Čo publikovať ďalej“ — počítané návrhy z týchto istých čísel. Keď sa pýta, čo publikovať, odpovedaj z „prilezitosti“ (téma, kde sa web zobrazuje a nikto neklikne — najlacnejší obsah, pozícia je už zaplatená) a z „topStrany“ (text, ktorý ľudia čítajú sami a stačí naň odkázať). Nikdy netvrdi príčinu — súbežnosť nie je dôkaz.",
+        // Bez tohto by Jarvis odporúčal veci, ktoré Jerry na obrazovke práve
+        // odklepol ako hotové — a to je presne ten druh straty odpovede,
+        // ktorý register rieši. Kľúč `plan|obsah|napis|<téma>` píše tlačidlo
+        // „hotové" v karte Čo publikovať ďalej.
+        uzHotove: Object.entries(data.anomalyAck || {})
+          .filter(([k]) => k.startsWith("plan|obsah|"))
+          .map(([k, v]) => ({ co: k.replace("plan|obsah|", ""), kedy: (v.ackedAt || "").slice(0, 10) })),
+        poznamkaKHotovym: "„uzHotove“ sú návrhy, ktoré Jerry označil za vybavené — NEODPORÚČAJ ich znova ako novú prácu. Tvar je `druh|čoho`: napis = stránku napísal, prepis = titulok prepísal, pripomen = na Instagrame pripomenul, rozsir = článok rozšíril. Keď sa na takú tému spýta sám, povedz, kedy to označil za hotové, a hovor o výsledku, nie o zadaní.",
       },
       // Google Ads. Prázdno tu neznamená, že sa neinzerovalo — znamená, že sa
       // ešte nestiahlo. Rozdiel medzi tým dvojím je celý rozdiel medzi
@@ -674,10 +686,20 @@ export function buildAiContext(
       // Mapa nákupného cyklu (23. 8. 2026). Rozloženie sa nedáva hotové —
       // je to obyčajné GROUP BY, ktoré si Jarvis spraví presnejšie sám. Čo mu
       // chýba, je VÝZNAM stĺpca `faza`; bez neho by čísla čítal ako kategórie.
+      // Titulka (25. 8. 2026). Jarvis ju nesádže — ale keď sa rieši, čo
+      // publikovať, mal by vedieť, že sa vyrába v appke a podľa čoho, inak
+      // bude Jerrymu radiť Canvu.
+      titulka: {
+        poznamka: "Titulku príspevku (1080×1920) SÁDŽE KOKPIT, negeneruje ju obrázkový model. Otvorí sa v Mape nákupného cyklu cez „vyrobiť titulku“. Píše sa Agrandirom vo váhe 800 a 300 pri šírke 120; slovo v *hviezdičkách* ide tenkým rezom. Nastavenie (štýl, režim, texty, ručné posuny) je v stĺpci mkt_napady.titulka ako JSON; fotka je v tabuľke napad_obrazky (druh = 'titulka'). Neodporúčaj Canvu ani generovanie celej titulky — na diakritike a na konzistencii to padá.",
+        styly: "Sedem štýlov v troch rodinách. Slovo (26 uhlopriečny rez, 31 riadok po riadku inou farbou, 30 slovo vyseknuté z bloku, 23 písmeno cez šev) na edukácie a otázky. Číslo (35) na výsledky a merania. Fotka (39 duotón, 40 fotka vnútri písmen) na klientske príbehy. Appka štýl NAVRHNE z fázy a textu: meranie v texte → Číslo, klientsky príbeh alebo fáza 5 → Fotka, inak Slovo.",
+        obrazok: "Keď nie je čo odfotiť, appka vie obrázok vygenerovať cez Cloudflare Workers AI (flux-1-schnell), alebo dá hotový prompt do Higgsfieldu. Prompt zakazuje text v obrázku, lebo písmená sádže appka.",
+        bezpecnaZona: "Instagram v reeli prekryje spodných ~320 px popisom a tlačidlami a v profilovej mriežke oreže na 4:5. Appka na to má vodiace čiary a hlási, keď text spadne pod hranu. Podpis (logo) sedí na y 1540, aby v zóne ostal.",
+      },
       mapaCyklu: {
         poznamka: "Stĺpec faza v ig_prispevky a mkt_napady je fáza nákupného cyklu podľa piatich stavov uvedomenia (Eugene Schwartz): 1 = nevie o probléme, 2 = tuší problém, 3 = hľadá riešenie, 4 = vyberá dodávateľa, 5 = rozhodnutý, 0 = nezaradené. NIE JE to to isté ako kategoria (tá hovorí, AKO je príspevok urobený — Edukácia, Klientsky príbeh; fáza hovorí, KOMU je určený). Keď sa rieši, čo publikovať, plánuje sa podľa fázy, nie podľa kategórie. Obrazovka je Marketing → Návrhy → Mapa nákupného cyklu.",
         zaradenieJeOdhad: "Fázy 116 príspevkov z 03/2025–08/2026 priradil model z textu háku 23. 8. 2026; starších 149 kusov má fazu 0 zámerne. Keď o rozložení hovoríš, povedz, že je to odhad — nie ručne overené zaradenie.",
         coUzVieme: "Rozloženie zverejnených bolo pri vzniku mapy 22/18/17/22/19 % — takmer rovnomerné. Nehovor Jerrymu, že mu 'chýba fáza X', kým si to neoveril dopytom; pri vzniku mapy to neplatilo a je to najlákavejší falošný nález.",
+        uvodneVety: "Stĺpec uvodne_vety v mkt_napady sú ALTERNATÍVNE PRVÉ VETY scenára, jedna na riadok — to, čo Jerry skúsi, keď prvá veta pred kamerou nesadne. Nie sú to parafrázy tej istej vety: každá má chytiť iným koncom (otázka, tvrdenie, číslo). Navrhuje ich Claude Project spolu so scenárom a captionom; Jerry ich číta na natáčacom liste hneď pod scenárom.",
         planovanie: "Nápad s vyplneným planovane_na (RRRR-MM) a fazou > 0 je SLOT V PLÁNE na ten mesiac; nápad bez mesiaca je zásobník. Pole koncept je návrh captionu alebo popis, o čom to bude, kto je meno človeka, ktorý v tom vystupuje. Keď Jerry žiada návrhy na mesiac, pozri sa najprv dopytom, čo už na ten mesiac a fázu naplánované je, a nenavrhuj to isté.",
         plany: "Marketingové plány sú v tabuľke mkt_plany — vytiahni si ich dopytom, keď sa rieši smer, cieľ, rozpočet alebo „ako nám to ide“. Plán je OBAL, nie ďalší zoznam cieľov: viaže na obdobie cieľ, metriky, prístup a rozpočet. Keď Jerry navrhuje cieľ, over ho proti tomu, čo sa dialo v rovnako dlhom období predtým, a keď je nereálny, povedz to a navrhni číslo, ktoré reálne je. Obrazovka: Marketing → Čo publikovať → Marketingový plán. Plán bez metriky alebo bez obdobia sa nedá vyhodnotiť — to je jediná vec, ktorú appka odmietne uložiť.",
         dlzkaObsahu: "PREČÍTAJ, NEPOČÍTAJ. Medián času sledovania na jedno pozretie je 12,7 s (79 príspevkov s meraním z Metricoolu, stav 23. 8. 2026), 75 % pod 16,1 s, 90 % pod 19,9 s. Toto je najtvrdší podklad pre odporúčanie dĺžky — cudzie benchmarky sú až druhé. Dôležitá výhrada: dlhšie sledované príspevky NEMAJÚ viac uložení (1,77 vs 1,99), a najkratšie sledované majú naopak najvyšší dosah. Čas sledovania a zámer nie sú to isté; neodporúčaj naháňať čas sledovania ako cieľ. Obrazovka: Marketing → Čo publikovať → Mapa nákupného cyklu.",

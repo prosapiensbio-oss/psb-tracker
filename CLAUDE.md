@@ -56,9 +56,11 @@ záver odporuje tomu, čo Jerry hovorí zo skúsenosti.
   ASCII. Používaj `“` alebo sa im v kóde vyhni. Platí to aj v JSX atribútoch
   (`text="… „X" …"`) — tam to ASCII `"` ukončí atribút. Stalo sa to 14. 8.
   trikrát za jeden deň.
-- **wrangler.jsonc je od 9. 8. 2026 OSTRÝ config pre Workers Builds** — nie
-  Higgsfieldov placeholder (ten je preč). `wrangler.psb.jsonc` je jeho totožná
-  kópia pre ručné nasadenie; obsah oboch drž v zhode. Workers Builds sú ŽIVÉ:
+- **`wrangler.jsonc` je JEDINÝ config nasadenia.** Kópia `wrangler.psb.jsonc`
+  vedľa neho tvrdila, že nasadzovacia je ona, hoci ju skript nepoužíval —
+  25. 8. 2026 sa väzba pridaná do nej ticho nenasadila. Kópia je preč a skript
+  odovzdáva `-c wrangler.jsonc` výslovne. Druhý config už nezakladaj.
+  Workers Builds sú ŽIVÉ:
   push na main → `bun install && bun run build` → `npx wrangler deploy`
   (root /app) → nasadené za ~2 min. POZOR: CI deploy NEMÁ stráž migrácií ani
   testovú bránu z nasad.sh — migrácie aplikuj VŽDY pred pushom a testy pusti
@@ -342,6 +344,42 @@ záver odporuje tomu, čo Jerry hovorí zo skúsenosti.
   `src/lib/psb/zapisy.test.ts` — porovná stĺpce v UPDATE a v INSERT v tom istom
   súbore. Keď spadne, buď stĺpec do INSERTu dopíš, alebo ho pridaj do VYNIMKY
   aj s dôvodom; zoznam výnimiek je krátky a každá v ňom má vetu, prečo tam je.
+
+## Odporúčanie bez pamäte sa opakuje donekonečna
+
+Karta „Čo publikovať ďalej" navrhovala napísať stránky, ktoré už napísané
+boli, a „Pripomeň na Instagrame" sa nedala odklepnúť vôbec — nemala ako.
+Jerry, 26. 8. 2026: „ako Kokpit bude vedieť, že sú hotové?" Nijako; žiadny
+mechanizmus tam nebol.
+
+Pravidlá, ktoré z toho platia pre každý zoznam odporúčaní:
+
+- **Kľúč sa neodvodzuje z textu karty.** Text nesie čísla zo Search Console
+  a mení sa každý týždeň; odklepnutie by padlo pri prvom pohybe. Kľúč je druh
+  práce + čoho sa týka (`obsah|napis|<téma>`). Pri prepise titulku je to
+  ADRESA, nie titulok — ten sa prepisom práve zmení.
+- **Skrýva sa na čas, nie navždy.** „Hotové" a „už to nechcem vidieť" vyzerajú
+  rovnako a znamenajú opak. Lehoty sú v `SKRY_DNI` a líšia sa podľa práce:
+  nová stránka 90 dní, pripomenutie na Instagrame 180, tempo 30.
+- **Odklepnuté sa nezahadzuje, nechá po sebe riadok.** Zoznam, ktorý po
+  odklepnutí vyzerá prázdny, tvrdí, že práca neexistuje.
+- **Musí to vidieť aj Jarvis** (`uzHotove` v aiContext) — inak odporučí to,
+  čo Jerry práve označil za vybavené. To je ten istý druh straty odpovede,
+  ktorý rieši register.
+
+## Import, ktorý číta cez keš, ticho nerobí nič
+
+`web_stranky` sa ťahalo LEN ručne a naposledy 17. 8.; karta rozhodovala
+z desať dní starého obrazu webu. Pridané do cronu (3:30) — ale prvý beh
+načítal NULA stránok, hoci sa v ten deň zmenilo 44 článkov: hosting
+(openresty) aj WP Fastest Cache držia starú sitemapu hodiny po úprave a
+`lastmod` v nej ukazoval desať dní dozadu. Import z toho usúdil, že sa nič
+nezmenilo, a vrátil úspech.
+
+**Každé sťahovanie z prosapiens.cz preto ide s jednorazovým parametrom
+v adrese** (`stiahni()` vo `web-obsah.ts`). Samotné `cache-control: no-cache`
+nestačí — CDN odpovie skôr. A pri overovaní webu zvonku platí to isté:
+`curl` bez parametra ti ukáže starú stránku a vyzerá to ako chyba v kóde.
 
 ## Jarvisove zdroje pravdy nie sú len DB
 

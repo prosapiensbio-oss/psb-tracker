@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { planObsahu, type Clanok, type HookVysledok, type Prilezitost } from "./planObsahu";
+import { klucHotoveho, planObsahu, rozdelPodlaHotovych, SKRY_DNI, type Clanok, type HookVysledok, type Prilezitost } from "./planObsahu";
 
 /** Slovenský formát čísel používa pevnú medzeru — v teste ju zrovnáme. */
 const bezPevnej = (s: string) => s.replace(/\u00a0/g, " ");
@@ -192,5 +192,75 @@ describe("pripomenutie článku stojí na klikoch, nie na zobrazeniach", () => {
     // Zobrazenie znamená, že ju Google ukázal; klik, že si ju niekto vybral.
     const v = planObsahu({ ...zaklad, clanky: [{ nazov: "Nikto", kliky: 0, zobrazenia: 9000 }] });
     expect(v.filter((x) => x.zdroj === "web")).toHaveLength(0);
+  });
+});
+
+/**
+ * Pamäť odklepnutých návrhov. Bez nej zoznam navrhoval napísať stránku,
+ * ktorá už bola napísaná — presne to Jerry našiel 26. 8. 2026.
+ */
+describe("hotové návrhy", () => {
+  const dnes = new Date("2026-08-26T12:00:00Z");
+  const pred = (dni: number) => new Date(dnes.getTime() - dni * 24 * 3600 * 1000).toISOString();
+
+  it("kľúč prežije zmenu čísel v karte", () => {
+    // Dôkaz nesie čísla zo Search Console a mení sa každý týždeň. Keby bol
+    // kľúč odvodený z celej karty, odklepnutie by padlo pri prvom pohybe.
+    const a = planObsahu({ ...zaklad, prilezitosti: [p("fascie", 0, 900, 4.0)] });
+    const b = planObsahu({ ...zaklad, prilezitosti: [p("fascie", 3, 4200, 4.7)] });
+    expect(a[0].dokaz).not.toBe(b[0].dokaz);
+    expect(a[0].kluc).toBe(b[0].kluc);
+  });
+
+  it("prepis sa viaže na adresu stránky, nie na jej titulok", () => {
+    // Titulok sa prepisom práve zmení — kľúč na ňom by sa hneď stratil.
+    const majitel = () => ({ url: "https://prosapiens.cz/fascia/", titulok: "FASCINUJÍCÍ FASCE", druh: "titulok" as const });
+    const [n] = planObsahu({ ...zaklad, prilezitosti: [p("fascie", 3, 4200, 4.7)], vlastnik: majitel });
+    expect(n.kluc).toContain("prosapiens.cz/fascia");
+    expect(n.kluc).not.toContain("FASCINUJÍCÍ");
+  });
+
+  it("odklepnutý návrh sa nezahodí, ale odloží", () => {
+    const navrhy = planObsahu({ ...zaklad, prilezitosti: [p("fascie", 0, 900, 4.0)] });
+    const ack = { [klucHotoveho(navrhy[0].kluc)]: { ackedAt: pred(1) } };
+    const { platne, hotove } = rozdelPodlaHotovych(navrhy, ack, dnes);
+    expect(platne).toHaveLength(0);
+    expect(hotove).toHaveLength(1);
+    expect(hotove[0].do.getTime()).toBeGreaterThan(dnes.getTime());
+  });
+
+  it("po uplynutí lehoty sa vráti", () => {
+    const navrhy = planObsahu({ ...zaklad, prilezitosti: [p("fascie", 0, 900, 4.0)] });
+    const ack = { [klucHotoveho(navrhy[0].kluc)]: { ackedAt: pred(SKRY_DNI.napis + 1) } };
+    expect(rozdelPodlaHotovych(navrhy, ack, dnes).platne).toHaveLength(1);
+  });
+
+  it("pripomenutie mlčí dlhšie než napísanie stránky", () => {
+    expect(SKRY_DNI.pripomen).toBeGreaterThan(SKRY_DNI.napis);
+  });
+
+  it("pokazený dátum návrh NEZMLČÍ", () => {
+    const navrhy = planObsahu({ ...zaklad, prilezitosti: [p("fascie", 0, 900, 4.0)] });
+    for (const zly of ["", "nezmysel", "0000-00-00"]) {
+      const ack = { [klucHotoveho(navrhy[0].kluc)]: { ackedAt: zly } };
+      expect(rozdelPodlaHotovych(navrhy, ack, dnes).platne).toHaveLength(1);
+    }
+  });
+
+  it("každý návrh má kľúč aj lehotu", () => {
+    const v = planObsahu({
+      ...zaklad,
+      prilezitosti: [p("fascie", 0, 900, 4.0)],
+      clanky: [c("Fascie – Voda v nás", 1829)],
+      hooky: [h("Vyvrátenie mýtu", 20, 44, 25)],
+      prispevkovMesacne: 6,
+      prispevkovVSilnychMesiacoch: 14,
+    });
+    expect(v.length).toBeGreaterThan(2);
+    for (const n of v) {
+      expect(n.kluc).toMatch(/^obsah\|/);
+      expect(n.skryDni).toBeGreaterThan(0);
+    }
+    expect(new Set(v.map((x) => x.kluc)).size).toBe(v.length);
   });
 });

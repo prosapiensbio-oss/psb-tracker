@@ -58,11 +58,19 @@ const fmtKedy = (ms: number) => {
 const zameranie = (id?: string) => ZAMERANIA.find((z) => z.id === (id || "")) || ZAMERANIA[0];
 
 export function JarvisOkno({
-  chat, onClientClick, onNavigate,
+  chat, onClientClick, onNavigate, navrat,
 }: {
   chat: AssistantChat;
   onClientClick?: (name: string) => void;
   onNavigate?: (tab: string, sub?: string) => void;
+  /**
+   * Cesta späť tam, odkiaľ sa sem prišlo.
+   *
+   * Jerry otvorí slot v mape cyklu, pošle ho Jarvisovi, dostane návrh — a
+   * potom sa musí preklikať späť cez Marketing → Čo publikovať a nájsť tú istú
+   * bunku. Návrat ho vráti rovno do okna, z ktorého odišiel.
+   */
+  navrat?: { popis: string; spat: () => void } | null;
 }) {
   /** Ktorý zoznam pozerám. Prázdne = všetky rozhovory, nie „nezaradené". */
   const [filter, setFilter] = useState("");
@@ -170,11 +178,27 @@ export function JarvisOkno({
   });
 
   return (
-    <div style={{
-      display: "flex", gap: 14, alignItems: "stretch",
-      // Okno má byť pracovný stôl, nie ďalšia karta, ktorou sa roluje.
-      height: "calc(100vh - 150px)", minHeight: 420,
-    }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      {/* NÁVRAT NA MIESTO, NIE NA OBRAZOVKU. Stojí tu po celý čas, nie len
+          pod poslednou odpoveďou — kým sa Jerry s Jarvisom dohaduje, prejde
+          niekoľko správ a tlačidlo pod jednou z nich by mu ušlo hore. */}
+      {navrat && (
+        <button
+          onClick={navrat.spat}
+          style={{
+            alignSelf: "flex-start", display: "flex", alignItems: "center", gap: 6,
+            background: mix(C.accent, 12), border: `1px solid ${mix(C.accent, 45)}`,
+            borderRadius: 6, padding: "6px 12px", color: C.accentLight,
+            fontSize: 12.5, fontFamily: "inherit", cursor: "pointer",
+          }}>
+          ← späť do {navrat.popis}
+        </button>
+      )}
+      <div style={{
+        display: "flex", gap: 14, alignItems: "stretch",
+        // Okno má byť pracovný stôl, nie ďalšia karta, ktorou sa roluje.
+        height: navrat ? "calc(100vh - 190px)" : "calc(100vh - 150px)", minHeight: 420,
+      }}>
       {/* ── vľavo: priečinky a konverzácie ───────────────────────────── */}
       <div style={{
         width: 250, flexShrink: 0, display: "flex", flexDirection: "column",
@@ -365,6 +389,7 @@ export function JarvisOkno({
         <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
           <ChatConversation chat={chat} autoFocus onClientClick={onClientClick} onNavigate={onNavigate}
             onKampan={(n) => { setNavrhKampane(n); setZNavrhu(true); }} />
+        </div>
         </div>
       </div>
     </div>

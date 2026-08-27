@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
+import { jeMesiac } from "../../lib/psb/format";
 import { isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 
@@ -58,7 +59,7 @@ export const Route = createFileRoute("/api/sprava")({
           return Response.json({ ok: false, error: "bad_json" }, { status: 400 });
         }
         const mesiac = String(b.mesiac || "");
-        if (!/^\d{4}-\d{2}$/.test(mesiac)) {
+        if (!jeMesiac(mesiac)) {
           return Response.json({ ok: false, error: "Chýba mesiac." }, { status: 400 });
         }
         const podklady = String(b.podklady || "").slice(0, 24000);

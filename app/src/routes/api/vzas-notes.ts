@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
+import { jeMesiac } from "../../lib/psb/format";
 import { isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 
@@ -36,7 +37,7 @@ export const Route = createFileRoute("/api/vzas-notes")({
           return Response.json({ ok: false, error: "bad_request" }, { status: 400 });
         }
         const month = typeof body.month === "string" ? body.month.slice(0, 7) : "";
-        if (!/^\d{4}-\d{2}$/.test(month)) return Response.json({ ok: false, error: "bad_month" }, { status: 400 });
+        if (!jeMesiac(month)) return Response.json({ ok: false, error: "bad_month" }, { status: 400 });
         // Rovnaká poistka ako vo vzas-settings (nález z testu Jarvisa 11. 8.):
         // ticho odrezaný JSON sa uloží nevalidný a pri ďalšom čítaní z neho
         // nezostane nič. Poznámka mesiaca je jediné miesto, kde appka drží

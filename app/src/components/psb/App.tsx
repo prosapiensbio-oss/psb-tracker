@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { nazovFazy } from "../../lib/psb/mapaCyklu";
 import { BARTER_KLIENTI, PRVY_MESIAC_OTAZOK, PRVY_MESIAC_Z_FIO, vzasVerzia, nastavBtcVyplaty, nastavHodinyZTrackera, nastavJarekZTrackera, nastavNakladyZFio, nastavPnlOverrides, nastavPrijmyZTrackera, nastavVyplaty, nastavZmenyKategorii, nazovKategorie, pnlHodnota, pnlOverridesNaUlozenie } from "../../lib/psb/vzas";
 
 import {
@@ -117,6 +118,15 @@ export type NavFocus = {
    *  doviesť človeka k zoznamu, kde si ho musí zapnúť sám, je polovičná
    *  práca (Terezka, 22. 8. 2026). */
   filter?: string;
+  /**
+   * Konkrétny slot v Mape nákupného cyklu.
+   *
+   * Doviesť človeka na mapu a nechať ho hľadať bunku, z ktorej pred piatimi
+   * minútami odišiel, je polovičná práca — presne tá, ktorú má preklik ušetriť.
+   * `napadId` je nepovinné: keď ho vieme (Jarvis práve príspevok založil),
+   * otvorí sa priamo ten, inak sa otvorí prázdny slot mesiaca a fázy.
+   */
+  slot?: { mesiac: string; faza: number; napadId?: string };
 };
 
 // Five top-level areas, each answering a different question, left to right as a
@@ -213,6 +223,14 @@ export function PSBApp() {
   /** Marketing sa doteraz zamerať nedal — notifikácia „úvodný bez dopytu"
    *  doviedla na zoznam dopytov a meno si musel človek napísať sám. */
   const [marketingFocus, setMarketingFocus] = useState<NavFocus | null>(null);
+  /**
+   * Odkiaľ sa odišlo do Jarvisa a kam sa treba vrátiť.
+   *
+   * Jerry otvorí slot v Mape nákupného cyklu, pošle ho Jarvisovi a dostane
+   * návrh. Bez tohto by sa musel preklikať späť cez Marketing → Čo publikovať
+   * a nájsť tú istú bunku medzi šesťdesiatimi.
+   */
+  const [navratDoMapy, setNavratDoMapy] = useState<{ mesiac: string; faza: number; napadId?: string } | null>(null);
   /** Neúspešný zápis do dát — hlási sa raz pre celú appku, viď setOverride. */
   const [chybaZapisu, setChybaZapisu] = useState("");
   const [marketingSub, setMarketingSub] = useState("lievik");
@@ -1935,7 +1953,10 @@ function skupinaFaktur(
 
 
   // One shared chat brain for both the floating panel and the inline dashboard widget.
-  const chat = useAssistantChat(aiContext, actions);
+  // Keď Jarvis založí príspevok, návrat sa spresní naň — inak by tlačidlo
+  // otvorilo prázdny slot tej bunky a Jerry by si nový návrh hľadal sám.
+  const chat = useAssistantChat(aiContext, actions, (mesiac, faza, napadId) =>
+    setNavratDoMapy({ mesiac, faza, napadId }));
   // Clicking a client name in a bot reply → open that client in Klienti + pop the
   // floating chat open (so the conversation follows you onto the new tab).
   const onClientClick = (name: string) => {
@@ -2112,7 +2133,7 @@ function skupinaFaktur(
               </>
         )}
 
-        {active === "marketing" && <Marketing data={data} clients={clients} leads={data.leads} chat={chat} sub={marketingSub} onSub={setMarketingSub} focus={marketingFocus} onKlient={(m) => navigate("klienti", undefined, { client: m, nonce: Date.now() })} refresh={actions.refresh} onPoznamkaStrata={(m, t) => actions.setOverride(m, "precoNeprisiel", t)} onNavigate={navigate} onAck={(k, zapnut, poznamka) => actions.ackAnomaly(k, zapnut ? (poznamka || "skryté hlásenie") : "", zapnut)} />}
+        {active === "marketing" && <Marketing data={data} clients={clients} leads={data.leads} chat={chat} sub={marketingSub} onSub={setMarketingSub} focus={marketingFocus} onOdchodKJarvisovi={(mesiac, faza, napadId) => setNavratDoMapy({ mesiac, faza, napadId })} onKlient={(m) => navigate("klienti", undefined, { client: m, nonce: Date.now() })} refresh={actions.refresh} onPoznamkaStrata={(m, t) => actions.setOverride(m, "precoNeprisiel", t)} onNavigate={navigate} onAck={(k, zapnut, poznamka) => actions.ackAnomaly(k, zapnut ? (poznamka || "skryté hlásenie") : "", zapnut)} />}
         {active === "vzas" && <Vzas sub={vzasSub} onSub={setVzasSub} data={data} clients={clients} focus={vzasFocus} onNavigate={navigate} />}
         {active === "kalendar" && <Kalendar clients={clients} data={data} focus={kalendarFocus} />}
 
@@ -2121,6 +2142,13 @@ function skupinaFaktur(
             chat={chat}
             onClientClick={onClientClick}
             onNavigate={(t, sub) => navigate(t, sub)}
+            navrat={navratDoMapy ? {
+              popis: `mapy — ${navratDoMapy.mesiac} · ${nazovFazy(navratDoMapy.faza)}`,
+              spat: () => {
+                navigate("marketing", "navrhy", { slot: navratDoMapy, nonce: Date.now() });
+                setNavratDoMapy(null);
+              },
+            } : null}
           />
         )}
 

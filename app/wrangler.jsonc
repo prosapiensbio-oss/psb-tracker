@@ -1,26 +1,18 @@
 {
-  // ── OSTRÁ KONFIGURÁCIA — jediná pravda o nasadení ────────────────
-  // Od presunu na GitHub + Cloudflare Workers Builds (9. 8. 2026) je toto
-  // hlavný konfig: Builds po pushi spustí `npx wrangler deploy` a ten číta
-  // tento súbor. Higgsfieldov placeholder, ktorý tu býval, je preč — appka
-  // už na Higgsfielde nežije. wrangler.psb.jsonc vedľa je totožná kópia pre
-  // ručné nasadenie (`bunx wrangler deploy -c wrangler.psb.jsonc`) a ostáva,
-  // kým naň odkazujú poznámky a pamäť; obsah drž v zhode s týmto súborom.
-
-  "$schema": "node_modules/wrangler/config-schema.json",
-
-  // ── DEPLOY CONFIG PRE VLASTNÝ CLOUDFLARE ÚČET ────────────────────
-  // wrangler.jsonc vedľa je Higgsfieldov build/dev súbor — ten sa pri ich
-  // nasadení prepisuje a jeho `name` aj binding id sú len zástupné hodnoty.
-  // Tento súbor je naopak ten pravý: mená a id sú skutočné a nasadzuje sa
-  // ním na účet prosapiensbio@gmail.com:
+  // ── JEDINÁ KONFIGURÁCIA NASADENIA ───────────────────────────────
+  // Nasadzuje sa na účet prosapiensbio@gmail.com, cez `./scripts/nasad.sh`
+  // alebo po pushi cez Cloudflare Workers Builds. Oboje číta TENTO súbor.
   //
-  //   bunx wrangler deploy -c wrangler.psb.jsonc
+  // Vedľa dlho ležala jeho kópia `wrangler.psb.jsonc`, ktorá o sebe tvrdila,
+  // že nasadzovacia je ona — pritom skript ju nepoužíval. 25. 8. 2026 sa
+  // väzba Workers AI pridaná do tej kópie ticho nenasadila a prejavilo sa to
+  // ako chýbajúca väzba za behu. Kópia je preto preč a skript odovzdáva `-c`
+  // výslovne. DRUHÝ KONFIG UŽ NEZAKLADAJ.
   //
-  // Oba súbory zostávajú vedľa seba zámerne, kým beží stará appka na
-  // Higgsfielde — až keď bude nová overená, ten druhý zmizne.
   // Meno workera je zároveň adresa: kokpit.<účet>.workers.dev. Cieľ je
   // kokpit.prosapiens.cz — na to musí byť zóna prosapiens.cz na Cloudflare.
+
+  "$schema": "node_modules/wrangler/config-schema.json",
   "name": "kokpit",
   "main": "dist/server/server.js",
   "compatibility_date": "2025-05-01",
@@ -54,6 +46,12 @@
       "database_id": "5f34fff3-d3a3-44f2-a68d-57d9f6151749"
     }
   ],
+
+  // Workers AI — generovanie obrázka do titulky, keď nie je čo odfotiť.
+  // Je to VÄZBA, nie kľúč: beží na tom istom účte ako appka, takže tu nie je
+  // čo nastavovať ani čo utajovať. Účtuje sa za obrázok (rádovo desatina
+  // centa), preto sa volá len na kliknutie, nikdy sama.
+  "ai": { "binding": "AI" },
 
   // Tajomstvá (PSB_PASSWORD, PSB_SESSION_SECRET, ANTHROPIC_API_KEY,
   // BTC_RESERVE_TOKEN) tu nie sú a nikdy tu byť nesmú — nastavujú sa cez

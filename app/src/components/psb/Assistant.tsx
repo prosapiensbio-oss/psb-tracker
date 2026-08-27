@@ -1,5 +1,5 @@
 import { type CSSProperties, Fragment, useEffect, useMemo, useRef, useState } from "react";
-import { fmtDMY } from "../../lib/psb/format";
+import { fmtDMY, jeMesiac } from "../../lib/psb/format";
 import { navrhZTokenu } from "../../lib/psb/kampanPlan";
 import type { NavrhKampane } from "./KampanForm";
 import { jePlatnyCiel, jeVonkajsiOdkaz, menoOdkazu, naPlnuAdresu } from "../../lib/psb/odkazy";
@@ -131,7 +131,7 @@ function parseActions(raw: string): { text: string; actions: ParsedAction[] } {
           actions.push({ type: "vyhodnot-zaver", label, data: o });
         } else if (o?.type === "novy-ciel" && typeof o.nazov === "string") {
           actions.push({ type: "novy-ciel", label, data: o });
-        } else if (o?.type === "kronika" && typeof o.fakt === "string" && /^\d{4}-\d{2}$/.test(String(o.mesiac))) {
+        } else if (o?.type === "kronika" && typeof o.fakt === "string" && jeMesiac(o.mesiac)) {
           actions.push({ type: "kronika", label, data: o });
         } else if (o?.type === "odloz-anomaliu" && typeof o.key === "string" && /^\d{4}-\d{2}-\d{2}$/.test(String(o.do))) {
           actions.push({ type: "odloz-anomaliu", key: o.key, label, data: o });
@@ -140,7 +140,7 @@ function parseActions(raw: string): { text: string; actions: ParsedAction[] } {
         // prekryv, takže bunka zostala navždy označená ako opravená a držala
         // by tú hodnotu aj po novom importe z banky. Nález z ostrého testu
         // akcie 12. 8.
-        } else if (o?.type === "uprav-pnl" && typeof o.kategoria === "string" && /^\d{4}-\d{2}$/.test(String(o.mesiac)) && (o.suma === null || Number.isFinite(Number(o.suma)))) {
+        } else if (o?.type === "uprav-pnl" && typeof o.kategoria === "string" && jeMesiac(o.mesiac) && (o.suma === null || Number.isFinite(Number(o.suma)))) {
           actions.push({ type: "uprav-pnl", label, data: o });
         } else if (o?.type === "zarad-pohyby" && Array.isArray(o.zmeny) && o.zmeny.length) {
           actions.push({ type: "zarad-pohyby", label, data: o });
@@ -151,7 +151,7 @@ function parseActions(raw: string): { text: string; actions: ParsedAction[] } {
                    && String(o.ciel || "").trim().length > 2) {
           actions.push({ type: "uloz-plan", label, data: o });
         } else if (o?.type === "naplanuj-obsah"
-                   && /^\d{4}-\d{2}$/.test(String(o.mesiac))
+                   && jeMesiac(o.mesiac)
                    && Number(o.faza) >= 1 && Number(o.faza) <= 5
                    && String(o.koncept || "").trim().length > 2) {
           actions.push({ type: "naplanuj-obsah", label, data: o });
@@ -291,7 +291,12 @@ function fmt(text: string, onClientClick?: (name: string) => void, onNavigate?: 
 // inline dashboard widget share the same conversation. ─────────────────────────
 export type AssistantChat = ReturnType<typeof useAssistantChat>;
 
-export function useAssistantChat(context: AiContext, actions: Actions) {
+export function useAssistantChat(
+  context: AiContext,
+  actions: Actions,
+  /** Ohlási, že Jarvis práve založil príspevok — aby bolo kam sa vrátiť. */
+  onNaplanovane?: (mesiac: string, faza: number, id?: string) => void,
+) {
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -716,10 +721,18 @@ export function useAssistantChat(context: AiContext, actions: Actions) {
           }),
         })
           .then((r) => r.json())
-          .then((j: { ok?: boolean; error?: string }) => oznamVysledok(j.ok
-            ? `Naplánované na ${String(d.mesiac)}: ${String(d.koncept).slice(0, 70)}`
-              + (d.zaber && !ZABER_MAPA.has(String(d.zaber)) ? " (záber sa nerozpoznal — vyber ho v mape)" : "")
-            : `Nenaplánovalo sa: ${j.error || "bez dôvodu"}`))
+          .then((j: { ok?: boolean; error?: string; id?: string }) => {
+            if (j.ok) {
+              // Návrat sa spresní na PRÁVE ZALOŽENÝ príspevok. Bez toho by
+              // tlačidlo otvorilo prázdny slot tej bunky a Jerry by si v nej
+              // svoj nový návrh musel nájsť sám.
+              onNaplanovane?.(String(d.mesiac), Number(d.faza), j.id);
+            }
+            oznamVysledok(j.ok
+              ? `Naplánované na ${String(d.mesiac)}: ${String(d.koncept).slice(0, 70)}`
+                + (d.zaber && !ZABER_MAPA.has(String(d.zaber)) ? " (záber sa nerozpoznal — vyber ho v mape)" : "")
+              : `Nenaplánovalo sa: ${j.error || "bez dôvodu"}`);
+          })
           .catch(() => oznamVysledok("Naplánovanie zlyhalo — spojenie."));
       } else if (a.type === "mkt-znacka" && a.data) {
         // Značka do marketingových grafov — „tu bežala kampaň". Rovnaký sklad

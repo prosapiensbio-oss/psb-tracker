@@ -4,7 +4,7 @@ import { clanky, prilezitosti, type Dopyt as GscDopytTyp } from "../../lib/psb/g
 import { GSC_DOPYTY, GSC_STRANY, marketingVerzia, WEB_STRANKY } from "../../lib/psb/marketing";
 import { obsahPredDopytmi, type Riadok } from "../../lib/psb/obsahDopyt";
 import { monthKey } from "../../lib/psb/format";
-import { planObsahu, type Navrh, type Vlastnik } from "../../lib/psb/planObsahu";
+import { klucHotoveho, planObsahu, rozdelPodlaHotovych, type Navrh, type Vlastnik } from "../../lib/psb/planObsahu";
 import { C, mix } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import type { AssistantChat } from "./Assistant";
@@ -28,7 +28,7 @@ import { Card, Empty, H3, Info } from "./ui";
 
 type IgPrispevok = { datum: string; mesiac: string; kategoria: string };
 
-export function PlanObsahu({ data, chat, onNavigate }: { data: PSBData; chat?: AssistantChat; onNavigate?: (tab: string, sub?: string) => void }) {
+export function PlanObsahu({ data, chat, onNavigate, onAck }: { data: PSBData; chat?: AssistantChat; onNavigate?: (tab: string, sub?: string) => void; onAck?: (kluc: string, zapnut: boolean) => void }) {
   const [ig, setIg] = useState<IgPrispevok[]>([]);
 
   useEffect(() => {
@@ -166,6 +166,15 @@ export function PlanObsahu({ data, chat, onNavigate }: { data: PSBData; chat?: A
     "vyhľadávanie": C.green, web: C.blue, obsah: C.accent, tempo: C.textMuted,
   };
 
+  /**
+   * Odklepnuté návrhy sa nezahadzujú — nechajú po sebe riadok.
+   *
+   * Zoznam, ktorý po odklepnutí vyzerá prázdny, tvrdí, že práca neexistuje.
+   * Existuje, len sa na ňu chvíľu nepýtame. To isté robia hlásenia
+   * v Marketingu.
+   */
+  const { platne, hotove } = rozdelPodlaHotovych(navrhy, data.anomalyAck, new Date());
+
   return (
     <Card>
       <H3>
@@ -175,14 +184,14 @@ export function PlanObsahu({ data, chat, onNavigate }: { data: PSBData; chat?: A
         />
       </H3>
 
-      {navrhy.length === 0 ? (
+      {platne.length === 0 && hotove.length === 0 ? (
         <Empty>
           Zatiaľ nemám z čoho navrhovať. Stiahni Instagram a Google v Mesiac → Dáta a uzávierka;
           návrhy sa objavia samy.
         </Empty>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 9, marginTop: 10 }}>
-          {navrhy.map((n, i) => (
+          {platne.map((n, i) => (
             <div key={n.co + i} style={{
               display: "grid", gridTemplateColumns: "3px 1fr auto", gap: 0,
               background: mix(C.text, 4), borderRadius: 8, overflow: "hidden",
@@ -195,8 +204,19 @@ export function PlanObsahu({ data, chat, onNavigate }: { data: PSBData; chat?: A
                   {n.dokaz} · {n.zdroj}
                 </div>
               </div>
-              {chat && (
-                <div style={{ display: "flex", alignItems: "center", padding: "0 12px 0 6px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "0 12px 0 6px" }}>
+                {onAck && (
+                  <button onClick={() => onAck(klucHotoveho(n.kluc), true)}
+                    title={`Skryje sa na ${n.skryDni} dní. Ak sa téma nepohne, vráti sa.`}
+                    style={{
+                      fontSize: 11.5, padding: "6px 10px", borderRadius: 6,
+                      border: `1px solid ${C.border}`, background: "none",
+                      color: C.textMuted, cursor: "pointer", whiteSpace: "nowrap", fontFamily: "inherit",
+                    }}>
+                    hotové
+                  </button>
+                )}
+                {chat && (
                   <button onClick={() => doZadania(n)} disabled={chat.busy}
                     style={{
                       fontSize: 11.5, padding: "6px 11px", borderRadius: 6,
@@ -206,7 +226,24 @@ export function PlanObsahu({ data, chat, onNavigate }: { data: PSBData; chat?: A
                     }}>
                     Zadanie →
                   </button>
-                </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {hotove.length > 0 && (
+        <div style={{ marginTop: platne.length ? 12 : 4, display: "flex", flexDirection: "column", gap: 5 }}>
+          {hotove.map(({ navrh, do: doKedy }) => (
+            <div key={navrh.kluc}
+              style={{ fontSize: 11.5, color: C.textDim, display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
+              <span>✓ {navrh.co} — hotové, vráti sa {doKedy.toLocaleDateString("sk-SK", { day: "numeric", month: "numeric" })}, ak sa téma nepohne.</span>
+              {onAck && (
+                <button onClick={() => onAck(klucHotoveho(navrh.kluc), false)}
+                  style={{ background: "none", border: "none", padding: 0, color: C.textMuted, fontSize: 11.5, cursor: "pointer", textDecoration: "underline", fontFamily: "inherit" }}>
+                  vrátiť
+                </button>
               )}
             </div>
           ))}

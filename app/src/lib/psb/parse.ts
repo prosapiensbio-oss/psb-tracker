@@ -1,6 +1,7 @@
 // PTminder CSV parsing + normalization. Pure functions — run server-side on
 // ingest. Handles the PTminder quirks: UTF-8 BOM, "CZK1,165.00" thousands,
 // "Jun 29; 2026" dates, and the hierarchical Payments Recorded format.
+import { jeMesiac } from "./format";
 import type { CSVType, PackageRow, PaymentRow, ServiceRow, SessionRow } from "./types";
 
 export const parseCZK = (s: string | number | null | undefined): number => {
@@ -661,7 +662,7 @@ export function parseGsc(text: string): GscImport {
     for (const r of ls.slice(1)) {
       const p = splitCSVLine(r);
       const m = (p[0] || "").slice(0, 7);
-      if (!/^\d{4}-\d{2}$/.test(m)) continue;
+      if (!jeMesiac(m)) continue;
       const e = podla.get(m) || { mesiac: m, kliky: 0, zobrazenia: 0 };
       e.kliky += parseFloat(p[1]) || 0;
       e.zobrazenia += parseFloat(p[2]) || 0;
@@ -715,7 +716,7 @@ export function parseKanaly(text: string): KanalRiadok[] {
   const out: KanalRiadok[] = [];
   for (const r of rows.slice(1)) {
     const mesiac = (r[iM] || "").trim().slice(0, 7);
-    if (!/^\d{4}-\d{2}$/.test(mesiac)) continue;
+    if (!jeMesiac(mesiac)) continue;
     const kanal = (r[iK] || "").trim().slice(0, 40);
     const metrika = (r[iMe] || "").trim().slice(0, 60);
     const hodnota = cisloZTabulky(r[iH]);

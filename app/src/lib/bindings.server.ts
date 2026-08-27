@@ -28,6 +28,9 @@ type AppEnv = {
   ANTHROPIC_API_KEY?: string;
   // Shared read-only token for the PSB Bitcoin app's /api/reserve endpoint.
   BTC_RESERVE_TOKEN?: string;
+  // Workers AI — obrázok do titulky. Väzba, nie kľúč: beží na tom istom účte
+  // ako appka. Chýba len vtedy, keď nie je vo `wrangler.jsonc`.
+  AI?: { run: (model: string, vstup: Record<string, unknown>) => Promise<unknown> };
 };
 
 export function bindings(): AppEnv {

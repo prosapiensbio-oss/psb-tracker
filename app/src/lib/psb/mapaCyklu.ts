@@ -59,6 +59,20 @@ export const nazovFazy = (f: number) => FAZA_MAPA.get(f)?.nazov ?? "Nezaradené"
  * bez budúcich stĺpcov je mapa len prehliadka minulosti a plánovať sa v nej
  * nedá.
  */
+/**
+ * Koľko mesiacov dopredu má mapa siahať.
+ *
+ * Po december BUDÚCEHO roka. Jerry plánuje obsah dopredu a keď sa mu os končí
+ * o štyri mesiace, nemá kam klikať — v auguste 2026 mu mapa dovolila plánovať
+ * len do decembra 2026 (26. 8. 2026). Takto je vždy k dispozícii zvyšok
+ * tohto roka a celý ten nasledujúci, a s prelomom roka pribudne ďalší celý
+ * rok sám. Nič sa nemusí prestavovať v januári.
+ */
+export function mesiacovDopredu(mesiac: string): number {
+  if (!jeMesiac(mesiac)) return 4;
+  return 24 - Number(mesiac.slice(5, 7));
+}
+
 export function osMapy(kotvaMesiac: string, dozadu = 12, dopredu = 4): string[] {
   if (!jeMesiac(kotvaMesiac)) return [];
   const [r, m] = kotvaMesiac.split("-").map(Number);
@@ -94,8 +108,21 @@ export type SlotPlanu = {
   sekvencia: string;
   /** Čo Jerry HOVORÍ na kameru — iný text než popis pod príspevkom. */
   scenar: string;
+  /**
+   * Alternatívne úvodné vety, jedna na riadok.
+   *
+   * Project ich navrhuje ku každému textu. Nesedia v scenári preto, že scenár
+   * je JEDNA verzia — toto sú tie, ktoré sa dajú skúsiť, keď prvá nesadne.
+   */
+  uvodneVety: string;
   /** Hashtagy pod príspevok. Bez nich sa nedá zverejniť. */
   hashtagy: string;
+  /**
+   * Nastavenie titulky ako JSON — skladba, režim, texty, ručné úpravy.
+   * Fotka tu NIE JE: je to súbor z Jerryho počítača a ako `data:` URI by
+   * nafúkla každú odpoveď plánovača o stovky kilobajtov.
+   */
+  titulka: string;
   zdroj: string;
   stav: string;
 };
@@ -166,7 +193,7 @@ export function tempoFaz(os: string[], vyslo: ZverejnenyKus[], kotva: string, ok
  */
 export function zadanieProProject(s: {
   mesiac: string; faza: number; koncept: string; kto: string;
-  hotovyText?: string; zaber?: string; sekvencia?: string; scenar?: string;
+  hotovyText?: string; zaber?: string; sekvencia?: string; scenar?: string; uvodneVety?: string;
 }): string {
   const f = FAZA_MAPA.get(s.faza);
   const riadky = [
@@ -197,14 +224,20 @@ export function zadanieProProject(s: {
   if ((s.scenar || "").trim()) {
     riadky.push("", "TERAJŠÍ SCENÁR (uprav ho, nepíš odznova):", (s.scenar || "").trim());
   }
+  if ((s.uvodneVety || "").trim()) {
+    riadky.push("", "TERAJŠIE ÚVODNÉ VETY (uprav ich, nepíš odznova):", (s.uvodneVety || "").trim());
+  }
   if ((s.hotovyText || "").trim()) {
     riadky.push("", "TERAJŠÍ CAPTION AJ S HASHTAGMI (uprav ho, nepíš odznova):", (s.hotovyText || "").trim());
   }
   riadky.push(
     "",
-    "ČO CHCEM SPÄŤ — DVE VECI, každú pod svoj nadpis:",
+    "ČO CHCEM SPÄŤ — TRI VECI, každú pod svoj nadpis:",
     "1. SCENÁR — čo hovorím na kameru, PO SLOVENSKY. Na kameru hovorím po slovensky, písané texty sú české; nemieš to. Hovorená veta znie inak než písaná: krátke vety, žiadne odkazy na to, čo je vidieť.",
-    "2. CAPTION AJ S HASHTAGMI ako JEDEN BLOK, PO ČESKY. Nie je to prepis scenára ani jeho preklad; má povedať to, čo v hovorenom slove nezaznelo. Na konci captionu, po prázdnom riadku, pridaj 8 až 12 hashtagov malými písmenami VŠETKY NA JEDNOM RIADKU za sebou oddelené medzerou. Kopírujem to do Metricoolu jedným ťahom, takže hashtagy NEDÁVAJ ako samostatnú sekciu s vlastným nadpisom.",
+    "2. TRI ALTERNATÍVNE ÚVODNÉ VETY, každú na samostatný riadok, PO SLOVENSKY. " +
+    "Sú to varianty PRVEJ vety scenára — to, čo skúsim, keď prvá nesadne pred kamerou. " +
+    "Nie parafrázy tej istej vety: každá má chytiť iným koncom (otázka, tvrdenie, číslo).",
+    "3. CAPTION AJ S HASHTAGMI ako JEDEN BLOK, PO ČESKY. Nie je to prepis scenára ani jeho preklad; má povedať to, čo v hovorenom slove nezaznelo. Na konci captionu, po prázdnom riadku, pridaj 8 až 12 hashtagov malými písmenami VŠETKY NA JEDNOM RIADKU za sebou oddelené medzerou. Kopírujem to do Metricoolu jedným ťahom, takže hashtagy NEDÁVAJ ako samostatnú sekciu s vlastným nadpisom.",
     ...(zab ? ["K úvodnému záberu napíš, ČO má byť v prvej sekunde vidieť a ako to nadväzuje na prvú vetu."] : []),
     "Meno klienta ani zdravotný detail do textu nedávaj; použi opis typu: klient, ktorý…",
   );

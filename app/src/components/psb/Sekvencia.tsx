@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   DLZKA_PODLA_FAZY, pocetZaberov, skontrolujSekvenciu, ZABER_SEK, type Krok,
@@ -21,13 +21,53 @@ import { Info, Select } from "./ui";
  * Dva rovnaké pohyby za sebou buď sú, alebo nie sú — to sa dá spočítať. Model
  * by to posúdil zakaždým trochu inak a raz za čas prehliadol.
  */
-export function Sekvencia({ faza, hotovyText, hodnota, onZmena }: {
+export function Sekvencia({ faza, hotovyText, scenar, hodnota, onZmena }: {
   faza: number;
   hotovyText: string;
+  /** Scenár — vety, ku ktorým sa zábery priraďujú. */
+  scenar?: string;
   /** JSON pole Krok. */
   hodnota: string;
   onZmena: (json: string) => void;
 }) {
+  const [navrhujem, setNavrhujem] = useState(false);
+  const [hlaska, setHlaska] = useState("");
+  /** Text, na ktorom už rozpis bežal sám. Bez toho by sa opakoval donekonečna. */
+  const uzSkusene = useRef("");
+
+  /**
+   * Nechá rozpis navrhnúť Jarvisa.
+   *
+   * Priradiť záber k vete nie je tvorivá práca — je to remeslo s pravidlami,
+   * ktoré Jarvis pozná. PREPÍŠE to, čo tam je: keby sa návrh pridával
+   * k existujúcemu, vznikla by zmes dvoch rozpisov a nikto by nevedel, ktorý
+   * je ktorý.
+   */
+  async function nechNavrhne(): Promise<boolean> {
+    const text = zdrojViet.trim();
+    if (navrhujem) return false;
+    setNavrhujem(true);
+    setHlaska("Jarvis rozpisuje…");
+    try {
+      const r = await fetch("/api/sekvencia-navrh", {
+        method: "POST", credentials: "same-origin",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ scenar: text, faza }),
+      });
+      const o = (await r.json()) as { ok?: boolean; error?: string; kroky?: Krok[]; zahodene?: string[] };
+      if (!o.ok || !o.kroky?.length) { setHlaska(o.error || "Návrh sa nepodaril."); return false; }
+      onZmena(JSON.stringify(o.kroky));
+      setHlaska(o.zahodene?.length
+        ? `navrhnuté ✓ — ${o.zahodene.length} ${o.zahodene.length === 1 ? "záber sa nerozpoznal a ostal" : "záberov sa nerozpoznalo a ostali"} prázdne`
+        : "navrhnuté ✓");
+      return true;
+    } catch {
+      setHlaska("Návrh zlyhal — spojenie.");
+      return false;
+    } finally {
+      setNavrhujem(false);
+    }
+  }
   const kroky = useMemo<Krok[]>(() => {
     if (!hodnota) return [];
     try {
@@ -44,10 +84,45 @@ export function Sekvencia({ faza, hotovyText, hodnota, onZmena }: {
   const nalezy = useMemo(() => skontrolujSekvenciu(kroky, ciel), [kroky, ciel]);
 
   // Vety z hotového textu — z nich sa vyberá, čo ku ktorému záberu patrí.
-  const vety = useMemo(() => hotovyText
+  /**
+   * Vety, ku ktorým sa zábery priraďujú.
+   *
+   * SCENÁR má prednosť pred captionom: zábery patria k tomu, čo Jerry HOVORÍ
+   * na kameru, nie k tomu, čo je napísané pod príspevkom. Sú to dva rôzne
+   * texty — scenár je po slovensky, caption po česky. Rozdelil som ich na dva
+   * parametre kvôli Jarvisovi a málem tým túto prednosť zahodil.
+   */
+  const zdrojViet = (scenar || "").trim() || hotovyText;
+  /**
+   * Rozpis nabehne SÁM.
+   *
+   * Doteraz sa čakalo na tlačidlo, hoci v momente, keď je scenár a rozpis
+   * prázdny, existuje len jedna rozumná vec, ktorú spraviť. Jerry: „mal by to
+   * už automaticky spraviť Jarvis, nie až po stlačení tlačidla" (26. 8. 2026).
+   *
+   * Tri poistky, aby to nebolo otravné ani drahé: beží len keď je rozpis
+   * PRÁZDNY (nikdy neprepíše hotovú prácu), len raz na ten istý text, a len
+   * keď je z čoho vychádzať. Tlačidlo zostáva — na prerobenie.
+   */
+  useEffect(() => {
+    const text = zdrojViet.trim();
+    if (!text || kroky.length > 0 || navrhujem) return;
+    if (uzSkusene.current === text) return;
+    uzSkusene.current = text;
+    void nechNavrhne().then((slo) => {
+      setOtvorene(true);
+      // Neúspech sa NEZAPAMÄTÁ. Prvý automatický pokus raz vrátil 502 a bez
+      // tohto by rozpis ostal navždy prázdny — pri ďalšom otvorení sa skúsi
+      // znova. Slučka nehrozí: efekt sa spúšťa zmenou textu, nie tejto značky.
+      if (!slo) uzSkusene.current = "";
+      else setTimeout(() => setHlaska(""), 6000);
+    });
+  }, [zdrojViet, kroky.length]);
+
+  const vety = useMemo(() => zdrojViet
     .split(/(?<=[.!?…])\s+|\n+/)
     .map((v) => v.trim())
-    .filter((v) => v.length > 2), [hotovyText]);
+    .filter((v) => v.length > 2), [zdrojViet]);
 
   const zapis = (n: Krok[]) => onZmena(n.length ? JSON.stringify(n) : "");
   const uprav = (i: number, zmena: Partial<Krok>) =>
@@ -72,14 +147,14 @@ export function Sekvencia({ faza, hotovyText, hodnota, onZmena }: {
     return (
       <div style={{ marginTop: 14 }}>
         <button onClick={() => { setOtvorene(true); if (!kroky.length) pridaj(); }}
-          disabled={!hotovyText.trim()}
+          disabled={!zdrojViet.trim()}
           style={{
             background: "none", border: `1px solid ${C.border}`, borderRadius: 6,
             padding: "7px 12px", fontSize: 12, fontFamily: "inherit",
-            color: hotovyText.trim() ? C.accentLight : C.textDim,
-            cursor: hotovyText.trim() ? "pointer" : "default",
+            color: zdrojViet.trim() ? C.accentLight : C.textDim,
+            cursor: zdrojViet.trim() ? "pointer" : "default",
           }}>
-          rozpísať zábery{!hotovyText.trim() && " — najprv vlož hotový text"}
+          rozpísať zábery{!zdrojViet.trim() && " — najprv vlož scenár alebo text"}
         </button>
       </div>
     );
@@ -97,10 +172,30 @@ export function Sekvencia({ faza, hotovyText, hodnota, onZmena }: {
             "a divák potrebuje asi 3 s, aby záber vstrebal. Pozor: dlhšie sledované príspevky u vás NEMAJÚ viac uložení — dĺžka je odporúčanie, nie cieľ."
           } />
         </div>
+        <button onClick={() => void nechNavrhne().then((slo) => { if (slo) setTimeout(() => setHlaska(""), 6000); })} disabled={navrhujem || !zdrojViet.trim()}
+          title={zdrojViet.trim() ? "" : "Najprv napíš scenár"}
+          style={{
+            background: "none", border: 0, padding: 0, color: C.accentLight, fontSize: 11.5,
+            fontFamily: "inherit", cursor: navrhujem ? "default" : "pointer",
+            opacity: navrhujem || !zdrojViet.trim() ? 0.5 : 1,
+          }}>
+          {navrhujem ? "Jarvis rozpisuje…" : "nech zábery rozpíše Jarvis"}
+        </button>
         <div style={{ fontSize: 11, color: C.textMuted, fontVariantNumeric: "tabular-nums" }}>
           cieľ {dlzka?.min}–{dlzka?.max} s · {rozsah.min}–{rozsah.max} záberov ·
           <b style={{ color: spolu > (dlzka?.max ?? 99) ? C.red : C.text }}> teraz {spolu} s</b>
         </div>
+        {hlaska && (
+          <div style={{ fontSize: 11.5, color: hlaska.includes("✓") ? C.textMuted : C.orange, width: "100%" }}>
+            {hlaska}
+            {!hlaska.includes("✓") && !navrhujem && (
+              <button onClick={() => setHlaska("")}
+                style={{ background: "none", border: 0, padding: 0, marginLeft: 8, color: C.textDim, fontSize: 11, fontFamily: "inherit", cursor: "pointer" }}>
+                skryť
+              </button>
+            )}
+          </div>
+        )}
       </div>
       {dlzka && <div style={{ fontSize: 11, color: C.textDim, marginTop: 3, lineHeight: 1.4 }}>{dlzka.preco}</div>}
 
@@ -138,8 +233,15 @@ export function Sekvencia({ faza, hotovyText, hodnota, onZmena }: {
                   placeholder="čo je vidieť" style={vstup} />
                 {vety.length > 0 && (
                   <Select value={k.veta} onChange={(v) => uprav(i, { veta: v })}
-                    options={[{ value: "", label: "— veta z textu —" },
-                      ...vety.map((v) => ({ value: v, label: v.length > 58 ? v.slice(0, 58) + "…" : v }))]} />
+                    // Vlastná veta kroku sa doplní, aj keď v rozpise viet nie je.
+                    // Jarvis zlúči staccato riadky („Plank. Skľapovačky. Mŕtvy ťah.")
+                    // do jedného záberu — a to je filmársky správne. Bez tohto by sa
+                    // taký krok tváril ako nepriradený a Jerry by ho vyberal znova.
+                    options={[
+                      { value: "", label: "— veta z textu —" },
+                      ...(k.veta && !vety.includes(k.veta) ? [k.veta] : []).concat(vety)
+                        .map((v) => ({ value: v, label: v.length > 58 ? v.slice(0, 58) + "…" : v })),
+                    ]} />
                 )}
                 {mojeNalezy.map((n, j) => (
                   <div key={j} style={{ fontSize: 11, color: n.tvrdy ? C.red : C.textMuted, lineHeight: 1.4 }}>

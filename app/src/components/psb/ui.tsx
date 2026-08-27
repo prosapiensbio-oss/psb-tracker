@@ -480,6 +480,15 @@ export function MiniBars({
   );
 }
 
+/**
+ * Zásobník otvorených okien.
+ *
+ * Escape zavrie len to NAJVRCHNEJŠIE. Titulka si otvára „Navrhni si obrázok"
+ * nad sebou; bez zásobníka by jedno stlačenie zavrelo obe a Jerry by skončil
+ * o dve okná ďalej, než chcel.
+ */
+const oknaNaVrchu: symbol[] = [];
+
 export function Modal({ title, onClose, children, sirka = 440 }: {
   title: string; onClose: () => void; children: ReactNode;
   /** Šírka panela. Východzích 440 px sedí na potvrdenia a krátke formuláre;
@@ -492,6 +501,32 @@ export function Modal({ title, onClose, children, sirka = 440 }: {
   // na obrazovku, ale na kartu. Dnes je každý modál renderovaný mimo kariet,
   // takže to nikde nesvieti — ale je to pasca, ktorá čaká na prvého, kto
   // otvorí okno z karty. Portál ju zavrie natrvalo.
+  // Zavretie klávesou Escape — ale NIE keď sa práve píše do políčka.
+  // Zavretie zahodí neuložené úpravy (rovnako ako klik vedľa okna) a stratiť
+  // rozpísaný caption jedným omylom stlačeným klávesom je horšie než musieť
+  // siahnuť po krížiku.
+  const zavri = useRef(onClose);
+  zavri.current = onClose;
+  useEffect(() => {
+    const ja = Symbol("okno");
+    oknaNaVrchu.push(ja);
+    function klaves(e: KeyboardEvent) {
+      if (e.key !== "Escape") return;
+      if (oknaNaVrchu[oknaNaVrchu.length - 1] !== ja) return;
+      const kde = document.activeElement;
+      const tag = kde?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || (kde as HTMLElement | null)?.isContentEditable) return;
+      e.preventDefault();
+      zavri.current();
+    }
+    window.addEventListener("keydown", klaves);
+    return () => {
+      window.removeEventListener("keydown", klaves);
+      const i = oknaNaVrchu.indexOf(ja);
+      if (i >= 0) oknaNaVrchu.splice(i, 1);
+    };
+  }, []);
+
   const okno = (
     <div
       onClick={onClose}
@@ -521,11 +556,33 @@ export function Modal({ title, onClose, children, sirka = 440 }: {
           // ktorou sa nemá čítať — musí byť nepriehľadný.
           background: C.surface,
           boxShadow: "0 24px 64px rgba(0,0,0,.55)",
-          maxWidth: sirka, width: "100%", marginBottom: 0, maxHeight: "92vh", overflowY: "auto",
+          maxWidth: sirka, width: "100%", marginBottom: 0, maxHeight: "92vh",
+          // Hlavička je mimo rolovania, aby krížik neodroloval preč. Vysoké
+          // okná (titulka má pod sebou celý editor) inak nechajú Jerryho
+          // uprostred bez viditeľnej cesty von.
+          padding: 0, overflow: "hidden", display: "flex", flexDirection: "column",
         }}
       >
-        <div style={{ ...S.h3, marginBottom: 14 }}>{title}</div>
-        {children}
+        <div style={{
+          display: "flex", alignItems: "flex-start", gap: 12,
+          padding: "16px 16px 12px", flexShrink: 0,
+        }}>
+          <div style={{ ...S.h3, marginBottom: 0, flex: 1 }}>{title}</div>
+          <button
+            onClick={onClose}
+            aria-label="zavrieť"
+            title="zavrieť"
+            style={{
+              background: "none", border: 0, padding: "2px 6px", margin: "-2px -4px 0 0",
+              color: C.textDim, fontSize: 20, lineHeight: 1, fontFamily: "inherit",
+              cursor: "pointer", flexShrink: 0,
+            }}>
+            ×
+          </button>
+        </div>
+        <div style={{ padding: "0 16px 16px", overflowY: "auto" }}>
+          {children}
+        </div>
       </div>
     </div>
   );

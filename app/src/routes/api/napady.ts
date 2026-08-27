@@ -26,6 +26,16 @@ const ZDROJE = new Set(["otazka_klienta", "vlastny", "jarvis", "ine", "inspiraci
 
 const kus = (v: unknown, max: number) => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 
+/**
+ * Text, kde ZÁLEŽÍ NA RIADKOCH.
+ *
+ * `kus` zráža všetky biele znaky na medzeru — pri úvodných vetách to zlepilo
+ * tri vety do jednej a pole stratilo zmysel (25. 8. 2026). Riadky sa tu držia,
+ * len sa čistia okraje a zahadzujú prázdne.
+ */
+const riadkyKus = (v: unknown, max: number) =>
+  String(v ?? "").split(/\n/).map((r) => r.trim()).filter(Boolean).join("\n").slice(0, max);
+
 /** Mesiac plánu je „YYYY-MM"; prázdny reťazec vracia slot do zásobníka. */
 const jeMesiac = (v: unknown) => v === "" || platnyMesiac(v);
 
@@ -38,7 +48,7 @@ export const Route = createFileRoute("/api/napady")({
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });
         try {
           const r = await DB.prepare(
-            "SELECT id, datum, text, zdroj, stav, poznamka, autor, odkaz, pouzite_at, faza, planovane_na, kto, koncept, hotovy_text, zaber, sekvencia, scenar, hashtagy, plan_id, inspiracia FROM mkt_napady ORDER BY datum DESC, created_at DESC LIMIT 200",
+            "SELECT id, datum, text, zdroj, stav, poznamka, autor, odkaz, pouzite_at, faza, planovane_na, kto, koncept, hotovy_text, zaber, sekvencia, scenar, hashtagy, plan_id, inspiracia, titulka, uvodne_vety FROM mkt_napady ORDER BY datum DESC, created_at DESC LIMIT 200",
           ).all();
           return Response.json({ ok: true, napady: r.results || [] });
         } catch {
@@ -124,9 +134,16 @@ export const Route = createFileRoute("/api/napady")({
             // mení sa len biely znak medzi značkami.
             const hashtagy = b.hashtagy === undefined ? null
               : String(b.hashtagy ?? "").replace(/\s+/g, " ").trim().slice(0, 1200);
+            // Nastavenie titulky. Prázdny reťazec je platná hodnota („zabudni,
+            // čo som nastavil"), takže sa rozlišuje od `undefined`.
+            const titulka = b.titulka === undefined ? null : String(b.titulka ?? "").slice(0, 4000);
+            // Jedna veta na riadok, prázdne riadky preč. Text, nie štruktúra —
+            // Jerry to číta a prepisuje pri statíve.
+            const uvodneVety = b.uvodneVety === undefined ? null : riadkyKus(b.uvodneVety, 1500);
             if (stav === null && poznamka === null && odkaz === null
                 && faza === null && mesiac === null && kto === null && koncept === null
-                && hotovy === null && zaber === null && sekvencia === null && inspiracia === null && scenar === null && hashtagy === null) {
+                && hotovy === null && zaber === null && sekvencia === null && inspiracia === null
+                && scenar === null && hashtagy === null && titulka === null && uvodneVety === null) {
               return Response.json({ ok: false, error: "nič na zmenu" }, { status: 400 });
             }
             // Deň použitia sa zapíše sám pri prechode na „použitý" — nikto ho
@@ -141,10 +158,12 @@ export const Route = createFileRoute("/api/napady")({
                  kto = COALESCE(?8, kto), koncept = COALESCE(?9, koncept),
                  hotovy_text = COALESCE(?10, hotovy_text), zaber = COALESCE(?11, zaber),
                  sekvencia = COALESCE(?12, sekvencia), inspiracia = COALESCE(?15, inspiracia),
-                 scenar = COALESCE(?13, scenar), hashtagy = COALESCE(?14, hashtagy)
+                 scenar = COALESCE(?13, scenar), hashtagy = COALESCE(?14, hashtagy),
+                 titulka = COALESCE(?16, titulka),
+                 uvodne_vety = COALESCE(?17, uvodne_vety)
                WHERE id = ?1`,
             ).bind(id, stav, poznamka, odkaz, pouzite, faza, mesiac, kto, koncept, hotovy, zaber, sekvencia,
-                   scenar, hashtagy, inspiracia).run().then((r) => {
+                   scenar, hashtagy, inspiracia, titulka, uvodneVety).run().then((r) => {
               // UPDATE s neexistujúcim id prejde „úspešne" s nulou zmien —
               // a obrazovka by ohlásila uložené nad ničím (revízia 19. 8.).
               if (!r.meta.changes) throw new Error("nenajdene");
@@ -198,11 +217,12 @@ export const Route = createFileRoute("/api/napady")({
             // najprv pri hotovy_text, potom pri scenari a sekvencii.
             `INSERT INTO mkt_napady (id, datum, text, zdroj, stav, poznamka, autor, created_at,
                                      faza, planovane_na, kto, koncept, zaber, hotovy_text,
-                                     sekvencia, scenar, hashtagy, inspiracia)
-             VALUES (?1, ?2, ?3, ?4, 'novy', ?17, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)`,
+                                     sekvencia, scenar, hashtagy, inspiracia, titulka, uvodne_vety)
+             VALUES (?1, ?2, ?3, ?4, 'novy', ?17, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?18, ?19)`,
           ).bind(novy, datum, text, zdroj, autor, new Date().toISOString(),
                  nFaza, nMesiac, nKto, nKoncept, nZaber, nHotovy,
-                 nSekvencia, nScenar, nHashtagy, nInspiracia, kus(b.poznamka, 600)).run();
+                 nSekvencia, nScenar, nHashtagy, nInspiracia, kus(b.poznamka, 600),
+                 kus(b.titulka, 4000), riadkyKus(b.uvodneVety, 1500)).run();
 
           await audit(DB, { action: "zapis", predmet: "marketingový nápad", neu: text.slice(0, 120), actor: autor || undefined });
           return Response.json({ ok: true, id: novy });

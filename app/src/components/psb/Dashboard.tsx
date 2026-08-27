@@ -980,8 +980,12 @@ export function Dashboard({
       id: "rezerva",
       label: "Rezerva",
       hodnota: mesRez === null ? "—" : `${mesRez.toFixed(1)} mes.`,
+      // Vek ručného stavu patrí na dlaždicu: BTC je živé, ale účet
+      // a hotovosť sú z ručného zápisu — 27. 8. 2026 tam ticho sedel stav
+      // z 8. 8. a číslo sa tvárilo ako dnešné. Prístroj kŕmený starým
+      // senzorom to musí povedať sám, nie až po rozkliknutí.
       podnadpis: majetok === null ? "načítava sa"
-        : stavPenazi ? `${fmtCZK(majetok)} — účet, hotovosť aj BTC`
+        : stavPenazi ? `${fmtCZK(majetok)} — účet+hotovosť z ${new Date(stavPenazi.datum).toLocaleDateString("sk-SK", { day: "numeric", month: "numeric" })}, BTC živé`
         : `${fmtCZK(majetok)} — zatiaľ len BTC`,
       pasmo: mesRez === null ? "nevie" : mesRez < 1 ? "zle" : mesRez < 3 ? "pozor" : "ok",
       // Číslo bez akcie je len číslo: „1,2 mesiaca" nepovie, čo s tým.

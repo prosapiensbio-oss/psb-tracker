@@ -1,6 +1,6 @@
 # Otvorené úlohy a otázky
 
-**Stav k 19. 8. 2026, večer.** Predchádzajúci zoznam (13. 8.) je v archíve dole.
+**Stav k 26. 8. 2026.** Predchádzajúci zoznam (13. 8.) je v archíve dole.
 
 Tento súbor drží to, čo čaká na **Jerryho**. Čo je na mne, je v druhej časti.
 Živý marketingový zoznam je v [zoznam-marketing.md](zoznam-marketing.md),
@@ -12,7 +12,6 @@ webový v [uprava-webu.md](uprava-webu.md).
 
 | kedy | čo | kde to je |
 |---|---|---|
-| **22. 8.** | **Poslať mail Functional Patterns.** Je napísaný po anglicky a pripravený na odoslanie. Pýta sa na dve veci: rozsah toho, čo sa smie verejne menovať, a verifikačný odkaz. | [`fp-otazka.md`](fp-otazka.md) · pripomienka vyskočí sama v registri |
 | **po odpovedi FP** | **Verifikačný odkaz na stránku „Co je Functional Patterns".** Handbook ho povoľuje a je to jediné miesto, kde meno metódy niečo dokazuje. | prosapiens.cz/co-je-functional-patterns |
 | **september** | **UTM parametre pri spustení reklamy.** Zámerne odložené — bez reklamy nemajú čo merať. | — |
 
@@ -33,11 +32,6 @@ Prejsť klientov, ktorých fotky sa už niekde použili, a skontrolovať súhlas
 Kým to nie je hotové, nemá zmysel stavať úložisko na fotky — a to je jediná
 vec, ktorá chýba k tomu, aby appka merala výsledky aj obrazom, nie len číslom.
 FP navyše žiada dve brány: súhlas klienta **a** schválenie na fp.app.
-
-**2 · Premenovať Zuzanu v PTminderi**
-V Kokpite je zlúčená správne (`Zuzana Sopoligová`, ako sa podpísala v maile),
-ale PTminder ju stále vedie ako `Zuzana Spoligova`. **Pri najbližšom importe
-sa založí druhýkrát.**
 
 ---
 

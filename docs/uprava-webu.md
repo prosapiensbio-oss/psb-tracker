@@ -37,6 +37,85 @@ návštevník, bez prihlásenia.
 
 ## Robím ja
 
+### Autorský blok — zo snippetu, nie ručne (26. 8. 2026) ✅
+
+**Ako to bolo:** blok so sociálnymi sieťami bol Gutenbergov `media-text`
+**ručne nalepený do textu** každého článku. Dôsledok: mal ho 30 zo 44 článkov
+a fotku len 8. Nebol to snippet — snippet („SB — CTA blok za článkami", #6,
+`the_content` priorita 10) pridáva to tlačidlo, nie autora.
+
+**Ako to je teraz:** snippet **#21 „PSB — autorský blok za článkami"**,
+`the_content` priorita **20**, takže ide až za CTA. Poradie je zámer: najprv
+dôkaz (text a zdroje), potom výzva k akcii, až potom kto to písal.
+
+Autor sa berie z `post_author`, nie z textu. Neznámy autor = blok sa
+nevykreslí; zlé meno je horšie než žiadne.
+
+**Autorstvo sa dalo určiť z dôkazu, nie odhadom:** Terezkine články niesli jej
+vlastný blok (`@terezka_zatkova`), Jerryho ten jeho (`philipjerry`). Podľa
+toho: **Jerry 35, Terezka 9**. Predtým bolo vo WordPresse 40 zo 45 článkov pod
+zberným účtom „ProSapiens" — teraz má každý skutočného autora, čo opravuje aj
+Yoastovu `Person` schému a autorské archívy.
+
+| | pred | po |
+|---|---|---|
+| článkov s autorským blokom | 30 / 44 | **44 / 44** |
+| z toho s fotkou | 8 | **44** |
+| skutočný autor v DB | 5 / 45 | **45 / 45** |
+
+Fotky: `Jerry čiernobiely` (5194), `Terezka čiernobiela` (5196).
+Odkazy: **LinkedIn + @prosapiens.biomechanic**. Osobný Facebook a osobný
+Instagram som z pätky článku vypustil — čitateľ, ktorý prišiel z Googlu na
+klinický text, dostával tesne pred CTA tri odkazy preč, a ani jeden neviedol
+na PSB. Vrátiť sa dajú jedným riadkom v poli `$autori`.
+
+**Pozor na keš:** hosting (openresty) drží staré stránky aj po „Vymazat všechny
+cache paměti". Spoľahlivo ich zhodí až dotyk na samotnom príspevku (prázdny
+UPDATE cez REST). Kontrola zvonku s `?x=nieco` obchádza keš a ukáže pravdu.
+
+**Zostáva:** Yoast berie autorskú fotku z Gravataru a na účte je
+`monsterid` — vygenerovaná príšerka. To je obrázok, ktorý si Google môže
+vziať ako tvár autora.
+
+
+### Dve nové stránky — NAPÍSANÉ, čakajú na zverejnenie (26. 8. 2026)
+
+Obe sú vo WordPresse ako **koncepty**, kompletné vrátane odkazov a zdrojov:
+
+| stránka | id | znakov | zdroje |
+|---|---|---|---|
+| `subokcipitalni-svaly` | 5531 | 944 slov | 5, všetky overené cez PubMed |
+| `thorakolumbalni-fascie` | 5532 | ~900 slov | 5, všetky overené cez PubMed |
+
+Citácie som **nebral z hlavy** — každú som ťahal cez PubMed E-utilities
+(autori, rok, časopis, ročník, číslo, strany). Vymyslená citácia na zdravotnom
+webe je horšia než žiadna.
+
+**Čo ešte chýba:** Yoast meta popis. Jeho pole je Draft.js editor, ktorý
+synteticky písaný text ani DOM zápis neprijme — skúsil som obe cesty, uložilo
+sa prázdno. Texty sú pripravené, treba ich vložiť ručne (alebo cez Yoast
+hromadný editor, `wpseo_tools&tool=bulk-editor`, kde sú obyčajné polia).
+
+**Obrázky (26. 8. 2026):** štyri, generované cez Higgsfield (nano_banana_pro,
+8 kreditov), mastre 2528 px v `docs/obrazky-clanky/`, webové verzie 1600 px
+v `docs/obrazky-clanky/web/`. Nahraté do knižnice (id 5535–5538), s českými
+alt textami, vložené do článkov aj ako náhľadové obrázky.
+
+Pravidlo, ktoré sa oplatí zapamätať: **žiadny text na obrázku**. Model
+anatomické latinské popisky komolí a zlý popisok na zdravotnom webe je horší
+než žiadny. Preto sú to čisté kresby bez písmen a význam nesie popiska pod
+obrázkom, ktorú píšem ja. Štýl: biele pozadie #FFFFFF (overené — roh má 255),
+linka #1A2E24, jedna akcentová #2D7D5A, žiadne tieňovanie. Na blogu potom
+obrázok splynie s bielym stĺpcom bez viditeľného rámu.
+
+Dva z prvých štyroch pokusov som zahodil: porovnanie predsunutej hlavy vyšlo
+tak, že obe postavy vyzerali rovnako, a chodiaca postava mala akcent takmer
+neviditeľný. Prerobené — pri porovnaní pomohlo napísať do promptu „OBVIOUS and
+EXAGGERATED", pri druhom výmena námetu za schému kĺzania vrstiev.
+
+**Zverejnenie je na Jerrym** — je to verejný obsah na jeho web pod jeho menom.
+
+
 ### ~~1 · Skrátiť šablónu titulkov~~ — HOTOVÉ, viď tabuľka Hotové
 
 **Zostáva päť titulkov, ktoré sú dlhé samy o sebe** — tam už značka nie je,
@@ -71,6 +150,21 @@ Rovnaká cesta ako pri LocalBusiness scheme.
 
 </details>
 
+### 2 · ~~Meta popisy~~ — HOTOVÉ 26. 8. 2026, CESTA NÁJDENÁ
+
+**Blokér padol.** Yoastove pole sa cez UI naozaj zapísať nedá (React/Draft.js),
+ale `update_post_meta( $id, '_yoast_wpseo_metadesc', ... )` funguje — a spustiť
+sa dá **jednorázovým snippetom** cez Code Snippets REST API
+(`/wp-json/code-snippets/v1/snippets`), ktorý sa po dobehnutí vypne.
+
+Takto sa doplnil chýbajúci popis pre `biotensegrita` a pre obe nové stránky.
+**Keď bude treba zapísať Yoast meta znova, toto je tá cesta** — nie klikanie.
+
+Stav: všetkých 32 stránok aj 44 z 44 článkov má meta popis. `sluzby` už
+skupinové lekce nespomína.
+
+<details><summary>pôvodný zápis (15. 8.)</summary>
+
 ### 2 · Meta popisy — TEXTY HOTOVÉ, VLOŽENIE NEPRECHÁDZA
 Zoznam je už len 12 stránok: `skupinovy-trenink` a `lekce-fascialni-svoboda`
 z neho vypadli, sú skryté.
@@ -91,12 +185,67 @@ Yoaste, Websupporte a modálnom okne UpdraftPlus.
 **„Meta description"** v Yoast boxe pod obsahom. Presunuté do časti
 „Potrebujem Jerryho" ako H4.
 
+</details>
+
+### Zdroje v článkoch — vyčistené 26. 8. 2026 ✅
+
+**37 odkazov v 5 článkoch nieslo `?utm_source=chatgpt.com`** — viditeľná stopa,
+odkiaľ sa zdroje brali, práve na stránkach, kde sú zdroje tá dôveryhodnosť.
+Parameter odstránený, cieľ odkazu nezmenený.
+
+**Dve citácie v `predsunuta-hlava` boli vecne zlé** (overené proti PubMed
+a Crossref, nie od oka):
+- prvá bola pripísaná *Nejati a spol., Clinical Spine Surgery 32(6)* — v
+  skutočnosti je to **Mahmoud a spol. (2019), Current Reviews in
+  Musculoskeletal Medicine 12(4), 562–577** (PMID 31773477). Text článku
+  pritom Mahmouda menoval správne; zlý bol zoznam zdrojov.
+- druhá bola pripísaná *Eftekharsadat a spol., článok 87* — v skutočnosti
+  **Lotfian a spol. (2025), BMC Musculoskeletal Disorders 26, 468**
+  (DOI 10.1186/s12891-025-08705-w), a názov hovorí *endurance and thickness*,
+  nie *endurance and disability*.
+- odkazy pri oboch boli navyše **prehodené** — každý viedol na tú druhú prácu.
+
 ### 3 · ~~LocalBusiness schema~~ — HOTOVÉ, viď tabuľka Hotové
 
 Zostáva jedna vec, ktorá potrebuje Jerryho: **otváracie hodiny**. Na webe nikde
 nie sú, takže som ich do schémy nedal — vymyslené hodiny sú horšie než žiadne.
 Keď ich pošleš (napr. „Po–Pi 7:00–20:00, So 8:00–12:00"), dopíšem ich do
 snippetu a Google ich bude môcť zobraziť priamo vo výsledku.
+
+### 4 · ~~Alt texty~~ — HOTOVÉ 26. 8. 2026, aj bod 4c
+
+**Všetkých 375 obrázkov v článkoch má alt text. Pokrytie 100 %** (na začiatku
+13 obrázkov, teda 3,5 %). Doplnených 186 v obsahu článkov a 185 v knižnici
+médií, po česky.
+
+**Ako sa prelomil bod 4c.** Stálo to na tom, že z názvu súboru
+(`AdobeStock_1563695645`, `hf_20260525_101500_…`) sa obsah odvodiť nedá
+a vymyslený alt je horší než žiadny. Riešenie: **obrázky som si pozrel.**
+Stiahol som všetkých 185 (320 MB), poskladal z nich 16 kontaktných hárkov po
+dvanástich (Pillow, `docs/…/alt/harky/`) a popísal to, čo na nich naozaj je.
+16 pohľadov namiesto 185.
+
+**Tri veci, na ktoré si dať pozor pri opakovaní:**
+1. **Kľúčom musí byť celá cesta, nie názov súboru.** `image-1`, `image-2`,
+   `image-3` a `image` existujú vo viacerých priečinkoch s úplne iným obsahom —
+   pri zhode podľa mena by alt sadol na nesprávny obrázok.
+2. **Diakritika v názvoch.** V HTML je percentovo zakódovaná (`Mat%CC%8Cka`),
+   v obsahu príspevku je surová. Bez `decodeURIComponent` + `normalize('NFC')`
+   deväť súborov nesadlo.
+3. **`${#retazec}` v bashi ráta bajty, nie znaky.** České titulky sa preto
+   javili o 8–10 znakov dlhšie, než sú.
+
+**Portréty skutočných ľudí** (3 kusy) som opísal bez mena — mená v texte
+článku síce sú, ale ktorá tvár patrí komu, z obrázka overiť neviem.
+Jerry ich vie doplniť.
+
+**Duplicitné logo v lepkavej hlavičke — ROZHODNUTÉ, nerobí sa** (Jerry,
+26. 8. 2026: „podľa mňa to môžeme nechať tak"). Logo je tam vložené druhýkrát
+a nemá alt vôbec; to prvé v hlavičke ho má správne, takže prístupné meno odkazu
+na úvodnú stránku existuje. Oprava by znamenala prepisovať celý výstup šablóny
+cez output buffering — za jeden duplicitný obrázok to nestojí.
+
+<details><summary>pôvodný zápis bodu 4</summary>
 
 ### 4 · Alt texty — 4a aj 4b HOTOVÉ, 4c naráža na hranicu
 - ~~**4a** `deep-front-line`, `arm-lines`, `spiral-line`~~ — 52 altov
@@ -131,6 +280,17 @@ preskočiť. Pri screenshotoch a fotkách by som musel vidieť, čo na nich je.
 
 Anatomické obrázky sa opisujú tým, čo na nich je (ktorá línia, ktorý sval) —
 nie „obrázok fascie". Toto je jediná vec, ktorú Google o obrázku vie.
+
+</details>
+
+### Titulky — NIE JE ČO ROBIŤ (overené 26. 8. 2026)
+
+V zozname stálo, že päť titulkov je nad 60 znakov. **Nie je nad 60 ani jeden** —
+najdlhší má 59 (`proc-cviceni-nezabere-na-bolest-zad`). Staré čísla boli
+namerané v bajtoch, nie v znakoch, a české diakritiky sú dvojbajtové.
+
+Jediná drobnosť: `jak-vznikaji-anatomy-trains-podle-pravidel` má v titulku
+medzeru pred otáznikom („Anatomické vlaky ? Podle pravidel!").
 
 ### 5 · Zmazať neaktívne pluginy a šablóny — ZASTAVENÉ, čaká na rozhodnutie
 Zálohy fungujú, takže krytie je. Ale keď som sa pozrel, čo tie „neaktívne

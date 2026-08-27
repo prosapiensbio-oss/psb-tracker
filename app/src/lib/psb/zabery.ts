@@ -24,7 +24,13 @@
  * minútu; sú to celé videá k téme.
  */
 
-export type Pohyb = "dopredu" | "odhalenie" | "oblúk" | "sklopenie" | "švih" | "statický";
+export type Pohyb =
+  | "dopredu" | "odhalenie" | "oblúk" | "sklopenie" | "švih" | "statický"
+  // Pribudlo 26. 8. 2026: pri siedmich záberoch a pravidle „dva rovnaké pohyby
+  // za sebou nie" sa Jarvisovi točili dokola štyri. Nové pohyby nie sú ozdoba —
+  // sú to uhly, ktoré biomechanika naozaj potrebuje: chôdza zboku, chodidlá
+  // zhora, reťaz zdola nahor.
+  | "dozadu" | "sledovanie" | "zhora" | "zdola" | "naklon" | "prelet";
 
 export type Zaber = {
   id: string;
@@ -42,6 +48,60 @@ export type Zaber = {
 };
 
 export const ZABERY: Zaber[] = [
+  {
+    id: "sledovanie",
+    nazov: "Sledovanie chôdze zboku",
+    coRobi: "Ide vedľa človeka a drží ho v rovnakom mieste obrazu, kým sa okolo neho hýbe pozadie. Chôdza sa dá čítať ako pohyb, nie ako séria póz.",
+    akoNaTo: "Postav sa dva metre nabok od klienta, telefón na výšku panvy. Kráčaj s ním rovnakým tempom a drž ho stále v tej istej tretine obrazu. Akčný režim ZAPNI. Nechaj bežať aspoň päť krokov — kratšie sa cyklus chôdze nedá uvidieť.",
+    prePSB: "Toto je záber, ktorý robí vašu prácu viditeľnou. Analýza chôdze na statickom zábere nevyzerá ako nič; tu vidno, že sa niečo deje.",
+    fazy: [2, 3, 4],
+    pohyb: "sledovanie",
+  },
+  {
+    id: "chodidla-zhora",
+    nazov: "Chodidlá zhora",
+    coRobi: "Pohľad zvislo dole na chodidlá a ich rozloženie. Ukáže to, čo z výšky očí vidieť nie je.",
+    akoNaTo: "Telefón drž nad chodidlami zhruba v úrovni pása, objektív kolmo dole. Zaber obe chodidlá aj kus podlahy okolo. Keď stojí, nechaj dve sekundy pokoj; keď prenáša váhu, natáčaj celý prenos.",
+    prePSB: "Ploché nohy a rozloženie váhy sú vaša bežná téma a z profilu sa nedajú ukázať. Toto je jediný uhol, kde to divák uvidí sám.",
+    fazy: [2, 3],
+    pohyb: "zhora",
+  },
+  {
+    id: "nizky-uhol",
+    nazov: "Nízky uhol od zeme",
+    coRobi: "Telefón takmer na podlahe. Členky a kolená dostanú váhu, akú v bežnom zábere nemajú.",
+    akoNaTo: "Polož telefón na podlahu opretý o niečo, alebo ho drž pár centimetrov nad ňou. Objektív mierne hore. Nezoomuj — priblíž sa telefónom. Pozor na to, čo je za klientom: z tohto uhla je vidieť celý strop.",
+    prePSB: "Keď hovoríš o základni — chodidlo, členok, koleno — tento uhol jej dáva dôležitosť, ktorú v texte tvrdíš.",
+    fazy: [2, 3],
+    pohyb: "zdola",
+  },
+  {
+    id: "naklon-po-tele",
+    nazov: "Naklonenie po tele",
+    coRobi: "Plynulý náklon od chodidiel po hlavu. Ukáže telo ako jednu reťaz, nie ako kus, o ktorom sa práve hovorí.",
+    akoNaTo: "Postav sa dva metre od klienta, telefón na chodidlá. Nakláňaj ho hore rovnomerne tri až štyri sekundy, až po hlavu. Telefón sa NEDVÍHA — otáča sa. Lakte pri tele, aby náklon nebol trhaný.",
+    prePSB: "„Bolí koleno, ale začína to v panve“ sa nedá povedať lepšie než záberom, ktorý po tom tele naozaj prejde.",
+    fazy: [1, 2, 3],
+    pohyb: "naklon",
+  },
+  {
+    id: "cuvanie",
+    nazov: "Cúvanie pred človekom",
+    coRobi: "Ide pred kráčajúcim človekom a cúva. Divák ide oproti nemu — je to najosobnejší spôsob, ako niekoho ukázať v pohybe.",
+    akoNaTo: "Postav sa dva až tri metre pred klienta, telefón na výšku hrudníka. Cúvaj rovnakým tempom, ako ide on. NECHAJ SI ZA CHRBTOM VOĽNÚ CESTU a pozri sa tam skôr, než začneš. Akčný režim zapni.",
+    prePSB: "Pri klientskych príbehoch a pri záveroch: človek prichádza k divákovi, nie od neho odchádza.",
+    fazy: [4, 5],
+    pohyb: "dozadu",
+  },
+  {
+    id: "prelet",
+    nazov: "Prechod cez popredie",
+    coRobi: "Niečo blízke prejde cez obraz a odkryje, čo je za tým. Funguje ako strih bez strihu.",
+    akoNaTo: "Nechaj v popredí predmet (rám dverí, stojan, rameno) asi 30 cm od objektívu. Pomaly prejdi tak, aby predmet prešiel celým obrazom a odhalil klienta. Dve sekundy stačia. Zaostri na klienta VOPRED, nie počas prechodu.",
+    prePSB: "Keď potrebuješ v jednom zábere prejsť z jednej veci na druhú a nechceš strih, ktorý by rozbil tempo.",
+    fazy: [3, 4],
+    pohyb: "prelet",
+  },
   {
     id: "detail-celok",
     nazov: "Z detailu na celok",

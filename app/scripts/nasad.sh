@@ -58,7 +58,7 @@ fi
 # Keď si istý, že je aplikovaná, dopíš ju do evidencie:
 #   ./scripts/nasad.sh --migracia-hotova 0051_nazov.sql
 d1() {
-  node node_modules/.bin/wrangler d1 execute psb-tracker-db --remote --config wrangler.psb.jsonc --command "$1" --json 2>/dev/null
+  node node_modules/.bin/wrangler d1 execute psb-tracker-db --remote --config wrangler.jsonc --command "$1" --json 2>/dev/null
 }
 if [ "${1:-}" = "--migracia-hotova" ] && [ -n "${2:-}" ]; then
   d1 "INSERT INTO d1_migrations (name, applied_at) VALUES ('$2', datetime('now'))" >/dev/null \
@@ -75,7 +75,7 @@ if [ -n "$chybaju" ]; then
   echo "✗ Migrácie v priečinku, ale NIE v evidencii databázy:"
   for n in $chybaju; do echo "    $n"; done
   echo "  Ak je aplikovaná: ./scripts/nasad.sh --migracia-hotova <súbor>"
-  echo "  Ak nie je:        wrangler d1 execute psb-tracker-db --remote --config wrangler.psb.jsonc --file migrations/<súbor>"
+  echo "  Ak nie je:        wrangler d1 execute psb-tracker-db --remote --config wrangler.jsonc --file migrations/<súbor>"
   echo "                    a potom --migracia-hotova."
   exit 1
 fi
@@ -132,7 +132,9 @@ for i in $(seq 1 $pokusov); do
   # Vyrovnávacia pamäť wranglera po prerušenom pokuse tvrdí, že assety už
   # nahral — a potom ich naozaj nenahrá. Pred každým pokusom preč.
   rm -rf .wrangler/tmp
-  $spustac deploy > /tmp/nasad-$i.log 2>&1
+  # `-c` výslovne, hoci je to východzí súbor: vedľa dlho ležala jeho kópia
+  # a väzba pridaná do tej nesprávnej sa ticho nenasadila (25. 8. 2026).
+  $spustac deploy -c wrangler.jsonc > /tmp/nasad-$i.log 2>&1
 
   po=$(verzia)
   asset=$(curl -s -o /dev/null -w '%{http_code}' "$adresa/assets/$kontrolny")

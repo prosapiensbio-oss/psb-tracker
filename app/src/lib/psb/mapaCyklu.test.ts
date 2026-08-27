@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { FAZY, jeFaza, mriezka, nazovFazy, osMapy, popisMesiaca, tempoFaz, zadanieProProject, POMER_IDEAL, podielFaz, poctyFaz } from "./mapaCyklu";
+import { FAZY, jeFaza, mesiacovDopredu, mriezka, nazovFazy, osMapy, popisMesiaca, tempoFaz, zadanieProProject, POMER_IDEAL, podielFaz, poctyFaz } from "./mapaCyklu";
 
 const kus = (mesiac: string, faza: number, hook = "h") => ({
   datum: `${mesiac}-05`, mesiac, faza, hook, dosah: 100, ulozenia: 1,
@@ -36,7 +36,7 @@ describe("mriežka", () => {
   it("rozdelí zverejnené a naplánované do správnych buniek", () => {
     const os = osMapy("2026-03", 2, 1);
     const m = mriezka(os, [kus("2026-02", 5)], [
-      { id: "a", faza: 5, mesiac: "2026-04", koncept: "k", kto: "", text: "t", zdroj: "jarvis", stav: "novy", hotovyText: "", zaber: "", sekvencia: "", scenar: "", hashtagy: "" },
+      { id: "a", faza: 5, mesiac: "2026-04", koncept: "k", kto: "", text: "t", zdroj: "jarvis", stav: "novy", hotovyText: "", zaber: "", sekvencia: "", scenar: "", hashtagy: "", titulka: "", uvodneVety: "" },
     ]);
     expect(m.get("2026-02|5")?.vyslo).toHaveLength(1);
     expect(m.get("2026-04|5")?.plan).toHaveLength(1);
@@ -142,10 +142,18 @@ describe("zadanie s už napísaným textom", () => {
     expect(t).toContain("Píšem toto.");
   });
 
+  it("pýta si aj alternatívne úvodné vety", () => {
+    // Project ich navrhoval vždy, ale nemali kde bývať — skončili
+    // v konverzácii a pri statíve už neboli po ruke.
+    const t = zadanieProProject({ mesiac: "2026-10", faza: 5, koncept: "Petra a koleno", kto: "Petra" });
+    expect(t).toContain("TRI ALTERNATÍVNE ÚVODNÉ VETY");
+    expect(t).toContain("TRI VECI");
+  });
+
   it("pýta scenár a caption AJ S HASHTAGMI ako jeden blok — kopíruje sa naraz", () => {
     const t = zadanieProProject(zaklad);
     expect(t).toContain("1. SCENÁR");
-    expect(t).toContain("2. CAPTION AJ S HASHTAGMI");
+    expect(t).toContain("3. CAPTION AJ S HASHTAGMI");
     expect(t).toContain("VŠETKY NA JEDNOM RIADKU");
     expect(t).not.toContain("3. HASHTAGY");
   });
@@ -191,5 +199,51 @@ describe("podiely fáz v koláči", () => {
   it("ideálny pomer dáva 100 a pokrýva všetkých päť fáz", () => {
     expect(FAZY.reduce((a, f) => a + POMER_IDEAL[f.id], 0)).toBe(100);
     expect(FAZY.every((f) => POMER_IDEAL[f.id] > 0)).toBe(true);
+  });
+});
+
+describe("alternatívne úvodné vety", () => {
+  it("terajšie vety idú do zadania na úpravu, nie na prepísanie", () => {
+    const t = zadanieProProject({
+      mesiac: "2026-10", faza: 3, koncept: "k", kto: "",
+      uvodneVety: "Skús toto.\nAlebo toto.",
+    });
+    expect(t).toContain("TERAJŠIE ÚVODNÉ VETY (uprav ich, nepíš odznova):");
+    expect(t).toContain("Skús toto.");
+  });
+
+  it("bez viet sa o nich v zadaní nehovorí ako o existujúcich", () => {
+    const t = zadanieProProject({ mesiac: "2026-10", faza: 3, koncept: "k", kto: "" });
+    expect(t).not.toContain("TERAJŠIE ÚVODNÉ VETY");
+    // Ale vypýtať si ich musí vždy.
+    expect(t).toContain("TRI ALTERNATÍVNE ÚVODNÉ VETY");
+  });
+});
+
+/**
+ * Mapa musí siahať tam, kam sa plánuje. Štyri mesiace dopredu znamenali, že
+ * v auguste 2026 sa nedalo naplánovať nič na rok 2027.
+ */
+describe("dokedy siaha os mapy", () => {
+  it("končí v decembri budúceho roka", () => {
+    const os = osMapy("2026-08", 12, mesiacovDopredu("2026-08"));
+    expect(os[0]).toBe("2025-09");
+    expect(os[os.length - 1]).toBe("2027-12");
+  });
+
+  it("s prelomom roka pribudne celý ďalší rok sám", () => {
+    expect(osMapy("2027-01", 12, mesiacovDopredu("2027-01")).at(-1)).toBe("2028-12");
+    expect(osMapy("2027-06", 12, mesiacovDopredu("2027-06")).at(-1)).toBe("2028-12");
+    expect(osMapy("2027-12", 12, mesiacovDopredu("2027-12")).at(-1)).toBe("2028-12");
+  });
+
+  it("december má stále celý budúci rok pred sebou, nie jeden mesiac", () => {
+    const os = osMapy("2026-12", 12, mesiacovDopredu("2026-12"));
+    expect(os.filter((m) => m > "2026-12").length).toBe(12);
+  });
+
+  it("na nezmysel odpovie východzou hodnotou, nie NaN", () => {
+    expect(mesiacovDopredu("2026-13")).toBe(4);
+    expect(mesiacovDopredu("")).toBe(4);
   });
 });

@@ -26,6 +26,7 @@ import { ZABER_MAPA } from "../lib/psb/zabery";
 type Riadok = {
   id: string; text: string; koncept: string; scenar: string; hotovy_text: string;
   sekvencia: string; zaber: string; faza: number; planovane_na: string; kto: string;
+  uvodne_vety: string;
 };
 
 type Krok = { zaber?: string; co?: string; veta?: string; sekund?: number };
@@ -56,6 +57,19 @@ function prispevok(r: Riadok, poradie: number): string {
     ? `<div class="scenar">${riadky(r.scenar).map((v) => `<p>${v}</p>`).join("")}</div>`
     : `<p class="chyba">Scenár ešte nie je napísaný — bez neho sa natáčať nedá.</p>`;
 
+  /**
+   * Alternatívne úvodné vety.
+   *
+   * Sedia HNEĎ POD SCENÁROM, lebo sa čítajú v tom istom okamihu: prvá veta
+   * nesadne, oko skočí o kus nižšie a skúsi sa druhá. Keby boli na konci
+   * papiera, Jerry by ich pri statíve nehľadal.
+   */
+  const uvodne = (r.uvodne_vety || "").trim()
+    ? `<section><h3>Keď prvá veta nesadne</h3><ol class="uvodne">${
+        riadky(r.uvodne_vety).map((v) => `<li>${v}</li>`).join("")
+      }</ol></section>`
+    : "";
+
   const sekvencia = k.length
     ? `<ol class="zabery">${k.map((x) => {
         const z = ZABER_MAPA.get(String(x.zaber || ""));
@@ -79,6 +93,7 @@ function prispevok(r: Riadok, poradie: number): string {
       <h2>${esc(nazov)}</h2>
     </header>
     <section><h3>Scenár — toto hovorím</h3>${scenar}</section>
+    ${uvodne}
     <section><h3>Zábery${spolu ? ` · spolu ${spolu} s` : ""}</h3>${sekvencia}</section>
     <section><h3>Caption a hashtagy</h3>${caption}</section>
   </article>`;
@@ -119,6 +134,9 @@ function stranka(rs: Riadok[], mesiac: string, pocet: string, mesiace: string[])
   /* VEĽKÉ PÍSMO. Toto je jediná časť, ktorá sa číta pri natáčaní — z odstupu
      asi metra, kútikom oka, medzi dvoma zábermi. Preto taká veľkosť, riadkovanie
      a jedna veta na riadok. Na telefóne sa zmenšuje len mierne. */
+  .uvodne { margin: 0; padding-left: 22px; }
+  .uvodne li { font-size: 19px; line-height: 1.45; margin-bottom: 6px; }
+  @media (max-width: 560px) { .uvodne li { font-size: 16px; } }
   .scenar p {
     font-size: 30px; line-height: 1.42; font-weight: 600; margin: 0 0 14px;
     letter-spacing: -.015em; text-wrap: balance;
@@ -210,7 +228,7 @@ export const Route = createFileRoute("/natacaci-list")({
         const pocet = Number.isFinite(pocetRaw) && pocetRaw > 0 ? Math.min(50, Math.floor(pocetRaw)) : 0;
 
         const rs = ((await DB.prepare(
-          `SELECT id, text, koncept, scenar, hotovy_text, sekvencia, zaber, faza, planovane_na, kto
+          `SELECT id, text, koncept, scenar, hotovy_text, sekvencia, zaber, faza, planovane_na, kto, uvodne_vety
              FROM mkt_napady
             WHERE stav <> 'zamietnuty' AND faza > 0 AND planovane_na <> ''
             ORDER BY planovane_na ASC, created_at ASC`,

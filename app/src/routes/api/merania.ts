@@ -54,7 +54,7 @@ export const Route = createFileRoute("/api/merania")({
             von.push({
               klient: k.klient, pocet: k.pocet,
               prveDatum: k.prve_datum, prva: prve?.bolest ?? null,
-              poslednéDatum: k.posledne_datum, posledna: posledne?.bolest ?? null,
+              posledneDatum: k.posledne_datum, posledna: posledne?.bolest ?? null,
             });
           }
           return Response.json({ ok: true, klienti: von });

@@ -31,9 +31,24 @@ const SITEMAPY = ["page-sitemap.xml", "post-sitemap.xml"];
 const DAVKA = 40;
 const ZAKLAD = "https://www.prosapiens.cz/";
 
+/**
+ * Stiahne stránku MIMO KEŠE.
+ *
+ * Hosting (openresty) aj WP Fastest Cache držia staré kópie aj hodiny po
+ * úprave — a sitemapa je medzi nimi. 26. 8. 2026 som upravil 44 článkov,
+ * sitemapa naďalej hlásila `lastmod` z 16. 8., import z nej usúdil, že sa nič
+ * nezmenilo, a načítal nula stránok. Tichý import, ktorý „prebehol", je horší
+ * než chyba: appka potom rozhoduje z desať dní starého obrazu webu a nikto to
+ * nezbadá.
+ *
+ * Jednorazový parameter v adrese kešu obíde; `cache: "no-store"` samo o sebe
+ * na CDN pred webom nestačí, lebo tá odpovedá skôr, než sa hlavička uplatní.
+ */
 async function stiahni(url: string): Promise<string> {
-  const r = await fetch(url, {
-    headers: { "user-agent": "PSB-Kokpit/1.0 (interny nastroj)" },
+  const oddelovac = url.includes("?") ? "&" : "?";
+  const r = await fetch(`${url}${oddelovac}_psb=${Date.now().toString(36)}`, {
+    headers: { "user-agent": "PSB-Kokpit/1.0 (interny nastroj)", "cache-control": "no-cache" },
+    cache: "no-store",
     signal: AbortSignal.timeout(15000),
   });
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -67,7 +82,21 @@ export const Route = createFileRoute("/api/web-obsah")({
       },
 
       POST: async ({ request }) => {
-        if (!(await isAuthed(request))) return unauthorized();
+        // Plánovač beží vo vlastnom workeri a nemá session — preukazuje sa
+        // tým istým zdieľaným tajomstvom ako pri kalendári. Do 26. 8. 2026 sa
+        // text webu ťahal LEN ručne a naposledy bežal 17. 8.; karta „Čo
+        // publikovať ďalej" preto navrhovala napísať stránky, ktoré už
+        // existovali, lebo `vlastnik()` ich v `web_stranky` nenašiel.
+        const zCronu = new URL(request.url).searchParams.get("cron") === "1";
+        if (zCronu) {
+          const token = (bindings() as { KAL_CRON_TOKEN?: string }).KAL_CRON_TOKEN;
+          const dany = request.headers.get("x-cron-token") || "";
+          if (!token || token.length !== dany.length || token !== dany) {
+            return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
+          }
+        } else if (!(await isAuthed(request))) {
+          return unauthorized();
+        }
         const { DB } = bindings();
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });
         let b: Record<string, unknown> = {};

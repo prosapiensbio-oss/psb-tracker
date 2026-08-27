@@ -419,7 +419,13 @@ export function Lievik({ data, clients, onPoznamka }: {
         </div>
 
         <div style={{ display: "flex", gap: 12, alignItems: "flex-start", flexWrap: "wrap", margin: "14px 0 4px" }}>
-          <Krok cislo={String(k.dopyty)} popis="Dopyty" konverzia={pct(k.uvodne, k.dopyty)}
+          {/* Šípka konvertuje DOPYTY, nie úvodné — `uvodne/dopyty` sú dve
+              rôzne množiny ľudí (úvodné z odporúčaní dopyt nemajú) a ich
+              podiel vyšiel v jan–aug 2026 „100 %", hoci na úvodný došlo
+              29 z 38 dopytov (76 %). Ten istý vzor ako „124 %" z 13. 8. —
+              vrchný pás to už počíta poctivo (zDopytuUvodny), pásik lievika
+              na to 27. 8. 2026 došiel tiež. */}
+          <Krok cislo={String(k.dopyty)} popis="Dopyty" konverzia={pct(k.zDopytuUvodny, k.dopyty)}
             onClick={k.dopyty ? () => setKtori(ktori === "dopyty" ? null : "dopyty") : undefined} aktivny={ktori === "dopyty"} />
           <Krok cislo={String(k.uvodne)} popis="Úvodné tréningy" konverzia={pct(k.klienti, k.uvodne)}
             onClick={k.uvodne ? () => setKtori(ktori === "uvodne" ? null : "uvodne") : undefined} aktivny={ktori === "uvodne"}

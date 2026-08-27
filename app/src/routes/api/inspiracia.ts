@@ -59,7 +59,16 @@ export const Route = createFileRoute("/api/inspiracia")({
             headers: { "user-agent": UA, "accept-language": "sk,cs;q=0.9,en;q=0.8" },
             signal: AbortSignal.timeout(12000),
           });
-          if (!r.ok) return Response.json({ ok: false, error: `Instagram vrátil HTTP ${r.status}.` }, { status: 502 });
+          if (!r.ok) {
+            // 429 je pri cloudflarových adresách TRVALÝ stav, nie výpadok:
+            // Instagram ich škrtí bez ohľadu na to, koľko odkazov Jerry vloží.
+            // Overené 25. 8. 2026 — päť pokusov, dva rôzne odkazy, zakaždým 429.
+            // Rada „skús to o chvíľu" by bola klamstvo.
+            const chyba = r.status === 429
+              ? "Instagram škrtí cloudflarové adresy (429) — z appky sa k metadátam nedostaneme. Ulož odkaz a prilož snímku obrazovky, Jarvis rozoberie tú."
+              : `Instagram vrátil HTTP ${r.status}.`;
+            return Response.json({ ok: false, error: chyba, kod: r.status }, { status: 502 });
+          }
           const html = await r.text();
 
           const titulok = og(html, "og:title");

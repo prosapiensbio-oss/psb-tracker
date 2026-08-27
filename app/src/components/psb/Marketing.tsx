@@ -1,7 +1,7 @@
 import { fetchVzasSettings, saveVzasSetting } from "../../lib/psb/client";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
-import { fmtDMY, fmtCZK } from "../../lib/psb/format";
+import { fmtDMY, fmtCZK, jeMesiac } from "../../lib/psb/format";
 import {
   GA4_MESACNE,
   GSC_DOPYTY,
@@ -547,7 +547,7 @@ function GoogleAdsKarta({ clients, chat, ack, onSkry, onVrat }: { clients: Recor
     let najstarsi = "";
     for (const c of Object.values(clients)) {
       const m = (c.firstSession || "").slice(0, 7);
-      if (!/^\d{4}-\d{2}$/.test(m)) continue;
+      if (!jeMesiac(m)) continue;
       n[m] = (n[m] || 0) + 1;
       if (!najstarsi || m < najstarsi) najstarsi = m;
     }
@@ -1048,7 +1048,7 @@ function Rychlost({ chat }: { chat?: AssistantChat }) {
   );
 }
 
-export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, refresh, onPoznamkaStrata, onNavigate, focus, onAck }: { data: PSBData; clients: Record<string, ClientAgg>; leads: Lead[]; chat?: AssistantChat; sub: string; onSub: (s: string) => void; onKlient?: (m: string) => void; refresh: () => Promise<void>; onPoznamkaStrata?: (meno: string, text: string) => void; onNavigate?: (tab: string, sub?: string) => void; focus?: { client?: string; filter?: string; nonce?: number } | null; onAck?: (kluc: string, zapnut: boolean, poznamka?: string) => void }) {
+export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, refresh, onPoznamkaStrata, onNavigate, focus, onAck, onOdchodKJarvisovi }: { data: PSBData; clients: Record<string, ClientAgg>; leads: Lead[]; chat?: AssistantChat; sub: string; onSub: (s: string) => void; onKlient?: (m: string) => void; refresh: () => Promise<void>; onPoznamkaStrata?: (meno: string, text: string) => void; onNavigate?: (tab: string, sub?: string) => void; focus?: { client?: string; filter?: string; nonce?: number; slot?: { mesiac: string; faza: number; napadId?: string } } | null; onOdchodKJarvisovi?: (mesiac: string, faza: number, napadId?: string) => void; onAck?: (kluc: string, zapnut: boolean, poznamka?: string) => void }) {
   const setSub = onSub;
   // Jedno miesto, odkiaľ karty berú stav skrytia — inak by každá karta
   // potrebovala vlastné tri propy a jedna by ich časom nedostala.
@@ -1181,8 +1181,8 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
           {/* Mapa je nad počítanými návrhmi zámerne: najprv treba vidieť, kam
               sa obsah chystá, až potom čítať, čo do toho dáta odporúčajú.
               Opačné poradie robilo z návrhov zoznam bez miesta, kam ich dať. */}
-          <MapaCyklu data={data} chat={chat} onNavigate={onNavigate} />
-          <PlanObsahu data={data} chat={chat} onNavigate={onNavigate} />
+          <MapaCyklu data={data} chat={chat} onNavigate={onNavigate} focus={focus} onOdchodKJarvisovi={onOdchodKJarvisovi} />
+          <PlanObsahu data={data} chat={chat} onNavigate={onNavigate} onAck={onAck ? (k, z) => onAck(k, z) : undefined} />
           {/* Nápady hneď za návrhmi z dát. Jedna karta vie, čo ľudia hľadali,
               druhá čo sa nahlas spýtali — nie je to duplicita. */}
           <Napady chat={chat} />

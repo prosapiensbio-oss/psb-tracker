@@ -3,13 +3,14 @@ import { createPortal } from "react-dom";
 
 import { kotvaDat } from "../../lib/psb/compute";
 import {
-  FAZY, mriezka, nazovFazy, osMapy, poctyFaz, podielFaz, POMER_IDEAL,
+  FAZY, mesiacovDopredu, mriezka, nazovFazy, osMapy, poctyFaz, podielFaz, POMER_IDEAL,
   popisMesiaca, tempoFaz, zadanieProProject,
   type Bunka, type SlotPlanu, type ZverejnenyKus,
 } from "../../lib/psb/mapaCyklu";
 import { C, mix } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import type { AssistantChat } from "./Assistant";
+import { Titulka } from "./Titulka";
 import { Card, Donut, H3, Info, Modal, Select } from "./ui";
 import { pocetHashtagov } from "../../lib/psb/sekvencia";
 import { ZaberUkazka } from "./ZaberUkazka";
@@ -55,6 +56,8 @@ const DRUH: Record<string, string> = {
 type NapadRiadok = {
   id: string; text: string; stav: string; zdroj: string;
   faza?: number; planovane_na?: string; kto?: string; koncept?: string; hotovy_text?: string; zaber?: string; sekvencia?: string; scenar?: string; hashtagy?: string;
+  titulka?: string;
+  uvodne_vety?: string;
 };
 
 type Vyber =
@@ -70,10 +73,14 @@ const nadpisOkna = (v: NonNullable<Vyber>) =>
     : v.druh === "slot" ? `Plán ${v.slot.mesiac} · ${nazovFazy(v.slot.faza)}`
       : `Naplánovať na ${v.mesiac}`;
 
-export function MapaCyklu({ data, chat, onNavigate }: {
+export function MapaCyklu({ data, chat, onNavigate, focus, onOdchodKJarvisovi }: {
   data: PSBData;
   chat?: AssistantChat;
   onNavigate?: (tab: string, sub?: string) => void;
+  /** Ktorý slot otvoriť po prejdení z inej obrazovky. */
+  focus?: { slot?: { mesiac: string; faza: number; napadId?: string }; nonce?: number } | null;
+  /** Odkiaľ sa odišlo k Jarvisovi — aby bolo kam sa vrátiť. */
+  onOdchodKJarvisovi?: (mesiac: string, faza: number, napadId?: string) => void;
 }) {
   const [ig, setIg] = useState<IgRiadok[]>([]);
   const [napady, setNapady] = useState<NapadRiadok[]>([]);
@@ -83,6 +90,10 @@ export function MapaCyklu({ data, chat, onNavigate }: {
   // Text na skopírovanie do Projectu. Druhé okno, nie odkaz rovno von —
   // Project nevidí do Kokpitu, takže bez zadania by dostal holú vetu.
   const [naKopirovanie, setNaKopirovanie] = useState<string | null>(null);
+  /** Slot, ktorý sa má otvoriť, len čo doň nápady dorazia. */
+  const [cakaSlot, setCakaSlot] = useState<{ mesiac: string; faza: number; napadId?: string } | null>(null);
+  /** Prvé načítanie nápadov je za nami — až potom má zmysel vzdať hľadanie. */
+  const [napadyNacitane, setNapadyNacitane] = useState(false);
 
   const nacitaj = useCallback(() => {
     void fetch("/api/meta?co=instagram", { credentials: "same-origin" })
@@ -91,8 +102,11 @@ export function MapaCyklu({ data, chat, onNavigate }: {
       .catch(() => {});
     void fetch("/api/napady", { credentials: "same-origin" })
       .then((r) => r.json())
-      .then((j: { napady?: NapadRiadok[] }) => setNapady(j.napady || []))
-      .catch(() => {});
+      // Zoznam aj príznak sa nastavujú NARAZ. V dvoch krokoch (`then` +
+      // `finally`) by mohol príznak preskočiť skôr než dáta a čakajúci slot
+      // by sa vzdal o jedno prekreslenie priskoro.
+      .then((j: { napady?: NapadRiadok[] }) => { setNapady(j.napady || []); setNapadyNacitane(true); })
+      .catch(() => setNapadyNacitane(true));
   }, []);
 
   useEffect(nacitaj, [nacitaj]);
@@ -102,8 +116,9 @@ export function MapaCyklu({ data, chat, onNavigate }: {
   const kotva = useMemo(() => kotvaDat(data), [data]);
   const dnes = dnesMesiac();
   const os = useMemo(() => {
-    const zaklad = osMapy(dnes, 12, 4);
-    return zaklad.length ? zaklad : osMapy(kotva.mesiac || dnes, 12, 4);
+    const zaklad = osMapy(dnes, 12, mesiacovDopredu(dnes));
+    const nahradny = kotva.mesiac || dnes;
+    return zaklad.length ? zaklad : osMapy(nahradny, 12, mesiacovDopredu(nahradny));
   }, [dnes, kotva.mesiac]);
 
   const vyslo = useMemo<ZverejnenyKus[]>(() => ig
@@ -120,6 +135,8 @@ export function MapaCyklu({ data, chat, onNavigate }: {
       id: n.id, faza: n.faza || 0, mesiac: n.planovane_na || "",
       koncept: n.koncept || "", kto: n.kto || "", text: n.text || "",
       hotovyText: n.hotovy_text || "", zaber: n.zaber || "", sekvencia: n.sekvencia || "", scenar: n.scenar || "", hashtagy: n.hashtagy || "",
+      titulka: n.titulka || "",
+      uvodneVety: n.uvodne_vety || "",
       zdroj: n.zdroj || "", stav: n.stav || "novy",
     })), [napady]);
 
@@ -169,12 +186,54 @@ export function MapaCyklu({ data, chat, onNavigate }: {
     } catch { setChyba("Uložiť sa nepodarilo — spojenie zlyhalo."); }
   };
 
-  const posliJarvisovi = (mesiac: string, faza: number) => {
+  /**
+   * Zaeviduje, ktorý slot sa má otvoriť.
+   *
+   * Beží na `nonce`, nie na obsahu focusu: bez neho by sa okno otvorilo znova
+   * pri každom prekreslení a nedalo by sa zavrieť.
+   */
+  useEffect(() => {
+    if (focus?.slot) { setCakaSlot(focus.slot); setNapadyNacitane(false); }
+  }, [focus?.nonce]);
+
+  /**
+   * Otvorí okno, LEN ČO SÚ NÁPADY NAČÍTANÉ.
+   *
+   * Prvá verzia otvárala okno hneď na `nonce`. Lenže mapa si nápady ťahá
+   * vlastným dopytom a ten je asynchrónny — príspevok, ktorý Jarvis pred
+   * sekundou založil, v nich ešte nebol. Okno sa otvorilo prázdne a vyzeralo
+   * to, že sa návrh stratil (Jerry, 25. 8.). Preto sa čaká.
+   */
+  useEffect(() => {
+    if (!cakaSlot) return;
+    const vBunke = (bunky.get(`${cakaSlot.mesiac}|${cakaSlot.faza}`)?.plan || []);
+    const najdeny = cakaSlot.napadId
+      ? vBunke.find((x) => x.id === cakaSlot.napadId)
+      : undefined;
+    if (najdeny) {
+      setVyber({ druh: "slot", slot: najdeny });
+      setCakaSlot(null);
+      return;
+    }
+    // Keď je načítané a príspevok tam aj tak nie je (niekto ho zmazal, alebo
+    // sa vracia bez id), otvorí sa prázdny slot tej bunky — je to stále to
+    // miesto, odkiaľ sa odišlo, a nechať človeka pozerať na mapu je horšie.
+    if (napadyNacitane) {
+      setVyber({ druh: "novy", mesiac: cakaSlot.mesiac, faza: cakaSlot.faza });
+      setCakaSlot(null);
+    }
+  }, [cakaSlot, napadyNacitane, bunky]);
+
+  const posliJarvisovi = (mesiac: string, faza: number, napadId?: string) => {
     if (!chat) return;
     const f = FAZY.find((x) => x.id === faza);
     if (!f) return;
     const uzJe = (bunky.get(`${mesiac}|${faza}`)?.plan || []).map((s) => s.koncept || s.text).filter(Boolean);
     chat.newChat("marketing");
+    // Zapamätá sa, odkiaľ sa odišlo — aj KTORÝ príspevok to bol. Bez id by sa
+    // návrat z existujúceho príspevku otvoril ako prázdny slot, čo je presne
+    // tá chyba, ktorú mal návrat riešiť.
+    onOdchodKJarvisovi?.(mesiac, faza, napadId);
     if (onNavigate) { chat.zachovajOkno(); onNavigate("jarvis"); }
     else chat.setFloatingOpen(true);
     void chat.ask([
@@ -197,6 +256,31 @@ export function MapaCyklu({ data, chat, onNavigate }: {
   };
 
   const sirkaStlpca = 62;
+
+  /**
+   * Mapa sa otvorí tam, kde sa PLÁNUJE — na najbližšom mesiaci, ktorý sa dá
+   * ešte naplniť, teda dnešok + 1.
+   *
+   * Predtým sa otvárala úplne vľavo, na najstaršom mesiaci histórie: Jerry
+   * prišiel na mapu a pozeral na september 2025 (26. 8. 2026). História sa
+   * nezrušila — je odrolovaná doľava, kde jej miesto je.
+   *
+   * Prvý stĺpec mriežky je lepkavý (190 px názvov fáz) a leží NAD obsahom,
+   * takže aby cieľový mesiac vyšiel hneď za ním, stačí odrolovať o presne
+   * toľko šírok stĺpca, koľko je pred ním mesiacov.
+   */
+  const posuv = useRef<HTMLDivElement>(null);
+  const odrolovaneNa = useRef("");
+  useEffect(() => {
+    const el = posuv.current;
+    if (!el || !os.length) return;
+    const ciel = os.find((m) => m > dnes) || os[os.length - 1];
+    // Raz na jednu os. Bez toho by sa Jerryho vlastné rolovanie vracalo späť
+    // pri každom prekreslení mriežky.
+    if (odrolovaneNa.current === ciel) return;
+    odrolovaneNa.current = ciel;
+    el.scrollLeft = os.indexOf(ciel) * sirkaStlpca;
+  }, [os, dnes]);
 
   return (
     <Card>
@@ -229,7 +313,7 @@ export function MapaCyklu({ data, chat, onNavigate }: {
         planKusov={plan.length}
       />
 
-      <div style={{ overflowX: "auto", paddingBottom: 4 }}>
+      <div ref={posuv} style={{ overflowX: "auto", paddingBottom: 4 }}>
         {/* `separate` je nutnosť, nie vkus: pri `collapse` prehliadače
               nectia z-index buniek a bodky sa kreslia NAD lepkavý stĺpec.
               Presne to Jerry 23. 8. 2026 videl. */}
@@ -370,6 +454,12 @@ export function MapaCyklu({ data, chat, onNavigate }: {
               style={{ fontSize: 11.5, color: C.accentLight }}>
               natáčací list ↗
             </a>
+            {/* Nástrely titulky: dvadsať skladieb vedľa seba. Vyberá sa z toho
+                prstom a na veľkej obrazovke — do modálu sa to porovnať nedá. */}
+            <a href="/navrhy-titulky" target="_blank" rel="noreferrer"
+              style={{ fontSize: 11.5, color: C.accentLight }}>
+              nástrely titulky ↗
+            </a>
           </div>
           <div style={{ fontSize: 11.5, color: C.textDim, marginBottom: 10 }}>
             Klikni na riadok a otvorí sa ten istý editor ako z mriežky.
@@ -440,7 +530,7 @@ export function MapaCyklu({ data, chat, onNavigate }: {
 
       {naKopirovanie !== null && (
         <Modal title="Text pre Claude Project" sirka={560} onClose={() => setNaKopirovanie(null)}>
-          <OknoKopirovania text={naKopirovanie} onZavri={() => setNaKopirovanie(null)} />
+          <OknoKopirovania text={naKopirovanie} />
         </Modal>
       )}
 
@@ -484,7 +574,7 @@ function Panel({ vyber, os, zasobnik, onZavri, onUloz, onFazaPrispevku, onJarvis
   onZavri: () => void;
   onUloz: (b: Record<string, unknown>) => Promise<boolean>;
   onFazaPrispevku: (id: string, faza: number) => void;
-  onJarvis?: (mesiac: string, faza: number) => void;
+  onJarvis?: (mesiac: string, faza: number, napadId?: string) => void;
   /** Otvorí okno s hotovým zadaním na skopírovanie do Projectu. */
   onDoProjectu: (text: string) => void;
 }) {
@@ -495,7 +585,9 @@ function Panel({ vyber, os, zasobnik, onZavri, onUloz, onFazaPrispevku, onJarvis
   const [zaber, setZaber] = useState(slot?.zaber || "");
   const [sekvencia, setSekvencia] = useState(slot?.sekvencia || "");
   const [scenar, setScenar] = useState(slot?.scenar || "");
+  const [uvodneVety, setUvodneVety] = useState(slot?.uvodneVety || "");
   const [kopirovane, setKopirovane] = useState(false);
+  const [titulka, setTitulka] = useState(false);
   const poleCaption = useRef<HTMLTextAreaElement>(null);
 
   // Rovnaké dve cesty ako v okne pre Project: clipboard API sa dá zakázať
@@ -562,9 +654,6 @@ function Panel({ vyber, os, zasobnik, onZavri, onUloz, onFazaPrispevku, onJarvis
               }}>{f.nazov}</button>
           ))}
         </div>
-        <div style={{ marginTop: 14 }}>
-          <button onClick={onZavri} style={tlacidlo(false)}>zavrieť</button>
-        </div>
       </div>
     );
   }
@@ -572,15 +661,15 @@ function Panel({ vyber, os, zasobnik, onZavri, onUloz, onFazaPrispevku, onJarvis
   // ── Slot v pláne: nový alebo existujúci ───────────────────────────────────
   const f = FAZY.find((x) => x.id === faza);
   const zapis = async () => {
-    if (!koncept.trim() && !kto.trim() && !hotovyText.trim() && !scenar.trim()) return;
+    if (!koncept.trim() && !kto.trim() && !hotovyText.trim() && !scenar.trim() && !uvodneVety.trim()) return;
     setBusy(true);
     const ok = slot
-      ? await onUloz({ id: slot.id, koncept, kto, faza, planovaneNa: mesiac, hotovyText, zaber, sekvencia, scenar })
+      ? await onUloz({ id: slot.id, koncept, kto, faza, planovaneNa: mesiac, hotovyText, zaber, sekvencia, scenar, uvodneVety })
       : await onUloz({
           // Text nápadu je prvá veta konceptu — zásobník aj plán sú tá istá
           // tabuľka a nápad bez textu by v zozname nápadov svietil prázdny.
           text: koncept.trim().slice(0, 300) || `Obsah na ${mesiac}`,
-          zdroj: "vlastny", faza, planovaneNa: mesiac, kto, koncept, hotovyText, zaber, sekvencia, scenar,
+          zdroj: "vlastny", faza, planovaneNa: mesiac, kto, koncept, hotovyText, zaber, sekvencia, scenar, uvodneVety,
         });
     setBusy(false);
     if (ok) onZavri();
@@ -678,6 +767,18 @@ function Panel({ vyber, os, zasobnik, onZavri, onUloz, onFazaPrispevku, onJarvis
         placeholder="hovorené slovo — z toho sa berú vety do sekvencie"
         style={{ ...vstup, resize: "vertical", lineHeight: 1.5, fontSize: 12.5 }} />
 
+      {/* ÚVODNÉ VETY AŽ ZA SCENÁROM. Sú to jeho varianty, nie samostatný text —
+          a čítajú sa pri statíve, keď prvá veta nesadne. */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10, margin: "12px 0 4px" }}>
+        <label style={{ fontSize: 11.5, color: C.textMuted }}>
+          Alternatívne úvodné vety — jedna na riadok
+          {uvodneVety.trim() ? ` (${uvodneVety.split("\n").filter((r) => r.trim()).length})` : ""}
+        </label>
+      </div>
+      <textarea value={uvodneVety} onChange={(e) => setUvodneVety(e.target.value)} rows={uvodneVety ? 4 : 2}
+        placeholder="čo skúsiť, keď prvá veta nesadne"
+        style={{ ...vstup, resize: "vertical", lineHeight: 1.5, fontSize: 12.5 }} />
+
       {/* CAPTION AJ S HASHTAGMI V JEDNOM POLI. Mal som ich rozdelené, lebo sa
           menia nezávisle — z pohľadu použitia to bola chyba: do Metricoolu ide
           celý blok jedným cmd+C a dve polia znamenali dve kopírovania. */}
@@ -699,7 +800,7 @@ function Panel({ vyber, os, zasobnik, onZavri, onUloz, onFazaPrispevku, onJarvis
 
       {/* Rozpis záberov až POD hotovým textom: zábery sa priraďujú k VETÁM,
           takže kým text nie je, niet čoho sa chytiť. */}
-      <Sekvencia faza={faza} hotovyText={scenar || hotovyText} hodnota={sekvencia} onZmena={setSekvencia} />
+      <Sekvencia faza={faza} hotovyText={hotovyText} scenar={scenar} hodnota={sekvencia} onZmena={setSekvencia} />
 
       <div style={{ marginTop: 10, fontSize: 11.5, color: C.textDim, lineHeight: 1.45 }}>
         <button
@@ -710,9 +811,34 @@ function Panel({ vyber, os, zasobnik, onZavri, onUloz, onFazaPrispevku, onJarvis
         {(hotovyText.trim() || scenar.trim()) ? " — zadanie ponesie aj terajšie verzie na úpravu." : " — otvorí sa zadanie na skopírovanie."}
       </div>
 
+      {/* TITULKA AŽ TU, POD TEXTOM. Nadpis na titulke je prvá veta captionu —
+          kým text nie je, generátor by ponúkal prázdno a Jerry by ho vypĺňal
+          druhýkrát ručne. */}
+      <div style={{ marginTop: 6, fontSize: 11.5, color: C.textDim, lineHeight: 1.45 }}>
+        <button
+          onClick={() => setTitulka(true)}
+          style={{ background: "none", border: 0, padding: 0, color: C.accentLight, fontSize: 11.5, fontFamily: "inherit", cursor: "pointer" }}>
+          vyrobiť titulku ↗
+        </button>
+        {" — 1080×1920 v PSB sadzbe, stiahne sa ako PNG."}
+      </div>
+      {titulka && (
+        <Titulka
+          zdroj={{ koncept, hotovyText, scenar }}
+          mesiac={mesiac}
+          faza={faza}
+          kluc={slot?.id || `${mesiac}|${faza}`}
+          ulozene={slot?.titulka || ""}
+          // Uložiť sa dá len k príspevku, ktorý už existuje. Kým nie je
+          // naplánovaný, nastavenie nemá kde bývať a okno to povie.
+          onUloz={slot ? (t) => onUloz({ id: slot.id, titulka: t }) : undefined}
+          onZavri={() => setTitulka(false)}
+        />
+      )}
+
       <div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap", alignItems: "center" }}>
-        <button onClick={zapis} disabled={busy || (!koncept.trim() && !kto.trim() && !hotovyText.trim() && !scenar.trim())}
-          style={{ ...tlacidlo(true), opacity: busy || (!koncept.trim() && !kto.trim() && !hotovyText.trim() && !scenar.trim()) ? 0.5 : 1 }}>
+        <button onClick={zapis} disabled={busy || (!koncept.trim() && !kto.trim() && !hotovyText.trim() && !scenar.trim() && !uvodneVety.trim())}
+          style={{ ...tlacidlo(true), opacity: busy || (!koncept.trim() && !kto.trim() && !hotovyText.trim() && !scenar.trim() && !uvodneVety.trim()) ? 0.5 : 1 }}>
           {slot ? "uložiť" : "naplánovať"}
         </button>
         {/* Do zásobníka, nie do koša. Nápad, ktorý ešte nechceš vyhodiť, ale
@@ -740,13 +866,14 @@ function Panel({ vyber, os, zasobnik, onZavri, onUloz, onFazaPrispevku, onJarvis
           </button>
         )}
         {onJarvis && mesiac && (
-          <button onClick={() => onJarvis(mesiac, faza)} disabled={busy}
+          <button onClick={() => onJarvis(mesiac, faza, slot?.id)} disabled={busy}
             style={{ ...tlacidlo(false), color: C.accentLight, borderColor: mix(C.accent, 0.6) }}>
             nech navrhne Jarvis
           </button>
         )}
-        {/* Modál sa inak zatvára len klikom mimo panela a to nie je vidieť —
-            Jerryho pôvodná výhrada bola presne o tom, že si zmenu nevšimne. */}
+        {/* Protipól k „uložiť": povie, že zmeny padnú. Zatvorenie samo o sebe
+            rieši krížik v hlavičke — ten pribudol 26. 8. 2026 a pôvodný dôvod
+            tohto tlačidla (okno sa dalo zavrieť len klikom mimo neho) zanikol. */}
         <button onClick={onZavri} disabled={busy} style={{ ...tlacidlo(false), marginLeft: "auto" }}>
           zrušiť
         </button>
@@ -770,7 +897,7 @@ function Panel({ vyber, os, zasobnik, onZavri, onUloz, onFazaPrispevku, onJarvis
  * napísal text pre niekoho iného. Toto okno mu dá zadanie do schránky skôr,
  * než odíde.
  */
-function OknoKopirovania({ text, onZavri }: { text: string; onZavri: () => void }) {
+function OknoKopirovania({ text }: { text: string }) {
   const [stav, setStav] = useState<"" | "ok" | "chyba">("");
   const pole = useRef<HTMLTextAreaElement>(null);
 
@@ -831,14 +958,6 @@ function OknoKopirovania({ text, onZavri }: { text: string; onZavri: () => void 
           }}>
           otvoriť Claude Project ↗
         </a>
-        <button onClick={onZavri}
-          style={{
-            background: "none", color: C.textMuted, border: `1px solid ${C.border}`,
-            borderRadius: 6, padding: "7px 14px", fontSize: 12.5, fontFamily: "inherit",
-            cursor: "pointer", marginLeft: "auto",
-          }}>
-          zavrieť
-        </button>
       </div>
       {stav === "chyba" && (
         <div style={{ fontSize: 11.5, color: C.red, marginTop: 8 }}>

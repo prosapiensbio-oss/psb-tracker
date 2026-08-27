@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
+import { jeMesiac } from "../../lib/psb/format";
 import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
@@ -50,7 +51,7 @@ export const Route = createFileRoute("/api/periods")({
         catch { return Response.json({ ok: false, error: "bad_request" }, { status: 400 }); }
 
         const month = String(b.month || "");
-        if (!/^\d{4}-\d{2}$/.test(month)) return Response.json({ ok: false, error: "bad_month" }, { status: 400 });
+        if (!jeMesiac(month)) return Response.json({ ok: false, error: "bad_month" }, { status: 400 });
         const locked = b.locked ? 1 : 0;
         const note = String(b.note || "").slice(0, 400);
         const now = new Date().toISOString();

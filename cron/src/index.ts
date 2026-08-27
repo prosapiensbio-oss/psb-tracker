@@ -39,6 +39,40 @@ const novinky = (env: Env) =>
     }),
   );
 
+/**
+ * Text vlastného webu — sitemapa a obsah stránok.
+ *
+ * Prečo to musí bežať samo: do 26. 8. 2026 sa ťahalo len ručne a naposledy
+ * bežalo 17. 8. Karta „Čo publikovať ďalej" pritom rozhoduje z `web_stranky`,
+ * či o téme stránka EXISTUJE — a keď je tabuľka deväť dní stará, navrhuje
+ * napísať niečo, čo už napísané je. To isté platí pre Jarvisa: `web_stranky`
+ * je jeho jediný zdroj o tom, čo na webe stojí.
+ *
+ * Endpoint spracuje 40 stránok na volanie (dlhší request na Cloudflare
+ * vyprší), preto sa volá v kole, kým `zostava` nie je nula. Poistka proti
+ * nekonečnu: keď kolo neprečíta ani jednu stránku, končí sa — rovnaké
+ * pravidlo ako v ručnom tlačidle v Údajoch.
+ */
+async function textWebu(env: Env): Promise<{ kol: number; nacitane: number; chyba?: string }> {
+  let nacitane = 0;
+  for (let kolo = 0; kolo < 12; kolo++) {
+    const r = await env.KOKPIT.fetch(
+      new Request("https://kokpit.prosapiensbio.workers.dev/api/web-obsah?cron=1", {
+        method: "POST",
+        headers: { "x-cron-token": env.KAL_CRON_TOKEN, "content-type": "application/json" },
+        body: "{}",
+      }),
+    );
+    if (!r.ok) return { kol: kolo + 1, nacitane, chyba: `HTTP ${r.status}: ${(await r.text()).slice(0, 200)}` };
+    const j = (await r.json()) as { error?: string; nacitane?: number; zostava?: number };
+    if (j.error) return { kol: kolo + 1, nacitane, chyba: j.error };
+    const pribudlo = j.nacitane ?? 0;
+    nacitane += pribudlo;
+    if (!j.zostava || !pribudlo) return { kol: kolo + 1, nacitane };
+  }
+  return { kol: 12, nacitane };
+}
+
 export default {
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
     // Podľa času spustenia sa rozhodne, čo sa má robiť — jeden worker, tri
@@ -48,6 +82,16 @@ export default {
         novinky(env).then(
           async (r) => console.log(`novinky v algoritmoch: HTTP ${r.status} ${(await r.text()).slice(0, 200)}`),
           (e) => console.error("novinky v algoritmoch zlyhali:", e),
+        ),
+      );
+      // Text webu ide v tom istom nočnom behu. Beží PO novinkách a nezávisle:
+      // keď jedno spadne, druhé sa aj tak spraví.
+      ctx.waitUntil(
+        textWebu(env).then(
+          (v) => console.log(v.chyba
+            ? `text webu ZLYHAL po ${v.kol} kolách (načítaných ${v.nacitane}): ${v.chyba}`
+            : `text webu: ${v.nacitane} stránok v ${v.kol} kolách`),
+          (e) => console.error("text webu zlyhal:", e),
         ),
       );
       return;
@@ -62,7 +106,15 @@ export default {
   // Ručné spustenie na overenie, že plánovač na Kokpit naozaj dosiahne.
   // `?novinky=1` skúša druhú vetvu bez čakania na 3:30 ráno.
   async fetch(req: Request, env: Env) {
-    const r = new URL(req.url).searchParams.get("novinky") === "1" ? await novinky(env) : await zavolaj(env);
+    const q = new URL(req.url).searchParams;
+    // `?web=1` skúša načítanie textu webu bez čakania na 3:30 ráno.
+    if (q.get("web") === "1") {
+      const v = await textWebu(env);
+      return new Response(v.chyba
+        ? `text webu ZLYHAL po ${v.kol} kolách (načítaných ${v.nacitane}): ${v.chyba}`
+        : `text webu: ${v.nacitane} stránok v ${v.kol} kolách`, { status: v.chyba ? 502 : 200 });
+    }
+    const r = q.get("novinky") === "1" ? await novinky(env) : await zavolaj(env);
     return new Response(`Kokpit odpovedal ${r.status}: ${(await r.text()).slice(0, 300)}`, {
       status: r.ok ? 200 : 502,
     });

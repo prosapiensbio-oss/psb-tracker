@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
+import { Route as NavrhyTitulkyRouteImport } from './routes/navrhy-titulky'
 import { Route as NatacaciListRouteImport } from './routes/natacaci-list'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiZositRouteImport } from './routes/api/zosit'
@@ -22,9 +23,12 @@ import { Route as ApiVzasSettingsRouteImport } from './routes/api/vzas-settings'
 import { Route as ApiVzasNotesRouteImport } from './routes/api/vzas-notes'
 import { Route as ApiVedomostRouteImport } from './routes/api/vedomost'
 import { Route as ApiUsersRouteImport } from './routes/api/users'
+import { Route as ApiTitulkaObrazokRouteImport } from './routes/api/titulka-obrazok'
+import { Route as ApiTitulkaNavrhRouteImport } from './routes/api/titulka-navrh'
 import { Route as ApiSsoRouteImport } from './routes/api/sso'
 import { Route as ApiSpravaRouteImport } from './routes/api/sprava'
 import { Route as ApiSessionRouteImport } from './routes/api/session'
+import { Route as ApiSekvenciaNavrhRouteImport } from './routes/api/sekvencia-navrh'
 import { Route as ApiResetRouteImport } from './routes/api/reset'
 import { Route as ApiRawUploadsRouteImport } from './routes/api/raw-uploads'
 import { Route as ApiPremenujRouteImport } from './routes/api/premenuj'
@@ -33,7 +37,9 @@ import { Route as ApiPeriodsRouteImport } from './routes/api/periods'
 import { Route as ApiPdfImportRouteImport } from './routes/api/pdf-import'
 import { Route as ApiPagespeedRouteImport } from './routes/api/pagespeed'
 import { Route as ApiOverrideRouteImport } from './routes/api/override'
+import { Route as ApiObrazokPromptRouteImport } from './routes/api/obrazok-prompt'
 import { Route as ApiNapadyRouteImport } from './routes/api/napady'
+import { Route as ApiNapadObrazokRouteImport } from './routes/api/napad-obrazok'
 import { Route as ApiMetaMediaRouteImport } from './routes/api/meta-media'
 import { Route as ApiMetaRouteImport } from './routes/api/meta'
 import { Route as ApiMeraniaRouteImport } from './routes/api/merania'
@@ -69,6 +75,11 @@ const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
 const RobotsDottxtRoute = RobotsDottxtRouteImport.update({
   id: '/robots.txt',
   path: '/robots.txt',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NavrhyTitulkyRoute = NavrhyTitulkyRouteImport.update({
+  id: '/navrhy-titulky',
+  path: '/navrhy-titulky',
   getParentRoute: () => rootRouteImport,
 } as any)
 const NatacaciListRoute = NatacaciListRouteImport.update({
@@ -126,6 +137,16 @@ const ApiUsersRoute = ApiUsersRouteImport.update({
   path: '/api/users',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiTitulkaObrazokRoute = ApiTitulkaObrazokRouteImport.update({
+  id: '/api/titulka-obrazok',
+  path: '/api/titulka-obrazok',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTitulkaNavrhRoute = ApiTitulkaNavrhRouteImport.update({
+  id: '/api/titulka-navrh',
+  path: '/api/titulka-navrh',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiSsoRoute = ApiSsoRouteImport.update({
   id: '/api/sso',
   path: '/api/sso',
@@ -139,6 +160,11 @@ const ApiSpravaRoute = ApiSpravaRouteImport.update({
 const ApiSessionRoute = ApiSessionRouteImport.update({
   id: '/api/session',
   path: '/api/session',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSekvenciaNavrhRoute = ApiSekvenciaNavrhRouteImport.update({
+  id: '/api/sekvencia-navrh',
+  path: '/api/sekvencia-navrh',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiResetRoute = ApiResetRouteImport.update({
@@ -181,9 +207,19 @@ const ApiOverrideRoute = ApiOverrideRouteImport.update({
   path: '/api/override',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiObrazokPromptRoute = ApiObrazokPromptRouteImport.update({
+  id: '/api/obrazok-prompt',
+  path: '/api/obrazok-prompt',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiNapadyRoute = ApiNapadyRouteImport.update({
   id: '/api/napady',
   path: '/api/napady',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiNapadObrazokRoute = ApiNapadObrazokRouteImport.update({
+  id: '/api/napad-obrazok',
+  path: '/api/napad-obrazok',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiMetaMediaRoute = ApiMetaMediaRouteImport.update({
@@ -320,6 +356,7 @@ const ApiAlgoRoute = ApiAlgoRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/natacaci-list': typeof NatacaciListRoute
+  '/navrhy-titulky': typeof NavrhyTitulkyRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/api/algo': typeof ApiAlgoRoute
@@ -348,7 +385,9 @@ export interface FileRoutesByFullPath {
   '/api/merania': typeof ApiMeraniaRoute
   '/api/meta': typeof ApiMetaRoute
   '/api/meta-media': typeof ApiMetaMediaRoute
+  '/api/napad-obrazok': typeof ApiNapadObrazokRoute
   '/api/napady': typeof ApiNapadyRoute
+  '/api/obrazok-prompt': typeof ApiObrazokPromptRoute
   '/api/override': typeof ApiOverrideRoute
   '/api/pagespeed': typeof ApiPagespeedRoute
   '/api/pdf-import': typeof ApiPdfImportRoute
@@ -357,9 +396,12 @@ export interface FileRoutesByFullPath {
   '/api/premenuj': typeof ApiPremenujRoute
   '/api/raw-uploads': typeof ApiRawUploadsRoute
   '/api/reset': typeof ApiResetRoute
+  '/api/sekvencia-navrh': typeof ApiSekvenciaNavrhRoute
   '/api/session': typeof ApiSessionRoute
   '/api/sprava': typeof ApiSpravaRoute
   '/api/sso': typeof ApiSsoRoute
+  '/api/titulka-navrh': typeof ApiTitulkaNavrhRoute
+  '/api/titulka-obrazok': typeof ApiTitulkaObrazokRoute
   '/api/users': typeof ApiUsersRoute
   '/api/vedomost': typeof ApiVedomostRoute
   '/api/vzas-notes': typeof ApiVzasNotesRoute
@@ -373,6 +415,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/natacaci-list': typeof NatacaciListRoute
+  '/navrhy-titulky': typeof NavrhyTitulkyRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/api/algo': typeof ApiAlgoRoute
@@ -401,7 +444,9 @@ export interface FileRoutesByTo {
   '/api/merania': typeof ApiMeraniaRoute
   '/api/meta': typeof ApiMetaRoute
   '/api/meta-media': typeof ApiMetaMediaRoute
+  '/api/napad-obrazok': typeof ApiNapadObrazokRoute
   '/api/napady': typeof ApiNapadyRoute
+  '/api/obrazok-prompt': typeof ApiObrazokPromptRoute
   '/api/override': typeof ApiOverrideRoute
   '/api/pagespeed': typeof ApiPagespeedRoute
   '/api/pdf-import': typeof ApiPdfImportRoute
@@ -410,9 +455,12 @@ export interface FileRoutesByTo {
   '/api/premenuj': typeof ApiPremenujRoute
   '/api/raw-uploads': typeof ApiRawUploadsRoute
   '/api/reset': typeof ApiResetRoute
+  '/api/sekvencia-navrh': typeof ApiSekvenciaNavrhRoute
   '/api/session': typeof ApiSessionRoute
   '/api/sprava': typeof ApiSpravaRoute
   '/api/sso': typeof ApiSsoRoute
+  '/api/titulka-navrh': typeof ApiTitulkaNavrhRoute
+  '/api/titulka-obrazok': typeof ApiTitulkaObrazokRoute
   '/api/users': typeof ApiUsersRoute
   '/api/vedomost': typeof ApiVedomostRoute
   '/api/vzas-notes': typeof ApiVzasNotesRoute
@@ -427,6 +475,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/natacaci-list': typeof NatacaciListRoute
+  '/navrhy-titulky': typeof NavrhyTitulkyRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/api/algo': typeof ApiAlgoRoute
@@ -455,7 +504,9 @@ export interface FileRoutesById {
   '/api/merania': typeof ApiMeraniaRoute
   '/api/meta': typeof ApiMetaRoute
   '/api/meta-media': typeof ApiMetaMediaRoute
+  '/api/napad-obrazok': typeof ApiNapadObrazokRoute
   '/api/napady': typeof ApiNapadyRoute
+  '/api/obrazok-prompt': typeof ApiObrazokPromptRoute
   '/api/override': typeof ApiOverrideRoute
   '/api/pagespeed': typeof ApiPagespeedRoute
   '/api/pdf-import': typeof ApiPdfImportRoute
@@ -464,9 +515,12 @@ export interface FileRoutesById {
   '/api/premenuj': typeof ApiPremenujRoute
   '/api/raw-uploads': typeof ApiRawUploadsRoute
   '/api/reset': typeof ApiResetRoute
+  '/api/sekvencia-navrh': typeof ApiSekvenciaNavrhRoute
   '/api/session': typeof ApiSessionRoute
   '/api/sprava': typeof ApiSpravaRoute
   '/api/sso': typeof ApiSsoRoute
+  '/api/titulka-navrh': typeof ApiTitulkaNavrhRoute
+  '/api/titulka-obrazok': typeof ApiTitulkaObrazokRoute
   '/api/users': typeof ApiUsersRoute
   '/api/vedomost': typeof ApiVedomostRoute
   '/api/vzas-notes': typeof ApiVzasNotesRoute
@@ -482,6 +536,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/natacaci-list'
+    | '/navrhy-titulky'
     | '/robots.txt'
     | '/sitemap.xml'
     | '/api/algo'
@@ -510,7 +565,9 @@ export interface FileRouteTypes {
     | '/api/merania'
     | '/api/meta'
     | '/api/meta-media'
+    | '/api/napad-obrazok'
     | '/api/napady'
+    | '/api/obrazok-prompt'
     | '/api/override'
     | '/api/pagespeed'
     | '/api/pdf-import'
@@ -519,9 +576,12 @@ export interface FileRouteTypes {
     | '/api/premenuj'
     | '/api/raw-uploads'
     | '/api/reset'
+    | '/api/sekvencia-navrh'
     | '/api/session'
     | '/api/sprava'
     | '/api/sso'
+    | '/api/titulka-navrh'
+    | '/api/titulka-obrazok'
     | '/api/users'
     | '/api/vedomost'
     | '/api/vzas-notes'
@@ -535,6 +595,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/natacaci-list'
+    | '/navrhy-titulky'
     | '/robots.txt'
     | '/sitemap.xml'
     | '/api/algo'
@@ -563,7 +624,9 @@ export interface FileRouteTypes {
     | '/api/merania'
     | '/api/meta'
     | '/api/meta-media'
+    | '/api/napad-obrazok'
     | '/api/napady'
+    | '/api/obrazok-prompt'
     | '/api/override'
     | '/api/pagespeed'
     | '/api/pdf-import'
@@ -572,9 +635,12 @@ export interface FileRouteTypes {
     | '/api/premenuj'
     | '/api/raw-uploads'
     | '/api/reset'
+    | '/api/sekvencia-navrh'
     | '/api/session'
     | '/api/sprava'
     | '/api/sso'
+    | '/api/titulka-navrh'
+    | '/api/titulka-obrazok'
     | '/api/users'
     | '/api/vedomost'
     | '/api/vzas-notes'
@@ -588,6 +654,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/natacaci-list'
+    | '/navrhy-titulky'
     | '/robots.txt'
     | '/sitemap.xml'
     | '/api/algo'
@@ -616,7 +683,9 @@ export interface FileRouteTypes {
     | '/api/merania'
     | '/api/meta'
     | '/api/meta-media'
+    | '/api/napad-obrazok'
     | '/api/napady'
+    | '/api/obrazok-prompt'
     | '/api/override'
     | '/api/pagespeed'
     | '/api/pdf-import'
@@ -625,9 +694,12 @@ export interface FileRouteTypes {
     | '/api/premenuj'
     | '/api/raw-uploads'
     | '/api/reset'
+    | '/api/sekvencia-navrh'
     | '/api/session'
     | '/api/sprava'
     | '/api/sso'
+    | '/api/titulka-navrh'
+    | '/api/titulka-obrazok'
     | '/api/users'
     | '/api/vedomost'
     | '/api/vzas-notes'
@@ -642,6 +714,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   NatacaciListRoute: typeof NatacaciListRoute
+  NavrhyTitulkyRoute: typeof NavrhyTitulkyRoute
   RobotsDottxtRoute: typeof RobotsDottxtRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   ApiAlgoRoute: typeof ApiAlgoRoute
@@ -670,7 +743,9 @@ export interface RootRouteChildren {
   ApiMeraniaRoute: typeof ApiMeraniaRoute
   ApiMetaRoute: typeof ApiMetaRoute
   ApiMetaMediaRoute: typeof ApiMetaMediaRoute
+  ApiNapadObrazokRoute: typeof ApiNapadObrazokRoute
   ApiNapadyRoute: typeof ApiNapadyRoute
+  ApiObrazokPromptRoute: typeof ApiObrazokPromptRoute
   ApiOverrideRoute: typeof ApiOverrideRoute
   ApiPagespeedRoute: typeof ApiPagespeedRoute
   ApiPdfImportRoute: typeof ApiPdfImportRoute
@@ -679,9 +754,12 @@ export interface RootRouteChildren {
   ApiPremenujRoute: typeof ApiPremenujRoute
   ApiRawUploadsRoute: typeof ApiRawUploadsRoute
   ApiResetRoute: typeof ApiResetRoute
+  ApiSekvenciaNavrhRoute: typeof ApiSekvenciaNavrhRoute
   ApiSessionRoute: typeof ApiSessionRoute
   ApiSpravaRoute: typeof ApiSpravaRoute
   ApiSsoRoute: typeof ApiSsoRoute
+  ApiTitulkaNavrhRoute: typeof ApiTitulkaNavrhRoute
+  ApiTitulkaObrazokRoute: typeof ApiTitulkaObrazokRoute
   ApiUsersRoute: typeof ApiUsersRoute
   ApiVedomostRoute: typeof ApiVedomostRoute
   ApiVzasNotesRoute: typeof ApiVzasNotesRoute
@@ -707,6 +785,13 @@ declare module '@tanstack/react-router' {
       path: '/robots.txt'
       fullPath: '/robots.txt'
       preLoaderRoute: typeof RobotsDottxtRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/navrhy-titulky': {
+      id: '/navrhy-titulky'
+      path: '/navrhy-titulky'
+      fullPath: '/navrhy-titulky'
+      preLoaderRoute: typeof NavrhyTitulkyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/natacaci-list': {
@@ -786,6 +871,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiUsersRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/titulka-obrazok': {
+      id: '/api/titulka-obrazok'
+      path: '/api/titulka-obrazok'
+      fullPath: '/api/titulka-obrazok'
+      preLoaderRoute: typeof ApiTitulkaObrazokRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/titulka-navrh': {
+      id: '/api/titulka-navrh'
+      path: '/api/titulka-navrh'
+      fullPath: '/api/titulka-navrh'
+      preLoaderRoute: typeof ApiTitulkaNavrhRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/sso': {
       id: '/api/sso'
       path: '/api/sso'
@@ -805,6 +904,13 @@ declare module '@tanstack/react-router' {
       path: '/api/session'
       fullPath: '/api/session'
       preLoaderRoute: typeof ApiSessionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/sekvencia-navrh': {
+      id: '/api/sekvencia-navrh'
+      path: '/api/sekvencia-navrh'
+      fullPath: '/api/sekvencia-navrh'
+      preLoaderRoute: typeof ApiSekvenciaNavrhRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/reset': {
@@ -863,11 +969,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiOverrideRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/obrazok-prompt': {
+      id: '/api/obrazok-prompt'
+      path: '/api/obrazok-prompt'
+      fullPath: '/api/obrazok-prompt'
+      preLoaderRoute: typeof ApiObrazokPromptRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/napady': {
       id: '/api/napady'
       path: '/api/napady'
       fullPath: '/api/napady'
       preLoaderRoute: typeof ApiNapadyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/napad-obrazok': {
+      id: '/api/napad-obrazok'
+      path: '/api/napad-obrazok'
+      fullPath: '/api/napad-obrazok'
+      preLoaderRoute: typeof ApiNapadObrazokRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/meta-media': {
@@ -1058,6 +1178,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   NatacaciListRoute: NatacaciListRoute,
+  NavrhyTitulkyRoute: NavrhyTitulkyRoute,
   RobotsDottxtRoute: RobotsDottxtRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   ApiAlgoRoute: ApiAlgoRoute,
@@ -1086,7 +1207,9 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMeraniaRoute: ApiMeraniaRoute,
   ApiMetaRoute: ApiMetaRoute,
   ApiMetaMediaRoute: ApiMetaMediaRoute,
+  ApiNapadObrazokRoute: ApiNapadObrazokRoute,
   ApiNapadyRoute: ApiNapadyRoute,
+  ApiObrazokPromptRoute: ApiObrazokPromptRoute,
   ApiOverrideRoute: ApiOverrideRoute,
   ApiPagespeedRoute: ApiPagespeedRoute,
   ApiPdfImportRoute: ApiPdfImportRoute,
@@ -1095,9 +1218,12 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPremenujRoute: ApiPremenujRoute,
   ApiRawUploadsRoute: ApiRawUploadsRoute,
   ApiResetRoute: ApiResetRoute,
+  ApiSekvenciaNavrhRoute: ApiSekvenciaNavrhRoute,
   ApiSessionRoute: ApiSessionRoute,
   ApiSpravaRoute: ApiSpravaRoute,
   ApiSsoRoute: ApiSsoRoute,
+  ApiTitulkaNavrhRoute: ApiTitulkaNavrhRoute,
+  ApiTitulkaObrazokRoute: ApiTitulkaObrazokRoute,
   ApiUsersRoute: ApiUsersRoute,
   ApiVedomostRoute: ApiVedomostRoute,
   ApiVzasNotesRoute: ApiVzasNotesRoute,

@@ -46,3 +46,32 @@ describe("záber v zadaní pre Project", () => {
     expect(zaberDoZadania("vymyslene")).toBe("");
   });
 });
+
+/**
+ * Katalóg sa rozšíril zo 7 na 13 záberov, lebo Jarvisovi sa štyri točili
+ * dokola. Rozšírenie je až vtedy hotové, keď každý nový pohyb vie appka aj
+ * nakresliť a pomenovať — inak sa záber ponúkne a obrazovka spadne.
+ */
+describe("rozšírený katalóg", () => {
+  it("každá fáza má z čoho vyberať", () => {
+    for (const f of [1, 2, 3, 4, 5]) {
+      expect(zaberyPreFazu(f).length).toBeGreaterThan(0);
+    }
+  });
+
+  it("žiadny pohyb nemá len jeden záber vo svojej fáze bez alternatívy", () => {
+    // Pravidlo „dva rovnaké pohyby za sebou nie" potrebuje aspoň dva rôzne
+    // pohyby na fázu, inak sa nedá splniť.
+    for (const f of [1, 2, 3, 4, 5]) {
+      const pohyby = new Set(zaberyPreFazu(f).map((z) => z.pohyb));
+      expect(pohyby.size).toBeGreaterThan(1);
+    }
+  });
+
+  it("každý záber povie, ako sa točí a načo je PSB", () => {
+    for (const z of ZABERY) {
+      expect(z.akoNaTo.length).toBeGreaterThan(60);
+      expect(z.prePSB.length).toBeGreaterThan(30);
+    }
+  });
+});

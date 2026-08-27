@@ -315,3 +315,24 @@ describe("dopyt → úvodný (zDopytuUvodny)", () => {
     expect(k.zDopytuUvodny).toBe(0);
   });
 });
+
+describe("šípka dopyt → úvodný v pásiku lievika", () => {
+  it("úvodný z odporúčania prvú šípku nenafúkne", () => {
+    // Jan–aug 2026 naživo: 38 dopytov, 38 úvodných, ale na úvodný došlo len
+    // 29 z tých 38 dopytov (76 %). `uvodne/dopyty` z dvoch rôznych množín
+    // dalo „100 %" — pásik musí konvertovať dopyty, nie deliť počty udalostí.
+    const s = [
+      session("Petra", "2026-01-10", "UVODNE"),
+      session("Jana", "2026-01-12", "UVODNE"), // z odporúčania, dopyt nemá
+    ];
+    const k = krokyZa(
+      psb({ leads: [lead("l1", "2026-01-05", "Petra"), lead("l2", "2026-01-06", "Nikto Neprišiel")], sessions: s, payments: [] }),
+      {},
+      MES,
+    );
+    expect(k.dopyty).toBe(2);
+    expect(k.uvodne).toBe(2);
+    // Podiel udalostí by dal 100 % — z dvoch dopytov ale došiel len jeden.
+    expect(k.zDopytuUvodny).toBe(1);
+  });
+});

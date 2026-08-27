@@ -121,6 +121,8 @@ export function skontrolujSekvenciu(kroky: Krok[], cielSekund: number): Nalez[] 
 const POPIS: Record<Pohyb, string> = {
   dopredu: "nájazd", odhalenie: "odhalenie", "oblúk": "oblúk",
   sklopenie: "z detailu na celok", "švih": "švih", "statický": "statický záber",
+  dozadu: "cúvanie", sledovanie: "sledovanie zboku", zhora: "pohľad zhora",
+  zdola: "nízky uhol", naklon: "naklonenie po tele", prelet: "prechod cez popredie",
 };
 export const popisPohybu = (p: Pohyb) => POPIS[p];
 

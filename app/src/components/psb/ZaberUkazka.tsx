@@ -21,6 +21,12 @@ const KROKY: Record<Pohyb, { popis: string; sekund: number }> = {
   sklopenie: { popis: "telefón cúva a dvíha sa z detailu na celok", sekund: 2.5 },
   "švih": { popis: "prudké otočenie s rozmazaním", sekund: 0.4 },
   "statický": { popis: "telefón sa nehýbe, hýbe sa človek v zábere", sekund: 3 },
+  dozadu: { popis: "telefón cúva pred idúcim človekom", sekund: 3 },
+  sledovanie: { popis: "telefón ide bokom vedľa človeka rovnakým tempom", sekund: 4 },
+  zhora: { popis: "telefón je nad subjektom, objektív kolmo dole", sekund: 2 },
+  zdola: { popis: "telefón takmer na zemi, objektív mierne hore", sekund: 2.5 },
+  naklon: { popis: "telefón sa na mieste otáča zdola nahor", sekund: 3.5 },
+  prelet: { popis: "predmet v popredí prejde obrazom a odkryje subjekt", sekund: 2 },
 };
 
 export function ZaberUkazka({ pohyb, vyska = 116 }: { pohyb: Pohyb; vyska?: number }) {
@@ -37,6 +43,12 @@ export function ZaberUkazka({ pohyb, vyska = 116 }: { pohyb: Pohyb; vyska?: numb
     sklopenie: "M 74 62 L 26 40",
     "švih": "M 40 50 L 88 50",
     "statický": "M 40 50 L 40 50",
+    dozadu: "M 74 50 L 30 50",
+    sledovanie: "M 18 50 L 82 50",
+    zhora: "M 50 18 L 50 40",
+    zdola: "M 50 82 L 50 62",
+    naklon: "M 44 74 Q 66 52 44 30",
+    prelet: "M 16 58 Q 50 38 84 58",
   };
 
   return (

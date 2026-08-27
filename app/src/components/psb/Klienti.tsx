@@ -806,7 +806,6 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
           <div style={{ marginBottom: 14 }}>
             <Dennik meno={editC.name} limit={4} onNovyZapis={onDennikZapis} />
           </div>
-          <button onClick={() => setEdit(null)} style={{ background: C.accent, color: "#fff", border: "none", borderRadius: 8, padding: "8px 16px", cursor: "pointer", fontSize: 13, width: "100%" }}>Hotovo</button>
         </Modal>
       )}
       </>

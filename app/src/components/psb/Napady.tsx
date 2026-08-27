@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
+import { vloz } from "../../lib/psb/titulkaFoto";
 import { C, mix } from "../../lib/psb/theme";
 import type { AssistantChat } from "./Assistant";
 import { Card, Empty, H3, Info } from "./ui";
@@ -47,6 +48,8 @@ const fmtDen = (d: string) => {
 export function Napady({ chat }: { chat?: AssistantChat }) {
   // Vloženie cudzieho odkazu. Nie je to samostatná obrazovka zámerne — nápad
   // zvonku je nápad ako každý iný, len má navyše adresu, odkiaľ prišiel.
+  /** Ktoré nápady už majú priloženú snímku — kvôli hláseniu na tlačidle. */
+  const [snimky, setSnimky] = useState<Record<string, boolean>>({});
   const [odkazVstup, setOdkazVstup] = useState("");
   const [ukladam, setUkladam] = useState(false);
   const [napady, setNapady] = useState<Napad[]>([]);
@@ -117,6 +120,31 @@ export function Napady({ chat }: { chat?: AssistantChat }) {
    * VIDIEŤ vie, takže rozbor stojí na snímke obrazovky. Preto sa o ňu pýta
    * hneď v prvej vete namiesto toho, aby predstieral, že si video pozrel.
    */
+  /**
+   * Priloží snímku obrazovky k inšpirácii.
+   *
+   * Zmenšuje sa tou istou cestou ako fotka do titulky — snímka z telefónu má
+   * cez megabajt a do databázy by sa nezmestila.
+   */
+  const prilozSnimku = async (id: string, subor?: File | null) => {
+    if (!subor) return;
+    try {
+      const v = await vloz(subor);
+      const r = await fetch("/api/napad-obrazok", {
+        method: "POST", credentials: "same-origin",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id, druh: "inspiracia", dataUri: v.dataUri, sirka: v.sirka, vyska: v.vyska }),
+      });
+      const o = (await r.json()) as { ok?: boolean; error?: string };
+      // Neúspech sa MUSÍ dostať späť: kto si myslí, že snímku priložil, sa
+      // k tomu už nevráti a Jarvis bude rozoberať naslepo.
+      setSnimky((z) => ({ ...z, [id]: !!o.ok }));
+      if (!o.ok) alert(o.error || "Snímku sa nepodarilo uložiť.");
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Snímku sa nepodarilo načítať.");
+    }
+  };
+
   const rozober = async (n: Napad) => {
     if (!chat) return;
     chat.setFloatingOpen(true);
@@ -129,13 +157,23 @@ export function Napady({ chat }: { chat?: AssistantChat }) {
           body: JSON.stringify({ url: n.inspiracia }),
         }).then((x) => x.json()).catch(() => null) as { ok?: boolean; obrazok?: string; popis?: string } | null
       : null;
-    const obrazky = meta?.ok && meta.obrazok ? [meta.obrazok] : [];
+    // Priložená snímka má prednosť pred titulným záberom z Instagramu: Jerry
+    // ju vybral, a hlavne — od 25. 8. 2026 Instagram cloudflarové adresy škrtí
+    // (HTTP 429), takže titulný záber sa väčšinou vôbec nestiahne.
+    const vlastna = await fetch(
+      `/api/napad-obrazok?id=${encodeURIComponent(n.id)}&druh=inspiracia`, { credentials: "same-origin" },
+    ).then((x) => x.json()).catch(() => null) as
+      { ok?: boolean; obrazok?: { dataUri: string } | null } | null;
+    const snimka = vlastna?.ok && vlastna.obrazok ? vlastna.obrazok.dataUri : "";
+    const obrazky = snimka ? [snimka] : meta?.ok && meta.obrazok ? [meta.obrazok] : [];
     void chat.ask([
       "Našiel som cudzí príspevok, ktorý ma zaujal, a chcem z neho spraviť niečo naše.",
       n.inspiracia ? `Odkaz: ${n.inspiracia}` : "",
       n.text ? `Čo si o ňom pamätám: ${n.text}` : "",
       "",
-      obrazky.length
+      snimka
+        ? "PRILOŽENÝ OBRÁZOK JE SNÍMKA OBRAZOVKY, ktorú spravil Jerry. Rozober z nej formát, text v obraze a kompozíciu. NETVRĎ, že vieš, ako sa vo videu hýbe kamera ani čo nasleduje — vidíš jeden okamih."
+        : obrazky.length
         ? "PRILOŽENÝ OBRÁZOK JE TITULNÝ ZÁBER — teda PRVÁ SEKUNDA videa, nie jeho priebeh. Rozober z neho formát, text v obraze a kompozíciu, ale NETVRĎ, že vieš, ako sa v ňom hýbe kamera ani čo je ďalej. Keď je pohyb kamery podstatný, povedz mi, nech pošlem záznam obrazovky."
         : "DÔLEŽITÉ: ten odkaz otvoriť nevieš a video nevidíš. Nepredstieraj, že áno. Povedz mi rovno, nech ti pošlem snímku obrazovky — stačí prvá sekunda a popis. Až potom rozoberaj.",
       "",
@@ -276,10 +314,22 @@ export function Napady({ chat }: { chat?: AssistantChat }) {
                     {chat && (
                       <>
                       {n.zdroj === "inspiracia" && (
-                        <button onClick={() => void rozober(n)} disabled={chat.busy}
-                          style={{ background: "none", border: "none", padding: 0, color: C.accentLight, fontSize: 11.5, cursor: chat.busy ? "default" : "pointer", fontFamily: "inherit", marginRight: 10 }}>
-                          rozobrať s Jarvisom
-                        </button>
+                        <>
+                          {/* SNÍMKA OBRAZOVKY. Instagram od 25. 8. 2026 škrtí
+                              cloudflarové adresy (429), takže titulný záber sa
+                              nestiahne — Jerryho snímka je jediná cesta, ako
+                              Jarvisovi ukázať, o čom ten príspevok bol. */}
+                          <label
+                            style={{ color: C.accentLight, fontSize: 11.5, cursor: "pointer", fontFamily: "inherit", marginRight: 10 }}>
+                            <input type="file" accept="image/*" style={{ display: "none" }}
+                              onChange={(e) => void prilozSnimku(n.id, e.target.files?.[0])} />
+                            {snimky[n.id] ? "snímka priložená ✓" : "priložiť snímku"}
+                          </label>
+                          <button onClick={() => void rozober(n)} disabled={chat.busy}
+                            style={{ background: "none", border: "none", padding: 0, color: C.accentLight, fontSize: 11.5, cursor: chat.busy ? "default" : "pointer", fontFamily: "inherit", marginRight: 10 }}>
+                            rozobrať s Jarvisom
+                          </button>
+                        </>
                       )}
                       <button onClick={() => posud(n)} disabled={chat.busy}
                         style={{ background: "none", border: "none", padding: 0, color: C.accentLight, fontSize: 11.5, cursor: chat.busy ? "default" : "pointer", fontFamily: "inherit" }}>

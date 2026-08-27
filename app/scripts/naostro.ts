@@ -134,7 +134,13 @@ else {
     u.klient === n.klient && u.zaciatok.slice(0, 10) !== n.datum && !u.zmizla_at
     && (u.typ === "trening" || u.typ === "uvodny")
     && u.zaciatok.slice(0, 10) > n.datum);
-  if (inyKryje) ok(!po.has(`gone|${n.klient}`), "kalendar ho kryje inym treningom - prestal chodit sa NEVRACIA");
+  // „Prestal chodiť" sa počíta zo SEDENÍ v PTminderi. Nový klient, ktorý
+  // ešte žiadne nemá (čaká na export), sa ním stať nemôže — 27. 8. 2026 tu
+  // kontrola spadla na Janke Malinovej presne takto. ŠTVRTÝ prípad, keď sa
+  // mýlila kontrola a nie appka.
+  const maSedenia = base.sessions.some((x) => x.client === n.klient);
+  if (!maSedenia) console.log("  (nový klient bez sedení — gone sa naňho nevzťahuje, preskakujem)");
+  else if (inyKryje) ok(!po.has(`gone|${n.klient}`), "kalendar ho kryje inym treningom - prestal chodit sa NEVRACIA");
   else ok(po.has(`gone|${n.klient}`) || po.has(`duch|${n.klient}`), "prestal chodit sa VRATIL - kalendar ho uz nekryje");
 }
 
@@ -159,9 +165,14 @@ h("3 · Odloženie a návrat po termíne");
 
 h('4 · „Nehlásiť" umlčí celý druh');
 {
+  const pred = otvorene(reg(base));
   const po = otvorene(reg(sAckom({ "mute|nepotvrdene": { note: "nehlásiť" } })));
   ok([...po].filter((k) => k.startsWith("nepotvrdene|")).length === 0, `umlčaných všetkých ${nezhody.length} nezhôd`);
-  ok([...po].filter((k) => k.startsWith("novy|")).length > 0, "iné druhy zostali");
+  // Nehardkódovať druh: „novy|" mal Jerry 24. 8. umlčaný sám a kontrola
+  // padla na jeho rozhodnutí, nie na chybe (PIATY prípad chybnej kontroly).
+  // Správne tvrdenie: žiadny INÝ otvorený kľúč nezmizol.
+  const zmizloIneho = [...pred].filter((k) => !k.startsWith("nepotvrdene|") && !po.has(k));
+  ok(zmizloIneho.length === 0, zmizloIneho.length ? `iné druhy zostali (zmizlo: ${zmizloIneho.join(", ")})` : "iné druhy zostali");
 }
 
 h("5 · Odpoveď priradí trénera");
