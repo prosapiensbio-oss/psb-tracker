@@ -30,6 +30,7 @@ import { Balicky, odtrenovaneMimoExportu, type KalUdalost } from "./Kalendar";
 import { jeKlient } from "./MarketingLievik";
 import { nastavPrijmyZTrackera, pnlCalc, poslednyMesiacSDatami, salaryCalc, vzasVerzia, VZAS_MONTHS } from "../../lib/psb/vzas";
 import { breakEvenPriemer, poslednyUzavretyIdx } from "../../lib/psb/rezerva";
+import { promptKontroly } from "../../lib/psb/kontrolnePrompty";
 import { fetchBtcReserve, fetchVzasSettings, saveLead } from "../../lib/psb/client";
 import { SOURCES } from "./Klienti";
 import { CIEL_MESIACOV, chybaDoCiela, spocitajRezervu } from "../../lib/psb/rezerva";
@@ -2105,6 +2106,33 @@ function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar }: { i
   // Sľuby dané človeku majú jedno tlačidlo, ktoré ich vybaví — nie „skryť".
   // Rozdiel je v tom, že po odklepnutí zostane pri položke napísané, ČO sa
   // stalo: „SMS poslaná" je záznam, „skryté" je zametenie.
+  // Mesačná kontrola nesie so sebou celý prompt pre Clauda. Bez tlačidla by
+  // pripomienka povedala „skontroluj peniaze" a ja by som hľadal, kde bol ten
+  // dokument — a kontrola by sa nespravila. Text žije v kontrolnePrompty.ts,
+  // nie tu: dve kópie promptu by po prvej zmene prestali sedieť.
+  const kontrolaId = item.key.match(/^zapis\|kontrola-([a-z]+)-/)?.[1] || "";
+  const promptKontrolyText = kontrolaId ? promptKontroly(kontrolaId) : null;
+  const [promptSkopirovany, setPromptSkopirovany] = useState(false);
+  const skopirujPrompt = async () => {
+    if (!promptKontrolyText) return;
+    // Dve cesty, lebo clipboard API sa dá v prehliadači zakázať (rovnako ako
+    // pri zadaní pre Project v MapaCyklu).
+    try {
+      await navigator.clipboard.writeText(promptKontrolyText);
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = promptKontrolyText;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand("copy"); } catch { /* ani jedna cesta */ }
+      document.body.removeChild(ta);
+    }
+    setPromptSkopirovany(true);
+    setTimeout(() => setPromptSkopirovany(false), 2000);
+  };
+
   const jeSms = item.key.startsWith("sms|");
   const jeOdmena = item.key.startsWith("referral|");
   const vybav = (poznamka: string) => actions.ackAnomaly(item.key, poznamka, true);
@@ -2316,6 +2344,11 @@ function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar }: { i
           {(jeOtazkaDovodu || jeOtazkaDuch) && !item.acked && (
             <button onClick={() => setDovodOtvoreny((o) => !o)} style={{ ...linkBtn, color: dovodOtvoreny ? C.accentLight : C.accent }}>
               {dovodOtvoreny ? "Zavrieť" : "Prečo?"}
+            </button>
+          )}
+          {promptKontrolyText && (
+            <button onClick={() => void skopirujPrompt()} style={{ ...linkBtn, color: promptSkopirovany ? C.green : C.blue }}>
+              {promptSkopirovany ? "Skopírované" : "Prompt pre Clauda"}
             </button>
           )}
           {jeSms && !item.acked && (
