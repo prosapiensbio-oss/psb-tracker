@@ -381,32 +381,25 @@ export function useAssistantChat(
   // ── Chat history (saved in localStorage; archive/delete) ──
   const [chats, setChats] = useState<SavedChat[]>([]);
   const [chatId, setChatId] = useState<string>(newId);
-  // Najprv localStorage (panel sa otvorí okamžite), potom D1 (pravda naprieč
+  // Najprv localStorage (história je hneď po ruke), potom D1 (pravda naprieč
   // zariadeniami). Databáza vyhráva — je to jediná kópia, ktorú vidí aj mobil.
+  //
+  // Načítava sa LEN ZOZNAM do histórie, nie posledná konverzácia. Kokpit ju
+  // predtým po štarte otvoril a panel ukazoval odpoveď spred dní — dnes ráno
+  // to bola rezerva s vtedajším kurzom bitcoinu, ktorá si protirečila
+  // s dlaždicou. Jarvis má pri otvorení začínať načisto (Jerry, 28. 8. 2026);
+  // starý rozhovor je na jeden klik v histórii a nič sa nestráca.
   useEffect(() => {
     let zivy = true;
     try {
       const raw = JSON.parse(localStorage.getItem(CHATS_KEY) || "null");
-      if (Array.isArray(raw) && raw.length) {
-        setChats(raw);
-        const recent = raw.filter((c: SavedChat) => !c.archived).sort((a: SavedChat, b: SavedChat) => b.updatedAt - a.updatedAt)[0];
-        if (recent) { setChatId(recent.id); setMsgs(opravStratene(recent.messages || [])); }
-      }
+      if (Array.isArray(raw) && raw.length) setChats(raw);
     } catch { /* ignore */ }
     void fetchJarvisMemory().then(({ chats: db }) => {
       if (!zivy || !Array.isArray(db) || !db.length) return;
       const zoz = db as SavedChat[];
       setChats(zoz);
       try { localStorage.setItem(CHATS_KEY, JSON.stringify(zoz.slice(0, 50))); } catch { /* ignore */ }
-      const recent = zoz.filter((c) => !c.archived).sort((a, b) => b.updatedAt - a.updatedAt)[0];
-      // Chat z databázy sa preberá LEN pri prázdnom štarte. Keby sa chatId
-      // prepol vždy, rozpísaná konverzácia z localStorage by sa pri najbližšom
-      // autosave zapísala pod cudzie id a zliala dve histórie do jednej.
-      setMsgs((m) => {
-        if (m.length) return m;
-        if (recent) setChatId(recent.id);
-        return opravStratene(recent?.messages || []);
-      });
     });
     return () => { zivy = false; };
   }, []);
@@ -447,6 +440,18 @@ export function useAssistantChat(
     setChatId(newId()); setMsgs([]); setInput(""); setAttach([]);
     if (typeof nova === "string") setKategoria(nova);
   };
+  /**
+   * Otvor panel s prázdnym oknom.
+   *
+   * Pre tlačidlá, ktorými Jarvisa otvára ČLOVEK — bublina vpravo dole. Kto
+   * otvára panel preto, že mu nesie hotovú otázku (register, karty obsahu,
+   * uzávierky), volá `setFloatingOpen` priamo a rozhovor si nezmaže.
+   *
+   * Rozpísaná odpoveď sa najprv zastaví: keby dobiehala do starých msgs,
+   * dopísala by sa do práve otvoreného prázdneho okna. Čo z nej stihlo prísť,
+   * zostáva uložené pod pôvodným rozhovorom.
+   */
+  const otvorPrazdny = () => { abortRef.current?.abort(); newChat(); setFloatingOpen(true); };
   /**
    * Oprava už odoslanej otázky.
    *
@@ -900,7 +905,7 @@ export function useAssistantChat(
     ].join(" · ");
   }
 
-  return { msgs, setMsgs, input, setInput, busy, stav, deep, setDeep, pending, setPending, attach, setAttach, ask, runAction, confirmImport, handleIncoming, floatingOpen, setFloatingOpen, kategoria, setKategoria, chats, chatId, newChat, upravSpravu, vetvi, presunChat, zastav, openChat, zvyraznit, setZvyraznit, jeKlient, zachovajOkno, spotrebujZachovaj, deleteChat, archiveChat, spracujDennik };
+  return { msgs, setMsgs, input, setInput, busy, stav, deep, setDeep, pending, setPending, attach, setAttach, ask, runAction, confirmImport, handleIncoming, floatingOpen, setFloatingOpen, otvorPrazdny, kategoria, setKategoria, chats, chatId, newChat, upravSpravu, vetvi, presunChat, zastav, openChat, zvyraznit, setZvyraznit, jeKlient, zachovajOkno, spotrebujZachovaj, deleteChat, archiveChat, spracujDennik };
 }
 
 // ── The conversation UI (messages + input) — used by both the floating panel and
@@ -1304,7 +1309,7 @@ export function Assistant({ chat, onClientClick, onNavigate }: { chat: Assistant
     // najvyšší možný z-index, takže sa prekryť nedá — Jarvis sa mu teda uhne.
     // Nie je to naša značka a potláčať ju nebudeme.
     return (
-      <button onClick={() => setOpen(true)} style={{ position: "fixed", right: 20, bottom: 20, zIndex: 60, display: "flex", alignItems: "center", gap: 9, padding: "12px 18px", borderRadius: 30, border: "none", cursor: "pointer", background: C.accent, color: C.onAccent, fontSize: 14, fontWeight: 600, boxShadow: "0 8px 24px rgba(0,0,0,.4)" }} aria-label="Otvoriť Jarvisa">
+      <button onClick={() => chat.otvorPrazdny()} style={{ position: "fixed", right: 20, bottom: 20, zIndex: 60, display: "flex", alignItems: "center", gap: 9, padding: "12px 18px", borderRadius: 30, border: "none", cursor: "pointer", background: C.accent, color: C.onAccent, fontSize: 14, fontWeight: 600, boxShadow: "0 8px 24px rgba(0,0,0,.4)" }} aria-label="Otvoriť Jarvisa">
         <Spark /> Jarvis
       </button>
     );
