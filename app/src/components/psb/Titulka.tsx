@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { C } from "../../lib/psb/theme";
+import { doSchranky } from "../../lib/psb/kopirovanie";
 import {
   farby, type Kluc, MAX_RIADKOV_NADPIS, navrhNadpisu, priDlhy, type Rezim,
   RODINA, sirkaRiadku, type Slovo, styl, textRiadku, zalam, zalamKusy,
@@ -505,12 +506,15 @@ export function Titulka({ zdroj, mesiac, faza, kluc, ulozene, onUloz, onZavri }:
    * (26. 8. 2026). Druhá cesta je označiť text, nech sa dá vziať ručne.
    */
   async function kopiruj(text: string, pole: HTMLTextAreaElement | null) {
-    try {
-      await navigator.clipboard.writeText(text);
+    // Oprava z 26. 8. riešila len ODMIETNUTIE schránky. Zaseknutý promise
+    // (28. 8.: povolenie granted, focus áno, a writeText sa po 3 s ešte
+    // nehol) ju obišiel — await nikdy neskončil, takže sa nespustila ani
+    // druhá cesta. doSchranky() má limit.
+    if (await doSchranky(text)) {
       setSkopirovane(true);
       setTimeout(() => setSkopirovane(false), 3000);
       return;
-    } catch { /* skúsi sa druhá cesta */ }
+    }
     if (pole) {
       pole.focus(); pole.select();
       try {
@@ -568,12 +572,11 @@ export function Titulka({ zdroj, mesiac, faza, kluc, ulozene, onUloz, onZavri }:
 
   async function kopirujPrompt() {
     const t = promptObrazka({ nadpis, koncept: zdroj.koncept || "", rezim, skladba: skladba.id });
-    try {
-      await navigator.clipboard.writeText(t);
+    if (await doSchranky(t)) {
       setPromptSkopirovany(true);
       setTimeout(() => setPromptSkopirovany(false), 3000);
-    } catch {
-      setChyba("Schránka je zakázaná — prompt sa nedá skopírovať. Skús cestu „napíš po svojom“, tam sa dá text označiť.");
+    } else {
+      setChyba("Schránka neodpovedala — prompt sa nedá skopírovať. Skús cestu „napíš po svojom“, tam sa dá text označiť.");
     }
   }
 

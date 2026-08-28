@@ -429,3 +429,26 @@ Rovnaká rodina: výdaj na reklamu. `mkt_prispevky.spend` je Metricool
 (len boostnuté kusy z nahratého exportu, mesiac bez exportu = 0), `mkt_kampane`
 je Meta Marketing API a je to jediný úplný zdroj — rozdiel za 19 mesiacov je
 18 179 vs 31 454 Kč. Pole `spendAds` v MktMesiac nesie ten správny.
+
+## „Nič sa nestane" nemusí byť zhltnutý catch — promise vie visieť
+
+`navigator.clipboard.writeText` sa nemusí odmietnuť: vie sa zaseknúť a NIKDY
+sa nedokončiť. Overené 28. 8. 2026 v živom Kokpite — povolenie
+`clipboard-write` bolo `granted`, stránka mala focus, a promise sa po 3 s
+ešte nehol. Kód tvaru
+
+```
+try { await navigator.clipboard.writeText(t); setOk(true); }
+catch { /* záložná cesta */ }
+```
+
+potom nespustí ani záložnú cestu, ani hlášku — používateľ klikne a nestane sa
+nič. Presne to Jerry hlásil pri „skopírovať prompt do Higgsfieldu" a oprava
+z 26. 8. to neriešila, lebo riešila len ODMIETNUTIE.
+
+Kopíruj vždy cez `doSchranky()` v `lib/psb/kopirovanie.ts` — má časový limit
+a druhú cestu cez execCommand. Test `kontrolnePrompty.test.ts` stráži, že sa
+`await navigator.clipboard.writeText` nikde v komponentoch neobjaví znova.
+
+Zovšeobecnenie: pri každom `await` nad prehliadačovým API sa pýtaj, čo sa
+stane, keď sa NEVRÁTI. Catch chráni pred chybou, nie pred tichom.

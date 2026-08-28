@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { PROMPTY_KONTROL, promptKontroly, PROTOKOL } from "./kontrolnePrompty";
 
 /**
@@ -28,5 +28,25 @@ describe("prompty mesačných kontrol", () => {
 
   it("neznáme id nevráti prázdny reťazec, ale null", () => {
     expect(promptKontroly("neexistuje")).toBeNull();
+  });
+});
+
+/**
+ * Držadlo na tichú chybu: writeText sa vie zaseknúť. Keby sa naň niekde
+ * znova čakalo holým awaitom, klik by nespravil nič a nikto by sa to
+ * nedozvedel — tak ako 28. 8. 2026 pri prvom nasadení tlačidla.
+ */
+describe("kopírovanie sa nesmie zaseknúť", () => {
+  const zdroj = (p: string) => readFileSync(new URL(p, import.meta.url).pathname, "utf8");
+
+  it("kopirovanie.ts má časový limit", () => {
+    expect(zdroj("./kopirovanie.ts")).toContain("Promise.race");
+  });
+
+  it("žiadny komponent nečaká na clipboard.writeText priamo", () => {
+    const dir = new URL("../../components/psb/", import.meta.url).pathname;
+    for (const f of readdirSync(dir).filter((x) => x.endsWith(".tsx"))) {
+      expect(readFileSync(dir + f, "utf8")).not.toContain("await navigator.clipboard.writeText");
+    }
   });
 });

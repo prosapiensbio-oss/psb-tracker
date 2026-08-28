@@ -8,6 +8,7 @@ import {
   type Bunka, type SlotPlanu, type ZverejnenyKus,
 } from "../../lib/psb/mapaCyklu";
 import { C, mix } from "../../lib/psb/theme";
+import { doSchranky } from "../../lib/psb/kopirovanie";
 import type { PSBData } from "../../lib/psb/types";
 import type { AssistantChat } from "./Assistant";
 import { Titulka } from "./Titulka";
@@ -594,7 +595,7 @@ function Panel({ vyber, os, zasobnik, onZavri, onUloz, onFazaPrispevku, onJarvis
   // aj pri skutočnom kliku, preto výber textu ako záloha.
   const kopirujCaption = async () => {
     try {
-      await navigator.clipboard.writeText(hotovyText);
+      if (!(await doSchranky(hotovyText))) throw new Error("schránka");
       setKopirovane(true);
       return;
     } catch { /* skúsi sa druhá cesta */ }
@@ -907,11 +908,9 @@ function OknoKopirovania({ text }: { text: string }) {
     // skutočnom kliku (overené 23. 8. 2026). Výber textu + execCommand je
     // zastaraný, ale povolenie nepotrebuje — a keď zlyhá aj on, používateľovi
     // zostane označený text a stačí mu cmd+C.
-    try {
-      await navigator.clipboard.writeText(text);
-      setStav("ok");
-      return;
-    } catch { /* skúsi sa druhá cesta */ }
+    // Pozor: writeText vie zostať visieť a nikdy sa nedokončiť — preto cez
+    // doSchranky() s časovým limitom, nie holý await (viď kopirovanie.ts).
+    if (await doSchranky(text)) { setStav("ok"); return; }
     try {
       const el = pole.current;
       if (!el) throw new Error("bez poľa");

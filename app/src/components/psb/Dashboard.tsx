@@ -31,6 +31,7 @@ import { jeKlient } from "./MarketingLievik";
 import { nastavPrijmyZTrackera, pnlCalc, poslednyMesiacSDatami, salaryCalc, vzasVerzia, VZAS_MONTHS } from "../../lib/psb/vzas";
 import { breakEvenPriemer, poslednyUzavretyIdx } from "../../lib/psb/rezerva";
 import { promptKontroly } from "../../lib/psb/kontrolnePrompty";
+import { doSchranky } from "../../lib/psb/kopirovanie";
 import { fetchBtcReserve, fetchVzasSettings, saveLead } from "../../lib/psb/client";
 import { SOURCES } from "./Klienti";
 import { CIEL_MESIACOV, chybaDoCiela, spocitajRezervu } from "../../lib/psb/rezerva";
@@ -2112,25 +2113,12 @@ function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar }: { i
   // nie tu: dve kópie promptu by po prvej zmene prestali sedieť.
   const kontrolaId = item.key.match(/^zapis\|kontrola-([a-z]+)-/)?.[1] || "";
   const promptKontrolyText = kontrolaId ? promptKontroly(kontrolaId) : null;
-  const [promptSkopirovany, setPromptSkopirovany] = useState(false);
+  const [promptStav, setPromptStav] = useState<"" | "ok" | "chyba">("");
   const skopirujPrompt = async () => {
     if (!promptKontrolyText) return;
-    // Dve cesty, lebo clipboard API sa dá v prehliadači zakázať (rovnako ako
-    // pri zadaní pre Project v MapaCyklu).
-    try {
-      await navigator.clipboard.writeText(promptKontrolyText);
-    } catch {
-      const ta = document.createElement("textarea");
-      ta.value = promptKontrolyText;
-      ta.style.position = "fixed";
-      ta.style.opacity = "0";
-      document.body.appendChild(ta);
-      ta.select();
-      try { document.execCommand("copy"); } catch { /* ani jedna cesta */ }
-      document.body.removeChild(ta);
-    }
-    setPromptSkopirovany(true);
-    setTimeout(() => setPromptSkopirovany(false), 2000);
+    const ok = await doSchranky(promptKontrolyText);
+    setPromptStav(ok ? "ok" : "chyba");
+    setTimeout(() => setPromptStav(""), 2500);
   };
 
   const jeSms = item.key.startsWith("sms|");
@@ -2347,8 +2335,8 @@ function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar }: { i
             </button>
           )}
           {promptKontrolyText && (
-            <button onClick={() => void skopirujPrompt()} style={{ ...linkBtn, color: promptSkopirovany ? C.green : C.blue }}>
-              {promptSkopirovany ? "Skopírované" : "Prompt pre Clauda"}
+            <button onClick={() => void skopirujPrompt()} style={{ ...linkBtn, color: promptStav === "ok" ? C.green : promptStav === "chyba" ? C.red : C.blue }}>
+              {promptStav === "ok" ? "Skopírované" : promptStav === "chyba" ? "Schránka odmietla" : "Prompt pre Clauda"}
             </button>
           )}
           {jeSms && !item.acked && (

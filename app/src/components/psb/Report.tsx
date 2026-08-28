@@ -5,6 +5,7 @@ import { monthLabel } from "../../lib/psb/format";
 import { buildReport, dostupneMesiace, reportGrafy, SEKCIE, type SekciaId } from "../../lib/psb/report";
 import { vytlacReport } from "../../lib/psb/reportHtml";
 import { C, mix } from "../../lib/psb/theme";
+import { doSchranky } from "../../lib/psb/kopirovanie";
 import type { PSBData } from "../../lib/psb/types";
 import { Card, H3, Info, Select } from "./ui";
 
@@ -63,14 +64,10 @@ export function Report({
   };
 
   const kopiruj = async () => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setSkopirovane(true);
-      setTimeout(() => setSkopirovane(false), 2000);
-    } catch {
-      // Clipboard bez povolenia — nech sa dá text aspoň označiť ručne.
-      setSkopirovane(false);
-    }
+    // Cez doSchranky(), lebo writeText sa vie zaseknúť a nikdy nedokončiť —
+    // potom by sa nespustil ani catch a klik by nespravil vôbec nič.
+    setSkopirovane(await doSchranky(text));
+    setTimeout(() => setSkopirovane(false), 2000);
   };
 
   // PDF si pýta vlastnú verziu markdownu — so značkami grafov. Text na

@@ -6,6 +6,7 @@ import { ZDROJE } from "./Klienti";
 import { OBDOBIA_MESACNE, mesiaceVOkne } from "../../lib/psb/obdobia";
 import { GA4_MESACNE, GSC_DOPYTY, WEB_STRANKY, marketingVerzia } from "../../lib/psb/marketing";
 import { C, mix, S } from "../../lib/psb/theme";
+import { doSchranky } from "../../lib/psb/kopirovanie";
 import { znackovanyOdkaz, type Platforma } from "../../lib/psb/utm";
 import type { PSBData } from "../../lib/psb/types";
 import { Card, Empty, FilterObdobia, H3, Info, RolovaciaTabulka, TableWrap, enterPosle } from "./ui";
@@ -745,7 +746,9 @@ export function AkoMeratReklamu() {
   const odkaz = znackovanyOdkaz(ciel, platforma, kampan);
 
   const kopiruj = async (t: string, co: string) => {
-    try { await navigator.clipboard.writeText(t); setKopirovane(co); setTimeout(() => setKopirovane(""), 2000); } catch { /* bez povolenia */ }
+    // doSchranky() má časový limit — holý await sa vie zaseknúť navždy
+    // a tlačidlo by potom nepovedalo ani „nepodarilo sa" (viď kopirovanie.ts).
+    if (await doSchranky(t)) { setKopirovane(co); setTimeout(() => setKopirovane(""), 2000); }
   };
   const krok: React.CSSProperties = { fontSize: 12.5, color: C.textMuted, lineHeight: 1.65, marginBottom: 12 };
   const prepinac = (p: Platforma, popis: string) => (
