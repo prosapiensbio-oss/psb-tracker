@@ -1,0 +1,728 @@
+<title>ProSapiens — zadání nového webu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=JetBrains+Mono:wght@400;600&display=swap">
+
+<style>
+:root{
+  --bg:#F7FAF8; --surface:#FFFFFF; --surface-2:#EFF5F1;
+  --ink:#16241D; --ink-2:#3D4E46; --muted:#6B7C74;
+  --line:#DCE6E0; --line-2:#C7D6CE;
+  --accent:#2D7D5A; --accent-soft:#E4F0E9; --deep:#1A2E24;
+  --warn:#9A5B1E; --warn-soft:#F7ECDF; --bad:#9B3226; --bad-soft:#F8E6E3;
+  --shadow:0 1px 2px rgba(22,36,29,.05);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F1714; --surface:#16211C; --surface-2:#1C2922;
+    --ink:#E4EDE7; --ink-2:#BCCCC3; --muted:#8FA098;
+    --line:#26332C; --line-2:#33443B;
+    --accent:#5DB88C; --accent-soft:#182C21; --deep:#0B120F;
+    --warn:#D9A05E; --warn-soft:#2A2115; --bad:#E08579; --bad-soft:#2B1815;
+    --shadow:0 1px 2px rgba(0,0,0,.3);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0F1714; --surface:#16211C; --surface-2:#1C2922;
+  --ink:#E4EDE7; --ink-2:#BCCCC3; --muted:#8FA098;
+  --line:#26332C; --line-2:#33443B;
+  --accent:#5DB88C; --accent-soft:#182C21; --deep:#0B120F;
+  --warn:#D9A05E; --warn-soft:#2A2115; --bad:#E08579; --bad-soft:#2B1815;
+  --shadow:0 1px 2px rgba(0,0,0,.3);
+}
+
+*{box-sizing:border-box}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:"Source Serif 4",Georgia,"Times New Roman",serif;
+  font-size:17px; line-height:1.62; margin:0;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1040px; margin:0 auto; padding:0 24px 120px}
+
+/* ── hlavička ───────────────────────────────────────────── */
+.top{
+  border-bottom:1px solid var(--line);
+  padding:56px 0 30px; margin-bottom:44px;
+}
+.eyebrow{
+  font-family:Archivo,system-ui,sans-serif; font-size:11.5px; font-weight:600;
+  letter-spacing:.14em; text-transform:uppercase; color:var(--accent); margin:0 0 14px;
+}
+h1{
+  font-family:Archivo,system-ui,sans-serif; font-weight:700;
+  font-size:clamp(30px,5.2vw,46px); line-height:1.08; letter-spacing:-.02em;
+  margin:0 0 18px; text-wrap:balance; color:var(--ink);
+}
+.lede{font-size:19px; color:var(--ink-2); max-width:62ch; margin:0 0 26px}
+.meta{
+  display:flex; flex-wrap:wrap; gap:8px 28px;
+  font-family:"JetBrains Mono",ui-monospace,monospace; font-size:12px; color:var(--muted);
+}
+.meta b{color:var(--ink-2); font-weight:600}
+
+/* ── obsah ──────────────────────────────────────────────── */
+.toc{
+  background:var(--surface); border:1px solid var(--line); border-radius:4px;
+  padding:22px 24px; margin-bottom:56px; box-shadow:var(--shadow);
+}
+.toc h2{
+  font-family:Archivo,system-ui,sans-serif; font-size:11.5px; font-weight:600;
+  letter-spacing:.14em; text-transform:uppercase; color:var(--muted);
+  margin:0 0 14px;
+}
+.toc ol{
+  list-style:none; margin:0; padding:0;
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:5px 28px;
+  counter-reset:toc;
+}
+.toc li{counter-increment:toc; font-size:15px; line-height:1.5}
+.toc li::before{
+  content:counter(toc) ".";
+  font-family:"JetBrains Mono",monospace; font-size:11.5px; color:var(--muted);
+  margin-right:9px;
+}
+.toc a{color:var(--ink-2); text-decoration:none; border-bottom:1px solid transparent}
+.toc a:hover,.toc a:focus-visible{color:var(--accent); border-bottom-color:var(--accent)}
+
+/* ── sekce ──────────────────────────────────────────────── */
+section{margin:0 0 60px; scroll-margin-top:20px}
+.sec-head{
+  display:grid; grid-template-columns:52px 1fr; gap:0 14px;
+  align-items:baseline; margin:0 0 22px;
+  padding-bottom:12px; border-bottom:2px solid var(--ink);
+}
+.sec-num{
+  font-family:"JetBrains Mono",monospace; font-size:13px; font-weight:600;
+  color:var(--accent);
+}
+h2.sec-title{
+  font-family:Archivo,system-ui,sans-serif; font-weight:700;
+  font-size:clamp(21px,3vw,27px); line-height:1.15; letter-spacing:-.015em;
+  margin:0; text-wrap:balance;
+}
+h3{
+  font-family:Archivo,system-ui,sans-serif; font-weight:600;
+  font-size:17px; letter-spacing:-.005em; margin:32px 0 10px; color:var(--ink);
+}
+h4{
+  font-family:Archivo,system-ui,sans-serif; font-weight:600; font-size:13px;
+  letter-spacing:.05em; text-transform:uppercase; color:var(--muted);
+  margin:26px 0 8px;
+}
+p{margin:0 0 14px; max-width:68ch}
+ul,ol.body{margin:0 0 16px; padding-left:22px; max-width:68ch}
+li{margin:0 0 6px}
+strong{font-weight:600}
+a{color:var(--accent)}
+code,.mono{
+  font-family:"JetBrains Mono",ui-monospace,monospace; font-size:.86em;
+  background:var(--surface-2); padding:1px 5px; border-radius:3px; color:var(--ink-2);
+}
+
+/* ── tabulky ────────────────────────────────────────────── */
+.scroll{overflow-x:auto; margin:0 0 18px; border:1px solid var(--line); border-radius:4px; background:var(--surface)}
+table{border-collapse:collapse; width:100%; font-size:14.5px; min-width:520px}
+th,td{
+  text-align:left; padding:9px 14px; border-bottom:1px solid var(--line);
+  vertical-align:top;
+}
+th{
+  font-family:Archivo,system-ui,sans-serif; font-weight:600; font-size:11.5px;
+  letter-spacing:.07em; text-transform:uppercase; color:var(--muted);
+  background:var(--surface-2); white-space:nowrap;
+}
+tbody tr:last-child td{border-bottom:none}
+td.num,th.num{text-align:right; font-family:"JetBrains Mono",monospace; font-variant-numeric:tabular-nums; white-space:nowrap}
+td.slug{font-family:"JetBrains Mono",monospace; font-size:12.5px; white-space:nowrap}
+
+/* ── boxy ───────────────────────────────────────────────── */
+.note{
+  border-left:3px solid var(--accent); background:var(--accent-soft);
+  padding:14px 18px; margin:0 0 20px; border-radius:0 4px 4px 0;
+}
+.note p:last-child{margin-bottom:0}
+.note.warn{border-left-color:var(--warn); background:var(--warn-soft)}
+.note.bad{border-left-color:var(--bad); background:var(--bad-soft)}
+.note-label{
+  font-family:Archivo,system-ui,sans-serif; font-size:11px; font-weight:600;
+  letter-spacing:.1em; text-transform:uppercase; display:block; margin-bottom:6px;
+  color:var(--accent);
+}
+.note.warn .note-label{color:var(--warn)}
+.note.bad .note-label{color:var(--bad)}
+
+.cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(215px,1fr)); gap:14px; margin:0 0 22px}
+.card{
+  background:var(--surface); border:1px solid var(--line); border-radius:4px;
+  padding:16px 18px; box-shadow:var(--shadow);
+}
+.card .k{
+  font-family:"JetBrains Mono",monospace; font-size:26px; font-weight:600;
+  color:var(--ink); font-variant-numeric:tabular-nums; line-height:1.1;
+}
+.card .k.bad{color:var(--bad)}
+.card .l{
+  font-family:Archivo,system-ui,sans-serif; font-size:11.5px; font-weight:600;
+  letter-spacing:.06em; text-transform:uppercase; color:var(--muted); margin-top:7px;
+}
+.card .d{font-size:13.5px; color:var(--ink-2); margin-top:6px; line-height:1.45}
+
+.swatches{display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin:0 0 20px}
+.sw{border:1px solid var(--line); border-radius:4px; overflow:hidden; background:var(--surface)}
+.sw .chip{height:62px}
+.sw .txt{padding:9px 12px}
+.sw .nm{font-family:Archivo,sans-serif; font-size:12.5px; font-weight:600}
+.sw .hx{font-family:"JetBrains Mono",monospace; font-size:11.5px; color:var(--muted); margin-top:2px}
+
+.pill{
+  display:inline-block; font-family:Archivo,sans-serif; font-size:11px; font-weight:600;
+  letter-spacing:.05em; text-transform:uppercase; padding:2px 8px; border-radius:3px;
+  background:var(--surface-2); color:var(--muted); border:1px solid var(--line);
+  vertical-align:middle;
+}
+.pill.must{background:var(--accent-soft); color:var(--accent); border-color:var(--accent)}
+.pill.open{background:var(--warn-soft); color:var(--warn); border-color:var(--warn)}
+
+.q{
+  border:1px solid var(--line-2); border-radius:4px; padding:16px 18px;
+  margin:0 0 12px; background:var(--surface);
+}
+.q .qt{font-family:Archivo,sans-serif; font-weight:600; font-size:15.5px; margin-bottom:5px}
+.q .qd{font-size:14.5px; color:var(--ink-2); max-width:68ch}
+
+hr.rule{border:none; border-top:1px solid var(--line); margin:34px 0}
+
+footer.end{
+  border-top:1px solid var(--line); padding-top:22px; margin-top:64px;
+  font-size:13.5px; color:var(--muted); max-width:68ch;
+}
+
+@media (max-width:640px){
+  body{font-size:16px}
+  .wrap{padding:0 18px 80px}
+  .sec-head{grid-template-columns:38px 1fr; gap:0 10px}
+  .top{padding:36px 0 24px}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important; transition:none!important}}
+:focus-visible{outline:2px solid var(--accent); outline-offset:2px}
+</style>
+
+<div class="wrap">
+
+<header class="top">
+  <p class="eyebrow">Zadání pro dodavatele · ProSapiens Biomechanic</p>
+  <h1>Podklad pro stavbu nového webu prosapiens.cz</h1>
+  <p class="lede">Všechno, co potřebuje vědět někdo, kdo nás nezná: co děláme, komu, za kolik, jak vypadá dnešní web, co je na něm změřeně špatně a co se při přechodu nesmí ztratit.</p>
+  <div class="meta">
+    <span><b>Zadavatel</b> ProSapiens Biomechanic, Brno</span>
+    <span><b>Sestaveno</b> 28. 8. 2026</span>
+    <span><b>Zdroje</b> živý web · Search Console · GA4 · PageSpeed · interní data</span>
+  </div>
+</header>
+
+<nav class="toc" aria-label="Obsah">
+  <h2>Obsah</h2>
+  <ol>
+    <li><a href="#s1">Kdo je ProSapiens</a></li>
+    <li><a href="#s2">Lidé</a></li>
+    <li><a href="#s3">Komu web mluví</a></li>
+    <li><a href="#s4">Služby a ceny</a></li>
+    <li><a href="#s5">Obchodní realita</a></li>
+    <li><a href="#s6">Značka a vizuální identita</a></li>
+    <li><a href="#s7">Metodické omezení (FP)</a></li>
+    <li><a href="#s8">Současný web — inventář</a></li>
+    <li><a href="#s9">Co je změřeně špatně</a></li>
+    <li><a href="#s10">Co se nesmí ztratit</a></li>
+    <li><a href="#s11">Požadavky na nový web</a></li>
+    <li><a href="#s12">Technické zadání</a></li>
+    <li><a href="#s13">Dělba práce</a></li>
+    <li><a href="#s14">Otevřené otázky</a></li>
+  </ol>
+</nav>
+
+<!-- 1 ─────────────────────────────────────────────── -->
+<section id="s1">
+  <div class="sec-head"><span class="sec-num">01</span><h2 class="sec-title">Kdo je ProSapiens</h2></div>
+
+  <p>Specializované <strong>biomechanické pohybové studio v Brně</strong>. Pracujeme metodikou Functional Patterns. Individuální práce 1:1, offline v Brně i online.</p>
+
+  <div class="note">
+    <span class="note-label">Positioning v jedné větě</span>
+    <p>ProSapiens je pro lidi, kteří nechtějí jen cvičit — chtějí systematicky změnit způsob, jakým se jejich tělo pohybuje, aby snížili chronické přetížení, bolest a neefektivní pohybové vzorce.</p>
+  </div>
+
+  <div class="scroll">
+    <table>
+      <thead><tr><th style="width:50%">Co ProSapiens je</th><th>Co ProSapiens není</th></tr></thead>
+      <tbody>
+        <tr><td>Individuální 1:1 práce s pohybem a biomechanikou</td><td>Fitness centrum</td></tr>
+        <tr><td>Diagnostika, dlouhodobé vedení, systematická změna pohybového chování</td><td>Skupinové lekce</td></tr>
+        <tr><td>Řešení držení těla, chůze, běhu, přenosu sil, chronického přetížení</td><td>Masová pohybová služba</td></tr>
+        <tr><td>Práce s příčinou, ne s místem bolesti</td><td>Klasická fyzioterapie · rychlé opravy bolesti · motivační wellness</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p><strong>Tenhle rozdíl je jádro veškeré komunikace.</strong> Většina obsahu, který u nás funguje, vysvětluje právě ho: ProSapiens versus běžné cvičení, masáž nebo nárazové řešení. Nový web má tenhle rozdíl nést v každé sekci, ne ho zmínit na jedné podstránce.</p>
+
+  <h4>Kontaktní údaje</h4>
+  <div class="scroll">
+    <table>
+      <tbody>
+        <tr><th>Adresa</th><td>Fanderlíková 70, 616 00 Brno – Žabovřesky</td></tr>
+        <tr><th>E-mail</th><td>info@prosapiens.cz</td></tr>
+        <tr><th>Telefon</th><td>+420 702 147 704</td></tr>
+        <tr><th>Otevírací doba</th><td>Po–Pá 7:00–20:00 · Ne 8:00–14:00</td></tr>
+        <tr><th>Instagram</th><td>@prosapiens.biomechanic</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- 2 ─────────────────────────────────────────────── -->
+<section id="s2">
+  <div class="sec-head"><span class="sec-num">02</span><h2 class="sec-title">Lidé</h2></div>
+
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Kdo</th><th>Role</th><th>Témata</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Filip „Jerry" Stráňavský</strong></td><td>Majitel, hlavní biomechanický trenér</td><td>Trénink, biomechanika, byznys, marketing, technologie, analytika</td></tr>
+        <tr><td><strong>Terézia „Terezka" Zaťková</strong></td><td>Biomechanická trenérka, spolumajitelka</td><td>Výživa, hormony, metabolismus, zdraví, lifestyle, péče o klienty</td></tr>
+        <tr><td><strong>Matyáš</strong></td><td>Trenér</td><td>Trénink</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>Oba zakladatelé mají certifikaci <strong>Human Biomechanics Specialist Level 1</strong> (Functional Patterns, Las Vegas, duben 2025, platnost do 7. 5. 2027), ověřitelnou v oficiálním registru. Oba jsou absolventi magisterského oboru na FTVŠ Univerzity Komenského v Bratislavě.</p>
+
+  <p>Témata Jerryho a Terezky se <strong>nemíchají</strong> — biomechanický a výživový obsah mluví za různé lidi. Nový web to musí unést: autorství u článků, oddělené profily, případně oddělené rubriky.</p>
+</section>
+
+<!-- 3 ─────────────────────────────────────────────── -->
+<section id="s3">
+  <div class="sec-head"><span class="sec-num">03</span><h2 class="sec-title">Komu web mluví</h2></div>
+
+  <h3>Primární klient</h3>
+  <p>Muž nebo žena, <strong>30–45 let</strong>, sedavé zaměstnání (kancelář, IT, podnikání). Řeší chronickou bolest, špatné držení těla, přetížení pohybového aparátu. Má za sebou zkušenost, že běžné cvičení, masáže ani nárazová řešení problém trvale nevyřešily. Má kapacitu investovat čas, pozornost i peníze do dlouhodobé spolupráce.</p>
+
+  <h3>Sekundární</h3>
+  <ul>
+    <li>Sportovci s biomechanickými limity</li>
+    <li>Ženy po těhotenství</li>
+    <li>Lidé po sérii neúspěšných pokusů u jiných odborníků</li>
+  </ul>
+
+  <div class="note">
+    <span class="note-label">Důležitý rozdíl oproti běžnému zadání</span>
+    <p>Web nemá přivést co nejvíc lidí. Má přivést <strong>ty správné</strong> a ostatní srozumitelně odfiltrovat — viz kapacitní strop v sekci 05. Nevhodný klient, který se objedná, je pro nás náklad, ne úspěch.</p>
+  </div>
+</section>
+
+<!-- 4 ─────────────────────────────────────────────── -->
+<section id="s4">
+  <div class="sec-head"><span class="sec-num">04</span><h2 class="sec-title">Služby a ceny</h2></div>
+
+  <p>Stav k 28. 8. 2026, tak jak je uvedený na webu. <strong>Hlavní produkt je dlouhodobá spolupráce, ne jednorázová hodina</strong> — tomu má odpovídat i hierarchie na stránce se službami.</p>
+
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Služba</th><th class="num">Offline (Brno)</th><th class="num">Online</th><th>Poznámka</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Úvodní trénink</strong> — diagnostika a analýza držení těla a chůze, 60 min</td><td class="num">1 100 Kč</td><td class="num">990 Kč</td><td>Vstupní brána do celé spolupráce</td></tr>
+        <tr><td><strong>Jednorázová lekce</strong>, 1 hodina</td><td class="num">1 450 Kč</td><td class="num">1 390 Kč</td><td>Online cena je dnes jen ve větě v textu, ne na kartě</td></tr>
+        <tr><td><strong>Balíček 6 h — bez závazku</strong></td><td class="num">7 790 Kč</td><td class="num">6 590 Kč</td><td>1 289 Kč/h offline · platnost 2 měsíce</td></tr>
+        <tr><td><strong>Předplatné 6 h / měsíc — se závazkem</strong></td><td class="num">6 990 Kč</td><td class="num">5 640 Kč</td><td>1 165 Kč/h offline · online v režimu 6 h × 6 měsíců</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h4>Co je součástí balíčku</h4>
+  <ul>
+    <li>Individuální trénink s trenérem 60 minut, s možností přijít dřív nebo zůstat déle (±60 minut)</li>
+    <li>Masáž podle potřeby — uvolnění fascií, svalů, lepší regenerace</li>
+    <li>Káva, čaj nebo kakao zdarma</li>
+    <li>Sprchy a základní hygienické potřeby (non-toxic šampon a mýdlo; ručník vlastní)</li>
+    <li>Mobilní aplikace <strong>PT Minder</strong> — sledování tréninků, zbývajících hodin a plateb</li>
+  </ul>
+
+  <h4>Struktura spolupráce, jak ji web dnes popisuje</h4>
+  <ul>
+    <li><strong>Fáze 1 — Obnova</strong> (0–6 měsíců)</li>
+    <li><strong>Fáze 2 — Integrace</strong> (6–18 měsíců)</li>
+    <li>Doporučený rytmus: 6 hodin měsíčně</li>
+  </ul>
+
+  <div class="note warn">
+    <span class="note-label">Pozor při přepisu ceníku</span>
+    <p>Interní názvy služeb v PT Minderu se s webem neshodují (<span class="mono">OFF - 6h BEZ viazanosti</span>, <span class="mono">OFF - 8 hodín offline</span>, <span class="mono">TC - 1 hodina</span>, paušály GOLD/SILVER/DIAMOND). Existují i varianty, které web vůbec neuvádí — například balíčky 8 h a 18 h. Před spuštěním nového ceníku je potřeba rozhodnout, co se veřejně nabízí a co zůstane interní.</p>
+  </div>
+</section>
+
+<!-- 5 ─────────────────────────────────────────────── -->
+<section id="s5">
+  <div class="sec-head"><span class="sec-num">05</span><h2 class="sec-title">Obchodní realita</h2></div>
+
+  <div class="cards">
+    <div class="card"><div class="k">58</div><div class="l">aktivních klientů</div><div class="d">za posledních 60 dní</div></div>
+    <div class="card"><div class="k">60–70</div><div class="l">kapacitní strop</div><div class="d">fyzický limit studia</div></div>
+    <div class="card"><div class="k">189 tis.</div><div class="l">Kč měsíčně</div><div class="d">průměr za 11 uzavřených měsíců</div></div>
+    <div class="card"><div class="k">42 %</div><div class="l">poptávek z doporučení</div><div class="d">nejsilnější kanál</div></div>
+  </div>
+
+  <p>Tržby září 2025 – červenec 2026 (11 uzavřených měsíců): <strong>2 083 068 Kč</strong>, tedy průměr 189 370 Kč měsíčně, s rozptylem 122 286 – 311 800 Kč.</p>
+
+  <h4>Odkud přicházejí poptávky</h4>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Kanál</th><th class="num">Poptávek</th><th>Co to znamená pro web</th></tr></thead>
+      <tbody>
+        <tr><td>Doporučení</td><td class="num">16</td><td>Člověk přichází s předem vysokou důvěrou a chce si nás jen ověřit. Web musí obstát jako <em>ověření</em>, ne jako přesvědčování.</td></tr>
+        <tr><td>Instagram</td><td class="num">8</td><td>Přichází z profilu na jednu konkrétní stránku. Vstupní stránka musí fungovat samostatně.</td></tr>
+        <tr><td>Google</td><td class="num">6</td><td>Nejčastěji přes odborný článek, ne přes stránku služby.</td></tr>
+        <tr><td>Web (přímo)</td><td class="num">4</td><td></td></tr>
+        <tr><td>Jiné</td><td class="num">6</td><td></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="note">
+    <span class="note-label">Co z toho plyne pro zadání</span>
+    <p>Cílem webu <strong>není maximalizovat objem poptávek</strong>. Při stropu 60–70 klientů je kampaň, která přivede hodně nevhodných lidí, zátěž, ne úspěch. Web má tři úkoly v tomhle pořadí: <strong>obstát při ověřování</strong> (doporučení), <strong>vysvětlit rozdíl</strong> (organické vyhledávání), <strong>odfiltrovat nevhodné</strong> dřív, než dojde na hovor.</p>
+  </div>
+</section>
+
+<!-- 6 ─────────────────────────────────────────────── -->
+<section id="s6">
+  <div class="sec-head"><span class="sec-num">06</span><h2 class="sec-title">Značka a vizuální identita</h2></div>
+
+  <h3>Barvy (závazné)</h3>
+  <div class="swatches">
+    <div class="sw"><div class="chip" style="background:#1A2E24"></div><div class="txt"><div class="nm">Pozadí tmavé</div><div class="hx">#1A2E24</div></div></div>
+    <div class="sw"><div class="chip" style="background:#2D7D5A"></div><div class="txt"><div class="nm">Akcent</div><div class="hx">#2D7D5A</div></div></div>
+    <div class="sw"><div class="chip" style="background:#A8C4B0"></div><div class="txt"><div class="nm">Tlumená podpora</div><div class="hx">#A8C4B0</div></div></div>
+    <div class="sw"><div class="chip" style="background:#EBF5EE"></div><div class="txt"><div class="nm">Text na tmavém</div><div class="hx">#EBF5EE</div></div></div>
+    <div class="sw"><div class="chip" style="background:#F4F9F6; border-bottom:1px solid #DCE6E0"></div><div class="txt"><div class="nm">Pozadí světlé</div><div class="hx">#F4F9F6</div></div></div>
+  </div>
+
+  <h3>Písmo</h3>
+  <p>Firemní font je <strong>Agrandir Variable</strong> (licencovaný, používá se v Canvě a na tištěných materiálech). <strong>Na webu dnes není vůbec</strong> — běží tam Open Sans a Raleway z koupené šablony. Sjednocení písma napříč webem, sociálními sítěmi a tiskem je jeden z důvodů, proč web měníme. Pokud licence Agrandiru neumožňuje webové nasazení, chceme <strong>návrh náhrady</strong>, ne tiché ponechání Open Sans.</p>
+
+  <h3>Estetika</h3>
+  <p>Klinická, editoriální — „vědecká terénní zpráva". Ne fitness, ne wellness.</p>
+
+  <div class="note bad">
+    <span class="note-label">Zakázáno</span>
+    <p>Gradienty · ikony · emoji · fitness estetika · motivační jazyk · bílá pozadí (kromě světlezelených variant) · stock fotografie lidí ve fitness.</p>
+  </div>
+
+  <h3>Tón hlasu</h3>
+  <p>Věcně, klidně, odborně, přesně. <strong>Bez klišé a přehánění.</strong> Nepoužívají se formulace typu <em>„transformuj svůj život", „revoluční metoda", „garantované výsledky", „rychlá úleva"</em>.</p>
+
+  <h4>Co se nepoužívá nikdy — ani jako UI prvek</h4>
+  <ul>
+    <li><strong>Umělá urgence a odpočty</strong> — „nakup do 48 h", mizející bonusy</li>
+    <li><strong>Vymyšlená vzácnost</strong> — „zbývají 3 místa", resetované countdowny <em>(skutečný kapacitní strop je legitimní a uvádět se smí)</em></li>
+    <li><strong>Slevy jako růstový mechanismus</strong> — pravidelné výprodeje, „−50 %" jako motor</li>
+    <li><strong>Pseudovědecké nálepky a sliby rychlých výsledků</strong></li>
+    <li><strong>Výkonový, pushovací tón</strong></li>
+  </ul>
+  <p>To platí i pro komponenty, které dodavatel běžně nabízí: žádné exit-intent popupy s odpočtem, žádné „14 lidí právě prohlíží", žádné hvězdičkové odznaky bez zdroje.</p>
+
+  <h3>Jazyk</h3>
+  <p><strong>Všechno, co jde ke klientovi, je česky</strong> — texty, titulky, meta popisy, chybové hlášky, e-maily z formulářů, texty tlačítek. Bez výjimky. Klienti jsou Češi a slovenská věta je v českém textu vidět na první pohled. (V srpnu 2026 se ukázalo, že pět stránek mělo roky slovenský meta popis — mimo jiné stránka s 5 761 zobrazeními v Googlu.)</p>
+</section>
+
+<!-- 7 ─────────────────────────────────────────────── -->
+<section id="s7">
+  <div class="sec-head"><span class="sec-num">07</span><h2 class="sec-title">Metodické omezení (Functional Patterns)</h2></div>
+
+  <p>Tohle je tvrdý limit, ne preference. Dodavatel ho musí znát, protože se dotýká grafiky i textů.</p>
+
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Pravidlo</th><th>Prakticky</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Jméno „Functional Patterns" se smí použít</strong></td><td>Ale jménem se neodlišíme — konkurence ho používá taky. Jméno má cenu tam, kde se <em>dokazuje</em> (ověření certifikace), ne tam, kde se <em>přitahuje</em> (reklama, první dotek). Obsah stojí na symptomu a mechanismu, ne na názvu metody.</td></tr>
+        <tr><td><strong>Logo a slovní značka FP se nepoužívají nikdy</strong></td><td>Ani ve vizuálech, ani v patičce, ani jako „certifikováno" odznak s jejich grafikou.</td></tr>
+        <tr><td><strong>Neodhaluje se interní metodika</strong></td><td>Žádný cueing krok za krokem, žádná struktura výuky, žádné neveřejné technické detaily.</td></tr>
+        <tr><td><strong>Před/po fotografie mají dvě branky</strong></td><td>Schválení na fp.app <em>a</em> předchozí písemný souhlas klienta. Bez obojího se nepublikuje — počítejte s tím, že galerie proměn nemusí být naplněná.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- 8 ─────────────────────────────────────────────── -->
+<section id="s8">
+  <div class="sec-head"><span class="sec-num">08</span><h2 class="sec-title">Současný web — inventář</h2></div>
+
+  <h3>8.1 Technologie</h3>
+  <div class="scroll">
+    <table>
+      <tbody>
+        <tr><th>Systém</th><td>WordPress</td></tr>
+        <tr><th>Šablona</th><td><span class="mono">setupfolio</span> (komerční) + <span class="mono">templatation-framework</span></td></tr>
+        <tr><th>Page builder</th><td><strong>WPBakery</strong> (js_composer 6.8.0) — veškerý layout je uzamčený v jeho shortcodech</td></tr>
+        <tr><th>Pluginy na frontendu</th><td>Slider Revolution, Contact Form 7, Forminator, PixelYourSite, Instagram Feed, Simple Download Monitor, Social Icons Widget, Cookie Law Info, Easy Accordion, Responsive Lightbox, Testimonial Free</td></tr>
+        <tr><th>Pluginy v adminu</th><td>Wordfence, WP Fastest Cache, UpdraftPlus (zálohy na Google Drive), Asset CleanUp, Yoast SEO, Code Snippets, WP Mail SMTP, Site Kit</td></tr>
+        <tr><th>Vlastní kód</th><td><strong>22 snippetů v pluginu Code Snippets, 12 aktivních</strong> — záplatují chování šablony i pluginů (viz 8.5)</td></tr>
+        <tr><th>Server</th><td>openresty · doména běží na <span class="mono">www.prosapiens.cz</span></td></tr>
+        <tr><th>Písma</th><td>Open Sans + Raleway z Google Fonts</td></tr>
+        <tr><th>Strukturovaná data</th><td>LocalBusiness JSON-LD (vlastní snippet) na úvodní stránce a Kontaktu</td></tr>
+        <tr><th>Autor současného webu</th><td>Emglare Technologies s.r.o. (uvedeno v patičce)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>8.2 Informační architektura</h3>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Hlavní menu</th><th>Podpoložky</th></tr></thead>
+      <tbody>
+        <tr><td>Domů</td><td>—</td></tr>
+        <tr><td>Služby</td><td>Jak to funguje · Úvodní trénink · Online trénink</td></tr>
+        <tr><td>Výsledky</td><td>—</td></tr>
+        <tr><td>Vzdělávaní</td><td>Co je Functional Patterns · Pochopte své tělo · Články · Protokol MFR – ZDARMA</td></tr>
+        <tr><td>O nás</td><td>FAQ</td></tr>
+        <tr><td>Kontakt</td><td>—</td></tr>
+        <tr><td>Kariera</td><td>—</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Patička obsahuje jen copyright, GDPR a Obchodní podmínky. Profily trenérů (<span class="mono">/jerry/</span>, <span class="mono">/terezia/</span>, <span class="mono">/matyas/</span>) nejsou v menu — dostanete se na ně jen přes slider na stránce O nás.</p>
+
+  <h3>8.3 Stránky</h3>
+  <p>34 stránek celkem (z toho 2 stažené do konceptu) a 45 publikovaných článků. Sloupec „slov" je celý text stránky včetně hlavičky a patičky, takže srovnává relativní délku, ne čistý obsah.</p>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Adresa</th><th>Úkol stránky</th><th class="num">Slov</th><th>Zvláštnosti</th></tr></thead>
+      <tbody>
+        <tr><td class="slug">/</td><td>Rozcestník + důkaz. Počitadla 10 let / 350 klientů / 9000 hodin, tři kroky procesu, tři profily „pro koho", tři video testimonialy</td><td class="num">1 696</td><td>4 videa, Slider Revolution</td></tr>
+        <tr><td class="slug">/sluzby/</td><td>Ceník offline: tři karty služeb, čtyři cenové karty, storno podmínky, co je v balíčku</td><td class="num">1 440</td><td>Odkaz na PT Minder</td></tr>
+        <tr><td class="slug">/jak-to-funguje/</td><td>Vysvětlení metody a 6měsíčního procesu (Fáze 1 Obnova, Fáze 2 Integrace)</td><td class="num">1 622</td><td>1 video</td></tr>
+        <tr><td class="slug">/uvodni-trenink/</td><td>Prodejní stránka vstupní služby. Nadpis „Fyzioterapie pomohla. Na chvíli."</td><td class="num">1 631</td><td>Formulář, 3 videa</td></tr>
+        <tr><td class="slug">/online-trenink/</td><td>Online varianta: tři kroky, šest FAQ, tři cenové karty</td><td class="num">1 729</td><td>Formulář</td></tr>
+        <tr><td class="slug">/vysledky/</td><td>Pět klientských příběhů s diagnózou a délkou spolupráce</td><td class="num">1 731</td><td>5 videí — nejsilnější konverzní prvek webu</td></tr>
+        <tr><td class="slug">/co-je-functional-patterns/</td><td>Vysvětlení metodiky, srovnání s fitness a fyzioterapií</td><td class="num">1 694</td><td>3 videa · nově ověření certifikace</td></tr>
+        <tr><td class="slug">/o-nas/</td><td>Příběh studia, 10 principů, kde trénujeme, sekce o Bitcoinu</td><td class="num">1 384</td><td>Jediná cesta na profily trenérů</td></tr>
+        <tr><td class="slug">/jerry/ /terezia/ /matyas/</td><td>Profily trenérů — životopis, zkušenosti, vzdělání</td><td class="num">1 124–1 349</td><td>Mimo menu. Terezčin profil neuváděl vzdělání</td></tr>
+        <tr><td class="slug">/faq/</td><td>Často kladené otázky</td><td class="num">1 419</td><td>Accordion plugin</td></tr>
+        <tr><td class="slug">/kontakt/</td><td>Kontakt + formulář</td><td class="num">1 006</td><td>CF7 #127</td></tr>
+        <tr><td class="slug">/test-postury/</td><td>Dotazník držení těla — nejdelší stránka webu</td><td class="num">3 724</td><td>CF7 #5111, 9 polí, automatický follow-up e-mail</td></tr>
+        <tr><td class="slug">/dychani/</td><td>Landing page funnelu: placená příručka 290 Kč (Gumroad) + free PDF za e-mail</td><td class="num">1 642</td><td>Forminator #5445, poděkování inline</td></tr>
+        <tr><td class="slug">/podekovani/</td><td>Děkovací stránka poptávek — časová osa 24–48 h, odkaz na test postury</td><td class="num">1 366</td><td>Měří konverze poptávek</td></tr>
+        <tr><td class="slug">/pochopte-sve-telo/</td><td>Rozcestník vzdělávacího obsahu</td><td class="num">1 516</td><td>Má podstránky</td></tr>
+        <tr><td class="slug">/protokol-o-myofascialnim-uvolnovani/</td><td>Lead magnet — protokol MFR zdarma</td><td class="num">1 316</td><td>Formulář · nejpomalejší stránka webu</td></tr>
+        <tr><td class="slug">/blog/</td><td>Výpis 45 článků</td><td class="num">1 860</td><td>Bez filtrů a rubrik</td></tr>
+        <tr><td class="slug">/kariera/</td><td>Nábor trenérů</td><td class="num">3 400</td><td>Formulář</td></tr>
+        <tr><td class="slug">/doporucene-pomucky/</td><td>Doporučené vybavení</td><td class="num">1 049</td><td></td></tr>
+        <tr><td class="slug">/informace-po-uvodnim-treninku/</td><td>Stránka pro klienta po první lekci</td><td class="num">1 845</td><td>Neveřejná v menu</td></tr>
+        <tr><td class="slug">/gdpr/ /obchodni-podminky/</td><td>Právní texty</td><td class="num">3 107–3 122</td><td></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>8.4 Formuláře</h3>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Formulář</th><th>Kde</th><th>Pole</th><th>Co se s tím děje</th></tr></thead>
+      <tbody>
+        <tr><td>CF7 <span class="mono">#127</span></td><td>Kontakt, Úvodní trénink, Online trénink, Kariéra</td><td>jméno, e-mail, telefon, zpráva</td><td>E-mail + zápis poptávky do interní aplikace, přesměrování na /podekovani/</td></tr>
+        <tr><td>CF7 <span class="mono">#5111</span></td><td>Test postury</td><td>bolest, postura, vhled, jméno, telefon, e-mail, poznámka, preference hovoru, GDPR</td><td>Automatický follow-up e-mail podle vzorce odpovědí</td></tr>
+        <tr><td>Forminator <span class="mono">#5445</span></td><td>Dýchání</td><td>e-mail</td><td>Odemkne free PDF. Poděkování se zobrazí <strong>inline</strong>, nepřesměrovává se</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>8.5 Napojení na okolní systémy</h3>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Systém</th><th>K čemu</th><th>Vazba na web</th></tr></thead>
+      <tbody>
+        <tr><td><strong>PT Minder</strong></td><td>Klientská aplikace — rezervace, balíčky, platby, docházka</td><td>Dnes jen zmínka a odkaz. Není napojený na web.</td></tr>
+        <tr><td><strong>Gumroad</strong></td><td>Prodej příručky za 290 Kč</td><td>Odkaz z /dychani/. Nákup probíhá mimo web.</td></tr>
+        <tr><td><strong>GA4 + Meta Pixel</strong></td><td>Měření</td><td>Přes PixelYourSite. Automatické sledování je záměrně vypnuté, události se posílají cíleně. Meta CAPI je nastavené.</td></tr>
+        <tr><td><strong>Google Search Console</strong></td><td>Organické vyhledávání</td><td>Data se stahují do interní aplikace</td></tr>
+        <tr><td><strong>Interní aplikace „Kokpit"</strong></td><td>Řízení studia — klienti, peníze, marketing</td><td>Každou noc ve 3:30 stahuje obsah celého webu a poptávky z formulářů. <strong>Tohle napojení musí zůstat funkční.</strong></td></tr>
+        <tr><td><strong>Instagram</strong></td><td>@prosapiens.biomechanic</td><td>Vložený feed na každé stránce</td></tr>
+        <tr><td><strong>Mailer</strong></td><td>~450 kontaktů z lead magnetu</td><td>Dnes bez napojení na web</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- 9 ─────────────────────────────────────────────── -->
+<section id="s9">
+  <div class="sec-head"><span class="sec-num">09</span><h2 class="sec-title">Co je změřeně špatně</h2></div>
+
+  <p>Nejde o dojmy. Všechno níže je měření, u každého bodu je uvedeno čím.</p>
+
+  <h3>9.1 Rychlost na mobilu</h3>
+  <div class="cards">
+    <div class="card"><div class="k bad">56</div><div class="l">výkon na mobilu</div><div class="d">průměr ze 46 měření (PageSpeed Insights, 16. 8. 2026)</div></div>
+    <div class="card"><div class="k bad">11,3 s</div><div class="l">LCP na mobilu</div><div class="d">průměrné vykreslení hlavního obsahu</div></div>
+    <div class="card"><div class="k">80</div><div class="l">výkon na desktopu</div><div class="d">LCP 2,2 s — desktop je v pořádku</div></div>
+    <div class="card"><div class="k">59 %</div><div class="l">zobrazení z mobilu</div><div class="d">64 907 ze 110 535 zobrazení v přehledu podle zařízení</div></div>
+  </div>
+  <p>Nejhorší stránky na mobilu: <span class="mono">/terezia/</span> 35 bodů (LCP 19,0 s), <strong>úvodní stránka 37 bodů (LCP 19,0 s)</strong>, <span class="mono">/protokol-o-myofascialnim-uvolnovani/</span> 38 (29,5 s), <span class="mono">/jak-to-funguje/</span> 41 (16,3 s), <span class="mono">/uvodni-trenink/</span> 45 (16,7 s).</p>
+  <p>Úvodní stránka posílá <strong>162 požadavků</strong> a její HTML má 200 kB. To je kombinace Slider Revolution, WPBakery, vloženého Instagram feedu a čtyř YouTube přehrávačů. <strong>Tohle je nejsilnější jednotlivý důvod pro přestavbu:</strong> většina lidí nás v Googlu vidí na telefonu a čeká 19 sekund.</p>
+
+  <h3>9.2 Obsah přitahuje jiné lidi, než potřebujeme</h3>
+  <p>Celkem 141 stránek s historií v Search Console, <strong>125 159 zobrazení a 2 729 prokliků</strong>. Ale rozložení je nezdravé:</p>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Stránka</th><th class="num">Zobrazení</th><th class="num">Prokliky</th><th class="num">CTR</th><th>Typ</th></tr></thead>
+      <tbody>
+        <tr><td class="slug">/lateral-line/</td><td class="num">15 777</td><td class="num">97</td><td class="num">0,6 %</td><td>anatomie</td></tr>
+        <tr><td class="slug">/arm-lines/</td><td class="num">9 555</td><td class="num">31</td><td class="num">0,3 %</td><td>anatomie</td></tr>
+        <tr><td class="slug">/spiral-line/</td><td class="num">8 809</td><td class="num">126</td><td class="num">1,4 %</td><td>anatomie</td></tr>
+        <tr><td class="slug">/padajici-kolena-dovnitr/</td><td class="num">7 508</td><td class="num">202</td><td class="num">2,7 %</td><td><strong>symptom</strong></td></tr>
+        <tr><td class="slug">/odstavajici-lopatky/</td><td class="num">7 032</td><td class="num">173</td><td class="num">2,5 %</td><td><strong>symptom</strong></td></tr>
+        <tr><td class="slug">/anterior-pelvic-tilt/</td><td class="num">4 351</td><td class="num">118</td><td class="num">2,7 %</td><td><strong>symptom</strong></td></tr>
+        <tr><td class="slug">/ (úvodní)</td><td class="num">4 284</td><td class="num">447</td><td class="num">10,4 %</td><td>značka</td></tr>
+        <tr><td class="slug">/co-je-functional-patterns/</td><td class="num">3 344</td><td class="num">283</td><td class="num">8,5 %</td><td>metoda</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Deset anatomických stránek dohromady nese <strong>53 % všech zobrazení, ale jen 19 % prokliků</strong> (66 160 zobrazení → 520 prokliků). Symptomové stránky mají proklik <strong>čtyřikrát až devětkrát lepší</strong>. Anatomie přivádí studenty a kolegy, ne klienty. Nový web s tím musí umět pracovat: symptomové stránky patří výš v architektuře než anatomický atlas.</p>
+
+  <h3>9.3 Blog nemá strukturu</h3>
+  <p>45 článků, <strong>jediná kategorie</strong> („blog"), žádné štítky, žádné filtry, žádné související články podle tématu. Čtenář, který přijde z Googlu na článek o fasciích, nemá kam pokračovat.</p>
+
+  <h3>9.4 Měření funnelu je slepé</h3>
+  <p>Formulář na free PDF (<span class="mono">/dychani/</span>) zobrazuje poděkování <strong>inline na téže stránce</strong>. Události GA4 i Pixelu jsou přitom navázané na děkovací stránku, takže se u tohoto formuláře <strong>nikdy nespustí</strong>. Odeslání reálně fungují, ale v datech nejsou vidět.</p>
+
+  <h3>9.5 Drobné vady šablony</h3>
+  <ul>
+    <li>Cenové karty ukazují <strong>„/Month" i u jednorázové lekce</strong> — zbytek anglické šablony, na všech ceníkových stránkách.</li>
+    <li>Základní text webu je <strong>14 px šedou #757575</strong> — pod dnešním standardem čitelnosti.</li>
+    <li>Průměrná přístupnost 82/100 na obou zařízeních.</li>
+    <li>Profily trenérů jsou dostupné jen přes slider, tedy prakticky neviditelné pro Google i pro člověka.</li>
+    <li>Chování šablony a pluginů dnes záplatuje <strong>12 aktivních kusů vlastního PHP</strong> (odstranění značky z titulků, české meta popisy, přesměrování zrušených stránek, LocalBusiness schema, autorský blok, zdroj poptávky, follow-up e-maily). Nový web by je z velké části neměl potřebovat — ale <em>funkce</em>, které dělají, se musí zachovat.</li>
+  </ul>
+</section>
+
+<!-- 10 ─────────────────────────────────────────────── -->
+<section id="s10">
+  <div class="sec-head"><span class="sec-num">10</span><h2 class="sec-title">Co se nesmí ztratit</h2></div>
+
+  <div class="note bad">
+    <span class="note-label">Kritické</span>
+    <p>Web má za sebou roky organického růstu. <strong>Ztráta pozic v Googlu by byla dražší než celý web.</strong> Migrace musí být řízená, ne „překlopíme obsah a uvidíme".</p>
+  </div>
+
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Co</th><th>Proč</th><th>Jak to ohlídat</th></tr></thead>
+      <tbody>
+        <tr><td><strong>141 adres s historií</strong></td><td>Top 15 z nich nese většinu ze 125 tisíc zobrazení</td><td>Mapa 1:1 starých a nových adres, u každé změněné adresy přesměrování 301, kontrola po nasazení</td></tr>
+        <tr><td><strong>Existující přesměrování</strong></td><td>Už teď běží pravidla pro zrušené stránky; pět řetězů bylo zkráceno na jeden skok</td><td>Převzít pravidla, nezakládat nové řetězy</td></tr>
+        <tr><td><strong>Alt texty obrázků</strong></td><td>375 obsahových obrázků, 100% pokrytí, anatomicky popsané</td><td>Přenést i s obrázky, ne generovat znovu</td></tr>
+        <tr><td><strong>Meta popisy a titulky</strong></td><td>Přepsané v srpnu 2026 do češtiny, žádný titulek nad 60 znaků, u článků bez přípony se značkou</td><td>Přenést; pravidlo o délce a příponě zachovat</td></tr>
+        <tr><td><strong>LocalBusiness schema</strong></td><td>Adresa, telefon, otevírací doba pro Google</td><td>Reimplementovat nativně, ideálně rozšířit</td></tr>
+        <tr><td><strong>Autorství článků</strong></td><td>Skutečné autorství (36 Jerry, 9 Terezka) + ověření certifikace u každého článku</td><td>Zachovat autorský blok a odkazy do registru FP</td></tr>
+        <tr><td><strong>Video testimonialy</strong></td><td>Nejsilnější konverzní prvek, který web má</td><td>Přenést všechna a dát jim víc prostoru</td></tr>
+        <tr><td><strong>Napojení na interní aplikaci</strong></td><td>Poptávky z formulářů a noční čtení obsahu webu</td><td>Zachovat rozhraní nebo dohodnout nové <em>před</em> spuštěním</td></tr>
+        <tr><td><strong>Měření</strong></td><td>GA4, Meta Pixel a CAPI, Search Console</td><td>Přenést včetně cílených událostí; nezapínat automatické sledování</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- 11 ─────────────────────────────────────────────── -->
+<section id="s11">
+  <div class="sec-head"><span class="sec-num">11</span><h2 class="sec-title">Požadavky na nový web</h2></div>
+
+  <h3>Musí umět <span class="pill must">nutné</span></h3>
+  <ul>
+    <li><strong>Být rychlý na mobilu.</strong> Cíl: PageSpeed mobil ≥ 90, LCP pod 2,5 s na každé stránce v menu. Tohle je měřitelná přejímací podmínka, ne přání.</li>
+    <li><strong>Nést vizuální identitu</strong> ze sekce 06 — včetně vyřešení otázky firemního písma.</li>
+    <li><strong>Editovatelnost bez vývojáře.</strong> Jerry sám píše a upravuje texty. Nechceme layout uzamčený v page builderu, ale ani nutnost volat dodavatele kvůli změně ceny.</li>
+    <li><strong>Blog s rubrikami</strong> — tematické kategorie, filtrování, související články, oddělené autorství Jerry / Terezka.</li>
+    <li><strong>Formuláře</strong> se zachováním dnešní logiky: poptávka, test postury s follow-upem, sběr e-mailů. Zdroj poptávky se musí předávat dál.</li>
+    <li><strong>Přístupnost</strong> alespoň na úrovni WCAG 2.1 AA — dnes 82/100.</li>
+    <li><strong>Cookie lišta</strong> a GDPR v souladu s českou úpravou.</li>
+    <li><strong>Migrace obsahu</strong> podle sekce 10, včetně mapy přesměrování.</li>
+  </ul>
+
+  <h3>Chceme probrat <span class="pill open">k rozhodnutí</span></h3>
+  <ul>
+    <li><strong>Online rezervace úvodního tréninku.</strong> Dnes je vstup přes formulář a ozveme se do 48 hodin. Rezervace přímo v kalendáři by zkrátila cestu — ale musí sednout k PT Minderu a k tomu, že vstupní hovor je zároveň filtr.</li>
+    <li><strong>Prodej příručky přímo na webu</strong> místo Gumroadu.</li>
+    <li><strong>Klientská zóna</strong> — dnes tuhle roli plní PT Minder.</li>
+    <li><strong>Slovenská jazyková verze</strong> — část klientů je ze Slovenska, ale obsah je záměrně český.</li>
+    <li><strong>Struktura vzdělávací sekce</strong> — anatomický atlas a symptomové stránky dnes leží vedle sebe, ačkoli mají jinou roli a jiné publikum.</li>
+  </ul>
+
+  <h3>Výslovně nechceme</h3>
+  <ul>
+    <li>Odpočty, popupy s urgencí, „zbývají 3 místa" — viz sekce 06.</li>
+    <li>Stock fotografie ve fitness estetice.</li>
+    <li>Chatbota, který předstírá člověka.</li>
+    <li>Slevové mechaniky jako součást návrhu.</li>
+  </ul>
+</section>
+
+<!-- 12 ─────────────────────────────────────────────── -->
+<section id="s12">
+  <div class="sec-head"><span class="sec-num">12</span><h2 class="sec-title">Technické zadání</h2></div>
+
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Oblast</th><th>Požadavek</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Rychlost</strong></td><td>PageSpeed mobil ≥ 90 a LCP &lt; 2,5 s na všech stránkách v hlavním menu, měřeno po nasazení na ostré doméně. CLS &lt; 0,1, INP &lt; 200 ms.</td></tr>
+        <tr><td><strong>Platforma</strong></td><td>Otevřené. Pokud WordPress, tak bez page builderu uzamykajícího layout. Jsme otevření i headless řešení, pokud zůstane editovatelnost bez vývojáře.</td></tr>
+        <tr><td><strong>Obrázky</strong></td><td>Moderní formáty, responzivní varianty, lazy loading pod ohybem. Alt texty se přenášejí, negenerují.</td></tr>
+        <tr><td><strong>Vložený obsah</strong></td><td>YouTube a Instagram se načítají až na vyžádání (facade), ne při načtení stránky. Dnes stojí úvodní stránku většinu její váhy.</td></tr>
+        <tr><td><strong>Strukturovaná data</strong></td><td>LocalBusiness, Article u článků, Person u profilů trenérů, FAQPage u FAQ, BreadcrumbList.</td></tr>
+        <tr><td><strong>Měření</strong></td><td>GA4 + Meta Pixel + CAPI. Události definujeme společně; automatické sledování zůstává vypnuté. Každý formulář musí spouštět vlastní událost — <strong>včetně těch s poděkováním na téže stránce</strong>.</td></tr>
+        <tr><td><strong>Sitemapa a robots</strong></td><td>Aktuální sitemapa bez zpoždění cache. Dnešní hosting drží starou sitemapu i hodiny po úpravě.</td></tr>
+        <tr><td><strong>Zálohy</strong></td><td>Automatické, mimo hosting, s ověřeným obnovením.</td></tr>
+        <tr><td><strong>Bezpečnost</strong></td><td>Skrytá administrace, dvoufázové přihlášení, aktualizace.</td></tr>
+        <tr><td><strong>Předání</strong></td><td>Přístupy, dokumentace, krátké školení pro Jerryho. Žádná část webu nesmí být závislá na dodavatelově účtu u třetí strany.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- 13 ─────────────────────────────────────────────── -->
+<section id="s13">
+  <div class="sec-head"><span class="sec-num">13</span><h2 class="sec-title">Dělba práce</h2></div>
+
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Dodáme my</th><th>Čekáme od dodavatele</th></tr></thead>
+      <tbody>
+        <tr><td>Všechny texty — píšeme si je sami a máme na ně vlastní pravidla</td><td>Návrh informační architektury a wireframy</td></tr>
+        <tr><td>Fotografie trenérů a studia</td><td>Vizuální návrh vycházející z naší palety a estetiky</td></tr>
+        <tr><td>Video testimonialy</td><td>Návrh řešení firemního písma na webu</td></tr>
+        <tr><td>Data ze Search Console a analytiky</td><td>Kompletní migrace obsahu a mapa přesměrování</td></tr>
+        <tr><td>Seznam adres, které musí přežít</td><td>Nasazení, měření rychlosti po nasazení, doložení splnění limitů</td></tr>
+        <tr><td>Přístupy k dnešnímu webu a doméně</td><td>Zaškolení a dokumentace</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- 14 ─────────────────────────────────────────────── -->
+<section id="s14">
+  <div class="sec-head"><span class="sec-num">14</span><h2 class="sec-title">Otevřené otázky</h2></div>
+
+  <p>Tyhle body v podkladu <strong>chybí a musí je doplnit zadavatel</strong>, než půjde dokument ven. Jsou to rozhodnutí, ne zjištění.</p>
+
+  <div class="q"><div class="qt">Rozpočet</div><div class="qd">Bez rámce nabídky nelze srovnat — a dodavatel navrhne rozsah, který se do něj vejde.</div></div>
+  <div class="q"><div class="qt">Termín</div><div class="qd">Kdy má nový web běžet? Je nějaké datum, ke kterému se to váže (kampaň, sezóna, kniha o fasciích)?</div></div>
+  <div class="q"><div class="qt">Zůstává WordPress?</div><div class="qd">Nebo je platforma otevřená? Ovlivňuje to cenu i okruh dodavatelů.</div></div>
+  <div class="q"><div class="qt">Online rezervace ano/ne</div><div class="qd">Zkrátí cestu ke klientovi, ale obchází vstupní hovor, který dnes filtruje nevhodné zájemce.</div></div>
+  <div class="q"><div class="qt">Zůstává Matyáš v týmu?</div><div class="qd">Rozhoduje o tom, jestli má nový web tři profily trenérů, nebo dva.</div></div>
+  <div class="q"><div class="qt">Licence firemního písma</div><div class="qd">Umožňuje Agrandir webové nasazení? Pokud ne, potřebujeme rozhodnout o náhradě.</div></div>
+  <div class="q"><div class="qt">Co s anatomickým atlasem</div><div class="qd">Deset anatomických stránek přináší 53 % všech zobrazení, ale jen 19 % prokliků. Ponechat, přestavět na symptomový vstup, nebo oddělit do samostatné sekce?</div></div>
+</section>
+
+<footer class="end">
+  <p>Podklad sestavený 28. 8. 2026 z živého webu prosapiens.cz, dat Google Search Console a GA4, měření PageSpeed Insights ze 16. 8. 2026 (82 měření) a interní evidence studia. Čísla o tržbách a klientech pocházejí z interního systému a jsou určena pro potřeby výběru dodavatele — před odesláním zvažte, kolik z nich chcete sdílet.</p>
+</footer>
+
+</div>
