@@ -528,7 +528,9 @@ export function PSBApp() {
    * isté, a tá horšia znela istejšie.
    */
   const [btcCelkom, setBtcCelkom] = useState<number | null>(null);
-  const [stavPenazi, setStavPenazi] = useState<{ fio: number; hotovost: number; datum: string } | null>(null);
+  /** Účet z hlavičky výpisu (`fio_zostatok`), hotovosť z ručného zápisu. */
+  const [ucetStav, setUcetStav] = useState<{ suma: number; datum: string } | null>(null);
+  const [hotovostStav, setHotovostStav] = useState<{ suma: number; datum: string } | null>(null);
 
   // Výplaty v bitcoine. Časť výplaty neodíde z účtu, ale z BTC rezervy — na
   // bankovom výpise nie sú, takže bez nich by mesiac vyzeral, akoby si tréner
@@ -652,10 +654,16 @@ export function PSBApp() {
     void fetchVzasSettings().then((st) => {
       const p = st["btc_parovanie"];
       if (p && typeof p === "object") setBtcParovanie(p as Record<string, string[]>);
-      const h = st["stav_penazi"] as { hotovost: number; datum: string } | undefined;
-      if (h && typeof h.hotovost === "number") setStavHotovosti(h);
-      const sp = st["stav_penazi"] as { fio: number; hotovost: number; datum: string } | undefined;
-      if (sp && typeof sp.fio === "number") setStavPenazi(sp);
+      const h = st["stav_penazi"] as { hotovost: number; fio?: number; datum: string } | undefined;
+      if (h && typeof h.hotovost === "number") {
+        setStavHotovosti(h);
+        setHotovostStav({ suma: h.hotovost, datum: h.datum });
+      }
+      // Účet: automatický zostatok z výpisu má prednosť; ručný `stav_penazi.fio`
+      // zostáva len ako náhrada pre stav spred prvého importu s hlavičkou.
+      const fz = st["fio_zostatok"] as { suma: number; datum: string } | undefined;
+      if (fz && typeof fz.suma === "number") setUcetStav({ suma: fz.suma, datum: fz.datum });
+      else if (h && typeof h.fio === "number") setUcetStav({ suma: h.fio, datum: h.datum });
       // Uložené opravy P&L, kategórie a mzdové nastavenia patria do modelu
       // CENTRÁLNE — pôvodne ich načítavali až karty Peniaze→P&L a Mzdy pri
       // svojom otvorení, takže Kvartálne otvorené rovno po štarte počítalo
@@ -1546,14 +1554,14 @@ function skupinaFaktur(
       .map((r) => ({
         key: `zapis|${r.id}`,
         category: "Zápis" as const,
-        tone: (r.druh === "kvartal" ? "blue" : "orange") as "blue" | "orange",
+        tone: (r.druh === "kvartal" || r.druh === "kontrola" ? "blue" : "orange") as "blue" | "orange",
         title: r.nadpis,
         detail: `${r.nadpis} — ${r.detail}`,
         ...stavPolozky(`zapis|${r.id}`),
         // Cieľ navigácie sa vezie v `client` — register nemá vlastné pole na
         // odkaz a zaviesť ho kvôli trom položkám by bolo viac kódu než úžitku.
         client: `${r.ciel.tab}|${r.ciel.sub || ""}${r.ciel.mesiac ? `|${r.ciel.mesiac}` : r.ciel.tyzden ? `|t:${r.ciel.tyzden}` : ""}`,
-        priority: r.druh === "tyzden" ? 5 : r.druh === "mesiac" ? 6 : 40,
+        priority: r.druh === "tyzden" ? 5 : r.druh === "mesiac" ? 6 : r.druh === "kontrola" ? 35 : 40,
       }));
     // Až tu, keď sú všetky zdroje pokope: „nový klient" je len konštatovanie
     // a ustúpi úlohám o tom istom človeku (SMS, chýbajúci dopyt). Kontext
@@ -1810,8 +1818,8 @@ function skupinaFaktur(
       // Rezerva sa počíta v lib/psb/rezerva.ts — tým istým výpočtom ako
       // dlaždica na Kokpite. Dve odpovede na to isté číslo boli 16. 8. reálny
       // stav appky a tá horšia znela istejšie.
-      spocitajRezervu({ btcCzk: btcCelkom, stavPenazi, bePriem: breakEvenPriemer().bePriem })),
-    [data, clients, sixM, capacity, registerAll, kalUdalosti, kalZmeny, uzavierkaPreAi, btcCelkom, stavPenazi, igVerzia, mktVerzia, vzasVerzia()], // eslint-disable-line react-hooks/exhaustive-deps
+      spocitajRezervu({ btcCzk: btcCelkom, ucet: ucetStav, hotovost: hotovostStav, bePriem: breakEvenPriemer().bePriem })),
+    [data, clients, sixM, capacity, registerAll, kalUdalosti, kalZmeny, uzavierkaPreAi, btcCelkom, ucetStav, hotovostStav, igVerzia, mktVerzia, vzasVerzia()], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   const actions = useMemo<Actions>(

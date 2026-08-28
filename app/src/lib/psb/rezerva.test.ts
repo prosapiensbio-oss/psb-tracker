@@ -7,7 +7,7 @@ describe("spocitajRezervu", () => {
   it("sčíta účet, hotovosť aj bitcoin", () => {
     const r = spocitajRezervu({
       btcCzk: 100_000,
-      stavPenazi: { fio: 110_000, hotovost: 9_371, datum: "2026-08-08" },
+      ucet: { suma: 110_000, datum: "2026-07-31" }, hotovost: { suma: 9_371, datum: "2026-08-08" },
       bePriem: 182_809,
     });
     expect(r.majetok).toBe(219_371);
@@ -18,7 +18,7 @@ describe("spocitajRezervu", () => {
   it("bez zapísaného stavu účtu ráta len bitcoin a povie to", () => {
     // Dlaždica v tomto stave hlási „zatiaľ len BTC" — číslo je nižšie než
     // skutočnosť a nesmie sa tváriť ako celý majetok.
-    const r = spocitajRezervu({ btcCzk: 100_000, stavPenazi: null, bePriem: 200_000 });
+    const r = spocitajRezervu({ btcCzk: 100_000, ucet: null, hotovost: null, bePriem: 200_000 });
     expect(r.majetok).toBe(100_000);
     expect(r.uplna).toBe(false);
     expect(r.mesiace).toBeCloseTo(0.5, 5);
@@ -27,13 +27,13 @@ describe("spocitajRezervu", () => {
   it("bez break-evenu nevyrobí mesiace", () => {
     // Delenie nulou by dalo Infinity a dlaždica by hlásila nekonečnú rezervu.
     for (const be of [0, null]) {
-      const r = spocitajRezervu({ btcCzk: 50_000, stavPenazi: null, bePriem: be });
+      const r = spocitajRezervu({ btcCzk: 50_000, ucet: null, hotovost: null, bePriem: be });
       expect(r.mesiace).toBeNull();
     }
   });
 
   it("bez bitcoinu a bez stavu nevie nič — a nevydá to za nulu", () => {
-    const r = spocitajRezervu({ btcCzk: null, stavPenazi: null, bePriem: 100_000 });
+    const r = spocitajRezervu({ btcCzk: null, ucet: null, hotovost: null, bePriem: 100_000 });
     expect(r.majetok).toBeNull();
     expect(r.mesiace).toBeNull();
   });
@@ -41,7 +41,7 @@ describe("spocitajRezervu", () => {
   it("keď je stav zapísaný, bitcoin ešte nenačítaný sa berie ako nula, nie ako diera", () => {
     const r = spocitajRezervu({
       btcCzk: null,
-      stavPenazi: { fio: 60_000, hotovost: 1_100, datum: "2026-08-08" },
+      ucet: { suma: 60_000, datum: "2026-08-08" }, hotovost: { suma: 1_100, datum: "2026-08-08" },
       bePriem: 100_000,
     });
     expect(r.majetok).toBe(61_100);
@@ -91,5 +91,27 @@ describe("chybaDoCiela", () => {
 
   it("cieľ je jedno číslo pre dlaždicu aj Jarvisa", () => {
     expect(CIEL_MESIACOV).toBe(3);
+  });
+});
+
+describe("konsolidácia zostatku (27. 8. 2026)", () => {
+  it("účet z výpisu a hotovosť z ručného zápisu sa sčítajú s BTC", () => {
+    const r = spocitajRezervu({
+      btcCzk: 100_000,
+      ucet: { suma: 38_223, datum: "2026-07-31" },
+      hotovost: { suma: 1_100, datum: "2026-08-08" },
+      bePriem: 178_522,
+    });
+    expect(r.majetok).toBe(139_323);
+    expect(r.uplna).toBe(true);
+    // Dátum stavu = najstarší vstup: rezerva je len taká čerstvá ako on.
+    expect(r.datumStavu).toBe("2026-07-31");
+  });
+
+  it("chýbajúca hotovosť neznamená NaN, ale neúplnú rezervu", () => {
+    const r = spocitajRezervu({ btcCzk: 100_000, ucet: { suma: 38_223, datum: "2026-07-31" }, hotovost: null, bePriem: 178_522 });
+    expect(r.majetok).toBe(138_223);
+    expect(Number.isFinite(r.majetok)).toBe(true);
+    expect(r.uplna).toBe(false);
   });
 });

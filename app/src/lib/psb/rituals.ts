@@ -16,8 +16,8 @@ import { weekKey } from "./format";
 
 export type Ritual = {
   id: string;
-  /** "tyzden" | "mesiac" | "kvartal" */
-  druh: "tyzden" | "mesiac" | "kvartal";
+  /** "tyzden" | "mesiac" | "kvartal" | "kontrola" */
+  druh: "tyzden" | "mesiac" | "kvartal" | "kontrola";
   nadpis: string;
   detail: string;
   /** Kam to zapísať — dvojica pre navigáciu. */
@@ -125,6 +125,53 @@ export function ritualy(
     splatne: poKvartali,
     hotove: false,
   });
+
+  // ── Mesačné kontroly po oblastiach ──────────────────────────────────────
+  //
+  // Revízia 27. 8. 2026 našla chyby, ktoré vznikali mesiace (lievik ukazoval
+  // 100 % namiesto 79 %) — a Jerry sa spýtal, ako často také kontroly robiť
+  // a či mu ich appka nemá pripomínať sama. Toto je odpoveď: každá oblasť
+  // RAZ MESAČNE, rozložené po týždňoch, aby nesvietili štyri naraz.
+  //
+  // Zhasína sa cez register (kľúč nesie mesiac, ďalší mesiac sa vráti sama).
+  // Detail je rovno kontrolný zoznam — nie odkaz na dokument, ktorý by si
+  // človek musel hľadať. Plné prompty pre hlbšiu kontrolu s Claudom sú
+  // v repe: docs/kontrolne-prompty.md; kvartálna úplná revízia
+  // docs/revizny-prompt.md.
+  const tyzdenVMesiaci = Math.min(4, Math.ceil(denVMesiaci / 7));
+  const KONTROLY: { tyzden: number; id: string; nadpis: string; detail: string; ciel: Ritual["ciel"] }[] = [
+    {
+      tyzden: 1, id: "peniaze", nadpis: "Mesačná kontrola: Peniaze",
+      detail: "Tri otázky Jarvisovi a porovnaj s obrazovkou: tržby a zisk uzavretého mesiaca (musia sedieť na korunu s Peniaze → Zisky), rezerva a koľko chýba do cieľa (dátum stavu účtu nesmie byť starší než mesiac), dlh z výplat a jeho tempo. Keď sa dve čísla líšia, je to nález — nie zaokrúhlenie.",
+      ciel: { tab: "vzas", sub: "pnl" },
+    },
+    {
+      tyzden: 2, id: "klienti", nadpis: "Mesačná kontrola: Klienti & register",
+      detail: "Prejdi otvorené notifikácie a pri každej si odpovedz: je pravdivá? Falošný poplach je chyba rovnakej váhy ako zmeškaný — nahlás ho Claudovi. Over odmlčaných proti realite a či niekto v zozname nechýba (klient, o ktorom vieš, že prestal, a appka mlčí).",
+      ciel: { tab: "tracker", sub: "klienti" },
+    },
+    {
+      tyzden: 3, id: "marketing", nadpis: "Mesačná kontrola: Marketing",
+      detail: "Lievik: klikni na každé číslo a over mená (číslo bez mien sa nedá overiť). Percentá musia byť z tej istej skupiny ľudí — nič nad 100 %. V karte Čo publikovať ďalej odklepni hotové. Dopyty: každý má zdroj a dôvod, prečo z neho nebol klient.",
+      ciel: { tab: "marketing", sub: "lievik" },
+    },
+    {
+      tyzden: 4, id: "jarvis", nadpis: "Mesačná kontrola: Jarvis & dáta",
+      detail: "Polož Jarvisovi tri otázky, na ktoré poznáš odpoveď z obrazovky (tržby mesiaca, posledné sedenie konkrétneho klienta, niečo z prázdnej tabuľky) — musí sedieť, a pri prázdnej tabuľke povedať „nemerali sme“, nie si vymýšľať. Over vek importov v Mesiac → Dáta: PTminder a Instagram nemajú byť staršie než dva týždne.",
+      ciel: { tab: "jarvis" },
+    },
+  ];
+  for (const k of KONTROLY) {
+    out.push({
+      id: `kontrola-${k.id}-${mesiacKluc(dnes)}`,
+      druh: "kontrola",
+      nadpis: k.nadpis,
+      detail: k.detail,
+      ciel: k.ciel,
+      splatne: tyzdenVMesiaci === k.tyzden,
+      hotove: false,
+    });
+  }
 
   return out;
 }

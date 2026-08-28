@@ -75,6 +75,15 @@ export type Kroky = {
    */
   zDopytuUvodny: number;
   /**
+   * Úvodné, z ktorých sa stal klient — čitateľ druhej šípky.
+   *
+   * Tá istá zásada ako pri prvej: konvertuje sa KROK, nie dve nesúvisiace
+   * množiny. `klienti/uvodne` by prestrelilo, keby mal nový klient prvé
+   * sedenie iného typu než UVODNE (chyba typu v PTminderi) — čitateľ by
+   * nebol podmnožinou menovateľa.
+   */
+  zUvodnehoKlient: number;
+  /**
    * Kto presne za tými číslami je.
    *
    * Jerry, 13. 8.: „keď kliknem na úvodný tréning 3, napíše mi, kto presne to
@@ -199,8 +208,10 @@ export function krokyZa(data: PSBData, clients: Record<string, ClientAgg>, mesia
     return [{ meno: l.name, dopyt: l.date, uvodny: datumUvodneho }];
   });
 
+  const zUvodnehoKlient = novi.filter((c) => uvodneMapa.has(c.name)).length;
+
   return {
-    dopyty, uvodne, klienti: novi.length, trzba, zDopytu, zDopytuUvodny: naUvodnyRiadky.length,
+    dopyty, uvodne, klienti: novi.length, trzba, zDopytu, zDopytuUvodny: naUvodnyRiadky.length, zUvodnehoKlient,
     kto: {
       dopyty: dopytyRiadky
         .map((l) => ({ meno: l.name || "(bez mena)", datum: l.date, zdroj: l.source || "" }))
@@ -427,7 +438,7 @@ export function Lievik({ data, clients, onPoznamka }: {
               na to 27. 8. 2026 došiel tiež. */}
           <Krok cislo={String(k.dopyty)} popis="Dopyty" konverzia={pct(k.zDopytuUvodny, k.dopyty)}
             onClick={k.dopyty ? () => setKtori(ktori === "dopyty" ? null : "dopyty") : undefined} aktivny={ktori === "dopyty"} />
-          <Krok cislo={String(k.uvodne)} popis="Úvodné tréningy" konverzia={pct(k.klienti, k.uvodne)}
+          <Krok cislo={String(k.uvodne)} popis="Úvodné tréningy" konverzia={pct(k.zUvodnehoKlient, k.uvodne)}
             onClick={k.uvodne ? () => setKtori(ktori === "uvodne" ? null : "uvodne") : undefined} aktivny={ktori === "uvodne"}
             onStrata={k.kto.nepokracovali.length ? () => setKtori(ktori === "strata" ? null : "strata") : undefined}
             strataAktivna={ktori === "strata"} />

@@ -57,8 +57,16 @@ export function breakEvenPriemer(): { be: number | null; bePriem: number | null;
 
 export type RezervaVstup = {
   btcCzk: number | null;
-  /** Ručne zapísaný stav účtu a hotovosti (Peniaze → Cashflow). */
-  stavPenazi: { fio: number; hotovost: number; datum: string } | null;
+  /**
+   * Zostatok na účte — z hlavičky bankového výpisu (`fio_zostatok`),
+   * NIE z ručného zápisu. Do 27. 8. 2026 rezerva čítala ručný
+   * `stav_penazi.fio` a automatický zostatok z importu ignorovala: dva
+   * zostatky, každá obrazovka iný. Ručný zápis zostáva ako náhrada pre
+   * mesiace pred tým, než to import vedel čítať.
+   */
+  ucet: { suma: number; datum: string } | null;
+  /** Hotovosť — jediné číslo, ktoré sa naozaj musí zapisovať ručne. */
+  hotovost: { suma: number; datum: string } | null;
   bePriem: number | null;
 };
 
@@ -78,14 +86,17 @@ export type Rezerva = {
  */
 export function spocitajRezervu(v: RezervaVstup): Rezerva {
   const btc = v.btcCzk;
-  const majetok = v.stavPenazi ? (btc ?? 0) + v.stavPenazi.fio + v.stavPenazi.hotovost : btc;
+  const maNieco = v.ucet !== null || v.hotovost !== null;
+  const majetok = maNieco ? (btc ?? 0) + (v.ucet?.suma ?? 0) + (v.hotovost?.suma ?? 0) : btc;
   const mesiace = majetok !== null && v.bePriem !== null && v.bePriem > 0 ? majetok / v.bePriem : null;
+  // Najstarší z dátumov — rezerva je len taká čerstvá ako jej najstarší vstup.
+  const datumy = [v.ucet?.datum, v.hotovost?.datum].filter((x): x is string => !!x).sort();
   return {
     majetok,
     mesiace,
-    uplna: !!v.stavPenazi,
+    uplna: v.ucet !== null && v.hotovost !== null,
     bePriem: v.bePriem,
-    datumStavu: v.stavPenazi?.datum || null,
+    datumStavu: datumy[0] || null,
   };
 }
 

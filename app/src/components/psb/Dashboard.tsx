@@ -710,11 +710,16 @@ export function Dashboard({
   // Skutočný stav účtu a hotovosti, zapísaný ručne v Peniaze → Cashflow.
   // Bez neho hovorila dlaždica Rezerva len o bitcoine — a to je časť majetku,
   // nie majetok. Runway sa neplánuje z jednej zásuvky.
-  const [stavPenazi, setStavPenazi] = useState<{ fio: number; hotovost: number; datum: string } | null>(null);
+  const [ucetStav, setUcetStav] = useState<{ suma: number; datum: string } | null>(null);
+  const [hotovostStav, setHotovostStav] = useState<{ suma: number; datum: string } | null>(null);
   useEffect(() => {
     void fetchVzasSettings().then((st) => {
-      const v = st["stav_penazi"] as { fio: number; hotovost: number; datum: string } | undefined;
-      if (v && typeof v.fio === "number") setStavPenazi(v);
+      const v = st["stav_penazi"] as { hotovost: number; fio?: number; datum: string } | undefined;
+      if (v && typeof v.hotovost === "number") setHotovostStav({ suma: v.hotovost, datum: v.datum });
+      // Účet z hlavičky výpisu; ručný zápis len ako náhrada za staré dáta.
+      const fz = st["fio_zostatok"] as { suma: number; datum: string } | undefined;
+      if (fz && typeof fz.suma === "number") setUcetStav({ suma: fz.suma, datum: fz.datum });
+      else if (v && typeof v.fio === "number") setUcetStav({ suma: v.fio, datum: v.datum });
     });
   }, []);
 
@@ -972,7 +977,7 @@ export function Dashboard({
     // o dvoch rôznych obdobiach a nedalo sa z nich nič usúdiť. Celá téma má
     // teraz vlastnú kartu „Platby v bitcoine" v sekcii Peniaze, kde je každé
     // číslo pri svojom období.
-    const r = spocitajRezervu({ btcCzk: btc?.czk ?? null, stavPenazi, bePriem: zisk?.bePriem ?? null });
+    const r = spocitajRezervu({ btcCzk: btc?.czk ?? null, ucet: ucetStav, hotovost: hotovostStav, bePriem: zisk?.bePriem ?? null });
     const majetok = r.majetok;
     const mesRez = r.mesiace;
     const chyba = chybaDoCiela(r);
@@ -985,7 +990,7 @@ export function Dashboard({
       // z 8. 8. a číslo sa tvárilo ako dnešné. Prístroj kŕmený starým
       // senzorom to musí povedať sám, nie až po rozkliknutí.
       podnadpis: majetok === null ? "načítava sa"
-        : stavPenazi ? `${fmtCZK(majetok)} — účet+hotovosť z ${new Date(stavPenazi.datum).toLocaleDateString("sk-SK", { day: "numeric", month: "numeric" })}, BTC živé`
+        : r.datumStavu ? `${fmtCZK(majetok)} — účet a hotovosť z ${new Date(r.datumStavu).toLocaleDateString("sk-SK", { day: "numeric", month: "numeric" })}, BTC živé`
         : `${fmtCZK(majetok)} — zatiaľ len BTC`,
       pasmo: mesRez === null ? "nevie" : mesRez < 1 ? "zle" : mesRez < 3 ? "pozor" : "ok",
       // Číslo bez akcie je len číslo: „1,2 mesiaca" nepovie, čo s tým.
@@ -993,7 +998,7 @@ export function Dashboard({
       poznamka: mesRez !== null && mesRez < CIEL_MESIACOV
         ? (chyba === null ? `cieľ sú ${CIEL_MESIACOV} mesiace` : `do ${CIEL_MESIACOV} mesiacov chýba ${fmtCZK(chyba)}`)
         : undefined,
-      vysvetlenie: "Koľko mesiacov by firma ustála bez jedinej tržby — všetko, čo má (účet + hotovosť + bitcoin), delené priemerným break-evenom za pol roka. Stav účtu a hotovosti sa zapisuje ručne v Peniaze → Cashflow, karta „Kde tie peniaze sú“; Fio dáva len výpis pohybov, nie aktuálny zostatok. Kým zapísaný nie je, ráta sa len bitcoin a číslo je nižšie než skutočnosť. Tvoj cieľ „120 000 Kč+“ je v korunách; toto je to isté prepočítané na čas, čo je jediné, čo v zlom mesiaci rozhoduje.",
+      vysvetlenie: "Koľko mesiacov by firma ustála bez jedinej tržby — všetko, čo má (účet + hotovosť + bitcoin), delené priemerným break-evenom za pol roka. Účet sa berie z hlavičky posledného bankového výpisu (obnoví sa každým importom v Mesiac → Dáta); ručne sa zapisuje už len hotovosť v Peniaze → Cashflow, karta „Kde tie peniaze sú“. Dátum v podnadpise je najstarší z tých dvoch — rezerva je len taká čerstvá ako on. Tvoj cieľ „120 000 Kč+“ je v korunách; toto je to isté prepočítané na čas, čo je jediné, čo v zlom mesiaci rozhoduje.",
       kam: () => onNavigate("vzas", "cashflow"),
     });
 
@@ -1003,7 +1008,7 @@ export function Dashboard({
       ? { mesiac: monthLabel(zisk.mesiac), zisk: zisk.v, trzby: zisk.prijmy, be: zisk.be }
       : null;
     return { kotva: kotvaP, vysledok, varovne, uzavrety };
-  }, [data, clients, stats, zisk, trzbyOdhad, toky, lievikMes, weekRows, btc, stavPenazi, kotva, trainer, zonaLo, zonaHi, onNavigate]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [data, clients, stats, zisk, trzbyOdhad, toky, lievikMes, weekRows, btc, ucetStav, hotovostStav, kotva, trainer, zonaLo, zonaHi, onNavigate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Čerstvosť dát. Tichý dashboard nad tri týždne starým exportom vyzerá presne
   // ako tichý dashboard nad dobrými dátami — a to je najhorší možný stav

@@ -336,3 +336,26 @@ describe("šípka dopyt → úvodný v pásiku lievika", () => {
     expect(k.zDopytuUvodny).toBe(1);
   });
 });
+
+describe("šípka úvodný → klient", () => {
+  it("klient bez úvodného druhú šípku nenafúkne", () => {
+    // Nový klient, ktorého prvé sedenie je omylom typu OFFLINE (chyba
+    // v PTminderi): nesmie sa počítať do konverzie z úvodných.
+    const s = [
+      session("Petra", "2026-01-10", "UVODNE"), session("Petra", "2026-01-17", "OFFLINE"),
+      session("Jana", "2026-01-12", "OFFLINE"), session("Jana", "2026-01-19", "OFFLINE"),
+    ];
+    const k = krokyZa(
+      psb({ leads: [], sessions: s, payments: [payment("Petra", "2026-01-20"), payment("Jana", "2026-01-22")] }),
+      {
+        Petra: klient("Petra", "2026-01-10", [s[0], s[1]]),
+        Jana: klient("Jana", "2026-01-12", [s[2], s[3]]),
+      },
+      MES,
+    );
+    expect(k.klienti).toBe(2);
+    expect(k.uvodne).toBe(1);
+    // klienti/uvodne by dalo 200 % — z úvodných sa klientom stala len Petra.
+    expect(k.zUvodnehoKlient).toBe(1);
+  });
+});
