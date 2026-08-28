@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 
 import { type ClientAgg } from "../../lib/psb/compute";
-import { fmtCZK, fmtDMY, monthLabel } from "../../lib/psb/format";
+import { daysBetween, fmtCZK, fmtDMY, monthLabel } from "../../lib/psb/format";
 import { C, mix } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import { Card, Info, ValueBars } from "./ui";
@@ -97,7 +97,10 @@ export function KlientProfil({ meno, data, clients, onZavri, btcSats }: {
       zaplatene: avg((x) => data.payments.filter((pp) => pp.client === x.name).reduce((a, pp) => a + pp.amount, 0)),
     };
 
-    const dniTicha = c.lastSession ? Math.round((Date.now() - Date.parse(c.lastSession)) / DEN) : null;
+    // daysBetween (floor) — tá istá definícia ako „X dní bez tréningu"
+    // v notifikácii. Vlastný Math.round tu 27. 8. 2026 ukazoval „23 d",
+    // kým notifikácia hovorila 22 — dve rátania tých istých dní.
+    const dniTicha = c.lastSession ? daysBetween(c.lastSession, new Date()) : null;
 
     // Ø cena = ZAPLATENÉ / ODTRÉNOVANÉ HODINY. Payrollové `avgPrice` delí
     // interné ceny sedení počtom sedení a pri balíčkových klientoch vyjde
