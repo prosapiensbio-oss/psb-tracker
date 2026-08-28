@@ -216,7 +216,7 @@ footer.end{
   <div class="meta">
     <span><b>Zadavatel</b> ProSapiens Biomechanic, Brno</span>
     <span><b>Implementátor</b> ChatGPT Codex</span>
-    <span><b>Verze</b> 2 · 28. 8. 2026</span>
+    <span><b>Verze</b> 3 · 28. 8. 2026</span>
   </div>
 </header>
 
@@ -565,6 +565,49 @@ footer.end{
     </table>
   </div>
 
+  <h3>Kde se ambice utratí konkrétně — tvůrčí směr</h3>
+  <p>Sedm bodů výše říká, <em>do čeho</em> se investuje. Tahle část říká, <em>jak to má vypadat</em> — protože „řemeslo" bez konkrétního nápadu skončí jako slušný, ale zaměnitelný web.</p>
+
+  <div class="note">
+    <span class="note-label">Jádro nápadu</span>
+    <p><strong>Web se hýbe tak, jak se hýbe tělo.</strong></p>
+  </div>
+
+  <p>Předmět podnikání je přenos sil tělem, chůze a řetězce. To je vizuálně mimořádně bohaté téma, které dnešní web nepoužívá <strong>vůbec</strong> — má fotky a slidery jako kterékoli fitko. Konkurence v biomechanice v ČR nemá nic ani zdaleka podobného, a hlavně: nemůže to okopírovat, protože k tomu potřebuje odbornost, kterou nemá.</p>
+
+  <ul>
+    <li><strong>Linka místo obrázku.</strong> Postura, fasciální řetězce a fáze kroku se kreslí jako čistá vektorová linka v barvách značky. Ne 3D model, ne stock fotka — anatomická kresba, která se hýbe. Doplňuje fotografii, nenahrazuje ji.</li>
+    <li><strong>Scroll je pohyb těla.</strong> Jak čtenář roluje, linka prochází krokovým cyklem, přenáší sílu, mění se z kompenzovaného držení na organizované. Obsah a animace vyprávějí jednu věc.</li>
+    <li><strong>Typografie jako přístroj.</strong> Velká, přesná, s hairline linkami a čísly v tabulkovém řezu — vzhled měřicího protokolu, ne reklamy.</li>
+    <li><strong>Klid jako luxus.</strong> V oboru plném křiku je ticho to, co působí draze.</li>
+  </ul>
+
+  <h3>Tři směry k rozhodnutí <span class="pill open">navrhni</span></h3>
+  <p>Předlož všechny tři jako vizuální návrh úvodní stránky (krok 3 postupu v sekci 18), doporuč jeden a zdůvodni to.</p>
+  <div class="cards">
+    <div class="card">
+      <div class="l">Směr A</div>
+      <div class="k" style="font-size:19px; font-family:Archivo,sans-serif">Terénní zpráva</div>
+      <div class="d">Editoriální. Velká typografie, hairline linky, čísla v mono řezu, hodně světlezeleného prostoru. Pohyb jen mikroskopický. Wow z řemesla, ne z efektu.<br><br><strong>Riziko:</strong> při špatném provedení působí jako obyčejný blog.</div>
+    </div>
+    <div class="card" style="border-color:var(--accent)">
+      <div class="l" style="color:var(--accent)">Směr B — doporučeno jako základ</div>
+      <div class="k" style="font-size:19px; font-family:Archivo,sans-serif">Pohyb</div>
+      <div class="d">Tmavé lesní pozadí #1A2E24. Páteří webu je <strong>anatomická linka řízená scrollem</strong> — postava v krokovém cyklu, řetězce se rozsvěcují podle toho, o čem je právě řeč.<br><br><strong>Riziko:</strong> výkon. Musí být SVG + CSS, ne WebGL.</div>
+    </div>
+    <div class="card">
+      <div class="l">Směr C</div>
+      <div class="k" style="font-size:19px; font-family:Archivo,sans-serif">Diagnostika</div>
+      <div class="d">Web se chová jako vyšetření. Návštěvník vybere, co ho trápí, a zbytek webu se tomu přizpůsobí.<br><br><strong>Riziko:</strong> mnoho kombinací obsahu. Ale přesně sedí na personu ze sekce 04.</div>
+    </div>
+  </div>
+  <p><strong>Doporučení:</strong> postav <strong>B jako vizuální jazyk</strong>, s typografickou přesností <strong>A</strong>, a <strong>C</strong> použij jako vstupní vrstvu na úvodní stránce — jeden výběr symptomu, ne celý dotazník.</p>
+
+  <div class="note bad">
+    <span class="note-label">Tvrdá podmínka</span>
+    <p>Animace primárně <strong>CSS a SVG</strong>, řízené <span class="mono">scroll-timeline</span> nebo <span class="mono">IntersectionObserver</span>. Nic z toho nesmí blokovat první vykreslení — motion se importuje dynamicky až po <span class="mono">load</span>. Při <span class="mono">prefers-reduced-motion: reduce</span> statická verze, plně použitelná. Animace se nesmí zaseknout na 4× zpomaleném CPU. Limit v sekci 18 platí i pro animovanou úvodní stránku.</p>
+  </div>
+
   <div class="note warn">
     <span class="note-label">Test před nasazením</span>
     <p>Vezmi tři weby přímé konkurence (biomechanická a fyzioterapeutická studia v ČR) a postav vedle nich úvodní stránku ProSapiens na telefonu. Rozdíl musí být viditelný do dvou sekund a musí být poznat, že vzniká z <strong>preciznosti</strong>, ne z efektů.</p>
@@ -617,7 +660,49 @@ footer.end{
 
   <div class="note warn">
     <span class="note-label">Proč jsou v druhé kategorii</span>
-    <p>Tohle jsou nejlepší weboví designéři na světě a stojí za prohlédnutí, aby bylo vidět, kde je strop řemesla. Ale jejich hlavní nástroj — WebGL podívaná — je pro ProSapiens špatně. Awwwards Site of the Year 2025 byla stránka s 3D planetou v prohlížeči; je to obdivuhodné a naprosto nevhodné pro člověka, který má bolesti zad a hledá, jestli mu někdo v Brně pomůže. <strong>Berte odsud úroveň provedení, ne formát.</strong></p>
+    <p>Tohle jsou nejlepší weboví designéři na světě a stojí za prohlédnutí, aby bylo vidět, kde je strop řemesla. Ale jejich hlavní nástroj — WebGL podívaná — je pro ProSapiens špatně. Mezi oceňovanými weby vévodí 3D podívaná; je obdivuhodná a naprosto nevhodná pro člověka, který má bolesti zad a hledá, jestli mu někdo v Brně pomůže. <strong>Berte odsud úroveň provedení, ne formát.</strong></p>
+  </div>
+
+  <h3>10.4 Obor — laťka pro anatomickou grafiku</h3>
+  <p>Nikdo z nich není vzor pro layout webu. Jsou tu proto, že ukazují, jak vysoko je laťka ve zpracování <strong>těla</strong> — a směr B ze sekce 09 na ní stojí.</p>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Web</th><th>Co si vzít</th></tr></thead>
+      <tbody>
+        <tr><td><a href="https://biodigital.com">biodigital.com</a></td><td>Interaktivní 3D anatomie. Úroveň zpracování těla — my chceme totéž v ploché lince.</td></tr>
+        <tr><td><a href="https://3d4medical.com">3d4medical.com</a></td><td>Complete Anatomy. Jak se prezentuje anatomický obsah profesionálně, bez fitness estetiky.</td></tr>
+        <tr><td><a href="https://muscleandmotion.com">muscleandmotion.com</a></td><td>Animace pohybu a kineziologie — jak animovat pohyb tak, aby něco vysvětlil.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>10.5 Další ověřené reference</h3>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Web</th><th>Co si vzít</th></tr></thead>
+      <tbody>
+        <tr><td><a href="https://lynnandtonic.com">lynnandtonic.com</a></td><td><strong>Důkaz, že wow nepotřebuje megabajty.</strong> Mistrovské CSS bez těžkých knihoven — přesně náš rozpočet na výkon.</td></tr>
+        <tr><td><a href="https://garden.bradwoods.io">garden.bradwoods.io</a></td><td>Vysvětlování složitých věcí interaktivní grafikou. Nejbližší analogie k výkladu biomechaniky.</td></tr>
+        <tr><td><a href="https://linear.app">linear.app</a></td><td>Absolutní přesnost v typografii, odstupech a tmavé paletě. Nejlepší studijní materiál pro tmavou variantu.</td></tr>
+        <tr><td><a href="https://unseen.co">unseen.co</a></td><td>Typografie a pohyb jako jeden jazyk.</td></tr>
+        <tr><td><a href="https://huncwot.com">huncwot.com</a></td><td>Editoriální přísnost, skoro žádná dekorace.</td></tr>
+        <tr><td><a href="https://14islands.com">14islands.com</a></td><td>Rovnováha designu a výkonu — hezké weby, které jsou zároveň rychlé.</td></tr>
+        <tr><td><a href="https://hellomonday.com">hellomonday.com</a></td><td>Vyprávění příběhu posouváním. Model pro sekci „proč ti to nefungovalo".</td></tr>
+        <tr><td><a href="https://obys.agency">obys.agency</a></td><td>Odvážná typografie na tmavé paletě — blízko naší barevnosti.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>10.6 Česká scéna — s čím nás budou srovnávat</h3>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Web</th><th>Poznámka</th></tr></thead>
+      <tbody>
+        <tr><td><a href="https://najbrt.cz">najbrt.cz</a></td><td>Přední české grafické studio. Měřítko typografie v češtině — včetně diakritiky.</td></tr>
+        <tr><td><a href="https://superkoderi.cz">superkoderi.cz</a></td><td>České weby s důrazem na výkon.</td></tr>
+        <tr><td><a href="https://ackee.cz">ackee.cz</a></td><td>Technická úroveň.</td></tr>
+      </tbody>
+    </table>
   </div>
 
   <h3>10.4 Kde hledat dál</h3>
@@ -825,6 +910,41 @@ footer.end{
   <h4>Proč ne headless nebo statický web</h4>
   <p>Byl by rychlejší, ale zdvojí infrastrukturu (WordPress <em>a</em> frontend <em>a</em> build), zkomplikuje publikování článku a přidá další místo, kde se něco rozbije. Cíl PageSpeed ≥ 90 je dosažitelný i s dobře napsanou vlastní šablonou. Pokud se ukáže, že není, je to důvod k novému rozhodnutí — ne k tichému snížení laťky.</p>
 
+  <h4>Struktura šablony</h4>
+  <div class="scroll"><table><tbody><tr><td><pre style="margin:0; font-family:'JetBrains Mono',monospace; font-size:12.5px; line-height:1.55; white-space:pre">psb-theme/
+  style.css                 hlavicka theme
+  functions.php             registrace, enqueue, cisteni WP hlavicky
+  inc/
+    setup.php               theme supports, menu, obrazove velikosti
+    assets.php              nacitani CSS/JS, preload pisem
+    schema.php              JSON-LD: LocalBusiness, Article, Person, FAQPage, Breadcrumb
+    blocks.php              vlastni bloky pro editor (cenik, testimonial, symptom karta)
+    forms.php               napojeni CF7 -> udalosti mereni + Kokpit
+    cleanup.php             odstraneni emoji, oEmbed balastu, zbytecnych dotazu
+  templates/
+    front-page.php  page.php  page-sluzby.php  page-kontakt.php
+    single.php              clanek + autorsky blok
+    archive.php             blog s rubrikami a filtrem
+    taxonomy-symptom.php    symptomove rozcestniky
+    404.php
+  parts/
+    header.php  footer.php  hero.php  cta.php  autor.php  testimonial.php
+  assets/
+    css/main.css            jeden soubor, design tokeny nahore
+    js/main.js              ES modul, zadne jQuery
+    js/motion.js            scroll-driven animace, lazy import
+    fonts/</pre></td></tr></tbody></table></div>
+
+  <h4>Pravidla kódu</h4>
+  <ul>
+    <li>Žádné jQuery. Žádný Bootstrap. Žádný Tailwind z CDN.</li>
+    <li>CSS: jeden soubor, vlastní vlastnosti (custom properties) nahoře, <span class="mono">@layer</span> pro pořadí kaskády. Žádné <span class="mono">!important</span> kromě dokumentovaných výjimek.</li>
+    <li>JS: ES moduly, <span class="mono">defer</span>. Těžké věci (motion) se importují dynamicky až po <span class="mono">load</span>.</li>
+    <li>Šablona musí být funkční <strong>i s vypnutým JavaScriptem</strong> — obsah, navigace, formuláře.</li>
+    <li>Šablona ve verzovacím systému. Nasazení = nahrání složky, ne editace v adminu.</li>
+    <li>README popisuje nasazení a seznam funkcí přesunutých ze snippetů do šablony.</li>
+  </ul>
+
   <div class="note warn">
     <span class="note-label">Podmínka</span>
     <p>Šablona musí být napsaná tak, aby <strong>majitel zvládl sám změnit text, cenu, obrázek a publikovat článek</strong> — bez zásahu do kódu a bez toho, aby si mohl rozbít layout. Kde je potřeba strukturovaný obsah (ceníky, profily trenérů, klientské příběhy), použij vlastní typy obsahu a pole, ne volný text v editoru.</p>
@@ -985,7 +1105,9 @@ footer.end{
 </section>
 
 <footer class="end">
-  <p>Verze 2, sestavená 28. 8. 2026 z živého webu prosapiens.cz, dat Google Search Console a GA4, měření PageSpeed Insights ze 16. 8. 2026 (82 měření), interní evidence studia a dokumentu <em>Persona PSB</em>. Referenční weby v sekci 10 byly ověřeny týž den. Čísla o tržbách a klientech pocházejí z interního systému.</p>
+  <p>Verze 3, sestavená 28. 8. 2026 z živého webu prosapiens.cz, dat Google Search Console a GA4, měření PageSpeed Insights ze 16. 8. 2026 (82 měření), interní evidence studia a dokumentu <em>Persona PSB</em>. Referenční weby v sekci 10 byly ověřeny týž den. Čísla o tržbách a klientech pocházejí z interního systému.</p>
 </footer>
 
 </div>
+
+</body></html>
