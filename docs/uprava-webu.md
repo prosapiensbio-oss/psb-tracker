@@ -525,6 +525,42 @@ prostredné pravidlá fungujú samy, a v pluginu nezostala ani jedna reťaz.
 
 ---
 
+### FP certifikace ověřitelná na webu (28. 8. 2026) ✅
+
+Jerry poslal dvě verifikační adresy z oficiálního registru Functional
+Patterns — `functionalpatterns.app/verification/…`. Obě jsou **Human
+Biomechanics Specialist Level 1**, kurz Las Vegas 17.–20. 4. 2025, platnost
+do **7. 5. 2027**: `51c9c6a7…` Filip Stráňavský, `95921e3c…` Terézia Zaťková.
+
+Kde to je a proč právě tam — jméno metodiky má cenu tam, kde se DOKAZUJE, ne
+tam, kde se přitahuje (kánon §5):
+
+| místo | co tam přibylo |
+|---|---|
+| `/jerry/` | řádek v seznamu FP školení dostal odkaz „ověřit certifikaci ↗" |
+| `/terezia/` | její stránka **žádné vzdělání ani certifikace neuváděla** — přibyl řádek s certifikací a odkazem |
+| `/co-je-functional-patterns/` | odstavec v sekci „Jak pracujeme" s oběma odkazy — tady se ptá skeptik |
+| autorský blok (snippet #21) | řádek „Certifikace: …ověřit v registru Functional Patterns ↗", automaticky podle `post_author` |
+
+Autorský blok pokrývá **všech 45 článků** (36 Jerry, 9 Terezka) a odkaz vede
+ke správnému člověku — ověřeno stažením článku od každého z nich.
+
+**Opraveno mimochodem:** názvy na `/jerry/` říkaly „Human Biomechanic
+Specialist 1", certifikát „Human Biomechanics Specialist **Level** 1".
+Sjednoceno podle certifikátu — jinak by tvrzení a doklad nesouhlasily.
+
+**Nález:** autorský blok se od 26. 8. kreslil **bez vlastního stylu** — jako
+obyčejný šedý text 14 px. Šablona má na odstavce v článku pravidlo se dvěma
+třídami a samotné `.psb-autor__*` prohrávalo na specificitě. Nikdo si toho
+nevšiml, protože blok tam *byl* a text seděl. Selektory přepsány na
+`aside.psb-autor p.psb-autor__…`; po opravě jméno 16 px tmavě zelené, role
+13 px, bio 14,5 px, certifikace 12,5 px — přesně jak byl blok navržen.
+
+Overené zvonku: obě verifikační stránky vracejí platný certifikát, všechny
+čtyři odkazy mají `target="_blank" rel="noopener"`, žádná PHP chyba.
+
+---
+
 ## Rozhodnuté, že sa nerobí
 
 | | |
