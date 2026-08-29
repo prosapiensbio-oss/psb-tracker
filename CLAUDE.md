@@ -512,3 +512,20 @@ Dve poistky, obe musia platiť pri každom takom formulári:
 
 D1 Time Travel tu nepomôže — vracia celú databázu, nie jeden riadok. Preto
 audit.
+
+## Dva iCal kalendáre v jednom volaní zhodia celý worker
+
+29. 8. 2026 som zmenil cron endpoint tak, aby sťahoval VŠETKY kalendáre
+namiesto jedného. Vyzeralo to lacno — dva súbory, ~95 udalostí. Výsledok:
+Cloudflare **error 1102 (worker prekročil limit CPU)** a appka vracala 503 na
+KAŽDÚ požiadavku, nielen na ten endpoint. Nasadenie prešlo, testy prešli,
+build bol zelený; zistilo sa to až `curl`-om na hlavnú stránku.
+
+**Preto je „jeden zdroj na volanie" zámer, nie nedbalosť.** Parsovanie iCal
+je drahšie, než vyzerá. Keď treba obidva kalendáre častejšie, riešenie je
+VIAC BEHOV plánovača (alebo `?trener=` adresne), nie viac práce v jednom.
+
+**A ponaučenie mimo kalendára:** po nasadení zmeny v serverovom kóde over
+`curl -o /dev/null -w '%{http_code}' <adresa>`. Zelený build ani úspešný
+`wrangler deploy` nehovoria nič o tom, či worker beží — 503 sa objaví až pri
+prvej skutočnej požiadavke.
