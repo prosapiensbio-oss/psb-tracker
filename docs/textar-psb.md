@@ -220,12 +220,40 @@ nepokazilo. Jarek se jen vrátil k tomu, jak chodí."*
 
 ---
 
-## 8. Prečo tie zátvorky nie sú lenivosť
+## 8. Tri zdroje — text nesmie stáť len na klientoch
 
-Pri oboch prepisoch vyšlo najavo to isté: **PSB nemá kde vziať konkrétnosti.**
-V databáze nie je jediný zapísaný klientsky príbeh — `client_notes` nemá ani
-jednu dlhšiu poznámku, `jarvis_dokumenty` obsahujú dva testovacie súbory.
-Šesťdesiatšesť aktívnych klientov a nula zapísaných detailov.
+Jerry, 29. 8. 2026: *„nepáči sa mi, že teraz všetka copywriting robota bude
+vychádzať iba z týchto klientov, musí existovať aj niečo viac."* Má pravdu —
+príbeh je DÔKAZ, nie téma. Každý text stojí na dvoch z troch nôh:
+
+| zdroj | čo dáva | kde je |
+|---|---|---|
+| **biomechanika** | tému a mechanizmus | Naudiho streamy (43 tis. riadkov), Články z FP blogu, Gait cycle, fascie_*, Handbook — už v Contexte Projectu |
+| **klienti** | dôkaz: čísla, scéna, citát | `docs/project/psb_klienti_pribehy.md` |
+| **prax** | čo sa pýtajú, čo Jerry vidí denne | jerry_real_comments.md, PLAYBOOK, zadanie z Kokpitu |
+
+Teória sama je prednáška, ktorú nikto nedopozerá. Príbeh sám je reklama.
+Keď k téme klient nie je, dôkaz sa berie z praxe alebo z FP materiálov —
+**nikdy sa nevymýšľa klient ani jeho čísla.**
+
+Remeslo krátkeho videa (hooky, prvých 1,7 s, pattern interrupt, slučka,
+dĺžka viet) je v `docs/project/psb_remeslo_reels.md`. Oba súbory sú nahraté
+v Contexte Claude Projectu a Instructions na ne odkazujú.
+
+---
+
+## 9. Prečo tie zátvorky nie sú lenivosť
+
+**OPRAVENÉ 29. 8. 2026.** Pôvodne tu stálo, že PSB nemá kde vziať
+konkrétnosti, lebo v D1 nie je zapísaný ani jeden klientsky príbeh. Bola to
+nesprávna diagnóza: príbehy existujú — šesť nahraných rozhovorov na disku
+LaCie (`1 Instagram/2026/<meno>/… príbeh.docx`). Neboli prázdne dáta, len
+neboli tam, kde som ich hľadal. Ich jadro je teraz v
+`docs/project/psb_klienti_pribehy.md` a v Contexte Projectu.
+
+Ostáva ale platné, že **v Kokpite nie je zapísaný ani jeden detail** —
+`client_notes` nemá dlhšiu poznámku. Šesť rozhovorov vydrží na štvrťrok;
+potom bude treba ďalšie.
 
 Žiadny textár — človek ani model — nenapíše konkrétny text z prázdneho
 zdroja. Odtiaľ pochádza väčšina tej „AI" príchute: nie zo štýlu, z chýbajúcich
