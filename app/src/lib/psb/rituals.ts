@@ -12,7 +12,7 @@
 // stále, prestane byť pripomienkou a stane sa tapetou; presne tak zomrel
 // pôvodný zámer týždenných zápisov.
 
-import { weekKey } from "./format";
+import { weekKey, weekLabel } from "./format";
 
 export type Ritual = {
   id: string;
@@ -62,11 +62,21 @@ export function ritualy(
   // V dátach to bolo vidieť: týždeň 24. 8. má jerry_score 7 a od Terezky iba
   // poznámku, týždne 10. a 17. 8. nemajú od nej nič. Únava je zápis jedného
   // človeka o sebe — cudzí zápis ho nemôže odškrtnúť.
+  //
+  // Pýta sa na DVA týždne: prebiehajúci od piatku a minulý, kým je nezapísaný.
+  // Jeden týždeň spätne je zámerná hranica (Jerry, 29. 8. 2026) — bez nej
+  // týždeň, ktorý sa v nedeľu nestihol, zmizol v pondelok navždy a už sa
+  // nikdy nepripomenul (tak zostal prázdny týždeň 17. 8.). S väčším rozsahom
+  // by sa zas nakopil stĺpec starých riadkov, čo je presne tá tapeta, ktorej
+  // sa celý modul vyhýba.
   const tw = weekKey(dnes.toISOString());
-  const zaznam = weeks[tw] || {};
+  // Pondelok o týždeň skôr. Počíta sa v UTC z UTC polnoci, takže sa cez
+  // zmenu času neposunie o deň.
+  const twMinuly = weekKey(new Date(Date.parse(`${tw}T00:00:00Z`) - 7 * 86400_000).toISOString());
   for (const p of PEOPLE) {
     const kto = p === "jerry" ? "Jerry" : "Terezka";
-    const vyplneny = String(zaznam[`${p}_score`] ?? "").trim() !== "";
+    const mam = (k: string) => String((weeks[k] || {})[`${p}_score`] ?? "").trim() !== "";
+    const vyplneny = mam(tw);
     out.push({
       id: `tyzden-${tw}-${p}`,
       druh: "tyzden",
@@ -79,6 +89,19 @@ export function ritualy(
       trener: kto,
       splatne: !vyplneny && den >= 5,
       hotove: vyplneny,
+    });
+    const vyplnenyMinuly = mam(twMinuly);
+    out.push({
+      id: `tyzden-${twMinuly}-${p}`,
+      druh: "tyzden",
+      nadpis: "Chýba únava za minulý týždeň",
+      detail: vyplnenyMinuly
+        ? `Týždeň ${weekLabel(twMinuly)} máš zapísaný.`
+        : `Týždeň ${weekLabel(twMinuly)} zostal bez hodnotenia. Toto je posledná pripomienka — v pondelok sa už nevráti. Klik otvorí rovno ten týždeň.`,
+      ciel: { tab: "treningy", sub: "prehled", tyzden: twMinuly },
+      trener: kto,
+      splatne: !vyplnenyMinuly,
+      hotove: vyplnenyMinuly,
     });
   }
 

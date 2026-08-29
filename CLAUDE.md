@@ -465,6 +465,11 @@ vyzerala „hotovo".
 `id` (inak odklepnutie umlčí oboch) a vlastný `trener` (inak ju filter ukáže
 obom). Platí pre všetko, čo má v kľúči meno človeka.
 
+Pripomienka sa navyše pýta **jeden týždeň spätne**: bez toho zmizol
+v pondelok aj nezapísaný týždeň a už sa nikdy nevrátil (tak zostal navždy
+prázdny týždeň 17. 8. 2026). Hranica je zámerne jeden týždeň — viac by
+nakopilo stĺpec starých riadkov.
+
 ## Preklik má viesť k písaniu, nie k tabuľke
 
 `Treningy` rozlišujú cieľ podľa TVARU: `RRRR-MM-DD` riadok týždňa **rozbalí**,
