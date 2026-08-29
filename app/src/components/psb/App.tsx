@@ -1555,8 +1555,13 @@ function skupinaFaktur(
         key: `zapis|${r.id}`,
         category: "Zápis" as const,
         tone: (r.druh === "kvartal" || r.druh === "kontrola" ? "blue" : "orange") as "blue" | "orange",
-        title: r.nadpis,
-        detail: `${r.nadpis} — ${r.detail}`,
+        title: r.trener ? `${r.nadpis} (${r.trener})` : r.nadpis,
+        // Meno patrí aj do detailu — riadok registra kreslí DETAIL, nie titulok,
+        // takže bez toho by Terezka nevidela, že tá pripomienka je jej.
+        detail: `${r.trener ? `${r.nadpis} — ${r.trener}` : r.nadpis} — ${r.detail}`,
+        // Bez trénera by týždenná únava svietila obom a filter by pri nej
+        // neznamenal nič — Terezka by videla Jerryho zápis a naopak.
+        trener: r.trener,
         ...stavPolozky(`zapis|${r.id}`),
         // Cieľ navigácie sa vezie v `client` — register nemá vlastné pole na
         // odkaz a zaviesť ho kvôli trom položkám by bolo viac kódu než úžitku.

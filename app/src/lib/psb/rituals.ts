@@ -22,6 +22,11 @@ export type Ritual = {
   detail: string;
   /** Kam to zapísať — dvojica pre navigáciu. */
   ciel: { tab: string; sub?: string; mesiac?: string; tyzden?: string };
+  /**
+   * Komu pripomienka patrí. Bez toho by ju filter trénera ukazoval obom —
+   * a týždenná únava je zápis jedného človeka o sebe, nie spoločná úloha.
+   */
+  trener?: string;
   /** true = práve teraz je čas to spraviť a nie je to spravené */
   splatne: boolean;
   /** true = už je to za dané obdobie vyplnené */
@@ -50,21 +55,32 @@ export function ritualy(
   // ── Týždenný ────────────────────────────────────────────────────────────
   // Zapisuje sa za PREBIEHAJÚCI týždeň, cez víkend. Piatok je najskorší deň,
   // kedy má zmysel sa pýtať „aký bol týždeň" — v stredu to človek nevie.
+  //
+  // Pripomienka je PO OSOBÁCH, nie jedna spoločná. Do 29. 8. 2026 zhasínala,
+  // len čo hodnotenie napísal ktokoľvek z dvojice — takže keď Jerry zapísal
+  // svoju sedmičku, Terezke pripomienka zmizla a svoj týždeň nemala kde nájsť.
+  // V dátach to bolo vidieť: týždeň 24. 8. má jerry_score 7 a od Terezky iba
+  // poznámku, týždne 10. a 17. 8. nemajú od nej nič. Únava je zápis jedného
+  // človeka o sebe — cudzí zápis ho nemôže odškrtnúť.
   const tw = weekKey(dnes.toISOString());
   const zaznam = weeks[tw] || {};
-  const vyplneny = PEOPLE.some((p) => String(zaznam[`${p}_score`] ?? "").trim() !== "");
-  out.push({
-    id: `tyzden-${tw}`,
-    druh: "tyzden",
-    nadpis: "Týždenný zápis",
-    detail: vyplneny
-      ? "Tento týždeň je zapísaný."
-      : "Náročnosť týždňa a iné hodiny — kým to máš v hlave. V pondelok si to už nikto nepamätá.",
-    // Bez týždňa dopadol klik na zoznam a človek si musel nájsť riadok sám.
-    ciel: { tab: "treningy", sub: "prehled", tyzden: tw },
-    splatne: !vyplneny && den >= 5,
-    hotove: vyplneny,
-  });
+  for (const p of PEOPLE) {
+    const kto = p === "jerry" ? "Jerry" : "Terezka";
+    const vyplneny = String(zaznam[`${p}_score`] ?? "").trim() !== "";
+    out.push({
+      id: `tyzden-${tw}-${p}`,
+      druh: "tyzden",
+      nadpis: "Zapíš týždennú únavu",
+      detail: vyplneny
+        ? "Tento týždeň máš zapísaný."
+        : "Náročnosť týždňa 1–10 (1 = ľahký, 10 = veľmi ťažký), odtrénované hodiny a poznámka — kým to máš v hlave. V pondelok si to už nikto nepamätá. Klik otvorí rovno tento týždeň.",
+      // Bez týždňa dopadol klik na zoznam a človek si musel nájsť riadok sám.
+      ciel: { tab: "treningy", sub: "prehled", tyzden: tw },
+      trener: kto,
+      splatne: !vyplneny && den >= 5,
+      hotove: vyplneny,
+    });
+  }
 
   // ── Mesačný ─────────────────────────────────────────────────────────────
   // Uzávierka je prvý víkend nasledujúceho mesiaca — ale pripomienka NEZHASÍNA

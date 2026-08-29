@@ -2085,8 +2085,12 @@ function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar }: { i
           // klik dopadol na zoznam a človek si riadok hľadal sám.
           // Štvrté pole je kategória v P&L — s ňou sa otvorí konkrétny riadok
           // a nie tabuľka, v ktorej ho treba hľadať (revízia 18. 8. 2026).
+          // Týždeň sa posiela ako PONDELOK (RRRR-MM-DD), nie ako štítok riadku:
+          // Tréningy podľa tvaru rozlišujú „zvýrazni riadok" od „ROZBAĽ ho".
+          // So štítkom sa tabuľka len prefiltrovala a políčko na náročnosť
+          // zostalo zabalené — Terezka 29. 8. 2026 nemala kam písať.
           zapisCiel[2]?.startsWith("t:")
-            ? { week: weekLabel(zapisCiel[2].slice(2)), nonce: Date.now() }
+            ? { week: zapisCiel[2].slice(2), nonce: Date.now() }
             : zapisCiel[2]?.startsWith("f:")
             ? { filter: zapisCiel[2].slice(2), nonce: Date.now() }
             : /^\d{4}-\d{2}$/.test(zapisCiel[2] || "")

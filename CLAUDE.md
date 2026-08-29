@@ -452,3 +452,23 @@ a druhú cestu cez execCommand. Test `kontrolnePrompty.test.ts` stráži, že sa
 
 Zovšeobecnenie: pri každom `await` nad prehliadačovým API sa pýtaj, čo sa
 stane, keď sa NEVRÁTI. Catch chráni pred chybou, nie pred tichom.
+
+## Spoločná pripomienka na osobný zápis zhasne cudzou rukou
+
+Týždenná únava sa zapisuje po ľuďoch (`jerry_score`, `terezka_score`), ale
+pripomienka bola JEDNA a zhasínala cez `PEOPLE.some(...)`. Len čo svoje
+hodnotenie napísal Jerry, Terezke zmizla — a jej týždne zostávali prázdne.
+V dátach to bolo vidieť mesiac dozadu, na obrazovke nie, lebo appka
+vyzerala „hotovo".
+
+**Keď je záznam per osoba, musí byť per osoba aj pripomienka** — vlastné
+`id` (inak odklepnutie umlčí oboch) a vlastný `trener` (inak ju filter ukáže
+obom). Platí pre všetko, čo má v kľúči meno človeka.
+
+## Preklik má viesť k písaniu, nie k tabuľke
+
+`Treningy` rozlišujú cieľ podľa TVARU: `RRRR-MM-DD` riadok týždňa **rozbalí**,
+štítok `24.8.` ho len zvýrazní. Register posielal štítok, takže sa tabuľka
+prefiltrovala a políčko na náročnosť zostalo zabalené — človek stál nad
+správnym riadkom a nemal kam písať. Pri každom novom prekliku over, že
+cieľová obrazovka nielen otvorí, ale aj ROZBALÍ to, čo sa má vyplniť.
