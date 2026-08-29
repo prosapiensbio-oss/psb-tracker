@@ -272,6 +272,29 @@ polovica už odchodená a dopredu zostalo šesť.
 zo zostatku v exporte balíčkov, nikdy z výšky platby. Výška platby hovorí, koľko
 zaplatil, nie koľko má pred sebou.
 
+## 12c. Zaplatené a bez balíčka NIE JE chyba
+
+Klient občas zaplatí hneď po poslednom tréningu zo starého balíčka, ale nové
+členstvo sa mu v PTminderi **ešte nezaloží**. Dôvod je vecný: členstvo má
+platiť **od prvého tréningu nového cyklu** a ten ešte nie je dohodnutý.
+Zakladať ho skôr by znamenalo, že platnosť začne bežať naprázdno a klientovi
+budú prepadávať hodiny, kým sa dohodne termín (viď oddiel 3).
+
+**Ako to vyzerá v dátach:** platba v `payments` je, v `packages` má klient
+starý riadok s nulou alebo jednotkou, prípadne v novom exporte vôbec nie je.
+
+**Príklad, na ktorom sa to potvrdilo:** Panagiotis Tsiolis zaplatil 26. 8.
+2026 dvadsaťjedentisíc stopäťdesiat korún, naposledy trénoval 20. 8. a
+v exporte balíčkov z 29. 8. mu zostáva jednotka zo starého „Doplnenia
+členstva". Jerry, 29. 8. 2026: *„zaplatené má, ale ešte nie sme dohodnutí na
+prvý tréning z nového členstva."*
+
+**Preto sa to NEHLÁSI ako nezrovnalosť.** Ani pri mesačnej kontrole peňazí,
+ani pri kontrole balíčkov. Falošný poplach je chyba rovnakej váhy ako
+zmeškaná. Jediné, čo je na tom naozaj hodné pozornosti, je **čas**: keď od
+platby ubehnú týždne a stále nie je dohodnutý termín, to už nie je účtovný
+stav, ale nedohodnutý klient — a to je otázka pre Jerryho, nie pre appku.
+
 ## 13. Mesačná uzávierka — kedy sú dáta úplné
 
 Tréningy a platby sa do PTmindera nedopĺňajú v reálnom čase. **Uzávierka mesiaca
