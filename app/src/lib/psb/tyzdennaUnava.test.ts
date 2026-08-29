@@ -160,13 +160,57 @@ describe("formulár týždňa neprepíše, čo už je zapísané", () => {
   });
 });
 
-/** Dve rovnaké položky bez mena vyzerali ako štyrikrát tá istá chyba. */
-describe("okno Čo chceš zapísať rozlišuje trénerov", () => {
+/**
+ * Dve rovnaké položky bez mena vyzerali ako štyrikrát tá istá chyba.
+ * Prvý pokus dal mená do nadpisov — riadky ostali štyri. Riešenie je
+ * zlúčenie (viď nižšie); meno sa nesie v popise, nie v nadpise.
+ */
+describe("okno Čo chceš zapísať nekreslí duplicity", () => {
   const zapis = readFileSync(new URL("../../components/psb/Zapis.tsx", import.meta.url).pathname, "utf8");
-  it("nadpis nesie meno trénera", () => {
-    expect(zapis).toContain("nadpis: r.trener ?");
-  });
   it("kľúč v zozname je jedinečný", () => {
     expect(zapis).not.toContain("key={p.nadpis}");
+  });
+  it("rituály sa do zoznamu nesypú po jednom", () => {
+    expect(zapis).not.toContain("...ritualy.map((r) => ({");
+  });
+});
+
+/** „Stále sú tu 4" — okno Čo chceš zapísať zlučuje rituály po ľuďoch. */
+describe("okno Čo chceš zapísať zlučuje položky", () => {
+  const zapis = readFileSync(new URL("../../components/psb/Zapis.tsx", import.meta.url).pathname, "utf8");
+
+  it("existuje zlučovanie a zoznam ho používa", () => {
+    expect(zapis).toContain("function zlucRitualy");
+    expect(zapis).toContain("...zlucRitualy(ritualy)");
+  });
+
+  it("zlúčený riadok povie, na koho sa čaká", () => {
+    expect(zapis).toContain("`Chýba: ${chybaju.join(\" a \")}");
+  });
+
+  it("odznak počíta zlúčené riadky, nie rituály", () => {
+    expect(zapis).toContain('zlucRitualy(ritualy).filter((p) => p.stav === "chyba").length');
+    expect(zapis).not.toContain("ritualy.filter((r) => r.splatne).length");
+  });
+
+  it("rôzne týždne sa nezlejú do jedného riadku", () => {
+    // Kľúč skupiny nesie cieľový týždeň.
+    expect(zapis).toContain("r.ciel.tyzden || r.ciel.mesiac");
+  });
+});
+
+/** Dobehnutý riadok s nadpisom Chýba si protirečí — má zmiznúť. */
+describe("dobehnutý minulý týždeň zo zoznamu zmizne", () => {
+  it("rituál dobiehania je označený", () => {
+    const r = minuleTyzdne(STREDA, {}, {});
+    expect(r.every((x) => x.tichyKedHotovy)).toBe(true);
+  });
+  it("prebiehajúci týždeň označený nie je, potvrdenie tam má zostať", () => {
+    const r = tyzdenne(PIATOK, {});
+    expect(r.every((x) => !x.tichyKedHotovy)).toBe(true);
+  });
+  it("zoznam ich odfiltruje, keď sú hotové", () => {
+    const zapis = readFileSync(new URL("../../components/psb/Zapis.tsx", import.meta.url).pathname, "utf8");
+    expect(zapis).toContain("zoz[0].tichyKedHotovy && zoz.every((r) => r.hotove)");
   });
 });

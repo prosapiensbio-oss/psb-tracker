@@ -112,6 +112,52 @@ type Polozka = {
  */
 const ANAMNEZA = "https://docs.google.com/forms/d/e/1FAIpQLScNbp8yLutGZAZqUIM3TqfOaI5IacAIBimsJnRhRV1pYF53rg/viewform";
 
+/**
+ * Rituály po ľuďoch sa v tomto zozname zlučujú do JEDNÉHO riadku.
+ *
+ * Týždenná únava je pripomienka pre každého zvlášť — v registri to tak byť
+ * musí, lebo tam sa filtruje podľa trénera a každý si odklikáva svoje.
+ * Tu je to na škodu: dva týždne × dvaja ľudia = štyri riadky, ktoré hovoria
+ * to isté. Jerry, 29. 8. 2026: „stále sú tu 4."
+ *
+ * Zlúčený riadok nesie navyše to podstatné — KOHO sa ešte čaká. Meno
+ * chýbajúceho je užitočnejšie než štyri riadky s „hotové".
+ */
+function zlucRitualy(ritualy: Ritual[]): Polozka[] {
+  const skupiny = new Map<string, Ritual[]>();
+  for (const r of ritualy) {
+    // Kľúč je nadpis + cieľ: dva rôzne týždne sa nezlejú do jedného riadku.
+    const kluc = `${r.nadpis}|${r.ciel.tab}|${r.ciel.sub || ""}|${r.ciel.tyzden || r.ciel.mesiac || ""}`;
+    const zoz = skupiny.get(kluc);
+    if (zoz) zoz.push(r);
+    else skupiny.set(kluc, [r]);
+  }
+  return [...skupiny.values()].filter((zoz) => !(zoz[0].tichyKedHotovy && zoz.every((r) => r.hotove))).map((zoz) => {
+    const prvy = zoz[0];
+    const chybaju = zoz.filter((r) => !r.hotove).map((r) => r.trener).filter(Boolean) as string[];
+    const vsetciHotovi = zoz.length > 1 && chybaju.length === 0;
+    const popis = zoz.length === 1
+      ? prvy.detail
+      : vsetciHotovi
+        ? `${zoz.map((r) => r.trener).join(" aj ")} máte zapísané.`
+        : `Chýba: ${chybaju.join(" a ")}. ${prvy.detail}`;
+    return {
+      nadpis: prvy.nadpis,
+      popis,
+      tab: prvy.ciel.tab,
+      sub: prvy.ciel.sub,
+      // Bez týždňa dopadne klik na tabuľku a človek si musí riadok nájsť sám —
+      // presne to Jerry hlásil: pripomienka vedie „niekam okolo", nie do formulára.
+      tyzden: prvy.ciel.tyzden,
+      stav: zoz.every((r) => r.hotove)
+        ? ("hotove" as const)
+        : zoz.some((r) => r.splatne)
+          ? ("chyba" as const)
+          : undefined,
+    };
+  });
+}
+
 export function ZapisButton({
   ritualy,
   onNavigate,
@@ -173,7 +219,9 @@ export function ZapisButton({
   // Platné meno = existujúci klient. Voľný text sa neukladá — zápis bez
   // klienta nemá kam patriť a preklep by ho stratil.
   const vybranyKlient = klienti.find((k) => k.meno === poznMeno);
-  const cakajuce = ritualy.filter((r) => r.splatne).length;
+  // Počítadlo na odznaku musí sedieť so ZOZNAMOM, nie s rituálmi: keď sa dva
+  // riadky zlúčia do jedného, odznak nesmie hlásiť dva.
+  const cakajuce = zlucRitualy(ritualy).filter((p) => p.stav === "chyba").length;
 
   // Poradie je frekvencia, nie história: nový klient príde niekoľkokrát
   // mesačne, rituály raz za týždeň, mesiac a kvartál.
@@ -194,19 +242,7 @@ export function ZapisButton({
       popis: "Otvorí anamnézu v Google Forms. Do Kokpitu sa klient dostane sám z PTmindera; odtiaľto sa berie len to, odkiaľ sa o nás dozvedel.",
       odkaz: ANAMNEZA,
     },
-    ...ritualy.map((r) => ({
-      // Meno trénera patrí do nadpisu. Týždenná únava je pripomienka po
-      // osobách, takže tu stoja DVE rovnaké položky — bez mena vyzerali ako
-      // štyrikrát tá istá chyba (Jerry, 29. 8. 2026).
-      nadpis: r.trener ? `${r.nadpis} — ${r.trener}` : r.nadpis,
-      popis: r.detail,
-      tab: r.ciel.tab,
-      sub: r.ciel.sub,
-      // Bez týždňa dopadne klik na tabuľku a človek si musí riadok nájsť sám —
-      // presne to Jerry hlásil: pripomienka vedie „niekam okolo", nie do formulára.
-      tyzden: r.ciel.tyzden,
-      stav: r.hotove ? ("hotove" as const) : r.splatne ? ("chyba" as const) : undefined,
-    })),
+    ...zlucRitualy(ritualy),
   ];
 
   const chod = (p: Polozka) => {

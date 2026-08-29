@@ -27,6 +27,14 @@ export type Ritual = {
    * a týždenná únava je zápis jedného človeka o sebe, nie spoločná úloha.
    */
   trener?: string;
+  /**
+   * Keď je hotová, zmizne aj zo zoznamu „Čo chceš zapísať".
+   *
+   * Platí pre dobiehanie minulého týždňa: jeho jediný zmysel je povedať
+   * „niečo ti ušlo". Dobehnutý riadok s nadpisom „Chýba…" a telom „máte
+   * zapísané" si protirečí a len predlžuje zoznam.
+   */
+  tichyKedHotovy?: boolean;
   /** true = práve teraz je čas to spraviť a nie je to spravené */
   splatne: boolean;
   /** true = už je to za dané obdobie vyplnené */
@@ -100,6 +108,7 @@ export function ritualy(
         : `Týždeň ${weekLabel(twMinuly)} zostal bez hodnotenia. Toto je posledná pripomienka — v pondelok sa už nevráti. Klik otvorí rovno ten týždeň.`,
       ciel: { tab: "treningy", sub: "prehled", tyzden: twMinuly },
       trener: kto,
+      tichyKedHotovy: true,
       splatne: !vyplnenyMinuly,
       hotove: vyplnenyMinuly,
     });

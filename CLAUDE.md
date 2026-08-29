@@ -465,6 +465,13 @@ vyzerala „hotovo".
 `id` (inak odklepnutie umlčí oboch) a vlastný `trener` (inak ju filter ukáže
 obom). Platí pre všetko, čo má v kľúči meno človeka.
 
+**Po osobách v registri, zlúčené v zozname.** Rovnaká vec sa v okne „Čo
+chceš zapísať" nesmie objaviť dvakrát — dva týždne × dvaja ľudia dali štyri
+riadky, ktoré hovorili to isté. `zlucRitualy()` ich spojí do jedného riadku,
+ktorý navyše povie, na koho sa čaká. Prvý pokus (mená do nadpisov) riadky
+nezmenšil — meno je informácia, nie riešenie počtu. A odznak s počtom musí
+počítať ZLÚČENÉ riadky, inak hlási dva tam, kde zoznam ukáže jeden.
+
 Pripomienka sa navyše pýta **jeden týždeň spätne**: bez toho zmizol
 v pondelok aj nezapísaný týždeň a už sa nikdy nevrátil (tak zostal navždy
 prázdny týždeň 17. 8. 2026). Hranica je zámerne jeden týždeň — viac by
