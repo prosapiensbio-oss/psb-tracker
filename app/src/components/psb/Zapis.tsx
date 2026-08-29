@@ -195,7 +195,10 @@ export function ZapisButton({
       odkaz: ANAMNEZA,
     },
     ...ritualy.map((r) => ({
-      nadpis: r.nadpis,
+      // Meno trénera patrí do nadpisu. Týždenná únava je pripomienka po
+      // osobách, takže tu stoja DVE rovnaké položky — bez mena vyzerali ako
+      // štyrikrát tá istá chyba (Jerry, 29. 8. 2026).
+      nadpis: r.trener ? `${r.nadpis} — ${r.trener}` : r.nadpis,
       popis: r.detail,
       tab: r.ciel.tab,
       sub: r.ciel.sub,
@@ -432,9 +435,9 @@ export function ZapisButton({
 
           <NapadBox />
           <div style={{ display: "grid", gap: 8 }}>
-            {polozky.map((p) => (
+            {polozky.map((p, i) => (
               <button
-                key={p.nadpis}
+                key={`${p.nadpis}|${i}`}
                 onClick={() => chod(p)}
                 style={{
                   display: "flex", alignItems: "center", gap: 10, textAlign: "left", cursor: "pointer",

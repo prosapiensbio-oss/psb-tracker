@@ -127,3 +127,46 @@ describe("dobiehanie minulého týždňa", () => {
     expect(vsetky.every((r) => r.ciel.tyzden === MINULY)).toBe(true);
   });
 });
+
+/**
+ * Prepísanie zápisu prázdnym formulárom (29. 8. 2026).
+ *
+ * Riadok týždňa sa cez pripomienku otvoril skôr, než dorazili dáta.
+ * `useState(entry)` berie hodnotu len pri prvom vykreslení, takže formulár
+ * zostal prázdny aj potom, čo sa týždeň načítal — a uloženie prepísalo
+ * poznámky, ktoré tam boli. Týždňu 24. 8. tak zmizli obe poznámky.
+ */
+describe("formulár týždňa neprepíše, čo už je zapísané", () => {
+  const treningy = readFileSync(new URL("../../components/psb/Treningy.tsx", import.meta.url).pathname, "utf8");
+  const api = readFileSync(new URL("../../routes/api/vzas-weeks.ts", import.meta.url).pathname, "utf8");
+
+  it("draft dobehne dáta, kým sa políčok nikto nedotkol", () => {
+    expect(treningy).toContain("const dotknute = useRef(false)");
+    expect(treningy).toContain("if (!dotknute.current) setDraft(entry ?? {})");
+  });
+
+  it("po prvom písmene sa draft zamkne", () => {
+    expect(treningy).toContain("dotknute.current = true; setDraft");
+  });
+
+  it("server zlučuje, neprepisuje celý riadok", () => {
+    expect(api).toContain("const zluc = { ...povodne, ...data }");
+    expect(api).not.toMatch(/\.bind\(week, JSON\.stringify\(data\)/);
+  });
+
+  it("predchádzajúca podoba sa odkladá do auditu", () => {
+    expect(api).toContain('"tyzden"');
+    expect(api).toContain("stare.data !== novy");
+  });
+});
+
+/** Dve rovnaké položky bez mena vyzerali ako štyrikrát tá istá chyba. */
+describe("okno Čo chceš zapísať rozlišuje trénerov", () => {
+  const zapis = readFileSync(new URL("../../components/psb/Zapis.tsx", import.meta.url).pathname, "utf8");
+  it("nadpis nesie meno trénera", () => {
+    expect(zapis).toContain("nadpis: r.trener ?");
+  });
+  it("kľúč v zozname je jedinečný", () => {
+    expect(zapis).not.toContain("key={p.nadpis}");
+  });
+});

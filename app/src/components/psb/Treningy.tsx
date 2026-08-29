@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState, type CSSProperties } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 
 import { fetchWeekEntries, saveWeekEntry, type WeekEntry } from "../../lib/psb/client";
 import { groupTrainings, periodInfo, kotvaDat, periodZone, sessionAnalysis, TARGET_H, type ClientAgg, type Period, type PeriodRow } from "../../lib/psb/compute";
@@ -28,7 +28,23 @@ function WeekEnergyRow({ weekKeyIso, colSpan, entry, onSave }: {
   const [draft, setDraft] = useState<WeekEntry>(entry);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const set = (k: string, v: string) => setDraft((d) => ({ ...d, [k]: v }));
+  /**
+   * Riadok sa smie otvoriť skôr, než dorazia dáta — a vtedy je `entry` prázdne.
+   *
+   * `useState(entry)` vezme hodnotu LEN pri prvom vykreslení, takže pri
+   * otvorení cez pripomienku sa formulár nakreslil prázdny, hoci týždeň
+   * zapísaný bol. Kto ho vyplnil, prepísal uloženú poznámku prázdnym
+   * formulárom — presne to sa stalo 29. 8. 2026 týždňu 24. 8.
+   *
+   * Kým sa políčok nikto nedotkol, draft zrkadlí `entry`. Po prvom písmene
+   * sa zamkne, aby dobiehajúce dáta nezmazali rozpísaný text.
+   */
+  const dotknute = useRef(false);
+  const entryKluc = JSON.stringify(entry ?? {});
+  useEffect(() => {
+    if (!dotknute.current) setDraft(entry ?? {});
+  }, [entryKluc]); // eslint-disable-line react-hooks/exhaustive-deps
+  const set = (k: string, v: string) => { dotknute.current = true; setDraft((d) => ({ ...d, [k]: v })); };
   const save = async () => {
     setSaving(true);
     const ok = await saveWeekEntry(weekKeyIso, draft);

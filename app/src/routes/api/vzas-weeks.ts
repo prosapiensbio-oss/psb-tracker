@@ -36,12 +36,35 @@ export const Route = createFileRoute("/api/vzas-weeks")({
         const week = typeof body.week === "string" ? body.week.slice(0, 10) : "";
         if (!/^\d{4}-\d{2}-\d{2}$/.test(week)) return Response.json({ ok: false, error: "bad_week" }, { status: 400 });
         const data = body.data && typeof body.data === "object" ? body.data : {};
+        /**
+         * Zápis ZLUČUJE, neprepisuje celý riadok.
+         *
+         * Doteraz sa uložil presne ten objekt, ktorý prišiel z formulára —
+         * takže neúplný formulár zmazal všetko ostatné. Kľúč, ktorý klient
+         * neposlal, zostáva; prázdny reťazec je platná hodnota (vymazanie
+         * políčka), lebo ten klient pošle výslovne.
+         */
+        const stare = await DB.prepare("SELECT data FROM vzas_week_notes WHERE week = ?").bind(week).first<{ data?: string }>();
+        let povodne: Record<string, unknown> = {};
+        try { povodne = stare?.data ? JSON.parse(stare.data) : {}; } catch { povodne = {}; }
+        const zluc = { ...povodne, ...data };
+        const novy = JSON.stringify(zluc).slice(0, 6000);
         await DB.prepare(
           `INSERT INTO vzas_week_notes (week, data, updated_at) VALUES (?,?,?)
            ON CONFLICT(week) DO UPDATE SET data=excluded.data, updated_at=excluded.updated_at`,
         )
-          .bind(week, JSON.stringify(data).slice(0, 6000), new Date().toISOString())
+          .bind(week, novy, new Date().toISOString())
           .run();
+        /**
+         * Predchádzajúca podoba sa odkladá do auditu, nech sa dá vrátiť krok
+         * späť. Bez toho sa 29. 8. 2026 prepísaná poznámka nedala obnoviť
+         * odnikiaľ — D1 Time Travel vracia celú databázu, nie jeden riadok.
+         */
+        if (stare?.data && stare.data !== novy) {
+          await DB.prepare(
+            "INSERT INTO vzas_audit (id, at, actor, action, month, old_value, new_value) VALUES (?,?,?,?,?,?,?)",
+          ).bind(crypto.randomUUID(), new Date().toISOString(), "app", "tyzden", week, stare.data, novy).run();
+        }
         return Response.json({ ok: true });
       },
     },

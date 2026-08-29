@@ -489,3 +489,19 @@ Pozadie (29. 8. 2026): celé remeslo bolo v Instructions popísané 188 znakmi
 („piš vecne, kľudne, odborne"). Modelu sa zakázal hype a nedal sa mu iný
 zdroj energie, tak siahol po vysvetľovaní — a každý príspevok bol esej
 o mechanizme. Jerry to nazval „slová idúce za sebou bez výpovednej hodnoty".
+
+## Formulár otvorený skôr než dáta prepíše, čo v ňom už bolo
+
+`useState(entry)` berie hodnotu LEN pri prvom vykreslení. Keď sa riadok
+otvorí deep-linkom hneď po štarte, `weeks` sú ešte prázdne — formulár sa
+nakreslí prázdny, hoci zápis existuje, a uloženie ho prepíše. Takto 29. 8.
+2026 zmizli poznámky týždňa 24. 8.
+
+Dve poistky, obe musia platiť pri každom takom formulári:
+1. **Klient:** kým sa políčok nikto nedotkol, draft zrkadlí prichádzajúce
+   dáta (`dotknute` ref). Po prvom písmene sa zamkne.
+2. **Server:** zápis ZLUČUJE (`{...povodne, ...data}`), neprepisuje celý
+   riadok, a predchádzajúcu podobu odloží do `vzas_audit` (action `tyzden`).
+
+D1 Time Travel tu nepomôže — vracia celú databázu, nie jeden riadok. Preto
+audit.
