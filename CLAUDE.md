@@ -477,3 +477,15 @@ nakopilo stĺpec starých riadkov.
 prefiltrovala a políčko na náročnosť zostalo zabalené — človek stál nad
 správnym riadkom a nemal kam písať. Pri každom novom prekliku over, že
 cieľová obrazovka nielen otvorí, ale aj ROZBALÍ to, čo sa má vyplniť.
+
+## Remeslo písania žije na dvoch miestach
+
+`docs/textar-psb.md` je zdroj pravdy; blok `<copywriting>` v Instructions
+Claude Projectu je jeho skrátená kópia. Keď sa zmení jedno, musí sa druhé —
+inak Project píše podľa starého pravidla a nikto to nezistí, lebo text
+vyzerá „nejako napísaný".
+
+Pozadie (29. 8. 2026): celé remeslo bolo v Instructions popísané 188 znakmi
+(„piš vecne, kľudne, odborne"). Modelu sa zakázal hype a nedal sa mu iný
+zdroj energie, tak siahol po vysvetľovaní — a každý príspevok bol esej
+o mechanizme. Jerry to nazval „slová idúce za sebou bez výpovednej hodnoty".
