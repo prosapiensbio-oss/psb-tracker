@@ -153,7 +153,11 @@ if (nezhody.length) {
 }
 
 h("3 · Odloženie a návrat po termíne");
-{
+// Keď je register prázdny, nie je čo odkladať — a kontrola, ktorá na tom
+// spadne, zhltne aj všetko za sebou (29. 8. 2026 takto neprebehli body 3-9
+// ani sekcie C a D). Prázdny register je legitímny stav, nie chyba.
+if (![...otvorene(reg(base))].length) console.log("  (register je prázdny — nie je čo odložiť, preskakujem)");
+else {
   const kluc = [...otvorene(reg(base))][0];
   const buduci = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
   const vcera = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
@@ -219,7 +223,9 @@ h("8 · Export dorazí → čakajúci sa potvrdia");
 }
 
 h("9 · Knižnica a obrazovka hovoria to isté");
-{
+// Rovnaký dôvod ako pri bode 3: bez otvorenej položky nie je čo porovnávať.
+if (![...otvorene(reg(base))].length) console.log("  (register je prázdny — preskakujem)");
+else {
   const kluc = [...otvorene(reg(base))][0];
   const a = { [kluc]: { note: "odlozene|2099-01-01|" } };
   const zK = reg(sAckom(a)).find((r) => r.key === kluc);
