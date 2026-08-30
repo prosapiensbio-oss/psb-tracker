@@ -762,7 +762,7 @@ export function useAssistantChat(
         const mes = String(d.mesiac);
         void fetchPeriods().then(({ periods }) => {
           if (periods.some((p) => p.month === mes && p.locked)) {
-            oznamVysledok(`${mes} je uzavretý mesiac — oprava P&L sa nezapísala. Najprv ho odomkni v Mesiac → Uzávierka.`);
+            oznamVysledok(`${mes} je uzavretý mesiac — oprava P&L sa nezapísala. Najprv ho odomkni v Upload → Uzávierka.`);
             return;
           }
           const zrusenie = d.suma === null;

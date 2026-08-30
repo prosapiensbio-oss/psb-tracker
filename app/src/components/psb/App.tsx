@@ -157,11 +157,11 @@ const TABS = [
   { id: "vzas", label: "Peniaze", icon: "wallet" },
   { id: "marketing", label: "Marketing", icon: "activity" },
   { id: "kalendar", label: "Kalendár", icon: "calendar" },
-  // Mesiac = mesačné VÝSLEDKY (P&L pohľady, správa mesiaca). Nahrávanie dát
-  // a uzávierka z neho odišli do vlastnej záložky — robili sa striedavo, ale
-  // sú to dva rôzne úkony a jeden z nich (nahrať CSV) prichádza aj mimo
-  // uzávierky.
-  { id: "mesiac", label: "Mesiac", icon: "barChart" },
+  // Výsledky = mesačné a kvartálne pohľady, KPI, ciele, správa mesiaca.
+  // Nahrávanie dát a uzávierka odišli do záložky Upload — robili sa
+  // striedavo, ale sú to dva rôzne úkony a nahrať CSV treba aj mimo
+  // uzávierky. `id` zostáva „mesiac“, adresa je aj tak #vysledky/…
+  { id: "mesiac", label: "Výsledky", icon: "barChart" },
   // Upload = nahrať exporty a zavrieť mesiac. `id` zostáva „udaje", lebo naň
   // visia adresy (#udaje), ciele rituálov aj Jarvisove odkazy — nápis je vec
   // pre človeka, id je vec pre kód.

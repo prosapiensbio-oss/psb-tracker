@@ -881,7 +881,7 @@ export function buildAiContext(
     kalendar: kalendarBlok,
     uzavierka: uzavierka
       ? {
-          poznamka: "Kroky mesačnej uzávierky pre posledný plný mesiac — to, čo appka od Jerryho ešte chce, aby sa mesiac dal ZAMKNÚŤ. „prekazky“ je hotový zoznam viet; keď je prázdny, mesiac sa dá zamknúť. Neodvodzuj to z registra ani z dát, appka to má spočítané. Obrazovka: Mesiac → Uzávierka.",
+          poznamka: "Kroky mesačnej uzávierky pre posledný plný mesiac — to, čo appka od Jerryho ešte chce, aby sa mesiac dal ZAMKNÚŤ. „prekazky“ je hotový zoznam viet; keď je prázdny, mesiac sa dá zamknúť. Neodvodzuj to z registra ani z dát, appka to má spočítané. Obrazovka: Upload → Uzávierka.",
           ...uzavierka,
         }
       : null,

@@ -587,7 +587,7 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
               </div>
             ))}
             <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 6 }}>
-              Do počtu klientov, kapacity ani 6M sa nerátajú. Po nahratí exportu (Mesiac → Údaje) sa presunú do tabuľky sami.
+              Do počtu klientov, kapacity ani 6M sa nerátajú. Po nahratí exportu (záložka Upload) sa presunú do tabuľky sami.
             </div>
           </div>
         )}

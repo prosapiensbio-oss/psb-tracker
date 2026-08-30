@@ -103,8 +103,8 @@ export const WIDGETS: WidgetMeta[] = [
   { id: "prebytok", label: "Kumulovaný prebytok", span: 1, sekcia: "zisky", popis: "Súčet ziskov a strát od začiatku — čo firma reálne vytvorila.", doma: "Peniaze" },
   { id: "dlhTreneri", label: "Dlh voči trénerom", span: 1, sekcia: "peniaze", popis: "Kumulovaný rozdiel medzi nárokom a poslaným, Jerry aj Terezka.", doma: "Peniaze → Mzdy" },
   { id: "dlhJarek", label: "Dlh voči Jarkovi", span: 1, sekcia: "peniaze", popis: "Zostatok investorského dlhu a tempo splácania.", doma: "Peniaze → Dlhy" },
-  { id: "kvartaly", label: "Kvartálne tržby", span: 1, sekcia: "peniaze", popis: "Tržby a marža po kvartáloch — sezónnosť na jeden pohľad.", doma: "Mesiac → Výsledky" },
-  { id: "ciele", label: "Ciele roka", span: 1, sekcia: "peniaze", popis: "Tržby a marža proti cieľu 2026, prepočítané na uplynulé mesiace.", doma: "Mesiac → Výsledky" },
+  { id: "kvartaly", label: "Kvartálne tržby", span: 1, sekcia: "peniaze", popis: "Tržby a marža po kvartáloch — sezónnosť na jeden pohľad.", doma: "Výsledky" },
+  { id: "ciele", label: "Ciele roka", span: 1, sekcia: "peniaze", popis: "Tržby a marža proti cieľu 2026, prepočítané na uplynulé mesiace.", doma: "Výsledky" },
   { id: "btc", label: "Bitcoinová rezerva", span: 1, sekcia: "peniaze", popis: "Hodnota rezervy a koľko mesiacov prevádzky pokryje.", doma: "Peniaze → Rezerva" },
   { id: "btcPlatby", label: "Platby v bitcoine", span: 2, sekcia: "peniaze", popis: "Kto platí v BTC, koľko v korunách aj satoshi, podiel na tržbách a zhodnotenie.", doma: "Bitcoinová evidencia" },
 
@@ -113,7 +113,7 @@ export const WIDGETS: WidgetMeta[] = [
   { id: "zony", label: "Týždne v zdravej zóne", span: 1, sekcia: "vytazenie", popis: "Koľko týždňov padlo do zóny, pod ňu a nad ňu.", doma: "Klienti → Tréningy" },
   { id: "kapacita", label: "Kapacita & vyťaženie", span: 1, sekcia: "vytazenie", popis: "Koľko klientov ešte zvládnete pri zdravom týždni.", doma: "Klienti → Klienti" },
   { id: "ziskavanie", label: "Koľko klientov naozaj treba", span: 1, sekcia: "vytazenie", popis: "Voľné miesta plus tí, čo medzitým odídu — číslo, z ktorého sa počíta rozpočet na reklamu.", doma: "Klienti → Rast" },
-  { id: "hodinyMes", label: "Hodiny po mesiacoch", span: 1, sekcia: "vytazenie", popis: "Dlhší horizont než týždne — sezónnosť práce a vyhorenie.", doma: "Mesiac → Výsledky" },
+  { id: "hodinyMes", label: "Hodiny po mesiacoch", span: 1, sekcia: "vytazenie", popis: "Dlhší horizont než týždne — sezónnosť práce a vyhorenie.", doma: "Výsledky" },
   { id: "sedeniaMes", label: "Počet sedení / mesiac", span: 1, sekcia: "vytazenie", popis: "Objem práce v kusoch — predstih pred tržbami.", doma: "Peniaze → Tržby" },
   { id: "typySedeni", label: "Pomer typov sedení", span: 1, sekcia: "vytazenie", popis: "Offline, online a úvodné — z čoho sa skladá prevádzka.", doma: "Klienti → Tréningy" },
   { id: "zrusene", label: "Zrušené a presunuté", span: 1, sekcia: "vytazenie", popis: "Stratená kapacita z týždenných zápisov, po trénerovi.", doma: "Klienti → Tréningy" },
@@ -143,7 +143,7 @@ export const WIDGETS: WidgetMeta[] = [
   { id: "pnlSuhrn", label: "Súhrn P&L", span: 1, sekcia: "zisky", popis: "Príjmy, náklady, hrubý zisk a marža — priemer na mesiac.", doma: "Peniaze → Zisky a straty" },
   { id: "naklady", label: "Fixné vs. variabilné", span: 1, sekcia: "zisky", popis: "Z čoho sa skladajú náklady a ktorá časť rastie.", doma: "Peniaze → Zisky a straty" },
   { id: "runRate", label: "Run-rate a odhad zisku", span: 1, sekcia: "zisky", popis: "Tempo posledných troch mesiacov prepočítané na rok.", doma: "Peniaze → Predikcia" },
-  { id: "h1", label: "H1 2025 vs. H1 2026", span: 1, sekcia: "zisky", popis: "Prvý polrok proti prvému polroku — rast bez sezónnosti.", doma: "Mesiac → Výsledky" },
+  { id: "h1", label: "H1 2025 vs. H1 2026", span: 1, sekcia: "zisky", popis: "Prvý polrok proti prvému polroku — rast bez sezónnosti.", doma: "Výsledky" },
 
   { id: "cenaSedenia", label: "Ø cena sedenia", span: 2, sekcia: "vytazenie", popis: "Koľko priemerne prinesie jedno odtrénované sedenie.", doma: "Peniaze → Sedenia & cena" },
   { id: "narocnost", label: "Náročnosť týždňov", span: 1, sekcia: "vytazenie", popis: "Vlastné hodnotenie 1–10 z týždenných zápisov — predstih pred vyhorením.", doma: "Klienti → Tréningy → Prehľad" },
@@ -718,7 +718,7 @@ export function useExtraGrafy({
     nodes.kvartaly = (
       <Card style={{ marginBottom: 0, height: "100%" }}>
         <H3><Info label="Kvartálne tržby" text="Tržby po kvartáloch — sezónnosť, ktorú mesačný graf rozdrobí. Posledný kvartál býva neúplný, kým sa neskončí." /></H3>
-        <Klik kam={() => onNavigate("vysledky", "kvartalne")} onNavigate="Mesiac → Výsledky">
+        <Klik kam={() => onNavigate("vysledky", "kvartalne")} onNavigate="Výsledky">
           {kvartaly.length ? <ValueBars data={kvartaly} color={C.accent} fmt={kcK} height={170} alignEnd /> : <Empty>Zatiaľ bez dát.</Empty>}
           {kvartalNeuplny && (
             <div style={{ fontSize: 11, color: C.textDim, marginTop: 6 }}>* kvartál ešte neskončil — obsahuje len uzavreté mesiace</div>
@@ -744,7 +744,7 @@ export function useExtraGrafy({
     nodes.ciele = (
       <Card style={{ marginBottom: 0, height: "100%" }}>
         <H3><Info label={`Ciele ${rok}`} text="Tržby a marža proti ročnému cieľu. Cieľ tržieb je prepočítaný na počet mesiacov, ktoré rok zatiaľ má — inak by aj skvelý rok vyzeral v marci na 25 %." /></H3>
-        <Klik kam={() => onNavigate("vysledky", "ciele")} onNavigate="Mesiac → Výsledky → Ciele">
+        <Klik kam={() => onNavigate("vysledky", "ciele")} onNavigate="Výsledky → Ciele">
           <div style={{ marginTop: 6 }}>
             <BarRow
               label={`Tržby (${idxRok.length} mes.)`} value={trzbyRok} max={Math.max(cielKMes, trzbyRok)}
@@ -1065,7 +1065,7 @@ export function useExtraGrafy({
     nodes.h1 = (
       <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column" }}>
         <H3><Info label="H1 2025 vs. H1 2026" text="Prvý polrok proti prvému polroku. Porovnávať posledný polrok s predošlým je pri sezónnom biznise klam — leto a jeseň sa nedajú porovnať. Rovnaké mesiace áno: to, čo zostane, je skutočný rast." /></H3>
-        <Klik kam={() => onNavigate("vysledky")} onNavigate="Mesiac → Výsledky">
+        <Klik kam={() => onNavigate("vysledky")} onNavigate="Výsledky">
           {h26.n === 0 ? <Empty>Rok 2026 ešte nemá prvý polrok uzavretý.</Empty> : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}>
               <MiniStat label={`Tržby H1 2025 (${h25.n} mes.)`} value={fmtCZK(h25.trzby)} />
@@ -1503,7 +1503,7 @@ export function useExtraGrafy({
               text="Počítané z dát v Kokpite, nie prepisované ručne. Ročné ciele sú prepočítané na uplynulé mesiace — polrok proti celoročnému cieľu by vyzeral ako zaostávanie, aj keby si bol na pláne. Ktoré riadky tu chceš, vyberáš v knižnici grafov; cieľ sa posúva vo Výsledkoch."
             />
           </H3>
-          <Klik kam={() => onNavigate("vysledky", "kpi")} onNavigate="Mesiac → Výsledky → KPI">
+          <Klik kam={() => onNavigate("vysledky", "kpi")} onNavigate="Výsledky → KPI">
             {riadky.length === 0 ? (
               <Empty>{vsetkyVSkupine ? "Všetky riadky tejto skupiny sú v knižnici odškrtnuté." : "Zatiaľ bez dát."}</Empty>
             ) : (
