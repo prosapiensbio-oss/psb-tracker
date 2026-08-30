@@ -42,6 +42,21 @@ describe("CTA pre fázy nákupného cyklu", () => {
     expect(z1).not.toContain("test-postury");
   });
 
+  it("fáza 3 posiela na rozcestník, nie na dychovú príručku", () => {
+    // /dychani je lead magnet o dychu — ako hlavné CTA fázy 3 je príliš úzke
+    // (Jerry, 30. 8. 2026). Rozcestník má osem tém aj podcast.
+    expect(CTA_FAZY[3]).toContain("pochopte-sve-telo");
+    expect(CTA_FAZY[3]).toContain("Co očekávat od biomechanického tréninku");
+  });
+
+  it("fáza 4 ponúka aj online tréning a nenesie číslo, čo zostarne", () => {
+    // Online má vlastné KPI s cieľom 10–15 % a je to jediné CTA bez stropu
+    // v kapacite štúdia. Číslo sa tu zámerne neuvádza — zostarlo by.
+    expect(CTA_FAZY[4]).toContain("online-trenink");
+    expect(CTA_FAZY[4]).toContain("ONLINE JE ZÁMER");
+    expect(CTA_FAZY[4]).not.toMatch(/\d+[,.]\d+\s*%/);
+  });
+
   it("pripomína striedanie formy a Stories bez odkazu v biu", () => {
     const z = zadanieProProject({ mesiac: "2026-10", faza: 5, koncept: "x", kto: "" });
     expect(z).toContain("Jedno CTA na jeden kus obsahu");

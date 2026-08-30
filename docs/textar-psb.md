@@ -254,13 +254,18 @@ zároveň jeden z dôvodov, prečo obsah pôsobí tlačivo.
 |---|---|
 | 1 · Nevie o probléme | **nič**. Vec, ktorú si divák overí na sebe hneď počas pozerania. Nanajvýš uloženie |
 | 2 · Tuší problém | test postury (`/test-postury`) — zadarmo, tri minúty, výsledok do 24 h |
-| 3 · Hľadá riešenie | text, ktorý vysvetlí, prečo doterajšie pokusy nezabrali — článok alebo príručka (`/dychani`) |
-| 4 · Vyberá dodávateľa | ako to u nás vyzerá: `/jak-to-funguje`, `/co-je-functional-patterns`, overená certifikácia |
+| 3 · Hľadá riešenie | `/pochopte-sve-telo` — osem tém, každá ako dokument aj podcast. Keď nič nesedí presne, „Co očekávat od biomechanického tréninku“. `/dychani` len pri téme o dychu |
+| 4 · Vyberá dodávateľa | `/jak-to-funguje`, `/co-je-functional-patterns`, overená certifikácia — a **`/online-trenink`**, kedykoľvek obsah nie je viazaný na Brno |
 | 5 · Rozhodnutý | úvodná diagnostika — odkaz v biu alebo správa |
 
 **Jedno CTA na jeden kus obsahu**, nie tri. Formu striedaj (odkaz v biu,
 správa, link sticker, uloženie); tá istá veta pod každým príspevkom prestane
 fungovať. V Stories nikdy „odkaz v biu" — tam je link sticker alebo správa.
+
+**Online je zámer, nie doplnok.** Má vlastné KPI („Online podiel“, cieľ
+10–15 % odtrénovaných hodín) a skutočnosť je hlboko pod ním. Je to jediné
+CTA, ktoré nemá strop v kapacite brnianskeho štúdia — takže kedykoľvek téma
+nie je viazaná na miesto, patrí do ponuky.
 
 Rebrík žije v `CTA_FAZY` v `app/src/lib/psb/mapaCyklu.ts` a chodí v každom
 zadaní z mapy cyklu. Instructions Projectu ho popisujú — obe strany sa musia

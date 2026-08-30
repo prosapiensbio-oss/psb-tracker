@@ -62,8 +62,8 @@ export const FAZA_MAPA = new Map<number, FazaDef>(FAZY.map((f) => [f.id, f]));
 export const CTA_FAZY: Record<number, string> = {
   1: "ŽIADNY odkaz a žiadna ponuka. Kto nevie, že má problém, nemá dôvod nikam klikať — a prosba oň znehodnotí aj to, čo si práve ukázal. Namiesto toho daj vec, ktorú si divák overí na sebe HNEĎ počas pozerania (postav sa, urob krok, všimni si X). Ak už niečo pýtaš, tak uloženie príspevku na neskôr.",
   2: "Test postury na prosapiens.cz/test-postury — zadarmo, tri minúty, výsledok do 24 hodín. Presne to, čo človek s príznakom potrebuje: premeniť „niečo ma bolí“ na pomenovanie. Nepýtaj tréning.",
-  3: "Text, ktorý vysvetlí, prečo doterajšie pokusy nezabrali — konkrétny článok na prosapiens.cz alebo príručka Struktura před technikou (prosapiens.cz/dychani). Človek, ktorý porovnáva, chce čítať, nie rezervovať.",
-  4: "Ukáž, ako to u nás vyzerá: prosapiens.cz/jak-to-funguje alebo /co-je-functional-patterns. Tu má zmysel aj overená certifikácia. Stále je to „pozri sa“, nie „objednaj sa“ — rozhoduje sa medzi nami a niekým iným a potrebuje podklady.",
+  3: "prosapiens.cz/pochopte-sve-telo — osem tém, každá ako dokument AJ ako podcast na Spotify. Kto porovnáva, chce čítať alebo počúvať, nie rezervovať. Vyber tému, ktorá sedí na obsah; keď žiadna nesedí presne, ber „Co očekávat od biomechanického tréninku“. Príručku Struktura před technikou (/dychani) ponúkni LEN pri téme o dychu — inak je príliš úzka.",
+  4: "Ukáž, ako to u nás vyzerá: prosapiens.cz/jak-to-funguje, /co-je-functional-patterns, a keď téma dovolí, prosapiens.cz/online-trenink. Tu má zmysel aj overená certifikácia. Stále je to „pozri sa“, nie „objednaj sa“ — rozhoduje sa medzi nami a niekým iným a potrebuje podklady.\nONLINE JE ZÁMER: Kokpit ho meria ako KPI „Online podiel“ s cieľom 10–15 % odtrénovaných hodín a skutočnosť je hlboko pod ním. Kedykoľvek obsah nie je viazaný na Brno, spomeň, že sa dá trénovať online — je to jediné CTA, ktoré nemá strop v kapacite štúdia.",
   5: "Úvodná diagnostika — odkaz v biu alebo správa. Toto je jediná fáza, kde sa priamo pýta o stretnutie, a preto to tu má vyznieť samozrejme, nie naliehavo.",
 };
 

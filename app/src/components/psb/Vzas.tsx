@@ -2864,10 +2864,10 @@ function KpiTab({ data, onNavigate }: { data: PSBData; onNavigate?: (tab: string
         );
       })}
 
-      <Card>
-        <H3>Ciele 2026, vybavenie a marketingová história</H3>
-        <Empty>Zoznam 13 cieľov s termínmi, nákupný zoznam vybavenia a mesačné marketingové čísla z 2025 sú zatiaľ len v Exceli — doplníme ich sem ako ďalší krok.</Empty>
-      </Card>
+      {/* Placeholder „Ciele 2026, vybavenie a marketingová história“ odstránený
+          30. 8. 2026: sľuboval, že ciele doplníme z Excelu, ale tie už majú
+          vlastnú podzáložku Ciele. Karta, ktorá sľubuje niečo hotové, je horšia
+          než žiadna. */}
     </>
   );
 }
