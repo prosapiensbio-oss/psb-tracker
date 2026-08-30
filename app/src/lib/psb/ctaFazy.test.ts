@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { CTA_FAZY, FAZY, ctaDoZadania, zadanieProProject } from "./mapaCyklu";
+import { CTA_FAZY, FAZY, FORMATY, ctaDoZadania, zadanieProProject } from "./mapaCyklu";
 
 /**
  * CTA podľa fázy nákupného cyklu.
@@ -42,11 +42,16 @@ describe("CTA pre fázy nákupného cyklu", () => {
     expect(z1).not.toContain("test-postury");
   });
 
-  it("fáza 3 posiela na rozcestník, nie na dychovú príručku", () => {
-    // /dychani je lead magnet o dychu — ako hlavné CTA fázy 3 je príliš úzke
-    // (Jerry, 30. 8. 2026). Rozcestník má osem tém aj podcast.
-    expect(CTA_FAZY[3]).toContain("pochopte-sve-telo");
-    expect(CTA_FAZY[3]).toContain("Co očekávat od biomechanického tréninku");
+  it("fáza 3 posiela na JEDNU stránku, nie na rozcestník", () => {
+    // Rozcestník s ôsmimi témami je menu — kto si má vybrať z ôsmich,
+    // nevyberie ani jednu (Jerry, 30. 8. 2026). /dychani je navyše lead
+    // magnet o dychu a ako hlavné CTA fázy 3 je príliš úzke.
+    expect(CTA_FAZY[3]).toContain("JEDNU konkrétnu stránku");
+    expect(CTA_FAZY[3]).not.toContain("pochopte-sve-telo");
+    // konkrétne adresy tém, z ktorých sa vyberá
+    for (const s of ["/principy-biomechaniky", "/postura-drzeni-tela", "/co-ocekavat-od-biomechanickeho-treninku"]) {
+      expect(CTA_FAZY[3]).toContain(s);
+    }
   });
 
   it("fáza 4 ponúka aj online tréning a nenesie číslo, čo zostarne", () => {
@@ -61,5 +66,33 @@ describe("CTA pre fázy nákupného cyklu", () => {
     const z = zadanieProProject({ mesiac: "2026-10", faza: 5, koncept: "x", kto: "" });
     expect(z).toContain("Jedno CTA na jeden kus obsahu");
     expect(z).toContain("link sticker");
+  });
+});
+
+/** Tvar obsahu — aby nebol každý kus príbeh klienta. */
+describe("tvary obsahu v zadaní", () => {
+  it("zadanie ponúka viac tvarov, nielen príbeh", () => {
+    const z = zadanieProProject({ mesiac: "2026-10", faza: 3, koncept: "x", kto: "" });
+    expect(z).toContain("TVAR OBSAHU");
+    expect(z).toContain("Rozbor jedného cviku");
+    expect(z).toContain("Otázka od klienta");
+    expect(z).toContain("Dva rovnaké tvary za sebou");
+  });
+
+  it("príbeh klienta je jeden z tvarov, nie jediný", () => {
+    expect(FORMATY.length).toBeGreaterThanOrEqual(5);
+    expect(FORMATY.some((f) => f.nazov === "Príbeh klienta")).toBe(true);
+  });
+
+  it("bez vybraného záberu ide do zadania katalóg, nie výmysel", () => {
+    const z = zadanieProProject({ mesiac: "2026-10", faza: 3, koncept: "x", kto: "" });
+    expect(z).toContain("ÚVODNÝ ZÁBER NIE JE VYBRANÝ");
+    expect(z).toContain("NEVYMÝŠĽAJ");
+  });
+
+  it("keď je záber vybraný, katalóg sa nepridáva", () => {
+    const z = zadanieProProject({ mesiac: "2026-10", faza: 3, koncept: "x", kto: "", zaber: "sledovanie" });
+    expect(z).toContain("ÚVODNÝ ZÁBER: Sledovanie chôdze zboku");
+    expect(z).not.toContain("ÚVODNÝ ZÁBER NIE JE VYBRANÝ");
   });
 });

@@ -21,7 +21,7 @@
  */
 
 import { jeMesiac } from "./format";
-import { zaberDoZadania } from "./zabery";
+import { zaberDoZadania, zaberyProFazu } from "./zabery";
 import { dlzkaDoZadania, sekvenciaDoZadania } from "./sekvencia";
 
 export type Faza = 0 | 1 | 2 | 3 | 4 | 5;
@@ -62,10 +62,37 @@ export const FAZA_MAPA = new Map<number, FazaDef>(FAZY.map((f) => [f.id, f]));
 export const CTA_FAZY: Record<number, string> = {
   1: "ŽIADNY odkaz a žiadna ponuka. Kto nevie, že má problém, nemá dôvod nikam klikať — a prosba oň znehodnotí aj to, čo si práve ukázal. Namiesto toho daj vec, ktorú si divák overí na sebe HNEĎ počas pozerania (postav sa, urob krok, všimni si X). Ak už niečo pýtaš, tak uloženie príspevku na neskôr.",
   2: "Test postury na prosapiens.cz/test-postury — zadarmo, tri minúty, výsledok do 24 hodín. Presne to, čo človek s príznakom potrebuje: premeniť „niečo ma bolí“ na pomenovanie. Nepýtaj tréning.",
-  3: "prosapiens.cz/pochopte-sve-telo — osem tém, každá ako dokument AJ ako podcast na Spotify. Kto porovnáva, chce čítať alebo počúvať, nie rezervovať. Vyber tému, ktorá sedí na obsah; keď žiadna nesedí presne, ber „Co očekávat od biomechanického tréninku“. Príručku Struktura před technikou (/dychani) ponúkni LEN pri téme o dychu — inak je príliš úzka.",
+  3: "Odkáž na JEDNU konkrétnu stránku, nikdy na rozcestník. Kto si má vybrať z ôsmich tém, nevyberie ani jednu. Každá téma má vlastnú adresu na prosapiens.cz a každá je aj podcast: /principy-biomechaniky (ako telo prenáša silu), /postura-drzeni-tela (držanie tela), /strecink-myty-a-legend (prečo strečing nedrží), /fascie-voda-v-nas-2 (fascie), /mechanotransdukce-jak-sily-formuji-vase-telo (ako záťaž mení tkanivo), /vyziva-k-lepsi-regeneraci (výživa a regenerácia), /idealni-pristup-2 (ako má vyzerať tréning), /co-ocekavat-od-biomechanickeho-treninku (čo čakať od spolupráce), /protokol-o-myofascialnim-uvolnovani (myofasciálne uvoľňovanie). Vyber tú, ktorá NADVÄZUJE na to, čo si práve povedal, a v texte ju pomenuj — nie „osem tém“, ale názov tej jednej. Príručku /dychani ponúkni LEN pri téme o dychu.",
   4: "Ukáž, ako to u nás vyzerá: prosapiens.cz/jak-to-funguje, /co-je-functional-patterns, a keď téma dovolí, prosapiens.cz/online-trenink. Tu má zmysel aj overená certifikácia. Stále je to „pozri sa“, nie „objednaj sa“ — rozhoduje sa medzi nami a niekým iným a potrebuje podklady.\nONLINE JE ZÁMER: Kokpit ho meria ako KPI „Online podiel“ s cieľom 10–15 % odtrénovaných hodín a skutočnosť je hlboko pod ním. Kedykoľvek obsah nie je viazaný na Brno, spomeň, že sa dá trénovať online — je to jediné CTA, ktoré nemá strop v kapacite štúdia.",
   5: "Úvodná diagnostika — odkaz v biu alebo správa. Toto je jediná fáza, kde sa priamo pýta o stretnutie, a preto to tu má vyznieť samozrejme, nie naliehavo.",
 };
+
+/**
+ * Tvary obsahu — aby nebol každý kus príbeh klienta.
+ *
+ * Jerry, 30. 8. 2026: „stala sa z toho jednotvárnosť, buď je to príbeh toho
+ * alebo onoho.“ Mal pravdu. Zákon „píš, čo sa stalo jednému človeku“ je dobrý
+ * ako zdroj konkrétnosti, ale zlý ako jediný formát — päť po sebe idúcich
+ * scenárov vyzeralo ako päť prípadových štúdií. Príbeh je JEDEN z tvarov,
+ * nie ten jediný.
+ */
+export const FORMATY: { nazov: string; co: string }[] = [
+  { nazov: "Rozbor jedného cviku", co: "Ukáž, ako ho ľudia robia, a čo sa pri tom deje inde v tele. Bez klienta, bez príbehu — stačí telo a kamera." },
+  { nazov: "Otázka od klienta", co: "Vezmi vetu, ktorú ti niekto povedal na tréningu, a odpovedz na ňu. Jazyk otázky je jazyk publika a nedá sa vymyslieť." },
+  { nazov: "Vyvrátenie tvrdenia", co: "Vec, ktorú počuť všade („strečing na to pomôže“). Povedz, prečo to nesedí, a čím to nahradiť. Vecne, bez posmechu." },
+  { nazov: "Pozorovanie z praxe", co: "„Tento týždeň prišli traja ľudia s tým istým.“ Nie príbeh jedného, ale vzorec, ktorý vidíš opakovane." },
+  { nazov: "Demonštrácia bez slov", co: "Rozdiel, ktorý je vidieť. Text na obrazovke, minimum hovoreného. Najsilnejšie tam, kde sa pohyb dá porovnať pred a po." },
+  { nazov: "Príbeh klienta", co: "Čo sa stalo jednému človeku. Najsilnejší tvar — a preto sa vyčerpá najrýchlejšie, keď sa použije na všetko." },
+];
+
+/** Riadok o formáte do zadania — s pripomienkou, že sa nemá opakovať. */
+export function formatyDoZadania(): string {
+  return [
+    "TVAR OBSAHU — vyber jeden a napíš na začiatku odpovede, ktorý si zvolil:",
+    ...FORMATY.map((f) => `• ${f.nazov} — ${f.co}`),
+    "Dva rovnaké tvary za sebou nie sú obsahový plán, ale šablóna. Keď v zadaní vidíš, že predošlý kus bol príbeh klienta, siahni po inom.",
+  ].join("\n");
+}
 
 /** Riadok o CTA do zadania. Bez fázy sa nepridáva — hádať by sa nemalo. */
 export function ctaDoZadania(faza: number): string {
@@ -243,6 +270,12 @@ export function zadanieProProject(s: {
   // vybraný, Project ho má rozpísať, nie si vymyslieť vlastný.
   const zab = zaberDoZadania(s.zaber || "");
   if (zab) riadky.push("", zab);
+  // Keď záber vybraný nie je, ide do zadania katalóg — inak si ho pisateľ
+  // vymyslí a vyzerá to ako náhodné obrázky (Jerry, 30. 8. 2026).
+  else {
+    const kat = zaberyProFazu(s.faza);
+    if (kat) riadky.push("", kat);
+  }
   // Dĺžka ide do zadania VŽDY. Bez nej Project napíše text na minútu a pol
   // a Jerry ho bude škrtať — pritom publikum PSB pozerá 12,7 sekundy.
   const dl = dlzkaDoZadania(s.faza);
@@ -251,6 +284,9 @@ export function zadanieProProject(s: {
   // scenár úvodnou diagnostikou, aj keď divák ešte nevie, že má problém.
   const cta = ctaDoZadania(s.faza);
   if (cta) riadky.push("", cta);
+  // Tvar obsahu ide do zadania VŽDY. Bez neho vyjde z každého zadania príbeh
+  // klienta — najsilnejší tvar, ktorý sa opakovaním vyčerpá najrýchlejšie.
+  riadky.push("", formatyDoZadania());
   // Keď je sekvencia rozpísaná, ide do zadania celá — Project ju má
   // pripomienkovať, nie navrhovať znova od nuly.
   const sek = sekvenciaDoZadania(s.sekvencia || "");

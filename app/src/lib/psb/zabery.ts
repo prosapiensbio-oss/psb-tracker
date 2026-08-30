@@ -184,6 +184,24 @@ export const zaberyPreFazu = (faza: number) => ZABERY.filter((z) => z.fazy.inclu
  * Prázdny reťazec, keď záber nie je vybraný — Project potom o ňom nepíše
  * a nevymyslí si vlastný.
  */
+/**
+ * Keď záber vybraný NIE JE, zadanie ponúkne katalóg pre danú fázu.
+ *
+ * Bez toho si ten, kto píše, zábery vymyslí — a vyzerá to presne tak.
+ * Jerry, 30. 8. 2026: „tie zábery mi prídu ako náhodne generované obrázky.“
+ * Mal pravdu a bola to moja chyba: katalóg pätnástich záberov s návodom, ako
+ * sa točia telefónom, tu je od začiatku a ja som ho obišiel.
+ */
+export function zaberyProFazu(faza: number): string {
+  const vhodne = ZABERY.filter((z) => z.fazy.includes(faza as never));
+  if (!vhodne.length) return "";
+  return [
+    "ÚVODNÝ ZÁBER NIE JE VYBRANÝ. Zábery si NEVYMÝŠĽAJ — vyber jeden z tohto katalógu a povedz, prečo práve ten:",
+    ...vhodne.map((z) => `• ${z.nazov} — ${z.coRobi}`),
+    "Ak ti ani jeden nesedí, napíš to a nechaj výber na mne; lepšie žiadny záber než vymyslený.",
+  ].join("\n");
+}
+
 export function zaberDoZadania(id: string): string {
   const z = ZABER_MAPA.get(id);
   if (!z) return "";

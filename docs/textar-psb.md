@@ -273,7 +273,41 @@ meniť naraz.
 
 ---
 
-## 10. Prečo tie zátvorky nie sú lenivosť
+## 10. Príbeh je JEDEN tvar, nie jediný
+
+Jerry, 30. 8. 2026, po piatich scenároch podľa tohto dokumentu: *„stala sa
+z toho jednotvárnosť, buď je to príbeh toho alebo onoho."* Mal pravdu a je to
+chyba tohto dokumentu, nie jeho čítania. Zákon „píš, čo sa stalo jednému
+človeku" je správny ako **zdroj konkrétnosti** a nesprávny ako **jediný
+formát**: opravil texty, ktoré zneli ako esej, a vyrobil texty, ktoré znejú
+ako prípadová štúdia. Zakázané ťahy strážia vetu; nikto nestrážil tvar.
+
+Tvary, medzi ktorými sa strieda (v `FORMATY`, chodia v každom zadaní):
+rozbor jedného cviku · otázka od klienta · vyvrátenie tvrdenia · pozorovanie
+z praxe · demonštrácia bez slov · príbeh klienta.
+
+**Dva rovnaké tvary za sebou nie sú plán, ale šablóna.** Príbeh je najsilnejší
+— a preto sa opakovaním vyčerpá najrýchlejšie.
+
+## 11. CTA na rozcestník je CTA na nič
+
+Jerry: *„ak si má človek vybrať z 8 tém, nevyberie si ani jednu."* Presne tak,
+a odporuje to zákonu konkrétnosti o dva odseky vyššie. Každá z tém na
+`/pochopte-sve-telo` má **vlastnú adresu** — CTA teda pomenuje jednu z nich,
+tú, ktorá nadväzuje na to, čo práve zaznelo. Rozcestník je miesto, kde téma
+býva, nie odpoveď pre diváka.
+
+## 12. Zábery sa nevymýšľajú, vyberajú
+
+Jerry: *„tie zábery mi prídu ako náhodne generované obrázky."* Boli. Kokpit má
+katalóg pätnástich záberov — čo každý robí, ako sa točí telefónom, prečo je
+dobrý pre PSB a do ktorých fáz sedí — a ja som ho pri písaní obišiel a zábery
+si vymyslel. Odteraz: keď v zadaní záber vybraný nie je, príde **katalóg pre
+danú fázu** a pokyn nevymýšľať. Lepšie žiadny záber než vymyslený.
+
+---
+
+## 13. Prečo tie zátvorky nie sú lenivosť
 
 **OPRAVENÉ 29. 8. 2026.** Pôvodne tu stálo, že PSB nemá kde vziať
 konkrétnosti, lebo v D1 nie je zapísaný ani jeden klientsky príbeh. Bola to
