@@ -242,7 +242,33 @@ v Contexte Claude Projectu a Instructions na ne odkazujú.
 
 ---
 
-## 9. Prečo tie zátvorky nie sú lenivosť
+## 9. CTA patrí k fáze, nie na koniec každého textu
+
+Jerry, 30. 8. 2026: *„nemalo by tam byť aj nejaké CTA pre jednotlivé nákupné
+fázy?"* Malo. Do vtedy zadanie hovorilo, komu sa píše a čo má obsah urobiť,
+ale o výzve mlčalo — takže každý scenár končil úvodnou diagnostikou. Pýtať si
+tréning od človeka, ktorý ešte nevie, že má problém, je zahodená výzva a
+zároveň jeden z dôvodov, prečo obsah pôsobí tlačivo.
+
+| fáza | čo si smieš pýtať |
+|---|---|
+| 1 · Nevie o probléme | **nič**. Vec, ktorú si divák overí na sebe hneď počas pozerania. Nanajvýš uloženie |
+| 2 · Tuší problém | test postury (`/test-postury`) — zadarmo, tri minúty, výsledok do 24 h |
+| 3 · Hľadá riešenie | text, ktorý vysvetlí, prečo doterajšie pokusy nezabrali — článok alebo príručka (`/dychani`) |
+| 4 · Vyberá dodávateľa | ako to u nás vyzerá: `/jak-to-funguje`, `/co-je-functional-patterns`, overená certifikácia |
+| 5 · Rozhodnutý | úvodná diagnostika — odkaz v biu alebo správa |
+
+**Jedno CTA na jeden kus obsahu**, nie tri. Formu striedaj (odkaz v biu,
+správa, link sticker, uloženie); tá istá veta pod každým príspevkom prestane
+fungovať. V Stories nikdy „odkaz v biu" — tam je link sticker alebo správa.
+
+Rebrík žije v `CTA_FAZY` v `app/src/lib/psb/mapaCyklu.ts` a chodí v každom
+zadaní z mapy cyklu. Instructions Projectu ho popisujú — obe strany sa musia
+meniť naraz.
+
+---
+
+## 10. Prečo tie zátvorky nie sú lenivosť
 
 **OPRAVENÉ 29. 8. 2026.** Pôvodne tu stálo, že PSB nemá kde vziať
 konkrétnosti, lebo v D1 nie je zapísaný ani jeden klientsky príbeh. Bola to

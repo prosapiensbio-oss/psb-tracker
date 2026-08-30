@@ -46,6 +46,38 @@ export const FAZY: FazaDef[] = [
 
 export const FAZA_MAPA = new Map<number, FazaDef>(FAZY.map((f) => [f.id, f]));
 
+/**
+ * Výzva na akciu podľa fázy.
+ *
+ * Do 30. 8. 2026 zadanie hovorilo, KOMU sa píše a ČO má obsah urobiť, ale
+ * o CTA mlčalo — takže každý scenár končil úvodnou diagnostikou. Jerry:
+ * „nemalo by tam byť aj nejaké CTA pre jednotlivé nákupné fázy?“ Má pravdu:
+ * pýtať si tréning od človeka, ktorý ešte nevie, že má problém, je zahodená
+ * výzva a zároveň dôvod, prečo pôsobí obsah tlačivo.
+ *
+ * Rebrík ide od „nič si nepýtaj“ po „ozvi sa dnes“. Ku každej fáze patrí to,
+ * čo si od diváka v tej chvíli MÔŽEŠ pýtať — nie to, čo by sme chceli.
+ * Naliehavosť a umelý nedostatok sú mimo (kánon).
+ */
+export const CTA_FAZY: Record<number, string> = {
+  1: "ŽIADNY odkaz a žiadna ponuka. Kto nevie, že má problém, nemá dôvod nikam klikať — a prosba oň znehodnotí aj to, čo si práve ukázal. Namiesto toho daj vec, ktorú si divák overí na sebe HNEĎ počas pozerania (postav sa, urob krok, všimni si X). Ak už niečo pýtaš, tak uloženie príspevku na neskôr.",
+  2: "Test postury na prosapiens.cz/test-postury — zadarmo, tri minúty, výsledok do 24 hodín. Presne to, čo človek s príznakom potrebuje: premeniť „niečo ma bolí“ na pomenovanie. Nepýtaj tréning.",
+  3: "Text, ktorý vysvetlí, prečo doterajšie pokusy nezabrali — konkrétny článok na prosapiens.cz alebo príručka Struktura před technikou (prosapiens.cz/dychani). Človek, ktorý porovnáva, chce čítať, nie rezervovať.",
+  4: "Ukáž, ako to u nás vyzerá: prosapiens.cz/jak-to-funguje alebo /co-je-functional-patterns. Tu má zmysel aj overená certifikácia. Stále je to „pozri sa“, nie „objednaj sa“ — rozhoduje sa medzi nami a niekým iným a potrebuje podklady.",
+  5: "Úvodná diagnostika — odkaz v biu alebo správa. Toto je jediná fáza, kde sa priamo pýta o stretnutie, a preto to tu má vyznieť samozrejme, nie naliehavo.",
+};
+
+/** Riadok o CTA do zadania. Bez fázy sa nepridáva — hádať by sa nemalo. */
+export function ctaDoZadania(faza: number): string {
+  const cta = CTA_FAZY[faza];
+  if (!cta) return "";
+  return [
+    `VÝZVA NA AKCIU (CTA) PRE TÚTO FÁZU: ${cta}`,
+    "Jedno CTA na jeden kus obsahu, nie tri. Formu striedaj (odkaz v biu, správa, link sticker, uloženie) — tá istá veta pod každým príspevkom prestane fungovať. V Stories NEPOUŽÍVAJ „odkaz v biu“, tam je link sticker alebo správa.",
+  ].join("\n");
+}
+
+
 export const jeFaza = (v: unknown): v is Faza => Number.isInteger(v) && Number(v) >= 0 && Number(v) <= 5;
 
 /** Názov fázy pre výpisy — aj pre nezaradené, nech nikde nesvieti holá nula. */
@@ -215,6 +247,10 @@ export function zadanieProProject(s: {
   // a Jerry ho bude škrtať — pritom publikum PSB pozerá 12,7 sekundy.
   const dl = dlzkaDoZadania(s.faza);
   if (dl) riadky.push("", dl);
+  // CTA ide do zadania VŽDY, keď je fáza známa. Bez neho Project končí každý
+  // scenár úvodnou diagnostikou, aj keď divák ešte nevie, že má problém.
+  const cta = ctaDoZadania(s.faza);
+  if (cta) riadky.push("", cta);
   // Keď je sekvencia rozpísaná, ide do zadania celá — Project ju má
   // pripomienkovať, nie navrhovať znova od nuly.
   const sek = sekvenciaDoZadania(s.sekvencia || "");
