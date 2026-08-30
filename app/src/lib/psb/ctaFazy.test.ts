@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { CTA_FAZY, FAZY, FORMATY, ctaDoZadania, zadanieProProject } from "./mapaCyklu";
+import { CTA_FAZY, DOKUMENTY, FAZY, FORMATY, ctaDoZadania, zadanieProProject } from "./mapaCyklu";
 
 /**
  * CTA podľa fázy nákupného cyklu.
@@ -42,15 +42,18 @@ describe("CTA pre fázy nákupného cyklu", () => {
     expect(z1).not.toContain("test-postury");
   });
 
-  it("fáza 3 posiela na JEDNU stránku, nie na rozcestník", () => {
+  it("fáza 3 odkazuje na stránku zvoleného dokumentu", () => {
+    expect(CTA_FAZY[3]).toContain("JEDNU konkrétnu stránku");
+    expect(CTA_FAZY[3]).toContain("POMENUJ");
+    expect(CTA_FAZY[3]).not.toContain("pochopte-sve-telo");
+  });
+
+  it("pôvodná kontrola: nie rozcestník", () => {
     // Rozcestník s ôsmimi témami je menu — kto si má vybrať z ôsmich,
     // nevyberie ani jednu (Jerry, 30. 8. 2026). /dychani je navyše lead
     // magnet o dychu a ako hlavné CTA fázy 3 je príliš úzke.
-    expect(CTA_FAZY[3]).toContain("JEDNU konkrétnu stránku");
-    expect(CTA_FAZY[3]).not.toContain("pochopte-sve-telo");
-    // konkrétne adresy tém, z ktorých sa vyberá
-    for (const s of ["/principy-biomechaniky", "/postura-drzeni-tela", "/co-ocekavat-od-biomechanickeho-treninku"]) {
-      expect(CTA_FAZY[3]).toContain(s);
+    for (const d of ["principy-biomechaniky", "postura-drzeni-tela", "co-ocekavat-od-biomechanickeho-treninku"]) {
+      expect(DOKUMENTY.some((x) => x.slug === d)).toBe(true);
     }
   });
 
@@ -94,5 +97,28 @@ describe("tvary obsahu v zadaní", () => {
     const z = zadanieProProject({ mesiac: "2026-10", faza: 3, koncept: "x", kto: "", zaber: "sledovanie" });
     expect(z).toContain("ÚVODNÝ ZÁBER: Sledovanie chôdze zboku");
     expect(z).not.toContain("ÚVODNÝ ZÁBER NIE JE VYBRANÝ");
+  });
+});
+
+/** Dokumenty: látka aj cieľ odkazu. */
+describe("dokumenty v zadaní", () => {
+  it("zadanie nesie katalóg dokumentov a pokyn postaviť to na jednom", () => {
+    const z = zadanieProProject({ mesiac: "2026-10", faza: 3, koncept: "x", kto: "" });
+    expect(z).toContain("POSTAV TO NA JEDNOM DOKUMENTE");
+    expect(z).toContain("prosapiens.cz/strecink-myty-a-legend");
+  });
+
+  it("každý dokument má názov, adresu aj to, čo dáva", () => {
+    expect(DOKUMENTY.length).toBeGreaterThanOrEqual(9);
+    for (const d of DOKUMENTY) {
+      expect(d.nazov.length).toBeGreaterThan(3);
+      expect(d.slug).toMatch(/^[a-z0-9-]+$/);
+      expect(d.dava.length).toBeGreaterThan(10);
+    }
+  });
+
+  it("zakazuje vymyslený dokument", () => {
+    const z = zadanieProProject({ mesiac: "2026-10", faza: 2, koncept: "x", kto: "" });
+    expect(z).toContain("NEVYMÝŠĽAJ");
   });
 });

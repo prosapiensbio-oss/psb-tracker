@@ -307,7 +307,30 @@ danú fázu** a pokyn nevymýšľať. Lepšie žiadny záber než vymyslený.
 
 ---
 
-## 13. Prečo tie zátvorky nie sú lenivosť
+## 13. Dokument ako látka aj ako odkaz
+
+Jerry, 30. 8. 2026: *„verím, že na každý z tých dokumentov sa dá spraviť
+príspevok, reel aj infografika na každú fázu."* Deväť dokumentov
+z `/pochopte-sve-telo` × päť fáz je **45 kusov obsahu** — pri tempe **7,6
+príspevku mesačne** (61 za osem mesiacov 2026) je to zásoba na roky, a to sú
+len tieto. Sú k tomu ešte 45 článkov, Naudiho streamy a kniha o fasciách.
+
+**Dva účely naraz.** Dokument dáva látku — fakty, ktoré sa nedajú vymyslieť —
+a zároveň je CTA: kus postavený na Strečingu končí odkazom na Strečink. Tým
+sa rieši aj to, že odkaz na rozcestník je odkaz na nič.
+
+**Ale matica nie je plán.** Nie každá bunka stojí za vyplnenie: Výživa vo fáze
+„vyberá dodávateľa" nepovie, prečo si vybrať PSB. Zásoba hovorí, že sa nemáš
+čoho báť; nehovorí, čo publikovať v októbri.
+
+**A nezamieňať s dosahom.** Rozmanitosť lieči jednotvárnosť, ktorú Jerry cíti,
+a pravdepodobne aj pomôže dosahu — opakovaný tvar diskontuje algoritmus aj
+človek. Ale úzke hrdlo PSB je podľa vlastnej analýzy dosah, nie skladba tém
+(viď `obsah-faza-nie-je-diera`). Väčšia zásoba tém sama o sebe dopyt nespraví.
+
+---
+
+## 14. Prečo tie zátvorky nie sú lenivosť
 
 **OPRAVENÉ 29. 8. 2026.** Pôvodne tu stálo, že PSB nemá kde vziať
 konkrétnosti, lebo v D1 nie je zapísaný ani jeden klientsky príbeh. Bola to

@@ -62,10 +62,47 @@ export const FAZA_MAPA = new Map<number, FazaDef>(FAZY.map((f) => [f.id, f]));
 export const CTA_FAZY: Record<number, string> = {
   1: "ŽIADNY odkaz a žiadna ponuka. Kto nevie, že má problém, nemá dôvod nikam klikať — a prosba oň znehodnotí aj to, čo si práve ukázal. Namiesto toho daj vec, ktorú si divák overí na sebe HNEĎ počas pozerania (postav sa, urob krok, všimni si X). Ak už niečo pýtaš, tak uloženie príspevku na neskôr.",
   2: "Test postury na prosapiens.cz/test-postury — zadarmo, tri minúty, výsledok do 24 hodín. Presne to, čo človek s príznakom potrebuje: premeniť „niečo ma bolí“ na pomenovanie. Nepýtaj tréning.",
-  3: "Odkáž na JEDNU konkrétnu stránku, nikdy na rozcestník. Kto si má vybrať z ôsmich tém, nevyberie ani jednu. Každá téma má vlastnú adresu na prosapiens.cz a každá je aj podcast: /principy-biomechaniky (ako telo prenáša silu), /postura-drzeni-tela (držanie tela), /strecink-myty-a-legend (prečo strečing nedrží), /fascie-voda-v-nas-2 (fascie), /mechanotransdukce-jak-sily-formuji-vase-telo (ako záťaž mení tkanivo), /vyziva-k-lepsi-regeneraci (výživa a regenerácia), /idealni-pristup-2 (ako má vyzerať tréning), /co-ocekavat-od-biomechanickeho-treninku (čo čakať od spolupráce), /protokol-o-myofascialnim-uvolnovani (myofasciálne uvoľňovanie). Vyber tú, ktorá NADVÄZUJE na to, čo si práve povedal, a v texte ju pomenuj — nie „osem tém“, ale názov tej jednej. Príručku /dychani ponúkni LEN pri téme o dychu.",
+  3: "Odkáž na JEDNU konkrétnu stránku, nikdy na rozcestník — kto si má vybrať z ôsmich tém, nevyberie ani jednu. Je to stránka toho dokumentu, na ktorom si kus postavil (viď zoznam vyššie), a v texte ju POMENUJ: nie „osem tém“, ale názov tej jednej. Každý dokument je aj podcast, takže sa dá ponúknuť na prečítanie aj na vypočutie. Príručku /dychani ponúkni LEN pri téme o dychu.",
   4: "Ukáž, ako to u nás vyzerá: prosapiens.cz/jak-to-funguje, /co-je-functional-patterns, a keď téma dovolí, prosapiens.cz/online-trenink. Tu má zmysel aj overená certifikácia. Stále je to „pozri sa“, nie „objednaj sa“ — rozhoduje sa medzi nami a niekým iným a potrebuje podklady.\nONLINE JE ZÁMER: Kokpit ho meria ako KPI „Online podiel“ s cieľom 10–15 % odtrénovaných hodín a skutočnosť je hlboko pod ním. Kedykoľvek obsah nie je viazaný na Brno, spomeň, že sa dá trénovať online — je to jediné CTA, ktoré nemá strop v kapacite štúdia.",
   5: "Úvodná diagnostika — odkaz v biu alebo správa. Toto je jediná fáza, kde sa priamo pýta o stretnutie, a preto to tu má vyznieť samozrejme, nie naliehavo.",
 };
+
+/**
+ * Dokumenty, z ktorých sa dá stavať obsah.
+ *
+ * Deväť tém z prosapiens.cz/pochopte-sve-telo, každá ako text AJ ako podcast.
+ * Jerry, 30. 8. 2026: „verím, že na každý z tých dokumentov sa dá spraviť
+ * príspevok, reel aj infografika na každú fázu.“ Deväť dokumentov × päť fáz
+ * je 45 kusov obsahu — pri tempe 7,6 príspevku mesačne je to zásoba na roky,
+ * a to sú len tieto; sú k tomu ešte články, Naudiho streamy a kniha o fasciách.
+ *
+ * DVA ÚČELY NARAZ: dokument dáva látku (fakty, ktoré sa nedajú vymyslieť)
+ * a zároveň je CTA — kus postavený na Strečingu končí odkazom na Strečing.
+ * Tým sa rieši aj to, že odkaz na rozcestník s ôsmimi témami je odkaz na nič.
+ *
+ * NIE KAŽDÁ BUNKA MATICE STOJÍ ZA VYPLNENIE. Výživa vo fáze „vyberá
+ * dodávateľa“ nepovie, prečo si vybrať nás. Matica je zásoba, nie plán.
+ */
+export const DOKUMENTY: { nazov: string; slug: string; dava: string }[] = [
+  { nazov: "Principy biomechaniky", slug: "principy-biomechaniky", dava: "ako telo prenáša silu — základ pod všetko ostatné" },
+  { nazov: "Fascie: Skrytá síť v těle", slug: "fascie-voda-v-nas-2", dava: "prečo bolí inde, než je príčina" },
+  { nazov: "Mechanotransdukce", slug: "mechanotransdukce-jak-sily-formuji-vase-telo", dava: "ako záťaž prestavuje tkanivo — argument pre trpezlivosť" },
+  { nazov: "Strečink: Mýty a legendy", slug: "strecink-myty-a-legend", dava: "prečo naťahovanie nedrží; najlepší materiál na vyvracanie" },
+  { nazov: "Postura — základ zdravého těla", slug: "postura-drzeni-tela", dava: "držanie tela ako výsledok, nie ako poloha" },
+  { nazov: "Výživa pro pohyb a regeneraci", slug: "vyziva-k-lepsi-regeneraci", dava: "prostredie, v ktorom sa telo mení; Terezkina téma" },
+  { nazov: "Ideální přístup k tréninku", slug: "idealni-pristup-2", dava: "ako má tréning vyzerať a prečo" },
+  { nazov: "Co očekávat od biomechanického tréninku", slug: "co-ocekavat-od-biomechanickeho-treninku", dava: "časový rámec a čo sa deje kedy — proti falošným očakávaniam" },
+  { nazov: "Myofasciální uvolňování — protokol", slug: "protokol-o-myofascialnim-uvolnovani", dava: "praktický postup, ktorý si divák môže skúsiť sám" },
+];
+
+/** Katalóg dokumentov do zadania — látka aj cieľ odkazu v jednom. */
+export function dokumentyDoZadania(): string {
+  return [
+    "POSTAV TO NA JEDNOM DOKUMENTE. Na začiatku odpovede napíš, ktorý si zvolil; jeho stránka je zároveň CTA (platí pre fázu 3, v ostatných fázach sa CTA riadi svojím pravidlom).",
+    ...DOKUMENTY.map((d) => `• ${d.nazov} — ${d.dava} · prosapiens.cz/${d.slug}`),
+    "Každý z nich je aj podcast, takže sa dá ponúknuť na počúvanie. Ak téma zadania nesedí ani na jeden, povedz to a stav na tom, čo je v zadaní — dokument si NEVYMÝŠĽAJ.",
+  ].join("\n");
+}
 
 /**
  * Tvary obsahu — aby nebol každý kus príbeh klienta.
@@ -286,6 +323,9 @@ export function zadanieProProject(s: {
   if (cta) riadky.push("", cta);
   // Tvar obsahu ide do zadania VŽDY. Bez neho vyjde z každého zadania príbeh
   // klienta — najsilnejší tvar, ktorý sa opakovaním vyčerpá najrýchlejšie.
+  // Dokument je látka aj cieľ odkazu. Bez neho stojí každý kus na tom, čo si
+  // pisateľ pamätá — a to je presne cesta k jednotvárnosti.
+  riadky.push("", dokumentyDoZadania());
   riadky.push("", formatyDoZadania());
   // Keď je sekvencia rozpísaná, ide do zadania celá — Project ju má
   // pripomienkovať, nie navrhovať znova od nuly.
