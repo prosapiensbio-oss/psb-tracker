@@ -541,3 +541,14 @@ a kontrolných promptov. Nič z toho by nespadlo v testoch: sú to reťazce.
 **Postup pri premenovaní alebo presune záložky:** id NIKDY nemeniť (visia na
 ňom adresy, ciele rituálov, Jarvisove odkazy), a potom
 `grep -rn '<starý názov>' src/lib src/components` a prejsť všetko.
+
+## Jarvisovi neposielaj dátum, posielaj rozsah
+
+`weekLabel` dáva len pondelok („17.8.“). Dlaždice s tým vystačia — človek vidí
+stĺpec v tabuľke. Jarvis nie: 30. 8. 2026 si z toho domyslel okno „18.–24. 8.“
+a Jerrymu tvrdil pokles 5 %, kým dlaždica hovorila 18 %. Dlaždica mala pravdu.
+
+**Každý časový údaj v aiContext musí byť jednoznačný** — rozsah pre človeka
+(`17.–23. 8. 2026`) a `od`/`do` v ISO pre stroj. Skratka, ktorú si musí model
+domyslieť, sa raz domyslí zle a nikto to nezistí, kým dve miesta nepovedia
+dve rôzne čísla.

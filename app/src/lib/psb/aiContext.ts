@@ -92,6 +92,26 @@ export function buildAiContext(
 ) {
   const clientList = Object.values(clients);
 
+  /**
+   * Týždeň sa Jarvisovi posiela ako ROZSAH, nie ako jeden deň.
+   *
+   * `weekLabel` dáva len pondelok („17.8.“) a Jarvis si musí domyslieť, čo to
+   * je za obdobie. 30. 8. 2026 si domyslel „18.–24. 8.“ a „11.–17. 8.“ —
+   * posunuté o deň — a k tomu priradil čísla, ktoré nesedeli ani na jedno
+   * okno. Jerrymu potom tvrdil pokles 5 %, kým dlaždica hovorila 18 %.
+   * Rozsah aj strojové `od`/`do` nedávajú priestor na hádanie.
+   */
+  const rozsahTyzdna = (k: string) => {
+    const od = new Date(`${k}T00:00:00Z`);
+    const do_ = new Date(od.getTime() + 6 * 86400_000);
+    const isoDo = do_.toISOString().slice(0, 10);
+    return {
+      tyzden: `${od.getUTCDate()}.–${do_.getUTCDate()}. ${do_.getUTCMonth() + 1}. ${do_.getUTCFullYear()}`,
+      od: k,
+      do: isoDo,
+    };
+  };
+
   // ── Weekly hours per trainer (same source as the "Odrobené hodiny/týždeň" card) ──
   const weekMap: Record<string, { Jerry: number; Terezka: number; iny: number }> = {};
   for (const s of data.sessions) {
@@ -114,7 +134,7 @@ export function buildAiContext(
   const useknuty = poslednyDen && new Date(`${poslednyDen}T00:00:00Z`).getUTCDay() !== 0 ? weekKey(poslednyDen) : "";
   const perWeekTotal = weekRows
     .filter(([k]) => k !== useknuty)
-    .map(([k, v]) => ({ label: weekLabel(k), h: v.Jerry + v.Terezka + v.iny })).filter((p) => p.h > 0);
+    .map(([k, v]) => ({ label: rozsahTyzdna(k).tyzden, h: v.Jerry + v.Terezka + v.iny })).filter((p) => p.h > 0);
   let wMax = perWeekTotal[0], wMin = perWeekTotal[0], wSum = 0;
   for (const p of perWeekTotal) {
     wSum += p.h;
@@ -125,7 +145,7 @@ export function buildAiContext(
     ? { priemer: r1(wSum / perWeekTotal.length), max: { tyzden: wMax.label, hodiny: r0(wMax.h) }, min: { tyzden: wMin.label, hodiny: r0(wMin.h) }, pocetTyzdnov: perWeekTotal.length, zdravaZona: `${ZONE_LO}–${ZONE_HI}h na trénera` }
     : null;
   // Full weekly history split by trainer — lets the bot answer "koľko urobil Jerry vs Terezka v týždni X".
-  const tyzdennePodlaTrenera = weekRows.map(([k, v]) => ({ tyzden: weekLabel(k), jerry: r1(v.Jerry), terezka: r1(v.Terezka), spolu: r1(v.Jerry + v.Terezka) }));
+  const tyzdennePodlaTrenera = weekRows.map(([k, v]) => ({ ...rozsahTyzdna(k), jerry: r1(v.Jerry), terezka: r1(v.Terezka), spolu: r1(v.Jerry + v.Terezka) }));
 
   // ── Zdravá zóna donut: trainer-weeks in / below / above the zone ──
   let zdrava = 0, pod = 0, nad = 0;
@@ -166,7 +186,7 @@ export function buildAiContext(
     aktivnychKlientov: clientList.filter((c) => c.status !== "Neaktívny").length,
     // Vedome NIE „tento týždeň“: PTminder sa prepisuje raz týždenne, takže
     // posledný týždeň s dátami je spravidla ten minulý. Názov klamal.
-    odrobenePoslednyUplnyTyzden: { hodiny: r0(weekHours), tyzden: lastWeek ? weekLabel(lastWeek) : null },
+    odrobenePoslednyUplnyTyzden: { hodiny: r0(weekHours), ...(lastWeek ? rozsahTyzdna(lastWeek) : { tyzden: null, od: null, do: null }) },
     zarobkyPoslednyPlnyMesiac: lastMonth ? { mesiac: monthLabel(lastMonth.month), czk: r0(lastMonth.revenue) } : null,
     klientov6M: sixM.length,
   };
