@@ -55,12 +55,13 @@ export function naPlnuAdresu(x: string): string | null {
  * zoznamu by potichu zabilo funkčné odkazy v registri aj v starých debatách.
  */
 export const CIELE = [
-  // dnešné záložky
-  "dashboard", "kalendar", "tracker", "vzas", "marketing", "mesiac", "jarvis",
+  // dnešné záložky. „mesiac“ je Výsledky a „udaje“ je Upload — nápisy sa
+  // 29. 8. 2026 zmenili, id zámerne nie.
+  "dashboard", "kalendar", "tracker", "vzas", "marketing", "mesiac", "udaje", "jarvis",
   // sekcie Klientov
   "treningy", "klienti",
   // presmerované staré id — navigate ich prekladá
-  "vysledky", "udaje", "financie", "6m",
+  "vysledky", "financie", "6m",
 ] as const;
 
 const MNOZINA = new Set<string>(CIELE);
