@@ -1418,7 +1418,7 @@ export function useExtraGrafy({
     const ig = (MKT_MESACNE.slice(-12)).filter((r) => vMes(r.m));
     nodes.dosahIG = (
       <Card style={{ marginBottom: 0, height: "100%" }}>
-        <H3><Info label="Dosah Instagramu" text="Zobrazenia a dosah po mesiacoch z Metricoolu. Dosah = koľko rôznych ľudí príspevky videlo, zobrazenia = koľkokrát sa zobrazili. Dáta pribúdajú s importom CSV v Údajoch." /></H3>
+        <H3><Info label="Dosah Instagramu" text="Zobrazenia a dosah po mesiacoch z Metricoolu. Dosah = koľko rôznych ľudí príspevky videlo, zobrazenia = koľkokrát sa zobrazili. Dáta pribúdajú s importom CSV v záložke Upload." /></H3>
         <Klik kam={() => onNavigate("marketing", "obsah")} onNavigate="Marketing → Reels & posty">
           {ig.length ? (
             <LineChart
@@ -1482,7 +1482,7 @@ export function useExtraGrafy({
                   sub={v >= 1000 ? `${Math.round(v / 1000)}k` : String(v)} />
               ))}
             </div>
-          ) : <Empty>Nahraj mesačnú zostavu (PDF) v Údajoch.</Empty>}
+          ) : <Empty>Nahraj mesačnú zostavu (PDF) v záložke Upload.</Empty>}
         </Klik>
       </Card>
     );

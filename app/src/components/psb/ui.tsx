@@ -1199,6 +1199,9 @@ const ICON_PATHS: Record<string, ReactNode> = {
   // Šípka do priehradky — nahrávanie a obsluha dát.
   upload: (<><path d="M21 15v4.4A1.6 1.6 0 0 1 19.4 21H4.6A1.6 1.6 0 0 1 3 19.4V15" /><path d="m7.5 9 4.5-4.5L16.5 9" /><path d="M12 4.5v10.8" /></>),
   activity: (<path d="M22 12h-4l-3 8.5L9 3.5l-3 8.5H2" />),
+  // Stĺpce s krivkou — mesačné výsledky. Mesiac stratil ikonu „upload" vtedy,
+  // keď sa nahrávanie dát osamostatnilo do vlastnej záložky (29. 8. 2026).
+  barChart: (<><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></>),
   // Bitcoinové „B" s dvoma nožičkami — kruh naokolo by v tejto veľkosti
   // splynul s ostatnými ikonami.
   bitcoin: (<><path d="M7 5.5h6.6a3.2 3.2 0 0 1 0 6.4H7z" /><path d="M7 11.9h7.4a3.3 3.3 0 0 1 0 6.6H7z" /><path d="M9.6 5.5V3M13.4 5.5V3M9.6 21v-2.5M13.4 21v-2.5M7 5.5v13" /></>),

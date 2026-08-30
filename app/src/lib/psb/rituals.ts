@@ -205,7 +205,7 @@ export function ritualy(
     },
     {
       tyzden: 4, id: "jarvis", nadpis: "Mesačná kontrola: Jarvis & dáta",
-      detail: "Polož Jarvisovi tri otázky, na ktoré poznáš odpoveď z obrazovky (tržby mesiaca, posledné sedenie konkrétneho klienta, niečo z prázdnej tabuľky) — musí sedieť, a pri prázdnej tabuľke povedať „nemerali sme“, nie si vymýšľať. Over vek importov v Mesiac → Dáta: PTminder a Instagram nemajú byť staršie než dva týždne.",
+      detail: "Polož Jarvisovi tri otázky, na ktoré poznáš odpoveď z obrazovky (tržby mesiaca, posledné sedenie konkrétneho klienta, niečo z prázdnej tabuľky) — musí sedieť, a pri prázdnej tabuľke povedať „nemerali sme“, nie si vymýšľať. Over vek importov v záložke Upload: PTminder a Instagram nemajú byť staršie než dva týždne.",
       ciel: { tab: "jarvis" },
     },
   ];

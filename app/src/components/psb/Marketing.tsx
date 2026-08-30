@@ -678,10 +678,10 @@ function WebKanaly({ rok, onRok, chat, ack, onSkry, onVrat }: { rok: string; onR
     return (
       <Card>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-          <H3><Info text="Zdroj: priamo GA4 cez Analytics Data API. Sťahuje sa tlačidlom v Mesiac → Dáta a uzávierka." label="Web a kanály (GA4)" /></H3>
+          <H3><Info text="Zdroj: priamo GA4 cez Analytics Data API. Sťahuje sa tlačidlom v záložke Upload." label="Web a kanály (GA4)" /></H3>
           <RokBar rok={rok} onRok={onRok} />
         </div>
-        <Empty>Za rok {rok} nemám z GA4 ani jeden meraný mesiac. Stiahni ich v Mesiac → Dáta a uzávierka → Google.</Empty>
+        <Empty>Za rok {rok} nemám z GA4 ani jeden meraný mesiac. Stiahni ich v záložke Upload → Google.</Empty>
       </Card>
     );
   }
@@ -709,7 +709,7 @@ function WebKanaly({ rok, onRok, chat, ack, onSkry, onVrat }: { rok: string; onR
   return (
     <Card>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-      <H3><Info text="Noví používatelia webu podľa toho, odkiaľ prišli. „Hlavné udalosti“ sú konverzie nastavené v GA4 — odoslaný formulár a podobne. Zdroj: priamo GA4 cez Analytics Data API, sťahuje sa v Mesiac → Dáta a uzávierka. Mesiace, v ktorých meranie nebežalo, sa do súčtov ani priemerov nepočítajú — nula by tvrdila, že nikto neprišiel." label="Web a kanály (GA4)" /></H3>
+      <H3><Info text="Noví používatelia webu podľa toho, odkiaľ prišli. „Hlavné udalosti“ sú konverzie nastavené v GA4 — odoslaný formulár a podobne. Zdroj: priamo GA4 cez Analytics Data API, sťahuje sa v záložke Upload. Mesiace, v ktorých meranie nebežalo, sa do súčtov ani priemerov nepočítajú — nula by tvrdila, že nikto neprišiel." label="Web a kanály (GA4)" /></H3>
       <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
         <RokBar rok={rok} onRok={onRok} />
         <Vysvetli chat={chat} titul="Web a kanály (GA4)" filter={`rok ${rok}`} vyrez={vyrez} />
@@ -947,7 +947,7 @@ function Titulky({ chat }: { chat?: AssistantChat }) {
       <Card>
         <H3>Titulky na prepis</H3>
         <div style={{ fontSize: 13, color: C.textMuted, lineHeight: 1.55, marginTop: 6 }}>
-          Text webu sa ešte nestiahol. V Údajoch → Napojenia je karta „Text webu“;
+          Text webu sa ešte nestiahol. V Upload → Napojenia je karta „Text webu“;
           po prečítaní tu bude pri každej stránke jej titulok a bude jasné, čo prepísať.
         </div>
       </Card>

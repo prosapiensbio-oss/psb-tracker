@@ -652,7 +652,7 @@ function PredikciaZisku({ prijmyOdhad, mesiac, hodiny }: { prijmyOdhad: number; 
         <H3>Predikcia nákladov a zisku</H3>
         <Empty>
           Zatiaľ nie je z čoho počítať — treba aspoň jeden mesiac s nákladmi.
-          Nahraj bankový výpis v Údajoch a odhad sa objaví sám.
+          Nahraj bankový výpis v záložke Upload a odhad sa objaví sám.
         </Empty>
       </Card>
     );

@@ -344,7 +344,7 @@ export function PripravitKampan({ akoKarta = true, navrh }: { akoKarta?: boolean
             kampaň, sadu aj reklamu, všetko pozastavené. Karusel prenesie so všetkými kartami.
             {/* Zoznam je z poslednej stiahnutej dávky, nie živý — Instagram sa
                 sťahuje na klik, nie sám. Bez tohto tlačidla by sa nový príspevok
-                dal pridať len cez Mesiac → Dáta a uzávierka a nikto by nevedel
+                dal pridať len cez záložku Upload a nikto by nevedel
                 prečo tam nie je (Jerry, 19. 8. 2026). */}
             <button onClick={() => {
               setStahujem(true); setChybaStiahnutia("");

@@ -105,7 +105,7 @@ povedz, z čoho vzniká.`,
 3. Keď hovorí niečo iné než obrazovka, nájdi, z KTOREJ kópie pravdy to má:
    aiContext, jarvis_vedomosti, statické súbory v PSB_KNOWLEDGE, pamäť
    Claude Projectu. Má ich viac než databázu — a starnú nezávisle.
-4. Vek importov (Mesiac → Dáta): PTminder, Fio, Instagram, GA4/GSC,
+4. Vek importov (záložka Upload): PTminder, Fio, Instagram, GA4/GSC,
    web_stranky. Nič staršie než dva týždne bez vysvetlenia.
 5. Jarvisove akcie: over, že zapisujú to, čo tvrdia — jednou akciou na
    testovacom zázname, ktorý po sebe zmažeš.`,

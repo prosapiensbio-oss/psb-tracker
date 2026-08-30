@@ -107,7 +107,7 @@ export function ObsahZive() {
   if (!prispevky.length) {
     return (
       <Card>
-        <H3><Info label="Čo fungovalo" text="Napĺňa sa v Mesiac → Dáta a uzávierka → Meta → Stiahnuť Instagram." /></H3>
+        <H3><Info label="Čo fungovalo" text="Napĺňa sa v záložke Upload → Meta → Stiahnuť Instagram." /></H3>
         <Empty>Ešte som z Instagramu nestiahol žiadny príspevok.</Empty>
       </Card>
     );

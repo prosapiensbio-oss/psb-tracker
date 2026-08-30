@@ -1000,7 +1000,7 @@ export function Dashboard({
       poznamka: mesRez !== null && mesRez < CIEL_MESIACOV
         ? (chyba === null ? `cieľ sú ${CIEL_MESIACOV} mesiace` : `do ${CIEL_MESIACOV} mesiacov chýba ${fmtCZK(chyba)}`)
         : undefined,
-      vysvetlenie: "Koľko mesiacov by firma ustála bez jedinej tržby — všetko, čo má (účet + hotovosť + bitcoin), delené priemerným break-evenom za pol roka. Účet sa berie z hlavičky posledného bankového výpisu (obnoví sa každým importom v Mesiac → Dáta); ručne sa zapisuje už len hotovosť v Peniaze → Cashflow, karta „Kde tie peniaze sú“. Dátum v podnadpise je najstarší z tých dvoch — rezerva je len taká čerstvá ako on. Tvoj cieľ „120 000 Kč+“ je v korunách; toto je to isté prepočítané na čas, čo je jediné, čo v zlom mesiaci rozhoduje.",
+      vysvetlenie: "Koľko mesiacov by firma ustála bez jedinej tržby — všetko, čo má (účet + hotovosť + bitcoin), delené priemerným break-evenom za pol roka. Účet sa berie z hlavičky posledného bankového výpisu (obnoví sa každým importom v záložke Upload); ručne sa zapisuje už len hotovosť v Peniaze → Cashflow, karta „Kde tie peniaze sú“. Dátum v podnadpise je najstarší z tých dvoch — rezerva je len taká čerstvá ako on. Tvoj cieľ „120 000 Kč+“ je v korunách; toto je to isté prepočítané na čas, čo je jediné, čo v zlom mesiaci rozhoduje.",
       kam: () => onNavigate("vzas", "cashflow"),
     });
 

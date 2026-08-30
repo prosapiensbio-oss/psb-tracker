@@ -1361,8 +1361,8 @@ export function Balicky({ udalosti, clients, sedenia = [], onObnov, style, onKli
       {zdroj === "ptminder" && (
         <div style={{ fontSize: 11, color: C.textDim, marginTop: -2, marginBottom: 8 }}>
           {poslednyReport
-            ? `Podľa reportu z ${fmtDMY(poslednyReport.date.slice(0, 10))}. Novší stav dostaneš ďalším importom v Mesiac → Dáta a uzávierka.`
-            : "Report z PTminderu zatiaľ v appke nie je — nahraj ho v Mesiac → Dáta a uzávierka."}
+            ? `Podľa reportu z ${fmtDMY(poslednyReport.date.slice(0, 10))}. Novší stav dostaneš ďalším importom v záložke Upload.`
+            : "Report z PTminderu zatiaľ v appke nie je — nahraj ho v záložke Upload."}
         </div>
       )}
       {!riadky.length ? (

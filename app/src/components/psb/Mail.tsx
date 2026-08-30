@@ -61,11 +61,11 @@ export function Mail({ clients, leads }: { clients: Record<string, ClientAgg>; l
   if (!odb.length && !kam.length) {
     return (
       <Card>
-        <H3><Info label="E-mail (MailerLite)" text="Napĺňa sa v Mesiac → Dáta a uzávierka → MailerLite." /></H3>
+        <H3><Info label="E-mail (MailerLite)" text="Napĺňa sa v záložke Upload → MailerLite." /></H3>
         <Empty>
           {chyba
             ? `Nepodarilo sa načítať: ${chyba}`
-            : "Ešte som z MailerLite nič nestiahol. Vlož token v Mesiac → Dáta a uzávierka a klikni „Stiahnuť odberateľov a kampane“."}
+            : "Ešte som z MailerLite nič nestiahol. Vlož token v záložke Upload a klikni „Stiahnuť odberateľov a kampane“."}
         </Empty>
       </Card>
     );

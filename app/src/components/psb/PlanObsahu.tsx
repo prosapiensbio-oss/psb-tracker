@@ -186,7 +186,7 @@ export function PlanObsahu({ data, chat, onNavigate, onAck }: { data: PSBData; c
 
       {platne.length === 0 && hotove.length === 0 ? (
         <Empty>
-          Zatiaľ nemám z čoho navrhovať. Stiahni Instagram a Google v Mesiac → Dáta a uzávierka;
+          Zatiaľ nemám z čoho navrhovať. Stiahni Instagram a Google v záložke Upload;
           návrhy sa objavia samy.
         </Empty>
       ) : (

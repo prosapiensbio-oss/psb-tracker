@@ -529,3 +529,15 @@ VIAC BEHOV plánovača (alebo `?trener=` adresne), nie viac práce v jednom.
 `curl -o /dev/null -w '%{http_code}' <adresa>`. Zelený build ani úspešný
 `wrangler deploy` nehovoria nič o tom, či worker beží — 503 sa objaví až pri
 prvej skutočnej požiadavke.
+
+## Presun záložky je aj prepis textov, ktoré na ňu ukazujú
+
+29. 8. 2026 sa „Dáta a uzávierka" osamostatnili z Mesiaca do vlastnej záložky
+**Upload**. Samotný presun bol pár riadkov; polovicu práce tvorilo dohľadať
+**jedenásť viet v desiatich súboroch**, ktoré posielali človeka „do Mesiac →
+Dáta" alebo „do Údajov" — vrátane Jarvisovho kontextu (aiContext), rituálov
+a kontrolných promptov. Nič z toho by nespadlo v testoch: sú to reťazce.
+
+**Postup pri premenovaní alebo presune záložky:** id NIKDY nemeniť (visia na
+ňom adresy, ciele rituálov, Jarvisove odkazy), a potom
+`grep -rn '<starý názov>' src/lib src/components` a prejsť všetko.

@@ -474,7 +474,7 @@ export const Route = createFileRoute("/api/meta")({
               ok: false,
               error: mozeZakladat
                 ? r.chyba
-                : "Token, ktorý má appka uložený, smie kampane len ČÍTAŤ (ads_read). Na zakladanie treba právo ads_management — vytvor nový token s týmto právom a vlož ho v Mesiac → Dáta a uzávierka → Meta. Účet ani kampaň nie sú chybné.",
+                : "Token, ktorý má appka uložený, smie kampane len ČÍTAŤ (ads_read). Na zakladanie treba právo ads_management — vytvor nový token s týmto právom a vlož ho v záložke Upload → Meta. Účet ani kampaň nie sú chybné.",
               chybaMety: r.chyba,
             }, { status: 502 });
           }

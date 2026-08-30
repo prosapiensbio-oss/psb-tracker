@@ -546,7 +546,7 @@ export function buildAiContext(
       googleAds: {
         poznamka: GADS_KAMPANE.length
           ? "Výkon vlastných kampaní na Googli. Náklad je už v mene účtu, nie v mikrách. „konverzie: 0“ pri stovkách klikov takmer isto znamená, že sa konverzie NEMERALI — nie že nikto nekonvertoval; nikdy z toho nerob záver, že Google nefunguje. Kľúč „hladaneVyrazy“ sú SKUTOČNÉ vety, ktoré ľudia napísali do Googlu predtým, než klikli — je to cennejší dôkaz o dopyte než akýkoľvek odhad objemu hľadania, lebo je zaplatený vlastnými peniazmi."
-          : "Google Ads sa ešte nestiahli. NEODPOVEDAJ, že sa na Googli neinzerovalo — v Dáta a uzávierka → Napojenia je karta „Google Ads“ a treba stlačiť Stiahnuť. Prázdna tabuľka nie je dôkaz.",
+          : "Google Ads sa ešte nestiahli. NEODPOVEDAJ, že sa na Googli neinzerovalo — v Upload → Napojenia je karta „Google Ads“ a treba stlačiť Stiahnuť. Prázdna tabuľka nie je dôkaz.",
         mesacne: adsMesiace(GADS_KAMPANE),
         kampane: GADS_KAMPANE.slice(0, 30),
         hladaneVyrazy: GADS_DOPYTY.slice(0, 40),
@@ -587,7 +587,7 @@ export function buildAiContext(
               co: hodnotenie(r).veta, stav: hodnotenie(r).stav,
               najvacsiZisk: r.prilezitosti.slice(0, 3),
             }))
-          : "Rýchlosť sa ešte nemerala. NEHOVOR, že o rýchlosti webu nič nevieš — v Údajoch → Napojenia je karta „Rýchlosť stránok“ a treba stlačiť Zmerať. Meria sa 20 najviac zobrazovaných stránok, mobil aj počítač.",
+          : "Rýchlosť sa ešte nemerala. NEHOVOR, že o rýchlosti webu nič nevieš — v Upload → Napojenia je karta „Rýchlosť stránok“ a treba stlačiť Zmerať. Meria sa 20 najviac zobrazovaných stránok, mobil aj počítač.",
         // Návrhy na prepis titulku sa rátajú LEN nad stránkami, ktoré web má —
         // radiť prepísať titulok zrušenej stránky je práca navyše pre nikoho.
         titulkyNaPrepis: prilezitostiTitulkov(

@@ -148,17 +148,24 @@ const TABS = [
   // adresy (#vzas/pnl), cieľové odkazy v registri, Jarvisove ⟦odkazy⟧ aj
   // uložené rozloženia — premenovať id znamená potichu odpojiť desiatky
   // miest. Nápis je vec, ktorú vidí človek; id je vec, ktorú vidí kód.
+  // Poradie podľa toho, čo Jerry rieši najčastejšie (29. 8. 2026): ľudia
+  // a peniaze pred kalendárom, ktorý si aj tak pozerá v Google.
   { id: "dashboard", label: "Kokpit", icon: "home" },
-  { id: "kalendar", label: "Kalendár", icon: "calendar" },
   // Obsahom je prevádzka — tréningy, klienti, 6M, fluktuácia — ale všetko
   // sú to ľudia, tak sa to tak aj volá.
   { id: "tracker", label: "Klienti", icon: "userCheck" },
   { id: "vzas", label: "Peniaze", icon: "wallet" },
   { id: "marketing", label: "Marketing", icon: "activity" },
-  // Mesiac = mesačný rituál na jednom mieste: nahrať dáta, zavrieť mesiac,
-  // pozrieť výsledky, napísať správu. Boli to dve záložky (Údaje a Výsledky)
-  // a robili sa striedavo v jednom sedení.
-  { id: "mesiac", label: "Mesiac", icon: "upload" },
+  { id: "kalendar", label: "Kalendár", icon: "calendar" },
+  // Mesiac = mesačné VÝSLEDKY (P&L pohľady, správa mesiaca). Nahrávanie dát
+  // a uzávierka z neho odišli do vlastnej záložky — robili sa striedavo, ale
+  // sú to dva rôzne úkony a jeden z nich (nahrať CSV) prichádza aj mimo
+  // uzávierky.
+  { id: "mesiac", label: "Mesiac", icon: "barChart" },
+  // Upload = nahrať exporty a zavrieť mesiac. `id` zostáva „udaje", lebo naň
+  // visia adresy (#udaje), ciele rituálov aj Jarvisove odkazy — nápis je vec
+  // pre človeka, id je vec pre kód.
+  { id: "udaje", label: "Upload", icon: "upload" },
   // Jarvis ako záložka, nie ako panel v rohu.
   //
   // Panel v pravom dolnom rohu je dobrý na jednu otázku medzi prácou. Na
@@ -180,7 +187,9 @@ const MIMO_RAD = ["jarvis"];
 const MKT_ALIAS: Record<string, string> = { algoritmus: "kanaly", dosah: "obsah" };
 
 /** Staré adresy tabov → nové. Nikdy sa nemažú (pravidlo z 10. 8.). */
-const TAB_ALIAS: Record<string, string> = { vysledky: "mesiac", udaje: "mesiac" };
+/** Staré adresy tabov → nové. „udaje" sa 29. 8. 2026 vrátilo ako vlastná
+ *  záložka (Upload), preto tu už nie je. */
+const TAB_ALIAS: Record<string, string> = { vysledky: "mesiac" };
 
 const TRACKER_SECTIONS = [
   { id: "treningy", label: "Tréningy", icon: "calendar" },
@@ -217,7 +226,6 @@ export function PSBApp() {
   // Tržby, nie P&L: Peniaze sa otvárajú na tom, čo Jerry sleduje denne.
   const [vzasSub, setVzasSub] = useState("trzby");
   /** Ktorá polovica Mesiaca je otvorená: dáta a uzávierka, alebo výsledky. */
-  const [mesiacSub, setMesiacSub] = useState<"udaje" | "vysledky">("udaje");
   const [vysledkySub, setVysledkySub] = useState("kvartalne");
   const [vysledkyFocus, setVysledkyFocus] = useState<NavFocus | null>(null);
   /** Marketing sa doteraz zamerať nedal — notifikácia „úvodný bez dopytu"
@@ -311,7 +319,7 @@ export function PSBApp() {
       return `#tracker/${trackerSection}${pod ? `/${pod}` : ""}`;
     }
     if (active === "vzas") return `#vzas/${vzasSub}`;
-    if (active === "mesiac") return mesiacSub === "udaje" ? "#udaje" : `#vysledky/${vysledkySub}`;
+    if (active === "mesiac") return `#vysledky/${vysledkySub}`;
     if (active === "marketing") return `#marketing/${marketingSub}`;
     return `#${active}`;
   };
@@ -321,8 +329,6 @@ export function PSBApp() {
     if (!zal) return;
     if (!TABS.some((t) => t.id === zal) && !TAB_ALIAS[zal]) return;
     setActive(TAB_ALIAS[zal] || zal);
-    if (zal === "udaje") setMesiacSub("udaje");
-    if (zal === "vysledky") setMesiacSub("vysledky");
     if (zal === "tracker" && pod && TRACKER_IDS.includes(pod)) {
       setTrackerSection(pod);
       if (pod === "treningy" && pod2) setTreningySub(pod2);
@@ -406,8 +412,6 @@ export function PSBApp() {
       // polovicu. Odkazy z registra, Jarvisa aj uložené adresy tak fungujú
       // ďalej — presmerovanie, nie mazanie.
       setActive(TAB_ALIAS[tab] || tab);
-      if (tab === "udaje") setMesiacSub("udaje");
-      if (tab === "vysledky") setMesiacSub("vysledky");
     }
     if (tab === "treningy" && sub) setTreningySub(sub);
     if (tab === "klienti" && sub) setKlientiSub(sub);
@@ -443,7 +447,7 @@ export function PSBApp() {
     if (tab === "vysledky" && focus) setVysledkyFocus(focus);
     // Zápisy mesiaca sa načítavajú raz pri štarte, ale odpovede na otázky sa
     // ukladajú v inom komponente s vlastným stavom. Kto vyplní otázky a prejde
-    // do Údajov zamknúť mesiac, narazil by na zámok tvrdiaci, že otázky
+    // do Uploadu zamknúť mesiac, narazil by na zámok tvrdiaci, že otázky
     // chýbajú — appka by ho poslala späť robiť, čo práve dokončil. Obnoviť
     // pri príchode na Údaje je lacné a rieši presne tento prechod.
     if (tab === "udaje") void nacitajZapisy();
@@ -1217,7 +1221,7 @@ function skupinaFaktur(
 
     // (1a2) Bitcoinové výbery bez faktúry sa v registri NEHLÁSIA (Jerry,
     // 21. 8. 2026: „tento druh notifikácií ma nezaujíma"). Párovanie dokladov
-    // k platbám zostáva v Údajoch → Bitcoin, kde si ho pozrie, keď chce.
+    // k platbám zostáva v Upload → Bitcoin, kde si ho pozrie, keď chce.
 
     // (1b) Ten istý výdavok dvoma cestami — z banky aj zo zošita. Vyzerá
     // úplne normálne z oboch strán a nájde sa len tak, že sa niekto pozrie.
@@ -2165,35 +2169,16 @@ function skupinaFaktur(
           />
         )}
 
-        {/* MESIAC — mesačný rituál na jednom mieste. Prvá podzáložka je to,
-            čím sa začína (nahrať dáta, zavrieť mesiac), zvyšok je to, čím sa
-            končí (pozrieť výsledky, napísať správu). Boli to dve záložky a
-            robili sa striedavo v jednom sedení. */}
+        {/* MESIAC — mesačné výsledky. Nahrávanie a uzávierka sú vo vlastnej
+            záložke Upload; tu zostalo to, čo sa mesiac ČÍTA, nie zapisuje. */}
         {active === "mesiac" && (
-          <>
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 14 }}>
-              {[{ id: "udaje", label: "Dáta a uzávierka" }, ...VYSLEDKY_LISTY].map((l) => {
-                const on = l.id === "udaje" ? mesiacSub === "udaje" : mesiacSub !== "udaje" && vysledkySub === l.id;
-                return (
-                  <button
-                    key={l.id}
-                    onClick={() => { if (l.id === "udaje") setMesiacSub("udaje"); else { setMesiacSub("vysledky"); setVysledkySub(l.id); } }}
-                    style={{
-                      padding: "6px 14px", borderRadius: 20, fontSize: 12.5, cursor: "pointer",
-                      border: `1px solid ${on ? C.accent : C.border}`,
-                      background: on ? C.accentBg : "transparent",
-                      color: on ? C.accentLight : C.textMuted,
-                    }}
-                  >
-                    {l.label}
-                  </button>
-                );
-              })}
-            </div>
-            {mesiacSub === "udaje"
-              ? <Udaje data={data} actions={actions} chat={chat} prekazky={prekazkyZamku} kroky={krokyZamku} podklady={podkladyMesiaca} onNavigate={navigate} btc={{ platby: [...btcBezDokladu, ...btcSparovane], faktury: volneFaktury, parovanie: btcParovanie, onSparuj: sparujBtc }} />
-              : <Vysledky data={data} onNavigate={navigate} clients={clients} sixM={sixM} capacity={capacity} register={register} sub={vysledkySub} onSub={setVysledkySub} focus={vysledkyFocus} skryVlastneTaby />}
-          </>
+          <Vysledky data={data} onNavigate={navigate} clients={clients} sixM={sixM} capacity={capacity} register={register} sub={vysledkySub} onSub={setVysledkySub} focus={vysledkyFocus} />
+        )}
+
+        {/* UPLOAD — nahrať exporty a zavrieť mesiac. Vlastná záložka od
+            29. 8. 2026; `id` zostalo „udaje" kvôli adresám a odkazom. */}
+        {active === "udaje" && (
+          <Udaje data={data} actions={actions} chat={chat} prekazky={prekazkyZamku} kroky={krokyZamku} podklady={podkladyMesiaca} onNavigate={navigate} btc={{ platby: [...btcBezDokladu, ...btcSparovane], faktury: volneFaktury, parovanie: btcParovanie, onSparuj: sparujBtc }} />
         )}
 
       </div>
