@@ -52,9 +52,11 @@ describe("CTA pre fázy nákupného cyklu", () => {
     // Rozcestník s ôsmimi témami je menu — kto si má vybrať z ôsmich,
     // nevyberie ani jednu (Jerry, 30. 8. 2026). /dychani je navyše lead
     // magnet o dychu a ako hlavné CTA fázy 3 je príliš úzke.
-    for (const d of ["principy-biomechaniky", "postura-drzeni-tela", "co-ocekavat-od-biomechanickeho-treninku"]) {
+    for (const d of ["pochopte-sve-telo/principy-biomechaniky", "pochopte-sve-telo/postura-drzeni-tela"]) {
       expect(DOKUMENTY.some((x) => x.slug === d)).toBe(true);
     }
+    // protokol žije na koreni, nie pod rozcestníkom
+    expect(DOKUMENTY.some((x) => x.slug === "protokol-o-myofascialnim-uvolnovani")).toBe(true);
   });
 
   it("fáza 4 ponúka aj online tréning a nenesie číslo, čo zostarne", () => {
@@ -105,14 +107,14 @@ describe("dokumenty v zadaní", () => {
   it("zadanie nesie katalóg dokumentov a pokyn postaviť to na jednom", () => {
     const z = zadanieProProject({ mesiac: "2026-10", faza: 3, koncept: "x", kto: "" });
     expect(z).toContain("POSTAV TO NA JEDNOM DOKUMENTE");
-    expect(z).toContain("prosapiens.cz/strecink-myty-a-legend");
+    expect(z).toContain("prosapiens.cz/pochopte-sve-telo/strecink-myty-a-legend");
   });
 
   it("každý dokument má názov, adresu aj to, čo dáva", () => {
     expect(DOKUMENTY.length).toBeGreaterThanOrEqual(9);
     for (const d of DOKUMENTY) {
       expect(d.nazov.length).toBeGreaterThan(3);
-      expect(d.slug).toMatch(/^[a-z0-9-]+$/);
+      expect(d.slug).toMatch(/^[a-z0-9/-]+$/);
       expect(d.dava.length).toBeGreaterThan(10);
     }
   });

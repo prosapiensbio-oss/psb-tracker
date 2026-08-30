@@ -80,18 +80,23 @@ export const CTA_FAZY: Record<number, string> = {
  * a zároveň je CTA — kus postavený na Strečingu končí odkazom na Strečing.
  * Tým sa rieši aj to, že odkaz na rozcestník s ôsmimi témami je odkaz na nič.
  *
+ * ADRESY: osem tém žije POD rozcestníkom (/pochopte-sve-telo/<téma>),
+ * protokol o myofasciálnom uvoľňovaní na koreni. Overené 30. 8. 2026 —
+ * bez presmerovania. Prvý raz som ich napísal na koreň a fungovali len
+ * cez presmerovanie; test s `redirect: "follow"` to zamaskoval.
+ *
  * NIE KAŽDÁ BUNKA MATICE STOJÍ ZA VYPLNENIE. Výživa vo fáze „vyberá
  * dodávateľa“ nepovie, prečo si vybrať nás. Matica je zásoba, nie plán.
  */
 export const DOKUMENTY: { nazov: string; slug: string; dava: string }[] = [
-  { nazov: "Principy biomechaniky", slug: "principy-biomechaniky", dava: "ako telo prenáša silu — základ pod všetko ostatné" },
-  { nazov: "Fascie: Skrytá síť v těle", slug: "fascie-voda-v-nas-2", dava: "prečo bolí inde, než je príčina" },
-  { nazov: "Mechanotransdukce", slug: "mechanotransdukce-jak-sily-formuji-vase-telo", dava: "ako záťaž prestavuje tkanivo — argument pre trpezlivosť" },
-  { nazov: "Strečink: Mýty a legendy", slug: "strecink-myty-a-legend", dava: "prečo naťahovanie nedrží; najlepší materiál na vyvracanie" },
-  { nazov: "Postura — základ zdravého těla", slug: "postura-drzeni-tela", dava: "držanie tela ako výsledok, nie ako poloha" },
-  { nazov: "Výživa pro pohyb a regeneraci", slug: "vyziva-k-lepsi-regeneraci", dava: "prostredie, v ktorom sa telo mení; Terezkina téma" },
-  { nazov: "Ideální přístup k tréninku", slug: "idealni-pristup-2", dava: "ako má tréning vyzerať a prečo" },
-  { nazov: "Co očekávat od biomechanického tréninku", slug: "co-ocekavat-od-biomechanickeho-treninku", dava: "časový rámec a čo sa deje kedy — proti falošným očakávaniam" },
+  { nazov: "Principy biomechaniky", slug: "pochopte-sve-telo/principy-biomechaniky", dava: "ako telo prenáša silu — základ pod všetko ostatné" },
+  { nazov: "Fascie: Skrytá síť v těle", slug: "pochopte-sve-telo/fascie-voda-v-nas-2", dava: "prečo bolí inde, než je príčina" },
+  { nazov: "Mechanotransdukce", slug: "pochopte-sve-telo/mechanotransdukce-jak-sily-formuji-vase-telo", dava: "ako záťaž prestavuje tkanivo — argument pre trpezlivosť" },
+  { nazov: "Strečink: Mýty a legendy", slug: "pochopte-sve-telo/strecink-myty-a-legend", dava: "prečo naťahovanie nedrží; najlepší materiál na vyvracanie" },
+  { nazov: "Postura — základ zdravého těla", slug: "pochopte-sve-telo/postura-drzeni-tela", dava: "držanie tela ako výsledok, nie ako poloha" },
+  { nazov: "Výživa pro pohyb a regeneraci", slug: "pochopte-sve-telo/vyziva-k-lepsi-regeneraci", dava: "prostredie, v ktorom sa telo mení; Terezkina téma" },
+  { nazov: "Ideální přístup k tréninku", slug: "pochopte-sve-telo/idealni-pristup-2", dava: "ako má tréning vyzerať a prečo" },
+  { nazov: "Co očekávat od biomechanického tréninku", slug: "pochopte-sve-telo/co-ocekavat-od-biomechanickeho-treninku", dava: "časový rámec a čo sa deje kedy — proti falošným očakávaniam" },
   { nazov: "Myofasciální uvolňování — protokol", slug: "protokol-o-myofascialnim-uvolnovani", dava: "praktický postup, ktorý si divák môže skúsiť sám" },
 ];
 
