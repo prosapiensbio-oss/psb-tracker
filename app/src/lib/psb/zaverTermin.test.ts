@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { zaverUzMaTermin } from "./compute";
+import { najblizsiTermin, terminSlovom, zaverUzMaTermin } from "./compute";
 
 /**
  * Pripomienka „ozvať sa a dohodnúť termín“ sa najprv pozrie do kalendára.
@@ -46,5 +46,39 @@ describe("záver o termíne sa overuje kalendárom", () => {
 
   it("termín iného klienta nestačí", () => {
     expect(zaverUzMaTermin(ROMAN, KLIENTI, [u("Michal Knapčok", "2026-09-01T10:30:00Z")], DNES)).toBeNull();
+  });
+});
+
+/**
+ * Pripomienka nezmizne — odpovie.
+ *
+ * Jerry, 31. 8. 2026: „nech notifikácia napíše, že sme dohodnutí na ten a ten
+ * termín, a ja dám Vybavené.“ Ticho by ho pripravilo o to, že sa človek vracia.
+ */
+describe("termín sa píše do pripomienky", () => {
+  it("nájde najbližší budúci termín", () => {
+    const u = [
+      { klient: "Roman Jakubiček", zaciatok: "2026-09-08T09:30:00Z", typ: "trening", zmizlaAt: null },
+      { klient: "Roman Jakubiček", zaciatok: "2026-09-01T09:30:00Z", typ: "trening", zmizlaAt: null },
+    ];
+    expect(najblizsiTermin("Roman Jakubiček", u, DNES)).toBe("2026-09-01T09:30:00Z");
+  });
+
+  it("minulý ani zrušený termín sa neráta", () => {
+    const u = [
+      { klient: "Jan Kral", zaciatok: "2026-08-20T18:00:00Z", typ: "trening", zmizlaAt: null },
+      { klient: "Jan Kral", zaciatok: "2026-09-02T18:00:00Z", typ: "trening", zmizlaAt: "2026-08-30T00:00:00Z" },
+    ];
+    expect(najblizsiTermin("Jan Kral", u, DNES)).toBeNull();
+  });
+
+  it("termín sa píše tak, ako ho čítaš v kalendári", () => {
+    expect(terminSlovom("2026-09-01T10:30:00Z")).toBe("ut 1. 9. o 10:30");
+    // bez vedúcej nuly — v kalendári to je 9:30, nie 09:30
+    expect(terminSlovom("2026-09-01T09:30:00Z")).toBe("ut 1. 9. o 9:30");
+  });
+
+  it("nezmyselný dátum nespadne", () => {
+    expect(terminSlovom("nezmysel")).toBe("");
   });
 });

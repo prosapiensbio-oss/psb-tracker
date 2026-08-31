@@ -562,8 +562,14 @@ platilo o Michalovi Knapčokovi (tri termíny) a o Janovi Kralovi (dnes o 18:00)
 
 `zaverUzMaTermin()` sa spúšťa LEN na záveroch, ktorých overenie hovorí
 o dohode alebo tréningu — záver „prišla odpoveď z Facebooku?" sa kalendárom
-overiť nedá a nesmie ním byť umlčaný. Záver sa nezatvára, len sa nehlási;
-keď termín z kalendára zmizne, pripomienka sa vráti sama.
+overiť nedá a nesmie ním byť umlčaný.
+
+**Pripomienka nezmizne — ODPOVIE.** Prvá verzia ju umlčala; Jerry to o hodinu
+upresnil: chce ju vidieť aj s odpoveďou („napísal som si, že ide na dovolenku,
+a rovno vidím, že sme dohodnutí na ten a ten termín") a zavrieť ju klikom na
+Vybavené. Ticho by ho pripravilo o informáciu, že sa človek vracia. Platí to
+aj pre „Prestal chodiť": Roman Jakubiček mal 14 dní pauzu a termín na
+1. a 8. 9. — pauza je pravdivá, výzva „ozvi sa" nie.
 
 **Pravidlo:** každá pripomienka, ktorá posiela človeka NIEČO UROBIŤ, musí
 najprv overiť, či to už nie je urobené. Falošný poplach je horší než

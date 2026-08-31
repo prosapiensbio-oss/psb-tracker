@@ -1323,6 +1323,30 @@ export function cakajuciKlienti(
 
 // Practical, client-centric signals — one item per client per type (deduped),
 // the actionable things a trainer should follow up on this week.
+/** Najbližší budúci termín klienta z kalendára, alebo null. */
+export function najblizsiTermin(
+  meno: string,
+  udalosti: { zaciatok: string; klient: string | null; typ: string | null; zmizlaAt?: string | null }[] | undefined,
+  dnes: Date = new Date(),
+): string | null {
+  const od = dnes.toISOString().slice(0, 10);
+  const buduce = (udalosti || [])
+    .filter((u) => (u.typ === "trening" || u.typ === "uvodny") && !u.zmizlaAt && u.klient
+      && normName(u.klient) === normName(meno) && u.zaciatok.slice(0, 10) >= od)
+    .sort((x, y) => x.zaciatok.localeCompare(y.zaciatok));
+  return buduce.length ? buduce[0].zaciatok : null;
+}
+
+/** „ut 1. 9. o 10:30“ — termín tak, ako ho Jerry číta v kalendári. */
+const DNI = ["ne", "po", "ut", "st", "št", "pi", "so"];
+export function terminSlovom(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  // Bez vedúcej nuly — v kalendári to Jerry číta ako „9:30“, nie „09:30“.
+  const cas = iso.slice(11, 16).replace(/^0/, "");
+  return `${DNI[d.getUTCDay()]} ${d.getUTCDate()}. ${d.getUTCMonth() + 1}.${cas ? ` o ${cas}` : ""}`;
+}
+
 /**
  * Má už človek zo záveru dohodnutý termín?
  *
@@ -1441,7 +1465,20 @@ export function deriveAnomalies(
     // istá výzva dvakrát. A keď je duch potvrdený, nenaháňa sa vôbec: vieme,
     // že odišiel, a „ozvi sa" by bol šum.
     if ((c.segment === "Anchor" || c.segment === "Stabilný") && days >= 14 && days < 30 && duch !== "ano") {
-      push(`gone|${c.name}`, days >= 21 ? "red" : "orange", "Prestal chodiť", `${c.name}: ${days} dní bez tréningu (${c.segment}) — ozvi sa`, c.name);
+      // „Ozvi sa“ len vtedy, keď sa naozaj je o čom ozvať. Roman Jakubiček
+      // mal 31. 8. 2026 štrnásť dní bez tréningu — a v kalendári termíny na
+      // 1. a 8. 9. Pauza je pravdivá, výzva nie; a výzva, ktorá je zbytočná,
+      // učí ignorovať aj tie, ktoré zbytočné nie sú.
+      const termin = najblizsiTermin(c.name, kal?.udalosti, now);
+      push(
+        `gone|${c.name}`,
+        termin ? "blue" : days >= 21 ? "red" : "orange",
+        "Prestal chodiť",
+        termin
+          ? `${c.name}: ${days} dní bez tréningu (${c.segment}) — termín má ${terminSlovom(termin)}.`
+          : `${c.name}: ${days} dní bez tréningu (${c.segment}) — ozvi sa`,
+        c.name,
+      );
     }
 
     // "Duch": kúpi balíček, odchodí pár hodín a prestane chodiť AJ odpisovať.
@@ -1508,12 +1545,21 @@ export function deriveAnomalies(
   const menaKlientov = Object.keys(clients);
   for (const z of data.zavery || []) {
     if (!z.overitDo || z.overitDo > dnes) continue;
-    if (zaverUzMaTermin(z, menaKlientov, kal?.udalosti, now)) continue;
+    // Keď termín už je, pripomienka NEZMIZNE — rovno odpovie.
+    //
+    // Prvá verzia ju umlčala. Jerry, 31. 8. 2026: chce ju vidieť aj s
+    // odpoveďou — „napísal som si, že ide na dovolenku, a rovno vidím, že
+    // sme dohodnutí na ten a ten termín“ — a zavrieť ju jedným klikom na
+    // Vybavené. Ticho by ho pripravilo o to, že sa človek vracia.
+    const termin = zaverUzMaTermin(z, menaKlientov, kal?.udalosti, now);
     push(
       `zaver|${z.id}`,
       "blue",
       "Čas overiť rozhodnutie",
-      `Z ${z.datum}: ${z.zaver}${z.overit ? ` — malo sa overiť: ${z.overit}` : ""}. Zabralo to?`,
+      // Bodku dopĺňame len keď tam nie je — `overit` ju často už má a dve
+      // za sebou vyzerajú ako preklep.
+      `Z ${z.datum}: ${z.zaver}${z.overit ? ` — malo sa overiť: ${z.overit.replace(/\.\s*$/, "")}` : ""}.`
+        + (termin ? ` Termín už máte dohodnutý: ${terminSlovom(termin)}.` : " Zabralo to?"),
     );
   }
 
