@@ -2278,8 +2278,17 @@ function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar }: { i
     return `${meno} → tréner ${trener}`;
   };
 
-  const posliJarvisovi = () => {
-    if (!chat || !text.trim()) return;
+  /**
+   * Odošle odpoveď k položke a uzavrie ju.
+   *
+   * `vlastnyText` je pre tlačidlá, ktoré odpoveď POZNAJÚ — „Vybavené“ je to
+   * isté, ako keby Jerry napísal „vybavené“ a odoslal. Bez parametra by sa
+   * musel volať `setText` a hneď za ním odoslanie, čo nefunguje: stav sa
+   * v Reacte nastaví až do ďalšieho vykreslenia.
+   */
+  const posliJarvisovi = (vlastnyText?: string) => {
+    const t = (vlastnyText ?? text).trim();
+    if (!chat || !t) return;
     // Odpoveď sa zapíše HNEĎ, deterministicky — nie až Jarvisovou akciou.
     //
     // 9. 8. sa presne tu stratila odpoveď o Danovi Kouřilovi: Jerry ju
@@ -2288,12 +2297,12 @@ function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar }: { i
     // od toho, či dobehne odpoveď jazykového modelu. Položka sa uzavrie
     // s odpoveďou ako poznámkou; keby sa ukázalo, že sa uzavrieť nemala,
     // „Vrátiť" ju otvorí späť a poznámka zostáva.
-    const zapisane = zapisTrenera(text.trim());
+    const zapisane = zapisTrenera(t);
     // Vysvetlenie zrušeného tréningu si Kalendár vyzdvihne sám — buď hneď, ak
     // už zmenu vidí, alebo pri najbližšej synchronizácii. Bez toho sa tá istá
     // veta písala dvakrát a druhýkrát už nikto nevedel, že to bola včela.
     const meno = item.oKom || item.client;
-    const preKalendar = meno && !meno.includes("|") && clients?.[meno] && znieAkoZrusenie(text);
+    const preKalendar = meno && !meno.includes("|") && clients?.[meno] && znieAkoZrusenie(t);
     if (preKalendar) {
       // Keď ten človek DNES v kalendári tréning má, zápis ide rovno tam ako
       // zrušenie — jeden zápis, o ktorom vedia obe strany. Notifikácie o ňom
@@ -2304,18 +2313,18 @@ function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar }: { i
         (u) => u.klient && normName(u.klient) === normName(meno!) && u.zaciatok.slice(0, 10) === dnes
           && (u.typ === "trening" || u.typ === "uvodny"),
       );
-      if (maDnesTrening) void actions.zapisZrusenie(meno!, dnes, text.trim());
+      if (maDnesTrening) void actions.zapisZrusenie(meno!, dnes, t);
       // Inak veta počká: zrušenie sa v kalendári objaví až po synchronizácii.
-      else actions.ackAnomaly(`kalvysv|${normName(meno!)}|${dnes}`, text.trim(), true);
+      else actions.ackAnomaly(`kalvysv|${normName(meno!)}|${dnes}`, t, true);
     }
-    actions.ackAnomaly(item.key, `odpoveď: ${text.trim()}${zapisane ? ` · zapísané: ${zapisane}` : ""}`, true);
+    actions.ackAnomaly(item.key, `odpoveď: ${t}${zapisane ? ` · zapísané: ${zapisane}` : ""}`, true);
     chat.setFloatingOpen(true);
     void chat.ask(
       `Toto je odpoveď na notifikáciu z Kokpitu (v dátach: naCoSaPozriet).\n\n` +
       `key: ${item.key}\n` +
       `Položka (${item.category}): ${item.title}\n` +
       `Detail: ${item.detail}\n\n` +
-      `Moja odpoveď: ${text.trim()}\n\n` +
+      `Moja odpoveď: ${t}\n\n` +
       (zapisane ? `Appka z tejto vety už sama zapísala do dát: ${zapisane}. Nenavrhuj to znova, len to jednou vetou potvrď.\n\n` : "") +
       `Odpoveď je už zapísaná k položke a položka je uzavretá — NEZAPISUJ ju znova ` +
       `a neposielaj ack-anomaly. Tvoja práca je nadstavba: ak z odpovede vyplýva ` +
@@ -2371,6 +2380,22 @@ function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar }: { i
               chýba nájom" tam nikde nezapíšeš. Odpovedať sa dá rovno tu —
               text ide Jarvisovi aj s tým, čoho sa týka, takže nemusíš
               vysvetľovať kontext, ktorý appka už pozná. */}
+          {/* „Vybavené" — viem o tom a je to vyriešené.
+              Chýbal krok medzi „Skryť" (nevybavené, len preč) a napísanou
+              odpoveďou. Jerry, 30. 8. 2026: pri Jarvisovej pripomienke typu
+              „Ozvať sa Michalovi po návrate. Zabralo to?" nechce písať vetu —
+              chce povedať, že to je hotové. Robí presne to, čo napísaná
+              odpoveď „vybavené": zapíše ju k položke, uzavrie ju a pošle to
+              Jarvisovi, aby vedel, ako jeho záver dopadol. */}
+          {!item.acked && (
+            <button
+              onClick={() => (chat ? posliJarvisovi("vybavené") : actions.ackAnomaly(item.key, "vybavené", true))}
+              style={{ ...linkBtn, color: C.green }}
+              title="Viem o tom a je to vyriešené"
+            >
+              Vybavené
+            </button>
+          )}
           {chat && !item.acked && (
             <button onClick={() => setOdpoved((o) => !o)} style={{ ...linkBtn, color: odpoved ? C.accentLight : C.accent }}>
               {odpoved ? "Zavrieť" : "Odpovedať"}
@@ -2520,7 +2545,7 @@ function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar }: { i
           />
           <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6, flexWrap: "wrap" }}>
             <button
-              onClick={posliJarvisovi}
+              onClick={() => posliJarvisovi()}
               disabled={!text.trim()}
               style={{ background: text.trim() ? C.accentBg : "transparent", border: `1px solid ${text.trim() ? C.accent : C.border}`, borderRadius: 7, padding: "5px 13px", color: text.trim() ? C.accentLight : C.textDim, fontSize: 12, cursor: text.trim() ? "pointer" : "default" }}
             >
