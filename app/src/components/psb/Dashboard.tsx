@@ -2286,7 +2286,7 @@ function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar }: { i
    * musel volať `setText` a hneď za ním odoslanie, čo nefunguje: stav sa
    * v Reacte nastaví až do ďalšieho vykreslenia.
    */
-  const posliJarvisovi = (vlastnyText?: string) => {
+  const posliJarvisovi = (vlastnyText?: string, otvorOkno = true) => {
     const t = (vlastnyText ?? text).trim();
     if (!chat || !t) return;
     // Odpoveď sa zapíše HNEĎ, deterministicky — nie až Jarvisovou akciou.
@@ -2318,7 +2318,11 @@ function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar }: { i
       else actions.ackAnomaly(`kalvysv|${normName(meno!)}|${dnes}`, t, true);
     }
     actions.ackAnomaly(item.key, `odpoveď: ${t}${zapisane ? ` · zapísané: ${zapisane}` : ""}`, true);
-    chat.setFloatingOpen(true);
+    // Okno sa otvára len tam, kde Jerry odpoveď NAPÍSAL a čaká na reakciu.
+    // Pri „Vybavené“ je to jeden klik na uzavretie veci — otvorený chat je
+    // pri ňom rušivý (Jerry, 31. 8. 2026). Správa Jarvisovi ide aj tak, len
+    // potichu: uloží sa do rozhovoru a on o výsledku vie.
+    if (otvorOkno) chat.setFloatingOpen(true);
     void chat.ask(
       `Toto je odpoveď na notifikáciu z Kokpitu (v dátach: naCoSaPozriet).\n\n` +
       `key: ${item.key}\n` +
@@ -2389,7 +2393,7 @@ function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar }: { i
               Jarvisovi, aby vedel, ako jeho záver dopadol. */}
           {!item.acked && (
             <button
-              onClick={() => (chat ? posliJarvisovi("vybavené") : actions.ackAnomaly(item.key, "vybavené", true))}
+              onClick={() => (chat ? posliJarvisovi("vybavené", false) : actions.ackAnomaly(item.key, "vybavené", true))}
               style={{ ...linkBtn, color: C.green }}
               title="Viem o tom a je to vyriešené"
             >
