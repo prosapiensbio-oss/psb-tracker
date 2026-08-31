@@ -567,9 +567,15 @@ overiť nedá a nesmie ním byť umlčaný.
 **Pripomienka nezmizne — ODPOVIE.** Prvá verzia ju umlčala; Jerry to o hodinu
 upresnil: chce ju vidieť aj s odpoveďou („napísal som si, že ide na dovolenku,
 a rovno vidím, že sme dohodnutí na ten a ten termín") a zavrieť ju klikom na
-Vybavené. Ticho by ho pripravilo o informáciu, že sa človek vracia. Platí to
-aj pre „Prestal chodiť": Roman Jakubiček mal 14 dní pauzu a termín na
-1. a 8. 9. — pauza je pravdivá, výzva „ozvi sa" nie.
+Vybavené. Ticho by ho pripravilo o informáciu, že sa človek vracia. 
+
+**Ale nie všade rovnako.** „Prestal chodiť" sa pri termíne NEZOBRAZÍ vôbec.
+Najprv som k nemu termín dopísal a vzniklo „14 dní bez tréningu — termín má
+po 31. 8.", čo si protirečí a navyše hovorí to isté, čo Jerryho vlastný záver
+o dovolenke. Rozdiel je v tom, čia je to veta: **záver je Jerryho poznámka**
+a tam sa termín dopisuje, lebo je to odpoveď na otázku, ktorú si sám položil.
+**„Prestal chodiť" je pravidlo appky** — a to má mlčať, keď nemá čo povedať.
+Kto má termín v kalendári, neprestal chodiť; má pauzu.
 
 **Pravidlo:** každá pripomienka, ktorá posiela človeka NIEČO UROBIŤ, musí
 najprv overiť, či to už nie je urobené. Falošný poplach je horší než

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { readFileSync } from "node:fs";
 import { najblizsiTermin, terminSlovom, zaverUzMaTermin } from "./compute";
 
 /**
@@ -80,5 +81,29 @@ describe("termín sa píše do pripomienky", () => {
 
   it("nezmyselný dátum nespadne", () => {
     expect(terminSlovom("nezmysel")).toBe("");
+  });
+});
+
+/**
+ * „Prestal chodiť“ mlčí, keď má klient termín.
+ *
+ * Jerry, 31. 8. 2026: veta „14 dní bez tréningu — termín má po 31. 8.“ si
+ * protirečí a je to zároveň druhýkrát to isté, čo hovorí jeho vlastný záver
+ * o dovolenke. Kto má termín, neprestal chodiť.
+ */
+describe("prestal chodiť vs. termín v kalendári", () => {
+  const zdroj = readFileSync(new URL("./compute.ts", import.meta.url).pathname, "utf8");
+
+  it("gone| sa pushuje len bez termínu", () => {
+    expect(zdroj).toContain("if (!najblizsiTermin(c.name, kal?.udalosti, now)) {");
+  });
+
+  it("do textu gone| sa termín NEdopisuje", () => {
+    const i = zdroj.indexOf("`gone|${c.name}`");
+    expect(zdroj.slice(i, i + 200)).not.toContain("terminSlovom");
+  });
+
+  it("v závere termín naopak zostáva", () => {
+    expect(zdroj).toContain("Termín už máte dohodnutý: ${terminSlovom(termin)}");
   });
 });

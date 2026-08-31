@@ -1465,20 +1465,21 @@ export function deriveAnomalies(
     // istá výzva dvakrát. A keď je duch potvrdený, nenaháňa sa vôbec: vieme,
     // že odišiel, a „ozvi sa" by bol šum.
     if ((c.segment === "Anchor" || c.segment === "Stabilný") && days >= 14 && days < 30 && duch !== "ano") {
-      // „Ozvi sa“ len vtedy, keď sa naozaj je o čom ozvať. Roman Jakubiček
-      // mal 31. 8. 2026 štrnásť dní bez tréningu — a v kalendári termíny na
-      // 1. a 8. 9. Pauza je pravdivá, výzva nie; a výzva, ktorá je zbytočná,
-      // učí ignorovať aj tie, ktoré zbytočné nie sú.
-      const termin = najblizsiTermin(c.name, kal?.udalosti, now);
-      push(
-        `gone|${c.name}`,
-        termin ? "blue" : days >= 21 ? "red" : "orange",
-        "Prestal chodiť",
-        termin
-          ? `${c.name}: ${days} dní bez tréningu (${c.segment}) — termín má ${terminSlovom(termin)}.`
-          : `${c.name}: ${days} dní bez tréningu (${c.segment}) — ozvi sa`,
-        c.name,
-      );
+      // Kto má termín, neprestal chodiť — má pauzu. Notifikácia sa preto
+      // NEZOBRAZÍ vôbec.
+      //
+      // Najprv som k nej termín len dopísal („14 dní bez tréningu — termín má
+      // po 31. 8.“). Jerry, 31. 8. 2026: veta si protirečí a je to zároveň
+      // druhýkrát to isté, čo hovorí jeho vlastný záver o dovolenke. Mal
+      // pravdu dvakrát: „prestal chodiť“ je varovanie pred odchodom klienta
+      // a človek s termínom v kalendári neodchádza.
+      //
+      // Rozdiel oproti záveru: ZÁVER je Jerryho vlastná poznámka a tam termín
+      // dopisujeme, lebo je to odpoveď na otázku, ktorú si sám položil. Toto
+      // je pravidlo appky — a to má mlčať, keď nemá čo povedať.
+      if (!najblizsiTermin(c.name, kal?.udalosti, now)) {
+        push(`gone|${c.name}`, days >= 21 ? "red" : "orange", "Prestal chodiť", `${c.name}: ${days} dní bez tréningu (${c.segment}) — ozvi sa`, c.name);
+      }
     }
 
     // "Duch": kúpi balíček, odchodí pár hodín a prestane chodiť AJ odpisovať.
