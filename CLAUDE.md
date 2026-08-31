@@ -552,3 +552,26 @@ a Jerrymu tvrdil pokles 5 %, kým dlaždica hovorila 18 %. Dlaždica mala pravdu
 (`17.–23. 8. 2026`) a `od`/`do` v ISO pre stroj. Skratka, ktorú si musí model
 domyslieť, sa raz domyslí zle a nikto to nezistí, kým dve miesta nepovedia
 dve rôzne čísla.
+
+## Pripomienka, ktorá posiela konať, sa najprv overí v dátach
+
+Záver „ozvať sa a dohodnúť termín" sa hlásil bez toho, aby sa niekto pozrel
+do kalendára. 31. 8. 2026 podľa neho Jerry napísal Romanovi Pavlíkovi SMS
+a Roman odpísal, že sú dohodnutí — mal termín na utorok 10:30. To isté
+platilo o Michalovi Knapčokovi (tri termíny) a o Janovi Kralovi (dnes o 18:00).
+
+`zaverUzMaTermin()` sa spúšťa LEN na záveroch, ktorých overenie hovorí
+o dohode alebo tréningu — záver „prišla odpoveď z Facebooku?" sa kalendárom
+overiť nedá a nesmie ním byť umlčaný. Záver sa nezatvára, len sa nehlási;
+keď termín z kalendára zmizne, pripomienka sa vráti sama.
+
+**Pravidlo:** každá pripomienka, ktorá posiela človeka NIEČO UROBIŤ, musí
+najprv overiť, či to už nie je urobené. Falošný poplach je horší než
+zmeškaný, lebo podľa neho sa koná — a druhá strana to vidí.
+
+## naostro.sh nevidí závery
+
+`scripts/naostro.ts` sťahuje sessions, packages, overrides, acks, leads,
+payments, services a kalendár — **nie `jarvis_zavery`**. Celá kategória
+„Čas overiť rozhodnutie" je preto pre kontrolu nad ostrými dátami neviditeľná
+a falošné poplachy v nej sa ňou odhaliť nedajú. Zistené 31. 8. 2026.

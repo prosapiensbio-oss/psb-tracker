@@ -1323,6 +1323,37 @@ export function cakajuciKlienti(
 
 // Practical, client-centric signals — one item per client per type (deduped),
 // the actionable things a trainer should follow up on this week.
+/**
+ * Má už človek zo záveru dohodnutý termín?
+ *
+ * Vracia začiatok najbližšieho budúceho tréningu, alebo null. Slúži na to,
+ * aby sa nehlásilo „ozvať sa a dohodnúť termín“ niekomu, kto termín má.
+ *
+ * Zámerne úzke: spúšťa sa LEN na záveroch, ktorých overenie hovorí o dohode
+ * alebo o tréningu. Záver typu „prišla odpoveď z Facebooku?“ sa kalendárom
+ * overiť nedá a nesmie ním byť umlčaný.
+ */
+const ZAVER_O_TERMINE = /dohodn|term[ií]n|ozva[tť] sa|tr[ée]ning|objedna/i;
+
+export function zaverUzMaTermin(
+  z: { zaver?: string | null; tema?: string | null; overit?: string | null },
+  menaKlientov: string[],
+  udalosti: { zaciatok: string; klient: string | null; typ: string | null; zmizlaAt?: string | null }[] | undefined,
+  dnes: Date = new Date(),
+): string | null {
+  if (!ZAVER_O_TERMINE.test(z.overit || "")) return null;
+  const text = normName(`${z.zaver || ""} ${z.tema || ""}`);
+  // Krátke mená sa v texte trafia náhodou — preto aspoň päť znakov.
+  const meno = menaKlientov.find((n) => normName(n).length >= 5 && text.includes(normName(n)));
+  if (!meno) return null;
+  const od = dnes.toISOString().slice(0, 10);
+  const buduce = (udalosti || [])
+    .filter((u) => (u.typ === "trening" || u.typ === "uvodny") && !u.zmizlaAt && u.klient
+      && normName(u.klient) === normName(meno) && u.zaciatok.slice(0, 10) >= od)
+    .sort((a, b) => a.zaciatok.localeCompare(b.zaciatok));
+  return buduce.length ? buduce[0].zaciatok : null;
+}
+
 export function deriveAnomalies(
   data: PSBData,
   clients: Record<string, ClientAgg>,
@@ -1463,9 +1494,21 @@ export function deriveAnomalies(
   // Rozhodnutie, ktorému prešiel termín overenia. Bez tohto by záver z debaty
   // žil len v Jarvisovom prompte a vrátil by sa k nemu, len keď sa naň niekto
   // sám spýta — čiže nikdy. Tu sa ozve sám.
+  //
+  // ALE NAJPRV SA POZRIE DO KALENDÁRA. Keď záver hovorí „ozvať sa a dohodnúť
+  // termín" a ten človek termín už má, pripomienka je falošný poplach — a ten
+  // je horší než zmeškaný, lebo podľa neho sa koná. Jerry, 31. 8. 2026: podľa
+  // pripomienky napísal Romanovi Pavlíkovi SMS a Roman odpísal, že sú
+  // dohodnutí (utorok 1. 9., 10:30). To isté platilo o Michalovi Knapčokovi,
+  // ktorý mal v kalendári hneď tri termíny.
+  //
+  // Záver sa NEZATVÁRA, len sa nehlási. Keď sa termín z kalendára stratí,
+  // pripomienka sa vráti sama — presne vtedy, keď je zase pravdivá.
   const dnes = new Date().toISOString().slice(0, 10);
+  const menaKlientov = Object.keys(clients);
   for (const z of data.zavery || []) {
     if (!z.overitDo || z.overitDo > dnes) continue;
+    if (zaverUzMaTermin(z, menaKlientov, kal?.udalosti, now)) continue;
     push(
       `zaver|${z.id}`,
       "blue",
