@@ -347,6 +347,10 @@ potom bude treba ďalšie.
 zdroja. Odtiaľ pochádza väčšina tej „AI" príchute: nie zo štýlu, z chýbajúcich
 faktov.
 
+**Ďalšie rozhovory: `docs/rozhovor-s-klientom.md`.** Otázky sú tam postavené
+priamo proti štyrom `[DOPLNIŤ]` miestam v tomto dokumente — teda proti faktom,
+ktoré zo šiestich doterajších rozhovorov nevyšli.
+
 **Najmenšia možná náprava:** po tréningu, pri ktorom niečo cvaklo, zapísať
 klientovi tri vety —
 

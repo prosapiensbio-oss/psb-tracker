@@ -581,9 +581,14 @@ Kto má termín v kalendári, neprestal chodiť; má pauzu.
 najprv overiť, či to už nie je urobené. Falošný poplach je horší než
 zmeškaný, lebo podľa neho sa koná — a druhá strana to vidí.
 
-## naostro.sh nevidí závery
+## naostro.sh vidí závery — odkedy sa umlčujú notifikácie
 
-`scripts/naostro.ts` sťahuje sessions, packages, overrides, acks, leads,
-payments, services a kalendár — **nie `jarvis_zavery`**. Celá kategória
-„Čas overiť rozhodnutie" je preto pre kontrolu nad ostrými dátami neviditeľná
-a falošné poplachy v nej sa ňou odhaliť nedajú. Zistené 31. 8. 2026.
+Doplnené 31. 8. 2026 (predtým `jarvis_zavery` nesťahovalo a celá kategória
+„Čas overiť rozhodnutie" bola pre kontrolu neviditeľná). Bolo to nutné v tej
+istej chvíli, keď otvorený záver začal UMLČIAVAŤ notifikácie o klientovi
+(`zaverKryjeKlienta`): bez záverov by kontrola nad ostrými dátami hlásila ako
+otvorené to, čo Jerry s Jarvisom už vyriešil, a rozišla by sa s obrazovkou.
+
+Skript ťahá aj `poplatky` — a preto v ňom stojí kontrola, či každý poplatok
+sedí na známeho klienta. Pravidlo: **keď pribudne tabuľka, ktorá vstupuje do
+registra alebo do notifikácií, pridaj ju do `naostro.sh` v tom istom kroku.**

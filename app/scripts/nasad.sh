@@ -110,6 +110,21 @@ fi
 # neposlať (pamätá si v .wrangler/tmp, čo už poslal), a v prehliadači potom
 # beží stará appka nad novým workerom.
 kontrolny=$(ls -t dist/client/assets/index-*.js 2>/dev/null | head -1 | xargs -r basename)
+
+# Čo má server, aby to appka vedela porovnať s tým, čo naozaj beží.
+#
+# Na iPhone beží Kokpit zo Safari a po návrate z pozadia môže pokračovať starý
+# kód v pamäti. Zvonku sa to nedá odlíšiť od „ešte to nie je nasadené" — a
+# presne to sa Jerry 31. 8. 2026 pýtal. Čas sa VYBERÁ Z POSTAVENÉHO BALÍKA
+# (vite ho tam zapiekol), nie generuje nanovo: musí to byť ten istý reťazec
+# do znaku, inak by porovnanie hlásilo nezhodu po každom nasadení.
+cas_buildu=$(grep -ohE '"20[0-9]{2}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z"' dist/client/assets/index-*.js 2>/dev/null | head -1 | tr -d '"')
+if [ -n "$cas_buildu" ]; then
+  printf '{"cas":"%s"}' "$cas_buildu" > dist/client/verzia.json
+  echo "▸ verzia balíka: $cas_buildu"
+else
+  echo "⚠ čas buildu sa v balíku nenašiel — appka nebude vedieť ohlásiť starú verziu"
+fi
 if [ -z "$kontrolny" ]; then
   echo "✗ v dist/client/assets nie je žiadny index-*.js — chýba build."
   exit 1

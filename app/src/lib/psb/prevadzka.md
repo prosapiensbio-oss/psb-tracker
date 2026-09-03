@@ -243,6 +243,27 @@ zapísaná v appke prosapiens-btc ako `income` s menom klienta, sumou v satoshi 
 CZK hodnotou v čase platby. To je jediná úplná evidencia BTC príjmov a dá sa
 použiť na krížovú kontrolu proti PTminderu.
 
+## 11b. Nezaplatené poplatky — čo to je a odkiaľ to je
+
+V kontexte je pole `nezaplatene` (počet, suma, položky). Je to **doslovný
+obsah exportu PTminder → Finances → Transactions**, druhá sekcia súboru.
+
+**Ako sa to číta:** v PTminderi sa poplatok po zaplatení **zmaže**. Čo teda
+v zozname stojí, to je otvorené — netreba a nedá sa to párovať s platbami
+v `payments`. Neexistuje „poplatok, ktorý už je uhradený, ale ešte tam visí".
+
+**Kde to Jerry vidí:** Kokpit → dole pod „Končí platnosť členstva", nadpis
+„Nezaplatené (N) · suma". Zoznam sa filtruje prepínačom trénera, celková
+suma tiež — takže Jerryho číslo a číslo v kontexte (všetci tréneri) sa
+legitímne líšia.
+
+**Čerstvosť je jediná pasca.** Zoznam je zrkadlo POSLEDNÉHO importu
+Transactions, nie živý stav. Keď niekto zaplatí dnes, zmizne až po ďalšom
+nahratí súboru. Preto sa nikdy netvrdí „X dlhuje" ako o dnešku — správne je
+„v poslednom exporte z <dátum> stálo otvorených N poplatkov".
+
+**Balíček bez platby nie je nezrovnalosť** — viď oddiel 12c.
+
 ## 12. Storno a predplatené hodiny
 
 **Storno neznamená stratené peniaze.** Klient má balíček predplatený vopred, takže
@@ -272,7 +293,7 @@ polovica už odchodená a dopredu zostalo šesť.
 zo zostatku v exporte balíčkov, nikdy z výšky platby. Výška platby hovorí, koľko
 zaplatil, nie koľko má pred sebou.
 
-## 12c. Zaplatené a bez balíčka NIE JE chyba
+## 12c. Platba a balíček sa nemusia stretnúť — ani jeden smer NIE JE chyba
 
 Klient občas zaplatí hneď po poslednom tréningu zo starého balíčka, ale nové
 členstvo sa mu v PTminderi **ešte nezaloží**. Dôvod je vecný: členstvo má
@@ -294,6 +315,23 @@ ani pri kontrole balíčkov. Falošný poplach je chyba rovnakej váhy ako
 zmeškaná. Jediné, čo je na tom naozaj hodné pozornosti, je **čas**: keď od
 platby ubehnú týždne a stále nie je dohodnutý termín, to už nie je účtovný
 stav, ale nedohodnutý klient — a to je otázka pre Jerryho, nie pre appku.
+
+**A platí to aj naopak: balíček bez platby tiež NIE JE chyba.** Nový balíček
+sa v PTminderi nahodí hneď, klient z neho začne čerpať a platba príde neskôr —
+preto je ten istý človek v Kokpite naraz v „Balíček dojde…" aj
+v „Nezaplatené". Jerry, 31. 8. 2026: *„my im v ptminder nahodíme nový balík,
+ale ešte nezaplatili, čerpajú z neho, je nezaplatený."*
+
+Sú to teda dva legitímne stavy, nie protiklady:
+
+| stav | ako vyzerá | prečo |
+| --- | --- | --- |
+| zaplatené, bez balíčka | platba je, členstvo nie | čaká sa na deň, keď sa klient vráti — členstvo má bežať od prvého tréningu (Tsiolis) |
+| balíček bez platby | členstvo beží, poplatok otvorený | balíček sa nahodí hneď, aby mohol trénovať; faktúra dobehne |
+
+**Ani jeden sa nehlási.** Hodný pozornosti je len čas: pri prvom to je dlho
+nedohodnutý termín, pri druhom dlho neuhradený poplatok — a na ten druhý je
+priamo karta „Nezaplatené" (oddiel o poplatkoch, zdroj PTminder Transactions).
 
 ## 13. Mesačná uzávierka — kedy sú dáta úplné
 

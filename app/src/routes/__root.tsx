@@ -80,6 +80,22 @@ function buildHead(meta: AppMeta) {
       { title },
       { name: "description", content: description },
       { name: "author", content: "Higgsfield" },
+      // ── Appka na ploche iPhonu ──────────────────────────────────────────
+      // Safari → Zdieľať → Pridať na plochu. Bez `apple-mobile-web-app-capable`
+      // sa otvorí obyčajná karta prehliadača s panelom; s ním je to celá
+      // obrazovka a vyzerá to ako appka.
+      //
+      // A je to zároveň PODMIENKA notifikácií: iOS doručuje web push LEN do
+      // appky pridanej na plochu. V Safari otvorenej stránke nepríde nič, a to
+      // ani keď človek povolenie udelí.
+      { name: "apple-mobile-web-app-capable", content: "yes" },
+      { name: "mobile-web-app-capable", content: "yes" },
+      // „black-translucent" = obsah ide pod stavový riadok. Kokpit má tmavé
+      // pozadie, takže hodiny a batéria zostanú čitateľné a nevznikne nad
+      // hlavičkou biely pás.
+      { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
+      { name: "apple-mobile-web-app-title", content: "Kokpit" },
+      { name: "theme-color", content: "#1a1e16" },
       { property: "og:title", content: title },
       { property: "og:description", content: description },
       { property: "og:type", content: "website" },
@@ -98,6 +114,10 @@ function buildHead(meta: AppMeta) {
     links: [
       { rel: "stylesheet", href: appCss },
       ...(favicon ? [{ rel: "icon", href: favicon }] : []),
+      // iOS ikonu z manifestu ignoruje a berie výhradne apple-touch-icon,
+      // a to len ako PNG — SVG by nechal a na plochu dal snímku stránky.
+      { rel: "apple-touch-icon", href: "/apple-touch-icon.png" },
+      { rel: "manifest", href: "/manifest.webmanifest" },
     ],
   };
 }

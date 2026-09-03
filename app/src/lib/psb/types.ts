@@ -147,6 +147,8 @@ export type PSBData = {
   leads: Lead[];
   /** Závery z debát s Jarvisom — do registra sa dostanú tie po termíne overenia. */
   zavery: ZaverRow[];
+  /** Nezaplatené poplatky z PTminderu — čo je v exporte, je otvorené. */
+  poplatky: PoplatokZaznam[];
   /** Vedomosti zvonku (rešerše, príručky). Text sa do kontextu neposiela — len prehľad. */
   vedomosti: VedomostRow[];
 };
@@ -181,8 +183,11 @@ export type ZaverRow = {
   stav: string;
 };
 
+export type PoplatokZaznam = { id: string; datum: string; klient: string; popis: string; suma: number };
+
 export const EMPTY_DATA: PSBData = {
   zavery: [],
+  poplatky: [],
   vedomosti: [],
   sessions: [],
   services: [],
@@ -194,4 +199,4 @@ export const EMPTY_DATA: PSBData = {
   leads: [],
 };
 
-export type CSVType = "sessions" | "services" | "payments" | "packages" | "cennik" | "metricool" | "ga4" | "gsc" | "anamneza" | "kanaly";
+export type CSVType = "sessions" | "services" | "payments" | "packages" | "transakcie" | "cennik" | "metricool" | "ga4" | "gsc" | "anamneza" | "kanaly";

@@ -266,3 +266,43 @@ export function nezhodyPrijmov(
   }
   return out.sort((a, b) => b.rozdiel - a.rozdiel);
 }
+
+/**
+ * Ako dlho už nedorazil bankový výpis.
+ *
+ * Jerry, 31. 8. 2026 pri mesačnej kontrole: „doplň tú kontrolu banky, nech
+ * svieti po 14 dňoch."
+ *
+ * PREČO TO DOVTEDY NIKTO NEHLÁSIL
+ *
+ * Zastaranie PTminderu appka hlási od štyroch dní, banku nehlásila vôbec.
+ * `chybajuceNaklady` sa zámerne pozerá len na UZAVRETÉ mesiace — inak by
+ * 7. augusta kričala, že nedorazil nájom, ktorý sa platí okolo desiateho.
+ * Lenže tým sa jej z dohľadu stratil práve ten prípad, keď výpis nedorazil
+ * ANI RAZ: chýbajúci mesiac nie je uzavretý, takže sa naň nikto nepozrie.
+ * Kontrola „čo v dátach nie je" mala dieru presne v tvare vlastnej výnimky.
+ *
+ * Zistené 31. 8. 2026: posledný pohyb 31. 7., celá história nahratá v jednej
+ * dávke 4.–6. 8. a odvtedy nič. Dvadsaťpäť dní ticha.
+ *
+ * PREČO ČERVENÁ AŽ PRI MESIACI
+ *
+ * Štrnásť dní je „zabudol si", tridsať je „P&L bežiaceho mesiaca nemá
+ * náklady". Druhé je iná vec než prvé a nemá vyzerať rovnako.
+ */
+export const BANKA_PRAH_DNI = 14;
+export const BANKA_PRAH_CERVENA = 30;
+
+export function zastaranaBanka(
+  poslednyPohyb: string,
+  dnes: Date = new Date(),
+): { dni: number; poslednyPohyb: string; tone: "red" | "orange" } | null {
+  const d = (poslednyPohyb || "").slice(0, 10);
+  // Prázdna banka NIE JE zastaraná banka. Kým sa nenahralo nič, appka nemá
+  // z čoho počítať vek a hlásiť „0 dní" by bola lož; na prázdny stav
+  // upozorňuje uzávierka.
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return null;
+  const dni = Math.floor((Date.parse(`${dnes.toISOString().slice(0, 10)}T00:00:00Z`) - Date.parse(`${d}T00:00:00Z`)) / 86400_000);
+  if (dni < BANKA_PRAH_DNI) return null;
+  return { dni, poslednyPohyb: d, tone: dni >= BANKA_PRAH_CERVENA ? "red" : "orange" };
+}

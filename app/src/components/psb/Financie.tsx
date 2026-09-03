@@ -1,8 +1,9 @@
 import { useContext, useEffect, useMemo, useState } from "react";
 
+import { porovnajBtcPlatby } from "../../lib/psb/btcKontrola";
 import { btcOznacenia, menoKluc, objednaneVerzia, kotvaDat, monthlyFinance, PAROVANIE, predictCash, predictEarnings, type ClientAgg } from "../../lib/psb/compute";
 import { fetchBtcReserve, type BtcPlatba } from "../../lib/psb/client";
-import { fmtCZK, monthLabel, normName } from "../../lib/psb/format";
+import { fmtCZK, fmtDMY, monthLabel, normName } from "../../lib/psb/format";
 import { ObdobieCtx } from "../../lib/psb/obdobie";
 import { C, mix, S } from "../../lib/psb/theme";
 import { pravidelneNaklady, predikciaNakladov, vzasVerzia } from "../../lib/psb/vzas";
@@ -121,84 +122,10 @@ function BtcKontrola({ data }: { data: PSBData }) {
     return () => { zivy = false; };
   }, []);
 
-  const porovnanie = useMemo(() => {
-    // Jedna platba môže prísť vo viacerých prevodoch — Krčmár poslal 77 tisíc
-    // v štyroch kusoch za dva dni. Porovnávať transakciu proti transakcii preto
-    // vyrába falošné poplachy; porovnávajú sa ZHLUKY: čo od jedného klienta
-    // prišlo v rozpätí pár dní, je jedna platba.
-    const OKNO_DNI = 4;        // čo prišlo od jedného klienta do 4 dní, je jedna platba
-    // Na spárovanie treba širšie okno než na zhlukovanie: zápis v PTminderi a
-    // pohyb v bitcoine sa bežne líšia o niekoľko dní (Gažo — bitcoin 12. 2.,
-    // zápis 4. 2.). Desať dní je stále bezpečných, lebo aj mesačný klient platí
-    // s odstupom tridsiatich.
-    // Tolerancie aj kľúč mena sú v compute.ts — táto obrazovka ich mala
-    // vlastnú kópiu (rovnaké čísla, samostatný kód). Keď sa jedna zmení,
-    // druhá o tom nevie (revízia 18. 8. 2026).
-    const OKNO_PAROVANIA = PAROVANIE.oknoDni;
-    const TOLERANCIA_KC = PAROVANIE.toleranciaKc;
-    const TOLERANCIA_PCT = PAROVANIE.toleranciaPct;
-    const kluc = menoKluc;
-
-    type Zhluk = { kluc: string; meno: string; od: number; suma: number };
-    const zhlukni = <T,>(polozky: T[], meno: (x: T) => string, datum: (x: T) => number, suma: (x: T) => number): Zhluk[] => {
-      const podlaKlienta: Record<string, T[]> = {};
-      for (const x of polozky) (podlaKlienta[kluc(meno(x))] ||= []).push(x);
-      const out: Zhluk[] = [];
-      for (const [k, zoz] of Object.entries(podlaKlienta)) {
-        const zoradene = [...zoz].sort((a, b) => datum(a) - datum(b));
-        let akt: Zhluk | null = null;
-        for (const x of zoradene) {
-          const d = datum(x);
-          if (akt && (d - akt.od) / 86400000 <= OKNO_DNI) akt.suma += suma(x);
-          else { akt = { kluc: k, meno: meno(x), od: d, suma: suma(x) }; out.push(akt); }
-        }
-      }
-      return out;
-    };
-
-    const btc = zhlukni(
-      platby.filter((b) => b.klient && b.czk != null),
-      (b) => b.klient as string, (b) => new Date(b.datum).getTime(), (b) => b.czk as number,
-    );
-    const pt = zhlukni(
-      data.payments.filter((p) => p.amount > 0),
-      (p) => p.client, (p) => new Date(p.date).getTime(), (p) => p.amount,
-    );
-
-    const pouzite = new Set<number>();
-    const nesedi: { text: string; tone: string }[] = [];
-    const ciastocne: string[] = [];
-    let sedi = 0;
-    for (const b of btc) {
-      let najdene = -1;
-      for (let i = 0; i < pt.length; i++) {
-        if (pouzite.has(i) || pt[i].kluc !== b.kluc) continue;
-        if (Math.abs(pt[i].od - b.od) / 86400000 > OKNO_PAROVANIA) continue;
-        najdene = i;
-        break;
-      }
-      const den = new Date(b.od).toISOString().slice(0, 10);
-      if (najdene < 0) {
-        nesedi.push({ tone: "orange", text: `«${b.meno}» ${fmtCZK(b.suma)} z ${den} — v BTC appke je, v PTminderi nie` });
-        continue;
-      }
-      pouzite.add(najdene);
-      const rozdiel = pt[najdene].suma - b.suma;
-      const limit = Math.max(TOLERANCIA_KC, b.suma * TOLERANCIA_PCT);
-      // Asymetria je zámerná. Keď je v PTminderi VIAC než v BTC appke, klient
-      // zaplatil časť inak — Lukáš Kríž platil na dvakrát a v bitcoine bola len
-      // časť. To nie je nezrovnalosť, to je bežná vec, a hlásiť ju ako problém
-      // by kartu zaplnilo šumom. Opačný smer je vážny: peniaze dorazili a
-      // v PTminderi po nich nie je stopa.
-      if (rozdiel > limit) {
-        ciastocne.push(`«${b.meno}» ${den}: v BTC ${fmtCZK(b.suma)} z ${fmtCZK(pt[najdene].suma)} — zvyšok inou cestou`);
-        sedi++;
-      } else if (-rozdiel > limit) {
-        nesedi.push({ tone: "orange", text: `«${b.meno}» ${den}: BTC appka ${fmtCZK(b.suma)} vs PTminder ${fmtCZK(pt[najdene].suma)} — v BTC prišlo o ${fmtCZK(-rozdiel)} VIAC` });
-      } else sedi++;
-    }
-    return { sedi, nesedi, ciastocne, spolu: btc.length };
-  }, [platby, data.payments]);
+  // Výpočet je v lib/psb/btcKontrola.ts — tá istá funkcia kŕmi túto kartu
+  // aj notifikácie v registri. Kým žil tu, karta o nezhode vedela a nikto
+  // sa to nedozvedel, kým na ňu nešiel (Jerry, 31. 8. 2026).
+  const porovnanie = useMemo(() => porovnajBtcPlatby(data.payments, platby), [platby, data.payments]);
 
   // Poistka z 11. 8.: platba, ktorá sa spáruje s BTC knihou, ale v PTminderi
   // má „bank" alebo „cash" (Kaňovský 1. 7. — klik pri zápise). Štatistiky si
@@ -231,7 +158,7 @@ function BtcKontrola({ data }: { data: PSBData }) {
             <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 10 }}>
               {zleOznacene.map((z, i) => (
                 <div key={i} style={{ padding: "8px 11px", borderRadius: 8, background: C.orangeBg, fontSize: 12.5, color: C.text, lineHeight: 1.5 }}>
-                  «{z.meno}» {fmtCZK(z.suma)} z {z.datum} — prišla bitcoinom, ale v PTminderi je označená ako {z.metoda === "bank" ? "účet" : "hotovosť"}. Štatistiky ju už rátajú ako bitcoin; preklikni ju v PTminderi na „other", nech sedí aj zdroj.
+                  «{z.meno}» {fmtCZK(z.suma)} z {fmtDMY(z.datum)} — prišla bitcoinom, ale v PTminderi je označená ako {z.metoda === "bank" ? "účet" : "hotovosť"}. Štatistiky ju už rátajú ako bitcoin; preklikni ju v PTminderi na „other", nech sedí aj zdroj.
                 </div>
               ))}
             </div>

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { fmtDMY, normName } from "../../lib/psb/format";
 
 import { fetchBtcReserve, type BtcVyplata } from "../../lib/psb/client";
-import type { ClientAgg } from "../../lib/psb/compute";
+import { navrhniKlientaKandidati, type ClientAgg } from "../../lib/psb/compute";
 import type { PSBData } from "../../lib/psb/types";
 import { C, mix } from "../../lib/psb/theme";
 import { Card, Empty, H3, Info, Modal, Select, TrenerPills } from "./ui";
@@ -57,40 +57,9 @@ export function navrhni(
   nazov: string,
   clients: Record<string, ClientAgg>,
 ): { typ: string; kandidati: string[]; meno: string } {
-  const holy = bezDiakritiky(nazov);
-
-  if (/guillermo/.test(holy)) return { typ: "guillermo", kandidati: [], meno: "" };
-
-  const uvodny = /\buvodn/.test(holy);
-  // Pri úvodnom sa slovo odreže — zvyšok je meno, ktoré Jerry píše celé.
-  // Meno sa berie z PÔVODNÉHO názvu (s diakritikou a veľkými písmenami), lebo
-  // pri úvodnom človek ešte nie je klientom a toto meno je jediné, čo o ňom máme.
-  const meno = uvodny ? nazov.replace(/[uúUÚ]vodn\S*/g, "").replace(/\s+/g, " ").trim() : "";
-  const hladane = uvodny ? holy.replace(/\buvodn\w*\b/g, "").trim() : holy;
-  if (!hladane) return { typ: uvodny ? "uvodny" : "trening", kandidati: [], meno };
-
-  const kusy = hladane.split(/[\s.,-]+/).filter((x) => x.length > 1);
-  const skore: { meno: string; bod: number }[] = [];
-
-  for (const [meno, c] of Object.entries(clients)) {
-    const casti = bezDiakritiky(meno).split(/\s+/).filter(Boolean);
-    let bod = 0;
-    // Celé meno („Uvodny Hana Nováková") — najsilnejší signál.
-    if (casti.length && kusy.length >= 2 && kusy.every((k) => casti.some((c2) => c2.startsWith(k)))) bod += 6;
-    // Jedno slovo, ktoré presne sedí na krstné meno alebo priezvisko.
-    else if (kusy.length === 1 && casti.includes(kusy[0])) bod += 4;
-    // „Jan K" — krstné meno sedí, druhý kus je začiatok priezviska.
-    else if (kusy.length === 2 && casti[0] === kusy[0] && casti.slice(1).some((c2) => c2.startsWith(kusy[1]))) bod += 5;
-    if (!bod) continue;
-    // Kto stále chodí a trénuje s Jerrym, je pravdepodobnejší než niekto,
-    // kto odišiel pred rokom — ale nikoho to nevylučuje.
-    if (c.status !== "Neaktívny") bod += 2;
-    if (c.primaryTrainer === "Jerry") bod += 1;
-    skore.push({ meno, bod });
-  }
-
-  skore.sort((a, b) => b.bod - a.bod || a.meno.localeCompare(b.meno, "sk"));
-  return { typ: uvodny ? "uvodny" : "trening", kandidati: skore.slice(0, 4).map((x) => x.meno), meno };
+  // Logika žije v compute.ts (navrhniKlientaKandidati) — notifikácia a táto
+  // karta musia dávať ten istý návrh, inak sa raz rozídu.
+  return navrhniKlientaKandidati(nazov, clients);
 }
 
 /**
@@ -147,23 +116,28 @@ export function Kalendar({ clients, data, focus }: { clients: Record<string, Cli
   // Preklik z Dashboardu („Kalendár: 4 nevysvetlené zmeny →") prináša
   // trénera a chce tabuľku zmien — nie vrch stránky. Rovnaký filter ako na
   // Dashboarde, inak by Jerry klikol na svoje zmeny a uvidel Terezkine.
-  const [rolovatNaZmeny, setRolovatNaZmeny] = useState(false);
+  // Kam zrolovať: „nezname" na kartu Nové názvy, inak na Zmeny. Preklik z
+  // dvoch rôznych notifikácií viedol dovtedy na tú istú kartu (Jerry, 3. 9.).
+  const [rolovatNa, setRolovatNa] = useState<string | null>(null);
   useEffect(() => {
     if (!focus?.nonce) return;
     setTrener(focus.trainer && focus.trainer !== "all" ? focus.trainer : "all");
-    setRolovatNaZmeny(true);
+    setRolovatNa(focus.sekcia === "nezname" ? "kal-nezname" : "kal-zmeny");
   }, [focus?.nonce]); // eslint-disable-line react-hooks/exhaustive-deps
-  // Roluje sa až keď tabuľka existuje — pri prvom otvorení sa kalendár ešte
-  // len sťahuje a `kal-zmeny` v DOM nie je (21. 8.: preklik otvoril Kalendár,
+  // Roluje sa až keď obsah existuje — pri prvom otvorení sa kalendár ešte
+  // len sťahuje a kotva v DOM nie je (21. 8.: preklik otvoril Kalendár,
   // ale zostal hore).
   useEffect(() => {
-    if (!rolovatNaZmeny || !stav) return;
+    if (!rolovatNa || !stav) return;
     const t = setTimeout(() => {
-      const el = document.getElementById("kal-zmeny");
-      if (el) { el.scrollIntoView({ behavior: "smooth", block: "start" }); setRolovatNaZmeny(false); }
+      const el = document.getElementById(rolovatNa);
+      // Keď cieľová karta neexistuje (nič neznáme), padni späť na Zmeny —
+      // radšej vrch tabuľky než nič.
+      const ciel = el || document.getElementById("kal-zmeny");
+      if (ciel) { ciel.scrollIntoView({ behavior: "smooth", block: "start" }); setRolovatNa(null); }
     }, 150);
     return () => clearTimeout(t);
-  }, [rolovatNaZmeny, stav]);
+  }, [rolovatNa, stav]);
 
   const nacitaj = useCallback(async () => {
     const r = await fetch("/api/kalendar", { credentials: "same-origin" });
@@ -238,7 +212,7 @@ export function Kalendar({ clients, data, focus }: { clients: Record<string, Cli
           spadne do „Chýba v PTminderi". Priradiť najprv a až potom čítať, čo
           chýba, znamená kratší zoznam a menej otázok. */}
       {stav.nezname.length > 0 && (
-        <Mapovanie nezname={stav.nezname} mena={menaKlientov} clients={clients} onHotovo={nacitaj} />
+        <div id="kal-nezname"><Mapovanie nezname={stav.nezname} mena={menaKlientov} clients={clients} onHotovo={nacitaj} /></div>
       )}
       {pripojene && <Kontrola udalosti={udalostiF} data={data} />}
       {/* Balíčky aj „Odpísaní, ale majú termín" sa zliali na Kokpit (Jerry,
@@ -329,7 +303,7 @@ function Pripojenie({ zdroje, onZmena }: { zdroje: Zdroj[]; onZmena: () => Promi
                 const zastaraný = hodin > 36;
                 return (
                   <div style={{ fontSize: 12, color: zastaraný ? C.red : C.green, marginTop: 3, lineHeight: 1.4 }}>
-                    pripojený{z.posledne_ok ? ` · naposledy ${z.posledne_ok.slice(0, 16).replace("T", " ")}` : ""}
+                    pripojený{z.posledne_ok ? ` · naposledy ${fmtDMY(z.posledne_ok)} ${z.posledne_ok.slice(11, 16)}` : ""}
                     {zastaraný && (
                       <div style={{ marginTop: 2 }}>
                         {Number.isFinite(hodin)

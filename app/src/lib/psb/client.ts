@@ -52,10 +52,34 @@ export async function logout(): Promise<void> {
   await post("/api/logout", {});
 }
 
+/**
+ * Hlavné dáta. Pri neúspechu SKÚSI ZNOVA, kým sa vzdá.
+ *
+ * `/api/data` je najťažšia požiadavka v appke (~930 kB) a keď súbežne beží
+ * ďalšia ťažká, worker vráti 500. Prvá verzia vtedy vrátila EMPTY_DATA a
+ * appka sa tvárila, že Jerry nemá ani jedného klienta — 1. 9. 2026 to tak
+ * vyzeralo aj v Kokpite: nula klientov, „dáta len k — —", a nikde ani slovo
+ * o tom, že požiadavka zlyhala. Ticho je tu horšie než chyba: prázdna appka
+ * sa nedá odlíšiť od appky bez dát.
+ *
+ * Dva pokusy navyše s odstupom stačia — ide o súbeh, nie o výpadok servera.
+ */
 export async function fetchData(): Promise<PSBData> {
-  const r = await fetch("/api/data");
-  if (!r.ok) return EMPTY_DATA;
-  return (await r.json()) as PSBData;
+  for (let pokus = 0; pokus < 3; pokus++) {
+    try {
+      const r = await fetch("/api/data");
+      if (r.ok) return (await r.json()) as PSBData;
+      // 4xx sa opakovaním nespraví — neprihlásenie ani zlá požiadavka.
+      if (r.status < 500) return EMPTY_DATA;
+    } catch {
+      // sieťová chyba — skúsi sa znova
+    }
+    if (pokus < 2) await new Promise((ok) => setTimeout(ok, 600 * (pokus + 1)));
+  }
+  // Posledná inštancia: nech je to aspoň v konzole, keď už to obrazovka
+  // nevie povedať. Bez tohto riadku je jediná stopa prázdna appka.
+  console.error("Kokpit: /api/data zlyhalo trikrát — appka beží bez dát.");
+  return EMPTY_DATA;
 }
 
 export async function ingestFiles(

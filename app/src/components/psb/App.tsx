@@ -23,7 +23,7 @@ import { stavPolozkyRegistra,
   parujVysvetlenia,
   zruseneTreningy,
   cakajuciKlienti,
-  novyKlientAkNicIne,
+  odstranDuplicity,
   najdiKlienta,
   menoKluc,
   kotvaDat,
@@ -32,6 +32,7 @@ import { stavPolozkyRegistra,
   nastavObjednaneZKalendara,
   deriveClients,
   deriveRegister,
+  dnesneTreningy,
   deriveSixM,
   nezapisaneDoRegistra,
   pripomienkySlubov,
@@ -39,7 +40,9 @@ import { stavPolozkyRegistra,
   ktoDnesTrenoval,
   TRAINERS,
 } from "../../lib/psb/compute";
-import type { RegisterItem } from "../../lib/psb/compute";
+import type { BtcKnihaPlatba, RegisterItem } from "../../lib/psb/compute";
+import { btcPlatbyJednotlivo, btcPodlaKlientov } from "../../lib/psb/btcKontrola";
+import { polozkaZastaranaBanka, polozkyBtcNesedi } from "../../lib/psb/penazneNotifikacie";
 import { breakEvenPriemer, spocitajRezervu } from "../../lib/psb/rezerva";
 import { buildAiContext } from "../../lib/psb/aiContext";
 import { Assistant, useAssistantChat } from "./Assistant";
@@ -66,7 +69,7 @@ import { HladanieKlienta } from "./Hladanie";
 import { ZapisButton } from "./Zapis";
 import { ritualy as spocitajRitualy } from "../../lib/psb/rituals";
 import { nastavRozpis, pridajDoRozpisu, type PohybZaBunku } from "../../lib/psb/rozpis";
-import { chybajuceNaklady, dvojiteZapisy, nezhodyPrijmov, nezhodySExcelom, type BankovyMesiac, type Pohyb } from "../../lib/psb/kontrolaNakladov";
+import { chybajuceNaklady, dvojiteZapisy, nezhodyPrijmov, nezhodySExcelom, zastaranaBanka, type BankovyMesiac, type Pohyb } from "../../lib/psb/kontrolaNakladov";
 import { MKT_MESACNE, nastavIgPrispevky, nastavMarketingZImportu, nastavWebZImportu, nastavAdsZImportu, nastavWebStranky, nastavWebRychlost, nastavKanaly } from "../../lib/psb/marketing";
 
 export type Actions = {
@@ -87,6 +90,8 @@ export type Actions = {
    * ktorý vidia obe strany: notifikácie stíchnu, Kalendár má záznam aj dôvod.
    */
   zapisZrusenie: (klient: string, datum: string, poznamka: string) => Promise<void>;
+  /** Priradí názov z kalendára klientovi (alebo typu) — potvrdenie návrhu z notifikácie. */
+  mapujKalendar: (nazov: string, trener: string, typ: string, klient: string | null) => Promise<void>;
 };
 
 // Deep-link from Dashboard click-throughs: focus one week (Tréningy → Prehľad) or one month (Financie → Zárobky).
@@ -127,6 +132,15 @@ export type NavFocus = {
    * otvorí sa priamo ten, inak sa otvorí prázdny slot mesiaca a fázy.
    */
   slot?: { mesiac: string; faza: number; napadId?: string };
+  /**
+   * Na ktorú kartu Kalendára zrolovať. „zmeny" (východisková) = Zmeny
+   * v kalendári, „nezname" = Nové názvy v kalendári.
+   *
+   * Jerry, 3. 9. 2026: klik na „N udalostí appka nepozná" ho prekliklo na
+   * Zmeny v kalendári, hoci potreboval Nové názvy — dve rôzne karty, dovtedy
+   * oba prekliky viedli na tú istú.
+   */
+  sekcia?: "zmeny" | "nezname";
 };
 
 // Five top-level areas, each answering a different question, left to right as a
@@ -297,7 +311,7 @@ export function PSBApp() {
   // Týždenné zápisy a mesačné poznámky nie sú v PSBData — majú vlastné tabuľky
   // a doteraz sa čítali až na obrazovke, kde sa píšu. Lenže pripomienka musí
   // vedieť, či je to vyplnené, skôr než tam človek príde.
-  const [zapisy, setZapisy] = useState<{ weeks: Record<string, Record<string, string>>; mesiace: Record<string, { note?: string; answers?: Record<string, string> }> }>({ weeks: {}, mesiace: {} });
+  const [zapisy, setZapisy] = useState<{ weeks: Record<string, Record<string, string>>; mesiace: Record<string, { note?: string; answers?: Record<string, string> }>; nacitane: boolean }>({ weeks: {}, mesiace: {}, nacitane: false });
   const [treningySub, setTreningySub] = useState("prehled");
   const [klientiSub, setKlientiSub] = useState("klienti");
   const [treningyFocus, setTreningyFocus] = useState<NavFocus | null>(null);
@@ -426,7 +440,7 @@ export function PSBApp() {
     if (tab === "vzas" && focus) setVzasFocus(focus);
     // Preklik z Dashboardu „Kalendár: N zmien →" nesie trénera — Kalendár sa
     // otvorí s tým istým filtrom a zroluje na tabuľku zmien.
-    if (tab === "kalendar" && focus) setKalendarFocus(focus);
+    if (tab === "kalendar" && focus) setKalendarFocus(sub ? { ...focus, sekcia: sub as NavFocus["sekcia"] } : focus);
     // Podzáložka Výsledkov sa nikdy nenastavovala — pripomienka „Mesačná
     // uzávierka" tak doviedla človeka na Kvartálne a vyzeralo to, že klik
     // nefunguje. Rovnaká mechanika ako pri ostatných, len chýbala.
@@ -464,7 +478,7 @@ export function PSBApp() {
 
   const nacitajZapisy = useCallback(async () => {
     const [weeks, mesiace] = await Promise.all([fetchWeekEntries(), fetchMonthNotes()]);
-    setZapisy({ weeks, mesiace });
+    setZapisy({ weeks, mesiace, nacitane: true });
   }, []);
 
   useEffect(() => {
@@ -472,7 +486,7 @@ export function PSBApp() {
       const s = await checkSession();
       setAuthed(s.authed);
       setKtoSom(s.user);
-      if (s.authed) { await load(); void nacitajZapisy(); }
+      if (s.authed) { await load(); setDataHotove(true); void nacitajZapisy(); }
       else setLoading(false);
     })();
   }, [load, nacitajZapisy]);
@@ -542,6 +556,12 @@ export function PSBApp() {
   useEffect(() => {
     void fetchBtcReserve(true, true, true).then((r) => {
       if (typeof r?.czk === "number") setBtcCelkom(r.czk);
+      setBtcKurz({ kurz: r?.rateCzkPerBtc ?? null, kedy: r?.rateUpdatedAt ?? null });
+      setBtcKniha({
+        vyplaty: (r?.vyplaty || []) as never,
+        nakupy: (r?.nakupy || []) as never,
+        cielSats: r?.goalSats ?? null,
+      });
       // Platby klientov v bitcoine sú TRŽBA, ktorá cez účet nikdy neprejde.
       // Bez nich kontrola príjmov hlásila, že za júl chýba 132 000 Kč — a
       // pritom 130 000 z toho prišlo v BTC.
@@ -559,6 +579,7 @@ export function PSBApp() {
         }
         setBtcPrijmy(bt);
         setBtcSatsKlienti(podlaKluca);
+        setBtcPlatby(r.platby as BtcKnihaPlatba[]);
       }
       // Nákupy platené bitcoinom sa do P&L NEPÍŠU.
       //
@@ -710,11 +731,29 @@ export function PSBApp() {
   const [kalNevysvetlene, setKalNevysvetlene] = useState<KalZmena[]>([]);
   // Ktoré mesiace sú uzavreté. Jarvis to potrebuje vedieť, aby nenavrhoval
   // opravy v zamknutom mesiaci a vedel povedať „júl sa už dá zamknúť".
+  /** Hlavné dáta sú načítané — až potom sa smú spustiť ďalšie ťažké dopyty. */
+  const [dataHotove, setDataHotove] = useState(false);
   const [zamknuteMesiace, setZamknuteMesiace] = useState<string[]>([]);
   useEffect(() => {
     void fetchPeriods().then(({ periods }) => setZamknuteMesiace(periods.filter((p) => p.locked).map((p) => p.month)));
   }, []);
+  /**
+   * Kalendár čaká na /api/data. NIE je to kozmetika, je to oprava výpadku.
+   *
+   * 1. 9. 2026 appka ukazovala nulu klientov a „dáta len k — —". Nebola to
+   * chyba v dátach ani v prihlásení: `/api/data` (928 kB) a `/api/kalendar`
+   * vyštartovali NARAZ a worker na oboch vrátil 500. Zmerané v prehliadači —
+   * samostatne `/api/data` vráti 200, spolu s kalendárom padnú obe.
+   *
+   * A padne to ticho: `fetchData()` pri neúspechu vráti EMPTY_DATA, takže
+   * appka nevyzerá rozbito, len prázdno — a to sa nedá odlíšiť od „ešte nič
+   * nemáš nahraté".
+   *
+   * Je to tá istá lekcia ako pri sťahovaní dvoch kalendárov 29. 8.: ťažká
+   * práca patrí do jednej požiadavky na jeden zdroj, nie do dvoch naraz.
+   */
   useEffect(() => {
+    if (!dataHotove) return;
     void fetch("/api/kalendar", { credentials: "same-origin" })
       .then((r) => r.json())
       .then((j: { ok?: boolean; udalosti?: KalUdalost[]; zmenyHistoria?: KalZmena[]; zmeny?: KalZmena[] }) => {
@@ -736,7 +775,7 @@ export function PSBApp() {
         if (nastavObjednaneZKalendara(objednane)) setFioTik((x) => x + 1);
       })
       .catch(() => {});
-  }, []);
+  }, [dataHotove]);
 
   /**
    * Vysvetlenie z registra sa doručí Kalendáru.
@@ -798,6 +837,26 @@ export function PSBApp() {
 
   const [bankaPrijmy, setBankaPrijmy] = useState<Record<string, number>>({});
   const [btcPrijmy, setBtcPrijmy] = useState<Record<string, number>>({});
+  // Surový zoznam BTC platieb, nielen mesačné súčty. Kontrola proti PTminderu
+  // potrebuje jednotlivé platby — a odkedy z nej chodia notifikácie, potrebuje
+  // ich aj register, nielen karta vo Financiách.
+  const [btcPlatby, setBtcPlatby] = useState<BtcKnihaPlatba[]>([]);
+  /** Dnešný kurz z BTC appky — bez neho sa dnešná hodnota netvrdí. */
+  const [btcKurz, setBtcKurz] = useState<{ kurz: number | null; kedy: string | null }>({ kurz: null, kedy: null });
+  /**
+   * Výplaty, nákupy a cieľ z BTC appky — surové, pre Jarvisov kontext.
+   *
+   * Kokpit ich sťahoval už predtým, ale rozpúšťal si ich do mesačných súčtov
+   * pre P&L a jednotlivé riadky zahodil. Jarvis tak o rezerve vedel len
+   * celkovú sumu. Jerry, 3. 9. 2026: „je možné, aby Jarvis videl aj do BTC
+   * appky?" Vidí — celá kniha má 99 riadkov a zmestí sa do kontextu celá,
+   * takže netreba ani nový nástroj, ani dopyt navyše.
+   */
+  const [btcKniha, setBtcKniha] = useState<{
+    vyplaty: { datum: string; sats: number; czk: number | null; poznamka?: string; kto?: string }[];
+    nakupy: { datum: string; sats: number; czk: number | null; poznamka?: string }[];
+    cielSats: number | null;
+  }>({ vyplaty: [], nakupy: [], cielSats: null });
   const [btcSatsKlienti, setBtcSatsKlienti] = useState<Record<string, number>>({});
   const [hotovostMesiace, setHotovostMesiace] = useState<Set<string>>(new Set());
   // Kedy sa naposledy čítal text webu. Sťahovanie musí spustiť človek (nočná
@@ -1190,6 +1249,38 @@ function skupinaFaktur(
     // pozerala na posledný mesiac v banke, čo je vždy ten rozbehnutý. Rovnaká
     // rodina chýb ako kotva dát: kód, ktorý predpokladá, že mesiac s dátami je
     // mesiac hotový.
+    // (0) Nedorazil samotný VÝPIS. Musí to stáť pred kontrolou uzavretých
+    // mesiacov, a to nie je detail: keď výpis nedorazí, chýbajúci mesiac nie
+    // je uzavretý, takže by ho `chybajuceNaklady` preskočili a appka by o tom
+    // mlčala tým hlasnejšie, čím väčšia je diera. Pri prázdnej banke sa navyše
+    // o riadok nižšie vyskakuje z celej kontroly.
+    //
+    // Hotovosť sa nepočíta — tá sa zapisuje ručne v zošite a o tom, či prišiel
+    // výpis z Fio, nehovorí nič.
+    const poslednyPohybBanky = Object.values(bankaPohyby)
+      .flatMap((mes) => Object.values(mes).flat())
+      .filter((x) => !x.hotovost)
+      .reduce((m, x) => (x.datum > m ? x.datum : m), "");
+    // Text aj kľúč sú v lib/psb/penazneNotifikacie.ts — tú istú funkciu
+    // volá ranná dávka notifikácií na telefón.
+    const polozkaBanka = polozkaZastaranaBanka(poslednyPohybBanky, data.anomalyAck || {});
+    if (polozkaBanka) out.push(polozkaBanka);
+
+    // (0b) Bitcoinové platby, ktoré nesedia s PTminderom.
+    //
+    // Dovtedy o nich vedela len karta „Kontrola bitcoinových platieb" vo
+    // Financiách — a nikto sa to nedozvedel, kým na ňu nešiel. Jerry, 31. 8.
+    // 2026: „to by mala byť notifikácia pre Jerryho, peniaze má na starosti
+    // on." Preto sem, a preto s `trener: "Jerry"`.
+    //
+    // Hlási sa LEN `nesedi`, nie `ciastocne`: čiastočná platba v bitcoine je
+    // bežná vec (zvyšok prišiel inou cestou) a upozornenie by z nej urobilo
+    // problém, ktorý neexistuje.
+    // Bitcoinové platby, ktoré nesedia s PTminderom. Text aj kľúč sú
+    // v lib/psb/penazneNotifikacie.ts — tú istú funkciu volá ranná dávka
+    // notifikácií na telefón, takže sa obrazovka a telefón nemôžu rozísť.
+    out.push(...polozkyBtcNesedi(data.payments, btcPlatby, data.anomalyAck || {}));
+
     const beziaci = new Date().toISOString().slice(0, 7);
     const mesiace = Object.keys(bankaSumy).filter((m) => m < beziaci).sort();
     if (!mesiace.length) return out;
@@ -1211,6 +1302,8 @@ function skupinaFaktur(
         detail: n.druh === "chyba"
           ? `${meno} — platilo sa ${n.zMesiacov} zo 4 predošlých mesiacov, obvykle ${Math.round(n.obvykle).toLocaleString("cs-CZ")} Kč, ale za ${monthLabel(n.mesiac)} v banke nie je nič. Buď je pohyb zaradený inde, platilo sa v hotovosti, alebo faktúra nie je uhradená. Zisk za ten mesiac je zatiaľ o túto sumu vyšší, než bude.`
           : `${meno} — obvykle ${Math.round(n.obvykle).toLocaleString("cs-CZ")} Kč, za ${monthLabel(n.mesiac)} len ${Math.round(n.teraz).toLocaleString("cs-CZ")} Kč. Buď je časť zaradená inde, alebo sa platilo menej.`,
+        // Peniaze má na starosti Jerry (31. 8. 2026).
+        trener: "Jerry",
         ...stavPolozky(key, `naklad|${n.kategoria}`),
         // Cieľ nesie mesiac aj kategóriu: P&L sa otvorí, riadok rozbalí,
         // zvýrazní a odroluje sa k nemu. Predtým to bola správna obrazovka
@@ -1239,6 +1332,8 @@ function skupinaFaktur(
         // pohyby pod ním sa nafiltrujú presne na tie dva pohyby, o ktorých
         // upozornenie hovorí. Predtým to viedlo na Údaje a hľadalo sa
         // v sedemsto riadkoch (revízia 18. 8. 2026).
+        // Peniaze má na starosti Jerry (31. 8. 2026).
+        trener: "Jerry",
         ...stavPolozky(key, `dvojity|${d.kategoria}`), priority: 2, client: `vzas|pnl|${d.mesiac}|${d.kategoria}`,
       });
     }
@@ -1255,6 +1350,8 @@ function skupinaFaktur(
       const key = `prijmy|${n.mesiac}`;
       out.push({
         key, category: "Zmena", tone: "orange",
+        // Peniaze má na starosti Jerry (31. 8. 2026).
+        trener: "Jerry",
         title: `${monthLabel(n.mesiac)}: banka a PTminder sa v príjmoch líšia o ${n.rozdiel.toLocaleString("cs-CZ")} Kč`,
         detail: n.bankaViac
           ? `Za ${monthLabel(n.mesiac)} prišlo tromi cestami (účet + zošit + BTC) ${n.banka.toLocaleString("cs-CZ")} Kč, ale PTminder hlási tržby ${n.ptminder.toLocaleString("cs-CZ")} Kč — o ${n.rozdiel.toLocaleString("cs-CZ")} Kč MENEJ. Buď chýba platba v PTminderi, alebo časť príjmu nie je tržba (vklad, vratka, preplatok) a patrí do koša „mimo".`
@@ -1277,6 +1374,8 @@ function skupinaFaktur(
         .join(" · ");
       out.push({
         key, category: "Zmena", tone: "orange",
+        // Peniaze má na starosti Jerry (31. 8. 2026).
+        trener: "Jerry",
         title: `Excel a banka sa rozchádzajú v ${nezhody.length} ${nezhody.length === 1 ? "položke" : nezhody.length < 5 ? "položkách" : "položkách"}`,
         detail: `Mesiace do jún 2026 berú číslo z Excelu, banka slúži na kontrolu. Najväčšie rozdiely — ${top}. Celý zoznam je vo VZAS → Zisky a straty, klikom na číslo.`,
         ...stavPolozky(key), priority: 9, client: "vzas|pnl",
@@ -1342,66 +1441,12 @@ function skupinaFaktur(
     // Zámerne len na dnešok. Zoznam „tento týždeň" by sa čítal ako plán a
     // strácal by naliehavosť; toto je veta, ktorú si prečítaš ráno a večer je
     // buď vybavená, alebo prepadla.
-    {
-      const dnesIso = new Date().toISOString().slice(0, 10);
-      // Zrušené sa nehlási. Google Kalendár appka prečíta sama (zmiznutá
-      // udalosť sa sem vôbec nedostane), ale zrušenie zapísané ručne
-      // v Kalendári dovtedy nikto okrem Kalendára nečítal — a appka ďalej
-      // hlásila hodinu, o ktorej Jerry pred chvíľou zapísal, že sa nekoná.
-      const zruseneDnes = zruseneTreningy(kalZmeny);
-      const dnesne = kalUdalosti
-        .filter((u) => u.zaciatok.slice(0, 10) === dnesIso && u.klient && (u.typ === "trening" || u.typ === "uvodny"))
-        .filter((u) => !zruseneDnes.has(`${normName(u.klient as string)}|${dnesIso}`))
-        .sort((a, b) => a.zaciatok.localeCompare(b.zaciatok));
-      for (const u of dnesne) {
-        const c = clients[u.klient as string];
-        if (!c) continue;
-        const dovody: string[] = [];
-
-        if (c.narodeniny) {
-          const [, m, d] = c.narodeniny.split("-");
-          if (m && d && `${m}-${d}` === dnesIso.slice(5)) dovody.push("má dnes narodeniny");
-        }
-        if (c.packageRemaining != null && c.packageTotal != null && c.packageRemaining <= 1) {
-          dovody.push(
-            c.packageRemaining <= 0
-              ? "balíček má vyčerpaný — dnes je posledná hodina, ktorú mu appka pozná"
-              : "v balíčku mu zostáva posledná hodina",
-          );
-        }
-        // 6M: upozornenie si nesie sám riadok procesu — netreba ho odvodzovať
-        // z fázy a mesiaca druhýkrát a inak než Prevádzka.
-        const s6 = sixM.find((x) => x.client === u.klient);
-        // Zodpovedaná 6M otázka sa v dennej pripomienke NEOPAKUJE. Denná
-        // pripomienka vzniká každý tréningový deň nanovo (kľúč nesie dátum),
-        // takže si „5. mesiac — hodnotiaci rozhovor" prilepila k Lukášovi
-        // Hanusovi ešte 21. 8. — jedenásť dní po tom, čo Jerry na 6M otázku
-        // odpovedal a rozhovor mal za sebou. Vysvetlená vec nie je pripomienka.
-        const sixmZodpovedane = s6 ? stavPolozky(`sixm|${s6.client}|${s6.phase}|${s6.monthInPhase}`, `sixm|${s6.client}`).acked : false;
-        if (s6?.alert && !sixmZodpovedane) dovody.push(s6.alert.replace(/^⚠️\s*/, "").toLowerCase());
-        // Nepodpísaná zmluva ZOSTÁVA (Jerry, 9. 8.) — je to vec, ktorú treba
-        // vybaviť práve vtedy, keď človeka vidíš. Šum, na ktorý sa sťažoval,
-        // nerobila samotná pripomienka, ale to, že vyskočila aj u niekoho, kto
-        // v 6M procese nie je. Na to je prepínač na karte klienta; keď ho tam
-        // označíš ako mimo 6M, zmizne aj táto veta. A keď obťažuje inak,
-        // umlčí ju „Nehlásiť" pre toho klienta.
-        if (s6 && !s6.contractSigned) dovody.push("nemá podpísanú zmluvu");
-        if (u.typ === "uvodny") dovody.push("je to úvodný tréning — po ňom sa rozhoduje o pokračovaní");
-
-        if (!dovody.length) continue;
-        const key = `dnes|${dnesIso}|${u.klient}`;
-        out.push({
-          key, category: "6M", tone: "blue",
-          title: `${u.zaciatok.slice(11, 16)} ${u.klient}: ${dovody[0]}`,
-          detail: `Dnes o ${u.zaciatok.slice(11, 16)} máš tréning s ${u.klient}. ${dovody.map((x) => x[0].toUpperCase() + x.slice(1)).join(". ")}.`,
-          ...stavPolozky(key, `dnes|${u.klient}`), priority: 1, client: `klienti|klienti`,
-          oKom: u.klient as string,
-        });
-      }
-    }
+    // Dnešné tréningy — výpočet je v lib/psb/compute.ts, aby ho okrem
+    // obrazovky videla aj ranná dávka notifikácií na telefón.
+    out.push(...dnesneTreningy(clients, sixM, { udalosti: kalUdalosti, zmeny: kalZmeny }, data.anomalyAck || {}));
 
     return out;
-  }, [bankaSumy, bankaPohyby, bankaPrijmy, btcPrijmy, btcBezDokladu, data.anomalyAck, kalUdalosti, clients, sixM, zapisy]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [bankaSumy, bankaPohyby, bankaPrijmy, btcPrijmy, btcPlatby, btcBezDokladu, data.payments, data.anomalyAck, kalUdalosti, clients, sixM, zapisy]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const zmenyMetrik = useMemo(() => {
     const ack = data.anomalyAck || {};
@@ -1458,7 +1503,7 @@ function skupinaFaktur(
   }, [data, bankaSumy, hotovostMesiace, kanalyMesiace]);
 
   const rituals = useMemo(
-    () => spocitajRitualy(new Date(), zapisy.weeks, zapisy.mesiace, chybajuceDoklady),
+    () => spocitajRitualy(new Date(), zapisy.weeks, zapisy.mesiace, chybajuceDoklady, { nacitane: zapisy.nacitane }),
     [zapisy, chybajuceDoklady],
   );
   // Veci, ktoré čakajú na vetu od človeka — dopyty bez dôvodu a nevysvetlené
@@ -1559,10 +1604,14 @@ function skupinaFaktur(
         key: `zapis|${r.id}`,
         category: "Zápis" as const,
         tone: (r.druh === "kvartal" || r.druh === "kontrola" ? "blue" : "orange") as "blue" | "orange",
-        title: r.trener ? `${r.nadpis} (${r.trener})` : r.nadpis,
+        // Meno v titulku len pri TÝŽDENNOM zápise. Tam ho oba tréneri majú
+        // každý svoje a bez mena by sa dva riadky nedali rozoznať. Mesačná
+        // kontrola je Jerryho a nikto iný ju nevidí — „(Jerry)" by tam bolo
+        // len šumom, ktorý nič nehovorí.
+        title: r.trener && r.druh === "tyzden" ? `${r.nadpis} (${r.trener})` : r.nadpis,
         // Meno patrí aj do detailu — riadok registra kreslí DETAIL, nie titulok,
         // takže bez toho by Terezka nevidela, že tá pripomienka je jej.
-        detail: `${r.trener ? `${r.nadpis} — ${r.trener}` : r.nadpis} — ${r.detail}`,
+        detail: `${r.trener && r.druh === "tyzden" ? `${r.nadpis} — ${r.trener}` : r.nadpis} — ${r.detail}`,
         // Bez trénera by týždenná únava svietila obom a filter by pri nej
         // neznamenal nič — Terezka by videla Jerryho zápis a naopak.
         trener: r.trener,
@@ -1575,7 +1624,7 @@ function skupinaFaktur(
     // Až tu, keď sú všetky zdroje pokope: „nový klient" je len konštatovanie
     // a ustúpi úlohám o tom istom človeku (SMS, chýbajúci dopyt). Kontext
     // o nepotvrdenom klientovi je v Klientoch, nie v treťom riadku notifikácií.
-    return novyKlientAkNicIne(
+    return odstranDuplicity(
       [...extra, ...nezapisane, ...kontrolaBanky, ...zmenyMetrik, ...kontrolaWebu, ...pripomienky, ...dovody, ...register],
     ).sort((a, b) => a.priority - b.priority);
   }, [rituals, register, kontrolaBanky, zmenyMetrik, kontrolaWebu, pripomienky, dovody, nezapisane, data.anomalyAck]);
@@ -1827,8 +1876,15 @@ function skupinaFaktur(
       // Rezerva sa počíta v lib/psb/rezerva.ts — tým istým výpočtom ako
       // dlaždica na Kokpite. Dve odpovede na to isté číslo boli 16. 8. reálny
       // stav appky a tá horšia znela istejšie.
-      spocitajRezervu({ btcCzk: btcCelkom, ucet: ucetStav, hotovost: hotovostStav, bePriem: breakEvenPriemer().bePriem })),
-    [data, clients, sixM, capacity, registerAll, kalUdalosti, kalZmeny, uzavierkaPreAi, btcCelkom, ucetStav, hotovostStav, igVerzia, mktVerzia, vzasVerzia()], // eslint-disable-line react-hooks/exhaustive-deps
+      spocitajRezervu({ btcCzk: btcCelkom, ucet: ucetStav, hotovost: hotovostStav, bePriem: breakEvenPriemer().bePriem }),
+      // Bitcoin po klientoch — ten istý výpočet, aký kŕmi kartu klienta.
+      {
+        kurzCzkZaBtc: btcKurz.kurz, kurzKedy: btcKurz.kedy,
+        klienti: btcPodlaKlientov(btcPlatby, btcKurz.kurz, Object.keys(clients)),
+        platby: btcPlatbyJednotlivo(btcPlatby, btcKurz.kurz, Object.keys(clients)),
+        vyplaty: btcKniha.vyplaty, nakupy: btcKniha.nakupy, cielSats: btcKniha.cielSats,
+      }),
+    [data, clients, sixM, capacity, registerAll, kalUdalosti, kalZmeny, uzavierkaPreAi, btcCelkom, btcKurz, btcKniha, btcPlatby, ucetStav, hotovostStav, igVerzia, mktVerzia, vzasVerzia()], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   const actions = useMemo<Actions>(
@@ -1913,6 +1969,20 @@ function skupinaFaktur(
         const j = await fetch("/api/kalendar", { credentials: "same-origin" }).then((r) => r.json()).catch(() => null);
         if (j?.ok && Array.isArray(j.zmeny)) setKalNevysvetlene(j.zmeny);
         if (j?.ok && Array.isArray(j.zmenyHistoria)) setKalZmeny(j.zmenyHistoria);
+      },
+      mapujKalendar: async (nazov, trener, typ, klient) => {
+        // Tá istá akcia ako karta Nové názvy v Kalendári — jeden zápis, jedno
+        // miesto. Notifikácia „Priradiť X → Y?" ju volá po potvrdení.
+        const r = await fetch("/api/kalendar", {
+          method: "POST", credentials: "same-origin",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ akcia: "mapuj", nazov, trener, typ, klient }),
+        }).then((x) => x.json()).catch(() => null);
+        if (!r?.ok) throw new Error("priradenie neprešlo");
+        // Kalendár sa znovu načíta — udalosti dostanú typ/klienta a notifikácia
+        // zmizne sama, lebo názov už appka pozná.
+        const j = await fetch("/api/kalendar", { credentials: "same-origin" }).then((r) => r.json()).catch(() => null);
+        if (j?.ok && Array.isArray(j.udalosti)) setKalUdalosti(j.udalosti);
       },
       obnovKalendar: async () => {
         // Sťahovanie je ZÁPIS (kal_udalosti/kal_zmeny). Prehltnutá chyba

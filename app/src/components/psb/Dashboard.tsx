@@ -1276,6 +1276,19 @@ export function Dashboard({
     return r ? { date: r.date, filename: r.filename } : null;
   }, [data.uploadLog]);
 
+  /**
+   * Nezaplatené poplatky. Filtruje sa podľa prepínača trénera rovnako ako
+   * zvyšok karty — inak by Terezka videla Jerryho dlžníkov a naopak.
+   */
+  const nezaplatene = useMemo(
+    () => (data.poplatky || []).filter((p) => {
+      const c = clients[p.klient];
+      return !c || matchT(c.primaryTrainer);
+    }),
+    [data.poplatky, clients, matchT],
+  );
+  const nezaplateneSpolu = useMemo(() => nezaplatene.reduce((a, p) => a + p.suma, 0), [nezaplatene]);
+
   const platnostKonci = useMemo(() => {
     const dnes = new Date().toISOString().slice(0, 10);
     const dni = (d: string) => Math.round((Date.parse(d) - Date.parse(dnes)) / 86400000);
@@ -1622,6 +1635,50 @@ export function Dashboard({
                     style={{ background: "none", border: "none", color: C.textDim, fontSize: 15, cursor: "pointer", padding: "0 2px", flexShrink: 0 }}
                   >
                     ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* NEZAPLATENÉ — poplatky, ktoré v PTminderi stále stoja otvorené.
+            V PTminderi sa poplatok po zaplatení zmaže, takže tu netreba nič
+            párovať: čo je v exporte, to je otvorené (Jerry, 31. 8. 2026).
+            Sedí to pod balíčkami zámerne — sú to tí istí ľudia o krok ďalej:
+            balíček majú, zaplatený ho nemajú. */}
+        {nezaplatene.length > 0 && (
+          <div style={{ marginTop: 18 }}>
+            {/* Nadpis nesie H3, rovnako ako „Balíček dojde po objednaných
+                hodinách" nad ním. Malý sivý popisok (ako „Končí platnosť
+                členstva") hovorí „toto je podčasť predošlého zoznamu" — lenže
+                nezaplatené nie sú podčasť balíčkov, je to samostatné číslo
+                o peniazoch. Jerry, 31. 8. 2026. */}
+            <H3 style={{ marginBottom: 8 }}>
+              <Info
+                text="Poplatky, ktoré v PTminderi stále stoja otvorené — Finances → Transactions. Po zaplatení sa poplatok v PTminderi maže, takže tu je presne to, čo ešte neprišlo; netreba to s ničím párovať. Zoznam je zrkadlo posledného importu: keď niekto zaplatí, zmizne až po ďalšom nahratí Transactions. Že je ten istý človek aj v balíčkoch vyššie, nie je nezrovnalosť: balíček sa v PTminderi nahodí hneď a klient z neho čerpá, platba príde neskôr."
+                /* Suma červeno, tou istou farbou ako odznaky pri menách nižšie.
+                   Nadpis a zoznam tak hovoria jednou farbou o jednej veci —
+                   inak nadpis vyzeral ako neutrálny popisok a červené pilulky
+                   pod ním ako niečo iné. Nie je to pilulka, len text: pilulka
+                   vo veľkosti H3 by nadpis roztiahla a prebila by odznaky,
+                   ktoré nesú konkrétne čísla. */
+                label={<>Nezaplatené ({nezaplatene.length}) · <span style={{ color: C.red }}>{fmtCZK(nezaplateneSpolu)}</span></>}
+              />
+            </H3>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 8 }}>
+              {nezaplatene.map((p) => (
+                <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 10px", background: mix(C.text, 4), border: `1px solid ${C.border}`, borderRadius: 9, width: "100%", minWidth: 0 }}>
+                  <span style={{ ...badge("red"), fontSize: 10, flexShrink: 0, whiteSpace: "nowrap" }}>{fmtCZK(p.suma)}</span>
+                  <button
+                    onClick={() => onNavigate("klienti", undefined, { client: p.klient, nonce: Date.now() })}
+                    title={p.popis}
+                    style={{ flex: 1, minWidth: 0, background: "none", border: "none", padding: 0, textAlign: "left", cursor: "pointer" }}
+                  >
+                    <span style={{ fontSize: 13, color: C.text, fontWeight: 500, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.klient}</span>
+                    <span style={{ fontSize: 11, color: C.textDim, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {fmtDMY(p.datum)} · {p.popis.split(" - from ")[0] || "poplatok"}
+                    </span>
                   </button>
                 </div>
               ))}
@@ -2129,6 +2186,22 @@ function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar }: { i
   const jeOdmena = item.key.startsWith("referral|");
   const vybav = (poznamka: string) => actions.ackAnomaly(item.key, poznamka, true);
 
+  // Návrh na priradenie názvu z kalendára — jeden klik namiesto otvárania
+  // Kalendára (Jerry, 3. 9. 2026).
+  const [navrhStav, setNavrhStav] = useState<"" | "uklada" | "chyba">("");
+  const potvrdNavrh = async () => {
+    if (!item.navrh) return;
+    setNavrhStav("uklada");
+    try {
+      await actions.mapujKalendar(item.navrh.nazov, item.navrh.trener, item.navrh.typ, item.navrh.klient);
+      // Notifikácia sa uzavrie — po ďalšom načítaní kalendára už názov appka
+      // pozná a nevráti sa, ale ack drží zmiznutie okamžite.
+      actions.ackAnomaly(item.key, `priradené: ${item.navrh.klient}`, true);
+    } catch {
+      setNavrhStav("chyba");
+    }
+  };
+
   /**
    * Úvodný bez dopytu — zapíš ho rovno tu.
    *
@@ -2379,7 +2452,12 @@ function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar }: { i
               {dopytOtvoreny ? "Zavrieť" : "Zapísať dopyt"}
             </button>
           )}
-          {!item.acked && !jeRozhodnutie && <button onClick={openItem} style={linkBtn}>Otvoriť →</button>}
+          {item.navrh && !item.acked && (
+            <button onClick={() => void potvrdNavrh()} disabled={navrhStav === "uklada"} style={{ ...linkBtn, color: navrhStav === "chyba" ? C.red : C.green }}>
+              {navrhStav === "uklada" ? "Priradzujem…" : navrhStav === "chyba" ? "Skús znova" : `Áno, ${item.navrh.klient.split(" ")[0]}`}
+            </button>
+          )}
+          {!item.acked && !jeRozhodnutie && <button onClick={openItem} style={linkBtn}>{item.navrh ? "Nie, otvoriť" : "Otvoriť →"}</button>}
           {/* „Otvoriť" ťa prepne na miesto, ale odpoveď na otázku typu „prečo
               chýba nájom" tam nikde nezapíšeš. Odpovedať sa dá rovno tu —
               text ide Jarvisovi aj s tým, čoho sa týka, takže nemusíš

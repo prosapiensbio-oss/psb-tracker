@@ -178,21 +178,56 @@ export const Route = createFileRoute("/api/meta")({
           // POZORNOSTI — koľko ľudí vydržalo aspoň tri sekundy. Kým sa
           // doťahovali z inej karty, existovala vedľa tejto druhá tabuľka
           // s tými istými kategóriami len kvôli jednému stĺpcu.
-          const p = await DB.prepare(
-            `SELECT i.id, i.datum, i.mesiac, i.typ, i.permalink, i.kategoria, i.faza,
-                    COALESCE(NULLIF(i.hook,''), (SELECT m.hook FROM mkt_prispevky m
-                       WHERE substr(m.datum,1,10) = substr(i.datum,1,10)
-                         AND m.hook <> '' ORDER BY m.views DESC LIMIT 1), '') AS hook,
-                    i.dosah, i.ulozenia, i.zdielania, i.komentare, i.lajky, i.videnia,
-                    COALESCE((SELECT m.view_rate FROM mkt_prispevky m
-                       WHERE substr(m.datum,1,10) = substr(i.datum,1,10)
-                         AND m.view_rate > 0 ORDER BY m.views DESC LIMIT 1), 0) AS viewRate,
-                    COALESCE((SELECT m.watch_time FROM mkt_prispevky m
-                       WHERE substr(m.datum,1,10) = substr(i.datum,1,10)
-                         AND m.watch_time > 0 ORDER BY m.views DESC LIMIT 1), 0) AS watchTime
-               FROM ig_prispevky i ORDER BY i.datum DESC`,
-          ).all();
-          return Response.json({ ok: true, prispevky: p.results });
+          // DVA DOPYTY, NIE JEDEN — a je to rozdiel medzi 1 413 a 912 660
+          // prečítanými riadkami.
+          //
+          // Pôvodne to bol jeden SELECT s tromi korelovanými poddopytmi nad
+          // `mkt_prispevky`, každý s `substr(m.datum,1,10)`. Funkcia na stĺpci
+          // znemožní použiť index, takže sa pre KAŽDÝ z 265 príspevkov trikrát
+          // prešla celá tabuľka 1 148 riadkov. To je 912 660 riadkov na jedno
+          // volanie — a volá sa pri každom otvorení Kokpitu. **Päť otvorení
+          // minulo celý denný limit D1** (5 miliónov) a appka potom ukazovala
+          // samé nuly.
+          //
+          // Cena bola KVADRATICKÁ: rástla súčinom oboch tabuliek. Preto to
+          // roky fungovalo a potom prestalo zo dňa na deň — pri 100 a 400
+          // riadkoch to bolo 120 000 na volanie, dnes sedemkrát viac.
+          // Jerry, 2. 9. 2026: „ako to mohlo doteraz fungovať?" Presne takto.
+          //
+          // Párovanie po dni sa robí v pamäti: jeden prechod cez každú
+          // tabuľku, zvyšok je mapa. Výsledok je ten istý — z riadkov toho dňa
+          // vyhráva ten s najvyšším `views`, ako predtým `ORDER BY views DESC
+          // LIMIT 1`.
+          const [ig, mkt] = await DB.batch([
+            DB.prepare(`SELECT id, datum, mesiac, typ, permalink, kategoria, faza, hook,
+                               dosah, ulozenia, zdielania, komentare, lajky, videnia
+                          FROM ig_prispevky ORDER BY datum DESC`),
+            DB.prepare(`SELECT substr(datum,1,10) den, hook, view_rate, watch_time, views
+                          FROM mkt_prispevky ORDER BY views DESC`),
+          ]);
+
+          type MktRiadok = { den: string; hook: string | null; view_rate: number | null; watch_time: number | null };
+          // Riadky sú zoradené podľa views zostupne, takže PRVÝ zapísaný pre
+          // daný deň je ten najsilnejší — presne to, čo robilo LIMIT 1.
+          const podlaDna = new Map<string, { hook: string; viewRate: number; watchTime: number }>();
+          for (const r of mkt.results as unknown as MktRiadok[]) {
+            const z = podlaDna.get(r.den) || { hook: "", viewRate: 0, watchTime: 0 };
+            if (!z.hook && (r.hook || "").trim()) z.hook = String(r.hook);
+            if (!z.viewRate && (r.view_rate || 0) > 0) z.viewRate = Number(r.view_rate);
+            if (!z.watchTime && (r.watch_time || 0) > 0) z.watchTime = Number(r.watch_time);
+            podlaDna.set(r.den, z);
+          }
+
+          const prispevky = (ig.results as unknown as Record<string, unknown>[]).map((i) => {
+            const d = podlaDna.get(String(i.datum || "").slice(0, 10));
+            return {
+              ...i,
+              hook: String(i.hook || "").trim() || d?.hook || "",
+              viewRate: d?.viewRate ?? 0,
+              watchTime: d?.watchTime ?? 0,
+            };
+          });
+          return Response.json({ ok: true, prispevky });
         }
 
         // Časová os obsahu pre kartu „Obsah → dopyt": Instagram API tam, kde
@@ -304,7 +339,19 @@ export const Route = createFileRoute("/api/meta")({
       },
 
       POST: async ({ request }) => {
-        if (!(await isAuthed(request))) return unauthorized();
+        // Plánovač smie spustiť sťahovanie reklám bez prihlásenia — tokenom,
+        // rovnako ako pri kalendári.
+        //
+        // Nie je to pohodlie: Meta 20. 8. 2026 zamietla vyšší stupeň prístupu
+        // s odôvodnením „nedostatočný počet volaní Ads API za posledných 15
+        // dní". Kokpit ho totiž volal LEN vtedy, keď Jerry klikol na Stiahnuť.
+        // Denné sťahovanie drží čísla reklám čerstvé a zároveň je to tá
+        // integrácia, ktorú Meta chce vidieť — nie umelé volania, ale skutočné
+        // používanie, ktoré appka aj tak potrebuje.
+        const cronToken = (bindings() as { KAL_CRON_TOKEN?: string }).KAL_CRON_TOKEN || "";
+        const dany = request.headers.get("x-cron-token") || "";
+        const odPlanovaca = !!cronToken && cronToken.length === dany.length && cronToken === dany;
+        if (!odPlanovaca && !(await isAuthed(request))) return unauthorized();
         const { DB } = bindings();
         DB_PRE_POCITADLO = DB;
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });

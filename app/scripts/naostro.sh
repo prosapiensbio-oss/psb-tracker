@@ -51,6 +51,8 @@ stiahni acks         "SELECT * FROM anomaly_ack"
 stiahni leads        "SELECT * FROM leads"
 stiahni payments     "SELECT date,client_name,amount_czk,payment_method FROM payments"
 stiahni services     "SELECT date,client_name,service_type,service_description,price_czk,is_6m,trainer FROM services"
+stiahni zavery       "SELECT id, datum, tema, zaver, overit, overit_do, stav FROM jarvis_zavery WHERE stav = 'otvoreny'"
+stiahni poplatky     "SELECT id,datum,client_name,popis,suma_czk FROM poplatky"
 stiahni kal_udalosti "SELECT uid,trener,zaciatok,koniec,nazov,klient,typ,zmizla_at FROM kal_udalosti WHERE zaciatok >= date('now','-40 days')"
 stiahni kal_zmeny    "SELECT id,kedy,trener,druh,nazov,klient,pred,po,vysvetlene,poznamka FROM kal_zmeny ORDER BY kedy DESC LIMIT 300"
 

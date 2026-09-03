@@ -46,6 +46,30 @@ const PEOPLE = ["jerry", "terezka"] as const;
 const dvoj = (n: number) => String(n).padStart(2, "0");
 const mesiacKluc = (d: Date) => `${d.getFullYear()}-${dvoj(d.getMonth() + 1)}`;
 
+/**
+ * Prvý deň, keď má zmysel pýtať si mesačnú uzávierku.
+ *
+ * Jerry, 1. 9. 2026: „dnes je 1. 9. a vyskočili mi všetky notifikácie typu
+ * treba zapísať platba… potreboval by som, aby mi to vyskakovali prvý víkend
+ * v novom mesiaci." Dovtedy pripomienka svietila od prvého dňa — v utorok,
+ * keď ešte nie sú nahraté doklady a uzávierka sa fyzicky nedá spraviť.
+ *
+ * Pravidlo je z `prevadzka.md` oddiel 13: uzávierka je prvý víkend
+ * nasledujúceho mesiaca, a **keď prvý padne na piatok alebo víkend, je to až
+ * ten ďalší** — inak by uzávierka pripadla na deň, keď mesiac práve skončil
+ * a PTminder ešte nemá zaúčtované.
+ *
+ * Vracia PIATOK, lebo víkend sa v Kokpite počíta od piatka (rovnako ako pri
+ * týždennom zápise).
+ */
+export function prvyVikendMesiaca(rok: number, mesiacOd0: number): Date {
+  const prvy = new Date(Date.UTC(rok, mesiacOd0, 1));
+  const den = prvy.getUTCDay() || 7;          // pondelok 1 … nedeľa 7
+  // Do najbližšieho piatku; keď 1. padne na pi/so/ne, preskakuje sa o týždeň.
+  const doPiatku = den <= 4 ? 5 - den : 12 - den;
+  return new Date(Date.UTC(rok, mesiacOd0, 1 + doPiatku));
+}
+
 /** Poradie dňa v týždni s pondelkom ako 1 a nedeľou ako 7. */
 const denVTyzdni = (d: Date) => d.getDay() || 7;
 
@@ -55,7 +79,24 @@ export function ritualy(
   monthNotes: Record<string, { note?: string; answers?: Record<string, string> }>,
   /** Čo ešte nie je nahraté — pripomienka na zápis čaká, kým je zoznam prázdny. */
   doklady?: { chybaju: string[] },
+  /**
+   * Sú týždenné a mesačné zápisy už načítané zo servera?
+   *
+   * Jerry, 1. 9. 2026: appka mu tvrdila, že týždeň 24. 8. zostal bez
+   * hodnotenia — pritom bol vyplnený oboma. Nebola to chyba pravidla:
+   * `weeks` bolo ešte PRÁZDNE, lebo panel sa otvoril skôr, než dobehol fetch,
+   * a z prázdna sa vyrobilo tvrdenie „chýba".
+   *
+   * Prázdna odpoveď nie je dôkaz. Kým dáta nie sú, pripomienka mlčí —
+   * falošné „nezapísal si to" je horšie než pripomienka o sekundu neskôr,
+   * lebo raz uverené sa overuje ručne.
+   *
+   * Predvolené `true` kvôli starším volaniam a testom, ktoré dáta dodávajú
+   * priamo.
+   */
+  opts?: { nacitane?: boolean },
 ): Ritual[] {
+  const nacitane = opts?.nacitane ?? true;
   const out: Ritual[] = [];
   const den = denVTyzdni(dnes);
   const denVMesiaci = dnes.getDate();
@@ -95,7 +136,7 @@ export function ritualy(
       // Bez týždňa dopadol klik na zoznam a človek si musel nájsť riadok sám.
       ciel: { tab: "treningy", sub: "prehled", tyzden: tw },
       trener: kto,
-      splatne: !vyplneny && den >= 5,
+      splatne: nacitane && !vyplneny && den >= 5,
       hotove: vyplneny,
     });
     const vyplnenyMinuly = mam(twMinuly);
@@ -109,7 +150,7 @@ export function ritualy(
       ciel: { tab: "treningy", sub: "prehled", tyzden: twMinuly },
       trener: kto,
       tichyKedHotovy: true,
-      splatne: !vyplnenyMinuly,
+      splatne: nacitane && !vyplnenyMinuly,
       hotove: vyplnenyMinuly,
     });
   }
@@ -154,7 +195,13 @@ export function ritualy(
     ciel: mozeZapisovat
       ? { tab: "vysledky", sub: "mesacne", mesiac: mk }
       : { tab: "udaje" },
-    splatne: !maMesiac,
+    // Pýta sa až od prvého víkendu — predtým sa uzávierka nedá spraviť, lebo
+    // PTminder ani banka ešte nemajú mesiac zaúčtovaný.
+    //
+    // Ale NEZHASÍNA kalendárom, iba zápisom (viď komentár vyššie). Sú to dve
+    // rôzne veci: kedy sa má začať pýtať a kedy má prestať. Prvá verzia ich
+    // zliala do jedného a chýbajúci júl tak zmizol z obrazovky 4. augusta.
+    splatne: nacitane && !maMesiac && dnes.getTime() >= prvyVikendMesiaca(dnes.getFullYear(), dnes.getMonth()).getTime(),
     hotove: maMesiac,
   });
 
@@ -187,6 +234,12 @@ export function ritualy(
   // v repe: docs/kontrolne-prompty.md; kvartálna úplná revízia
   // docs/revizny-prompt.md.
   const tyzdenVMesiaci = Math.min(4, Math.ceil(denVMesiaci / 7));
+  //
+  // KOMU PATRIA: Jerrymu, všetky štyri. Jerry, 31. 8. 2026: „tieto kontroly
+  // mám na starosti ja, tak tie sa nemusia Terezke zobrazovať v jej
+  // notifikáciách, nech ju nerozptyľujú." Je to audit appky, nie práca
+  // s klientom — Terezka na ňom nemá čo robiť a štyri modré riadky mesačne
+  // sú presne ten šum, cez ktorý sa prestane čítať aj to ostatné.
   const KONTROLY: { tyzden: number; id: string; nadpis: string; detail: string; ciel: Ritual["ciel"] }[] = [
     {
       tyzden: 1, id: "peniaze", nadpis: "Mesačná kontrola: Peniaze",
@@ -213,6 +266,7 @@ export function ritualy(
     out.push({
       id: `kontrola-${k.id}-${mesiacKluc(dnes)}`,
       druh: "kontrola",
+      trener: "Jerry",
       nadpis: k.nadpis,
       detail: k.detail,
       ciel: k.ciel,

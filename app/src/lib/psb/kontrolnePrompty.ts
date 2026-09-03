@@ -50,9 +50,12 @@ miesta, kde tu už chyby boli:
 3. Miesta, kde jeden zdroj závisí od druhého — faktúra ↔ platba, zošit ↔
    banka, BTC ↔ P&L. Tam vznikajú tiché diery: suma, ktorá je dvakrát, alebo
    nie je vôbec. Pri každom páre over dopytom, či počty sedia.
-   POZOR na falošný poplach: platba BEZ nového balíčka je normálny stav —
-   členstvo sa zakladá až od prvého tréningu nového cyklu, ktorý ešte nemusí
-   byť dohodnutý (prevadzka.md, oddiel 12c). Nehlás to.
+   POZOR na falošný poplach, oba smery sú normálny stav a NEHLÁSIA sa:
+   platba BEZ nového balíčka (členstvo sa zakladá až od prvého tréningu
+   nového cyklu, ktorý ešte nemusí byť dohodnutý) aj balíček BEZ platby
+   (balíček sa nahodí hneď, klient z neho čerpá, faktúra dobehne — preto je
+   ten istý človek naraz v „Balíček dojde…" aj v „Nezaplatené").
+   Viď prevadzka.md, oddiel 12c.
 4. Dlh z výplat a jeho tempo: číslo na obrazovke = Jarvisovo číslo.
 5. Break-even a predikcia: z akého obdobia sa počítajú a či to obdobie ešte
    existuje v dátach (kotva dát, nie kalendár).

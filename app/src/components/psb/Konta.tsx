@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { fmtDMY } from "../../lib/psb/format";
 
 import { C, mix } from "../../lib/psb/theme";
 import { Info } from "./ui";
@@ -117,7 +118,7 @@ export function Konta() {
                 {k.login === ja && <span style={{ color: C.accentLight, fontWeight: 400 }}> · to si ty</span>}
               </span>
               <span style={{ fontSize: 11, color: C.textDim, flex: "0 0 auto" }}>
-                {k.active ? (k.lastLogin ? `naposledy ${k.lastLogin.slice(0, 10)}` : "ešte sa neprihlásil") : "vypnuté"}
+                {k.active ? (k.lastLogin ? `naposledy ${fmtDMY(k.lastLogin)}` : "ešte sa neprihlásil") : "vypnuté"}
               </span>
               <button
                 onClick={() => { setUpravovany(k.login); setLogin(k.login); setMeno(k.name); setHeslo(""); setSprava(""); setChyba(""); }}

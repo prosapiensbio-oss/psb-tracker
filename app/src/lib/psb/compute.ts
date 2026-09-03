@@ -1261,6 +1261,104 @@ export function klientUdalosti(u: { klient?: string | null; typ?: string | null;
  * nevyvolá SMS po úvodnom, nespáruje sa s dopytom a pri úvodnom nevznikne
  * profil klienta. A pritom to je jedno kliknutie v Kalendári.
  */
+/**
+ * Udalosti, ktorých názov appka nepozná — a preto sa nepočítajú do hodín.
+ *
+ * Jerry, 3. 9. 2026: „vie vôbec rozpoznať, čo je tréning a čo je niečo iné?"
+ * Vie — ale len to, čo má v `kal_mapovanie`. Čo tam nie je, dostane prázdny
+ * typ a dlaždica Hodiny/týždeň to ticho preskočí.
+ *
+ * V ten deň to bolo SEDEM udalostí za týždeň: Lukas H, Maty, Katka Matlová,
+ * Patrik, Regina-dať zdarma, Tomaš, Veronika. Samé mená klientov, čiže skoro
+ * isto tréningy — dlaždica ukazovala 47 h namiesto ~54 a nič nehovorilo, že
+ * niečo chýba. Zoznam neznámych názvov appka mala, ale len v Kalendári; do
+ * notifikácií sa nedostal.
+ *
+ * To je presne ten druh tichej chyby, na ktorý má appka vlastné pravidlo:
+ * chýbajúce upozornenie nie je dôkaz, že je dobre.
+ *
+ * PREČO PODĽA TRÉNERA A PREČO JEDEN RIADOK
+ *
+ * Mapovanie robí ten, kto vie, čo tá skratka znamená — „Maty" môže byť Matyáš
+ * (tretí tréner), nie klient. A osemnásť samostatných riadkov by register
+ * zaplavilo; jeden riadok na trénera s počtom a menami stačí.
+ *
+ * PREČO LEN TENTO TÝŽDEŇ
+ *
+ * Následok je konkrétny: skreslená dlaždica za BEŽIACI týždeň. Staršie
+ * neznáme názvy sú práca na inokedy a v Kalendári na ne zoznam čaká.
+ */
+/**
+ * Ku skratke z kalendára najlepší kandidát z klientov.
+ *
+ * Presunuté z Kalendar.tsx (kde žila ako `navrhni`), aby ho vedela použiť aj
+ * notifikácia — Jerry, 3. 9. 2026: „nech to navrhne v notifikácii." Jeden
+ * zdroj pravdy: karta v Kalendári aj notifikácia dávajú ten istý návrh.
+ *
+ * JEDNOZNAČNÉ = práve jeden kandidát. Vtedy sa dá navrhnúť na jeden klik.
+ * Nula alebo viac než jeden = nechať na človeka; hádať by znamenalo priradiť
+ * tréning zlému klientovi (dnes „Tomaš" = päť ľudí).
+ */
+export function navrhniKlientaKandidati(
+  nazov: string,
+  clients: Record<string, Pick<ClientAgg, "status" | "primaryTrainer">>,
+): { typ: string; kandidati: string[]; meno: string } {
+  const holy = normName(nazov);
+  if (/guillermo/.test(holy)) return { typ: "guillermo", kandidati: [], meno: "" };
+
+  const uvodny = /\buvodn/.test(holy);
+  const meno = uvodny ? nazov.replace(/[uúUÚ]vodn\S*/g, "").replace(/\s+/g, " ").trim() : "";
+  const hladane = uvodny ? holy.replace(/\buvodn\w*\b/g, "").trim() : holy;
+  if (!hladane) return { typ: uvodny ? "uvodny" : "trening", kandidati: [], meno };
+
+  // Jednopísmenové iniciály sa PONECHÁVAJÚ. Predtým sa zahadzovali
+  // (filter > 1), takže „Monika Č." spadla na holé „Monika" a sedela na obe
+  // Moniky — hoci „Č." ju jednoznačne odlišuje (Jerry, 3. 9. 2026). Iniciála
+  // ako predpona priezviska maťchovanie SPRÍSNI, nie rozvoľní: viac kúskov =
+  // každý musí sedieť.
+  const kusy = hladane.split(/[\s.,-]+/).filter((x) => x.length >= 1);
+  const skore: { meno: string; bod: number }[] = [];
+  for (const [m, c] of Object.entries(clients)) {
+    const casti = normName(m).split(/\s+/).filter(Boolean);
+    let bod = 0;
+    if (casti.length && kusy.length >= 2 && kusy.every((k) => casti.some((c2) => c2.startsWith(k)))) bod += 6;
+    else if (kusy.length === 1 && casti.includes(kusy[0])) bod += 4;
+    else if (kusy.length === 2 && casti[0] === kusy[0] && casti.slice(1).some((c2) => c2.startsWith(kusy[1]))) bod += 5;
+    if (!bod) continue;
+    if (c.status !== "Neaktívny") bod += 2;
+    if (c.primaryTrainer === "Jerry") bod += 1;
+    skore.push({ meno: m, bod });
+  }
+  skore.sort((a, b) => b.bod - a.bod || a.meno.localeCompare(b.meno, "sk"));
+  return { typ: uvodny ? "uvodny" : "trening", kandidati: skore.slice(0, 4).map((x) => x.meno), meno };
+}
+
+export function neznameUdalosti(
+  udalosti: { zaciatok: string; koniec?: string; typ: string | null; nazov?: string; trener?: string }[] | undefined,
+  dnes: Date = new Date(),
+): { trener: string; nazvy: string[]; pocet: number; hodin: number }[] {
+  const pon = new Date(Date.parse(`${dnes.toISOString().slice(0, 10)}T00:00:00Z`));
+  pon.setUTCDate(pon.getUTCDate() - ((pon.getUTCDay() || 7) - 1));
+  const do_ = new Date(pon.getTime() + 7 * 86400000);
+
+  const podla: Record<string, { nazvy: Set<string>; pocet: number; hodin: number }> = {};
+  for (const u of udalosti || []) {
+    if (u.typ) continue;                       // pozná ho — netreba nič
+    const t = Date.parse(u.zaciatok);
+    if (!(t >= pon.getTime() && t < do_.getTime())) continue;
+    const kto = String(u.trener || "").trim() || "—";
+    const z = podla[kto] || (podla[kto] = { nazvy: new Set(), pocet: 0, hodin: 0 });
+    z.nazvy.add(String(u.nazov || "(bez názvu)").trim());
+    z.pocet++;
+    // Rovnaké počítanie ako v dlaždici: udalosť bez konca je hodina.
+    const min = u.koniec ? (Date.parse(u.koniec) - t) / 60000 : 60;
+    z.hodin += min > 5 && min < 300 ? min / 60 : 1;
+  }
+  return Object.entries(podla)
+    .map(([trener, z]) => ({ trener, nazvy: [...z.nazvy].sort(), pocet: z.pocet, hodin: Math.round(z.hodin * 10) / 10 }))
+    .sort((a, b) => b.pocet - a.pocet);
+}
+
 export function udalostiBezMena(
   udalosti: { zaciatok: string; klient: string | null; typ: string | null; nazov?: string; trener?: string }[] | undefined,
   dnes: Date = new Date(),
@@ -1378,6 +1476,60 @@ export function zaverUzMaTermin(
   return buduce.length ? buduce[0].zaciatok : null;
 }
 
+/** Bez vlastného dátumu overenia platí záver dva týždne. */
+const ZAVER_PLATI_DNI = 14;
+/**
+ * Otvorený záver, ktorý o tomto klientovi PRÁVE TERAZ platí.
+ *
+ * Jerry, 31. 8. 2026: „s Jarvisom v chate som riešil, čo je s Robinom — to by
+ * mi teda malo automaticky vymazať tú notifikáciu, pretože už je to
+ * vyriešené."
+ *
+ * Mal pravdu a bola to presne tá diera, o ktorej hovorí vo väčšej otázke:
+ * o klientovi sa píše na piatich miestach a jedno o druhom nevie. Záver
+ * „Robin Martinek je chorý, ozvať sa cez víkend 5.–6. 9." ležal v
+ * `jarvis_zavery` s dátumom overenia — a appka vedľa neho hlásila „Robin nemá
+ * termín, napíš mu". Dve vety o tom istom človeku, jedna z nich zbytočná.
+ *
+ * PREČO SA NEZATVÁRA, LEN MLČÍ
+ *
+ * Rovnaké pravidlo ako pri termíne z kalendára: záver zostáva otvorený a
+ * svoju pripomienku („ozval si sa Robinovi?") vydá sám v deň, na ktorý si ju
+ * Jerry nastavil. Umlčanie teda nie je strata — je to odovzdanie slova tomu,
+ * kto je na rade. Keby sme notifikáciu zavreli natvrdo, po 7. 9. by sa už
+ * neozval nikto.
+ *
+ * PREČO LEN ZÁVERY O TERMÍNE
+ *
+ * Tá istá úzka podmienka ako v `zaverUzMaTermin`: záver „prišla odpoveď
+ * z Facebooku?" nesmie umlčať otázku o klientovom tréningu, aj keby v ňom
+ * jeho meno náhodou stálo.
+ */
+export function zaverKryjeKlienta(
+  zavery: { id?: string; datum?: string; zaver?: string | null; tema?: string | null; overit?: string | null; overitDo?: string | null; stav?: string | null }[] | undefined,
+  meno: string,
+  dnes: Date = new Date(),
+): { id: string; datum: string; zaver: string; plati_do: string } | null {
+  const dnesStr = dnes.toISOString().slice(0, 10);
+  const ciel = normName(meno);
+  // Krátke mená sa v texte trafia náhodou — rovnaká poistka ako inde.
+  if (ciel.length < 5) return null;
+  const platne = (zavery || [])
+    .filter((z) => (z.stav || "otvoreny") === "otvoreny")
+    .filter((z) => ZAVER_O_TERMINE.test(`${z.overit || ""} ${z.zaver || ""}`))
+    .filter((z) => normName(`${z.zaver || ""} ${z.tema || ""}`).includes(ciel))
+    .map((z) => {
+      // Bez dátumu overenia platí záver dva týždne od zápisu — dlhšie by
+      // umlčal aj klienta, na ktorého sa medzitým naozaj zabudlo.
+      const doKedy = (z.overitDo || "").slice(0, 10)
+        || new Date(Date.parse(`${(z.datum || dnesStr).slice(0, 10)}T00:00:00Z`) + ZAVER_PLATI_DNI * 86400_000).toISOString().slice(0, 10);
+      return { id: String(z.id || ""), datum: (z.datum || "").slice(0, 10), zaver: String(z.zaver || ""), plati_do: doKedy };
+    })
+    .filter((z) => z.plati_do >= dnesStr)
+    .sort((a, b) => b.plati_do.localeCompare(a.plati_do));
+  return platne[0] || null;
+}
+
 export function deriveAnomalies(
   data: PSBData,
   clients: Record<string, ClientAgg>,
@@ -1477,7 +1629,11 @@ export function deriveAnomalies(
       // Rozdiel oproti záveru: ZÁVER je Jerryho vlastná poznámka a tam termín
       // dopisujeme, lebo je to odpoveď na otázku, ktorú si sám položil. Toto
       // je pravidlo appky — a to má mlčať, keď nemá čo povedať.
-      if (!najblizsiTermin(c.name, kal?.udalosti, now)) {
+      //
+      // To isté platí o otvorenom ZÁVERE. Keď Jerry s Jarvisom vyriešil, čo je
+      // s klientom, appka nemá o dva riadky nižšie pýtať to isté — pripomienku
+      // vydá sám záver v deň, na ktorý si ju nastavil.
+      if (!najblizsiTermin(c.name, kal?.udalosti, now) && !zaverKryjeKlienta(data.zavery, c.name, now)) {
         push(`gone|${c.name}`, days >= 21 ? "red" : "orange", "Prestal chodiť", `${c.name}: ${days} dní bez tréningu (${c.segment}) — ozvi sa`, c.name);
       }
     }
@@ -2024,6 +2180,13 @@ export type RegisterItem = {
   kto?: string;
   /** Odpoveď na to isté z minulosti — pri pripomienke, ktorá sa vrátila. */
   predchadzajuca?: { text: string; kedy: string; kto?: string };
+  /**
+   * Návrh na jeden klik: priradiť názov z kalendára tomuto klientovi.
+   *
+   * Vzniká len pri JEDNOZNAČNEJ skratke (práve jeden kandidát). Notifikácia
+   * potom nemá „choď to niekam vybaviť", ale „Priradiť X → Y?" s potvrdením.
+   */
+  navrh?: { nazov: string; trener: string; typ: string; klient: string };
 };
 
 /**
@@ -2038,21 +2201,126 @@ export type RegisterItem = {
  * Keď o človeku nič iné otvorené nie je (SMS sa pripomína 21 dní, dopyt 45),
  * `novy|` zostáva — inak by po uplynutí okien nezostal signál žiadny.
  */
-export function novyKlientAkNicIne(polozky: RegisterItem[]): RegisterItem[] {
+export function odstranDuplicity(polozky: RegisterItem[]): RegisterItem[] {
+  const menoPolozky = (p: RegisterItem) => p.oKom || (p.client && !p.client.includes("|") ? p.client : "");
+
+  // (1) „Nový klient" ustúpi akejkoľvek ÚLOHE o tom istom človeku.
   const inde = new Set<string>();
   for (const p of polozky) {
     if (p.acked || p.key.startsWith("novy|")) continue;
-    const meno = p.oKom || (p.client && !p.client.includes("|") ? p.client : "");
+    const meno = menoPolozky(p);
     if (meno) inde.add(normName(meno));
   }
+
+  // (2) Samostatná 6M otázka ustúpi DNEŠNEJ pripomienke o tom istom človeku.
+  //
+  // Jerry, 1. 9. 2026: „vidím v notifikáciách redundanciu ohľadom Martina
+  // Vaška… jedna z nich sa musí vyhodiť." Mal pravdu — appka to isté povedala
+  // dvakrát: raz ako „Martin Vaško: 5. mesiac — hodnotiaci rozhovor" a raz
+  // ako „Dnes o 18:00 máš tréning s Martin Vaško. 5. mesiac — hodnotiaci
+  // rozhovor."
+  //
+  // Vyhadzuje sa tá SAMOSTATNÁ, nie denná. Denná hovorí to isté a navyše
+  // KEDY — a hodnotiaci rozhovor sa aj tak vedie na tréningu. V dňoch, keď
+  // klient netrénuje, denná pripomienka neexistuje a 6M riadok zostáva; nič
+  // sa teda nestráca, len sa to nehovorí dvakrát za sebou.
+  const maDnesTrening = new Set<string>();
+  for (const p of polozky) {
+    if (p.acked || !p.key.startsWith("dnes|")) continue;
+    const meno = menoPolozky(p);
+    if (meno) maDnesTrening.add(normName(meno));
+  }
+
   return polozky.filter((p) => {
-    if (!p.key.startsWith("novy|") || p.acked) return true;
-    const meno = p.oKom || p.client || "";
-    return !inde.has(normName(meno));
+    if (p.acked) return true;
+    const meno = normName(menoPolozky(p));
+    if (p.key.startsWith("novy|")) return !inde.has(meno);
+    if (p.key.startsWith("sixm|")) return !maDnesTrening.has(meno);
+    return true;
   });
 }
 
 const toneRank: Record<string, number> = { red: 0, orange: 1, blue: 2 };
+
+/**
+ * Dnešné tréningy, pri ktorých treba niečo vybaviť.
+ *
+ * Žilo to v App.tsx, kým to čítal len človek pri obrazovke. Od 3. 9. 2026
+ * chodí ráno push do telefónu a ten sa počíta na serveri — a bez tohto bloku
+ * by v ňom chýbala práve tá veta, kvôli ktorej má ranná správa zmysel
+ * („Dnes o 7:00 máš tréning s Annou, balíček má vyčerpaný"). Jerry:
+ * „keď ráno otvorím telefón, chcem tam mať všetky notifikácie."
+ *
+ * Preto je to tu: jeden výpočet, dvaja konzumenti — obrazovka aj push.
+ */
+export function dnesneTreningy(
+  clients: Record<string, ClientAgg>,
+  sixM: SixMRow[],
+  kal: { udalosti?: { zaciatok: string; klient: string | null; typ: string | null; nazov?: string }[]; zmeny?: ZmenaVKalendari[] } | undefined,
+  ack: Record<string, { note?: string; ackedAt?: string } | undefined>,
+  dnes: Date = new Date(),
+): RegisterItem[] {
+  const out: RegisterItem[] = [];
+  const stavPolozky = (key: string, rodina?: string) => stavPolozkyRegistra(key, ack, rodina, dnes);
+  const kalUdalosti = kal?.udalosti || [];
+  const kalZmeny = kal?.zmeny;
+    const dnesIso = new Date().toISOString().slice(0, 10);
+    // Zrušené sa nehlási. Google Kalendár appka prečíta sama (zmiznutá
+    // udalosť sa sem vôbec nedostane), ale zrušenie zapísané ručne
+    // v Kalendári dovtedy nikto okrem Kalendára nečítal — a appka ďalej
+    // hlásila hodinu, o ktorej Jerry pred chvíľou zapísal, že sa nekoná.
+    const zruseneDnes = zruseneTreningy(kalZmeny);
+    const dnesne = kalUdalosti
+      .filter((u) => u.zaciatok.slice(0, 10) === dnesIso && u.klient && (u.typ === "trening" || u.typ === "uvodny"))
+      .filter((u) => !zruseneDnes.has(`${normName(u.klient as string)}|${dnesIso}`))
+      .sort((a, b) => a.zaciatok.localeCompare(b.zaciatok));
+    for (const u of dnesne) {
+      const c = clients[u.klient as string];
+      if (!c) continue;
+      const dovody: string[] = [];
+
+      if (c.narodeniny) {
+        const [, m, d] = c.narodeniny.split("-");
+        if (m && d && `${m}-${d}` === dnesIso.slice(5)) dovody.push("má dnes narodeniny");
+      }
+      if (c.packageRemaining != null && c.packageTotal != null && c.packageRemaining <= 1) {
+        dovody.push(
+          c.packageRemaining <= 0
+            ? "balíček má vyčerpaný — dnes je posledná hodina, ktorú mu appka pozná"
+            : "v balíčku mu zostáva posledná hodina",
+        );
+      }
+      // 6M: upozornenie si nesie sám riadok procesu — netreba ho odvodzovať
+      // z fázy a mesiaca druhýkrát a inak než Prevádzka.
+      const s6 = sixM.find((x) => x.client === u.klient);
+      // Zodpovedaná 6M otázka sa v dennej pripomienke NEOPAKUJE. Denná
+      // pripomienka vzniká každý tréningový deň nanovo (kľúč nesie dátum),
+      // takže si „5. mesiac — hodnotiaci rozhovor" prilepila k Lukášovi
+      // Hanusovi ešte 21. 8. — jedenásť dní po tom, čo Jerry na 6M otázku
+      // odpovedal a rozhovor mal za sebou. Vysvetlená vec nie je pripomienka.
+      const sixmZodpovedane = s6 ? stavPolozky(`sixm|${s6.client}|${s6.phase}|${s6.monthInPhase}`, `sixm|${s6.client}`).acked : false;
+      if (s6?.alert && !sixmZodpovedane) dovody.push(s6.alert.replace(/^⚠️\s*/, "").toLowerCase());
+      // Nepodpísaná zmluva ZOSTÁVA (Jerry, 9. 8.) — je to vec, ktorú treba
+      // vybaviť práve vtedy, keď človeka vidíš. Šum, na ktorý sa sťažoval,
+      // nerobila samotná pripomienka, ale to, že vyskočila aj u niekoho, kto
+      // v 6M procese nie je. Na to je prepínač na karte klienta; keď ho tam
+      // označíš ako mimo 6M, zmizne aj táto veta. A keď obťažuje inak,
+      // umlčí ju „Nehlásiť" pre toho klienta.
+      if (s6 && !s6.contractSigned) dovody.push("nemá podpísanú zmluvu");
+      if (u.typ === "uvodny") dovody.push("je to úvodný tréning — po ňom sa rozhoduje o pokračovaní");
+
+      if (!dovody.length) continue;
+      const key = `dnes|${dnesIso}|${u.klient}`;
+      out.push({
+        key, category: "6M", tone: "blue",
+        title: `${u.zaciatok.slice(11, 16)} ${u.klient}: ${dovody[0]}`,
+        detail: `Dnes o ${u.zaciatok.slice(11, 16)} máš tréning s ${u.klient}. ${dovody.map((x) => x[0].toUpperCase() + x.slice(1)).join(". ")}.`,
+        ...stavPolozky(key, `dnes|${u.klient}`), priority: 1, client: `klienti|klienti`,
+        oKom: u.klient as string,
+      });
+    }
+  return out;
+}
 
 export function deriveRegister(
   data: PSBData,
@@ -2082,7 +2350,7 @@ export function deriveRegister(
     client?: string,
     rodina?: string,
     /** Komu položka patrí, keď to z klienta nevyplýva — filter podľa trénera. */
-    kto?: { trener?: string | null; oKom?: string },
+    kto?: { trener?: string | null; oKom?: string; navrh?: RegisterItem["navrh"] },
   ) =>
     items.push({
       key,
@@ -2094,6 +2362,7 @@ export function deriveRegister(
       client,
       trener: kto?.trener || undefined,
       oKom: kto?.oKom,
+      navrh: kto?.navrh,
       // Umlčanie AJ odloženie sa počítajú tu, nie v komponente: register čítajú
       // tri miesta (Kokpit, Jarvisov kontext, mesačná správa) a musia platiť
       // vo všetkých rovnako.
@@ -2205,6 +2474,83 @@ export function deriveRegister(
     );
   }
 
+  // Pravidelný klient, ktorý nemá dohodnutý ďalší termín. Jerry si variabilných
+  // klientov zapisuje do kalendára každý týždeň ručne — a na niektorého vždy
+  // zabudne. Fixní sem nespadnú, tí termín majú.
+  for (const b of bezDohodnutehoTerminu(clients, kal?.udalosti, { dnes: new Date(), zmeny: kal?.zmeny })) {
+    // Vyriešené v debate s Jarvisom = nehlásiť. Záver si svoju pripomienku
+    // vydá sám v deň overenia; dovtedy by táto veta bola to isté dvakrát.
+    if (zaverKryjeKlienta(data.zavery, b.meno)) continue;
+    const kedy = b.rytmus <= 5 ? "chodí niekoľkokrát do týždňa"
+      : b.rytmus <= 9 ? "chodí raz za týždeň"
+      : b.rytmus <= 17 ? "chodí raz za dva týždne"
+      : `chodí raz za ${Math.round(b.rytmus / 7)} týždne`;
+    add(
+      // Kľúč nesie POSLEDNÝ TRÉNING. Keď klient príde, kľúč sa zmení a položka
+      // sa vráti sama — odklepnutie teda umlčí tento týždeň, nie človeka
+      // navždy. Bez toho by stačilo raz kliknúť a Robin by zmizol nadobro.
+      `bezterminu|${b.poslednySession}|${b.meno}`,
+      "Zápis",
+      "orange",
+      `${b.meno} — ${kedy}, ďalší termín nemá`,
+      // Vysvetlenie, ktoré Jerry sám zapísal pri zrušení, ide DO VETY — nie
+      // do Jarvisa, kam sa treba spýtať. Bez neho appka pýtala „napíš mu"
+      // pri človeku, o ktorom pred týždňom sám zapísal, že je u lekára.
+      `${b.meno}: naposledy trénoval ${fmtDMY(b.poslednySession)}, teda pred ${b.dni} dňami, a v kalendári nemá nič dopredu.${b.poznamka ? ` Zapísal si k nemu ${fmtDMY(b.poznamka.kedy)}: „${b.poznamka.text}“.` : ""} Napíš mu — alebo sem napíš, že je preč, a do najbližšieho tréningu bude ticho.`,
+      9,
+      b.meno,
+      "bezterminu",
+      { trener: b.trener, oKom: b.meno },
+    );
+  }
+
+  // Názvy, ktoré appka nepozná — hodiny sú kvôli nim nižšie, než majú byť.
+  for (const n of neznameUdalosti(kal?.udalosti as never, new Date())) {
+    const trener = n.trener === "—" ? undefined : n.trener;
+    // Jednoznačná skratka (práve jeden kandidát) dostane vlastný riadok
+    // s návrhom na jeden klik; dvojznačné a bez zhody sa zoskupia a čakajú
+    // na rozhodnutie v Kalendári. Jerry, 3. 9. 2026: „nech to navrhne
+    // v notifikácii."
+    const nejasne: string[] = [];
+    for (const nazov of n.nazvy) {
+      const nav = navrhniKlientaKandidati(nazov, clients);
+      if (nav.kandidati.length === 1 && (nav.typ === "trening" || nav.typ === "uvodny")) {
+        const klient = nav.kandidati[0];
+        // Kľúč nesie MENO, nie týždeň: kým sa nepotvrdí, vracia sa každý deň,
+        // a po potvrdení zmizne sám (názov už bude namapovaný).
+        const key = `mapuj|${n.trener}|${nazov}`;
+        add(
+          key,
+          "Zápis",
+          "blue",
+          `Priradiť „${nazov}“ ku klientovi ${klient}?`,
+          `V kalendári je „${nazov}“ a sedí presne na jedného klienta — ${klient}. Potvrď a appka si to zapamätá navždy; tréning sa započíta do hodín. Ak to nie je on, otvor Kalendár → Nové názvy.`,
+          4,
+          "kalendar|nezname",
+          `mapuj|${n.trener}|${nazov}`,
+          { trener, oKom: klient, navrh: { nazov, trener: n.trener, typ: nav.typ, klient } },
+        );
+      } else {
+        nejasne.push(nazov);
+      }
+    }
+    if (nejasne.length) {
+      const key = `nezname|${n.trener}|${weekKey(new Date().toISOString())}`;
+      const mena = nejasne.slice(0, 6).join(", ") + (nejasne.length > 6 ? `, +${nejasne.length - 6}` : "");
+      add(
+        key,
+        "Zápis",
+        "orange",
+        `${nejasne.length} ${nejasne.length === 1 ? "názov" : nejasne.length < 5 ? "názvy" : "názvov"} v kalendári treba priradiť`,
+        `${mena} — appka nevie, kto to je (sedí na viacerých alebo na nikoho), takže sa NEPOČÍTAJÚ do hodín. Priraď ich v Kalendár → Nové názvy: sú to buď tréningy, alebo si ich označ ako súkromné.`,
+        4,
+        "kalendar|nezname",
+        "nezname",
+        { trener },
+      );
+    }
+  }
+
   // Tréning bez mena. Nespočíta sa nikam a pritom je to jedno kliknutie.
   for (const u of udalostiBezMena(kal?.udalosti)) {
     add(
@@ -2214,7 +2560,7 @@ export function deriveRegister(
       `${u.typ === "uvodny" ? "Úvodný" : "Tréning"} ${fmtDMY(u.datum)} bez mena klienta`,
       `${u.nazov ? `„${u.nazov}"` : `${u.typ === "uvodny" ? "Úvodný" : "Tréning"} ${fmtDMY(u.datum)}`} nemá priradeného klienta, takže sa nespočíta nikam. Prirad ho v Kalendár → neznáme názvy.`,
       7,
-      "kalendar|",
+      "kalendar|nezname",
       "bezmena",
       { trener: u.trener },
     );
@@ -2967,6 +3313,144 @@ export function odmlcaniKlienti(
 }
 
 /**
+ * Pravidelný klient, ktorý nemá dohodnutý ďalší termín.
+ *
+ * Jerry, 31. 8. 2026: „niektorých klientov mám fixne a pravidelne sú
+ * v kalendári, ale niektorí sú variabilní a tých si tam musím vložiť každý
+ * týždeň — a každý týždeň zabudnem. Napr. tento týždeň je Robin na dovolenke,
+ * je preč, alebo som mu zabudol napísať."
+ *
+ * PREČO TO NEZACHYTIL ODMLČANÝ
+ *
+ * `odmlcaniKlienti` sa ozve až po 14 dňoch. Pri človeku, ktorý chodí raz za
+ * týždeň, to nie je upozornenie, ale nekrológ: dva týždne ticha už znamenajú
+ * dve vynechané hodiny a klienta, ktorý si medzitým zvykol nechodiť. Toto
+ * hovorí to isté o týždeň skôr a inou vetou — nie „ozvi sa, možno odišiel",
+ * ale „nemá kedy prísť".
+ *
+ * PREČO PODĽA VLASTNÉHO RYTMU, NIE PODĽA PEVNEJ HRANICE
+ *
+ * Jedna hranica pre všetkých by bola buď hluchá, alebo otravná: pri klientovi
+ * raz za dva týždne by kričala každý druhý deň, pri klientovi dvakrát týždenne
+ * by mlčala celý týždeň. Rytmus sa preto berie ako MEDIÁN medzier medzi
+ * poslednými sedeniami — medián preto, že jedna dovolenka alebo jedna choroba
+ * priemer roztiahne, ale medián neposunie.
+ *
+ * PREČO SPODNÁ HRANICA PÄŤ DNÍ
+ *
+ * Klient, ktorý chodí trikrát do týždňa, má medzeru dva dni. Bez podlahy by
+ * appka pýtala termín každé dve rána — a to je presne ten druh riadku, cez
+ * ktorý sa človek naučí prechádzať pohľadom. Päť dní je najmenej, čo ešte
+ * znamená „tento týždeň si ho nezapísal".
+ *
+ * FIXNÝ KLIENT SA NEOZVE NIKDY, a to bez toho, aby ho niekto musel označiť:
+ * má termín v kalendári dopredu, takže cez `maTermin` vypadne. Zoznam sa teda
+ * sám zúži presne na tých variabilných, o ktorých Jerry hovorí.
+ */
+export type BezTerminu = {
+  meno: string;
+  /** Koľko dní ubehlo od posledného tréningu. */
+  dni: number;
+  /** Ako často chodieva — medián medzier v dňoch. */
+  rytmus: number;
+  trener: string | null;
+  poslednySession: string;
+  /**
+   * Posledné, čo o ňom niekto zapísal pri zmene v kalendári.
+   *
+   * Jerry, 31. 8. 2026: „tu by mi ideálne mala vyskočiť aj poznámka, ktorú som
+   * Jarvisovi ponúkol, keď som si zapísal, prečo sa jeho tréning zrušil."
+   * Mal pravdu a bola to tichá strata: dôvod ležal v `kal_zmeny`, Jarvis ho
+   * na priamu otázku našiel, ale notifikácia o ňom mlčala — takže Jerry čítal
+   * „nemá termín" a musel si sám spomenúť, že mu to pred týždňom sám vysvetlil.
+   * Vedieť odpoveď a nepovedať ju na mieste, kde sa pýta otázka, je to isté
+   * ako ju nemať.
+   */
+  poznamka: { text: string; kedy: string } | null;
+};
+
+/** Kým sa nezoberie slovo `odmlcaniKlienti`. Nad touto hranicou už hovorí on. */
+const BEZ_TERMINU_STROP_DNI = 14;
+/** Najmenšia medzera, pri ktorej má zmysel pýtať sa na termín. */
+const BEZ_TERMINU_PODLAHA_DNI = 5;
+/** Koľko sedení treba, aby sa dalo hovoriť o rytme. */
+const BEZ_TERMINU_MIN_SEDENI = 4;
+/** Z akého okna sa rytmus číta. */
+const BEZ_TERMINU_OKNO_TYZDNOV = 10;
+/** Ako staré vysvetlenie z kalendára má ešte zmysel pripomínať. */
+const BEZ_TERMINU_POZNAMKA_DNI = 21;
+
+/** Medián medzier medzi po sebe idúcimi sedeniami, v dňoch. */
+function medzeraMedzi(datumy: string[]): number | null {
+  const dni = [...new Set(datumy)].sort();
+  if (dni.length < 2) return null;
+  const medzery: number[] = [];
+  for (let i = 1; i < dni.length; i++) {
+    medzery.push(Math.round((Date.parse(dni[i]) - Date.parse(dni[i - 1])) / 86400000));
+  }
+  medzery.sort((a, b) => a - b);
+  const s = Math.floor(medzery.length / 2);
+  return medzery.length % 2 ? medzery[s] : Math.round((medzery[s - 1] + medzery[s]) / 2);
+}
+
+export function bezDohodnutehoTerminu(
+  clients: Record<string, ClientAgg>,
+  udalosti: { zaciatok: string; klient: string | null; typ: string | null }[] | undefined,
+  // Zmeny sem chodia bohatšie, než hovorí `ZmenaVKalendari` — nesú aj kedy
+  // a poznámku. Typ sa rozširuje tu, nie v ňom: `zruseneTreningy` tie dve
+  // polia nepotrebuje a povinné by boli len na obtiaž.
+  opts?: { dnes?: Date; zmeny?: (ZmenaVKalendari & { kedy?: string; poznamka?: string | null })[] },
+): BezTerminu[] {
+  const dnes = opts?.dnes ?? new Date();
+  const teraz = dnes.getTime();
+  const den = dnes.toISOString().slice(0, 10);
+  const posledny = poslednyTrening(clients, udalosti, opts?.zmeny, dnes);
+  // Termín dopredu = človek je zapísaný, nie je čo riešiť. Zrušená udalosť
+  // sa nepočíta: zrušený termín je presne ten prípad, keď treba dohodnúť nový.
+  const zrusene = zruseneTreningy(opts?.zmeny);
+  const maTermin = new Set(
+    (udalosti || [])
+      .filter((u) => (u.typ === "trening" || u.typ === "uvodny") && u.klient)
+      .filter((u) => u.zaciatok.slice(0, 10) >= den && Date.parse(u.zaciatok) >= teraz)
+      .filter((u) => !zrusene.has(`${normName(u.klient as string)}|${u.zaciatok.slice(0, 10)}`))
+      .map((u) => normName(u.klient as string)),
+  );
+  const odkedy = new Date(teraz - BEZ_TERMINU_OKNO_TYZDNOV * 7 * 86400000).toISOString().slice(0, 10);
+
+  // Posledné vysvetlenie ku každému menu. Berie sa najnovšie: keď Jerry zapísal
+  // najprv „necítil sa dobre" a o týždeň „zápal, ide k lekárovi", platí to
+  // druhé — staršia veta by ho poslala volať s neaktuálnym dôvodom.
+  const hranicaPoznamky = new Date(teraz - BEZ_TERMINU_POZNAMKA_DNI * 86400000).toISOString();
+  const poznamky: Record<string, { text: string; kedy: string }> = {};
+  for (const z of opts?.zmeny || []) {
+    const text = String(z.poznamka || "").trim();
+    const kedy = String(z.kedy || "");
+    if (!text || !z.klient || !kedy || kedy < hranicaPoznamky) continue;
+    const k = normName(z.klient);
+    if (!poznamky[k] || kedy > poznamky[k].kedy) poznamky[k] = { text, kedy: kedy.slice(0, 10) };
+  }
+
+  return Object.values(clients)
+    .filter((c) => c.status === "Aktívny")
+    .filter((c) => !maTermin.has(normName(c.name)))
+    .map((c) => {
+      const nedavne = (c.sessions || []).map((s) => (s.date || "").slice(0, 10)).filter((d) => d >= odkedy);
+      const rytmus = nedavne.length >= BEZ_TERMINU_MIN_SEDENI ? medzeraMedzi(nedavne) : null;
+      const posl = (posledny[c.name] || c.lastSession || "").slice(0, 10);
+      const dni = posl ? Math.floor((teraz - Date.parse(posl)) / 86400000) : 0;
+      return { c, rytmus, posl, dni };
+    })
+    .filter(({ rytmus, posl }) => rytmus !== null && !!posl)
+    .filter(({ rytmus, dni }) => dni >= Math.max(BEZ_TERMINU_PODLAHA_DNI, rytmus as number) && dni < BEZ_TERMINU_STROP_DNI)
+    .map(({ c, rytmus, posl, dni }) => ({
+      meno: c.name, dni, rytmus: rytmus as number,
+      trener: c.primaryTrainer || null, poslednySession: posl,
+      poznamka: poznamky[normName(c.name)] || null,
+    }))
+    .sort((a, b) => b.dni - a.dni || a.meno.localeCompare(b.meno));
+}
+
+/**
  * Dve pripomienky, ktoré appka dovtedy nevedela: SMS po úvodnom a odmena
  * za odporúčanie.
  *
@@ -3115,7 +3599,13 @@ export function pripomienkySlubov(
       // Predtým klik doviedol na zoznam a meno, ktoré appka práve povedala,
       // si musel človek napísať sám.
       client: `marketing|dopyty|${meno}`,
-      trener: u.trener || undefined,
+      // Terezka, nie ten, kto viedol úvodný. Jerry, 31. 8. 2026: „všetky
+      // otázky ohľadom nových klientov smerovať na ňu." Dopyt sa dopisuje
+      // v Marketing → Dopyty, čo je jej obrazovka — a je to tá istá práca ako
+      // „Dopyty bez odpovede prečo" a „Odporúčanie bez mena", ktoré k nej idú
+      // tiež. Výnimka z tohto pravidla je jediná: SMS po úvodnom patrí tomu,
+      // kto ten úvodný viedol.
+      trener: "Terezka",
       oKom: meno,
       ...stav(key, rodina),
     });
@@ -3207,6 +3697,12 @@ export function pripomienkaDovodu(
         detail: `${c.meno} — úvodný tréning ${fmtDMY(c.uvodny)} a odvtedy nič. Vieš prečo? Jedno slovo stačí — z opakovaných dôvodov sa dá niečo urobiť, z prázdneho poľa nič.`,
         priority: 11,
         client: c.meno,
+        // Človek po úvodnom, z ktorého sa klient nestal, je dopyt, ktorý
+        // nedopadol — a to je Terezkina agenda (Jerry, 31. 8. 2026). Bez
+        // tohto riadku by položka šla podľa primárneho trénera, teda tomu,
+        // kto viedol úvodný, a rozišla by sa s „Dopyty bez odpovede prečo",
+        // hoci je to tá istá otázka o tom istom človeku.
+        trener: "Terezka",
         ...stavPolozkyRegistra(key, ack, rodina, dnes),
       };
     });

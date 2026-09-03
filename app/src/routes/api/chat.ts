@@ -453,9 +453,23 @@ const SCHEMA_DB = `sessions(id, date, time, client_name, session_trainer, sessio
   „Koľko hodín odrobila Terezka v júli" = SUM(duration_min)/60 WHERE session_type <> 'UVODNE'. Bez tejto podmienky
   vyjde o úvodné viac než ukazuje appka vo VZAS → J&T Výplaty, a to je číslo, podľa ktorého sa počíta nárok aj dlh.
 payments(id, date, client_name, amount_czk, payment_method, note)   payment_method: bank | cash | other
+poplatky(id, datum, client_name, popis, suma_czk)  — NEZAPLATENÉ poplatky z PTminder → Finances → Transactions. V PTminderi sa poplatok po zaplatení ZMAŽE, takže čo je v tabuľke, je otvorené — NEPÁRUJ to s payments, hľadanie „zaplatil už?" nedáva zmysel. Import je úplná výmena: celá tabuľka je zrkadlo posledného nahratia, nie história. Preto nikdy nehovor „X dlhuje dnes", ale „v poslednom exporte stálo otvorených N poplatkov". Karta v Kokpite: dole pod Balíčkami, filtruje sa trénerom (rozpad je v kontexte v nezaplatene.podlaTrenera).
 packages(id, client_name, client_status, package_name, sessions_remaining, sessions_total, added, valid_from, valid_to, payment_czk, kind)  — MOMENTKA aktuálneho stavu, nie história; valid_to = skutočný koniec platnosti členstva, payment_czk = koľko klient za tento balíček reálne zaplatil (nesie jeho zľavy), kind = package | membership
 client_overrides(name, status, special_rate, special_rate_note, trainer_note, contract_signed, primary_trainer, bitcoin, duch, zdroj, zdroj_kto, narodeniny, v6m, prvy_kontakt, preco_neprisiel)  — zdroj: referencia|reklama|instagram|google|fp|offline|ai|ine; zdroj_kto = meno odporúčateľa; status "Pauza|YYYY-MM-DD" = dohodnutá pauza do dátumu; preco_neprisiel = prečo človek po ÚVODNOM tréningu už nikdy neprišiel (zapisuje sa ručne v Marketingu, prázdne ≠ dôvod neexistuje, ale že to nikto nezapísal)
 client_notes(id, client_name, note, author, created_at)  — denník klienta: dátované zápisy trénerov v čase (append-only, nič sa nemaže); trainer_note v client_overrides je len „stála poznámka" s faktami
+HISTÓRIA JEDNÉHO KLIENTA JE ROZTRÚSENÁ V PIATICH TABUĽKÁCH. Keď sa pýta „čo je s X", „prečo X neprišiel",
+„vieme o X niečo" alebo keď máš o klientovi rozhodnúť, NIKDY nečítaj len client_notes — denník má z celej
+histórie asi len desatinu. Použi tento dopyt (nahraď MENO) a čítaj z neho, inak povieš „nič o ňom nemám",
+hoci to tam stojí:
+  SELECT created_at kedy, 'denník' odkial, note text FROM client_notes WHERE client_name='MENO'
+  UNION ALL SELECT kedy, 'kalendár', druh||': '||poznamka FROM kal_zmeny WHERE klient='MENO' AND TRIM(COALESCE(poznamka,''))<>''
+  UNION ALL SELECT acked_at, 'notifikácia', note FROM anomaly_ack WHERE TRIM(COALESCE(note,''))<>'' AND anomaly_key LIKE '%MENO%'
+  UNION ALL SELECT datum, 'Jarvis', zaver FROM jarvis_zavery WHERE zaver LIKE '%MENO%' OR tema LIKE '%MENO%'
+  UNION ALL SELECT COALESCE(updated_at,''), 'karta', trainer_note FROM client_overrides WHERE name='MENO' AND TRIM(COALESCE(trainer_note,''))<>''
+  ORDER BY kedy DESC
+Je to tá istá os času, akú Jerry vidí v denníku na karte klienta — takže sa s obrazovkou nemôžeš rozísť.
+Zdroj (stĺpec odkial) hovor nahlas: „zapísal si pri zrušení" a „odklepol si pri notifikácii" nie je to isté.
+
 klient_merania(id, klient, datum, bolest, poznamka, autor)  — VÝSLEDOK klienta: bolesť 0–10 (0 = žiadna, 10 = najhoršia), zapisovaná v čase. Zapisuje sa v „+ Zápis" pri denníku klienta. Je to jediné miesto v appke, ktoré meria to, čo PSB predáva — zmenu stavu, nie peniaze ani dochádzku. Na otázku „zlepšujú sa nám klienti" odpovedaj ODTIAĽTO: porovnaj prvé a posledné meranie toho istého človeka. NEVYVODZUJ výsledok z počtu tréningov ani z toho, že klient zostal — to je vernosť, nie zlepšenie. Keď meranie chýba, povedz to; prázdna tabuľka neznamená, že sa ľudia nezlepšujú, ale že sa to nemeralo.
 leads(id, date, name, source, referrer, status, note, created_at, email, telefon, kampan, utm, stranka, odpovedane_at, dovod)
   status: novy | neodpisal | dohodnuty | zruseny. dovod = prečo sa z dopytu nestal klient (cena, vzdialenosť, termín nesedel…), prázdne = nikto to nezapísal.
@@ -605,6 +619,18 @@ async function spustiNastroj(name: string, input: Record<string, unknown>): Prom
     if ("chyba" in g) return g.chyba;
     try {
       const rs = await DB.prepare(g.sql).all();
+      // Koľko riadkov dopyt PREŠIEL — nie koľko vrátil. Presne to počíta
+      // Cloudflare do denného limitu D1 a presne to sa nedalo nikde vyčítať.
+      //
+      // 2. 9. 2026 sa limit minul dva dni po sebe a ja som príčinu tri razy
+      // uhádol zle (rast dát, moje nasadenia, slučka v efektoch — vylúčené
+      // všetky). Jerry sa právom pýtal, ako to mohlo doteraz fungovať.
+      // Netipuj ďalej: `SELECT * FROM sessions WHERE meno LIKE '%x%'` prejde
+      // 3 545 riadkov, aj keď vráti jeden — a Jarvis má v prompte napísané,
+      // nech radšej dopytuje dvakrát než hádal. Odteraz to bude v logu
+      // (`wrangler tail`) aj s dopytom, ktorý to spôsobil.
+      const preslo = (rs.meta as { rows_read?: number } | undefined)?.rows_read ?? 0;
+      console.log(`dopyt_db: prečítaných ${preslo} riadkov | ${g.sql.replace(/\s+/g, " ").slice(0, 160)}`);
       const rows = rs.results as unknown[];
       if (!rows.length) return "Dopyt prebehol, ale nevrátil ani jeden riadok.";
       const out = JSON.stringify(rows);

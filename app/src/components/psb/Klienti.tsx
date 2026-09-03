@@ -455,7 +455,7 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
           btcSatsKlienti je kľúčované fuzzy kľúčom (menoKluc), nie normName —
           inak „Prochadzka" z PTmindera nenájde „Procházku" z BTC knihy. */}
       {focusClient && clients[focusClient] && (
-        <KlientProfil meno={focusClient} data={data} clients={clients} btcSats={btcSatsKlienti[menoKluc(focusClient)]} onZavri={() => setFocusClient(null)} />
+        <KlientProfil meno={focusClient} data={data} clients={clients} btcSats={btcSatsKlienti[menoKluc(focusClient)]} onZavri={() => setFocusClient(null)} onDennikZapis={onDennikZapis} />
       )}
 
       <Card>
@@ -614,7 +614,21 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
             {list.map((c) => (
               <tr key={c.name} style={{ background: c.specialRate ? C.orangeBg : undefined, opacity: c.status === "Neaktívny" ? 0.6 : 1 }}>
                 <td style={{ ...S.td, fontWeight: 500 }}>
-                  {c.name}
+                  {/* Meno otvára PROFIL, ceruzka na konci riadku úpravu polí.
+                      Predtým sa meno nedalo kliknúť vôbec: profil so všetkým
+                      o človeku (vrátane denníka) sa dal otvoriť len prekliknutím
+                      z notifikácie, takže v samotnej tabuľke klientov o ňom
+                      nikto nevedel. Jerry, 31. 8. 2026: „keď kliknem na klienta,
+                      malo by mi to otvoriť tú istú tabuľku ako keď dám hľadať
+                      klienta." Delenie je zámerné: klik na meno = pozrieť sa
+                      naňho, klik na ✎ = prepísať mu polia. */}
+                  <button
+                    onClick={() => setFocusClient(c.name)}
+                    title="Otvoriť profil klienta — čísla, história a denník"
+                    style={{ background: "none", border: "none", padding: 0, font: "inherit", color: C.text, cursor: "pointer", textAlign: "left" }}
+                  >
+                    {c.name}
+                  </button>
                   {c.specialRate && <span title={c.specialRateNote} style={{ marginLeft: 6, fontSize: 10, color: C.orange }}>★</span>}
                   {c.substituteCount > 0 && <span title={`${c.substituteCount}× zástup`} style={{ marginLeft: 6, fontSize: 9, color: C.blue }}>⇄</span>}
                 </td>

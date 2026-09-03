@@ -94,8 +94,8 @@ describe("termín sa píše do pripomienky", () => {
 describe("prestal chodiť vs. termín v kalendári", () => {
   const zdroj = readFileSync(new URL("./compute.ts", import.meta.url).pathname, "utf8");
 
-  it("gone| sa pushuje len bez termínu", () => {
-    expect(zdroj).toContain("if (!najblizsiTermin(c.name, kal?.udalosti, now)) {");
+  it("gone| sa pushuje len bez termínu a bez otvoreného záveru", () => {
+    expect(zdroj).toContain("if (!najblizsiTermin(c.name, kal?.udalosti, now) && !zaverKryjeKlienta(data.zavery, c.name, now)) {");
   });
 
   it("do textu gone| sa termín NEdopisuje", () => {

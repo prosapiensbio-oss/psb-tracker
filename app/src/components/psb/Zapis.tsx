@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { fetchVzasSettings, saveLead, saveVzasSetting } from "../../lib/psb/client";
 import type { Ritual } from "../../lib/psb/rituals";
 import { Dennik } from "./Dennik";
 import { SOURCES } from "./Klienti";
+import { normName } from "../../lib/psb/format";
 import { C, mix } from "../../lib/psb/theme";
 import { Modal, enterPosle } from "./ui";
 
@@ -218,7 +219,21 @@ export function ZapisButton({
   };
   // Platné meno = existujúci klient. Voľný text sa neukladá — zápis bez
   // klienta nemá kam patriť a preklep by ho stratil.
+  const [hladanie, setHladanie] = useState("");
   const vybranyKlient = klienti.find((k) => k.meno === poznMeno);
+  /**
+   * Hľadá sa po SLOVÁCH, nie ako súvislý reťazec — „kalmus jan" nájde to isté
+   * čo „jan kalmus". Diakritika ani veľkosť písmen nerozhodujú: mená
+   * v PTminderi ich nemajú konzistentné a človek ich pri hľadaní nepíše.
+   */
+  const najdeni = useMemo(() => {
+    const slova = normName(hladanie).split(" ").filter(Boolean);
+    if (!slova.length) return [];
+    return klienti.filter((k) => {
+      const n = normName(k.meno);
+      return slova.every((w) => n.includes(w));
+    });
+  }, [hladanie, klienti]);
   // Počítadlo na odznaku musí sedieť so ZOZNAMOM, nie s rituálmi: keď sa dva
   // riadky zlúčia do jedného, odznak nesmie hlásiť dva.
   const cakajuce = zlucRitualy(ritualy).filter((p) => p.stav === "chyba").length;
@@ -367,7 +382,13 @@ export function ZapisButton({
               nie sú smetisko, sú príbeh klienta (Jerryho formulácia, a je
               správna: „marec: rameno prestalo bolieť" sa nedá zrekonštruovať
               z ničoho iného). Stála poznámka na fakty žije na karte klienta. */}
-          {klienti.length > 0 && (
+          {/* Blok sa ukazuje VŽDY, aj kým klienti ešte nedobehli.
+              Jerry, 1. 9. 2026 poslal snímku, na ktorej denník v paneli
+              chýbal úplne — otvoril „+ Zápis" skôr, než dobehol fetch, a
+              `klienti.length > 0` celú sekciu schovalo. Chýbajúca sekcia
+              vyzerá ako appka, ktorá to nevie, nie ako appka, ktorá ešte
+              načítava — a presne tak si to prečítal („zmizlo to"). */}
+          {(
             <div style={{ marginBottom: 14, padding: "11px 13px", borderRadius: 10, border: `1px solid ${mix(C.accent, 30)}`, background: mix(C.accent, 5) }}>
               <div style={{ fontSize: 12.5, fontWeight: 600, color: C.text, marginBottom: 8 }}>Denník klienta — čo sa stalo</div>
               {/*
@@ -378,6 +399,9 @@ export function ZapisButton({
                 to v krížoch nebolí, keď sedím" má životnosť pár minút — kým ju
                 človek doklikáva, je preč.
               */}
+              {klienti.length === 0 && (
+                <div style={{ fontSize: 11.5, color: C.textDim }}>Načítavam klientov…</div>
+              )}
               {dnesTrenoval.length > 0 && (
                 <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8, alignItems: "center" }}>
                   <span style={{ fontSize: 11.5, color: C.textMuted }}>Dnes si trénoval:</span>
@@ -392,7 +416,7 @@ export function ZapisButton({
                     return (
                     <button
                       key={m}
-                      onClick={() => setPoznMeno(m)}
+                      onClick={() => { setPoznMeno(m); setHladanie(m); }}
                       style={{
                         padding: "4px 10px", borderRadius: 999, fontSize: 12, cursor: "pointer",
                         fontFamily: "inherit",
@@ -407,16 +431,66 @@ export function ZapisButton({
                   })}
                 </div>
               )}
-              <input
-                value={poznMeno} list="zapis-klienti" placeholder="Klient — začni písať"
-                onChange={(e) => setPoznMeno(e.target.value)}
+              {/*
+                Hľadanie namiesto `<datalist>`.
+
+                Jerry, 1. 9. 2026: „keď som chcel zapísať Jana Kalmusa, nemal
+                som ho v zozname klientov." Bol tam — appka ho len nevedela
+                nájsť. Boli to dve chyby naraz:
+
+                  • `<datalist>` na iPhone Safari návrhy spoľahlivo neukáže,
+                    takže pole vyzeralo ako obyčajný textový vstup;
+                  • denník sa otváral len pri PRESNEJ zhode mena, takže
+                    „kalmus" ani „Jan Kalmus " nenašli nič a človek nemal ako
+                    zistiť, čo je zle.
+
+                Teraz sa hľadá bez ohľadu na diakritiku, veľkosť písmen a
+                poradie slov („kalmus jan" nájde to isté) a nájdené mená sú
+                tlačidlá — nie návrh, ktorý sa musí trafiť naslepo.
+              */}
+              {klienti.length > 0 && <input
+                value={hladanie} placeholder="Nájdi klienta — meno alebo priezvisko"
+                onChange={(e) => { setHladanie(e.target.value); setPoznMeno(""); }}
+
                 style={{ width: "100%", marginBottom: 6, padding: "7px 10px", borderRadius: 8, border: `1px solid ${vybranyKlient ? mix(C.green, 50) : C.border}`, background: C.bg, color: C.text, fontSize: 13 }}
-              />
-              <datalist id="zapis-klienti">
-                {klienti.map((k) => <option key={k.meno} value={k.meno} />)}
-              </datalist>
+              />}
+              {/* Nájdené mená ako tlačidlá. Strop je osem — dlhší zoznam pod
+                  poľom odtlačí denník mimo obrazovku a hľadanie prestane byť
+                  rýchlejšie než rolovanie. */}
+              {!vybranyKlient && najdeni.length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 5, marginBottom: 8 }}>
+                  {najdeni.slice(0, 8).map((k) => (
+                    <button
+                      key={k.meno}
+                      onClick={() => { setPoznMeno(k.meno); setHladanie(k.meno); }}
+                      style={{ padding: "4px 10px", borderRadius: 999, fontSize: 12, cursor: "pointer", fontFamily: "inherit", border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted }}
+                    >
+                      {k.meno}
+                    </button>
+                  ))}
+                  {najdeni.length > 8 && (
+                    <span style={{ fontSize: 11.5, color: C.textDim, alignSelf: "center" }}>…a ďalších {najdeni.length - 8} — píš ďalej</span>
+                  )}
+                </div>
+              )}
+              {/* Prázdny výsledok sa musí povedať nahlas. Ticho po napísaní
+                  mena je presne to, čo Jerry čítal ako „klienta tam nemám". */}
+              {!vybranyKlient && hladanie.trim().length >= 2 && najdeni.length === 0 && (
+                <div style={{ fontSize: 11.5, color: C.orange, marginBottom: 8 }}>
+                  Nikto taký medzi {klienti.length} klientmi nie je. Skús priezvisko, alebo over meno v Klientoch.
+                </div>
+              )}
               {vybranyKlient ? (
                 <>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 12.5, fontWeight: 600, color: C.text }}>{vybranyKlient.meno}</span>
+                    <button
+                      onClick={() => { setPoznMeno(""); setHladanie(""); }}
+                      style={{ background: "none", border: "none", color: C.textDim, fontSize: 11.5, cursor: "pointer", padding: 0, fontFamily: "inherit" }}
+                    >
+                      zmeniť
+                    </button>
+                  </div>
                   {vybranyKlient.poznamka && (
                     <div style={{ fontSize: 11.5, color: C.textDim, margin: "2px 0 8px", lineHeight: 1.5 }}>
                       Stála poznámka: <span style={{ color: C.textMuted }}>{vybranyKlient.poznamka}</span>
@@ -425,7 +499,11 @@ export function ZapisButton({
                   <Dennik meno={vybranyKlient.meno} limit={3} onNovyZapis={onDennikZapis} />
                 </>
               ) : (
-                <div style={{ fontSize: 11.5, color: C.textDim }}>Vyber klienta zo zoznamu — potom sa ukáže jeho denník.</div>
+                klienti.length > 0 && (
+                  <div style={{ fontSize: 11.5, color: C.textDim }}>
+                    {hladanie.trim() ? "Klikni na meno — potom sa ukáže jeho denník." : "Klikni na meno z dnešných tréningov, alebo hľadaj hore."}
+                  </div>
+                )
               )}
             </div>
           )}

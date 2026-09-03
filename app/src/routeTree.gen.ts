@@ -31,6 +31,9 @@ import { Route as ApiSessionRouteImport } from './routes/api/session'
 import { Route as ApiSekvenciaNavrhRouteImport } from './routes/api/sekvencia-navrh'
 import { Route as ApiResetRouteImport } from './routes/api/reset'
 import { Route as ApiRawUploadsRouteImport } from './routes/api/raw-uploads'
+import { Route as ApiPushRanoRouteImport } from './routes/api/push-rano'
+import { Route as ApiPushBehRouteImport } from './routes/api/push-beh'
+import { Route as ApiPushRouteImport } from './routes/api/push'
 import { Route as ApiPremenujRouteImport } from './routes/api/premenuj'
 import { Route as ApiPlanyRouteImport } from './routes/api/plany'
 import { Route as ApiPeriodsRouteImport } from './routes/api/periods'
@@ -175,6 +178,21 @@ const ApiResetRoute = ApiResetRouteImport.update({
 const ApiRawUploadsRoute = ApiRawUploadsRouteImport.update({
   id: '/api/raw-uploads',
   path: '/api/raw-uploads',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPushRanoRoute = ApiPushRanoRouteImport.update({
+  id: '/api/push-rano',
+  path: '/api/push-rano',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPushBehRoute = ApiPushBehRouteImport.update({
+  id: '/api/push-beh',
+  path: '/api/push-beh',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPushRoute = ApiPushRouteImport.update({
+  id: '/api/push',
+  path: '/api/push',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPremenujRoute = ApiPremenujRouteImport.update({
@@ -394,6 +412,9 @@ export interface FileRoutesByFullPath {
   '/api/periods': typeof ApiPeriodsRoute
   '/api/plany': typeof ApiPlanyRoute
   '/api/premenuj': typeof ApiPremenujRoute
+  '/api/push': typeof ApiPushRoute
+  '/api/push-beh': typeof ApiPushBehRoute
+  '/api/push-rano': typeof ApiPushRanoRoute
   '/api/raw-uploads': typeof ApiRawUploadsRoute
   '/api/reset': typeof ApiResetRoute
   '/api/sekvencia-navrh': typeof ApiSekvenciaNavrhRoute
@@ -453,6 +474,9 @@ export interface FileRoutesByTo {
   '/api/periods': typeof ApiPeriodsRoute
   '/api/plany': typeof ApiPlanyRoute
   '/api/premenuj': typeof ApiPremenujRoute
+  '/api/push': typeof ApiPushRoute
+  '/api/push-beh': typeof ApiPushBehRoute
+  '/api/push-rano': typeof ApiPushRanoRoute
   '/api/raw-uploads': typeof ApiRawUploadsRoute
   '/api/reset': typeof ApiResetRoute
   '/api/sekvencia-navrh': typeof ApiSekvenciaNavrhRoute
@@ -513,6 +537,9 @@ export interface FileRoutesById {
   '/api/periods': typeof ApiPeriodsRoute
   '/api/plany': typeof ApiPlanyRoute
   '/api/premenuj': typeof ApiPremenujRoute
+  '/api/push': typeof ApiPushRoute
+  '/api/push-beh': typeof ApiPushBehRoute
+  '/api/push-rano': typeof ApiPushRanoRoute
   '/api/raw-uploads': typeof ApiRawUploadsRoute
   '/api/reset': typeof ApiResetRoute
   '/api/sekvencia-navrh': typeof ApiSekvenciaNavrhRoute
@@ -574,6 +601,9 @@ export interface FileRouteTypes {
     | '/api/periods'
     | '/api/plany'
     | '/api/premenuj'
+    | '/api/push'
+    | '/api/push-beh'
+    | '/api/push-rano'
     | '/api/raw-uploads'
     | '/api/reset'
     | '/api/sekvencia-navrh'
@@ -633,6 +663,9 @@ export interface FileRouteTypes {
     | '/api/periods'
     | '/api/plany'
     | '/api/premenuj'
+    | '/api/push'
+    | '/api/push-beh'
+    | '/api/push-rano'
     | '/api/raw-uploads'
     | '/api/reset'
     | '/api/sekvencia-navrh'
@@ -692,6 +725,9 @@ export interface FileRouteTypes {
     | '/api/periods'
     | '/api/plany'
     | '/api/premenuj'
+    | '/api/push'
+    | '/api/push-beh'
+    | '/api/push-rano'
     | '/api/raw-uploads'
     | '/api/reset'
     | '/api/sekvencia-navrh'
@@ -752,6 +788,9 @@ export interface RootRouteChildren {
   ApiPeriodsRoute: typeof ApiPeriodsRoute
   ApiPlanyRoute: typeof ApiPlanyRoute
   ApiPremenujRoute: typeof ApiPremenujRoute
+  ApiPushRoute: typeof ApiPushRoute
+  ApiPushBehRoute: typeof ApiPushBehRoute
+  ApiPushRanoRoute: typeof ApiPushRanoRoute
   ApiRawUploadsRoute: typeof ApiRawUploadsRoute
   ApiResetRoute: typeof ApiResetRoute
   ApiSekvenciaNavrhRoute: typeof ApiSekvenciaNavrhRoute
@@ -925,6 +964,27 @@ declare module '@tanstack/react-router' {
       path: '/api/raw-uploads'
       fullPath: '/api/raw-uploads'
       preLoaderRoute: typeof ApiRawUploadsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/push-rano': {
+      id: '/api/push-rano'
+      path: '/api/push-rano'
+      fullPath: '/api/push-rano'
+      preLoaderRoute: typeof ApiPushRanoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/push-beh': {
+      id: '/api/push-beh'
+      path: '/api/push-beh'
+      fullPath: '/api/push-beh'
+      preLoaderRoute: typeof ApiPushBehRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/push': {
+      id: '/api/push'
+      path: '/api/push'
+      fullPath: '/api/push'
+      preLoaderRoute: typeof ApiPushRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/premenuj': {
@@ -1216,6 +1276,9 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPeriodsRoute: ApiPeriodsRoute,
   ApiPlanyRoute: ApiPlanyRoute,
   ApiPremenujRoute: ApiPremenujRoute,
+  ApiPushRoute: ApiPushRoute,
+  ApiPushBehRoute: ApiPushBehRoute,
+  ApiPushRanoRoute: ApiPushRanoRoute,
   ApiRawUploadsRoute: ApiRawUploadsRoute,
   ApiResetRoute: ApiResetRoute,
   ApiSekvenciaNavrhRoute: ApiSekvenciaNavrhRoute,

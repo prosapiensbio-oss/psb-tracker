@@ -29,6 +29,13 @@ const VYNIMKY: Record<string, Record<string, string>> = {
   jarvis_dokumenty: {
     zmazane_at: "mäkké mazanie — pri vzniku dokument zmazaný nie je",
   },
+  // Odber vzniká v prehliadači; ako mu potom chodia správy, sa zisťuje až
+  // pri prvom odoslaní. Predvyplniť to pri zápise by znamenalo tvrdiť niečo,
+  // čo sa ešte nestalo.
+  push_odbery: {
+    posledne_ok: "posledné úspešné doručenie — pri prihlásení ešte žiadne nebolo",
+    chyba: "chyba doručenia — vzniká až pri neúspešnom odoslaní",
+  },
   jarvis_zavery: {
     vysledok: "vyhodnotenie záveru prichádza až po termíne overenia",
   },

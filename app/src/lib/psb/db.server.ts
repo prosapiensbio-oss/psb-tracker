@@ -3,7 +3,7 @@ import type { D1Database } from "@cloudflare/workers-types";
 
 import { audit, jeZamknuty, zamknuteMesiace } from "./audit.server";
 import { normName } from "./format";
-import { parseAnamneza, parseCennik, parseGa4, parseGsc, parseKanaly, parseMetricool } from "./parse";
+import { parseAnamneza, parseCennik, parseGa4, parseGsc, parseKanaly, parseMetricool, parsePoplatky } from "./parse";
 import {
   detectCSVType,
   parsePackages,
@@ -20,7 +20,7 @@ import { EMPTY_DATA } from "./types";
 const uid = () => crypto.randomUUID();
 
 export async function loadData(DB: D1Database): Promise<PSBData> {
-  const [sessions, services, payments, packages, overrides, acks, log, leads, zavery, vedomosti] = await Promise.all([
+  const [sessions, services, payments, packages, overrides, acks, log, leads, zavery, vedomosti, poplatky] = await Promise.all([
     DB.prepare("SELECT * FROM sessions").all(),
     DB.prepare("SELECT * FROM services").all(),
     DB.prepare("SELECT * FROM payments").all(),
@@ -40,6 +40,10 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
     DB.prepare(
       "SELECT id, nazov, o_com, zdroj, obnovovat_po_dnoch, overene_at, LENGTH(text) AS znakov FROM jarvis_vedomosti",
     ).all().catch(() => ({ results: [] })),
+    // Nezaplatené poplatky z PTminderu. Tabuľka je zrkadlo exportu: čo v nej
+    // je, to je otvorené (viď migráciu 0063).
+    DB.prepare("SELECT id, datum, client_name, popis, suma_czk FROM poplatky ORDER BY datum DESC")
+      .all().catch(() => ({ results: [] })),
   ]);
 
   const data: PSBData = {
@@ -92,6 +96,9 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
     zavery: (zavery.results as any[]).map((r) => ({
       id: r.id, datum: r.datum, tema: r.tema, zaver: r.zaver,
       overit: r.overit, overitDo: r.overit_do, stav: r.stav,
+    })),
+    poplatky: (poplatky.results as any[]).map((r) => ({
+      id: r.id, datum: r.datum, klient: r.client_name, popis: r.popis || "", suma: Number(r.suma_czk) || 0,
     })),
     leads: (leads.results as any[]).map((r) => ({
       id: r.id,
@@ -382,6 +389,25 @@ export async function ingest(DB: D1Database, filename: string, text: string, act
       ).bind(JSON.stringify(spolu), new Date().toISOString()).run();
       added = riadky.length;
     }
+  } else if (type === "transakcie") {
+    /**
+     * Poplatky sa NEPRIDÁVAJÚ, tabuľka sa PREPÍŠE.
+     *
+     * V PTminderi sa poplatok po zaplatení zmaže, takže export je vždy úplný
+     * zoznam otvorených položiek — nie prírastok. Keby sa importovalo cez
+     * INSERT OR IGNORE, zaplatené poplatky by v Kokpite zostali navždy
+     * a appka by pýtala peniaze, ktoré už prišli.
+     */
+    const rows = parsePoplatky(text);
+    const stmts = [
+      DB.prepare("DELETE FROM poplatky"),
+      ...rows.map((r) =>
+        DB.prepare("INSERT INTO poplatky (id,datum,client_name,popis,suma_czk,dedup_key) VALUES (?,?,?,?,?,?)")
+          .bind(uid(), r.datum, r.klient, r.popis, r.suma, `${r.datum}|${r.klient}|${r.suma}`),
+      ),
+    ];
+    await DB.batch(stmts);
+    added = rows.length;
   } else if (type === "packages") {
     // Per-client MERGE, not a wholesale replace: refresh package rows only for the
     // clients present in THIS file, and leave every other client's packages intact.

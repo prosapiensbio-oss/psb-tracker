@@ -132,9 +132,56 @@ export function parseCennik(text: string): CennikRiadok[] {
   return out;
 }
 
+export type PoplatokRow = { datum: string; klient: string; popis: string; suma: number };
+
+/**
+ * Nezaplatené poplatky z PTminderu (Finances → Transactions).
+ *
+ * Export má dve časti. Prvá je súhrn po klientoch — tá je NEPOUŽITEĽNÁ:
+ * `Amount Due` je u všetkých nula a `Amount Credit` sčítava každú platbu od
+ * roku 2022 (dokopy 7,7 milióna), takže voči nej nikto nikdy nedlhuje.
+ * Druhá časť je história transakcií a z nej berieme len riadky s poplatkom.
+ *
+ * PREČO SA NEPÁRUJE S PLATBAMI: v PTminderi sa poplatok po zaplatení ZMAŽE
+ * (Jerry, 31. 8. 2026). Poplatok, ktorý v exporte je, je teda nezaplatený —
+ * hotovo. Skúšal som to párovať sám a nešlo to: Barbora Vanková zaplatila
+ * päť dní PRED vystavením poplatku, takže ani pravidlo „platba po poplatku“
+ * neplatí.
+ *
+ * Sumy chodia v tvare „-7;790.00“ — bodkočiarka je oddeľovač tisícov.
+ */
+export function parsePoplatky(text: string): PoplatokRow[] {
+  const ls = lines(text);
+  const out: PoplatokRow[] = [];
+  let vHistorii = false;
+  for (const riadok of ls) {
+    const h = riadok.toLowerCase();
+    if (!vHistorii) {
+      // Hlavička druhej časti. Až za ňou sú transakcie.
+      if (h.startsWith("date,") && h.includes("charges")) vHistorii = true;
+      continue;
+    }
+    const p = splitCSVLine(riadok);
+    if (p.length < 4) continue;
+    const suma = Math.abs(Number((p[3] || "").replace(/[;\s]/g, "").replace(/[^\d.-]/g, "")));
+    if (!suma || !Number.isFinite(suma)) continue;
+    const d = parsePTDate(p[0].trim());
+    if (!d) continue;
+    const klient = (p[1] || "").trim();
+    if (!klient) continue;
+    // toUtcMidnight, nie toISOString: „28 August 2026“ sa naparsuje ako
+    // lokálna polnoc a priamy prevod na ISO by z toho v našom pásme spravil
+    // 27. augusta.
+    out.push({ datum: toUtcMidnight(d).slice(0, 10), klient, popis: (p[2] || "").trim().slice(0, 300), suma });
+  }
+  return out;
+}
+
 export function detectCSVType(text: string): CSVType | null {
   const h = text.slice(0, 600).toLowerCase();
   if (h.includes("payments recorded report")) return "payments";
+  // Transactions z Financií — pozná sa podľa súhrnnej hlavičky na začiatku.
+  if (h.includes("total charges") && h.includes("amount due")) return "transakcie";
   if (h.includes("session name")) return "sessions";
   if (h.includes("staff,date,service type") || h.includes("service type,service description"))
     return "services";

@@ -23,6 +23,12 @@ export default defineConfig(({ mode }) => {
   const designInspectorEnabled = process.env.HF_DESIGN_INSPECTOR === "1" || mode === "design";
 
   return {
+    // Čas buildu zapečený do balíka. Appka inak o sebe nevie nič — beží živá
+    // zo servera, takže „ktorú verziu mám?" sa nedalo zodpovedať inak než
+    // tým, že človek uvidí zmenu. Jerry, 31. 8. 2026.
+    define: {
+      __KOKPIT_BUILD__: JSON.stringify(new Date().toISOString()),
+    },
     resolve: {
       alias: [{ find: /^@higgsfield-ai\/icons(\/.*)?$/, replacement: QUANTA_ICONS_SHIM }],
     },

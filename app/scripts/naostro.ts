@@ -12,9 +12,9 @@
  * Nič nezapisuje. Zmeny sa simulujú nad kópiou dát v pamäti.
  */
 import {
-  capacityByTrainer, cakajuciKlienti, deriveClients, deriveRegister, deriveSixM,
+  bezDohodnutehoTerminu, capacityByTrainer, cakajuciKlienti, deriveClients, deriveRegister, deriveSixM,
   ktoDnesTrenoval, nepotvrdeneTreningy, nezapisaneDoRegistra, odmlcaniKlienti,
-  novyKlientAkNicIne, odpovedeZRegistra, parujVysvetlenia, patriTrenerovi, poslednyTrening,
+  odstranDuplicity, odpovedeZRegistra, parujVysvetlenia, patriTrenerovi, poslednyTrening,
   pripomienkaDovodu, pripomienkySlubov, stavPolozkyRegistra, trenerZOdpovede,
   udalostiBezMena, znieAkoZrusenie, zruseneTreningy,
 } from "../src/lib/psb/compute";
@@ -40,6 +40,13 @@ const base: PSBData = {
   leads: nacitaj("leads").map((r: any) => ({
     id: r.id, date: r.date, name: r.name, source: r.source, referrer: r.referrer,
     status: r.status, note: r.note, dovod: r.dovod, createdAt: r.created_at || "" })),
+  // Závery z debát s Jarvisom. Bez nich kontrola nevidí, že Jerry o klientovi
+  // už rozhodol — a hlásila by ako otvorené to, čo je vyriešené.
+  zavery: nacitaj("zavery").map((r: any) => ({
+    id: r.id, datum: r.datum, tema: r.tema, zaver: r.zaver,
+    overit: r.overit, overitDo: r.overit_do, stav: r.stav })),
+  poplatky: nacitaj("poplatky").map((r: any) => ({
+    id: String(r.id), datum: r.datum, klient: r.client_name, popis: r.popis || "", suma: r.suma_czk })),
   clientOverrides: {}, anomalyAck: {},
 };
 for (const r of nacitaj("overrides")) base.clientOverrides[r.name] = {
@@ -58,7 +65,7 @@ const udalosti = nacitaj("kal_udalosti")
   .map((u: any) => ({ zaciatok: u.zaciatok, klient: u.klient, typ: u.typ, trener: u.trener, nazov: u.nazov, zmizlaAt: null }));
 const zmeny = nacitaj("kal_zmeny").map((z: any) => ({
   id: z.id, kedy: z.kedy, druh: z.druh, klient: z.klient, pred: z.pred, po: z.po,
-  trener: z.trener, vysvetlene: z.vysvetlene }));
+  trener: z.trener, vysvetlene: z.vysvetlene, poznamka: z.poznamka }));
 
 let zlyhani = 0;
 const H = (t: string) => console.log(`\n${"═".repeat(78)}\n${t}\n${"═".repeat(78)}`);
@@ -72,9 +79,9 @@ const reg = (d: PSBData, zm = zmeny, ud = udalosti) => {
 /** Všetko, čo Kokpit v registri naozaj ukáže — vrátane pripomienok z App.tsx. */
 const vsetko = (d: PSBData, zm = zmeny, ud = udalosti) => {
   const c = deriveClients(d);
-  // `novyKlientAkNicIne` je posledný krok aj v App.tsx — bez neho by skript
+  // `odstranDuplicity` je posledný krok aj v App.tsx — bez neho by skript
   // ukazoval o riadok viac než appka.
-  return novyKlientAkNicIne([
+  return odstranDuplicity([
     ...reg(d, zm, ud),
     ...pripomienkySlubov(ud as any, d.leads as any, d.anomalyAck, new Date(), zm),
     ...pripomienkaDovodu(c, d.packages as any, ud as any, d.anomalyAck),
@@ -99,8 +106,29 @@ const vs = vsetko(base).filter((x) => !x.acked);
 for (const r of vs) console.log(`  [${r.category.padEnd(11)}] ${r.tone.padEnd(6)} ${r.title.slice(0, 62)}`);
 console.log(`  spolu ${vs.length}`);
 
+// Nezaplatené sa nehlásia notifikáciou — sú to len peniaze v zozname. Kontrola
+// je preto na inom mieste: kto je v poplatkoch a appka ho vôbec nepozná?
+// Taký človek by v Kokpite visel bez trénera a klik na meno by nikam neviedol.
+h("nezaplatené poplatky");
+{
+  const spolu = base.poplatky.reduce((a, p) => a + p.suma, 0);
+  console.log(`  ${base.poplatky.length} poplatkov · ${Math.round(spolu).toLocaleString("sk-SK")} Kč`);
+  const cudzi = base.poplatky.filter((p) => !clients[p.klient]);
+  if (cudzi.length) for (const p of cudzi) console.log(`  ⚠ ${p.klient} — appka tohto klienta nepozná (${p.suma} Kč)`);
+  else console.log("  ✓  každý poplatok sedí na známeho klienta");
+}
+
 h("nezhoda kalendár vs export");
 for (const n of nepotvrdeneTreningy(base.sessions, udalosti, zmeny)) console.log(`  ${n.klient.padEnd(22)} ${n.datum}  (${n.trener})`);
+
+// Pravidelný klient bez termínu dopredu. Zoznam sa musí sám zúžiť na
+// variabilných — keby v ňom bol niekto, kto má fixný slot, znamenalo by to,
+// že sa jeho termíny do kalendára nedostávajú.
+h("pravidelní klienti bez ďalšieho termínu");
+for (const b of bezDohodnutehoTerminu(clients, udalosti, { zmeny })) {
+  console.log(`  ${b.meno.padEnd(22)} naposledy ${b.poslednySession} (${b.dni} dní)  chodí raz za ${b.rytmus} dní  (${b.trener || "—"})`);
+  if (b.poznamka) console.log(`      ↳ zapísané ${b.poznamka.kedy}: „${b.poznamka.text}"`);
+}
 
 h("klienti čakajúci na potvrdenie z exportu");
 for (const c of cakajuciKlienti(clients, udalosti, zmeny)) console.log(`  ${c.meno.padEnd(22)} úvodný ${c.uvodny}  (${c.trener})${c.zNazvu ? "  [meno z názvu]" : ""}`);

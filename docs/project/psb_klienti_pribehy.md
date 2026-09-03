@@ -88,7 +88,7 @@ jí kotníky, výron nebo vytknutá noha. **Dnes uběhne půlmaraton.**
 
 ---
 
-## DANIELKA · výhřez ploténky
+## DANIELKA (v Kokpite: Daniela Šašinkova) · výhřez ploténky
 
 Začalo to po lyžování — sekla se záda, tři dny nemohla chodit. Zůstala
 vystřelující bolest do pravé nohy a hýždě při sezení. Chtěla to řešit, začal
@@ -106,7 +106,7 @@ přejde."* — přesně tohle do textu patří, ne se tomu vyhýbat.
 
 ---
 
-## TKEJ · 12 let s bolestí předloktí
+## TKEJ (v Kokpite: Tomaš Krčmar) · 12 let s bolestí předloktí
 
 Začalo v 16–17 letech: bolela vnější strana předloktí, **nemohl skoro nic
 udržet**. Příčina zpětně: tělo naučené, že předloktí dělá všechno — od

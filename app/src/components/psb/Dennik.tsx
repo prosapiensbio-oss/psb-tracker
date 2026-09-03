@@ -15,7 +15,25 @@ import { enterPosle } from "./ui";
 // Stála poznámka na karte klienta zostáva — na fakty, ktoré sa nemenia
 // (kto za koho platí, na čo si dať pozor). Udalosti patria sem.
 
-export type DennikZapis = { id: string; note: string; autor: string; kedy: string };
+/**
+ * Riadok histórie klienta — zápis z denníka, poznámka pri zrušení, odpoveď na
+ * notifikáciu, záver z debaty s Jarvisom, meranie alebo pole z karty.
+ *
+ * Jerry, 31. 8. 2026: „mal by existovať jeden veľký register, jedno miesto
+ * o jednom klientovi, kde sa zapisuje všetko, čo sa ho týka."
+ * Zapisuje sa ďalej tam, kde sa vec stane — zlúčené je čítanie.
+ */
+export type HistoriaRiadok = { id: string; kedy: string; odkial: string; text: string; autor: string };
+
+/** Odkiaľ zápis prišiel. Farba nesie zdroj, aby sa nemusel čítať štítok. */
+const FARBA_ZDROJA: Record<string, string> = {
+  "denník": C.green,
+  "kalendár": C.blue,
+  "notifikácia": C.orange,
+  "Jarvis": C.accentLight,
+  "meranie": C.bark,
+  "karta klienta": C.textMuted,
+};
 
 export function Dennik({ meno, limit = 4, onNovyZapis }: {
   meno: string;
@@ -24,7 +42,7 @@ export function Dennik({ meno, limit = 4, onNovyZapis }: {
    *  jednu vetu o tom, čo si zapísal, alebo null, keď nič nevyplynulo. */
   onNovyZapis?: (meno: string, text: string) => Promise<string | null>;
 }) {
-  const [zapisy, setZapisy] = useState<DennikZapis[]>([]);
+  const [historia, setHistoria] = useState<HistoriaRiadok[]>([]);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [vsetky, setVsetky] = useState(false);
@@ -66,10 +84,10 @@ export function Dennik({ meno, limit = 4, onNovyZapis }: {
   const nacitaj = (m: string) => {
     void fetch(`/api/client-notes?name=${encodeURIComponent(m)}`, { credentials: "same-origin" })
       .then((r) => r.json())
-      .then((j: { zapisy?: DennikZapis[] }) => setZapisy(j.zapisy || []))
+      .then((j: { historia?: HistoriaRiadok[] }) => setHistoria(j.historia || []))
       .catch(() => {});
   };
-  useEffect(() => { setZapisy([]); setText(""); setVsetky(false); setBolest(null); setMerania([]); nacitaj(meno); nacitajMerania(meno); }, [meno]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setHistoria([]); setText(""); setVsetky(false); setBolest(null); setMerania([]); nacitaj(meno); nacitajMerania(meno); }, [meno]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pridaj = () => {
     const t = text.trim();
@@ -104,7 +122,7 @@ export function Dennik({ meno, limit = 4, onNovyZapis }: {
       .finally(() => setBusy(false));
   };
 
-  const videne = vsetky ? zapisy : zapisy.slice(0, limit);
+  const videne = vsetky ? historia : historia.slice(0, limit);
 
   return (
     <div>
@@ -176,25 +194,32 @@ export function Dennik({ meno, limit = 4, onNovyZapis }: {
           {jarvisOznam}
         </div>
       )}
-      {zapisy.length > 0 && (
+      {historia.length > 0 && (
         <div style={{ marginTop: 8 }}>
           {videne.map((z) => (
             <div key={z.id} style={{ padding: "6px 0", borderBottom: `1px solid ${mix(C.border, 40)}` }}>
-              <div style={{ fontSize: 10.5, color: C.textDim, marginBottom: 2, fontVariantNumeric: "tabular-nums" }}>
-                {fmtDMY(z.kedy)} · {z.autor}
+              <div style={{ fontSize: 10.5, color: C.textDim, marginBottom: 2, fontVariantNumeric: "tabular-nums", display: "flex", alignItems: "center", gap: 6 }}>
+                <span>{fmtDMY(z.kedy)}</span>
+                {/* Štítok zdroja. Bez neho by odpoveď na notifikáciu a zápis
+                    z denníka vyzerali rovnako — a Jerry by nevedel, či si to
+                    napísal sám, alebo to appka len zachytila pri zrušení. */}
+                <span style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: 0.3, textTransform: "uppercase", color: FARBA_ZDROJA[z.odkial] || C.textDim, background: mix(FARBA_ZDROJA[z.odkial] || C.textDim, 14), padding: "1px 5px", borderRadius: 5 }}>
+                  {z.odkial}
+                </span>
+                {z.autor && <span>· {z.autor}</span>}
               </div>
-              <div style={{ fontSize: 12.5, color: C.text, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{z.note}</div>
+              <div style={{ fontSize: 12.5, color: C.text, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{z.text}</div>
             </div>
           ))}
-          {zapisy.length > limit && (
+          {historia.length > limit && (
             <button onClick={() => setVsetky((v) => !v)} style={{ background: "none", border: "none", color: C.textDim, fontSize: 11.5, cursor: "pointer", padding: "6px 0 0" }}>
-              {vsetky ? "skryť staršie" : `zobraziť všetky (${zapisy.length})`}
+              {vsetky ? "skryť staršie" : `zobraziť všetko (${historia.length})`}
             </button>
           )}
         </div>
       )}
-      {zapisy.length === 0 && (
-        <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 6 }}>Denník je zatiaľ prázdny — zápisy sa pridávajú a nikdy nemažú.</div>
+      {historia.length === 0 && (
+        <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 6 }}>Zatiaľ nič — zápisy sa pridávajú a nikdy nemažú.</div>
       )}
     </div>
   );

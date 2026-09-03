@@ -35,6 +35,7 @@ import {
   type ClientAgg,
   type RegisterItem,
   type SixMRow,
+  bezDohodnutehoTerminu,
   odmlcaniKlienti,
   odpovedeZRegistra,
   vytazenieSpolu,
@@ -72,6 +73,23 @@ export type KalendarPreAi = {
 };
 
 /** Rezerva, ako ju počíta lib/psb/rezerva.ts — to isté číslo ako dlaždica. */
+/**
+ * Bitcoin po klientoch. Bez tohto Jarvis na „koľko Knapčok zaplatil v BTC"
+ * odpovie, že nevie — hoci to karta klienta ukazuje (Jerry, 2. 9. 2026).
+ */
+export type BtcPreAi = {
+  kurzCzkZaBtc: number | null;
+  kurzKedy: string | null;
+  klienti: { klient: string; sats: number; czkVtedy: number; czkDnes: number | null; rozdielCzk: number | null; rozdielPct: number | null; platieb: number }[];
+  /** Jednotlivé platby — bez nich sa nedá odpovedať na „a za tú poslednú?". */
+  platby?: { klient: string; datum: string; sats: number; czkVtedy: number; czkDnes: number | null }[];
+  /** Čo z rezervy odišlo — kedy, koľko a komu. */
+  vyplaty?: { datum: string; sats: number; czk: number | null; poznamka?: string; kto?: string }[];
+  /** Dokúpené satoshi mimo klientskych platieb. */
+  nakupy?: { datum: string; sats: number; czk: number | null; poznamka?: string }[];
+  cielSats?: number | null;
+};
+
 export type RezervaPreAi = {
   majetok: number | null;
   mesiace: number | null;
@@ -89,6 +107,7 @@ export function buildAiContext(
   kalendar?: KalendarPreAi,
   uzavierka?: UzavierkaPreAi,
   rezerva?: RezervaPreAi,
+  btc?: BtcPreAi,
 ) {
   const clientList = Object.values(clients);
 
@@ -874,6 +893,30 @@ export function buildAiContext(
       ? { mesiac: monthLabel(beziaci.month), doDna: kotva.den, vyfakturovane: r0(beziaci.revenue), prijateTrzby: r0(beziaci.cash), sedeni: beziaci.sessions, poznamka: "Rozrobený mesiac — čiastkový súčet, nie výsledok." }
       : null,
     kpi,
+    /**
+     * Nezaplatené poplatky z PTminderu. Čo je v zozname, je otvorené —
+     * v PTminderi sa poplatok po zaplatení maže, takže sa nič nepáruje.
+     * Bez tohto by Jarvis na „kto nezaplatil“ odpovedal, že nevie.
+     */
+    nezaplatene: {
+      pocet: (data.poplatky || []).length,
+      spoluCzk: r0((data.poplatky || []).reduce((a, p) => a + p.suma, 0)),
+      // Rozpad podľa trénera je tu preto, že karta v Kokpite sa filtruje
+      // prepínačom trénera. Bez neho by Jerry videl na obrazovke „3 · 22 181"
+      // a Jarvis mu na tú istú otázku odpovedal „10 · 76 331" — dve čísla pre
+      // tú istú vec, a to je presne ten druh rozporu, ktorý appku zdiskredituje.
+      podlaTrenera: (data.poplatky || []).reduce((m: Record<string, { pocet: number; spoluCzk: number }>, p) => {
+        const t = clients[p.klient]?.primaryTrainer || "neznámy";
+        const z = m[t] || (m[t] = { pocet: 0, spoluCzk: 0 });
+        z.pocet++; z.spoluCzk = r0(z.spoluCzk + p.suma);
+        return m;
+      }, {}),
+      polozky: (data.poplatky || []).map((p) => ({
+        klient: p.klient, suma: r0(p.suma), datum: p.datum, popis: p.popis,
+        trener: clients[p.klient]?.primaryTrainer || "neznámy",
+      })),
+      poznamka: "Zrkadlo posledného importu Transactions z PTminderu; v PTminderi sa poplatok po zaplatení maže, takže čo je v zozname, je otvorené a s ničím sa to nepáruje. NIE je to živý stav — nehovor „X dlhuje dnes“, ale „v poslednom exporte stálo otvorených N poplatkov“. Karta v Kokpite sa filtruje trénerom, preto pri otázke jedného trénera použi podlaTrenera, nie celkový súčet.",
+    },
     tyzdenneHodiny,
     tyzdennePodlaTrenera,
     zdravaZona,
@@ -984,6 +1027,35 @@ export function buildAiContext(
         klienti: zoznam,
       };
     })(),
+    // Krok PRED odmlčaním. Bez tohto by Jarvis na „komu mám napísať" siahol
+    // po odmlčaných, teda po ľuďoch, ktorí sú preč už dva týždne — a mlčal by
+    // o tých, u ktorých ešte stačí poslať správu.
+    bezTerminu: (() => {
+      const zoznam = bezDohodnutehoTerminu(clients, kalendar?.udalosti || [], { zmeny: kalendar?.zmeny });
+      return {
+        poznamka: "Aktívni klienti s pravidelným rytmom, ktorí od posledného tréningu prekročili svoju BEŽNÚ medzeru a NEMAJÚ nič dohodnuté dopredu v kalendári. Je to krok PRED odmlčanými (tí sú 14+ dní): tu ešte stačí napísať správu. Zoznam obsahuje len variabilných klientov — kto má fixný slot, má termín v kalendári a nespadne sem. Rytmus je medián medzier medzi poslednými sedeniami, nie priemer. Dôvod môže byť aj neškodný (dovolenka) — pýtaj sa, netvrď, že klient odchádza.",
+        spolu: zoznam.length,
+        klienti: zoznam,
+      };
+    })(),
+    // Čo kto zaplatil v bitcoine a čo to má za hodnotu dnes.
+    bitcoinKlienti: btc ? {
+      kurzCzkZaBtc: btc.kurzCzkZaBtc,
+      kurzKedy: btc.kurzKedy,
+      spoluSats: btc.klienti.reduce((a, k) => a + k.sats, 0),
+      klienti: btc.klienti,
+      // Platba po platbe. Súčet za klienta nestačil: na otázku „a koľko za tú
+      // poslednú?" musel Jarvis 3. 9. 2026 povedať, že rozpad nemá — hoci ho
+      // appka celý čas mala.
+      platby: btc.platby || [],
+      // Celá kniha z BTC appky — 99 riadkov, zmestí sa celá. Bez nej Jarvis
+      // o rezerve vedel len súčet a na „kedy sme naposledy nakupovali" alebo
+      // „koľko sme si vyplatili" odpovedal, že nevie.
+      vyplaty: btc.vyplaty || [],
+      nakupy: btc.nakupy || [],
+      cielSats: btc.cielSats ?? null,
+      poznamka: "CELÁ kniha z appky prosapiens-btc: platby klientov, výplaty z rezervy, dokúpené satoshi a cieľ. Je to druhá appka a vlastná databáza — do SQL dopytov (`dopyt_db`) sa NEDOSTANEŠ, tieto čísla sú jediná cesta k nim, tak ich nehľadaj v tabuľkách Kokpitu. `platby` sú JEDNOTLIVÉ platby (dátum, satoshi, hodnota vtedy aj dnes) — na otázku o konkrétnej platbe odpovedaj z nich, nie zo súčtu v `klienti`. POZOR, `czkVtedy` NIE JE FAKTUROVANÁ CENA — je to hodnota poslaných mincí v deň platby a od ceny v PTminderi sa líši o kurz a spread brány (Michal Knapčok 7. 7. 2026: PTminder 14 805 Kč, bitcoin 14 598 Kč). Keď sa niekto pýta, KOĽKO KLIENT ZAPLATIL, odpovedaj sumou z PTmindera — ten je zdroj pravdy o tržbách; tieto čísla hovoria, ČÍM zaplatil a čo to má za hodnotu. Ak nie je jasné, ktoré chce, povedz obe a pomenuj rozdiel. `czkDnes` sú tie isté satoshi dnešným kurzom, teda čo by mince stáli teraz. PREČÍTAJ, NEPOČÍTAJ: obe čísla sú hotové. NEZAMIEŇAJ so „zhodnotením“ z BTC appky — to je vážený výnos celej rezervy proti nákupnej cene. Keď kurz nie je známy, czkDnes je null a dnešná hodnota sa NETVRDÍ.",
+    } : null,
     ziskavanie,
     ekonomikaDopytu,
     marketing,

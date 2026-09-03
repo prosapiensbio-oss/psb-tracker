@@ -10,6 +10,8 @@ import type { IngestResult } from "../../lib/psb/db.server";
 import type { Actions, KrokUzavierky, NavFocus } from "./App";
 import { fetchVzasSettings, saveVzasSetting, type BtcNakup } from "../../lib/psb/client";
 import { BtcParovanie } from "./BtcParovanie";
+import { PushOdber } from "./PushOdber";
+import { CAS_BUILDU, kontrolnySubor, verziaServera } from "../../lib/psb/verzia";
 import { BankovyImport } from "./Banka";
 import { BankaUlozene } from "./BankaUlozene";
 import { FakturyNahlad } from "./Faktury";
@@ -37,6 +39,7 @@ const REPORTS: { key: keyof PSBData; label: string; path: string }[] = [
   { key: "services", label: "Payroll by Service", path: "PTminder → Payroll Reports › By Service" },
   { key: "payments", label: "Payments Recorded", path: "PTminder → Financial Reports › Payments Recorded" },
   { key: "packages", label: "Packages & Memberships", path: "PTminder → General Reports › Packages & Memberships (všetky 4 pohľady)" },
+  { key: "poplatky", label: "Transactions", path: "PTminder → Finances › Transactions (Export). Nezaplatené poplatky — po zaplatení sa v PTminderi mažú, takže export je vždy úplný zoznam otvorených." },
 ];
 
 const BANKA_ZDROJ = {
@@ -102,6 +105,22 @@ export function Udaje({ data, actions, chat, prekazky, kroky, podklady, onNaviga
         <NapojenieRychlost />
       </Card>
 
+      {/* Notifikácie na telefón sú tu, a nie v hlavičke, kde stáli prvý deň.
+          Jerry, 31. 8. 2026: „neviem, prečo by malo byť zapnúť notifikácie na
+          hlavnej obrazovke, kľudne to daj niekde do upload." Mal pravdu
+          dvakrát: je to nastavenie, ktoré sa spraví raz za zariadenie — a na
+          iPhone sa z toho v Safari stal trojriadkový návod, ktorý rozhádzal
+          celú hlavičku. */}
+      <Card>
+        <H3>
+          <Info
+            label="Notifikácie na telefón"
+            text="Kokpit sa dá pridať na plochu iPhonu ako appka a posielať upozornenia z registra. Chodia len tie, ktoré si pýtajú akciu, a len tomu trénerovi, ktorého sa týkajú. Rovnaká vec príde raz, nie pri každom behu plánovača."
+          />
+        </H3>
+        <PushOdber />
+      </Card>
+
       {/* Kontá pred vzhľadom: kto sa prihlasuje, je prevádzková vec, farebná
           schéma je vkus. */}
       <Card>
@@ -122,7 +141,39 @@ export function Udaje({ data, actions, chat, prekazky, kroky, podklady, onNaviga
         </div>
         <ResetButton onReset={actions.reset} />
       </div>
+
+      {/* Verzia úplne dole a nenápadne. Nie je to nastavenie, je to odpoveď na
+          jedinú otázku: „mám tú najnovšiu?" — a tá sa pýta len vtedy, keď
+          niečo nesedí. Na iPhone má zmysel obzvlášť: appka beží zo Safari
+          a po návrate z pozadia môže pokračovať starý kód v pamäti. */}
+      <Verzia />
     </>
+  );
+}
+
+function Verzia() {
+  const subor = kontrolnySubor();
+  const cas = CAS_BUILDU ? new Date(CAS_BUILDU) : null;
+  const [naServeri, setNaServeri] = useState<string | null>(null);
+  useEffect(() => { void verziaServera().then(setNaServeri); }, []);
+  // Reťazce sa porovnávajú do znaku — nasadzovací skript ich vyberá priamo
+  // z postaveného balíka, takže zhoda znamená naozaj tú istú verziu.
+  const zastarana = !!naServeri && !!CAS_BUILDU && naServeri !== CAS_BUILDU;
+  const cs = (d: Date) => `${fmtDMY(d)} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  return (
+    <div style={{ marginTop: 18, paddingTop: 10, borderTop: `1px solid ${mix(C.border, 50)}`, fontSize: 11, color: C.textDim, lineHeight: 1.6 }}>
+      <Info
+        text={`Čas zostavenia verzie, ktorú máš PRÁVE OTVORENÚ. Appka sa zároveň pýta servera, čo je nasadené — keď sa to líši, beží ti staršia verzia z pamäte a napíše to sem. Na iPhone ju vtedy odpáľ z prepínača aplikácií a otvor znova, na počítači daj cmd+shift+R.${subor ? ` Bežiaci balík: ${subor}. Meno sa NEMUSÍ zhodovať s tým, čo vypíše nasadzovací skript — balík má viac kusov a každý má vlastný odtlačok; rozhoduje čas.` : ""}`}
+        label={<span style={{ color: zastarana ? C.orange : C.textDim }}>
+          Verzia: {cas ? cs(cas) : "vývojová"}
+        </span>}
+      />
+      {zastarana && (
+        <div style={{ color: C.orange, marginTop: 3 }}>
+          Na serveri je novšia ({cs(new Date(naServeri))}) — odpáľ appku z prepínača aplikácií a otvor ju znova.
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1027,7 +1078,7 @@ function NapojenieTextWebu() {
         Stránok s textom: <b style={{ color: (stav?.sText ?? 0) > 0 ? C.green : C.orange }}>{stav?.sText ?? 0}</b>
         {" z "}<b style={{ color: C.text }}>{stav?.vsetky ?? 0}</b>
         {chyba > 0 && <> · chýba <b style={{ color: C.orange }}>{chyba}</b></>}
-        {stav?.naposledy && <> · naposledy {stav.naposledy.slice(0, 10)}</>}
+        {stav?.naposledy && <> · naposledy {fmtDMY(stav.naposledy)}</>}
       </div>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <button style={btn} disabled={robim} onClick={() => void posli({})}>
@@ -1132,7 +1183,7 @@ function NapojenieRychlost() {
       <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 8, lineHeight: 1.6 }}>
         Kľúč: <b style={{ color: stav?.maKluc ? C.green : C.orange }}>{stav?.maKluc ? "uložený" : "chýba"}</b>
         {" · "}zmeraných stránok: <b style={{ color: C.text }}>{stav?.stranok ?? 0}</b> z {stav?.ciel ?? 20}
-        {stav?.naposledy && <> · naposledy {stav.naposledy.slice(0, 10)}</>}
+        {stav?.naposledy && <> · naposledy {fmtDMY(stav.naposledy)}</>}
         {!stav?.maKluc && (
           <>
             <br />

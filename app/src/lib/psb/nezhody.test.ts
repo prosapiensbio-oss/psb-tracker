@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { cakajuciKlienti, minutyZCasu, nepotvrdeneTreningy, novyKlientAkNicIne, udalostiBezMena } from "./compute";
+import { cakajuciKlienti, minutyZCasu, nepotvrdeneTreningy, odstranDuplicity, udalostiBezMena } from "./compute";
 
 /**
  * Kalendár vyhráva, export potvrdzuje — a keď nepotvrdí, appka to povie.
@@ -146,14 +146,14 @@ describe("cakajuciKlienti — profil vzniká z úvodného v kalendári", () => {
   });
 });
 
-describe("novyKlientAkNicIne", () => {
+describe("odstranDuplicity", () => {
   const p = (key: string, oKom: string) =>
     ({ key, oKom, category: "Zápis" as const, tone: "blue" as const, title: "", detail: "", acked: false, priority: 1 });
 
   it("ustúpi, keď o tom istom človeku niečo pýta akciu", () => {
     // Jana Malinová mala 18. 8. tri riadky naraz — a tri riadky o jednom
     // človeku sú presne to, po čom sa zoznam prestane čítať.
-    const von = novyKlientAkNicIne([
+    const von = odstranDuplicity([
       p("novy|2026-08-17|Jana Malinová", "Jana Malinová"),
       p("sms|2026-08-17|Jana Malinová", "Jana Malinová"),
     ]);
@@ -163,12 +163,12 @@ describe("novyKlientAkNicIne", () => {
   it("zostane, keď o ňom nič iné otvorené nie je", () => {
     // Po 21 dňoch SMS pripomienka zmizne — a vtedy je `novy` jediný signál,
     // že človek stále nie je potvrdený exportom.
-    const von = novyKlientAkNicIne([p("novy|2026-07-01|Kto Caka", "Kto Caka")]);
+    const von = odstranDuplicity([p("novy|2026-07-01|Kto Caka", "Kto Caka")]);
     expect(von).toHaveLength(1);
   });
 
   it("vybavená položka nikoho neumlčí", () => {
-    const von = novyKlientAkNicIne([
+    const von = odstranDuplicity([
       p("novy|2026-08-17|Jana Malinová", "Jana Malinová"),
       { ...p("sms|2026-08-17|Jana Malinová", "Jana Malinová"), acked: true },
     ]);
@@ -176,10 +176,45 @@ describe("novyKlientAkNicIne", () => {
   });
 
   it("iný človek nič neumlčí", () => {
-    const von = novyKlientAkNicIne([
+    const von = odstranDuplicity([
       p("novy|2026-08-17|Jana Malinová", "Jana Malinová"),
       p("sms|2026-08-17|Tereza Pehalova", "Tereza Pehalova"),
     ]);
     expect(von).toHaveLength(2);
+  });
+});
+
+// Jerry, 1. 9. 2026: „vidím v notifikáciách redundanciu ohľadom Martina Vaška
+// … jedna z nich sa musí vyhodiť."
+describe("6M otázka a dnešný tréning o tom istom človeku", () => {
+  const dnes = (meno: string) =>
+    ({ key: `dnes|2026-09-01|${meno}`, category: "6M" as const, tone: "blue" as const,
+       title: `18:00 ${meno}: 5. mesiac`, detail: `Dnes o 18:00 máš tréning s ${meno}. 5. mesiac — hodnotiaci rozhovor.`,
+       priority: 1, acked: false, oKom: meno });
+  const sixm = (meno: string) =>
+    ({ key: `sixm|${meno}|Obnova|5`, category: "6M" as const, tone: "orange" as const,
+       title: `${meno} — 6M`, detail: `${meno}: 5. mesiac — hodnotiaci rozhovor`,
+       priority: 0, acked: false, client: meno });
+
+  it("v deň tréningu zostane len tá dnešná", () => {
+    const von = odstranDuplicity([sixm("Martin Vaško"), dnes("Martin Vaško")]);
+    expect(von.map((x) => x.key)).toEqual(["dnes|2026-09-01|Martin Vaško"]);
+  });
+
+  it("bez dnešného tréningu 6M riadok zostáva — nič sa nestráca", () => {
+    const von = odstranDuplicity([sixm("Martin Vaško")]);
+    expect(von.length).toBe(1);
+  });
+
+  it("dnešný tréning iného klienta 6M riadok neumlčí", () => {
+    const von = odstranDuplicity([sixm("Martin Vaško"), dnes("Anna Nova")]);
+    expect(von.map((x) => x.key).sort()).toEqual(["dnes|2026-09-01|Anna Nova", "sixm|Martin Vaško|Obnova|5"]);
+  });
+
+  it("odklepnutá dnešná pripomienka 6M riadok nezhasne", () => {
+    // Inak by odklepnutie dnešného riadku umlčalo aj otázku, na ktorú nikto
+    // neodpovedal — a tá by sa vrátila až o mesiac.
+    const von = odstranDuplicity([sixm("Martin Vaško"), { ...dnes("Martin Vaško"), acked: true }]);
+    expect(von.some((x) => x.key.startsWith("sixm|"))).toBe(true);
   });
 });

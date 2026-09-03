@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { monthLabel } from "../../lib/psb/format";
+import { fmtDMY, monthLabel } from "../../lib/psb/format";
 import type { AssistantChat } from "./Assistant";
 import type { KrokUzavierky, NavFocus } from "./App";
 import { SpravaMesiaca } from "./SpravaMesiaca";
@@ -94,7 +94,7 @@ function Konta() {
               <span style={{ color: C.textDim, fontSize: 11 }}>{u.login}</span>
               {ja === u.login && <span style={{ color: C.green, fontSize: 11 }}>· prihlásený</span>}
               <span style={{ marginLeft: "auto", color: C.textDim, fontSize: 11 }}>
-                {u.lastLogin ? `naposledy ${u.lastLogin.slice(0, 10)}` : "ešte sa neprihlásil"}
+                {u.lastLogin ? `naposledy ${fmtDMY(u.lastLogin)}` : "ešte sa neprihlásil"}
               </span>
             </div>
           ))}

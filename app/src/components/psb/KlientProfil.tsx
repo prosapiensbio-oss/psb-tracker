@@ -4,6 +4,7 @@ import { type ClientAgg } from "../../lib/psb/compute";
 import { daysBetween, fmtCZK, fmtDMY, monthLabel } from "../../lib/psb/format";
 import { C, mix } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
+import { Dennik } from "./Dennik";
 import { Card, Info, ValueBars } from "./ui";
 
 // Profil klienta — všetko o jednom človeku na jednej obrazovke.
@@ -17,6 +18,16 @@ import { Card, Info, ValueBars } from "./ui";
 // Porovnanie s priemerom je tu preto, lebo číslo bez mierky nič nehovorí:
 // tempo 2,1 sedenia mesačne je málo alebo veľa len oproti tomu, ako chodia
 // ostatní.
+//
+// DENNÍK PRIBUDOL 31. 8. 2026. Zadanie „všetko všetko všetko" dovtedy platilo
+// len o číslach: peniaze, dochádzka, balíček. To, čo o človeku KTOSI NAPÍSAL,
+// žilo na druhej obrazovke — v ✎ modáli v tabuľke Klientov. Klik na meno
+// z notifikácie teda otvoril profil bez jediného slova o tom, čo sa s ním
+// deje, a Jerry sa musel prekliknúť inam. Jerry, 31. 8. 2026: „keď kliknem na
+// klienta, malo by mi to otvoriť tú istú tabuľku ako keď dám hľadať klienta,
+// a tam by mohol byť ten denník."
+//
+// Je to ten istý komponent ako v ✎ — jedna história, dve okná, žiadna kópia.
 
 const DEN = 86400000;
 
@@ -53,11 +64,13 @@ function Porovnanie({ label, hodnota, priemer, fmt, vyssieLepsie = true }: {
   );
 }
 
-export function KlientProfil({ meno, data, clients, onZavri, btcSats }: {
+export function KlientProfil({ meno, data, clients, onZavri, btcSats, onDennikZapis }: {
   meno: string;
   data: PSBData;
   clients: Record<string, ClientAgg>;
   onZavri: () => void;
+  /** Zápis do denníka spracuje Jarvis na pozadí — rovnako ako v ✎ modáli. */
+  onDennikZapis?: (meno: string, text: string) => Promise<string | null>;
   /** Koľko satov klient celkovo zaplatil (z appky PSB Bitcoin). */
   btcSats?: number;
 }) {
@@ -286,6 +299,19 @@ export function KlientProfil({ meno, data, clients, onZavri, btcSats }: {
             <div style={{ fontSize: 12, color: C.textDim }}>Žiadne platby — barter alebo platí inak.</div>
           )}
         </div>
+      </div>
+
+      {/* Denník je posledný a cez celú šírku zámerne: je to jediná časť
+          profilu, ktorá sa číta ako text, nie ako tabuľka — a jediná, do
+          ktorej sa dá rovno písať. */}
+      <div style={{ marginTop: 16, paddingTop: 14, borderTop: `1px solid ${mix(C.border, 60)}` }}>
+        <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 6 }}>
+          <Info
+            text="Celá história klienta na jednej osi času — zápisy z denníka, poznámky pri zrušení tréningu v Kalendári, odpovede na notifikácie, závery z debát s Jarvisom a merania bolesti. Štítok vľavo hovorí, odkiaľ riadok prišiel. Zapisuje sa naďalej tam, kde sa vec stane; tu je to len zlúčené dokopy."
+            label="História klienta — všetko, čo o ňom kde stojí"
+          />
+        </div>
+        <Dennik meno={c.name} limit={6} onNovyZapis={onDennikZapis} />
       </div>
     </Card>
   );
