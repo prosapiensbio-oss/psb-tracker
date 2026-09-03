@@ -6,6 +6,7 @@ import {
   higgsfieldDesignSourceBabelPlugin,
 } from "./src/module/design-inspector/vite";
 import svgr from "vite-plugin-svgr";
+import { writeFileSync, mkdirSync } from "node:fs";
 import { defineConfig } from "vite";
 import tsconfigPaths from "vite-tsconfig-paths";
 import { fileURLToPath } from "node:url";
@@ -19,15 +20,37 @@ const QUANTA_ICONS_SHIM = fileURLToPath(
   new URL("./src/lib/quanta-material-icons.ts", import.meta.url),
 );
 
+// Jeden čas pre celý build. MUSÍ byť na úrovni modulu, nie vo factory:
+// TanStack Start volá factory zvlášť pre klienta a server a `new Date()` by
+// tak dalo dve rôzne hodnoty — verzia.json by sa nezhodovala s __KOKPIT_BUILD__
+// v balíku a appka by hlásila „je novšia verzia" po každom nasadení. Modulový
+// const sa vyhodnotí raz pri importe configu a je zdieľaný oboma buildmi.
+const casBuildu = process.env.KOKPIT_BUILD || new Date().toISOString();
+
 export default defineConfig(({ mode }) => {
   const designInspectorEnabled = process.env.HF_DESIGN_INSPECTOR === "1" || mode === "design";
+
+  // verzia.json patrí do BUILDU, nie do nasad.sh — inak ho CI nasadenie (push →
+  // Workers Builds) vôbec nevyrobí a kontrola „bežíš staré?" ticho nefunguje.
+  // Presne to sa stalo 3. 9. 2026: push nasadil appku bez verzia.json a fetch
+  // vracal 404. Píše sa len do klientského výstupu (dist/client).
+  const verziaPlugin = {
+    name: "kokpit-verzia",
+    writeBundle(opts: { dir?: string }) {
+      if (!opts.dir || !/[\\/]client$/.test(opts.dir)) return;
+      try {
+        mkdirSync(opts.dir, { recursive: true });
+        writeFileSync(`${opts.dir}/verzia.json`, JSON.stringify({ cas: casBuildu }));
+      } catch { /* build kvôli tomu nespadne */ }
+    },
+  };
 
   return {
     // Čas buildu zapečený do balíka. Appka inak o sebe nevie nič — beží živá
     // zo servera, takže „ktorú verziu mám?" sa nedalo zodpovedať inak než
     // tým, že človek uvidí zmenu. Jerry, 31. 8. 2026.
     define: {
-      __KOKPIT_BUILD__: JSON.stringify(new Date().toISOString()),
+      __KOKPIT_BUILD__: JSON.stringify(casBuildu),
     },
     resolve: {
       alias: [{ find: /^@higgsfield-ai\/icons(\/.*)?$/, replacement: QUANTA_ICONS_SHIM }],
@@ -50,6 +73,7 @@ export default defineConfig(({ mode }) => {
       rollupOptions: { external: [/^cloudflare:/] },
     },
     plugins: [
+      verziaPlugin,
       // Material Symbols SVGs (the app icon set) import as React components via
       // `?react`. `icon: true` sizes them 1em; fill is forced to currentColor so
       // they color like text (the raw SVGs have no fill attribute). Keep the
