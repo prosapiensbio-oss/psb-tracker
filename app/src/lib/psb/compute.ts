@@ -1457,10 +1457,19 @@ export function terminSlovom(iso: string): string {
  */
 const ZAVER_O_TERMINE = /dohodn|term[ií]n|ozva[tť] sa|tr[ée]ning|objedna/i;
 
+/** Sedí názov udalosti z kalendára na TOHTO klienta? Znesie aj skratku
+ *  s iniciálou priezviska („Lukas H." → Lukas Hanus). */
+function nazovSediNaMeno(nazov: string, meno: string): boolean {
+  const kusy = normName(nazov).split(/[\s.,-]+/).filter(Boolean);
+  if (!kusy.length) return false;
+  const casti = normName(meno).split(/\s+/).filter(Boolean);
+  return kusy.every((k) => casti.some((c) => c.startsWith(k)));
+}
+
 export function zaverUzMaTermin(
   z: { zaver?: string | null; tema?: string | null; overit?: string | null },
   menaKlientov: string[],
-  udalosti: { zaciatok: string; klient: string | null; typ: string | null; zmizlaAt?: string | null }[] | undefined,
+  udalosti: { zaciatok: string; klient: string | null; typ: string | null; zmizlaAt?: string | null; nazov?: string }[] | undefined,
   dnes: Date = new Date(),
 ): string | null {
   if (!ZAVER_O_TERMINE.test(z.overit || "")) return null;
@@ -1469,9 +1478,13 @@ export function zaverUzMaTermin(
   const meno = menaKlientov.find((n) => normName(n).length >= 5 && text.includes(normName(n)));
   if (!meno) return null;
   const od = dnes.toISOString().slice(0, 10);
+  // Termín sa počíta, aj keď udalosť ešte NIE JE zmapovaná: budúci tréning
+  // pod skratkou „Lukas H." patrí Lukasovi rovnako ako zmapovaný. Bez tohto
+  // sa appka pýtala „má Lukas ďalší termín?", hoci ho mala v kalendári —
+  // len pod nezmapovaným názvom (Jerry, 4. 9. 2026). Súkromné sa nepočíta.
   const buduce = (udalosti || [])
-    .filter((u) => (u.typ === "trening" || u.typ === "uvodny") && !u.zmizlaAt && u.klient
-      && normName(u.klient) === normName(meno) && u.zaciatok.slice(0, 10) >= od)
+    .filter((u) => !u.zmizlaAt && u.typ !== "sukromne" && u.zaciatok.slice(0, 10) >= od)
+    .filter((u) => (u.klient && normName(u.klient) === normName(meno)) || nazovSediNaMeno(u.nazov || "", meno))
     .sort((a, b) => a.zaciatok.localeCompare(b.zaciatok));
   return buduce.length ? buduce[0].zaciatok : null;
 }
@@ -1702,21 +1715,26 @@ export function deriveAnomalies(
   const menaKlientov = Object.keys(clients);
   for (const z of data.zavery || []) {
     if (!z.overitDo || z.overitDo > dnes) continue;
-    // Keď termín už je, pripomienka NEZMIZNE — rovno odpovie.
+    // Keď termín v kalendári UŽ JE, pripomienka sa NEZOBRAZÍ vôbec.
     //
-    // Prvá verzia ju umlčala. Jerry, 31. 8. 2026: chce ju vidieť aj s
-    // odpoveďou — „napísal som si, že ide na dovolenku, a rovno vidím, že
-    // sme dohodnutí na ten a ten termín“ — a zavrieť ju jedným klikom na
-    // Vybavené. Ticho by ho pripravilo o to, že sa človek vracia.
+    // 31. 8. som ju najprv umlčal, potom (na Jerryho žiadosť) ukazoval AJ
+    // s termínom („Termín už máte dohodnutý…"). 4. 9. 2026 to Jerry upresnil:
+    // keď je v kalendári termín, pripomienka nemá vyskočiť — je to presne ten
+    // istý dôvod ako pri „Prestal chodiť" (Roman Pavlík: napísal som mu SMS
+    // podľa notifikácie a on odpísal, že sme dohodnutí — „bolo to blbé").
+    // Kalendár odpoveď dáva; netreba sa pýtať.
+    //
+    // Záver sa NEZATVÁRA. Keď termín z kalendára zmizne, pripomienka sa vráti
+    // sama — presne vtedy, keď je zase pravdivá.
     const termin = zaverUzMaTermin(z, menaKlientov, kal?.udalosti, now);
+    if (termin) continue;
     push(
       `zaver|${z.id}`,
       "blue",
       "Čas overiť rozhodnutie",
       // Bodku dopĺňame len keď tam nie je — `overit` ju často už má a dve
       // za sebou vyzerajú ako preklep.
-      `Z ${z.datum}: ${z.zaver}${z.overit ? ` — malo sa overiť: ${z.overit.replace(/\.\s*$/, "")}` : ""}.`
-        + (termin ? ` Termín už máte dohodnutý: ${terminSlovom(termin)}.` : " Zabralo to?"),
+      `Z ${z.datum}: ${z.zaver}${z.overit ? ` — malo sa overiť: ${z.overit.replace(/\.\s*$/, "")}` : ""}. Zabralo to?`,
     );
   }
 

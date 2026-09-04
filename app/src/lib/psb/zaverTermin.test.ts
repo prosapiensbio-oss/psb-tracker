@@ -103,7 +103,47 @@ describe("prestal chodiť vs. termín v kalendári", () => {
     expect(zdroj.slice(i, i + 200)).not.toContain("terminSlovom");
   });
 
-  it("v závere termín naopak zostáva", () => {
-    expect(zdroj).toContain("Termín už máte dohodnutý: ${terminSlovom(termin)}");
+  it("záver s termínom v kalendári sa NEZOBRAZÍ (Jerry, 4. 9. 2026)", () => {
+    // Keď zaverUzMaTermin nájde termín, notifikácia sa preskočí — kalendár
+    // odpoveď dáva, netreba sa pýtať.
+    const i = zdroj.indexOf("const termin = zaverUzMaTermin(z, menaKlientov");
+    expect(zdroj.slice(i, i + 120)).toContain("if (termin) continue;");
+  });
+});
+
+// Jerry, 4. 9. 2026: záver o Lukasovi sa pýtal „má ďalší termín?", hoci Lukas
+// mal 9. 9. tréning — len zapísaný ako nezmapované „Lukas H.".
+describe("zaverUzMaTermin nájde termín aj pod skratkou", () => {
+  const zaver = {
+    zaver: "Lukas Hanus mal anginu, dohodnutý návrat na štvrtok 3. 9. 2026 o 16:00.",
+    overit: "Prebehol tréning 3. 9. a má Lukas dohodnutý ďalší termín?",
+  };
+  const mena = ["Lukas Hanus", "Lukas Novak"];
+  const DNES = new Date("2026-09-04T09:00:00Z");
+
+  it("nezmapovaný budúci tréning „Lukas H.“ sa počíta ako jeho termín", () => {
+    const ud = [{ zaciatok: "2026-09-09T16:00", klient: null, typ: "", nazov: "Lukas H." }];
+    expect(zaverUzMaTermin(zaver, mena, ud, DNES)).toBe("2026-09-09T16:00");
+  });
+
+  it("zmapovaný termín funguje ďalej", () => {
+    const ud = [{ zaciatok: "2026-09-09T16:00", klient: "Lukas Hanus", typ: "trening", nazov: "Lukas H" }];
+    expect(zaverUzMaTermin(zaver, mena, ud, DNES)).toBe("2026-09-09T16:00");
+  });
+
+  it("bez budúceho termínu vráti null — vtedy sa pripomienka zobrazí", () => {
+    // len minulý (3. 9.) tréning, nič dopredu
+    const ud = [{ zaciatok: "2026-09-03T16:00", klient: "Lukas Hanus", typ: "trening", nazov: "Lukas H" }];
+    expect(zaverUzMaTermin(zaver, mena, ud, DNES)).toBe(null);
+  });
+
+  it("súkromná udalosť s jeho menom sa nepočíta ako termín", () => {
+    const ud = [{ zaciatok: "2026-09-09T16:00", klient: null, typ: "sukromne", nazov: "Lukas H." }];
+    expect(zaverUzMaTermin(zaver, mena, ud, DNES)).toBe(null);
+  });
+
+  it("cudzí klient sa nezamení — Lukas N. nie je Lukas Hanus", () => {
+    const ud = [{ zaciatok: "2026-09-09T16:00", klient: null, typ: "", nazov: "Lukas N." }];
+    expect(zaverUzMaTermin(zaver, mena, ud, DNES)).toBe(null);
   });
 });

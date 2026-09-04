@@ -512,6 +512,17 @@ export function PSBApp() {
   // (→ kanaly_mesiace). Kontrola dokladov pozerala len na prvý, takže hlásila
   // „chýba Metricool" aj keď bola nahratá zostava. Stačí ktorýkoľvek.
   const [kanalyMesiace, setKanalyMesiace] = useState<string[]>([]);
+  // Téma na dnešné hovorené video — do registra, aby ju Jerry našiel aj
+  // v appke, nielen v rannej push (Jerry, 4. 9. 2026).
+  const [temaDna, setTemaDna] = useState<{ tema: string; odkial: string } | null>(null);
+  useEffect(() => {
+    void fetch("/api/tema", { credentials: "same-origin" })
+      .then((r) => r.json())
+      .then((j: { ok?: boolean; tema?: string; odkial?: string }) => {
+        if (j?.ok && j.tema) setTemaDna({ tema: j.tema, odkial: j.odkial || "" });
+      })
+      .catch(() => {});
+  }, []);
   // Mzdové hodiny pre mesiace, ktoré Excel nemá — priamo z PTmindera, bez
   // úvodných tréningov (tie sa platia zvlášť a do mzdových hodín nepatria).
   useEffect(() => {
@@ -1624,10 +1635,22 @@ function skupinaFaktur(
     // Až tu, keď sú všetky zdroje pokope: „nový klient" je len konštatovanie
     // a ustúpi úlohám o tom istom človeku (SMS, chýbajúci dopyt). Kontext
     // o nepotvrdenom klientovi je v Klientoch, nie v treťom riadku notifikácií.
+    // Téma dňa — Jerryho, úplne dole (priorita 90), modrá, informatívna.
+    // Kľúč nesie DEŇ, takže „Skryť" ju umlčí len na dnes a zajtra príde nová.
+    const temaPolozka = temaDna ? [{
+      key: `tema|${new Date().toISOString().slice(0, 10)}`,
+      category: "Zápis" as const,
+      tone: "blue" as const,
+      title: `🎥 Téma na dnes: ${temaDna.tema}`,
+      detail: `Nápad na hovorené video (do 60 s). Zdroj: ${temaDna.odkial}. Nemusíš to nakrútiť — je to inšpirácia, keď máš čas a priestor.`,
+      trener: "Jerry",
+      priority: 90,
+      ...stavPolozky(`tema|${new Date().toISOString().slice(0, 10)}`),
+    }] : [];
     return odstranDuplicity(
-      [...extra, ...nezapisane, ...kontrolaBanky, ...zmenyMetrik, ...kontrolaWebu, ...pripomienky, ...dovody, ...register],
+      [...extra, ...nezapisane, ...kontrolaBanky, ...zmenyMetrik, ...kontrolaWebu, ...pripomienky, ...dovody, ...register, ...temaPolozka],
     ).sort((a, b) => a.priority - b.priority);
-  }, [rituals, register, kontrolaBanky, zmenyMetrik, kontrolaWebu, pripomienky, dovody, nezapisane, data.anomalyAck]);
+  }, [rituals, register, kontrolaBanky, zmenyMetrik, kontrolaWebu, pripomienky, dovody, nezapisane, temaDna, data.anomalyAck]);
 
   // Jarvis dostáva CELÝ register vrátane kontrol nad bankou — inak by nevedel
   // o chýbajúcom nájme a na otázku „čo mi uniká" by odpovedal, že nič.
@@ -2222,7 +2245,7 @@ function skupinaFaktur(
 
         {active === "marketing" && <Marketing data={data} clients={clients} leads={data.leads} chat={chat} sub={marketingSub} onSub={setMarketingSub} focus={marketingFocus} onOdchodKJarvisovi={(mesiac, faza, napadId) => setNavratDoMapy({ mesiac, faza, napadId })} onKlient={(m) => navigate("klienti", undefined, { client: m, nonce: Date.now() })} refresh={actions.refresh} onPoznamkaStrata={(m, t) => actions.setOverride(m, "precoNeprisiel", t)} onNavigate={navigate} onAck={(k, zapnut, poznamka) => actions.ackAnomaly(k, zapnut ? (poznamka || "skryté hlásenie") : "", zapnut)} />}
         {active === "vzas" && <Vzas sub={vzasSub} onSub={setVzasSub} data={data} clients={clients} focus={vzasFocus} onNavigate={navigate} />}
-        {active === "kalendar" && <Kalendar clients={clients} data={data} focus={kalendarFocus} />}
+        {active === "kalendar" && <Kalendar clients={clients} data={data} focus={kalendarFocus} ktoSom={ktoSom} />}
 
         {active === "jarvis" && (
           <JarvisOkno

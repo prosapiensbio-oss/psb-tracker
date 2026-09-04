@@ -25,6 +25,7 @@ import { Route as ApiVedomostRouteImport } from './routes/api/vedomost'
 import { Route as ApiUsersRouteImport } from './routes/api/users'
 import { Route as ApiTitulkaObrazokRouteImport } from './routes/api/titulka-obrazok'
 import { Route as ApiTitulkaNavrhRouteImport } from './routes/api/titulka-navrh'
+import { Route as ApiTemaRouteImport } from './routes/api/tema'
 import { Route as ApiSsoRouteImport } from './routes/api/sso'
 import { Route as ApiSpravaRouteImport } from './routes/api/sprava'
 import { Route as ApiSessionRouteImport } from './routes/api/session'
@@ -148,6 +149,11 @@ const ApiTitulkaObrazokRoute = ApiTitulkaObrazokRouteImport.update({
 const ApiTitulkaNavrhRoute = ApiTitulkaNavrhRouteImport.update({
   id: '/api/titulka-navrh',
   path: '/api/titulka-navrh',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTemaRoute = ApiTemaRouteImport.update({
+  id: '/api/tema',
+  path: '/api/tema',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSsoRoute = ApiSsoRouteImport.update({
@@ -421,6 +427,7 @@ export interface FileRoutesByFullPath {
   '/api/session': typeof ApiSessionRoute
   '/api/sprava': typeof ApiSpravaRoute
   '/api/sso': typeof ApiSsoRoute
+  '/api/tema': typeof ApiTemaRoute
   '/api/titulka-navrh': typeof ApiTitulkaNavrhRoute
   '/api/titulka-obrazok': typeof ApiTitulkaObrazokRoute
   '/api/users': typeof ApiUsersRoute
@@ -483,6 +490,7 @@ export interface FileRoutesByTo {
   '/api/session': typeof ApiSessionRoute
   '/api/sprava': typeof ApiSpravaRoute
   '/api/sso': typeof ApiSsoRoute
+  '/api/tema': typeof ApiTemaRoute
   '/api/titulka-navrh': typeof ApiTitulkaNavrhRoute
   '/api/titulka-obrazok': typeof ApiTitulkaObrazokRoute
   '/api/users': typeof ApiUsersRoute
@@ -546,6 +554,7 @@ export interface FileRoutesById {
   '/api/session': typeof ApiSessionRoute
   '/api/sprava': typeof ApiSpravaRoute
   '/api/sso': typeof ApiSsoRoute
+  '/api/tema': typeof ApiTemaRoute
   '/api/titulka-navrh': typeof ApiTitulkaNavrhRoute
   '/api/titulka-obrazok': typeof ApiTitulkaObrazokRoute
   '/api/users': typeof ApiUsersRoute
@@ -610,6 +619,7 @@ export interface FileRouteTypes {
     | '/api/session'
     | '/api/sprava'
     | '/api/sso'
+    | '/api/tema'
     | '/api/titulka-navrh'
     | '/api/titulka-obrazok'
     | '/api/users'
@@ -672,6 +682,7 @@ export interface FileRouteTypes {
     | '/api/session'
     | '/api/sprava'
     | '/api/sso'
+    | '/api/tema'
     | '/api/titulka-navrh'
     | '/api/titulka-obrazok'
     | '/api/users'
@@ -734,6 +745,7 @@ export interface FileRouteTypes {
     | '/api/session'
     | '/api/sprava'
     | '/api/sso'
+    | '/api/tema'
     | '/api/titulka-navrh'
     | '/api/titulka-obrazok'
     | '/api/users'
@@ -797,6 +809,7 @@ export interface RootRouteChildren {
   ApiSessionRoute: typeof ApiSessionRoute
   ApiSpravaRoute: typeof ApiSpravaRoute
   ApiSsoRoute: typeof ApiSsoRoute
+  ApiTemaRoute: typeof ApiTemaRoute
   ApiTitulkaNavrhRoute: typeof ApiTitulkaNavrhRoute
   ApiTitulkaObrazokRoute: typeof ApiTitulkaObrazokRoute
   ApiUsersRoute: typeof ApiUsersRoute
@@ -922,6 +935,13 @@ declare module '@tanstack/react-router' {
       path: '/api/titulka-navrh'
       fullPath: '/api/titulka-navrh'
       preLoaderRoute: typeof ApiTitulkaNavrhRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/tema': {
+      id: '/api/tema'
+      path: '/api/tema'
+      fullPath: '/api/tema'
+      preLoaderRoute: typeof ApiTemaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/sso': {
@@ -1285,6 +1305,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSessionRoute: ApiSessionRoute,
   ApiSpravaRoute: ApiSpravaRoute,
   ApiSsoRoute: ApiSsoRoute,
+  ApiTemaRoute: ApiTemaRoute,
   ApiTitulkaNavrhRoute: ApiTitulkaNavrhRoute,
   ApiTitulkaObrazokRoute: ApiTitulkaObrazokRoute,
   ApiUsersRoute: ApiUsersRoute,

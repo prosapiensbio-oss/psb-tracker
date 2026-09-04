@@ -98,7 +98,7 @@ async function posli(telo: Record<string, unknown>) {
   };
 }
 
-export function Kalendar({ clients, data, focus }: { clients: Record<string, ClientAgg>; data: PSBData; focus?: NavFocus | null }) {
+export function Kalendar({ clients, data, focus, ktoSom }: { clients: Record<string, ClientAgg>; data: PSBData; focus?: NavFocus | null; ktoSom?: string | null }) {
   const [stav, setStav] = useState<Stav | null>(null);
   const [chyba, setChyba] = useState("");
   const [sprava, setSprava] = useState("");
@@ -212,7 +212,7 @@ export function Kalendar({ clients, data, focus }: { clients: Record<string, Cli
           spadne do „Chýba v PTminderi". Priradiť najprv a až potom čítať, čo
           chýba, znamená kratší zoznam a menej otázok. */}
       {stav.nezname.length > 0 && (
-        <div id="kal-nezname"><Mapovanie nezname={stav.nezname} mena={menaKlientov} clients={clients} onHotovo={nacitaj} /></div>
+        <div id="kal-nezname"><Mapovanie nezname={stav.nezname} mena={menaKlientov} clients={clients} onHotovo={nacitaj} trener={trener} ktoSom={ktoSom} /></div>
       )}
       {pripojene && <Kontrola udalosti={udalostiF} data={data} />}
       {/* Balíčky aj „Odpísaní, ale majú termín" sa zliali na Kokpit (Jerry,
@@ -364,7 +364,20 @@ function Pripojenie({ zdroje, onZmena }: { zdroje: Zdroj[]; onZmena: () => Promi
  * a „Natalia" u Terezky sú dvaja rôzni ľudia a jedno pravidlo pre oboch by ich
  * ticho zlialo do jedného klienta.
  */
-function Mapovanie({ nezname, mena, clients, onHotovo }: { nezname: Nezname[]; mena: string[]; clients: Record<string, ClientAgg>; onHotovo: () => Promise<void> }) {
+function Mapovanie({ nezname: nezmameVsetky, mena, clients, onHotovo, trener, ktoSom }: { nezname: Nezname[]; mena: string[]; clients: Record<string, ClientAgg>; onHotovo: () => Promise<void>; trener: string; ktoSom?: string | null }) {
+  // Karta poslúcha ten istý filter, čo je hore na stránke (Obaja/Jerry/Terezka)
+  // — druhý filter len pre túto kartu by si mohol s ním protirečiť.
+  // Jerry, 3. 9. 2026: rozdeliť podľa filtra a pri „Obaja" uprednostniť
+  // prihláseného.
+  const ktoSomTrener = ktoSom === "jerry" ? "Jerry" : ktoSom === "terezka" ? "Terezka" : null;
+  const nezname = trener === "all" ? nezmameVsetky : nezmameVsetky.filter((n) => n.trener === trener);
+  // Rozdelenie pre podnadpis — nech je split vidno aj v pohľade „Obaja".
+  const pocty = { Jerry: 0, Terezka: 0, ine: 0 };
+  for (const n of nezmameVsetky) {
+    if (n.trener === "Jerry") pocty.Jerry++;
+    else if (n.trener === "Terezka") pocty.Terezka++;
+    else pocty.ine++;
+  }
   const [vyber, setVyber] = useState<Record<string, { klient: string; typ: string }>>({});
   const [uklada, setUklada] = useState("");
 
@@ -435,11 +448,15 @@ function Mapovanie({ nezname, mena, clients, onHotovo }: { nezname: Nezname[]; m
       if (odhad && !e.meno) e.meno = odhad;
       m.set(kluc, e);
     }
-    // Skupiny s viacerými zápismi hore — tam sa jedným sedením vybaví najviac.
+    // Pri „Obaja" idú skupiny prihláseného trénera hore; inak najviac zápisov
+    // hore — tam sa jedným sedením vybaví najviac.
+    const mojaSkupina = (v: { polozky: Nezname[] }) =>
+      trener === "all" && ktoSomTrener && v.polozky.some((p) => p.trener === ktoSomTrener) ? 0 : 1;
     return [...m.entries()]
       .map(([kluc, v]) => ({ kluc, ...v }))
-      .sort((a, b) => (b.polozky.length - a.polozky.length) || (b.spolu - a.spolu));
-  }, [nezname, navrhy]);
+      .sort((a, b) => (mojaSkupina(a) - mojaSkupina(b))
+        || (b.polozky.length - a.polozky.length) || (b.spolu - a.spolu));
+  }, [nezname, navrhy, trener, ktoSomTrener]);
 
   // Server vie vrátiť {ok:false} aj s HTTP 200 — kto telo nečíta, hlási
   // úspech aj pri odmietnutom zápise. Vzor s lokálnou chybou je ten istý
@@ -465,8 +482,17 @@ function Mapovanie({ nezname, mena, clients, onHotovo }: { nezname: Nezname[]; m
           label={`Nové názvy v kalendári (${nezname.length})`}
         />
       </H3>
-      <div style={{ fontSize: 11.5, color: C.textDim, margin: "6px 0 12px", lineHeight: 1.5 }}>
-        Zoskupené podľa človeka — jeden klient chodí v kalendári aj pod tromi názvami a takto sa vybavia naraz. Hore sú skupiny, kde je zápisov najviac.
+      {/* Rozpad podľa trénera — filter je hore na stránke; toto len ukazuje,
+          koľko čaká na koho, aj v pohľade „Obaja". */}
+      <div style={{ fontSize: 11.5, color: C.textMuted, margin: "6px 0 4px", display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <span>Jerry <b style={{ color: C.text }}>{pocty.Jerry}</b></span>
+        <span>Terezka <b style={{ color: C.text }}>{pocty.Terezka}</b></span>
+        {pocty.ine > 0 && <span>bez trénera <b style={{ color: C.text }}>{pocty.ine}</b></span>}
+        {trener !== "all" && <span style={{ color: C.textDim }}>· filter: {trener}</span>}
+      </div>
+      <div style={{ fontSize: 11.5, color: C.textDim, margin: "0 0 12px", lineHeight: 1.5 }}>
+        Zoskupené podľa človeka — jeden klient chodí v kalendári aj pod tromi názvami a takto sa vybavia naraz.
+        {trener === "all" && ktoSomTrener ? ` Hore sú ${ktoSomTrener === "Jerry" ? "Jerryho" : "Terezkine"}.` : " Hore sú skupiny, kde je zápisov najviac."}
         {jednoznacne > 0 && <> Pri {jednoznacne} z nich appka pozná odpoveď jednoznačne — stačí potvrdiť.</>}
       </div>
       {chybaUloz && <div style={{ fontSize: 12, color: C.red, marginBottom: 8 }}>{chybaUloz}</div>}
