@@ -65,6 +65,7 @@ import { krokyZa, oknoMesiacov } from "./MarketingLievik";
 import { tokyKlientov } from "./Fluktuacia";
 import { VYCHODZIA_TEMA } from "./ThemeSwitch";
 import { Udaje } from "./Udaje";
+import { CAS_BUILDU, verziaServera } from "../../lib/psb/verzia";
 import { HladanieKlienta } from "./Hladanie";
 import { ZapisButton } from "./Zapis";
 import { ritualy as spocitajRitualy } from "../../lib/psb/rituals";
@@ -210,6 +211,57 @@ const TRACKER_SECTIONS = [
   { id: "klienti", label: "Klienti", icon: "userCheck" },
 ];
 const TRACKER_IDS = TRACKER_SECTIONS.map((s) => s.id);
+
+/**
+ * Prúžok „Aktualizovať", keď je na serveri novšia verzia než tá v pamäti.
+ *
+ * Jerry, 4. 9. 2026: „keď nasadíš niečo nové a ja som v appke, musím ju
+ * vypnúť a zapnúť, aby sa to prepísalo — nedalo by sa priamo tlačidlo?"
+ * Dalo. Číslo verzie appka porovnávať vedela už dole v Upmarke (`Verzia`),
+ * ale kontrolovala len raz pri načítaní (dole v Upload) a nechala to schované. Toto ju
+ * postaví navrch a hlavne ju spustí ZNOVA pri návrate z pozadia — na iPhone
+ * je to presne tá chvíľa, keď v pamäti pokračuje starý kód a človek nevie, že
+ * je zastaraný. Reload nič neuloží a nič nepokazí — len stiahne nový balík
+ * (má iné meno súboru pri každom nasadení), takže nahradí presne to, čo treba.
+ */
+function NovaVerziaPas() {
+  const [nova, setNova] = useState(false);
+  useEffect(() => {
+    // Vo vývoji je `CAS_BUILDU` prázdny — nič sa neporovnáva a prúžok nesvieti.
+    if (!CAS_BUILDU) return;
+    let zrusene = false;
+    const skontroluj = async () => {
+      const s = await verziaServera();
+      // Raz zapnuté necháme zapnuté — keby ďalší dopyt zlyhal (telefón chvíľu
+      // bez siete po prebudení), prúžok nesmie zmiznúť.
+      if (!zrusene && s && s !== CAS_BUILDU) setNova(true);
+    };
+    void skontroluj();
+    const priNavrate = () => { if (document.visibilityState === "visible") void skontroluj(); };
+    document.addEventListener("visibilitychange", priNavrate);
+    window.addEventListener("focus", priNavrate);
+    // Aj počas otvorenej appky — keby nasadenie prišlo, kým sa Jerry pozerá.
+    const t = setInterval(() => { void skontroluj(); }, 5 * 60 * 1000);
+    return () => {
+      zrusene = true;
+      document.removeEventListener("visibilitychange", priNavrate);
+      window.removeEventListener("focus", priNavrate);
+      clearInterval(t);
+    };
+  }, []);
+  if (!nova) return null;
+  return (
+    <div style={{ position: "sticky", top: 0, zIndex: 61, padding: "8px 16px", background: mix(C.accent, 20), borderBottom: `1px solid ${mix(C.accent, 55)}`, color: C.text, fontSize: 12.5, textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 12, flexWrap: "wrap" }}>
+      <span>Je pripravená novšia verzia Kokpitu.</span>
+      <button
+        onClick={() => window.location.reload()}
+        style={{ padding: "4px 12px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, border: `1px solid ${mix(C.accent, 60)}`, background: mix(C.accent, 30), color: C.text, whiteSpace: "nowrap" }}
+      >
+        Aktualizovať
+      </button>
+    </div>
+  );
+}
 
 export function PSBApp() {
   // Zvolená paleta sa musí nasadiť pri ŠTARTE appky.
@@ -2116,6 +2168,9 @@ function skupinaFaktur(
         potom vyzerala len ako iné farby, nie ako sklo. V klasických paletách
         trieda nič nerobí. */}
     <div className="psb-app" style={{ minHeight: "100dvh", color: C.text }}>
+      {/* Nová verzia nasadená → ponuka reloadu navrchu. Rieši „musím appku
+          vypnúť a zapnúť". */}
+      <NovaVerziaPas />
       {/* Neúspešný zápis nesmie zapadnúť. Pás je nad všetkým, aby ho človek
           videl aj vtedy, keď je práve inde na obrazovke. */}
       {chybaZapisu && (
