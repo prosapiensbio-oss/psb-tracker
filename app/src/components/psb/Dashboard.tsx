@@ -2183,6 +2183,9 @@ function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar }: { i
   };
 
   const jeSms = item.key.startsWith("sms|");
+  // Téma je čistá inšpirácia — niet kam „Otvoriť". Bez tohto klik padal na
+  // Klienti (default jump) a viedol nikam (Jerry, 4. 9. 2026).
+  const jeTema = item.key.startsWith("tema|");
   const jeOdmena = item.key.startsWith("referral|");
   const vybav = (poznamka: string) => actions.ackAnomaly(item.key, poznamka, true);
 
@@ -2457,7 +2460,7 @@ function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar }: { i
               {navrhStav === "uklada" ? "Priradzujem…" : navrhStav === "chyba" ? "Skús znova" : `Áno, ${item.navrh.klient.split(" ")[0]}`}
             </button>
           )}
-          {!item.acked && !jeRozhodnutie && <button onClick={openItem} style={linkBtn}>{item.navrh ? "Nie, otvoriť" : "Otvoriť →"}</button>}
+          {!item.acked && !jeRozhodnutie && !jeTema && <button onClick={openItem} style={linkBtn}>{item.navrh ? "Nie, otvoriť" : "Otvoriť →"}</button>}
           {/* „Otvoriť" ťa prepne na miesto, ale odpoveď na otázku typu „prečo
               chýba nájom" tam nikde nezapíšeš. Odpovedať sa dá rovno tu —
               text ide Jarvisovi aj s tým, čoho sa týka, takže nemusíš

@@ -1641,8 +1641,10 @@ function skupinaFaktur(
       key: `tema|${new Date().toISOString().slice(0, 10)}`,
       category: "Zápis" as const,
       tone: "blue" as const,
-      title: `🎥 Téma na dnes: ${temaDna.tema}`,
-      detail: `Nápad na hovorené video (do 60 s). Zdroj: ${temaDna.odkial}. Nemusíš to nakrútiť — je to inšpirácia, keď máš čas a priestor.`,
+      title: "🎥 Téma na hovorené video",
+      // Samotná téma ide do DETAILU — riadok registra kreslí detail, nie
+      // titulok, takže v titulku ju Jerry nevidel (4. 9. 2026).
+      detail: `${temaDna.tema} · zdroj: ${temaDna.odkial}. Nemusíš to nakrútiť — je to inšpirácia na deň, keď máš čas a priestor.`,
       trener: "Jerry",
       priority: 90,
       ...stavPolozky(`tema|${new Date().toISOString().slice(0, 10)}`),

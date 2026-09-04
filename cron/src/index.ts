@@ -118,7 +118,7 @@ export default {
     // 6:10 v zime — teda vtedy, keď človek berie telefón do ruky, nie keď
     // ešte spí. Beží PRED snímkou kalendára z toho istého behu by sa nezmestila
     // do jednej požiadavky (limit CPU, 29. 8.), preto vlastný plán.
-    if (event.cron === "10 5 * * *") {
+    if (event.cron === "30 4 * * *") {  // 06:30 lokál — ranná dávka
       ctx.waitUntil(
         rannePush(env).then(
           async (r) => console.log(`ranné push: HTTP ${r.status} ${(await r.text()).slice(0, 300)}`),

@@ -17,7 +17,7 @@
   // Každé tri hodiny = snímka kalendára (00, 03, 06 … 21 UTC).
   // 3:30 UTC = novinky v algoritmoch a text webu. Raz denne a v noci:
   // oficiálne blogy pridávajú pár správ týždenne a nikto na ne ráno nečaká.
-  "triggers": { "crons": ["0 */3 * * *", "30 3 * * *", "10 5 * * *", "20 4 * * *"] },
+  "triggers": { "crons": ["0 */3 * * *", "30 3 * * *", "30 4 * * *", "20 4 * * *"] },
   // Priame prepojenie na Kokpit. Cez verejnú adresu to nejde — worker volajúci
   // *.workers.dev iného workera dostane 404.
   "services": [{ "binding": "KOKPIT", "service": "kokpit" }]
