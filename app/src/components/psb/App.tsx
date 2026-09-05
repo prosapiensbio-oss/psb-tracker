@@ -741,7 +741,7 @@ export function PSBApp() {
   /** Posledný zapísaný stav hotovosti — jeden z krokov uzávierky. */
   const [stavHotovosti, setStavHotovosti] = useState<{ hotovost: number; datum: string } | null>(null);
   /** Faktúry, ktoré zatiaľ nemajú platbu — ponuka pri ručnom párovaní. */
-  const [volneFaktury, setVolneFaktury] = useState<{ cislo: string; datum: string; celkom: number; dodavatel: string }[]>([]);
+  const [volneFaktury, setVolneFaktury] = useState<{ cislo: string; datum: string; celkom: number; dodavatel: string; obsadena?: boolean }[]>([]);
   useEffect(() => {
     void fetchVzasSettings().then((st) => {
       const p = st["btc_parovanie"];
@@ -1316,10 +1316,14 @@ function skupinaFaktur(
         // Do ponuky patria aj doklady, ktoré drží niektorý ručný pár — inak by
         // sa z už potvrdeného spárovania nedalo nič odobrať ani doplniť.
         const drziRucne = new Set(Object.values(btcParovanie).flat());
+        // Do ponuky idú VŠETKY doklady, nielen voľné. Automat páruje nenásytne
+        // a vie faktúru prideliť nesprávnej platbe; potom tá správna platba
+        // zostane „bez dokladu" a jej faktúra sa v ponuke neukáže — človek ju
+        // nemá ako prebrať (Jerry, 5. 9. 2026). `obsadena` = automat ju drží pri
+        // inej platbe; zaškrtnutím sa ručne presunie sem a automat ju už obíde.
         setVolneFaktury(
           [...doklady.entries()]
-            .filter(([c]) => !pouzite.has(c) || drziRucne.has(c))
-            .map(([c, d]) => ({ cislo: c, datum: d.datum, celkom: Math.round(d.celkom * 100) / 100, dodavatel: d.polozky[0]?.dodavatel || "" }))
+            .map(([c, d]) => ({ cislo: c, datum: d.datum, celkom: Math.round(d.celkom * 100) / 100, dodavatel: d.polozky[0]?.dodavatel || "", obsadena: pouzite.has(c) && !drziRucne.has(c) }))
             .sort((a, b) => b.datum.localeCompare(a.datum)),
         );
 

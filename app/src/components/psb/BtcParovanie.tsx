@@ -27,7 +27,7 @@ export function BtcParovanie({
   /** Výbery z peňaženky, ku ktorým automatika doklad nenašla. */
   platby: BtcNakup[];
   /** Faktúry, ktoré zatiaľ nemajú platbu. */
-  faktury: { cislo: string; datum: string; celkom: number; dodavatel: string }[];
+  faktury: { cislo: string; datum: string; celkom: number; dodavatel: string; obsadena?: boolean }[];
   parovanie: Record<string, string[]>;
   onSparuj: (idVyberu: number, faktury: string[]) => void;
 }) {
@@ -93,9 +93,10 @@ export function BtcParovanie({
         const jeOtvorena = otvorena === p.id;
         // Kandidáti: čo je v okne mesiaca okolo platby. Širšie než automatika,
         // lebo tu vyberá človek a ten nesprávnu dvojicu nespáruje.
-        const kandidati = faktury.filter(
-          (f) => Math.abs(Date.parse(p.datum) - Date.parse(f.datum)) / 86400000 <= 31,
-        );
+        const kandidati = faktury
+          .filter((f) => Math.abs(Date.parse(p.datum) - Date.parse(f.datum)) / 86400000 <= 31)
+          // Voľné navrch, obsadené (automat ich drží pri inej platbe) naspodok.
+          .sort((a, b) => Number(!!a.obsadena) - Number(!!b.obsadena) || b.datum.localeCompare(a.datum));
         return (
           <div key={p.id} style={{ borderTop: `1px solid ${mix(C.border, 55)}`, padding: "10px 2px" }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
@@ -140,7 +141,10 @@ export function BtcParovanie({
                             style={{ accentColor: C.accent }}
                           />
                           <span style={{ color: C.textMuted, minWidth: 74 }}>{fmtDMY(f.datum)}</span>
-                          <span style={{ color: C.text, flex: 1, minWidth: 90 }}>{f.dodavatel || f.cislo}</span>
+                          <span style={{ color: f.obsadena && !on ? C.textDim : C.text, flex: 1, minWidth: 90 }}>
+                            {f.dodavatel || f.cislo}
+                            {f.obsadena && <span style={{ color: C.orange, fontSize: 10.5 }}> · spárovaná inde — zaškrtnutím ju prevezmeš</span>}
+                          </span>
                           <span style={{ color: C.textDim, fontSize: 11 }}>{f.cislo}</span>
                           <span style={{ color: C.text, fontWeight: 600, minWidth: 82, textAlign: "right" }}>{fmtCZK(f.celkom)}</span>
                         </label>
