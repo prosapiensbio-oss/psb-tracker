@@ -367,7 +367,11 @@ function UploadCard({ data, missing, actions, chat }: { data: PSBData; missing: 
     if (files.length) {
       const res = await actions.ingest(files);
       setUploadResult(res);
-      setTimeout(() => setUploadResult(null), 9000);
+      // Zámerne BEZ časovača. Predtým sa výsledok po 9 s sám skryl — a s ním aj
+      // varovanie „N klientov má živý balíček, ale v súbore nie je". Jerry ho
+      // pri jednom reporte nestihol prečítať (5. 9. 2026). Anomália pri importe
+      // je presne to, čo sa nesmie stratiť skôr, než ju človek vidí; zavrie sa
+      // krížikom nižšie.
     }
     setBusy(false);
   };
@@ -450,6 +454,15 @@ function UploadCard({ data, missing, actions, chat }: { data: PSBData; missing: 
       )}
       {uploadResult && (
         <div style={{ marginTop: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+            <span style={{ fontSize: 11, color: C.textDim }}>Výsledok nahrania</span>
+            <button
+              onClick={() => setUploadResult(null)}
+              style={{ background: "none", border: "none", color: C.textDim, cursor: "pointer", fontSize: 12 }}
+            >
+              ✕ zavrieť
+            </button>
+          </div>
           {uploadResult.map((r, i) => (
             <div key={i}>
               <div style={{ padding: 9, marginBottom: 4, fontSize: 12, borderRadius: 8, background: r.error ? C.redBg : C.greenBg, color: r.error ? C.red : C.green }}>
