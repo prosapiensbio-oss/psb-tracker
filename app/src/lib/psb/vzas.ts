@@ -894,6 +894,30 @@ export function nastavPrijmyZTrackera(cashPodlaMesiaca: Record<string, number>):
   return zmena;
 }
 
+// Ručný príjem mimo PTmindera — napr. hotovosť za úvodný tréning, ktorú Jerry
+// zapíše do „zošita" a priradí cieľ `prijem`. Sadne do PRIJMY_INE (to isté
+// pole, kde žijú historické mimo-PTminder tržby 14 000 / 34 000 z jan–feb),
+// ale LEN pre mesiace z Fio éry — historické mesiace sa nedotýka.
+//
+// Berie CELÝ obraz ručných príjmov z aktuálneho prechodu pohybov: každý
+// Fio-mesiac sa prepíše na to, čo v ňom práve je (0, keď nič), takže opakovaný
+// import ani zmazanie priradenia nenechá po sebe starú sumu. Jerry potvrdil
+// (5. 9. 2026), že tieto sumy NIE SÚ v PTminder reportoch, takže sa pripočítať
+// smú bez dvojitého rátania.
+export function nastavRucnePrijmy(podlaMesiaca: Record<string, number>): boolean {
+  let zmena = false;
+  VZAS_MONTHS.forEach((mk, i) => {
+    if (mk < PRVY_MESIAC_Z_FIO) return;
+    const v = podlaMesiaca[mk] || 0;
+    if (Math.abs(PRIJMY_INE[i] - v) > 0.5) { PRIJMY_INE[i] = v; zmena = true; }
+  });
+  if (zmena) {
+    VZAS_MONTHS.forEach((_, i) => { PRIJMY[i] = PRIJMY_PTMINDER[i] + PRIJMY_INE[i]; });
+    oznacZmenu();
+  }
+  return zmena;
+}
+
 // Debt bookkeeping starts empty at 1.1.2025 — every balance below is built up
 // month by month from the records, not carried in as an assumption.
 export const DEBT_START = 0;

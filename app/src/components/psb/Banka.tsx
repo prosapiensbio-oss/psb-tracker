@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { fetchBtcReserve, type BtcVyplata, saveVzasSetting} from "../../lib/psb/client";
 import { fmtCZK, fmtDMY} from "../../lib/psb/format";
 import { MIMO_PNL, VYPLATY, VYPLATY_DELENE, VYPLATY_JERRY, VYPLATY_TEREZKA, type FioRiadok } from "../../lib/psb/fio";
+import { PRIJEM } from "../../lib/psb/pohybSplit";
 import { C, mix, S } from "../../lib/psb/theme";
 import { PNL, SPOLOCNE, VZAS_MONTHS } from "../../lib/psb/vzas";
 import { VyberKategorie } from "./VyberKategorie";
@@ -60,6 +61,10 @@ export function kategorieZoznam(): Kat[] {
   zive.push({ value: VYPLATY_DELENE, label: "Výplata — spoločná (delí sa /2)", skupina: "Výplaty zakladateľov" });
   zive.push({ value: VYPLATY, label: "Výplata — bez určenia", skupina: "Výplaty zakladateľov" });
   zive.push({ value: MIMO_PNL, label: "Mimo P&L — súkromné", skupina: "Mimo P&L" });
+  // Cieľ len pre rozdelenie/priradenie pohybu (Rozdeliť) — ručný príjem, napr.
+  // hotovosť za úvodný tréning. Ako bežná kategória výdavku nedáva zmysel;
+  // v agregácii sa `prijem` na zápornom pohybe aj tak ticho ignoruje.
+  zive.push({ value: PRIJEM, label: "Príjem — ručný (hotovosť/úvodný)", skupina: "Príjem (len pri rozdelení)" });
   return [...zive, ...stare.map((k) => ({ ...k, skupina: "Staršie (nepoužíva sa v tomto roku)" }))];
 }
 

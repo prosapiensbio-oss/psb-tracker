@@ -9,6 +9,7 @@ import { Zosit } from "./Zosit";
 import type { IngestResult } from "../../lib/psb/db.server";
 import type { Actions, KrokUzavierky, NavFocus } from "./App";
 import { fetchVzasSettings, saveVzasSetting, type BtcNakup } from "../../lib/psb/client";
+import type { PohybSplits, SplitCiast } from "../../lib/psb/pohybSplit";
 import { BtcParovanie } from "./BtcParovanie";
 import { PushOdber } from "./PushOdber";
 import { CAS_BUILDU, kontrolnySubor, verziaServera } from "../../lib/psb/verzia";
@@ -73,11 +74,11 @@ const MARKETING_ZDROJE: { druh: string; label: string; path: string }[] = [
   { druh: "anamneza", label: "Anamnéza — zdroj klienta a dátum narodenia (nepovinné)", path: "Google Forms → Odpovede › Exportovať do Sheets › Súbor › Stiahnuť › CSV. Appka z celého formulára berie DVE polia: „Jak jste se o nás dozvěděli?“ (plus meno odporúčateľa) a dátum narodenia — ten PTminder neexportuje vôbec, takže formulár je jediný zdroj. Zdravotná časť sa neukladá vôbec: nie je na ňu v appke dôvod a bola by to najcitlivejšia vec v databáze. Mesačne to netreba." },
 ];
 
-export function Udaje({ data, actions, chat, prekazky, kroky, podklady, onNavigate, btc }: { data: PSBData; actions: Actions; chat?: AssistantChat; prekazky?: (mesiac: string) => string[]; kroky?: (mesiac: string) => KrokUzavierky[]; podklady?: (mesiac: string) => string; onNavigate?: (tab: string, sub?: string, focus?: NavFocus) => void; btc?: { platby: BtcNakup[]; faktury: { cislo: string; datum: string; celkom: number; dodavatel: string }[]; parovanie: Record<string, string[]>; onSparuj: (id: number, f: string[]) => void } }) {
+export function Udaje({ data, actions, chat, prekazky, kroky, podklady, onNavigate, btc, pohybSplits, nastavPohybSplit }: { data: PSBData; actions: Actions; chat?: AssistantChat; prekazky?: (mesiac: string) => string[]; kroky?: (mesiac: string) => KrokUzavierky[]; podklady?: (mesiac: string) => string; onNavigate?: (tab: string, sub?: string, focus?: NavFocus) => void; btc?: { platby: BtcNakup[]; faktury: { cislo: string; datum: string; celkom: number; dodavatel: string }[]; parovanie: Record<string, string[]>; onSparuj: (id: number, f: string[]) => void }; pohybSplits?: PohybSplits; nastavPohybSplit?: (kluc: string, casti: SplitCiast[]) => void }) {
   const missing = REPORTS.filter((r) => (data[r.key] as unknown[]).length === 0);
   return (
     <>
-      <UploadCard data={data} missing={missing} actions={actions} chat={chat} />
+      <UploadCard data={data} missing={missing} actions={actions} chat={chat} pohybSplits={pohybSplits} nastavPohybSplit={nastavPohybSplit} />
 
       {/* Zošit je zdroj dát ako každý iný — patrí sem, medzi nahrávanie. */}
       <Zosit onZapisane={() => void actions.refresh()} />
@@ -177,7 +178,7 @@ function Verzia() {
   );
 }
 
-function UploadCard({ data, missing, actions, chat }: { data: PSBData; missing: typeof REPORTS; actions: Actions ; chat?: AssistantChat }) {
+function UploadCard({ data, missing, actions, chat, pohybSplits, nastavPohybSplit }: { data: PSBData; missing: typeof REPORTS; actions: Actions ; chat?: AssistantChat; pohybSplits?: PohybSplits; nastavPohybSplit?: (kluc: string, casti: SplitCiast[]) => void }) {
   const [uploadResult, setUploadResult] = useState<IngestResult[] | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -578,7 +579,7 @@ function UploadCard({ data, missing, actions, chat }: { data: PSBData; missing: 
         {/* Aj zapísané pohyby patria sem dnu: prezerajú sa občas a pri oprave,
             nie pri každom nahrávaní. Na obrazovku sa chodí nahrávať. */}
         <div style={{ marginTop: 14 }}>
-          <BankaUlozene />
+          <BankaUlozene pohybSplits={pohybSplits} onSplit={nastavPohybSplit} />
         </div>
       </div>
       )}

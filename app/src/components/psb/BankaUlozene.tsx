@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 
 import { fmtCZK, fmtDMY } from "../../lib/psb/format";
 import { nazovKategorie } from "../../lib/psb/vzas";
 import { C, mix, S } from "../../lib/psb/theme";
 import { kategorieZoznam } from "./Banka";
+import { platnySplit, rozdelPohyb, type PohybSplits, type SplitCiast } from "../../lib/psb/pohybSplit";
 import { VyberKategorie } from "./VyberKategorie";
 import { Card, Empty, H3, Info, TableWrap } from "./ui";
 
@@ -21,7 +22,14 @@ import { Card, Empty, H3, Info, TableWrap } from "./ui";
 type Pohyb = { datum: string; suma: number; protistrana: string; poznamka: string; typ: string; kategoria: string; kluc: string };
 type Pravidlo = { vzor: string; kategoria: string };
 
-export function BankaUlozene({ focus }: { focus?: { month?: string; kategoria?: string; nonce?: number } | null } = {}) {
+export function BankaUlozene({ focus, pohybSplits, onSplit }: {
+  focus?: { month?: string; kategoria?: string; nonce?: number } | null;
+  /** Rozdelenia/priradenia pohybov z App (split telefónu, príjem, vrátenie). */
+  pohybSplits?: PohybSplits;
+  /** Uloží rozdelenie jedného pohybu; prázdny zoznam ho zruší. Bez tejto
+   *  funkcie sa rozdeľovanie neponúkne (napr. keď komponent nemá kam zapísať). */
+  onSplit?: (kluc: string, casti: SplitCiast[]) => void;
+} = {}) {
   const [pohyby, setPohyby] = useState<Pohyb[]>([]);
   const [pravidla, setPravidla] = useState<Pravidlo[]>([]);
   const [nacitane, setNacitane] = useState(false);
@@ -37,6 +45,16 @@ export function BankaUlozene({ focus }: { focus?: { month?: string; kategoria?: 
   const [busy, setBusy] = useState(false);
   const [sprava, setSprava] = useState("");
   const KAT = useMemo(kategorieZoznam, []);
+  // Rozdeľovanie pohybu: kľúč otvoreného riadku + rozpracované časti.
+  const [delenyKluc, setDelenyKluc] = useState<string | null>(null);
+  const [koncept, setKoncept] = useState<SplitCiast[]>([]);
+  const popisCiel = (ciel: string) => KAT.find((k) => k.value === ciel)?.label || nazovKategorie(ciel) || ciel;
+  const otvorDelenie = (kluc: string) => {
+    const jest = pohybSplits?.[kluc];
+    setKoncept(jest && jest.length ? jest.map((c) => ({ ...c })) : [{ ciel: "", pct: 50 }, { ciel: "", pct: 50 }]);
+    setDelenyKluc(kluc);
+  };
+  const suciastPct = koncept.reduce((a, c) => a + (c.pct || 0), 0);
 
   const nacitaj = () => {
     void fetch("/api/fio", { credentials: "same-origin" })
@@ -188,7 +206,8 @@ export function BankaUlozene({ focus }: { focus?: { month?: string; kategoria?: 
               </thead>
               <tbody>
                 {viditelne.slice(0, 400).map((p) => (
-                  <tr key={p.kluc} style={{ background: oznacene.has(p.kluc) ? mix(C.accent, 7) : undefined }}>
+                  <Fragment key={p.kluc}>
+                  <tr style={{ background: oznacene.has(p.kluc) ? mix(C.accent, 7) : undefined }}>
                     <td style={{ ...S.td, textAlign: "center", padding: "3px 4px" }}>
                       <input type="checkbox" checked={oznacene.has(p.kluc)}
                         onChange={() => setOznacene((prev) => {
@@ -216,13 +235,78 @@ export function BankaUlozene({ focus }: { focus?: { month?: string; kategoria?: 
                       />
                     </td>
                     <td style={{ ...S.td, padding: "3px 6px" }}>
-                      <VyberKategorie
-                        hodnota={p.kategoria}
-                        pocetOznacenych={oznacene.has(p.kluc) ? oznacene.size : 0}
-                        onZmena={(kat) => void zmen(kat, oznacene.has(p.kluc) && oznacene.size > 1 ? undefined : [p.kluc])}
-                      />
+                      {(() => {
+                        const split = pohybSplits?.[p.kluc];
+                        if (platnySplit(split)) {
+                          const casti = rozdelPohyb(p.suma, split);
+                          return (
+                            <div>
+                              {casti.map((c, ci) => (
+                                <div key={ci} style={{ fontSize: 11.5, color: C.text }}>
+                                  <span style={{ color: C.textDim }}>{split[ci].pct}%</span> {popisCiel(c.ciel)} <span style={{ color: C.textDim, fontVariantNumeric: "tabular-nums" }}>{fmtCZK(-c.ciastka)}</span>
+                                </div>
+                              ))}
+                              {onSplit && (
+                                <button onClick={() => otvorDelenie(p.kluc)} style={{ background: "none", border: "none", color: C.accentLight, cursor: "pointer", fontSize: 11, padding: "2px 0" }}>upraviť rozdelenie</button>
+                              )}
+                            </div>
+                          );
+                        }
+                        return (
+                          <div>
+                            <VyberKategorie
+                              hodnota={p.kategoria}
+                              pocetOznacenych={oznacene.has(p.kluc) ? oznacene.size : 0}
+                              onZmena={(kat) => void zmen(kat, oznacene.has(p.kluc) && oznacene.size > 1 ? undefined : [p.kluc])}
+                            />
+                            {onSplit && (
+                              <button onClick={() => otvorDelenie(p.kluc)} title="Rozdeliť pohyb na časti / označiť ako príjem alebo vrátenie" style={{ background: "none", border: "none", color: C.textDim, cursor: "pointer", fontSize: 11, padding: "2px 0" }}>⑂ rozdeliť / priradiť</button>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </td>
                   </tr>
+                  {onSplit && delenyKluc === p.kluc && (
+                    <tr>
+                      <td colSpan={5} style={{ ...S.td, background: mix(C.accent, 8), padding: "10px 12px" }}>
+                        <div style={{ fontSize: 12, color: C.textDim, marginBottom: 8 }}>
+                          Rozdeľuješ <b style={{ color: C.text }}>{fmtCZK(p.suma)}</b> ({fmtDMY(p.datum)}, {p.protistrana || "—"}). Percentá musia dať 100 %. Cieľ „Príjem" = ručný príjem; kladný pohyb na nákladovú kategóriu ten náklad zníži (vrátenie).
+                        </div>
+                        {koncept.map((c, ci) => (
+                          <div key={ci} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6, flexWrap: "wrap" }}>
+                            <select value={c.ciel} onChange={(e) => setKoncept((k) => k.map((x, j) => (j === ci ? { ...x, ciel: e.target.value } : x)))}
+                              style={{ background: C.bg, color: C.text, border: `1px solid ${mix(C.accent, 40)}`, borderRadius: 7, fontSize: 12, padding: "5px 7px", maxWidth: 300, cursor: "pointer" }}>
+                              <option value="">— cieľ —</option>
+                              {[...new Set(KAT.map((k) => k.skupina))].filter(Boolean).map((sk) => (
+                                <optgroup key={sk} label={sk}>
+                                  {KAT.filter((k) => k.skupina === sk).map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
+                                </optgroup>
+                              ))}
+                            </select>
+                            <input type="number" value={c.pct} min={0} max={100} onChange={(e) => setKoncept((k) => k.map((x, j) => (j === ci ? { ...x, pct: Number(e.target.value) } : x)))}
+                              style={{ width: 64, background: C.bg, color: C.text, border: `1px solid ${C.border}`, borderRadius: 7, fontSize: 12, padding: "5px 7px" }} />
+                            <span style={{ fontSize: 12, color: C.textDim }}>%</span>
+                            {koncept.length > 1 && (
+                              <button onClick={() => setKoncept((k) => k.filter((_, j) => j !== ci))} style={{ background: "none", border: "none", color: C.textDim, cursor: "pointer", fontSize: 12 }}>✕</button>
+                            )}
+                          </div>
+                        ))}
+                        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginTop: 6 }}>
+                          <button onClick={() => setKoncept((k) => [...k, { ciel: "", pct: Math.max(0, 100 - suciastPct) }])} style={{ background: "none", border: `1px dashed ${C.border}`, color: C.textMuted, borderRadius: 7, fontSize: 12, padding: "4px 10px", cursor: "pointer" }}>+ časť</button>
+                          <span style={{ fontSize: 12, color: Math.abs(suciastPct - 100) < 0.01 ? C.green : C.orange }}>súčet {suciastPct} %</span>
+                          <span style={{ marginLeft: "auto" }} />
+                          <button disabled={!platnySplit(koncept)} onClick={() => { onSplit(p.kluc, koncept); setDelenyKluc(null); }}
+                            style={{ background: platnySplit(koncept) ? mix(C.accent, 30) : C.track, color: platnySplit(koncept) ? C.text : C.textDim, border: `1px solid ${mix(C.accent, 45)}`, borderRadius: 7, fontSize: 12, padding: "5px 12px", cursor: platnySplit(koncept) ? "pointer" : "not-allowed", fontWeight: 600 }}>Uložiť rozdelenie</button>
+                          {platnySplit(pohybSplits?.[p.kluc]) && (
+                            <button onClick={() => { onSplit(p.kluc, []); setDelenyKluc(null); }} style={{ background: "none", border: "none", color: C.red, cursor: "pointer", fontSize: 12 }}>zrušiť rozdelenie</button>
+                          )}
+                          <button onClick={() => setDelenyKluc(null)} style={{ background: "none", border: "none", color: C.textDim, cursor: "pointer", fontSize: 12 }}>zavrieť</button>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
                 ))}
               </tbody>
             </table>

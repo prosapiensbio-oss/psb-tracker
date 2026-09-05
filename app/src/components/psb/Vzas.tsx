@@ -69,6 +69,7 @@ import {
 import { Card, Empty, H3, Info, LineChart, Select, StatCard, SubTabs, useScrollEnd, ValueBars } from "./ui";
 import { tokyKlientov } from "./Fluktuacia";
 import { BankaUlozene } from "./BankaUlozene";
+import type { PohybSplits, SplitCiast } from "../../lib/psb/pohybSplit";
 import { Nakupy } from "./Nakupy";
 import { Report } from "./Report";
 
@@ -3097,7 +3098,7 @@ const SEKCIE_PENIAZE = [
 const sekciaPre = (list: string) =>
   (SEKCIE_PENIAZE.find((x) => x.listy.some((l) => l.id === list)) || SEKCIE_PENIAZE[0]).id;
 
-export function Vzas({ sub, onSub, data, clients, focus, onNavigate }: { sub: string; onSub: (s: string) => void; data: PSBData; clients: Record<string, ClientAgg>; focus?: NavFocus | null; onNavigate?: (tab: string, sub?: string, focus?: NavFocus) => void }) {
+export function Vzas({ sub, onSub, data, clients, focus, onNavigate, pohybSplits, nastavPohybSplit }: { sub: string; onSub: (s: string) => void; data: PSBData; clients: Record<string, ClientAgg>; focus?: NavFocus | null; onNavigate?: (tab: string, sub?: string, focus?: NavFocus) => void; pohybSplits?: PohybSplits; nastavPohybSplit?: (kluc: string, casti: SplitCiast[]) => void }) {
   // Tržby do VZAS tečú živé z PTmindera — excelový prepis sa nahradí pri
   // každom otvorení. `tik` len prekreslí strom po mutácii modulových polí.
   const [, tik] = useState(0);
@@ -3145,7 +3146,7 @@ export function Vzas({ sub, onSub, data, clients, focus, onNavigate }: { sub: st
           {/* Pohyby patria k P&L: sú to riadky, z ktorých sú tie súčty poskladané.
               V Údajoch boli schované za rozbaľovačom a nedali sa nájsť. */}
           <div style={{ marginTop: 14 }}>
-            <BankaUlozene focus={focus} />
+            <BankaUlozene focus={focus} pohybSplits={pohybSplits} onSplit={nastavPohybSplit} />
           </div>
         </>
       )}
@@ -3154,7 +3155,7 @@ export function Vzas({ sub, onSub, data, clients, focus, onNavigate }: { sub: st
           <SalaryTab />
           {/* Aj tu: výplaty sú riadky v banke, nie abstraktné číslo. */}
           <div style={{ marginTop: 14 }}>
-            <BankaUlozene focus={focus} />
+            <BankaUlozene focus={focus} pohybSplits={pohybSplits} onSplit={nastavPohybSplit} />
           </div>
         </>
       )}

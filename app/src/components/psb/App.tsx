@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { nazovFazy } from "../../lib/psb/mapaCyklu";
-import { BARTER_KLIENTI, PRVY_MESIAC_OTAZOK, PRVY_MESIAC_Z_FIO, vzasVerzia, nastavBtcVyplaty, nastavHodinyZTrackera, nastavJarekZTrackera, nastavNakladyZFio, nastavPnlOverrides, nastavPrijmyZTrackera, nastavVyplaty, nastavZmenyKategorii, nazovKategorie, pnlHodnota, pnlOverridesNaUlozenie } from "../../lib/psb/vzas";
+import { BARTER_KLIENTI, PRVY_MESIAC_OTAZOK, PRVY_MESIAC_Z_FIO, vzasVerzia, nastavBtcVyplaty, nastavHodinyZTrackera, nastavJarekZTrackera, nastavNakladyZFio, nastavPnlOverrides, nastavPrijmyZTrackera, nastavRucnePrijmy, nastavVyplaty, nastavZmenyKategorii, nazovKategorie, pnlHodnota, pnlOverridesNaUlozenie } from "../../lib/psb/vzas";
+import { platnySplit, rozdelPohyb, PRIJEM, type PohybSplits, type SplitCiast } from "../../lib/psb/pohybSplit";
 
 import {
   checkSession,
@@ -734,6 +735,9 @@ export function PSBApp() {
    * pamätá; automatika sa doň už nemieša.
    */
   const [btcParovanie, setBtcParovanie] = useState<Record<string, string[]>>({});
+  /** Rozdelenie/priradenie pohybov — split telefónov, ručný príjem, vrátenia.
+   *  Kľúč = dedup_key pohybu (viď pohybSplit.pohybKluc). */
+  const [pohybSplits, setPohybSplits] = useState<PohybSplits>({});
   /** Posledný zapísaný stav hotovosti — jeden z krokov uzávierky. */
   const [stavHotovosti, setStavHotovosti] = useState<{ hotovost: number; datum: string } | null>(null);
   /** Faktúry, ktoré zatiaľ nemajú platbu — ponuka pri ručnom párovaní. */
@@ -742,6 +746,8 @@ export function PSBApp() {
     void fetchVzasSettings().then((st) => {
       const p = st["btc_parovanie"];
       if (p && typeof p === "object") setBtcParovanie(p as Record<string, string[]>);
+      const sp = st["pohyb_splits"];
+      if (sp && typeof sp === "object") setPohybSplits(sp as PohybSplits);
       const h = st["stav_penazi"] as { hotovost: number; fio?: number; datum: string } | undefined;
       if (h && typeof h.hotovost === "number") {
         setStavHotovosti(h);
@@ -765,6 +771,18 @@ export function PSBApp() {
       if (sal && typeof sal === "object" && nastavVyplaty(sal as never)) zmena = true;
       if (zmena) setFioTik((x) => x + 1);
     });
+  }, []);
+  /** Uloží rozdelenie/priradenie jedného pohybu a prepočíta P&L. Prázdny
+   *  zoznam = priradenie zrušené (pohyb sa vráti k svojmu bežnému správaniu). */
+  const nastavPohybSplit = useCallback((kluc: string, casti: SplitCiast[]) => {
+    setPohybSplits((prev) => {
+      const next = { ...prev };
+      if (casti.length) next[kluc] = casti;
+      else delete next[kluc];
+      void saveVzasSetting("pohyb_splits", next);
+      return next;
+    });
+    setFioTik((x) => x + 1);
   }, []);
   /** Uloží pár a hneď prepočíta náklady. */
   const sparujBtc = useCallback((idVyberu: number, faktury: string[]) => {
@@ -1041,7 +1059,7 @@ function skupinaFaktur(
   useEffect(() => {
     void fetch("/api/fio", { credentials: "same-origin" })
       .then((r) => r.json())
-      .then(async (j: { pohyby?: { datum: string; suma: number; kategoria: string; protistrana?: string; poznamka?: string; typ?: string }[] }) => {
+      .then(async (j: { pohyby?: { datum: string; suma: number; kategoria: string; protistrana?: string; poznamka?: string; typ?: string; kluc?: string }[] }) => {
         // Faktúry ROZPISUJÚ bankový pohyb, nenahrádzajú ho. Nákup z Alzy je
         // v banke ako jedna suma a na faktúre ako trinásť položiek — keby sa
         // pripočítalo oboje, náklad by bol dvojnásobný. Preto sa spárovaný
@@ -1109,7 +1127,41 @@ function skupinaFaktur(
         // tabuľka ukáže po rozkliknutí, mohlo rozísť s číslom nad ním.
         const rozpis: Record<string, PohybZaBunku[]> = {};
         const prijmyBanka: Record<string, number> = {};
+        // Ručný príjem (úvodný v hotovosti) — plní ho split s cieľom `prijem`.
+        const rucnePrijmy: Record<string, number> = {};
+        // Zaradí JEDNU časť pohybu (rozdeleného alebo priradeného) na jej cieľ.
+        // `ciastka` je so znamienkom: záporná = výdavok, kladná = príjem/vrátenie.
+        // Vďaka tomu vrátenie (kladná časť na nákladový cieľ) ten náklad odčíta.
+        const zaradCiast = (mk: string, ciel: string, ciastka: number, meta: { datum: string; popis: string }) => {
+          if (!ciel || ciel === "mimo") return;                 // osobné mimo P&L
+          if (ciel.startsWith(PRIJEM)) { rucnePrijmy[mk] = (rucnePrijmy[mk] || 0) + ciastka; return; }
+          if (ciel.startsWith("vyplaty")) {
+            const v = (vyplaty[mk] ||= { jerry: 0, terezka: 0 });
+            const suma = -ciastka;                              // výdavok → +, vrátenie → −
+            if (ciel === "vyplaty.jerry") v.jerry += suma;
+            else if (ciel === "vyplaty.terezka") v.terezka += suma;
+            else { v.jerry += suma / 2; v.terezka += suma / 2; }
+            return;
+          }
+          (sumy[mk] ||= {});
+          sumy[mk][ciel] = (sumy[mk][ciel] || 0) + -ciastka;    // výdavok → +náklad, vrátenie → −náklad
+          pridajDoRozpisu(rozpis, mk, ciel, { datum: meta.datum, popis: meta.popis, suma: -ciastka, zdroj: "banka" });
+        };
         for (const p of j.pohyby || []) {
+          // Rozdelený/priradený pohyb má prednosť pred bežným zaradením:
+          // split telefónu (50/50), ručný príjem, vrátenie od Alzy. Je to
+          // VÝSLOVNÝ opt-in podľa dedup_key, takže sa netýka pohybov, ktorých
+          // sa Jerry nedotkol — automatická kategória na kladnom riadku P&L
+          // ticho nemení.
+          const split = p.kluc ? pohybSplits[p.kluc] : undefined;
+          if (platnySplit(split)) {
+            const mk = String(p.datum).slice(0, 7);
+            // Príchodzí pohyb (vrátenie) aj tak patrí do kontrolného súčtu.
+            if (p.suma > 0) prijmyBanka[mk] = (prijmyBanka[mk] || 0) + p.suma;
+            const popis = [p.protistrana, p.poznamka].filter(Boolean).join(" · ") || (p.suma > 0 ? "vrátenie / príjem" : "bankový pohyb");
+            for (const c of rozdelPohyb(p.suma, split)) zaradCiast(mk, c.ciel, c.ciastka, { datum: String(p.datum).slice(0, 10), popis });
+            continue;
+          }
           // Príchodzie pohyby sa do nákladov nerátajú, ale sčítať ich treba —
           // sú jediné nezávislé svedectvo o tom, čo naozaj prišlo, a jediný
           // spôsob, ako skontrolovať PTminder.
@@ -1280,9 +1332,12 @@ function skupinaFaktur(
         // Rozpis má odteraz vlastnú verziu (nastavRozpis vyššie), takže sa
         // netreba spoliehať na tik „pre istotu".
         if (nastavNakladyZFio(sumy, vyplaty)) setFioTik((x) => x + 1);
+        // Ručný príjem berie CELÝ obraz z tohto prechodu — mesiac bez neho sa
+        // vynuluje, takže zrušené priradenie nenechá po sebe starú sumu.
+        if (nastavRucnePrijmy(rucnePrijmy)) setFioTik((x) => x + 1);
       })
       .catch(() => {});
-  }, [btcNakupy, btcParovanie]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [btcNakupy, btcParovanie, pohybSplits]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Kontroly nad bankovými sumami. Register je jediné miesto, kam sa človek
   // pozerá, keď hľadá „čo mám spraviť" — ďalšia karta vedľa neho by znamenala
@@ -2301,7 +2356,7 @@ function skupinaFaktur(
         )}
 
         {active === "marketing" && <Marketing data={data} clients={clients} leads={data.leads} chat={chat} sub={marketingSub} onSub={setMarketingSub} focus={marketingFocus} onOdchodKJarvisovi={(mesiac, faza, napadId) => setNavratDoMapy({ mesiac, faza, napadId })} onKlient={(m) => navigate("klienti", undefined, { client: m, nonce: Date.now() })} refresh={actions.refresh} onPoznamkaStrata={(m, t) => actions.setOverride(m, "precoNeprisiel", t)} onNavigate={navigate} onAck={(k, zapnut, poznamka) => actions.ackAnomaly(k, zapnut ? (poznamka || "skryté hlásenie") : "", zapnut)} />}
-        {active === "vzas" && <Vzas sub={vzasSub} onSub={setVzasSub} data={data} clients={clients} focus={vzasFocus} onNavigate={navigate} />}
+        {active === "vzas" && <Vzas sub={vzasSub} onSub={setVzasSub} data={data} clients={clients} focus={vzasFocus} onNavigate={navigate} pohybSplits={pohybSplits} nastavPohybSplit={nastavPohybSplit} />}
         {active === "kalendar" && <Kalendar clients={clients} data={data} focus={kalendarFocus} ktoSom={ktoSom} />}
 
         {active === "jarvis" && (
@@ -2328,7 +2383,7 @@ function skupinaFaktur(
         {/* UPLOAD — nahrať exporty a zavrieť mesiac. Vlastná záložka od
             29. 8. 2026; `id` zostalo „udaje" kvôli adresám a odkazom. */}
         {active === "udaje" && (
-          <Udaje data={data} actions={actions} chat={chat} prekazky={prekazkyZamku} kroky={krokyZamku} podklady={podkladyMesiaca} onNavigate={navigate} btc={{ platby: [...btcBezDokladu, ...btcSparovane], faktury: volneFaktury, parovanie: btcParovanie, onSparuj: sparujBtc }} />
+          <Udaje data={data} actions={actions} chat={chat} prekazky={prekazkyZamku} kroky={krokyZamku} podklady={podkladyMesiaca} onNavigate={navigate} btc={{ platby: [...btcBezDokladu, ...btcSparovane], faktury: volneFaktury, parovanie: btcParovanie, onSparuj: sparujBtc }} pohybSplits={pohybSplits} nastavPohybSplit={nastavPohybSplit} />
         )}
 
       </div>
