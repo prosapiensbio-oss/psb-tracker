@@ -78,7 +78,12 @@ export function Udaje({ data, actions, chat, prekazky, kroky, podklady, onNaviga
   const missing = REPORTS.filter((r) => (data[r.key] as unknown[]).length === 0);
   return (
     <>
-      <UploadCard data={data} missing={missing} actions={actions} chat={chat} pohybSplits={pohybSplits} nastavPohybSplit={nastavPohybSplit} />
+      <UploadCard data={data} missing={missing} actions={actions} chat={chat} />
+
+      {/* Zapísané pohyby majú vlastnú kartu hneď pod nahrávaním — tu sa rozdeľujú
+          pohyby (telefón, príjem, vrátenie), a to sa robí pri uzávierke, nie raz
+          za rok. Predtým boli zahrabané dva rozkliky hlboko (Jerry, 5. 9. 2026). */}
+      <BankaUlozene pohybSplits={pohybSplits} onSplit={nastavPohybSplit} />
 
       {/* Zošit je zdroj dát ako každý iný — patrí sem, medzi nahrávanie. */}
       <Zosit onZapisane={() => void actions.refresh()} />
@@ -178,7 +183,7 @@ function Verzia() {
   );
 }
 
-function UploadCard({ data, missing, actions, chat, pohybSplits, nastavPohybSplit }: { data: PSBData; missing: typeof REPORTS; actions: Actions ; chat?: AssistantChat; pohybSplits?: PohybSplits; nastavPohybSplit?: (kluc: string, casti: SplitCiast[]) => void }) {
+function UploadCard({ data, missing, actions, chat }: { data: PSBData; missing: typeof REPORTS; actions: Actions ; chat?: AssistantChat }) {
   const [uploadResult, setUploadResult] = useState<IngestResult[] | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -575,11 +580,6 @@ function UploadCard({ data, missing, actions, chat, pohybSplits, nastavPohybSpli
           Packages report dáva PTminder v štyroch pohľadoch (šablóny balíčkov, šablóny členstiev, balíčky klientov,
           členstvá klientov) — nahraj všetky, každý nesie niečo iné a ten posledný má aj platnosť členstva.
           Rovnaký súbor nič nezduplikuje.
-        </div>
-        {/* Aj zapísané pohyby patria sem dnu: prezerajú sa občas a pri oprave,
-            nie pri každom nahrávaní. Na obrazovku sa chodí nahrávať. */}
-        <div style={{ marginTop: 14 }}>
-          <BankaUlozene pohybSplits={pohybSplits} onSplit={nastavPohybSplit} />
         </div>
       </div>
       )}

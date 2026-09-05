@@ -1280,7 +1280,12 @@ function skupinaFaktur(
             const kandidati = [...doklady.entries()]
               .filter(([c, d]) => !pouzite.has(c) && Math.abs(Date.parse(nakup.datum) - Date.parse(d.datum)) / 86400000 <= 7)
               .map(([c, d]) => ({ cislo: c, celkom: d.celkom, datum: d.datum, dodavatel: d.polozky[0]?.dodavatel || "" }));
-            const skupina = skupinaFaktur(kandidati, czk, Math.max(50, czk * 0.02));
+            // Tolerancia 5 % (Jerry, 5. 9. 2026): pri BTC sa suma prepočítava
+            // kurzom v čase nákupu a spread býva 3–4 %, takže 2 % tesné trafenia
+            // (napr. platba 2 284 Kč proti faktúre 2 202) prepadávali do „bez
+            // dokladu" a museli sa párovať ručne. ±7 dní okno drží falošné páry
+            // na uzde aj pri širšej tolerancii.
+            const skupina = skupinaFaktur(kandidati, czk, Math.max(50, czk * 0.05));
             if (!skupina) { bezDokladu.push(nakup); continue; }
             for (const cislo of skupina) {
               const d = doklady.get(cislo);
