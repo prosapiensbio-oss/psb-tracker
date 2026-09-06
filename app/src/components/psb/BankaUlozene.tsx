@@ -72,7 +72,7 @@ export function BankaUlozene({ focus, pohybSplits, onSplit }: {
   const viditelne = pohyby.filter((p) => {
     if (mesiac && String(p.datum).slice(0, 7) !== mesiac) return false;
     if (ibaKat && p.kategoria !== ibaKat) return false;
-    if (filter === "nezaradene" && p.kategoria) return false;
+    if (filter === "nezaradene" && (p.kategoria || platnySplit(pohybSplits?.[p.kluc]))) return false;
     if (filter === "vyplaty" && !p.kategoria.startsWith("vyplaty")) return false;
     if (hladat.trim()) {
       const h = hladat.trim().toLowerCase();
@@ -125,7 +125,10 @@ export function BankaUlozene({ focus, pohybSplits, onSplit }: {
     setIbaKat(focus.kategoria || "");
   }, [focus?.month, focus?.kategoria, focus?.nonce]);
 
-  const nezaradenych = pohyby.filter((p) => !p.kategoria).length;
+  // Pohyb s platným rozdelením (split) je zaradený, aj keď jeho surové pole
+  // `category` je prázdne — split ho v P&L kryje. Bez tohto svietil telefón
+  // −8999 ako „bez kategórie", hoci má 50/50 split (Jerry, 6. 9. 2026).
+  const nezaradenych = pohyby.filter((p) => !p.kategoria && !platnySplit(pohybSplits?.[p.kluc])).length;
   if (!nacitane || !pohyby.length) return null;
 
   return (
