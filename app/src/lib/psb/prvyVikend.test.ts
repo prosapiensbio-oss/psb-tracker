@@ -85,3 +85,25 @@ describe("kým dáta nedobehli, pripomienka mlčí", () => {
     expect(r.filter((x) => x.druh === "mesiac").some((x) => x.splatne)).toBe(true);
   });
 });
+
+describe("pripomienka na stav hotovosti", () => {
+  const hotovost = (dnes: Date, stavDatum?: string) =>
+    ritualy(dnes, {}, {}, { chybaju: [] }, { nacitane: true, stavDatum }).find((r) => r.id.startsWith("hotovost-"));
+
+  it("bez zapísaného stavu sa v okne uzávierky pýta (a patrí Jerrymu)", () => {
+    const r = hotovost(new Date("2026-09-06T09:00:00Z"));
+    expect(r?.splatne).toBe(true);
+    expect(r?.trener).toBe("Jerry");
+  });
+
+  it("stav zo stredu uzatváraného mesiaca NESTAČÍ — pýta sa ďalej", () => {
+    // zatvára sa august (mk 2026-08); stav z 8. 8. je spred uzávierky
+    expect(hotovost(new Date("2026-09-06T09:00:00Z"), "2026-08-08")?.splatne).toBe(true);
+  });
+
+  it("stav zapísaný v septembri (po konci augusta) = hotové, nepýta sa", () => {
+    const r = hotovost(new Date("2026-09-06T09:00:00Z"), "2026-09-06");
+    expect(r?.splatne).toBe(false);
+    expect(r?.hotove).toBe(true);
+  });
+});

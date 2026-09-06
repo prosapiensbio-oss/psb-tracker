@@ -1641,8 +1641,8 @@ function skupinaFaktur(
   }, [data, bankaSumy, hotovostMesiace, kanalyMesiace]);
 
   const rituals = useMemo(
-    () => spocitajRitualy(new Date(), zapisy.weeks, zapisy.mesiace, chybajuceDoklady, { nacitane: zapisy.nacitane }),
-    [zapisy, chybajuceDoklady],
+    () => spocitajRitualy(new Date(), zapisy.weeks, zapisy.mesiace, chybajuceDoklady, { nacitane: zapisy.nacitane, stavDatum: stavHotovosti?.datum }),
+    [zapisy, chybajuceDoklady, stavHotovosti],
   );
   // Veci, ktoré čakajú na vetu od človeka — dopyty bez dôvodu a nevysvetlené
   // zmeny v kalendári. Sú v jednom rade s ostatnými, aby sa na dashboarde

@@ -94,7 +94,7 @@ export function ritualy(
    * Predvolené `true` kvôli starším volaniam a testom, ktoré dáta dodávajú
    * priamo.
    */
-  opts?: { nacitane?: boolean },
+  opts?: { nacitane?: boolean; stavDatum?: string },
 ): Ritual[] {
   const nacitane = opts?.nacitane ?? true;
   const out: Ritual[] = [];
@@ -203,6 +203,28 @@ export function ritualy(
     // zliala do jedného a chýbajúci júl tak zmizol z obrazovky 4. augusta.
     splatne: nacitane && !maMesiac && dnes.getTime() >= prvyVikendMesiaca(dnes.getFullYear(), dnes.getMonth()).getTime(),
     hotove: maMesiac,
+  });
+
+  // ── Stav hotovosti ku koncu mesiaca ─────────────────────────────────────
+  // Jerry, 6. 9. 2026: chce na to pripomienku. Účet aj bitcoin appka doplní
+  // sama; hotovosť je jediné číslo, ktoré musí opísať človek — a bez neho sa
+  // nedá povedať, koľko firma naozaj má. Peniaze = Jerry.
+  //
+  // „Hotové" = stav bol zapísaný v NESKORŠOM mesiaci než ten uzatváraný, teda
+  // spočítaný až keď mesiac skončil. Dátum v strede mesiaca (napr. 8. 8. pre
+  // august) nestačí — to je stav spred uzávierky, nie ku koncu.
+  const hotovostHotova = !!(opts?.stavDatum && opts.stavDatum.slice(0, 7) > mk);
+  out.push({
+    id: `hotovost-${mk}`,
+    druh: "mesiac",
+    trener: "Jerry",
+    nadpis: "Zapíš stav hotovosti",
+    detail: hotovostHotova
+      ? `Stav hotovosti ku koncu ${mk} je zapísaný.`
+      : `Spočítaj obálku a zapíš stav hotovosti ku koncu ${mk} — treba to na uzávierku (účet aj bitcoin appka doplní sama).`,
+    ciel: { tab: "vzas", sub: "cashflow" },
+    splatne: nacitane && !hotovostHotova && dnes.getTime() >= prvyVikendMesiaca(dnes.getFullYear(), dnes.getMonth()).getTime(),
+    hotove: hotovostHotova,
   });
 
   // ── Kvartálny ───────────────────────────────────────────────────────────

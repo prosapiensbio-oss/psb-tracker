@@ -39,8 +39,9 @@ function ritualyDoRegistra(
   mesiace: Record<string, { note?: string; answers?: Record<string, string> }>,
   ack: PSBData["anomalyAck"],
   dnes: Date,
+  stavDatum?: string,
 ): RegisterItem[] {
-  return ritualy(dnes, weeks, mesiace, { chybaju: [] }, { nacitane: true })
+  return ritualy(dnes, weeks, mesiace, { chybaju: [] }, { nacitane: true, stavDatum })
     .filter((r) => r.splatne)
     .map((r) => ({
       key: `zapis|${r.id}`,
@@ -63,6 +64,8 @@ export function registerZoServera(
   zapisy?: {
     weeks: Record<string, Record<string, string>>;
     mesiace: Record<string, { note?: string; answers?: Record<string, string> }>;
+    /** Dátum posledného zapísaného stavu hotovosti — pre pripomienku na uzávierku. */
+    stavDatum?: string;
   },
 ): RegisterItem[] {
   const clients = deriveClients(data);
@@ -70,7 +73,7 @@ export function registerZoServera(
   const zm = kal.zmeny;
   const sixM = deriveSixM(data, clients);
   return odstranDuplicity([
-    ...(zapisy ? ritualyDoRegistra(zapisy.weeks, zapisy.mesiace, data.anomalyAck, dnes) : []),
+    ...(zapisy ? ritualyDoRegistra(zapisy.weeks, zapisy.mesiace, data.anomalyAck, dnes, zapisy.stavDatum) : []),
     // Dnešné tréningy sú v rannej správe to najdôležitejšie — veta, ktorú si
     // človek prečíta o siedmej a večer je buď vybavená, alebo prepadla.
     ...dnesneTreningy(clients, sixM, { udalosti: ud, zmeny: zm }, data.anomalyAck || {}, dnes),

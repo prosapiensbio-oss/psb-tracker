@@ -117,10 +117,20 @@ export const Route = createFileRoute("/api/push-rano")({
         // Týždenné a mesačné zápisy — bez nich by v rannej správe chýbali
         // rituály (mesačné kontroly, týždenná únava, uzávierka). Dve malé
         // tabuľky, pár desiatok riadkov.
-        const [wk, mn] = await DB.batch([
+        const [wk, mn, sp] = await DB.batch([
           DB.prepare("SELECT week, data FROM vzas_week_notes ORDER BY week DESC LIMIT 12"),
           DB.prepare("SELECT month, note, answers FROM vzas_month_notes ORDER BY month DESC LIMIT 6"),
+          DB.prepare("SELECT value FROM vzas_settings WHERE key='stav_penazi'"),
         ]);
+        // Dátum posledného zapísaného stavu hotovosti — pre pripomienku na
+        // uzávierku (Jerry, 6. 9. 2026). Bez neho by rituál nevedel, či je stav
+        // ku koncu mesiaca už spočítaný.
+        let stavDatum: string | undefined;
+        try {
+          const raw = (sp.results as unknown as { value: string }[])[0]?.value;
+          const v = raw ? (JSON.parse(raw) as { datum?: string }) : null;
+          if (v?.datum) stavDatum = v.datum;
+        } catch { /* prázdne */ }
         const weeks: Record<string, Record<string, string>> = {};
         for (const r of wk.results as unknown as { week: string; data: string }[]) {
           try { weeks[r.week] = JSON.parse(r.data || "{}"); } catch { weeks[r.week] = {}; }
@@ -138,7 +148,7 @@ export const Route = createFileRoute("/api/push-rano")({
             nazov: String(u.nazov || ""), trener: String(u.trener || ""), zmizlaAt: null,
           })),
           zmeny: zm.results as never,
-        }, new Date(), { weeks, mesiace }));
+        }, new Date(), { weeks, mesiace, stavDatum }));
 
         // ── Téma na dnešné hovorené video ──────────────────────────────
         //
