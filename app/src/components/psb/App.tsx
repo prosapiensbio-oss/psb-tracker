@@ -2314,31 +2314,46 @@ function skupinaFaktur(
             <Icon name={t.icon} /> {t.label}
           </button>
         ))}
-        {/* Bitcoin nie je záložka, je to odkaz do druhej appky — a odkaz
-            v rade záložiek vyzerá ako obsah, ktorý tam nie je. Stojí preto
-            napravo, oddelene, a otvára sa v NOVEJ karte: BTC appka má vlastné
-            prihlásenie a keby sa Kokpit zavrel, prišiel by človek o rozrobený
-            stav (filtre, rozbalený register, návrh uzávierky). */}
+        {/* Bitcoin žije vo vlastnej appke (prosapiens-btc), ale Jerry (6. 9.
+            2026) ju chce mať v JEDNOM okne — na iPhone je Kokpit appka na
+            ploche a odkaz do inej domény ho vyhodí do Safari. Preto je to
+            teraz ZÁLOŽKA s iframe: BTC appka sa načíta vnútri Kokpitu
+            (prihlási sa sama cez podpísaný token v URL, nie cez cookie).
+            Malé ↗ vedľa stále otvorí plnú obrazovku v novej karte. */}
+        <button
+          onClick={() => setActive("btc")}
+          title="Bitcoinová evidencia — otvorí sa vnútri Kokpitu"
+          style={{ ...tab(active === "btc"), marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 7, flexShrink: 0 }}
+        >
+          <Icon name="bitcoin" /> Bitcoin
+        </button>
         <a
           href="/api/sso?prejst=1"
           target="_blank"
           rel="noopener noreferrer"
-          title="Otvoriť bitcoinovú evidenciu v novej karte (prihlási sa sama)"
-          style={{ ...tab(false), marginLeft: "auto", display: "inline-flex", alignItems: "center", gap: 7, textDecoration: "none", flexShrink: 0 }}
+          title="Otvoriť na celú obrazovku v novej karte"
+          style={{ ...tab(false), display: "inline-flex", alignItems: "center", textDecoration: "none", flexShrink: 0, padding: "8px 10px" }}
         >
-          <Icon name="bitcoin" /> Bitcoin
-          <span style={{ fontSize: 11, opacity: 0.7 }}>↗</span>
+          ↗
         </a>
-        {/* Bitcoin žije vo vlastnej appke (prosapiens-btc) a táto karta tam
-            len vedie — nie je to obsah Kokpitu. Otvára sa v NOVEJ karte
-            prehliadača zámerne: BTC appka má vlastné prihlásenie a keby sa
-            Kokpit zavrel, človek by po návrate prišiel o rozpracovaný stav
-            (filtre, rozbalený register, návrh uzávierky).
-            Šípka ↗ je jediné miesto v hlavičke, ktoré hovorí „toto vedie von". */}
       </nav>
       <div style={{ padding: 16, maxWidth: 1200, margin: "0 auto" }}>
         {active === "dashboard" && (
           <Dashboard trainer={trainer} onTrainer={setTrainer} data={data} clients={clients} kalendar={kalUdalosti} kalZmeny={kalZmeny} kalNevysvetlene={kalNevysvetlene} register={registerAll} sixM={sixM} capacity={capacity} actions={actions} onNavigate={navigate} assistantChat={chat} onClientClick={onClientClick} />
+        )}
+
+        {/* Bitcoinová evidencia vnútri Kokpitu (Jerry, 6. 9. 2026 — jedno okno).
+            `/api/sso?prejst=1` presmeruje na BTC appku s podpísaným tokenom,
+            iframe ho nasleduje a appka sa prihlási sama. Načíta sa až pri
+            otvorení záložky — vždy čerstvé dáta. Na iPhone (PWA) môže iOS
+            blokovať cookie BTC appky vnútri rámu; keby sa odhlasovala, cesta je
+            proxy pod doménou Kokpitu — vtedy sa ozvi. */}
+        {active === "btc" && (
+          <iframe
+            title="Bitcoinová evidencia"
+            src="/api/sso?prejst=1"
+            style={{ width: "100%", height: "calc(100dvh - 130px)", border: "none", borderRadius: 10, background: C.bg }}
+          />
         )}
 
         {active === "tracker" && (
