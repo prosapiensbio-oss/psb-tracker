@@ -1278,13 +1278,17 @@ function skupinaFaktur(
           // je platieb v deň viac. Logika je v `dokladyPreBtcPlatbu` s testami.
           const platiebVDen = platiebPodlaDni(
             vsetkyNakupy
-              .filter((n) => (n.czk || 0) && !rucne.has(String(n.id)) && String(n.datum).slice(0, 7) >= PRVY_MESIAC_Z_FIO)
+              .filter((n) => (n.czk || 0) && !rucne.has(String(n.id)) && !/konsolid/i.test(n.poznamka || "") && String(n.datum).slice(0, 7) >= PRVY_MESIAC_Z_FIO)
               .map((n) => n.datum),
           );
           for (const nakup of vsetkyNakupy) {
             const czk = nakup.czk || 0;
             if (!czk) continue;
             if (rucne.has(String(nakup.id))) continue; // človek už rozhodol
+            // Konsolidácia peňaženky (Muun zlúči drobné UTXO do jedného) NIE JE
+            // nákup — je to interný presun, ktorý kniha zapíše ako výber. Nemá
+            // faktúru a do nákladov nepatrí, tak ho medzi „bez dokladu" nehádž.
+            if (/konsolid/i.test(nakup.poznamka || "")) continue;
             const mk = String(nakup.datum).slice(0, 7);
             if (mk < PRVY_MESIAC_Z_FIO) continue;
             // Blízke nepoužité doklady: ±3 dni (rozdelená objednávka sa fakturuje
