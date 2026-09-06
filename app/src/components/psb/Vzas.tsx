@@ -429,19 +429,24 @@ function Divider({ label, span }: { label: string; span: number }) {
   );
 }
 
-function TotalRow({ label, values, color, big = false, showAvg = true, onClick, open }: {
+function TotalRow({ label, values, color, big = false, showAvg = true, onClick, open, signPerCell = false }: {
   label: string; values: Vals; color: string; big?: boolean; showAvg?: boolean; onClick?: () => void; open?: boolean;
+  /** Každá bunka sa farbí podľa VLASTNÉHO znamienka (zelená +, červená −).
+   *  Bez toho dostal celý riadok jednu farbu zo súčtu obdobia a záporný mesiac
+   *  svietil zeleno pri kladnom súčte (Jerry, 6. 9. 2026 — hrubý zisk). */
+  signPerCell?: boolean;
 }) {
   const cell = { textAlign: "right" as const, padding: big ? "10px" : "8px 10px", fontWeight: 700, fontSize: big ? 14 : 13, color, fontVariantNumeric: "tabular-nums" as const, whiteSpace: "nowrap" as const };
+  const farba = (v: number) => (signPerCell ? signColor(v) : color);
   return (
     <tr onClick={onClick} style={{ background: big ? mix(C.accent, 12) : "transparent", borderTop: `2px solid ${mix(C.accent, 45)}`, cursor: onClick ? "pointer" : "default" }}>
       <td style={{ padding: big ? "10px" : "8px 10px", fontWeight: 700, fontSize: big ? 14 : 13, color: C.text, whiteSpace: "nowrap", ...sticky(big ? mix(C.accent, 12) : undefined) }}>
         {onClick && <span style={{ display: "inline-block", width: 15, color: C.textDim, fontSize: 9 }}>{open ? "▼" : "▶"}</span>}
         {label}
       </td>
-      {values.map((v, i) => <td key={i} style={cell}>{money(v)}</td>)}
-      <td style={{ ...cell, borderLeft: `1px solid ${C.border}` }}>{money(vSum(values))}</td>
-      {showAvg && <td style={cell}>{money(avg(values))}</td>}
+      {values.map((v, i) => <td key={i} style={{ ...cell, color: farba(v) }}>{money(v)}</td>)}
+      <td style={{ ...cell, color: farba(vSum(values)), borderLeft: `1px solid ${C.border}` }}>{money(vSum(values))}</td>
+      {showAvg && <td style={{ ...cell, color: farba(avg(values)) }}>{money(avg(values))}</td>}
     </tr>
   );
 }
@@ -607,7 +612,7 @@ function CommitmentTable({ idx }: { idx: number[] }) {
               {rows("neprevadzkove")}
             </Row>
 
-            <TotalRow label="Výsledok po neprevádzkových" values={pick(p.hrubyZisk, idx)} color={signColor(vSum(pick(p.hrubyZisk, idx)))} big />
+            <TotalRow label="Výsledok po neprevádzkových" values={pick(p.hrubyZisk, idx)} color={signColor(vSum(pick(p.hrubyZisk, idx)))} big signPerCell />
           </tbody>
         </table>
       </ScrollX>
@@ -875,7 +880,7 @@ function PnlTab({ focus }: { focus?: { month?: string; kategoria?: string; nonce
                 <Row label={<Info text="Príjmy mimo tréningov — v jan/feb 2025 Jarkov preplatok za kurz a bitcoin. Excel ich v hárku „Mesačné výsledky“ nezobrazoval pri tržbách, ale zisk z nich počítal — preto tam tie dva mesiace nesedeli." label="Iné príjmy" />} values={pick(PRIJMY_INE, i)} depth={1} />
               </Row>
 
-              <TotalRow label="Hrubý zisk" values={pick(p.hrubyZisk, i)} color={signColor(vSum(sel.zisk))} big />
+              <TotalRow label="Hrubý zisk" values={pick(p.hrubyZisk, i)} color={signColor(vSum(sel.zisk))} big signPerCell />
               <tr>
                 <td style={{ padding: "5px 10px", fontSize: 11, color: C.textMuted }}>Marža %</td>
                 {i.map((mi) => (
