@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { nazovFazy } from "../../lib/psb/mapaCyklu";
 import { BARTER_KLIENTI, PRVY_MESIAC_OTAZOK, PRVY_MESIAC_Z_FIO, vzasVerzia, nastavBtcVyplaty, nastavHodinyZTrackera, nastavJarekZTrackera, nastavNakladyZFio, nastavPnlOverrides, nastavPrijmyZTrackera, nastavRucnePrijmy, nastavVyplaty, nastavZmenyKategorii, nazovKategorie, pnlHodnota, pnlOverridesNaUlozenie } from "../../lib/psb/vzas";
 import { platnySplit, rozdelPohyb, PRIJEM, type PohybSplits, type SplitCiast } from "../../lib/psb/pohybSplit";
+import { dokladyPreBtcPlatbu, platiebPodlaDni } from "../../lib/psb/btcSparovanie";
 
 import {
   checkSession,
@@ -1269,29 +1270,35 @@ function skupinaFaktur(
           .slice()
           .sort((a, b) => String(a.datum).localeCompare(String(b.datum)));
         {
+          // DÁTUM je prvé kritérium (Jerry, 6. 9. 2026): keď na deň pripadá
+          // jediná BTC platba, patria jej všetky blízke doklady toho dňa — Alza
+          // jednu objednávku roztrhne na viac dokladov, lebo nevie dodať všetko
+          // naraz. Suma je len KONTROLA (výber z peňaženky sa od faktúry líši
+          // o poplatok/spread a presne nikdy nesedí), rozlišuje len vtedy, keď
+          // je platieb v deň viac. Logika je v `dokladyPreBtcPlatbu` s testami.
+          const platiebVDen = platiebPodlaDni(
+            vsetkyNakupy
+              .filter((n) => (n.czk || 0) && !rucne.has(String(n.id)) && String(n.datum).slice(0, 7) >= PRVY_MESIAC_Z_FIO)
+              .map((n) => n.datum),
+          );
           for (const nakup of vsetkyNakupy) {
             const czk = nakup.czk || 0;
             if (!czk) continue;
             if (rucne.has(String(nakup.id))) continue; // človek už rozhodol
             const mk = String(nakup.datum).slice(0, 7);
             if (mk < PRVY_MESIAC_Z_FIO) continue;
-            // Kandidáti: nepoužité doklady v okne ±7 dní. Jedna platba môže
-            // pokryť viac faktúr — Alza rozdelí objednávku podľa skladov.
-            const kandidati = [...doklady.entries()]
-              .filter(([c, d]) => !pouzite.has(c) && Math.abs(Date.parse(nakup.datum) - Date.parse(d.datum)) / 86400000 <= 7)
-              .map(([c, d]) => ({ cislo: c, celkom: d.celkom, datum: d.datum, dodavatel: d.polozky[0]?.dodavatel || "" }));
-            // Tolerancia 5 % (Jerry, 5. 9. 2026): pri BTC sa suma prepočítava
-            // kurzom v čase nákupu a spread býva 3–4 %, takže 2 % tesné trafenia
-            // (napr. platba 2 284 Kč proti faktúre 2 202) prepadávali do „bez
-            // dokladu" a museli sa párovať ručne. ±7 dní okno drží falošné páry
-            // na uzde aj pri širšej tolerancii.
-            const skupina = skupinaFaktur(kandidati, czk, Math.max(50, czk * 0.05));
-            if (!skupina) { bezDokladu.push(nakup); continue; }
+            // Blízke nepoužité doklady: ±3 dni (rozdelená objednávka sa fakturuje
+            // aj o deň-dva neskôr). Užšie než predtým — dátum teraz rozhoduje.
+            const blizke = [...doklady.entries()]
+              .filter(([c, dd]) => !pouzite.has(c) && Math.abs(Date.parse(nakup.datum) - Date.parse(dd.datum)) / 86400000 <= 3)
+              .map(([c, dd]) => ({ cislo: c, celkom: dd.celkom, datum: dd.datum, dodavatel: dd.polozky[0]?.dodavatel || "" }));
+            const skupina = blizke.length ? dokladyPreBtcPlatbu(nakup.datum, czk, blizke, platiebVDen, skupinaFaktur) : [];
+            if (!skupina.length) { bezDokladu.push(nakup); continue; }
             for (const cislo of skupina) {
-              const d = doklady.get(cislo);
-              if (!d) continue;
+              const dd = doklady.get(cislo);
+              if (!dd) continue;
               pouzite.add(cislo);
-              for (const pol of d.polozky) zapocitajPolozku(mk, pol, `${pol.nazov || pol.dodavatel || "položka"} · zaplatené bitcoinom${skupina.length > 1 ? ` (${skupina.length} faktúry naraz)` : ""}`, cislo);
+              for (const pol of dd.polozky) zapocitajPolozku(mk, pol, `${pol.nazov || pol.dodavatel || "položka"} · zaplatené bitcoinom${skupina.length > 1 ? ` (${skupina.length} dokladov naraz)` : ""}`, cislo);
             }
           }
         }
