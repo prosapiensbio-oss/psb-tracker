@@ -5,6 +5,19 @@ import { C, mix } from "../../lib/psb/theme";
 import { patriDoZoznamu, ZAMERANIA } from "../../lib/psb/zamerania";
 import { ChatConversation, type AssistantChat } from "./Assistant";
 
+/** Úzke okno (telefón): pod 760 px sa nezmestí zoznam vedľa rozhovoru, tak sa
+ *  ukazuje len jeden panel naraz (Jerry, 7. 9. 2026 — na telefóne sa v Jarvisovi
+ *  nedalo pracovať, chat bol stlačený na pár pixelov vedľa zoznamu). */
+function useUzkeOkno(): boolean {
+  const [uzke, setUzke] = useState(() => (typeof window !== "undefined" ? window.innerWidth < 760 : false));
+  useEffect(() => {
+    const f = () => setUzke(window.innerWidth < 760);
+    window.addEventListener("resize", f);
+    return () => window.removeEventListener("resize", f);
+  }, []);
+  return uzke;
+}
+
 /**
  * Veľké okno Jarvisa — vľavo konverzácie, vpravo rozhovor.
  *
@@ -74,6 +87,10 @@ export function JarvisOkno({
 }) {
   /** Ktorý zoznam pozerám. Prázdne = všetky rozhovory, nie „nezaradené". */
   const [filter, setFilter] = useState("");
+  const uzke = useUzkeOkno();
+  // Na telefóne sa ukazuje len jeden panel — chat, alebo zoznam rozhovorov.
+  const [mobilPohlad, setMobilPohlad] = useState<"zoznam" | "chat">("chat");
+  const doChatu = () => { if (uzke) setMobilPohlad("chat"); };
   const [archivOtvoreny, setArchivOtvoreny] = useState(false);
   const [menimZameranie, setMenimZameranie] = useState(false);
   /**
@@ -200,8 +217,9 @@ export function JarvisOkno({
         height: navrat ? "calc(100vh - 190px)" : "calc(100vh - 150px)", minHeight: 420,
       }}>
       {/* ── vľavo: priečinky a konverzácie ───────────────────────────── */}
+      {(!uzke || mobilPohlad === "zoznam") && (
       <div style={{
-        width: 250, flexShrink: 0, display: "flex", flexDirection: "column",
+        width: uzke ? "100%" : 250, flexShrink: 0, display: "flex", flexDirection: "column",
         background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden",
       }}>
         <div style={{ padding: 10, borderBottom: `1px solid ${C.border}`, display: "flex", flexWrap: "wrap", gap: 5 }}>
@@ -252,7 +270,7 @@ export function JarvisOkno({
         )}
 
         <button
-          onClick={() => chat.newChat(filter)}
+          onClick={() => { chat.newChat(filter); doChatu(); }}
           style={{
             margin: 10, marginBottom: 6, padding: "8px 10px", borderRadius: 8, cursor: "pointer",
             border: `1px dashed ${C.border}`, background: "transparent", color: C.textMuted,
@@ -280,7 +298,7 @@ export function JarvisOkno({
               odznak={!filter && c.kategoria ? zameranie(c.kategoria).label : ""}
               uryvok={uryvok(c)}
               aktivny={c.id === chat.chatId}
-              onOpen={() => chat.openChat(c.id, hladane)}
+              onOpen={() => { chat.openChat(c.id, hladane); doChatu(); }}
               onArchive={() => chat.archiveChat(c.id)}
               onDelete={() => chat.deleteChat(c.id)}
               onPresun={(k) => chat.presunChat(c.id, k)}
@@ -307,7 +325,7 @@ export function JarvisOkno({
                   odznak={!filter && c.kategoria ? zameranie(c.kategoria).label : ""}
                   uryvok={uryvok(c)}
                   aktivny={c.id === chat.chatId} dim
-                  onOpen={() => chat.openChat(c.id, hladane)}
+                  onOpen={() => { chat.openChat(c.id, hladane); doChatu(); }}
                   onArchive={() => chat.archiveChat(c.id)}
                   onDelete={() => chat.deleteChat(c.id)}
                   onPresun={(k) => chat.presunChat(c.id, k)}
@@ -319,12 +337,23 @@ export function JarvisOkno({
           )}
         </div>
       </div>
+      )}
 
       {/* ── vpravo: rozhovor ─────────────────────────────────────────── */}
+      {(!uzke || mobilPohlad === "chat") && (
       <div style={{
         flex: 1, minWidth: 0, display: "flex", flexDirection: "column",
         background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden",
       }}>
+        {/* Na telefóne: späť do zoznamu rozhovorov (dva panely sa nezmestia). */}
+        {uzke && (
+          <button
+            onClick={() => setMobilPohlad("zoznam")}
+            style={{ display: "flex", alignItems: "center", gap: 7, padding: "9px 12px", background: "none", border: "none", borderBottom: `1px solid ${C.border}`, color: C.accentLight, fontSize: 12.5, fontFamily: "inherit", cursor: "pointer", textAlign: "left" }}
+          >
+            ☰ Rozhovory
+          </button>
+        )}
         {/*
           Kto Jarvis v TOMTO rozhovore je. Nie je to ozdoba: bez toho sa nedá
           overiť, či zameranie naozaj niečo robí — a nastavenie, ktorého účinok
@@ -391,6 +420,7 @@ export function JarvisOkno({
             onKampan={(n) => { setNavrhKampane(n); setZNavrhu(true); }} />
         </div>
         </div>
+      )}
       </div>
     </div>
   );

@@ -969,6 +969,15 @@ export function ChatConversation({ chat, autoFocus, onClientClick, onNavigate, o
   useEffect(() => {
     if (autoFocus) setTimeout(() => inputRef.current?.focus(), 60);
   }, [autoFocus]);
+  // Rastúce políčko: textarea sa zväčšuje s dĺžkou správy (Jerry, 7. 9. 2026),
+  // po strop, potom scrolluje. Bez toho zostávalo na jednom riadku a dlhšia
+  // otázka sa písala do úzkeho okienka.
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+  }, [input]);
 
   return (
     <div
@@ -1171,7 +1180,7 @@ export function ChatConversation({ chat, autoFocus, onClientClick, onNavigate, o
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ask(input); } }}
           placeholder="Napíš otázku… (Enter odošle)"
           rows={1}
-          style={{ flex: 1, resize: "none", maxHeight: 120, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: "9px 11px", color: C.text, fontSize: 13, outline: "none", fontFamily: "inherit", lineHeight: 1.4 }}
+          style={{ flex: 1, resize: "none", height: 40, maxHeight: 200, overflowY: "auto", background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: "9px 11px", color: C.text, fontSize: 13, outline: "none", fontFamily: "inherit", lineHeight: 1.4 }}
         />
         {/*
           Počas písania odpovede je z tlačidla STOP.
