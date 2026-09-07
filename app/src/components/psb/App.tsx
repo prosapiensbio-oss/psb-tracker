@@ -4,7 +4,7 @@ import { nazovFazy } from "../../lib/psb/mapaCyklu";
 import { BARTER_KLIENTI, PRVY_MESIAC_OTAZOK, PRVY_MESIAC_Z_FIO, vzasVerzia, nastavBtcVyplaty, nastavHodinyZTrackera, nastavJarekZTrackera, nastavNakladyZFio, nastavPnlOverrides, nastavPrijmyZTrackera, nastavRucnePrijmy, nastavVyplaty, nastavZmenyKategorii, nazovKategorie, pnlHodnota, pnlOverridesNaUlozenie } from "../../lib/psb/vzas";
 import { platnySplit, rozdelPohyb, PRIJEM, type PohybSplits, type SplitCiast } from "../../lib/psb/pohybSplit";
 import { dokladyPreBtcPlatbu, platiebPodlaDni } from "../../lib/psb/btcSparovanie";
-import { ZAVER_PODLA_DRUHU, type TemaDruh } from "../../lib/psb/temaDna";
+import { OTVORENIE_PODLA_DRUHU, ZAVER_PODLA_DRUHU, type TemaDruh } from "../../lib/psb/temaDna";
 
 import {
   checkSession,
@@ -1772,7 +1772,7 @@ function skupinaFaktur(
       title: "🎥 Téma na hovorené video",
       // Samotná téma ide do DETAILU — riadok registra kreslí detail, nie
       // titulok, takže v titulku ju Jerry nevidel (4. 9. 2026).
-      detail: `${temaDna.tema}${temaDna.druh ? ` 🎬 Než zapneš kameru, maj hotovú JEDNU vetu, ktorou to zavrieš: ${ZAVER_PODLA_DRUHU[temaDna.druh]}` : ""} · zdroj: ${temaDna.odkial}. Nemusíš to nakrútiť — je to inšpirácia na deň, keď máš čas a priestor.`,
+      detail: `${temaDna.tema}${temaDna.druh ? ` 🎬 Pred kamerou maj hotové dve vety — otvorenie: ${OTVORENIE_PODLA_DRUHU[temaDna.druh]} A zavretie: ${ZAVER_PODLA_DRUHU[temaDna.druh]}` : ""} · zdroj: ${temaDna.odkial}. Nemusíš to nakrútiť — je to inšpirácia na deň, keď máš čas a priestor.`,
       trener: "Jerry",
       priority: 90,
       ...stavPolozky(`tema|${new Date().toISOString().slice(0, 10)}`),

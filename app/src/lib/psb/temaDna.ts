@@ -71,6 +71,20 @@ const PORADIE: TemaDna["druh"][] = ["hladanie", "otazka", "tvrdenie", "dokument"
  * druhu témy: čo tá jedna posledná veta má spraviť. Jerry si ju povie sám.
  */
 export type TemaDruh = TemaDna["druh"];
+
+/**
+ * Ako to OTVORIŤ. Jerry, 7. 9. 2026: chce pred kamerou vedieť aj PRVÚ vetu, nie
+ * len poslednú — s otvorením aj zavretím sa stred povie voľne, ale nerozplynie.
+ * Zas TVAR, nie hotová veta (to je tá AI príchuť).
+ */
+export const OTVORENIE_PODLA_DRUHU: Record<TemaDna["druh"], string> = {
+  hladanie: "pomenuj, čo väčšina pri tomto hľadá — a prečo im to nezaberie.",
+  otazka: "začni tou otázkou nahlas, presne ako ti ju položili.",
+  tvrdenie: "zopakuj to tvrdenie tak, ako ho počuješ — a hneď „a to nesedí“.",
+  dokument: "začni tou jednou myšlienkou, nie úvodom o článku.",
+  faza: "otvor tým, čo ich prekvapí — jedna vec, čo nie je normálna.",
+};
+
 export const ZAVER_PODLA_DRUHU: Record<TemaDna["druh"], string> = {
   hladanie: "čo má človek spraviť ako PRVÉ — jeden krok, nie zoznam.",
   otazka: "čo si z toho má odniesť — jedna veta, nie ďalšia otázka.",

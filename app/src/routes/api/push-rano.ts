@@ -3,7 +3,7 @@ import type { D1Database } from "@cloudflare/workers-types";
 
 import { bindings } from "../../lib/bindings.server";
 import { loadData } from "../../lib/psb/db.server";
-import { temaDna, ZAVER_PODLA_DRUHU } from "../../lib/psb/temaDna";
+import { temaDna, OTVORENIE_PODLA_DRUHU, ZAVER_PODLA_DRUHU } from "../../lib/psb/temaDna";
 import { preTrenera, registerZoServera } from "../../lib/psb/registerServer";
 import { posli, type Odber } from "../../lib/psb/push.server";
 import { polozkaZastaranaBanka, polozkyBtcNesedi } from "../../lib/psb/penazneNotifikacie";
@@ -208,7 +208,7 @@ export const Route = createFileRoute("/api/push-rano")({
             // Téma ide LEN Jerrymu — hovorené videá nakrúca on. Terezke by
             // to bol riadok, s ktorým nemá čo robiť.
             text: (riadky.length ? riadky.join("\n") + (zvysok > 0 ? `\n…a ďalších ${zvysok}` : "") : "")
-              + (jeJerry ? `${riadky.length ? "\n\n" : ""}🎥 Téma na dnes: ${tema.tema}\n🎬 Zavri to jednou vetou: ${ZAVER_PODLA_DRUHU[tema.druh]}` : ""),
+              + (jeJerry ? `${riadky.length ? "\n\n" : ""}🎥 Téma na dnes: ${tema.tema}\n🎬 Otvor: ${OTVORENIE_PODLA_DRUHU[tema.druh]}\n🏁 Zavri: ${ZAVER_PODLA_DRUHU[tema.druh]}` : ""),
             url: "/#dashboard",
             // Rovnaká značka = ranná správa NAHRADÍ včerajšiu, ak ju človek
             // nechal ležať. Dve rovnaké na zamknutej obrazovke nikto nečíta.
