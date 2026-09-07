@@ -62,6 +62,23 @@ const denCislo = (d: Date) => Math.floor(Date.parse(`${d.toISOString().slice(0, 
  */
 const PORADIE: TemaDna["druh"][] = ["hladanie", "otazka", "tvrdenie", "dokument", "faza"];
 
+/**
+ * Ako to ZAVRIEŤ. Jerry cez Jarvisa, 7. 9. 2026: „predtým než zapneš kameru,
+ * mal by si vedieť aspoň JEDNU vetu, ktorou to skončíš — inak sa freestyle
+ * rozplynie a caption to musí zachraňovať."
+ *
+ * Nie je to hotová veta (to by bola tá AI príchuť) — je to TVAR záveru podľa
+ * druhu témy: čo tá jedna posledná veta má spraviť. Jerry si ju povie sám.
+ */
+export type TemaDruh = TemaDna["druh"];
+export const ZAVER_PODLA_DRUHU: Record<TemaDna["druh"], string> = {
+  hladanie: "čo má človek spraviť ako PRVÉ — jeden krok, nie zoznam.",
+  otazka: "čo si z toho má odniesť — jedna veta, nie ďalšia otázka.",
+  tvrdenie: "čím to nahradiť — konkrétne, nie „treba viac cvičiť“.",
+  dokument: "jedna myšlienka z článku, nie zhrnutie celého.",
+  faza: "jasný ďalší krok — čo má spraviť dnes.",
+};
+
 export function temaDna(
   zdroje: {
     /** Skutočné vety z Googlu, najčastejšie prvé. */

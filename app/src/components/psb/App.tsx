@@ -4,6 +4,7 @@ import { nazovFazy } from "../../lib/psb/mapaCyklu";
 import { BARTER_KLIENTI, PRVY_MESIAC_OTAZOK, PRVY_MESIAC_Z_FIO, vzasVerzia, nastavBtcVyplaty, nastavHodinyZTrackera, nastavJarekZTrackera, nastavNakladyZFio, nastavPnlOverrides, nastavPrijmyZTrackera, nastavRucnePrijmy, nastavVyplaty, nastavZmenyKategorii, nazovKategorie, pnlHodnota, pnlOverridesNaUlozenie } from "../../lib/psb/vzas";
 import { platnySplit, rozdelPohyb, PRIJEM, type PohybSplits, type SplitCiast } from "../../lib/psb/pohybSplit";
 import { dokladyPreBtcPlatbu, platiebPodlaDni } from "../../lib/psb/btcSparovanie";
+import { ZAVER_PODLA_DRUHU, type TemaDruh } from "../../lib/psb/temaDna";
 
 import {
   checkSession,
@@ -568,12 +569,12 @@ export function PSBApp() {
   const [kanalyMesiace, setKanalyMesiace] = useState<string[]>([]);
   // Téma na dnešné hovorené video — do registra, aby ju Jerry našiel aj
   // v appke, nielen v rannej push (Jerry, 4. 9. 2026).
-  const [temaDna, setTemaDna] = useState<{ tema: string; odkial: string } | null>(null);
+  const [temaDna, setTemaDna] = useState<{ tema: string; odkial: string; druh?: TemaDruh } | null>(null);
   useEffect(() => {
     void fetch("/api/tema", { credentials: "same-origin" })
       .then((r) => r.json())
-      .then((j: { ok?: boolean; tema?: string; odkial?: string }) => {
-        if (j?.ok && j.tema) setTemaDna({ tema: j.tema, odkial: j.odkial || "" });
+      .then((j: { ok?: boolean; tema?: string; odkial?: string; druh?: TemaDruh }) => {
+        if (j?.ok && j.tema) setTemaDna({ tema: j.tema, odkial: j.odkial || "", druh: j.druh });
       })
       .catch(() => {});
   }, []);
@@ -1771,7 +1772,7 @@ function skupinaFaktur(
       title: "🎥 Téma na hovorené video",
       // Samotná téma ide do DETAILU — riadok registra kreslí detail, nie
       // titulok, takže v titulku ju Jerry nevidel (4. 9. 2026).
-      detail: `${temaDna.tema} · zdroj: ${temaDna.odkial}. Nemusíš to nakrútiť — je to inšpirácia na deň, keď máš čas a priestor.`,
+      detail: `${temaDna.tema}${temaDna.druh ? ` 🎬 Než zapneš kameru, maj hotovú JEDNU vetu, ktorou to zavrieš: ${ZAVER_PODLA_DRUHU[temaDna.druh]}` : ""} · zdroj: ${temaDna.odkial}. Nemusíš to nakrútiť — je to inšpirácia na deň, keď máš čas a priestor.`,
       trener: "Jerry",
       priority: 90,
       ...stavPolozky(`tema|${new Date().toISOString().slice(0, 10)}`),
