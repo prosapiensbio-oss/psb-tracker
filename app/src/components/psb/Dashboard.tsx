@@ -2461,6 +2461,24 @@ function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar }: { i
             </button>
           )}
           {!item.acked && !jeRozhodnutie && !jeTema && <button onClick={openItem} style={linkBtn}>{item.navrh ? "Nie, otvoriť" : "Otvoriť →"}</button>}
+          {/* Téma nemá „Otvoriť" — namiesto toho pošle dnešnú tému Jarvisovi
+              a nechá ho napísať konkrétny hook a záver v PSB štýle (Jerry,
+              7. 9. 2026). Appka dáva TVAR viet, Jarvis konkrétne slová —
+              natvrdo napísané by zneli genericky. */}
+          {jeTema && chat && !item.acked && (
+            <button
+              onClick={() => {
+                const t = item.detail.split(/ 🎬 | · zdroj:/)[0].trim();
+                chat.newChat("marketing");
+                chat.setFloatingOpen(true);
+                void chat.ask(`Na dnešné hovorené video (do 60 s) mi napíš PRVÚ vetu (hook) a POSLEDNÚ vetu (záver) v našom štýle — vecne, konkrétne, bez klišé a bez hype. Stred nepíš, ten poviem voľne. Daj mi 2 varianty.\n\nTéma: ${t}`);
+              }}
+              style={{ ...linkBtn, color: C.accentLight }}
+              title="Jarvis ti napíše prvú a poslednú vetu k tejto téme"
+            >
+              ✍️ Napíš hook a záver
+            </button>
+          )}
           {/* „Otvoriť" ťa prepne na miesto, ale odpoveď na otázku typu „prečo
               chýba nájom" tam nikde nezapíšeš. Odpovedať sa dá rovno tu —
               text ide Jarvisovi aj s tým, čoho sa týka, takže nemusíš
