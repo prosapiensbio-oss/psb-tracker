@@ -2,6 +2,7 @@
 // no browser globals. Reused across every module.
 import { daysBetween, fmtDMY, monthKey, monthLabel, monthsBetween, normName, quarterKey, quarterLabel, weekKey, weekLabel } from "./format";
 import { menoZNazvuUvodneho } from "./kalendar";
+import { vlastnikKlienta } from "./zaskok";
 import { BARTER_KLIENTI } from "./vzas";
 import { podozriveCisla, type Podiel } from "./kontrolaDat";
 import type {
@@ -284,10 +285,18 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
     //
     // Keď klient za pol roka netrénoval, platí celoživotný pomer — inak by
     // sa každý, kto má pauzu, ocitol bez trénera.
-    const nedavne = Object.entries(c.trainersNedavno).sort((a, b) => b[1] - a[1])[0]?.[0];
-    const autoPrimary = nedavne
-      || Object.entries(c.trainers).sort((a, b) => b[1] - a[1])[0]?.[0]
-      || "—";
+    //
+    // OD SEPTEMBRA 2026 ZÁSKOK NEMENÍ VLASTNÍKA (zaskok.ts). Matyáš trénuje
+    // Jerryho a Terezkiných klientov, ale klient zostáva ich — rozhodujú len
+    // ich sedenia. Matyášov je len nový klient, ktorého úvodný viedol on.
+    const prvyDen = c.firstSession.slice(0, 10);
+    const autoPrimary = vlastnikKlienta({
+      celkom: c.trainers,
+      nedavno: c.trainersNedavno,
+      prvyDenTreneri: c.sessions.filter((s) => s.date.slice(0, 10) === prvyDen).map((s) => s.sessionTrainer),
+      prvyDatum: c.firstSession,
+      zakladatelia: TRAINERS,
+    });
     c.primaryTrainer = ov?.primaryTrainer || autoPrimary;
     c.primaryTrainerOverride = !!ov?.primaryTrainer;
     c.substituteCount = c.sessions.filter((s) => s.sessionTrainer !== c.primaryTrainer).length;

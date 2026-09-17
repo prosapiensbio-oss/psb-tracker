@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { audit, jeZamknuty, zamknuteMesiace } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
-import { parseFio, type FioRiadok } from "../../lib/psb/fio";
+import { fioKluc, parseFio, type FioRiadok } from "../../lib/psb/fio";
 
 // Import bankového výpisu — dvojkrokovo.
 //
@@ -25,8 +25,8 @@ const uid = () => crypto.randomUUID();
 //
 // Bez ID (export „Vyhledané pohyby" ani textový výpis ho nemajú) sa vracia
 // pôvodný kľúč. Ten duplicitné platby zlúči — preto appka odporúča výpis.
-const kluc = (r: { id?: string; datum: string; suma: number; protistrana?: string }) =>
-  r.id ? `fio:${r.id}` : `${r.datum}|${r.suma}|${(r.protistrana || "").slice(0, 40)}`;
+// Jedna definícia s klientom — viď fio.fioKluc (poradie duplicít bez ID).
+const kluc = fioKluc;
 
 export const Route = createFileRoute("/api/fio")({
   server: {

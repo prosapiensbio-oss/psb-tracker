@@ -728,6 +728,8 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
             { value: "", label: `Automatický (${editC.primaryTrainer})` },
             { value: "Jerry", label: "Jerry" },
             { value: "Terezka", label: "Terezka" },
+            // Len pre klienta, ktorý prišiel priamo k nemu. Záskok vlastníka nemení.
+            { value: "Matyáš", label: "Matyáš (vlastný klient)" },
           ]} />
           <label style={{ fontSize: 13, color: C.text, display: "flex", alignItems: "center", gap: 8, marginBottom: 8, cursor: "pointer" }}>
             <input type="checkbox" checked={editC.specialRate} onChange={(e) => actions.setOverride(editC.name, "specialRate", e.target.checked)} style={{ accentColor: C.accent }} />

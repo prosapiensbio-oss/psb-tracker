@@ -4,7 +4,8 @@
 // the alerts. Where a card recomputes something (zones, weekly hours, capacity
 // util, top KPIs), we mirror that exact logic below rather than reuse a
 // deprecated field (e.g. capacity.effHours is reference-only, NOT what the card shows).
-import { breakEvenRad, PNL, VZAS_MONTHS, pnlCalc, poslednyMesiacSDatami, salaryCalc as pnlSalary, tempoDlhu, CURRENT_ERA } from "./vzas";
+import { breakEvenRad, PNL, SALARY, VZAS_MONTHS, pnlCalc, poslednyMesiacSDatami, salaryCalc as pnlSalary, tempoDlhu, CURRENT_ERA } from "./vzas";
+import { guillermoZostatok, type GuillermoZaznam, type GuillermoUdalost } from "./guillermo";
 import {
   GA4_MESACNE, GSC_DOPYTY, GSC_MESACNE, GSC_STRANY,
   MKT_CLANKY, MKT_MESACNE,
@@ -108,6 +109,7 @@ export function buildAiContext(
   uzavierka?: UzavierkaPreAi,
   rezerva?: RezervaPreAi,
   btc?: BtcPreAi,
+  guillermo?: { zaznamy: GuillermoZaznam[]; udalosti: GuillermoUdalost[] },
 ) {
   const clientList = Object.values(clients);
 
@@ -272,6 +274,13 @@ export function buildAiContext(
   // ktoré potrebuje zoznam klientov.
   const pnlMesiace = VZAS_MONTHS.slice(-12);
   const _p = pnlCalc();
+  // Poslané, nárok a hodiny PO OSOBE a PO MESIACOCH — ten istý mzdový model
+  // (salaryCalc), aký beží na obrazovke J&T Výplaty. 9. 9. 2026 Jarvis nevedel
+  // odpovedať „koľko má Jerry reálne na hodinu za posledné 3 mesiace / od
+  // začiatku roka", lebo v kontexte mal Jerryho POSLANÉ len za posledný mesiac
+  // (dlhyVyplaty.poslanePoslednyMesiac) a spadol na prázdne SQL vzas_payments.
+  const _sc = { jerry: pnlSalary("jerry"), terezka: pnlSalary("terezka") };
+  const _g = guillermo ? guillermoZostatok(guillermo.zaznamy, guillermo.udalosti) : null;
   const pnlSuhrn: Record<string, Record<string, number>> = {};
   for (const mk of pnlMesiace) {
     const idx = VZAS_MONTHS.indexOf(mk);
@@ -280,6 +289,12 @@ export function buildAiContext(
       prijmy: Math.round(_p.prijmy[idx] || 0),
       naklady_bez_vyplat: Math.round(_p.bezVyplat[idx] || 0),
       vyplaty_poslane: Math.round(_p.vyplatySpolu[idx] || 0),
+      poslane_jerry: Math.round(_sc.jerry.poslane[idx] || 0),
+      poslane_terezka: Math.round(_sc.terezka.poslane[idx] || 0),
+      narok_jerry: Math.round(_sc.jerry.narok[idx] || 0),
+      narok_terezka: Math.round(_sc.terezka.narok[idx] || 0),
+      hodiny_jerry: Math.round((SALARY.jerry.hours[idx] || 0) * 10) / 10,
+      hodiny_terezka: Math.round((SALARY.terezka.hours[idx] || 0) * 10) / 10,
       naklady_spolu: Math.round(_p.celkoveNaklady[idx] || 0),
       hruby_zisk: Math.round(_p.hrubyZisk[idx] || 0),
       marza_pct: Math.round((_p.marza[idx] || 0) * 10) / 10,
@@ -1067,9 +1082,18 @@ export function buildAiContext(
     // v bankových pohyboch a odpovedal buď zle, alebo vôbec — číslo, ktoré
     // appka počíta na jednom riadku, nemá zmysel nechať odvodzovať.
     pnlSuhrn: {
-      poznamka: "HOTOVÝ P&L po mesiacoch — to isté číslo, aké ukazuje obrazovka Peniaze → Zisky a straty a dlaždica uzavretého mesiaca na Kokpite. Na otázku „aký bol zisk / tržby / náklady v mesiaci X“ PREČÍTAJ hruby_zisk / prijmy / naklady_spolu odtiaľto a NEPOČÍTAJ si ho sám z bankových pohybov ani z payments. 19. 8. 2026 si na „hrubý zisk júl 2026“ odpovedal 157 498 Kč — poskladal si to z banky a zabudol väčšinu výplat; obrazovka mala 133 465. Banka má pohyby, P&L má pravidlá (čo je náklad, čo výplata, čo osobné, čo barter) — bez tých pravidiel vyjde iné číslo. vyplaty_poslane sú VŠETKY poslané výplaty za mesiac (Jerry, Terezka, Matyáš, spoločné), nie len dva riadky z fio_transactions. Keď sa ťa niekto spýta, odkiaľ číslo máš, povedz: z P&L appky, kľúč pnlSuhrn.",
+      poznamka: "HOTOVÝ P&L po mesiacoch — to isté číslo, aké ukazuje obrazovka Peniaze → Zisky a straty a dlaždica uzavretého mesiaca na Kokpite. Na otázku „aký bol zisk / tržby / náklady v mesiaci X“ PREČÍTAJ hruby_zisk / prijmy / naklady_spolu odtiaľto a NEPOČÍTAJ si ho sám z bankových pohybov ani z payments. 19. 8. 2026 si na „hrubý zisk júl 2026“ odpovedal 157 498 Kč — poskladal si to z banky a zabudol väčšinu výplat; obrazovka mala 133 465. Banka má pohyby, P&L má pravidlá (čo je náklad, čo výplata, čo osobné, čo barter) — bez tých pravidiel vyjde iné číslo. vyplaty_poslane sú VŠETKY poslané výplaty za mesiac (Jerry, Terezka, Matyáš, spoločné), nie len dva riadky z fio_transactions. VÝPLATA PO OSOBE A HODINOVKA: poslane_jerry / poslane_terezka = reálne poslané tomu človeku v tom mesiaci (mzdový model salaryCalc, to isté číslo ako riadok „Jerry/Terezka Poslané“ na obrazovke Peniaze → J&T Výplaty); narok_jerry/narok_terezka = nárok podľa modelu; hodiny_jerry/hodiny_terezka = mzdotvorné hodiny (offline+online, bez úvodných). PREČÍTAJ ich odtiaľto — NIKDY nehľadaj poslané v tabuľkách vzas_payments / vzas_payment_splits (sú prázdne, appka poslané drží v MODELI, nie v SQL) ani v bankových pohyboch (tam sa „Jerry vyplata“ mieša s osobnými nákupmi). Reálna hodinovka za obdobie = SÚČET poslane_<osoba> cez mesiace ÷ SÚČET hodiny_<osoba> cez tie isté mesiace (nie priemer mesačných hodinoviek). Keď sa ťa niekto spýta, odkiaľ číslo máš, povedz: z P&L appky, kľúč pnlSuhrn.",
       mesiace: pnlSuhrn,
     },
+    guillermo: _g
+      ? {
+          poznamka: "Zostatok sedení u Guillerma (FP Spain) — HOTOVÉ číslo z toho istého výpočtu ako karta „Guillermo“ v Peniaze → J&T Výplaty (lib guillermoZostatok). PREČÍTAJ `zostatok` — NEPOČÍTAJ si ho sám z guillermo_hodiny ani z kal_udalosti; počítanie „odtrénované od kotvy“ je jemné a ľahko sa pomýli. Kladné = koľko sedení má Jerry ešte dopredu; záporné = koľko dlží. `kotvaDatum` je deň posledného ručného stavu, od ktorého sa ráta (+ kúpené, − odtrénované guillermo tréningy). FP Spain je Jerryho OSOBNÝ výdaj, nie firemný náklad — nikdy to neprehadzuj do P&L.",
+          zostatok: _g.zostatok,
+          kupene_po_kotve: _g.kupene,
+          odtrenovane_po_kotve: _g.odtrenovane,
+          kotvaDatum: _g.kotvaDatum,
+        }
+      : null,
     pnlPolozky,
     klientiDetail,
   };

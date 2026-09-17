@@ -10,22 +10,21 @@ webový v [uprava-webu.md](uprava-webu.md).
 
 ## A · Čaká na teba — s termínom
 
-| kedy | čo | kde to je |
-|---|---|---|
-| **po odpovedi FP** | **Verifikačný odkaz na stránku „Co je Functional Patterns".** Handbook ho povoľuje a je to jediné miesto, kde meno metódy niečo dokazuje. | prosapiens.cz/co-je-functional-patterns |
-| **september** | **UTM parametre pri spustení reklamy.** Zámerne odložené — bez reklamy nemajú čo merať. | — |
+— nič otvorené —
+
+<!-- Vybavené 8. 9. 2026:
+     • FP verifikačný odkaz na /co-je-functional-patterns — vyriešené (Jerry).
+     • UTM parametre pri spustení reklamy — hotové, návštevnostná kampaň
+       (grafika A) beží s utm_campaign=uvodni-trenink-brno-2026-09. -->
+
 
 ---
 
 ## B · Čaká na teba — bez termínu, ale blokuje ďalšie veci
 
-**0 · Full Access: ŽIADOSŤ ODOSLANÁ — čaká sa na Metu (do ~20 dní)**
-20. 8. večer: Business Verification prešla ešte v deň podania (údaje podľa ŽR:
-Mgr. Filip Stráňavský, IČO 19126841) a žiadosť o Marketing API Access Tier je
-odoslaná do App Review — stav „Review in progress“. Z tvojej strany NIČ
-netreba; keby Meta chcela doplnenie, príde mail. Register to pripomenie 3. 9.
-(záver zv-full-access-verifikacia). Keď schvália, appka sama prepne propagáciu
-z kópie na pravý boost. Dovtedy všetko funguje záložnou cestou.
+<!-- Full Access od Mety: ZAMIETNUTÝ (7. 9. 2026). Neudelili ho. Appka beží
+     ďalej záložnou cestou (kópia príspevku namiesto pravého boostu) — to nám
+     stačí, položka je uzavretá. -->
 
 **1 · NDA pri fotkách pred/po**
 Prejsť klientov, ktorých fotky sa už niekde použili, a skontrolovať súhlasy.
@@ -37,42 +36,36 @@ FP navyše žiada dve brány: súhlas klienta **a** schválenie na fp.app.
 
 ## C · Práca, ktorá je pripravená a čaká len na teba
 
-**4 · Dve nové stránky na web**
-Zadania sú hotové v Jarvisovi, obe v pevnom tvare a s overenými číslami:
+**4 · Dve nové stránky na web — HOTOVÉ (8. 9. 2026)**
+Oba články sú **publikované** (Jerry): *subokcipitální svaly* aj
+*thorakolumbální fascie*. Keď web_stranky pri najbližšom sťahu uvidí nové
+adresy, karta „Čo publikovať ďalej" ich prestane navrhovať; ak by predsa
+svietili, odklepni ich v appke ako *hotové*.
 
-| téma | prečo | stav |
-|---|---|---|
-| **subokcipitální svaly** | 849 zobrazení, pozícia 2,3 — a na webe o tom nie je veta | zadanie pripravené |
-| **thorakolumbální fascie** | 630 zobrazení, pozícia 1,8 — termín je len v článkoch o SBL a DFL | zadanie pripravené |
+<!-- 5 · Register čaká na akciu — VYBAVENÉ (bolo z 26. 8.). Mesačná kontrola
+     8. 9. 2026 (naostro) tieto položky v otvorenom registri už nenašla —
+     SMS po úvodnom aj odmeny za odporúčanie sú vyriešené. -->
 
-Postup: skopírovať zadanie → Project napíše → **text vrátiť Jarvisovi na
-kontrolu** → publikovať → označiť nápad ako *použitý*.
+**5 · Register — priebežná operatíva**
+Bežné položky (SMS po úvodnom, odmeny za odporúčanie) rieš priamo
+v Notifikáciách, keď sa objavia. Nie je to zoznam navyše — appka ich hlási sama.
 
-**5 · Register čaká na akciu**
-- **4× SMS po úvodnom** — Roman Pavlik, Hana Hrdinova, Zuzana Sopoligová, Tereza Pehalova
-- **5× odmena za odporúčanie (10 %)** — Petra Rupova, Natalia Peckova, Regina Obrovska, Jakub Gerich, Katerina Matlova
-
-**6a · Päť tréningov chýba v PTminderi**
-Kalendár ich má, export ten deň pokrýva a sedenie v ňom nie je. Pri každom
-sú v Notifikáciách dve tlačidlá — *Netrénoval* (zapíše sa zrušenie) alebo
-*Trénoval* (potom je to hodina, ktorá nie je vyfakturovaná):
-
-| kto | kedy | tréner |
-|---|---|---|
-| Marketa Lozias | 13. 8. | Terezka |
-| **Roman Pavlik** | **13. 8.** | **Jerry** — zaplatil 7 790 Kč |
-| Naďa Khamaziuk | 12. 8. | Terezka |
-| Iva Stoklaskova | 12. 8. | Terezka |
-| Richard Matl | 10. 8. | Jerry |
+<!-- 6a · Päť tréningov chýba v PTminderi — VYBAVENÉ (overené 15. 9. 2026):
+     Roman Pavlik 13. 8., Richard Matl 10. 8., Iva Stoklaskova a Naďa Khamaziuk
+     12. 8. sú už v PTminderi; Marketa Lozias 13. 8. zodpovedaná (mala 10. 8.). -->
 
 **6 · Šesť dôvodov odchodu, na ktoré sa appka už nepýta**
 Sú staršie než 90 dní, takže sa v registri neobjavia — ak si na niektorý
 spomenieš, stačí meno a jedno slovo: Andrea Čonkova (12/2025), Vojta Bartoň,
 Viera Adamkova, Josef Žiška, Jiri Kubik, Denisa Chmelarova.
 
-**7 · Prvé meranie bolesti**
-Tabuľka je prázdna a čaká. Pri najbližšom tréningu: **+ Zápis** → meno z čipov
-→ číslo 0–10. Bez prvého merania sa nedá porovnať nič.
+<!-- 7 · Prvé meranie bolesti — ZRUŠENÉ zo zoznamu (Jerry, 8. 9. 2026:
+     „zbytočná robota navyše"). Nebola to appková notifikácia (nič nenutilo),
+     len tento pripomienkový bod. Samotná funkcia merania bolesti na karte
+     klienta zostáva ako NEPOVINNÁ možnosť — nerobí prácu, kým sa nepoužije.
+     Ak ju Jerry chce úplne vytrhnúť z UI, je to samostatná (deštruktívna)
+     úloha naprieč ~10 obrazovkami — až na výslovný pokyn. -->
+
 
 ---
 
@@ -81,7 +74,6 @@ Tabuľka je prázdna a čaká. Pri najbližšom tréningu: **+ Zápis** → meno
 | | |
 |---|---|
 | **Forminator /dychani — meranie, nie formulár** | Overené naživo 20. 8.: formulár FUNGUJE (testovacie odoslanie prešlo, ďakovná správa s PDF sa zobrazila; test som po sebe zmazal). V databáze sú 2 reálne leady (28. 7. a 2. 8.) + tvoj test z 19. 7. „Nula odoslaní" z čias reklamy bola z väčšej časti iná vec: formulár prišiel na /dychani až 19. 7. — dovtedy tam bol priamy odkaz na PDF bez zbierania mailov, takže 448 klikov z reklamy (1.–19. 7.) nemalo čo vyplniť. Meranie je navyše slepé dodnes: poďakovanie je inline (`behaviour-thankyou`), nikdy nepresmeruje na ďakovnú stránku, takže GA4/Pixel udalosti sa nespúšťajú. **Reklama na príručku je zámerne STOP** (jún+júl spolu 2 082 Kč, produkt za 290 Kč, predaje ~0 — ekonomicky sa to nemôže vrátiť; kampaň 52576823609275 pozastavená). Prípadná oprava merania má teda zmysel len pre organiku: nová ďakovná stránka `/podekovani-dychani/` (nie tá „ozveme sa do 48 h" — tá patrí dopytom) + vlastná udalosť `LeadMagnetDychani`. Pozor: Forminator leady nejdú do Kokpitu — snippet počúva len Contact Form 7. |
-| **Appka na iPhone** | PWA je pol dňa práce, mobilná verzia Kokpitu deň, upozornenia na telefón ďalší deň. Natívna appka až keby ju mal používať niekto mimo vás. Povedz, či to ide na rad. |
 | **Prepojenie Kokpit ↔ Project** | Cesta A (adresa so snapshotom, hodina) alebo B (konektor MCP, deň). Zhodli sme sa, že B je lepšia, ale A sa dá overiť za hodinu. Zatiaľ nestaviame. |
 | **Cieľ presmerovania** | `/drevena-bezecka-draha/` teraz vedie na `/o-nas/` — cieľ, ktorým som si najmenej istý. |
 | **Rezerva 1,2 mesiaca** | Cieľ sú 3. Nie je to úloha, je to číslo, ktoré rozhoduje o tom, koľko sa dá minúť. |

@@ -336,6 +336,10 @@ záver odporuje tomu, čo Jerry hovorí zo skúsenosti.
   „klient tretieho trénera patrí obom" svietili jej narodeniny aj Terezke.
   Bez sedení za pol roka platí celoživotný pomer, inak by klient na pauze
   zostal bez trénera.
+  **Od 14. 9. 2026 rátajú len sedenia Jerryho a Terezky** (`zaskok.ts`):
+  Matyáš je záskok a „kto trénoval" ≠ „čí je klient". Matyášov je automaticky
+  len nový klient, ktorého prvý deň (od 9/2026) viedol on. Jeho mzda (DPP,
+  370 Kč/h) sa od 7/2026 plní sama zo sedení (`nastavMatyasZTrackera`).
 
 - **Chýbajúci stĺpec v INSERTe nespadne — ticho mlčí.** 24. 8. 2026 som ho
   zabudol ŠTYRIKRÁT za jeden deň (hotovy_text, zaber, scenar so sekvenciou,
@@ -592,3 +596,64 @@ otvorené to, čo Jerry s Jarvisom už vyriešil, a rozišla by sa s obrazovkou.
 Skript ťahá aj `poplatky` — a preto v ňom stojí kontrola, či každý poplatok
 sedí na známeho klienta. Pravidlo: **keď pribudne tabuľka, ktorá vstupuje do
 registra alebo do notifikácií, pridaj ju do `naostro.sh` v tom istom kroku.**
+
+## Zaseknutý PWA shell = biela obrazovka, nie chyba servera
+
+11. 9. 2026: „Kokpit nefunguje" — v Safari fungoval, v PWA na ploche biela
+obrazovka. Server, SSR, D1, všetkých 30 assetov: v poriadku. Príčina: nasadenie
+vymení hashované `index-<hash>.js` a staré ZMAŽE; iOS si pri PWA drží STARÝ
+`index.html`, ktorý žiada starý hash → 404 → nespustí sa JS → biela. Appka sa
+ani nenaštartuje, takže pás „nová verzia" nepomôže.
+
+**Riešenie v kóde:** `lib/psb/samoliecenie.ts` + routa `routes/assets/$.ts`.
+Na worker padnú len CHÝBAJÚCE assety (`not_found_handling: "none"`); chýbajúci
+`*.js` sa vráti ako **200 + skript**, ktorý appku presmeruje na `?v=<čas>` →
+čerstvý shell (`no-cache`) → nový bundle. 404-ový module script by sa
+nevykonal, preto 200. Poistka: jeden reload za minútu (sessionStorage).
+
+**Diagnostický postup pri „nefunguje":** najprv `curl` shell + assety + API
+(401 = žije, 5xx = padá), potom **„funguje to v Safari?"** — ak áno, je to
+zariadenie/PWA, nie appka. Nepúšťaj sa do lovu v kóde skôr, než vylúčiš keš.
+A `naostro.sh` vie spadnúť na rate-limite wranglera (stlmený stderr) —
+prechodná chyba nástroja nie je nález; zopakuj beh.
+
+## Export bez ID operace zahadzoval rovnaké platby v jeden deň
+
+13. 9. 2026: Jerry nahráva „Pohyby na všech účtech" namiesto „Výpisu z účtu".
+Formát parser čítal správne — ale export **nemá stĺpec ID operace**, takže
+kľúč bol `dátum|suma|protistrana`. Jerry si posiela výplatu po častiach, a dve
+„Jerry vyplata −1500" v jeden deň mali ten istý kľúč; `INSERT OR IGNORE` na
+unikátnom `dedup_key` druhú **ticho zahodil**. V jednom súbore 3 kolízie =
+5 000 Kč výplat preč a dlh by vyšiel o toľko lepší.
+
+**Oprava:** `ocislujDuplicity` v `fio.ts` očísluje druhý a ďalší rovnaký pohyb
+bez ID (`#2`, `#3`) podľa poradia v súbore — stabilné aj pri znovunahratí a pri
+dlhšom prekrývajúcom sa exporte. Prvý výskyt má kľúč PRESNE ako predtým (v DB
+bolo 22 takých riadkov). Kľúč má **jednu definíciu** `fioKluc`; server aj
+`pohybSplit.pohybKluc` ju volajú. Testy v `fio.test.ts` na presnom tvare exportu.
+
+**Čo tento export stále nevie:** (1) nemá „Koncový stav účtu", takže stav účtu
+v Rezerve sa z neho neaktualizuje; (2) pre ten istý mesiac NEMIEŠAJ oba typy
+exportu — pohyb z Výpisu má kľúč `fio:<id>`, z Pohybov `dátum|suma|…`, a
+naimportoval by sa dvakrát.
+
+## „Kalendár odpojený" = worker zomrel, nie adresa
+
+13. 9. 2026 Jerry: „to ich fakt musím pripájať raz za 1,5 týždňa?" Nie —
+adresy boli platné (HTTP 200). Jerryho kalendár (2,6 MB) zabíjal worker na
+CPU: `posunMinut` staval `new Intl.DateTimeFormat` pri každom čase v súbore
+(78 % CPU v profile). A cron vyberal zdroj podľa posledného ÚSPECHU, takže
+padajúci kalendár si vybral každý beh — tri dni sa nestiahol ani jeden.
+
+Tri pravidlá, ktoré z toho platia:
+- **Drahý objekt (Intl, RegExp s flagmi, formátovač) nestav v slučke nad
+  súborom.** Parser si formátovač drží a posun pásma pamätá po hodinách.
+- **Rotácia podľa pokusu, nie úspechu** (`vyberZdroj` v `kalendarZdroje.ts`)
+  — inak jeden padajúci zdroj zablokuje všetky ostatné.
+- **Pokus sa zapíše PRED ťažkou prácou** (`kal_snimky`, `chyba` začína
+  „nedokončené"); úspech/chyba ho prepíše. Neprepísaný pokus starší než
+  2 min je na obrazovke chyba (`chybaZdroja`), nie zelené „pripojený".
+
+Zmena parsera sa overuje porovnaním starej a novej verzie na REÁLNYCH
+súboroch v rôznych oknách (vrátane prelomov letného času) — výstup musí
+byť zhodný do znaku. Syntetické testy sú v `ical.test.ts`.

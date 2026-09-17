@@ -167,7 +167,15 @@ else {
   // kontrola spadla na Janke Malinovej presne takto. ŠTVRTÝ prípad, keď sa
   // mýlila kontrola a nie appka.
   const maSedenia = base.sessions.some((x) => x.client === n.klient);
+  // Odchod už niekto vysvetlil (duch|/gone| ack): appka zámerne mlčí a
+  // vynoriť „prestal chodiť" by bolo proti odpovedi. 8. 9. 2026 tu kontrola
+  // spadla na Lucii Kafkovej — `duch|Lucie Kafkova` bol odklepnutý 22. 8.
+  // („bola celé leto preč"), a jej nezhoda 31. 8. je navyše zámena
+  // „Lucka" → Lucia Podolová, ktorú Terezka dvakrát opravila. PIATY prípad,
+  // keď sa mýli kontrola, nie appka (viď varovanie v hlavičke skriptu).
+  const odchodZodpovedany = !!base.anomalyAck[`duch|${n.klient}`] || !!base.anomalyAck[`gone|${n.klient}`];
   if (!maSedenia) console.log("  (nový klient bez sedení — gone sa naňho nevzťahuje, preskakujem)");
+  else if (odchodZodpovedany) console.log("  (odchod už zodpovedaný v registri — gone/duch sa právom neozve, preskakujem)");
   else if (inyKryje) ok(!po.has(`gone|${n.klient}`), "kalendar ho kryje inym treningom - prestal chodit sa NEVRACIA");
   else ok(po.has(`gone|${n.klient}`) || po.has(`duch|${n.klient}`), "prestal chodit sa VRATIL - kalendar ho uz nekryje");
 }

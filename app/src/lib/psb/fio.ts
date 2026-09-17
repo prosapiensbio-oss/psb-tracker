@@ -32,7 +32,48 @@ export type FioRiadok = {
   typ: string;
   /** Odhad kategórie v P&L, napr. "fixne.apps.adobe". Prázdne = netuším. */
   kategoria: string;
+  /** Poradie medzi rovnakými pohybmi BEZ ID (rovnaký deň, suma, protistrana).
+   *  Prvý výskyt ho nemá, druhý má 2, tretí 3… Viď `ocislujDuplicity`. */
+  poradie?: number;
 };
+
+/**
+ * Deduplikačný kľúč pohybu — JEDINÁ definícia (server `api/fio.ts` aj klient
+ * `pohybSplit.pohybKluc`). S ID je to `fio:<id>`, bez ID `dátum|suma|protistrana`
+ * a pri druhom a ďalšom rovnakom pohybe v súbore `#<poradie>`.
+ *
+ * Prvý výskyt má kľúč PRESNE ako pred 13. 9. 2026 — v databáze je 22 takých
+ * riadkov a zmenou tvaru by sa pri ďalšom importe naimportovali druhýkrát.
+ */
+export function fioKluc(r: { id?: string; datum: string; suma: number; protistrana?: string; poradie?: number }): string {
+  if (r.id) return `fio:${r.id}`;
+  const zaklad = `${r.datum}|${r.suma}|${(r.protistrana || "").slice(0, 40)}`;
+  return r.poradie && r.poradie > 1 ? `${zaklad}#${r.poradie}` : zaklad;
+}
+
+/**
+ * Očísluje pohyby bez ID, ktoré by inak dostali rovnaký kľúč.
+ *
+ * Export „Pohyby na všech účtech" (13. 9. 2026) nemá stĺpec ID operace. Jerry si
+ * posiela výplatu po častiach, takže v jeden deň býva dvakrát „Jerry vyplata
+ * −1500". Oba riadky mali kľúč `2026-09-01|-1500|Jerry vyplata` a databáza
+ * (`INSERT OR IGNORE` na unikátnom dedup_key) druhý TICHO ZAHODILA — v tom jednom
+ * súbore by chýbalo 5 000 Kč výplat a dlh by vyšiel o toľko lepší.
+ *
+ * Poradie berie poradie riadkov v súbore, preto je stabilné: ten istý export
+ * (aj export dlhšieho obdobia, ktoré ho prekrýva) dá tie isté kľúče a znovu
+ * nahratý súbor sa neduplikuje.
+ */
+export function ocislujDuplicity(riadky: FioRiadok[]): FioRiadok[] {
+  const videne = new Map<string, number>();
+  return riadky.map((r) => {
+    if (r.id) return r;
+    const k = fioKluc({ ...r, poradie: undefined });
+    const n = (videne.get(k) || 0) + 1;
+    videne.set(k, n);
+    return n > 1 ? { ...r, poradie: n } : r;
+  });
+}
 
 /** Kontrolné súčty z hlavičiek výpisov — na overenie, že import nič nestratil. */
 export type FioKontrola = {
@@ -322,7 +363,7 @@ export function parseFio(text: string, pravidla: { vzor: string; kategoria: stri
   if (!out.length) return parseFioText(text, pravidla);
   // Celý text, nie len blok pred prvou hlavičkou — pri viacerých nahratých
   // výpisoch sú ďalšie hlavičky uprostred.
-  return { ok: true, riadky: out, hlavicka, kontrola: kontrolneSucty(riadky) };
+  return { ok: true, riadky: ocislujDuplicity(out), hlavicka, kontrola: kontrolneSucty(riadky) };
 }
 
 
@@ -370,5 +411,5 @@ function parseFioText(text: string, pravidla: { vzor: string; kategoria: string 
     });
   }
   if (!out.length) return { ok: false, chyba: "Kotvy som našiel, ale nedal sa z nich prečítať dátum ani suma.", ukazka: [] };
-  return { ok: true, riadky: out, hlavicka: ["textový výpis z internetbankingu"] };
+  return { ok: true, riadky: ocislujDuplicity(out), hlavicka: ["textový výpis z internetbankingu"] };
 }

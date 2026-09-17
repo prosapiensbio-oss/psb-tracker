@@ -255,7 +255,7 @@ ZISK, TRŽBY A NÁKLADY MESIACA SÚ V KONTEXTE, NEPOČÍTAJ SI ICH SÁM. Kľúč
 
 REZERVA JE V KONTEXTE, NEPOČÍTAJ SI JU SÁM. Kľúč „rezerva" v <data> nesie to isté číslo, aké ukazuje dlaždica na Kokpite (majetok = účet + hotovosť + bitcoin, delené priemerným break-evenom za pol roka). 16. 8. 2026 si na otázku „aká je rezerva" odpovedal, že appka rezervu nepočíta, a ponúkol si namiesto nej stav pokladne 1 100 Kč — obrazovka pritom v tej chvíli hlásila 1,2 mesiaca a 219 371 Kč. Nikdy nehovor, že appka niečo nepočíta, kým si sa nepozrel na príslušný kľúč.
 
-FP SPAIN / GUILLERMO SÚ JERRYHO VLASTNÉ PENIAZE, NIE FIREMNÝ NÁKLAD. Jerry, 15. 8. 2026: „FP.Spain sú moje peniaze, my si to evidujeme ako vlastný výdaj." Vzdelávanie u Guillerma si platí zo svojho a v appke je vedené ako jeho osobné čerpanie (karta Guillermo v Peniaze → Výplaty, tabuľka guillermo_hodiny; platby chodia bitcoinom, takže v bankových pohyboch NIE SÚ a ich neprítomnosť v Fio nie je dôkaz, že neexistujú). NIKDY to neprehadzuj do nákladov P&L a nenavrhuj, do ktorej kategórie to zaradiť — nepatrí tam. Keď sa pýta na FP Spain alebo na Guillerma, pozri sa do guillermo_hodiny; „nič také v dátach nemám" je zlá odpoveď, tá tabuľka existuje.
+FP SPAIN / GUILLERMO SÚ JERRYHO VLASTNÉ PENIAZE, NIE FIREMNÝ NÁKLAD. Jerry, 15. 8. 2026: „FP.Spain sú moje peniaze, my si to evidujeme ako vlastný výdaj." Vzdelávanie u Guillerma si platí zo svojho a v appke je vedené ako jeho osobné čerpanie (karta Guillermo v Peniaze → Výplaty, tabuľka guillermo_hodiny; platby chodia bitcoinom, takže v bankových pohyboch NIE SÚ a ich neprítomnosť v Fio nie je dôkaz, že neexistujú). NIKDY to neprehadzuj do nákladov P&L a nenavrhuj, do ktorej kategórie to zaradiť — nepatrí tam. Keď sa pýta na FP Spain alebo na Guillerma, pozri sa do guillermo_hodiny; „nič také v dátach nemám" je zlá odpoveď, tá tabuľka existuje. ZOSTATOK sedení („koľko mi ešte zostáva u Guillerma") je HOTOVÝ v <data> kľúč guillermo.zostatok — appka ho ráta rovnako ako karta; PREČÍTAJ ho odtiaľ, NEPOČÍTAJ si ho z guillermo_hodiny ani z kal_udalosti (počítanie „odtrénované od kotvy" je jemné a ľahko sa pomýli).
 
 FP COMPLIANCE — TVRDÉ PRAVIDLO, PLATÍ PRED VŠETKÝM OSTATNÝM. PSB pracuje s metodikou Functional Patterns pod NDA. **Functional Patterns SA SMIE MENOVAŤ** — Jerry to rozhodol 15. 8. 2026 a dokumenty to nikdy nezakazovali (Handbook uvádzanie certifikácie na vlastnom webe výslovne povoľuje). Menovať metódu ale nie je to isté ako ju vysvetľovať a menom sa PSB neodlíši — konkurencia ho používa tiež. Meno má cenu tam, kde sa DOKAZUJE (človek na webe, ktorý si overuje, či si skutočný), nie tam, kde sa priťahuje (reklama, prvý dotyk — tam nič neznamená). Preto: keď navrhuješ obsah, opri ho o symptóm a mechanizmus, nie o názov metódy; keď je reč o certifikácii alebo dôveryhodnosti, meno použi. Čo zakázané ZOSTÁVA: **logo a slovná značka FP nikdy a nikde** (Handbook: len licencované prevádzky) a **metodika sa neodhaľuje** — žiadne cueing krok za krokom, žiadna štruktúra výučby, žiadne neverejné technické detaily. Pracuje sa s PRINCÍPMI (integrovaný pohyb, elastický recoil, prirodzené pohybové vzorce, SAID princíp), vždy podloženými peer-reviewed zdrojmi. Keď je niečo komunikačne silné, ale metodicky nepresné, NEPOUŽI TO a povedz prečo. Pri pochybnosti voľ konzervatívnu formuláciu. Celý rámec je v <pozadie_psb>, sekcia MARKETINGOVÝ ONBOARDING PSB, časť 2.3.
 
@@ -394,7 +394,7 @@ Vždy povedz jednou vetou, ČO sa tým zavrie — Jerry musí vedieť, že to u�
 Vieš navrhnúť aj ÚPRAVU KLIENTA (údaje sú v klientiDetail) — napr. dať Anetku na letnú pauzu, pridať poznámku trénera, zmeniť primárneho trénera. Rovnaký princíp: na koniec pridaj psb-action blok s type "set-override" a poľami name (presné meno klienta z klientiDetail), field, value, label. Povolené field/value:
 - "status": "Aktívny" | "Sporadický" | "Pauza" | "Neaktívny" | "" (prázdny = automatický). Pauza BEZ dátumu → "Pauza". Pauza S DÁTUMOM konca → "Pauza|YYYY-MM-DD" (napr. letná pauza do septembra → "Pauza|2026-09-01"). Po tom dátume systém sám pridá medzi notifikácie pripomienku "ozvi sa". Keď klient spomenie dĺžku/koniec pauzy ("do septembra", "na 2 mesiace", "na leto"), VŽDY použi variant s dátumom — konkrétny dátum dopočítaj z meta.generatedAt (dnešok).
 - "trainerNote": text poznámky (upload CSV ju neprepíše).
-- "primaryTrainer": "Jerry" | "Terezka" | "".
+- "primaryTrainer": "Jerry" | "Terezka" | "Matyáš" | "" (prázdny = automatický). MATYÁŠ JE OD 9/2026 ZÁSKOK: trénuje Jerryho a Terezkiných klientov, ale klient zostáva ich — automatika berie len ich sedenia. Matyášov je automaticky len nový klient, ktorého úvodný viedol on (prišiel k nemu cez referenciu). Keď Jerry povie „ten je môj / Terezkin / Matyášov", navrhni set-override s týmto poľom. Matyášova mzda (DPP, 370 Kč za odtrénovanú hodinu) je v P&L riadok Matyáš a od júla 2026 sa počíta sama z PTmindera.
 - "specialRate": true/false; "specialRateNote": text; "contractSigned": true/false; "bitcoin": true/false (platí v Bitcoine).
 - "zdroj": "referencia" | "instagram" | "google" | "fp" | "offline" | "ai" | "ine" | "" — odkiaľ sa klient o PSB dozvedel. Toto je JEDINÉ miesto, kde sa marketing spája s peniazmi; keď v rozhovore padne, odkiaľ niekto prišiel, navrhni zápis.
 - "zdrojKto": meno človeka, ktorý klienta poslal (len pri zdroj = "referencia"). Bez mena sa nedá odovzdať odmena za doporučenie.
@@ -505,7 +505,8 @@ web_rychlost(id, url, strategia, merane_at, vykon, seo, pristupnost, postupy, lc
 web_stranky(url, typ, titulok, meta_popis, h1, text, znakov, zmenene, nacitane_at)  — TEXT CELÉHO VLASTNÉHO WEBU prosapiens.cz — všetky stránky a články zo sitemapy (počet sa mení s webom). typ: stranka | clanok. \`text\` je čitateľný obsah bez značiek (do 20 000 znakov na stránku), \`titulok\` je to, čo človek vidí vo výsledkoch Googlu, \`zmenene\` je lastmod zo sitemapy. Adresa je v rovnakom tvare ako v gsc_strany, takže sa dá JOIN-nuť priamo: \`SELECT w.titulok, g.zobrazenia, g.kliky FROM web_stranky w JOIN gsc_strany g ON g.url = w.url\`. TOTO JE PLNÝ PRÍSTUP NA WEB — na otázku „čo je na stránke X" alebo „kde na webe sa píše o Y" NEODPOVEDAJ, že web nevidíš, a nechoď to čítať nástrojom web_fetch: je to tu, aj s textom. Hľadaj cez \`WHERE text LIKE '%výraz%'\`. Keď v tabuľke stránka nie je vôbec, až potom je web_fetch na mieste.
 meta_volania(den, volani, chyb)  — počítadlo volaní do Meta Marketing API po dňoch (podmienka Full Access: 500 volaní za posledných 15 dní pri chybovosti pod 15 %). Na otázku „koľko volaní nám chýba na Full Access" spočítaj SUM(volani) a SUM(chyb) WHERE den >= date('now','-15 days').
 users(login, name, active, last_login)  — kontá; vzas_audit(at, actor, action, ...) — kto čo zmenil
-vzas_payments, vzas_payment_splits, vzas_periods, vzas_rules, vzas_salary_params, vzas_settings, vzas_month_notes, vzas_week_notes, anomaly_ack, services, upload_log, algo_novinky`;
+vzas_payments, vzas_payment_splits — POZOR: PRÁZDNE, appka ich nepoužíva. Reálne POSLANÉ výplaty (Jerry/Terezka) po mesiacoch drží MODEL, nie SQL — sú v <data> kľúč pnlSuhrn.mesiace ako poslane_jerry / poslane_terezka (+ narok_jerry/terezka, hodiny_jerry/terezka). Na „koľko si Jerry/Terezka poslal(a)" alebo „hodinovka" NIKDY nedopytuj tieto tabuľky ani banku (vyplaty.jerry v fio_transactions je len časť, mieša sa s osobnými nákupmi) — PREČÍTAJ pnlSuhrn.
+vzas_periods, vzas_rules, vzas_salary_params, vzas_settings, vzas_month_notes, vzas_week_notes, anomaly_ack, services, upload_log, algo_novinky`;
 
 const TOOLS = [
   {
@@ -822,7 +823,27 @@ export const Route = createFileRoute("/api/chat")({
           // sa nedá zistiť. Register je preto v kontexte prvý (viď aiContext)
           // a strop je vyšší; keď sa aj tak reže, povie sa to nahlas, nech
           // Jarvis vie, že časť dát nevidí, a nehádže o nej závery.
-          const surovy = typeof body.context === "string" ? body.context : JSON.stringify(body.context ?? {});
+          // PORADIE KĽÚČOV ROZHODUJE, ČO ODPADNE. JSON sa reže odzadu, takže
+          // hotové čísla musia byť VPREDU a objemné zoznamy VZADU. 9. 9. 2026
+          // bol pnlSuhrn (poslané výplaty po mesiacoch) predposledný a pri strope
+          // 180k odpadol spolu s pnlPolozky — Jarvis potom tvrdil, že poslané
+          // „v tomto zobrazení chýba", hoci ho klient poslal. Rez je tu, na
+          // serveri, takže aj poistka poradia patrí sem — nezávisle od toho,
+          // ako starý bundle klient práve má.
+          const usporiadaj = (o: unknown): unknown => {
+            if (!o || typeof o !== "object" || Array.isArray(o)) return o;
+            const src = o as Record<string, unknown>;
+            const PRVE = ["naCoSaPozriet", "pnlSuhrn", "guillermo", "rezerva", "dlhyVyplaty", "kpi"];
+            const POSLEDNE = ["marketing", "pnlPolozky", "klientiDetail"];
+            const out: Record<string, unknown> = {};
+            for (const k of PRVE) if (k in src) out[k] = src[k];
+            for (const k of Object.keys(src)) if (!PRVE.includes(k) && !POSLEDNE.includes(k)) out[k] = src[k];
+            for (const k of POSLEDNE) if (k in src) out[k] = src[k];
+            return out;
+          };
+          let ctxObj: unknown = body.context ?? {};
+          if (typeof ctxObj === "string") { try { ctxObj = JSON.parse(ctxObj); } catch { /* nechaj ako reťazec */ } }
+          const surovy = typeof ctxObj === "string" ? ctxObj : JSON.stringify(usporiadaj(ctxObj));
           // 11. 8.: po pridaní kalendára (~6 kB) a marketingu (~15 kB) sedel
           // kontext na 119 kB — teda tesne pod starým stropom 120 000, takže
           // by sa bol začal rezať zoznam klientov pri najbližších pár nových.
@@ -832,7 +853,7 @@ export const Route = createFileRoute("/api/chat")({
           // ďalej — vtedy je na rade posielať klientiDetail len na vyžiadanie.
           const STROP = 180000;
           context = surovy.length > STROP
-            ? `${surovy.slice(0, STROP)}\n\n[POZOR: kontext bol orezaný — chýba ${surovy.length - STROP} znakov z konca (koniec zoznamu klientov). Keď potrebuješ klienta, ktorý tu nie je, vytiahni ho dopytom.]`
+            ? `${surovy.slice(0, STROP)}\n\n[POZOR: kontext bol orezaný — chýba ${surovy.length - STROP} znakov z konca. Odzadu odpadá klientiDetail, potom pnlPolozky, potom marketing; hotové čísla (pnlSuhrn, guillermo, rezerva, dlhyVyplaty) sú vpredu a sú celé. Keď potrebuješ klienta, ktorý tu nie je, vytiahni ho dopytom.]`
             : surovy;
         } catch {
           return Response.json({ ok: false, error: "bad_request" }, { status: 400 });

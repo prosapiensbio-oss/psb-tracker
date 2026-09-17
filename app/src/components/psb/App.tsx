@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { nazovFazy } from "../../lib/psb/mapaCyklu";
-import { BARTER_KLIENTI, PRVY_MESIAC_OTAZOK, PRVY_MESIAC_Z_FIO, vzasVerzia, nastavBtcVyplaty, nastavHodinyZTrackera, nastavJarekZTrackera, nastavNakladyZFio, nastavPnlOverrides, nastavPrijmyZTrackera, nastavRucnePrijmy, nastavVyplaty, nastavZmenyKategorii, nazovKategorie, pnlHodnota, pnlOverridesNaUlozenie } from "../../lib/psb/vzas";
+import { mzdaZaskoku } from "../../lib/psb/zaskok";
+import { BARTER_KLIENTI, PRVY_MESIAC_OTAZOK, PRVY_MESIAC_Z_FIO, vzasVerzia, nastavBtcVyplaty, nastavHodinyZTrackera, nastavJarekZTrackera, nastavMatyasZTrackera, nastavNakladyZFio, nastavPnlOverrides, nastavPrijmyZTrackera, nastavRucnePrijmy, nastavVyplaty, nastavZmenyKategorii, nazovKategorie, pnlHodnota, pnlOverridesNaUlozenie } from "../../lib/psb/vzas";
 import { platnySplit, rozdelPohyb, PRIJEM, type PohybSplits, type SplitCiast } from "../../lib/psb/pohybSplit";
 import { dokladyPreBtcPlatbu, platiebPodlaDni } from "../../lib/psb/btcSparovanie";
 import { OTVORENIE_PODLA_DRUHU, ZAVER_PODLA_DRUHU, type TemaDruh } from "../../lib/psb/temaDna";
@@ -201,6 +202,12 @@ const TABS = [
 /** Záložky, ktoré majú vlastné miesto mimo radu záložiek. */
 const MIMO_RAD = ["jarvis"];
 
+/** Meno dodávateľa/protistrany na porovnanie: malé písmená, bez diakritiky,
+ *  nepísmenové znaky na medzery. Slúži párovaniu bankového pohybu s faktúrou —
+ *  dodávateľ faktúry sa musí nájsť v protistrane pohybu (viď kandidatiB). */
+const normDodavatel = (s?: string) =>
+  (s || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
+
 /** Staré podzáložky Marketingu → nové. Nikdy sa nemažú. */
 const MKT_ALIAS: Record<string, string> = { algoritmus: "kanaly", dosah: "obsah" };
 
@@ -257,7 +264,19 @@ function NovaVerziaPas() {
     <div style={{ position: "sticky", top: 0, zIndex: 61, padding: "8px 16px", background: mix(C.accent, 20), borderBottom: `1px solid ${mix(C.accent, 55)}`, color: C.text, fontSize: 12.5, textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 12, flexWrap: "wrap" }}>
       <span>Je pripravená novšia verzia Kokpitu.</span>
       <button
-        onClick={() => window.location.reload()}
+        onClick={() => {
+          // Cache-busting navigácia, nie obyčajný reload: iOS PWA vie
+          // `location.reload()` obslúžiť zo starého snímku shellu a stará
+          // verzia zostane. Nová URL vždy vynúti čerstvý sieťový fetch (shell
+          // je no-cache), takže sa natiahne nový index.html → nový JS bundle.
+          try {
+            const u = new URL(window.location.href);
+            u.searchParams.set("v", String(Date.now()));
+            window.location.replace(u.toString());
+          } catch {
+            window.location.reload();
+          }
+        }}
         style={{ padding: "4px 12px", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 700, border: `1px solid ${mix(C.accent, 60)}`, background: mix(C.accent, 30), color: C.text, whiteSpace: "nowrap" }}
       >
         Aktualizovať
@@ -591,6 +610,11 @@ export function PSBApp() {
     }
     if (nastavHodinyZTrackera(podlaMesiaca)) setFioTik((x) => x + 1);
   }, [data.sessions]);
+  // Matyášova mzda (záskok, DPP) pre mesiace mimo Excelu — zo sedení, CENTRÁLNE
+  // z toho istého dôvodu ako hodiny vyššie (VZAS centrálne nalievanie).
+  useEffect(() => {
+    if (nastavMatyasZTrackera(mzdaZaskoku(data.sessions))) setFioTik((x) => x + 1);
+  }, [data.sessions]);
 
   // Živé tržby z PTmindera do P&L — CENTRÁLNE. Pôvodne to volali len
   // Dashboard, DashGrafy a karta Peniaze; keď sa appka otvorila rovno na
@@ -810,6 +834,10 @@ export function PSBApp() {
   // od 31. 7. a v tej chvíli ich mala v databáze 18. Nevidel ich, lebo
   // kalendár si sťahovala len obrazovka Kalendár, do kontextu nešiel.
   const [kalZmeny, setKalZmeny] = useState<KalZmena[]>([]);
+  // Guillermo (FP Spain) záznamy + jeho tréningy — do Jarvisovho kontextu, nech
+  // vie zostatok sedení. Berú sa z toho istého /api/kalendar fetchu ako udalosti.
+  const [guillermoZazn, setGuillermoZazn] = useState<{ datum: string; druh: string; hodiny: number }[]>([]);
+  const [guillermoUdal, setGuillermoUdal] = useState<KalUdalost[]>([]);
   /** Zmeny, ktoré ešte nikto nevysvetlil — `vysvetlene = 0`. */
   const [kalNevysvetlene, setKalNevysvetlene] = useState<KalZmena[]>([]);
   // Ktoré mesiace sú uzavreté. Jarvis to potrebuje vedieť, aby nenavrhoval
@@ -839,9 +867,11 @@ export function PSBApp() {
     if (!dataHotove) return;
     void fetch("/api/kalendar", { credentials: "same-origin" })
       .then((r) => r.json())
-      .then((j: { ok?: boolean; udalosti?: KalUdalost[]; zmenyHistoria?: KalZmena[]; zmeny?: KalZmena[] }) => {
+      .then((j: { ok?: boolean; udalosti?: KalUdalost[]; zmenyHistoria?: KalZmena[]; zmeny?: KalZmena[]; guillermo?: { datum: string; druh: string; hodiny: number }[]; guillermoUdalosti?: KalUdalost[] }) => {
         if (!j.ok || !Array.isArray(j.udalosti)) return;
         setKalUdalosti(j.udalosti);
+        if (Array.isArray(j.guillermo)) setGuillermoZazn(j.guillermo);
+        if (Array.isArray(j.guillermoUdalosti)) setGuillermoUdal(j.guillermoUdalosti);
         if (Array.isArray(j.zmenyHistoria)) setKalZmeny(j.zmenyHistoria);
         // Nevysvetlené zmeny idú do registra — dovtedy o nich vedel len ten,
         // kto sám zašiel do Kalendára.
@@ -1199,9 +1229,22 @@ function skupinaFaktur(
           // objednávku podľa skladov a z jedného stiahnutia z karty sú tri
           // doklady. Tolerancia zostáva korunová — skupina, ktorá dá presne
           // zaplatenú sumu, je takmer isto tá správna.
+          //
+          // ALE dodávateľ MUSÍ sedieť s protistranou pohybu. Suma do koruny sama
+          // nestačí: 8. 9. 2026 sa PTminder (−2 266,37 Kč, 2. 8.) spároval s Alza
+          // faktúrou 4027438058 (2 266 Kč, 1. 8.), lebo sedeli na korunu a dátum.
+          // Výsledok: PTminder zmizol z `fixne.apps.ptminder` (falošná anomália
+          // „nedorazil") a jeho náklad sa zaúčtoval pod Alza položky. Párovanie
+          // je nástroj na rozbitie ALZA platby na položky — patrí len k platbe
+          // tomu istému dodávateľovi. „Alza" v protistrane áno, „PTMINDER" nie.
+          const protiN = normDodavatel(p.protistrana);
+          const dodavatelSedi = (dod: string) =>
+            normDodavatel(dod).split(" ").filter((t) => t.length >= 4).some((t) => protiN.includes(t));
           let rozpisany = false;
           const kandidatiB = [...doklady.entries()]
-            .filter(([c, d]) => !pouzite.has(c) && Math.abs(Date.parse(p.datum) - Date.parse(d.datum)) / 86400000 <= 7)
+            .filter(([c, d]) => !pouzite.has(c)
+              && Math.abs(Date.parse(p.datum) - Date.parse(d.datum)) / 86400000 <= 7
+              && dodavatelSedi(d.polozky[0]?.dodavatel || ""))
             .map(([c, d]) => ({ cislo: c, celkom: d.celkom, datum: d.datum, dodavatel: d.polozky[0]?.dodavatel || "" }));
           const skupinaB = skupinaFaktur(kandidatiB, -p.suma, 1);
           for (const cislo of skupinaB || []) {
@@ -2036,8 +2079,9 @@ function skupinaFaktur(
         klienti: btcPodlaKlientov(btcPlatby, btcKurz.kurz, Object.keys(clients)),
         platby: btcPlatbyJednotlivo(btcPlatby, btcKurz.kurz, Object.keys(clients)),
         vyplaty: btcKniha.vyplaty, nakupy: btcKniha.nakupy, cielSats: btcKniha.cielSats,
-      }),
-    [data, clients, sixM, capacity, registerAll, kalUdalosti, kalZmeny, uzavierkaPreAi, btcCelkom, btcKurz, btcKniha, btcPlatby, ucetStav, hotovostStav, igVerzia, mktVerzia, vzasVerzia()], // eslint-disable-line react-hooks/exhaustive-deps
+      },
+      { zaznamy: guillermoZazn, udalosti: guillermoUdal }),
+    [data, clients, sixM, capacity, registerAll, kalUdalosti, kalZmeny, uzavierkaPreAi, btcCelkom, btcKurz, btcKniha, btcPlatby, ucetStav, hotovostStav, guillermoZazn, guillermoUdal, igVerzia, mktVerzia, vzasVerzia()], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   const actions = useMemo<Actions>(
@@ -2393,7 +2437,7 @@ function skupinaFaktur(
 
         {active === "marketing" && <Marketing data={data} clients={clients} leads={data.leads} chat={chat} sub={marketingSub} onSub={setMarketingSub} focus={marketingFocus} onOdchodKJarvisovi={(mesiac, faza, napadId) => setNavratDoMapy({ mesiac, faza, napadId })} onKlient={(m) => navigate("klienti", undefined, { client: m, nonce: Date.now() })} refresh={actions.refresh} onPoznamkaStrata={(m, t) => actions.setOverride(m, "precoNeprisiel", t)} onNavigate={navigate} onAck={(k, zapnut, poznamka) => actions.ackAnomaly(k, zapnut ? (poznamka || "skryté hlásenie") : "", zapnut)} />}
         {active === "vzas" && <Vzas sub={vzasSub} onSub={setVzasSub} data={data} clients={clients} focus={vzasFocus} onNavigate={navigate} pohybSplits={pohybSplits} nastavPohybSplit={nastavPohybSplit} />}
-        {active === "kalendar" && <Kalendar clients={clients} data={data} focus={kalendarFocus} ktoSom={ktoSom} />}
+        {active === "kalendar" && <Kalendar clients={clients} data={data} focus={kalendarFocus} ktoSom={ktoSom} trainer={trainer} onTrainer={setTrainer} />}
 
         {active === "jarvis" && (
           <JarvisOkno

@@ -9,6 +9,7 @@ import { fmtCZK, fmtDMY, monthLabel } from "../../lib/psb/format";
 import { ObdobieCtx } from "../../lib/psb/obdobie";
 import { PRVY_MESIAC_Z_FIO, nastavPnlBunku, nastavPnlOverrides, nastavZmenyKategorii, vzasVerzia, premenujKategoriu, presunKategoriu, pridajKategoriu, skupinyPnl, zmenyKategoriiNaUlozenie, nastavPrijmyZTrackera, nastavVyplaty, pnlHodnotaOpravy, pnlJeOpravena, pnlOverridesNaUlozenie, pnlPovodnaHodnota, poslednyMesiacSDatami, vyplatyNaUlozenie } from "../../lib/psb/vzas";
 import { rozpisPre, type PohybZaBunku } from "../../lib/psb/rozpis";
+import { SADZBA_ZASKOK_KC, ZASKOK, ZASKOK_OD } from "../../lib/psb/zaskok";
 import { breakEvenRad } from "../../lib/psb/rezerva";
 import { C, mix, S } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
@@ -18,6 +19,7 @@ import {
   DEBT_CHECKPOINT_2026,
   JAREK_SPLATKY,
   JAREK_VKLADY,
+  MATYAS,
   PNL,
   PRIJMY,
   PRIJMY_INE,
@@ -869,7 +871,7 @@ function PnlTab({ focus }: { focus?: { month?: string; kategoria?: string; nonce
               <Divider label="Výplaty" span={i.length + 3} />
               <Row label="Jerry (Poslané)" values={pick(p.poslaneJerry, i)} />
               <Row label="Terezka (Poslané)" values={pick(p.poslaneTerezka, i)} />
-              <Row label={<Info text="Matyáš bol zamestnanec celý rok 2025 a jan–mar 2026 — nemá nárokovo-dlhovú logiku zakladateľov, len mzdový náklad." label="Matyáš" />} values={pick(p.matyas, i)} />
+              <Row label={<Info text="Matyáš je zamestnanec (DPP) — nemá nárokovo-dlhovú logiku zakladateľov, len mzdový náklad. 2025 až jún 2026 z Excelu; od júla 2026 sa počíta sám: jeho odtrénované hodiny z PTmindera × 370 Kč (záskok za Jerryho a Terezku, úvodný ako hodina)." label="Matyáš" />} values={pick(p.matyas, i)} />
               <Row label="Výplaty spolu" values={pick(p.vyplatySpolu, i)} bold color={C.red} />
 
               <TotalRow label="Celkové náklady" values={pick(p.celkoveNaklady, i)} color={C.red} />
@@ -964,8 +966,16 @@ function PersonCard({ pk, idx, onZmena }: { pk: PersonKey; idx: number[]; onZmen
     onZmena?.();
   };
   const konecny = c.cumDebt[c.cumDebt.length - 1];
-  /** Posledný mesiac v zobrazenom rozsahu — hlavička hovorí o ňom. */
-  const posledny = idx.length ? idx[idx.length - 1] : MONTHS.length - 1;
+  /** Posledný ZOBRAZENÝ mesiac s reálnou výplatou — hlavička hovorí o ňom.
+      Bežiaci mesiac má odrobené hodiny (trénuje sa), ale mzda zaň sa vypláca
+      a importuje až neskôr, takže `idx[posledný]` ukázal „Výplata sep: 0".
+      Jerry, 7. 9. 2026: chce v hlavičke poslednú UZAVRETÚ výplatu aj s jej
+      mesiacom (aug), nie prázdny bežiaci september. Kráčaj od konca po prvý
+      mesiac, kde je Poslané > 0. */
+  const posledny = (() => {
+    for (let k = idx.length - 1; k >= 0; k--) if (c.poslane[idx[k]] > 0) return idx[k];
+    return idx.length ? idx[idx.length - 1] : MONTHS.length - 1;
+  })();
   const cell = { textAlign: "right" as const, padding: "5px 8px", fontSize: 12, fontVariantNumeric: "tabular-nums" as const, whiteSpace: "nowrap" as const };
   const lbl = { ...S.td, fontSize: 12, color: C.textMuted, ...sticky() } as const;
   const detailBtn = (on: boolean, fn: () => void) => (
@@ -1455,7 +1465,95 @@ function EraCard() {
   );
 }
 
-function SalaryTab() {
+/**
+ * Matyáš na obrazovke výplat.
+ *
+ * Jerry, 14. 9. 2026: „ja tu Matyáša nevidím". Jeho mzda žila len ako riadok
+ * v Zisky → P&L, hoci „Dlhy & výplaty" je miesto, kde sa na výplaty pozerá.
+ * Nemá nárok ani dlh (zamestnanec, DPP), preto nie PersonCard — len hodiny,
+ * mzda a odkiaľ sa vzala. Mzda je TEN ISTÝ rad MATYAS, ktorý ide do P&L.
+ */
+function MatyasCard({ idx, sessions }: { idx: number[]; sessions: PSBData["sessions"] }) {
+  const [open, setOpen] = useState(false);
+  const hodiny = useMemo(() => {
+    const h: Record<string, number> = {};
+    for (const s of sessions) {
+      if (s.sessionTrainer !== ZASKOK) continue;
+      const mk = s.date.slice(0, 7);
+      h[mk] = (h[mk] || 0) + s.duration / 60;
+    }
+    return h;
+  }, [sessions]);
+  const hod = (i: number) => hodiny[VZAS_MONTHS[i]] || 0;
+  const posledny = (() => {
+    for (let k = idx.length - 1; k >= 0; k--) if (MATYAS[idx[k]] > 0 || hod(idx[k]) > 0) return idx[k];
+    return -1;
+  })();
+  const cell = { textAlign: "right" as const, padding: "5px 8px", fontSize: 12, fontVariantNumeric: "tabular-nums" as const, whiteSpace: "nowrap" as const };
+  const zdroj = (i: number) => (VZAS_MONTHS[i] >= PRVY_MESIAC_Z_FIO ? `${hod(i).toFixed(1)} h × ${SADZBA_ZASKOK_KC}` : "Excel");
+
+  return (
+    <Card>
+      <div onClick={() => setOpen(!open)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, cursor: "pointer", flexWrap: "wrap" }}>
+        <div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>
+            <span style={{ display: "inline-block", width: 15, color: C.textDim, fontSize: 9 }}>{open ? "▼" : "▶"}</span>
+            Matyáš
+          </div>
+          <div style={{ fontSize: 11, color: C.textMuted, marginLeft: 15 }}>
+            Záskok od {fmtDMY(ZASKOK_OD)} · DPP · {SADZBA_ZASKOK_KC} Kč za odtrénovanú hodinu. Mzdový náklad — žiadny nárok ani dlh. Od júla 2026 sa mzda počíta sama z jeho sedení v PTminderi.
+          </div>
+        </div>
+        {posledny >= 0 ? (
+          <div style={{ display: "flex", gap: 20 }}>
+            <div style={{ textAlign: "right" }}>
+              <div style={{ fontSize: 11, color: C.textMuted }}>Hodín {MONTHS[posledny]}</div>
+              <div style={{ fontSize: 15, fontWeight: 600, color: C.text, fontVariantNumeric: "tabular-nums" }}>{hod(posledny).toFixed(1)} h</div>
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <div style={{ fontSize: 11, color: C.textMuted }}>Mzda {MONTHS[posledny]}</div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: C.text, fontVariantNumeric: "tabular-nums" }}>{fmtCZK(MATYAS[posledny])}</div>
+            </div>
+          </div>
+        ) : (
+          <div style={{ fontSize: 12, color: C.textDim }}>v zvolenom období bez odtrénovaných hodín</div>
+        )}
+      </div>
+      {open && (
+        <ScrollX dep={idx.length}>
+          <table style={{ ...tableStyle, marginTop: 12, minWidth: 660 }}>
+            <thead>
+              <tr style={{ borderBottom: `1px solid ${C.border}` }}>
+                <th style={{ textAlign: "left", padding: "6px 8px", fontSize: 11, color: C.textMuted, minWidth: 150, ...sticky(), zIndex: 2 }} />
+                {idx.map((i) => <th key={i} style={{ ...cell, fontSize: 11, color: C.textMuted, fontWeight: 600 }}>{MONTHS[i]}</th>)}
+                <th style={{ ...cell, fontSize: 11, color: C.textMuted, fontWeight: 600, borderLeft: `1px solid ${C.border}` }}>Ø</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style={{ ...S.td, fontSize: 12, color: C.textMuted, ...sticky() }}>Hodiny (PTminder)</td>
+                {idx.map((i) => <td key={i} style={{ ...cell, color: hod(i) > 0 ? C.text : C.textDim }}>{hod(i) > 0 ? hod(i).toFixed(1) : "—"}</td>)}
+                <td style={{ ...cell, color: C.textDim, borderLeft: `1px solid ${C.border}` }}>{avg(idx.map(hod)).toFixed(1)}</td>
+              </tr>
+              <tr style={{ borderTop: `1px solid ${C.border}` }}>
+                <td style={{ ...S.td, fontSize: 12, fontWeight: 600, color: C.text, ...sticky() }}>Mzda</td>
+                {idx.map((i) => <td key={i} style={{ ...cell, fontWeight: 600, color: MATYAS[i] > 0 ? C.text : C.textDim }}>{money(MATYAS[i])}</td>)}
+                <td style={{ ...cell, fontWeight: 600, color: C.textDim, borderLeft: `1px solid ${C.border}` }}>{money(avg(idx.map((i) => MATYAS[i])))}</td>
+              </tr>
+              <tr>
+                <td style={{ ...S.td, fontSize: 12, color: C.textDim, fontStyle: "italic", ...sticky() }}>odkiaľ</td>
+                {idx.map((i) => <td key={i} style={{ ...cell, color: C.textDim, fontStyle: "italic", fontSize: 11 }}>{zdroj(i)}</td>)}
+                <td style={{ ...cell, borderLeft: `1px solid ${C.border}` }} />
+              </tr>
+            </tbody>
+          </table>
+        </ScrollX>
+      )}
+    </Card>
+  );
+}
+
+function SalaryTab({ sessions }: { sessions: PSBData["sessions"] }) {
   const r = useRange();
   const idx = r.idx;
   // Upravené výplatné kategórie žijú v databáze; načítajú sa raz a zapíšu sa
@@ -1514,7 +1612,10 @@ function SalaryTab() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginTop: 12 }}>
           <StatCard value={fmtCZK(avg(idx.map((i) => j.poslane[i])))} label="Ø Jerry / mes." color={C.accent} />
           <StatCard value={fmtCZK(avg(idx.map((i) => t.poslane[i])))} label="Ø Terezka / mes." color={C.blue} />
-          <StatCard value={fmtCZK(avg(idx.map((i) => j.poslane[i] + t.poslane[i])))} label="Ø výplaty spolu / mes." color={C.red} />
+          <StatCard value={fmtCZK(avg(idx.map((i) => MATYAS[i])))} label="Ø Matyáš / mes." color={C.textMuted} />
+          {/* Spolu = to isté ako „Výplaty spolu" v P&L (Jerry + Terezka + Matyáš).
+              Do 14. 9. 2026 tu Matyáš chýbal a dve obrazovky dávali dve čísla. */}
+          <StatCard value={fmtCZK(avg(idx.map((i) => j.poslane[i] + t.poslane[i] + MATYAS[i])))} label="Ø výplaty spolu / mes." color={C.red} />
         </div>
 
         {chartOpen && (
@@ -1533,6 +1634,7 @@ function SalaryTab() {
 
       <PersonCard pk="jerry" idx={idx} onZmena={() => tik((x) => x + 1)} />
       <PersonCard pk="terezka" idx={idx} onZmena={() => tik((x) => x + 1)} />
+      <MatyasCard idx={idx} sessions={sessions} />
 
       <Card>
         <div onClick={() => setSpolOpen(!spolOpen)} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, cursor: "pointer", flexWrap: "wrap" }}>
@@ -3157,7 +3259,7 @@ export function Vzas({ sub, onSub, data, clients, focus, onNavigate, pohybSplits
       )}
       {sub === "vyplaty" && (
         <>
-          <SalaryTab />
+          <SalaryTab sessions={data.sessions} />
           {/* Aj tu: výplaty sú riadky v banke, nie abstraktné číslo. */}
           <div style={{ marginTop: 14 }}>
             <BankaUlozene focus={focus} pohybSplits={pohybSplits} onSplit={nastavPohybSplit} />

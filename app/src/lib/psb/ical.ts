@@ -37,24 +37,52 @@ function spojRiadky(text: string): string[] {
 const odescapuj = (s: string) =>
   s.replace(/\\n/gi, " ").replace(/\\,/g, ",").replace(/\\;/g, ";").replace(/\\\\/g, "\\").trim();
 
-/** Posun pásma pre daný okamih — z Intl, takže letný čas rieši systém, nie my. */
+/**
+ * Posun pásma pre daný okamih — z Intl, takže letný čas rieši systém, nie my.
+ *
+ * FORMÁTOVAČ SA STAVIA RAZ A POSUN SA PAMÄTÁ PO HODINÁCH. 13. 9. 2026 CPU
+ * profil parsovania ukázal 78 % času práve tu: pri KAŽDOM čase v súbore sa
+ * staval nový `Intl.DateTimeFormat`, a Jerryho kalendár ich má desaťtisíce
+ * (5 132 začiatkov + 5 132 koncov v UTC, 3 173 riadkov EXDATE). Worker na tom
+ * 10. 9. zomrel na `exceededResources`, chybu nestihol zapísať a kalendár sa
+ * tri dni ticho nesťahoval. Hodinový kľúč je presný: pražské pásmo sa mení
+ * vždy o celej hodine UTC (01:00), v rámci hodiny je posun rovnaký.
+ */
+const formatovace = new Map<string, Intl.DateTimeFormat>();
+const posuny = new Map<string, number>();
 function posunMinut(d: Date, pasmo: string): number {
-  const f = new Intl.DateTimeFormat("en-US", {
-    timeZone: pasmo, hour12: false,
-    year: "numeric", month: "2-digit", day: "2-digit",
-    hour: "2-digit", minute: "2-digit", second: "2-digit",
-  });
+  const hodina = Math.floor(d.getTime() / 3600000);
+  const kluc = `${pasmo}|${hodina}`;
+  const znamy = posuny.get(kluc);
+  if (znamy !== undefined) return znamy;
+  let f = formatovace.get(pasmo);
+  if (!f) {
+    f = new Intl.DateTimeFormat("en-US", {
+      timeZone: pasmo, hour12: false,
+      year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", second: "2-digit",
+    });
+    formatovace.set(pasmo, f);
+  }
+  // Počíta sa zo ZAČIATKU hodiny, nie z presného okamihu — posun je rovnaký
+  // a delenie na minúty nikdy nevyjde necelé kvôli milisekundám.
+  const zaciatokHodiny = new Date(hodina * 3600000);
   const p: Record<string, string> = {};
-  for (const x of f.formatToParts(d)) if (x.type !== "literal") p[x.type] = x.value;
+  for (const x of f.formatToParts(zaciatokHodiny)) if (x.type !== "literal") p[x.type] = x.value;
   const akoUtc = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour % 24, +p.minute, +p.second);
-  return (akoUtc - d.getTime()) / 60000;
+  const posun = (akoUtc - zaciatokHodiny.getTime()) / 60000;
+  if (posuny.size > 100000) posuny.clear(); // poistka pre dlho žijúci izolát
+  posuny.set(kluc, posun);
+  return posun;
 }
 
 const PASMO = "Europe/Prague";
 
+const PLATNY_CAS = /^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})(Z)?)?$/;
+
 /** "20260803T090000" / "20260803T070000Z" / "20260803" → "2026-08-03T09:00" */
 function naMiestny(hodnota: string): { s: string; celodenna: boolean } | null {
-  const m = /^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})(Z)?)?$/.exec(hodnota.trim());
+  const m = PLATNY_CAS.exec(hodnota.trim());
   if (!m) return null;
   const [, r, mes, d, h, min, , z] = m;
   if (!h) return { s: `${r}-${mes}-${d}T00:00`, celodenna: true };
@@ -78,6 +106,18 @@ const zMs = (ms: number) => new Date(ms).toISOString().slice(0, 16);
 type SurovaUdalost = {
   uid: string; zaciatok: string; koniec: string; nazov: string; celodenna: boolean;
   rrule?: string; exdate: string[]; recurrenceId?: string; zruseny: boolean;
+};
+
+/**
+ * Udalosť počas čítania: časy zostávajú SUROVÉ (tak, ako stoja v súbore).
+ * Prevod pásma je drahý a tisíce udalostí z minulých rokov ho nepotrebujú —
+ * rozhodne sa až pri END:VEVENT, či udalosť vôbec môže do okna. Ukladajú sa
+ * len hodnoty, ktoré by `naMiestny` prijal, takže výsledok je rovnaký, ako
+ * keby sa prevádzalo hneď.
+ */
+type Rozrobena = {
+  uid: string; nazov: string; zruseny: boolean; rrule?: string;
+  start?: string; end?: string; recId?: string; exdate: string[];
 };
 
 /**
@@ -142,6 +182,39 @@ function rozvin(u: SurovaUdalost, odMs: number, doMs: number): string[] {
  * a zasahujú doň — bez nej by viacdňová udalosť z okna vypadla.
  */
 const REZERVA_MS = 14 * 86400000;
+const DEN_MS = 86400000;
+
+/**
+ * Hrubé sito na SUROVOM dátume, ešte pred prevodom pásma — musí prepustiť
+ * všetko, čo by prepustil `vOkne`, a nič navyše rozhodovať nesmie. Miestny
+ * čas sa od surového líši najviac o pár hodín (UTC → Praha je +1/+2 a môže
+ * prekročiť polnoc), preto deň rezervy na oboch stranách; presná podmienka
+ * sa uplatní až po prevode.
+ */
+function mozeDoOkna(surova: string, odMs: number, doMs: number): boolean {
+  const m = PLATNY_CAS.exec(surova.trim());
+  if (!m) return true;
+  const den = Date.UTC(+m[1], +m[2] - 1, +m[3]);
+  return den + 2 * DEN_MS >= odMs - REZERVA_MS && den - DEN_MS <= doMs;
+}
+
+/** Z rozpracovanej udalosti spraví surovú — alebo ju zahodí, keď do okna nemôže. */
+function dokonci(a: Rozrobena, odMs: number, doMs: number): SurovaUdalost | null {
+  if (!a.uid || !a.start) return null;
+  // Série a presunuté výskyty sa držia vždy (séria z 2023 môže mať výskyt
+  // budúci týždeň); jednorazové len keď ich surový dátum pripúšťa okno.
+  if (!(a.rrule || a.recId || mozeDoOkna(a.start, odMs, doMs))) return null;
+  const s = naMiestny(a.start);
+  if (!s) return null;
+  const u: SurovaUdalost = {
+    uid: a.uid, zaciatok: s.s, celodenna: s.celodenna, koniec: "", nazov: a.nazov,
+    rrule: a.rrule, exdate: [], zruseny: a.zruseny,
+  };
+  if (a.end) { const e = naMiestny(a.end); if (e) u.koniec = e.s; }
+  if (a.recId) { const v = naMiestny(a.recId); if (v) u.recurrenceId = v.s; }
+  for (const x of a.exdate) { const v = naMiestny(x); if (v) u.exdate.push(v.s); }
+  return u.rrule || u.recurrenceId || vOkne(u.zaciatok, odMs, doMs) ? u : null;
+}
 function vOkne(zaciatok: string, odMs: number, doMs: number): boolean {
   const t = Date.parse(zaciatok.length <= 10 ? `${zaciatok}T00:00:00Z` : zaciatok);
   if (!Number.isFinite(t)) return true; // nečitateľný dátum radšej nechaj prejsť
@@ -151,11 +224,11 @@ function vOkne(zaciatok: string, odMs: number, doMs: number): boolean {
 export function citajIcal(text: string, odMs: number, doMs: number): IcalUdalost[] {
   const riadky = spojRiadky(text);
   const surove: SurovaUdalost[] = [];
-  let akt: SurovaUdalost | null = null;
+  let akt: Rozrobena | null = null;
 
   for (const r of riadky) {
     if (r.startsWith("BEGIN:VEVENT")) {
-      akt = { uid: "", zaciatok: "", koniec: "", nazov: "", celodenna: false, exdate: [], zruseny: false };
+      akt = { uid: "", nazov: "", zruseny: false, exdate: [] };
       continue;
     }
     if (r.startsWith("END:VEVENT")) {
@@ -169,9 +242,8 @@ export function citajIcal(text: string, odMs: number, doMs: number): IcalUdalost
       //
       // Opakované série a presunuté výskyty sa držať MUSIA aj keď začali dávno:
       // séria z roku 2023 môže mať výskyt budúci týždeň.
-      if (akt && akt.uid && akt.zaciatok && (akt.rrule || akt.recurrenceId || vOkne(akt.zaciatok, odMs, doMs))) {
-        surove.push(akt);
-      }
+      const hotova = akt ? dokonci(akt, odMs, doMs) : null;
+      if (hotova) surove.push(hotova);
       akt = null;
       continue;
     }
@@ -187,20 +259,13 @@ export function citajIcal(text: string, odMs: number, doMs: number): IcalUdalost
     else if (meno === "SUMMARY") akt.nazov = odescapuj(hodnota);
     else if (meno === "STATUS") akt.zruseny = hodnota.trim().toUpperCase() === "CANCELLED";
     else if (meno === "RRULE") akt.rrule = hodnota.trim();
-    else if (meno === "DTSTART") {
-      const v = naMiestny(hodnota);
-      if (v) { akt.zaciatok = v.s; akt.celodenna = v.celodenna; }
-    } else if (meno === "DTEND") {
-      const v = naMiestny(hodnota);
-      if (v) akt.koniec = v.s;
-    } else if (meno === "RECURRENCE-ID") {
-      const v = naMiestny(hodnota);
-      if (v) akt.recurrenceId = v.s;
-    } else if (meno === "EXDATE") {
-      for (const kus of hodnota.split(",")) {
-        const v = naMiestny(kus);
-        if (v) akt.exdate.push(v.s);
-      }
+    // Časy sa len odložia surové (a len platné — neplatný riadok nesmie
+    // prepísať skorší platný, presne ako predtým); prevod až v `dokonci`.
+    else if (meno === "DTSTART") { if (PLATNY_CAS.test(hodnota.trim())) akt.start = hodnota; }
+    else if (meno === "DTEND") { if (PLATNY_CAS.test(hodnota.trim())) akt.end = hodnota; }
+    else if (meno === "RECURRENCE-ID") { if (PLATNY_CAS.test(hodnota.trim())) akt.recId = hodnota; }
+    else if (meno === "EXDATE") {
+      for (const kus of hodnota.split(",")) if (PLATNY_CAS.test(kus.trim())) akt.exdate.push(kus);
     }
   }
 

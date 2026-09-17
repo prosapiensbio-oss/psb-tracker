@@ -797,7 +797,7 @@ export function Dashboard({
         ? {
             label: "Očakávané",
             hodnota: `~${fmtCZK(stats.beziaciCash + cakaSa)}`,
-            podnadpis: `${monthLabel(stats.beziaciMk)} · ak dobehnú obnovy`,
+            podnadpis: `${monthLabel(stats.beziaciMk)} · tento mesiac, ak dobehnú obnovy`,
             poznamka: `prišlo ${fmtCZK(stats.beziaciCash)} · čaká sa ~${fmtCZK(cakaSa)} od ${cakaSaKlienti.length} klientov`,
             poznamkaKam: cakaSaKlienti.length ? () => otvorCakajucich() : undefined,
           }
@@ -862,8 +862,25 @@ export function Dashboard({
           // v kalendári stojí jeden tréning za jeden riadok.
           return a + (min > 5 && min < 300 ? min / 60 : 1);
         }, 0);
+    // NEZARADENÉ SA NEZAPOČÍTAJÚ, ALE MUSIA SA PRIZNAŤ.
+    //
+    // 14. 9. 2026: Terezke dlaždica ukázala minulý týždeň 23 h, PTminder aj
+    // kalendár 25. Chýbali „Kalva" (záskok za Jerryho — mapovanie mien je per
+    // tréner, u Jerryho zaradený je, u nej nie) a nová „Monika Schnowalderová".
+    // Hádať, že nezaradená udalosť je tréning, sa nesmie (v tom istom týždni
+    // stál aj „Trening" bez klienta, ktorý v PTminderi nie je) — ale ticho ich
+    // vynechať tvrdí, že tréning neexistuje. Preto sa ukáže počet a preklik
+    // vedie do kalendára, kde sa jedným klikom zaradia.
+    const nezaradeneZKal = (od: Date, do_: Date) =>
+      kalendar.filter((u) => !u.typ && matchT(u.trener)).filter((u) => {
+        const t = Date.parse(u.zaciatok);
+        return t >= od.getTime() && t < do_.getTime();
+      }).length;
     const hTento = hodinyZKal(tenPondelok, new Date(tenPondelok.getTime() + 7 * 86400000));
     const hMinuly = hodinyZKal(minPondelok, tenPondelok);
+    const nezTento = nezaradeneZKal(tenPondelok, new Date(tenPondelok.getTime() + 7 * 86400000));
+    const nezMinuly = nezaradeneZKal(minPondelok, tenPondelok);
+    const nezText = (n: number) => `${n} ${n === 1 ? "nezaradená udalosť" : n < 5 ? "nezaradené udalosti" : "nezaradených udalostí"}`;
     const maKal = kalendar.length > 0;
     // Bez kalendára zostáva pôvodné číslo z PTmindera — appka bez pripojeného
     // kalendára nesmie stratiť prístroj, len ukáže to, čo vie.
@@ -876,14 +893,14 @@ export function Dashboard({
       label: "Hodiny / týždeň",
       hodnota: `${hZobraz.toFixed(0)} h`,
       podnadpis: maKal
-        ? `tento týždeň · nachystané v kalendári`
+        ? `tento týždeň · nachystané v kalendári${nezTento ? ` · +${nezTento} nezaradené (nezapočítané)` : ""}`
         : poslTyzden ? `týž. ${weekLabel(poslTyzden[0])} · odtrénované` : undefined,
       pasmo: hZobraz === 0 ? "nevie" : hZobraz < zonaLo ? "pozor" : hZobraz > zonaHi ? "zle" : "ok",
       poznamka: hZobraz === 0 ? undefined
         : zmenaTyzdna !== null
-          ? `${zmenaTyzdna >= 0 ? "+" : ""}${zmenaTyzdna.toFixed(0)} % oproti minulému týždňu (${hMinuly.toFixed(0)} h)`
+          ? `${zmenaTyzdna >= 0 ? "+" : ""}${zmenaTyzdna.toFixed(0)} % oproti minulému týždňu (${hMinuly.toFixed(0)} h${nezMinuly ? ` + ${nezText(nezMinuly)}` : ""})`
           : hZobraz > zonaHi ? "nad zónou — riziko vyhorenia" : hZobraz < zonaLo ? "pod zónou" : `zóna ${zonaLo}–${zonaHi} h`,
-      vysvetlenie: `Koľko hodín je na TENTO týždeň nachystaných v Google Kalendári — vrátane toho, čo sa už odtrénovalo. Porovnanie je s minulým týždňom z toho istého zdroja, aby sa porovnávalo rovnaké s rovnakým. Zdravá zóna je ${ZONE_LO}–${ZONE_HI} h na trénera; pri „Obaja“ sa zdvojnásobuje, lebo dlaždica sčítava oboch. Keď kalendár pripojený nie je, ukazuje sa posledný uzavretý týždeň z PTmindera. Krivka pod číslom je história odtrénovaných týždňov.`,
+      vysvetlenie: `Koľko hodín je na TENTO týždeň nachystaných v Google Kalendári — vrátane toho, čo sa už odtrénovalo. Počítajú sa len udalosti zaradené ako tréning alebo úvodný; udalosť s novým menom (nový klient, záskok za druhého trénera) je nezaradená, kým ju v Kalendári nezaradíš — dlaždica ju nezapočíta, ale napíše, koľko ich je. Porovnanie je s minulým týždňom z toho istého zdroja, aby sa porovnávalo rovnaké s rovnakým. Zdravá zóna je ${ZONE_LO}–${ZONE_HI} h na trénera; pri „Obaja“ sa zdvojnásobuje, lebo dlaždica sčítava oboch. Keď kalendár pripojený nie je, ukazuje sa posledný uzavretý týždeň z PTmindera. Krivka pod číslom je história odtrénovaných týždňov.`,
       seria: uplne.slice(-12).map(hodinyTyzdna),
       kam: () => onNavigate("kalendar"),
     });
@@ -895,12 +912,17 @@ export function Dashboard({
     const beRef = zisk?.be ?? null;
     varovne.push({
       id: "odhad",
-      label: "Odhad tržieb",
+      // TOTO JE BUDÚCI MESIAC, nie ten bežiaci hore. Karta „Tržby tento mesiac"
+      // (prepínač Očakávané) = prišlo + čaká sa za BEŽIACI mesiac; toto je
+      // projekcia na ĎALŠÍ mesiac z balíčkov a kalendára. Jerry, 9. 9. 2026:
+      // „mätúce, 2× odhad a každé iné číslo" — mesiac bol len v podnadpise
+      // malým písmom, preto ide „budúci mesiac" priamo do názvu.
+      label: "Odhad tržieb — budúci mesiac",
       hodnota: odhad === null ? "—" : fmtCZK(odhad),
-      podnadpis: trzbyOdhad ? monthLabel(trzbyOdhad.month) : undefined,
+      podnadpis: trzbyOdhad ? `${monthLabel(trzbyOdhad.month)} · projekcia z balíčkov a kalendára` : undefined,
       pasmo: odhad === null || beRef === null ? "nevie" : odhad < beRef ? "zle" : odhad < beRef * 1.2 ? "pozor" : "ok",
       poznamka: odhad !== null && beRef !== null && odhad < beRef ? "pod break-even" : "z rozchodených balíčkov",
-      vysvetlenie: "Koľko peňazí príde budúci mesiac podľa zostatkov balíčkov a tempa klientov — vrátane toho, čo je objednané v Google Kalendári. Kto má dohodnutý termín, počíta sa ako aktívny, aj keď ho história odpísala. Porovnáva sa s break-evenom: odhad pod ním znamená stratový mesiac, ak sa nič nepredá.",
+      vysvetlenie: "Koľko peňazí príde BUDÚCI mesiac podľa zostatkov balíčkov a tempa klientov — vrátane toho, čo je objednané v Google Kalendári. Kto má dohodnutý termín, počíta sa ako aktívny, aj keď ho história odpísala. Porovnáva sa s break-evenom: odhad pod ním znamená stratový mesiac, ak sa nič nepredá. POZOR, nie je to to isté ako karta Tržby tento mesiac / Očakávané hore: tá je za BEŽIACI mesiac a skladá sa z peňazí, čo už prišli, plus obnov, ktoré ešte majú doraziť — preto býva vyššia. Táto je konzervatívna projekcia na mesiac, ktorý sa ešte nezačal.",
       kam: () => onNavigate("vzas", "predikcia"),
     });
 

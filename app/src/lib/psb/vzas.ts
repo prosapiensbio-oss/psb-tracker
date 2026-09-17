@@ -410,6 +410,8 @@ export const SPOLOCNE: Record<string, Vals> = {
 // Matyáš — employee for all of 2025 and jan–mar 2026 (no entitlement/debt
 // logic, just a payroll cost). The prototype omitted him, which understated
 // Výplaty (and so overstated profit).
+// Od júla 2026 (mesiace mimo Excelu) sa rad plní sám zo sedení v PTminderi —
+// `nastavMatyasZTrackera` (záskok, DPP, 370 Kč/h; viď zaskok.ts).
 export const MATYAS: Vals = dorovnaj([3200, 2720, 4320, 5120, 2560, 2860, 3840, 2880, 3180, 3520, 4160, 2560, 2310, 2890, 3700, 0, 0, 0]);
 
 // Dorovnanie zvyšku radov (spoločné výdavky, mzdové hodiny a osobné položky).
@@ -546,6 +548,24 @@ export function nastavHodinyZTrackera(hodiny: Record<string, { jerry: number; te
       if (Math.abs(rad[i] - v) > 0.05) { rad[i] = v; zmena = true; }
     }
   }
+  if (zmena) oznacZmenu();
+  return zmena;
+}
+
+/**
+ * Mzda Matyáša za mesiace, ktoré Excel nemá — zo sedení v PTminderi
+ * (`mzdaZaskoku`). Vstup nesie CELÝ obraz, preto sa mesiac bez sedení
+ * vynuluje: sedenie opravené v PTminderi na iného trénera nesmie nechať
+ * mzdu visieť v P&L (pravidlo importných setterov z CLAUDE.md).
+ */
+export function nastavMatyasZTrackera(mzda: Record<string, number>): boolean {
+  let zmena = false;
+  dorovnaj(MATYAS);
+  VZAS_MONTHS.forEach((mk, i) => {
+    if (mk < PRVY_MESIAC_Z_FIO) return;
+    const v = mzda[mk] || 0;
+    if (MATYAS[i] !== v) { MATYAS[i] = v; zmena = true; }
+  });
   if (zmena) oznacZmenu();
   return zmena;
 }

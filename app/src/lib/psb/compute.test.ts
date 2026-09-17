@@ -673,10 +673,29 @@ describe("primárny tréner podľa nedávnych sedení", () => {
 
   it("keď za pol roka nikto netrénoval, platí celoživotný pomer", () => {
     const sedenia = [
+      ...Array.from({ length: 9 }, (_, i) => ses("Spiaci", "Terezka", den(-400 - i))),
+      ...Array.from({ length: 2 }, (_, i) => ses("Spiaci", "Jerry", den(-500 - i))),
+    ];
+    expect(postav(sedenia)["Spiaci"].primaryTrainer).toBe("Terezka");
+  });
+
+  // Od 14. 9. 2026 Matyáš vlastných klientov nevedie (záskok, zaskok.ts).
+  // Do vtedy tu bolo „9× Matyáš + 2× Jerry → Matyáš" — ostrý prípad Daniel
+  // Karasek (23× Matyáš, 2× Jerry, neaktívny od 9/2025) teraz patrí Jerrymu.
+  it("starý Matyášov klient s hodinami u zakladateľa patrí zakladateľovi", () => {
+    const sedenia = [
       ...Array.from({ length: 9 }, (_, i) => ses("Spiaci", "Matyáš", den(-400 - i))),
       ...Array.from({ length: 2 }, (_, i) => ses("Spiaci", "Jerry", den(-500 - i))),
     ];
-    expect(postav(sedenia)["Spiaci"].primaryTrainer).toBe("Matyáš");
+    expect(postav(sedenia)["Spiaci"].primaryTrainer).toBe("Jerry");
+  });
+
+  it("záskok za pol roka nemení vlastníka", () => {
+    const sedenia = [
+      ...Array.from({ length: 3 }, (_, i) => ses("Zaskok", "Jerry", den(-60 - i))),
+      ...Array.from({ length: 6 }, (_, i) => ses("Zaskok", "Matyáš", den(-5 - i))),
+    ];
+    expect(postav(sedenia)["Zaskok"].primaryTrainer).toBe("Jerry");
   });
 
   it("jeden zástup nedávno neprebije toho, kto klienta vedie", () => {

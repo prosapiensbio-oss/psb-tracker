@@ -633,14 +633,19 @@ function snippetWeb(url: string, tajne: string): string {
     "  document.addEventListener('wpcf7mailsent',function(e){",
     "    try{",
     "      var f=(e.detail&&e.detail.inputs)||[];var v=function(n){for(var i=0;i<f.length;i++)if(f[i].name===n)return String(f[i].value||'');return '';};",
-    "      var email=(v('your-email')||v('email')).trim().toLowerCase();var tel=v('your-tel')||v('tel')||v('telefon');var meno=v('your-name')||v('meno');",
+    // Test postury (CF7 #5111) má vlastné mená polí `psb-*`. Snippet ich do
+    // 14. 9. 2026 nepoznal: meno, e-mail aj telefón prišli prázdne, Kokpit vrátil
+    // `prazdny_dopyt` a dopyt z testu sa ticho stratil — hoci práve z testu
+    // prišla prvá odozva na reklamu. Výsledok testu ide do správy dopytu.
+    "      var email=(v('your-email')||v('email')||v('psb-email')).trim().toLowerCase();var tel=v('your-tel')||v('tel')||v('telefon')||v('psb-phone');var meno=v('your-name')||v('meno')||v('psb-name');",
+    "      var test=v('psb-insight')?['TEST POSTURY','bolí: '+(v('psb-pain')||'-'),'postura: '+(v('psb-posture')||'-'),'výsledok: '+v('psb-insight'),'hovor: '+(v('psb-call')||'-')].join(' | '):'';",
     "      var den=new Date().toISOString().slice(0,10);",
     "      var id=('web-'+den+'-'+(email||tel||meno).toLowerCase()).slice(0,64);",
     "      var u={};try{u=JSON.parse(localStorage.getItem('psb_utm')||'{}');}catch(x){}",
     "      var ck=function(n){var m=document.cookie.match('(^|;)\\s*'+n+'\\s*=\\s*([^;]+)');return m?m.pop():'';};",
     "      if(window.fbq)fbq('track','Lead',{},{eventID:id});",
     "      fetch('" + url + "',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({",
-    "        secret:'" + tajne + "',id:id,name:meno,email:email,telefon:tel,message:v('your-message')||v('sprava'),",
+    "        secret:'" + tajne + "',id:id,name:meno,email:email,telefon:tel,message:[test,v('your-message')||v('sprava')||v('psb-note')].filter(Boolean).join(' | '),",
     "        utm_source:u.utm_source||'',utm_medium:u.utm_medium||'',utm_campaign:u.utm_campaign||'',",
     "        utm_content:u.utm_content||'',utm_term:u.utm_term||'',page:location.href,fbc:ck('_fbc'),fbp:ck('_fbp')",
     "      })});",

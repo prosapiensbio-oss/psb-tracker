@@ -14,6 +14,7 @@ import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
 import { Route as NavrhyTitulkyRouteImport } from './routes/navrhy-titulky'
 import { Route as NatacaciListRouteImport } from './routes/natacaci-list'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AssetsSplatRouteImport } from './routes/assets/$'
 import { Route as ApiZositRouteImport } from './routes/api/zosit'
 import { Route as ApiWishlistRouteImport } from './routes/api/wishlist'
 import { Route as ApiWebObsahRouteImport } from './routes/api/web-obsah'
@@ -94,6 +95,11 @@ const NatacaciListRoute = NatacaciListRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AssetsSplatRoute = AssetsSplatRouteImport.update({
+  id: '/assets/$',
+  path: '/assets/$',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiZositRoute = ApiZositRouteImport.update({
@@ -439,6 +445,7 @@ export interface FileRoutesByFullPath {
   '/api/web-obsah': typeof ApiWebObsahRoute
   '/api/wishlist': typeof ApiWishlistRoute
   '/api/zosit': typeof ApiZositRoute
+  '/assets/$': typeof AssetsSplatRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -502,6 +509,7 @@ export interface FileRoutesByTo {
   '/api/web-obsah': typeof ApiWebObsahRoute
   '/api/wishlist': typeof ApiWishlistRoute
   '/api/zosit': typeof ApiZositRoute
+  '/assets/$': typeof AssetsSplatRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -566,6 +574,7 @@ export interface FileRoutesById {
   '/api/web-obsah': typeof ApiWebObsahRoute
   '/api/wishlist': typeof ApiWishlistRoute
   '/api/zosit': typeof ApiZositRoute
+  '/assets/$': typeof AssetsSplatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -631,6 +640,7 @@ export interface FileRouteTypes {
     | '/api/web-obsah'
     | '/api/wishlist'
     | '/api/zosit'
+    | '/assets/$'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -694,6 +704,7 @@ export interface FileRouteTypes {
     | '/api/web-obsah'
     | '/api/wishlist'
     | '/api/zosit'
+    | '/assets/$'
   id:
     | '__root__'
     | '/'
@@ -757,6 +768,7 @@ export interface FileRouteTypes {
     | '/api/web-obsah'
     | '/api/wishlist'
     | '/api/zosit'
+    | '/assets/$'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -821,6 +833,7 @@ export interface RootRouteChildren {
   ApiWebObsahRoute: typeof ApiWebObsahRoute
   ApiWishlistRoute: typeof ApiWishlistRoute
   ApiZositRoute: typeof ApiZositRoute
+  AssetsSplatRoute: typeof AssetsSplatRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -858,6 +871,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/assets/$': {
+      id: '/assets/$'
+      path: '/assets/$'
+      fullPath: '/assets/$'
+      preLoaderRoute: typeof AssetsSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/zosit': {
@@ -1317,6 +1337,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiWebObsahRoute: ApiWebObsahRoute,
   ApiWishlistRoute: ApiWishlistRoute,
   ApiZositRoute: ApiZositRoute,
+  AssetsSplatRoute: AssetsSplatRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

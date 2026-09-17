@@ -4,6 +4,7 @@ import { fmtDMY, normName } from "../../lib/psb/format";
 
 import { fetchBtcReserve, type BtcVyplata } from "../../lib/psb/client";
 import { navrhniKlientaKandidati, type ClientAgg } from "../../lib/psb/compute";
+import { guillermoZostatok } from "../../lib/psb/guillermo";
 import type { PSBData } from "../../lib/psb/types";
 import { C, mix } from "../../lib/psb/theme";
 import { Card, Empty, H3, Info, Modal, Select, TrenerPills } from "./ui";
@@ -98,7 +99,7 @@ async function posli(telo: Record<string, unknown>) {
   };
 }
 
-export function Kalendar({ clients, data, focus, ktoSom }: { clients: Record<string, ClientAgg>; data: PSBData; focus?: NavFocus | null; ktoSom?: string | null }) {
+export function Kalendar({ clients, data, focus, ktoSom, trainer, onTrainer }: { clients: Record<string, ClientAgg>; data: PSBData; focus?: NavFocus | null; ktoSom?: string | null; trainer?: string; onTrainer?: (t: string) => void }) {
   const [stav, setStav] = useState<Stav | null>(null);
   const [chyba, setChyba] = useState("");
   const [sprava, setSprava] = useState("");
@@ -111,7 +112,15 @@ export function Kalendar({ clients, data, focus, ktoSom }: { clients: Record<str
    * Terezkine zrušenia, jej chýbajúce zápisy a jej balíčky. Prepínač je jeden a
    * drží ho tento komponent; karty dostávajú už prefiltrované dáta.
    */
-  const [trener, setTrener] = useState("all");
+  //
+  // A je to TEN ISTÝ prepínač ako na Dashboarde, Klientoch a Tréningoch
+  // (`trainer` z App). Dovtedy mal Kalendár vlastný, ktorý sa pri každom
+  // otvorení vrátil na „Obaja" — Jerry, 14. 9. 2026: „mám nastavenú Terezku,
+  // kliknem na Hodiny / týždeň a hodí ma to do kalendára na Obaja". Vlastný
+  // stav zostáva len ako záloha, keby komponent niekto použil bez App.
+  const [trenerLokalny, setTrenerLokalny] = useState(trainer || "all");
+  const trener = trainer ?? trenerLokalny;
+  const setTrener = (t: string) => (onTrainer ? onTrainer(t) : setTrenerLokalny(t));
 
   // Preklik z Dashboardu („Kalendár: 4 nevysvetlené zmeny →") prináša
   // trénera a chce tabuľku zmien — nie vrch stránky. Rovnaký filter ako na
@@ -121,7 +130,9 @@ export function Kalendar({ clients, data, focus, ktoSom }: { clients: Record<str
   const [rolovatNa, setRolovatNa] = useState<string | null>(null);
   useEffect(() => {
     if (!focus?.nonce) return;
-    setTrener(focus.trainer && focus.trainer !== "all" ? focus.trainer : "all");
+    // Preklik bez trénera nechá platiť to, čo je práve zvolené — nesmie
+    // prepnúť na „Obaja".
+    if (focus.trainer) setTrener(focus.trainer);
     setRolovatNa(focus.sekcia === "nezname" ? "kal-nezname" : "kal-zmeny");
   }, [focus?.nonce]); // eslint-disable-line react-hooks/exhaustive-deps
   // Roluje sa až keď obsah existuje — pri prvom otvorení sa kalendár ešte
@@ -287,7 +298,15 @@ function Pripojenie({ zdroje, onZmena }: { zdroje: Zdroj[]; onZmena: () => Promi
             <div key={t} style={{ flex: "1 1 220px", padding: "10px 12px", borderRadius: 9, border: `1px solid ${C.border}`, background: mix(C.border, 18) }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{t}</div>
               {!z && <div style={{ fontSize: 12, color: C.textDim, marginTop: 3 }}>nepripojený</div>}
-              {z && z.posledna_chyba && <div style={{ fontSize: 12, color: C.red, marginTop: 3 }}>{z.posledna_chyba}</div>}
+              {z && z.posledna_chyba && (
+                <div style={{ fontSize: 12, color: C.red, marginTop: 3, lineHeight: 1.4 }}>
+                  {z.posledna_chyba}
+                  {/* Pri chybe má človek vedieť aj to, AKO staré je to, čo vidí. */}
+                  <div style={{ color: C.textDim, marginTop: 2 }}>
+                    {z.posledne_ok ? `naposledy stiahnutý ${fmtDMY(z.posledne_ok)} ${z.posledne_ok.slice(11, 16)}` : "ešte sa nikdy nestiahol"}
+                  </div>
+                </div>
+              )}
               {z && !z.posledna_chyba && (() => {
                 // ZASTARANÝ ZDROJ SA MUSÍ OHLÁSIŤ.
                 //
@@ -1470,8 +1489,11 @@ export function GuillermoKarta() {
 
   const nacitaj = useCallback(async () => {
     const r = await fetch("/api/kalendar", { credentials: "same-origin" });
-    const j = (await r.json()) as { ok?: boolean; guillermo?: Guillermo[]; udalosti?: KalUdalost[] };
-    if (j.ok) { setZaznamy(j.guillermo || []); setUdalosti(j.udalosti || []); }
+    const j = (await r.json()) as { ok?: boolean; guillermo?: Guillermo[]; udalosti?: KalUdalost[]; guillermoUdalosti?: KalUdalost[] };
+    // Odtrénované sa počíta z guillermoUdalosti (VŠETKY guillermo tréningy bez
+    // ohľadu na okno), nie z `udalosti` (len 21 dní dozadu) — inak by starší
+    // tréning z počtu vypadol a zostatok by narástol späť.
+    if (j.ok) { setZaznamy(j.guillermo || []); setUdalosti(j.guillermoUdalosti || j.udalosti || []); }
     const btc = await fetchBtcReserve(false, true, false);
     // „FP spain" aj staršie „Jerry vyplata fp" — ten istý človek, iný zápis.
     setPlatby((btc?.vyplaty || []).filter((v) => /fp\s*spain|vyplata fp|fpspain/i.test(v.poznamka || "")));
@@ -1482,9 +1504,9 @@ export function GuillermoKarta() {
   const kotva = zaznamy.filter((z) => z.druh === "zostatok").sort((a, b) => b.datum.localeCompare(a.datum))[0] || null;
   const odKedy = kotva?.datum || "0000-00-00";
   const nakupy = zaznamy.filter((z) => z.druh === "nakup");
-  const kupene = nakupy.filter((z) => z.datum > odKedy).reduce((a, z) => a + z.hodiny, 0);
-  const odtrenovane = udalosti.filter((u) => u.typ === "guillermo" && u.zaciatok.slice(0, 10) > odKedy && u.zaciatok.slice(0, 10) <= dnes).length;
-  const zostatok = (kotva?.hodiny ?? 0) + kupene - odtrenovane;
+  // Balance math je jedna definícia v lib/psb/guillermo.ts — tú istú funkciu
+  // číta aj Jarvisov kontext (aiContext.guillermo), nech sa nerozídu.
+  const { zostatok, kupene, odtrenovane } = guillermoZostatok(zaznamy, udalosti, dnes);
 
   // Platba, ku ktorej ešte nikto nepovedal, koľko sedení kúpila.
   const zaradene = new Set(nakupy.map((z) => z.datum));

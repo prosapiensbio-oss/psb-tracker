@@ -6,6 +6,7 @@ import { bindings } from "../../lib/bindings.server";
 import { typZNazvu } from "../../lib/psb/kalendar";
 import { citajIcal } from "../../lib/psb/ical";
 import { ohlasitZmenu } from "../../lib/psb/kalendarZmeny";
+import { chybaZdroja, NEDOKONCENE, vyberZdroj, type ZdrojSPokusom } from "../../lib/psb/kalendarZdroje";
 
 // Kalendár — predbežný obraz týždňa medzi dvoma exportmi z PTmindera.
 //
@@ -36,6 +37,10 @@ const uid = () => crypto.randomUUID();
 const teraz = () => new Date().toISOString();
 
 type Zdroj = { id: string; trener: string; url: string; aktivny: number };
+type ZdrojStav = {
+  id: string; trener: string; aktivny: number; posledne_ok: string | null; posledna_chyba: string | null;
+  snimka_kedy: string | null; snimka_ok: number | null; snimka_chyba: string | null;
+};
 type Ulozena = { uid: string; trener: string; zaciatok: string; koniec: string; nazov: string; klient: string | null; typ: string | null; zmizla_at: string | null };
 
 function okno() {
@@ -56,16 +61,28 @@ async function snimka(DB: D1Database, z: Zdroj) {
   const { odMs, doMs, od, do_ } = okno();
   const kedy = teraz();
 
+  // POKUS SA ZAPÍŠE PRED ŤAŽKOU PRÁCOU. Worker zabitý na limite nestihne nič
+  // zapísať — bez tohto riadku by po ňom neostala stopa a výber zdroja by si
+  // ho pri ďalšom behu vzal znova (10.–13. 9. 2026). Úspech aj chyba tento
+  // riadok len prepíšu; keď ho neprepíše nič, beh zomrel (viď kalendarZdroje).
+  const snimkaId = uid();
+  await DB.prepare("INSERT INTO kal_snimky (id, kedy, trener, udalosti, zmien, ok, chyba) VALUES (?,?,?,0,0,0,?)")
+    .bind(snimkaId, kedy, z.trener, `${NEDOKONCENE} — beh sa neukončil (limit workera)`).run();
+
   let udalosti;
   try {
-    const r = await fetch(z.url, { headers: { "user-agent": "psb-kokpit-kalendar" }, signal: AbortSignal.timeout(15000) });
+    // 28 s, nie 15: Google generuje iCal rôzne dlho a Jerryho kalendár (~2,5 MB)
+    // sa z Workera pri pomalšom behu na 15 s nestihol — `posledná_chyba = timeout`,
+    // kalendár „odpojený" (8. 9. 2026). Odo mňa 9 s, ale Google kolíše (memory:
+    // „snímka vyjde ~1 z 3"). 28 s dáva rezervu a fetch je I/O, nie CPU, takže
+    // to nehrozí prekročením CPU limitu workera. Cloudflare req cap je ~30 s.
+    const r = await fetch(z.url, { headers: { "user-agent": "psb-kokpit-kalendar" }, signal: AbortSignal.timeout(28000) });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     udalosti = citajIcal(await r.text(), odMs, doMs);
   } catch (e) {
     const chyba = e instanceof Error ? e.message : "nepodarilo sa stiahnuť";
     await DB.prepare("UPDATE kal_zdroje SET posledna_chyba = ? WHERE id = ?").bind(chyba, z.id).run();
-    await DB.prepare("INSERT INTO kal_snimky (id, kedy, trener, udalosti, zmien, ok, chyba) VALUES (?,?,?,0,0,0,?)")
-      .bind(uid(), kedy, z.trener, chyba).run();
+    await DB.prepare("UPDATE kal_snimky SET chyba = ? WHERE id = ?").bind(chyba, snimkaId).run();
     return { ok: false, chyba };
   }
 
@@ -166,8 +183,8 @@ async function snimka(DB: D1Database, z: Zdroj) {
   }
 
   prikazy.push(DB.prepare("UPDATE kal_zdroje SET posledne_ok = ?, posledna_chyba = NULL WHERE id = ?").bind(kedy, z.id));
-  prikazy.push(DB.prepare("INSERT INTO kal_snimky (id, kedy, trener, udalosti, zmien, ok, chyba) VALUES (?,?,?,?,?,1,NULL)")
-    .bind(uid(), kedy, z.trener, udalosti.length, zmien));
+  prikazy.push(DB.prepare("UPDATE kal_snimky SET udalosti = ?, zmien = ?, ok = 1, chyba = NULL WHERE id = ?")
+    .bind(udalosti.length, zmien, snimkaId));
 
   await DB.batch(prikazy);
   return { ok: true, udalosti: udalosti.length, zmien, prveStiahnutie };
@@ -196,13 +213,14 @@ export const Route = createFileRoute("/api/kalendar")({
           }
           // Aj tu jeden zdroj na volanie — z rovnakého dôvodu ako pri ručnom
           // sťahovaní. `trener` v query si vie plánovač vypýtať adresne;
-          // bez neho sa berie najzanedbanejší, takže sa cez ne pretočí.
+          // bez neho sa berie najdlhšie NESKÚŠANÝ (vyberZdroj) — nie najdlhšie
+          // neúspešný, inak padajúci kalendár zablokuje každý beh (10.–13. 9. 2026).
           const ziadany = q0.get("trener") || "";
           const zdroje = ((await DB.prepare(
-            "SELECT id, trener, url, aktivny, posledne_ok FROM kal_zdroje WHERE aktivny = 1 ORDER BY COALESCE(posledne_ok, '') ASC",
-          ).all()).results || []) as unknown as (Zdroj & { posledne_ok: string | null })[];
+            "SELECT z.id, z.trener, z.url, z.aktivny, z.posledne_ok, (SELECT MAX(s.kedy) FROM kal_snimky s WHERE s.trener = z.trener) AS posledny_pokus FROM kal_zdroje z WHERE z.aktivny = 1",
+          ).all()).results || []) as unknown as (Zdroj & ZdrojSPokusom & { posledne_ok: string | null })[];
           if (!zdroje.length) return Response.json({ ok: true, vysledky: {} });
-          const z = ziadany ? zdroje.find((x) => x.trener === ziadany) : zdroje[0];
+          const z = vyberZdroj(zdroje, ziadany);
           if (!z) return Response.json({ ok: false, error: "neznamy trener" }, { status: 404 });
           return Response.json({ ok: true, vysledky: { [z.trener]: await snimka(DB, z) } });
         }
@@ -210,8 +228,12 @@ export const Route = createFileRoute("/api/kalendar")({
         if (!(await isAuthed(request))) return unauthorized();
         const { od, do_ } = okno();
 
-        const [zdroje, zmeny, zmenyHistoria, mapovanie, udalosti, guillermo] = await Promise.all([
-          DB.prepare("SELECT id, trener, aktivny, posledne_ok, posledna_chyba FROM kal_zdroje ORDER BY trener").all(),
+        const [zdroje, zmeny, zmenyHistoria, mapovanie, udalosti, guillermo, guillermoUdalosti] = await Promise.all([
+          DB.prepare(`SELECT z.id, z.trener, z.aktivny, z.posledne_ok, z.posledna_chyba,
+            (SELECT s.kedy FROM kal_snimky s WHERE s.trener = z.trener ORDER BY s.kedy DESC LIMIT 1) AS snimka_kedy,
+            (SELECT s.ok FROM kal_snimky s WHERE s.trener = z.trener ORDER BY s.kedy DESC LIMIT 1) AS snimka_ok,
+            (SELECT s.chyba FROM kal_snimky s WHERE s.trener = z.trener ORDER BY s.kedy DESC LIMIT 1) AS snimka_chyba
+            FROM kal_zdroje z ORDER BY z.trener`).all(),
           DB.prepare("SELECT id, kedy, trener, uid, druh, nazov, klient, pred, po, vysvetlene, poznamka FROM kal_zmeny WHERE vysvetlene = 0 ORDER BY kedy DESC LIMIT 60").all(),
           // Karta „Zmeny v kalendári" je schránka — ukazuje len to, čo ešte
           // čaká na odpoveď (vysvetlene = 0). Pre Jarvisa to nestačí: na
@@ -222,6 +244,11 @@ export const Route = createFileRoute("/api/kalendar")({
           DB.prepare("SELECT nazov, trener, klient, typ FROM kal_mapovanie ORDER BY trener, nazov").all(),
           DB.prepare("SELECT uid, trener, zaciatok, koniec, nazov, klient, typ FROM kal_udalosti WHERE zmizla_at IS NULL AND zaciatok >= ? AND zaciatok <= ? ORDER BY zaciatok").bind(od, do_).all(),
           DB.prepare("SELECT id, datum, druh, hodiny, suma_czk, poznamka FROM guillermo_hodiny ORDER BY datum DESC").all(),
+          // Guillermo tréningy MIMO okna: zostatok sedení sa počíta od kotvy
+          // (napr. 9. 8.), ale okno udalostí siaha len 21 dní dozadu — tréning
+          // starší by z počtu vypadol a zostatok by ticho narástol späť. Preto
+          // sa guillermo udalosti berú bez ohľadu na okno (je ich pár).
+          DB.prepare("SELECT uid, trener, zaciatok, koniec, nazov, klient, typ FROM kal_udalosti WHERE typ = 'guillermo' AND zmizla_at IS NULL ORDER BY zaciatok").all(),
         ]);
 
         // Názvy, ktoré appka ešte nepozná — to je práca, ktorú treba odklikať.
@@ -237,12 +264,18 @@ export const Route = createFileRoute("/api/kalendar")({
 
         return Response.json({
           ok: true,
-          zdroje: zdroje.results || [],
+          // Beh, ktorý zomrel bez zápisu chyby, sa ukáže ako chyba — nie ako
+          // zelené „pripojený" (kalendarZdroje.chybaZdroja).
+          zdroje: ((zdroje.results || []) as unknown as ZdrojStav[]).map(({ snimka_kedy, snimka_ok, snimka_chyba, ...z }) => ({
+            ...z,
+            posledna_chyba: chybaZdroja(z, snimka_kedy ? { kedy: snimka_kedy, ok: snimka_ok ?? 1, chyba: snimka_chyba } : null, Date.now()),
+          })),
           zmeny: zmeny.results || [],
           zmenyHistoria: zmenyHistoria.results || [],
           mapovanie: mapovanie.results || [],
           udalosti: udalosti.results || [],
           guillermo: guillermo.results || [],
+          guillermoUdalosti: guillermoUdalosti.results || [],
           nezname: Object.values(nezname).sort((a, b) => b.pocet - a.pocet),
         });
       },
@@ -287,15 +320,15 @@ export const Route = createFileRoute("/api/kalendar")({
         // sa nedozvedel, že sa jej kalendár od 17. 8. nesťahuje. Appka celý ten
         // čas ukazovala tréningy, ktoré si už dávno zmazala.
         //
-        // Bez `trener` sa vezme NAJZANEDBANEJŠÍ zdroj, takže opakované volania
-        // sa cez všetky pretočia a žiadny nezostane pozadu natrvalo.
+        // Bez `trener` sa vezme najdlhšie NESKÚŠANÝ zdroj (vyberZdroj), takže
+        // opakované volania sa cez všetky pretočia — aj keď jeden z nich padá.
         if (akcia === "stiahni") {
           const ziadany = String(b.trener || "").trim();
           const zdroje = ((await DB.prepare(
-            "SELECT id, trener, url, aktivny, posledne_ok FROM kal_zdroje WHERE aktivny = 1 ORDER BY COALESCE(posledne_ok, '') ASC",
-          ).all()).results || []) as unknown as (Zdroj & { posledne_ok: string | null })[];
+            "SELECT z.id, z.trener, z.url, z.aktivny, z.posledne_ok, (SELECT MAX(s.kedy) FROM kal_snimky s WHERE s.trener = z.trener) AS posledny_pokus FROM kal_zdroje z WHERE z.aktivny = 1",
+          ).all()).results || []) as unknown as (Zdroj & ZdrojSPokusom & { posledne_ok: string | null })[];
           if (!zdroje.length) return Response.json({ ok: false, error: "Nie je pripojený žiadny kalendár." });
-          const z = ziadany ? zdroje.find((x) => x.trener === ziadany) : zdroje[0];
+          const z = vyberZdroj(zdroje, ziadany);
           if (!z) return Response.json({ ok: false, error: `Kalendár trénera ${ziadany} nie je pripojený.` }, { status: 404 });
           const vysledok = await snimka(DB, z);
           return Response.json({

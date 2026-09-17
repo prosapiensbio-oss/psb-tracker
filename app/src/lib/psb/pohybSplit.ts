@@ -1,3 +1,4 @@
+import { fioKluc } from "./fio";
 // Rozdelenie jedného bankového (alebo hotovostného) pohybu na časti.
 //
 // Jerry, 5. 9. 2026: nový iPhone aj Terezkin iPhone sa majú deliť „polka PSB,
@@ -25,8 +26,10 @@ export type PohybSplits = Record<string, SplitCiast[]>;
  *  `kluc`): `fio:<ID operace>`, a keď výpis ID nenesie, `dátum|suma|protistrana`.
  *  Vďaka tomu sa split zapísaný v náhľade pred importom trafí na ten istý
  *  pohyb po importe. */
-export function pohybKluc(r: { id?: string; datum: string; suma: number; protistrana?: string }): string {
-  return r.id ? `fio:${r.id}` : `${r.datum}|${r.suma}|${(r.protistrana || "").slice(0, 40)}`;
+export function pohybKluc(r: { id?: string; datum: string; suma: number; protistrana?: string; poradie?: number }): string {
+  // Jedna definícia so serverom — viď fio.fioKluc (od 13. 9. 2026 aj poradie
+  // duplicitných pohybov bez ID).
+  return fioKluc(r);
 }
 
 /** Je split použiteľný? Aspoň jedna časť, každé percento v (0,100], súčet 100
