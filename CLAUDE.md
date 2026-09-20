@@ -657,3 +657,46 @@ Tri pravidlá, ktoré z toho platia:
 Zmena parsera sa overuje porovnaním starej a novej verzie na REÁLNYCH
 súboroch v rôznych oknách (vrátane prelomov letného času) — výstup musí
 byť zhodný do znaku. Syntetické testy sú v `ical.test.ts`.
+
+## Dlaždica bez zoznamu zhodí celú appku, nielen svoju kartu
+
+20. 9. 2026: do karty reklamy pribudla dlaždica „Cena za dopyt" a zoznam
+riadkov k nej nie. `zoznamy[kluc]` bolo `undefined`, `z.riadky.length`
+vyhodilo výnimku — a koreňová hranica TanStacku zhasla CELÝ Kokpit. Jerry
+videl „This page didn't load" na všetkom, nie na jednej karte. Worker pritom
+bežal (HTTP 200, assety 200); príčina bola v prehliadači a poznať ju bolo len
+z konzoly.
+
+- **Index do `Record<string, …>` TypeScript nekontroluje.** Nový kľúč pre
+  existujúcu mapu je rovnako nebezpečný ako chýbajúci stĺpec v INSERTe.
+  Stráži to `Reklama.test.ts` — porovná kľúče v `stat("…")` s kľúčmi v
+  `zoznamy`.
+- **Komponent, ktorý číta z mapy podľa kľúča, musí mať pád nabok**
+  (`zoznamy[kluc] ?? { nadpis: label, riadky: [] }`). Prázdny zoznam je
+  zrozumiteľná strata, biela stránka nie.
+- **Diagnostika „appka nejde":** `curl` shell + assety (ak sú 200, server
+  žije) → konzola prehliadača. Do konzoly sa dá pozrieť aj cez Chrome
+  s Jerryho prihlásením, netreba ho o nič prosiť.
+
+## Schránka info@ je tretí zdroj dopytov
+
+Formulár na webe posiela dopyt sám, ale kto napíše rovno mailom, do
+štatistiky nespadol — a 20. 9. 2026 to bol práve človek z platenej reklamy,
+takže cena za dopyt vychádzala vyššia, než bola.
+
+- **IMAP z workera ide**, ale len na `imap.websupport.sk` (Dovecot).
+  `mail.prosapiens.cz`, `imap.prosapiens.cz` ani `mailin1.prosapiens.cz`
+  spojenie nedokončia („Stream was cancelled"). Overuje sa akciou `test`
+  v `/api/mail-dopyty`, ktorá nepotrebuje heslo.
+- **Knižnice z npm sem nejdú** (bežia nad `net`/`tls` z Node). Klient je
+  vlastný, nad `cloudflare:sockets`, a robí len čítanie: `BODY.PEEK`, žiadne
+  mazanie, žiadne označovanie prečítaného.
+- **Čisté rozobratie odpovede je v `imapParse.ts`**, socket v `imap.ts` —
+  `cloudflare:sockets` sa pod bunom nenačíta a testy by celý súbor nevideli.
+- **Telo sa prekladá z bajtov LEN keď je quoted-printable.** Zo socketu
+  prichádza text už dekódovaný; druhý preklad by z „Dobrý" spravil „Dobr?".
+- **Mail z formulára dostáva KĽÚČ WEBOVÉHO DOPYTU** (`web-<deň>-<e-mail>`),
+  aby sa so snippetom zliali do jedného riadku. A mail nikdy neprepíše
+  kampaň ani zdroj — UTM v e-maile nie sú, prepísal by pravdu domnienkou.
+- **Vyradené správy sa ukazujú.** Tichý filter sa nedá odlíšiť od prázdnej
+  schránky a presne tak sa stratí dopyt.
