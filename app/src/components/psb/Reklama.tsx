@@ -116,6 +116,10 @@ export function Reklama({ data, clients }: { data: PSBData; clients: Record<stri
       nadpis: `Dopyty so zdrojom „reklama“ alebo s kampaňou — ${v.platena.dopytov} ľudí (jeden človek = jeden dopyt, aj keď napísal dvakrát)`,
       riadky: v.platena.kto.dopyty.map((x) => ({ meno: x.meno || "(bez mena)", vpravo: `${fmtDen(x.datum)}${x.klient ? " · stal sa klientom" : ""}` })),
     },
+    cenadopyt: {
+      nadpis: `Cena za dopyt = ${fmtCZK(v.spend)} (výdavok, zoznam „Minuté“) ÷ ${v.platena.dopytov} dopytov z reklamy`,
+      riadky: v.platena.kto.dopyty.map((x) => ({ meno: x.meno || "(bez mena)", vpravo: `${fmtDen(x.datum)}${x.klient ? " · stal sa klientom" : ""}` })),
+    },
     klienti: {
       nadpis: `Z reklamných dopytov klientmi (jeKlient: prišiel znova alebo zaplatil nad úvodný) — ${v.platena.klientov} z ${v.platena.dopytov}`,
       riadky: v.platena.kto.klienti.map((x) => ({ meno: x.meno, vpravo: `tržba v okne ${fmtCZK(x.trzbaVOkne)}` })),
@@ -130,7 +134,15 @@ export function Reklama({ data, clients }: { data: PSBData; clients: Record<stri
     },
   };
   const stat = (kluc: string, hodnota: string, label: string, farba: string, info: string) => {
-    const z = zoznamy[kluc];
+    /**
+     * Dlaždica bez zoznamu nesmie zhodiť obrazovku.
+     *
+     * 20. 9. 2026 som pridal „Cena za dopyt" a zoznam k nej nie — `zoznamy[kluc]`
+     * bolo `undefined`, `z.riadky` vyhodilo výnimku a koreňová hranica zhasla
+     * CELÝ Kokpit, nielen túto kartu („This page didn't load"). Prázdny zoznam
+     * je zrozumiteľná strata, biela stránka nie.
+     */
+    const z = zoznamy[kluc] ?? { nadpis: label, riadky: [] };
     const je = zoznam === kluc;
     return (
       <div style={{ minWidth: 128 }}>
@@ -166,6 +178,11 @@ export function Reklama({ data, clients }: { data: PSBData; clients: Record<stri
           <div style={{ display: "flex", gap: 22, flexWrap: "wrap", margin: "10px 0 6px" }}>
             {stat("minute", fmtCZK(v.spend), "Minuté", C.orange, `Výdavok na reklamu za zvolené obdobie, ${zdroj}. Zdroje sa nesčítavajú — mesačná zostava aj Metricool popisujú tie isté peniaze.`)}
             {stat("dopyty", String(v.platena.dopytov), "Dopytov z reklamy", C.blue, "Dopyty so zdrojom „reklama” alebo s vyplnenou kampaňou. Jeden človek, ktorý napísal dvakrát, je jeden dopyt.")}
+            {/* Jerry, 20. 9. 2026: „vidím prvý dopyt z reklamy, ale nevidím cenu za
+                dopyt". Vrchný pás ju má, ale počíta ju len z PLNÝCH mesiacov, takže
+                dopyt z 20. 9. do nej ešte nespadol a svietila pomlčka. Tu je z toho
+                istého okna ako ostatné čísla karty, takže sedí s „Dopytov z reklamy". */}
+            {stat("cenadopyt", cislo(v.platena.cenaZaDopyt), "Cena za dopyt", v.platena.dopytov ? C.text : C.textDim, "Výdavok za zvolené obdobie ÷ dopyty z reklamy v tom istom období. Je to prvý medzikrok pred cenou za klienta: dopyt ešte nie je klient. Strop, s ktorým počíta plán kampane, je 2 200 Kč.")}
             {stat("klienti", String(v.platena.klientov), "Z nich klientov", C.accentLight, "Klient = prišiel znova alebo zaplatil nad rámec úvodného. Úvodný tréning je platený, takže „má platbu” by splnil každý, kto naň prišiel.")}
             {stat("cena", cislo(v.platena.cenaZaKlienta), "Cena za klienta", v.platena.klientov ? C.text : C.textDim, "TOTO je číslo na rozhodnutie o rozpočte: výdavok ÷ klienti, ktorí prišli z reklamy. Strop je 2 200 Kč (hodnota klienta u Terezky).")}
             {stat("navratnost", v.platena.navratnost == null ? "—" : `${(v.platena.navratnost * 100).toFixed(0)} %`, "Návratnosť", v.platena.navratnost && v.platena.navratnost >= 1 ? C.green : C.textMuted, "Tržba od klientov z reklamy ÷ výdavok. Sto percent znamená, že sa reklama zaplatila.")}

@@ -50,6 +50,7 @@ import { Route as ApiMetaRouteImport } from './routes/api/meta'
 import { Route as ApiMeraniaRouteImport } from './routes/api/merania'
 import { Route as ApiMarketingRouteImport } from './routes/api/marketing'
 import { Route as ApiMailerRouteImport } from './routes/api/mailer'
+import { Route as ApiMailDopytyRouteImport } from './routes/api/mail-dopyty'
 import { Route as ApiLogoutRouteImport } from './routes/api/logout'
 import { Route as ApiLoginRouteImport } from './routes/api/login'
 import { Route as ApiLeadsRouteImport } from './routes/api/leads'
@@ -277,6 +278,11 @@ const ApiMailerRoute = ApiMailerRouteImport.update({
   path: '/api/mailer',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiMailDopytyRoute = ApiMailDopytyRouteImport.update({
+  id: '/api/mail-dopyty',
+  path: '/api/mail-dopyty',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiLogoutRoute = ApiLogoutRouteImport.update({
   id: '/api/logout',
   path: '/api/logout',
@@ -410,6 +416,7 @@ export interface FileRoutesByFullPath {
   '/api/leads': typeof ApiLeadsRoute
   '/api/login': typeof ApiLoginRoute
   '/api/logout': typeof ApiLogoutRoute
+  '/api/mail-dopyty': typeof ApiMailDopytyRoute
   '/api/mailer': typeof ApiMailerRoute
   '/api/marketing': typeof ApiMarketingRoute
   '/api/merania': typeof ApiMeraniaRoute
@@ -474,6 +481,7 @@ export interface FileRoutesByTo {
   '/api/leads': typeof ApiLeadsRoute
   '/api/login': typeof ApiLoginRoute
   '/api/logout': typeof ApiLogoutRoute
+  '/api/mail-dopyty': typeof ApiMailDopytyRoute
   '/api/mailer': typeof ApiMailerRoute
   '/api/marketing': typeof ApiMarketingRoute
   '/api/merania': typeof ApiMeraniaRoute
@@ -539,6 +547,7 @@ export interface FileRoutesById {
   '/api/leads': typeof ApiLeadsRoute
   '/api/login': typeof ApiLoginRoute
   '/api/logout': typeof ApiLogoutRoute
+  '/api/mail-dopyty': typeof ApiMailDopytyRoute
   '/api/mailer': typeof ApiMailerRoute
   '/api/marketing': typeof ApiMarketingRoute
   '/api/merania': typeof ApiMeraniaRoute
@@ -605,6 +614,7 @@ export interface FileRouteTypes {
     | '/api/leads'
     | '/api/login'
     | '/api/logout'
+    | '/api/mail-dopyty'
     | '/api/mailer'
     | '/api/marketing'
     | '/api/merania'
@@ -669,6 +679,7 @@ export interface FileRouteTypes {
     | '/api/leads'
     | '/api/login'
     | '/api/logout'
+    | '/api/mail-dopyty'
     | '/api/mailer'
     | '/api/marketing'
     | '/api/merania'
@@ -733,6 +744,7 @@ export interface FileRouteTypes {
     | '/api/leads'
     | '/api/login'
     | '/api/logout'
+    | '/api/mail-dopyty'
     | '/api/mailer'
     | '/api/marketing'
     | '/api/merania'
@@ -798,6 +810,7 @@ export interface RootRouteChildren {
   ApiLeadsRoute: typeof ApiLeadsRoute
   ApiLoginRoute: typeof ApiLoginRoute
   ApiLogoutRoute: typeof ApiLogoutRoute
+  ApiMailDopytyRoute: typeof ApiMailDopytyRoute
   ApiMailerRoute: typeof ApiMailerRoute
   ApiMarketingRoute: typeof ApiMarketingRoute
   ApiMeraniaRoute: typeof ApiMeraniaRoute
@@ -1125,6 +1138,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiMailerRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/mail-dopyty': {
+      id: '/api/mail-dopyty'
+      path: '/api/mail-dopyty'
+      fullPath: '/api/mail-dopyty'
+      preLoaderRoute: typeof ApiMailDopytyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/logout': {
       id: '/api/logout'
       path: '/api/logout'
@@ -1302,6 +1322,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiLeadsRoute: ApiLeadsRoute,
   ApiLoginRoute: ApiLoginRoute,
   ApiLogoutRoute: ApiLogoutRoute,
+  ApiMailDopytyRoute: ApiMailDopytyRoute,
   ApiMailerRoute: ApiMailerRoute,
   ApiMarketingRoute: ApiMarketingRoute,
   ApiMeraniaRoute: ApiMeraniaRoute,

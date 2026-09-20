@@ -104,6 +104,25 @@ async function textWebu(env: Env): Promise<{ kol: number; nacitane: number; chyb
   return { kol: 12, nacitane };
 }
 
+/**
+ * Dopyty zo schránky info@prosapiens.cz.
+ *
+ * Beží v tom istom trojhodinovom pláne ako kalendár, ale VLASTNÝM volaním:
+ * IMAP spojenie je I/O, nie procesor, no keby sa prilepilo ku snímke
+ * kalendára, jedno zlyhanie by zobralo oboje (29. 8. 2026).
+ *
+ * Mailom prichádza dopyt, ktorý formulár na webe nezachytí — a práve ten
+ * rozhoduje, či cena za dopyt z reklamy vychádza pravdivo.
+ */
+const mailDopyty = (env: Env) =>
+  env.KOKPIT.fetch(
+    new Request("https://kokpit.prosapiensbio.workers.dev/api/mail-dopyty?cron=1", {
+      method: "POST",
+      headers: { "x-cron-token": env.KAL_CRON_TOKEN, "content-type": "application/json" },
+      body: JSON.stringify({ akcia: "stiahni" }),
+    }),
+  );
+
 const push = (env: Env) =>
   env.KOKPIT.fetch(
     new Request("https://kokpit.prosapiensbio.workers.dev/api/push-beh", {
@@ -178,6 +197,14 @@ export default {
         (e) => console.error("push na telefón zlyhal:", e),
       ),
     );
+    // Schránka. Tiež vlastné volanie — keď je poštový server nedostupný,
+    // nesmie to zhodiť ani kalendár, ani notifikácie.
+    ctx.waitUntil(
+      mailDopyty(env).then(
+        async (r) => console.log(`dopyty z mailu: HTTP ${r.status} ${(await r.text()).slice(0, 300)}`),
+        (e) => console.error("dopyty z mailu zlyhali:", e),
+      ),
+    );
   },
   // Ručné spustenie na overenie, že plánovač na Kokpit naozaj dosiahne.
   // `?novinky=1` skúša druhú vetvu bez čakania na 3:30 ráno.
@@ -208,6 +235,11 @@ export default {
     if (q.get("push") === "1") {
       const r = await push(env);
       return new Response(`push: ${r.status} ${(await r.text()).slice(0, 400)}`, { status: r.ok ? 200 : 502 });
+    }
+    // `?mail=1` prečíta schránku hneď — na overenie bez čakania na celú hodinu.
+    if (q.get("mail") === "1") {
+      const r = await mailDopyty(env);
+      return new Response(`dopyty z mailu: ${r.status} ${(await r.text()).slice(0, 600)}`, { status: r.ok ? 200 : 502 });
     }
     const r = q.get("novinky") === "1" ? await novinky(env) : await zavolaj(env);
     return new Response(`Kokpit odpovedal ${r.status}: ${(await r.text()).slice(0, 300)}`, {

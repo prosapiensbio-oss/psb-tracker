@@ -102,6 +102,7 @@ export function Udaje({ data, actions, chat, prekazky, kroky, podklady, onNaviga
           />
         </H3>
         <NapojenieWebu />
+        <NapojenieMailu />
         <NapojenieMeta />
         <NapojenieMailer />
         <CoJarvisVieZvonku data={data} />
@@ -654,6 +655,138 @@ function snippetWeb(url: string, tajne: string): string {
     "})();",
     "<\/script>",
   ].join("\n");
+}
+
+/**
+ * Napojenie schránky info@prosapiens.cz.
+ *
+ * Dopyt, ktorý príde mailom, appka doteraz nevidela — a 20. 9. 2026 to bol
+ * práve ten, ktorý prišiel v čase platenej reklamy. Kokpit sa preto raz za
+ * pár hodín pripojí na schránku, prečíta nové správy a tie, čo vyzerajú ako
+ * dopyt, zapíše do Dopytov.
+ *
+ * HESLO ZADÁVA JERRY, NIE JA. Uloží sa do nastavení appky (rovnaká tabuľka
+ * ako tokeny na Metu a Google) a von sa už nikdy neposiela — obrazovka
+ * dostane len odpoveď „uložené".
+ */
+function NapojenieMailu() {
+  type Stav = {
+    nastavene: { host: string; port: number; user: string; od: string; heslo: string; ignoruj: string };
+    posledny: null | { kedy: string; precitanych: number; pridanych: number; doplnenych: number;
+      pridane: string[]; doplnene: string[]; preskocene: { predmet: string; preco: string }[]; chyba: string };
+    dopytovZMailu: number; poslednyDopyt: string | null;
+  };
+  const [stav, setStav] = useState<Stav | null>(null);
+  const [host, setHost] = useState("");
+  const [user, setUser] = useState("");
+  const [heslo, setHeslo] = useState("");
+  const [od, setOd] = useState("");
+  const [ignoruj, setIgnoruj] = useState("");
+  const [hlaska, setHlaska] = useState("");
+  const [bezi, setBezi] = useState(false);
+
+  const nacitaj = async () => {
+    const r = await fetch("/api/mail-dopyty").then((x) => x.json() as Promise<Stav & { ok: boolean }>).catch(() => null);
+    if (!r?.ok) return;
+    setStav(r);
+    setHost(r.nastavene.host); setUser(r.nastavene.user);
+    setOd(r.nastavene.od); setIgnoruj(r.nastavene.ignoruj);
+  };
+  useEffect(() => { void nacitaj(); }, []);
+
+  const uloz = async () => {
+    setHlaska("ukladám…");
+    await saveVzasSetting("mail_host", host.trim());
+    await saveVzasSetting("mail_user", user.trim());
+    await saveVzasSetting("mail_od", od.trim());
+    await saveVzasSetting("mail_ignoruj", ignoruj.trim());
+    // Heslo sa posiela len vtedy, keď ho Jerry práve napísal — prázdne
+    // políčko nesmie zmazať uložené heslo.
+    if (heslo) { await saveVzasSetting("mail_heslo", heslo); setHeslo(""); }
+    setHlaska("uložené");
+    await nacitaj();
+  };
+
+  const posli = async (akcia: "test" | "stiahni") => {
+    setBezi(true);
+    setHlaska(akcia === "test" ? "skúšam spojenie…" : "sťahujem…");
+    try {
+      const r = await fetch("/api/mail-dopyty", {
+        method: "POST", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ akcia, host: host.trim() }),
+      }).then((x) => x.json() as Promise<{ ok: boolean; error?: string; banner?: string; pridanych?: number; precitanych?: number }>);
+      if (!r.ok) setHlaska(`nepodarilo sa: ${r.error || "neznáma chyba"}`);
+      else if (akcia === "test") setHlaska(`spojenie funguje — server odpovedal: ${r.banner}`);
+      else setHlaska(`prečítaných ${r.precitanych}, nových dopytov ${r.pridanych}`);
+    } catch (e) {
+      setHlaska(`nepodarilo sa: ${String(e).slice(0, 200)}`);
+    }
+    setBezi(false);
+    await nacitaj();
+  };
+
+  if (!stav) return null;
+  const p = stav.posledny;
+  const vstup = { background: C.bg, color: C.text, border: `1px solid ${C.border}`, borderRadius: 6, padding: "5px 8px", fontSize: 12, fontFamily: "inherit" } as const;
+
+  return (
+    <div style={{ marginTop: 14, padding: 12, background: mix(C.blue, 6), borderRadius: 8 }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: C.textMuted, marginBottom: 6 }}>
+        <Info
+          label="Dopyty z e-mailu"
+          text="Kto napíše rovno na info@prosapiens.cz, doteraz do štatistiky nespadol — appka videla len formulár z webu. Kokpit sa pripojí na schránku (IMAP, len čítanie), nové správy prevedie na dopyty a nič v schránke nemení ani neoznačuje ako prečítané. Newslettery, faktúry a strojová pošta sa preskakujú a je vidieť, čo a prečo — keby filter vyhodil skutočný dopyt, má sa to dať zbadať. Heslo zadávaš ty a von sa už neposiela. Formulárový mail dostane ten istý kľúč ako dopyt zo snippetu, takže sa nezaloží dvakrát; kampaň zo snippetu mail neprepíše, lebo v e-maile UTM nie sú."
+        />
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 8, marginBottom: 8 }}>
+        <label style={{ fontSize: 11.5, color: C.textDim }}>Server (IMAP)
+          <input value={host} onChange={(e) => setHost(e.target.value)} placeholder="mail.prosapiens.cz" style={{ ...vstup, width: "100%", marginTop: 3 }} />
+        </label>
+        <label style={{ fontSize: 11.5, color: C.textDim }}>Schránka
+          <input value={user} onChange={(e) => setUser(e.target.value)} placeholder="info@prosapiens.cz" style={{ ...vstup, width: "100%", marginTop: 3 }} />
+        </label>
+        <label style={{ fontSize: 11.5, color: C.textDim }}>Heslo {stav.nastavene.heslo ? "(uložené — prepíš len pri zmene)" : ""}
+          <input type="password" value={heslo} onChange={(e) => setHeslo(e.target.value)} placeholder={stav.nastavene.heslo ? "••••••••" : "heslo k schránke"} style={{ ...vstup, width: "100%", marginTop: 3 }} />
+        </label>
+        <label style={{ fontSize: 11.5, color: C.textDim }}>Čítať od dňa
+          <input value={od} onChange={(e) => setOd(e.target.value)} placeholder="2026-09-01" style={{ ...vstup, width: "100%", marginTop: 3 }} />
+        </label>
+        <label style={{ fontSize: 11.5, color: C.textDim }}>Nikdy nečítať (adresy alebo domény, oddelené čiarkou)
+          <input value={ignoruj} onChange={(e) => setIgnoruj(e.target.value)} placeholder="newsletter@x.cz, seznam.cz" style={{ ...vstup, width: "100%", marginTop: 3 }} />
+        </label>
+      </div>
+
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+        <button onClick={() => void uloz()} style={{ ...btn, fontSize: 12 }}>Uložiť</button>
+        <button onClick={() => void posli("test")} disabled={bezi || !host} style={{ ...btn, fontSize: 12 }}>Otestovať spojenie</button>
+        <button onClick={() => void posli("stiahni")} disabled={bezi || !stav.nastavene.heslo} style={{ ...btn, fontSize: 12 }}>Stiahnuť teraz</button>
+        {hlaska && <span style={{ fontSize: 11.5, color: hlaska.startsWith("nepodarilo") ? C.orange : C.textMuted }}>{hlaska}</span>}
+      </div>
+
+      <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 8, lineHeight: 1.55 }}>
+        Z mailu je v Dopytoch {stav.dopytovZMailu} {stav.dopytovZMailu === 1 ? "záznam" : "záznamov"}
+        {stav.poslednyDopyt ? `, posledný ${fmtDMY(stav.poslednyDopyt)}` : ""}.
+        {p ? ` Naposledy sa čítalo ${fmtDMY(p.kedy.slice(0, 10))}: prečítaných ${p.precitanych}, nových ${p.pridanych}, doplnených ${p.doplnenych}.` : " Zatiaľ nikdy nebežalo."}
+        {p?.chyba ? ` Chyba: ${p.chyba}` : ""}
+      </div>
+
+      {/* Vyradené správy sú vidieť zámerne: tichý filter sa nedá odlíšiť od
+          prázdnej schránky a práve tak by sa stratil dopyt. */}
+      {p && p.preskocene.length > 0 && (
+        <details style={{ marginTop: 6 }}>
+          <summary style={{ fontSize: 11.5, color: C.textDim, cursor: "pointer" }}>Čo sa nezapísalo ({p.preskocene.length})</summary>
+          <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 5, maxHeight: 200, overflowY: "auto" }}>
+            {p.preskocene.map((x, i) => (
+              <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 10, fontSize: 11.5 }}>
+                <span style={{ color: C.textMuted, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{x.predmet}</span>
+                <span style={{ color: C.textDim, flexShrink: 0 }}>{x.preco}</span>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+    </div>
+  );
 }
 
 function NapojenieWebu() {
