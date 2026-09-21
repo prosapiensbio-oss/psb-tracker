@@ -790,3 +790,21 @@ a klamali o rád:
 Pravidlo: **každé porovnanie dvoch klientov musí byť normalizované na čas** —
 inak meria, kto je dlhšie, nie kto je lepší. A keď sa normalizovať nedá
 (dochádzka v pevnom okne), radšej mlč než ukáž stĺpec.
+
+Druhé kolo kontroly (tie isté dáta, zvyšok dlaždíc) našlo ešte tri veci —
+všetky z rodiny „dve miesta, dve pravdy":
+
+- **„Posledné" čítalo len export.** Janka šnirychova mala v profile
+  „11. 8. (41 d)", hoci 17. 9. na tréningu bola — appka o tom vedela
+  z kalendára a o pár centimetrov vedľa hlásila „tréning nie je v PTminderi".
+  Profil teraz berie `poslednyTrening` (kalendár + export), rovnako ako
+  notifikácie, a keď dátum pochádza z kalendára, povie to v bublinke.
+- **„Koho priviedol" páruje meno cez `===`.** Dominika Križova odporučila
+  Lukáša Kríža, ale v poli odporúčateľa stálo „Dominika Krížova" — jeden
+  dĺžeň, a odporúčanie (36 390 Kč tržby) sa v profile nezobrazilo vôbec.
+  Páruje sa cez `najdiKlienta`, ako všade inde. Z 61 odporúčaní bolo takto
+  stratené jedno; ďalších osem sú ľudia mimo klientely („Masérka z BestGym"),
+  čo je v poriadku.
+- **Okno „90 dní" sa hýbalo podľa hodiny.** Sedenia majú v dátume polnoc,
+  takže tréning presne na hranici vypadol podľa toho, kedy si profil otvoril
+  (Janka 0,7 namiesto 1,0). Porovnáva sa po dňoch.

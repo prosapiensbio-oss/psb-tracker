@@ -49,8 +49,12 @@ export function tyzdnovVztahu(c: Pick<ClientAgg, "firstSession">, teraz: Date = 
  * chodí tri týždne, sa delí tromi týždňami, nie štvrťrokom.
  */
 export function tempoMesacne(c: Pick<ClientAgg, "sessions" | "firstSession">, teraz: Date = new Date()): number {
-  const od = teraz.getTime() - 90 * DEN;
-  const n = c.sessions.filter((s) => Date.parse(s.date) >= od).length;
+  // Okno sa porovnáva po DŇOCH, nie po milisekundách. Sedenia majú v dátume
+  // polnoc, takže pri porovnaní s presným časom vypadne tréning spadnutý
+  // presne na hranicu — a tempo sa mení podľa toho, o koľkej si profil
+  // otvoríš. Janka šnirychova tak mala 0,7 namiesto 1,0 (21. 9. 2026).
+  const od = new Date(teraz.getTime() - 90 * DEN).toISOString().slice(0, 10);
+  const n = c.sessions.filter((s) => String(s.date).slice(0, 10) >= od).length;
   const mesiacov = Math.min(3, mesiacovVztahu(c, teraz));
   return n / mesiacov;
 }

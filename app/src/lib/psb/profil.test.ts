@@ -26,6 +26,13 @@ describe("tempo nepenalizuje nováčika", () => {
     expect(tempoMesacne(c, TERAZ)).toBeCloseTo(4 / 3, 2);
   });
 
+  it("tréning presne na hranici 90 dní sa ešte počíta", () => {
+    // Sedenia majú v dátume polnoc; keby sa okno porovnávalo s presným časom,
+    // toto by vypadlo a tempo by záviselo od hodiny, kedy sa profil otvorí.
+    const c = klient(200, [90, 30]);
+    expect(tempoMesacne(c, TERAZ)).toBeCloseTo(2 / 3, 2);
+  });
+
   it("staršie sedenia než 90 dní do tempa nevstupujú", () => {
     expect(tempoMesacne(klient(400, [300, 200]), TERAZ)).toBe(0);
   });

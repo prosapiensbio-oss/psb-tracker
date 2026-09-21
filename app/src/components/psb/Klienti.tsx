@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { menoKluc, najdiKlienta, duchOdpoved, membershipBucket, MEMBERSHIP_ORDER, TRAINERS, type CakajuciKlient, type CapacityRow, type ClientAgg, type SixMRow } from "../../lib/psb/compute";
+import { menoKluc, najdiKlienta, duchOdpoved, membershipBucket, MEMBERSHIP_ORDER, TRAINERS, type CakajuciKlient, type CapacityRow, type ClientAgg, type SixMRow, type ZmenaVKalendari } from "../../lib/psb/compute";
 import { fmtCZK, fmtDate, fmtDMY, normName } from "../../lib/psb/format";
 import { C, MEMBERSHIP_COLORS, mix, S } from "../../lib/psb/theme";
 import { KlientProfil } from "./KlientProfil";
@@ -181,7 +181,7 @@ function Premenovanie({ meno, onHotovo }: { meno: string; onHotovo: (nove: strin
   );
 }
 
-export function Klienti({ clients, capacity, actions, focus, leads, trainer, onTrainer, sixM, sub, onSub, data, btcSatsKlienti = {}, onDennikZapis, cakajuci = [] }: { clients: Record<string, ClientAgg>; capacity: CapacityRow[]; actions: Actions; focus?: NavFocus | null; leads: Lead[]; trainer: string; onTrainer: (t: string) => void; sixM: SixMRow[]; sub: string; onSub: (s: string) => void; data: PSBData; btcSatsKlienti?: Record<string, number>; onDennikZapis?: (meno: string, text: string) => Promise<string | null>; /** Ľudia po úvodnom, ktorých export ešte nepotvrdil. */ cakajuci?: CakajuciKlient[] }) {
+export function Klienti({ clients, capacity, actions, focus, leads, trainer, onTrainer, sixM, sub, onSub, data, btcSatsKlienti = {}, onDennikZapis, cakajuci = [], kalUdalosti, kalZmeny }: { clients: Record<string, ClientAgg>; capacity: CapacityRow[]; actions: Actions; focus?: NavFocus | null; leads: Lead[]; trainer: string; onTrainer: (t: string) => void; sixM: SixMRow[]; sub: string; onSub: (s: string) => void; data: PSBData; btcSatsKlienti?: Record<string, number>; onDennikZapis?: (meno: string, text: string) => Promise<string | null>; /** Ľudia po úvodnom, ktorých export ešte nepotvrdil. */ cakajuci?: CakajuciKlient[]; /** Kalendár — profil z neho berie posledný tréning, kým ho export nedobehne. */ kalUdalosti?: { zaciatok: string; klient: string | null; typ: string | null }[]; kalZmeny?: ZmenaVKalendari[] }) {
   const [focusClient, setFocusClient] = useState<string | null>(null);
   const [skupina, setSkupina] = useState<{ label: string; mena: string[] } | null>(null);
   useEffect(() => {
@@ -455,7 +455,7 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
           btcSatsKlienti je kľúčované fuzzy kľúčom (menoKluc), nie normName —
           inak „Prochadzka" z PTmindera nenájde „Procházku" z BTC knihy. */}
       {focusClient && clients[focusClient] && (
-        <KlientProfil meno={focusClient} data={data} clients={clients} btcSats={btcSatsKlienti[menoKluc(focusClient)]} onZavri={() => setFocusClient(null)} onDennikZapis={onDennikZapis} />
+        <KlientProfil meno={focusClient} data={data} clients={clients} btcSats={btcSatsKlienti[menoKluc(focusClient)]} onZavri={() => setFocusClient(null)} onDennikZapis={onDennikZapis} kalUdalosti={kalUdalosti} kalZmeny={kalZmeny} />
       )}
 
       <Card>

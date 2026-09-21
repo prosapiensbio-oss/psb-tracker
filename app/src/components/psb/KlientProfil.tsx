@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 
-import { type ClientAgg } from "../../lib/psb/compute";
+import { najdiKlienta, poslednyTrening, type ClientAgg } from "../../lib/psb/compute";
 import { daysBetween, fmtCZK, fmtDMY, monthLabel } from "../../lib/psb/format";
 import { dochadzkaPorovnatelna, mesiacovVztahu, priemerOstatnych, tempoMesacne, zaplateneMesacne } from "../../lib/psb/profil";
 import { C, mix } from "../../lib/psb/theme";
@@ -67,11 +67,19 @@ function Porovnanie({ label, hodnota, priemer, fmt, vyssieLepsie = true }: {
   );
 }
 
-export function KlientProfil({ meno, data, clients, onZavri, btcSats, onDennikZapis }: {
+export function KlientProfil({ meno, data, clients, onZavri, btcSats, onDennikZapis, kalUdalosti, kalZmeny }: {
   meno: string;
   data: PSBData;
   clients: Record<string, ClientAgg>;
   onZavri: () => void;
+  /**
+   * Kalendár. Bez neho profil tvrdí „naposledy 11. 8." o klientke, ktorá
+   * bola na tréningu 17. 9. — len ho PTminder ešte nevyexportoval, a tá istá
+   * appka o pár centimetrov vedľa píše „tréning nie je v PTminderi".
+   * Dve miesta, dve pravdy (nájdené 21. 9. 2026 pri kontrole profilu).
+   */
+  kalUdalosti?: { zaciatok: string; klient: string | null; typ: string | null }[];
+  kalZmeny?: Parameters<typeof poslednyTrening>[2];
   /** Zápis do denníka spracuje Jarvis na pozadí — rovnako ako v ✎ modáli. */
   onDennikZapis?: (meno: string, text: string) => Promise<string | null>;
   /** Koľko satov klient celkovo zaplatil (z appky PSB Bitcoin). */
@@ -114,7 +122,17 @@ export function KlientProfil({ meno, data, clients, onZavri, btcSats, onDennikZa
     // daysBetween (floor) — tá istá definícia ako „X dní bez tréningu"
     // v notifikácii. Vlastný Math.round tu 27. 8. 2026 ukazoval „23 d",
     // kým notifikácia hovorila 22 — dve rátania tých istých dní.
-    const dniTicha = c.lastSession ? daysBetween(c.lastSession, new Date()) : null;
+    //
+    // A ten istý ZDROJ ako notifikácia: `poslednyTrening` pozerá aj do
+    // kalendára, lebo export z PTmindera chodí s oneskorením. Bez toho tu
+    // Janka šnirychova mala „naposledy 11. 8." (41 dní ticha), hoci 17. 9.
+    // na tréningu bola.
+    const posledneZKal = poslednyTrening({ [meno]: c }, kalUdalosti, kalZmeny)[meno] || "";
+    const posledne = posledneZKal && posledneZKal > String(c.lastSession || "").slice(0, 10)
+      ? posledneZKal
+      : String(c.lastSession || "").slice(0, 10);
+    const poslednezKalendara = !!posledne && posledne !== String(c.lastSession || "").slice(0, 10);
+    const dniTicha = posledne ? daysBetween(posledne, new Date()) : null;
 
     // Ø cena = ZAPLATENÉ / ODTRÉNOVANÉ HODINY. Payrollové `avgPrice` delí
     // interné ceny sedení počtom sedení a pri balíčkových klientoch vyjde
@@ -135,9 +153,9 @@ export function KlientProfil({ meno, data, clients, onZavri, btcSats, onDennikZa
     const t90 = tempoMesacne(c);
     const minieO = c.packageRemaining > 0 && t90 > 0 ? (c.packageRemaining / t90) * 4.33 : null;
 
-    return { platby, zaplatene, mesacne, priemery, dniTicha, tempo: t90, cenaHodiny, priemMedzera, minieO,
+    return { platby, zaplatene, mesacne, priemery, dniTicha, posledne, poslednezKalendara, tempo: t90, cenaHodiny, priemMedzera, minieO,
       mesiacov: mesiacovVztahu(c), dochadzkaSedi: dochadzkaPorovnatelna(c) };
-  }, [c, data, clients, meno]);
+  }, [c, data, clients, meno, kalUdalosti, kalZmeny]);
 
   if (!c || !p) return null;
 
@@ -203,9 +221,11 @@ export function KlientProfil({ meno, data, clients, onZavri, btcSats, onDennikZa
           );
         })()}
         {stat("Prvé sedenie", c.firstSession ? fmtDMY(c.firstSession) : "—")}
-        {stat("Posledné", c.lastSession ? `${fmtDMY(c.lastSession)}${p.dniTicha != null ? ` (${p.dniTicha} d)` : ""}` : "—",
+        {stat("Posledné", p.posledne ? `${fmtDMY(p.posledne)}${p.dniTicha != null ? ` (${p.dniTicha} d)` : ""}` : "—",
           p.dniTicha != null && p.dniTicha > 21 ? C.orange : undefined,
-          "Posledné sedenie a koľko dní odvtedy ubehlo.")}
+          p.poslednezKalendara
+            ? "Posledný tréning podľa KALENDÁRA — v exporte z PTmindera ešte nie je. Appka ho berie ako platný, rovnako ako notifikácie; do počtu sedení a do tempa sa dostane až po importe."
+            : "Posledné sedenie a koľko dní odvtedy ubehlo.")}
         {/* Zátvorka s hodinami len keď sa líšia od počtu — pri hodinových
             sedeniach je „4 (4 h)" to isté číslo dvakrát. */}
         {stat("Sedení", Math.round(c.totalHours) === c.sessionCount ? String(c.sessionCount) : `${c.sessionCount} (${Math.round(c.totalHours)} h)`)}
@@ -249,8 +269,14 @@ export function KlientProfil({ meno, data, clients, onZavri, btcSats, onDennikZa
           ráta zo všetkých platieb, lebo profil nemá obdobie; je to odpoveď na
           otázku „koľko tento človek PSB priniesol cez iných". */}
       {(() => {
+        // Meno odporúčateľa píše človek ručne, takže „Dominika Krížova" vs
+        // „Dominika Križova" (jeden dĺžeň) rozhodovalo o tom, či sa
+        // odporúčanie v profile vôbec ukáže. Páruje sa preto rovnako ako
+        // všade inde v appke — cez `najdiKlienta`, nie cez `===`.
+        const menaKlientov = Object.keys(clients);
         const privedeni = Object.values(clients)
-          .filter((x) => x.zdroj === "referencia" && (x.zdrojKto || "").trim() === c.name)
+          .filter((x) => x.zdroj === "referencia" && (x.zdrojKto || "").trim()
+            && najdiKlienta(menaKlientov, (x.zdrojKto || "").trim()) === c.name)
           .sort((a, b) => (a.firstSession || "").localeCompare(b.firstSession || ""));
         if (!privedeni.length) return null;
         const trzba = data.payments.filter((pp) => privedeni.some((x) => x.name === pp.client)).reduce((a, pp) => a + pp.amount, 0);
