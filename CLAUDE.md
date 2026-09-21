@@ -717,3 +717,30 @@ na webe stratil a v Kokpite nebol vôbec.
 - **Počty musia dať súčet.** `prečítaných = nových + doplnených + už
   evidovaných + preskočených`; bez „už evidovaných" to vyzeralo, akoby sa
   po ceste strácali správy.
+
+## Offline členstvá PTminder vyváža ako 0/0 — zostatok sa dopočítava
+
+21. 9. 2026 Jerry: „Gažo mi ukazuje 0 a pritom má 5 hodín ešte." Jeho
+„OFF - 18 hodín offline" je v PTminderi ČLENSTVO a v exporte stojí na
+`0 left from 0` — rovnako ako paušál GOLD. Počet hodín je pritom priamo
+v názve, takže nula nie je pravda o produkte, je to chýbajúci údaj. Týkalo sa
+to **14 balíčkov u 11 klientov** (celá rodina „OFF - …"), takže appka hlásila
+„balíček došiel" skoro každému offline klientovi.
+
+- **Keď export mlčí (0/0) a v názve je počet hodín, zostatok sa dopočíta:**
+  hodiny z názvu mínus tréningy v platnosti balíčka (`deriveClients`).
+- **Dopočítané číslo sa musí PRIZNAŤ.** `packageOdvodeny` → obrazovky píšu
+  „≈4/18", profil povie prečo, denná pripomienka dodá „(dopočítané —
+  over v PTminderi)". Odhad, ktorý sa tvári ako výpis, je horší než chýbajúce
+  číslo — Jerry ho hovorí klientovi nahlas.
+- **Presnosť je ±1 hodina.** Pri Gažovi appka ráta 4, PTminder hovorí 5:
+  rozdiel je tréning z 24. 7., v deň, keď sa začalo nové členstvo a staré
+  ešte platilo. Ktorému členstvu PTminder hodinu strhol, z exportu nezistíš.
+
+## Poštový server vie odmietnuť správne heslo
+
+Beh importu mailu o 6:00 spadol na `[AUTHENTICATIONFAILED]`, ten o 6:46 prešiel
+bez akejkoľvek zmeny — Dovecot po sérii prihlásení chvíľu odmieta. Preto sa
+vedľa posledného behu drží aj posledný ÚSPEŠNÝ (`mail_stav_ok`) a panel pri
+chybe povie, kedy sa naposledy čítalo. Jedna chyba nie je rozbité napojenie;
+to je tá istá lekcia ako pri kalendári.

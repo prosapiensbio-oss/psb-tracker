@@ -766,3 +766,63 @@ describe("kto na notifikáciu odpovedal", () => {
     expect(s.kto).toBeUndefined();
   });
 });
+
+/**
+ * Jerry, 21. 9. 2026: „Gažo mi ukazuje 0 a pritom má 5 hodín ešte."
+ *
+ * Jeho „OFF - 18 hodín offline" je v PTminderi ČLENSTVO a v exporte stojí na
+ * `0 left from 0` — rovnako ako paušál GOLD. Lenže počet hodín je priamo
+ * v názve, takže nula nie je pravda o produkte, je to chýbajúci údaj — a
+ * appka podľa nej hlásila „došiel balíček" človeku, ktorý hodiny zaplatené má.
+ */
+describe("zostatok balíčka, keď ho export nedal", () => {
+  const den = (posun: number) => new Date(Date.now() + posun * 86400000).toISOString().slice(0, 10);
+  const ses = (date: string) => ({
+    id: `s-${date}`, date, time: "10:00", client: "Peter Gažo", sessionTrainer: "Jerry",
+    sessionName: "Functional Patterns - 60min", sessionType: "OFFLINE", durationMin: 60, price: 1116.25,
+  });
+  const postav = (balik: Record<string, unknown>, kolkoSedeni: number) =>
+    deriveClients({
+      sessions: Array.from({ length: kolkoSedeni }, (_, i) => ses(den(-i - 1))),
+      payments: [], services: [], leads: [], clientOverrides: {}, anomalyAck: {},
+      packages: [{
+        client: "Peter Gažo", status: "Active Client", remaining: 0, total: 0,
+        added: den(-60), validFrom: den(-60), validTo: den(120), kind: "membership", ...balik,
+      }],
+    } as never)["Peter Gažo"];
+
+  it("dopočíta sa z názvu mínus odtrénované hodiny", () => {
+    const c = postav({ package: "OFF - 18 hodín offline" }, 14);
+    expect(c.packageTotal).toBe(18);
+    expect(c.packageRemaining).toBe(4);
+    expect(c.packageOdvodeny).toBe(true);
+  });
+
+  it("dopočítaný zostatok nejde pod nulu", () => {
+    expect(postav({ package: "OFF - 18 hodín offline" }, 25).packageRemaining).toBe(0);
+  });
+
+  it("tréningy spred platnosti balíčka sa neodpočítavajú", () => {
+    const c = deriveClients({
+      sessions: [ses(den(-200)), ses(den(-190)), ses(den(-3))],
+      payments: [], services: [], leads: [], clientOverrides: {}, anomalyAck: {},
+      packages: [{
+        client: "Peter Gažo", status: "Active Client", package: "OFF - 18 hodín offline",
+        remaining: 0, total: 0, added: den(-60), validFrom: den(-60), validTo: den(120), kind: "membership",
+      }],
+    } as never)["Peter Gažo"];
+    expect(c.packageRemaining).toBe(17);
+  });
+
+  it("keď export zostatok DAL, appka si ho nevymýšľa", () => {
+    const c = postav({ package: "OFF - 18 hodín offline", remaining: 7, total: 18 }, 14);
+    expect(c.packageRemaining).toBe(7);
+    expect(c.packageOdvodeny).toBe(false);
+  });
+
+  it("paušálne členstvo bez hodín v názve zostáva bez zostatku", () => {
+    const c = postav({ package: "GOLD členství" }, 14);
+    expect(c.packageOdvodeny).toBe(false);
+    expect(c.packageRemaining).toBe(0);
+  });
+});

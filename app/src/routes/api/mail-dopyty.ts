@@ -57,10 +57,24 @@ async function nastavenia(DB: D1Database): Promise<Nast> {
   };
 }
 
-const stav = async (DB: D1Database, v: unknown) =>
-  DB.prepare("INSERT INTO vzas_settings (key,value) VALUES ('mail_stav',?1) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
-    .bind(JSON.stringify(JSON.stringify(v))).run()
-    .catch(() => undefined);
+/**
+ * Stav posledného behu — a zvlášť posledného ÚSPEŠNÉHO.
+ *
+ * Poštový server vie odmietnuť prihlásenie aj vtedy, keď je heslo správne
+ * (21. 9. 2026 beh o 6:00 spadol na `AUTHENTICATIONFAILED` a ten o 6:46 prešiel
+ * bez toho, aby sa čokoľvek zmenilo — Dovecot po sérii prihlásení chvíľu
+ * odmieta). Keby panel ukazoval len poslednú chybu, vyzeralo by to ako
+ * rozbité napojenie. To je tá istá lekcia ako pri kalendári: k chybe patrí
+ * vek posledného úspechu.
+ */
+const stav = async (DB: D1Database, v: { chyba: string } & Record<string, unknown>) => {
+  const zapis = (kluc: string) =>
+    DB.prepare(`INSERT INTO vzas_settings (key,value) VALUES ('${kluc}',?1) ON CONFLICT(key) DO UPDATE SET value=excluded.value`)
+      .bind(JSON.stringify(JSON.stringify(v))).run()
+      .catch(() => undefined);
+  await zapis("mail_stav");
+  if (!v.chyba) await zapis("mail_stav_ok");
+};
 
 export const Route = createFileRoute("/api/mail-dopyty")({
   server: {
@@ -70,9 +84,12 @@ export const Route = createFileRoute("/api/mail-dopyty")({
         const { DB } = bindings();
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });
         const n = await nastavenia(DB);
-        const s = await DB.prepare("SELECT value FROM vzas_settings WHERE key='mail_stav'").first<{ value: string }>();
-        let posledny: unknown = null;
-        try { posledny = JSON.parse(JSON.parse(s?.value || '""') || "null"); } catch { posledny = null; }
+        const precitaj = async (kluc: string) => {
+          const r = await DB.prepare("SELECT value FROM vzas_settings WHERE key = ?1").bind(kluc).first<{ value: string }>();
+          try { return JSON.parse(JSON.parse(r?.value || '""') || "null"); } catch { return null; }
+        };
+        const posledny = await precitaj("mail_stav");
+        const poslednyUspech = await precitaj("mail_stav_ok");
         const zMailu = await DB.prepare(
           "SELECT COUNT(*) n, MAX(date) posledny FROM leads WHERE id LIKE 'mail-%'",
         ).first<{ n: number; posledny: string | null }>().catch(() => null);
@@ -81,6 +98,7 @@ export const Route = createFileRoute("/api/mail-dopyty")({
           // Heslo sa von neposiela nikdy — len to, či je vyplnené.
           nastavene: { host: n.host, port: n.port, user: n.user, od: n.od, heslo: n.heslo ? "uložené" : "", ignoruj: n.ignoruj.join(", ") },
           posledny,
+          poslednyUspech,
           dopytovZMailu: zMailu?.n ?? 0,
           poslednyDopyt: zMailu?.posledny ?? null,
         });

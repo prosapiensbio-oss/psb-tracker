@@ -1635,7 +1635,7 @@ export function Dashboard({
               {platnostKonci.map(({ c, doKonca, frekvencia, zostava }) => (
                 <div key={c.name} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 10px", background: mix(C.text, 4), border: `1px solid ${C.border}`, borderRadius: 9, width: "100%", minWidth: 0 }}>
                   <span style={{ ...badge(doKonca !== null && doKonca <= 7 ? "red" : "orange"), fontSize: 10, flexShrink: 0 }}>
-                    {c.packageTotal > 0 ? `${zostava}/${c.packageTotal}` : "—"}
+                    {c.packageTotal > 0 ? `${c.packageOdvodeny ? "≈" : ""}${zostava}/${c.packageTotal}` : "—"}
                   </span>
                   <button
                     onClick={() => onNavigate("klienti", undefined, { client: c.name, nonce: Date.now() })}

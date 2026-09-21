@@ -221,8 +221,16 @@ export function KlientProfil({ meno, data, clients, onZavri, btcSats, onDennikZa
           "Podiel týždňov z posledných 18, v ktorých klient reálne trénoval.")}
         {stat("Zaplatené spolu", fmtCZK(p.zaplatene), C.green)}
         {stat("Ø cena hodiny", fmtCZK(Math.round(p.cenaHodiny)), undefined, "Zaplatené spolu delené odtrénovanými hodinami — koľko klienta hodina naozaj stojí, vrátane zliav a bonusov.")}
-        {stat("Balíček", c.packageTotal ? `${c.packageRemaining}/${c.packageTotal}` : (c.lenDoplnky ? "len členstvo" : "—"), undefined,
-          c.membership ? `${c.membership}${c.packageValidTo ? ` · platí do ${fmtDMY(c.packageValidTo)}` : ""}` : undefined)}
+        {stat("Balíček", c.packageTotal ? `${c.packageOdvodeny ? "≈" : ""}${c.packageRemaining}/${c.packageTotal}` : (c.lenDoplnky ? "len členstvo" : "—"), undefined,
+          [
+            c.membership,
+            c.packageValidTo ? `platí do ${fmtDMY(c.packageValidTo)}` : "",
+            // „≈" nie je ozdoba: pri offline členstvách PTminder zostatok
+            // v exporte NEDÁVA (stojí tam 0 z 0), takže appka odčíta
+            // odtrénované hodiny od počtu v názve. Číslo, ktoré sa tvári ako
+            // výpis, pritom Jerry povie klientovi nahlas.
+            c.packageOdvodeny ? "≈ dopočítané z odtrénovaných hodín — PTminder tento zostatok nevyváža" : "",
+          ].filter(Boolean).join(" · ") || undefined)}
         {p.priemMedzera != null && stat("Ø medzi nákupmi", `${Math.round(p.priemMedzera)} dní`, undefined,
           "Priemerný odstup medzi platbami (platby menej než 7 dní od seba sa rátajú ako doplnky k tej istej kúpe). Hovorí, ako často klient reálne obnovuje.")}
         {p.minieO != null && stat("Zostatok minie o", `~${p.minieO.toFixed(0)} týž.`, p.minieO <= 2 ? C.orange : undefined,

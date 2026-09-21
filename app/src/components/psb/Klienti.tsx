@@ -636,7 +636,8 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
                 <td style={S.td}><Badge tone={statusTone(c.status)}>{c.status}</Badge>{c.statusOverride && <span title={`Auto: ${c.statusAuto}`} style={{ fontSize: 9, color: C.textDim, marginLeft: 4 }}>✎</span>}</td>
                 <td style={S.td}><Badge tone={segTone(c.segment)}>{c.segment}</Badge></td>
                 <td style={{ ...S.td, fontSize: 12, color: c.is6m ? C.accentLight : C.textMuted }} title={c.membership}>{c.membership ? shortPkg(c.membership) : c.clientType}</td>
-                <td style={{ ...S.td, textAlign: "right" }}>{c.packageTotal ? `${c.packageRemaining}/${c.packageTotal}` : "—"}</td>
+                <td style={{ ...S.td, textAlign: "right" }} title={c.packageOdvodeny ? "Dopočítané: export z PTmindera pri tomto členstve zostatok nedáva, tak sa odčítali odtrénované hodiny od počtu v názve balíčka." : undefined}>
+                  {c.packageTotal ? `${c.packageOdvodeny ? "≈" : ""}${c.packageRemaining}/${c.packageTotal}` : "—"}</td>
                 <td style={{ ...S.td, textAlign: "right" }} title={`${c.totalHours.toFixed(0)} hodín`}>{c.sessionCount}</td>
                 <td style={{ ...S.td, textAlign: "right" }}>{(c.attendance * 100).toFixed(0)}%</td>
                 <td style={{ ...S.td, textAlign: "right" }}>{fmtCZK(c.paidAvg)}</td>

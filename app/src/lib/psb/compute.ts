@@ -141,6 +141,11 @@ export type ClientAgg = {
   packageRemaining: number;
   packageTotal: number;
   packageStatus: string;
+  /**
+   * Zostatok nedal export, appka ho DOPOČÍTALA z odtrénovaných hodín.
+   * Obrazovka aj Jarvis to majú povedať — je to odhad, nie výpis z PTmindera.
+   */
+  packageOdvodeny: boolean;
   /** Klient má v exporte len doplnky k členstvu, nie balíček s hodinami. */
   lenDoplnky: boolean;
 };
@@ -219,6 +224,7 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
         packageRemaining: 0,
         packageTotal: 0,
         packageStatus: "",
+        packageOdvodeny: false,
         lenDoplnky: false,
       };
     }
@@ -392,6 +398,34 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
     // o ňom mlčí ako doteraz.
     const totalZNazvu = Number(/(\d+)\s*h/i.exec(active?.package || "")?.[1] || 0);
     c.packageTotal = (active?.total || totalZNazvu) ?? 0;
+
+    /**
+     * „0 z 18" pri balíčku, ktorý ešte beží.
+     *
+     * Jerry, 21. 9. 2026: „Gažo mi ukazuje 0 a pritom má 5 hodín ešte."
+     * Jeho „OFF - 18 hodín offline" je v PTminderi ČLENSTVO a v exporte stojí
+     * na `0 left from 0` — rovnako ako paušály GOLD/SILVER. Lenže tu je počet
+     * hodín priamo v názve, takže nula nie je pravda o produkte, je to
+     * chýbajúci údaj. Appka potom hlásila „došiel balíček" človeku, ktorý má
+     * hodiny zaplatené.
+     *
+     * Keď export mlčí (0/0) a názov hovorí o hodinách, zostatok sa DOPOČÍTA:
+     * hodiny z názvu mínus tréningy odvtedy, čo balíček platí. Je to odhad —
+     * PTminder môže hodinu strhnúť inak (zrušený tréning, hodina dokúpená
+     * mimo balíčka) — preto `packageOdvodeny` a preto to obrazovka povie
+     * nahlas. Odhad, ktorý sa tvári ako výpis, je horší než chýbajúce číslo.
+     */
+    const exportMlci = (active?.total ?? 0) === 0 && (active?.remaining ?? 0) === 0;
+    if (exportMlci && totalZNazvu > 0 && active?.validFrom) {
+      const koniec = active.validTo && active.validTo < dnesPack ? active.validTo : dnesPack;
+      let minute = 0;
+      for (const s of c.sessions) {
+        const den = (s.date || "").slice(0, 10);
+        if (den >= active.validFrom && den <= koniec) minute++;
+      }
+      c.packageRemaining = Math.max(0, totalZNazvu - minute);
+      c.packageOdvodeny = true;
+    }
     c.packageStatus = active?.status || "";
     c.membership = active?.package || "";
     c.packageValidTo = active?.validTo || "";
@@ -2311,10 +2345,14 @@ export function dnesneTreningy(
         if (m && d && `${m}-${d}` === dnesIso.slice(5)) dovody.push("má dnes narodeniny");
       }
       if (c.packageRemaining != null && c.packageTotal != null && c.packageRemaining <= 1) {
+        // Keď zostatok appka dopočítala (export ho pri offline členstvách
+        // nedáva), musí to v pripomienke zaznieť — inak by Jerry pred
+        // klientom tvrdil číslo, ktoré v PTminderi nikde nestojí.
+        const odkial = c.packageOdvodeny ? " (dopočítané z odtrénovaných hodín — over v PTminderi)" : "";
         dovody.push(
-          c.packageRemaining <= 0
+          (c.packageRemaining <= 0
             ? "balíček má vyčerpaný — dnes je posledná hodina, ktorú mu appka pozná"
-            : "v balíčku mu zostáva posledná hodina",
+            : "v balíčku mu zostáva posledná hodina") + odkial,
         );
       }
       // 6M: upozornenie si nesie sám riadok procesu — netreba ho odvodzovať

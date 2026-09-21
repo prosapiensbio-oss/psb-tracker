@@ -674,6 +674,7 @@ function NapojenieMailu() {
     nastavene: { host: string; port: number; user: string; od: string; heslo: string; ignoruj: string };
     posledny: null | { kedy: string; precitanych: number; pridanych: number; doplnenych: number; uzBoli?: number;
       pridane: string[]; doplnene: string[]; preskocene: { predmet: string; preco: string }[]; chyba: string };
+    poslednyUspech: null | { kedy: string; precitanych: number; pridanych: number };
     dopytovZMailu: number; poslednyDopyt: string | null;
   };
   const [stav, setStav] = useState<Stav | null>(null);
@@ -771,6 +772,12 @@ function NapojenieMailu() {
         {stav.poslednyDopyt ? `, posledný ${fmtDMY(stav.poslednyDopyt)}` : ""}.
         {p ? ` Naposledy sa čítalo ${fmtDMY(p.kedy.slice(0, 10))}: prečítaných ${p.precitanych}, nových ${p.pridanych}, doplnených ${p.doplnenych}, už evidovaných ${p.uzBoli ?? 0}.` : " Zatiaľ nikdy nebežalo."}
         {p?.chyba ? ` Chyba: ${p.chyba}` : ""}
+        {/* Pri chybe sa hlási aj posledný úspech. Poštový server vie odmietnuť
+            prihlásenie aj so správnym heslom (krátke stlmenie po sérii
+            prihlásení) — bez tejto vety to vyzerá ako rozbité napojenie. */}
+        {p?.chyba && stav.poslednyUspech
+          ? ` Naposledy úspešne ${fmtDMY(stav.poslednyUspech.kedy.slice(0, 10))} (prečítaných ${stav.poslednyUspech.precitanych}). Jedno zlyhanie býva dočasné — ďalší beh je o pár hodín.`
+          : ""}
       </div>
 
       {/* Vyradené správy sú vidieť zámerne: tichý filter sa nedá odlíšiť od
