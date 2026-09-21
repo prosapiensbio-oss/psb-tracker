@@ -764,7 +764,10 @@ function NapojenieMailu() {
       </div>
 
       <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 8, lineHeight: 1.55 }}>
-        Z mailu je v Dopytoch {stav.dopytovZMailu} {stav.dopytovZMailu === 1 ? "záznam" : "záznamov"}
+        {/* Počíta len dopyty napísané PRIAMO mailom. Formulár preposlaný
+            mailom má kľúč webového dopytu (inak by bol ten istý človek
+            v Dopytoch dvakrát), takže sa sem nerátá. */}
+        Priamo mailom (nie cez formulár) prišlo {stav.dopytovZMailu} {stav.dopytovZMailu === 1 ? "dopyt" : "dopytov"}
         {stav.poslednyDopyt ? `, posledný ${fmtDMY(stav.poslednyDopyt)}` : ""}.
         {p ? ` Naposledy sa čítalo ${fmtDMY(p.kedy.slice(0, 10))}: prečítaných ${p.precitanych}, nových ${p.pridanych}, doplnených ${p.doplnenych}, už evidovaných ${p.uzBoli ?? 0}.` : " Zatiaľ nikdy nebežalo."}
         {p?.chyba ? ` Chyba: ${p.chyba}` : ""}
