@@ -146,14 +146,36 @@ export function MarketingVrch({ data, clients }: { data: PSBData; clients: Recor
     const zReklamy = data.leads.filter((l) =>
       mesiace.includes(monthKey(l.date)) && jeZReklamy(l)).length;
     const cenaZaDopyt = zReklamy > 0 ? s.spend / zReklamy : null;
-    const hC = hodnot(cenaZaDopyt, CENA_ZA_DOPYT);
 
-    // Bežiaci mesiac zvlášť — do priemeru nevstupuje, ale je to jediné miesto,
-    // kde vidno, že meranie reklamy od 14. 9. 2026 naozaj funguje.
+    /**
+     * Bežiaci mesiac ako NÁHRADNÍK, nie ako poznámka pod čiarou.
+     *
+     * Priemery v tomto páse sa rátajú z plných mesiacov — polovičný mesiac by
+     * ich ťahal nadol. Pri cene za dopyt to ale znamenalo pomlčku aj vtedy,
+     * keď reklama práve beží a prvý dopyt už prišiel (20. 9. 2026). Jerry,
+     * 21. 9.: „pomlčka, ktorá by sa dala krásne nahradiť číslom 3 572 —
+     * a je to cena za dopyt, takže tam patrí suma."
+     *
+     * Takže: keď plné mesiace číslo nedajú a bežiaci áno, ukáže sa ten
+     * bežiaci a pod ním stojí, že je z tohto mesiaca. Pomlčka zostáva len
+     * vtedy, keď naozaj niet z čoho počítať.
+     */
     const mesiacTeraz = monthKey(new Date().toISOString());
     const spendTeraz = suhrnKampani(zlucKampane(kampane.filter((x) => x.mesiac === mesiacTeraz))).spend;
-    const dopytyTeraz = data.leads.filter((l) => monthKey(l.date) === mesiacTeraz && jeZReklamy(l)).length;
+    const leadyTeraz = data.leads.filter((l) => monthKey(l.date) === mesiacTeraz && jeZReklamy(l));
+    const dopytyTeraz = leadyTeraz.length;
     const cenaTeraz = dopytyTeraz > 0 ? spendTeraz / dopytyTeraz : null;
+    const jeTeraz = cenaZaDopyt == null && cenaTeraz != null;
+    const cenaZobrazena = cenaZaDopyt ?? cenaTeraz;
+    // Farba aj verdikt patria k číslu, ktoré je na dlaždici — nie k tomu,
+    // ktoré tam nie je.
+    const hC = hodnot(cenaZobrazena, CENA_ZA_DOPYT);
+    // Keď je na dlaždici číslo z bežiaceho mesiaca, verdikt to musí povedať —
+    // inak by vyzeralo ako ročný priemer a Jerry by podľa neho rozhodoval
+    // o rozpočte s vierou, že za tým stojí dvanásť mesiacov.
+    const poznTeraz = jeTeraz
+      ? ` Pozor, je to číslo z BEŽIACEHO mesiaca: ${fmtCZK(spendTeraz)} ÷ ${dopytyTeraz} ${dopytyTeraz === 1 ? "dopyt" : "dopyty"}. Dvanásť plných mesiacov predtým nemá ani jeden doložený dopyt z reklamy — meranie (UTM v odkazoch) beží až od 14. 9. 2026, takže toto je prvé obdobie, ktoré sa dá vôbec zmerať. Po uzavretí mesiaca sa číslo prepne na priemer.`
+      : "";
 
     // Podporné čísla. Nemajú stupnicu — nie je proti čomu ich merať, ich
     // úloha je vysvetliť tie tri hlavné.
@@ -199,27 +221,29 @@ export function MarketingVrch({ data, clients }: { data: PSBData; clients: Recor
       {
         kluc: "cena",
         nazov: "Cena za dopyt",
-        hodnota: cenaZaDopyt == null ? "—" : fmtCZK(cenaZaDopyt),
+        hodnota: cenaZobrazena == null ? "—" : fmtCZK(cenaZobrazena),
         h: hC,
-        smer: "čím nižšia, tým lepšia · strop 2 200 Kč",
-        beziaci: cenaTeraz != null
-          ? `tento mesiac ${fmtCZK(cenaTeraz)} za dopyt = ${fmtCZK(spendTeraz)} ÷ ${dopytyTeraz} — do priemeru spadne po konci mesiaca`
-          : spendTeraz > 0
-            ? `tento mesiac ${fmtCZK(spendTeraz)} a zatiaľ žiadny dopyt z reklamy`
-            : undefined,
+        smer: jeTeraz
+          ? `tento mesiac · ${dopytyTeraz} ${dopytyTeraz === 1 ? "dopyt" : dopytyTeraz < 5 ? "dopyty" : "dopytov"} · strop 2 200 Kč`
+          : "čím nižšia, tým lepšia · strop 2 200 Kč",
+        beziaci: !jeTeraz && cenaZaDopyt == null && spendTeraz > 0
+          ? `tento mesiac ${fmtCZK(spendTeraz)} a zatiaľ žiadny dopyt z reklamy`
+          : undefined,
         preco: "Bez tohto čísla je rozpočet stávka, nie nákup. S ním sa dá povedať vetu, ktorá dnes povedať nejde: „keď mi odíde osem ľudí, za X korún si objednám dvadsať dopytov.“",
         verdikt: verdikt(hC, {
-          dobre: "Pod stropom aj u klientov, čo pôjdu k Terezke. Toto sa oplatí zopakovať vo väčšom.",
-          priestor: "Nad cieľom 1 000 Kč, ale pod stropom 2 200 Kč. Vráti sa to, len pomaly.",
-          zle: "Nad stropom 2 200 Kč — klient, ktorý pôjde k Terezke, sa z toho nezaplatí.",
+          dobre: `Pod stropom aj u klientov, čo pôjdu k Terezke. Toto sa oplatí zopakovať vo väčšom.${poznTeraz}`,
+          priestor: `Nad cieľom 1 000 Kč, ale pod stropom 2 200 Kč. Vráti sa to, len pomaly.${poznTeraz}`,
+          zle: `Nad stropom 2 200 Kč — klient, ktorý pôjde k Terezke, sa z toho nezaplatí.${poznTeraz}`,
           bezDat: kampane.length === 0
             ? "Ešte som z Mety nestiahol kampane."
-            : cenaTeraz != null
-              ? `V dvanástich PLNÝCH mesiacoch nemá ani jeden dopyt zdroj „reklama“ ani UTM — celých ${fmtCZK(s.spend)} kupovalo dosah, nie dopyty. Meranie ale od 14. 9. 2026 funguje: tento mesiac už ${dopytyTeraz} ${dopytyTeraz === 1 ? "dopyt prišiel" : "dopyty prišli"} s kampaňou v UTM a ${fmtCZK(spendTeraz)} výdavku dáva ${fmtCZK(cenaTeraz)} za dopyt. Do tohto priemeru to spadne, až keď sa mesiac uzavrie — bežiaci mesiac má napočítanú len časť dopytov a ťahal by ho nadol. Číslo za bežiace obdobie je v ⟦Marketing → Čo to stálo⟧.`
-              : `Za ${mes} mesiacov nemá ani jeden dopyt v Kokpite zdroj „reklama“ ani UTM — ${fmtCZK(s.spend)} teda zatiaľ nekúpilo žiadny dopyt, ktorý by som vedel doložiť. Meta hlási ${s.dopyty} konverzií, ale to sú prekliky a stiahnutia dokumentu, nie ľudia, čo napísali. UTM v odkazoch bežia od 14. 9. 2026, takže prvý doložený dopyt sa objaví tu.`,
+            : `Za ${mes} mesiacov nemá ani jeden dopyt v Kokpite zdroj „reklama“ ani UTM — ${fmtCZK(s.spend)} teda zatiaľ nekúpilo žiadny dopyt, ktorý by som vedel doložiť. Meta hlási ${s.dopyty} konverzií, ale to sú prekliky a stiahnutia dokumentu, nie ľudia, čo napísali. UTM v odkazoch bežia od 14. 9. 2026, takže prvý doložený dopyt sa objaví tu.`,
         }),
-        riadky: rDopyty.filter((x) => /reklama/i.test(x.vpravo)),
-        zoznamNadpis: `Dopyty so zdrojom „reklama“ za ${mes} mesiacov — menovateľ ceny (čitateľ je „Minuté na reklamu“)`,
+        riadky: jeTeraz
+          ? leadyTeraz.map((l) => ({ meno: l.name || l.email || "(bez mena)", vpravo: `${fmtDen(l.date)}${l.kampan ? ` · ${l.kampan}` : " · reklama"}` }))
+          : rDopyty.filter((x) => /reklama/i.test(x.vpravo)),
+        zoznamNadpis: jeTeraz
+          ? `Dopyty z reklamy za tento mesiac — menovateľ ceny (čitateľ je ${fmtCZK(spendTeraz)} výdavku za ten istý mesiac)`
+          : `Dopyty so zdrojom „reklama“ za ${mes} mesiacov — menovateľ ceny (čitateľ je „Minuté na reklamu“)`,
       },
       {
         kluc: "uvodne",
