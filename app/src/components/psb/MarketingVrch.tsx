@@ -53,6 +53,17 @@ type Metrika = {
   h: Hodnotenie;
   /** Jednoriadkový smer: kam sa má číslo hýbať a kde je méta. */
   smer: string;
+  /**
+   * Čo hovorí BEŽIACI mesiac.
+   *
+   * Pás počíta z plných mesiacov (inak by polovičný mesiac ťahal priemer
+   * nadol). Lenže keď sa práve teraz niečo deje — 20. 9. 2026 prišiel prvý
+   * dopyt z reklamy — pomlčka o tom mlčí a vyzerá ako porucha. Jerry sa preto
+   * pýtal „je cena za dopyt stále 0?". Nie je nula; nie je za čo ju ešte
+   * počítať. Tento riadok povie, čo sa deje teraz a kedy to do priemeru
+   * spadne.
+   */
+  beziaci?: string;
   preco: string;
   verdikt: string;
   /**
@@ -130,10 +141,19 @@ export function MarketingVrch({ data, clients }: { data: PSBData; clients: Recor
     // zhruba o polovicu a verdikt pripisoval celoživotný výdavok dvanástim
     // mesiacom (revízia 18. 8. 2026).
     const s = suhrnKampani(zlucKampane(kampane.filter((x) => mesiace.includes(x.mesiac))));
+    const jeZReklamy = (l: { source?: string; kampan?: string }) =>
+      l.source === "reklama" || !!l.kampan?.trim();
     const zReklamy = data.leads.filter((l) =>
-      mesiace.includes(monthKey(l.date)) && (l.source === "reklama" || !!l.kampan?.trim())).length;
+      mesiace.includes(monthKey(l.date)) && jeZReklamy(l)).length;
     const cenaZaDopyt = zReklamy > 0 ? s.spend / zReklamy : null;
     const hC = hodnot(cenaZaDopyt, CENA_ZA_DOPYT);
+
+    // Bežiaci mesiac zvlášť — do priemeru nevstupuje, ale je to jediné miesto,
+    // kde vidno, že meranie reklamy od 14. 9. 2026 naozaj funguje.
+    const mesiacTeraz = monthKey(new Date().toISOString());
+    const spendTeraz = suhrnKampani(zlucKampane(kampane.filter((x) => x.mesiac === mesiacTeraz))).spend;
+    const dopytyTeraz = data.leads.filter((l) => monthKey(l.date) === mesiacTeraz && jeZReklamy(l)).length;
+    const cenaTeraz = dopytyTeraz > 0 ? spendTeraz / dopytyTeraz : null;
 
     // Podporné čísla. Nemajú stupnicu — nie je proti čomu ich merať, ich
     // úloha je vysvetliť tie tri hlavné.
@@ -182,6 +202,11 @@ export function MarketingVrch({ data, clients }: { data: PSBData; clients: Recor
         hodnota: cenaZaDopyt == null ? "—" : fmtCZK(cenaZaDopyt),
         h: hC,
         smer: "čím nižšia, tým lepšia · strop 2 200 Kč",
+        beziaci: cenaTeraz != null
+          ? `tento mesiac ${fmtCZK(cenaTeraz)} za dopyt = ${fmtCZK(spendTeraz)} ÷ ${dopytyTeraz} — do priemeru spadne po konci mesiaca`
+          : spendTeraz > 0
+            ? `tento mesiac ${fmtCZK(spendTeraz)} a zatiaľ žiadny dopyt z reklamy`
+            : undefined,
         preco: "Bez tohto čísla je rozpočet stávka, nie nákup. S ním sa dá povedať vetu, ktorá dnes povedať nejde: „keď mi odíde osem ľudí, za X korún si objednám dvadsať dopytov.“",
         verdikt: verdikt(hC, {
           dobre: "Pod stropom aj u klientov, čo pôjdu k Terezke. Toto sa oplatí zopakovať vo väčšom.",
@@ -189,7 +214,9 @@ export function MarketingVrch({ data, clients }: { data: PSBData; clients: Recor
           zle: "Nad stropom 2 200 Kč — klient, ktorý pôjde k Terezke, sa z toho nezaplatí.",
           bezDat: kampane.length === 0
             ? "Ešte som z Mety nestiahol kampane."
-            : `Za ${mes} mesiacov nemá ani jeden dopyt v Kokpite zdroj „reklama“ ani UTM — ${fmtCZK(s.spend)} teda zatiaľ nekúpilo žiadny dopyt, ktorý by som vedel doložiť. Meta hlási ${s.dopyty} konverzií, ale to sú prekliky a stiahnutia dokumentu, nie ľudia, čo napísali. Číslo vznikne, keď do odkazu v reklame pribudnú UTM parametre a spustí sa kampaň s cieľom „dopyt“.`,
+            : cenaTeraz != null
+              ? `V dvanástich PLNÝCH mesiacoch nemá ani jeden dopyt zdroj „reklama“ ani UTM — celých ${fmtCZK(s.spend)} kupovalo dosah, nie dopyty. Meranie ale od 14. 9. 2026 funguje: tento mesiac už ${dopytyTeraz} ${dopytyTeraz === 1 ? "dopyt prišiel" : "dopyty prišli"} s kampaňou v UTM a ${fmtCZK(spendTeraz)} výdavku dáva ${fmtCZK(cenaTeraz)} za dopyt. Do tohto priemeru to spadne, až keď sa mesiac uzavrie — bežiaci mesiac má napočítanú len časť dopytov a ťahal by ho nadol. Číslo za bežiace obdobie je v ⟦Marketing → Čo to stálo⟧.`
+              : `Za ${mes} mesiacov nemá ani jeden dopyt v Kokpite zdroj „reklama“ ani UTM — ${fmtCZK(s.spend)} teda zatiaľ nekúpilo žiadny dopyt, ktorý by som vedel doložiť. Meta hlási ${s.dopyty} konverzií, ale to sú prekliky a stiahnutia dokumentu, nie ľudia, čo napísali. UTM v odkazoch bežia od 14. 9. 2026, takže prvý doložený dopyt sa objaví tu.`,
         }),
         riadky: rDopyty.filter((x) => /reklama/i.test(x.vpravo)),
         zoznamNadpis: `Dopyty so zdrojom „reklama“ za ${mes} mesiacov — menovateľ ceny (čitateľ je „Minuté na reklamu“)`,
@@ -268,6 +295,9 @@ export function MarketingVrch({ data, clients }: { data: PSBData; clients: Recor
               </button>
               <div style={{ fontSize: 12.5, fontWeight: 600, color: C.text, marginTop: 3 }}>{x.nazov}</div>
               <div style={{ fontSize: 11, color: C.textDim, marginTop: 2 }}>{x.smer}</div>
+              {x.beziaci && (
+                <div style={{ fontSize: 11, color: C.accentLight, marginTop: 3, lineHeight: 1.45 }}>{x.beziaci}</div>
+              )}
 
               <button
                 onClick={() => setOtvorene(je ? null : x.kluc)}
