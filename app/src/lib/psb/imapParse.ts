@@ -15,6 +15,8 @@ export type ImapSprava = {
   predmet: string;
   datum: string;
   komu: string;
+  /** Reply-To. Formulár na webe posiela mail zo SVOJEJ adresy a človeka dá sem. */
+  odpovedat: string;
   text: string;
 };
 
@@ -40,6 +42,7 @@ export function rozoberOdpoved(r: string): Omit<ImapSprava, "uid"> {
     od: hlavicka("From"),
     komu: hlavicka("To"),
     predmet: hlavicka("Subject"),
+    odpovedat: hlavicka("Reply-To"),
     datum: hlavicka("Date"),
     text: dekodujTelo(text).slice(0, 3000),
   };
@@ -69,27 +72,24 @@ function zBajtov(s: string): string {
 /**
  * Telo správy na jednu čitateľnú poznámku.
  *
- * PREČO SA BAJTY PREKLÁDAJÚ LEN NIEKEDY
+ * PREČO CELÝ MIME A NIE LEN ODSTRÁNENIE ZNAČIEK
  *
- * Zo socketu prichádza text už dekódovaný ako UTF-8. Keď je telo v
- * quoted-printable, je celé v ASCII a diakritika je schovaná v `=C3=A9` —
- * tie treba po rozbalení prečítať ešte raz ako bajty. Keď v tele žiadne `=XX`
- * nie sú, je už hotové a druhý preklad by z „Dobrý" spravil „Dobr?".
+ * `BODY[TEXT]` vráti telo tak, ako je v schránke — a to je pri väčšine pošty
+ * viacdielna zásielka: oddeľovače `--b1=…`, hlavičky každého dielu a až potom
+ * text, často zakódovaný v base64. Prvý pokus 21. 9. 2026 to bral ako jeden
+ * reťazec a z dopytu Josefa Pávka sa stala poznámka
+ * „--b1=_l6zOgx… Content-Type: text/plain … NOV? TEST POSTURY … Jm?no".
+ * Nečitateľná poznámka je pritom to jediné, čo o dopyte zostane.
+ *
+ * Preto: nájdi diely, vezmi ten textový, dekóduj ho podľa JEHO hlavičky
+ * a hlavičky dielu zahoď.
  */
 export function dekodujTelo(s: string): string {
-  let t = String(s || "");
-
-  // Celé telo v base64 (Content-Transfer-Encoding: base64) — jeden blok
-  // bez medzier a bez diakritiky, ktorý by inak skončil v poznámke ako šifra.
-  const cisty = t.replace(/\s+/g, "");
-  if (cisty.length > 40 && /^[A-Za-z0-9+/=]+$/.test(cisty)) {
-    try { t = zBajtov(atob(cisty)); } catch { /* nebol to base64 */ }
-  }
-
-  if (/=[0-9A-Fa-f]{2}/.test(t) || /=\r?\n/.test(t)) {
-    t = t.replace(/=\r?\n/g, "").replace(/=([0-9A-Fa-f]{2})/g, (_m, h) => String.fromCharCode(parseInt(h, 16)));
-    t = zBajtov(t);
-  }
+  const raw = String(s || "");
+  const diely = mimeDiely(raw);
+  const textovy = diely.find((d) => /text\/plain/i.test(d.typ)) || diely.find((d) => /text\/html/i.test(d.typ)) || diely[0];
+  if (!textovy) return "";
+  let t = dekodujObsah(textovy.telo, textovy.kodovanie);
 
   if (/<\/?(p|div|br|html|table)\b/i.test(t)) {
     t = t.replace(/<(script|style)[\s\S]*?<\/\1>/gi, " ")
@@ -101,4 +101,57 @@ export function dekodujTelo(s: string): string {
     .replace(/\r/g, "")
     .split("\n").map((r) => r.replace(/[ \t]+/g, " ").trim()).join("\n")
     .replace(/\n{3,}/g, "\n\n").trim();
+}
+
+type Diel = { typ: string; kodovanie: string; telo: string };
+
+/**
+ * Rozdelí telo na MIME diely. Keď žiadne oddeľovače nie sú, je to jeden diel.
+ *
+ * Posledný diel býva odrezaný — sťahuje sa len prvých 3 000 znakov, aby sa
+ * z jednej správy nestala stránka textu. To je v poriadku: do poznámky ide
+ * aj tak len začiatok.
+ */
+export function mimeDiely(raw: string): Diel[] {
+  const hranica = /^--([A-Za-z0-9'()+_,\-./:=?]{6,})\s*$/m.exec(raw);
+  if (!hranica) return [{ ...hlavickyDielu(raw), telo: bezHlaviciek(raw) }];
+  const kusy = raw.split(new RegExp(`^--${hranica[1].replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(--)?\\s*$`, "m"));
+  const out: Diel[] = [];
+  for (const k of kusy.slice(1)) {
+    if (!k || !k.trim() || k.trim() === "--") continue;
+    out.push({ ...hlavickyDielu(k), telo: bezHlaviciek(k) });
+  }
+  return out.length ? out : [{ ...hlavickyDielu(raw), telo: bezHlaviciek(raw) }];
+}
+
+function hlavickyDielu(k: string): { typ: string; kodovanie: string } {
+  const hlava = k.split(/\r?\n\r?\n/)[0] || "";
+  const typ = /content-type:\s*([^;\r\n]+)/i.exec(hlava)?.[1]?.trim() || "text/plain";
+  const kodovanie = /content-transfer-encoding:\s*([^;\r\n]+)/i.exec(hlava)?.[1]?.trim().toLowerCase() || "";
+  return { typ, kodovanie };
+}
+
+/** Diel má vlastné hlavičky oddelené prázdnym riadkom — tie do poznámky nepatria. */
+function bezHlaviciek(k: string): string {
+  const m = /\r?\n\r?\n/.exec(k);
+  if (m && /^(\s*[A-Za-z-]+:\s)/.test(k.trimStart())) return k.slice(m.index + m[0].length);
+  return k;
+}
+
+/**
+ * Dekóduje obsah dielu podľa jeho hlavičky.
+ *
+ * Bez hlavičky sa háda podľa obsahu — ale opatrne: zo socketu prichádza text
+ * UŽ dekódovaný ako UTF-8 a druhý preklad by z „Dobrý" spravil „Dobr?".
+ * Preto sa preklad z bajtov robí len tam, kde sú naozaj `=XX` značky.
+ */
+function dekodujObsah(t: string, kodovanie: string): string {
+  if (kodovanie === "base64") {
+    try { return zBajtov(atob(t.replace(/\s+/g, ""))); } catch { return t; }
+  }
+  if (kodovanie === "quoted-printable" || (!kodovanie && /=[0-9A-Fa-f]{2}/.test(t))) {
+    const rozbalene = t.replace(/=\r?\n/g, "").replace(/=([0-9A-Fa-f]{2})/g, (_m, h) => String.fromCharCode(parseInt(h, 16)));
+    return /[\u0080-\u00ff]/.test(rozbalene) ? zBajtov(rozbalene) : rozbalene;
+  }
+  return t;
 }

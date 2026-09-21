@@ -137,6 +137,10 @@ export const Route = createFileRoute("/api/mail-dopyty")({
 
           const pridane: string[] = [];
           const doplnene: string[] = [];
+          // Správa, ktorá už dopyt má a nemá čo doplniť, nesmie zmiznúť
+          // z počtov — inak „prečítaných 7, nových 3" nesedí a vyzerá to,
+          // akoby sa po ceste niečo stratilo.
+          let uzBoli = 0;
           const preskocene: { predmet: string; preco: string }[] = [];
 
           for (const s of spravy) {
@@ -168,6 +172,8 @@ export const Route = createFileRoute("/api/mail-dopyty")({
               if (set.length) {
                 await DB.prepare(`UPDATE leads SET ${set.join(", ")} WHERE id = ?1`).bind(d.kluc, ...hod).run();
                 doplnene.push(`${uz.name || d.email}: ${zmeny.join(", ")}`);
+              } else {
+                uzBoli++;
               }
             }
           }
@@ -177,6 +183,7 @@ export const Route = createFileRoute("/api/mail-dopyty")({
             precitanych: spravy.length,
             pridanych: pridane.length,
             doplnenych: doplnene.length,
+            uzBoli,
             pridane: pridane.slice(0, 20),
             doplnene: doplnene.slice(0, 20),
             // Vyradené sa ukazujú zámerne: keď filter vyhodí skutočný dopyt,

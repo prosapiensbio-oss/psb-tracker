@@ -681,22 +681,39 @@ z konzoly.
 ## Schránka info@ je tretí zdroj dopytov
 
 Formulár na webe posiela dopyt sám, ale kto napíše rovno mailom, do
-štatistiky nespadol — a 20. 9. 2026 to bol práve človek z platenej reklamy,
-takže cena za dopyt vychádzala vyššia, než bola.
+štatistiky nespadol. 21. 9. 2026 prvý ostrý beh ukázal, že to nie je teória:
+v schránke ležal **test postury Josefa Pávka z 13. 9.**, ktorý snippet
+na webe stratil a v Kokpite nebol vôbec.
 
-- **IMAP z workera ide**, ale len na `imap.websupport.sk` (Dovecot).
-  `mail.prosapiens.cz`, `imap.prosapiens.cz` ani `mailin1.prosapiens.cz`
-  spojenie nedokončia („Stream was cancelled"). Overuje sa akciou `test`
-  v `/api/mail-dopyty`, ktorá nepotrebuje heslo.
+- **IMAP z workera ide len na `imap.m1.websupport.sk` (alebo
+  `mail.m1.websupport.sk`).** `imap.websupport.sk` sa spojí a povie
+  „Dovecot ready", ale schránka na ňom NIE JE — vráti
+  `[AUTHENTICATIONFAILED]`, čo vyzerá ako zlé heslo. Ktorý stroj je ten
+  pravý, povie SPF domény (`include:_spf.m1.websupport.sk`) a IP adresa
+  `mail.<doména>`. `mail.prosapiens.cz` samo o sebe TLS nedokončí
+  („Stream was cancelled" — certifikát znie na websupport).
 - **Knižnice z npm sem nejdú** (bežia nad `net`/`tls` z Node). Klient je
   vlastný, nad `cloudflare:sockets`, a robí len čítanie: `BODY.PEEK`, žiadne
   mazanie, žiadne označovanie prečítaného.
 - **Čisté rozobratie odpovede je v `imapParse.ts`**, socket v `imap.ts` —
   `cloudflare:sockets` sa pod bunom nenačíta a testy by celý súbor nevideli.
-- **Telo sa prekladá z bajtov LEN keď je quoted-printable.** Zo socketu
-  prichádza text už dekódovaný; druhý preklad by z „Dobrý" spravil „Dobr?".
-- **Mail z formulára dostáva KĽÚČ WEBOVÉHO DOPYTU** (`web-<deň>-<e-mail>`),
-  aby sa so snippetom zliali do jedného riadku. A mail nikdy neprepíše
-  kampaň ani zdroj — UTM v e-maile nie sú, prepísal by pravdu domnienkou.
-- **Vyradené správy sa ukazujú.** Tichý filter sa nedá odlíšiť od prázdnej
-  schránky a presne tak sa stratí dopyt.
+- **`BODY[TEXT]` je celá MIME zásielka**, nie text: oddeľovače `--b1=…`,
+  hlavičky dielov a telo často v base64. Prvá verzia to brala ako reťazec
+  a z dopytu Josefa Pávka spravila poznámku „--b1=_l6zOgx… NOV? TEST
+  POSTURY… Jm?no". Diel sa vyberá podľa `Content-Type` a dekóduje podľa
+  `Content-Transfer-Encoding`; preklad z bajtov len tam, kde sú `=XX`.
+- **Contact Form 7 posiela mail Z ADRESY WEBU** (`online@prosapiens.cz`)
+  a pisateľa dáva do **Reply-To**. Bez toho vznikol z Hany Marko druhý dopyt
+  pomenovaný „online@prosapiens.cz" vedľa jej vlastného zo snippetu. Preto
+  sa ťahá aj hlavička Reply-To a pošta z vlastnej domény sa inak nezapisuje.
+- **„Vyzerá to ako formulár" sa musí DOKÁZAŤ.** Keď stačilo slovo
+  „prosapiens" kdekoľvek v texte, prešli tadiaľ dva studené obchodné maily —
+  správa označená za formulár totiž obchádza celý filter. Formulár = z našej
+  domény + šablóna alebo pomenované polia.
+- **Studená obchodná pošta sa zahadzuje a bežná pošta musí niečo CHCIEŤ**
+  (slová o tréningu, bolesti, termíne, cene). Falošný dopyt pokazí cenu za
+  dopyt skôr, než si ho niekto všimne; falošné preskočenie je vidieť
+  v zozname „Čo sa nezapísalo".
+- **Počty musia dať súčet.** `prečítaných = nových + doplnených + už
+  evidovaných + preskočených`; bez „už evidovaných" to vyzeralo, akoby sa
+  po ceste strácali správy.

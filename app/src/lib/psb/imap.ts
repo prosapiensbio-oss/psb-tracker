@@ -125,7 +125,7 @@ export async function stiahniSpravy(opts: {
     const out: ImapSprava[] = [];
     for (const uid of vybrane) {
       const r = await s.prikaz(
-        `UID FETCH ${uid} (BODY.PEEK[HEADER.FIELDS (FROM TO SUBJECT DATE)] BODY.PEEK[TEXT]<0.3000>)`,
+        `UID FETCH ${uid} (BODY.PEEK[HEADER.FIELDS (FROM TO SUBJECT DATE REPLY-TO)] BODY.PEEK[TEXT]<0.3000>)`,
       );
       out.push({ uid, ...rozoberOdpoved(r) });
     }

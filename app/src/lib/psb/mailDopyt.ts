@@ -17,7 +17,7 @@
  * je poistka proti tichu: keď sa niečo vyhodí omylom, má sa to dať zbadať.
  */
 
-export type MailVstup = { uid: string; od: string; komu: string; predmet: string; datum: string; text: string };
+export type MailVstup = { uid: string; od: string; komu: string; predmet: string; datum: string; text: string; odpovedat?: string };
 
 export type MailDopyt = {
   kluc: string;
@@ -55,6 +55,37 @@ const STROJOVE = [
   "automatická odpověď", "automaticka odpoved", "out of office", "mimo kancelář",
   "faktura", "faktúra", "invoice", "objednávka č", "potvrzení platby",
   "newsletter", "odhlásit", "unsubscribe",
+];
+
+/**
+ * Studená obchodná pošta. 21. 9. 2026 sa do Dopytov dostali dva takéto maily
+ * („jsem Zuzana z aisignal.cz", „spolupracuji s firmami v Česku") a hneď
+ * pokazili cenu za dopyt: menovateľ sa zväčšil o ľudí, ktorí nič nechceli.
+ */
+const OBCHODNE = [
+  "vlastníkem webu", "vlastnikem webu", "majitelem webu", "ohledně webu", "ohledne webu",
+  "spolupracuji s firmami", "nabídku spolupráce", "nabizime", "nabízíme", "naše agentura",
+  "seo", "chatgpt", "gemini", "umělá inteligence", "umela inteligence", "analýza webu",
+  "provize", "provizi", "investic", "kryptom", "e-shop na míru", "webové stránky na míru",
+  "odhlásit odběr", "unsubscribe", "affiliate", "outsourc", "backlink", "pozice ve vyhledávání",
+];
+
+/**
+ * Slová, po ktorých je poznať, že píše človek so ZÁUJMOM O TRÉNING.
+ *
+ * Bez nich sa správa nezapíše — ale objaví sa v zozname „Čo sa nezapísalo",
+ * takže sa dá zbadať, keby sa filter pomýlil. Opačné poradie (zapísať všetko
+ * a mazať) sa nedá: dopyt, ktorý tam nemá byť, pokazí cenu za dopyt skôr,
+ * než si ho niekto všimne.
+ */
+const DOPYT_SLOVA = [
+  "trénink", "trenink", "tréning", "trening", "cvič", "cvic", "bolest", "bolí", "boli ",
+  "záda", "zada", "chrbát", "chrbat", "krční", "krk", "rameno", "koleno", "kyčl", "kycl",
+  "postur", "držení těla", "drzeni tela", "pohyb", "rehabilit", "fyzio", "hernie", "ploténk",
+  "termín", "termin", "objednat", "objednání", "objednam", "rezerv", "konzultac", "lekce",
+  "hodinu", "hodin", "schůzk", "schuzk", "sedenie", "zájem", "zajem", "záujem", "cena",
+  "ceník", "cenik", "cennik", "úvodní", "uvodni", "úvodný", "první návštěv", "zkusit",
+  "pomoct", "pomôc", "pomoci", "zranění", "zraneni", "operac", "doporučil", "doporucil",
 ];
 
 const MESIACE_ISO = (d: Date, pasmo = "Europe/Prague") => {
@@ -95,9 +126,24 @@ export function telefonZTextu(t: string): string {
  * keď obe cesty prejdú, vznikne jeden dopyt, nie dva, a kampaň zo snippetu
  * zostane, lebo mail ju prepísať nesmie (v e-maile UTM nie sú).
  */
-export function zFormulara(v: MailVstup): { meno: string; email: string; telefon: string; sprava: string } | null {
+export function zFormulara(v: MailVstup, vlastneDomeny: string[] = []): { meno: string; email: string; telefon: string; sprava: string } | null {
   const t = v.text || "";
-  const znaky = /(prosapiens|kontaktní formulář|kontaktni formular|nový příspěvek|test postury|úvodní trénink)/i.test(v.predmet + " " + t);
+  const predmet = v.predmet || "";
+  /**
+   * Formulár sa musí POZNAŤ, nie uhádnuť.
+   *
+   * Prvá verzia stačila so slovom „prosapiens" kdekoľvek v správe — a 21. 9.
+   * 2026 tým prepustila dva studené obchodné maily („píšu Vám ohledně webu
+   * prosapiens.cz"), lebo správa označená za formulár obchádza celý filter.
+   * Formulárová pošta má dva znaky naraz: chodí Z NAŠEJ DOMÉNY (Contact
+   * Form 7 posiela zo servera webu) a má v tele pomenované polia.
+   */
+  const odosielatel = (rozdelAdresu(v.od).email.split("@")[1] || "");
+  const zNasho = vlastneDomeny.some((d) => d && (odosielatel === d || odosielatel.endsWith("." + d)));
+  const poliVTele = (t.match(/^\s*(jm[ée]no|meno|e-?mail|telefon|tel[eé]fon|zpr[áa]va|spr[áa]va|message|hovor|oblasti bolesti)\s*[:：]/gim) || []).length;
+  const sablona = /(nová zpráva od|nova zprava od|nový test postury|novy test postury|test postury|úvodní trénink|uvodni trenink|kontaktní formulář|kontaktni formular)/i
+    .test(`${predmet} ${t}`);
+  const znaky = (zNasho && (sablona || poliVTele >= 1)) || poliVTele >= 2;
   const pole = (mena: string[]) => {
     for (const m of mena) {
       const r = new RegExp(`^\\s*${m}\\s*[:：]\\s*(.+)$`, "im").exec(t);
@@ -105,12 +151,24 @@ export function zFormulara(v: MailVstup): { meno: string; email: string; telefon
     }
     return "";
   };
-  const email = pole(["e-?mail", "email", "váš e-?mail", "vas e-?mail"]);
-  const meno = pole(["jm[ée]no", "meno", "jm[ée]no a p[řr][íi]jmen[íi]", "n[áa]zev"]);
+  /**
+   * Adresa človeka z Reply-To.
+   *
+   * Contact Form 7 posiela mail zo SVOJEJ adresy (`online@prosapiens.cz`)
+   * a pisateľa dá do Reply-To. 21. 9. 2026 na tom vznikol duplicitný dopyt:
+   * Hana Marko bola v appke raz zo snippetu a druhý raz ako „online@
+   * prosapiens.cz". Bez Reply-To sa z takej správy človek nedá zistiť.
+   */
+  const zOdpovedat = rozdelAdresu(v.odpovedat || "");
+  const email = (pole(["e-?mail", "email", "váš e-?mail", "vas e-?mail"]) || zOdpovedat.email).toLowerCase();
+  // Meno býva v poli formulára, inak v predmete („Nová zpráva od Hana Marko“).
+  const zPredmetu = /(?:nová|nova) zpráva od\s+(.+?)(?:\s+[–—-]\s+|$)/i.exec(predmet)?.[1]?.trim()
+    || /test postury\s*[–—-]\s*(.+)$/i.exec(predmet)?.[1]?.trim() || "";
+  const meno = pole(["jm[ée]no", "meno", "jm[ée]no a p[řr][íi]jmen[íi]", "n[áa]zev"]) || zPredmetu || zOdpovedat.meno;
   if (!znaky || (!email && !meno)) return null;
   return {
     meno: meno.slice(0, 120),
-    email: email.toLowerCase().slice(0, 160),
+    email: email.slice(0, 160),
     telefon: (pole(["telefon", "tel", "tel[eé]fon", "telefonn[íi] [čc][íi]slo"]) || telefonZTextu(t)).slice(0, 40),
     sprava: (pole(["zpr[áa]va", "spr[áa]va", "message", "dotaz", "pozn[áa]mka"]) || t).slice(0, 500),
   };
@@ -133,7 +191,8 @@ export function naDopyt(v: MailVstup, vlastne: string[] = [], ignoruj: string[] 
     return isNaN(d.getTime()) ? MESIACE_ISO(new Date()) : MESIACE_ISO(d);
   })();
 
-  const form = zFormulara(v);
+  const vlastneDomeny = vlastne.map((a) => a.split("@")[1]).filter(Boolean);
+  const form = zFormulara(v, vlastneDomeny);
   if (form) {
     const adresa = form.email || email;
     if (!adresa) return { preskocene: "formulár bez e-mailu" };
@@ -154,6 +213,10 @@ export function naDopyt(v: MailVstup, vlastne: string[] = [], ignoruj: string[] 
 
   if (!email) return { preskocene: "bez odosielateľa" };
   if (vlastne.some((a) => a && email === a.toLowerCase())) return { preskocene: "vlastná adresa" };
+  // Čokoľvek z vlastnej domény je preposlanie, kópia alebo hláška webu —
+  // nie nový človek. (Formulár sa rieši vyššie a ten si so sebou nesie
+  // adresu pisateľa v Reply-To.)
+  if (vlastneDomeny.includes(domena)) return { preskocene: `vlastná doména (${domena})` };
   if (ignoruj.some((a) => a && (email === a.toLowerCase() || domena === a.toLowerCase().replace(/^@/, "")))) {
     return { preskocene: "na zozname ignorovaných" };
   }
@@ -162,6 +225,12 @@ export function naDopyt(v: MailVstup, vlastne: string[] = [], ignoruj: string[] 
   if (STROJOVE.some((s) => predmet.includes(s))) return { preskocene: "strojový predmet" };
   // Odpoveď na vlastný mail nie je nový dopyt — človek už v Kokpite je.
   if (/^(re|odp|fwd|fw)\s*:/i.test(v.predmet || "")) return { preskocene: "odpoveď v rozhovore" };
+
+  // Až sem sa dostane pošta od človeka. Teraz otázka, či niečo CHCE.
+  const cely = `${v.predmet} ${v.text}`.toLowerCase();
+  const obchod = OBCHODNE.find((o) => cely.includes(o));
+  if (obchod) return { preskocene: `obchodná ponuka („${obchod}“)` };
+  if (!DOPYT_SLOVA.some((d) => cely.includes(d))) return { preskocene: "nevyzerá ako dopyt na tréning" };
 
   return {
     dopyt: {

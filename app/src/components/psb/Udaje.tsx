@@ -672,7 +672,7 @@ function snippetWeb(url: string, tajne: string): string {
 function NapojenieMailu() {
   type Stav = {
     nastavene: { host: string; port: number; user: string; od: string; heslo: string; ignoruj: string };
-    posledny: null | { kedy: string; precitanych: number; pridanych: number; doplnenych: number;
+    posledny: null | { kedy: string; precitanych: number; pridanych: number; doplnenych: number; uzBoli?: number;
       pridane: string[]; doplnene: string[]; preskocene: { predmet: string; preco: string }[]; chyba: string };
     dopytovZMailu: number; poslednyDopyt: string | null;
   };
@@ -766,7 +766,7 @@ function NapojenieMailu() {
       <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 8, lineHeight: 1.55 }}>
         Z mailu je v Dopytoch {stav.dopytovZMailu} {stav.dopytovZMailu === 1 ? "záznam" : "záznamov"}
         {stav.poslednyDopyt ? `, posledný ${fmtDMY(stav.poslednyDopyt)}` : ""}.
-        {p ? ` Naposledy sa čítalo ${fmtDMY(p.kedy.slice(0, 10))}: prečítaných ${p.precitanych}, nových ${p.pridanych}, doplnených ${p.doplnenych}.` : " Zatiaľ nikdy nebežalo."}
+        {p ? ` Naposledy sa čítalo ${fmtDMY(p.kedy.slice(0, 10))}: prečítaných ${p.precitanych}, nových ${p.pridanych}, doplnených ${p.doplnenych}, už evidovaných ${p.uzBoli ?? 0}.` : " Zatiaľ nikdy nebežalo."}
         {p?.chyba ? ` Chyba: ${p.chyba}` : ""}
       </div>
 
