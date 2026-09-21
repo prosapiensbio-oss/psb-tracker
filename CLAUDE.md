@@ -753,3 +753,16 @@ bez akejkoľvek zmeny — Dovecot po sérii prihlásení chvíľu odmieta. Preto
 vedľa posledného behu drží aj posledný ÚSPEŠNÝ (`mail_stav_ok`) a panel pri
 chybe povie, kedy sa naposledy čítalo. Jedna chyba nie je rozbité napojenie;
 to je tá istá lekcia ako pri kalendári.
+
+## Pripomienka na dopyt patrí do deriveRegister, nie vedľa neho
+
+21. 9. 2026: „notifikáciu pre Terezku, že v schránke je nový mail — treba
+odpísať." Prvý inštinkt bol pridať to k `dopyt|nevyriesene`
+v `nezapisaneDoRegistra`. Bola by to slepá ulička: **push číta
+`deriveRegister`, nie `nezapisaneDoRegistra` ani `pripomienkySlubov`** — tie
+dve sa skladajú až v `App.tsx`, takže ich položky žijú len na obrazovke
+a na telefón sa nikdy nedostanú.
+
+Pravidlo: keď má nová pripomienka dôjsť aj na telefón, patrí do
+`deriveRegister` (`add(...)` s `kto: { trener }`). Overenie, komu sa ukáže,
+robí `./scripts/naostro.sh` v sekcii „KOMU SA NOTIFIKÁCIA UKÁŽE".

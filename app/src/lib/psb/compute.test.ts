@@ -12,6 +12,7 @@ import {
   rodinaZKluca,
   predictCash,
   deriveClients,
+  deriveRegister,
   maTermin,
   nastavObjednaneZKalendara,
   nezapisaneDoRegistra,
@@ -871,5 +872,59 @@ describe("ručná kotva zostatku má prednosť pred dopočtom", () => {
 
   it("zmazaná kotva vráti dopočet", () => {
     expect(postav({ balicekZostatok: null, balicekKDatumu: "" }, [-2]).packageRemaining).toBe(17);
+  });
+});
+
+/**
+ * Jerry, 21. 9. 2026: „vedel by si vytvoriť notifikáciu pre Terezku, že
+ * v schránke je nový mail od… treba odpísať?"
+ *
+ * Dopyt, na ktorý nikto neodpísal, je najdrahšia vec v celom lieviku — je
+ * zaplatený a ešte nič nestál len preto, že o ňom nikto nevie.
+ */
+describe("nový dopyt čaká na odpoveď", () => {
+  const den = (posun: number) => new Date(Date.now() + posun * 86400000).toISOString().slice(0, 10);
+  const lead = (o: Record<string, unknown> = {}) => ({
+    id: "mail-x", date: den(0), name: "Hana Marko", source: "mail", referrer: "",
+    status: "novy", note: "Bolí mě krk, chtěla bych se objednat.", email: "hana@example.cz",
+    telefon: "", kampan: "", utm: "", stranka: "", odpovedaneAt: "", dovod: "",
+    createdAt: new Date().toISOString(), ...o,
+  });
+  const register = (leads: Record<string, unknown>[]) =>
+    deriveRegister({ ...EMPTY_DATA, leads } as never, {}, [], []);
+  const najdi = (leads: Record<string, unknown>[]) => register(leads).filter((r) => r.key.startsWith("odpoved|"));
+
+  it("dnešný mail vyvolá oranžovú pripomienku pre Terezku", () => {
+    const [x] = najdi([lead()]);
+    expect(x).toBeTruthy();
+    expect(x.tone).toBe("orange");
+    expect(x.trener).toBe("Terezka");
+    expect(x.title).toContain("Nový mail");
+    expect(x.title).toContain("Hana Marko");
+    expect(x.client).toBe("marketing|dopyty");
+  });
+
+  it("po dni je červená a povie, ako dlho čaká", () => {
+    const [x] = najdi([lead({ date: den(-2) })]);
+    expect(x.tone).toBe("red");
+    expect(x.title).toContain("čaká 2 dni");
+  });
+
+  it("odpovedané zhasne pripomienku", () => {
+    expect(najdi([lead({ odpovedaneAt: new Date().toISOString() })])).toHaveLength(0);
+  });
+
+  it("dohodnutý dopyt sa už nepripomína", () => {
+    expect(najdi([lead({ status: "dohodnuty" })])).toHaveLength(0);
+  });
+
+  it("starší než dva týždne preberá „Dopyty bez odpovede prečo“", () => {
+    expect(najdi([lead({ date: den(-20) })])).toHaveLength(0);
+  });
+
+  it("dopyt z webu sa volá dopyt, nie mail", () => {
+    const [x] = najdi([lead({ source: "web", id: "web-1" })]);
+    expect(x.title).toContain("Nový dopyt");
+    expect(x.detail).toContain("cez formulár na webe");
   });
 });

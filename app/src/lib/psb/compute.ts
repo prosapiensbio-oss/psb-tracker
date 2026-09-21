@@ -2673,6 +2673,48 @@ export function deriveRegister(
     );
   }
 
+  // ── nový dopyt čaká na odpoveď ───────────────────────────────────────────
+  //
+  // Jerry, 21. 9. 2026: „vedel by si vytvoriť notifikáciu pre Terezku, že
+  // v schránke je nový mail od… treba odpísať?" Odkedy Kokpit číta schránku
+  // info@ (`/api/mail-dopyty`), vie o dopyte skôr, než si ho niekto všimne —
+  // ale nepovedal to nikomu: dopyt ticho ležal v zozname.
+  //
+  // Prečo je to červené hneď na druhý deň: rýchlosť PRVEJ odpovede je
+  // v službách najsilnejšia páka na konverziu — silnejšia než cena aj než
+  // text reklamy. Presne preto appka `odpovedaneAt` vôbec meria.
+  //
+  // Zhasne to klik „Odpovedané" v Dopytoch alebo zmena stavu z „nový", teda
+  // to, čo človek po odpovedi aj tak urobí. Po dvoch týždňoch sa prestane
+  // pripomínať — vtedy to preberá „Dopyty bez odpovede prečo", ktoré sa už
+  // nepýta na odpoveď, ale na dôvod.
+  const dnesOdpoved = new Date();
+  for (const l of data.leads || []) {
+    if (l.status !== "novy" || String(l.odpovedaneAt || "").trim()) continue;
+    const den = String(l.date || "").slice(0, 10);
+    if (!den) continue;
+    const dni = Math.floor(daysBetween(den, dnesOdpoved));
+    if (dni < 0 || dni > 14) continue;
+    const meno = String(l.name || "").trim() || String(l.email || "").trim() || "(bez mena)";
+    const odkial = l.source === "mail" ? "mailom na info@"
+      : l.source === "reklama" ? "z reklamy"
+        : l.source === "web" ? "cez formulár na webe"
+          : `cez ${l.source}`;
+    const kontakt = [l.email, l.telefon].filter(Boolean).join(" · ");
+    const uryvok = String(l.note || "").replace(/\s+/g, " ").trim().slice(0, 140);
+    add(
+      `odpoved|${l.id}`,
+      "Zápis",
+      dni >= 1 ? "red" : "orange",
+      `${l.source === "mail" ? "Nový mail" : "Nový dopyt"} — ${meno}${dni >= 1 ? ` (čaká ${dni} ${dni === 1 ? "deň" : dni < 5 ? "dni" : "dní"})` : ""}`,
+      `${meno} sa ozval ${fmtDMY(den)} ${odkial}${kontakt ? ` (${kontakt})` : ""} a nikto zatiaľ neodpísal.${uryvok ? ` Píše: „${uryvok}“` : ""} Po odpovedi klikni v Dopytoch na „Odpovedané" — meria sa čas prvej odpovede.`,
+      dni >= 1 ? 2 : 4,
+      "marketing|dopyty",
+      "odpoved",
+      { trener: "Terezka", oKom: meno },
+    );
+  }
+
   for (const a of deriveAnomalies(data, clients, kal)) {
     // Záver z debaty nie je anomália — je to sľub, ktorý si sám pripomenul.
     add(a.key, a.key.startsWith("zaver|") ? "Rozhodnutie" : "Anomália", a.tone, a.label, a.detail, 20, a.client);
