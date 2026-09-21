@@ -146,6 +146,11 @@ export type ClientAgg = {
    * Obrazovka aj Jarvis to majú povedať — je to odhad, nie výpis z PTmindera.
    */
   packageOdvodeny: boolean;
+  /** Odkiaľ zostatok je — prázdne = priamo z exportu PTmindera. */
+  packageOdkial: string;
+  /** Ručná kotva: čo ukazoval PTminder a ku ktorému dňu. */
+  balicekZostatok: number | null;
+  balicekKDatumu: string;
   /** Klient má v exporte len doplnky k členstvu, nie balíček s hodinami. */
   lenDoplnky: boolean;
 };
@@ -225,6 +230,9 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
         packageTotal: 0,
         packageStatus: "",
         packageOdvodeny: false,
+        packageOdkial: "",
+        balicekZostatok: null,
+        balicekKDatumu: "",
         lenDoplnky: false,
       };
     }
@@ -336,6 +344,8 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
     c.vratenie = !!(c.prvyKontakt && c.firstSession && c.prvyKontakt.slice(0, 10) < c.firstSession.slice(0, 10));
     c.v6m = String(ov?.v6m || "");
     c.precoNeprisiel = String(ov?.precoNeprisiel || "");
+    c.balicekZostatok = ov?.balicekZostatok ?? null;
+    c.balicekKDatumu = String(ov?.balicekKDatumu || "");
     c.is6m = sixMSet.has(c.name);
     c.clientType = c.is6m ? "6M Predplatné" : "Balíček";
     c.serviceCount = serviceCounts[c.name] || 0;
@@ -416,15 +426,47 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
      * nahlas. Odhad, ktorý sa tvári ako výpis, je horší než chýbajúce číslo.
      */
     const exportMlci = (active?.total ?? 0) === 0 && (active?.remaining ?? 0) === 0;
-    if (exportMlci && totalZNazvu > 0 && active?.validFrom) {
-      const koniec = active.validTo && active.validTo < dnesPack ? active.validTo : dnesPack;
-      let minute = 0;
+    const koniecOkna = active?.validTo && active.validTo < dnesPack ? active.validTo : dnesPack;
+    const odtrenovaneOd = (od: string) => {
+      let n = 0;
       for (const s of c.sessions) {
         const den = (s.date || "").slice(0, 10);
-        if (den >= active.validFrom && den <= koniec) minute++;
+        if (den >= od && den <= koniecOkna) n++;
       }
+      return n;
+    };
+
+    /**
+     * Ručná kotva má prednosť pred dopočtom.
+     *
+     * Jerry, 21. 9. 2026: „platí 18 h na 6 mesiacov, ale minie ich skôr, takže
+     * má akoby dve členstvá — na jednom 0, na druhom 5." Presne v deň, keď sa
+     * prekrývajú, sa z exportu NEDÁ zistiť, ktorému z nich PTminder hodinu
+     * strhol; dopočet je preto presný na ±1. Keď Jerry raz odpíše, čo
+     * PTminder ukazuje a ku ktorému dňu, appka odvtedy odpočítava odtrénované
+     * hodiny od jeho čísla — a rozchod sa neopakuje.
+     *
+     * Hodina z dňa kotvy sa NEODPOČÍTAVA: číslo z PTmindera už ju v sebe má.
+     */
+    const kotva = ov?.balicekZostatok;
+    const kotvaDen = String(ov?.balicekKDatumu || "");
+    if (kotva != null && kotvaDen) {
+      const poKotve = (() => {
+        let n = 0;
+        for (const s of c.sessions) {
+          const den = (s.date || "").slice(0, 10);
+          if (den > kotvaDen && den <= koniecOkna) n++;
+        }
+        return n;
+      })();
+      c.packageRemaining = Math.max(0, kotva - poKotve);
+      c.packageOdvodeny = true;
+      c.packageOdkial = `podľa PTmindera k ${kotvaDen}${poKotve ? ` mínus ${poKotve} odtrénovaných` : ""}`;
+    } else if (exportMlci && totalZNazvu > 0 && active?.validFrom) {
+      const minute = odtrenovaneOd(active.validFrom);
       c.packageRemaining = Math.max(0, totalZNazvu - minute);
       c.packageOdvodeny = true;
+      c.packageOdkial = `dopočítané: ${totalZNazvu} h z názvu mínus ${minute} odtrénovaných od ${active.validFrom}`;
     }
     c.packageStatus = active?.status || "";
     c.membership = active?.package || "";

@@ -119,6 +119,13 @@ export type ClientOverride = {
    * Preto sa nezapisuje do `trainerNote`, ktorá je o klientovi ako takom.
    */
   precoNeprisiel?: string;
+  /**
+   * Zostatok balíčka odpísaný z PTmindera a deň, ku ktorému platil.
+   * Appka od neho ďalej odpočítava odtrénované hodiny — pozri
+   * `deriveClients`. Bez dátumu je číslo bezcenné, preto chodia v páre.
+   */
+  balicekZostatok?: number | null;
+  balicekKDatumu?: string;
 };
 
 export type UploadLogEntry = {

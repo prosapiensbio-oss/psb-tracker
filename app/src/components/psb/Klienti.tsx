@@ -685,7 +685,46 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
       {editC && (
         <Modal title={editC.name} onClose={() => setEdit(null)}>
           <Premenovanie meno={editC.name} onHotovo={async (nove) => { setEdit(null); await actions.refresh(); void nove; }} />
-          {editC.membership && <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 12 }}>Predplatné: <strong style={{ color: C.text }}>{editC.membership}</strong>{editC.packageTotal ? ` · zostatok ${editC.packageRemaining}/${editC.packageTotal}` : ""}</div>}
+          {editC.membership && (
+            <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 12 }}>
+              Predplatné: <strong style={{ color: C.text }}>{editC.membership}</strong>
+              {editC.packageTotal ? ` · zostatok ${editC.packageOdvodeny ? "≈" : ""}${editC.packageRemaining}/${editC.packageTotal}` : ""}
+              {editC.packageOdkial ? <span style={{ color: C.textDim }}> · {editC.packageOdkial}</span> : null}
+            </div>
+          )}
+          {/* ── Oprava zostatku podľa PTmindera ───────────────────────────
+              PTminder pri offline členstvách zostatok nevyváža (0 z 0), takže
+              ho appka dopočítava z odtrénovaných hodín — a keď sa dve členstvá
+              prekrývajú, môže byť o hodinu vedľa. Tu sa raz odpíše pravda
+              z PTmindera; appka od nej ďalej odpočítava sama a nemusí sa to
+              opakovať. */}
+          {editC.packageTotal > 0 && (
+            <div style={{ marginBottom: 14, padding: "9px 11px", borderRadius: 8, background: mix(C.text, 4), border: `1px solid ${C.border}` }}>
+              <div style={{ fontSize: 11.5, color: C.textMuted, marginBottom: 6 }}>
+                Zostatok podľa PTmindera (appka od neho ďalej odpočítava odtrénované hodiny)
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <input
+                  type="number" min={0} max={99} placeholder="napr. 5"
+                  defaultValue={editC.balicekZostatok ?? ""}
+                  onBlur={(e) => {
+                    const v = e.currentTarget.value.trim();
+                    // Dátum dopĺňa server spolu s číslom — pozri /api/override.
+                    if (v === "") { actions.setOverride(editC.name, "balicekZostatok", null); return; }
+                    const n = Math.max(0, Math.round(Number(v)));
+                    if (!Number.isFinite(n)) return;
+                    actions.setOverride(editC.name, "balicekZostatok", n);
+                  }}
+                  style={{ width: 90, background: C.bg, color: C.text, border: `1px solid ${C.border}`, borderRadius: 6, padding: "5px 8px", fontSize: 12, fontFamily: "inherit" }}
+                />
+                <span style={{ fontSize: 11.5, color: C.textDim }}>
+                  {editC.balicekKDatumu
+                    ? `hodín k ${fmtDMY(editC.balicekKDatumu)} — odvtedy odtrénoval ${Math.max(0, (editC.balicekZostatok ?? 0) - editC.packageRemaining)} h`
+                    : "hodín k dnešku (uloží sa aj dátum)"}
+                </span>
+              </div>
+            </div>
+          )}
           {duchOdpoved(editC) === "ano" && (
             // Zadné vrátka. Potvrdenie ducha je rozhodnutie, nie rozsudok —
             // ľudia sa vracajú a vtedy sa to musí dať zrušiť jedným klikom,

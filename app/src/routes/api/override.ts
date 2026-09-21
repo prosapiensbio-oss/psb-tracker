@@ -21,6 +21,8 @@ const ALLOWED = new Set<keyof ClientOverride>([
   "prvyKontakt",
   "v6m",
   "precoNeprisiel",
+  "balicekZostatok",
+  "balicekKDatumu",
 ]);
 
 export const Route = createFileRoute("/api/override")({
@@ -61,6 +63,19 @@ export const Route = createFileRoute("/api/override")({
           } catch { /* denník je poistka — jeho výpadok nesmie zablokovať uloženie */ }
         }
         const ulozene = await setOverride(DB, name, key as keyof ClientOverride, value);
+
+        /**
+         * Zostatok z PTmindera bez dňa je bezcenný.
+         *
+         * „Gažo má 5 hodín" platí k nejakému dátumu — o týždeň je to iné číslo
+         * a appka od neho nemá od čoho odpočítavať. Preto sa deň zapisuje
+         * SPOLU s číslom, na serveri: obrazovka aj Jarvis tak posielajú jednu
+         * hodnotu a zabudnúť sa nedá.
+         */
+        if (key === "balicekZostatok" && ulozene) {
+          await setOverride(DB, name, "balicekKDatumu" as keyof ClientOverride,
+            value == null || value === "" ? "" : new Date().toISOString().slice(0, 10));
+        }
         if (!ulozene) {
           // Nehlásiť „uložené" nad ničím. Obrazovka dostane ok:false a ukáže
           // červenú; dovtedy tu bolo ok:true bez ohľadu na výsledok.

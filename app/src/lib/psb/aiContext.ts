@@ -780,6 +780,7 @@ export function buildAiContext(
       // „≈" znamená, že export zostatok nedal a appka ho dopočítala z odtrénovaných
       // hodín. Povedz to, keď sa na zostatok niekto pýta — nie je to výpis z PTmindera.
       zostatokDopocitany: c.packageOdvodeny || undefined,
+      zostatokOdkial: c.packageOdkial || undefined,
       stavBalicka: c.packageStatus || null,
       typ: c.clientType,
       is6m: c.is6m,

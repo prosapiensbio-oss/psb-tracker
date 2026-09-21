@@ -826,3 +826,50 @@ describe("zostatok balíčka, keď ho export nedal", () => {
     expect(c.packageRemaining).toBe(0);
   });
 });
+
+
+/**
+ * Jerryho vysvetlenie (21. 9. 2026): „platí 18 h na 6 mesiacov, ale minie ich
+ * skôr, takže má akoby dve členstvá — na jednom 0, na druhom 5." V deň, keď
+ * sa prekrývajú, sa z exportu nedá zistiť, ktorému PTminder hodinu strhol.
+ * Preto kotva: raz sa odpíše, čo PTminder ukazuje, a appka od toho ďalej
+ * odpočítava.
+ */
+describe("ručná kotva zostatku má prednosť pred dopočtom", () => {
+  const den = (posun: number) => new Date(Date.now() + posun * 86400000).toISOString().slice(0, 10);
+  const ses = (date: string) => ({
+    id: `k-${date}`, date, time: "10:00", client: "Peter Gažo", sessionTrainer: "Jerry",
+    sessionName: "Functional Patterns - 60min", sessionType: "OFFLINE", durationMin: 60, price: 1116.25,
+  });
+  const postav = (over: Record<string, unknown>, dniSedeni: number[]) =>
+    deriveClients({
+      sessions: dniSedeni.map((d) => ses(den(d))),
+      payments: [], services: [], leads: [], anomalyAck: {},
+      clientOverrides: { "Peter Gažo": over },
+      packages: [{
+        client: "Peter Gažo", status: "Active Client", package: "OFF - 18 hodín offline",
+        remaining: 0, total: 0, added: den(-60), validFrom: den(-60), validTo: den(120), kind: "membership",
+      }],
+    } as never)["Peter Gažo"];
+
+  it("od kotvy sa odpočítajú len tréningy PO jej dni", () => {
+    // Kotva: PTminder ukazoval 5 h pred tromi dňami; odvtedy dva tréningy.
+    const c = postav({ balicekZostatok: 5, balicekKDatumu: den(-3) }, [-10, -5, -3, -2, -1]);
+    expect(c.packageRemaining).toBe(3);
+    expect(c.packageOdkial).toContain("podľa PTmindera");
+  });
+
+  it("tréning v deň kotvy sa neodpočítava — PTminder ho už má v sebe", () => {
+    expect(postav({ balicekZostatok: 5, balicekKDatumu: den(-3) }, [-3]).packageRemaining).toBe(5);
+  });
+
+  it("bez dátumu je číslo bezcenné a kotva sa nepoužije", () => {
+    const c = postav({ balicekZostatok: 5, balicekKDatumu: "" }, [-10, -5, -1]);
+    expect(c.packageRemaining).toBe(15);
+    expect(c.packageOdkial).toContain("dopočítané");
+  });
+
+  it("zmazaná kotva vráti dopočet", () => {
+    expect(postav({ balicekZostatok: null, balicekKDatumu: "" }, [-2]).packageRemaining).toBe(17);
+  });
+});

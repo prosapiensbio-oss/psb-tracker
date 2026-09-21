@@ -733,9 +733,18 @@ to **14 balíčkov u 11 klientov** (celá rodina „OFF - …"), takže appka hl
   „≈4/18", profil povie prečo, denná pripomienka dodá „(dopočítané —
   over v PTminderi)". Odhad, ktorý sa tvári ako výpis, je horší než chýbajúce
   číslo — Jerry ho hovorí klientovi nahlas.
-- **Presnosť je ±1 hodina.** Pri Gažovi appka ráta 4, PTminder hovorí 5:
-  rozdiel je tréning z 24. 7., v deň, keď sa začalo nové členstvo a staré
-  ešte platilo. Ktorému členstvu PTminder hodinu strhol, z exportu nezistíš.
+- **Dopočet je presný na ±1 hodinu a viac sa z exportu vytiahnuť nedá.**
+  Jerry to vysvetlil 21. 9.: „platí 18 h na 6 mesiacov, ale minie ich skôr,
+  takže má akoby dve členstvá — na jednom 0, na druhom 5." V deň prekryvu
+  (u Gaža 24. 7.) sa z dát nezistí, ktorému z nich PTminder hodinu strhol.
+  Platby to potvrdzujú: druhé členstvo má `valid_from` 24. 7., ale zaplatené
+  bolo až 7. a 17. 8.
+- **Preto kotva, nie lepší odhad.** `client_overrides.balicek_zostatok`
+  + `balicek_k_datumu`: Jerry raz odpíše, čo ukazuje PTminder, a appka od
+  toho čísla odpočítava ďalšie tréningy (`deriveClients`). Dátum zapisuje
+  SERVER spolu s číslom (`/api/override`) — hodnota bez dňa je bezcenná
+  a zabudnúť sa na ňu nesmie dať. Nastaviť to vie aj Jarvis
+  („Gažo má v PTminderi 5 hodín" → set-override `balicekZostatok`).
 
 ## Poštový server vie odmietnuť správne heslo
 

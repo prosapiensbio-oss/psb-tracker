@@ -142,6 +142,8 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
       prvyKontakt: String(r.prvy_kontakt || ""),
       v6m: String(r.v6m || ""),
       precoNeprisiel: String(r.preco_neprisiel || ""),
+      balicekZostatok: r.balicek_zostatok == null ? null : Number(r.balicek_zostatok),
+      balicekKDatumu: String(r.balicek_k_datumu || ""),
     };
   }
   for (const r of acks.results as any[]) {
@@ -544,6 +546,8 @@ export async function setOverride(
     prvyKontakt: "prvy_kontakt",
     v6m: "v6m",
     precoNeprisiel: "preco_neprisiel",
+    balicekZostatok: "balicek_zostatok",
+    balicekKDatumu: "balicek_k_datumu",
   };
   const col = colMap[key as string];
   if (!col) return false;
