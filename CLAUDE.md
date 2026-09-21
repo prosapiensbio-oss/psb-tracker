@@ -766,3 +766,27 @@ a na telefón sa nikdy nedostanú.
 Pravidlo: keď má nová pripomienka dôjsť aj na telefón, patrí do
 `deriveRegister` (`add(...)` s `kto: { trener }`). Overenie, komu sa ukáže,
 robí `./scripts/naostro.sh` v sekcii „KOMU SA NOTIFIKÁCIA UKÁŽE".
+
+## Porovnanie s priemerom musí počítať s krátkou históriou
+
+21. 9. 2026 Jerry: „skontroluj, či tie štatistiky v profile klienta fungujú
+správne." Priemery sedeli, ale dve zo štyroch čísel klamali pri nováčikoch —
+a klamali o rád:
+
+- **Tempo** delilo sedenia z 90 dní vždy TROMI mesiacmi. Dominika Križova
+  (chodí 6 dní) tak mala 0,3 sedenia mesačne namiesto 2,0; Albert Matl 0,7
+  namiesto 4,0. Vedľa priemeru 3,4 vyzerali obaja ako ľudia, ktorí prestali
+  chodiť — čo je presne opačná informácia. Týkalo sa to 12 zo 66 aktívnych.
+  Oprava: delí sa počtom mesiacov, ktoré klient NAOZAJ chodí, najviac tromi
+  a najmenej pol mesiaca (`tempoMesacne` v `lib/psb/profil.ts`).
+- **Dochádzka** má menovateľ `max(6, týždne histórie)`, takže dvojtýždňový
+  klient má strop 33 % a jednotýždňový 17 %. Pod šesť týždňov sa preto
+  neporovnáva vôbec — namiesto stĺpca je veta, koľko týždňov chodí.
+- **„Zaplatené celkovo"** neporovnávalo hodnotu klienta, ale dĺžku vzťahu
+  (Knapčok 51 934 Kč za 20 mesiacov = 2 520 Kč mesačne, Gažo 118 797 =
+  7 157 Kč mesačne). Stĺpec je odteraz **mesačný**; celková suma zostáva ako
+  dlaždica.
+
+Pravidlo: **každé porovnanie dvoch klientov musí byť normalizované na čas** —
+inak meria, kto je dlhšie, nie kto je lepší. A keď sa normalizovať nedá
+(dochádzka v pevnom okne), radšej mlč než ukáž stĺpec.

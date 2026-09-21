@@ -2,6 +2,7 @@ import { useMemo } from "react";
 
 import { type ClientAgg } from "../../lib/psb/compute";
 import { daysBetween, fmtCZK, fmtDMY, monthLabel } from "../../lib/psb/format";
+import { dochadzkaPorovnatelna, mesiacovVztahu, priemerOstatnych, tempoMesacne, zaplateneMesacne } from "../../lib/psb/profil";
 import { C, mix } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import { Dennik } from "./Dennik";
@@ -31,13 +32,15 @@ import { Card, Info, ValueBars } from "./ui";
 
 const DEN = 86400000;
 
-// Tempo z posledných 90 dní — rovnaké okno, aké používa predikcia. Počíta sa
-// tu nanovo, lebo ClientAgg tempo nenesie (žije až vo výstupe predikcie).
-const tempo90 = (c: ClientAgg): number => {
-  const od = Date.now() - 90 * DEN;
-  const n = c.sessions.filter((s) => Date.parse(s.date) >= od).length;
-  return n / 3; // sedení za mesiac
+/** „1 týždeň / 2 týždne / 6 týždňov“ — skloňovanie, nie „2 týždňa“. */
+const tyzdne = (mesiacov: number): string => {
+  const n = Math.max(1, Math.round(mesiacov * 4.35));
+  return `${n} ${n === 1 ? "týždeň" : n < 5 ? "týždne" : "týždňov"}`;
 };
+
+// Tempo, dĺžka vzťahu a priemer ostatných žijú v `lib/psb/profil.ts` — aj
+// preto, že sa 21. 9. 2026 ukázalo, že delenie tromi mesiacmi pri nováčikovi
+// klame o rád (Dominika Križova: 0,3 namiesto 5,0 sedenia mesačne).
 
 function Porovnanie({ label, hodnota, priemer, fmt, vyssieLepsie = true }: {
   label: string; hodnota: number; priemer: number; fmt: (n: number) => string; vyssieLepsie?: boolean;
@@ -96,18 +99,16 @@ export function KlientProfil({ meno, data, clients, onZavri, btcSats, onDennikZa
     // Priemer sa ráta z AKTÍVNYCH klientov — porovnávať sa s duchmi a
     // odídenými by každého robilo hviezdou.
     const aktivni = Object.values(clients).filter((x) => x.status !== "Neaktívny" && x.name !== meno);
-    const avg = (f: (x: ClientAgg) => number) => {
-      const v = aktivni.map(f).filter((n) => Number.isFinite(n) && n > 0);
-      return v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0;
-    };
+    const avg = (f: (x: ClientAgg) => number) => priemerOstatnych(aktivni.map(f));
+    const zaplatilKlient = (x: ClientAgg) =>
+      data.payments.filter((pp) => pp.client === x.name).reduce((a, pp) => a + pp.amount, 0);
     const priemery = {
-      tempo: avg((x) => tempo90(x)),
-      dochadzka: avg((x) => x.attendance * 100),
-      cena: avg((x) => {
-        const z = data.payments.filter((pp) => pp.client === x.name).reduce((a, pp) => a + pp.amount, 0);
-        return x.totalHours > 0 ? z / x.totalHours : 0;
-      }),
-      zaplatene: avg((x) => data.payments.filter((pp) => pp.client === x.name).reduce((a, pp) => a + pp.amount, 0)),
+      tempo: avg((x) => tempoMesacne(x)),
+      // Priemer sa ráta len z klientov, ktorých dochádzka už niečo znamená —
+      // inak by ho ťahali nadol tí, čo chodia dva týždne a majú strop 33 %.
+      dochadzka: avg((x) => (dochadzkaPorovnatelna(x) ? x.attendance * 100 : 0)),
+      cena: avg((x) => (x.totalHours > 0 ? zaplatilKlient(x) / x.totalHours : 0)),
+      zaplateneMes: avg((x) => zaplateneMesacne(zaplatilKlient(x), x)),
     };
 
     // daysBetween (floor) — tá istá definícia ako „X dní bez tréningu"
@@ -131,10 +132,11 @@ export function KlientProfil({ meno, data, clients, onZavri, btcSats, onDennikZa
       if (d >= 7) medzery.push(d);
     }
     const priemMedzera = medzery.length ? medzery.reduce((a, b) => a + b, 0) / medzery.length : null;
-    const t90 = tempo90(c);
+    const t90 = tempoMesacne(c);
     const minieO = c.packageRemaining > 0 && t90 > 0 ? (c.packageRemaining / t90) * 4.33 : null;
 
-    return { platby, zaplatene, mesacne, priemery, dniTicha, tempo: t90, cenaHodiny, priemMedzera, minieO };
+    return { platby, zaplatene, mesacne, priemery, dniTicha, tempo: t90, cenaHodiny, priemMedzera, minieO,
+      mesiacov: mesiacovVztahu(c), dochadzkaSedi: dochadzkaPorovnatelna(c) };
   }, [c, data, clients, meno]);
 
   if (!c || !p) return null;
@@ -274,9 +276,22 @@ export function KlientProfil({ meno, data, clients, onZavri, btcSats, onDennikZa
             <Info text="Porovnanie s priemerom AKTÍVNYCH klientov (bez tohto klienta). Číslo bez mierky nič nehovorí — tempo 2,1 je málo alebo veľa len oproti tomu, ako chodia ostatní." label="Oproti ostatným" />
           </div>
           <Porovnanie label="Tempo (sedení / mes.)" hodnota={burnRate} priemer={p.priemery.tempo} fmt={(n) => n.toFixed(1)} />
-          <Porovnanie label="Dochádzka" hodnota={c.attendance * 100} priemer={p.priemery.dochadzka} fmt={(n) => `${Math.round(n)} %`} />
+          {/* Dochádzka s krátkou históriou nie je dochádzka, ale dátum
+              začiatku: jej menovateľ je `max(6, týždne)`, takže dvojtýždňový
+              klient má strop 33 %. Radšej vetu než klamlivý stĺpec. */}
+          {p.dochadzkaSedi ? (
+            <Porovnanie label="Dochádzka" hodnota={c.attendance * 100} priemer={p.priemery.dochadzka} fmt={(n) => `${Math.round(n)} %`} />
+          ) : (
+            <div style={{ marginBottom: 10, fontSize: 11, color: C.textDim, lineHeight: 1.5 }}>
+              <span style={{ color: C.textMuted }}>Dochádzka</span> — chodí {tyzdne(p.mesiacov)}, na porovnanie
+              je to krátko (meria sa okno 18 týždňov).
+            </div>
+          )}
           <Porovnanie label="Ø cena hodiny" hodnota={p.cenaHodiny} priemer={p.priemery.cena} fmt={(n) => fmtCZK(Math.round(n))} />
-          <Porovnanie label="Zaplatené celkovo" hodnota={p.zaplatene} priemer={p.priemery.zaplatene} fmt={(n) => fmtCZK(Math.round(n))} />
+          {/* Mesačne, nie celkovo: celková suma meria dĺžku vzťahu, nie
+              hodnotu klienta — nový človek by proti dvadsaťmesačnému nikdy
+              nemal šancu. Celkovú sumu ukazuje dlaždica „Zaplatené spolu". */}
+          <Porovnanie label="Zaplatené mesačne" hodnota={zaplateneMesacne(p.zaplatene, c)} priemer={p.priemery.zaplateneMes} fmt={(n) => fmtCZK(Math.round(n))} />
         </div>
 
         {/* sedenia po mesiacoch */}
