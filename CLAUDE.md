@@ -838,6 +838,48 @@ pritom tam boli celý čas.
   **4 z 339 sedení** bez udalosti v kalendári — a dve z nich sú z 3. a 5. 8.,
   teda spred pripojenia kalendárov (8. 8.). Kalendár je dosť presný na to,
   aby niesol dochádzku.
+## Platby: banka z výpisu, hotovosť zo zošita
+
+Tretia tretina odchodu od PTmindera (migrácia 0071, `lib/psb/platbyEvidencia.ts`,
+karta „Platby — vlastná evidencia"). Jerry, 22. 9. 2026: „platby by ťahal
+z výpisu banky a hotovosť stále zo zošita, tam sa nič nemení."
+
+- **Komu platba patrí, sa nedá čítať z jedného poľa.** Fio dáva v
+  `counterparty` zlepenec „správa · odosielateľ" a klient je raz v jednej
+  polovici, raz v druhej, raz nikde:
+  „Prosapiens 18h · Natália Pecková" (klient platí sám),
+  „Josef snyrich · Filip Stráňavský" (platí niekto iný, klient je v správe),
+  „20260035 MGR. FILIP STRANAVSKY · Ing. BARBORA VANKOVÁ" (naša faktúra),
+  „Vklad do bankomatu" (nie je to platba klienta vôbec).
+  Preto sa hľadá PRIEZVISKO kdekoľvek v celom texte — jediná časť mena, ktorá
+  v bankovom zápise prežije skratky aj poradie. Tokenu stačí priezviskom
+  začínať a byť najviac o tri písmená dlhší (prechyľovanie: „Dvořákové"),
+  a y/i sa nerozlišuje („snyrich"/„šnirych").
+- **Priezviská kratšie než štyri písmená sa nehľadajú** — „Kral" by sadol na
+  pol výpisu.
+- **Pri kolízii sa nevyberie nikto** (Richard Matl verzus Katerina Matlová).
+  Zle priradená platba je horšia než nepriradená: pokazí tržbu klienta aj
+  jeho históriu a nikto to nezbadá, lebo súčet v banke sedí.
+- **Nenalieva sa hromadne, na rozdiel od balíčkov.** V exporte balíčkov klient
+  STOJÍ, vo výpise nie. Hromadné naliatie by rozdalo peniaze cudzím ľuďom.
+  Appka navrhne, človek potvrdí — a odosielateľ sa zapamätá
+  (`platba_mapovanie`), takže ten istý platiteľ sa pýta raz. Vzor je LEN
+  odosielateľ, nie celá správa: tá nesie číslo faktúry a mesiac a nikdy by sa
+  nechytila druhý raz.
+- **Vlastný vklad hotovosti do bankomatu sa preskakuje.** Tie peniaze sú už
+  v zošite a v banke by sa započítali druhýkrát.
+- **Porovnáva sa po MESIACOCH, nie po platbách.** Jedna platba v banke môže
+  v PTminderi stáť ako dve (balíček aj doplatok jedným prevodom). Mesačný
+  súčet je to, čo musí sedieť, a aj to, z čoho appka počíta tržby.
+- **Kým čaká front nepriradených, rozdiel sa NEUKAZUJE.** Prvé spustenie
+  hlásilo −209 867 Kč, čo meralo len to, koľko práce zostáva. Červené číslo,
+  ktoré nič nehovorí, je horšie než žiadne.
+
+Zmerané pri spustení (234 príjmov vo výpise od 1/2026): 121 jednoznačných
+návrhov, 25 s viacerými možnosťami, 88 bez návrhu. **Z tých 121 ich PTminder
+potvrdil 118** (klient má platbu do 10 dní) a pri 113 sedí aj suma do 2 %.
+Priraďovanie zostáva na človeku — sú to peniaze.
+
 ## Celý reťazec jedným príkazom: `./scripts/hotovo.sh`
 
 Jerry, 22. 9. 2026: „postav testera, kontrolóra, nasadzovača — a ty mi len

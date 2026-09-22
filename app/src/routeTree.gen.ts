@@ -37,6 +37,7 @@ import { Route as ApiPushRanoRouteImport } from './routes/api/push-rano'
 import { Route as ApiPushBehRouteImport } from './routes/api/push-beh'
 import { Route as ApiPushRouteImport } from './routes/api/push'
 import { Route as ApiPremenujRouteImport } from './routes/api/premenuj'
+import { Route as ApiPlatbyRouteImport } from './routes/api/platby'
 import { Route as ApiPlanyRouteImport } from './routes/api/plany'
 import { Route as ApiPeriodsRouteImport } from './routes/api/periods'
 import { Route as ApiPdfImportRouteImport } from './routes/api/pdf-import'
@@ -212,6 +213,11 @@ const ApiPushRoute = ApiPushRouteImport.update({
 const ApiPremenujRoute = ApiPremenujRouteImport.update({
   id: '/api/premenuj',
   path: '/api/premenuj',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPlatbyRoute = ApiPlatbyRouteImport.update({
+  id: '/api/platby',
+  path: '/api/platby',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPlanyRoute = ApiPlanyRouteImport.update({
@@ -437,6 +443,7 @@ export interface FileRoutesByFullPath {
   '/api/pdf-import': typeof ApiPdfImportRoute
   '/api/periods': typeof ApiPeriodsRoute
   '/api/plany': typeof ApiPlanyRoute
+  '/api/platby': typeof ApiPlatbyRoute
   '/api/premenuj': typeof ApiPremenujRoute
   '/api/push': typeof ApiPushRoute
   '/api/push-beh': typeof ApiPushBehRoute
@@ -503,6 +510,7 @@ export interface FileRoutesByTo {
   '/api/pdf-import': typeof ApiPdfImportRoute
   '/api/periods': typeof ApiPeriodsRoute
   '/api/plany': typeof ApiPlanyRoute
+  '/api/platby': typeof ApiPlatbyRoute
   '/api/premenuj': typeof ApiPremenujRoute
   '/api/push': typeof ApiPushRoute
   '/api/push-beh': typeof ApiPushBehRoute
@@ -570,6 +578,7 @@ export interface FileRoutesById {
   '/api/pdf-import': typeof ApiPdfImportRoute
   '/api/periods': typeof ApiPeriodsRoute
   '/api/plany': typeof ApiPlanyRoute
+  '/api/platby': typeof ApiPlatbyRoute
   '/api/premenuj': typeof ApiPremenujRoute
   '/api/push': typeof ApiPushRoute
   '/api/push-beh': typeof ApiPushBehRoute
@@ -638,6 +647,7 @@ export interface FileRouteTypes {
     | '/api/pdf-import'
     | '/api/periods'
     | '/api/plany'
+    | '/api/platby'
     | '/api/premenuj'
     | '/api/push'
     | '/api/push-beh'
@@ -704,6 +714,7 @@ export interface FileRouteTypes {
     | '/api/pdf-import'
     | '/api/periods'
     | '/api/plany'
+    | '/api/platby'
     | '/api/premenuj'
     | '/api/push'
     | '/api/push-beh'
@@ -770,6 +781,7 @@ export interface FileRouteTypes {
     | '/api/pdf-import'
     | '/api/periods'
     | '/api/plany'
+    | '/api/platby'
     | '/api/premenuj'
     | '/api/push'
     | '/api/push-beh'
@@ -837,6 +849,7 @@ export interface RootRouteChildren {
   ApiPdfImportRoute: typeof ApiPdfImportRoute
   ApiPeriodsRoute: typeof ApiPeriodsRoute
   ApiPlanyRoute: typeof ApiPlanyRoute
+  ApiPlatbyRoute: typeof ApiPlatbyRoute
   ApiPremenujRoute: typeof ApiPremenujRoute
   ApiPushRoute: typeof ApiPushRoute
   ApiPushBehRoute: typeof ApiPushBehRoute
@@ -1058,6 +1071,13 @@ declare module '@tanstack/react-router' {
       path: '/api/premenuj'
       fullPath: '/api/premenuj'
       preLoaderRoute: typeof ApiPremenujRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/platby': {
+      id: '/api/platby'
+      path: '/api/platby'
+      fullPath: '/api/platby'
+      preLoaderRoute: typeof ApiPlatbyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/plany': {
@@ -1357,6 +1377,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPdfImportRoute: ApiPdfImportRoute,
   ApiPeriodsRoute: ApiPeriodsRoute,
   ApiPlanyRoute: ApiPlanyRoute,
+  ApiPlatbyRoute: ApiPlatbyRoute,
   ApiPremenujRoute: ApiPremenujRoute,
   ApiPushRoute: ApiPushRoute,
   ApiPushBehRoute: ApiPushBehRoute,

@@ -9,6 +9,7 @@ import { guillermoZostatok } from "../../lib/psb/guillermo";
 import type { PSBData } from "../../lib/psb/types";
 import { C, mix } from "../../lib/psb/theme";
 import { BalickyEvidencia } from "./BalickyEvidencia";
+import { PlatbyEvidencia } from "./PlatbyEvidencia";
 import { Card, Empty, H3, Info, Modal, Select, TrenerPills } from "./ui";
 
 /**
@@ -238,6 +239,7 @@ export function Kalendar({ clients, data, focus, ktoSom, trainer, onTrainer }: {
       {/* Druhá polovica tej istej otázky — hodiny. Rozhodnutie vypnúť
           PTminder sa nedá urobiť z jednej polovice, tak stoja vedľa seba. */}
       {pripojene && <div id="kal-balicky"><BalickyEvidencia mena={menaKlientov} /></div>}
+      {pripojene && <div id="kal-platby"><PlatbyEvidencia mena={menaKlientov} /></div>}
       {pripojene && <Kontrola udalosti={udalostiF} data={data} />}
       {/* Balíčky aj „Odpísaní, ale majú termín" sa zliali na Kokpit (Jerry,
           9. 8.): dlaždica Odmlčaní sama vynecháva ľudí s budúcim termínom,

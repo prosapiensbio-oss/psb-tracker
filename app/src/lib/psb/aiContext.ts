@@ -115,6 +115,8 @@ export function buildAiContext(
   porovnanie?: PorovnanieDochadzky | null,
   /** To isté pre balíčky (`/api/balicky`). */
   balicky?: { spolu: number; sedi: number; rozdiel: number; mlci: number; poExport: string; riadky: { klient: string; kokpit: number | null; ptminder: number | null; rozdiel: number | null; stav: string }[] } | null,
+  /** A to isté pre platby (`/api/platby`). */
+  platby?: { porovnanie: { mesiace: { mesiac: string; kokpit: number; ptminder: number; rozdiel: number }[]; kokpit: number; ptminder: number; rozdiel: number } | null; cakaju: number } | null,
 ) {
   const clientList = Object.values(clients);
 
@@ -389,11 +391,21 @@ export function buildAiContext(
           rozdielni: balicky.riadky.filter((r) => r.stav === "rozdiel" || r.stav === "lenPtminder").slice(0, 20),
         }
         : null,
+      platby: platby?.porovnanie
+        ? {
+          poznamka: "Tretia tretina: peniaze. Kokpit berie bankové platby z výpisu Fio a hotovosť zo zošita. „rozdiel“ je rozdiel mesačných súčtov proti PTminderu v korunách. „cakaju“ je počet príjmov z výpisu, ktoré ešte nemajú priradeného klienta — kým ich je veľa, rozdiel nič nehovorí. Obrazovka: Kalendár → Platby — vlastná evidencia.",
+          kokpitKc: platby.porovnanie.kokpit,
+          ptminderKc: platby.porovnanie.ptminder,
+          rozdielKc: platby.porovnanie.rozdiel,
+          cakaNaPriradenie: platby.cakaju,
+          mesiace: platby.porovnanie.mesiace.slice(0, 12),
+        }
+        : { poznamka: "Platby sa zatiaľ nemerajú.", cakaNaPriradenie: platby?.cakaju ?? 0 },
       zaverPreVypnutie: !balicky
         ? "Hodiny sa zatiaľ nemerajú — na otázku o vypnutí PTmindera odpovedz, že polovica obrazu chýba."
-        : porovnanie.lenPtminder === 0 && balicky.rozdiel === 0
-          ? "Obe polovice sedia. Zostávajú platby — tie Kokpit zatiaľ berie z PTmindera."
-          : "Ešte nesedí obe naraz; kým sa rozchádzajú, PTminder je potrebný.",
+        : porovnanie.lenPtminder === 0 && balicky.rozdiel === 0 && platby?.porovnanie && platby.porovnanie.rozdiel === 0 && !platby.cakaju
+          ? "Všetky tri tretiny sedia: dochádzka, hodiny aj peniaze."
+          : "Ešte nesedia všetky tri naraz; kým sa rozchádzajú, PTminder je potrebný.",
     }
     : null;
 
