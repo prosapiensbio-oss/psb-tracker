@@ -6,6 +6,7 @@ import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 import { typZNazvu } from "../../lib/psb/kalendar";
 import { casUdalosti, nejednoznacneMena, vyberMapu, type Mapa } from "../../lib/psb/kalendarMena";
+import { porovnajTyzdne } from "../../lib/psb/porovnanieDochadzky";
 import { citajIcal } from "../../lib/psb/ical";
 import { ohlasitZmenu } from "../../lib/psb/kalendarZmeny";
 import { chybaZdroja, NEDOKONCENE, vyberZdroj, type ZdrojSPokusom } from "../../lib/psb/kalendarZdroje";
@@ -254,6 +255,33 @@ export const Route = createFileRoute("/api/kalendar")({
           DB.prepare("SELECT uid, trener, zaciatok, koniec, nazov, klient, typ FROM kal_udalosti WHERE typ = 'guillermo' AND zmizla_at IS NULL ORDER BY zaciatok").all(),
         ]);
 
+        /**
+         * Meradlo súbežného chodu kalendára a PTmindera.
+         *
+         * Ťahá sa ZVLÁŠŤ, mimo `okno()`: okno má 21 dní dozadu, ale otázka
+         * „vydrží kalendár sám?" sa nedá zodpovedať z troch týždňov. Sú to
+         * dva ploché SELECTy (pár stoviek riadkov) a porovnanie sa robí
+         * v TypeScripte — JOIN mena s menom cez celú históriu je v D1 presne
+         * ten kvadratický dopyt, ktorý appku už raz položil.
+         */
+        const odKedy = new Date(Date.now() - 84 * 86400000).toISOString().slice(0, 10);
+        const [udalostiP, sedeniaP, prveSnimky] = await DB.batch([
+          DB.prepare("SELECT klient, zaciatok, typ FROM kal_udalosti WHERE zmizla_at IS NULL AND klient IS NOT NULL AND zaciatok >= ?").bind(odKedy),
+          DB.prepare("SELECT client_name, date, session_trainer FROM sessions WHERE date >= ?").bind(odKedy),
+          // Odkedy sa ktorý kalendár ČÍTA — nie odkedy je v ňom najstaršia
+          // udalosť. Pred prvou snímkou nemal kalendár ako niečo obsahovať
+          // a každé sedenie by vyzeralo ako strata.
+          DB.prepare("SELECT trener, MIN(substr(kedy,1,10)) od FROM kal_snimky GROUP BY trener"),
+        ]);
+        const kalendarOd: Record<string, string> = {};
+        for (const r of ((prveSnimky.results || []) as unknown as { trener: string; od: string }[])) kalendarOd[r.trener] = r.od;
+        const porovnanie = porovnajTyzdne(
+          (udalostiP.results || []) as unknown as { klient: string | null; zaciatok: string; typ: string | null }[],
+          ((sedeniaP.results || []) as unknown as { client_name: string; date: string; session_trainer: string }[])
+            .map((r) => ({ client: r.client_name, date: r.date, trener: r.session_trainer })),
+          kalendarOd,
+        );
+
         // Názvy, ktoré appka ešte nepozná — to je práca, ktorú treba odklikať.
         //
         // Pozor na mapovanie viazané na ČAS: „Marketa 8:30 = Resnerová" znamená,
@@ -316,6 +344,7 @@ export const Route = createFileRoute("/api/kalendar")({
           guillermo: guillermo.results || [],
           guillermoUdalosti: guillermoUdalosti.results || [],
           nezname: Object.values(nezname).sort((a, b) => b.pocet - a.pocet),
+          porovnanie,
         });
       },
 

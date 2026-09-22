@@ -838,6 +838,39 @@ pritom tam boli celý čas.
   **4 z 339 sedení** bez udalosti v kalendári — a dve z nich sú z 3. a 5. 8.,
   teda spred pripojenia kalendárov (8. 8.). Kalendár je dosť presný na to,
   aby niesol dochádzku.
+## Súbežný chod potrebuje meradlo, nie druhú tabuľku
+
+Jerry, 22. 9. 2026: „nemohli by sme postaviť spôsob, kde by ešte stále
+fungoval PTminder, ale súčasne by tam bola už aj samostatná evidencia,
+nejakú dobu by sme používali obe, a keď by to všetko sedelo, PTminder by sme
+odstránili?" Áno — a pre dochádzku ten súbežný chod už BEŽÍ od 8. 8. 2026,
+len ho nikto nemeral. Chýbalo číslo, nie tabuľka.
+
+`lib/psb/porovnanieDochadzky.ts` (`porovnajTyzdne`) + karta „Vydrží kalendár
+sám?" v Kalendári. Pravidlá, ktoré z toho platia pre každý súbežný chod:
+
+- **Dva smery nie sú symetrické.** Sedenie bez udalosti v kalendári je
+  RIZIKO (po vypnutí PTmindera by sa stratilo) a rozhoduje. Udalosť bez
+  zápisu v PTminderi je len dnešná robota navyše — po vypnutí prestane
+  existovať aj otázka. Jedno číslo pre oboje by zamlžilo to dôležité.
+- **Okno sa ohraničuje z oboch strán, a zľava PER ZDROJ.** Prvá verzia brala
+  začiatok z najstaršej udalosti v tabuľke (26. 7.) a týždne pred pripojením
+  kalendárov hlásili stratu troch sedení. Hranica je prvá SNÍMKA daného
+  kalendára (`kal_snimky`): Jerry 8. 8., Terezka 9. 8. Sprava je to posledný
+  deň exportu — za ním PTminder nemá nič a každá udalosť by bola „prebytok".
+- **Kto nemá zdroj, nesmie z porovnania ticho vypadnúť.** Tréner bez
+  pripojeného kalendára sa neporovnáva, ale vracia sa ako `bezKalendara` —
+  jeho sedenia by sa po vypnutí stratili všetky.
+- **Tolerancie sú tie isté ako v `nezapisaneTreningy`** (meno bez diakritiky,
+  ±1 deň na presunutú hodinu). Vlastná kópia by sa rozišla a dve obrazovky by
+  tvrdili dve veci.
+- **Do `aiContext` ide hotové číslo zo servera**, nie prepočet:
+  `kalendar.udalosti` je okno 21 dní dozadu a Jarvis by odpovedal inak než
+  obrazovka.
+
+Stav 22. 9. 2026: 296 sedení, **1 chýba v kalendári** (Lenka Prinosilová
+17. 9.), 1 chýba v PTminderi. Šesť celých týždňov 10. 8. – 13. 9. na nule.
+
 ## Diera v kalendári nebola diera — bolo to nespoznané meno
 
 22. 9. 2026 som ohlásil, že kalendár v okne 31. 8. – 3. 9. vynechal štrnásť

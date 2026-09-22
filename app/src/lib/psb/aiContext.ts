@@ -44,6 +44,7 @@ import {
   jeKlient,
 } from "./compute";
 import { monthLabel, normName, weekKey, weekLabel } from "./format";
+import type { PorovnanieDochadzky } from "./porovnanieDochadzky";
 import type { PSBData } from "./types";
 import { CIEL_MESIACOV, chybaDoCiela } from "./rezerva";
 
@@ -110,6 +111,8 @@ export function buildAiContext(
   rezerva?: RezervaPreAi,
   btc?: BtcPreAi,
   guillermo?: { zaznamy: GuillermoZaznam[]; udalosti: GuillermoUdalost[] },
+  /** Hotové meradlo súbežného chodu zo servera — sem sa neprepočítava. */
+  porovnanie?: PorovnanieDochadzky | null,
 ) {
   const clientList = Object.values(clients);
 
@@ -346,6 +349,32 @@ export function buildAiContext(
    */
   const sitemapaUrl = new Set(WEB_STRANKY.map((w) => w.url.replace(/\/$/, "").toLowerCase()));
   const vSitemapeUrl = (u: string) => sitemapaUrl.has(String(u || "").replace(/\/$/, "").toLowerCase());
+
+  /**
+   * „Vydrží kalendár sám?" — to isté číslo, aké ukazuje karta v Kalendári.
+   *
+   * Počíta ho server nad celou históriou a sem príde HOTOVÉ. Prepočítať ho tu
+   * by nešlo: `kalendar.udalosti` je okno 21 dní dozadu, takže by Jarvis
+   * odpovedal iným číslom než obrazovka — a to je horšie než neodpovedať.
+   */
+  const subeznyChodBlok = porovnanie && porovnanie.sedeni
+    ? {
+      poznamka: "PREČÍTAJ, NEPOČÍTAJ. Odpoveď na otázku „môžeme vypnúť PTminder?“. Kalendár a PTminder bežia súbežne; „lenPtminder“ je počet sedení, ktoré sú v PTminderi a v kalendári nie — presne to by sa po vypnutí stratilo. „lenKalendar“ je opak a je to len dnešná robota navyše, nie riziko. Obrazovka: Kalendár → Vydrží kalendár sám?. Nepočítaj tieto čísla z „kalendar.udalosti“ — tam je len okno 21 dní dozadu.",
+      od: porovnanie.od,
+      do: porovnanie.do,
+      sedeniSpolu: porovnanie.sedeni,
+      lenPtminder: porovnanie.lenPtminder,
+      lenKalendar: porovnanie.lenKalendar,
+      tyzdnovBezStratyVRade: (() => {
+        let n = 0;
+        for (const t of porovnanie.tyzdne.filter((x) => x.sedeni > 0)) { if (t.lenPtminder === 0) n++; else break; }
+        return n;
+      })(),
+      tyzdne: porovnanie.tyzdne.filter((t) => t.sedeni > 0).map((t) => ({ od: t.od, do: t.do, sedeni: t.sedeni, lenPtminder: t.lenPtminder, lenKalendar: t.lenKalendar })),
+      chybaju: porovnanie.tyzdne.flatMap((t) => t.chybaju).slice(0, 40),
+      trenerBezKalendara: porovnanie.bezKalendara,
+    }
+    : null;
 
   const kalendarBlok = (() => {
     if (!kalendar) return null;
@@ -961,6 +990,7 @@ export function buildAiContext(
     },
     sixM: { spolu: sixM.length, podlaFazy: sixMPhases, poznamka: "6M proces: Obnova 1.–6. mesiac, Integrácia 7.–18., Udržateľnosť 19.+" },
     kalendar: kalendarBlok,
+    subeznyChod: subeznyChodBlok,
     uzavierka: uzavierka
       ? {
           poznamka: "Kroky mesačnej uzávierky pre posledný plný mesiac — to, čo appka od Jerryho ešte chce, aby sa mesiac dal ZAMKNÚŤ. „prekazky“ je hotový zoznam viet; keď je prázdny, mesiac sa dá zamknúť. Neodvodzuj to z registra ani z dát, appka to má spočítané. Obrazovka: Upload → Uzávierka.",

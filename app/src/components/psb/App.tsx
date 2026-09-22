@@ -49,6 +49,7 @@ import { btcPlatbyJednotlivo, btcPodlaKlientov } from "../../lib/psb/btcKontrola
 import { polozkaZastaranaBanka, polozkyBtcNesedi } from "../../lib/psb/penazneNotifikacie";
 import { breakEvenPriemer, spocitajRezervu } from "../../lib/psb/rezerva";
 import { buildAiContext } from "../../lib/psb/aiContext";
+import type { PorovnanieDochadzky } from "../../lib/psb/porovnanieDochadzky";
 import { Assistant, useAssistantChat } from "./Assistant";
 import { JarvisOkno } from "./JarvisOkno";
 import { fmtDMY, monthLabel, normName } from "../../lib/psb/format";
@@ -829,6 +830,11 @@ export function PSBApp() {
    * tú obrazovku nikto neotvorí.
    */
   const [kalUdalosti, setKalUdalosti] = useState<KalUdalost[]>([]);
+  // Meradlo súbežného chodu kalendára a PTmindera. Počíta ho SERVER nad celou
+  // históriou (obrazovka aj Jarvis majú 21-dňové okno, z ktorého sa otázka
+  // „vydrží kalendár sám?" zodpovedať nedá) a berie sa hotové — dve odpovede
+  // na to isté číslo sú horšie než žiadna.
+  const [kalPorovnanie, setKalPorovnanie] = useState<PorovnanieDochadzky | null>(null);
   // Zmeny v kalendári si App drží kvôli Jarvisovi. Test 11. 8.: na „kde vidím
   // zrušené tréningy" odpovedal, že ich appka nesleduje — pritom ich sleduje
   // od 31. 7. a v tej chvíli ich mala v databáze 18. Nevidel ich, lebo
@@ -867,9 +873,10 @@ export function PSBApp() {
     if (!dataHotove) return;
     void fetch("/api/kalendar", { credentials: "same-origin" })
       .then((r) => r.json())
-      .then((j: { ok?: boolean; udalosti?: KalUdalost[]; zmenyHistoria?: KalZmena[]; zmeny?: KalZmena[]; guillermo?: { datum: string; druh: string; hodiny: number }[]; guillermoUdalosti?: KalUdalost[] }) => {
+      .then((j: { ok?: boolean; udalosti?: KalUdalost[]; zmenyHistoria?: KalZmena[]; zmeny?: KalZmena[]; guillermo?: { datum: string; druh: string; hodiny: number }[]; guillermoUdalosti?: KalUdalost[]; porovnanie?: PorovnanieDochadzky }) => {
         if (!j.ok || !Array.isArray(j.udalosti)) return;
         setKalUdalosti(j.udalosti);
+        if (j.porovnanie) setKalPorovnanie(j.porovnanie);
         if (Array.isArray(j.guillermo)) setGuillermoZazn(j.guillermo);
         if (Array.isArray(j.guillermoUdalosti)) setGuillermoUdal(j.guillermoUdalosti);
         if (Array.isArray(j.zmenyHistoria)) setKalZmeny(j.zmenyHistoria);
@@ -2080,8 +2087,8 @@ function skupinaFaktur(
         platby: btcPlatbyJednotlivo(btcPlatby, btcKurz.kurz, Object.keys(clients)),
         vyplaty: btcKniha.vyplaty, nakupy: btcKniha.nakupy, cielSats: btcKniha.cielSats,
       },
-      { zaznamy: guillermoZazn, udalosti: guillermoUdal }),
-    [data, clients, sixM, capacity, registerAll, kalUdalosti, kalZmeny, uzavierkaPreAi, btcCelkom, btcKurz, btcKniha, btcPlatby, ucetStav, hotovostStav, guillermoZazn, guillermoUdal, igVerzia, mktVerzia, vzasVerzia()], // eslint-disable-line react-hooks/exhaustive-deps
+      { zaznamy: guillermoZazn, udalosti: guillermoUdal }, kalPorovnanie),
+    [data, clients, sixM, capacity, registerAll, kalUdalosti, kalZmeny, uzavierkaPreAi, btcCelkom, btcKurz, btcKniha, btcPlatby, ucetStav, hotovostStav, guillermoZazn, guillermoUdal, kalPorovnanie, igVerzia, mktVerzia, vzasVerzia()], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   const actions = useMemo<Actions>(
