@@ -8,6 +8,7 @@ import type { TyzdenPorovnania } from "../../lib/psb/porovnanieDochadzky";
 import { guillermoZostatok } from "../../lib/psb/guillermo";
 import type { PSBData } from "../../lib/psb/types";
 import { C, mix } from "../../lib/psb/theme";
+import { BalickyEvidencia } from "./BalickyEvidencia";
 import { Card, Empty, H3, Info, Modal, Select, TrenerPills } from "./ui";
 
 /**
@@ -234,6 +235,9 @@ export function Kalendar({ clients, data, focus, ktoSom, trainer, onTrainer }: {
         <div id="kal-nezname"><Mapovanie nezname={stav.nezname} mena={menaKlientov} clients={clients} onHotovo={nacitaj} trener={trener} ktoSom={ktoSom} /></div>
       )}
       {pripojene && stav.porovnanie && <div id="kal-porovnanie"><SubeznyChod p={stav.porovnanie} /></div>}
+      {/* Druhá polovica tej istej otázky — hodiny. Rozhodnutie vypnúť
+          PTminder sa nedá urobiť z jednej polovice, tak stoja vedľa seba. */}
+      {pripojene && <div id="kal-balicky"><BalickyEvidencia mena={menaKlientov} /></div>}
       {pripojene && <Kontrola udalosti={udalostiF} data={data} />}
       {/* Balíčky aj „Odpísaní, ale majú termín" sa zliali na Kokpit (Jerry,
           9. 8.): dlaždica Odmlčaní sama vynecháva ľudí s budúcim termínom,

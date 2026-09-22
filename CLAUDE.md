@@ -838,6 +838,61 @@ pritom tam boli celý čas.
   **4 z 339 sedení** bez udalosti v kalendári — a dve z nich sú z 3. a 5. 8.,
   teda spred pripojenia kalendárov (8. 8.). Kalendár je dosť presný na to,
   aby niesol dochádzku.
+## Celý reťazec jedným príkazom: `./scripts/hotovo.sh`
+
+Jerry, 22. 9. 2026: „postav testera, kontrolóra, nasadzovača — a ty mi len
+napíš, keď to bude celé hotové." Kúsky existovali (`bun run test`,
+`nasad.sh`, `naostro.sh`), ale spúšťali sa ručne a v rôznom poradí, takže sa
+dalo nasadiť bez toho, aby niekto overil, či appka naživo vôbec beží.
+
+Poradie je zámer: **typy → testy → nasadenie → naživo → ostré dáta.**
+Kontrola naživo je AŽ PO nasadení — pred ním by merala starú verziu. Overuje
+tri veci cez HTTP: shell 200, čerstvý `index-*.js` z `dist/client/assets`
+200 (to je jediný spôsob, ako zistiť, že wrangler assety naozaj nahral)
+a `/api/*` bez prihlásenia 401. Dvestovka na API by nebola úspech, ale diera.
+
+`--bez-nasadenia` pustí len kontroly. Návratový kód je 0 len vtedy, keď
+prešlo všetko.
+
+Dve pasce, na ktoré skript naráža a ktoré platia pre každý shell v tomto repe:
+- **`printf %-22s` aj `${#retazec}` počítajú BAJTY** (bash 3.2 na macOS), tak
+  sa stĺpec pri „ostré dáta" rozsypal. Znaky = bajty mínus pokračovacie
+  bajty UTF-8.
+- **`cut -c` krája po bajtoch** a z rámčekov v `naostro.sh` robilo kašu.
+  Posledný riadok sa preto neoreže.
+
+## Balíčky majú vlastnú evidenciu, nielen export
+
+Druhá polovica odchodu od PTmindera (tabuľka `balicky`, migrácia 0070,
+`lib/psb/balickyEvidencia.ts`, karta „Balíčky — vlastná evidencia").
+Dochádzku vypnúť samostatne NEJDE: keď Jerry prestane zapisovať tréningy do
+PTmindera, prestanú tam klesať hodiny a zostatky z exportu sa stanú
+nepravdou.
+
+- **Záznam v knihe, nie snímka.** `balicky` drží to, čo sa PREDALO; zostatok
+  je odvodenina (predané mínus odtrénované podľa kalendára). Uložený zostatok
+  by po prvom tréningu klamal.
+- **Štart bez prepisovania.** Akcia `nalej` založí riadky z aktuálneho
+  exportu; `ptminder_id` je unikátne, takže opakované spustenie nič nezdvojí.
+  Bez toho by súbežný chod znamenal prepísať ručne päťdesiat členstiev —
+  presne tú administratívu, ktorej sa má Jerry zbaviť.
+- **Porovnáva sa po KLIENTOVI, nie po balíčku.** Pri dvoch balíčkoch cez seba
+  (Gažo) sa nedá povedať, ktorému PTminder hodinu strhol; súčet je
+  jednoznačný, kus nie.
+- **Porovnáva sa K DÁTUMU EXPORTU.** Prvé ostré porovnanie hlásilo 59
+  rozdielov a takmer všetky boli −1 h: export bol z 20. 9. a Kokpit rátal aj
+  tréningy z 21.–22. 9. Meralo to vek súboru, nie zhodu.
+- **Doplnenie členstva nemá v exporte dátumy.** Zahodiť sa nedá (Tomáš Krčmar
+  68 h, Jaroslav Broskva 50 h), dopočítať minulosť tiež nie. Preberá sa ako
+  OTVÁRACIA POLOŽKA k dňu exportu — to jediné, čo taký riadok naozaj hovorí.
+  Riadok s nulovým zostatkom sa preskočí úplne.
+- **Prázdny riadok v exporte nie je nález.** PTminder hovorí nulu, Kokpit
+  nemá nič — tá istá odpoveď. Bez tejto vetvy karta hlásila 24 „chýbajúcich"
+  klientov, ktorým nezostávala ani hodina.
+
+Stav pri spustení 22. 9. 2026: 54 klientov sedí do hodiny, **2 rozdiely**
+(Markéta Lozias, Veronika Stoklasková), 11 sa porovnať nedá.
+
 ## Súbežný chod potrebuje meradlo, nie druhú tabuľku
 
 Jerry, 22. 9. 2026: „nemohli by sme postaviť spôsob, kde by ešte stále

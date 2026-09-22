@@ -113,6 +113,8 @@ export function buildAiContext(
   guillermo?: { zaznamy: GuillermoZaznam[]; udalosti: GuillermoUdalost[] },
   /** Hotové meradlo súbežného chodu zo servera — sem sa neprepočítava. */
   porovnanie?: PorovnanieDochadzky | null,
+  /** To isté pre balíčky (`/api/balicky`). */
+  balicky?: { spolu: number; sedi: number; rozdiel: number; mlci: number; poExport: string; riadky: { klient: string; kokpit: number | null; ptminder: number | null; rozdiel: number | null; stav: string }[] } | null,
 ) {
   const clientList = Object.values(clients);
 
@@ -373,6 +375,25 @@ export function buildAiContext(
       tyzdne: porovnanie.tyzdne.filter((t) => t.sedeni > 0).map((t) => ({ od: t.od, do: t.do, sedeni: t.sedeni, lenPtminder: t.lenPtminder, lenKalendar: t.lenKalendar })),
       chybaju: porovnanie.tyzdne.flatMap((t) => t.chybaju).slice(0, 40),
       trenerBezKalendara: porovnanie.bezKalendara,
+      // Vypnúť PTminder sa nedá z jednej polovice: dochádzka aj hodiny musia
+      // sedieť naraz. Preto sú obe čísla v jednom kľúči — oddelené by
+      // pozývali k odpovedi „dochádzka sedí, môžeme vypnúť".
+      balicky: balicky
+        ? {
+          poznamka: "Druhá polovica tej istej otázky: zostatky hodín. „rozdiel“ je počet klientov, pri ktorých Kokpit počíta iný zostatok než PTminder. „mlci“ sa porovnať nedá (paušál alebo export 0/0) a nie je to chyba. Obrazovka: Kalendár → Balíčky — vlastná evidencia.",
+          kDatumu: balicky.poExport,
+          klientovSpolu: balicky.spolu,
+          sedi: balicky.sedi,
+          rozdiel: balicky.rozdiel,
+          nedaSaPorovnat: balicky.mlci,
+          rozdielni: balicky.riadky.filter((r) => r.stav === "rozdiel" || r.stav === "lenPtminder").slice(0, 20),
+        }
+        : null,
+      zaverPreVypnutie: !balicky
+        ? "Hodiny sa zatiaľ nemerajú — na otázku o vypnutí PTmindera odpovedz, že polovica obrazu chýba."
+        : porovnanie.lenPtminder === 0 && balicky.rozdiel === 0
+          ? "Obe polovice sedia. Zostávajú platby — tie Kokpit zatiaľ berie z PTmindera."
+          : "Ešte nesedí obe naraz; kým sa rozchádzajú, PTminder je potrebný.",
     }
     : null;
 

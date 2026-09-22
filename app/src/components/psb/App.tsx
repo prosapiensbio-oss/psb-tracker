@@ -835,6 +835,10 @@ export function PSBApp() {
   // „vydrží kalendár sám?" zodpovedať nedá) a berie sa hotové — dve odpovede
   // na to isté číslo sú horšie než žiadna.
   const [kalPorovnanie, setKalPorovnanie] = useState<PorovnanieDochadzky | null>(null);
+  // Druhá polovica tej istej otázky — hodiny. Bez nej by Jarvis na „môžeme
+  // vypnúť PTminder?" odpovedal z polovice obrazu, čo je presne tá chyba,
+  // ktorú appka má zdokumentovanú pri rezerve a dlhoch.
+  const [balickyPorovnanie, setBalickyPorovnanie] = useState<{ spolu: number; sedi: number; rozdiel: number; mlci: number; poExport: string; riadky: { klient: string; kokpit: number | null; ptminder: number | null; rozdiel: number | null; stav: string }[] } | null>(null);
   // Zmeny v kalendári si App drží kvôli Jarvisovi. Test 11. 8.: na „kde vidím
   // zrušené tréningy" odpovedal, že ich appka nesleduje — pritom ich sleduje
   // od 31. 7. a v tej chvíli ich mala v databáze 18. Nevidel ich, lebo
@@ -869,6 +873,14 @@ export function PSBApp() {
    * Je to tá istá lekcia ako pri sťahovaní dvoch kalendárov 29. 8.: ťažká
    * práca patrí do jednej požiadavky na jeden zdroj, nie do dvoch naraz.
    */
+  useEffect(() => {
+    if (!dataHotove) return;
+    void fetch("/api/balicky", { credentials: "same-origin" })
+      .then((r) => r.json())
+      .then((j: { ok?: boolean; porovnanie?: typeof balickyPorovnanie }) => { if (j.ok && j.porovnanie) setBalickyPorovnanie(j.porovnanie); })
+      .catch(() => undefined);
+  }, [dataHotove]);
+
   useEffect(() => {
     if (!dataHotove) return;
     void fetch("/api/kalendar", { credentials: "same-origin" })
@@ -2087,8 +2099,8 @@ function skupinaFaktur(
         platby: btcPlatbyJednotlivo(btcPlatby, btcKurz.kurz, Object.keys(clients)),
         vyplaty: btcKniha.vyplaty, nakupy: btcKniha.nakupy, cielSats: btcKniha.cielSats,
       },
-      { zaznamy: guillermoZazn, udalosti: guillermoUdal }, kalPorovnanie),
-    [data, clients, sixM, capacity, registerAll, kalUdalosti, kalZmeny, uzavierkaPreAi, btcCelkom, btcKurz, btcKniha, btcPlatby, ucetStav, hotovostStav, guillermoZazn, guillermoUdal, kalPorovnanie, igVerzia, mktVerzia, vzasVerzia()], // eslint-disable-line react-hooks/exhaustive-deps
+      { zaznamy: guillermoZazn, udalosti: guillermoUdal }, kalPorovnanie, balickyPorovnanie),
+    [data, clients, sixM, capacity, registerAll, kalUdalosti, kalZmeny, uzavierkaPreAi, btcCelkom, btcKurz, btcKniha, btcPlatby, ucetStav, hotovostStav, guillermoZazn, guillermoUdal, kalPorovnanie, balickyPorovnanie, igVerzia, mktVerzia, vzasVerzia()], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   const actions = useMemo<Actions>(
