@@ -177,8 +177,14 @@ const TABS = [
   { id: "dashboard", label: "Dnes", icon: "home" },
   // Obsahom je prevádzka — tréningy, klienti, 6M, fluktuácia — ale všetko
   // sú to ľudia, tak sa to tak aj volá.
-  { id: "tracker", label: "Klienti", icon: "userCheck" },
-  { id: "vzas", label: "Peniaze", icon: "wallet" },
+  // Klienti, Peniaze a Výsledky sa 22. 9. 2026 zliali do jednej záložky
+  // FIRMA. Spoločný menovateľ: v žiadnej z nich sa nič nevypĺňa — sú to tri
+  // pohľady na to isté, len z inej vzdialenosti (ľudia → peniaze → čas).
+  // `id` zostávajú, lebo na nich visia adresy (#vzas/pnl), ciele rituálov aj
+  // Jarvisove odkazy; mení sa len to, že v rade záložiek ich zastupuje jedno
+  // tlačidlo a prepína sa medzi nimi o riadok nižšie.
+  { id: "tracker", label: "Klienti", icon: "userCheck", skupina: "firma" },
+  { id: "vzas", label: "Peniaze", icon: "wallet", skupina: "firma" },
   { id: "marketing", label: "Marketing", icon: "activity" },
   { id: "kalendar", label: "Kalendár", icon: "calendar" },
   // Dočasná záložka na odchod od PTmindera (22. 9. 2026). Tri meradlá
@@ -190,7 +196,7 @@ const TABS = [
   // Nahrávanie dát a uzávierka odišli do záložky Upload — robili sa
   // striedavo, ale sú to dva rôzne úkony a nahrať CSV treba aj mimo
   // uzávierky. `id` zostáva „mesiac“, adresa je aj tak #vysledky/…
-  { id: "mesiac", label: "Výsledky", icon: "barChart" },
+  { id: "mesiac", label: "Výsledky", icon: "barChart", skupina: "firma" },
   // Upload = nahrať exporty a zavrieť mesiac. `id` zostáva „udaje", lebo naň
   // visia adresy (#udaje), ciele rituálov aj Jarvisove odkazy — nápis je vec
   // pre človeka, id je vec pre kód.
@@ -211,6 +217,23 @@ const TABS = [
 
 /** Záložky, ktoré majú vlastné miesto mimo radu záložiek. */
 const MIMO_RAD = ["jarvis"];
+
+/** Záložky pod jedným tlačidlom „Firma". Poradie určuje ich poradie v TABS. */
+const FIRMA_IDS = TABS.filter((t) => (t as { skupina?: string }).skupina === "firma").map((t) => t.id);
+
+/**
+ * Riadok pod záložkami, keď je otvorená Firma.
+ *
+ * Je PLOCHÝ: „Tréningy" a „Klienti" boli doteraz o úroveň nižšie, vnútri
+ * záložky Klienti. Po zlúčení by z toho boli tri úrovne (Firma → Klienti →
+ * Tréningy) a to je o jednu viac, než koľko sa dá udržať v hlave.
+ */
+const FIRMA_SEKCIE: { id: string; label: string; icon: string; tab: string; sekcia?: string }[] = [
+  { id: "treningy", label: "Tréningy", icon: "calendar", tab: "tracker", sekcia: "treningy" },
+  { id: "klienti", label: "Klienti", icon: "userCheck", tab: "tracker", sekcia: "klienti" },
+  { id: "vzas", label: "Peniaze", icon: "wallet", tab: "vzas" },
+  { id: "mesiac", label: "Výsledky", icon: "barChart", tab: "mesiac" },
+];
 
 /** Meno dodávateľa/protistrany na porovnanie: malé písmená, bez diakritiky,
  *  nepísmenové znaky na medzery. Slúži párovaniu bankového pohybu s faktúrou —
@@ -321,6 +344,14 @@ export function PSBApp() {
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState("dashboard");
   const [trackerSection, setTrackerSection] = useState("treningy");
+  // Kam Firma otvorí, keď na ňu klikneš. Drží poslednú navštívenú sekciu —
+  // pri uzávierke chodíš do Peňazí a nemá zmysel ťa zakaždým hodiť inam.
+  const [firmaSub, setFirmaSub] = useState("tracker");
+
+  // Do Firmy sa dá prísť aj zboku — odkazom z registra, od Jarvisa alebo
+  // adresou (#vzas/pnl). Vtedy sa tiež musí zapamätať, kde človek skončil,
+  // inak by ho tlačidlo Firma nabudúce hodilo inam, než kde naposledy bol.
+  useEffect(() => { if (FIRMA_IDS.includes(active)) setFirmaSub(active); }, [active]);
   // Tržby, nie P&L: Peniaze sa otvárajú na tom, čo Jerry sleduje denne.
   const [vzasSub, setVzasSub] = useState("trzby");
   /** Ktorá polovica Mesiaca je otvorená: dáta a uzávierka, alebo výsledky. */
@@ -2394,11 +2425,27 @@ function skupinaFaktur(
           margin: "0 auto",
         }}
       >
-        {TABS.filter((t) => !MIMO_RAD.includes(t.id)).map((t) => (
-          <button key={t.id} style={{ ...tab(active === t.id), display: "inline-flex", alignItems: "center", gap: 7 }} onClick={() => setActive(t.id)}>
-            <Icon name={t.icon} /> {t.label}
-          </button>
-        ))}
+        {TABS.filter((t) => !MIMO_RAD.includes(t.id)).map((t) => {
+          // Tri záložky Firmy zastupuje jedno tlačidlo na mieste tej prvej.
+          if (FIRMA_IDS.includes(t.id)) {
+            if (t.id !== FIRMA_IDS[0]) return null;
+            const vnutri = FIRMA_IDS.includes(active);
+            return (
+              <button
+                key="firma"
+                style={{ ...tab(vnutri), display: "inline-flex", alignItems: "center", gap: 7 }}
+                onClick={() => setActive(firmaSub)}
+              >
+                <Icon name="barChart" /> Firma
+              </button>
+            );
+          }
+          return (
+            <button key={t.id} style={{ ...tab(active === t.id), display: "inline-flex", alignItems: "center", gap: 7 }} onClick={() => setActive(t.id)}>
+              <Icon name={t.icon} /> {t.label}
+            </button>
+          );
+        })}
         {/* Bitcoin žije vo vlastnej appke (prosapiens-btc), ale Jerry (6. 9.
             2026) ju chce mať v JEDNOM okne — na iPhone je Kokpit appka na
             ploche a odkaz do inej domény ho vyhodí do Safari. Preto je to
@@ -2423,6 +2470,29 @@ function skupinaFaktur(
         </a>
       </nav>
       <div style={{ padding: 16, maxWidth: 1200, margin: "0 auto" }}>
+        {FIRMA_IDS.includes(active) && (
+          <div style={{ display: "flex", gap: 6, marginBottom: 14, flexWrap: "wrap" }}>
+            {FIRMA_SEKCIE.map((s) => {
+              const on = s.tab === active && (!s.sekcia || s.sekcia === trackerSection);
+              return (
+                <button
+                  key={s.id}
+                  onClick={() => { setActive(s.tab); setFirmaSub(s.tab); if (s.sekcia) setTrackerSection(s.sekcia); }}
+                  style={{
+                    display: "inline-flex", alignItems: "center", gap: 7,
+                    padding: "7px 14px", borderRadius: 8,
+                    border: `1px solid ${on ? C.accent : C.border}`,
+                    background: on ? C.accentBg : "transparent",
+                    color: on ? C.accentLight : C.textMuted,
+                    fontSize: 13, fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap",
+                  }}
+                >
+                  <Icon name={s.icon} /> {s.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
         {active === "dashboard" && (
           <Dashboard trainer={trainer} onTrainer={setTrainer} data={data} clients={clients} kalendar={kalUdalosti} kalZmeny={kalZmeny} kalNevysvetlene={kalNevysvetlene} register={registerAll} sixM={sixM} capacity={capacity} actions={actions} onNavigate={navigate} assistantChat={chat} onClientClick={onClientClick} />
         )}
@@ -2443,33 +2513,8 @@ function skupinaFaktur(
 
         {active === "tracker" && (
           <>
-            <div style={{ display: "flex", gap: 6, marginBottom: 14, flexWrap: "wrap" }}>
-              {TRACKER_SECTIONS.map((s) => {
-                const on = trackerSection === s.id;
-                return (
-                  <button
-                    key={s.id}
-                    onClick={() => setTrackerSection(s.id)}
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 7,
-                      padding: "7px 14px",
-                      borderRadius: 8,
-                      border: `1px solid ${on ? C.accent : C.border}`,
-                      background: on ? C.accentBg : "transparent",
-                      color: on ? C.accentLight : C.textMuted,
-                      fontSize: 13,
-                      fontWeight: 500,
-                      cursor: "pointer",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    <Icon name={s.icon} /> {s.label}
-                  </button>
-                );
-              })}
-            </div>
+            {/* Riadok Tréningy/Klienti je od 22. 9. 2026 HORE, spolu s Peniazmi
+                a Výsledkami — inak by boli tri úrovne pod sebou. */}
             {trackerSection === "treningy" && <Treningy data={data} clients={clients} sub={treningySub} onSub={setTreningySub} focus={treningyFocus} trainer={trainer} onTrainer={setTrainer} />}
             {trackerSection === "klienti" && <Klienti clients={clients} capacity={capacity} actions={actions} focus={klientiFocus} leads={data.leads} trainer={trainer} onTrainer={setTrainer} sixM={sixM} sub={klientiSub} onSub={setKlientiSub} data={data} btcSatsKlienti={btcSatsKlienti} onDennikZapis={chat.spracujDennik} cakajuci={cakajuci} kalUdalosti={kalUdalosti} kalZmeny={kalZmeny} />}
               </>

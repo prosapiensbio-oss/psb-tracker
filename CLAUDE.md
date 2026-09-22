@@ -893,6 +893,31 @@ potvrdil 118** (klient má platbu do 10 dní) a pri 113 sedí aj suma do 2 %.
 Tých 113 je priradených (666 247 Kč); zvyšok zostáva na človeku — sú to
 peniaze a pri kolízii sa hádať nesmie.
 
+## Záložka sa zlučuje nápisom, nie `id`
+
+22. 9. 2026 sa Klienti, Peniaze a Výsledky zliali do jednej záložky **Firma**
+(Jerry: „napadá ťa pod tie tri spoločný menovateľ?" — je: v žiadnej z nich sa
+nič nevypĺňa, sú to tri pohľady na to isté z inej vzdialenosti). Zlúčenie
+NEPREPÍSALO smerovanie:
+
+- **`id` `tracker`, `vzas`, `mesiac` zostali.** Visia na nich adresy
+  (`#vzas/pnl`), ciele rituálov, odkazy z registra aj Jarvisove ⟦odkazy⟧
+  a kontrolujú sa proti `TABS`. Preto TABS drží všetky tri ďalej a nesie na
+  nich len značku `skupina: "firma"`; rad záložiek ich zastúpi jedným
+  tlačidlom na mieste tej prvej a `active` je ďalej jedno z tých troch.
+  Vďaka tomu funguje `setActive("vzas")` odkiaľkoľvek bez zmeny.
+- **Riadok sekcií je PLOCHÝ.** „Tréningy" a „Klienti" boli o úroveň nižšie,
+  vnútri Klientov; po zlúčení by z toho boli tri úrovne (Firma → Klienti →
+  Tréningy). Štyri tlačidlá v jednom rade (`FIRMA_SEKCIE`) sú o úroveň menej.
+- **Posledná sekcia sa pamätá** (`firmaSub`) a dopĺňa sa aj pri príchode
+  zboku (odkaz, adresa, Jarvis) — inak by tlačidlo Firma hádzalo človeka inam,
+  než kde naposledy skončil. Pri uzávierke chodí do Peňazí.
+- **Nápis hlavnej obrazovky je „Dnes", nie „Kokpit".** Appka sa volá Kokpit
+  celá; hlavná obrazovka je zoznam toho, čo dnes čaká. `id` zostáva
+  `dashboard`. Pri premenovaní treba prejsť aj vety, ktoré na ňu ukazujú —
+  „dlaždica Rezerva na Kokpite" v `aiContext` by inak posielala na záložku,
+  ktorá sa tak už nevolá.
+
 ## Celý reťazec jedným príkazom: `./scripts/hotovo.sh`
 
 Jerry, 22. 9. 2026: „postav testera, kontrolóra, nasadzovača — a ty mi len
