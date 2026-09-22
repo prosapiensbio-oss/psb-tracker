@@ -8,8 +8,6 @@ import type { TyzdenPorovnania } from "../../lib/psb/porovnanieDochadzky";
 import { guillermoZostatok } from "../../lib/psb/guillermo";
 import type { PSBData } from "../../lib/psb/types";
 import { C, mix } from "../../lib/psb/theme";
-import { BalickyEvidencia } from "./BalickyEvidencia";
-import { PlatbyEvidencia } from "./PlatbyEvidencia";
 import { Card, Empty, H3, Info, Modal, Select, TrenerPills } from "./ui";
 
 /**
@@ -32,7 +30,7 @@ type Nezname = { nazov: string; trener: string; pocet: number; najblizsi: string
 /** Meno z kalendára, ktoré sedí na viacerých klientov (napr. dve Markety). */
 type Nejednoznacne = { nazov: string; kandidati: string[]; casy: string[] };
 type Guillermo = { id: string; datum: string; druh: string; hodiny: number; suma_czk: number | null; poznamka: string | null };
-type Porovnanie = { tyzdne: TyzdenPorovnania[]; od: string; do: string; sedeni: number; lenPtminder: number; lenKalendar: number; bezKalendara: { trener: string; sedeni: number }[] };
+export type Porovnanie = { tyzdne: TyzdenPorovnania[]; od: string; do: string; sedeni: number; lenPtminder: number; lenKalendar: number; bezKalendara: { trener: string; sedeni: number }[] };
 type Stav = { zdroje: Zdroj[]; zmeny: Zmena[]; mapovanie: Mapa[]; udalosti: KalUdalost[]; nezname: Nezname[]; guillermo: Guillermo[]; nejednoznacne: Nejednoznacne[]; porovnanie: Porovnanie | null };
 
 const TYPY = [
@@ -235,11 +233,6 @@ export function Kalendar({ clients, data, focus, ktoSom, trainer, onTrainer }: {
       {stav.nezname.length > 0 && (
         <div id="kal-nezname"><Mapovanie nezname={stav.nezname} mena={menaKlientov} clients={clients} onHotovo={nacitaj} trener={trener} ktoSom={ktoSom} /></div>
       )}
-      {pripojene && stav.porovnanie && <div id="kal-porovnanie"><SubeznyChod p={stav.porovnanie} /></div>}
-      {/* Druhá polovica tej istej otázky — hodiny. Rozhodnutie vypnúť
-          PTminder sa nedá urobiť z jednej polovice, tak stoja vedľa seba. */}
-      {pripojene && <div id="kal-balicky"><BalickyEvidencia mena={menaKlientov} /></div>}
-      {pripojene && <div id="kal-platby"><PlatbyEvidencia mena={menaKlientov} /></div>}
       {pripojene && <Kontrola udalosti={udalostiF} data={data} />}
       {/* Balíčky aj „Odpísaní, ale majú termín" sa zliali na Kokpit (Jerry,
           9. 8.): dlaždica Odmlčaní sama vynecháva ľudí s budúcim termínom,
@@ -842,7 +835,7 @@ function Mapovanie({ nezname: nezmameVsetky, mena, clients, onHotovo, trener, kt
  *   • „chýba v PTminderi" je dnešná robota navyše, nič viac. Po vypnutí
  *     PTmindera prestane existovať aj otázka.
  */
-function SubeznyChod({ p }: { p: Porovnanie }) {
+export function SubeznyChod({ p }: { p: Porovnanie }) {
   const [detail, setDetail] = useState(false);
   const stabilne = p.tyzdne.filter((t) => t.sedeni > 0);
   // Za „sedí" sa počíta týždeň bez jediného strateného sedenia. Cieľ je

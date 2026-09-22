@@ -981,7 +981,7 @@ export function useExtraGrafy({
 
     nodes.predikciaScen = (
       <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column" }}>
-        <H3><Info label="Scenáre na 3 mesiace" text="Súčet troch mesiacov z modelu obnov (rovnaké číslo ako Predikcia a dlaždica na Kokpite): opatrný ráta len s istejšími obnovami, optimistický s vyššou vierou v obnovu. Run-rate je mesačné tempo portfólia, ak klienti chodia ako TERAZ — nie priemer za posledné mesiace, ten obsahuje aj ľudí, ktorí medzitým prestali chodiť." /></H3>
+        <H3><Info label="Scenáre na 3 mesiace" text="Súčet troch mesiacov z modelu obnov (rovnaké číslo ako Predikcia a dlaždica na obrazovke Dnes): opatrný ráta len s istejšími obnovami, optimistický s vyššou vierou v obnovu. Run-rate je mesačné tempo portfólia, ak klienti chodia ako TERAZ — nie priemer za posledné mesiace, ten obsahuje aj ľudí, ktorí medzitým prestali chodiť." /></H3>
         <Klik kam={() => onNavigate("vzas", "predikcia")} onNavigate="Peniaze → Predikcia">
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 8 }}>
             {/* Jeden model tržieb (Jerry, 9. 8.): sumy z predictCash — to isté

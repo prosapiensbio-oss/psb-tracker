@@ -48,6 +48,7 @@ import type { BtcKnihaPlatba, RegisterItem } from "../../lib/psb/compute";
 import { btcPlatbyJednotlivo, btcPodlaKlientov } from "../../lib/psb/btcKontrola";
 import { polozkaZastaranaBanka, polozkyBtcNesedi } from "../../lib/psb/penazneNotifikacie";
 import { breakEvenPriemer, spocitajRezervu } from "../../lib/psb/rezerva";
+import { Prechod } from "./Prechod";
 import { buildAiContext } from "../../lib/psb/aiContext";
 import type { PorovnanieDochadzky } from "../../lib/psb/porovnanieDochadzky";
 import { Assistant, useAssistantChat } from "./Assistant";
@@ -170,13 +171,21 @@ const TABS = [
   // miest. Nápis je vec, ktorú vidí človek; id je vec, ktorú vidí kód.
   // Poradie podľa toho, čo Jerry rieši najčastejšie (29. 8. 2026): ľudia
   // a peniaze pred kalendárom, ktorý si aj tak pozerá v Google.
-  { id: "dashboard", label: "Kokpit", icon: "home" },
+  // Nápis „Dnes", nie „Kokpit": appka sa volá Kokpit celá a hlavná obrazovka
+  // nie je jej zhrnutie, je to zoznam toho, čo dnes čaká na ruku. `id`
+  // zostáva „dashboard" — visia naň adresy, ciele rituálov aj Jarvisove odkazy.
+  { id: "dashboard", label: "Dnes", icon: "home" },
   // Obsahom je prevádzka — tréningy, klienti, 6M, fluktuácia — ale všetko
   // sú to ľudia, tak sa to tak aj volá.
   { id: "tracker", label: "Klienti", icon: "userCheck" },
   { id: "vzas", label: "Peniaze", icon: "wallet" },
   { id: "marketing", label: "Marketing", icon: "activity" },
   { id: "kalendar", label: "Kalendár", icon: "calendar" },
+  // Dočasná záložka na odchod od PTmindera (22. 9. 2026). Tri meradlá
+  // súbežného chodu najprv viseli v Kalendári — Jerry v ten istý deň: „keď
+  // kliknem na kalendár, už to nie je len kalendár, ale aj platby atď."
+  // Jedna otázka na záložku; a keď sa PTminder vypne, táto sa celá zmaže.
+  { id: "prechod", label: "Prechod", icon: "prechod" },
   // Výsledky = mesačné a kvartálne pohľady, KPI, ciele, správa mesiaca.
   // Nahrávanie dát a uzávierka odišli do záložky Upload — robili sa
   // striedavo, ale sú to dva rôzne úkony a nahrať CSV treba aj mimo
@@ -2469,6 +2478,7 @@ function skupinaFaktur(
         {active === "marketing" && <Marketing data={data} clients={clients} leads={data.leads} chat={chat} sub={marketingSub} onSub={setMarketingSub} focus={marketingFocus} onOdchodKJarvisovi={(mesiac, faza, napadId) => setNavratDoMapy({ mesiac, faza, napadId })} onKlient={(m) => navigate("klienti", undefined, { client: m, nonce: Date.now() })} refresh={actions.refresh} onPoznamkaStrata={(m, t) => actions.setOverride(m, "precoNeprisiel", t)} onNavigate={navigate} onAck={(k, zapnut, poznamka) => actions.ackAnomaly(k, zapnut ? (poznamka || "skryté hlásenie") : "", zapnut)} />}
         {active === "vzas" && <Vzas sub={vzasSub} onSub={setVzasSub} data={data} clients={clients} focus={vzasFocus} onNavigate={navigate} pohybSplits={pohybSplits} nastavPohybSplit={nastavPohybSplit} />}
         {active === "kalendar" && <Kalendar clients={clients} data={data} focus={kalendarFocus} ktoSom={ktoSom} trainer={trainer} onTrainer={setTrainer} />}
+        {active === "prechod" && <Prechod mena={Object.keys(clients)} />}
 
         {active === "jarvis" && (
           <JarvisOkno

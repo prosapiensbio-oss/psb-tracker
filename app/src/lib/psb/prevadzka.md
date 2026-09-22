@@ -252,7 +252,7 @@ obsah exportu PTminder → Finances → Transactions**, druhá sekcia súboru.
 v zozname stojí, to je otvorené — netreba a nedá sa to párovať s platbami
 v `payments`. Neexistuje „poplatok, ktorý už je uhradený, ale ešte tam visí".
 
-**Kde to Jerry vidí:** Kokpit → dole pod „Končí platnosť členstva", nadpis
+**Kde to Jerry vidí:** obrazovka Dnes → dole pod „Končí platnosť členstva", nadpis
 „Nezaplatené (N) · suma". Zoznam sa filtruje prepínačom trénera, celková
 suma tiež — takže Jerryho číslo a číslo v kontexte (všetci tréneri) sa
 legitímne líšia.

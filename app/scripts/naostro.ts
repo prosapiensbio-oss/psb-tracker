@@ -174,7 +174,20 @@ else {
   // „Lucka" → Lucia Podolová, ktorú Terezka dvakrát opravila. PIATY prípad,
   // keď sa mýli kontrola, nie appka (viď varovanie v hlavičke skriptu).
   const odchodZodpovedany = !!base.anomalyAck[`duch|${n.klient}`] || !!base.anomalyAck[`gone|${n.klient}`];
+  // „Prestal chodiť" je 14+ dní bez tréningu. Keď klient trénoval pred
+  // týždňom, po zrušení jednej hodiny sa ním NESTANE — a čakať to je chyba
+  // kontroly, nie appky. 22. 9. 2026 na tom spadla Barbora Vanková: nezhoda
+  // je jej tréning zo 17. 9., ale posledné sedenie má z 15. 9., teda sedem
+  // dní pred behom. ŠIESTY prípad, keď sa mýli kontrola (viď hlavičku).
+  const DNI_ODMLCANY = 14;
+  const posledne = base.sessions
+    .filter((x) => x.client === n.klient && x.date.slice(0, 10) !== n.datum)
+    .map((x) => x.date.slice(0, 10)).sort().pop() || "";
+  const dniOdPosledneho = posledne
+    ? Math.floor((Date.now() - Date.parse(`${posledne}T00:00:00Z`)) / 86400000)
+    : Infinity;
   if (!maSedenia) console.log("  (nový klient bez sedení — gone sa naňho nevzťahuje, preskakujem)");
+  else if (dniOdPosledneho < DNI_ODMLCANY) console.log(`  (posledný tréning pred ${dniOdPosledneho} dňami — na „prestal chodiť" treba ${DNI_ODMLCANY}, preskakujem)`);
   else if (odchodZodpovedany) console.log("  (odchod už zodpovedaný v registri — gone/duch sa právom neozve, preskakujem)");
   else if (inyKryje) ok(!po.has(`gone|${n.klient}`), "kalendar ho kryje inym treningom - prestal chodit sa NEVRACIA");
   else ok(po.has(`gone|${n.klient}`) || po.has(`duch|${n.klient}`), "prestal chodit sa VRATIL - kalendar ho uz nekryje");

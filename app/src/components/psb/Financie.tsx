@@ -462,7 +462,7 @@ function Predikcia({ data, clients }: { data: PSBData; clients: Record<string, C
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
           <H3>
             <Info
-              text="Model obnov členstiev: pre každého klienta sa z tempa (posledných 90 dní + objednané v kalendári) a zostatku spočíta, KEDY dochodí zaplatené hodiny, a vtedy sa čaká platba vo výške tej poslednej, vážená dôverou obnovy. Negatívny/realistický/optimistický = pásma dôvery. Jediný model tržieb v appke — rovnaké číslo ukazuje Kokpit."
+              text="Model obnov členstiev: pre každého klienta sa z tempa (posledných 90 dní + objednané v kalendári) a zostatku spočíta, KEDY dochodí zaplatené hodiny, a vtedy sa čaká platba vo výške tej poslednej, vážená dôverou obnovy. Negatívny/realistický/optimistický = pásma dôvery. Jediný model tržieb v appke — rovnaké číslo ukazuje obrazovka Dnes."
               label={`Predikcia tržieb — ${monthsCovered}`}
             />
           </H3>

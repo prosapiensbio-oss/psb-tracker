@@ -1193,6 +1193,8 @@ export function LineChart({
 // ── Line icons for the main nav (Lucide-style) ───────────────────────────────
 const ICON_PATHS: Record<string, ReactNode> = {
   home: (<><path d="M3 9.5 12 2.5l9 7v10a1.6 1.6 0 0 1-1.6 1.6H4.6A1.6 1.6 0 0 1 3 19.5z" /><path d="M9.3 21.1V13h5.4v8.1" /></>),
+  // Dve šípky proti sebe — súbežný chod dvoch evidencií (záložka Prechod).
+  prechod: (<><path d="M4 8.5h13" /><path d="m13.5 5 3.5 3.5-3.5 3.5" /><path d="M20 15.5H7" /><path d="m10.5 12 -3.5 3.5 3.5 3.5" /></>),
   calendar: (<><rect x="3" y="4.2" width="18" height="16.8" rx="2" /><path d="M16 2.2v4M8 2.2v4M3 9.2h18" /></>),
   userCheck: (<><path d="M15 21v-1.8a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4V21" /><circle cx="8.5" cy="7.5" r="3.8" /><path d="m16.5 11.5 2 2 4-4" /></>),
   wallet: (<><rect x="3" y="6" width="18" height="13" rx="2.2" /><path d="M3 10.2h18" /><circle cx="16.6" cy="13.6" r="1.4" /></>),
