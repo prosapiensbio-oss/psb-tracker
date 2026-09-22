@@ -829,5 +829,19 @@ pritom tam boli celý čas.
   počíta len mapovanie na čas alebo potvrdenie z karty „Jedno meno, viac
   klientov", kde je dvojica vidieť.
 - **Kontrola, ktorá to odhalí:** udalosť z kalendára, ktorej priradený klient
-  v ten deň v PTminderi nie je. Pred opravou 8, po oprave 2 — a tie dva sú
-  tréningy, ktoré v PTminderi naozaj nie sú.
+  v ten deň v PTminderi nie je — a **MUSÍ mať `zmizla_at IS NULL`**. Bez toho
+  filtra hlási aj zrušené tréningy (v tabuľke zostávajú ako stopa po zmiznutej
+  udalosti) a z 321 živých udalostí vyrobí vyše sto „nesedí". Takto som sa
+  22. 9. sám vyplašil, že kalendár nesedí v pätine prípadov.
+- **Zmerané 22. 9. 2026 po priradení mien** (1. 8. – 20. 9., pokiaľ siaha
+  export): 321 živých udalostí, **1 bez sedenia v PTminderi**. Opačne 18 sedení
+  bez udalosti v kalendári, takmer všetky z jedného okna 31. 8. – 3. 9.
+  u Terezky (výpadok sťahovania); po oprave rotácie zdrojov je to 2 z 58 za
+  týždeň 14. – 20. 9. Kalendár je teda dosť presný na to, aby niesol dochádzku —
+  slabina nie je v menách, ale vo výpadkoch sťahovania.
+- **Dve pravopisné podoby toho istého klienta vyzerajú ako chýbajúci tréning.**
+  „Tereza/Terezie Pehalova" a „Tomas/Tomaš Dvořak" boli dva z troch nálezov:
+  kalendár si meno vyrobil z názvu udalosti, PTminder má svoje. Pozná sa to
+  tak, že ten istý deň je v OBOCH zoznamoch (nesedí aj chýba). Rieši to
+  mapovanie názvu na meno z PTminderu, nie prepis riadku — najbližšia
+  synchronizácia by ho vrátila.

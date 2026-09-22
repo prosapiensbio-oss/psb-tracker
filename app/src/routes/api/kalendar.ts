@@ -254,11 +254,18 @@ export const Route = createFileRoute("/api/kalendar")({
         ]);
 
         // Názvy, ktoré appka ešte nepozná — to je práca, ktorú treba odklikať.
+        //
+        // Pozor na mapovanie viazané na ČAS: „Marketa 8:30 = Resnerová" znamená,
+        // že názov v tabuľke JE, ale pre tréning o 15:00 z neho klient nevyplýva.
+        // Taká udalosť by bez tejto vetvy ticho zostala bez klienta — ani medzi
+        // neznámymi, ani v dochádzke. Preto sa za neznáme považuje aj udalosť,
+        // ktorej mapovanie nedalo klienta (22. 9. 2026).
         const zname = new Set((mapovanie.results || []).map((m) => `${(m as { nazov: string }).nazov}|${(m as { trener: string }).trener}`));
         const nezname: Record<string, { nazov: string; trener: string; pocet: number; najblizsi: string }> = {};
         for (const u of (udalosti.results || []) as unknown as Ulozena[]) {
           const k = `${u.nazov}|${u.trener}`;
-          if (zname.has(k)) continue;
+          const chybaKlient = !u.klient && (u.typ === "trening" || u.typ === "uvodny");
+          if (zname.has(k) && !chybaKlient) continue;
           const e = (nezname[k] ||= { nazov: u.nazov, trener: u.trener, pocet: 0, najblizsi: u.zaciatok });
           e.pocet++;
           if (u.zaciatok < e.najblizsi) e.najblizsi = u.zaciatok;
