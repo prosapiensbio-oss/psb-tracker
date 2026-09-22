@@ -4,7 +4,7 @@ import type { D1Database } from "@cloudflare/workers-types";
 import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
-import { nepriradene, porovnajPlatby, vzorPlatby, type FioRiadok, type Platba } from "../../lib/psb/platbyEvidencia";
+import { nepriradene, porovnajPlatby, smieSaZapamatat, vzorPlatby, type FioRiadok, type Platba } from "../../lib/psb/platbyEvidencia";
 
 /**
  * Vlastná evidencia platieb: banka z výpisu, hotovosť zo zošita.
@@ -62,26 +62,43 @@ export const Route = createFileRoute("/api/platby")({
         for (const m of ((mapa.results || []) as unknown as { vzor: string; klient: string }[])) mapovanie[m.vzor] = m.klient;
         const poExport = String(((horizont.results || [])[0] as { den?: string } | undefined)?.den || new Date().toISOString().slice(0, 10));
 
+        /**
+         * Odkedy sa porovnáva — a prečo to nie je „odjakživa".
+         *
+         * Bankové platby sa dajú doplniť spätne z výpisu, HOTOVOSŤ nie:
+         * tá je v zošite a nikto ju rok dozadu prepisovať nebude. V starších
+         * mesiacoch by teda rozdiel ukazoval chýbajúcu hotovosť, nie chybu —
+         * a cieľ „rozdiel nula" by bol nedosiahnuteľný. Súbežný chod preto
+         * začína mesiacom, ktorý si Jerry zvolí (`platby_od`); staršie
+         * bankové platby v evidencii zostávajú, len sa nesúdia.
+         */
+        const odMesiaca = String(
+          (await DB.prepare("SELECT value FROM vzas_settings WHERE key = 'platby_od'").first<{ value: string }>())?.value || "",
+        ).replace(/"/g, "") || new Date().toISOString().slice(0, 7);
+
+        const vsetkyNepriradene = nepriradene(
+          (fio.results || []) as unknown as FioRiadok[],
+          platby.map(naPlatbu),
+          mapovanie,
+          new Set(((nieKlient.results || []) as unknown as { fio_id: string }[]).map((x) => x.fio_id)),
+          ((mena.results || []) as unknown as { client_name: string }[]).map((x) => x.client_name),
+        );
+        const celkomNepriradenych = vsetkyNepriradene.length;
+
         return Response.json({
           ok: true,
           platby,
-          nepriradene: nepriradene(
-            (fio.results || []) as unknown as FioRiadok[],
-            platby.map(naPlatbu),
-            mapovanie,
-            new Set(((nieKlient.results || []) as unknown as { fio_id: string }[]).map((x) => x.fio_id)),
-            ((mena.results || []) as unknown as { client_name: string }[]).map((x) => x.client_name),
-          ).slice(0, 120),
+          nepriradene: vsetkyNepriradene.slice(0, 120),
           porovnanie: porovnajPlatby(
             platby.map(naPlatbu),
             ((pt.results || []) as unknown as { client_name: string; date: string; amount_czk: number; payment_method: string }[])
               .map((p) => ({ klient: p.client_name, datum: p.date, suma: p.amount_czk, metoda: p.payment_method })),
             poExport,
-            // Porovnávať roky dozadu nemá zmysel: vlastná evidencia začala
-            // dnes a staršie mesiace by ukazovali celú tržbu ako rozdiel.
-            (await DB.prepare("SELECT MIN(substr(datum,1,7)) m FROM platby").first<{ m: string }>())?.m || new Date().toISOString().slice(0, 7),
+            odMesiaca,
           ),
           poExport,
+          odMesiaca,
+          celkomNepriradenych,
         });
       },
 
@@ -108,13 +125,18 @@ export const Route = createFileRoute("/api/platby")({
               "INSERT OR IGNORE INTO platby (id, klient, datum, suma_czk, sposob, fio_id, poznamka, created_at, autor) VALUES (?,?,?,?,'banka',?,?,?,?)",
             ).bind(uid(), klient, r.date.slice(0, 10), r.amount_czk, fioId, (r.counterparty || "").slice(0, 200), teraz(), kto || null),
           ];
-          if (b.zapamataj) {
+          // Pravidlo sa učí LEN vtedy, keď je klient priamo v odosielateľovi.
+          // Inak by sa naučilo zo sprostredkovaného prevodu a každý ďalší
+          // prevod tej istej osoby by appka ponúkala ako platbu toho klienta.
+          const vzor = vzorPlatby(r);
+          const naucil = !!b.zapamataj && smieSaZapamatat(vzor, klient);
+          if (naucil) {
             prikazy.push(DB.prepare("INSERT OR REPLACE INTO platba_mapovanie (vzor, klient, potvrdene_at) VALUES (?,?,?)")
-              .bind(vzorPlatby(r), klient, teraz()));
+              .bind(vzor, klient, teraz()));
           }
           await DB.batch(prikazy);
           await audit(DB, { action: "platba-priradena", predmet: klient, neu: `${r.amount_czk} Kč · ${r.date.slice(0, 10)}`, actor: kto });
-          return Response.json({ ok: true });
+          return Response.json({ ok: true, zapamatane: naucil });
         }
 
         /**
@@ -151,6 +173,16 @@ export const Route = createFileRoute("/api/platby")({
           if (!id) return Response.json({ ok: false, error: "Chýba id." }, { status: 400 });
           await DB.prepare("UPDATE platby SET zrusene_at = ? WHERE id = ?").bind(akcia === "zrus" ? teraz() : null, id).run();
           await audit(DB, { action: akcia === "zrus" ? "platba-zrusena" : "platba-vratena", predmet: id, actor: kto });
+          return Response.json({ ok: true });
+        }
+
+        /** Odkedy sa súbežný chod súdi. Staršie mesiace zostávajú v evidencii. */
+        if (akcia === "odMesiaca") {
+          const m = String(b.mesiac || "").slice(0, 7);
+          if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(m)) return Response.json({ ok: false, error: "Mesiac musí byť RRRR-MM." }, { status: 400 });
+          await DB.prepare("INSERT INTO vzas_settings (key,value) VALUES ('platby_od',?1) ON CONFLICT(key) DO UPDATE SET value=excluded.value")
+            .bind(JSON.stringify(m)).run();
+          await audit(DB, { action: "platby-od", predmet: m, actor: kto });
           return Response.json({ ok: true });
         }
 

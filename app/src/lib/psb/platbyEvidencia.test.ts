@@ -1,7 +1,7 @@
 // Platby z výpisu banky — posledná tretina odchodu od PTmindera.
 import { describe, expect, it } from "bun:test";
 
-import { najdiKlientaVTexte, nepriradene, porovnajPlatby, textPlatby, vzorPlatby, type FioRiadok, type Platba } from "./platbyEvidencia";
+import { najdiKlientaVTexte, nepriradene, porovnajPlatby, smieSaZapamatat, textPlatby, vzorPlatby, type FioRiadok, type Platba } from "./platbyEvidencia";
 
 const MENA = [
   "Natalia Peckova", "Josef Šnirych", "Natalia Krivdova", "Barbora Vankova",
@@ -116,5 +116,22 @@ describe("porovnajPlatby", () => {
   it("chýbajúca platba v Kokpite je záporný rozdiel", () => {
     const v = porovnajPlatby([], [{ klient: "X", datum: "2026-09-05", suma: 6990, metoda: "bank" }], "2026-09-20");
     expect(v.mesiace[0].rozdiel).toBe(-6990);
+  });
+});
+
+describe("smieSaZapamatat", () => {
+  it("odosielateľ, ktorý JE klient, sa zapamätá", () => {
+    expect(smieSaZapamatat("eva dolezalova", "Eva Doležalova")).toBe(true);
+  });
+
+  it("rodinný príslušník s tým istým priezviskom tiež", () => {
+    expect(smieSaZapamatat("tomas krivda", "Tomaš Krivda")).toBe(true);
+  });
+
+  it("sprostredkovateľ sa NEzapamätá", () => {
+    // „Josef snyrich · Filip Stráňavský" — Jerry poslal prevod za Josefa.
+    // Keby sa to naučilo, každý jeho ďalší prevod by appka ponúkala ako
+    // platbu Josefa Šnirycha.
+    expect(smieSaZapamatat("filip stranavsky", "Josef Šnirych")).toBe(false);
   });
 });

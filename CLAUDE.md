@@ -875,10 +875,23 @@ z výpisu banky a hotovosť stále zo zošita, tam sa nič nemení."
   hlásilo −209 867 Kč, čo meralo len to, koľko práce zostáva. Červené číslo,
   ktoré nič nehovorí, je horšie než žiadne.
 
+- **Naučí sa LEN platiteľ, v ktorom stojí priezvisko klienta**
+  (`smieSaZapamatat`). Bez toho by sa pravidlo naučilo zo sprostredkovaného
+  prevodu („Josef snyrich · Filip Stráňavský" posiela Jerry sám) a odvtedy by
+  appka každý jeho prevod ponúkala ako platbu toho klienta. Pri 113 ostrých
+  priradeniach sa takto zapamätalo 50 platiteľov a 63 sa zámerne nezapamätalo.
+- **Súbežný chod sa súdi až od zvoleného mesiaca** (`vzas_settings.platby_od`,
+  predvolene bežný mesiac). Bankové platby sa dajú doplniť spätne z výpisu,
+  HOTOVOSŤ nie — tá je v zošite a nikto ju rok dozadu prepisovať nebude.
+  V starších mesiacoch by rozdiel ukazoval chýbajúcu hotovosť, nie chybu,
+  a cieľ „rozdiel nula" by bol nedosiahnuteľný. Staršie bankové platby
+  v evidencii zostávajú, len sa nesúdia.
+
 Zmerané pri spustení (234 príjmov vo výpise od 1/2026): 121 jednoznačných
 návrhov, 25 s viacerými možnosťami, 88 bez návrhu. **Z tých 121 ich PTminder
 potvrdil 118** (klient má platbu do 10 dní) a pri 113 sedí aj suma do 2 %.
-Priraďovanie zostáva na človeku — sú to peniaze.
+Tých 113 je priradených (666 247 Kč); zvyšok zostáva na človeku — sú to
+peniaze a pri kolízii sa hádať nesmie.
 
 ## Celý reťazec jedným príkazom: `./scripts/hotovo.sh`
 

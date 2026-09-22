@@ -29,6 +29,11 @@ const VYNIMKY: Record<string, Record<string, string>> = {
   jarvis_dokumenty: {
     zmazane_at: "mäkké mazanie — pri vzniku dokument zmazaný nie je",
   },
+  // Platba je záznam v knihe: zrušiť sa dá, zmazať nie. Nová platba sa ale
+  // nikdy nezakladá ako zrušená, takže do INSERTu ten stĺpec nepatrí.
+  platby: {
+    zrusene_at: "mäkké zrušenie — nová platba zrušená nevzniká",
+  },
   // Odber vzniká v prehliadači; ako mu potom chodia správy, sa zisťuje až
   // pri prvom odoslaní. Predvyplniť to pri zápise by znamenalo tvrdiť niečo,
   // čo sa ešte nestalo.

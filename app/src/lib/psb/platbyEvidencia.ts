@@ -77,6 +77,19 @@ export function vzorPlatby(r: FioRiadok): string {
   return normName(kusy.length > 1 ? kusy[kusy.length - 1] : cely).slice(0, 80);
 }
 
+/**
+ * Smie sa odosielateľ zapamätať ako pravidlo pre tohto klienta?
+ *
+ * Len vtedy, keď v ňom STOJÍ priezvisko klienta. Bez toho by sa pravidlo
+ * naučilo z prevodov, ktoré Jerry posiela sám za niekoho iného
+ * („Josef snyrich · Filip Stráňavský"): odosielateľ je Filip Stráňavský
+ * a appka by odvtedy každý jeho prevod ponúkala ako platbu Josefa Šnirycha.
+ * Sprostredkovateľ nie je platiteľ.
+ */
+export function smieSaZapamatat(vzor: string, klient: string): boolean {
+  return najdiKlientaVTexte(vzor, [klient]).length === 1;
+}
+
 export type NepriradenaPlatba = {
   fioId: string;
   datum: string;

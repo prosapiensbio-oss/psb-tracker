@@ -42,6 +42,8 @@ export function PlatbyEvidencia({ mena }: { mena: string[] }) {
   const [nepriradene, setNepriradene] = useState<Nepriradena[]>([]);
   const [p, setP] = useState<Porovnanie | null>(null);
   const [poExport, setPoExport] = useState("");
+  const [odMesiaca, setOdMesiaca] = useState("");
+  const [celkom, setCelkom] = useState(0);
   const [vyber, setVyber] = useState<Record<string, string>>({});
   const [pracujem, setPracujem] = useState("");
   const [chyba, setChyba] = useState("");
@@ -50,8 +52,11 @@ export function PlatbyEvidencia({ mena }: { mena: string[] }) {
 
   const nacitaj = useCallback(async () => {
     const r = await fetch("/api/platby", { credentials: "same-origin" });
-    const j = (await r.json()) as { ok: boolean; platby?: Platba[]; nepriradene?: Nepriradena[]; porovnanie?: Porovnanie; poExport?: string };
-    if (j.ok) { setPlatby(j.platby || []); setNepriradene(j.nepriradene || []); setP(j.porovnanie || null); setPoExport(j.poExport || ""); }
+    const j = (await r.json()) as { ok: boolean; platby?: Platba[]; nepriradene?: Nepriradena[]; porovnanie?: Porovnanie; poExport?: string; odMesiaca?: string; celkomNepriradenych?: number };
+    if (j.ok) {
+      setPlatby(j.platby || []); setNepriradene(j.nepriradene || []); setP(j.porovnanie || null);
+      setPoExport(j.poExport || ""); setOdMesiaca(j.odMesiaca || ""); setCelkom(j.celkomNepriradenych ?? (j.nepriradene || []).length);
+    }
   }, []);
   useEffect(() => { void nacitaj(); }, [nacitaj]);
 
@@ -73,14 +78,15 @@ export function PlatbyEvidencia({ mena }: { mena: string[] }) {
       <H3>
         <Info
           text="Kokpit si vedie vlastnú knihu platieb: bankové z výpisu Fio, hotovosť prepísanú zo zošita. Kým sa mesačné súčty rozchádzajú s PTminderom, PTminder je potrebný."
-          label={`Platby — vlastná evidencia${nepriradene.length ? ` (${nepriradene.length} čaká)` : ""}`}
+          label={`Platby — vlastná evidencia${celkom ? ` (${celkom} čaká)` : ""}`}
         />
       </H3>
 
       {p && p.mesiace.length > 0 && (
         <>
-          <div style={{ fontSize: 11.5, color: C.textDim, margin: "2px 0 10px" }}>
-            Porovnáva sa k {poExport ? denKratko(poExport) + " " + poExport.slice(0, 4) : "dnešku"} — pokiaľ siaha export z PTmindera.
+          <div style={{ fontSize: 11.5, color: C.textDim, margin: "2px 0 10px", lineHeight: 1.5 }}>
+            Súbežný chod sa súdi od {odMesiaca ? mesiacKratko(odMesiaca) : "tohto mesiaca"}, po {poExport ? `${denKratko(poExport)} ${poExport.slice(0, 4)}` : "dnešok"} (pokiaľ siaha export).
+            Staršie mesiace v evidencii zostávajú, ale neporovnávajú sa — hotovosť z nich nikto spätne prepisovať nebude, a rozdiel by ukazoval ju, nie chybu.
           </div>
           <div style={{ display: "flex", gap: 18, flexWrap: "wrap", marginBottom: 12 }}>
             <div>
@@ -93,7 +99,7 @@ export function PlatbyEvidencia({ mena }: { mena: string[] }) {
               <div style={{ fontSize: 11.5, color: C.textMuted }}>
                 rozdiel proti PTminderu<br />
                 <span style={{ color: C.textDim }}>
-                  {nepriradene.length ? `najprv priraď ${nepriradene.length} príjmov` : "toto rozhoduje"}
+                  {nepriradene.length ? `najprv priraď ${celkom} príjmov` : "toto rozhoduje"}
                 </span>
               </div>
             </div>
@@ -138,7 +144,7 @@ export function PlatbyEvidencia({ mena }: { mena: string[] }) {
       {nepriradene.length > 0 && (
         <>
           <div style={{ fontSize: 12.5, color: C.text, fontWeight: 700, marginTop: 4 }}>
-            Príjmy z výpisu, ktoré ešte nemajú klienta ({nepriradene.length})
+            Príjmy z výpisu, ktoré ešte nemajú klienta ({celkom}{celkom > nepriradene.length ? `, tu prvých ${nepriradene.length}` : ""})
           </div>
           <div style={{ fontSize: 11.5, color: C.textDim, margin: "3px 0 8px", lineHeight: 1.5 }}>
             Appka navrhne podľa priezviska v texte — a platiteľa si zapamätá, takže ten istý sa pýta raz.
