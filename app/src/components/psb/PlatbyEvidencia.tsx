@@ -141,6 +141,16 @@ export function PlatbyEvidencia({ mena }: { mena: string[] }) {
         </>
       )}
 
+      {p && p.mesiace.length === 0 && (
+        // Prázdna tabuľka bez vysvetlenia vyzerá ako porucha. Keď zvolený
+        // mesiac ešte nezačal, treba povedať, že sa čaká — nie mlčať.
+        <div style={{ fontSize: 12.5, color: C.textMuted, lineHeight: 1.55, margin: "2px 0 12px" }}>
+          Súbežný chod začína {odMesiaca ? mesiacKratko(odMesiaca) : "budúci mesiac"}. Dovtedy sa neporovnáva nič —
+          v Kokpite je {zive.length} bankových platieb doplnených spätne z výpisu, ale hotovosť zo starších mesiacov
+          v ňom nie je a rozdiel by ukazoval ju, nie chybu. Od {odMesiaca ? mesiacKratko(odMesiaca) : "začiatku"} zapisuj
+          hotovosť aj sem a mesačné súčty musia sedieť s PTminderom.
+        </div>
+      )}
       {nepriradene.length > 0 && (
         <>
           <div style={{ fontSize: 12.5, color: C.text, fontWeight: 700, marginTop: 4 }}>
