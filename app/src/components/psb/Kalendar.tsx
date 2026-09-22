@@ -26,8 +26,10 @@ export type Zmena = { id: string; kedy: string; trener: string; uid: string; dru
 type Mapa = { nazov: string; trener: string; klient: string | null; typ: string };
 export type KalUdalost = { uid: string; trener: string; zaciatok: string; koniec: string; nazov: string; klient: string | null; typ: string | null };
 type Nezname = { nazov: string; trener: string; pocet: number; najblizsi: string };
+/** Meno z kalendára, ktoré sedí na viacerých klientov (napr. dve Markety). */
+type Nejednoznacne = { nazov: string; kandidati: string[]; casy: string[] };
 type Guillermo = { id: string; datum: string; druh: string; hodiny: number; suma_czk: number | null; poznamka: string | null };
-type Stav = { zdroje: Zdroj[]; zmeny: Zmena[]; mapovanie: Mapa[]; udalosti: KalUdalost[]; nezname: Nezname[]; guillermo: Guillermo[] };
+type Stav = { zdroje: Zdroj[]; zmeny: Zmena[]; mapovanie: Mapa[]; udalosti: KalUdalost[]; nezname: Nezname[]; guillermo: Guillermo[]; nejednoznacne: Nejednoznacne[] };
 
 const TYPY = [
   { value: "trening", label: "Tréning klienta" },
@@ -153,7 +155,7 @@ export function Kalendar({ clients, data, focus, ktoSom, trainer, onTrainer }: {
   const nacitaj = useCallback(async () => {
     const r = await fetch("/api/kalendar", { credentials: "same-origin" });
     const j = (await r.json()) as { ok: boolean } & Stav;
-    if (j.ok) setStav({ zdroje: j.zdroje, zmeny: j.zmeny, mapovanie: j.mapovanie, udalosti: j.udalosti, nezname: j.nezname, guillermo: j.guillermo || [] });
+    if (j.ok) setStav({ zdroje: j.zdroje, zmeny: j.zmeny, mapovanie: j.mapovanie, udalosti: j.udalosti, nezname: j.nezname, guillermo: j.guillermo || [], nejednoznacne: j.nejednoznacne || [] });
   }, []);
 
   useEffect(() => { void nacitaj(); }, [nacitaj]);
@@ -222,6 +224,10 @@ export function Kalendar({ clients, data, focus, ktoSom, trainer, onTrainer }: {
           nepriradí človeku, tréning nemá komu patriť — a presne preto potom
           spadne do „Chýba v PTminderi". Priradiť najprv a až potom čítať, čo
           chýba, znamená kratší zoznam a menej otázok. */}
+      {stav.nejednoznacne.length > 0 && (
+        <div id="kal-nejednoznacne"><DveMena zoznam={stav.nejednoznacne} onHotovo={nacitaj} /></div>
+      )}
+
       {stav.nezname.length > 0 && (
         <div id="kal-nezname"><Mapovanie nezname={stav.nezname} mena={menaKlientov} clients={clients} onHotovo={nacitaj} trener={trener} ktoSom={ktoSom} /></div>
       )}
@@ -383,6 +389,91 @@ function Pripojenie({ zdroje, onZmena }: { zdroje: Zdroj[]; onZmena: () => Promi
  * a „Natalia" u Terezky sú dvaja rôzni ľudia a jedno pravidlo pre oboch by ich
  * ticho zlialo do jedného klienta.
  */
+/**
+ * Mená, ktoré sedia na viacerých klientov.
+ *
+ * Toto je karta, ktorá 22. 9. 2026 chýbala. V kalendári stojí „Marketa"
+ * a v štúdiu sú dve — appka si jednu ticho vybrala a šesť tréningov skončilo
+ * u nesprávnej (aj s tempom, dochádzkou a zostatkom balíčka).
+ *
+ * Rieši sa to dvoma spôsobmi a oba sú tu: buď sa meno priradí podľa ČASU
+ * (Marketa 8:30 = Resnerová), alebo sa v kalendári prepíše na celé meno —
+ * čo je lepšie, lebo potom niet čo hádať.
+ */
+function DveMena({ zoznam, onHotovo }: { zoznam: Nejednoznacne[]; onHotovo: () => Promise<void> }) {
+  const [uklada, setUklada] = useState("");
+  const [chyba, setChyba] = useState("");
+
+  const priraď = async (nazov: string, trener: string, cas: string, klient: string) => {
+    setUklada(`${nazov}|${trener}|${cas}`); setChyba("");
+    const j = await posli({ akcia: "mapuj", nazov, trener, cas, typ: "trening", klient, vedome: true })
+      .catch(() => ({ ok: false, error: "spojenie" }));
+    setUklada("");
+    if (!j.ok) { setChyba(j.error || "nepodarilo sa uložiť"); return; }
+    await onHotovo();
+  };
+
+  return (
+    <Card>
+      <H3>
+        <Info
+          label={`Jedno meno, viac klientov (${zoznam.length})`}
+          text="V kalendári stojí krstné meno a v štúdiu je viac ľudí s tým istým. Kokpit si nesmie vybrať sám — zle priradený tréning sa pripíše cudziemu človeku a pokazí mu tempo, dochádzku aj zostatok balíčka. Priraď podľa času, alebo (lepšie) prepíš v kalendári na celé meno."
+        />
+      </H3>
+      {chyba && <div style={{ fontSize: 12, color: C.red, marginBottom: 6 }}>{chyba}</div>}
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {zoznam.map((n) => (
+          <div key={n.nazov} style={{ padding: "9px 11px", borderRadius: 9, background: mix(C.orange, 7), border: `1px solid ${mix(C.orange, 22)}` }}>
+            <div style={{ fontSize: 13, color: C.text, fontWeight: 600 }}>
+              „{n.nazov}" — sedí na {n.kandidati.length}: {n.kandidati.join(", ")}
+            </div>
+            <div style={{ fontSize: 11.5, color: C.textMuted, margin: "5px 0 7px" }}>
+              Priraď podľa času, alebo prepíš v Google kalendári na celé meno — potom netreba nič.
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+              {/* „Vždy" pre prípad, že to meno v kalendári patrí naozaj len
+                  jednému z nich — jeden klik a meno z karty zmizne. */}
+              {[...new Set(n.casy.map((tc) => tc.split("|")[0]))].map((trener) => (
+                <div key={`vzdy-${trener}`} style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 12, color: C.textMuted, minWidth: 116 }}>{trener} · vždy</span>
+                  {n.kandidati.map((kand) => (
+                    <button key={kand} disabled={!!uklada}
+                      onClick={() => void priraď(n.nazov, trener, "", kand)}
+                      style={{ fontSize: 11.5, padding: "4px 10px", borderRadius: 7, cursor: "pointer",
+                        border: `1px solid ${mix(C.accent, 40)}`, background: "transparent", color: C.accentLight, fontFamily: "inherit" }}>
+                      {uklada === `${n.nazov}|${trener}|` ? "ukladám…" : `vždy ${kand.split(" ")[1] || kand}`}
+                    </button>
+                  ))}
+                </div>
+              ))}
+              {n.casy.map((tc) => {
+                const [trener, cas] = tc.split("|");
+                const k = `${n.nazov}|${trener}|${cas}`;
+                return (
+                  <div key={tc} style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <span style={{ fontSize: 12, color: C.textMuted, minWidth: 116 }}>{trener} · {cas || "bez času"}</span>
+                    {n.kandidati.map((kand) => (
+                      <button
+                        key={kand}
+                        disabled={!!uklada}
+                        onClick={() => void priraď(n.nazov, trener, cas, kand)}
+                        style={{ fontSize: 11.5, padding: "4px 10px", borderRadius: 7, cursor: "pointer",
+                          border: `1px solid ${C.border}`, background: "transparent", color: C.text, fontFamily: "inherit" }}>
+                        {uklada === k ? "ukladám…" : kand}
+                      </button>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+
 function Mapovanie({ nezname: nezmameVsetky, mena, clients, onHotovo, trener, ktoSom }: { nezname: Nezname[]; mena: string[]; clients: Record<string, ClientAgg>; onHotovo: () => Promise<void>; trener: string; ktoSom?: string | null }) {
   // Karta poslúcha ten istý filter, čo je hore na stránke (Obaja/Jerry/Terezka)
   // — druhý filter len pre túto kartu by si mohol s ním protirečiť.

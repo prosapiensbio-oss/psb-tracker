@@ -4,6 +4,7 @@ import type { D1Database, D1PreparedStatement } from "@cloudflare/workers-types"
 import { isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 import { typZNazvu } from "../../lib/psb/kalendar";
+import { casUdalosti, nejednoznacneMena, vyberMapu, type Mapa } from "../../lib/psb/kalendarMena";
 import { citajIcal } from "../../lib/psb/ical";
 import { ohlasitZmenu } from "../../lib/psb/kalendarZmeny";
 import { chybaZdroja, NEDOKONCENE, vyberZdroj, type ZdrojSPokusom } from "../../lib/psb/kalendarZdroje";
@@ -93,10 +94,8 @@ async function snimka(DB: D1Database, z: Zdroj) {
   const podlaUid = new Map(stare.map((s) => [s.uid, s]));
 
   // Naučené mapovanie mien — čo už raz človek potvrdil, sa druhýkrát nepýta.
-  const mapovanie = new Map<string, { klient: string | null; typ: string }>();
-  for (const m of ((await DB.prepare("SELECT nazov, trener, klient, typ FROM kal_mapovanie WHERE trener = ?").bind(z.trener).all()).results || []) as { nazov: string; klient: string | null; typ: string }[]) {
-    mapovanie.set(m.nazov, { klient: m.klient, typ: m.typ });
-  }
+  const mapovanie = ((await DB.prepare("SELECT nazov, trener, cas, klient, typ FROM kal_mapovanie WHERE trener = ?")
+    .bind(z.trener).all()).results || []) as unknown as Mapa[];
 
   const prikazy: D1PreparedStatement[] = [];
   // Zmeny sa najprv nazbierajú a až potom zapíšu — treba ich vidieť naraz, aby
@@ -109,7 +108,10 @@ async function snimka(DB: D1Database, z: Zdroj) {
 
   for (const u of udalosti) {
     videne.add(u.uid);
-    const m = mapovanie.get(u.nazov);
+    // Mapovanie sa vyberá aj podľa ČASU: „Marketa 8:30" je iná klientka než
+    // „Marketa 14:00" a jedno meno na dvoch ľudí je v PSB bežné (18 krstných
+    // mien má viac než jedného klienta).
+    const m = vyberMapu(mapovanie, u.nazov, z.trener, casUdalosti(u.zaciatok));
     const klient = m?.klient ?? null;
     // Naučené mapovanie vyhráva vždy; hádanie z názvu je až náhradník.
     // Pri úvodnom je každý nový človek nový názov, teda nová práca — a to
@@ -241,7 +243,7 @@ export const Route = createFileRoute("/api/kalendar")({
           // stále zrušenie. Preto druhý, širší rad — celá história zmien,
           // z ktorej sa dá počítať.
           DB.prepare("SELECT kedy, trener, druh, nazov, klient, pred, po, vysvetlene, poznamka FROM kal_zmeny ORDER BY kedy DESC LIMIT 300").all(),
-          DB.prepare("SELECT nazov, trener, klient, typ FROM kal_mapovanie ORDER BY trener, nazov").all(),
+          DB.prepare("SELECT nazov, trener, cas, klient, typ, vedome FROM kal_mapovanie ORDER BY trener, nazov, cas").all(),
           DB.prepare("SELECT uid, trener, zaciatok, koniec, nazov, klient, typ FROM kal_udalosti WHERE zmizla_at IS NULL AND zaciatok >= ? AND zaciatok <= ? ORDER BY zaciatok").bind(od, do_).all(),
           DB.prepare("SELECT id, datum, druh, hodiny, suma_czk, poznamka FROM guillermo_hodiny ORDER BY datum DESC").all(),
           // Guillermo tréningy MIMO okna: zostatok sedení sa počíta od kotvy
@@ -262,8 +264,37 @@ export const Route = createFileRoute("/api/kalendar")({
           if (u.zaciatok < e.najblizsi) e.najblizsi = u.zaciatok;
         }
 
+        /**
+         * Mená, ktoré sedia na viacerých klientov.
+         *
+         * Toto je to, čo 22. 9. 2026 stálo Marketu Resnerovú šesť tréningov:
+         * „Marketa" v kalendári sedí na ňu aj na Marketu Lozias, mapovanie
+         * poznalo len jednu a appka o tom mlčala. Osemnásť krstných mien má
+         * v PSB viac než jedného klienta, takže mlčať sa nedá.
+         */
+        const menaKlientov = ((await DB.prepare(
+          "SELECT DISTINCT client_name FROM sessions WHERE date >= date('now','-400 days')",
+        ).all()).results || []).map((r) => String((r as { client_name: string }).client_name));
+        const nazvyVKalendari = [...new Set(((udalosti.results || []) as unknown as Ulozena[])
+          .filter((u) => u.typ === "trening" || u.typ === "uvodny")
+          .map((u) => u.nazov))];
+        // Meno, pri ktorom už človek vedome rozhodol (alebo ho rozlíšil časom),
+        // sa nepripomína — karta má byť prázdna, keď je práca hotová.
+        const vyriesene = new Set(((mapovanie.results || []) as unknown as (Mapa & { vedome: number })[])
+          .filter((m) => m.cas || m.vedome)
+          .map((m) => m.nazov));
+        const nejednoznacne = nejednoznacneMena(nazvyVKalendari.filter((x) => !vyriesene.has(x)), menaKlientov).map((n) => ({
+          ...n,
+          // Časy, v ktorých to meno v kalendári stojí — podľa nich sa to dá
+          // rozlíšiť jedným klikom namiesto prepisovania mien v kalendári.
+          casy: [...new Set(((udalosti.results || []) as unknown as Ulozena[])
+            .filter((u) => u.nazov === n.nazov)
+            .map((u) => `${u.trener}|${casUdalosti(u.zaciatok)}`))].sort(),
+        }));
+
         return Response.json({
           ok: true,
+          nejednoznacne,
           // Beh, ktorý zomrel bez zápisu chyby, sa ukáže ako chyba — nie ako
           // zelené „pripojený" (kalendarZdroje.chybaZdroja).
           zdroje: ((zdroje.results || []) as unknown as ZdrojStav[]).map(({ snimka_kedy, snimka_ok, snimka_chyba, ...z }) => ({
@@ -343,12 +374,31 @@ export const Route = createFileRoute("/api/kalendar")({
           const trener = String(b.trener || "");
           const typ = String(b.typ || "trening");
           const klient = b.klient ? String(b.klient) : null;
-          await DB.prepare("INSERT OR REPLACE INTO kal_mapovanie (nazov, trener, klient, typ, potvrdene_at) VALUES (?,?,?,?,?)")
-            .bind(nazov, trener, klient, typ, teraz()).run();
+          // Prázdny čas = platí pre všetky hodiny (tak to bolo doteraz).
+          // Vyplnený čas rieši mená, ktoré má viac klientov naraz.
+          const cas = /^\d{2}:\d{2}$/.test(String(b.cas || "")) ? String(b.cas) : "";
+          // `vedome` = potvrdené v karte „Jedno meno, viac klientov", teda
+          // s vedomím, že to meno sedí na viacerých ľudí. Staré mapovania
+          // vznikli bez tej informácie, preto sa za rozhodnutie nepočítajú.
+          const vedome = b.vedome ? 1 : 0;
+          await DB.prepare("INSERT OR REPLACE INTO kal_mapovanie (nazov, trener, cas, klient, typ, potvrdene_at, vedome) VALUES (?,?,?,?,?,?,?)")
+            .bind(nazov, trener, cas, klient, typ, teraz(), vedome).run();
           // Doplní sa spätne aj na už uložené udalosti — inak by sa mapovanie
           // prejavilo až pri ďalšom stiahnutí a človek by mal pocit, že sa nič nestalo.
-          await DB.prepare("UPDATE kal_udalosti SET klient = ?, typ = ? WHERE nazov = ? AND trener = ?")
-            .bind(klient, typ, nazov, trener).run();
+          // Pri mapovaní na čas sa prepíšu len udalosti v tom čase.
+          if (cas) {
+            await DB.prepare("UPDATE kal_udalosti SET klient = ?, typ = ? WHERE nazov = ? AND trener = ? AND substr(zaciatok, 12, 5) = ?")
+              .bind(klient, typ, nazov, trener, cas).run();
+          } else {
+            // Udalosti, pre ktoré platí presnejšie mapovanie na čas, sa
+            // nesmú prepísať všeobecným — inak by oprava zmizla pri prvom
+            // uložení všeobecného pravidla.
+            await DB.prepare(
+              `UPDATE kal_udalosti SET klient = ?, typ = ?
+                WHERE nazov = ? AND trener = ?
+                  AND substr(zaciatok, 12, 5) NOT IN (SELECT cas FROM kal_mapovanie WHERE nazov = ? AND trener = ? AND cas <> '')`,
+            ).bind(klient, typ, nazov, trener, nazov, trener).run();
+          }
           return Response.json({ ok: true });
         }
 

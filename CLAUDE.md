@@ -808,3 +808,26 @@ všetky z rodiny „dve miesta, dve pravdy":
 - **Okno „90 dní" sa hýbalo podľa hodiny.** Sedenia majú v dátume polnoc,
   takže tréning presne na hranici vypadol podľa toho, kedy si profil otvoril
   (Janka 0,7 namiesto 1,0). Porovnáva sa po dňoch.
+
+## Jedno meno v kalendári môže sedieť na dvoch klientov
+
+22. 9. 2026: v Terezkinom kalendári stojí „Marketa" a v štúdiu sú dve —
+Resnerová (vždy 8:30) a Lozias (11:00, 14:00, 17:00, 18:00). `kal_mapovanie`
+malo kľúč `(nazov, trener)`, takže meno mohlo patriť len jednej: **šesť
+tréningov Resnerovej sa pripísalo Lozias** — aj s tempom, dochádzkou
+a zostatkom balíčka. Vyzeralo to ako „chýbajúce tréningy v kalendári",
+pritom tam boli celý čas.
+
+- **Krstné meno nie je identita.** V PSB má 18 krstných mien viac než jedného
+  klienta (Tomáš štyria, Martin a Jakub traja) a 13 z nich má viac klientov
+  AKTÍVNYCH. Pri takom mene sa appka nesmie rozhodnúť sama.
+- **Mapovanie má čas** (`kal_mapovanie.cas`, migrácia 0068): presný čas
+  vyhráva nad všeobecným, prázdny platí pre všetky hodiny. Funkcie sú
+  v `lib/psb/kalendarMena.ts` s testami.
+- **Staré mapovanie nie je rozhodnutie.** Vzniklo vtedy, keď appka
+  o dvojznačnosti mlčala — preto `vedome` (migrácia 0069): za vyriešené sa
+  počíta len mapovanie na čas alebo potvrdenie z karty „Jedno meno, viac
+  klientov", kde je dvojica vidieť.
+- **Kontrola, ktorá to odhalí:** udalosť z kalendára, ktorej priradený klient
+  v ten deň v PTminderi nie je. Pred opravou 8, po oprave 2 — a tie dva sú
+  tréningy, ktoré v PTminderi naozaj nie sú.
