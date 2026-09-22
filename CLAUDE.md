@@ -834,11 +834,43 @@ pritom tam boli celý čas.
   udalosti) a z 321 živých udalostí vyrobí vyše sto „nesedí". Takto som sa
   22. 9. sám vyplašil, že kalendár nesedí v pätine prípadov.
 - **Zmerané 22. 9. 2026 po priradení mien** (1. 8. – 20. 9., pokiaľ siaha
-  export): 321 živých udalostí, **1 bez sedenia v PTminderi**. Opačne 18 sedení
-  bez udalosti v kalendári, takmer všetky z jedného okna 31. 8. – 3. 9.
-  u Terezky (výpadok sťahovania); po oprave rotácie zdrojov je to 2 z 58 za
-  týždeň 14. – 20. 9. Kalendár je teda dosť presný na to, aby niesol dochádzku —
-  slabina nie je v menách, ale vo výpadkoch sťahovania.
+  export): 321 živých udalostí, **1 bez sedenia v PTminderi**; opačne
+  **4 z 339 sedení** bez udalosti v kalendári — a dve z nich sú z 3. a 5. 8.,
+  teda spred pripojenia kalendárov (8. 8.). Kalendár je dosť presný na to,
+  aby niesol dochádzku.
+## Diera v kalendári nebola diera — bolo to nespoznané meno
+
+22. 9. 2026 som ohlásil, že kalendár v okne 31. 8. – 3. 9. vynechal štrnásť
+Terezkiných tréningov, a hľadal príčinu vo výpadku sťahovania. **Bola to
+nesprávna diagnóza.** `kal_snimky` ukazujú, že sa v tých dňoch sťahovalo
+každý deň a prešlo; tie udalosti boli v databáze celý čas — s `typ` aj
+`klient` na NULL, pretože Terezka ich v tých dňoch písala ako **zdrobneninu
+krstného mena + iniciálu priezviska** („Peťa B", „Katka S", „Lucka P").
+
+Z toho platia tri veci:
+
+- **Chýbajúci ÚDAJ a chýbajúci ZÁZNAM vyzerajú v dopyte rovnako.** Dopyt na
+  `typ IN ('trening','uvodny')` tie riadky nevrátil, takže vyzerali ako
+  neexistujúce. Keď niečo „chýba", najprv sa pozri, či to tam nie je
+  nepomenované — až potom hľadaj výpadok.
+- **Kalendár netreba dopĺňať ďalšou tabuľkou.** Jerryho otázka znela, či by
+  proti stratám pomohlo zapisovanie tréningov niekam bokom. Nepomohlo by:
+  zápis nechýbal, chýbalo rozpoznanie. Ďalší zoznam by len znamenal písať to
+  isté dvakrát.
+- **Zoznam, ktorý sa nedá vyčistiť, sa prestane čítať.** Karta „Nové názvy"
+  mala 91 položiek, z toho sedemdesiat veterín a poznámok — a preto v nej
+  tých štrnásť tréningov ležalo týždne. Má preto dve časti: hore to, kde
+  appka niekoho spoznala (alebo aspoň tuší meno), dole zvyšok s jedným
+  tlačidlom „toto nie sú tréningy" (`akcia: "mapujVela"`, LEN typ, nikdy
+  klient). Čo `vyzeraNaMeno` označí za meno, dole nespadne — inak by jeden
+  klik umlčal skutočný tréning.
+
+Pravidlá párovania mena sú v `navrhniKlientaKandidati` (compute.ts): zdrobnenina
+sa uvoľňuje LEN cez spoločný začiatok krstného mena a len keď priezvisko sedí
+ďalej; y a i sú to isté písmeno („Šnyrychová"/„šnirychova"). Pri dvoch
+zhodách sa nevyberie ani jedna. **Návrh nie je zápis** — appka ho predvyplní,
+potvrdí ho človek.
+
 - **Dve pravopisné podoby toho istého klienta vyzerajú ako chýbajúci tréning.**
   „Tereza/Terezie Pehalova" a „Tomas/Tomaš Dvořak" boli dva z troch nálezov:
   kalendár si meno vyrobil z názvu udalosti, PTminder má svoje. Pozná sa to

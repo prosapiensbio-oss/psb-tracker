@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { fmtDMY, normName } from "../../lib/psb/format";
 
 import { fetchBtcReserve, type BtcVyplata } from "../../lib/psb/client";
-import { navrhniKlientaKandidati, type ClientAgg } from "../../lib/psb/compute";
+import { navrhniKlientaKandidati, vyzeraNaMeno, type ClientAgg } from "../../lib/psb/compute";
 import { guillermoZostatok } from "../../lib/psb/guillermo";
 import type { PSBData } from "../../lib/psb/types";
 import { C, mix } from "../../lib/psb/theme";
@@ -481,23 +481,20 @@ function Mapovanie({ nezname: nezmameVsetky, mena, clients, onHotovo, trener, kt
   // prihláseného.
   const ktoSomTrener = ktoSom === "jerry" ? "Jerry" : ktoSom === "terezka" ? "Terezka" : null;
   const nezname = trener === "all" ? nezmameVsetky : nezmameVsetky.filter((n) => n.trener === trener);
-  // Rozdelenie pre podnadpis — nech je split vidno aj v pohľade „Obaja".
-  const pocty = { Jerry: 0, Terezka: 0, ine: 0 };
-  for (const n of nezmameVsetky) {
-    if (n.trener === "Jerry") pocty.Jerry++;
-    else if (n.trener === "Terezka") pocty.Terezka++;
-    else pocty.ine++;
-  }
   const [vyber, setVyber] = useState<Record<string, { klient: string; typ: string }>>({});
   const [uklada, setUklada] = useState("");
+  // Server vie vrátiť {ok:false} aj s HTTP 200 — kto telo nečíta, hlási
+  // úspech aj pri odmietnutom zápise. Vzor s lokálnou chybou je ten istý
+  // ako pri zdrojoch kalendára vyššie (revízia 18. 8. 2026).
+  const [chybaUloz, setChybaUloz] = useState("");
 
   // Návrhy sa počítajú z názvu — Jerryho pravidlo (krstné meno alebo
   // priezvisko, „úvodný + celé meno", „guillermo") je čitateľné strojom.
   const navrhy = useMemo(() => {
     const m: Record<string, { typ: string; kandidati: string[]; meno: string }> = {};
-    for (const n of nezname) m[`${n.nazov}|${n.trener}`] = navrhni(n.nazov, clients);
+    for (const n of nezmameVsetky) m[`${n.nazov}|${n.trener}`] = navrhni(n.nazov, clients);
     return m;
-  }, [nezname, clients]);
+  }, [nezmameVsetky, clients]);
   const stav = (k: string) => {
     if (vyber[k]) return vyber[k];
     const n = navrhy[k];
@@ -540,9 +537,52 @@ function Mapovanie({ nezname: nezmameVsetky, mena, clients, onHotovo, trener, kt
    * Tréner zostáva súčasťou kľúča riadku (Natalia u Jerryho a Natalia
    * u Terezky sú dvaja ľudia) — zoskupenie ho len zobrazí vedľa mena.
    */
+  /**
+   * Čo vyzerá na tréning a čo nie.
+   *
+   * 22. 9. 2026 mala karta 91 položiek a sedemdesiat z nich bola veterina,
+   * box, plávanie a „napísať Zuzke". Nikto ju neotváral — a tak v nej celé
+   * týždne ležalo aj štrnásť skutočných tréningov, v ktorých appka nespoznala
+   * človeka. Dlhý zoznam nie je práca navyše, je to zoznam, ktorý sa prestane
+   * čítať.
+   *
+   * Deliaca čiara je appkin vlastný návrh: keď v názve niekoho spoznala
+   * (alebo je to úvodný či Guillermo), je to skoro isto tréning. Keď nie,
+   * patrí to dole — a dole sa to dá odbaviť naraz.
+   */
+  const jeTreningovy = (n: Nezname) => {
+    const nav = navrhy[`${n.nazov}|${n.trener}`];
+    if (nav && (nav.typ !== "trening" || nav.kandidati.length > 0)) return true;
+    // Bez návrhu, ale začína menom niekoho z klientely („Sofia B",
+    // „Lucka-onliena"): priezvisko appka nepozná, človek ho pozná. Dole to
+    // ísť nesmie — tam sa hromadne umlčiava.
+    return vyzeraNaMeno(n.nazov, mena);
+  };
+  const asiNieTrening = nezname.filter((n) => !jeTreningovy(n));
+  // Rozdelenie pre podnadpis — nech je split vidno aj v pohľade „Obaja".
+  const pocty = { Jerry: 0, Terezka: 0, ine: 0 };
+  for (const n of nezmameVsetky.filter(jeTreningovy)) {
+    if (n.trener === "Jerry") pocty.Jerry++;
+    else if (n.trener === "Terezka") pocty.Terezka++;
+    else pocty.ine++;
+  }
+  const [ukazZvysok, setUkazZvysok] = useState(false);
+  const [hromadne, setHromadne] = useState(false);
+  const odlozZvysok = async () => {
+    setHromadne(true); setChybaUloz("");
+    const j = await posli({
+      akcia: "mapujVela",
+      typ: "netrening",
+      polozky: asiNieTrening.map((n) => ({ nazov: n.nazov, trener: n.trener })),
+    }).catch(() => ({ ok: false, error: "spojenie" }));
+    setHromadne(false);
+    if (!j.ok) { setChybaUloz(j.error || "nepodarilo sa uložiť"); return; }
+    await onHotovo();
+  };
+
   const skupiny = useMemo(() => {
     const m = new Map<string, { meno: string; polozky: Nezname[]; spolu: number }>();
-    for (const n of nezname) {
+    for (const n of nezname.filter(jeTreningovy)) {
       const k = `${n.nazov}|${n.trener}`;
       const nav = navrhy[k];
       // POZOR: kľúč sa NESMIE počítať z toho, čo je práve napísané v poli.
@@ -568,10 +608,6 @@ function Mapovanie({ nezname: nezmameVsetky, mena, clients, onHotovo, trener, kt
         || (b.polozky.length - a.polozky.length) || (b.spolu - a.spolu));
   }, [nezname, navrhy, trener, ktoSomTrener]);
 
-  // Server vie vrátiť {ok:false} aj s HTTP 200 — kto telo nečíta, hlási
-  // úspech aj pri odmietnutom zápise. Vzor s lokálnou chybou je ten istý
-  // ako pri zdrojoch kalendára vyššie (revízia 18. 8. 2026).
-  const [chybaUloz, setChybaUloz] = useState("");
   const uloz = async (n: Nezname) => {
     const k = `${n.nazov}|${n.trener}`;
     const v = stav(k);
@@ -589,7 +625,7 @@ function Mapovanie({ nezname: nezmameVsetky, mena, clients, onHotovo, trener, kt
       <H3>
         <Info
           text="Kalendár nesie krstné mená a skratky — appka z nich sama nespozná klienta. Potvrdíš to raz a odvtedy to vie. Čo tréning nie je (plávanie, strihanie, poznámka), označ ako súkromné alebo iné a appka sa už nikdy nespýta."
-          label={`Nové názvy v kalendári (${nezname.length})`}
+          label={`Nové názvy v kalendári (${nezname.length - asiNieTrening.length})`}
         />
       </H3>
       {/* Rozpad podľa trénera — filter je hore na stránke; toto len ukazuje,
@@ -707,6 +743,79 @@ function Mapovanie({ nezname: nezmameVsetky, mena, clients, onHotovo, trener, kt
           })}
         </div>
       ))}
+      {asiNieTrening.length > 0 && (
+        <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <button
+              onClick={() => setUkazZvysok(!ukazZvysok)}
+              style={{
+                padding: "5px 10px", borderRadius: 7, fontSize: 12, cursor: "pointer",
+                border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted,
+              }}
+            >
+              {ukazZvysok ? "Skryť" : "Ukázať"} {asiNieTrening.length} {asiNieTrening.length < 5 ? "názvy" : "názvov"}, v ktorých appka nespoznala človeka
+            </button>
+            <button
+              onClick={() => void odlozZvysok()}
+              disabled={hromadne}
+              style={{
+                padding: "5px 11px", borderRadius: 7, fontSize: 12, fontWeight: 600,
+                cursor: hromadne ? "wait" : "pointer",
+                border: `1px solid ${mix(C.border, 80)}`, background: "transparent", color: C.textMuted,
+              }}
+            >
+              {hromadne ? "…" : `Toto nie sú tréningy (${asiNieTrening.length})`}
+            </button>
+          </div>
+          <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 6, lineHeight: 1.5 }}>
+            Veterina, box, plávanie, poznámky. Označením sa uložia ako „iné" a appka sa na ne
+            už nikdy nespýta — do hodín sa nerátali ani doteraz. Keď je medzi nimi tréning,
+            najprv mu tu dole priraď meno; hromadné označenie mená nenastavuje.
+          </div>
+          {ukazZvysok && asiNieTrening.map((n) => {
+            const k = `${n.nazov}|${n.trener}`;
+            // Predvolené je „iné", nie tréning: v týchto názvoch appka nikoho
+            // nespoznala, takže pravdepodobnejšia odpoveď je, že to tréning nie je.
+            const v = vyber[k] ?? { klient: "", typ: "netrening" };
+            return (
+              <div key={k} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "7px 0", borderBottom: `1px solid ${mix(C.border, 55)}` }}>
+                <div style={{ minWidth: 150 }}>
+                  <div style={{ fontSize: 13, color: C.text }}>{n.nazov}</div>
+                  <div style={{ fontSize: 11, color: C.textDim }}>{n.trener} · {n.pocet}× · {den(n.najblizsi)}</div>
+                </div>
+                <Select value={v.typ} onChange={(t) => setVyber({ ...vyber, [k]: { ...v, typ: t } })} options={TYPY} />
+                {(v.typ === "trening" || v.typ === "uvodny") && (
+                  <input
+                    value={v.klient}
+                    onChange={(e) => setVyber({ ...vyber, [k]: { ...v, klient: e.target.value } })}
+                    placeholder="píš meno…"
+                    list={`kl2-${n.trener}-${n.nazov}`}
+                    style={{
+                      flex: "1 1 170px", minWidth: 150, padding: "6px 9px", borderRadius: 8, fontSize: 12.5,
+                      border: `1px solid ${C.border}`, background: C.bg, color: C.text,
+                    }}
+                  />
+                )}
+                <datalist id={`kl2-${n.trener}-${n.nazov}`}>
+                  {mena.map((m) => <option key={m} value={m} />)}
+                </datalist>
+                <button
+                  onClick={() => void uloz(n)}
+                  disabled={uklada === k || !daSa(v)}
+                  style={{
+                    padding: "5px 11px", borderRadius: 8, fontSize: 12,
+                    cursor: daSa(v) ? "pointer" : "not-allowed",
+                    border: `1px solid ${C.border}`, background: "transparent",
+                    color: daSa(v) ? C.textMuted : C.textDim,
+                  }}
+                >
+                  {uklada === k ? "…" : "Potvrdiť"}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </Card>
   );
 }

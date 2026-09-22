@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import type { D1Database, D1PreparedStatement } from "@cloudflare/workers-types";
 
-import { isAuthed, unauthorized } from "../../lib/psb/auth.server";
+import { audit } from "../../lib/psb/audit.server";
+import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 import { typZNazvu } from "../../lib/psb/kalendar";
 import { casUdalosti, nejednoznacneMena, vyberMapu, type Mapa } from "../../lib/psb/kalendarMena";
@@ -407,6 +408,48 @@ export const Route = createFileRoute("/api/kalendar")({
             ).bind(klient, typ, nazov, trener, nazov, trener).run();
           }
           return Response.json({ ok: true });
+        }
+
+        /**
+         * Hromadné odloženie toho, čo tréning nie je.
+         *
+         * Karta „Nové názvy" mala 22. 9. 2026 deväťdesiatjeden položiek a
+         * sedemdesiat z nich boli veterina, box, plávanie, strihanie
+         * a „napísať Zuzke". Odklepávať ich po jednej nikto nešiel — a tak
+         * v tom zozname celé týždne ležalo aj štrnásť skutočných tréningov,
+         * ktoré appka nespoznala. Zoznam, ktorý sa nedá vyčistiť, prestane
+         * byť zoznamom a stane sa šumom.
+         *
+         * Zámerne LEN typ, bez klienta: hromadne sa dá povedať „toto nie sú
+         * tréningy", nikdy „toto je ten a ten človek". Priradenie mena
+         * zostáva po jednom, tam sa hádať nesmie.
+         */
+        if (akcia === "mapujVela") {
+          const polozky = Array.isArray(b.polozky) ? b.polozky : [];
+          const typ = String(b.typ || "netrening");
+          if (typ === "trening" || typ === "uvodny") {
+            return Response.json({ ok: false, error: "Hromadne sa dá označiť len to, čo tréning NIE JE." }, { status: 400 });
+          }
+          const dvojice = polozky
+            .map((x) => x as { nazov?: unknown; trener?: unknown })
+            .map((x) => ({ nazov: String(x?.nazov ?? ""), trener: String(x?.trener ?? "") }))
+            .filter((x) => x.nazov && x.trener)
+            .slice(0, 200);
+          if (!dvojice.length) return Response.json({ ok: false, error: "Nič na označenie." }, { status: 400 });
+          const kedy2 = teraz();
+          await DB.batch(dvojice.flatMap((d) => [
+            DB.prepare("INSERT OR REPLACE INTO kal_mapovanie (nazov, trener, cas, klient, typ, potvrdene_at, vedome) VALUES (?,?,'',NULL,?,?,1)")
+              .bind(d.nazov, d.trener, typ, kedy2),
+            DB.prepare("UPDATE kal_udalosti SET klient = NULL, typ = ? WHERE nazov = ? AND trener = ?")
+              .bind(typ, d.nazov, d.trener),
+          ]));
+          await audit(DB, {
+            action: "kalendar-nie-treningy",
+            predmet: `${dvojice.length} názvov`,
+            neu: dvojice.map((d) => `${d.trener}: ${d.nazov}`).join(" · ").slice(0, 300),
+            actor: await currentUser(request) || undefined,
+          });
+          return Response.json({ ok: true, oznacenych: dvojice.length });
         }
 
         // Guillermo: nákup sedení. Čerpanie sa neeviduje ručne — to hovorí

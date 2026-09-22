@@ -1384,6 +1384,72 @@ export function klientUdalosti(u: { klient?: string | null; typ?: string | null;
  * Nula alebo viac než jeden = nechať na človeka; hádať by znamenalo priradiť
  * tréning zlému klientovi (dnes „Tomaš" = päť ľudí).
  */
+/**
+ * Y a I sú v českých priezviskách to isté písmeno napísané dvakrát inak.
+ * Používa sa LEN pri návrhu (nikdy pri zápise) — je to tolerancia, nie tvrdenie.
+ */
+const bezY = (s: string) => s.replace(/y/g, "i");
+
+/** Koľko prvých znakov majú dve slová spoločných. */
+const spolocnyZaciatok = (a: string, b: string): number => {
+  let i = 0;
+  while (i < a.length && i < b.length && a[i] === b[i]) i++;
+  return i;
+};
+
+/**
+ * Poznámky, ktoré sa v kalendári lepia k menu a menom nie sú.
+ *
+ * Zámerne krátky zoznam — rovnaký dôvod ako pri `PODLA_SLOVA` v kalendar.ts:
+ * každé ďalšie slovo je ďalšia šanca odrezať kus skutočného mena.
+ */
+const POZNAMKA = /^(onlin\w*|zdarma|free|cvic\w*|nahrad\w*|presun\w*|trening|treninky)$/;
+
+/**
+ * Názov rozobratý na kúsky mena — bez poznámky prilepenej k menu.
+ *
+ * „Veronika-online", „Regina-dať zdarma", „Marcela Hrůzová online": všetko sú
+ * tréningy, v ktorých appka nespoznala nikoho, lebo poznámka za menom sa
+ * počítala ako ďalšia časť mena a tá už nesadla na žiadneho klienta.
+ *
+ * Za pomlčkou začína poznámka (meno pred ňou stačí), zvyšné poznámkové slová
+ * sa vyhadzujú. Keby po vyhodení nezostalo nič, vráti sa pôvodný rozpad —
+ * prázdny zoznam kúskov by znamenal, že sa nenavrhne nikto.
+ */
+export function kusyZNazvu(hladane: string): string[] {
+  const pomlcka = hladane.search(/\p{Pd}/u);
+  const zaklad = pomlcka > 1 ? hladane.slice(0, pomlcka) : hladane;
+  const vsetky = zaklad.split(/[\s.,\p{Pd}]+/u).filter(Boolean);
+  const bezPoznamky = vsetky.filter((x) => !POZNAMKA.test(x));
+  return bezPoznamky.length ? bezPoznamky : vsetky;
+}
+
+/**
+ * Vyzerá prvé slovo názvu na krstné meno niekoho z klientely?
+ *
+ * Nie je to párovanie — je to otázka „má sa toto vôbec pýtať človeka?".
+ * Karta „Nové názvy" dáva dole to, v čom appka nikoho nespoznala, a ponúka
+ * pri tom hromadné „toto nie sú tréningy". Keby medzi nimi ležala „Sofia B"
+ * alebo „Lucka-onliena" — mená klientok, len s priezviskom, ktoré appka
+ * nepozná — jedno kliknutie by umlčalo skutočný tréning. Preto sa takéto
+ * názvy držia HORE, medzi tým, čo čaká na meno, aj keď návrh nemajú.
+ *
+ * Zámerne mäkké: stačí zhodný začiatok krstného mena. Falošný poplach tu
+ * stojí jeden riadok navyše, falošné ticho stojí tréning.
+ */
+export function vyzeraNaMeno(nazov: string, menaKlientov: string[]): boolean {
+  const holy = normName(nazov);
+  // Názov, ktorý sám o sebe hovorí „tréning", je tréning bez mena — a to je
+  // presne to, čo má zostať na očiach. („Trening", Terezka, 9. 9. 2026.)
+  if (/trenin|trenink/.test(holy)) return true;
+  const prve = kusyZNazvu(holy)[0] || "";
+  if (prve.length < 3) return false;
+  return menaKlientov.some((m) => {
+    const krstne = normName(m).split(/\s+/)[0] || "";
+    return spolocnyZaciatok(bezY(krstne), bezY(prve)) >= 3;
+  });
+}
+
 export function navrhniKlientaKandidati(
   nazov: string,
   clients: Record<string, Pick<ClientAgg, "status" | "primaryTrainer">>,
@@ -1392,7 +1458,12 @@ export function navrhniKlientaKandidati(
   if (/guillermo/.test(holy)) return { typ: "guillermo", kandidati: [], meno: "" };
 
   const uvodny = /\buvodn/.test(holy);
-  const meno = uvodny ? nazov.replace(/[uúUÚ]vodn\S*/g, "").replace(/\s+/g, " ").trim() : "";
+  // Meno z názvu úvodného čistí `menoZNazvuUvodneho` — má na to vlastné
+  // pravidlá (odreže aj „tréning", pomlčky a dvojbodky) a je to jediné miesto,
+  // kde to žije. Vlastná kópia tu nechávala „Petr Baťa - tréning".
+  const meno = uvodny
+    ? (menoZNazvuUvodneho(nazov) || nazov.replace(/[uúUÚ]vodn\S*/g, "").replace(/\s+/g, " ").trim())
+    : "";
   const hladane = uvodny ? holy.replace(/\buvodn\w*\b/g, "").trim() : holy;
   if (!hladane) return { typ: uvodny ? "uvodny" : "trening", kandidati: [], meno };
 
@@ -1401,7 +1472,7 @@ export function navrhniKlientaKandidati(
   // Moniky — hoci „Č." ju jednoznačne odlišuje (Jerry, 3. 9. 2026). Iniciála
   // ako predpona priezviska maťchovanie SPRÍSNI, nie rozvoľní: viac kúskov =
   // každý musí sedieť.
-  const kusy = hladane.split(/[\s.,-]+/).filter((x) => x.length >= 1);
+  const kusy = kusyZNazvu(hladane);
   const skore: { meno: string; bod: number }[] = [];
   for (const [m, c] of Object.entries(clients)) {
     const casti = normName(m).split(/\s+/).filter(Boolean);
@@ -1409,6 +1480,24 @@ export function navrhniKlientaKandidati(
     if (casti.length && kusy.length >= 2 && kusy.every((k) => casti.some((c2) => c2.startsWith(k)))) bod += 6;
     else if (kusy.length === 1 && casti.includes(kusy[0])) bod += 4;
     else if (kusy.length === 2 && casti[0] === kusy[0] && casti.slice(1).some((c2) => c2.startsWith(kusy[1]))) bod += 5;
+    // Zdrobnenina krstného mena + priezvisko (aj samotná iniciála).
+    // „Peťa B" je Petra Bambúšková, „Katka S" Kateřina Stoklásková, „Lucka P"
+    // Lucie Podolova, „Luky Kriz" Lukas Kriz — v kalendári bežný zápis, ktorý
+    // cez `startsWith` neprejde ani raz. Terezka ho použila 31. 8. – 3. 9.
+    // 2026 na štrnásť tréningov a appka v nich nevidela nikoho; vyzeralo to
+    // ako chýbajúce udalosti, pritom boli v databáze celý čas.
+    //
+    // Uvoľňuje sa LEN krstné meno a len o spoločný začiatok. Priezvisko musí
+    // sedieť ďalej — ono je tu poistka, bez ktorej by „Peťa" sadla na každú
+    // Petru v štúdiu. Preto holá zdrobnenina (jeden kúsok) sem nespadne.
+    // Keď takto vyjdú dvaja (Petra Bambúšková a Petr Baťa), zostanú obaja
+    // v ponuke a appka nevyberie ani jedného — hádať sa nesmie.
+    //
+    // `bezY` navyše zlučuje y/i: „Šnyrychová" v kalendári verzus „šnirychova"
+    // v PTminderi je jeden dĺžeň od seba a bez toho je to dvojica cudzích ľudí.
+    else if (kusy.length === 2
+      && spolocnyZaciatok(bezY(casti[0] || ""), bezY(kusy[0])) >= 3
+      && casti.slice(1).some((c2) => bezY(c2).startsWith(bezY(kusy[1])))) bod += 3;
     if (!bod) continue;
     if (c.status !== "Neaktívny") bod += 2;
     if (c.primaryTrainer === "Jerry") bod += 1;
