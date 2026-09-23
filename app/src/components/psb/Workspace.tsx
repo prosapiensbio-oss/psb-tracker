@@ -77,25 +77,6 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   );
   const k = zive[Math.min(i, Math.max(0, zive.length - 1))];
 
-  const text = (kluc: string, predvolene = "") => texty[kluc] ?? predvolene;
-  const nastavText = (kluc: string, v: string) => setTexty((s) => ({ ...s, [kluc]: v }));
-
-  const posli = async (url: string, telo: Record<string, unknown>) => {
-    const r = await fetch(url, { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify(telo) });
-    return (await r.json()) as { ok: boolean; error?: string };
-  };
-
-  const vybav = async (kluc: string, url: string, telo: Record<string, unknown>) => {
-    setPracujem(kluc); setChyba("");
-    const j = await posli(url, telo).catch(() => ({ ok: false, error: "spojenie" }));
-    setPracujem("");
-    if (!j.ok) { setChyba(j.error || "nepodarilo sa uložiť"); return; }
-    setHotove((s) => new Set([...s, kluc]));
-  };
-
-  if (!zdroje) return null;
-
-  const vybavenych = hotove.size;
   /**
    * Prepínanie kariet dvoma prstami po trackpade (Jerry, 23. 9. 2026).
    *
@@ -137,6 +118,26 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
     return () => { el.removeEventListener("wheel", naKoleso); clearTimeout(gesto.current.ticho); };
   }, [zive.length]);
 
+
+  const text = (kluc: string, predvolene = "") => texty[kluc] ?? predvolene;
+  const nastavText = (kluc: string, v: string) => setTexty((s) => ({ ...s, [kluc]: v }));
+
+  const posli = async (url: string, telo: Record<string, unknown>) => {
+    const r = await fetch(url, { method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" }, body: JSON.stringify(telo) });
+    return (await r.json()) as { ok: boolean; error?: string };
+  };
+
+  const vybav = async (kluc: string, url: string, telo: Record<string, unknown>) => {
+    setPracujem(kluc); setChyba("");
+    const j = await posli(url, telo).catch(() => ({ ok: false, error: "spojenie" }));
+    setPracujem("");
+    if (!j.ok) { setChyba(j.error || "nepodarilo sa uložiť"); return; }
+    setHotove((s) => new Set([...s, kluc]));
+  };
+
+  if (!zdroje) return null;
+
+  const vybavenych = hotove.size;
   const spolu = karty.reduce((a, x) => a + x.polozky.length, 0);
 
   if (!zive.length) {

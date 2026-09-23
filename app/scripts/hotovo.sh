@@ -14,6 +14,7 @@
 # PORADIE JE ZÁMER
 #
 #   1. typy       — najlacnejšie, spadne najskôr
+#   1b. hooky     — poradie hookov; chyba, ktorú typy ani testy nevidia
 #   2. testy      — pravidlá na vymyslených dátach
 #   3. nasadenie  — nasad.sh (má v sebe stráž migrácií aj overenie assetu)
 #   4. naživo     — shell, asset a API cez HTTP; to je jediný dôkaz, že beží
@@ -101,6 +102,7 @@ naziveA() {
 
 echo "── Kokpit: celý reťazec ────────────────────────────────"
 krok "typy"        bunx tsc --noEmit -p tsconfig.json
+krok "hooky"       bunx eslint -c eslint.hooks.config.js src --quiet
 krok "testy"       bun run test
 if [ "$bez_nasadenia" = "0" ]; then
   krok "nasadenie"  ./scripts/nasad.sh

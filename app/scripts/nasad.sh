@@ -91,6 +91,24 @@ if [ "${1:-}" != "--bez-buildu" ]; then
   # Testy pred buildom — 20. 8. 2026 sa nasadila zmena, ktorá rozbila 3 testy,
   # a nikto si to nevšimol, lebo nasadenie testy nepúšťalo. Zelený build nie je
   # dôkaz; zelené testy aspoň strážia to, čo dokumentujú.
+  # Poradie hookov — jediná chyba, ktorá zhasne CELÝ Kokpit.
+  #
+  # 23. 9. 2026 sa useRef/useEffect ocitli POD `if (!zdroje) return null;`.
+  # Typy prešli, testy prešli, build prešiel, wrangler ohlásil úspech — a Jerry
+  # uvidel „This page didn't load" namiesto celej appky. Beží to totiž až
+  # v prehliadači: prvé vykreslenie má menej hookov než druhé a React na to
+  # zhodí koreňovú hranicu.
+  #
+  # `bun run lint` to chytí tiež, ale vypľuje vyše sto formátovacích výhrad,
+  # takže ho nikto nespúšťa. Toto je preto jedno jediné pravidlo, potichu.
+  echo "▸ poradie hookov…"
+  if ! bunx eslint -c eslint.hooks.config.js src --quiet > /tmp/hooky.log 2>&1; then
+    echo "✗ hook je za podmienkou alebo za návratom — appka by nenabehla:"
+    tail -20 /tmp/hooky.log
+    exit 1
+  fi
+  echo "  hooky OK"
+
   echo "▸ testy…"
   if ! bun run test > /tmp/nasad-test.log 2>&1; then
     echo "✗ testy zlyhali — pozri /tmp/nasad-test.log"
