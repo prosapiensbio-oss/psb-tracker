@@ -144,6 +144,11 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
       precoNeprisiel: String(r.preco_neprisiel || ""),
       balicekZostatok: r.balicek_zostatok == null ? null : Number(r.balicek_zostatok),
       balicekKDatumu: String(r.balicek_k_datumu || ""),
+      // Kedy sa override naposledy zapísal. Bez toho sa nedá povedať, či
+      // ručná „Pauza" ešte platí — a 23. 9. 2026 ju malo trinásť klientov,
+      // ktorí odvtedy trénovali. Ručný zápis je snímka, ktorá nevyprší;
+      // aspoň nech je vidieť, kedy vznikla.
+      updatedAt: String(r.updated_at || ""),
     };
   }
   for (const r of acks.results as any[]) {

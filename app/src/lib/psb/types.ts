@@ -84,6 +84,8 @@ export type Lead = {
 };
 
 export type ClientOverride = {
+  /** Kedy sa override naposledy zapísal — ručný stav je snímka, nie pravidlo. */
+  updatedAt?: string;
   status?: string | null;
   specialRate?: boolean;
   specialRateNote?: string;

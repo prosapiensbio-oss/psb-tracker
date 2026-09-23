@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { normName, fmtCZK, fmtDMY } from "../../lib/psb/format";
+import { CENNIK, platnostDo } from "../../lib/psb/cennik";
 import { osCasuKlienta } from "../../lib/psb/klientOsCasu";
 import type { ClientAgg } from "../../lib/psb/compute";
 import type { PSBData } from "../../lib/psb/types";
@@ -51,6 +52,9 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats }: {
   const [meno, setMeno] = useState("");
   const [filter, setFilter] = useState<"vsetko" | "treningy" | "peniaze" | "balicky" | "poznamky" | "puvod">("vsetko");
   const [detaily, setDetaily] = useState(false);
+  const [pisemPlatbu, setPisemPlatbu] = useState(false);
+  const [pl, setPl] = useState({ datum: dnesISO(), suma: "", sposob: "hotovost", poznamka: "" });
+  const [menimStav, setMenimStav] = useState(false);
   const [balicky, setBalicky] = useState<Balicek[]>([]);
   const [pisem, setPisem] = useState(false);
   const [f, setF] = useState({ nazov: "", hodiny: "", platnostOd: dnesISO(), platnostDo: "", cenaCzk: "", poznamka: "" });
@@ -111,6 +115,23 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats }: {
     [data.zavery, meno],
   );
 
+  /**
+   * Ručne nastavený stav, ktorý dáta už neplatia — koľko tréningov odvtedy.
+   *
+   * Override sa zapisuje raz a platí navždy; nikto ho nechodí rušiť. Preto
+   * sa pýta appka.
+   */
+  const zabudnutaPauza = useMemo(() => {
+    const ov = (data.clientOverrides || {})[meno];
+    const [stav, doDna] = (ov?.status || "").split("|");
+    if (!c || (stav !== "Pauza" && stav !== "Neaktívny")) return 0;
+    // „Pauza|2026-08-27" hovorí, dokedy pauza trvá — po tom dni už tréning
+    // nie je rozpor. Pri holej „Pauze" je hranicou deň, keď sa zapísala.
+    const od = (doDna || (ov?.updatedAt || "").slice(0, 10));
+    if (!od) return 0;
+    return c.sessions.filter((x) => x.date.slice(0, 10) > od).length;
+  }, [data.clientOverrides, meno, c]);
+
   /** Koľko údajov je pod tlačidlom „ďalších N" — aby číslo nebolo vymyslené. */
   const dalsichUdajov = useMemo(
     () => (c ? stitky(c, dopyt, priviedol, poplatkyKlienta, btcSats?.[meno]).length : 0),
@@ -121,6 +142,34 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats }: {
   const predane = mojeBalicky.reduce((a, b) => a + (b.cena_czk || 0), 0);
   const zaplatene = platby.reduce((a, p) => a + p.amount, 0);
   const rozdiel = Math.round(predane - zaplatene);
+
+  const pridajPlatbu = async () => {
+    setPracujem(true); setChyba("");
+    const r = await fetch("/api/platby", {
+      method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ akcia: "hotovost", klient: meno, ...pl }),
+    }).then((x) => x.json()).catch(() => ({ ok: false, error: "spojenie" }));
+    setPracujem(false);
+    if (!r.ok) { setChyba(r.error || "nepodarilo sa uložiť"); return; }
+    setPl({ datum: dnesISO(), suma: "", sposob: "hotovost", poznamka: "" });
+    setPisemPlatbu(false);
+  };
+
+  /** Zmena kategórie klienta — ručný stav prebije automatický. */
+  const nastavStav = async (novy: string) => {
+    setPracujem(true); setChyba("");
+    const r = await fetch("/api/override", {
+      method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: meno, key: "status", value: novy }),
+    }).then((x) => x.json()).catch(() => ({ ok: false, error: "spojenie" }));
+    setPracujem(false);
+    setMenimStav(false);
+    if (!r.ok) { setChyba(r.error || "nepodarilo sa uložiť"); return; }
+    // Stav žije v `data`, ktoré sem prichádzajú zhora — kým sa nenačítajú
+    // znova, obrazovka by tvrdila staré. Radšej povedať, že treba obnoviť,
+    // než ukázať číslo, ktoré už neplatí.
+    setChyba("Uložené. Obnov stránku, aby sa stav prepočítal všade.");
+  };
 
   const pridaj = async () => {
     setPracujem(true); setChyba("");
@@ -241,9 +290,47 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats }: {
       <div style={{ width: 250, flexShrink: 0, display: "flex", flexDirection: "column", gap: 10, overflowY: "auto", minHeight: 0 }}>
         <div>
           <div style={{ fontSize: 19, fontWeight: 800, lineHeight: 1.2 }}>{meno}</div>
-          <div style={{ fontSize: 11.5, color: C.textMuted, marginTop: 3 }}>
-            {c ? `${c.status} · ${c.primaryTrainer}` : "čaká na prvý tréning"}
+          <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4, flexWrap: "wrap" }}>
+            <button onClick={() => setMenimStav(!menimStav)} style={{
+              padding: "3px 9px", borderRadius: 7, fontSize: 11.5, cursor: "pointer",
+              border: `1px solid ${zabudnutaPauza ? C.orange : C.border}`,
+              background: zabudnutaPauza ? mix(C.orange, 15) : "transparent",
+              color: zabudnutaPauza ? C.orange : C.textMuted,
+            }}>
+              {c ? c.status : "čaká na prvý tréning"} ▾
+            </button>
+            {c && <span style={{ fontSize: 11.5, color: C.textDim }}>{c.primaryTrainer}</span>}
           </div>
+
+          {/* Ručný stav je SNÍMKA, ktorá nikdy nevyprší.
+              23. 9. 2026 malo trinásť klientov ručne nastavenú „Pauzu" a
+              odvtedy trénovali — Anetka Přinosilová od 4. 8. trikrát a ešte
+              aj zaplatila 21 150 Kč. Appka o tom vedela a mlčala, lebo ručný
+              zápis prebíja dáta bez otázky. Toto je tá otázka. */}
+          {zabudnutaPauza && (
+            <div style={{ fontSize: 11, color: C.orange, marginTop: 6, lineHeight: 1.5 }}>
+              Ručne nastavené „{c?.status}", ale odvtedy {zabudnutaPauza} {zabudnutaPauza === 1 ? "tréning" : zabudnutaPauza < 5 ? "tréningy" : "tréningov"}. Platí to ešte?
+            </div>
+          )}
+
+          {menimStav && (
+            <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginTop: 7 }}>
+              {["Aktívny", "Pauza", "Neaktívny"].map((x) => (
+                <button key={x} onClick={() => void nastavStav(x)} disabled={pracujem} style={{
+                  padding: "4px 9px", borderRadius: 7, fontSize: 11, cursor: "pointer",
+                  border: `1px solid ${c?.status === x ? C.accent : C.border}`,
+                  background: c?.status === x ? C.accentBg : "transparent",
+                  color: c?.status === x ? C.accentLight : C.textMuted,
+                }}>{x}</button>
+              ))}
+              {/* Prázdna hodnota vráti rozhodovanie appke — ručný zápis, na
+                  ktorý sa zabudne, je horší než žiadny. */}
+              <button onClick={() => void nastavStav("")} disabled={pracujem} style={{
+                padding: "4px 9px", borderRadius: 7, fontSize: 11, cursor: "pointer",
+                border: `1px solid ${C.border}`, background: "transparent", color: C.textDim,
+              }}>nech rozhodne appka</button>
+            </div>
+          )}
         </div>
 
         <div style={{ padding: "11px 13px", borderRadius: 11, background: mix(rozdiel > 0 ? C.red : C.green, 10), border: `1px solid ${mix(rozdiel > 0 ? C.red : C.green, 40)}` }}>
@@ -295,10 +382,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats }: {
         )}
 
         <div style={{ flexGrow: 1 }} />
-        <button onClick={() => setPisem(!pisem)} style={{ ...navrhTlacidlo, borderColor: mix(C.green, 45), color: C.green, fontWeight: 600 }}>
-          {pisem ? "Zavrieť" : "+ Nahodiť balíček"}
-        </button>
-        <button onClick={() => { setMeno(""); setFilter("vsetko"); }} style={navrhTlacidlo}>← späť na zoznam</button>
+        <button onClick={() => { setMeno(""); setFilter("vsetko"); setPisem(false); setPisemPlatbu(false); }} style={navrhTlacidlo}>← späť na zoznam</button>
       </div>
 
       <div style={{ flexGrow: 1, minWidth: 0, display: "flex", flexDirection: "column", minHeight: 0 }}>
@@ -312,7 +396,29 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats }: {
           </div>
         </div>
 
-        {pisem && <FormularBalicka f={f} setF={setF} pracujem={pracujem} onUloz={() => void pridaj()} />}
+        {/* Pridávanie patrí k svojej záložke (Jerry, 23. 9. 2026). Tlačidlo
+            „nahodiť balíček" pri zozname tréningov je ponuka na vec, ktorú
+            človek v tej chvíli nerieši — a pri piatich takých tlačidlách sa
+            prestanú čítať všetky. */}
+        {filter === "balicky" && (
+          <button onClick={() => setPisem(!pisem)} style={{ ...navrhTlacidlo, marginTop: 10, alignSelf: "flex-start", borderColor: mix(C.green, 45), color: C.green, fontWeight: 600 }}>
+            {pisem ? "Zavrieť" : "+ Nahodiť balíček alebo členstvo"}
+          </button>
+        )}
+        {filter === "peniaze" && (
+          <button onClick={() => setPisemPlatbu(!pisemPlatbu)} style={{ ...navrhTlacidlo, marginTop: 10, alignSelf: "flex-start", borderColor: mix(C.green, 45), color: C.green, fontWeight: 600 }}>
+            {pisemPlatbu ? "Zavrieť" : "+ Pridať platbu"}
+          </button>
+        )}
+        {filter === "balicky" && pisem && <FormularBalicka f={f} setF={setF} pracujem={pracujem} onUloz={() => void pridaj()} />}
+        {filter === "peniaze" && pisemPlatbu && (
+          <FormularPlatby
+            p={pl}
+            setP={setPl}
+            pracujem={pracujem}
+            onUloz={() => void pridajPlatbu()}
+          />
+        )}
         {chyba && <div style={{ fontSize: 12, color: C.red, marginTop: 8 }}>{chyba}</div>}
 
         <div style={{ flexGrow: 1, minHeight: 0, overflowY: "auto", marginTop: 10 }}>
@@ -419,25 +525,79 @@ function FormularBalicka({ f, setF, pracujem, onUloz }: {
   pracujem: boolean;
   onUloz: () => void;
 }) {
+  /**
+   * Zo šablóny sa predvyplní VŠETKO, čo sa dá — a dá sa to prepísať.
+   *
+   * PSB má pevné formáty (prevadzka.md, oddiel 1), takže písať názov rukou
+   * znamená len šancu na preklep: iný názov = iný „typ" balíčka a porovnanie
+   * s PTminderom by ho hlásilo ako rozdiel navždy. Ceny sú katalógové, lebo
+   * zľavy (Jarek, barter, bitcoin) sú v PSB bežné — predvyplnenie je pomoc,
+   * nie tvrdenie.
+   */
+  const zoSablony = (nazov: string) => {
+    const sab = CENNIK.find((x) => x.nazov === nazov);
+    if (!sab) { setF({ ...f, nazov } as never); return; }
+    setF({
+      ...f,
+      nazov: sab.nazov,
+      hodiny: sab.hodiny == null ? "" : String(sab.hodiny),
+      cenaCzk: sab.cena == null ? "" : String(sab.cena),
+      platnostDo: platnostDo(f.platnostOd, sab.tyzdnov),
+    } as never);
+  };
+
+  const skupiny = ["Offline", "Online", "Špeciálne"] as const;
+
   return (
-    <div style={{ marginTop: 10, display: "flex", gap: 7, flexWrap: "wrap", alignItems: "flex-end", padding: "10px 11px", borderRadius: 10, background: mix(C.border, 40) }}>
+    <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end", padding: "11px 12px", borderRadius: 10, background: mix(C.border, 40) }}>
+      <label style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 10.5, color: C.textDim }}>
+        balíček alebo členstvo
+        <select
+          value={CENNIK.some((x) => x.nazov === f.nazov) ? f.nazov : ""}
+          onChange={(e) => zoSablony(e.target.value)}
+          style={{ width: 226, padding: "6px 8px", borderRadius: 7, fontSize: 12, border: `1px solid ${C.border}`, background: C.bg, color: C.text }}
+        >
+          <option value="">— vyber zo zoznamu —</option>
+          {skupiny.map((sk) => (
+            <optgroup key={sk} label={sk}>
+              {CENNIK.filter((x) => x.skupina === sk).map((x) => (
+                <option key={x.nazov} value={x.nazov}>
+                  {x.nazov}{x.cena ? ` · ${x.cena.toLocaleString("sk-SK")} Kč` : ""}
+                </option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+      </label>
+
       {([
-        { k: "nazov", l: "názov balíčka", w: 210 },
-        { k: "hodiny", l: "hodín", w: 80 },
-        { k: "platnostOd", l: "platí od", w: 115 },
-        { k: "platnostDo", l: "platí do", w: 115 },
-        { k: "cenaCzk", l: "cena Kč", w: 95 },
-        { k: "poznamka", l: "poznámka", w: 150 },
+        { k: "hodiny", l: "hodín", w: 70, typ: "text" },
+        { k: "platnostOd", l: "platí od", w: 145, typ: "date" },
+        { k: "platnostDo", l: "platí do", w: 145, typ: "date" },
+        { k: "cenaCzk", l: "cena Kč", w: 95, typ: "text" },
+        { k: "poznamka", l: "poznámka", w: 150, typ: "text" },
       ]).map((x) => (
         <label key={x.k} style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 10.5, color: C.textDim }}>
           {x.l}
           <input
+            type={x.typ}
             value={f[x.k]}
             onChange={(e) => setF({ ...f, [x.k]: e.target.value } as never)}
-            style={{ width: x.w, padding: "6px 8px", borderRadius: 7, fontSize: 12, border: `1px solid ${C.border}`, background: C.bg, color: C.text }}
+            style={{ width: x.w, padding: "6px 8px", borderRadius: 7, fontSize: 12, border: `1px solid ${C.border}`, background: C.bg, color: C.text, colorScheme: "dark" }}
           />
         </label>
       ))}
+
+      {/* Názov mimo cenníka je dovolený (výnimky sa dejú), ale je vidieť. */}
+      {f.nazov && !CENNIK.some((x) => x.nazov === f.nazov) && (
+        <input
+          value={f.nazov}
+          onChange={(e) => setF({ ...f, nazov: e.target.value } as never)}
+          placeholder="vlastný názov"
+          style={{ width: 190, padding: "6px 8px", borderRadius: 7, fontSize: 12, border: `1px solid ${C.orange}`, background: C.bg, color: C.text }}
+        />
+      )}
+
       <button onClick={onUloz} disabled={pracujem || !f.nazov.trim()} style={{
         padding: "7px 14px", borderRadius: 8, fontSize: 12, fontWeight: 700,
         cursor: f.nazov.trim() ? "pointer" : "not-allowed",
@@ -447,6 +607,62 @@ function FormularBalicka({ f, setF, pracujem, onUloz }: {
       }}>
         {pracujem ? "…" : "Nahodiť"}
       </button>
+    </div>
+  );
+}
+
+/**
+ * Ručná platba — hotovosť zo zošita, barter, čokoľvek, čo nejde cez banku.
+ *
+ * Bankové platby sa priraďujú vo vlastnej karte z výpisu; sem sa píše to,
+ * čo v banke nikdy nebude. Preto je predvolená „hotovosť" a nie prevod —
+ * prevod, ktorý by sa sem zapísal ručne, by sa raz spároval z výpisu ešte
+ * raz a klient by mal zaplatené dvakrát.
+ */
+function FormularPlatby({ p, setP, pracujem, onUloz }: {
+  p: { datum: string; suma: string; sposob: string; poznamka: string };
+  setP: (v: never) => void;
+  pracujem: boolean;
+  onUloz: () => void;
+}) {
+  const platne = Number(p.suma) > 0 && /^\d{4}-\d{2}-\d{2}$/.test(p.datum);
+  return (
+    <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end", padding: "11px 12px", borderRadius: 10, background: mix(C.border, 40) }}>
+      <label style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 10.5, color: C.textDim }}>
+        kedy zaplatil
+        <input type="date" value={p.datum} onChange={(e) => setP({ ...p, datum: e.target.value } as never)}
+          style={{ width: 145, padding: "6px 8px", borderRadius: 7, fontSize: 12, border: `1px solid ${C.border}`, background: C.bg, color: C.text, colorScheme: "dark" }} />
+      </label>
+      <label style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 10.5, color: C.textDim }}>
+        suma Kč
+        <input value={p.suma} onChange={(e) => setP({ ...p, suma: e.target.value } as never)}
+          style={{ width: 100, padding: "6px 8px", borderRadius: 7, fontSize: 12, border: `1px solid ${C.border}`, background: C.bg, color: C.text }} />
+      </label>
+      <label style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 10.5, color: C.textDim }}>
+        ako
+        <select value={p.sposob} onChange={(e) => setP({ ...p, sposob: e.target.value } as never)}
+          style={{ width: 130, padding: "6px 8px", borderRadius: 7, fontSize: 12, border: `1px solid ${C.border}`, background: C.bg, color: C.text }}>
+          <option value="hotovost">hotovosť</option>
+          <option value="ine">iné (barter, BTC)</option>
+        </select>
+      </label>
+      <label style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 10.5, color: C.textDim }}>
+        poznámka
+        <input value={p.poznamka} onChange={(e) => setP({ ...p, poznamka: e.target.value } as never)}
+          style={{ width: 180, padding: "6px 8px", borderRadius: 7, fontSize: 12, border: `1px solid ${C.border}`, background: C.bg, color: C.text }} />
+      </label>
+      <button onClick={onUloz} disabled={pracujem || !platne} style={{
+        padding: "7px 14px", borderRadius: 8, fontSize: 12, fontWeight: 700,
+        cursor: platne ? "pointer" : "not-allowed",
+        border: `1px solid ${mix(C.green, 50)}`,
+        background: platne ? mix(C.green, 12) : "transparent",
+        color: platne ? C.green : C.textDim,
+      }}>
+        {pracujem ? "…" : "Uložiť platbu"}
+      </button>
+      <div style={{ fontSize: 11, color: C.textDim, flexBasis: "100%" }}>
+        Bankové platby sem nepíš — tie sa priraďujú z výpisu v karte „Platby z banky", inak by sa započítali dvakrát.
+      </div>
     </div>
   );
 }
