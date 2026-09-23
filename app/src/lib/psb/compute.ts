@@ -794,8 +794,38 @@ export function vytazenieSpolu(capacity: Pick<CapacityRow, "recentWeekly" | "bus
   return Math.round(Math.max(typicky / (TARGET_H * n), rusny / (ZONE_HI * n)) * 100);
 }
 
-export function capacityByTrainer(clients: Record<string, ClientAgg>, sessions: SessionRow[]): CapacityRow[] {
-  const allWeeks = [...new Set(sessions.map((s) => weekKey(s.date)))].sort();
+/**
+ * BEŽIACI TÝŽDEŇ SA NEPOČÍTA.
+ *
+ * Kontrola 23. 9. 2026 (Jerry: „skontroluj mi graf kapacita/vyťaženie, či
+ * sedí"): počítal sa každý týždeň, ktorý mal v dátach aspoň jeden tréning —
+ * teda aj ten rozrobený. Useknutý týždeň má menej hodín než celý, takže
+ * ťahal priemer dole a appka z toho robila voľnú kapacitu.
+ *
+ * Koľko to robí: pri tých istých dátach vyšlo Jerryho vyťaženie 87 %, keď
+ * export dobehol v nedeľu, ale 81 %, keď dobehol v utorok — a „zvládne ešte"
+ * skočilo zo 4 klientov na 7. To isté odtrénované, iné číslo, a rozhodovalo
+ * o ňom to, KEDY sa nahral súbor.
+ *
+ * Je to tá istá kotva, akú má appka pri mesačných grafoch, len týždenná.
+ * Hranicou je DNEŠOK, nie posledný tréning v dátach: keby sa merala podľa
+ * neho, týždeň, v ktorom sa netrénovalo v nedeľu, by vyzeral ako rozrobený.
+ */
+export function capacityByTrainer(
+  clients: Record<string, ClientAgg>,
+  sessions: SessionRow[],
+  dnes: string = new Date().toISOString().slice(0, 10),
+): CapacityRow[] {
+  const koniecTyzdna = (pondelok: string) => {
+    const d = new Date(`${pondelok}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + 6);
+    return d.toISOString().slice(0, 10);
+  };
+  const vsetky = [...new Set(sessions.map((s) => weekKey(s.date)))].sort();
+  const uplne = vsetky.filter((w) => koniecTyzdna(w) < dnes);
+  // Keď sú v dátach LEN rozrobené týždne (čerstvá appka, prvý import), radšej
+  // ukázať niečo z nich než deliť nulou a tvrdiť nulové vyťaženie.
+  const allWeeks = uplne.length ? uplne : vsetky;
   const avgWeeks = new Set(allWeeks.slice(-CAP_AVG_WEEKS));
   const peakWeeks = allWeeks.slice(-CAP_PEAK_WEEKS);
   const nAvg = avgWeeks.size || 1;
@@ -810,9 +840,11 @@ export function capacityByTrainer(clients: Record<string, ClientAgg>, sessions: 
 
     const perWeek: Record<string, number> = {};
     let avgHours = 0;
+    const vUplnom = new Set(allWeeks);
     for (const s of sessions) {
       if (s.sessionTrainer !== trainer) continue;
       const w = weekKey(s.date);
+      if (!vUplnom.has(w)) continue;
       perWeek[w] = (perWeek[w] || 0) + s.duration / 60;
       if (avgWeeks.has(w)) avgHours += s.duration / 60;
     }
