@@ -9,7 +9,7 @@ const klient = (o: Partial<ClientAgg> = {}) => ({
 } as ClientAgg);
 
 const vstupy = (o: Partial<Parameters<typeof zdravieKlienta>[2]> = {}) => ({
-  tempoTeraz: 3, tempoPredtym: 3, zrusene: 0, bolestPrve: null, bolestPosledne: null,
+  tempoTeraz: 3, tempoPredtym: 3, zrusene: 0, dniOdPosledneho: 7, obvyklyOdstup: 8,
   obnovil: 3, mohol: 3, zrusenePriemer: 0.8, ...o,
 });
 
@@ -30,18 +30,18 @@ describe("signály", () => {
     expect(s.tón).toBe("nevieme");
   });
 
-  it("bolesť bez dvoch meraní sa netvrdí", () => {
-    // „Zostal rok" je vernosť, nie zlepšenie — výsledok sa smie tvrdiť len
-    // z porovnania prvého a posledného merania toho istého človeka.
-    const s = zdravieKlienta(klient(), [klient()], vstupy({ bolestPrve: 7, bolestPosledne: null })).signaly.find((x) => x.id === "bolest")!;
-    expect(s.tón).toBe("nevieme");
-    expect(s.hodnota).toBe("nemeraná");
+  it("medzera dvaapolnásobne dlhšia než obvyklá je zlý signál", () => {
+    const s = zdravieKlienta(klient(), [klient()], vstupy({ dniOdPosledneho: 21, obvyklyOdstup: 7 })).signaly.find((x) => x.id === "medzera")!;
+    expect(s.tón).toBe("zle");
+    expect(s.detail).toBe("obvykle chodí každých 7 dní");
   });
 
-  it("bolesť, ktorá klesla, je dobrý signál", () => {
-    const s = zdravieKlienta(klient(), [klient()], vstupy({ bolestPrve: 7, bolestPosledne: 3 })).signaly.find((x) => x.id === "bolest")!;
-    expect(s.tón).toBe("dobre");
-    expect(s.detail).toBe("zlepšenie o 4");
+  it("medzera v rámci obvyklého rytmu je v poriadku", () => {
+    expect(zdravieKlienta(klient(), [klient()], vstupy({ dniOdPosledneho: 6, obvyklyOdstup: 7 })).signaly.find((x) => x.id === "medzera")!.tón).toBe("dobre");
+  });
+
+  it("bez histórie odstupu sa netvrdí nič", () => {
+    expect(zdravieKlienta(klient(), [klient()], vstupy({ obvyklyOdstup: null })).signaly.find((x) => x.id === "medzera")!.tón).toBe("nevieme");
   });
 
   it("pri zrušených je MENEJ lepšie — mierka sa obracia", () => {
@@ -58,7 +58,7 @@ describe("signály", () => {
 
 describe("záver", () => {
   it("keď je všetko v poriadku, netvrdí nič zlé", () => {
-    const z = zdravieKlienta(klient(), [klient()], vstupy({ bolestPrve: 6, bolestPosledne: 3 }));
+    const z = zdravieKlienta(klient(), [klient()], vstupy());
     expect(z.tón).toBe("dobre");
     expect(z.zaver).toBe("Nič nenaznačuje, že by odchádzal.");
   });
@@ -70,7 +70,7 @@ describe("záver", () => {
   });
 
   it("záver menuje aj to, čo drží — nie je to len výčitka", () => {
-    const z = zdravieKlienta(klient(), [klient()], vstupy({ tempoTeraz: 2, tempoPredtym: 4, bolestPrve: 7, bolestPosledne: 2 }));
+    const z = zdravieKlienta(klient(), [klient()], vstupy({ tempoTeraz: 2, tempoPredtym: 4 }));
     expect(z.zaver).toContain("drží");
   });
 });

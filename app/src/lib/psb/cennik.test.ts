@@ -10,8 +10,18 @@ describe("cenník", () => {
     for (const n of vExporte) expect(CENNIK.some((s) => s.nazov === n)).toBe(true);
   });
 
-  it("paušály nemajú hodiny — nula a „neobmedzene“ sa nesmú zliať", () => {
-    expect(CENNIK.find((s) => s.nazov === "ČLENSTVÍ ONE")!.hodiny).toBeNull();
+  it("doplnenie členstva nemá pevný počet hodín ani platnosť", () => {
+    const d = CENNIK.find((s) => s.nazov === "Doplnenie členstva")!;
+    expect(d.hodiny).toBeNull();
+    expect(d.tyzdnov).toBeNull();
+  });
+
+  it("vyradené produkty v ponuke nie sú", () => {
+    // Jerry, 23. 9. 2026: TC, ČLENSTVÍ ONE/SILVER, DYNAMIKA a MFR sa už
+    // nepredávajú a v roletke len predlžujú zoznam.
+    for (const n of ["TC - 1 hodina", "TC - 4 hodiny", "TC - 4 hodiny + call", "ČLENSTVÍ ONE", "ČLENSTVÍ SILVER", "DYNAMIKA", "MFR/KOREKCIA"]) {
+      expect(CENNIK.some((s) => s.nazov === n)).toBe(false);
+    }
   });
 
   it("žiadne dva rovnaké názvy", () => {

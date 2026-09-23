@@ -18,7 +18,7 @@
 import type { ClientAgg } from "./compute";
 
 export type Signal = {
-  id: "tempo" | "zrusene" | "bolest" | "obnovy";
+  id: "tempo" | "zrusene" | "medzera" | "obnovy";
   nazov: string;
   /** Hodnota klienta ako text pre človeka. */
   hodnota: string;
@@ -44,9 +44,9 @@ export function zdravieKlienta(
     tempoPredtym: number;
     /** Zrušené tréningy za 90 dní. */
     zrusene: number;
-    /** Prvé a posledné meranie bolesti (0–10). */
-    bolestPrve?: number | null;
-    bolestPosledne?: number | null;
+    /** Dní od posledného tréningu a obvyklý odstup medzi nimi. */
+    dniOdPosledneho: number | null;
+    obvyklyOdstup: number | null;
     /** Koľko balíčkov klient obnovil a koľko ich mohol obnoviť. */
     obnovil: number;
     mohol: number;
@@ -86,22 +86,23 @@ export function zdravieKlienta(
       tón: vstupy.zrusene === 0 ? "dobre" : vstupy.zrusene > vstupy.zrusenePriemer * 2 ? "zle" : vstupy.zrusene > vstupy.zrusenePriemer ? "vsimnut" : "dobre",
     },
     (() => {
-      const p = vstupy.bolestPrve, k = vstupy.bolestPosledne;
-      if (p == null || k == null) {
+      const d = vstupy.dniOdPosledneho, o = vstupy.obvyklyOdstup;
+      // Bolesť sa v PSB nemeria (Jerry, 23. 9. 2026) — signál na jej mieste
+      // hovorí to, čo sa naozaj dá zistiť: či už nemal byť dávno tu.
+      if (d == null || o == null || o <= 0) {
         return {
-          id: "bolest" as const, nazov: "Bolesť", hodnota: "nemeraná",
-          podiel: 0, priemer: 0,
-          // „Zostal rok" je vernosť, nie zlepšenie — výsledok sa smie tvrdiť
-          // len z porovnania prvého a posledného merania toho istého človeka.
-          detail: "bez dvoch meraní sa o výsledku nedá povedať nič",
-          tón: "nevieme" as const,
+          id: "medzera" as const, nazov: "Od posledného tréningu", hodnota: d == null ? "—" : `${d} dní`,
+          podiel: 0, priemer: 0, detail: "krátka história, odstup sa ešte nedá porovnať", tón: "nevieme" as const,
         };
       }
+      const nasobok = d / o;
       return {
-        id: "bolest" as const, nazov: "Bolesť", hodnota: `${p} → ${k}`,
-        podiel: 1 - podiel(k, 10), priemer: 1 - podiel(5, 10),
-        detail: k < p ? `zlepšenie o ${p - k}` : k > p ? `zhoršenie o ${k - p}` : "bez zmeny",
-        tón: k < p ? "dobre" as const : k > p ? "zle" as const : "vsimnut" as const,
+        id: "medzera" as const, nazov: "Od posledného tréningu", hodnota: `${d} dní`,
+        // Menej je lepšie; mierka sa obracia, tak ako pri zrušených.
+        podiel: 1 - podiel(d, Math.max(o * 3, d + 1)),
+        priemer: 1 - podiel(o, Math.max(o * 3, d + 1)),
+        detail: `obvykle chodí každých ${Math.round(o)} dní`,
+        tón: nasobok >= 2.5 ? "zle" as const : nasobok >= 1.5 ? "vsimnut" as const : "dobre" as const,
       };
     })(),
     {

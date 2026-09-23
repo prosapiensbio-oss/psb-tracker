@@ -51,7 +51,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats }: {
   const [novy, setNovy] = useState(false);
   const [stav, setStav] = useState<"aktivni" | "neaktivni">("aktivni");
   const [meno, setMeno] = useState("");
-  const [filter, setFilter] = useState<"zdravie" | "vsetko" | "treningy" | "peniaze" | "balicky" | "poznamky" | "puvod">("zdravie");
+  const [filter, setFilter] = useState<"zdravie" | "vsetko" | "peniaze" | "balicky" | "poznamky">("zdravie");
   const [detaily, setDetaily] = useState(false);
   const [pisemPlatbu, setPisemPlatbu] = useState(false);
   const [pl, setPl] = useState({ datum: dnesISO(), suma: "", sposob: "hotovost", poznamka: "" });
@@ -133,16 +133,6 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats }: {
     return c.sessions.filter((x) => x.date.slice(0, 10) > od).length;
   }, [data.clientOverrides, meno, c]);
 
-  /** Merania bolesti — bez dvoch sa o výsledku nedá povedať nič. */
-  const [merania, setMerania] = useState<{ datum: string; bolest: number | null }[]>([]);
-  useEffect(() => {
-    if (!meno) { setMerania([]); return; }
-    void fetch(`/api/merania?name=${encodeURIComponent(meno)}`, { credentials: "same-origin" })
-      .then((r) => r.json())
-      .then((j: { merania?: { datum: string; bolest: number | null }[] }) => setMerania(j.merania || []))
-      .catch(() => setMerania([]));
-  }, [meno]);
-
   /** Zrušené tréningy za 90 dní — z histórie zmien v kalendári. */
   const [zruseneKal, setZruseneKal] = useState<{ klient: string | null; druh: string; kedy: string }[]>([]);
   useEffect(() => {
@@ -166,7 +156,20 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats }: {
     const mojeZrusene = zruseneKal.filter((z) => z.druh === "zrusene" && z.klient && normName(z.klient) === normName(meno) && z.kedy.slice(0, 10) > dni(90)).length;
     const vsetkyZrusene = zruseneKal.filter((z) => z.druh === "zrusene" && z.kedy.slice(0, 10) > dni(90)).length;
     const klientov = Math.max(1, Object.keys(clients).length);
-    const sBolestou = merania.filter((x) => x.bolest != null);
+    /**
+     * Obvyklý odstup medzi tréningami — medián, nie priemer.
+     * Jedna dovolenka v lete by priemer vytiahla natoľko, že by potom
+     * „mešká" nevyzeralo ako meškanie u nikoho.
+     */
+    const dni_ = c.sessions.map((x) => x.date.slice(0, 10)).sort();
+    const odstupy: number[] = [];
+    for (let i = 1; i < dni_.length; i++) {
+      odstupy.push((Date.parse(dni_[i]) - Date.parse(dni_[i - 1])) / 86400000);
+    }
+    odstupy.sort((a, b) => a - b);
+    const obvyklyOdstup = odstupy.length >= 4 ? odstupy[Math.floor(odstupy.length / 2)] : null;
+    const posledny = dni_[dni_.length - 1];
+    const dniOdPosledneho = posledny ? Math.floor((Date.now() - Date.parse(posledny)) / 86400000) : null;
     // Balíček, po ktorom prišiel ďalší, je obnovený. Posledný sa nepočíta —
     // ešte nemal šancu.
     const zoradene = [...mojeBalicky].sort((a, b) => a.platnost_od.localeCompare(b.platnost_od));
@@ -175,11 +178,10 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats }: {
       tempoTeraz, tempoPredtym,
       zrusene: mojeZrusene,
       zrusenePriemer: vsetkyZrusene / klientov,
-      bolestPrve: sBolestou.length >= 2 ? sBolestou[sBolestou.length - 1].bolest : null,
-      bolestPosledne: sBolestou.length >= 2 ? sBolestou[0].bolest : null,
+      dniOdPosledneho, obvyklyOdstup,
       obnovil: mohol, mohol,
     });
-  }, [c, clients, meno, merania, zruseneKal, mojeBalicky]);
+  }, [c, clients, meno, zruseneKal, mojeBalicky]);
 
   /** Koľko údajov je pod tlačidlom „ďalších N" — aby číslo nebolo vymyslené. */
   const dalsichUdajov = useMemo(
@@ -187,10 +189,9 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats }: {
     [c, dopyt, priviedol, poplatkyKlienta, btcSats, meno],
   );
 
-  // Mínus: predané z vlastnej evidencie proti zaplatenému z PTmindera.
-  const predane = mojeBalicky.reduce((a, b) => a + (b.cena_czk || 0), 0);
   const zaplatene = platby.reduce((a, p) => a + p.amount, 0);
-  const rozdiel = Math.round(predane - zaplatene);
+  /** Čo klient naozaj dlhuje — otvorené poplatky z PTmindera, nie odhad. */
+  const dlzi = Math.round(poplatkyKlienta.reduce((a, x) => a + ((x as { suma?: number }).suma || 0), 0));
 
   const pridajPlatbu = async () => {
     setPracujem(true); setChyba("");
@@ -386,12 +387,20 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats }: {
           )}
         </div>
 
-        <div style={{ padding: "11px 13px", borderRadius: 11, background: mix(rozdiel > 0 ? C.red : C.green, 10), border: `1px solid ${mix(rozdiel > 0 ? C.red : C.green, 40)}` }}>
-          <div style={{ fontSize: 17, fontWeight: 800, color: rozdiel > 0 ? C.red : C.green }}>
-            {rozdiel > 0 ? `dlhuje ${fmtCZK(rozdiel)}` : rozdiel < 0 ? `predplatené ${fmtCZK(-rozdiel)}` : "vyrovnaný"}
+        {/* NEZAPLATENÉ, nie vymyslený rozdiel.
+            Prvá verzia odčítavala „predané balíčky" od „zaplatené celkovo"
+            a Anetke z toho vyšlo „predplatené 60 240 Kč" — porovnávala
+            platby za celý život s balíčkami, ktoré sú v Kokpite od 2026.
+            Číslo, ktoré nikomu nič nehovorí, je horšie než žiadne.
+            Toto je priamy zdroj: nezaplatené poplatky z PTmindera. */}
+        <div style={{ padding: "11px 13px", borderRadius: 11, background: mix(dlzi > 0 ? C.red : C.green, 10), border: `1px solid ${mix(dlzi > 0 ? C.red : C.green, 40)}` }}>
+          <div style={{ fontSize: 17, fontWeight: 800, color: dlzi > 0 ? C.red : C.green }}>
+            {dlzi > 0 ? `nezaplatené ${fmtCZK(dlzi)}` : "nič nedlhuje"}
           </div>
           <div style={{ fontSize: 11, color: C.textMuted, marginTop: 3 }}>
-            predané {fmtCZK(predane)} · zaplatené {fmtCZK(zaplatene)}
+            {dlzi > 0
+              ? `${poplatkyKlienta.length} ${poplatkyKlienta.length === 1 ? "položka" : poplatkyKlienta.length < 5 ? "položky" : "položiek"} z PTmindera`
+              : `zaplatil ${fmtCZK(zaplatene)} celkom`}
           </div>
         </div>
 
@@ -409,11 +418,24 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats }: {
 
         {c && (
           <div style={{ fontSize: 12, color: C.textMuted, lineHeight: 1.95 }}>
-            {c.firstSession && <div><span style={{ color: C.textDim }}>chodí od</span> {fmtDMY(c.firstSession)}</div>}
+            {/* Narodeniny s odpočtom namiesto „chodí od" (Jerry, 23. 9.):
+                deň, kedy začal chodiť, sa nedá použiť na nič — narodeniny áno. */}
+            {c.narodeniny ? (
+              <div>
+                <span style={{ color: C.textDim }}>narodeniny</span> {fmtDMY(c.narodeniny)}
+                {doNarodenin(c.narodeniny) != null && (
+                  <span style={{ color: doNarodenin(c.narodeniny)! <= 14 ? C.accentLight : C.textDim }}>
+                    {" "}· {doNarodenin(c.narodeniny) === 0 ? "dnes!" : `o ${doNarodenin(c.narodeniny)} dní`}
+                  </span>
+                )}
+              </div>
+            ) : (
+              <div style={{ color: C.textDim }}>narodeniny nezapísané</div>
+            )}
+            <div><span style={{ color: C.textDim }}>dochádzka</span> {Math.round((c.attendance || 0) * 100)} %</div>
+            <div><span style={{ color: C.textDim }}>Ø hodina</span> {c.avgPrice ? fmtCZK(Math.round(c.avgPrice)) : "—"}</div>
             {!!c.sessionCount && <div><span style={{ color: C.textDim }}>tempo</span> {(c.sessionCount / Math.max(1, mesiacov(c))).toFixed(1)} / mes.</div>}
-            {c.narodeniny && <div><span style={{ color: C.textDim }}>narodeniny</span> {fmtDMY(c.narodeniny)}</div>}
             {c.zdrojKto && <div><span style={{ color: C.textDim }}>priviedol</span> {c.zdrojKto}</div>}
-            {!!priviedol.length && <div><span style={{ color: C.textDim }}>priviedol on</span> {priviedol.length}</div>}
           </div>
         )}
 
@@ -443,7 +465,10 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats }: {
           <div style={{ fontSize: 11, fontWeight: 700, color: C.textDim, letterSpacing: 0.5 }}>VŠETKO V ČASE</div>
           <div style={{ flexGrow: 1 }} />
           <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-            {([["zdravie", "zdravie"], ["vsetko", "všetko"], ["treningy", "tréningy"], ["peniaze", "peniaze"], ["balicky", "balíčky"], ["poznamky", "poznámky"], ["puvod", "odkiaľ prišiel"]] as const).map(([id, l]) => (
+            {/* „Tréningy" a „Odkiaľ prišiel" sú preč (Jerry, 23. 9. 2026):
+                prvé bolo to isté, čo „všetko" bez dvoch riadkov, druhé sa
+                pozerá raz za život a kradlo miesto tomu, čo sa rieši denne. */}
+            {([["zdravie", "zdravie"], ["vsetko", "všetko"], ["peniaze", "peniaze"], ["balicky", "balíčky"], ["poznamky", "poznámky"]] as const).map(([id, l]) => (
               <button key={id} onClick={() => setFilter(id)} style={prepinac(filter === id)}>{l}</button>
             ))}
           </div>
@@ -483,19 +508,23 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats }: {
                     <span style={{ color: C.textMuted }}>{sig.nazov}</span>
                     <span style={{ color: TON[sig.tón], fontWeight: 700 }}>{sig.hodnota}</span>
                   </div>
-                  {/* Pás s mierkou: sivá je priemer klientely, farebná značka
-                      je tento klient. Signál bez mierky nič nehovorí — to je
-                      pravidlo, ktoré appka má už pri porovnaniach v profile. */}
-                  <div style={{ position: "relative", height: 8, background: mix(C.border, 120), borderRadius: 4, marginTop: 7 }}>
+                  {/* Pás s mierkou. V náhľade vyzeral inak než naživo, lebo
+                      výplň po priemer bola takmer neviditeľná a značky sa
+                      strácali — bez nich pás nehovorí nič, len zaberá miesto.
+                      Teraz je výplň po HODNOTU klienta (to je to, čo sa číta
+                      ako prvé) a priemer je zvislá čiarka s popiskom. */}
+                  <div style={{ position: "relative", height: 10, background: mix(C.border, 90), borderRadius: 5, marginTop: 8, overflow: "visible" }}>
                     {sig.tón !== "nevieme" && (
                       <>
-                        <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${sig.priemer * 100}%`, background: mix(C.border, 220), borderRadius: 4 }} />
-                        <div style={{ position: "absolute", left: `${sig.priemer * 100}%`, top: -3, width: 2, height: 14, background: C.textDim }} title="priemer klientely" />
-                        <div style={{ position: "absolute", left: `calc(${sig.podiel * 100}% - 2px)`, top: -4, width: 5, height: 16, background: TON[sig.tón], borderRadius: 2 }} />
+                        <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${Math.max(2, sig.podiel * 100)}%`, background: TON[sig.tón], borderRadius: 5, opacity: 0.85 }} />
+                        <div style={{ position: "absolute", left: `${sig.priemer * 100}%`, top: -4, width: 2, height: 18, background: C.textMuted }} title="priemer klientely" />
                       </>
                     )}
                   </div>
-                  <div style={{ fontSize: 10.5, color: C.textDim, marginTop: 5 }}>{sig.detail}</div>
+                  <div style={{ display: "flex", justifyContent: "space-between", gap: 10, fontSize: 10.5, color: C.textDim, marginTop: 6 }}>
+                    <span>{sig.detail}</span>
+                    {sig.tón !== "nevieme" && <span style={{ whiteSpace: "nowrap" }}>│ priemer klientely</span>}
+                  </div>
                 </div>
               ))}
               <div style={{ padding: "11px 13px", borderRadius: 10, background: mix(TON[zdravie.tón], 12), border: `1px solid ${mix(TON[zdravie.tón], 45)}`, fontSize: 12.5, color: C.textMuted, lineHeight: 1.55 }}>
@@ -507,16 +536,15 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats }: {
             </div>
           )}
 
-          {(filter === "vsetko" || filter === "treningy") && buduce.map((z) => (
+          {filter === "vsetko" && buduce.map((z) => (
             <div key={z} style={{ ...riadok, color: C.blue }}>
               <span style={stlpecDen}>{fmtDMY(z.slice(0, 10))}</span>
               <span style={{ flex: 1 }}>objednané {z.slice(11, 16)} · z kalendára</span>
             </div>
           ))}
 
-          {filter !== "poznamky" && filter !== "puvod" && filter !== "zdravie" && os
+          {filter !== "poznamky" && filter !== "zdravie" && os
             .filter((x) => filter === "vsetko"
-              || (filter === "treningy" && x.druh === "trening")
               || (filter === "peniaze" && x.druh === "platba")
               || (filter === "balicky" && (x.druh === "balicekOd" || x.druh === "balicekDo")))
             .map((x, i) => <RiadokOsi key={i} u={x} />)}
@@ -534,31 +562,21 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats }: {
             </>
           )}
 
-          {filter === "puvod" && (
-            dopyt ? (
-              <>
-                <div style={riadok}>
-                  <span style={stlpecDen}>{fmtDMY(dopyt.date)}</span>
-                  <span style={{ flex: 1 }}>prišiel dopyt · <b>{dopyt.source}</b>{dopyt.status ? ` · ${dopyt.status}` : ""}</span>
-                </div>
-                {(dopyt as { kampan?: string }).kampan && <div style={riadok}><span style={stlpecDen} /><span style={{ flex: 1, color: C.textMuted }}>kampaň: {(dopyt as { kampan: string }).kampan}</span></div>}
-                {(dopyt as { stranka?: string }).stranka && <div style={riadok}><span style={stlpecDen} /><span style={{ flex: 1, color: C.textMuted }}>stránka: {(dopyt as { stranka: string }).stranka}</span></div>}
-                {dopyt.note && <div style={riadok}><span style={stlpecDen} /><span style={{ flex: 1, color: C.textMuted }}>{dopyt.note}</span></div>}
-                {priviedol.length > 0 && (
-                  <div style={{ marginTop: 10 }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Koho priviedol ({priviedol.length})</div>
-                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                      {priviedol.map((m) => <button key={m} onClick={() => setMeno(m)} style={navrhTlacidlo}>{m}</button>)}
-                    </div>
-                  </div>
-                )}
-              </>
-            ) : <Prazdne>Dopyt sa nenašiel — klient prišiel skôr, než appka dopyty evidovala.</Prazdne>
-          )}
         </div>
       </div>
     </div>
   );
+}
+
+/** Koľko dní do najbližších narodenín. null = dátum nedáva zmysel. */
+function doNarodenin(narodeniny: string): number | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(narodeniny);
+  if (!m) return null;
+  const dnes = new Date();
+  const dnesUTC = Date.UTC(dnes.getUTCFullYear(), dnes.getUTCMonth(), dnes.getUTCDate());
+  let d = Date.UTC(dnes.getUTCFullYear(), Number(m[2]) - 1, Number(m[3]));
+  if (d < dnesUTC) d = Date.UTC(dnes.getUTCFullYear() + 1, Number(m[2]) - 1, Number(m[3]));
+  return Math.round((d - dnesUTC) / 86400000);
 }
 
 /** Koľko mesiacov klient chodí — na tempo. */
@@ -631,6 +649,19 @@ function FormularBalicka({ f, setF, pracujem, onUloz }: {
     } as never);
   };
 
+  /**
+   * Zmena začiatku musí posunúť aj koniec.
+   *
+   * Prvá verzia počítala „platí do" LEN pri výbere šablóny, takže keď Jerry
+   * potom prepísal „platí od", koniec zostal starý a ticho nesedel. To je tá
+   * istá chyba ako formulár, ktorý sa nakreslí skôr, než dorazia dáta:
+   * obrazovka ukazuje niečo, čo už neplatí, a nič o tom nepovie.
+   */
+  const zmenOd = (od: string) => {
+    const sab = CENNIK.find((x) => x.nazov === f.nazov);
+    setF({ ...f, platnostOd: od, platnostDo: sab ? platnostDo(od, sab.tyzdnov) : f.platnostDo } as never);
+  };
+
   const skupiny = ["Offline", "Online", "Špeciálne"] as const;
 
   return (
@@ -657,7 +688,7 @@ function FormularBalicka({ f, setF, pracujem, onUloz }: {
 
       {([
         { k: "hodiny", l: "hodín", w: 70, typ: "text" },
-        { k: "platnostOd", l: "platí od", w: 145, typ: "date" },
+        { k: "platnostOd", l: "platí od", w: 145, typ: "date", vlastne: true },
         { k: "platnostDo", l: "platí do", w: 145, typ: "date" },
         { k: "cenaCzk", l: "cena Kč", w: 95, typ: "text" },
         { k: "poznamka", l: "poznámka", w: 150, typ: "text" },
@@ -667,7 +698,7 @@ function FormularBalicka({ f, setF, pracujem, onUloz }: {
           <input
             type={x.typ}
             value={f[x.k]}
-            onChange={(e) => setF({ ...f, [x.k]: e.target.value } as never)}
+            onChange={(e) => ((x as { vlastne?: boolean }).vlastne ? zmenOd(e.target.value) : setF({ ...f, [x.k]: e.target.value } as never))}
             style={{ width: x.w, padding: "6px 8px", borderRadius: 7, fontSize: 12, border: `1px solid ${C.border}`, background: C.bg, color: C.text, colorScheme: "dark" }}
           />
         </label>

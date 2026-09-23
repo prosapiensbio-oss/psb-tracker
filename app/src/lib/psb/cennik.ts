@@ -9,6 +9,11 @@
  * klient môže mať zľavu (Jarek, barter, bitcoin), preto sa po výbere dajú
  * prepísať. Predvyplnenie je pomoc, nie tvrdenie.
  *
+ * ČO V ZOZNAME NIE JE: TC (tri druhy), ČLENSTVÍ ONE a SILVER, DYNAMIKA
+ * a MFR/KOREKCIA. Jerry ich 23. 9. 2026 vyradil — sú to staré alebo
+ * jednorazové produkty, ktoré sa už nepredávajú, a v roletke len predlžujú
+ * zoznam. V starých dátach zostávajú; do ponuky na nový predaj nepatria.
+ *
  * `tyzdnov` je bežná platnosť. Používa sa len na predvyplnenie dátumu „do";
  * skutočný koniec zapisuje človek, lebo PSB dáva výnimky bežne.
  */
@@ -32,20 +37,12 @@ export const CENNIK: Sablona[] = [
   { nazov: "ON - 6h BEZ viazanosti", hodiny: 6, cena: 6590, tyzdnov: 8, skupina: "Online" },
   { nazov: "ON - 6h S viazanostou", hodiny: 6, cena: 5640, tyzdnov: 4, skupina: "Online" },
   { nazov: "ON - 1 hodina online", hodiny: 1, cena: 1390, tyzdnov: 4, skupina: "Online" },
-  { nazov: "TC - 1 hodina", hodiny: 1, cena: 750, tyzdnov: 4, skupina: "Online" },
-  { nazov: "TC - 4 hodiny", hodiny: 4, cena: 1790, tyzdnov: 8, skupina: "Online" },
-  { nazov: "TC - 4 hodiny + call", hodiny: 4, cena: 2490, tyzdnov: 8, skupina: "Online" },
 
   { nazov: "ONE YEAR", hodiny: 78, cena: 90870, tyzdnov: 52, skupina: "Špeciálne" },
   { nazov: "SPECIAL 3", hodiny: 3, cena: 3990, tyzdnov: 8, skupina: "Špeciálne" },
   // Benevolencia: hodiny navyše k bežiacemu členstvu, bez ceny a bez dátumov
   // (viď prevadzka.md bod 3). Platnosť sa nepredvypĺňa — nemá ju.
   { nazov: "Doplnenie členstva", hodiny: null, cena: 0, tyzdnov: null, skupina: "Špeciálne" },
-  // Paušály: hodiny sa pri nich nepočítajú a nikdy nedôjdu.
-  { nazov: "ČLENSTVÍ ONE", hodiny: null, cena: null, tyzdnov: null, skupina: "Špeciálne" },
-  { nazov: "ČLENSTVÍ SILVER", hodiny: null, cena: 7100, tyzdnov: null, skupina: "Špeciálne" },
-  { nazov: "DYNAMIKA", hodiny: 5, cena: 2000, tyzdnov: 8, skupina: "Špeciálne" },
-  { nazov: "MFR/KOREKCIA", hodiny: 5, cena: 2250, tyzdnov: 8, skupina: "Špeciálne" },
 ];
 
 /** Koniec platnosti podľa šablóny — predvyplnenie, nie pravidlo. */
