@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { navrhniKlientaKandidati, type ClientAgg } from "../../lib/psb/compute";
+import { krokGesta, novyStavGesta } from "../../lib/psb/gestoKariet";
 import { klucPolozky, popisZmeny, postavKarty, trenerZPrihlasenia, type Karta, type NeznamyNazov, type NepriradenaPlatba, type Zmena } from "../../lib/psb/workspaceKarty";
 import type { PSBData } from "../../lib/psb/types";
 import { KlientStol } from "./KlientStol";
@@ -78,46 +79,69 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   const k = zive[Math.min(i, Math.max(0, zive.length - 1))];
 
   /**
-   * Prepínanie kariet dvoma prstami po trackpade (Jerry, 23. 9. 2026).
+   * PREPNUTIE KARTY SA MUSÍ DAŤ VIDIEŤ.
    *
-   * macOS posiela vodorovné šmýkanie ako `wheel` s deltaX, nie ako
-   * `touch`-udalosti — na touchpade žiadne prsty „nevidno". Preto sa
-   * počúva koleso a sčítava sa vodorovný posun.
+   * Jerry, 23. 9. 2026: „nech vidím, že sa tie karty presúvajú, že to nie je
+   * len, že sa prepne obrazovka." Okamžitá výmena obsahu nepovie, ktorým
+   * smerom sa človek pohol ani odkiaľ nová karta prišla — z kopy sa stane
+   * len striedanie textov.
    *
-   * Tri veci, bez ktorých to je na obtiaž:
-   *   • zvislé rolovanie sa nesmie ukradnúť — keď je |deltaY| väčšie,
-   *     gesto sa ignoruje, inak by sa karta prepla pri rolovaní zoznamu;
-   *   • jedno gesto = jedna karta. Trackpad posiela desiatky udalostí za
-   *     sekundu a bez zámku by jedno šmyknutie preletelo celou kopou;
-   *   • zámok pustí až po chvíli ticha, nie po čase — dlhý dojazd zotrvačnosti
-   *     na Macu inak prepne kartu druhýkrát, keď už prsty dávno nie sú na ploche.
-   *
-   * `passive: false` a preventDefault sú tu preto, aby Safari zo šmyknutia
-   * neurobilo „krok späť v histórii" a appka sa nezavrela.
+   * Karta sa preto najprv odsunie a stratí, obsah sa vymení, keď ju nevidno,
+   * a nová priletí z opačnej strany. Je to JEDNA karta, nie dve: klientský
+   * stôl si vnútri drží stav aj sťahuje dáta a dve kópie naraz by znamenali
+   * dve sťahovania a preblikávanie.
+   */
+  const [prechod, setPrechod] = useState<{ smer: 1 | -1; faza: "von" | "dnu" } | null>(null);
+  const bezi = useRef(false);
+  const menejPohybu = typeof window !== "undefined"
+    && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+  const prepni = useCallback((smer: 1 | -1, ciel?: number) => {
+    if (zive.length < 2 || bezi.current) return;
+    const dalsi = (x: number) => (ciel ?? (x + smer + zive.length)) % zive.length;
+    if (menejPohybu) { setI(dalsi); return; }
+    bezi.current = true;
+    setPrechod({ smer, faza: "von" });
+    setTimeout(() => {
+      setI(dalsi);
+      // „dnu" posadí kartu na druhú stranu BEZ prechodu; až ďalší snímok ju
+      // pustí späť na nulu, a to už s prechodom. Bez tých dvoch rámcov by
+      // prehliadač obe zmeny zlial do jednej a karta by nikam nešla.
+      setPrechod({ smer, faza: "dnu" });
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        setPrechod(null);
+        bezi.current = false;
+      }));
+    }, 150);
+  }, [zive.length, menejPohybu]);
+
+  /**
+   * Prepínanie dvoma prstami po trackpade. Rozhodovanie je v `gestoKariet.ts`,
+   * aby sa dalo odskúšať — vrátane chyby, pre ktorú to Jerrymu fungovalo len
+   * raz a potom siahol po tlačidle.
    */
   const kopa = useRef<HTMLDivElement | null>(null);
-  const gesto = useRef({ suma: 0, zamknute: false, ticho: 0 as unknown as ReturnType<typeof setTimeout> });
+  const gesto = useRef(novyStavGesta());
+  const poistka = useRef(0 as unknown as ReturnType<typeof setTimeout>);
   useEffect(() => {
     const el = kopa.current;
     if (!el || zive.length < 2) return;
-    const PRAH = 60;
     const naKoleso = (e: WheelEvent) => {
       if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
+      // Bez toho Safari zo šmyknutia urobí „krok späť v histórii" a appka
+      // sa zavrie. Preto `passive: false` nižšie.
       e.preventDefault();
-      clearTimeout(gesto.current.ticho);
-      gesto.current.ticho = setTimeout(() => { gesto.current.suma = 0; gesto.current.zamknute = false; }, 260);
-      if (gesto.current.zamknute) return;
-      gesto.current.suma += e.deltaX;
-      if (Math.abs(gesto.current.suma) < PRAH) return;
-      const smer = gesto.current.suma > 0 ? 1 : -1;
-      gesto.current.zamknute = true;
-      gesto.current.suma = 0;
-      setI((x) => (x + smer + zive.length) % zive.length);
+      // Poistka LEN otvára, nikdy nezatvára — preto ju smie odkladať každá
+      // udalosť bez rizika, že zámok zostane visieť. Presne na to doplatila
+      // prvá verzia, kde odkladanie zámok DRŽALO.
+      clearTimeout(poistka.current);
+      poistka.current = setTimeout(() => { gesto.current.cakaNaPokoj = false; gesto.current.suma = 0; }, 300);
+      const smer = krokGesta(gesto.current, { deltaX: e.deltaX, deltaY: e.deltaY, cas: e.timeStamp });
+      if (smer) prepni(smer);
     };
     el.addEventListener("wheel", naKoleso, { passive: false });
-    return () => { el.removeEventListener("wheel", naKoleso); clearTimeout(gesto.current.ticho); };
-  }, [zive.length]);
-
+    return () => { el.removeEventListener("wheel", naKoleso); clearTimeout(poistka.current); };
+  }, [zive.length, prepni]);
 
   const text = (kluc: string, predvolene = "") => texty[kluc] ?? predvolene;
   const nastavText = (kluc: string, v: string) => setTexty((s) => ({ ...s, [kluc]: v }));
@@ -207,7 +231,11 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
               borderRadius: 14,
               background: mix(C.border, 90),
               border: `1px solid ${mix(C.border, 150)}`,
-              opacity: j === 0 ? 0.6 : 0.3,
+              // Plátky vzadu sa pri prepnutí posunú tiež — inak by karta
+              // odletela sama a kopa by stála, čo vyzerá ako chyba.
+              opacity: prechod?.faza === "von" ? (j === 0 ? 0.85 : 0.5) : j === 0 ? 0.6 : 0.3,
+              transform: prechod?.faza === "von" ? `translateX(${-prechod.smer * 7}px)` : "none",
+              transition: "transform .15s ease-in, opacity .15s ease-in",
               zIndex: 0,
             }}
           />
@@ -221,14 +249,14 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
         {/* Kolotoč: z poslednej karty sa ide na prvú a naopak (Jerry, 23. 9.
             2026). Šípka na konci, ktorá sa nedá stlačiť, je slepá ulička —
             človek musí prejsť celú kopu späť, aby sa dostal o jednu ďalej. */}
-        <button onClick={() => setI((x) => (x - 1 + zive.length) % zive.length)} aria-label="Predchádzajúca karta" style={bocnaSipka("left", zive.length > 1)}>‹</button>
-        <button onClick={() => setI((x) => (x + 1) % zive.length)} aria-label="Ďalšia karta" style={bocnaSipka("right", zive.length > 1)}>›</button>
+        <button onClick={() => prepni(-1)} aria-label="Predchádzajúca karta" style={bocnaSipka("left", zive.length > 1)}>‹</button>
+        <button onClick={() => prepni(1)} aria-label="Ďalšia karta" style={bocnaSipka("right", zive.length > 1)}>›</button>
         {/* Karta má PEVNÚ výšku. Jerry, 23. 9. 2026: „karty musia byť stále
             rovnako veľké, aj keď je tam menej textu, aby miesto na pravej
             a ľavej strane, kde prepínam, bolo stále na tom istom mieste."
             Šípka, ktorá pri každej karte skočí inam, sa hľadá očami — a to je
             presne tá práca navyše, ktorú mala kopa odstrániť. */}
-        <div style={{ position: "relative", zIndex: 1, margin: "0 46px", height: "100%" }}>
+        <div style={{ position: "relative", zIndex: 1, margin: "0 46px", height: "100%", ...pohybKarty(prechod) }}>
           <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
               <div style={{ fontSize: 18, fontWeight: 800 }}>{k.nadpis}</div>
@@ -318,7 +346,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
           {zive.map((x, j) => (
             <button
               key={x.druh}
-              onClick={() => setI(j)}
+              onClick={() => (j === i ? undefined : prepni(j > i ? 1 : -1, j))}
               aria-label={`${x.nadpis} (${zostava(x)} zostáva)`}
               title={`${x.nadpis} · ${zostava(x)} zostáva`}
               style={{
@@ -366,6 +394,21 @@ const vedlajsie = {
   padding: "6px 10px", borderRadius: 8, fontSize: 11.5, cursor: "pointer",
   border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted,
 };
+
+/**
+ * Kde má karta práve stáť.
+ *
+ * `von` ju odsunie proti smeru pohybu a stratí; `dnu` ju BEZ prechodu posadí
+ * na druhú stranu (odtiaľ priletí). `null` je pokoj — a práve ten prechod
+ * z „dnu" na „null" kartu dolietne na miesto.
+ */
+function pohybKarty(prechod: { smer: 1 | -1; faza: "von" | "dnu" } | null): React.CSSProperties {
+  if (!prechod) return { transform: "translateX(0) scale(1)", opacity: 1, transition: "transform .22s cubic-bezier(.22,1,.36,1), opacity .18s ease-out" };
+  if (prechod.faza === "von") {
+    return { transform: `translateX(${-prechod.smer * 52}px) scale(.965)`, opacity: 0, transition: "transform .15s ease-in, opacity .15s ease-in" };
+  }
+  return { transform: `translateX(${prechod.smer * 52}px) scale(.965)`, opacity: 0, transition: "none" };
+}
 
 /**
  * Šípka prilepená na bok karty, zvisle v strede a stále na mieste.
