@@ -140,6 +140,8 @@ export type RiadokPlatieb = {
   rozdiel: number;
   kokpitHotovost: number;
   kokpitBanka: number;
+  /** Bitcoin, barter — čo nie je ani účet, ani zošit. */
+  kokpitIne: number;
 };
 
 /**
@@ -162,7 +164,7 @@ export function porovnajPlatby(
   const m = new Map<string, RiadokPlatieb>();
   const riadok = (mesiac: string) => {
     let r = m.get(mesiac);
-    if (!r) { r = { mesiac, kokpit: 0, ptminder: 0, rozdiel: 0, kokpitHotovost: 0, kokpitBanka: 0 }; m.set(mesiac, r); }
+    if (!r) { r = { mesiac, kokpit: 0, ptminder: 0, rozdiel: 0, kokpitHotovost: 0, kokpitBanka: 0, kokpitIne: 0 }; m.set(mesiac, r); }
     return r;
   };
   for (const p of platby) {
@@ -173,8 +175,12 @@ export function porovnajPlatby(
     if (odMesiaca && mes < odMesiaca) continue;
     const r = riadok(mes);
     r.kokpit += p.sumaCzk;
-    if (p.sposob === "hotovost") r.kokpitHotovost += p.sumaCzk;
-    else if (p.sposob === "banka") r.kokpitBanka += p.sumaCzk;
+    // Rozpad musí dať dokopy `kokpit`, inak tabuľka ticho stratí riadky.
+    // „prevod" je ručne zapísaný prevod z cudzieho účtu (Revolut), ktorý
+    // vo Fio výpise nie je; bitcoin a barter idú do „iné".
+    if (p.sposob === "banka" || p.sposob === "prevod") r.kokpitBanka += p.sumaCzk;
+    else if (p.sposob === "hotovost") r.kokpitHotovost += p.sumaCzk;
+    else r.kokpitIne += p.sumaCzk;
   }
   for (const p of ptminder) {
     const den = p.datum.slice(0, 10);

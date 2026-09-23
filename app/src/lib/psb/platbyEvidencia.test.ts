@@ -102,6 +102,20 @@ describe("porovnajPlatby", () => {
     expect(v.mesiace[0].kokpitBanka).toBe(6990);
   });
 
+  it("rozpad na banku, hotovosť a iné dá dokopy celok", () => {
+    // Keď pribudol „prevod" a „bitcoin", pôvodný rozpad ich nezaradil nikam
+    // a stĺpce v tabuľke prestali dávať dokopy súčet — ticho, bez chyby.
+    const v = porovnajPlatby(
+      [p("2026-09-01", 1000, "banka"), p("2026-09-02", 2000, "prevod"), p("2026-09-03", 300, "hotovost"), p("2026-09-04", 40, "bitcoin"), p("2026-09-05", 5, "ine")],
+      [], "2026-09-30",
+    );
+    const m = v.mesiace[0];
+    expect(m.kokpitBanka).toBe(3000);
+    expect(m.kokpitHotovost).toBe(300);
+    expect(m.kokpitIne).toBe(45);
+    expect(m.kokpitBanka + m.kokpitHotovost + m.kokpitIne).toBe(m.kokpit);
+  });
+
   it("platba po konci exportu sa neporovnáva", () => {
     const v = porovnajPlatby([p("2026-09-05", 6990), p("2026-09-22", 5000)], [{ klient: "X", datum: "2026-09-05", suma: 6990, metoda: "bank" }], "2026-09-20");
     expect(v.rozdiel).toBe(0);

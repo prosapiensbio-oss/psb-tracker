@@ -21,7 +21,7 @@ import { Card, H3, Info } from "./ui";
 
 type Platba = { id: string; klient: string; datum: string; suma_czk: number; sposob: string; fio_id: string | null; poznamka: string | null; zrusene_at: string | null };
 type Nepriradena = { fioId: string; datum: string; suma: number; text: string; kandidati: string[] };
-type Mesiac = { mesiac: string; kokpit: number; ptminder: number; rozdiel: number; kokpitHotovost: number; kokpitBanka: number };
+type Mesiac = { mesiac: string; kokpit: number; ptminder: number; rozdiel: number; kokpitHotovost: number; kokpitBanka: number; kokpitIne: number };
 type Porovnanie = { mesiace: Mesiac[]; kokpit: number; ptminder: number; rozdiel: number; sediacich: number };
 
 const kc = (n: number) => `${Math.round(n).toLocaleString("sk-SK")} Kč`;
@@ -118,6 +118,7 @@ export function PlatbyEvidencia({ mena }: { mena: string[] }) {
                 <th style={{ padding: "4px 6px 4px 0", fontWeight: 600 }}>mesiac</th>
                 <th style={{ padding: "4px 6px", fontWeight: 600, textAlign: "right" }}>banka</th>
                 <th style={{ padding: "4px 6px", fontWeight: 600, textAlign: "right" }}>hotovosť</th>
+                <th style={{ padding: "4px 6px", fontWeight: 600, textAlign: "right" }}>iné</th>
                 <th style={{ padding: "4px 6px", fontWeight: 600, textAlign: "right" }}>Kokpit</th>
                 <th style={{ padding: "4px 6px", fontWeight: 600, textAlign: "right" }}>PTminder</th>
                 <th style={{ padding: "4px 0 4px 6px", fontWeight: 600, textAlign: "right" }}>rozdiel</th>
@@ -129,6 +130,7 @@ export function PlatbyEvidencia({ mena }: { mena: string[] }) {
                   <td style={{ padding: "5px 6px 5px 0", color: C.text }}>{mesiacKratko(m.mesiac)}</td>
                   <td style={{ padding: "5px 6px", textAlign: "right", color: C.textDim }}>{kc(m.kokpitBanka)}</td>
                   <td style={{ padding: "5px 6px", textAlign: "right", color: C.textDim }}>{kc(m.kokpitHotovost)}</td>
+                  <td style={{ padding: "5px 6px", textAlign: "right", color: C.textDim }}>{m.kokpitIne ? kc(m.kokpitIne) : "—"}</td>
                   <td style={{ padding: "5px 6px", textAlign: "right", color: C.text, fontWeight: 700 }}>{kc(m.kokpit)}</td>
                   <td style={{ padding: "5px 6px", textAlign: "right", color: C.textMuted }}>{kc(m.ptminder)}</td>
                   <td style={{ padding: "5px 0 5px 6px", textAlign: "right", fontWeight: 700, color: m.rozdiel === 0 ? C.green : C.red }}>

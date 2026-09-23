@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { normName, fmtCZK, fmtDMY } from "../../lib/psb/format";
+import { menoKluc } from "../../lib/psb/compute";
+import { satsNaCzk } from "../../lib/psb/btcKontrola";
 import { CENNIK, platnostDo } from "../../lib/psb/cennik";
 import { osCasuKlienta } from "../../lib/psb/klientOsCasu";
 import { zdravieKlienta } from "../../lib/psb/klientZdravie";
@@ -37,15 +39,22 @@ type Balicek = {
   zdroj: string; poznamka: string | null; zrusene_at: string | null;
 };
 
+type Platba = {
+  id: string; klient: string; datum: string; suma_czk: number;
+  sposob: string; fio_id: string | null; poznamka: string | null; zrusene_at: string | null;
+};
+
 const dnesISO = () => new Date().toISOString().slice(0, 10);
 
-export function KlientStol({ clients, mena, data, kalUdalosti, btcSats }: {
+export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc }: {
   clients: Record<string, ClientAgg>;
   mena: string[];
   data: PSBData;
   kalUdalosti?: { zaciatok: string; klient: string | null; typ: string | null }[];
   /** Koľko satoshi klient celkovo zaplatil (z appky PSB Bitcoin). */
   btcSats?: Record<string, number>;
+  /** Jednotlivé bitcoinové platby a aktuálny kurz — na záložku ₿. */
+  btc?: { platby: { klient: string | null; datum: string; sats?: number; czk: number | null }[]; kurz: number | null; kedy: string | null };
 }) {
   const [hladam, setHladam] = useState("");
   const [novy, setNovy] = useState(false);
@@ -55,8 +64,12 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats }: {
   const [detaily, setDetaily] = useState(false);
   const [pisemPlatbu, setPisemPlatbu] = useState(false);
   const [pl, setPl] = useState({ datum: dnesISO(), suma: "", sposob: "hotovost", poznamka: "" });
-  const [menimStav, setMenimStav] = useState(false);
   const [balicky, setBalicky] = useState<Balicek[]>([]);
+  const [vlastnePlatby, setVlastnePlatby] = useState<Platba[]>([]);
+  /** Čo sa práve upravuje — id riadku, alebo prázdno. */
+  const [upravaPlatby, setUpravaPlatby] = useState("");
+  const [upravaBalicka, setUpravaBalicka] = useState("");
+  const [penazSub, setPenazSub] = useState<"platby" | "bitcoin">("platby");
   const [pisem, setPisem] = useState(false);
   const [f, setF] = useState({ nazov: "", hodiny: "", platnostOd: dnesISO(), platnostDo: "", cenaCzk: "", poznamka: "" });
   const [pracujem, setPracujem] = useState(false);
@@ -66,7 +79,11 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats }: {
     const r = await fetch("/api/balicky", { credentials: "same-origin" }).then((x) => x.json()).catch(() => null);
     if (r?.ok) setBalicky(r.balicky || []);
   }, []);
-  useEffect(() => { void nacitajBalicky(); }, [nacitajBalicky]);
+  const nacitajPlatby = useCallback(async () => {
+    const r = await fetch("/api/platby?klient=1", { credentials: "same-origin" }).then((x) => x.json()).catch(() => null);
+    if (r?.ok) setVlastnePlatby(r.platby || []);
+  }, []);
+  useEffect(() => { void nacitajBalicky(); void nacitajPlatby(); }, [nacitajBalicky, nacitajPlatby]);
 
   const c = meno ? clients[meno] : undefined;
   const os = useMemo(
@@ -78,6 +95,26 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats }: {
     () => balicky.filter((b) => normName(b.klient) === normName(meno) && !b.zrusene_at).sort((a, b) => b.platnost_od.localeCompare(a.platnost_od)),
     [balicky, meno],
   );
+
+  const mojePlatby = useMemo(
+    () => vlastnePlatby.filter((x) => normName(x.klient) === normName(meno) && !x.zrusene_at).sort((a, b) => b.datum.localeCompare(a.datum)),
+    [vlastnePlatby, meno],
+  );
+
+  /** Bitcoinové platby tohto klienta. Kľúč je fuzzy — BTC kniha píše mená inak. */
+  const mojeBtc = useMemo(() => {
+    if (!btc?.platby?.length || !meno) return [];
+    const k = menoKluc(meno);
+    return btc.platby
+      .filter((x) => x.klient && menoKluc(x.klient) === k)
+      .map((x) => ({
+        datum: String(x.datum).slice(0, 10),
+        sats: x.sats || 0,
+        vtedy: Math.round(x.czk || 0),
+        dnes: satsNaCzk(x.sats || 0, btc.kurz ?? null),
+      }))
+      .sort((a, b) => b.datum.localeCompare(a.datum));
+  }, [btc, meno]);
 
   const buduce = useMemo(() => {
     const d = dnesISO();
@@ -147,41 +184,75 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats }: {
    * Výpočet žije v `lib/psb/klientZdravie.ts`, aby ho mohla použiť aj
    * notifikácia a Jarvis, keď na to príde — dve kópie by sa raz rozišli.
    */
+  /**
+   * Obnovy balíčka: po skončení jedného začal ďalší do mesiaca?
+   * Posledný balíček sa nepočíta — ešte nemal príležitosť.
+   */
+  const obnovy = useCallback((zoznam: Balicek[]) => {
+    const zor = [...zoznam].filter((b) => !b.zrusene_at && b.platnost_do).sort((a, b) => a.platnost_od.localeCompare(b.platnost_od));
+    let mohol = 0, obnovil = 0;
+    for (let i = 0; i < zor.length - 1; i++) {
+      const koniec = Date.parse(`${zor[i].platnost_do}T00:00:00Z`);
+      const dalsi = Date.parse(`${zor[i + 1].platnost_od}T00:00:00Z`);
+      if (!Number.isFinite(koniec) || !Number.isFinite(dalsi)) continue;
+      mohol++;
+      if ((dalsi - koniec) / 86400000 <= 31) obnovil++;
+    }
+    return { mohol, obnovil };
+  }, []);
+
+  const dni = useCallback((n: number) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10), []);
+
+  /**
+   * Priemery klientely — RAZ nad všetkými, nie odvodené od otvoreného klienta.
+   * Prvá verzia delila sedenia ostatných mesiacmi tohto klienta, takže sa
+   * „priemer" menil podľa toho, koho si človek otvoril.
+   */
+  const priemery = useMemo(() => {
+    const ostatni = Object.values(clients);
+    const tempa = ostatni.map((x) => x.sessions.filter((y) => y.date.slice(0, 10) > dni(90)).length / 3).filter((x) => x > 0);
+    const tempo = tempa.length ? tempa.reduce((a, b) => a + b, 0) / tempa.length : 0;
+
+    const zruseneVsetky = zruseneKal.filter((z) => z.druh === "zrusene" && z.kedy.slice(0, 10) > dni(90));
+    const aktivnych = Math.max(1, ostatni.filter((x) => x.sessions.some((y) => y.date.slice(0, 10) > dni(90))).length);
+    const zrusene = zruseneVsetky.length / aktivnych;
+
+    const podlaKlienta = new Map<string, Balicek[]>();
+    for (const b of balicky) {
+      const k = normName(b.klient);
+      if (!podlaKlienta.has(k)) podlaKlienta.set(k, []);
+      podlaKlienta.get(k)!.push(b);
+    }
+    let m = 0, o = 0;
+    for (const zoznam of podlaKlienta.values()) { const r = obnovy(zoznam); m += r.mohol; o += r.obnovil; }
+    return { tempo, zrusene, obnovy: m ? o / m : 0.7 };
+  }, [clients, zruseneKal, balicky, dni, obnovy]);
+
   const zdravie = useMemo(() => {
     if (!c) return null;
-    const dni = (n: number) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
     const vokne = (od: string, doD: string) => c.sessions.filter((x) => x.date.slice(0, 10) > od && x.date.slice(0, 10) <= doD).length;
-    const tempoTeraz = vokne(dni(90), dni(0)) / 3;
-    const tempoPredtym = vokne(dni(180), dni(90)) / 3;
-    const mojeZrusene = zruseneKal.filter((z) => z.druh === "zrusene" && z.klient && normName(z.klient) === normName(meno) && z.kedy.slice(0, 10) > dni(90)).length;
-    const vsetkyZrusene = zruseneKal.filter((z) => z.druh === "zrusene" && z.kedy.slice(0, 10) > dni(90)).length;
-    const klientov = Math.max(1, Object.keys(clients).length);
     /**
      * Obvyklý odstup medzi tréningami — medián, nie priemer.
      * Jedna dovolenka v lete by priemer vytiahla natoľko, že by potom
      * „mešká" nevyzeralo ako meškanie u nikoho.
      */
-    const dni_ = c.sessions.map((x) => x.date.slice(0, 10)).sort();
+    const dniS = c.sessions.map((x) => x.date.slice(0, 10)).sort();
     const odstupy: number[] = [];
-    for (let i = 1; i < dni_.length; i++) {
-      odstupy.push((Date.parse(dni_[i]) - Date.parse(dni_[i - 1])) / 86400000);
-    }
+    for (let i = 1; i < dniS.length; i++) odstupy.push((Date.parse(dniS[i]) - Date.parse(dniS[i - 1])) / 86400000);
     odstupy.sort((a, b) => a - b);
     const obvyklyOdstup = odstupy.length >= 4 ? odstupy[Math.floor(odstupy.length / 2)] : null;
-    const posledny = dni_[dni_.length - 1];
-    const dniOdPosledneho = posledny ? Math.floor((Date.now() - Date.parse(posledny)) / 86400000) : null;
-    // Balíček, po ktorom prišiel ďalší, je obnovený. Posledný sa nepočíta —
-    // ešte nemal šancu.
-    const zoradene = [...mojeBalicky].sort((a, b) => a.platnost_od.localeCompare(b.platnost_od));
-    const mohol = Math.max(0, zoradene.length - 1);
-    return zdravieKlienta(c, Object.values(clients).filter((x) => x.name !== c.name), {
-      tempoTeraz, tempoPredtym,
-      zrusene: mojeZrusene,
-      zrusenePriemer: vsetkyZrusene / klientov,
-      dniOdPosledneho, obvyklyOdstup,
-      obnovil: mohol, mohol,
+    const posledny = dniS[dniS.length - 1];
+    const r = obnovy(mojeBalicky);
+    return zdravieKlienta(c, {
+      tempoTeraz: vokne(dni(90), dni(0)) / 3,
+      tempoPredtym: vokne(dni(180), dni(90)) / 3,
+      zrusene: zruseneKal.filter((z) => z.druh === "zrusene" && z.klient && normName(z.klient) === normName(meno) && z.kedy.slice(0, 10) > dni(90)).length,
+      dniOdPosledneho: posledny ? Math.floor((Date.now() - Date.parse(posledny)) / 86400000) : null,
+      obvyklyOdstup,
+      obnovil: r.obnovil, mohol: r.mohol,
+      priemery,
     });
-  }, [c, clients, meno, zruseneKal, mojeBalicky]);
+  }, [c, meno, zruseneKal, mojeBalicky, priemery, dni, obnovy]);
 
   /** Koľko údajov je pod tlačidlom „ďalších N" — aby číslo nebolo vymyslené. */
   const dalsichUdajov = useMemo(
@@ -205,6 +276,8 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats }: {
     setPisemPlatbu(false);
   };
 
+  const naZoznam = () => { setMeno(""); setFilter("zdravie"); setPisem(false); setPisemPlatbu(false); };
+
   /** Zmena kategórie klienta — ručný stav prebije automatický. */
   const nastavStav = async (novy: string) => {
     setPracujem(true); setChyba("");
@@ -213,7 +286,6 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats }: {
       body: JSON.stringify({ name: meno, key: "status", value: novy }),
     }).then((x) => x.json()).catch(() => ({ ok: false, error: "spojenie" }));
     setPracujem(false);
-    setMenimStav(false);
     if (!r.ok) { setChyba(r.error || "nepodarilo sa uložiť"); return; }
     // Stav žije v `data`, ktoré sem prichádzajú zhora — kým sa nenačítajú
     // znova, obrazovka by tvrdila staré. Radšej povedať, že treba obnoviť,
@@ -231,6 +303,63 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats }: {
     if (!r.ok) { setChyba(r.error || "nepodarilo sa uložiť"); return; }
     setF({ nazov: "", hodiny: "", platnostOd: dnesISO(), platnostDo: "", cenaCzk: "", poznamka: "" });
     setPisem(false);
+    await nacitajBalicky();
+  };
+
+  /**
+   * Oprava a zrušenie — pre to, čo appka vie, že napísal človek.
+   *
+   * Riadky z banky a z PTmindera sa tu neupravujú: ich pravdou je výpis,
+   * respektíve export. Keby sa prepísali tu, najbližší import by ich
+   * prepísal späť a nikto by nevedel, ktorá suma platí.
+   *
+   * Zrušenie NEMAŽE riadok, len ho odloží — platba je záznam v knihe.
+   */
+  const upravPlatbu = async (id: string) => {
+    setPracujem(true); setChyba("");
+    const r = await fetch("/api/platby", {
+      method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ akcia: "uprav", id, ...pl }),
+    }).then((x) => x.json()).catch(() => ({ ok: false, error: "spojenie" }));
+    setPracujem(false);
+    if (!r.ok) { setChyba(r.error || "nepodarilo sa uložiť"); return; }
+    setUpravaPlatby(""); setPl({ datum: dnesISO(), suma: "", sposob: "hotovost", poznamka: "" });
+    await nacitajPlatby();
+  };
+
+  const zrusPlatbu = async (id: string) => {
+    if (!confirm("Zrušiť túto platbu? Zo súčtov zmizne, v knihe zostane.")) return;
+    setPracujem(true); setChyba("");
+    const r = await fetch("/api/platby", {
+      method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ akcia: "zrus", id }),
+    }).then((x) => x.json()).catch(() => ({ ok: false, error: "spojenie" }));
+    setPracujem(false);
+    if (!r.ok) { setChyba(r.error || "nepodarilo sa zrušiť"); return; }
+    await nacitajPlatby();
+  };
+
+  const upravBalicek = async (id: string) => {
+    setPracujem(true); setChyba("");
+    const r = await fetch("/api/balicky", {
+      method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ akcia: "uprav", id, klient: meno, ...f }),
+    }).then((x) => x.json()).catch(() => ({ ok: false, error: "spojenie" }));
+    setPracujem(false);
+    if (!r.ok) { setChyba(r.error || "nepodarilo sa uložiť"); return; }
+    setUpravaBalicka(""); setF({ nazov: "", hodiny: "", platnostOd: dnesISO(), platnostDo: "", cenaCzk: "", poznamka: "" });
+    await nacitajBalicky();
+  };
+
+  const zrusBalicek = async (id: string) => {
+    if (!confirm("Zrušiť tento balíček? Zo zostatku zmizne, v evidencii zostane.")) return;
+    setPracujem(true); setChyba("");
+    const r = await fetch("/api/balicky", {
+      method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ akcia: "zrus", id }),
+    }).then((x) => x.json()).catch(() => ({ ok: false, error: "spojenie" }));
+    setPracujem(false);
+    if (!r.ok) { setChyba(r.error || "nepodarilo sa zrušiť"); return; }
     await nacitajBalicky();
   };
 
@@ -339,16 +468,27 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats }: {
 
       <div style={{ width: 250, flexShrink: 0, display: "flex", flexDirection: "column", gap: 10, overflowY: "auto", minHeight: 0 }}>
         <div>
+          {/* Krok späť patrí hore vľavo (Jerry, 23. 9. 2026) — dole na konci
+              stĺpca ho pri dlhom profile nebolo vidno bez rolovania. */}
+          <button onClick={naZoznam} title="späť na zoznam" style={{
+            border: "none", background: "transparent", color: C.textMuted,
+            fontSize: 16, cursor: "pointer", padding: "0 6px 4px 0", lineHeight: 1,
+          }}>←</button>
           <div style={{ fontSize: 19, fontWeight: 800, lineHeight: 1.2 }}>{meno}</div>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4, flexWrap: "wrap" }}>
-            <button onClick={() => setMenimStav(!menimStav)} style={{
-              padding: "3px 9px", borderRadius: 7, fontSize: 11.5, cursor: "pointer",
-              border: `1px solid ${zabudnutaPauza ? C.orange : C.border}`,
-              background: zabudnutaPauza ? mix(C.orange, 15) : "transparent",
-              color: zabudnutaPauza ? C.orange : C.textMuted,
-            }}>
-              {c ? c.status : "čaká na prvý tréning"} ▾
-            </button>
+            {/* Rozbaľovačka, nie riadok tlačidiel (Jerry, 23. 9. 2026).
+                Prázdna hodnota vráti rozhodovanie appke — ručný zápis, na
+                ktorý sa zabudne, je horší než žiadny. */}
+            <select value={c?.statusOverride ? c.status : ""} disabled={!c || pracujem}
+              onChange={(e) => void nastavStav(e.target.value)} style={{
+                padding: "3px 7px", borderRadius: 7, fontSize: 11.5, cursor: "pointer",
+                border: `1px solid ${zabudnutaPauza ? C.orange : C.border}`,
+                background: zabudnutaPauza ? mix(C.orange, 15) : C.card,
+                color: zabudnutaPauza ? C.orange : C.textMuted,
+              }}>
+              <option value="">{c ? `${c.status} (počíta appka)` : "čaká na prvý tréning"}</option>
+              {["Aktívny", "Pauza", "Neaktívny"].map((x) => <option key={x} value={x}>{x}</option>)}
+            </select>
             {c && <span style={{ fontSize: 11.5, color: C.textDim }}>{c.primaryTrainer}</span>}
           </div>
 
@@ -367,24 +507,6 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats }: {
             </div>
           )}
 
-          {menimStav && (
-            <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginTop: 7 }}>
-              {["Aktívny", "Pauza", "Neaktívny"].map((x) => (
-                <button key={x} onClick={() => void nastavStav(x)} disabled={pracujem} style={{
-                  padding: "4px 9px", borderRadius: 7, fontSize: 11, cursor: "pointer",
-                  border: `1px solid ${c?.status === x ? C.accent : C.border}`,
-                  background: c?.status === x ? C.accentBg : "transparent",
-                  color: c?.status === x ? C.accentLight : C.textMuted,
-                }}>{x}</button>
-              ))}
-              {/* Prázdna hodnota vráti rozhodovanie appke — ručný zápis, na
-                  ktorý sa zabudne, je horší než žiadny. */}
-              <button onClick={() => void nastavStav("")} disabled={pracujem} style={{
-                padding: "4px 9px", borderRadius: 7, fontSize: 11, cursor: "pointer",
-                border: `1px solid ${C.border}`, background: "transparent", color: C.textDim,
-              }}>nech rozhodne appka</button>
-            </div>
-          )}
         </div>
 
         {/* NEZAPLATENÉ, nie vymyslený rozdiel.
@@ -434,7 +556,6 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats }: {
             )}
             <div><span style={{ color: C.textDim }}>dochádzka</span> {Math.round((c.attendance || 0) * 100)} %</div>
             <div><span style={{ color: C.textDim }}>Ø hodina</span> {c.avgPrice ? fmtCZK(Math.round(c.avgPrice)) : "—"}</div>
-            {!!c.sessionCount && <div><span style={{ color: C.textDim }}>tempo</span> {(c.sessionCount / Math.max(1, mesiacov(c))).toFixed(1)} / mes.</div>}
             {c.zdrojKto && <div><span style={{ color: C.textDim }}>priviedol</span> {c.zdrojKto}</div>}
           </div>
         )}
@@ -456,8 +577,6 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats }: {
           </div>
         )}
 
-        <div style={{ flexGrow: 1 }} />
-        <button onClick={() => { setMeno(""); setFilter("zdravie"); setPisem(false); setPisemPlatbu(false); }} style={navrhTlacidlo}>← späť na zoznam</button>
       </div>
 
       <div style={{ flexGrow: 1, minWidth: 0, display: "flex", flexDirection: "column", minHeight: 0 }}>
@@ -483,13 +602,23 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats }: {
             {pisem ? "Zavrieť" : "+ Nahodiť balíček alebo členstvo"}
           </button>
         )}
+        {/* Bitcoin je pod Peniazmi vlastná záložka (Jerry, 23. 9. 2026).
+            Do zoznamu platieb sa miešať nedá: v knihe je to satoshi, nie
+            koruny, a jedna suma tam má dve hodnoty — vtedajšiu a dnešnú. */}
         {filter === "peniaze" && (
-          <button onClick={() => setPisemPlatbu(!pisemPlatbu)} style={{ ...navrhTlacidlo, marginTop: 10, alignSelf: "flex-start", borderColor: mix(C.green, 45), color: C.green, fontWeight: 600 }}>
-            {pisemPlatbu ? "Zavrieť" : "+ Pridať platbu"}
-          </button>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 10 }}>
+            {([["platby", "platby"], ["bitcoin", "₿ bitcoin"]] as const).map(([id, l]) => (
+              <button key={id} onClick={() => setPenazSub(id)} style={prepinac(penazSub === id)}>{l}</button>
+            ))}
+            {penazSub === "platby" && (
+              <button onClick={() => { setPisemPlatbu(!pisemPlatbu); setUpravaPlatby(""); }} style={{ ...navrhTlacidlo, borderColor: mix(C.green, 45), color: C.green, fontWeight: 600 }}>
+                {pisemPlatbu ? "Zavrieť" : "+ Pridať platbu"}
+              </button>
+            )}
+          </div>
         )}
         {filter === "balicky" && pisem && <FormularBalicka f={f} setF={setF} pracujem={pracujem} onUloz={() => void pridaj()} />}
-        {filter === "peniaze" && pisemPlatbu && (
+        {filter === "peniaze" && penazSub === "platby" && pisemPlatbu && !upravaPlatby && (
           <FormularPlatby
             p={pl}
             setP={setPl}
@@ -543,7 +672,137 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats }: {
             </div>
           ))}
 
-          {filter !== "poznamky" && filter !== "zdravie" && os
+          {/* VLASTNÁ EVIDENCIA — to, čo Jerry nahodil v Kokpite.
+              Doteraz sa nahodený balíček nikde nezobrazoval: zapísal sa do
+              databázy a z obrazovky zmizol. Len tieto riadky sa dajú upraviť
+              a zrušiť; PTminder pod nimi je export, nie zápisník. */}
+          {filter === "balicky" && !!mojeBalicky.length && (
+            <div style={{ marginBottom: 14 }}>
+              <div style={hlavicka}>NAHODENÉ V KOKPITE</div>
+              {mojeBalicky.map((b) => (
+                <div key={b.id}>
+                  <div style={riadok}>
+                    <span style={stlpecDen}>{fmtDMY(b.platnost_od)}</span>
+                    <span style={{ flex: 1 }}>
+                      {b.nazov}
+                      <span style={{ color: C.textDim }}>
+                        {b.hodiny ? ` · ${b.hodiny} h` : ""}
+                        {b.platnost_do ? ` · do ${fmtDMY(b.platnost_do)}` : ""}
+                        {b.poznamka ? ` · ${b.poznamka}` : ""}
+                      </span>
+                    </span>
+                    {!!b.cena_czk && <span style={{ color: C.textMuted }}>{fmtCZK(b.cena_czk)}</span>}
+                    <Upravit
+                      naUpravu={() => {
+                        setUpravaBalicka(b.id); setPisem(false);
+                        setF({
+                          nazov: b.nazov, hodiny: b.hodiny == null ? "" : String(b.hodiny),
+                          platnostOd: b.platnost_od, platnostDo: b.platnost_do || "",
+                          cenaCzk: b.cena_czk == null ? "" : String(b.cena_czk), poznamka: b.poznamka || "",
+                        });
+                      }}
+                      naZrusenie={() => void zrusBalicek(b.id)}
+                      pracujem={pracujem}
+                    />
+                  </div>
+                  {upravaBalicka === b.id && (
+                    <FormularBalicka f={f} setF={setF} pracujem={pracujem} onUloz={() => void upravBalicek(b.id)} popis="Uložiť zmenu" />
+                  )}
+                </div>
+              ))}
+              <div style={hlavicka}>Z PTMINDERA</div>
+            </div>
+          )}
+
+          {/* VLASTNÉ PLATBY — banka z výpisu a hotovosť zo zošita.
+              Hotovosť sa dá opraviť aj zrušiť, riadok z banky nie: jeho
+              pravdou je výpis a najbližší import by opravu aj tak prepísal. */}
+          {filter === "peniaze" && penazSub === "platby" && !!mojePlatby.length && (
+            <div style={{ marginBottom: 14 }}>
+              <div style={hlavicka}>V KOKPITE</div>
+              {mojePlatby.map((x) => (
+                <div key={x.id}>
+                  <div style={riadok}>
+                    <span style={stlpecDen}>{fmtDMY(x.datum)}</span>
+                    <span style={{ flex: 1, color: C.green }}>
+                      {SPOSOB[x.sposob] || x.sposob}
+                      {x.fio_id ? <span style={{ color: C.textDim }}> · z výpisu</span> : ""}
+                      {x.poznamka ? <span style={{ color: C.textDim }}> · {x.poznamka}</span> : ""}
+                    </span>
+                    <span style={{ color: C.green, fontWeight: 700 }}>{fmtCZK(x.suma_czk)}</span>
+                    {x.fio_id ? <span style={{ width: 46 }} /> : (
+                      <Upravit
+                        naUpravu={() => {
+                          setUpravaPlatby(x.id); setPisemPlatbu(false);
+                          setPl({ datum: x.datum.slice(0, 10), suma: String(x.suma_czk), sposob: x.sposob, poznamka: x.poznamka || "" });
+                        }}
+                        naZrusenie={() => void zrusPlatbu(x.id)}
+                        pracujem={pracujem}
+                      />
+                    )}
+                  </div>
+                  {upravaPlatby === x.id && (
+                    <FormularPlatby p={pl} setP={setPl} pracujem={pracujem} onUloz={() => void upravPlatbu(x.id)} popis="Uložiť zmenu" />
+                  )}
+                </div>
+              ))}
+              <div style={hlavicka}>Z PTMINDERA</div>
+            </div>
+          )}
+
+          {/* BITCOIN — tá istá tabuľka ako v BTC appke, len pre jedného človeka.
+              „Vtedy" je suma, za ktorú sa tréning predal; „dnes" je, čo tie
+              satoshi stoja teraz. Bez kurzu sa druhý stĺpec netvrdí. */}
+          {filter === "peniaze" && penazSub === "bitcoin" && (
+            mojeBtc.length ? (
+              <div>
+                {(() => {
+                  const sats = mojeBtc.reduce((a, x) => a + x.sats, 0);
+                  const vtedy = mojeBtc.reduce((a, x) => a + x.vtedy, 0);
+                  const dnes = satsNaCzk(sats, btc?.kurz ?? null);
+                  const rozdiel = dnes === null ? null : dnes - vtedy;
+                  return (
+                    <div style={{ padding: "12px 14px", borderRadius: 11, background: mix(C.orange, 10), border: `1px solid ${mix(C.orange, 40)}`, marginBottom: 12 }}>
+                      <div style={{ fontSize: 18, fontWeight: 800, color: C.orange }}>{sats.toLocaleString("cs-CZ")} sats</div>
+                      <div style={{ fontSize: 12, color: C.textMuted, marginTop: 4 }}>
+                        zaplatil za {fmtCZK(vtedy)}
+                        {dnes !== null && <> · dnes {fmtCZK(dnes)}</>}
+                        {rozdiel !== null && vtedy > 0 && (
+                          <span style={{ color: rozdiel >= 0 ? C.green : C.red, fontWeight: 700 }}>
+                            {" "}({rozdiel >= 0 ? "+" : ""}{Math.round((rozdiel / vtedy) * 1000) / 10} %)
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: 10.5, color: C.textDim, marginTop: 5 }}>
+                        {mojeBtc.length} {mojeBtc.length === 1 ? "platba" : mojeBtc.length < 5 ? "platby" : "platieb"}
+                        {btc?.kedy ? ` · kurz z ${fmtDMY(String(btc.kedy).slice(0, 10))}` : " · kurz nepoznáme, dnešná hodnota sa netvrdí"}
+                      </div>
+                    </div>
+                  );
+                })()}
+                {mojeBtc.map((x, i) => (
+                  <div key={i} style={riadok}>
+                    <span style={stlpecDen}>{fmtDMY(x.datum)}</span>
+                    <span style={{ flex: 1, color: C.orange }}>{x.sats.toLocaleString("cs-CZ")} sats</span>
+                    <span style={{ color: C.textMuted }}>{fmtCZK(x.vtedy)}</span>
+                    {x.dnes !== null && (
+                      <span style={{ width: 96, textAlign: "right", color: x.dnes >= x.vtedy ? C.green : C.red, fontWeight: 700 }}>
+                        → {fmtCZK(x.dnes)}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <Prazdne>
+                {btc?.platby?.length
+                  ? "Tento klient v bitcoine neplatil. Platby sú v appke PSB Bitcoin."
+                  : "Bitcoinová kniha sa nenačítala."}
+              </Prazdne>
+            )
+          )}
+
+          {filter !== "poznamky" && filter !== "zdravie" && !(filter === "peniaze" && penazSub === "bitcoin") && os
             .filter((x) => filter === "vsetko"
               || (filter === "peniaze" && x.druh === "platba")
               || (filter === "balicky" && (x.druh === "balicekOd" || x.druh === "balicekDo")))
@@ -577,13 +836,6 @@ function doNarodenin(narodeniny: string): number | null {
   let d = Date.UTC(dnes.getUTCFullYear(), Number(m[2]) - 1, Number(m[3]));
   if (d < dnesUTC) d = Date.UTC(dnes.getUTCFullYear() + 1, Number(m[2]) - 1, Number(m[3]));
   return Math.round((d - dnesUTC) / 86400000);
-}
-
-/** Koľko mesiacov klient chodí — na tempo. */
-function mesiacov(c: ClientAgg): number {
-  if (!c.firstSession) return 1;
-  const d = (Date.now() - Date.parse(c.firstSession)) / (1000 * 60 * 60 * 24 * 30.44);
-  return Math.max(0.5, d);
 }
 
 function RiadokOsi({ u }: { u: ReturnType<typeof osCasuKlienta>[number] }) {
@@ -622,11 +874,13 @@ function RiadokOsi({ u }: { u: ReturnType<typeof osCasuKlienta>[number] }) {
   );
 }
 
-function FormularBalicka({ f, setF, pracujem, onUloz }: {
+function FormularBalicka({ f, setF, pracujem, onUloz, popis = "Nahodiť" }: {
   f: Record<string, string>;
   setF: (v: never) => void;
   pracujem: boolean;
   onUloz: () => void;
+  /** Ten istý formulár slúži na nahodenie aj na opravu. */
+  popis?: string;
 }) {
   /**
    * Zo šablóny sa predvyplní VŠETKO, čo sa dá — a dá sa to prepísať.
@@ -721,7 +975,7 @@ function FormularBalicka({ f, setF, pracujem, onUloz }: {
         background: f.nazov.trim() ? mix(C.green, 12) : "transparent",
         color: f.nazov.trim() ? C.green : C.textDim,
       }}>
-        {pracujem ? "…" : "Nahodiť"}
+        {pracujem ? "…" : popis}
       </button>
     </div>
   );
@@ -735,11 +989,12 @@ function FormularBalicka({ f, setF, pracujem, onUloz }: {
  * prevod, ktorý by sa sem zapísal ručne, by sa raz spároval z výpisu ešte
  * raz a klient by mal zaplatené dvakrát.
  */
-function FormularPlatby({ p, setP, pracujem, onUloz }: {
+function FormularPlatby({ p, setP, pracujem, onUloz, popis = "Uložiť platbu" }: {
   p: { datum: string; suma: string; sposob: string; poznamka: string };
   setP: (v: never) => void;
   pracujem: boolean;
   onUloz: () => void;
+  popis?: string;
 }) {
   const platne = Number(p.suma) > 0 && /^\d{4}-\d{2}-\d{2}$/.test(p.datum);
   return (
@@ -759,7 +1014,9 @@ function FormularPlatby({ p, setP, pracujem, onUloz }: {
         <select value={p.sposob} onChange={(e) => setP({ ...p, sposob: e.target.value } as never)}
           style={{ width: 130, padding: "6px 8px", borderRadius: 7, fontSize: 12, border: `1px solid ${C.border}`, background: C.bg, color: C.text }}>
           <option value="hotovost">hotovosť</option>
-          <option value="ine">iné (barter, BTC)</option>
+          <option value="prevod">bankový prevod</option>
+          <option value="bitcoin">bitcoin</option>
+          <option value="ine">iné (barter)</option>
         </select>
       </label>
       <label style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 10.5, color: C.textDim }}>
@@ -774,10 +1031,12 @@ function FormularPlatby({ p, setP, pracujem, onUloz }: {
         background: platne ? mix(C.green, 12) : "transparent",
         color: platne ? C.green : C.textDim,
       }}>
-        {pracujem ? "…" : "Uložiť platbu"}
+        {pracujem ? "…" : popis}
       </button>
-      <div style={{ fontSize: 11, color: C.textDim, flexBasis: "100%" }}>
-        Bankové platby sem nepíš — tie sa priraďujú z výpisu v karte „Platby z banky", inak by sa započítali dvakrát.
+      <div style={{ fontSize: 11, color: p.sposob === "prevod" ? C.orange : C.textDim, flexBasis: "100%", lineHeight: 1.5 }}>
+        {p.sposob === "prevod"
+          ? "Pozor: prevod z účtu sa sem dostane sám z výpisu Fio. Ručne ho píš len vtedy, keď vo výpise nie je (cudzí účet, Revolut) — inak bude klient zaplatený dvakrát."
+          : "Bankové platby sem nepíš — tie sa priraďujú z výpisu v karte „Platby z banky“, inak by sa započítali dvakrát."}
       </div>
     </div>
   );
@@ -930,6 +1189,32 @@ const riadok = {
 const stlpecDen = { color: C.textDim, minWidth: 74, fontVariantNumeric: "tabular-nums" as const };
 
 /** Farba podľa tónu signálu — jedno miesto, nech sa pásy a záver nerozídu. */
+/** Spôsob platby ľudsky. `prevod` píše Jerry ručne, `bank` prišlo z exportu. */
+const SPOSOB: Record<string, string> = {
+  hotovost: "hotovosť", prevod: "bankový prevod", bitcoin: "bitcoin", ine: "iné",
+  cash: "hotovosť", bank: "prevodom",
+};
+
+const hlavicka: React.CSSProperties = {
+  fontSize: 10, fontWeight: 700, color: C.textDim, letterSpacing: 0.6,
+  padding: "8px 0 4px", borderBottom: `1px solid ${mix(C.border, 60)}`, marginBottom: 2,
+};
+
+/**
+ * Ceruzka a krížik. Sú malé a sivé zámerne — pri každom riadku svieti
+ * tlačidlo „zmazať" len dovtedy, kým ho niekto nestlačí omylom.
+ */
+const Upravit = ({ naUpravu, naZrusenie, pracujem }: { naUpravu: () => void; naZrusenie: () => void; pracujem: boolean }) => (
+  <span style={{ display: "flex", gap: 4, width: 46, justifyContent: "flex-end" }}>
+    {([["✎", naUpravu, "upraviť"], ["✕", naZrusenie, "zrušiť"]] as const).map(([z, fn, t]) => (
+      <button key={z} onClick={fn} disabled={pracujem} title={t} style={{
+        border: "none", background: "transparent", color: C.textDim,
+        fontSize: 12, cursor: pracujem ? "not-allowed" : "pointer", padding: "0 2px", lineHeight: 1,
+      }}>{z}</button>
+    ))}
+  </span>
+);
+
 const TON: Record<string, string> = { dobre: C.green, vsimnut: C.orange, zle: C.red, nevieme: C.textDim };
 
 const prepinac = (on: boolean) => ({

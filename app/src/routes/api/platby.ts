@@ -39,6 +39,9 @@ const naPlatbu = (r: PlatbaRiadok): Platba => ({
   sposob: r.sposob, fioId: r.fio_id, zruseneAt: r.zrusene_at,
 });
 
+/** Ručné spôsoby platby. Fio si svoje riadky značí samo cez fio_id. */
+const SPOSOBY = ["hotovost", "prevod", "bitcoin", "ine"];
+
 export const Route = createFileRoute("/api/platby")({
   server: {
     handlers: {
@@ -46,6 +49,22 @@ export const Route = createFileRoute("/api/platby")({
         if (!(await isAuthed(request))) return unauthorized();
         const { DB } = bindings();
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });
+
+        /**
+         * Platby jedného klienta — pre jeho profil.
+         * Celá odpoveď nižšie ťahá aj výpis z banky a porovnanie s PTminderom;
+         * na profil to je zbytočná práca, ktorú by človek čakal pri každom
+         * kliknutí na meno.
+         */
+        // Meno sa NEPOROVNÁVA v SQL: „Tomáš Dvořák" a „Tomas Dvorak" sú v D1
+        // dva rôzne reťazce a klientovi by jeho vlastná platba zmizla.
+        // Tabuľka má stovky riadkov, takže sa vráti celá a triedi sa hore.
+        if (new URL(request.url).searchParams.has("klient")) {
+          const r = await DB.prepare(
+            "SELECT id, klient, datum, suma_czk, sposob, fio_id, poznamka, zrusene_at FROM platby ORDER BY datum DESC",
+          ).all();
+          return Response.json({ ok: true, platby: r.results || [] });
+        }
 
         const [vlastne, fio, mapa, nieKlient, mena, pt, horizont] = await DB.batch([
           DB.prepare("SELECT id, klient, datum, suma_czk, sposob, fio_id, poznamka, zrusene_at FROM platby ORDER BY datum DESC"),
@@ -159,11 +178,33 @@ export const Route = createFileRoute("/api/platby")({
           if (!klient) return Response.json({ ok: false, error: "Chýba klient." }, { status: 400 });
           if (!datum) return Response.json({ ok: false, error: "Chýba dátum (RRRR-MM-DD)." }, { status: 400 });
           if (suma <= 0) return Response.json({ ok: false, error: "Suma musí byť kladná." }, { status: 400 });
-          const sposob = b.sposob === "ine" ? "ine" : "hotovost";
+          const sposob = SPOSOBY.includes(String(b.sposob)) ? String(b.sposob) : "hotovost";
           await DB.prepare(
             "INSERT INTO platby (id, klient, datum, suma_czk, sposob, fio_id, poznamka, created_at, autor) VALUES (?,?,?,?,?,NULL,?,?,?)",
           ).bind(uid(), klient, datum, suma, sposob, String(b.poznamka || "").slice(0, 300) || null, teraz(), kto || null).run();
           await audit(DB, { action: "platba-hotovost", predmet: klient, neu: `${suma} Kč · ${datum}`, actor: kto });
+          return Response.json({ ok: true });
+        }
+
+        /**
+         * Oprava ručnej platby — preklep v sume alebo dátume.
+         * Platby z banky sa neupravujú: ich pravdou je výpis, nie Kokpit.
+         */
+        if (akcia === "uprav") {
+          const id = String(b.id || "");
+          const datum = denISO(b.datum);
+          const suma = Number(b.suma) || 0;
+          if (!id) return Response.json({ ok: false, error: "Chýba id." }, { status: 400 });
+          if (!datum) return Response.json({ ok: false, error: "Chýba dátum (RRRR-MM-DD)." }, { status: 400 });
+          if (suma <= 0) return Response.json({ ok: false, error: "Suma musí byť kladná." }, { status: 400 });
+          const stav = await DB.prepare("SELECT fio_id FROM platby WHERE id = ?").bind(id).first<{ fio_id: string | null }>();
+          if (!stav) return Response.json({ ok: false, error: "Platba sa nenašla." }, { status: 404 });
+          if (stav.fio_id) return Response.json({ ok: false, error: "Platbu z banky upraviť nejde — pravdou je výpis." }, { status: 400 });
+          const sposob = SPOSOBY.includes(String(b.sposob)) ? String(b.sposob) : "hotovost";
+          await DB.prepare(
+            "UPDATE platby SET datum=?, suma_czk=?, sposob=?, poznamka=? WHERE id=?",
+          ).bind(datum, suma, sposob, String(b.poznamka || "").slice(0, 300) || null, id).run();
+          await audit(DB, { action: "platba-upravena", predmet: id, neu: `${suma} Kč · ${datum}`, actor: kto });
           return Response.json({ ok: true });
         }
 

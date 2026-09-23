@@ -26,9 +26,28 @@ export type Signal = {
   podiel: number;
   /** 0..1 — kde je na tej istej mierke priemer klientely. */
   priemer: number;
+  /** Čo znamená sivá čiarka na páse. Prázdne = pás mierku nemá. */
+  mierka: string;
   /** Vysvetlenie pod pásom; prázdne = netreba nič dodávať. */
   detail: string;
   tón: "dobre" | "vsimnut" | "zle" | "nevieme";
+};
+
+/**
+ * Priemery celej klientely — počítajú sa RAZ, nie pri každom klientovi.
+ *
+ * Prvá verzia delila počet sedení OSTATNÝCH klientov počtom mesiacov TOHTO
+ * klienta, takže „priemer klientely" vychádzal zakaždým inak podľa toho,
+ * koho si človek otvoril. Jerry to 23. 9. 2026 zbadal na prvý pohľad:
+ * „nezdá sa mi, že by tam boli priemery, pôsobí to náhodne."
+ */
+export type PriemeryKlientely = {
+  /** Priemerné tempo (tréningov za mesiac) za posledných 90 dní. */
+  tempo: number;
+  /** Priemerný počet zrušených tréningov na klienta za 90 dní. */
+  zrusene: number;
+  /** Podiel obnovených balíčkov naprieč klientelou, 0..1. */
+  obnovy: number;
 };
 
 export type Zdravie = { signaly: Signal[]; zaver: string; tón: "dobre" | "vsimnut" | "zle" | "nevieme" };
@@ -37,31 +56,27 @@ const podiel = (v: number, max: number) => Math.max(0, Math.min(1, max ? v / max
 
 export function zdravieKlienta(
   c: ClientAgg,
-  ostatni: ClientAgg[],
   vstupy: {
     /** Tréningy za posledných 90 dní a za 90 dní pred nimi. */
     tempoTeraz: number;
     tempoPredtym: number;
     /** Zrušené tréningy za 90 dní. */
     zrusene: number;
-    /** Dní od posledného tréningu a obvyklý odstup medzi nimi. */
+    /** Dní od posledného tréningu a jeho OBVYKLÝ odstup (medián). */
     dniOdPosledneho: number | null;
     obvyklyOdstup: number | null;
-    /** Koľko balíčkov klient obnovil a koľko ich mohol obnoviť. */
+    /** Koľko balíčkov po sebe nadviazalo a koľko ich mohlo. */
     obnovil: number;
     mohol: number;
-    /** Priemerné zrušené za 90 dní naprieč klientelou. */
-    zrusenePriemer: number;
+    /** Priemery klientely — počítajú sa RAZ nad všetkými, nie tu. */
+    priemery: PriemeryKlientely;
   },
 ): Zdravie {
-  const priemerTempa = ostatni.length
-    ? ostatni.reduce((a, x) => a + (x.sessionCount || 0), 0) / ostatni.length / Math.max(1, mesiacov(c))
-    : 0;
-  const maxTempo = Math.max(vstupy.tempoTeraz, vstupy.tempoPredtym, priemerTempa, 1) * 1.2;
-
+  const maxTempo = Math.max(vstupy.tempoTeraz, vstupy.tempoPredtym, vstupy.priemery.tempo, 1) * 1.2;
   const zmenaTempa = vstupy.tempoPredtym > 0
     ? Math.round(((vstupy.tempoTeraz - vstupy.tempoPredtym) / vstupy.tempoPredtym) * 100)
     : 0;
+  const maxZrusene = Math.max(4, vstupy.zrusene + 1, vstupy.priemery.zrusene * 2);
 
   const signaly: Signal[] = [
     {
@@ -69,7 +84,8 @@ export function zdravieKlienta(
       nazov: "Tempo",
       hodnota: `${vstupy.tempoTeraz.toFixed(1)} / mes.`,
       podiel: podiel(vstupy.tempoTeraz, maxTempo),
-      priemer: podiel(priemerTempa, maxTempo),
+      priemer: podiel(vstupy.priemery.tempo, maxTempo),
+      mierka: `priemer klientely ${vstupy.priemery.tempo.toFixed(1)}`,
       detail: vstupy.tempoPredtym > 0
         ? `${vstupy.tempoPredtym.toFixed(1)} → ${vstupy.tempoTeraz.toFixed(1)} za pol roka`
         : "kratšia história, než aby sa dal porovnať trend",
@@ -80,40 +96,61 @@ export function zdravieKlienta(
       nazov: "Zrušené tréningy",
       hodnota: `${vstupy.zrusene} za 90 dní`,
       // Menej je lepšie — mierka sa preto obracia.
-      podiel: 1 - podiel(vstupy.zrusene, Math.max(4, vstupy.zrusene + 1)),
-      priemer: 1 - podiel(vstupy.zrusenePriemer, Math.max(4, vstupy.zrusene + 1)),
-      detail: `priemer klientely ${vstupy.zrusenePriemer.toFixed(1)}`,
-      tón: vstupy.zrusene === 0 ? "dobre" : vstupy.zrusene > vstupy.zrusenePriemer * 2 ? "zle" : vstupy.zrusene > vstupy.zrusenePriemer ? "vsimnut" : "dobre",
+      podiel: 1 - podiel(vstupy.zrusene, maxZrusene),
+      priemer: 1 - podiel(vstupy.priemery.zrusene, maxZrusene),
+      mierka: `priemer klientely ${vstupy.priemery.zrusene.toFixed(1)}`,
+      detail: vstupy.zrusene === 0 ? "nezrušil ani jeden" : "",
+      tón: vstupy.zrusene === 0 ? "dobre" : vstupy.zrusene > vstupy.priemery.zrusene * 2 ? "zle" : vstupy.zrusene > vstupy.priemery.zrusene ? "vsimnut" : "dobre",
     },
     (() => {
       const d = vstupy.dniOdPosledneho, o = vstupy.obvyklyOdstup;
       // Bolesť sa v PSB nemeria (Jerry, 23. 9. 2026) — signál na jej mieste
       // hovorí to, čo sa naozaj dá zistiť: či už nemal byť dávno tu.
+      //
+      // Mierkou je JEHO vlastný rytmus, nie priemer klientely. Kto chodí raz
+      // za dva týždne, nemešká, keď je desať dní preč — a porovnávať ho
+      // s niekým, kto chodí dvakrát týždenne, by klamalo.
       if (d == null || o == null || o <= 0) {
         return {
           id: "medzera" as const, nazov: "Od posledného tréningu", hodnota: d == null ? "—" : `${d} dní`,
-          podiel: 0, priemer: 0, detail: "krátka história, odstup sa ešte nedá porovnať", tón: "nevieme" as const,
+          podiel: 0, priemer: 0, mierka: "", detail: "krátka história, odstup sa ešte nedá porovnať", tón: "nevieme" as const,
         };
       }
-      const nasobok = d / o;
+      const max = Math.max(o * 3, d + 1);
       return {
         id: "medzera" as const, nazov: "Od posledného tréningu", hodnota: `${d} dní`,
-        // Menej je lepšie; mierka sa obracia, tak ako pri zrušených.
-        podiel: 1 - podiel(d, Math.max(o * 3, d + 1)),
-        priemer: 1 - podiel(o, Math.max(o * 3, d + 1)),
-        detail: `obvykle chodí každých ${Math.round(o)} dní`,
-        tón: nasobok >= 2.5 ? "zle" as const : nasobok >= 1.5 ? "vsimnut" as const : "dobre" as const,
+        podiel: 1 - podiel(d, max),
+        priemer: 1 - podiel(o, max),
+        mierka: `jeho obvyklý odstup ${Math.round(o)} dní`,
+        detail: "",
+        tón: d / o >= 2.5 ? "zle" as const : d / o >= 1.5 ? "vsimnut" as const : "dobre" as const,
       };
     })(),
-    {
-      id: "obnovy",
-      nazov: "Obnovy balíčka",
-      hodnota: vstupy.mohol ? `${vstupy.obnovil} z ${vstupy.mohol}` : "zatiaľ prvý",
-      podiel: vstupy.mohol ? podiel(vstupy.obnovil, vstupy.mohol) : 0.5,
-      priemer: 0.7,
-      detail: vstupy.mohol ? (vstupy.obnovil === vstupy.mohol ? "nikdy nevynechal" : `${vstupy.mohol - vstupy.obnovil}× nechal prestávku`) : "",
-      tón: !vstupy.mohol ? "nevieme" : vstupy.obnovil === vstupy.mohol ? "dobre" : vstupy.obnovil / vstupy.mohol < 0.6 ? "zle" : "vsimnut",
-    },
+    (() => {
+      /**
+       * Obnova = po skončení balíčka začal ďalší do mesiaca.
+       *
+       * Prvá verzia posielala `obnovil = mohol`, takže každému vychádzalo
+       * 100 % — číslo, ktoré je u všetkých rovnaké, nie je signál, je to
+       * ozdoba. Jerry sa 23. 9. 2026 oprávnene pýtal, čo to vlastne znamená.
+       */
+      if (vstupy.mohol <= 0) {
+        return {
+          id: "obnovy" as const, nazov: "Obnovy balíčka", hodnota: "zatiaľ prvý",
+          podiel: 0, priemer: 0, mierka: "", detail: "na obnovu ešte nemal príležitosť", tón: "nevieme" as const,
+        };
+      }
+      const pomer = vstupy.obnovil / vstupy.mohol;
+      return {
+        id: "obnovy" as const, nazov: "Obnovy balíčka",
+        hodnota: `${vstupy.obnovil} z ${vstupy.mohol}`,
+        podiel: pomer,
+        priemer: vstupy.priemery.obnovy,
+        mierka: `priemer klientely ${Math.round(vstupy.priemery.obnovy * 100)} %`,
+        detail: vstupy.obnovil === vstupy.mohol ? "nadviazal vždy do mesiaca" : `${vstupy.mohol - vstupy.obnovil}× nechal dlhšiu prestávku`,
+        tón: pomer >= 0.99 ? "dobre" as const : pomer < 0.6 ? "zle" as const : "vsimnut" as const,
+      };
+    })(),
   ];
 
   const zle = signaly.filter((x) => x.tón === "zle").length;
