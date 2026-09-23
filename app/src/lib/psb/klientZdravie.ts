@@ -25,7 +25,7 @@
 import type { ClientAgg } from "./compute";
 
 export type Signal = {
-  id: "tempo" | "zrusene" | "medzera";
+  id: "tempo" | "zrusene" | "dochadzka" | "vztah" | "hodinovka";
   nazov: string;
   /** Hodnota klienta ako text pre človeka. */
   hodnota: string;
@@ -38,6 +38,15 @@ export type Signal = {
   /** Vysvetlenie pod pásom; prázdne = netreba nič dodávať. */
   detail: string;
   tón: "dobre" | "vsimnut" | "zle" | "nevieme";
+  /**
+   * Počíta sa tento riadok do záveru?
+   *
+   * Dĺžka vzťahu a hodinovka sú KONTEXT, nie varovanie. Nový klient nie je
+   * problém a nízka hodinovka je spravidla zľava, ktorú niekto schválil —
+   * keby zhoršovali záver, appka by hlásila „pozor" pri každom nováčikovi
+   * so zľavou a človek by prestal čítať aj tie riadky, ktoré varovanie sú.
+   */
+  doZaveru: boolean;
 };
 
 /**
@@ -53,6 +62,12 @@ export type PriemeryKlientely = {
   tempo: number;
   /** Priemerný počet zrušených tréningov na klienta za 90 dní. */
   zrusene: number;
+  /** Priemerná dochádzka klientely, 0..1. */
+  dochadzka: number;
+  /** Priemerná dĺžka vzťahu v mesiacoch. */
+  vztah: number;
+  /** Priemerná cena odtrénovanej hodiny v Kč. */
+  hodinovka: number;
 };
 
 export type Zdravie = { signaly: Signal[]; zaver: string; tón: "dobre" | "vsimnut" | "zle" | "nevieme" };
@@ -67,9 +82,6 @@ export function zdravieKlienta(
     tempoPredtym: number;
     /** Zrušené tréningy za 90 dní. */
     zrusene: number;
-    /** Dní od posledného tréningu a jeho OBVYKLÝ odstup (medián). */
-    dniOdPosledneho: number | null;
-    obvyklyOdstup: number | null;
     /** Priemery klientely — počítajú sa RAZ nad všetkými, nie tu. */
     priemery: PriemeryKlientely;
   },
@@ -92,6 +104,7 @@ export function zdravieKlienta(
         ? `${vstupy.tempoPredtym.toFixed(1)} → ${vstupy.tempoTeraz.toFixed(1)} za pol roka`
         : "kratšia história, než aby sa dal porovnať trend",
       tón: vstupy.tempoPredtym <= 0 ? "nevieme" : zmenaTempa <= -25 ? "zle" : zmenaTempa <= -10 ? "vsimnut" : "dobre",
+      doZaveru: true,
     },
     {
       id: "zrusene",
@@ -103,38 +116,80 @@ export function zdravieKlienta(
       mierka: `priemer klientely ${vstupy.priemery.zrusene.toFixed(1)}`,
       detail: vstupy.zrusene === 0 ? "nezrušil ani jeden" : "",
       tón: vstupy.zrusene === 0 ? "dobre" : vstupy.zrusene > vstupy.priemery.zrusene * 2 ? "zle" : vstupy.zrusene > vstupy.priemery.zrusene ? "vsimnut" : "dobre",
+      doZaveru: true,
     },
     (() => {
-      const d = vstupy.dniOdPosledneho, o = vstupy.obvyklyOdstup;
-      // Bolesť sa v PSB nemeria (Jerry, 23. 9. 2026) — signál na jej mieste
-      // hovorí to, čo sa naozaj dá zistiť: či už nemal byť dávno tu.
-      //
-      // Mierkou je JEHO vlastný rytmus, nie priemer klientely. Kto chodí raz
-      // za dva týždne, nemešká, keď je desať dní preč — a porovnávať ho
-      // s niekým, kto chodí dvakrát týždenne, by klamalo.
-      if (d == null || o == null || o <= 0) {
+      // DOCHÁDZKA — z ľavého stĺpca sem (Jerry, 23. 9. 2026). Holé „78 %"
+      // nehovorí nič; vedľa priemeru klientely áno.
+      const moja = c.attendance || 0;
+      const p = vstupy.priemery.dochadzka;
+      if (!c.sessionCount) {
         return {
-          id: "medzera" as const, nazov: "Od posledného tréningu", hodnota: d == null ? "—" : `${d} dní`,
-          podiel: 0, priemer: 0, mierka: "", detail: "krátka história, odstup sa ešte nedá porovnať", tón: "nevieme" as const,
+          id: "dochadzka" as const, nazov: "Dochádzka", hodnota: "—", podiel: 0, priemer: 0,
+          mierka: "", detail: "ešte nemá odtrénované", tón: "nevieme" as const, doZaveru: false,
         };
       }
-      const max = Math.max(o * 3, d + 1);
       return {
-        id: "medzera" as const, nazov: "Od posledného tréningu", hodnota: `${d} dní`,
-        podiel: 1 - podiel(d, max),
-        priemer: 1 - podiel(o, max),
-        mierka: `jeho obvyklý odstup ${Math.round(o)} dní`,
-        detail: "",
-        tón: d / o >= 2.5 ? "zle" as const : d / o >= 1.5 ? "vsimnut" as const : "dobre" as const,
+        id: "dochadzka" as const, nazov: "Dochádzka",
+        hodnota: `${Math.round(moja * 100)} %`,
+        podiel: podiel(moja, 1), priemer: podiel(p, 1),
+        mierka: `priemer klientely ${Math.round(p * 100)} %`,
+        detail: "koľko z objednaných termínov naozaj odchodil",
+        tón: moja >= p ? "dobre" as const : moja >= p * 0.8 ? "vsimnut" as const : "zle" as const,
+        doZaveru: true,
+      };
+    })(),
+    (() => {
+      // DĹŽKA VZŤAHU — kontext, nie varovanie. Prvé mesiace sú najrizikovejšie
+      // a je dobré to vidieť, ale nováčik nie je chyba.
+      const m = mesiacovVztahu(c);
+      const max = Math.max(vstupy.priemery.vztah * 2, m * 1.2, 12);
+      if (!c.firstSession) {
+        return {
+          id: "vztah" as const, nazov: "Dĺžka vzťahu", hodnota: "—", podiel: 0, priemer: 0,
+          mierka: "", detail: "zatiaľ bez odtrénovaného tréningu", tón: "nevieme" as const, doZaveru: false,
+        };
+      }
+      return {
+        id: "vztah" as const, nazov: "Dĺžka vzťahu",
+        hodnota: m >= 12 ? `${(m / 12).toFixed(1)} roka` : `${Math.round(m)} mes.`,
+        podiel: podiel(m, max), priemer: podiel(vstupy.priemery.vztah, max),
+        mierka: `priemer klientely ${Math.round(vstupy.priemery.vztah)} mes.`,
+        detail: m < 3 ? "prvé mesiace sú najrizikovejšie" : "",
+        tón: m >= vstupy.priemery.vztah ? "dobre" as const : "vsimnut" as const,
+        doZaveru: false,
+      };
+    })(),
+    (() => {
+      // HODINOVKA — jediný riadok, ktorý hovorí o peniazoch. Tiež kontext:
+      // nízka hodinovka je skoro vždy zľava, ktorú niekto vedome dal.
+      const h = Math.round(c.avgPrice || 0);
+      const p = vstupy.priemery.hodinovka;
+      if (!h) {
+        return {
+          id: "hodinovka" as const, nazov: "Cena hodiny", hodnota: "—", podiel: 0, priemer: 0,
+          mierka: "", detail: "bez zaplatených hodín sa nedá spočítať", tón: "nevieme" as const, doZaveru: false,
+        };
+      }
+      const max = Math.max(h, p, 1) * 1.2;
+      return {
+        id: "hodinovka" as const, nazov: "Cena hodiny",
+        hodnota: `${h.toLocaleString("cs-CZ")} Kč`,
+        podiel: podiel(h, max), priemer: podiel(p, max),
+        mierka: `priemer klientely ${Math.round(p).toLocaleString("cs-CZ")} Kč`,
+        detail: c.specialRate ? "má schválenú špeciálnu sadzbu" : "",
+        tón: h >= p ? "dobre" as const : h >= p * 0.8 ? "vsimnut" as const : "zle" as const,
+        doZaveru: false,
       };
     })(),
   ];
 
-  const zle = signaly.filter((x) => x.tón === "zle").length;
-  const vsimnut = signaly.filter((x) => x.tón === "vsimnut").length;
+  const varovne = signaly.filter((x) => x.doZaveru);
+  const zle = varovne.filter((x) => x.tón === "zle").length;
+  const vsimnut = varovne.filter((x) => x.tón === "vsimnut").length;
   const tón: Zdravie["tón"] = zle >= 2 ? "zle" : zle === 1 || vsimnut >= 2 ? "vsimnut" : "dobre";
-  const zlé = signaly.filter((x) => x.tón === "zle" || x.tón === "vsimnut").map((x) => x.nazov.toLowerCase());
-  const dobré = signaly.filter((x) => x.tón === "dobre").map((x) => x.nazov.toLowerCase());
+  const zlé = varovne.filter((x) => x.tón === "zle" || x.tón === "vsimnut").map((x) => x.nazov.toLowerCase());
+  const dobré = varovne.filter((x) => x.tón === "dobre").map((x) => x.nazov.toLowerCase());
 
   const zaver = tón === "dobre"
     ? "Nič nenaznačuje, že by odchádzal."
@@ -143,3 +198,8 @@ export function zdravieKlienta(
   return { signaly, zaver, tón };
 }
 
+/** Koľko mesiacov klient chodí — od prvého tréningu podnes. */
+function mesiacovVztahu(c: ClientAgg): number {
+  if (!c.firstSession) return 0;
+  return Math.max(0, (Date.now() - Date.parse(c.firstSession)) / (1000 * 60 * 60 * 24 * 30.44));
+}

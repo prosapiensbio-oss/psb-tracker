@@ -5,12 +5,13 @@ import { zdravieKlienta } from "./klientZdravie";
 import type { ClientAgg } from "./compute";
 
 const klient = (o: Partial<ClientAgg> = {}) => ({
-  name: "Test", sessionCount: 30, firstSession: "2025-09-01", ...o,
-} as ClientAgg);
+  name: "Test", sessionCount: 30, firstSession: "2025-09-01",
+  attendance: 0.8, avgPrice: 1000, sessions: [], ...o,
+} as unknown as ClientAgg);
 
 const vstupy = (o: Partial<Parameters<typeof zdravieKlienta>[1]> = {}) => ({
-  tempoTeraz: 3, tempoPredtym: 3, zrusene: 0, dniOdPosledneho: 7, obvyklyOdstup: 8,
-  priemery: { tempo: 2.8, zrusene: 0.8 },
+  tempoTeraz: 3, tempoPredtym: 3, zrusene: 0,
+  priemery: { tempo: 2.8, zrusene: 0.8, dochadzka: 0.8, vztah: 12, hodinovka: 1000 },
   ...o,
 });
 
@@ -31,18 +32,31 @@ describe("signály", () => {
     expect(s.tón).toBe("nevieme");
   });
 
-  it("medzera dvaapolnásobne dlhšia než obvyklá je zlý signál", () => {
-    const s = zdravieKlienta(klient(), vstupy({ dniOdPosledneho: 21, obvyklyOdstup: 7 })).signaly.find((x) => x.id === "medzera")!;
+
+
+  it("dochádzka pod priemerom je varovanie", () => {
+    const s = zdravieKlienta(klient({ attendance: 0.5 }), vstupy()).signaly.find((x) => x.id === "dochadzka")!;
     expect(s.tón).toBe("zle");
-    expect(s.mierka).toBe("jeho obvyklý odstup 7 dní");
+    expect(s.mierka).toBe("priemer klientely 80 %");
   });
 
-  it("medzera v rámci obvyklého rytmu je v poriadku", () => {
-    expect(zdravieKlienta(klient(), vstupy({ dniOdPosledneho: 6, obvyklyOdstup: 7 })).signaly.find((x) => x.id === "medzera")!.tón).toBe("dobre");
+  it("klient bez odtrénovaného tréningu nemá dochádzku ani dĺžku vzťahu", () => {
+    const z = zdravieKlienta(klient({ sessionCount: 0, firstSession: "" }), vstupy());
+    expect(z.signaly.find((x) => x.id === "dochadzka")!.tón).toBe("nevieme");
+    expect(z.signaly.find((x) => x.id === "vztah")!.tón).toBe("nevieme");
   });
 
-  it("bez histórie odstupu sa netvrdí nič", () => {
-    expect(zdravieKlienta(klient(), vstupy({ obvyklyOdstup: null })).signaly.find((x) => x.id === "medzera")!.tón).toBe("nevieme");
+  it("nováčik so zľavou nie je „pozor“ — kontext sa do záveru nepočíta", () => {
+    // Dĺžka vzťahu a hodinovka sú kontext. Keby zhoršovali záver, appka by
+    // varovala pri každom novom klientovi so zľavou a človek by prestal
+    // čítať aj tie riadky, ktoré varovanie naozaj sú.
+    const z = zdravieKlienta(
+      klient({ firstSession: new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10), avgPrice: 500 }),
+      vstupy(),
+    );
+    expect(z.signaly.find((x) => x.id === "vztah")!.doZaveru).toBe(false);
+    expect(z.signaly.find((x) => x.id === "hodinovka")!.doZaveru).toBe(false);
+    expect(z.tón).toBe("dobre");
   });
 
   it("pri zrušených je MENEJ lepšie — mierka sa obracia", () => {
@@ -73,16 +87,10 @@ describe("záver", () => {
 
 describe("priemery sú priemery klientely, nie odvodenina od jedného klienta", () => {
   it("tempo nad priemerom je vpravo od čiarky", () => {
-    const z = zdravieKlienta(klient(), vstupy({ tempoTeraz: 4, priemery: { tempo: 2, zrusene: 0.8 } }));
+    const z = zdravieKlienta(klient(), vstupy({ tempoTeraz: 4, priemery: { tempo: 2, zrusene: 0.8, dochadzka: 0.8, vztah: 12, hodinovka: 1000 } }));
     const s = z.signaly.find((x) => x.id === "tempo")!;
     expect(s.podiel).toBeGreaterThan(s.priemer);
     expect(s.mierka).toBe("priemer klientely 2.0");
   });
 
-  it("medzera sa porovnáva s JEHO rytmom, nie s klientelou", () => {
-    // Kto chodí raz za dva týždne, nemešká, keď je desať dní preč.
-    const s = zdravieKlienta(klient(), vstupy({ dniOdPosledneho: 10, obvyklyOdstup: 14 })).signaly.find((x) => x.id === "medzera")!;
-    expect(s.mierka).toBe("jeho obvyklý odstup 14 dní");
-    expect(s.tón).toBe("dobre");
-  });
 });

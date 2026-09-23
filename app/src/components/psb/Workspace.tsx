@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { navrhniKlientaKandidati, type ClientAgg } from "../../lib/psb/compute";
 import { klucPolozky, popisZmeny, postavKarty, trenerZPrihlasenia, type Karta, type NeznamyNazov, type NepriradenaPlatba, type Zmena } from "../../lib/psb/workspaceKarty";
@@ -96,6 +96,47 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   if (!zdroje) return null;
 
   const vybavenych = hotove.size;
+  /**
+   * Prepínanie kariet dvoma prstami po trackpade (Jerry, 23. 9. 2026).
+   *
+   * macOS posiela vodorovné šmýkanie ako `wheel` s deltaX, nie ako
+   * `touch`-udalosti — na touchpade žiadne prsty „nevidno". Preto sa
+   * počúva koleso a sčítava sa vodorovný posun.
+   *
+   * Tri veci, bez ktorých to je na obtiaž:
+   *   • zvislé rolovanie sa nesmie ukradnúť — keď je |deltaY| väčšie,
+   *     gesto sa ignoruje, inak by sa karta prepla pri rolovaní zoznamu;
+   *   • jedno gesto = jedna karta. Trackpad posiela desiatky udalostí za
+   *     sekundu a bez zámku by jedno šmyknutie preletelo celou kopou;
+   *   • zámok pustí až po chvíli ticha, nie po čase — dlhý dojazd zotrvačnosti
+   *     na Macu inak prepne kartu druhýkrát, keď už prsty dávno nie sú na ploche.
+   *
+   * `passive: false` a preventDefault sú tu preto, aby Safari zo šmyknutia
+   * neurobilo „krok späť v histórii" a appka sa nezavrela.
+   */
+  const kopa = useRef<HTMLDivElement | null>(null);
+  const gesto = useRef({ suma: 0, zamknute: false, ticho: 0 as unknown as ReturnType<typeof setTimeout> });
+  useEffect(() => {
+    const el = kopa.current;
+    if (!el || zive.length < 2) return;
+    const PRAH = 60;
+    const naKoleso = (e: WheelEvent) => {
+      if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
+      e.preventDefault();
+      clearTimeout(gesto.current.ticho);
+      gesto.current.ticho = setTimeout(() => { gesto.current.suma = 0; gesto.current.zamknute = false; }, 260);
+      if (gesto.current.zamknute) return;
+      gesto.current.suma += e.deltaX;
+      if (Math.abs(gesto.current.suma) < PRAH) return;
+      const smer = gesto.current.suma > 0 ? 1 : -1;
+      gesto.current.zamknute = true;
+      gesto.current.suma = 0;
+      setI((x) => (x + smer + zive.length) % zive.length);
+    };
+    el.addEventListener("wheel", naKoleso, { passive: false });
+    return () => { el.removeEventListener("wheel", naKoleso); clearTimeout(gesto.current.ticho); };
+  }, [zive.length]);
+
   const spolu = karty.reduce((a, x) => a + x.polozky.length, 0);
 
   if (!zive.length) {
@@ -151,7 +192,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
           + `minHeight: 0` na rolovacom vnútri je jediná dvojica, ktorá vo
           flexe naozaj drží: bez tej nuly sa dieťa odmietne zmenšiť pod svoj
           obsah a `overflow` sa nikdy nezapne. */}
-      <div style={{ position: "relative", height: "min(72vh, 660px)" }}>
+      <div ref={kopa} style={{ position: "relative", height: "min(72vh, 660px)" }}>
         {dalsie.map((d, j) => (
           <div
             key={d.druh}
