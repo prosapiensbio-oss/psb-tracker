@@ -72,3 +72,22 @@ describe("popisZmeny", () => {
       .toBe("presun z 22. 9. na 24. 9.");
   });
 });
+
+describe("prihlásenie sa porovnáva bez ohľadu na veľkosť písmen", () => {
+  it("„Jerry“ zo session filtruje rovnako ako „jerry“", () => {
+    // Session nesie `users.name`, teda „Jerry" s veľkým J. Prvá verzia
+    // porovnávala s „jerry", nesedelo to nikdy a filter ticho prepúšťal
+    // všetko — Jerry videl aj Terezkine veci.
+    const k = postavKarty({ ...zdroje, ktoSom: "Jerry" });
+    expect(k.find((x) => x.druh === "zmeny")!.polozky.map((p) => (p as Zmena).id)).toEqual(["z1"]);
+  });
+
+  it("aj „Terezka“ s veľkým T", () => {
+    const k = postavKarty({ ...zdroje, ktoSom: "Terezka" });
+    expect(k.map((x) => x.druh)).toEqual(["zmeny", "mena"]);
+  });
+
+  it("„app“ (spoločné prihlásenie) nefiltruje", () => {
+    expect(postavKarty({ ...zdroje, ktoSom: "app" })[0].polozky.length).toBe(2);
+  });
+});

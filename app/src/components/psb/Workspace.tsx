@@ -148,7 +148,29 @@ export function Workspace({ clients, mena, ktoSom }: { clients: Record<string, C
             }}
           />
         ))}
-        <div style={{ position: "relative", zIndex: 1 }}>
+        {/* Šípky sedia na BOKOCH karty, nie pod ňou.
+            Jerry, 23. 9. 2026: „prepínanie medzi kartami by malo byť po
+            stranách kariet, pretože keď chcem prepnúť, musím ďaleko
+            zoskrolovať." Karta má vnútri zoznam na pol obrazovky, takže
+            tlačidlo pod ňou je zakaždým na inom mieste a často mimo
+            dohľadu. Bok je vždy tam, kde bol. */}
+        <button
+          onClick={() => setI((x) => Math.max(0, x - 1))}
+          disabled={i === 0}
+          aria-label="Predchádzajúca karta"
+          style={bocnaSipka("left", i > 0)}
+        >
+          ‹
+        </button>
+        <button
+          onClick={() => setI((x) => Math.min(zive.length - 1, x + 1))}
+          disabled={i >= zive.length - 1}
+          aria-label="Ďalšia karta"
+          style={bocnaSipka("right", i < zive.length - 1)}
+        >
+          ›
+        </button>
+        <div style={{ position: "relative", zIndex: 1, margin: "0 46px" }}>
           <Card style={{ marginBottom: 0 }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
               <div style={{ fontSize: 18, fontWeight: 800 }}>{k.nadpis}</div>
@@ -225,11 +247,10 @@ export function Workspace({ clients, mena, ktoSom }: { clients: Record<string, C
         </div>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 16, flexWrap: "wrap" }}>
-        <button onClick={() => setI((x) => Math.max(0, x - 1))} disabled={i === 0} aria-label="Späť" style={sipka(i > 0)}>←</button>
-        {/* Bodky hovoria, koľko kariet je dokopy a kde v nich stojíš — číslo
-            „Karta 2 z 3" to povie tiež, ale bodky to ukážu bez čítania.
-            Sú to tlačidlá, nie ozdoba: dá sa nimi preskočiť rovno na kartu. */}
+      {/* Bodky hovoria, koľko kariet je dokopy a kde v nich stojíš — číslo
+          „Karta 2 z 3" to povie tiež, ale bodky to ukážu bez čítania.
+          Sú to tlačidlá, nie ozdoba: dá sa nimi preskočiť rovno na kartu. */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 14, flexWrap: "wrap", justifyContent: "center" }}>
         <div style={{ display: "flex", gap: 7, alignItems: "center" }}>
           {zive.map((x, j) => (
             <button
@@ -245,7 +266,6 @@ export function Workspace({ clients, mena, ktoSom }: { clients: Record<string, C
             />
           ))}
         </div>
-        <button onClick={() => setI((x) => Math.min(zive.length - 1, x + 1))} disabled={i >= zive.length - 1} aria-label="Ďalej" style={sipka(i < zive.length - 1)}>→</button>
         <div style={{ fontSize: 11.5, color: C.textDim }}>
           {i < zive.length - 1 ? `Ďalej: ${zive[i + 1].nadpis}` : "Toto je posledná karta."}
         </div>
@@ -284,9 +304,24 @@ const vedlajsie = {
   border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted,
 };
 
-const sipka = (aktivna: boolean) => ({
-  width: 40, height: 40, borderRadius: "50%", fontSize: 16,
+/**
+ * Šípka prilepená na bok karty, zvisle v strede a stále na mieste.
+ * `position: sticky` na zvislej osi by nefungovala (karta je v obyčajnom
+ * toku), preto absolútne umiestnenie voči kope — a `top: 50%` s posunom
+ * o polovicu vlastnej výšky ju drží v strede bez ohľadu na to, aký dlhý
+ * je zoznam vnútri.
+ */
+const bocnaSipka = (strana: "left" | "right", aktivna: boolean) => ({
+  position: "absolute" as const,
+  [strana]: 0,
+  top: "50%",
+  transform: "translateY(-50%)",
+  zIndex: 2,
+  width: 38, height: 64, borderRadius: 12, fontSize: 24, lineHeight: 1,
   cursor: aktivna ? "pointer" : "not-allowed",
-  border: `1px solid ${C.border}`, background: "transparent",
+  border: `1px solid ${C.border}`,
+  background: mix(C.border, 60),
   color: aktivna ? C.textMuted : C.textDim,
+  opacity: aktivna ? 1 : 0.35,
 });
+

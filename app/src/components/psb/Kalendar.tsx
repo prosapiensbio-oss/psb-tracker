@@ -5,6 +5,7 @@ import { fmtDMY, normName } from "../../lib/psb/format";
 import { fetchBtcReserve, type BtcVyplata } from "../../lib/psb/client";
 import { navrhniKlientaKandidati, vyzeraNaMeno, type ClientAgg } from "../../lib/psb/compute";
 import type { TyzdenPorovnania } from "../../lib/psb/porovnanieDochadzky";
+import { trenerZPrihlasenia } from "../../lib/psb/workspaceKarty";
 import { guillermoZostatok } from "../../lib/psb/guillermo";
 import type { PSBData } from "../../lib/psb/types";
 import { C, mix } from "../../lib/psb/theme";
@@ -481,7 +482,11 @@ function Mapovanie({ nezname: nezmameVsetky, mena, clients, onHotovo, trener, kt
   // — druhý filter len pre túto kartu by si mohol s ním protirečiť.
   // Jerry, 3. 9. 2026: rozdeliť podľa filtra a pri „Obaja" uprednostniť
   // prihláseného.
-  const ktoSomTrener = ktoSom === "jerry" ? "Jerry" : ktoSom === "terezka" ? "Terezka" : null;
+  // Session nesie `users.name` („Jerry" s veľkým J), nie login. Porovnanie
+  // s malými písmenami tu nikdy nesedelo a poradie skupín sa podľa
+  // prihláseného nikdy neriadilo — ticho, bez chyby. Jedna definícia je
+  // v `workspaceKarty.trenerZPrihlasenia`.
+  const ktoSomTrener = trenerZPrihlasenia(ktoSom ?? null);
   const nezname = trener === "all" ? nezmameVsetky : nezmameVsetky.filter((n) => n.trener === trener);
   const [vyber, setVyber] = useState<Record<string, { klient: string; typ: string }>>({});
   const [uklada, setUklada] = useState("");

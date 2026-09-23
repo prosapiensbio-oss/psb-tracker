@@ -954,6 +954,14 @@ klienti jeden po druhom, ale zmeny kalendára v jednom." Focus nie je „teraz
 riešim Martina", ale „teraz robím zmeny v kalendári" — jeden druh práce
 naraz, lebo hlava sa neprepína.
 
+**Session nesie `users.name`, nie login.** `ktoSom` je „Jerry" s veľkým J
+(z tabuľky `users`), nie „jerry". Porovnanie s malými písmenami nesedí nikdy
+— a je to tichá chyba: nič nespadne, filter len prepustí všetko. Takto Jerry
+videl aj Terezkine veci a poradie skupín v karte „Nové názvy" sa podľa
+prihláseného nikdy neriadilo. Jedna definícia je
+`trenerZPrihlasenia` vo `workspaceKarty.ts` a porovnáva bez ohľadu na
+veľkosť písmen.
+
 **Karta patrí prihlásenému.** Zmeny a názvy majú trénera v sebe; peniaze ho
 nemajú a sú Jerryho, rovnako ako mesačné kontroly a stav hotovosti (pravidlo
 z 31. 8. 2026). Terezka teda vidí dve karty, Jerry tri.

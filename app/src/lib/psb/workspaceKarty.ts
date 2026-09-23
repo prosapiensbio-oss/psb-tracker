@@ -37,9 +37,19 @@ export type ZdrojeKariet = {
   ktoSom: string | null;
 };
 
-/** Meno trénera tak, ako stojí v dátach — z prihlásenia v malých písmenách. */
-const trenerZPrihlasenia = (ktoSom: string | null): "Jerry" | "Terezka" | null =>
-  ktoSom === "jerry" ? "Jerry" : ktoSom === "terezka" ? "Terezka" : null;
+/**
+ * Meno trénera z prihlásenia, v tvare, v akom stojí v dátach.
+ *
+ * POROVNÁVA SA BEZ OHĽADU NA VEĽKOSŤ PÍSMEN. Session nesie `users.name`, teda
+ * „Jerry" s veľkým J — a prvá verzia porovnávala s „jerry". Nesedelo to nikdy,
+ * takže filter ticho prepúšťal všetko a Jerry videl aj Terezkine veci.
+ * Presne ten druh tichej chyby, pri ktorej nič nespadne a nič sa neukáže zle
+ * — len to robí niečo iné, než má.
+ */
+export const trenerZPrihlasenia = (ktoSom: string | null): "Jerry" | "Terezka" | null => {
+  const m = (ktoSom || "").trim().toLowerCase();
+  return m === "jerry" ? "Jerry" : m === "terezka" ? "Terezka" : null;
+};
 
 const denSK = (iso: string) => {
   const d = (iso || "").slice(0, 10);
