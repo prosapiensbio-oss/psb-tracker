@@ -39,7 +39,7 @@ export type Karta =
 export type ZdrojeKariet = {
   zmeny: Zmena[];
   nezname: { nazov: string; trener: string; pocet: number; najblizsi: string }[];
-  platby: { fioId: string; datum: string; suma: number; text: string; kandidati: string[] }[];
+  platby: { fioId: string; datum: string; suma: number; text: string; kandidati: string[]; klientsky?: boolean }[];
   navrhMena: (nazov: string) => string;
   /** „jerry" | „terezka" | null (nevie sa / spoločné prihlásenie). */
   ktoSom: string | null;
@@ -94,7 +94,14 @@ export function postavKarty(z: ZdrojeKariet): Karta[] {
   const zmeny = moje(z.zmeny);
   const mena: NeznamyNazov[] = moje(z.nezname).map((n) => ({ ...n, navrh: z.navrhMena(n.nazov) }));
   // Peniaze nemajú trénera a sú Jerryho. Terezke by boli len šumom.
-  const platby: NepriradenaPlatba[] = ja === "Terezka" ? [] : z.platby.map((p) => ({
+  /**
+   * V kope sú LEN príjmy od klientov. Vrátka z Alzy, vklad do bankomatu
+   * alebo vratka kaucie sa riešia pri nahrávaní výpisu, kde sa berie celý
+   * účet (Jerry, 23. 9. 2026) — tu by boli votrelci, nad ktorými človek
+   * každý deň znova zastane a zistí, že to nie je klient.
+   * Nezahadzujú sa: obrazovka „Platby z banky" ich ukazuje ďalej.
+   */
+  const platby: NepriradenaPlatba[] = ja === "Terezka" ? [] : z.platby.filter((p) => p.klientsky !== false).map((p) => ({
     fioId: p.fioId, datum: p.datum, suma: p.suma, text: p.text,
     // Jednoznačný návrh sa predvyplní; pri dvoch a viacerých nie — hádať sa
     // nesmie, to je pravidlo platné všade v appke.

@@ -1,7 +1,7 @@
 // Platby z výpisu banky — posledná tretina odchodu od PTmindera.
 import { describe, expect, it } from "bun:test";
 
-import { najdiKlientaVTexte, nepriradene, porovnajPlatby, smieSaZapamatat, textPlatby, vzorPlatby, type FioRiadok, type Platba } from "./platbyEvidencia";
+import { najdiKlientaVTexte, nepriradene, porovnajPlatby, smieSaZapamatat, textPlatby, vzorPlatby, type FioRiadok, type Platba, vyzeraNaKlienta } from "./platbyEvidencia";
 
 const MENA = [
   "Natalia Peckova", "Josef Šnirych", "Natalia Krivdova", "Barbora Vankova",
@@ -147,5 +147,47 @@ describe("smieSaZapamatat", () => {
     // Keby sa to naučilo, každý jeho ďalší prevod by appka ponúkala ako
     // platbu Josefa Šnirycha.
     expect(smieSaZapamatat("filip stranavsky", "Josef Šnirych")).toBe(false);
+  });
+});
+
+describe("vyzeraNaKlienta", () => {
+  const r = (counterparty: string, typ = "Okamžitá platba", note = "") => ({ counterparty, note, typ });
+
+  it("prevod od človeka s poznámkou o balíčku je platba klienta", () => {
+    expect(vyzeraNaKlienta(r("6 hodín s viazanosťou · PETRA RUPOVÁ"))).toBe(true);
+    expect(vyzeraNaKlienta(r("ProSapiens Úvodní trénink · Dvořák"))).toBe(true);
+  });
+
+  it("vrátka z e-shopu nie je platba klienta", () => {
+    // Do kopy chodila každý deň a Jerry nad ňou zakaždým zastal.
+    expect(vyzeraNaKlienta(r("Eshop · ALZA.CZ A.S.", "Bezhotovostní platba"))).toBe(false);
+    expect(vyzeraNaKlienta(r("Kredit: Alza.cz, Prague, CZ", "Karetní transakce"))).toBe(false);
+  });
+
+  it("vklad do bankomatu a dobropis na kartu nie sú platby klienta", () => {
+    expect(vyzeraNaKlienta(r("Vklad do bankomatu: FIO BANKA", "Karetní transakce"))).toBe(false);
+    expect(vyzeraNaKlienta(r("Kavarna a pekarna PANE, Brno-sever", "Karetní transakce"))).toBe(false);
+  });
+
+  it("titul pred menom firmu nerobí", () => {
+    // „Ing." a „MGR." sú ľudia; pravidlo hľadá a.s., s.r.o., spol., z.ú.
+    expect(vyzeraNaKlienta(r("Fyzio Tomas Dvorak · Ing. Silvie Dvořáková"))).toBe(true);
+    expect(vyzeraNaKlienta(r("20260037 MGR. FILIP STRANAVSKY"))).toBe(true);
+  });
+
+  it("firma medzi odosielateľmi sa vylúči", () => {
+    expect(vyzeraNaKlienta(r("PROSAPIENS BIOMECHANIC S.R.O."))).toBe(false);
+  });
+});
+
+describe("faktúra prebíja firmu", () => {
+  it("firemný účet platiaci našu faktúru je klient", () => {
+    // „HBH PROJEKT SPOL. S · 20260016" — klientovi platí zamestnávateľ.
+    // Bez tejto výnimky by riadok z kopy vypadol ako vrátka z obchodu.
+    expect(vyzeraNaKlienta({ counterparty: "HBH PROJEKT SPOL. S · 20260016", note: "", typ: "Okamžitá platba" })).toBe(true);
+  });
+
+  it("dlhé číslo objednávky faktúrou nie je", () => {
+    expect(vyzeraNaKlienta({ counterparty: "ALZA.CZ A.S. · 1053853034", note: "", typ: "Bezhotovostní platba" })).toBe(false);
   });
 });

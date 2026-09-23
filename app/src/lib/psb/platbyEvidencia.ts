@@ -96,7 +96,52 @@ export type NepriradenaPlatba = {
   suma: number;
   text: string;
   kandidati: string[];
+  /** Vyzerá to na platbu klienta? `false` = vrátka z obchodu, vklad, kaucia. */
+  klientsky: boolean;
 };
+
+/**
+ * JE TO PRÍJEM OD KLIENTA, ALEBO NIEČO INÉ?
+ *
+ * Jerry, 23. 9. 2026: „vo workspace budeme evidovať iba platby klientov;
+ * Alzu vyriešime pri nahrávaní výpisu, tam sa to robí dopodrobna."
+ *
+ * Na účet chodia aj príjmy, ktoré s klientmi nemajú nič spoločné — vrátené
+ * peniaze z e-shopu, dobropis z kaviarne, vlastný vklad do bankomatu, vratka
+ * kaucie od prenajímateľa. V kope na dennú prácu sú to votrelci: človek nad
+ * nimi zastane, zistí, že to nie je klient, a klikne „nie je klient". Každý
+ * deň znova, kým ich niekto neodklikne.
+ *
+ * Dva znaky, obidva z výpisu, nie z hádania:
+ *
+ *   • KARETNÍ TRANSAKCE — peniaze, ktoré prišli späť na kartu (vrátený tovar,
+ *     dobropis) alebo vklad v bankomate. Klient cez kartu neplatí, platí
+ *     prevodom. Tento typ teda nikdy nie je príjem od klienta.
+ *   • PROTISTRANA JE FIRMA — „a.s.", „s.r.o.", „spol. s r.o.", „z.ú." alebo
+ *     slovo „eshop"/„kredit". Klienti sú ľudia.
+ *
+ * NIČ SA NESTRÁCA. Riadok sa len označí; obrazovka „Platby z banky" ho
+ * ukazuje ďalej, lebo tam sa rieši celý výpis. Skryje ho iba kopa vo
+ * Workspace, kde ide o dennú prácu s klientmi.
+ *
+ * Kde to môže zlyhať: klient, ktorému platí zamestnávateľ zo s.r.o. Stalo sa
+ * to hneď pri prvej skúške — „HBH PROJEKT SPOL. S · 20260016" je faktúra PSB
+ * zaplatená z firemného účtu. Preto má ČÍSLO FAKTÚRY prednosť pred všetkým
+ * ostatným: kto platí našu faktúru, je náš klient, nech posiela odkiaľkoľvek.
+ * A riadok sa aj tak NEZAHADZUJE — v úplnom zozname zostane a dá sa priradiť.
+ */
+/** Číslo faktúry PSB: rok a štyri číslice, napr. 20260037. */
+const FAKTURA = /\b20\d{6}\b/;
+const FIRMA = /\b(a\.\s?s\.|s\.\s?r\.\s?o\.|spol\.|z\.\s?ú\.|eshop|kredit:)/i;
+
+export function vyzeraNaKlienta(r: Pick<FioRiadok, "counterparty" | "note" | "typ">): boolean {
+  const text = `${r.counterparty || ""} ${r.note || ""}`;
+  if (FAKTURA.test(text)) return true;
+  const typ = (r.typ || "").toLowerCase();
+  if (typ.includes("karetní") || typ.includes("karetni")) return false;
+  if (FIRMA.test(text)) return false;
+  return true;
+}
 
 /**
  * Príjmy z výpisu, ktoré ešte nemajú klienta — a návrh, komu patria.
@@ -128,6 +173,9 @@ export function nepriradene(
       suma: r.amount_czk,
       text,
       kandidati: naucene ? [naucene] : najdiKlientaVTexte(text, menaKlientov),
+      // Naučené priradenie prebíja odhad: keď už niekto raz povedal, že tento
+      // odosielateľ je klient, appka to nemá spochybňovať.
+      klientsky: !!naucene || vyzeraNaKlienta(r),
     });
   }
   return out.sort((a, b) => b.datum.localeCompare(a.datum));

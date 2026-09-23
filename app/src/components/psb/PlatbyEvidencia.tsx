@@ -20,7 +20,7 @@ import { Card, H3, Info } from "./ui";
  */
 
 type Platba = { id: string; klient: string; datum: string; suma_czk: number; sposob: string; fio_id: string | null; poznamka: string | null; zrusene_at: string | null };
-type Nepriradena = { fioId: string; datum: string; suma: number; text: string; kandidati: string[] };
+type Nepriradena = { fioId: string; datum: string; suma: number; text: string; kandidati: string[]; klientsky?: boolean };
 type Mesiac = { mesiac: string; kokpit: number; ptminder: number; rozdiel: number; kokpitHotovost: number; kokpitBanka: number; kokpitIne: number };
 type Porovnanie = { mesiace: Mesiac[]; kokpit: number; ptminder: number; rozdiel: number; sediacich: number };
 
@@ -161,6 +161,8 @@ export function PlatbyEvidencia({ mena }: { mena: string[] }) {
           <div style={{ fontSize: 11.5, color: C.textDim, margin: "3px 0 8px", lineHeight: 1.5 }}>
             Appka navrhne podľa priezviska v texte — a platiteľa si zapamätá, takže ten istý sa pýta raz.
             Čo platba klienta nie je (nájom, vrátenie, vlastný prevod), odlož tlačidlom vpravo.
+            {" "}Riadky označené <b style={{ color: C.textDim }}>nevyzerá na klienta</b> sú tu ZÁMERNE — vrátky z e-shopov
+            a vklady sa v kope vo Workspace neukazujú, lebo tam ide o dennú prácu s klientmi, ale celý výpis sa rieši TU.
           </div>
           {nepriradene.slice(0, 30).map((n) => {
             const v = vyber[n.fioId] ?? (n.kandidati.length === 1 ? n.kandidati[0] : "");
@@ -171,6 +173,7 @@ export function PlatbyEvidencia({ mena }: { mena: string[] }) {
                 <div style={{ flex: "1 1 240px", fontSize: 11.5, color: C.textMuted, minWidth: 200 }}>
                   {n.text.slice(0, 90)}
                   {n.kandidati.length > 1 && <span style={{ color: C.orange }}> · {n.kandidati.length} možností</span>}
+                  {n.klientsky === false && <span style={{ color: C.textDim }}> · nevyzerá na klienta</span>}
                 </div>
                 <input
                   list="platby-klienti"
