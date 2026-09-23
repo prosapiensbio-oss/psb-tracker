@@ -209,6 +209,11 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
   // spája s peniazmi, a doteraz sa dalo dopĺňať len tak, že človek prechádzal
   // celý zoznam a hádal, ktorému chýba. Filter z toho robí odškrtávací zoznam.
   const [lenBezZdroja, setLenBezZdroja] = useState(false);
+  // „Kto je na pauze" (Jerry, 23. 9. 2026). Pauza je jediný stav, ktorý sám
+  // od seba neskončí — klient nechodí, appka o ňom mlčí a po pol roku sa
+  // nikto nepamätá, či sa ešte vráti. Zoznam z toho robí vec, ktorú sa dá
+  // prejsť; počíta sa aj do kapacity, tak nech je vidieť, koho to drží.
+  const [lenPauza, setLenPauza] = useState(false);
   const [kpiWin, setKpiWin] = useState("2026");
   const [kpiFrom, setKpiFrom] = useState("");
   const [kpiTo, setKpiTo] = useState("");
@@ -221,6 +226,7 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
   // Počíta sa zo VŠETKÝCH klientov vrátane neaktívnych — inak by tlačidlo
   // hlásilo menšie číslo, než koľko sa po jeho stlačení objaví.
   const pocetBezZdroja = useMemo(() => all.filter((c) => !c.zdroj).length, [all]);
+  const pocetPauz = useMemo(() => all.filter((c) => c.status === "Pauza").length, [all]);
 
   // Package-type filter options built from the real memberships in the data.
   const typeOptions = useMemo(() => {
@@ -291,6 +297,7 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
     else if (typeF.startsWith("m:")) arr = arr.filter((c) => c.membership === typeF.slice(2));
     if (modalityF !== "all") arr = arr.filter((c) => c.modality === modalityF);
     if (lenBezZdroja) arr = arr.filter((c) => !c.zdroj);
+    if (lenPauza) arr = arr.filter((c) => c.status === "Pauza");
     if (nameSearch.trim()) {
       const q = normName(nameSearch);
       arr = arr.filter((c) => normName(c.name).includes(q));
@@ -309,7 +316,7 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
       bitcoin: (c) => (c.bitcoin ? 1 : 0),
       zdroj: (c) => c.zdroj || "zzz",
     });
-  }, [baseList, membershipF, typeF, modalityF, lenBezZdroja, nameSearch, sorted, focusClient, all, skupina]);
+  }, [baseList, membershipF, typeF, modalityF, lenBezZdroja, lenPauza, nameSearch, sorted, focusClient, all, skupina]);
 
   const donut = useMemo(
     () => SEGMENTS.map((s) => ({ label: s, value: list.filter((c) => c.segment === s).length, color: segColor(s) })),
@@ -553,11 +560,23 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
               >
                 {lenBezZdroja ? "✓ " : ""}bez zdroja ({pocetBezZdroja})
               </button>
+              {pocetPauz > 0 && (
+                <button
+                  onClick={() => setLenPauza((v) => !v)}
+                  title="Klienti, ktorí majú ručne nastavenú pauzu. Tréning ju ruší sám — kto je tu, ten od jej zapísania netrénoval."
+                  style={{ padding: "5px 12px", borderRadius: 16, fontSize: 12, cursor: "pointer",
+                    border: `1px solid ${lenPauza ? C.blue : C.border}`,
+                    background: lenPauza ? mix(C.blue, 12) : "transparent",
+                    color: lenPauza ? C.blue : C.textMuted }}
+                >
+                  {lenPauza ? "✓ " : ""}na pauze ({pocetPauz})
+                </button>
+              )}
               {membershipF && (
                 <button onClick={() => setMembershipF("")} style={{ background: C.accentBg, border: `1px solid ${C.accent}`, borderRadius: 6, padding: "6px 10px", color: C.accentLight, fontSize: 12, cursor: "pointer", whiteSpace: "nowrap" }}>Balíček: {membershipF} ✕</button>
               )}
-              {(typeF !== "all" || modalityF !== "all" || nameSearch) && (
-                <button onClick={() => { setTypeF("all"); setModalityF("all"); setNameSearch(""); setMembershipF(""); }} style={{ background: "none", border: "none", color: C.textDim, fontSize: 12, cursor: "pointer" }}>Zrušiť filtre</button>
+              {(typeF !== "all" || modalityF !== "all" || nameSearch || lenPauza || lenBezZdroja) && (
+                <button onClick={() => { setTypeF("all"); setModalityF("all"); setNameSearch(""); setMembershipF(""); setLenPauza(false); setLenBezZdroja(false); }} style={{ background: "none", border: "none", color: C.textDim, fontSize: 12, cursor: "pointer" }}>Zrušiť filtre</button>
               )}
               <span style={{ marginLeft: "auto", fontSize: 13, color: C.accentLight, fontWeight: 600 }}>{list.length} klientov</span>
             </>
@@ -633,7 +652,23 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
                   {c.substituteCount > 0 && <span title={`${c.substituteCount}× zástup`} style={{ marginLeft: 6, fontSize: 9, color: C.blue }}>⇄</span>}
                 </td>
                 <td style={S.td}>{c.primaryTrainer}{c.primaryTrainerOverride && <span title="Manuálne" style={{ fontSize: 9, color: C.textDim, marginLeft: 3 }}>✎</span>}</td>
-                <td style={S.td}><Badge tone={statusTone(c.status)}>{c.status}</Badge>{c.statusOverride && <span title={`Auto: ${c.statusAuto}`} style={{ fontSize: 9, color: C.textDim, marginLeft: 4 }}>✎</span>}</td>
+                {/* Pri pauze je dôležitejšie DOKEDY než to, že je. Bez dátumu
+                    je to otvorený koniec, ktorý nikto nechodí zatvárať. */}
+                <td style={S.td}>
+                  <Badge tone={statusTone(c.status)}>{c.status}</Badge>
+                  {c.status === "Pauza" && (() => {
+                    // Pauza, ktorej dátum už prešiel, je to jediné, čo si
+                    // z tohto zoznamu pýta ruku: mala skončiť a klient sa
+                    // neozval. Preto je oranžová rovnako ako pauza bez dátumu.
+                    const vyprsala = !!c.pauseUntil && c.pauseUntil < new Date().toISOString().slice(0, 10);
+                    return (
+                      <span style={{ fontSize: 10, color: !c.pauseUntil || vyprsala ? C.orange : C.textMuted, marginLeft: 5 }}>
+                        {!c.pauseUntil ? "bez dátumu" : vyprsala ? `vypršala ${fmtDate(c.pauseUntil)}` : `do ${fmtDate(c.pauseUntil)}`}
+                      </span>
+                    );
+                  })()}
+                  {c.statusOverride && <span title={`Auto: ${c.statusAuto}`} style={{ fontSize: 9, color: C.textDim, marginLeft: 4 }}>✎</span>}
+                </td>
                 <td style={S.td}><Badge tone={segTone(c.segment)}>{c.segment}</Badge></td>
                 <td style={{ ...S.td, fontSize: 12, color: c.is6m ? C.accentLight : C.textMuted }} title={c.membership}>{c.membership ? shortPkg(c.membership) : c.clientType}</td>
                 <td style={{ ...S.td, textAlign: "right" }} title={c.packageOdvodeny ? "Dopočítané: export z PTmindera pri tomto členstve zostatok nedáva, tak sa odčítali odtrénované hodiny od počtu v názve balíčka." : undefined}>
