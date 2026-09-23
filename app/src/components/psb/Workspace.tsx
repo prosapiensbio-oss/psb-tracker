@@ -144,7 +144,12 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats }:
           „ale ja chcem široké cez celú." Vedľa seba sa nedá mať oboje —
           buď je karta široká, alebo je vedľa nej miesto. Takto je: široká
           je, a to, že za ňou niečo je, hovorí okraj, nie stĺpec. */}
-      <div style={{ position: "relative" }}>
+      {/* PEVNÁ výška, nie minimálna. Minimálna výšku len nadstavuje — karta
+          s dlhým zoznamom aj tak narástla a šípky skákali. Fixná výška
+          + `minHeight: 0` na rolovacom vnútri je jediná dvojica, ktorá vo
+          flexe naozaj drží: bez tej nuly sa dieťa odmietne zmenšiť pod svoj
+          obsah a `overflow` sa nikdy nezapne. */}
+      <div style={{ position: "relative", height: "min(72vh, 660px)" }}>
         {dalsie.map((d, j) => (
           <div
             key={d.druh}
@@ -179,15 +184,17 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats }:
             a ľavej strane, kde prepínam, bolo stále na tom istom mieste."
             Šípka, ktorá pri každej karte skočí inam, sa hľadá očami — a to je
             presne tá práca navyše, ktorú mala kopa odstrániť. */}
-        <div style={{ position: "relative", zIndex: 1, margin: "0 46px" }}>
-          <Card style={{ marginBottom: 0, minHeight: "min(72vh, 660px)", display: "flex", flexDirection: "column" }}>
+        <div style={{ position: "relative", zIndex: 1, margin: "0 46px", height: "100%" }}>
+          <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
               <div style={{ fontSize: 18, fontWeight: 800 }}>{k.nadpis}</div>
               {k.druh !== "klient" && <div style={{ fontSize: 11.5, color: C.textMuted }}>{zostava(k)} zostáva</div>}
             </div>
             <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 3 }}>{k.podnadpis}</div>
 
-            <div style={{ marginTop: 16, flexGrow: 1, overflowY: "auto" }}>
+            <div style={{ marginTop: 14, flexGrow: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+              {/* Zoznamy rolujú vnútri; karta klienta si výšku riadi sama. */}
+              <div style={{ flexGrow: 1, minHeight: 0, overflowY: k.druh === "klient" ? "visible" : "auto", display: k.druh === "klient" ? "flex" : "block", flexDirection: "column" }}>
               {k.druh === "zmeny" && k.polozky.map((z) => {
                 const kluc = klucPolozky("zmeny", z);
                 if (hotove.has(kluc)) return null;
@@ -251,6 +258,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats }:
                   </div>
                 );
               })}
+              </div>
             </div>
             <datalist id="ws-klienti">{mena.map((m) => <option key={m} value={m} />)}</datalist>
             {chyba && <div style={{ fontSize: 12, color: C.red, marginTop: 10 }}>{chyba}</div>}

@@ -47,8 +47,10 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats }: {
 }) {
   const [hladam, setHladam] = useState("");
   const [novy, setNovy] = useState(false);
+  const [stav, setStav] = useState<"aktivni" | "neaktivni">("aktivni");
   const [meno, setMeno] = useState("");
-  const [zalozka, setZalozka] = useState<"treningy" | "financie" | "balicky" | "poznamky" | "puvod">("treningy");
+  const [filter, setFilter] = useState<"vsetko" | "treningy" | "peniaze" | "balicky" | "poznamky" | "puvod">("vsetko");
+  const [detaily, setDetaily] = useState(false);
   const [balicky, setBalicky] = useState<Balicek[]>([]);
   const [pisem, setPisem] = useState(false);
   const [f, setF] = useState({ nazov: "", hodiny: "", platnostOd: dnesISO(), platnostDo: "", cenaCzk: "", poznamka: "" });
@@ -109,6 +111,12 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats }: {
     [data.zavery, meno],
   );
 
+  /** Koľko údajov je pod tlačidlom „ďalších N" — aby číslo nebolo vymyslené. */
+  const dalsichUdajov = useMemo(
+    () => (c ? stitky(c, dopyt, priviedol, poplatkyKlienta, btcSats?.[meno]).length : 0),
+    [c, dopyt, priviedol, poplatkyKlienta, btcSats, meno],
+  );
+
   // Mínus: predané z vlastnej evidencie proti zaplatenému z PTmindera.
   const predane = mojeBalicky.reduce((a, b) => a + (b.cena_czk || 0), 0);
   const zaplatene = platby.reduce((a, p) => a + p.amount, 0);
@@ -129,46 +137,87 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats }: {
 
   if (!meno) {
     /**
-     * Zoznam VŠETKÝCH klientov abecedne, vyhľadávanie hore.
+     * Zoznam všetkých klientov — pod sebou, po abecede, s hlavičkou písmena.
      *
-     * Prvá verzia ukazovala prázdno, kým človek nezačal písať. Jerry, 23. 9.
-     * 2026: „nech sú tam všetci v zozname abecedne a hneď na vrchu je
-     * vyhľadávanie." Prázdna obrazovka núti vedieť meno vopred; zoznam ho
-     * ponúkne — a pri sedemdesiatich menách sa v ňom dá aj len pozerať.
+     * Prvá verzia ich sypala vedľa seba ako štítky; pri sedemdesiatich menách
+     * z toho bola stena, v ktorej sa nedalo nič nájsť. Jerry, 23. 9. 2026:
+     * „daj ich ako zoznam, nie vedľa seba, rozdeľ na A a všetci na A, B
+     * a všetci na B, a nech je to rolovacie."
+     *
+     * Predvolene AKTÍVNI. Neaktívnych je viac než aktívnych a kto otvára
+     * stôl, ide skoro vždy za niekým, kto chodí.
      */
-    const vsetci = [...new Set([...mena, ...Object.keys(data.clientOverrides || {})])]
-      .sort((a, b) => a.localeCompare(b, "sk"));
+    const vsetci = [...new Set([...mena, ...Object.keys(data.clientOverrides || {})])];
+    const jeAktivny = (m: string) => (clients[m]?.status || "") !== "Neaktívny";
+    const podlaStavu = vsetci.filter((m) => (stav === "aktivni" ? jeAktivny(m) : !jeAktivny(m)));
     const q = normName(hladam);
-    const vidno = q ? vsetci.filter((m) => normName(m).includes(q)) : vsetci;
-    const bezSedeni = new Set(vsetci.filter((m) => !clients[m]));
+    // Hľadá sa cez OBE skupiny — kto píše meno, chce toho človeka nájsť,
+    // nie sa dozvedieť, že je v druhej záložke.
+    const zdrojHladania = q ? vsetci : podlaStavu;
+    const vidno = (q ? zdrojHladania.filter((m) => normName(m).includes(q)) : podlaStavu)
+      .sort((a, b) => a.localeCompare(b, "sk"));
+
+    const skupiny: { pismeno: string; mena: string[] }[] = [];
+    for (const m of vidno) {
+      const p = (m.trim()[0] || "?").toLocaleUpperCase("sk");
+      const posledna = skupiny[skupiny.length - 1];
+      if (posledna && posledna.pismeno === p) posledna.mena.push(m);
+      else skupiny.push({ pismeno: p, mena: [m] });
+    }
 
     return (
-      <div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+      <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", flexShrink: 0 }}>
           <input
             value={hladam}
             onChange={(e) => setHladam(e.target.value)}
             placeholder="hľadať klienta…"
             autoFocus
-            style={{ flex: "1 1 260px", minWidth: 200, padding: "9px 12px", borderRadius: 10, fontSize: 13.5, background: C.bg, border: `1px solid ${C.border}`, color: C.text }}
+            style={{ flex: "1 1 240px", minWidth: 190, padding: "9px 12px", borderRadius: 10, fontSize: 13.5, background: C.bg, border: `1px solid ${C.border}`, color: C.text }}
           />
+          <div style={{ display: "flex", gap: 5 }}>
+            <button onClick={() => setStav("aktivni")} style={prepinac(stav === "aktivni")}>Aktívni</button>
+            <button onClick={() => setStav("neaktivni")} style={prepinac(stav === "neaktivni")}>Neaktívni</button>
+          </div>
           <button onClick={() => setNovy(true)} style={{ ...navrhTlacidlo, borderColor: mix(C.green, 45), color: C.green, fontWeight: 600 }}>
             + Nový klient
           </button>
-          <span style={{ fontSize: 11.5, color: C.textDim }}>{vidno.length} z {vsetci.length}</span>
+          <span style={{ fontSize: 11.5, color: C.textDim }}>{vidno.length}</span>
         </div>
 
         {novy && <NovyKlient onHotovo={(m: string | null) => { setNovy(false); if (m) setMeno(m); }} />}
 
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 12 }}>
-          {vidno.map((m) => (
-            <button key={m} onClick={() => { setMeno(m); setHladam(""); }} style={{
-              ...navrhTlacidlo,
-              color: bezSedeni.has(m) ? C.textDim : C.text,
-              borderStyle: bezSedeni.has(m) ? "dashed" : "solid",
-            }} title={bezSedeni.has(m) ? "Zatiaľ bez sedení — čaká na export z PTmindera" : undefined}>
-              {m}
-            </button>
+        <div style={{ flexGrow: 1, minHeight: 0, overflowY: "auto", marginTop: 12 }}>
+          {skupiny.map((sk) => (
+            <div key={sk.pismeno}>
+              <div style={{
+                position: "sticky", top: 0, background: C.card, zIndex: 1,
+                fontSize: 11, fontWeight: 800, color: C.accentLight, letterSpacing: 0.6,
+                padding: "6px 2px 4px", borderBottom: `1px solid ${mix(C.border, 60)}`,
+              }}>
+                {sk.pismeno}
+              </div>
+              {sk.mena.map((m) => {
+                const c2 = clients[m];
+                return (
+                  <button key={m} onClick={() => { setMeno(m); setHladam(""); }} style={{
+                    display: "flex", width: "100%", gap: 10, alignItems: "baseline", textAlign: "left",
+                    padding: "7px 4px", border: "none", borderBottom: `1px solid ${mix(C.border, 35)}`,
+                    background: "transparent", color: C.text, fontSize: 13, cursor: "pointer",
+                  }}>
+                    <span style={{ flex: 1 }}>{m}</span>
+                    {c2 ? (
+                      <span style={{ fontSize: 11, color: C.textDim }}>
+                        {c2.primaryTrainer}
+                        {c2.lastSession ? ` · naposledy ${fmtDMY(c2.lastSession)}` : ""}
+                      </span>
+                    ) : (
+                      <span style={{ fontSize: 11, color: C.textDim }}>čaká na prvý tréning</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           ))}
           {!vidno.length && <Prazdne>Nikto taký. Skús menej písmen, alebo ho založ tlačidlom vyššie.</Prazdne>}
         </div>
@@ -177,203 +226,227 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats }: {
   }
 
   return (
-    <div>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap", marginBottom: 4 }}>
-        <div style={{ fontSize: 17, fontWeight: 800 }}>{meno}</div>
-        {c && <div style={{ fontSize: 11.5, color: C.textMuted }}>{c.status} · {c.primaryTrainer} · {c.sessionCount} sedení</div>}
-        <button onClick={() => { setMeno(""); setZalozka("treningy"); }} style={{ ...navrhTlacidlo, marginLeft: "auto" }}>zmeniť klienta</button>
+    /**
+     * Profil podľa návrhu C (Jerry si ho vybral 23. 9. 2026): vľavo úzky
+     * stĺpec s tým podstatným, vpravo celá história v čase s filtrami.
+     *
+     * Predtým to bolo dvadsať štítkov vedľa seba — Jerry: „vyzerá to extrémne
+     * zle a som v tom mega stratený." Mal pravdu a je to tá istá chyba, pred
+     * ktorou appka inde sama varuje: keď svieti všetko, nesvieti nič.
+     * Naľavo je preto len to, na čo sa človek pýta zakaždým; zvyšok je pod
+     * jedným tlačidlom a nekričí.
+     */
+    <div style={{ display: "flex", gap: 20, height: "100%", minHeight: 0 }}>
+
+      <div style={{ width: 250, flexShrink: 0, display: "flex", flexDirection: "column", gap: 10, overflowY: "auto", minHeight: 0 }}>
+        <div>
+          <div style={{ fontSize: 19, fontWeight: 800, lineHeight: 1.2 }}>{meno}</div>
+          <div style={{ fontSize: 11.5, color: C.textMuted, marginTop: 3 }}>
+            {c ? `${c.status} · ${c.primaryTrainer}` : "čaká na prvý tréning"}
+          </div>
+        </div>
+
+        <div style={{ padding: "11px 13px", borderRadius: 11, background: mix(rozdiel > 0 ? C.red : C.green, 10), border: `1px solid ${mix(rozdiel > 0 ? C.red : C.green, 40)}` }}>
+          <div style={{ fontSize: 17, fontWeight: 800, color: rozdiel > 0 ? C.red : C.green }}>
+            {rozdiel > 0 ? `dlhuje ${fmtCZK(rozdiel)}` : rozdiel < 0 ? `predplatené ${fmtCZK(-rozdiel)}` : "vyrovnaný"}
+          </div>
+          <div style={{ fontSize: 11, color: C.textMuted, marginTop: 3 }}>
+            predané {fmtCZK(predane)} · zaplatené {fmtCZK(zaplatene)}
+          </div>
+        </div>
+
+        {c && c.packageTotal > 0 && (
+          <div style={{ padding: "11px 13px", borderRadius: 11, background: mix(C.accent, 10), border: `1px solid ${mix(C.accent, 40)}` }}>
+            <div style={{ fontSize: 17, fontWeight: 800, color: C.accentLight }}>
+              {c.packageOdvodeny ? "≈" : ""}{c.packageRemaining} h zostáva
+            </div>
+            <div style={{ fontSize: 11, color: C.textMuted, marginTop: 3 }}>
+              {c.membership || `z ${c.packageTotal}`}
+              {c.packageValidTo ? ` · do ${fmtDMY(c.packageValidTo)}` : ""}
+            </div>
+          </div>
+        )}
+
+        {c && (
+          <div style={{ fontSize: 12, color: C.textMuted, lineHeight: 1.95 }}>
+            {c.firstSession && <div><span style={{ color: C.textDim }}>chodí od</span> {fmtDMY(c.firstSession)}</div>}
+            {!!c.sessionCount && <div><span style={{ color: C.textDim }}>tempo</span> {(c.sessionCount / Math.max(1, mesiacov(c))).toFixed(1)} / mes.</div>}
+            {c.narodeniny && <div><span style={{ color: C.textDim }}>narodeniny</span> {fmtDMY(c.narodeniny)}</div>}
+            {c.zdrojKto && <div><span style={{ color: C.textDim }}>priviedol</span> {c.zdrojKto}</div>}
+            {!!priviedol.length && <div><span style={{ color: C.textDim }}>priviedol on</span> {priviedol.length}</div>}
+          </div>
+        )}
+
+        <button onClick={() => setDetaily(!detaily)} style={{ ...navrhTlacidlo, textAlign: "left" }}>
+          {detaily ? "Skryť detaily ▴" : `Ďalších ${dalsichUdajov} údajov ▾`}
+        </button>
+        {detaily && c && (
+          <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+            {stitky(c, dopyt, priviedol, poplatkyKlienta, btcSats?.[meno]).map((x) => (
+              <span key={x.k} title={x.info} style={{
+                fontSize: 10.5, padding: "3px 7px", borderRadius: 6,
+                background: mix(x.farba || C.border, 20), color: x.farba || C.textMuted,
+                border: `1px solid ${mix(x.farba || C.border, 50)}`,
+              }}>
+                <span style={{ opacity: 0.7 }}>{x.k}</span> {x.v}
+              </span>
+            ))}
+          </div>
+        )}
+
+        <div style={{ flexGrow: 1 }} />
+        <button onClick={() => setPisem(!pisem)} style={{ ...navrhTlacidlo, borderColor: mix(C.green, 45), color: C.green, fontWeight: 600 }}>
+          {pisem ? "Zavrieť" : "+ Nahodiť balíček"}
+        </button>
+        <button onClick={() => { setMeno(""); setFilter("vsetko"); }} style={navrhTlacidlo}>← späť na zoznam</button>
       </div>
 
-      {/* VŠETKO, čo o klientovi appka vie — Jerry, 23. 9. 2026: „na tom
-          profile chcem, aby bolo úplne všetko, čo si schopný o tom klientovi
-          zistiť z celého Kokpitu."
-          Ukazuje sa len to, čo je vyplnené: prázdne políčka by zo štítkov
-          spravili tapetu a to, čo tam naozaj je, by sa v nich stratilo. */}
-      {c && (
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
-          {stitky(c, dopyt, priviedol, poplatkyKlienta, btcSats?.[meno]).map((x) => (
-            <span key={x.k} title={x.info} style={{
-              fontSize: 11, padding: "3px 8px", borderRadius: 7,
-              background: mix(x.farba || C.border, 22), color: x.farba || C.textMuted,
-              border: `1px solid ${mix(x.farba || C.border, 60)}`,
-            }}>
-              <span style={{ opacity: 0.75 }}>{x.k}</span> {x.v}
-            </span>
+      <div style={{ flexGrow: 1, minWidth: 0, display: "flex", flexDirection: "column", minHeight: 0 }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", flexShrink: 0 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: C.textDim, letterSpacing: 0.5 }}>VŠETKO V ČASE</div>
+          <div style={{ flexGrow: 1 }} />
+          <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+            {([["vsetko", "všetko"], ["treningy", "tréningy"], ["peniaze", "peniaze"], ["balicky", "balíčky"], ["poznamky", "poznámky"], ["puvod", "odkiaľ prišiel"]] as const).map(([id, l]) => (
+              <button key={id} onClick={() => setFilter(id)} style={prepinac(filter === id)}>{l}</button>
+            ))}
+          </div>
+        </div>
+
+        {pisem && <FormularBalicka f={f} setF={setF} pracujem={pracujem} onUloz={() => void pridaj()} />}
+        {chyba && <div style={{ fontSize: 12, color: C.red, marginTop: 8 }}>{chyba}</div>}
+
+        <div style={{ flexGrow: 1, minHeight: 0, overflowY: "auto", marginTop: 10 }}>
+          {(filter === "vsetko" || filter === "treningy") && buduce.map((z) => (
+            <div key={z} style={{ ...riadok, color: C.blue }}>
+              <span style={stlpecDen}>{fmtDMY(z.slice(0, 10))}</span>
+              <span style={{ flex: 1 }}>objednané {z.slice(11, 16)} · z kalendára</span>
+            </div>
           ))}
-        </div>
-      )}
 
-      {/* Mínus — to, čo si Jerry vypýtal menovite. Obe sumy sú vidieť, aby
-          sa dalo overiť, z čoho to číslo vzniklo. */}
-      <div style={{ display: "flex", gap: 16, alignItems: "baseline", flexWrap: "wrap", padding: "9px 11px", borderRadius: 9, background: mix(rozdiel > 0 ? C.red : C.green, 10), marginBottom: 12 }}>
-        <div style={{ fontSize: 18, fontWeight: 800, color: rozdiel > 0 ? C.red : C.green }}>
-          {rozdiel > 0 ? `dlhuje ${fmtCZK(rozdiel)}` : rozdiel < 0 ? `predplatené ${fmtCZK(-rozdiel)}` : "vyrovnané"}
-        </div>
-        <div style={{ fontSize: 11.5, color: C.textMuted }}>
-          predané balíčky {fmtCZK(predane)} · zaplatené {fmtCZK(zaplatene)}
-        </div>
-        <Info text="Predané balíčky sú z vlastnej evidencie Kokpitu, zaplatené z PTmindera — tie sú dnes jediný úplný zdroj (vlastná kniha platieb má zatiaľ len banku od januára, hotovosť v nej nie je). Keď sa súbežný chod dokončí, zdroj sa prepne. Balíček bez ceny sa do „predaného“ neráta." label="" />
-      </div>
+          {filter !== "poznamky" && filter !== "puvod" && os
+            .filter((x) => filter === "vsetko"
+              || (filter === "treningy" && x.druh === "trening")
+              || (filter === "peniaze" && x.druh === "platba")
+              || (filter === "balicky" && (x.druh === "balicekOd" || x.druh === "balicekDo")))
+            .map((x, i) => <RiadokOsi key={i} u={x} />)}
 
-      <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
-        {([["treningy", `Tréningy (${os.filter((x) => x.druh === "trening").length}${buduce.length ? ` + ${buduce.length}` : ""})`],
-           ["financie", `Financie (${platby.length})`],
-           ["balicky", `Balíčky (${mojeBalicky.length})`],
-           ["poznamky", "Poznámky a história"],
-           ["puvod", `Odkiaľ prišiel${priviedol.length ? ` · priviedol ${priviedol.length}` : ""}`]] as const).map(([id, label]) => (
-          <button key={id} onClick={() => setZalozka(id)} style={podzalozka(zalozka === id)}>{label}</button>
-        ))}
-      </div>
-
-      <div style={{ maxHeight: "min(46vh, 420px)", overflowY: "auto" }}>
-        {zalozka === "treningy" && (
-          <>
-            {buduce.map((z) => (
-              <div key={z} style={{ ...riadok, color: C.blue }}>
-                <span style={stlpecDen}>{fmtDMY(z.slice(0, 10))}</span>
-                <span style={{ flex: 1 }}>objednané {z.slice(11, 16)} · z kalendára</span>
-              </div>
-            ))}
-            {os.filter((x) => x.druh === "trening").map((x, i) => (
-              <div key={i} style={riadok}>
-                <span style={stlpecDen}>{fmtDMY(x.den)}</span>
-                <span style={{ flex: 1, color: C.textMuted }}>
-                  {x.druh === "trening" && [x.cas, x.trener, x.nazov].filter(Boolean).join(" · ")}
-                </span>
-                {x.druh === "trening" && x.zKalendara && <span style={{ fontSize: 11, color: C.blue }}>z kalendára</span>}
-              </div>
-            ))}
-            {!os.some((x) => x.druh === "trening") && !buduce.length && <Prazdne>Žiadne tréningy.</Prazdne>}
-          </>
-        )}
-
-        {zalozka === "financie" && (
-          platby.length ? platby.map((p, i) => (
-            <div key={i} style={riadok}>
-              <span style={stlpecDen}>{fmtDMY(p.date)}</span>
-              <span style={{ flex: 1, color: C.textMuted }}>{p.method === "bank" ? "prevodom" : p.method === "cash" ? "hotovosť" : "iné"}</span>
-              <span style={{ color: C.green, fontWeight: 700 }}>{fmtCZK(p.amount)}</span>
-            </div>
-          )) : <Prazdne>Žiadne platby — barter alebo platí inak.</Prazdne>
-        )}
-
-        {zalozka === "poznamky" && (
-          <>
-            {c?.trainerNote && <Blok nadpis="Poznámka trénera">{c.trainerNote}</Blok>}
-            {c?.precoNeprisiel && <Blok nadpis="Prečo po úvodnom neprišiel">{c.precoNeprisiel}</Blok>}
-            {c?.duch && <Blok nadpis="Odchod">{c.duch}</Blok>}
-            {c?.specialRateNote && <Blok nadpis="Špeciálna sadzba">{c.specialRateNote}</Blok>}
-            {zavery.map((z, i) => (
-              <Blok key={i} nadpis={`Záver z debaty${(z as { datum?: string }).datum ? ` · ${fmtDMY((z as { datum: string }).datum)}` : ""}`}>
-                {(z as { text?: string }).text || ""}
-              </Blok>
-            ))}
-            {/* Denník ťahá zápisy, poznámky pri zrušených tréningoch, odpovede
-                na notifikácie a merania bolesti — všetko na jednej osi. */}
-            <div style={{ marginTop: 10 }}>
+          {filter === "poznamky" && (
+            <>
+              {c?.trainerNote && <Blok nadpis="Poznámka trénera">{c.trainerNote}</Blok>}
+              {c?.precoNeprisiel && <Blok nadpis="Prečo po úvodnom neprišiel">{c.precoNeprisiel}</Blok>}
+              {c?.duch && <Blok nadpis="Odchod">{c.duch}</Blok>}
+              {c?.specialRateNote && <Blok nadpis="Špeciálna sadzba">{c.specialRateNote}</Blok>}
+              {zavery.map((z, i) => (
+                <Blok key={i} nadpis="Záver z debaty">{(z as { text?: string }).text || ""}</Blok>
+              ))}
               <Dennik meno={meno} limit={12} />
-            </div>
-          </>
-        )}
+            </>
+          )}
 
-        {zalozka === "puvod" && (
-          <>
-            {dopyt ? (
+          {filter === "puvod" && (
+            dopyt ? (
               <>
                 <div style={riadok}>
                   <span style={stlpecDen}>{fmtDMY(dopyt.date)}</span>
                   <span style={{ flex: 1 }}>prišiel dopyt · <b>{dopyt.source}</b>{dopyt.status ? ` · ${dopyt.status}` : ""}</span>
                 </div>
-                {(dopyt as { kampan?: string }).kampan && (
-                  <div style={riadok}><span style={stlpecDen} /><span style={{ flex: 1, color: C.textMuted }}>kampaň: {(dopyt as { kampan: string }).kampan}</span></div>
-                )}
-                {(dopyt as { stranka?: string }).stranka && (
-                  <div style={riadok}><span style={stlpecDen} /><span style={{ flex: 1, color: C.textMuted }}>stránka: {(dopyt as { stranka: string }).stranka}</span></div>
-                )}
+                {(dopyt as { kampan?: string }).kampan && <div style={riadok}><span style={stlpecDen} /><span style={{ flex: 1, color: C.textMuted }}>kampaň: {(dopyt as { kampan: string }).kampan}</span></div>}
+                {(dopyt as { stranka?: string }).stranka && <div style={riadok}><span style={stlpecDen} /><span style={{ flex: 1, color: C.textMuted }}>stránka: {(dopyt as { stranka: string }).stranka}</span></div>}
                 {dopyt.note && <div style={riadok}><span style={stlpecDen} /><span style={{ flex: 1, color: C.textMuted }}>{dopyt.note}</span></div>}
-                {(dopyt.email || dopyt.telefon) && (
-                  <div style={riadok}><span style={stlpecDen} /><span style={{ flex: 1, color: C.textMuted }}>{[dopyt.email, dopyt.telefon].filter(Boolean).join(" · ")}</span></div>
+                {priviedol.length > 0 && (
+                  <div style={{ marginTop: 10 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Koho priviedol ({priviedol.length})</div>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      {priviedol.map((m) => <button key={m} onClick={() => setMeno(m)} style={navrhTlacidlo}>{m}</button>)}
+                    </div>
+                  </div>
                 )}
               </>
-            ) : (
-              <Prazdne>Dopyt sa nenašiel — klient prišiel skôr, než appka dopyty evidovala, alebo cez niekoho.</Prazdne>
-            )}
-            {c?.zdrojKto && (
-              <div style={{ ...riadok, marginTop: 8 }}>
-                <span style={stlpecDen} /><span style={{ flex: 1 }}>priviedol ho: <b>{c.zdrojKto}</b></span>
-              </div>
-            )}
-            {priviedol.length > 0 && (
-              <div style={{ marginTop: 10 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Koho priviedol ({priviedol.length})</div>
-                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                  {priviedol.map((m) => <button key={m} onClick={() => setMeno(m)} style={navrhTlacidlo}>{m}</button>)}
-                </div>
-              </div>
-            )}
-          </>
-        )}
-
-        {zalozka === "balicky" && (
-          <>
-            {mojeBalicky.map((b) => (
-              <div key={b.id} style={riadok}>
-                <span style={stlpecDen}>{fmtDMY(b.platnost_od)}</span>
-                <span style={{ flex: 1 }}>
-                  <b style={{ fontSize: 12.5 }}>{b.nazov}</b>
-                  <span style={{ color: C.textMuted, fontSize: 11.5 }}>
-                    {" "}· {b.hodiny ? `${b.hodiny} h` : "bez limitu"}
-                    {b.platnost_do ? ` · do ${fmtDMY(b.platnost_do)}` : " · bez konca"}
-                    {b.zdroj === "ptminder" ? " · z PTmindera" : ""}
-                  </span>
-                </span>
-                <span style={{ color: b.cena_czk ? C.text : C.textDim, fontVariantNumeric: "tabular-nums" }}>
-                  {b.cena_czk ? fmtCZK(b.cena_czk) : "bez ceny"}
-                </span>
-              </div>
-            ))}
-            {!mojeBalicky.length && <Prazdne>Zatiaľ žiadny balíček v Kokpite.</Prazdne>}
-          </>
-        )}
-      </div>
-
-      <div style={{ marginTop: 12 }}>
-        <button onClick={() => setPisem(!pisem)} style={{ ...navrhTlacidlo, borderColor: mix(C.accentLight, 45), color: C.accentLight }}>
-          {pisem ? "Zavrieť" : "+ Nahodiť balíček alebo členstvo"}
-        </button>
-      </div>
-
-      {pisem && (
-        <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
-          {([
-            { k: "nazov" as const, l: "názov (napr. OFF - 6h S viazanostou)", w: 240 },
-            { k: "hodiny" as const, l: "hodín (prázdne = paušál)", w: 150 },
-            { k: "platnostOd" as const, l: "platí od", w: 120 },
-            { k: "platnostDo" as const, l: "platí do", w: 120 },
-            { k: "cenaCzk" as const, l: "cena Kč", w: 100 },
-            { k: "poznamka" as const, l: "poznámka", w: 180 },
-          ]).map((x) => (
-            <label key={x.k} style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 10.5, color: C.textDim }}>
-              {x.l}
-              <input
-                value={f[x.k]}
-                onChange={(e) => setF({ ...f, [x.k]: e.target.value })}
-                placeholder={x.k.startsWith("platnost") ? "RRRR-MM-DD" : ""}
-                style={{ width: x.w, padding: "7px 9px", borderRadius: 8, fontSize: 12.5, border: `1px solid ${C.border}`, background: C.bg, color: C.text }}
-              />
-            </label>
-          ))}
-          <button onClick={() => void pridaj()} disabled={pracujem || !f.nazov.trim()} style={{
-            padding: "8px 15px", borderRadius: 9, fontSize: 12.5, fontWeight: 700,
-            cursor: f.nazov.trim() ? "pointer" : "not-allowed",
-            border: `1px solid ${mix(C.green, 50)}`, background: f.nazov.trim() ? mix(C.green, 12) : "transparent",
-            color: f.nazov.trim() ? C.green : C.textDim,
-          }}>
-            {pracujem ? "…" : "Nahodiť"}
-          </button>
+            ) : <Prazdne>Dopyt sa nenašiel — klient prišiel skôr, než appka dopyty evidovala.</Prazdne>
+          )}
         </div>
-      )}
-      {chyba && <div style={{ fontSize: 12, color: C.red, marginTop: 8 }}>{chyba}</div>}
+      </div>
+    </div>
+  );
+}
+
+/** Koľko mesiacov klient chodí — na tempo. */
+function mesiacov(c: ClientAgg): number {
+  if (!c.firstSession) return 1;
+  const d = (Date.now() - Date.parse(c.firstSession)) / (1000 * 60 * 60 * 24 * 30.44);
+  return Math.max(0.5, d);
+}
+
+function RiadokOsi({ u }: { u: ReturnType<typeof osCasuKlienta>[number] }) {
+  if (u.druh === "balicekOd") {
+    return (
+      <div style={{ ...riadok, background: mix(C.accent, 10), borderRadius: 7, padding: "8px 9px", marginTop: 4, border: "none" }}>
+        <span style={stlpecDen}>{fmtDMY(u.den)}</span>
+        <span style={{ flex: 1 }}>
+          <b>{u.nazov}</b>
+          <span style={{ color: C.textMuted }}>
+            {" "}· {u.hodin ? `${u.hodin} h` : "bez limitu"}{u.doDna ? ` · do ${fmtDMY(u.doDna)}` : ""}
+            {u.zaplatene ? ` · ${fmtCZK(u.zaplatene)}` : ""}
+          </span>
+        </span>
+      </div>
+    );
+  }
+  if (u.druh === "balicekDo") {
+    return <div style={{ ...riadok, color: C.textDim }}><span style={stlpecDen}>{fmtDMY(u.den)}</span><span style={{ flex: 1 }}>skončila platnosť — {u.nazov}</span></div>;
+  }
+  if (u.druh === "platba") {
+    return (
+      <div style={riadok}>
+        <span style={stlpecDen}>{fmtDMY(u.den)}</span>
+        <span style={{ flex: 1, color: C.green }}>zaplatil {u.metoda === "bank" ? "prevodom" : u.metoda === "cash" ? "hotovosť" : "iné"}</span>
+        <span style={{ color: C.green, fontWeight: 700 }}>{fmtCZK(u.suma)}</span>
+      </div>
+    );
+  }
+  return (
+    <div style={riadok}>
+      <span style={stlpecDen}>{fmtDMY(u.den)}</span>
+      <span style={{ flex: 1, color: C.textMuted }}>tréning{u.cas ? ` ${u.cas}` : ""}{u.trener ? ` · ${u.trener}` : ""}</span>
+      {u.zKalendara && <span style={{ fontSize: 11, color: C.blue }}>z kalendára</span>}
+    </div>
+  );
+}
+
+function FormularBalicka({ f, setF, pracujem, onUloz }: {
+  f: Record<string, string>;
+  setF: (v: never) => void;
+  pracujem: boolean;
+  onUloz: () => void;
+}) {
+  return (
+    <div style={{ marginTop: 10, display: "flex", gap: 7, flexWrap: "wrap", alignItems: "flex-end", padding: "10px 11px", borderRadius: 10, background: mix(C.border, 40) }}>
+      {([
+        { k: "nazov", l: "názov balíčka", w: 210 },
+        { k: "hodiny", l: "hodín", w: 80 },
+        { k: "platnostOd", l: "platí od", w: 115 },
+        { k: "platnostDo", l: "platí do", w: 115 },
+        { k: "cenaCzk", l: "cena Kč", w: 95 },
+        { k: "poznamka", l: "poznámka", w: 150 },
+      ]).map((x) => (
+        <label key={x.k} style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 10.5, color: C.textDim }}>
+          {x.l}
+          <input
+            value={f[x.k]}
+            onChange={(e) => setF({ ...f, [x.k]: e.target.value } as never)}
+            style={{ width: x.w, padding: "6px 8px", borderRadius: 7, fontSize: 12, border: `1px solid ${C.border}`, background: C.bg, color: C.text }}
+          />
+        </label>
+      ))}
+      <button onClick={onUloz} disabled={pracujem || !f.nazov.trim()} style={{
+        padding: "7px 14px", borderRadius: 8, fontSize: 12, fontWeight: 700,
+        cursor: f.nazov.trim() ? "pointer" : "not-allowed",
+        border: `1px solid ${mix(C.green, 50)}`,
+        background: f.nazov.trim() ? mix(C.green, 12) : "transparent",
+        color: f.nazov.trim() ? C.green : C.textDim,
+      }}>
+        {pracujem ? "…" : "Nahodiť"}
+      </button>
     </div>
   );
 }
@@ -523,6 +596,13 @@ const riadok = {
   padding: "6px 2px", borderBottom: `1px solid ${mix(C.border, 40)}`, fontSize: 12,
 };
 const stlpecDen = { color: C.textDim, minWidth: 74, fontVariantNumeric: "tabular-nums" as const };
+
+const prepinac = (on: boolean) => ({
+  padding: "6px 11px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer",
+  border: `1px solid ${on ? C.accent : C.border}`,
+  background: on ? C.accentBg : "transparent",
+  color: on ? C.accentLight : C.textMuted,
+});
 
 const navrhTlacidlo = {
   padding: "6px 11px", borderRadius: 8, fontSize: 12, cursor: "pointer",
