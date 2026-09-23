@@ -22,8 +22,9 @@ describe("karta je kategória, nie položka", () => {
   it("tri kategórie dajú tri karty, nie päť", () => {
     // Prvá verzia dávala jednu kartu na jednu vec a z troch zmien boli tri
     // karty. Jerry 23. 9. 2026: „predstavoval som si celé kategórie."
+    // Karta „klient" je navyše — nie je to fronta, je to pracovný stôl.
     const k = postavKarty({ ...zdroje, ktoSom: null });
-    expect(k.map((x) => x.druh)).toEqual(["zmeny", "mena", "platby"]);
+    expect(k.map((x) => x.druh)).toEqual(["zmeny", "mena", "platby", "klient"]);
     expect(k[0].polozky.length).toBe(2);
   });
 
@@ -35,7 +36,7 @@ describe("karta je kategória, nie položka", () => {
 
   it("prázdna kategória kartu nevyrobí", () => {
     const k = postavKarty({ ...zdroje, zmeny: [], nezname: [], ktoSom: null });
-    expect(k.map((x) => x.druh)).toEqual(["platby"]);
+    expect(k.map((x) => x.druh)).toEqual(["platby", "klient"]);
   });
 });
 
@@ -50,7 +51,7 @@ describe("karta patrí prihlásenému", () => {
     // Peniaze trénera nemajú a sú Jerryho, rovnako ako mesačné kontroly
     // (pravidlo z 31. 8. 2026: „nech Terezku nerozptyľujú").
     const k = postavKarty({ ...zdroje, ktoSom: "terezka" });
-    expect(k.map((x) => x.druh)).toEqual(["zmeny", "mena"]);
+    expect(k.map((x) => x.druh)).toEqual(["zmeny", "mena", "klient"]);
     expect(k[0].polozky.map((p) => (p as Zmena).id)).toEqual(["z2"]);
   });
 
@@ -84,10 +85,24 @@ describe("prihlásenie sa porovnáva bez ohľadu na veľkosť písmen", () => {
 
   it("aj „Terezka“ s veľkým T", () => {
     const k = postavKarty({ ...zdroje, ktoSom: "Terezka" });
-    expect(k.map((x) => x.druh)).toEqual(["zmeny", "mena"]);
+    expect(k.map((x) => x.druh)).toEqual(["zmeny", "mena", "klient"]);
   });
 
   it("„app“ (spoločné prihlásenie) nefiltruje", () => {
     expect(postavKarty({ ...zdroje, ktoSom: "app" })[0].polozky.length).toBe(2);
+  });
+});
+
+describe("karta klienta je stôl, nie fronta", () => {
+  it("je tam vždy, aj keď nič nečaká", () => {
+    // Ostatné karty sú zoznamy toho, čo čaká, a keď sa vyprázdnia, zmiznú.
+    // Stôl nie — je to miesto, kam sa chodí robiť.
+    const k = postavKarty({ zmeny: [], nezname: [], platby: [], navrhMena: () => "", ktoSom: "Jerry" });
+    expect(k.map((x) => x.druh)).toEqual(["klient"]);
+  });
+
+  it("nemá položky, takže sa nedá „vybaviť“", () => {
+    const k = postavKarty({ ...zdroje, ktoSom: null }).find((x) => x.druh === "klient")!;
+    expect(k.polozky).toEqual([]);
   });
 });

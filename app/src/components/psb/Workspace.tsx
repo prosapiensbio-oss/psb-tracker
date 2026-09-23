@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { navrhniKlientaKandidati, type ClientAgg } from "../../lib/psb/compute";
-import { klucPolozky, popisZmeny, postavKarty, type Karta, type NeznamyNazov, type NepriradenaPlatba, type Zmena } from "../../lib/psb/workspaceKarty";
+import { klucPolozky, popisZmeny, postavKarty, trenerZPrihlasenia, type Karta, type NeznamyNazov, type NepriradenaPlatba, type Zmena } from "../../lib/psb/workspaceKarty";
+import type { PSBData } from "../../lib/psb/types";
+import { KlientStol } from "./KlientStol";
 import { C, mix } from "../../lib/psb/theme";
 import { Card } from "./ui";
 
@@ -26,7 +28,14 @@ import { Card } from "./ui";
 const kc = (n: number) => `${Math.round(n).toLocaleString("sk-SK")} Kč`;
 const den = (s: string) => (s ? `${Number(s.slice(8))}. ${Number(s.slice(5, 7))}.` : "");
 
-export function Workspace({ clients, mena, ktoSom }: { clients: Record<string, ClientAgg>; mena: string[]; ktoSom: string | null }) {
+export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats }: {
+  clients: Record<string, ClientAgg>;
+  mena: string[];
+  ktoSom: string | null;
+  data: PSBData;
+  kalUdalosti?: { zaciatok: string; klient: string | null; typ: string | null }[];
+  btcSats?: Record<string, number>;
+}) {
   const [zdroje, setZdroje] = useState<{ zmeny: Zmena[]; nezname: { nazov: string; trener: string; pocet: number; najblizsi: string }[]; platby: { fioId: string; datum: string; suma: number; text: string; kandidati: string[] }[] } | null>(null);
   const [hotove, setHotove] = useState<Set<string>>(new Set());
   const [texty, setTexty] = useState<Record<string, string>>({});
@@ -58,7 +67,10 @@ export function Workspace({ clients, mena, ktoSom }: { clients: Record<string, C
   // Karta, v ktorej už nič nezostalo, z kopy zmizne — ale až po tom, čo sa
   // v nej naozaj odklikalo; inak by zmizla pod rukami uprostred práce.
   const zive = useMemo(
-    () => karty.filter((k) => (k.polozky as (Zmena | NeznamyNazov | NepriradenaPlatba)[]).some((p) => !hotove.has(klucPolozky(k.druh, p)))),
+    // Karta klienta nie je fronta — nemá položky a nikdy nezmizne. Ostatné
+    // zmiznú, keď sa v nich všetko odklikalo.
+    () => karty.filter((k) => k.druh === "klient"
+      || (k.polozky as (Zmena | NeznamyNazov | NepriradenaPlatba)[]).some((p) => !hotove.has(klucPolozky(k.druh, p)))),
     [karty, hotove],
   );
   const k = zive[Math.min(i, Math.max(0, zive.length - 1))];
@@ -92,7 +104,7 @@ export function Workspace({ clients, mena, ktoSom }: { clients: Record<string, C
           <div style={{ fontSize: 13, color: C.textMuted, marginTop: 7, lineHeight: 1.6 }}>
             {vybavenych > 0
               ? `Vybavil si ${vybavenych} ${vybavenych === 1 ? "vec" : vybavenych < 5 ? "veci" : "vecí"}. Administratívu máš za sebou.`
-              : ktoSom === "terezka"
+              : trenerZPrihlasenia(ktoSom) === "Terezka"
                 ? "Nič nečaká. Peniaze a uzávierku má na starosti Jerry."
                 : "Nič nečaká. Administratívu máš za sebou."}
           </div>
@@ -102,7 +114,10 @@ export function Workspace({ clients, mena, ktoSom }: { clients: Record<string, C
   }
 
   const zostava = (x: Karta) => (x.polozky as (Zmena | NeznamyNazov | NepriradenaPlatba)[]).filter((p) => !hotove.has(klucPolozky(x.druh, p))).length;
-  const dalsie = zive.slice(i + 1, i + 3);
+  // Presvitajúce karty idú tiež dokola — na poslednej je za ňou prvá.
+  const dalsie = zive.length > 1
+    ? [1, 2].slice(0, Math.min(2, zive.length - 1)).map((o) => zive[(i + o) % zive.length])
+    : [];
 
   return (
     // Celá šírka obrazovky, nie 1200 px ako zvyšok appky. Karta je pracovná
@@ -119,7 +134,7 @@ export function Workspace({ clients, mena, ktoSom }: { clients: Record<string, C
         </div>
         <div style={{ fontSize: 12, color: C.textDim, whiteSpace: "nowrap" }}>
           {vybavenych > 0 ? `${vybavenych} vybavených` : `${spolu} vecí celkom`}
-          {ktoSom === "jerry" || ktoSom === "terezka" ? ` · len ${ktoSom === "jerry" ? "Jerryho" : "Terezkine"}` : ""}
+          {trenerZPrihlasenia(ktoSom) ? ` · len ${trenerZPrihlasenia(ktoSom) === "Jerry" ? "Jerryho" : "Terezkine"}` : ""}
         </div>
       </div>
 
@@ -154,27 +169,16 @@ export function Workspace({ clients, mena, ktoSom }: { clients: Record<string, C
             zoskrolovať." Karta má vnútri zoznam na pol obrazovky, takže
             tlačidlo pod ňou je zakaždým na inom mieste a často mimo
             dohľadu. Bok je vždy tam, kde bol. */}
-        <button
-          onClick={() => setI((x) => Math.max(0, x - 1))}
-          disabled={i === 0}
-          aria-label="Predchádzajúca karta"
-          style={bocnaSipka("left", i > 0)}
-        >
-          ‹
-        </button>
-        <button
-          onClick={() => setI((x) => Math.min(zive.length - 1, x + 1))}
-          disabled={i >= zive.length - 1}
-          aria-label="Ďalšia karta"
-          style={bocnaSipka("right", i < zive.length - 1)}
-        >
-          ›
-        </button>
+        {/* Kolotoč: z poslednej karty sa ide na prvú a naopak (Jerry, 23. 9.
+            2026). Šípka na konci, ktorá sa nedá stlačiť, je slepá ulička —
+            človek musí prejsť celú kopu späť, aby sa dostal o jednu ďalej. */}
+        <button onClick={() => setI((x) => (x - 1 + zive.length) % zive.length)} aria-label="Predchádzajúca karta" style={bocnaSipka("left", zive.length > 1)}>‹</button>
+        <button onClick={() => setI((x) => (x + 1) % zive.length)} aria-label="Ďalšia karta" style={bocnaSipka("right", zive.length > 1)}>›</button>
         <div style={{ position: "relative", zIndex: 1, margin: "0 46px" }}>
           <Card style={{ marginBottom: 0 }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
               <div style={{ fontSize: 18, fontWeight: 800 }}>{k.nadpis}</div>
-              <div style={{ fontSize: 11.5, color: C.textMuted }}>{zostava(k)} zostáva</div>
+              {k.druh !== "klient" && <div style={{ fontSize: 11.5, color: C.textMuted }}>{zostava(k)} zostáva</div>}
             </div>
             <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 3 }}>{k.podnadpis}</div>
 
@@ -223,6 +227,8 @@ export function Workspace({ clients, mena, ktoSom }: { clients: Record<string, C
                 );
               })}
 
+              {k.druh === "klient" && <KlientStol clients={clients} mena={mena} data={data} kalUdalosti={kalUdalosti} btcSats={btcSats} />}
+
               {k.druh === "platby" && k.polozky.map((p) => {
                 const kluc = klucPolozky("platby", p);
                 if (hotove.has(kluc)) return null;
@@ -267,7 +273,7 @@ export function Workspace({ clients, mena, ktoSom }: { clients: Record<string, C
           ))}
         </div>
         <div style={{ fontSize: 11.5, color: C.textDim }}>
-          {i < zive.length - 1 ? `Ďalej: ${zive[i + 1].nadpis}` : "Toto je posledná karta."}
+          {zive.length > 1 ? `Ďalej: ${zive[(i + 1) % zive.length].nadpis}` : ""}
         </div>
       </div>
     </div>

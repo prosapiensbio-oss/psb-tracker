@@ -26,7 +26,15 @@ export type NepriradenaPlatba = { fioId: string; datum: string; suma: number; te
 export type Karta =
   | { druh: "zmeny"; nadpis: string; podnadpis: string; polozky: Zmena[] }
   | { druh: "mena"; nadpis: string; podnadpis: string; polozky: NeznamyNazov[] }
-  | { druh: "platby"; nadpis: string; podnadpis: string; polozky: NepriradenaPlatba[] };
+  | { druh: "platby"; nadpis: string; podnadpis: string; polozky: NepriradenaPlatba[] }
+  /**
+   * Karta bez fronty — pracovný stôl jedného klienta.
+   *
+   * Ostatné karty sú zoznamy toho, čo čaká. Táto nie: vyhľadá sa v nej
+   * človek a robí sa na ňom. Preto nemá počet a nikdy nezmizne — kopa sa
+   * bez nej môže vyprázdniť, ona zostáva ako miesto, kam sa chodí.
+   */
+  | { druh: "klient"; nadpis: string; podnadpis: string; polozky: never[] };
 
 export type ZdrojeKariet = {
   zmeny: Zmena[];
@@ -97,6 +105,12 @@ export function postavKarty(z: ZdrojeKariet): Karta[] {
     nadpis: "Platby z banky",
     podnadpis: `${platby.length} ${pocet(platby.length, "príjem bez klienta", "príjmy bez klienta", "príjmov bez klienta")}`,
     polozky: platby,
+  });
+  karty.push({
+    druh: "klient",
+    nadpis: "Klient",
+    podnadpis: "vyhľadaj človeka a rob na ňom — tréningy, peniaze, balíčky",
+    polozky: [],
   });
   return karty;
 }
