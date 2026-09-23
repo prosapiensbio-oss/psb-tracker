@@ -1,4 +1,5 @@
 // Server-only D1 access for the PSB Tracker. All reads/writes hit env.DB.
+import { zjednotOverrides } from "./zjednotOverrides";
 import type { D1Database } from "@cloudflare/workers-types";
 
 import { audit, jeZamknuty, zamknuteMesiace } from "./audit.server";
@@ -126,8 +127,9 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
     })),
   };
 
+  const overrideRiadky: { meno: string; ov: any }[] = [];
   for (const r of overrides.results as any[]) {
-    data.clientOverrides[r.name] = {
+    overrideRiadky.push({ meno: r.name, ov: {
       status: r.status,
       specialRate: !!r.special_rate,
       specialRateNote: r.special_rate_note || "",
@@ -149,8 +151,12 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
       // ktorí odvtedy trénovali. Ručný zápis je snímka, ktorá nevyprší;
       // aspoň nech je vidieť, kedy vznikla.
       updatedAt: String(r.updated_at || ""),
-    };
+    } });
   }
+  // Prekľúčovanie na meno z exportu. Bez neho má človek napísaný na dva
+  // spôsoby dva profily a svoj zápis nevidí ani v jednom z nich.
+  data.clientOverrides = zjednotOverrides(overrideRiadky, data.sessions.map((s) => s.client));
+
   for (const r of acks.results as any[]) {
     data.anomalyAck[r.anomaly_key] = { note: r.note || "", ackedAt: r.acked_at, actor: r.actor || "" };
   }

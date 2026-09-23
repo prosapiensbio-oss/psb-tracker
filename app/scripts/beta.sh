@@ -62,6 +62,20 @@ echo "  shell: $kod · asset: $kodAsset"
 if [ "$kod" = "200" ] && [ "$kodAsset" = "200" ]; then
   echo "✓ beta beží — $adresa"
   echo "  POZOR: je to tá istá databáza ako ostrý Kokpit. Čo tu klikneš, je zapísané naozaj."
+
+  # Tajomstvá sú VLASTNÉ pre každého workera — deploy pod iným menom ich
+  # neprenesie. 23. 9. 2026 sa preto v bete nenačítal bitcoin a Jerry si
+  # myslel, že je to chyba obrazovky; pritom /api/btc-reserve vracal
+  # „no_token". Radšej to povedať hneď pri nasadení než hľadať v kóde.
+  maju=$($spustac secret list --name "$meno" 2>/dev/null | tr -d ' "' | grep -o 'name:[A-Z_]*' | cut -d: -f2)
+  chyba=""
+  for s in ANTHROPIC_API_KEY BTC_RESERVE_TOKEN PSB_SESSION_SECRET; do
+    echo "$maju" | grep -qx "$s" || chyba="$chyba $s"
+  done
+  [ -n "$chyba" ] && {
+    echo "  Bez tajomstiev (tieto časti budú v bete prázdne):$chyba"
+    echo "  Doplníš ich: $spustac secret put NAZOV --name $meno"
+  }
 else
   echo "✗ beta neodpovedá tak, ako má (čakalo sa 200/200)"
   tail -12 /tmp/beta-deploy.log

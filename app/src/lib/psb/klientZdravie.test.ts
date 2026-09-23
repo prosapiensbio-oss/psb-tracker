@@ -1,4 +1,4 @@
-// Zdravie vzťahu — štyri signály s mierkou a jedna veta.
+// Zdravie vzťahu — signály s mierkou a jedna veta.
 import { describe, expect, it } from "bun:test";
 
 import { zdravieKlienta } from "./klientZdravie";
@@ -10,8 +10,7 @@ const klient = (o: Partial<ClientAgg> = {}) => ({
 
 const vstupy = (o: Partial<Parameters<typeof zdravieKlienta>[1]> = {}) => ({
   tempoTeraz: 3, tempoPredtym: 3, zrusene: 0, dniOdPosledneho: 7, obvyklyOdstup: 8,
-  obnovil: 3, mohol: 3,
-  priemery: { tempo: 2.8, zrusene: 0.8, obnovy: 0.7 },
+  priemery: { tempo: 2.8, zrusene: 0.8 },
   ...o,
 });
 
@@ -51,11 +50,6 @@ describe("signály", () => {
     const vela = zdravieKlienta(klient(), vstupy({ zrusene: 4 })).signaly.find((x) => x.id === "zrusene")!;
     expect(malo.podiel).toBeGreaterThan(vela.podiel);
   });
-
-  it("prvý balíček sa nepočíta ako vynechaná obnova", () => {
-    const s = zdravieKlienta(klient(), vstupy({ obnovil: 0, mohol: 0 })).signaly.find((x) => x.id === "obnovy")!;
-    expect(s.tón).toBe("nevieme");
-  });
 });
 
 describe("záver", () => {
@@ -79,7 +73,7 @@ describe("záver", () => {
 
 describe("priemery sú priemery klientely, nie odvodenina od jedného klienta", () => {
   it("tempo nad priemerom je vpravo od čiarky", () => {
-    const z = zdravieKlienta(klient(), vstupy({ tempoTeraz: 4, priemery: { tempo: 2, zrusene: 0.8, obnovy: 0.7 } }));
+    const z = zdravieKlienta(klient(), vstupy({ tempoTeraz: 4, priemery: { tempo: 2, zrusene: 0.8 } }));
     const s = z.signaly.find((x) => x.id === "tempo")!;
     expect(s.podiel).toBeGreaterThan(s.priemer);
     expect(s.mierka).toBe("priemer klientely 2.0");
@@ -90,21 +84,5 @@ describe("priemery sú priemery klientely, nie odvodenina od jedného klienta", 
     const s = zdravieKlienta(klient(), vstupy({ dniOdPosledneho: 10, obvyklyOdstup: 14 })).signaly.find((x) => x.id === "medzera")!;
     expect(s.mierka).toBe("jeho obvyklý odstup 14 dní");
     expect(s.tón).toBe("dobre");
-  });
-});
-
-describe("obnovy balíčka", () => {
-  it("prvý balíček nie je vynechaná obnova", () => {
-    const s = zdravieKlienta(klient(), vstupy({ obnovil: 0, mohol: 0 })).signaly.find((x) => x.id === "obnovy")!;
-    expect(s.tón).toBe("nevieme");
-    expect(s.hodnota).toBe("zatiaľ prvý");
-  });
-
-  it("vynechaná obnova je vidieť", () => {
-    // Predtým sa posielalo obnovil = mohol, takže každému vychádzalo 100 %
-    // a číslo nebolo signál, ale ozdoba.
-    const s = zdravieKlienta(klient(), vstupy({ obnovil: 1, mohol: 3 })).signaly.find((x) => x.id === "obnovy")!;
-    expect(s.hodnota).toBe("1 z 3");
-    expect(s.tón).toBe("zle");
   });
 });

@@ -1,3 +1,4 @@
+import { normName } from "../../lib/psb/format";
 import { createFileRoute } from "@tanstack/react-router";
 
 import { audit } from "../../lib/psb/audit.server";
@@ -45,6 +46,28 @@ export const Route = createFileRoute("/api/override")({
         }
         if (!name || !ALLOWED.has(key as keyof ClientOverride)) {
           return Response.json({ ok: false, error: "bad_field" }, { status: 400 });
+        }
+        /**
+         * Zápis ide pod meno z EXPORTU, nie pod to, ako ho niekto napísal.
+         *
+         * Dominika Križová mala 14. 9. zapísanú doživotnú zľavu pod menom
+         * z kalendára („Krizova", bez ž) a PTminder ju exportuje s ž. Appka
+         * si override hľadá presným kľúčom, takže zápis nikdy neuvidela
+         * a v zozname klientov bola dvakrát. Čítanie to už zlučuje
+         * (zjednotOverrides), ale kým sa zapisuje krivé meno, vyrábajú sa
+         * ďalšie riadky, ktoré treba zlučovať.
+         */
+        const zhoda = await DB.prepare(
+          "SELECT client_name FROM sessions WHERE client_name = ?1 COLLATE NOCASE LIMIT 1",
+        ).bind(name).first<{ client_name: string }>();
+        if (!zhoda) {
+          const kandidati = await DB.prepare("SELECT DISTINCT client_name FROM sessions").all<{ client_name: string }>();
+          const hladane = normName(name);
+          const presne = (kandidati.results || []).filter((r) => normName(r.client_name) === hladane);
+          // Len keď je zhoda JEDNA. Dvaja ľudia s rovnakým menom po odstránení
+          // diakritiky sú zriedkavosť, ale zápis pod nesprávneho z nich by
+          // bol horší než zápis pod nové meno.
+          if (presne.length === 1) name = presne[0].client_name;
         }
         // Stála poznámka sa prepisuje — ale poznámky v čase sú príbeh klienta,
         // nie smetisko. Pred prepisom sa stará verzia odloží do denníka

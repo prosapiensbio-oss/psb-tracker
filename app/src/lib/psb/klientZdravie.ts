@@ -1,8 +1,8 @@
 /**
- * Zdravie vzťahu s klientom — štyri signály a jedna veta.
+ * Zdravie vzťahu s klientom — tri signály a jedna veta.
  *
- * Jerry si 23. 9. 2026 vybral kombináciu návrhov 3 a 5: štyri signály
- * odchodu, každý s mierkou (kde na nej stojí tento klient oproti ostatným).
+ * Jerry si 23. 9. 2026 vybral kombináciu návrhov 3 a 5: signály odchodu,
+ * každý s mierkou (kde na nej stojí tento klient oproti ostatným).
  * Dôvod, prečo spolu: signál bez mierky nič nehovorí — „tempo 3,0" je veľa
  * alebo málo len oproti tomu, ako chodia ostatní, a to je pravidlo, ktoré
  * má appka napísané už pri profile (21. 9. 2026).
@@ -10,15 +10,22 @@
  * ČO TO NEROBÍ
  *
  * Nepredpovedá odchod. Hovorí, čo sa u toho klienta zmenilo a ako to vyzerá
- * vedľa ostatných; záver „riziko stredné" je zhrnutie tých štyroch riadkov,
+ * vedľa ostatných; záver „riziko stredné" je zhrnutie tých riadkov,
  * nie model. Appka má vlastné pravidlo o tom, že číslo bez akcie je
  * zbytočné — preto je pri každom signále napísané, čo ho zhoršilo.
+ *
+ * ŠTVRTÝ SIGNÁL TU BOL A JE PREČ
+ *
+ * „Obnovy balíčka" ukazovali percento, ktoré Jerrymu nič nehovorilo ani po
+ * oprave výpočtu — u väčšiny klientov vyšlo z jediného páru balíčkov, takže
+ * skákalo medzi 0 a 100 % podľa jednej dovolenky. Jerry ho 23. 9. zrušil.
+ * To, či klient nadviazal, je vidieť v záložke balíčky ako dátumy.
  */
 
 import type { ClientAgg } from "./compute";
 
 export type Signal = {
-  id: "tempo" | "zrusene" | "medzera" | "obnovy";
+  id: "tempo" | "zrusene" | "medzera";
   nazov: string;
   /** Hodnota klienta ako text pre človeka. */
   hodnota: string;
@@ -46,8 +53,6 @@ export type PriemeryKlientely = {
   tempo: number;
   /** Priemerný počet zrušených tréningov na klienta za 90 dní. */
   zrusene: number;
-  /** Podiel obnovených balíčkov naprieč klientelou, 0..1. */
-  obnovy: number;
 };
 
 export type Zdravie = { signaly: Signal[]; zaver: string; tón: "dobre" | "vsimnut" | "zle" | "nevieme" };
@@ -65,9 +70,6 @@ export function zdravieKlienta(
     /** Dní od posledného tréningu a jeho OBVYKLÝ odstup (medián). */
     dniOdPosledneho: number | null;
     obvyklyOdstup: number | null;
-    /** Koľko balíčkov po sebe nadviazalo a koľko ich mohlo. */
-    obnovil: number;
-    mohol: number;
     /** Priemery klientely — počítajú sa RAZ nad všetkými, nie tu. */
     priemery: PriemeryKlientely;
   },
@@ -126,31 +128,6 @@ export function zdravieKlienta(
         tón: d / o >= 2.5 ? "zle" as const : d / o >= 1.5 ? "vsimnut" as const : "dobre" as const,
       };
     })(),
-    (() => {
-      /**
-       * Obnova = po skončení balíčka začal ďalší do mesiaca.
-       *
-       * Prvá verzia posielala `obnovil = mohol`, takže každému vychádzalo
-       * 100 % — číslo, ktoré je u všetkých rovnaké, nie je signál, je to
-       * ozdoba. Jerry sa 23. 9. 2026 oprávnene pýtal, čo to vlastne znamená.
-       */
-      if (vstupy.mohol <= 0) {
-        return {
-          id: "obnovy" as const, nazov: "Obnovy balíčka", hodnota: "zatiaľ prvý",
-          podiel: 0, priemer: 0, mierka: "", detail: "na obnovu ešte nemal príležitosť", tón: "nevieme" as const,
-        };
-      }
-      const pomer = vstupy.obnovil / vstupy.mohol;
-      return {
-        id: "obnovy" as const, nazov: "Obnovy balíčka",
-        hodnota: `${vstupy.obnovil} z ${vstupy.mohol}`,
-        podiel: pomer,
-        priemer: vstupy.priemery.obnovy,
-        mierka: `priemer klientely ${Math.round(vstupy.priemery.obnovy * 100)} %`,
-        detail: vstupy.obnovil === vstupy.mohol ? "nadviazal vždy do mesiaca" : `${vstupy.mohol - vstupy.obnovil}× nechal dlhšiu prestávku`,
-        tón: pomer >= 0.99 ? "dobre" as const : pomer < 0.6 ? "zle" as const : "vsimnut" as const,
-      };
-    })(),
   ];
 
   const zle = signaly.filter((x) => x.tón === "zle").length;
@@ -166,7 +143,3 @@ export function zdravieKlienta(
   return { signaly, zaver, tón };
 }
 
-function mesiacov(c: ClientAgg): number {
-  if (!c.firstSession) return 1;
-  return Math.max(1, (Date.now() - Date.parse(c.firstSession)) / (1000 * 60 * 60 * 24 * 30.44));
-}

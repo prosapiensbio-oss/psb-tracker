@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { normName, fmtCZK, fmtDMY } from "../../lib/psb/format";
+import { jeBeta } from "../../lib/psb/beta";
 import { menoKluc } from "../../lib/psb/compute";
 import { satsNaCzk } from "../../lib/psb/btcKontrola";
 import { CENNIK, platnostDo } from "../../lib/psb/cennik";
@@ -184,23 +185,6 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc }: {
    * Výpočet žije v `lib/psb/klientZdravie.ts`, aby ho mohla použiť aj
    * notifikácia a Jarvis, keď na to príde — dve kópie by sa raz rozišli.
    */
-  /**
-   * Obnovy balíčka: po skončení jedného začal ďalší do mesiaca?
-   * Posledný balíček sa nepočíta — ešte nemal príležitosť.
-   */
-  const obnovy = useCallback((zoznam: Balicek[]) => {
-    const zor = [...zoznam].filter((b) => !b.zrusene_at && b.platnost_do).sort((a, b) => a.platnost_od.localeCompare(b.platnost_od));
-    let mohol = 0, obnovil = 0;
-    for (let i = 0; i < zor.length - 1; i++) {
-      const koniec = Date.parse(`${zor[i].platnost_do}T00:00:00Z`);
-      const dalsi = Date.parse(`${zor[i + 1].platnost_od}T00:00:00Z`);
-      if (!Number.isFinite(koniec) || !Number.isFinite(dalsi)) continue;
-      mohol++;
-      if ((dalsi - koniec) / 86400000 <= 31) obnovil++;
-    }
-    return { mohol, obnovil };
-  }, []);
-
   const dni = useCallback((n: number) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10), []);
 
   /**
@@ -217,16 +201,8 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc }: {
     const aktivnych = Math.max(1, ostatni.filter((x) => x.sessions.some((y) => y.date.slice(0, 10) > dni(90))).length);
     const zrusene = zruseneVsetky.length / aktivnych;
 
-    const podlaKlienta = new Map<string, Balicek[]>();
-    for (const b of balicky) {
-      const k = normName(b.klient);
-      if (!podlaKlienta.has(k)) podlaKlienta.set(k, []);
-      podlaKlienta.get(k)!.push(b);
-    }
-    let m = 0, o = 0;
-    for (const zoznam of podlaKlienta.values()) { const r = obnovy(zoznam); m += r.mohol; o += r.obnovil; }
-    return { tempo, zrusene, obnovy: m ? o / m : 0.7 };
-  }, [clients, zruseneKal, balicky, dni, obnovy]);
+    return { tempo, zrusene };
+  }, [clients, zruseneKal, dni]);
 
   const zdravie = useMemo(() => {
     if (!c) return null;
@@ -242,17 +218,15 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc }: {
     odstupy.sort((a, b) => a - b);
     const obvyklyOdstup = odstupy.length >= 4 ? odstupy[Math.floor(odstupy.length / 2)] : null;
     const posledny = dniS[dniS.length - 1];
-    const r = obnovy(mojeBalicky);
     return zdravieKlienta(c, {
       tempoTeraz: vokne(dni(90), dni(0)) / 3,
       tempoPredtym: vokne(dni(180), dni(90)) / 3,
       zrusene: zruseneKal.filter((z) => z.druh === "zrusene" && z.klient && normName(z.klient) === normName(meno) && z.kedy.slice(0, 10) > dni(90)).length,
       dniOdPosledneho: posledny ? Math.floor((Date.now() - Date.parse(posledny)) / 86400000) : null,
       obvyklyOdstup,
-      obnovil: r.obnovil, mohol: r.mohol,
       priemery,
     });
-  }, [c, meno, zruseneKal, mojeBalicky, priemery, dni, obnovy]);
+  }, [c, meno, zruseneKal, priemery, dni]);
 
   /** Koľko údajov je pod tlačidlom „ďalších N" — aby číslo nebolo vymyslené. */
   const dalsichUdajov = useMemo(
@@ -274,6 +248,29 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc }: {
     if (!r.ok) { setChyba(r.error || "nepodarilo sa uložiť"); return; }
     setPl({ datum: dnesISO(), suma: "", sposob: "hotovost", poznamka: "" });
     setPisemPlatbu(false);
+  };
+
+  /**
+   * Kto s klientom trénuje. Zoznam z DÁT, nie napevno — Matyáš skončil
+   * 20. 9. 2026 a natvrdo napísané meno by v appke zostalo navždy, zatiaľ
+   * čo nový tréner by v nej nebol vôbec.
+   */
+  const treneri = useMemo(() => {
+    const zo = new Set<string>();
+    for (const x of Object.values(clients)) if (x.primaryTrainer) zo.add(x.primaryTrainer);
+    for (const s2 of data.sessions) if (s2.sessionTrainer) zo.add(s2.sessionTrainer);
+    return [...zo].sort((a, b) => a.localeCompare(b, "sk"));
+  }, [clients, data.sessions]);
+
+  const nastavTrenera = async (novy: string) => {
+    setPracujem(true); setChyba("");
+    const r = await fetch("/api/override", {
+      method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: meno, key: "primaryTrainer", value: novy }),
+    }).then((x) => x.json()).catch(() => ({ ok: false, error: "spojenie" }));
+    setPracujem(false);
+    if (!r.ok) { setChyba(r.error || "nepodarilo sa uložiť"); return; }
+    setChyba("Uložené. Obnov stránku, aby sa tréner prepočítal všade.");
   };
 
   const naZoznam = () => { setMeno(""); setFilter("zdravie"); setPisem(false); setPisemPlatbu(false); };
@@ -375,7 +372,16 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc }: {
      * Predvolene AKTÍVNI. Neaktívnych je viac než aktívnych a kto otvára
      * stôl, ide skoro vždy za niekým, kto chodí.
      */
-    const vsetci = [...new Set([...mena, ...Object.keys(data.clientOverrides || {})])];
+    /**
+     * Mená z exportu plus tí, čo majú zatiaľ len ručný zápis (nový klient,
+     * override od Jarvisa). Zlučuje sa po normName, nie po znakoch: Dominika
+     * Križová bola v zozname dvakrát, lebo Jarvis jej zápis uložil pod meno
+     * z kalendára bez mäkčeňa. Meno z exportu vyhráva — to vidí zvyšok appky.
+     */
+    const podlaKluca = new Map<string, string>();
+    for (const m of mena) if (!podlaKluca.has(normName(m))) podlaKluca.set(normName(m), m);
+    for (const m of Object.keys(data.clientOverrides || {})) if (!podlaKluca.has(normName(m))) podlaKluca.set(normName(m), m);
+    const vsetci = [...podlaKluca.values()];
     const jeAktivny = (m: string) => (clients[m]?.status || "") !== "Neaktívny";
     const podlaStavu = vsetci.filter((m) => (stav === "aktivni" ? jeAktivny(m) : !jeAktivny(m)));
     const q = normName(hladam);
@@ -489,7 +495,18 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc }: {
               <option value="">{c ? `${c.status} (počíta appka)` : "čaká na prvý tréning"}</option>
               {["Aktívny", "Pauza", "Neaktívny"].map((x) => <option key={x} value={x}>{x}</option>)}
             </select>
-            {c && <span style={{ fontSize: 11.5, color: C.textDim }}>{c.primaryTrainer}</span>}
+            {/* Tréner sa dá prepnúť (Jerry, 23. 9. 2026). Appka ho počíta
+                z posledných šiestich mesiacov sedení a to je dobré pravidlo,
+                ale klient prechádza medzi trénermi skôr, než sa to stihne
+                prejaviť v exporte. Prázdna hodnota vráti výpočet appke. */}
+            <select value={c?.primaryTrainerOverride ? (c.primaryTrainer || "") : ""} disabled={!c || pracujem}
+              onChange={(e) => void nastavTrenera(e.target.value)} style={{
+                padding: "3px 7px", borderRadius: 7, fontSize: 11.5, cursor: "pointer",
+                border: `1px solid ${C.border}`, background: C.card, color: C.textDim,
+              }}>
+              <option value="">{c?.primaryTrainer ? `${c.primaryTrainer} (počíta appka)` : "bez trénera"}</option>
+              {treneri.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
           </div>
 
           {/* Pauzu ruší tréning sám (compute.ts) — tu sa to len POVIE, aby sa
@@ -650,16 +667,20 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc }: {
                       </>
                     )}
                   </div>
+                  {/* Pod čiarou stojí ČÍSLO, nie slovo „priemer" (Jerry,
+                      23. 9. 2026). Značka bez hodnoty hovorí len „si nad"
+                      alebo „si pod" — a na to, či je rozdiel veľký, sa
+                      z pásu pozerať nedá. */}
                   <div style={{ display: "flex", justifyContent: "space-between", gap: 10, fontSize: 10.5, color: C.textDim, marginTop: 6 }}>
                     <span>{sig.detail}</span>
-                    {sig.tón !== "nevieme" && <span style={{ whiteSpace: "nowrap" }}>│ priemer klientely</span>}
+                    {!!sig.mierka && <span style={{ whiteSpace: "nowrap" }}>│ {sig.mierka}</span>}
                   </div>
                 </div>
               ))}
               <div style={{ padding: "11px 13px", borderRadius: 10, background: mix(TON[zdravie.tón], 12), border: `1px solid ${mix(TON[zdravie.tón], 45)}`, fontSize: 12.5, color: C.textMuted, lineHeight: 1.55 }}>
                 <b style={{ color: TON[zdravie.tón] }}>{zdravie.zaver}</b>
                 <div style={{ fontSize: 11, color: C.textDim, marginTop: 5 }}>
-                  Sivá značka na páse je priemer klientely. Appka nepredpovedá odchod — hovorí, čo sa zmenilo.
+                  Sivá značka na páse je to, s čím sa klient porovnáva — pri tempe a zrušeniach priemer klientely, pri medzere jeho vlastný rytmus. Appka nepredpovedá odchod, hovorí, čo sa zmenilo.
                 </div>
               </div>
             </div>
@@ -797,7 +818,9 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc }: {
               <Prazdne>
                 {btc?.platby?.length
                   ? "Tento klient v bitcoine neplatil. Platby sú v appke PSB Bitcoin."
-                  : "Bitcoinová kniha sa nenačítala."}
+                  : jeBeta()
+                    ? "V bete bitcoin nie je. Beta je samostatný worker a nemá tajomstvo, ktorým sa Kokpit pýta BTC appky — v ostrom Kokpite sa načíta."
+                    : "Bitcoinová kniha sa nenačítala."}
               </Prazdne>
             )
           )}
@@ -810,6 +833,23 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc }: {
 
           {filter === "poznamky" && (
             <>
+              {/* ČO SA O KLIENTOVI VIE — a dá sa to sem napísať.
+                  Jerry, 23. 9. 2026: „do profilu klienta by som potreboval
+                  mať možnosť presne ako Dominika Križová." To, čo o nej
+                  vtedy napísal Jarvisovi — prvá klientka PSB od 2022, pauza
+                  kvôli tehotenstvu, doživotná 15% zľava — sa dá zapísať len
+                  cez debatu s Jarvisom. Toto je to isté rovno v profile,
+                  takže to nezávisí od toho, či sa Jarvisa niekto opýta. */}
+              <ZapisOKlientovi
+                meno={meno}
+                pociatocne={{
+                  trainerNote: c?.trainerNote || "",
+                  specialRate: !!c?.specialRate,
+                  specialRateNote: c?.specialRateNote || "",
+                  narodeniny: c?.narodeniny || "",
+                }}
+                onUlozene={(sprava) => setChyba(sprava)}
+              />
               {c?.trainerNote && <Blok nadpis="Poznámka trénera">{c.trainerNote}</Blok>}
               {c?.precoNeprisiel && <Blok nadpis="Prečo po úvodnom neprišiel">{c.precoNeprisiel}</Blok>}
               {c?.duch && <Blok nadpis="Odchod">{c.duch}</Blok>}
@@ -1189,6 +1229,85 @@ const riadok = {
 const stlpecDen = { color: C.textDim, minWidth: 74, fontVariantNumeric: "tabular-nums" as const };
 
 /** Farba podľa tónu signálu — jedno miesto, nech sa pásy a záver nerozídu. */
+/**
+ * Stále veci o klientovi — poznámka, špeciálna sadzba, narodeniny.
+ *
+ * Každé políčko sa ukladá zvlášť, hneď po opustení (onBlur), a appka povie,
+ * čo uložila. Jedno veľké tlačidlo „Uložiť" by znamenalo, že kto ho nestlačí,
+ * o zápis príde — a presne to sa tu stať nesmie: sú to veci, ktoré si človek
+ * pamätá raz za rok.
+ *
+ * Stará poznámka sa pri prepise odkladá do denníka (rieši /api/override),
+ * takže história klienta sa prepisom nestratí.
+ */
+function ZapisOKlientovi({ meno, pociatocne, onUlozene }: {
+  meno: string;
+  pociatocne: { trainerNote: string; specialRate: boolean; specialRateNote: string; narodeniny: string };
+  onUlozene: (sprava: string) => void;
+}) {
+  const [v, setV] = useState(pociatocne);
+  const [pisem, setPisem] = useState(false);
+  useEffect(() => { setV(pociatocne); /* eslint-disable-line react-hooks/exhaustive-deps */ }, [meno]);
+
+  const uloz = async (key: string, value: unknown) => {
+    const r = await fetch("/api/override", {
+      method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: meno, key, value }),
+    }).then((x) => x.json()).catch(() => ({ ok: false, error: "spojenie" }));
+    onUlozene(r?.ok ? "Uložené. Obnov stránku, aby sa to prepísalo všade." : (r?.error || "nepodarilo sa uložiť"));
+  };
+
+  if (!pisem) {
+    return (
+      <button onClick={() => setPisem(true)} style={{ ...navrhTlacidlo, marginBottom: 12, alignSelf: "flex-start" }}>
+        ✎ Zapísať, čo o ňom vieš
+      </button>
+    );
+  }
+
+  return (
+    <div style={{ marginBottom: 14, padding: "12px 13px", borderRadius: 10, background: mix(C.border, 40), display: "flex", flexDirection: "column", gap: 9 }}>
+      <label style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 10.5, color: C.textDim }}>
+        stála poznámka — história, zdravie, čo treba vedieť pred tréningom
+        <textarea
+          value={v.trainerNote}
+          onChange={(e) => setV({ ...v, trainerNote: e.target.value })}
+          onBlur={() => v.trainerNote !== pociatocne.trainerNote && void uloz("trainerNote", v.trainerNote)}
+          rows={3}
+          style={{ padding: "7px 9px", borderRadius: 7, fontSize: 12.5, border: `1px solid ${C.border}`, background: C.bg, color: C.text, resize: "vertical", fontFamily: "inherit" }}
+        />
+      </label>
+
+      <div style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
+        <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 12, color: C.textMuted, cursor: "pointer" }}>
+          <input type="checkbox" checked={v.specialRate}
+            onChange={(e) => { setV({ ...v, specialRate: e.target.checked }); void uloz("specialRate", e.target.checked); }} />
+          špeciálna sadzba
+        </label>
+        <label style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 10.5, color: C.textDim, flex: "1 1 260px" }}>
+          aká a prečo
+          <input
+            value={v.specialRateNote}
+            onChange={(e) => setV({ ...v, specialRateNote: e.target.value })}
+            onBlur={() => v.specialRateNote !== pociatocne.specialRateNote && void uloz("specialRateNote", v.specialRateNote)}
+            placeholder="napr. DC15 — 15 % doživotne, prvá klientka PSB"
+            style={{ padding: "6px 8px", borderRadius: 7, fontSize: 12, border: `1px solid ${C.border}`, background: C.bg, color: C.text }}
+          />
+        </label>
+        <label style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 10.5, color: C.textDim }}>
+          narodeniny
+          <input type="date" value={v.narodeniny}
+            onChange={(e) => { setV({ ...v, narodeniny: e.target.value }); void uloz("narodeniny", e.target.value); }}
+            style={{ width: 145, padding: "6px 8px", borderRadius: 7, fontSize: 12, border: `1px solid ${C.border}`, background: C.bg, color: C.text, colorScheme: "dark" }} />
+        </label>
+      </div>
+      <div style={{ fontSize: 10.5, color: C.textDim }}>
+        Ukladá sa hneď, ako z políčka odídeš. Predošlá poznámka sa odloží do denníka nižšie — prepisom sa história nestratí.
+      </div>
+    </div>
+  );
+}
+
 /** Spôsob platby ľudsky. `prevod` píše Jerry ručne, `bank` prišlo z exportu. */
 const SPOSOB: Record<string, string> = {
   hotovost: "hotovosť", prevod: "bankový prevod", bitcoin: "bitcoin", ine: "iné",
