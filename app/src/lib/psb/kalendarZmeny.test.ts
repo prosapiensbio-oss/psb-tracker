@@ -45,4 +45,19 @@ describe("ohlasitZmenu", () => {
   test("zmena bez termínu sa nehlási — nie je o čom", () => {
     expect(ohlasitZmenu("pridane", null, null, DNES)).toBe(false);
   });
+
+  test("„posun“ z rovnakého času na rovnaký sa nehlási", () => {
+    // Opakovaná udalosť prerobená Googlom: iné uid, ten istý termín.
+    // Lenka Přinosilová takto 22. 9. 2026 vyrobila štyri otázky naraz,
+    // hoci sa v jej kalendári nestalo nič.
+    expect(ohlasitZmenu("posunute", "2026-10-01T15:00", "2026-10-01T15:00", "2026-09-23")).toBe(false);
+  });
+
+  test("skutočný posun v ten istý deň sa hlási aj naďalej", () => {
+    expect(ohlasitZmenu("posunute", "2026-09-25T10:00", "2026-09-25T09:30", "2026-09-23")).toBe(true);
+  });
+
+  test("posun na iný deň sa hlási", () => {
+    expect(ohlasitZmenu("posunute", "2026-09-23T19:00", "2026-09-24T19:00", "2026-09-23")).toBe(true);
+  });
 });

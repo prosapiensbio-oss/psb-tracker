@@ -18,6 +18,21 @@
  *   • zrušené a posunuté — hlásiť VŽDY, minulé aj budúce,
  *   • pridané a premenované — len keď sa to týka minulosti (nová rezervácia
  *     do budúcna je plán, nie otázka; premenovanie budúcej udalosti je šum).
+ *
+ * POSUN NA TEN ISTÝ ČAS NIE JE POSUN
+ *
+ * Jerry, 23. 9. 2026: „som v kalendári a sú tu štyri Lenky, prečo?" Všetky
+ * štyri hlásili „presun z Št 1. 10. 15:00 na Št 1. 10. 15:00" — z toho istého
+ * času na ten istý čas.
+ *
+ * Vzniká to takto: keď sa upraví opakovaná udalosť, Google jej budúce výskyty
+ * NEPOSUNIE, ale zruší a vytvorí nanovo s iným uid. Appka párovanie zrušenej
+ * a pridanej udalosti toho istého človeka v ten istý deň správne považuje za
+ * posun — len sa nikdy nepýtala, či sa čas naozaj zmenil. Lenke sa 22. 9.
+ * o 15:01 takto prerobili štyri termíny naraz a appka chcela ku každému dôvod,
+ * hoci sa v jej kalendári nestalo nič.
+ *
+ * Udalosť s novým uid a rovnakým časom je tá istá hodina. Nehlási sa.
  */
 export function ohlasitZmenu(
   druh: string,
@@ -28,6 +43,7 @@ export function ohlasitZmenu(
   /** Dnešný deň `YYYY-MM-DD`. */
   dnesDen: string,
 ): boolean {
+  if (druh === "posunute" && pred && po && pred === po) return false;
   if (druh === "zrusene" || druh === "posunute") return true;
   const kedy = (pred || po || "").slice(0, 10);
   return !!kedy && kedy <= dnesDen;
