@@ -331,7 +331,23 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                       ))}
                     </div>
                     <input value={t} onChange={(e) => nastavText(kluc, e.target.value)} placeholder="alebo vlastnými slovami…" style={vstup(false)} />
-                    <button onClick={() => void vybav(kluc, "/api/kalendar", { akcia: "vysvetli", id: z.id, poznamka: t.trim() })} disabled={pracujem === kluc || t.trim().length < 2} style={hlavne(t.trim().length >= 2)}>
+                    {/* „Vybavené" sa dá stlačiť VŽDY, aj bez dôvodu.
+                        Jerry, 23. 9. 2026: „nabehnem myšou na Vybavené a
+                        ukáže sa prečiarknutý kruh." Ukazoval sa preto, že
+                        som tu vymyslel prísnejšie pravidlo než má samotná
+                        appka — v Kalendári to isté tlačidlo funguje aj
+                        s prázdnou poznámkou. Dve obrazovky, jedna akcia,
+                        dve rôzne pravidlá: to bola tá chyba.
+                        Dôvod je na tom cenný, nie povinný — a štítky vyššie
+                        ho spravia jedným klikom. */}
+                    <button
+                      onClick={() => void vybav(kluc, "/api/kalendar", { akcia: "vysvetli", id: z.id, poznamka: t.trim() })}
+                      disabled={pracujem === kluc}
+                      title={t.trim() ? "Uzavrieť s týmto dôvodom" : "Uzavrieť bez dôvodu — dôvod sa hodí, ale povinný nie je"}
+                      // Zelené až s dôvodom: kliknúť sa dá vždy, ale je vidieť,
+                      // ktorá z dvoch ciest je tá lepšia.
+                      style={t.trim() ? hlavne(true) : { ...hlavne(true), border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted }}
+                    >
                       {pracujem === kluc ? "…" : "Vybavené"}
                     </button>
                     {/* „Súkromné" VEDĽA „Vybavené" (Jerry, 23. 9. 2026).
@@ -363,7 +379,12 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                       <div style={{ fontSize: 11, color: C.textDim }}>{n.trener} · {n.pocet}× · {den(n.najblizsi)}</div>
                     </div>
                     <input list="ws-klienti" value={t} onChange={(e) => nastavText(kluc, e.target.value)} placeholder="kto to je…" style={vstup(!!t && !mena.includes(t))} />
-                    <button onClick={() => void vybav(kluc, "/api/kalendar", { akcia: "mapuj", nazov: n.nazov, trener: n.trener, typ: "trening", klient: t.trim() })} disabled={pracujem === kluc || t.trim().length < 3} style={hlavne(t.trim().length >= 3)}>
+                    <button
+                      onClick={() => void vybav(kluc, "/api/kalendar", { akcia: "mapuj", nazov: n.nazov, trener: n.trener, typ: "trening", klient: t.trim() })}
+                      disabled={pracujem === kluc || t.trim().length < 3}
+                      title={t.trim().length >= 3 ? `Priradiť ${n.nazov} klientovi ${t.trim()}` : "Najprv napíš, kto to je — bez mena nie je čo priradiť"}
+                      style={hlavne(t.trim().length >= 3)}
+                    >
                       {pracujem === kluc ? "…" : "Je to on"}
                     </button>
                     {/* „Súkromné" chýbalo (Jerry, 23. 9. 2026) — v Kalendári
