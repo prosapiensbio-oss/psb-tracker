@@ -47,7 +47,7 @@ type Platba = {
 
 const dnesISO = () => new Date().toISOString().slice(0, 10);
 
-export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc }: {
+export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onOverride }: {
   clients: Record<string, ClientAgg>;
   mena: string[];
   data: PSBData;
@@ -56,6 +56,18 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc }: {
   btcSats?: Record<string, number>;
   /** Jednotlivé bitcoinové platby a aktuálny kurz — na záložku ₿. */
   btc?: { platby: { klient: string | null; datum: string; sats?: number; czk: number | null }[]; kurz: number | null; kedy: string | null };
+  /**
+   * Zápis ručnej opravy klienta CESTOU APPKY, nie vlastným fetchom.
+   *
+   * Jerry, 23. 9. 2026: „skúsil som cez workspace dať Romana Jakubička ako
+   * neaktívneho, ale v Klienti ostal stále na pauze." Zápis do databázy
+   * prebehol správne — lenže tento stôl si ho posielal sám a zvyšok appky
+   * o ňom nevedel, takže ostatné obrazovky ukazovali starú hodnotu až do
+   * obnovenia stránky. Appka na to má jedno miesto (`actions.setOverride`):
+   * hodnotu hneď premietne všade, pri neúspechu ju vráti späť a povie to
+   * nahlas. Vlastný fetch z toho vynechal všetky tri veci.
+   */
+  onOverride?: (meno: string, kluc: string, hodnota: unknown) => Promise<boolean>;
 }) {
   const [hladam, setHladam] = useState("");
   const [novy, setNovy] = useState(false);
@@ -319,33 +331,37 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc }: {
     return [...zo].sort((a, b) => a.localeCompare(b, "sk"));
   }, [clients, data.sessions, dni]);
 
-  const nastavTrenera = async (novy: string) => {
-    setPracujem(true); setChyba("");
+  const nastavTrenera = (novy: string) => zapisOverride("primaryTrainer", novy);
+
+  /**
+   * Jedna cesta pre všetky ručné opravy klienta.
+   *
+   * Keď ju appka podá zhora (`onOverride`), zmena sa premietne do všetkých
+   * obrazoviek naraz. Vlastný fetch je len záchranná brzda pre prípad, že by
+   * sa stôl niekedy použil mimo appky — a vtedy sa aj otvorene povie, že
+   * ostatné obrazovky treba obnoviť.
+   */
+  const zapisPre = useCallback(async (kohoMeno: string, kluc: string, hodnota: unknown): Promise<boolean> => {
+    if (onOverride) return onOverride(kohoMeno, kluc, hodnota);
     const r = await fetch("/api/override", {
       method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name: meno, key: "primaryTrainer", value: novy }),
-    }).then((x) => x.json()).catch(() => ({ ok: false, error: "spojenie" }));
+      body: JSON.stringify({ name: kohoMeno, key: kluc, value: hodnota }),
+    }).then((x) => x.json()).catch(() => ({ ok: false }));
+    return !!r.ok;
+  }, [onOverride]);
+
+  const zapisOverride = async (kluc: string, hodnota: unknown) => {
+    setPracujem(true); setChyba("");
+    const ok = await zapisPre(meno, kluc, hodnota);
     setPracujem(false);
-    if (!r.ok) { setChyba(r.error || "nepodarilo sa uložiť"); return; }
-    setChyba("Uložené. Obnov stránku, aby sa tréner prepočítal všade.");
+    if (!ok) setChyba("Nepodarilo sa uložiť — hodnota je späť.");
+    else if (!onOverride) setChyba("Uložené. Obnov stránku, aby sa to prepočítalo všade.");
   };
 
   const naZoznam = () => { setMeno(""); setFilter("zdravie"); setPisem(false); setPisemPlatbu(false); };
 
   /** Zmena kategórie klienta — ručný stav prebije automatický. */
-  const nastavStav = async (novy: string) => {
-    setPracujem(true); setChyba("");
-    const r = await fetch("/api/override", {
-      method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name: meno, key: "status", value: novy }),
-    }).then((x) => x.json()).catch(() => ({ ok: false, error: "spojenie" }));
-    setPracujem(false);
-    if (!r.ok) { setChyba(r.error || "nepodarilo sa uložiť"); return; }
-    // Stav žije v `data`, ktoré sem prichádzajú zhora — kým sa nenačítajú
-    // znova, obrazovka by tvrdila staré. Radšej povedať, že treba obnoviť,
-    // než ukázať číslo, ktoré už neplatí.
-    setChyba("Uložené. Obnov stránku, aby sa stav prepočítal všade.");
-  };
+  const nastavStav = (novy: string) => zapisOverride("status", novy);
 
   const pridaj = async () => {
     setPracujem(true); setChyba("");
@@ -476,7 +492,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc }: {
           <span style={{ fontSize: 11.5, color: C.textDim }}>{vidno.length}</span>
         </div>
 
-        {novy && <NovyKlient onHotovo={(m: string | null) => { setNovy(false); if (m) setMeno(m); }} />}
+        {novy && <NovyKlient zapis={zapisPre} onHotovo={(m: string | null) => { setNovy(false); if (m) setMeno(m); }} />}
 
         <div
           ref={zoznamEl}
@@ -915,14 +931,13 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc }: {
                   cez debatu s Jarvisom. Toto je to isté rovno v profile,
                   takže to nezávisí od toho, či sa Jarvisa niekto opýta. */}
               <ZapisOKlientovi
-                meno={meno}
+                zapis={zapisOverride}
                 pociatocne={{
                   trainerNote: c?.trainerNote || "",
                   specialRate: !!c?.specialRate,
                   specialRateNote: c?.specialRateNote || "",
                   narodeniny: c?.narodeniny || "",
                 }}
-                onUlozene={(sprava) => setChyba(sprava)}
               />
               {c?.trainerNote && <Blok nadpis="Poznámka trénera">{c.trainerNote}</Blok>}
               {c?.precoNeprisiel && <Blok nadpis="Prečo po úvodnom neprišiel">{c.precoNeprisiel}</Blok>}
@@ -1282,7 +1297,11 @@ const Blok = ({ nadpis, children }: { nadpis: string; children: React.ReactNode 
  * inak než v PTminderi, vzniknú dvaja ľudia a všetko sa rozdelí na polovicu.
  * Karta to hovorí nahlas — nie je to detail, ktorý si niekto domyslí.
  */
-function NovyKlient({ onHotovo }: { onHotovo: (meno: string | null) => void }) {
+function NovyKlient({ zapis, onHotovo }: {
+  /** Tá istá cesta ako ostatné zápisy — bez nej by appka nového klienta nevidela. */
+  zapis: (meno: string, kluc: string, hodnota: unknown) => Promise<boolean>;
+  onHotovo: (meno: string | null) => void;
+}) {
   const [f, setF] = useState({ meno: "", narodeniny: "", zdroj: "", zdrojKto: "", poznamka: "" });
   const [pracujem, setPracujem] = useState(false);
   const [chyba, setChyba] = useState("");
@@ -1301,11 +1320,7 @@ function NovyKlient({ onHotovo }: { onHotovo: (meno: string | null) => void }) {
     ];
     for (const [key, value] of polia) {
       if (!value) continue;
-      const r = await fetch("/api/override", {
-        method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ name: meno, key, value }),
-      }).then((x) => x.json()).catch(() => ({ ok: false, error: "spojenie" }));
-      if (!r.ok) { setPracujem(false); setChyba(r.error || "nepodarilo sa založiť"); return; }
+      if (!(await zapis(meno, key, value))) { setPracujem(false); setChyba("nepodarilo sa založiť"); return; }
     }
     setPracujem(false);
     onHotovo(meno);
@@ -1373,22 +1388,16 @@ const stlpecDen = { color: C.textDim, minWidth: 74, fontVariantNumeric: "tabular
  * Stará poznámka sa pri prepise odkladá do denníka (rieši /api/override),
  * takže história klienta sa prepisom nestratí.
  */
-function ZapisOKlientovi({ meno, pociatocne, onUlozene }: {
-  meno: string;
+function ZapisOKlientovi({ pociatocne, zapis }: {
   pociatocne: { trainerNote: string; specialRate: boolean; specialRateNote: string; narodeniny: string };
-  onUlozene: (sprava: string) => void;
+  /** Tá istá cesta ako pri stave a trénerovi — inak by ostatné obrazovky ukazovali staré. */
+  zapis: (kluc: string, hodnota: unknown) => Promise<void>;
 }) {
   const [v, setV] = useState(pociatocne);
   const [pisem, setPisem] = useState(false);
-  useEffect(() => { setV(pociatocne); /* eslint-disable-line react-hooks/exhaustive-deps */ }, [meno]);
+  useEffect(() => { setV(pociatocne); /* eslint-disable-line react-hooks/exhaustive-deps */ }, [pociatocne.trainerNote, pociatocne.narodeniny]);
 
-  const uloz = async (key: string, value: unknown) => {
-    const r = await fetch("/api/override", {
-      method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ name: meno, key, value }),
-    }).then((x) => x.json()).catch(() => ({ ok: false, error: "spojenie" }));
-    onUlozene(r?.ok ? "Uložené. Obnov stránku, aby sa to prepísalo všade." : (r?.error || "nepodarilo sa uložiť"));
-  };
+  const uloz = zapis;
 
   if (!pisem) {
     return (

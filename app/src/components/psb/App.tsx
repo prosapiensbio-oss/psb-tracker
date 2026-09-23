@@ -2538,7 +2538,7 @@ function skupinaFaktur(
         {active === "vzas" && <Vzas sub={vzasSub} onSub={setVzasSub} data={data} clients={clients} focus={vzasFocus} onNavigate={navigate} pohybSplits={pohybSplits} nastavPohybSplit={nastavPohybSplit} />}
         {active === "kalendar" && <Kalendar clients={clients} data={data} focus={kalendarFocus} ktoSom={ktoSom} trainer={trainer} onTrainer={setTrainer} />}
         {active === "prechod" && <Prechod mena={Object.keys(clients)} />}
-        {active === "workspace" && <Workspace clients={clients} mena={Object.keys(clients)} ktoSom={ktoSom} data={data} kalUdalosti={kalUdalosti} btcSats={btcSatsKlienti} btc={{ platby: btcPlatby, kurz: btcKurz.kurz, kedy: btcKurz.kedy }} />}
+        {active === "workspace" && <Workspace clients={clients} mena={Object.keys(clients)} ktoSom={ktoSom} data={data} kalUdalosti={kalUdalosti} btcSats={btcSatsKlienti} btc={{ platby: btcPlatby, kurz: btcKurz.kurz, kedy: btcKurz.kedy }} onOverride={(m, k, v) => actions.setOverride(m, k as never, v)} />}
 
         {active === "jarvis" && (
           <JarvisOkno

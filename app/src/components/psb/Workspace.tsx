@@ -29,7 +29,7 @@ import { Card } from "./ui";
 const kc = (n: number) => `${Math.round(n).toLocaleString("sk-SK")} Kč`;
 const den = (s: string) => (s ? `${Number(s.slice(8))}. ${Number(s.slice(5, 7))}.` : "");
 
-export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, btc }: {
+export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, btc, onOverride }: {
   clients: Record<string, ClientAgg>;
   mena: string[];
   ktoSom: string | null;
@@ -38,6 +38,8 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   btcSats?: Record<string, number>;
   /** Bitcoinová kniha a kurz — profil klienta z nej sádže záložku ₿. */
   btc?: { platby: { klient: string | null; datum: string; sats?: number; czk: number | null }[]; kurz: number | null; kedy: string | null };
+  /** Ručné opravy klienta idú cestou appky, nie vlastným fetchom — viď KlientStol. */
+  onOverride?: (meno: string, kluc: string, hodnota: unknown) => Promise<boolean>;
 }) {
   const [zdroje, setZdroje] = useState<{ zmeny: Zmena[]; nezname: { nazov: string; trener: string; pocet: number; najblizsi: string }[]; platby: { fioId: string; datum: string; suma: number; text: string; kandidati: string[] }[] } | null>(null);
   const [hotove, setHotove] = useState<Set<string>>(new Set());
@@ -311,7 +313,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                 );
               })}
 
-              {k.druh === "klient" && <KlientStol clients={clients} mena={mena} data={data} kalUdalosti={kalUdalosti} btcSats={btcSats} btc={btc} />}
+              {k.druh === "klient" && <KlientStol clients={clients} mena={mena} data={data} kalUdalosti={kalUdalosti} btcSats={btcSats} btc={btc} onOverride={onOverride} />}
 
               {k.druh === "platby" && k.polozky.map((p) => {
                 const kluc = klucPolozky("platby", p);
