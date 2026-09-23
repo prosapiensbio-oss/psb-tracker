@@ -1208,6 +1208,10 @@ const ICON_PATHS: Record<string, ReactNode> = {
   bitcoin: (<><path d="M7 5.5h6.6a3.2 3.2 0 0 1 0 6.4H7z" /><path d="M7 11.9h7.4a3.3 3.3 0 0 1 0 6.6H7z" /><path d="M9.6 5.5V3M13.4 5.5V3M9.6 21v-2.5M13.4 21v-2.5M7 5.5v13" /></>),
   // Jarvis. Bublina rozhovoru s iskrou — samotná bublina by splynula
   // s kalendárom a peňaženkou, samotná iskra by nepovedala, že sa tam píše.
+  // Kopa kariet — Workspace. Vlastná ikona preto, že odkedy sedí hneď vedľa
+  // Prechodu (23. 9. 2026), dve záložky v jednom rade s tými istými šípkami
+  // sa hľadajú očami; rad sa číta podľa tvarov, nie podľa nápisov.
+  kopa: (<><rect x="3" y="7" width="13" height="14" rx="2.2" /><path d="M7 4h11a2.2 2.2 0 0 1 2.2 2.2v11" /></>),
   sparkles: (
     <>
       <path d="M20.5 11.4a8.4 8.4 0 0 1-8.5 8.2 9.3 9.3 0 0 1-3.2-.55L3.5 21l1.5-4.2a7.9 7.9 0 0 1-1.5-4.6 8.4 8.4 0 0 1 8.5-8.2 8.4 8.4 0 0 1 8.5 8.2z" />

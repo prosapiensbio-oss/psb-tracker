@@ -187,6 +187,13 @@ const TABS = [
   // tlačidlo a prepína sa medzi nimi o riadok nižšie.
   { id: "tracker", label: "Klienti", icon: "userCheck", skupina: "firma" },
   { id: "vzas", label: "Peniaze", icon: "wallet", skupina: "firma" },
+  // Workspace — administratíva ako kopa kariet: to, čo sa v appke VYPĹŇA.
+  // Sedí hneď za Firmou (Jerry, 23. 9. 2026), lebo tam patrí významom:
+  // Firma sú tri pohľady na to, ako sa firme darí, a vo všetkých troch sa
+  // len pozerá. Workspace je jediné miesto, kde sa niečo dopisuje — a chodí
+  // sa doň denne, takže na konci radu, za Kalendárom a Prechodom, bol ďaleko
+  // od ruky aj od zmyslu.
+  { id: "workspace", label: "Workspace", icon: "kopa" },
   { id: "marketing", label: "Marketing", icon: "activity" },
   { id: "kalendar", label: "Kalendár", icon: "calendar" },
   // Dočasná záložka na odchod od PTmindera (22. 9. 2026). Tri meradlá
@@ -194,10 +201,6 @@ const TABS = [
   // kliknem na kalendár, už to nie je len kalendár, ale aj platby atď."
   // Jedna otázka na záložku; a keď sa PTminder vypne, táto sa celá zmaže.
   { id: "prechod", label: "Prechod", icon: "prechod" },
-  // Workspace — administratíva ako kopa kariet. Zatiaľ LEN V BETE
-  // (`kokpit-beta`): je to skúška rozloženia, nie hotová obrazovka, a ostrý
-  // Kokpit sa ňou nemá zaťažiť, kým Jerry nepovie, že to takto chce.
-  { id: "workspace", label: "Workspace", icon: "prechod" },
   // Výsledky = mesačné a kvartálne pohľady, KPI, ciele, správa mesiaca.
   // Nahrávanie dát a uzávierka odišli do záložky Upload — robili sa
   // striedavo, ale sú to dva rôzne úkony a nahrať CSV treba aj mimo
