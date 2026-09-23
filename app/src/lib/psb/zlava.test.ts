@@ -1,8 +1,8 @@
 import { describe, expect, it } from "bun:test";
 
-import { poZlave } from "../../components/psb/KlientStol";
+import { cenaPoZlave, poZlave } from "../../components/psb/KlientStol";
 
-describe("zľava na platbe", () => {
+describe("zľava na balíčku", () => {
   it("bez zľavy sa suma nemení", () => {
     expect(poZlave({ suma: "7790", zlava: "" }).suma).toBe("7790");
   });
@@ -28,5 +28,17 @@ describe("zľava na platbe", () => {
     const znova = poZlave({ suma: "1000", zlava: "15" });
     expect(raz.suma).toBe(znova.suma);
     expect(raz.suma).toBe("850");
+  });
+
+  it("na balíčku zľavňuje cenu, nie sumu platby", () => {
+    // Zľava je vlastnosť PREDAJA, nie úhrady (Jerry, 23. 9. 2026). Keby sedela
+    // pri platbe, musela by sa zadávať znova pri každej splátke.
+    const v = cenaPoZlave({ cenaCzk: "7790", zlava: "15" });
+    expect(v.cenaCzk).toBe("6622");
+    expect(v.poznamka).toContain("15 % zľava z");
+  });
+
+  it("balíček bez zľavy si cenu nechá", () => {
+    expect(cenaPoZlave({ cenaCzk: "7790" }).cenaCzk).toBe("7790");
   });
 });

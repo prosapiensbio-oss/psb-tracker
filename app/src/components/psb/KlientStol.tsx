@@ -64,7 +64,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc }: {
   const [filter, setFilter] = useState<"zdravie" | "vsetko" | "peniaze" | "balicky" | "poznamky">("zdravie");
   const [detaily, setDetaily] = useState(false);
   const [pisemPlatbu, setPisemPlatbu] = useState(false);
-  const [pl, setPl] = useState({ datum: dnesISO(), suma: "", sposob: "hotovost", poznamka: "", zlava: "" });
+  const [pl, setPl] = useState({ datum: dnesISO(), suma: "", sposob: "hotovost", poznamka: "" });
   const [balicky, setBalicky] = useState<Balicek[]>([]);
   const [vlastnePlatby, setVlastnePlatby] = useState<Platba[]>([]);
   /** Čo sa práve upravuje — id riadku, alebo prázdno. */
@@ -72,7 +72,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc }: {
   const [upravaBalicka, setUpravaBalicka] = useState("");
   const [penazSub, setPenazSub] = useState<"platby" | "bitcoin">("platby");
   const [pisem, setPisem] = useState(false);
-  const [f, setF] = useState({ nazov: "", hodiny: "", platnostOd: dnesISO(), platnostDo: "", cenaCzk: "", poznamka: "" });
+  const [f, setF] = useState({ nazov: "", hodiny: "", platnostOd: dnesISO(), platnostDo: "", cenaCzk: "", poznamka: "", zlava: "" });
   const [pracujem, setPracujem] = useState(false);
   const [chyba, setChyba] = useState("");
 
@@ -293,11 +293,11 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc }: {
     setPracujem(true); setChyba("");
     const r = await fetch("/api/platby", {
       method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ akcia: "hotovost", klient: meno, ...pl, ...poZlave(pl) }),
+      body: JSON.stringify({ akcia: "hotovost", klient: meno, ...pl }),
     }).then((x) => x.json()).catch(() => ({ ok: false, error: "spojenie" }));
     setPracujem(false);
     if (!r.ok) { setChyba(r.error || "nepodarilo sa uložiť"); return; }
-    setPl({ datum: dnesISO(), suma: "", sposob: "hotovost", poznamka: "", zlava: "" });
+    setPl({ datum: dnesISO(), suma: "", sposob: "hotovost", poznamka: "" });
     setPisemPlatbu(false);
   };
 
@@ -351,11 +351,11 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc }: {
     setPracujem(true); setChyba("");
     const r = await fetch("/api/balicky", {
       method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ akcia: "pridaj", klient: meno, ...f }),
+      body: JSON.stringify({ akcia: "pridaj", klient: meno, ...f, ...cenaPoZlave(f) }),
     }).then((x) => x.json()).catch(() => ({ ok: false, error: "spojenie" }));
     setPracujem(false);
     if (!r.ok) { setChyba(r.error || "nepodarilo sa uložiť"); return; }
-    setF({ nazov: "", hodiny: "", platnostOd: dnesISO(), platnostDo: "", cenaCzk: "", poznamka: "" });
+    setF({ nazov: "", hodiny: "", platnostOd: dnesISO(), platnostDo: "", cenaCzk: "", poznamka: "", zlava: "" });
     setPisem(false);
     await nacitajBalicky();
   };
@@ -373,11 +373,11 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc }: {
     setPracujem(true); setChyba("");
     const r = await fetch("/api/platby", {
       method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ akcia: "uprav", id, ...pl, ...poZlave(pl) }),
+      body: JSON.stringify({ akcia: "uprav", id, ...pl }),
     }).then((x) => x.json()).catch(() => ({ ok: false, error: "spojenie" }));
     setPracujem(false);
     if (!r.ok) { setChyba(r.error || "nepodarilo sa uložiť"); return; }
-    setUpravaPlatby(""); setPl({ datum: dnesISO(), suma: "", sposob: "hotovost", poznamka: "", zlava: "" });
+    setUpravaPlatby(""); setPl({ datum: dnesISO(), suma: "", sposob: "hotovost", poznamka: "" });
     await nacitajPlatby();
   };
 
@@ -397,11 +397,11 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc }: {
     setPracujem(true); setChyba("");
     const r = await fetch("/api/balicky", {
       method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ akcia: "uprav", id, klient: meno, ...f }),
+      body: JSON.stringify({ akcia: "uprav", id, klient: meno, ...f, ...cenaPoZlave(f) }),
     }).then((x) => x.json()).catch(() => ({ ok: false, error: "spojenie" }));
     setPracujem(false);
     if (!r.ok) { setChyba(r.error || "nepodarilo sa uložiť"); return; }
-    setUpravaBalicka(""); setF({ nazov: "", hodiny: "", platnostOd: dnesISO(), platnostDo: "", cenaCzk: "", poznamka: "" });
+    setUpravaBalicka(""); setF({ nazov: "", hodiny: "", platnostOd: dnesISO(), platnostDo: "", cenaCzk: "", poznamka: "", zlava: "" });
     await nacitajBalicky();
   };
 
@@ -793,7 +793,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc }: {
                         setF({
                           nazov: b.nazov, hodiny: b.hodiny == null ? "" : String(b.hodiny),
                           platnostOd: b.platnost_od, platnostDo: b.platnost_do || "",
-                          cenaCzk: b.cena_czk == null ? "" : String(b.cena_czk), poznamka: b.poznamka || "",
+                          cenaCzk: b.cena_czk == null ? "" : String(b.cena_czk), poznamka: b.poznamka || "", zlava: "",
                         });
                       }}
                       naZrusenie={() => void zrusBalicek(b.id)}
@@ -829,7 +829,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc }: {
                       <Upravit
                         naUpravu={() => {
                           setUpravaPlatby(x.id); setPisemPlatbu(false);
-                          setPl({ datum: x.datum.slice(0, 10), suma: String(x.suma_czk), sposob: x.sposob, poznamka: x.poznamka || "", zlava: "" });
+                          setPl({ datum: x.datum.slice(0, 10), suma: String(x.suma_czk), sposob: x.sposob, poznamka: x.poznamka || "" });
                         }}
                         naZrusenie={() => void zrusPlatbu(x.id)}
                         pracujem={pracujem}
@@ -989,7 +989,7 @@ function RiadokOsi({ u }: { u: ReturnType<typeof osCasuKlienta>[number] }) {
 }
 
 function FormularBalicka({ f, setF, pracujem, onUloz, popis = "Nahodiť" }: {
-  f: Record<string, string>;
+  f: Record<string, string> & { cenaCzk: string; zlava?: string };
   setF: (v: never) => void;
   pracujem: boolean;
   onUloz: () => void;
@@ -1072,6 +1072,33 @@ function FormularBalicka({ f, setF, pracujem, onUloz, popis = "Nahodiť" }: {
         </label>
       ))}
 
+      {/* Zľavy v PSB sú bežné (Jarek, barter, doživotné percentá ako Dominikino
+          DC15) a doteraz sa počítali v hlave. Klik prepočíta cenu a zapíše,
+          z čoho — bez toho by o mesiac nikto nevedel, prečo je tam 6 622
+          a nie 7 790. */}
+      <label style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 10.5, color: C.textDim }}>
+        zľava
+        <div style={{ display: "flex", gap: 3 }}>
+          {ZLAVY.map((z) => {
+            const vybrate = Number(f.zlava) === z;
+            return (
+              <button key={z} onClick={() => setF({ ...f, zlava: vybrate ? "" : String(z) } as never)} style={{
+                padding: "6px 7px", borderRadius: 7, fontSize: 11.5, cursor: "pointer",
+                border: `1px solid ${vybrate ? C.accent : C.border}`,
+                background: vybrate ? C.accentBg : "transparent",
+                color: vybrate ? C.accentLight : C.textMuted,
+              }}>{z} %</button>
+            );
+          })}
+        </div>
+      </label>
+
+      {!!Number(f.zlava) && !!Number(f.cenaCzk) && (
+        <div style={{ fontSize: 11.5, color: C.textMuted, alignSelf: "flex-end", paddingBottom: 7 }}>
+          zaplatí <b style={{ color: C.green, fontSize: 14 }}>{fmtCZK(Number(cenaPoZlave(f).cenaCzk))}</b>
+        </div>
+      )}
+
       {/* Názov mimo cenníka je dovolený (výnimky sa dejú), ale je vidieť. */}
       {f.nazov && !CENNIK.some((x) => x.nazov === f.nazov) && (
         <input
@@ -1106,8 +1133,8 @@ function FormularBalicka({ f, setF, pracujem, onUloz, popis = "Nahodiť" }: {
 /**
  * Suma, ktorá sa naozaj zapíše.
  *
- * Do políčka „suma" sa píše CENNÍKOVÁ cena, zľava je percento vedľa. Keby
- * tlačidlo zľavy prepísalo priamo sumu, druhý klik by zľavnil už zľavnené
+ * Do políčka s cenou sa píše CENNÍKOVÁ cena, zľava je percento vedľa. Keby
+ * tlačidlo zľavy prepísalo priamo cenu, druhý klik by zľavnil už zľavnené
  * a z 15 % by bolo 27,75 % — a nikto by nevedel, z čoho to číslo vzniklo.
  * Takto je základ stále vidieť a poznámka si zapamätá, z čoho sa zľavovalo.
  */
@@ -1120,10 +1147,23 @@ export function poZlave(p: { suma: string; zlava?: string; poznamka?: string }):
   return { suma: String(konecna), poznamka: p.poznamka ? `${p.poznamka} · ${stopa}` : stopa };
 }
 
+/**
+ * To isté pre balíček — zľava patrí k CENE, nie k platbe (Jerry, 23. 9. 2026).
+ *
+ * Dáva to zmysel aj v číslach: zľava je vlastnosť predaja, nie úhrady. Keď ju
+ * má balíček, sedí aj vtedy, keď ho klient zaplatí na dvakrát alebo z inej
+ * kapsy — a presne to sa v PSB deje. Pri platbe by sa musela zadávať znova
+ * pri každej splátke a súčet by sedel len náhodou.
+ */
+export function cenaPoZlave(f: { cenaCzk: string; zlava?: string; poznamka?: string }): { cenaCzk: string; poznamka: string } {
+  const v = poZlave({ suma: f.cenaCzk, zlava: f.zlava, poznamka: f.poznamka });
+  return { cenaCzk: v.suma, poznamka: v.poznamka };
+}
+
 const ZLAVY = [5, 10, 15, 20, 30];
 
 function FormularPlatby({ p, setP, pracujem, onUloz, popis = "Uložiť platbu" }: {
-  p: { datum: string; suma: string; sposob: string; poznamka: string; zlava?: string };
+  p: { datum: string; suma: string; sposob: string; poznamka: string };
   setP: (v: never) => void;
   pracujem: boolean;
   onUloz: () => void;
@@ -1138,7 +1178,7 @@ function FormularPlatby({ p, setP, pracujem, onUloz, popis = "Uložiť platbu" }
           style={{ width: 145, padding: "6px 8px", borderRadius: 7, fontSize: 12, border: `1px solid ${C.border}`, background: C.bg, color: C.text, colorScheme: "dark" }} />
       </label>
       <label style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 10.5, color: C.textDim }}>
-        suma Kč {!!Number(p.zlava) && <span style={{ color: C.textDim }}>pred zľavou</span>}
+        suma Kč
         <input value={p.suma} onChange={(e) => setP({ ...p, suma: e.target.value } as never)}
           style={{ width: 100, padding: "6px 8px", borderRadius: 7, fontSize: 12, border: `1px solid ${C.border}`, background: C.bg, color: C.text }} />
       </label>
@@ -1152,34 +1192,11 @@ function FormularPlatby({ p, setP, pracujem, onUloz, popis = "Uložiť platbu" }
           <option value="ine">iné (barter)</option>
         </select>
       </label>
-      {/* Zľavy v PSB sú bežné (Jarek, barter, doživotné percentá) a doteraz
-          sa počítali v hlave. Klik prepočíta sumu a zapíše, z čoho. */}
-      <label style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 10.5, color: C.textDim }}>
-        zľava
-        <div style={{ display: "flex", gap: 3 }}>
-          {ZLAVY.map((z) => {
-            const vybrate = Number(p.zlava) === z;
-            return (
-              <button key={z} onClick={() => setP({ ...p, zlava: vybrate ? "" : String(z) } as never)} style={{
-                padding: "6px 7px", borderRadius: 7, fontSize: 11.5, cursor: "pointer",
-                border: `1px solid ${vybrate ? C.accent : C.border}`,
-                background: vybrate ? C.accentBg : "transparent",
-                color: vybrate ? C.accentLight : C.textMuted,
-              }}>{z} %</button>
-            );
-          })}
-        </div>
-      </label>
       <label style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 10.5, color: C.textDim }}>
         poznámka
         <input value={p.poznamka} onChange={(e) => setP({ ...p, poznamka: e.target.value } as never)}
           style={{ width: 180, padding: "6px 8px", borderRadius: 7, fontSize: 12, border: `1px solid ${C.border}`, background: C.bg, color: C.text }} />
       </label>
-      {!!Number(p.zlava) && !!Number(p.suma) && (
-        <div style={{ fontSize: 11.5, color: C.textMuted, alignSelf: "flex-end", paddingBottom: 7 }}>
-          k úhrade <b style={{ color: C.green, fontSize: 14 }}>{fmtCZK(Number(poZlave(p).suma))}</b>
-        </div>
-      )}
       <button onClick={onUloz} disabled={pracujem || !platne} style={{
         padding: "7px 14px", borderRadius: 8, fontSize: 12, fontWeight: 700,
         cursor: platne ? "pointer" : "not-allowed",
