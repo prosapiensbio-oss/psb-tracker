@@ -105,9 +105,13 @@ export function Workspace({ clients, mena, ktoSom }: { clients: Record<string, C
   const dalsie = zive.slice(i + 1, i + 3);
 
   return (
-    <div>
-      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 18, flexWrap: "wrap" }}>
-        <div style={{ fontSize: 12.5, color: C.textMuted, fontWeight: 700, whiteSpace: "nowrap" }}>
+    // Celá šírka obrazovky, nie 1200 px ako zvyšok appky. Karta je pracovná
+    // plocha — čím širšia, tým viac riadkov sa vybaví bez rolovania, a vpravo
+    // zostane miesto na to, čo príde. Vylomenie z `maxWidth` rodiča je bežný
+    // trik: 100vw a posun o polovicu rozdielu doľava.
+    <div style={{ width: "100vw", marginLeft: "calc(50% - 50vw)", padding: "0 20px", boxSizing: "border-box" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 14, flexWrap: "wrap" }}>
+        <div style={{ fontSize: 11.5, color: C.textMuted, fontWeight: 700, whiteSpace: "nowrap" }}>
           Karta {Math.min(i + 1, zive.length)} z {zive.length}
         </div>
         <div style={{ flexGrow: 1, minWidth: 120, height: 4, background: C.border, borderRadius: 2, overflow: "hidden" }}>
@@ -123,12 +127,12 @@ export function Workspace({ clients, mena, ktoSom }: { clients: Record<string, C
         <div style={{ flex: "1 1 auto", minWidth: 0 }}>
           <Card style={{ marginBottom: 0 }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-              <div style={{ fontSize: 22, fontWeight: 800 }}>{k.nadpis}</div>
-              <div style={{ fontSize: 12.5, color: C.textMuted }}>{zostava(k)} zostáva</div>
+              <div style={{ fontSize: 18, fontWeight: 800 }}>{k.nadpis}</div>
+              <div style={{ fontSize: 11.5, color: C.textMuted }}>{zostava(k)} zostáva</div>
             </div>
-            <div style={{ fontSize: 12.5, color: C.textDim, marginTop: 4 }}>{k.podnadpis}</div>
+            <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 3 }}>{k.podnadpis}</div>
 
-            <div style={{ marginTop: 16, maxHeight: 430, overflowY: "auto" }}>
+            <div style={{ marginTop: 16, maxHeight: "min(56vh, 520px)", overflowY: "auto" }}>
               {k.druh === "zmeny" && k.polozky.map((z) => {
                 const kluc = klucPolozky("zmeny", z);
                 if (hotove.has(kluc)) return null;
@@ -136,8 +140,8 @@ export function Workspace({ clients, mena, ktoSom }: { clients: Record<string, C
                 return (
                   <div key={kluc} style={riadok}>
                     <div style={{ minWidth: 150, flex: "1 1 190px" }}>
-                      <div style={{ fontSize: 13.5, fontWeight: 700 }}>{z.klient || z.nazov || "(bez mena)"}</div>
-                      <div style={{ fontSize: 11.5, color: C.textDim }}>{popisZmeny(z)} · {z.trener}</div>
+                      <div style={{ fontSize: 12.5, fontWeight: 700 }}>{z.klient || z.nazov || "(bez mena)"}</div>
+                      <div style={{ fontSize: 11, color: C.textDim }}>{popisZmeny(z)} · {z.trener}</div>
                     </div>
                     <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
                       {["klient zrušil", "presunuli sme", "chyba v zápise"].map((d) => (
@@ -159,8 +163,8 @@ export function Workspace({ clients, mena, ktoSom }: { clients: Record<string, C
                 return (
                   <div key={kluc} style={riadok}>
                     <div style={{ minWidth: 130, flex: "1 1 160px" }}>
-                      <div style={{ fontSize: 13.5, fontWeight: 700 }}>{n.nazov}</div>
-                      <div style={{ fontSize: 11.5, color: C.textDim }}>{n.trener} · {n.pocet}× · {den(n.najblizsi)}</div>
+                      <div style={{ fontSize: 12.5, fontWeight: 700 }}>{n.nazov}</div>
+                      <div style={{ fontSize: 11, color: C.textDim }}>{n.trener} · {n.pocet}× · {den(n.najblizsi)}</div>
                     </div>
                     <input list="ws-klienti" value={t} onChange={(e) => nastavText(kluc, e.target.value)} placeholder="kto to je…" style={vstup(!!t && !mena.includes(t))} />
                     <button onClick={() => void vybav(kluc, "/api/kalendar", { akcia: "mapuj", nazov: n.nazov, trener: n.trener, typ: "trening", klient: t.trim() })} disabled={pracujem === kluc || t.trim().length < 3} style={hlavne(t.trim().length >= 3)}>
@@ -179,9 +183,9 @@ export function Workspace({ clients, mena, ktoSom }: { clients: Record<string, C
                 const t = text(kluc, p.navrh);
                 return (
                   <div key={kluc} style={riadok}>
-                    <div style={{ minWidth: 54, fontSize: 12, color: C.textDim }}>{den(p.datum)}</div>
-                    <div style={{ minWidth: 84, fontSize: 14, fontWeight: 700, textAlign: "right" }}>{kc(p.suma)}</div>
-                    <div style={{ flex: "1 1 200px", minWidth: 150, fontSize: 11.5, color: C.textMuted }}>{p.text.slice(0, 80)}</div>
+                    <div style={{ minWidth: 50, fontSize: 11.5, color: C.textDim }}>{den(p.datum)}</div>
+                    <div style={{ minWidth: 80, fontSize: 13, fontWeight: 700, textAlign: "right" }}>{kc(p.suma)}</div>
+                    <div style={{ flex: "1 1 200px", minWidth: 150, fontSize: 11, color: C.textMuted }}>{p.text.slice(0, 96)}</div>
                     <input list="ws-klienti" value={t} onChange={(e) => nastavText(kluc, e.target.value)} placeholder="komu patrí…" style={vstup(!!t && !mena.includes(t))} />
                     <button onClick={() => void vybav(kluc, "/api/platby", { akcia: "priradz", fioId: p.fioId, klient: t.trim(), zapamataj: true })} disabled={pracujem === kluc || t.trim().length < 3} style={hlavne(t.trim().length >= 3)}>
                       {pracujem === kluc ? "…" : "Priradiť"}
@@ -197,20 +201,47 @@ export function Workspace({ clients, mena, ktoSom }: { clients: Record<string, C
         </div>
 
         {/* Ďalšie karty presvitajú — za aktívnou je vidieť, že sa niekam ide. */}
+        {/* Ďalšie karty presvitajú vpravo — klikateľné, nie len ozdoba: keď
+            človek vidí, čo príde, chce tam často skočiť rovno. */}
         {dalsie.map((d, j) => (
-          <div key={d.druh} style={{ flex: "0 0 auto", width: j === 0 ? 220 : 160, opacity: j === 0 ? 0.5 : 0.26, pointerEvents: "none" }}>
+          <button
+            key={d.druh}
+            onClick={() => setI(i + 1 + j)}
+            style={{
+              flex: "0 0 auto", width: j === 0 ? 210 : 150, opacity: j === 0 ? 0.55 : 0.3,
+              background: "none", border: "none", padding: 0, textAlign: "left", cursor: "pointer",
+            }}
+          >
             <Card style={{ marginBottom: 0 }}>
-              <div style={{ fontSize: j === 0 ? 16 : 14, fontWeight: 700, lineHeight: 1.25 }}>{d.nadpis}</div>
-              <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 6 }}>{zostava(d)} zostáva</div>
+              <div style={{ fontSize: j === 0 ? 14.5 : 13, fontWeight: 700, lineHeight: 1.25 }}>{d.nadpis}</div>
+              <div style={{ fontSize: 11, color: C.textDim, marginTop: 5 }}>{zostava(d)} zostáva</div>
             </Card>
-          </div>
+          </button>
         ))}
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 18, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 16, flexWrap: "wrap" }}>
         <button onClick={() => setI((x) => Math.max(0, x - 1))} disabled={i === 0} aria-label="Späť" style={sipka(i > 0)}>←</button>
+        {/* Bodky hovoria, koľko kariet je dokopy a kde v nich stojíš — číslo
+            „Karta 2 z 3" to povie tiež, ale bodky to ukážu bez čítania.
+            Sú to tlačidlá, nie ozdoba: dá sa nimi preskočiť rovno na kartu. */}
+        <div style={{ display: "flex", gap: 7, alignItems: "center" }}>
+          {zive.map((x, j) => (
+            <button
+              key={x.druh}
+              onClick={() => setI(j)}
+              aria-label={`${x.nadpis} (${zostava(x)} zostáva)`}
+              title={`${x.nadpis} · ${zostava(x)} zostáva`}
+              style={{
+                width: j === i ? 11 : 8, height: j === i ? 11 : 8, borderRadius: "50%",
+                border: "none", padding: 0, cursor: "pointer",
+                background: j === i ? C.accent : j < i ? mix(C.green, 60) : mix(C.border, 160),
+              }}
+            />
+          ))}
+        </div>
         <button onClick={() => setI((x) => Math.min(zive.length - 1, x + 1))} disabled={i >= zive.length - 1} aria-label="Ďalej" style={sipka(i < zive.length - 1)}>→</button>
-        <div style={{ fontSize: 12, color: C.textDim }}>
+        <div style={{ fontSize: 11.5, color: C.textDim }}>
           {i < zive.length - 1 ? `Ďalej: ${zive[i + 1].nadpis}` : "Toto je posledná karta."}
         </div>
       </div>
@@ -220,23 +251,23 @@ export function Workspace({ clients, mena, ktoSom }: { clients: Record<string, C
 
 const riadok = {
   display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" as const,
-  padding: "9px 0", borderBottom: `1px solid ${mix(C.border, 55)}`,
+  padding: "7px 0", borderBottom: `1px solid ${mix(C.border, 55)}`,
 };
 
 const vstup = (varovanie: boolean) => ({
-  flex: "0 1 180px", minWidth: 150, padding: "7px 10px", borderRadius: 8, fontSize: 12.5,
+  flex: "0 1 190px", minWidth: 150, padding: "6px 9px", borderRadius: 8, fontSize: 12,
   border: `1px solid ${varovanie ? C.orange : C.border}`, background: C.bg, color: C.text,
 });
 
 const stitok = (on: boolean) => ({
-  padding: "5px 10px", borderRadius: 7, fontSize: 11.5, cursor: "pointer",
+  padding: "4px 9px", borderRadius: 7, fontSize: 11, cursor: "pointer",
   border: `1px solid ${on ? C.accent : C.border}`,
   background: on ? C.accentBg : "transparent",
   color: on ? C.accentLight : C.textMuted,
 });
 
 const hlavne = (aktivne: boolean) => ({
-  padding: "7px 14px", borderRadius: 8, fontSize: 12.5, fontWeight: 600,
+  padding: "6px 13px", borderRadius: 8, fontSize: 12, fontWeight: 600,
   cursor: aktivne ? "pointer" : "not-allowed",
   border: `1px solid ${aktivne ? mix(C.green, 50) : C.border}`,
   background: aktivne ? mix(C.green, 12) : "transparent",
@@ -244,7 +275,7 @@ const hlavne = (aktivne: boolean) => ({
 });
 
 const vedlajsie = {
-  padding: "7px 11px", borderRadius: 8, fontSize: 12, cursor: "pointer",
+  padding: "6px 10px", borderRadius: 8, fontSize: 11.5, cursor: "pointer",
   border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted,
 };
 
