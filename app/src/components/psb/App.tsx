@@ -49,7 +49,6 @@ import { btcPlatbyJednotlivo, btcPodlaKlientov } from "../../lib/psb/btcKontrola
 import { polozkaZastaranaBanka, polozkyBtcNesedi } from "../../lib/psb/penazneNotifikacie";
 import { breakEvenPriemer, spocitajRezervu } from "../../lib/psb/rezerva";
 import { BetaPruh } from "./BetaPruh";
-import { jeBeta } from "../../lib/psb/beta";
 import { Workspace } from "./Workspace";
 import { Prechod } from "./Prechod";
 import { buildAiContext } from "../../lib/psb/aiContext";
@@ -2433,7 +2432,11 @@ function skupinaFaktur(
           margin: "0 auto",
         }}
       >
-        {TABS.filter((t) => !MIMO_RAD.includes(t.id) && (t.id !== "workspace" || jeBeta())).map((t) => {
+        {/* Workspace už nie je len v bete (Jerry, 23. 9. 2026: „nasaď to aj
+            naostro"). Prešiel siedmimi kolami jeho pripomienok — karty dokola,
+            filter podľa prihláseného, pevná výška, pracovný stôl klienta —
+            a bez odomknutia by sa v ostrom Kokpite nedalo otvoriť vôbec. */}
+        {TABS.filter((t) => !MIMO_RAD.includes(t.id)).map((t) => {
           // Tri záložky Firmy zastupuje jedno tlačidlo na mieste tej prvej.
           if (FIRMA_IDS.includes(t.id)) {
             if (t.id !== FIRMA_IDS[0]) return null;
@@ -2532,7 +2535,7 @@ function skupinaFaktur(
         {active === "vzas" && <Vzas sub={vzasSub} onSub={setVzasSub} data={data} clients={clients} focus={vzasFocus} onNavigate={navigate} pohybSplits={pohybSplits} nastavPohybSplit={nastavPohybSplit} />}
         {active === "kalendar" && <Kalendar clients={clients} data={data} focus={kalendarFocus} ktoSom={ktoSom} trainer={trainer} onTrainer={setTrainer} />}
         {active === "prechod" && <Prechod mena={Object.keys(clients)} />}
-        {active === "workspace" && jeBeta() && <Workspace clients={clients} mena={Object.keys(clients)} ktoSom={ktoSom} data={data} kalUdalosti={kalUdalosti} btcSats={btcSatsKlienti} btc={{ platby: btcPlatby, kurz: btcKurz.kurz, kedy: btcKurz.kedy }} />}
+        {active === "workspace" && <Workspace clients={clients} mena={Object.keys(clients)} ktoSom={ktoSom} data={data} kalUdalosti={kalUdalosti} btcSats={btcSatsKlienti} btc={{ platby: btcPlatby, kurz: btcKurz.kurz, kedy: btcKurz.kedy }} />}
 
         {active === "jarvis" && (
           <JarvisOkno
