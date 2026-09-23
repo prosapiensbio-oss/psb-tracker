@@ -942,10 +942,21 @@ by sme mohli testovať rôzne návrhy?" Beží na
   neplatí — do bety sa treba prihlásiť zvlášť.
 
 Pri workspace platia tri pravidlá, bez ktorých je kopa kariet horšia než
-zoznam: vidno, koľko toho ešte je; odložená karta sa VRACIA (na koniec, nie
-preč — to je tá istá strata odpovede, ktorú rieši register); a postupy na
-dvadsať minút (uzávierka, nahrávanie exportov) medzi karty nepatria — karta
-z nich je len dvere inam a kopa by sa tvárila dlhšia než práca.
+zoznam: vidno, koľko toho ešte je; vybavený riadok zmizne, ale počet
+vybavených je vidieť; a postupy na dvadsať minút (uzávierka, nahrávanie
+exportov) medzi karty nepatria — karta z nich je len dvere inam a kopa by sa
+tvárila dlhšia než práca.
+
+**Karta je KATEGÓRIA, nie položka.** Prvá verzia dávala jednu kartu na jednu
+vec a z troch zmien v kalendári boli tri karty. Jerry po skúške v bete
+(23. 9. 2026): „na tých kartách som si predstavoval celé kategórie, nie že
+klienti jeden po druhom, ale zmeny kalendára v jednom." Focus nie je „teraz
+riešim Martina", ale „teraz robím zmeny v kalendári" — jeden druh práce
+naraz, lebo hlava sa neprepína.
+
+**Karta patrí prihlásenému.** Zmeny a názvy majú trénera v sebe; peniaze ho
+nemajú a sú Jerryho, rovnako ako mesačné kontroly a stav hotovosti (pravidlo
+z 31. 8. 2026). Terezka teda vidí dve karty, Jerry tri.
 
 ## Celý reťazec jedným príkazom: `./scripts/hotovo.sh`
 

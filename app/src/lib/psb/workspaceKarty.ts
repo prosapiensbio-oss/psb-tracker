@@ -1,84 +1,98 @@
 /**
- * Kopa kariet — administratíva po jednej veci.
+ * Workspace — administratíva po KATEGÓRIÁCH, nie po položkách.
  *
- * Jerry, 23. 9. 2026: „tie karty by mi dali focus, že by som sa sústredil len
- * na jednu vec." Toto je zoznam tých vecí: čo dnes naozaj čaká na ruku, ako
- * rad rozhodnutí, nie ako päť obrazoviek.
+ * Prvá verzia dávala jednu kartu na jednu vec: Martin Vaško, potom Peťa B,
+ * potom platba z banky. Jerry to vyskúšal 23. 9. 2026 a povedal presne, čo
+ * mu chýba: „na tých kartách som si predstavoval celé kategórie, nie že
+ * klienti jeden po druhom, ale zmeny kalendára v jednom."
  *
- * PORADIE NIE JE NÁHODNÉ
+ * Má pravdu a je to rozdiel v tom, čo znamená FOCUS. Nie „teraz riešim
+ * Martina", ale „teraz robím zmeny v kalendári" — jeden DRUH práce naraz,
+ * v ňom to ide rýchlo, lebo hlava sa neprepína. Pri jednej položke na kartu
+ * sa navyše z troch zmien stali tri karty a kopa vyzerala nekonečná.
  *
- * Najprv to, čo sa pýta na fakt z hlavy a rýchlo sa zodpovie (zmeny
- * v kalendári — človek si pamätá, prečo hodina zmizla, len pár dní). Potom
- * mená, bez ktorých nesedí dochádzka. Až nakoniec peniaze, ktorých je veľa
- * a idú mechanicky. Keby boli peniaze prvé, na zvyšok by nezostala trpezlivosť.
+ * KOMU KARTA PATRÍ
  *
- * ODLOŽENÁ KARTA SA VRACIA
- *
- * „Neviem" nesmie znamenať „zmizlo". Odložené idú na KONIEC kopy, nie preč —
- * appka inak ticho stratí prácu a to je chyba, ktorú tu už raz rieši register.
+ * Prihlásený Jerry vidí svoje, Terezka svoje. Zmeny v kalendári a názvy majú
+ * trénera priamo v sebe. Peniaze trénera nemajú a sú Jerryho — rovnako ako
+ * mesačné kontroly a stav hotovosti (pravidlo z 31. 8. 2026: „tieto kontroly
+ * mám na starosti ja, nech Terezku nerozptyľujú").
  */
 
+export type Zmena = { id: string; druh: string; klient: string | null; nazov: string | null; pred: string | null; po: string | null; kedy: string; trener: string };
+export type NeznamyNazov = { nazov: string; trener: string; pocet: number; najblizsi: string; navrh: string };
+export type NepriradenaPlatba = { fioId: string; datum: string; suma: number; text: string; navrh: string };
+
 export type Karta =
-  | { druh: "zmena"; id: string; nadpis: string; detail: string; kedy: string }
-  | { druh: "meno"; id: string; nazov: string; trener: string; pocet: number; najblizsi: string; navrh: string }
-  | { druh: "platba"; id: string; datum: string; suma: number; text: string; navrh: string };
+  | { druh: "zmeny"; nadpis: string; podnadpis: string; polozky: Zmena[] }
+  | { druh: "mena"; nadpis: string; podnadpis: string; polozky: NeznamyNazov[] }
+  | { druh: "platby"; nadpis: string; podnadpis: string; polozky: NepriradenaPlatba[] };
 
 export type ZdrojeKariet = {
-  zmeny: { id: string; druh: string; klient: string | null; nazov: string | null; pred: string | null; po: string | null; kedy: string; trener: string }[];
+  zmeny: Zmena[];
   nezname: { nazov: string; trener: string; pocet: number; najblizsi: string }[];
   platby: { fioId: string; datum: string; suma: number; text: string; kandidati: string[] }[];
-  /** Návrh klienta k názvu z kalendára — počíta ho `navrhniKlientaKandidati`. */
   navrhMena: (nazov: string) => string;
+  /** „jerry" | „terezka" | null (nevie sa / spoločné prihlásenie). */
+  ktoSom: string | null;
 };
+
+/** Meno trénera tak, ako stojí v dátach — z prihlásenia v malých písmenách. */
+const trenerZPrihlasenia = (ktoSom: string | null): "Jerry" | "Terezka" | null =>
+  ktoSom === "jerry" ? "Jerry" : ktoSom === "terezka" ? "Terezka" : null;
 
 const denSK = (iso: string) => {
   const d = (iso || "").slice(0, 10);
   return d ? `${Number(d.slice(8))}. ${Number(d.slice(5, 7))}.` : "";
 };
 
+export const popisZmeny = (x: Zmena): string =>
+  x.druh === "zrusene" ? `zmizol tréning z ${denSK(x.pred || x.kedy)}`
+    : x.druh === "posunute" ? `presun z ${denSK(x.pred || "")} na ${denSK(x.po || "")}`
+      : x.druh === "pridane" ? `pribudol tréning ${denSK(x.po || x.kedy)}`
+        : "premenované";
+
+const pocet = (n: number, jeden: string, malo: string, vela: string) =>
+  n === 1 ? jeden : n < 5 ? malo : vela;
+
 export function postavKarty(z: ZdrojeKariet): Karta[] {
-  const zmeny: Karta[] = z.zmeny.map((x) => ({
-    druh: "zmena" as const,
-    id: x.id,
-    nadpis: x.klient || x.nazov || "(bez mena)",
-    detail: x.druh === "zrusene"
-      ? `zmizol tréning z ${denSK(x.pred || x.kedy)}`
-      : x.druh === "posunute"
-        ? `presun z ${denSK(x.pred || "")} na ${denSK(x.po || "")}`
-        : x.druh === "pridane"
-          ? `pribudol tréning ${denSK(x.po || x.kedy)}`
-          : "premenované",
-    kedy: x.kedy,
-  }));
+  const ja = trenerZPrihlasenia(z.ktoSom);
+  const moje = <T extends { trener: string }>(xs: T[]) => (ja ? xs.filter((x) => x.trener === ja) : xs);
 
-  const mena: Karta[] = z.nezname.map((n) => ({
-    druh: "meno" as const,
-    id: `${n.nazov}|${n.trener}`,
-    nazov: n.nazov,
-    trener: n.trener,
-    pocet: n.pocet,
-    najblizsi: n.najblizsi,
-    navrh: z.navrhMena(n.nazov),
-  }));
-
-  const platby: Karta[] = z.platby.map((p) => ({
-    druh: "platba" as const,
-    id: p.fioId,
-    datum: p.datum,
-    suma: p.suma,
-    text: p.text,
-    // Jednoznačný návrh sa predvyplní; pri dvoch a viacerých sa nevyberá nič
-    // — to je to isté pravidlo ako všade inde, hádať sa nesmie.
+  const zmeny = moje(z.zmeny);
+  const mena: NeznamyNazov[] = moje(z.nezname).map((n) => ({ ...n, navrh: z.navrhMena(n.nazov) }));
+  // Peniaze nemajú trénera a sú Jerryho. Terezke by boli len šumom.
+  const platby: NepriradenaPlatba[] = ja === "Terezka" ? [] : z.platby.map((p) => ({
+    fioId: p.fioId, datum: p.datum, suma: p.suma, text: p.text,
+    // Jednoznačný návrh sa predvyplní; pri dvoch a viacerých nie — hádať sa
+    // nesmie, to je pravidlo platné všade v appke.
     navrh: p.kandidati.length === 1 ? p.kandidati[0] : "",
   }));
 
-  return [...zmeny, ...mena, ...platby];
+  const karty: Karta[] = [];
+  if (zmeny.length) karty.push({
+    druh: "zmeny",
+    nadpis: "Zmeny v kalendári",
+    podnadpis: `${zmeny.length} ${pocet(zmeny.length, "zmena čaká", "zmeny čakajú", "zmien čaká")} na dôvod`,
+    polozky: zmeny,
+  });
+  if (mena.length) karty.push({
+    druh: "mena",
+    nadpis: "Nové názvy v kalendári",
+    podnadpis: `${mena.length} ${pocet(mena.length, "názov, ktorý", "názvy, ktoré", "názvov, ktoré")} appka nepozná`,
+    polozky: mena,
+  });
+  if (platby.length) karty.push({
+    druh: "platby",
+    nadpis: "Platby z banky",
+    podnadpis: `${platby.length} ${pocet(platby.length, "príjem bez klienta", "príjmy bez klienta", "príjmov bez klienta")}`,
+    polozky: platby,
+  });
+  return karty;
 }
 
-/** Karty bez tých, ktoré sú vybavené, a s odloženými na konci. */
-export function poradie(karty: Karta[], hotove: Set<string>, odlozene: string[]): Karta[] {
-  const kluc = (k: Karta) => `${k.druh}|${k.id}`;
-  const zive = karty.filter((k) => !hotove.has(kluc(k)));
-  const jeOdlozena = (k: Karta) => odlozene.includes(kluc(k));
-  return [...zive.filter((k) => !jeOdlozena(k)), ...zive.filter(jeOdlozena)];
+export function klucPolozky(druh: Karta["druh"], p: Zmena | NeznamyNazov | NepriradenaPlatba): string {
+  if (druh === "zmeny") return `zmeny|${(p as Zmena).id}`;
+  if (druh === "mena") return `mena|${(p as NeznamyNazov).nazov}|${(p as NeznamyNazov).trener}`;
+  return `platby|${(p as NepriradenaPlatba).fioId}`;
 }

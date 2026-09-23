@@ -2532,7 +2532,7 @@ function skupinaFaktur(
         {active === "vzas" && <Vzas sub={vzasSub} onSub={setVzasSub} data={data} clients={clients} focus={vzasFocus} onNavigate={navigate} pohybSplits={pohybSplits} nastavPohybSplit={nastavPohybSplit} />}
         {active === "kalendar" && <Kalendar clients={clients} data={data} focus={kalendarFocus} ktoSom={ktoSom} trainer={trainer} onTrainer={setTrainer} />}
         {active === "prechod" && <Prechod mena={Object.keys(clients)} />}
-        {active === "workspace" && jeBeta() && <Workspace clients={clients} mena={Object.keys(clients)} />}
+        {active === "workspace" && jeBeta() && <Workspace clients={clients} mena={Object.keys(clients)} ktoSom={ktoSom} />}
 
         {active === "jarvis" && (
           <JarvisOkno
