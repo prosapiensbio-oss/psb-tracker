@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { normName, fmtCZK, fmtDMY } from "../../lib/psb/format";
 import { CENNIK, platnostDo } from "../../lib/psb/cennik";
 import { osCasuKlienta } from "../../lib/psb/klientOsCasu";
+import { zdravieKlienta } from "../../lib/psb/klientZdravie";
 import type { ClientAgg } from "../../lib/psb/compute";
 import type { PSBData } from "../../lib/psb/types";
 import { C, mix } from "../../lib/psb/theme";
@@ -50,7 +51,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats }: {
   const [novy, setNovy] = useState(false);
   const [stav, setStav] = useState<"aktivni" | "neaktivni">("aktivni");
   const [meno, setMeno] = useState("");
-  const [filter, setFilter] = useState<"vsetko" | "treningy" | "peniaze" | "balicky" | "poznamky" | "puvod">("vsetko");
+  const [filter, setFilter] = useState<"zdravie" | "vsetko" | "treningy" | "peniaze" | "balicky" | "poznamky" | "puvod">("zdravie");
   const [detaily, setDetaily] = useState(false);
   const [pisemPlatbu, setPisemPlatbu] = useState(false);
   const [pl, setPl] = useState({ datum: dnesISO(), suma: "", sposob: "hotovost", poznamka: "" });
@@ -131,6 +132,54 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats }: {
     if (!od) return 0;
     return c.sessions.filter((x) => x.date.slice(0, 10) > od).length;
   }, [data.clientOverrides, meno, c]);
+
+  /** Merania bolesti — bez dvoch sa o výsledku nedá povedať nič. */
+  const [merania, setMerania] = useState<{ datum: string; bolest: number | null }[]>([]);
+  useEffect(() => {
+    if (!meno) { setMerania([]); return; }
+    void fetch(`/api/merania?name=${encodeURIComponent(meno)}`, { credentials: "same-origin" })
+      .then((r) => r.json())
+      .then((j: { merania?: { datum: string; bolest: number | null }[] }) => setMerania(j.merania || []))
+      .catch(() => setMerania([]));
+  }, [meno]);
+
+  /** Zrušené tréningy za 90 dní — z histórie zmien v kalendári. */
+  const [zruseneKal, setZruseneKal] = useState<{ klient: string | null; druh: string; kedy: string }[]>([]);
+  useEffect(() => {
+    void fetch("/api/kalendar", { credentials: "same-origin" })
+      .then((r) => r.json())
+      .then((j: { zmenyHistoria?: { klient: string | null; druh: string; kedy: string }[] }) => setZruseneKal(j.zmenyHistoria || []))
+      .catch(() => setZruseneKal([]));
+  }, []);
+
+  /**
+   * Zdravie vzťahu — štyri signály s mierkou (Jerryho výber: návrh 3 + 5).
+   * Výpočet žije v `lib/psb/klientZdravie.ts`, aby ho mohla použiť aj
+   * notifikácia a Jarvis, keď na to príde — dve kópie by sa raz rozišli.
+   */
+  const zdravie = useMemo(() => {
+    if (!c) return null;
+    const dni = (n: number) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+    const vokne = (od: string, doD: string) => c.sessions.filter((x) => x.date.slice(0, 10) > od && x.date.slice(0, 10) <= doD).length;
+    const tempoTeraz = vokne(dni(90), dni(0)) / 3;
+    const tempoPredtym = vokne(dni(180), dni(90)) / 3;
+    const mojeZrusene = zruseneKal.filter((z) => z.druh === "zrusene" && z.klient && normName(z.klient) === normName(meno) && z.kedy.slice(0, 10) > dni(90)).length;
+    const vsetkyZrusene = zruseneKal.filter((z) => z.druh === "zrusene" && z.kedy.slice(0, 10) > dni(90)).length;
+    const klientov = Math.max(1, Object.keys(clients).length);
+    const sBolestou = merania.filter((x) => x.bolest != null);
+    // Balíček, po ktorom prišiel ďalší, je obnovený. Posledný sa nepočíta —
+    // ešte nemal šancu.
+    const zoradene = [...mojeBalicky].sort((a, b) => a.platnost_od.localeCompare(b.platnost_od));
+    const mohol = Math.max(0, zoradene.length - 1);
+    return zdravieKlienta(c, Object.values(clients).filter((x) => x.name !== c.name), {
+      tempoTeraz, tempoPredtym,
+      zrusene: mojeZrusene,
+      zrusenePriemer: vsetkyZrusene / klientov,
+      bolestPrve: sBolestou.length >= 2 ? sBolestou[sBolestou.length - 1].bolest : null,
+      bolestPosledne: sBolestou.length >= 2 ? sBolestou[0].bolest : null,
+      obnovil: mohol, mohol,
+    });
+  }, [c, clients, meno, merania, zruseneKal, mojeBalicky]);
 
   /** Koľko údajov je pod tlačidlom „ďalších N" — aby číslo nebolo vymyslené. */
   const dalsichUdajov = useMemo(
@@ -302,12 +351,16 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats }: {
             {c && <span style={{ fontSize: 11.5, color: C.textDim }}>{c.primaryTrainer}</span>}
           </div>
 
-          {/* Ručný stav je SNÍMKA, ktorá nikdy nevyprší.
-              23. 9. 2026 malo trinásť klientov ručne nastavenú „Pauzu" a
-              odvtedy trénovali — Anetka Přinosilová od 4. 8. trikrát a ešte
-              aj zaplatila 21 150 Kč. Appka o tom vedela a mlčala, lebo ručný
-              zápis prebíja dáta bez otázky. Toto je tá otázka. */}
-          {zabudnutaPauza && (
+          {/* Pauzu ruší tréning sám (compute.ts) — tu sa to len POVIE, aby sa
+              človek nedivil, prečo tam stav, ktorý zapísal, nie je. */}
+          {c?.pauzaZrusenaTreningom && (
+            <div style={{ fontSize: 11, color: C.textDim, marginTop: 6, lineHeight: 1.5 }}>
+              Ručná pauza padla — odvtedy bol na tréningu. Appka stav počíta znova sama.
+            </div>
+          )}
+          {/* „Neaktívny" tréning neprebíja: je to rozhodnutie o konci vzťahu,
+              nie tvrdenie o budúcom týždni. Preto sa appka spýta. */}
+          {zabudnutaPauza > 0 && !c?.pauzaZrusenaTreningom && (
             <div style={{ fontSize: 11, color: C.orange, marginTop: 6, lineHeight: 1.5 }}>
               Ručne nastavené „{c?.status}", ale odvtedy {zabudnutaPauza} {zabudnutaPauza === 1 ? "tréning" : zabudnutaPauza < 5 ? "tréningy" : "tréningov"}. Platí to ešte?
             </div>
@@ -382,7 +435,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats }: {
         )}
 
         <div style={{ flexGrow: 1 }} />
-        <button onClick={() => { setMeno(""); setFilter("vsetko"); setPisem(false); setPisemPlatbu(false); }} style={navrhTlacidlo}>← späť na zoznam</button>
+        <button onClick={() => { setMeno(""); setFilter("zdravie"); setPisem(false); setPisemPlatbu(false); }} style={navrhTlacidlo}>← späť na zoznam</button>
       </div>
 
       <div style={{ flexGrow: 1, minWidth: 0, display: "flex", flexDirection: "column", minHeight: 0 }}>
@@ -390,7 +443,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats }: {
           <div style={{ fontSize: 11, fontWeight: 700, color: C.textDim, letterSpacing: 0.5 }}>VŠETKO V ČASE</div>
           <div style={{ flexGrow: 1 }} />
           <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
-            {([["vsetko", "všetko"], ["treningy", "tréningy"], ["peniaze", "peniaze"], ["balicky", "balíčky"], ["poznamky", "poznámky"], ["puvod", "odkiaľ prišiel"]] as const).map(([id, l]) => (
+            {([["zdravie", "zdravie"], ["vsetko", "všetko"], ["treningy", "tréningy"], ["peniaze", "peniaze"], ["balicky", "balíčky"], ["poznamky", "poznámky"], ["puvod", "odkiaľ prišiel"]] as const).map(([id, l]) => (
               <button key={id} onClick={() => setFilter(id)} style={prepinac(filter === id)}>{l}</button>
             ))}
           </div>
@@ -422,6 +475,38 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats }: {
         {chyba && <div style={{ fontSize: 12, color: C.red, marginTop: 8 }}>{chyba}</div>}
 
         <div style={{ flexGrow: 1, minHeight: 0, overflowY: "auto", marginTop: 10 }}>
+          {filter === "zdravie" && zdravie && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 13 }}>
+              {zdravie.signaly.map((sig) => (
+                <div key={sig.id}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10, fontSize: 12.5 }}>
+                    <span style={{ color: C.textMuted }}>{sig.nazov}</span>
+                    <span style={{ color: TON[sig.tón], fontWeight: 700 }}>{sig.hodnota}</span>
+                  </div>
+                  {/* Pás s mierkou: sivá je priemer klientely, farebná značka
+                      je tento klient. Signál bez mierky nič nehovorí — to je
+                      pravidlo, ktoré appka má už pri porovnaniach v profile. */}
+                  <div style={{ position: "relative", height: 8, background: mix(C.border, 120), borderRadius: 4, marginTop: 7 }}>
+                    {sig.tón !== "nevieme" && (
+                      <>
+                        <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${sig.priemer * 100}%`, background: mix(C.border, 220), borderRadius: 4 }} />
+                        <div style={{ position: "absolute", left: `${sig.priemer * 100}%`, top: -3, width: 2, height: 14, background: C.textDim }} title="priemer klientely" />
+                        <div style={{ position: "absolute", left: `calc(${sig.podiel * 100}% - 2px)`, top: -4, width: 5, height: 16, background: TON[sig.tón], borderRadius: 2 }} />
+                      </>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 10.5, color: C.textDim, marginTop: 5 }}>{sig.detail}</div>
+                </div>
+              ))}
+              <div style={{ padding: "11px 13px", borderRadius: 10, background: mix(TON[zdravie.tón], 12), border: `1px solid ${mix(TON[zdravie.tón], 45)}`, fontSize: 12.5, color: C.textMuted, lineHeight: 1.55 }}>
+                <b style={{ color: TON[zdravie.tón] }}>{zdravie.zaver}</b>
+                <div style={{ fontSize: 11, color: C.textDim, marginTop: 5 }}>
+                  Sivá značka na páse je priemer klientely. Appka nepredpovedá odchod — hovorí, čo sa zmenilo.
+                </div>
+              </div>
+            </div>
+          )}
+
           {(filter === "vsetko" || filter === "treningy") && buduce.map((z) => (
             <div key={z} style={{ ...riadok, color: C.blue }}>
               <span style={stlpecDen}>{fmtDMY(z.slice(0, 10))}</span>
@@ -429,7 +514,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats }: {
             </div>
           ))}
 
-          {filter !== "poznamky" && filter !== "puvod" && os
+          {filter !== "poznamky" && filter !== "puvod" && filter !== "zdravie" && os
             .filter((x) => filter === "vsetko"
               || (filter === "treningy" && x.druh === "trening")
               || (filter === "peniaze" && x.druh === "platba")
@@ -812,6 +897,9 @@ const riadok = {
   padding: "6px 2px", borderBottom: `1px solid ${mix(C.border, 40)}`, fontSize: 12,
 };
 const stlpecDen = { color: C.textDim, minWidth: 74, fontVariantNumeric: "tabular-nums" as const };
+
+/** Farba podľa tónu signálu — jedno miesto, nech sa pásy a záver nerozídu. */
+const TON: Record<string, string> = { dobre: C.green, vsimnut: C.orange, zle: C.red, nevieme: C.textDim };
 
 const prepinac = (on: boolean) => ({
   padding: "6px 11px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer",

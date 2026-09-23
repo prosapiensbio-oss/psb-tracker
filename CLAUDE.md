@@ -966,6 +966,33 @@ veľkosť písmen.
 nemajú a sú Jerryho, rovnako ako mesačné kontroly a stav hotovosti (pravidlo
 z 31. 8. 2026). Terezka teda vidí dve karty, Jerry tri.
 
+## Ručná pauza je tvrdenie o budúcnosti — tréning ju vyvráti
+
+23. 9. 2026 malo **trinásť klientov ručne nastavenú „Pauzu" a odvtedy
+trénovali**. Anetka Přinosilová od 4. 8. trikrát a ešte aj zaplatila
+21 150 Kč; appka ju celý čas viedla ako pauzu, takže o nej mlčali aj
+notifikácie. Ručný stav je snímka a nikdy nevyprší — nikto ho nechodí rušiť.
+
+Jerry: „malo by to byť automaticky — keď klient príde na tréning, ten deň sa
+mu pauza zruší, a keď to niekto prenastaví a on zase príde, znovu sa to
+zmení." Je to v `deriveClients`:
+
+- **„Pauza|2026-08-27"** je dohoda na konkrétny čas. Tréning POČAS nej je
+  výnimka a pauzu nechá bežať; tréning PO nej ju ruší. Inak by sa dohoda
+  zmazala prvou výnimkou.
+- **Holá „Pauza"** padne ktorýmkoľvek tréningom po dni, keď sa zapísala.
+  Preto musel `updated_at` prejsť z `client_overrides` až do `ClientOverride`
+  — bez neho nie je odkiaľ merať a kontrola by ticho nikdy nezabrala.
+- **„Neaktívny" sa tréningom NERUŠÍ.** Je to rozhodnutie o konci vzťahu, nie
+  tvrdenie o budúcom týždni; tam sa appka spýta a rozhodne človek.
+- Po zrušení `statusOverride` prestáva platiť — inak by obrazovky tvrdili
+  „nastavené rukou", hoci rozhoduje appka. `pauzaZrusenaTreningom` to povie
+  nahlas, aby sa človek nedivil, kam sa podel stav, ktorý zapísal.
+
+Zovšeobecnenie: **ručný zápis, ktorý hovorí o budúcnosti, potrebuje dátum
+alebo udalosť, ktorá ho ukončí.** Bez toho žije večne a appka podľa neho
+mlčí o veciach, ktoré sa dávno zmenili.
+
 ## Celý reťazec jedným príkazom: `./scripts/hotovo.sh`
 
 Jerry, 22. 9. 2026: „postav testera, kontrolóra, nasadzovača — a ty mi len

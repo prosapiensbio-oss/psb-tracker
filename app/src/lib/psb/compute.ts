@@ -109,6 +109,11 @@ export type ClientAgg = {
   statusAuto: string;
   status: string;
   statusOverride: boolean;
+  /**
+   * Ručná pauza padla, lebo klient odvtedy trénoval. Obrazovka to má
+   * povedať — inak sa človek diví, prečo mu tam pauza, ktorú zapísal, nie je.
+   */
+  pauzaZrusenaTreningom?: boolean;
   pauseUntil?: string; // ISO date — when a "Pauza" is meant to end (from status override "Pauza|YYYY-MM-DD")
   specialRate: boolean;
   specialRateNote: string;
@@ -207,6 +212,7 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
         statusAuto: "Neaktívny",
         status: "Neaktívny",
         statusOverride: false,
+        pauzaZrusenaTreningom: false,
         specialRate: false,
         specialRateNote: "",
         trainerNote: "",
@@ -317,17 +323,48 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
 
     c.statusAuto =
       c.attendance >= 0.5 ? "Aktívny" : c.attendance >= 0.16 ? "Sporadický" : "Neaktívny";
-    // A "Pauza" override may carry an end date encoded as "Pauza|YYYY-MM-DD".
+
+    /**
+     * PAUZU UKONČÍ TRÉNING — nie človek, ktorý si na ňu spomenie.
+     *
+     * Ručný stav je snímka a nikdy nevyprší; 23. 9. 2026 mala „Pauzu"
+     * trinástka klientov, ktorí odvtedy trénovali. Anetka Přinosilová od
+     * 4. 8. trikrát a ešte aj zaplatila 21 150 Kč — a appka ju celý čas
+     * viedla ako pauzu, takže o nej mlčali aj notifikácie.
+     *
+     * Jerry, 23. 9.: „malo by to byť automaticky — keď klient príde na
+     * tréning, ten deň sa mu pauza zruší, a keď to niekto prenastaví a on
+     * zase príde, znovu sa to zmení."
+     *
+     * Presne tak. Pauza je tvrdenie o BUDÚCNOSTI („nebude chodiť") a
+     * tréning je fakt, ktorý ho vyvráti. Hranica:
+     *   • „Pauza|2026-08-27" — dohodnutý koniec; tréning PO ňom pauzu ruší,
+     *     tréning počas nej je výnimka a pauzu nechá bežať,
+     *   • holá „Pauza" — ruší ju ktorýkoľvek tréning po dni, keď sa zapísala.
+     *
+     * Ruší sa len PAUZA. „Neaktívny" nastavený rukou je rozhodnutie o tom,
+     * že vzťah skončil, a to jeden tréning neprebíja — takého klienta appka
+     * ponúkne v karte, nech sa človek rozhodne sám.
+     */
     const rawStatus = ov?.status || null;
     if (rawStatus && rawStatus.startsWith("Pauza")) {
-      c.status = "Pauza";
       const bar = rawStatus.indexOf("|");
-      c.pauseUntil = bar >= 0 ? rawStatus.slice(bar + 1).trim() || undefined : undefined;
+      const doDna = bar >= 0 ? rawStatus.slice(bar + 1).trim() : "";
+      const odKedy = doDna || (ov?.updatedAt || "").slice(0, 10);
+      const trenovalPo = !!odKedy && c.sessions.some((x) => x.date.slice(0, 10) > odKedy);
+      if (trenovalPo) {
+        c.status = c.statusAuto;
+        c.pauseUntil = undefined;
+        c.pauzaZrusenaTreningom = true;
+      } else {
+        c.status = "Pauza";
+        c.pauseUntil = doDna || undefined;
+      }
     } else {
       c.status = rawStatus || c.statusAuto;
       c.pauseUntil = undefined;
     }
-    c.statusOverride = !!ov?.status;
+    c.statusOverride = !!ov?.status && !c.pauzaZrusenaTreningom;
     c.specialRate = !!ov?.specialRate;
     c.specialRateNote = ov?.specialRateNote || "";
     c.trainerNote = ov?.trainerNote || "";
