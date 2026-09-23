@@ -48,6 +48,9 @@ import type { BtcKnihaPlatba, RegisterItem } from "../../lib/psb/compute";
 import { btcPlatbyJednotlivo, btcPodlaKlientov } from "../../lib/psb/btcKontrola";
 import { polozkaZastaranaBanka, polozkyBtcNesedi } from "../../lib/psb/penazneNotifikacie";
 import { breakEvenPriemer, spocitajRezervu } from "../../lib/psb/rezerva";
+import { BetaPruh } from "./BetaPruh";
+import { jeBeta } from "../../lib/psb/beta";
+import { Workspace } from "./Workspace";
 import { Prechod } from "./Prechod";
 import { buildAiContext } from "../../lib/psb/aiContext";
 import type { PorovnanieDochadzky } from "../../lib/psb/porovnanieDochadzky";
@@ -192,6 +195,10 @@ const TABS = [
   // kliknem na kalendár, už to nie je len kalendár, ale aj platby atď."
   // Jedna otázka na záložku; a keď sa PTminder vypne, táto sa celá zmaže.
   { id: "prechod", label: "Prechod", icon: "prechod" },
+  // Workspace — administratíva ako kopa kariet. Zatiaľ LEN V BETE
+  // (`kokpit-beta`): je to skúška rozloženia, nie hotová obrazovka, a ostrý
+  // Kokpit sa ňou nemá zaťažiť, kým Jerry nepovie, že to takto chce.
+  { id: "workspace", label: "Workspace", icon: "prechod" },
   // Výsledky = mesačné a kvartálne pohľady, KPI, ciele, správa mesiaca.
   // Nahrávanie dát a uzávierka odišli do záložky Upload — robili sa
   // striedavo, ale sú to dva rôzne úkony a nahrať CSV treba aj mimo
@@ -2364,6 +2371,7 @@ function skupinaFaktur(
       <NovaVerziaPas />
       {/* Neúspešný zápis nesmie zapadnúť. Pás je nad všetkým, aby ho človek
           videl aj vtedy, keď je práve inde na obrazovke. */}
+      <BetaPruh />
       {chybaZapisu && (
         <div
           onClick={() => setChybaZapisu("")}
@@ -2425,7 +2433,7 @@ function skupinaFaktur(
           margin: "0 auto",
         }}
       >
-        {TABS.filter((t) => !MIMO_RAD.includes(t.id)).map((t) => {
+        {TABS.filter((t) => !MIMO_RAD.includes(t.id) && (t.id !== "workspace" || jeBeta())).map((t) => {
           // Tri záložky Firmy zastupuje jedno tlačidlo na mieste tej prvej.
           if (FIRMA_IDS.includes(t.id)) {
             if (t.id !== FIRMA_IDS[0]) return null;
@@ -2524,6 +2532,7 @@ function skupinaFaktur(
         {active === "vzas" && <Vzas sub={vzasSub} onSub={setVzasSub} data={data} clients={clients} focus={vzasFocus} onNavigate={navigate} pohybSplits={pohybSplits} nastavPohybSplit={nastavPohybSplit} />}
         {active === "kalendar" && <Kalendar clients={clients} data={data} focus={kalendarFocus} ktoSom={ktoSom} trainer={trainer} onTrainer={setTrainer} />}
         {active === "prechod" && <Prechod mena={Object.keys(clients)} />}
+        {active === "workspace" && jeBeta() && <Workspace clients={clients} mena={Object.keys(clients)} />}
 
         {active === "jarvis" && (
           <JarvisOkno

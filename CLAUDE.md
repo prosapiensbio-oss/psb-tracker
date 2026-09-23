@@ -918,6 +918,35 @@ NEPREPÍSALO smerovanie:
   „dlaždica Rezerva na Kokpite" v `aiContext` by inak posielala na záložku,
   ktorá sa tak už nevolá.
 
+## Beta: ten istý kód, iné meno workera — `./scripts/beta.sh`
+
+Jerry, 23. 9. 2026: „vedel by si postaviť niečo ako beta verziu Kokpitu, kde
+by sme mohli testovať rôzne návrhy?" Beží na
+`kokpit-beta.prosapiensbio.workers.dev`.
+
+- **Žiadny druhý config.** `wrangler.jsonc` zostáva jediný (pravidlo z 25. 8.
+  2026); meno workera sa prepisuje parametrom `--name kokpit-beta`. Jeden
+  config, dva ciele — druhý súbor by raz začal tvrdiť, že nasadzovací je on.
+- **TÁ ISTÁ DATABÁZA.** Oddelená kópia by znamenala skúšanie na starých
+  číslach a stratilo by to zmysel. Preto červený pruh — a je aj na
+  PRIHLASOVACEJ obrazovke: človek inak zadá heslo v domnení, že je v ostrom
+  Kokpite, a skúša na ostrých dátach bez toho, aby to vedel.
+- **Beta sa pozná z ADRESY** (`lib/psb/beta.ts`), nie z premennej prostredia.
+  Premenná by sa raz pri nasadení zabudla a beta bez pruhu je horšia než
+  žiadna beta.
+- **Skúšané obrazovky sa zapínajú `jeBeta()`**, nie vetvou v gite. Vetva by
+  sa rozišla s hlavnou a zlučovanie by trvalo dlhšie než samotná skúška;
+  takto je v ostrom Kokpite ten istý kód, len bez tlačidla. Prvá taká
+  obrazovka je **Workspace** (kopa kariet, `workspaceKarty.ts`).
+- **Prihlásenie je per adresa.** Session cookie ostrého Kokpitu na bete
+  neplatí — do bety sa treba prihlásiť zvlášť.
+
+Pri workspace platia tri pravidlá, bez ktorých je kopa kariet horšia než
+zoznam: vidno, koľko toho ešte je; odložená karta sa VRACIA (na koniec, nie
+preč — to je tá istá strata odpovede, ktorú rieši register); a postupy na
+dvadsať minút (uzávierka, nahrávanie exportov) medzi karty nepatria — karta
+z nich je len dvere inam a kopa by sa tvárila dlhšia než práca.
+
 ## Celý reťazec jedným príkazom: `./scripts/hotovo.sh`
 
 Jerry, 22. 9. 2026: „postav testera, kontrolóra, nasadzovača — a ty mi len
