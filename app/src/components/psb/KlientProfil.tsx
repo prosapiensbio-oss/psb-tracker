@@ -7,6 +7,7 @@ import { C, mix } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import { Dennik } from "./Dennik";
 import { Card, Info, ValueBars } from "./ui";
+import { KlientOsCasu, osCasuZapnuta } from "./KlientOsCasu";
 
 // Profil klienta — všetko o jednom človeku na jednej obrazovke.
 //
@@ -362,6 +363,9 @@ export function KlientProfil({ meno, data, clients, onZavri, btcSats, onDennikZa
         </div>
         <Dennik meno={c.name} limit={6} onNovyZapis={onDennikZapis} />
       </div>
+
+      {/* Os času — odpoveď na „nevychádzajú mu tréningy". Zatiaľ len v bete. */}
+      {osCasuZapnuta() && <KlientOsCasu meno={c.name} data={data} kalUdalosti={kalUdalosti} />}
     </Card>
   );
 }
