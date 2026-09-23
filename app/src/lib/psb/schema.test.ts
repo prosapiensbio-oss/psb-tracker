@@ -38,6 +38,23 @@ function stlpceZMigracii(): Record<string, Set<string>> {
     for (const m of sql.matchAll(/ALTER\s+TABLE\s+["`]?(\w+)["`]?\s+ADD\s+(?:COLUMN\s+)?["`]?(\w+)["`]?/gi)) {
       (out[m[1].toLowerCase()] ||= new Set()).add(m[2].toLowerCase());
     }
+    /**
+     * PREMENOVANIE CELEJ TABUĽKY. SQLite nevie zmeniť stĺpec, tak sa tabuľka
+     * postaví nanovo (`kal_mapovanie_nove`), stará sa zahodí a nová sa
+     * premenuje na jej miesto. Bez tohto kroku test o pôvodnom mene tvrdil,
+     * že má staré stĺpce — a `kal_mapovanie.cas` hlásil ako neexistujúci,
+     * hoci v databáze je (overené cez pragma 23. 9. 2026).
+     */
+    for (const m of sql.matchAll(/ALTER\s+TABLE\s+["`]?(\w+)["`]?\s+RENAME\s+TO\s+["`]?(\w+)["`]?/gi)) {
+      const z = m[1].toLowerCase(), na = m[2].toLowerCase();
+      if (out[z]) { out[na] = out[z]; delete out[z]; }
+    }
+    for (const m of sql.matchAll(/DROP\s+TABLE(?:\s+IF\s+EXISTS)?\s+["`]?(\w+)["`]?/gi)) {
+      // Zahodenie PRED premenovaním v tom istom súbore rieši poradie vyššie;
+      // tu ide o tabuľky, ktoré naozaj zanikli.
+      const t = m[1].toLowerCase();
+      if (!new RegExp(`RENAME\\s+TO\\s+["\`]?${t}\\b`, "i").test(sql)) delete out[t];
+    }
     // Premenovanie stĺpca. Bez tohto by test tvrdil, že nový názov v databáze
     // neexistuje a starý áno — presne naopak, než ako to po migrácii je
     // (mkt_reklamy.videnia3s → videnia2s, 19. 8. 2026).
@@ -95,5 +112,36 @@ describe("SCHEMA_DB pre Jarvisa", () => {
   it("tabuľky, ktoré Jarvis pozná, v migráciách existujú", () => {
     const chyba = Object.keys(SCHEMA).filter((t) => !MIGRACIE[t]);
     expect(chyba).toEqual([]);
+  });
+
+  /**
+   * A TERAZ OPAČNE — to bola diera, ktorou prepadli `balicky` a `platby`.
+   *
+   * Testy vyššie strážia, aby Jarvis nedostal tabuľku alebo stĺpec, ktorý
+   * neexistuje. Opačný smer nestrážil nikto: tabuľka, ktorá v databáze JE,
+   * ale v schéme nie, je pre Jarvisa neviditeľná — a to je horšie než
+   * neexistujúci stĺpec. Neexistujúci stĺpec zhodí dopyt a je to hneď vidieť;
+   * chýbajúca tabuľka ho ticho pošle sa spýtať inej a odpovedať sebavedome zle.
+   *
+   * Mesačná kontrola 23. 9. 2026 našla, že vlastná evidencia balíčkov
+   * a kniha platieb — teda to, čím sa nahrádza PTminder — chýbali v schéme
+   * celý mesiac od svojho vzniku. Starý komentár v tomto súbore diery dokonca
+   * vedomý bol („Chýbajúca tabuľka je vlastný nález"), len sa nikdy nedoplnil.
+   */
+  it("každá vecná tabuľka z databázy je Jarvisovi aspoň spomenutá", () => {
+    // Tabuľky, o ktorých vedieť NEMÁ: vodovod appky, nie dáta o firme.
+    const TECHNICKE = new Set([
+      "jarvis_chats", "jarvis_dokument_casti", "jarvis_dokumenty",
+      "kal_snimky", "kal_zdroje", "kal_mapovanie_nove",
+      "napad_obrazky", "push_odbery", "push_poslane",
+      "platba_mapovanie", "platba_nie_klient",
+    ]);
+    const chat = readFileSync(`${KOREN}src/routes/api/chat.ts`, "utf8");
+    const i = chat.indexOf("const SCHEMA_DB");
+    const text = chat.slice(i, chat.indexOf("`;", i));
+    const chybaju = Object.keys(MIGRACIE)
+      .filter((t) => !TECHNICKE.has(t) && !/^(if|items|sqlite_|_)/.test(t))
+      .filter((t) => !new RegExp(`\\b${t}\\b`).test(text));
+    expect(chybaju).toEqual([]);
   });
 });

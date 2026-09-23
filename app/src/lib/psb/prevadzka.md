@@ -183,9 +183,15 @@ sa dopĺňa ručne tlačidlom *+ Zrušenie / náhrada*. V kontexte je to pod kľ
 
 ## 8. Ľudia
 
-- **Matyáš Rozbořil** — zamestnanec celý rok 2025 a jan–mar 2026, tréner do
-  augusta 2025 (84 sedení, 89 h). Skončil ako študent medicíny, nestíhal to
-  popri škole. Povedal, že sa vráti; PSB je presvedčené, že sa nevráti.
+- **Matyáš Rozbořil** — zamestnanec (DPP) od januára 2025, tréner do
+  **13. 3. 2026** (151 sedení, 155,5 h). Študent medicíny, nestíhal to popri
+  škole. Od jari 2026 už len občasný záskok, definitívne **skončil 20. 9. 2026**.
+  V Kokpite zostáva v mzdách a v P&L — je to zaplatená história —, ale
+  v ponukách, kde sa vyberá tréner, už nie je.
+  (Opravené 23. 9. 2026 pri mesačnej kontrole: dovtedy tu stálo „tréner do
+  augusta 2025, 84 sedení, 89 h". Odvtedy odtrénoval ešte 76 sedení, takže
+  každá odpoveď postavená na tomto odstavci podceňovala jeho podiel takmer
+  o polovicu.)
 - **Sofia** — **barter, NEPOČÍTA sa do tržieb.** Funguje ako bežná klientka: keď
   by mala „zaplatiť" členstvo, namiesto platby sa tá suma odpočíta z Jarkovho
   dlhu. Preto jej platba nechodí každý mesiac, ale v rytme členstiev — a preto je
