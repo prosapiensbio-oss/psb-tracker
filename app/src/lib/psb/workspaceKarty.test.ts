@@ -106,3 +106,32 @@ describe("karta klienta je stôl, nie fronta", () => {
     expect(k.polozky).toEqual([]);
   });
 });
+
+describe("čie veci sa ukazujú", () => {
+  const zmeny = [
+    { id: "1", kedy: "2026-09-20", trener: "Jerry", druh: "zrusene", nazov: "Anetka", klient: "Anetka", pred: "", po: "" },
+    { id: "2", kedy: "2026-09-20", trener: "Terezka", druh: "zrusene", nazov: "Sofia", klient: "Sofia", pred: "", po: "" },
+  ] as never[];
+  const postav = (ktoSom: string | null, trener?: "Jerry" | "Terezka" | null) =>
+    postavKarty({ zmeny, nezname: [], platby: [], ktoSom, trener, navrhMena: () => "" })
+      .find((k) => k.druh === "zmeny")?.polozky ?? [];
+
+  it("prihlásený tréner vidí len svoje", () => {
+    expect(postav("Jerry").map((p) => (p as { trener: string }).trener)).toEqual(["Jerry"]);
+  });
+
+  it("bez identity (zdieľané heslo) vidí všetko — a to je stav, ktorý treba povedať nahlas", () => {
+    // Presne toto Jerry hlásil dvakrát: v kope boli Terezkine udalosti.
+    // Filter nebol pokazený, len sa prihlásenie nedalo preložiť na trénera.
+    expect(postav("app").length).toBe(2);
+  });
+
+  it("ručná voľba prebije prihlásenie", () => {
+    expect(postav("Jerry", "Terezka").map((p) => (p as { trener: string }).trener)).toEqual(["Terezka"]);
+  });
+
+  it("null znamená všetko, undefined znamená „nechaj to na prihlásenie“", () => {
+    expect(postav("Jerry", null).length).toBe(2);
+    expect(postav("Jerry", undefined).length).toBe(1);
+  });
+});

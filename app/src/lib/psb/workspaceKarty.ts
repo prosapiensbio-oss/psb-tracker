@@ -43,6 +43,8 @@ export type ZdrojeKariet = {
   navrhMena: (nazov: string) => string;
   /** „jerry" | „terezka" | null (nevie sa / spoločné prihlásenie). */
   ktoSom: string | null;
+  /** Ručne zvolený tréner; `null` = všetko, `undefined` = podľa prihlásenia. */
+  trener?: "Jerry" | "Terezka" | null;
 };
 
 /**
@@ -74,7 +76,19 @@ const pocet = (n: number, jeden: string, malo: string, vela: string) =>
   n === 1 ? jeden : n < 5 ? malo : vela;
 
 export function postavKarty(z: ZdrojeKariet): Karta[] {
-  const ja = trenerZPrihlasenia(z.ktoSom);
+  /**
+   * Koho veci sa ukazujú.
+   *
+   * `trener` prebije prihlásenie: keď si človek v kope prepne filter, platí
+   * jeho voľba. `undefined` znamená „nechaj to na prihlásenie", `null` znamená
+   * „všetko" — a to sú dve rôzne veci, preto sa nedá použiť jedna hodnota.
+   *
+   * Prečo vôbec voľba: keď sa prihlásenie nepodarí preložiť na trénera
+   * (zdieľané heslo, identita „app"), filter ticho prestal platiť a v kope
+   * boli zrazu aj cudzie udalosti. Ticho je tu to zlé slovo — Jerry to 23. 9.
+   * 2026 hlásil druhýkrát a nemal ako zistiť, prečo sa to deje.
+   */
+  const ja = z.trener !== undefined ? z.trener : trenerZPrihlasenia(z.ktoSom);
   const moje = <T extends { trener: string }>(xs: T[]) => (ja ? xs.filter((x) => x.trener === ja) : xs);
 
   const zmeny = moje(z.zmeny);

@@ -46,6 +46,13 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   const [texty, setTexty] = useState<Record<string, string>>({});
   const [i, setI] = useState(0);
   const [pracujem, setPracujem] = useState("");
+  /**
+   * Čie veci sa ukazujú. "auto" = podľa prihlásenia; keď sa prihlásenie nedá
+   * preložiť na trénera (zdieľané heslo, identita „app"), kopa doteraz TICHO
+   * ukázala všetko — a Jerry z nej videl aj Terezkine udalosti bez toho, aby
+   * mal ako zistiť prečo. Teraz je to napísané a dá sa to prepnúť.
+   */
+  const [ktoreVeci, setKtoreVeci] = useState<"auto" | "Jerry" | "Terezka" | "vsetko">("auto");
   const [chyba, setChyba] = useState("");
 
   const nacitaj = useCallback(async () => {
@@ -62,12 +69,13 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
     return postavKarty({
       ...zdroje,
       ktoSom,
+      trener: ktoreVeci === "auto" ? undefined : ktoreVeci === "vsetko" ? null : ktoreVeci,
       navrhMena: (nazov) => {
         const v = navrhniKlientaKandidati(nazov, clients);
         return v.typ === "uvodny" ? (v.kandidati[0] || v.meno) : (v.kandidati.length === 1 ? v.kandidati[0] : "");
       },
     });
-  }, [zdroje, clients, ktoSom]);
+  }, [zdroje, clients, ktoSom, ktoreVeci]);
 
   // Karta, v ktorej už nič nezostalo, z kopy zmizne — ale až po tom, čo sa
   // v nej naozaj odklikalo; inak by zmizla pod rukami uprostred práce.
@@ -164,6 +172,8 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   if (!zdroje) return null;
 
   const vybavenych = hotove.size;
+  /** Koho vybralo prihlásenie; null = appka nevie, kto sedí pri appke. */
+  const automat = trenerZPrihlasenia(ktoSom);
   const spolu = karty.reduce((a, x) => a + x.polozky.length, 0);
 
   if (!zive.length) {
@@ -204,8 +214,27 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
         </div>
         <div style={{ fontSize: 12, color: C.textDim, whiteSpace: "nowrap" }}>
           {vybavenych > 0 ? `${vybavenych} vybavených` : `${spolu} vecí celkom`}
-          {trenerZPrihlasenia(ktoSom) ? ` · len ${trenerZPrihlasenia(ktoSom) === "Jerry" ? "Jerryho" : "Terezkine"}` : ""}
         </div>
+        {/* Čie veci — vždy vidieť, aj keď to appka vybrala sama. Doteraz to
+            bola len veta na konci riadku a pri identite „app" nebola žiadna. */}
+        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+          {([["auto", automat ? (automat === "Jerry" ? "Jerryho" : "Terezkine") : "všetko"], ["Jerry", "Jerryho"], ["Terezka", "Terezkine"], ["vsetko", "všetko"]] as const)
+            .filter(([id]) => id !== "auto" || !!automat)
+            .filter(([id]) => !(automat && id === automat))
+            .map(([id, l]) => (
+              <button key={id} onClick={() => setKtoreVeci(id)} style={{
+                padding: "4px 10px", borderRadius: 14, fontSize: 11.5, cursor: "pointer",
+                border: `1px solid ${ktoreVeci === id ? C.accent : C.border}`,
+                background: ktoreVeci === id ? C.accentBg : "transparent",
+                color: ktoreVeci === id ? C.accentLight : C.textMuted,
+              }}>{l}</button>
+            ))}
+        </div>
+        {!automat && ktoreVeci === "auto" && (
+          <div style={{ fontSize: 11, color: C.orange, whiteSpace: "nowrap" }}>
+            Appka nevie, kto si — ukazuje všetko. Prihlás sa menom, nie spoločným heslom.
+          </div>
+        )}
       </div>
 
       {/* KOPA: aktívna karta je cez celú šírku, ostatné ležia pod ňou a
@@ -306,8 +335,16 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                     <button onClick={() => void vybav(kluc, "/api/kalendar", { akcia: "mapuj", nazov: n.nazov, trener: n.trener, typ: "trening", klient: t.trim() })} disabled={pracujem === kluc || t.trim().length < 3} style={hlavne(t.trim().length >= 3)}>
                       {pracujem === kluc ? "…" : "Je to on"}
                     </button>
+                    {/* „Súkromné" chýbalo (Jerry, 23. 9. 2026) — v Kalendári
+                        je v ponuke typov, v kope nie, takže sa tu plávanie
+                        alebo strihanie dalo odložiť len ako „iné". Sú to dva
+                        rôzne dôvody, prečo udalosť nie je tréning, a človek
+                        si pamätá, ktorý zapísal. */}
+                    <button onClick={() => void vybav(kluc, "/api/kalendar", { akcia: "mapuj", nazov: n.nazov, trener: n.trener, typ: "sukromne", klient: null })} style={vedlajsie}>
+                      Súkromné
+                    </button>
                     <button onClick={() => void vybav(kluc, "/api/kalendar", { akcia: "mapuj", nazov: n.nazov, trener: n.trener, typ: "netrening", klient: null })} style={vedlajsie}>
-                      Nie je tréning
+                      Iné (nie tréning)
                     </button>
                   </div>
                 );
