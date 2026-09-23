@@ -33,6 +33,15 @@
  * hoci sa v jej kalendári nestalo nič.
  *
  * Udalosť s novým uid a rovnakým časom je tá istá hodina. Nehlási sa.
+ *
+ * SÚKROMNÉ A NETRÉNINGOVÉ SA NEHLÁSIA VÔBEC
+ *
+ * O zmazanom plávaní sa nikto pýtať nechce — to pravidlo appka mala, ale len
+ * pre zmiznuté udalosti. Pridané, posunuté a premenované ho nemali, takže keď
+ * si Jerry zapísal do kalendára „Poslat veronika QR" alebo „Napisat lenke",
+ * appka chcela vedieť, prečo to pribudlo. Kontrola 23. 9. 2026 našla štyri
+ * také otázky visieť v registri. Pravidlo je odteraz na jednom mieste
+ * a platí na všetky druhy zmien.
  */
 export function ohlasitZmenu(
   druh: string,
@@ -42,7 +51,10 @@ export function ohlasitZmenu(
   po: string | null,
   /** Dnešný deň `YYYY-MM-DD`. */
   dnesDen: string,
+  /** Typ udalosti (`trening`, `uvodny`, `sukromne`, `netrening`, `guillermo`). */
+  typ?: string | null,
 ): boolean {
+  if (typ === "sukromne" || typ === "netrening") return false;
   if (druh === "posunute" && pred && po && pred === po) return false;
   if (druh === "zrusene" || druh === "posunute") return true;
   const kedy = (pred || po || "").slice(0, 10);

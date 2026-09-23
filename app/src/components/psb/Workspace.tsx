@@ -161,6 +161,23 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
     return (await r.json()) as { ok: boolean; error?: string };
   };
 
+  /**
+   * „Toto nie je tréning" — dva zápisy v jednom kliku.
+   *
+   * Najprv sa názov zapíše ako súkromný (aby sa appka na neho nepýtala
+   * nabudúce), až potom sa uzavrie táto konkrétna otázka. V tomto poradí
+   * preto, že keby druhý krok zlyhal, zostane aspoň naučené pravidlo —
+   * opačne by sa otázka zavrela a názov by sa pýtal ďalej.
+   */
+  const sukromne = async (kluc: string, z: Zmena) => {
+    setPracujem(kluc); setChyba("");
+    const a = await posli("/api/kalendar", { akcia: "mapuj", nazov: z.nazov, trener: z.trener, typ: "sukromne", klient: null })
+      .catch(() => ({ ok: false, error: "spojenie" }));
+    if (!a.ok) { setPracujem(""); setChyba(a.error || "nepodarilo sa uložiť"); return; }
+    setPracujem("");
+    await vybav(kluc, "/api/kalendar", { akcia: "vysvetli", id: z.id, poznamka: "súkromná udalosť — nie je to tréning" });
+  };
+
   const vybav = async (kluc: string, url: string, telo: Record<string, unknown>) => {
     setPracujem(kluc); setChyba("");
     const j = await posli(url, telo).catch(() => ({ ok: false, error: "spojenie" }));
@@ -316,6 +333,20 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                     <input value={t} onChange={(e) => nastavText(kluc, e.target.value)} placeholder="alebo vlastnými slovami…" style={vstup(false)} />
                     <button onClick={() => void vybav(kluc, "/api/kalendar", { akcia: "vysvetli", id: z.id, poznamka: t.trim() })} disabled={pracujem === kluc || t.trim().length < 2} style={hlavne(t.trim().length >= 2)}>
                       {pracujem === kluc ? "…" : "Vybavené"}
+                    </button>
+                    {/* „Súkromné" VEDĽA „Vybavené" (Jerry, 23. 9. 2026).
+                        Nie je to dôvod zmeny, je to odpoveď „toto sem vôbec
+                        nepatrí" — a robí dve veci naraz: uzavrie túto otázku
+                        a zapíše názov ako súkromný, takže sa appka na ten
+                        názov už nikdy nespýta. Bez druhého kroku by sa tá
+                        istá udalosť vrátila pri najbližšej zmene. */}
+                    <button
+                      onClick={() => void sukromne(kluc, z)}
+                      disabled={pracujem === kluc}
+                      title="Nie je to tréning — uzavrieť a už sa na tento názov nepýtať"
+                      style={vedlajsie}
+                    >
+                      Súkromné
                     </button>
                   </div>
                 );

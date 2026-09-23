@@ -60,4 +60,21 @@ describe("ohlasitZmenu", () => {
   test("posun na iný deň sa hlási", () => {
     expect(ohlasitZmenu("posunute", "2026-09-23T19:00", "2026-09-24T19:00", "2026-09-23")).toBe(true);
   });
+
+  test("súkromná udalosť sa nehlási, ani keď pribudne", () => {
+    // Pravidlo existovalo len pre zmiznuté. „Poslat veronika QR" a „Napisat
+    // lenke" tak viseli v registri ako otázky, prečo pribudli (23. 9. 2026).
+    expect(ohlasitZmenu("pridane", null, MINULOST, DNES, "sukromne")).toBe(false);
+    expect(ohlasitZmenu("zrusene", MINULOST, null, DNES, "sukromne")).toBe(false);
+    expect(ohlasitZmenu("posunute", MINULOST, BUDUCNOST, DNES, "netrening")).toBe(false);
+  });
+
+  test("tréning sa hlási aj naďalej", () => {
+    expect(ohlasitZmenu("zrusene", BUDUCNOST, null, DNES, "trening")).toBe(true);
+    expect(ohlasitZmenu("pridane", null, MINULOST, DNES, "uvodny")).toBe(true);
+  });
+
+  test("bez typu sa nič nemení — staré volania platia ďalej", () => {
+    expect(ohlasitZmenu("zrusene", BUDUCNOST, null, DNES)).toBe(true);
+  });
 });

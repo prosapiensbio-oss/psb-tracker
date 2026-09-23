@@ -102,9 +102,11 @@ async function snimka(DB: D1Database, z: Zdroj) {
   const prikazy: D1PreparedStatement[] = [];
   // Zmeny sa najprv nazbierajú a až potom zapíšu — treba ich vidieť naraz, aby
   // sa dalo spárovať zrušenie s pridaním (to je posun, nie dve udalosti).
-  const surove: { druh: string; u: string; nazov: string; klient: string | null; pred: string | null; po: string | null }[] = [];
-  const zmena = (druh: string, u: string, nazov: string, klient: string | null, pred: string | null, po: string | null) =>
-    surove.push({ druh, u, nazov, klient, pred, po });
+  const surove: { druh: string; u: string; nazov: string; klient: string | null; pred: string | null; po: string | null; typ: string }[] = [];
+  // `typ` sa nesie až k `ohlasitZmenu` — o tom, či sa zmena hlási, rozhoduje
+  // JEDNO miesto, nie tri podmienky roztrúsené v cykle.
+  const zmena = (druh: string, u: string, nazov: string, klient: string | null, pred: string | null, po: string | null, typ: string | null = "trening") =>
+    surove.push({ druh, u, nazov, klient, pred, po, typ: typ || "trening" });
 
   const videne = new Set<string>();
 
@@ -126,13 +128,13 @@ async function snimka(DB: D1Database, z: Zdroj) {
       prikazy.push(DB.prepare(
         "INSERT OR REPLACE INTO kal_udalosti (uid, trener, zaciatok, koniec, nazov, klient, typ, prvy_raz, naposledy, zmizla_at) VALUES (?,?,?,?,?,?,?,?,?,NULL)",
       ).bind(u.uid, z.trener, u.zaciatok, u.koniec, u.nazov, klient, typ, kedy, kedy));
-      if (!prveStiahnutie) zmena("pridane", u.uid, u.nazov, klient, null, u.zaciatok);
+      if (!prveStiahnutie) zmena("pridane", u.uid, u.nazov, klient, null, u.zaciatok, typ);
       continue;
     }
 
-    if (s.zaciatok !== u.zaciatok) zmena("posunute", u.uid, u.nazov, klient, s.zaciatok, u.zaciatok);
-    else if (s.nazov !== u.nazov) zmena("premenovane", u.uid, u.nazov, klient, s.nazov, u.nazov);
-    else if (s.zmizla_at) zmena("pridane", u.uid, u.nazov, klient, null, u.zaciatok);
+    if (s.zaciatok !== u.zaciatok) zmena("posunute", u.uid, u.nazov, klient, s.zaciatok, u.zaciatok, typ);
+    else if (s.nazov !== u.nazov) zmena("premenovane", u.uid, u.nazov, klient, s.nazov, u.nazov, typ);
+    else if (s.zmizla_at) zmena("pridane", u.uid, u.nazov, klient, null, u.zaciatok, typ);
 
     prikazy.push(DB.prepare(
       "UPDATE kal_udalosti SET zaciatok = ?, koniec = ?, nazov = ?, klient = ?, typ = ?, naposledy = ?, zmizla_at = NULL WHERE uid = ? AND trener = ?",
@@ -144,8 +146,7 @@ async function snimka(DB: D1Database, z: Zdroj) {
   for (const s of stare) {
     if (videne.has(s.uid) || s.zmizla_at) continue;
     prikazy.push(DB.prepare("UPDATE kal_udalosti SET zmizla_at = ? WHERE uid = ? AND trener = ?").bind(kedy, s.uid, z.trener));
-    if (s.typ === "sukromne" || s.typ === "netrening") continue;
-    zmena("zrusene", s.uid, s.nazov, s.klient, s.zaciatok, null);
+    zmena("zrusene", s.uid, s.nazov, s.klient, s.zaciatok, null, s.typ);
   }
 
   /**
@@ -179,7 +180,7 @@ async function snimka(DB: D1Database, z: Zdroj) {
 
   let zmien = 0;
   for (const x of paruj()) {
-    if (!ohlasitZmenu(x.druh, x.pred, x.po, dnesDen)) continue;
+    if (!ohlasitZmenu(x.druh, x.pred, x.po, dnesDen, x.typ)) continue;
     zmien++;
     prikazy.push(DB.prepare(
       "INSERT INTO kal_zmeny (id, kedy, trener, uid, druh, nazov, klient, pred, po) VALUES (?,?,?,?,?,?,?,?,?)",
