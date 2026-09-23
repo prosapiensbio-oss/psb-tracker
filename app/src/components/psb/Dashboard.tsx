@@ -1079,9 +1079,33 @@ export function Dashboard({
     [obdobie, kotva.plny],
   );
   const vOkne = (mk: string) => mk >= okno.od && mk <= okno.do_;
+
+  /**
+   * Horná hranica TÝŽDENNÝCH grafov — deň, nie mesiac.
+   *
+   * Jerry, 23. 9. 2026: „prečo zelené pásmo končí určitým týždňom a prečo
+   * ukazuje, že som nad zónou nebol ani raz, keď som minulý týždeň urobil
+   * 36 hodín?" Lebo `okno` sa ráta z poslednej KOTVY MESIACA (posledný plný
+   * mesiac = august), a september tak z grafu aj zo zón vypadol celý. Na osi
+   * zostal skok 31. 8. → 21. 9. (predpoveď z kalendára) a dva hotové
+   * septembrové týždne — vrátane toho 36-hodinového — nikde.
+   *
+   * Pravidlo „graf končí posledným plným mesiacom" platí pre MESAČNÉ grafy.
+   * Uzavretý týždeň v neuzavretom mesiaci je uzavretý údaj a patrí dnu;
+   * hranicou je deň, po ktorý siahajú dáta (`kotva.den`).
+   */
+  const koniecTyzdnov = useMemo(() => {
+    const poslednyDenMesiaca = `${okno.do_}-31`;
+    if (!kotva.den) return poslednyDenMesiaca;
+    // Historické obdobie (2025, konkrétny kvartál) sa kotvou neposúva.
+    return okno.do_ >= kotva.den.slice(0, 7) || okno.do_ >= (kotva.plny || "")
+      ? kotva.den
+      : poslednyDenMesiaca;
+  }, [okno.do_, kotva.den, kotva.plny]);
+
   const oknoTyzdnov = useMemo(
-    () => weekRows.filter(([k]) => vOkne(k.slice(0, 7))),
-    [weekRows, okno], // eslint-disable-line react-hooks/exhaustive-deps
+    () => weekRows.filter(([k]) => k.slice(0, 7) >= okno.od && k <= koniecTyzdnov),
+    [weekRows, okno, koniecTyzdnov], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   const weeklyHours = useMemo(() => {
@@ -1145,8 +1169,16 @@ export function Dashboard({
   }, [oknoTyzdnov, trainer, kalendar]);
 
   // Ø / max / min weekly hours (basis follows the trainer pill: "all" = PSB total per week).
+  /**
+   * Ø, najťažší a najľahší týždeň — z TOHO ISTÉHO okna ako graf a zóny.
+   *
+   * Dovtedy sa rátali z celej histórie (`weekRows`), takže na jednej karte
+   * stáli tri rôzne obdobia: graf a zóny za zvolené obdobie, priemer za 87
+   * týždňov a „Max 36h · 14.9." ukazoval na týždeň, ktorý v grafe ani nebol.
+   * Dve miesta, dve pravdy — appka má na to vlastné pravidlo.
+   */
   const weekStats = useMemo(() => {
-    const zdroj = poslednyTyzdenNeuplny ? weekRows.slice(0, -1) : weekRows;
+    const zdroj = poslednyTyzdenNeuplny ? oknoTyzdnov.slice(0, -1) : oknoTyzdnov;
     const pts = zdroj
       .map(([k, v]) => ({
         label: weekLabel(k),
@@ -1162,7 +1194,7 @@ export function Dashboard({
       if (p.h < min.h) min = p;
     }
     return { avg: sum / pts.length, max, min, n: pts.length };
-  }, [weekRows, trainer, poslednyTyzdenNeuplny]);
+  }, [oknoTyzdnov, trainer, poslednyTyzdenNeuplny]);
 
   // Priemerné týždenné hodiny každého trénera zvlášť — počíta sa len z týždňov,
   // v ktorých daný tréner naozaj trénoval, inak by dovolenka jedného stiahla

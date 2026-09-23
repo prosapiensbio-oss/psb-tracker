@@ -840,22 +840,21 @@ export function ZoneBars({
   return (
     <div>
       <div ref={scrollRef} style={{ overflowX: "auto", paddingBottom: 4 }}>
-        <div style={{ position: "relative", display: "flex", gap: 8, alignItems: "flex-end", height, width: "max-content", minWidth: "100%" }}>
-          {zone && (
-            <div
-              style={{
-                position: "absolute",
-                left: 0,
-                right: 0,
-                bottom: 22 + (zone.lo / max) * plotH,
-                height: ((zone.hi - zone.lo) / max) * plotH,
-                background: C.greenBg,
-                borderTop: `1px dashed ${mix(C.green, 40)}`,
-                borderBottom: `1px dashed ${mix(C.green, 40)}`,
-                pointerEvents: "none",
-              }}
-            />
-          )}
+        {/* Zdravé pásmo sa kreslí ako POZADIE, nie ako absolútne umiestnený
+            prvok. Absolútny prvok s `left:0; right:0` vnútri flexu so
+            `width:max-content` sa v niektorých prehliadačoch (Safari, a Kokpit
+            na iPhone je PWA) rozmeria podľa viditeľnej časti, nie podľa obsahu
+            — pásmo potom končí v polovici grafu a vyzerá to ako chyba dát.
+            Gradient na pozadí má vždy presne šírku svojho prvku. */}
+        <div
+          style={{
+            position: "relative", display: "flex", gap: 8, alignItems: "flex-end",
+            height, width: "max-content", minWidth: "100%",
+            ...(zone ? {
+              backgroundImage: `linear-gradient(to top, transparent ${22 + (zone.lo / max) * plotH}px, ${mix(C.green, 40)} ${22 + (zone.lo / max) * plotH}px, ${mix(C.green, 40)} ${23 + (zone.lo / max) * plotH}px, ${C.greenBg} ${23 + (zone.lo / max) * plotH}px, ${C.greenBg} ${22 + (zone.hi / max) * plotH}px, ${mix(C.green, 40)} ${22 + (zone.hi / max) * plotH}px, ${mix(C.green, 40)} ${23 + (zone.hi / max) * plotH}px, transparent ${23 + (zone.hi / max) * plotH}px)`,
+            } : {}),
+          }}
+        >
           {data.map((d, i) => (
             <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", flex: "0 0 46px", zIndex: 1 }}>
               <div style={{ display: "flex", gap: 2, alignItems: "flex-end", height: plotH, flexDirection: stacked ? "column-reverse" : "row" }}>
