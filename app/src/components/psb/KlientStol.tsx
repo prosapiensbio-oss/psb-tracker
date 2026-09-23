@@ -46,6 +46,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats }: {
   btcSats?: Record<string, number>;
 }) {
   const [hladam, setHladam] = useState("");
+  const [novy, setNovy] = useState(false);
   const [meno, setMeno] = useState("");
   const [zalozka, setZalozka] = useState<"treningy" | "financie" | "balicky" | "poznamky" | "puvod">("treningy");
   const [balicky, setBalicky] = useState<Balicek[]>([]);
@@ -59,12 +60,6 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats }: {
     if (r?.ok) setBalicky(r.balicky || []);
   }, []);
   useEffect(() => { void nacitajBalicky(); }, [nacitajBalicky]);
-
-  const navrhy = useMemo(() => {
-    const q = normName(hladam);
-    if (!q || q.length < 2) return [];
-    return mena.filter((m) => normName(m).includes(q)).slice(0, 8);
-  }, [hladam, mena]);
 
   const c = meno ? clients[meno] : undefined;
   const os = useMemo(
@@ -133,22 +128,49 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats }: {
   };
 
   if (!meno) {
+    /**
+     * Zoznam VŠETKÝCH klientov abecedne, vyhľadávanie hore.
+     *
+     * Prvá verzia ukazovala prázdno, kým človek nezačal písať. Jerry, 23. 9.
+     * 2026: „nech sú tam všetci v zozname abecedne a hneď na vrchu je
+     * vyhľadávanie." Prázdna obrazovka núti vedieť meno vopred; zoznam ho
+     * ponúkne — a pri sedemdesiatich menách sa v ňom dá aj len pozerať.
+     */
+    const vsetci = [...new Set([...mena, ...Object.keys(data.clientOverrides || {})])]
+      .sort((a, b) => a.localeCompare(b, "sk"));
+    const q = normName(hladam);
+    const vidno = q ? vsetci.filter((m) => normName(m).includes(q)) : vsetci;
+    const bezSedeni = new Set(vsetci.filter((m) => !clients[m]));
+
     return (
-      <div style={{ padding: "14px 0" }}>
-        <div style={{ fontSize: 12.5, color: C.textMuted, marginBottom: 10 }}>
-          Napíš meno klienta — otvorí sa jeho stôl s tréningami, peniazmi a balíčkami.
+      <div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <input
+            value={hladam}
+            onChange={(e) => setHladam(e.target.value)}
+            placeholder="hľadať klienta…"
+            autoFocus
+            style={{ flex: "1 1 260px", minWidth: 200, padding: "9px 12px", borderRadius: 10, fontSize: 13.5, background: C.bg, border: `1px solid ${C.border}`, color: C.text }}
+          />
+          <button onClick={() => setNovy(true)} style={{ ...navrhTlacidlo, borderColor: mix(C.green, 45), color: C.green, fontWeight: 600 }}>
+            + Nový klient
+          </button>
+          <span style={{ fontSize: 11.5, color: C.textDim }}>{vidno.length} z {vsetci.length}</span>
         </div>
-        <input
-          value={hladam}
-          onChange={(e) => setHladam(e.target.value)}
-          placeholder="hľadať klienta…"
-          autoFocus
-          style={{ width: "min(100%, 360px)", padding: "10px 13px", borderRadius: 10, fontSize: 14, background: C.bg, border: `1px solid ${C.border}`, color: C.text }}
-        />
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10 }}>
-          {navrhy.map((m) => (
-            <button key={m} onClick={() => { setMeno(m); setHladam(""); }} style={navrhTlacidlo}>{m}</button>
+
+        {novy && <NovyKlient onHotovo={(m: string | null) => { setNovy(false); if (m) setMeno(m); }} />}
+
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 12 }}>
+          {vidno.map((m) => (
+            <button key={m} onClick={() => { setMeno(m); setHladam(""); }} style={{
+              ...navrhTlacidlo,
+              color: bezSedeni.has(m) ? C.textDim : C.text,
+              borderStyle: bezSedeni.has(m) ? "dashed" : "solid",
+            }} title={bezSedeni.has(m) ? "Zatiaľ bez sedení — čaká na export z PTmindera" : undefined}>
+              {m}
+            </button>
           ))}
+          {!vidno.length && <Prazdne>Nikto taký. Skús menej písmen, alebo ho založ tlačidlom vyššie.</Prazdne>}
         </div>
       </div>
     );
@@ -409,6 +431,88 @@ const Blok = ({ nadpis, children }: { nadpis: string; children: React.ReactNode 
     <div style={{ fontSize: 12.5, color: C.text, marginTop: 4, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{children}</div>
   </div>
 );
+
+/**
+ * Nový klient — založený v Kokpite skôr, než o ňom vie PTminder.
+ *
+ * Jerry, 23. 9. 2026: „potrebujem aj vytvoriť nového klienta."
+ *
+ * Zakladá sa riadok v `client_overrides`, takže človek existuje hneď —
+ * dá sa mu zapísať balíček, poznámka aj narodeniny. Sedenia a platby
+ * pribudnú samy, keď dorazí export.
+ *
+ * PRETO JE MENO NAJDÔLEŽITEJŠIE POLE. Spája sa podľa neho: keď sa tu napíše
+ * inak než v PTminderi, vzniknú dvaja ľudia a všetko sa rozdelí na polovicu.
+ * Karta to hovorí nahlas — nie je to detail, ktorý si niekto domyslí.
+ */
+function NovyKlient({ onHotovo }: { onHotovo: (meno: string | null) => void }) {
+  const [f, setF] = useState({ meno: "", narodeniny: "", zdroj: "", zdrojKto: "", poznamka: "" });
+  const [pracujem, setPracujem] = useState(false);
+  const [chyba, setChyba] = useState("");
+
+  const zaloz = async () => {
+    const meno = f.meno.trim();
+    if (meno.length < 3) { setChyba("Meno je príliš krátke."); return; }
+    setPracujem(true); setChyba("");
+    // Prvé pole zakladá riadok, ostatné ho dopĺňajú. Keď prvé zlyhá, ďalšie
+    // sa neposielajú — inak by sa polia zapisovali do neexistujúceho človeka.
+    const polia: [string, string][] = [
+      ["zdroj", f.zdroj.trim() || "ine"],
+      ["narodeniny", f.narodeniny.trim()],
+      ["zdrojKto", f.zdrojKto.trim()],
+      ["trainerNote", f.poznamka.trim()],
+    ];
+    for (const [key, value] of polia) {
+      if (!value) continue;
+      const r = await fetch("/api/override", {
+        method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: meno, key, value }),
+      }).then((x) => x.json()).catch(() => ({ ok: false, error: "spojenie" }));
+      if (!r.ok) { setPracujem(false); setChyba(r.error || "nepodarilo sa založiť"); return; }
+    }
+    setPracujem(false);
+    onHotovo(meno);
+  };
+
+  return (
+    <div style={{ marginTop: 12, padding: "12px 14px", borderRadius: 10, border: `1px solid ${mix(C.green, 40)}`, background: mix(C.green, 8) }}>
+      <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 8 }}>Nový klient</div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
+        {([
+          { k: "meno" as const, l: "meno a priezvisko", w: 220 },
+          { k: "narodeniny" as const, l: "narodeniny (RRRR-MM-DD)", w: 170 },
+          { k: "zdroj" as const, l: "odkiaľ prišiel", w: 150 },
+          { k: "zdrojKto" as const, l: "kto ho priviedol", w: 170 },
+          { k: "poznamka" as const, l: "poznámka", w: 200 },
+        ]).map((x) => (
+          <label key={x.k} style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 10.5, color: C.textDim }}>
+            {x.l}
+            <input
+              value={f[x.k]}
+              onChange={(e) => setF({ ...f, [x.k]: e.target.value })}
+              style={{ width: x.w, padding: "7px 9px", borderRadius: 8, fontSize: 12.5, border: `1px solid ${C.border}`, background: C.bg, color: C.text }}
+            />
+          </label>
+        ))}
+        <button onClick={() => void zaloz()} disabled={pracujem || f.meno.trim().length < 3} style={{
+          padding: "8px 15px", borderRadius: 9, fontSize: 12.5, fontWeight: 700,
+          cursor: f.meno.trim().length >= 3 ? "pointer" : "not-allowed",
+          border: `1px solid ${mix(C.green, 50)}`,
+          background: f.meno.trim().length >= 3 ? mix(C.green, 14) : "transparent",
+          color: f.meno.trim().length >= 3 ? C.green : C.textDim,
+        }}>
+          {pracujem ? "…" : "Založiť"}
+        </button>
+        <button onClick={() => onHotovo(null)} style={navrhTlacidlo}>Zrušiť</button>
+      </div>
+      <div style={{ fontSize: 11.5, color: C.orange, marginTop: 9, lineHeight: 1.5 }}>
+        Meno napíš PRESNE tak, ako ho budeš mať v PTminderi. Podľa neho sa to spojí — pri inom
+        zápise vzniknú dvaja ľudia a sedenia aj platby sa rozdelia medzi nich.
+      </div>
+      {chyba && <div style={{ fontSize: 12, color: C.red, marginTop: 8 }}>{chyba}</div>}
+    </div>
+  );
+}
 
 const Prazdne = ({ children }: { children: React.ReactNode }) => (
   <div style={{ fontSize: 12, color: C.textDim, padding: "10px 2px" }}>{children}</div>
