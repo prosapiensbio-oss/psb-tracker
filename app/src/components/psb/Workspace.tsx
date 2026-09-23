@@ -123,8 +123,14 @@ export function Workspace({ clients, mena, ktoSom }: { clients: Record<string, C
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 18, alignItems: "flex-start", overflow: "hidden" }}>
-        <div style={{ flex: "1 1 auto", minWidth: 0 }}>
+      {/* Mriežka s PEVNÝMI stĺpcami, nie flex.
+          Pri flexe sa aktívna karta rozťahovala podľa toho, koľko kariet za
+          ňou ešte zostalo: prvá najužšia (dve presvitali), posledná cez celú
+          šírku. Jerry to zbadal hneď — karta má byť rovnako široká vždy,
+          inak sa obsah pri každom kroku preskladá. Miesto vpravo sa drží aj
+          vtedy, keď už za kartou nič nie je. */}
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) 210px 150px", gap: 18, alignItems: "flex-start", overflow: "hidden" }}>
+        <div style={{ minWidth: 0 }}>
           <Card style={{ marginBottom: 0 }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
               <div style={{ fontSize: 18, fontWeight: 800 }}>{k.nadpis}</div>
@@ -202,22 +208,27 @@ export function Workspace({ clients, mena, ktoSom }: { clients: Record<string, C
 
         {/* Ďalšie karty presvitajú — za aktívnou je vidieť, že sa niekam ide. */}
         {/* Ďalšie karty presvitajú vpravo — klikateľné, nie len ozdoba: keď
-            človek vidí, čo príde, chce tam často skočiť rovno. */}
-        {dalsie.map((d, j) => (
-          <button
-            key={d.druh}
-            onClick={() => setI(i + 1 + j)}
-            style={{
-              flex: "0 0 auto", width: j === 0 ? 210 : 150, opacity: j === 0 ? 0.55 : 0.3,
-              background: "none", border: "none", padding: 0, textAlign: "left", cursor: "pointer",
-            }}
-          >
-            <Card style={{ marginBottom: 0 }}>
-              <div style={{ fontSize: j === 0 ? 14.5 : 13, fontWeight: 700, lineHeight: 1.25 }}>{d.nadpis}</div>
-              <div style={{ fontSize: 11, color: C.textDim, marginTop: 5 }}>{zostava(d)} zostáva</div>
-            </Card>
-          </button>
-        ))}
+            človek vidí, čo príde, chce tam často skočiť rovno. Prázdny slot
+            zostáva prázdny, ale miesto si drží. */}
+        {[0, 1].map((j) => {
+          const d = dalsie[j];
+          if (!d) return <div key={`prazdno-${j}`} />;
+          return (
+            <button
+              key={d.druh}
+              onClick={() => setI(i + 1 + j)}
+              style={{
+                opacity: j === 0 ? 0.55 : 0.3, width: "100%",
+                background: "none", border: "none", padding: 0, textAlign: "left", cursor: "pointer",
+              }}
+            >
+              <Card style={{ marginBottom: 0 }}>
+                <div style={{ fontSize: j === 0 ? 14.5 : 13, fontWeight: 700, lineHeight: 1.25 }}>{d.nadpis}</div>
+                <div style={{ fontSize: 11, color: C.textDim, marginTop: 5 }}>{zostava(d)} zostáva</div>
+              </Card>
+            </button>
+          );
+        })}
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 16, flexWrap: "wrap" }}>
