@@ -1,3 +1,4 @@
+import { pocuvaj } from "../../lib/psb/obnovaSignal";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { krokyZa } from "./MarketingLievik";
@@ -58,6 +59,10 @@ export function PlanMarketingu({ data, clients, chat, onNavigate }: {
       .catch(() => {});
   }, []);
   useEffect(nacitaj, [nacitaj]);
+  // Jarvis píše do tých istých tabuliek z plávajúceho panela, teda bez toho,
+  // aby sa táto obrazovka odmountovala — bez odberu by nový slot alebo plán
+  // pribudol až po obnovení stránky (kontrola 24. 9. 2026).
+  useEffect(() => pocuvaj("marketing", () => { nacitaj(); }), [nacitaj]);
 
   const uloz = async (body: Record<string, unknown>) => {
     setChyba("");

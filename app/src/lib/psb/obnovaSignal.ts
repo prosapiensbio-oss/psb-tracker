@@ -37,7 +37,9 @@ export type Oblast =
   /** Týždenná únava a mesačné poznámky → rituály a kroky uzávierky. */
   | "zapisy"
   /** Klienti a ich polia → `/api/data`, teda skoro celá appka. */
-  | "klienti";
+  | "klienti"
+  /** Nápady, sloty v mape cyklu, marketingové plány. */
+  | "marketing";
 
 type Poslucháč = () => void;
 const poslucháči = new Map<Oblast, Set<Poslucháč>>();

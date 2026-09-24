@@ -214,6 +214,8 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
   // nikto nepamätá, či sa ešte vráti. Zoznam z toho robí vec, ktorú sa dá
   // prejsť; počíta sa aj do kapacity, tak nech je vidieť, koho to drží.
   const [lenPauza, setLenPauza] = useState(false);
+  /** Zvýši sa po prepise stálej poznámky — denník pod ňou sa načíta znova. */
+  const [dennikVerzia, setDennikVerzia] = useState(0);
   const [kpiWin, setKpiWin] = useState("2026");
   const [kpiFrom, setKpiFrom] = useState("");
   const [kpiTo, setKpiTo] = useState("");
@@ -600,8 +602,13 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
               <div key={c.meno} style={{ display: "flex", gap: 10, alignItems: "center", fontSize: 13, padding: "3px 0", flexWrap: "wrap" }}>
                 <span style={{ fontWeight: 500 }}>{c.meno}</span>
                 <Badge tone="blue">nepotvrdená</Badge>
+                {/* Tri rôzne dôvody, prečo tu človek je — a každý znamená
+                    niečo iné (24. 9. 2026). „Založený ručne" nečaká na nič
+                    v kalendári, čaká na prvý tréning v exporte. */}
                 <span style={{ color: C.textMuted, fontSize: 12 }}>
-                  úvodný {fmtDate(c.uvodny)}{c.trener ? ` · ${c.trener}` : ""} — z kalendára
+                  {c.druh === "rucne"
+                    ? "založený ručne v Kokpite"
+                    : `${c.druh === "trening" ? "tréning" : "úvodný"} ${fmtDate(c.uvodny)}${c.trener ? ` · ${c.trener}` : ""} — z kalendára`}
                 </span>
               </div>
             ))}
@@ -894,10 +901,10 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
               nemaže. Pri prepise stálej poznámky server odloží starú verziu do
               denníka — nič sa nestráca ani tu. */}
           <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4, marginTop: 4 }}>Stála poznámka (fakty — prepisuje sa, stará verzia sa odloží do denníka)</div>
-          <textarea style={{ ...S.input, minHeight: 70, resize: "vertical", marginBottom: 14 }} defaultValue={editC.trainerNote} onBlur={(e) => actions.setOverride(editC.name, "trainerNote", e.target.value)} />
+          <textarea style={{ ...S.input, minHeight: 70, resize: "vertical", marginBottom: 14 }} defaultValue={editC.trainerNote} onBlur={(e) => void actions.setOverride(editC.name, "trainerNote", e.target.value).then(() => setDennikVerzia((v) => v + 1))} />
           <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 6 }}>Denník — príbeh klienta v čase (pridáva sa, nemaže)</div>
           <div style={{ marginBottom: 14 }}>
-            <Dennik meno={editC.name} limit={4} onNovyZapis={onDennikZapis} />
+            <Dennik meno={editC.name} limit={4} onNovyZapis={onDennikZapis} obnovKluc={dennikVerzia} />
           </div>
         </Modal>
       )}

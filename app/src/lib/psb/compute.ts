@@ -1630,23 +1630,48 @@ export function udalostiBezMena(
  * Existencia klienta a POTVRDENIE jeho existencie sú dve rôzne veci. Toto je
  * to prvé; druhé prinesie export a vtedy človek z tohto zoznamu zmizne sám.
  */
-export type CakajuciKlient = { meno: string; uvodny: string; trener: string | null; zNazvu?: boolean };
+export type CakajuciKlient = {
+  meno: string;
+  /** Deň, od ktorého o ňom vieme (úvodný alebo prvý tréning v kalendári). */
+  uvodny: string;
+  trener: string | null;
+  zNazvu?: boolean;
+  /**
+   * Odkiaľ o ňom vieme. `uvodny` = mal úvodný tréning, `trening` = má bežný
+   * tréning v kalendári, `rucne` = niekto ho v appke založil.
+   */
+  druh?: "uvodny" | "trening" | "rucne";
+};
 
 export function cakajuciKlienti(
   clients: Record<string, Pick<ClientAgg, "name">>,
   udalosti: { zaciatok: string; klient: string | null; typ: string | null; trener?: string; nazov?: string }[] | undefined,
   zmeny?: ZmenaVKalendari[],
   dnes: Date = new Date(),
+  /** Mená, ktoré má appka len z ručného zápisu (novo založený klient). */
+  menaZOverride: string[] = [],
 ): CakajuciKlient[] {
   const zname = new Set(Object.keys(clients).map(normName));
   const zrusene = zruseneTreningy(zmeny);
   const den = dnes.toISOString().slice(0, 10);
   const najdene: Record<string, CakajuciKlient> = {};
   for (const u of udalosti || []) {
-    if (u.typ !== "uvodny") continue;
-    // Meno smie prísť aj z názvu udalosti — pri úvodnom je to nový človek,
-    // takže sa nemá čo pripísať cudziemu.
-    const meno = klientUdalosti(u);
+    /**
+     * BEŽNÝ TRÉNING TU PATRÍ TIEŽ (Jerry, 24. 9. 2026).
+     *
+     * „Teraz to robíme dvojito" — PTminder aj Google Kalendár. Kým sa čaká na
+     * export, je kalendár rovnocenný zdroj a človek, ktorý má v ňom tréning,
+     * je klient. Doteraz sa chytal len úvodný, takže klient, ktorý prešiel
+     * rovno na bežné tréningy, v appke neexistoval.
+     *
+     * Rozdiel medzi nimi je v tom, ODKIAĽ smie prísť meno. Pri úvodnom je to
+     * nový človek, takže sa smie prečítať aj z názvu udalosti — nemá sa čo
+     * pripísať cudziemu. Pri bežnom tréningu nie: „Peťa B" v kalendári môže
+     * byť ktokoľvek a vyrobiť z nej klienta by znamenalo založiť človeka,
+     * ktorý neexistuje. Preto sa berie LEN potvrdené priradenie.
+     */
+    if (u.typ !== "uvodny" && u.typ !== "trening") continue;
+    const meno = u.typ === "uvodny" ? klientUdalosti(u) : (u.klient || "").trim();
     if (!meno) continue;
     const d = (u.zaciatok || "").slice(0, 10);
     // Úvodný, ktorý sa ešte nekonal, nikoho klientom nerobí.
@@ -1656,8 +1681,26 @@ export function cakajuciKlienti(
     // Fuzzy zhoda podrží preklep aj diakritiku — Prochadzka verzus Procházka.
     if (najdiKlienta(Object.keys(clients), meno)) continue;
     if (!najdene[k] || d > najdene[k].uvodny) {
-      najdene[k] = { meno, uvodny: d, trener: u.trener || null, zNazvu: !(u.klient || "").trim() };
+      najdene[k] = {
+        meno, uvodny: d, trener: u.trener || null,
+        zNazvu: !(u.klient || "").trim(),
+        // Úvodný má prednosť: keď má človek oboje, je to nový klient po
+        // úvodnom, nie „len tréning v kalendári".
+        druh: najdene[k]?.druh === "uvodny" || u.typ === "uvodny" ? "uvodny" : "trening",
+      };
     }
+  }
+  /**
+   * Ručne založený klient (+ Nový klient) tiež ešte v exporte nie je.
+   *
+   * Doteraz existoval iba v tom jednom zozname, kde ho človek založil —
+   * v Klientoch, vo vyhľadávaní ani u Jarvisa nebol (kontrola 24. 9. 2026).
+   */
+  for (const m of menaZOverride) {
+    const k = normName(m);
+    if (!k || zname.has(k) || najdene[k]) continue;
+    if (najdiKlienta(Object.keys(clients), m)) continue;
+    najdene[k] = { meno: m, uvodny: "", trener: null, druh: "rucne" };
   }
   return Object.values(najdene).sort((a, b) => b.uvodny.localeCompare(a.uvodny));
 }

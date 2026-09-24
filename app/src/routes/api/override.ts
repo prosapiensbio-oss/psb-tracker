@@ -95,9 +95,20 @@ export const Route = createFileRoute("/api/override")({
          * SPOLU s číslom, na serveri: obrazovka aj Jarvis tak posielajú jednu
          * hodnotu a zabudnúť sa nedá.
          */
+        /**
+         * Server vracia VŠETKO, čo zapísal — nielen to, o čo ho niekto požiadal.
+         *
+         * Pri zostatku balíčka sa dopisuje aj druhé pole (dátum kotvy), lenže
+         * obrazovka premietla len ten jeden kľúč, ktorý poslala. A `compute.ts`
+         * kotvu použije, len keď má OBE — takže do obnovenia stránky sa
+         * nezmenilo ani jedno číslo (kontrola 24. 9. 2026). Nech teda appka
+         * nehádá, čo server urobil; nech jej to povie.
+         */
+        const zapisane: Record<string, unknown> = { [key]: value };
         if (key === "balicekZostatok" && ulozene) {
-          await setOverride(DB, name, "balicekKDatumu" as keyof ClientOverride,
-            value == null || value === "" ? "" : new Date().toISOString().slice(0, 10));
+          const den = value == null || value === "" ? "" : new Date().toISOString().slice(0, 10);
+          await setOverride(DB, name, "balicekKDatumu" as keyof ClientOverride, den);
+          zapisane.balicekKDatumu = den;
         }
         if (!ulozene) {
           // Nehlásiť „uložené" nad ničím. Obrazovka dostane ok:false a ukáže
@@ -105,7 +116,7 @@ export const Route = createFileRoute("/api/override")({
           return Response.json({ ok: false, error: "Zápis do databázy neprešiel — skús znova. Ak sa to opakuje, povedz to." }, { status: 502 });
         }
         await audit(DB, { action: "uprava-klienta", predmet: `${name} · ${key}`, neu: value, actor: await currentUser(request) || undefined });
-        return Response.json({ ok: true });
+        return Response.json({ ok: true, zapisane, meno: name });
       },
     },
   },

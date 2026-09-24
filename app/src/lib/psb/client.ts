@@ -98,13 +98,21 @@ export async function ingestFiles(
  * obrazovka aj tak ukázala novú hodnotu (optimistický zápis) a po načítaní
  * stránky bola preč. Tichý neúspech je horší než hlasitá chyba.
  */
+/**
+ * Vracia aj to, čo server naozaj zapísal.
+ *
+ * Pri zostatku balíčka dopisuje server druhé pole (dátum kotvy) a obrazovka
+ * o ňom nevedela, takže sa zmena do obnovenia stránky neprejavila. Namiesto
+ * zrkadlenia serverovej logiky v prehliadači — čo je presne tá chyba „dve
+ * miesta, jedno pravidlo" — si appka vypýta výsledok.
+ */
 export async function saveOverride(
   name: string,
   key: keyof ClientOverride,
   value: unknown,
-): Promise<boolean> {
-  const r = await post("/api/override", { name, key, value });
-  return r.ok;
+): Promise<{ ok: boolean; zapisane?: Record<string, unknown> }> {
+  const r = await post("/api/override", { name, key, value }) as { ok: boolean; zapisane?: Record<string, unknown> };
+  return { ok: r.ok, zapisane: r.zapisane };
 }
 
 /**

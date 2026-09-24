@@ -35,9 +35,18 @@ const FARBA_ZDROJA: Record<string, string> = {
   "karta klienta": C.textMuted,
 };
 
-export function Dennik({ meno, limit = 4, onNovyZapis }: {
+export function Dennik({ meno, limit = 4, onNovyZapis, obnovKluc = 0 }: {
   meno: string;
   limit?: number;
+  /**
+   * Zmena tohto čísla načíta denník znova.
+   *
+   * Prepis stálej poznámky odkladá jej starú verziu do denníka (rieši to
+   * server), lenže denník sa načítaval len pri zmene mena — takže riadok
+   * „Stála poznámka predtým: …" sa v otvorenom okne neobjavil (kontrola
+   * 24. 9. 2026). Kto poznámku prepíše, zvýši toto číslo.
+   */
+  obnovKluc?: number;
   /** Zápis po uložení spracuje Jarvis na pozadí (pripomienky) — vracia
    *  jednu vetu o tom, čo si zapísal, alebo null, keď nič nevyplynulo. */
   onNovyZapis?: (meno: string, text: string) => Promise<string | null>;
@@ -71,7 +80,9 @@ export function Dennik({ meno, limit = 4, onNovyZapis }: {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ klient: meno, bolest: hodnota }),
     }).then((r) => r.json()).catch(() => ({ ok: false }));
-    if (j.ok) { nacitajMerania(meno); return; }
+    // Aj os času, nielen zhrnutie nad tlačidlami. Bez tohto sa nový riadok
+    // „bolesť X/10" objavil až po zavretí a otvorení karty (kontrola 24. 9.).
+    if (j.ok) { nacitajMerania(meno); void nacitaj(meno); return; }
     // Zvýraznené číslo bez zápisu je presne tá lož, kvôli ktorej Jerry celý
     // večer vypisoval dôvody do prázdna (precoNeprisiel, 13. 8.). Tlačidlo
     // sa vráti a chyba sa povie.
@@ -114,7 +125,13 @@ export function Dennik({ meno, limit = 4, onNovyZapis }: {
         if (onNovyZapis) {
           setJarvisOznam("Jarvis číta zápis…");
           void onNovyZapis(meno, t)
-            .then((o) => setJarvisOznam(o || ""))
+            .then((o) => {
+              setJarvisOznam(o || "");
+              // Jarvisov záver sa uloží až TERAZ — os času sa načítala pred
+              // ním, takže riadok „Jarvis: …" v nej chýbal až do zavretia
+              // a otvorenia karty (kontrola 24. 9. 2026).
+              if (o) nacitaj(meno);
+            })
             .catch(() => setJarvisOznam(""));
         }
       })

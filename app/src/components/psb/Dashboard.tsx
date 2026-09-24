@@ -1,3 +1,4 @@
+import { oznam } from "../../lib/psb/obnovaSignal";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 
@@ -2294,9 +2295,10 @@ function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar }: { i
     if (!id) { setDopytChyba("Dopyt sa NEULOŽIL — skús znova."); return; }
     setDopytOtvoreny(false);
     const zdrojLabel = SOURCES.find((x) => x.value === dopytZdroj)?.label || dopytZdroj;
-    // Uzavretie položky prekreslí register; samotný dopyt sa v Marketingu
-    // objaví pri najbližšom načítaní dát. Dôležité je, že je ZAPÍSANÝ —
-    // notifikácia zmizne až po potvrdenom id, nie po kliknutí.
+    // Uzavretie položky prekreslí register a dopyt sa hneď objaví aj
+    // v Marketingu a v Dopytoch. Dovtedy tu stálo „objaví sa pri najbližšom
+    // načítaní dát" — appka na to má cestu, tak ju použi (kontrola 24. 9.).
+    oznam("klienti");
     vybav(`dopyt dopísaný: ${zdrojLabel}${dopytZdroj === "referencia" && dopytOdKoho.trim() ? ` — od ${dopytOdKoho.trim()}` : ""}`);
   };
   /**

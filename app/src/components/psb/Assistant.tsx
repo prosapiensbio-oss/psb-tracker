@@ -714,9 +714,12 @@ export function useAssistantChat(
           body: JSON.stringify(telo),
         })
           .then((r) => r.json())
-          .then((j: { ok?: boolean; error?: string }) => oznamVysledok(j.ok
-            ? `Plán zapísaný: ${String(d.nazov)} (${String(d.od)} – ${String(d.do)}). Otvor si ho v Marketing → Čo publikovať.`
-            : `Plán sa NEZAPÍSAL: ${j.error || "bez dôvodu"}`))
+          .then((j: { ok?: boolean; error?: string }) => {
+            if (j.ok) oznam("marketing");
+            oznamVysledok(j.ok
+              ? `Plán zapísaný: ${String(d.nazov)} (${String(d.od)} – ${String(d.do)}). Otvor si ho v Marketing → Čo publikovať.`
+              : `Plán sa NEZAPÍSAL: ${j.error || "bez dôvodu"}`);
+          })
           .catch(() => oznamVysledok("Zápis plánu zlyhal — spojenie."));
       } else if (a.type === "naplanuj-obsah" && a.data) {
         // Jarvisov návrh sa zapíše do TEJ ISTEJ tabuľky, do ktorej píše mapa
@@ -743,6 +746,10 @@ export function useAssistantChat(
               // tlačidlo otvorilo prázdny slot tej bunky a Jerry by si v nej
               // svoj nový návrh musel nájsť sám.
               onNaplanovane?.(String(d.mesiac), Number(d.faza), j.id);
+              // Mapa cyklu aj karta Nápady si nápady ťahajú samy a len pri
+              // otvorení — z plávajúceho panela by sa nový slot neobjavil,
+              // kým sa stránka nenačíta znova (kontrola 24. 9. 2026).
+              oznam("marketing");
             }
             oznamVysledok(j.ok
               ? `Naplánované na ${String(d.mesiac)}: ${String(d.koncept).slice(0, 70)}`
@@ -757,7 +764,10 @@ export function useAssistantChat(
         void fetchVzasSettings().then((st) => {
           const zoz = Array.isArray(st["mkt_znacky"]) ? (st["mkt_znacky"] as Record<string, unknown>[]) : [];
           zoz.push({ id: `z${Date.now().toString(36)}`, datum: String(d.datum), text: String(d.text).slice(0, 160) });
-          void saveVzasSetting("mkt_znacky", zoz).then((ok) => oznamVysledok(ok ? `Značka zapísaná: ${String(d.text).slice(0, 60)}` : "Značka sa NEZAPÍSALA — skús znova."));
+          void saveVzasSetting("mkt_znacky", zoz).then((ok) => {
+            oznamVysledok(ok ? `Značka zapísaná: ${String(d.text).slice(0, 60)}` : "Značka sa NEZAPÍSALA — skús znova.");
+            if (ok) oznam("marketing");
+          });
         });
       } else if (a.type === "uprav-pnl" && a.data) {
         // Rovnaká cesta, akou opravu zapíše človek klikom na číslo v tabuľke —

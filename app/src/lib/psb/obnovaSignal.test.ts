@@ -43,9 +43,13 @@ describe("signál obnovy", () => {
   it("každá oblasť, ktorú appka oznamuje, má v App poslucháča", () => {
     // Stráž proti pridaniu oblasti, ktorú nikto nespracuje — zápis by sa
     // zase potichu nikam nepremietol.
-    const app = readFileSync(`${import.meta.dir}/../../components/psb/App.tsx`, "utf8");
-    const oblasti: Oblast[] = ["peniaze", "kalendar", "zapisy", "klienti"];
-    const bezPosluchaca = oblasti.filter((o) => !app.includes(`pocuvaj("${o}"`));
+    // Poslucháč nemusí byť v App — marketingové obrazovky si oblasť
+    // „marketing" odoberajú samy. Hľadá sa preto naprieč komponentmi.
+    const kde = ["App.tsx", "MapaCyklu.tsx", "PlanMarketingu.tsx"]
+      .map((f) => readFileSync(`${import.meta.dir}/../../components/psb/${f}`, "utf8"))
+      .join("\n");
+    const oblasti: Oblast[] = ["peniaze", "kalendar", "zapisy", "klienti", "marketing"];
+    const bezPosluchaca = oblasti.filter((o) => !kde.includes(`pocuvaj("${o}"`));
     expect(bezPosluchaca).toEqual([]);
   });
 });

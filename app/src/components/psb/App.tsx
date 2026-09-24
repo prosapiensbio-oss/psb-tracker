@@ -1,4 +1,4 @@
-import { pocuvaj } from "../../lib/psb/obnovaSignal";
+import { oznam, pocuvaj } from "../../lib/psb/obnovaSignal";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { nazovFazy } from "../../lib/psb/mapaCyklu";
@@ -1060,8 +1060,10 @@ export function PSBApp() {
    * Obrazovka Klienti ich ukáže nad tabuľkou ako „nepotvrdená".
    */
   const cakajuci = useMemo(
-    () => cakajuciKlienti(clients, kalUdalosti, kalZmeny),
-    [clients, kalUdalosti, kalZmeny],
+    // Ručne založení klienti idú do toho istého zoznamu — sú to tiež ľudia,
+    // o ktorých appka vie, ale export ich ešte nepotvrdil (24. 9. 2026).
+    () => cakajuciKlienti(clients, kalUdalosti, kalZmeny, new Date(), Object.keys(data.clientOverrides || {})),
+    [clients, kalUdalosti, kalZmeny, data.clientOverrides],
   );
 
   const [bankaPrijmy, setBankaPrijmy] = useState<Record<string, number>>({});
@@ -2218,7 +2220,16 @@ function skupinaFaktur(
           ...prev,
           clientOverrides: { ...prev.clientOverrides, [canonical]: { ...prev.clientOverrides[canonical], [key]: value } },
         }));
-        const ok = await saveOverride(canonical, key, value);
+        const { ok, zapisane } = await saveOverride(canonical, key, value);
+        // Server môže zapísať VIAC polí, než o koľko ho appka požiadala
+        // (zostatok balíčka si so sebou nesie dátum kotvy). Premietne sa
+        // presne to, čo naozaj zapísal — appka jeho logiku nezrkadlí.
+        if (ok && zapisane && Object.keys(zapisane).length > 1) {
+          setData((prev) => ({
+            ...prev,
+            clientOverrides: { ...prev.clientOverrides, [canonical]: { ...prev.clientOverrides[canonical], ...zapisane } },
+          }));
+        }
         if (!ok) {
           // Karta klienta má štrnásť polí a každé volá tento setter. Obaliť
           // ich po jednom by znamenalo pätnáste miesto, na ktoré sa zabudne —
@@ -2260,6 +2271,11 @@ function skupinaFaktur(
         // scrollu. Po nahratí to vyzeralo, akoby appka skočila na začiatok a
         // upload sa sám zabalil; pritom sa len prekreslila od nuly.
         await load(true);
+        // Porovnania s PTminderom a peňažné sumy nežijú v /api/data — bez
+        // tohto ukazovali obrazovky nové čísla a Jarvis stále staré
+        // (kontrola 24. 9. 2026).
+        oznam("peniaze");
+        oznam("kalendar");
         return res;
       },
       reset: async () => {

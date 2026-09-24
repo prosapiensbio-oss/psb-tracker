@@ -141,8 +141,43 @@ describe("cakajuciKlienti — profil vzniká z úvodného v kalendári", () => {
       [{ druh: "zrusene", klient: "Kto", pred: "2026-08-14T16:00" }], DNES)).toHaveLength(0);
   });
 
-  it("bežný tréning profil nezakladá — len úvodný", () => {
-    expect(cakajuciKlienti(KLIENTI, [u("2026-08-14T16:00:00Z", "Kto", "trening")], [], DNES)).toHaveLength(0);
+  it("bežný tréning profil ZAKLADÁ — kým beží dvojitý chod, kalendár je rovnocenný zdroj", () => {
+    // Zmenené 24. 9. 2026. Jerry: „nezabúdaj, že teraz to robíme dvojito."
+    // Kým sa čaká na export z PTmindera, človek s tréningom v kalendári je
+    // klient — dovtedy klient, ktorý prešiel rovno na bežné tréningy, v appke
+    // neexistoval.
+    const v = cakajuciKlienti(KLIENTI, [u("2026-08-14T16:00:00Z", "Kto", "trening")], [], DNES);
+    expect(v).toHaveLength(1);
+    expect(v[0].druh).toBe("trening");
+  });
+
+  it("ale NEPOTVRDENÝ názov z kalendára klienta nezaloží", () => {
+    // „Peťa B" môže byť ktokoľvek. Pri úvodnom sa meno z názvu čítať smie
+    // (je to nový človek), pri bežnom tréningu nie — vyrobilo by to človeka,
+    // ktorý neexistuje, a tréningy by sa mu pripisovali.
+    const bezPriradenia = { zaciatok: "2026-08-14T16:00:00Z", klient: null, typ: "trening", trener: "Jerry", nazov: "Peťa B" };
+    expect(cakajuciKlienti(KLIENTI, [bezPriradenia], [], DNES)).toHaveLength(0);
+  });
+
+  it("úvodný má prednosť pred bežným tréningom toho istého človeka", () => {
+    const v = cakajuciKlienti(KLIENTI, [
+      u("2026-08-10T16:00:00Z", "Kto", "uvodny"),
+      u("2026-08-14T16:00:00Z", "Kto", "trening"),
+    ], [], DNES);
+    expect(v).toHaveLength(1);
+    expect(v[0].druh).toBe("uvodny");
+  });
+
+  it("ručne založený klient je v zozname tiež", () => {
+    // Doteraz existoval iba na tej jednej obrazovke, kde ho človek založil.
+    const v = cakajuciKlienti(KLIENTI, [], [], DNES, ["Novy Clovek"]);
+    expect(v.map((x) => x.meno)).toEqual(["Novy Clovek"]);
+    expect(v[0].druh).toBe("rucne");
+  });
+
+  it("kto už v exporte je, sa medzi čakajúcich nepridá", () => {
+    const meno = Object.keys(KLIENTI)[0];
+    expect(cakajuciKlienti(KLIENTI, [], [], DNES, [meno])).toHaveLength(0);
   });
 });
 

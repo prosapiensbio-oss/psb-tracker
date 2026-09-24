@@ -1,3 +1,4 @@
+import { pocuvaj } from "../../lib/psb/obnovaSignal";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -111,6 +112,10 @@ export function MapaCyklu({ data, chat, onNavigate, focus, onOdchodKJarvisovi }:
   }, []);
 
   useEffect(nacitaj, [nacitaj]);
+  // Jarvis píše do tých istých tabuliek z plávajúceho panela, teda bez toho,
+  // aby sa táto obrazovka odmountovala — bez odberu by nový slot alebo plán
+  // pribudol až po obnovení stránky (kontrola 24. 9. 2026).
+  useEffect(() => pocuvaj("marketing", () => { nacitaj(); }), [nacitaj]);
 
   // Kotva je posledný mesiac s dátami — to isté pravidlo ako pri grafoch.
   // Plánovacia časť ide za dnešok, nie za kotvu: plánuje sa do kalendára.
