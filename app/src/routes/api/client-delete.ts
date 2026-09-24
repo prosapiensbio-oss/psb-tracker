@@ -30,11 +30,22 @@ export const Route = createFileRoute("/api/client-delete")({
         if (!name) return Response.json({ ok: false, error: "no_name" }, { status: 400 });
 
         const zmazane: Record<string, number> = {};
+        // Zoznam musí rásť s appkou. Pribudli tabuľky, ktoré v pôvodnom
+        // zozname neboli — vlastná evidencia balíčkov a kniha platieb (obe
+        // 22. 9. 2026), poplatky, denník, merania a mapovanie z kalendára —
+        // a bez nich by po „zmazanom" klientovi zostali riadky, ktoré ho
+        // z appky vrátia späť.
         for (const [tabulka, stlpec] of [
           ["sessions", "client_name"],
           ["payments", "client_name"],
           ["packages", "client_name"],
           ["services", "client_name"],
+          ["poplatky", "client_name"],
+          ["client_notes", "client_name"],
+          ["klient_merania", "klient"],
+          ["balicky", "klient"],
+          ["platby", "klient"],
+          ["kal_mapovanie", "klient"],
           ["client_overrides", "name"],
         ] as const) {
           try {

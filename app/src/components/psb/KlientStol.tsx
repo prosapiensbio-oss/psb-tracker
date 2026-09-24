@@ -79,6 +79,9 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
   const [pl, setPl] = useState({ datum: dnesISO(), suma: "", sposob: "hotovost", poznamka: "" });
   const [balicky, setBalicky] = useState<Balicek[]>([]);
   const [vlastnePlatby, setVlastnePlatby] = useState<Platba[]>([]);
+  /** Príjmy z výpisu, ktoré ešte nemajú klienta — na návrh „nie je to jeho?". */
+  const [cakajuce, setCakajuce] = useState<{ fioId: string; datum: string; suma: number; text: string; kandidati: string[]; zdrojNavrhu?: string }[]>([]);
+  const [mazem, setMazem] = useState(false);
   /** Čo sa práve upravuje — id riadku, alebo prázdno. */
   const [upravaPlatby, setUpravaPlatby] = useState("");
   const [upravaBalicka, setUpravaBalicka] = useState("");
@@ -110,7 +113,20 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
     const r = await fetch("/api/platby?klient=1", { credentials: "same-origin" }).then((x) => x.json()).catch(() => null);
     if (r?.ok) setVlastnePlatby(r.platby || []);
   }, []);
-  useEffect(() => { void nacitajBalicky(); void nacitajPlatby(); }, [nacitajBalicky, nacitajPlatby]);
+
+  /**
+   * Nepriradené príjmy z banky — celý zoznam, filtruje sa až pri klientovi.
+   *
+   * Jerry, 24. 9. 2026: „keď kliknem na platbu, mohla by sa tam ukázať už
+   * pravdepodobná platba a ja by som ju vedel pridať priamo z profilu."
+   * Doteraz sa príjmy priraďovali len v kope alebo v Platbách z banky —
+   * teda na inom mieste, než kde človek rieši konkrétneho človeka.
+   */
+  const nacitajCakajuce = useCallback(async () => {
+    const r = await fetch("/api/platby", { credentials: "same-origin" }).then((x) => x.json()).catch(() => null);
+    if (r?.ok) setCakajuce(r.nepriradene || []);
+  }, []);
+  useEffect(() => { void nacitajBalicky(); void nacitajPlatby(); void nacitajCakajuce(); }, [nacitajBalicky, nacitajPlatby, nacitajCakajuce]);
 
   const c = meno ? clients[meno] : undefined;
   const os = useMemo(
@@ -127,6 +143,19 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
     () => vlastnePlatby.filter((x) => normName(x.klient) === normName(meno) && !x.zrusene_at).sort((a, b) => b.datum.localeCompare(a.datum)),
     [vlastnePlatby, meno],
   );
+
+  /**
+   * Príjmy z výpisu, ktoré appka navrhuje práve tomuto klientovi.
+   *
+   * Nič sa nepriraďuje samo — je to návrh na jeden klik. Preto sa berú aj
+   * riadky, kde sedí viac ľudí: tu už je jasné, o koho ide, takže z dvoch
+   * možností je to rozhodnuté.
+   */
+  const jehoCakajuce = useMemo(() => {
+    if (!meno) return [];
+    const k = normName(meno);
+    return cakajuce.filter((x) => (x.kandidati || []).some((c) => normName(c) === k));
+  }, [cakajuce, meno]);
 
   /** Bitcoinové platby tohto klienta. Kľúč je fuzzy — BTC kniha píše mená inak. */
   const mojeBtc = useMemo(() => {
@@ -358,6 +387,30 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
     else if (!onOverride) setChyba("Uložené. Obnov stránku, aby sa to prepočítalo všade.");
   };
 
+  /**
+   * Zmazanie klienta zo VŠETKÝCH tabuliek.
+   *
+   * Jerry, 24. 9. 2026: „je tam _test_ a toho nemôžem vymazať." Appka to
+   * vedela celý čas (/api/client-delete), len sa to nedalo odnikiaľ stlačiť.
+   * Je to oprava dát, nie bežná operácia — preto je schované pod detailmi,
+   * pýta si napísanie mena a hovorí, čo presne zmizne.
+   */
+  const zmazKlienta = async () => {
+    const co = prompt(`Zmazať ${meno} zo VŠETKÝCH tabuliek? Tréningy, platby, balíčky, poznámky aj meranie.\nNedá sa vrátiť.\n\nNapíš meno presne tak, ako je hore:`);
+    if (co === null) return;
+    if (co.trim() !== meno) { setChyba("Meno nesedí — nemažem nič."); return; }
+    setMazem(true); setChyba("");
+    const r = await fetch("/api/client-delete", {
+      method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name: meno, reason: "zmazané z pracovného stola" }),
+    }).then((x) => x.json()).catch(() => ({ ok: false, error: "spojenie" }));
+    setMazem(false);
+    if (!r.ok) { setChyba(r.error || "nepodarilo sa zmazať"); return; }
+    const kolko = Object.entries(r.zmazane || {}).filter(([, n]) => Number(n) > 0).map(([t, n]) => `${t}: ${n}`).join(", ");
+    naZoznam();
+    setChyba(`${meno} zmazaný (${kolko || "nič nebolo"}). Obnov stránku, aby zmizol všade.`);
+  };
+
   const naZoznam = () => { setMeno(""); setFilter("zdravie"); setPisem(false); setPisemPlatbu(false); };
 
   /** Zmena kategórie klienta — ručný stav prebije automatický. */
@@ -395,6 +448,18 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
     if (!r.ok) { setChyba(r.error || "nepodarilo sa uložiť"); return; }
     setUpravaPlatby(""); setPl({ datum: dnesISO(), suma: "", sposob: "hotovost", poznamka: "" });
     await nacitajPlatby();
+  };
+
+  /** Príjem z výpisu patrí tomuto klientovi — jedným klikom, aj s naučením. */
+  const priradPrijem = async (fioId: string) => {
+    setPracujem(true); setChyba("");
+    const r = await fetch("/api/platby", {
+      method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ akcia: "priradz", fioId, klient: meno, zapamataj: true }),
+    }).then((x) => x.json()).catch(() => ({ ok: false, error: "spojenie" }));
+    setPracujem(false);
+    if (!r.ok) { setChyba(r.error || "nepodarilo sa priradiť"); return; }
+    await Promise.all([nacitajPlatby(), nacitajCakajuce()]);
   };
 
   const zrusPlatbu = async (id: string) => {
@@ -689,7 +754,15 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
       <div style={{ flexGrow: 1, minWidth: 0, display: "flex", flexDirection: "column", minHeight: 0 }}>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", flexShrink: 0 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: C.textDim, letterSpacing: 0.5 }}>VŠETKO V ČASE</div>
-          <div style={{ flexGrow: 1 }} />
+          {detaily && (
+          <button onClick={() => void zmazKlienta()} disabled={mazem} style={{
+            ...navrhTlacidlo, textAlign: "left", borderColor: mix(C.red, 40), color: C.red,
+          }}>
+            {mazem ? "mažem…" : "Zmazať klienta zo všetkého"}
+          </button>
+        )}
+
+        <div style={{ flexGrow: 1 }} />
           <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
             {/* „Tréningy" a „Odkiaľ prišiel" sú preč (Jerry, 23. 9. 2026):
                 prvé bolo to isté, čo „všetko" bez dvoch riadkov, druhé sa
@@ -822,6 +895,39 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
                 </div>
               ))}
               <div style={hlavicka}>Z PTMINDERA</div>
+            </div>
+          )}
+
+          {/* ČO MU APPKA PONÚKA Z VÝPISU.
+              Príjem, ktorý ešte nemá klienta a podľa mena alebo podľa sumy
+              a dňa vyzerá na tohto človeka. Priradiť sa dá odtiaľto — doteraz
+              sa to dalo len v kope alebo v Platbách z banky, teda inde, než
+              kde človek rieši konkrétneho klienta (Jerry, 24. 9. 2026). */}
+          {filter === "peniaze" && penazSub === "platby" && !!jehoCakajuce.length && (
+            <div style={{ marginBottom: 14, padding: "10px 12px", borderRadius: 10, background: mix(C.accent, 8), border: `1px solid ${mix(C.accent, 35)}` }}>
+              <div style={{ ...hlavicka, borderBottom: "none", padding: "0 0 6px", color: C.accentLight }}>
+                Z VÝPISU — NEPRIRADENÉ, VYZERÁ TO NA NEHO
+              </div>
+              {jehoCakajuce.map((x) => (
+                <div key={x.fioId} style={riadok}>
+                  <span style={stlpecDen}>{fmtDMY(x.datum)}</span>
+                  <span style={{ flex: 1, color: C.textMuted, fontSize: 11.5 }}>
+                    {x.text.slice(0, 70)}
+                    <span style={{ color: C.textDim }}>
+                      {" · "}{x.zdrojNavrhu === "suma" ? "podľa sumy a dňa" : x.zdrojNavrhu === "naucene" ? "naučené" : "podľa mena"}
+                      {x.kandidati.length > 1 ? ` · ${x.kandidati.length} možností` : ""}
+                    </span>
+                  </span>
+                  <span style={{ color: C.green, fontWeight: 700 }}>{fmtCZK(x.suma)}</span>
+                  <button onClick={() => void priradPrijem(x.fioId)} disabled={pracujem} style={{
+                    padding: "5px 11px", borderRadius: 8, fontSize: 11.5, fontWeight: 700,
+                    cursor: pracujem ? "not-allowed" : "pointer",
+                    border: `1px solid ${mix(C.green, 50)}`, background: mix(C.green, 12), color: C.green,
+                  }}>
+                    Je to jeho
+                  </button>
+                </div>
+              ))}
             </div>
           )}
 

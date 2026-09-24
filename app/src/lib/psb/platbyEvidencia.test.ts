@@ -1,7 +1,7 @@
 // Platby z výpisu banky — posledná tretina odchodu od PTmindera.
 import { describe, expect, it } from "bun:test";
 
-import { najdiKlientaVTexte, nepriradene, porovnajPlatby, smieSaZapamatat, textPlatby, vzorPlatby, type FioRiadok, type Platba, vyzeraNaKlienta } from "./platbyEvidencia";
+import { najdiKlientaVTexte, nepriradene, porovnajPlatby, smieSaZapamatat, textPlatby, vzorPlatby, type FioRiadok, type Platba, vyzeraNaKlienta, parujPodlaSumy } from "./platbyEvidencia";
 
 const MENA = [
   "Natalia Peckova", "Josef Šnirych", "Natalia Krivdova", "Barbora Vankova",
@@ -189,5 +189,52 @@ describe("faktúra prebíja firmu", () => {
 
   it("dlhé číslo objednávky faktúrou nie je", () => {
     expect(vyzeraNaKlienta({ counterparty: "ALZA.CZ A.S. · 1053853034", note: "", typ: "Bezhotovostní platba" })).toBe(false);
+  });
+});
+
+describe("párovanie podľa sumy a dňa", () => {
+  const pt = [
+    { klient: "Jan Kral", datum: "2026-09-16", suma: 6990, metoda: "bank" },
+    { klient: "Eva Doležalova", datum: "2026-09-09", suma: 6990, metoda: "bank" },
+    { klient: "Janka Malinova", datum: "2026-08-17", suma: 1100, metoda: "cash" },
+  ];
+
+  it("suma a deň nájdu človeka, ktorého meno v texte nie je", () => {
+    // „20260037 MGR. FILIP STRANAVSKY" je číslo faktúry a meno PRÍJEMCU.
+    // PTminder o tej istej platbe vie, kto ju poslal.
+    expect(parujPodlaSumy({ date: "2026-09-16", amount_czk: 6990 }, pt)).toEqual(["Jan Kral"]);
+  });
+
+  it("na hotovosť sa nepáruje — cez účet neprešla", () => {
+    expect(parujPodlaSumy({ date: "2026-08-17", amount_czk: 1100 }, pt)).toEqual([]);
+  });
+
+  it("mimo okna sa nepáruje", () => {
+    expect(parujPodlaSumy({ date: "2026-09-25", amount_czk: 6990 }, pt)).toEqual([]);
+  });
+
+  it("dvaja s rovnakou sumou v okne = nevyberie sa nikto sám", () => {
+    const v = parujPodlaSumy({ date: "2026-09-16", amount_czk: 6990 }, [
+      ...pt, { klient: "Iný Človek", datum: "2026-09-15", suma: 6990, metoda: "bank" },
+    ]);
+    expect(v.length).toBe(2);
+  });
+});
+
+describe("krstné meno ako druhý pokus", () => {
+  const mena = ["Richard Matl", "Roman Pavlik", "Jan Kral"];
+
+  it("priezvisko má prednosť", () => {
+    expect(najdiKlientaVTexte("platba · Pavlik", mena)).toEqual(["Roman Pavlik"]);
+  });
+
+  it("keď priezvisko nesedí, skúsi sa krstné", () => {
+    // „ProSapiens Balíček 6h Richard" — priezvisko tam nie je.
+    expect(najdiKlientaVTexte("ProSapiens Balíček 6h Richard", mena)).toEqual(["Richard Matl"]);
+  });
+
+  it("vrátka nie je platba klienta", () => {
+    expect(vyzeraNaKlienta({ counterparty: "Vraciam za potraviny · Terézia Zaťková", note: "", typ: "Okamžitá platba" })).toBe(false);
+    expect(vyzeraNaKlienta({ counterparty: "vratka kauce · KATEŘINA KONVIČKOVÁ", note: "", typ: "Okamžitá platba" })).toBe(false);
   });
 });

@@ -48,13 +48,70 @@ const tokeny = (s: string) =>
 export function najdiKlientaVTexte(text: string, menaKlientov: string[]): string[] {
   const t = tokeny(text);
   if (!t.length) return [];
-  const sedi = (priezvisko: string) =>
-    t.some((x) => x === priezvisko || (x.startsWith(priezvisko) && x.length - priezvisko.length <= 3));
-  return menaKlientov.filter((m) => {
+  const sedi = (cast: string) =>
+    t.some((x) => x === cast || (x.startsWith(cast) && x.length - cast.length <= 3));
+  const podlaPriezviska = menaKlientov.filter((m) => {
     const casti = bezY(normName(m)).split(/\s+/).filter(Boolean);
     const priezvisko = casti[casti.length - 1] || "";
     return priezvisko.length >= 4 && sedi(priezvisko);
   });
+  if (podlaPriezviska.length) return podlaPriezviska;
+
+  /**
+   * Až keď priezvisko nesedí na nikoho, skúsi sa KRSTNÉ.
+   *
+   * „ProSapiens Balíček 6h Richard" alebo „Roman · …" priezvisko nemá, ale
+   * krstné meno tam je a človek z neho vie. Appka z neho vedieť nemá — osem
+   * krstných mien má v PSB viac než jedného klienta — preto je to až druhý
+   * pokus a výsledok je NÁVRH na potvrdenie, nie priradenie. Keď sedí
+   * viac ľudí, ukážu sa všetci; vybrať musí človek.
+   *
+   * Prečo vôbec: bez tohto zostalo 75 zo 108 príjmov úplne bez návrhu
+   * a Jerry k nim meno písal rukou (23. 9. 2026).
+   */
+  return menaKlientov.filter((m) => {
+    const krstne = bezY(normName(m)).split(/\s+/).filter(Boolean)[0] || "";
+    return krstne.length >= 4 && sedi(krstne);
+  });
+}
+
+/**
+ * KTO ZAPLATIL, KEĎ V TEXTE MENO NIE JE.
+ *
+ * Jerry, 23. 9. 2026: „v poznámkach je vo väčšine prípadov meno alebo aspoň
+ * niečo, podľa čoho by sa dalo usúdiť, komu to patrí — skús tam vytvoriť
+ * párovací systém."
+ *
+ * Časť príjmov meno naozaj nenesie: „20260037 MGR. FILIP STRANAVSKY" je číslo
+ * faktúry a meno PRÍJEMCU, nie odosielateľa. Zato PTminder o tej istej platbe
+ * vie všetko — kto, koľko a kedy. Bankový prevod chodí na korunu presne, takže
+ * dvojica (suma, deň) je silný kľúč: 6 990 Kč zo 16. 9. sa v PTminderi viaže
+ * na Jana Krála a na nikoho iného.
+ *
+ * Preto sa páruje LEN na `bank` platby: hotovosť z PTmindera cez účet neprešla
+ * a zhoda s ňou by bola náhoda. A preto sa vracia ZOZNAM — keď v okne sedí
+ * viac ľudí s rovnakou sumou, nevyberie sa nikto a rozhodne človek. To je tá
+ * istá poistka ako pri menách: falošná zhoda je horšia než diera, lebo podľa
+ * nej sa ZAPISUJE.
+ */
+export function parujPodlaSumy(
+  r: Pick<FioRiadok, "date" | "amount_czk">,
+  ptPlatby: PtPlatba[],
+  /** Koľko dní môže byť medzi bankou a zápisom v PTminderi. */
+  oknoDni = 3,
+): string[] {
+  const den = r.date.slice(0, 10);
+  const cas = Date.parse(`${den}T00:00:00Z`);
+  if (!Number.isFinite(cas) || !r.amount_czk) return [];
+  const najdene = new Set<string>();
+  for (const p of ptPlatby) {
+    if (p.metoda !== "bank") continue;
+    if (Math.round(p.suma) !== Math.round(r.amount_czk)) continue;
+    const c = Date.parse(`${p.datum.slice(0, 10)}T00:00:00Z`);
+    if (!Number.isFinite(c) || Math.abs(c - cas) > oknoDni * 86400000) continue;
+    najdene.add(p.klient);
+  }
+  return [...najdene];
 }
 
 export type FioRiadok = { id: string; date: string; amount_czk: number; counterparty: string | null; note: string | null; typ: string | null };
@@ -98,6 +155,8 @@ export type NepriradenaPlatba = {
   kandidati: string[];
   /** Vyzerá to na platbu klienta? `false` = vrátka z obchodu, vklad, kaucia. */
   klientsky: boolean;
+  /** Odkiaľ je návrh: aby človek vedel, čomu verí. */
+  zdrojNavrhu: "naucene" | "meno" | "suma" | "";
 };
 
 /**
@@ -134,12 +193,22 @@ export type NepriradenaPlatba = {
 const FAKTURA = /\b20\d{6}\b/;
 const FIRMA = /\b(a\.\s?s\.|s\.\s?r\.\s?o\.|spol\.|z\.\s?ú\.|eshop|kredit:)/i;
 
+/**
+ * „Vrátenie", „vratka", „vraciam" — peniaze idúce SPÄŤ, nie platba za tréning.
+ *
+ * V PSB je to bežné: Jerry a Terézia si posielajú späť za nákupy („Vraciam za
+ * potraviny", „Vratenie za zmrzku"), a prenajímateľ vracia kauciu. Klient
+ * takú správu k platbe nenapíše — platí za balíček, nie vracia.
+ */
+const VRATKA = /\b(vr[aá]t|vraci)/i;
+
 export function vyzeraNaKlienta(r: Pick<FioRiadok, "counterparty" | "note" | "typ">): boolean {
   const text = `${r.counterparty || ""} ${r.note || ""}`;
   if (FAKTURA.test(text)) return true;
   const typ = (r.typ || "").toLowerCase();
   if (typ.includes("karetní") || typ.includes("karetni")) return false;
   if (FIRMA.test(text)) return false;
+  if (VRATKA.test(text)) return false;
   return true;
 }
 
@@ -156,6 +225,8 @@ export function nepriradene(
   mapovanie: Record<string, string>,
   nieKlient: Set<string>,
   menaKlientov: string[],
+  /** Platby z PTmindera — na spárovanie podľa sumy a dňa, keď meno chýba. */
+  ptPlatby: PtPlatba[] = [],
 ): NepriradenaPlatba[] {
   const uz = new Set(platby.filter((p) => !p.zruseneAt && p.fioId).map((p) => p.fioId as string));
   const out: NepriradenaPlatba[] = [];
@@ -167,15 +238,22 @@ export function nepriradene(
     // sú už v zošite a v banke by sa započítali druhýkrát.
     if (/vklad do bankomatu|vklad hotovosti/i.test(text)) continue;
     const naucene = mapovanie[vzorPlatby(r)];
+    // Poradie dôvery: čo už človek potvrdil → meno v texte → suma a deň
+    // z PTmindera. Miešať sa nesmú: keď meno sedí, je zbytočné pridávať
+    // k nemu niekoho, kto má len rovnakú sumu.
+    const podlaMena = naucene ? [] : najdiKlientaVTexte(text, menaKlientov);
+    const podlaSumy = naucene || podlaMena.length ? [] : parujPodlaSumy(r, ptPlatby);
+    const kandidati = naucene ? [naucene] : podlaMena.length ? podlaMena : podlaSumy;
     out.push({
       fioId: r.id,
       datum: r.date.slice(0, 10),
       suma: r.amount_czk,
       text,
-      kandidati: naucene ? [naucene] : najdiKlientaVTexte(text, menaKlientov),
+      kandidati,
       // Naučené priradenie prebíja odhad: keď už niekto raz povedal, že tento
       // odosielateľ je klient, appka to nemá spochybňovať.
       klientsky: !!naucene || vyzeraNaKlienta(r),
+      zdrojNavrhu: naucene ? "naucene" : podlaMena.length ? "meno" : podlaSumy.length ? "suma" : "",
     });
   }
   return out.sort((a, b) => b.datum.localeCompare(a.datum));

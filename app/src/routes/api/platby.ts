@@ -95,12 +95,15 @@ export const Route = createFileRoute("/api/platby")({
           (await DB.prepare("SELECT value FROM vzas_settings WHERE key = 'platby_od'").first<{ value: string }>())?.value || "",
         ).replace(/"/g, "") || new Date().toISOString().slice(0, 7);
 
+        const ptPlatby = ((pt.results || []) as unknown as { client_name: string; date: string; amount_czk: number; payment_method: string }[])
+          .map((p) => ({ klient: p.client_name, datum: p.date, suma: p.amount_czk, metoda: p.payment_method }));
         const vsetkyNepriradene = nepriradene(
           (fio.results || []) as unknown as FioRiadok[],
           platby.map(naPlatbu),
           mapovanie,
           new Set(((nieKlient.results || []) as unknown as { fio_id: string }[]).map((x) => x.fio_id)),
           ((mena.results || []) as unknown as { client_name: string }[]).map((x) => x.client_name),
+          ptPlatby,
         );
         const celkomNepriradenych = vsetkyNepriradene.length;
 
@@ -110,8 +113,7 @@ export const Route = createFileRoute("/api/platby")({
           nepriradene: vsetkyNepriradene.slice(0, 120),
           porovnanie: porovnajPlatby(
             platby.map(naPlatbu),
-            ((pt.results || []) as unknown as { client_name: string; date: string; amount_czk: number; payment_method: string }[])
-              .map((p) => ({ klient: p.client_name, datum: p.date, suma: p.amount_czk, metoda: p.payment_method })),
+            ptPlatby,
             poExport,
             odMesiaca,
           ),

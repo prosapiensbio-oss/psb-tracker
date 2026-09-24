@@ -24,19 +24,19 @@ describe("karta je kategória, nie položka", () => {
     // karty. Jerry 23. 9. 2026: „predstavoval som si celé kategórie."
     // Karta „klient" je navyše — nie je to fronta, je to pracovný stôl.
     const k = postavKarty({ ...zdroje, ktoSom: null });
-    expect(k.map((x) => x.druh)).toEqual(["zmeny", "mena", "platby", "klient"]);
-    expect(k[0].polozky.length).toBe(2);
+    expect(k.map((x) => x.druh)).toEqual(["klient", "zmeny", "mena", "platby"]);
+    expect(k.find((x) => x.druh === "zmeny")!.polozky.length).toBe(2);
   });
 
-  it("poradie je zmeny → mená → peniaze", () => {
+  it("poradie je klient → zmeny → mená → peniaze", () => {
     // Zmeny prvé, kým si človek pamätá, prečo hodina zmizla. Peniaze
     // posledné — je ich veľa a idú mechanicky.
-    expect(postavKarty({ ...zdroje, ktoSom: null })[2].druh).toBe("platby");
+    expect(postavKarty({ ...zdroje, ktoSom: null })[3].druh).toBe("platby");
   });
 
   it("prázdna kategória kartu nevyrobí", () => {
     const k = postavKarty({ ...zdroje, zmeny: [], nezname: [], ktoSom: null });
-    expect(k.map((x) => x.druh)).toEqual(["platby", "klient"]);
+    expect(k.map((x) => x.druh)).toEqual(["klient", "platby"]);
   });
 });
 
@@ -51,12 +51,12 @@ describe("karta patrí prihlásenému", () => {
     // Peniaze trénera nemajú a sú Jerryho, rovnako ako mesačné kontroly
     // (pravidlo z 31. 8. 2026: „nech Terezku nerozptyľujú").
     const k = postavKarty({ ...zdroje, ktoSom: "terezka" });
-    expect(k.map((x) => x.druh)).toEqual(["zmeny", "mena", "klient"]);
-    expect(k[0].polozky.map((p) => (p as Zmena).id)).toEqual(["z2"]);
+    expect(k.map((x) => x.druh)).toEqual(["klient", "zmeny", "mena"]);
+    expect(k[1].polozky.map((p) => (p as Zmena).id)).toEqual(["z2"]);
   });
 
   it("bez prihlásenia sa nefiltruje nič", () => {
-    expect(postavKarty({ ...zdroje, ktoSom: null })[0].polozky.length).toBe(2);
+    expect(postavKarty({ ...zdroje, ktoSom: null }).find((x) => x.druh === "zmeny")!.polozky.length).toBe(2);
   });
 
   it("Jerry vidí peniaze", () => {
@@ -85,11 +85,11 @@ describe("prihlásenie sa porovnáva bez ohľadu na veľkosť písmen", () => {
 
   it("aj „Terezka“ s veľkým T", () => {
     const k = postavKarty({ ...zdroje, ktoSom: "Terezka" });
-    expect(k.map((x) => x.druh)).toEqual(["zmeny", "mena", "klient"]);
+    expect(k.map((x) => x.druh)).toEqual(["klient", "zmeny", "mena"]);
   });
 
   it("„app“ (spoločné prihlásenie) nefiltruje", () => {
-    expect(postavKarty({ ...zdroje, ktoSom: "app" })[0].polozky.length).toBe(2);
+    expect(postavKarty({ ...zdroje, ktoSom: "app" }).find((x) => x.druh === "zmeny")!.polozky.length).toBe(2);
   });
 });
 

@@ -109,6 +109,18 @@ export function postavKarty(z: ZdrojeKariet): Karta[] {
   }));
 
   const karty: Karta[] = [];
+  /**
+   * KLIENT JE PRVÝ (Jerry, 24. 9. 2026: „ako hlavnú obrazovku vo workspace
+   * daj klient"). Ostatné karty sú fronty, ktoré sa raz za čas vyprázdnia
+   * a zmiznú; pracovný stôl klienta je to, kvôli čomu sa sem chodí denne.
+   * Karta, ktorá nikdy nezmizne, má byť tá, na ktorú kopa otvorí.
+   */
+  karty.push({
+    druh: "klient",
+    nadpis: "Klient",
+    podnadpis: "vyhľadaj človeka a rob na ňom — tréningy, peniaze, balíčky",
+    polozky: [],
+  });
   if (zmeny.length) karty.push({
     druh: "zmeny",
     nadpis: "Zmeny v kalendári",
@@ -126,12 +138,6 @@ export function postavKarty(z: ZdrojeKariet): Karta[] {
     nadpis: "Platby z banky",
     podnadpis: `${platby.length} ${pocet(platby.length, "príjem bez klienta", "príjmy bez klienta", "príjmov bez klienta")}`,
     polozky: platby,
-  });
-  karty.push({
-    druh: "klient",
-    nadpis: "Klient",
-    podnadpis: "vyhľadaj človeka a rob na ňom — tréningy, peniaze, balíčky",
-    polozky: [],
   });
   return karty;
 }
