@@ -260,7 +260,7 @@ describe("lievik — konverzia nad rovnakým obdobím", () => {
     const d: PSBData = { ...data, sessions: [...data.sessions, ...sessions], leads: leads.map((l, i) => ({
       id: `l${i}`, date: "2026-02-01", name: l.name, source: l.source as never, referrer: "",
       status: "novy" as never, note: "", email: "", telefon: "", kampan: "", utm: "", stranka: "",
-      odpovedaneAt: "", dovod: "", createdAt: "2026-02-01T09:00:00.000Z",
+      odpovedaneAt: "", dovod: "", druh: "dopyt" as const, createdAt: "2026-02-01T09:00:00.000Z",
     })) };
     return buildAiContext(d, { ...vzorka().clients, ...clients }, [], [], []);
   };

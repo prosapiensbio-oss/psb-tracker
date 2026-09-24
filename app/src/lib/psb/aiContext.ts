@@ -459,6 +459,8 @@ export function buildAiContext(
     { prisloMes: toky.prisloMes, odisloMes: toky.odisloMes, aktivnych: toky.zoznam.filter((c) => !c._odisiel).length },
     capacity.reduce((a, c) => a + c.canTake, 0),
   );
+  // `data.leads` sú LEN dopyty na úvodný tréning — stiahnutia lead magnetu
+  // sa oddeľujú už v db.server.ts a žijú v `data.magnety` (24. 9. 2026).
   const dopytySpolu = (data.leads || []).length;
   const ziskavanie = {
     poznamka: "Voľné miesta sú statické, klientela je prietok: kým zapĺňaš, tečie. Počet klientov, ktorých treba ZÍSKAŤ = voľné miesta + odchod × mesiace. Odchod sa počíta z TICHA (posledná hodina viac než 60 dní dozadu), nie zo zrušenia. Priemer za posledných 12 UZAVRETÝCH mesiacov; mesiace, kde ticho ešte nedozrelo, sa do odchodu nerátajú. Sú to tie isté čísla, aké ukazuje obrazovka Rast a strata — jeden zdroj. Obrazovka: Kokpit, karta „Koľko klientov naozaj treba“.",

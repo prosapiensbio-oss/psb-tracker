@@ -81,6 +81,12 @@ export type Lead = {
    * z webu je to presný čas odoslania formulára.
    */
   createdAt: string;
+  /**
+   * Čo to je: `dopyt` = pýta sa na úvodný tréning, `magnet` = stiahol lead
+   * magnet. Do počtu dopytov, ceny za dopyt a lievika ide LEN `dopyt`
+   * (Jerry, 24. 9. 2026). Magnet je e-mail do zoznamu, nie otázka na tréning.
+   */
+  druh: "dopyt" | "magnet";
 };
 
 export type ClientOverride = {
@@ -154,6 +160,12 @@ export type PSBData = {
   anomalyAck: Record<string, AnomalyAck>;
   uploadLog: UploadLogEntry[];
   leads: Lead[];
+  /**
+   * Stiahnutia lead magnetu. Sú to e-maily do zoznamu, nie otázky na tréning,
+   * takže do `leads` nepatria a do počtu dopytov sa nerátajú — ale stratiť sa
+   * nesmú, mailing z nich žije.
+   */
+  magnety: LeadMagnet[];
   /** Závery z debát s Jarvisom — do registra sa dostanú tie po termíne overenia. */
   zavery: ZaverRow[];
   /** Nezaplatené poplatky z PTminderu — čo je v exporte, je otvorené. */
@@ -192,6 +204,11 @@ export type ZaverRow = {
   stav: string;
 };
 
+export type LeadMagnet = {
+  id: string; date: string; name: string; email: string;
+  stranka: string; kampan: string; source: string;
+};
+
 export type PoplatokZaznam = { id: string; datum: string; klient: string; popis: string; suma: number };
 
 export const EMPTY_DATA: PSBData = {
@@ -206,6 +223,7 @@ export const EMPTY_DATA: PSBData = {
   anomalyAck: {},
   uploadLog: [],
   leads: [],
+  magnety: [],
 };
 
 export type CSVType = "sessions" | "services" | "payments" | "packages" | "transakcie" | "cennik" | "metricool" | "ga4" | "gsc" | "anamneza" | "kanaly";

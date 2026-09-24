@@ -101,7 +101,17 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
     poplatky: (poplatky.results as any[]).map((r) => ({
       id: r.id, datum: r.datum, klient: r.client_name, popis: r.popis || "", suma: Number(r.suma_czk) || 0,
     })),
-    leads: (leads.results as any[]).map((r) => ({
+    /**
+     * V `leads` sú LEN dopyty na úvodný tréning.
+     *
+     * Jerry, 24. 9. 2026: „keď má lead magnet, to nie je úplne dopyt."
+     * Mal pravdu a je to dôležitejšie, než to znie: stiahnutý protokol
+     * a veta „trpím na hexenšus" sú dve rôzne veci a v jednom počte skazia
+     * cenu za dopyt, konverziu aj lievik. Delí sa to TU, na jednom mieste —
+     * inak by sa musel doplniť filter do pätnástich výpočtov a na šestnásty
+     * by sa zabudlo. Magnety sa nestrácajú, sú vedľa v `magnety`.
+     */
+    leads: (leads.results as any[]).filter((r) => (r.druh || "dopyt") !== "magnet").map((r) => ({
       id: r.id,
       date: r.date,
       name: r.name || "",
@@ -116,7 +126,12 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
       stranka: r.stranka || "",
       odpovedaneAt: r.odpovedane_at || "",
       dovod: r.dovod || "",
+      druh: r.druh || "dopyt",
       createdAt: r.created_at || "",
+    })),
+    magnety: (leads.results as any[]).filter((r) => (r.druh || "dopyt") === "magnet").map((r) => ({
+      id: r.id, date: r.date, name: r.name || "", email: r.email || "",
+      stranka: r.stranka || "", kampan: r.kampan || "", source: r.source,
     })),
     uploadLog: (log.results as any[]).map((r) => ({
       date: r.date,

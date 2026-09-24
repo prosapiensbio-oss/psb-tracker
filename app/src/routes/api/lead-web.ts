@@ -117,19 +117,35 @@ export const Route = createFileRoute("/api/lead-web")({
           ? zWebu
           : `web-${dnes}-${(email || telefon || meno).toLowerCase()}`.slice(0, 64);
 
+        /**
+         * Lead magnet nie je dopyt (Jerry, 24. 9. 2026).
+         *
+         * Formulár na stiahnutie protokolu posiela tú istú požiadavku ako
+         * kontaktný formulár, líši sa len poznámkou, ktorú si pridáva sám.
+         * Bez rozlíšenia sedí stiahnutý protokol v dopytoch vedľa človeka,
+         * ktorý napísal, že ho bolí chrbát — a kazí cenu za dopyt aj lievik.
+         * Príznak sa berie z poznámky aj zo stránky: formulár sa môže
+         * premenovať, ale adresa lead magnetu je iná než kontaktná stránka.
+         */
+        const poznamka = kus(b.message ?? b.sprava, 500);
+        const stranka = kus(b.page ?? b.stranka, 300) || kus(referer, 300);
+        const jeMagnet = /lead magnet/i.test(poznamka) || /protokol-o-myofascialnim/i.test(stranka);
+
         await DB.prepare(
-          `INSERT INTO leads (id,date,name,source,referrer,status,note,created_at,email,telefon,kampan,utm,stranka)
-           VALUES (?1,?2,?3,?4,'',?5,?6,?7,?8,?9,?10,?11,?12)
+          `INSERT INTO leads (id,date,name,source,referrer,status,note,created_at,email,telefon,kampan,utm,stranka,druh)
+           VALUES (?1,?2,?3,?4,'',?5,?6,?7,?8,?9,?10,?11,?12,?13)
            ON CONFLICT(id) DO UPDATE SET name=excluded.name, email=excluded.email, telefon=excluded.telefon,
-             note=excluded.note, kampan=excluded.kampan, utm=excluded.utm, stranka=excluded.stranka`,
+             note=excluded.note, kampan=excluded.kampan, utm=excluded.utm, stranka=excluded.stranka,
+             druh=excluded.druh`,
         )
           .bind(
             kluc, dnes, meno || email || telefon,
             zdrojZUtm(utmSource, utmMedium, referer),
             "novy",
-            kus(b.message ?? b.sprava, 500),
+            poznamka,
             new Date().toISOString(),
-            email, telefon, utmCampaign, utm, kus(b.page ?? b.stranka, 300),
+            email, telefon, utmCampaign, utm, stranka,
+            jeMagnet ? "magnet" : "dopyt",
           )
           .run();
 
