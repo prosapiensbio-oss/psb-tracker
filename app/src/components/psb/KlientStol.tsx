@@ -83,6 +83,9 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
   /** Príjmy z výpisu, ktoré ešte nemajú klienta — na návrh „nie je to jeho?". */
   const [cakajuce, setCakajuce] = useState<{ fioId: string; datum: string; suma: number; text: string; kandidati: string[]; zdrojNavrhu?: string }[]>([]);
   const [mazem, setMazem] = useState(false);
+  /** Meno prepísané rukou — poistka proti omylu, viď `zmazKlienta`. */
+  const [potvrdMazanie, setPotvrdMazanie] = useState("");
+  const [mazemOtvorene, setMazemOtvorene] = useState(false);
   /** Čo sa práve upravuje — id riadku, alebo prázdno. */
   const [upravaPlatby, setUpravaPlatby] = useState("");
   const [upravaBalicka, setUpravaBalicka] = useState("");
@@ -401,10 +404,24 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
    * Je to oprava dát, nie bežná operácia — preto je schované pod detailmi,
    * pýta si napísanie mena a hovorí, čo presne zmizne.
    */
+  /**
+   * Potvrdenie je V APPKE, nie v `prompt()`.
+   *
+   * 24. 9. 2026: Jerry napísal, že `__test__` zmazal a že to funguje — v
+   * databáze pritom riadok zostal a v audite nepribudlo nič. Okno `prompt()`
+   * vie prehliadač potichu zablokovať („nepovoliť ďalšie dialógy"); vtedy
+   * vráti `null`, kód sa ticho vráti a NIČ sa nestane ani nepovie. Človek
+   * klikne, nevidí chybu a myslí si, že má hotovo.
+   *
+   * Je to tá istá chyba, akú má appka napísanú v pravidlách: tichý neúspech
+   * je horší než hlasitá chyba. Preto sa potvrdzuje v poli na obrazovke a
+   * výsledok sa vypíše — vrátane toho, koľko riadkov naozaj zmizlo.
+   */
   const zmazKlienta = async () => {
-    const co = prompt(`Zmazať ${meno} zo VŠETKÝCH tabuliek? Tréningy, platby, balíčky, poznámky aj meranie.\nNedá sa vrátiť.\n\nNapíš meno presne tak, ako je hore:`);
-    if (co === null) return;
-    if (co.trim() !== meno) { setChyba("Meno nesedí — nemažem nič."); return; }
+    if (potvrdMazanie.trim() !== meno) {
+      setChyba(`Napíš do políčka presne „${meno}" — bez toho nemažem nič.`);
+      return;
+    }
     setMazem(true); setChyba("");
     const r = await fetch("/api/client-delete", {
       method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
@@ -413,10 +430,11 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
     setMazem(false);
     if (!r.ok) { setChyba(r.error || "nepodarilo sa zmazať"); return; }
     const kolko = Object.entries(r.zmazane || {}).filter(([, n]) => Number(n) > 0).map(([t, n]) => `${t}: ${n}`).join(", ");
+    setPotvrdMazanie(""); setMazemOtvorene(false);
     naZoznam();
     // Appka na to má cestu — netreba posielať človeka obnovovať stránku.
     oznam("klienti"); oznam("kalendar"); oznam("peniaze");
-    setChyba(`${meno} zmazaný (${kolko || "nič nebolo"}).`);
+    setChyba(`${meno} zmazaný — ${kolko || "NIČ sa nezmazalo, riadky tam neboli"}.`);
   };
 
   const naZoznam = () => { setMeno(""); setFilter("zdravie"); setPisem(false); setPisemPlatbu(false); };
@@ -789,19 +807,44 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
             Schovaná akcia, ktorú človek potrebuje, je to isté ako žiadna.
             Nekričí ale ani teraz: je sivé, malé a na konci stĺpca — a pýta
             si napísanie mena, takže omylom sa stlačiť nedá. */}
-        <button
-          onClick={() => void zmazKlienta()}
-          disabled={mazem}
-          title="Zmaže klienta zo všetkých tabuliek — tréningy, platby, balíčky, poznámky. Nedá sa vrátiť."
-          style={{
-            marginTop: 10, padding: "5px 9px", borderRadius: 8, fontSize: 11,
-            cursor: mazem ? "not-allowed" : "pointer", textAlign: "left",
-            border: `1px solid ${mix(C.border, 70)}`, background: "transparent",
-            color: mazem ? C.orange : C.textDim,
-          }}
-        >
-          {mazem ? "mažem…" : "Zmazať klienta"}
-        </button>
+        {!mazemOtvorene ? (
+          <button
+            onClick={() => { setMazemOtvorene(true); setChyba(""); }}
+            style={{
+              marginTop: 10, padding: "5px 9px", borderRadius: 8, fontSize: 11,
+              cursor: "pointer", textAlign: "left",
+              border: `1px solid ${mix(C.border, 70)}`, background: "transparent", color: C.textDim,
+            }}
+          >
+            Zmazať klienta
+          </button>
+        ) : (
+          <div style={{ marginTop: 10, padding: "9px 10px", borderRadius: 9, border: `1px solid ${mix(C.red, 45)}`, background: mix(C.red, 8) }}>
+            <div style={{ fontSize: 11, color: C.textMuted, lineHeight: 1.5 }}>
+              Zmaže <b style={{ color: C.text }}>{meno}</b> zo všetkých tabuliek — tréningy, platby,
+              balíčky, poznámky aj merania. <b style={{ color: C.red }}>Nedá sa vrátiť.</b>
+            </div>
+            <input
+              value={potvrdMazanie}
+              onChange={(e) => setPotvrdMazanie(e.target.value)}
+              placeholder={`napíš ${meno}`}
+              style={{ width: "100%", marginTop: 7, padding: "6px 8px", borderRadius: 7, fontSize: 12, border: `1px solid ${C.border}`, background: C.bg, color: C.text }}
+            />
+            <div style={{ display: "flex", gap: 6, marginTop: 7 }}>
+              <button onClick={() => void zmazKlienta()} disabled={mazem || potvrdMazanie.trim() !== meno} style={{
+                padding: "5px 11px", borderRadius: 7, fontSize: 11.5, fontWeight: 700,
+                cursor: potvrdMazanie.trim() === meno && !mazem ? "pointer" : "not-allowed",
+                border: `1px solid ${mix(C.red, 55)}`,
+                background: potvrdMazanie.trim() === meno ? mix(C.red, 16) : "transparent",
+                color: potvrdMazanie.trim() === meno ? C.red : C.textDim,
+              }}>{mazem ? "mažem…" : "Zmazať naozaj"}</button>
+              <button onClick={() => { setMazemOtvorene(false); setPotvrdMazanie(""); }} style={{
+                padding: "5px 11px", borderRadius: 7, fontSize: 11.5, cursor: "pointer",
+                border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted,
+              }}>Nechať tak</button>
+            </div>
+          </div>
+        )}
 
       </div>
 
