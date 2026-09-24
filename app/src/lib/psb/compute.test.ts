@@ -431,7 +431,8 @@ describe("maTermin", () => {
  * mlčí. Dopyty patria Terezke — prvý kontakt je jej práca.
  */
 describe("nezapisaneDoRegistra", () => {
-  const dopyt = (name: string, date: string, dovod = "", status: Lead["status"] = "novy") => ({ name, date, dovod, status });
+  const dopyt = (name: string, date: string, dovod = "", status: Lead["status"] = "novy") =>
+    ({ id: `l-${name}`, name, date, dovod, status, odpovedaneAt: "", createdAt: `${date}T09:00:00.000Z`, druh: "dopyt" as const });
   const DNES = "2026-08-14";
 
   test("dopyty bez dôvodu idú Terezke, nie obom", () => {
@@ -523,7 +524,8 @@ describe("patriTrenerovi — priame priradenie", () => {
 
 describe("dohodnutý úvodný sa nerieši otázkou prečo", () => {
   const DNES2 = "2026-08-14";
-  const d = (name: string, date: string, status: Lead["status"]) => ({ name, date, dovod: "", status });
+  const d = (name: string, date: string, status: Lead["status"]) =>
+    ({ id: `l-${name}`, name, date, dovod: "", status, odpovedaneAt: "", createdAt: `${date}T09:00:00.000Z`, druh: "dopyt" as const });
 
   test("čerstvo dohodnutý dopyt v zozname nie je — ešte sa rieši", () => {
     nastavObjednaneZKalendara({});

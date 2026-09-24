@@ -3496,7 +3496,7 @@ export function ziskavanieKlientov(
  * vie, kto je kto. Zmeny v kalendári tomu, komu sa v kalendári stali.
  */
 export type NezapisaneVstup = {
-  leads: Pick<Lead, "name" | "date" | "dovod" | "status">[];
+  leads: Pick<Lead, "id" | "name" | "date" | "dovod" | "status" | "odpovedaneAt" | "createdAt" | "druh">[];
   /** Dnešok ako ISO deň — kvôli testovateľnosti sa neberie zo systému. */
   dnes: string;
   /** Mená klientov — dopyt, z ktorého klient vznikol, sa nerieši. */
@@ -3581,6 +3581,45 @@ export function nezapisaneDoRegistra(v: NezapisaneVstup): Omit<RegisterItem, "ac
       // ten zoznam, o ktorom veta hovorí, nie všetky dopyty.
       client: "marketing|dopyty|f:nevyriesene",
       priority: 12,
+    });
+  }
+
+  /**
+   * DOPYT, NA KTORÝ SME SA EŠTE NEOZVALI.
+   *
+   * Jerry, 24. 9. 2026: „zapisovať jedným klikom priamo v notifikácii —
+   * ozval som sa = pečiatka času."
+   *
+   * Čas odpovede je v službách najsilnejšia páka na konverziu a appka ho vie
+   * merať od 12. 8. 2026. Lenže sa zapisoval len na obrazovke Dopyty, kam
+   * nikto nechodí v tej chvíli, keď sa ozve — a tak zostalo 46 zo 47 dopytov
+   * bez času. Notifikácia je jediné miesto, kde človek v tej chvíli JE.
+   *
+   * Jedna položka na jeden dopyt, nie súhrn: klik má zapísať pečiatku
+   * konkrétnemu človeku a súhrn by nemal čo zapísať.
+   *
+   * Dopyty spred zavedenia merania sa nehlásia — nulu z nich nedostaneme
+   * a číslo má rásť z pravdy, nie zo spätného dopĺňania.
+   */
+  const MERANIE_OD = "2026-08-12";
+  const cakajuNaOdpoved = v.leads
+    .filter((l) => (l.druh || "dopyt") === "dopyt")
+    .filter((l) => String(l.date) >= MERANIE_OD && !l.odpovedaneAt && l.status === "novy")
+    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  for (const l of cakajuNaOdpoved) {
+    const odkedy = String(l.createdAt || l.date);
+    const hodin = Math.max(0, Math.round((Date.parse(v.dnes) - Date.parse(odkedy)) / 3600000));
+    const ako = hodin < 24 ? `${hodin} h` : `${Math.round(hodin / 24)} dní`;
+    von.push({
+      key: `ozvatsa|${l.id}`,
+      category: "Zápis",
+      // Po dni je to už naliehavé — kto čaká deň, väčšinou medzitým napísal inam.
+      tone: hodin >= 24 ? "red" : "orange",
+      trener: "Terezka",
+      title: `${l.name || "Dopyt bez mena"} čaká na odpoveď (${ako})`,
+      detail: `Dopyt z ${String(l.date).slice(8, 10)}. ${Number(String(l.date).slice(5, 7))}. nemá zapísané, kedy sme sa ozvali. Keď si sa už ozval, klikni „ozval som sa" — zapíše sa čas a z neho sa počíta rýchlosť odpovede.`,
+      client: l.name || "",
+      priority: hodin >= 24 ? 4 : 11,
     });
   }
 

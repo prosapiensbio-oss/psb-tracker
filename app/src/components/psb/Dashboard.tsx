@@ -33,7 +33,7 @@ import { nastavPrijmyZTrackera, pnlCalc, poslednyMesiacSDatami, salaryCalc, vzas
 import { breakEvenPriemer, poslednyUzavretyIdx } from "../../lib/psb/rezerva";
 import { promptKontroly } from "../../lib/psb/kontrolnePrompty";
 import { doSchranky } from "../../lib/psb/kopirovanie";
-import { fetchBtcReserve, fetchVzasSettings, saveLead } from "../../lib/psb/client";
+import { fetchBtcReserve, fetchVzasSettings, ozvalSomSa, saveLead } from "../../lib/psb/client";
 import { SOURCES } from "./Klienti";
 import { CIEL_MESIACOV, chybaDoCiela, spocitajRezervu } from "../../lib/psb/rezerva";
 import { PrehladPanel, useZmenyOdMinule, type Pristroj, type Zmena } from "./Prehlad";
@@ -2330,6 +2330,35 @@ function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar }: { i
       return ok;
     });
   };
+  /**
+   * „Ozval som sa" — pečiatka času jedným klikom.
+   *
+   * Jerry, 24. 9. 2026. Čas odpovede sa dal zapísať len na obrazovke Dopyty,
+   * kam nikto nechodí v tej chvíli, keď sa ozýva — a tak zostalo 46 zo 47
+   * dopytov bez neho. Notifikácia je jediné miesto, kde človek v tej chvíli
+   * je, tak sa zapisuje odtiaľto.
+   *
+   * Poradie je ako pri dôvode: najprv zápis, až potom uzavretie položky.
+   * Obrátene by otázka zmizla aj vtedy, keď sa pečiatka nikam nezapísala.
+   */
+  const jeOzvatSa = item.key.startsWith("ozvatsa|");
+  const [ozyvamSa, setOzyvamSa] = useState(false);
+  const zapisOzvanie = () => {
+    const id = item.key.split("|")[1];
+    if (!id) return;
+    setOzyvamSa(true);
+    void ozvalSomSa(id)
+      .then((ok) => {
+        setOzyvamSa(false);
+        if (!ok) return;
+        actions.ackAnomaly(item.key, "ozval som sa", true);
+        // Rýchlosť odpovede počíta obrazovka Dopyty z `data.leads` — bez
+        // obnovenia by tam číslo zostalo staré.
+        void actions.refresh();
+      })
+      .catch(() => setOzyvamSa(false));
+  };
+
   const jeOtazkaDovodu = item.key.startsWith("dovod|") && !!item.client;
   const zapisDovod = (dovod: string) => {
     if (!item.client) return;
@@ -2486,6 +2515,11 @@ function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar }: { i
           {promptKontrolyText && (
             <button onClick={() => void skopirujPrompt()} style={{ ...linkBtn, color: promptStav === "ok" ? C.green : promptStav === "chyba" ? C.red : C.blue }}>
               {promptStav === "ok" ? "Skopírované" : promptStav === "chyba" ? "Schránka odmietla" : "Prompt pre Clauda"}
+            </button>
+          )}
+          {jeOzvatSa && !item.acked && (
+            <button onClick={zapisOzvanie} disabled={ozyvamSa} style={{ ...linkBtn, color: C.green }}>
+              {ozyvamSa ? "zapisujem…" : "Ozval som sa"}
             </button>
           )}
           {jeSms && !item.acked && (

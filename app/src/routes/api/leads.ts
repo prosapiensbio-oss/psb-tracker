@@ -27,6 +27,31 @@ export const Route = createFileRoute("/api/leads")({
           return Response.json({ ok: false, error: "bad_request" }, { status: 400 });
         }
         const id = typeof b.id === "string" && b.id ? b.id.slice(0, 64) : crypto.randomUUID();
+
+        /**
+         * PEČIATKA ČASU ODPOVEDE — vlastná akcia, nie čiastočný zápis.
+         *
+         * Zápis nižšie je ÚPLNÝ upsert: čo nepríde, prepíše sa prázdnym.
+         * Poslať sem `{id, odpovedaneAt}` z notifikácie by teda dopytu zmazalo
+         * meno, mail, telefón aj dôvod. Je to tá istá pasca ako pri cieľoch
+         * a marketingových značkách (24. 9. 2026) — len tu by stála celý
+         * dopyt, nielen jednu položku zoznamu.
+         *
+         * Preto úzka akcia, ktorá sa dotkne jediného stĺpca. A nikdy
+         * neprepíše pečiatku, ktorá už existuje: prvé ozvanie je to, z čoho
+         * sa počíta rýchlosť odpovede.
+         */
+        if (b.akcia === "ozval-som-sa") {
+          const kedy = typeof b.odpovedaneAt === "string" && b.odpovedaneAt
+            ? b.odpovedaneAt.slice(0, 30)
+            : new Date().toISOString();
+          const r = await DB.prepare(
+            "UPDATE leads SET odpovedane_at = ?2 WHERE id = ?1 AND COALESCE(odpovedane_at,'') = ''",
+          ).bind(id, kedy).run();
+          const zmenene = r.meta?.changes ?? 0;
+          await audit(DB, { action: "dopyt-ozvanie", predmet: id, neu: kedy, actor: await currentUser(request) || undefined });
+          return Response.json({ ok: true, id, zapisane: zmenene > 0 });
+        }
         if (b.remove === true) {
           await DB.prepare("DELETE FROM leads WHERE id = ?").bind(id).run();
           await audit(DB, { action: "zmazanie-dopytu", predmet: id, actor: await currentUser(request) || undefined });

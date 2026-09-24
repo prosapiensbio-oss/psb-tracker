@@ -1,3 +1,4 @@
+import { jeBeta } from "../../lib/psb/beta";
 import { zlucZoznam } from "../../lib/psb/zlucZoznam";
 import { fetchVzasSettings, saveVzasSetting } from "../../lib/psb/client";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
@@ -1060,6 +1061,37 @@ function Rychlost({ chat }: { chat?: AssistantChat }) {
   );
 }
 
+/**
+ * MARKETING AKO CESTA, NIE ABECEDA KARIET — skúška v bete.
+ *
+ * Jerry, 24. 9. 2026: „zoraď ich ako jednu cestu: čo sa deje → čo z toho
+ * plynie → čo vyrobiť → čo zverejniť. Dnes je to abeceda kariet, nie postup."
+ *
+ * Doterajšie skupiny (Výsledok / Kde nás nájdu / Čo púšťame von) hovorili,
+ * ČOHO sa karta týka. Nepovedali, v akom poradí sa nimi má prejsť — a tak
+ * človek začínal tam, kam mu padlo oko.
+ *
+ * Záložky ani ich `id` sa NEMENIA, mení sa poradie a názvy skupín. Odkazov
+ * na ne je plno v registri, u Jarvisa aj v uložených adresách; premenovať id
+ * by znamenalo potichu odpojiť desiatky miest.
+ *
+ * „Čo publikovať" zostáva zatiaľ jedna záložka, hoci vnútri drží plán, mapu
+ * cyklu aj nápady — teda tri kroky cesty naraz. Rozdeliť ju je ďalší krok,
+ * nie tento: najprv nech je vidieť, či poradie samo o sebe pomôže.
+ */
+const TABY_CESTA = [
+  { id: "lievik", label: "Odkiaľ prišli klienti", skupina: "1 · Čo sa deje" },
+  { id: "dopyty", label: "Dopyty", skupina: "1 · Čo sa deje" },
+  { id: "naklady", label: "Čo to stálo", skupina: "1 · Čo sa deje" },
+  { id: "kanaly", label: "Soc. siete", skupina: "1 · Čo sa deje" },
+  { id: "vyhladavanie", label: "Vyhľadávanie", skupina: "1 · Čo sa deje" },
+  { id: "web", label: "Web", skupina: "1 · Čo sa deje" },
+  { id: "navrhy", label: "Plán a čo vyrobiť", skupina: "2 · Čo z toho plynie" },
+  { id: "obsah", label: "Reels & posty", skupina: "3 · Čo sme zverejnili" },
+  { id: "mail", label: "Mailer", skupina: "3 · Čo sme zverejnili" },
+  { id: "kampan", label: "Kampaň ↗", skupina: "3 · Čo sme zverejnili" },
+];
+
 export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, refresh, onPoznamkaStrata, onNavigate, focus, onAck, onOdchodKJarvisovi }: { data: PSBData; clients: Record<string, ClientAgg>; leads: Lead[]; chat?: AssistantChat; sub: string; onSub: (s: string) => void; onKlient?: (m: string) => void; refresh: () => Promise<void>; onPoznamkaStrata?: (meno: string, text: string) => void; onNavigate?: (tab: string, sub?: string) => void; focus?: { client?: string; filter?: string; nonce?: number; slot?: { mesiac: string; faza: number; napadId?: string } } | null; onOdchodKJarvisovi?: (mesiac: string, faza: number, napadId?: string) => void; onAck?: (kluc: string, zapnut: boolean, poznamka?: string) => void }) {
   const setSub = onSub;
   // Jedno miesto, odkiaľ karty berú stav skrytia — inak by každá karta
@@ -1100,7 +1132,7 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
         // výkaz práce, nie odpoveď. Instagram priviedol za 18 mesiacov 5
         // klientov, referencie 26; karty majú zodpovedať tomuto pomeru, nie
         // tomu, kde je najviac dát.
-        tabs={[
+        tabs={jeBeta() ? TABY_CESTA : [
           // Dopyty prvé: sú vstupom lievika a jediná záložka, kde sa niečo
           // zapisuje. Ostatné tri sú čítanie nad tým, čo tu vznikne.
           { id: "dopyty", label: "Dopyty", skupina: "Výsledok" },

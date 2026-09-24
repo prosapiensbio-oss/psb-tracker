@@ -357,7 +357,7 @@ export function KlientProfil({ meno, data, clients, onZavri, btcSats, onDennikZa
       <div style={{ marginTop: 16, paddingTop: 14, borderTop: `1px solid ${mix(C.border, 60)}` }}>
         <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 6 }}>
           <Info
-            text="Celá história klienta na jednej osi času — zápisy z denníka, poznámky pri zrušení tréningu v Kalendári, odpovede na notifikácie, závery z debát s Jarvisom a merania bolesti. Štítok vľavo hovorí, odkiaľ riadok prišiel. Zapisuje sa naďalej tam, kde sa vec stane; tu je to len zlúčené dokopy."
+            text="Celá história klienta na jednej osi času — zápisy z denníka, poznámky pri zrušení tréningu v Kalendári, odpovede na notifikácie, závery z debát s Jarvisom. Štítok vľavo hovorí, odkiaľ riadok prišiel. Zapisuje sa naďalej tam, kde sa vec stane; tu je to len zlúčené dokopy."
             label="História klienta — všetko, čo o ňom kde stojí"
           />
         </div>

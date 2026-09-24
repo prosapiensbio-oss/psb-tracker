@@ -233,6 +233,14 @@ export async function fetchBtcReserve(sPlatbami = false, sVyplatami = false, sNa
   }
 }
 
+/**
+ * Zapíše, že sme sa dopytu ozvali. Úzka akcia zámerne — `saveLead` je úplný
+ * upsert a poslať mu len pečiatku by dopytu zmazalo meno aj kontakt.
+ */
+export async function ozvalSomSa(id: string): Promise<boolean> {
+  try { return (await post("/api/leads", { id, akcia: "ozval-som-sa" })).ok; } catch { return false; }
+}
+
 export async function saveLead(lead: Partial<Lead> & { id?: string; remove?: boolean }): Promise<string | null> {
   const r = await post("/api/leads", lead);
   if (!r.ok) return null;

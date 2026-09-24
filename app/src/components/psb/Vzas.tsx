@@ -1,3 +1,4 @@
+import { jeBeta } from "../../lib/psb/beta";
 import { BODY, kohortyKlientov, priemernePrezitie } from "../../lib/psb/kohorty";
 import { oznam } from "../../lib/psb/obnovaSignal";
 import { zlucZoznam } from "../../lib/psb/zlucZoznam";
@@ -3270,19 +3271,27 @@ export function Vzas({ sub, onSub, data, clients, focus, onNavigate, pohybSplits
           </div>
           <PnlTab focus={focus} />
           {/* Pohyby patria k P&L: sú to riadky, z ktorých sú tie súčty poskladané.
-              V Údajoch boli schované za rozbaľovačom a nedali sa nájsť. */}
-          <div style={{ marginTop: 14 }}>
-            <BankaUlozene focus={focus} pohybSplits={pohybSplits} onSplit={nastavPohybSplit} />
-          </div>
+              V Údajoch boli schované za rozbaľovačom a nedali sa nájsť.
+              V BETE sa skúša opak (Jerry, 24. 9. 2026): pohyby žijú len
+              v Uploade, kde už nie sú schované — tu boli TRETÍ výskyt tej istej
+              karty a robili z P&L dve rôzne práce naraz. */}
+          {!jeBeta() && (
+            <div style={{ marginTop: 14 }}>
+              <BankaUlozene focus={focus} pohybSplits={pohybSplits} onSplit={nastavPohybSplit} />
+            </div>
+          )}
         </>
       )}
       {sub === "vyplaty" && (
         <>
           <SalaryTab sessions={data.sessions} />
-          {/* Aj tu: výplaty sú riadky v banke, nie abstraktné číslo. */}
-          <div style={{ marginTop: 14 }}>
-            <BankaUlozene focus={focus} pohybSplits={pohybSplits} onSplit={nastavPohybSplit} />
-          </div>
+          {/* Aj tu: výplaty sú riadky v banke, nie abstraktné číslo.
+              V bete skryté — viď poznámku pri P&L vyššie. */}
+          {!jeBeta() && (
+            <div style={{ marginTop: 14 }}>
+              <BankaUlozene focus={focus} pohybSplits={pohybSplits} onSplit={nastavPohybSplit} />
+            </div>
+          )}
         </>
       )}
       {sub === "cashflow" && <CashflowTab />}
