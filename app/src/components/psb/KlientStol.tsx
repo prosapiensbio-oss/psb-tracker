@@ -502,7 +502,6 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
   };
 
   const zrusPlatbu = async (id: string) => {
-    if (!confirm("Zrušiť túto platbu? Zo súčtov zmizne, v knihe zostane.")) return;
     setPracujem(true); setChyba("");
     const r = await fetch("/api/platby", {
       method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
@@ -526,7 +525,6 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
   };
 
   const zrusBalicek = async (id: string) => {
-    if (!confirm("Zrušiť tento balíček? Zo zostatku zmizne, v evidencii zostane.")) return;
     setPracujem(true); setChyba("");
     const r = await fetch("/api/balicky", {
       method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
@@ -989,6 +987,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
                       }}
                       naZrusenie={() => void zrusBalicek(b.id)}
                       pracujem={pracujem}
+                      comu="balíček"
                     />
                   </div>
                   {upravaBalicka === b.id && (
@@ -1057,6 +1056,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
                         }}
                         naZrusenie={() => void zrusPlatbu(x.id)}
                         pracujem={pracujem}
+                        comu="platbu"
                       />
                     )}
                   </div>
@@ -1673,16 +1673,57 @@ const hlavicka: React.CSSProperties = {
  * Ceruzka a krížik. Sú malé a sivé zámerne — pri každom riadku svieti
  * tlačidlo „zmazať" len dovtedy, kým ho niekto nestlačí omylom.
  */
-const Upravit = ({ naUpravu, naZrusenie, pracujem }: { naUpravu: () => void; naZrusenie: () => void; pracujem: boolean }) => (
-  <span style={{ display: "flex", gap: 4, width: 46, justifyContent: "flex-end" }}>
-    {([["✎", naUpravu, "upraviť"], ["✕", naZrusenie, "zrušiť"]] as const).map(([z, fn, t]) => (
-      <button key={z} onClick={fn} disabled={pracujem} title={t} style={{
-        border: "none", background: "transparent", color: C.textDim,
-        fontSize: 12, cursor: pracujem ? "not-allowed" : "pointer", padding: "0 2px", lineHeight: 1,
-      }}>{z}</button>
-    ))}
-  </span>
-);
+/**
+ * Ceruzka a krížik — a potvrdenie V RIADKU, nie v okne prehliadača.
+ *
+ * Krížik sa najprv opýta priamo tu: „zrušiť? áno · nie". Prehliadač vie
+ * `confirm()` potichu zablokovať a vtedy vráti „nie" — tlačidlo potom
+ * nerobí NIČ a človek nemá ako zistiť prečo. Jerry to 24. 9. 2026 zažil
+ * pri mazaní klienta, kde to bolo horšie (`prompt()` tváril, že zadal zlé
+ * meno). Appka má to pravidlo napísané vo vlastnom kóde — Banka.tsx má pri
+ * svojom potvrdení „vlastné potvrdenie, nie confirm()" — a toto miesto ho
+ * porušovalo.
+ *
+ * Otázka žije TU, nie v rodičovi: dve miesta, ktoré to používajú, tak
+ * dostanú to isté správanie a netreba im pridávať stav.
+ */
+const Upravit = ({ naUpravu, naZrusenie, pracujem, comu = "toto" }: {
+  naUpravu: () => void;
+  naZrusenie: () => void;
+  pracujem: boolean;
+  /** Čo sa ruší — do otázky, aby bolo jasné, čoho sa klik týka. */
+  comu?: string;
+}) => {
+  const [pyta, setPyta] = useState(false);
+
+  if (pyta) {
+    return (
+      <span style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 11, whiteSpace: "nowrap" }}>
+        <span style={{ color: C.textMuted }}>zrušiť {comu}?</span>
+        <button onClick={() => { setPyta(false); naZrusenie(); }} disabled={pracujem} style={{
+          border: `1px solid ${mix(C.red, 50)}`, background: mix(C.red, 14), color: C.red,
+          fontSize: 11, fontWeight: 700, borderRadius: 6, padding: "2px 8px",
+          cursor: pracujem ? "not-allowed" : "pointer",
+        }}>áno</button>
+        <button onClick={() => setPyta(false)} style={{
+          border: "none", background: "transparent", color: C.textDim,
+          fontSize: 11, cursor: "pointer", padding: "2px 4px",
+        }}>nie</button>
+      </span>
+    );
+  }
+
+  return (
+    <span style={{ display: "flex", gap: 4, width: 46, justifyContent: "flex-end" }}>
+      {([["✎", naUpravu, "upraviť"], ["✕", () => setPyta(true), "zrušiť"]] as const).map(([z, fn, t]) => (
+        <button key={z} onClick={fn} disabled={pracujem} title={t} style={{
+          border: "none", background: "transparent", color: C.textDim,
+          fontSize: 12, cursor: pracujem ? "not-allowed" : "pointer", padding: "0 2px", lineHeight: 1,
+        }}>{z}</button>
+      ))}
+    </span>
+  );
+};
 
 const TON: Record<string, string> = { dobre: C.green, vsimnut: C.orange, zle: C.red, nevieme: C.textDim };
 
