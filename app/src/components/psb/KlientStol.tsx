@@ -781,20 +781,34 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
           </div>
         )}
 
+        <div style={{ flexGrow: 1 }} />
+        {/* MAZANIE JE VIDIEŤ.
+            Prvá verzia ho schovala pod „Ďalších N údajov" — a Jerry ho
+            nenašiel (24. 9. 2026), lebo pri klientovi bez údajov tam stálo
+            „Ďalších 0 údajov" a nič nenaznačovalo, že je za tým ešte niečo.
+            Schovaná akcia, ktorú človek potrebuje, je to isté ako žiadna.
+            Nekričí ale ani teraz: je sivé, malé a na konci stĺpca — a pýta
+            si napísanie mena, takže omylom sa stlačiť nedá. */}
+        <button
+          onClick={() => void zmazKlienta()}
+          disabled={mazem}
+          title="Zmaže klienta zo všetkých tabuliek — tréningy, platby, balíčky, poznámky. Nedá sa vrátiť."
+          style={{
+            marginTop: 10, padding: "5px 9px", borderRadius: 8, fontSize: 11,
+            cursor: mazem ? "not-allowed" : "pointer", textAlign: "left",
+            border: `1px solid ${mix(C.border, 70)}`, background: "transparent",
+            color: mazem ? C.orange : C.textDim,
+          }}
+        >
+          {mazem ? "mažem…" : "Zmazať klienta"}
+        </button>
+
       </div>
 
       <div style={{ flexGrow: 1, minWidth: 0, display: "flex", flexDirection: "column", minHeight: 0 }}>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", flexShrink: 0 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: C.textDim, letterSpacing: 0.5 }}>VŠETKO V ČASE</div>
-          {detaily && (
-          <button onClick={() => void zmazKlienta()} disabled={mazem} style={{
-            ...navrhTlacidlo, textAlign: "left", borderColor: mix(C.red, 40), color: C.red,
-          }}>
-            {mazem ? "mažem…" : "Zmazať klienta zo všetkého"}
-          </button>
-        )}
-
-        <div style={{ flexGrow: 1 }} />
+          <div style={{ flexGrow: 1 }} />
           <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
             {/* „Tréningy" a „Odkiaľ prišiel" sú preč (Jerry, 23. 9. 2026):
                 prvé bolo to isté, čo „všetko" bez dvoch riadkov, druhé sa
