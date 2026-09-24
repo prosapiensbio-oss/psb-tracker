@@ -975,6 +975,23 @@ export const Route = createFileRoute("/api/meta")({
             const r = await graphPost(o, { status: cielovyStav }, n.token);
             if (!r.ok) return Response.json({ ok: false, error: `Prepnutie ${o} neprešlo: ${r.chyba}` }, { status: 502 });
           }
+          /**
+           * Zapíš nový stav aj SEBE, nielen Mete.
+           *
+           * Kontrola 24. 9. 2026: prepnutie kampane prešlo do Mety, ale
+           * `mkt_kampane` zostalo na starom — a z tej tabuľky číta aj
+           * obrazovka („Práve beží…"), aj Jarvis. Appka teda o kampani, ktorú
+           * práve vypla, tvrdila, že beží. Nočné sťahovanie o 4:20 to zrovná,
+           * takže to trvalo len do rána — ale celý deň sa podľa toho dalo
+           * rozhodovať a Jarvis podľa toho radil.
+           *
+           * Bez filtra na mesiac zámerne: `stav` je prepínač kampane, nie
+           * vlastnosť mesiaca, a presne tak ho píše aj samotná synchronizácia.
+           */
+          await DB.prepare("UPDATE mkt_kampane SET stav = ?2, stav_sad = ?3, updated_at = ?4 WHERE id = ?1")
+            .bind(kampanId, cielovyStav, cielovyStav === "ACTIVE" ? "bezi" : "pozastavena", new Date().toISOString())
+            .run()
+            .catch(() => undefined);
           await audit(DB, {
             action: "reklama", predmet: akcia,
             neu: `${kd.name || kampanId} → ${cielovyStav} (${objekty.length} objektov)`,
