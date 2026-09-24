@@ -334,6 +334,12 @@ export function Reklama({ data, clients }: { data: PSBData; clients: Record<stri
                     <th style={{ ...S.th, textAlign: "left" }}>Mesiac</th>
                     <th style={{ ...S.th, textAlign: "right" }}>Minuté</th>
                     <th style={{ ...S.th, textAlign: "right" }}>Dopytov z reklamy</th>
+                    {/* Cena za DOPYT chýbala (Jerry, 24. 9. 2026). Cena za
+                        klienta tu bola, ale medzi nimi je mesiac čakania:
+                        dopyt príde hneď, klient až keď príde na úvodný
+                        a vráti sa. V mesiaci, kde ešte žiadny klient nie je,
+                        tak stĺpec mlčal, hoci reklama dopyty priniesla. */}
+                    <th style={{ ...S.th, textAlign: "right" }}>Cena za dopyt</th>
                     <th style={{ ...S.th, textAlign: "right" }}>Klientov</th>
                     <th style={{ ...S.th, textAlign: "right" }}>Cena za klienta</th>
                   </tr>
@@ -344,6 +350,9 @@ export function Reklama({ data, clients }: { data: PSBData; clients: Record<stri
                       <td style={S.td}>{monthLabel(r.mesiac)}</td>
                       <td style={{ ...S.td, textAlign: "right", color: C.orange }}>{fmtCZK(r.spend)}</td>
                       <td style={{ ...S.td, textAlign: "right" }}>{r.dopytov || "—"}</td>
+                      <td style={{ ...S.td, textAlign: "right", fontWeight: 600, color: r.dopytov ? C.text : C.textDim }}>
+                        {r.dopytov ? fmtCZK(r.spend / r.dopytov) : "—"}
+                      </td>
                       <td style={{ ...S.td, textAlign: "right" }}>{r.klientov || "—"}</td>
                       <td style={{ ...S.td, textAlign: "right", fontWeight: 600, color: r.klientov ? C.text : C.textDim }}>
                         {r.klientov ? fmtCZK(r.spend / r.klientov) : "—"}

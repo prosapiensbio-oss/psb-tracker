@@ -181,7 +181,7 @@ function Premenovanie({ meno, onHotovo }: { meno: string; onHotovo: (nove: strin
   );
 }
 
-export function Klienti({ clients, capacity, actions, focus, leads, trainer, onTrainer, sixM, sub, onSub, data, btcSatsKlienti = {}, onDennikZapis, cakajuci = [], kalUdalosti, kalZmeny }: { clients: Record<string, ClientAgg>; capacity: CapacityRow[]; actions: Actions; focus?: NavFocus | null; leads: Lead[]; trainer: string; onTrainer: (t: string) => void; sixM: SixMRow[]; sub: string; onSub: (s: string) => void; data: PSBData; btcSatsKlienti?: Record<string, number>; onDennikZapis?: (meno: string, text: string) => Promise<string | null>; /** Ľudia po úvodnom, ktorých export ešte nepotvrdil. */ cakajuci?: CakajuciKlient[]; /** Kalendár — profil z neho berie posledný tréning, kým ho export nedobehne. */ kalUdalosti?: { zaciatok: string; klient: string | null; typ: string | null }[]; kalZmeny?: ZmenaVKalendari[] }) {
+export function Klienti({ clients, capacity, actions, focus, leads, trainer, onTrainer, sixM, sub, onSub, data, btcSatsKlienti = {}, onDennikZapis, cakajuci = [], kalUdalosti, kalZmeny, onProfil }: { clients: Record<string, ClientAgg>; capacity: CapacityRow[]; actions: Actions; focus?: NavFocus | null; leads: Lead[]; trainer: string; onTrainer: (t: string) => void; sixM: SixMRow[]; sub: string; onSub: (s: string) => void; data: PSBData; btcSatsKlienti?: Record<string, number>; onDennikZapis?: (meno: string, text: string) => Promise<string | null>; /** Ľudia po úvodnom, ktorých export ešte nepotvrdil. */ cakajuci?: CakajuciKlient[]; /** Kalendár — profil z neho berie posledný tréning, kým ho export nedobehne. */ kalUdalosti?: { zaciatok: string; klient: string | null; typ: string | null }[]; kalZmeny?: ZmenaVKalendari[]; /** Otvorí profil klienta — jeden a ten istý, vo Workspace (24. 9. 2026). */ onProfil?: (meno: string) => void }) {
   const [focusClient, setFocusClient] = useState<string | null>(null);
   const [skupina, setSkupina] = useState<{ label: string; mena: string[] } | null>(null);
   useEffect(() => {
@@ -405,7 +405,7 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
         onChange={setSub}
       />
       {sub === "referencie" ? (
-        <Referencie data={data} clients={clients} onKlient={(m) => { setFocusClient(m); onSub("klienti"); }} />
+        <Referencie data={data} clients={clients} onKlient={(m) => (onProfil ? onProfil(m) : (setFocusClient(m), onSub("klienti")))} />
       ) : sub === "rast" ? (
         <RastAStrata
           data={data}
@@ -413,7 +413,7 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
           // Klik na meno prepne na zoznam klientov a zameria ho. Zameraný klient
           // obchádza všetky filtre vrátane „zobraziť neaktívnych", takže sa
           // otvorí aj ten, kto v bežnom zozname nie je.
-          onKlient={(m) => { setFocusClient(m); onSub("klienti"); }}
+          onKlient={(m) => (onProfil ? onProfil(m) : (setFocusClient(m), onSub("klienti")))}
           // Klik na POČET v kohortách či zdrojoch otvorí zoznam len s tými
           // ľuďmi — rovnaká skupina ako z dlaždice Odmlčaní na Kokpite.
           onSkupina={(label, mena) => { setSkupina({ label, mena }); setFocusClient(null); onSub("klienti"); }}
@@ -649,8 +649,8 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
                       klienta." Delenie je zámerné: klik na meno = pozrieť sa
                       naňho, klik na ✎ = prepísať mu polia. */}
                   <button
-                    onClick={() => setFocusClient(c.name)}
-                    title="Otvoriť profil klienta — čísla, história a denník"
+                    onClick={() => (onProfil ? onProfil(c.name) : setFocusClient(c.name))}
+                    title="Otvoriť pracovný stôl klienta — čísla, história, platby aj balíčky"
                     style={{ background: "none", border: "none", padding: 0, font: "inherit", color: C.text, cursor: "pointer", textAlign: "left" }}
                   >
                     {c.name}

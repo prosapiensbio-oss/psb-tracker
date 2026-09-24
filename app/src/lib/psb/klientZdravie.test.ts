@@ -37,7 +37,7 @@ describe("signály", () => {
   it("dochádzka pod priemerom je varovanie", () => {
     const s = zdravieKlienta(klient({ attendance: 0.5 }), vstupy()).signaly.find((x) => x.id === "dochadzka")!;
     expect(s.tón).toBe("zle");
-    expect(s.mierka).toBe("priemer klientely 80 %");
+    expect(s.priemerHodnota).toBe("80 %");
   });
 
   it("klient bez odtrénovaného tréningu nemá dochádzku ani dĺžku vzťahu", () => {
@@ -59,10 +59,25 @@ describe("signály", () => {
     expect(z.tón).toBe("dobre");
   });
 
-  it("pri zrušených je MENEJ lepšie — mierka sa obracia", () => {
+  it("pás meria POČET zrušení, nie „ako dobre na tom je“", () => {
+    // Zmenené 24. 9. 2026. Pôvodne sa dĺžka obracala, aby dlhší pás vždy
+    // znamenal lepšie — lenže pás, ktorý raz meria vec a raz jej opak, sa
+    // nedá čítať. Že je menej lepšie, hovorí `lepsieJeViac` a je to vidieť
+    // na farbe, nie na dĺžke.
     const malo = zdravieKlienta(klient(), vstupy({ zrusene: 0 })).signaly.find((x) => x.id === "zrusene")!;
     const vela = zdravieKlienta(klient(), vstupy({ zrusene: 4 })).signaly.find((x) => x.id === "zrusene")!;
-    expect(malo.podiel).toBeGreaterThan(vela.podiel);
+    expect(vela.podiel).toBeGreaterThan(malo.podiel);
+    expect(malo.lepsieJeViac).toBe(false);
+    expect(malo.tón).toBe("dobre");
+    expect(vela.tón).toBe("zle");
+  });
+
+  it("každý porovnateľný signál nesie priemer aj ako text", () => {
+    // Bez toho by sa druhý pás nemal čím popísať.
+    const z = zdravieKlienta(klient(), vstupy());
+    for (const s of z.signaly.filter((x) => x.tón !== "nevieme")) {
+      expect(s.priemerHodnota.length).toBeGreaterThan(0);
+    }
   });
 });
 
@@ -86,11 +101,11 @@ describe("záver", () => {
 });
 
 describe("priemery sú priemery klientely, nie odvodenina od jedného klienta", () => {
-  it("tempo nad priemerom je vpravo od čiarky", () => {
+  it("tempo nad priemerom má dlhší pás než priemer", () => {
     const z = zdravieKlienta(klient(), vstupy({ tempoTeraz: 4, priemery: { tempo: 2, zrusene: 0.8, dochadzka: 0.8, vztah: 12, hodinovka: 1000 } }));
     const s = z.signaly.find((x) => x.id === "tempo")!;
     expect(s.podiel).toBeGreaterThan(s.priemer);
-    expect(s.mierka).toBe("priemer klientely 2.0");
+    expect(s.priemerHodnota).toBe("2.0 / mes.");
   });
 
 });

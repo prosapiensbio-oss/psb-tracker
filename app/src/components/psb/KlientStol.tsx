@@ -7,6 +7,7 @@ import { menoKluc } from "../../lib/psb/compute";
 import { satsNaCzk } from "../../lib/psb/btcKontrola";
 import { CENNIK, platnostDo } from "../../lib/psb/cennik";
 import { osCasuKlienta } from "../../lib/psb/klientOsCasu";
+import { sedeniaPoMesiacoch } from "../../lib/psb/profil";
 import { zdravieKlienta } from "../../lib/psb/klientZdravie";
 import type { ClientAgg } from "../../lib/psb/compute";
 import type { PSBData } from "../../lib/psb/types";
@@ -48,7 +49,7 @@ type Platba = {
 
 const dnesISO = () => new Date().toISOString().slice(0, 10);
 
-export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onOverride }: {
+export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onOverride, otvorKlienta, onOtvoreny }: {
   clients: Record<string, ClientAgg>;
   mena: string[];
   data: PSBData;
@@ -69,6 +70,13 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
    * nahlas. Vlastný fetch z toho vynechal všetky tri veci.
    */
   onOverride?: (meno: string, kluc: string, hodnota: unknown) => Promise<boolean>;
+  /**
+   * Koho otvoriť rovno — klik na klienta v tabuľke, v hľadaní alebo
+   * v registri vedie sem (24. 9. 2026). Profil klienta je odteraz jeden.
+   */
+  otvorKlienta?: string | null;
+  /** Zavolá sa, keď je otvorený — aby sa ten istý klik neopakoval. */
+  onOtvoreny?: () => void;
 }) {
   const [hladam, setHladam] = useState("");
   const [novy, setNovy] = useState(false);
@@ -119,6 +127,16 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
   useLayoutEffect(() => {
     if (!meno && zoznamEl.current) zoznamEl.current.scrollTop = pozicia.current;
   }, [meno]);
+
+  useEffect(() => {
+    if (!otvorKlienta) return;
+    // Meno z odkazu nemusí sedieť na znak (register aj Jarvis píšu po svojom);
+    // hľadá sa preto tolerantne, rovnako ako všade inde v appke.
+    const presne = Object.keys(clients).find((x) => normName(x) === normName(otvorKlienta));
+    setMeno(presne || otvorKlienta);
+    setFilter("zdravie");
+    onOtvoreny?.();
+  }, [otvorKlienta]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const nacitajBalicky = useCallback(async () => {
     const r = await fetch("/api/balicky", { credentials: "same-origin" }).then((x) => x.json()).catch(() => null);
@@ -323,6 +341,9 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
       farba: !obvykle ? C.textMuted : pomer >= 2.5 ? C.red : pomer >= 1.5 ? C.orange : C.green,
     };
   }, [c]);
+
+  /** Rytmus klienta po mesiacoch — do záložky „všetko". */
+  const poMesiacoch = useMemo(() => (c ? sedeniaPoMesiacoch(c) : []), [c]);
 
   const zdravie = useMemo(() => {
     if (!c) return null;
@@ -911,40 +932,80 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
         <div style={{ flexGrow: 1, minHeight: 0, overflowY: "auto", marginTop: 10 }}>
           {filter === "zdravie" && zdravie && (
             <div style={{ display: "flex", flexDirection: "column", gap: 13 }}>
-              {zdravie.signaly.map((sig) => (
-                <div key={sig.id}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10, fontSize: 12.5 }}>
-                    <span style={{ color: C.textMuted }}>{sig.nazov}</span>
-                    <span style={{ color: TON[sig.tón], fontWeight: 700 }}>{sig.hodnota}</span>
+              {/* DVA PÁSY POD SEBOU — klient a priemer.
+                  Jerry, 24. 9. 2026: „tá grafika porovnania s priemerom je
+                  veľmi mätúca, sprav to rovnako ako v profile v Klientoch."
+                  Mal pravdu a dôvod je konkrétny: jeden pás so sivou značkou
+                  núti človeka odhadovať vzdialenosť značky od konca výplne,
+                  a pri zrušených tréningoch sa navyše obracal, takže dlhší
+                  pás raz znamenal viac a raz menej. Dva pásy pod sebou sa
+                  čítajú bez počítania — vidno, ktorý je dlhší. */}
+              {zdravie.signaly.map((sig) => {
+                const pas = (meno: string, sirka: number, text: string, farba: string, hrubsi: boolean) => (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ width: 62, fontSize: 10.5, color: C.textDim, textAlign: "right" }}>{meno}</span>
+                    <div style={{ flex: 1, height: hrubsi ? 14 : 10, background: mix(C.border, 90), borderRadius: 7, overflow: "hidden" }}>
+                      <div style={{ width: `${Math.max(2, sirka * 100)}%`, height: "100%", background: farba, borderRadius: 7 }} />
+                    </div>
+                    <span style={{
+                      width: 92, fontSize: 11.5, textAlign: "right", fontVariantNumeric: "tabular-nums",
+                      color: hrubsi ? C.text : C.textMuted, fontWeight: hrubsi ? 600 : 400,
+                    }}>{text}</span>
                   </div>
-                  {/* Pás s mierkou. V náhľade vyzeral inak než naživo, lebo
-                      výplň po priemer bola takmer neviditeľná a značky sa
-                      strácali — bez nich pás nehovorí nič, len zaberá miesto.
-                      Teraz je výplň po HODNOTU klienta (to je to, čo sa číta
-                      ako prvé) a priemer je zvislá čiarka s popiskom. */}
-                  <div style={{ position: "relative", height: 10, background: mix(C.border, 90), borderRadius: 5, marginTop: 8, overflow: "visible" }}>
-                    {sig.tón !== "nevieme" && (
-                      <>
-                        <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${Math.max(2, sig.podiel * 100)}%`, background: TON[sig.tón], borderRadius: 5, opacity: 0.85 }} />
-                        <div style={{ position: "absolute", left: `${sig.priemer * 100}%`, top: -4, width: 2, height: 18, background: C.textMuted }} title="priemer klientely" />
-                      </>
+                );
+                const maPorovnanie = sig.tón !== "nevieme" && !!sig.priemerHodnota;
+                return (
+                  <div key={sig.id}>
+                    <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4 }}>{sig.nazov}</div>
+                    {maPorovnanie ? (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                        {pas("klient", sig.podiel, sig.hodnota, TON[sig.tón], true)}
+                        {pas("Ø ostatní", sig.priemer, sig.priemerHodnota, mix(C.accent, 55), false)}
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: 13, color: C.textMuted }}>{sig.hodnota}</div>
+                    )}
+                    {!!sig.detail && (
+                      <div style={{ fontSize: 10.5, color: C.textDim, marginTop: 5 }}>{sig.detail}</div>
                     )}
                   </div>
-                  {/* Pod čiarou stojí ČÍSLO, nie slovo „priemer" (Jerry,
-                      23. 9. 2026). Značka bez hodnoty hovorí len „si nad"
-                      alebo „si pod" — a na to, či je rozdiel veľký, sa
-                      z pásu pozerať nedá. */}
-                  <div style={{ display: "flex", justifyContent: "space-between", gap: 10, fontSize: 10.5, color: C.textDim, marginTop: 6 }}>
-                    <span>{sig.detail}</span>
-                    {!!sig.mierka && <span style={{ whiteSpace: "nowrap" }}>│ {sig.mierka}</span>}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
               <div style={{ padding: "11px 13px", borderRadius: 10, background: mix(TON[zdravie.tón], 12), border: `1px solid ${mix(TON[zdravie.tón], 45)}`, fontSize: 12.5, color: C.textMuted, lineHeight: 1.55 }}>
                 <b style={{ color: TON[zdravie.tón] }}>{zdravie.zaver}</b>
                 <div style={{ fontSize: 11, color: C.textDim, marginTop: 5 }}>
                   Sivá značka na páse je to, s čím sa klient porovnáva — pri tempe a zrušeniach priemer klientely, pri medzere jeho vlastný rytmus. Appka nepredpovedá odchod, hovorí, čo sa zmenilo.
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* RYTMUS PO MESIACOCH (Jerry, 24. 9. 2026).
+              Tempo za 90 dní a dátum posledného tréningu nepovedia, či klient
+              postupne spomaľuje, alebo mal jeden hluchý mesiac a vrátil sa.
+              Mesiac bez tréningu je nula, nie vynechaný stĺpec — medzera je
+              to jediné, čo je na takom klientovi zaujímavé. */}
+          {filter === "vsetko" && poMesiacoch.length > 1 && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={hlavicka}>SEDENIA PO MESIACOCH</div>
+              <div style={{ display: "flex", alignItems: "flex-end", gap: 4, height: 72, marginTop: 8 }}>
+                {poMesiacoch.map((m) => {
+                  const max = Math.max(1, ...poMesiacoch.map((x) => x.pocet));
+                  return (
+                    <div key={m.mesiac} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 3, minWidth: 0 }}>
+                      <div style={{ fontSize: 10, color: m.pocet ? C.textMuted : C.textDim, fontVariantNumeric: "tabular-nums" }}>{m.pocet || ""}</div>
+                      <div
+                        title={`${m.mesiac}: ${m.pocet} ${m.pocet === 1 ? "tréning" : m.pocet < 5 ? "tréningy" : "tréningov"}`}
+                        style={{
+                          width: "100%", height: `${Math.max(2, (m.pocet / max) * 46)}px`,
+                          background: m.pocet ? C.accent : mix(C.border, 120),
+                          borderRadius: 3,
+                        }}
+                      />
+                      <div style={{ fontSize: 9.5, color: C.textDim, whiteSpace: "nowrap" }}>{m.mesiac.slice(5)}</div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

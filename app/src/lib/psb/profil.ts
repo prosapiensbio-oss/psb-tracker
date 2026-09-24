@@ -87,3 +87,45 @@ export function priemerOstatnych(hodnoty: number[]): number {
   const v = hodnoty.filter((n) => Number.isFinite(n) && n > 0);
   return v.length ? v.reduce((a, b) => a + b, 0) / v.length : 0;
 }
+
+/**
+ * Sedenia klienta po mesiacoch — jeho rytmus na prvý pohľad.
+ *
+ * Jerry, 24. 9. 2026: „do profilu klienta vo Workspace mi môžeš pridať
+ * sedenia po mesiacoch." Profil dovtedy hovoril tempo za posledných 90 dní
+ * a dátum posledného tréningu; ani jedno nepovie, či klient postupne
+ * spomaľuje, alebo mal jeden hluchý mesiac a vrátil sa.
+ *
+ * Mesiace BEZ tréningu sa vypĺňajú nulou. Bez nich by sa rad dvoch tréningov
+ * v januári a dvoch v júni čítal ako pravidelné chodenie — medzera je pritom
+ * to jediné, čo je na takom klientovi zaujímavé.
+ *
+ * Prázdne mesiace na KONCI (po poslednom tréningu) sa dopĺňajú tiež, až po
+ * dnešok: práve tie hovoria, že klient prestal chodiť.
+ */
+export function sedeniaPoMesiacoch(
+  c: Pick<ClientAgg, "sessions">,
+  /** Koľko mesiacov dozadu. */
+  kolko = 12,
+  teraz: Date = new Date(),
+): { mesiac: string; pocet: number }[] {
+  const doMesiaca = teraz.toISOString().slice(0, 7);
+  const pocty = new Map<string, number>();
+  for (const s of c.sessions) {
+    const m = String(s.date).slice(0, 7);
+    if (m) pocty.set(m, (pocty.get(m) || 0) + 1);
+  }
+  if (!pocty.size) return [];
+
+  const rad: { mesiac: string; pocet: number }[] = [];
+  const [r, me] = doMesiaca.split("-").map(Number);
+  for (let i = kolko - 1; i >= 0; i--) {
+    const d = new Date(Date.UTC(r, me - 1 - i, 1));
+    const m = d.toISOString().slice(0, 7);
+    rad.push({ mesiac: m, pocet: pocty.get(m) || 0 });
+  }
+  // Mesiace pred prvým tréningom klienta nie sú jeho ticho, ten tu ešte
+  // nebol — odrezávajú sa zľava.
+  const prvy = [...pocty.keys()].sort()[0];
+  return rad.filter((x) => x.mesiac >= prvy);
+}

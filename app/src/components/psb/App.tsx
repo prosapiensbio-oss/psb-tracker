@@ -356,6 +356,8 @@ export function PSBApp() {
 
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [ktoSom, setKtoSom] = useState<string | null>(null);
+  /** Koho otvoriť v pracovnom stole vo Workspace. */
+  const [workspaceKlient, setWorkspaceKlient] = useState<string | null>(null);
   const [data, setData] = useState<PSBData>(EMPTY_DATA);
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState("dashboard");
@@ -507,6 +509,22 @@ export function PSBApp() {
   // click-throughs still pass the old section ids (treningy/klienti/…), so map
   // those onto the Tracker tab + its section rather than making callers change.
   const navigate = useCallback((tab: string, sub?: string, focus?: NavFocus) => {
+    /**
+     * PROFIL KLIENTA JE JEDEN — a je vo Workspace.
+     *
+     * Jerry, 24. 9. 2026: „v Klienti by mali byť všetci a keď chcem niekoho
+     * profil, malo by ma to prekliknúť priamo do Workspace na jeho profil."
+     * Dva profily s tými istými poľami znamenali dvojitú údržbu a boli
+     * najčastejším zdrojom tichých rozdielov medzi obrazovkami.
+     *
+     * Presmerúva sa TU, nie na každom tlačidle: odkazov na klienta je plno
+     * v registri, v hľadaní, v referenciách aj v Jarvisových cieľoch.
+     */
+    if (focus?.client) {
+      setActive("workspace");
+      setWorkspaceKlient(focus.client);
+      return;
+    }
     // „6m" už nie je sekcia — je to pohľad v Klientoch. Staré odkazy (register,
     // karta na dashboarde) tým pádom vedú tam, kde 6M dnes žije.
     // Dopyty sa 12. 8. presťahovali z Klientov do Marketingu (Jerry: „prečo sú
@@ -2583,7 +2601,7 @@ function skupinaFaktur(
             {/* Riadok Tréningy/Klienti je od 22. 9. 2026 HORE, spolu s Peniazmi
                 a Výsledkami — inak by boli tri úrovne pod sebou. */}
             {trackerSection === "treningy" && <Treningy data={data} clients={clients} sub={treningySub} onSub={setTreningySub} focus={treningyFocus} trainer={trainer} onTrainer={setTrainer} />}
-            {trackerSection === "klienti" && <Klienti clients={clients} capacity={capacity} actions={actions} focus={klientiFocus} leads={data.leads} trainer={trainer} onTrainer={setTrainer} sixM={sixM} sub={klientiSub} onSub={setKlientiSub} data={data} btcSatsKlienti={btcSatsKlienti} onDennikZapis={chat.spracujDennik} cakajuci={cakajuci} kalUdalosti={kalUdalosti} kalZmeny={kalZmeny} />}
+            {trackerSection === "klienti" && <Klienti clients={clients} capacity={capacity} actions={actions} focus={klientiFocus} leads={data.leads} trainer={trainer} onTrainer={setTrainer} sixM={sixM} sub={klientiSub} onSub={setKlientiSub} data={data} btcSatsKlienti={btcSatsKlienti} onDennikZapis={chat.spracujDennik} cakajuci={cakajuci} kalUdalosti={kalUdalosti} kalZmeny={kalZmeny} onProfil={(m) => { setActive("workspace"); setWorkspaceKlient(m); }} />}
               </>
         )}
 
@@ -2591,7 +2609,7 @@ function skupinaFaktur(
         {active === "vzas" && <Vzas sub={vzasSub} onSub={setVzasSub} data={data} clients={clients} focus={vzasFocus} onNavigate={navigate} pohybSplits={pohybSplits} nastavPohybSplit={nastavPohybSplit} />}
         {active === "kalendar" && <Kalendar clients={clients} data={data} focus={kalendarFocus} ktoSom={ktoSom} trainer={trainer} onTrainer={setTrainer} />}
         {active === "prechod" && <Prechod mena={Object.keys(clients)} />}
-        {active === "workspace" && <Workspace clients={clients} mena={Object.keys(clients)} ktoSom={ktoSom} data={data} kalUdalosti={kalUdalosti} btcSats={btcSatsKlienti} btc={{ platby: btcPlatby, kurz: btcKurz.kurz, kedy: btcKurz.kedy }} onOverride={(m, k, v) => actions.setOverride(m, k as never, v)} />}
+        {active === "workspace" && <Workspace clients={clients} mena={Object.keys(clients)} ktoSom={ktoSom} data={data} kalUdalosti={kalUdalosti} btcSats={btcSatsKlienti} btc={{ platby: btcPlatby, kurz: btcKurz.kurz, kedy: btcKurz.kedy }} otvorKlienta={workspaceKlient} onOtvoreny={() => setWorkspaceKlient(null)} onOverride={(m, k, v) => actions.setOverride(m, k as never, v)} />}
 
         {active === "jarvis" && (
           <JarvisOkno

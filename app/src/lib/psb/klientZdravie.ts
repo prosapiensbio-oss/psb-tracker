@@ -29,11 +29,23 @@ export type Signal = {
   nazov: string;
   /** Hodnota klienta ako text pre človeka. */
   hodnota: string;
-  /** 0..1 — kde stojí na mierke; 1 = najlepšie. */
+  /**
+   * 0..1 — dĺžka pásu klienta. VIAC ZNAMENÁ VIAC, nie „lepšie".
+   *
+   * Pôvodne sa hodnota obracala tak, aby dlhší pás vždy znamenal lepšie
+   * (menej zrušení = dlhší pás). Jerry to 24. 9. 2026 nazval matúcim
+   * a mal pravdu: pás, ktorý raz meria vec a raz jej opak, sa nedá čítať.
+   * Teraz pás meria hodnotu a to, či je vyššie lepšie, hovorí `lepsieJeViac`
+   * — z toho sa berie iba FARBA.
+   */
   podiel: number;
-  /** 0..1 — kde je na tej istej mierke priemer klientely. */
+  /** 0..1 — dĺžka pásu priemeru klientely, na tej istej mierke. */
   priemer: number;
-  /** Čo znamená sivá čiarka na páse. Prázdne = pás mierku nemá. */
+  /** Priemer ako text pre človeka („2,8 / mes."). */
+  priemerHodnota: string;
+  /** Je vyššie číslo lepšie? Pri zrušených tréningoch nie. */
+  lepsieJeViac: boolean;
+  /** Čo sa s čím porovnáva. Prázdne = porovnanie nemá zmysel. */
   mierka: string;
   /** Vysvetlenie pod pásom; prázdne = netreba nič dodávať. */
   detail: string;
@@ -99,7 +111,9 @@ export function zdravieKlienta(
       hodnota: `${vstupy.tempoTeraz.toFixed(1)} / mes.`,
       podiel: podiel(vstupy.tempoTeraz, maxTempo),
       priemer: podiel(vstupy.priemery.tempo, maxTempo),
-      mierka: `priemer klientely ${vstupy.priemery.tempo.toFixed(1)}`,
+      priemerHodnota: `${vstupy.priemery.tempo.toFixed(1)} / mes.`,
+      lepsieJeViac: true,
+      mierka: "priemer aktívnych klientov",
       detail: vstupy.tempoPredtym > 0
         ? `${vstupy.tempoPredtym.toFixed(1)} → ${vstupy.tempoTeraz.toFixed(1)} za pol roka`
         : "kratšia história, než aby sa dal porovnať trend",
@@ -110,10 +124,14 @@ export function zdravieKlienta(
       id: "zrusene",
       nazov: "Zrušené tréningy",
       hodnota: `${vstupy.zrusene} za 90 dní`,
-      // Menej je lepšie — mierka sa preto obracia.
-      podiel: 1 - podiel(vstupy.zrusene, maxZrusene),
-      priemer: 1 - podiel(vstupy.priemery.zrusene, maxZrusene),
-      mierka: `priemer klientely ${vstupy.priemery.zrusene.toFixed(1)}`,
+      // Pás meria POČET zrušení; že menej je lepšie, hovorí `lepsieJeViac`
+      // a prejaví sa to len na farbe. Obracať dĺžku by znamenalo pás, ktorý
+      // raz meria vec a raz jej opak.
+      podiel: podiel(vstupy.zrusene, maxZrusene),
+      priemer: podiel(vstupy.priemery.zrusene, maxZrusene),
+      priemerHodnota: `${vstupy.priemery.zrusene.toFixed(1)} za 90 dní`,
+      lepsieJeViac: false,
+      mierka: "priemer aktívnych klientov",
       detail: vstupy.zrusene === 0 ? "nezrušil ani jeden" : "",
       tón: vstupy.zrusene === 0 ? "dobre" : vstupy.zrusene > vstupy.priemery.zrusene * 2 ? "zle" : vstupy.zrusene > vstupy.priemery.zrusene ? "vsimnut" : "dobre",
       doZaveru: true,
@@ -126,6 +144,7 @@ export function zdravieKlienta(
       if (!c.sessionCount) {
         return {
           id: "dochadzka" as const, nazov: "Dochádzka", hodnota: "—", podiel: 0, priemer: 0,
+          priemerHodnota: "", lepsieJeViac: true,
           mierka: "", detail: "ešte nemá odtrénované", tón: "nevieme" as const, doZaveru: false,
         };
       }
@@ -133,7 +152,9 @@ export function zdravieKlienta(
         id: "dochadzka" as const, nazov: "Dochádzka",
         hodnota: `${Math.round(moja * 100)} %`,
         podiel: podiel(moja, 1), priemer: podiel(p, 1),
-        mierka: `priemer klientely ${Math.round(p * 100)} %`,
+        priemerHodnota: `${Math.round(p * 100)} %`,
+        lepsieJeViac: true,
+        mierka: "priemer aktívnych klientov",
         detail: "koľko z objednaných termínov naozaj odchodil",
         tón: moja >= p ? "dobre" as const : moja >= p * 0.8 ? "vsimnut" as const : "zle" as const,
         doZaveru: true,
@@ -147,6 +168,7 @@ export function zdravieKlienta(
       if (!c.firstSession) {
         return {
           id: "vztah" as const, nazov: "Dĺžka vzťahu", hodnota: "—", podiel: 0, priemer: 0,
+          priemerHodnota: "", lepsieJeViac: true,
           mierka: "", detail: "zatiaľ bez odtrénovaného tréningu", tón: "nevieme" as const, doZaveru: false,
         };
       }
@@ -154,7 +176,9 @@ export function zdravieKlienta(
         id: "vztah" as const, nazov: "Dĺžka vzťahu",
         hodnota: m >= 12 ? `${(m / 12).toFixed(1)} roka` : `${Math.round(m)} mes.`,
         podiel: podiel(m, max), priemer: podiel(vstupy.priemery.vztah, max),
-        mierka: `priemer klientely ${Math.round(vstupy.priemery.vztah)} mes.`,
+        priemerHodnota: `${Math.round(vstupy.priemery.vztah)} mes.`,
+        lepsieJeViac: true,
+        mierka: "priemer aktívnych klientov",
         detail: m < 3 ? "prvé mesiace sú najrizikovejšie" : "",
         tón: m >= vstupy.priemery.vztah ? "dobre" as const : "vsimnut" as const,
         doZaveru: false,
@@ -168,6 +192,7 @@ export function zdravieKlienta(
       if (!h) {
         return {
           id: "hodinovka" as const, nazov: "Cena hodiny", hodnota: "—", podiel: 0, priemer: 0,
+          priemerHodnota: "", lepsieJeViac: true,
           mierka: "", detail: "bez zaplatených hodín sa nedá spočítať", tón: "nevieme" as const, doZaveru: false,
         };
       }
@@ -176,7 +201,9 @@ export function zdravieKlienta(
         id: "hodinovka" as const, nazov: "Cena hodiny",
         hodnota: `${h.toLocaleString("cs-CZ")} Kč`,
         podiel: podiel(h, max), priemer: podiel(p, max),
-        mierka: `priemer klientely ${Math.round(p).toLocaleString("cs-CZ")} Kč`,
+        priemerHodnota: `${Math.round(p).toLocaleString("cs-CZ")} Kč`,
+        lepsieJeViac: true,
+        mierka: "priemer aktívnych klientov",
         detail: c.specialRate ? "má schválenú špeciálnu sadzbu" : "",
         tón: h >= p ? "dobre" as const : h >= p * 0.8 ? "vsimnut" as const : "zle" as const,
         doZaveru: false,

@@ -1,3 +1,4 @@
+import { BODY, kohortyKlientov, priemernePrezitie } from "../../lib/psb/kohorty";
 import { oznam } from "../../lib/psb/obnovaSignal";
 import { zlucZoznam } from "../../lib/psb/zlucZoznam";
 import { Fragment, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
@@ -3304,6 +3305,82 @@ export const VYSLEDKY_LISTY = [
   { id: "report", label: "Report" },
 ];
 
+/**
+ * PREŽITIE KLIENTOV PO KOHORTÁCH.
+ *
+ * Kokpit vedel, koľko klientov má dnes a koľko ich odišlo za mesiac. Nevedel
+ * povedať to podstatnejšie: koľko z ľudí, čo prišli v marci, tu je po pol
+ * roku. Podľa toho sa rozhoduje, či kupovať ďalších, alebo držať tých, čo
+ * sú — nový klient za 2 000 Kč je dobrý obchod len vtedy, keď vydrží.
+ *
+ * Prázdne políčko znamená „kohorta na ten bod ešte nedozrela", nie nulu.
+ * Rozdiel je dôležitý: nula by vyzerala ako odchod a ťahala priemer dole
+ * práve v najnovších mesiacoch, kde je najviac ľudí.
+ */
+function KohortyTab({ clients }: { clients: Record<string, ClientAgg> }) {
+  const koh = useMemo(() => kohortyKlientov(Object.values(clients) as never), [clients]);
+  const priemer = useMemo(() => priemernePrezitie(koh), [koh]);
+  const vidno = useMemo(() => [...koh].reverse().slice(0, 18), [koh]);
+
+  const bunka = (ziju: number | null, prislo: number) => {
+    if (ziju == null) return <span style={{ color: C.textDim }}>—</span>;
+    const pct = prislo ? Math.round((ziju / prislo) * 100) : 0;
+    const farba = pct >= 70 ? C.green : pct >= 40 ? C.orange : C.red;
+    return (
+      <span style={{ display: "inline-flex", alignItems: "baseline", gap: 6 }}>
+        <b style={{ color: farba, fontVariantNumeric: "tabular-nums" }}>{pct} %</b>
+        <span style={{ color: C.textDim, fontSize: 11 }}>{ziju}/{prislo}</span>
+      </span>
+    );
+  };
+
+  if (!koh.length) return <Empty>Zatiaľ nie sú sedenia, z ktorých by sa dali kohorty postaviť.</Empty>;
+
+  return (
+    <Card>
+      <H3>
+        <Info
+          label="Prežitie klientov"
+          text="Klient patrí do mesiaca svojho PRVÉHO tréningu. Po N mesiacoch sa počíta za žijúceho vtedy, keď má tréning v okne ±1 mesiac okolo toho bodu — nie keď má hocikedy neskôr aspoň jeden, lebo to by z jedného zabudnutého tréningu po roku urobilo verného klienta. Prázdne políčko = kohorta ešte nedozrela."
+        />
+      </H3>
+      <div style={{ display: "flex", gap: 22, flexWrap: "wrap", margin: "10px 0 16px" }}>
+        {BODY.map((n) => (
+          <div key={n}>
+            <div style={{ fontSize: 26, fontWeight: 800, color: C.text, lineHeight: 1.1 }}>
+              {priemer[n] == null ? "—" : `${Math.round((priemer[n] as number) * 100)} %`}
+            </div>
+            <div style={{ fontSize: 11.5, color: C.textMuted }}>chodí po {n} mesiacoch</div>
+          </div>
+        ))}
+      </div>
+      <div style={{ overflowX: "auto" }}>
+      <table style={tableStyle}>
+        <thead>
+          <tr>
+            <th style={S.th}>Prišli v</th>
+            <th style={{ ...S.th, textAlign: "right" }}>Ľudí</th>
+            {BODY.map((n) => <th key={n} style={{ ...S.th, textAlign: "right" }}>po {n} mes.</th>)}
+          </tr>
+        </thead>
+        <tbody>
+          {vidno.map((x) => (
+            <tr key={x.mesiac}>
+              <td style={S.td}>{monthLabel(x.mesiac)}</td>
+              <td style={{ ...S.td, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{x.prislo}</td>
+              {BODY.map((n) => <td key={n} style={{ ...S.td, textAlign: "right" }}>{bunka(x.ziju[n], x.prislo)}</td>)}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      </div>
+      <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 10, lineHeight: 1.55 }}>
+        Priemer hore je vážený počtom ľudí a berie len dozreté kohorty. Mesiace, ktoré ešte nedozreli, doň nevstupujú vôbec.
+      </div>
+    </Card>
+  );
+}
+
 export function Vysledky({
   data, onNavigate, clients, sixM, capacity, register, sub, onSub, skryVlastneTaby, focus,
 }: {
@@ -3328,6 +3405,7 @@ export function Vysledky({
           { id: "kvartalne", label: "Kvartálne" },
           { id: "mesacne", label: "Mesačné" },
           { id: "kpi", label: "KPI" },
+          { id: "kohorty", label: "Prežitie" },
           { id: "ciele", label: "Ciele" },
           { id: "report", label: "Report" },
         ]}
@@ -3337,6 +3415,7 @@ export function Vysledky({
       {sub === "kvartalne" && <KvartalneTab data={data} clients={clients} />}
       {sub === "mesacne" && <MesacneTab data={data} clients={clients} focus={focus} />}
       {sub === "kpi" && <KpiTab data={data} onNavigate={onNavigate} />}
+      {sub === "kohorty" && <KohortyTab clients={clients} />}
       {sub === "ciele" && <CieleTab data={data} />}
       {sub === "report" && <Report data={data} clients={clients} sixM={sixM} capacity={capacity} register={register} />}
     </>
