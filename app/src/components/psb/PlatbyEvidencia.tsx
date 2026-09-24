@@ -1,3 +1,4 @@
+import { oznam } from "../../lib/psb/obnovaSignal";
 import { useCallback, useEffect, useState } from "react";
 
 import { C, mix } from "../../lib/psb/theme";
@@ -66,6 +67,7 @@ export function PlatbyEvidencia({ mena }: { mena: string[] }) {
     setPracujem("");
     if (!j.ok) { setChyba(j.error || "nepodarilo sa uložiť"); return false; }
     await nacitaj();
+    oznam("peniaze");
     return true;
   };
 

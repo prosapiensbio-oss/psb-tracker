@@ -1,3 +1,4 @@
+import { oznam } from "../../lib/psb/obnovaSignal";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { navrhniKlientaKandidati, type ClientAgg } from "../../lib/psb/compute";
@@ -184,6 +185,9 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
     setPracujem("");
     if (!j.ok) { setChyba(j.error || "nepodarilo sa uložiť"); return; }
     setHotove((s) => new Set([...s, kluc]));
+    // Register na Dnes drží vlastnú kópiu kalendára — bez oznámenia by
+    // vybavená zmena svietila ďalej (kontrola 24. 9. 2026).
+    oznam(url.includes("platby") ? "peniaze" : "kalendar");
   };
 
   if (!zdroje) return null;

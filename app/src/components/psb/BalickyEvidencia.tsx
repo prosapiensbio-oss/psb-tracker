@@ -1,3 +1,4 @@
+import { oznam } from "../../lib/psb/obnovaSignal";
 import { useCallback, useEffect, useState } from "react";
 
 import type { RiadokPorovnania } from "../../lib/psb/balickyEvidencia";
@@ -62,6 +63,7 @@ export function BalickyEvidencia({ mena }: { mena: string[] }) {
       setHlaska(`Naliatych ${j.pridanych} balíčkov z exportu${j.preskocenych ? `, ${j.preskocenych} preskočených (bez dátumu platnosti)` : ""}.`);
     }
     await nacitaj();
+    oznam("peniaze");
     return true;
   };
 

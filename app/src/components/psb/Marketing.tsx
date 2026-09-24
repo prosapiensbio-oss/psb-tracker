@@ -1,3 +1,4 @@
+import { zlucZoznam } from "../../lib/psb/zlucZoznam";
 import { fetchVzasSettings, saveVzasSetting } from "../../lib/psb/client";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
@@ -246,9 +247,20 @@ function useZnacky() {
       if (Array.isArray(z)) setZnacky(z as MktZnacka[]);
     }).catch(() => {});
   }, []);
+  /**
+   * To isté ako pri cieľoch: značky píše aj Jarvis (akcia „mkt-znacka")
+   * priamo do databázy a táto obrazovka ukladá celý kľúč zo svojho stavu.
+   * Bez zlúčenia by ďalšia ručne pridaná značka tú od Jarvisa zmazala
+   * (kontrola 24. 9. 2026). Kľúčom položky je dátum a text — značka nemá id.
+   */
   const uloz = async (nove: MktZnacka[]) => {
+    const predtym = znacky;
     setZnacky(nove);
-    await saveVzasSetting("mkt_znacky", nove);
+    const st = await fetchVzasSettings().catch(() => ({}) as Record<string, unknown>);
+    const naServeri = Array.isArray(st["mkt_znacky"]) ? (st["mkt_znacky"] as MktZnacka[]) : predtym;
+    const spolu = zlucZoznam(predtym, nove, naServeri, (z) => `${z.datum}|${z.text}`);
+    if (spolu.length !== nove.length) setZnacky(spolu);
+    await saveVzasSetting("mkt_znacky", spolu);
   };
   return { znacky, uloz };
 }

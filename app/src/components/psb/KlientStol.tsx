@@ -1,3 +1,4 @@
+import { oznam } from "../../lib/psb/obnovaSignal";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { normName, fmtCZK, fmtDMY } from "../../lib/psb/format";
@@ -340,6 +341,11 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
     if (!r.ok) { setChyba(r.error || "nepodarilo sa uložiť"); return; }
     setPl({ datum: dnesISO(), suma: "", sposob: "hotovost", poznamka: "" });
     setPisemPlatbu(false);
+    // Bez tohto sa práve zapísaná platba v zozname „V KOKPITE" neobjavila —
+    // jediný z piatich zápisov do tej istej tabuľky, ktorý si zoznam nenačítal
+    // (kontrola 24. 9. 2026). `oznam` k tomu prepočíta P&L a Prechod.
+    await nacitajPlatby();
+    oznam("peniaze");
   };
 
   /**
@@ -408,7 +414,9 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
     if (!r.ok) { setChyba(r.error || "nepodarilo sa zmazať"); return; }
     const kolko = Object.entries(r.zmazane || {}).filter(([, n]) => Number(n) > 0).map(([t, n]) => `${t}: ${n}`).join(", ");
     naZoznam();
-    setChyba(`${meno} zmazaný (${kolko || "nič nebolo"}). Obnov stránku, aby zmizol všade.`);
+    // Appka na to má cestu — netreba posielať človeka obnovovať stránku.
+    oznam("klienti"); oznam("kalendar"); oznam("peniaze");
+    setChyba(`${meno} zmazaný (${kolko || "nič nebolo"}).`);
   };
 
   const naZoznam = () => { setMeno(""); setFilter("zdravie"); setPisem(false); setPisemPlatbu(false); };

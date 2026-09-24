@@ -1,3 +1,4 @@
+import { oznam } from "../../lib/psb/obnovaSignal";
 import type { NavFocus } from "./App";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { fmtDMY, normName } from "../../lib/psb/format";
@@ -218,21 +219,21 @@ export function Kalendar({ clients, data, focus, ktoSom, trainer, onTrainer }: {
           mena={menaKlientov}
           clients={clients}
           onZavri={() => setUpravovana(null)}
-          onHotovo={async () => { setUpravovana(null); await nacitaj(); }}
+          onHotovo={async () => { setUpravovana(null); await nacitaj(); oznam("kalendar"); }}
         />
       )}
-      {pripojene && <div id="kal-zmeny"><Zmeny zmeny={zmenyF} onHotovo={nacitaj} mena={menaKlientov} /></div>}
+      {pripojene && <div id="kal-zmeny"><Zmeny zmeny={zmenyF} onHotovo={async () => { await nacitaj(); oznam("kalendar"); }} mena={menaKlientov} /></div>}
       {/* „Nové názvy" idú NAD „Chýba v PTminderi" (Jerry, 22. 8. 2026).
           Je to poradie práce, nie estetika: kým sa meno z názvu udalosti
           nepriradí človeku, tréning nemá komu patriť — a presne preto potom
           spadne do „Chýba v PTminderi". Priradiť najprv a až potom čítať, čo
           chýba, znamená kratší zoznam a menej otázok. */}
       {stav.nejednoznacne.length > 0 && (
-        <div id="kal-nejednoznacne"><DveMena zoznam={stav.nejednoznacne} onHotovo={nacitaj} /></div>
+        <div id="kal-nejednoznacne"><DveMena zoznam={stav.nejednoznacne} onHotovo={async () => { await nacitaj(); oznam("kalendar"); }} /></div>
       )}
 
       {stav.nezname.length > 0 && (
-        <div id="kal-nezname"><Mapovanie nezname={stav.nezname} mena={menaKlientov} clients={clients} onHotovo={nacitaj} trener={trener} ktoSom={ktoSom} /></div>
+        <div id="kal-nezname"><Mapovanie nezname={stav.nezname} mena={menaKlientov} clients={clients} onHotovo={async () => { await nacitaj(); oznam("kalendar"); }} trener={trener} ktoSom={ktoSom} /></div>
       )}
       {pripojene && <Kontrola udalosti={udalostiF} data={data} />}
       {/* Balíčky aj „Odpísaní, ale majú termín" sa zliali na Kokpit (Jerry,

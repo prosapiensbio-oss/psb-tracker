@@ -1,3 +1,4 @@
+import { oznam } from "../../lib/psb/obnovaSignal";
 import { Fragment, useEffect, useMemo, useState } from "react";
 
 import { fmtCZK, fmtDMY } from "../../lib/psb/format";
@@ -97,6 +98,7 @@ export function BankaUlozene({ focus, pohybSplits, onSplit }: {
       setSprava(`Prehodené: ${r.zmenene}${r.zamknute ? `, ${r.zamknute} odmietnutých (uzavretý mesiac)` : ""}.`);
       if (!kluce) setOznacene(new Set());
       nacitaj();
+      oznam("peniaze");
       setTimeout(() => setSprava(""), 5000);
     } else setSprava("Zmena sa nepodarila.");
   };

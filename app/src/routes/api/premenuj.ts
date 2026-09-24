@@ -48,6 +48,18 @@ const TABULKY: { tab: string; stlpec: string; kluc: boolean }[] = [
   // mene nevedel.
   { tab: "kal_udalosti", stlpec: "klient", kluc: false },
   { tab: "kal_mapovanie", stlpec: "klient", kluc: false },
+  // Tá istá diera o mesiac neskôr, len v iných tabuľkách (kontrola 24. 9.
+  // 2026). Vlastná evidencia balíčkov a kniha platieb vznikli 22. 9. a do
+  // tohto zoznamu ich nikto nepridal — premenovaný klient by tak prišiel
+  // o balíček aj o hotovostné platby a nikto by nevedel kam. To isté platí
+  // pre merania, nezaplatené poplatky, zmeny v kalendári a naučené
+  // priradenie platiteľa.
+  { tab: "balicky", stlpec: "klient", kluc: false },
+  { tab: "platby", stlpec: "klient", kluc: false },
+  { tab: "klient_merania", stlpec: "klient", kluc: false },
+  { tab: "poplatky", stlpec: "client_name", kluc: false },
+  { tab: "kal_zmeny", stlpec: "klient", kluc: false },
+  { tab: "platba_mapovanie", stlpec: "klient", kluc: false },
 ];
 
 async function pocet(DB: D1Database, tab: string, stlpec: string, meno: string): Promise<number> {

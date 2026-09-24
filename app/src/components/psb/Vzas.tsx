@@ -1,3 +1,5 @@
+import { oznam } from "../../lib/psb/obnovaSignal";
+import { zlucZoznam } from "../../lib/psb/zlucZoznam";
 import { Fragment, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { PlatobneKanaly } from "./PlatobneKanaly";
@@ -1842,11 +1844,14 @@ function KamOdisliCard() {
   // neúspech tu znamená, že runway sa počíta zo starého zostatku a nikto to
   // nevie; preto sa výsledok číta a neúspech vracia obrazovku späť.
   const ulozHotovost = async () => {
+    // Stav hotovosti zhasína krok uzávierky aj dlaždicu Rezerva — obe si ho
+    // čítali raz pri štarte (kontrola 24. 9. 2026).
     const predtym = stav;
     const v: StavPenazi = { hotovost: cislo(hotTxt), datum: new Date().toISOString().slice(0, 10) };
     setStav(v);
     setUprava("");
     const ok = await saveVzasSetting("stav_penazi", v);
+    oznam("peniaze");
     if (!ok) { setStav(predtym); setUprava("hotovost"); }
   };
 
@@ -2458,6 +2463,7 @@ function MonthNoteRow({ mi, colSpan, notes, onSaved, kotva }: {
   const save = async () => {
     setSaving(true);
     const ok = await saveMonthNote(key, note, answers);
+    if (ok) oznam("zapisy");
     setSaving(false);
     if (ok) {
       setSaved(true);
@@ -3023,11 +3029,23 @@ function CieleTab({ data }: { data: PSBData }) {
     const predtym = ciele;
     setCiele(next);
     setChybaCiela(false);
-    void saveVzasSetting("ciele", next).then((ok) => {
-      if (ok) return;
-      setCiele(predtym);
-      setChybaCiela(true);
-    });
+    /**
+     * Pred uložením sa pozrie, čo je na serveri TERAZ.
+     *
+     * Ciele píše aj Jarvis (akcia „novy-ciel") priamo do databázy. Obrazovka
+     * ukladá celý kľúč zo svojho stavu, takže bez tohto kroku by Jerryho
+     * ďalší klik Jarvisov cieľ nielen nezobrazil — zmazal by ho (kontrola
+     * 24. 9. 2026). Zlúčenie vie rozlíšiť „pribudlo inde" od „práve som to
+     * zmazal", lebo pozná aj zoznam, z ktorého obrazovka vyšla.
+     */
+    void (async () => {
+      const st = await fetchVzasSettings().catch(() => ({}) as Record<string, unknown>);
+      const naServeri = Array.isArray(st["ciele"]) ? (st["ciele"] as Goal[]) : predtym;
+      const spolu = zlucZoznam(predtym, next, naServeri, (g) => g.id);
+      if (spolu.length !== next.length) setCiele(spolu);
+      const ok = await saveVzasSetting("ciele", spolu);
+      if (!ok) { setCiele(predtym); setChybaCiela(true); }
+    })();
   };
   const update = (id: string, patch: Partial<Goal>) =>
     persist(ciele.map((g) => (g.id === id ? { ...g, ...patch } : g)));

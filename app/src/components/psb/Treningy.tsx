@@ -1,3 +1,4 @@
+import { oznam } from "../../lib/psb/obnovaSignal";
 import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 
 import { fetchWeekEntries, saveWeekEntry, type WeekEntry } from "../../lib/psb/client";
@@ -52,6 +53,9 @@ function WeekEnergyRow({ weekKeyIso, colSpan, entry, onSave }: {
     if (!ok) return; // tlačidlo zostane „Uložiť" — nič sa nezapísalo
     setSaved(true);
     onSave(weekKeyIso, draft);
+    // Bez tohto appka pripomínala aj týždeň, ktorý bol práve zapísaný —
+    // `zapisy` v App sa čítali len pri štarte (kontrola 24. 9. 2026).
+    oznam("zapisy");
     setTimeout(() => setSaved(false), 2000);
   };
   const field: CSSProperties = {

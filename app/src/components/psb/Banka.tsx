@@ -1,3 +1,4 @@
+import { oznam } from "../../lib/psb/obnovaSignal";
 import { useEffect, useMemo, useState } from "react";
 
 import { fetchBtcReserve, type BtcVyplata, saveVzasSetting} from "../../lib/psb/client";
@@ -264,6 +265,9 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
       setVysledok(`Zapísané: ${r.pridane} pohybov${r.preskocene ? `, ${r.preskocene} už v databáze bolo` : ""}${r.zamknute ? `, ${r.zamknute} odmietnutých (uzavretý mesiac)` : ""}. Naučených pravidiel: ${r.pravidla}.`);
       setNahlad(null);
       onHotovo?.();
+      // Import výpisu mení náklady v P&L aj kroky uzávierky — `refresh()`
+      // sám sťahuje iba /api/data (kontrola 24. 9. 2026).
+      oznam("peniaze");
     } else setVysledok("Zápis sa nepodaril.");
   };
 

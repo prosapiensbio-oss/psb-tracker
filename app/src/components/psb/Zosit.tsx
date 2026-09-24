@@ -1,3 +1,4 @@
+import { oznam } from "../../lib/psb/obnovaSignal";
 import { useRef, useState } from "react";
 
 import { fmtCZK } from "../../lib/psb/format";
@@ -135,6 +136,7 @@ export function Zosit({ onZapisane }: { onZapisane?: () => void }) {
       setDenMesiac({});
       setStav("");
       onZapisane?.();
+      oznam("peniaze");
     } catch (e) {
       setStav(`Zápis zlyhal: ${e instanceof Error ? e.message : String(e)}`);
     } finally {

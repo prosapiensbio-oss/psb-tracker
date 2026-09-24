@@ -1,3 +1,4 @@
+import { oznam } from "../../lib/psb/obnovaSignal";
 import { Fragment, useEffect, useMemo, useState } from "react";
 
 import { kotvaDat, tokyKlientov, type ClientAgg, type KlientTok } from "../../lib/psb/compute";
@@ -443,6 +444,7 @@ function DovodyOdchodu({ mesiac, mena, clients }: { mesiac: string; mena: string
     const doterajsie = n[mesiac]?.answers || {};
     const nove = { ...doterajsie, [k]: text };
     const ok = await saveMonthNote(mesiac, n[mesiac]?.note || "", nove, "jerry");
+    oznam("zapisy");
     setUklada("");
     // Dôvod odchodu je veta z hlavy — pri neúspechu zostáva v poli,
     // nie vymazaná s tvárou, že je uložená.

@@ -1,3 +1,4 @@
+import { oznam } from "../../lib/psb/obnovaSignal";
 import { useEffect, useMemo, useState } from "react";
 
 import { fmtDMY, monthLabel } from "../../lib/psb/format";
@@ -198,6 +199,9 @@ export function Uzavierky({ prekazky, kroky, podklady, onNavigate, chat }: {
     setChybaZamku("");
     const ok = await setPeriodLock(m, na);
     nacitaj();
+    // App si zoznam zamknutých mesiacov čítala raz pri štarte, takže Jarvis
+    // do konca sedenia tvrdil opak toho, čo bolo na obrazovke.
+    oznam("peniaze");
     setPrebieha(null);
     // Zámok, ktorý neprešiel, nesmie otvoriť mesačnú správu — tá je signál
     // „mesiac je hotový" a človek podľa nej prestane mesiac riešiť.

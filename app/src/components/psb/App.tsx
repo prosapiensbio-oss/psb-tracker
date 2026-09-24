@@ -1,3 +1,4 @@
+import { pocuvaj } from "../../lib/psb/obnovaSignal";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { nazovFazy } from "../../lib/psb/mapaCyklu";
@@ -88,6 +89,12 @@ export type Actions = {
   ingest: (files: { filename: string; text: string }[]) => Promise<IngestResult[]>;
   reset: () => Promise<void>;
   refresh: () => Promise<void>;
+  /**
+   * Prepočítaj všetko okolo peňazí. Volá ho každý, kto zapísal pohyb,
+   * faktúru, platbu, balíček, stav hotovosti alebo zámok mesiaca —
+   * `refresh()` na to nestačí, ten sťahuje iba /api/data.
+   */
+  prepocitajPeniaze: () => void;
   /** Tvrdé obnovenie kalendára: stiahne ho teraz a prepočíta zostatky. */
   obnovKalendar: () => Promise<void>;
   /**
@@ -615,6 +622,14 @@ export function PSBApp() {
     })();
   }, [load, nacitajZapisy]);
 
+  // Týždenná únava a odpovede na otázky mesiaca zhasínajú vlastné pripomienky
+  // na Dnes. Dovtedy sa `zapisy` čítali len pri štarte a pri vstupe na Upload,
+  // takže appka pripomínala aj to, čo bolo práve zapísané (kontrola 24. 9.).
+  useEffect(() => pocuvaj("zapisy", () => void nacitajZapisy()), [nacitajZapisy]);
+  // Zmazanie alebo premenovanie klienta mení `/api/data` — bez tohto by appka
+  // posielala človeka obnoviť stránku, čo je ospravedlnenie, nie riešenie.
+  useEffect(() => pocuvaj("klienti", () => void load(true)), [load]);
+
   const clients = useMemo(() => deriveClients(data), [data]);
   // Latest clients for tolerant name resolution in setOverride (e.g. AI passes "Jakub Stigut" → "Jakub Štigut").
   const clientsRef = useRef(clients);
@@ -815,6 +830,27 @@ export function PSBApp() {
    *  Kľúč = dedup_key pohybu (viď pohybSplit.pohybKluc). */
   const [pohybSplits, setPohybSplits] = useState<PohybSplits>({});
   /** Posledný zapísaný stav hotovosti — jeden z krokov uzávierky. */
+  /**
+   * PEŇAŽNÁ VERZIA — jedno počítadlo, ktoré prepočíta všetko okolo peňazí.
+   *
+   * Kontrola 24. 9. 2026 našla sedem miest, kde zápis prešiel, ale číslo sa
+   * nepohlo: zaradenie pohybu do kategórie, import výpisu, zápis zošita,
+   * faktúry, stav hotovosti v obálke, zámok mesiaca, hromadné zaradenie
+   * Jarvisom. Dôvod bol vždy ten istý — peňažný stav v App sa číta raz pri
+   * štarte alebo z efektu, ktorého závislosti sa tým zápisom nezmenia.
+   * `actions.refresh()` nepomáha: ten sťahuje iba /api/data, a tieto veci
+   * žijú v /api/fio, /api/faktury, /api/periods a vo vzas_settings.
+   *
+   * Preto jedno číslo v závislostiach všetkých peňažných efektov a jedna
+   * akcia, ktorú zavolá každý, kto s peniazmi pohol. Sedem záplat by znamenalo
+   * ôsme miesto, na ktoré sa zabudne.
+   */
+  const [penazVerzia, setPenazVerzia] = useState(0);
+  // Obrazovky, ktoré zapisujú, sú zanorené hlboko a je ich vyše desať —
+  // signál je preto modulový, nie prop. Detaily v obnovaSignal.ts.
+  useEffect(() => pocuvaj("peniaze", () => setPenazVerzia((v) => v + 1)), []);
+  const [kalVerzia, setKalVerzia] = useState(0);
+  useEffect(() => pocuvaj("kalendar", () => setKalVerzia((v) => v + 1)), []);
   const [stavHotovosti, setStavHotovosti] = useState<{ hotovost: number; datum: string } | null>(null);
   /** Faktúry, ktoré zatiaľ nemajú platbu — ponuka pri ručnom párovaní. */
   const [volneFaktury, setVolneFaktury] = useState<{ cislo: string; datum: string; celkom: number; dodavatel: string; obsadena?: boolean }[]>([]);
@@ -847,7 +883,7 @@ export function PSBApp() {
       if (sal && typeof sal === "object" && nastavVyplaty(sal as never)) zmena = true;
       if (zmena) setFioTik((x) => x + 1);
     });
-  }, []);
+  }, [penazVerzia]);
   /** Uloží rozdelenie/priradenie jedného pohybu a prepočíta P&L. Prázdny
    *  zoznam = priradenie zrušené (pohyb sa vráti k svojmu bežnému správaniu). */
   const nastavPohybSplit = useCallback((kluc: string, casti: SplitCiast[]) => {
@@ -910,7 +946,7 @@ export function PSBApp() {
   const [zamknuteMesiace, setZamknuteMesiace] = useState<string[]>([]);
   useEffect(() => {
     void fetchPeriods().then(({ periods }) => setZamknuteMesiace(periods.filter((p) => p.locked).map((p) => p.month)));
-  }, []);
+  }, [penazVerzia]);
   /**
    * Kalendár čaká na /api/data. NIE je to kozmetika, je to oprava výpadku.
    *
@@ -940,7 +976,7 @@ export function PSBApp() {
         setPlatbyCakaju((j.nepriradene || []).length);
       })
       .catch(() => undefined);
-  }, [dataHotove]);
+  }, [dataHotove, penazVerzia]);
 
   useEffect(() => {
     if (!dataHotove) return;
@@ -968,7 +1004,7 @@ export function PSBApp() {
         if (nastavObjednaneZKalendara(objednane)) setFioTik((x) => x + 1);
       })
       .catch(() => {});
-  }, [dataHotove]);
+  }, [dataHotove, kalVerzia]);
 
   /**
    * Vysvetlenie z registra sa doručí Kalendáru.
@@ -1481,7 +1517,7 @@ function skupinaFaktur(
         if (nastavRucnePrijmy(rucnePrijmy)) setFioTik((x) => x + 1);
       })
       .catch(() => {});
-  }, [btcNakupy, btcParovanie, pohybSplits]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [btcNakupy, btcParovanie, pohybSplits, penazVerzia]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Kontroly nad bankovými sumami. Register je jediné miesto, kam sa človek
   // pozerá, keď hľadá „čo mám spraviť" — ďalšia karta vedľa neho by znamenala
@@ -2231,6 +2267,7 @@ function skupinaFaktur(
         await load();
       },
       refresh: () => load(true),
+      prepocitajPeniaze: () => setPenazVerzia((v) => v + 1),
       // Stiahne kalendár TERAZ a hneď načíta jeho udalosti aj dáta z PTmindera.
       // Cron beží ráno a večer; toto je pre chvíľu, keď človek práve dotrénoval
       // a chce vidieť zostatok bez čakania do večera.

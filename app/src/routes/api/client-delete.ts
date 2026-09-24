@@ -30,7 +30,10 @@ export const Route = createFileRoute("/api/client-delete")({
         if (!name) return Response.json({ ok: false, error: "no_name" }, { status: 400 });
 
         const zmazane: Record<string, number> = {};
-        // Zoznam musí rásť s appkou. Pribudli tabuľky, ktoré v pôvodnom
+        // POZOR: `kal_udalosti` sa tu MAŽE, ale pri premenovaní sa len
+        // prepisuje — je to zámer. Zmazaný klient nemá v kalendári čo hľadať
+        // a inak sa vráti späť ako „po úvodnom, čaká na export" (appka ten
+        // zoznam stavia práve z kalendára). Zoznam musí rásť s appkou. Pribudli tabuľky, ktoré v pôvodnom
         // zozname neboli — vlastná evidencia balíčkov a kniha platieb (obe
         // 22. 9. 2026), poplatky, denník, merania a mapovanie z kalendára —
         // a bez nich by po „zmazanom" klientovi zostali riadky, ktoré ho
@@ -46,6 +49,10 @@ export const Route = createFileRoute("/api/client-delete")({
           ["balicky", "klient"],
           ["platby", "klient"],
           ["kal_mapovanie", "klient"],
+          ["kal_udalosti", "klient"],
+          ["kal_zmeny", "klient"],
+          ["platba_mapovanie", "klient"],
+          ["leads", "name"],
           ["client_overrides", "name"],
         ] as const) {
           try {

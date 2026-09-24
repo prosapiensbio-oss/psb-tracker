@@ -1,3 +1,4 @@
+import { oznam } from "../../lib/psb/obnovaSignal";
 import { useMemo, useState } from "react";
 
 import { fmtCZK } from "../../lib/psb/format";
@@ -93,7 +94,7 @@ export function FakturyNahlad({
       body: JSON.stringify({ polozky: riadky }),
     }).then((x) => x.json()).catch(() => ({ ok: false }));
     setBusy(false);
-    if (r.ok) { setVysledok(`Zapísané: ${r.pridane} položiek, naučených pravidiel ${r.pravidla}.`); onHotovo(); }
+    if (r.ok) { setVysledok(`Zapísané: ${r.pridane} položiek, naučených pravidiel ${r.pravidla}.`); onHotovo(); oznam("peniaze"); }
     else setVysledok("Zápis sa nepodaril.");
   };
 

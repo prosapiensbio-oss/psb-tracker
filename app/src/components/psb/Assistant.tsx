@@ -1,3 +1,4 @@
+import { oznam } from "../../lib/psb/obnovaSignal";
 import { type CSSProperties, Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { fmtDMY, jeMesiac } from "../../lib/psb/format";
 import { navrhZTokenu } from "../../lib/psb/kampanPlan";
@@ -640,11 +641,18 @@ export function useAssistantChat(
           .then((ok) => { if (!ok) oznamVysledok(`Zápis pre ${a.name} NEPREŠIEL — skús znova.`); });
       }
       else if (a.type === "zapis-zaver" && a.data) {
-        void saveZaver(a.data).then((ok) => { if (!ok) oznamVysledok("Záver sa NEZAPÍSAL — skús znova."); });
+        void saveZaver(a.data).then((ok) => {
+          if (!ok) { oznamVysledok("Záver sa NEZAPÍSAL — skús znova."); return; }
+          // Závery sú v /api/data a idú do registra aj do stola klienta.
+          void actions.refresh();
+        });
       }
       else if (a.type === "vyhodnot-zaver" && a.data) {
         void vyhodnotZaver(String(a.data.id || ""), String(a.data.stav || "otvoreny"), String(a.data.vysledok || ""))
-          .then((ok) => { if (!ok) oznamVysledok("Vyhodnotenie sa NEZAPÍSALO — skús znova."); });
+          .then((ok) => {
+            if (!ok) { oznamVysledok("Vyhodnotenie sa NEZAPÍSALO — skús znova."); return; }
+            void actions.refresh();
+          });
       } else if (a.type === "zarad-pohyby" && a.data) {
         // Zaradenie bankových pohybov do kategórií. Toto je najväčšia ručná
         // práca v celej appke — 174 nezaradených riadkov po prvom importe — a
@@ -662,6 +670,9 @@ export function useAssistantChat(
               ? `Zaradených ${j.zmenene ?? 0} pohybov${j.zamknute ? `, ${j.zamknute} preskočených (zamknutý mesiac)` : ""}.`
               : "Zaradenie pohybov zlyhalo.");
             void actions.refresh();
+            // Kategórie pohybov žijú v /api/fio, nie v /api/data — refresh
+            // sám by P&L nepohol (kontrola 24. 9. 2026).
+            oznam("peniaze");
           })
           .catch(() => oznamVysledok("Zaradenie pohybov zlyhalo — spojenie."));
       } else if ((a.type === "spusti-kampan" || a.type === "zastav-kampan") && a.data) {
@@ -792,7 +803,10 @@ export function useAssistantChat(
             const dnes = new Date().toISOString().slice(0, 10);
             const riadok = `• ${fakt} (zapísal Jarvis ${dnes})`;
             if (stara.includes(fakt)) return; // to isté dvakrát nie
-            void saveMonthNote(mes, [stara, riadok].filter(Boolean).join("\n"), n[mes]?.answers || {}, "jarvis");
+            void saveMonthNote(mes, [stara, riadok].filter(Boolean).join("\n"), n[mes]?.answers || {}, "jarvis")
+              // Kronika ide do podkladov pre správu mesiaca. Bez oznámenia
+              // by Jarvis o minútu neskôr ten istý fakt napísal druhýkrát.
+              .then(() => oznam("zapisy"));
           });
         }
       } else if (a.type === "novy-ciel" && a.data) {
