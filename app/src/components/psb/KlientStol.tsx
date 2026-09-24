@@ -681,7 +681,23 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
             a Anetke z toho vyšlo „predplatené 60 240 Kč" — porovnávala
             platby za celý život s balíčkami, ktoré sú v Kokpite od 2026.
             Číslo, ktoré nikomu nič nehovorí, je horšie než žiadne.
-            Toto je priamy zdroj: nezaplatené poplatky z PTmindera. */}
+            Toto je priamy zdroj: nezaplatené poplatky z PTmindera.
+
+            A PRETO AJ „PODĽA PTMINDERA" V POPISKE (Jerry, 24. 9. 2026).
+            Obe čísla tu — dlh aj zaplatené — stoja LEN na exporte. Platby
+            zapísané v Kokpite (hotovosť zo zošita, prevod priradený z Fia)
+            žijú vo vlastnej tabuľke a do nich nevstupujú. Kontrola zápisov
+            to našla v praktickej podobe: klientovi svieti „nezaplatené
+            2 600 Kč", človek mu zapíše 2 600 Kč hotovosti, platba je vidieť
+            o pätnásť centimetrov nižšie — a dlaždica hlási nezaplatené ďalej,
+            kým nepríde nový export.
+
+            Dáta sú v poriadku, klamalo slovo „celkom". Sčítať oba zdroje sa
+            počas súbežného chodu NESMIE: tá istá platba môže prísť raz z Fia
+            a raz z exportu a započítala by sa dvakrát. Až keď sa PTminder
+            vypne, nahradia tieto dve čísla dve vedľa seba — Kokpit a export —
+            aby bolo vidieť, kde sa rozchádzajú. Dovtedy nech aspoň povie,
+            odkiaľ je. */}
         <div style={{ padding: "11px 13px", borderRadius: 11, background: mix(dlzi > 0 ? C.red : C.green, 10), border: `1px solid ${mix(dlzi > 0 ? C.red : C.green, 40)}` }}>
           <div style={{ fontSize: 17, fontWeight: 800, color: dlzi > 0 ? C.red : C.green }}>
             {dlzi > 0 ? `nezaplatené ${fmtCZK(dlzi)}` : "nič nedlhuje"}
@@ -689,8 +705,16 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
           <div style={{ fontSize: 11, color: C.textMuted, marginTop: 3 }}>
             {dlzi > 0
               ? `${poplatkyKlienta.length} ${poplatkyKlienta.length === 1 ? "položka" : poplatkyKlienta.length < 5 ? "položky" : "položiek"} z PTmindera`
-              : `zaplatil ${fmtCZK(zaplatene)} celkom`}
+              : `zaplatil ${fmtCZK(zaplatene)} podľa PTmindera`}
           </div>
+          {/* Keď má klient platby aj v Kokpite, povedz to — inak človek číta
+              číslo z jedného zdroja ako celok. */}
+          {!!mojePlatby.length && (
+            <div style={{ fontSize: 10.5, color: C.textDim, marginTop: 4, lineHeight: 1.45 }}>
+              + {fmtCZK(mojePlatby.reduce((a, x) => a + x.suma_czk, 0))} zapísané v Kokpite
+              {dlzi > 0 ? " — kým nepríde nový export, dlh o ne nevie" : ""}
+            </div>
+          )}
         </div>
 
         {c && c.packageTotal > 0 && (

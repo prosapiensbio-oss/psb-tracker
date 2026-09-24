@@ -1074,6 +1074,15 @@ sám?" v Kalendári. Pravidlá, ktoré z toho platia pre každý súbežný chod
 - **Tolerancie sú tie isté ako v `nezapisaneTreningy`** (meno bez diakritiky,
   ±1 deň na presunutú hodinu). Vlastná kópia by sa rozišla a dve obrazovky by
   tvrdili dve veci.
+- **Čísla o peniazoch klienta stoja LEN na exporte, a musia to povedať.**
+  Dlaždica na karte klienta („nezaplatené X", „zaplatil X") sa počíta
+  z PTmindera; platby zapísané v Kokpite sú vo vlastnej tabuľke a nevstupujú
+  do nej. Sčítať oba zdroje sa počas súbežného chodu NESMIE — tá istá platba
+  príde raz z Fia a raz z exportu a započítala by sa dvakrát. Preto popiska
+  hovorí „podľa PTmindera" a pod ňou stojí, koľko je zapísané v Kokpite
+  (Jerry, 24. 9. 2026).
+  **PO VYPNUTÍ PTMINDERA:** nahradiť to dvoma číslami vedľa seba — Kokpit
+  a export — aby bolo vidieť, kde sa rozchádzajú. Dovtedy nie.
 - **Do `aiContext` ide hotové číslo zo servera**, nie prepočet:
   `kalendar.udalosti` je okno 21 dní dozadu a Jarvis by odpovedal inak než
   obrazovka.
