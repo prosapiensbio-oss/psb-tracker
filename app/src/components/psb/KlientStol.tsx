@@ -94,6 +94,17 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
   const [f, setF] = useState({ nazov: "", hodiny: "", platnostOd: dnesISO(), platnostDo: "", cenaCzk: "", poznamka: "", zlava: "" });
   const [pracujem, setPracujem] = useState(false);
   const [chyba, setChyba] = useState("");
+  /** Je posledná hláška dobrá správa? Červená veta o úspechu mätie. */
+  const [chybaJeDobra, setChybaJeDobra] = useState(false);
+  /**
+   * Hláška patrí tomu, pri kom vznikla.
+   *
+   * Jerry, 24. 9. 2026: „prečo mi pri Kadličkovej ukazuje, že sa vymazal
+   * test?" Lebo hláška o zmazaní `__test__` zostala v stave a prežila
+   * otvorenie iného klienta. Veta o cudzom človeku na cudzej karte je
+   * horšia než žiadna — vyzerá ako niečo, čo sa práve stalo tomuto.
+   */
+  useEffect(() => { if (meno) setChyba(""); }, [meno]);
 
   /**
    * Kam bol zoznam odrolovaný, keď z neho človek odišiel do profilu.
@@ -389,11 +400,11 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
   }, [onOverride]);
 
   const zapisOverride = async (kluc: string, hodnota: unknown) => {
-    setPracujem(true); setChyba("");
+    setPracujem(true); setChyba(""); setChybaJeDobra(false);
     const ok = await zapisPre(meno, kluc, hodnota);
     setPracujem(false);
     if (!ok) setChyba("Nepodarilo sa uložiť — hodnota je späť.");
-    else if (!onOverride) setChyba("Uložené. Obnov stránku, aby sa to prepočítalo všade.");
+    else if (!onOverride) { setChybaJeDobra(true); setChyba("Uložené. Obnov stránku, aby sa to prepočítalo všade."); }
   };
 
   /**
@@ -418,6 +429,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
    * výsledok sa vypíše — vrátane toho, koľko riadkov naozaj zmizlo.
    */
   const zmazKlienta = async () => {
+    setChybaJeDobra(false);
     if (potvrdMazanie.trim() !== meno) {
       setChyba(`Napíš do políčka presne „${meno}" — bez toho nemažem nič.`);
       return;
@@ -434,6 +446,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
     naZoznam();
     // Appka na to má cestu — netreba posielať človeka obnovovať stránku.
     oznam("klienti"); oznam("kalendar"); oznam("peniaze");
+    setChybaJeDobra(!!kolko);
     setChyba(`${meno} zmazaný — ${kolko || "NIČ sa nezmazalo, riadky tam neboli"}.`);
   };
 
@@ -895,7 +908,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
             onUloz={() => void pridajPlatbu()}
           />
         )}
-        {chyba && <div style={{ fontSize: 12, color: C.red, marginTop: 8 }}>{chyba}</div>}
+        {chyba && <div style={{ fontSize: 12, color: chybaJeDobra ? C.green : C.red, marginTop: 8 }}>{chyba}</div>}
 
         <div style={{ flexGrow: 1, minHeight: 0, overflowY: "auto", marginTop: 10 }}>
           {filter === "zdravie" && zdravie && (
