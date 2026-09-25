@@ -52,7 +52,12 @@ export type Uzol = {
   zbalene: boolean;
   /** Fáza nákupného cyklu, 0 = nezaradené. */
   faza: number;
+  /** Stav nápadu z karty Nápady: novy | pouzity | zamietnuty. */
+  stav?: string;
 };
+
+/** Nápad, ktorý sa ešte len chystá — publikovaný sa do plánu nepočíta. */
+export const jeNaPlan = (u: Uzol) => !!(u.text || "").trim() && u.stav !== "pouzity" && u.stav !== "zamietnuty";
 
 /**
  * Do ktorej vetvy uzol patrí. Vetva sa NEUKLADÁ na každý uzol, len na
@@ -77,8 +82,13 @@ export const farbaVetvy = (id: string) => VETVA_MAPA.get(id)?.farba ?? "#6d7560"
 /** Deti uzla v poradí. Kľúč "" znamená korene danej vetvy. */
 export function detiPodla(uzly: Uzol[]): Map<string, Uzol[]> {
   const m = new Map<string, Uzol[]>();
+  const su = new Set(uzly.map((u) => u.id));
   for (const u of uzly) {
-    const k = u.rodic || "";
+    // SIROTA: rodič, ktorý v zozname nie je (zamietnutý v karte Nápady,
+    // zmazaný slot, odrezaný stropom dopytu). Bez tejto vetvy by uzol
+    // nedostal pozíciu, z mapy by zmizol — a keďže sa nekreslí, nedal by sa
+    // ani vrátiť späť. Visí teda na vetve ako koreň a je vidieť.
+    const k = u.rodic && su.has(u.rodic) ? u.rodic : "";
     if (!m.has(k)) m.set(k, []);
     m.get(k)!.push(u);
   }
@@ -130,6 +140,9 @@ export function smiePresunut(id: string, cielId: string, uzly: Uzol[]): boolean 
   return !potomkovia(id, uzly).has(cielId);
 }
 
+/** Výška jedného riadku mapy. Kreslí z nej rozloženie, čiary aj trafenie cieľa. */
+export const RIADOK = 52;
+
 export type Miesto = { x: number; y: number; w: number; hlbka: number };
 export type Rozlozenie = { poz: Record<string, Miesto>; vyska: number };
 
@@ -147,7 +160,6 @@ export const sirkaUzla = (text: string, hlbka: number) =>
 export function rozlozMapu(uzly: Uzol[], koren = { x: 38, y: 28, text: "" }): Rozlozenie {
   const deti = detiPodla(uzly);
   const poz: Record<string, Miesto> = {};
-  const RIADOK = 52;
   const MEDZERA = 76;
 
   const chod = (u: Uzol, x: number, yHore: number, hlbka: number): number => {
@@ -201,13 +213,18 @@ export function rozlozMapu(uzly: Uzol[], koren = { x: 38, y: 28, text: "" }): Ro
  * vety: čo sa chystá, koľko toho je, a hlavne ČO CHÝBA. Prázdna fáza je
  * v tomto texte to najcennejšie — na obrazovke sa dá prehliadnuť, vo vete nie.
  */
+/** Koľko kusov obsahu je mesiac pri danej týždennej kadencii. Jedno miesto. */
+export const kusovNaMesiac = (kadenciaTyzdenne: number) => Math.round(kadenciaTyzdenne * 4);
+
 export function mapaNaText(uzly: Uzol[], v: {
   mesiac: string;
   kadenciaTyzdenne: number;
   nazovFazy: (f: number) => string;
 }): string {
-  const listy = uzly.filter((u) => (u.text || "").trim());
-  const treba = Math.round(v.kadenciaTyzdenne * 4);
+  // Do plánu sa počíta len to, čo sa ešte len chystá. Publikovaný nápad
+  // v zásobníku by inak vyhlásil mesiac za pokrytý obsahom, ktorý už vyšiel.
+  const listy = uzly.filter(jeNaPlan);
+  const treba = kusovNaMesiac(v.kadenciaTyzdenne);
   const sFazou = listy.filter((u) => u.faza > 0);
   const riadky: string[] = [];
 
@@ -251,4 +268,42 @@ export function mapaNaText(uzly: Uzol[], v: {
     }
   }
   return riadky.join("\n");
+}
+
+/**
+ * HROMADNÉ VYSYPANIE: jeden riadok = jeden nápad.
+ *
+ * Jerryho vlastná veta znie „najprv vysypem, potom usporiadam" — a vysypanie
+ * dvadsiatich nápadov po jednom Tabe je presne tá práca, ktorej sa mal
+ * zbaviť. Toto je to isté, čo má Miro ako Bulk mode a XMind pri vložení
+ * textu zo schránky: text z poznámok v telefóne sa vloží naraz.
+ *
+ * ODSADENIE DRŽÍ HIERARCHIU. Riadok odsadený tabulátorom alebo dvoma
+ * medzerami je potomkom predošlého plytšieho riadku — tak, ako si človek
+ * píše poznámky. Bez toho by sa z odsadeného zoznamu stala plochá kopa
+ * a usporiadanie by sa muselo urobiť znova.
+ *
+ * Odrážky na začiatku (`-`, `*`, `•`, `1.`) sa zahadzujú: sú to znaky
+ * zoznamu, nie súčasť nápadu.
+ */
+export type VysypRiadok = { text: string; uroven: number };
+
+export function rozparsujVysyp(vstup: string): VysypRiadok[] {
+  const von: VysypRiadok[] = [];
+  for (const surovy of (vstup || "").split(/\r?\n/)) {
+    if (!surovy.trim()) continue;
+    const odsadenie = /^[\t ]*/.exec(surovy)?.[0] ?? "";
+    // Tabulátor je jedna úroveň, dve medzery tiež — obe sa v poznámkach bežne
+    // miešajú a rozlišovať ich by znamenalo hádať, čo mal človek na mysli.
+    const uroven = (odsadenie.match(/\t/g)?.length ?? 0) + Math.floor(odsadenie.replace(/\t/g, "").length / 2);
+    const text = surovy.trim().replace(/^(?:[-*•–]|\d+[.)])\s*/, "").trim();
+    if (text) von.push({ text, uroven: Math.min(uroven, 6) });
+  }
+  // Prvý riadok je vždy na nule, nech je odsadený akokoľvek — inak by celý
+  // vložený blok visel na nepočujúcom rodičovi.
+  if (von.length) {
+    const posun = von[0].uroven;
+    for (const r of von) r.uroven = Math.max(0, r.uroven - posun);
+  }
+  return von;
 }

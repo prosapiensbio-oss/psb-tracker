@@ -48,14 +48,22 @@ export const Route = createFileRoute("/api/napady")({
         const { DB } = bindings();
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });
         try {
-          const [r, m] = await DB.batch([
-            DB.prepare("SELECT id, datum, text, zdroj, stav, poznamka, autor, odkaz, pouzite_at, faza, planovane_na, kto, koncept, hotovy_text, zaber, sekvencia, scenar, hashtagy, plan_id, inspiracia, titulka, uvodne_vety, rodic, vetva, poradie, zbalene, mapa_id FROM mkt_napady ORDER BY datum DESC, created_at DESC LIMIT 400"),
-            DB.prepare("SELECT id, nazov, created_at, poradie FROM mkt_mapy ORDER BY poradie, created_at"),
-          ]);
+          const r = await DB.prepare("SELECT id, datum, text, zdroj, stav, poznamka, autor, odkaz, pouzite_at, faza, planovane_na, kto, koncept, hotovy_text, zaber, sekvencia, scenar, hashtagy, plan_id, inspiracia, titulka, uvodne_vety, rodic, vetva, poradie, zbalene, mapa_id FROM mkt_napady ORDER BY datum DESC, created_at DESC LIMIT 2000").all();
+          const m = await DB.prepare("SELECT id, nazov, created_at, poradie FROM mkt_mapy ORDER BY poradie, created_at").all();
           return Response.json({ ok: true, napady: r.results || [], mapy: m.results || [] });
-        } catch {
-          // Tabuľka ešte nie je (staršia migrácia) — obrazovka si vystačí s prázdnym.
-          return Response.json({ ok: true, napady: [] });
+        } catch (e) {
+          // Prázdno s úspechom je najhoršia možná odpoveď: nápady čítajú štyri
+          // obrazovky a jedna neaplikovaná migrácia by ich všetky vyprázdnila
+          // bez slova. Dopyty sú preto ODDELENÉ (D1 batch je transakcia, takže
+          // chýbajúca `mkt_mapy` by zhodila aj nápady) a chyba sa hlási.
+          try {
+            const r = await DB.prepare(
+              "SELECT id, datum, text, zdroj, stav, poznamka, autor, odkaz, pouzite_at, faza, planovane_na, kto, koncept, hotovy_text, zaber, sekvencia, scenar, hashtagy, plan_id, inspiracia, titulka, uvodne_vety FROM mkt_napady ORDER BY datum DESC, created_at DESC LIMIT 2000",
+            ).all();
+            return Response.json({ ok: true, napady: r.results || [], mapy: [], varovanie: `Mapa sa nenačítala: ${String(e).slice(0, 160)}` });
+          } catch (e2) {
+            return Response.json({ ok: false, error: String(e2).slice(0, 300) }, { status: 500 });
+          }
         }
       },
 
@@ -95,7 +103,9 @@ export const Route = createFileRoute("/api/napady")({
             // Mapa s nápadmi sa NEZMAŽE. Zmazať ju aj s obsahom by znamenalo
             // stratiť nápady jedným klikom; presunúť ich inam by zase ticho
             // premiestnilo prácu. Obe rozhodnutia patria človeku.
-            const kolko = await DB.prepare("SELECT COUNT(*) n FROM mkt_napady WHERE mapa_id = ?1").bind(idMapy).first<{ n: number }>();
+            // Rovnaká podmienka ako odznak na karte mapy — inak odznak hlási
+            // nulu a mazanie odmietne s „v mape je 3 nápadov".
+            const kolko = await DB.prepare("SELECT COUNT(*) n FROM mkt_napady WHERE mapa_id = ?1 AND stav <> 'zamietnuty'").bind(idMapy).first<{ n: number }>();
             if ((kolko?.n ?? 0) > 0) {
               return Response.json({ ok: false, error: `V mape je ${kolko?.n} nápadov — najprv ich presuň alebo zmaž.` }, { status: 400 });
             }
@@ -106,12 +116,36 @@ export const Route = createFileRoute("/api/napady")({
           const id = kus(b.id, 40);
 
           if (b.zmaz === true && id) {
+            // Jediné miesto v appke, kde nápad naozaj mizne. Hlavička tohto
+            // súboru hovorí „prečo sa nič nemaže" — platí to pre zamietnuté
+            // nápady, ktoré majú zostať aj s dôvodom. Prázdna bublina z mapy
+            // je iný prípad: nikdy nebola nápadom. Preto sa maže LEN riadok,
+            // v ktorom nie je nič okrem textu, a zostane po ňom záznam.
+            const r = await DB.prepare(
+              `SELECT text, COALESCE(koncept,'') koncept, COALESCE(hotovy_text,'') hotovy,
+                      COALESCE(scenar,'') scenar, COALESCE(odkaz,'') odkaz,
+                      COALESCE(planovane_na,'') mesiac, COALESCE(faza,0) faza
+                 FROM mkt_napady WHERE id = ?1`,
+            ).bind(id).first<{ text: string; koncept: string; hotovy: string; scenar: string; odkaz: string; mesiac: string; faza: number }>();
+            if (!r) return Response.json({ ok: true });
+            if (r.koncept || r.hotovy || r.scenar || r.odkaz || r.mesiac || r.faza) {
+              return Response.json({
+                ok: false,
+                error: "Nápad má rozpracovaný obsah alebo termín — zmaž ho v karte Nápady, nech je vidieť prečo.",
+              }, { status: 400 });
+            }
             await DB.prepare("DELETE FROM mkt_napady WHERE id = ?1").bind(id).run();
+            await audit(DB, { action: "zmazanie", predmet: "marketingový nápad", old: String(r.text || "").slice(0, 120), actor: (await currentUser(request)) || undefined });
             return Response.json({ ok: true });
           }
 
           // Úprava stavu alebo poznámky pri existujúcom nápade.
           if (id) {
+            // TEXT NÁPADU. Chýbal tu do 25. 9. 2026 a myšlienková mapa je prvá
+            // obrazovka, ktorá ho upravuje: prepísaná bublina sa neuložila,
+            // server vrátil „nič na zmenu" a najbližšie načítanie vrátilo starý
+            // text. Prázdny text sa NEZAPÍŠE — nápad bez vety nie je nápad.
+            const novyText = b.text === undefined ? null : (kus(b.text, 600) || null);
             const stav = STAVY.has(String(b.stav)) ? String(b.stav) : null;
             const poznamka = b.poznamka === undefined ? null : kus(b.poznamka, 600);
             // Odkaz na hotový príspevok — tým sa kruh uzatvára. Prázdny
@@ -190,7 +224,7 @@ export const Route = createFileRoute("/api/napady")({
             // Nápad sa dá presunúť do inej mapy — je to ten istý nápad, len sa
             // o ňom premýšľa inde.
             const mapaId = b.mapaId === undefined ? null : (kus(b.mapaId, 40) || "m-hlavna");
-            if (stav === null && poznamka === null && odkaz === null
+            if (novyText === null && stav === null && poznamka === null && odkaz === null
                 && faza === null && mesiac === null && kto === null && koncept === null
                 && hotovy === null && zaber === null && sekvencia === null && inspiracia === null
                 && scenar === null && hashtagy === null && titulka === null && uvodneVety === null
@@ -203,7 +237,8 @@ export const Route = createFileRoute("/api/napady")({
             // nápad premení na obsah.
             const pouzite = stav === "pouzity" ? new Date().toISOString().slice(0, 10) : null;
             await DB.prepare(
-              `UPDATE mkt_napady SET stav = COALESCE(?2, stav), poznamka = COALESCE(?3, poznamka),
+              `UPDATE mkt_napady SET text = COALESCE(?23, text),
+                 stav = COALESCE(?2, stav), poznamka = COALESCE(?3, poznamka),
                  odkaz = COALESCE(?4, odkaz),
                  pouzite_at = CASE WHEN ?5 IS NOT NULL AND pouzite_at = '' THEN ?5 ELSE pouzite_at END,
                  faza = COALESCE(?6, faza), planovane_na = COALESCE(?7, planovane_na),
@@ -218,7 +253,8 @@ export const Route = createFileRoute("/api/napady")({
                  mapa_id = COALESCE(?22, mapa_id)
                WHERE id = ?1`,
             ).bind(id, stav, poznamka, odkaz, pouzite, faza, mesiac, kto, koncept, hotovy, zaber, sekvencia,
-                   scenar, hashtagy, inspiracia, titulka, uvodneVety, rodic, vetva, poradie, zbalene, mapaId).run().then((r) => {
+                   scenar, hashtagy, inspiracia, titulka, uvodneVety, rodic, vetva, poradie, zbalene, mapaId,
+                   novyText).run().then((r) => {
               // UPDATE s neexistujúcim id prejde „úspešne" s nulou zmien —
               // a obrazovka by ohlásila uložené nad ničím (revízia 19. 8.).
               if (!r.meta.changes) throw new Error("nenajdene");
@@ -264,6 +300,11 @@ export const Route = createFileRoute("/api/napady")({
           // Nápad z „+ Zápis" mapu nepozná a patrí do prvej — inak by spadol
           // do prázdna a nikde by nebol vidieť.
           const nMapa = kus(b.mapaId, 40) || "m-hlavna";
+          // Nápad zapísaný do mapy, ktorá neexistuje, by nebol vidieť nikde.
+          if (nMapa !== "m-hlavna") {
+            const ma = await DB.prepare("SELECT 1 x FROM mkt_mapy WHERE id = ?1").bind(nMapa).first();
+            if (!ma) return Response.json({ ok: false, error: "Taká mapa neexistuje." }, { status: 400 });
+          }
           // Aj pri ZAKLADANÍ, nielen pri úprave. Obrazovka hotový text posiela
           // a bez tohto riadka by ho INSERT ticho zahodil — appka by ohlásila
           // uložené nad stratou (23. 8. 2026, nájdené pri kontrole).

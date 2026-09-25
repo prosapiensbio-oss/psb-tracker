@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { mapaNaText, potomkovia, rozlozMapu, sirkaUzla, smiePresunut, vetvaUzla, viditelny, type Uzol } from "./mapaNapadov";
+import { RIADOK, kusovNaMesiac, rozparsujVysyp, mapaNaText, potomkovia, rozlozMapu, sirkaUzla, smiePresunut, vetvaUzla, viditelny, type Uzol } from "./mapaNapadov";
 import { nazovFazy } from "./mapaCyklu";
 
 const u = (o: Partial<Uzol> & { id: string }): Uzol =>
@@ -53,7 +53,7 @@ describe("rozloženie", () => {
   it("súrodenci sa neprekrývajú", () => {
     const uzly = [u({ id: "a", vetva: "uvodny" }), u({ id: "b", vetva: "uvodny", poradie: 1 })];
     const { poz } = rozlozMapu(uzly);
-    expect(Math.abs(poz.a.y - poz.b.y)).toBeGreaterThanOrEqual(52);
+    expect(Math.abs(poz.a.y - poz.b.y)).toBeGreaterThanOrEqual(RIADOK);
   });
 
   it("zbalená vetva miesto svojich detí nezaberá", () => {
@@ -141,5 +141,90 @@ describe("ťahanie nápadu pod iný", () => {
 
   it("neznámy uzol neprejde", () => {
     expect(smiePresunut("zzz", "a", strom)).toBe(false);
+  });
+});
+
+describe("sirota — uzol, ktorému zmizol rodič", () => {
+  // Rodiča môže zamietnuť karta Nápady alebo ho odreže strop dopytu. Bez
+  // tejto vetvy by potomok nedostal pozíciu, z mapy by zmizol a keďže sa
+  // nekreslí, nedal by sa ani vrátiť späť.
+  const sirota = [u({ id: "b", rodic: "niet-ho", vetva: "" })];
+
+  it("dostane pozíciu, teda je vidieť", () => {
+    expect(rozlozMapu(sirota).poz.b).toBeDefined();
+  });
+
+  it("visí v odkladisku, nie v prázdne", () => {
+    expect(vetvaUzla("b", sirota)).toBe("nezaradene");
+  });
+
+  it("uzol so živým rodičom sa nezmení", () => {
+    const zdravy = [u({ id: "a", vetva: "kniha" }), u({ id: "b", rodic: "a" })];
+    const { poz } = rozlozMapu(zdravy);
+    expect(poz.b.x).toBeGreaterThan(poz.a.x);
+  });
+});
+
+describe("šírka bubliny", () => {
+  it("má spodok aj strop — inak sa mapa rozsype na jednom dlhom nápade", () => {
+    expect(sirkaUzla("", 2)).toBe(150);
+    expect(sirkaUzla("", 0)).toBe(200);
+    expect(sirkaUzla("x".repeat(400), 2)).toBe(360);
+  });
+
+  it("rastie s dĺžkou textu", () => {
+    expect(sirkaUzla("krátky", 2)).toBeLessThan(sirkaUzla("oveľa dlhší nápad na dve slová", 2));
+  });
+});
+
+describe("čo sa počíta do mesiaca", () => {
+  const zaklad = { mesiac: "október 2026", kadenciaTyzdenne: 2, nazovFazy };
+
+  it("kadencia má jedno miesto", () => {
+    expect(kusovNaMesiac(2)).toBe(8);
+    expect(kusovNaMesiac(3)).toBe(12);
+  });
+
+  it("publikovaný nápad mesiac nezapĺňa", () => {
+    // Inak mapa vyhlási mesiac za pokrytý obsahom, ktorý už dávno vyšiel.
+    const uzly = [
+      u({ id: "a", vetva: "uvodny", text: "Už vyšlo", faza: 3, stav: "pouzity" }),
+      u({ id: "b", vetva: "uvodny", text: "Ešte len bude", faza: 3 }),
+    ];
+    const t = mapaNaText(uzly, zaklad);
+    expect(t).toContain("chýba 7 zaradených kusov");
+    expect(t).not.toContain("Už vyšlo");
+  });
+});
+
+describe("hromadné vysypanie", () => {
+  it("jeden riadok = jeden nápad, prázdne sa zahodia", () => {
+    expect(rozparsujVysyp("prvý\n\ndruhý\n   \ntretí")).toEqual([
+      { text: "prvý", uroven: 0 }, { text: "druhý", uroven: 0 }, { text: "tretí", uroven: 0 },
+    ]);
+  });
+
+  it("odsadenie tabulátorom aj medzerami drží hierarchiu", () => {
+    expect(rozparsujVysyp("rodič\n\tdieťa\n  druhé dieťa")).toEqual([
+      { text: "rodič", uroven: 0 }, { text: "dieťa", uroven: 1 }, { text: "druhé dieťa", uroven: 1 },
+    ]);
+  });
+
+  it("odrážky sa zahodia — sú to znaky zoznamu, nie nápad", () => {
+    expect(rozparsujVysyp("- prvý\n* druhý\n• tretí\n1. štvrtý\n2) piaty").map((r) => r.text))
+      .toEqual(["prvý", "druhý", "tretí", "štvrtý", "piaty"]);
+  });
+
+  it("celý blok odsadený rovnako začína na nule", () => {
+    // Skopírované z poznámok aj s odsadením — inak by celý blok visel
+    // na rodičovi, ktorý neexistuje.
+    expect(rozparsujVysyp("\tprvý\n\t\tdruhý")).toEqual([
+      { text: "prvý", uroven: 0 }, { text: "druhý", uroven: 1 },
+    ]);
+  });
+
+  it("prázdny vstup nič nevyrobí", () => {
+    expect(rozparsujVysyp("")).toEqual([]);
+    expect(rozparsujVysyp("   \n\n- \n")).toEqual([]);
   });
 });
