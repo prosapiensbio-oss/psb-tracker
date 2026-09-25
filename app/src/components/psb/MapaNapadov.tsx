@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { doSchranky } from "../../lib/psb/kopirovanie";
 import { nazovFazy } from "../../lib/psb/mapaCyklu";
 import {
-  VETVY, farbaVetvy, mapaNaText, rozlozMapu, vetvaUzla, viditelny, type Uzol,
+  VETVY, farbaVetvy, mapaNaText, rozlozMapu, smiePresunut, vetvaUzla, viditelny, type Uzol,
 } from "../../lib/psb/mapaNapadov";
 import { C, mix } from "../../lib/psb/theme";
 import type { AssistantChat } from "./Assistant";
@@ -99,6 +99,17 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
   const [zoom, setZoom] = useState(1);
   /** Nad ktorým uzlom je otvorená ponuka „presunúť do inej vetvy". */
   const [presunPre, setPresunPre] = useState<string | null>(null);
+  /**
+   * Ťahanie za obrys.
+   *
+   * Jerry, 25. 9. 2026: „skôr tak, že to chytím za obrys a tým to presuniem,
+   * kde chcem." Ponuka ⇄ zostáva — z klávesnice a pre čítačku obrazovky je to
+   * jediná cesta — ale myšou je prirodzené nápad chytiť a pustiť inam.
+   *
+   * Ťahá sa za RÁM okolo bubliny, nie za text: vnútro je políčko, do ktorého
+   * sa píše, a keby začínalo ťahanie, nedalo by sa v ňom označiť slovo.
+   */
+  const [tahanie, setTahanie] = useState<{ id: string; text: string; x: number; y: number; ciel: string | null } | null>(null);
   const plochaRef = useRef<HTMLDivElement | null>(null);
 
   const nacitaj = useCallback(() => void fetch("/api/napady", { credentials: "same-origin" })
@@ -255,6 +266,18 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
     nacitaj();
   };
 
+  /** Zavesiť nápad pod iný nápad (ťahaním). Kruh v strome neprejde. */
+  const presunPodUzol = async (u: Uzol, cielId: string) => {
+    if (u.id === DOCASNY || !smiePresunut(u.id, cielId, uzly)) return;
+    const koniec = uzly.filter((x) => x.rodic === cielId).length;
+    // `vetva` sa pri zavesení pod iný nápad VYPRÁZDNI: platí len na koreňových
+    // a nechať v nej starú hodnotu by znamenalo druhú, neplatnú pravdu
+    // o tom, kam nápad patrí.
+    setRiadky((r) => r.map((x) => (x.id === u.id ? { ...x, rodic: cielId, vetva: "", poradie: koniec } : x)));
+    await posli({ id: u.id, rodic: cielId, vetva: "", poradie: koniec });
+    nacitaj();
+  };
+
   const nastavFazu = async (id: string, f: number) => {
     setRiadky((r) => r.map((x) => (x.id === id ? { ...x, faza: f } : x)));
     await posli({ id, faza: f });
@@ -288,13 +311,71 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
     spoj(rodicPoz, poz[u.id], f, (poz[u.id]?.hlbka || 2) <= 2 ? 2 : 1.4, "u" + u.id);
   }
 
+  /** Bod myši v súradniciach mapy (cez priblíženie aj posunutie plochy). */
+  const bodVMape = (e: { clientX: number; clientY: number }) => {
+    const el = plochaRef.current;
+    if (!el) return { x: 0, y: 0 };
+    const r = el.getBoundingClientRect();
+    return { x: (e.clientX - r.left + el.scrollLeft) / zoom, y: (e.clientY - r.top + el.scrollTop) / zoom };
+  };
+
+  /** Čo je pod myšou — uzol, vetva, alebo nič. */
+  const cielPod = (bod: { x: number; y: number }, okremId: string): string | null => {
+    for (const [kluc, m] of Object.entries(poz)) {
+      if (kluc === "koren" || kluc === okremId) continue;
+      if (bod.x < m.x || bod.x > m.x + m.w || bod.y < m.y || bod.y > m.y + 52) continue;
+      if (kluc.startsWith("vetva:")) return kluc;
+      return smiePresunut(okremId, kluc, uzly) ? kluc : null;
+    }
+    return null;
+  };
+
+  /** Spoločná obsluha ťahania pre bublinu aj vetvu. */
+  const tahaj = (u: Uzol) => ({
+    onPointerDown: (e: React.PointerEvent) => {
+      const t = e.target as HTMLElement;
+      if (t.tagName === "INPUT" || t.closest("button")) return;
+      e.preventDefault();
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      setPresunPre(null);
+      const b = bodVMape(e);
+      setTahanie({ id: u.id, text: u.text, x: b.x, y: b.y, ciel: null });
+    },
+    onPointerMove: (e: React.PointerEvent) => {
+      if (!tahanie || tahanie.id !== u.id) return;
+      const b = bodVMape(e);
+      setTahanie({ ...tahanie, x: b.x, y: b.y, ciel: cielPod(b, u.id) });
+    },
+    onPointerUp: (e: React.PointerEvent) => {
+      if (!tahanie || tahanie.id !== u.id) return;
+      const ciel = tahanie.ciel;
+      setTahanie(null);
+      if (!ciel) return;
+      if (ciel.startsWith("vetva:")) void presunDoVetvy(u, ciel.slice(6));
+      else void presunPodUzol(u, ciel);
+      (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
+    },
+    onPointerCancel: () => setTahanie(null),
+  });
+
   const bublina = (u: Uzol) => {
     const p = poz[u.id];
     if (!p) return null;
     const f = farbaVetvy(vetvaUzla(u.id, uzly));
     const deti = uzly.filter((x) => x.rodic === u.id).length;
     return (
-      <div key={u.id} style={{ position: "absolute", left: p.x, top: p.y, display: "flex", alignItems: "center", gap: 7, zIndex: presunPre === u.id ? 4 : undefined }}>
+      <div key={u.id} style={{ position: "absolute", left: p.x, top: p.y, display: "flex", alignItems: "center", gap: 7, zIndex: presunPre === u.id ? 4 : (tahanie?.id === u.id ? 5 : undefined) }}>
+        <div
+          {...tahaj(u)}
+          title="Chyť za rám a presuň"
+          style={{
+            padding: 5, borderRadius: 999, touchAction: "none",
+            cursor: tahanie?.id === u.id ? "grabbing" : "grab",
+            border: `1px solid ${tahanie?.ciel === u.id ? C.accent : "transparent"}`,
+            background: tahanie?.ciel === u.id ? mix(C.accent, 16) : "transparent",
+            opacity: tahanie?.id === u.id ? 0.45 : 1,
+          }}
+        >
         <input
           type="text"
           aria-label="Nápad"
@@ -318,6 +399,7 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
             fontFamily: "inherit", fontSize: 14, outline: "none",
           }}
         />
+        </div>
         {deti > 0 && (
           <button
             type="button"
@@ -442,6 +524,7 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
             <span><b style={{ color: C.text }}>Enter</b> ďalšia vedľa</span>
             <span><b style={{ color: C.text }}>⌫</b> na prázdnej zmaže</span>
             <span><b style={{ color: C.text }}>⇄</b> presunie do inej vetvy</span>
+            <span>alebo chyť bublinu <b style={{ color: C.text }}>za rám</b> a pusť ju nad iný nápad</span>
             <span style={{ flexGrow: 1 }} />
             <span>dva prsty na trackpade — štipnutím priblížiš a oddiališ</span>
             <div style={{ display: "flex", alignItems: "center", gap: 2, padding: 2, borderRadius: 8, border: `1px solid ${C.border}`, background: C.card }}>
@@ -473,7 +556,12 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
                 const kolko = uzly.filter((u) => !u.rodic && vetvaUzla(u.id, uzly) === v.id).length;
                 return (
                   <div key={v.id} style={{ position: "absolute", left: p.x, top: p.y, display: "flex", alignItems: "center", gap: 7 }}>
-                    <div style={{ width: p.w, boxSizing: "border-box", padding: "12px 17px", borderRadius: 999, background: C.surface, border: `1px solid ${v.farba}`, borderLeftWidth: 4, color: C.text, fontSize: 14.5, fontWeight: 600 }}>
+                    <div style={{
+                      width: p.w, boxSizing: "border-box", padding: "12px 17px", borderRadius: 999,
+                      background: tahanie?.ciel === "vetva:" + v.id ? mix(C.accent, 18) : C.surface,
+                      border: `1px solid ${tahanie?.ciel === "vetva:" + v.id ? C.accent : v.farba}`,
+                      borderLeftWidth: 4, color: C.text, fontSize: 14.5, fontWeight: 600,
+                    }}>
                       {v.nazov} <span style={{ color: C.textDim, fontWeight: 400 }}>{kolko}</span>
                     </div>
                     <button
@@ -499,6 +587,19 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
                 />
               )}
               {vidno.map(bublina)}
+              {tahanie && (
+                <div style={{
+                  position: "absolute", left: tahanie.x + 14, top: tahanie.y - 16, zIndex: 6,
+                  pointerEvents: "none", padding: "9px 15px", borderRadius: 999,
+                  background: C.surface, border: `1px solid ${C.accent}`, color: C.accentLight,
+                  fontSize: 13, whiteSpace: "nowrap", boxShadow: "0 8px 22px rgba(0,0,0,.45)",
+                }}>
+                  {tahanie.text || "(prázdne)"}
+                  <span style={{ color: C.textDim, marginLeft: 8 }}>
+                    {tahanie.ciel ? "pustiť sem" : "pusť nad nápad alebo vetvu"}
+                  </span>
+                </div>
+              )}
             </div>
             </div>
           </div>

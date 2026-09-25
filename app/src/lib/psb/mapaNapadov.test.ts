@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { mapaNaText, rozlozMapu, sirkaUzla, vetvaUzla, viditelny, type Uzol } from "./mapaNapadov";
+import { mapaNaText, potomkovia, rozlozMapu, sirkaUzla, smiePresunut, vetvaUzla, viditelny, type Uzol } from "./mapaNapadov";
 import { nazovFazy } from "./mapaCyklu";
 
 const u = (o: Partial<Uzol> & { id: string }): Uzol =>
@@ -105,5 +105,41 @@ describe("preklad mapy do textu", () => {
   it("prázdny text sa do zadania nedostane", () => {
     const s = mapaNaText([...uzly, u({ id: "x", text: "   " })], { mesiac: "október 2026", kadenciaTyzdenne: 2, nazovFazy });
     expect(s).not.toContain("„   “");
+  });
+});
+
+describe("ťahanie nápadu pod iný", () => {
+  const strom = [
+    u({ id: "a", vetva: "uvodny" }),
+    u({ id: "b", rodic: "a" }),
+    u({ id: "c", rodic: "b" }),
+    u({ id: "x", vetva: "kniha" }),
+  ];
+
+  it("pozná všetkých potomkov do hĺbky", () => {
+    expect([...potomkovia("a", strom)].sort()).toEqual(["b", "c"]);
+    expect([...potomkovia("c", strom)]).toEqual([]);
+  });
+
+  it("pod cudzí nápad sa presunúť dá", () => {
+    expect(smiePresunut("a", "x", strom)).toBe(true);
+    expect(smiePresunut("c", "x", strom)).toBe(true);
+  });
+
+  it("pod vlastného potomka NIE — inak sa konár odpojí od kmeňa", () => {
+    expect(smiePresunut("a", "b", strom)).toBe(false);
+    expect(smiePresunut("a", "c", strom)).toBe(false);
+  });
+
+  it("sám na seba nie", () => {
+    expect(smiePresunut("a", "a", strom)).toBe(false);
+  });
+
+  it("tam, kde už visí, sa nepresúva", () => {
+    expect(smiePresunut("b", "a", strom)).toBe(false);
+  });
+
+  it("neznámy uzol neprejde", () => {
+    expect(smiePresunut("zzz", "a", strom)).toBe(false);
   });
 });

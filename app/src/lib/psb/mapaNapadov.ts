@@ -99,6 +99,37 @@ export function viditelny(id: string, uzly: Uzol[]): boolean {
   return true;
 }
 
+/** Všetci potomkovia uzla, do hĺbky. */
+export function potomkovia(id: string, uzly: Uzol[]): Set<string> {
+  const deti = detiPodla(uzly);
+  const von = new Set<string>();
+  const front = [id];
+  for (let i = 0; i < front.length && i < 4000; i++) {
+    for (const d of deti.get(front[i]) || []) {
+      if (von.has(d.id)) continue;
+      von.add(d.id);
+      front.push(d.id);
+    }
+  }
+  return von;
+}
+
+/**
+ * Smie sa uzol zavesiť pod tento cieľ?
+ *
+ * Ťahanie myšou dovolí pustiť nápad kamkoľvek — aj pod jeho vlastného
+ * potomka. Tým by v strome vznikol kruh: konár by sa odpojil od kmeňa,
+ * z mapy by zmizol a rozloženie by sa točilo dovtedy, kým ho strop
+ * nezastaví. Preto sa cieľ kontroluje PRED zápisom, nie potom.
+ */
+export function smiePresunut(id: string, cielId: string, uzly: Uzol[]): boolean {
+  if (!id || id === cielId) return false;
+  const u = uzly.find((x) => x.id === id);
+  if (!u) return false;
+  if (u.rodic === cielId) return false;          // už tam visí
+  return !potomkovia(id, uzly).has(cielId);
+}
+
 export type Miesto = { x: number; y: number; w: number; hlbka: number };
 export type Rozlozenie = { poz: Record<string, Miesto>; vyska: number };
 
