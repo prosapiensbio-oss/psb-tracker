@@ -371,7 +371,7 @@ export function PSBApp() {
   // inak by ho tlačidlo Firma nabudúce hodilo inam, než kde naposledy bol.
   useEffect(() => { if (FIRMA_IDS.includes(active)) setFirmaSub(active); }, [active]);
   // Tržby, nie P&L: Peniaze sa otvárajú na tom, čo Jerry sleduje denne.
-  const [vzasSub, setVzasSub] = useState("trzby");
+  const [vzasSub, setVzasSub] = useState("prehlad");
   /** Ktorá polovica Mesiaca je otvorená: dáta a uzávierka, alebo výsledky. */
   const [vysledkySub, setVysledkySub] = useState("kvartalne");
   const [vysledkyFocus, setVysledkyFocus] = useState<NavFocus | null>(null);
@@ -388,7 +388,7 @@ export function PSBApp() {
   const [navratDoMapy, setNavratDoMapy] = useState<{ mesiac: string; faza: number; napadId?: string } | null>(null);
   /** Neúspešný zápis do dát — hlási sa raz pre celú appku, viď setOverride. */
   const [chybaZapisu, setChybaZapisu] = useState("");
-  const [marketingSub, setMarketingSub] = useState("lievik");
+  const [marketingSub, setMarketingSub] = useState("prehlad");
   // Filter trénera a obdobia žije tu, nie na každej obrazovke zvlášť.
   //
   // Doteraz mal svoj vlastný Dashboard, Tréningy, Klienti, Financie aj 6M — a

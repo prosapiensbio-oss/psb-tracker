@@ -1,5 +1,4 @@
 import { zlucZoznam } from "../../lib/psb/zlucZoznam";
-import { jeBeta } from "../../lib/psb/beta";
 import { MarketingPrehlad } from "./MarketingPrehlad";
 import { fetchVzasSettings, saveVzasSetting } from "../../lib/psb/client";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
@@ -1093,12 +1092,6 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
   // v deps nižšie zabezpečí prekreslenie, keď dorazia.
   const [, tik] = useState(0);
   useEffect(() => { tik((x) => x + 1); }, [marketingVerzia()]); // eslint-disable-line react-hooks/exhaustive-deps
-  // Uložená adresa #marketing/prehlad by v ostrom Kokpite ukázala prázdno:
-  // záložka tam nie je, takže by sa nevykreslil ani Prehľad, ani nič iné.
-  // Presmerovanie, nie mazanie — to isté pravidlo ako pri zrušených id.
-  useEffect(() => {
-    if (!jeBeta() && sub === "prehlad") onSub("dopyty");
-  }, [sub, onSub]);
   // The header used to sum all 18 months no matter which year was selected —
   // the switch looked broken because the summary never moved.
   const vRoku = MKT_MESACNE.filter((r) => r.m.startsWith(rok));
@@ -1127,9 +1120,10 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
         // klientov, referencie 26; karty majú zodpovedať tomuto pomeru, nie
         // tomu, kde je najviac dát.
         tabs={[
-          // Prehľad ako prvý — skúška v bete (Jerry, 25. 9. 2026): jedna
-          // obrazovka, ktorá odpovie „beží to, alebo nie" bez preklikávania.
-          ...(jeBeta() ? [{ id: "prehlad", label: "Prehľad", skupina: "Výsledok" }] : []),
+          // Prehľad prvý: jedna obrazovka, ktorá odpovie „beží to, alebo nie"
+          // bez preklikávania. Skúšaný v bete 25. 9. 2026, v ten istý deň
+          // nasadený naostro.
+          { id: "prehlad", label: "Prehľad", skupina: "Výsledok" },
           // Dopyty prvé: sú vstupom lievika a jediná záložka, kde sa niečo
           // zapisuje. Ostatné tri sú čítanie nad tým, čo tu vznikne.
           { id: "dopyty", label: "Dopyty", skupina: "Výsledok" },
@@ -1189,7 +1183,7 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
         }}
       />
 
-      {sub === "prehlad" && jeBeta() && <MarketingPrehlad data={data} clients={clients} onNavigate={onNavigate} />}
+      {sub === "prehlad" && <MarketingPrehlad data={data} clients={clients} onNavigate={onNavigate} />}
       {sub === "dopyty" && <Dopyty leads={leads} clients={clients} refresh={refresh} focus={focus} />}
 
       {sub === "lievik" && (

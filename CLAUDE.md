@@ -1144,8 +1144,10 @@ stojí odpoveď na otázku, kvôli ktorej sa obrazovka otvára.** Keď odpoveď
 znie „o nič, len to inak vyzerá", nerob to. Obe zmeny sú vrátené.
 
 Čo z toho vzniklo namiesto nich: **Marketing → Prehľad** a **Peniaze →
-Prehľad** (beta, `MarketingPrehlad.tsx` / `PeniazePrehlad.tsx`). Nie nové
-poradie starých kariet — jedna obrazovka, ktorá odpovie bez preklikávania.
+Prehľad** (`MarketingPrehlad.tsx` / `PeniazePrehlad.tsx`) — nie nové poradie
+starých kariet, ale jedna obrazovka, ktorá odpovie bez preklikávania. Jerry
+ich v ten istý deň nasadil naostro a sú PRVÉ v oboch záložkách
+(`marketingSub` aj `vzasSub` štartujú na `prehlad`).
 
 - **Dlaždica sa nekreslí druhýkrát.** `PristrojeMriezka` v `Prehlad.tsx` je
   tá istá dlaždica ako na Dnes (pásmo, značka „riešiť"/„sledovať", sparkline,

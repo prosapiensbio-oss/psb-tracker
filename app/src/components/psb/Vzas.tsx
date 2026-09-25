@@ -1,4 +1,3 @@
-import { jeBeta } from "../../lib/psb/beta";
 import { PeniazePrehlad } from "./PeniazePrehlad";
 import { BODY, kohortyKlientov, priemernePrezitie } from "../../lib/psb/kohorty";
 import { oznam } from "../../lib/psb/obnovaSignal";
@@ -3224,7 +3223,7 @@ const SEKCIE_PENIAZE = [
   ] },
 ];
 /**
- * Prehľad ako PRVÁ sekcia Peňazí — skúška v bete (Jerry, 25. 9. 2026).
+ * Prehľad ako PRVÁ sekcia Peňazí.
  *
  * Peniaze majú osem listov v štyroch sekciách a každý odpovedá na inú otázku.
  * Chýbal ten, ktorý si človek kladie ako prvý: ako to dopadlo a stačí to.
@@ -3233,7 +3232,7 @@ const SEKCIE_PENIAZE = [
  */
 const SEKCIA_PREHLAD = { id: "sk-prehlad", label: "Prehľad", listy: [{ id: "prehlad", label: "Prehľad" }] };
 
-const sekcie = () => (jeBeta() ? [SEKCIA_PREHLAD, ...SEKCIE_PENIAZE] : SEKCIE_PENIAZE);
+const sekcie = () => [SEKCIA_PREHLAD, ...SEKCIE_PENIAZE];
 const sekciaPre = (list: string) =>
   (sekcie().find((x) => x.listy.some((l) => l.id === list)) || sekcie()[0]).id;
 
@@ -3246,11 +3245,6 @@ export function Vzas({ sub, onSub, data, clients, focus, onNavigate, pohybSplits
     for (const m of monthlyFinance(data)) cash[m.month] = m.cash;
     if (nastavPrijmyZTrackera(cash)) tik((x) => x + 1);
   }, [data]);
-  // Tá istá poistka ako v Marketingu: adresa #vzas/prehlad uložená z bety by
-  // v ostrom Kokpite nevykreslila nič — sekcia sa nenájde a obsah tiež nie.
-  useEffect(() => {
-    if (!jeBeta() && sub === "prehlad") onSub("trzby");
-  }, [sub, onSub]);
   return (
     <>
       {/* Dve úrovne namiesto ôsmich pilulí v jednom rade. Osem plochých
@@ -3271,7 +3265,7 @@ export function Vzas({ sub, onSub, data, clients, focus, onNavigate, pohybSplits
           <SubTabs tabs={sekcia.listy} value={sub} onChange={onSub} />
         ) : null;
       })()}
-      {sub === "prehlad" && jeBeta() && <PeniazePrehlad data={data} onNavigate={onNavigate} />}
+      {sub === "prehlad" && <PeniazePrehlad data={data} onNavigate={onNavigate} />}
       {["trzby", "sedenia", "predikcia"].includes(sub) && (
         <FinancieObsah data={data} clients={clients} focus={focus} sub={sub} onSub={onSub} />
       )}

@@ -15,8 +15,9 @@ import { C } from "../../lib/psb/theme";
  * inak pruh o pol roka klame rovnako, ako klamal text pod P&L.
  */
 const SKUSA_SA: { text: string; tab: string; sub: string }[] = [
-  { text: "Marketing → Prehľad", tab: "marketing", sub: "prehlad" },
-  { text: "Peniaze → Prehľad", tab: "vzas", sub: "prehlad" },
+  // Prázdne: Marketing → Prehľad aj Peniaze → Prehľad sú od 25. 9. 2026
+  // naostro. Pruh vtedy ukáže len varovanie o databáze — a to je správne,
+  // beta bez skúšky je len druhá adresa toho istého.
 ];
 
 /**
