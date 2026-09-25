@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { KROK_Y, MAX_ZOOM, MEDZERA_X, MIN_ZOOM, okrajBubliny, vMedziach, RIADOK, STRANA_VETVY, STRED, VETVY, kusovNaMesiac, rozparsujVysyp, mapaNaText, potomkovia, rozlozMapu, sirkaUzla, smiePresunut, vetvaUzla, viditelny, type Uzol } from "./mapaNapadov";
+import { KROK_Y, MAX_ZOOM, MEDZERA_X, MIN_ZOOM, spojnica, vMedziach, RIADOK, STRED, VETVY_ZAKLAD, novaVetva, vetvyMapy, idVetvy, kusovNaMesiac, rozparsujVysyp, mapaNaText, potomkovia, rozlozMapu, sirkaUzla, smiePresunut, vetvaUzla, viditelny, type Uzol } from "./mapaNapadov";
 import { nazovFazy } from "./mapaCyklu";
 
 const u = (o: Partial<Uzol> & { id: string }): Uzol =>
@@ -46,8 +46,8 @@ describe("rozloženie v stĺpcoch", () => {
 
   it("vetvy idú na obe strany kmeňa", () => {
     const { poz } = rozlozMapu([]);
-    const vpravo = VETVY.filter((v) => STRANA_VETVY[v.id] === 1);
-    const vlavo = VETVY.filter((v) => STRANA_VETVY[v.id] === -1);
+    const vpravo = VETVY_ZAKLAD.filter((v) => v.strana === 1);
+    const vlavo = VETVY_ZAKLAD.filter((v) => v.strana === -1);
     expect(vpravo.length).toBeGreaterThan(0);
     expect(vlavo.length).toBeGreaterThan(0);
     for (const v of vpravo) expect(stredB(poz["vetva:" + v.id]).x).toBeGreaterThan(STRED.x);
@@ -287,7 +287,7 @@ describe("ručné miesto kmeňa a vetiev", () => {
   it("kmeň sa dá posunúť a vetvy idú s ním", () => {
     const { poz } = rozlozMapu([], { text: "Obsah" }, { koren: { x: 900, y: 700 } });
     expect(stredB(poz.koren)).toEqual({ x: 900, y: 700 });
-    for (const v of VETVY) {
+    for (const v of VETVY_ZAKLAD) {
       const s = stredB(poz["vetva:" + v.id]);
       expect(Math.abs(s.x - 900)).toBeGreaterThan(MEDZERA_X);
       expect(Math.abs(s.y - 700)).toBeLessThan(400);
@@ -316,35 +316,74 @@ describe("ručné miesto kmeňa a vetiev", () => {
   });
 });
 
-describe("čiara sa chytá okraja bubliny", () => {
-  const m = { x: 100, y: 100, w: 200, h: 0, hlbka: 2 } as never as { x: number; y: number; w: number; hlbka: number };
-  // stred bubliny je (200, 126) pri RIADOK = 52
+describe("spojnica", () => {
+  const kus = (x: number, y: number, w = 200) => ({ x, y, w, hlbka: 2 }) as never as { x: number; y: number; w: number; hlbka: number };
 
-  it("doprava sa trafí pravý okraj, nie stred", () => {
-    const b = okrajBubliny(m, 1000, 126);
-    expect(b.x).toBeCloseTo(300, 6);
-    expect(b.y).toBeCloseTo(126, 6);
+  /** Body na kubike `M x y C c1 c2 koniec` — na kontrolu, kade oblúk vedie. */
+  const body = (d: string) => {
+    const c = d.replace(/[MC,]/g, " ").trim().split(/\s+/).map(Number);
+    const [x0, y0, x1, y1, x2, y2, x3, y3] = c;
+    const out: { x: number; y: number }[] = [];
+    for (let i = 0; i <= 40; i++) {
+      const t = i / 40, o = 1 - t;
+      out.push({
+        x: o * o * o * x0 + 3 * o * o * t * x1 + 3 * o * t * t * x2 + t * t * t * x3,
+        y: o * o * o * y0 + 3 * o * o * t * y1 + 3 * o * t * t * y2 + t * t * t * y3,
+      });
+    }
+    return out;
+  };
+  const vnutri = (m: { x: number; y: number; w: number }, p: { x: number; y: number }) =>
+    p.x > m.x + 0.01 && p.x < m.x + m.w - 0.01 && p.y > m.y + 0.01 && p.y < m.y + RIADOK - 0.01;
+
+  it("vedľa seba: z pravého boku do ľavého, vo výške stredov", () => {
+    const a = kus(100, 100), b = kus(400, 100);
+    const p = body(spojnica(a, b));
+    expect(p[0].x).toBeCloseTo(300, 6);
+    expect(p[0].y).toBeCloseTo(126, 6);
+    expect(p[p.length - 1].x).toBeCloseTo(400, 6);
   });
 
-  it("doľava ľavý okraj", () => {
-    expect(okrajBubliny(m, -500, 126).x).toBeCloseTo(100, 6);
+  it("doľava: z ľavého boku do pravého", () => {
+    const a = kus(400, 100), b = kus(100, 100);
+    const p = body(spojnica(a, b));
+    expect(p[0].x).toBeCloseTo(400, 6);
+    expect(p[p.length - 1].x).toBeCloseTo(300, 6);
   });
 
-  it("nadol spodný okraj", () => {
-    const b = okrajBubliny(m, 200, 900);
-    expect(b.y).toBeCloseTo(126 + RIADOK / 2, 6);
-    expect(b.x).toBeCloseTo(200, 6);
+  it("dieťa vysoko nad rodičom nepretne ani jednu bublinu", () => {
+    // Presne prípad, ktorý Jerry videl 25. 9.: hlbšia vrstva, dieťa o osem
+    // riadkov vyššie. Starý výpočet vyšiel HORNOU stenou a oblúk sa vrátil
+    // cez text.
+    const a = kus(100, 600), b = kus(400, 100);
+    for (const t of body(spojnica(a, b))) {
+      expect(vnutri(a, t)).toBe(false);
+      expect(vnutri(b, t)).toBe(false);
+    }
   });
 
-  it("bod vnútri bubliny sa neposúva von", () => {
-    // Inak by čiara k prekrytej bubline vystrelila mimo nej.
-    const b = okrajBubliny(m, 210, 130);
-    expect(b.x).toBeCloseTo(210, 6);
-    expect(b.y).toBeCloseTo(130, 6);
+  it("oblúk ostane v medzere medzi stĺpcami", () => {
+    const a = kus(100, 600), b = kus(400, 100);
+    for (const t of body(spojnica(a, b))) {
+      expect(t.x).toBeGreaterThanOrEqual(300 - 0.01);
+      expect(t.x).toBeLessThanOrEqual(400 + 0.01);
+    }
   });
 
-  it("na strede sa nedelí nulou", () => {
-    expect(okrajBubliny(m, 200, 126)).toEqual({ x: 200, y: 126 });
+  it("nad sebou: z vrchu do spodku, nie cez bublinu", () => {
+    const a = kus(100, 100), b = kus(120, 400);
+    const p = body(spojnica(a, b));
+    expect(p[0].y).toBeCloseTo(100 + RIADOK, 6);
+    expect(p[p.length - 1].y).toBeCloseTo(400, 6);
+    for (const t of p) {
+      expect(vnutri(a, t)).toBe(false);
+      expect(vnutri(b, t)).toBe(false);
+    }
+  });
+
+  it("dve bubliny na sebe nevyrobia NaN", () => {
+    const d = spojnica(kus(100, 100), kus(100, 100));
+    expect(d.includes("NaN")).toBe(false);
   });
 });
 
@@ -366,5 +405,79 @@ describe("vMedziach", () => {
     // nie pri mierke NaN, ktorá by plochu zmenila na prázdnu.
     expect(vMedziach(Number.POSITIVE_INFINITY)).toBe(MAX_ZOOM);
     expect(vMedziach(Number.NaN)).toBe(1);
+  });
+});
+
+describe("vlastné vetvy mapy", () => {
+  it("prázdny stĺpec znamená tri základné", () => {
+    expect(vetvyMapy("")).toEqual(VETVY_ZAKLAD);
+    expect(vetvyMapy(null)).toEqual(VETVY_ZAKLAD);
+    expect(vetvyMapy("[]")).toEqual(VETVY_ZAKLAD);
+  });
+
+  it("pokazený JSON mapu nezhasne", () => {
+    expect(vetvyMapy("{toto nie je")).toEqual(VETVY_ZAKLAD);
+  });
+
+  it("prečíta uložené vetvy", () => {
+    const v = vetvyMapy('[{"id":"videa","nazov":"Videá","farba":"#3E82A8","strana":-1}]');
+    expect(v[0]).toEqual({ id: "videa", nazov: "Videá", farba: "#3E82A8", strana: -1 });
+    // Odkladisko sa doplní vždy — inak by nápady bez domova zmizli z mapy.
+    expect(v.some((x) => x.id === "nezaradene")).toBe(true);
+  });
+
+  it("zahodí id, ktoré nie je bezpečné do SQL ani do adresy", () => {
+    const v = vetvyMapy('[{"id":"a\'; DROP TABLE","nazov":"zlo"},{"id":"ok","nazov":"Dobrá"}]');
+    expect(v.map((x) => x.id)).toEqual(["ok", "nezaradene"]);
+  });
+
+  it("dve vetvy s tým istým id sa nezdvoja", () => {
+    const v = vetvyMapy('[{"id":"a","nazov":"Prvá"},{"id":"a","nazov":"Druhá"}]');
+    expect(v.filter((x) => x.id === "a").length).toBe(1);
+  });
+
+  it("id sa vyrobí z názvu, bez diakritiky a jedinečné", () => {
+    expect(idVetvy("Články na blog", [])).toBe("clanky-na-blog");
+    expect(idVetvy("Články", [{ id: "clanky", nazov: "x", farba: "#000000", strana: 1 }])).toBe("clanky-2");
+    expect(idVetvy("🙂", [])).toBe("vetva");
+  });
+
+  it("nová vetva si vezme voľnú farbu a redšiu stranu", () => {
+    const v = novaVetva("Videá", VETVY_ZAKLAD);
+    // Vpravo sú dve zo základu, vľavo jedna — nová ide doľava.
+    expect(v.strana).toBe(-1);
+    expect(VETVY_ZAKLAD.some((x) => x.farba.toLowerCase() === v.farba.toLowerCase())).toBe(false);
+  });
+
+  it("rozloženie postaví aj vlastnú vetvu", () => {
+    const vetvy = [...VETVY_ZAKLAD, novaVetva("Videá", VETVY_ZAKLAD)];
+    const uzly = [u({ id: "a", vetva: "videa", text: "prvý" })];
+    const r = rozlozMapu(uzly, { text: "Obsah" }, {}, vetvy);
+    expect(r.poz["vetva:videa"]).toBeDefined();
+    // Nápad visí na svojej vetve, nie v odkladisku.
+    expect(vetvaUzla("a", uzly, vetvy)).toBe("videa");
+    expect(vetvaUzla("a", uzly)).toBe("nezaradene");
+  });
+});
+
+describe("nová vetva a ručne odsunuté vetvy", () => {
+  it("ručne položená vetva nedrží miesto v stĺpci", () => {
+    // Všetky tri základné sú odsunuté rukou; štvrtá je na výpočte a nesmie
+    // pristáť na žiadnej z nich.
+    const vetvy = [...VETVY_ZAKLAD, novaVetva("Skúška", VETVY_ZAKLAD)];
+    const rucne = {
+      "vetva:uvodny": { x: 1329, y: 635 },
+      "vetva:kniha": { x: 1974, y: 1104 },
+      "vetva:nezaradene": { x: 1443, y: 1309 },
+    };
+    const r = rozlozMapu([], { text: "Obsah" }, rucne, vetvy);
+    const nova = r.poz["vetva:skuska"];
+    expect(nova).toBeDefined();
+    for (const kluc of Object.keys(rucne)) {
+      const iná = r.poz[kluc];
+      const prekryv = nova.x < iná.x + iná.w && nova.x + nova.w > iná.x
+        && nova.y < iná.y + RIADOK && nova.y + RIADOK > iná.y;
+      expect(prekryv).toBe(false);
+    }
   });
 });

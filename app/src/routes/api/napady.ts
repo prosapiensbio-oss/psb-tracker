@@ -4,7 +4,7 @@ import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 import { jeFaza } from "../../lib/psb/mapaCyklu";
-import { jeFarba, jeVetva } from "../../lib/psb/mapaNapadov";
+import { ODKLADISKO, jeFarba, jeVetva, vetvyMapy } from "../../lib/psb/mapaNapadov";
 import { jeMesiac as platnyMesiac } from "../../lib/psb/format";
 import { ZABER_MAPA } from "../../lib/psb/zabery";
 
@@ -49,7 +49,7 @@ export const Route = createFileRoute("/api/napady")({
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });
         try {
           const r = await DB.prepare("SELECT id, datum, text, zdroj, stav, poznamka, autor, odkaz, pouzite_at, faza, planovane_na, kto, koncept, hotovy_text, zaber, sekvencia, scenar, hashtagy, plan_id, inspiracia, titulka, uvodne_vety, rodic, vetva, poradie, zbalene, mapa_id, pos_x, pos_y, farba FROM mkt_napady ORDER BY datum DESC, created_at DESC LIMIT 2000").all();
-          const m = await DB.prepare("SELECT id, nazov, created_at, poradie, pozicie FROM mkt_mapy ORDER BY poradie, created_at").all();
+          const m = await DB.prepare("SELECT id, nazov, created_at, poradie, pozicie, vetvy FROM mkt_mapy ORDER BY poradie, created_at").all();
           // BEZ KEŠE. Nápady sa čítajú hneď po zápise (mapa, mapa cyklu,
           // Jarvis) a odpoveď bez `cache-control` si prehliadač smie nechať
           // podľa vlastného uváženia — potom po presune bubliny prečíta
@@ -92,7 +92,7 @@ export const Route = createFileRoute("/api/napady")({
             // `pozicie` je prázdne: nová mapa nemá ručne posunuté bubliny,
             // rozloženie si spočíta appka. Stĺpec tu stojí kvôli stráži
             // zo zapisy.test.ts.
-            await DB.prepare("INSERT INTO mkt_mapy (id, nazov, created_at, poradie, pozicie) VALUES (?1, ?2, ?3, ?4, '')")
+            await DB.prepare("INSERT INTO mkt_mapy (id, nazov, created_at, poradie, pozicie, vetvy) VALUES (?1, ?2, ?3, ?4, '', '')")
               .bind(idMapy, nazov, new Date().toISOString(), poradie?.p ?? 1).run();
             return Response.json({ ok: true, id: idMapy, nazov });
           }
@@ -104,18 +104,68 @@ export const Route = createFileRoute("/api/napady")({
             if (!r.meta.changes) return Response.json({ ok: false, error: "Taká mapa neexistuje." }, { status: 404 });
             return Response.json({ ok: true });
           }
+          /**
+           * VETVY MAPY. Zoznam sa posiela celý — pridanie, premenovanie,
+           * zmazanie aj prefarbenie je jeden zápis. Rozdiel by znamenal
+           * štyri akcie a štyri miesta, kde sa dá pokaziť poradie.
+           *
+           * Odkladisko sa ustráži v `vetvyMapy`: bez neho by nápady
+           * s neznámou vetvou zmizli z mapy.
+           */
+          if (b.akcia === "mapa-vetvy") {
+            const idMapy = kus(b.mapaId, 40);
+            if (!idMapy) return Response.json({ ok: false, error: "chýba mapa" }, { status: 400 });
+            if (!Array.isArray(b.vetvy) || !b.vetvy.length) {
+              return Response.json({ ok: false, error: "Vetvy chýbajú." }, { status: 400 });
+            }
+            if (b.vetvy.length > 12) {
+              return Response.json({ ok: false, error: "Viac ako dvanásť vetiev sa už nedá prehliadnuť." }, { status: 400 });
+            }
+            // Prečistí sa tým istým kódom, ktorý ju potom číta — čo prejde
+            // sem, obrazovka bez výhrad zobrazí.
+            const cisto = vetvyMapy(b.vetvy);
+            if (!cisto.some((v) => v.id === ODKLADISKO)) {
+              return Response.json({ ok: false, error: "Odkladisko musí zostať." }, { status: 400 });
+            }
+            const r = await DB.prepare("UPDATE mkt_mapy SET vetvy = ?2 WHERE id = ?1")
+              .bind(idMapy, JSON.stringify(cisto)).run();
+            if (!r.meta.changes) return Response.json({ ok: false, error: "Taká mapa neexistuje." }, { status: 404 });
+            // Nápady zo ZMAZANEJ vetvy padnú do odkladiska. Mapa ich zobrazí
+            // tam tak či tak (neznáma vetva = odkladisko), ale v dátach by
+            // zostalo id vetvy, ktorá neexistuje — a to je presne ten druh
+            // tichej nepravdy, ktorú potom Jarvis prečíta ako fakt.
+            // Id prešli cez `vetvyMapy`, kde sú obmedzené na [a-z0-9-] —
+            // preto sa smú vložiť do dopytu priamo; zoznam sa viazať nedá.
+            const zoznam = cisto.map((v) => `'${v.id}'`).join(", ");
+            await DB.prepare(
+              `UPDATE mkt_napady SET vetva = '${ODKLADISKO}' WHERE mapa_id = ?1 AND COALESCE(rodic, '') = '' AND COALESCE(vetva, '') <> '' AND vetva NOT IN (${zoznam})`,
+            ).bind(idMapy).run();
+            return Response.json({ ok: true, vetvy: cisto });
+          }
+          /**
+           * Vetvy nápadu sa overujú proti TEJ mape, v ktorej leží — od
+           * 25. 9. 2026 si každá mapa nesie vlastný zoznam. Bez toho by
+           * vlastná vetva neprešla zápisom a nápad by ticho spadol do
+           * odkladiska.
+           */
+          const vetvyTejMapy = async (mapaId: string) => {
+            const r = await DB.prepare("SELECT vetvy FROM mkt_mapy WHERE id = ?1").bind(mapaId || "m-hlavna").first<{ vetvy: string }>();
+            return vetvyMapy(r?.vetvy ?? "");
+          };
+
           // Miesto kmeňa a vetiev. Patrí k mape, lebo tie bubliny nemajú
           // vlastný riadok — sú pevné v kóde.
           if (b.akcia === "mapa-pozicie") {
             const idMapy = kus(b.mapaId, 40);
             if (!idMapy) return Response.json({ ok: false, error: "chýba mapa" }, { status: 400 });
             const vstup = (b.pozicie || {}) as Record<string, { x?: unknown; y?: unknown }>;
+            const vetvyTu = await vetvyTejMapy(idMapy);
             const cisto: Record<string, { x: number; y: number }> = {};
             for (const [kluc, bod] of Object.entries(vstup)) {
               // Len známe kľúče a len čísla v rozsahu plátna — inak by sa do
               // stĺpca dal uložiť ľubovoľný JSON a obrazovka by ho poslušne
               // prečítala.
-              if (kluc !== "koren" && !jeVetva(kluc.replace(/^vetva:/, ""))) continue;
+              if (kluc !== "koren" && !jeVetva(kluc.replace(/^vetva:/, ""), vetvyTu)) continue;
               const x = Math.max(0, Math.min(20000, Math.round(Number(bod?.x) || 0)));
               const y = Math.max(0, Math.min(20000, Math.round(Number(bod?.y) || 0)));
               cisto[kluc] = { x, y };
@@ -244,8 +294,13 @@ export const Route = createFileRoute("/api/napady")({
             // Miesto v myšlienkovej mape. Prázdny `rodic` je platná hodnota
             // („odpoj a zaves priamo na vetvu"), preto sa rozlišuje od
             // `undefined` — rovnako ako pri odkaze.
-            if (b.vetva !== undefined && b.vetva !== "" && !jeVetva(b.vetva)) {
-              return Response.json({ ok: false, error: "Neznáma vetva." }, { status: 400 });
+            if (b.vetva !== undefined && b.vetva !== "") {
+              const kdeLezi = b.mapaId === undefined
+                ? (await DB.prepare("SELECT mapa_id FROM mkt_napady WHERE id = ?1").bind(id).first<{ mapa_id: string }>())?.mapa_id || "m-hlavna"
+                : (kus(b.mapaId, 40) || "m-hlavna");
+              if (!jeVetva(b.vetva, await vetvyTejMapy(kdeLezi))) {
+                return Response.json({ ok: false, error: "Neznáma vetva." }, { status: 400 });
+              }
             }
             const rodic = b.rodic === undefined ? null : kus(b.rodic, 40);
             const vetva = b.vetva === undefined ? null : kus(b.vetva, 20);
@@ -336,11 +391,12 @@ export const Route = createFileRoute("/api/napady")({
           // Miesto v myšlienkovej mape. Nápad založený z „+ Zápis" mapu
           // nepozná a padne do vetvy „nezaradene" — to je pravda o ňom, nie
           // chýbajúci údaj, a práve preto tá vetva v mape existuje.
-          if (b.vetva !== undefined && b.vetva !== "" && !jeVetva(b.vetva)) {
+          const nVetvyMapy = await vetvyTejMapy(kus(b.mapaId, 40) || "m-hlavna");
+          if (b.vetva !== undefined && b.vetva !== "" && !jeVetva(b.vetva, nVetvyMapy)) {
             return Response.json({ ok: false, error: "Neznáma vetva." }, { status: 400 });
           }
           const nRodic = kus(b.rodic, 40);
-          const nVetva = nRodic ? "" : (jeVetva(b.vetva) ? String(b.vetva) : "nezaradene");
+          const nVetva = nRodic ? "" : (jeVetva(b.vetva, nVetvyMapy) ? String(b.vetva) : ODKLADISKO);
           const nPoradie = Math.max(0, Math.min(9999, Math.round(Number(b.poradie) || 0)));
           // Nápad z „+ Zápis" mapu nepozná a patrí do prvej — inak by spadol
           // do prázdna a nikde by nebol vidieť.

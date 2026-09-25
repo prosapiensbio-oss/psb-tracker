@@ -4,7 +4,7 @@ import { doSchranky } from "../../lib/psb/kopirovanie";
 import { FAZA_MAPA, nazovFazy } from "../../lib/psb/mapaCyklu";
 import { oznam, pocuvaj } from "../../lib/psb/obnovaSignal";
 import {
-  FARBY, OKRAJ_ZMESTIT, RIADOK, STRED, VETVY, farbaUzla, farbaVetvy, jeNaPlan, okrajBubliny, kusovNaMesiac, mapaNaText, rozlozMapu, rozparsujVysyp, smiePresunut, vMedziach, vetvaUzla, viditelny, type Uzol,
+  FARBY, OKRAJ_ZMESTIT, ODKLADISKO, RIADOK, STRED, farbaUzla, farbaVetvy, jeNaPlan, novaVetva, spojnica, kusovNaMesiac, mapaNaText, rozlozMapu, rozparsujVysyp, smiePresunut, vMedziach, vetvaUzla, vetvyMapy, viditelny, type Uzol, type Vetva,
 } from "../../lib/psb/mapaNapadov";
 import { C, mix } from "../../lib/psb/theme";
 import type { Miesto } from "../../lib/psb/mapaNapadov";
@@ -51,7 +51,7 @@ type Riadok = {
 };
 
 /** Mapa je obal: zoznam nápadov, ktoré patria k sebe. */
-type Mapa = { id: string; nazov: string; poradie?: number; pozicie?: string };
+type Mapa = { id: string; nazov: string; poradie?: number; pozicie?: string; vetvy?: string };
 
 const KLUC_MAPY = "psb-mapa-napadov";
 
@@ -153,6 +153,10 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
   const uzVycentrovane = useRef(false);
   /** Nad ktorým uzlom je otvorená ponuka „presunúť do inej vetvy". */
   const [presunPre, setPresunPre] = useState<string | null>(null);
+  /** Rozpísaný názov novej vetvy; `null` = ponuka zatvorená. */
+  const [novaVetvaNazov, setNovaVetvaNazov] = useState<string | null>(null);
+  /** Premenúvaná vetva a jej rozpísaný názov. */
+  const [premenuvaVetva, setPremenuvaVetva] = useState<{ id: string; text: string } | null>(null);
   /**
    * Ťahanie za obrys.
    *
@@ -163,7 +167,17 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
    * Ťahá sa za RÁM okolo bubliny, nie za text: vnútro je políčko, do ktorého
    * sa píše, a keby začínalo ťahanie, nedalo by sa v ňom označiť slovo.
    */
-  const [tahanie, setTahanie] = useState<{ id: string; text: string; x: number; y: number; ciel: string | null; odX: number; odY: number } | null>(null);
+  type Tahanie = { id: string; text: string; x: number; y: number; ciel: string | null; odX: number; odY: number };
+  const [tahanie, setTahanieStav] = useState<Tahanie | null>(null);
+  /**
+   * Ťahanie žije aj v refe, nielen v stave.
+   *
+   * Stav sa mení až pri prekreslení, takže pri RÝCHLOM kliknutí (stlačenie
+   * a pustenie v tom istom snímku) videl `onPointerUp` ešte `null` — a
+   * ponuka na obvode sa neotvorila. Ref je aktuálny okamžite.
+   */
+  const tahanieRef = useRef<Tahanie | null>(null);
+  const setTahanie = (t: Tahanie | null) => { tahanieRef.current = t; setTahanieStav(t); };
   const plochaRef = useRef<HTMLDivElement | null>(null);
 
   const nacitaj = useCallback(() => void fetch("/api/napady", { credentials: "same-origin" })
@@ -230,9 +244,17 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
     if (!raw) return {};
     try { return JSON.parse(raw) as Record<string, { x: number; y: number }>; } catch { return {}; }
   }, [mapy, mapaId]);
+  /**
+   * Vetvy TEJTO mapy. Do 25. 9. 2026 boli tri, natvrdo v kóde; odvtedy si ich
+   * mapa nesie vo vlastnom stĺpci a kód drží len východisko.
+   */
+  const vetvy = useMemo(
+    () => vetvyMapy(mapy.find((m) => m.id === mapaId)?.vetvy ?? ""),
+    [mapy, mapaId],
+  );
   const { poz, vyska, sirka } = useMemo(
-    () => rozlozMapu(uzly, { text: nazovMapy }, rucnePozicie),
-    [uzly, nazovMapy, rucnePozicie],
+    () => rozlozMapu(uzly, { text: nazovMapy }, rucnePozicie, vetvy),
+    [uzly, nazovMapy, rucnePozicie, vetvy],
   );
 
   /** Uloží rozpísaný uzol (alebo ho zahodí, keď je prázdny). */
@@ -453,8 +475,8 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
       if (novyRef.current) nastavNovy({ ...novyRef.current, rodic: "", vetva });
       return;
     }
-    if (!u.rodic && vetvaUzla(u.id, uzly) === vetva) return;
-    const koniec = uzly.filter((x) => !x.rodic && vetvaUzla(x.id, uzly) === vetva).length;
+    if (!u.rodic && vetvaUzla(u.id, uzly, vetvy) === vetva) return;
+    const koniec = uzly.filter((x) => !x.rodic && vetvaUzla(x.id, uzly, vetvy) === vetva).length;
     const predtym = { rodic: u.rodic, vetva: u.vetva, poradie: u.poradie };
     setRiadky((r) => r.map((x) => (x.id === u.id ? { ...x, rodic: "", vetva, poradie: koniec } : x)));
     if (await posli({ id: u.id, rodic: "", vetva, poradie: koniec })) {
@@ -474,7 +496,7 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
       setRiadky((r) => r.map((x) => (x.id === u.id ? { ...x, rodic: rodic.rodic } : x)));
       await posli({ id: u.id, rodic: rodic.rodic });
     } else {
-      await presunDoVetvy(u, vetvaUzla(u.id, uzly));
+      await presunDoVetvy(u, vetvaUzla(u.id, uzly, vetvy));
       return;
     }
     nacitaj();
@@ -530,6 +552,73 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
     prepniMapu(String(j.id));
     setPremenuva(true);
     nacitaj();
+  };
+
+  /**
+   * ZÁPIS ZOZNAMU VETIEV.
+   *
+   * Posiela sa celý zoznam, nie rozdiel — pridanie, premenovanie aj zmazanie
+   * je ten istý zápis a mapa má po ňom presne to, čo je na obrazovke.
+   * Obrazovka sa prekreslí hneď (`setMapy`), server len potvrdzuje: čakať na
+   * odpoveď by pri písaní názvu blikalo.
+   */
+  const ulozVetvy = async (zoznam: Vetva[], popis: string) => {
+    const predtym = mapy.find((m) => m.id === mapaId)?.vetvy ?? "";
+    const text = JSON.stringify(zoznam);
+    setMapy((m) => m.map((x) => (x.id === mapaId ? { ...x, vetvy: text } : x)));
+    const ok = await posli({ akcia: "mapa-vetvy", mapaId, vetvy: zoznam });
+    if (!ok) {
+      setMapy((m) => m.map((x) => (x.id === mapaId ? { ...x, vetvy: predtym } : x)));
+      return false;
+    }
+    zapamataj(popis, async () => {
+      // Prázdny reťazec znamená „tri základné" — poslať sa musí zoznam,
+      // takže sa pri návrate k východisku pošlú tie tri.
+      await posli({ akcia: "mapa-vetvy", mapaId, vetvy: vetvyMapy(predtym) });
+    });
+    // Nápady, ktoré v zmazanej vetve viseli, prepísal server na odkladisko —
+    // bez načítania by obrazovka ďalej ukazovala starú vetvu.
+    nacitaj();
+    return true;
+  };
+
+  const zalozVetvu = async (nazov: string) => {
+    const t = nazov.trim().slice(0, 60);
+    if (!t) { setChyba("Vetva potrebuje meno."); return; }
+    if (vetvy.length >= 12) { setChyba("Viac ako dvanásť vetiev sa už nedá prehliadnuť."); return; }
+    const v = novaVetva(t, vetvy);
+    if (await ulozVetvy([...vetvy, v], `vetva „${t}“`)) setNovaVetvaNazov(null);
+  };
+
+  const premenujVetvu = async (id: string, nazov: string) => {
+    const t = nazov.trim().slice(0, 60);
+    if (!t) { setChyba("Vetva potrebuje meno."); return; }
+    await ulozVetvy(vetvy.map((v) => (v.id === id ? { ...v, nazov: t } : v)), "premenovanie vetvy");
+    setPremenuvaVetva(null);
+  };
+
+  const prefarbiVetvu = async (id: string, farba: string) => {
+    await ulozVetvy(vetvy.map((v) => (v.id === id ? { ...v, farba } : v)), "farba vetvy");
+    setPresunPre(null);
+  };
+
+  const prehodVetvu = async (id: string) => {
+    await ulozVetvy(vetvy.map((v) => (v.id === id ? { ...v, strana: v.strana === 1 ? -1 : 1 } : v)), "strana vetvy");
+    setPresunPre(null);
+  };
+
+  /**
+   * Zmazanie vetvy nápady NEMAŽE — spadnú do odkladiska. Zmazať kategóriu
+   * a s ňou aj myšlienky, ktoré v nej ležali, je presne ten krok, ktorý sa
+   * nedá vrátiť a nikto ho nečakal.
+   */
+  const zmazVetvu = async (id: string) => {
+    if (id === ODKLADISKO) { setChyba("Odkladisko musí zostať — padá doň všetko bez domova."); return; }
+    const v = vetvy.find((x) => x.id === id);
+    const kolko = uzly.filter((u) => !u.rodic && vetvaUzla(u.id, uzly, vetvy) === id).length;
+    await ulozVetvy(vetvy.filter((x) => x.id !== id), `vetva „${v?.nazov || id}“`);
+    setPresunPre(null);
+    if (kolko) setChyba(`Vetva je preč, ${kolko} nápadov spadlo do „Zatiaľ neviem kam".`);
   };
 
   const premenujMapu = async (nazov: string) => {
@@ -677,17 +766,12 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
     if (!a || !b) return;
     // Od OKRAJA k okraju, nie od stredu k stredu: čiara vedená do stredu
     // prechádza cez text a kríži susedné bubliny (snímka, 25. 9. 2026).
-    const sa = okrajBubliny(a, b.x + b.w / 2, b.y + RIADOK / 2);
-    const sb = okrajBubliny(b, a.x + a.w / 2, a.y + RIADOK / 2);
-    // Vodorovné dotyčnice: rozloženie je v stĺpcoch, takže oblúk, ktorý
-    // vychádza nabok a nabok prichádza, kopíruje smer čítania.
-    const mx = (sa.x + sb.x) / 2;
-    ciary.push({ id, d: `M ${sa.x} ${sa.y} C ${mx} ${sa.y}, ${mx} ${sb.y}, ${sb.x} ${sb.y}`, farba, hrubka });
+    ciary.push({ id, d: spojnica(a, b), farba, hrubka });
   };
-  for (const v of VETVY) spoj(poz["koren"], poz["vetva:" + v.id], v.farba, 3, "v" + v.id);
+  for (const v of vetvy) spoj(poz["koren"], poz["vetva:" + v.id], v.farba, 3, "v" + v.id);
   for (const u of vidno) {
-    const f = farbaUzla(u, uzly);
-    const rodicPoz = u.rodic ? poz[u.rodic] : poz["vetva:" + vetvaUzla(u.id, uzly)];
+    const f = farbaUzla(u, uzly, vetvy);
+    const rodicPoz = u.rodic ? poz[u.rodic] : poz["vetva:" + vetvaUzla(u.id, uzly, vetvy)];
     spoj(rodicPoz, poz[u.id], f, (poz[u.id]?.hlbka || 2) <= 2 ? 2 : 1.4, "u" + u.id);
   }
 
@@ -727,11 +811,13 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
       try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* bez zachytenia */ }
     },
     onPointerMove: (e: React.PointerEvent) => {
-      if (!tahanie || tahanie.id !== kluc) return;
+      const t = tahanieRef.current;
+      if (!t || t.id !== kluc) return;
       const b = bodVMape(e);
-      setTahanie({ ...tahanie, x: b.x, y: b.y, ciel: lenPosun ? null : cielPod(b, kluc) });
+      setTahanie({ ...t, x: b.x, y: b.y, ciel: lenPosun ? null : cielPod(b, kluc) });
     },
     onPointerUp: (e: React.PointerEvent) => {
+      const tahanie = tahanieRef.current;
       if (!tahanie || tahanie.id !== kluc) return;
       const ciel = tahanie.ciel;
       const kam = { x: tahanie.x, y: tahanie.y };
@@ -761,12 +847,40 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
     return m.x + m.w / 2 >= stredKmena ? 1 : -1;
   };
 
+  /** Riadok v ponuke — rovnaký v ponuke vetvy aj nápadu. */
+  const polozkaPonuky: React.CSSProperties = {
+    display: "block", width: "100%", textAlign: "left", padding: "7px 8px", borderRadius: 8,
+    border: "none", background: "transparent", color: C.text, fontFamily: "inherit",
+    fontSize: 12.5, cursor: "pointer",
+  };
+
   const plusStyl: React.CSSProperties = {
     width: 30, height: 30, flexShrink: 0, borderRadius: "50%", padding: 0,
     border: `1px dashed ${mix(C.border, 130)}`, background: "transparent", color: C.textDim,
     fontFamily: "inherit", fontSize: 15, lineHeight: 1, cursor: "pointer",
     display: "flex", alignItems: "center", justifyContent: "center",
   };
+
+  /**
+   * TLAČIDLÁ VEDĽA BUBLINY — mimo toku, nie vo flexe.
+   *
+   * Kým bublina a jej tlačidlá stáli v jednom riadku flexu, `row-reverse`
+   * pri ľavej strane posunul samotnú bublinu o šírku tlačidiel doprava —
+   * zatiaľ čo čiary sa kreslia z vypočítaného miesta. Rozdiel bol vyše
+   * tridsať pixelov a presne to Jerry videl 25. 9. 2026: „čiary zasahujú do
+   * textu." Bublina teraz stojí tam, kde ju rozloženie položilo, a tlačidlá
+   * visia vedľa nej.
+   */
+  const vedlaStyl = (strana: 1 | -1): React.CSSProperties => ({
+    position: "absolute",
+    top: "50%",
+    transform: "translateY(-50%)",
+    display: "flex",
+    alignItems: "center",
+    gap: 7,
+    flexDirection: strana === 1 ? "row" : "row-reverse",
+    ...(strana === 1 ? { left: "100%", marginLeft: 7 } : { right: "100%", marginRight: 7 }),
+  });
 
   /** Rám, za ktorý sa bublina chytá. Rovnaký pre nápad, vetvu aj kmeň. */
   const ramStyl = (kluc: string, rucne: boolean): React.CSSProperties => ({
@@ -782,7 +896,7 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
   const bublina = (u: Uzol) => {
     const p = poz[u.id];
     if (!p) return null;
-    const f = farbaUzla(u, uzly);
+    const f = farbaUzla(u, uzly, vetvy);
     const deti = uzly.filter((x) => x.rodic === u.id).length;
     // Na ktorej strane kmeňa bublina leží. Tlačidlá patria VŽDY na vonkajšiu
     // stranu — inak „+" pri ľavej vetve ukazuje späť do stredu a nová bublina
@@ -792,7 +906,7 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
     // otočilo druhýkrát a bolo by to zase zle.
     const strana = stranaPodlaPozicie(p);
     return (
-      <div key={u.id} style={{ position: "absolute", left: p.x, top: p.y, display: "flex", alignItems: "center", gap: 7, flexDirection: strana === 1 ? "row" : "row-reverse", zIndex: presunPre === u.id ? 4 : (tahanie?.id === u.id ? 5 : undefined) }}>
+      <div key={u.id} style={{ position: "absolute", left: p.x - 6, top: p.y - 6, zIndex: presunPre === u.id ? 4 : (tahanie?.id === u.id ? 5 : undefined) }}>
         <div {...tahaj(u.id, u.text, false)} title="Chyť za rám a presuň" style={ramStyl(u.id, u.posX != null)}>
         <input
           type="text"
@@ -805,7 +919,7 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
           onKeyDown={(e) => {
             if (e.key === "Tab" && e.shiftKey) { e.preventDefault(); void oUrovenVyssie(u); }
             else if (e.key === "Tab") { e.preventDefault(); void zaloz(u.id, "", deti); }
-            else if (e.key === "Enter") { e.preventDefault(); void zaloz(u.rodic, u.rodic ? "" : vetvaUzla(u.id, uzly), u.poradie + 1); }
+            else if (e.key === "Enter") { e.preventDefault(); void zaloz(u.rodic, u.rodic ? "" : vetvaUzla(u.id, uzly, vetvy), u.poradie + 1); }
             else if (e.key === "Backspace" && !u.text) { e.preventDefault(); void zmaz(u.id); }
             // Escape ZAHADZUJE — tak to má každá mindmapa (Coggle to má
             // v dokumentácii doslova) a je to kláves, po ktorom človek siahne,
@@ -825,24 +939,26 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
           }}
         />
         </div>
-        {deti > 0 && (
+        <div style={vedlaStyl(strana)}>
+          {deti > 0 && (
+            <button
+              type="button"
+              aria-label="Zbaliť alebo rozbaliť vetvu"
+              onClick={() => void prepniZbal(u)}
+              style={{ height: 26, minWidth: 26, padding: "0 7px", borderRadius: 999, border: `1px solid ${C.border}`, background: C.bg, color: C.textMuted, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}
+            >
+              {u.zbalene ? `▸ ${deti}` : "▾"}
+            </button>
+          )}
           <button
             type="button"
-            aria-label="Zbaliť alebo rozbaliť vetvu"
-            onClick={() => void prepniZbal(u)}
-            style={{ height: 26, minWidth: 26, padding: "0 7px", borderRadius: 999, border: `1px solid ${C.border}`, background: C.bg, color: C.textMuted, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}
+            aria-label="Pridať nadväzujúci nápad"
+            onClick={() => void zaloz(u.id, "", deti)}
+            style={plusStyl}
           >
-            {u.zbalene ? `▸ ${deti}` : "▾"}
+            +
           </button>
-        )}
-        <button
-          type="button"
-          aria-label="Pridať nadväzujúci nápad"
-          onClick={() => void zaloz(u.id, "", deti)}
-          style={plusStyl}
-        >
-          +
-        </button>
+        </div>
         {presunPre === u.id && (
           <div style={{ position: "absolute", left: 0, top: 46, zIndex: 3, minWidth: 232, maxHeight: 420, overflow: "auto", padding: 6, borderRadius: 11, background: C.surface, border: `1px solid ${mix(C.border, 140)}`, boxShadow: "0 10px 26px rgba(0,0,0,.45)" }}>
             <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 1, color: C.textDim, padding: "4px 8px 6px" }}>FARBA</div>
@@ -885,8 +1001,8 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
               )}
             </div>
             <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 1, color: C.textDim, padding: "2px 8px 6px", borderTop: `1px solid ${mix(C.border, 60)}` }}>PRESUNÚŤ DO VETVY</div>
-            {VETVY.map((v) => {
-              const tu = !u.rodic && vetvaUzla(u.id, uzly) === v.id;
+            {vetvy.map((v: Vetva) => {
+              const tu = !u.rodic && vetvaUzla(u.id, uzly, vetvy) === v.id;
               return (
                 <button
                   key={v.id}
@@ -1095,7 +1211,7 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
                   onChange={(e) => setVysypVetva(e.target.value)}
                   style={{ padding: "7px 10px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontFamily: "inherit", fontSize: 12.5 }}
                 >
-                  {VETVY.map((v) => <option key={v.id} value={v.id}>{v.nazov}</option>)}
+                  {vetvy.map((v: Vetva) => <option key={v.id} value={v.id}>{v.nazov}</option>)}
                 </select>
                 <span style={{ flexGrow: 1 }} />
                 <button type="button" onClick={() => setVysyp(null)} style={{ background: "none", border: "none", color: C.textDim, fontFamily: "inherit", fontSize: 12.5, cursor: "pointer" }}>zrušiť</button>
@@ -1122,7 +1238,7 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
                 ))}
               </svg>
               {poz["koren"] && (
-                <div style={{ position: "absolute", left: poz["koren"].x - 6, top: poz["koren"].y - 6, display: "flex", alignItems: "center", gap: 7, zIndex: tahanie?.id === "koren" ? 5 : undefined }}>
+                <div style={{ position: "absolute", left: poz["koren"].x - 6, top: poz["koren"].y - 6, zIndex: tahanie?.id === "koren" ? 5 : undefined }}>
                   <div {...tahaj("koren", nazovMapy, true)} title="Chyť za rám a presuň" style={{ ...ramStyl("koren", !!rucnePozicie["koren"]), borderRadius: 18 }}>
                     <div style={{ width: poz["koren"].w, boxSizing: "border-box", padding: "15px 20px", borderRadius: 14, background: C.surface, border: `1px solid ${mix(C.border, 130)}`, color: C.text, fontSize: 15.5, fontWeight: 600 }}>
                       {nazovMapy}
@@ -1130,24 +1246,26 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
                   </div>
                   {/* Z kmeňa sa dá písať rovno. Vetvu si nápad vyberie sám —
                       ponuka je tesne pri tlačidle, aby to bol jeden pohyb. */}
-                  <button
-                    type="button"
-                    aria-label="Pridať nápad z hlavnej bubliny"
-                    onClick={() => setPresunPre(presunPre === "koren" ? null : "koren")}
-                    style={plusStyl}
-                  >
-                    +
-                  </button>
+                  <div style={vedlaStyl(1)}>
+                    <button
+                      type="button"
+                      aria-label="Pridať nápad z hlavnej bubliny"
+                      onClick={() => setPresunPre(presunPre === "koren" ? null : "koren")}
+                      style={plusStyl}
+                    >
+                      +
+                    </button>
+                  </div>
                   {presunPre === "koren" && (
                     <div style={{ position: "absolute", left: "100%", top: 44, zIndex: 6, minWidth: 210, padding: 6, borderRadius: 11, background: C.surface, border: `1px solid ${mix(C.border, 140)}`, boxShadow: "0 10px 26px rgba(0,0,0,.45)" }}>
                       <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 1, color: C.textDim, padding: "4px 8px 6px" }}>NOVÝ NÁPAD DO VETVY</div>
-                      {VETVY.map((v) => (
+                      {vetvy.map((v: Vetva) => (
                         <button
                           key={v.id}
                           type="button"
                           onClick={() => {
                             setPresunPre(null);
-                            void zaloz("", v.id, uzly.filter((x) => !x.rodic && vetvaUzla(x.id, uzly) === v.id).length);
+                            void zaloz("", v.id, uzly.filter((x) => !x.rodic && vetvaUzla(x.id, uzly, vetvy) === v.id).length);
                           }}
                           style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", textAlign: "left", padding: "7px 8px", borderRadius: 8, border: "none", background: "transparent", color: C.text, fontFamily: "inherit", fontSize: 12.5, cursor: "pointer" }}
                         >
@@ -1155,16 +1273,43 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
                           {v.nazov}
                         </button>
                       ))}
+                      {/* NOVÁ VETVA. Jerry, 25. 9. 2026: „v Obsahu nie som
+                          schopný vytvoriť ďalšiu novú kategóriu." Píše sa
+                          rovno tu — dialóg by prerušil myšlienku. */}
+                      <div style={{ borderTop: `1px solid ${mix(C.border, 60)}`, marginTop: 4, paddingTop: 4 }}>
+                        {novaVetvaNazov === null ? (
+                          <button
+                            type="button"
+                            onClick={() => setNovaVetvaNazov("")}
+                            style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", textAlign: "left", padding: "7px 8px", borderRadius: 8, border: "none", background: "transparent", color: C.accentLight, fontFamily: "inherit", fontSize: 12.5, cursor: "pointer" }}
+                          >
+                            + nová vetva
+                          </button>
+                        ) : (
+                          <input
+                            autoFocus
+                            value={novaVetvaNazov}
+                            placeholder="názov vetvy"
+                            onChange={(e) => setNovaVetvaNazov(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") { e.preventDefault(); void zalozVetvu(novaVetvaNazov); }
+                              if (e.key === "Escape") { e.preventDefault(); setNovaVetvaNazov(null); }
+                            }}
+                            onBlur={() => setNovaVetvaNazov(null)}
+                            style={{ width: "100%", boxSizing: "border-box", padding: "7px 8px", borderRadius: 8, border: `1px solid ${C.accent}`, background: C.bg, color: C.text, fontFamily: "inherit", fontSize: 12.5 }}
+                          />
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
               )}
-              {VETVY.map((v) => {
+              {vetvy.map((v: Vetva) => {
                 const p = poz["vetva:" + v.id];
                 if (!p) return null;
-                const kolko = uzly.filter((u) => !u.rodic && vetvaUzla(u.id, uzly) === v.id).length;
+                const kolko = uzly.filter((u) => !u.rodic && vetvaUzla(u.id, uzly, vetvy) === v.id).length;
                 return (
-                  <div key={v.id} style={{ position: "absolute", left: p.x - 6, top: p.y - 6, display: "flex", alignItems: "center", gap: 7, flexDirection: stranaPodlaPozicie(p) === 1 ? "row" : "row-reverse", zIndex: tahanie?.id === "vetva:" + v.id ? 5 : undefined }}>
+                  <div key={v.id} style={{ position: "absolute", left: p.x - 6, top: p.y - 6, zIndex: tahanie?.id === "vetva:" + v.id ? 5 : undefined }}>
                     <div {...tahaj("vetva:" + v.id, v.nazov, true)} title="Chyť za rám a presuň" style={ramStyl("vetva:" + v.id, !!rucnePozicie["vetva:" + v.id])}>
                     <div style={{
                       width: p.w, boxSizing: "border-box", padding: "12px 17px", borderRadius: 999,
@@ -1175,14 +1320,58 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
                       {v.nazov} <span style={{ color: C.textDim, fontWeight: 400 }}>{kolko}</span>
                     </div>
                     </div>
-                    <button
-                      type="button"
-                      aria-label={`Pridať nápad do vetvy ${v.nazov}`}
-                      onClick={() => void zaloz("", v.id, kolko)}
-                      style={plusStyl}
-                    >
-                      +
-                    </button>
+                    <div style={vedlaStyl(stranaPodlaPozicie(p))}>
+                      <button
+                        type="button"
+                        aria-label={`Pridať nápad do vetvy ${v.nazov}`}
+                        onClick={() => void zaloz("", v.id, kolko)}
+                        style={plusStyl}
+                      >
+                        +
+                      </button>
+                    </div>
+                    {/* Ponuka vetvy — otvára ju klik na obvod, rovnako ako
+                        pri nápade. Premenovať, prefarbiť, prehodiť na druhú
+                        stranu, zmazať. */}
+                    {presunPre === "vetva:" + v.id && (
+                      <div style={{ position: "absolute", left: stranaPodlaPozicie(p) === 1 ? 0 : "auto", right: stranaPodlaPozicie(p) === 1 ? "auto" : 0, top: 52, zIndex: 6, minWidth: 226, padding: 6, borderRadius: 11, background: C.surface, border: `1px solid ${mix(C.border, 140)}`, boxShadow: "0 10px 26px rgba(0,0,0,.45)" }}>
+                        <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 1, color: C.textDim, padding: "4px 8px 6px" }}>VETVA</div>
+                        {premenuvaVetva?.id === v.id ? (
+                          <input
+                            autoFocus
+                            value={premenuvaVetva.text}
+                            onChange={(e) => setPremenuvaVetva({ id: v.id, text: e.target.value })}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") { e.preventDefault(); void premenujVetvu(v.id, premenuvaVetva.text); }
+                              if (e.key === "Escape") { e.preventDefault(); setPremenuvaVetva(null); }
+                            }}
+                            onBlur={() => setPremenuvaVetva(null)}
+                            style={{ width: "100%", boxSizing: "border-box", padding: "7px 8px", borderRadius: 8, border: `1px solid ${C.accent}`, background: C.bg, color: C.text, fontFamily: "inherit", fontSize: 12.5 }}
+                          />
+                        ) : (
+                          <button type="button" onClick={() => setPremenuvaVetva({ id: v.id, text: v.nazov })} style={polozkaPonuky}>premenovať</button>
+                        )}
+                        <div style={{ display: "flex", gap: 5, padding: "6px 8px" }}>
+                          {FARBY.map((f) => (
+                            <button
+                              key={f.id}
+                              type="button"
+                              aria-label={`Farba vetvy ${f.nazov}`}
+                              onClick={() => void prefarbiVetvu(v.id, f.farba)}
+                              style={{ width: 17, height: 17, borderRadius: "50%", background: f.farba, border: v.farba.toLowerCase() === f.farba.toLowerCase() ? `2px solid ${C.text}` : "1px solid rgba(0,0,0,.35)", cursor: "pointer", padding: 0 }}
+                            />
+                          ))}
+                        </div>
+                        <button type="button" onClick={() => void prehodVetvu(v.id)} style={polozkaPonuky}>
+                          {v.strana === 1 ? "presunúť doľava od kmeňa" : "presunúť doprava od kmeňa"}
+                        </button>
+                        {v.id !== ODKLADISKO && (
+                          <button type="button" onClick={() => void zmazVetvu(v.id)} style={{ ...polozkaPonuky, color: C.textMuted, borderTop: `1px solid ${mix(C.border, 60)}`, marginTop: 4, paddingTop: 8 }}>
+                            zmazať vetvu{kolko ? ` — ${kolko} nápadov padne do odkladiska` : ""}
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -1224,7 +1413,7 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
             {naPlan.filter((u) => !u.faza).map((u) => (
               <div key={u.id} style={{ padding: "10px 12px", borderRadius: 11, background: C.surface, border: `1px solid ${C.border}` }}>
                 <div style={{ display: "flex", alignItems: "flex-start", gap: 7 }}>
-                  <span style={{ width: 8, height: 8, flexShrink: 0, marginTop: 5, borderRadius: "50%", background: farbaUzla(u, uzly) }} />
+                  <span style={{ width: 8, height: 8, flexShrink: 0, marginTop: 5, borderRadius: "50%", background: farbaUzla(u, uzly, vetvy) }} />
                   <span style={{ fontSize: 12.5, lineHeight: 1.35, color: C.text }}>{u.text}</span>
                 </div>
                 <div style={{ marginTop: 8, display: "flex", gap: 5 }}>
@@ -1258,7 +1447,7 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
                   </div>
                   {kusy.map((u) => (
                     <div key={u.id} style={{ display: "flex", alignItems: "flex-start", gap: 6, padding: "9px 8px 9px 11px", borderRadius: 9, background: C.surface, border: `1px solid ${C.border}`, borderLeft: `3px solid ${fazaFarba(f)}` }}>
-                      <span style={{ width: 8, height: 8, flexShrink: 0, marginTop: 4, borderRadius: "50%", background: farbaUzla(u, uzly) }} />
+                      <span style={{ width: 8, height: 8, flexShrink: 0, marginTop: 4, borderRadius: "50%", background: farbaUzla(u, uzly, vetvy) }} />
                       <span style={{ flexGrow: 1, fontSize: 12, lineHeight: 1.3, color: C.text }}>{u.text}</span>
                       <button type="button" aria-label="Vrátiť medzi nezaradené" onClick={() => void nastavFazu(u.id, 0)} style={{ width: 22, height: 22, flexShrink: 0, borderRadius: 6, padding: 0, border: "none", background: "transparent", color: C.textDim, fontFamily: "inherit", fontSize: 14, lineHeight: 1, cursor: "pointer" }}>×</button>
                     </div>

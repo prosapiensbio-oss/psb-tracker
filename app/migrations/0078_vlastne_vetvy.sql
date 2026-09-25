@@ -1,0 +1,17 @@
+-- Vlastné vetvy mapy.
+--
+-- Jerry, 25. 9. 2026: „v Obsahu nie som schopný vytvoriť ďalšiu novú
+-- kategóriu, iba tie, ktoré tam teraz sú."
+--
+-- Vetvy boli natvrdo v kóde (lib/psb/mapaNapadov.ts): dva lieviky
+-- a odkladisko. Pribudnúť nemohla žiadna — a mapa, do ktorej sa nedá pridať
+-- vlastná kategória, núti myslieť v troch priehradkách.
+--
+-- Jeden stĺpec s JSON poľom `[{"id":"...","nazov":"...","farba":"#rrggbb",
+-- "strana":1}]`. Prázdny reťazec znamená „tri základné z kódu" — takto
+-- existujúce mapy nepotrebujú prepis a nová mapa začína rovnako ako doteraz.
+--
+-- Prečo nie vlastná tabuľka: vetva nemá nič svoje okrem mena, farby a strany,
+-- a nápad na ňu odkazuje textom v `mkt_napady.vetva`. Tabuľka by pridala
+-- spojenie do každého dopytu a nič by za to nedala.
+ALTER TABLE mkt_mapy ADD COLUMN vetvy TEXT NOT NULL DEFAULT '';

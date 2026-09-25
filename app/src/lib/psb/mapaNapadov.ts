@@ -23,22 +23,33 @@
  * textu. Obrazovka je v `components/psb/MapaNapadov.tsx`.
  */
 
-export type Vetva = { id: string; nazov: string; farba: string };
+export type Vetva = {
+  id: string;
+  nazov: string;
+  farba: string;
+  /** 1 = vpravo od kmeňa, −1 = vľavo. Mapa sa tak nezvalí na jednu stranu. */
+  strana: 1 | -1;
+};
 
 /**
- * Tri vetvy, nie päť. Prvé dve sú Jerryho dva lieviky zo 7. 9. 2026
- * (fasciový obsah na predaj knihy, ostatný obsah na rezerváciu úvodného);
- * tretia je odkladisko. Fázy nákupného cyklu sem NEPATRIA — tie sa priraďujú
- * až pri triedení, lebo rozhodnúť fázu skôr, než je nápad dopísaný, je presne
- * to, čo Jerrymu na plánovači vadilo.
+ * Tri vetvy na začiatok, nie päť. Prvé dve sú Jerryho dva lieviky zo 7. 9.
+ * 2026 (fasciový obsah na predaj knihy, ostatný obsah na rezerváciu
+ * úvodného); tretia je odkladisko. Fázy nákupného cyklu sem NEPATRIA — tie
+ * sa priraďujú až pri triedení, lebo rozhodnúť fázu skôr, než je nápad
+ * dopísaný, je presne to, čo Jerrymu na plánovači vadilo.
+ *
+ * Od 25. 9. 2026 to je len VÝCHODISKO: každá mapa si môže pridať vlastné
+ * vetvy a tie sa ukladajú do `mkt_mapy.vetvy`. Jerry: „v Obsahu nie som
+ * schopný vytvoriť ďalšiu novú kategóriu, iba tie, ktoré tam teraz sú."
  */
-export const VETVY: Vetva[] = [
-  { id: "uvodny", nazov: "→ úvodný tréning", farba: "#6EA45C" },
-  { id: "kniha", nazov: "→ kniha", farba: "#d1854a" },
-  { id: "nezaradene", nazov: "Zatiaľ neviem kam", farba: "#6d7560" },
+export const VETVY_ZAKLAD: Vetva[] = [
+  { id: "uvodny", nazov: "→ úvodný tréning", farba: "#6EA45C", strana: 1 },
+  { id: "kniha", nazov: "→ kniha", farba: "#d1854a", strana: 1 },
+  { id: "nezaradene", nazov: "Zatiaľ neviem kam", farba: "#6d7560", strana: -1 },
 ];
 
-export const VETVA_MAPA = new Map(VETVY.map((v) => [v.id, v]));
+/** Vetva, do ktorej padne všetko bez domova. Zmazať sa nedá. */
+export const ODKLADISKO = "nezaradene";
 
 /**
  * Farby, ktoré si bublina môže vziať na seba.
@@ -57,7 +68,7 @@ export const FARBY: { id: string; nazov: string; farba: string }[] = [
 ];
 export const FARBA_MAPA = new Map(FARBY.map((f) => [f.id, f]));
 export const jeFarba = (v: unknown) => FARBA_MAPA.has(String(v));
-export const jeVetva = (v: unknown) => VETVA_MAPA.has(String(v));
+export const jeVetva = (v: unknown, vetvy: Vetva[] = VETVY_ZAKLAD) => vetvy.some((x) => x.id === String(v));
 
 export type Uzol = {
   id: string;
@@ -90,21 +101,22 @@ export const jeNaPlan = (u: Uzol) => !!(u.text || "").trim() && u.stav !== "pouz
  * Cyklus (rodič sám na seba, alebo kruh po presune) mapu nezacyklí: strop
  * zastaví hľadanie a vráti odkladisko.
  */
-export function vetvaUzla(id: string, uzly: Uzol[]): string {
+export function vetvaUzla(id: string, uzly: Uzol[], vetvy: Vetva[] = VETVY_ZAKLAD): string {
   const podla = new Map(uzly.map((u) => [u.id, u]));
   let n = podla.get(id);
   for (let i = 0; n && i < 60; i++) {
-    if (!n.rodic) return jeVetva(n.vetva) ? n.vetva : "nezaradene";
+    if (!n.rodic) return jeVetva(n.vetva, vetvy) ? n.vetva : ODKLADISKO;
     n = podla.get(n.rodic);
   }
-  return "nezaradene";
+  return ODKLADISKO;
 }
 
-export const farbaVetvy = (id: string) => VETVA_MAPA.get(id)?.farba ?? "#6d7560";
+export const farbaVetvy = (id: string, vetvy: Vetva[] = VETVY_ZAKLAD) =>
+  vetvy.find((v) => v.id === id)?.farba ?? "#6d7560";
 
 /** Akú farbu má bublina: vlastnú, inak tú z vetvy. */
-export const farbaUzla = (u: Uzol, uzly: Uzol[]) =>
-  FARBA_MAPA.get(u.farba || "")?.farba ?? farbaVetvy(vetvaUzla(u.id, uzly));
+export const farbaUzla = (u: Uzol, uzly: Uzol[], vetvy: Vetva[] = VETVY_ZAKLAD) =>
+  FARBA_MAPA.get(u.farba || "")?.farba ?? farbaVetvy(vetvaUzla(u.id, uzly, vetvy), vetvy);
 
 /** Deti uzla v poradí. Kľúč "" znamená korene danej vetvy. */
 export function detiPodla(uzly: Uzol[]): Map<string, Uzol[]> {
@@ -207,10 +219,74 @@ export function vMedziach(z: number, zaokruhli: (n: number) => number = Math.rou
 }
 
 /**
- * Na ktorú stranu kmeňa vetva rastie. Dve vpravo, jedna vľavo — tak, ako to
- * robia klasické mindmapy: kmeň v strede, konáre na obe strany.
+ * ZOZNAM VETIEV ULOŽENÝ PRI MAPE.
+ *
+ * Vetvy boli do 25. 9. 2026 natvrdo v kóde. Odvtedy si ich mapa nesie vo
+ * vlastnom stĺpci — ale číta sa cez toto, lebo v stĺpci je JSON a ten môže
+ * byť prázdny, starý alebo pokazený. Nepoužiteľný vstup nesmie zhasnúť mapu,
+ * len sa vráti k východisku.
+ *
+ * Odkladisko musí zostať VŽDY: každý nápad, ktorého vetva sa nenájde, padá
+ * doň, a keby chýbalo, zmizol by z mapy úplne.
  */
-export const STRANA_VETVY: Record<string, 1 | -1> = { uvodny: 1, kniha: 1, nezaradene: -1 };
+export function vetvyMapy(ulozene: unknown): Vetva[] {
+  let pole: unknown = ulozene;
+  if (typeof pole === "string") {
+    if (!pole.trim()) return VETVY_ZAKLAD;
+    try { pole = JSON.parse(pole); } catch { return VETVY_ZAKLAD; }
+  }
+  if (!Array.isArray(pole) || !pole.length) return VETVY_ZAKLAD;
+  const von: Vetva[] = [];
+  const videne = new Set<string>();
+  for (const x of pole) {
+    const v = x as Partial<Vetva>;
+    const id = String(v?.id ?? "").trim().slice(0, 40);
+    const nazov = String(v?.nazov ?? "").trim().slice(0, 60);
+    // Id je prísne obmedzené na písmená, číslice a pomlčku: chodí do SQL
+    // podmienky `vetva IN (...)` a ide do adresy uloženej pozície. Názov si
+    // človek píše, ako chce — id si z neho vyrobí `idVetvy`.
+    if (!id || !nazov || videne.has(id) || !/^[a-z0-9-]+$/.test(id)) continue;
+    videne.add(id);
+    von.push({
+      id,
+      nazov,
+      farba: /^#[0-9a-fA-F]{6}$/.test(String(v?.farba)) ? String(v?.farba) : "#6d7560",
+      strana: Number(v?.strana) === -1 ? -1 : 1,
+    });
+  }
+  if (!von.length) return VETVY_ZAKLAD;
+  if (!videne.has(ODKLADISKO)) von.push(VETVY_ZAKLAD[2]);
+  return von;
+}
+
+/** Id novej vetvy z jej názvu — čitateľné, bez diakritiky, vždy jedinečné. */
+export function idVetvy(nazov: string, vetvy: Vetva[]): string {
+  const zaklad = nazov.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 24) || "vetva";
+  let id = zaklad;
+  for (let i = 2; vetvy.some((v) => v.id === id); i++) id = `${zaklad}-${i}`;
+  return id;
+}
+
+/**
+ * Nová vetva do mapy.
+ *
+ * Farba sa berie prvá voľná z palety — dve rovnaké vetvy vedľa seba by
+ * zrušili zmysel farby. Strana je tá, kde je vetiev menej, aby sa mapa
+ * nezvalila na jednu stranu kmeňa.
+ */
+export function novaVetva(nazov: string, vetvy: Vetva[]): Vetva {
+  const pouzite = new Set(vetvy.map((v) => v.farba.toLowerCase()));
+  const volna = FARBY.find((f) => !pouzite.has(f.farba.toLowerCase()));
+  const vpravo = vetvy.filter((v) => v.strana === 1).length;
+  const vlavo = vetvy.length - vpravo;
+  return {
+    id: idVetvy(nazov, vetvy),
+    nazov: nazov.trim().slice(0, 60),
+    farba: volna ? volna.farba : FARBY[vetvy.length % FARBY.length].farba,
+    strana: vlavo < vpravo ? -1 : 1,
+  };
+}
 
 /**
  * ROZLOŽENIE V STĹPCOCH, NIE DOKOLA.
@@ -233,6 +309,7 @@ export function rozlozMapu(
   koren: { text: string } = { text: "" },
   /** Ručné miesta kmeňa a vetiev — kľúče "koren" a "vetva:<id>". */
   rucne: RucnePozicie = {},
+  vetvy: Vetva[] = VETVY_ZAKLAD,
 ): Rozlozenie {
   const deti = detiPodla(uzly);
   const poz: Record<string, Miesto> = {};
@@ -279,13 +356,17 @@ export function rozlozMapu(
 
   // Každá strana sa zvisle vycentruje na kmeň, aby mapa nevisela nadol.
   for (const strana of [1, -1] as const) {
-    const naStrane = VETVY.filter((v) => (STRANA_VETVY[v.id] ?? 1) === strana);
+    const naStrane = vetvy.filter((v) => v.strana === strana);
     const bloky = naStrane.map((v) => {
-      const korene = (deti.get("") || []).filter((u) => (jeVetva(u.vetva) ? u.vetva : "nezaradene") === v.id);
+      const korene = (deti.get("") || []).filter((u) => (jeVetva(u.vetva, vetvy) ? u.vetva : ODKLADISKO) === v.id);
       const h = korene.reduce((a, u) => a + blok(u), 0) || KROK_Y;
       return { v, korene, h };
     });
-    const spolu = bloky.reduce((a, b) => a + b.h, 0);
+    // Ručne položená vetva si miesto v stĺpci NEDRŽÍ — stojí, kam ju človek
+    // dal. Keby sa s ňou v stohu rátalo, nová vetva by dostala jej starý slot
+    // a pristála by presne na nej (25. 9. 2026: prvá vlastná vetva padla na
+    // „Zatiaľ neviem kam", ktorú mal Jerry odsunutú).
+    const spolu = bloky.filter((b) => !rucne["vetva:" + b.v.id]).reduce((a, b) => a + b.h, 0);
     let y = stredKmena.y - spolu / 2;
     for (const { v, korene, h } of bloky) {
       const wv = sirkaUzla(v.nazov, 1);
@@ -299,7 +380,7 @@ export function rozlozMapu(
         chod(u, vx + strana * (wv / 2 + MEDZERA_X + wu / 2), yd, strana, 2);
         yd += blok(u);
       }
-      y += h;
+      if (!rucnaVetva) y += h;
     }
   }
 
@@ -320,7 +401,7 @@ export function mapaNaText(uzly: Uzol[], v: {
   mesiac: string;
   kadenciaTyzdenne: number;
   nazovFazy: (f: number) => string;
-}): string {
+}, vetvy: Vetva[] = VETVY_ZAKLAD): string {
   // Do plánu sa počíta len to, čo sa ešte len chystá. Publikovaný nápad
   // v zásobníku by inak vyhlásil mesiac za pokrytý obsahom, ktorý už vyšiel.
   const listy = uzly.filter(jeNaPlan);
@@ -330,12 +411,12 @@ export function mapaNaText(uzly: Uzol[], v: {
 
   riadky.push(`PLÁN OBSAHU · ${v.mesiac} · ${sFazou.length} ${sFazou.length === 1 ? "kus" : sFazou.length < 5 ? "kusy" : "kusov"} so zaradením`);
   riadky.push("");
-  const podlaVetvy = VETVY.map((vt) => ({
+  const podlaVetvy = vetvy.map((vt) => ({
     vetva: vt,
-    kusy: listy.filter((u) => vetvaUzla(u.id, uzly) === vt.id),
+    kusy: listy.filter((u) => vetvaUzla(u.id, uzly, vetvy) === vt.id),
   }));
   const doLievikov = podlaVetvy
-    .filter((x) => x.vetva.id !== "nezaradene" && x.kusy.length)
+    .filter((x) => x.vetva.id !== ODKLADISKO && x.kusy.length)
     .map((x) => `${x.kusy.length} do „${x.vetva.nazov.replace("→ ", "")}“`);
   riadky.push(
     `Kadencia ${v.kadenciaTyzdenne} kusy do týždňa, teda ${treba} za mesiac. `
@@ -347,8 +428,8 @@ export function mapaNaText(uzly: Uzol[], v: {
     if (!kusy.length) continue;
     riadky.push("");
     riadky.push(`Fáza ${f} · ${v.nazovFazy(f)} — ` + kusy.map((u) => {
-      const vt = VETVA_MAPA.get(vetvaUzla(u.id, uzly));
-      return `„${u.text.trim()}“${vt && vt.id !== "nezaradene" ? ` (${vt.nazov.replace("→ ", "")})` : ""}`;
+      const vt = vetvy.find((x) => x.id === vetvaUzla(u.id, uzly, vetvy));
+      return `„${u.text.trim()}“${vt && vt.id !== ODKLADISKO ? ` (${vt.nazov.replace("→ ", "")})` : ""}`;
     }).join(", ") + ".");
   }
 
@@ -409,24 +490,43 @@ export function rozparsujVysyp(vstup: string): VysypRiadok[] {
 }
 
 /**
- * Bod na OKRAJI bubliny v smere k druhej bubline.
+ * ČIARA MEDZI DVOMA BUBLINAMI.
  *
  * Jerry, 25. 9. 2026: „tie čiary nemusia ísť na stred bubliny, ale na jej
- * okraj, a ten sa prispôsobuje na základe pozície od bodu, z ktorého
- * vychádza." Na snímke bolo vidieť, prečo: čiary vedené do stredu prechádzali
- * cez text a krížili susedné bubliny.
+ * okraj." Prvá verzia hľadala priesečník priamky so stenou obdĺžnika — na
+ * prvej vrstve to vyzeralo dobre, ale hlbšie, kde dieťa leží vysoko nad
+ * rodičom, priamka vyšla HORNOU stenou a oblúk s vodorovnými dotyčnicami sa
+ * potom vrátil späť cez bublinu. Jerry, 25. 9.: „čiary zasahujú do textu
+ * a to je veľmi nepríjemné."
  *
- * Bublina sa počíta ako obdĺžnik — zaoblenie je len o pár pixelov a hľadať
- * priesečník s kapsulou by pridalo matematiku bez viditeľného rozdielu.
+ * Preto sa nehľadá priesečník, ale strana:
+ *
+ * • Bubliny stoja vedľa seba (medzi stĺpcami je medzera) — čiara ide z BOKU
+ *   do boku a riadiace body sedia v polovici medzery. Celý oblúk tak leží
+ *   medzi stĺpcami, kde žiadna bublina nie je.
+ * • Bubliny sa vodorovne prekrývajú (jedna nad druhou, typicky po ručnom
+ *   posunutí) — čiara ide z VRCHU do spodku so zvislými dotyčnicami.
+ *
+ * V oboch prípadoch platí to isté: oblúk neopustí obdĺžnik medzi bublinami,
+ * takže do textu nemá ako zasiahnuť.
  */
-export function okrajBubliny(m: Miesto, kamX: number, kamY: number): { x: number; y: number } {
-  const cx = m.x + m.w / 2;
-  const cy = m.y + RIADOK / 2;
-  const dx = kamX - cx;
-  const dy = kamY - cy;
-  if (!dx && !dy) return { x: cx, y: cy };
-  const tx = dx ? (m.w / 2) / Math.abs(dx) : Infinity;
-  const ty = dy ? (RIADOK / 2) / Math.abs(dy) : Infinity;
-  const t = Math.min(tx, ty, 1);
-  return { x: cx + dx * t, y: cy + dy * t };
+export function spojnica(a: Miesto, b: Miesto): string {
+  const ay = a.y + RIADOK / 2;
+  const by = b.y + RIADOK / 2;
+  const doprava = b.x + b.w / 2 >= a.x + a.w / 2;
+  // Medzera medzi obdĺžnikmi vo vodorovnom smere; záporná = prekrývajú sa.
+  const medzera = doprava ? b.x - (a.x + a.w) : a.x - (b.x + b.w);
+  if (medzera > 0) {
+    const zx = doprava ? a.x + a.w : a.x;
+    const dox = doprava ? b.x : b.x + b.w;
+    const mx = (zx + dox) / 2;
+    return `M ${zx} ${ay} C ${mx} ${ay}, ${mx} ${by}, ${dox} ${by}`;
+  }
+  const dole = b.y >= a.y;
+  const zx = a.x + a.w / 2;
+  const dox = b.x + b.w / 2;
+  const zy = dole ? a.y + RIADOK : a.y;
+  const doy = dole ? b.y : b.y + RIADOK;
+  const my = (zy + doy) / 2;
+  return `M ${zx} ${zy} C ${zx} ${my}, ${dox} ${my}, ${dox} ${doy}`;
 }
