@@ -4,7 +4,7 @@ import { doSchranky } from "../../lib/psb/kopirovanie";
 import { FAZA_MAPA, nazovFazy } from "../../lib/psb/mapaCyklu";
 import { oznam, pocuvaj } from "../../lib/psb/obnovaSignal";
 import {
-  FARBY, RIADOK, STRED, VETVY, farbaUzla, farbaVetvy, jeNaPlan, okrajBubliny, kusovNaMesiac, mapaNaText, rozlozMapu, rozparsujVysyp, smiePresunut, vetvaUzla, viditelny, type Uzol,
+  FARBY, OKRAJ_ZMESTIT, RIADOK, STRED, VETVY, farbaUzla, farbaVetvy, jeNaPlan, okrajBubliny, kusovNaMesiac, mapaNaText, rozlozMapu, rozparsujVysyp, smiePresunut, vMedziach, vetvaUzla, viditelny, type Uzol,
 } from "../../lib/psb/mapaNapadov";
 import { C, mix } from "../../lib/psb/theme";
 import type { Miesto } from "../../lib/psb/mapaNapadov";
@@ -271,7 +271,7 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
       // zostane na mieste. Bez toho mapa pri štipnutí ujde a treba ju
       // doháňať posuvníkom.
       const stary = zoomRef.current;
-      const novy = Math.min(1.5, Math.max(0.4, Math.round((stary - e.deltaY * 0.0025) * 100) / 100));
+      const novy = vMedziach(stary - e.deltaY * 0.0025);
       if (novy === stary) return;
       const r = el.getBoundingClientRect();
       const vx = e.clientX - r.left;
@@ -317,16 +317,47 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
     return () => document.removeEventListener("keydown", na);
   });
 
-  /** Postaviť pohľad na kmeň. */
-  const naStred = useCallback(() => {
+  /** Postaviť pohľad na kmeň pri danej mierke. */
+  const naStredPri = useCallback((z: number) => {
     const el = plochaRef.current;
     if (!el) return;
     const k = poz["koren"];
     const sx = k ? k.x + k.w / 2 : STRED.x;
     const sy = k ? k.y + RIADOK / 2 : STRED.y;
-    el.scrollLeft = sx * zoomRef.current - el.clientWidth / 2;
-    el.scrollTop = sy * zoomRef.current - el.clientHeight / 2;
+    el.scrollLeft = sx * z - el.clientWidth / 2;
+    el.scrollTop = sy * z - el.clientHeight / 2;
   }, [poz]);
+
+  /**
+   * Postaviť pohľad na kmeň. Bez parametra zámerne: vešia sa aj na `onClick`,
+   * aj na `requestAnimationFrame`, a tie by do voliteľného čísla ticho
+   * podstrčili event, resp. časovú značku.
+   */
+  const naStred = useCallback(() => naStredPri(zoomRef.current), [naStredPri]);
+
+  /**
+   * Zoom z tlačidiel. Ukotvený v STREDE okna — rovnako ako štipnutie kotví
+   * pod myšou. Bez toho sa `scrollLeft` nechá na starej hodnote a mapa po
+   * zmene mierky ujde bokom; pri skoku zo 100 % na 40 % odišla úplne z
+   * obrazovky a plocha vyzerala prázdna.
+   */
+  const zmenZoom = useCallback((kam: number | ((z: number) => number)) => {
+    const el = plochaRef.current;
+    const stary = zoomRef.current;
+    const novy = vMedziach(typeof kam === "function" ? kam(stary) : kam);
+    if (novy === stary) return;
+    zoomRef.current = novy;
+    setZoom(novy);
+    if (!el) return;
+    const vx = el.clientWidth / 2;
+    const vy = el.clientHeight / 2;
+    const bodX = (el.scrollLeft + vx) / stary;
+    const bodY = (el.scrollTop + vy) / stary;
+    requestAnimationFrame(() => {
+      el.scrollLeft = bodX * novy - vx;
+      el.scrollTop = bodY * novy - vy;
+    });
+  }, []);
 
   // Pri prvom otvorení mapy: kmeň doprostred okna. Len raz — potom je
   // posúvanie v rukách človeka a appka mu doň nemá skákať.
@@ -612,7 +643,24 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
   const zmestiSa = () => {
     const el = plochaRef.current;
     if (!el) return;
-    setZoom(Math.min(1, Math.max(0.4, Math.round((el.clientWidth / sirkaMapy) * 100) / 100)));
+    // Podľa toho, čo na mape SKUTOČNE je, nie podľa plochy: tá má vždy aspoň
+    // 3200 × 2200 px, aj keď mapa zaberá desatinu. Mierka počítaná z nej
+    // preto vždy spadla na minimum a „zmestiť" nezmestilo nič.
+    const m = Object.values(poz);
+    if (!m.length) return;
+    const x1 = Math.min(...m.map((q) => q.x)) - OKRAJ_ZMESTIT;
+    const y1 = Math.min(...m.map((q) => q.y)) - OKRAJ_ZMESTIT;
+    const x2 = Math.max(...m.map((q) => q.x + q.w)) + OKRAJ_ZMESTIT;
+    const y2 = Math.max(...m.map((q) => q.y + RIADOK)) + OKRAJ_ZMESTIT;
+    const novy = vMedziach(Math.min(el.clientWidth / (x2 - x1), el.clientHeight / (y2 - y1)), Math.floor);
+    zoomRef.current = novy;
+    setZoom(novy);
+    // Zmenšiť nestačí: po prekreslení treba pohľad aj posunúť na mapu, inak
+    // ostane posuvník na starých pixeloch a človek hľadí do prázdnej plochy.
+    requestAnimationFrame(() => {
+      el.scrollLeft = ((x1 + x2) / 2) * novy - el.clientWidth / 2;
+      el.scrollTop = ((y1 + y2) / 2) * novy - el.clientHeight / 2;
+    });
   };
   const listy = uzly.filter((u) => u.text.trim());
   // Do plánu mesiaca sa počíta len to, čo sa ešte chystá — publikovaný nápad
@@ -1016,9 +1064,9 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
             <span style={{ flexGrow: 1 }} />
             <span>dva prsty na trackpade — štipnutím priblížiš a oddiališ</span>
             <div style={{ display: "flex", alignItems: "center", gap: 2, padding: 2, borderRadius: 8, border: `1px solid ${C.border}`, background: C.card }}>
-              <button type="button" aria-label="Oddialiť" onClick={() => setZoom((z) => Math.max(0.4, Math.round((z - 0.1) * 100) / 100))} style={tlacidloZoom}>−</button>
-              <button type="button" onClick={() => setZoom(1)} title="Späť na 100 %" style={{ ...tlacidloZoom, width: 46, fontVariantNumeric: "tabular-nums" }}>{Math.round(zoom * 100)} %</button>
-              <button type="button" aria-label="Priblížiť" onClick={() => setZoom((z) => Math.min(1.5, Math.round((z + 0.1) * 100) / 100))} style={tlacidloZoom}>+</button>
+              <button type="button" aria-label="Oddialiť" onClick={() => zmenZoom((z) => z - 0.1)} style={tlacidloZoom}>−</button>
+              <button type="button" onClick={() => zmenZoom(1)} title="Späť na 100 %" style={{ ...tlacidloZoom, width: 46, fontVariantNumeric: "tabular-nums" }}>{Math.round(zoom * 100)} %</button>
+              <button type="button" aria-label="Priblížiť" onClick={() => zmenZoom((z) => z + 0.1)} style={tlacidloZoom}>+</button>
               <button type="button" onClick={zmestiSa} title="Zmestiť celú mapu do šírky" style={{ ...tlacidloZoom, width: "auto", padding: "0 8px" }}>zmestiť</button>
               <button type="button" onClick={naStred} title="Postaviť pohľad na hlavnú bublinu" style={{ ...tlacidloZoom, width: "auto", padding: "0 8px" }}>na stred</button>
             </div>

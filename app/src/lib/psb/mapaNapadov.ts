@@ -187,6 +187,25 @@ export const MEDZERA_Y = 14;
 /** Výška jedného riadku aj s medzerou pod ním. */
 export const KROK_Y = RIADOK + MEDZERA_Y;
 
+/** Medze mierky mapy. Jedno miesto — štipnutie, tlačidlá aj „zmestiť". */
+export const MIN_ZOOM = 0.3;
+export const MAX_ZOOM = 1.5;
+/** Vzduch okolo mapy pri „zmestiť", aby bubliny nesedeli na hrane. */
+export const OKRAJ_ZMESTIT = 40;
+
+/**
+ * Orezať mierku na medze a na celé percentá.
+ *
+ * `zaokruhli` je Math.floor tam, kde sa niečo má ZMESTIŤ: zaokrúhlenie nahor
+ * by o kúsok presiahlo okno a mapa by opäť nebola celá vidieť.
+ */
+export function vMedziach(z: number, zaokruhli: (n: number) => number = Math.round): number {
+  // NaN (napr. 0 / 0 z prázdnej plochy) by sa cez Math.min prešmykol a mierka
+  // NaN zhasne celú mapu. Nekonečno naopak znamená „čo najviac" a orežú ho medze.
+  if (Number.isNaN(z)) return 1;
+  return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zaokruhli(z * 100) / 100));
+}
+
 /**
  * Na ktorú stranu kmeňa vetva rastie. Dve vpravo, jedna vľavo — tak, ako to
  * robia klasické mindmapy: kmeň v strede, konáre na obe strany.

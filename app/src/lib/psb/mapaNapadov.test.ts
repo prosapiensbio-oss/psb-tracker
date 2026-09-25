@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { KROK_Y, MEDZERA_X, okrajBubliny, RIADOK, STRANA_VETVY, STRED, VETVY, kusovNaMesiac, rozparsujVysyp, mapaNaText, potomkovia, rozlozMapu, sirkaUzla, smiePresunut, vetvaUzla, viditelny, type Uzol } from "./mapaNapadov";
+import { KROK_Y, MAX_ZOOM, MEDZERA_X, MIN_ZOOM, okrajBubliny, vMedziach, RIADOK, STRANA_VETVY, STRED, VETVY, kusovNaMesiac, rozparsujVysyp, mapaNaText, potomkovia, rozlozMapu, sirkaUzla, smiePresunut, vetvaUzla, viditelny, type Uzol } from "./mapaNapadov";
 import { nazovFazy } from "./mapaCyklu";
 
 const u = (o: Partial<Uzol> & { id: string }): Uzol =>
@@ -345,5 +345,26 @@ describe("čiara sa chytá okraja bubliny", () => {
 
   it("na strede sa nedelí nulou", () => {
     expect(okrajBubliny(m, 200, 126)).toEqual({ x: 200, y: 126 });
+  });
+});
+
+describe("vMedziach", () => {
+  it("drží mierku v medziach", () => {
+    expect(vMedziach(0.05)).toBe(MIN_ZOOM);
+    expect(vMedziach(9)).toBe(MAX_ZOOM);
+    expect(vMedziach(0.734)).toBeCloseTo(0.73, 6);
+  });
+
+  it("pri zmestení radšej menej — Math.floor", () => {
+    // 0.418 zaokrúhlené nahor by mapu o kúsok vystrčilo z okna.
+    expect(vMedziach(0.418, Math.floor)).toBeCloseTo(0.41, 6);
+    expect(vMedziach(0.418)).toBeCloseTo(0.42, 6);
+  });
+
+  it("delenie nulou nezhodí mapu", () => {
+    // clientWidth / 0 je Infinity, 0 / 0 je NaN — oboje musí skončiť pri 1,
+    // nie pri mierke NaN, ktorá by plochu zmenila na prázdnu.
+    expect(vMedziach(Number.POSITIVE_INFINITY)).toBe(MAX_ZOOM);
+    expect(vMedziach(Number.NaN)).toBe(1);
   });
 });
