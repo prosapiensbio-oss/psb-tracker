@@ -1,5 +1,6 @@
-import { jeBeta } from "../../lib/psb/beta";
 import { zlucZoznam } from "../../lib/psb/zlucZoznam";
+import { jeBeta } from "../../lib/psb/beta";
+import { MarketingPrehlad } from "./MarketingPrehlad";
 import { fetchVzasSettings, saveVzasSetting } from "../../lib/psb/client";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
@@ -1062,36 +1063,18 @@ function Rychlost({ chat }: { chat?: AssistantChat }) {
 }
 
 /**
- * MARKETING AKO CESTA, NIE ABECEDA KARIET — skúška v bete.
+ * SKÚŠKA „marketing ako cesta" JE ZA NAMI (beta, 24.–25. 9. 2026).
  *
- * Jerry, 24. 9. 2026: „zoraď ich ako jednu cestu: čo sa deje → čo z toho
- * plynie → čo vyrobiť → čo zverejniť. Dnes je to abeceda kariet, nie postup."
+ * Zadanie znelo zoradiť záložky ako postup: čo sa deje → čo z toho plynie →
+ * čo zverejniť. Urobilo sa to a Jerry to odmietol vetou, ktorá to vystihuje:
+ * „len si zmenil v marketingu názvy kategórií, ktoré ale inak ostali rovnaké."
+ * Mal pravdu — záložky boli v skupinách aj predtým, takže sa prelepili nápisy
+ * a nič sa nezmenilo v tom, koľko práce obrazovka ušetrí.
  *
- * Doterajšie skupiny (Výsledok / Kde nás nájdu / Čo púšťame von) hovorili,
- * ČOHO sa karta týka. Nepovedali, v akom poradí sa nimi má prejsť — a tak
- * človek začínal tam, kam mu padlo oko.
- *
- * Záložky ani ich `id` sa NEMENIA, mení sa poradie a názvy skupín. Odkazov
- * na ne je plno v registri, u Jarvisa aj v uložených adresách; premenovať id
- * by znamenalo potichu odpojiť desiatky miest.
- *
- * „Čo publikovať" zostáva zatiaľ jedna záložka, hoci vnútri drží plán, mapu
- * cyklu aj nápady — teda tri kroky cesty naraz. Rozdeliť ju je ďalší krok,
- * nie tento: najprv nech je vidieť, či poradie samo o sebe pomôže.
+ * Preto sa tu poradie NEMENÍ a ďalší pokus nech nezačína nápismi. Ak má
+ * Marketing dlhovať niečo, tak zhrnutie, ktoré odpovie bez preklikávania —
+ * to je záložka „Prehľad".
  */
-const TABY_CESTA = [
-  { id: "lievik", label: "Odkiaľ prišli klienti", skupina: "1 · Čo sa deje" },
-  { id: "dopyty", label: "Dopyty", skupina: "1 · Čo sa deje" },
-  { id: "naklady", label: "Čo to stálo", skupina: "1 · Čo sa deje" },
-  { id: "kanaly", label: "Soc. siete", skupina: "1 · Čo sa deje" },
-  { id: "vyhladavanie", label: "Vyhľadávanie", skupina: "1 · Čo sa deje" },
-  { id: "web", label: "Web", skupina: "1 · Čo sa deje" },
-  { id: "navrhy", label: "Plán a čo vyrobiť", skupina: "2 · Čo z toho plynie" },
-  { id: "obsah", label: "Reels & posty", skupina: "3 · Čo sme zverejnili" },
-  { id: "mail", label: "Mailer", skupina: "3 · Čo sme zverejnili" },
-  { id: "kampan", label: "Kampaň ↗", skupina: "3 · Čo sme zverejnili" },
-];
-
 export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, refresh, onPoznamkaStrata, onNavigate, focus, onAck, onOdchodKJarvisovi }: { data: PSBData; clients: Record<string, ClientAgg>; leads: Lead[]; chat?: AssistantChat; sub: string; onSub: (s: string) => void; onKlient?: (m: string) => void; refresh: () => Promise<void>; onPoznamkaStrata?: (meno: string, text: string) => void; onNavigate?: (tab: string, sub?: string) => void; focus?: { client?: string; filter?: string; nonce?: number; slot?: { mesiac: string; faza: number; napadId?: string } } | null; onOdchodKJarvisovi?: (mesiac: string, faza: number, napadId?: string) => void; onAck?: (kluc: string, zapnut: boolean, poznamka?: string) => void }) {
   const setSub = onSub;
   // Jedno miesto, odkiaľ karty berú stav skrytia — inak by každá karta
@@ -1119,7 +1102,12 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
     <>
       {/* Nad záložkami, nie v jednej z nich: sú to čísla, ktoré platia bez
           ohľadu na to, ktorú otázku si práve otváraš. */}
-      <MarketingVrch data={data} clients={clients} />
+      {/* Nad Prehľadom by to boli tie isté otázky dvakrát — a v jednom prípade
+          s iným číslom pri rovnakom nápise (vrchný pás počíta cenu za dopyt
+          za bežiaci mesiac, Prehľad za rok a len z platenej cesty). Dva
+          rôzne „cena za dopyt" na jednej obrazovke je presne tá chyba, ktorú
+          appka opakovane liečila. */}
+      {sub !== "prehlad" && <MarketingVrch data={data} clients={clients} />}
       <SubTabs
         // Osem podzáložiek v troch rodinách (Jerry, 17. 8.: „nedá sa aj to
         // nejako optimalizovať?"). Zlučovať ich by bola chyba — Soc. siete
@@ -1132,7 +1120,10 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
         // výkaz práce, nie odpoveď. Instagram priviedol za 18 mesiacov 5
         // klientov, referencie 26; karty majú zodpovedať tomuto pomeru, nie
         // tomu, kde je najviac dát.
-        tabs={jeBeta() ? TABY_CESTA : [
+        tabs={[
+          // Prehľad ako prvý — skúška v bete (Jerry, 25. 9. 2026): jedna
+          // obrazovka, ktorá odpovie „beží to, alebo nie" bez preklikávania.
+          ...(jeBeta() ? [{ id: "prehlad", label: "Prehľad", skupina: "Výsledok" }] : []),
           // Dopyty prvé: sú vstupom lievika a jediná záložka, kde sa niečo
           // zapisuje. Ostatné tri sú čítanie nad tým, čo tu vznikne.
           { id: "dopyty", label: "Dopyty", skupina: "Výsledok" },
@@ -1192,6 +1183,7 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
         }}
       />
 
+      {sub === "prehlad" && jeBeta() && <MarketingPrehlad data={data} clients={clients} onNavigate={onNavigate} />}
       {sub === "dopyty" && <Dopyty leads={leads} clients={clients} refresh={refresh} focus={focus} />}
 
       {sub === "lievik" && (

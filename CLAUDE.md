@@ -1129,3 +1129,42 @@ potvrdí ho človek.
   tak, že ten istý deň je v OBOCH zoznamoch (nesedí aj chýba). Rieši to
   mapovanie názvu na meno z PTminderu, nie prepis riadku — najbližšia
   synchronizácia by ho vrátila.
+
+## Prelepiť nápisy nie je zmena
+
+25. 9. 2026 sa v bete skúšali dve veci a Jerry obe odmietol tou istou vetou:
+„len si zmenil v marketingu názvy kategórií, ktoré ale inak ostali rovnaké."
+Mal pravdu v oboch prípadoch. Prvá zmena PRESÚVALA kartu preč z obrazovky —
+teda absencia, ktorú si nikto nevšimne. Druhá premenovala a preusporiadala
+skupiny záložiek tam, kde skupiny boli aj predtým. Ani jedna neubrala ani
+jeden klik.
+
+**Meradlo pre každý návrh na „lepšie usporiadanie": o koľko menej práce to
+stojí odpoveď na otázku, kvôli ktorej sa obrazovka otvára.** Keď odpoveď
+znie „o nič, len to inak vyzerá", nerob to. Obe zmeny sú vrátené.
+
+Čo z toho vzniklo namiesto nich: **Marketing → Prehľad** a **Peniaze →
+Prehľad** (beta, `MarketingPrehlad.tsx` / `PeniazePrehlad.tsx`). Nie nové
+poradie starých kariet — jedna obrazovka, ktorá odpovie bez preklikávania.
+
+- **Dlaždica sa nekreslí druhýkrát.** `PristrojeMriezka` v `Prehlad.tsx` je
+  tá istá dlaždica ako na Dnes (pásmo, značka „riešiť"/„sledovať", sparkline,
+  preklik) — bez registra a kotvy. Druhá kópia by sa o mesiac rozišla.
+- **Žiadny nový výpočet.** `krokyZa`, `reklamaSuhrn`, `pnlCalc`,
+  `breakEvenRad`, `spocitajRezervu`, `byCommitment`, `salaryCalc`,
+  `jarekCalc`. Overené proti D1: nezaplatené 12 / 85 642 Kč.
+- **Dve čísla s rovnakým nápisom na jednej obrazovke sa vylučujú.** Vrchný
+  pás Marketingu („Cena za dopyt" za bežiaci mesiac, zmiešaná) sa nad
+  Prehľadom NEKRESLÍ — Prehľad ju počíta za rok a len z platenej cesty.
+- **Diagnóza sa pýta najprv na VSTUP** (`diagnozaLievika`
+  v `prehladPasma.ts`). Prvá verzia hlásila „najslabší prechod: úvodný →
+  klient (77 %)" a posielala prerábať úvodný tréning, ktorý funguje. Pri
+  zdravých prechodoch (oba nad 60 %) je odpoveď iná: lievik drží, chýbajú
+  dopyty — 3,6 namiesto 10,5 mesačne.
+- **Čísla s opačným znamienkom sa nesčítavajú.** `cumDebt` je kladný, keď
+  firma dlží trénerovi, a záporný, keď si tréner vzal viac. Súčet Jerryho
+  −107 897 a Terezkiných +34 255 nehovorí nič; preto veta so smerom
+  (`smerDlhu`), nie jedno číslo.
+- **Karta filtrovaná trénerom musí povedať, čo ukazuje.** Nezaplatené je na
+  Dnes za vybraného trénera (6 / 47 560 Kč), v Prehľade za oboch
+  (12 / 85 642 Kč). Bez poznámky „obaja tréneri" sú to dve pravdy o jednom.

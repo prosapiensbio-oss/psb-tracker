@@ -299,6 +299,33 @@ function Pasmo({ titulok, popis, deti }: { titulok: string; popis: string; deti:
   );
 }
 
+/**
+ * Prístroje bez panela — tá istá dlaždica, len v mriežke.
+ *
+ * Kokpit má na „Dnes" jazyk, ktorý sa oplatí zopakovať: pásmo (ok / sledovať /
+ * riešiť), značka pre toho, kto farby nerozlíši, veta pod číslom a preklik na
+ * miesto, kde sa s tým dá niečo urobiť. Podobrazovky (Marketing → Prehľad,
+ * Peniaze → Prehľad) potrebujú presne toto a nič z panela okolo — register,
+ * kotvu ani čerstvosť dát. Preto sa vyberá mriežka, nie celý panel; druhá
+ * kópia dlaždice by sa o mesiac rozišla s touto.
+ */
+export function PristrojeMriezka({ pristroje, titulok, popis, stlpcov }: {
+  pristroje: Pristroj[];
+  titulok?: string;
+  popis?: string;
+  /** Strop stĺpcov — tri čísla vedľa seba sa čítajú inak než päť. */
+  stlpcov?: number;
+}) {
+  const sirka = useStlpce();
+  const n = Math.max(1, Math.min(sirka, stlpcov ?? sirka, pristroje.length || 1));
+  const mriezka = (
+    <div style={{ display: "grid", gridTemplateColumns: `repeat(${n}, minmax(0,1fr))`, gap: 9, alignItems: "stretch" }}>
+      {pristroje.map((p) => <Dlazdica key={p.id} p={p} />)}
+    </div>
+  );
+  return titulok ? <Pasmo titulok={titulok} popis={popis || ""} deti={mriezka} /> : mriezka;
+}
+
 // ── Panel ────────────────────────────────────────────────────────────────────
 
 export function PrehladPanel({

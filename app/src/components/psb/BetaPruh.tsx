@@ -4,18 +4,19 @@ import { C } from "../../lib/psb/theme";
 /**
  * Čo sa v bete práve skúša.
  *
- * Jerry, 25. 9. 2026: „v bete nevidím žiadnu zmenu." Obe zmeny tam pritom
- * boli — jedna je PRESUN karty preč (teda absencia, ktorú si nikto nevšimne)
- * a druhá je iné poradie záložiek na obrazovke, kde záložky boli aj predtým.
- * Beta, o ktorej treba hádať, kde sa pozrieť, je na nič; pruh preto rovno
- * povie, čo sa skúša, a klik zavedie na to miesto.
+ * Jerry, 25. 9. 2026: „v bete nevidím žiadnu zmenu." Obe vtedajšie zmeny tam
+ * pritom boli — jedna bola PRESUN karty preč (teda absencia, ktorú si nikto
+ * nevšimne) a druhá iné poradie záložiek na obrazovke, kde záložky boli aj
+ * predtým. Obe sme podľa jeho rozhodnutia vrátili. Beta, o ktorej treba hádať,
+ * kde sa pozrieť, je na nič; pruh preto rovno povie, čo sa skúša, a klik
+ * zavedie na to miesto.
  *
  * Keď sa niečo z bety nasadí naostro alebo zahodí, RIADOK SA ODTIAĽTO MAŽE —
  * inak pruh o pol roka klame rovnako, ako klamal text pod P&L.
  */
 const SKUSA_SA: { text: string; tab: string; sub: string }[] = [
-  { text: "Peniaze bez pohybov z banky", tab: "vzas", sub: "pnl" },
-  { text: "Marketing zoradený ako cesta", tab: "marketing", sub: "lievik" },
+  { text: "Marketing → Prehľad", tab: "marketing", sub: "prehlad" },
+  { text: "Peniaze → Prehľad", tab: "vzas", sub: "prehlad" },
 ];
 
 /**

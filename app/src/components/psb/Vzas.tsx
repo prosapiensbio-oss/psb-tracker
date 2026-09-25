@@ -1,4 +1,5 @@
 import { jeBeta } from "../../lib/psb/beta";
+import { PeniazePrehlad } from "./PeniazePrehlad";
 import { BODY, kohortyKlientov, priemernePrezitie } from "../../lib/psb/kohorty";
 import { oznam } from "../../lib/psb/obnovaSignal";
 import { zlucZoznam } from "../../lib/psb/zlucZoznam";
@@ -3222,8 +3223,19 @@ const SEKCIE_PENIAZE = [
     { id: "nakupy", label: "Nákupy" },
   ] },
 ];
+/**
+ * Prehľad ako PRVÁ sekcia Peňazí — skúška v bete (Jerry, 25. 9. 2026).
+ *
+ * Peniaze majú osem listov v štyroch sekciách a každý odpovedá na inú otázku.
+ * Chýbal ten, ktorý si človek kladie ako prvý: ako to dopadlo a stačí to.
+ * Preto je prvý a preto je jediný v svojej sekcii — druhý riadok pilúl by
+ * pri jednom liste bol len jeho vlastné meno napísané dvakrát.
+ */
+const SEKCIA_PREHLAD = { id: "sk-prehlad", label: "Prehľad", listy: [{ id: "prehlad", label: "Prehľad" }] };
+
+const sekcie = () => (jeBeta() ? [SEKCIA_PREHLAD, ...SEKCIE_PENIAZE] : SEKCIE_PENIAZE);
 const sekciaPre = (list: string) =>
-  (SEKCIE_PENIAZE.find((x) => x.listy.some((l) => l.id === list)) || SEKCIE_PENIAZE[0]).id;
+  (sekcie().find((x) => x.listy.some((l) => l.id === list)) || sekcie()[0]).id;
 
 export function Vzas({ sub, onSub, data, clients, focus, onNavigate, pohybSplits, nastavPohybSplit }: { sub: string; onSub: (s: string) => void; data: PSBData; clients: Record<string, ClientAgg>; focus?: NavFocus | null; onNavigate?: (tab: string, sub?: string, focus?: NavFocus) => void; pohybSplits?: PohybSplits; nastavPohybSplit?: (kluc: string, casti: SplitCiast[]) => void }) {
   // Tržby do VZAS tečú živé z PTmindera — excelový prepis sa nahradí pri
@@ -3242,18 +3254,19 @@ export function Vzas({ sub, onSub, data, clients, focus, onNavigate, pohybSplits
           si nechávajú PÔVODNÉ id, takže každý uložený aj Jarvisov odkaz
           (vzas|pnl, vzas|predikcia…) trafí presne tam, kam mieril. */}
       <SubTabs
-        tabs={SEKCIE_PENIAZE.map((x) => ({ id: x.id, label: x.label }))}
+        tabs={sekcie().map((x) => ({ id: x.id, label: x.label }))}
         value={sekciaPre(sub)}
-        onChange={(id) => onSub(SEKCIE_PENIAZE.find((x) => x.id === id)!.listy[0].id)}
+        onChange={(id) => onSub(sekcie().find((x) => x.id === id)!.listy[0].id)}
       />
       {(() => {
-        const sekcia = SEKCIE_PENIAZE.find((x) => x.id === sekciaPre(sub))!;
+        const sekcia = sekcie().find((x) => x.id === sekciaPre(sub))!;
         // Sekcia s jediným listom druhý riadok nepotrebuje — bol by to
         // jeden osamelý pill s tým istým menom.
         return sekcia.listy.length > 1 ? (
           <SubTabs tabs={sekcia.listy} value={sub} onChange={onSub} />
         ) : null;
       })()}
+      {sub === "prehlad" && jeBeta() && <PeniazePrehlad data={data} onNavigate={onNavigate} />}
       {["trzby", "sedenia", "predikcia"].includes(sub) && (
         <FinancieObsah data={data} clients={clients} focus={focus} sub={sub} onSub={onSub} />
       )}
@@ -3266,43 +3279,26 @@ export function Vzas({ sub, onSub, data, clients, focus, onNavigate, pohybSplits
         <>
           <div style={{ fontSize: 11.5, color: C.textDim, margin: "0 0 10px", lineHeight: 1.5 }}>
             Tržby idú živé z PTmindera, náklady od júla 2026 z Fio — mesiace do júna zostávajú z Excelu,
-            aby sa dali oboje porovnať. Jednotlivé pohyby za mesiace z banky nájdeš{" "}
-            {jeBeta()
-              ? <>v <b style={{ color: C.textMuted }}>Upload → Zapísané pohyby</b></>
-              : <>nižšie v <b style={{ color: C.textMuted }}>Zapísané pohyby</b></>}
-            , kde sa dá prehodiť kategória aj dopísať poznámka.
+            aby sa dali oboje porovnať. Jednotlivé pohyby za mesiace z banky nájdeš nižšie
+            v <b style={{ color: C.textMuted }}>Zapísané pohyby</b>, kde sa dá prehodiť kategória aj dopísať poznámka.
           </div>
           <PnlTab focus={focus} />
           {/* Pohyby patria k P&L: sú to riadky, z ktorých sú tie súčty poskladané.
               V Údajoch boli schované za rozbaľovačom a nedali sa nájsť.
-              V BETE sa skúša opak (Jerry, 24. 9. 2026): pohyby žijú len
-              v Uploade, kde už nie sú schované — tu boli TRETÍ výskyt tej istej
-              karty a robili z P&L dve rôzne práce naraz. */}
-          {!jeBeta() && (
-            <div style={{ marginTop: 14 }}>
-              <BankaUlozene focus={focus} pohybSplits={pohybSplits} onSplit={nastavPohybSplit} />
-            </div>
-          )}
+              Skúšali sme ich odtiaľto odobrať (beta, 24.–25. 9. 2026) — Jerry
+              na tom nevidel rozdiel, takže zostávajú. */}
+          <div style={{ marginTop: 14 }}>
+            <BankaUlozene focus={focus} pohybSplits={pohybSplits} onSplit={nastavPohybSplit} />
+          </div>
         </>
       )}
       {sub === "vyplaty" && (
         <>
           <SalaryTab sessions={data.sessions} />
-          {/* V bete sa karta s pohybmi odtiaľto vytratila — bez tejto vety by
-              po nej zostala len diera a človek by hľadal, kam zmizla. */}
-          {jeBeta() && (
-            <div style={{ fontSize: 11.5, color: C.textDim, margin: "10px 0 0", lineHeight: 1.5 }}>
-              Riadky z banky, z ktorých sú výplaty poskladané, nájdeš v{" "}
-              <b style={{ color: C.textMuted }}>Upload → Zapísané pohyby</b>.
-            </div>
-          )}
-          {/* Aj tu: výplaty sú riadky v banke, nie abstraktné číslo.
-              V bete skryté — viď poznámku pri P&L vyššie. */}
-          {!jeBeta() && (
-            <div style={{ marginTop: 14 }}>
-              <BankaUlozene focus={focus} pohybSplits={pohybSplits} onSplit={nastavPohybSplit} />
-            </div>
-          )}
+          {/* Aj tu: výplaty sú riadky v banke, nie abstraktné číslo. */}
+          <div style={{ marginTop: 14 }}>
+            <BankaUlozene focus={focus} pohybSplits={pohybSplits} onSplit={nastavPohybSplit} />
+          </div>
         </>
       )}
       {sub === "cashflow" && <CashflowTab />}
