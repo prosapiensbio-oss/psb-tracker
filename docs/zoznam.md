@@ -61,12 +61,10 @@ sa neprečíslováva), server neoveruje, že `rodic` existuje, a `vetvaUzla`
 s `viditelny` sa pri každom vykreslení počítajú odznova (pri 200 nápadoch
 ~12 ms na znak; dnes desiatky, takže neviditeľné).
 
-**Vlastné vetvy.** Kmeň má „+", ale nová bublina padne do jednej z troch
-pevných vetiev — štvrtú vetvu (vlastný konár s vlastným menom a farbou)
-zatiaľ založiť nejde. Vetvy sú definované v kóde vrátane strany, na ktorú
-rastú; presunúť ich do dát mapy je samostatný krok. Jerry o to 25. 9. priamo
-nežiadal, ale vetou „daj mi možnosť vytvárať z centrálneho bodu ďalšie
-bubliny" to môže byť myslené — spýtať sa pri najbližšej práci na mape.
+~~**Vlastné vetvy.**~~ Hotové 25. 9. 2026 (migrácia 0078): zoznam vetiev
+žije v `mkt_mapy.vetvy`, nová sa píše v ponuke pri kmeni, na obvode vetvy sa
+dá premenovať, prefarbiť, prehodiť na druhú stranu a zmazať. Zmazanie nápady
+nemaže — padnú do odkladiska.
 
 ## 3 · Blokované niečím mimo Kokpitu
 
