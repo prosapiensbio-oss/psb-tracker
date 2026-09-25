@@ -12,7 +12,7 @@ v správach, a tie sa strácajú.
 patrí to SEM v tom istom ťahu. Hotová vec sa z hornej časti maže a jednou
 vetou dopíše do „Zavreté" dolu — aby sa už nikdy neotvárala odznova.
 
-Stav k **25. 9. 2026**.
+Stav k **26. 9. 2026**.
 
 ---
 
@@ -33,6 +33,18 @@ Stav k **25. 9. 2026**.
   od 1/2026 je priradených 113. Pri poslednom meraní malo 74 nepriradených
   jednoznačný návrh — zoznam s odškrtávaním a jedným potvrdením z toho robí
   prácu na večer, nie na mesiac. Dnes sa potvrdzuje po jednom.
+
+- **Anamnéza klienta v Kokpite** (Jerry, 26. 9.). Argument je jeho: „ak už
+  máme citlivé dáta o meraniach klientov, spravme v Kokpite aj anamnézu a tým
+  pádom tu bude všetko." Tabuľka `klient_merania` už dnes drží telesné
+  merania, takže sa tým nezvyšuje kategória údajov — len prestane byť pravda
+  o klientovi roztrhaná medzi appku a papier. Rozsah dohodnúť; pri zdravotných
+  údajoch platí „len to, čo sa naozaj používa pri tréningu".
+
+- **Fakturácia v Kokpite** (Jerry, 26. 9.). Rozhovor je v konverzácii z 26. 9.,
+  fakty: 84 faktúr od 2023, z toho 37 za rok 2026 (347 079 Kč), číselná rada
+  `RRRRNNNN`, posledná 20260038. Dnes v iDokladi. Faktúra má vzniknúť pri
+  balíčku, niesť QR platbu a odísť mailom.
 
 ## 2b · Myšlienková mapa — čo z rešerše zostalo nepostavené
 
@@ -80,6 +92,12 @@ nemaže — padnú do odkladiska.
 - Na karte klienta nahradiť „zaplatil podľa PTmindera" **dvoma číslami vedľa
   seba** — Kokpit a export. Podrobne aj s dôvodom v `CLAUDE.md`, sekcia
   „Súbežný chod potrebuje meradlo".
+
+- **Vytiahnuť z PTmindera maily a telefóny** a pripojiť ich k profilom
+  klientov (Jerry, 26. 9.). Bez nich sa faktúra ani pripomienka nedá poslať
+  z Kokpitu — dnes je v appke 9 mailov (a tie sú z dopytov, nie od klientov)
+  a v iDokladi 8 z 35 kontaktov. Odísť z PTmindera bez tohto kroku by
+  znamenalo stratiť jediné miesto, kde tie kontakty sú.
 
 ## 5 · Fronty, ktoré appka meria a nikto ich neznižuje
 
