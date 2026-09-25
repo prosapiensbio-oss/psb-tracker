@@ -89,6 +89,15 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
    * vráti kurzor tam, kde bol, takže sa píše ďalej bez prerušenia.
    */
   const casovac = useRef<number | null>(null);
+  /**
+   * Priblíženie. Mapa s tridsiatimi nápadmi sa na šírku obrazovky nezmestí
+   * a posúvanie doprava je horšie než menšie písmo — v mindmapách sa preto
+   * zoom považuje za základnú vec, nie za výbavu. Krok je pevný zoznam, nie
+   * plynulé percento: päť rozumných veľkostí sa trafí jedným klikom, kým
+   * plynulý posuvník vyžaduje mierenie.
+   */
+  const [zoom, setZoom] = useState(1);
+  const plochaRef = useRef<HTMLDivElement | null>(null);
 
   const nacitaj = useCallback(() => void fetch("/api/napady", { credentials: "same-origin" })
     .then((r) => r.json())
@@ -145,6 +154,28 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
     nacitaj();
   }, [nacitaj]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  /**
+   * Štípanie na trackpade a ctrl+koliesko.
+   *
+   * Prehliadač posiela štípnutie ako `wheel` s `ctrlKey`; bez `passive:false`
+   * sa `preventDefault` ignoruje a namiesto mapy sa priblíži celá stránka.
+   * Preto natívny poslucháč, nie `onWheel`.
+   */
+  useEffect(() => {
+    const el = plochaRef.current;
+    if (!el) return;
+    const na = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      setZoom((z) => Math.min(1.5, Math.max(0.4, Math.round((z - e.deltaY * 0.0025) * 100) / 100)));
+    };
+    el.addEventListener("wheel", na, { passive: false });
+    return () => el.removeEventListener("wheel", na);
+    // Plocha vzniká až po načítaní a len v pohľade Mapa — s prázdnym zoznamom
+    // závislostí by sa poslucháč vešal na ešte neexistujúci prvok a štipnutie
+    // by ticho nerobilo nič. (Presne to sa 25. 9. aj stalo.)
+  }, [nacitane, pohlad]);
+
   /** Odchod z obrazovky koncept nezahodí. */
   useEffect(() => () => {
     if (casovac.current) clearTimeout(casovac.current);
@@ -191,6 +222,16 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
   };
 
   const vidno = uzly.filter((u) => viditelny(u.id, uzly));
+  // Šírka plochy z ROZLOŽENIA, nie natvrdo: pri zbalených vetvách bola
+  // dvojtisícpixelová plocha z väčšej časti prázdna a posuvník klamal o tom,
+  // koľko mapy ešte je.
+  const sirkaMapy = Math.max(900, ...Object.values(poz).map((m) => m.x + m.w)) + 140;
+  const vyskaMapy = Math.max(420, vyska);
+  const zmestiSa = () => {
+    const el = plochaRef.current;
+    if (!el) return;
+    setZoom(Math.min(1, Math.max(0.4, Math.round((el.clientWidth / sirkaMapy) * 100) / 100)));
+  };
   const listy = uzly.filter((u) => u.text.trim());
   const sFazou = listy.filter((u) => u.faza > 0);
   const chybaDoMesiaca = Math.max(0, KADENCIA * 4 - sFazou.length);
@@ -319,11 +360,21 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
             <span><b style={{ color: C.text }}>Enter</b> ďalšia vedľa</span>
             <span><b style={{ color: C.text }}>⌫</b> na prázdnej zmaže</span>
             <span style={{ flexGrow: 1 }} />
-            <span>rozloženie sa kreslí samo — nič sa neťahá myšou</span>
+            <span>dva prsty na trackpade — štipnutím priblížiš a oddiališ</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 2, padding: 2, borderRadius: 8, border: `1px solid ${C.border}`, background: C.card }}>
+              <button type="button" aria-label="Oddialiť" onClick={() => setZoom((z) => Math.max(0.4, Math.round((z - 0.1) * 100) / 100))} style={tlacidloZoom}>−</button>
+              <button type="button" onClick={() => setZoom(1)} title="Späť na 100 %" style={{ ...tlacidloZoom, width: 46, fontVariantNumeric: "tabular-nums" }}>{Math.round(zoom * 100)} %</button>
+              <button type="button" aria-label="Priblížiť" onClick={() => setZoom((z) => Math.min(1.5, Math.round((z + 0.1) * 100) / 100))} style={tlacidloZoom}>+</button>
+              <button type="button" onClick={zmestiSa} title="Zmestiť celú mapu do šírky" style={{ ...tlacidloZoom, width: "auto", padding: "0 8px" }}>zmestiť</button>
+            </div>
           </div>
-          <div style={{ position: "relative", height: 520, overflow: "auto", border: `1px solid ${mix(C.border, 80)}`, borderRadius: 13, background: mix(C.card, 60) }}>
-            <div style={{ position: "relative", width: 2000, height: Math.max(480, vyska) }}>
-              <svg width={2000} height={Math.max(480, vyska)} style={{ position: "absolute", left: 0, top: 0, pointerEvents: "none" }} aria-hidden="true">
+          <div ref={plochaRef} style={{ position: "relative", height: 520, overflow: "auto", border: `1px solid ${mix(C.border, 80)}`, borderRadius: 13, background: mix(C.card, 60), overscrollBehavior: "contain" }}>
+            {/* Dve vrstvy zámerne: vnútorná sa zmenšuje `transform`om (text
+                zostane ostrý a nič sa neprelomí), vonkajšia nesie zmenšený
+                rozmer, aby posuvníky vedeli, koľko mapy naozaj je. */}
+            <div style={{ width: sirkaMapy * zoom, height: vyskaMapy * zoom }}>
+            <div style={{ position: "relative", width: sirkaMapy, height: vyskaMapy, transform: `scale(${zoom})`, transformOrigin: "0 0" }}>
+              <svg width={sirkaMapy} height={vyskaMapy} style={{ position: "absolute", left: 0, top: 0, pointerEvents: "none" }} aria-hidden="true">
                 {ciary.map((c) => (
                   <path key={c.id} d={c.d} stroke={c.farba} strokeWidth={c.hrubka} strokeLinecap="round" fill="none" opacity={0.65} />
                 ))}
@@ -354,6 +405,7 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
                 );
               })}
               {vidno.map(bublina)}
+            </div>
             </div>
           </div>
         </>
@@ -457,6 +509,11 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
     </Card>
   );
 }
+
+const tlacidloZoom: React.CSSProperties = {
+  height: 24, width: 24, padding: 0, borderRadius: 6, border: "none", background: "transparent",
+  color: C.textMuted, fontFamily: "inherit", fontSize: 12, lineHeight: 1, cursor: "pointer",
+};
 
 const FAZA_FARBA: Record<number, string> = {
   1: "#3E82A8", 2: "#3D9B99", 3: "#6EA45C", 4: "#C08F32", 5: "#B45038",
