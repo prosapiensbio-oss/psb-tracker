@@ -3266,8 +3266,11 @@ export function Vzas({ sub, onSub, data, clients, focus, onNavigate, pohybSplits
         <>
           <div style={{ fontSize: 11.5, color: C.textDim, margin: "0 0 10px", lineHeight: 1.5 }}>
             Tržby idú živé z PTmindera, náklady od júla 2026 z Fio — mesiace do júna zostávajú z Excelu,
-            aby sa dali oboje porovnať. Jednotlivé pohyby za mesiace z banky nájdeš nižšie
-            v <b style={{ color: C.textMuted }}>Zapísané pohyby</b>, kde sa dá prehodiť kategória aj dopísať poznámka.
+            aby sa dali oboje porovnať. Jednotlivé pohyby za mesiace z banky nájdeš{" "}
+            {jeBeta()
+              ? <>v <b style={{ color: C.textMuted }}>Upload → Zapísané pohyby</b></>
+              : <>nižšie v <b style={{ color: C.textMuted }}>Zapísané pohyby</b></>}
+            , kde sa dá prehodiť kategória aj dopísať poznámka.
           </div>
           <PnlTab focus={focus} />
           {/* Pohyby patria k P&L: sú to riadky, z ktorých sú tie súčty poskladané.
@@ -3285,6 +3288,14 @@ export function Vzas({ sub, onSub, data, clients, focus, onNavigate, pohybSplits
       {sub === "vyplaty" && (
         <>
           <SalaryTab sessions={data.sessions} />
+          {/* V bete sa karta s pohybmi odtiaľto vytratila — bez tejto vety by
+              po nej zostala len diera a človek by hľadal, kam zmizla. */}
+          {jeBeta() && (
+            <div style={{ fontSize: 11.5, color: C.textDim, margin: "10px 0 0", lineHeight: 1.5 }}>
+              Riadky z banky, z ktorých sú výplaty poskladané, nájdeš v{" "}
+              <b style={{ color: C.textMuted }}>Upload → Zapísané pohyby</b>.
+            </div>
+          )}
           {/* Aj tu: výplaty sú riadky v banke, nie abstraktné číslo.
               V bete skryté — viď poznámku pri P&L vyššie. */}
           {!jeBeta() && (

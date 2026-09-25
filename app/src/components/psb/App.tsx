@@ -2444,7 +2444,7 @@ function skupinaFaktur(
       <NovaVerziaPas />
       {/* Neúspešný zápis nesmie zapadnúť. Pás je nad všetkým, aby ho človek
           videl aj vtedy, keď je práve inde na obrazovke. */}
-      <BetaPruh />
+      <BetaPruh onSkoc={navigate} />
       {chybaZapisu && (
         <div
           onClick={() => setChybaZapisu("")}
