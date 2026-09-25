@@ -388,3 +388,26 @@ export function rozparsujVysyp(vstup: string): VysypRiadok[] {
   }
   return von;
 }
+
+/**
+ * Bod na OKRAJI bubliny v smere k druhej bubline.
+ *
+ * Jerry, 25. 9. 2026: „tie čiary nemusia ísť na stred bubliny, ale na jej
+ * okraj, a ten sa prispôsobuje na základe pozície od bodu, z ktorého
+ * vychádza." Na snímke bolo vidieť, prečo: čiary vedené do stredu prechádzali
+ * cez text a krížili susedné bubliny.
+ *
+ * Bublina sa počíta ako obdĺžnik — zaoblenie je len o pár pixelov a hľadať
+ * priesečník s kapsulou by pridalo matematiku bez viditeľného rozdielu.
+ */
+export function okrajBubliny(m: Miesto, kamX: number, kamY: number): { x: number; y: number } {
+  const cx = m.x + m.w / 2;
+  const cy = m.y + RIADOK / 2;
+  const dx = kamX - cx;
+  const dy = kamY - cy;
+  if (!dx && !dy) return { x: cx, y: cy };
+  const tx = dx ? (m.w / 2) / Math.abs(dx) : Infinity;
+  const ty = dy ? (RIADOK / 2) / Math.abs(dy) : Infinity;
+  const t = Math.min(tx, ty, 1);
+  return { x: cx + dx * t, y: cy + dy * t };
+}

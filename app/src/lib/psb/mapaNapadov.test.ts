@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { KROK_Y, MEDZERA_X, RIADOK, STRANA_VETVY, STRED, VETVY, kusovNaMesiac, rozparsujVysyp, mapaNaText, potomkovia, rozlozMapu, sirkaUzla, smiePresunut, vetvaUzla, viditelny, type Uzol } from "./mapaNapadov";
+import { KROK_Y, MEDZERA_X, okrajBubliny, RIADOK, STRANA_VETVY, STRED, VETVY, kusovNaMesiac, rozparsujVysyp, mapaNaText, potomkovia, rozlozMapu, sirkaUzla, smiePresunut, vetvaUzla, viditelny, type Uzol } from "./mapaNapadov";
 import { nazovFazy } from "./mapaCyklu";
 
 const u = (o: Partial<Uzol> & { id: string }): Uzol =>
@@ -313,5 +313,37 @@ describe("ručné miesto kmeňa a vetiev", () => {
     const bez = rozlozMapu([], { text: "" });
     const s = rozlozMapu([], { text: "" }, {});
     expect(s.poz.koren).toEqual(bez.poz.koren);
+  });
+});
+
+describe("čiara sa chytá okraja bubliny", () => {
+  const m = { x: 100, y: 100, w: 200, h: 0, hlbka: 2 } as never as { x: number; y: number; w: number; hlbka: number };
+  // stred bubliny je (200, 126) pri RIADOK = 52
+
+  it("doprava sa trafí pravý okraj, nie stred", () => {
+    const b = okrajBubliny(m, 1000, 126);
+    expect(b.x).toBeCloseTo(300, 6);
+    expect(b.y).toBeCloseTo(126, 6);
+  });
+
+  it("doľava ľavý okraj", () => {
+    expect(okrajBubliny(m, -500, 126).x).toBeCloseTo(100, 6);
+  });
+
+  it("nadol spodný okraj", () => {
+    const b = okrajBubliny(m, 200, 900);
+    expect(b.y).toBeCloseTo(126 + RIADOK / 2, 6);
+    expect(b.x).toBeCloseTo(200, 6);
+  });
+
+  it("bod vnútri bubliny sa neposúva von", () => {
+    // Inak by čiara k prekrytej bubline vystrelila mimo nej.
+    const b = okrajBubliny(m, 210, 130);
+    expect(b.x).toBeCloseTo(210, 6);
+    expect(b.y).toBeCloseTo(130, 6);
+  });
+
+  it("na strede sa nedelí nulou", () => {
+    expect(okrajBubliny(m, 200, 126)).toEqual({ x: 200, y: 126 });
   });
 });

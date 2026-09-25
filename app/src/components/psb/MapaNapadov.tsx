@@ -4,7 +4,7 @@ import { doSchranky } from "../../lib/psb/kopirovanie";
 import { FAZA_MAPA, nazovFazy } from "../../lib/psb/mapaCyklu";
 import { oznam, pocuvaj } from "../../lib/psb/obnovaSignal";
 import {
-  FARBY, RIADOK, STRED, VETVY, farbaUzla, farbaVetvy, jeNaPlan, kusovNaMesiac, mapaNaText, rozlozMapu, rozparsujVysyp, smiePresunut, vetvaUzla, viditelny, type Uzol,
+  FARBY, RIADOK, STRED, VETVY, farbaUzla, farbaVetvy, jeNaPlan, okrajBubliny, kusovNaMesiac, mapaNaText, rozlozMapu, rozparsujVysyp, smiePresunut, vetvaUzla, viditelny, type Uzol,
 } from "../../lib/psb/mapaNapadov";
 import { C, mix } from "../../lib/psb/theme";
 import type { Miesto } from "../../lib/psb/mapaNapadov";
@@ -627,9 +627,14 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
   // by kreslilo čiary naprieč plochou.
   const spoj = (a: Miesto | undefined, b: Miesto | undefined, farba: string, hrubka: number, id: string) => {
     if (!a || !b) return;
-    const x1 = a.x + a.w / 2, y1 = a.y + RIADOK / 2, x2 = b.x + b.w / 2, y2 = b.y + RIADOK / 2;
-    const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
-    ciary.push({ id, d: `M ${x1} ${y1} Q ${mx} ${my}, ${x2} ${y2}`, farba, hrubka });
+    // Od OKRAJA k okraju, nie od stredu k stredu: čiara vedená do stredu
+    // prechádza cez text a kríži susedné bubliny (snímka, 25. 9. 2026).
+    const sa = okrajBubliny(a, b.x + b.w / 2, b.y + RIADOK / 2);
+    const sb = okrajBubliny(b, a.x + a.w / 2, a.y + RIADOK / 2);
+    // Vodorovné dotyčnice: rozloženie je v stĺpcoch, takže oblúk, ktorý
+    // vychádza nabok a nabok prichádza, kopíruje smer čítania.
+    const mx = (sa.x + sb.x) / 2;
+    ciary.push({ id, d: `M ${sa.x} ${sa.y} C ${mx} ${sa.y}, ${mx} ${sb.y}, ${sb.x} ${sb.y}`, farba, hrubka });
   };
   for (const v of VETVY) spoj(poz["koren"], poz["vetva:" + v.id], v.farba, 3, "v" + v.id);
   for (const u of vidno) {
@@ -701,6 +706,20 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
     onPointerCancel: () => setTahanie(null),
   });
 
+  /** Na ktorej strane kmeňa bublina leží (1 vpravo, −1 vľavo). */
+  const stranaPodlaPozicie = (m: Miesto): 1 | -1 => {
+    const k = poz["koren"];
+    const stredKmena = k ? k.x + k.w / 2 : STRED.x;
+    return m.x + m.w / 2 >= stredKmena ? 1 : -1;
+  };
+
+  const plusStyl: React.CSSProperties = {
+    width: 30, height: 30, flexShrink: 0, borderRadius: "50%", padding: 0,
+    border: `1px dashed ${mix(C.border, 130)}`, background: "transparent", color: C.textDim,
+    fontFamily: "inherit", fontSize: 15, lineHeight: 1, cursor: "pointer",
+    display: "flex", alignItems: "center", justifyContent: "center",
+  };
+
   /** Rám, za ktorý sa bublina chytá. Rovnaký pre nápad, vetvu aj kmeň. */
   const ramStyl = (kluc: string, rucne: boolean): React.CSSProperties => ({
     padding: 5,
@@ -717,8 +736,15 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
     if (!p) return null;
     const f = farbaUzla(u, uzly);
     const deti = uzly.filter((x) => x.rodic === u.id).length;
+    // Na ktorej strane kmeňa bublina leží. Tlačidlá patria VŽDY na vonkajšiu
+    // stranu — inak „+" pri ľavej vetve ukazuje späť do stredu a nová bublina
+    // vyrastie na opačnú stranu, než kam prst mieri.
+    // `row-reverse` otočí poradie detí, takže „+" a zbalenie skončia na
+    // vonkajšej strane. Robí to JEDEN mechanizmus — `order` navrch by to
+    // otočilo druhýkrát a bolo by to zase zle.
+    const strana = stranaPodlaPozicie(p);
     return (
-      <div key={u.id} style={{ position: "absolute", left: p.x, top: p.y, display: "flex", alignItems: "center", gap: 7, zIndex: presunPre === u.id ? 4 : (tahanie?.id === u.id ? 5 : undefined) }}>
+      <div key={u.id} style={{ position: "absolute", left: p.x, top: p.y, display: "flex", alignItems: "center", gap: 7, flexDirection: strana === 1 ? "row" : "row-reverse", zIndex: presunPre === u.id ? 4 : (tahanie?.id === u.id ? 5 : undefined) }}>
         <div {...tahaj(u.id, u.text, false)} title="Chyť za rám a presuň" style={ramStyl(u.id, u.posX != null)}>
         <input
           type="text"
@@ -765,18 +791,9 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
           type="button"
           aria-label="Pridať nadväzujúci nápad"
           onClick={() => void zaloz(u.id, "", deti)}
-          style={{ width: 30, height: 30, flexShrink: 0, borderRadius: "50%", padding: 0, border: `1px dashed ${mix(C.border, 130)}`, background: "transparent", color: C.textDim, fontFamily: "inherit", fontSize: 15, lineHeight: 1, cursor: "pointer" }}
+          style={plusStyl}
         >
           +
-        </button>
-        <button
-          type="button"
-          aria-label="Presunúť do inej vetvy"
-          title="Presunúť do inej vetvy"
-          onClick={() => setPresunPre(presunPre === u.id ? null : u.id)}
-          style={{ width: 30, height: 30, flexShrink: 0, borderRadius: "50%", padding: 0, border: `1px solid ${presunPre === u.id ? C.accent : "transparent"}`, background: "transparent", color: presunPre === u.id ? C.accentLight : C.textDim, fontFamily: "inherit", fontSize: 13, lineHeight: 1, cursor: "pointer" }}
-        >
-          ⇄
         </button>
         {presunPre === u.id && (
           <div style={{ position: "absolute", left: 0, top: 46, zIndex: 3, minWidth: 232, maxHeight: 420, overflow: "auto", padding: 6, borderRadius: 11, background: C.surface, border: `1px solid ${mix(C.border, 140)}`, boxShadow: "0 10px 26px rgba(0,0,0,.45)" }}>
@@ -1057,12 +1074,41 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
                 ))}
               </svg>
               {poz["koren"] && (
-                <div style={{ position: "absolute", left: poz["koren"].x - 6, top: poz["koren"].y - 6, zIndex: tahanie?.id === "koren" ? 5 : undefined }}>
+                <div style={{ position: "absolute", left: poz["koren"].x - 6, top: poz["koren"].y - 6, display: "flex", alignItems: "center", gap: 7, zIndex: tahanie?.id === "koren" ? 5 : undefined }}>
                   <div {...tahaj("koren", nazovMapy, true)} title="Chyť za rám a presuň" style={{ ...ramStyl("koren", !!rucnePozicie["koren"]), borderRadius: 18 }}>
                     <div style={{ width: poz["koren"].w, boxSizing: "border-box", padding: "15px 20px", borderRadius: 14, background: C.surface, border: `1px solid ${mix(C.border, 130)}`, color: C.text, fontSize: 15.5, fontWeight: 600 }}>
                       {nazovMapy}
                     </div>
                   </div>
+                  {/* Z kmeňa sa dá písať rovno. Vetvu si nápad vyberie sám —
+                      ponuka je tesne pri tlačidle, aby to bol jeden pohyb. */}
+                  <button
+                    type="button"
+                    aria-label="Pridať nápad z hlavnej bubliny"
+                    onClick={() => setPresunPre(presunPre === "koren" ? null : "koren")}
+                    style={plusStyl}
+                  >
+                    +
+                  </button>
+                  {presunPre === "koren" && (
+                    <div style={{ position: "absolute", left: "100%", top: 44, zIndex: 6, minWidth: 210, padding: 6, borderRadius: 11, background: C.surface, border: `1px solid ${mix(C.border, 140)}`, boxShadow: "0 10px 26px rgba(0,0,0,.45)" }}>
+                      <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 1, color: C.textDim, padding: "4px 8px 6px" }}>NOVÝ NÁPAD DO VETVY</div>
+                      {VETVY.map((v) => (
+                        <button
+                          key={v.id}
+                          type="button"
+                          onClick={() => {
+                            setPresunPre(null);
+                            void zaloz("", v.id, uzly.filter((x) => !x.rodic && vetvaUzla(x.id, uzly) === v.id).length);
+                          }}
+                          style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", textAlign: "left", padding: "7px 8px", borderRadius: 8, border: "none", background: "transparent", color: C.text, fontFamily: "inherit", fontSize: 12.5, cursor: "pointer" }}
+                        >
+                          <span style={{ width: 8, height: 8, borderRadius: "50%", background: v.farba, flexShrink: 0 }} />
+                          {v.nazov}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
               {VETVY.map((v) => {
@@ -1070,7 +1116,7 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
                 if (!p) return null;
                 const kolko = uzly.filter((u) => !u.rodic && vetvaUzla(u.id, uzly) === v.id).length;
                 return (
-                  <div key={v.id} style={{ position: "absolute", left: p.x - 6, top: p.y - 6, display: "flex", alignItems: "center", gap: 7, zIndex: tahanie?.id === "vetva:" + v.id ? 5 : undefined }}>
+                  <div key={v.id} style={{ position: "absolute", left: p.x - 6, top: p.y - 6, display: "flex", alignItems: "center", gap: 7, flexDirection: stranaPodlaPozicie(p) === 1 ? "row" : "row-reverse", zIndex: tahanie?.id === "vetva:" + v.id ? 5 : undefined }}>
                     <div {...tahaj("vetva:" + v.id, v.nazov, true)} title="Chyť za rám a presuň" style={ramStyl("vetva:" + v.id, !!rucnePozicie["vetva:" + v.id])}>
                     <div style={{
                       width: p.w, boxSizing: "border-box", padding: "12px 17px", borderRadius: 999,
@@ -1085,7 +1131,7 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
                       type="button"
                       aria-label={`Pridať nápad do vetvy ${v.nazov}`}
                       onClick={() => void zaloz("", v.id, kolko)}
-                      style={{ width: 30, height: 30, flexShrink: 0, borderRadius: "50%", padding: 0, border: `1px dashed ${mix(C.border, 130)}`, background: "transparent", color: C.textDim, fontFamily: "inherit", fontSize: 15, lineHeight: 1, cursor: "pointer" }}
+                      style={plusStyl}
                     >
                       +
                     </button>
