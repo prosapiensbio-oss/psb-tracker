@@ -45,8 +45,13 @@ import { Card, H3, Info } from "./ui";
 type Riadok = {
   id: string; text: string; faza?: number;
   rodic?: string; vetva?: string; poradie?: number; zbalene?: number;
-  stav?: string;
+  stav?: string; mapa_id?: string;
 };
+
+/** Mapa je obal: zoznam nápadov, ktoré patria k sebe. */
+type Mapa = { id: string; nazov: string; poradie?: number };
+
+const KLUC_MAPY = "psb-mapa-napadov";
 
 const DOCASNY = "tmp";
 const KADENCIA = 2;
@@ -58,6 +63,15 @@ const mesiacSlovom = (d: Date) => {
 
 export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
   const [riadky, setRiadky] = useState<Riadok[]>([]);
+  const [mapy, setMapy] = useState<Mapa[]>([]);
+  /**
+   * Ktorá mapa je otvorená. Pamätá sa medzi návštevami — kto si založí mapu
+   * na kampaň, nechce ju hľadať pri každom otvorení Marketingu.
+   */
+  const [mapaId, setMapaId] = useState<string>(() => {
+    try { return localStorage.getItem(KLUC_MAPY) || "m-hlavna"; } catch { return "m-hlavna"; }
+  });
+  const [premenuva, setPremenuva] = useState(false);
   const [nacitane, setNacitane] = useState(false);
   const [pohlad, setPohlad] = useState<"mapa" | "triedenie">("mapa");
   const [chyba, setChyba] = useState("");
@@ -114,7 +128,14 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
 
   const nacitaj = useCallback(() => void fetch("/api/napady", { credentials: "same-origin" })
     .then((r) => r.json())
-    .then((j: { napady?: Riadok[] }) => setRiadky(j.napady || []))
+    .then((j: { napady?: Riadok[]; mapy?: Mapa[] }) => {
+      setRiadky(j.napady || []);
+      const zoznam = j.mapy || [];
+      setMapy(zoznam);
+      // Otvorená mapa, ktorú niekto medzitým zmazal, by nechala prázdnu
+      // obrazovku bez vysvetlenia — padni na prvú.
+      setMapaId((m) => (zoznam.some((x) => x.id === m) ? m : (zoznam[0]?.id || "m-hlavna")));
+    })
     .catch(() => {})
     .finally(() => setNacitane(true)), []);
   useEffect(() => { nacitaj(); }, [nacitaj]);
@@ -134,6 +155,7 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
   const uzly = useMemo<Uzol[]>(() => {
     const zive = riadky
       .filter((r) => r.stav !== "zamietnuty")
+      .filter((r) => (r.mapa_id || "m-hlavna") === mapaId)
       .map((r) => ({
         id: r.id,
         text: r.text || "",
@@ -147,9 +169,10 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
       zive.push({ id: DOCASNY, text: novy.text, rodic: novy.rodic, vetva: novy.vetva, poradie: novy.poradie, zbalene: false, faza: 0 });
     }
     return zive;
-  }, [riadky, novy]);
+  }, [riadky, novy, mapaId]);
 
-  const { poz, vyska } = useMemo(() => rozlozMapu(uzly, { x: 38, y: 28, text: "Obsah · " + mesiacSlovom(new Date()) }), [uzly]);
+  const nazovMapy = mapy.find((m) => m.id === mapaId)?.nazov || "Obsah";
+  const { poz, vyska } = useMemo(() => rozlozMapu(uzly, { x: 38, y: 28, text: nazovMapy }), [uzly, nazovMapy]);
 
   /** Uloží rozpísaný uzol (alebo ho zahodí, keď je prázdny). */
   const dopis = useCallback(async (vratFokus = false): Promise<void> => {
@@ -159,7 +182,7 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
     nastavNovy(null);
     const t = d.text.trim();
     if (t.length < 3) return;
-    const id = await posli({ text: t, zdroj: "vlastny", rodic: d.rodic, vetva: d.vetva, poradie: d.poradie });
+    const id = await posli({ text: t, zdroj: "vlastny", rodic: d.rodic, vetva: d.vetva, poradie: d.poradie, mapaId });
     // Keď zápis neprejde, koncept sa VRÁTI na obrazovku aj s textom. Zmiznúť
     // smie len to, čo je uložené — inak človek napíše vetu a tá sa stratí.
     if (!id) { nastavNovy(d); return; }
@@ -263,6 +286,46 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
       await presunDoVetvy(u, vetvaUzla(u.id, uzly));
       return;
     }
+    nacitaj();
+  };
+
+  const prepniMapu = (id: string) => {
+    void dopis();
+    setPresunPre(null);
+    setPremenuva(false);
+    setMapaId(id);
+    try { localStorage.setItem(KLUC_MAPY, id); } catch { /* súkromný režim */ }
+  };
+
+  const novaMapa = async () => {
+    const j = await fetch("/api/napady", {
+      method: "POST", credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ akcia: "mapa-nova", nazov: `Mapa ${mapy.length + 1}` }),
+    }).then((r) => r.json()).catch(() => ({ ok: false }));
+    if (!j?.ok) { setChyba(j?.error || "Mapa sa nezaložila."); return; }
+    setChyba("");
+    prepniMapu(String(j.id));
+    setPremenuva(true);
+    nacitaj();
+  };
+
+  const premenujMapu = async (nazov: string) => {
+    const t = nazov.trim().slice(0, 60);
+    setMapy((m) => m.map((x) => (x.id === mapaId ? { ...x, nazov: t } : x)));
+    if (!t) return;
+    await posli({ akcia: "mapa-premenuj", mapaId, nazov: t });
+  };
+
+  const zmazMapu = async () => {
+    const j = await fetch("/api/napady", {
+      method: "POST", credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ akcia: "mapa-zmaz", mapaId }),
+    }).then((r) => r.json()).catch(() => ({ ok: false }));
+    if (!j?.ok) { setChyba(j?.error || "Mapa sa nezmazala."); return; }
+    setChyba("");
+    prepniMapu("m-hlavna");
     nacitaj();
   };
 
@@ -465,7 +528,7 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
   };
 
   const doJarvisa = () => {
-    const t = mapaNaText(uzly, { mesiac: mesiacSlovom(new Date()), kadenciaTyzdenne: KADENCIA, nazovFazy });
+    const t = mapaNaText(uzly, { mesiac: `${nazovMapy} · ${mesiacSlovom(new Date())}`, kadenciaTyzdenne: KADENCIA, nazovFazy });
     setText(t);
     if (!chat) return;
     chat.setFloatingOpen(true);
@@ -513,6 +576,60 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
         </span>
       </div>
 
+      {/* Rad máp. Mapa je obal — nápady v nej zostávajú bežnými nápadmi,
+          takže karta Nápady aj plánovanie do mesiacov o nich vedia ďalej. */}
+      <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 10, paddingBottom: 10, borderBottom: `1px solid ${mix(C.border, 55)}` }}>
+        {mapy.map((m) => {
+          const aktivna = m.id === mapaId;
+          const kolko = riadky.filter((r) => (r.mapa_id || "m-hlavna") === m.id && r.stav !== "zamietnuty").length;
+          return (
+            <button
+              key={m.id}
+              type="button"
+              onClick={() => prepniMapu(m.id)}
+              style={{
+                padding: "6px 12px", borderRadius: 999, cursor: "pointer", fontFamily: "inherit",
+                fontSize: 12.5, fontWeight: aktivna ? 600 : 400,
+                border: `1px solid ${aktivna ? C.accent : C.border}`,
+                background: aktivna ? mix(C.accent, 14) : "transparent",
+                color: aktivna ? C.accentLight : C.textMuted,
+              }}
+            >
+              {m.nazov} <span style={{ color: C.textDim, fontWeight: 400 }}>{kolko}</span>
+            </button>
+          );
+        })}
+        <button
+          type="button"
+          onClick={() => void novaMapa()}
+          title="Nová mapa"
+          style={{ padding: "6px 11px", borderRadius: 999, cursor: "pointer", fontFamily: "inherit", fontSize: 12.5, border: `1px dashed ${mix(C.border, 130)}`, background: "transparent", color: C.textDim }}
+        >
+          + nová
+        </button>
+        <span style={{ flexGrow: 1 }} />
+        {premenuva ? (
+          <input
+            type="text"
+            aria-label="Názov mapy"
+            autoFocus
+            defaultValue={mapy.find((m) => m.id === mapaId)?.nazov || ""}
+            onBlur={(e) => { void premenujMapu(e.target.value); setPremenuva(false); }}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === "Escape") (e.target as HTMLInputElement).blur(); }}
+            style={{ padding: "6px 12px", borderRadius: 999, border: `1px solid ${C.accent}`, background: C.bg, color: C.text, fontFamily: "inherit", fontSize: 12.5, width: 200 }}
+          />
+        ) : (
+          <button type="button" onClick={() => setPremenuva(true)} style={{ background: "none", border: "none", padding: 0, color: C.textDim, fontSize: 11.5, cursor: "pointer", fontFamily: "inherit" }}>
+            premenovať
+          </button>
+        )}
+        {mapaId !== "m-hlavna" && (
+          <button type="button" onClick={() => void zmazMapu()} style={{ background: "none", border: "none", padding: 0, color: C.textDim, fontSize: 11.5, cursor: "pointer", fontFamily: "inherit" }}>
+            zmazať mapu
+          </button>
+        )}
+      </div>
+
       {chyba && <div style={{ fontSize: 12, color: C.red, marginBottom: 8 }}>{chyba}</div>}
       {!nacitane && <div style={{ fontSize: 12.5, color: C.textDim }}>Načítavam…</div>}
 
@@ -547,7 +664,7 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
               </svg>
               {poz["koren"] && (
                 <div style={{ position: "absolute", left: poz["koren"].x, top: poz["koren"].y, width: poz["koren"].w, boxSizing: "border-box", padding: "15px 20px", borderRadius: 14, background: C.surface, border: `1px solid ${mix(C.border, 130)}`, color: C.text, fontSize: 15.5, fontWeight: 600 }}>
-                  Obsah · {mesiacSlovom(new Date())}
+                  {nazovMapy}
                 </div>
               )}
               {VETVY.map((v) => {
