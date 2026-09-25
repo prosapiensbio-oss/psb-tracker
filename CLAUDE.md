@@ -1170,3 +1170,24 @@ ich v ten istý deň nasadil naostro a sú PRVÉ v oboch záložkách
 - **Karta filtrovaná trénerom musí povedať, čo ukazuje.** Nezaplatené je na
   Dnes za vybraného trénera (6 / 47 560 Kč), v Prehľade za oboch
   (12 / 85 642 Kč). Bez poznámky „obaja tréneri" sú to dve pravdy o jednom.
+
+## Chýbajúci stĺpec v SELECTe zhasne celý Kokpit
+
+Dvojča pravidla o INSERTe — a horšie. 25. 9. 2026 pribudla v Kalendári karta
+„Nedávno vybavené" (krok späť nad vysvetlenými zmenami) a brala riadky
+z `zmenyHistoria`. Ten dopyt nikdy nevracal `uid`, lebo ho dovtedy nikto
+nepotreboval; `popis()` ním pritom rozlišuje ručne zapísané zmeny
+(`z.uid.startsWith("rucne-")`). Výsledok: `undefined.startsWith` v `.map`,
+koreňová hranica TanStacku a **„This page didn't load" na celom Kokpite** —
+nie na jednej karte. Typy to nechytili (riadky idú z `fetch` cez `as`),
+testy tiež nie, `hotovo.sh` prešiel celý.
+
+- **Keď novú obrazovku kŕmiš EXISTUJÚCIM dopytom, porovnaj jeho stĺpce
+  s poľami, ktoré tá obrazovka číta.** Dopyt bol napísaný pre iného
+  konzumenta a nikto ho neupravil.
+- **Komponent, ktorý číta pole z fetchnutých dát, musí prežiť jeho
+  neprítomnosť** (`(z.uid || "").startsWith(…)`). Popis má v najhoršom
+  stratiť slovo, nie zhasnúť appku.
+- **Po nasadení novej obrazovky ju OTVOR** — `curl` shell a assety vrátili
+  200, worker bežal, chyba bola len v prehliadači. Nájsť sa dala jedine
+  v konzole.

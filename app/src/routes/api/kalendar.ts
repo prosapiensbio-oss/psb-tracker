@@ -224,7 +224,10 @@ export const Route = createFileRoute("/api/kalendar")({
           // otázku „koľko sa mi tento týždeň zrušilo" je vysvetlené zrušenie
           // stále zrušenie. Preto druhý, širší rad — celá história zmien,
           // z ktorej sa dá počítať.
-          DB.prepare("SELECT kedy, trener, druh, nazov, klient, pred, po, vysvetlene, poznamka FROM kal_zmeny ORDER BY kedy DESC LIMIT 300").all(),
+          // `uid` tu MUSÍ byť: karta z neho pozná ručne zapísané zmeny
+          // (`rucne-`). Bez neho spadol 25. 9. 2026 celý Kokpit na
+          // `undefined.startsWith` — chýbajúci stĺpec vyzeral ako prázdny.
+          DB.prepare("SELECT id, kedy, trener, uid, druh, nazov, klient, pred, po, vysvetlene, poznamka, odpovedane_at FROM kal_zmeny ORDER BY kedy DESC LIMIT 300").all(),
           DB.prepare("SELECT nazov, trener, cas, klient, typ, vedome FROM kal_mapovanie ORDER BY trener, nazov, cas").all(),
           DB.prepare("SELECT uid, trener, zaciatok, koniec, nazov, klient, typ FROM kal_udalosti WHERE zmizla_at IS NULL AND zaciatok >= ? AND zaciatok <= ? ORDER BY zaciatok").bind(od, do_).all(),
           DB.prepare("SELECT id, datum, druh, hodiny, suma_czk, poznamka FROM guillermo_hodiny ORDER BY datum DESC").all(),
@@ -534,6 +537,29 @@ export const Route = createFileRoute("/api/kalendar")({
           await DB.prepare("UPDATE kal_zmeny SET vysvetlene = 1, poznamka = ?, odpovedane_at = ? WHERE id = ?")
             .bind(b.poznamka ? String(b.poznamka) : null, teraz(), String(b.id || "")).run();
           return Response.json({ ok: true });
+        }
+
+        /**
+         * KROK SPÄŤ.
+         *
+         * Jerry, 25. 9. 2026: „zle som to pochopil a rovno som aj zlý zápis
+         * spravil… a teraz nemá možnosť to vrátiť späť." Napísal k zrušeniu
+         * 7. 10., že klienti idú na dovolenku — dovolenka je pritom 30. 9.
+         * Vysvetlená zmena z karty zmizne (ukazuje sa len `vysvetlene = 0`),
+         * takže omyl sa nedal ani nájsť, nieto opraviť.
+         *
+         * Vracia sa CELÝ zápis, nie len text: poznámka bez odklepnutia by
+         * v karte svietila ako cudzia veta bez majiteľa.
+         */
+        if (akcia === "vrat") {
+          const id = String(b.id || "");
+          if (!id) return Response.json({ ok: false, error: "chýba id" }, { status: 400 });
+          const r = await DB.prepare(
+            "UPDATE kal_zmeny SET vysvetlene = 0, poznamka = NULL, odpovedane_at = NULL WHERE id = ?1 AND vysvetlene = 1",
+          ).bind(id).run();
+          // Nula zmenených riadkov znamená, že zmena už otvorená bola — to nie
+          // je chyba, ale nesmie sa to tváriť ako úspešné vrátenie.
+          return Response.json({ ok: true, vratene: r.meta.changes || 0 });
         }
 
         return Response.json({ ok: false, error: "neznáma akcia" }, { status: 400 });

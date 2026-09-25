@@ -25,7 +25,7 @@ import { Card, Empty, H3, Info, Modal, Select, TrenerPills } from "./ui";
  */
 
 type Zdroj = { id: string; trener: string; aktivny: number; posledne_ok: string | null; posledna_chyba: string | null };
-export type Zmena = { id: string; kedy: string; trener: string; uid: string; druh: string; nazov: string | null; klient: string | null; pred: string | null; po: string | null; poznamka?: string | null };
+export type Zmena = { id: string; kedy: string; trener: string; uid: string; druh: string; nazov: string | null; klient: string | null; pred: string | null; po: string | null; poznamka?: string | null; vysvetlene?: number; odpovedane_at?: string | null };
 type Mapa = { nazov: string; trener: string; klient: string | null; typ: string };
 export type KalUdalost = { uid: string; trener: string; zaciatok: string; koniec: string; nazov: string; klient: string | null; typ: string | null };
 type Nezname = { nazov: string; trener: string; pocet: number; najblizsi: string };
@@ -33,7 +33,7 @@ type Nezname = { nazov: string; trener: string; pocet: number; najblizsi: string
 type Nejednoznacne = { nazov: string; kandidati: string[]; casy: string[] };
 type Guillermo = { id: string; datum: string; druh: string; hodiny: number; suma_czk: number | null; poznamka: string | null };
 export type Porovnanie = { tyzdne: TyzdenPorovnania[]; od: string; do: string; sedeni: number; lenPtminder: number; lenKalendar: number; bezKalendara: { trener: string; sedeni: number }[] };
-type Stav = { zdroje: Zdroj[]; zmeny: Zmena[]; mapovanie: Mapa[]; udalosti: KalUdalost[]; nezname: Nezname[]; guillermo: Guillermo[]; nejednoznacne: Nejednoznacne[]; porovnanie: Porovnanie | null };
+type Stav = { zdroje: Zdroj[]; zmeny: Zmena[]; zmenyHistoria: Zmena[]; mapovanie: Mapa[]; udalosti: KalUdalost[]; nezname: Nezname[]; guillermo: Guillermo[]; nejednoznacne: Nejednoznacne[]; porovnanie: Porovnanie | null };
 
 const TYPY = [
   { value: "trening", label: "Tréning klienta" },
@@ -159,7 +159,7 @@ export function Kalendar({ clients, data, focus, ktoSom, trainer, onTrainer }: {
   const nacitaj = useCallback(async () => {
     const r = await fetch("/api/kalendar", { credentials: "same-origin" });
     const j = (await r.json()) as { ok: boolean } & Stav;
-    if (j.ok) setStav({ zdroje: j.zdroje, zmeny: j.zmeny, mapovanie: j.mapovanie, udalosti: j.udalosti, nezname: j.nezname, guillermo: j.guillermo || [], nejednoznacne: j.nejednoznacne || [], porovnanie: j.porovnanie || null });
+    if (j.ok) setStav({ zdroje: j.zdroje, zmeny: j.zmeny, zmenyHistoria: j.zmenyHistoria || [], mapovanie: j.mapovanie, udalosti: j.udalosti, nezname: j.nezname, guillermo: j.guillermo || [], nejednoznacne: j.nejednoznacne || [], porovnanie: j.porovnanie || null });
   }, []);
 
   useEffect(() => { void nacitaj(); }, [nacitaj]);
@@ -201,6 +201,13 @@ export function Kalendar({ clients, data, focus, ktoSom, trainer, onTrainer }: {
   const pripojene = stav.zdroje.length > 0;
   const udalostiF = trener === "all" ? stav.udalosti : stav.udalosti.filter((u) => u.trener === trener);
   const zmenyF = trener === "all" ? stav.zmeny : stav.zmeny.filter((z) => z.trener === trener);
+  // Nedávno vybavené zmeny — kvôli kroku späť. Len tie, ktoré niekto naozaj
+  // odklepol (majú čas odpovede), najnovších pätnásť; staršie sú už história,
+  // nie omyl spred chvíle.
+  const vybaveneF = (stav.zmenyHistoria || [])
+    .filter((z) => z.vysvetlene === 1 && !!z.odpovedane_at && (trener === "all" || z.trener === trener))
+    .sort((a, b) => String(b.odpovedane_at).localeCompare(String(a.odpovedane_at)))
+    .slice(0, 15);
 
   return (
     <>
@@ -222,7 +229,7 @@ export function Kalendar({ clients, data, focus, ktoSom, trainer, onTrainer }: {
           onHotovo={async () => { setUpravovana(null); await nacitaj(); oznam("kalendar"); }}
         />
       )}
-      {pripojene && <div id="kal-zmeny"><Zmeny zmeny={zmenyF} onHotovo={async () => { await nacitaj(); oznam("kalendar"); }} mena={menaKlientov} /></div>}
+      {pripojene && <div id="kal-zmeny"><Zmeny zmeny={zmenyF} vybavene={vybaveneF} onHotovo={async () => { await nacitaj(); oznam("kalendar"); }} mena={menaKlientov} /></div>}
       {/* „Nové názvy" idú NAD „Chýba v PTminderi" (Jerry, 22. 8. 2026).
           Je to poradie práce, nie estetika: kým sa meno z názvu udalosti
           nepriradí človeku, tréning nemá komu patriť — a presne preto potom
@@ -943,7 +950,8 @@ export function SubeznyChod({ p }: { p: Porovnanie }) {
 }
 
 /** Rozdiely medzi snímkami — materiál na otázky typu „prečo zmizla tá hodina". */
-function Zmeny({ zmeny, onHotovo, mena }: { zmeny: Zmena[]; onHotovo: () => Promise<void>; mena: string[] }) {
+function Zmeny({ zmeny, vybavene, onHotovo, mena }: { zmeny: Zmena[]; vybavene: Zmena[]; onHotovo: () => Promise<void>; mena: string[] }) {
+  const [historiaOtvorena, setHistoriaOtvorena] = useState(false);
   const [pisem, setPisem] = useState<Record<string, string>>({});
   const [obnovujem, setObnovujem] = useState(false);
   const [chybaObnovy, setChybaObnovy] = useState("");
@@ -963,7 +971,9 @@ function Zmeny({ zmeny, onHotovo, mena }: { zmeny: Zmena[]; onHotovo: () => Prom
     const kto = z.klient || z.nazov || "udalosť";
     // Ručne zapísané nesú uid s predponou `rucne-` — vetu treba inú, lebo
     // „zmizol z kalendára" by pri telefonickom zrušení klamalo.
-    const rucne = z.uid.startsWith("rucne-");
+    // `|| ""` zámerne: jeden chýbajúci stĺpec v dopyte zhasol 25. 9. 2026
+    // celý Kokpit, nie iba túto kartu. Popis má v najhoršom stratiť slovo.
+    const rucne = (z.uid || "").startsWith("rucne-");
     if (rucne) {
       return z.druh === "nahrada"
         ? `${kto} — náhrada dohodnutá na ${z.po ? den(z.po) : "?"} (zapísané ručne)`
@@ -1065,6 +1075,45 @@ function Zmeny({ zmeny, onHotovo, mena }: { zmeny: Zmena[]; onHotovo: () => Prom
     </div>
   );
 
+  /**
+   * KROK SPÄŤ nad vybavenými zmenami.
+   *
+   * Jerry, 25. 9. 2026: zle prečítal riadok, napísal k nesprávnemu termínu,
+   * že klienti idú na dovolenku — a zmena mu zmizla z karty, lebo tá ukazuje
+   * len to, čo ešte čaká. Omyl sa tak nedal ani nájsť.
+   *
+   * Zabalené zámerne: vybavené veci nemajú zaberať miesto tým, ktoré ešte
+   * čakajú. Otvorí sa, keď človek vie, že sa pomýlil.
+   */
+  const historia = vybavene.length > 0 && (
+    <div style={{ marginTop: 10, paddingTop: 8, borderTop: `1px solid ${mix(C.border, 55)}` }}>
+      <button
+        onClick={() => setHistoriaOtvorena((x) => !x)}
+        style={{ background: "none", border: "none", padding: 0, color: C.textDim, fontSize: 11.5, cursor: "pointer", fontFamily: "inherit" }}
+      >
+        {historiaOtvorena ? "▾" : "▸"} Nedávno vybavené ({vybavene.length}) — dá sa vrátiť späť
+      </button>
+      {historiaOtvorena && vybavene.map((z) => (
+        <div key={z.id} style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap", padding: "6px 0", borderBottom: `1px solid ${mix(C.border, 35)}` }}>
+          <span style={{ fontSize: 10.5, fontWeight: 700, color: farba(z.druh), textTransform: "uppercase" }}>{z.druh}</span>
+          <span style={{ fontSize: 12, color: C.textMuted }}>{popis(z)}</span>
+          {z.poznamka && <span style={{ fontSize: 11.5, color: C.textDim, fontStyle: "italic" }}>„{z.poznamka}"</span>}
+          <button
+            onClick={async () => {
+              const j = await posli({ akcia: "vrat", id: z.id }).catch(() => ({ ok: false, error: "spojenie" }));
+              if (!j.ok) { setChybaVysv(j.error || "Vrátiť sa nepodarilo."); return; }
+              setChybaVysv("");
+              await onHotovo();
+            }}
+            style={{ marginLeft: "auto", padding: "3px 10px", borderRadius: 7, fontSize: 11.5, cursor: "pointer", border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted, fontFamily: "inherit" }}
+          >
+            Vrátiť späť
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+
   if (!zmeny.length) {
     return (
       <Card>
@@ -1075,6 +1124,7 @@ function Zmeny({ zmeny, onHotovo, mena }: { zmeny: Zmena[]; onHotovo: () => Prom
         {formular}
         {(chybaZmeny || chybaVysv) && <div style={{ fontSize: 12, color: C.red, marginBottom: 8 }}>{chybaZmeny || chybaVysv}</div>}
         {!pridavam && <Empty>Od posledného stiahnutia sa nič nezmenilo.</Empty>}
+        {historia}
       </Card>
     );
   }
@@ -1115,6 +1165,7 @@ function Zmeny({ zmeny, onHotovo, mena }: { zmeny: Zmena[]; onHotovo: () => Prom
           </div>
         </div>
       ))}
+      {historia}
     </Card>
   );
 }
