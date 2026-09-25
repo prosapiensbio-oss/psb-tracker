@@ -1,3 +1,5 @@
+import { normName } from "./format";
+
 /**
  * KTORÚ ZMENU V KALENDÁRI OHLÁSIŤ.
  *
@@ -59,4 +61,70 @@ export function ohlasitZmenu(
   if (druh === "zrusene" || druh === "posunute") return true;
   const kedy = (pred || po || "").slice(0, 10);
   return !!kedy && kedy <= dnesDen;
+}
+
+export type SurovaZmena = {
+  druh: string;
+  u: string;
+  nazov: string;
+  klient: string | null;
+  pred: string | null;
+  po: string | null;
+  typ: string;
+};
+
+/**
+ * Je to ten istý človek? (na párovanie zrušenia s pridaním)
+ *
+ * Porovnávať `klient || nazov` cez `===` nestačí a 24. 9. 2026 to zlyhalo
+ * naostro. Google prerobil Annin opakovaný termín na 7. 10. 19:00: starý
+ * výskyt mal v databáze `klient` „Anna Kadličkova", nový prišiel ako nová
+ * udalosť s názvom „Anna Kadlickova" a bez priradeného klienta (čaká
+ * v Nových názvoch). Dva reťazce sa nerovnali, párovanie neprebehlo — a Jerry
+ * dostal „zmizol tréning 7. 10.", hoci sa nezmizlo nič. Otázku, na ktorú sa
+ * nedá odpovedať: „čo tam mám napísať?"
+ *
+ * Preto sa porovnáva bez diakritiky a malými písmenami; a keď je jedna strana
+ * len PRIEZVISKO („Kadlickova" proti „Anna Kadličkova"), sedí to na posledné
+ * slovo tej druhej. Krstné meno samo nestačí — „Jakub" majú v PSB traja
+ * a zle spárovaný presun by ticho schoval zrušenú hodinu.
+ */
+export function tenIstyClovek(a: string, b: string): boolean {
+  const x = normName(a), y = normName(b);
+  if (!x || !y) return false;
+  if (x === y) return true;
+  const tx = x.split(" ").filter(Boolean), ty = y.split(" ").filter(Boolean);
+  const jednoSlovo = (kratke: string[], dlhe: string[]) =>
+    kratke.length === 1 && kratke[0].length >= 4 && dlhe.length > 1 && dlhe[dlhe.length - 1] === kratke[0];
+  return jednoSlovo(tx, ty) || jednoSlovo(ty, tx);
+}
+
+/**
+ * Dve zmeny, ktoré sú v skutočnosti jedna.
+ *
+ * Keď sa upraví opakovaná udalosť, Google jej budúce výskyty neposunie, ale
+ * ZRUŠÍ a vytvorí nanovo s iným uid. Bez párovania to vyzerá ako „zmizol
+ * tréning" a hneď vedľa „pridaný tréning" toho istého človeka v ten istý deň.
+ * Ten istý človek + ten istý DEŇ = posun, nie dve udalosti. Či sa aj čas
+ * naozaj zmenil, rieši potom `ohlasitZmenu` (posun na ten istý čas nie je
+ * posun a nehlási sa vôbec).
+ */
+export function sparujZmeny(surove: SurovaZmena[]): SurovaZmena[] {
+  const von: SurovaZmena[] = [];
+  const pouzite = new Set<number>();
+  const den = (x: string | null) => (x || "").slice(0, 10);
+  surove.forEach((a, i) => {
+    if (pouzite.has(i) || a.druh !== "zrusene") return;
+    const j = surove.findIndex((b, k) =>
+      !pouzite.has(k) && b.druh === "pridane" &&
+      tenIstyClovek(b.klient || b.nazov, a.klient || a.nazov) &&
+      den(b.po) === den(a.pred));
+    if (j < 0) return;
+    pouzite.add(i); pouzite.add(j);
+    // Typ berieme zo STARÉHO záznamu: nová udalosť ešte nemusí byť
+    // rozpoznaná (`typ` NULL) a posun tréningu by sa tak stratil.
+    von.push({ ...a, druh: "posunute", po: surove[j].po });
+  });
+  surove.forEach((x, i) => { if (!pouzite.has(i)) von.push(x); });
+  return von;
 }

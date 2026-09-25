@@ -8,7 +8,7 @@ import { typZNazvu } from "../../lib/psb/kalendar";
 import { casUdalosti, nejednoznacneMena, vyberMapu, type Mapa } from "../../lib/psb/kalendarMena";
 import { porovnajTyzdne } from "../../lib/psb/porovnanieDochadzky";
 import { citajIcal } from "../../lib/psb/ical";
-import { ohlasitZmenu } from "../../lib/psb/kalendarZmeny";
+import { ohlasitZmenu, sparujZmeny } from "../../lib/psb/kalendarZmeny";
 import { chybaZdroja, NEDOKONCENE, vyberZdroj, type ZdrojSPokusom } from "../../lib/psb/kalendarZdroje";
 
 // Kalendár — predbežný obraz týždňa medzi dvoma exportmi z PTmindera.
@@ -149,37 +149,16 @@ async function snimka(DB: D1Database, z: Zdroj) {
     zmena("zrusene", s.uid, s.nazov, s.klient, s.zaciatok, null, s.typ);
   }
 
-  /**
-   * Dve zmeny, ktoré sú v skutočnosti jedna.
-   *
-   * Keď Jerry presunie hodinu, Google často nepošle zmenený čas, ale zruší
-   * pôvodnú udalosť a vytvorí novú. Appka to videla ako „zrušené Robin Martin"
-   * a hneď pod tým „pridané Robin Martin" — a pýtala sa dvakrát na to isté.
-   * Ak sedí ten istý človek a ten istý deň, je to posun.
-   */
-  const paruj = () => {
-    const von: typeof surove = [];
-    const pouzite = new Set<number>();
-    surove.forEach((a, i) => {
-      if (pouzite.has(i) || a.druh !== "zrusene") return;
-      const j = surove.findIndex((b, k) =>
-        !pouzite.has(k) && b.druh === "pridane" &&
-        (b.klient || b.nazov) === (a.klient || a.nazov) &&
-        (b.po || "").slice(0, 10) === (a.pred || "").slice(0, 10));
-      if (j < 0) return;
-      pouzite.add(i); pouzite.add(j);
-      von.push({ ...a, druh: "posunute", po: surove[j].po });
-    });
-    surove.forEach((x, i) => { if (!pouzite.has(i)) von.push(x); });
-    return von;
-  };
+  // Párovanie zrušenia s pridaním (to je posun, nie dve udalosti) žije
+  // v `kalendarZmeny.ts` spolu s pravidlom, ktoré zmeny sa hlásia — obe sa
+  // dajú zlomiť ticho a obe sú otestované.
 
   // Ktoré zmeny sa hlásia, rozhoduje `ohlasitZmenu` — pravidlo žije vo
   // vlastnom module, lebo sa dá zlomiť ticho a je otestované.
   const dnesDen = kedy.slice(0, 10);
 
   let zmien = 0;
-  for (const x of paruj()) {
+  for (const x of sparujZmeny(surove)) {
     if (!ohlasitZmenu(x.druh, x.pred, x.po, dnesDen, x.typ)) continue;
     zmien++;
     prikazy.push(DB.prepare(

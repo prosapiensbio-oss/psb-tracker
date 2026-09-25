@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { ohlasitZmenu } from "./kalendarZmeny";
+import { ohlasitZmenu, sparujZmeny, tenIstyClovek, type SurovaZmena } from "./kalendarZmeny";
 
 /**
  * Michal Knapčok, 11. 8.: „mal tréning v stredu o 15, zrušil, program to
@@ -76,5 +76,72 @@ describe("ohlasitZmenu", () => {
 
   test("bez typu sa nič nemení — staré volania platia ďalej", () => {
     expect(ohlasitZmenu("zrusene", BUDUCNOST, null, DNES)).toBe(true);
+  });
+});
+
+const zmena = (o: Partial<SurovaZmena>): SurovaZmena =>
+  ({ druh: "zrusene", u: "u1", nazov: "", klient: null, pred: null, po: null, typ: "trening", ...o });
+
+describe("kto je to — párovanie mien", () => {
+  test("diakritika nerozhoduje", () => {
+    // Presne prípad z 24. 9. 2026: starý výskyt mal priradenú „Annu
+    // Kadličkovu", nový prišiel ako názov „Anna Kadlickova" bez klienta.
+    expect(tenIstyClovek("Anna Kadličkova", "Anna Kadlickova")).toBe(true);
+  });
+
+  test("samotné priezvisko sedí na celé meno", () => {
+    expect(tenIstyClovek("Kadlickova", "Anna Kadličkova")).toBe(true);
+    expect(tenIstyClovek("Anna Kadličkova", "Kadlickova")).toBe(true);
+  });
+
+  test("samotné krstné meno NESEDÍ — Jakubov je v PSB viac", () => {
+    expect(tenIstyClovek("Jakub", "Jakub Gerich")).toBe(false);
+    expect(tenIstyClovek("Jakub Gerich", "Jakub Kaňovský")).toBe(false);
+  });
+
+  test("prázdne meno nesedí na nič", () => {
+    expect(tenIstyClovek("", "Anna Kadličkova")).toBe(false);
+  });
+});
+
+describe("zrušené + pridané v ten istý deň je posun", () => {
+  test("spáruje sa aj cez inak napísané meno a nový záznam bez klienta", () => {
+    const v = sparujZmeny([
+      zmena({ druh: "pridane", nazov: "Anna Kadlickova", klient: null, po: "2026-10-07T19:00", typ: "netrening" }),
+      zmena({ druh: "zrusene", nazov: "Kadlickova", klient: "Anna Kadličkova", pred: "2026-10-07T19:00" }),
+    ]);
+    expect(v).toHaveLength(1);
+    expect(v[0].druh).toBe("posunute");
+    expect(v[0].pred).toBe("2026-10-07T19:00");
+    expect(v[0].po).toBe("2026-10-07T19:00");
+    // …a taký „posun" sa už neohlási, lebo sa čas nezmenil.
+    expect(ohlasitZmenu(v[0].druh, v[0].pred, v[0].po, "2026-09-24", v[0].typ)).toBe(false);
+  });
+
+  test("typ ostáva zo STARÉHO záznamu — nový ešte nemusí byť rozpoznaný", () => {
+    const [v] = sparujZmeny([
+      zmena({ druh: "zrusene", klient: "Anna Kadličkova", pred: "2026-10-07T19:00", typ: "trening" }),
+      zmena({ druh: "pridane", nazov: "Anna Kadlickova", po: "2026-10-07T18:00", typ: "netrening" }),
+    ]);
+    expect(v.typ).toBe("trening");
+    expect(ohlasitZmenu(v.druh, v.pred, v.po, "2026-09-24", v.typ)).toBe(true);
+  });
+
+  test("iný deň sa nepáruje — to je naozaj zrušenie a naozaj pridanie", () => {
+    const v = sparujZmeny([
+      zmena({ druh: "zrusene", klient: "Anna Kadličkova", pred: "2026-09-30T19:00" }),
+      zmena({ druh: "pridane", klient: "Anna Kadličkova", po: "2026-10-07T19:00" }),
+    ]);
+    expect(v.map((x) => x.druh).sort()).toEqual(["pridane", "zrusene"]);
+  });
+
+  test("jedno zrušenie si nevezme dve pridania", () => {
+    const v = sparujZmeny([
+      zmena({ druh: "zrusene", klient: "Anna Kadličkova", pred: "2026-10-07T19:00" }),
+      zmena({ druh: "pridane", klient: "Anna Kadličkova", po: "2026-10-07T18:00", u: "a" }),
+      zmena({ druh: "pridane", klient: "Anna Kadličkova", po: "2026-10-07T20:00", u: "b" }),
+    ]);
+    expect(v.filter((x) => x.druh === "posunute")).toHaveLength(1);
+    expect(v.filter((x) => x.druh === "pridane")).toHaveLength(1);
   });
 });
