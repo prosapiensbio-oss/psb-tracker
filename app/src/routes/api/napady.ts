@@ -4,6 +4,7 @@ import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 import { jeFaza } from "../../lib/psb/mapaCyklu";
+import { jeVetva } from "../../lib/psb/mapaNapadov";
 import { jeMesiac as platnyMesiac } from "../../lib/psb/format";
 import { ZABER_MAPA } from "../../lib/psb/zabery";
 
@@ -48,7 +49,7 @@ export const Route = createFileRoute("/api/napady")({
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });
         try {
           const r = await DB.prepare(
-            "SELECT id, datum, text, zdroj, stav, poznamka, autor, odkaz, pouzite_at, faza, planovane_na, kto, koncept, hotovy_text, zaber, sekvencia, scenar, hashtagy, plan_id, inspiracia, titulka, uvodne_vety FROM mkt_napady ORDER BY datum DESC, created_at DESC LIMIT 200",
+            "SELECT id, datum, text, zdroj, stav, poznamka, autor, odkaz, pouzite_at, faza, planovane_na, kto, koncept, hotovy_text, zaber, sekvencia, scenar, hashtagy, plan_id, inspiracia, titulka, uvodne_vety, rodic, vetva, poradie, zbalene FROM mkt_napady ORDER BY datum DESC, created_at DESC LIMIT 200",
           ).all();
           return Response.json({ ok: true, napady: r.results || [] });
         } catch {
@@ -140,10 +141,21 @@ export const Route = createFileRoute("/api/napady")({
             // Jedna veta na riadok, prázdne riadky preč. Text, nie štruktúra —
             // Jerry to číta a prepisuje pri statíve.
             const uvodneVety = b.uvodneVety === undefined ? null : riadkyKus(b.uvodneVety, 1500);
+            // Miesto v myšlienkovej mape. Prázdny `rodic` je platná hodnota
+            // („odpoj a zaves priamo na vetvu"), preto sa rozlišuje od
+            // `undefined` — rovnako ako pri odkaze.
+            if (b.vetva !== undefined && b.vetva !== "" && !jeVetva(b.vetva)) {
+              return Response.json({ ok: false, error: "Neznáma vetva." }, { status: 400 });
+            }
+            const rodic = b.rodic === undefined ? null : kus(b.rodic, 40);
+            const vetva = b.vetva === undefined ? null : kus(b.vetva, 20);
+            const poradie = b.poradie === undefined ? null : Math.max(0, Math.min(9999, Math.round(Number(b.poradie) || 0)));
+            const zbalene = b.zbalene === undefined ? null : (b.zbalene ? 1 : 0);
             if (stav === null && poznamka === null && odkaz === null
                 && faza === null && mesiac === null && kto === null && koncept === null
                 && hotovy === null && zaber === null && sekvencia === null && inspiracia === null
-                && scenar === null && hashtagy === null && titulka === null && uvodneVety === null) {
+                && scenar === null && hashtagy === null && titulka === null && uvodneVety === null
+                && rodic === null && vetva === null && poradie === null && zbalene === null) {
               return Response.json({ ok: false, error: "nič na zmenu" }, { status: 400 });
             }
             // Deň použitia sa zapíše sám pri prechode na „použitý" — nikto ho
@@ -160,10 +172,12 @@ export const Route = createFileRoute("/api/napady")({
                  sekvencia = COALESCE(?12, sekvencia), inspiracia = COALESCE(?15, inspiracia),
                  scenar = COALESCE(?13, scenar), hashtagy = COALESCE(?14, hashtagy),
                  titulka = COALESCE(?16, titulka),
-                 uvodne_vety = COALESCE(?17, uvodne_vety)
+                 uvodne_vety = COALESCE(?17, uvodne_vety),
+                 rodic = COALESCE(?18, rodic), vetva = COALESCE(?19, vetva),
+                 poradie = COALESCE(?20, poradie), zbalene = COALESCE(?21, zbalene)
                WHERE id = ?1`,
             ).bind(id, stav, poznamka, odkaz, pouzite, faza, mesiac, kto, koncept, hotovy, zaber, sekvencia,
-                   scenar, hashtagy, inspiracia, titulka, uvodneVety).run().then((r) => {
+                   scenar, hashtagy, inspiracia, titulka, uvodneVety, rodic, vetva, poradie, zbalene).run().then((r) => {
               // UPDATE s neexistujúcim id prejde „úspešne" s nulou zmien —
               // a obrazovka by ohlásila uložené nad ničím (revízia 19. 8.).
               if (!r.meta.changes) throw new Error("nenajdene");
@@ -197,6 +211,15 @@ export const Route = createFileRoute("/api/napady")({
             return Response.json({ ok: false, error: "Neznámy záber." }, { status: 400 });
           }
           const nZaber = b.zaber === undefined ? "" : String(b.zaber);
+          // Miesto v myšlienkovej mape. Nápad založený z „+ Zápis" mapu
+          // nepozná a padne do vetvy „nezaradene" — to je pravda o ňom, nie
+          // chýbajúci údaj, a práve preto tá vetva v mape existuje.
+          if (b.vetva !== undefined && b.vetva !== "" && !jeVetva(b.vetva)) {
+            return Response.json({ ok: false, error: "Neznáma vetva." }, { status: 400 });
+          }
+          const nRodic = kus(b.rodic, 40);
+          const nVetva = nRodic ? "" : (jeVetva(b.vetva) ? String(b.vetva) : "nezaradene");
+          const nPoradie = Math.max(0, Math.min(9999, Math.round(Number(b.poradie) || 0)));
           // Aj pri ZAKLADANÍ, nielen pri úprave. Obrazovka hotový text posiela
           // a bez tohto riadka by ho INSERT ticho zahodil — appka by ohlásila
           // uložené nad stratou (23. 8. 2026, nájdené pri kontrole).
@@ -217,12 +240,17 @@ export const Route = createFileRoute("/api/napady")({
             // najprv pri hotovy_text, potom pri scenari a sekvencii.
             `INSERT INTO mkt_napady (id, datum, text, zdroj, stav, poznamka, autor, created_at,
                                      faza, planovane_na, kto, koncept, zaber, hotovy_text,
-                                     sekvencia, scenar, hashtagy, inspiracia, titulka, uvodne_vety)
-             VALUES (?1, ?2, ?3, ?4, 'novy', ?17, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?18, ?19)`,
+                                     sekvencia, scenar, hashtagy, inspiracia, titulka, uvodne_vety,
+                                     rodic, vetva, poradie, zbalene)
+             -- zbalene je natvrdo 0: nový uzol nemá deti, takže sa nemá čo
+             -- zbaliť. Stĺpec tu stojí preto, aby stráž zo zapisy.test.ts
+             -- videla, že sa naň nezabudlo.
+             VALUES (?1, ?2, ?3, ?4, 'novy', ?17, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?18, ?19, ?20, ?21, ?22, 0)`,
           ).bind(novy, datum, text, zdroj, autor, new Date().toISOString(),
                  nFaza, nMesiac, nKto, nKoncept, nZaber, nHotovy,
                  nSekvencia, nScenar, nHashtagy, nInspiracia, kus(b.poznamka, 600),
-                 kus(b.titulka, 4000), riadkyKus(b.uvodneVety, 1500)).run();
+                 kus(b.titulka, 4000), riadkyKus(b.uvodneVety, 1500),
+                 nRodic, nVetva, nPoradie).run();
 
           await audit(DB, { action: "zapis", predmet: "marketingový nápad", neu: text.slice(0, 120), actor: autor || undefined });
           return Response.json({ ok: true, id: novy });

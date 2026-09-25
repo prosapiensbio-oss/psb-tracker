@@ -33,14 +33,6 @@ Stav k **25. 9. 2026**.
   od 1/2026 je priradených 113. Pri poslednom meraní malo 74 nepriradených
   jednoznačný návrh — zoznam s odškrtávaním a jedným potvrdením z toho robí
   prácu na večer, nie na mesiac. Dnes sa potvrdzuje po jednom.
-- **Myšlienková mapa na plánovanie marketingu** (Jerry, 7. 9. 2026:
-  „znovu otváram nápad tvorby jednoduchej myšlienkovej mapy, ktorá by sa
-  potom previedla do textu, ktorý by som mohol s Jarvisom prehodnotiť").
-  Vtedy sám rozhodol „zatiaľ nestavaj — dokončime plán v chate" a odvtedy sa
-  k tomu nikto nevrátil. Dôvod, prečo to chcel, platí ďalej: plánovač ho núti
-  vyplniť štruktúru skôr, než premyslí; on najprv vysype a potom usporadúva.
-  **Pred stavbou treba od neho jednu odpoveď: akú mapu** — voľné bubliny,
-  alebo stromček po fázach nákupného cyklu.
 
 ## 3 · Blokované niečím mimo Kokpitu
 
@@ -90,6 +82,10 @@ Z posledného kola kontroly (17.–18. 9.) zostalo:
 - **Peniaze bez pohybov z banky** a **Marketing zoradený ako cesta** —
   skúšané v bete 24.–25. 9., Jerry oboje zamietol („len si zmenil názvy
   kategórií"). Namiesto nich vznikli Prehľady.
+- **Myšlienková mapa na plánovanie marketingu** — postavená 25. 9. 2026
+  (Marketing → Plán a čo vyrobiť). Uzly sú riadky v `mkt_napady`, nie druhý
+  zoznam; tri vetvy (dva lieviky + odkladisko), klávesnica Tab/Enter,
+  rozloženie sa počíta, výstup je text pre Jarvisa.
 - **Matyáš záskok** — skončil 20. 9. 2026.
 - **Ambiguózne meno v kalendári sa nemá auto-priradiť** — hotové 22. 9.
   (kal_mapovanie.cas + vedome).

@@ -1206,3 +1206,26 @@ zapíše sa to do `docs/zoznam.md` v tom istom ťahu** — nie na konci debaty,
 nie „potom“. A hotová vec sa nemaže: presunie sa do sekcie „Zavreté“, aby sa
 o mesiac neotvárala odznova (tá sekcia už raz ušetrila druhé kolo debaty
 o meraní bolesti).
+
+## Písanie do Reactu z konzoly potrebuje `_valueTracker`
+
+25. 9. 2026 som pri overovaní myšlienkovej mapy „našiel" chybu, ktorá
+neexistovala. Do políčka som z konzoly nastavil hodnotu cez natívny setter
+a poslal `input` — v DOM sa text objavil, React o ňom NEVEDEL, stav zostal
+prázdny a appka koncept správne zahodila ako prázdny. Vyzeralo to ako tichý
+zápis do prázdna a prepísal som kvôli tomu obsluhu dvakrát.
+
+React si pri každom riadenom políčku drží `el._valueTracker`; kým sa
+nevynuluje, zmenu považuje za tú istú hodnotu a `onChange` nepustí:
+
+```js
+const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+el._valueTracker?.setValue("");          // bez tohto React zmenu prehliadne
+set.call(el, "text");
+el.dispatchEvent(new Event("input", { bubbles: true }));
+```
+
+**A všeobecnejšie:** keď kontrola z prehliadača ohlási, že sa zápis nedeje,
+najprv over, či testovací nástroj vôbec dokázal napísať — až potom hľadaj
+chybu v appke. Je to tá istá lekcia ako pri `naostro.sh`: dvakrát sa mýlila
+kontrola, nie appka.

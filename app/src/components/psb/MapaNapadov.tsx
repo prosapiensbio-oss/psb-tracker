@@ -1,0 +1,463 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import { doSchranky } from "../../lib/psb/kopirovanie";
+import { nazovFazy } from "../../lib/psb/mapaCyklu";
+import {
+  VETVY, farbaVetvy, mapaNaText, rozlozMapu, vetvaUzla, viditelny, type Uzol,
+} from "../../lib/psb/mapaNapadov";
+import { C, mix } from "../../lib/psb/theme";
+import type { AssistantChat } from "./Assistant";
+import { Card, H3, Info } from "./ui";
+
+/**
+ * MYŠLIENKOVÁ MAPA NÁPADOV.
+ *
+ * Jerry si ju vypýtal 7. 9. 2026, vtedy sám odložil („zatiaľ nestavaj —
+ * dokončime plán v chate“) a 25. 9. si pozrel maketu a povedal postaviť.
+ *
+ * PREČO KLÁVESNICA
+ *
+ * Toto je celá vec, nie ozdoba. Plánovač ho nútil vyplniť štruktúru skôr,
+ * než premyslel — a tým ho zabil. V mape sa píše: Tab urobí vetvu nižšie,
+ * Enter ďalšiu vedľa, kurzor skočí sám. Dvadsať nápadov vysypeš bez toho,
+ * aby si sa dotkol myši.
+ *
+ * PREČO SA NEŤAHÁ MYŠOU
+ *
+ * Rozloženie sa počíta (`rozlozMapu`), nepamätá. Uložené pozície by znamenali
+ * ďalšie dva stĺpce v databáze a mapu, ktorá sa po pridaní uzla rozsype.
+ * Skutočné mindmapy to robia takto isto.
+ *
+ * PREČO TO NIE JE DRUHÝ ZOZNAM NÁPADOV
+ *
+ * Uzly SÚ riadky v `mkt_napady` — tie isté, ktoré vidí karta Nápady a ktoré
+ * sa plánujú do mesiacov. Mapa pridala len `rodic`, `vetva`, `poradie`
+ * a `zbalene`. Druhá tabuľka by znamenala dve pravdy o tom, čo sa chystá.
+ *
+ * PRÁZDNY UZOL SA ZAHODÍ
+ *
+ * Pravidlo z MindMupu. Kým sa do novej bubliny nenapíšu aspoň tri znaky,
+ * neexistuje na serveri; keď z nej odídeš prázdnej, zmizne. Inak by po každom
+ * omylom stlačenom Tabe zostal v dátach prázdny riadok.
+ */
+
+/** Riadok, ako ho vracia /api/napady. */
+type Riadok = {
+  id: string; text: string; faza?: number;
+  rodic?: string; vetva?: string; poradie?: number; zbalene?: number;
+  stav?: string;
+};
+
+const DOCASNY = "tmp";
+const KADENCIA = 2;
+
+const mesiacSlovom = (d: Date) => {
+  const M = ["január", "február", "marec", "apríl", "máj", "jún", "júl", "august", "september", "október", "november", "december"];
+  return `${M[d.getMonth()]} ${d.getFullYear()}`;
+};
+
+export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
+  const [riadky, setRiadky] = useState<Riadok[]>([]);
+  const [nacitane, setNacitane] = useState(false);
+  const [pohlad, setPohlad] = useState<"mapa" | "triedenie">("mapa");
+  const [chyba, setChyba] = useState("");
+  /**
+   * Rozpísaný uzol, ktorý na serveri ešte nie je. Vždy najviac jeden.
+   *
+   * Drží sa V REFE, nielen v stave. Prvá verzia čítala koncept zo stavu
+   * a `onBlur` ho nikdy neuložil — obsluha videla staršiu podobu, v ktorej
+   * bol koncept ešte prázdny, a zahodila ho ako prázdny uzol. Na obrazovke
+   * text ostal, do databázy sa nedostal: presne ten tichý zápis, pred ktorým
+   * varuje CLAUDE.md. Ref vidí vždy to, čo je napísané teraz.
+   */
+  const [novy, setNovy] = useState<{ rodic: string; vetva: string; poradie: number; text: string } | null>(null);
+  const novyRef = useRef<{ rodic: string; vetva: string; poradie: number; text: string } | null>(null);
+  const nastavNovy = (d: { rodic: string; vetva: string; poradie: number; text: string } | null) => {
+    novyRef.current = d;
+    setNovy(d);
+  };
+  const [text, setText] = useState<string | null>(null);
+  const [kopia, setKopia] = useState("");
+  const zameraj = useRef<string | null>(null);
+  /**
+   * Koncept sa ukladá aj SÁM, po sekunde a pol ticha.
+   *
+   * Nie preto, že by odchod z políčka nestačil — ale preto, že celá appka
+   * stojí na pravidle „ticho zlyhávajúci zápis je horší než hlasitá chyba".
+   * Napísaná veta sa nesmie stratiť ani vtedy, keď prehliadač obsluhu odchodu
+   * z políčka nepošle (zatvorená karta, prepnutá aplikácia, iOS). Uloženie
+   * vráti kurzor tam, kde bol, takže sa píše ďalej bez prerušenia.
+   */
+  const casovac = useRef<number | null>(null);
+
+  const nacitaj = useCallback(() => void fetch("/api/napady", { credentials: "same-origin" })
+    .then((r) => r.json())
+    .then((j: { napady?: Riadok[] }) => setRiadky(j.napady || []))
+    .catch(() => {})
+    .finally(() => setNacitane(true)), []);
+  useEffect(() => { nacitaj(); }, [nacitaj]);
+
+  /** Zápis na server. Vracia úspech — „uložené“ sa nesmie tvrdiť do prázdna. */
+  const posli = async (telo: Record<string, unknown>): Promise<string | null> => {
+    const j = await fetch("/api/napady", {
+      method: "POST", credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(telo),
+    }).then((r) => r.json()).catch(() => ({ ok: false, error: "spojenie" }));
+    if (!j?.ok) { setChyba(j?.error || "Zmena sa nezapísala — skús znova."); return null; }
+    setChyba("");
+    return String(j.id || telo.id || "");
+  };
+
+  const uzly = useMemo<Uzol[]>(() => {
+    const zive = riadky
+      .filter((r) => r.stav !== "zamietnuty")
+      .map((r) => ({
+        id: r.id,
+        text: r.text || "",
+        rodic: r.rodic || "",
+        vetva: r.vetva || "nezaradene",
+        poradie: Number(r.poradie || 0),
+        zbalene: !!r.zbalene,
+        faza: Number(r.faza || 0),
+      }));
+    if (novy) {
+      zive.push({ id: DOCASNY, text: novy.text, rodic: novy.rodic, vetva: novy.vetva, poradie: novy.poradie, zbalene: false, faza: 0 });
+    }
+    return zive;
+  }, [riadky, novy]);
+
+  const { poz, vyska } = useMemo(() => rozlozMapu(uzly, { x: 38, y: 28, text: "Obsah · " + mesiacSlovom(new Date()) }), [uzly]);
+
+  /** Uloží rozpísaný uzol (alebo ho zahodí, keď je prázdny). */
+  const dopis = useCallback(async (vratFokus = false): Promise<void> => {
+    if (casovac.current) { clearTimeout(casovac.current); casovac.current = null; }
+    const d = novyRef.current;
+    if (!d) return;
+    nastavNovy(null);
+    const t = d.text.trim();
+    if (t.length < 3) return;
+    const id = await posli({ text: t, zdroj: "vlastny", rodic: d.rodic, vetva: d.vetva, poradie: d.poradie });
+    // Keď zápis neprejde, koncept sa VRÁTI na obrazovku aj s textom. Zmiznúť
+    // smie len to, čo je uložené — inak človek napíše vetu a tá sa stratí.
+    if (!id) { nastavNovy(d); return; }
+    if (vratFokus) zameraj.current = id;
+    nacitaj();
+  }, [nacitaj]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** Odchod z obrazovky koncept nezahodí. */
+  useEffect(() => () => {
+    if (casovac.current) clearTimeout(casovac.current);
+    void dopis();
+  }, [dopis]);
+
+  const zaloz = async (rodic: string, vetva: string, poradie: number) => {
+    await dopis();
+    nastavNovy({ rodic, vetva, poradie, text: "" });
+    zameraj.current = DOCASNY;
+  };
+
+  const uprav = async (id: string, t: string) => {
+    if (id === DOCASNY) {
+      if (novyRef.current) nastavNovy({ ...novyRef.current, text: t });
+      if (casovac.current) clearTimeout(casovac.current);
+      casovac.current = window.setTimeout(() => { void dopis(true); }, 1500);
+      return;
+    }
+    setRiadky((r) => r.map((x) => (x.id === id ? { ...x, text: t } : x)));
+  };
+
+  const ulozText = async (id: string, t: string) => {
+    if (id === DOCASNY) { await dopis(); return; }
+    if (t.trim().length < 3) return;
+    await posli({ id, text: t.trim() });
+  };
+
+  const zmaz = async (id: string) => {
+    if (id === DOCASNY) { nastavNovy(null); return; }
+    if (uzly.some((u) => u.rodic === id)) return;
+    await posli({ id, zmaz: true });
+    nacitaj();
+  };
+
+  const prepniZbal = async (u: Uzol) => {
+    setRiadky((r) => r.map((x) => (x.id === u.id ? { ...x, zbalene: u.zbalene ? 0 : 1 } : x)));
+    await posli({ id: u.id, zbalene: !u.zbalene });
+  };
+
+  const nastavFazu = async (id: string, f: number) => {
+    setRiadky((r) => r.map((x) => (x.id === id ? { ...x, faza: f } : x)));
+    await posli({ id, faza: f });
+  };
+
+  const vidno = uzly.filter((u) => viditelny(u.id, uzly));
+  const listy = uzly.filter((u) => u.text.trim());
+  const sFazou = listy.filter((u) => u.faza > 0);
+  const chybaDoMesiaca = Math.max(0, KADENCIA * 4 - sFazou.length);
+
+  const ciary: { id: string; d: string; farba: string; hrubka: number }[] = [];
+  const spoj = (a: { x: number; y: number; w: number } | undefined, b: { x: number; y: number } | undefined, farba: string, hrubka: number, id: string) => {
+    if (!a || !b) return;
+    const x1 = a.x + a.w, y1 = a.y + 26, x2 = b.x, y2 = b.y + 26, m = (x1 + x2) / 2;
+    ciary.push({ id, d: `M ${x1} ${y1} C ${m} ${y1}, ${m} ${y2}, ${x2} ${y2}`, farba, hrubka });
+  };
+  for (const v of VETVY) spoj(poz["koren"], poz["vetva:" + v.id], v.farba, 3, "v" + v.id);
+  for (const u of vidno) {
+    const f = farbaVetvy(vetvaUzla(u.id, uzly));
+    const rodicPoz = u.rodic ? poz[u.rodic] : poz["vetva:" + vetvaUzla(u.id, uzly)];
+    spoj(rodicPoz, poz[u.id], f, (poz[u.id]?.hlbka || 2) <= 2 ? 2 : 1.4, "u" + u.id);
+  }
+
+  const bublina = (u: Uzol) => {
+    const p = poz[u.id];
+    if (!p) return null;
+    const f = farbaVetvy(vetvaUzla(u.id, uzly));
+    const deti = uzly.filter((x) => x.rodic === u.id).length;
+    return (
+      <div key={u.id} style={{ position: "absolute", left: p.x, top: p.y, display: "flex", alignItems: "center", gap: 7 }}>
+        <input
+          type="text"
+          aria-label="Nápad"
+          placeholder="píš…"
+          value={u.text}
+          ref={(el) => { if (el && zameraj.current === u.id) { zameraj.current = null; el.focus(); } }}
+          onChange={(e) => void uprav(u.id, e.target.value)}
+          onBlur={() => void ulozText(u.id, u.text)}
+          onKeyDown={(e) => {
+            if (e.key === "Tab") { e.preventDefault(); void zaloz(u.id, "", deti); }
+            else if (e.key === "Enter") { e.preventDefault(); void zaloz(u.rodic, u.rodic ? "" : vetvaUzla(u.id, uzly), u.poradie + 1); }
+            else if (e.key === "Backspace" && !u.text) { e.preventDefault(); void zmaz(u.id); }
+            // Escape ukladá SÁM, nespolieha sa na blur — obsluha odchodu
+            // z políčka sa pri prvej verzii ukázala ako nespoľahlivá.
+            else if (e.key === "Escape") { (e.target as HTMLInputElement).blur(); void dopis(); }
+          }}
+          style={{
+            width: p.w, boxSizing: "border-box", padding: "12px 17px", borderRadius: 999,
+            background: C.card, border: `1px solid ${f}`, color: C.text,
+            fontFamily: "inherit", fontSize: 14, outline: "none",
+          }}
+        />
+        {deti > 0 && (
+          <button
+            type="button"
+            aria-label="Zbaliť alebo rozbaliť vetvu"
+            onClick={() => void prepniZbal(u)}
+            style={{ height: 26, minWidth: 26, padding: "0 7px", borderRadius: 999, border: `1px solid ${C.border}`, background: C.bg, color: C.textMuted, fontFamily: "inherit", fontSize: 11, cursor: "pointer" }}
+          >
+            {u.zbalene ? `▸ ${deti}` : "▾"}
+          </button>
+        )}
+        <button
+          type="button"
+          aria-label="Pridať nadväzujúci nápad"
+          onClick={() => void zaloz(u.id, "", deti)}
+          style={{ width: 30, height: 30, flexShrink: 0, borderRadius: "50%", padding: 0, border: `1px dashed ${mix(C.border, 130)}`, background: "transparent", color: C.textDim, fontFamily: "inherit", fontSize: 15, lineHeight: 1, cursor: "pointer" }}
+        >
+          +
+        </button>
+      </div>
+    );
+  };
+
+  const doJarvisa = () => {
+    const t = mapaNaText(uzly, { mesiac: mesiacSlovom(new Date()), kadenciaTyzdenne: KADENCIA, nazovFazy });
+    setText(t);
+    if (!chat) return;
+    chat.setFloatingOpen(true);
+    void chat.ask([
+      "Toto je môj plán obsahu z myšlienkovej mapy. Prejdi ho a rýp doň:",
+      "",
+      t,
+      "",
+      "Zaujíma ma hlavne: chýba niečo, čo by tam malo byť? Nie je niektorá fáza prehustená na úkor inej? A je pomer medzi lievikmi rozumný voči tomu, čo appka vie o tom, odkiaľ klienti naozaj prišli?",
+    ].join("\n"));
+  };
+
+  return (
+    <Card id="mapa-napadov">
+      <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", marginBottom: 10 }}>
+        <H3 style={{ marginBottom: 0 }}>
+          <Info
+            label="Myšlienková mapa"
+            text="Uzly sú tie isté nápady, ktoré vidíš v karte Nápady — mapa im len pridáva miesto v strome. Tri vetvy sú dva lieviky (úvodný tréning, kniha) a odkladisko pre nápad, pri ktorom sa ti ešte nechce rozhodovať. Fáza nákupného cyklu sa priraďuje až v druhom pohľade."
+          />
+        </H3>
+        <div style={{ display: "flex", gap: 4, padding: 4, borderRadius: 11, background: C.card, border: `1px solid ${C.border}` }}>
+          {([["mapa", "Mapa"], ["triedenie", "Vysyp a usporiadaj"]] as const).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setPohlad(id)}
+              style={{
+                padding: "7px 14px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit",
+                fontSize: 12.5, fontWeight: 600, border: "none",
+                background: pohlad === id ? mix(C.accent, 20) : "transparent",
+                color: pohlad === id ? C.accentLight : C.textMuted,
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <span style={{ flexGrow: 1 }} />
+        {novy && novy.text.trim().length >= 3 && (
+          <span style={{ fontSize: 11.5, color: C.orange }}>neuložené — Tab, Enter alebo Esc to zapíše</span>
+        )}
+        <span style={{ fontSize: 12.5, color: C.textMuted }}>
+          {listy.length} nápadov · <b style={{ color: C.text }}>{sFazou.length} má fázu</b> · {listy.length - sFazou.length} bez nej
+        </span>
+      </div>
+
+      {chyba && <div style={{ fontSize: 12, color: C.red, marginBottom: 8 }}>{chyba}</div>}
+      {!nacitane && <div style={{ fontSize: 12.5, color: C.textDim }}>Načítavam…</div>}
+
+      {nacitane && pohlad === "mapa" && (
+        <>
+          <div style={{ display: "flex", gap: 14, flexWrap: "wrap", fontSize: 11.5, color: C.textDim, marginBottom: 8 }}>
+            <span style={{ color: C.textMuted }}>Klávesnica:</span>
+            <span><b style={{ color: C.text }}>Tab</b> vetva nižšie</span>
+            <span><b style={{ color: C.text }}>Enter</b> ďalšia vedľa</span>
+            <span><b style={{ color: C.text }}>⌫</b> na prázdnej zmaže</span>
+            <span style={{ flexGrow: 1 }} />
+            <span>rozloženie sa kreslí samo — nič sa neťahá myšou</span>
+          </div>
+          <div style={{ position: "relative", height: 520, overflow: "auto", border: `1px solid ${mix(C.border, 80)}`, borderRadius: 13, background: mix(C.card, 60) }}>
+            <div style={{ position: "relative", width: 2000, height: Math.max(480, vyska) }}>
+              <svg width={2000} height={Math.max(480, vyska)} style={{ position: "absolute", left: 0, top: 0, pointerEvents: "none" }} aria-hidden="true">
+                {ciary.map((c) => (
+                  <path key={c.id} d={c.d} stroke={c.farba} strokeWidth={c.hrubka} strokeLinecap="round" fill="none" opacity={0.65} />
+                ))}
+              </svg>
+              {poz["koren"] && (
+                <div style={{ position: "absolute", left: poz["koren"].x, top: poz["koren"].y, width: poz["koren"].w, boxSizing: "border-box", padding: "15px 20px", borderRadius: 14, background: C.surface, border: `1px solid ${mix(C.border, 130)}`, color: C.text, fontSize: 15.5, fontWeight: 600 }}>
+                  Obsah · {mesiacSlovom(new Date())}
+                </div>
+              )}
+              {VETVY.map((v) => {
+                const p = poz["vetva:" + v.id];
+                if (!p) return null;
+                const kolko = uzly.filter((u) => !u.rodic && vetvaUzla(u.id, uzly) === v.id).length;
+                return (
+                  <div key={v.id} style={{ position: "absolute", left: p.x, top: p.y, display: "flex", alignItems: "center", gap: 7 }}>
+                    <div style={{ width: p.w, boxSizing: "border-box", padding: "12px 17px", borderRadius: 999, background: C.surface, border: `1px solid ${v.farba}`, borderLeftWidth: 4, color: C.text, fontSize: 14.5, fontWeight: 600 }}>
+                      {v.nazov} <span style={{ color: C.textDim, fontWeight: 400 }}>{kolko}</span>
+                    </div>
+                    <button
+                      type="button"
+                      aria-label={`Pridať nápad do vetvy ${v.nazov}`}
+                      onClick={() => void zaloz("", v.id, kolko)}
+                      style={{ width: 30, height: 30, flexShrink: 0, borderRadius: "50%", padding: 0, border: `1px dashed ${mix(C.border, 130)}`, background: "transparent", color: C.textDim, fontFamily: "inherit", fontSize: 15, lineHeight: 1, cursor: "pointer" }}
+                    >
+                      +
+                    </button>
+                  </div>
+                );
+              })}
+              {vidno.map(bublina)}
+            </div>
+          </div>
+        </>
+      )}
+
+      {nacitane && pohlad === "triedenie" && (
+        <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
+          <div style={{ width: 280, flexShrink: 0, display: "flex", flexDirection: "column", gap: 8, padding: 14, borderRadius: 13, background: mix(C.card, 60), border: `1px dashed ${C.border}`, maxHeight: 520, overflow: "auto" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.2, color: C.textDim }}>BEZ FÁZY · {listy.length - sFazou.length}</div>
+            {listy.filter((u) => !u.faza).map((u) => (
+              <div key={u.id} style={{ padding: "10px 12px", borderRadius: 11, background: C.surface, border: `1px solid ${C.border}` }}>
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 7 }}>
+                  <span style={{ width: 8, height: 8, flexShrink: 0, marginTop: 5, borderRadius: "50%", background: farbaVetvy(vetvaUzla(u.id, uzly)) }} />
+                  <span style={{ fontSize: 12.5, lineHeight: 1.35, color: C.text }}>{u.text}</span>
+                </div>
+                <div style={{ marginTop: 8, display: "flex", gap: 5 }}>
+                  {[1, 2, 3, 4, 5].map((f) => (
+                    <button
+                      key={f}
+                      type="button"
+                      aria-label={`Zaradiť do fázy ${f} — ${nazovFazy(f)}`}
+                      onClick={() => void nastavFazu(u.id, f)}
+                      style={{ width: 32, height: 32, borderRadius: 8, padding: 0, cursor: "pointer", border: `1px solid ${FAZA_FARBA[f]}`, background: "transparent", color: FAZA_FARBA[f], fontFamily: "inherit", fontSize: 12.5, fontWeight: 600 }}
+                    >
+                      {f}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+            {sFazou.length === listy.length && <div style={{ fontSize: 12, color: C.textDim }}>Všetko má fázu.</div>}
+          </div>
+          <div style={{ flexGrow: 1, display: "flex", gap: 10, alignItems: "flex-start", padding: 14, borderRadius: 13, background: mix(C.card, 60), border: `1px solid ${C.border}`, maxHeight: 520, overflow: "auto" }}>
+            {[1, 2, 3, 4, 5].map((f) => {
+              const kusy = listy.filter((u) => u.faza === f);
+              return (
+                <div key={f} style={{ flexGrow: 1, flexBasis: 0, display: "flex", flexDirection: "column", gap: 7, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, paddingBottom: 6, borderBottom: `2px solid ${FAZA_FARBA[f]}` }}>
+                    <span style={{ width: 19, height: 19, flexShrink: 0, borderRadius: 5, background: FAZA_FARBA[f], color: "#10130e", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{f}</span>
+                    <span style={{ fontSize: 11.5, fontWeight: 600, color: C.text, lineHeight: 1.15 }}>{nazovFazy(f)}</span>
+                  </div>
+                  {kusy.map((u) => (
+                    <div key={u.id} style={{ display: "flex", alignItems: "flex-start", gap: 6, padding: "9px 8px 9px 11px", borderRadius: 9, background: C.surface, border: `1px solid ${C.border}`, borderLeft: `3px solid ${FAZA_FARBA[f]}` }}>
+                      <span style={{ width: 8, height: 8, flexShrink: 0, marginTop: 4, borderRadius: "50%", background: farbaVetvy(vetvaUzla(u.id, uzly)) }} />
+                      <span style={{ flexGrow: 1, fontSize: 12, lineHeight: 1.3, color: C.text }}>{u.text}</span>
+                      <button type="button" aria-label="Vrátiť medzi nezaradené" onClick={() => void nastavFazu(u.id, 0)} style={{ width: 22, height: 22, flexShrink: 0, borderRadius: 6, padding: 0, border: "none", background: "transparent", color: C.textDim, fontFamily: "inherit", fontSize: 14, lineHeight: 1, cursor: "pointer" }}>×</button>
+                    </div>
+                  ))}
+                  {!kusy.length && (
+                    <div style={{ padding: "13px 10px", border: `1px dashed ${C.border}`, borderRadius: 9, textAlign: "center", fontSize: 11.5, lineHeight: 1.5, color: C.textDim }}>
+                      zatiaľ nič<br /><span style={{ color: C.accent }}>tu vzniká diera</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginTop: 12 }}>
+        <span style={{ fontSize: 12, color: C.textDim }}>
+          {chybaDoMesiaca > 0
+            ? `Na mesiac pri kadencii ${KADENCIA} kusy/týždeň treba ${KADENCIA * 4} kusov s fázou — chýba ${chybaDoMesiaca}.`
+            : `Na mesiac to stačí: ${KADENCIA * 4} kusov s fázou pri kadencii ${KADENCIA} kusy/týždeň.`}
+        </span>
+        <span style={{ flexGrow: 1 }} />
+        <button
+          type="button"
+          onClick={doJarvisa}
+          style={{ padding: "9px 16px", borderRadius: 9, border: `1px solid ${C.accent}`, background: mix(C.accent, 14), color: C.accentLight, fontFamily: "inherit", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+        >
+          Previesť na text →
+        </button>
+      </div>
+
+      {text !== null && (
+        <div style={{ marginTop: 12, padding: 16, borderRadius: 12, background: C.surface, border: `1px solid ${C.border}` }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.2, color: C.textDim }}>ZADANIE PRE JARVISA</span>
+            <span style={{ flexGrow: 1 }} />
+            <span style={{ fontSize: 11.5, color: C.green }}>{kopia}</span>
+            <button
+              type="button"
+              onClick={() => void doSchranky(text).then((ok) => setKopia(ok ? "skopírované" : "nešlo to — text je nižšie, označ a cmd+C"))}
+              style={{ padding: "6px 12px", borderRadius: 8, border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}
+            >
+              Skopírovať
+            </button>
+            <button
+              type="button"
+              onClick={() => { setText(null); setKopia(""); }}
+              style={{ padding: "6px 12px", borderRadius: 8, border: "none", background: "transparent", color: C.textDim, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}
+            >
+              zavrieť
+            </button>
+          </div>
+          <pre style={{ margin: 0, whiteSpace: "pre-wrap", fontFamily: "inherit", fontSize: 12.5, lineHeight: 1.65, color: C.textMuted }}>{text}</pre>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+const FAZA_FARBA: Record<number, string> = {
+  1: "#3E82A8", 2: "#3D9B99", 3: "#6EA45C", 4: "#C08F32", 5: "#B45038",
+};

@@ -1,5 +1,6 @@
 import { zlucZoznam } from "../../lib/psb/zlucZoznam";
 import { MarketingPrehlad } from "./MarketingPrehlad";
+import { MapaNapadov } from "./MapaNapadov";
 import { fetchVzasSettings, saveVzasSetting } from "../../lib/psb/client";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
@@ -1214,6 +1215,10 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
           {/* Plán je NAD mapou: najprv cieľ a obdobie, potom obsah, ktorý ho
               má naplniť. Opačné poradie robilo z obsahu samoúčel. */}
           <PlanMarketingu data={data} clients={clients} chat={chat} onNavigate={onNavigate} />
+          {/* Myšlienková mapa hneď za plánom: cieľ je daný, teraz sa vysypú
+              nápady, ktoré ho majú naplniť. Až potom má zmysel mapa cyklu
+              (kam sa už chystá) a návrhy z dát. */}
+          <MapaNapadov chat={chat} />
           {/* Mapa je nad počítanými návrhmi zámerne: najprv treba vidieť, kam
               sa obsah chystá, až potom čítať, čo do toho dáta odporúčajú.
               Opačné poradie robilo z návrhov zoznam bez miesta, kam ich dať. */}
