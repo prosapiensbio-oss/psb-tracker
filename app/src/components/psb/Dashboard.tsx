@@ -2341,7 +2341,10 @@ function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar }: { i
    * Poradie je ako pri dôvode: najprv zápis, až potom uzavretie položky.
    * Obrátene by otázka zmizla aj vtedy, keď sa pečiatka nikam nezapísala.
    */
-  const jeOzvatSa = item.key.startsWith("ozvatsa|");
+  // Kľúč je `odpoved|<id>`. Do 25. 9. 2026 to bol vlastný `ozvatsa|<id>`,
+  // lenže to bola druhá položka o tom istom dopyte — Terezke sa každé ráno
+  // hlásil každý neodpovedaný dopyt dvakrát.
+  const jeOzvatSa = item.key.startsWith("odpoved|");
   const [ozyvamSa, setOzyvamSa] = useState(false);
   const zapisOzvanie = () => {
     const id = item.key.split("|")[1];

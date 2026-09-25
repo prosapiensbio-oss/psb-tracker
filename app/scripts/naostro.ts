@@ -37,9 +37,16 @@ const base: PSBData = {
     client: r.client_name, status: r.client_status, package: r.package_name,
     remaining: r.sessions_remaining, total: r.sessions_total, added: r.added || "",
     validFrom: r.valid_from || "", validTo: r.valid_to || "", payment: r.payment_czk ?? undefined, kind: r.kind || "" })),
-  leads: nacitaj("leads").map((r: any) => ({
-    id: r.id, date: r.date, name: r.name, source: r.source, referrer: r.referrer,
-    status: r.status, note: r.note, dovod: r.dovod, createdAt: r.created_at || "" })),
+  // Presne ako `loadData`: magnety do dopytov nepatria a `odpovedane_at`
+  // musí prejsť. 25. 9. 2026 tu chýbalo oboje a kontrola hlásila ako
+  // „čaká na odpoveď" lead magnet aj dopyt, ktorý zodpovedaný bol. Kontrola,
+  // ktorá číta dáta inak než appka, meria samu seba.
+  leads: nacitaj("leads")
+    .filter((r: any) => (r.druh || "dopyt") !== "magnet")
+    .map((r: any) => ({
+      id: r.id, date: r.date, name: r.name, source: r.source, referrer: r.referrer,
+      status: r.status, note: r.note, dovod: r.dovod, createdAt: r.created_at || "",
+      odpovedaneAt: r.odpovedane_at || "", druh: r.druh || "dopyt" })),
   // Závery z debát s Jarvisom. Bez nich kontrola nevidí, že Jerry o klientovi
   // už rozhodol — a hlásila by ako otvorené to, čo je vyriešené.
   zavery: nacitaj("zavery").map((r: any) => ({

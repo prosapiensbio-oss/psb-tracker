@@ -2891,6 +2891,10 @@ export function deriveRegister(
   // nepýta na odpoveď, ale na dôvod.
   const dnesOdpoved = new Date();
   for (const l of data.leads || []) {
+    // Lead magnet nie je dopyt (Jerry, 24. 9. 2026) — stiahol si e-book, nikoho
+    // sa nepýtal na tréning. `loadData` ho síce do `leads` nepustí, ale toto
+    // pravidlo má platiť aj tam, kde sa dáta poskladajú inak (skript, test).
+    if ((l.druh || "dopyt") !== "dopyt") continue;
     if (l.status !== "novy" || String(l.odpovedaneAt || "").trim()) continue;
     const den = String(l.date || "").slice(0, 10);
     if (!den) continue;
@@ -2903,12 +2907,17 @@ export function deriveRegister(
           : `cez ${l.source}`;
     const kontakt = [l.email, l.telefon].filter(Boolean).join(" · ");
     const uryvok = String(l.note || "").replace(/\s+/g, " ").trim().slice(0, 140);
+    const hodin = Math.max(0, Math.round((dnesOdpoved.getTime() - Date.parse(String(l.createdAt || l.date))) / 3600000));
+    const caka = dni >= 1 ? `${dni} ${dni === 1 ? "deň" : dni < 5 ? "dni" : "dní"}` : `${hodin} h`;
     add(
       `odpoved|${l.id}`,
       "Zápis",
       dni >= 1 ? "red" : "orange",
-      `${l.source === "mail" ? "Nový mail" : "Nový dopyt"} — ${meno}${dni >= 1 ? ` (čaká ${dni} ${dni === 1 ? "deň" : dni < 5 ? "dni" : "dní"})` : ""}`,
-      `${meno} sa ozval ${fmtDMY(den)} ${odkial}${kontakt ? ` (${kontakt})` : ""} a nikto zatiaľ neodpísal.${uryvok ? ` Píše: „${uryvok}“` : ""} Po odpovedi klikni v Dopytoch na „Odpovedané" — meria sa čas prvej odpovede.`,
+      // Čaká sa v HODINÁCH, kým je to prvý deň. „Nový dopyt — Hana Marko"
+      // bez čísla vyzeralo rovnako po hodine aj po dvadsiatich troch, a to
+      // je práve to okno, v ktorom sa rozhoduje, či človek napíše inam.
+      `${l.source === "mail" ? "Nový mail" : "Nový dopyt"} — ${meno} (čaká ${caka})`,
+      `${meno} sa ozval ${fmtDMY(den)} ${odkial}${kontakt ? ` (${kontakt})` : ""} a nikto zatiaľ neodpísal.${uryvok ? ` Píše: „${uryvok}“` : ""} Keď si sa ozval, klikni rovno tu na „ozval som sa" — zapíše sa čas a z neho sa počíta rýchlosť prvej odpovede.`,
       dni >= 1 ? 2 : 4,
       "marketing|dopyty",
       "odpoved",
@@ -3584,44 +3593,18 @@ export function nezapisaneDoRegistra(v: NezapisaneVstup): Omit<RegisterItem, "ac
     });
   }
 
-  /**
-   * DOPYT, NA KTORÝ SME SA EŠTE NEOZVALI.
-   *
-   * Jerry, 24. 9. 2026: „zapisovať jedným klikom priamo v notifikácii —
-   * ozval som sa = pečiatka času."
-   *
-   * Čas odpovede je v službách najsilnejšia páka na konverziu a appka ho vie
-   * merať od 12. 8. 2026. Lenže sa zapisoval len na obrazovke Dopyty, kam
-   * nikto nechodí v tej chvíli, keď sa ozve — a tak zostalo 46 zo 47 dopytov
-   * bez času. Notifikácia je jediné miesto, kde človek v tej chvíli JE.
-   *
-   * Jedna položka na jeden dopyt, nie súhrn: klik má zapísať pečiatku
-   * konkrétnemu človeku a súhrn by nemal čo zapísať.
-   *
-   * Dopyty spred zavedenia merania sa nehlásia — nulu z nich nedostaneme
-   * a číslo má rásť z pravdy, nie zo spätného dopĺňania.
-   */
-  const MERANIE_OD = "2026-08-12";
-  const cakajuNaOdpoved = v.leads
-    .filter((l) => (l.druh || "dopyt") === "dopyt")
-    .filter((l) => String(l.date) >= MERANIE_OD && !l.odpovedaneAt && l.status === "novy")
-    .sort((a, b) => String(a.date).localeCompare(String(b.date)));
-  for (const l of cakajuNaOdpoved) {
-    const odkedy = String(l.createdAt || l.date);
-    const hodin = Math.max(0, Math.round((Date.parse(v.dnes) - Date.parse(odkedy)) / 3600000));
-    const ako = hodin < 24 ? `${hodin} h` : `${Math.round(hodin / 24)} dní`;
-    von.push({
-      key: `ozvatsa|${l.id}`,
-      category: "Zápis",
-      // Po dni je to už naliehavé — kto čaká deň, väčšinou medzitým napísal inam.
-      tone: hodin >= 24 ? "red" : "orange",
-      trener: "Terezka",
-      title: `${l.name || "Dopyt bez mena"} čaká na odpoveď (${ako})`,
-      detail: `Dopyt z ${String(l.date).slice(8, 10)}. ${Number(String(l.date).slice(5, 7))}. nemá zapísané, kedy sme sa ozvali. Keď si sa už ozval, klikni „ozval som sa" — zapíše sa čas a z neho sa počíta rýchlosť odpovede.`,
-      client: l.name || "",
-      priority: hodin >= 24 ? 4 : 11,
-    });
-  }
+  // DOPYT, NA KTORÝ SME SA EŠTE NEOZVALI, tu NIE JE.
+  //
+  // Bol tu od 24. 9. 2026 ako `ozvatsa|<id>` — a bola to tá istá otázka, akú
+  // o tom istom človeku kladie `odpoved|<id>` v `deriveRegister`. Obe stáli
+  // na rovnakej podmienke (stav „novy" a prázdne `odpovedaneAt`), obe patrili
+  // Terezke, takže každý neodpovedaný dopyt svietil v registri aj v rannej
+  // správe DVAKRÁT. 25. 9. 2026 to bolo 5 dopytov = 10 riadkov.
+  //
+  // Zlúčené do `odpoved|`: ten je starší (nesie odklepnutia), vie povedať
+  // odkiaľ dopyt prišiel, kontakt aj úryvok — a od 25. 9. nesie aj tlačidlo
+  // „ozval som sa". Kto pridáva ďalšiu pripomienku na dopyt, nech ju pridá
+  // TAM, nie vedľa.
 
   // ── zmeny v kalendári bez vysvetlenia ────────────────────────────────────
   const podlaTrenera = new Map<string, Record<string, number>>();
