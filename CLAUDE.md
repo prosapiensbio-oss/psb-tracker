@@ -1191,3 +1191,18 @@ testy tiež nie, `hotovo.sh` prešiel celý.
 - **Po nasadení novej obrazovky ju OTVOR** — `curl` shell a assety vrátili
   200, worker bežal, chyba bola len v prehliadači. Nájsť sa dala jedine
   v konzole.
+
+## Zoznam úloh je `docs/zoznam.md`, nie správa v chate
+
+25. 9. 2026 sa Jerry spýtal, čo zostáva. Vypísal som zoznam — a poskladal som
+ho len z tej jednej konverzácie, v ktorej som práve bol. Vypadla z neho
+**myšlienková mapa na plánovanie marketingu** (vypýtal si ju 7. 9.), **NDA pri
+fotkách pred/po** (8. 9.) a **šesť konkrétnych dôvodov odchodu** (15. 9.).
+Jerry na to prišiel sám: „v tvojom zozname mi napr. chýba…“
+
+Príčina nie je zábudlivosť, je to miesto: zoznam žil v správach a tie sa
+sumarizujú preč. **Keď Jerry niečo odloží alebo mu niečo sľúbim na neskôr,
+zapíše sa to do `docs/zoznam.md` v tom istom ťahu** — nie na konci debaty,
+nie „potom“. A hotová vec sa nemaže: presunie sa do sekcie „Zavreté“, aby sa
+o mesiac neotvárala odznova (tá sekcia už raz ušetrila druhé kolo debaty
+o meraní bolesti).
