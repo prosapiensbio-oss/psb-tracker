@@ -97,6 +97,8 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
    * plynulý posuvník vyžaduje mierenie.
    */
   const [zoom, setZoom] = useState(1);
+  /** Nad ktorým uzlom je otvorená ponuka „presunúť do inej vetvy". */
+  const [presunPre, setPresunPre] = useState<string | null>(null);
   const plochaRef = useRef<HTMLDivElement | null>(null);
 
   const nacitaj = useCallback(() => void fetch("/api/napady", { credentials: "same-origin" })
@@ -216,6 +218,43 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
     await posli({ id: u.id, zbalene: !u.zbalene });
   };
 
+  /**
+   * PRESUN DO INEJ VETVY.
+   *
+   * Nápad sa zavesí priamo pod vetvu a POTOMKOV BERIE SO SEBOU — tí sa na
+   * rodiča odkazujú cez `rodic`, takže sa presunie celý konár naraz. Preto sa
+   * dá presúvať len na vetvu a o úroveň vyššie: obe cesty sú bezpečné,
+   * zatiaľ čo presun pod vlastného potomka by v strome vyrobil kruh.
+   */
+  const presunDoVetvy = async (u: Uzol, vetva: string) => {
+    setPresunPre(null);
+    if (u.id === DOCASNY) {
+      if (novyRef.current) nastavNovy({ ...novyRef.current, rodic: "", vetva });
+      return;
+    }
+    if (!u.rodic && vetvaUzla(u.id, uzly) === vetva) return;
+    const koniec = uzly.filter((x) => !x.rodic && vetvaUzla(x.id, uzly) === vetva).length;
+    setRiadky((r) => r.map((x) => (x.id === u.id ? { ...x, rodic: "", vetva, poradie: koniec } : x)));
+    await posli({ id: u.id, rodic: "", vetva, poradie: koniec });
+    nacitaj();
+  };
+
+  /** O úroveň vyššie: nápad sa prilepí k rodičovi svojho rodiča. */
+  const oUrovenVyssie = async (u: Uzol) => {
+    setPresunPre(null);
+    if (!u.rodic || u.id === DOCASNY) return;
+    const rodic = uzly.find((x) => x.id === u.rodic);
+    if (!rodic) return;
+    if (rodic.rodic) {
+      setRiadky((r) => r.map((x) => (x.id === u.id ? { ...x, rodic: rodic.rodic } : x)));
+      await posli({ id: u.id, rodic: rodic.rodic });
+    } else {
+      await presunDoVetvy(u, vetvaUzla(u.id, uzly));
+      return;
+    }
+    nacitaj();
+  };
+
   const nastavFazu = async (id: string, f: number) => {
     setRiadky((r) => r.map((x) => (x.id === id ? { ...x, faza: f } : x)));
     await posli({ id, faza: f });
@@ -255,7 +294,7 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
     const f = farbaVetvy(vetvaUzla(u.id, uzly));
     const deti = uzly.filter((x) => x.rodic === u.id).length;
     return (
-      <div key={u.id} style={{ position: "absolute", left: p.x, top: p.y, display: "flex", alignItems: "center", gap: 7 }}>
+      <div key={u.id} style={{ position: "absolute", left: p.x, top: p.y, display: "flex", alignItems: "center", gap: 7, zIndex: presunPre === u.id ? 4 : undefined }}>
         <input
           type="text"
           aria-label="Nápad"
@@ -265,7 +304,8 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
           onChange={(e) => void uprav(u.id, e.target.value)}
           onBlur={() => void ulozText(u.id, u.text)}
           onKeyDown={(e) => {
-            if (e.key === "Tab") { e.preventDefault(); void zaloz(u.id, "", deti); }
+            if (e.key === "Tab" && e.shiftKey) { e.preventDefault(); void oUrovenVyssie(u); }
+            else if (e.key === "Tab") { e.preventDefault(); void zaloz(u.id, "", deti); }
             else if (e.key === "Enter") { e.preventDefault(); void zaloz(u.rodic, u.rodic ? "" : vetvaUzla(u.id, uzly), u.poradie + 1); }
             else if (e.key === "Backspace" && !u.text) { e.preventDefault(); void zmaz(u.id); }
             // Escape ukladá SÁM, nespolieha sa na blur — obsluha odchodu
@@ -296,6 +336,48 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
         >
           +
         </button>
+        <button
+          type="button"
+          aria-label="Presunúť do inej vetvy"
+          title="Presunúť do inej vetvy"
+          onClick={() => setPresunPre(presunPre === u.id ? null : u.id)}
+          style={{ width: 30, height: 30, flexShrink: 0, borderRadius: "50%", padding: 0, border: `1px solid ${presunPre === u.id ? C.accent : "transparent"}`, background: "transparent", color: presunPre === u.id ? C.accentLight : C.textDim, fontFamily: "inherit", fontSize: 13, lineHeight: 1, cursor: "pointer" }}
+        >
+          ⇄
+        </button>
+        {presunPre === u.id && (
+          <div style={{ position: "absolute", left: 0, top: 46, zIndex: 3, minWidth: 210, padding: 6, borderRadius: 11, background: C.surface, border: `1px solid ${mix(C.border, 140)}`, boxShadow: "0 10px 26px rgba(0,0,0,.45)" }}>
+            <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 1, color: C.textDim, padding: "4px 8px 6px" }}>PRESUNÚŤ DO VETVY</div>
+            {VETVY.map((v) => {
+              const tu = !u.rodic && vetvaUzla(u.id, uzly) === v.id;
+              return (
+                <button
+                  key={v.id}
+                  type="button"
+                  onClick={() => void presunDoVetvy(u, v.id)}
+                  disabled={tu}
+                  style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", textAlign: "left", padding: "7px 8px", borderRadius: 8, border: "none", background: "transparent", color: tu ? C.textDim : C.text, fontFamily: "inherit", fontSize: 12.5, cursor: tu ? "default" : "pointer" }}
+                >
+                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: v.farba, flexShrink: 0 }} />
+                  {v.nazov}
+                  {tu && <span style={{ marginLeft: "auto", fontSize: 11, color: C.textDim }}>tu je</span>}
+                </button>
+              );
+            })}
+            {!!u.rodic && (
+              <button
+                type="button"
+                onClick={() => void oUrovenVyssie(u)}
+                style={{ display: "block", width: "100%", textAlign: "left", padding: "7px 8px", marginTop: 4, borderTop: `1px solid ${mix(C.border, 60)}`, borderLeft: "none", borderRight: "none", borderBottom: "none", background: "transparent", color: C.textMuted, fontFamily: "inherit", fontSize: 12.5, cursor: "pointer" }}
+              >
+                o úroveň vyššie <span style={{ color: C.textDim }}>· shift+Tab</span>
+              </button>
+            )}
+            <div style={{ fontSize: 10.5, lineHeight: 1.45, color: C.textDim, padding: "6px 8px 2px" }}>
+              Nadväzujúce nápady idú s ním.
+            </div>
+          </div>
+        )}
       </div>
     );
   };
@@ -359,6 +441,7 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
             <span><b style={{ color: C.text }}>Tab</b> vetva nižšie</span>
             <span><b style={{ color: C.text }}>Enter</b> ďalšia vedľa</span>
             <span><b style={{ color: C.text }}>⌫</b> na prázdnej zmaže</span>
+            <span><b style={{ color: C.text }}>⇄</b> presunie do inej vetvy</span>
             <span style={{ flexGrow: 1 }} />
             <span>dva prsty na trackpade — štipnutím priblížiš a oddiališ</span>
             <div style={{ display: "flex", alignItems: "center", gap: 2, padding: 2, borderRadius: 8, border: `1px solid ${C.border}`, background: C.card }}>
@@ -404,6 +487,17 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
                   </div>
                 );
               })}
+              {/* Klik mimo ponuky ju zavrie. Je to tlačidlo, nie div —
+                  neviditeľná plocha, na ktorú sa dá kliknúť, musí byť
+                  dosiahnuteľná aj klávesom. */}
+              {presunPre && (
+                <button
+                  type="button"
+                  aria-label="Zavrieť ponuku presunu"
+                  onClick={() => setPresunPre(null)}
+                  style={{ position: "absolute", inset: 0, zIndex: 2, border: "none", background: "transparent", cursor: "default", padding: 0 }}
+                />
+              )}
               {vidno.map(bublina)}
             </div>
             </div>
