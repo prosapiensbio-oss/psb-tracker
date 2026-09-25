@@ -1093,6 +1093,12 @@ export function Marketing({ data, clients, leads, chat, sub, onSub, onKlient, re
   // v deps nižšie zabezpečí prekreslenie, keď dorazia.
   const [, tik] = useState(0);
   useEffect(() => { tik((x) => x + 1); }, [marketingVerzia()]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Uložená adresa #marketing/prehlad by v ostrom Kokpite ukázala prázdno:
+  // záložka tam nie je, takže by sa nevykreslil ani Prehľad, ani nič iné.
+  // Presmerovanie, nie mazanie — to isté pravidlo ako pri zrušených id.
+  useEffect(() => {
+    if (!jeBeta() && sub === "prehlad") onSub("dopyty");
+  }, [sub, onSub]);
   // The header used to sum all 18 months no matter which year was selected —
   // the switch looked broken because the summary never moved.
   const vRoku = MKT_MESACNE.filter((r) => r.m.startsWith(rok));

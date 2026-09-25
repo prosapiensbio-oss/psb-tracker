@@ -3246,6 +3246,11 @@ export function Vzas({ sub, onSub, data, clients, focus, onNavigate, pohybSplits
     for (const m of monthlyFinance(data)) cash[m.month] = m.cash;
     if (nastavPrijmyZTrackera(cash)) tik((x) => x + 1);
   }, [data]);
+  // Tá istá poistka ako v Marketingu: adresa #vzas/prehlad uložená z bety by
+  // v ostrom Kokpite nevykreslila nič — sekcia sa nenájde a obsah tiež nie.
+  useEffect(() => {
+    if (!jeBeta() && sub === "prehlad") onSub("trzby");
+  }, [sub, onSub]);
   return (
     <>
       {/* Dve úrovne namiesto ôsmich pilulí v jednom rade. Osem plochých
