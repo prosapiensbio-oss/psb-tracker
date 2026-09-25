@@ -49,6 +49,16 @@ export function PeniazePrehlad({ data, onNavigate }: {
   data: PSBData;
   onNavigate?: (tab: string, sub?: string, focus?: { client?: string; nonce?: number }) => void;
 }) {
+  /**
+   * Zoznam nezaplatených je ZABALENÝ a otvára ho klik na dlaždicu.
+   *
+   * Jerry, 25. 9. 2026: „tú tabuľku schovaj, daj ju úplne preč — ale keď
+   * kliknem na Nezaplatené, nech sa objaví presne tam, kde je." Dvanásť
+   * riadkov mien a súm je tu otvorených zbytočne: prehľad má odpovedať
+   * číslom a rozpad si má vypýtať ten, kto ho práve potrebuje. Preto sa
+   * vykresľuje NA MIESTE, hneď pod dlaždicami — nikam to neskočí.
+   */
+  const [nezaplateneOtvorene, setNezaplateneOtvorene] = useState(false);
   const [btcCzk, setBtcCzk] = useState<number | null>(null);
   const [ucet, setUcet] = useState<{ suma: number; datum: string } | null>(null);
   const [hotovost, setHotovost] = useState<{ suma: number; datum: string } | null>(null);
@@ -208,14 +218,13 @@ export function PeniazePrehlad({ data, onNavigate }: {
       pasmo: nezaplatene === 0 ? "ok" : nezaplatene > 30000 ? "zle" : "pozor",
       poznamka: nezaplatene === 0
         ? "Nikto nič nedlhuje."
-        : "Predané balíčky a úvodné tréningy, ktoré PTminder eviduje ako nezaplatené. Kto a za čo — v zozname nižšie.",
+        : `Predané balíčky a úvodné tréningy, ktoré PTminder eviduje ako nezaplatené. Klik ${nezaplateneOtvorene ? "zoznam zavrie" : "ukáže, kto a za čo"}.`,
       vysvetlenie: "Otvorené položky z PTminderu (Transactions). Po zaplatení sa tam mažú, takže čo je v zozname, je podľa PTmindera otvorené — ale platba a balíček sa nemusia stretnúť: kto poslal peniaze na účet a v PTminderi sa to nespárovalo, tu stále visí. Na Dnes je tá istá karta filtrovaná prepínačom trénera; tu sú zámerne obaja, lebo peniaze firmy sú jedny.",
       dobreHore: false,
       // Preklik viedol na Dnes a človek pristál hore na dashboarde — číslo
-      // teda poslalo hľadať. Vedie na zoznam pod tým istým číslom.
-      kam: nezaplatene
-        ? () => document.getElementById("pp-zoznam-nezaplatene")?.scrollIntoView({ behavior: "smooth", block: "start" })
-        : undefined,
+      // teda poslalo hľadať. Teraz rozbalí zoznam pod sebou a druhý klik ho
+      // zase zavrie.
+      kam: nezaplatene ? () => setNezaplateneOtvorene((x) => !x) : undefined,
     },
     {
       id: "pp-jarek",
@@ -254,13 +263,19 @@ export function PeniazePrehlad({ data, onNavigate }: {
         stlpcov={4}
       />
 
-      {nezaplatene > 0 && (
+      {nezaplatene > 0 && nezaplateneOtvorene && (
         <Card id="pp-zoznam-nezaplatene">
           <H3>
             <Info
               label={`Nezaplatené · ${(data.poplatky || []).length} položiek · ${fmtCZK(nezaplatene)}`}
               text="Zoznam je presne to, čo v PTminderi stojí ako otvorená transakcia — predaný balíček alebo úvodný tréning, ku ktorému sa nepripísala platba. Klik na riadok otvorí profil klienta, kde sú jeho platby a dá sa priradiť aj bankový prevod."
             />
+            <button
+              onClick={() => setNezaplateneOtvorene(false)}
+              style={{ marginLeft: 10, background: "none", border: "none", padding: 0, color: C.textDim, fontSize: 11.5, cursor: "pointer", fontFamily: "inherit" }}
+            >
+              zavrieť
+            </button>
           </H3>
           <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
             {[...(data.poplatky || [])].sort((a, b) => b.datum.localeCompare(a.datum)).map((x) => (
