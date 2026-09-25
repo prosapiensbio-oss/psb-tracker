@@ -34,10 +34,14 @@ async function posli(telo: Record<string, unknown>) {
     headers: { "content-type": "application/json" },
     body: JSON.stringify(telo),
   });
-  return (await r.json()) as { ok: boolean; error?: string; pridanych?: number; preskocenych?: number; preskocene?: string[] };
+  return (await r.json()) as { ok: boolean; error?: string; id?: string; pridanych?: number; preskocenych?: number; preskocene?: string[] };
 }
 
-export function BalickyEvidencia({ mena }: { mena: string[] }) {
+export function BalickyEvidencia({ mena, onFaktura }: {
+  mena: string[];
+  /** Ponuka „vystaviť faktúru" po zapísaní balíčka; bez nej sa neukáže. */
+  onFaktura?: (p: { klient: string; popis: string; cena: number; balicekId?: string }) => void;
+}) {
   const [balicky, setBalicky] = useState<Balicek[] | null>(null);
   const [p, setP] = useState<Porovnanie | null>(null);
   const [chyba, setChyba] = useState("");
@@ -46,6 +50,14 @@ export function BalickyEvidencia({ mena }: { mena: string[] }) {
   const [pisem, setPisem] = useState(false);
   const [detail, setDetail] = useState(false);
   const [f, setF] = useState({ klient: "", nazov: "", hodiny: "", platnostOd: new Date().toISOString().slice(0, 10), platnostDo: "", cenaCzk: "", poznamka: "" });
+  /**
+   * Čo sa práve zapísalo — kvôli ponuke faktúry.
+   *
+   * Jerry, 26. 9. 2026: „pohľadávka vzniká vytvorením balíčka a tým vzniká aj
+   * potreba platby." Ponuka sa preto ukáže presne tu a hneď, nie ako ďalšia
+   * položka niekde v menu.
+   */
+  const [posledny, setPosledny] = useState<{ klient: string; nazov: string; cena: number; id?: string } | null>(null);
 
   const nacitaj = useCallback(async () => {
     const r = await fetch("/api/balicky", { credentials: "same-origin" });
@@ -58,13 +70,13 @@ export function BalickyEvidencia({ mena }: { mena: string[] }) {
     setPracujem(znacka); setChyba(""); setHlaska("");
     const j = await posli(telo).catch(() => ({ ok: false, error: "spojenie" } as Awaited<ReturnType<typeof posli>>));
     setPracujem("");
-    if (!j.ok) { setChyba(j.error || "nepodarilo sa uložiť"); return false; }
+    if (!j.ok) { setChyba(j.error || "nepodarilo sa uložiť"); return null; }
     if (typeof j.pridanych === "number") {
       setHlaska(`Naliatych ${j.pridanych} balíčkov z exportu${j.preskocenych ? `, ${j.preskocenych} preskočených (bez dátumu platnosti)` : ""}.`);
     }
     await nacitaj();
     oznam("peniaze");
-    return true;
+    return j;
   };
 
   if (!balicky) return null;
@@ -209,11 +221,38 @@ export function BalickyEvidencia({ mena }: { mena: string[] }) {
           ))}
           <datalist id="balicky-klienti">{mena.map((m) => <option key={m} value={m} />)}</datalist>
           <button
-            onClick={async () => { if (await akcia({ akcia: "pridaj", ...f }, "pridaj")) { setF({ ...f, klient: "", nazov: "", hodiny: "", cenaCzk: "", poznamka: "" }); setPisem(false); } }}
+            onClick={async () => {
+              const j = await akcia({ akcia: "pridaj", ...f }, "pridaj");
+              if (!j) return;
+              setPosledny({ klient: f.klient, nazov: f.nazov, cena: Number(f.cenaCzk) || 0, id: typeof j.id === "string" ? j.id : undefined });
+              setF({ ...f, klient: "", nazov: "", hodiny: "", cenaCzk: "", poznamka: "" });
+              setPisem(false);
+            }}
             disabled={pracujem === "pridaj"}
             style={{ padding: "8px 14px", borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: "pointer", border: `1px solid ${mix(C.green, 45)}`, background: mix(C.green, 12), color: C.green }}
           >
             {pracujem === "pridaj" ? "…" : "Uložiť"}
+          </button>
+        </div>
+      )}
+
+      {posledny && onFaktura && (
+        <div style={{ marginTop: 10, padding: "9px 11px", borderRadius: 9, border: `1px solid ${mix(C.accentLight, 40)}`, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <span style={{ fontSize: 12.5, color: C.text }}>
+            Zapísaný balíček <b>{posledny.nazov}</b> pre {posledny.klient}
+            {posledny.cena ? ` za ${Math.round(posledny.cena)} Kč` : ""}.
+          </span>
+          <button
+            onClick={() => { onFaktura({ klient: posledny.klient, popis: posledny.nazov, cena: posledny.cena, balicekId: posledny.id }); setPosledny(null); }}
+            style={{ padding: "6px 12px", borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: "pointer", border: `1px solid ${mix(C.accent, 45)}`, background: mix(C.accent, 12), color: C.accentLight }}
+          >
+            Vystaviť faktúru
+          </button>
+          <button
+            onClick={() => setPosledny(null)}
+            style={{ background: "none", border: "none", color: C.textDim, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}
+          >
+            netreba
           </button>
         </div>
       )}

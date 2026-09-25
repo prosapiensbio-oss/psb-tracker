@@ -22,6 +22,7 @@ import { Route as ApiVzasWeeksRouteImport } from './routes/api/vzas-weeks'
 import { Route as ApiVzasStatusRouteImport } from './routes/api/vzas-status'
 import { Route as ApiVzasSettingsRouteImport } from './routes/api/vzas-settings'
 import { Route as ApiVzasNotesRouteImport } from './routes/api/vzas-notes'
+import { Route as ApiVydaneFakturyRouteImport } from './routes/api/vydane-faktury'
 import { Route as ApiVedomostRouteImport } from './routes/api/vedomost'
 import { Route as ApiUsersRouteImport } from './routes/api/users'
 import { Route as ApiTitulkaObrazokRouteImport } from './routes/api/titulka-obrazok'
@@ -138,6 +139,11 @@ const ApiVzasSettingsRoute = ApiVzasSettingsRouteImport.update({
 const ApiVzasNotesRoute = ApiVzasNotesRouteImport.update({
   id: '/api/vzas-notes',
   path: '/api/vzas-notes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiVydaneFakturyRoute = ApiVydaneFakturyRouteImport.update({
+  id: '/api/vydane-faktury',
+  path: '/api/vydane-faktury',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiVedomostRoute = ApiVedomostRouteImport.update({
@@ -459,6 +465,7 @@ export interface FileRoutesByFullPath {
   '/api/titulka-obrazok': typeof ApiTitulkaObrazokRoute
   '/api/users': typeof ApiUsersRoute
   '/api/vedomost': typeof ApiVedomostRoute
+  '/api/vydane-faktury': typeof ApiVydaneFakturyRoute
   '/api/vzas-notes': typeof ApiVzasNotesRoute
   '/api/vzas-settings': typeof ApiVzasSettingsRoute
   '/api/vzas-status': typeof ApiVzasStatusRoute
@@ -526,6 +533,7 @@ export interface FileRoutesByTo {
   '/api/titulka-obrazok': typeof ApiTitulkaObrazokRoute
   '/api/users': typeof ApiUsersRoute
   '/api/vedomost': typeof ApiVedomostRoute
+  '/api/vydane-faktury': typeof ApiVydaneFakturyRoute
   '/api/vzas-notes': typeof ApiVzasNotesRoute
   '/api/vzas-settings': typeof ApiVzasSettingsRoute
   '/api/vzas-status': typeof ApiVzasStatusRoute
@@ -594,6 +602,7 @@ export interface FileRoutesById {
   '/api/titulka-obrazok': typeof ApiTitulkaObrazokRoute
   '/api/users': typeof ApiUsersRoute
   '/api/vedomost': typeof ApiVedomostRoute
+  '/api/vydane-faktury': typeof ApiVydaneFakturyRoute
   '/api/vzas-notes': typeof ApiVzasNotesRoute
   '/api/vzas-settings': typeof ApiVzasSettingsRoute
   '/api/vzas-status': typeof ApiVzasStatusRoute
@@ -663,6 +672,7 @@ export interface FileRouteTypes {
     | '/api/titulka-obrazok'
     | '/api/users'
     | '/api/vedomost'
+    | '/api/vydane-faktury'
     | '/api/vzas-notes'
     | '/api/vzas-settings'
     | '/api/vzas-status'
@@ -730,6 +740,7 @@ export interface FileRouteTypes {
     | '/api/titulka-obrazok'
     | '/api/users'
     | '/api/vedomost'
+    | '/api/vydane-faktury'
     | '/api/vzas-notes'
     | '/api/vzas-settings'
     | '/api/vzas-status'
@@ -797,6 +808,7 @@ export interface FileRouteTypes {
     | '/api/titulka-obrazok'
     | '/api/users'
     | '/api/vedomost'
+    | '/api/vydane-faktury'
     | '/api/vzas-notes'
     | '/api/vzas-settings'
     | '/api/vzas-status'
@@ -865,6 +877,7 @@ export interface RootRouteChildren {
   ApiTitulkaObrazokRoute: typeof ApiTitulkaObrazokRoute
   ApiUsersRoute: typeof ApiUsersRoute
   ApiVedomostRoute: typeof ApiVedomostRoute
+  ApiVydaneFakturyRoute: typeof ApiVydaneFakturyRoute
   ApiVzasNotesRoute: typeof ApiVzasNotesRoute
   ApiVzasSettingsRoute: typeof ApiVzasSettingsRoute
   ApiVzasStatusRoute: typeof ApiVzasStatusRoute
@@ -966,6 +979,13 @@ declare module '@tanstack/react-router' {
       path: '/api/vzas-notes'
       fullPath: '/api/vzas-notes'
       preLoaderRoute: typeof ApiVzasNotesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/vydane-faktury': {
+      id: '/api/vydane-faktury'
+      path: '/api/vydane-faktury'
+      fullPath: '/api/vydane-faktury'
+      preLoaderRoute: typeof ApiVydaneFakturyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/vedomost': {
@@ -1393,6 +1413,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiTitulkaObrazokRoute: ApiTitulkaObrazokRoute,
   ApiUsersRoute: ApiUsersRoute,
   ApiVedomostRoute: ApiVedomostRoute,
+  ApiVydaneFakturyRoute: ApiVydaneFakturyRoute,
   ApiVzasNotesRoute: ApiVzasNotesRoute,
   ApiVzasSettingsRoute: ApiVzasSettingsRoute,
   ApiVzasStatusRoute: ApiVzasStatusRoute,

@@ -22,7 +22,11 @@ import { Card, H3 } from "./ui";
  * sa mazala ťažšie: prerástla by do neho.
  */
 
-export function Prechod({ mena }: { mena: string[] }) {
+export function Prechod({ mena, onFaktura }: {
+  mena: string[];
+  /** Ponuka faktúry po zapísaní balíčka; Prechod ju len podáva ďalej. */
+  onFaktura?: (p: { klient: string; popis: string; cena: number; balicekId?: string }) => void;
+}) {
   const [porovnanie, setPorovnanie] = useState<Porovnanie | null>(null);
   const [nacitane, setNacitane] = useState(false);
 
@@ -56,7 +60,7 @@ export function Prechod({ mena }: { mena: string[] }) {
         </Card>
       )}
       {porovnanie && <div id="prechod-dochadzka"><SubeznyChod p={porovnanie} /></div>}
-      <div id="prechod-balicky"><BalickyEvidencia mena={mena} /></div>
+      <div id="prechod-balicky"><BalickyEvidencia mena={mena} onFaktura={onFaktura} /></div>
       <div id="prechod-platby"><PlatbyEvidencia mena={mena} /></div>
 
       <Card style={{ background: mix(C.border, 25) }}>
