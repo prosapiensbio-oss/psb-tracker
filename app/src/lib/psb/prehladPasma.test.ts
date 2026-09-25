@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { diagnozaLievika, pasmoZoSkore, smerDlhu } from "./prehladPasma";
+import { diagnozaLievika, pasmoZoSkore, popisPoplatku, smerDlhu } from "./prehladPasma";
 
 describe("pásma dlaždíc", () => {
   it("hranice sedia na to, čo hovorí veta pod číslom", () => {
@@ -60,5 +60,26 @@ describe("smer dlhu voči trénerovi", () => {
   });
   it("nula je vyrovnanie, nie dlh", () => {
     expect(smerDlhu("Jerry", "Jerrymu", 0, s)).toBe("Jerry vyrovnané");
+  });
+});
+
+describe("popis poplatku z PTmindera", () => {
+  it("zahodí dátumy platnosti, nechá produkt", () => {
+    expect(popisPoplatku("OFF - 6h S viazanostou - from 17/09/2026 to 17/10/2026"))
+      .toBe("6h S viazanostou");
+  });
+
+  it("zľavu nechá — inak sa suma 6 621,50 Kč nedá vysvetliť", () => {
+    expect(popisPoplatku("OFF - 6h BEZ viazanosti - from 18/09/2026 to 13/11/2026 (Promo code 'DC15' 15% discount applied)"))
+      .toBe("6h BEZ viazanosti · zľava 15 %");
+  });
+
+  it("úvodný tréning je úvodný tréning, nie dátum s časom", () => {
+    expect(popisPoplatku("Uvodny trenink OFFLINE - 14/09/2026 18:00 (attended)"))
+      .toBe("Úvodný tréning (offline)");
+  });
+
+  it("prázdny popis nespadne", () => {
+    expect(popisPoplatku("")).toBe("—");
   });
 });

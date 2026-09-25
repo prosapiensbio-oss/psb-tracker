@@ -101,3 +101,21 @@ export function smerDlhu(kto: string, komu: string, cumDebt: number, suma: (x: n
     ? `firma dlží ${komu} ${suma(cumDebt)}`
     : `${kto} má vybraté o ${suma(-cumDebt)} viac`;
 }
+
+/**
+ * Z popisu poplatku z PTmindera urobí vetu, ktorú sa dá prečítať.
+ *
+ * Export dáva veci ako „OFF - 6h BEZ viazanosti - from 18/09/2026 to
+ * 13/11/2026 (Promo code 'DC15' 15% discount applied)". Dátumy platnosti sú
+ * v zozname zbytočné — ten má odpovedať na „za čo to je", nie „dokedy platí".
+ * Zľava sa NEZAHADZUJE: je to jediné miesto, kde je pri sume vidieť, prečo
+ * nie je okrúhla.
+ */
+export function popisPoplatku(popis: string): string {
+  const s = (popis || "").trim();
+  if (!s) return "—";
+  if (/^uvodny\s+trenink/i.test(s)) return /offline/i.test(s) ? "Úvodný tréning (offline)" : "Úvodný tréning";
+  const zlava = s.match(/(\d{1,2})\s*%\s*discount/i);
+  const hlavne = s.split(/\s+-\s+from\s+/i)[0].replace(/^OFF\s*-\s*/i, "").trim() || s;
+  return zlava ? `${hlavne} · zľava ${zlava[1]} %` : hlavne;
+}

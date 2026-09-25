@@ -9,7 +9,7 @@ import {
   MATYAS, VZAS_MONTHS, VZAS_MONTH_LABELS, VZAS_TARGETS,
   breakEvenRad, byCommitment, jarekCalc, pnlCalc, salaryCalc, vzasVerzia,
 } from "../../lib/psb/vzas";
-import { smerDlhu } from "../../lib/psb/prehladPasma";
+import { popisPoplatku, smerDlhu } from "../../lib/psb/prehladPasma";
 import { PristrojeMriezka, type Pasmo, type Pristroj } from "./Prehlad";
 import { Card, H3, Info } from "./ui";
 
@@ -47,7 +47,7 @@ const priemer = (a: number[]) => (a.length ? a.reduce((x, y) => x + y, 0) / a.le
 
 export function PeniazePrehlad({ data, onNavigate }: {
   data: PSBData;
-  onNavigate?: (tab: string, sub?: string) => void;
+  onNavigate?: (tab: string, sub?: string, focus?: { client?: string; nonce?: number }) => void;
 }) {
   const [btcCzk, setBtcCzk] = useState<number | null>(null);
   const [ucet, setUcet] = useState<{ suma: number; datum: string } | null>(null);
@@ -206,10 +206,16 @@ export function PeniazePrehlad({ data, onNavigate }: {
       hodnota: fmtCZK(nezaplatene),
       podnadpis: `${(data.poplatky || []).length} poplatkov · obaja tréneri`,
       pasmo: nezaplatene === 0 ? "ok" : nezaplatene > 30000 ? "zle" : "pozor",
-      poznamka: nezaplatene === 0 ? "Nikto nič nedlhuje." : "Peniaze za odtrénované hodiny, ktoré nikto nevypýtal.",
-      vysvetlenie: "Otvorené poplatky z PTminderu. Po zaplatení sa v PTminderi mažú, takže čo je v zozname, je naozaj otvorené. Na Dnes je tá istá karta filtrovaná prepínačom trénera — tu sú zámerne obaja, lebo peniaze firmy sú jedny.",
+      poznamka: nezaplatene === 0
+        ? "Nikto nič nedlhuje."
+        : "Predané balíčky a úvodné tréningy, ktoré PTminder eviduje ako nezaplatené. Kto a za čo — v zozname nižšie.",
+      vysvetlenie: "Otvorené položky z PTminderu (Transactions). Po zaplatení sa tam mažú, takže čo je v zozname, je podľa PTmindera otvorené — ale platba a balíček sa nemusia stretnúť: kto poslal peniaze na účet a v PTminderi sa to nespárovalo, tu stále visí. Na Dnes je tá istá karta filtrovaná prepínačom trénera; tu sú zámerne obaja, lebo peniaze firmy sú jedny.",
       dobreHore: false,
-      kam: onNavigate ? () => onNavigate("dashboard") : undefined,
+      // Preklik viedol na Dnes a človek pristál hore na dashboarde — číslo
+      // teda poslalo hľadať. Vedie na zoznam pod tým istým číslom.
+      kam: nezaplatene
+        ? () => document.getElementById("pp-zoznam-nezaplatene")?.scrollIntoView({ behavior: "smooth", block: "start" })
+        : undefined,
     },
     {
       id: "pp-jarek",
@@ -247,6 +253,47 @@ export function PeniazePrehlad({ data, onNavigate }: {
         pristroje={dlhodobo}
         stlpcov={4}
       />
+
+      {nezaplatene > 0 && (
+        <Card id="pp-zoznam-nezaplatene">
+          <H3>
+            <Info
+              label={`Nezaplatené · ${(data.poplatky || []).length} položiek · ${fmtCZK(nezaplatene)}`}
+              text="Zoznam je presne to, čo v PTminderi stojí ako otvorená transakcia — predaný balíček alebo úvodný tréning, ku ktorému sa nepripísala platba. Klik na riadok otvorí profil klienta, kde sú jeho platby a dá sa priradiť aj bankový prevod."
+            />
+          </H3>
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            {[...(data.poplatky || [])].sort((a, b) => b.datum.localeCompare(a.datum)).map((x) => (
+              <button
+                key={x.id}
+                onClick={onNavigate ? () => onNavigate("klienti", undefined, { client: x.klient, nonce: Date.now() }) : undefined}
+                style={{
+                  display: "flex", alignItems: "baseline", gap: 10, width: "100%", textAlign: "left",
+                  background: "none", border: "none", borderBottom: `1px solid ${mix(C.border, 40)}`,
+                  padding: "7px 2px", margin: 0, cursor: onNavigate ? "pointer" : "default", fontFamily: "inherit",
+                }}
+              >
+                <span style={{ width: 64, flexShrink: 0, fontSize: 11.5, color: C.textDim, fontVariantNumeric: "tabular-nums" }}>
+                  {`${Number(x.datum.slice(8, 10))}. ${Number(x.datum.slice(5, 7))}.`}
+                </span>
+                <span style={{ width: 170, flexShrink: 0, fontSize: 12.5, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {x.klient}
+                </span>
+                <span style={{ flex: 1, fontSize: 12, color: C.textMuted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {popisPoplatku(x.popis)}
+                </span>
+                <span style={{ fontSize: 12.5, color: C.text, fontWeight: 600, fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap" }}>
+                  {fmtCZK(x.suma)}
+                </span>
+              </button>
+            ))}
+          </div>
+          <div style={{ fontSize: 11, color: C.textDim, marginTop: 8, lineHeight: 1.5 }}>
+            Ten istý klient môže mať dva riadky — sú to dva predané balíčky, nie chyba. A riadok tu môže
+            visieť aj po zaplatení, keď platba prišla na účet a v PTminderi sa k balíčku nepripísala.
+          </div>
+        </Card>
+      )}
 
       <Card>
         <H3>
