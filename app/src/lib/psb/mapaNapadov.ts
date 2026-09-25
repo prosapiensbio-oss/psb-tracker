@@ -177,7 +177,14 @@ const TAU = Math.PI * 2;
  * ju nemá kam vrátiť. Potomkovia posunutej bubliny sa počítajú od nej, takže
  * sa presunie celý konár — inak by čiary viedli cez pol plochy.
  */
-export function rozlozMapu(uzly: Uzol[], koren: { text: string } = { text: "" }): Rozlozenie {
+export type RucnePozicie = Record<string, { x: number; y: number }>;
+
+export function rozlozMapu(
+  uzly: Uzol[],
+  koren: { text: string } = { text: "" },
+  /** Ručné miesta kmeňa a vetiev — kľúče "koren" a "vetva:<id>". */
+  rucne: RucnePozicie = {},
+): Rozlozenie {
   const deti = detiPodla(uzly);
   const poz: Record<string, Miesto> = {};
 
@@ -216,7 +223,8 @@ export function rozlozMapu(uzly: Uzol[], koren: { text: string } = { text: "" })
     }
   };
 
-  uloz("koren", STRED.x, STRED.y, koren.text, 0);
+  const stredKmena = rucne["koren"] || STRED;
+  uloz("koren", stredKmena.x, stredKmena.y, koren.text, 0);
 
   // Tri vetvy dookola. Začína sa vľavo hore, aby prvá (úvodný tréning)
   // sedela tam, kam oko na obrazovke chodí ako prvé.
@@ -228,13 +236,20 @@ export function rozlozMapu(uzly: Uzol[], koren: { text: string } = { text: "" })
   let uhol0 = -Math.PI * 0.85;
   for (const { v, korene, vaha } of vahy) {
     const uhol1 = uhol0 + TAU * (vaha / suma);
-    const stredVetvy = (uhol0 + uhol1) / 2;
-    uloz("vetva:" + v.id, STRED.x + Math.cos(stredVetvy) * KROK, STRED.y + Math.sin(stredVetvy) * KROK, v.nazov, 1);
+    const stredUseku = (uhol0 + uhol1) / 2;
+    const rucnaVetva = rucne["vetva:" + v.id];
+    const vx = rucnaVetva ? rucnaVetva.x : stredKmena.x + Math.cos(stredUseku) * KROK;
+    const vy = rucnaVetva ? rucnaVetva.y : stredKmena.y + Math.sin(stredUseku) * KROK;
+    uloz("vetva:" + v.id, vx, vy, v.nazov, 1);
+    // Presunutá vetva ťahá svoj konár za sebou — rovnako ako presunutý nápad.
+    const zaklad = rucnaVetva ? Math.atan2(vy - stredKmena.y, vx - stredKmena.x) : stredUseku;
+    const rozpatie = rucnaVetva ? Math.PI * 0.9 : (uhol1 - uhol0);
+    const zac = rucnaVetva ? zaklad - rozpatie / 2 : uhol0;
     const celkom = korene.reduce((a, u) => a + listov(u.id), 0) || 1;
-    let u0 = uhol0;
+    let u0 = zac;
     for (const u of korene) {
-      const u1 = u0 + (uhol1 - uhol0) * (listov(u.id) / celkom);
-      chod(u, u0, u1, KROK * 2, 2, STRED.x, STRED.y);
+      const u1 = u0 + rozpatie * (listov(u.id) / celkom);
+      chod(u, u0, u1, rucnaVetva ? KROK : KROK * 2, 2, rucnaVetva ? vx : stredKmena.x, rucnaVetva ? vy : stredKmena.y);
       u0 = u1;
     }
     uhol0 = uhol1;

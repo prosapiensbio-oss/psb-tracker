@@ -51,7 +51,7 @@ type Riadok = {
 };
 
 /** Mapa je obal: zoznam nápadov, ktoré patria k sebe. */
-type Mapa = { id: string; nazov: string; poradie?: number };
+type Mapa = { id: string; nazov: string; poradie?: number; pozicie?: string };
 
 const KLUC_MAPY = "psb-mapa-napadov";
 
@@ -189,7 +189,11 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
     }).then((r) => r.json()).catch(() => ({ ok: false, error: "spojenie" }));
     if (!j?.ok) { setChyba(j?.error || "Zmena sa nezapísala — skús znova."); return null; }
     setChyba("");
-    return String(j.id || telo.id || "");
+    // Úspech musí byť VŽDY pravdivý. Akcie nad mapou (posun vetvy,
+    // premenovanie) nevracajú žiadne id, takže prázdny reťazec by sa
+    // v `if (await posli(...))` čítal ako neúspech — a krok späť by sa
+    // nezapamätal. Stálo to jeden presun vetvy, ktorý sa nedal vrátiť.
+    return String(j.id || telo.id || "ok");
   };
 
   const uzly = useMemo<Uzol[]>(() => {
@@ -215,7 +219,16 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
   }, [riadky, novy, mapaId]);
 
   const nazovMapy = mapy.find((m) => m.id === mapaId)?.nazov || "Obsah";
-  const { poz, vyska, sirka } = useMemo(() => rozlozMapu(uzly, { text: nazovMapy }), [uzly, nazovMapy]);
+  /** Ručné miesta kmeňa a vetiev — sú uložené pri mape, nie pri nápade. */
+  const rucnePozicie = useMemo<Record<string, { x: number; y: number }>>(() => {
+    const raw = mapy.find((m) => m.id === mapaId)?.pozicie || "";
+    if (!raw) return {};
+    try { return JSON.parse(raw) as Record<string, { x: number; y: number }>; } catch { return {}; }
+  }, [mapy, mapaId]);
+  const { poz, vyska, sirka } = useMemo(
+    () => rozlozMapu(uzly, { text: nazovMapy }, rucnePozicie),
+    [uzly, nazovMapy, rucnePozicie],
+  );
 
   /** Uloží rozpísaný uzol (alebo ho zahodí, keď je prázdny). */
   const dopis = useCallback(async (vratFokus = false): Promise<string | null> => {
@@ -481,14 +494,29 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
     } else nacitaj();
   };
 
+  /** Uloží miesto kmeňa alebo vetvy (kľúč "koren" / "vetva:<id>"). */
+  const ulozPoziciuPevnej = async (kluc: string, x: number, y: number) => {
+    const predtym = rucnePozicie;
+    const nove = { ...predtym, [kluc]: { x: Math.round(x), y: Math.round(y) } };
+    setMapy((m) => m.map((z) => (z.id === mapaId ? { ...z, pozicie: JSON.stringify(nove) } : z)));
+    const ok = await posli({ akcia: "mapa-pozicie", mapaId, pozicie: nove });
+    if (!ok) { nacitaj(); return; }
+    zapamataj("posun bubliny", async () => { await posli({ akcia: "mapa-pozicie", mapaId, pozicie: predtym }); });
+    oznam("marketing");
+  };
+
   /** Vrátiť celé rozloženie appke — ručné pozície sa zahodia. */
   const vratRozlozenie = async () => {
     const rucne = uzly.filter((x) => x.posX != null || x.posY != null);
-    if (!rucne.length) return;
+    const pevne = Object.keys(rucnePozicie).length;
+    if (!rucne.length && !pevne) return;
     const zaloha = rucne.map((x) => ({ id: x.id, posX: x.posX ?? null, posY: x.posY ?? null }));
+    const zalohaPevnych = rucnePozicie;
     for (const x of rucne) await posli({ id: x.id, posX: null, posY: null });
-    zapamataj(`rozloženie (${rucne.length})`, async () => {
+    if (pevne) await posli({ akcia: "mapa-pozicie", mapaId, pozicie: {} });
+    zapamataj(`rozloženie (${rucne.length + pevne})`, async () => {
       for (const z of zaloha) await posli({ id: z.id, posX: z.posX, posY: z.posY });
+      if (pevne) await posli({ akcia: "mapa-pozicie", mapaId, pozicie: zalohaPevnych });
     });
     nacitaj();
     oznam("marketing");
@@ -576,39 +604,55 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
     return null;
   };
 
-  /** Spoločná obsluha ťahania pre bublinu aj vetvu. */
-  const tahaj = (u: Uzol) => ({
+  /**
+   * Obsluha ťahania. Rovnaká pre nápad, vetvu aj kmeň — Jerry chcel hýbať
+   * VŠETKÝMI bublinami, a vetva, ktorá sa jediná nedá chytiť, vyzerá ako
+   * pokazená. Rozdiel je len v tom, že vetva a kmeň sa nedajú nikam zavesiť,
+   * takže sa pri nich cieľ ani nehľadá.
+   */
+  const tahaj = (kluc: string, text: string, lenPosun: boolean) => ({
     onPointerDown: (e: React.PointerEvent) => {
       const t = e.target as HTMLElement;
       if (t.tagName === "INPUT" || t.closest("button")) return;
       e.preventDefault();
       setPresunPre(null);
       const b = bodVMape(e);
-      setTahanie({ id: u.id, text: u.text, x: b.x, y: b.y, ciel: null });
-      // Zachytenie ukazovateľa AŽ POTOM a v try: bez neho sa ťahanie stratí
-      // pri vyjdení z bubliny, ale výnimka pred `setTahanie` by ho zabila
-      // celé. Lepšie horšie ťahanie než žiadne.
+      setTahanie({ id: kluc, text, x: b.x, y: b.y, ciel: null });
       try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* bez zachytenia */ }
     },
     onPointerMove: (e: React.PointerEvent) => {
-      if (!tahanie || tahanie.id !== u.id) return;
+      if (!tahanie || tahanie.id !== kluc) return;
       const b = bodVMape(e);
-      setTahanie({ ...tahanie, x: b.x, y: b.y, ciel: cielPod(b, u.id) });
+      setTahanie({ ...tahanie, x: b.x, y: b.y, ciel: lenPosun ? null : cielPod(b, kluc) });
     },
     onPointerUp: (e: React.PointerEvent) => {
-      if (!tahanie || tahanie.id !== u.id) return;
+      if (!tahanie || tahanie.id !== kluc) return;
       const ciel = tahanie.ciel;
       const kam = { x: tahanie.x, y: tahanie.y };
       setTahanie(null);
+      try { (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId); } catch { /* nebolo čo pustiť */ }
+      if (lenPosun) { void ulozPoziciuPevnej(kluc, kam.x, kam.y); return; }
+      const u = uzly.find((x) => x.id === kluc);
+      if (!u) return;
       // Pustenie NAD uzlom alebo vetvou prevesí, pustenie na voľné miesto
       // bublinu položí. Jedno gesto, dva zmysly — a oba sú zrejmé z toho,
       // čo je pod myšou zvýraznené.
       if (!ciel) void polozNaMiesto(u, kam.x, kam.y);
       else if (ciel.startsWith("vetva:")) void presunDoVetvy(u, ciel.slice(6));
       else void presunPodUzol(u, ciel);
-      try { (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId); } catch { /* nebolo čo pustiť */ }
     },
     onPointerCancel: () => setTahanie(null),
+  });
+
+  /** Rám, za ktorý sa bublina chytá. Rovnaký pre nápad, vetvu aj kmeň. */
+  const ramStyl = (kluc: string, rucne: boolean): React.CSSProperties => ({
+    padding: 5,
+    borderRadius: 999,
+    touchAction: "none",
+    cursor: tahanie?.id === kluc ? "grabbing" : "grab",
+    border: `1px ${rucne ? "dotted" : "solid"} ${tahanie?.ciel === kluc ? C.accent : (rucne ? mix(C.border, 120) : "transparent")}`,
+    background: tahanie?.ciel === kluc ? mix(C.accent, 16) : "transparent",
+    opacity: tahanie?.id === kluc ? 0.45 : 1,
   });
 
   const bublina = (u: Uzol) => {
@@ -618,17 +662,7 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
     const deti = uzly.filter((x) => x.rodic === u.id).length;
     return (
       <div key={u.id} style={{ position: "absolute", left: p.x, top: p.y, display: "flex", alignItems: "center", gap: 7, zIndex: presunPre === u.id ? 4 : (tahanie?.id === u.id ? 5 : undefined) }}>
-        <div
-          {...tahaj(u)}
-          title="Chyť za rám a presuň"
-          style={{
-            padding: 5, borderRadius: 999, touchAction: "none",
-            cursor: tahanie?.id === u.id ? "grabbing" : "grab",
-            border: `1px ${u.posX != null ? "dotted" : "solid"} ${tahanie?.ciel === u.id ? C.accent : (u.posX != null ? mix(C.border, 120) : "transparent")}`,
-            background: tahanie?.ciel === u.id ? mix(C.accent, 16) : "transparent",
-            opacity: tahanie?.id === u.id ? 0.45 : 1,
-          }}
-        >
+        <div {...tahaj(u.id, u.text, false)} title="Chyť za rám a presuň" style={ramStyl(u.id, u.posX != null)}>
         <input
           type="text"
           aria-label="Nápad"
@@ -853,9 +887,9 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
             <button
               type="button"
               onClick={() => void vratRozlozenie()}
-              disabled={!uzly.some((x) => x.posX != null)}
+              disabled={!uzly.some((x) => x.posX != null) && !Object.keys(rucnePozicie).length}
               title="Zahodiť ručné posuny a nechať rozloženie na appku"
-              style={{ background: "none", border: "none", padding: 0, color: uzly.some((x) => x.posX != null) ? C.textMuted : C.textDim, fontFamily: "inherit", fontSize: 11.5, cursor: uzly.some((x) => x.posX != null) ? "pointer" : "default" }}
+              style={{ background: "none", border: "none", padding: 0, color: C.textMuted, fontFamily: "inherit", fontSize: 11.5, cursor: "pointer" }}
             >
               urovnať rozloženie
             </button>
@@ -926,8 +960,12 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
                 ))}
               </svg>
               {poz["koren"] && (
-                <div style={{ position: "absolute", left: poz["koren"].x, top: poz["koren"].y, width: poz["koren"].w, boxSizing: "border-box", padding: "15px 20px", borderRadius: 14, background: C.surface, border: `1px solid ${mix(C.border, 130)}`, color: C.text, fontSize: 15.5, fontWeight: 600 }}>
-                  {nazovMapy}
+                <div style={{ position: "absolute", left: poz["koren"].x - 6, top: poz["koren"].y - 6, zIndex: tahanie?.id === "koren" ? 5 : undefined }}>
+                  <div {...tahaj("koren", nazovMapy, true)} title="Chyť za rám a presuň" style={{ ...ramStyl("koren", !!rucnePozicie["koren"]), borderRadius: 18 }}>
+                    <div style={{ width: poz["koren"].w, boxSizing: "border-box", padding: "15px 20px", borderRadius: 14, background: C.surface, border: `1px solid ${mix(C.border, 130)}`, color: C.text, fontSize: 15.5, fontWeight: 600 }}>
+                      {nazovMapy}
+                    </div>
+                  </div>
                 </div>
               )}
               {VETVY.map((v) => {
@@ -935,7 +973,8 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
                 if (!p) return null;
                 const kolko = uzly.filter((u) => !u.rodic && vetvaUzla(u.id, uzly) === v.id).length;
                 return (
-                  <div key={v.id} style={{ position: "absolute", left: p.x, top: p.y, display: "flex", alignItems: "center", gap: 7 }}>
+                  <div key={v.id} style={{ position: "absolute", left: p.x - 6, top: p.y - 6, display: "flex", alignItems: "center", gap: 7, zIndex: tahanie?.id === "vetva:" + v.id ? 5 : undefined }}>
+                    <div {...tahaj("vetva:" + v.id, v.nazov, true)} title="Chyť za rám a presuň" style={ramStyl("vetva:" + v.id, !!rucnePozicie["vetva:" + v.id])}>
                     <div style={{
                       width: p.w, boxSizing: "border-box", padding: "12px 17px", borderRadius: 999,
                       background: tahanie?.ciel === "vetva:" + v.id ? mix(C.accent, 18) : C.surface,
@@ -943,6 +982,7 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
                       borderLeftWidth: 4, color: C.text, fontSize: 14.5, fontWeight: 600,
                     }}>
                       {v.nazov} <span style={{ color: C.textDim, fontWeight: 400 }}>{kolko}</span>
+                    </div>
                     </div>
                     <button
                       type="button"

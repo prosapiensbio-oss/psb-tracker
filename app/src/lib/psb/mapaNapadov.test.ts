@@ -260,3 +260,36 @@ describe("hromadné vysypanie", () => {
     expect(rozparsujVysyp("   \n\n- \n")).toEqual([]);
   });
 });
+
+describe("ručné miesto kmeňa a vetiev", () => {
+  const stredB = (m: { x: number; y: number; w: number }) => ({ x: m.x + m.w / 2, y: m.y + RIADOK / 2 });
+
+  it("kmeň sa dá posunúť a vetvy idú s ním", () => {
+    const { poz } = rozlozMapu([], { text: "Obsah" }, { koren: { x: 900, y: 700 } });
+    expect(stredB(poz.koren)).toEqual({ x: 900, y: 700 });
+    for (const v of VETVY) {
+      const s = stredB(poz["vetva:" + v.id]);
+      expect(Math.hypot(s.x - 900, s.y - 700)).toBeCloseTo(KROK, 6);
+    }
+  });
+
+  it("vetva sa dá posunúť samostatne", () => {
+    const { poz } = rozlozMapu([], { text: "" }, { "vetva:kniha": { x: 1500, y: 300 } });
+    expect(stredB(poz["vetva:kniha"])).toEqual({ x: 1500, y: 300 });
+    // Ostatné dve zostanú tam, kde ich spočítala appka.
+    expect(stredB(poz["vetva:uvodny"])).not.toEqual({ x: 1500, y: 300 });
+  });
+
+  it("nápady presunutej vetvy idú s ňou, nie späť ku kmeňu", () => {
+    const uzly = [u({ id: "a", vetva: "kniha" })];
+    const { poz } = rozlozMapu(uzly, { text: "" }, { "vetva:kniha": { x: 1500, y: 300 } });
+    const s = stredB(poz.a);
+    expect(Math.hypot(s.x - 1500, s.y - 300)).toBeCloseTo(KROK, 6);
+  });
+
+  it("prázdne ručné pozície nič nemenia", () => {
+    const bez = rozlozMapu([], { text: "" });
+    const s = rozlozMapu([], { text: "" }, {});
+    expect(s.poz.koren).toEqual(bez.poz.koren);
+  });
+});

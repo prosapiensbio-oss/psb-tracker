@@ -1,0 +1,14 @@
+-- Miesto kmeňa a vetiev na ploche.
+--
+-- Jerry, 25. 9. 2026: „prečo sa nedá zelený úvodný tréning a oranžovým kniha
+-- hýbať tiež, ja chcem, aby sa všetkými bublinami dalo hýbať."
+--
+-- Nápady majú `pos_x`/`pos_y` vo vlastnom riadku, ale kmeň a tri vetvy žiadny
+-- riadok nemajú — sú pevné v kóde (lib/psb/mapaNapadov.ts). Ich pozície preto
+-- patria k MAPE: jeden stĺpec s JSON objektom `{"koren":{"x":..,"y":..},
+-- "vetva:uvodny":{...}}`. Prázdny reťazec znamená „nechaj to na výpočet",
+-- rovnako ako prázdne pos_x pri nápade.
+--
+-- Prečo nie štyri stĺpce: vetvy sú definované v kóde a keby raz pribudla
+-- štvrtá, stĺpce by sa museli pridávať migráciou. JSON to prežije.
+ALTER TABLE mkt_mapy ADD COLUMN pozicie TEXT NOT NULL DEFAULT '';

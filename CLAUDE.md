@@ -1229,3 +1229,20 @@ el.dispatchEvent(new Event("input", { bubbles: true }));
 najprv over, či testovací nástroj vôbec dokázal napísať — až potom hľadaj
 chybu v appke. Je to tá istá lekcia ako pri `naostro.sh`: dvakrát sa mýlila
 kontrola, nie appka.
+
+## Odpoveď API bez `cache-control` si prehliadač smie nechať
+
+25. 9. 2026: po presune bubliny v myšlienkovej mape ukazovalo čítanie starý
+stav a vyzeralo to, že sa zápis nestal. `/api/napady` nemalo `cache-control`,
+takže prehliadač smel odpoveď považovať za čerstvú podľa vlastného uváženia —
+a čítanie hneď po zápise vrátilo predošlý zoznam. Je to tá istá pasca ako
+„proxy drží obrázky", len na JSON.
+
+**Endpoint, z ktorého sa číta hneď po zápise, posiela
+`{ headers: { "cache-control": "no-store" } }`.** Platí to najmä tam, kde
+ten istý zoznam číta viac kariet na jednej obrazovke.
+
+**A pri overovaní z prehliadača:** skôr než vyhlásiš zápis za nefunkčný,
+over, či nečítaš z inej mapy/iného filtra a či odpoveď nie je z keše. 25. 9.
+ma to stálo štyri kolá — bublina sa naozaj presúvala, len som sa pozeral na
+mapu, ktorú mi pamätal `localStorage`, a nie na tú, do ktorej appka písala.

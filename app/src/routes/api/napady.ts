@@ -49,8 +49,14 @@ export const Route = createFileRoute("/api/napady")({
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });
         try {
           const r = await DB.prepare("SELECT id, datum, text, zdroj, stav, poznamka, autor, odkaz, pouzite_at, faza, planovane_na, kto, koncept, hotovy_text, zaber, sekvencia, scenar, hashtagy, plan_id, inspiracia, titulka, uvodne_vety, rodic, vetva, poradie, zbalene, mapa_id, pos_x, pos_y FROM mkt_napady ORDER BY datum DESC, created_at DESC LIMIT 2000").all();
-          const m = await DB.prepare("SELECT id, nazov, created_at, poradie FROM mkt_mapy ORDER BY poradie, created_at").all();
-          return Response.json({ ok: true, napady: r.results || [], mapy: m.results || [] });
+          const m = await DB.prepare("SELECT id, nazov, created_at, poradie, pozicie FROM mkt_mapy ORDER BY poradie, created_at").all();
+          // BEZ KEŠE. Nápady sa čítajú hneď po zápise (mapa, mapa cyklu,
+          // Jarvis) a odpoveď bez `cache-control` si prehliadač smie nechať
+          // podľa vlastného uváženia — potom po presune bubliny prečíta
+          // starý zoznam a vyzerá to, že sa zápis nestal. Je to tá istá
+          // pasca ako pri obrázkoch za proxy.
+          return Response.json({ ok: true, napady: r.results || [], mapy: m.results || [] },
+            { headers: { "cache-control": "no-store" } });
         } catch (e) {
           // Prázdno s úspechom je najhoršia možná odpoveď: nápady čítajú štyri
           // obrazovky a jedna neaplikovaná migrácia by ich všetky vyprázdnila
@@ -83,7 +89,10 @@ export const Route = createFileRoute("/api/napady")({
             const nazov = kus(b.nazov, 60) || "Nová mapa";
             const idMapy = `m${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
             const poradie = await DB.prepare("SELECT COALESCE(MAX(poradie), 0) + 1 p FROM mkt_mapy").first<{ p: number }>();
-            await DB.prepare("INSERT INTO mkt_mapy (id, nazov, created_at, poradie) VALUES (?1, ?2, ?3, ?4)")
+            // `pozicie` je prázdne: nová mapa nemá ručne posunuté bubliny,
+            // rozloženie si spočíta appka. Stĺpec tu stojí kvôli stráži
+            // zo zapisy.test.ts.
+            await DB.prepare("INSERT INTO mkt_mapy (id, nazov, created_at, poradie, pozicie) VALUES (?1, ?2, ?3, ?4, '')")
               .bind(idMapy, nazov, new Date().toISOString(), poradie?.p ?? 1).run();
             return Response.json({ ok: true, id: idMapy, nazov });
           }
@@ -92,6 +101,27 @@ export const Route = createFileRoute("/api/napady")({
             const nazov = kus(b.nazov, 60);
             if (!idMapy || !nazov) return Response.json({ ok: false, error: "Mapa potrebuje meno." }, { status: 400 });
             const r = await DB.prepare("UPDATE mkt_mapy SET nazov = ?2 WHERE id = ?1").bind(idMapy, nazov).run();
+            if (!r.meta.changes) return Response.json({ ok: false, error: "Taká mapa neexistuje." }, { status: 404 });
+            return Response.json({ ok: true });
+          }
+          // Miesto kmeňa a vetiev. Patrí k mape, lebo tie bubliny nemajú
+          // vlastný riadok — sú pevné v kóde.
+          if (b.akcia === "mapa-pozicie") {
+            const idMapy = kus(b.mapaId, 40);
+            if (!idMapy) return Response.json({ ok: false, error: "chýba mapa" }, { status: 400 });
+            const vstup = (b.pozicie || {}) as Record<string, { x?: unknown; y?: unknown }>;
+            const cisto: Record<string, { x: number; y: number }> = {};
+            for (const [kluc, bod] of Object.entries(vstup)) {
+              // Len známe kľúče a len čísla v rozsahu plátna — inak by sa do
+              // stĺpca dal uložiť ľubovoľný JSON a obrazovka by ho poslušne
+              // prečítala.
+              if (kluc !== "koren" && !jeVetva(kluc.replace(/^vetva:/, ""))) continue;
+              const x = Math.max(0, Math.min(20000, Math.round(Number(bod?.x) || 0)));
+              const y = Math.max(0, Math.min(20000, Math.round(Number(bod?.y) || 0)));
+              cisto[kluc] = { x, y };
+            }
+            const r = await DB.prepare("UPDATE mkt_mapy SET pozicie = ?2 WHERE id = ?1")
+              .bind(idMapy, Object.keys(cisto).length ? JSON.stringify(cisto) : "").run();
             if (!r.meta.changes) return Response.json({ ok: false, error: "Taká mapa neexistuje." }, { status: 404 });
             return Response.json({ ok: true });
           }
