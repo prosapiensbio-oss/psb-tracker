@@ -4,7 +4,7 @@ import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 import { jeFaza } from "../../lib/psb/mapaCyklu";
-import { jeVetva } from "../../lib/psb/mapaNapadov";
+import { jeFarba, jeVetva } from "../../lib/psb/mapaNapadov";
 import { jeMesiac as platnyMesiac } from "../../lib/psb/format";
 import { ZABER_MAPA } from "../../lib/psb/zabery";
 
@@ -48,7 +48,7 @@ export const Route = createFileRoute("/api/napady")({
         const { DB } = bindings();
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });
         try {
-          const r = await DB.prepare("SELECT id, datum, text, zdroj, stav, poznamka, autor, odkaz, pouzite_at, faza, planovane_na, kto, koncept, hotovy_text, zaber, sekvencia, scenar, hashtagy, plan_id, inspiracia, titulka, uvodne_vety, rodic, vetva, poradie, zbalene, mapa_id, pos_x, pos_y FROM mkt_napady ORDER BY datum DESC, created_at DESC LIMIT 2000").all();
+          const r = await DB.prepare("SELECT id, datum, text, zdroj, stav, poznamka, autor, odkaz, pouzite_at, faza, planovane_na, kto, koncept, hotovy_text, zaber, sekvencia, scenar, hashtagy, plan_id, inspiracia, titulka, uvodne_vety, rodic, vetva, poradie, zbalene, mapa_id, pos_x, pos_y, farba FROM mkt_napady ORDER BY datum DESC, created_at DESC LIMIT 2000").all();
           const m = await DB.prepare("SELECT id, nazov, created_at, poradie, pozicie FROM mkt_mapy ORDER BY poradie, created_at").all();
           // BEZ KEŠE. Nápady sa čítajú hneď po zápise (mapa, mapa cyklu,
           // Jarvis) a odpoveď bez `cache-control` si prehliadač smie nechať
@@ -259,6 +259,12 @@ export const Route = createFileRoute("/api/napady")({
             // orezáva — súradnica mimo plátna by bublinu poslala tam, odkiaľ
             // sa nedá pritiahnuť späť.
             const suradnica = (v: unknown) => (v === null ? -1 : Math.max(0, Math.min(20000, Math.round(Number(v) || 0))));
+            // Farba sa berie zo zoznamu — prázdny reťazec znamená „podľa
+            // vetvy" a je to platná hodnota, takže sa rozlišuje od undefined.
+            if (b.farba !== undefined && b.farba !== "" && !jeFarba(b.farba)) {
+              return Response.json({ ok: false, error: "Neznáma farba." }, { status: 400 });
+            }
+            const farba = b.farba === undefined ? null : kus(b.farba, 20);
             const posX = b.posX === undefined ? null : suradnica(b.posX);
             const posY = b.posY === undefined ? null : suradnica(b.posY);
             if (novyText === null && stav === null && poznamka === null && odkaz === null
@@ -266,7 +272,7 @@ export const Route = createFileRoute("/api/napady")({
                 && hotovy === null && zaber === null && sekvencia === null && inspiracia === null
                 && scenar === null && hashtagy === null && titulka === null && uvodneVety === null
                 && rodic === null && vetva === null && poradie === null && zbalene === null
-                && mapaId === null && posX === null && posY === null) {
+                && mapaId === null && posX === null && posY === null && farba === null) {
               return Response.json({ ok: false, error: "nič na zmenu" }, { status: 400 });
             }
             // Deň použitia sa zapíše sám pri prechode na „použitý" — nikto ho
@@ -287,13 +293,13 @@ export const Route = createFileRoute("/api/napady")({
                  uvodne_vety = COALESCE(?17, uvodne_vety),
                  rodic = COALESCE(?18, rodic), vetva = COALESCE(?19, vetva),
                  poradie = COALESCE(?20, poradie), zbalene = COALESCE(?21, zbalene),
-                 mapa_id = COALESCE(?22, mapa_id),
+                 mapa_id = COALESCE(?22, mapa_id), farba = COALESCE(?26, farba),
                  pos_x = CASE WHEN ?24 IS NULL THEN pos_x WHEN ?24 < 0 THEN NULL ELSE ?24 END,
                  pos_y = CASE WHEN ?25 IS NULL THEN pos_y WHEN ?25 < 0 THEN NULL ELSE ?25 END
                WHERE id = ?1`,
             ).bind(id, stav, poznamka, odkaz, pouzite, faza, mesiac, kto, koncept, hotovy, zaber, sekvencia,
                    scenar, hashtagy, inspiracia, titulka, uvodneVety, rodic, vetva, poradie, zbalene, mapaId,
-                   novyText, posX, posY).run().then((r) => {
+                   novyText, posX, posY, farba).run().then((r) => {
               // UPDATE s neexistujúcim id prejde „úspešne" s nulou zmien —
               // a obrazovka by ohlásila uložené nad ničím (revízia 19. 8.).
               if (!r.meta.changes) throw new Error("nenajdene");
@@ -365,12 +371,12 @@ export const Route = createFileRoute("/api/napady")({
             `INSERT INTO mkt_napady (id, datum, text, zdroj, stav, poznamka, autor, created_at,
                                      faza, planovane_na, kto, koncept, zaber, hotovy_text,
                                      sekvencia, scenar, hashtagy, inspiracia, titulka, uvodne_vety,
-                                     rodic, vetva, poradie, zbalene, mapa_id, pos_x, pos_y)
+                                     rodic, vetva, poradie, zbalene, mapa_id, pos_x, pos_y, farba)
              -- zbalene je natvrdo 0: nový uzol nemá deti, takže sa nemá čo
              -- zbaliť. Stĺpec tu stojí preto, aby stráž zo zapisy.test.ts
              -- videla, že sa naň nezabudlo.
              -- pos_x/pos_y sú NULL: nový uzol si miesto nechá spočítať.
-             VALUES (?1, ?2, ?3, ?4, 'novy', ?17, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?18, ?19, ?20, ?21, ?22, 0, ?23, NULL, NULL)`,
+             VALUES (?1, ?2, ?3, ?4, 'novy', ?17, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?18, ?19, ?20, ?21, ?22, 0, ?23, NULL, NULL, '')`,
           ).bind(novy, datum, text, zdroj, autor, new Date().toISOString(),
                  nFaza, nMesiac, nKto, nKoncept, nZaber, nHotovy,
                  nSekvencia, nScenar, nHashtagy, nInspiracia, kus(b.poznamka, 600),

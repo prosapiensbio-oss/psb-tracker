@@ -4,7 +4,7 @@ import { doSchranky } from "../../lib/psb/kopirovanie";
 import { FAZA_MAPA, nazovFazy } from "../../lib/psb/mapaCyklu";
 import { oznam, pocuvaj } from "../../lib/psb/obnovaSignal";
 import {
-  RIADOK, VETVY, farbaVetvy, jeNaPlan, kusovNaMesiac, mapaNaText, rozlozMapu, rozparsujVysyp, smiePresunut, vetvaUzla, viditelny, type Uzol,
+  FARBY, RIADOK, STRED, VETVY, farbaUzla, farbaVetvy, jeNaPlan, kusovNaMesiac, mapaNaText, rozlozMapu, rozparsujVysyp, smiePresunut, vetvaUzla, viditelny, type Uzol,
 } from "../../lib/psb/mapaNapadov";
 import { C, mix } from "../../lib/psb/theme";
 import type { Miesto } from "../../lib/psb/mapaNapadov";
@@ -45,7 +45,7 @@ import { Card, H3, Info } from "./ui";
 
 /** Riadok, ako ho vracia /api/napady. */
 type Riadok = {
-  id: string; text: string; faza?: number; pos_x?: number | null; pos_y?: number | null;
+  id: string; text: string; faza?: number; pos_x?: number | null; pos_y?: number | null; farba?: string;
   rodic?: string; vetva?: string; poradie?: number; zbalene?: number;
   stav?: string; mapa_id?: string;
 };
@@ -147,6 +147,10 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
    * plynulý posuvník vyžaduje mierenie.
    */
   const [zoom, setZoom] = useState(1);
+  const zoomRef = useRef(1);
+  useEffect(() => { zoomRef.current = zoom; }, [zoom]);
+  /** Pohľad sa raz sám postaví na kmeň; potom už scrolluje človek. */
+  const uzVycentrovane = useRef(false);
   /** Nad ktorým uzlom je otvorená ponuka „presunúť do inej vetvy". */
   const [presunPre, setPresunPre] = useState<string | null>(null);
   /**
@@ -159,7 +163,7 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
    * Ťahá sa za RÁM okolo bubliny, nie za text: vnútro je políčko, do ktorého
    * sa píše, a keby začínalo ťahanie, nedalo by sa v ňom označiť slovo.
    */
-  const [tahanie, setTahanie] = useState<{ id: string; text: string; x: number; y: number; ciel: string | null } | null>(null);
+  const [tahanie, setTahanie] = useState<{ id: string; text: string; x: number; y: number; ciel: string | null; odX: number; odY: number } | null>(null);
   const plochaRef = useRef<HTMLDivElement | null>(null);
 
   const nacitaj = useCallback(() => void fetch("/api/napady", { credentials: "same-origin" })
@@ -211,9 +215,10 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
         stav: r.stav || "novy",
         posX: r.pos_x ?? null,
         posY: r.pos_y ?? null,
+        farba: r.farba || "",
       }));
     if (novy) {
-      zive.push({ id: DOCASNY, text: novy.text, rodic: novy.rodic, vetva: novy.vetva, poradie: novy.poradie, zbalene: false, faza: 0, stav: "novy", posX: null, posY: null });
+      zive.push({ id: DOCASNY, text: novy.text, rodic: novy.rodic, vetva: novy.vetva, poradie: novy.poradie, zbalene: false, faza: 0, stav: "novy", posX: null, posY: null, farba: "" });
     }
     return zive;
   }, [riadky, novy, mapaId]);
@@ -262,7 +267,25 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
     const na = (e: WheelEvent) => {
       if (!e.ctrlKey && !e.metaKey) return;
       e.preventDefault();
-      setZoom((z) => Math.min(1.5, Math.max(0.4, Math.round((z - e.deltaY * 0.0025) * 100) / 100)));
+      // Priblíženie sa ukotví POD MYŠOU: bod, na ktorý sa človek pozerá,
+      // zostane na mieste. Bez toho mapa pri štipnutí ujde a treba ju
+      // doháňať posuvníkom.
+      const stary = zoomRef.current;
+      const novy = Math.min(1.5, Math.max(0.4, Math.round((stary - e.deltaY * 0.0025) * 100) / 100));
+      if (novy === stary) return;
+      const r = el.getBoundingClientRect();
+      const vx = e.clientX - r.left;
+      const vy = e.clientY - r.top;
+      const bodX = (el.scrollLeft + vx) / stary;
+      const bodY = (el.scrollTop + vy) / stary;
+      zoomRef.current = novy;
+      setZoom(novy);
+      // Po prekreslení na novú veľkosť posuň tak, aby ten istý bod mapy
+      // ostal pod kurzorom.
+      requestAnimationFrame(() => {
+        el.scrollLeft = bodX * novy - vx;
+        el.scrollTop = bodY * novy - vy;
+      });
     };
     el.addEventListener("wheel", na, { passive: false });
     return () => el.removeEventListener("wheel", na);
@@ -293,6 +316,25 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
     document.addEventListener("keydown", na);
     return () => document.removeEventListener("keydown", na);
   });
+
+  /** Postaviť pohľad na kmeň. */
+  const naStred = useCallback(() => {
+    const el = plochaRef.current;
+    if (!el) return;
+    const k = poz["koren"];
+    const sx = k ? k.x + k.w / 2 : STRED.x;
+    const sy = k ? k.y + RIADOK / 2 : STRED.y;
+    el.scrollLeft = sx * zoomRef.current - el.clientWidth / 2;
+    el.scrollTop = sy * zoomRef.current - el.clientHeight / 2;
+  }, [poz]);
+
+  // Pri prvom otvorení mapy: kmeň doprostred okna. Len raz — potom je
+  // posúvanie v rukách človeka a appka mu doň nemá skákať.
+  useEffect(() => {
+    if (!nacitane || pohlad !== "mapa" || uzVycentrovane.current) return;
+    uzVycentrovane.current = true;
+    requestAnimationFrame(naStred);
+  }, [nacitane, pohlad, naStred]);
 
   /** Odchod z obrazovky koncept nezahodí. */
   useEffect(() => () => {
@@ -538,6 +580,17 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
     oznam("marketing");
   };
 
+  const nastavFarbu = async (u: Uzol, farba: string) => {
+    setPresunPre(null);
+    if (u.id === DOCASNY) return;
+    const predtym = u.farba || "";
+    setRiadky((r) => r.map((x) => (x.id === u.id ? { ...x, farba } : x)));
+    if (await posli({ id: u.id, farba })) {
+      zapamataj("zmenená farba", async () => { await posli({ id: u.id, farba: predtym }); });
+      oznam("marketing");
+    } else nacitaj();
+  };
+
   const nastavFazu = async (id: string, f: number) => {
     // Rozpísaný koncept ešte na serveri nie je — fáza by skončila chybou
     // „nenajdene" a nenastavila by sa ani lokálne.
@@ -580,7 +633,7 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
   };
   for (const v of VETVY) spoj(poz["koren"], poz["vetva:" + v.id], v.farba, 3, "v" + v.id);
   for (const u of vidno) {
-    const f = farbaVetvy(vetvaUzla(u.id, uzly));
+    const f = farbaUzla(u, uzly);
     const rodicPoz = u.rodic ? poz[u.rodic] : poz["vetva:" + vetvaUzla(u.id, uzly)];
     spoj(rodicPoz, poz[u.id], f, (poz[u.id]?.hlbka || 2) <= 2 ? 2 : 1.4, "u" + u.id);
   }
@@ -617,7 +670,7 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
       e.preventDefault();
       setPresunPre(null);
       const b = bodVMape(e);
-      setTahanie({ id: kluc, text, x: b.x, y: b.y, ciel: null });
+      setTahanie({ id: kluc, text, x: b.x, y: b.y, ciel: null, odX: e.clientX, odY: e.clientY });
       try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* bez zachytenia */ }
     },
     onPointerMove: (e: React.PointerEvent) => {
@@ -629,8 +682,12 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
       if (!tahanie || tahanie.id !== kluc) return;
       const ciel = tahanie.ciel;
       const kam = { x: tahanie.x, y: tahanie.y };
+      // KLIK, NIE ŤAHANIE. Kto sa obvodu len dotkne, nechce bublinu presunúť
+      // — chce ponuku. Hranica je päť pixelov, aby ju neotvorilo chvenie ruky.
+      const klik = Math.hypot(e.clientX - tahanie.odX, e.clientY - tahanie.odY) < 5;
       setTahanie(null);
       try { (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId); } catch { /* nebolo čo pustiť */ }
+      if (klik) { setPresunPre(presunPre === kluc ? null : kluc); return; }
       if (lenPosun) { void ulozPoziciuPevnej(kluc, kam.x, kam.y); return; }
       const u = uzly.find((x) => x.id === kluc);
       if (!u) return;
@@ -658,7 +715,7 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
   const bublina = (u: Uzol) => {
     const p = poz[u.id];
     if (!p) return null;
-    const f = farbaVetvy(vetvaUzla(u.id, uzly));
+    const f = farbaUzla(u, uzly);
     const deti = uzly.filter((x) => x.rodic === u.id).length;
     return (
       <div key={u.id} style={{ position: "absolute", left: p.x, top: p.y, display: "flex", alignItems: "center", gap: 7, zIndex: presunPre === u.id ? 4 : (tahanie?.id === u.id ? 5 : undefined) }}>
@@ -722,8 +779,47 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
           ⇄
         </button>
         {presunPre === u.id && (
-          <div style={{ position: "absolute", left: 0, top: 46, zIndex: 3, minWidth: 210, padding: 6, borderRadius: 11, background: C.surface, border: `1px solid ${mix(C.border, 140)}`, boxShadow: "0 10px 26px rgba(0,0,0,.45)" }}>
-            <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 1, color: C.textDim, padding: "4px 8px 6px" }}>PRESUNÚŤ DO VETVY</div>
+          <div style={{ position: "absolute", left: 0, top: 46, zIndex: 3, minWidth: 232, maxHeight: 420, overflow: "auto", padding: 6, borderRadius: 11, background: C.surface, border: `1px solid ${mix(C.border, 140)}`, boxShadow: "0 10px 26px rgba(0,0,0,.45)" }}>
+            <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 1, color: C.textDim, padding: "4px 8px 6px" }}>FARBA</div>
+            <div style={{ display: "flex", gap: 6, padding: "0 8px 8px", flexWrap: "wrap" }}>
+              <button
+                type="button"
+                aria-label="Farba podľa vetvy"
+                title="Podľa vetvy"
+                onClick={() => void nastavFarbu(u, "")}
+                style={{ width: 24, height: 24, borderRadius: "50%", padding: 0, cursor: "pointer", background: "transparent", border: `2px ${u.farba ? "solid" : "double"} ${!u.farba ? C.accent : mix(C.border, 140)}` }}
+              />
+              {FARBY.map((fb) => (
+                <button
+                  key={fb.id}
+                  type="button"
+                  aria-label={`Farba ${fb.nazov}`}
+                  title={fb.nazov}
+                  onClick={() => void nastavFarbu(u, fb.id)}
+                  style={{ width: 24, height: 24, borderRadius: "50%", padding: 0, cursor: "pointer", background: fb.farba, border: `2px solid ${u.farba === fb.id ? C.text : "transparent"}` }}
+                />
+              ))}
+            </div>
+            <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 1, color: C.textDim, padding: "2px 8px 6px", borderTop: `1px solid ${mix(C.border, 60)}` }}>FÁZA NÁKUPNÉHO CYKLU</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 3, padding: "0 8px 8px" }}>
+              {[1, 2, 3, 4, 5].map((f) => (
+                <button
+                  key={f}
+                  type="button"
+                  onClick={() => { setPresunPre(null); void nastavFazu(u.id, f); }}
+                  style={{ display: "flex", alignItems: "center", gap: 7, width: "100%", textAlign: "left", padding: "5px 6px", borderRadius: 7, border: "none", background: u.faza === f ? mix(C.accent, 14) : "transparent", color: C.text, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}
+                >
+                  <span style={{ width: 17, height: 17, flexShrink: 0, borderRadius: 4, background: fazaFarba(f), color: "#10130e", fontSize: 10.5, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{f}</span>
+                  {nazovFazy(f)}
+                </button>
+              ))}
+              {u.faza > 0 && (
+                <button type="button" onClick={() => { setPresunPre(null); void nastavFazu(u.id, 0); }} style={{ textAlign: "left", padding: "5px 6px", borderRadius: 7, border: "none", background: "transparent", color: C.textDim, fontFamily: "inherit", fontSize: 11.5, cursor: "pointer" }}>
+                  bez fázy
+                </button>
+              )}
+            </div>
+            <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 1, color: C.textDim, padding: "2px 8px 6px", borderTop: `1px solid ${mix(C.border, 60)}` }}>PRESUNÚŤ DO VETVY</div>
             {VETVY.map((v) => {
               const tu = !u.rodic && vetvaUzla(u.id, uzly) === v.id;
               return (
@@ -750,7 +846,7 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
               </button>
             )}
             <div style={{ fontSize: 10.5, lineHeight: 1.45, color: C.textDim, padding: "6px 8px 2px" }}>
-              Nadväzujúce nápady idú s ním.
+              Nadväzujúce nápady idú s ním. Ponuku otvoríš kliknutím na obvod bubliny.
             </div>
           </div>
         )}
@@ -873,7 +969,7 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
             <span><b style={{ color: C.text }}>⌫</b> na prázdnej zmaže</span>
             <span><b style={{ color: C.text }}>Esc</b> zahodí rozpísanú</span>
             <span><b style={{ color: C.text }}>⌘Z</b> krok späť</span>
-            <span><b style={{ color: C.text }}>⇄</b> presunie do inej vetvy</span>
+            <span>klik na <b style={{ color: C.text }}>obvod</b> = farba, fáza, presun</span>
             <span>alebo chyť bublinu <b style={{ color: C.text }}>za rám</b> a pusť ju nad iný nápad</span>
             <button
               type="button"
@@ -907,6 +1003,7 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
               <button type="button" onClick={() => setZoom(1)} title="Späť na 100 %" style={{ ...tlacidloZoom, width: 46, fontVariantNumeric: "tabular-nums" }}>{Math.round(zoom * 100)} %</button>
               <button type="button" aria-label="Priblížiť" onClick={() => setZoom((z) => Math.min(1.5, Math.round((z + 0.1) * 100) / 100))} style={tlacidloZoom}>+</button>
               <button type="button" onClick={zmestiSa} title="Zmestiť celú mapu do šírky" style={{ ...tlacidloZoom, width: "auto", padding: "0 8px" }}>zmestiť</button>
+              <button type="button" onClick={naStred} title="Postaviť pohľad na hlavnú bublinu" style={{ ...tlacidloZoom, width: "auto", padding: "0 8px" }}>na stred</button>
             </div>
           </div>
           {vysyp !== null && (
@@ -1033,7 +1130,7 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
             {naPlan.filter((u) => !u.faza).map((u) => (
               <div key={u.id} style={{ padding: "10px 12px", borderRadius: 11, background: C.surface, border: `1px solid ${C.border}` }}>
                 <div style={{ display: "flex", alignItems: "flex-start", gap: 7 }}>
-                  <span style={{ width: 8, height: 8, flexShrink: 0, marginTop: 5, borderRadius: "50%", background: farbaVetvy(vetvaUzla(u.id, uzly)) }} />
+                  <span style={{ width: 8, height: 8, flexShrink: 0, marginTop: 5, borderRadius: "50%", background: farbaUzla(u, uzly) }} />
                   <span style={{ fontSize: 12.5, lineHeight: 1.35, color: C.text }}>{u.text}</span>
                 </div>
                 <div style={{ marginTop: 8, display: "flex", gap: 5 }}>
@@ -1067,7 +1164,7 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
                   </div>
                   {kusy.map((u) => (
                     <div key={u.id} style={{ display: "flex", alignItems: "flex-start", gap: 6, padding: "9px 8px 9px 11px", borderRadius: 9, background: C.surface, border: `1px solid ${C.border}`, borderLeft: `3px solid ${fazaFarba(f)}` }}>
-                      <span style={{ width: 8, height: 8, flexShrink: 0, marginTop: 4, borderRadius: "50%", background: farbaVetvy(vetvaUzla(u.id, uzly)) }} />
+                      <span style={{ width: 8, height: 8, flexShrink: 0, marginTop: 4, borderRadius: "50%", background: farbaUzla(u, uzly) }} />
                       <span style={{ flexGrow: 1, fontSize: 12, lineHeight: 1.3, color: C.text }}>{u.text}</span>
                       <button type="button" aria-label="Vrátiť medzi nezaradené" onClick={() => void nastavFazu(u.id, 0)} style={{ width: 22, height: 22, flexShrink: 0, borderRadius: 6, padding: 0, border: "none", background: "transparent", color: C.textDim, fontFamily: "inherit", fontSize: 14, lineHeight: 1, cursor: "pointer" }}>×</button>
                     </div>
