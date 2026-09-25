@@ -41,19 +41,15 @@ ju s MindMeisterom, MindMupom, Coggle, Freeplane, XMindom a Mirom. Chyby sú
 opravené; toto sú mechaniky, ktoré tie nástroje majú a my vedome zatiaľ nie,
 zoradené podľa toho, koľko práce Jerrymu ušetria:
 
-1. **Undo (⌘Z)** — mapa nabáda k nedbalosti („vysyp všetko"), takže nesmie
-   mať nezvratný kláves. Dnes ⌫ na prázdnej bubline maže riadok natrvalo
-   (aspoň odmietne nápad s rozpracovaným obsahom a nechá záznam v audite).
-   Má to Coggle, MindMup aj MindMeister.
-2. **↑/↓ skok na súrodenca a ⌘↑/⌘↓ preradenie** — dnes sa klávesnicou dá ísť
+1. **↑/↓ skok na súrodenca a ⌘↑/⌘↓ preradenie** — dnes sa klávesnicou dá ísť
    len dopredu; späť na štvrtý nápad len myšou. Preradenie je jediný spôsob,
    ako z výsypu spraviť poradie bez prepisovania. `poradie` v databáze už je.
-3. **Osnova ako druhý POHĽAD na tie isté riadky** (XMind Outliner) — dnes
+2. **Osnova ako druhý POHĽAD na tie isté riadky** (XMind Outliner) — dnes
    vieme len jednosmerný text. Písanie dvadsiatich viet je v zozname
    rýchlejšie a celý mesiac sa dá prečítať naraz.
-4. **Viacnásobný výber v „Vysyp a usporiadaj"** — priradiť fázu dvadsiatim
+3. **Viacnásobný výber v „Vysyp a usporiadaj"** — priradiť fázu dvadsiatim
    nápadom je dnes dvadsať mierení na malé tlačidlo.
-5. **Hľadanie (⌘F)** — odkedy je máp viac, „napísal som to už?" nemá odpoveď.
+4. **Hľadanie (⌘F)** — odkedy je máp viac, „napísal som to už?" nemá odpoveď.
 
 Vedome NEROBIŤ (z tej istej rešerše): ukladané pozície a voľné ťahanie,
 prepojenia medzi vetvami, ikony a priority, prezentačný režim, zdieľanie,

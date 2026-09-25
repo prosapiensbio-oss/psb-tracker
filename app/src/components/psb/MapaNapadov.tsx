@@ -7,6 +7,7 @@ import {
   RIADOK, VETVY, farbaVetvy, jeNaPlan, kusovNaMesiac, mapaNaText, rozlozMapu, rozparsujVysyp, smiePresunut, vetvaUzla, viditelny, type Uzol,
 } from "../../lib/psb/mapaNapadov";
 import { C, mix } from "../../lib/psb/theme";
+import type { Miesto } from "../../lib/psb/mapaNapadov";
 import type { AssistantChat } from "./Assistant";
 import { Card, H3, Info } from "./ui";
 
@@ -44,7 +45,7 @@ import { Card, H3, Info } from "./ui";
 
 /** Riadok, ako ho vracia /api/napady. */
 type Riadok = {
-  id: string; text: string; faza?: number;
+  id: string; text: string; faza?: number; pos_x?: number | null; pos_y?: number | null;
   rodic?: string; vetva?: string; poradie?: number; zbalene?: number;
   stav?: string; mapa_id?: string;
 };
@@ -84,6 +85,27 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
   const [vysyp, setVysyp] = useState<string | null>(null);
   const [vysypVetva, setVysypVetva] = useState("nezaradene");
   const [sypem, setSypem] = useState(false);
+  /**
+   * KROK SPÄŤ (⌘Z).
+   *
+   * Mapa nabáda k nedbalosti — „vysyp všetko, potom to usporiadaj" — takže
+   * nesmie mať nezvratný pohyb. Zásobník drží posledných dvadsať krokov
+   * a každý vie, ako sa vráti. Nežije medzi návštevami: po obnovení stránky
+   * je prázdny, rovnako ako v Coggle („works for all changes since the page
+   * was reloaded"). Sľubovať viac by znamenalo klamať.
+   */
+  const [kroky, setKroky] = useState<{ popis: string; vrat: () => Promise<void> }[]>([]);
+  const zapamataj = (popis: string, vrat: () => Promise<void>) =>
+    setKroky((k) => [...k.slice(-19), { popis, vrat }]);
+  const vratKrok = async () => {
+    const k = kroky[kroky.length - 1];
+    if (!k) return;
+    setKroky((z) => z.slice(0, -1));
+    await k.vrat();
+    nacitaj();
+    oznam("marketing");
+  };
+
   const mapaIdRef = useRef(mapaId);
   useEffect(() => { mapaIdRef.current = mapaId; }, [mapaId]);
   const [nacitane, setNacitane] = useState(false);
@@ -183,15 +205,17 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
         zbalene: !!r.zbalene,
         faza: Number(r.faza || 0),
         stav: r.stav || "novy",
+        posX: r.pos_x ?? null,
+        posY: r.pos_y ?? null,
       }));
     if (novy) {
-      zive.push({ id: DOCASNY, text: novy.text, rodic: novy.rodic, vetva: novy.vetva, poradie: novy.poradie, zbalene: false, faza: 0, stav: "novy" });
+      zive.push({ id: DOCASNY, text: novy.text, rodic: novy.rodic, vetva: novy.vetva, poradie: novy.poradie, zbalene: false, faza: 0, stav: "novy", posX: null, posY: null });
     }
     return zive;
   }, [riadky, novy, mapaId]);
 
   const nazovMapy = mapy.find((m) => m.id === mapaId)?.nazov || "Obsah";
-  const { poz, vyska } = useMemo(() => rozlozMapu(uzly, { x: 38, y: 28, text: nazovMapy }), [uzly, nazovMapy]);
+  const { poz, vyska, sirka } = useMemo(() => rozlozMapu(uzly, { text: nazovMapy }), [uzly, nazovMapy]);
 
   /** Uloží rozpísaný uzol (alebo ho zahodí, keď je prázdny). */
   const dopis = useCallback(async (vratFokus = false): Promise<string | null> => {
@@ -206,6 +230,7 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
     // smie len to, čo je uložené — inak človek napíše vetu a tá sa stratí.
     if (!id) { nastavNovy(d); return null; }
     if (vratFokus) zameraj.current = id;
+    zapamataj(`nápad „${t.slice(0, 28)}"`, async () => { await posli({ id, zmaz: true }); });
     nacitaj();
     oznam("marketing");
     return id;
@@ -232,6 +257,29 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
     // závislostí by sa poslucháč vešal na ešte neexistujúci prvok a štipnutie
     // by ticho nerobilo nič. (Presne to sa 25. 9. aj stalo.)
   }, [nacitane, pohlad]);
+
+  /**
+   * ⌘Z nad mapou. Poslucháč je na dokumente, lebo po zmazaní bubliny už
+   * fokus nemá kde sedieť — ale reaguje LEN keď je mapa na obrazovke a keď
+   * sa práve nepíše do iného poľa, aby nebral ⌘Z formulárom vedľa.
+   */
+  useEffect(() => {
+    const na = (e: KeyboardEvent) => {
+      if (e.key !== "z" && e.key !== "Z") return;
+      if (!(e.metaKey || e.ctrlKey) || e.shiftKey) return;
+      const k = document.getElementById("mapa-napadov");
+      if (!k) return;
+      const kde = document.activeElement as HTMLElement | null;
+      const pisemInde = !!kde && (kde.tagName === "TEXTAREA" || (kde.tagName === "INPUT" && !k.contains(kde)));
+      if (pisemInde) return;
+      // Kým je bublina rozpísaná, ⌘Z patrí textu v nej, nie mape.
+      if (novyRef.current) return;
+      e.preventDefault();
+      void vratKrok();
+    };
+    document.addEventListener("keydown", na);
+    return () => document.removeEventListener("keydown", na);
+  });
 
   /** Odchod z obrazovky koncept nezahodí. */
   useEffect(() => () => {
@@ -273,7 +321,11 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
       nacitaj();
       return;
     }
-    if (await posli({ id, text: t.trim() })) oznam("marketing");
+    const predtym = riadky.find((x) => x.id === id)?.text ?? "";
+    if (await posli({ id, text: t.trim() })) {
+      if (predtym && predtym !== t.trim()) zapamataj("prepísaný text", async () => { await posli({ id, text: predtym }); });
+      oznam("marketing");
+    }
   };
 
   const zmaz = async (id: string) => {
@@ -282,7 +334,16 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
       setChyba("Najprv presuň alebo zmaž nadväzujúce nápady.");
       return;
     }
-    await posli({ id, zmaz: true });
+    const r = riadky.find((x) => x.id === id);
+    if (!(await posli({ id, zmaz: true }))) return;
+    // Zmazať sa dá len holý nápad (server to stráži), takže na vrátenie
+    // stačí text a miesto v strome. Nové id je iné — a to je jediné, čo sa
+    // z pôvodného riadku nevráti.
+    if (r) {
+      zapamataj(`zmazaný „${(r.text || "").slice(0, 28)}"`, async () => {
+        await posli({ text: r.text, zdroj: "vlastny", mapaId: mapaIdRef.current, rodic: r.rodic || "", vetva: r.vetva || "nezaradene", poradie: Number(r.poradie || 0) });
+      });
+    }
     nacitaj();
     oznam("marketing");
   };
@@ -308,8 +369,11 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
     }
     if (!u.rodic && vetvaUzla(u.id, uzly) === vetva) return;
     const koniec = uzly.filter((x) => !x.rodic && vetvaUzla(x.id, uzly) === vetva).length;
+    const predtym = { rodic: u.rodic, vetva: u.vetva, poradie: u.poradie };
     setRiadky((r) => r.map((x) => (x.id === u.id ? { ...x, rodic: "", vetva, poradie: koniec } : x)));
-    await posli({ id: u.id, rodic: "", vetva, poradie: koniec });
+    if (await posli({ id: u.id, rodic: "", vetva, poradie: koniec })) {
+      zapamataj("presun do vetvy", async () => { await posli({ id: u.id, ...predtym }); });
+    }
     nacitaj();
     oznam("marketing");
   };
@@ -401,6 +465,35 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
     nacitaj();
   };
 
+  /**
+   * Položiť bublinu na voľné miesto. Ručná pozícia prebíja výpočet — kto ju
+   * posunul, ju posunul, a potomkovia idú s ňou.
+   */
+  const polozNaMiesto = async (u: Uzol, x: number, y: number) => {
+    if (u.id === DOCASNY) return;
+    const predtym = { posX: u.posX ?? null, posY: u.posY ?? null };
+    const nx = Math.round(x);
+    const ny = Math.round(y);
+    setRiadky((r) => r.map((z) => (z.id === u.id ? { ...z, pos_x: nx, pos_y: ny } : z)));
+    if (await posli({ id: u.id, posX: nx, posY: ny })) {
+      zapamataj("posun bubliny", async () => { await posli({ id: u.id, posX: predtym.posX, posY: predtym.posY }); });
+      oznam("marketing");
+    } else nacitaj();
+  };
+
+  /** Vrátiť celé rozloženie appke — ručné pozície sa zahodia. */
+  const vratRozlozenie = async () => {
+    const rucne = uzly.filter((x) => x.posX != null || x.posY != null);
+    if (!rucne.length) return;
+    const zaloha = rucne.map((x) => ({ id: x.id, posX: x.posX ?? null, posY: x.posY ?? null }));
+    for (const x of rucne) await posli({ id: x.id, posX: null, posY: null });
+    zapamataj(`rozloženie (${rucne.length})`, async () => {
+      for (const z of zaloha) await posli({ id: z.id, posX: z.posX, posY: z.posY });
+    });
+    nacitaj();
+    oznam("marketing");
+  };
+
   /** Zavesiť nápad pod iný nápad (ťahaním). Kruh v strome neprejde. */
   const presunPodUzol = async (u: Uzol, cielId: string) => {
     if (u.id === DOCASNY || !smiePresunut(u.id, cielId, uzly)) return;
@@ -408,8 +501,11 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
     // `vetva` sa pri zavesení pod iný nápad VYPRÁZDNI: platí len na koreňových
     // a nechať v nej starú hodnotu by znamenalo druhú, neplatnú pravdu
     // o tom, kam nápad patrí.
+    const predtym = { rodic: u.rodic, vetva: u.vetva, poradie: u.poradie };
     setRiadky((r) => r.map((x) => (x.id === u.id ? { ...x, rodic: cielId, vetva: "", poradie: koniec } : x)));
-    await posli({ id: u.id, rodic: cielId, vetva: "", poradie: koniec });
+    if (await posli({ id: u.id, rodic: cielId, vetva: "", poradie: koniec })) {
+      zapamataj("zavesenie pod iný nápad", async () => { await posli({ id: u.id, ...predtym }); });
+    }
     nacitaj();
     oznam("marketing");
   };
@@ -419,16 +515,19 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
     // „nenajdene" a nenastavila by sa ani lokálne.
     if (id === DOCASNY) { setChyba("Nápad sa najprv musí uložiť — dopíš ho a stlač Enter."); return; }
     setRiadky((r) => r.map((x) => (x.id === id ? { ...x, faza: f } : x)));
-    if (await posli({ id, faza: f })) oznam("marketing");
-    else nacitaj();
+    const predtym = Number(riadky.find((x) => x.id === id)?.faza || 0);
+    if (await posli({ id, faza: f })) {
+      zapamataj("zmenená fáza", async () => { await posli({ id, faza: predtym }); });
+      oznam("marketing");
+    } else nacitaj();
   };
 
   const vidno = uzly.filter((u) => viditelny(u.id, uzly));
   // Šírka plochy z ROZLOŽENIA, nie natvrdo: pri zbalených vetvách bola
   // dvojtisícpixelová plocha z väčšej časti prázdna a posuvník klamal o tom,
   // koľko mapy ešte je.
-  const sirkaMapy = Math.max(900, ...Object.values(poz).map((m) => m.x + m.w)) + 140;
-  const vyskaMapy = Math.max(420, vyska);
+  const sirkaMapy = sirka;
+  const vyskaMapy = vyska;
   const zmestiSa = () => {
     const el = plochaRef.current;
     if (!el) return;
@@ -442,10 +541,14 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
   const chybaDoMesiaca = Math.max(0, kusovNaMesiac(KADENCIA) - sFazou.length);
 
   const ciary: { id: string; d: string; farba: string; hrubka: number }[] = [];
-  const spoj = (a: { x: number; y: number; w: number } | undefined, b: { x: number; y: number } | undefined, farba: string, hrubka: number, id: string) => {
+  // Od stredu bubliny k stredu bubliny: v radiálnom rozložení môže dieťa
+  // ležať na ktorejkoľvek strane rodiča, takže „z pravého okraja do ľavého"
+  // by kreslilo čiary naprieč plochou.
+  const spoj = (a: Miesto | undefined, b: Miesto | undefined, farba: string, hrubka: number, id: string) => {
     if (!a || !b) return;
-    const x1 = a.x + a.w, y1 = a.y + 26, x2 = b.x, y2 = b.y + 26, m = (x1 + x2) / 2;
-    ciary.push({ id, d: `M ${x1} ${y1} C ${m} ${y1}, ${m} ${y2}, ${x2} ${y2}`, farba, hrubka });
+    const x1 = a.x + a.w / 2, y1 = a.y + RIADOK / 2, x2 = b.x + b.w / 2, y2 = b.y + RIADOK / 2;
+    const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+    ciary.push({ id, d: `M ${x1} ${y1} Q ${mx} ${my}, ${x2} ${y2}`, farba, hrubka });
   };
   for (const v of VETVY) spoj(poz["koren"], poz["vetva:" + v.id], v.farba, 3, "v" + v.id);
   for (const u of vidno) {
@@ -479,10 +582,13 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
       const t = e.target as HTMLElement;
       if (t.tagName === "INPUT" || t.closest("button")) return;
       e.preventDefault();
-      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
       setPresunPre(null);
       const b = bodVMape(e);
       setTahanie({ id: u.id, text: u.text, x: b.x, y: b.y, ciel: null });
+      // Zachytenie ukazovateľa AŽ POTOM a v try: bez neho sa ťahanie stratí
+      // pri vyjdení z bubliny, ale výnimka pred `setTahanie` by ho zabila
+      // celé. Lepšie horšie ťahanie než žiadne.
+      try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* bez zachytenia */ }
     },
     onPointerMove: (e: React.PointerEvent) => {
       if (!tahanie || tahanie.id !== u.id) return;
@@ -492,11 +598,15 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
     onPointerUp: (e: React.PointerEvent) => {
       if (!tahanie || tahanie.id !== u.id) return;
       const ciel = tahanie.ciel;
+      const kam = { x: tahanie.x, y: tahanie.y };
       setTahanie(null);
-      if (!ciel) return;
-      if (ciel.startsWith("vetva:")) void presunDoVetvy(u, ciel.slice(6));
+      // Pustenie NAD uzlom alebo vetvou prevesí, pustenie na voľné miesto
+      // bublinu položí. Jedno gesto, dva zmysly — a oba sú zrejmé z toho,
+      // čo je pod myšou zvýraznené.
+      if (!ciel) void polozNaMiesto(u, kam.x, kam.y);
+      else if (ciel.startsWith("vetva:")) void presunDoVetvy(u, ciel.slice(6));
       else void presunPodUzol(u, ciel);
-      (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
+      try { (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId); } catch { /* nebolo čo pustiť */ }
     },
     onPointerCancel: () => setTahanie(null),
   });
@@ -514,7 +624,7 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
           style={{
             padding: 5, borderRadius: 999, touchAction: "none",
             cursor: tahanie?.id === u.id ? "grabbing" : "grab",
-            border: `1px solid ${tahanie?.ciel === u.id ? C.accent : "transparent"}`,
+            border: `1px ${u.posX != null ? "dotted" : "solid"} ${tahanie?.ciel === u.id ? C.accent : (u.posX != null ? mix(C.border, 120) : "transparent")}`,
             background: tahanie?.ciel === u.id ? mix(C.accent, 16) : "transparent",
             opacity: tahanie?.id === u.id ? 0.45 : 1,
           }}
@@ -728,8 +838,27 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
             <span><b style={{ color: C.text }}>Enter</b> ďalšia vedľa</span>
             <span><b style={{ color: C.text }}>⌫</b> na prázdnej zmaže</span>
             <span><b style={{ color: C.text }}>Esc</b> zahodí rozpísanú</span>
+            <span><b style={{ color: C.text }}>⌘Z</b> krok späť</span>
             <span><b style={{ color: C.text }}>⇄</b> presunie do inej vetvy</span>
             <span>alebo chyť bublinu <b style={{ color: C.text }}>za rám</b> a pusť ju nad iný nápad</span>
+            <button
+              type="button"
+              disabled={!kroky.length}
+              onClick={() => void vratKrok()}
+              title={kroky.length ? `Vrátiť: ${kroky[kroky.length - 1].popis}` : "Zatiaľ nie je čo vrátiť"}
+              style={{ background: "none", border: "none", padding: 0, color: kroky.length ? C.accentLight : C.textDim, fontFamily: "inherit", fontSize: 11.5, cursor: kroky.length ? "pointer" : "default", textDecoration: kroky.length ? "underline" : "none", textUnderlineOffset: 2 }}
+            >
+              ↶ späť{kroky.length ? ` · ${kroky[kroky.length - 1].popis}` : ""}
+            </button>
+            <button
+              type="button"
+              onClick={() => void vratRozlozenie()}
+              disabled={!uzly.some((x) => x.posX != null)}
+              title="Zahodiť ručné posuny a nechať rozloženie na appku"
+              style={{ background: "none", border: "none", padding: 0, color: uzly.some((x) => x.posX != null) ? C.textMuted : C.textDim, fontFamily: "inherit", fontSize: 11.5, cursor: uzly.some((x) => x.posX != null) ? "pointer" : "default" }}
+            >
+              urovnať rozloženie
+            </button>
             <button
               type="button"
               onClick={() => setVysyp(vysyp === null ? "" : null)}
@@ -847,7 +976,7 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
                 }}>
                   {tahanie.text || "(prázdne)"}
                   <span style={{ color: C.textDim, marginLeft: 8 }}>
-                    {tahanie.ciel ? "pustiť sem" : "pusť nad nápad alebo vetvu"}
+                    {tahanie.ciel ? "zavesiť sem" : "položiť na toto miesto"}
                   </span>
                 </div>
               )}

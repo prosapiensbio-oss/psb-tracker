@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { RIADOK, kusovNaMesiac, rozparsujVysyp, mapaNaText, potomkovia, rozlozMapu, sirkaUzla, smiePresunut, vetvaUzla, viditelny, type Uzol } from "./mapaNapadov";
+import { KROK, RIADOK, STRED, VETVY, kusovNaMesiac, rozparsujVysyp, mapaNaText, potomkovia, rozlozMapu, sirkaUzla, smiePresunut, vetvaUzla, viditelny, type Uzol } from "./mapaNapadov";
 import { nazovFazy } from "./mapaCyklu";
 
 const u = (o: Partial<Uzol> & { id: string }): Uzol =>
@@ -37,37 +37,68 @@ describe("zbalená vetva", () => {
   });
 });
 
-describe("rozloženie", () => {
-  it("rodič sedí v strede svojich detí", () => {
-    const uzly = [u({ id: "a", vetva: "uvodny" }), u({ id: "b", rodic: "a" }), u({ id: "c", rodic: "a", poradie: 1 })];
-    const { poz } = rozlozMapu(uzly);
-    expect(poz.a.y).toBeCloseTo((poz.b.y + poz.c.y) / 2, 5);
-  });
+describe("radiálne rozloženie", () => {
+  const stredBubliny = (m: { x: number; y: number; w: number }) => ({ x: m.x + m.w / 2, y: m.y + RIADOK / 2 });
+  const vzdialenost = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y);
 
-  it("dieťa je napravo od rodiča, za jeho šírkou", () => {
-    const uzly = [u({ id: "a", vetva: "uvodny", text: "dlhší text nápadu" }), u({ id: "b", rodic: "a" })];
-    const { poz } = rozlozMapu(uzly);
-    expect(poz.b.x).toBe(poz.a.x + sirkaUzla("dlhší text nápadu", 2) + 76);
-  });
-
-  it("súrodenci sa neprekrývajú", () => {
-    const uzly = [u({ id: "a", vetva: "uvodny" }), u({ id: "b", vetva: "uvodny", poradie: 1 })];
-    const { poz } = rozlozMapu(uzly);
-    expect(Math.abs(poz.a.y - poz.b.y)).toBeGreaterThanOrEqual(RIADOK);
-  });
-
-  it("zbalená vetva miesto svojich detí nezaberá", () => {
-    const zbalena = [u({ id: "a", vetva: "uvodny", zbalene: true }), u({ id: "b", rodic: "a" }), u({ id: "c", rodic: "a", poradie: 1 })];
-    const otvorena = zbalena.map((x) => (x.id === "a" ? { ...x, zbalene: false } : x));
-    expect(rozlozMapu(zbalena).vyska).toBeLessThan(rozlozMapu(otvorena).vyska);
-  });
-
-  it("všetky tri vetvy majú miesto aj keď sú prázdne", () => {
+  it("kmeň je presne v strede plochy", () => {
     const { poz } = rozlozMapu([]);
-    expect(poz["vetva:uvodny"]).toBeDefined();
-    expect(poz["vetva:kniha"]).toBeDefined();
-    expect(poz["vetva:nezaradene"]).toBeDefined();
-    expect(poz["koren"]).toBeDefined();
+    expect(stredBubliny(poz.koren)).toEqual(STRED);
+  });
+
+  it("všetky tri vetvy sú rovnako ďaleko od kmeňa, ale inde", () => {
+    const { poz } = rozlozMapu([]);
+    const v = VETVY.map((x) => stredBubliny(poz["vetva:" + x.id]));
+    for (const s of v) expect(vzdialenost(s, STRED)).toBeCloseTo(KROK, 6);
+    expect(vzdialenost(v[0], v[1])).toBeGreaterThan(100);
+    expect(vzdialenost(v[1], v[2])).toBeGreaterThan(100);
+  });
+
+  it("každá ďalšia úroveň leží ďalej od stredu", () => {
+    const uzly = [u({ id: "a", vetva: "uvodny" }), u({ id: "b", rodic: "a" }), u({ id: "c", rodic: "b" })];
+    const { poz } = rozlozMapu(uzly);
+    const r = (id: string) => vzdialenost(stredBubliny(poz[id]), STRED);
+    expect(r("a")).toBeGreaterThan(KROK);
+    expect(r("b")).toBeGreaterThan(r("a"));
+    expect(r("c")).toBeGreaterThan(r("b"));
+  });
+
+  it("konár s viacerými nápadmi dostane širší výsek", () => {
+    // Inak by sa desať bublín tlačilo do toho istého uhla ako jedna.
+    const husty = [
+      u({ id: "a", vetva: "uvodny" }), u({ id: "a1", rodic: "a" }), u({ id: "a2", rodic: "a" }),
+      u({ id: "a3", rodic: "a" }), u({ id: "a4", rodic: "a" }),
+      u({ id: "b", vetva: "kniha" }),
+    ];
+    const { poz } = rozlozMapu(husty);
+    const uhly = ["a1", "a2", "a3", "a4"].map((id) => {
+      const s = stredBubliny(poz[id]);
+      return Math.atan2(s.y - STRED.y, s.x - STRED.x);
+    });
+    const rozptyl = Math.max(...uhly) - Math.min(...uhly);
+    expect(rozptyl).toBeGreaterThan(0.2);
+  });
+
+  it("ručná pozícia prebíja výpočet", () => {
+    const { poz } = rozlozMapu([u({ id: "a", vetva: "uvodny", posX: 400, posY: 250 })]);
+    expect(stredBubliny(poz.a)).toEqual({ x: 400, y: 250 });
+  });
+
+  it("potomok posunutej bubliny ide s ňou, nie späť ku kmeňu", () => {
+    const uzly = [u({ id: "a", vetva: "uvodny", posX: 300, posY: 300 }), u({ id: "b", rodic: "a" })];
+    const { poz } = rozlozMapu(uzly);
+    expect(vzdialenost(stredBubliny(poz.b), { x: 300, y: 300 })).toBeCloseTo(KROK, 6);
+  });
+
+  it("zbalená vetva svoje deti nekreslí", () => {
+    const uzly = [u({ id: "a", vetva: "uvodny", zbalene: true }), u({ id: "b", rodic: "a" })];
+    expect(rozlozMapu(uzly).poz.b).toBeUndefined();
+  });
+
+  it("plátno sa roztiahne na ručne vytlačenú bublinu", () => {
+    const daleko = rozlozMapu([u({ id: "a", vetva: "uvodny", posX: 4000, posY: 3000 })]);
+    expect(daleko.sirka).toBeGreaterThan(4000);
+    expect(daleko.vyska).toBeGreaterThan(3000);
   });
 });
 
@@ -158,10 +189,11 @@ describe("sirota — uzol, ktorému zmizol rodič", () => {
     expect(vetvaUzla("b", sirota)).toBe("nezaradene");
   });
 
-  it("uzol so živým rodičom sa nezmení", () => {
+  it("uzol so živým rodičom visí ďalej od stredu než jeho rodič", () => {
     const zdravy = [u({ id: "a", vetva: "kniha" }), u({ id: "b", rodic: "a" })];
     const { poz } = rozlozMapu(zdravy);
-    expect(poz.b.x).toBeGreaterThan(poz.a.x);
+    const r = (m: { x: number; y: number; w: number }) => Math.hypot(m.x + m.w / 2 - STRED.x, m.y + RIADOK / 2 - STRED.y);
+    expect(r(poz.b)).toBeGreaterThan(r(poz.a));
   });
 });
 

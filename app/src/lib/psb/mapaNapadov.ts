@@ -54,6 +54,9 @@ export type Uzol = {
   faza: number;
   /** Stav nápadu z karty Nápady: novy | pouzity | zamietnuty. */
   stav?: string;
+  /** Ručne posunutá bublina. `null` = nechaj to na výpočet. */
+  posX?: number | null;
+  posY?: number | null;
 };
 
 /** Nápad, ktorý sa ešte len chystá — publikovaný sa do plánu nepočíta. */
@@ -144,75 +147,109 @@ export function smiePresunut(id: string, cielId: string, uzly: Uzol[]): boolean 
 export const RIADOK = 52;
 
 export type Miesto = { x: number; y: number; w: number; hlbka: number };
-export type Rozlozenie = { poz: Record<string, Miesto>; vyska: number };
+export type Rozlozenie = { poz: Record<string, Miesto>; vyska: number; sirka: number };
 
 /** Šírka bubliny podľa textu. Jedno miesto — kreslí sa z nej aj čiara. */
 export const sirkaUzla = (text: string, hlbka: number) =>
   Math.max(hlbka <= 1 ? 200 : 150, Math.min(360, (text || "").length * 8.4 + (hlbka === 0 ? 118 : 104)));
 
+/** Stred pracovnej plochy. Plátno je pevné, aby ručné súradnice platili. */
+export const PLATNO = { sirka: 2600, vyska: 1800 };
+export const STRED = { x: PLATNO.sirka / 2, y: PLATNO.vyska / 2 };
+/** O koľko ďalej od stredu leží každá ďalšia úroveň. */
+export const KROK = 300;
+
+const TAU = Math.PI * 2;
+
 /**
- * Rozloženie stromu zľava doprava.
+ * RADIÁLNE ROZLOŽENIE: kmeň v strede, vetvy do všetkých strán.
  *
- * Rodič sedí v strede svojich detí, súrodenci pod sebou; nič sa neprekrýva
- * a nič sa neťahá myšou. Toto je celý rozdiel medzi mapou a nálepkovou
- * stenou: pozície sa POČÍTAJÚ, nepamätajú.
+ * Jerry, 25. 9. 2026: „obsah daj na stred pracovnej plochy a z nej môžu do
+ * všetkých smerov vyrastať ďalšie bubliny." Je to aj klasický tvar
+ * myšlienkovej mapy — strom doprava bol kompromis, ktorý sa na šírku
+ * obrazovky rýchlo minul.
+ *
+ * Každá vetva dostane výsek kruhu podľa toho, koľko listov pod ňou visí:
+ * konár s desiatimi nápadmi má desaťkrát širší výsek než konár s jedným,
+ * takže sa bubliny neprekrývajú bez toho, aby sa museli odtláčať.
+ *
+ * RUČNÁ POZÍCIA PREBÍJA VÝPOČET. Kto bublinu posunie, ju posunul; appka mu
+ * ju nemá kam vrátiť. Potomkovia posunutej bubliny sa počítajú od nej, takže
+ * sa presunie celý konár — inak by čiary viedli cez pol plochy.
  */
-export function rozlozMapu(uzly: Uzol[], koren = { x: 38, y: 28, text: "" }): Rozlozenie {
+export function rozlozMapu(uzly: Uzol[], koren: { text: string } = { text: "" }): Rozlozenie {
   const deti = detiPodla(uzly);
   const poz: Record<string, Miesto> = {};
-  const MEDZERA = 76;
 
-  const chod = (u: Uzol, x: number, yHore: number, hlbka: number): number => {
-    const w = sirkaUzla(u.text, hlbka);
-    const ds = u.zbalene ? [] : (deti.get(u.id) || []);
-    if (!ds.length) {
-      poz[u.id] = { x, y: yHore, w, hlbka };
-      return RIADOK;
-    }
-    let y = yHore;
-    let spolu = 0;
-    for (const d of ds) {
-      const h = chod(d, x + w + MEDZERA, y, hlbka + 1);
-      y += h;
-      spolu += h;
-    }
-    poz[u.id] = { x, y: yHore + spolu / 2 - RIADOK / 2, w, hlbka };
-    return spolu;
+  const listov = (id: string, strop = 0): number => {
+    if (strop > 40) return 1;
+    const ds = deti.get(id) || [];
+    if (!ds.length) return 1;
+    return ds.reduce((a, d) => a + listov(d.id, strop + 1), 0);
   };
 
-  // Vetvy sú tri pevné uzly medzi kmeňom a nápadmi; kreslia sa rovnako,
-  // len nemajú riadok v databáze.
-  const sirkaKmena = sirkaUzla(koren.text, 0);
-  let y = koren.y;
-  let spolu = 0;
-  for (const v of VETVY) {
-    const korene = (deti.get("") || []).filter((u) => (jeVetva(u.vetva) ? u.vetva : "nezaradene") === v.id);
-    const xVetvy = koren.x + sirkaKmena + MEDZERA;
-    const wVetvy = sirkaUzla(v.nazov, 1);
-    let yv = y;
-    let vSpolu = 0;
-    for (const u of korene) {
-      const h = chod(u, xVetvy + wVetvy + MEDZERA, yv, 2);
-      yv += h;
-      vSpolu += h;
+  const uloz = (kluc: string, sx: number, sy: number, text: string, hlbka: number) => {
+    const w = sirkaUzla(text, hlbka);
+    poz[kluc] = { x: sx - w / 2, y: sy - RIADOK / 2, w, hlbka };
+  };
+
+  const chod = (u: Uzol, od: number, do_: number, r: number, hlbka: number, ox: number, oy: number) => {
+    const uhol = (od + do_) / 2;
+    const rucne = u.posX != null && u.posY != null;
+    const sx = rucne ? (u.posX as number) : ox + Math.cos(uhol) * r;
+    const sy = rucne ? (u.posY as number) : oy + Math.sin(uhol) * r;
+    uloz(u.id, sx, sy, u.text, hlbka);
+    const ds = u.zbalene ? [] : (deti.get(u.id) || []);
+    if (!ds.length) return;
+    // Potomkovia posunutej bubliny vyrastajú od NEJ a smerom od stredu —
+    // inak by sa po presune vrátili k pôvodnému konáru a čiary by sa krížili.
+    const zaklad = rucne ? Math.atan2(sy - STRED.y, sx - STRED.x) : uhol;
+    const rozpatie = rucne ? Math.PI * 0.8 : (do_ - od);
+    const zac = rucne ? zaklad - rozpatie / 2 : od;
+    const celkom = ds.reduce((a, d) => a + listov(d.id), 0) || 1;
+    let u0 = zac;
+    for (const d of ds) {
+      const podiel = listov(d.id) / celkom;
+      const u1 = u0 + rozpatie * podiel;
+      chod(d, u0, u1, rucne ? KROK : r + KROK, hlbka + 1, rucne ? sx : ox, rucne ? sy : oy);
+      u0 = u1;
     }
-    if (!korene.length) vSpolu = RIADOK;
-    poz["vetva:" + v.id] = { x: xVetvy, y: y + vSpolu / 2 - RIADOK / 2, w: wVetvy, hlbka: 1 };
-    y += vSpolu;
-    spolu += vSpolu;
+  };
+
+  uloz("koren", STRED.x, STRED.y, koren.text, 0);
+
+  // Tri vetvy dookola. Začína sa vľavo hore, aby prvá (úvodný tréning)
+  // sedela tam, kam oko na obrazovke chodí ako prvé.
+  const vahy = VETVY.map((v) => {
+    const korene = (deti.get("") || []).filter((u) => (jeVetva(u.vetva) ? u.vetva : "nezaradene") === v.id);
+    return { v, korene, vaha: Math.max(1, korene.reduce((a, u) => a + listov(u.id), 0)) };
+  });
+  const suma = vahy.reduce((a, x) => a + x.vaha, 0);
+  let uhol0 = -Math.PI * 0.85;
+  for (const { v, korene, vaha } of vahy) {
+    const uhol1 = uhol0 + TAU * (vaha / suma);
+    const stredVetvy = (uhol0 + uhol1) / 2;
+    uloz("vetva:" + v.id, STRED.x + Math.cos(stredVetvy) * KROK, STRED.y + Math.sin(stredVetvy) * KROK, v.nazov, 1);
+    const celkom = korene.reduce((a, u) => a + listov(u.id), 0) || 1;
+    let u0 = uhol0;
+    for (const u of korene) {
+      const u1 = u0 + (uhol1 - uhol0) * (listov(u.id) / celkom);
+      chod(u, u0, u1, KROK * 2, 2, STRED.x, STRED.y);
+      u0 = u1;
+    }
+    uhol0 = uhol1;
   }
-  poz["koren"] = { x: koren.x, y: koren.y + spolu / 2 - RIADOK / 2, w: sirkaKmena, hlbka: 0 };
-  return { poz, vyska: koren.y + spolu + 60 };
+
+  // Plátno sa roztiahne na to, čo doň ručné posuny vytlačili.
+  let maxX = PLATNO.sirka;
+  let maxY = PLATNO.vyska;
+  for (const m of Object.values(poz)) {
+    maxX = Math.max(maxX, m.x + m.w + 120);
+    maxY = Math.max(maxY, m.y + RIADOK + 120);
+  }
+  return { poz, vyska: maxY, sirka: maxX };
 }
 
-/**
- * Z mapy zadanie vetami.
- *
- * Toto je dôvod, prečo mapa vzniká — nie obrázok, ale text, ktorý sa dá
- * podať Jarvisovi a nechať si doň rýpať. Preto tu nie je zoznam odrážok, ale
- * vety: čo sa chystá, koľko toho je, a hlavne ČO CHÝBA. Prázdna fáza je
- * v tomto texte to najcennejšie — na obrazovke sa dá prehliadnuť, vo vete nie.
- */
 /** Koľko kusov obsahu je mesiac pri danej týždennej kadencii. Jedno miesto. */
 export const kusovNaMesiac = (kadenciaTyzdenne: number) => Math.round(kadenciaTyzdenne * 4);
 
