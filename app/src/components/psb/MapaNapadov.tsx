@@ -167,7 +167,11 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
    * Ťahá sa za RÁM okolo bubliny, nie za text: vnútro je políčko, do ktorého
    * sa píše, a keby začínalo ťahanie, nedalo by sa v ňom označiť slovo.
    */
-  type Tahanie = { id: string; text: string; x: number; y: number; ciel: string | null; odX: number; odY: number };
+  type Tahanie = {
+    id: string; text: string; x: number; y: number; ciel: string | null; odX: number; odY: number;
+    /** Kam padne STRED bubliny oproti miestu, kde ju človek chytil. */
+    posunX: number; posunY: number;
+  };
   const [tahanie, setTahanieStav] = useState<Tahanie | null>(null);
   /**
    * Ťahanie žije aj v refe, nielen v stave.
@@ -800,27 +804,96 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
    * pokazená. Rozdiel je len v tom, že vetva a kmeň sa nedajú nikam zavesiť,
    * takže sa pri nich cieľ ani nehľadá.
    */
+  /**
+   * Chytenie, ktoré sa ešte nerozhodlo, či je z neho klik alebo ťah.
+   *
+   * Na textovom políčku sa `preventDefault` zavolať NESMIE — klik doň musí
+   * položiť kurzor. Preto sa chytenie najprv len zapamätá a ťahať sa začne
+   * až pri pohybe.
+   */
+  const cakaRef = useRef<{ kluc: string; text: string; odX: number; odY: number; posunX: number; posunY: number } | null>(null);
+
+  /** Prechod z písania na ťahanie. */
+  const zacniTahatZTextu = (
+    ev: PointerEvent,
+    ram: HTMLElement,
+    caka: { kluc: string; text: string; odX: number; odY: number; posunX: number; posunY: number },
+  ) => {
+    // Kurzor z políčka von a OZNAČENIE PREČ: ťah myšou po stránke ho inak
+    // rozťahuje cez susedné bubliny a po mape sa vlečie modrá plocha
+    // (Jerry, 25. 9. 2026: „chytím to a ono sa to celé označí").
+    // Blur pri ťahaní NIE JE uloženie textu: pri krátkej rozpísanej bubline
+    // by uprostred pohybu vyskočilo „musí mať aspoň tri znaky".
+    zahadzuje.current = true;
+    (document.activeElement as HTMLElement | null)?.blur?.();
+    try { window.getSelection()?.removeAllRanges(); } catch { /* bez výberu */ }
+    cakaRef.current = null;
+    setPresunPre(null);
+    const b = bodVMape(ev);
+    setTahanie({ id: caka.kluc, text: caka.text, x: b.x, y: b.y, ciel: null, odX: caka.odX, odY: caka.odY, posunX: caka.posunX, posunY: caka.posunY });
+    try { ram.setPointerCapture(ev.pointerId); } catch { /* bez zachytenia */ }
+  };
+
   const tahaj = (kluc: string, text: string, lenPosun: boolean) => ({
     onPointerDown: (e: React.PointerEvent) => {
       const t = e.target as HTMLElement;
-      if (t.tagName === "INPUT" || t.closest("button")) return;
+      if (t.closest("button")) return;
+      const b = bodVMape(e);
+      const m = poz[kluc];
+      // Kde v bubline ju človek chytil. Bez tohto sa bublina po pustení
+      // skokom vycentrovala na kurzor — pri širokej bubline to je aj sto
+      // pixelov bokom. Jerry, 25. 9. 2026: „uloží sa to len plus mínus do
+      // tej oblasti, ale nie presne."
+      const posunX = m ? m.x + m.w / 2 - b.x : 0;
+      const posunY = m ? m.y + RIADOK / 2 - b.y : 0;
+      if (t.tagName === "INPUT") {
+        /**
+         * Chytenie za TEXT. Nesmie sa tu zavolať `preventDefault` (klik musí
+         * položiť kurzor do políčka) ani zachytiť ukazovateľ (to by kurzor
+         * zobralo tiež). Lenže bez zachytenia idú ďalšie pohyby myši tomu,
+         * nad čím sa práve nachádza — nie bubline — a `onPointerMove` rámu sa
+         * už nikdy nespustí. Preto sa počúva na OKNE a ťah sa začne až pri
+         * pohybe; vtedy sa ukazovateľ zachytí a zvyšok ide po starom.
+         */
+        const ram = e.currentTarget as HTMLElement;
+        const od = { x: e.clientX, y: e.clientY };
+        cakaRef.current = { kluc, text, odX: od.x, odY: od.y, posunX, posunY };
+        const upratuj = () => {
+          window.removeEventListener("pointermove", naPohyb);
+          window.removeEventListener("pointerup", naPustenie);
+          window.removeEventListener("pointercancel", naPustenie);
+        };
+        const naPohyb = (ev: PointerEvent) => {
+          if (!cakaRef.current || cakaRef.current.kluc !== kluc) { upratuj(); return; }
+          if (Math.hypot(ev.clientX - od.x, ev.clientY - od.y) < 5) return;
+          upratuj();
+          zacniTahatZTextu(ev, ram, cakaRef.current);
+        };
+        const naPustenie = () => { cakaRef.current = null; upratuj(); };
+        window.addEventListener("pointermove", naPohyb);
+        window.addEventListener("pointerup", naPustenie);
+        window.addEventListener("pointercancel", naPustenie);
+        return;
+      }
       e.preventDefault();
       setPresunPre(null);
-      const b = bodVMape(e);
-      setTahanie({ id: kluc, text, x: b.x, y: b.y, ciel: null, odX: e.clientX, odY: e.clientY });
+      setTahanie({ id: kluc, text, x: b.x, y: b.y, ciel: null, odX: e.clientX, odY: e.clientY, posunX, posunY });
       try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* bez zachytenia */ }
     },
     onPointerMove: (e: React.PointerEvent) => {
       const t = tahanieRef.current;
       if (!t || t.id !== kluc) return;
+      e.preventDefault();
       const b = bodVMape(e);
       setTahanie({ ...t, x: b.x, y: b.y, ciel: lenPosun ? null : cielPod(b, kluc) });
     },
     onPointerUp: (e: React.PointerEvent) => {
+      cakaRef.current = null;
       const tahanie = tahanieRef.current;
       if (!tahanie || tahanie.id !== kluc) return;
       const ciel = tahanie.ciel;
-      const kam = { x: tahanie.x, y: tahanie.y };
+      // Bublina si drží miesto, za ktoré ju človek chytil.
+      const kam = { x: tahanie.x + tahanie.posunX, y: tahanie.y + tahanie.posunY };
       // KLIK, NIE ŤAHANIE. Kto sa obvodu len dotkne, nechce bublinu presunúť
       // — chce ponuku. Hranica je päť pixelov, aby ju neotvorilo chvenie ruky.
       const klik = Math.hypot(e.clientX - tahanie.odX, e.clientY - tahanie.odY) < 5;
@@ -837,7 +910,7 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
       else if (ciel.startsWith("vetva:")) void presunDoVetvy(u, ciel.slice(6));
       else void presunPodUzol(u, ciel);
     },
-    onPointerCancel: () => setTahanie(null),
+    onPointerCancel: () => { cakaRef.current = null; setTahanie(null); },
   });
 
   /** Na ktorej strane kmeňa bublina leží (1 vpravo, −1 vľavo). */
@@ -885,6 +958,8 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
   /** Rám, za ktorý sa bublina chytá. Rovnaký pre nápad, vetvu aj kmeň. */
   const ramStyl = (kluc: string, rucne: boolean): React.CSSProperties => ({
     padding: 5,
+    // Rám sa chytá, nečíta — bez tohto ťah po ňom označuje text na mape.
+    userSelect: "none",
     borderRadius: 999,
     touchAction: "none",
     cursor: tahanie?.id === kluc ? "grabbing" : "grab",
@@ -1226,7 +1301,7 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
               </div>
             </div>
           )}
-          <div ref={plochaRef} style={{ position: "relative", height: 520, overflow: "auto", border: `1px solid ${mix(C.border, 80)}`, borderRadius: 13, background: mix(C.card, 60), overscrollBehavior: "contain" }}>
+          <div ref={plochaRef} style={{ position: "relative", height: 520, overflow: "auto", border: `1px solid ${mix(C.border, 80)}`, borderRadius: 13, background: mix(C.card, 60), overscrollBehavior: "contain", userSelect: tahanie ? "none" : undefined }}>
             {/* Dve vrstvy zámerne: vnútorná sa zmenšuje `transform`om (text
                 zostane ostrý a nič sa neprelomí), vonkajšia nesie zmenšený
                 rozmer, aby posuvníky vedeli, koľko mapy naozaj je. */}
