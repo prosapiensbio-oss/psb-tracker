@@ -198,8 +198,19 @@ export const Route = createFileRoute("/api/vydane-faktury")({
             if (!id || !klient) return Response.json({ ok: false, error: "Chýba kontakt alebo klient." }, { status: 400 });
             const k = await DB.prepare("SELECT * FROM fakturacne_kontakty WHERE id = ?1").bind(id).first<Record<string, string>>();
             if (!k) return Response.json({ ok: false, error: "Taký kontakt neexistuje." }, { status: 404 });
+            /**
+             * JEDEN KONTAKT MÔŽE PATRIŤ VIACERÝM KLIENTOM.
+             *
+             * Jerry, 26. 9. 2026: „Ani/Anetka Přinosilová je naša 8-ročná
+             * klientka, ktorej faktúra bola na jej mamu Lenku, a rovnako aj
+             * jej 10-ročný syn Maty." Jedna platiteľka, traja klienti. Keby
+             * sa pri druhom spárovaní prvé prepísalo, appka by o deťoch
+             * nevedela — preto sa mená pridávajú, nie nahrádzajú.
+             */
+            const uz = String(k.klient || "").split(",").map((x) => x.trim()).filter(Boolean);
+            const zoznam = uz.includes(klient) ? uz : [...uz, klient];
             await DB.batch([
-              DB.prepare("UPDATE fakturacne_kontakty SET klient = ?2, odlozene_at = NULL WHERE id = ?1").bind(id, klient),
+              DB.prepare("UPDATE fakturacne_kontakty SET klient = ?2, odlozene_at = NULL WHERE id = ?1").bind(id, zoznam.join(", ")),
               // Údaje idú tam, odkiaľ ich berie faktúra aj párovanie platieb.
               // Existujúce polia sa neprepisujú prázdnym — kto si už niečo
               // doplnil ručne, o to párovaním nepríde.
@@ -219,6 +230,20 @@ export const Route = createFileRoute("/api/vydane-faktury")({
             ]);
             await audit(DB, { action: "kontakt-sparovany", predmet: `${k.firma} → ${klient}`, actor: kto });
             return Response.json({ ok: true, klient });
+          }
+
+          /** Zrušenie jedného spárovania — omyl sa má dať vziať späť. */
+          if (b.akcia === "kontakt-odparuj") {
+            const id = kus(b.id, 40);
+            const klient = kus(b.klient, 120);
+            if (!id) return Response.json({ ok: false, error: "Chýba kontakt." }, { status: 400 });
+            const k = await DB.prepare("SELECT klient FROM fakturacne_kontakty WHERE id = ?1").bind(id).first<{ klient: string }>();
+            if (!k) return Response.json({ ok: false, error: "Taký kontakt neexistuje." }, { status: 404 });
+            const zvysok = String(k.klient || "").split(",").map((x) => x.trim()).filter((x) => x && x !== klient);
+            await DB.prepare("UPDATE fakturacne_kontakty SET klient = ?2 WHERE id = ?1").bind(id, zvysok.join(", ")).run();
+            // Fakturačné údaje klienta sa NEMAŽÚ: mohol si ich medzitým
+            // doplniť ručne a odpárovanie kontaktu o ne pripraviť nemá.
+            return Response.json({ ok: true });
           }
 
           if (b.akcia === "kontakt-odloz") {

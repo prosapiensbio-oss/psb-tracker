@@ -26,6 +26,12 @@ type Kontakt = {
 };
 
 export function ParovacKontaktov({ mena }: { mena: string[] }) {
+  /**
+   * Klienti abecedne. Jerry, 26. 9. 2026: „prečo klienti nie sú abecedne?
+   * Chýba mi tam nejaký vyhľadávač." Zoznam chodí v poradí, v akom ho vrátila
+   * databáza — medzi sto menami sa tak hľadalo očami.
+   */
+  const zoradene = useMemo(() => [...mena].sort((a, b) => a.localeCompare(b, "sk")), [mena]);
   const [kontakty, setKontakty] = useState<Kontakt[] | null>(null);
   const [vyber, setVyber] = useState<Record<string, string>>({});
   const [pracujem, setPracujem] = useState("");
@@ -78,7 +84,10 @@ export function ParovacKontaktov({ mena }: { mena: string[] }) {
     const klient = vyber[k.id] || navrhy[k.id] || "";
     if (!klient) { setChyba(`Pri „${k.firma}" vyber klienta.`); return; }
     const j = await posli({ akcia: "kontakt-paruj", id: k.id, klient }, k.id);
-    if (j) setHlaska(`${k.firma} → ${j.klient}. Platby z tejto firmy sa odteraz priradia samy.`);
+    if (j) {
+      setVyber((v) => ({ ...v, [k.id]: "" }));
+      setHlaska(`${k.firma} → ${j.klient}. Platby z tejto firmy sa odteraz priradia samy.`);
+    }
   };
 
   if (!kontakty) return null;
@@ -92,17 +101,43 @@ export function ParovacKontaktov({ mena }: { mena: string[] }) {
         </span>
       </span>
       {hotovy ? (
-        <span style={{ minWidth: 190, fontSize: 12.5, color: C.green }}>→ {k.klient}</span>
+        <>
+          <span style={{ minWidth: 190, fontSize: 12.5, color: C.green }}>
+            → {k.klient.split(",").map((x) => x.trim()).filter(Boolean).join(" · ")}
+          </span>
+          {/* Jedna platiteľka môže mať viac klientov — mama platí za dve deti
+              aj za seba (Jerry, 26. 9. 2026). */}
+          <input
+            list={`klienti-${k.id}`}
+            value={vyber[k.id] || ""}
+            onChange={(e) => setVyber((v) => ({ ...v, [k.id]: e.target.value }))}
+            placeholder="+ ďalší klient"
+            style={{ padding: "5px 7px", borderRadius: 7, fontSize: 12, border: `1px solid ${C.border}`, background: C.bg, color: C.text, width: 150 }}
+          />
+          <datalist id={`klienti-${k.id}`}>{zoradene.map((m) => <option key={m} value={m} />)}</datalist>
+          {vyber[k.id] && (
+            <button type="button" onClick={() => void paruj(k)} style={{ background: "none", border: "none", color: C.accentLight, fontSize: 11.5, cursor: "pointer", fontFamily: "inherit" }}>
+              pridať
+            </button>
+          )}
+        </>
       ) : (
         <>
-          <select
+          {/* Vyhľadávanie, nie rozbaľovací zoznam: klientov je vyše sto
+              a v `select`e sa medzi nimi hľadá očami. `datalist` filtruje
+              podľa toho, čo človek píše. */}
+          <input
+            list={`klienti-${k.id}`}
             value={vyber[k.id] ?? navrhy[k.id] ?? ""}
             onChange={(e) => setVyber((v) => ({ ...v, [k.id]: e.target.value }))}
-            style={{ padding: "5px 7px", borderRadius: 7, fontSize: 12, border: `1px solid ${navrhy[k.id] && !vyber[k.id] ? mix(C.accent, 60) : C.border}`, background: C.bg, color: C.text, minWidth: 190 }}
-          >
-            <option value="">{jeFirma(k) ? "— kto za firmou stojí? —" : "— vyber klienta —"}</option>
-            {mena.map((m) => <option key={m} value={m}>{m}</option>)}
-          </select>
+            placeholder={jeFirma(k) ? "kto za firmou stojí?" : "hľadaj klienta…"}
+            style={{
+              padding: "5px 7px", borderRadius: 7, fontSize: 12, minWidth: 190,
+              border: `1px solid ${navrhy[k.id] && !vyber[k.id] ? mix(C.accent, 60) : C.border}`,
+              background: C.bg, color: C.text,
+            }}
+          />
+          <datalist id={`klienti-${k.id}`}>{zoradene.map((m) => <option key={m} value={m} />)}</datalist>
           <button
             type="button"
             onClick={() => void paruj(k)}

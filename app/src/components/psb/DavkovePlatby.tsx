@@ -39,6 +39,8 @@ const ZDROJ: Record<string, string> = {
 };
 
 export function DavkovePlatby({ mena }: { mena: string[] }) {
+  /** Abecedne — medzi sto menami sa v neusporiadanom zozname hľadá očami. */
+  const zoradene = useMemo(() => [...mena].sort((a, b) => a.localeCompare(b, "sk")), [mena]);
   const [vsetky, setVsetky] = useState<Navrh[] | null>(null);
   const [vyber, setVyber] = useState<Record<string, string>>({});
   const [pracujem, setPracujem] = useState(false);
@@ -126,15 +128,21 @@ export function DavkovePlatby({ mena }: { mena: string[] }) {
       <span style={{ width: 82, fontSize: 12.5, fontWeight: 700, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{fmtCZK(p.suma)}</span>
       <span style={{ flex: "1 1 180px", minWidth: 140, fontSize: 11, color: C.textMuted }}>{p.text.slice(0, 80)}</span>
       {sVyberom ? (
-        <select
-          value={vyber[p.fioId] || ""}
-          onChange={(e) => setVyber((v) => ({ ...v, [p.fioId]: e.target.value }))}
-          style={{ padding: "5px 7px", borderRadius: 7, fontSize: 12, border: `1px solid ${C.border}`, background: C.bg, color: C.text, minWidth: 170 }}
-        >
-          <option value="">— vyber klienta —</option>
-          {p.kandidati.map((k) => <option key={k} value={k}>{k}</option>)}
-          {mena.filter((m) => !p.kandidati.includes(m)).map((m) => <option key={m} value={m}>{m}</option>)}
-        </select>
+        <>
+          <input
+            list={`klienti-${p.fioId}`}
+            value={vyber[p.fioId] || ""}
+            onChange={(e) => setVyber((v) => ({ ...v, [p.fioId]: e.target.value }))}
+            placeholder={p.kandidati.length ? `napr. ${p.kandidati[0]}` : "hľadaj klienta…"}
+            style={{ padding: "5px 7px", borderRadius: 7, fontSize: 12, border: `1px solid ${C.border}`, background: C.bg, color: C.text, minWidth: 170 }}
+          />
+          {/* Kandidáti hore, potom zvyšok abecedne — návrh má byť po ruke,
+              ale nesmie byť jediná možnosť. */}
+          <datalist id={`klienti-${p.fioId}`}>
+            {p.kandidati.map((k) => <option key={k} value={k} />)}
+            {zoradene.filter((m) => !p.kandidati.includes(m)).map((m) => <option key={m} value={m} />)}
+          </datalist>
+        </>
       ) : (
         <span style={{ minWidth: 170, fontSize: 12.5, color: C.text }}>
           {p.kandidati[0]}
