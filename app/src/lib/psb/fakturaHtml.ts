@@ -39,9 +39,17 @@ export function qrSvg(text: string, velkost = 3): string {
 const adresa = (r: (string | undefined)[]) =>
   r.filter((x) => x && String(x).trim()).map((x) => `${esc(String(x))}<br>`).join("");
 
-/** Značka a figúra sa berú zo súborov, ktoré appka už serveruje. */
-const ZNACKA = "/znacka-napis.svg";
-const FIGURA = "/znacka-figura.svg";
+/**
+ * ZNAČKA VO FARBE, NIE CEZ CSS.
+ *
+ * Pôvodné súbory majú `fill="currentColor"` — v `<img>` sa to preloží na
+ * čiernu, lebo obrázok nemá od koho farbu zdediť. Zbieliť figúru filtrom
+ * (`brightness(0) invert(1)`) fungovalo na obrazovke, ale tlač filtre
+ * zahadzuje: Jerry, 26. 9. 2026 — „v návrhu je to logo biele, ale keď to dám
+ * tlačiť, je čierne." Preto sú v `public/` kópie s napevno zapísanou farbou.
+ */
+const ZNACKA = "/znacka-napis-zelena.svg";
+const FIGURA = "/znacka-figura-biela.svg";
 
 export function fakturaDocument(f: Faktura): string {
   const platba = spayd({
@@ -103,7 +111,7 @@ export function fakturaDocument(f: Faktura): string {
 <body>
 <div class="list">
   <div class="pasik">
-    <img src="${FIGURA}" alt="" style="width:100%;height:40mm;object-fit:contain;filter:brightness(0) invert(1)">
+    <img src="${FIGURA}" alt="" style="width:100%;height:40mm;object-fit:contain">
     <div style="writing-mode:vertical-rl;transform:rotate(180deg);font-size:8pt;letter-spacing:3pt;text-transform:uppercase;opacity:.7">Biomechanika pohybu</div>
     <div style="font-size:7.5pt;text-align:center;opacity:.75;line-height:1.6">${esc(DODAVATEL.web)}</div>
   </div>

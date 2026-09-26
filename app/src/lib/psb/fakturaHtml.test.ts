@@ -69,8 +69,8 @@ describe("značka na doklade", () => {
   it("nesie zelený pásik, figúru aj nápis", () => {
     // Jerry si 26. 9. 2026 vybral návrh 4: „vyhráva 4, zelený pásik."
     const h = fakturaDocument(f);
-    expect(h).toContain("/znacka-figura.svg");
-    expect(h).toContain("/znacka-napis.svg");
+    expect(h).toContain("/znacka-figura-biela.svg");
+    expect(h).toContain("/znacka-napis-zelena.svg");
     expect(h).toContain("#456127");
   });
 
@@ -94,5 +94,20 @@ describe("faktúra je JEDNA strana", () => {
 
   it("za listom už nič nenasleduje", () => {
     expect(fakturaDocument(f)).toContain("page-break-after: avoid");
+  });
+});
+
+describe("značka sa tlačí vo farbe", () => {
+  it("nepoužíva CSS filter — tlač ho zahadzuje", () => {
+    // Jerry, 26. 9. 2026: „v návrhu je to logo biele, ale keď to dám tlačiť,
+    // je čierne." Figúra sa bielila filtrom; na papieri z toho bola čierna
+    // škvrna na zelenom pásiku. Farba patrí do súboru, nie do CSS.
+    expect(fakturaDocument(f)).not.toContain("filter:");
+  });
+
+  it("neberie súbory s currentColor — tie by v <img> sčerneli", () => {
+    const h = fakturaDocument(f);
+    expect(h).not.toContain('"/znacka-napis.svg"');
+    expect(h).not.toContain('"/znacka-figura.svg"');
   });
 });
