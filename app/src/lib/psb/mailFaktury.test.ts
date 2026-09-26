@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { krstne, mailFaktury, menoPrilohy } from "./mailFaktury";
+import { TRENERI, krstne, mailFaktury, menoPrilohy } from "./mailFaktury";
 import type { Faktura } from "./vydanaFaktura";
 
 const zaklad: Faktura = {
@@ -54,5 +54,46 @@ describe("predmet a príloha", () => {
 
   it("príloha sa volá ako doklad", () => {
     expect(menoPrilohy("20261001")).toBe("Faktura 20261001.pdf");
+  });
+});
+
+describe("podpis patrí trénerovi klienta", () => {
+  it("Terezkin klient dostane jej meno a jej telefón", () => {
+    // Jerry, 26. 9. 2026: „niektorí klienti patria Terezke a niektorí mne."
+    const m = mailFaktury(zaklad, { trener: "Terezka" });
+    expect(m.telo).toContain("Terezka");
+    expect(m.telo).toContain(TRENERI.Terezka.telefon);
+    expect(m.telo).not.toContain("Filip");
+  });
+
+  it("bez trénera sa podpíše Jerry", () => {
+    const m = mailFaktury(zaklad);
+    expect(m.telo).toContain("Filip");
+    expect(m.telo).toContain(TRENERI.Jerry.telefon);
+  });
+
+  it("neznámy tréner appku nezhodí", () => {
+    expect(mailFaktury(zaklad, { trener: "Matyáš" }).telo).toContain("Filip");
+  });
+});
+
+describe("tykanie a vykanie sa dá prepnúť", () => {
+  it("človeku sa dá vykať, keď si to Jerry vyberie", () => {
+    const m = mailFaktury(zaklad, { vykanie: true });
+    expect(m.vykanie).toBe(true);
+    expect(m.telo.startsWith("Dobrý den,")).toBe(true);
+    expect(m.telo).toContain("Mgr. Filip Stráňavský");
+  });
+
+  it("firme sa dá aj tykať", () => {
+    const m = mailFaktury({ ...zaklad, odberatel: { ...zaklad.odberatel, firma: "FSH Devices s.r.o." } }, { vykanie: false });
+    expect(m.firme).toBe(true);
+    expect(m.vykanie).toBe(false);
+    expect(m.telo.startsWith("Ahoj Anna,")).toBe(true);
+  });
+
+  it("bez voľby rozhoduje, či je to firma", () => {
+    expect(mailFaktury(zaklad).vykanie).toBe(false);
+    expect(mailFaktury({ ...zaklad, odberatel: { ...zaklad.odberatel, firma: "FSH Devices s.r.o." } }).vykanie).toBe(true);
   });
 });

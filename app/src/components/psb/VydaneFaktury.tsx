@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { oznam } from "../../lib/psb/obnovaSignal";
 import { C, mix } from "../../lib/psb/theme";
 import { vytlacFakturu } from "../../lib/psb/fakturaHtml";
+import { mailFaktury } from "../../lib/psb/mailFaktury";
 import {
   DODAVATEL, POPISY, SPLATNOST_DNI, den, poSplatnosti, splatnostZ, suma, type Faktura,
 } from "../../lib/psb/vydanaFaktura";
@@ -74,8 +75,10 @@ function Pole({ label, hodnota, nastav, sirka = 1, typ = "text", placeholder = "
   );
 }
 
-export function VydaneFaktury({ mena, predvolba, onPredvolbaSpracovana }: {
+export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana }: {
   mena: string[];
+  /** Kto klienta vedie — podľa toho sa mail podpíše. */
+  treneri?: Record<string, string>;
   predvolba?: FakturaPredvolba | null;
   onPredvolbaSpracovana?: () => void;
 }) {
@@ -91,6 +94,15 @@ export function VydaneFaktury({ mena, predvolba, onPredvolbaSpracovana }: {
     splatnostDni: String(SPLATNOST_DNI), poznamka: "", balicekId: "",
   });
   const [u, setU] = useState<Omit<Udaje, "klient">>(PRAZDNE_UDAJE);
+  /**
+   * Rozpísaný mail pred odoslaním.
+   *
+   * Jerry, 26. 9. 2026: „nech na mňa ešte raz vyskočí adresa, kam sa posiela,
+   * s textom a možnosťou úpravy, prípadne s prepnutím na vykanie." Doklad ide
+   * cudziemu človeku — posledný pohľad pred odoslaním je lacnejší než
+   * ospravedlnenie.
+   */
+  const [mail, setMail] = useState<{ id: string; cislo: string; komu: string; predmet: string; telo: string; vykanie: boolean; znova: boolean } | null>(null);
 
   const nacitaj = useCallback(async () => {
     const j = await fetch("/api/vydane-faktury", { credentials: "same-origin" })
@@ -155,6 +167,36 @@ export function VydaneFaktury({ mena, predvolba, onPredvolbaSpracovana }: {
     setHlaska(`Vystavená faktúra ${j.cislo}. Otvor ju a ulož ako PDF.`);
     setOtvorenaNova(false);
     setF((s) => ({ ...s, popis: "", cena: "", poznamka: "", balicekId: "" }));
+  };
+
+  /** Otvorí náhľad mailu — text sa zloží tu a dá sa prepísať. */
+  const otvorMail = (r: Riadok) => {
+    const komu = r.odb_email || udaje.find((x) => x.klient === r.klient)?.email || "";
+    if (!komu) { setChyba(`${r.klient} nemá e-mail — doplň ho vo fakturačných údajoch nižšie.`); return; }
+    const t = mailFaktury(naFakturu(r), { trener: treneri?.[r.klient] });
+    setChyba("");
+    setMail({ id: r.id, cislo: r.cislo, komu, predmet: t.predmet, telo: t.telo, vykanie: t.vykanie, znova: !!r.odoslane_at });
+  };
+
+  /** Prepnutie tykania/vykania prepíše text — ale len ten nezmenený. */
+  const prepniOslovenie = (vykanie: boolean) => {
+    if (!mail) return;
+    const r = riadky.find((x) => x.id === mail.id);
+    if (!r) return;
+    const stary = mailFaktury(naFakturu(r), { trener: treneri?.[r.klient], vykanie: mail.vykanie });
+    const novy = mailFaktury(naFakturu(r), { trener: treneri?.[r.klient], vykanie });
+    // Keď si Jerry text prepísal, prepnutie mu ho neprepíše — vyrobí sa nový
+    // len vtedy, keď v poli stojí presne to, čo appka napísala.
+    setMail({ ...mail, vykanie, telo: mail.telo === stary.telo ? novy.telo : mail.telo });
+  };
+
+  const posliMailTeraz = async () => {
+    if (!mail) return;
+    const j = await posli({ akcia: "posli-mail", id: mail.id, komu: mail.komu, predmet: mail.predmet, telo: mail.telo }, mail.id);
+    if (j) {
+      setHlaska(`Faktúra ${mail.cislo} odišla na ${mail.komu}. Kópia je aj v tvojej schránke.`);
+      setMail(null);
+    }
   };
 
   const ulozUdaje = async () => {
@@ -333,6 +375,68 @@ export function VydaneFaktury({ mena, predvolba, onPredvolbaSpracovana }: {
         </div>
       )}
 
+      {mail && (
+        <div style={{ padding: 12, borderRadius: 11, border: `1px solid ${mix(C.green, 45)}`, background: mix(C.green, 6), marginBottom: 14 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: C.text }}>
+              Odoslanie faktúry {mail.cislo}
+              {mail.znova ? <span style={{ color: C.orange, fontWeight: 400 }}> — už raz odišla</span> : null}
+            </div>
+            <div style={{ display: "flex", gap: 4 }}>
+              {[{ v: false, l: "tykanie" }, { v: true, l: "vykanie" }].map((x) => (
+                <button
+                  key={x.l}
+                  type="button"
+                  onClick={() => prepniOslovenie(x.v)}
+                  style={{
+                    padding: "5px 11px", borderRadius: 999, fontSize: 11.5, cursor: "pointer", fontFamily: "inherit",
+                    border: `1px solid ${mail.vykanie === x.v ? C.accent : C.border}`,
+                    background: mail.vykanie === x.v ? mix(C.accent, 14) : "transparent",
+                    color: mail.vykanie === x.v ? C.accentLight : C.textMuted,
+                  }}
+                >
+                  {x.l}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
+            <Pole label="Komu" hodnota={mail.komu} nastav={(v) => setMail({ ...mail, komu: v })} sirka={2} typ="email" />
+            <Pole label="Predmet" hodnota={mail.predmet} nastav={(v) => setMail({ ...mail, predmet: v })} sirka={3} />
+          </div>
+          <span style={popisStyl}>Text — čo prepíšeš, to odíde</span>
+          <textarea
+            value={mail.telo}
+            onChange={(e) => setMail({ ...mail, telo: e.target.value })}
+            rows={12}
+            style={{ ...poleStyl, resize: "vertical", lineHeight: 1.55, marginBottom: 10 }}
+          />
+          <div style={{ fontSize: 11.5, color: C.textDim, marginBottom: 10 }}>
+            Príloha: <b style={{ color: C.textMuted }}>Faktura {mail.cislo}.pdf</b> — vyrobí sa pri odoslaní.
+            Kópia ide skryto aj tebe.
+          </div>
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <button
+              type="button"
+              onClick={() => void posliMailTeraz()}
+              disabled={pracujem === mail.id || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail.komu)}
+              style={{
+                padding: "9px 16px", borderRadius: 9, fontSize: 13.5, fontWeight: 600,
+                cursor: pracujem === mail.id ? "default" : "pointer",
+                border: `1px solid ${mix(C.green, 55)}`, background: mix(C.green, 14), color: C.green,
+                opacity: /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail.komu) ? 1 : 0.5,
+              }}
+            >
+              {pracujem === mail.id ? "posielam…" : "Odoslať"}
+            </button>
+            <button type="button" onClick={() => setMail(null)} style={{ background: "none", border: "none", color: C.textDim, fontFamily: "inherit", fontSize: 12.5, cursor: "pointer" }}>
+              zrušiť
+            </button>
+          </div>
+        </div>
+      )}
+
       {riadky.length === 0 ? (
         <div style={{ fontSize: 12.5, color: C.textMuted, lineHeight: 1.55 }}>
           Zatiaľ žiadna faktúra. Prvá dostane číslo {new Date().getFullYear()}1001 — stará rada
@@ -369,16 +473,7 @@ export function VydaneFaktury({ mena, predvolba, onPredvolbaSpracovana }: {
                   <button
                     type="button"
                     disabled={pracujem === r.id}
-                    onClick={() => {
-                      const komu = r.odb_email || udaje.find((u) => u.klient === r.klient)?.email || "";
-                      if (!komu) { setChyba(`${r.klient} nemá e-mail — doplň ho vo fakturačných údajoch.`); return; }
-                      const znova = r.odoslane_at ? `Faktúra ${r.cislo} už raz odišla na ${r.odoslane_komu}. Poslať znova na ${komu}?` : `Poslať faktúru ${r.cislo} na ${komu}?`;
-                      if (!window.confirm(znova)) return;
-                      void (async () => {
-                        const j = await posli({ akcia: "posli-mail", id: r.id, komu }, r.id);
-                        if (j) setHlaska(`Faktúra ${r.cislo} odišla na ${komu}. Kópia je aj v tvojej schránke.`);
-                      })();
-                    }}
+                    onClick={() => otvorMail(r)}
                     style={{ ...odkazStyl, color: r.odoslane_at ? C.textDim : C.green }}
                   >
                     {pracujem === r.id ? "posielam…" : r.odoslane_at ? "poslať znova" : "poslať mailom"}

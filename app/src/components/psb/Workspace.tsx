@@ -68,6 +68,12 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
    * kartu Faktúry, inak by človek klikol a nič by sa nestalo.
    */
   const [predvolbaFaktury, setPredvolbaFaktury] = useState<FakturaPredvolba | null>(null);
+  /** Kto ktorého klienta vedie — kvôli podpisu v maili s faktúrou. */
+  const treneriKlientov = useMemo(() => {
+    const m: Record<string, string> = {};
+    for (const [meno, k] of Object.entries(clients)) if (k.primaryTrainer) m[meno] = k.primaryTrainer;
+    return m;
+  }, [clients]);
 
   const nacitaj = useCallback(async () => {
     const [k, p] = await Promise.all([
@@ -356,6 +362,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
               {k.druh === "faktury" && (
                 <VydaneFaktury
                   mena={mena}
+                  treneri={treneriKlientov}
                   predvolba={predvolbaFaktury}
                   onPredvolbaSpracovana={() => setPredvolbaFaktury(null)}
                 />

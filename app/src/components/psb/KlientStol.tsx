@@ -1,6 +1,7 @@
 import { oznam } from "../../lib/psb/obnovaSignal";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
+import { dlhKlienta } from "../../lib/psb/dlhKlienta";
 import { normName, fmtCZK, fmtDMY } from "../../lib/psb/format";
 import { jeBeta } from "../../lib/psb/beta";
 import { menoKluc } from "../../lib/psb/compute";
@@ -180,6 +181,23 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
   const mojeBalicky = useMemo(
     () => balicky.filter((b) => normName(b.klient) === normName(meno) && !b.zrusene_at).sort((a, b) => b.platnost_od.localeCompare(a.platnost_od)),
     [balicky, meno],
+  );
+
+  /**
+   * Čo klient dlží za balíčky nahodené v Kokpite.
+   *
+   * Jerry, 26. 9. 2026: „vytvoril som balíček, ale nevznikol dlh."
+   * Podrobné pravidlá (prečo len ručné balíčky a prečo len platby od prvého
+   * z nich) sú v `dlhKlienta.ts`.
+   */
+  const dlh = useMemo(
+    () => dlhKlienta(
+      balicky.filter((b) => normName(b.klient) === normName(meno))
+        .map((b) => ({ cena: b.cena_czk, platnostOd: b.platnost_od, zdroj: b.zdroj, zruseneAt: b.zrusene_at, nazov: b.nazov })),
+      vlastnePlatby.filter((x) => normName(x.klient) === normName(meno))
+        .map((x) => ({ suma: x.suma_czk, datum: x.datum, zruseneAt: x.zrusene_at })),
+    ),
+    [balicky, vlastnePlatby, meno],
   );
 
   const mojePlatby = useMemo(
@@ -759,14 +777,22 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
             vypne, nahradia tieto dve čísla dve vedľa seba — Kokpit a export —
             aby bolo vidieť, kde sa rozchádzajú. Dovtedy nech aspoň povie,
             odkiaľ je. */}
-        <div style={{ padding: "11px 13px", borderRadius: 11, background: mix(dlzi > 0 ? C.red : C.green, 10), border: `1px solid ${mix(dlzi > 0 ? C.red : C.green, 40)}` }}>
-          <div style={{ fontSize: 17, fontWeight: 800, color: dlzi > 0 ? C.red : C.green }}>
-            {dlzi > 0 ? `nezaplatené ${fmtCZK(dlzi)}` : "nič nedlhuje"}
+        {/* DVA ZDROJE DLHU, JEDNA DLAŽDICA.
+            `dlzi` sú nezaplatené poplatky z PTmindera; `dlh.dlzi` je balíček
+            nahodený v Kokpite, za ktorý ešte neprišla platba. Jerry, 26. 9.
+            2026: „vytvoril som balíček, ale nevznikol dlh" — karta mu vtedy
+            hlásila „nič nedlhuje", hoci klient dlžil 9 400. */}
+        <div style={{ padding: "11px 13px", borderRadius: 11, background: mix(dlzi + dlh.dlzi > 0 ? C.red : C.green, 10), border: `1px solid ${mix(dlzi + dlh.dlzi > 0 ? C.red : C.green, 40)}` }}>
+          <div style={{ fontSize: 17, fontWeight: 800, color: dlzi + dlh.dlzi > 0 ? C.red : C.green }}>
+            {dlzi + dlh.dlzi > 0 ? `nezaplatené ${fmtCZK(dlzi + dlh.dlzi)}` : "nič nedlhuje"}
           </div>
           <div style={{ fontSize: 11, color: C.textMuted, marginTop: 3 }}>
-            {dlzi > 0
-              ? `${poplatkyKlienta.length} ${poplatkyKlienta.length === 1 ? "položka" : poplatkyKlienta.length < 5 ? "položky" : "položiek"} z PTmindera`
-              : `zaplatil ${fmtCZK(zaplatene)} podľa PTmindera`}
+            {dlh.dlzi > 0
+              ? `${dlh.pocet === 1 ? "balíček" : `${dlh.pocet} balíčky`} za ${fmtCZK(dlh.zaBalicky)}${dlh.zaplatene ? `, zaplatené ${fmtCZK(dlh.zaplatene)}` : ", zatiaľ bez platby"}`
+              : dlzi > 0
+                ? `${poplatkyKlienta.length} ${poplatkyKlienta.length === 1 ? "položka" : poplatkyKlienta.length < 5 ? "položky" : "položiek"} z PTmindera`
+                : `zaplatil ${fmtCZK(zaplatene)} podľa PTmindera`}
+            {dlh.dlzi > 0 && dlzi > 0 ? ` · a ${fmtCZK(dlzi)} z PTmindera` : ""}
           </div>
           {/* Keď má klient platby aj v Kokpite, povedz to — inak človek číta
               číslo z jedného zdroja ako celok. */}
@@ -1034,6 +1060,16 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
               a zrušiť; PTminder pod nimi je export, nie zápisník. */}
           {filter === "balicky" && !!mojeBalicky.length && (
             <div style={{ marginBottom: 14 }}>
+              {dlh.dlzi > 0 && (
+                <div style={{ margin: "0 0 10px", padding: "9px 11px", borderRadius: 9, border: `1px solid ${mix(C.orange, 45)}`, background: mix(C.orange, 8) }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: C.orange }}>Dlží {fmtCZK(dlh.dlzi)}</span>
+                  <span style={{ fontSize: 11.5, color: C.textMuted }}>
+                    {" "}— {dlh.pocet === 1 ? "balíček" : `${dlh.pocet} balíčky`} za {fmtCZK(dlh.zaBalicky)}
+                    {dlh.zaplatene ? `, zaplatené ${fmtCZK(dlh.zaplatene)}` : ", zatiaľ bez platby"}
+                    {" "}(od {fmtDMY(dlh.od)})
+                  </span>
+                </div>
+              )}
               {ponukniFakturu && onFaktura && (
                 <div style={{ margin: "0 0 10px", padding: "9px 11px", borderRadius: 9, border: `1px solid ${mix(C.accentLight, 40)}`, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
                   <span style={{ fontSize: 12.5, color: C.text }}>
@@ -1247,6 +1283,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
                   narodeniny: c?.narodeniny || "",
                 }}
               />
+              <KontaktKlienta meno={meno} />
               {c?.trainerNote && <Blok nadpis="Poznámka trénera">{c.trainerNote}</Blok>}
               {c?.precoNeprisiel && <Blok nadpis="Prečo po úvodnom neprišiel">{c.precoNeprisiel}</Blok>}
               {c?.duch && <Blok nadpis="Odchod">{c.duch}</Blok>}
@@ -1610,7 +1647,7 @@ function NovyKlient({ zapis, onHotovo }: {
   zapis: (meno: string, kluc: string, hodnota: unknown) => Promise<boolean>;
   onHotovo: (meno: string | null) => void;
 }) {
-  const [f, setF] = useState({ meno: "", narodeniny: "", zdroj: "", zdrojKto: "", poznamka: "" });
+  const [f, setF] = useState({ meno: "", email: "", telefon: "", narodeniny: "", zdroj: "", zdrojKto: "", poznamka: "" });
   const [pracujem, setPracujem] = useState(false);
   const [chyba, setChyba] = useState("");
 
@@ -1630,6 +1667,16 @@ function NovyKlient({ zapis, onHotovo }: {
       if (!value) continue;
       if (!(await zapis(meno, key, value))) { setPracujem(false); setChyba("nepodarilo sa založiť"); return; }
     }
+    // Kontakt ide do tabuľky, z ktorej sa berie aj faktúra — nie vedľa nej.
+    // Bez tohto by sa mail musel dopisovať až pri prvej faktúre (Jerry,
+    // 26. 9. 2026: „pri tvorbe nového klienta mi chýba vyplnenie profilu").
+    if (f.email.trim() || f.telefon.trim()) {
+      await fetch("/api/vydane-faktury", {
+        method: "POST", credentials: "same-origin",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ akcia: "udaje", klient: meno, email: f.email.trim(), telefon: f.telefon.trim() }),
+      }).catch(() => null);
+    }
     setPracujem(false);
     onHotovo(meno);
   };
@@ -1640,6 +1687,8 @@ function NovyKlient({ zapis, onHotovo }: {
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
         {([
           { k: "meno" as const, l: "meno a priezvisko", w: 220 },
+          { k: "email" as const, l: "e-mail", w: 210 },
+          { k: "telefon" as const, l: "telefón", w: 150 },
           { k: "narodeniny" as const, l: "narodeniny (RRRR-MM-DD)", w: 170 },
           { k: "zdroj" as const, l: "odkiaľ prišiel", w: 150 },
           { k: "zdrojKto" as const, l: "kto ho priviedol", w: 170 },
@@ -1753,6 +1802,110 @@ function ZapisOKlientovi({ pociatocne, zapis }: {
       </div>
       <div style={{ fontSize: 10.5, color: C.textDim }}>
         Ukladá sa hneď, ako z políčka odídeš. Predošlá poznámka sa odloží do denníka nižšie — prepisom sa história nestratí.
+      </div>
+    </div>
+  );
+}
+
+/**
+ * KONTAKT A FAKTURAČNÉ ÚDAJE KLIENTA.
+ *
+ * Jerry, 26. 9. 2026: „pri tvorbe nového klienta mi chýba vyplnenie profilu,
+ * kde by som napísal ešte mail a telefónne číslo, a priamo v profile mi chýba
+ * možnosť upraviť profil."
+ *
+ * Je to tá istá tabuľka, z ktorej sa berú údaje na faktúru — jedno miesto,
+ * nie dve. Appka inde kontakt na klienta nemá: v `leads` sú maily z dopytov,
+ * nie od klientov.
+ */
+const PRAZDNY_KONTAKT = {
+  stat: "Česká republika", firma: "", ico: "", dic: "", ulica: "", psc: "", mesto: "",
+  email: "", telefon: "", os_meno: "", os_priezvisko: "",
+};
+
+function KontaktKlienta({ meno }: { meno: string }) {
+  const PRAZDNE = PRAZDNY_KONTAKT;
+  const [v, setV] = useState(PRAZDNE);
+  const [je, setJe] = useState(false);
+  const [pisem, setPisem] = useState(false);
+  const [stav, setStav] = useState("");
+
+  const nacitaj = useCallback(async () => {
+    const j = await fetch("/api/vydane-faktury", { credentials: "same-origin" }).then((r) => r.json()).catch(() => null);
+    const u = (j?.udaje || []).find((x: { klient: string }) => x.klient === meno);
+    setJe(!!u);
+    setV(u ? { ...PRAZDNY_KONTAKT, ...u } : PRAZDNY_KONTAKT);
+  }, [meno]);
+  useEffect(() => { void nacitaj(); }, [nacitaj]);
+
+  const uloz = async () => {
+    setStav("ukladám…");
+    const j = await fetch("/api/vydane-faktury", {
+      method: "POST", credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ akcia: "udaje", klient: meno, ...v, osMeno: v.os_meno, osPriezvisko: v.os_priezvisko }),
+    }).then((r) => r.json()).catch(() => ({ ok: false, error: "spojenie" }));
+    setStav(j?.ok ? "uložené" : (j?.error || "nepodarilo sa uložiť"));
+    if (j?.ok) { setJe(true); setPisem(false); await nacitaj(); }
+  };
+
+  const pole = (k: keyof typeof PRAZDNE, l: string, w: number, typ = "text") => (
+    <label key={k} style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 10.5, color: C.textDim }}>
+      {l}
+      <input
+        type={typ}
+        value={v[k]}
+        onChange={(e) => setV({ ...v, [k]: e.target.value })}
+        style={{ width: w, padding: "6px 8px", borderRadius: 7, fontSize: 12, border: `1px solid ${C.border}`, background: C.bg, color: C.text }}
+      />
+    </label>
+  );
+
+  if (!pisem) {
+    return (
+      <div style={{ marginBottom: 12 }}>
+        {je && (v.email || v.telefon) ? (
+          <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4 }}>
+            {v.email && <span style={{ marginRight: 12 }}>✉ {v.email}</span>}
+            {v.telefon && <span style={{ marginRight: 12 }}>☎ {v.telefon}</span>}
+            {v.firma && v.firma !== meno && <span style={{ color: C.textDim }}>fakturuje sa na {v.firma}</span>}
+          </div>
+        ) : null}
+        <button onClick={() => setPisem(true)} style={navrhTlacidlo}>
+          {je ? "✎ Upraviť kontakt a fakturáciu" : "✎ Doplniť mail, telefón a fakturáciu"}
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ marginBottom: 14, padding: "12px 13px", borderRadius: 10, background: mix(C.border, 40), display: "flex", flexDirection: "column", gap: 9 }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: C.text }}>Kontakt a fakturácia</div>
+      <div style={{ display: "flex", gap: 9, flexWrap: "wrap" }}>
+        {pole("email", "e-mail", 230, "email")}
+        {pole("telefon", "telefón", 150)}
+      </div>
+      <div style={{ fontSize: 10.5, color: C.textDim, marginTop: 2 }}>
+        Na faktúru — vyplň len vtedy, keď ju klient chce. Firmu nechaj prázdnu, keď sa fakturuje priamo jemu.
+      </div>
+      <div style={{ display: "flex", gap: 9, flexWrap: "wrap" }}>
+        {pole("firma", "firma / meno na faktúre", 240)}
+        {pole("ico", "IČ", 110)}
+        {pole("dic", "DIČ", 120)}
+      </div>
+      <div style={{ display: "flex", gap: 9, flexWrap: "wrap" }}>
+        {pole("ulica", "ulica", 200)}
+        {pole("psc", "PSČ", 90)}
+        {pole("mesto", "mesto", 150)}
+        {pole("stat", "štát", 150)}
+      </div>
+      <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+        <button onClick={() => void uloz()} style={{
+          padding: "7px 14px", borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: "pointer",
+          border: `1px solid ${mix(C.green, 45)}`, background: mix(C.green, 12), color: C.green,
+        }}>Uložiť</button>
+        <button onClick={() => { setPisem(false); void nacitaj(); }} style={navrhTlacidlo}>Zrušiť</button>
+        {stav && <span style={{ fontSize: 11.5, color: stav === "uložené" ? C.green : C.textMuted }}>{stav}</span>}
       </div>
     </div>
   );
