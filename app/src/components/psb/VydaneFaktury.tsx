@@ -382,6 +382,25 @@ export function VydaneFaktury({ mena, predvolba, onPredvolbaSpracovana }: {
                     storno
                   </button>
                 )}
+                {/* Mazanie vedľa storna, nie namiesto neho. Storno je pre
+                    doklad, ktorý niekomu odišiel — má byť vidieť, že bol
+                    a prečo padol. Mazanie je pre skúšobné a omylom založené
+                    faktúry (Jerry, 26. 9. 2026). */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const posledna = r.cislo === riadky[0]?.cislo;
+                    const otazka = r.odoslane_at
+                      ? `Faktúra ${r.cislo} už bola odoslaná klientovi. Naozaj ju zmazať? Po zmazaní po nej zostane len riadok v audite.`
+                      : posledna
+                        ? `Zmazať faktúru ${r.cislo}? Číslo sa uvoľní a dostane ho ďalšia faktúra.`
+                        : `Zmazať faktúru ${r.cislo}? V číselnej rade po nej zostane diera — ak doklad niekomu odišiel, správne je storno.`;
+                    if (window.confirm(otazka)) void posli({ akcia: "zmaz", id: r.id }, r.id);
+                  }}
+                  style={{ ...odkazStyl, color: C.textDim }}
+                >
+                  zmazať
+                </button>
               </div>
             );
           })}

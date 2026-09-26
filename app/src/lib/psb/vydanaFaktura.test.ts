@@ -20,6 +20,15 @@ describe("číselná rada", () => {
     expect(dalsieCislo("2026-09-26", ["20260038", "20260037"])).toBe("20261001");
   });
 
+  it("po zmazaní poslednej sa jej číslo vráti do hry", () => {
+    // Jerry, 26. 9. 2026: chcel mazanie, nielen storno. Keď zmaže skúšobnú
+    // faktúru, ďalšia nesmie dostať o číslo vyššie — v rade by zostala
+    // diera po niečom, čo nikdy neexistovalo.
+    expect(dalsieCislo("2026-09-26", ["20261001", "20261002"])).toBe("20261003");
+    expect(dalsieCislo("2026-09-26", ["20261001"])).toBe("20261002");
+    expect(dalsieCislo("2026-09-26", [])).toBe("20261001");
+  });
+
   it("nový rok začína odznova", () => {
     expect(dalsieCislo("2027-01-02", ["20261037"])).toBe("20271001");
   });

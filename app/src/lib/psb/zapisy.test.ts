@@ -41,6 +41,14 @@ const VYNIMKY: Record<string, Record<string, string>> = {
     posledne_ok: "posledné úspešné doručenie — pri prihlásení ešte žiadne nebolo",
     chyba: "chyba doručenia — vzniká až pri neúspešnom odoslaní",
   },
+  // Faktúra vzniká ako vystavená a nezaplatená. Všetko ostatné sa k nej
+  // dopisuje až podľa toho, čo sa s ňou naozaj stalo.
+  vydane_faktury: {
+    odoslane_at: "kedy doklad odišiel klientovi — pri vystavení ešte neodišiel",
+    odoslane_komu: "adresa, na ktorú doklad odišiel — dtto",
+    uhradene_at: "deň úhrady; nová faktúra zaplatená nie je",
+    platba_id: "platba, ktorá ju uhradila — existuje až keď peniaze prídu",
+  },
   jarvis_zavery: {
     vysledok: "vyhodnotenie záveru prichádza až po termíne overenia",
   },

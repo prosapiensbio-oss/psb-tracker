@@ -207,6 +207,34 @@ export const Route = createFileRoute("/api/vydane-faktury")({
             return Response.json({ ok: true });
           }
 
+          /**
+           * ZMAZANIE. Jerry, 26. 9. 2026: „tu potrebujem aj možnosť iba
+           * vymazať a odstrániť faktúru."
+           *
+           * Storno zostáva pre doklad, ktorý už niekomu odišiel — tam sa má
+           * vedieť, že existoval a prečo padol. Mazanie je pre skúšobné
+           * a omylom založené faktúry, ktoré nikam nešli; nechať ich navždy
+           * v knihe je horšie než diera v číslovaní.
+           *
+           * Čo z nej zostane: riadok v audite s číslom, klientom a sumou.
+           * Zmazanie POSLEDNEJ faktúry v rade uvoľní jej číslo — nasledujúca
+           * ho dostane znova, takže po skúške nezostane preskočené číslo.
+           */
+          if (b.akcia === "zmaz") {
+            const f = await DB.prepare(
+              "SELECT cislo, klient, celkom_czk, odoslane_at FROM vydane_faktury WHERE id = ?1",
+            ).bind(id).first<{ cislo: string; klient: string; celkom_czk: number; odoslane_at: string | null }>();
+            if (!f) return Response.json({ ok: false, error: "Taká faktúra neexistuje." }, { status: 404 });
+            await DB.prepare("DELETE FROM vydane_faktury WHERE id = ?1").bind(id).run();
+            await audit(DB, {
+              action: "faktura-zmazana",
+              predmet: `${f.cislo} · ${f.klient}`,
+              old: `${Math.round(f.celkom_czk)} Kč${f.odoslane_at ? ` · odoslaná ${f.odoslane_at.slice(0, 10)}` : ""}`,
+              actor: kto,
+            });
+            return Response.json({ ok: true, cislo: f.cislo });
+          }
+
           if (b.akcia === "uhradena" || b.akcia === "neuhradena") {
             await DB.prepare("UPDATE vydane_faktury SET uhradene_at=?2, platba_id=?3 WHERE id=?1")
               .bind(id, b.akcia === "uhradena" ? (denISO(b.den) || teraz().slice(0, 10)) : null,
