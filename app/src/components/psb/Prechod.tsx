@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { BalickyEvidencia } from "./BalickyEvidencia";
 import { DavkovePlatby } from "./DavkovePlatby";
 import { KalendarHistoria } from "./KalendarHistoria";
+import { ParovacKontaktov } from "./ParovacKontaktov";
 import { PlatbyEvidencia } from "./PlatbyEvidencia";
 import { SubeznyChod, type Porovnanie } from "./Kalendar";
 import { C, mix } from "../../lib/psb/theme";
@@ -64,6 +65,7 @@ export function Prechod({ mena, onFaktura }: {
       {porovnanie && <div id="prechod-dochadzka"><SubeznyChod p={porovnanie} /></div>}
       <div id="prechod-mesiace"><KalendarHistoria /></div>
       <div id="prechod-balicky"><BalickyEvidencia mena={mena} onFaktura={onFaktura} /></div>
+      <div id="prechod-kontakty"><ParovacKontaktov mena={mena} /></div>
       <div id="prechod-davka"><DavkovePlatby mena={mena} /></div>
       <div id="prechod-platby"><PlatbyEvidencia mena={mena} /></div>
 

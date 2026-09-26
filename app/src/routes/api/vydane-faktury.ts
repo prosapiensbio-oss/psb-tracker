@@ -7,6 +7,7 @@ import { bindings } from "../../lib/bindings.server";
 import { dalsieCislo, splatnostZ, SPLATNOST_DNI, type Faktura } from "../../lib/psb/vydanaFaktura";
 import { fakturaDoPdf } from "../../lib/psb/fakturaPdf.server";
 import { mailFaktury, menoPrilohy } from "../../lib/psb/mailFaktury";
+import { rozparsujKontakty } from "../../lib/psb/kontaktyIdokladu";
 import { posliMail } from "../../lib/psb/smtp.server";
 import { jeMesiac, normName } from "../../lib/psb/format";
 
@@ -107,9 +108,13 @@ export const Route = createFileRoute("/api/vydane-faktury")({
              FROM vydane_faktury ORDER BY cislo DESC`,
           ).all();
           const u = await DB.prepare("SELECT * FROM klient_fakturacia").all();
+          // Kontakty na spárovanie — bez klienta a neodložené.
+          const k = await DB.prepare(
+            "SELECT id, firma, ico, dic, email, telefon, os_meno, os_priezvisko, klient, odlozene_at FROM fakturacne_kontakty ORDER BY firma",
+          ).all().catch(() => ({ results: [] }));
           // Bez keše: faktúra sa číta hneď po vystavení a stará odpoveď by
           // ukázala doklad bez čísla.
-          return Response.json({ ok: true, faktury: f.results || [], udaje: u.results || [] },
+          return Response.json({ ok: true, faktury: f.results || [], udaje: u.results || [], kontakty: k.results || [] },
             { headers: { "cache-control": "no-store" } });
         } catch (e) {
           return Response.json({ ok: false, error: String(e).slice(0, 300) }, { status: 500 });
@@ -161,6 +166,66 @@ export const Route = createFileRoute("/api/vydane-faktury")({
               v.telefon, v.web, v.os_titul, v.os_meno, v.os_priezvisko, v.os_mobil, teraz()).run();
             await audit(DB, { action: "fakturacne-udaje", predmet: klient, actor: kto });
             return Response.json({ ok: true, klient });
+          }
+
+          /**
+           * FAKTURAČNÉ KONTAKTY — import z iDokladu a spárovanie s klientom.
+           *
+           * Platba z firmy patrí človeku, ktorý za ňou stojí. Appka to vie
+           * až vtedy, keď dvojicu človek ↔ firma niekto povie — a povedať ju
+           * vie len Jerry.
+           */
+          if (b.akcia === "kontakty-import") {
+            const kontakty = rozparsujKontakty(String(b.csv || ""));
+            if (!kontakty.length) return Response.json({ ok: false, error: "V súbore nie sú kontakty." }, { status: 400 });
+            const kedy = teraz();
+            const prikazy = kontakty.map((k) => DB.prepare(
+              `INSERT INTO fakturacne_kontakty (id, firma, ico, dic, email, telefon, os_meno, os_priezvisko, klient, created_at)
+               VALUES (?1,?2,?3,?4,?5,?6,?7,?8,'',?9)
+               ON CONFLICT(firma, ico) DO UPDATE SET
+                 dic = CASE WHEN excluded.dic <> '' THEN excluded.dic ELSE dic END,
+                 email = CASE WHEN excluded.email <> '' THEN excluded.email ELSE email END,
+                 telefon = CASE WHEN excluded.telefon <> '' THEN excluded.telefon ELSE telefon END`,
+            ).bind(uid(), k.firma, k.ico, k.dic, k.email, k.telefon, k.osMeno, k.osPriezvisko, kedy));
+            for (let i = 0; i < prikazy.length; i += 50) await DB.batch(prikazy.slice(i, i + 50));
+            await audit(DB, { action: "kontakty-import", predmet: `${kontakty.length} kontaktov`, actor: kto });
+            return Response.json({ ok: true, nacitanych: kontakty.length });
+          }
+
+          if (b.akcia === "kontakt-paruj") {
+            const id = kus(b.id, 40);
+            const klient = await kanonickeMeno(DB, kus(b.klient, 120));
+            if (!id || !klient) return Response.json({ ok: false, error: "Chýba kontakt alebo klient." }, { status: 400 });
+            const k = await DB.prepare("SELECT * FROM fakturacne_kontakty WHERE id = ?1").bind(id).first<Record<string, string>>();
+            if (!k) return Response.json({ ok: false, error: "Taký kontakt neexistuje." }, { status: 404 });
+            await DB.batch([
+              DB.prepare("UPDATE fakturacne_kontakty SET klient = ?2, odlozene_at = NULL WHERE id = ?1").bind(id, klient),
+              // Údaje idú tam, odkiaľ ich berie faktúra aj párovanie platieb.
+              // Existujúce polia sa neprepisujú prázdnym — kto si už niečo
+              // doplnil ručne, o to párovaním nepríde.
+              DB.prepare(
+                `INSERT INTO klient_fakturacia (klient, stat, firma, ico, dic, ulica, psc, mesto, email, dalsie_maily,
+                   telefon, web, os_titul, os_meno, os_priezvisko, os_mobil, updated_at)
+                 VALUES (?1, 'Česká republika', ?2, ?3, ?4, '', '', '', ?5, '', ?6, '', '', ?7, ?8, '', ?9)
+                 ON CONFLICT(klient) DO UPDATE SET
+                   firma = CASE WHEN excluded.firma <> '' THEN excluded.firma ELSE firma END,
+                   ico = CASE WHEN excluded.ico <> '' THEN excluded.ico ELSE ico END,
+                   dic = CASE WHEN excluded.dic <> '' THEN excluded.dic ELSE dic END,
+                   email = CASE WHEN klient_fakturacia.email = '' THEN excluded.email ELSE klient_fakturacia.email END,
+                   telefon = CASE WHEN klient_fakturacia.telefon = '' THEN excluded.telefon ELSE klient_fakturacia.telefon END,
+                   updated_at = excluded.updated_at`,
+              ).bind(klient, k.firma || "", k.ico || "", k.dic || "", (k.email || "").toLowerCase(), k.telefon || "",
+                k.os_meno || "", k.os_priezvisko || "", teraz()),
+            ]);
+            await audit(DB, { action: "kontakt-sparovany", predmet: `${k.firma} → ${klient}`, actor: kto });
+            return Response.json({ ok: true, klient });
+          }
+
+          if (b.akcia === "kontakt-odloz") {
+            const id = kus(b.id, 40);
+            if (!id) return Response.json({ ok: false, error: "Chýba kontakt." }, { status: 400 });
+            await DB.prepare("UPDATE fakturacne_kontakty SET odlozene_at = ?2 WHERE id = ?1").bind(id, teraz()).run();
+            return Response.json({ ok: true });
           }
 
           // ── nová faktúra ─────────────────────────────────────────────
