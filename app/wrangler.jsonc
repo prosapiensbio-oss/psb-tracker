@@ -53,6 +53,15 @@
   // centa), preto sa volá len na kliknutie, nikdy sama.
   "ai": { "binding": "AI" },
 
+  // Browser Rendering — PDF faktúry vyrobené NA SERVERI.
+  //
+  // Tlač z prehliadača vyrobí súbor až u človeka v dialógu; do prílohy mailu
+  // sa tým pádom nedostane. Toto je ten istý dokument otvorený v prehliadači
+  // na Cloudflare a uložený ako PDF, takže papier aj príloha vyzerajú
+  // rovnako — jedna šablóna, dve cesty. Je to väzba, nie kľúč; beží na tom
+  // istom účte a je v platenom pláne.
+  "browser": { "binding": "BROWSER" },
+
   // Tajomstvá (PSB_PASSWORD, PSB_SESSION_SECRET, ANTHROPIC_API_KEY,
   // BTC_RESERVE_TOKEN) tu nie sú a nikdy tu byť nesmú — nastavujú sa cez
   // `wrangler secret put` a žijú len na Cloudflare.

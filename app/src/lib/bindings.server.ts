@@ -31,6 +31,12 @@ type AppEnv = {
   // Workers AI — obrázok do titulky. Väzba, nie kľúč: beží na tom istom účte
   // ako appka. Chýba len vtedy, keď nie je vo `wrangler.jsonc`.
   AI?: { run: (model: string, vstup: Record<string, unknown>) => Promise<unknown> };
+  // Browser Rendering — prehliadač na Cloudflare, ktorým sa faktúra vysádže
+  // do PDF na serveri (do prílohy mailu). Väzba, nie kľúč.
+  BROWSER?: unknown;
+  // Statické súbory appky. Čítajú sa cez ňu aj zo servera (značka a písmo do
+  // PDF), aby sa nemuseli ťahať sieťou cez vlastný worker.
+  ASSETS?: { fetch: (req: Request) => Promise<Response> };
 };
 
 export function bindings(): AppEnv {

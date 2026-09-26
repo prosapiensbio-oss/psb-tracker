@@ -4,7 +4,8 @@ import type { D1Database } from "@cloudflare/workers-types";
 import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
-import { dalsieCislo, splatnostZ, SPLATNOST_DNI } from "../../lib/psb/vydanaFaktura";
+import { dalsieCislo, splatnostZ, SPLATNOST_DNI, type Faktura } from "../../lib/psb/vydanaFaktura";
+import { fakturaDoPdf } from "../../lib/psb/fakturaPdf.server";
 import { jeMesiac, normName } from "../../lib/psb/format";
 
 /**
@@ -51,6 +52,22 @@ async function kanonickeMeno(DB: D1Database, meno: string): Promise<string> {
   return zhody.length === 1 ? zhody[0].client_name : meno;
 }
 
+/** Riadok z databázy na doklad. Jedno miesto, nech sa PDF a obrazovka nerozídu. */
+const naFakturu = (r: Record<string, string | number | null>): Faktura => ({
+  cislo: String(r.cislo), klient: String(r.klient),
+  vystavene: String(r.vystavene), splatnost: String(r.splatnost),
+  popis: String(r.popis), ks: Number(r.ks) || 1,
+  cena: Number(r.cena_czk) || 0, celkom: Number(r.celkom_czk) || 0,
+  poznamka: String(r.poznamka || ""),
+  stornoAt: r.storno_at ? String(r.storno_at) : null,
+  uhradeneAt: r.uhradene_at ? String(r.uhradene_at) : null,
+  odberatel: {
+    firma: String(r.odb_firma || ""), ico: String(r.odb_ico || ""), dic: String(r.odb_dic || ""),
+    ulica: String(r.odb_ulica || ""), psc: String(r.odb_psc || ""), mesto: String(r.odb_mesto || ""),
+    stat: String(r.odb_stat || ""), email: String(r.odb_email || ""),
+  },
+});
+
 /** Fakturačné údaje klienta; prázdne, keď ešte žiadne nemá. */
 const prazdneUdaje = {
   stat: "Česká republika", firma: "", ico: "", dic: "", ulica: "", psc: "", mesto: "",
@@ -84,7 +101,7 @@ export const Route = createFileRoute("/api/vydane-faktury")({
 
       POST: async ({ request }) => {
         if (!(await isAuthed(request))) return unauthorized();
-        const { DB } = bindings();
+        const { DB, BROWSER, ASSETS } = bindings();
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });
         let b: Record<string, unknown>;
         try { b = (await request.json()) as Record<string, unknown>; }
@@ -205,6 +222,29 @@ export const Route = createFileRoute("/api/vydane-faktury")({
             if (!r.meta.changes) return Response.json({ ok: false, error: "Faktúra neexistuje alebo už je stornovaná." }, { status: 400 });
             await audit(DB, { action: "faktura-storno", predmet: id, neu: dovod, actor: kto });
             return Response.json({ ok: true });
+          }
+
+          /**
+           * PDF NA SERVERI. Vráti hotový doklad ako súbor — rovnaký, aký
+           * vyjde z tlače, lebo ho sádže tá istá šablóna. Kvôli prílohe
+           * mailu; obrazovka si zatiaľ tlačí sama.
+           */
+          if (b.akcia === "pdf") {
+            if (!BROWSER) return Response.json({ ok: false, error: "Prehliadač na serveri nie je zapnutý." }, { status: 503 });
+            const r = await DB.prepare(
+              `SELECT cislo, klient, vystavene, splatnost, popis, ks, cena_czk, celkom_czk, poznamka, storno_at, uhradene_at,
+                      odb_firma, odb_ico, odb_dic, odb_ulica, odb_psc, odb_mesto, odb_stat, odb_email
+               FROM vydane_faktury WHERE id = ?1`,
+            ).bind(kus(b.id, 40)).first<Record<string, string | number | null>>();
+            if (!r) return Response.json({ ok: false, error: "Taká faktúra neexistuje." }, { status: 404 });
+            const pdf = await fakturaDoPdf(BROWSER, ASSETS, naFakturu(r), new URL(request.url).origin);
+            return new Response(pdf, {
+              headers: {
+                "content-type": "application/pdf",
+                "content-disposition": `inline; filename="Faktura ${r.cislo}.pdf"`,
+                "cache-control": "no-store",
+              },
+            });
           }
 
           /**
