@@ -161,6 +161,54 @@ export const Route = createFileRoute("/api/platby")({
         }
 
         /**
+         * DÁVKOVÉ PRIRADENIE.
+         *
+         * Jerry, 26. 9. 2026: „vieš tie platby na účte automaticky priradiť
+         * ku klientovi na základe poznámky v platbe — ale nie tak, že sa
+         * priamo zapíšu?" Presne tak to aj je: appka návrh urobí sama
+         * (z mena v texte, z naučeného pravidla, zo sumy a dňa), ale zapíše
+         * sa až to, čo človek odklikne. Toto je len to odkliknutie naraz —
+         * po jednom to bola práca na mesiac.
+         *
+         * Každý riadok sa spracuje zvlášť a chyba jedného neruší ostatné:
+         * jedna platba na neexistujúci riadok výpisu nesmie zhodiť dávku
+         * dvadsiatich.
+         */
+        if (akcia === "priradz-davka") {
+          const polozky = (Array.isArray(b.polozky) ? b.polozky : []) as { fioId?: unknown; klient?: unknown }[];
+          if (!polozky.length) return Response.json({ ok: false, error: "Nič na priradenie." }, { status: 400 });
+          if (polozky.length > 100) return Response.json({ ok: false, error: "Naraz najviac sto platieb." }, { status: 400 });
+
+          let hotovo = 0;
+          let naucenych = 0;
+          const chyby: string[] = [];
+          for (const p of polozky) {
+            const fioId = String(p.fioId || "");
+            const klient = String(p.klient || "").trim();
+            if (!fioId || !klient) { chyby.push("chýba platba alebo klient"); continue; }
+            const r = await DB.prepare("SELECT id, date, amount_czk, counterparty, note, typ FROM fio_transactions WHERE id = ?")
+              .bind(fioId).first<FioRiadok>();
+            if (!r) { chyby.push(`${fioId.slice(0, 8)}: riadok výpisu neexistuje`); continue; }
+            const vzor = vzorPlatby(r);
+            const naucil = smieSaZapamatat(vzor, klient);
+            const prikazy = [
+              DB.prepare(
+                "INSERT OR IGNORE INTO platby (id, klient, datum, suma_czk, sposob, fio_id, poznamka, created_at, autor) VALUES (?,?,?,?,'banka',?,?,?,?)",
+              ).bind(uid(), klient, r.date.slice(0, 10), r.amount_czk, fioId, (r.counterparty || "").slice(0, 200), teraz(), kto || null),
+            ];
+            if (naucil) {
+              prikazy.push(DB.prepare("INSERT OR REPLACE INTO platba_mapovanie (vzor, klient, potvrdene_at) VALUES (?,?,?)")
+                .bind(vzor, klient, teraz()));
+              naucenych++;
+            }
+            await DB.batch(prikazy);
+            hotovo++;
+          }
+          await audit(DB, { action: "platby-davka", predmet: `${hotovo} z ${polozky.length}`, neu: `naučených pravidiel: ${naucenych}`, actor: kto });
+          return Response.json({ ok: true, hotovo, naucenych, chyby: chyby.slice(0, 10) });
+        }
+
+        /**
          * „Toto nie je platba klienta" — nájom, vrátenie, vlastný prevod.
          * Nemaže sa nič z výpisu; len sa prestane pýtať.
          */
