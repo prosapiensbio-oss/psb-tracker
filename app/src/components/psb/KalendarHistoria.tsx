@@ -149,6 +149,26 @@ export function KalendarHistoria() {
                   </span>
                 </div>
               ))}
+              {/* Vyťaženosť sa počíta na trénera, nie na štúdio: celkové
+                  číslo môže sedieť a rozdelenie byť pokazené — stačí, aby sa
+                  záskok pripísal nesprávnemu človeku. */}
+              {mes.treneri.length > 0 && (
+                <div style={{ marginTop: 6, paddingTop: 5, borderTop: `1px solid ${mix(C.border, 50)}` }}>
+                  {mes.treneri.map((t) => (
+                    <div key={t.trener} style={{ display: "flex", gap: 10, fontSize: 11.5, padding: "2px 0", fontVariantNumeric: "tabular-nums", color: C.textDim }}>
+                      <span style={{ flex: 1 }}>
+                        {t.trener}
+                        <span style={{ color: mix(C.textDim, 140) }}> · {t.klientiExport} / {t.klientiVlastne} klientov</span>
+                      </span>
+                      <span style={{ width: 78, textAlign: "right" }}>{t.treningyExport} · {t.hodinyExport} h</span>
+                      <span style={{ width: 78, textAlign: "right" }}>{t.treningyVlastne} · {t.hodinyVlastne} h</span>
+                      <span style={{ width: 86, textAlign: "right", color: mes.neuplny ? C.textDim : t.sedi ? C.green : C.red }}>
+                        {t.treningyVlastne - t.treningyExport > 0 ? "+" : ""}{t.treningyVlastne - t.treningyExport}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
         </div>

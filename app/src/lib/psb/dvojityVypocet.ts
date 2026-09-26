@@ -36,14 +36,36 @@ export type RiadokPorovnania = {
   jednotka: string;
 };
 
+/**
+ * Vyťaženosť jedného trénera dvoma cestami.
+ *
+ * Celkové číslo môže sedieť a rozdelenie na trénerov byť pokazené — stačí,
+ * aby sa záskok pripísal nesprávnemu človeku. Preto sa porovnáva aj to;
+ * mzdy aj vyťaženosť sa počítajú na trénera, nie na štúdio.
+ */
+export type TrenerDvojmo = {
+  trener: string;
+  treningyExport: number;
+  treningyVlastne: number;
+  hodinyExport: number;
+  hodinyVlastne: number;
+  klientiExport: number;
+  klientiVlastne: number;
+  sedi: boolean;
+};
+
 export type MesiacDvojmo = {
   mesiac: string;
   /** Prebiehajúci mesiac alebo mesiac, kam export ešte nedočiahol. */
   neuplny: boolean;
   riadky: RiadokPorovnania[];
+  /** Rozdelenie na trénerov — vyťaženosť sa počíta na človeka. */
+  treneri: TrenerDvojmo[];
   /** Sedia všetky metriky, ktoré sa dajú hodnotiť. */
   sedi: boolean;
 };
+
+export type StranaTrenera = { mesiac: string; trener: string; treningy: number; hodiny: number; klienti: number };
 
 const PRAZDNA: Omit<StranaMesiaca, "mesiac"> = { treningy: 0, hodiny: 0, klienti: 0, trzby: 0 };
 
@@ -68,6 +90,34 @@ const POPIS: Record<Metrika, { nazov: string; jednotka: string }> = {
   trzby: { nazov: "Peniaze, čo prišli", jednotka: "Kč" },
 };
 
+/** Spojí obe strany po trénerovi pre jeden mesiac. */
+export function porovnajTrenerov(
+  export_: StranaTrenera[],
+  vlastne: StranaTrenera[],
+  mesiac: string,
+  neuplny: boolean,
+): TrenerDvojmo[] {
+  const mena = [...new Set([...export_, ...vlastne].filter((x) => x.mesiac === mesiac).map((x) => x.trener))]
+    .filter(Boolean)
+    .sort();
+  return mena.map((t) => {
+    const e = export_.find((x) => x.mesiac === mesiac && x.trener === t);
+    const v = vlastne.find((x) => x.mesiac === mesiac && x.trener === t);
+    const treningyExport = e?.treningy || 0;
+    const treningyVlastne = v?.treningy || 0;
+    return {
+      trener: t,
+      treningyExport,
+      treningyVlastne,
+      hodinyExport: Math.round((e?.hodiny || 0) * 10) / 10,
+      hodinyVlastne: Math.round((v?.hodiny || 0) * 10) / 10,
+      klientiExport: e?.klienti || 0,
+      klientiVlastne: v?.klienti || 0,
+      sedi: neuplny || sedi("treningy", treningyExport, treningyVlastne),
+    };
+  });
+}
+
 export function porovnajDvojmo(
   export_: StranaMesiaca[],
   vlastne: StranaMesiaca[],
@@ -77,6 +127,9 @@ export function porovnajDvojmo(
   kolko = 3,
   /** Dnešok — kvôli odrezaniu budúcnosti. */
   dnes = new Date().toISOString().slice(0, 7),
+  /** Rozdelenie na trénerov; prázdne, keď sa nesleduje. */
+  trenerExport: StranaTrenera[] = [],
+  trenerVlastne: StranaTrenera[] = [],
 ): MesiacDvojmo[] {
   // BUDÚCNOSŤ SA NEPOROVNÁVA. Kalendár má objednané hodiny aj na tri mesiace
   // dopredu; export o nich nevie a ani nemá. Bez tohto orezania vyplnili
@@ -108,6 +161,12 @@ export function porovnajDvojmo(
         sedi: neuplny ? true : sedi(k, e[k], v[k]),
       };
     });
-    return { mesiac: m, neuplny, riadky, sedi: riadky.every((r) => r.sedi) };
+    return {
+      mesiac: m,
+      neuplny,
+      riadky,
+      treneri: porovnajTrenerov(trenerExport, trenerVlastne, m, neuplny),
+      sedi: riadky.every((r) => r.sedi),
+    };
   });
 }

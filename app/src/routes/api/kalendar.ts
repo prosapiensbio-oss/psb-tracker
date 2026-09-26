@@ -416,7 +416,7 @@ export const Route = createFileRoute("/api/kalendar")({
          * `dvojityVypocet.ts`, aby sa to dalo otestovať.
          */
         if (akcia === "dvojmo") {
-          const [exp, kal, plat, doExportu] = await DB.batch([
+          const [exp, kal, plat, doExportu, trenExp, trenKal] = await DB.batch([
             DB.prepare(
               `SELECT substr(date,1,7) mesiac, COUNT(*) treningy, SUM(duration_min)/60.0 hodiny,
                       COUNT(DISTINCT client_name) klienti
@@ -440,8 +440,24 @@ export const Route = createFileRoute("/api/kalendar")({
                ) GROUP BY mesiac ORDER BY mesiac DESC LIMIT 8`,
             ),
             DB.prepare("SELECT MAX(substr(date,1,10)) den FROM sessions"),
+            // Vyťaženosť sa počíta na trénera, nie na štúdio — celkové číslo
+            // môže sedieť a rozdelenie byť pokazené.
+            DB.prepare(
+              `SELECT substr(date,1,7) mesiac, session_trainer trener, COUNT(*) treningy,
+                      SUM(duration_min)/60.0 hodiny, COUNT(DISTINCT client_name) klienti
+               FROM sessions WHERE date >= date('now','-5 months') GROUP BY 1,2`,
+            ),
+            DB.prepare(
+              `SELECT substr(zaciatok,1,7) mesiac, trener, COUNT(*) treningy,
+                      SUM((julianday(koniec) - julianday(zaciatok)) * 24) hodiny,
+                      COUNT(DISTINCT klient) klienti
+               FROM kal_udalosti
+               WHERE zmizla_at IS NULL AND typ IN ('trening','uvodny') AND zaciatok >= date('now','-5 months')
+               GROUP BY 1,2`,
+            ),
           ]);
           type R = { mesiac: string; treningy: number; hodiny: number; klienti: number };
+          type T = R & { trener: string };
           type P = { mesiac: string; export: number; vlastne: number };
           const peniaze = new Map((plat.results as unknown as P[] || []).map((r) => [r.mesiac, r]));
           const stranu = (rs: R[], kto: "export" | "vlastne") => rs.map((r) => ({
@@ -451,13 +467,24 @@ export const Route = createFileRoute("/api/kalendar")({
             klienti: Number(r.klienti) || 0,
             trzby: Math.round(Number(peniaze.get(r.mesiac)?.[kto]) || 0),
           }));
+          const doDna = String((doExportu.results as { den: string }[] || [])[0]?.den || "").slice(0, 10);
+          const poTrenerovi = (rs: T[]) => rs.map((r) => ({
+            mesiac: r.mesiac, trener: r.trener || "—",
+            treningy: Number(r.treningy) || 0,
+            hodiny: Math.round((Number(r.hodiny) || 0) * 10) / 10,
+            klienti: Number(r.klienti) || 0,
+          }));
           return Response.json({
             ok: true,
-            exportDo: String((doExportu.results as { den: string }[] || [])[0]?.den || "").slice(0, 10),
+            exportDo: doDna,
             mesiace: porovnajDvojmo(
               stranu((exp.results as unknown as R[]) || [], "export"),
               stranu((kal.results as unknown as R[]) || [], "vlastne"),
-              String((doExportu.results as { den: string }[] || [])[0]?.den || "").slice(0, 10),
+              doDna,
+              3,
+              new Date().toISOString().slice(0, 7),
+              poTrenerovi((trenExp.results as unknown as T[]) || []),
+              poTrenerovi((trenKal.results as unknown as T[]) || []),
             ),
           }, { headers: { "cache-control": "no-store" } });
         }

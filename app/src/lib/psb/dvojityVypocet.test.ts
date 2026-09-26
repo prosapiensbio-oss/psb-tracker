@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { porovnajDvojmo, sedi } from "./dvojityVypocet";
+import { porovnajDvojmo, porovnajTrenerov, sedi } from "./dvojityVypocet";
 
 const m = (mesiac: string, treningy: number, hodiny: number, klienti: number, trzby: number) =>
   ({ mesiac, treningy, hodiny, klienti, trzby });
@@ -75,5 +75,54 @@ describe("dvojitý výpočet po mesiacoch", () => {
   it("každý mesiac nesie všetky štyri metriky", () => {
     const r = porovnajDvojmo(exp, vla, "2026-09-20", 3, "2026-09");
     expect(r[0].riadky.map((x) => x.metrika)).toEqual(["treningy", "hodiny", "klienti", "trzby"]);
+  });
+});
+
+describe("vyťaženosť po trénerovi", () => {
+  const t = (mesiac: string, trener: string, treningy: number, hodiny: number, klienti: number) =>
+    ({ mesiac, trener, treningy, hodiny, klienti });
+
+  it("spáruje trénerov z oboch strán", () => {
+    // August 2026 naozaj: Terezka na kus, Jerry o tri menej.
+    const r = porovnajTrenerov(
+      [t("2026-08", "Jerry", 101, 101, 26), t("2026-08", "Terezka", 85, 85, 29)],
+      [t("2026-08", "Jerry", 98, 98, 26), t("2026-08", "Terezka", 85, 85, 29)],
+      "2026-08", false,
+    );
+    expect(r.map((x) => x.trener)).toEqual(["Jerry", "Terezka"]);
+    expect(r[0]).toMatchObject({ treningyExport: 101, treningyVlastne: 98, sedi: true });
+    expect(r[1]).toMatchObject({ treningyExport: 85, treningyVlastne: 85, sedi: true });
+  });
+
+  it("tréner len na jednej strane nie je pád, ale nezhoda", () => {
+    // Záskok pripísaný v exporte niekomu, kto v kalendári nie je.
+    const r = porovnajTrenerov([t("2026-08", "Matyáš", 12, 12, 5)], [], "2026-08", false);
+    expect(r[0]).toMatchObject({ trener: "Matyáš", treningyExport: 12, treningyVlastne: 0, sedi: false });
+  });
+
+  it("v neúplnom mesiaci sa nehodnotí ani tréner", () => {
+    const r = porovnajTrenerov([t("2026-09", "Jerry", 86, 86, 31)], [t("2026-09", "Jerry", 134, 134, 32)], "2026-09", true);
+    expect(r[0].sedi).toBe(true);
+  });
+
+  it("mesiace sa nemiešajú", () => {
+    const r = porovnajTrenerov(
+      [t("2026-08", "Jerry", 101, 101, 26), t("2026-07", "Jerry", 102, 102, 26)],
+      [t("2026-08", "Jerry", 98, 98, 26)],
+      "2026-08", false,
+    );
+    expect(r.length).toBe(1);
+    expect(r[0].treningyExport).toBe(101);
+  });
+
+  it("dvojitý výpočet nesie trénerov v každom mesiaci", () => {
+    const r = porovnajDvojmo(
+      [m("2026-08", 186, 186, 54, 199036)],
+      [m("2026-08", 183, 183, 54, 83940)],
+      "2026-09-20", 3, "2026-09",
+      [t("2026-08", "Jerry", 101, 101, 26)],
+      [t("2026-08", "Jerry", 98, 98, 26)],
+    );
+    expect(r[0].treneri[0]).toMatchObject({ trener: "Jerry", treningyVlastne: 98 });
   });
 });
