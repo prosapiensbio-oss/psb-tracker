@@ -7,6 +7,7 @@ import { bindings } from "../../lib/bindings.server";
 import { typZNazvu } from "../../lib/psb/kalendar";
 import { casUdalosti, nejednoznacneMena, vyberMapu, type Mapa } from "../../lib/psb/kalendarMena";
 import { porovnajTyzdne } from "../../lib/psb/porovnanieDochadzky";
+import { odkedyKalendar, porovnajMesiace } from "../../lib/psb/porovnanieMesiacov";
 import { citajIcal } from "../../lib/psb/ical";
 import { ohlasitZmenu, sparujZmeny } from "../../lib/psb/kalendarZmeny";
 import { chybaZdroja, NEDOKONCENE, vyberZdroj, type ZdrojSPokusom } from "../../lib/psb/kalendarZdroje";
@@ -385,6 +386,94 @@ export const Route = createFileRoute("/api/kalendar")({
           return Response.json({
             ok: true, trener: z.trener, vysledok,
             // Obrazovka podľa toho vie, či má zavolať ešte raz pre ďalší kalendár.
+            zostava: zdroje.filter((x) => x.trener !== z.trener).map((x) => x.trener),
+          });
+        }
+
+        /**
+         * DOPLNENIE HISTÓRIE Z KALENDÁRA.
+         *
+         * Jerry, 26. 9. 2026: grafy majú časom stáť na vlastných dátach,
+         * nie na reportoch z PTmindera — a obe verzie majú chvíľu bežať
+         * vedľa seba a porovnávať sa.
+         *
+         * Prečo to ide bez novej integrácie: kalendár sa ťahá ako iCal súbor
+         * a v ňom je CELÁ história. Bežná snímka z neho odreže okno 21 dní
+         * dozadu (to je správne, lebo sleduje zmeny), ale na grafy treba
+         * roky. Toto je to isté sťahovanie s iným oknom.
+         *
+         * ŽIADNE ZMENY SA NEHLÁSIA. Udalosť spred roka nie je „pribudlo" —
+         * bolo by ich niekoľko tisíc a zoznam zmien by sa stal nepoužiteľným.
+         * Existujúce riadky sa neprepisujú: ak už udalosť v tabuľke je,
+         * nechá sa tak aj s naučeným menom klienta.
+         */
+        /**
+         * MERADLO: kalendár proti exportu, mesiac po mesiaci. Kým sa
+         * rozchádzajú, grafy na kalendári stáť nemôžu.
+         */
+        if (akcia === "porovnaj-mesiace") {
+          const [kal, exp] = await DB.batch([
+            DB.prepare("SELECT zaciatok, typ, klient, zmizla_at FROM kal_udalosti"),
+            DB.prepare("SELECT substr(date, 1, 10) AS date FROM sessions"),
+          ]);
+          const kalR = ((kal.results || []) as unknown as { zaciatok: string; typ: string | null; klient: string | null; zmizla_at: string | null }[])
+            .map((r) => ({ zaciatok: r.zaciatok, typ: r.typ, klient: r.klient, zmizlaAt: r.zmizla_at }));
+          const od = odkedyKalendar(kalR);
+          return Response.json({
+            ok: true,
+            od,
+            mesiace: porovnajMesiace(kalR, (exp.results || []) as unknown as { date: string }[], od),
+          }, { headers: { "cache-control": "no-store" } });
+        }
+
+        if (akcia === "historia") {
+          const ziadany = String(b.trener || "").trim();
+          const od = String(b.od || "").slice(0, 10);
+          const do_ = String(b.do || "").slice(0, 10);
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(od) || !/^\d{4}-\d{2}-\d{2}$/.test(do_)) {
+            return Response.json({ ok: false, error: "Chýba obdobie (RRRR-MM-DD)." }, { status: 400 });
+          }
+          const zdroje = ((await DB.prepare(
+            "SELECT id, trener, url, aktivny FROM kal_zdroje WHERE aktivny = 1",
+          ).all()).results || []) as unknown as Zdroj[];
+          const z = ziadany ? zdroje.find((x) => x.trener === ziadany) : zdroje[0];
+          if (!z) return Response.json({ ok: false, error: "Taký kalendár nie je pripojený." }, { status: 404 });
+
+          let text: string;
+          try {
+            const r = await fetch(z.url, { headers: { "user-agent": "psb-kokpit-kalendar" }, signal: AbortSignal.timeout(28000) });
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            text = await r.text();
+          } catch (e) {
+            return Response.json({ ok: false, error: e instanceof Error ? e.message : "nepodarilo sa stiahnuť" }, { status: 502 });
+          }
+
+          const odMs = Date.parse(`${od}T00:00:00Z`);
+          const doMs = Date.parse(`${do_}T23:59:59Z`);
+          const udalosti = citajIcal(text, odMs, doMs);
+          const uz = new Set(((await DB.prepare(
+            "SELECT uid FROM kal_udalosti WHERE trener = ?1 AND zaciatok >= ?2 AND zaciatok <= ?3",
+          ).bind(z.trener, `${od}T00:00`, `${do_}T23:59`).all()).results || [])
+            .map((r) => String((r as { uid: string }).uid)));
+          const mapovanie = ((await DB.prepare("SELECT nazov, trener, cas, klient, typ FROM kal_mapovanie WHERE trener = ?")
+            .bind(z.trener).all()).results || []) as unknown as Mapa[];
+
+          const kedy = teraz();
+          const prikazy: D1PreparedStatement[] = [];
+          for (const u of udalosti) {
+            if (uz.has(u.uid)) continue;
+            const m = vyberMapu(mapovanie, u.nazov, z.trener, casUdalosti(u.zaciatok));
+            prikazy.push(DB.prepare(
+              "INSERT OR IGNORE INTO kal_udalosti (uid, trener, zaciatok, koniec, nazov, klient, typ, prvy_raz, naposledy, zmizla_at) VALUES (?,?,?,?,?,?,?,?,?,NULL)",
+            ).bind(u.uid, z.trener, u.zaciatok, u.koniec, u.nazov, m?.klient ?? null, m?.typ ?? typZNazvu(u.nazov), kedy, kedy));
+          }
+          // Po stovkách, nie naraz: D1 má na dávku strop a tisíc príkazov
+          // v jednej transakcii ju prekročí.
+          for (let i = 0; i < prikazy.length; i += 200) await DB.batch(prikazy.slice(i, i + 200));
+          await audit(DB, { action: "kalendar-historia", predmet: `${z.trener} ${od}–${do_}`, neu: `${prikazy.length} udalostí`, actor: await currentUser(request) || undefined });
+          return Response.json({
+            ok: true, trener: z.trener, od, do: do_,
+            vIcale: udalosti.length, pridanych: prikazy.length, uzBolo: udalosti.length - prikazy.length,
             zostava: zdroje.filter((x) => x.trener !== z.trener).map((x) => x.trener),
           });
         }

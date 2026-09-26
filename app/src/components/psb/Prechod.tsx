@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { BalickyEvidencia } from "./BalickyEvidencia";
+import { KalendarHistoria } from "./KalendarHistoria";
 import { PlatbyEvidencia } from "./PlatbyEvidencia";
 import { SubeznyChod, type Porovnanie } from "./Kalendar";
 import { C, mix } from "../../lib/psb/theme";
@@ -60,6 +61,7 @@ export function Prechod({ mena, onFaktura }: {
         </Card>
       )}
       {porovnanie && <div id="prechod-dochadzka"><SubeznyChod p={porovnanie} /></div>}
+      <div id="prechod-mesiace"><KalendarHistoria /></div>
       <div id="prechod-balicky"><BalickyEvidencia mena={mena} onFaktura={onFaktura} /></div>
       <div id="prechod-platby"><PlatbyEvidencia mena={mena} /></div>
 

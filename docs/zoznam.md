@@ -46,6 +46,15 @@ Stav k **26. 9. 2026**.
   `RRRRNNNN`, posledná 20260038. Dnes v iDokladi. Faktúra má vzniknúť pri
   balíčku, niesť QR platbu a odísť mailom.
 
+- **Grafy na vlastných dátach, nie na reportoch** (Jerry, 26. 9.). Cieľ:
+  dochádzka a tréningy z Google kalendára, peniaze z Fia a vlastných platieb;
+  export z PTmindera beží súbežne a porovnáva sa. Prvý krok hotový —
+  doplnenie histórie z iCalu a mesačné porovnanie v Prechode. Merané 26. 9.:
+  august sedí (183 / 186), staršie mesiace chýbajú takmer presne toľko, koľko
+  je v nich NEZARADENÝCH udalostí (marec −72 pri 72 nezaradených). Ďalší krok
+  je teda hromadné mapovanie starých názvov, nie ďalšie sťahovanie. Potom to
+  isté pre peniaze a až nakoniec prepnutie grafov.
+
 ## 2b · Myšlienková mapa — čo z rešerše zostalo nepostavené
 
 Traja agenti (tester, kontrolór, kritik) prešli mapu 25. 9. 2026 a porovnali
