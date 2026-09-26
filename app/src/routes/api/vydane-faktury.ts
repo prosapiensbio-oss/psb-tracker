@@ -209,6 +209,18 @@ export const Route = createFileRoute("/api/vydane-faktury")({
              */
             const uz = String(k.klient || "").split(",").map((x) => x.trim()).filter(Boolean);
             const zoznam = uz.includes(klient) ? uz : [...uz, klient];
+            /**
+             * MAIL Z FIREMNÉHO KONTAKTU SA NEROZDÁVA.
+             *
+             * Kontakt „Benefit Management" mal v iDokladi mail Bohdana
+             * Klimka. Keď sa cez tú istú firmu fakturovalo aj Panagiotisovi
+             * Tsiolisovi, dostal Klimkov mail — a faktúra by odišla cudziemu
+             * človeku. Kontakt, cez ktorý ide viac klientov, preto mail ani
+             * telefón nepodáva ďalej; tie patria jednému človeku.
+             */
+            const viacKlientov = zoznam.length > 1;
+            const mail = viacKlientov ? "" : (k.email || "").toLowerCase();
+            const tel = viacKlientov ? "" : (k.telefon || "");
             await DB.batch([
               DB.prepare("UPDATE fakturacne_kontakty SET klient = ?2, odlozene_at = NULL WHERE id = ?1").bind(id, zoznam.join(", ")),
               // Údaje idú tam, odkiaľ ich berie faktúra aj párovanie platieb.
@@ -225,7 +237,7 @@ export const Route = createFileRoute("/api/vydane-faktury")({
                    email = CASE WHEN klient_fakturacia.email = '' THEN excluded.email ELSE klient_fakturacia.email END,
                    telefon = CASE WHEN klient_fakturacia.telefon = '' THEN excluded.telefon ELSE klient_fakturacia.telefon END,
                    updated_at = excluded.updated_at`,
-              ).bind(klient, k.firma || "", k.ico || "", k.dic || "", (k.email || "").toLowerCase(), k.telefon || "",
+              ).bind(klient, k.firma || "", k.ico || "", k.dic || "", mail, tel,
                 k.os_meno || "", k.os_priezvisko || "", teraz()),
             ]);
             await audit(DB, { action: "kontakt-sparovany", predmet: `${k.firma} → ${klient}`, actor: kto });
