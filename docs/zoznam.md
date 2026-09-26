@@ -63,6 +63,15 @@ Stav k **26. 9. 2026**.
   je teda hromadné mapovanie starých názvov, nie ďalšie sťahovanie. Potom to
   isté pre peniaze a až nakoniec prepnutie grafov.
 
+- **Export rokov pred 2025 z PTmindera** (Jerry, 26. 9.). Kokpit má dáta od
+  3. 1. 2025; PTminder drží aj 2022–2024 (používa sa 4,5 roka). Dohoda:
+  NEMIGROVAŤ do živých tabuliek — staré čísla by vstúpili do priemerov, LTV
+  a kohort a Jerry by musel riešiť nezrovnalosti, ktoré ho nezaujímajú.
+  Namiesto toho ARCHÍV: surové riadky tak, ako prídu, bez opráv, a z nich sa
+  nič nepočíta; na karte klienta len riadok „pred 2025: N tréningov, X Kč".
+  Čaká na Jerryho: stiahnuť z PTmindera kompletný export za celé obdobie.
+  Urobiť to treba TAK ČI TAK, kým PTminder beží — po vypnutí sú dáta preč.
+
 ## 2b · Myšlienková mapa — čo z rešerše zostalo nepostavené
 
 Traja agenti (tester, kontrolór, kritik) prešli mapu 25. 9. 2026 a porovnali
