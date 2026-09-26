@@ -7,18 +7,27 @@ import type { Udalost } from "./klientOsCasu";
  * tréningov aj počty hodín, koľko bolo hodín, keď klient zaplatil, s možnosťou
  * vytvoriť z toho report a poslať to klientovi na kontrolu."
  *
- * Os času ukazuje, ČO sa kedy stalo. Toto k tomu dopočíta jediné číslo, ktoré
- * pri spore chýba: stav hodín po každom riadku. Keď klient povie „veď mi ešte
- * zostávali štyri", dá sa prejsť zhora nadol a ukázať, kde sa to rozišlo.
+ * DVE ČÍSLA, LEBO APPKA VIE DVE RÔZNE VECI
  *
- * JEDEN TRÉNING = JEDNA HODINA. Je to pravda pre drvivú väčšinu tréningov
- * a os času inú informáciu nenesie. Dlhšie bloky (dve hodiny pre firmy) sa
- * takto počítajú ako jeden — preto to výpis píše nahlas, nech sa nikto
- * nedohaduje o čísle, ktoré appka nevie.
+ * Odtrénované hodiny appka pozná od prvého dňa — sedenia sú v exporte aj
+ * v kalendári. Zostatok balíčka pozná len tam, kde vie aj NÁKUP, a balíčky
+ * PTminder exportuje až od marca 2026 (55 zo 120 riadkov má dátum, najstarší
+ * 3/2026). Anetka Přinosilová má v appke jediný balíček — z 2. 9. 2026 —
+ * hoci chodí od januára 2025 a má za sebou 54 tréningov.
  *
- * ZOSTATOK NESMIE ZÁVISIEŤ OD OBDOBIA. Keď sa výpis obmedzí na posledné tri
- * mesiace, staršie balíčky a tréningy sa spočítajú do počiatočného stavu —
- * inak by klientovi vyšlo, že mu appka zobrala hodiny, ktoré minul vlani.
+ * Prvá verzia (26. 9.) počítala zostatok od začiatku osi a vyšlo jej −37 h.
+ * Druhá zostatok zakotvila pri poslednom balíčku, ale tým zmizli čísla zo
+ * zvyšku histórie a filter obdobia prestal čokoľvek meniť. Preto teraz:
+ *
+ * - **`spolu`** — koľko hodín má klient za sebou. Beží cez celú históriu
+ *   a je to tvrdé číslo zo sedení.
+ * - **`zostatok`** — koľko mu zostáva z balíčka. Existuje LEN od kotvy
+ *   (`zaciatokBalicka`) ďalej; pred ňou je `null`, lebo nákup appka nevidí.
+ *   Dopočítaný zostatok by bol výmysel a Jerry ho hovorí klientovi nahlas.
+ *
+ * HODINA JE HODINA, NIE TRÉNING. Sedenie nesie dĺžku (`duration_min`);
+ * 3 698 ich má 60 minút a 11 má deväťdesiat. Tie sa počítajú ako 1,5 h.
+ * Tréning z kalendára dĺžku nenesie — berie sa hodina.
  */
 
 export type RiadokVypisu = {
@@ -27,31 +36,47 @@ export type RiadokVypisu = {
   popis: string;
   /** +18 pri balíčku, −1 pri tréningu, 0 pri platbe. */
   zmena: number;
-  /** Stav po tomto riadku. */
-  zostatok: number;
+  /** Zostatok balíčka po tomto riadku; `null` tam, kde appka nákup nevidí. */
+  zostatok: number | null;
+  /** Koľko hodín má klient odtrénovaných vrátane tohto riadku. */
+  spolu: number;
   druh: Udalost["druh"];
   /** Tréning, ktorý je zatiaľ len v kalendári — v exporte ešte nie je. */
   zKalendara?: boolean;
+  /** Hodiny balíčka sú z názvu, nie z exportu. */
+  odvodene?: boolean;
 };
 
 export type Vypis = {
   riadky: RiadokVypisu[];
   od: string;
   do: string;
-  /** Stav hodín pred začiatkom obdobia. */
-  zaciatok: number;
-  /** Stav hodín na konci. */
-  koniec: number;
-  /** Koľko hodín v období pribudlo a koľko sa odtrénovalo. */
+  /** Stav hodín pred začiatkom obdobia (`null`, keď obdobie začína pred kotvou). */
+  zaciatok: number | null;
+  /** Stav hodín na konci (`null`, keď appka nemá ani jeden balíček). */
+  koniec: number | null;
+  /** Koľko hodín v období pribudlo, odtrénovalo sa a koľko klient zaplatil. */
   kupene: number;
   odtrenovane: number;
-  /** Obdobie začína posledným balíčkom, nie tam, kde si človek vypýtal. */
-  odKotvy: boolean;
+  zaplatene: number;
+  /** Odtrénované hodiny za celú históriu, nielen za obdobie. */
+  spolu: number;
+  /** Deň, od ktorého sa zostatok dá počítať. Prázdne = appka balíček nevidí. */
+  kotva: string;
+  /** Zostatok nesiaha cez celé obdobie — staršie riadky balíček nepokrýva. */
+  neuplny: boolean;
+};
+
+/** Dĺžka tréningu v hodinách. Bez údaja je to hodina — tak vyzerá 99,7 % z nich. */
+export const hodinTreningu = (u: Udalost): number => {
+  if (u.druh !== "trening") return 0;
+  const m = u.minut && u.minut > 0 ? u.minut : 60;
+  return Math.round((m / 60) * 4) / 4;
 };
 
 const zmenaZ = (u: Udalost): number => {
   if (u.druh === "balicekOd") return u.hodin || 0;
-  if (u.druh === "trening") return -1;
+  if (u.druh === "trening") return -hodinTreningu(u);
   return 0;
 };
 
@@ -73,87 +98,164 @@ const cas24 = (c: string): string => {
   return `${String(h).padStart(2, "0")}:${m[2]}`;
 };
 
-const suma = (n: number): string => Math.round(n).toLocaleString("sk-SK").replace(/\u00a0/g, " ");
+const suma = (n: number): string => Math.round(n).toLocaleString("sk-SK").replace(/ /g, " ");
+
+/** Hodiny bez zbytočnej nuly: 1 h, 1,5 h. */
+export const hod = (n: number): string => (Number.isInteger(n) ? String(n) : n.toFixed(2).replace(/0$/, "").replace(".", ","));
 
 const METODY: Record<string, string> = { bank: "prevodom", cash: "v hotovosti", card: "kartou" };
 
 const popisZ = (u: Udalost): string => {
-  if (u.druh === "balicekOd") return `${u.nazov}${u.hodin ? ` · ${u.hodin} h` : ""}${u.doDna ? ` · do ${den(u.doDna)}` : ""}`;
+  if (u.druh === "balicekOd") return `${u.nazov}${u.hodin ? ` · ${u.odvodene ? "≈" : ""}${u.hodin} h` : ""}${u.doDna ? ` · do ${den(u.doDna)}` : ""}`;
   if (u.druh === "balicekDo") return `koniec platnosti — ${u.nazov}`;
   if (u.druh === "platba") return `platba ${suma(u.suma)} Kč${u.metoda ? ` · ${METODY[u.metoda] || u.metoda}` : ""}`;
   return `tréning${u.cas ? ` ${cas24(u.cas)}` : ""}${u.trener ? ` · ${u.trener}` : ""}`;
 };
 
 /**
- * @param od    začiatok zobrazeného obdobia (staršie sa zráta do `zaciatok`)
- * @param doDna koniec obdobia
- * @param kotva deň, od ktorého sa vôbec počíta — staršie riadky sa IGNORUJÚ,
- *              nie zrátajú. Viď `zaciatokBalicka`.
+ * Posledný balíček, ktorý už platí. Berie sa POSLEDNÝ, nie prvý: členstvá sa
+ * u nás neskladajú, nové nahrádza dočerpané.
  */
-export function vypisHodin(os: Udalost[], od = "", doDna = "", kotva = ""): Vypis {
-  // Od najstaršieho: zostatok je bežiaci súčet a ten sa pozadu počítať nedá.
-  const vsetko = [...os].sort((a, b) => a.den.localeCompare(b.den));
-  let bezi = 0;
-  let zaciatok = 0;
+export function poslednyBalicek(os: Udalost[], dnes = new Date().toISOString().slice(0, 10)) {
+  let naj: Extract<Udalost, { druh: "balicekOd" }> | null = null;
+  for (const u of os) {
+    if (u.druh !== "balicekOd" || u.den > dnes) continue;
+    if (!naj || u.den > naj.den) naj = u;
+  }
+  return naj;
+}
+
+export function zaciatokBalicka(os: Udalost[], dnes = new Date().toISOString().slice(0, 10)): string {
+  return poslednyBalicek(os, dnes)?.den || "";
+}
+
+/** Chronologicky od najstaršieho; v rámci dňa tak, ako sa to naozaj stalo. */
+const vCase = (os: Udalost[]): Udalost[] => {
+  const poradie = { balicekOd: 0, trening: 1, platba: 2, balicekDo: 3 } as const;
+  return [...os].sort((a, b) => a.den.localeCompare(b.den) || poradie[a.druh] - poradie[b.druh]);
+};
+
+/**
+ * ZOSTATOK SA POČÍTA SPÄTNE, OD ČÍSLA, KTORÉ APPKA POZNÁ.
+ *
+ * Prvý pokus (26. 9. 2026) ho počítal dopredu od balíčka: hodiny z balíčka
+ * mínus tréningy. Na ostrých dátach to sedelo len tam, kde má klient jedno
+ * členstvo. Pri OBNOVOVANOM členstve export nesie jediný riadok za posledné
+ * obdobie, takže Jakubovi Gerichovi („OFF - 6h S viazanosťou", 1 zo 6)
+ * vyšlo −30 h a Natálii Pečkovej −3 h. Obe čísla boli nezmysel a obe by
+ * Jerry poslal klientovi.
+ *
+ * Pravda o zostatku je jedno číslo: to, ktoré appka ukazuje na karte klienta
+ * (`packageRemaining` — z exportu, z ručnej kotvy alebo dopočítané z názvu).
+ * Preto sa od neho ide DOZADU: pred každým tréningom mal klient o hodinu
+ * viac. Rad tak vždy končí na čísle, ktoré sedí s PTminderom.
+ *
+ * Kde sa rad dostane nad hodiny balíčka, počítanie sa ZASTAVÍ — tam už
+ * história patrí predošlému obdobiu členstva, o ktorom appka nič nevie.
+ * Radšej prázdno než vymyslený riadok.
+ */
+export function zostatkyOsi(
+  os: Udalost[],
+  zostatokTeraz: number | null,
+  dnes = new Date().toISOString().slice(0, 10),
+): { stavy: Map<Udalost, number>; kotva: string; neuplny: boolean } {
+  const stavy = new Map<Udalost, number>();
+  const bal = poslednyBalicek(os, dnes);
+  if (!bal || zostatokTeraz == null) return { stavy, kotva: bal?.den || "", neuplny: false };
+
+  // Export končí posledným sedením, ktoré z neho prišlo. Tréningy po ňom sú
+  // z kalendára a appka o nich pri svojom čísle ešte nevedela.
+  let denExportu = bal.den;
+  for (const u of os) if (u.druh === "trening" && !u.zKalendara && u.den > denExportu) denExportu = u.den;
+
+  const rad = vCase(os).filter((u) => u.den <= dnes);
+
+  // Dopredu: čo sa stalo po exporte. Pod nulu sa nejde — mínusový zostatok
+  // neznamená, že klient dlží hodiny, ale že appka ešte nevidí novší
+  // balíček (Natália Pečková zaplatila 16. 9. a export je z 20. 9.).
+  let neuplny = false;
+  let po = zostatokTeraz;
+  for (const u of rad) {
+    if (u.den <= denExportu) continue;
+    if (po + zmenaZ(u) < 0) { neuplny = true; break; }
+    po += zmenaZ(u);
+    stavy.set(u, po);
+  }
+
+  // Dozadu: pred každým tréningom mal klient o hodinu viac.
+  let bezi = zostatokTeraz;
+  for (let i = rad.length - 1; i >= 0; i--) {
+    const u = rad[i];
+    if (u.den > denExportu) continue;
+    if (u.den < bal.den) { neuplny = true; break; }
+    if (bal.hodin > 0 && bezi > bal.hodin) { neuplny = true; break; }
+    stavy.set(u, bezi);
+    bezi -= zmenaZ(u);
+  }
+
+  return { stavy, kotva: bal.den, neuplny };
+}
+
+/**
+ * @param od            začiatok zobrazeného obdobia (staršie sa nezobrazí)
+ * @param doDna         koniec obdobia
+ * @param zostatokTeraz koľko hodín klientovi zostáva podľa appky
+ *                      (`packageRemaining`). Bez neho sa zostatok nepočíta —
+ *                      radšej prázdny stĺpec než vymyslené číslo.
+ */
+export function vypisHodin(os: Udalost[], od = "", doDna = "", zostatokTeraz: number | null = null): Vypis {
+  const dnes = doDna || new Date().toISOString().slice(0, 10);
+  const { stavy, kotva, neuplny } = zostatkyOsi(os, zostatokTeraz, dnes);
+  const vsetko = vCase(os);
+
+  let spolu = 0;
+  let zaciatok: number | null = null;
+  let koniec: number | null = null;
   const riadky: RiadokVypisu[] = [];
   let kupene = 0;
   let odtrenovane = 0;
+  let zaplatene = 0;
 
   for (const u of vsetko) {
     // Čo je za koncom obdobia, sa nepočíta vôbec — inak by „stav na konci"
     // hovoril o dnešku, hoci výpis končí v júni.
     if (doDna && u.den > doDna) continue;
-    // Pred kotvou appka nevie, koľko hodín klient mal — tie riadky sa
-    // nesmú ani zrátať do počiatočného stavu, inak ide zostatok do mínusu.
-    if (kotva && u.den < kotva) continue;
     const zmena = zmenaZ(u);
-    bezi += zmena;
-    if (od && u.den < od) { zaciatok = bezi; continue; }
+    if (u.druh === "trening") spolu += hodinTreningu(u);
+    const zostatok = stavy.has(u) ? (stavy.get(u) as number) : null;
+    if (od && u.den < od) {
+      if (zostatok !== null) zaciatok = zostatok;
+      continue;
+    }
     if (zmena > 0) kupene += zmena;
-    if (zmena < 0) odtrenovane += -zmena;
+    if (u.druh === "trening") odtrenovane += hodinTreningu(u);
+    if (u.druh === "platba") zaplatene += u.suma;
+    if (zostatok !== null) koniec = zostatok;
     riadky.push({
       den: u.den,
       popis: popisZ(u),
       zmena,
-      zostatok: bezi,
+      zostatok,
+      spolu,
       druh: u.druh,
       zKalendara: u.druh === "trening" ? u.zKalendara : undefined,
+      odvodene: u.druh === "balicekOd" || u.druh === "balicekDo" ? u.odvodene : undefined,
     });
   }
 
-  // Obdobie nesmie tvrdiť viac, než výpis pokrýva: keď kotva leží neskôr než
-  // vyžiadaný začiatok, platí kotva. Inak by hlavička hovorila „od júna"
-  // a stav na začiatku 0 h — klient by si prečítal, že v júni nemal nič.
-  const zacObdobia = od && kotva ? (od > kotva ? od : kotva) : (od || kotva);
-
   return {
     riadky: riadky.reverse(),
-    od: zacObdobia || (vsetko[0]?.den ?? ""),
+    od: od || (vsetko[0]?.den ?? ""),
     do: doDna || (vsetko[vsetko.length - 1]?.den ?? ""),
     zaciatok,
-    koniec: bezi,
+    koniec,
     kupene,
     odtrenovane,
-    odKotvy: Boolean(kotva) && (!od || od <= kotva),
+    zaplatene,
+    spolu,
+    kotva,
+    neuplny,
   };
-}
-
-/**
- * ODKEDY MÁ ZOSTATOK ZMYSEL — deň posledného balíčka.
- *
- * Os času nesie tréningy od začiatku, ale balíčky len tie, ktoré PTminder
- * exportuje dnes. Bežiaci súčet od úplného začiatku preto vychádzal do
- * mínusu (Anetka −37 h): odčítal roky tréningov, ku ktorým v appke žiadny
- * balíček nie je. Zostatok sa preto počíta od posledného balíčka, ktorý už
- * začal platiť — presne tak, ako to hovorí karta klienta („15 h zostáva").
- */
-export function zaciatokBalicka(os: Udalost[], dnes = new Date().toISOString().slice(0, 10)): string {
-  let naj = "";
-  for (const u of os) {
-    if (u.druh !== "balicekOd" || u.den > dnes) continue;
-    if (!naj || u.den > naj) naj = u.den;
-  }
-  return naj;
 }
 
 /** Obdobie „posledné N mesiace" ako dvojica dátumov. */
@@ -166,20 +268,28 @@ export function poslednychMesiacov(n: number, dnes = new Date().toISOString().sl
 /** Výpis ako text do mailu — klient ho číta v tele správy, nie v prílohe. */
 export function vypisAkoText(v: Vypis, klient: string): string {
   const riadky = [...v.riadky].reverse().map((r) => {
-    const zmena = r.zmena > 0 ? `+${r.zmena}` : r.zmena < 0 ? String(r.zmena) : "";
-    return `${den(r.den).padEnd(14)} ${r.popis}${zmena ? `   ${zmena} h → zostatok ${r.zostatok} h` : ""}`;
+    const zmena = r.zmena > 0 ? `+${hod(r.zmena)} h` : r.zmena < 0 ? `-${hod(-r.zmena)} h` : "";
+    const stav = r.zostatok !== null && r.zmena !== 0
+      ? `   ${zmena} → zostatok ${hod(r.zostatok)} h`
+      : r.druh === "trening"
+        ? `   ${zmena} → spolu ${hod(r.spolu)} h`
+        : "";
+    return `${den(r.den).padEnd(14)} ${r.popis}${stav}`;
   });
   return [
     `Výpis hodín — ${klient}`,
     `Obdobie ${den(v.od)} až ${den(v.do)}`,
     "",
-    `Stav na začiatku: ${v.zaciatok} h`,
-    `Pribudlo: ${v.kupene} h · odtrénované: ${v.odtrenovane} h`,
-    `Stav na konci: ${v.koniec} h`,
+    v.zaplatene > 0 ? `Zaplatené: ${suma(v.zaplatene)} Kč` : "",
+    `Odtrénované: ${hod(v.odtrenovane)} h${v.odtrenovane !== v.spolu ? ` (za celú históriu ${hod(v.spolu)} h)` : ""}`,
+    v.koniec !== null ? `Zostáva: ${hod(v.koniec)} h` : "",
     "",
     ...riadky,
     "",
-    v.odKotvy ? "Výpis začína posledným balíčkom — staršie hodiny už boli vyčerpané." : "",
-    "Jeden tréning sa počíta ako jedna hodina.",
+    v.neuplny && v.koniec !== null
+      ? `Zostatok je uvedený za posledné členstvo. Staršie riadky majú stĺpec „spolu" — koľko hodín má klient dovtedy za sebou.`
+      : "",
+    v.riadky.some((r) => r.odvodene) ? "Hodiny označené ≈ sú z názvu členstva — PTminder ich vo výpise neuvádza." : "",
+    "Dĺžka tréningu sa berie zo záznamu o sedení; bežný tréning je hodina.",
   ].filter((r, i, p) => r !== "" || p[i - 1] !== "").join("\n");
 }

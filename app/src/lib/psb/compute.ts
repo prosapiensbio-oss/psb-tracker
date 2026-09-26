@@ -2,6 +2,7 @@
 // no browser globals. Reused across every module.
 import { daysBetween, fmtDMY, monthKey, monthLabel, monthsBetween, normName, quarterKey, quarterLabel, weekKey, weekLabel } from "./format";
 import { menoZNazvuUvodneho } from "./kalendar";
+import { hodinZNazvuBalicka } from "./klientOsCasu";
 import { vlastnikKlienta } from "./zaskok";
 import { BARTER_KLIENTI } from "./vzas";
 import { podozriveCisla, type Podiel } from "./kontrolaDat";
@@ -443,7 +444,7 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
     // Hanus potom svietil s odznakom bez menovateľa. Keď export total nedal,
     // vezme sa z názvu; kto číslo v názve nemá, zostáva na nule a karta
     // o ňom mlčí ako doteraz.
-    const totalZNazvu = Number(/(\d+)\s*h/i.exec(active?.package || "")?.[1] || 0);
+    const totalZNazvu = hodinZNazvuBalicka(active?.package || "");
     c.packageTotal = (active?.total || totalZNazvu) ?? 0;
 
     /**

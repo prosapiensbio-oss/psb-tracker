@@ -26,11 +26,23 @@ import { normName } from "./format";
 
 export type Udalost =
   | { druh: "platba"; den: string; suma: number; metoda: string; poznamka?: string }
-  | { druh: "trening"; den: string; cas?: string; trener?: string; nazov?: string; zKalendara?: boolean }
-  | { druh: "balicekOd"; den: string; nazov: string; hodin: number; doDna?: string; zaplatene?: number }
-  | { druh: "balicekDo"; den: string; nazov: string; hodin: number };
+  | { druh: "trening"; den: string; cas?: string; trener?: string; nazov?: string; zKalendara?: boolean; minut?: number }
+  | { druh: "balicekOd"; den: string; nazov: string; hodin: number; doDna?: string; zaplatene?: number; odvodene?: boolean }
+  | { druh: "balicekDo"; den: string; nazov: string; hodin: number; odvodene?: boolean };
 
-type Sedenie = { client: string; date: string; time?: string; sessionTrainer?: string; sessionName?: string };
+/**
+ * Koľko hodín má balíček v názve.
+ *
+ * Offline členstvá PTminder vyváža ako 0/0 a počet hodín stojí len v názve
+ * („OFF - 18 hodín offline"). Bez toho by os času tvrdila „bez limitu"
+ * a zostatok by po prvom tréningu padol do mínusu — Natália Pečková −1 h.
+ * Tú istú hodnotu číta `deriveClients` v compute.ts; definícia je JEDNA.
+ */
+export function hodinZNazvuBalicka(nazov: string): number {
+  return Number(/(\d+)\s*h/i.exec(nazov || "")?.[1] || 0);
+}
+
+type Sedenie = { client: string; date: string; time?: string; sessionTrainer?: string; sessionName?: string; duration?: number };
 type Platba = { client: string; date: string; amount: number; method: string; note?: string };
 type Balicek = { client: string; package: string; total: number; remaining: number; validFrom?: string; validTo?: string; payment?: number; kind?: string };
 type KalUdalost = { zaciatok: string; klient: string | null; typ: string | null };
@@ -48,7 +60,7 @@ export function osCasuKlienta(
   const out: Udalost[] = [];
 
   for (const s of moje(zdroj.sessions)) {
-    out.push({ druh: "trening", den: den(s.date), cas: s.time, trener: s.sessionTrainer, nazov: s.sessionName });
+    out.push({ druh: "trening", den: den(s.date), cas: s.time, trener: s.sessionTrainer, nazov: s.sessionName, minut: s.duration });
   }
 
   // Tréningy, ktoré sú v kalendári a v exporte ešte nie. Porovnáva sa po
@@ -72,8 +84,12 @@ export function osCasuKlienta(
     const doDna = den(b.validTo || "");
     // Doplnenie členstva nemá v exporte dátumy — na os ho položiť nejde,
     // lebo sa nevie kam. Radšej vynechať než hádať deň.
-    if (od) out.push({ druh: "balicekOd", den: od, nazov: b.package, hodin: b.total, doDna: doDna || undefined, zaplatene: b.payment });
-    if (doDna && doDna <= dnes) out.push({ druh: "balicekDo", den: doDna, nazov: b.package, hodin: b.total });
+    // Export mlčí (0/0) → hodiny z názvu, a riadok to prizná značkou ≈.
+    const zNazvu = hodinZNazvuBalicka(b.package);
+    const hodin = b.total || zNazvu;
+    const odvodene = !b.total && zNazvu > 0;
+    if (od) out.push({ druh: "balicekOd", den: od, nazov: b.package, hodin, doDna: doDna || undefined, zaplatene: b.payment, odvodene });
+    if (doDna && doDna <= dnes) out.push({ druh: "balicekDo", den: doDna, nazov: b.package, hodin, odvodene });
   }
 
   // Najnovšie hore. Pri rovnakom dni ide začiatok balíčka pred tréningy

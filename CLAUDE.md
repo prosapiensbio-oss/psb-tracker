@@ -1247,24 +1247,47 @@ over, či nečítaš z inej mapy/iného filtra a či odpoveď nie je z keše. 25
 ma to stálo štyri kolá — bublina sa naozaj presúvala, len som sa pozeral na
 mapu, ktorú mi pamätal `localStorage`, a nie na tú, do ktorej appka písala.
 
-## Bežiaci súčet nad neúplným zdrojom potrebuje kotvu
+## Odvodené číslo sa počíta SPÄTNE od toho, ktoré appka už pozná
 
-26. 9. 2026 pribudol v profile klienta stĺpec so zostatkom hodín pri každom
-riadku osi času a výpis na poslanie klientovi. Prvá verzia ho počítala od
-úplného začiatku a Anetke Přinosilovej vyšlo **−37 h**, hoci jej zostáva 15.
-Príčina nie je v súčte: os času nesie tréningy od roku 2025, ale balíčky len
-tie, ktoré PTminder exportuje DNES. Stará členstvá v appke nie sú, takže sa
-roky tréningov odčítali od nuly.
+26. 9. 2026 pribudol v profile klienta stĺpec s hodinami pri každom riadku osi
+času a výpis na poslanie klientovi. Trvalo tri pokusy, kým čísla sedeli — a
+všetky tri zlyhania boli tá istá chyba: dopredný súčet nad zdrojom, ktorý
+nesie len výsek sveta.
 
-- **Zostatok sa počíta od posledného balíčka** (`zaciatokBalicka`), staršie
-  riadky sa nesmú ani zrátať do počiatočného stavu — len ignorovať. Číslo tak
-  vychádza presne to, ktoré appka hovorí inde („15 h zostáva“).
-- **Obdobie v hlavičke nesmie tvrdiť viac, než výpis pokrýva.** Keď kotva leží
-  neskôr než vyžiadaný filter, platí kotva a výpis povie prečo. Inak by tam
-  stálo „od júna“ a „stav na začiatku 0 h“ — klient by si prečítal, že v júni
-  nemal nič.
-- **Mínusové číslo je horšie než žiadne.** Klient ho číta ako obvinenie, že
-  mu appka zobrala hodiny.
+1. **Súčet od začiatku osi** dal Anetke Přinosilovej **−37 h**. Tréningy má
+   appka od 2025, ale balíčky len tie, ktoré PTminder exportuje dnes (55 zo
+   120 riadkov má dátum, najstarší 3/2026). Roky tréningov sa odčítali od nuly.
+2. **Súčet od posledného balíčka** opravil Anetku, ale zabil zvyšok histórie
+   a filter obdobia prestal čokoľvek meniť.
+3. **Súčet od hodín balíčka** („18 h mínus tréningy") sedel len tam, kde má
+   klient jedno členstvo. Pri OBNOVOVANOM členstve nesie export jediný riadok
+   za posledné obdobie, takže Jakubovi Gerichovi („OFF - 6h S viazanosťou",
+   export hovorí 1 zo 6) vyšlo **−30 h** a Natálii Pečkovej −3 h.
+
+Pravda o zostatku je jedno číslo: to, ktoré appka ukazuje na karte klienta
+(`packageRemaining` — z exportu, z ručnej kotvy alebo dopočítané z názvu pri
+0/0). `zostatkyOsi` preto ide od neho DOZADU: pred každým tréningom mal klient
+o hodinu viac. Rad tak vždy končí na čísle, ktoré sedí s PTminderom — overené
+na všetkých 125 klientoch, 0 záporných riadkov, 0 rozchodov s kartou.
+
+- **Kde rad prerastie hodiny balíčka, počítanie sa ZASTAVÍ** a riadok ostane
+  prázdny. Tam už história patrí predošlému obdobiu členstva, o ktorom appka
+  nič nevie. Prázdno je lepšie než vymyslený riadok.
+- **Pod nulu sa nejde.** Mínusový zostatok neznamená, že klient dlží hodiny,
+  ale že appka ešte nevidí novší balíček (Natália zaplatila 16. 9., export je
+  z 20. 9.).
+- **Dve čísla, lebo appka vie dve rôzne veci.** `spolu` (odtrénované hodiny)
+  pozná od prvého dňa a beží cez celú históriu; `zostatok` existuje len tam,
+  kde vie aj nákup. Miešať ich do jedného stĺpca bez pomenovania znamená, že
+  si ich klient zlúči.
+- **Hodina je hodina, nie tréning.** Sedenie nesie `duration_min` (3 698 má
+  60 minút, 11 má deväťdesiat). „Jeden tréning = jedna hodina" bola výhovorka,
+  nie pravidlo.
 - **Dokument pre klienta sa sádže inak než obrazovka.** Do mailu nepatrí ISO
   dátum (`2027-03-01`), kód metódy (`bank`) ani dva tvary času vedľa seba
-  (PTminder „3:00pm“, kalendár „15:00“).
+  (PTminder „3:00pm", kalendár „15:00").
+
+Zovšeobecnenie: **keď appka niekde ukazuje číslo, ktorému verí, odvodený rad
+sa má od neho odvíjať — nie ho prepočítavať nanovo z neúplných vstupov.** Je
+to tá istá vec ako „číslo, ktoré vidí obrazovka, musí vidieť aj Jarvis", len
+o riadok nižšie.

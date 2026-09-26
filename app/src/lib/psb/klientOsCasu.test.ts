@@ -74,3 +74,22 @@ describe("treningovVBalicku", () => {
     expect(treningovVBalicku(os, "2026-08-18")).toBe(3);
   });
 });
+
+describe("členstvo 0/0 má hodiny v názve", () => {
+  // Natália Pečková: PTminder vyváža „OFF - 18 hodín offline" ako 0 z 0.
+  // Bez hodín z názvu tvrdila os „bez limitu" a zostatok padol na −1 h.
+  const off = {
+    ...zdroj,
+    packages: [{ client: "Barbora Vankova", package: "OFF - 18 hodín offline", total: 0, remaining: 0, validFrom: "2026-08-18", validTo: "2027-02-17" }],
+  };
+
+  it("hodiny sa vezmú z názvu a riadok to prizná", () => {
+    const b = osCasuKlienta("Barbora Vankova", off, DNES).find((x) => x.druh === "balicekOd");
+    expect(b).toMatchObject({ hodin: 18, odvodene: true });
+  });
+
+  it("čo export naozaj hovorí, sa nedopočítava", () => {
+    const b = osCasuKlienta("Barbora Vankova", zdroj, DNES).find((x) => x.druh === "balicekOd");
+    expect(b?.odvodene).toBeFalsy();
+  });
+});

@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
 
-import { fmtDMY } from "../../lib/psb/format";
+import { fmtCZK, fmtDMY } from "../../lib/psb/format";
 import type { osCasuKlienta } from "../../lib/psb/klientOsCasu";
 import { C, mix } from "../../lib/psb/theme";
-import { poslednychMesiacov, vypisAkoText, vypisHodin, zaciatokBalicka } from "../../lib/psb/vypisHodin";
+import { hod, poslednychMesiacov, vypisAkoText, vypisHodin } from "../../lib/psb/vypisHodin";
 
 /**
  * VÝPIS HODÍN PRE KLIENTA.
@@ -26,7 +26,7 @@ const OBDOBIA = [
   { l: "všetko", m: 0 },
 ];
 
-export function VypisHodinPanel({ meno, os, email }: { meno: string; os: Os; email?: string }) {
+export function VypisHodinPanel({ meno, os, email, zostatokTeraz }: { meno: string; os: Os; email?: string; zostatokTeraz: number | null }) {
   const [otvorene, setOtvorene] = useState(false);
   const [mesiacov, setMesiacov] = useState(3);
   const [komu, setKomu] = useState(email || "");
@@ -37,14 +37,10 @@ export function VypisHodinPanel({ meno, os, email }: { meno: string; os: Os; ema
   const [hlaska, setHlaska] = useState("");
   const [chyba, setChyba] = useState("");
 
-  // Zostatok sa počíta od posledného balíčka — staršie tréningy appka vie,
-  // ale balíčky k nim nie, a výpis by klientovi tvrdil mínusové hodiny.
-  const kotva = useMemo(() => zaciatokBalicka(os), [os]);
-
   const v = useMemo(() => {
     const { od, do: doDna } = mesiacov ? poslednychMesiacov(mesiacov) : { od: "", do: "" };
-    return vypisHodin(os, od, doDna, kotva);
-  }, [os, mesiacov, kotva]);
+    return vypisHodin(os, od, doDna, zostatokTeraz);
+  }, [os, mesiacov, zostatokTeraz]);
 
   // Text sa prepočíta pri zmene obdobia — ale len dovtedy, kým doň človek
   // nesiahol. Prepísaný text sa prepnutím filtra nemá stratiť.
@@ -106,20 +102,25 @@ export function VypisHodinPanel({ meno, os, email }: { meno: string; os: Os; ema
       </div>
 
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 8, fontSize: 12 }}>
-        <span style={{ color: C.textMuted }}>na začiatku <b style={{ color: C.text }}>{v.zaciatok} h</b></span>
-        <span style={{ color: C.textMuted }}>pribudlo <b style={{ color: C.green }}>+{v.kupene} h</b></span>
-        <span style={{ color: C.textMuted }}>odtrénované <b style={{ color: C.text }}>{v.odtrenovane} h</b></span>
-        <span style={{ color: C.textMuted }}>zostáva <b style={{ color: v.koniec > 0 ? C.green : C.orange }}>{v.koniec} h</b></span>
+        <span style={{ color: C.textMuted }}>zaplatené <b style={{ color: C.text }}>{fmtCZK(v.zaplatene)}</b></span>
+        <span style={{ color: C.textMuted }}>odtrénované <b style={{ color: C.text }}>{hod(v.odtrenovane)} h</b></span>
+        {v.kupene > 0 && <span style={{ color: C.textMuted }}>kúpené <b style={{ color: C.green }}>+{hod(v.kupene)} h</b></span>}
+        {v.koniec !== null && (
+          <span style={{ color: C.textMuted }}>zostáva <b style={{ color: v.koniec > 0 ? C.green : C.orange }}>{hod(v.koniec)} h</b></span>
+        )}
         <span style={{ color: C.textDim }}>{v.od ? `${fmtDMY(v.od)} – ${fmtDMY(v.do)}` : ""}</span>
       </div>
 
-      {/* Kratšie obdobie, než si človek vypýtal, musí povedať prečo — inak to
-          vyzerá ako chyba filtra. Staršie balíčky appka nedopočíta. */}
-      {v.odKotvy && (
-        <div style={{ fontSize: 11, color: C.textDim, marginBottom: 8 }}>
-          Počíta sa od posledného balíčka ({fmtDMY(v.od)}) — čo bolo predtým, už bolo vyčerpané.
-        </div>
-      )}
+      {/* Dve rôzne čísla treba oddeliť slovami, inak si ich klient zlúči.
+          Zostatok appka vie len od balíčka, ktorý vidí; odtrénované hodiny
+          pozná od prvého dňa. */}
+      <div style={{ fontSize: 11, color: C.textDim, marginBottom: 8 }}>
+        {v.koniec === null
+          ? "Zostatok sa nedá spočítať — k tomuto klientovi nemá appka bežiaci balíček. Odtrénované hodiny sedia."
+          : v.neuplny
+            ? `Zostatok je za posledné členstvo (od ${fmtDMY(v.kotva)}); staršie riadky ukazujú „spolu" — koľko hodín mal klient dovtedy za sebou. Celkovo ${hod(v.spolu)} h.`
+            : `Za celú históriu má odtrénovaných ${hod(v.spolu)} h.`}
+      </div>
 
       <div style={{ display: "flex", gap: 9, flexWrap: "wrap", marginBottom: 8 }}>
         <input
