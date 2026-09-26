@@ -6,6 +6,8 @@ import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 import { dalsieCislo, splatnostZ, SPLATNOST_DNI, type Faktura } from "../../lib/psb/vydanaFaktura";
 import { fakturaDoPdf } from "../../lib/psb/fakturaPdf.server";
+import { mailFaktury, menoPrilohy } from "../../lib/psb/mailFaktury";
+import { posliMail } from "../../lib/psb/smtp.server";
 import { jeMesiac, normName } from "../../lib/psb/format";
 
 /**
@@ -50,6 +52,21 @@ async function kanonickeMeno(DB: D1Database, meno: string): Promise<string> {
   const hladane = normName(meno);
   const zhody = (kandidati.results || []).filter((r) => normName(r.client_name) === hladane);
   return zhody.length === 1 ? zhody[0].client_name : meno;
+}
+
+/**
+ * Prístup do schránky. Tie isté údaje, aké Kokpit používa na čítanie dopytov
+ * — heslo zadáva Jerry v Údajoch a odtiaľto sa nikam nevypisuje.
+ */
+async function nastaveniaMailu(DB: D1Database): Promise<{ host: string; user: string; heslo: string }> {
+  const rs = await DB.prepare(
+    "SELECT key, value FROM vzas_settings WHERE key IN ('mail_host','mail_user','mail_heslo')",
+  ).all();
+  const m: Record<string, string> = {};
+  for (const r of (rs.results as { key: string; value: string }[]) || []) {
+    try { m[r.key] = String(JSON.parse(r.value)); } catch { m[r.key] = r.value; }
+  }
+  return { host: m.mail_host || "", user: m.mail_user || "", heslo: m.mail_heslo || "" };
 }
 
 /** Riadok z databázy na doklad. Jedno miesto, nech sa PDF a obrazovka nerozídu. */
@@ -222,6 +239,67 @@ export const Route = createFileRoute("/api/vydane-faktury")({
             if (!r.meta.changes) return Response.json({ ok: false, error: "Faktúra neexistuje alebo už je stornovaná." }, { status: 400 });
             await audit(DB, { action: "faktura-storno", predmet: id, neu: dovod, actor: kto });
             return Response.json({ ok: true });
+          }
+
+          /**
+           * ODOSLANIE MAILOM.
+           *
+           * Vlastná schránka `info@prosapiens.cz`, ktorú Kokpit už pozná
+           * z čítania dopytov. Klientovi tým príde faktúra z adresy, na
+           * ktorú vie odpovedať — a odpoveď padne Jerrymu do schránky, nie
+           * do appky.
+           *
+           * PORADIE JE ÚMYSELNÉ: najprv PDF, potom mail, a až po úspešnom
+           * odoslaní sa zapíše `odoslane_at`. Keby sa zapisovalo dopredu,
+           * appka by pri spadnutom SMTP tvrdila, že doklad odišiel.
+           */
+          if (b.akcia === "posli-mail") {
+            if (!BROWSER) return Response.json({ ok: false, error: "Prehliadač na serveri nie je zapnutý — PDF sa nemá ako vyrobiť." }, { status: 503 });
+            const r = await DB.prepare(
+              `SELECT cislo, klient, vystavene, splatnost, popis, ks, cena_czk, celkom_czk, poznamka, storno_at, uhradene_at,
+                      odb_firma, odb_ico, odb_dic, odb_ulica, odb_psc, odb_mesto, odb_stat, odb_email
+               FROM vydane_faktury WHERE id = ?1`,
+            ).bind(id).first<Record<string, string | number | null>>();
+            if (!r) return Response.json({ ok: false, error: "Taká faktúra neexistuje." }, { status: 404 });
+            if (r.storno_at) return Response.json({ ok: false, error: "Stornovaná faktúra sa neposiela." }, { status: 400 });
+
+            const komu = (kus(b.komu, 160) || String(r.odb_email || "")).toLowerCase();
+            if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(komu)) {
+              return Response.json({ ok: false, error: "Klient nemá e-mail — doplň ho vo fakturačných údajoch." }, { status: 400 });
+            }
+
+            const n = await nastaveniaMailu(DB);
+            if (!n.host || !n.user || !n.heslo) {
+              return Response.json({ ok: false, error: "Schránka nie je nastavená — doplň ju v Údajoch." }, { status: 400 });
+            }
+
+            const faktura = naFakturu(r);
+            const pdf = await fakturaDoPdf(BROWSER, ASSETS, faktura, new URL(request.url).origin);
+            const text = mailFaktury(faktura);
+            const vysledok = await posliMail(
+              // Čítanie chodí na IMAP (993), odosielanie na SMTP (587) —
+              // ten istý stroj, iný port a iná služba.
+              { host: n.host.replace(/^imap\./, "smtp."), port: 587, pouzivatel: n.user, heslo: n.heslo },
+              {
+                od: n.user,
+                odMeno: "ProSapiens Biomechanic",
+                komu: [komu],
+                // Kópia sebe: v schránke tak zostane stopa po tom, čo klientovi
+                // naozaj odišlo — SMTP sám do „Odoslané" nič nedá.
+                kopiaSkryta: [n.user],
+                predmet: String(b.predmet || text.predmet).slice(0, 200),
+                telo: String(b.telo || text.telo).slice(0, 5000),
+                prilohy: [{ meno: menoPrilohy(String(r.cislo)), typ: "application/pdf", data: pdf }],
+              },
+            );
+            if (!vysledok.ok) {
+              await audit(DB, { action: "faktura-mail-zlyhal", predmet: `${r.cislo} · ${komu}`, old: vysledok.chyba, actor: kto });
+              return Response.json({ ok: false, error: `Mail neodišiel — ${vysledok.chyba}` }, { status: 502 });
+            }
+            await DB.prepare("UPDATE vydane_faktury SET odoslane_at = ?2, odoslane_komu = ?3 WHERE id = ?1")
+              .bind(id, teraz(), komu).run();
+            await audit(DB, { action: "faktura-odoslana-mailom", predmet: `${r.cislo} · ${komu}`, actor: kto });
+            return Response.json({ ok: true, komu });
           }
 
           /**

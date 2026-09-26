@@ -362,8 +362,28 @@ export function VydaneFaktury({ mena, predvolba, onPredvolbaSpracovana }: {
                   {r.storno_at ? `storno — ${r.storno_dovod}`
                     : r.uhradene_at ? `uhradená ${den(r.uhradene_at.slice(0, 10))}`
                       : mesk ? `po splatnosti od ${den(r.splatnost)}` : `splatná ${den(r.splatnost)}`}
+                  {r.odoslane_at && !r.storno_at ? ` · odoslaná ${den(r.odoslane_at.slice(0, 10))}` : ""}
                 </span>
                 <button type="button" onClick={() => vytlacFakturu(naFakturu(r))} style={odkazStyl}>PDF</button>
+                {!r.storno_at && (
+                  <button
+                    type="button"
+                    disabled={pracujem === r.id}
+                    onClick={() => {
+                      const komu = r.odb_email || udaje.find((u) => u.klient === r.klient)?.email || "";
+                      if (!komu) { setChyba(`${r.klient} nemá e-mail — doplň ho vo fakturačných údajoch.`); return; }
+                      const znova = r.odoslane_at ? `Faktúra ${r.cislo} už raz odišla na ${r.odoslane_komu}. Poslať znova na ${komu}?` : `Poslať faktúru ${r.cislo} na ${komu}?`;
+                      if (!window.confirm(znova)) return;
+                      void (async () => {
+                        const j = await posli({ akcia: "posli-mail", id: r.id, komu }, r.id);
+                        if (j) setHlaska(`Faktúra ${r.cislo} odišla na ${komu}. Kópia je aj v tvojej schránke.`);
+                      })();
+                    }}
+                    style={{ ...odkazStyl, color: r.odoslane_at ? C.textDim : C.green }}
+                  >
+                    {pracujem === r.id ? "posielam…" : r.odoslane_at ? "poslať znova" : "poslať mailom"}
+                  </button>
+                )}
                 {!r.storno_at && !r.uhradene_at && (
                   <button type="button" onClick={() => void posli({ akcia: "uhradena", id: r.id }, r.id)} style={odkazStyl}>uhradená</button>
                 )}
