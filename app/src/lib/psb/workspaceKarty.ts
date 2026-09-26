@@ -34,7 +34,17 @@ export type Karta =
    * človek a robí sa na ňom. Preto nemá počet a nikdy nezmizne — kopa sa
    * bez nej môže vyprázdniť, ona zostáva ako miesto, kam sa chodí.
    */
-  | { druh: "klient"; nadpis: string; podnadpis: string; polozky: never[] };
+  | { druh: "klient"; nadpis: string; podnadpis: string; polozky: never[] }
+  /**
+   * Faktúry. Druhá karta bez fronty — Jerry, 26. 9. 2026: „toto okno faktúry
+   * mi môžeš presunúť do Workspace ako ďalšiu kartu." Patrí sem, lebo
+   * faktúra vzniká pri balíčku, a balíčky sa nahadzujú na karte klienta
+   * hneď vedľa.
+   */
+  | { druh: "faktury"; nadpis: string; podnadpis: string; polozky: never[] };
+
+/** Karty, ktoré nie sú fronta — nemajú počet a z kopy nikdy nezmiznú. */
+export const BEZ_FRONTY: Karta["druh"][] = ["klient", "faktury"];
 
 export type ZdrojeKariet = {
   zmeny: Zmena[];
@@ -119,6 +129,14 @@ export function postavKarty(z: ZdrojeKariet): Karta[] {
     druh: "klient",
     nadpis: "Klient",
     podnadpis: "vyhľadaj človeka a rob na ňom — tréningy, peniaze, balíčky",
+    polozky: [],
+  });
+  // Faktúry sú peniaze, a tie sú Jerryho — rovnaké pravidlo ako pri
+  // nepriradených platbách. Terezke by to bol len šum.
+  if (ja !== "Terezka") karty.push({
+    druh: "faktury",
+    nadpis: "Faktúry",
+    podnadpis: "vystav doklad, pošli QR platbu a veď si, čo je zaplatené",
     polozky: [],
   });
   if (zmeny.length) karty.push({

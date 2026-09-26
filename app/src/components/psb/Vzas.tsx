@@ -1,4 +1,3 @@
-import { VydaneFaktury, type FakturaPredvolba } from "./VydaneFaktury";
 import { PeniazePrehlad } from "./PeniazePrehlad";
 import { BODY, kohortyKlientov, priemernePrezitie } from "../../lib/psb/kohorty";
 import { oznam } from "../../lib/psb/obnovaSignal";
@@ -3210,7 +3209,6 @@ const SEKCIE_PENIAZE = [
     { id: "trzby", label: "Po mesiacoch" },
     { id: "sedenia", label: "Sedenia & cena" },
     { id: "predikcia", label: "Predikcia" },
-    { id: "faktury", label: "Faktúry" },
   ] },
   { id: "sk-zisky", label: "Zisky", listy: [
     { id: "pnl", label: "Zisky a straty" },
@@ -3238,7 +3236,7 @@ const sekcie = () => [SEKCIA_PREHLAD, ...SEKCIE_PENIAZE];
 const sekciaPre = (list: string) =>
   (sekcie().find((x) => x.listy.some((l) => l.id === list)) || sekcie()[0]).id;
 
-export function Vzas({ sub, onSub, data, clients, focus, onNavigate, pohybSplits, nastavPohybSplit, fakturaPredvolba, onFakturaPredvolbaSpracovana }: { sub: string; onSub: (s: string) => void; data: PSBData; clients: Record<string, ClientAgg>; focus?: NavFocus | null; onNavigate?: (tab: string, sub?: string, focus?: NavFocus) => void; pohybSplits?: PohybSplits; nastavPohybSplit?: (kluc: string, casti: SplitCiast[]) => void; fakturaPredvolba?: FakturaPredvolba | null; onFakturaPredvolbaSpracovana?: () => void }) {
+export function Vzas({ sub, onSub, data, clients, focus, onNavigate, pohybSplits, nastavPohybSplit }: { sub: string; onSub: (s: string) => void; data: PSBData; clients: Record<string, ClientAgg>; focus?: NavFocus | null; onNavigate?: (tab: string, sub?: string, focus?: NavFocus) => void; pohybSplits?: PohybSplits; nastavPohybSplit?: (kluc: string, casti: SplitCiast[]) => void }) {
   // Tržby do VZAS tečú živé z PTmindera — excelový prepis sa nahradí pri
   // každom otvorení. `tik` len prekreslí strom po mutácii modulových polí.
   const [, tik] = useState(0);
@@ -3268,13 +3266,6 @@ export function Vzas({ sub, onSub, data, clients, focus, onNavigate, pohybSplits
         ) : null;
       })()}
       {sub === "prehlad" && <PeniazePrehlad data={data} onNavigate={onNavigate} />}
-      {sub === "faktury" && (
-        <VydaneFaktury
-          mena={Object.keys(clients)}
-          predvolba={fakturaPredvolba}
-          onPredvolbaSpracovana={onFakturaPredvolbaSpracovana}
-        />
-      )}
       {["trzby", "sedenia", "predikcia"].includes(sub) && (
         <FinancieObsah data={data} clients={clients} focus={focus} sub={sub} onSub={onSub} />
       )}

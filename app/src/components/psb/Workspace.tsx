@@ -3,7 +3,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { navrhniKlientaKandidati, type ClientAgg } from "../../lib/psb/compute";
 import { krokGesta, novyStavGesta } from "../../lib/psb/gestoKariet";
-import { klucPolozky, popisZmeny, postavKarty, trenerZPrihlasenia, type Karta, type NeznamyNazov, type NepriradenaPlatba, type Zmena } from "../../lib/psb/workspaceKarty";
+import { BEZ_FRONTY, klucPolozky, popisZmeny, postavKarty, trenerZPrihlasenia, type Karta, type NeznamyNazov, type NepriradenaPlatba, type Zmena } from "../../lib/psb/workspaceKarty";
+import { VydaneFaktury, type FakturaPredvolba } from "./VydaneFaktury";
 import type { PSBData } from "../../lib/psb/types";
 import { KlientStol } from "./KlientStol";
 import { C, mix } from "../../lib/psb/theme";
@@ -30,7 +31,7 @@ import { Card } from "./ui";
 const kc = (n: number) => `${Math.round(n).toLocaleString("sk-SK")} Kč`;
 const den = (s: string) => (s ? `${Number(s.slice(8))}. ${Number(s.slice(5, 7))}.` : "");
 
-export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, btc, onOverride, otvorKlienta, onOtvoreny, onFaktura }: {
+export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, btc, onOverride, otvorKlienta, onOtvoreny, fakturaPredvolba, onFakturaPredvolbaSpracovana }: {
   clients: Record<string, ClientAgg>;
   mena: string[];
   ktoSom: string | null;
@@ -41,8 +42,9 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   btc?: { platby: { klient: string | null; datum: string; sats?: number; czk: number | null }[]; kurz: number | null; kedy: string | null };
   /** Ručné opravy klienta idú cestou appky, nie vlastným fetchom — viď KlientStol. */
   onOverride?: (meno: string, kluc: string, hodnota: unknown) => Promise<boolean>;
-  /** Vystaviť faktúru na balíček — Workspace ju len podáva karte klienta. */
-  onFaktura?: (p: { klient: string; popis: string; cena: number; balicekId?: string }) => void;
+  /** Faktúra vypýtaná mimo Workspace (Prechod → balíčky). */
+  fakturaPredvolba?: FakturaPredvolba | null;
+  onFakturaPredvolbaSpracovana?: () => void;
   /** Koho otvoriť rovno po prepnutí sem (klik na klienta inde v appke). */
   otvorKlienta?: string | null;
   onOtvoreny?: () => void;
@@ -60,6 +62,12 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
    */
   const [ktoreVeci, setKtoreVeci] = useState<"auto" | "Jerry" | "Terezka" | "vsetko">("auto");
   const [chyba, setChyba] = useState("");
+  /**
+   * Rozpracovaná faktúra. Príde buď z karty klienta (ponuka po nahodení
+   * balíčka), alebo zvonka z Prechodu — v oboch prípadoch treba prepnúť na
+   * kartu Faktúry, inak by človek klikol a nič by sa nestalo.
+   */
+  const [predvolbaFaktury, setPredvolbaFaktury] = useState<FakturaPredvolba | null>(null);
 
   const nacitaj = useCallback(async () => {
     const [k, p] = await Promise.all([
@@ -88,7 +96,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   const zive = useMemo(
     // Karta klienta nie je fronta — nemá položky a nikdy nezmizne. Ostatné
     // zmiznú, keď sa v nich všetko odklikalo.
-    () => karty.filter((k) => k.druh === "klient"
+    () => karty.filter((k) => BEZ_FRONTY.includes(k.druh)
       || (k.polozky as (Zmena | NeznamyNazov | NepriradenaPlatba)[]).some((p) => !hotove.has(klucPolozky(k.druh, p)))),
     [karty, hotove],
   );
@@ -101,6 +109,19 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
     const idx = zive.findIndex((x) => x.druh === "klient");
     if (idx >= 0) setI(idx);
   }, [otvorKlienta, zive]);
+
+  /** Faktúra vypýtaná odinakiaľ (Prechod → balíčky) otvorí kartu Faktúry. */
+  useEffect(() => {
+    if (!fakturaPredvolba) return;
+    setPredvolbaFaktury(fakturaPredvolba);
+    onFakturaPredvolbaSpracovana?.();
+  }, [fakturaPredvolba, onFakturaPredvolbaSpracovana]);
+
+  useEffect(() => {
+    if (!predvolbaFaktury) return;
+    const idx = zive.findIndex((x) => x.druh === "faktury");
+    if (idx >= 0) setI(idx);
+  }, [predvolbaFaktury, zive]);
 
   /**
    * PREPNUTIE KARTY SA MUSÍ DAŤ VIDIEŤ.
@@ -325,13 +346,20 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
           <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
               <div style={{ fontSize: 18, fontWeight: 800 }}>{k.nadpis}</div>
-              {k.druh !== "klient" && <div style={{ fontSize: 11.5, color: C.textMuted }}>{zostava(k)} zostáva</div>}
+              {!BEZ_FRONTY.includes(k.druh) && <div style={{ fontSize: 11.5, color: C.textMuted }}>{zostava(k)} zostáva</div>}
             </div>
             <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 3 }}>{k.podnadpis}</div>
 
             <div style={{ marginTop: 14, flexGrow: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
               {/* Zoznamy rolujú vnútri; karta klienta si výšku riadi sama. */}
               <div style={{ flexGrow: 1, minHeight: 0, overflowY: k.druh === "klient" ? "visible" : "auto", display: k.druh === "klient" ? "flex" : "block", flexDirection: "column" }}>
+              {k.druh === "faktury" && (
+                <VydaneFaktury
+                  mena={mena}
+                  predvolba={predvolbaFaktury}
+                  onPredvolbaSpracovana={() => setPredvolbaFaktury(null)}
+                />
+              )}
               {k.druh === "zmeny" && k.polozky.map((z) => {
                 const kluc = klucPolozky("zmeny", z);
                 if (hotove.has(kluc)) return null;
@@ -419,7 +447,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                 );
               })}
 
-              {k.druh === "klient" && <KlientStol clients={clients} mena={mena} data={data} kalUdalosti={kalUdalosti} btcSats={btcSats} btc={btc} onOverride={onOverride} otvorKlienta={otvorKlienta} onOtvoreny={onOtvoreny} onFaktura={onFaktura} />}
+              {k.druh === "klient" && <KlientStol clients={clients} mena={mena} data={data} kalUdalosti={kalUdalosti} btcSats={btcSats} btc={btc} onOverride={onOverride} otvorKlienta={otvorKlienta} onOtvoreny={onOtvoreny} onFaktura={setPredvolbaFaktury} />}
 
               {k.druh === "platby" && k.polozky.map((p) => {
                 const kluc = klucPolozky("platby", p);
@@ -455,8 +483,8 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
             <button
               key={x.druh}
               onClick={() => (j === i ? undefined : prepni(j > i ? 1 : -1, j))}
-              aria-label={`${x.nadpis} (${zostava(x)} zostáva)`}
-              title={`${x.nadpis} · ${zostava(x)} zostáva`}
+              aria-label={BEZ_FRONTY.includes(x.druh) ? x.nadpis : `${x.nadpis} (${zostava(x)} zostáva)`}
+              title={BEZ_FRONTY.includes(x.druh) ? x.nadpis : `${x.nadpis} · ${zostava(x)} zostáva`}
               style={{
                 width: j === i ? 11 : 8, height: j === i ? 11 : 8, borderRadius: "50%",
                 border: "none", padding: 0, cursor: "pointer",
