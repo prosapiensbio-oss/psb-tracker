@@ -49,7 +49,7 @@ type Platba = {
 
 const dnesISO = () => new Date().toISOString().slice(0, 10);
 
-export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onOverride, otvorKlienta, onOtvoreny }: {
+export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onOverride, otvorKlienta, onOtvoreny, onFaktura }: {
   clients: Record<string, ClientAgg>;
   mena: string[];
   data: PSBData;
@@ -77,6 +77,14 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
   otvorKlienta?: string | null;
   /** Zavolá sa, keď je otvorený — aby sa ten istý klik neopakoval. */
   onOtvoreny?: () => void;
+  /**
+   * Vystaviť faktúru na balíček.
+   *
+   * Jerry, 26. 9. 2026: „testoval som nahodenie balíčka a ani sa nespýtalo,
+   * či chcem vytvoriť faktúru." Ponuka bola len v Prechode — lenže balíčky
+   * sa nahadzujú TU, na karte klienta.
+   */
+  onFaktura?: (p: { klient: string; popis: string; cena: number; balicekId?: string }) => void;
 }) {
   const [hladam, setHladam] = useState("");
   const [novy, setNovy] = useState(false);
@@ -102,6 +110,8 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
   const [f, setF] = useState({ nazov: "", hodiny: "", platnostOd: dnesISO(), platnostDo: "", cenaCzk: "", poznamka: "", zlava: "" });
   const [pracujem, setPracujem] = useState(false);
   const [chyba, setChyba] = useState("");
+  /** Práve nahodený balíček — kvôli ponuke faktúry hneď pod formulárom. */
+  const [ponukniFakturu, setPonukniFakturu] = useState<{ nazov: string; cena: number; id?: string } | null>(null);
   /** Je posledná hláška dobrá správa? Červená veta o úspechu mätie. */
   const [chybaJeDobra, setChybaJeDobra] = useState(false);
   /**
@@ -484,6 +494,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
     }).then((x) => x.json()).catch(() => ({ ok: false, error: "spojenie" }));
     setPracujem(false);
     if (!r.ok) { setChyba(r.error || "nepodarilo sa uložiť"); return; }
+    setPonukniFakturu({ nazov: f.nazov, cena: Number(cenaPoZlave(f).cenaCzk) || 0, id: typeof r.id === "string" ? r.id : undefined });
     setF({ nazov: "", hodiny: "", platnostOd: dnesISO(), platnostDo: "", cenaCzk: "", poznamka: "", zlava: "" });
     setPisem(false);
     await nacitajBalicky();
@@ -1023,6 +1034,25 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
               a zrušiť; PTminder pod nimi je export, nie zápisník. */}
           {filter === "balicky" && !!mojeBalicky.length && (
             <div style={{ marginBottom: 14 }}>
+              {ponukniFakturu && onFaktura && (
+                <div style={{ margin: "0 0 10px", padding: "9px 11px", borderRadius: 9, border: `1px solid ${mix(C.accentLight, 40)}`, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 12.5, color: C.text }}>
+                    Nahodený <b>{ponukniFakturu.nazov}</b>{ponukniFakturu.cena ? ` za ${fmtCZK(ponukniFakturu.cena)}` : ""}. Chceš naň faktúru?
+                  </span>
+                  <button
+                    onClick={() => { onFaktura({ klient: meno, popis: ponukniFakturu.nazov, cena: ponukniFakturu.cena, balicekId: ponukniFakturu.id }); setPonukniFakturu(null); }}
+                    style={{ padding: "6px 12px", borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: "pointer", border: `1px solid ${mix(C.accent, 45)}`, background: mix(C.accent, 12), color: C.accentLight, fontFamily: "inherit" }}
+                  >
+                    Vystaviť faktúru
+                  </button>
+                  <button
+                    onClick={() => setPonukniFakturu(null)}
+                    style={{ background: "none", border: "none", color: C.textDim, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}
+                  >
+                    netreba
+                  </button>
+                </div>
+              )}
               <div style={hlavicka}>NAHODENÉ V KOKPITE</div>
               {mojeBalicky.map((b) => (
                 <div key={b.id}>
@@ -1037,6 +1067,15 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
                       </span>
                     </span>
                     {!!b.cena_czk && <span style={{ color: C.textMuted }}>{fmtCZK(b.cena_czk)}</span>}
+                    {onFaktura && (
+                      <button
+                        onClick={() => onFaktura({ klient: meno, popis: b.nazov, cena: b.cena_czk || 0, balicekId: b.id })}
+                        title="Vystaviť faktúru na tento balíček"
+                        style={{ background: "none", border: "none", padding: 0, color: C.accentLight, fontFamily: "inherit", fontSize: 11.5, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 2 }}
+                      >
+                        faktúra
+                      </button>
+                    )}
                     <Upravit
                       naUpravu={() => {
                         setUpravaBalicka(b.id); setPisem(false);

@@ -64,3 +64,20 @@ describe("faktúra ako dokument", () => {
     expect(s.startsWith("<svg")).toBe(true);
   });
 });
+
+describe("značka na doklade", () => {
+  it("nesie zelený pásik, figúru aj nápis", () => {
+    // Jerry si 26. 9. 2026 vybral návrh 4: „vyhráva 4, zelený pásik."
+    const h = fakturaDocument(f);
+    expect(h).toContain("/znacka-figura.svg");
+    expect(h).toContain("/znacka-napis.svg");
+    expect(h).toContain("#456127");
+  });
+
+  it("písmo sa serveruje z appky, nie z internetu", () => {
+    // Faktúra sa tlačí aj bez siete; externý odkaz by ju vysádzal inak.
+    const h = fakturaDocument(f);
+    expect(h).toContain("/agrandir.woff2");
+    expect(h).not.toContain("fonts.googleapis");
+  });
+});

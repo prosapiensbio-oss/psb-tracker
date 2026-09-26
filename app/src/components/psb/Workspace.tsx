@@ -30,7 +30,7 @@ import { Card } from "./ui";
 const kc = (n: number) => `${Math.round(n).toLocaleString("sk-SK")} Kč`;
 const den = (s: string) => (s ? `${Number(s.slice(8))}. ${Number(s.slice(5, 7))}.` : "");
 
-export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, btc, onOverride, otvorKlienta, onOtvoreny }: {
+export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, btc, onOverride, otvorKlienta, onOtvoreny, onFaktura }: {
   clients: Record<string, ClientAgg>;
   mena: string[];
   ktoSom: string | null;
@@ -41,6 +41,8 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   btc?: { platby: { klient: string | null; datum: string; sats?: number; czk: number | null }[]; kurz: number | null; kedy: string | null };
   /** Ručné opravy klienta idú cestou appky, nie vlastným fetchom — viď KlientStol. */
   onOverride?: (meno: string, kluc: string, hodnota: unknown) => Promise<boolean>;
+  /** Vystaviť faktúru na balíček — Workspace ju len podáva karte klienta. */
+  onFaktura?: (p: { klient: string; popis: string; cena: number; balicekId?: string }) => void;
   /** Koho otvoriť rovno po prepnutí sem (klik na klienta inde v appke). */
   otvorKlienta?: string | null;
   onOtvoreny?: () => void;
@@ -417,7 +419,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                 );
               })}
 
-              {k.druh === "klient" && <KlientStol clients={clients} mena={mena} data={data} kalUdalosti={kalUdalosti} btcSats={btcSats} btc={btc} onOverride={onOverride} otvorKlienta={otvorKlienta} onOtvoreny={onOtvoreny} />}
+              {k.druh === "klient" && <KlientStol clients={clients} mena={mena} data={data} kalUdalosti={kalUdalosti} btcSats={btcSats} btc={btc} onOverride={onOverride} otvorKlienta={otvorKlienta} onOtvoreny={onOtvoreny} onFaktura={onFaktura} />}
 
               {k.druh === "platby" && k.polozky.map((p) => {
                 const kluc = klucPolozky("platby", p);

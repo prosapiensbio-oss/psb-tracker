@@ -17,6 +17,16 @@ import { DODAVATEL, den, spayd, suma, type Faktura } from "./vydanaFaktura";
 const esc = (s: string) =>
   String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
+/** Farby z palety appky (svetlá), nie vymyslené — doklad patrí k značke. */
+const B = {
+  text: "#2c3524",
+  zelen: "#5e7c38",
+  zelenTmava: "#456127",
+  linka: "#c8c2ae",
+  slaba: "#6b7560",
+  slabsia: "#8a9280",
+} as const;
+
 /** QR platba ako SVG. Vkladá sa priamo do dokumentu — žiadny externý obrázok. */
 export function qrSvg(text: string, velkost = 3): string {
   const q = qrcode(0, "M");
@@ -27,7 +37,11 @@ export function qrSvg(text: string, velkost = 3): string {
 
 /** Riadky adresy, prázdne sa vynechajú. */
 const adresa = (r: (string | undefined)[]) =>
-  r.filter((x) => x && String(x).trim()).map((x) => `<div>${esc(String(x))}</div>`).join("");
+  r.filter((x) => x && String(x).trim()).map((x) => `${esc(String(x))}<br>`).join("");
+
+/** Značka a figúra sa berú zo súborov, ktoré appka už serveruje. */
+const ZNACKA = "/znacka-napis.svg";
+const FIGURA = "/znacka-figura.svg";
 
 export function fakturaDocument(f: Faktura): string {
   const platba = spayd({
@@ -38,112 +52,125 @@ export function fakturaDocument(f: Faktura): string {
     prijemca: DODAVATEL.meno,
   });
   const o = f.odberatel;
-  const mestoRiadok = [o.psc, o.mesto].filter(Boolean).join(" ");
-  const ic = [o.ico && `IČ: ${esc(o.ico)}`, o.dic && `DIČ: ${esc(o.dic)}`].filter(Boolean).join(" &nbsp; ");
+  const odberatel = o.firma || f.klient;
+  const ic = [o.ico && `IČ ${esc(o.ico)}`, o.dic && `DIČ ${esc(o.dic)}`].filter(Boolean).join(" · ");
   return `<!doctype html>
 <html lang="cs">
 <head>
 <meta charset="utf-8">
 <title>Faktura ${esc(f.cislo)}</title>
 <style>
-  @page { size: A4; margin: 16mm 14mm 14mm; }
+  /* Písmo značky. Keď sa nenačíta (tlač z iného zariadenia), doklad vyzerá
+     inak, ale zostane čitateľný — preto rozumný záložný rad, nie serif. */
+  @font-face { font-family: "Agrandir"; src: url("/agrandir.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+  @page { size: A4; margin: 0; }
   @media print { * { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
-  :root { --text: #1d2420; --slaba: #6b7a72; --linka: #d8e0da; --zvyraz: #2d7d5a; }
   * { box-sizing: border-box; }
-  body { margin: 0; color: var(--text); font-size: 10.5pt; line-height: 1.5;
-         font-family: "Helvetica Neue", -apple-system, "Segoe UI", Roboto, sans-serif; }
-  h1 { margin: 0 0 2mm; font-size: 20pt; letter-spacing: -0.3pt; }
-  .hlavicka { display: flex; justify-content: space-between; align-items: flex-start;
-              border-bottom: 2px solid var(--zvyraz); padding-bottom: 4mm; margin-bottom: 6mm; }
-  .cislo { font-size: 12pt; color: var(--slaba); }
-  .strany { display: flex; gap: 10mm; margin-bottom: 7mm; }
-  .strana { flex: 1; }
-  .nadpis { font-size: 8pt; letter-spacing: 1.1pt; text-transform: uppercase;
-            color: var(--slaba); margin-bottom: 2mm; }
-  .meno { font-weight: 700; font-size: 11.5pt; }
-  .slaba { color: var(--slaba); }
-  .pasik { display: flex; gap: 10mm; padding: 3mm 0; border-top: 1px solid var(--linka);
-           border-bottom: 1px solid var(--linka); margin-bottom: 6mm; }
-  .pasik div { flex: 1; }
-  table { width: 100%; border-collapse: collapse; margin-bottom: 6mm; }
-  th { text-align: right; font-size: 8pt; letter-spacing: 1pt; text-transform: uppercase;
-       color: var(--slaba); border-bottom: 1px solid var(--linka); padding: 0 0 2mm; }
+  body { margin: 0; font-family: "Agrandir", "Helvetica Neue", -apple-system, "Segoe UI", Roboto, sans-serif;
+         color: ${B.text}; -webkit-font-smoothing: antialiased; }
+  .list { width: 210mm; min-height: 297mm; margin: 0 auto; background: #fff; display: flex; }
+  /* Pásik so značkou. Jerry si ho vybral 26. 9. 2026 z piatich návrhov:
+     „vyhráva 4, zelený pásik." Vyzerá to ako hlavičkový papier, na ktorom je
+     faktúra len obsah. */
+  .pasik { flex: 0 0 34mm; background: ${B.zelenTmava}; color: #fbfaf2; padding: 14mm 6mm;
+           display: flex; flex-direction: column; justify-content: space-between; align-items: center; }
+  .telo { flex: 1; padding: 14mm 14mm 12mm; position: relative; }
+  .stitok { font-size: 7.5pt; letter-spacing: 1.4pt; text-transform: uppercase; color: ${B.slaba}; font-weight: 600; }
+  .n { font-variant-numeric: tabular-nums; }
+  table { width: 100%; border-collapse: collapse; }
+  th { font-size: 7.5pt; letter-spacing: 1.4pt; text-transform: uppercase; color: ${B.slaba};
+       font-weight: 600; text-align: right; padding-bottom: 3mm; }
   th:first-child, td:first-child { text-align: left; }
-  td { padding: 3mm 0; text-align: right; vertical-align: top; border-bottom: 1px solid var(--linka); }
-  .spolu { display: flex; justify-content: flex-end; align-items: baseline; gap: 6mm; margin-bottom: 8mm; }
-  .spolu .suma { font-size: 17pt; font-weight: 700; }
-  .platba { display: flex; gap: 8mm; align-items: flex-start; }
-  .platba svg { width: 34mm; height: 34mm; }
-  .patka { margin-top: 10mm; padding-top: 3mm; border-top: 1px solid var(--linka);
-           font-size: 8.5pt; color: var(--slaba); display: flex; justify-content: space-between; }
+  th + th, td + td { padding-left: 7mm; }
+  td { padding: 3.5mm 0; text-align: right; font-size: 10.5pt;
+       border-top: 1px solid ${B.linka}; border-bottom: 1px solid ${B.linka}; }
+  .suma { border: 1px solid ${B.linka}; border-left: 4px solid ${B.zelen}; padding: 5mm 6mm;
+          margin: 8mm 0 10mm; display: flex; justify-content: space-between; align-items: center; }
+  .qr { width: 30mm; height: 30mm; }
+  .qr svg { width: 100%; height: 100%; display: block; }
   .storno { color: #b23b2c; font-weight: 700; letter-spacing: 2pt; }
 </style>
 </head>
 <body>
-  <div class="hlavicka">
-    <div>
-      <h1>Faktura</h1>
-      <div class="cislo">č. ${esc(f.cislo)}${f.stornoAt ? ' <span class="storno">STORNO</span>' : ""}</div>
-    </div>
-    <div style="text-align:right" class="slaba">
-      <div>Datum vystavení: <b style="color:var(--text)">${den(f.vystavene)}</b></div>
-      <div>Datum splatnosti: <b style="color:var(--text)">${den(f.splatnost)}</b></div>
-      <div>Způsob platby: převodem</div>
-    </div>
-  </div>
-
-  <div class="strany">
-    <div class="strana">
-      <div class="nadpis">Dodavatel</div>
-      <div class="meno">${esc(DODAVATEL.meno)}</div>
-      ${adresa([DODAVATEL.ulica, `${DODAVATEL.psc} ${DODAVATEL.mesto}`, DODAVATEL.stat])}
-      <div style="margin-top:2mm">IČ: ${esc(DODAVATEL.ico)}</div>
-      <div>${esc(DODAVATEL.dph)}</div>
-      <div class="slaba" style="margin-top:2mm">${esc(DODAVATEL.email)} · ${esc(DODAVATEL.telefon)}</div>
-      <div class="slaba">${esc(DODAVATEL.web)}</div>
-    </div>
-    <div class="strana">
-      <div class="nadpis">Odběratel</div>
-      <div class="meno">${esc(o.firma || f.klient)}</div>
-      ${adresa([o.ulica, mestoRiadok, o.stat])}
-      ${ic ? `<div style="margin-top:2mm">${ic}</div>` : ""}
-      ${o.firma && o.firma !== f.klient ? `<div class="slaba" style="margin-top:2mm">Za: ${esc(f.klient)}</div>` : ""}
-    </div>
-  </div>
-
+<div class="list">
   <div class="pasik">
-    <div><span class="slaba">Bankovní účet</span><br><b>${esc(DODAVATEL.ucet)}</b><br>
-      <span class="slaba">IBAN ${esc(DODAVATEL.iban)} · ${esc(DODAVATEL.swift)}</span></div>
-    <div><span class="slaba">Variabilní symbol</span><br><b>${esc(f.cislo)}</b></div>
+    <img src="${FIGURA}" alt="" style="width:100%;height:40mm;object-fit:contain;filter:brightness(0) invert(1)">
+    <div style="writing-mode:vertical-rl;transform:rotate(180deg);font-size:8pt;letter-spacing:3pt;text-transform:uppercase;opacity:.7">Biomechanika pohybu</div>
+    <div style="font-size:7.5pt;text-align:center;opacity:.75;line-height:1.6">${esc(DODAVATEL.web)}</div>
   </div>
+  <div class="telo">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:9mm">
+      <div>
+        <img src="${ZNACKA}" alt="ProSapiens Biomechanic" style="width:46mm;display:block">
+        <div style="font-size:9pt;letter-spacing:3pt;text-transform:uppercase;color:${B.zelen};margin-top:4mm">
+          Faktura <b class="n" style="color:${B.text};letter-spacing:0">${esc(f.cislo)}</b>
+          ${f.stornoAt ? '<span class="storno">· STORNO</span>' : ""}
+        </div>
+      </div>
+      <div style="font-size:9.5pt;line-height:1.7;color:${B.slaba};text-align:right">
+        <div>Datum vystavení <b style="color:${B.text}">${den(f.vystavene)}</b></div>
+        <div>Datum splatnosti <b style="color:${B.text}">${den(f.splatnost)}</b></div>
+        <div>Způsob platby převodem</div>
+      </div>
+    </div>
 
-  <div style="font-weight:600;margin-bottom:2mm">Fakturujeme Vám za dodané služby:</div>
-  <table>
-    <thead><tr><th>Označení dodávky</th><th>Počet m. j.</th><th>Cena za m. j.</th><th>Celkem</th></tr></thead>
-    <tbody><tr>
-      <td>${esc(f.popis)}</td>
-      <td>${suma(f.ks).replace(",00", ",00")}</td>
-      <td>${suma(f.cena)}</td>
-      <td>${suma(f.celkom)}</td>
-    </tr></tbody>
-  </table>
+    <div style="display:flex;gap:8mm;margin-bottom:8mm">
+      <div style="flex:1">
+        <div class="stitok" style="margin-bottom:2mm">Dodavatel</div>
+        <div style="font-size:11pt;font-weight:700">${esc(DODAVATEL.meno)}</div>
+        <div style="font-size:9.5pt;line-height:1.6;color:${B.slaba}">
+          ${esc(DODAVATEL.ulica)}, ${esc(DODAVATEL.psc)} ${esc(DODAVATEL.mesto)}<br>
+          IČ ${esc(DODAVATEL.ico)} · ${esc(DODAVATEL.dph)}
+        </div>
+      </div>
+      <div style="flex:1">
+        <div class="stitok" style="margin-bottom:2mm">Odběratel</div>
+        <div style="font-size:11pt;font-weight:700">${esc(odberatel)}</div>
+        <div style="font-size:9.5pt;line-height:1.6;color:${B.slaba}">
+          ${adresa([o.ulica, [o.psc, o.mesto].filter(Boolean).join(" ")])}
+          ${ic ? `${ic}<br>` : ""}
+          ${odberatel !== f.klient ? `Za: ${esc(f.klient)}` : ""}
+        </div>
+      </div>
+    </div>
 
-  <div class="spolu"><span class="slaba">Celkem k úhradě</span><span class="suma">${suma(f.celkom)} Kč</span></div>
+    <table>
+      <thead><tr><th style="width:52%">Označení dodávky</th><th>Počet m. j.</th><th>Cena za m. j.</th><th>Celkem</th></tr></thead>
+      <tbody><tr>
+        <td>${esc(f.popis)}</td>
+        <td class="n">${suma(f.ks)}</td>
+        <td class="n">${suma(f.cena)}</td>
+        <td class="n">${suma(f.celkom)}</td>
+      </tr></tbody>
+    </table>
 
-  <div class="platba">
-    ${qrSvg(platba)}
-    <div>
-      <div class="nadpis">QR platba</div>
-      <div class="slaba" style="max-width:80mm">Načtěte kód v mobilním bankovnictví — částka, účet
-      i variabilní symbol se předvyplní.</div>
-      ${f.poznamka ? `<div style="margin-top:4mm">${esc(f.poznamka)}</div>` : ""}
+    <div class="suma">
+      <div style="font-size:9.5pt;line-height:1.6">
+        <div><span class="stitok">Účet</span> <b>${esc(DODAVATEL.ucet)}</b></div>
+        <div><span class="stitok">VS</span> <b class="n">${esc(f.cislo)}</b> ·
+             <span class="stitok">Splatnost</span> <b>${den(f.splatnost)}</b></div>
+      </div>
+      <div style="text-align:right">
+        <div class="stitok">Celkem k úhradě</div>
+        <div style="font-size:21pt;font-weight:800" class="n">${suma(f.celkom)} Kč</div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:6mm;align-items:flex-start">
+      <div class="qr">${qrSvg(platba)}</div>
+      <div style="max-width:70mm">
+        <div class="stitok" style="margin-bottom:1.5mm">QR platba</div>
+        <div style="font-size:9pt;line-height:1.5;color:${B.slaba}">Načtěte kód v mobilním bankovnictví —
+        částka, účet i variabilní symbol se předvyplní.</div>
+        ${f.poznamka ? `<div style="font-size:9.5pt;margin-top:3mm">${esc(f.poznamka)}</div>` : ""}
+      </div>
+    </div>
+
+    <div style="position:absolute;left:14mm;right:14mm;bottom:10mm;font-size:8pt;color:${B.slabsia}">
+      ${esc(DODAVATEL.meno)} · ${esc(DODAVATEL.email)} · ${esc(DODAVATEL.telefon)}
     </div>
   </div>
-
-  <div class="patka">
-    <span>${esc(DODAVATEL.meno)} · IČ ${esc(DODAVATEL.ico)} · ${esc(DODAVATEL.dph)}</span>
-    <span>Vystaveno v Kokpitu</span>
-  </div>
+</div>
 </body>
 </html>`;
 }

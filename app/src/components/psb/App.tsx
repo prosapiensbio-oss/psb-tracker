@@ -2624,7 +2624,7 @@ function skupinaFaktur(
             onFaktura={(p) => { setFakturaPredvolba(p); setVzasSub("faktury"); setActive("vzas"); }}
           />
         )}
-        {active === "workspace" && <Workspace clients={clients} mena={Object.keys(clients)} ktoSom={ktoSom} data={data} kalUdalosti={kalUdalosti} btcSats={btcSatsKlienti} btc={{ platby: btcPlatby, kurz: btcKurz.kurz, kedy: btcKurz.kedy }} otvorKlienta={workspaceKlient} onOtvoreny={() => setWorkspaceKlient(null)} onOverride={(m, k, v) => actions.setOverride(m, k as never, v)} />}
+        {active === "workspace" && <Workspace clients={clients} mena={Object.keys(clients)} ktoSom={ktoSom} data={data} kalUdalosti={kalUdalosti} btcSats={btcSatsKlienti} btc={{ platby: btcPlatby, kurz: btcKurz.kurz, kedy: btcKurz.kedy }} otvorKlienta={workspaceKlient} onOtvoreny={() => setWorkspaceKlient(null)} onOverride={(m, k, v) => actions.setOverride(m, k as never, v)} onFaktura={(p) => { setFakturaPredvolba(p); setVzasSub("faktury"); setActive("vzas"); }} />}
 
         {active === "jarvis" && (
           <JarvisOkno
