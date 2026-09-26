@@ -8,6 +8,7 @@ import { typZNazvu } from "../../lib/psb/kalendar";
 import { casUdalosti, nejednoznacneMena, vyberMapu, type Mapa } from "../../lib/psb/kalendarMena";
 import { porovnajTyzdne } from "../../lib/psb/porovnanieDochadzky";
 import { odkedyKalendar, porovnajMesiace } from "../../lib/psb/porovnanieMesiacov";
+import { porovnajDvojmo } from "../../lib/psb/dvojityVypocet";
 import { citajIcal } from "../../lib/psb/ical";
 import { ohlasitZmenu, sparujZmeny } from "../../lib/psb/kalendarZmeny";
 import { chybaZdroja, NEDOKONCENE, vyberZdroj, type ZdrojSPokusom } from "../../lib/psb/kalendarZdroje";
@@ -407,6 +408,60 @@ export const Route = createFileRoute("/api/kalendar")({
          * Existujúce riadky sa neprepisujú: ak už udalosť v tabuľke je,
          * nechá sa tak aj s naučeným menom klienta.
          */
+        /**
+         * DVOJITÝ VÝPOČET — to isté číslo z exportu aj z vlastných dát.
+         *
+         * Agreguje SQL, nie appka: sťahovať 3 700 sedení do prehliadača kvôli
+         * štyrom číslam by bolo plytvanie. Porovnanie a hranice zhody robí
+         * `dvojityVypocet.ts`, aby sa to dalo otestovať.
+         */
+        if (akcia === "dvojmo") {
+          const [exp, kal, plat, doExportu] = await DB.batch([
+            DB.prepare(
+              `SELECT substr(date,1,7) mesiac, COUNT(*) treningy, SUM(duration_min)/60.0 hodiny,
+                      COUNT(DISTINCT client_name) klienti
+               FROM sessions GROUP BY 1 ORDER BY 1 DESC LIMIT 8`,
+            ),
+            DB.prepare(
+              `SELECT substr(zaciatok,1,7) mesiac, COUNT(*) treningy,
+                      SUM((julianday(koniec) - julianday(zaciatok)) * 24) hodiny,
+                      COUNT(DISTINCT klient) klienti
+               FROM kal_udalosti
+               WHERE zmizla_at IS NULL AND typ IN ('trening','uvodny')
+               GROUP BY 1 ORDER BY 1 DESC LIMIT 8`,
+            ),
+            // Peniaze z oboch strán: čo prišlo podľa PTmindera a čo podľa
+            // vlastnej knihy (banka + hotovosť).
+            DB.prepare(
+              `SELECT mesiac, SUM(export) export, SUM(vlastne) vlastne FROM (
+                 SELECT substr(date,1,7) mesiac, COALESCE(amount_czk,0) export, 0 vlastne FROM payments
+                 UNION ALL
+                 SELECT substr(datum,1,7) mesiac, 0 export, suma_czk vlastne FROM platby WHERE zrusene_at IS NULL
+               ) GROUP BY mesiac ORDER BY mesiac DESC LIMIT 8`,
+            ),
+            DB.prepare("SELECT MAX(substr(date,1,10)) den FROM sessions"),
+          ]);
+          type R = { mesiac: string; treningy: number; hodiny: number; klienti: number };
+          type P = { mesiac: string; export: number; vlastne: number };
+          const peniaze = new Map((plat.results as unknown as P[] || []).map((r) => [r.mesiac, r]));
+          const stranu = (rs: R[], kto: "export" | "vlastne") => rs.map((r) => ({
+            mesiac: r.mesiac,
+            treningy: Number(r.treningy) || 0,
+            hodiny: Math.round((Number(r.hodiny) || 0) * 10) / 10,
+            klienti: Number(r.klienti) || 0,
+            trzby: Math.round(Number(peniaze.get(r.mesiac)?.[kto]) || 0),
+          }));
+          return Response.json({
+            ok: true,
+            exportDo: String((doExportu.results as { den: string }[] || [])[0]?.den || "").slice(0, 10),
+            mesiace: porovnajDvojmo(
+              stranu((exp.results as unknown as R[]) || [], "export"),
+              stranu((kal.results as unknown as R[]) || [], "vlastne"),
+              String((doExportu.results as { den: string }[] || [])[0]?.den || "").slice(0, 10),
+            ),
+          }, { headers: { "cache-control": "no-store" } });
+        }
+
         /**
          * MERADLO: kalendár proti exportu, mesiac po mesiaci. Kým sa
          * rozchádzajú, grafy na kalendári stáť nemôžu.

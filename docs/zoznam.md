@@ -46,7 +46,15 @@ Stav k **26. 9. 2026**.
   `RRRRNNNN`, posledná 20260038. Dnes v iDokladi. Faktúra má vzniknúť pri
   balíčku, niesť QR platbu a odísť mailom.
 
-- **Grafy na vlastných dátach, nie na reportoch** (Jerry, 26. 9.). Cieľ:
+- **Grafy na vlastných dátach, nie na reportoch** (Jerry, 26. 9.). Meradlo
+  beží v Prechode („Vlastné dáta proti exportu", dvojitý výpočet za posledné
+  tri mesiace). Stav k 26. 9. — august, jediný uzavretý mesiac:
+  tréningy 186/183, hodiny 186/183, klienti 54/54 sedia; **peniaze
+  199 036 / 83 940 nie**. Chýbajú DVE veci, obe známe:
+  (a) staré názvy v kalendári nie sú namapované (júl −21 tréningov pri 32
+  nezaradených), (b) z bankových príjmov je priradená polovica — august 32
+  príjmov za 180 817 Kč, priradených 16. Banka teda peniaze má, len nevie,
+  komu patria. Cieľ:
   dochádzka a tréningy z Google kalendára, peniaze z Fia a vlastných platieb;
   export z PTmindera beží súbežne a porovnáva sa. Prvý krok hotový —
   doplnenie histórie z iCalu a mesačné porovnanie v Prechode. Merané 26. 9.:

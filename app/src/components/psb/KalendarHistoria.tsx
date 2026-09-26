@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { C, mix } from "../../lib/psb/theme";
+import type { MesiacDvojmo } from "../../lib/psb/dvojityVypocet";
 import type { MesiacPorovnanie } from "../../lib/psb/porovnanieMesiacov";
 import { Card, H3, Info } from "./ui";
 
@@ -25,6 +26,9 @@ const ROKY = [new Date().getFullYear(), new Date().getFullYear() - 1, new Date()
 
 export function KalendarHistoria() {
   const [m, setM] = useState<MesiacPorovnanie[] | null>(null);
+  /** Dvojitý výpočet — to isté číslo z exportu aj z vlastných dát. */
+  const [dvojmo, setDvojmo] = useState<MesiacDvojmo[] | null>(null);
+  const [exportDo, setExportDo] = useState("");
   const [od, setOd] = useState("");
   const [pracujem, setPracujem] = useState("");
   const [hlaska, setHlaska] = useState("");
@@ -37,6 +41,12 @@ export function KalendarHistoria() {
       body: JSON.stringify({ akcia: "porovnaj-mesiace" }),
     }).then((r) => r.json()).catch(() => null)) as Odpoved | null;
     if (j?.ok) { setM(j.mesiace || []); setOd(j.od || ""); }
+    const d = (await fetch("/api/kalendar", {
+      method: "POST", credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ akcia: "dvojmo" }),
+    }).then((r) => r.json()).catch(() => null)) as { ok?: boolean; mesiace?: MesiacDvojmo[]; exportDo?: string } | null;
+    if (d?.ok) { setDvojmo(d.mesiace || []); setExportDo(d.exportDo || ""); }
   }, []);
   useEffect(() => { void nacitaj(); }, [nacitaj]);
 
@@ -107,6 +117,44 @@ export function KalendarHistoria() {
       {chyba && <div style={{ fontSize: 12.5, color: C.red, marginBottom: 8 }}>{chyba}</div>}
       {hlaska && <div style={{ fontSize: 12.5, color: C.green, marginBottom: 8 }}>{hlaska}</div>}
 
+      {dvojmo && dvojmo.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: 11.5, color: C.textMuted, lineHeight: 1.55, marginBottom: 10 }}>
+            To isté číslo dvoma cestami: vľavo to, čo appka počíta dnes z exportu, vpravo to, čo si
+            dopočíta sama z kalendára a z vlastnej knihy platieb. Prebiehajúci mesiac sa nehodnotí —
+            export chodí raz týždenne a je v ňom vždy pozadu{exportDo ? ` (siaha po ${exportDo})` : ""}.
+          </div>
+          {dvojmo.map((mes) => (
+            <div key={mes.mesiac} style={{ marginBottom: 10, padding: "9px 11px", borderRadius: 10, border: `1px solid ${mix(mes.neuplny ? C.border : mes.sedi ? C.green : C.red, mes.neuplny ? 90 : 45)}` }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 6 }}>
+                <b style={{ fontSize: 13, color: C.text }}>{mes.mesiac}</b>
+                <span style={{ fontSize: 11.5, color: mes.neuplny ? C.textDim : mes.sedi ? C.green : C.red }}>
+                  {mes.neuplny ? "prebieha — nehodnotí sa" : mes.sedi ? "sedí" : "rozchádza sa"}
+                </span>
+              </div>
+              <div style={{ display: "flex", gap: 10, fontSize: 10, fontWeight: 700, color: C.textDim, letterSpacing: 0.6, paddingBottom: 3 }}>
+                <span style={{ flex: 1 }}></span>
+                <span style={{ width: 78, textAlign: "right" }}>EXPORT</span>
+                <span style={{ width: 78, textAlign: "right" }}>VLASTNÉ</span>
+                <span style={{ width: 86, textAlign: "right" }}>ROZDIEL</span>
+              </div>
+              {mes.riadky.map((r) => (
+                <div key={r.metrika} style={{ display: "flex", gap: 10, fontSize: 12.5, padding: "3px 0", fontVariantNumeric: "tabular-nums" }}>
+                  <span style={{ flex: 1, color: C.textMuted }}>{r.nazov}</span>
+                  <span style={{ width: 78, textAlign: "right", color: C.text }}>{r.export.toLocaleString("sk-SK")}{r.jednotka ? ` ${r.jednotka}` : ""}</span>
+                  <span style={{ width: 78, textAlign: "right", color: C.text }}>{r.vlastne.toLocaleString("sk-SK")}{r.jednotka ? ` ${r.jednotka}` : ""}</span>
+                  <span style={{ width: 86, textAlign: "right", color: mes.neuplny ? C.textDim : r.sedi ? C.green : C.red, fontWeight: 600 }}>
+                    {r.rozdiel > 0 ? "+" : ""}{r.rozdiel.toLocaleString("sk-SK")}
+                    {r.percent ? <span style={{ fontWeight: 400, color: C.textDim }}> · {r.percent > 0 ? "+" : ""}{r.percent} %</span> : null}
+                  </span>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div style={{ fontSize: 10, fontWeight: 700, color: C.textDim, letterSpacing: 0.6, marginBottom: 4 }}>POČTY TRÉNINGOV PO MESIACOCH</div>
       <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
         <div style={{ display: "flex", gap: 10, fontSize: 10, fontWeight: 700, color: C.textDim, letterSpacing: 0.6, paddingBottom: 4, borderBottom: `1px solid ${mix(C.border, 60)}` }}>
           <span style={{ width: 62 }}>MESIAC</span>
