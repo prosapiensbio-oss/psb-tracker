@@ -81,3 +81,18 @@ describe("značka na doklade", () => {
     expect(h).not.toContain("fonts.googleapis");
   });
 });
+
+describe("faktúra je JEDNA strana", () => {
+  it("list je nižší než strana A4", () => {
+    // Jerry, 26. 9. 2026: „prečo sú tam dve strany, z toho jedna prázdna?"
+    // Pri presnej výške 297 mm sa dokument zaokrúhli na 1123 px proti
+    // 1122,52 px strany a tlač založí ďalší, prázdny list.
+    const h = fakturaDocument(f);
+    expect(h).toContain("height: 296mm");
+    expect(h).not.toContain("297mm");
+  });
+
+  it("za listom už nič nenasleduje", () => {
+    expect(fakturaDocument(f)).toContain("page-break-after: avoid");
+  });
+});

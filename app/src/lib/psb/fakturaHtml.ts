@@ -68,7 +68,16 @@ export function fakturaDocument(f: Faktura): string {
   * { box-sizing: border-box; }
   body { margin: 0; font-family: "Agrandir", "Helvetica Neue", -apple-system, "Segoe UI", Roboto, sans-serif;
          color: ${B.text}; -webkit-font-smoothing: antialiased; }
-  .list { width: 210mm; min-height: 297mm; margin: 0 auto; background: #fff; display: flex; }
+  /**
+   * O MILIMETER NIŽŠIE, NEŽ JE STRANA.
+   *
+   * Pri presných 297 mm vyliezol z tlače druhý, prázdny list. Výška
+   * v milimetroch sa prepočíta na 1122,52 px, ale dokument sa zaokrúhli
+   * nahor na 1123 — a tých pol pixela stačí, aby tlač založila ďalšiu
+   * stranu. Milimeter rezervy nie je na papieri vidieť.
+   */
+  .list { width: 210mm; height: 296mm; margin: 0 auto; background: #fff; display: flex; overflow: hidden; }
+  @media print { html, body { height: auto; } .list { break-after: avoid; page-break-after: avoid; } }
   /* Pásik so značkou. Jerry si ho vybral 26. 9. 2026 z piatich návrhov:
      „vyhráva 4, zelený pásik." Vyzerá to ako hlavičkový papier, na ktorom je
      faktúra len obsah. */
