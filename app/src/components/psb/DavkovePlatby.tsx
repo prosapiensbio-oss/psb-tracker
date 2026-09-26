@@ -32,6 +32,8 @@ type Navrh = {
 
 const ZDROJ: Record<string, string> = {
   naucene: "už potvrdené pravidlo",
+  faktura: "variabilný symbol sedí s faktúrou",
+  firma: "firma alebo IČO klienta",
   meno: "meno v platbe",
   suma: "suma a deň sedia s PTminderom",
 };

@@ -66,7 +66,7 @@ export const Route = createFileRoute("/api/platby")({
           return Response.json({ ok: true, platby: r.results || [] });
         }
 
-        const [vlastne, fio, mapa, nieKlient, mena, pt, horizont] = await DB.batch([
+        const [vlastne, fio, mapa, nieKlient, mena, pt, horizont, faktury, firmy] = await DB.batch([
           DB.prepare("SELECT id, klient, datum, suma_czk, sposob, fio_id, poznamka, zrusene_at FROM platby ORDER BY datum DESC"),
           DB.prepare("SELECT id, date, amount_czk, counterparty, note, typ FROM fio_transactions WHERE amount_czk > 0 ORDER BY date DESC"),
           DB.prepare("SELECT vzor, klient FROM platba_mapovanie"),
@@ -74,6 +74,11 @@ export const Route = createFileRoute("/api/platby")({
           DB.prepare("SELECT DISTINCT client_name FROM sessions WHERE date >= date('now','-400 days')"),
           DB.prepare("SELECT client_name, date, amount_czk, payment_method FROM payments"),
           DB.prepare("SELECT MAX(substr(date,1,10)) den FROM sessions"),
+          // Faktúry a firmy klientov — dva najtvrdšie dôkazy v texte platby.
+          // Číslo faktúry chodí ako variabilný symbol; firma je fakturačný
+          // údaj KLIENTA, nie cudzia strana (Jerry, 26. 9. 2026).
+          DB.prepare("SELECT cislo, klient FROM vydane_faktury WHERE storno_at IS NULL"),
+          DB.prepare("SELECT klient, firma, ico FROM klient_fakturacia WHERE firma <> '' OR ico <> ''"),
         ]);
 
         const platby = ((vlastne.results || []) as unknown as PlatbaRiadok[]);
@@ -104,6 +109,8 @@ export const Route = createFileRoute("/api/platby")({
           new Set(((nieKlient.results || []) as unknown as { fio_id: string }[]).map((x) => x.fio_id)),
           ((mena.results || []) as unknown as { client_name: string }[]).map((x) => x.client_name),
           ptPlatby,
+          ((faktury.results || []) as unknown as { cislo: string; klient: string }[]).filter((f) => f.cislo),
+          ((firmy.results || []) as unknown as { klient: string; firma: string; ico: string }[]),
         );
         const celkomNepriradenych = vsetkyNepriradene.length;
 

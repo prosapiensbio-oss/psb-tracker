@@ -156,8 +156,20 @@ export type NepriradenaPlatba = {
   /** Vyzerá to na platbu klienta? `false` = vrátka z obchodu, vklad, kaucia. */
   klientsky: boolean;
   /** Odkiaľ je návrh: aby človek vedel, čomu verí. */
-  zdrojNavrhu: "naucene" | "meno" | "suma" | "";
+  zdrojNavrhu: "naucene" | "faktura" | "firma" | "meno" | "suma" | "";
 };
+
+/** Vystavená faktúra — na párovanie podľa variabilného symbolu. */
+export type FakturaVzor = { cislo: string; klient: string };
+
+/**
+ * Firma, na ktorú sa klientovi fakturuje.
+ *
+ * Jerry, 26. 9. 2026: „vnímaj to skôr tak, že k menu sa priraďuje IČO, a nie
+ * názov." Klient je človek; firma a IČO sú jeho fakturačný údaj. Platba
+ * z firmy teda patrí tomu človeku — nie je to cudzia platba.
+ */
+export type FirmaKlienta = { klient: string; firma: string; ico: string };
 
 /**
  * JE TO PRÍJEM OD KLIENTA, ALEBO NIEČO INÉ?
@@ -219,6 +231,47 @@ export function vyzeraNaKlienta(r: Pick<FioRiadok, "counterparty" | "note" | "ty
  * klienta", a vlastné vklady hotovosti (tie do banky prichádzajú zo zošita
  * a započítať ich druhýkrát by zdvojilo tržbu).
  */
+/**
+ * Klient podľa variabilného symbolu v texte platby.
+ *
+ * Číslo faktúry je v príkaze ako VS a banka ho dá do správy — je to najtvrdší
+ * dôkaz, aký v platbe je. Silnejší než meno: firma zaplatí za zamestnanca
+ * a v texte je meno firmy, nie klienta.
+ */
+export function klientPodlaFaktury(text: string, faktury: FakturaVzor[]): string[] {
+  if (!faktury.length) return [];
+  const cisla = new Set(text.match(/\d{6,10}/g) || []);
+  if (!cisla.size) return [];
+  const najdene = faktury.filter((f) => cisla.has(f.cislo)).map((f) => f.klient);
+  return [...new Set(najdene)];
+}
+
+/**
+ * Klient podľa firmy alebo IČO v texte platby.
+ *
+ * „FSH Devices s.r.o." nie je cudzia platba — je to klient, ktorý si nechal
+ * faktúru vystaviť na svoju firmu. Appka to vie z jeho fakturačných údajov.
+ */
+export function klientPodlaFirmy(text: string, firmy: FirmaKlienta[]): string[] {
+  if (!firmy.length) return [];
+  // Bodky a čiarky preč: „FSH Devices s.r.o." v banke býva ako „FSH DEVICES
+  // S R O" alebo úplne bez právnej formy. Bez tohto kroku sa nenašlo nič.
+  const holy = (x: string) => normName(x).replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+  const bezFormy = (x: string) => holy(x)
+    .replace(/\b(s r o|sro|a s|as|spol|k s|z s|ltd|gmbh|zs|os)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const t = holy(text);
+  const cisla = new Set(text.match(/\d{6,10}/g) || []);
+  const najdene = firmy.filter((f) => {
+    if (f.ico && cisla.has(f.ico)) return true;
+    if (!f.firma) return false;
+    const jadro = bezFormy(f.firma);
+    return jadro.length >= 4 && t.includes(jadro);
+  }).map((f) => f.klient);
+  return [...new Set(najdene)];
+}
+
 export function nepriradene(
   fio: FioRiadok[],
   platby: Platba[],
@@ -227,6 +280,10 @@ export function nepriradene(
   menaKlientov: string[],
   /** Platby z PTmindera — na spárovanie podľa sumy a dňa, keď meno chýba. */
   ptPlatby: PtPlatba[] = [],
+  /** Vystavené faktúry — variabilný symbol je najtvrdší dôkaz. */
+  faktury: FakturaVzor[] = [],
+  /** Firmy klientov — platba z firmy patrí človeku, ktorý za ňou stojí. */
+  firmy: FirmaKlienta[] = [],
 ): NepriradenaPlatba[] {
   const uz = new Set(platby.filter((p) => !p.zruseneAt && p.fioId).map((p) => p.fioId as string));
   const out: NepriradenaPlatba[] = [];
@@ -238,12 +295,23 @@ export function nepriradene(
     // sú už v zošite a v banke by sa započítali druhýkrát.
     if (/vklad do bankomatu|vklad hotovosti/i.test(text)) continue;
     const naucene = mapovanie[vzorPlatby(r)];
-    // Poradie dôvery: čo už človek potvrdil → meno v texte → suma a deň
-    // z PTmindera. Miešať sa nesmú: keď meno sedí, je zbytočné pridávať
-    // k nemu niekoho, kto má len rovnakú sumu.
-    const podlaMena = naucene ? [] : najdiKlientaVTexte(text, menaKlientov);
-    const podlaSumy = naucene || podlaMena.length ? [] : parujPodlaSumy(r, ptPlatby);
-    const kandidati = naucene ? [naucene] : podlaMena.length ? podlaMena : podlaSumy;
+    /**
+     * PORADIE DÔVERY, a miešať sa nesmie: čo už človek potvrdil → číslo
+     * faktúry (variabilný symbol) → firma alebo IČO klienta → meno v texte →
+     * suma a deň z PTmindera.
+     *
+     * Faktúra a firma sú vyššie než meno zámerne: keď platí firma za
+     * zamestnanca, v texte je meno firmy a meno klienta tam nie je vôbec.
+     * Suma zostáva posledná — je to zhoda čísla, nie dôkaz.
+     */
+    const podlaFaktury = naucene ? [] : klientPodlaFaktury(text, faktury);
+    const podlaFirmy = naucene || podlaFaktury.length ? [] : klientPodlaFirmy(text, firmy);
+    const podlaMena = naucene || podlaFaktury.length || podlaFirmy.length ? [] : najdiKlientaVTexte(text, menaKlientov);
+    const podlaSumy = naucene || podlaFaktury.length || podlaFirmy.length || podlaMena.length ? [] : parujPodlaSumy(r, ptPlatby);
+    const kandidati = naucene ? [naucene]
+      : podlaFaktury.length ? podlaFaktury
+        : podlaFirmy.length ? podlaFirmy
+          : podlaMena.length ? podlaMena : podlaSumy;
     out.push({
       fioId: r.id,
       datum: r.date.slice(0, 10),
@@ -253,7 +321,10 @@ export function nepriradene(
       // Naučené priradenie prebíja odhad: keď už niekto raz povedal, že tento
       // odosielateľ je klient, appka to nemá spochybňovať.
       klientsky: !!naucene || vyzeraNaKlienta(r),
-      zdrojNavrhu: naucene ? "naucene" : podlaMena.length ? "meno" : podlaSumy.length ? "suma" : "",
+      zdrojNavrhu: naucene ? "naucene"
+        : podlaFaktury.length ? "faktura"
+          : podlaFirmy.length ? "firma"
+            : podlaMena.length ? "meno" : podlaSumy.length ? "suma" : "",
     });
   }
   return out.sort((a, b) => b.datum.localeCompare(a.datum));

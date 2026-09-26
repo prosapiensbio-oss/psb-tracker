@@ -1,7 +1,7 @@
 // Platby z výpisu banky — posledná tretina odchodu od PTmindera.
 import { describe, expect, it } from "bun:test";
 
-import { najdiKlientaVTexte, nepriradene, porovnajPlatby, smieSaZapamatat, textPlatby, vzorPlatby, type FioRiadok, type Platba, vyzeraNaKlienta, parujPodlaSumy } from "./platbyEvidencia";
+import { klientPodlaFaktury, klientPodlaFirmy, najdiKlientaVTexte, nepriradene, porovnajPlatby, smieSaZapamatat, textPlatby, vzorPlatby, type FioRiadok, type Platba, vyzeraNaKlienta, parujPodlaSumy } from "./platbyEvidencia";
 
 const MENA = [
   "Natalia Peckova", "Josef Šnirych", "Natalia Krivdova", "Barbora Vankova",
@@ -236,5 +236,52 @@ describe("krstné meno ako druhý pokus", () => {
   it("vrátka nie je platba klienta", () => {
     expect(vyzeraNaKlienta({ counterparty: "Vraciam za potraviny · Terézia Zaťková", note: "", typ: "Okamžitá platba" })).toBe(false);
     expect(vyzeraNaKlienta({ counterparty: "vratka kauce · KATEŘINA KONVIČKOVÁ", note: "", typ: "Okamžitá platba" })).toBe(false);
+  });
+});
+
+describe("platba od firmy patrí klientovi", () => {
+  /**
+   * Jerry, 26. 9. 2026: „tá platba patrí Kráľovi, ktorý to fakturuje na
+   * svoju firmu… vnímaj to skôr tak, že k menu sa priraďuje IČO, a nie
+   * názov." Klient je človek; firma je jeho fakturačný údaj.
+   */
+  const firmy = [
+    { klient: "Jan Kral", firma: "FSH Devices s.r.o.", ico: "11642629" },
+    { klient: "Katarína Tchuřová", firma: "Heidelberg Materials Digital Hub Brno, s.r.o.", ico: "06025811" },
+  ];
+
+  it("nájde klienta podľa mena firmy aj bez právnej formy", () => {
+    expect(klientPodlaFirmy("FSH Devices platba", firmy)).toEqual(["Jan Kral"]);
+    expect(klientPodlaFirmy("FSH DEVICES S.R.O. · faktura", firmy)).toEqual(["Jan Kral"]);
+  });
+
+  it("nájde klienta podľa IČO", () => {
+    expect(klientPodlaFirmy("prevod 11642629 uhrada", firmy)).toEqual(["Jan Kral"]);
+  });
+
+  it("cudziu firmu nepriradí", () => {
+    expect(klientPodlaFirmy("Alza.cz a.s. vratka", firmy)).toEqual([]);
+  });
+
+  it("variabilný symbol trafí klienta cez faktúru", () => {
+    // Najtvrdší dôkaz: číslo faktúry je v príkaze ako VS.
+    const faktury = [{ cislo: "20261001", klient: "Anna Nová" }];
+    expect(klientPodlaFaktury("20261001 MGR. FILIP STRANAVSKY", faktury)).toEqual(["Anna Nová"]);
+    expect(klientPodlaFaktury("bez cisla", faktury)).toEqual([]);
+    expect(klientPodlaFaktury("20269999 ine cislo", faktury)).toEqual([]);
+  });
+
+  it("faktúra prebíja meno v texte aj sumu", () => {
+    const fio = [{ id: "f1", date: "2026-09-16", amount_czk: 6990, counterparty: "20261001 MGR. FILIP STRANAVSKY", note: "", typ: "" }];
+    const r = nepriradene(fio, [], {}, new Set(), ["Filip Stranavsky"], [], [{ cislo: "20261001", klient: "Anna Nová" }], firmy);
+    expect(r[0].kandidati).toEqual(["Anna Nová"]);
+    expect(r[0].zdrojNavrhu).toBe("faktura");
+  });
+
+  it("firma prebíja odhad zo sumy", () => {
+    const fio = [{ id: "f2", date: "2026-09-16", amount_czk: 6990, counterparty: "FSH Devices s.r.o.", note: "", typ: "" }];
+    const r = nepriradene(fio, [], {}, new Set(), [], [{ client: "Niekto Iny", date: "2026-09-16", amount: 6990 }] as never, [], firmy);
+    expect(r[0].kandidati).toEqual(["Jan Kral"]);
+    expect(r[0].zdrojNavrhu).toBe("firma");
   });
 });
