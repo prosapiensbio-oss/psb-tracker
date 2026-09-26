@@ -2,6 +2,8 @@ import { oznam } from "../../lib/psb/obnovaSignal";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { dlhKlienta } from "../../lib/psb/dlhKlienta";
+import { VypisHodinPanel } from "./VypisHodinPanel";
+import { zaciatokBalicka } from "../../lib/psb/vypisHodin";
 import { normName, fmtCZK, fmtDMY } from "../../lib/psb/format";
 import { jeBeta } from "../../lib/psb/beta";
 import { menoKluc } from "../../lib/psb/compute";
@@ -177,6 +179,44 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
     () => (meno ? osCasuKlienta(meno, { sessions: data.sessions as never, payments: data.payments as never, packages: (data.packages || []) as never, kalUdalosti }) : []),
     [meno, data.sessions, data.payments, data.packages, kalUdalosti],
   );
+
+  /**
+   * Stav hodín pri každom riadku osi.
+   *
+   * Kľúčom je sama udalosť, nie index: os sa pri filtroch („peniaze",
+   * „balíčky") preosieva a index by po prvom filtri ukazoval inde.
+   */
+  /** Mail klienta z fakturačných údajov — predvyplní sa do výpisu. */
+  const [kontaktMail, setKontaktMail] = useState("");
+  useEffect(() => {
+    let zive = true;
+    void fetch("/api/vydane-faktury", { credentials: "same-origin" })
+      .then((r) => r.json())
+      .then((j) => {
+        if (!zive) return;
+        const u = (j?.udaje || []).find((x: { klient: string }) => x.klient === meno);
+        setKontaktMail(u?.email || "");
+      })
+      .catch(() => null);
+    return () => { zive = false; };
+  }, [meno]);
+
+  const stavy = useMemo(() => {
+    const m = new Map<(typeof os)[number], { zmena: number; zostatok: number }>();
+    // Až od posledného balíčka: pred ním appka nevie, s koľkými hodinami
+    // klient do obdobia vstupoval (staré členstvá PTminder neexportuje),
+    // a bežiaci súčet od začiatku ukazoval mínusy — Anetka −37 h.
+    const kotva = zaciatokBalicka(os);
+    const odNajstarsieho = [...os].sort((a, b) => a.den.localeCompare(b.den));
+    let bezi = 0;
+    for (const u of odNajstarsieho) {
+      if (kotva && u.den < kotva) continue;
+      const zmena = u.druh === "balicekOd" ? (u.hodin || 0) : u.druh === "trening" ? -1 : 0;
+      bezi += zmena;
+      m.set(u, { zmena, zostatok: bezi });
+    }
+    return m;
+  }, [os]);
 
   const mojeBalicky = useMemo(
     () => balicky.filter((b) => normName(b.klient) === normName(meno) && !b.zrusene_at).sort((a, b) => b.platnost_od.localeCompare(a.platnost_od)),
@@ -1263,7 +1303,13 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
             .filter((x) => filter === "vsetko"
               || (filter === "peniaze" && x.druh === "platba")
               || (filter === "balicky" && (x.druh === "balicekOd" || x.druh === "balicekDo")))
-            .map((x, i) => <RiadokOsi key={i} u={x} />)}
+            .map((x, i) => <RiadokOsi key={i} u={x} stav={stavy.get(x)} />)}
+
+          {/* Výpis na poslanie klientovi — pod zoznamom, nie nad ním: najprv
+              sa človek pozrie, potom sa rozhodne posielať. */}
+          {filter === "vsetko" && os.length > 0 && (
+            <VypisHodinPanel meno={meno} os={os} email={kontaktMail} />
+          )}
 
           {filter === "poznamky" && (
             <>
@@ -1312,7 +1358,24 @@ function doNarodenin(narodeniny: string): number | null {
   return Math.round((d - dnesUTC) / 86400000);
 }
 
-function RiadokOsi({ u }: { u: ReturnType<typeof osCasuKlienta>[number] }) {
+/**
+ * Stav hodín pri riadku.
+ *
+ * Jerry, 26. 9. 2026: „chcem vedľa tréningov vidieť aj počty hodín." Os času
+ * hovorí, ČO sa stalo; toto k tomu pripisuje jediné číslo, ktoré pri spore
+ * chýba — koľko hodín po tom riadku zostalo.
+ */
+function StavHodin({ zmena, zostatok }: { zmena?: number; zostatok?: number }) {
+  if (zostatok === undefined) return null;
+  return (
+    <span style={{ minWidth: 92, textAlign: "right", fontSize: 11.5, fontVariantNumeric: "tabular-nums", color: C.textDim }}>
+      {zmena ? <b style={{ color: zmena > 0 ? C.green : C.textMuted }}>{zmena > 0 ? `+${zmena}` : zmena} h</b> : null}
+      <span style={{ marginLeft: zmena ? 7 : 0 }}>= {zostatok} h</span>
+    </span>
+  );
+}
+
+function RiadokOsi({ u, stav }: { u: ReturnType<typeof osCasuKlienta>[number]; stav?: { zmena: number; zostatok: number } }) {
   if (u.druh === "balicekOd") {
     return (
       <div style={{ ...riadok, background: mix(C.accent, 10), borderRadius: 7, padding: "8px 9px", marginTop: 4, border: "none" }}>
@@ -1324,6 +1387,7 @@ function RiadokOsi({ u }: { u: ReturnType<typeof osCasuKlienta>[number] }) {
             {u.zaplatene ? ` · ${fmtCZK(u.zaplatene)}` : ""}
           </span>
         </span>
+        <StavHodin zmena={stav?.zmena} zostatok={stav?.zostatok} />
       </div>
     );
   }
@@ -1336,6 +1400,7 @@ function RiadokOsi({ u }: { u: ReturnType<typeof osCasuKlienta>[number] }) {
         <span style={stlpecDen}>{fmtDMY(u.den)}</span>
         <span style={{ flex: 1, color: C.green }}>zaplatil {u.metoda === "bank" ? "prevodom" : u.metoda === "cash" ? "hotovosť" : "iné"}</span>
         <span style={{ color: C.green, fontWeight: 700 }}>{fmtCZK(u.suma)}</span>
+        <StavHodin zostatok={stav?.zostatok} />
       </div>
     );
   }
@@ -1344,6 +1409,7 @@ function RiadokOsi({ u }: { u: ReturnType<typeof osCasuKlienta>[number] }) {
       <span style={stlpecDen}>{fmtDMY(u.den)}</span>
       <span style={{ flex: 1, color: C.textMuted }}>tréning{u.cas ? ` ${u.cas}` : ""}{u.trener ? ` · ${u.trener}` : ""}</span>
       {u.zKalendara && <span style={{ fontSize: 11, color: C.blue }}>z kalendára</span>}
+      <StavHodin zmena={stav?.zmena} zostatok={stav?.zostatok} />
     </div>
   );
 }

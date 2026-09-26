@@ -1246,3 +1246,25 @@ ten istý zoznam číta viac kariet na jednej obrazovke.
 over, či nečítaš z inej mapy/iného filtra a či odpoveď nie je z keše. 25. 9.
 ma to stálo štyri kolá — bublina sa naozaj presúvala, len som sa pozeral na
 mapu, ktorú mi pamätal `localStorage`, a nie na tú, do ktorej appka písala.
+
+## Bežiaci súčet nad neúplným zdrojom potrebuje kotvu
+
+26. 9. 2026 pribudol v profile klienta stĺpec so zostatkom hodín pri každom
+riadku osi času a výpis na poslanie klientovi. Prvá verzia ho počítala od
+úplného začiatku a Anetke Přinosilovej vyšlo **−37 h**, hoci jej zostáva 15.
+Príčina nie je v súčte: os času nesie tréningy od roku 2025, ale balíčky len
+tie, ktoré PTminder exportuje DNES. Stará členstvá v appke nie sú, takže sa
+roky tréningov odčítali od nuly.
+
+- **Zostatok sa počíta od posledného balíčka** (`zaciatokBalicka`), staršie
+  riadky sa nesmú ani zrátať do počiatočného stavu — len ignorovať. Číslo tak
+  vychádza presne to, ktoré appka hovorí inde („15 h zostáva“).
+- **Obdobie v hlavičke nesmie tvrdiť viac, než výpis pokrýva.** Keď kotva leží
+  neskôr než vyžiadaný filter, platí kotva a výpis povie prečo. Inak by tam
+  stálo „od júna“ a „stav na začiatku 0 h“ — klient by si prečítal, že v júni
+  nemal nič.
+- **Mínusové číslo je horšie než žiadne.** Klient ho číta ako obvinenie, že
+  mu appka zobrala hodiny.
+- **Dokument pre klienta sa sádže inak než obrazovka.** Do mailu nepatrí ISO
+  dátum (`2027-03-01`), kód metódy (`bank`) ani dva tvary času vedľa seba
+  (PTminder „3:00pm“, kalendár „15:00“).

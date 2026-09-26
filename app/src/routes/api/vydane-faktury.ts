@@ -344,6 +344,47 @@ export const Route = createFileRoute("/api/vydane-faktury")({
           }
 
           /**
+           * VÝPIS HODÍN KLIENTOVI.
+           *
+           * Jerry, 26. 9. 2026: „s možnosťou vytvoriť z toho report a poslať
+           * to klientovi na kontrolu." Ide do TELA správy, nie do prílohy —
+           * klient to má prečítať a povedať, či to sedí.
+           *
+           * Text skladá obrazovka a človek ho pred odoslaním vidí a môže
+           * prepísať; server ho neprepisuje, len pošle.
+           */
+          if (b.akcia === "posli-vypis") {
+            const klient = kus(b.klient, 120);
+            const komu = kus(b.komu, 160).toLowerCase();
+            const telo = String(b.telo || "").slice(0, 20000);
+            if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(komu)) {
+              return Response.json({ ok: false, error: "Chýba e-mail klienta." }, { status: 400 });
+            }
+            if (telo.trim().length < 20) return Response.json({ ok: false, error: "Výpis je prázdny." }, { status: 400 });
+            const n = await nastaveniaMailu(DB);
+            if (!n.host || !n.user || !n.heslo) {
+              return Response.json({ ok: false, error: "Schránka nie je nastavená — doplň ju v Údajoch." }, { status: 400 });
+            }
+            const vysledok = await posliMail(
+              { host: n.host.replace(/^imap\./, "smtp."), port: 587, pouzivatel: n.user, heslo: n.heslo },
+              {
+                od: n.user,
+                odMeno: "ProSapiens Biomechanic",
+                komu: [komu],
+                kopiaSkryta: [n.user],
+                predmet: kus(b.predmet, 200) || "Výpis hodín — ProSapiens Biomechanic",
+                telo,
+              },
+            );
+            if (!vysledok.ok) {
+              await audit(DB, { action: "vypis-mail-zlyhal", predmet: `${klient} · ${komu}`, old: vysledok.chyba, actor: kto });
+              return Response.json({ ok: false, error: `Mail neodišiel — ${vysledok.chyba}` }, { status: 502 });
+            }
+            await audit(DB, { action: "vypis-hodin-odoslany", predmet: `${klient} · ${komu}`, actor: kto });
+            return Response.json({ ok: true, komu });
+          }
+
+          /**
            * ODOSLANIE MAILOM.
            *
            * Vlastná schránka `info@prosapiens.cz`, ktorú Kokpit už pozná
