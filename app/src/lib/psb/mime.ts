@@ -72,3 +72,23 @@ export function mimeSprava(s: Sprava, hranica = `psb${Date.now().toString(36)}${
   casti.push(`--${hranica}--`, "");
   return `${hlavicky.join(CRLF)}${CRLF}${CRLF}${casti.join(CRLF)}`;
 }
+
+/**
+ * Chyba servera preložená do vety, ktorá hovorí, čo s tým.
+ *
+ * Jerry, 27. 9. 2026 dostal na obrazovku „535 535 5.7.8 Error: authentication
+ * failed: (reason unavailable)". Je to presné, ale nepovie, že má ísť do
+ * Údajov prepísať heslo. Kód servera sa necháva v zátvorke — keď sa má niekto
+ * pýtať Websupportu, potrebuje presné znenie.
+ */
+export function poLudsky(chyba: string): string {
+  const t = chyba.slice(0, 300);
+  if (/\b535\b|authentication failed|auth.*fail/i.test(t)) {
+    return `schránka odmietla prihlásenie — over heslo v Údajoch (server hovorí: ${t.slice(0, 120)})`;
+  }
+  if (/neodpovedal|timeout/i.test(t)) return t;
+  if (/55[04]|relay|not permitted/i.test(t)) {
+    return `server správu neprijal — skontroluj adresu príjemcu (server hovorí: ${t.slice(0, 120)})`;
+  }
+  return t.slice(0, 200);
+}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { mimeSprava } from "./mime";
+import { mimeSprava, poLudsky } from "./mime";
 
 const dekoduj = (s: string) => new TextDecoder().decode(Uint8Array.from(atob(s.replace(/\r\n/g, "")), (c) => c.charCodeAt(0)));
 
@@ -55,5 +55,17 @@ describe("MIME správa", () => {
     const id = (m: string) => /Message-ID: <([^>]+)>/.exec(m)?.[1];
     expect(id(a)).not.toBe(id(b));
     expect(id(a)).toContain("@prosapiens.cz");
+  });
+});
+
+describe("chyba servera po ľudsky", () => {
+  it("535 povie, že sa má prepísať heslo, a nechá znenie servera", () => {
+    const t = poLudsky("prihlásenie: 535 535 5.7.8 Error: authentication failed: (reason unavailable)");
+    expect(t).toContain("over heslo v Údajoch");
+    expect(t).toContain("535");
+  });
+
+  it("cudzia chyba sa nepreloží nasilu", () => {
+    expect(poLudsky("server neodpovedal do 25 s")).toBe("server neodpovedal do 25 s");
   });
 });

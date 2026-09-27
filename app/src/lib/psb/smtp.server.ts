@@ -1,6 +1,6 @@
 import { connect } from "cloudflare:sockets";
 
-import { CRLF, base64Text, mimeSprava, type Priloha, type Sprava } from "./mime";
+import { CRLF, base64Text, mimeSprava, poLudsky, type Priloha, type Sprava } from "./mime";
 
 /**
  * ODOSLANIE MAILU CEZ SMTP — priamo z Workera.
@@ -148,7 +148,7 @@ async function rozhovor(u: SmtpUcet, s: Sprava): Promise<{ ok: boolean; chyba?: 
     await posli("QUIT");
     return { ok: true };
   } catch (e) {
-    return { ok: false, chyba: String(e instanceof Error ? e.message : e).slice(0, 200) };
+    return { ok: false, chyba: poLudsky(String(e instanceof Error ? e.message : e)) };
   } finally {
     try { await socket?.close(); } catch { /* spojenie už spadlo */ }
   }
