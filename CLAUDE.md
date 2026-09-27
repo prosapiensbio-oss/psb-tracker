@@ -1373,3 +1373,30 @@ Je to tá istá rodina omylu ako „ceny sedení nie sú peniaze".
   by karta hovorila o hodinu menej — a to číslo Jerry hovorí klientovi nahlas.
 - **Dôvod sa píše hneď** („kompenzácia za zrušený tréning") a ide aj do výpisu
   pre klienta. Darovaná hodina bez dôvodu sa o mesiac nedá obhájiť.
+
+## Kontrolór profilu: `./scripts/kontrola-profilov.sh`
+
+Tretí skript nad ostrými dátami, vedľa `naostro.sh` (notifikácie) a jednotkových
+testov (pravidlá). Tento overuje ČÍSLA V PROFILE: odpočet hodín, dlh, platby,
+dochádzku — a hlavne miesta, kde sa dva zdroje o tom istom rozchádzajú.
+Iba číta. Prvý beh 27. 9. 2026 našiel 324 vecí a ani jedna nebola chyba
+výpočtu; všetko sú rozdiely medzi zdrojmi, ktoré treba vedieť prečítať:
+
+- **8× „os a karta hovoria iné číslo"** — a všetkých osem má tú istú príčinu:
+  os pozná dokúpené hodiny (`packages.added` + počet), `deriveClients` nie.
+  Karta je tam menej informovaná než os. Preto kontrola príčinu POMENUJE,
+  nielen ohlási rozdiel — nález bez príčiny sa prestane čítať.
+- **Porovnávať sa musí KU DŇU EXPORTU.** Prvá verzia hlásila 27 rozdielov,
+  z toho 17 boli tréningy z kalendára po poslednom nahratí. Karta počíta
+  k dňu exportu; kto porovná k dnešku, meria vek súboru.
+- **Zrovnanie s kartou potrebuje kotvu aj v prázdnom členstve.** Keď v ňom
+  ešte nebol tréning, nie je sa čoho chytiť a rad ostal na hodinách z názvu
+  (Josef Šnirych: SPECIAL 3 kúpené 20. 9., PTminder hovorí 2 z 3). Fallback
+  je otváracia hodnota obdobia.
+- **35 % tréningov nesie značku dlhu a má ju 123 zo 125 klientov.** Pravidlo
+  „tréning skôr, než prišla platba" je doslovne to, čo Jerry chcel, ale ako
+  signál je to nepoužiteľné — svieti skoro všetko. Meradlo z 19. 8. 2026 tu
+  platí znova: kontrola, ktorá svieti na nesprávnych ľudí, je horšia než žiadna.
+- **98 zo 113 platieb v Kokpite je aj v PTminderi a 15 len v Kokpite.** Karta
+  ich drží oddelene a nesčítava (správne), ale výpis pre klienta berie len
+  PTminder — tých 15 platieb v ňom klientovi chýba.

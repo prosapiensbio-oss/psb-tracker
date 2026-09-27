@@ -268,7 +268,10 @@ export function priebehBalickov(
     }
 
     // Posledné členstvo sa zrovná s číslom, ktoré appka ukazuje na karte.
-    const kExportu = [...doUseku].reverse().find((x) => x.u.den <= (denExportu || dnes) && x.po !== null)?.po;
+    // Keď v členstve ešte nebol žiadny tréning, zrovnáva sa jeho otváracia
+    // hodnota — inak by sa nemalo čoho chytiť a rad by ostal na hodinách
+    // z názvu (Josef Šnirych: „SPECIAL 3" kúpené 20. 9., PTminder hovorí 2 z 3).
+    const kExportu = [...doUseku].reverse().find((x) => x.u.den <= (denExportu || dnes) && x.po !== null)?.po ?? bezi;
     // Keď appka pozná dokúpené hodiny, je informovanejšia než karta klienta
     // (tá ráta len z aktívneho členstva) a zrovnávať sa nemá načím.
     if (b && b === posledny && !maDokupene && zostatokTeraz != null && kExportu != null && kExportu !== zostatokTeraz) {
