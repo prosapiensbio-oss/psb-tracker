@@ -93,7 +93,9 @@ sekcia("ODPOČET HODÍN V ČLENSTVE");
       const dopl = packages.find((b: any) => normName(b.client) === normName(m) && /doplnenie/i.test(b.package) && b.added && b.total > 0);
       nesedi.push(`${m}: os ${kExportu} h · karta ${zostatokTeraz} h${dopl ? ` — os počíta dokúpené hodiny z ${den(dopl.added)} (${dopl.total} h)` : " — príčina neznáma"}`);
     }
-    if (c.packageTotal > 0 && v.koniec === null) bezOdpoctu.push(`${m} — ${c.membership || "bez názvu"}`);
+    // Zaujíma len ten, komu karta hlási ZOSTATOK. Dočerpané členstvo bez
+    // odpočtu nikomu nechýba.
+    if (c.packageRemaining > 0 && v.koniec === null) bezOdpoctu.push(`${m} — ${c.membership || "bez názvu"} (karta ${c.packageRemaining} h)`);
   }
   hlas("záporný odpočet (nikdy by nemal byť)", zaporne);
   hlas("os času a karta klienta hovoria iné číslo", nesedi, "os sa má posledným členstvom zrovnať s kartou");
@@ -104,19 +106,30 @@ sekcia("ODPOČET HODÍN V ČLENSTVE");
 sekcia("ZDROJE ČLENSTIEV");
 {
   const bezHodin = new Map<string, number>();
+  // Dokúpenie bez dátumu sa na os položiť nedá. Keď je ale dočerpané
+  // (`remaining = 0`), nič to dnes nemení — je to len chýbajúci riadok
+  // v histórii. Hlási sa preto len to, čo má ešte zostatok.
   const bezDatumu: string[] = [];
+  let docerpanychBezDatumu = 0;
   for (const b of packages) {
-    if (!b.validFrom && !b.added && b.total > 0) bezDatumu.push(`${b.client} — ${b.package} (${b.remaining}/${b.total})`);
+    if (b.validFrom || b.added || b.total <= 0) continue;
+    if (b.remaining > 0) bezDatumu.push(`${b.client} — ${b.package} (${b.remaining}/${b.total})`);
+    else docerpanychBezDatumu++;
   }
+  console.log(`  \u001b[2m  dočerpaných dokúpení bez dátumu: ${docerpanychBezDatumu} — dnes už nič nemenia\u001b[0m`);
+  // Staré stupne (SILVER, BRONZ, GOLD…) sa predávali do 2025 a Jerry ich už
+  // nerieši (27. 9. 2026). Hlási sa len to, čo sa predáva TERAZ — zoznam,
+  // ktorý sa nedá vyčistiť, sa prestane čítať.
+  const odKedy = new Date(Date.now() - 183 * 86400000).toISOString().slice(0, 10);
   for (const s of services) {
     if (s.serviceType !== "Membership" && s.serviceType !== "Package") continue;
-    if (/doplnenie/i.test(s.description)) continue;
+    if (/doplnenie/i.test(s.description) || den(s.date) < odKedy) continue;
     if (!hodinZNazvuBalicka(s.description)) bezHodin.set(s.description, (bezHodin.get(s.description) || 0) + 1);
   }
-  hlas("členstvo bez počtu hodín (odpočet preň nebeží)",
+  hlas("členstvo predané za posledného pol roka bez počtu hodín (odpočet preň nebeží)",
     [...bezHodin.entries()].sort((a, b) => b[1] - a[1]).map(([d, n]) => `${d} — ${n}×`),
     "hodiny nie sú v názve ani v mape HODIN_PODLA_NAZVU");
-  hlas("dokúpené hodiny bez dátumu (na os ich položiť nejde)", bezDatumu);
+  hlas("dokúpené hodiny so zostatkom, ale bez dátumu", bezDatumu, "na os ich položiť nejde a klientovi hodiny chýbajú");
 
   const dvojice = new Map<string, number>();
   for (const b of packages) {
@@ -124,8 +137,11 @@ sekcia("ZDROJE ČLENSTIEV");
     const k = `${b.client}|${den(b.validFrom)}|${b.package}`;
     dvojice.set(k, (dvojice.get(k) || 0) + 1);
   }
-  hlas("dva rovnaké balíčky v ten istý deň", [...dvojice.entries()].filter(([, n]) => n > 1).map(([k, n]) => `${k.replace(/\|/g, " · ")} — ${n}×`),
-    "os ich SČÍTA; keď to neboli dve členstvá, hodiny sú dvojnásobné");
+  hlas("dva rovnaké balíčky v ten istý deň", [...dvojice.entries()].filter(([, n]) => n > 1).map(([k, n]) => {
+    const [kl, d, nz] = k.split("|");
+    const vKnihe = services.filter((x: any) => normName(x.client) === normName(kl) && den(x.date) === d && x.description === nz).length;
+    return `${kl} · ${d} · ${nz} — v snímke ${n}×, v knihe predajov ${vKnihe}×${vKnihe < n ? " → os berie knihu" : ""}`;
+  }), "snímka môže mať duplicitu; rozhoduje kniha predajov");
 }
 
 // ───────────────────────────────────────────────────────── TRÉNINGY

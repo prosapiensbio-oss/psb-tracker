@@ -31,6 +31,43 @@ export type Udalost =
   | { druh: "balicekDo"; den: string; nazov: string; hodin: number; odvodene?: boolean };
 
 /**
+ * DVA ROVNAKÉ BALÍČKY V JEDEN DEŇ — KOĽKO ICH NAOZAJ JE, POVIE KNIHA PREDAJOV.
+ *
+ * `packages` je snímka a Anne Novej v nej stoja DVA riadky „OFF - 8 hodín
+ * offline" s tou istou platnosťou aj cenou (4/8 a 8/8). V exporte služieb —
+ * v knihe predajov — je v ten deň PREDAJ JEDEN a platba tiež jedna. Je to
+ * duplicita v PTminderi, nie druhé členstvo; brať oba riadky by znamenalo
+ * dvojnásobok hodín na osi a na karte klienta ten riadok, ktorý sa netýka
+ * ničoho (8 z 8, hoci štyri hodiny sú odtrénované).
+ *
+ * Peter Gažo je ten druhý prípad a vyzerá inak: jeho dve členstvá majú RÔZNE
+ * dni (18. 5. a 24. 7.), takže sa ich to netýka. Naprieč celou databázou je
+ * dvojica v jeden deň jediná — Anna.
+ *
+ * Keď kniha o tom dni nevie (staršie obdobia), berie sa JEDEN riadok:
+ * duplicita je horšia než chýbajúce druhé členstvo.
+ */
+export function bezDuplicitBalickov<T extends { client: string; package: string; validFrom?: string }>(
+  packages: T[],
+  services: { client: string; date: string; description: string }[] | undefined,
+): T[] {
+  const kniha = new Map<string, number>();
+  for (const s of services || []) {
+    const kluc = `${normName(s.client)}|${(s.date || "").slice(0, 10)}|${normName(s.description)}`;
+    kniha.set(kluc, (kniha.get(kluc) || 0) + 1);
+  }
+  const uz = new Map<string, number>();
+  return packages.filter((b) => {
+    if (!b.validFrom) return true;
+    const kluc = `${normName(b.client)}|${b.validFrom.slice(0, 10)}|${normName(b.package)}`;
+    const koľko = (uz.get(kluc) || 0) + 1;
+    if (koľko > Math.max(1, kniha.get(kluc) || 0)) return false;
+    uz.set(kluc, koľko);
+    return true;
+  });
+}
+
+/**
  * Koľko hodín má balíček v názve.
  *
  * Offline členstvá PTminder vyváža ako 0/0 a počet hodín stojí len v názve
@@ -114,7 +151,7 @@ export function osCasuKlienta(
     out.push({ druh: "platba", den: den(p.date), suma: p.amount, metoda: p.method, poznamka: p.note });
   }
 
-  for (const b of moje(zdroj.packages)) {
+  for (const b of bezDuplicitBalickov(moje(zdroj.packages), zdroj.services)) {
     /**
      * DOKÚPENÉ HODINY MAJÚ DEŇ AJ POČET — len inde.
      *

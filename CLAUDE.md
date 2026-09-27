@@ -1324,8 +1324,8 @@ Z toho vzišiel model odpočtu, ktorý si Jerry vypýtal (`priebehBalickov`):
   riadok nad ňou.
 - **Pri dátume je deň v týždni** — klient pozná „streda", nie „23. 9.". Pri
   platnosti členstva („do 28. 10.") deň v týždni nič nehovorí a nedáva sa.
-- **Dve členstvá kúpené v ten istý deň sa SČÍTAJÚ**, nezačínajú odznova.
-  PTminder ich vyváža ako dva riadky (Peter Gažo, Anna Nova).
+- **Dve členstvá kúpené v ten istý deň sa SČÍTAJÚ** — ale najprv sa overí, či
+  sú naozaj dve. Viď „Snímka klame v počte" nižšie.
 - **Posledné členstvo sa zrovná s číslom z karty klienta, a to KU DŇU EXPORTU.**
   Dopredný odpočet sedel na ostrých dátach v 28 z 35 prípadov; rozdiel robia
   „Doplnenia členstva" (144 riadkov v exporte a ani jedno nehovorí, o koľko
@@ -1400,3 +1400,25 @@ výpočtu; všetko sú rozdiely medzi zdrojmi, ktoré treba vedieť prečítať:
 - **98 zo 113 platieb v Kokpite je aj v PTminderi a 15 len v Kokpite.** Karta
   ich drží oddelene a nesčítava (správne), ale výpis pre klienta berie len
   PTminder — tých 15 platieb v ňom klientovi chýba.
+
+## Snímka klame v počte — koľko ich je, povie kniha predajov
+
+27. 9. 2026 som Jerrymu vysvetlil, že Anna Nová má dve členstvá „OFF - 8 hodín
+offline" z 3. 9., „rovnako ako Gažo". **Bola to nesprávna odpoveď a stálo ma to
+len jeden dopyt navyše, aby som to zistil.** Rozdiel:
+
+- **Gažo** má dve členstvá s RÔZNYMI dňami (18. 5. a 24. 7.) — dve skutočné,
+  prekrývajúce sa členstvá. To je ten prípad z 21. 9.
+- **Anna Nová** má dva riadky s TÝM ISTÝM dňom, platnosťou aj cenou (4/8 a 8/8).
+  V knihe predajov (`services`) je v ten deň predaj JEDEN a platba jedna. Je to
+  duplicita v PTminderi.
+
+Naprieč celou databázou je taká dvojica JEDINÁ. Napriek tomu škodila na oboch
+stranách: os čas sčítala na 16 hodín a `deriveClients` si ako aktívny vybral
+ten netknutý riadok (8 z 8), takže karta hlásila zostatok, ktorý sa netýkal
+ničoho. Rieši to `bezDuplicitBalickov` — JEDNA funkcia, ktorú volá os aj
+karta; keď kniha o tom dni nevie (staršie obdobia), berie sa jeden riadok.
+
+**Pravidlo:** keď snímka (`packages`) a kniha (`services`) hovoria o počte
+rôzne, platí kniha. A keď si nie som istý, čo dáta znamenajú, nemám to
+vysvetľovať ako fakt — mám sa pozrieť na druhý zdroj.

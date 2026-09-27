@@ -2,7 +2,7 @@
 // no browser globals. Reused across every module.
 import { daysBetween, fmtDMY, monthKey, monthLabel, monthsBetween, normName, quarterKey, quarterLabel, weekKey, weekLabel } from "./format";
 import { menoZNazvuUvodneho } from "./kalendar";
-import { hodinZNazvuBalicka } from "./klientOsCasu";
+import { bezDuplicitBalickov, hodinZNazvuBalicka } from "./klientOsCasu";
 import { vlastnikKlienta } from "./zaskok";
 import { BARTER_KLIENTI } from "./vzas";
 import { podozriveCisla, type Podiel } from "./kontrolaDat";
@@ -262,7 +262,10 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
   const serviceCounts: Record<string, number> = {};
   for (const s of data.services) serviceCounts[s.client] = (serviceCounts[s.client] || 0) + 1;
   const packByClient: Record<string, PackageRow[]> = {};
-  for (const p of data.packages) (packByClient[p.client] ||= []).push(p);
+  // Snímka balíčkov môže mať duplicitu (Anna Nová: dva rovnaké riadky v jeden
+  // deň, v knihe predajov jeden). Bez toho si karta vyberie ten netknutý
+  // riadok a hlási zostatok, ktorý sa netýka ničoho.
+  for (const p of bezDuplicitBalickov(data.packages, data.services)) (packByClient[p.client] ||= []).push(p);
 
   for (const c of Object.values(map)) {
     c.sessionCount = c.sessions.length;

@@ -93,3 +93,29 @@ describe("členstvo 0/0 má hodiny v názve", () => {
     expect(b?.odvodene).toBeFalsy();
   });
 });
+
+describe("dva rovnaké balíčky v jeden deň", () => {
+  // Anna Nová má v snímke dva riadky „OFF - 8 hodín offline" s tou istou
+  // platnosťou, ale v knihe predajov je v ten deň predaj jeden. Sčítať ich
+  // na 16 hodín by bola nepravda.
+  const dva = [
+    { client: "Barbora Vankova", package: "OFF - 8 hodín offline", total: 8, remaining: 4, validFrom: "2026-09-03", validTo: "2026-10-28" },
+    { client: "Barbora Vankova", package: "OFF - 8 hodín offline", total: 8, remaining: 8, validFrom: "2026-09-03", validTo: "2026-10-28" },
+  ];
+
+  it("kniha predajov hovorí o jednom — na osi je jeden", () => {
+    const z = { ...zdroj, packages: dva, services: [{ client: "Barbora Vankova", date: "2026-09-03", serviceType: "Membership", description: "OFF - 8 hodín offline", price: 9400 }] };
+    expect(osCasuKlienta("Barbora Vankova", z as never, DNES).filter((x) => x.druh === "balicekOd")).toHaveLength(1);
+  });
+
+  it("kniha predajov hovorí o dvoch — na osi sú dva", () => {
+    const sl = { client: "Barbora Vankova", date: "2026-09-03", serviceType: "Membership", description: "OFF - 8 hodín offline", price: 9400 };
+    const z = { ...zdroj, packages: dva, services: [sl, { ...sl }] };
+    expect(osCasuKlienta("Barbora Vankova", z as never, DNES).filter((x) => x.druh === "balicekOd")).toHaveLength(2);
+  });
+
+  it("keď kniha o tom dni nevie, berie sa jeden", () => {
+    const z = { ...zdroj, packages: dva, services: [] };
+    expect(osCasuKlienta("Barbora Vankova", z as never, DNES).filter((x) => x.druh === "balicekOd")).toHaveLength(1);
+  });
+});
