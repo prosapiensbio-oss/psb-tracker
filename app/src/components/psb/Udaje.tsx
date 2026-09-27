@@ -481,6 +481,20 @@ function UploadCard({ data, missing, actions, chat }: { data: PSBData; missing: 
                 riadku nedozvie nikto. Preto je to varovanie, nie chyba: import
                 prebehol správne, len možno nad menším výsekom, než si myslíš.
               */}
+              {/* PTminder vie namiesto zostatku vyexportovať ikonu („Click to
+                  see the number of available credits"). Riadok potom prejde
+                  ako 0/0 a appka si zostatok dopočíta z názvu — čo je v
+                  poriadku, ale prestane platiť, že číslo na karte je
+                  z PTminderu. Bez tejto vety je to tichá strata. */}
+              {!!r.bezZostatku && (
+                <div style={{ padding: 9, marginBottom: 8, fontSize: 12, borderRadius: 8, background: C.orangeBg, color: C.orange }}>
+                  Pozor: {r.bezZostatku} {r.bezZostatku === 1 ? "riadok prišiel" : r.bezZostatku < 5 ? "riadky prišli" : "riadkov prišlo"} bez
+                  zostatku — PTminder namiesto čísla vyexportoval ikonu „Click to see the number of available credits".
+                  Appka si hodiny dopočíta z názvu členstva a označí ich ≈. Keď chceš presné čísla, otvor v PTminderi
+                  ten stĺpec, nech sa hodnoty načítajú, a exportuj znova.
+                </div>
+              )}
+
               {r.chybaju && r.chybaju.length > 0 && (
                 <div style={{ padding: 9, marginBottom: 8, fontSize: 12, borderRadius: 8, background: C.orangeBg, color: C.orange }}>
                   Pozor: {r.chybaju.length}{" "}

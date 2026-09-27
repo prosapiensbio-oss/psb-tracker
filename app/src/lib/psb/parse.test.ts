@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { datumNarodenia, parseAnamneza } from "./parse";
+import { datumNarodenia, parseAnamneza, jeIkonaMiestoCisla, parsePackages } from "./parse";
 
 /**
  * Anamnéza je Google Forms a ľudia si do nej píšu sami. Preto sa z nej berie
@@ -67,5 +67,25 @@ describe("parseAnamneza", () => {
       ["", "", "Instagram"],
     ]));
     expect(v).toEqual([]);
+  });
+});
+
+describe("PTminder vie miesto čísla vyexportovať ikonu", () => {
+  const hlavicka = "First Name,Last Name,Client Status,Membership,Payment,# of sessions,# of classes,# of sessions in current period,# of classes in current period,Status,Added,Dates,Duration,Payments Schedule";
+  const ikona = "<i class=bootstrap-tooltip far fa-question-circle credits-in-current-period data-type=sessions data-original-title=Click to see the number of available credits for the current period style=cursor: pointer;></i>";
+
+  test("rozpozná ikonu v riadku", () => {
+    expect(jeIkonaMiestoCisla(`Albert,Matl,Active Client,OFF - 6h,CZK7790,6 per 8-week,0 per week,${ikona}`)).toBe(true);
+    expect(jeIkonaMiestoCisla("Anetka,Přinosilová,Active Client,OFF - 18 hodín offline,CZK21150,18 per 6-month,0 per month,16 left from 18")).toBe(false);
+  });
+
+  test("keď je zostatok číslo, prečíta sa", () => {
+    const csv = `${hlavicka}\nAnetka,Přinosilová,Active Client,OFF - 18 hodín offline,CZK21150,18 per 6-month,0 per month,16 left from 18,0 left from 0,active,05 Sep; 2026,02 Sep  2026 - 01 Mar  2027,1 6-monthly,none`;
+    expect(parsePackages(csv)[0]).toMatchObject({ remaining: 16, total: 18, validFrom: "2026-09-02", kind: "membership" });
+  });
+
+  test("keď je tam ikona, zostatok je 0/0 — appka ho dopočíta z názvu", () => {
+    const csv = `${hlavicka}\nAlbert,Matl,Active Client,OFF - 6h BEZ viazanosti,CZK7790,6 per 8-week,0 per week,${ikona},${ikona},active,20 Sep; 2026,16 Sep  2026 - 10 Nov  2026,1 8-weekly,none`;
+    expect(parsePackages(csv)[0]).toMatchObject({ remaining: 0, total: 0, validFrom: "2026-09-16" });
   });
 });

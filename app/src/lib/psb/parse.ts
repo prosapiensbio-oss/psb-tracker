@@ -317,6 +317,22 @@ export function parsePayments(text: string): PaymentRow[] {
 // Find "X left from Y" (or the common variants "X/Y", "X of Y") anywhere in the
 // row, so a shifted "# of sessions" column still parses. Ignores the classes
 // column ("0 left from 0") in favour of the first non-zero-total match.
+/**
+ * PTMINDER VIE MIESTO ČÍSLA VYEXPORTOVAŤ IKONU.
+ *
+ * Stĺpec „# of sessions in current period" niesol 13. 9. 2026 hodnotu
+ * „16 left from 18", 27. 9. už len kus HTML:
+ * `<i class=bootstrap-tooltip … credits-in-current-period … Click to see the
+ * number of available credits …>`. Je to ten istý report a ten istý pohľad.
+ *
+ * Bez rozpoznania je to TICHÁ STRATA: riadok prejde ako „0 left from 0",
+ * import ohlási úspech a 43 členstiev naraz príde o presný zostatok. Appka si
+ * ho potom dopočíta z názvu (a označí ≈), takže nič nespadne — len prestane
+ * platiť, že číslo na karte je z PTminderu.
+ */
+export const jeIkonaMiestoCisla = (riadok: string): boolean =>
+  /credits-in-current-period|bootstrap-tooltip/i.test(riadok);
+
 function extractSessions(parts: string[]): { remaining: number; total: number } {
   let fallback: { remaining: number; total: number } | null = null;
   for (const raw of parts) {

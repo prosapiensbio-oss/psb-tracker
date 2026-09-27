@@ -12,6 +12,7 @@ import {
   parseServices,
   parseSessions,
   paymentKey,
+  jeIkonaMiestoCisla,
   serviceKey,
   sessionKey,
 } from "./parse";
@@ -189,6 +190,11 @@ export type IngestResult = {
   /** Koľko riadkov import odmietol, lebo patria do uzavretého mesiaca. */
   zamknute?: number;
   /**
+   * Koľko riadkov prišlo bez zostatku, lebo PTminder namiesto čísla
+   * vyexportoval ikonu. Viď `jeIkonaMiestoCisla`.
+   */
+  bezZostatku?: number;
+  /**
    * Klienti, ktorí sú podľa PTminderu aktívni, ale v nahranom súbore nie sú.
    * Import ich nechá tak, ako boli — čo je správne, ale ticho. Preto sa mená
    * vracajú von: čiastočný export vyzerá presne ako úplný.
@@ -203,6 +209,7 @@ export async function ingest(DB: D1Database, filename: string, text: string, act
   let added = 0;
   let skipped = 0;
   let chybaju: string[] = [];
+  let bezZostatku = 0;
   // Uzavretý mesiac sa neprepisuje. Nie varovaním — odmietnutím. Import je
   // jediná cesta, ktorou sa do appky dostávajú tréningy a platby, takže stačí
   // strážiť ju; riadky z uzamknutých mesiacov sa preskočia a povie sa o tom.
@@ -449,6 +456,9 @@ export async function ingest(DB: D1Database, filename: string, text: string, act
     // wholesale replace would wipe clients missing from the file. This way uploads
     // accumulate safely by client, and a client's rows are always the latest snapshot.
     const rows = parsePackages(text);
+    // Ticho by to prešlo ako „0 left from 0" — a karta klienta by odvtedy
+    // ukazovala dopočítané číslo namiesto toho z PTminderu.
+    bezZostatku = text.split(/\r?\n/).slice(1).filter((r) => r.trim() && jeIkonaMiestoCisla(r)).length;
     const clientsInFile = [...new Set(rows.map((r) => r.client))];
     // Mazať sa smie len ten POHĽAD, ktorý súbor nesie. Report má štyri pohľady
     // a klient môže byť v dvoch naraz (dochodí starý balíček A má nové
@@ -535,7 +545,7 @@ export async function ingest(DB: D1Database, filename: string, text: string, act
     actor,
   });
 
-  return { filename, type, added, skipped, zamknute: zamknutych, chybaju };
+  return { filename, type, added, skipped, zamknute: zamknutych, chybaju, bezZostatku };
 }
 
 // Zapíše JEDEN stĺpec. Nie celý riadok — a to je oprava skutočnej chyby.
