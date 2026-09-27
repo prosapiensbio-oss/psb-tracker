@@ -1349,3 +1349,27 @@ doimportovalo priamo do D1 s tým istým `dedup_key` (`date|client|description`)
 aký robí `ingest`. Odpočet odvtedy beží 73 klientom namiesto 57 a na osiach je
 689 začiatkov členstiev namiesto 450. `services` nevstupuje do P&L — ide z neho
 6M proces a počty služieb.
+
+## Tréning zdarma nie je v exporte — je to rozhodnutie trénera
+
+27. 9. 2026 Jerry: „niekedy chceme dať tréning ZDARMA. V PTminderi dávame
+recoil tréningov, tu ale nič také nie je — čo keď nechcem, aby sa klientovi
+odpočítal tréning od členstva?"
+
+Z exportu sa to zistiť NEDÁ a je to pasca, na ktorú sa dá naletieť: `price_czk
+= 0` má 690 zo 3 449 sedení a znamená „zaplatené balíčkom", nie „zadarmo".
+Je to tá istá rodina omylu ako „ceny sedení nie sú peniaze".
+
+- **Tabuľka `treningy_zdarma`** (migrácia 0081), kľúč klient + DEŇ, nie id
+  sedenia: ten istý tréning príde raz z kalendára a raz z exportu a os času
+  ich už dnes páruje po dňoch. Značka tak prežije oba zdroje aj opakovaný
+  import.
+- **Neodpočítava sa z členstva a nemôže byť na dlh.** Darovaná hodina nemá
+  ako chýbať — ani v balíčku, ani v platbe.
+- **Do dochádzky, vyťaženosti trénera a „naposledy trénoval" sa POČÍTA.**
+  Čas trénera to stálo, len klienta nie.
+- **Musí to vedieť aj karta klienta**, nielen os času. `deriveClients` má
+  vlastný počet odtrénovaných hodín (`odtrenovaneOd`) a bez tej istej výnimky
+  by karta hovorila o hodinu menej — a to číslo Jerry hovorí klientovi nahlas.
+- **Dôvod sa píše hneď** („kompenzácia za zrušený tréning") a ide aj do výpisu
+  pre klienta. Darovaná hodina bez dôvodu sa o mesiac nedá obhájiť.

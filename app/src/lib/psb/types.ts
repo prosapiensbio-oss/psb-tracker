@@ -170,6 +170,8 @@ export type PSBData = {
   zavery: ZaverRow[];
   /** Nezaplatené poplatky z PTminderu — čo je v exporte, je otvorené. */
   poplatky: PoplatokZaznam[];
+  /** Tréningy zadarmo — hodina sa odtrénovala, z členstva sa nestrhla. */
+  treningyZdarma: TreningZdarma[];
   /** Vedomosti zvonku (rešerše, príručky). Text sa do kontextu neposiela — len prehľad. */
   vedomosti: VedomostRow[];
 };
@@ -211,9 +213,18 @@ export type LeadMagnet = {
 
 export type PoplatokZaznam = { id: string; datum: string; klient: string; popis: string; suma: number };
 
+/**
+ * Tréning, ktorý sa z členstva neodpočíta.
+ *
+ * Kľúč je klient + deň, nie id sedenia: ten istý tréning príde raz z kalendára
+ * a raz z exportu a značka musí platiť pre oba.
+ */
+export type TreningZdarma = { id: string; klient: string; den: string; dovod: string; kto: string };
+
 export const EMPTY_DATA: PSBData = {
   zavery: [],
   poplatky: [],
+  treningyZdarma: [],
   vedomosti: [],
   sessions: [],
   services: [],

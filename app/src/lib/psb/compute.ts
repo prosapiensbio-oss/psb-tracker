@@ -189,6 +189,9 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
   const ref = refNow(data);
   const window = lastWeekKeys(ref);
   const map: Record<string, ClientAgg> = {};
+  // Tréningy, ktoré sa z členstva neodpočítavajú — kľúč je klient + deň,
+  // rovnako ako na osi času (migrácia 0081).
+  const zdarmaDni = new Set((data.treningyZdarma || []).map((z) => `${normName(z.klient)}|${z.den}`));
 
   for (const s of data.sessions) {
     let c = map[s.client];
@@ -465,11 +468,16 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
      */
     const exportMlci = (active?.total ?? 0) === 0 && (active?.remaining ?? 0) === 0;
     const koniecOkna = active?.validTo && active.validTo < dnesPack ? active.validTo : dnesPack;
+    /**
+     * Tréning zadarmo sa z členstva neodpočíta (`treningy_zdarma`, 0081).
+     * Bez toho by karta hovorila o hodinu menej, než klient naozaj má — a to
+     * číslo Jerry hovorí klientovi nahlas.
+     */
     const odtrenovaneOd = (od: string) => {
       let n = 0;
       for (const s of c.sessions) {
         const den = (s.date || "").slice(0, 10);
-        if (den >= od && den <= koniecOkna) n++;
+        if (den >= od && den <= koniecOkna && !zdarmaDni.has(`${normName(c.name)}|${den}`)) n++;
       }
       return n;
     };
@@ -493,7 +501,7 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
         let n = 0;
         for (const s of c.sessions) {
           const den = (s.date || "").slice(0, 10);
-          if (den > kotvaDen && den <= koniecOkna) n++;
+          if (den > kotvaDen && den <= koniecOkna && !zdarmaDni.has(`${normName(c.name)}|${den}`)) n++;
         }
         return n;
       })();

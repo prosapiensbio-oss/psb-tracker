@@ -66,9 +66,12 @@ export type Vypis = {
   naDlh: number;
 };
 
-/** Dĺžka tréningu v hodinách. Bez údaja je to hodina — tak vyzerá 99,7 % z nich. */
+/**
+ * Dĺžka tréningu v hodinách. Bez údaja je to hodina — tak vyzerá 99,7 % z nich.
+ * Tréning zadarmo je nula: odtrénoval sa, ale z členstva sa nestrhol.
+ */
 export const hodinTreningu = (u: Udalost): number => {
-  if (u.druh !== "trening") return 0;
+  if (u.druh !== "trening" || u.zdarma !== undefined) return 0;
   const m = u.minut && u.minut > 0 ? u.minut : 60;
   return Math.round((m / 60) * 4) / 4;
 };
@@ -119,7 +122,8 @@ const popisZ = (u: Udalost): string => {
   if (u.druh === "balicekOd") return `${u.nazov}${u.hodin ? ` · ${u.odvodene ? "≈" : ""}${u.hodin} h` : ""}${u.doDna ? ` · do ${datum(u.doDna)}` : ""}`;
   if (u.druh === "balicekDo") return `koniec platnosti — ${u.nazov}`;
   if (u.druh === "platba") return `platba ${suma(u.suma)} Kč${u.metoda ? ` · ${METODY[u.metoda] || u.metoda}` : ""}`;
-  return `tréning${u.cas ? ` ${cas24(u.cas)}` : ""}${u.trener ? ` · ${u.trener}` : ""}`;
+  const zdarma = u.zdarma !== undefined ? ` · zdarma${u.zdarma ? ` (${u.zdarma})` : ""}` : "";
+  return `tréning${u.cas ? ` ${cas24(u.cas)}` : ""}${u.trener ? ` · ${u.trener}` : ""}${zdarma}`;
 };
 
 /** Posledný balíček s hodinami, ktorý už platí. */
@@ -249,7 +253,9 @@ export function priebehBalickov(
       let dlh: number | null = null;
       let zostatok: number | null = null;
       if (u.druh === "balicekOd" && u.doplnenie && u.hodin > 0) bezi = (bezi || 0) + u.hodin;
-      if (u.druh === "trening") {
+      // Tréning zadarmo do odpočtu ani do dlhu nevstupuje — je darovaný,
+      // takže zaň nemá čo chýbať ani hodina, ani platba.
+      if (u.druh === "trening" && u.zdarma === undefined) {
         // Číslo pri tréningu je stav PRED ním. Keď už hodiny nie sú, riadok
         // číslo nemá a tréning sa počíta do dlhu.
         const vycerpane = bezi !== null && bezi < hodinTreningu(u);

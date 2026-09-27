@@ -109,6 +109,9 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
   const [filter, setFilter] = useState<"zdravie" | "vsetko" | "peniaze" | "balicky" | "poznamky">("zdravie");
   const [detaily, setDetaily] = useState(false);
   const [pisemPlatbu, setPisemPlatbu] = useState(false);
+  /** Deň, ktorého tréning sa práve označuje ako zdarma (píše sa k nemu dôvod). */
+  const [zdarmaDen, setZdarmaDen] = useState("");
+  const [zdarmaDovod, setZdarmaDovod] = useState("");
   const [pl, setPl] = useState({ datum: dnesISO(), suma: "", sposob: "hotovost", poznamka: "" });
   const [balicky, setBalicky] = useState<Balicek[]>([]);
   const [vlastnePlatby, setVlastnePlatby] = useState<Platba[]>([]);
@@ -197,9 +200,10 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
       // jediný balíček a odpočet nemá kde začať.
       services: (data.services || []) as never,
       poplatky: (data.poplatky || []) as never,
+      treningyZdarma: (data.treningyZdarma || []) as never,
       kalUdalosti,
     }) : []),
-    [meno, data.sessions, data.payments, data.packages, data.services, data.poplatky, kalUdalosti],
+    [meno, data.sessions, data.payments, data.packages, data.services, data.poplatky, data.treningyZdarma, kalUdalosti],
   );
 
   /**
@@ -592,6 +596,26 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
     if (!r.ok) { setChyba(r.error || "nepodarilo sa uložiť"); return; }
     setUpravaPlatby(""); setPl({ datum: dnesISO(), suma: "", sposob: "hotovost", poznamka: "" });
     await nacitajPlatby();
+  };
+
+  /**
+   * Tréning zadarmo — hodina sa odtrénovala, z členstva sa nestrhne.
+   *
+   * Jerry, 27. 9. 2026: „v PTminderi dávame recoil tréningov, tu ale nič také
+   * nie je." V exporte sa to poznať nedá, je to rozhodnutie trénera.
+   */
+  const oznacZdarma = async (den: string, zrus: boolean) => {
+    setPracujem(true); setChyba("");
+    const r = await fetch("/api/trening-zdarma", {
+      method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ klient: meno, den, dovod: zrus ? "" : zdarmaDovod.trim(), zrus }),
+    }).then((x) => x.json()).catch(() => ({ ok: false, error: "spojenie" }));
+    setPracujem(false);
+    if (!r.ok) { setChyba(r.error || "nepodarilo sa uložiť"); return; }
+    setZdarmaDen(""); setZdarmaDovod("");
+    // Zostatok hodín drží App mimo /api/data — bez signálu by karta klienta
+    // ďalej tvrdila starý počet.
+    oznam("klienti");
   };
 
   /** Príjem z výpisu patrí tomuto klientovi — jedným klikom, aj s naučením. */
@@ -1318,7 +1342,19 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
             .filter((x) => filter === "vsetko"
               || (filter === "peniaze" && x.druh === "platba")
               || (filter === "balicky" && (x.druh === "balicekOd" || x.druh === "balicekDo")))
-            .map((x, i) => <RiadokOsi key={i} u={x} stav={stavy.get(x)} />)}
+            .map((x, i) => (
+              <RiadokOsi
+                key={i}
+                u={x}
+                stav={stavy.get(x)}
+                pisemZdarma={zdarmaDen === x.den}
+                dovod={zdarmaDovod}
+                setDovod={setZdarmaDovod}
+                pracujem={pracujem}
+                onZdarma={(zrus) => (zrus || zdarmaDen === x.den ? void oznacZdarma(x.den, zrus) : (setZdarmaDen(x.den), setZdarmaDovod("")))}
+                onZrusZapis={() => { setZdarmaDen(""); setZdarmaDovod(""); }}
+              />
+            ))}
 
           {/* Výpis na poslanie klientovi — pod zoznamom, nie nad ním: najprv
               sa človek pozrie, potom sa rozhodne posielať. */}
@@ -1399,7 +1435,16 @@ function StavHodin({ stav }: { stav?: StavRiadku }) {
   );
 }
 
-function RiadokOsi({ u, stav }: { u: ReturnType<typeof osCasuKlienta>[number]; stav?: StavRiadku }) {
+function RiadokOsi({ u, stav, pisemZdarma, dovod, setDovod, pracujem, onZdarma, onZrusZapis }: {
+  u: ReturnType<typeof osCasuKlienta>[number];
+  stav?: StavRiadku;
+  pisemZdarma?: boolean;
+  dovod?: string;
+  setDovod?: (v: string) => void;
+  pracujem?: boolean;
+  onZdarma?: (zrus: boolean) => void;
+  onZrusZapis?: () => void;
+}) {
   if (u.druh === "balicekOd") {
     return (
       <div style={{ ...riadok, background: mix(C.accent, 10), borderRadius: 7, padding: "8px 9px", marginTop: 4, border: "none" }}>
@@ -1429,12 +1474,48 @@ function RiadokOsi({ u, stav }: { u: ReturnType<typeof osCasuKlienta>[number]; s
       </div>
     );
   }
+  const zdarma = u.zdarma !== undefined;
   return (
-    <div style={riadok}>
+    <div style={{ ...riadok, flexWrap: "wrap" }}>
       <span style={stlpecDen}>{denVTyzdni(u.den)} {fmtDMY(u.den)}</span>
-      <span style={{ flex: 1, color: C.textMuted }}>tréning{u.cas ? ` ${u.cas}` : ""}{u.trener ? ` · ${u.trener}` : ""}</span>
+      <span style={{ flex: 1, color: C.textMuted }}>
+        tréning{u.cas ? ` ${u.cas}` : ""}{u.trener ? ` · ${u.trener}` : ""}
+        {zdarma && (
+          <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: C.green }}>
+            zdarma{u.zdarma ? ` · ${u.zdarma}` : ""}
+          </span>
+        )}
+      </span>
       {u.zKalendara && <span style={{ fontSize: 11, color: C.blue }}>z kalendára</span>}
+      {onZdarma && (
+        <button
+          onClick={() => onZdarma(zdarma)}
+          disabled={pracujem}
+          title={zdarma ? "Zrušiť — hodina sa bude z členstva odpočítavať" : "Hodinu z členstva neodpočítať"}
+          style={{ background: "none", border: "none", cursor: "pointer", fontSize: 10.5, color: zdarma ? C.textDim : C.textMuted, padding: "2px 4px" }}
+        >
+          {zdarma ? "zrušiť" : "zdarma"}
+        </button>
+      )}
       <StavHodin stav={stav} />
+      {pisemZdarma && (
+        <div style={{ flexBasis: "100%", display: "flex", gap: 7, marginTop: 5, paddingLeft: 92 }}>
+          <input
+            autoFocus
+            value={dovod || ""}
+            onChange={(e) => setDovod?.(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") onZdarma?.(false); if (e.key === "Escape") onZrusZapis?.(); }}
+            placeholder="prečo zdarma (napr. kompenzácia za zrušený tréning)"
+            style={{ flex: "1 1 240px", padding: "5px 8px", borderRadius: 7, fontSize: 11.5, border: `1px solid ${C.border}`, background: C.bg, color: C.text }}
+          />
+          <button onClick={() => onZdarma?.(false)} disabled={pracujem} style={{ padding: "5px 11px", borderRadius: 7, fontSize: 11.5, fontWeight: 700, border: "none", background: C.accent, color: "#fff", cursor: "pointer" }}>
+            {pracujem ? "…" : "Označiť"}
+          </button>
+          <button onClick={onZrusZapis} style={{ padding: "5px 9px", borderRadius: 7, fontSize: 11.5, border: `1px solid ${C.border}`, background: "none", color: C.textMuted, cursor: "pointer" }}>
+            späť
+          </button>
+        </div>
+      )}
     </div>
   );
 }

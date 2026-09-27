@@ -221,3 +221,35 @@ describe("dokúpené hodiny sa pripočítajú", () => {
     expect(v.riadky.find((r) => r.den === "2026-09-18")!.zostatok).toBe(1);
   });
 });
+
+describe("tréning zadarmo", () => {
+  // Jerry, 27. 9. 2026: „čo keď nechcem, aby sa klientovi odpočítal tréning
+  // od členstva?" Hodina sa odtrénovala, z balíčka sa nestrhne — a nemôže
+  // byť ani na dlh, lebo je darovaná.
+  const os: Udalost[] = [
+    bal("2026-09-02", 6, { nezaplatene: true }),
+    tre("2026-09-02"),
+    { druh: "trening", den: "2026-09-09", zdarma: "kompenzácia za zrušený tréning" },
+    tre("2026-09-16"),
+  ];
+
+  it("z odpočtu ani z dlhu sa nepočíta", () => {
+    const v = vypisHodin(os, "", DNES, null);
+    const r = new Map(v.riadky.filter((x) => x.druh === "trening").map((x) => [x.den, x]));
+    expect(r.get("2026-09-02")).toMatchObject({ zostatok: 6, dlh: 1 });
+    expect(r.get("2026-09-09")).toMatchObject({ zostatok: null, dlh: null });
+    expect(r.get("2026-09-16")).toMatchObject({ zostatok: 5, dlh: 2 });
+    expect(v.koniec).toBe(4);
+  });
+
+  it("dôvod je v texte pre klienta", () => {
+    const t = vypisAkoText(vypisHodin(os, "", DNES, null), "Klient");
+    expect(t).toContain("zdarma (kompenzácia za zrušený tréning)");
+  });
+
+  it("do vyčerpaných hodín sa nepočíta, ale v zozname stojí", () => {
+    const v = vypisHodin(os, "", DNES, null);
+    expect(v.odtrenovane).toBe(2);                                   // tri tréningy, dve hodiny z členstva
+    expect(v.riadky.filter((r) => r.druh === "trening")).toHaveLength(3);
+  });
+});

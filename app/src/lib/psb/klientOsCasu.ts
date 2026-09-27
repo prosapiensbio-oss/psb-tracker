@@ -26,7 +26,7 @@ import { normName } from "./format";
 
 export type Udalost =
   | { druh: "platba"; den: string; suma: number; metoda: string; poznamka?: string }
-  | { druh: "trening"; den: string; cas?: string; trener?: string; nazov?: string; zKalendara?: boolean; minut?: number }
+  | { druh: "trening"; den: string; cas?: string; trener?: string; nazov?: string; zKalendara?: boolean; minut?: number; zdarma?: string }
   | { druh: "balicekOd"; den: string; nazov: string; hodin: number; doDna?: string; zaplatene?: number; odvodene?: boolean; nezaplatene?: boolean; doplnenie?: boolean }
   | { druh: "balicekDo"; den: string; nazov: string; hodin: number; odvodene?: boolean };
 
@@ -80,12 +80,13 @@ type Balicek = { client: string; package: string; total: number; remaining: numb
 type Sluzba = { client: string; date: string; serviceType: string; description: string; price: number };
 type Poplatok = { klient: string; datum: string; popis: string; suma: number };
 type KalUdalost = { zaciatok: string; klient: string | null; typ: string | null };
+type Zdarma = { klient: string; den: string; dovod: string };
 
 const den = (s: string) => (s || "").slice(0, 10);
 
 export function osCasuKlienta(
   meno: string,
-  zdroj: { sessions: Sedenie[]; payments: Platba[]; packages: Balicek[]; kalUdalosti?: KalUdalost[]; services?: Sluzba[]; poplatky?: Poplatok[] },
+  zdroj: { sessions: Sedenie[]; payments: Platba[]; packages: Balicek[]; kalUdalosti?: KalUdalost[]; services?: Sluzba[]; poplatky?: Poplatok[]; treningyZdarma?: Zdarma[] },
   dnes: string = new Date().toISOString().slice(0, 10),
 ): Udalost[] {
   const k = normName(meno);
@@ -178,6 +179,25 @@ export function osCasuKlienta(
   // Nezaplatené sa musí prilepiť aj na riadok, ktorý prišiel z `packages`.
   for (const u of out) {
     if (u.druh === "balicekOd" && nezaplateneDni.has(u.den)) u.nezaplatene = true;
+  }
+
+  /**
+   * Tréning zadarmo sa z členstva neodpočíta.
+   *
+   * Značka je per klient a DEŇ, takže platí pre oba zdroje tréningu — z
+   * exportu aj z kalendára. Dôvod sa nesie so sebou, nech je na osi vidieť,
+   * prečo sa hodina nestrhla.
+   */
+  const zdarma = new Map<string, string>();
+  for (const z of zdroj.treningyZdarma || []) {
+    if (normName(z.klient) === k) zdarma.set(den(z.den), z.dovod || "zadarmo");
+  }
+  if (zdarma.size) {
+    for (const u of out) {
+      if (u.druh !== "trening") continue;
+      const d = zdarma.get(u.den);
+      if (d !== undefined) u.zdarma = d;
+    }
   }
 
   // Najnovšie hore. Pri rovnakom dni ide začiatok balíčka pred tréningy

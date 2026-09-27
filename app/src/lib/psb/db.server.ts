@@ -21,7 +21,7 @@ import { EMPTY_DATA } from "./types";
 const uid = () => crypto.randomUUID();
 
 export async function loadData(DB: D1Database): Promise<PSBData> {
-  const [sessions, services, payments, packages, overrides, acks, log, leads, zavery, vedomosti, poplatky] = await Promise.all([
+  const [sessions, services, payments, packages, overrides, acks, log, leads, zavery, vedomosti, poplatky, zdarma] = await Promise.all([
     DB.prepare("SELECT * FROM sessions").all(),
     DB.prepare("SELECT * FROM services").all(),
     DB.prepare("SELECT * FROM payments").all(),
@@ -44,6 +44,9 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
     // Nezaplatené poplatky z PTminderu. Tabuľka je zrkadlo exportu: čo v nej
     // je, to je otvorené (viď migráciu 0063).
     DB.prepare("SELECT id, datum, client_name, popis, suma_czk FROM poplatky ORDER BY datum DESC")
+      .all().catch(() => ({ results: [] })),
+    // Tréningy, ktoré sa z členstva neodpočítavajú — viď migráciu 0081.
+    DB.prepare("SELECT id, client_name, den, dovod, kto FROM treningy_zdarma ORDER BY den DESC")
       .all().catch(() => ({ results: [] })),
   ]);
 
@@ -100,6 +103,9 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
     })),
     poplatky: (poplatky.results as any[]).map((r) => ({
       id: r.id, datum: r.datum, klient: r.client_name, popis: r.popis || "", suma: Number(r.suma_czk) || 0,
+    })),
+    treningyZdarma: (zdarma.results as any[]).map((r) => ({
+      id: r.id, klient: r.client_name, den: String(r.den).slice(0, 10), dovod: r.dovod || "", kto: r.kto || "",
     })),
     /**
      * V `leads` sú LEN dopyty na úvodný tréning.

@@ -25,6 +25,7 @@ import { Route as ApiVzasNotesRouteImport } from './routes/api/vzas-notes'
 import { Route as ApiVydaneFakturyRouteImport } from './routes/api/vydane-faktury'
 import { Route as ApiVedomostRouteImport } from './routes/api/vedomost'
 import { Route as ApiUsersRouteImport } from './routes/api/users'
+import { Route as ApiTreningZdarmaRouteImport } from './routes/api/trening-zdarma'
 import { Route as ApiTitulkaObrazokRouteImport } from './routes/api/titulka-obrazok'
 import { Route as ApiTitulkaNavrhRouteImport } from './routes/api/titulka-navrh'
 import { Route as ApiTemaRouteImport } from './routes/api/tema'
@@ -154,6 +155,11 @@ const ApiVedomostRoute = ApiVedomostRouteImport.update({
 const ApiUsersRoute = ApiUsersRouteImport.update({
   id: '/api/users',
   path: '/api/users',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTreningZdarmaRoute = ApiTreningZdarmaRouteImport.update({
+  id: '/api/trening-zdarma',
+  path: '/api/trening-zdarma',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiTitulkaObrazokRoute = ApiTitulkaObrazokRouteImport.update({
@@ -463,6 +469,7 @@ export interface FileRoutesByFullPath {
   '/api/tema': typeof ApiTemaRoute
   '/api/titulka-navrh': typeof ApiTitulkaNavrhRoute
   '/api/titulka-obrazok': typeof ApiTitulkaObrazokRoute
+  '/api/trening-zdarma': typeof ApiTreningZdarmaRoute
   '/api/users': typeof ApiUsersRoute
   '/api/vedomost': typeof ApiVedomostRoute
   '/api/vydane-faktury': typeof ApiVydaneFakturyRoute
@@ -531,6 +538,7 @@ export interface FileRoutesByTo {
   '/api/tema': typeof ApiTemaRoute
   '/api/titulka-navrh': typeof ApiTitulkaNavrhRoute
   '/api/titulka-obrazok': typeof ApiTitulkaObrazokRoute
+  '/api/trening-zdarma': typeof ApiTreningZdarmaRoute
   '/api/users': typeof ApiUsersRoute
   '/api/vedomost': typeof ApiVedomostRoute
   '/api/vydane-faktury': typeof ApiVydaneFakturyRoute
@@ -600,6 +608,7 @@ export interface FileRoutesById {
   '/api/tema': typeof ApiTemaRoute
   '/api/titulka-navrh': typeof ApiTitulkaNavrhRoute
   '/api/titulka-obrazok': typeof ApiTitulkaObrazokRoute
+  '/api/trening-zdarma': typeof ApiTreningZdarmaRoute
   '/api/users': typeof ApiUsersRoute
   '/api/vedomost': typeof ApiVedomostRoute
   '/api/vydane-faktury': typeof ApiVydaneFakturyRoute
@@ -670,6 +679,7 @@ export interface FileRouteTypes {
     | '/api/tema'
     | '/api/titulka-navrh'
     | '/api/titulka-obrazok'
+    | '/api/trening-zdarma'
     | '/api/users'
     | '/api/vedomost'
     | '/api/vydane-faktury'
@@ -738,6 +748,7 @@ export interface FileRouteTypes {
     | '/api/tema'
     | '/api/titulka-navrh'
     | '/api/titulka-obrazok'
+    | '/api/trening-zdarma'
     | '/api/users'
     | '/api/vedomost'
     | '/api/vydane-faktury'
@@ -806,6 +817,7 @@ export interface FileRouteTypes {
     | '/api/tema'
     | '/api/titulka-navrh'
     | '/api/titulka-obrazok'
+    | '/api/trening-zdarma'
     | '/api/users'
     | '/api/vedomost'
     | '/api/vydane-faktury'
@@ -875,6 +887,7 @@ export interface RootRouteChildren {
   ApiTemaRoute: typeof ApiTemaRoute
   ApiTitulkaNavrhRoute: typeof ApiTitulkaNavrhRoute
   ApiTitulkaObrazokRoute: typeof ApiTitulkaObrazokRoute
+  ApiTreningZdarmaRoute: typeof ApiTreningZdarmaRoute
   ApiUsersRoute: typeof ApiUsersRoute
   ApiVedomostRoute: typeof ApiVedomostRoute
   ApiVydaneFakturyRoute: typeof ApiVydaneFakturyRoute
@@ -1000,6 +1013,13 @@ declare module '@tanstack/react-router' {
       path: '/api/users'
       fullPath: '/api/users'
       preLoaderRoute: typeof ApiUsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/trening-zdarma': {
+      id: '/api/trening-zdarma'
+      path: '/api/trening-zdarma'
+      fullPath: '/api/trening-zdarma'
+      preLoaderRoute: typeof ApiTreningZdarmaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/titulka-obrazok': {
@@ -1411,6 +1431,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiTemaRoute: ApiTemaRoute,
   ApiTitulkaNavrhRoute: ApiTitulkaNavrhRoute,
   ApiTitulkaObrazokRoute: ApiTitulkaObrazokRoute,
+  ApiTreningZdarmaRoute: ApiTreningZdarmaRoute,
   ApiUsersRoute: ApiUsersRoute,
   ApiVedomostRoute: ApiVedomostRoute,
   ApiVydaneFakturyRoute: ApiVydaneFakturyRoute,
