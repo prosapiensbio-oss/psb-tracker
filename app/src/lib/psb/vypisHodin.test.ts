@@ -17,19 +17,21 @@ describe("odpočet sa vracia na začiatku každého členstva", () => {
     bal("2026-07-09", 6), tre("2026-07-09"), tre("2026-07-17"),
   ];
 
-  it("každý balíček začína od svojich hodín", () => {
+  it("prvý tréning balíčka ukáže jeho hodiny, ďalšie klesajú", () => {
     const v = vypisHodin(os, "", DNES, 4);
     const podlaDna = new Map(v.riadky.map((r) => [`${r.den}|${r.druh}`, r]));
-    expect(podlaDna.get("2026-05-07|balicekOd")!.zostatok).toBe(6);
-    expect(podlaDna.get("2026-05-07|trening")!.zostatok).toBe(5);
-    expect(podlaDna.get("2026-05-28|trening")!.zostatok).toBe(3);
-    expect(podlaDna.get("2026-07-09|balicekOd")!.zostatok).toBe(6);
-    expect(podlaDna.get("2026-07-17|trening")!.zostatok).toBe(4);
+    // Riadok balíčka aj platby ostáva prázdny — počet hodín je v názve.
+    expect(podlaDna.get("2026-05-07|balicekOd")!.zostatok).toBeNull();
+    expect(podlaDna.get("2026-05-15|platba")!.zostatok).toBeNull();
+    expect(podlaDna.get("2026-05-07|trening")!.zostatok).toBe(6);
+    expect(podlaDna.get("2026-05-28|trening")!.zostatok).toBe(4);
+    expect(podlaDna.get("2026-07-09|trening")!.zostatok).toBe(6);
+    expect(podlaDna.get("2026-07-17|trening")!.zostatok).toBe(5);
   });
 
   it("paušál bez hodín v názve odpočet ukončí", () => {
     const v = vypisHodin([bal("2026-05-07", 6), tre("2026-05-10"), bal("2026-06-01", 0), tre("2026-06-05")], "", DNES, null);
-    expect(v.riadky.find((r) => r.den === "2026-05-10")!.zostatok).toBe(5);
+    expect(v.riadky.find((r) => r.den === "2026-05-10")!.zostatok).toBe(6);
     expect(v.riadky.find((r) => r.den === "2026-06-05")!.zostatok).toBeNull();
   });
 });
@@ -44,10 +46,10 @@ describe("dlh — tréning na nezaplatenom členstve", () => {
   it("počíta tréningy, nie hodiny do mínusu", () => {
     const v = vypisHodin(os, "", DNES, 3);
     expect(v.riadky.map((r) => [r.den, r.dlh, r.zostatok])).toEqual([
-      ["2026-09-18", 3, 3],
-      ["2026-09-10", 2, 4],
-      ["2026-09-02", 1, 5],
-      ["2026-09-02", null, 6],
+      ["2026-09-18", 3, 4],
+      ["2026-09-10", 2, 5],
+      ["2026-09-02", 1, 6],
+      ["2026-09-02", null, null],
     ]);
     expect(v.naDlh).toBe(3);
   });
@@ -69,11 +71,11 @@ describe("dlh — tréning na nezaplatenom členstve", () => {
     const v = vypisHodin(os, "", DNES, 14);
     expect(v.riadky.map((r) => [r.den, r.druh, r.dlh, r.zostatok])).toEqual([
       ["2026-09-23", "platba", null, null],
-      ["2026-09-23", "trening", null, 14],
-      ["2026-09-16", "trening", 3, 15],
-      ["2026-09-09", "trening", 2, 16],
-      ["2026-09-02", "trening", 1, 17],
-      ["2026-09-01", "balicekOd", null, 18],
+      ["2026-09-23", "trening", null, 15],
+      ["2026-09-16", "trening", 3, 16],
+      ["2026-09-09", "trening", 2, 17],
+      ["2026-09-02", "trening", 1, 18],
+      ["2026-09-01", "balicekOd", null, null],
     ]);
   });
 
@@ -81,11 +83,11 @@ describe("dlh — tréning na nezaplatenom členstve", () => {
     const os: Udalost[] = [bal("2026-09-02", 2), tre("2026-09-05"), tre("2026-09-12"), tre("2026-09-19"), tre("2026-09-26")];
     const v = vypisHodin(os, "", DNES, 0);
     expect(v.riadky.map((r) => [r.den, r.zostatok, r.dlh])).toEqual([
-      ["2026-09-26", 0, 2],
-      ["2026-09-19", 0, 1],
-      ["2026-09-12", 0, null],
-      ["2026-09-05", 1, null],
-      ["2026-09-02", 2, null],
+      ["2026-09-26", null, 2],
+      ["2026-09-19", null, 1],
+      ["2026-09-12", 1, null],
+      ["2026-09-05", 2, null],
+      ["2026-09-02", null, null],
     ]);
   });
 
@@ -112,7 +114,7 @@ describe("posledné členstvo sa zrovná s PTminderom", () => {
     const os: Udalost[] = [bal("2026-09-02", 6), tre("2026-09-09"), tre("2026-09-16")];
     const v = vypisHodin(os, "", DNES, 6);
     expect(v.koniec).toBe(6);
-    expect(v.riadky[v.riadky.length - 1].zostatok).toBe(8);   // riadok balíčka
+    expect(v.riadky.find((r) => r.den === "2026-09-09")!.zostatok).toBe(8);   // prvý tréning
   });
 
   it("zrovnáva sa ku dňu exportu, nie k tréningu z kalendára", () => {
@@ -123,12 +125,13 @@ describe("posledné členstvo sa zrovná s PTminderom", () => {
       { druh: "trening", den: "2026-09-25", zKalendara: true },
     ];
     const v = vypisHodin(os, "", DNES, 3);
-    expect(v.riadky[v.riadky.length - 1].zostatok).toBe(6);   // balíček ostal šesťhodinový
+    expect(v.riadky.find((r) => r.den === "2026-09-02" && r.druh === "trening")!.zostatok).toBe(6);
     expect(v.koniec).toBe(2);                                  // po tréningu z kalendára
   });
 
   it("bez čísla z karty sa nič neposúva", () => {
     const v = vypisHodin([bal("2026-09-02", 6), tre("2026-09-09")], "", DNES, null);
+    expect(v.riadky[0].zostatok).toBe(6);
     expect(v.koniec).toBe(5);
   });
 });
@@ -141,7 +144,8 @@ describe("dĺžka tréningu", () => {
 
   it("do odpočtu ide skutočná dĺžka", () => {
     const v = vypisHodin([bal("2026-09-02", 18), tre("2026-09-09", 90)], "", DNES, null);
-    expect(v.riadky[0].zostatok).toBe(16.5);
+    expect(v.riadky[0].zostatok).toBe(18);
+    expect(v.koniec).toBe(16.5);
     expect(v.odtrenovane).toBe(1.5);
   });
 });
@@ -152,12 +156,12 @@ describe("obdobie", () => {
   it("staršie členstvá sú vo výpise aj s odpočtom", () => {
     const v = vypisHodin(os, "", DNES, 16);
     expect(v.riadky).toHaveLength(5);
-    expect(v.riadky.find((r) => r.den === "2025-05-10")!.zostatok).toBe(5);
+    expect(v.riadky.find((r) => r.den === "2025-05-10")!.zostatok).toBe(6);
   });
 
   it("obdobie nesie počiatočný stav", () => {
     const v = vypisHodin(os, "2026-09-10", DNES, 16);
-    expect(v.zaciatok).toBe(17);
+    expect(v.zaciatok).toBe(18);
     expect(v.odtrenovane).toBe(1);
   });
 
@@ -176,8 +180,7 @@ describe("text pre klienta", () => {
     const t = vypisAkoText(vypisHodin(os, "", DNES, 5), "Dan Kouřil");
     expect(t).toContain("Výpis hodín — Dan Kouřil");
     expect(t).toContain("OFF - 6h BEZ viazanosti · 6 h · do 28. 10. 2026");
-    expect(t).toContain("zostáva 6 h");
-    expect(t).toContain("zostáva 5 h · nezaplatené · 1. tréning");
+    expect(t).toContain("zostávalo 6 h · nezaplatené · 1. tréning");
     expect(t).toContain("Tréningov na nezaplatenom členstve: 1");
     expect(t).toContain("tréning 15:00 · Jerry");
   });
@@ -190,6 +193,6 @@ describe("kotva", () => {
   });
 
   it("bez balíčka žiadne stavy", () => {
-    expect(priebehBalickov([tre("2026-09-01")], 5, DNES).get(tre("2026-09-01"))).toBeUndefined();
+    expect(priebehBalickov([tre("2026-09-01")], 5, DNES).stavy.size).toBe(1);
   });
 });

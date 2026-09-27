@@ -146,7 +146,10 @@ const vCase = (os: Udalost[]): Udalost[] => {
 };
 
 export type StavRiadku = {
-  /** Koľko hodín v balíčku zostáva po tomto riadku. `null` = appka nevie. */
+  /**
+   * Koľkátá hodina balíčka to je, počítané dolu — prvý tréning zo šiestich
+   * ukáže 6, posledný 1. `null` = appka nevie alebo je riadok bez hodiny.
+   */
   zostatok: number | null;
   /** Koľkátý tréning na nezaplatenom balíčku to je (1, 2, 3…). */
   dlh: number | null;
@@ -162,8 +165,13 @@ export type StavRiadku = {
  * Sú to dve nezávislé veci a preto dve čísla:
  *
  * 1. **Odpočet** sa pri každom začiatku členstva vráti na jeho hodiny a
- *    tréningom klesá. Paušál bez hodín v názve (SILVER, GOLD, ČLENSTVÍ ONE)
- *    odpočet UKONČÍ — appka o ňom nevie nič a tvrdiť číslo by bol výmysel.
+ *    tréningom klesá. Číslo pri tréningu je stav PRED ním, teda koľkátá
+ *    hodina balíčka to je: prvá zo šiestich ukáže 6, posledná 1 (Jerry,
+ *    27. 9. 2026: „1 h = posledná v balíku a prvá hodina v balíku = 6 h").
+ *    Riadok balíčka aj platby ostáva prázdny — balíček má počet hodín
+ *    v názve a platba hodiny nemení. Paušál bez hodín v názve (SILVER, GOLD,
+ *    ČLENSTVÍ ONE) odpočet UKONČÍ — appka o ňom nevie nič a tvrdiť číslo by
+ *    bol výmysel.
  * 2. **Dlh** hovorí, koľký tréning si klient vybral skôr, než zaň zaplatil.
  *    Jerry, 27. 9. 2026: „má nový balík, ale je −1 (18), ďalší týždeň −2 (17),
  *    −3 (16), a na štvrtý týždeň zaplatila, tak to už len pokračuje 15, 14 —
@@ -191,7 +199,7 @@ export function priebehBalickov(
   os: Udalost[],
   zostatokTeraz: number | null = null,
   dnes = new Date().toISOString().slice(0, 10),
-): Map<Udalost, StavRiadku> {
+): { stavy: Map<Udalost, StavRiadku>; koniec: number | null } {
   const rad = vCase(os).filter((u) => u.den <= dnes);
   const stavy = new Map<Udalost, StavRiadku>();
 
@@ -220,6 +228,7 @@ export function priebehBalickov(
   // inak by sa balíček Dana Kouřila nafúkol zo 6 na 7 hodín.
   let denExportu = "";
   for (const u of rad) if (u.druh === "trening" && !u.zKalendara && u.den > denExportu) denExportu = u.den;
+  let koniec: number | null = null;
 
   for (const usek of useky) {
     const b = usek.balicek;
@@ -233,34 +242,38 @@ export function priebehBalickov(
     const zaplateneOd = b?.nezaplatene ? null : platbaKBalicku || (b ? b.den : undefined);
 
     let dlhPocet = 0;
-    const doUseku: { u: Udalost; zostatok: number | null }[] = [];
+    const doUseku: { u: Udalost; po: number | null }[] = [];
     for (const u of usek.riadky) {
       let dlh: number | null = null;
+      let zostatok: number | null = null;
       if (u.druh === "trening") {
-        // Prebytok nad hodiny členstva sa preleje do dlhu, odpočet stojí na nule.
+        // Číslo pri tréningu je stav PRED ním. Keď už hodiny nie sú, riadok
+        // číslo nemá a tréning sa počíta do dlhu.
         const vycerpane = bezi !== null && bezi < hodinTreningu(u);
+        if (bezi !== null && !vycerpane) zostatok = bezi;
         if (bezi !== null) bezi = Math.max(0, bezi - hodinTreningu(u));
         if (vycerpane || !zaplateneOd || u.den < zaplateneOd) dlh = (dlhPocet += 1);
       }
-      // Pri platbe ostáva okno prázdne — hodiny nemení a číslo vedľa nej
-      // len opakuje riadok nad ňou (Jerry, 27. 9. 2026).
-      const zostatok = u.druh === "platba" ? null : bezi;
-      doUseku.push({ u, zostatok });
+      doUseku.push({ u, po: u.druh === "trening" ? bezi : null });
       stavy.set(u, { zostatok, dlh });
     }
 
     // Posledné členstvo sa zrovná s číslom, ktoré appka ukazuje na karte.
-    const kExportu = [...doUseku].reverse().find((x) => x.u.den <= (denExportu || dnes) && x.zostatok !== null)?.zostatok;
+    const kExportu = [...doUseku].reverse().find((x) => x.u.den <= (denExportu || dnes) && x.po !== null)?.po;
     if (b && b === posledny && zostatokTeraz != null && kExportu != null && kExportu !== zostatokTeraz) {
       const posun = zostatokTeraz - kExportu;
-      for (const { u, zostatok } of doUseku) {
-        if (zostatok === null) continue;
-        stavy.set(u, { zostatok: zostatok + posun, dlh: stavy.get(u)?.dlh ?? null });
+      if (bezi !== null) bezi += posun;
+      for (const { u } of doUseku) {
+        const st = stavy.get(u);
+        if (!st || st.zostatok === null) continue;
+        stavy.set(u, { zostatok: st.zostatok + posun, dlh: st.dlh });
       }
     }
+
+    if (b === posledny) koniec = bezi;
   }
 
-  return stavy;
+  return { stavy, koniec };
 }
 
 /**
@@ -272,11 +285,10 @@ export function priebehBalickov(
  */
 export function vypisHodin(os: Udalost[], od = "", doDna = "", zostatokTeraz: number | null = null): Vypis {
   const dnes = doDna || new Date().toISOString().slice(0, 10);
-  const stavy = priebehBalickov(os, zostatokTeraz, dnes);
+  const { stavy, koniec: konecnyZostatok } = priebehBalickov(os, zostatokTeraz, dnes);
   const vsetko = vCase(os);
 
   let zaciatok: number | null = null;
-  let koniec: number | null = null;
   const riadky: RiadokVypisu[] = [];
   let kupene = 0;
   let odtrenovane = 0;
@@ -298,7 +310,6 @@ export function vypisHodin(os: Udalost[], od = "", doDna = "", zostatokTeraz: nu
     if (u.druh === "trening") odtrenovane += hodinTreningu(u);
     if (u.druh === "platba") zaplatene += u.suma;
     if (stav?.dlh) naDlh += 1;
-    if (zostatok !== null) koniec = zostatok;
     riadky.push({
       den: u.den,
       popis: popisZ(u),
@@ -316,7 +327,7 @@ export function vypisHodin(os: Udalost[], od = "", doDna = "", zostatokTeraz: nu
     od: od || (vsetko[0]?.den ?? ""),
     do: doDna || (vsetko[vsetko.length - 1]?.den ?? ""),
     zaciatok,
-    koniec,
+    koniec: konecnyZostatok,
     kupene,
     odtrenovane,
     zaplatene,
@@ -335,7 +346,9 @@ export function poslednychMesiacov(n: number, dnes = new Date().toISOString().sl
 /** Výpis ako text do mailu — klient ho číta v tele správy, nie v prílohe. */
 export function vypisAkoText(v: Vypis, klient: string): string {
   const riadky = [...v.riadky].reverse().map((r) => {
-    const stav = r.zostatok !== null ? `zostáva ${hod(r.zostatok)} h` : "";
+    // Číslo je stav PRED tréningom, preto „zostávalo" — v tej chvíli ich
+    // toľko mal, vrátane tej, ktorú práve išiel odtrénovať.
+    const stav = r.zostatok !== null ? `zostávalo ${hod(r.zostatok)} h` : "";
     const dlh = r.dlh ? `nezaplatené · ${r.dlh}. tréning` : "";
     const znacka = [stav, dlh].filter(Boolean).join(" · ");
     // padEnd nestačí: dlhší popis by sa zlepil so značkou („do 27. 10. 2026zostáva").

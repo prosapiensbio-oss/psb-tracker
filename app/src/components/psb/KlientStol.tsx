@@ -218,7 +218,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
    * Dve čísla k riadku osi: odpočet v členstve a dlh, keď sa nezaplatilo.
    * Pravidlá sú v `priebehBalickov`.
    */
-  const stavy = useMemo(() => priebehBalickov(os, zostatokTeraz), [os, zostatokTeraz]);
+  const { stavy } = useMemo(() => priebehBalickov(os, zostatokTeraz), [os, zostatokTeraz]);
 
   const mojeBalicky = useMemo(
     () => balicky.filter((b) => normName(b.klient) === normName(meno) && !b.zrusene_at).sort((a, b) => b.platnost_od.localeCompare(a.platnost_od)),

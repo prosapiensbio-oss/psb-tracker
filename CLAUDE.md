@@ -1306,6 +1306,11 @@ Z toho vzišiel model odpočtu, ktorý si Jerry vypýtal (`priebehBalickov`):
 - **Odpočet sa pri každom začiatku členstva vráti na jeho hodiny** (6, 5, 4…)
   a tréningom klesá. Nie je to jeden súčet cez celú históriu — to Jerry
   výslovne odmietol („nepočítalo by sa to ako celok spolu 9, spolu 8").
+- **Číslo pri tréningu je stav PRED ním**, teda koľkátá hodina balíčka to je.
+  Jerry, 27. 9. 2026: „1 h = posledná v balíku a prvá hodina v balíku = 6 h."
+  Prvý zo šiestich ukáže 6, šiesty 1, siedmy už číslo nemá a je to −1.
+- **Riadok balíčka číslo NEMÁ.** Počet hodín je v jeho názve a číslo vedľa
+  pôsobilo mätúco („OFF - 18 hodín offline · ≈18 h … 18 h").
 - **Pod nulu odpočet nejde.** Prebytok sa preleje do druhého čísla.
 - **Dlh (−1, −2, −3) je počet tréningov, ktoré si klient vybral skôr, než zaň
   zaplatil.** Jerry, 27. 9. 2026: „na štvrtý týždeň zaplatila, tak to už len
