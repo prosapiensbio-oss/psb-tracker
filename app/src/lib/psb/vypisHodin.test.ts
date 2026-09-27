@@ -196,3 +196,28 @@ describe("kotva", () => {
     expect(priebehBalickov([tre("2026-09-01")], 5, DNES).stavy.size).toBe(1);
   });
 });
+
+describe("dokúpené hodiny sa pripočítajú", () => {
+  // Markéta Lozias: balíček 6 h z 31. 7. vyčerpala 7. 9., 12. 9. si dokúpila
+  // tri hodiny a 18. 9. trénovala. Kým appka dokúpené hodiny ignorovala,
+  // vyšlo jej −2 nad rámec balíčka.
+  const dopl = (den: string, hodin: number): Udalost =>
+    ({ druh: "balicekOd", den, nazov: "Doplnenie členstva", hodin, doplnenie: true });
+
+  it("po dokúpení odpočet pokračuje, nezačína odznova", () => {
+    const os: Udalost[] = [
+      bal("2026-07-31", 2), tre("2026-08-07"), tre("2026-09-07"),
+      dopl("2026-09-12", 3), tre("2026-09-18"),
+    ];
+    const v = vypisHodin(os, "", DNES, null);
+    expect(v.riadky.find((r) => r.den === "2026-09-07")!.zostatok).toBe(1);
+    expect(v.riadky.find((r) => r.den === "2026-09-18")).toMatchObject({ zostatok: 3, dlh: null });
+    expect(v.koniec).toBe(2);
+  });
+
+  it("doplnenie bez hodín odpočet nemení", () => {
+    const os: Udalost[] = [bal("2026-07-31", 2), tre("2026-08-07"), dopl("2026-09-12", 0), tre("2026-09-18")];
+    const v = vypisHodin(os, "", DNES, null);
+    expect(v.riadky.find((r) => r.den === "2026-09-18")!.zostatok).toBe(1);
+  });
+});

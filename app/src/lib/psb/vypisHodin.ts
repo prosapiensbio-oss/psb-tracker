@@ -233,6 +233,8 @@ export function priebehBalickov(
   for (const usek of useky) {
     const b = usek.balicek;
     let bezi: number | null = b ? (usek.hodin > 0 ? usek.hodin : null) : null;
+    // Dokúpené hodiny sa k bežiacemu členstvu PRIPOČÍTAJÚ, nezačínajú odznova.
+    const maDokupene = usek.riadky.some((u) => u.druh === "balicekOd" && u.doplnenie && u.hodin > 0);
 
     const platbaKBalicku = b
       ? usek.riadky.find((u) => u.druh === "platba" && dniMedzi(b.den, u.den) <= 30)?.den
@@ -246,6 +248,7 @@ export function priebehBalickov(
     for (const u of usek.riadky) {
       let dlh: number | null = null;
       let zostatok: number | null = null;
+      if (u.druh === "balicekOd" && u.doplnenie && u.hodin > 0) bezi = (bezi || 0) + u.hodin;
       if (u.druh === "trening") {
         // Číslo pri tréningu je stav PRED ním. Keď už hodiny nie sú, riadok
         // číslo nemá a tréning sa počíta do dlhu.
@@ -260,7 +263,9 @@ export function priebehBalickov(
 
     // Posledné členstvo sa zrovná s číslom, ktoré appka ukazuje na karte.
     const kExportu = [...doUseku].reverse().find((x) => x.u.den <= (denExportu || dnes) && x.po !== null)?.po;
-    if (b && b === posledny && zostatokTeraz != null && kExportu != null && kExportu !== zostatokTeraz) {
+    // Keď appka pozná dokúpené hodiny, je informovanejšia než karta klienta
+    // (tá ráta len z aktívneho členstva) a zrovnávať sa nemá načím.
+    if (b && b === posledny && !maDokupene && zostatokTeraz != null && kExportu != null && kExportu !== zostatokTeraz) {
       const posun = zostatokTeraz - kExportu;
       if (bezi !== null) bezi += posun;
       for (const { u } of doUseku) {

@@ -76,7 +76,7 @@ const SLUZBA_JE_BALICEK = (typ: string) => typ === "Membership" || typ === "Pack
 
 type Sedenie = { client: string; date: string; time?: string; sessionTrainer?: string; sessionName?: string; duration?: number };
 type Platba = { client: string; date: string; amount: number; method: string; note?: string };
-type Balicek = { client: string; package: string; total: number; remaining: number; validFrom?: string; validTo?: string; payment?: number; kind?: string };
+type Balicek = { client: string; package: string; total: number; remaining: number; validFrom?: string; validTo?: string; payment?: number; kind?: string; added?: string };
 type Sluzba = { client: string; date: string; serviceType: string; description: string; price: number };
 type Poplatok = { klient: string; datum: string; popis: string; suma: number };
 type KalUdalost = { zaciatok: string; klient: string | null; typ: string | null };
@@ -114,6 +114,21 @@ export function osCasuKlienta(
   }
 
   for (const b of moje(zdroj.packages)) {
+    /**
+     * DOKÚPENÉ HODINY MAJÚ DEŇ AJ POČET — len inde.
+     *
+     * „Doplnenie členstva" nemá platnosť od–do, takže sa na os dlho nedostalo
+     * vôbec. Deň má ale v stĺpci `Added` a počet hodín v `# of sessions`
+     * („2 left from 3"). Bez nich vyšlo Markéte Lozias, že 18. 9. trénovala
+     * nad rámec balíčka — pritom 12. 9. si dokúpila tri hodiny (Jerry,
+     * 27. 9. 2026: „ako je možné, že má −2, keď zaplatila 9. 9.?").
+     * Z 65 takých riadkov má deň 27; zvyšok na os položiť nejde.
+     */
+    if (!b.validFrom && b.added && b.total > 0 && jeDoplnenie(b.package)) {
+      const d = den(b.added);
+      if (d && d <= dnes) out.push({ druh: "balicekOd", den: d, nazov: b.package, hodin: b.total, doplnenie: true });
+      continue;
+    }
     const od = den(b.validFrom || "");
     const doDna = den(b.validTo || "");
     // Doplnenie členstva nemá v exporte dátumy — na os ho položiť nejde,
