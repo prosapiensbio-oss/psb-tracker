@@ -3,7 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 
 import { dlhKlienta } from "../../lib/psb/dlhKlienta";
 import { VypisHodinPanel } from "./VypisHodinPanel";
-import { hod, hodinTreningu, zostatkyOsi } from "../../lib/psb/vypisHodin";
+import { hod, priebehBalickov, type StavRiadku } from "../../lib/psb/vypisHodin";
 import { normName, fmtCZK, fmtDMY } from "../../lib/psb/format";
 import { jeBeta } from "../../lib/psb/beta";
 import { menoKluc } from "../../lib/psb/compute";
@@ -176,8 +176,17 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
 
   const c = meno ? clients[meno] : undefined;
   const os = useMemo(
-    () => (meno ? osCasuKlienta(meno, { sessions: data.sessions as never, payments: data.payments as never, packages: (data.packages || []) as never, kalUdalosti }) : []),
-    [meno, data.sessions, data.payments, data.packages, kalUdalosti],
+    () => (meno ? osCasuKlienta(meno, {
+      sessions: data.sessions as never,
+      payments: data.payments as never,
+      packages: (data.packages || []) as never,
+      // Export služieb je kniha predajov od 1/2025 — bez neho stojí na osi
+      // jediný balíček a odpočet nemá kde začať.
+      services: (data.services || []) as never,
+      poplatky: (data.poplatky || []) as never,
+      kalUdalosti,
+    }) : []),
+    [meno, data.sessions, data.payments, data.packages, data.services, data.poplatky, kalUdalosti],
   );
 
   /**
@@ -206,26 +215,10 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
   const zostatokTeraz = c && c.packageTotal > 0 ? c.packageRemaining : null;
 
   /**
-   * Dva bežiace súčty k osi času.
-   *
-   * `spolu` sú odtrénované hodiny od prvého dňa — to appka vie vždy.
-   * `zostatok` je stav balíčka; počíta ho `zostatkyOsi` spätne od čísla,
-   * ktoré appka ukazuje na karte, aby rad vždy skončil na tom, čo hovorí
-   * PTminder. Kde balíček nesiaha, je `null` — prázdno je lepšie než
-   * vymyslený riadok.
+   * Dve čísla k riadku osi: odpočet v členstve a dlh, keď sa nezaplatilo.
+   * Pravidlá sú v `priebehBalickov`.
    */
-  const stavy = useMemo(() => {
-    const m = new Map<(typeof os)[number], { zmena: number; zostatok: number | null; spolu: number }>();
-    const { stavy: zost } = zostatkyOsi(os, zostatokTeraz);
-    const odNajstarsieho = [...os].sort((a, b) => a.den.localeCompare(b.den));
-    let spolu = 0;
-    for (const u of odNajstarsieho) {
-      const zmena = u.druh === "balicekOd" ? (u.hodin || 0) : u.druh === "trening" ? -hodinTreningu(u) : 0;
-      if (u.druh === "trening") spolu += hodinTreningu(u);
-      m.set(u, { zmena, zostatok: zost.has(u) ? (zost.get(u) as number) : null, spolu });
-    }
-    return m;
-  }, [os, zostatokTeraz]);
+  const stavy = useMemo(() => priebehBalickov(os, zostatokTeraz), [os, zostatokTeraz]);
 
   const mojeBalicky = useMemo(
     () => balicky.filter((b) => normName(b.klient) === normName(meno) && !b.zrusene_at).sort((a, b) => b.platnost_od.localeCompare(a.platnost_od)),
@@ -1374,33 +1367,39 @@ function doNarodenin(narodeniny: string): number | null {
  * hovorí, ČO sa stalo; toto k tomu pripisuje jediné číslo, ktoré pri spore
  * chýba — koľko hodín po tom riadku zostalo.
  */
-function StavHodin({ zmena, stav, sucet }: { zmena?: number; stav?: { zostatok: number | null; spolu: number }; sucet?: boolean }) {
-  if (!stav) return null;
-  // Zostatok balíčka, kde sa dá; inak koľko hodín má klient za sebou. Sú to
-  // dve rôzne veci, preto „= 14 h" verzus „spolu 42 h" — nie dve holé čísla.
-  const text = stav.zostatok !== null ? `= ${hod(stav.zostatok)} h` : sucet ? `spolu ${hod(stav.spolu)} h` : "";
-  if (!zmena && !text) return null;
+/**
+ * Dve čísla vpravo od riadku.
+ *
+ * Vľavo −1, −2, −3: koľký tréning si klient vybral na členstve, ktoré ešte
+ * nebolo zaplatené. Svieti len vtedy, keď sa naozaj nezaplatilo — inak je
+ * tam prázdno. Vpravo odpočet hodín v členstve (6, 5, 4…).
+ */
+function StavHodin({ stav }: { stav?: StavRiadku }) {
+  if (!stav || (stav.zostatok === null && !stav.dlh)) return null;
   return (
     <span style={{ minWidth: 104, textAlign: "right", fontSize: 11.5, fontVariantNumeric: "tabular-nums", color: C.textDim }}>
-      {zmena ? <b style={{ color: zmena > 0 ? C.green : C.textMuted }}>{zmena > 0 ? `+${hod(zmena)}` : `−${hod(-zmena)}`} h</b> : null}
-      {text ? <span style={{ marginLeft: zmena ? 7 : 0 }}>{text}</span> : null}
+      {stav.dlh ? <b style={{ color: C.orange }} title="tréning na nezaplatenom členstve">−{stav.dlh}</b> : null}
+      {stav.zostatok !== null ? (
+        <span style={{ marginLeft: stav.dlh ? 8 : 0, color: stav.zostatok <= 1 ? C.orange : C.textDim }}>{hod(stav.zostatok)} h</span>
+      ) : null}
     </span>
   );
 }
 
-function RiadokOsi({ u, stav }: { u: ReturnType<typeof osCasuKlienta>[number]; stav?: { zmena: number; zostatok: number | null; spolu: number } }) {
+function RiadokOsi({ u, stav }: { u: ReturnType<typeof osCasuKlienta>[number]; stav?: StavRiadku }) {
   if (u.druh === "balicekOd") {
     return (
       <div style={{ ...riadok, background: mix(C.accent, 10), borderRadius: 7, padding: "8px 9px", marginTop: 4, border: "none" }}>
         <span style={stlpecDen}>{fmtDMY(u.den)}</span>
         <span style={{ flex: 1 }}>
           <b>{u.nazov}</b>
+          {u.nezaplatene && <span style={{ marginLeft: 7, fontSize: 11, fontWeight: 700, color: C.orange }}>nezaplatené</span>}
           <span style={{ color: C.textMuted }}>
-            {" "}· {u.hodin ? `${u.odvodene ? "≈" : ""}${u.hodin} h` : "bez limitu"}{u.doDna ? ` · do ${fmtDMY(u.doDna)}` : ""}
+            {" "}· {u.hodin ? `${u.odvodene ? "≈" : ""}${u.hodin} h` : u.doplnenie ? "dokúpené hodiny" : "paušál"}{u.doDna ? ` · do ${fmtDMY(u.doDna)}` : ""}
             {u.zaplatene ? ` · ${fmtCZK(u.zaplatene)}` : ""}
           </span>
         </span>
-        <StavHodin zmena={stav?.zmena} stav={stav} />
+        <StavHodin stav={stav} />
       </div>
     );
   }
@@ -1422,7 +1421,7 @@ function RiadokOsi({ u, stav }: { u: ReturnType<typeof osCasuKlienta>[number]; s
       <span style={stlpecDen}>{fmtDMY(u.den)}</span>
       <span style={{ flex: 1, color: C.textMuted }}>tréning{u.cas ? ` ${u.cas}` : ""}{u.trener ? ` · ${u.trener}` : ""}</span>
       {u.zKalendara && <span style={{ fontSize: 11, color: C.blue }}>z kalendára</span>}
-      <StavHodin zmena={stav?.zmena} stav={stav} sucet />
+      <StavHodin stav={stav} />
     </div>
   );
 }

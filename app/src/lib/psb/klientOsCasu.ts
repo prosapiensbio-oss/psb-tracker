@@ -27,7 +27,7 @@ import { normName } from "./format";
 export type Udalost =
   | { druh: "platba"; den: string; suma: number; metoda: string; poznamka?: string }
   | { druh: "trening"; den: string; cas?: string; trener?: string; nazov?: string; zKalendara?: boolean; minut?: number }
-  | { druh: "balicekOd"; den: string; nazov: string; hodin: number; doDna?: string; zaplatene?: number; odvodene?: boolean }
+  | { druh: "balicekOd"; den: string; nazov: string; hodin: number; doDna?: string; zaplatene?: number; odvodene?: boolean; nezaplatene?: boolean; doplnenie?: boolean }
   | { druh: "balicekDo"; den: string; nazov: string; hodin: number; odvodene?: boolean };
 
 /**
@@ -39,19 +39,35 @@ export type Udalost =
  * Tú istú hodnotu číta `deriveClients` v compute.ts; definícia je JEDNA.
  */
 export function hodinZNazvuBalicka(nazov: string): number {
-  return Number(/(\d+)\s*h/i.exec(nazov || "")?.[1] || 0);
+  return Number(/(\d+)\s*(?:h\b|hodin|hodiny|hodín)/i.exec(nazov || "")?.[1] || 0);
 }
+
+/**
+ * Doplnenie členstva — hodiny sa dokupujú k bežiacemu balíčku.
+ *
+ * V exporte je 144 takých riadkov a ani jeden nehovorí, o koľko hodín ide.
+ * Na os sa preto kladú ako značka („v ten deň sa dokupovalo"), nie ako číslo;
+ * rozdiel oproti PTminderu sa k nim priradí, ak nejaký je.
+ */
+export function jeDoplnenie(nazov: string): boolean {
+  return /doplnenie/i.test(nazov || "");
+}
+
+/** Čo z exportu služieb je predaj tréningov a čo tovar (míček, poukaz). */
+const SLUZBA_JE_BALICEK = (typ: string) => typ === "Membership" || typ === "Package";
 
 type Sedenie = { client: string; date: string; time?: string; sessionTrainer?: string; sessionName?: string; duration?: number };
 type Platba = { client: string; date: string; amount: number; method: string; note?: string };
 type Balicek = { client: string; package: string; total: number; remaining: number; validFrom?: string; validTo?: string; payment?: number; kind?: string };
+type Sluzba = { client: string; date: string; serviceType: string; description: string; price: number };
+type Poplatok = { klient: string; datum: string; popis: string; suma: number };
 type KalUdalost = { zaciatok: string; klient: string | null; typ: string | null };
 
 const den = (s: string) => (s || "").slice(0, 10);
 
 export function osCasuKlienta(
   meno: string,
-  zdroj: { sessions: Sedenie[]; payments: Platba[]; packages: Balicek[]; kalUdalosti?: KalUdalost[] },
+  zdroj: { sessions: Sedenie[]; payments: Platba[]; packages: Balicek[]; kalUdalosti?: KalUdalost[]; services?: Sluzba[]; poplatky?: Poplatok[] },
   dnes: string = new Date().toISOString().slice(0, 10),
 ): Udalost[] {
   const k = normName(meno);
@@ -90,6 +106,45 @@ export function osCasuKlienta(
     const odvodene = !b.total && zNazvu > 0;
     if (od) out.push({ druh: "balicekOd", den: od, nazov: b.package, hodin, doDna: doDna || undefined, zaplatene: b.payment, odvodene });
     if (doDna && doDna <= dnes) out.push({ druh: "balicekDo", den: doDna, nazov: b.package, hodin, odvodene });
+  }
+
+  /**
+   * ZAČIATKY ČLENSTIEV Z EXPORTU SLUŽIEB
+   *
+   * Jerry, 26. 9. 2026: „vidím zapísané platby, ale nevidím začiatky členstiev,
+   * iba tak max posledného." Bola to pravda o zdroji: `packages` je SNÍMKA
+   * dneška (55 riadkov s dátumom, najstarší 3/2026), takže na osi stál jediný
+   * balíček. Export služieb (Payroll → Services) je naproti tomu KNIHA — 456
+   * riadkov od 5. 1. 2025 — a nesie každý predaj členstva aj s dňom a cenou.
+   *
+   * Riadok z `packages` má prednosť, lebo vie aj platnosť a zostatok; služba
+   * v ten istý deň s tým istým názvom sa preto preskočí.
+   */
+  const uzJe = new Set(out.filter((x) => x.druh === "balicekOd").map((x) => `${x.den}|${normName(x.nazov)}`));
+  const nezaplateneDni = new Set(
+    (zdroj.poplatky || []).filter((p) => normName(p.klient) === k).map((p) => den(p.datum)),
+  );
+  for (const sl of (zdroj.services || []).filter((x) => normName(x.client) === k)) {
+    if (!SLUZBA_JE_BALICEK(sl.serviceType)) continue;
+    const d = den(sl.date);
+    if (!d || d > dnes) continue;
+    const kluc = `${d}|${normName(sl.description)}`;
+    if (uzJe.has(kluc)) continue;
+    uzJe.add(kluc);
+    const zNazvu = hodinZNazvuBalicka(sl.description);
+    out.push({
+      druh: "balicekOd",
+      den: d,
+      nazov: sl.description,
+      hodin: zNazvu,
+      zaplatene: sl.price || undefined,
+      nezaplatene: nezaplateneDni.has(d) || undefined,
+      doplnenie: jeDoplnenie(sl.description) || undefined,
+    });
+  }
+  // Nezaplatené sa musí prilepiť aj na riadok, ktorý prišiel z `packages`.
+  for (const u of out) {
+    if (u.druh === "balicekOd" && nezaplateneDni.has(u.den)) u.nezaplatene = true;
   }
 
   // Najnovšie hore. Pri rovnakom dni ide začiatok balíčka pred tréningy

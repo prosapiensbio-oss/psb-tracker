@@ -1291,3 +1291,37 @@ Zovšeobecnenie: **keď appka niekde ukazuje číslo, ktorému verí, odvodený 
 sa má od neho odvíjať — nie ho prepočítavať nanovo z neúplných vstupov.** Je
 to tá istá vec ako „číslo, ktoré vidí obrazovka, musí vidieť aj Jarvis", len
 o riadok nižšie.
+
+## Snímka verzus kniha: `packages` je dnešok, `services` je história
+
+27. 9. 2026 Jerry: „vidím zapísané platby, ale nevidím začiatky členstiev, iba
+tak max posledného." Bola to pravda o zdroji, nie o obrazovke. Os času brala
+balíčky z `packages` — to je SNÍMKA aktuálneho stavu z PTmindera (55 riadkov
+s dátumom, najstarší 3/2026). Kniha predajov je `services` (Payroll → Services):
+708 riadkov od 5. 1. 2025, každý s dňom, názvom aj cenou. Tá istá dvojica platí
+inde v appke tiež — keď niečo „chýba", over najprv, či sa nečíta zo snímky.
+
+Z toho vzišiel model odpočtu, ktorý si Jerry vypýtal (`priebehBalickov`):
+
+- **Odpočet sa pri každom začiatku členstva vráti na jeho hodiny** (6, 5, 4…)
+  a tréningom klesá. Nie je to jeden súčet cez celú históriu — to Jerry
+  výslovne odmietol („nepočítalo by sa to ako celok spolu 9, spolu 8").
+- **Pod nulu odpočet nejde.** Prebytok sa preleje do druhého čísla.
+- **Dlh (−1, −2, −3) je počet tréningov, za ktoré klient nezaplatil** — buď je
+  poplatok v PTminderi stále otvorený, alebo sa členstvo vyčerpalo a ďalšie
+  nepribudlo. NEZNAČÍ sa to, že platba prišla o pár dní po tréningu: tak to
+  chodí bežne a svietilo by 68 zo 125 klientov.
+- **Dve členstvá kúpené v ten istý deň sa SČÍTAJÚ**, nezačínajú odznova.
+  PTminder ich vyváža ako dva riadky (Peter Gažo, Anna Nova).
+- **Posledné členstvo sa zrovná s číslom z karty klienta, a to KU DŇU EXPORTU.**
+  Dopredný odpočet sedel na ostrých dátach v 28 z 35 prípadov; rozdiel robia
+  „Doplnenia členstva" (144 riadkov v exporte a ani jedno nehovorí, o koľko
+  hodín ide). Zrovnávať sa musí ku dňu exportu, nie k dnešku — tréning, ktorý
+  prišiel po ňom z kalendára, PTminder ešte nevidel a Danovi Kouřilovi
+  nafukoval šesťhodinový balíček na sedem.
+
+**Uzávierka blokuje aj import histórie.** `ingest` preskakuje riadky
+z uzamknutých mesiacov (`vzas_periods.locked`) a zamknuté je všetko do 8/2026.
+Nový export sa teda nedoimportuje spätne — v `services` ostalo 456 zo 708
+riadkov. Je to zámer (uzavreté obdobia sa nemenia), ale pri každom „appka o tom
+nevie" nad starými dátami to treba overiť skôr, než sa hľadá chyba v kóde.

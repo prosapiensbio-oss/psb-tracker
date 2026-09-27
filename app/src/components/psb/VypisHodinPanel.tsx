@@ -108,6 +108,9 @@ export function VypisHodinPanel({ meno, os, email, zostatokTeraz }: { meno: stri
         {v.koniec !== null && (
           <span style={{ color: C.textMuted }}>zostáva <b style={{ color: v.koniec > 0 ? C.green : C.orange }}>{hod(v.koniec)} h</b></span>
         )}
+        {v.naDlh > 0 && (
+          <span style={{ color: C.textMuted }}>na nezaplatené <b style={{ color: C.orange }}>{v.naDlh}×</b></span>
+        )}
         <span style={{ color: C.textDim }}>{v.od ? `${fmtDMY(v.od)} – ${fmtDMY(v.do)}` : ""}</span>
       </div>
 
@@ -116,10 +119,8 @@ export function VypisHodinPanel({ meno, os, email, zostatokTeraz }: { meno: stri
           pozná od prvého dňa. */}
       <div style={{ fontSize: 11, color: C.textDim, marginBottom: 8 }}>
         {v.koniec === null
-          ? "Zostatok sa nedá spočítať — k tomuto klientovi nemá appka bežiaci balíček. Odtrénované hodiny sedia."
-          : v.neuplny
-            ? `Zostatok je za posledné členstvo (od ${fmtDMY(v.kotva)}); staršie riadky ukazujú „spolu" — koľko hodín mal klient dovtedy za sebou. Celkovo ${hod(v.spolu)} h.`
-            : `Za celú históriu má odtrénovaných ${hod(v.spolu)} h.`}
+          ? "Odpočet hodín tu nebeží — posledné členstvo nemá počet hodín v názve (paušál) alebo v appke žiadne nie je."
+          : `Odpočet sa pri každom začiatku členstva vracia na jeho hodiny; posledné je z ${fmtDMY(v.kotva)}.`}
       </div>
 
       <div style={{ display: "flex", gap: 9, flexWrap: "wrap", marginBottom: 8 }}>
