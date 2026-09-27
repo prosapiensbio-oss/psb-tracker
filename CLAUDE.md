@@ -746,13 +746,31 @@ to **14 balíčkov u 11 klientov** (celá rodina „OFF - …"), takže appka hl
   a zabudnúť sa na ňu nesmie dať. Nastaviť to vie aj Jarvis
   („Gažo má v PTminderi 5 hodín" → set-override `balicekZostatok`).
 
-## Poštový server vie odmietnuť správne heslo
+## Poštový server vie odmietnuť správne heslo — aj pri ODOSIELANÍ
 
 Beh importu mailu o 6:00 spadol na `[AUTHENTICATIONFAILED]`, ten o 6:46 prešiel
 bez akejkoľvek zmeny — Dovecot po sérii prihlásení chvíľu odmieta. Preto sa
 vedľa posledného behu drží aj posledný ÚSPEŠNÝ (`mail_stav_ok`) a panel pri
 chybe povie, kedy sa naposledy čítalo. Jedna chyba nie je rozbité napojenie;
 to je tá istá lekcia ako pri kalendári.
+
+**Platí to aj pre SMTP a zle som to prečítal.** 27. 9. 2026 nešla faktúra
+Martinovi Vaškovi na `535 5.7.8 authentication failed`. Vyhlásil som, že heslo
+je zmenené, a poslal Jerryho prepisovať ho — pritom tá istá faktúra o
+JEDENÁSŤ MINÚT neskôr odišla s tým istým heslom (v `vzas_audit` stojí
+`faktura-mail-zlyhal 14:55:28` a `faktura-odoslana-mailom 15:06:30`, dĺžka
+`mail_heslo` sa nezmenila). Diagnostika, ktorú som spravil, bola správna —
+uložené heslo je čisté, kódovanie sedí, adresa servera sedí — ale záver
+z nej nie. **Keď sú všetky vstupy v poriadku a server odmieta, prvá odpoveď
+je „skús znova", nie „zmeň heslo".** Hláška v appke to odvtedy hovorí v tomto
+poradí.
+
+**A keď mail odíde, ale nedorazí, ďalší krok je SKRYTÁ KÓPIA.** Každá faktúra
+aj výpis idú BCC na `info@prosapiens.cz` (RCPT TO ide aj za ňu, takže 250 od
+servera platí pre obe adresy). Keď je kópia v schránke, správa odišla a
+problém je u príjemcu (spam); keď nie je, zastavila sa u nás. DNS domény je
+pritom v poriadku: SPF má `include:_spf.m1.websupport.sk`, DKIM je pod
+selektorom `mail`, DMARC je `p=none`.
 
 ## Pripomienka na dopyt patrí do deriveRegister, nie vedľa neho
 

@@ -77,14 +77,18 @@ export function mimeSprava(s: Sprava, hranica = `psb${Date.now().toString(36)}${
  * Chyba servera preložená do vety, ktorá hovorí, čo s tým.
  *
  * Jerry, 27. 9. 2026 dostal na obrazovku „535 535 5.7.8 Error: authentication
- * failed: (reason unavailable)". Je to presné, ale nepovie, že má ísť do
- * Údajov prepísať heslo. Kód servera sa necháva v zátvorke — keď sa má niekto
- * pýtať Websupportu, potrebuje presné znenie.
+ * failed: (reason unavailable)". Je to presné, ale nepovie, čo robiť.
+ *
+ * A NERADÍ SA PREPÍSAŤ HESLO. Tá istá faktúra o jedenásť minút neskôr odišla
+ * s tým istým heslom — server ho odmietol len dočasne, presne ako Dovecot pri
+ * čítaní schránky (21. 9. 2026). Prvá rada je preto skúsiť znova; heslo je až
+ * druhá možnosť. Kód servera ostáva v zátvorke — kto sa pýta Websupportu,
+ * potrebuje presné znenie.
  */
 export function poLudsky(chyba: string): string {
   const t = chyba.slice(0, 300);
   if (/\b535\b|authentication failed|auth.*fail/i.test(t)) {
-    return `schránka odmietla prihlásenie — over heslo v Údajoch (server hovorí: ${t.slice(0, 120)})`;
+    return `schránka odmietla prihlásenie — skús o chvíľu znova, server odmieta aj správne heslo po sérii pokusov. Keď to nepôjde ani potom, prepíš heslo v Údajoch (server hovorí: ${t.slice(0, 120)})`;
   }
   if (/neodpovedal|timeout/i.test(t)) return t;
   if (/55[04]|relay|not permitted/i.test(t)) {

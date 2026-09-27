@@ -59,9 +59,10 @@ describe("MIME správa", () => {
 });
 
 describe("chyba servera po ľudsky", () => {
-  it("535 povie, že sa má prepísať heslo, a nechá znenie servera", () => {
+  it("535 radí najprv skúsiť znova, až potom heslo, a nechá znenie servera", () => {
     const t = poLudsky("prihlásenie: 535 535 5.7.8 Error: authentication failed: (reason unavailable)");
-    expect(t).toContain("over heslo v Údajoch");
+    expect(t).toContain("skús o chvíľu znova");
+    expect(t).toContain("prepíš heslo v Údajoch");
     expect(t).toContain("535");
   });
 
