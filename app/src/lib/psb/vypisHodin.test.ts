@@ -52,11 +52,29 @@ describe("dlh — tréning na nezaplatenom členstve", () => {
     expect(v.naDlh).toBe(3);
   });
 
-  it("platba o pár dní neskôr nie je dlh", () => {
-    // Anetka: balíček 2. 9. (zaplatený), tréning v ten istý deň, platba 3. 9.
-    // Keby toto svietilo, svietilo by 68 zo 125 klientov — tak to chodí bežne.
+  it("tréning pred platbou je dlh, tréning po nej už nie", () => {
+    // Anetka: balíček 2. 9., tréning v ten istý deň, platba až 3. 9.
     const v = vypisHodin([bal("2026-09-02", 18), tre("2026-09-02"), pla("2026-09-03", 21150), tre("2026-09-09")], "", DNES, 16);
-    expect(v.riadky.every((r) => r.dlh === null)).toBe(true);
+    expect(v.riadky.find((r) => r.den === "2026-09-02" && r.druh === "trening")!.dlh).toBe(1);
+    expect(v.riadky.find((r) => r.den === "2026-09-09")!.dlh).toBeNull();
+  });
+
+  it("Jerryho príklad: nové členstvo, platba až po troch tréningoch", () => {
+    // „Má nový balík, ale je −1 (18), ďalší týždeň −2 (17), −3 (16), a na
+    // štvrtý týždeň zaplatila, tak to už len pokračuje 15, 14."
+    const os: Udalost[] = [
+      bal("2026-09-01", 18), tre("2026-09-02"), tre("2026-09-09"), tre("2026-09-16"),
+      pla("2026-09-23", 21150), tre("2026-09-23"),
+    ];
+    const v = vypisHodin(os, "", DNES, 14);
+    expect(v.riadky.map((r) => [r.den, r.druh, r.dlh, r.zostatok])).toEqual([
+      ["2026-09-23", "platba", null, null],
+      ["2026-09-23", "trening", null, 14],
+      ["2026-09-16", "trening", 3, 15],
+      ["2026-09-09", "trening", 2, 16],
+      ["2026-09-02", "trening", 1, 17],
+      ["2026-09-01", "balicekOd", null, 18],
+    ]);
   });
 
   it("vyčerpané členstvo bez nového = ďalšie tréningy na dlh", () => {

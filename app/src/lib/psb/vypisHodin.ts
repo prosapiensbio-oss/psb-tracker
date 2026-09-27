@@ -1,4 +1,5 @@
 import type { Udalost } from "./klientOsCasu";
+import { denVTyzdni } from "./format";
 
 /**
  * VÝPIS HODÍN — čo klient kúpil, čo odtrénoval a koľko mu zostáva.
@@ -79,9 +80,20 @@ const zmenaZ = (u: Udalost): number => {
 };
 
 /** Dátum pre človeka. Klient v maile nemá čítať ISO. */
-const den = (iso: string): string => {
+const datum = (iso: string): string => {
   const [r, m, d] = iso.split("-");
   return r && m && d ? `${Number(d)}. ${Number(m)}. ${r}` : iso;
+};
+
+/**
+ * Dátum s dňom v týždni — len tam, kde sa niečo stalo.
+ *
+ * Jerry, 27. 9. 2026: „u nej je to väčšinou streda, ale u ďalších sú to iné
+ * dni." Pri platnosti členstva („do 28. 10.") deň v týždni nič nehovorí.
+ */
+const den = (iso: string): string => {
+  const dt = denVTyzdni(iso);
+  return dt ? `${dt} ${datum(iso)}` : datum(iso);
 };
 
 /**
@@ -104,7 +116,7 @@ export const hod = (n: number): string => (Number.isInteger(n) ? String(n) : n.t
 const METODY: Record<string, string> = { bank: "prevodom", cash: "v hotovosti", card: "kartou" };
 
 const popisZ = (u: Udalost): string => {
-  if (u.druh === "balicekOd") return `${u.nazov}${u.hodin ? ` · ${u.odvodene ? "≈" : ""}${u.hodin} h` : ""}${u.doDna ? ` · do ${den(u.doDna)}` : ""}`;
+  if (u.druh === "balicekOd") return `${u.nazov}${u.hodin ? ` · ${u.odvodene ? "≈" : ""}${u.hodin} h` : ""}${u.doDna ? ` · do ${datum(u.doDna)}` : ""}`;
   if (u.druh === "balicekDo") return `koniec platnosti — ${u.nazov}`;
   if (u.druh === "platba") return `platba ${suma(u.suma)} Kč${u.metoda ? ` · ${METODY[u.metoda] || u.metoda}` : ""}`;
   return `tréning${u.cas ? ` ${cas24(u.cas)}` : ""}${u.trener ? ` · ${u.trener}` : ""}`;
@@ -123,6 +135,9 @@ export function poslednyBalicek(os: Udalost[], dnes = new Date().toISOString().s
 export function zaciatokBalicka(os: Udalost[], dnes = new Date().toISOString().slice(0, 10)): string {
   return poslednyBalicek(os, dnes)?.den || "";
 }
+
+const dniMedzi = (a: string, b: string): number =>
+  Math.round((Date.parse(`${b}T12:00:00Z`) - Date.parse(`${a}T12:00:00Z`)) / 86400000);
 
 /** Chronologicky od najstaršieho; v rámci dňa tak, ako sa to naozaj stalo. */
 const vCase = (os: Udalost[]): Udalost[] => {
@@ -149,18 +164,23 @@ export type StavRiadku = {
  * 1. **Odpočet** sa pri každom začiatku členstva vráti na jeho hodiny a
  *    tréningom klesá. Paušál bez hodín v názve (SILVER, GOLD, ČLENSTVÍ ONE)
  *    odpočet UKONČÍ — appka o ňom nevie nič a tvrdiť číslo by bol výmysel.
- * 2. **Dlh** hovorí, koľký tréning si klient vybral bez toho, aby zaň zaplatil.
- *    Sú na to dve cesty a obe znamenajú to isté:
- *      - poplatok za členstvo je v PTminderi STÁLE OTVORENÝ (Dan Kouřil:
- *        balíček z 2. 9., 7 790 Kč nezaplatených, tri tréningy → −1, −2, −3,
- *        kým odpočet beží 5, 4, 3),
- *      - alebo sa členstvo VYČERPALO a ďalšie nepribudlo (Jerry: „keby
- *        balíček skončil a platba neprišla, tam by bolo −1, −2, −3").
+ * 2. **Dlh** hovorí, koľký tréning si klient vybral skôr, než zaň zaplatil.
+ *    Jerry, 27. 9. 2026: „má nový balík, ale je −1 (18), ďalší týždeň −2 (17),
+ *    −3 (16), a na štvrtý týždeň zaplatila, tak to už len pokračuje 15, 14 —
+ *    a je tam naznačené, že bol rozdiel medzi prvým tréningom a platbou."
+ *    Značka teda po zaplatení NEZMIZNE, len sa ďalej nepridáva.
+ *
+ *    Za nezaplatené sa počíta tréning, ktorý padol:
+ *      - na členstvo s OTVORENÝM poplatkom v PTminderi (Dan Kouřil: balíček
+ *        z 2. 9., 7 790 Kč nezaplatených → −1, −2, −3, kým odpočet beží 5, 4, 3),
+ *      - pred platbu za to členstvo,
+ *      - alebo mimo hodín členstva, keď sa vyčerpalo a ďalšie nepribudlo.
  *    Odpočet preto pod nulu nejde; prebytok sa preleje do dlhu.
  *
- * Značka sa NEDÁVA len preto, že platba prišla o pár dní po tréningu — tak to
- * chodí bežne a svietilo by 68 zo 125 klientov. Kontrola, ktorá svieti na
- * nesprávnych ľudí, je horšia než žiadna.
+ * Za platbu členstva sa berie len tá, ktorá prišla do MESIACA od jeho začiatku.
+ * Bez tejto hranice by sa za ňu považovala aj platba za členstvo ďalšie:
+ * Natália Pečková má balíček z 29. 4. a platbu 16. 9., a appke by vyšlo, že
+ * celé leto trénovala na dlh.
  *
  * POSLEDNÉ ČLENSTVO SA ZROVNÁ S PTMINDEROM. Dopredný odpočet sedel na ostrých
  * dátach v 28 z 35 prípadov; rozdiel robia „Doplnenia členstva" (144 riadkov
@@ -205,7 +225,12 @@ export function priebehBalickov(
     const b = usek.balicek;
     let bezi: number | null = b ? (usek.hodin > 0 ? usek.hodin : null) : null;
 
-    const neplatene = Boolean(b?.nezaplatene);
+    const platbaKBalicku = b
+      ? usek.riadky.find((u) => u.druh === "platba" && dniMedzi(b.den, u.den) <= 30)?.den
+      : undefined;
+    // Otvorený poplatok = nezaplatené dodnes. Inak platí deň platby; keď
+    // v období platba nie je vôbec, predpokladá sa, že sa platilo dopredu.
+    const zaplateneOd = b?.nezaplatene ? null : platbaKBalicku || (b ? b.den : undefined);
 
     let dlhPocet = 0;
     const doUseku: { u: Udalost; zostatok: number | null }[] = [];
@@ -215,10 +240,13 @@ export function priebehBalickov(
         // Prebytok nad hodiny členstva sa preleje do dlhu, odpočet stojí na nule.
         const vycerpane = bezi !== null && bezi < hodinTreningu(u);
         if (bezi !== null) bezi = Math.max(0, bezi - hodinTreningu(u));
-        if (neplatene || vycerpane) dlh = (dlhPocet += 1);
+        if (vycerpane || !zaplateneOd || u.den < zaplateneOd) dlh = (dlhPocet += 1);
       }
-      doUseku.push({ u, zostatok: bezi });
-      stavy.set(u, { zostatok: bezi, dlh });
+      // Pri platbe ostáva okno prázdne — hodiny nemení a číslo vedľa nej
+      // len opakuje riadok nad ňou (Jerry, 27. 9. 2026).
+      const zostatok = u.druh === "platba" ? null : bezi;
+      doUseku.push({ u, zostatok });
+      stavy.set(u, { zostatok, dlh });
     }
 
     // Posledné členstvo sa zrovná s číslom, ktoré appka ukazuje na karte.
@@ -312,7 +340,7 @@ export function vypisAkoText(v: Vypis, klient: string): string {
     const znacka = [stav, dlh].filter(Boolean).join(" · ");
     // padEnd nestačí: dlhší popis by sa zlepil so značkou („do 27. 10. 2026zostáva").
     const popis = r.popis.length >= 46 ? `${r.popis}  ` : r.popis.padEnd(46);
-    return `${den(r.den).padEnd(14)} ${popis}${znacka}`.trimEnd();
+    return `${den(r.den).padEnd(17)} ${popis}${znacka}`.trimEnd();
   });
   return [
     `Výpis hodín — ${klient}`,

@@ -39,8 +39,26 @@ export type Udalost =
  * Tú istú hodnotu číta `deriveClients` v compute.ts; definícia je JEDNA.
  */
 export function hodinZNazvuBalicka(nazov: string): number {
-  return Number(/(\d+)\s*(?:h\b|hodin|hodiny|hodín)/i.exec(nazov || "")?.[1] || 0);
+  const z = Number(/(\d+)\s*(?:h\b|hodin|hodiny|hodín)/i.exec(nazov || "")?.[1] || 0);
+  if (z) return z;
+  for (const [vzor, hodin] of Object.entries(HODIN_PODLA_NAZVU)) {
+    if (new RegExp(vzor, "i").test(nazov || "")) return hodin;
+  }
+  return 0;
 }
+
+/**
+ * Balíčky, ktoré počet hodín v názve nemajú.
+ *
+ * Jerry ich doložil exportom Packages & Memberships (27. 9. 2026), kde stojí
+ * „50 left from 78" a „2 left from 3". Staré stupne (SILVER, BRONZ, GOLD,
+ * ČLENSTVÍ ONE, EXKLUZIVNÍ PLÁN) tu zámerne NIE SÚ — z roku 2025 a počet
+ * hodín k nim nikto nepovedal. Radšej prázdny odpočet než vymyslené číslo.
+ */
+const HODIN_PODLA_NAZVU: Record<string, number> = {
+  "^ONE YEAR": 78,
+  "^SPECIAL 3": 3,
+};
 
 /**
  * Doplnenie členstva — hodiny sa dokupujú k bežiacemu balíčku.

@@ -75,6 +75,20 @@ export const normName = (s: string): string =>
     .trim();
 
 // "2026-07-24T…" or "2026-07-24" → "24.7.2026" (Slovak short date).
+/**
+ * Deň v týždni, skratkou.
+ *
+ * Jerry, 27. 9. 2026: „okrem dátumov by bolo dobré, keby tam bol aj deň
+ * v týždni — u nej je to väčšinou streda, ale u ďalších sú to iné dni."
+ * Pri výpise hodín je to to, čo klient pozná; dátum sám o sebe nie.
+ */
+const DNI = ["ne", "po", "ut", "st", "št", "pi", "so"];
+
+export const denVTyzdni = (d: string | Date): string => {
+  const dt = typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d) ? new Date(`${d}T12:00:00Z`) : new Date(d);
+  return isNaN(dt.getTime()) ? "" : DNI[dt.getUTCDay()];
+};
+
 export const fmtDMY = (d: string | Date): string => {
   const dt = new Date(d);
   if (isNaN(dt.getTime())) return "";

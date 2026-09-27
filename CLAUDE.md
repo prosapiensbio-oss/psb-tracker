@@ -1307,10 +1307,18 @@ Z toho vzišiel model odpočtu, ktorý si Jerry vypýtal (`priebehBalickov`):
   a tréningom klesá. Nie je to jeden súčet cez celú históriu — to Jerry
   výslovne odmietol („nepočítalo by sa to ako celok spolu 9, spolu 8").
 - **Pod nulu odpočet nejde.** Prebytok sa preleje do druhého čísla.
-- **Dlh (−1, −2, −3) je počet tréningov, za ktoré klient nezaplatil** — buď je
-  poplatok v PTminderi stále otvorený, alebo sa členstvo vyčerpalo a ďalšie
-  nepribudlo. NEZNAČÍ sa to, že platba prišla o pár dní po tréningu: tak to
-  chodí bežne a svietilo by 68 zo 125 klientov.
+- **Dlh (−1, −2, −3) je počet tréningov, ktoré si klient vybral skôr, než zaň
+  zaplatil.** Jerry, 27. 9. 2026: „na štvrtý týždeň zaplatila, tak to už len
+  pokračuje 15, 14 — a je tam naznačené, že bol rozdiel medzi prvým tréningom
+  a platbou." Značka po zaplatení nezmizne, len sa ďalej nepridáva. Počíta sa
+  tréning na členstve s otvoreným poplatkom, tréning pred platbou zaň, a
+  tréning mimo hodín vyčerpaného členstva. Za platbu členstva sa berie len tá
+  do MESIACA od jeho začiatku — inak by sa ňou stala platba za to ďalšie.
+  Na ostrých dátach to vychádza na 21 % tréningov; Jerry o tom čísle vie.
+- **Platba nemá vedľa seba odpočet.** Hodiny nemení a číslo by len opakovalo
+  riadok nad ňou.
+- **Pri dátume je deň v týždni** — klient pozná „streda", nie „23. 9.". Pri
+  platnosti členstva („do 28. 10.") deň v týždni nič nehovorí a nedáva sa.
 - **Dve členstvá kúpené v ten istý deň sa SČÍTAJÚ**, nezačínajú odznova.
   PTminder ich vyváža ako dva riadky (Peter Gažo, Anna Nova).
 - **Posledné členstvo sa zrovná s číslom z karty klienta, a to KU DŇU EXPORTU.**
@@ -1320,8 +1328,19 @@ Z toho vzišiel model odpočtu, ktorý si Jerry vypýtal (`priebehBalickov`):
   prišiel po ňom z kalendára, PTminder ešte nevidel a Danovi Kouřilovi
   nafukoval šesťhodinový balíček na sedem.
 
+**Hodiny, ktoré nie sú v názve, sú v exporte Packages & Memberships**
+(„50 left from 78"). Odtiaľ je ONE YEAR = 78 a SPECIAL 3 = 3 v mape
+`HODIN_PODLA_NAZVU`. Staré stupne z roku 2025 (SILVER, BRONZ, GOLD, ČLENSTVÍ
+ONE, EXKLUZIVNÍ PLÁN) tam zámerne nie sú — počet hodín k nim nikto nepovedal
+a vymyslené číslo je horšie než prázdny odpočet.
+
 **Uzávierka blokuje aj import histórie.** `ingest` preskakuje riadky
 z uzamknutých mesiacov (`vzas_periods.locked`) a zamknuté je všetko do 8/2026.
 Nový export sa teda nedoimportuje spätne — v `services` ostalo 456 zo 708
 riadkov. Je to zámer (uzavreté obdobia sa nemenia), ale pri každom „appka o tom
 nevie" nad starými dátami to treba overiť skôr, než sa hľadá chyba v kóde.
+27. 9. 2026 to Jerry odklepol a 251 chýbajúcich riadkov (9/2025 – 6/2026) sa
+doimportovalo priamo do D1 s tým istým `dedup_key` (`date|client|description`),
+aký robí `ingest`. Odpočet odvtedy beží 73 klientom namiesto 57 a na osiach je
+689 začiatkov členstiev namiesto 450. `services` nevstupuje do P&L — ide z neho
+6M proces a počty služieb.

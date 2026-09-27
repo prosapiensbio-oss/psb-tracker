@@ -4,7 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { dlhKlienta } from "../../lib/psb/dlhKlienta";
 import { VypisHodinPanel } from "./VypisHodinPanel";
 import { hod, priebehBalickov, type StavRiadku } from "../../lib/psb/vypisHodin";
-import { normName, fmtCZK, fmtDMY } from "../../lib/psb/format";
+import { normName, fmtCZK, fmtDMY, denVTyzdni } from "../../lib/psb/format";
 import { jeBeta } from "../../lib/psb/beta";
 import { menoKluc } from "../../lib/psb/compute";
 import { satsNaCzk } from "../../lib/psb/btcKontrola";
@@ -1390,7 +1390,7 @@ function RiadokOsi({ u, stav }: { u: ReturnType<typeof osCasuKlienta>[number]; s
   if (u.druh === "balicekOd") {
     return (
       <div style={{ ...riadok, background: mix(C.accent, 10), borderRadius: 7, padding: "8px 9px", marginTop: 4, border: "none" }}>
-        <span style={stlpecDen}>{fmtDMY(u.den)}</span>
+        <span style={stlpecDen}>{denVTyzdni(u.den)} {fmtDMY(u.den)}</span>
         <span style={{ flex: 1 }}>
           <b>{u.nazov}</b>
           {u.nezaplatene && <span style={{ marginLeft: 7, fontSize: 11, fontWeight: 700, color: C.orange }}>nezaplatené</span>}
@@ -1404,12 +1404,12 @@ function RiadokOsi({ u, stav }: { u: ReturnType<typeof osCasuKlienta>[number]; s
     );
   }
   if (u.druh === "balicekDo") {
-    return <div style={{ ...riadok, color: C.textDim }}><span style={stlpecDen}>{fmtDMY(u.den)}</span><span style={{ flex: 1 }}>skončila platnosť — {u.nazov}</span></div>;
+    return <div style={{ ...riadok, color: C.textDim }}><span style={stlpecDen}>{denVTyzdni(u.den)} {fmtDMY(u.den)}</span><span style={{ flex: 1 }}>skončila platnosť — {u.nazov}</span></div>;
   }
   if (u.druh === "platba") {
     return (
       <div style={riadok}>
-        <span style={stlpecDen}>{fmtDMY(u.den)}</span>
+        <span style={stlpecDen}>{denVTyzdni(u.den)} {fmtDMY(u.den)}</span>
         <span style={{ flex: 1, color: C.green }}>zaplatil {u.metoda === "bank" ? "prevodom" : u.metoda === "cash" ? "hotovosť" : "iné"}</span>
         <span style={{ color: C.green, fontWeight: 700 }}>{fmtCZK(u.suma)}</span>
         <StavHodin stav={stav} />
@@ -1418,7 +1418,7 @@ function RiadokOsi({ u, stav }: { u: ReturnType<typeof osCasuKlienta>[number]; s
   }
   return (
     <div style={riadok}>
-      <span style={stlpecDen}>{fmtDMY(u.den)}</span>
+      <span style={stlpecDen}>{denVTyzdni(u.den)} {fmtDMY(u.den)}</span>
       <span style={{ flex: 1, color: C.textMuted }}>tréning{u.cas ? ` ${u.cas}` : ""}{u.trener ? ` · ${u.trener}` : ""}</span>
       {u.zKalendara && <span style={{ fontSize: 11, color: C.blue }}>z kalendára</span>}
       <StavHodin stav={stav} />
@@ -1809,7 +1809,7 @@ const riadok = {
   display: "flex", gap: 10, alignItems: "baseline",
   padding: "6px 2px", borderBottom: `1px solid ${mix(C.border, 40)}`, fontSize: 12,
 };
-const stlpecDen = { color: C.textDim, minWidth: 74, fontVariantNumeric: "tabular-nums" as const };
+const stlpecDen = { color: C.textDim, minWidth: 92, fontVariantNumeric: "tabular-nums" as const };
 
 /** Farba podľa tónu signálu — jedno miesto, nech sa pásy a záver nerozídu. */
 /**
