@@ -53,6 +53,9 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   const [hotove, setHotove] = useState<Set<string>>(new Set());
   const [texty, setTexty] = useState<Record<string, string>>({});
   const [i, setI] = useState(0);
+  // Otvorený klient prežije prepnutie karty, nie odchod zo záložky — viď
+  // `menoZvonku` v KlientStol.
+  const [klientNaStole, setKlientNaStole] = useState("");
   const [pracujem, setPracujem] = useState("");
   /**
    * Čie veci sa ukazujú. "auto" = podľa prihlásenia; keď sa prihlásenie nedá
@@ -454,7 +457,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                 );
               })}
 
-              {k.druh === "klient" && <KlientStol clients={clients} mena={mena} data={data} kalUdalosti={kalUdalosti} btcSats={btcSats} btc={btc} onOverride={onOverride} otvorKlienta={otvorKlienta} onOtvoreny={onOtvoreny} onFaktura={setPredvolbaFaktury} />}
+              {k.druh === "klient" && <KlientStol clients={clients} mena={mena} data={data} kalUdalosti={kalUdalosti} btcSats={btcSats} btc={btc} onOverride={onOverride} otvorKlienta={otvorKlienta} onOtvoreny={onOtvoreny} onFaktura={setPredvolbaFaktury} menoZvonku={klientNaStole} setMenoZvonku={setKlientNaStole} />}
 
               {k.druh === "platby" && k.polozky.map((p) => {
                 const kluc = klucPolozky("platby", p);

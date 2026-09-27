@@ -52,7 +52,7 @@ type Platba = {
 
 const dnesISO = () => new Date().toISOString().slice(0, 10);
 
-export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onOverride, otvorKlienta, onOtvoreny, onFaktura }: {
+export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onOverride, otvorKlienta, onOtvoreny, onFaktura, menoZvonku, setMenoZvonku }: {
   clients: Record<string, ClientAgg>;
   mena: string[];
   data: PSBData;
@@ -81,6 +81,17 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
   /** Zavolá sa, keď je otvorený — aby sa ten istý klik neopakoval. */
   onOtvoreny?: () => void;
   /**
+   * Otvorený klient ŽIJE MIMO tejto karty.
+   *
+   * Jerry, 27. 9. 2026: „keď som v profile klienta a posuniem doľava, vrátim
+   * sa a som znovu v celom zozname a musím znovu nahadzovať ten profil."
+   * Karta sa pri prepnutí odmontuje, takže vlastný `useState` by sa zakaždým
+   * stratil. Drží ho Workspace — ten prepínanie kariet prežije a odmontuje sa
+   * až pri odchode zo záložky, kde už Jerry celý zoznam chce.
+   */
+  menoZvonku?: string;
+  setMenoZvonku?: (v: string) => void;
+  /**
    * Vystaviť faktúru na balíček.
    *
    * Jerry, 26. 9. 2026: „testoval som nahodenie balíčka a ani sa nespýtalo,
@@ -92,7 +103,9 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
   const [hladam, setHladam] = useState("");
   const [novy, setNovy] = useState(false);
   const [stav, setStav] = useState<"aktivni" | "neaktivni">("aktivni");
-  const [meno, setMeno] = useState("");
+  const [menoVnutri, setMenoVnutri] = useState("");
+  const meno = menoZvonku ?? menoVnutri;
+  const setMeno = setMenoZvonku ?? setMenoVnutri;
   const [filter, setFilter] = useState<"zdravie" | "vsetko" | "peniaze" | "balicky" | "poznamky">("zdravie");
   const [detaily, setDetaily] = useState(false);
   const [pisemPlatbu, setPisemPlatbu] = useState(false);
