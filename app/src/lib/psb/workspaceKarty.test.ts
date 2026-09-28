@@ -50,17 +50,27 @@ describe("karta patrí prihlásenému", () => {
     expect(k.find((x) => x.druh === "mena")!.polozky.length).toBe(1);
   });
 
-  it("Terezka vidí svoje — a peniaze nie", () => {
-    // Peniaze trénera nemajú a sú Jerryho, rovnako ako mesačné kontroly
-    // (pravidlo z 31. 8. 2026: „nech Terezku nerozptyľujú").
-    // Faktúry sú tiež peniaze — v Terezkinej kope nemajú čo robiť.
+  it("Terezka vidí svoje — front platieb nie, faktúry áno", () => {
+    // Front príjmov z banky trénera nemá a je Jerryho (pravidlo z 31. 8.
+    // 2026: „nech Terezku nerozptyľujú"). Faktúra pre vlastného klienta je
+    // ale jej robota — a bez karty tlačidlo „Vystaviť faktúru" na karte
+    // klienta ticho nerobilo nič (28. 9. 2026, Janka šnirychova).
     const k = postavKarty({ ...zdroje, ktoSom: "terezka" });
-    expect(k.map((x) => x.druh)).toEqual(["klient", "zmeny", "mena"]);
-    expect(k[1].polozky.map((p) => (p as Zmena).id)).toEqual(["z2"]);
+    expect(k.map((x) => x.druh)).toEqual(["klient", "faktury", "zmeny", "mena"]);
+    expect(k.find((x) => x.druh === "zmeny")!.polozky.map((p) => (p as Zmena).id)).toEqual(["z2"]);
   });
 
   it("bez prihlásenia sa nefiltruje nič", () => {
     expect(postavKarty({ ...zdroje, ktoSom: null }).find((x) => x.druh === "zmeny")!.polozky.length).toBe(2);
+  });
+
+  it("kartu Faktúry má každý — tlačidlo na karte klienta ju hľadá", () => {
+    // „Vystaviť faktúru" v profile klienta prepne kopu na kartu Faktúry.
+    // Keď tá karta v kope nie je, klik neurobí nič a nič ani nepovie —
+    // presne to sa stalo Terezke 28. 9. 2026.
+    for (const kto of ["jerry", "Jerry", "terezka", "Terezka", "app", null]) {
+      expect(postavKarty({ ...zdroje, ktoSom: kto }).some((x) => x.druh === "faktury")).toBe(true);
+    }
   });
 
   it("Jerry vidí peniaze", () => {
@@ -89,7 +99,7 @@ describe("prihlásenie sa porovnáva bez ohľadu na veľkosť písmen", () => {
 
   it("aj „Terezka“ s veľkým T", () => {
     const k = postavKarty({ ...zdroje, ktoSom: "Terezka" });
-    expect(k.map((x) => x.druh)).toEqual(["klient", "zmeny", "mena"]);
+    expect(k.map((x) => x.druh)).toEqual(["klient", "faktury", "zmeny", "mena"]);
   });
 
   it("„app“ (spoločné prihlásenie) nefiltruje", () => {

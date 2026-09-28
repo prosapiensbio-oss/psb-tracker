@@ -131,9 +131,20 @@ export function postavKarty(z: ZdrojeKariet): Karta[] {
     podnadpis: "vyhľadaj človeka a rob na ňom — tréningy, peniaze, balíčky",
     polozky: [],
   });
-  // Faktúry sú peniaze, a tie sú Jerryho — rovnaké pravidlo ako pri
-  // nepriradených platbách. Terezke by to bol len šum.
-  if (ja !== "Terezka") karty.push({
+  /**
+   * FAKTÚRU VYSTAVUJE AJ TEREZKA.
+   *
+   * Pôvodne tu stálo „faktúry sú peniaze, a tie sú Jerryho" — tá istá veta
+   * ako pri nepriradených platbách. Lenže to sú dve rôzne práce. Front
+   * príjmov z banky naozaj Terezku nezaujíma; doklad pre klienta, ktorého
+   * vedie, je jej robota.
+   *
+   * A chýbajúca karta nebola len „o jednu menej". Tlačidlo „Vystaviť
+   * faktúru" na karte klienta má KAŽDÝ — Workspace po kliku hľadá kartu
+   * Faktúry a keď ju nenájde, neurobí nič a nič ani nepovie. Terezka
+   * 28. 9. 2026 klikala na faktúru pre Janku šnirychovú a appka mlčala.
+   */
+  karty.push({
     druh: "faktury",
     nadpis: "Faktúry",
     podnadpis: "vystav doklad, pošli QR platbu a veď si, čo je zaplatené",

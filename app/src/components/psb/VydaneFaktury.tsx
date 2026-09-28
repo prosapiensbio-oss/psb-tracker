@@ -153,7 +153,17 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana 
   const adresati = useMemo(() => adresyMailu(mail?.komu || ""), [mail]);
   const mozeOdist = adresati.adresy.length > 0 && adresati.zle.length === 0;
 
-  if (!riadky) return null;
+  /**
+   * Kým sa faktúry načítavajú, karta je prázdna — ale keď sa načítať NEDAJÚ,
+   * musí to povedať. Prvá verzia vracala `null` aj pri chybe, takže sa
+   * chybová hláška nemala kde vykresliť a karta ostala biela. „Nič sa
+   * nedeje" je najhoršia možná odpoveď: človek klikne znova a znova.
+   */
+  if (!riadky) {
+    return chyba
+      ? <div style={{ fontSize: 12.5, color: C.red }}>{chyba}</div>
+      : <div style={{ fontSize: 12.5, color: C.textDim }}>načítavam faktúry…</div>;
+  }
 
   const zive = riadky.filter((r) => !r.storno_at);
   const nezaplatene = zive.filter((r) => !r.uhradene_at);
