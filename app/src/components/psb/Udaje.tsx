@@ -568,6 +568,20 @@ function UploadCard({ data, missing, actions, chat }: { data: PSBData; missing: 
             <br /><span style={{ color: C.textDim }}>{FAKTURY_ZDROJ.path}</span>
           </span>
         </div>
+        {/* Faktúry z iDokladu — číslo dokladu je variabilný symbol v texte
+            prevodu a najtvrdší dôkaz, komu platba patrí. Bez nich zostávajú
+            príjmy typu „20260037 MGR. FILIP STRANAVSKY" bez návrhu. */}
+        <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 5, display: "flex", gap: 8, marginTop: 2 }}>
+          <span style={{ color: C.textDim, flexShrink: 0 }}>·</span>
+          <span>
+            <strong style={{ color: C.text }}>Vydané faktúry z iDokladu</strong>
+            <br /><span style={{ color: C.textDim }}>
+              iDoklad → Fakturace › Vydané faktury › Export do CSV. Číslo dokladu je variabilný symbol,
+              ktorý stojí v texte bankového prevodu — bez neho appka pri takej platbe nevie, komu patrí.
+              Meno na faktúre býva firma, tú spáruješ s klientom v Prechode.
+            </span>
+          </span>
+        </div>
         <div style={{ fontSize: 12, color: C.textMuted, fontWeight: 600, margin: "12px 0 8px" }}>Marketing a web:</div>
         {MARKETING_ZDROJE.map((m) => {
           const st = surove.find((x) => x.druh === m.druh);
