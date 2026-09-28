@@ -1460,6 +1460,16 @@ ich takto ubudlo 24.
 - **Zovšeobecnenie:** keď zdroj vráti VIAC než jednu možnosť, neskončil —
   vtedy sa má pýtať ďalej. Prvý zdroj, ktorý niečo vráti, nie je automaticky
   ten, ktorý vie odpoveď.
+- **Platba z PTmindera sa smie použiť RAZ** (`volnePtPlatby`). Jerry, 28. 9.:
+  „veľa platieb 6990, 7790 alebo 1100 — porovnaj ich s dátumami z PTmindera."
+  PTminder o nich vedel, len ponúkal viacerých naraz: 1 100 Kč za úvodný
+  tréning zaplatia za týždeň traja. Lenže dvaja z nich už majú svoj bankový
+  pohyb priradený — tá platba je vysvetlená a druhýkrát sa použiť nesmie.
+  Je to párovanie JEDNA KU JEDNEJ, nie hľadanie zhody čísla; sporných tak
+  z deviatich ostali tri. Okno je tu desať dní (v PTminderi zapisuje človek
+  a vie sa oneskoriť), kým pri hľadaní kandidáta sú tri — tam ide o dôkaz,
+  tu o to, čo je už vybavené. Vedľajší účinok: čím viac Jerry priradí, tým
+  menej zostane sporných. Zoznam sa čistí sám.
 
 Tá istá chyba bola v mene samotnom a Jerry ju našiel o hodinu neskôr
 („9. 6. Marketa Resnerova, 20. 6. Tomáš Krivda"):

@@ -1,7 +1,7 @@
 // Platby z výpisu banky — posledná tretina odchodu od PTmindera.
 import { describe, expect, it } from "bun:test";
 
-import { klientPodlaFaktury, klientPodlaFirmy, najdiKlientaVTexte, nepriradene, porovnajPlatby, smieSaZapamatat, textPlatby, vzorPlatby, type FioRiadok, type Platba, vyzeraNaKlienta, parujPodlaSumy } from "./platbyEvidencia";
+import { klientPodlaFaktury, klientPodlaFirmy, najdiKlientaVTexte, nepriradene, porovnajPlatby, smieSaZapamatat, textPlatby, vzorPlatby, type FioRiadok, type Platba, vyzeraNaKlienta, parujPodlaSumy, volnePtPlatby } from "./platbyEvidencia";
 
 const MENA = [
   "Natalia Peckova", "Josef Šnirych", "Natalia Krivdova", "Barbora Vankova",
@@ -329,5 +329,36 @@ describe("keď meno nestačí, rozhodne PTminder", () => {
     const pt = [{ klient: "Katarina Cvičelova", datum: "2026-07-28", suma: 7790, metoda: "bank" }];
     const out = nepriradene(fio as never, [], {}, new Set(), mena, pt);
     expect(out[0]).toMatchObject({ kandidati: mena, zdrojNavrhu: "meno" });
+  });
+});
+
+describe("platba z PTmindera sa použije raz", () => {
+  // Jerry, 28. 9. 2026: „veľa platieb 6990, 7790 alebo 1100 — porovnaj ich
+  // s dátumami z PTmindera." PTminder o nich vie, len ponúkal viacerých
+  // naraz; tí, ktorých pohyb je už priradený, medzi kandidátov nepatria.
+  const ptPlatby = [
+    { klient: "Katerina Matlova", datum: "2026-05-26", suma: 7790, metoda: "bank" },
+    { klient: "Katarina Tchuřova", datum: "2026-05-26", suma: 7790, metoda: "bank" },
+  ];
+  const riadok = { id: "f9", date: "2026-05-26", amount_czk: 7790, counterparty: "ProSapiens 6h balíček", note: "", typ: "prijem" };
+
+  it("bez priradených pohybov ponúkne oboch", () => {
+    expect(nepriradene([riadok] as never, [], {}, new Set(), MENA, ptPlatby)[0].kandidati).toHaveLength(2);
+  });
+
+  it("keď má jeden z nich svoj pohyb, zostane druhý", () => {
+    const uz: Platba[] = [{ id: "p1", klient: "Katarina Tchuřova", datum: "2026-05-24", sumaCzk: 7790, sposob: "banka", fioId: "ine", zruseneAt: null }];
+    const out = nepriradene([riadok] as never, uz, {}, new Set(), MENA, ptPlatby);
+    expect(out[0]).toMatchObject({ kandidati: ["Katerina Matlova"], zdrojNavrhu: "suma" });
+  });
+
+  it("zrušená platba pohyb nevysvetľuje", () => {
+    const zrusena: Platba[] = [{ id: "p1", klient: "Katarina Tchuřova", datum: "2026-05-24", sumaCzk: 7790, sposob: "banka", fioId: "ine", zruseneAt: "2026-05-25" }];
+    expect(nepriradene([riadok] as never, zrusena, {}, new Set(), MENA, ptPlatby)[0].kandidati).toHaveLength(2);
+  });
+
+  it("hotovosť z PTmindera sa cez účet nevysvetľuje", () => {
+    const hotovost = [{ klient: "Katerina Matlova", datum: "2026-05-26", suma: 7790, metoda: "cash" }];
+    expect(volnePtPlatby(hotovost, [{ id: "p1", klient: "Katerina Matlova", datum: "2026-05-26", sumaCzk: 7790, sposob: "banka", fioId: "x", zruseneAt: null }])).toHaveLength(1);
   });
 });

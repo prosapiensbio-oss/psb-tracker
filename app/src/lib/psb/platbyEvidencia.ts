@@ -307,6 +307,40 @@ export function klientPodlaFirmy(text: string, firmy: FirmaKlienta[]): string[] 
   return [...new Set(najdene)];
 }
 
+/**
+ * PLATBA Z PTMINDERA, KTORÚ UŽ VYSVETĽUJE PRIRADENÝ POHYB.
+ *
+ * Jerry, 28. 9. 2026: „vidím tu veľa platieb 6990, 7790 alebo 1100 — chcem,
+ * aby si ich porovnal s dátumami platieb z PTmindera a pomohol určiť, kto sú
+ * tie, ktoré majú len všeobecné názvy bez mien."
+ *
+ * PTminder o nich vie, len ponúkal viacerých naraz: 1 100 Kč za úvodný
+ * tréning zaplatia za týždeň traja ľudia. Lenže dvaja z nich už majú svoj
+ * bankový pohyb priradený — tá platba je teda vysvetlená a druhýkrát sa
+ * použiť nesmie. Je to párovanie JEDNA KU JEDNEJ, nie hľadanie zhody čísla.
+ *
+ * Vedľajší účinok je príjemný: čím viac Jerry priradí, tým menej zostane
+ * sporných. Zoznam sa čistí sám.
+ *
+ * Okno je desať dní, nie tri: v PTminderi platbu zapisuje človek a vie sa
+ * oneskoriť. Pri hľadaní kandidáta sú tri dni správne (tam ide o dôkaz),
+ * tu ide o opak — čo už je vybavené.
+ */
+export function volnePtPlatby(ptPlatby: PtPlatba[], platby: Platba[]): PtPlatba[] {
+  const hotove = platby.filter((p) => !p.zruseneAt && p.fioId);
+  if (!hotove.length) return ptPlatby;
+  const den = (x: string) => String(x).slice(0, 10);
+  const dni = (a: string, b: string) =>
+    Math.abs(Date.parse(`${a}T00:00:00Z`) - Date.parse(`${b}T00:00:00Z`)) / 86400000;
+  return ptPlatby.filter((p) => {
+    if (p.metoda !== "bank") return true;
+    return !hotove.some((h) =>
+      normName(h.klient) === normName(p.klient)
+      && Math.round(h.sumaCzk) === Math.round(p.suma)
+      && dni(den(h.datum), den(p.datum)) <= 10);
+  });
+}
+
 export function nepriradene(
   fio: FioRiadok[],
   platby: Platba[],
@@ -321,6 +355,9 @@ export function nepriradene(
   firmy: FirmaKlienta[] = [],
 ): NepriradenaPlatba[] {
   const uz = new Set(platby.filter((p) => !p.zruseneAt && p.fioId).map((p) => p.fioId as string));
+  // Platba z PTmindera, ktorú už vysvetľuje priradený pohyb, nesmie byť
+  // kandidátom pre druhý — viď `volnePtPlatby`.
+  const volne = volnePtPlatby(ptPlatby, platby);
   const out: NepriradenaPlatba[] = [];
   for (const r of fio) {
     if (r.amount_czk <= 0) continue;
@@ -342,7 +379,7 @@ export function nepriradene(
     const podlaFaktury = naucene ? [] : klientPodlaFaktury(text, faktury);
     const podlaFirmy = naucene || podlaFaktury.length ? [] : klientPodlaFirmy(text, firmy);
     const podlaMena = naucene || podlaFaktury.length || podlaFirmy.length ? [] : najdiKlientaVTexte(text, menaKlientov);
-    const podlaSumy = naucene || podlaFaktury.length || podlaFirmy.length || podlaMena.length ? [] : parujPodlaSumy(r, ptPlatby);
+    const podlaSumy = naucene || podlaFaktury.length || podlaFirmy.length || podlaMena.length ? [] : parujPodlaSumy(r, volne);
     let kandidati = naucene ? [naucene]
       : podlaFaktury.length ? podlaFaktury
         : podlaFirmy.length ? podlaFirmy
@@ -366,7 +403,7 @@ export function nepriradene(
      */
     let rozhodlaSuma = false;
     if (kandidati.length > 1) {
-      const prienik = kandidati.filter((k) => parujPodlaSumy(r, ptPlatby).includes(k));
+      const prienik = kandidati.filter((k) => parujPodlaSumy(r, volne).includes(k));
       if (prienik.length === 1) { kandidati = prienik; rozhodlaSuma = true; }
     }
     out.push({
