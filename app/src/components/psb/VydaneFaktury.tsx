@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { oznam } from "../../lib/psb/obnovaSignal";
 import { C, mix } from "../../lib/psb/theme";
 import { vytlacFakturu } from "../../lib/psb/fakturaHtml";
+import { adresyMailu } from "../../lib/psb/mime";
 import { mailFaktury } from "../../lib/psb/mailFaktury";
 import {
   DODAVATEL, POPISY, SPLATNOST_DNI, den, poSplatnosti, splatnostZ, suma, type Faktura,
@@ -148,6 +149,10 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana 
     return j as { ok: true; cislo?: string; id?: string };
   };
 
+  /** Odoslať sa dá, keď je aspoň jeden adresát a ani jeden pokazený. */
+  const adresati = useMemo(() => adresyMailu(mail?.komu || ""), [mail]);
+  const mozeOdist = adresati.adresy.length > 0 && adresati.zle.length === 0;
+
   if (!riadky) return null;
 
   const zive = riadky.filter((r) => !r.storno_at);
@@ -171,7 +176,15 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana 
 
   /** Otvorí náhľad mailu — text sa zloží tu a dá sa prepísať. */
   const otvorMail = (r: Riadok) => {
-    const komu = r.odb_email || udaje.find((x) => x.klient === r.klient)?.email || "";
+    /**
+     * DVA MAILY = DVAJA ADRESÁTI.
+     *
+     * Bohdan Klímek, Panagiotis Tsiolis a Tomáš Krčmár majú firemnú aj
+     * súkromnú adresu a nevieme, ktorú čítajú. Doklad preto odchádza na obe
+     * naraz. Pole sa dá prepísať — keď Jerry vie, ktorá platí, druhú zmaže.
+     */
+    const u = udaje.find((x) => x.klient === r.klient);
+    const komu = adresyMailu([r.odb_email || u?.email || "", u?.dalsie_maily || ""].join(",")).adresy.join(", ");
     if (!komu) { setChyba(`${r.klient} nemá e-mail — doplň ho vo fakturačných údajoch nižšie.`); return; }
     const t = mailFaktury(naFakturu(r), { trener: treneri?.[r.klient] });
     setChyba("");
@@ -402,9 +415,18 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana 
           </div>
 
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
-            <Pole label="Komu" hodnota={mail.komu} nastav={(v) => setMail({ ...mail, komu: v })} sirka={2} typ="email" />
+            <Pole label="Komu" hodnota={mail.komu} nastav={(v) => setMail({ ...mail, komu: v })} sirka={2} />
             <Pole label="Predmet" hodnota={mail.predmet} nastav={(v) => setMail({ ...mail, predmet: v })} sirka={3} />
           </div>
+          {adresati.zle.length > 0 ? (
+            <div style={{ fontSize: 11.5, color: C.red, marginBottom: 8 }}>
+              Toto nie je e-mailová adresa: {adresati.zle.join(", ")}
+            </div>
+          ) : adresati.adresy.length > 1 ? (
+            <div style={{ fontSize: 11.5, color: C.textDim, marginBottom: 8 }}>
+              Odíde na {adresati.adresy.length} adresy naraz — klient má v Kokpite dva maily.
+            </div>
+          ) : null}
           <span style={popisStyl}>Text — čo prepíšeš, to odíde</span>
           <textarea
             value={mail.telo}
@@ -420,12 +442,12 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana 
             <button
               type="button"
               onClick={() => void posliMailTeraz()}
-              disabled={pracujem === mail.id || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail.komu)}
+              disabled={pracujem === mail.id || !mozeOdist}
               style={{
                 padding: "9px 16px", borderRadius: 9, fontSize: 13.5, fontWeight: 600,
                 cursor: pracujem === mail.id ? "default" : "pointer",
                 border: `1px solid ${mix(C.green, 55)}`, background: mix(C.green, 14), color: C.green,
-                opacity: /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(mail.komu) ? 1 : 0.5,
+                opacity: mozeOdist ? 1 : 0.5,
               }}
             >
               {pracujem === mail.id ? "posielam…" : "Odoslať"}

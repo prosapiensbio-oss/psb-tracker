@@ -96,3 +96,27 @@ export function poLudsky(chyba: string): string {
   }
   return t.slice(0, 200);
 }
+
+/**
+ * ADRESÁTI Z JEDNÉHO POĽA.
+ *
+ * Traja klienti majú dva maily — firemný a súkromný — a nevieme, ktorý
+ * naozaj čítajú. Bohdan Klímek má v PTminderi `b.klimek@email.cz` a v appke
+ * heinekenovskú adresu; Martinovi Vaškovi faktúra odišla na adresu s jedným
+ * preklepom a nikto sa to nedozvedel, lebo SMTP ju prevzal. Doklad má preto
+ * vedieť odísť na obe adresy naraz — nie dvakrát a nie do prázdna.
+ *
+ * Pokazenú adresu ticho nezahadzuje: vráti ju v `zle`, nech to obrazovka
+ * povie. Inak by mail odišiel polovici ľudí a tvárilo by sa to ako úspech.
+ */
+export function adresyMailu(text: string): { adresy: string[]; zle: string[] } {
+  const adresy: string[] = [];
+  const zle: string[] = [];
+  for (const kus of String(text || "").split(/[\n,;]+/)) {
+    const a = kus.trim().toLowerCase();
+    if (!a) continue;
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(a)) zle.push(a);
+    else if (!adresy.includes(a)) adresy.push(a);
+  }
+  return { adresy, zle };
+}

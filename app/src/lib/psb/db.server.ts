@@ -493,14 +493,21 @@ export async function ingest(DB: D1Database, filename: string, text: string, act
      * a súkromný z PTmindera sú obe správne odpovede na inú otázku a appka
      * nemá rozhodovať, ktorá platí.
      *
+     * Jerry, 28. 9. 2026: „kľudne k tým ľuďom daj dva maily." Odlišný mail sa
+     * preto neodhodí — uloží sa ako druhý a faktúra aj výpis hodín potom
+     * odídu na obe adresy. Martinovi Vaškovi doklad mesiac odchádzal na
+     * adresu s jedným preklepom a nikomu to nedalo vedieť.
+     *
      * Narodeniny majú vlastnú stráž: `datumNarodenia` odmietne nezrozumiteľný
      * tvar a rok mimo rozumného rozsahu — Naďa Khamaziuk má v PTminderi 2036
      * a appka ju kvôli tomu kedysi viedla ako dieťa.
      */
     const rows = parseClientList(text);
     const kf = new Map(
-      ((await DB.prepare("SELECT klient, email, telefon FROM klient_fakturacia").all()).results as any[])
-        .map((r) => [String(r.klient), { email: String(r.email || ""), telefon: String(r.telefon || "") }]),
+      ((await DB.prepare("SELECT klient, email, dalsie_maily, telefon FROM klient_fakturacia").all()).results as any[])
+        .map((r) => [String(r.klient), {
+          email: String(r.email || ""), dalsie: String(r.dalsie_maily || ""), telefon: String(r.telefon || ""),
+        }]),
     );
     const nar = new Map(
       ((await DB.prepare("SELECT name, narodeniny FROM client_overrides").all()).results as any[])
@@ -511,15 +518,23 @@ export async function ingest(DB: D1Database, filename: string, text: string, act
       const uz = kf.get(r.meno);
       const mail = r.email && (!uz?.email ? r.email : "");
       const tel = r.telefon && (!uz?.telefon ? r.telefon : "");
-      if (uz?.email && r.email && uz.email.trim().toLowerCase() !== r.email.trim().toLowerCase()) {
-        rozdiely.push(`${r.meno}: v appke ${uz.email}, v PTminderi ${r.email}`);
+      const iny = !!uz?.email && !!r.email && uz.email.trim().toLowerCase() !== r.email.trim().toLowerCase();
+      // Druhý mail sa dopĺňa len do prázdna — ručne zapísanú adresu import neprepíše.
+      const druhy = iny && !uz?.dalsie ? r.email : "";
+      if (iny) {
+        rozdiely.push(druhy
+          ? `${r.meno}: v appke ${uz!.email}, v PTminderi ${r.email} — uložené ako druhý mail, pôjde na obe`
+          : `${r.meno}: v appke ${uz!.email}, v PTminderi ${r.email}`);
       }
-      if (mail || tel) {
+      if (mail || tel || druhy) {
         stmts.push(
           uz
             ? DB.prepare(
-              "UPDATE klient_fakturacia SET email = CASE WHEN email = '' THEN ?2 ELSE email END, telefon = CASE WHEN telefon = '' THEN ?3 ELSE telefon END, updated_at = ?4 WHERE klient = ?1",
-            ).bind(r.meno, mail, tel, new Date().toISOString())
+              `UPDATE klient_fakturacia SET email = CASE WHEN email = '' THEN ?2 ELSE email END,
+                 telefon = CASE WHEN telefon = '' THEN ?3 ELSE telefon END,
+                 dalsie_maily = CASE WHEN dalsie_maily = '' THEN ?5 ELSE dalsie_maily END,
+                 updated_at = ?4 WHERE klient = ?1`,
+            ).bind(r.meno, mail, tel, new Date().toISOString(), druhy)
             : DB.prepare(
               "INSERT INTO klient_fakturacia (klient, firma, email, telefon, updated_at) VALUES (?1, ?1, ?2, ?3, ?4)",
             ).bind(r.meno, mail, tel, new Date().toISOString()),

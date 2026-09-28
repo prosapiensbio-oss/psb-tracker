@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { mimeSprava, poLudsky } from "./mime";
+import { adresyMailu, mimeSprava, poLudsky } from "./mime";
 
 const dekoduj = (s: string) => new TextDecoder().decode(Uint8Array.from(atob(s.replace(/\r\n/g, "")), (c) => c.charCodeAt(0)));
 
@@ -68,5 +68,23 @@ describe("chyba servera po ľudsky", () => {
 
   it("cudzia chyba sa nepreloží nasilu", () => {
     expect(poLudsky("server neodpovedal do 25 s")).toBe("server neodpovedal do 25 s");
+  });
+});
+
+describe("adresyMailu", () => {
+  it("rozdelí viac adries a zahodí duplicitu", () => {
+    const r = adresyMailu("A@firma.cz, a@firma.cz\nsukromny@email.cz");
+    expect(r.adresy).toEqual(["a@firma.cz", "sukromny@email.cz"]);
+    expect(r.zle).toEqual([]);
+  });
+
+  it("pokazenú adresu nezahodí ticho", () => {
+    const r = adresyMailu("dobry@email.cz; toto nie je mail");
+    expect(r.adresy).toEqual(["dobry@email.cz"]);
+    expect(r.zle).toEqual(["toto nie je mail"]);
+  });
+
+  it("z prázdneho poľa nevyrobí adresáta", () => {
+    expect(adresyMailu("  ,\n ; ")).toEqual({ adresy: [], zle: [] });
   });
 });

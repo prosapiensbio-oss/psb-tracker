@@ -7,6 +7,7 @@ import { bindings } from "../../lib/bindings.server";
 import { dalsieCislo, splatnostZ, SPLATNOST_DNI, type Faktura } from "../../lib/psb/vydanaFaktura";
 import { fakturaDoPdf } from "../../lib/psb/fakturaPdf.server";
 import { mailFaktury, menoPrilohy } from "../../lib/psb/mailFaktury";
+import { adresyMailu } from "../../lib/psb/mime";
 import { rozparsujKontakty } from "../../lib/psb/kontaktyIdokladu";
 import { posliMail } from "../../lib/psb/smtp.server";
 import { jeMesiac, normName } from "../../lib/psb/format";
@@ -355,11 +356,13 @@ export const Route = createFileRoute("/api/vydane-faktury")({
            */
           if (b.akcia === "posli-vypis") {
             const klient = kus(b.klient, 120);
-            const komu = kus(b.komu, 160).toLowerCase();
+            const { adresy, zle } = adresyMailu(kus(b.komu, 400));
+            const komu = adresy.join(", ");
             const telo = String(b.telo || "").slice(0, 20000);
-            if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(komu)) {
-              return Response.json({ ok: false, error: "Chýba e-mail klienta." }, { status: 400 });
+            if (zle.length) {
+              return Response.json({ ok: false, error: `Toto nie je e-mailová adresa: ${zle.join(", ")}` }, { status: 400 });
             }
+            if (!adresy.length) return Response.json({ ok: false, error: "Chýba e-mail klienta." }, { status: 400 });
             if (telo.trim().length < 20) return Response.json({ ok: false, error: "Výpis je prázdny." }, { status: 400 });
             const n = await nastaveniaMailu(DB);
             if (!n.host || !n.user || !n.heslo) {
@@ -370,7 +373,7 @@ export const Route = createFileRoute("/api/vydane-faktury")({
               {
                 od: n.user,
                 odMeno: "ProSapiens Biomechanic",
-                komu: [komu],
+                komu: adresy,
                 kopiaSkryta: [n.user],
                 predmet: kus(b.predmet, 200) || "Výpis hodín — ProSapiens Biomechanic",
                 telo,
@@ -406,8 +409,12 @@ export const Route = createFileRoute("/api/vydane-faktury")({
             if (!r) return Response.json({ ok: false, error: "Taká faktúra neexistuje." }, { status: 404 });
             if (r.storno_at) return Response.json({ ok: false, error: "Stornovaná faktúra sa neposiela." }, { status: 400 });
 
-            const komu = (kus(b.komu, 160) || String(r.odb_email || "")).toLowerCase();
-            if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(komu)) {
+            const { adresy, zle } = adresyMailu(kus(b.komu, 400) || String(r.odb_email || ""));
+            const komu = adresy.join(", ");
+            if (zle.length) {
+              return Response.json({ ok: false, error: `Toto nie je e-mailová adresa: ${zle.join(", ")}` }, { status: 400 });
+            }
+            if (!adresy.length) {
               return Response.json({ ok: false, error: "Klient nemá e-mail — doplň ho vo fakturačných údajoch." }, { status: 400 });
             }
 
@@ -426,7 +433,7 @@ export const Route = createFileRoute("/api/vydane-faktury")({
               {
                 od: n.user,
                 odMeno: "ProSapiens Biomechanic",
-                komu: [komu],
+                komu: adresy,
                 // Kópia sebe: v schránke tak zostane stopa po tom, čo klientovi
                 // naozaj odišlo — SMTP sám do „Odoslané" nič nedá.
                 kopiaSkryta: [n.user],

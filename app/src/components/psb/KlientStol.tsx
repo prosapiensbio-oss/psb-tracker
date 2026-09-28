@@ -6,6 +6,7 @@ import { VypisHodinPanel } from "./VypisHodinPanel";
 import { cas24, hod, priebehBalickov, type StavRiadku } from "../../lib/psb/vypisHodin";
 import { normName, fmtCZK, fmtDMY, denVTyzdni } from "../../lib/psb/format";
 import { jeBeta } from "../../lib/psb/beta";
+import { adresyMailu } from "../../lib/psb/mime";
 import { menoKluc } from "../../lib/psb/compute";
 import { satsNaCzk } from "../../lib/psb/btcKontrola";
 import { CENNIK, platnostDo } from "../../lib/psb/cennik";
@@ -222,8 +223,9 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
       .then((r) => r.json())
       .then((j) => {
         if (!zive) return;
-        const u = (j?.udaje || []).find((x: { klient: string }) => x.klient === meno);
-        setKontaktMail(u?.email || "");
+        const u = (j?.udaje || []).find((x: { klient: string; email?: string; dalsie_maily?: string }) => x.klient === meno);
+        // Keď má klient dva maily, výpis odíde na oba — nevieme, ktorý číta.
+        setKontaktMail(adresyMailu([u?.email || "", u?.dalsie_maily || ""].join(",")).adresy.join(", "));
       })
       .catch(() => null);
     return () => { zive = false; };
@@ -2083,7 +2085,7 @@ function ZapisOKlientovi({ pociatocne, zapis }: {
  */
 const PRAZDNY_KONTAKT = {
   stat: "Česká republika", firma: "", ico: "", dic: "", ulica: "", psc: "", mesto: "",
-  email: "", telefon: "", os_meno: "", os_priezvisko: "",
+  email: "", dalsie_maily: "", telefon: "", os_meno: "", os_priezvisko: "",
 };
 
 function KontaktKlienta({ meno }: { meno: string }) {
@@ -2106,7 +2108,12 @@ function KontaktKlienta({ meno }: { meno: string }) {
     const j = await fetch("/api/vydane-faktury", {
       method: "POST", credentials: "same-origin",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ akcia: "udaje", klient: meno, ...v, osMeno: v.os_meno, osPriezvisko: v.os_priezvisko }),
+      // `dalsieMaily` musí ísť vždy: server berie telo ako celý záznam a čo
+      // nepríde, to prepíše prázdnym — druhý mail by po uložení profilu zmizol.
+      body: JSON.stringify({
+        akcia: "udaje", klient: meno, ...v,
+        dalsieMaily: v.dalsie_maily, osMeno: v.os_meno, osPriezvisko: v.os_priezvisko,
+      }),
     }).then((r) => r.json()).catch(() => ({ ok: false, error: "spojenie" }));
     setStav(j?.ok ? "uložené" : (j?.error || "nepodarilo sa uložiť"));
     if (j?.ok) { setJe(true); setPisem(false); await nacitaj(); }
@@ -2130,6 +2137,7 @@ function KontaktKlienta({ meno }: { meno: string }) {
         {je && (v.email || v.telefon) ? (
           <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4 }}>
             {v.email && <span style={{ marginRight: 12 }}>✉ {v.email}</span>}
+            {v.dalsie_maily && <span style={{ marginRight: 12 }}>✉ {v.dalsie_maily.split(/[\n,;]/)[0]}</span>}
             {v.telefon && <span style={{ marginRight: 12 }}>☎ {v.telefon}</span>}
             {v.firma && v.firma !== meno && <span style={{ color: C.textDim }}>fakturuje sa na {v.firma}</span>}
           </div>
@@ -2146,7 +2154,11 @@ function KontaktKlienta({ meno }: { meno: string }) {
       <div style={{ fontSize: 12, fontWeight: 700, color: C.text }}>Kontakt a fakturácia</div>
       <div style={{ display: "flex", gap: 9, flexWrap: "wrap" }}>
         {pole("email", "e-mail", 230, "email")}
+        {pole("dalsie_maily", "druhý e-mail", 230)}
         {pole("telefon", "telefón", 150)}
+      </div>
+      <div style={{ fontSize: 10.5, color: C.textDim, marginTop: -4 }}>
+        Druhý mail vyplň, keď nevieš, ktorú adresu klient číta — faktúra aj výpis hodín potom odídu na obe.
       </div>
       <div style={{ fontSize: 10.5, color: C.textDim, marginTop: 2 }}>
         Na faktúru — vyplň len vtedy, keď ju klient chce. Firmu nechaj prázdnu, keď sa fakturuje priamo jemu.
