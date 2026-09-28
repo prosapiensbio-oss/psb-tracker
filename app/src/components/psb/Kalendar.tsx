@@ -1584,8 +1584,16 @@ export function odtrenovaneMimoExportu(
  * (ozvať sa, kým klienta ešte vidíš na hodine), a tie patria na prvú obrazovku.
  * Kalendár je miesto, kde sa dáta zbierajú; Kokpit je miesto, kde sa konajú.
  */
-export function Balicky({ udalosti, clients, sedenia = [], onObnov, style, onKlient, matchTrener, children, poslednyReport }: {
+export function Balicky({ udalosti, buduce = [], clients, sedenia = [], onObnov, style, onKlient, matchTrener, children, poslednyReport }: {
   udalosti: KalUdalost[];
+  /**
+   * Objednané tréningy ĎALEKO dopredu — len klient a deň.
+   *
+   * `udalosti` je okno 14 dní a pre týždenný pohľad to stačí; pre otázku
+   * „kedy dôjde balíček" nie. Vítězslav Papiež má termíny do konca roka
+   * a karta o nich vedela dva (Jerry, 28. 9. 2026).
+   */
+  buduce?: { klient: string | null; zaciatok: string }[];
   clients: Record<string, ClientAgg>;
   /** Zápisy z PTmindera — podľa nich sa pozná, ktorý tréning z kalendára
    *  už JE zapísaný a ktorý sa odtrénoval, ale do exportu sa ešte nedostal. */
@@ -1647,13 +1655,22 @@ export function Balicky({ udalosti, clients, sedenia = [], onObnov, style, onKli
     // Odtrénované-ale-neexportované ráta spoločný helper hore — tie isté
     // čísla číta aj sekcia „Končí platnosť členstva" na Kokpite.
     const odtrenovane = odtrenovaneMimoExportu(udalosti, sedenia);
-    for (const u of udalosti) {
-      if (u.typ !== "trening" || !u.klient) continue;
+    // Budúce termíny sa berú zo širokého radu; keď ho server nepošle
+    // (staršia odpoveď v keši), spadne sa na okno udalostí.
+    const dopredu = buduce.length
+      ? buduce.filter((u) => u.klient).map((u) => ({ klient: u.klient as string, zaciatok: u.zaciatok }))
+      : udalosti.filter((u) => u.typ === "trening" && u.klient).map((u) => ({ klient: u.klient as string, zaciatok: u.zaciatok }));
+    const videne = new Set<string>();
+    for (const u of dopredu) {
       const den = u.zaciatok.slice(0, 10);
-      if (den > dnes || (den === dnes && Date.parse(u.zaciatok) > teraz.getTime())) {
-        objednane[u.klient] = (objednane[u.klient] || 0) + 1;
-        (terminy[u.klient] ||= []).push(den);
-      }
+      if (!(den > dnes || (den === dnes && Date.parse(u.zaciatok) > teraz.getTime()))) continue;
+      // Ten istý termín môže prísť z oboch radov — počítať ho dvakrát by
+      // balíček minulo skôr, než sa naozaj minie.
+      const kluc = `${u.klient}|${u.zaciatok.slice(0, 16)}`;
+      if (videne.has(kluc)) continue;
+      videne.add(kluc);
+      objednane[u.klient] = (objednane[u.klient] || 0) + 1;
+      (terminy[u.klient] ||= []).push(den);
     }
     for (const meno of Object.keys(odtrenovane)) if (objednane[meno] === undefined) objednane[meno] = 0;
     // Kto má hodiny dochodené a v kalendári NIČ, je najurgentnejší telefonát zo
@@ -1696,10 +1713,14 @@ export function Balicky({ udalosti, clients, sedenia = [], onObnov, style, onKli
           meno, kusov, uz, zostava: c.packageRemaining, spolu: c.packageTotal,
           po: c.packageRemaining - kusov - uz, platnostDo: c.packageValidTo || "",
           dojde, teraz, uzDosiel: teraz <= 0,
+          // Členstvo, ktorému už skončila platnosť, hodiny nemíňa — tie
+          // prepadli. „Dôjde 28. 9." pri členstve, ktoré skončilo 2. 9., je
+          // nepravda o tom, čo sa deje (Jakub Gerich, 28. 9. 2026).
+          poPlatnosti: !!c.packageValidTo && c.packageValidTo < dnes,
         };
       })
       .filter((x): x is NonNullable<typeof x> => !!x);
-  }, [udalosti, clients, matchTrener, sedenia]);
+  }, [udalosti, buduce, clients, matchTrener, sedenia]);
 
   /**
    * Filter aj poradie sa riadia zvoleným zdrojom — inak by prepínač menil
@@ -1722,7 +1743,16 @@ export function Balicky({ udalosti, clients, sedenia = [], onObnov, style, onKli
      * Kto hodiny minul UŽ TERAZ, zostáva bez ohľadu na dátum: to je
      * najurgentnejší telefonát a žiadny horizont ho nesmie schovať.
      */
-    const hranica = new Date(Date.now() + 35 * 86400000).toISOString().slice(0, 10);
+    /**
+     * HORIZONT DVA TÝŽDNE.
+     *
+     * Pôvodných päť bolo napísaných v čase, keď kalendár siahal 14 dní
+     * dopredu a dátum sa aj tak nedal spočítať. Odkedy appka vidí termíny na
+     * štyri mesiace (28. 9. 2026), päť týždňov znamená dvadsaťtri mien —
+     * pri šesťhodinových balíčkoch a týždennom tempe dôjde niekomu stále.
+     * Dva týždne sú toľko, koľko sa dá za týždeň naozaj obvolať.
+     */
+    const hranica = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
     /**
      * Do zoznamu patrí len ten, komu balíček NAOZAJ dôjde:
      *   • hodiny už nemá,
@@ -1734,9 +1764,17 @@ export function Balicky({ udalosti, clients, sedenia = [], onObnov, style, onKli
      * z ktorých väčšina hovorila „dôjde po objednaných", teda nedôjde.
      */
     return vsetky
+      /**
+       * Členstvo po platnosti sa do zoznamu NEŤAHÁ a nejde dopredu.
+       *
+       * Vyzeralo to ako sedem urgentných prípadov, ale väčšina z nich je len
+       * chýbajúci novší riadok v exporte: Jakub Gerich má „OFF - 6h
+       * S viazanosťou", ktoré sa každý mesiac obnovuje, a Regina Obrovska má
+       * dokúpené hodiny z 20. 9. „Platnosť skončila" by o nich tvrdilo niečo,
+       * čo appka nevie. Dátum zostáva v riadku ako informácia.
+       */
       .filter((r) => r.uzDosiel || r.teraz <= 1 || (!!r.dojde && r.dojde <= hranica))
       .sort((a, b) => {
-        // Najprv tí, čo hodiny už nemajú; potom podľa dňa, kedy dôjdu.
         if (a.uzDosiel !== b.uzDosiel) return a.uzDosiel ? -1 : 1;
         return (a.dojde || "9999").localeCompare(b.dojde || "9999") || a.meno.localeCompare(b.meno);
       });
@@ -1875,7 +1913,7 @@ export function Balicky({ udalosti, clients, sedenia = [], onObnov, style, onKli
                       </span>
                       {r.uz ? ` · ${r.uz} h odtrénovaná, v PTminderi ešte nie` : null}
                       {r.kusov ? ` · obj. ${r.kusov}` : null}
-                      {r.platnostDo ? ` · do ${fmtDMY(r.platnostDo)}` : ""}
+                      {r.platnostDo ? `${r.poPlatnosti ? " · členstvo v appke platilo do " : " · do "}${fmtDMY(r.platnostDo)}` : ""}
                     </>
                   )}
                 </span>

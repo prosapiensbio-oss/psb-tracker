@@ -943,6 +943,8 @@ export function PSBApp() {
    * tú obrazovku nikto neotvorí.
    */
   const [kalUdalosti, setKalUdalosti] = useState<KalUdalost[]>([]);
+  /** Objednané tréningy ďaleko dopredu — len klient a deň (karta Balíčky). */
+  const [buduceTreningy, setBuduceTreningy] = useState<{ klient: string | null; zaciatok: string }[]>([]);
   // Meradlo súbežného chodu kalendára a PTmindera. Počíta ho SERVER nad celou
   // históriou (obrazovka aj Jarvis majú 21-dňové okno, z ktorého sa otázka
   // „vydrží kalendár sám?" zodpovedať nedá) a berie sa hotové — dve odpovede
@@ -1010,12 +1012,13 @@ export function PSBApp() {
     if (!dataHotove) return;
     void fetch("/api/kalendar", { credentials: "same-origin" })
       .then((r) => r.json())
-      .then((j: { ok?: boolean; udalosti?: KalUdalost[]; zmenyHistoria?: KalZmena[]; zmeny?: KalZmena[]; guillermo?: { datum: string; druh: string; hodiny: number }[]; guillermoUdalosti?: KalUdalost[]; porovnanie?: PorovnanieDochadzky }) => {
+      .then((j: { ok?: boolean; udalosti?: KalUdalost[]; zmenyHistoria?: KalZmena[]; zmeny?: KalZmena[]; guillermo?: { datum: string; druh: string; hodiny: number }[]; guillermoUdalosti?: KalUdalost[]; buduceTreningy?: { klient: string | null; zaciatok: string }[]; porovnanie?: PorovnanieDochadzky }) => {
         if (!j.ok || !Array.isArray(j.udalosti)) return;
         setKalUdalosti(j.udalosti);
         if (j.porovnanie) setKalPorovnanie(j.porovnanie);
         if (Array.isArray(j.guillermo)) setGuillermoZazn(j.guillermo);
         if (Array.isArray(j.guillermoUdalosti)) setGuillermoUdal(j.guillermoUdalosti);
+        if (Array.isArray(j.buduceTreningy)) setBuduceTreningy(j.buduceTreningy);
         if (Array.isArray(j.zmenyHistoria)) setKalZmeny(j.zmenyHistoria);
         // Nevysvetlené zmeny idú do registra — dovtedy o nich vedel len ten,
         // kto sám zašiel do Kalendára.
@@ -2589,7 +2592,7 @@ function skupinaFaktur(
           </div>
         )}
         {active === "dashboard" && (
-          <Dashboard trainer={trainer} onTrainer={setTrainer} data={data} clients={clients} kalendar={kalUdalosti} kalZmeny={kalZmeny} kalNevysvetlene={kalNevysvetlene} register={registerAll} sixM={sixM} capacity={capacity} actions={actions} onNavigate={navigate} assistantChat={chat} onClientClick={onClientClick} />
+          <Dashboard trainer={trainer} onTrainer={setTrainer} data={data} clients={clients} kalendar={kalUdalosti} buduceTreningy={buduceTreningy} kalZmeny={kalZmeny} kalNevysvetlene={kalNevysvetlene} register={registerAll} sixM={sixM} capacity={capacity} actions={actions} onNavigate={navigate} assistantChat={chat} onClientClick={onClientClick} />
         )}
 
         {/* Bitcoinová evidencia vnútri Kokpitu (Jerry, 6. 9. 2026 — jedno okno).

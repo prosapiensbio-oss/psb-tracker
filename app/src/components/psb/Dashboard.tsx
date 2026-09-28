@@ -444,6 +444,7 @@ export function Dashboard({
   trainer,
   onTrainer,
   kalendar,
+  buduceTreningy = [],
 }: {
   data: PSBData;
   clients: Record<string, ClientAgg>;
@@ -462,6 +463,8 @@ export function Dashboard({
   onTrainer: (t: string) => void;
   /** Udalosti z Google Kalendára — predbežná vrstva, nikdy nie zápis. */
   kalendar: KalUdalost[];
+  /** Objednané tréningy ďaleko dopredu — karta Balíčky (14-dňové okno na ne nestačí). */
+  buduceTreningy?: { klient: string | null; zaciatok: string }[];
 }) {
   const [showAcked, setShowAcked] = useState(false);
   const [registerExpanded, setRegisterExpanded] = useState(false);
@@ -1641,6 +1644,7 @@ export function Dashboard({
     koniecBalicka: (
       <Balicky
         udalosti={kalendar.filter((u) => matchT(u.trener))}
+        buduce={buduceTreningy}
         clients={clients}
         sedenia={data.sessions}
         onObnov={actions.obnovKalendar}

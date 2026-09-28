@@ -1549,8 +1549,24 @@ objednaný termín" skončí na jednej hodine a nedeje sa nič.
   ktorá balíček vyčerpá (`terminy` z kalendára, `dojde`). Riadok tým odpovedá
   na otázku, kvôli ktorej sa karta otvára: komu zavolať prvému.
 - **Do zoznamu patrí len ten, komu naozaj dôjde:** hodiny už nemá, objednané
-  termíny ho vyčerpajú do piatich týždňov, alebo mu zostáva posledná hodina.
-  Zo pätnástich mien tak ostali štyri.
+  termíny ho vyčerpajú do DVOCH týždňov, alebo mu zostáva posledná hodina.
+- **Karta videla kalendár len 14 dní dopredu** a „obj. N" preto klamalo:
+  Vítězslav Papiež má naplánované tréningy do konca roka a stálo tam „obj. 2".
+  Hlavné okno udalostí (21 dozadu, 14 dopredu) je pre týždenný pohľad správne
+  a nemení sa; karta dostáva vlastný úzky rad `buduceTreningy` (klient + deň,
+  120 dní dopredu) z tej istej tabuľky. Sťahovanie kalendára sa nemení.
+  Termín, ktorý príde z oboch radov, sa počíta RAZ — inak by balíček minul
+  skôr, než sa naozaj minie.
+- **Horizont sa musel skrátiť, keď appka začala vidieť ďalej.** Päť týždňov
+  bolo napísaných v čase, keď sa dátum aj tak nedal spočítať; s termínmi na
+  štyri mesiace to znamenalo dvadsaťtri mien. Dva týždne sú toľko, koľko sa
+  dá za týždeň obvolať.
+- **„Platnosť skončila" sa netvrdí.** Sedem klientov má v appke členstvo
+  s platnosťou v minulosti a vyzeralo to ako sedem urgentných prípadov —
+  lenže väčšina z nich je len chýbajúci novší riadok v exporte (Jakub Gerich
+  má mesačne obnovované členstvo, Regina Obrovska dokúpené hodiny z 20. 9.).
+  Dátum zostáva v riadku ako informácia („členstvo v appke platilo do…"),
+  ale do zoznamu nikoho neťahá a poradie nemení.
 - **Horizont nesmie schovať toho, kto je na nule.** Kto hodiny minul už dnes,
   zostáva bez ohľadu na dátum — to je najurgentnejší telefonát.
 

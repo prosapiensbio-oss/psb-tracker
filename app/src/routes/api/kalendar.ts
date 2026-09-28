@@ -214,7 +214,7 @@ export const Route = createFileRoute("/api/kalendar")({
         if (!(await isAuthed(request))) return unauthorized();
         const { od, do_ } = okno();
 
-        const [zdroje, zmeny, zmenyHistoria, mapovanie, udalosti, guillermo, guillermoUdalosti] = await Promise.all([
+        const [zdroje, zmeny, zmenyHistoria, mapovanie, udalosti, guillermo, buduce, guillermoUdalosti] = await Promise.all([
           DB.prepare(`SELECT z.id, z.trener, z.aktivny, z.posledne_ok, z.posledna_chyba,
             (SELECT s.kedy FROM kal_snimky s WHERE s.trener = z.trener ORDER BY s.kedy DESC LIMIT 1) AS snimka_kedy,
             (SELECT s.ok FROM kal_snimky s WHERE s.trener = z.trener ORDER BY s.kedy DESC LIMIT 1) AS snimka_ok,
@@ -233,6 +233,19 @@ export const Route = createFileRoute("/api/kalendar")({
           DB.prepare("SELECT nazov, trener, cas, klient, typ, vedome FROM kal_mapovanie ORDER BY trener, nazov, cas").all(),
           DB.prepare("SELECT uid, trener, zaciatok, koniec, nazov, klient, typ FROM kal_udalosti WHERE zmizla_at IS NULL AND zaciatok >= ? AND zaciatok <= ? ORDER BY zaciatok").bind(od, do_).all(),
           DB.prepare("SELECT id, datum, druh, hodiny, suma_czk, poznamka FROM guillermo_hodiny ORDER BY datum DESC").all(),
+          /**
+           * OBJEDNANÉ TERMÍNY ĎALEKO DOPREDU — len klient a deň.
+           *
+           * Hlavné okno udalostí je 14 dní dopredu a to je pre týždenný
+           * pohľad správne. Pre otázku „kedy klientovi dôjde balíček" je to
+           * ale málo: Vítězslav Papiež má naplánované tréningy do konca roka
+           * a karta o nich vedela dva, lebo ďalej nevidela (Jerry,
+           * 28. 9. 2026). Rad je úzky (dve polia) a číta sa z tej istej
+           * tabuľky, takže sťahovanie kalendára sa nemení.
+           */
+          DB.prepare(
+            "SELECT klient, zaciatok FROM kal_udalosti WHERE zmizla_at IS NULL AND klient IS NOT NULL AND typ IN ('trening','uvodny') AND zaciatok > ? AND zaciatok <= ? ORDER BY zaciatok",
+          ).bind(new Date().toISOString().slice(0, 16), new Date(Date.now() + 120 * 86400000).toISOString().slice(0, 16)).all(),
           // Guillermo tréningy MIMO okna: zostatok sedení sa počíta od kotvy
           // (napr. 9. 8.), ale okno udalostí siaha len 21 dní dozadu — tréning
           // starší by z počtu vypadol a zostatok by ticho narástol späť. Preto
@@ -327,6 +340,7 @@ export const Route = createFileRoute("/api/kalendar")({
           mapovanie: mapovanie.results || [],
           udalosti: udalosti.results || [],
           guillermo: guillermo.results || [],
+          buduceTreningy: buduce.results || [],
           guillermoUdalosti: guillermoUdalosti.results || [],
           nezname: Object.values(nezname).sort((a, b) => b.pocet - a.pocet),
           porovnanie,
