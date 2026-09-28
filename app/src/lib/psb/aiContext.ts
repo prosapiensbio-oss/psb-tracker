@@ -46,6 +46,7 @@ import {
 import { rozborUvodnych } from "./uvodneTreningy";
 import type { BezBalicka } from "./bezBalicka";
 import type { Dlznik } from "./dlznici";
+import type { ZostavaPoPlatnosti } from "./platnostZostatok";
 import { monthLabel, normName, weekKey, weekLabel } from "./format";
 import type { PorovnanieDochadzky } from "./porovnanieDochadzky";
 import type { PSBData } from "./types";
@@ -121,7 +122,7 @@ export function buildAiContext(
   /** A to isté pre platby (`/api/platby`). */
   platby?: { porovnanie: { mesiace: { mesiac: string; kokpit: number; ptminder: number; rozdiel: number }[]; kokpit: number; ptminder: number; rozdiel: number } | null; cakaju: number } | null,
   /** Dve fronty z Workspace — hotové, nie na prepočítanie (28. 9. 2026). */
-  fronty?: { bezBalicka: BezBalicka[]; dlznici: Dlznik[] } | null,
+  fronty?: { bezBalicka: BezBalicka[]; dlznici: Dlznik[]; platnost?: ZostavaPoPlatnosti[] } | null,
 ) {
   const clientList = Object.values(clients);
 
@@ -1031,6 +1032,14 @@ export function buildAiContext(
         zPoplatkovCzk: d.zPoplatkov, zBalickovCzk: d.zBalickov, najstarsiDen: d.najstarsi, dni: d.dni,
       })),
       poznamka: "Kto dlží peniaze — karta „Dlhujú peniaze“ vo Workspace. Sčítava DVA zdroje: otvorené poplatky z PTmindera (kľúč „nezaplatene“, už po odrátaní platieb zapísaných v Kokpite) a balíčky nahodené v Kokpite, na ktoré neprišla platba. Na otázku „kto dlží“ odpovedaj odtiaľto; „nezaplatene“ je len jedna polovica.",
+    },
+    platnostAHodiny: {
+      pocet: (fronty?.platnost || []).length,
+      klienti: (fronty?.platnost || []).map((x) => ({
+        klient: x.meno, trener: x.trener, hodin: x.hodin, platnostDo: x.platnostDo,
+        dniPoPlatnosti: x.dni, predplatne: x.predplatne, prenositelnychHodin: x.presunHodin,
+      })),
+      poznamka: "Komu končí (alebo do troch dní skončí) platnosť členstva a ešte mu zostávajú hodiny — karta „Platnosť končí, hodiny zostávajú“ vo Workspace a rovnaká notifikácia pod kľúčom platnost|. Sú z toho tri východiská a appka ani jedno nevyberá sama: hodiny prepadnú, dopíšu sa ako doplnenie (klient ich odtrénuje nad rámec platnosti), alebo sa pri PREDPLATNOM prenesú do ďalšieho balíčka — najviac dve hodiny, zvyšok prepadá aj tam. Keď sa Jerry rozhodne, odpoveď sa zapíše do anomaly_ack pod tým istým kľúčom.",
     },
     tyzdenneHodiny,
     tyzdennePodlaTrenera,

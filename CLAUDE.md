@@ -1812,3 +1812,32 @@ prejdú testy a nie keď to dáva zmysel.
 
 **Pravidlo:** keď karta pribudne do kopy, pozri sa na ňu aj v šírke telefónu.
 Súčet `minWidth` v jednom riadku je strop, pod ktorý sa layout nezmestí.
+
+## Platnosť skončila a hodiny zostali — tri východiská, appka nevyberá
+
+Jerry, 28. 9. 2026: „keď niekomu skončí platnosť členstva, ale ostane mu tam
+nejako hodiny, chcem, aby ma notifikácie na to upozornili." Dovtedy sa to
+nedozvedel od nikoho: karta „Balíček dojde" hovorí o tom, komu hodiny
+DOCHÁDZAJÚ, a klienta po platnosti zámerne neťahá dopredu.
+
+Tri východiská sú jeho, nie appkine (`platnostZostatok.ts`):
+
+1. **Prepadlo** — hodiny zaniknú, nič sa nedopisuje.
+2. **Doplnenie členstva** — „má ako keby tréning zdarma, ale vlastne nemá, len
+   ho odtrénuje nad rámec platnosti". Hodiny sa zapíšu ako ručný balíček, takže
+   ich odpočet ďalej vidí.
+3. **Pri PREDPLATNOM** to isté, alebo **presun do ďalšieho balíčka — najviac
+   dve hodiny**. Zvyšok nad dve prepadá aj tam; preniesť celé nedočerpané
+   členstvo by znamenalo, že platnosť neznamená nič.
+
+- **Hlási sa TRI DNI VOPRED.** Po skončení sa dá ešte dohodnúť, čo s tým, ale
+  pred ním sa dá aj niečo odtrénovať — a to je lacnejšie pre oboch.
+- **Kľúč nesie deň konca platnosti** (`platnost|meno|deň`): nové členstvo je
+  nová otázka, ale to isté sa nepýta každý deň znova.
+- **Odpoveď sa MUSÍ zapísať do `anomaly_ack`, nielen schovať riadok.**
+  Notifikácia sa riadi zostatkom z PTmindera a ten sa dopísaním doplnenia
+  nezmení — bez `ack` by sa upozornenie zajtra vrátilo, hoci Jerry odpovedal.
+  Preto všetky tri tlačidlá acknú a dve z nich k tomu ešte zapíšu hodiny.
+
+Stav pri spustení: 7 klientov, z toho 5 po platnosti (Regina Obrovská 5 h,
+20 dní) a 2 pred ňou.

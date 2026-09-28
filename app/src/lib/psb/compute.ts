@@ -1,6 +1,7 @@
 // All derived analytics for the PSB Tracker. Pure functions over PSBData —
 // no browser globals. Reused across every module.
 import { daysBetween, fmtDMY, monthKey, monthLabel, monthsBetween, normName, quarterKey, quarterLabel, weekKey, weekLabel } from "./format";
+import { vetaPlatnosti, zostavaPoPlatnosti } from "./platnostZostatok";
 import { menoZNazvuUvodneho } from "./kalendar";
 import { bezDuplicitBalickov, hodinZNazvuBalicka } from "./klientOsCasu";
 import { vlastnikKlienta } from "./zaskok";
@@ -1853,6 +1854,7 @@ export function deriveAnomalies(
 
   const serviceClients = new Set(data.services.map((s) => s.client));
   const now = new Date();
+  const dnesISO = now.toISOString().slice(0, 10);
   // Kalendár má rovnaké slovo ako export — a hovorí skôr.
   const posledny = poslednyTrening(clients, kal?.udalosti, kal?.zmeny, now);
 
@@ -1947,6 +1949,26 @@ export function deriveAnomalies(
       if (!najblizsiTermin(c.name, kal?.udalosti, now) && !zaverKryjeKlienta(data.zavery, c.name, now)) {
         push(`gone|${c.name}`, days >= 21 ? "red" : "orange", "Prestal chodiť", `${c.name}: ${days} dní bez tréningu (${c.segment}) — ozvi sa`, c.name);
       }
+    }
+
+    /**
+     * PLATNOSŤ KONČÍ A HODINY ZOSTÁVAJÚ.
+     *
+     * Jerry, 28. 9. 2026: „keď niekomu skončí platnosť členstva, ale ostane
+     * mu tam nejako hodiny, chcem, aby ma notifikácie na to upozornili."
+     * Karta „Balíček dojde" hovorí o tom, komu hodiny DOCHÁDZAJÚ, a klienta
+     * po platnosti zámerne neťahá dopredu — takže o tomto sa dovtedy
+     * nedozvedel od nikoho.
+     *
+     * Hlási sa už TRI DNI VOPRED. Po skončení sa dá ešte dohodnúť, čo s tým,
+     * ale pred ním sa dá aj niečo odtrénovať — a to je lacnejšie pre oboch.
+     *
+     * Kľúč nesie deň konca platnosti: nové členstvo = nová otázka, ale to
+     * isté sa nepýta každý deň znova.
+     */
+    for (const x of zostavaPoPlatnosti([c], dnesISO)) {
+      push(`platnost|${c.name}|${x.platnostDo}`, x.dni >= 0 ? "orange" : "blue",
+        "Platnosť končí, hodiny zostávajú", vetaPlatnosti(x), c.name);
     }
 
     // "Duch": kúpi balíček, odchodí pár hodín a prestane chodiť AJ odpisovať.
@@ -2239,6 +2261,7 @@ const DRUH_KLUCA: Record<string, string> = {
   prijmy: "príjmy", barter: "barterové členstvo", data: "staré dáta z PTmindera",
   web: "text webu", zapis: "chýbajúci zápis", cap: "kapacita", zaver: "záver z debaty",
   balicek: "končiaci balíček", btcbezdokladu: "bitcoin bez dokladu", odchody: "odchody klientov",
+  platnost: "platnosť končí a hodiny zostávajú",
 };
 
 /**

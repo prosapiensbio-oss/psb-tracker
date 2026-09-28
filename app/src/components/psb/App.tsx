@@ -56,6 +56,7 @@ import { Prechod } from "./Prechod";
 import { buildAiContext } from "../../lib/psb/aiContext";
 import { bezAktivnehoBalicka, treningyZObochZdrojov, vMinuseKlienta } from "../../lib/psb/bezBalicka";
 import { dlznici as spocitajDlznikov } from "../../lib/psb/dlznici";
+import { zostavaPoPlatnosti } from "../../lib/psb/platnostZostatok";
 
 /** Riadky z `/api/balicky` a `/api/platby`, ktoré kŕmia fronty Workspace. */
 type BalicekRiadok = {
@@ -2268,6 +2269,7 @@ function skupinaFaktur(
       kalUdalosti: (kalUdalosti || []) as never,
     };
     return {
+      platnost: zostavaPoPlatnosti(Object.values(clients)),
       bezBalicka: bezAktivnehoBalicka(
         Object.values(clients), evidencia, treningyZObochZdrojov(data.sessions, kalUdalosti || []), undefined,
         (meno) => vMinuseKlienta(meno, ZDROJ_OSI, clients[meno]?.packageTotal > 0 ? clients[meno].packageRemaining : null),

@@ -6,6 +6,7 @@ import { krokGesta, krokSvihu, novyStavGesta, novyStavSvihu, zacniSvih } from ".
 import { BEZ_FRONTY, klucPolozky, popisZmeny, postavKarty, trenerZPrihlasenia, type Karta, type NeznamyNazov, type NepriradenaPlatba, type Zmena } from "../../lib/psb/workspaceKarty";
 import { bezAktivnehoBalicka, treningyZObochZdrojov, vMinuseKlienta, type BezBalicka } from "../../lib/psb/bezBalicka";
 import { dlznici as spocitajDlznikov, type Dlznik } from "../../lib/psb/dlznici";
+import { zostavaPoPlatnosti, type ZostavaPoPlatnosti } from "../../lib/psb/platnostZostatok";
 
 /** Riadky z `/api/balicky` a `/api/platby` — len to, čo tieto karty potrebujú. */
 type BalicekRiadok = {
@@ -159,12 +160,16 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
     );
   }, [data.poplatky, balicky, vlastnePlatby, clients]);
 
+  /** Komu končí platnosť a zostávajú hodiny — to isté, čo hlási notifikácia. */
+  const platnost = useMemo(() => zostavaPoPlatnosti(Object.values(clients)), [clients]);
+
   const karty = useMemo(() => {
     if (!zdroje) return [];
     return postavKarty({
       ...zdroje,
       bezBalicka,
       dlznici: dlzniciRiadky,
+      platnost,
       ktoSom,
       trener: ktoreVeci === "auto" ? undefined : ktoreVeci === "vsetko" ? null : ktoreVeci,
       navrhMena: (nazov) => {
@@ -172,7 +177,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
         return v.typ === "uvodny" ? (v.kandidati[0] || v.meno) : (v.kandidati.length === 1 ? v.kandidati[0] : "");
       },
     });
-  }, [zdroje, clients, ktoSom, ktoreVeci, bezBalicka, dlzniciRiadky]);
+  }, [zdroje, clients, ktoSom, ktoreVeci, bezBalicka, dlzniciRiadky, platnost]);
 
   // Karta, v ktorej už nič nezostalo, z kopy zmizne — ale až po tom, čo sa
   // v nej naozaj odklikalo; inak by zmizla pod rukami uprostred práce.
@@ -180,7 +185,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
     // Karta klienta nie je fronta — nemá položky a nikdy nezmizne. Ostatné
     // zmiznú, keď sa v nich všetko odklikalo.
     () => karty.filter((k) => BEZ_FRONTY.includes(k.druh)
-      || (k.polozky as (Zmena | NeznamyNazov | NepriradenaPlatba | BezBalicka | Dlznik)[]).some((p) => !hotove.has(klucPolozky(k.druh, p)))),
+      || (k.polozky as (Zmena | NeznamyNazov | NepriradenaPlatba | BezBalicka | Dlznik | ZostavaPoPlatnosti)[]).some((p) => !hotove.has(klucPolozky(k.druh, p)))),
     [karty, hotove],
   );
   const k = zive[Math.min(i, Math.max(0, zive.length - 1))];
@@ -778,6 +783,70 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                       </div>
                     )}
                     <button onClick={() => oznacHotove(kluc)} style={{ ...vedlajsie, order: 5 }}>vybavené</button>
+                  </div>
+                );
+              })}
+
+              {/* PLATNOSŤ KONČÍ — tri tlačidlá, tri Jerryho možnosti.
+                  „Prepadlo" len umlčí; ostatné dve hodiny naozaj zapíšu ako
+                  doplnenie, takže ich odpočet ďalej vidí. Kľúč je ten istý,
+                  aký nesie notifikácia, takže sa to nepýta dvakrát. */}
+              {k.druh === "platnost" && k.polozky.map((x) => {
+                const kluc = klucPolozky("platnost", x);
+                if (hotove.has(kluc)) return null;
+                /**
+                 * Rozhodnutie sa musí ZAPÍSAŤ, nie len schovať.
+                 *
+                 * Kľúč `platnost|meno|deň` nesie aj notifikácia, a tá sa riadi
+                 * zostatkom z PTmindera — ten sa dopísaním doplnenia nezmení.
+                 * Bez `ack` by sa upozornenie zajtra vrátilo, hoci Jerry
+                 * odpovedal. Preto ide odpoveď vždy do `anomaly_ack` a pri
+                 * dvoch z troch možností sa k nej ešte zapíšu hodiny.
+                 */
+                const odpovedz = async (poznamka: string, hodin?: number, nazov?: string) => {
+                  if (hodin != null && nazov) {
+                    setPracujem(kluc); setChyba("");
+                    const j = await posli("/api/balicky", {
+                      akcia: "pridaj", klient: x.meno, nazov, hodiny: hodin,
+                      platnostOd: x.platnostDo, cenaCzk: 0, poznamka,
+                    }).catch(() => ({ ok: false, error: "spojenie" }));
+                    setPracujem("");
+                    if (!j.ok) { setChyba(j.error || "nepodarilo sa uložiť"); return; }
+                  }
+                  await vybav(kluc, "/api/anomaly", { key: kluc, ack: true, note: poznamka });
+                };
+                return (
+                  <div key={kluc} style={{ ...riadok, flexWrap: "wrap" }}>
+                    <button onClick={() => naStol(x.meno)} style={{ ...vedlajsie, fontSize: 13.5, fontWeight: 600, color: C.text, minWidth: uzke ? 0 : 150, flex: uzke ? "1 1 auto" : undefined, textAlign: "left" }}>
+                      {x.meno}
+                    </button>
+                    <div style={{ minWidth: uzke ? 0 : 90, textAlign: "right", fontSize: 13.5, fontWeight: 700, color: C.orange }}>
+                      {x.hodin} h
+                    </div>
+                    <div style={{ flex: uzke ? "1 1 100%" : "1 1 180px", minWidth: uzke ? 0 : 150, fontSize: 11.5, color: C.textMuted }}>
+                      {x.dni < 0 ? `končí ${den(x.platnostDo)}` : `skončila ${den(x.platnostDo)}`}
+                      {` · ${x.membership}`}
+                      {x.predplatne ? " · predplatné" : ""}
+                    </div>
+                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap", flex: uzke ? "1 1 100%" : undefined }}>
+                      <button onClick={() => void odpovedz(`${x.hodin} h prepadlo — platnosť skončila ${x.platnostDo}`)} disabled={pracujem === kluc} style={vedlajsie}>prepadlo</button>
+                      <button
+                        onClick={() => void odpovedz(`nedočerpané hodiny z členstva do ${x.platnostDo}`, x.hodin, "Doplnenie členstva")}
+                        disabled={pracujem === kluc}
+                        style={hlavne(true)}
+                      >
+                        {pracujem === kluc ? "…" : `doplniť ${x.hodin} h`}
+                      </button>
+                      {x.predplatne && (
+                        <button
+                          onClick={() => void odpovedz(`presun z členstva do ${x.platnostDo} (max 2 h)`, x.presunHodin, "Prenesené hodiny")}
+                          disabled={pracujem === kluc}
+                          style={vedlajsie}
+                        >
+                          preniesť {x.presunHodin} h
+                        </button>
+                      )}
+                    </div>
                   </div>
                 );
               })}

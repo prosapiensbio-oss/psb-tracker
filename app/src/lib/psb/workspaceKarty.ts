@@ -21,6 +21,7 @@
 
 import type { BezBalicka } from "./bezBalicka";
 import type { Dlznik } from "./dlznici";
+import type { ZostavaPoPlatnosti } from "./platnostZostatok";
 
 export type Zmena = { id: string; druh: string; klient: string | null; nazov: string | null; pred: string | null; po: string | null; kedy: string; trener: string };
 export type NeznamyNazov = { nazov: string; trener: string; pocet: number; najblizsi: string; navrh: string };
@@ -39,6 +40,12 @@ export type Karta =
    */
   | { druh: "bezBalicka"; nadpis: string; podnadpis: string; polozky: BezBalicka[] }
   | { druh: "dlznici"; nadpis: string; podnadpis: string; polozky: Dlznik[] }
+  /**
+   * Platnosť končí a hodiny zostávajú — a treba sa rozhodnúť, čo s nimi.
+   * Jerry, 28. 9. 2026: prepadnú, dopíšu sa ako doplnenie, alebo (pri
+   * predplatnom) sa najviac dve prenesú do ďalšieho balíčka.
+   */
+  | { druh: "platnost"; nadpis: string; podnadpis: string; polozky: ZostavaPoPlatnosti[] }
   /**
    * Karta bez fronty — pracovný stôl jedného klienta.
    *
@@ -64,6 +71,8 @@ export type ZdrojeKariet = {
   bezBalicka?: BezBalicka[];
   /** Kto dlží peniaze — poplatky z PTmindera aj nezaplatené balíčky. */
   dlznici?: Dlznik[];
+  /** Komu končí platnosť a zostávajú hodiny. */
+  platnost?: ZostavaPoPlatnosti[];
   nezname: { nazov: string; trener: string; pocet: number; najblizsi: string }[];
   platby: { fioId: string; datum: string; suma: number; text: string; kandidati: string[]; klientsky?: boolean }[];
   navrhMena: (nazov: string) => string;
@@ -213,12 +222,27 @@ export function postavKarty(z: ZdrojeKariet): Karta[] {
     polozky: dlzni,
   });
 
+  /**
+   * PLATNOSŤ KONČÍ, HODINY ZOSTÁVAJÚ.
+   *
+   * Filtruje sa trénerom: je to dohoda s vlastným klientom, nie účtovníctvo.
+   * Karta stojí až za peniazmi, lebo sa týka pár ľudí mesačne — ale keď sa
+   * týka, treba to vybaviť v ten týždeň, nie v tom mesiaci.
+   */
+  const platnost = moje(z.platnost || []);
+  if (platnost.length) karty.push({
+    druh: "platnost",
+    nadpis: "Platnosť končí, hodiny zostávajú",
+    podnadpis: `${platnost.length} ${pocet(platnost.length, "klient má", "klienti majú", "klientov má")} nedočerpané hodiny`,
+    polozky: platnost,
+  });
+
   return karty;
 }
 
 export function klucPolozky(
   druh: Karta["druh"],
-  p: Zmena | NeznamyNazov | NepriradenaPlatba | BezBalicka | Dlznik,
+  p: Zmena | NeznamyNazov | NepriradenaPlatba | BezBalicka | Dlznik | ZostavaPoPlatnosti,
 ): string {
   if (druh === "zmeny") return `zmeny|${(p as Zmena).id}`;
   if (druh === "mena") return `mena|${(p as NeznamyNazov).nazov}|${(p as NeznamyNazov).trener}`;
@@ -231,5 +255,8 @@ export function klucPolozky(
    */
   if (druh === "bezBalicka") return `bezBalicka|${(p as BezBalicka).meno}`;
   if (druh === "dlznici") return `dlznici|${(p as Dlznik).meno}`;
+  // Kľúč je ten istý, aký nesie notifikácia — odklepnutie na karte tým
+  // umlčí aj upozornenie a nepýta sa to na dvoch miestach zvlášť.
+  if (druh === "platnost") return `platnost|${(p as ZostavaPoPlatnosti).meno}|${(p as ZostavaPoPlatnosti).platnostDo}`;
   return `platby|${(p as NepriradenaPlatba).fioId}`;
 }
