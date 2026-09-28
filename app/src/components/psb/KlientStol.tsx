@@ -9,7 +9,7 @@ import { jeBeta } from "../../lib/psb/beta";
 import { menoKluc } from "../../lib/psb/compute";
 import { satsNaCzk } from "../../lib/psb/btcKontrola";
 import { CENNIK, platnostDo } from "../../lib/psb/cennik";
-import { osCasuKlienta } from "../../lib/psb/klientOsCasu";
+import { osCasuKlienta, treningyVBalicku } from "../../lib/psb/klientOsCasu";
 import { sedeniaPoMesiacoch } from "../../lib/psb/profil";
 import { zdravieKlienta } from "../../lib/psb/klientZdravie";
 import type { ClientAgg } from "../../lib/psb/compute";
@@ -1190,10 +1190,21 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
                 </div>
               )}
               <div style={hlavicka}>NAHODENÉ V KOKPITE</div>
-              {mojeBalicky.map((b) => (
+              {mojeBalicky.map((b, iB) => {
+                /**
+                 * Tréningy nahodeného balíčka. Na osi času nestojí — tá číta
+                 * PTminder — takže sa berú podľa jeho vlastnej platnosti.
+                 * Keď koniec zapísaný nie je, obdobie končí začiatkom
+                 * nasledujúceho balíčka (zoznam je zoradený od najnovšieho,
+                 * takže ten „nasledujúci" je o index nižšie).
+                 */
+                const doDna = b.platnost_do || (iB > 0 ? mojeBalicky[iB - 1].platnost_od : "");
+                const tre = treningyVBalicku(os, b.platnost_od, doDna || undefined);
+                const otvorene = rozbalenyBalicek === `kokpit-${b.id}`;
+                return (
                 <div key={b.id}>
                   <div style={riadok}>
-                    <span style={stlpecDen}>{fmtDMY(b.platnost_od)}</span>
+                    <span style={stlpecDen}>{denVTyzdni(b.platnost_od)} {fmtDMY(b.platnost_od)}</span>
                     <span style={{ flex: 1 }}>
                       {b.nazov}
                       <span style={{ color: C.textDim }}>
@@ -1203,6 +1214,15 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
                       </span>
                     </span>
                     {!!b.cena_czk && <span style={{ color: C.textMuted }}>{fmtCZK(b.cena_czk)}</span>}
+                    {!!tre.length && (
+                      <button
+                        onClick={() => setRozbalenyBalicek((s) => (s === `kokpit-${b.id}` ? "" : `kokpit-${b.id}`))}
+                        title="Tréningy v rámci tohto balíčka"
+                        style={{ background: "none", border: "none", padding: 0, color: C.accentLight, fontFamily: "inherit", fontSize: 11, cursor: "pointer", whiteSpace: "nowrap" }}
+                      >
+                        {otvorene ? "▾" : "▸"} {tre.length}× tréning
+                      </button>
+                    )}
                     {onFaktura && (
                       <button
                         onClick={() => onFaktura({ klient: meno, popis: b.nazov, cena: b.cena_czk || 0, balicekId: b.id })}
@@ -1226,11 +1246,25 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
                       comu="balíček"
                     />
                   </div>
+                  {otvorene && (
+                    <div style={{ margin: "2px 0 8px", paddingLeft: 12, borderLeft: `2px solid ${mix(C.accent, 30)}` }}>
+                      {tre.map((t, i) => (
+                        <div key={i} style={{ display: "flex", gap: 8, fontSize: 11.5, color: C.textMuted, padding: "2px 0" }}>
+                          <span style={{ minWidth: 92, color: C.textDim, fontVariantNumeric: "tabular-nums" }}>{denVTyzdni(t.den)} {fmtDMY(t.den)}</span>
+                          <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {t.druh === "trening" ? `${t.cas ? cas24(t.cas) : "tréning"}${t.trener ? ` · ${t.trener}` : ""}${t.zdarma !== undefined ? " · zdarma" : ""}` : ""}
+                          </span>
+                          {t.druh === "trening" && t.zKalendara && <span style={{ fontSize: 10.5, color: C.blue }}>z kalendára</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   {upravaBalicka === b.id && (
                     <FormularBalicka f={f} setF={setF} pracujem={pracujem} onUloz={() => void upravBalicek(b.id)} popis="Uložiť zmenu" />
                   )}
                 </div>
-              ))}
+                );
+              })}
               <div style={hlavicka}>Z PTMINDERA</div>
             </div>
           )}

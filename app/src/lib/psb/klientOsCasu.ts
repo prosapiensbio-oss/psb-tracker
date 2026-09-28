@@ -243,7 +243,18 @@ export function osCasuKlienta(
   return out.sort((a, b) => b.den.localeCompare(a.den) || poradie[a.druh] - poradie[b.druh]);
 }
 
+/**
+ * Tréningy, ktoré padli do platnosti daného balíčka.
+ *
+ * Pre balíčky nahodené v Kokpite (`balicky`) — tie na osi času nestoja, lebo
+ * os číta PTminder. Rozsah je ich vlastná platnosť; keď koniec nie je
+ * zapísaný, berie sa dnešok alebo začiatok nasledujúceho balíčka.
+ */
+export function treningyVBalicku(os: Udalost[], od: string, doDna?: string): Udalost[] {
+  return os.filter((x) => x.druh === "trening" && x.den >= od && (!doDna || x.den <= doDna));
+}
+
 /** Koľko tréningov padlo do platnosti daného balíčka — na spočítanie očami. */
 export function treningovVBalicku(os: Udalost[], od: string, doDna?: string): number {
-  return os.filter((x) => x.druh === "trening" && x.den >= od && (!doDna || x.den <= doDna)).length;
+  return treningyVBalicku(os, od, doDna).length;
 }
