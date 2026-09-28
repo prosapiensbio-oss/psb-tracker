@@ -103,7 +103,7 @@ const den = (iso: string): string => {
  * Čas v jednom tvare. PTminder dáva „3:00pm", kalendár „15:00" — v jednom
  * výpise vedľa seba to vyzerá ako dva rôzne tréningy.
  */
-const cas24 = (c: string): string => {
+export const cas24 = (c: string): string => {
   const m = /^(\d{1,2}):(\d{2})\s*(am|pm)$/i.exec(c.trim());
   if (!m) return c;
   let h = Number(m[1]) % 12;
@@ -150,6 +150,15 @@ const vCase = (os: Udalost[]): Udalost[] => {
 };
 
 export type StavRiadku = {
+  /**
+   * Ktorému členstvu riadok patrí — deň jeho začiatku.
+   *
+   * Obdobia už `priebehBalickov` počíta kvôli odpočtu; toto je len ich meno,
+   * aby sa dali riadky zoskupiť. Profil klienta na tom stojí: klik na balíček
+   * ukáže tréningy, ktoré sa naň vybrali (Jerry, 28. 9. 2026). Prázdne =
+   * riadok je spred prvého známeho členstva.
+   */
+  usek: string;
   /**
    * Koľkátá hodina balíčka to je, počítané dolu — prvý tréning zo šiestich
    * ukáže 6, posledný 1. `null` = appka nevie alebo je riadok bez hodiny.
@@ -264,7 +273,7 @@ export function priebehBalickov(
         if (vycerpane || !zaplateneOd || u.den < zaplateneOd) dlh = (dlhPocet += 1);
       }
       doUseku.push({ u, po: u.druh === "trening" ? bezi : null });
-      stavy.set(u, { zostatok, dlh });
+      stavy.set(u, { zostatok, dlh, usek: b?.den || "" });
     }
 
     // Posledné členstvo sa zrovná s číslom, ktoré appka ukazuje na karte.
@@ -280,7 +289,7 @@ export function priebehBalickov(
       for (const { u } of doUseku) {
         const st = stavy.get(u);
         if (!st || st.zostatok === null) continue;
-        stavy.set(u, { zostatok: st.zostatok + posun, dlh: st.dlh });
+        stavy.set(u, { zostatok: st.zostatok + posun, dlh: st.dlh, usek: st.usek });
       }
     }
 

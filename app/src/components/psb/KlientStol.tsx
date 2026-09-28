@@ -3,7 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 
 import { dlhKlienta } from "../../lib/psb/dlhKlienta";
 import { VypisHodinPanel } from "./VypisHodinPanel";
-import { hod, priebehBalickov, type StavRiadku } from "../../lib/psb/vypisHodin";
+import { cas24, hod, priebehBalickov, type StavRiadku } from "../../lib/psb/vypisHodin";
 import { normName, fmtCZK, fmtDMY, denVTyzdni } from "../../lib/psb/format";
 import { jeBeta } from "../../lib/psb/beta";
 import { menoKluc } from "../../lib/psb/compute";
@@ -110,6 +110,8 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
   const [detaily, setDetaily] = useState(false);
   const [pisemPlatbu, setPisemPlatbu] = useState(false);
   /** Deň, ktorého tréning sa práve označuje ako zdarma (píše sa k nemu dôvod). */
+  /** Rozbalený balíček na osi — ukáže tréningy, ktoré sa naň vybrali. */
+  const [rozbalenyBalicek, setRozbalenyBalicek] = useState("");
   const [zdarmaDen, setZdarmaDen] = useState("");
   const [zdarmaDovod, setZdarmaDovod] = useState("");
   const [pl, setPl] = useState({ datum: dnesISO(), suma: "", sposob: "hotovost", poznamka: "" });
@@ -236,6 +238,25 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
    * Pravidlá sú v `priebehBalickov`.
    */
   const { stavy } = useMemo(() => priebehBalickov(os, zostatokTeraz), [os, zostatokTeraz]);
+
+  /**
+   * Tréningy podľa členstva, na ktoré sa vybrali.
+   *
+   * Jerry, 28. 9. 2026: „keď v profile klienta kliknem na balíček, chcem
+   * vidieť všetky tréningy, kedy bol, v rámci toho členstva." Obdobia už
+   * počíta `priebehBalickov` kvôli odpočtu — toto ich len zoskupí, aby
+   * nevznikla druhá definícia toho, čo do balíčka patrí.
+   */
+  const treningyBalicka = useMemo(() => {
+    const m = new Map<string, (typeof os)[number][]>();
+    for (const u of os) {
+      if (u.druh !== "trening") continue;
+      const usek = stavy.get(u)?.usek;
+      if (!usek) continue;
+      (m.get(usek) || m.set(usek, []).get(usek)!).push(u);
+    }
+    return m;
+  }, [os, stavy]);
 
   const mojeBalicky = useMemo(
     () => balicky.filter((b) => normName(b.klient) === normName(meno) && !b.zrusene_at).sort((a, b) => b.platnost_od.localeCompare(a.platnost_od)),
@@ -1347,6 +1368,9 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
                 key={i}
                 u={x}
                 stav={stavy.get(x)}
+                treningy={x.druh === "balicekOd" ? treningyBalicka.get(x.den) : undefined}
+                rozbalene={x.druh === "balicekOd" && rozbalenyBalicek === x.den}
+                onRozbal={() => setRozbalenyBalicek((s) => (s === x.den ? "" : x.den))}
                 pisemZdarma={zdarmaDen === x.den}
                 dovod={zdarmaDovod}
                 setDovod={setZdarmaDovod}
@@ -1435,9 +1459,13 @@ function StavHodin({ stav }: { stav?: StavRiadku }) {
   );
 }
 
-function RiadokOsi({ u, stav, pisemZdarma, dovod, setDovod, pracujem, onZdarma, onZrusZapis }: {
+function RiadokOsi({ u, stav, treningy, rozbalene, onRozbal, pisemZdarma, dovod, setDovod, pracujem, onZdarma, onZrusZapis }: {
   u: ReturnType<typeof osCasuKlienta>[number];
   stav?: StavRiadku;
+  /** Tréningy, ktoré sa vybrali na tento balíček — rozbaľujú sa klikom. */
+  treningy?: ReturnType<typeof osCasuKlienta>;
+  rozbalene?: boolean;
+  onRozbal?: () => void;
   pisemZdarma?: boolean;
   dovod?: string;
   setDovod?: (v: string) => void;
@@ -1446,8 +1474,10 @@ function RiadokOsi({ u, stav, pisemZdarma, dovod, setDovod, pracujem, onZdarma, 
   onZrusZapis?: () => void;
 }) {
   if (u.druh === "balicekOd") {
+    const pocet = treningy?.length || 0;
     return (
-      <div style={{ ...riadok, background: mix(C.accent, 10), borderRadius: 7, padding: "8px 9px", marginTop: 4, border: "none" }}>
+      <div style={{ background: mix(C.accent, 10), borderRadius: 7, padding: "8px 9px", marginTop: 4 }}>
+      <div style={{ ...riadok, border: "none", padding: 0, cursor: pocet ? "pointer" : "default" }} onClick={pocet ? onRozbal : undefined}>
         <span style={stlpecDen}>{denVTyzdni(u.den)} {fmtDMY(u.den)}</span>
         <span style={{ flex: 1 }}>
           <b>{u.nazov}</b>
@@ -1457,7 +1487,27 @@ function RiadokOsi({ u, stav, pisemZdarma, dovod, setDovod, pracujem, onZdarma, 
             {u.zaplatene ? ` · ${fmtCZK(u.zaplatene)}` : ""}
           </span>
         </span>
+        {/* Koľko hodín sa naň naozaj vybralo — a klikom ktoré. */}
+        {pocet > 0 && (
+          <span style={{ fontSize: 11, color: C.accentLight, whiteSpace: "nowrap" }}>
+            {rozbalene ? "▾" : "▸"} {pocet}× tréning
+          </span>
+        )}
         <StavHodin stav={stav} />
+      </div>
+      {rozbalene && !!treningy?.length && (
+        <div style={{ marginTop: 6, paddingTop: 6, borderTop: `1px solid ${mix(C.text, 10)}` }}>
+          {treningy.map((t, i) => (
+            <div key={i} style={{ display: "flex", gap: 8, fontSize: 11.5, color: C.textMuted, padding: "2px 0" }}>
+              <span style={{ minWidth: 92, color: C.textDim, fontVariantNumeric: "tabular-nums" }}>{denVTyzdni(t.den)} {fmtDMY(t.den)}</span>
+              <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {t.druh === "trening" ? `${t.cas ? cas24(t.cas) : "tréning"}${t.trener ? ` · ${t.trener}` : ""}${t.zdarma !== undefined ? " · zdarma" : ""}` : ""}
+              </span>
+              {t.druh === "trening" && t.zKalendara && <span style={{ fontSize: 10.5, color: C.blue }}>z kalendára</span>}
+            </div>
+          ))}
+        </div>
+      )}
       </div>
     );
   }
