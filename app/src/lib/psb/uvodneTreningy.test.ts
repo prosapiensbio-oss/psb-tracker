@@ -47,6 +47,27 @@ describe("rozborUvodnych", () => {
     expect(r.klzave[0]).toEqual({ mesiac: "2026-01", podiel: { Jerry: 100, Terezka: 0 }, zaklad: 1 });
   });
 
+  it("záskok do pomeru nevstupuje ani ako základ percent", () => {
+    // Matyáš skončil 20. 9. 2026; jeho úvodné sú záskok, nie tretia strana.
+    const r = rozborUvodnych([
+      s("2026-01-05", "Jerry"),
+      s("2026-01-06", "Terezka"),
+      s("2026-01-07", "Matyáš"),
+    ]);
+    expect(r.celkom).toBe(2);
+    expect(r.treneri.map((t) => t.trener)).toEqual(["Jerry", "Terezka"]);
+    expect(r.treneri.every((t) => t.podiel === 50)).toBe(true);
+    expect(r.mesiace[0].podla["Matyáš"]).toBeUndefined();
+  });
+
+  it("tréner bez úvodných v období zostáva v pomere s nulou", () => {
+    const r = rozborUvodnych([s("2026-01-05", "Jerry")]);
+    expect(r.treneri).toEqual([
+      { trener: "Jerry", pocet: 1, podiel: 100 },
+      { trener: "Terezka", pocet: 0, podiel: 0 },
+    ]);
+  });
+
   it("bez úvodných nevyrobí graf ani delenie nulou", () => {
     const r = rozborUvodnych([s("2026-01-05", "Jerry", "OFFLINE")]);
     expect(r).toEqual({ celkom: 0, treneri: [], mesiace: [], klzave: [] });

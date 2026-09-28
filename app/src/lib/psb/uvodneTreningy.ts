@@ -17,8 +17,15 @@
  *
  * Mesačné počty sa vracajú zvlášť a nie sú prepočítané na percentá — objem
  * a pomer sú dve rôzne otázky a jeden graf ich nemá miešať.
+ *
+ * POČÍTAJÚ SA LEN JERRY A TEREZKA. Matyáš u nás skončil 20. 9. 2026 a jeho
+ * štyri úvodné sú záskok, nie tretia strana pomeru — v grafe robili tretiu
+ * krivku, ktorá rovno pri vzniku karty patrila minulosti (Jerry, 28. 9.
+ * 2026: „Matyáša odstráň"). Jeho sedenia nevstupujú ani do základu percent,
+ * inak by Jerry a Terezka nedali dokopy sto.
  */
 
+import { TRAINERS } from "./compute";
 import { monthKey } from "./format";
 import type { SessionRow } from "./types";
 
@@ -60,8 +67,14 @@ function radMesiacov(od: string, do_: string): string[] {
   return rad;
 }
 
-export function rozborUvodnych(sessions: SessionRow[], okno = 6): UvodneRozbor {
-  const uvodne = sessions.filter((s) => s.sessionType === "UVODNE" && s.date);
+export function rozborUvodnych(
+  sessions: SessionRow[],
+  okno = 6,
+  treneriVPomere: readonly string[] = TRAINERS,
+): UvodneRozbor {
+  const uvodne = sessions.filter(
+    (s) => s.sessionType === "UVODNE" && s.date && treneriVPomere.includes(s.sessionTrainer),
+  );
 
   const podlaTrenera: Record<string, number> = {};
   const podlaMesiaca: Record<string, Record<string, number>> = {};
@@ -73,10 +86,17 @@ export function rozborUvodnych(sessions: SessionRow[], okno = 6): UvodneRozbor {
     (podlaMesiaca[m] ||= {})[t] = (podlaMesiaca[m][t] || 0) + 1;
   }
 
+  /**
+   * V pomere stoja VŠETCI zo zoznamu, aj ten, kto v období nemá ani jeden.
+   * Nula je odpoveď („tento mesiac som neviedol žiadny"), chýbajúca krivka
+   * je diera — a graf by pri nej menil počet čiar podľa filtra obdobia.
+   */
   const celkom = uvodne.length;
-  const treneri = Object.entries(podlaTrenera)
-    .map(([trener, pocet]) => ({ trener, pocet, podiel: celkom ? (pocet / celkom) * 100 : 0 }))
-    .sort((a, b) => b.pocet - a.pocet || a.trener.localeCompare(b.trener));
+  const treneri = celkom
+    ? treneriVPomere
+      .map((trener) => ({ trener, pocet: podlaTrenera[trener] || 0, podiel: (podlaTrenera[trener] || 0) / celkom * 100 }))
+      .sort((a, b) => b.pocet - a.pocet || a.trener.localeCompare(b.trener))
+    : [];
 
   const kluce = Object.keys(podlaMesiaca).sort();
   const rad = kluce.length ? radMesiacov(kluce[0], kluce[kluce.length - 1]) : [];
@@ -94,7 +114,7 @@ export function rozborUvodnych(sessions: SessionRow[], okno = 6): UvodneRozbor {
       zaklad += m.celkom;
     }
     const podiel: Record<string, number> = {};
-    for (const t of Object.keys(podlaTrenera)) podiel[t] = zaklad ? ((sucet[t] || 0) / zaklad) * 100 : 0;
+    for (const t of treneriVPomere) podiel[t] = zaklad ? ((sucet[t] || 0) / zaklad) * 100 : 0;
     return { mesiac: mesiace[i].mesiac, podiel, zaklad };
   });
 
