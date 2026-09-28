@@ -292,6 +292,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
      * `pan-y` v štýle nechá zvislé rolovanie prehliadaču a vodorovné nám,
      * takže čítanie zoznamu prstom kartu neprepína.
      */
+    const zrus = () => { svih.current.aktivny = false; };
     const zac = (e: PointerEvent) => {
       if (e.pointerType === "mouse") return;
       zacniSvih(svih.current, e.clientX, e.clientY, e.timeStamp);
@@ -303,12 +304,39 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
     };
     el.addEventListener("pointerdown", zac);
     el.addEventListener("pointerup", kon);
-    el.addEventListener("pointercancel", () => { svih.current.aktivny = false; });
+    el.addEventListener("pointercancel", zrus);
+
+    /**
+     * A to isté ešte raz cez `touch*`.
+     *
+     * Pointer eventy by na telefóne mali stačiť — na Jerryho iPhone
+     * 28. 9. 2026 gesto nezabralo ani raz a nemám ako zistiť, či ich Safari
+     * v PWA na tomto mieste naozaj doručí. Dve cesty k tomu istému stavu sú
+     * lacnejšie než ďalšie kolo hádania: prvá, ktorá dobehne, švihnutie
+     * uzavrie, druhá dostane `aktivny: false` a nespraví nič.
+     */
+    const zacDotyk = (e: TouchEvent) => {
+      const t = e.touches[0];
+      if (t) zacniSvih(svih.current, t.clientX, t.clientY, e.timeStamp);
+    };
+    const konDotyk = (e: TouchEvent) => {
+      const t = e.changedTouches[0];
+      if (!t) return;
+      const smer = koniecSvihu(svih.current, t.clientX, t.clientY, e.timeStamp, window.innerWidth || 375);
+      if (smer) prepni(smer);
+    };
+    el.addEventListener("touchstart", zacDotyk, { passive: true });
+    el.addEventListener("touchend", konDotyk, { passive: true });
+    el.addEventListener("touchcancel", zrus, { passive: true });
 
     return () => {
       el.removeEventListener("wheel", naKoleso);
       el.removeEventListener("pointerdown", zac);
       el.removeEventListener("pointerup", kon);
+      el.removeEventListener("pointercancel", zrus);
+      el.removeEventListener("touchstart", zacDotyk);
+      el.removeEventListener("touchend", konDotyk);
+      el.removeEventListener("touchcancel", zrus);
       clearTimeout(poistka.current);
     };
   }, [zive.length, prepni]);
@@ -504,14 +532,20 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
         {/* Kolotoč: z poslednej karty sa ide na prvú a naopak (Jerry, 23. 9.
             2026). Šípka na konci, ktorá sa nedá stlačiť, je slepá ulička —
             človek musí prejsť celú kopu späť, aby sa dostal o jednu ďalej. */}
-        {!uzke && <button onClick={() => prepni(-1)} aria-label="Predchádzajúca karta" style={bocnaSipka("left", zive.length > 1)}>‹</button>}
-        {!uzke && <button onClick={() => prepni(1)} aria-label="Ďalšia karta" style={bocnaSipka("right", zive.length > 1)}>›</button>}
+        {/* ŠÍPKY ZOSTÁVAJÚ AJ NA TELEFÓNE.
+            28. 9. 2026 som ich na úzkej obrazovke skryl s tým, že ich nahradí
+            ťah prsta — a Jerry zostal bez oboch: „teraz mi to nejde už vôbec,
+            pretože tam nie sú ani tie gombíky po strane." Náhrada sa smie
+            zapnúť až vtedy, keď je overené, že naozaj funguje; dovtedy platí
+            to, čo fungovalo. Na telefóne sú len užšie. */}
+        <button onClick={() => prepni(-1)} aria-label="Predchádzajúca karta" style={bocnaSipka("left", zive.length > 1, uzke)}>‹</button>
+        <button onClick={() => prepni(1)} aria-label="Ďalšia karta" style={bocnaSipka("right", zive.length > 1, uzke)}>›</button>
         {/* Karta má PEVNÚ výšku. Jerry, 23. 9. 2026: „karty musia byť stále
             rovnako veľké, aj keď je tam menej textu, aby miesto na pravej
             a ľavej strane, kde prepínam, bolo stále na tom istom mieste."
             Šípka, ktorá pri každej karte skočí inam, sa hľadá očami — a to je
             presne tá práca navyše, ktorú mala kopa odstrániť. */}
-        <div style={{ position: "relative", zIndex: 1, margin: uzke ? "0 4px" : "0 46px", height: "100%", ...pohybKarty(prechod) }}>
+        <div style={{ position: "relative", zIndex: 1, margin: uzke ? "0 30px" : "0 46px", height: "100%", ...pohybKarty(prechod) }}>
           <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
               <div style={{ fontSize: 18, fontWeight: 800 }}>{k.nadpis}</div>
@@ -869,13 +903,14 @@ function pohybKarty(prechod: { smer: 1 | -1; faza: "von" | "dnu" } | null): Reac
  * o polovicu vlastnej výšky ju drží v strede bez ohľadu na to, aký dlhý
  * je zoznam vnútri.
  */
-const bocnaSipka = (strana: "left" | "right", aktivna: boolean) => ({
+const bocnaSipka = (strana: "left" | "right", aktivna: boolean, uzke = false) => ({
   position: "absolute" as const,
   [strana]: 0,
   top: "50%",
   transform: "translateY(-50%)",
   zIndex: 2,
-  width: 38, height: 64, borderRadius: 12, fontSize: 24, lineHeight: 1,
+  // Na telefóne užšia, nech karte zostane šírka — ale zostáva.
+  width: uzke ? 26 : 38, height: uzke ? 88 : 64, borderRadius: 12, fontSize: uzke ? 20 : 24, lineHeight: 1,
   cursor: aktivna ? "pointer" : "not-allowed",
   border: `1px solid ${C.border}`,
   background: mix(C.border, 60),

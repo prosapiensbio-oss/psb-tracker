@@ -82,9 +82,12 @@ export function krokGesta(
  *
  * TRI PODMIENKY, A KAŽDÁ MÁ SVOJ DÔVOD
  *
- *  • Vodorovný ťah musí byť ZRETEĽNE väčší než zvislý. Vnútri karty sa
- *    roluje prstom a šikmý pohyb pri rolovaní je bežný; bez tohto by sa
- *    karta prepínala človeku pod rukami, keď si len číta zoznam.
+ *  • Vodorovný ťah musí byť väčší než zvislý. Vnútri karty sa roluje prstom
+ *    a bez tohto by sa karta prepínala človeku pod rukami, keď si len číta
+ *    zoznam. Prvá verzia žiadala 1,5-násobok a Jerrymu gesto nezabralo ani
+ *    raz: palec sa po obrazovke pohybuje po OBLÚKU, takže pri ťahu o 80 px
+ *    do strany klesne aj o 50–60 a podmienka spadne. Rolovanie sa tým
+ *    neohrozí — pri ňom je zvislá zložka násobne väčšia, nie o kúsok.
  *  • Musí prejsť aspoň kus šírky. Krátke šklbnutie býva začiatok rolovania
  *    alebo nepresný klik na meno klienta.
  *  • Musí byť rýchle. Pomalé ťahanie je skôr označovanie textu.
@@ -110,7 +113,7 @@ export function koniecSvihu(
   const dx = x - s.x;
   const dy = y - s.y;
   if (cas - s.cas > 800) return 0;
-  if (Math.abs(dx) < Math.abs(dy) * 1.5) return 0;
+  if (Math.abs(dx) <= Math.abs(dy)) return 0;
   // Na úzkej obrazovke je 12 % šírky ~45 px, na širokej by to bolo priveľa —
   // preto strop. Spodná hranica drží krátke šklbnutia mimo.
   const hranica = Math.max(44, Math.min(sirkaOkna * 0.12, 110));

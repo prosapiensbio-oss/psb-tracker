@@ -103,6 +103,11 @@ describe("švihnutie prstom", () => {
     expect(svih(-60, 200)).toBe(0);
   });
 
+  it("palec ide po oblúku — a aj tak sa to počíta", () => {
+    // Prvá verzia žiadala 1,5-násobok a na telefóne nezabrala ani raz.
+    expect(svih(-90, 70)).toBe(1);
+  });
+
   it("krátke šklbnutie nestačí", () => {
     expect(svih(-30, 0)).toBe(0);
   });

@@ -1788,9 +1788,16 @@ zožierajúce 92 px šírky a riadky s `minWidth` 150 + 160 + 118 + 96 px, ktor�
 sa lámali do štyroch riadkov na jedného človeka. Zo siedmich mien tak bolo
 vidieť dve a zvyšok sa musel vyrolovať vnútri karty — o čom sa nedalo tušiť.
 
-Na úzkej obrazovke preto: šípky preč (gesto ich nahradí), okraje 4 px namiesto
-46 a v riadku ide **meno a hlavné číslo do prvého riadku**, zvyšok pod ne ako
+Na úzkej obrazovke preto: okraje 30 px namiesto 46, šípky užšie a vyššie,
+a v riadku ide **meno a hlavné číslo do prvého riadku**, zvyšok pod ne ako
 jedna veta. Hook je rovnaký ako `useDashColumns` v Dashboarde.
+
+**ŠÍPKY SOM PRITOM NAJPRV SKRYL A BOLA TO CHYBA.** Zdôvodnenie znelo logicky
+— gesto ich predsa nahradí — lenže gesto som overil len testami a na Jerryho
+telefóne nezabralo. Zostal bez oboch spôsobov: „teraz mi to nejde už vôbec,
+pretože tam nie sú ani tie gombíky po strane." **Starý spôsob sa vypína až
+vtedy, keď je nový overený rukou na tom zariadení, kde má bežať.** Nie keď
+prejdú testy a nie keď to dáva zmysel.
 
 **Pravidlo:** keď karta pribudne do kopy, pozri sa na ňu aj v šírke telefónu.
 Súčet `minWidth` v jednom riadku je strop, pod ktorý sa layout nezmestí.
