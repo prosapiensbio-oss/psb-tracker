@@ -2,7 +2,7 @@ import { oznam } from "../../lib/psb/obnovaSignal";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { navrhniKlientaKandidati, type ClientAgg } from "../../lib/psb/compute";
-import { krokGesta, koniecSvihu, novyStavGesta, novyStavSvihu, zacniSvih } from "../../lib/psb/gestoKariet";
+import { krokGesta, krokSvihu, novyStavGesta, novyStavSvihu, zacniSvih } from "../../lib/psb/gestoKariet";
 import { BEZ_FRONTY, klucPolozky, popisZmeny, postavKarty, trenerZPrihlasenia, type Karta, type NeznamyNazov, type NepriradenaPlatba, type Zmena } from "../../lib/psb/workspaceKarty";
 import { bezAktivnehoBalicka, treningyZObochZdrojov, vMinuseKlienta, type BezBalicka } from "../../lib/psb/bezBalicka";
 import { dlznici as spocitajDlznikov, type Dlznik } from "../../lib/psb/dlznici";
@@ -292,50 +292,62 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
      * `pan-y` v štýle nechá zvislé rolovanie prehliadaču a vodorovné nám,
      * takže čítanie zoznamu prstom kartu neprepína.
      */
+    /**
+     * ŤAH PRSTOM. Telefón `wheel` neposiela vôbec, takže bez tohto sa kopa
+     * na mobile dala prepnúť len šípkami pri okraji.
+     *
+     * Rozhoduje sa POČAS ťahu (`*move`), nie až pri zdvihnutí prsta —
+     * pomalý ťah človeka, ktorý skúša, či to vôbec reaguje, sa inak
+     * nepočítal. Koniec ťahu je len poistka pre prípad, že by `move`
+     * neprišiel.
+     *
+     * Počúva sa `pointer*` AJ `touch*`. Nemám ako zistiť, či Safari v PWA
+     * doručí jedno alebo druhé, a dve cesty k tomu istému stavu sú lacnejšie
+     * než ďalšie kolo hádania: prvá, ktorá dobehne, ťah uzavrie, druhá
+     * dostane `aktivny: false` a nespraví nič.
+     */
     const zrus = () => { svih.current.aktivny = false; };
-    const zac = (e: PointerEvent) => {
+    const sirka = () => window.innerWidth || 375;
+    const krok = (x: number, y: number) => {
+      const smer = krokSvihu(svih.current, x, y, sirka());
+      if (smer) prepni(smer);
+    };
+
+    const zacP = (e: PointerEvent) => {
       if (e.pointerType === "mouse") return;
       zacniSvih(svih.current, e.clientX, e.clientY, e.timeStamp);
     };
-    const kon = (e: PointerEvent) => {
+    const pohybP = (e: PointerEvent) => {
       if (e.pointerType === "mouse") return;
-      const smer = koniecSvihu(svih.current, e.clientX, e.clientY, e.timeStamp, window.innerWidth || 375);
-      if (smer) prepni(smer);
+      krok(e.clientX, e.clientY);
     };
-    el.addEventListener("pointerdown", zac);
-    el.addEventListener("pointerup", kon);
+    el.addEventListener("pointerdown", zacP);
+    el.addEventListener("pointermove", pohybP);
+    el.addEventListener("pointerup", pohybP);
     el.addEventListener("pointercancel", zrus);
 
-    /**
-     * A to isté ešte raz cez `touch*`.
-     *
-     * Pointer eventy by na telefóne mali stačiť — na Jerryho iPhone
-     * 28. 9. 2026 gesto nezabralo ani raz a nemám ako zistiť, či ich Safari
-     * v PWA na tomto mieste naozaj doručí. Dve cesty k tomu istému stavu sú
-     * lacnejšie než ďalšie kolo hádania: prvá, ktorá dobehne, švihnutie
-     * uzavrie, druhá dostane `aktivny: false` a nespraví nič.
-     */
-    const zacDotyk = (e: TouchEvent) => {
+    const zacD = (e: TouchEvent) => {
       const t = e.touches[0];
       if (t) zacniSvih(svih.current, t.clientX, t.clientY, e.timeStamp);
     };
-    const konDotyk = (e: TouchEvent) => {
-      const t = e.changedTouches[0];
-      if (!t) return;
-      const smer = koniecSvihu(svih.current, t.clientX, t.clientY, e.timeStamp, window.innerWidth || 375);
-      if (smer) prepni(smer);
+    const pohybD = (e: TouchEvent) => {
+      const t = e.touches[0] || e.changedTouches[0];
+      if (t) krok(t.clientX, t.clientY);
     };
-    el.addEventListener("touchstart", zacDotyk, { passive: true });
-    el.addEventListener("touchend", konDotyk, { passive: true });
+    el.addEventListener("touchstart", zacD, { passive: true });
+    el.addEventListener("touchmove", pohybD, { passive: true });
+    el.addEventListener("touchend", pohybD, { passive: true });
     el.addEventListener("touchcancel", zrus, { passive: true });
 
     return () => {
       el.removeEventListener("wheel", naKoleso);
-      el.removeEventListener("pointerdown", zac);
-      el.removeEventListener("pointerup", kon);
+      el.removeEventListener("pointerdown", zacP);
+      el.removeEventListener("pointermove", pohybP);
+      el.removeEventListener("pointerup", pohybP);
       el.removeEventListener("pointercancel", zrus);
-      el.removeEventListener("touchstart", zacDotyk);
-      el.removeEventListener("touchend", konDotyk);
+      el.removeEventListener("touchstart", zacD);
+      el.removeEventListener("touchmove", pohybD);
+      el.removeEventListener("touchend", pohybD);
       el.removeEventListener("touchcancel", zrus);
       clearTimeout(poistka.current);
     };

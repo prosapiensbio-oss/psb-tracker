@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { koniecSvihu, krokGesta, novyStavGesta, novyStavSvihu, zacniSvih, type StavGesta } from "./gestoKariet";
+import { krokGesta, krokSvihu, novyStavGesta, novyStavSvihu, zacniSvih, type StavGesta } from "./gestoKariet";
 
 /** Jedno šmyknutie: niekoľko udalostí rýchlo po sebe. */
 function smyk(g: StavGesta, dx: number, od: number, kusov = 4): { smer: number; cas: number } {
@@ -86,11 +86,11 @@ describe("gesto dvoma prstami", () => {
   });
 });
 
-describe("švihnutie prstom", () => {
-  const svih = (dx: number, dy: number, ms = 200, sirka = 375) => {
+describe("ťah prstom", () => {
+  const svih = (dx: number, dy: number, sirka = 390) => {
     const s = novyStavSvihu();
     zacniSvih(s, 200, 400, 1000);
-    return koniecSvihu(s, 200 + dx, 400 + dy, 1000 + ms, sirka);
+    return krokSvihu(s, 200 + dx, 400 + dy, sirka);
   };
 
   it("ťah doľava ide na ďalšiu kartu, doprava na predchádzajúcu", () => {
@@ -99,7 +99,7 @@ describe("švihnutie prstom", () => {
   });
 
   it("rolovanie prstom kartu neprepne", () => {
-    // Zvislý pohyb s malým bočným šmykom je bežný pri čítaní zoznamu.
+    // Zvislý pohyb s bočným šmykom je bežný pri čítaní zoznamu.
     expect(svih(-60, 200)).toBe(0);
   });
 
@@ -112,25 +112,30 @@ describe("švihnutie prstom", () => {
     expect(svih(-30, 0)).toBe(0);
   });
 
-  it("pomalé ťahanie nie je švihnutie", () => {
-    expect(svih(-150, 0, 1200)).toBe(0);
+  it("pomalý ťah sa počíta — na čase nezáleží", () => {
+    // Človek, ktorý skúša, či appka reaguje, ťahá pomaly a pozerá sa.
+    // Pôvodná podmienka „do 800 ms" presne takýto ťah zahodila.
+    const s = novyStavSvihu();
+    zacniSvih(s, 200, 400, 1000);
+    expect(krokSvihu(s, 60, 400, 390)).toBe(1);
+  });
+
+  it("jeden ťah prepne o JEDNU kartu, aj keď pohybov príde veľa", () => {
+    const s = novyStavSvihu();
+    zacniSvih(s, 300, 400, 1000);
+    expect(krokSvihu(s, 275, 400, 390)).toBe(0);   // ešte málo
+    expect(krokSvihu(s, 200, 400, 390)).toBe(1);   // prah prekročený
+    expect(krokSvihu(s, 120, 400, 390)).toBe(0);   // ďalšie pohyby už mlčia
+    expect(krokSvihu(s, 40, 400, 390)).toBe(0);
   });
 
   it("na širokej obrazovke treba dlhší ťah, ale nie donekonečna", () => {
     // 12 % z 1600 px je 192 — strop je 110, inak sa na monitore nešvihne.
-    expect(svih(-120, 0, 200, 1600)).toBe(1);
-    expect(svih(-90, 0, 200, 1600)).toBe(0);
+    expect(svih(-120, 0, 1600)).toBe(1);
+    expect(svih(-90, 0, 1600)).toBe(0);
   });
 
-  it("koniec bez začiatku nič nespraví", () => {
-    const s = novyStavSvihu();
-    expect(koniecSvihu(s, 0, 0, 1000, 375)).toBe(0);
-  });
-
-  it("jeden začiatok = jedno švihnutie", () => {
-    const s = novyStavSvihu();
-    zacniSvih(s, 200, 400, 1000);
-    expect(koniecSvihu(s, 60, 400, 1200, 375)).toBe(1);
-    expect(koniecSvihu(s, 60, 400, 1200, 375)).toBe(0);
+  it("pohyb bez začiatku nič nespraví", () => {
+    expect(krokSvihu(novyStavSvihu(), 0, 0, 390)).toBe(0);
   });
 });

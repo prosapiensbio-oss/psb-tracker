@@ -70,27 +70,29 @@ export function krokGesta(
 }
 
 /**
- * ŠVIHNUTIE PRSTOM PO DOTYKOVEJ OBRAZOVKE.
+ * ŤAH PRSTOM PO DOTYKOVEJ OBRAZOVKE.
  *
  * Jerry, 28. 9. 2026: „na telefóne sa mi nedajú jednotlivé karty vo
  * Workspace posúvať posunom palca do strany." Nedali — `krokGesta` vyššie
- * číta `wheel`, a ten telefón neposiela vôbec. Kopa sa tak na mobile dala
- * prepnúť len šípkami, ktoré majú 38 px a sedia pri okraji.
+ * číta `wheel`, a ten telefón neposiela vôbec.
  *
- * Rozhodovanie je tu, mimo komponentu, z toho istého dôvodu ako pri
- * trackpade: chyba v ňom sa inak nájde až rukou na telefóne.
+ * ROZHODUJE SA POČAS ŤAHU, NIE AŽ NA JEHO KONCI.
  *
- * TRI PODMIENKY, A KAŽDÁ MÁ SVOJ DÔVOD
+ * Prvá verzia čakala na zdvihnutie prsta a merala aj čas: ťah dlhší než
+ * 800 ms sa nepočítal, aby sa označovanie textu nepletlo so švihnutím.
+ * Jerrymu nezabrala ani raz. Človek, ktorý skúša, či appka vôbec reaguje,
+ * ťahá POMALY a sleduje pritom obrazovku — a presne taký ťah podmienka
+ * zahodila. Čas je preto preč a smer padne hneď, ako prst prejde kus cesty;
+ * karta sa pohne ešte počas ťahu, takže je aj vidieť, že gesto zabralo.
  *
- *  • Vodorovný ťah musí byť väčší než zvislý. Vnútri karty sa roluje prstom
- *    a bez tohto by sa karta prepínala človeku pod rukami, keď si len číta
- *    zoznam. Prvá verzia žiadala 1,5-násobok a Jerrymu gesto nezabralo ani
- *    raz: palec sa po obrazovke pohybuje po OBLÚKU, takže pri ťahu o 80 px
- *    do strany klesne aj o 50–60 a podmienka spadne. Rolovanie sa tým
- *    neohrozí — pri ňom je zvislá zložka násobne väčšia, nie o kúsok.
- *  • Musí prejsť aspoň kus šírky. Krátke šklbnutie býva začiatok rolovania
+ * DVE PODMIENKY, KAŽDÁ MÁ SVOJ DÔVOD
+ *
+ *  • Vodorovná zložka musí byť väčšia než zvislá. Vnútri karty sa roluje
+ *    prstom; pri rolovaní je zvislá zložka násobne väčšia, takže sa karta
+ *    neprepne. Pôvodný 1,5-násobok bol priveľa: palec ide po OBLÚKU a pri
+ *    ťahu o 80 px do strany klesne aj o 50.
+ *  • Musí prejsť aspoň kus šírky — krátke šklbnutie býva začiatok rolovania
  *    alebo nepresný klik na meno klienta.
- *  • Musí byť rýchle. Pomalé ťahanie je skôr označovanie textu.
  */
 export type StavSvihu = { x: number; y: number; cas: number; aktivny: boolean };
 
@@ -100,24 +102,23 @@ export const zacniSvih = (s: StavSvihu, x: number, y: number, cas: number): void
   s.x = x; s.y = y; s.cas = cas; s.aktivny = true;
 };
 
-/** `1` = ďalšia karta, `-1` = predchádzajúca, `0` = nebolo to švihnutie. */
-export function koniecSvihu(
-  s: StavSvihu,
-  x: number,
-  y: number,
-  cas: number,
-  sirkaOkna: number,
-): 1 | -1 | 0 {
+/**
+ * `1` = ďalšia karta, `-1` = predchádzajúca, `0` = zatiaľ nič.
+ *
+ * Volá sa pri KAŽDOM pohybe aj na konci ťahu. Len čo raz odpovie, ťah sa
+ * uzavrie — druhé volanie vráti nulu, takže jeden ťah prepne o jednu kartu
+ * a nie o tri.
+ */
+export function krokSvihu(s: StavSvihu, x: number, y: number, sirkaOkna: number): 1 | -1 | 0 {
   if (!s.aktivny) return 0;
-  s.aktivny = false;
   const dx = x - s.x;
   const dy = y - s.y;
-  if (cas - s.cas > 800) return 0;
   if (Math.abs(dx) <= Math.abs(dy)) return 0;
   // Na úzkej obrazovke je 12 % šírky ~45 px, na širokej by to bolo priveľa —
   // preto strop. Spodná hranica drží krátke šklbnutia mimo.
   const hranica = Math.max(44, Math.min(sirkaOkna * 0.12, 110));
   if (Math.abs(dx) < hranica) return 0;
+  s.aktivny = false;
   // Ťah doľava odkrýva to, čo je vpravo — teda ďalšiu kartu.
   return dx < 0 ? 1 : -1;
 }
