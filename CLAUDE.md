@@ -1596,3 +1596,23 @@ alebo vôbec.
   vráti viac riadkov než to, čo appka ukazuje.
 
 Karta na Dnes tým spadla zo 6 položiek za 43 972 Kč na 4 za 29 192 Kč.
+
+## Tlačidlo, ktoré prepína na kartu, musí mať kam prepnúť
+
+28. 9. 2026 Jerry: „keď Terezka cez seba dáva vystaviť faktúru Janke
+Šnyrych, tak sa nič nedeje a nefunguje to." Tlačidlo „Vystaviť faktúru" je
+na karte klienta a tú má v kope každý; po kliku Workspace hľadá kartu
+Faktúry (`zive.findIndex`) a prepne na ňu. Terezka ju nemala — `idx` bolo
+−1, `if (idx >= 0)` nič neurobilo a appka nepovedala ani slovo.
+
+Chyba nebola v tom `findIndex`, ale v tom, že sa VIDITEĽNOSŤ tlačidla
+a viditeľnosť jeho cieľa riadili inde a nikto ich nedržal spolu. Pravidlo:
+**keď akcia prepína na kartu, obrazovku alebo záložku, ktorá sa niekomu
+nemusí zobraziť, patrí k nej test, že cieľ existuje pre KAŽDÉ prihlásenie**
+— alebo sa musí skryť aj samo tlačidlo. Ticho je najhoršia odpoveď: človek
+klikne znova a znova a usúdi, že je appka rozbitá.
+
+A vecne: **„peniaze sú Jerryho" neplatí na faktúry.** Front nepriradených
+príjmov z banky je administratíva nad celým účtom a Terezku nezaujíma;
+doklad pre klienta, ktorého vedie, je jej robota. Dve rôzne práce, ktoré
+dostali jedno pravidlo.
