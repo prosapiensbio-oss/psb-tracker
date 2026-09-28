@@ -119,3 +119,43 @@ describe("dva rovnaké balíčky v jeden deň", () => {
     expect(osCasuKlienta("Barbora Vankova", z as never, DNES).filter((x) => x.druh === "balicekOd")).toHaveLength(1);
   });
 });
+
+describe("balíčky nahodené v Kokpite", () => {
+  const kokpitovy = {
+    klient: "Barbora Vankova", nazov: "OFF - 6h BEZ viazanosti", hodiny: 6,
+    platnost_od: "2026-09-20", platnost_do: "2026-11-20", cena_czk: 7790, zdroj: "rucne",
+  };
+
+  it("stoja na osi rovnako ako tie z exportu", () => {
+    const os = osCasuKlienta("Barbora Vankova", { ...zdroj, balicky: [kokpitovy] } as never, DNES);
+    const b = os.find((x) => x.druh === "balicekOd" && x.den === "2026-09-20");
+    expect(b).toMatchObject({ nazov: "OFF - 6h BEZ viazanosti", hodin: 6, doDna: "2026-11-20", zKokpitu: true });
+  });
+
+  it("zrušený balíček ani ten s budúcou platnosťou na os nejde", () => {
+    const z = {
+      ...zdroj,
+      balicky: [{ ...kokpitovy, zrusene_at: "2026-09-21T10:00:00Z" }, { ...kokpitovy, platnost_od: "2026-12-01" }],
+    };
+    expect(osCasuKlienta("Barbora Vankova", z as never, DNES).some((x) => x.druh === "balicekOd" && x.zKokpitu)).toBe(false);
+  });
+
+  it("nezdvojí sa s tým istým balíčkom z exportu", () => {
+    // Akcia „nalej" nakopírovala export do `balicky` — ten istý deň a názov.
+    const z = { ...zdroj, balicky: [{ ...kokpitovy, nazov: "OFF - 6h S viazanostou", platnost_od: "2026-08-18" }] };
+    expect(osCasuKlienta("Barbora Vankova", z as never, DNES).filter((x) => x.druh === "balicekOd")).toHaveLength(1);
+  });
+
+  it("otváracia položka z importu na os nejde", () => {
+    // 20. 9. 2026 nalial import do `balicky` zostatky ku dňu exportu. Sú to
+    // snímky, nie predaje — na osi by každému otvorili nové obdobie.
+    const z = { ...zdroj, balicky: [{ ...kokpitovy, nazov: "Doplnenie členstva", zdroj: "ptminder" }] };
+    expect(osCasuKlienta("Barbora Vankova", z as never, DNES).some((x) => x.druh === "balicekOd" && x.zKokpitu)).toBe(false);
+  });
+
+  it("bez zapísaných hodín ich vezme z názvu", () => {
+    const z = { ...zdroj, balicky: [{ ...kokpitovy, hodiny: null, nazov: "OFF - 18 hodín offline" }] };
+    const b = osCasuKlienta("Barbora Vankova", z as never, DNES).find((x) => x.druh === "balicekOd" && x.den === "2026-09-20");
+    expect(b).toMatchObject({ hodin: 18 });
+  });
+});

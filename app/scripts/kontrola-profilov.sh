@@ -56,5 +56,7 @@ stiahni overrides  "SELECT * FROM client_overrides"
 stiahni acks       "SELECT * FROM anomaly_ack"
 stiahni leads      "SELECT * FROM leads"
 stiahni kal        "SELECT uid,trener,zaciatok,koniec,nazov,klient,typ,zmizla_at FROM kal_udalosti WHERE zmizla_at IS NULL"
+# Vlastná evidencia balíčkov — od 28. 9. 2026 stojí na osi a mení odpočet.
+stiahni balicky    "SELECT klient,nazov,hodiny,platnost_od,platnost_do,cena_czk,zrusene_at,zdroj FROM balicky"
 
 bun run scripts/kontrola-profilov.ts

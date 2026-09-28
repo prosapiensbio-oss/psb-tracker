@@ -47,6 +47,7 @@ const treningyZdarma = nacitaj("zdarma").map((r: any) => ({
   id: "", klient: r.client_name, den: den(r.den), dovod: r.dovod || "", kto: r.kto || "",
 }));
 const kal = nacitaj("kal");
+const balicky = nacitaj("balicky");
 
 const data: PSBData = {
   ...EMPTY_DATA, sessions, packages, services, payments, poplatky, treningyZdarma,
@@ -59,7 +60,7 @@ const mena = Object.keys(clients);
 const kalUdalosti = kal.map((r: any) => ({ zaciatok: r.zaciatok, klient: r.klient, typ: r.typ }));
 const osi = new Map<string, Udalost[]>();
 for (const m of mena) {
-  osi.set(m, osCasuKlienta(m, { sessions, payments, packages, services, poplatky, treningyZdarma, kalUdalosti } as never, DNES));
+  osi.set(m, osCasuKlienta(m, { sessions, payments, packages, services, poplatky, treningyZdarma, balicky, kalUdalosti } as never, DNES));
 }
 
 let nalezov = 0;
@@ -91,7 +92,16 @@ sekcia("ODPOČET HODÍN V ČLENSTVE");
       // Najčastejšia príčina: os pozná dokúpené hodiny (`Added` + počet
       // v exporte), karta ráta len z aktívneho členstva a o doplnení nevie.
       const dopl = packages.find((b: any) => normName(b.client) === normName(m) && /doplnenie/i.test(b.package) && b.added && b.total > 0);
-      nesedi.push(`${m}: os ${kExportu} h · karta ${zostatokTeraz} h${dopl ? ` — os počíta dokúpené hodiny z ${den(dopl.added)} (${dopl.total} h)` : " — príčina neznáma"}`);
+      // Druhá príčina: posledný balíček nahodil Jerry v Kokpite. Karta ráta
+      // z exportu PTmindera, takže o ňom nevie — a vedieť ani nemá.
+      // Os je zoradená najnovším hore, takže prvý nájdený je ten posledný.
+      const vlastny = osi.get(m)!.find((x: any) => x.druh === "balicekOd" && x.hodin > 0) as any;
+      const preco = dopl
+        ? ` — os počíta dokúpené hodiny z ${den(dopl.added)} (${dopl.total} h)`
+        : vlastny?.zKokpitu
+          ? ` — posledný balíček je nahodený v Kokpite (${vlastny.nazov}, ${den(vlastny.den)}); PTminder o ňom nevie`
+          : " — príčina neznáma";
+      nesedi.push(`${m}: os ${kExportu} h · karta ${zostatokTeraz} h${preco}`);
     }
     // Zaujíma len ten, komu karta hlási ZOSTATOK. Dočerpané členstvo bez
     // odpočtu nikomu nechýba.

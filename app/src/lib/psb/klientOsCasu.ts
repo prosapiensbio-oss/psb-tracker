@@ -27,7 +27,7 @@ import { normName } from "./format";
 export type Udalost =
   | { druh: "platba"; den: string; suma: number; metoda: string; poznamka?: string }
   | { druh: "trening"; den: string; cas?: string; trener?: string; nazov?: string; zKalendara?: boolean; minut?: number; zdarma?: string }
-  | { druh: "balicekOd"; den: string; nazov: string; hodin: number; doDna?: string; zaplatene?: number; odvodene?: boolean; nezaplatene?: boolean; doplnenie?: boolean }
+  | { druh: "balicekOd"; den: string; nazov: string; hodin: number; doDna?: string; zaplatene?: number; odvodene?: boolean; nezaplatene?: boolean; doplnenie?: boolean; zKokpitu?: boolean }
   | { druh: "balicekDo"; den: string; nazov: string; hodin: number; odvodene?: boolean };
 
 /**
@@ -118,12 +118,18 @@ type Sluzba = { client: string; date: string; serviceType: string; description: 
 type Poplatok = { klient: string; datum: string; popis: string; suma: number };
 type KalUdalost = { zaciatok: string; klient: string | null; typ: string | null };
 type Zdarma = { klient: string; den: string; dovod: string };
+/** Riadok z vlastnej evidencie balíčkov (tabuľka `balicky`). */
+type BalicekKokpitu = {
+  klient: string; nazov: string; hodiny?: number | null;
+  platnost_od: string; platnost_do?: string | null; cena_czk?: number | null;
+  zrusene_at?: string | null; zdroj?: string;
+};
 
 const den = (s: string) => (s || "").slice(0, 10);
 
 export function osCasuKlienta(
   meno: string,
-  zdroj: { sessions: Sedenie[]; payments: Platba[]; packages: Balicek[]; kalUdalosti?: KalUdalost[]; services?: Sluzba[]; poplatky?: Poplatok[]; treningyZdarma?: Zdarma[] },
+  zdroj: { sessions: Sedenie[]; payments: Platba[]; packages: Balicek[]; kalUdalosti?: KalUdalost[]; services?: Sluzba[]; poplatky?: Poplatok[]; treningyZdarma?: Zdarma[]; balicky?: BalicekKokpitu[] },
   dnes: string = new Date().toISOString().slice(0, 10),
 ): Udalost[] {
   const k = normName(meno);
@@ -213,6 +219,45 @@ export function osCasuKlienta(
       doplnenie: jeDoplnenie(sl.description) || undefined,
     });
   }
+  /**
+   * BALÍČKY NAHODENÉ V KOKPITE PATRIA NA OS.
+   *
+   * Do 28. 9. 2026 na nej nestáli — os čítala len PTminder. Jerry vtedy pri
+   * Richardovi Matlovi: „keď mu nahodím nový balík, chcem, aby sa od tej −1
+   * znovu odpočítaval počet tréningov, ktoré mu nahodím." Bez tohto zdroja
+   * sa nemalo čo odpočítavať: klient mal vyčerpané členstvo, Jerry mu zapísal
+   * nové a na osi sa nezmenilo nič.
+   *
+   * Berú sa LEN ručne nahodené (`zdroj = "rucne"`). Zvyšných 82 riadkov
+   * nalial do `balicky` import z exportu a 22 z nich sú OTVÁRACIE POLOŽKY
+   * ku dňu exportu („Doplnenie členstva", 20. 9. 2026) — nie predaje. Keby
+   * sa dostali na os, otvorili by v ten deň nové obdobie a každému klientovi
+   * by prepísali odpočet zostatkom, ktorý sa tvári ako nový balíček.
+   *
+   * Navyše je to tá istá dvojica ako pri službách: keď v ten deň s tým istým
+   * názvom už balíček stojí, tento sa preskočí.
+   */
+  for (const b of zdroj.balicky || []) {
+    if (b.zdroj !== "rucne") continue;
+    if (normName(b.klient) !== k || b.zrusene_at) continue;
+    const d = den(b.platnost_od);
+    if (!d || d > dnes) continue;
+    const kluc = `${d}|${normName(b.nazov)}`;
+    if (uzJe.has(kluc)) continue;
+    uzJe.add(kluc);
+    out.push({
+      druh: "balicekOd",
+      den: d,
+      nazov: b.nazov,
+      // Hodiny sú zapísané ručne; keď chýbajú, ostáva názov ako pri exporte.
+      hodin: Number(b.hodiny) > 0 ? Number(b.hodiny) : hodinZNazvuBalicka(b.nazov),
+      doDna: den(b.platnost_do || "") || undefined,
+      zaplatene: b.cena_czk || undefined,
+      nezaplatene: nezaplateneDni.has(d) || undefined,
+      zKokpitu: true,
+    });
+  }
+
   // Nezaplatené sa musí prilepiť aj na riadok, ktorý prišiel z `packages`.
   for (const u of out) {
     if (u.druh === "balicekOd" && nezaplateneDni.has(u.den)) u.nezaplatene = true;

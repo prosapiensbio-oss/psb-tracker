@@ -219,6 +219,24 @@ export function priebehBalickov(
   // Hranice členstiev: každý balíček s hodinami otvára nové obdobie.
   type Usek = { balicek: Extract<Udalost, { druh: "balicekOd" }> | null; hodin: number; riadky: Udalost[] };
   const useky: Usek[] = [{ balicek: null, hodin: 0, riadky: [] }];
+  /**
+   * Index prvého tréningu, na ktorý už v členstve nezostala hodina.
+   * −1 = všetko sa zmestilo (alebo je to obdobie bez hodín).
+   */
+  const prvyNekryty = (u: Usek): number => {
+    if (!u.balicek || u.hodin <= 0) return -1;
+    let zostava = u.hodin;
+    for (let i = 0; i < u.riadky.length; i++) {
+      const r = u.riadky[i];
+      if (r.druh === "balicekOd" && r.doplnenie && r.hodin > 0) zostava += r.hodin;
+      const h = hodinTreningu(r);
+      if (!h) continue;
+      if (zostava < h) return i;
+      zostava -= h;
+    }
+    return -1;
+  };
+
   for (const u of rad) {
     if (u.druh === "balicekOd" && !u.doplnenie) {
       const posl = useky[useky.length - 1];
@@ -230,7 +248,28 @@ export function priebehBalickov(
         posl.riadky.push(u);
         continue;
       }
-      useky.push({ balicek: u, hodin: u.hodin, riadky: [] });
+      const novy: Usek = { balicek: u, hodin: u.hodin, riadky: [] };
+      /**
+       * NOVÝ BALÍČEK PREBERÁ TRÉNINGY, NA KTORÉ UŽ HODINA NEBOLA.
+       *
+       * Jerry, 28. 9. 2026 nad Richardom Matlom: „keď mu nahodím nový balík,
+       * chcem, aby sa od tej −1 znovu odpočítaval počet tréningov — keby mu
+       * nahodím 18 h, vedľa −1 sa ukáže 18 h, ako keby tá −1 bola 18. hodina
+       * z toho balíka."
+       *
+       * Je to tak, ako sa to naozaj deje: klient trénuje ďalej, hodiny mu
+       * došli, a keď si balíček doplatí, tie tréningy sa z neho odpíšu.
+       * Preberajú sa LEN tréningy z vyčerpaného členstva — obdobie bez hodín
+       * (paušál, čas pred prvým balíčkom) by inak nový balíček zhltol celé.
+       *
+       * Mínus im zostáva: odtrénované boli skôr, než balíček vznikol, a to
+       * je iná informácia než koľká hodina to bola.
+       */
+      if (u.hodin > 0) {
+        const od = prvyNekryty(posl);
+        if (od >= 0) novy.riadky.push(...posl.riadky.splice(od));
+      }
+      useky.push(novy);
     }
     useky[useky.length - 1].riadky.push(u);
   }
@@ -300,7 +339,10 @@ export function priebehBalickov(
     const kExportu = [...doUseku].reverse().find((x) => x.u.den <= (denExportu || dnes) && x.po !== null)?.po ?? bezi;
     // Keď appka pozná dokúpené hodiny, je informovanejšia než karta klienta
     // (tá ráta len z aktívneho členstva) a zrovnávať sa nemá načím.
-    if (b && b === posledny && !maDokupene && zostatokTeraz != null && kExportu != null && kExportu !== zostatokTeraz) {
+    // Balíček nahodený v Kokpite karta klienta NEPOZNÁ — tá ráta z exportu
+    // PTmindera. Zrovnať sa s ňou by znamenalo stiahnuť nový balíček na
+    // zostatok toho vyčerpaného, teda na nulu.
+    if (b && b === posledny && !b.zKokpitu && !maDokupene && zostatokTeraz != null && kExportu != null && kExportu !== zostatokTeraz) {
       const posun = zostatokTeraz - kExportu;
       if (bezi !== null) bezi += posun;
       for (const { u } of doUseku) {

@@ -1663,3 +1663,30 @@ Preto to ráno fungovalo, na obed nie a večer zase áno.
   587 so STARTTLS funguje tiež, ale dokumentovaný je 465. Klient skúša 465
   a potom 587 (`smtp.server.ts`), a chyba nesie číslo portu — inak sa nedá
   odlíšiť „neprešlo ani jedno" od „skúsilo sa len jedno".
+
+## Balíček nahodený v Kokpite musí stáť na osi, inak sa nemá čo odpočítať
+
+28. 9. 2026 Jerry nad Richardom Matlom, ktorý mal po vyčerpanom členstve −1:
+„keď mu nahodím nový balík, chcem, aby sa od tej −1 znovu odpočítaval počet
+tréningov, ktoré mu nahodím — keby mu nahodím 18 h, vedľa −1 sa ukáže 18 h,
+ako keby tá −1 bola 18. hodina z toho balíka."
+
+Nefungovalo to z dôvodu, ktorý nebolo vidieť: os času čítala LEN PTminder
+(`packages` + `services`), takže balíček zapísaný v Kokpite (`balicky`) na nej
+nestál. Jerry ho nahodil a na obrazovke sa nezmenilo nič.
+
+- **Z `balicky` sa berú len ručne nahodené (`zdroj = "rucne"`).** Zvyšných 82
+  riadkov tam nalial import z exportu a 22 z nich sú OTVÁRACIE POLOŽKY ku dňu
+  exportu („Doplnenie členstva", 20. 9. 2026) — snímky zostatku, nie predaje.
+  Na osi by každému klientovi otvorili v ten deň nové obdobie a prepísali
+  odpočet. Overené: s týmto filtrom dáva `kontrola-profilov.sh` rovnaký počet
+  nálezov, ako keby sa `balicky` nečítali vôbec.
+- **Nový balíček PREBERÁ tréningy, na ktoré už hodina nebola** (`prvyNekryty`
+  vo `vypisHodin.ts`). Preberajú sa len tréningy z VYČERPANÉHO členstva;
+  obdobie bez hodín (paušál, čas pred prvým balíčkom) by nový balíček zhltlo
+  celé. Mínus im zostáva — odtrénované boli skôr, než balíček vznikol, a to je
+  iná informácia než koľká hodina to bola.
+- **S kartou klienta sa takýto balíček NEZROVNÁVA** (`zKokpitu`). Karta ráta
+  z exportu PTmindera a o ňom nevie; zrovnanie by nový balíček stiahlo na
+  zostatok toho vyčerpaného, teda na nulu. Kontrolór profilov túto príčinu
+  pomenúva, aby z nej nebol nález bez vysvetlenia.

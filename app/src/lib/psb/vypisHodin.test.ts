@@ -111,6 +111,34 @@ describe("dlh — tréning na nezaplatenom členstve", () => {
     expect(podla.get("2026-09-03")!.dlh).toBe(2);
   });
 
+  it("nový balíček preberie tréningy, na ktoré už hodina nebola", () => {
+    // Richard Matl: 6 h z 10. 8. minul do 23. 9., 28. 9. odtrénoval na dlh
+    // (−1, bez hodín). Keď mu Jerry 29. 9. nahodí ďalších 6 h, ten tréning
+    // sa stane šiestou hodinou nového balíčka — mínus mu zostáva.
+    const bezNoveho: Udalost[] = [
+      bal("2026-09-01", 2), tre("2026-09-05"), tre("2026-09-12"), tre("2026-09-20"),
+    ];
+    const v1 = vypisHodin(bezNoveho, "", "2026-09-29", 0);
+    expect(v1.riadky.find((r) => r.den === "2026-09-20")!.zostatok).toBeNull();
+    expect(v1.riadky.find((r) => r.den === "2026-09-20")!.dlh).toBe(1);
+
+    // Karta klienta stále hovorí 0 — o balíčku nahodenom v Kokpite nevie,
+    // lebo ráta z exportu PTmindera. Zrovnávať sa s ňou nesmie.
+    const v2 = vypisHodin([...bezNoveho, bal("2026-09-29", 6, { zKokpitu: true })], "", "2026-09-29", 0);
+    const r = v2.riadky.find((x) => x.den === "2026-09-20")!;
+    expect(r.zostatok).toBe(6);
+    expect(r.dlh).toBe(1);
+  });
+
+  it("nový balíček neprevezme obdobie, ktoré hodiny nikdy nemalo", () => {
+    // Paušál ani čas pred prvým balíčkom sa nepreberá — inak by nový balíček
+    // zhltol celú históriu klienta.
+    const os: Udalost[] = [tre("2026-08-05"), tre("2026-08-12"), bal("2026-09-01", 6), tre("2026-09-03")];
+    const v = vypisHodin(os, "", DNES, 5);
+    expect(v.riadky.find((x) => x.den === "2026-08-12")!.zostatok).toBeNull();
+    expect(v.riadky.find((x) => x.den === "2026-09-03")!.zostatok).toBe(6);
+  });
+
   it("vyčerpané členstvo bez nového = ďalšie tréningy na dlh", () => {
     const os: Udalost[] = [bal("2026-09-02", 2), tre("2026-09-05"), tre("2026-09-12"), tre("2026-09-19"), tre("2026-09-26")];
     const v = vypisHodin(os, "", DNES, 0);

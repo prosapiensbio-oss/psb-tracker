@@ -204,9 +204,12 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
       services: (data.services || []) as never,
       poplatky: (data.poplatky || []) as never,
       treningyZdarma: (data.treningyZdarma || []) as never,
+      // Vlastná evidencia balíčkov: bez nej by sa po nahodení nového balíčka
+      // na osi nezmenilo nič a odpočet by ostal stáť na vyčerpanom členstve.
+      balicky: balicky as never,
       kalUdalosti,
     }) : []),
-    [meno, data.sessions, data.payments, data.packages, data.services, data.poplatky, data.treningyZdarma, kalUdalosti],
+    [meno, data.sessions, data.payments, data.packages, data.services, data.poplatky, data.treningyZdarma, balicky, kalUdalosti],
   );
 
   /**
