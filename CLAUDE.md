@@ -1464,6 +1464,19 @@ ich takto ubudlo 24.
 **Jeden prevod vie patriť dvom klientom.** „15 580 DK Consulting" sú dva
 balíčky po 7 790 (Dan Kouřil a Monika Schonwalderová). Akcia `rozdel` zapíše
 toľko platieb, koľko je dielov, všetky s tým istým `fio_id` — pohyb zmizne zo
-zoznamu nepriradených a mesačný súčet sedí. Diely sa musia zložiť na sumu
+zoznamu nepriradených a mesačný súčet sedí.
+
+**Prvá verzia to nedokázala zapísať a vyzeralo to, že sa nestalo nič.** Nad
+`platby` bol `UNIQUE INDEX platby_fio (fio_id)`, takže pohyb smel mať práve
+jednu platbu; batch s dvoma dielmi padol na porušení indexu, worker vrátil
+HTML stránku „This page didn't load" a obrazovka o tom mlčala. Stráž bola
+správna, len príliš hrubá — od migrácie 0082 je unikátna dvojica
+`(fio_id, klient)`: ten istý pohyb sa stále nedá započítať tomu istému
+klientovi dvakrát, ale rozdeliť medzi rôznych sa dá.
+
+**Zápis do D1 bez try/catch je pád na HTML stránku.** Vracať sa má veta, ktorú
+človek prečíta („Tento pohyb už má priradenú platbu pre toho istého klienta"),
+nie chybová stránka — to je ten istý druh tichej chyby ako zhltnutý catch,
+len hlučnejší a rovnako nepoužiteľný. Diely sa musia zložiť na sumu
 pohybu (tolerancia koruna); rozdelenie, ktoré nesedí, sa nezapíše. A
 odosielateľ sa pri rozdelení NEUČÍ: vzor by ukazoval na dvoch ľudí naraz.

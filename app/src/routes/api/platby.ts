@@ -255,12 +255,25 @@ export const Route = createFileRoute("/api/platby")({
               { status: 400 },
             );
           }
-          await DB.batch(kusy.map((d) =>
-            DB.prepare(
-              "INSERT INTO platby (id, klient, datum, suma_czk, sposob, fio_id, poznamka, created_at, autor) VALUES (?,?,?,?,'banka',?,?,?,?)",
-            ).bind(uid(), d.klient, r.date.slice(0, 10), d.suma, fioId,
-              `rozdelené · ${(r.counterparty || "").slice(0, 160)}`, teraz(), kto || null),
-          ));
+          // Bez try/catch vracia worker HTML stránku „This page didn't load"
+          // a na obrazovke to vyzerá, že sa neudialo nič. Presne tak vyzerala
+          // zrazená unikátna stráž nad `fio_id` (migrácia 0082).
+          try {
+            await DB.batch(kusy.map((d) =>
+              DB.prepare(
+                "INSERT INTO platby (id, klient, datum, suma_czk, sposob, fio_id, poznamka, created_at, autor) VALUES (?,?,?,?,'banka',?,?,?,?)",
+              ).bind(uid(), d.klient, r.date.slice(0, 10), d.suma, fioId,
+                `rozdelené · ${(r.counterparty || "").slice(0, 160)}`, teraz(), kto || null),
+            ));
+          } catch (e) {
+            const t = String(e instanceof Error ? e.message : e);
+            return Response.json({
+              ok: false,
+              error: /UNIQUE/i.test(t)
+                ? "Tento pohyb už má priradenú platbu pre toho istého klienta."
+                : `Diely sa nezapísali: ${t.slice(0, 160)}`,
+            }, { status: 500 });
+          }
           await audit(DB, {
             action: "platba-rozdelena",
             predmet: `${r.date.slice(0, 10)} · ${Math.round(r.amount_czk)} Kč`,
