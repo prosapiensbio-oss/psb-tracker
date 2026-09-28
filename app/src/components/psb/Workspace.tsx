@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { navrhniKlientaKandidati, type ClientAgg } from "../../lib/psb/compute";
 import { krokGesta, novyStavGesta } from "../../lib/psb/gestoKariet";
 import { BEZ_FRONTY, klucPolozky, popisZmeny, postavKarty, trenerZPrihlasenia, type Karta, type NeznamyNazov, type NepriradenaPlatba, type Zmena } from "../../lib/psb/workspaceKarty";
-import { bezAktivnehoBalicka, type BezBalicka } from "../../lib/psb/bezBalicka";
+import { bezAktivnehoBalicka, treningyZObochZdrojov, type BezBalicka } from "../../lib/psb/bezBalicka";
 import { dlznici as spocitajDlznikov, type Dlznik } from "../../lib/psb/dlznici";
 
 /** Riadky z `/api/balicky` a `/api/platby` — len to, čo tieto karty potrebujú. */
@@ -116,9 +116,9 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
         platnostOd: (b.platnost_od || "").slice(0, 10), platnostDo: (b.platnost_do || "")?.slice(0, 10) || null,
         cenaCzk: b.cena_czk, zdroj: b.zdroj, zruseneAt: b.zrusene_at,
       })),
-      kalUdalosti || [],
+      treningyZObochZdrojov(data.sessions, kalUdalosti || []),
     ),
-    [clients, balicky, kalUdalosti],
+    [clients, balicky, kalUdalosti, data.sessions],
   );
 
   /** Kto dlží — otvorené poplatky z PTmindera aj nezaplatené balíčky z Kokpitu. */

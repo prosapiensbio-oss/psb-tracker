@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { bezAktivnehoBalicka, type KlientPreKartu } from "./bezBalicka";
+import { bezAktivnehoBalicka, treningyZObochZdrojov, type KlientPreKartu } from "./bezBalicka";
 import type { Balicek } from "./balickyEvidencia";
 
 const DNES = "2026-09-28";
@@ -44,6 +44,17 @@ describe("bezAktivnehoBalicka", () => {
     expect(bezAktivnehoBalicka(l, [bal({ klient: "Richard Matl" })], [], DNES)).toHaveLength(0);
   });
 
+  it("kópia exportu v `balicky` klienta zo zoznamu NESCHOVÁ", () => {
+    // Richard Matl, 28. 9. 2026: 6 h kúpených 10. 8., všetky minuté. V
+    // `balicky` má ten istý balíček naliaty z exportu — a odtrénované hodiny
+    // by sa k nemu rátali z kalendára, ktorý siaha pár týždňov dozadu. Karta
+    // ho tak vynechala, hoci na karte klienta stojí 0 h.
+    const l = [kl({ name: "Richard Matl" })];
+    const kopia = bal({ klient: "Richard Matl", zdroj: "ptminder", platnostOd: "2026-08-10", platnostDo: "2026-10-04" });
+    const v = bezAktivnehoBalicka(l, [kopia], [], DNES);
+    expect(v.map((x) => x.meno)).toEqual(["Richard Matl"]);
+  });
+
   it("aj balíček z Kokpitu sa dá minúť", () => {
     const udalosti = ["2026-09-25", "2026-09-26", "2026-09-27"].map((d) => ({ klient: "Richard Matl", zaciatok: `${d}T17:00`, typ: "trening" }));
     const l = [kl({ name: "Richard Matl" })];
@@ -72,5 +83,26 @@ describe("bezAktivnehoBalicka", () => {
     const v = bezAktivnehoBalicka(l, [], udalosti, DNES);
     expect(v.map((x) => x.meno)).toEqual(["S termínom", "Bez termínu"]);
     expect(v[0].objednanych).toBe(1);
+  });
+});
+
+describe("treningyZObochZdrojov", () => {
+  it("spojí export a kalendár, ten istý deň nezdvojí", () => {
+    const v = treningyZObochZdrojov(
+      [{ client: "Richard Matl", date: "2026-09-23T00:00:00Z" }],
+      [
+        { klient: "Richard Matl", zaciatok: "2026-09-23T17:00", typ: "trening" },
+        { klient: "Richard Matl", zaciatok: "2026-09-28T17:00", typ: "trening" },
+      ],
+    );
+    expect(v.map((x) => x.zaciatok.slice(0, 10))).toEqual(["2026-09-23", "2026-09-28"]);
+  });
+
+  it("nepomenovanú udalosť ani iný typ neberie", () => {
+    const v = treningyZObochZdrojov([], [
+      { klient: null, zaciatok: "2026-09-24T10:00", typ: "trening" },
+      { klient: "Richard Matl", zaciatok: "2026-09-25T10:00", typ: "veterina" },
+    ]);
+    expect(v).toHaveLength(0);
   });
 });

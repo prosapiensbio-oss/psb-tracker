@@ -54,7 +54,7 @@ import { Workspace } from "./Workspace";
 import type { FakturaPredvolba } from "./VydaneFaktury";
 import { Prechod } from "./Prechod";
 import { buildAiContext } from "../../lib/psb/aiContext";
-import { bezAktivnehoBalicka } from "../../lib/psb/bezBalicka";
+import { bezAktivnehoBalicka, treningyZObochZdrojov } from "../../lib/psb/bezBalicka";
 import { dlznici as spocitajDlznikov } from "../../lib/psb/dlznici";
 
 /** Riadky z `/api/balicky` a `/api/platby`, ktoré kŕmia fronty Workspace. */
@@ -2257,7 +2257,7 @@ function skupinaFaktur(
     const treneri: Record<string, string> = {};
     for (const [meno, c] of Object.entries(clients)) if (c.primaryTrainer) treneri[meno] = c.primaryTrainer;
     return {
-      bezBalicka: bezAktivnehoBalicka(Object.values(clients), evidencia, kalUdalosti || []),
+      bezBalicka: bezAktivnehoBalicka(Object.values(clients), evidencia, treningyZObochZdrojov(data.sessions, kalUdalosti || [])),
       dlznici: spocitajDlznikov(
         (data.poplatky || []).map((p) => ({ datum: p.datum, klient: p.klient, popis: p.popis, suma: p.suma })),
         Object.fromEntries(Object.entries(podla(balickyRiadky)).map(([m, bs]) => [m, bs.map((b) => ({
@@ -2269,7 +2269,7 @@ function skupinaFaktur(
         treneri,
       ),
     };
-  }, [clients, balickyRiadky, vlastnePlatby, data.poplatky, kalUdalosti]);
+  }, [clients, balickyRiadky, vlastnePlatby, data.poplatky, data.sessions, kalUdalosti]);
 
   const aiContext = useMemo(
     () => buildAiContext(data, clients, sixM, capacity, registerAll, { udalosti: kalUdalosti, zmeny: kalZmeny }, uzavierkaPreAi,

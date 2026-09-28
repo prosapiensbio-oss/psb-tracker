@@ -1705,6 +1705,17 @@ jeden DRUH práce naraz.
   ráta z PTmindera a nevie o balíčku nahodenom v Kokpite; keby sa zoznam
   staval len z nej, klient by v ňom svietil aj potom, čo mu balíček pribudol
   — a fronta, ktorá sa po vybavení nevyprázdni, sa prestane čítať.
+- **Z `balicky` sa počítajú LEN ručne nahodené — tu rovnako ako na osi času.**
+  Zvyšok je kópia exportu, teda tie isté členstvá, ktoré už nesie
+  `packageRemaining`. Prvá verzia ich počítala tiež a odtrénované hodiny
+  k nim rátala z kalendára, ktorý siaha 21 dní dozadu, kým platnosť balíčka
+  beží mesiace: Richard Matl mal 6 h kúpených 10. 8. a všetky minuté, ale
+  v okne kalendára boli vidieť dva tréningy — karta usúdila, že mu štyri
+  hodiny zostávajú, a vynechala ho. Jerry si to všimol hneď („bez balíčka
+  a čo Richard Matl?"), lebo o tom klientovi hodinu predtým hovoril.
+  **Odvtedy sa minuté hodiny rátajú z oboch zdrojov naraz**
+  (`treningyZObochZdrojov`): export nesie celú históriu, kalendár to, čo
+  v ňom ešte nie je, a páruje sa po dňoch.
 - **Paušál nie je chýbajúci balíček.** GOLD a spol. stoja v exporte navždy na
   0/0, lebo sa nemíňajú po hodinách. Tá istá pasca ako pri anomálii „chodí,
   ale má 0 hodín" (19. 8. 2026).

@@ -57,12 +57,52 @@ const den = (s: string) => (s || "").slice(0, 10);
 const dniMedzi = (a: string, b: string) => Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
 
 /**
+ * Tréningy z OBOCH zdrojov v jednom tvare.
+ *
+ * Kalendár drží len pár týždňov dozadu, export nesie celú históriu, ale
+ * končí posledným nahratím. Kto počíta minuté hodiny len z jedného, spočíta
+ * ich málo. Páruje sa po DŇOCH — klient v jeden deň druhýkrát netrénuje
+ * a dvojica by hodinu strhla dvakrát (to isté pravidlo ako na osi času).
+ */
+export function treningyZObochZdrojov(
+  sessions: { client: string; date: string }[],
+  kalUdalosti: Udalost[],
+): Udalost[] {
+  const out: Udalost[] = [];
+  const uz = new Set<string>();
+  for (const s of sessions) {
+    const kluc = `${normName(s.client)}|${den(s.date)}`;
+    if (uz.has(kluc)) continue;
+    uz.add(kluc);
+    out.push({ klient: s.client, zaciatok: s.date, typ: "trening" });
+  }
+  for (const u of kalUdalosti) {
+    if (!u.klient || (u.typ !== "trening" && u.typ !== "uvodny")) continue;
+    const kluc = `${normName(u.klient)}|${den(u.zaciatok)}`;
+    if (uz.has(kluc)) continue;
+    uz.add(kluc);
+    out.push(u);
+  }
+  return out;
+}
+
+/**
  * Hodiny, ktoré klientovi zostávajú podľa VLASTNEJ evidencie Kokpitu.
  * `null` = medzi jeho balíčkami je paušál, zostatok sa nepočíta.
+ *
+ * POČÍTAJÚ SA LEN RUČNE NAHODENÉ BALÍČKY.
+ *
+ * Zvyšok `balicky` je kópia exportu — tie isté členstvá, ktoré už nesie
+ * `packageRemaining` na karte klienta. Počítať ich druhýkrát znamená viesť
+ * jednu vec v dvoch knihách, a tá druhá je horšia: odtrénované hodiny sa
+ * k nej rátajú z kalendára, ktorý siaha pár týždňov dozadu, kým platnosť
+ * balíčka beží mesiace. Richard Matl mal takto 10. 8. kúpených 6 h, všetky
+ * minuté — a karta ho zo zoznamu vynechala, lebo v okne kalendára videla
+ * len dva tréningy a usúdila, že mu štyri hodiny zostávajú (28. 9. 2026).
  */
 function zostatokVKokpite(vlastne: Balicek[], udalosti: Udalost[], meno: string, dnes: string): number | null {
   const k = normName(meno);
-  const moje = vlastne.filter((b) => normName(b.klient) === k && jeAktivny(b, dnes));
+  const moje = vlastne.filter((b) => b.zdroj === "rucne" && normName(b.klient) === k && jeAktivny(b, dnes));
   if (!moje.length) return 0;
   if (moje.some((b) => b.hodiny == null)) return null;
   const od = moje.reduce((m, b) => (b.platnostOd < m ? b.platnostOd : m), moje[0].platnostOd);
