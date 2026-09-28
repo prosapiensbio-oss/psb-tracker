@@ -156,7 +156,7 @@ export type NepriradenaPlatba = {
   /** Vyzerá to na platbu klienta? `false` = vrátka z obchodu, vklad, kaucia. */
   klientsky: boolean;
   /** Odkiaľ je návrh: aby človek vedel, čomu verí. */
-  zdrojNavrhu: "naucene" | "faktura" | "firma" | "meno" | "suma" | "";
+  zdrojNavrhu: "naucene" | "faktura" | "firma" | "meno" | "meno+suma" | "suma" | "";
 };
 
 /** Vystavená faktúra — na párovanie podľa variabilného symbolu. */
@@ -308,10 +308,32 @@ export function nepriradene(
     const podlaFirmy = naucene || podlaFaktury.length ? [] : klientPodlaFirmy(text, firmy);
     const podlaMena = naucene || podlaFaktury.length || podlaFirmy.length ? [] : najdiKlientaVTexte(text, menaKlientov);
     const podlaSumy = naucene || podlaFaktury.length || podlaFirmy.length || podlaMena.length ? [] : parujPodlaSumy(r, ptPlatby);
-    const kandidati = naucene ? [naucene]
+    let kandidati = naucene ? [naucene]
       : podlaFaktury.length ? podlaFaktury
         : podlaFirmy.length ? podlaFirmy
           : podlaMena.length ? podlaMena : podlaSumy;
+
+    /**
+     * KEĎ MENO NESTAČÍ, ROZHODNE PTMINDER.
+     *
+     * Jerry, 28. 9. 2026: „28. 7. 7 790 Kč, neviem či je Roman Pavlík alebo
+     * Roman Jakubiček — podľa PTmindera by sa dalo zistiť, pochybujem že
+     * zaplatili obaja v ten istý deň."
+     *
+     * Priezvisko vracia pri Stokláskovcoch a Tomášoch aj šesť mien naraz a
+     * appka sa dovtedy nepýtala ďalej — párovanie podľa sumy a dňa bežalo len
+     * vtedy, keď meno nenašlo NIC. Pritom je to presne ten druhý pohľad,
+     * ktorý spor rozsekne: z 38 sporných ich takto ubudlo 24.
+     *
+     * Zužuje sa PRIENIKOM, nie nahradením: keď PTminder ukáže na niekoho, kto
+     * v texte platby nie je, je to zhoda čísel a nie dôkaz — vtedy sa nechá
+     * pôvodná dvojica a rozhodne človek.
+     */
+    let rozhodlaSuma = false;
+    if (kandidati.length > 1) {
+      const prienik = kandidati.filter((k) => parujPodlaSumy(r, ptPlatby).includes(k));
+      if (prienik.length === 1) { kandidati = prienik; rozhodlaSuma = true; }
+    }
     out.push({
       fioId: r.id,
       datum: r.date.slice(0, 10),
@@ -324,7 +346,8 @@ export function nepriradene(
       zdrojNavrhu: naucene ? "naucene"
         : podlaFaktury.length ? "faktura"
           : podlaFirmy.length ? "firma"
-            : podlaMena.length ? "meno" : podlaSumy.length ? "suma" : "",
+            : podlaMena.length ? (rozhodlaSuma ? "meno+suma" : "meno")
+              : podlaSumy.length ? "suma" : "",
     });
   }
   return out.sort((a, b) => b.datum.localeCompare(a.datum));

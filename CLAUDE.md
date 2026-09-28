@@ -1440,3 +1440,30 @@ karta; keď kniha o tom dni nevie (staršie obdobia), berie sa jeden riadok.
 **Pravidlo:** keď snímka (`packages`) a kniha (`services`) hovoria o počte
 rôzne, platí kniha. A keď si nie som istý, čo dáta znamenajú, nemám to
 vysvetľovať ako fakt — mám sa pozrieť na druhý zdroj.
+
+## Keď meno nestačí, druhý pohľad spor rozsekne
+
+28. 9. 2026 Jerry nad výpisom: „28. 7. 7 790 Kč, neviem či je Roman Pavlík
+alebo Roman Jakubiček — podľa PTmindera by sa dalo zistiť, pochybujem že
+zaplatili obaja v ten istý deň."
+
+Mal pravdu a príčina bola v PORADÍ, nie v pravidlách. `nepriradene` má štyri
+zdroje návrhu (faktúra → firma → meno → suma a deň z PTmindera) a brala prvý,
+ktorý niečo vrátil. Párovanie podľa sumy tak bežalo len vtedy, keď meno
+nenašlo NIC — pritom priezvisko vracia pri Stokláskovcoch a Tomášoch aj šesť
+mien naraz a práve tam je druhý pohľad najcennejší. Z 38 sporných príjmov
+ich takto ubudlo 24.
+
+- **Zužuje sa PRIENIKOM, nie nahradením.** Keď PTminder ukáže na niekoho, kto
+  v texte platby nie je, je to zhoda čísel a nie dôkaz — vtedy sa nechá
+  pôvodná dvojica a rozhodne človek.
+- **Zovšeobecnenie:** keď zdroj vráti VIAC než jednu možnosť, neskončil —
+  vtedy sa má pýtať ďalej. Prvý zdroj, ktorý niečo vráti, nie je automaticky
+  ten, ktorý vie odpoveď.
+
+**Jeden prevod vie patriť dvom klientom.** „15 580 DK Consulting" sú dva
+balíčky po 7 790 (Dan Kouřil a Monika Schonwalderová). Akcia `rozdel` zapíše
+toľko platieb, koľko je dielov, všetky s tým istým `fio_id` — pohyb zmizne zo
+zoznamu nepriradených a mesačný súčet sedí. Diely sa musia zložiť na sumu
+pohybu (tolerancia koruna); rozdelenie, ktoré nesedí, sa nezapíše. A
+odosielateľ sa pri rozdelení NEUČÍ: vzor by ukazoval na dvoch ľudí naraz.

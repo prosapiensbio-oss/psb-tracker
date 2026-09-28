@@ -216,6 +216,61 @@ export const Route = createFileRoute("/api/platby")({
         }
 
         /**
+         * JEDEN PREVOD, VIAC KLIENTOV.
+         *
+         * Jerry, 28. 9. 2026: „15 580 DK Consulting — to je Dan Kouřil, ale
+         * spoločne s Monikou Schonwalderovou, takže to potrebujem rozdeliť."
+         * Dvaja klienti si pošlú balíčky jedným prevodom a v banke je to
+         * jeden riadok.
+         *
+         * Zapíše sa toľko platieb, koľko je dielov, a všetky nesú to isté
+         * `fio_id` — pohyb tak zmizne zo zoznamu nepriradených a v mesačnom
+         * porovnaní s PTminderom sedí súčet.
+         *
+         * Diely sa musia zložiť na SUMU POHYBU. Tolerancia je koruna kvôli
+         * zaokrúhľovaniu; väčší rozdiel je preklep a ten sa nezapíše —
+         * rozdelenie, ktoré nesedí, je horšie než nerozdelené.
+         *
+         * Odosielateľ sa NEUČÍ: vzor by ukazoval na dvoch ľudí naraz a
+         * najbližší prevod od tej istej firmy by sa priradil jednému z nich.
+         */
+        if (akcia === "rozdel") {
+          const fioId = String(b.fioId || "");
+          const diely = (Array.isArray(b.diely) ? b.diely : []) as { klient?: unknown; suma?: unknown }[];
+          if (!fioId || diely.length < 2) {
+            return Response.json({ ok: false, error: "Na rozdelenie treba aspoň dvoch klientov." }, { status: 400 });
+          }
+          const r = await DB.prepare("SELECT id, date, amount_czk, counterparty, note, typ FROM fio_transactions WHERE id = ?")
+            .bind(fioId).first<FioRiadok>();
+          if (!r) return Response.json({ ok: false, error: "Riadok výpisu neexistuje." }, { status: 404 });
+
+          const kusy = diely.map((d) => ({ klient: String(d.klient || "").trim(), suma: Math.round(Number(d.suma) || 0) }));
+          if (kusy.some((d) => !d.klient || d.suma <= 0)) {
+            return Response.json({ ok: false, error: "Každý diel potrebuje klienta a kladnú sumu." }, { status: 400 });
+          }
+          const spolu = kusy.reduce((n, d) => n + d.suma, 0);
+          if (Math.abs(spolu - Math.round(r.amount_czk)) > 1) {
+            return Response.json(
+              { ok: false, error: `Diely dávajú ${spolu} Kč, pohyb je ${Math.round(r.amount_czk)} Kč.` },
+              { status: 400 },
+            );
+          }
+          await DB.batch(kusy.map((d) =>
+            DB.prepare(
+              "INSERT INTO platby (id, klient, datum, suma_czk, sposob, fio_id, poznamka, created_at, autor) VALUES (?,?,?,?,'banka',?,?,?,?)",
+            ).bind(uid(), d.klient, r.date.slice(0, 10), d.suma, fioId,
+              `rozdelené · ${(r.counterparty || "").slice(0, 160)}`, teraz(), kto || null),
+          ));
+          await audit(DB, {
+            action: "platba-rozdelena",
+            predmet: `${r.date.slice(0, 10)} · ${Math.round(r.amount_czk)} Kč`,
+            neu: kusy.map((d) => `${d.klient}: ${d.suma}`).join(" · "),
+            actor: kto,
+          });
+          return Response.json({ ok: true, dielov: kusy.length });
+        }
+
+        /**
          * „Toto nie je platba klienta" — nájom, vrátenie, vlastný prevod.
          * Nemaže sa nič z výpisu; len sa prestane pýtať.
          */

@@ -56,6 +56,9 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   // Otvorený klient prežije prepnutie karty, nie odchod zo záložky — viď
   // `menoZvonku` v KlientStol.
   const [klientNaStole, setKlientNaStole] = useState("");
+  /** Pohyb, ktorý sa práve delí medzi viacerých klientov, a jeho diely. */
+  const [delim, setDelim] = useState("");
+  const [diely, setDiely] = useState<{ klient: string; suma: string }[]>([]);
   const [pracujem, setPracujem] = useState("");
   /**
    * Čie veci sa ukazujú. "auto" = podľa prihlásenia; keď sa prihlásenie nedá
@@ -231,6 +234,32 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
     // Register na Dnes drží vlastnú kópiu kalendára — bez oznámenia by
     // vybavená zmena svietila ďalej (kontrola 24. 9. 2026).
     oznam(url.includes("platby") ? "peniaze" : "kalendar");
+  };
+
+  /**
+   * DÁVKOVÉ POTVRDENIE.
+   *
+   * Jerry, 28. 9. 2026: „vidím, že si tam môžem najprv povyplňať kto je kto,
+   * ale chýba tam potom také spoločné potvrdenie." Appka návrh urobí sama a
+   * po jednom to bola práca na večer — jeden klik zapíše všetko, čo je
+   * vyplnené a čo sedí na existujúceho klienta.
+   */
+  const davkaPlatieb = (polozky: NepriradenaPlatba[]) =>
+    polozky
+      .map((p) => ({ kluc: klucPolozky("platby", p), p }))
+      .filter(({ kluc, p }) => !hotove.has(kluc) && mena.includes(text(kluc, p.navrh).trim()))
+      .map(({ kluc, p }) => ({ kluc, fioId: p.fioId, klient: text(kluc, p.navrh).trim() }));
+
+  const potvrdDavku = async (polozky: NepriradenaPlatba[]) => {
+    const davka = davkaPlatieb(polozky);
+    if (!davka.length) return;
+    setPracujem("davka-platby"); setChyba("");
+    const j = await posli("/api/platby", { akcia: "priradz-davka", polozky: davka.map(({ fioId, klient }) => ({ fioId, klient })) })
+      .catch(() => ({ ok: false, error: "spojenie" }));
+    setPracujem("");
+    if (!j.ok) { setChyba(j.error || "nepodarilo sa uložiť"); return; }
+    setHotove((s) => new Set([...s, ...davka.map((x) => x.kluc)]));
+    oznam("peniaze");
   };
 
   if (!zdroje) return null;
@@ -459,23 +488,86 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
 
               {k.druh === "klient" && <KlientStol clients={clients} mena={mena} data={data} kalUdalosti={kalUdalosti} btcSats={btcSats} btc={btc} onOverride={onOverride} otvorKlienta={otvorKlienta} onOtvoreny={onOtvoreny} onFaktura={setPredvolbaFaktury} menoZvonku={klientNaStole} setMenoZvonku={setKlientNaStole} />}
 
-              {k.druh === "platby" && k.polozky.map((p) => {
-                const kluc = klucPolozky("platby", p);
-                if (hotove.has(kluc)) return null;
-                const t = text(kluc, p.navrh);
+              {k.druh === "platby" && (() => {
+                const pripravene = davkaPlatieb(k.polozky);
                 return (
-                  <div key={kluc} style={riadok}>
-                    <div style={{ minWidth: 50, fontSize: 11.5, color: C.textDim }}>{den(p.datum)}</div>
-                    <div style={{ minWidth: 80, fontSize: 13, fontWeight: 700, textAlign: "right" }}>{kc(p.suma)}</div>
-                    <div style={{ flex: "1 1 200px", minWidth: 150, fontSize: 11, color: C.textMuted }}>{p.text.slice(0, 96)}</div>
-                    <input list="ws-klienti" value={t} onChange={(e) => nastavText(kluc, e.target.value)} placeholder="komu patrí…" style={vstup(!!t && !mena.includes(t))} />
-                    <button onClick={() => void vybav(kluc, "/api/platby", { akcia: "priradz", fioId: p.fioId, klient: t.trim(), zapamataj: true })} disabled={pracujem === kluc || t.trim().length < 3} style={hlavne(t.trim().length >= 3)}>
-                      {pracujem === kluc ? "…" : "Priradiť"}
-                    </button>
-                    <button onClick={() => void vybav(kluc, "/api/platby", { akcia: "nieKlient", fioId: p.fioId })} style={vedlajsie}>Nie je klient</button>
-                  </div>
+                  <>
+                    {pripravene.length > 1 && (
+                      <div style={{ ...riadok, background: mix(C.accent, 8), borderRadius: 8, marginBottom: 6 }}>
+                        <div style={{ flex: 1, fontSize: 12, color: C.textMuted }}>
+                          {pripravene.length} platieb má vyplneného klienta — dajú sa zapísať naraz.
+                        </div>
+                        <button onClick={() => void potvrdDavku(k.polozky)} disabled={pracujem === "davka-platby"} style={hlavne(true)}>
+                          {pracujem === "davka-platby" ? "…" : `Priradiť všetkých ${pripravene.length}`}
+                        </button>
+                      </div>
+                    )}
+                    {k.polozky.map((p) => {
+                      const kluc = klucPolozky("platby", p);
+                      if (hotove.has(kluc)) return null;
+                      const t = text(kluc, p.navrh);
+                      const delenie = delim === p.fioId;
+                      const spolu = diely.reduce((n, d) => n + (Number(d.suma) || 0), 0);
+                      return (
+                        <div key={kluc} style={{ ...riadok, flexWrap: "wrap" }}>
+                          <div style={{ minWidth: 50, fontSize: 11.5, color: C.textDim }}>{den(p.datum)}</div>
+                          <div style={{ minWidth: 80, fontSize: 13, fontWeight: 700, textAlign: "right" }}>{kc(p.suma)}</div>
+                          <div style={{ flex: "1 1 200px", minWidth: 150, fontSize: 11, color: C.textMuted }}>{p.text.slice(0, 96)}</div>
+                          {!delenie && (
+                            <>
+                              <input list="ws-klienti" value={t} onChange={(e) => nastavText(kluc, e.target.value)} placeholder="komu patrí…" style={vstup(!!t && !mena.includes(t))} />
+                              <button onClick={() => void vybav(kluc, "/api/platby", { akcia: "priradz", fioId: p.fioId, klient: t.trim(), zapamataj: true })} disabled={pracujem === kluc || t.trim().length < 3} style={hlavne(t.trim().length >= 3)}>
+                                {pracujem === kluc ? "…" : "Priradiť"}
+                              </button>
+                              {/* Jeden prevod, dvaja klienti — Jerry, 28. 9. 2026: „15 580
+                                  DK Consulting je Dan Kouřil spoločne s Monikou." */}
+                              <button
+                                onClick={() => { setDelim(p.fioId); setDiely([{ klient: t.trim(), suma: String(Math.round(p.suma / 2)) }, { klient: "", suma: String(Math.round(p.suma) - Math.round(p.suma / 2)) }]); }}
+                                style={vedlajsie}
+                              >
+                                Rozdeliť
+                              </button>
+                              <button onClick={() => void vybav(kluc, "/api/platby", { akcia: "nieKlient", fioId: p.fioId })} style={vedlajsie}>Nie je klient</button>
+                            </>
+                          )}
+                          {delenie && (
+                            <div style={{ flexBasis: "100%", marginTop: 6 }}>
+                              {diely.map((d, i) => (
+                                <div key={i} style={{ display: "flex", gap: 7, marginBottom: 5 }}>
+                                  <input
+                                    list="ws-klienti" value={d.klient} placeholder="komu patrí tento diel…"
+                                    onChange={(e) => setDiely((s) => s.map((x, j) => (j === i ? { ...x, klient: e.target.value } : x)))}
+                                    style={{ ...vstup(!!d.klient && !mena.includes(d.klient)), flex: "1 1 200px" }}
+                                  />
+                                  <input
+                                    value={d.suma} inputMode="numeric"
+                                    onChange={(e) => setDiely((s) => s.map((x, j) => (j === i ? { ...x, suma: e.target.value.replace(/[^\d]/g, "") } : x)))}
+                                    style={{ ...vstup(false), width: 90, textAlign: "right" }}
+                                  />
+                                </div>
+                              ))}
+                              <div style={{ display: "flex", gap: 7, alignItems: "center", flexWrap: "wrap" }}>
+                                <span style={{ fontSize: 11.5, color: Math.abs(spolu - Math.round(p.suma)) > 1 ? C.orange : C.textDim }}>
+                                  diely dávajú {kc(spolu)} z {kc(p.suma)}
+                                </span>
+                                <button onClick={() => setDiely((s) => [...s, { klient: "", suma: "0" }])} style={vedlajsie}>+ ďalší</button>
+                                <button
+                                  onClick={() => { setDelim(""); void vybav(kluc, "/api/platby", { akcia: "rozdel", fioId: p.fioId, diely: diely.map((d) => ({ klient: d.klient.trim(), suma: Number(d.suma) || 0 })) }); }}
+                                  disabled={pracujem === kluc || diely.some((d) => !mena.includes(d.klient.trim())) || Math.abs(spolu - Math.round(p.suma)) > 1}
+                                  style={hlavne(true)}
+                                >
+                                  {pracujem === kluc ? "…" : "Zapísať diely"}
+                                </button>
+                                <button onClick={() => { setDelim(""); setDiely([]); }} style={vedlajsie}>späť</button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </>
                 );
-              })}
+              })()}
               </div>
             </div>
             <datalist id="ws-klienti">{mena.map((m) => <option key={m} value={m} />)}</datalist>

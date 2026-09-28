@@ -285,3 +285,31 @@ describe("platba od firmy patrí klientovi", () => {
     expect(r[0].zdrojNavrhu).toBe("firma");
   });
 });
+
+describe("keď meno nestačí, rozhodne PTminder", () => {
+  // Jerry, 28. 9. 2026: „28. 7. 7 790 Kč, neviem či je Roman Pavlík alebo
+  // Roman Jakubiček — podľa PTmindera by sa dalo zistiť."
+  const fio = [{ id: "f1", date: "2026-07-28", amount_czk: 7790, counterparty: "Roman · Filip Stráňavský", note: "", typ: "prijem" }];
+  const mena = ["Roman Jakubiček", "Roman Pavlik"];
+
+  it("prienik mena a sumy dá jedno meno", () => {
+    const pt = [{ klient: "Roman Jakubiček", datum: "2026-07-28", suma: 7790, metoda: "bank" }];
+    const out = nepriradene(fio as never, [], {}, new Set(), mena, pt);
+    expect(out[0]).toMatchObject({ kandidati: ["Roman Jakubiček"], zdrojNavrhu: "meno+suma" });
+  });
+
+  it("keď PTminder ukáže na oboch, nerozhodne sa", () => {
+    const pt = [
+      { klient: "Roman Jakubiček", datum: "2026-07-28", suma: 7790, metoda: "bank" },
+      { klient: "Roman Pavlik", datum: "2026-07-28", suma: 7790, metoda: "bank" },
+    ];
+    expect(nepriradene(fio as never, [], {}, new Set(), mena, pt)[0].kandidati).toHaveLength(2);
+  });
+
+  it("keď PTminder ukáže na niekoho mimo textu, pôvodná dvojica ostáva", () => {
+    // Zhoda čísel nie je dôkaz — Katarína Cvičelová v texte platby nie je.
+    const pt = [{ klient: "Katarina Cvičelova", datum: "2026-07-28", suma: 7790, metoda: "bank" }];
+    const out = nepriradene(fio as never, [], {}, new Set(), mena, pt);
+    expect(out[0]).toMatchObject({ kandidati: mena, zdrojNavrhu: "meno" });
+  });
+});
