@@ -39,10 +39,28 @@ describe("najdiKlientaVTexte — skutočné riadky z Fio", () => {
     expect(najdiKlientaVTexte("Vklad do bankomatu: FIO BANKA, JOŠTOVA 4, BRNO", MENA)).toEqual([]);
   });
 
-  it("dve priezviská na jeden token = nevyberie sa nikto", () => {
+  it("samotné priezvisko na dvoch klientov = nevyberie sa nikto", () => {
     // Richard Matl a Katerina Matlová. Zle priradená platba pokazí tržbu
     // aj históriu a nikto to nezbadá — súčet v banke sedí.
-    expect(najdiKlientaVTexte("Platba · Katerina Matlova", MENA).length).toBe(2);
+    expect(najdiKlientaVTexte("ProSapiens balíček · MATLOVA", MENA).length).toBe(2);
+  });
+
+  it("celé meno kolíziu rozsekne", () => {
+    // Jerry, 28. 9. 2026: „9. 6. Marketa Resnerova" — keď je v texte aj
+    // krstné, je to o jednu zhodu viac a nemá zmysel pýtať sa človeka.
+    expect(najdiKlientaVTexte("Platba · Katerina Matlova", MENA)).toEqual(["Katerina Matlova"]);
+    expect(najdiKlientaVTexte("Richard Matl zo zošita", MENA)).toEqual(["Richard Matl"]);
+  });
+
+  it("mužský tvar nájde prechýlené priezvisko", () => {
+    // Platí manžel: „6 hodín s viazanosťou · Tomáš Krivda" a klientka je
+    // Natália Krivdová. Bežné pravidlo ju nenašlo — „Krivda" je KRATŠIE.
+    expect(najdiKlientaVTexte("6 hodín s viazanosťou · Tomáš Krivda", MENA)).toEqual(["Natalia Krivdova"]);
+  });
+
+  it("podobné korene sa nezlejú", () => {
+    // „Nováková" a „Novák" sú dvaja ľudia; koreň musí sedieť celý.
+    expect(najdiKlientaVTexte("Platba · Peckov", MENA)).toEqual([]);
   });
 
   it("krátke priezvisko sa nehľadá — sedelo by na pol výpisu", () => {

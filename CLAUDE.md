@@ -1461,6 +1461,21 @@ ich takto ubudlo 24.
   vtedy sa má pýtať ďalej. Prvý zdroj, ktorý niečo vráti, nie je automaticky
   ten, ktorý vie odpoveď.
 
+Tá istá chyba bola v mene samotnom a Jerry ju našiel o hodinu neskôr
+(„9. 6. Marketa Resnerova, 20. 6. Tomáš Krivda"):
+
+- **Celé meno prebíja samotné priezvisko.** Krstné sa používalo AŽ vtedy, keď
+  priezvisko nesedelo na nikoho — takže „Marketa Resnerová" v texte ponúkla
+  všetky tri Resnerové. Keď je v texte aj krstné, je to o jednu zhodu viac
+  a rozhoduje ono.
+- **Mužský tvar ženského priezviska.** Platí manžel: „Tomáš Krivda" a
+  klientka je Natália Krivdová. „Krivda" je KRATŠIE než „Krivdová", takže
+  pravidlo „token začína priezviskom a je najviac o tri písmená dlhší" ho
+  nenašlo a appka spadla na krstné — šesť Tomášov. Porovnávajú sa preto aj
+  korene bez prechyľovacej koncovky, a to na ZHODU, nie na začiatok
+  („Novák" a „Nová" sa zliať nesmú). Koreň musí mať aspoň päť písmen; pri
+  kratších (Matl / Matlová) by to len vyrobilo ďalšie kolízie.
+
 **Jeden prevod vie patriť dvom klientom.** „15 580 DK Consulting" sú dva
 balíčky po 7 790 (Dan Kouřil a Monika Schonwalderová). Akcia `rozdel` zapíše
 toľko platieb, koľko je dielov, všetky s tým istým `fio_id` — pohyb zmizne zo

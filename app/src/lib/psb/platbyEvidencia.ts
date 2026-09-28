@@ -53,8 +53,23 @@ export function najdiKlientaVTexte(text: string, menaKlientov: string[]): string
   const podlaPriezviska = menaKlientov.filter((m) => {
     const casti = bezY(normName(m)).split(/\s+/).filter(Boolean);
     const priezvisko = casti[casti.length - 1] || "";
-    return priezvisko.length >= 4 && sedi(priezvisko);
+    return (priezvisko.length >= 4 && sedi(priezvisko)) || sediMuzskyTvar(priezvisko, t);
   });
+  /**
+   * CELÉ MENO PREBÍJA SAMOTNÉ PRIEZVISKO.
+   *
+   * Jerry, 28. 9. 2026: „9. 6. Marketa Resnerova" — v texte stojí celé meno,
+   * ale appka ponúkla všetky tri Resnerové, lebo krstné použila až vtedy, keď
+   * priezvisko nesedelo na nikoho. Keď je v texte aj krstné, je to o jednu
+   * zhodu viac a rozhoduje ono.
+   */
+  if (podlaPriezviska.length > 1) {
+    const ajKrstne = podlaPriezviska.filter((m) => {
+      const krstne = bezY(normName(m)).split(/\s+/).filter(Boolean)[0] || "";
+      return krstne.length >= 4 && sedi(krstne);
+    });
+    if (ajKrstne.length === 1) return ajKrstne;
+  }
   if (podlaPriezviska.length) return podlaPriezviska;
 
   /**
@@ -73,6 +88,26 @@ export function najdiKlientaVTexte(text: string, menaKlientov: string[]): string
     const krstne = bezY(normName(m)).split(/\s+/).filter(Boolean)[0] || "";
     return krstne.length >= 4 && sedi(krstne);
   });
+}
+
+/**
+ * MUŽSKÝ TVAR ŽENSKÉHO PRIEZVISKA.
+ *
+ * Jerry, 28. 9. 2026: „20. 6. Tomáš Krivda." Platí manžel a klientka je
+ * Natália Krivdová — lenže „Krivda" je KRATŠIE než „Krivdová", takže bežné
+ * pravidlo (token začína priezviskom a je najviac o tri písmená dlhší) ho
+ * nenašlo. Appka potom spadla na krstné a ponúkla šesť Tomášov.
+ *
+ * Porovnávajú sa preto aj korene bez prechyľovacej koncovky. Zámerne sa
+ * žiada ZHODA koreňov, nie začiatok: „Novák" a „Nová" majú rôzne korene a
+ * zliať sa nesmú. A koreň musí mať aspoň päť písmen — pri kratších (Matl /
+ * Matlová) by to len vyrobilo ďalšie kolízie.
+ */
+const koren = (s: string) => s.replace(/(ova|ová)$/i, "").replace(/a$/i, "");
+
+function sediMuzskyTvar(priezvisko: string, tokeny: string[]): boolean {
+  const k = koren(priezvisko);
+  return k.length >= 5 && tokeny.some((x) => koren(x) === k);
 }
 
 /**
