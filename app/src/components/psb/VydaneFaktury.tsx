@@ -217,7 +217,7 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana 
     if (!mail) return;
     const j = await posli({ akcia: "posli-mail", id: mail.id, komu: mail.komu, predmet: mail.predmet, telo: mail.telo }, mail.id);
     if (j) {
-      setHlaska(`Faktúra ${mail.cislo} odišla na ${mail.komu}. Kópia je aj v tvojej schránke.`);
+      setHlaska(`Faktúra ${mail.cislo} odišla na ${mail.komu}.`);
       setMail(null);
     }
   };
@@ -446,7 +446,7 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana 
           />
           <div style={{ fontSize: 11.5, color: C.textDim, marginBottom: 10 }}>
             Príloha: <b style={{ color: C.textMuted }}>Faktura {mail.cislo}.pdf</b> — vyrobí sa pri odoslaní.
-            Kópia ide skryto aj tebe.
+            Kópia do info@ nechodí; že doklad odišiel, je vidieť pri faktúre.
           </div>
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
             <button
@@ -498,7 +498,14 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana 
                   {r.storno_at ? `storno — ${r.storno_dovod}`
                     : r.uhradene_at ? `uhradená ${den(r.uhradene_at.slice(0, 10))}`
                       : mesk ? `po splatnosti od ${den(r.splatnost)}` : `splatná ${den(r.splatnost)}`}
-                  {r.odoslane_at && !r.storno_at ? ` · odoslaná ${den(r.odoslane_at.slice(0, 10))}` : ""}
+                  {/* Odkedy nechodí skrytá kópia do info@, je toto jediné
+                      miesto, kde je vidieť, že doklad odišiel — a komu. */}
+                  {r.odoslane_at && !r.storno_at
+                    ? <span title={r.odoslane_komu ? `odišla na ${r.odoslane_komu}` : undefined}>
+                      {` · odoslaná ${den(r.odoslane_at.slice(0, 10))}`}
+                      {r.odoslane_komu ? ` na ${r.odoslane_komu}` : ""}
+                    </span>
+                    : null}
                 </span>
                 <button type="button" onClick={() => vytlacFakturu(naFakturu(r))} style={odkazStyl}>PDF</button>
                 {!r.storno_at && (

@@ -765,12 +765,18 @@ z nej nie. **Keď sú všetky vstupy v poriadku a server odmieta, prvá odpoveď
 je „skús znova", nie „zmeň heslo".** Hláška v appke to odvtedy hovorí v tomto
 poradí.
 
-**A keď mail odíde, ale nedorazí, ďalší krok je SKRYTÁ KÓPIA.** Každá faktúra
-aj výpis idú BCC na `info@prosapiens.cz` (RCPT TO ide aj za ňu, takže 250 od
-servera platí pre obe adresy). Keď je kópia v schránke, správa odišla a
-problém je u príjemcu (spam); keď nie je, zastavila sa u nás. DNS domény je
-pritom v poriadku: SPF má `include:_spf.m1.websupport.sk`, DKIM je pod
-selektorom `mail`, DMARC je `p=none`.
+**Keď mail odíde, ale nedorazí, kópiu v schránke už NEMÁME.** Faktúry a výpisy
+chodili BCC na `info@prosapiens.cz`; Jerry to 28. 9. 2026 zrušil („plní nám to
+mailovú schránku" — je to tá istá schránka, z ktorej Kokpit číta dopyty).
+Mechanizmus (`kopiaSkryta` v `mime.ts`) zostáva, len ho nikto nepoužíva.
+
+Stopa je odteraz v appke: `vydane_faktury.odoslane_at` a `odoslane_komu`
+(vidno ich pri riadku faktúry) plus záznam v `vzas_audit`. Čo z nej nezistíš,
+je telo správy — to sa dá zložiť znova, lebo text skladá appka. Pri „klientovi
+mail nedorazil" tak zostávajú tri kroky: 1. je v audite `faktura-mail-zlyhal`?
+2. sedí adresa v `odoslane_komu` na znak? 3. nech sa pozrie do spamu. DNS je
+v poriadku: SPF má `include:_spf.m1.websupport.sk`, DKIM je pod selektorom
+`mail`, DMARC je `p=none`.
 
 ## Pripomienka na dopyt patrí do deriveRegister, nie vedľa neho
 

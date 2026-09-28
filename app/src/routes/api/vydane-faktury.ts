@@ -374,7 +374,6 @@ export const Route = createFileRoute("/api/vydane-faktury")({
                 od: n.user,
                 odMeno: "ProSapiens Biomechanic",
                 komu: adresy,
-                kopiaSkryta: [n.user],
                 predmet: kus(b.predmet, 200) || "Výpis hodín — ProSapiens Biomechanic",
                 telo,
               },
@@ -434,9 +433,22 @@ export const Route = createFileRoute("/api/vydane-faktury")({
                 od: n.user,
                 odMeno: "ProSapiens Biomechanic",
                 komu: adresy,
-                // Kópia sebe: v schránke tak zostane stopa po tom, čo klientovi
-                // naozaj odišlo — SMTP sám do „Odoslané" nič nedá.
-                kopiaSkryta: [n.user],
+                /**
+                 * SKRYTÁ KÓPIA SEBE TU BOLA A UŽ NIE JE.
+                 *
+                 * Držala stopu po tom, čo klientovi naozaj odišlo — SMTP sám
+                 * do „Odoslané" nič nedá — a raz sa zišla: keď faktúra
+                 * Martinovi Vaškovi „nedorazila", kópia by povedala, či sa
+                 * zastavila u nás alebo u neho.
+                 *
+                 * Jerry, 28. 9. 2026: „nechcem, aby nám na info@ chodil mail,
+                 * plní nám to mailovú schránku." Je to tá istá schránka, z
+                 * ktorej Kokpit číta dopyty, takže každá faktúra v nej ležala
+                 * navyše. Stopa zostáva v appke: `odoslane_at`,
+                 * `odoslane_komu` a záznam v `vzas_audit` (kto, kedy, na aké
+                 * adresy). Čo sa z nej už nedozvieme, je samotné telo správy —
+                 * to sa dá zložiť znova z faktúry, lebo text skladá appka.
+                 */
                 predmet: String(b.predmet || text.predmet).slice(0, 200),
                 telo: String(b.telo || text.telo).slice(0, 5000),
                 prilohy: [{ meno: menoPrilohy(String(r.cislo)), typ: "application/pdf", data: pdf }],

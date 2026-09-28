@@ -62,7 +62,7 @@ export function VypisHodinPanel({ meno, os, email, zostatokTeraz }: { meno: stri
     }).then((r) => r.json()).catch(() => ({ ok: false, error: "spojenie" }));
     setPracujem(false);
     if (!j?.ok) { setChyba(j?.error || "Nepodarilo sa odoslať."); return; }
-    setHlaska(`Výpis odišiel na ${komu.trim()}. Kópia je aj v tvojej schránke.`);
+    setHlaska(`Výpis odišiel na ${komu.trim()}.`);
   };
 
   if (!otvorene) {
