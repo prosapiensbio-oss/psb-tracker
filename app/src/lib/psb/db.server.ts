@@ -2,6 +2,7 @@
 import { zjednotOverrides } from "./zjednotOverrides";
 import type { D1Database } from "@cloudflare/workers-types";
 
+import { poplatkyPoOdrataniPlatieb } from "./platbyEvidencia";
 import { audit, jeZamknuty, zamknuteMesiace } from "./audit.server";
 import { normName } from "./format";
 import { parseAnamneza, parseCennik, parseGa4, parseGsc, parseKanaly, parseMetricool, parsePoplatky } from "./parse";
@@ -23,7 +24,7 @@ import { EMPTY_DATA } from "./types";
 const uid = () => crypto.randomUUID();
 
 export async function loadData(DB: D1Database): Promise<PSBData> {
-  const [sessions, services, payments, packages, overrides, acks, log, leads, zavery, vedomosti, poplatky, zdarma] = await Promise.all([
+  const [sessions, services, payments, packages, overrides, acks, log, leads, zavery, vedomosti, poplatky, zdarma, vlastnePlatby] = await Promise.all([
     DB.prepare("SELECT * FROM sessions").all(),
     DB.prepare("SELECT * FROM services").all(),
     DB.prepare("SELECT * FROM payments").all(),
@@ -49,6 +50,10 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
       .all().catch(() => ({ results: [] })),
     // Tréningy, ktoré sa z členstva neodpočítavajú — viď migráciu 0081.
     DB.prepare("SELECT id, client_name, den, dovod, kto FROM treningy_zdarma ORDER BY den DESC")
+      .all().catch(() => ({ results: [] })),
+    // Vlastná evidencia platieb — potrebná na to, aby sa z otvorených
+    // poplatkov odrátali tie, ktoré už niekto zaplatil (viď nižšie).
+    DB.prepare("SELECT id, klient, datum, suma_czk, sposob, fio_id, zrusene_at FROM platby")
       .all().catch(() => ({ results: [] })),
   ]);
 
@@ -103,9 +108,28 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
       id: r.id, datum: r.datum, tema: r.tema, zaver: r.zaver,
       overit: r.overit, overitDo: r.overit_do, stav: r.stav,
     })),
-    poplatky: (poplatky.results as any[]).map((r) => ({
-      id: r.id, datum: r.datum, klient: r.client_name, popis: r.popis || "", suma: Number(r.suma_czk) || 0,
-    })),
+    /**
+     * OTVORENÉ POPLATKY MÍNUS TO, ČO UŽ VIDÍ KOKPIT.
+     *
+     * Jerry, 28. 9. 2026: „Kalva má platbu 27. 9., to isté aj Kouřil."
+     * `poplatky` je zrkadlo PTmindera a platilo, že čo v ňom je, je otvorené.
+     * Počas súbežného chodu je ale Kokpit napred: peniaze vidí vo výpise
+     * z banky hneď, kým v PTminderi ich Jerry zapíše neskôr alebo vôbec.
+     * Zo štrnástich poplatkov tak štyri viseli zaplatené.
+     *
+     * Odratáva sa TU, nie v komponente — na „nezaplatené" sa pozerá karta na
+     * Dnes, Prehľad peňazí aj Jarvis, a tri kópie toho istého pravidla by sa
+     * rozišli.
+     */
+    poplatky: poplatkyPoOdrataniPlatieb(
+      (poplatky.results as any[]).map((r) => ({
+        id: r.id, datum: r.datum, klient: r.client_name, popis: r.popis || "", suma: Number(r.suma_czk) || 0,
+      })),
+      (vlastnePlatby.results as any[]).map((r) => ({
+        id: r.id, klient: r.klient, datum: r.datum, sumaCzk: Number(r.suma_czk) || 0,
+        sposob: r.sposob, fioId: r.fio_id, zruseneAt: r.zrusene_at,
+      })),
+    ).otvorene,
     treningyZdarma: (zdarma.results as any[]).map((r) => ({
       id: r.id, klient: r.client_name, den: String(r.den).slice(0, 10), dovod: r.dovod || "", kto: r.kto || "",
     })),

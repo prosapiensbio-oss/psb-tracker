@@ -490,3 +490,49 @@ export function porovnajPlatby(
     sediacich: mesiace.filter((r) => r.rozdiel === 0).length,
   };
 }
+
+/**
+ * POPLATOK, KTORÝ UŽ VYSVETĽUJE PLATBA ZAPÍSANÁ V KOKPITE.
+ *
+ * Jerry, 28. 9. 2026: „Kalva má platbu 27. 9., to isté aj Kouřil." Mal
+ * pravdu a týkalo sa to štyroch z jedenástich otvorených poplatkov.
+ *
+ * `poplatky` je zrkadlo PTmindera a platilo o ňom, že čo v ňom je, je
+ * otvorené — PTminder poplatok po zaplatení ZMAŽE. To bola pravda, kým bol
+ * PTminder jediný zdroj platieb. Počas súbežného chodu je ale Kokpit
+ * o niekoľko dní NAPRED: peniaze vidí vo výpise z banky hneď, kým v PTminderi
+ * ich Jerry zapíše neskôr alebo vôbec.
+ *
+ * Preto sa nepáruje s platbami z PTmindera (to je zakázané a nefunguje — viď
+ * `parsePoplatky`), ale s vlastnou evidenciou. Pravidlá sú tie isté ako pri
+ * párovaní príjmov:
+ *
+ * • JEDNA KU JEDNEJ — Lucie Podolová má dva otvorené poplatky po 6 990 a
+ *   jednu platbu; zmizne jeden, druhý zostáva.
+ * • Suma musí sedieť na korunu. Poplatok je predpis, nie odhad.
+ * • Okno je −10 až +60 dní: Barbora Vanková zaplatila päť dní PRED vystavením
+ *   poplatku, takže „platba až po poplatku" neplatí ani tu.
+ */
+export function poplatkyPoOdrataniPlatieb<T extends { klient: string; datum: string; suma: number }>(
+  poplatky: T[],
+  platby: Platba[],
+): { otvorene: T[]; kryte: { poplatok: T; zaplatene: string }[] } {
+  const dni = (a: string, b: string) =>
+    Math.round((Date.parse(`${b.slice(0, 10)}T00:00:00Z`) - Date.parse(`${a.slice(0, 10)}T00:00:00Z`)) / 86400000);
+  const volne = platby.filter((p) => !p.zruseneAt).map((p) => ({ p, pouzita: false }));
+  const otvorene: T[] = [];
+  const kryte: { poplatok: T; zaplatene: string }[] = [];
+  // Od najstaršieho: keď má klient dva rovnaké poplatky a jednu platbu,
+  // zaplatený je ten skorší.
+  for (const c of [...poplatky].sort((a, b) => a.datum.localeCompare(b.datum))) {
+    const n = volne.find((x) =>
+      !x.pouzita
+      && normName(x.p.klient) === normName(c.klient)
+      && Math.round(x.p.sumaCzk) === Math.round(c.suma)
+      && dni(c.datum, x.p.datum) >= -10
+      && dni(c.datum, x.p.datum) <= 60);
+    if (n) { n.pouzita = true; kryte.push({ poplatok: c, zaplatene: n.p.datum.slice(0, 10) }); }
+    else otvorene.push(c);
+  }
+  return { otvorene, kryte };
+}

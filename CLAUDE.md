@@ -1553,3 +1553,30 @@ objednaný termín" skončí na jednej hodine a nedeje sa nič.
   Zo pätnástich mien tak ostali štyri.
 - **Horizont nesmie schovať toho, kto je na nule.** Kto hodiny minul už dnes,
   zostáva bez ohľadu na dátum — to je najurgentnejší telefonát.
+
+## Otvorený poplatok už nie je dôkaz — Kokpit je napred
+
+28. 9. 2026 Jerry nad kartou Nezaplatené: „Kalva má platbu 27. 9., to isté aj
+Kouřil." Mal pravdu a týkalo sa to ŠTYROCH z jedenástich poplatkov (Lucie
+Podolová 7. 8., Monika Schonwalderová 28. 8., Dan Kouřil 2. 9., Jaroslav
+Kalva 17. 9.).
+
+Pravidlo z 31. 8. 2026 znelo, že poplatok v `poplatky` je otvorený, lebo
+PTminder ho po zaplatení ZMAŽE. To bola pravda, kým bol PTminder jediný
+zdroj platieb. Počas súbežného chodu je Kokpit o dni až týždne NAPRED:
+peniaze vidí vo výpise z banky hneď, kým v PTminderi ich Jerry zapíše neskôr
+alebo vôbec.
+
+- **Neruší sa zákaz párovať s `payments` z PTmindera** — ten platí ďalej a
+  nefunguje. Odratáva sa vlastná evidencia (`platby`), čo je iný, nezávislý
+  zdroj.
+- **Jedna ku jednej, suma na korunu, okno −10 až +60 dní.** Lucie Podolová má
+  dva poplatky po 6 990 a jednu platbu: zavrie sa STARŠÍ, druhý zostáva.
+  Mínus desať dní preto, že Barbora Vanková zaplatila päť dní PRED vystavením
+  poplatku — „platba až po poplatku" neplatí ani tu.
+- **Odratáva sa v `loadData`, nie v komponente.** Na „nezaplatené" sa pozerá
+  karta na Dnes, Prehľad peňazí aj Jarvis; tri kópie toho istého pravidla by
+  sa rozišli. Jarvis má v schéme napísané, že surový dopyt do `poplatky`
+  vráti viac riadkov než to, čo appka ukazuje.
+
+Karta na Dnes tým spadla zo 6 položiek za 43 972 Kč na 4 za 29 192 Kč.

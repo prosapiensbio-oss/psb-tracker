@@ -1,7 +1,7 @@
 // Platby z výpisu banky — posledná tretina odchodu od PTmindera.
 import { describe, expect, it } from "bun:test";
 
-import { klientPodlaFaktury, klientPodlaFirmy, najdiKlientaVTexte, nepriradene, porovnajPlatby, smieSaZapamatat, textPlatby, vzorPlatby, type FioRiadok, type Platba, vyzeraNaKlienta, parujPodlaSumy, volnePtPlatby } from "./platbyEvidencia";
+import { klientPodlaFaktury, klientPodlaFirmy, najdiKlientaVTexte, nepriradene, porovnajPlatby, smieSaZapamatat, textPlatby, vzorPlatby, type FioRiadok, type Platba, vyzeraNaKlienta, parujPodlaSumy, volnePtPlatby, poplatkyPoOdrataniPlatieb } from "./platbyEvidencia";
 
 const MENA = [
   "Natalia Peckova", "Josef Šnirych", "Natalia Krivdova", "Barbora Vankova",
@@ -360,5 +360,46 @@ describe("platba z PTmindera sa použije raz", () => {
   it("hotovosť z PTmindera sa cez účet nevysvetľuje", () => {
     const hotovost = [{ klient: "Katerina Matlova", datum: "2026-05-26", suma: 7790, metoda: "cash" }];
     expect(volnePtPlatby(hotovost, [{ id: "p1", klient: "Katerina Matlova", datum: "2026-05-26", sumaCzk: 7790, sposob: "banka", fioId: "x", zruseneAt: null }])).toHaveLength(1);
+  });
+});
+
+describe("poplatok, ktorý už vysvetľuje platba v Kokpite", () => {
+  // Jerry, 28. 9. 2026: „Kalva má platbu 27. 9., to isté aj Kouřil."
+  const pl = (klient: string, datum: string, sumaCzk: number): Platba =>
+    ({ id: datum + klient, klient, datum, sumaCzk, sposob: "banka", fioId: "x", zruseneAt: null });
+  const po = (klient: string, datum: string, suma: number) => ({ klient, datum, suma });
+
+  it("platba po poplatku ho zavrie", () => {
+    const v = poplatkyPoOdrataniPlatieb([po("Jaroslav Kalva", "2026-09-17", 6990)], [pl("Jaroslav Kalva", "2026-09-27", 6990)]);
+    expect(v.otvorene).toHaveLength(0);
+    expect(v.kryte[0].zaplatene).toBe("2026-09-27");
+  });
+
+  it("dva rovnaké poplatky a jedna platba — zavrie sa STARŠÍ", () => {
+    // Lucie Podolová: 7. 8. a 31. 8. po 6 990, platba jedna.
+    const v = poplatkyPoOdrataniPlatieb(
+      [po("Lucie Podolova", "2026-08-31", 6990), po("Lucie Podolova", "2026-08-07", 6990)],
+      [pl("Lucie Podolova", "2026-09-21", 6990)],
+    );
+    expect(v.kryte.map((x) => x.poplatok.datum)).toEqual(["2026-08-07"]);
+    expect(v.otvorene.map((x) => x.datum)).toEqual(["2026-08-31"]);
+  });
+
+  it("platba PÄŤ DNÍ PRED poplatkom ho tiež zavrie", () => {
+    // Barbora Vanková to tak robí; „platba až po poplatku" neplatí.
+    expect(poplatkyPoOdrataniPlatieb([po("Barbora Vankova", "2026-09-10", 6990)], [pl("Barbora Vankova", "2026-09-05", 6990)]).otvorene).toHaveLength(0);
+  });
+
+  it("iná suma poplatok nezavrie — predpis nie je odhad", () => {
+    expect(poplatkyPoOdrataniPlatieb([po("Jan Kral", "2026-09-17", 6990)], [pl("Jan Kral", "2026-09-20", 6000)]).otvorene).toHaveLength(1);
+  });
+
+  it("zrušená platba nezavrie nič", () => {
+    const zrusena = { ...pl("Jan Kral", "2026-09-20", 6990), zruseneAt: "2026-09-21" };
+    expect(poplatkyPoOdrataniPlatieb([po("Jan Kral", "2026-09-17", 6990)], [zrusena]).otvorene).toHaveLength(1);
+  });
+
+  it("platba o pol roka neskôr je už iný obchod", () => {
+    expect(poplatkyPoOdrataniPlatieb([po("Jan Kral", "2026-01-17", 6990)], [pl("Jan Kral", "2026-09-20", 6990)]).otvorene).toHaveLength(1);
   });
 });
