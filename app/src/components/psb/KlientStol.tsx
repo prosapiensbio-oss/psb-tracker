@@ -951,6 +951,14 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
           </div>
         )}
 
+        {/* KONTAKT PATRÍ K MENU, NIE DO POZNÁMOK.
+            Jerry, 28. 9. 2026: „potrebujem v profile klienta nájsť niečo ako
+            upraviť profil, pretože Martin Vaško má zlý mail." Úprava
+            existovala — v záložke poznámky, kam sa pri tejto otázke nikto
+            nepozrie. Mail je pritom to, na čo odchádza faktúra aj výpis
+            hodín; keď je zlý, klient nedostane nič a appka o tom nevie. */}
+        <KontaktKlienta meno={meno} />
+
         <button onClick={() => setDetaily(!detaily)} style={{ ...navrhTlacidlo, textAlign: "left" }}>
           {detaily ? "Skryť detaily ▴" : `Ďalších ${dalsichUdajov} údajov ▾`}
         </button>
@@ -1438,7 +1446,6 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
                   narodeniny: c?.narodeniny || "",
                 }}
               />
-              <KontaktKlienta meno={meno} />
               {c?.trainerNote && <Blok nadpis="Poznámka trénera">{c.trainerNote}</Blok>}
               {c?.precoNeprisiel && <Blok nadpis="Prečo po úvodnom neprišiel">{c.precoNeprisiel}</Blok>}
               {c?.duch && <Blok nadpis="Odchod">{c.duch}</Blok>}

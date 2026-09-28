@@ -72,6 +72,17 @@ Stav k **26. 9. 2026**.
   Čaká na Jerryho: stiahnuť z PTmindera kompletný export za celé obdobie.
   Urobiť to treba TAK ČI TAK, kým PTminder beží — po vypnutí sú dáta preč.
 
+- **Tréningy pod balíčkom ignorujú DRUH sedenia.** Jerry, 28. 9. 2026:
+  „prečo má Veronika 2 tréningy na 1 hodinu?" Rozbalenie balíčka berie
+  všetko, čo padne do jeho platnosti — Veronika Stoklasková má „OFF -
+  1 hodina offline" (2. 9. – 29. 9.) a v tom okne dve sedenia: OFFLINE 2. 9.
+  (to je tá hodina) a **ONLINE 16. 9.**, ktoré z offline balíčka čerpať
+  nemôže. Rovnaká slepota je v odpočte hodín. Treba rozhodnúť, čo z čoho
+  čerpá: `session_type` (OFFLINE/ONLINE/UVODNE) verzus názov balíčka
+  („OFF - …" / „ON - …"), a či sa online hodiny platia zvlášť.
+  Súvisí s tým aj to, že balíček na 1 h mal v tom okne dve sedenia — keď
+  ONLINE vypadne, sedí to.
+
 ## 2b · Myšlienková mapa — čo z rešerše zostalo nepostavené
 
 Traja agenti (tester, kontrolór, kritik) prešli mapu 25. 9. 2026 a porovnali
