@@ -2,7 +2,7 @@ import { oznam } from "../../lib/psb/obnovaSignal";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { navrhniKlientaKandidati, type ClientAgg } from "../../lib/psb/compute";
-import { krokGesta, novyStavGesta } from "../../lib/psb/gestoKariet";
+import { krokGesta, koniecSvihu, novyStavGesta, novyStavSvihu, zacniSvih } from "../../lib/psb/gestoKariet";
 import { BEZ_FRONTY, klucPolozky, popisZmeny, postavKarty, trenerZPrihlasenia, type Karta, type NeznamyNazov, type NepriradenaPlatba, type Zmena } from "../../lib/psb/workspaceKarty";
 import { bezAktivnehoBalicka, treningyZObochZdrojov, vMinuseKlienta, type BezBalicka } from "../../lib/psb/bezBalicka";
 import { dlznici as spocitajDlznikov, type Dlznik } from "../../lib/psb/dlznici";
@@ -263,6 +263,8 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
    */
   const kopa = useRef<HTMLDivElement | null>(null);
   const gesto = useRef(novyStavGesta());
+  const svih = useRef(novyStavSvihu());
+  const uzke = useUzke();
   const poistka = useRef(0 as unknown as ReturnType<typeof setTimeout>);
   useEffect(() => {
     const el = kopa.current;
@@ -281,7 +283,34 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
       if (smer) prepni(smer);
     };
     el.addEventListener("wheel", naKoleso, { passive: false });
-    return () => { el.removeEventListener("wheel", naKoleso); clearTimeout(poistka.current); };
+
+    /**
+     * ŤAH PRSTOM. Telefón `wheel` neposiela vôbec, takže bez tohto sa kopa
+     * na mobile dala prepnúť len šípkami — a tie majú 38 px pri okraji.
+     *
+     * Počúva sa `pointer*`, nie `touch*`: to isté obslúži prst, pero aj myš.
+     * `pan-y` v štýle nechá zvislé rolovanie prehliadaču a vodorovné nám,
+     * takže čítanie zoznamu prstom kartu neprepína.
+     */
+    const zac = (e: PointerEvent) => {
+      if (e.pointerType === "mouse") return;
+      zacniSvih(svih.current, e.clientX, e.clientY, e.timeStamp);
+    };
+    const kon = (e: PointerEvent) => {
+      if (e.pointerType === "mouse") return;
+      const smer = koniecSvihu(svih.current, e.clientX, e.clientY, e.timeStamp, window.innerWidth || 375);
+      if (smer) prepni(smer);
+    };
+    el.addEventListener("pointerdown", zac);
+    el.addEventListener("pointerup", kon);
+    el.addEventListener("pointercancel", () => { svih.current.aktivny = false; });
+
+    return () => {
+      el.removeEventListener("wheel", naKoleso);
+      el.removeEventListener("pointerdown", zac);
+      el.removeEventListener("pointerup", kon);
+      clearTimeout(poistka.current);
+    };
   }, [zive.length, prepni]);
 
   const text = (kluc: string, predvolene = "") => texty[kluc] ?? predvolene;
@@ -443,7 +472,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
           + `minHeight: 0` na rolovacom vnútri je jediná dvojica, ktorá vo
           flexe naozaj drží: bez tej nuly sa dieťa odmietne zmenšiť pod svoj
           obsah a `overflow` sa nikdy nezapne. */}
-      <div ref={kopa} style={{ position: "relative", height: "min(72vh, 660px)" }}>
+      <div ref={kopa} style={{ position: "relative", height: "min(72vh, 660px)", touchAction: "pan-y" }}>
         {dalsie.map((d, j) => (
           <div
             key={d.druh}
@@ -475,14 +504,14 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
         {/* Kolotoč: z poslednej karty sa ide na prvú a naopak (Jerry, 23. 9.
             2026). Šípka na konci, ktorá sa nedá stlačiť, je slepá ulička —
             človek musí prejsť celú kopu späť, aby sa dostal o jednu ďalej. */}
-        <button onClick={() => prepni(-1)} aria-label="Predchádzajúca karta" style={bocnaSipka("left", zive.length > 1)}>‹</button>
-        <button onClick={() => prepni(1)} aria-label="Ďalšia karta" style={bocnaSipka("right", zive.length > 1)}>›</button>
+        {!uzke && <button onClick={() => prepni(-1)} aria-label="Predchádzajúca karta" style={bocnaSipka("left", zive.length > 1)}>‹</button>}
+        {!uzke && <button onClick={() => prepni(1)} aria-label="Ďalšia karta" style={bocnaSipka("right", zive.length > 1)}>›</button>}
         {/* Karta má PEVNÚ výšku. Jerry, 23. 9. 2026: „karty musia byť stále
             rovnako veľké, aj keď je tam menej textu, aby miesto na pravej
             a ľavej strane, kde prepínam, bolo stále na tom istom mieste."
             Šípka, ktorá pri každej karte skočí inam, sa hľadá očami — a to je
             presne tá práca navyše, ktorú mala kopa odstrániť. */}
-        <div style={{ position: "relative", zIndex: 1, margin: "0 46px", height: "100%", ...pohybKarty(prechod) }}>
+        <div style={{ position: "relative", zIndex: 1, margin: uzke ? "0 4px" : "0 46px", height: "100%", ...pohybKarty(prechod) }}>
           <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
               <div style={{ fontSize: 18, fontWeight: 800 }}>{k.nadpis}</div>
@@ -678,27 +707,31 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                 if (hotove.has(kluc)) return null;
                 return (
                   <div key={kluc} style={{ ...riadok, flexWrap: "wrap" }}>
-                    <button onClick={() => naStol(x.meno)} style={{ ...vedlajsie, fontSize: 13.5, fontWeight: 600, color: C.text, minWidth: 150, textAlign: "left" }}>
+                    <button onClick={() => naStol(x.meno)} style={{ ...vedlajsie, fontSize: 13.5, fontWeight: 600, color: C.text, minWidth: uzke ? 0 : 150, flex: uzke ? "1 1 auto" : undefined, textAlign: "left" }}>
                       {x.meno}
                     </button>
-                    <div style={{ flex: "1 1 200px", minWidth: 160, fontSize: 11.5, color: C.textMuted }}>
-                      {x.dovod}
-                      {x.membership ? ` · ${x.membership}` : ""}
-                      {x.dovod === "platnosť skončila" && x.platnostDo ? ` ${den(x.platnostDo)}` : ""}
-                    </div>
                     {/* Mínus je hlavné číslo. Jerry, 28. 9. 2026: „mňa skôr
                         bude zaujímať, koľko sú už v mínuse." Objednaný termín
-                        sa dá prehodiť, odtrénovaná hodina bez krytia nie. */}
-                    <div style={{ minWidth: 118, textAlign: "right", fontSize: 11.5, color: C.textDim }}>
+                        sa dá prehodiť, odtrénovaná hodina bez krytia nie.
+                        Na telefóne ide hneď za meno, nech je v prvom riadku. */}
+                    <div style={{ minWidth: uzke ? 0 : 118, textAlign: "right", fontSize: 11.5, color: C.textDim, order: uzke ? 1 : 2 }}>
                       {x.vMinuse > 0
                         ? <span style={{ fontSize: 13.5, fontWeight: 700, color: C.orange }}>−{x.vMinuse} h</span>
                         : <span>na nule</span>}
                       {x.objednanych ? <span style={{ marginLeft: 7 }}>obj. {x.objednanych}</span> : null}
                     </div>
-                    <div style={{ fontSize: 11.5, color: C.textDim, minWidth: 96, textAlign: "right" }}>
-                      {x.dni >= 0 ? `pred ${x.dni} dňami` : "netrénoval"}
+                    <div style={{ flex: uzke ? "1 1 100%" : "1 1 200px", minWidth: uzke ? 0 : 160, fontSize: 11.5, color: C.textMuted, order: 3 }}>
+                      {x.dovod}
+                      {x.membership ? ` · ${x.membership}` : ""}
+                      {x.dovod === "platnosť skončila" && x.platnostDo ? ` ${den(x.platnostDo)}` : ""}
+                      {uzke ? ` · ${x.dni >= 0 ? `pred ${x.dni} dňami` : "netrénoval"}` : ""}
                     </div>
-                    <button onClick={() => oznacHotove(kluc)} style={vedlajsie}>vybavené</button>
+                    {!uzke && (
+                      <div style={{ fontSize: 11.5, color: C.textDim, minWidth: 96, textAlign: "right", order: 4 }}>
+                        {x.dni >= 0 ? `pred ${x.dni} dňami` : "netrénoval"}
+                      </div>
+                    )}
+                    <button onClick={() => oznacHotove(kluc)} style={{ ...vedlajsie, order: 5 }}>vybavené</button>
                   </div>
                 );
               })}
@@ -709,11 +742,11 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                 if (hotove.has(kluc)) return null;
                 return (
                   <div key={kluc} style={{ ...riadok, flexWrap: "wrap" }}>
-                    <button onClick={() => naStol(x.meno)} style={{ ...vedlajsie, fontSize: 13.5, fontWeight: 600, color: C.text, minWidth: 150, textAlign: "left" }}>
+                    <button onClick={() => naStol(x.meno)} style={{ ...vedlajsie, fontSize: 13.5, fontWeight: 600, color: C.text, minWidth: uzke ? 0 : 150, flex: uzke ? "1 1 auto" : undefined, textAlign: "left" }}>
                       {x.meno}
                     </button>
-                    <div style={{ minWidth: 90, fontSize: 13, fontWeight: 700, textAlign: "right", color: C.red }}>{kc(x.spolu)}</div>
-                    <div style={{ flex: "1 1 200px", minWidth: 180, fontSize: 11, color: C.textMuted }}>
+                    <div style={{ minWidth: uzke ? 0 : 90, fontSize: 13, fontWeight: 700, textAlign: "right", color: C.red }}>{kc(x.spolu)}</div>
+                    <div style={{ flex: uzke ? "1 1 100%" : "1 1 200px", minWidth: uzke ? 0 : 180, fontSize: 11, color: C.textMuted }}>
                       {x.polozky.length
                         ? `${den(x.polozky[0].datum)} ${x.polozky[0].popis.slice(0, 40)}${x.polozky.length > 1 ? ` (+${x.polozky.length - 1})` : ""}`
                         : "nezaplatený balíček z Kokpitu"}
@@ -759,6 +792,29 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
       </div>
     </div>
   );
+}
+
+/**
+ * Telefón. Inline štýly médiá nevedia, takže sa to pýta cez `matchMedia`
+ * — rovnako ako dashboard.
+ *
+ * Na 375 px zožierali bočné šípky 92 px zo šírky karty a riadky s
+ * minimálnymi šírkami sa lámali do štyroch riadkov na jedného človeka.
+ * Zo siedmich mien tak bolo vidieť dve a zvyšok sa musel vyrolovať vnútri
+ * karty, o čom sa nedalo tušiť (Jerry, 28. 9. 2026: „nezobrazujú sa mi tam
+ * všetci bez balíčka"). Odkedy sa kopa prepína ťahom prsta, šípky na
+ * telefóne netreba.
+ */
+function useUzke() {
+  const [uzke, setUzke] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 640px)");
+    const pouzi = () => setUzke(mq.matches);
+    pouzi();
+    mq.addEventListener("change", pouzi);
+    return () => mq.removeEventListener("change", pouzi);
+  }, []);
+  return uzke;
 }
 
 const riadok = {

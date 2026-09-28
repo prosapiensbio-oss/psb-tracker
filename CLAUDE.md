@@ -1764,3 +1764,33 @@ klientov bez balíčka a appka dvoch.
 
 **Keď sa harness a appka rozídu, najprv over harness.** Platí to aj pre
 `naostro.sh` — dvakrát sa mýlila kontrola, nie appka.
+
+## Trackpadové gesto nie je dotykové gesto
+
+28. 9. 2026 Jerry: „na telefóne sa mi nedajú jednotlivé karty vo Workspace
+posúvať posunom palca do strany." Nedali sa — `krokGesta` číta `wheel`
+a telefón `wheel` neposiela vôbec. Kopa sa na mobile dala prepnúť len bočnými
+šípkami, ktoré majú 38 px a sedia pri okraji obrazovky.
+
+Ťah prsta rozhoduje `koniecSvihu` v `gestoKariet.ts`, vedľa trackpadu a z toho
+istého dôvodu mimo komponentu. Tri podmienky a každá má svoju príčinu:
+vodorovný ťah musí byť **1,5× väčší než zvislý** (vnútri karty sa roluje
+prstom a šikmý pohyb je pri tom bežný), musí prejsť **aspoň 44 px a najviac
+12 % šírky okna** (krátke šklbnutie býva začiatok rolovania) a musí byť **do
+800 ms** (pomalé ťahanie je označovanie textu). Počúvajú sa `pointer*`, nie
+`touch*` — jedna obsluha pre prst, pero aj myš — a `touch-action: pan-y`
+nechá zvislé rolovanie prehliadaču.
+
+## Inline štýly nevedia médiá, takže na telefón treba `matchMedia`
+
+Tá istá karta, ktorá na monitore vyzerá dobre, mala na 375 px bočné šípky
+zožierajúce 92 px šírky a riadky s `minWidth` 150 + 160 + 118 + 96 px, ktoré
+sa lámali do štyroch riadkov na jedného človeka. Zo siedmich mien tak bolo
+vidieť dve a zvyšok sa musel vyrolovať vnútri karty — o čom sa nedalo tušiť.
+
+Na úzkej obrazovke preto: šípky preč (gesto ich nahradí), okraje 4 px namiesto
+46 a v riadku ide **meno a hlavné číslo do prvého riadku**, zvyšok pod ne ako
+jedna veta. Hook je rovnaký ako `useDashColumns` v Dashboarde.
+
+**Pravidlo:** keď karta pribudne do kopy, pozri sa na ňu aj v šírke telefónu.
+Súčet `minWidth` v jednom riadku je strop, pod ktorý sa layout nezmestí.

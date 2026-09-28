@@ -68,3 +68,53 @@ export function krokGesta(
   g.cakaNaPokoj = true;
   return smer;
 }
+
+/**
+ * ŠVIHNUTIE PRSTOM PO DOTYKOVEJ OBRAZOVKE.
+ *
+ * Jerry, 28. 9. 2026: „na telefóne sa mi nedajú jednotlivé karty vo
+ * Workspace posúvať posunom palca do strany." Nedali — `krokGesta` vyššie
+ * číta `wheel`, a ten telefón neposiela vôbec. Kopa sa tak na mobile dala
+ * prepnúť len šípkami, ktoré majú 38 px a sedia pri okraji.
+ *
+ * Rozhodovanie je tu, mimo komponentu, z toho istého dôvodu ako pri
+ * trackpade: chyba v ňom sa inak nájde až rukou na telefóne.
+ *
+ * TRI PODMIENKY, A KAŽDÁ MÁ SVOJ DÔVOD
+ *
+ *  • Vodorovný ťah musí byť ZRETEĽNE väčší než zvislý. Vnútri karty sa
+ *    roluje prstom a šikmý pohyb pri rolovaní je bežný; bez tohto by sa
+ *    karta prepínala človeku pod rukami, keď si len číta zoznam.
+ *  • Musí prejsť aspoň kus šírky. Krátke šklbnutie býva začiatok rolovania
+ *    alebo nepresný klik na meno klienta.
+ *  • Musí byť rýchle. Pomalé ťahanie je skôr označovanie textu.
+ */
+export type StavSvihu = { x: number; y: number; cas: number; aktivny: boolean };
+
+export const novyStavSvihu = (): StavSvihu => ({ x: 0, y: 0, cas: 0, aktivny: false });
+
+export const zacniSvih = (s: StavSvihu, x: number, y: number, cas: number): void => {
+  s.x = x; s.y = y; s.cas = cas; s.aktivny = true;
+};
+
+/** `1` = ďalšia karta, `-1` = predchádzajúca, `0` = nebolo to švihnutie. */
+export function koniecSvihu(
+  s: StavSvihu,
+  x: number,
+  y: number,
+  cas: number,
+  sirkaOkna: number,
+): 1 | -1 | 0 {
+  if (!s.aktivny) return 0;
+  s.aktivny = false;
+  const dx = x - s.x;
+  const dy = y - s.y;
+  if (cas - s.cas > 800) return 0;
+  if (Math.abs(dx) < Math.abs(dy) * 1.5) return 0;
+  // Na úzkej obrazovke je 12 % šírky ~45 px, na širokej by to bolo priveľa —
+  // preto strop. Spodná hranica drží krátke šklbnutia mimo.
+  const hranica = Math.max(44, Math.min(sirkaOkna * 0.12, 110));
+  if (Math.abs(dx) < hranica) return 0;
+  // Ťah doľava odkrýva to, čo je vpravo — teda ďalšiu kartu.
+  return dx < 0 ? 1 : -1;
+}
