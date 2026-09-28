@@ -262,6 +262,22 @@ export function priebehBalickov(
       let dlh: number | null = null;
       let zostatok: number | null = null;
       if (u.druh === "balicekOd" && u.doplnenie && u.hodin > 0) bezi = (bezi || 0) + u.hodin;
+      /**
+       * MÍNUS SA PLATBOU VYNULUJE.
+       *
+       * Jerry, 28. 9. 2026: „to sa nemá sčítavať naprieč históriou — keď
+       * zaplatí, minusovanie sa vynuluje, a ak zase zaplatí neskoro, ide do
+       * nového mínusu." Richard Matl mal na 28. 9. −3: dva tréningy z augusta
+       * pred platbou (10. a 19. 8., zaplatené 23. 8.) a jeden nad rámec
+       * balíčka. Dva z tých troch boli dávno vyrovnané a číslo tvrdilo, že je
+       * tri hodiny v mínuse, hoci je jednu.
+       *
+       * Počítadlo preto beží po SÉRIÁCH, nie cez celý úsek: vynuluje ho
+       * platba aj tréning, ktorý mal hodinu aj zaplatené. Čísla na starých
+       * riadkoch zostávajú (10. 8. ďalej hovorí −1) — to je fakt o tom dni;
+       * mení sa len to, odkiaľ začína ďalší mínus.
+       */
+      if (u.druh === "platba") dlhPocet = 0;
       // Tréning zadarmo do odpočtu ani do dlhu nevstupuje — je darovaný,
       // takže zaň nemá čo chýbať ani hodina, ani platba.
       if (u.druh === "trening" && u.zdarma === undefined) {
@@ -271,6 +287,7 @@ export function priebehBalickov(
         if (bezi !== null && !vycerpane) zostatok = bezi;
         if (bezi !== null) bezi = Math.max(0, bezi - hodinTreningu(u));
         if (vycerpane || !zaplateneOd || u.den < zaplateneOd) dlh = (dlhPocet += 1);
+        else dlhPocet = 0;
       }
       doUseku.push({ u, po: u.druh === "trening" ? bezi : null });
       stavy.set(u, { zostatok, dlh, usek: b?.den || "" });

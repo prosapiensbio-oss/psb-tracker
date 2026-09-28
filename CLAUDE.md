@@ -1339,11 +1339,21 @@ Z toho vzišiel model odpočtu, ktorý si Jerry vypýtal (`priebehBalickov`):
 - **Dlh (−1, −2, −3) je počet tréningov, ktoré si klient vybral skôr, než zaň
   zaplatil.** Jerry, 27. 9. 2026: „na štvrtý týždeň zaplatila, tak to už len
   pokračuje 15, 14 — a je tam naznačené, že bol rozdiel medzi prvým tréningom
-  a platbou." Značka po zaplatení nezmizne, len sa ďalej nepridáva. Počíta sa
-  tréning na členstve s otvoreným poplatkom, tréning pred platbou zaň, a
-  tréning mimo hodín vyčerpaného členstva. Za platbu členstva sa berie len tá
-  do MESIACA od jeho začiatku — inak by sa ňou stala platba za to ďalšie.
-  Na ostrých dátach to vychádza na 21 % tréningov; Jerry o tom čísle vie.
+  a platbou." Počíta sa tréning na členstve s otvoreným poplatkom, tréning
+  pred platbou zaň, a tréning mimo hodín vyčerpaného členstva. Za platbu
+  členstva sa berie len tá do MESIACA od jeho začiatku — inak by sa ňou stala
+  platba za to ďalšie. Na ostrých dátach to vychádza na 21 % tréningov;
+  Jerry o tom čísle vie.
+- **Mínus sa PLATBOU VYNULUJE — nesčítava sa cez históriu.** Jerry, 28. 9.
+  2026: „keď zaplatí, minusovanie sa vynuluje, a ak zase zaplatí neskoro, ide
+  do nového mínusu." Prvá verzia počítala cez celý úsek členstva, takže
+  Richard Matl mal na 28. 9. **−3**: dva tréningy z augusta pred platbou
+  (10. a 19. 8., zaplatené 23. 8.) plus jeden nad rámec balíčka. Dva z nich
+  boli mesiac vyrovnané a číslo tvrdilo tri hodiny v mínuse namiesto jednej.
+  Počítadlo beží po SÉRIÁCH: vynuluje ho platba aj tréning, ktorý mal hodinu
+  aj zaplatené. Čísla na starých riadkoch zostávajú — sú to fakty o tých
+  dňoch; mení sa len to, odkiaľ začína ďalší mínus. Vynulovanie pritom nie je
+  strop: druhá séria bez hodín zase rastie −1, −2.
 - **Platba nemá vedľa seba odpočet.** Hodiny nemení a číslo by len opakovalo
   riadok nad ňou.
 - **Pri dátume je deň v týždni** — klient pozná „streda", nie „23. 9.". Pri

@@ -79,6 +79,38 @@ describe("dlh — tréning na nezaplatenom členstve", () => {
     ]);
   });
 
+  it("platba mínus vynuluje — ďalší začína od jednotky", () => {
+    // Richard Matl: balíček 6 h z 10. 8., dva tréningy pred platbou (23. 8.),
+    // štyri po nej, a 28. 9. siedmy tréning na balíček, ktorý už nemá hodiny.
+    // Pred opravou to bolo −3, lebo sa mínusy sčítavali cez celý úsek.
+    const os: Udalost[] = [
+      bal("2026-08-10", 6), tre("2026-08-10"), tre("2026-08-19"), pla("2026-08-23", 7790),
+      tre("2026-08-27"), tre("2026-09-02"), tre("2026-09-07"), tre("2026-09-23"), tre("2026-09-28"),
+    ];
+    const v = vypisHodin(os, "", "2026-09-28", 0);
+    const podla = new Map(v.riadky.filter((r) => r.druh === "trening").map((r) => [r.den, r]));
+    expect(podla.get("2026-08-10")!.dlh).toBe(1);
+    expect(podla.get("2026-08-19")!.dlh).toBe(2);
+    expect(podla.get("2026-08-27")!.dlh).toBeNull();
+    expect(podla.get("2026-09-23")!.zostatok).toBe(1);
+    expect(podla.get("2026-09-28")!.dlh).toBe(1);
+  });
+
+  it("dva mínusy za sebou v tom istom členstve rastú", () => {
+    // Vynulovanie je udalosť, nie strop: kto po platbe znova trénuje bez
+    // hodín, ide −1, −2 — inak by sa druhá séria nikdy nepohla z jednotky.
+    const os: Udalost[] = [
+      bal("2026-08-10", 2), tre("2026-08-10"), pla("2026-08-12", 2600),
+      tre("2026-08-20"), tre("2026-08-27"), tre("2026-09-03"),
+    ];
+    const v = vypisHodin(os, "", DNES, 0);
+    const podla = new Map(v.riadky.filter((r) => r.druh === "trening").map((r) => [r.den, r]));
+    expect(podla.get("2026-08-10")!.dlh).toBe(1);
+    expect(podla.get("2026-08-20")!.dlh).toBeNull();
+    expect(podla.get("2026-08-27")!.dlh).toBe(1);
+    expect(podla.get("2026-09-03")!.dlh).toBe(2);
+  });
+
   it("vyčerpané členstvo bez nového = ďalšie tréningy na dlh", () => {
     const os: Udalost[] = [bal("2026-09-02", 2), tre("2026-09-05"), tre("2026-09-12"), tre("2026-09-19"), tre("2026-09-26")];
     const v = vypisHodin(os, "", DNES, 0);
