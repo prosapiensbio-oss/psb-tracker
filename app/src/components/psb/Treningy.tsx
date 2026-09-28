@@ -5,10 +5,11 @@ import { fetchWeekEntries, saveWeekEntry, type WeekEntry } from "../../lib/psb/c
 import { groupTrainings, periodInfo, kotvaDat, periodZone, sessionAnalysis, TARGET_H, type ClientAgg, type Period, type PeriodRow } from "../../lib/psb/compute";
 import { fmtCZK, monthLabel, weekKey, weekLabel } from "../../lib/psb/format";
 import { C, mix, S } from "../../lib/psb/theme";
-import type { PSBData } from "../../lib/psb/types";
+import type { PSBData, SessionRow } from "../../lib/psb/types";
 import type { NavFocus } from "./App";
+import { rozborUvodnych } from "../../lib/psb/uvodneTreningy";
 import { SessionTrend } from "./SessionTrend";
-import { Card, Donut, Empty, H3, Info, LineChart, Select, SortTh, StatCard, SubTabs, TableWrap, Toolbar, TrenerPills, useSort } from "./ui";
+import { Card, Donut, Empty, H3, Info, LineChart, Select, SortTh, StatCard, StatGrid, SubTabs, TableWrap, Toolbar, TrenerPills, useSort } from "./ui";
 
 const PEOPLE = [
   { key: "jerry", label: "Jerry" },
@@ -540,6 +541,81 @@ const WINDOWS = [
   { value: "custom", label: "Vlastné", days: -1 },
 ];
 
+
+/** Farby trénerov sú tie isté ako v grafe odrobených hodín — ten istý človek
+ *  nemá mať na dvoch obrazovkách dve farby. */
+const FARBA_TRENERA: Record<string, string> = { Jerry: C.accent, Terezka: C.accentLight };
+const farbaTrenera = (meno: string, i: number) => FARBA_TRENERA[meno] || [C.orange, C.blue, C.green][i % 3];
+
+/**
+ * KTO VEDIE ÚVODNÉ TRÉNINGY.
+ *
+ * Úvodný je jediné sedenie, po ktorom sa klient rozhodne, či zostane — komu
+ * padajú, je otázka o tom, kto firme robí nových klientov, nie o rozpise.
+ *
+ * Grafy sú dva zámerne. Kĺzavý podiel odpovedá na „aký je pomer" a mesačné
+ * počty na „koľko ich vôbec bolo" — pri troch úvodných za mesiac je 100 %
+ * podiel jeden človek a bez druhého grafu by to vyzeralo ako trend.
+ */
+function UvodneKtoVedie({ sessions }: { sessions: SessionRow[] }) {
+  const r = useMemo(() => rozborUvodnych(sessions), [sessions]);
+
+  const grafPodiel = useMemo(
+    () => r.klzave.map((b) => ({ label: monthLabel(b.mesiac), values: r.treneri.map((t) => b.podiel[t.trener] || 0) })),
+    [r],
+  );
+  const grafPocty = useMemo(
+    () => r.mesiace.map((m) => ({ label: monthLabel(m.mesiac), values: r.treneri.map((t) => m.podla[t.trener] || 0) })),
+    [r],
+  );
+  const serie = r.treneri.map((t, i) => ({ name: t.trener, color: farbaTrenera(t.trener, i) }));
+
+  return (
+    <Card>
+      <H3>
+        <Info
+          text="Úvodné tréningy podľa toho, kto ich viedol. Podiel sa počíta z kĺzavého okna šiestich mesiacov — mesačne ich býva okolo troch a jeden človek by krivkou hádzal zo 100 % na nulu."
+          label="Kto vedie úvodné tréningy"
+        />
+      </H3>
+      {!r.celkom ? (
+        <Empty>V tomto období nebol žiadny úvodný tréning.</Empty>
+      ) : (
+        <>
+          <StatGrid>
+            {r.treneri.map((t, i) => (
+              <StatCard
+                key={t.trener}
+                value={`${Math.round(t.podiel)} %`}
+                label={`${t.trener} · ${t.pocet} z ${r.celkom}`}
+                color={farbaTrenera(t.trener, i)}
+              />
+            ))}
+          </StatGrid>
+          <div style={{ fontSize: 12, color: C.textDim, margin: "12px 0 4px" }}>
+            Podiel na úvodných — kĺzavých 6 mesiacov
+          </div>
+          <LineChart
+            data={grafPodiel}
+            series={serie}
+            refLine={{ value: 50, label: "polovica", color: C.textDim }}
+            fmt={(n) => `${Math.round(n)} %`}
+            bezSuhrnu
+            height={190}
+          />
+          <div style={{ fontSize: 12, color: C.textDim, margin: "14px 0 4px" }}>
+            Koľko ich v mesiaci vôbec bolo
+          </div>
+          <LineChart data={grafPocty} series={serie} bezSuhrnu height={150} />
+          <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 10 }}>
+            Prepínač trénera hore sa tejto karty netýka — pomer má zmysel len vtedy, keď sú v ňom všetci.
+          </div>
+        </>
+      )}
+    </Card>
+  );
+}
+
 function Analyza({ data }: { data: PSBData }) {
   const [trainerF, setTrainerF] = useState("all");
   const [win, setWin] = useState("all");
@@ -548,7 +624,7 @@ function Analyza({ data }: { data: PSBData }) {
   // Najnovší mesiac hore, rovnako ako v ostatných mesačných tabuľkách.
   const { sort, toggle, sorted } = useSort({ key: "month", dir: "desc" });
 
-  const filtered = useMemo(() => {
+  const vObdobi = useMemo(() => {
     let lo = 0;
     let hi = Infinity;
     if (win === "custom") {
@@ -563,11 +639,22 @@ function Analyza({ data }: { data: PSBData }) {
       if (days > 0) lo = Date.now() - days * 86400000;
     }
     return data.sessions.filter((s) => {
-      if (trainerF !== "all" && s.sessionTrainer !== trainerF) return false;
       const t = new Date(s.date).getTime();
       return t >= lo && t <= hi;
     });
-  }, [data.sessions, trainerF, win, from, to]);
+  }, [data.sessions, win, from, to]);
+
+  /**
+   * Prepínač trénera sa na obdobie nasadzuje AŽ TU.
+   *
+   * Karta „Kto vedie úvodné" musí vidieť oboch — pomer jedného trénera voči
+   * sebe samému je vždy 100 % a graf by ticho klamal. Preto pracuje s
+   * `vObdobi` a filter podľa trénera sa jej netýka.
+   */
+  const filtered = useMemo(
+    () => (trainerF === "all" ? vObdobi : vObdobi.filter((s) => s.sessionTrainer === trainerF)),
+    [vObdobi, trainerF],
+  );
 
   const donut = useMemo(() => {
     let off = 0, onTc = 0, uvod = 0;
@@ -615,6 +702,8 @@ function Analyza({ data }: { data: PSBData }) {
         </div>
         {filtered.length ? <Donut data={donut} size={160} centerLabel={String(filtered.length)} /> : <Empty>Žiadne sedenia pre tento filter.</Empty>}
       </Card>
+
+      <UvodneKtoVedie sessions={vObdobi} />
 
       <SessionTrend sessions={filtered} />
 

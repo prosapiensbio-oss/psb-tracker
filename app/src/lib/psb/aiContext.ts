@@ -43,6 +43,7 @@ import {
   poUvodnomNikdy,
   jeKlient,
 } from "./compute";
+import { rozborUvodnych } from "./uvodneTreningy";
 import { monthLabel, normName, weekKey, weekLabel } from "./format";
 import type { PorovnanieDochadzky } from "./porovnanieDochadzky";
 import type { PSBData } from "./types";
@@ -236,6 +237,10 @@ export function buildAiContext(
   // ── Session trend ──
   const trendRaw = sessionAnalysisPSB(data.sessions);
   const trend = trendRaw.map((m) => ({ mesiac: monthLabel(m.month), celkovo: m.total, offline: m.offline, online: m.onlineTc, uvodne: m.uvodne, ...(m.month === kotva.mesiac && kotva.ciastocny ? { rozrobeny: true } : {}) }));
+  // Kto vedie úvodné — to isté číslo, aké ukazuje karta vo Firme → Tréningy →
+  // Analýza sedení. Bez tohto kľúča by si Jarvis pomer počítal zo `sessions`
+  // sám a odpovedal inak než obrazovka.
+  const uvodne = rozborUvodnych(data.sessions);
   const trendPlne = trendRaw.filter((m) => !kotva.plny || m.month <= kotva.plny);
   const trendAvg = trendPlne.length ? r1(trendPlne.reduce((a, b) => a + b.total, 0) / trendPlne.length) : 0;
 
@@ -1015,6 +1020,12 @@ export function buildAiContext(
       odhad3mes: { optimisticky: r0(cashSum("hi")), realisticky: r0(cashSum("expected")), negativny: r0(cashSum("lo")), mesacnyRunRate: r0(pred.monthlyRunRate) },
     },
     sedeniaTrend: { mesacne: trend, priemerMesacne: trendAvg, poznamka: "Ø len z plných mesiacov (rozrobený vynechaný)." },
+    uvodneKtoVedie: {
+      spolu: uvodne.celkom,
+      treneri: uvodne.treneri.map((t) => ({ trener: t.trener, pocet: t.pocet, podielPct: r0(t.podiel) })),
+      mesacne: uvodne.mesiace.map((m) => ({ mesiac: monthLabel(m.mesiac), podla: m.podla, celkom: m.celkom })),
+      poznamka: "Kto viedol úvodné tréningy za celú históriu — to isté číslo, aké ukazuje karta „Kto vedie úvodné tréningy“ vo Firme → Tréningy → Analýza sedení. Na otázku „koľko % úvodných robí Jerry / Terezka“ prečítaj podielPct ODTIAĽTO a nepočítaj si to zo sessions. Úvodných je okolo troch za mesiac, takže mesačný podiel nič neznamená — obrazovka ho preto kreslí z kĺzavého okna šiestich mesiacov a ty rovnako nerob závery z jedného mesiaca.",
+    },
     tempo: { priemerSedeniMes: tempoAvg, poznamka: "Priemerný počet sedení klienta za mesiac (z histórie)." },
     doveraObnovy: { priemerPct: confAvg, poznamka: "Priemerná pravdepodobnosť obnovy naprieč klientmi, vážená segmentom." },
     klienti: {
