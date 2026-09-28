@@ -2251,6 +2251,24 @@ function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar }: { i
   // Návrh na priradenie názvu z kalendára — jeden klik namiesto otvárania
   // Kalendára (Jerry, 3. 9. 2026).
   const [navrhStav, setNavrhStav] = useState<"" | "uklada" | "chyba">("");
+  /** Ktorá možnosť sa práve zapisuje; `chyba:<popis>` = tá neprešla. */
+  const [akciaStav, setAkciaStav] = useState("");
+  /**
+   * Jedna možnosť z notifikácie. Keď nesie balíček, hodiny sa najprv zapíšu
+   * a až potom sa odpovie — inak by zlyhaný zápis zostal umlčaný upozornením
+   * a hodiny by nikde neboli.
+   */
+  const spravAkciu = async (a: NonNullable<RegisterItem["akcie"]>[number]) => {
+    setAkciaStav(a.popis);
+    if (a.balicek) {
+      const ok = await actions.dopisHodiny(
+        a.balicek.klient, a.balicek.nazov, a.balicek.hodiny, a.balicek.platnostOd, a.poznamka,
+      ).catch(() => false);
+      if (!ok) { setAkciaStav(`chyba:${a.popis}`); return; }
+    }
+    actions.ackAnomaly(item.key, a.poznamka, true);
+    setAkciaStav("");
+  };
   const potvrdNavrh = async () => {
     if (!item.navrh) return;
     setNavrhStav("uklada");
@@ -2557,6 +2575,20 @@ function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar }: { i
               {navrhStav === "uklada" ? "Priradzujem…" : navrhStav === "chyba" ? "Skús znova" : `Áno, ${item.navrh.klient.split(" ")[0]}`}
             </button>
           )}
+          {/* MOŽNOSTI PRIAMO TU, NIE V TEXTE.
+              Jerry, 28. 9. 2026: „daj do notifikácií rovno možnosť namiesto
+              pýtania sa." Upozornenie, ktoré vymenuje, čo sa dá urobiť, a
+              potom pošle človeka urobiť to inam, je polovičná odpoveď. */}
+          {!item.acked && (item.akcie || []).map((a) => (
+            <button
+              key={a.popis}
+              onClick={() => void spravAkciu(a)}
+              disabled={akciaStav === a.popis}
+              style={{ ...linkBtn, color: akciaStav === `chyba:${a.popis}` ? C.red : a.balicek ? C.green : C.textMuted }}
+            >
+              {akciaStav === a.popis ? "…" : akciaStav === `chyba:${a.popis}` ? "skús znova" : a.popis}
+            </button>
+          ))}
           {!item.acked && !jeRozhodnutie && !jeTema && <button onClick={openItem} style={linkBtn}>{item.navrh ? "Nie, otvoriť" : "Otvoriť →"}</button>}
           {/* Téma nemá „Otvoriť" — namiesto toho pošle dnešnú tému Jarvisovi
               a nechá ho napísať konkrétny hook a záver v PSB štýle (Jerry,

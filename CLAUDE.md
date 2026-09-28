@@ -1834,6 +1834,15 @@ Tri východiská sú jeho, nie appkine (`platnostZostatok.ts`):
   pred ním sa dá aj niečo odtrénovať — a to je lacnejšie pre oboch.
 - **Kľúč nesie deň konca platnosti** (`platnost|meno|deň`): nové členstvo je
   nová otázka, ale to isté sa nepýta každý deň znova.
+- **MOŽNOSTI PATRIA MEDZI TLAČIDLÁ, NIE DO TEXTU.** Prvá verzia mala vo vete
+  „— nechať prepadnúť, alebo dopísať ako doplnenie a nechať ho to odtrénovať".
+  Jerry: „toto sa nepýtaj a daj to dole medzi možnosti." Upozornenie, ktoré
+  vymenuje, čo sa dá urobiť, a potom pošle človeka urobiť to inam, je
+  polovičná odpoveď. Veta hovorí STAV, tlačidlá ponúkajú ROZHODNUTIE.
+  Register na to má `RegisterItem.akcie` — zoznam možností s nepovinným
+  balíčkom; bez neho sa len zapíše odpoveď, s ním sa najprv dopíšu hodiny.
+  Je to všeobecný mechanizmus, nie jednorazovka: ďalšie upozornenie s
+  konečným počtom východísk ho vie použiť tiež.
 - **Odpoveď sa MUSÍ zapísať do `anomaly_ack`, nielen schovať riadok.**
   Notifikácia sa riadi zostatkom z PTmindera a ten sa dopísaním doplnenia
   nezmení — bez `ack` by sa upozornenie zajtra vrátilo, hoci Jerry odpovedal.
@@ -1841,3 +1850,20 @@ Tri východiská sú jeho, nie appkine (`platnostZostatok.ts`):
 
 Stav pri spustení: 7 klientov, z toho 5 po platnosti (Regina Obrovská 5 h,
 20 dní) a 2 pred ňou.
+
+
+## Filter trénera musí platiť na CELÝ zoznam, nie na jeho časť
+
+Karta „Balíček dojde" filtrovala podľa trénera len v slučke, ktorá dopĺňa
+ľudí bez termínu v kalendári. Kým sa zoznam staval z `udalosti`, stačilo to —
+tie prichádzajú už prefiltrované podľa trénera udalosti. 28. 9. 2026 k nim
+pribudol rad `buduce` (objednané termíny na štyri mesiace), ktorý nesie len
+klienta a deň, žiadneho trénera, a keď je neprázdny, `udalosti` NAHRÁDZA.
+Filter tým ticho prestal platiť a Jerry videl pod svojím menom Terezkiných
+klientov.
+
+**Keď pribudne nový zdroj do zoznamu, over, čo z neho vypadne** — najmä
+filtre, ktoré visia na poliach, ktoré nový zdroj nemá. A filter patrí na
+KONIEC, k hotovému riadku, nie do jednej z vetiev, ktorými riadky vznikajú.
+Rozhoduje pritom primárny tréner KLIENTA, nie trénera udalosti: karta je
+o tom, komu predať ďalší balíček, a to je vec toho, kto ho vedie.

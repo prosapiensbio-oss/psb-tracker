@@ -119,6 +119,14 @@ export type Actions = {
   zapisZrusenie: (klient: string, datum: string, poznamka: string) => Promise<void>;
   /** Priradí názov z kalendára klientovi (alebo typu) — potvrdenie návrhu z notifikácie. */
   mapujKalendar: (nazov: string, trener: string, typ: string, klient: string | null) => Promise<void>;
+  /**
+   * Dopíše klientovi hodiny ako ručný balíček — z ktorejkoľvek obrazovky.
+   *
+   * Jerry, 28. 9. 2026 pri končiacej platnosti: „daj do notifikácií rovno
+   * možnosť namiesto pýtania sa." Notifikácia, ktorá vymenuje, čo sa dá
+   * urobiť, a potom pošle človeka urobiť to inam, je polovičná odpoveď.
+   */
+  dopisHodiny: (klient: string, nazov: string, hodiny: number, platnostOd: string, poznamka: string) => Promise<boolean>;
 };
 
 // Deep-link from Dashboard click-throughs: focus one week (Tréningy → Prehľad) or one month (Financie → Zárobky).
@@ -2417,6 +2425,21 @@ function skupinaFaktur(
         // zmizne sama, lebo názov už appka pozná.
         const j = await fetch("/api/kalendar", { credentials: "same-origin" }).then((r) => r.json()).catch(() => null);
         if (j?.ok && Array.isArray(j.udalosti)) setKalUdalosti(j.udalosti);
+      },
+      dopisHodiny: async (klient, nazov, hodiny, platnostOd, poznamka) => {
+        // Tá istá akcia ako ručný zápis balíčka v profile klienta —
+        // jeden zápis, jedno miesto. Cena je nula: tieto hodiny klient
+        // zaplatil už v pôvodnom členstve.
+        const r = await fetch("/api/balicky", {
+          method: "POST", credentials: "same-origin",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ akcia: "pridaj", klient, nazov, hodiny, platnostOd, cenaCzk: 0, poznamka }),
+        }).then((x) => x.json()).catch(() => null);
+        if (!r?.ok) return false;
+        // Balíček mení zostatok aj peniaze — bez tohto by obrazovky držali staré.
+        const j = await fetch("/api/balicky", { credentials: "same-origin" }).then((x) => x.json()).catch(() => null);
+        if (j?.ok) setBalickyRiadky(j.balicky || []);
+        return true;
       },
       obnovKalendar: async () => {
         // Sťahovanie je ZÁPIS (kal_udalosti/kal_zmeny). Prehltnutá chyba

@@ -1,7 +1,7 @@
 // All derived analytics for the PSB Tracker. Pure functions over PSBData —
 // no browser globals. Reused across every module.
 import { daysBetween, fmtDMY, monthKey, monthLabel, monthsBetween, normName, quarterKey, quarterLabel, weekKey, weekLabel } from "./format";
-import { vetaPlatnosti, zostavaPoPlatnosti } from "./platnostZostatok";
+import { moznostiPlatnosti, vetaPlatnosti, zostavaPoPlatnosti } from "./platnostZostatok";
 import { menoZNazvuUvodneho } from "./kalendar";
 import { bezDuplicitBalickov, hodinZNazvuBalicka } from "./klientOsCasu";
 import { vlastnikKlienta } from "./zaskok";
@@ -1219,6 +1219,8 @@ export type Anomaly = {
   acked: boolean;
   note?: string;
   client?: string; // the client this item is about (for click-through to Klienti)
+  /** Možnosti na jeden klik — viď `RegisterItem["akcie"]`. */
+  akcie?: RegisterItem["akcie"];
 };
 
 // Odpoveď na otázku „je toto duch?" sa ukladá s dátumom ("ano|2026-08-03").
@@ -1849,8 +1851,8 @@ export function deriveAnomalies(
 ): Anomaly[] {
   const out: Anomaly[] = [];
   const ack = data.anomalyAck || {};
-  const push = (key: string, tone: Anomaly["tone"], label: string, detail: string, client?: string) =>
-    out.push({ key, tone, label, detail, acked: !!ack[key], note: ack[key]?.note, client });
+  const push = (key: string, tone: Anomaly["tone"], label: string, detail: string, client?: string, akcie?: Anomaly["akcie"]) =>
+    out.push({ key, tone, label, detail, acked: !!ack[key], note: ack[key]?.note, client, akcie });
 
   const serviceClients = new Set(data.services.map((s) => s.client));
   const now = new Date();
@@ -1968,7 +1970,7 @@ export function deriveAnomalies(
      */
     for (const x of zostavaPoPlatnosti([c], dnesISO)) {
       push(`platnost|${c.name}|${x.platnostDo}`, x.dni >= 0 ? "orange" : "blue",
-        "Platnosť končí, hodiny zostávajú", vetaPlatnosti(x), c.name);
+        "Platnosť končí, hodiny zostávajú", vetaPlatnosti(x), c.name, moznostiPlatnosti(x));
     }
 
     // "Duch": kúpi balíček, odchodí pár hodín a prestane chodiť AJ odpisovať.
@@ -2526,6 +2528,23 @@ export type RegisterItem = {
    * potom nemá „choď to niekam vybaviť", ale „Priradiť X → Y?" s potvrdením.
    */
   navrh?: { nazov: string; trener: string; typ: string; klient: string };
+  /**
+   * MOŽNOSTI NA JEDEN KLIK PRIAMO V NOTIFIKÁCII.
+   *
+   * Jerry, 28. 9. 2026: „vidím, že môžeš dať do notifikácií rovno možnosť
+   * namiesto pýtania sa." Mal pravdu — upozornenie, ktoré vymenuje, čo sa dá
+   * urobiť, a potom pošle človeka urobiť to inam, je polovičná odpoveď. Veta
+   * sa preto skrátila a možnosti zostúpili medzi tlačidlá.
+   *
+   * `balicek` je nepovinný: možnosť bez neho iba zapíše odpoveď („prepadlo"),
+   * s ním sa klientovi najprv dopíšu hodiny.
+   */
+  akcie?: {
+    popis: string;
+    /** Čo sa zapíše ako odpoveď na upozornenie. */
+    poznamka: string;
+    balicek?: { klient: string; nazov: string; hodiny: number; platnostOd: string };
+  }[];
 };
 
 /**
@@ -2693,7 +2712,7 @@ export function deriveRegister(
     client?: string,
     rodina?: string,
     /** Komu položka patrí, keď to z klienta nevyplýva — filter podľa trénera. */
-    kto?: { trener?: string | null; oKom?: string; navrh?: RegisterItem["navrh"] },
+    kto?: { trener?: string | null; oKom?: string; navrh?: RegisterItem["navrh"]; akcie?: RegisterItem["akcie"] },
   ) =>
     items.push({
       key,
@@ -2706,6 +2725,7 @@ export function deriveRegister(
       trener: kto?.trener || undefined,
       oKom: kto?.oKom,
       navrh: kto?.navrh,
+      akcie: kto?.akcie,
       // Umlčanie AJ odloženie sa počítajú tu, nie v komponente: register čítajú
       // tri miesta (Kokpit, Jarvisov kontext, mesačná správa) a musia platiť
       // vo všetkých rovnako.
@@ -2962,7 +2982,8 @@ export function deriveRegister(
 
   for (const a of deriveAnomalies(data, clients, kal)) {
     // Záver z debaty nie je anomália — je to sľub, ktorý si sám pripomenul.
-    add(a.key, a.key.startsWith("zaver|") ? "Rozhodnutie" : "Anomália", a.tone, a.label, a.detail, 20, a.client);
+    add(a.key, a.key.startsWith("zaver|") ? "Rozhodnutie" : "Anomália", a.tone, a.label, a.detail, 20, a.client,
+      undefined, a.akcie ? { akcie: a.akcie } : undefined);
   }
 
   return items.sort((a, b) => {

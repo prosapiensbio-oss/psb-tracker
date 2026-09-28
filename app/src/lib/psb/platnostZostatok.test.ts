@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { vetaPlatnosti, zostavaPoPlatnosti, type KlientPlatnost } from "./platnostZostatok";
+import { moznostiPlatnosti, vetaPlatnosti, zostavaPoPlatnosti, type KlientPlatnost } from "./platnostZostatok";
 
 const DNES = "2026-09-28";
 
@@ -72,10 +72,28 @@ describe("vetaPlatnosti", () => {
     expect(vetaPlatnosti(v)).toContain("platnosť končí o 3 dni");
   });
 
-  it("predplatnému ponúkne aj presun, balíčku nie", () => {
+  it("možnosti vo vete NIE SÚ — tie patria medzi tlačidlá", () => {
+    // Jerry, 28. 9. 2026: „toto sa nepýtaj a daj to dole medzi možnosti."
+    const v = zostavaPoPlatnosti([kl({ name: "A" })], DNES)[0];
+    expect(vetaPlatnosti(v)).not.toContain("prepadnúť");
+    expect(vetaPlatnosti(v)).not.toContain("doplnenie");
+  });
+});
+
+describe("moznostiPlatnosti", () => {
+  it("balíček má dve možnosti, predplatné tri", () => {
     const b = zostavaPoPlatnosti([kl({ name: "A" })], DNES)[0];
     const p = zostavaPoPlatnosti([kl({ name: "B", clientType: "6M Predplatné" })], DNES)[0];
-    expect(vetaPlatnosti(b)).not.toContain("preniesť");
-    expect(vetaPlatnosti(p)).toContain("preniesť 2 h");
+    expect(moznostiPlatnosti(b).map((x) => x.popis)).toEqual(["nechať prepadnúť", "dopísať 2 h ako doplnenie"]);
+    expect(moznostiPlatnosti(p).map((x) => x.popis)).toContain("preniesť 2 h do ďalšieho");
+  });
+
+  it("prepadnutie nič nezapisuje, ostatné dopisujú hodiny", () => {
+    const p = zostavaPoPlatnosti([kl({ name: "B", clientType: "6M Predplatné", packageRemaining: 5 })], DNES)[0];
+    const m = moznostiPlatnosti(p);
+    expect(m[0].balicek).toBeUndefined();
+    expect(m[1].balicek).toMatchObject({ klient: "B", nazov: "Doplnenie členstva", hodiny: 5, platnostOd: "2026-09-26" });
+    // Preniesť sa smú najviac dve, aj keď zostáva päť.
+    expect(m[2].balicek).toMatchObject({ nazov: "Prenesené hodiny", hodiny: 2 });
   });
 });

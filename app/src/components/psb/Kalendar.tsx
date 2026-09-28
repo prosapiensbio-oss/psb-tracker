@@ -1688,6 +1688,22 @@ export function Balicky({ udalosti, buduce = [], clients, sedenia = [], onObnov,
       .map(([meno, kusov]) => {
         const c = clients[meno];
         if (!c || c.packageTotal == null || c.packageRemaining == null) return null;
+        /**
+         * FILTER TRÉNERA PLATÍ PRE CELÝ ZOZNAM, NIE LEN PRE DOPLNENÝCH.
+         *
+         * Dovtedy stál len o pár riadkov vyššie, v slučke, ktorá dopĺňa ľudí
+         * bez termínu v kalendári. Kým sa zoznam staval z `udalosti`, stačilo
+         * to: tie sa filtrovali podľa trénera udalosti ešte pred vstupom.
+         * 28. 9. 2026 pribudol rad `buduce` (termíny na štyri mesiace) — ten
+         * nesie len klienta a deň, žiadneho trénera — a keď je neprázdny,
+         * `udalosti` NAHRÁDZA. Tým filter ticho prestal platiť a Jerry videl
+         * pod svojím menom Terezkiných klientov.
+         *
+         * Rozhoduje primárny tréner KLIENTA, nie trénera udalosti: karta je
+         * o tom, komu treba predať ďalší balíček, a to je vec toho, kto ho
+         * vedie — aj keď konkrétnu hodinu odtrénoval niekto iný.
+         */
+        if (matchTrener && !matchTrener(c.primaryTrainer)) return null;
         // Kto má len „doplnenie členstva" alebo „za protokol", nemá balíček —
         // má paušál a v exporte stojí navždy na 0/N. Tvrdiť mu, že mu dochádzajú
         // hodiny, je nepravda o produkte, ktorý si kúpil; presne táto zámena

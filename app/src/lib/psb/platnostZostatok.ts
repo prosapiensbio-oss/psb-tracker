@@ -88,13 +88,47 @@ export function zostavaPoPlatnosti(
   return out.sort((a, b) => b.hodin - a.hodin || b.dni - a.dni || a.meno.localeCompare(b.meno));
 }
 
-/** Veta do notifikácie — to, čo sa má dať prečítať bez otvárania appky. */
+/**
+ * Veta do notifikácie — to, čo sa má dať prečítať bez otvárania appky.
+ *
+ * MOŽNOSTI V NEJ NIE SÚ. Jerry, 28. 9. 2026: „toto sa nepýtaj a daj to dole
+ * medzi možnosti." Vymenovať v texte, čo sa dá urobiť, a potom poslať človeka
+ * urobiť to inam, je polovičná odpoveď; veta hovorí STAV, tlačidlá ponúkajú
+ * rozhodnutie (`moznostiPlatnosti`).
+ */
 export function vetaPlatnosti(x: ZostavaPoPlatnosti): string {
   const kedy = x.dni < 0
     ? `platnosť končí o ${-x.dni} ${-x.dni === 1 ? "deň" : -x.dni < 5 ? "dni" : "dní"}`
     : x.dni === 0 ? "platnosť skončila dnes" : `platnosť skončila pred ${x.dni} dňami`;
-  const moznosti = x.predplatne
-    ? `nechať prepadnúť, dopísať ako doplnenie, alebo preniesť ${x.presunHodin} h do ďalšieho balíčka`
-    : "nechať prepadnúť, alebo dopísať ako doplnenie a nechať ho to odtrénovať";
-  return `${x.meno}: ${kedy} (${x.membership}) a zostáva ${x.hodin} h — ${moznosti}`;
+  return `${x.meno}: ${kedy} (${x.membership}) a zostáva ${x.hodin} h.`;
+}
+
+/**
+ * Tri Jerryho východiská ako tlačidlá pod upozornením.
+ *
+ * „Prepadlo" iba zapíše odpoveď. Ostatné dve hodiny naozaj dopíšu ako ručný
+ * balíček — inak by sa upozornenie zajtra vrátilo, lebo zostatok z PTmindera
+ * sa rozhodnutím nemení.
+ */
+export function moznostiPlatnosti(x: ZostavaPoPlatnosti): {
+  popis: string;
+  poznamka: string;
+  balicek?: { klient: string; nazov: string; hodiny: number; platnostOd: string };
+}[] {
+  const out = [
+    { popis: "nechať prepadnúť", poznamka: `${x.hodin} h prepadlo — platnosť skončila ${x.platnostDo}` },
+    {
+      popis: `dopísať ${x.hodin} h ako doplnenie`,
+      poznamka: `nedočerpané hodiny z členstva do ${x.platnostDo} — odtrénuje ich nad rámec platnosti`,
+      balicek: { klient: x.meno, nazov: "Doplnenie členstva", hodiny: x.hodin, platnostOd: x.platnostDo },
+    },
+  ];
+  if (x.predplatne) {
+    out.push({
+      popis: `preniesť ${x.presunHodin} h do ďalšieho`,
+      poznamka: `presun z členstva do ${x.platnostDo} (najviac 2 h, zvyšok prepadá)`,
+      balicek: { klient: x.meno, nazov: "Prenesené hodiny", hodiny: x.presunHodin, platnostOd: x.platnostDo },
+    });
+  }
+  return out;
 }
