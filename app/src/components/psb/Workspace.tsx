@@ -4,6 +4,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { navrhniKlientaKandidati, type ClientAgg } from "../../lib/psb/compute";
 import { krokGesta, novyStavGesta } from "../../lib/psb/gestoKariet";
 import { BEZ_FRONTY, klucPolozky, popisZmeny, postavKarty, trenerZPrihlasenia, type Karta, type NeznamyNazov, type NepriradenaPlatba, type Zmena } from "../../lib/psb/workspaceKarty";
+import { bezAktivnehoBalicka, type BezBalicka } from "../../lib/psb/bezBalicka";
+import { dlznici as spocitajDlznikov, type Dlznik } from "../../lib/psb/dlznici";
+
+/** Riadky z `/api/balicky` a `/api/platby` — len to, čo tieto karty potrebujú. */
+type BalicekRiadok = {
+  klient: string; nazov: string; hodiny: number | null; platnost_od: string;
+  platnost_do: string | null; cena_czk: number | null; zdroj: string; zrusene_at: string | null;
+};
+type PlatbaRiadok = { klient: string; datum: string; suma_czk: number; zrusene_at: string | null };
 import { VydaneFaktury, type FakturaPredvolba } from "./VydaneFaktury";
 import type { PSBData } from "../../lib/psb/types";
 import { KlientStol } from "./KlientStol";
@@ -49,6 +58,8 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   otvorKlienta?: string | null;
   onOtvoreny?: () => void;
 }) {
+  const [balicky, setBalicky] = useState<BalicekRiadok[]>([]);
+  const [vlastnePlatby, setVlastnePlatby] = useState<PlatbaRiadok[]>([]);
   const [zdroje, setZdroje] = useState<{ zmeny: Zmena[]; nezname: { nazov: string; trener: string; pocet: number; najblizsi: string }[]; platby: { fioId: string; datum: string; suma: number; text: string; kandidati: string[] }[] } | null>(null);
   const [hotove, setHotove] = useState<Set<string>>(new Set());
   const [texty, setTexty] = useState<Record<string, string>>({});
@@ -82,18 +93,61 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   }, [clients]);
 
   const nacitaj = useCallback(async () => {
-    const [k, p] = await Promise.all([
+    const [k, p, b, vp] = await Promise.all([
       fetch("/api/kalendar", { credentials: "same-origin" }).then((r) => r.json()).catch(() => null),
       fetch("/api/platby", { credentials: "same-origin" }).then((r) => r.json()).catch(() => null),
+      // Vlastná evidencia balíčkov aj platieb — bez nej by karta „Bez balíčka"
+      // svietila na klienta aj potom, čo mu Jerry balíček nahodil.
+      fetch("/api/balicky", { credentials: "same-origin" }).then((r) => r.json()).catch(() => null),
+      fetch("/api/platby?klient=1", { credentials: "same-origin" }).then((r) => r.json()).catch(() => null),
     ]);
     setZdroje({ zmeny: (k?.zmeny || []) as Zmena[], nezname: k?.nezname || [], platby: p?.nepriradene || [] });
+    setBalicky(b?.balicky || []);
+    setVlastnePlatby(vp?.platby || []);
   }, []);
   useEffect(() => { void nacitaj(); }, [nacitaj]);
+
+  /** Aktívni bez hodín — pýta sa exportu aj vlastnej evidencie naraz. */
+  const bezBalicka = useMemo<BezBalicka[]>(
+    () => bezAktivnehoBalicka(
+      Object.values(clients),
+      balicky.map((b) => ({
+        id: "", klient: b.klient, nazov: b.nazov, hodiny: b.hodiny,
+        platnostOd: (b.platnost_od || "").slice(0, 10), platnostDo: (b.platnost_do || "")?.slice(0, 10) || null,
+        cenaCzk: b.cena_czk, zdroj: b.zdroj, zruseneAt: b.zrusene_at,
+      })),
+      kalUdalosti || [],
+    ),
+    [clients, balicky, kalUdalosti],
+  );
+
+  /** Kto dlží — otvorené poplatky z PTmindera aj nezaplatené balíčky z Kokpitu. */
+  const dlzniciRiadky = useMemo<Dlznik[]>(() => {
+    const podlaKlienta = <T extends { klient: string }>(xs: T[]) => {
+      const m: Record<string, T[]> = {};
+      for (const x of xs) (m[x.klient] ||= []).push(x);
+      return m;
+    };
+    const treneri: Record<string, string> = {};
+    for (const [meno, c] of Object.entries(clients)) if (c.primaryTrainer) treneri[meno] = c.primaryTrainer;
+    return spocitajDlznikov(
+      (data.poplatky || []).map((p) => ({ datum: p.datum, klient: p.klient, popis: p.popis, suma: p.suma })),
+      Object.fromEntries(Object.entries(podlaKlienta(balicky)).map(([m, bs]) => [m, bs.map((b) => ({
+        cena: b.cena_czk, platnostOd: (b.platnost_od || "").slice(0, 10), zdroj: b.zdroj, zruseneAt: b.zrusene_at, nazov: b.nazov,
+      }))])),
+      Object.fromEntries(Object.entries(podlaKlienta(vlastnePlatby)).map(([m, ps]) => [m, ps.map((p) => ({
+        suma: p.suma_czk, datum: (p.datum || "").slice(0, 10), zruseneAt: p.zrusene_at,
+      }))])),
+      treneri,
+    );
+  }, [data.poplatky, balicky, vlastnePlatby, clients]);
 
   const karty = useMemo(() => {
     if (!zdroje) return [];
     return postavKarty({
       ...zdroje,
+      bezBalicka,
+      dlznici: dlzniciRiadky,
       ktoSom,
       trener: ktoreVeci === "auto" ? undefined : ktoreVeci === "vsetko" ? null : ktoreVeci,
       navrhMena: (nazov) => {
@@ -101,7 +155,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
         return v.typ === "uvodny" ? (v.kandidati[0] || v.meno) : (v.kandidati.length === 1 ? v.kandidati[0] : "");
       },
     });
-  }, [zdroje, clients, ktoSom, ktoreVeci]);
+  }, [zdroje, clients, ktoSom, ktoreVeci, bezBalicka, dlzniciRiadky]);
 
   // Karta, v ktorej už nič nezostalo, z kopy zmizne — ale až po tom, čo sa
   // v nej naozaj odklikalo; inak by zmizla pod rukami uprostred práce.
@@ -109,7 +163,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
     // Karta klienta nie je fronta — nemá položky a nikdy nezmizne. Ostatné
     // zmiznú, keď sa v nich všetko odklikalo.
     () => karty.filter((k) => BEZ_FRONTY.includes(k.druh)
-      || (k.polozky as (Zmena | NeznamyNazov | NepriradenaPlatba)[]).some((p) => !hotove.has(klucPolozky(k.druh, p)))),
+      || (k.polozky as (Zmena | NeznamyNazov | NepriradenaPlatba | BezBalicka | Dlznik)[]).some((p) => !hotove.has(klucPolozky(k.druh, p)))),
     [karty, hotove],
   );
   const k = zive[Math.min(i, Math.max(0, zive.length - 1))];
@@ -165,10 +219,23 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
       // pustí späť na nulu, a to už s prechodom. Bez tých dvoch rámcov by
       // prehliadač obe zmeny zlial do jednej a karta by nikam nešla.
       setPrechod({ smer, faza: "dnu" });
-      requestAnimationFrame(() => requestAnimationFrame(() => {
+      /**
+       * `requestAnimationFrame` v NEAKTÍVNEJ ZÁLOŽKE NEBEŽÍ.
+       *
+       * Zámok `bezi` sa púšťal len v ňom, takže keď človek prepol kartu
+       * a hneď odišiel do iného okna, rAF sa nikdy nevykonal, zámok zostal
+       * zatvorený a kopa sa po návrate už nedala prepnúť — ani tlačidlami,
+       * ani gestom. Vyzeralo to, akoby obrazovka zamrzla; nič nespadlo
+       * a v konzole nebolo nič (28. 9. 2026).
+       *
+       * Poistka je obyčajný časovač. Pustiť zámok dvakrát nevadí.
+       */
+      const uvolni = () => {
         setPrechod(null);
         bezi.current = false;
-      }));
+      };
+      requestAnimationFrame(() => requestAnimationFrame(uvolni));
+      setTimeout(uvolni, 400);
     }, 150);
   }, [zive.length, menejPohybu]);
 
@@ -223,6 +290,24 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
     if (!a.ok) { setPracujem(""); setChyba(a.error || "nepodarilo sa uložiť"); return; }
     setPracujem("");
     await vybav(kluc, "/api/kalendar", { akcia: "vysvetli", id: z.id, poznamka: "súkromná udalosť — nie je to tréning" });
+  };
+
+  /**
+   * Odklepnutie bez zápisu do databázy.
+   *
+   * Karty „Bez balíčka" a „Dlhujú peniaze" nie sú fronta úkonov v appke —
+   * vybavuje sa telefonátom. Riadok sa preto len schová do konca sedenia
+   * a pri ďalšom otvorení Workspace sa vráti, kým sa nezmenia dáta. Zápis
+   * „vybavené" do databázy by tvrdil, že klient balíček má alebo zaplatil,
+   * a to appka nevie.
+   */
+  const oznacHotove = (kluc: string) => setHotove((s) => new Set([...s, kluc]));
+
+  /** Otvorí kartu Klient s týmto človekom na stole. */
+  const naStol = (meno: string) => {
+    setKlientNaStole(meno);
+    const idx = zive.findIndex((x) => x.druh === "klient");
+    if (idx >= 0) setI(idx);
   };
 
   const vybav = async (kluc: string, url: string, telo: Record<string, unknown>) => {
@@ -568,6 +653,55 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                   </>
                 );
               })()}
+
+              {/* BEZ BALÍČKA — jeden riadok = jeden telefonát „kúp si ďalší".
+                  Klik na meno otvorí jeho stôl, kde sa balíček nahadzuje. */}
+              {k.druh === "bezBalicka" && k.polozky.map((x) => {
+                const kluc = klucPolozky("bezBalicka", x);
+                if (hotove.has(kluc)) return null;
+                return (
+                  <div key={kluc} style={{ ...riadok, flexWrap: "wrap" }}>
+                    <button onClick={() => naStol(x.meno)} style={{ ...vedlajsie, fontSize: 13.5, fontWeight: 600, color: C.text, minWidth: 150, textAlign: "left" }}>
+                      {x.meno}
+                    </button>
+                    <div style={{ flex: "1 1 200px", minWidth: 160, fontSize: 11.5, color: C.textMuted }}>
+                      {x.dovod}
+                      {x.membership ? ` · ${x.membership}` : ""}
+                      {x.dovod === "platnosť skončila" && x.platnostDo ? ` ${den(x.platnostDo)}` : ""}
+                    </div>
+                    <div style={{ fontSize: 11.5, color: x.objednanych ? C.orange : C.textDim, minWidth: 120, textAlign: "right" }}>
+                      {x.objednanych
+                        ? `${x.objednanych} objednaných termínov`
+                        : x.dni >= 0 ? `naposledy pred ${x.dni} dňami` : "netrénoval"}
+                    </div>
+                    <button onClick={() => oznacHotove(kluc)} style={vedlajsie}>vybavené</button>
+                  </div>
+                );
+              })}
+
+              {/* DLHUJÚ PENIAZE — suma hore, za čo to je pod ňou. */}
+              {k.druh === "dlznici" && k.polozky.map((x) => {
+                const kluc = klucPolozky("dlznici", x);
+                if (hotove.has(kluc)) return null;
+                return (
+                  <div key={kluc} style={{ ...riadok, flexWrap: "wrap" }}>
+                    <button onClick={() => naStol(x.meno)} style={{ ...vedlajsie, fontSize: 13.5, fontWeight: 600, color: C.text, minWidth: 150, textAlign: "left" }}>
+                      {x.meno}
+                    </button>
+                    <div style={{ minWidth: 90, fontSize: 13, fontWeight: 700, textAlign: "right", color: C.red }}>{kc(x.spolu)}</div>
+                    <div style={{ flex: "1 1 200px", minWidth: 180, fontSize: 11, color: C.textMuted }}>
+                      {x.polozky.length
+                        ? `${den(x.polozky[0].datum)} ${x.polozky[0].popis.slice(0, 40)}${x.polozky.length > 1 ? ` (+${x.polozky.length - 1})` : ""}`
+                        : "nezaplatený balíček z Kokpitu"}
+                      {x.zBalickov > 0 && x.zPoplatkov > 0 ? ` · z toho ${kc(x.zBalickov)} za balíčky` : ""}
+                    </div>
+                    <div style={{ fontSize: 11.5, color: x.dni > 30 ? C.orange : C.textDim, minWidth: 80, textAlign: "right" }}>
+                      {x.dni >= 0 ? `${x.dni} dní` : ""}
+                    </div>
+                    <button onClick={() => oznacHotove(kluc)} style={vedlajsie}>vybavené</button>
+                  </div>
+                );
+              })}
               </div>
             </div>
             <datalist id="ws-klienti">{mena.map((m) => <option key={m} value={m} />)}</datalist>

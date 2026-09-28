@@ -51,7 +51,35 @@ const balicky = nacitaj("balicky");
 
 const data: PSBData = {
   ...EMPTY_DATA, sessions, packages, services, payments, poplatky, treningyZdarma,
-  overrides: nacitaj("overrides").map((r: any) => ({ ...r, name: r.name })),
+  /**
+   * RUČNÉ ZÁSAHY SA MUSIA VOLAŤ `clientOverrides` A BYŤ MAPA PODĽA MENA.
+   *
+   * Do 28. 9. 2026 tu stálo `overrides: [...]` — pole pod iným názvom, na
+   * ktoré sa `deriveClients` ani nepozrie. Kontrolór teda celý čas bežal,
+   * akoby Jerry nikdy nič ručne nenastavil: manuálne „Neaktívny" neplatil,
+   * kotvy `balicek_zostatok` sa neuplatnili a časť nálezov boli ľudia,
+   * o ktorých už dávno rozhodol. Je to presne tá chyba, pred ktorou varuje
+   * CLAUDE.md — dvakrát sa mýlila kontrola, nie appka.
+   */
+  clientOverrides: Object.fromEntries(nacitaj("overrides").map((r: any) => [r.name, {
+    status: r.status,
+    specialRate: !!r.special_rate,
+    specialRateNote: r.special_rate_note || "",
+    trainerNote: r.trainer_note || "",
+    contractSigned: !!r.contract_signed,
+    primaryTrainer: r.primary_trainer,
+    bitcoin: !!r.bitcoin,
+    duch: String(r.duch || ""),
+    zdroj: String(r.zdroj || ""),
+    zdrojKto: String(r.zdroj_kto || ""),
+    narodeniny: String(r.narodeniny || ""),
+    prvyKontakt: String(r.prvy_kontakt || ""),
+    v6m: String(r.v6m || ""),
+    precoNeprisiel: String(r.preco_neprisiel || ""),
+    balicekZostatok: r.balicek_zostatok == null ? null : Number(r.balicek_zostatok),
+    balicekKDatumu: String(r.balicek_k_datumu || ""),
+    updatedAt: String(r.updated_at || ""),
+  }])),
   acks: nacitaj("acks"), leads: nacitaj("leads"),
 } as PSBData;
 

@@ -19,6 +19,9 @@
  * mám na starosti ja, nech Terezku nerozptyľujú").
  */
 
+import type { BezBalicka } from "./bezBalicka";
+import type { Dlznik } from "./dlznici";
+
 export type Zmena = { id: string; druh: string; klient: string | null; nazov: string | null; pred: string | null; po: string | null; kedy: string; trener: string };
 export type NeznamyNazov = { nazov: string; trener: string; pocet: number; najblizsi: string; navrh: string };
 export type NepriradenaPlatba = { fioId: string; datum: string; suma: number; text: string; navrh: string };
@@ -27,6 +30,15 @@ export type Karta =
   | { druh: "zmeny"; nadpis: string; podnadpis: string; polozky: Zmena[] }
   | { druh: "mena"; nadpis: string; podnadpis: string; polozky: NeznamyNazov[] }
   | { druh: "platby"; nadpis: string; podnadpis: string; polozky: NepriradenaPlatba[] }
+  /**
+   * DVE FRONTY, KTORÉ NIE SÚ O ADMINISTRATÍVE, ALE O PENIAZOCH FIRMY.
+   *
+   * Jerry, 28. 9. 2026: „ide mi o to, aby na jednom mieste boli balíčky
+   * a na ďalšom peniaze." Obe otázky sa dali dovtedy zodpovedať len
+   * prechádzaním klientov po jednom.
+   */
+  | { druh: "bezBalicka"; nadpis: string; podnadpis: string; polozky: BezBalicka[] }
+  | { druh: "dlznici"; nadpis: string; podnadpis: string; polozky: Dlznik[] }
   /**
    * Karta bez fronty — pracovný stôl jedného klienta.
    *
@@ -48,6 +60,10 @@ export const BEZ_FRONTY: Karta["druh"][] = ["klient", "faktury"];
 
 export type ZdrojeKariet = {
   zmeny: Zmena[];
+  /** Aktívni klienti, ktorým nezostala hodina. */
+  bezBalicka?: BezBalicka[];
+  /** Kto dlží peniaze — poplatky z PTmindera aj nezaplatené balíčky. */
+  dlznici?: Dlznik[];
   nezname: { nazov: string; trener: string; pocet: number; najblizsi: string }[];
   platby: { fioId: string; datum: string; suma: number; text: string; kandidati: string[]; klientsky?: boolean }[];
   navrhMena: (nazov: string) => string;
@@ -168,11 +184,52 @@ export function postavKarty(z: ZdrojeKariet): Karta[] {
     podnadpis: `${platby.length} ${pocet(platby.length, "príjem bez klienta", "príjmy bez klienta", "príjmov bez klienta")}`,
     polozky: platby,
   });
+
+  /**
+   * BALÍČKY A PENIAZE SÚ DVE KARTY, NIE JEDNA.
+   *
+   * Jerry, 28. 9. 2026: „ide mi o to, aby na jednom mieste boli balíčky a na
+   * ďalšom peniaze." Sú to dva rôzne telefonáty — „kúp si ďalší balíček"
+   * a „pošli, čo dlžíš" — a miešať ich do jedného zoznamu by znamenalo
+   * prepínať hlavu pri každom riadku. To je presne to, čo mala kopa odstrániť.
+   *
+   * Bez balíčka sa filtruje podľa trénera: predať ďalší balíček svojmu
+   * klientovi je robota toho, kto ho vedie. Dlhy zostávajú Jerryho, rovnako
+   * ako front príjmov z banky a mesačné kontroly.
+   */
+  const bezBalicka = moje(z.bezBalicka || []);
+  if (bezBalicka.length) karty.push({
+    druh: "bezBalicka",
+    nadpis: "Bez balíčka",
+    podnadpis: `${bezBalicka.length} ${pocet(bezBalicka.length, "klient chodí bez hodín", "klienti chodia bez hodín", "klientov chodí bez hodín")}`,
+    polozky: bezBalicka,
+  });
+
+  const dlzni = ja === "Terezka" ? [] : (z.dlznici || []);
+  if (dlzni.length) karty.push({
+    druh: "dlznici",
+    nadpis: "Dlhujú peniaze",
+    podnadpis: `${dlzni.length} ${pocet(dlzni.length, "klient dlží", "klienti dlžia", "klientov dlží")} ${Math.round(dlzni.reduce((a, d) => a + d.spolu, 0)).toLocaleString("sk-SK")} Kč`,
+    polozky: dlzni,
+  });
+
   return karty;
 }
 
-export function klucPolozky(druh: Karta["druh"], p: Zmena | NeznamyNazov | NepriradenaPlatba): string {
+export function klucPolozky(
+  druh: Karta["druh"],
+  p: Zmena | NeznamyNazov | NepriradenaPlatba | BezBalicka | Dlznik,
+): string {
   if (druh === "zmeny") return `zmeny|${(p as Zmena).id}`;
   if (druh === "mena") return `mena|${(p as NeznamyNazov).nazov}|${(p as NeznamyNazov).trener}`;
+  /**
+   * Kľúč je MENO, nie stav.
+   *
+   * Pravidlo z 26. 8. 2026: kľúč sa neodvodzuje z textu, ktorý sa mení. Suma
+   * dlhu aj počet hodín sa hýbu každým importom a odklepnutie by padlo pri
+   * prvom pohybe. „Vybavené" tu znamená „s týmto človekom som to riešil".
+   */
+  if (druh === "bezBalicka") return `bezBalicka|${(p as BezBalicka).meno}`;
+  if (druh === "dlznici") return `dlznici|${(p as Dlznik).meno}`;
   return `platby|${(p as NepriradenaPlatba).fioId}`;
 }

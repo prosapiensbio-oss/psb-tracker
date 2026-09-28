@@ -54,6 +54,15 @@ import { Workspace } from "./Workspace";
 import type { FakturaPredvolba } from "./VydaneFaktury";
 import { Prechod } from "./Prechod";
 import { buildAiContext } from "../../lib/psb/aiContext";
+import { bezAktivnehoBalicka } from "../../lib/psb/bezBalicka";
+import { dlznici as spocitajDlznikov } from "../../lib/psb/dlznici";
+
+/** Riadky z `/api/balicky` a `/api/platby`, ktoré kŕmia fronty Workspace. */
+type BalicekRiadok = {
+  klient: string; nazov: string; hodiny: number | null; platnost_od: string;
+  platnost_do: string | null; cena_czk: number | null; zdroj: string; zrusene_at: string | null;
+};
+type PlatbaRiadok = { klient: string; datum: string; suma_czk: number; zrusene_at: string | null };
 import type { PorovnanieDochadzky } from "../../lib/psb/porovnanieDochadzky";
 import { Assistant, useAssistantChat } from "./Assistant";
 import { JarvisOkno } from "./JarvisOkno";
@@ -953,6 +962,10 @@ export function PSBApp() {
   // Druhá polovica tej istej otázky — hodiny. Bez nej by Jarvis na „môžeme
   // vypnúť PTminder?" odpovedal z polovice obrazu, čo je presne tá chyba,
   // ktorú appka má zdokumentovanú pri rezerve a dlhoch.
+  /** Surové riadky vlastnej evidencie — kŕmia fronty „Bez balíčka" a „Dlhujú". */
+  const [balickyRiadky, setBalickyRiadky] = useState<BalicekRiadok[]>([]);
+  /** Platby zapísané v Kokpite — bez nich by každý nahodený balíček vyzeral ako dlh. */
+  const [vlastnePlatby, setVlastnePlatby] = useState<PlatbaRiadok[]>([]);
   const [balickyPorovnanie, setBalickyPorovnanie] = useState<{ spolu: number; sedi: number; rozdiel: number; mlci: number; poExport: string; riadky: { klient: string; kokpit: number | null; ptminder: number | null; rozdiel: number | null; stav: string }[] } | null>(null);
   // Tretia tretina: platby. Bez nej by Jarvis na „môžeme vypnúť PTminder?"
   // odpovedal z dvoch tretín obrazu.
@@ -996,7 +1009,14 @@ export function PSBApp() {
     if (!dataHotove) return;
     void fetch("/api/balicky", { credentials: "same-origin" })
       .then((r) => r.json())
-      .then((j: { ok?: boolean; porovnanie?: typeof balickyPorovnanie }) => { if (j.ok && j.porovnanie) setBalickyPorovnanie(j.porovnanie); })
+      .then((j: { ok?: boolean; porovnanie?: typeof balickyPorovnanie; balicky?: BalicekRiadok[] }) => {
+        if (j.ok && j.porovnanie) setBalickyPorovnanie(j.porovnanie);
+        if (j.ok) setBalickyRiadky(j.balicky || []);
+      })
+      .catch(() => undefined);
+    void fetch("/api/platby?klient=1", { credentials: "same-origin" })
+      .then((r) => r.json())
+      .then((j: { ok?: boolean; platby?: PlatbaRiadok[] }) => { if (j.ok) setVlastnePlatby(j.platby || []); })
       .catch(() => undefined);
     void fetch("/api/platby", { credentials: "same-origin" })
       .then((r) => r.json())
@@ -2216,6 +2236,41 @@ function skupinaFaktur(
     return { mesiac: mk, zamknuty: zamknuteMesiace.includes(mk), kroky, prekazky: prekazkyZamku(mk) };
   }, [data, krokyZamku, prekazkyZamku, zamknuteMesiace]);
 
+  /**
+   * DVE FRONTY Z WORKSPACE, SPOČÍTANÉ RAZ.
+   *
+   * Tie isté zoznamy ukazuje kopa kariet aj Jarvis. Keby si ich každý počítal
+   * sám, o týždeň by na otázku „kto nemá balíček" odpovedali inak — je to ten
+   * istý dôvod, prečo rezerva aj dlh trénera žijú v `lib/psb`.
+   */
+  const fronty = useMemo(() => {
+    const evidencia = balickyRiadky.map((b) => ({
+      id: "", klient: b.klient, nazov: b.nazov, hodiny: b.hodiny,
+      platnostOd: (b.platnost_od || "").slice(0, 10), platnostDo: (b.platnost_do || "")?.slice(0, 10) || null,
+      cenaCzk: b.cena_czk, zdroj: b.zdroj, zruseneAt: b.zrusene_at,
+    }));
+    const podla = <T extends { klient: string }>(xs: T[]) => {
+      const m: Record<string, T[]> = {};
+      for (const x of xs) (m[x.klient] ||= []).push(x);
+      return m;
+    };
+    const treneri: Record<string, string> = {};
+    for (const [meno, c] of Object.entries(clients)) if (c.primaryTrainer) treneri[meno] = c.primaryTrainer;
+    return {
+      bezBalicka: bezAktivnehoBalicka(Object.values(clients), evidencia, kalUdalosti || []),
+      dlznici: spocitajDlznikov(
+        (data.poplatky || []).map((p) => ({ datum: p.datum, klient: p.klient, popis: p.popis, suma: p.suma })),
+        Object.fromEntries(Object.entries(podla(balickyRiadky)).map(([m, bs]) => [m, bs.map((b) => ({
+          cena: b.cena_czk, platnostOd: (b.platnost_od || "").slice(0, 10), zdroj: b.zdroj, zruseneAt: b.zrusene_at, nazov: b.nazov,
+        }))])),
+        Object.fromEntries(Object.entries(podla(vlastnePlatby)).map(([m, ps]) => [m, ps.map((p) => ({
+          suma: p.suma_czk, datum: (p.datum || "").slice(0, 10), zruseneAt: p.zrusene_at,
+        }))])),
+        treneri,
+      ),
+    };
+  }, [clients, balickyRiadky, vlastnePlatby, data.poplatky, kalUdalosti]);
+
   const aiContext = useMemo(
     () => buildAiContext(data, clients, sixM, capacity, registerAll, { udalosti: kalUdalosti, zmeny: kalZmeny }, uzavierkaPreAi,
       // Rezerva sa počíta v lib/psb/rezerva.ts — tým istým výpočtom ako
@@ -2229,8 +2284,10 @@ function skupinaFaktur(
         platby: btcPlatbyJednotlivo(btcPlatby, btcKurz.kurz, Object.keys(clients)),
         vyplaty: btcKniha.vyplaty, nakupy: btcKniha.nakupy, cielSats: btcKniha.cielSats,
       },
-      { zaznamy: guillermoZazn, udalosti: guillermoUdal }, kalPorovnanie, balickyPorovnanie, { porovnanie: platbyPorovnanie, cakaju: platbyCakaju }),
-    [data, clients, sixM, capacity, registerAll, kalUdalosti, kalZmeny, uzavierkaPreAi, btcCelkom, btcKurz, btcKniha, btcPlatby, ucetStav, hotovostStav, guillermoZazn, guillermoUdal, kalPorovnanie, balickyPorovnanie, platbyPorovnanie, platbyCakaju, igVerzia, mktVerzia, vzasVerzia()], // eslint-disable-line react-hooks/exhaustive-deps
+      { zaznamy: guillermoZazn, udalosti: guillermoUdal }, kalPorovnanie, balickyPorovnanie, { porovnanie: platbyPorovnanie, cakaju: platbyCakaju },
+      // Tie isté dve fronty, aké ukazuje Workspace — hotové, nie na dopočítanie.
+      fronty),
+    [data, clients, sixM, capacity, registerAll, kalUdalosti, kalZmeny, uzavierkaPreAi, btcCelkom, btcKurz, btcKniha, btcPlatby, ucetStav, hotovostStav, guillermoZazn, guillermoUdal, kalPorovnanie, balickyPorovnanie, platbyPorovnanie, platbyCakaju, fronty, igVerzia, mktVerzia, vzasVerzia()], // eslint-disable-line react-hooks/exhaustive-deps
   );
 
   const actions = useMemo<Actions>(

@@ -1690,3 +1690,55 @@ nestál. Jerry ho nahodil a na obrazovke sa nezmenilo nič.
   z exportu PTmindera a o ňom nevie; zrovnanie by nový balíček stiahlo na
   zostatok toho vyčerpaného, teda na nulu. Kontrolór profilov túto príčinu
   pomenúva, aby z nej nebol nález bez vysvetlenia.
+
+## Balíčky na jednej karte, peniaze na druhej
+
+Jerry, 28. 9. 2026: „chcem novú kartu — všetci aktívni ľudia, ktorí nemajú
+aktívne balíky, a ďalšiu, kde sú všetci, ktorí dlhujú peniaze. Ide mi o to,
+aby na jednom mieste boli balíčky a na ďalšom peniaze."
+
+Sú to dva rôzne telefonáty — „kúp si ďalší balíček" a „pošli, čo dlžíš" —
+a preto dve karty, nie jedna. To je tá istá myšlienka ako pri celej kope:
+jeden DRUH práce naraz.
+
+- **„Bez balíčka" sa pýta OBOCH zdrojov** (`bezBalicka.ts`). Karta klienta
+  ráta z PTmindera a nevie o balíčku nahodenom v Kokpite; keby sa zoznam
+  staval len z nej, klient by v ňom svietil aj potom, čo mu balíček pribudol
+  — a fronta, ktorá sa po vybavení nevyprázdni, sa prestane čítať.
+- **Paušál nie je chýbajúci balíček.** GOLD a spol. stoja v exporte navždy na
+  0/0, lebo sa nemíňajú po hodinách. Tá istá pasca ako pri anomálii „chodí,
+  ale má 0 hodín" (19. 8. 2026).
+- **„Dlhujú peniaze" SČÍTAVA dva zdroje** (`dlznici.ts`): otvorené poplatky
+  z PTmindera (kľúč `nezaplatene`) a balíčky nahodené v Kokpite, na ktoré
+  neprišla platba (`dlhKlienta`). Hovoria o inom období a klient môže dlžiť
+  v oboch naraz; dve karty vedľa seba by z jedného človeka spravili dvoch.
+- **Kľúč odklepnutia je MENO, nie suma.** Suma aj počet hodín sa hýbu každým
+  importom a odklepnutie by padlo pri prvom pohybe (pravidlo z 26. 8. 2026).
+  „Vybavené" tu navyše nič nezapisuje do databázy — vybavuje sa telefonátom
+  a appka nevie, či klient zaplatil.
+- **Bez balíčka sa filtruje trénerom, dlhy zostávajú Jerryho.** Predať balíček
+  svojmu klientovi je robota toho, kto ho vedie.
+
+## `requestAnimationFrame` v skrytej záložke nebeží
+
+Prepínanie kariet v kope drží zámok `bezi`, aby sa dve animácie neprekryli —
+a púšťal sa LEN v `requestAnimationFrame`. V neaktívnej záložke rAF nebeží,
+takže kto prepol kartu a hneď odišiel do iného okna, našiel po návrate kopu,
+ktorá sa nedala prepnúť ani tlačidlom, ani gestom. Nič nespadlo a v konzole
+nebolo nič. Poistkou je obyčajný časovač; pustiť zámok dvakrát nevadí.
+
+**Všeobecne:** čo púšťa zámok, nesmie visieť na jedinom callbacku, ktorý
+prehliadač smie odložiť. Je to tá istá rodina ako „promise vie visieť" pri
+schránke (28. 8. 2026) — catch chráni pred chybou, nie pred tichom.
+
+## Kontrolór profilov bežal bez ručných zásahov
+
+`scripts/kontrola-profilov.ts` skladal `PSBData` a ručné zásahy dával do poľa
+`overrides`. `deriveClients` ich ale číta z `clientOverrides` a ako MAPU podľa
+mena, takže sa na ne ani nepozrel: manuálne „Neaktívny" neplatil, kotvy
+`balicek_zostatok` sa neuplatnili a časť nálezov boli ľudia, o ktorých už
+Jerry dávno rozhodol. Našlo sa to 28. 9. 2026 tak, že kontrolór hlásil piatich
+klientov bez balíčka a appka dvoch.
+
+**Keď sa harness a appka rozídu, najprv over harness.** Platí to aj pre
+`naostro.sh` — dvakrát sa mýlila kontrola, nie appka.

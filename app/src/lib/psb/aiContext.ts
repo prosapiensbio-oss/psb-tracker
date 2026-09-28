@@ -44,6 +44,8 @@ import {
   jeKlient,
 } from "./compute";
 import { rozborUvodnych } from "./uvodneTreningy";
+import type { BezBalicka } from "./bezBalicka";
+import type { Dlznik } from "./dlznici";
 import { monthLabel, normName, weekKey, weekLabel } from "./format";
 import type { PorovnanieDochadzky } from "./porovnanieDochadzky";
 import type { PSBData } from "./types";
@@ -118,6 +120,8 @@ export function buildAiContext(
   balicky?: { spolu: number; sedi: number; rozdiel: number; mlci: number; poExport: string; riadky: { klient: string; kokpit: number | null; ptminder: number | null; rozdiel: number | null; stav: string }[] } | null,
   /** A to isté pre platby (`/api/platby`). */
   platby?: { porovnanie: { mesiace: { mesiac: string; kokpit: number; ptminder: number; rozdiel: number }[]; kokpit: number; ptminder: number; rozdiel: number } | null; cakaju: number } | null,
+  /** Dve fronty z Workspace — hotové, nie na prepočítanie (28. 9. 2026). */
+  fronty?: { bezBalicka: BezBalicka[]; dlznici: Dlznik[] } | null,
 ) {
   const clientList = Object.values(clients);
 
@@ -1004,6 +1008,29 @@ export function buildAiContext(
         trener: clients[p.klient]?.primaryTrainer || "neznámy",
       })),
       poznamka: "Zrkadlo posledného importu Transactions z PTminderu; v PTminderi sa poplatok po zaplatení maže, takže čo je v zozname, je otvorené a s ničím sa to nepáruje. NIE je to živý stav — nehovor „X dlhuje dnes“, ale „v poslednom exporte stálo otvorených N poplatkov“. Karta v Kokpite sa filtruje trénerom, preto pri otázke jedného trénera použi podlaTrenera, nie celkový súčet.",
+    },
+    /**
+     * KTO CHODÍ BEZ BALÍČKA a KTO DLŽÍ — to isté, čo ukazujú dve karty vo
+     * Workspace. Prišlo sem hotové, lebo appka to už spočítala z oboch
+     * zdrojov naraz (export aj vlastná evidencia) a Jarvis by si to zo
+     * `klientiDetail` poskladal inak.
+     */
+    bezBalicka: {
+      pocet: (fronty?.bezBalicka || []).length,
+      klienti: (fronty?.bezBalicka || []).map((x) => ({
+        klient: x.meno, trener: x.trener, dovod: x.dovod, clenstvo: x.membership,
+        objednanychTerminov: x.objednanych, dniOdTreningu: x.dni,
+      })),
+      poznamka: "Aktívni klienti, ktorým nezostala ani hodina — karta „Bez balíčka“ vo Workspace. Počíta sa z PTmindera AJ z vlastnej evidencie balíčkov naraz, takže kto má balíček nahodený v Kokpite, v zozname NIE JE. Paušály (GOLD, ONE YEAR) tu nie sú: nemíňajú sa po hodinách. PREČÍTAJ odtiaľto a nepočítaj si to z klientiDetail — tam je len zostatok z exportu.",
+    },
+    dlznici: {
+      pocet: (fronty?.dlznici || []).length,
+      spoluCzk: r0((fronty?.dlznici || []).reduce((a, d) => a + d.spolu, 0)),
+      klienti: (fronty?.dlznici || []).map((d) => ({
+        klient: d.meno, trener: d.trener, spoluCzk: d.spolu,
+        zPoplatkovCzk: d.zPoplatkov, zBalickovCzk: d.zBalickov, najstarsiDen: d.najstarsi, dni: d.dni,
+      })),
+      poznamka: "Kto dlží peniaze — karta „Dlhujú peniaze“ vo Workspace. Sčítava DVA zdroje: otvorené poplatky z PTmindera (kľúč „nezaplatene“, už po odrátaní platieb zapísaných v Kokpite) a balíčky nahodené v Kokpite, na ktoré neprišla platba. Na otázku „kto dlží“ odpovedaj odtiaľto; „nezaplatene“ je len jedna polovica.",
     },
     tyzdenneHodiny,
     tyzdennePodlaTrenera,

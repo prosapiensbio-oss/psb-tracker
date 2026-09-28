@@ -73,6 +73,30 @@ describe("karta patrí prihlásenému", () => {
     }
   });
 
+  it("bez balíčka je karta každého, dlhy sú Jerryho", () => {
+    // Predať ďalší balíček svojmu klientovi je robota toho, kto ho vedie.
+    // Dlhy zostávajú Jerryho, rovnako ako front príjmov z banky.
+    const zdrojeNavyse = {
+      ...zdroje,
+      bezBalicka: [{ meno: "Richard Matl", trener: "Jerry", membership: "OFF - 6h", dovod: "hodiny minuté" as const, platnostDo: "", poslednyTrening: "2026-09-23", dni: 5, objednanych: 0 }],
+      dlznici: [{ meno: "Dan Kouřil", trener: "Jerry", spolu: 7790, zPoplatkov: 7790, zBalickov: 0, polozky: [], najstarsi: "2026-09-02", dni: 26 }],
+    };
+    const u = postavKarty({ ...zdrojeNavyse, ktoSom: "jerry" }).map((x) => x.druh);
+    expect(u).toContain("bezBalicka");
+    expect(u).toContain("dlznici");
+
+    const t = postavKarty({ ...zdrojeNavyse, ktoSom: "terezka" }).map((x) => x.druh);
+    expect(t).not.toContain("dlznici");
+    // Jerryho klient sa Terezke neukáže ani v „Bez balíčka" — má trénera v sebe.
+    expect(t).not.toContain("bezBalicka");
+  });
+
+  it("prázdna fronta kartu nevyrobí", () => {
+    const u = postavKarty({ ...zdroje, bezBalicka: [], dlznici: [], ktoSom: "jerry" }).map((x) => x.druh);
+    expect(u).not.toContain("bezBalicka");
+    expect(u).not.toContain("dlznici");
+  });
+
   it("Jerry vidí peniaze", () => {
     expect(postavKarty({ ...zdroje, ktoSom: "jerry" }).some((x) => x.druh === "platby")).toBe(true);
   });
