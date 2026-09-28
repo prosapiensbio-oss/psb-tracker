@@ -14,6 +14,7 @@ import {
   parseSessions,
   paymentKey,
   jeIkonaMiestoCisla,
+  parseClientList,
   parseIdoklad,
   serviceKey,
   sessionKey,
@@ -220,6 +221,12 @@ export type IngestResult = {
    */
   bezZostatku?: number;
   /**
+   * Dvojice, kde appka a zdroj hovoria iné — import ich nechal tak.
+   * Pracovný mail z faktúry a súkromný z PTmindera sú obe správne; appka
+   * nemá rozhodovať, ktorý platí.
+   */
+  rozdiely?: string[];
+  /**
    * Klienti, ktorí sú podľa PTminderu aktívni, ale v nahranom súbore nie sú.
    * Import ich nechá tak, ako boli — čo je správne, ale ticho. Preto sa mená
    * vracajú von: čiastočný export vyzerá presne ako úplný.
@@ -235,6 +242,8 @@ export async function ingest(DB: D1Database, filename: string, text: string, act
   let skipped = 0;
   let chybaju: string[] = [];
   let bezZostatku = 0;
+  /** Údaje, ktoré sa v appke a v zdroji líšia — import ich NEPREPÍŠE. */
+  const rozdiely: string[] = [];
   // Uzavretý mesiac sa neprepisuje. Nie varovaním — odmietnutím. Import je
   // jediná cesta, ktorou sa do appky dostávajú tréningy a platby, takže stačí
   // strážiť ju; riadky z uzamknutých mesiacov sa preskočia a povie sa o tom.
@@ -474,6 +483,56 @@ export async function ingest(DB: D1Database, filename: string, text: string, act
     ];
     await DB.batch(stmts);
     added = rows.length;
+  } else if (type === "klienti") {
+    /**
+     * ZOZNAM KLIENTOV — DOPLNÍ, NEPREPÍŠE.
+     *
+     * Jerry, 28. 9. 2026: „skús podoplňať do profilov klientov všetko, čo tam
+     * chýba." Doplní sa to, čo v appke NIE JE; kde už hodnota stojí a líši sa,
+     * import ju nechá a vráti dvojicu von (`rozdiely`). Pracovný mail z faktúr
+     * a súkromný z PTmindera sú obe správne odpovede na inú otázku a appka
+     * nemá rozhodovať, ktorá platí.
+     *
+     * Narodeniny majú vlastnú stráž: `datumNarodenia` odmietne nezrozumiteľný
+     * tvar a rok mimo rozumného rozsahu — Naďa Khamaziuk má v PTminderi 2036
+     * a appka ju kvôli tomu kedysi viedla ako dieťa.
+     */
+    const rows = parseClientList(text);
+    const kf = new Map(
+      ((await DB.prepare("SELECT klient, email, telefon FROM klient_fakturacia").all()).results as any[])
+        .map((r) => [String(r.klient), { email: String(r.email || ""), telefon: String(r.telefon || "") }]),
+    );
+    const nar = new Map(
+      ((await DB.prepare("SELECT name, narodeniny FROM client_overrides").all()).results as any[])
+        .map((r) => [String(r.name), String(r.narodeniny || "")]),
+    );
+    const stmts = [];
+    for (const r of rows) {
+      const uz = kf.get(r.meno);
+      const mail = r.email && (!uz?.email ? r.email : "");
+      const tel = r.telefon && (!uz?.telefon ? r.telefon : "");
+      if (uz?.email && r.email && uz.email.trim().toLowerCase() !== r.email.trim().toLowerCase()) {
+        rozdiely.push(`${r.meno}: v appke ${uz.email}, v PTminderi ${r.email}`);
+      }
+      if (mail || tel) {
+        stmts.push(
+          uz
+            ? DB.prepare(
+              "UPDATE klient_fakturacia SET email = CASE WHEN email = '' THEN ?2 ELSE email END, telefon = CASE WHEN telefon = '' THEN ?3 ELSE telefon END, updated_at = ?4 WHERE klient = ?1",
+            ).bind(r.meno, mail, tel, new Date().toISOString())
+            : DB.prepare(
+              "INSERT INTO klient_fakturacia (klient, firma, email, telefon, updated_at) VALUES (?1, ?1, ?2, ?3, ?4)",
+            ).bind(r.meno, mail, tel, new Date().toISOString()),
+        );
+        added++;
+      }
+      if (r.narodeniny && !nar.get(r.meno)) {
+        stmts.push(DB.prepare(
+          "INSERT INTO client_overrides (name, narodeniny, updated_at) VALUES (?1, ?2, ?3) ON CONFLICT(name) DO UPDATE SET narodeniny = ?2, updated_at = ?3 WHERE narodeniny = ''",
+        ).bind(r.meno, r.narodeniny, new Date().toISOString()));
+      }
+    }
+    if (stmts.length) await DB.batch(stmts);
   } else if (type === "idoklad") {
     /**
      * Faktúry z iDokladu sú ZRKADLO exportu: `INSERT OR REPLACE` podľa čísla
@@ -585,7 +644,7 @@ export async function ingest(DB: D1Database, filename: string, text: string, act
     actor,
   });
 
-  return { filename, type, added, skipped, zamknute: zamknutych, chybaju, bezZostatku };
+  return { filename, type, added, skipped, zamknute: zamknutych, chybaju, bezZostatku, rozdiely };
 }
 
 // Zapíše JEDEN stĺpec. Nie celý riadok — a to je oprava skutočnej chyby.

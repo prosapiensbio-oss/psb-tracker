@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { datumNarodenia, detectCSVType, jeIkonaMiestoCisla, parseAnamneza, parseIdoklad, parsePackages } from "./parse";
+import { datumNarodenia, detectCSVType, jeIkonaMiestoCisla, parseAnamneza, parseClientList, parseIdoklad, parsePackages } from "./parse";
 
 /**
  * Anamnéza je Google Forms a ľudia si do nej píšu sami. Preto sa z nej berie
@@ -114,5 +114,35 @@ describe("vydané faktúry z iDokladu", () => {
 
   test("riadok bez čísla dokladu sa preskočí", () => {
     expect(parseIdoklad(`${csv}\n,Poznámka,,,,,,`)).toHaveLength(2);
+  });
+});
+
+describe("zoznam klientov z PTmindera", () => {
+  const csv = [
+    "Client List",
+    "Name,Email,Mobile Number,Client Status,Business Name,Assigned Trainer,Other Number,Birthday,Created Date,Sign up date,Last Form Submission Date,In Credit,Amount Due,Inactive From,Client Login Status",
+    "Martin Vaško,matovidlo2@gmail.com,739581340,Active,,Jerry Stranavsky,,1996-02-06,02 February; 2026,30 January; 2026,,CZK29;230.00,0,,Activated",
+    "Eva Doležalova,evdvor@email.cz,602 588 083,Active,,Terezka Zaťková,,1977-05-16,27 September; 2025,02 October; 2025,,CZK85;580.00,0,,Inactive",
+    "Naďa Khamaziuk,,675696358,Active,,Terezka Zaťková,,2036-01-19,30 October; 2022,30 October; 2022,,CZK216;200.00,0,,Inactive",
+  ].join("\n");
+
+  test("hlavička je až na druhom riadku — prvý je nadpis", () => {
+    expect(detectCSVType(csv)).toBe("klienti");
+    expect(parseClientList(csv)).toHaveLength(3);
+  });
+
+  test("telefón sa zbaví medzier a pomlčiek", () => {
+    expect(parseClientList(csv)[1]).toMatchObject({ meno: "Eva Doležalova", telefon: "602588083" });
+  });
+
+  test("rok 2036 sa nezapíše — Naďa nie je dieťa", () => {
+    expect(parseClientList(csv)[2].narodeniny).toBe("");
+    expect(parseClientList(csv)[0].narodeniny).toBe("1996-02-06");
+  });
+
+  test("krátky export bez narodenín a trénera prejde tiež", () => {
+    const kratky = "Client List\nName,Email,Mobile Number,Client Status\nJan Kral,jan@kralovo.cz,721962648,Active";
+    expect(detectCSVType(kratky)).toBe("klienti");
+    expect(parseClientList(kratky)[0]).toMatchObject({ meno: "Jan Kral", email: "jan@kralovo.cz", narodeniny: "" });
   });
 });

@@ -182,6 +182,8 @@ export function detectCSVType(text: string): CSVType | null {
   if (h.includes("payments recorded report")) return "payments";
   // Vydané faktúry z iDokladu — český export s bodkočiarkou aj čiarkou.
   if (h.includes("číslo dokladu") && h.includes("název/jméno")) return "idoklad";
+  // Zoznam klientov z PTmindera — jediný úplný zdroj mailov a telefónov.
+  if (h.includes("client list") || (h.includes("mobile number") && h.includes("client status"))) return "klienti";
   // Transactions z Financií — pozná sa podľa súhrnnej hlavičky na začiatku.
   if (h.includes("total charges") && h.includes("amount due")) return "transakcie";
   if (h.includes("session name")) return "sessions";
@@ -413,6 +415,56 @@ export function parseIdoklad(text: string): IdokladFaktura[] {
   return out;
 }
 
+/**
+ * ZOZNAM KLIENTOV Z PTMINDERA — maily, telefóny a narodeniny.
+ *
+ * Jerry, 28. 9. 2026: „v profiloch klientov stále chýbajú telefónne čísla,
+ * mailové adresy a dátumy." Chýbali, lebo appka ich nikdy nemala odkiaľ
+ * vziať: `klient_fakturacia` sa plní ručne alebo z iDokladu a to pokrývalo
+ * 27 zo 125 klientov. PTminder ich má všetky.
+ *
+ * Súbor má dva tvary — krátky (meno, mail, telefón, stav) a dlhý (navyše
+ * tréner, narodeniny, dátumy). Berie sa, čo v hlavičke je.
+ *
+ * Prvý riadok býva nadpis „Client List" a až druhý je hlavička; preto sa
+ * hlavička hľadá, nie predpokladá na nultom riadku.
+ */
+export type KlientRow = {
+  meno: string; email: string; telefon: string; stav: string;
+  trener: string; narodeniny: string; vytvoreny: string; neaktivnyOd: string;
+};
+
+export function parseClientList(text: string): KlientRow[] {
+  const ls = lines(text);
+  const iHlavicka = ls.findIndex((r) => /name/i.test(r) && /email/i.test(r));
+  if (iHlavicka < 0) return [];
+  const hlavicka = splitCSVLine(ls[iHlavicka]).map((x) => x.trim().toLowerCase());
+  const idx = (...m: string[]) => hlavicka.findIndex((x) => m.some((y) => x === y || x.includes(y)));
+  const iMeno = idx("name"), iMail = idx("email"), iTel = idx("mobile number");
+  const iStav = idx("client status"), iTrener = idx("assigned trainer");
+  const iNar = idx("birthday"), iVzn = idx("created date"), iNeaktiv = idx("inactive from");
+  if (iMeno < 0) return [];
+
+  const out: KlientRow[] = [];
+  for (let i = iHlavicka + 1; i < ls.length; i++) {
+    const p = splitCSVLine(ls[i]);
+    const meno = (p[iMeno] || "").trim();
+    if (!meno) continue;
+    out.push({
+      meno,
+      email: iMail >= 0 ? (p[iMail] || "").trim() : "",
+      // Telefón chodí s medzerami aj pomlčkami („737-212-792", „602 588 083").
+      telefon: iTel >= 0 ? (p[iTel] || "").replace(/[\s-]/g, "").trim() : "",
+      stav: iStav >= 0 ? (p[iStav] || "").trim() : "",
+      trener: iTrener >= 0 ? (p[iTrener] || "").trim() : "",
+      narodeniny: iNar >= 0 ? datumNarodenia(p[iNar] || "") : "",
+      vytvoreny: iVzn >= 0 ? ptDatum(p[iVzn] || "") : "",
+      neaktivnyOd: iNeaktiv >= 0 ? ptDatum(p[iNeaktiv] || "") : "",
+    });
+  }
+  return out;
+}
+
 export function parsePackages(text: string): PackageRow[] {
   const ls = lines(text);
   if (!ls.length) return [];
@@ -497,15 +549,20 @@ export type AnamnezaRiadok = {
 export function datumNarodenia(v: string): string {
   const t = (v || "").trim();
   if (!t) return "";
+  // Rok v budúcnosti alebo pred 1900 je preklep, nie dátum. Platí to pre OBA
+  // tvary: stráž bola pôvodne len pri „12.3.1984" a ISO ju obchádzalo, takže
+  // Naďa Khamaziuk prešla s rokom 2036 aj po tom, čo sa to raz opravovalo
+  // (28. 9. 2026, pri importe zoznamu klientov z PTmindera).
+  const teraz = new Date().getFullYear();
+  const rozumny = (r: number) => r <= teraz && r >= 1900;
+
   const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(t);
-  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+  if (iso) return rozumny(Number(iso[1])) ? `${iso[1]}-${iso[2]}-${iso[3]}` : "";
   const dmy = /^(\d{1,2})[.\/\s-]+(\d{1,2})[.\/\s-]+(\d{4})$/.exec(t);
   if (!dmy) return "";
   const d = Number(dmy[1]), m = Number(dmy[2]), r = Number(dmy[3]);
   if (m < 1 || m > 12 || d < 1 || d > 31) return "";
-  // Rok v budúcnosti alebo pred 1900 je preklep, nie dátum.
-  const teraz = new Date().getFullYear();
-  if (r > teraz || r < 1900) return "";
+  if (!rozumny(r)) return "";
   return `${r}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
 }
 

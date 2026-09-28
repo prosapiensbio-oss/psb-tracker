@@ -495,6 +495,20 @@ function UploadCard({ data, missing, actions, chat }: { data: PSBData; missing: 
                 </div>
               )}
 
+              {/* Čo sa v appke a v zdroji líši, import nechal tak a vracia
+                  von. Pracovný mail z faktúry a súkromný z PTmindera sú obe
+                  správne — appka nemá rozhodovať, ktorý platí. */}
+              {!!r.rozdiely?.length && (
+                <div style={{ padding: 9, marginBottom: 8, fontSize: 12, borderRadius: 8, background: C.orangeBg, color: C.orange }}>
+                  {r.rozdiely.length} {r.rozdiely.length === 1 ? "údaj sa líši" : r.rozdiely.length < 5 ? "údaje sa líšia" : "údajov sa líši"} od toho,
+                  čo je v appke — import ich nechal tak. Oprav ich v profile klienta, keď viem, ktorý platí.
+                  <div style={{ marginTop: 4, opacity: 0.85 }}>
+                    {r.rozdiely.slice(0, 8).map((x) => <div key={x}>{x}</div>)}
+                    {r.rozdiely.length > 8 ? `… a ďalších ${r.rozdiely.length - 8}` : ""}
+                  </div>
+                </div>
+              )}
+
               {r.chybaju && r.chybaju.length > 0 && (
                 <div style={{ padding: 9, marginBottom: 8, fontSize: 12, borderRadius: 8, background: C.orangeBg, color: C.orange }}>
                   Pozor: {r.chybaju.length}{" "}
@@ -579,6 +593,18 @@ function UploadCard({ data, missing, actions, chat }: { data: PSBData; missing: 
               iDoklad → Fakturace › Vydané faktury › Export do CSV. Číslo dokladu je variabilný symbol,
               ktorý stojí v texte bankového prevodu — bez neho appka pri takej platbe nevie, komu patrí.
               Meno na faktúre býva firma, tú spáruješ s klientom v Prechode.
+            </span>
+          </span>
+        </div>
+        {/* Zoznam klientov — jediný úplný zdroj mailov a telefónov. Bez neho
+            má kontakt 27 zo 125 klientov a faktúra nemá kam odísť. */}
+        <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 5, display: "flex", gap: 8, marginTop: 2 }}>
+          <span style={{ color: C.textDim, flexShrink: 0 }}>·</span>
+          <span>
+            <strong style={{ color: C.text }}>Zoznam klientov</strong>
+            <br /><span style={{ color: C.textDim }}>
+              PTminder → Clients › Export. Doplní maily, telefóny a narodeniny do profilov — čo už v appke je,
+              neprepíše, len na rozdiel upozorní. Stiahni si ten DLHŠÍ export (s trénerom a narodeninami).
             </span>
           </span>
         </div>
