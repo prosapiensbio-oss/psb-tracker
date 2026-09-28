@@ -1530,3 +1530,26 @@ a do appky sa nikdy nedostalo.
 - **Výťažnosť je malá, ale je to istota, nie odhad:** z 55 nepriradených
   nesú číslo faktúry tri. Rastie to s každou vystavenou faktúrou a na rozdiel
   od zhody sumy sa nedá pomýliť.
+
+## Zostatok bez dátumu nerozlíši naliehavosť
+
+28. 9. 2026 Jerry nad kartou „Balíček dojde po objednaných hodinách (15)":
+„vidím veľa mien aj takých, čo majú 4/6 alebo 5/8 alebo 4/18 — za mňa je
+rozdiel mať posledné 4 z 18 vs posledné 4 zo 6, a keď mám 6 h v balíčku, to
+tam vkuse niekto svieti."
+
+Mal pravdu dvakrát. Karta brala každého, komu po objednaných hodinách zostane
+≤ 1 — lenže šesťhodinový balíček sa míňa stále, takže to sadne skoro na
+každého a karta je trvalo plná. A z pätnástich mien ich jedenásť hovorilo
+„dôjde po objednaných", čo znamená, že práve NEDÔJDE: „2 zo 6 a jeden
+objednaný termín" skončí na jednej hodine a nedeje sa nič.
+
+- **Dátum rozlíši to, čo zostatok nie.** Kto chodí raz týždenne, minie štyri
+  hodiny za mesiac, nech má balíček akýkoľvek — a preto sa počíta DEŇ hodiny,
+  ktorá balíček vyčerpá (`terminy` z kalendára, `dojde`). Riadok tým odpovedá
+  na otázku, kvôli ktorej sa karta otvára: komu zavolať prvému.
+- **Do zoznamu patrí len ten, komu naozaj dôjde:** hodiny už nemá, objednané
+  termíny ho vyčerpajú do piatich týždňov, alebo mu zostáva posledná hodina.
+  Zo pätnástich mien tak ostali štyri.
+- **Horizont nesmie schovať toho, kto je na nule.** Kto hodiny minul už dnes,
+  zostáva bez ohľadu na dátum — to je najurgentnejší telefonát.

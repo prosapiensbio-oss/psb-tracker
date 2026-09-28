@@ -1640,6 +1640,10 @@ export function Balicky({ udalosti, clients, sedenia = [], onObnov, style, onKli
      * je len predbežná vrstva medzi dvoma nedeľnými exportmi.
      */
     const objednane: Record<string, number> = {};
+    // Nielen POČET objednaných hodín, ale aj ICH DNI — z nich sa dá povedať,
+    // KEDY balíček dôjde, a to je pri obnove jediná otázka, ktorá platí
+    // rovnako pre šesťhodinový aj osemnásťhodinový (Jerry, 28. 9. 2026).
+    const terminy: Record<string, string[]> = {};
     // Odtrénované-ale-neexportované ráta spoločný helper hore — tie isté
     // čísla číta aj sekcia „Končí platnosť členstva" na Kokpite.
     const odtrenovane = odtrenovaneMimoExportu(udalosti, sedenia);
@@ -1648,6 +1652,7 @@ export function Balicky({ udalosti, clients, sedenia = [], onObnov, style, onKli
       const den = u.zaciatok.slice(0, 10);
       if (den > dnes || (den === dnes && Date.parse(u.zaciatok) > teraz.getTime())) {
         objednane[u.klient] = (objednane[u.klient] || 0) + 1;
+        (terminy[u.klient] ||= []).push(den);
       }
     }
     for (const meno of Object.keys(odtrenovane)) if (objednane[meno] === undefined) objednane[meno] = 0;
@@ -1674,7 +1679,24 @@ export function Balicky({ udalosti, clients, sedenia = [], onObnov, style, onKli
         if (c.lenDoplnky) return null;
         if (!c.packageTotal && !c.membership) return null;
         const uz = odtrenovane[meno] || 0;
-        return { meno, kusov, uz, zostava: c.packageRemaining, spolu: c.packageTotal, po: c.packageRemaining - kusov - uz, platnostDo: c.packageValidTo || "" };
+        /**
+         * KEDY DÔJDE — deň hodiny, ktorá balíček vyčerpá.
+         *
+         * Jerry, 28. 9. 2026: „je rozdiel mať posledné 4 z 18 vs posledné
+         * 4 zo 6, a keď mám 6 h v balíčku, tam vkuse niekto svieti."
+         * Samotný zostatok tie dva prípady nerozlíši — dátum áno: kto chodí
+         * raz týždenne, minie štyri hodiny za mesiac, nech má balíček
+         * akýkoľvek. Šesťhodinové balíčky sa navyše míňajú stále, takže bez
+         * dátumu je karta trvalo plná a nehovorí, komu zavolať PRVÉMU.
+         */
+        const teraz = c.packageRemaining - uz;
+        const dni = (terminy[meno] || []).slice().sort();
+        const dojde = teraz <= 0 ? "" : (dni[teraz - 1] || "");
+        return {
+          meno, kusov, uz, zostava: c.packageRemaining, spolu: c.packageTotal,
+          po: c.packageRemaining - kusov - uz, platnostDo: c.packageValidTo || "",
+          dojde, teraz, uzDosiel: teraz <= 0,
+        };
       })
       .filter((x): x is NonNullable<typeof x> => !!x);
   }, [udalosti, clients, matchTrener, sedenia]);
@@ -1685,12 +1707,40 @@ export function Balicky({ udalosti, clients, sedenia = [], onObnov, style, onKli
    * nedochádza nič. Kalendár triedi podľa projekcie (po objednaných),
    * PTminder podľa toho, čo naozaj stojí v poslednom reporte.
    */
-  const riadky = useMemo(
-    () => zdroj === "ptminder"
-      ? vsetky.filter((r) => r.zostava <= 1).sort((a, b) => a.zostava - b.zostava || a.meno.localeCompare(b.meno))
-      : vsetky.filter((r) => r.po <= 1).sort((a, b) => a.po - b.po || a.meno.localeCompare(b.meno)),
-    [vsetky, zdroj],
-  );
+  const riadky = useMemo(() => {
+    if (zdroj === "ptminder") {
+      return vsetky.filter((r) => r.zostava <= 1).sort((a, b) => a.zostava - b.zostava || a.meno.localeCompare(b.meno));
+    }
+    /**
+     * HORIZONT PÄŤ TÝŽDŇOV.
+     *
+     * Bez neho je karta trvalo plná: šesťhodinový balíček sa míňa stále
+     * a projekcia „po objednaných bude ≤ 1" na neho sadne skoro vždy.
+     * Pätnásť mien, z ktorých polovica dôjde až o dva mesiace, je zoznam,
+     * ktorý sa prestane čítať — a to je presne to, čo Jerry hlásil.
+     *
+     * Kto hodiny minul UŽ TERAZ, zostáva bez ohľadu na dátum: to je
+     * najurgentnejší telefonát a žiadny horizont ho nesmie schovať.
+     */
+    const hranica = new Date(Date.now() + 35 * 86400000).toISOString().slice(0, 10);
+    /**
+     * Do zoznamu patrí len ten, komu balíček NAOZAJ dôjde:
+     *   • hodiny už nemá,
+     *   • objednané termíny ho vyčerpajú (a je to do piatich týždňov),
+     *   • alebo mu zostáva posledná hodina.
+     *
+     * „2 zo 6 a jeden objednaný termín" medzi ne nepatrí — po ňom mu zostane
+     * hodina a nič sa nedeje. Práve tieto riadky robili z karty pätnásť mien,
+     * z ktorých väčšina hovorila „dôjde po objednaných", teda nedôjde.
+     */
+    return vsetky
+      .filter((r) => r.uzDosiel || r.teraz <= 1 || (!!r.dojde && r.dojde <= hranica))
+      .sort((a, b) => {
+        // Najprv tí, čo hodiny už nemajú; potom podľa dňa, kedy dôjdu.
+        if (a.uzDosiel !== b.uzDosiel) return a.uzDosiel ? -1 : 1;
+        return (a.dojde || "9999").localeCompare(b.dojde || "9999") || a.meno.localeCompare(b.meno);
+      });
+  }, [vsetky, zdroj]);
 
   return (
     <Card style={style}>
@@ -1815,11 +1865,17 @@ export function Balicky({ udalosti, clients, sedenia = [], onObnov, style, onKli
                       {r.uz || r.kusov ? ` · kalendár vie o ${[r.uz ? `${r.uz} odtrénovanej` : "", r.kusov ? `${r.kusov} objednaných` : ""].filter(Boolean).join(" a ")}` : ""}
                     </>
                   ) : (
+                    /* KEDY dôjde je prvé, čo sa má prečítať — to je celý
+                       rozdiel medzi „posledné 4 z 18" a „posledné 4 zo 6".
+                       Zvyšok (odtrénované, objednané, platnosť) je kontext
+                       a ide za tým. */
                     <>
-                      {r.uz ? `${r.uz} h odtrénovaná, v PTminderi ešte nie` : null}
-                      {r.uz && r.kusov ? " · " : null}
-                      {r.kusov ? `obj. ${r.kusov}` : r.uz ? null : "bez termínu"}
-                      {r.platnostDo ? ` · platnosť do ${fmtDMY(r.platnostDo)}` : ""}
+                      <span style={{ color: r.uzDosiel ? C.red : C.orange, fontWeight: 600 }}>
+                        {r.uzDosiel ? "hodiny minuté" : r.dojde ? `dôjde ${fmtDMY(r.dojde)}` : "dôjde po objednaných"}
+                      </span>
+                      {r.uz ? ` · ${r.uz} h odtrénovaná, v PTminderi ešte nie` : null}
+                      {r.kusov ? ` · obj. ${r.kusov}` : null}
+                      {r.platnostDo ? ` · do ${fmtDMY(r.platnostDo)}` : ""}
                     </>
                   )}
                 </span>
