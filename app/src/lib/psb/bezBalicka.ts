@@ -22,6 +22,8 @@
  */
 
 import { jeAktivny, odtrenovane, type Balicek } from "./balickyEvidencia";
+import { osCasuKlienta } from "./klientOsCasu";
+import { priebehBalickov } from "./vypisHodin";
 import { normName } from "./format";
 
 /** Len to, čo z karty klienta naozaj potrebujeme. */
@@ -51,6 +53,12 @@ export type BezBalicka = {
   dni: number;
   /** Koľko má objednaných termínov, na ktoré nemá hodinu. */
   objednanych: number;
+  /**
+   * Koľko tréningov už odtrénoval bez krytia — to isté číslo, aké v profile
+   * stojí ako −1, −2, −3. Nula znamená „je presne na nule", nie „nič nedlží
+   * hodinami": to sú dve rôzne veci a Jerryho zaujíma práve tá druhá.
+   */
+  vMinuse: number;
 };
 
 const den = (s: string) => (s || "").slice(0, 10);
@@ -110,11 +118,41 @@ function zostatokVKokpite(vlastne: Balicek[], udalosti: Udalost[], meno: string,
   return predane - odtrenovane(udalosti, meno, od, dnes);
 }
 
+/**
+ * Koľko tréningov klient odtrénoval bez krytia — z TEJ ISTEJ osi času,
+ * akú vidí jeho profil.
+ *
+ * Nepočíta sa tu nanovo: mínus má jednu definíciu (`priebehBalickov`) a keby
+ * si ho karta rátala po svojom, o týždeň by na obrazovke stálo −1 a v kope
+ * −3. Číslo pri poslednom tréningu je aktuálna séria — os je zoradená
+ * najnovším hore, takže stačí prvý tréning, na ktorý sa narazí.
+ */
+export function vMinuseKlienta(
+  meno: string,
+  zdroj: Parameters<typeof osCasuKlienta>[1],
+  zostatokTeraz: number | null,
+  dnes: string = new Date().toISOString().slice(0, 10),
+): number {
+  const os = osCasuKlienta(meno, zdroj, dnes);
+  const { stavy } = priebehBalickov(os, zostatokTeraz, dnes);
+  for (const u of os) {
+    if (u.druh !== "trening") continue;
+    return stavy.get(u)?.dlh ?? 0;
+  }
+  return 0;
+}
+
 export function bezAktivnehoBalicka(
   clients: KlientPreKartu[],
   vlastne: Balicek[],
   udalosti: Udalost[],
   dnes: string = new Date().toISOString().slice(0, 10),
+  /**
+   * Koľko je klient v mínuse. Dáva ho volajúci, lebo potrebuje celú os času
+   * — a tá sa oplatí postaviť len tým pár ľuďom, ktorí v zozname naozaj sú,
+   * nie všetkým stodvadsiatim piatim.
+   */
+  minus?: (meno: string) => number,
 ): BezBalicka[] {
   const out: BezBalicka[] = [];
   for (const c of clients) {
@@ -150,16 +188,24 @@ export function bezAktivnehoBalicka(
         u.klient && normName(u.klient) === k
         && (u.typ === "trening" || u.typ === "uvodny")
         && den(u.zaciatok) > dnes).length,
+      vMinuse: minus ? minus(c.name) : 0,
     });
   }
 
   /**
-   * Hore ten, kto má objednaný termín — na ten nemá hodinu a je to najbližšia
-   * vec, ktorú treba vybaviť. Potom kto bol naposledy, lebo balíček sa predáva
-   * čerstvému klientovi, nie tomu, kto nechodí dva mesiace.
+   * HORE TEN, KTO JE NAJHLBŠIE V MÍNUSE.
+   *
+   * Prvá verzia radila podľa objednaných termínov. Jerry, 28. 9. 2026:
+   * „vidím, že je tam 2 objednané termíny, ale mňa skôr bude zaujímať, koľko
+   * sú už v mínuse." Objednaný termín je budúcnosť, ktorá sa dá ešte prehodiť;
+   * odtrénovaná hodina bez krytia je hotová vec a stojí peniaze.
+   *
+   * Až potom rozhodujú objednané termíny a nakoniec kto bol naposledy —
+   * balíček sa predáva čerstvému klientovi, nie tomu, kto nechodí dva mesiace.
    */
   return out.sort((a, b) =>
-    b.objednanych - a.objednanych
+    b.vMinuse - a.vMinuse
+    || b.objednanych - a.objednanych
     || b.poslednyTrening.localeCompare(a.poslednyTrening)
     || a.meno.localeCompare(b.meno));
 }

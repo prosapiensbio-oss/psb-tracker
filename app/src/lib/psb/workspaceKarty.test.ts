@@ -78,7 +78,7 @@ describe("karta patrí prihlásenému", () => {
     // Dlhy zostávajú Jerryho, rovnako ako front príjmov z banky.
     const zdrojeNavyse = {
       ...zdroje,
-      bezBalicka: [{ meno: "Richard Matl", trener: "Jerry", membership: "OFF - 6h", dovod: "hodiny minuté" as const, platnostDo: "", poslednyTrening: "2026-09-23", dni: 5, objednanych: 0 }],
+      bezBalicka: [{ meno: "Richard Matl", trener: "Jerry", membership: "OFF - 6h", dovod: "hodiny minuté" as const, platnostDo: "", poslednyTrening: "2026-09-23", dni: 5, objednanych: 0, vMinuse: 1 }],
       dlznici: [{ meno: "Dan Kouřil", trener: "Jerry", spolu: 7790, zPoplatkov: 7790, zBalickov: 0, polozky: [], najstarsi: "2026-09-02", dni: 26 }],
     };
     const u = postavKarty({ ...zdrojeNavyse, ktoSom: "jerry" }).map((x) => x.druh);

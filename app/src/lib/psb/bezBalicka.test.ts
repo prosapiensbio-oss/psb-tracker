@@ -106,3 +106,28 @@ describe("treningyZObochZdrojov", () => {
     expect(v).toHaveLength(0);
   });
 });
+
+describe("poradie podľa mínusu", () => {
+  it("najhlbší mínus je hore, objednané termíny rozhodujú až potom", () => {
+    const l = [
+      kl({ name: "Na nule, dva termíny" }),
+      kl({ name: "Tri v mínuse" }),
+      kl({ name: "Jeden v mínuse" }),
+    ];
+    const minus: Record<string, number> = { "Tri v mínuse": 3, "Jeden v mínuse": 1 };
+    const udalosti = [
+      { klient: "Na nule, dva termíny", zaciatok: "2026-10-01T17:00", typ: "trening" },
+      { klient: "Na nule, dva termíny", zaciatok: "2026-10-03T17:00", typ: "trening" },
+    ];
+    const v = bezAktivnehoBalicka(l, [], udalosti, DNES, (m) => minus[m] || 0);
+    expect(v.map((x) => [x.meno, x.vMinuse])).toEqual([
+      ["Tri v mínuse", 3],
+      ["Jeden v mínuse", 1],
+      ["Na nule, dva termíny", 0],
+    ]);
+  });
+
+  it("bez funkcie na mínus je všade nula a nič nespadne", () => {
+    expect(bezAktivnehoBalicka([kl({ name: "A" })], [], [], DNES)[0].vMinuse).toBe(0);
+  });
+});

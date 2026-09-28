@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { navrhniKlientaKandidati, type ClientAgg } from "../../lib/psb/compute";
 import { krokGesta, novyStavGesta } from "../../lib/psb/gestoKariet";
 import { BEZ_FRONTY, klucPolozky, popisZmeny, postavKarty, trenerZPrihlasenia, type Karta, type NeznamyNazov, type NepriradenaPlatba, type Zmena } from "../../lib/psb/workspaceKarty";
-import { bezAktivnehoBalicka, treningyZObochZdrojov, type BezBalicka } from "../../lib/psb/bezBalicka";
+import { bezAktivnehoBalicka, treningyZObochZdrojov, vMinuseKlienta, type BezBalicka } from "../../lib/psb/bezBalicka";
 import { dlznici as spocitajDlznikov, type Dlznik } from "../../lib/psb/dlznici";
 
 /** Riadky z `/api/balicky` a `/api/platby` — len to, čo tieto karty potrebujú. */
@@ -109,16 +109,33 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
 
   /** Aktívni bez hodín — pýta sa exportu aj vlastnej evidencie naraz. */
   const bezBalicka = useMemo<BezBalicka[]>(
-    () => bezAktivnehoBalicka(
+    () => {
+    const evidencia = balicky.map((b) => ({
+      id: "", klient: b.klient, nazov: b.nazov, hodiny: b.hodiny,
+      platnostOd: (b.platnost_od || "").slice(0, 10), platnostDo: (b.platnost_do || "")?.slice(0, 10) || null,
+      cenaCzk: b.cena_czk, zdroj: b.zdroj, zruseneAt: b.zrusene_at,
+    }));
+    /** Zdroj osi času — ten istý, aký používa profil klienta. */
+    const ZDROJ_OSI = {
+      sessions: data.sessions as never,
+      payments: data.payments as never,
+      packages: (data.packages || []) as never,
+      services: (data.services || []) as never,
+      poplatky: (data.poplatky || []) as never,
+      treningyZdarma: (data.treningyZdarma || []) as never,
+      balicky: evidencia as never,
+      kalUdalosti: (kalUdalosti || []) as never,
+    };
+    return bezAktivnehoBalicka(
       Object.values(clients),
-      balicky.map((b) => ({
-        id: "", klient: b.klient, nazov: b.nazov, hodiny: b.hodiny,
-        platnostOd: (b.platnost_od || "").slice(0, 10), platnostDo: (b.platnost_do || "")?.slice(0, 10) || null,
-        cenaCzk: b.cena_czk, zdroj: b.zdroj, zruseneAt: b.zrusene_at,
-      })),
+      evidencia,
       treningyZObochZdrojov(data.sessions, kalUdalosti || []),
-    ),
-    [clients, balicky, kalUdalosti, data.sessions],
+      undefined,
+      // Mínus berie tá istá funkcia, ktorá kreslí čísla na osi v profile.
+      (meno) => vMinuseKlienta(meno, ZDROJ_OSI, clients[meno]?.packageTotal > 0 ? clients[meno].packageRemaining : null),
+    );
+    },
+    [clients, balicky, kalUdalosti, data],
   );
 
   /** Kto dlží — otvorené poplatky z PTmindera aj nezaplatené balíčky z Kokpitu. */
@@ -669,10 +686,17 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                       {x.membership ? ` · ${x.membership}` : ""}
                       {x.dovod === "platnosť skončila" && x.platnostDo ? ` ${den(x.platnostDo)}` : ""}
                     </div>
-                    <div style={{ fontSize: 11.5, color: x.objednanych ? C.orange : C.textDim, minWidth: 120, textAlign: "right" }}>
-                      {x.objednanych
-                        ? `${x.objednanych} objednaných termínov`
-                        : x.dni >= 0 ? `naposledy pred ${x.dni} dňami` : "netrénoval"}
+                    {/* Mínus je hlavné číslo. Jerry, 28. 9. 2026: „mňa skôr
+                        bude zaujímať, koľko sú už v mínuse." Objednaný termín
+                        sa dá prehodiť, odtrénovaná hodina bez krytia nie. */}
+                    <div style={{ minWidth: 118, textAlign: "right", fontSize: 11.5, color: C.textDim }}>
+                      {x.vMinuse > 0
+                        ? <span style={{ fontSize: 13.5, fontWeight: 700, color: C.orange }}>−{x.vMinuse} h</span>
+                        : <span>na nule</span>}
+                      {x.objednanych ? <span style={{ marginLeft: 7 }}>obj. {x.objednanych}</span> : null}
+                    </div>
+                    <div style={{ fontSize: 11.5, color: C.textDim, minWidth: 96, textAlign: "right" }}>
+                      {x.dni >= 0 ? `pred ${x.dni} dňami` : "netrénoval"}
                     </div>
                     <button onClick={() => oznacHotove(kluc)} style={vedlajsie}>vybavené</button>
                   </div>

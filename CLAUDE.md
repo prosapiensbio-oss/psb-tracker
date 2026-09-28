@@ -1723,6 +1723,17 @@ jeden DRUH práce naraz.
   z PTmindera (kľúč `nezaplatene`) a balíčky nahodené v Kokpite, na ktoré
   neprišla platba (`dlhKlienta`). Hovoria o inom období a klient môže dlžiť
   v oboch naraz; dve karty vedľa seba by z jedného človeka spravili dvoch.
+- **Hlavné číslo je MÍNUS, nie objednané termíny.** Prvá verzia radila podľa
+  objednaných hodín; Jerry, 28. 9. 2026: „mňa skôr bude zaujímať, koľko sú už
+  v mínuse." Objednaný termín je budúcnosť, ktorá sa dá prehodiť, odtrénovaná
+  hodina bez krytia je hotová vec. Mínus berie `vMinuseKlienta` z
+  `priebehBalickov` — tá istá funkcia, ktorá kreslí −1, −2, −3 v profile;
+  vlastný prepočet by znamenal, že o týždeň bude na obrazovke iné číslo než
+  v kope. Os času sa stavia LEN kandidátom zoznamu (bolo ich sedem), nie
+  všetkým stodvadsiatim piatim.
+- **„Na nule" a „v mínuse" sú dve rôzne veci.** Kto má 0 h a nechodil, nič
+  nedlží; kto má 0 h a odvtedy trénoval, stojí firmu peniaze. Karta to preto
+  rozlišuje slovom, nie len poradím.
 - **Kľúč odklepnutia je MENO, nie suma.** Suma aj počet hodín sa hýbu každým
   importom a odklepnutie by padlo pri prvom pohybe (pravidlo z 26. 8. 2026).
   „Vybavené" tu navyše nič nezapisuje do databázy — vybavuje sa telefonátom

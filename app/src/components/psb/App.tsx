@@ -54,7 +54,7 @@ import { Workspace } from "./Workspace";
 import type { FakturaPredvolba } from "./VydaneFaktury";
 import { Prechod } from "./Prechod";
 import { buildAiContext } from "../../lib/psb/aiContext";
-import { bezAktivnehoBalicka, treningyZObochZdrojov } from "../../lib/psb/bezBalicka";
+import { bezAktivnehoBalicka, treningyZObochZdrojov, vMinuseKlienta } from "../../lib/psb/bezBalicka";
 import { dlznici as spocitajDlznikov } from "../../lib/psb/dlznici";
 
 /** Riadky z `/api/balicky` a `/api/platby`, ktoré kŕmia fronty Workspace. */
@@ -2256,8 +2256,22 @@ function skupinaFaktur(
     };
     const treneri: Record<string, string> = {};
     for (const [meno, c] of Object.entries(clients)) if (c.primaryTrainer) treneri[meno] = c.primaryTrainer;
+    /** Zdroj osi času — ten istý, aký používa profil klienta. */
+    const ZDROJ_OSI = {
+      sessions: data.sessions as never,
+      payments: data.payments as never,
+      packages: (data.packages || []) as never,
+      services: (data.services || []) as never,
+      poplatky: (data.poplatky || []) as never,
+      treningyZdarma: (data.treningyZdarma || []) as never,
+      balicky: evidencia as never,
+      kalUdalosti: (kalUdalosti || []) as never,
+    };
     return {
-      bezBalicka: bezAktivnehoBalicka(Object.values(clients), evidencia, treningyZObochZdrojov(data.sessions, kalUdalosti || [])),
+      bezBalicka: bezAktivnehoBalicka(
+        Object.values(clients), evidencia, treningyZObochZdrojov(data.sessions, kalUdalosti || []), undefined,
+        (meno) => vMinuseKlienta(meno, ZDROJ_OSI, clients[meno]?.packageTotal > 0 ? clients[meno].packageRemaining : null),
+      ),
       dlznici: spocitajDlznikov(
         (data.poplatky || []).map((p) => ({ datum: p.datum, klient: p.klient, popis: p.popis, suma: p.suma })),
         Object.fromEntries(Object.entries(podla(balickyRiadky)).map(([m, bs]) => [m, bs.map((b) => ({
@@ -2269,7 +2283,7 @@ function skupinaFaktur(
         treneri,
       ),
     };
-  }, [clients, balickyRiadky, vlastnePlatby, data.poplatky, data.sessions, kalUdalosti]);
+  }, [clients, balickyRiadky, vlastnePlatby, data, kalUdalosti]);
 
   const aiContext = useMemo(
     () => buildAiContext(data, clients, sixM, capacity, registerAll, { udalosti: kalUdalosti, zmeny: kalZmeny }, uzavierkaPreAi,
