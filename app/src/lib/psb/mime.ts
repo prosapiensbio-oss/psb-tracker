@@ -24,7 +24,20 @@ const hlavicka = (s: string) => (/^[\x20-\x7E]*$/.test(s) ? s : `=?UTF-8?B?${bas
 /** Meno pred adresou; zakódované, keď má diakritiku. */
 const adresa = (mail: string, meno?: string) => (meno ? `${hlavicka(meno)} <${mail}>` : mail);
 
-export type Priloha = { meno: string; typ: string; data: ArrayBuffer };
+export type Priloha = {
+  meno: string;
+  typ: string;
+  data: ArrayBuffer;
+  /**
+   * Obrázok, ktorý sa má zobraziť VNÚTRI správy, nie visieť pod ňou.
+   *
+   * QR na platbu musí byť vidieť v tele mailu. Dátová adresa (`data:`) by
+   * bola jednoduchšia, lenže Gmail ju v obrázkoch zahadzuje — jediná cesta,
+   * ktorá prejde všade, je príloha s `Content-ID`, na ktorú sa HTML odkáže
+   * cez `cid:`.
+   */
+  cid?: string;
+};
 
 export type Sprava = {
   od: string;
@@ -32,7 +45,10 @@ export type Sprava = {
   komu: string[];
   kopiaSkryta?: string[];
   predmet: string;
+  /** Čisto textová podoba — to, čo uvidí klient v čítačke bez HTML. */
   telo: string;
+  /** Nepovinná HTML podoba tej istej správy. */
+  html?: string;
   prilohy?: Priloha[];
 };
 
@@ -47,19 +63,66 @@ export function mimeSprava(s: Sprava, hranica = `psb${Date.now().toString(36)}${
     "MIME-Version: 1.0",
   ];
   const prilohy = s.prilohy || [];
-  if (!prilohy.length) {
-    hlavicky.push('Content-Type: text/plain; charset="UTF-8"', "Content-Transfer-Encoding: base64");
-    return `${hlavicky.join(CRLF)}${CRLF}${CRLF}${zalom(base64Text(s.telo))}`;
+  const vnutri = prilohy.filter((p) => p.cid);
+  const pripojene = prilohy.filter((p) => !p.cid);
+
+  /**
+   * SPRÁVA SA SKLADÁ ZVNÚTRA VON.
+   *
+   *   text            — keď nie je ani HTML, ani príloha
+   *   alternative     — text + HTML (čítačka si vyberie, čo vie)
+   *   related         — alternative + obrázky, na ktoré sa HTML odkazuje
+   *   mixed           — to všetko + prílohy, ktoré sa sťahujú (PDF faktúry)
+   *
+   * Každá vrstva pribudne LEN vtedy, keď má čo obaliť. Mail s holým textom
+   * tak vyzerá presne ako predtým — a to je zámer, lebo tri roky fungoval.
+   */
+  const h = (n: number) => `${hranica}_${n}`;
+  const cast = (typ: string, obsah: string, extra: string[] = []) =>
+    [`Content-Type: ${typ}`, "Content-Transfer-Encoding: base64", ...extra, "", zalom(base64Text(obsah))];
+
+  let telo: string[];
+  let typTela: string;
+  if (s.html) {
+    typTela = `multipart/alternative; boundary="${h(1)}"`;
+    telo = [
+      `--${h(1)}`, ...cast('text/plain; charset="UTF-8"', s.telo),
+      `--${h(1)}`, ...cast('text/html; charset="UTF-8"', s.html),
+      `--${h(1)}--`,
+    ];
+  } else {
+    typTela = 'text/plain; charset="UTF-8"';
+    telo = ["Content-Transfer-Encoding: base64", "", zalom(base64Text(s.telo))];
+    // Bez obalu je hlavička tela zároveň hlavičkou správy — rieši sa nižšie.
   }
+
+  if (vnutri.length) {
+    const vnutorne = telo;
+    const vnutornyTyp = typTela;
+    typTela = `multipart/related; type="multipart/alternative"; boundary="${h(2)}"`;
+    telo = [`--${h(2)}`, `Content-Type: ${vnutornyTyp}`, ...(s.html ? [""] : []), ...vnutorne];
+    for (const p of vnutri) {
+      telo.push(
+        `--${h(2)}`,
+        `Content-Type: ${p.typ}; name="${p.meno}"`,
+        "Content-Transfer-Encoding: base64",
+        `Content-ID: <${p.cid}>`,
+        `Content-Disposition: inline; filename="${p.meno}"`,
+        "",
+        zalom(base64(p.data)),
+      );
+    }
+    telo.push(`--${h(2)}--`);
+  }
+
+  if (!pripojene.length) {
+    hlavicky.push(`Content-Type: ${typTela}`);
+    return `${hlavicky.join(CRLF)}${CRLF}${telo.join(CRLF)}${CRLF}`;
+  }
+
   hlavicky.push(`Content-Type: multipart/mixed; boundary="${hranica}"`);
-  const casti = [
-    `--${hranica}`,
-    'Content-Type: text/plain; charset="UTF-8"',
-    "Content-Transfer-Encoding: base64",
-    "",
-    zalom(base64Text(s.telo)),
-  ];
-  for (const p of prilohy) {
+  const casti = [`--${hranica}`, `Content-Type: ${typTela}`, ...(s.html || vnutri.length ? [""] : []), ...telo];
+  for (const p of pripojene) {
     casti.push(
       `--${hranica}`,
       `Content-Type: ${p.typ}; name="${p.meno}"`,

@@ -35,6 +35,25 @@ export function qrSvg(text: string, velkost = 3): string {
   return q.createSvgTag({ cellSize: velkost, margin: velkost * 2, scalable: true });
 }
 
+/**
+ * QR platba ako GIF — na vloženie do mailu.
+ *
+ * SVG by bolo krajšie, lenže Gmail ho v správach zahadzuje; dátová adresa
+ * (`data:`) tiež. Do mailu preto ide obyčajný obrázok ako príloha
+ * s `Content-ID`, a toto sú jeho bajty.
+ */
+export function qrObrazok(text: string, velkost = 6): { typ: string; data: ArrayBuffer } {
+  const q = qrcode(0, "M");
+  q.addData(text, "Byte");
+  q.make();
+  const url = q.createDataURL(velkost, velkost);
+  const b64 = url.slice(url.indexOf(",") + 1);
+  const bin = atob(b64);
+  const bajty = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bajty[i] = bin.charCodeAt(i);
+  return { typ: url.slice(5, url.indexOf(";")), data: bajty.buffer };
+}
+
 /** Riadky adresy, prázdne sa vynechajú. */
 const adresa = (r: (string | undefined)[]) =>
   r.filter((x) => x && String(x).trim()).map((x) => `${esc(String(x))}<br>`).join("");

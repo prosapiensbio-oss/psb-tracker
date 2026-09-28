@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { fakturaDocument, qrSvg } from "./fakturaHtml";
+import { fakturaDocument, qrSvg, qrObrazok } from "./fakturaHtml";
 import { spayd, type Faktura } from "./vydanaFaktura";
 
 const f: Faktura = {
@@ -109,5 +109,15 @@ describe("značka sa tlačí vo farbe", () => {
     const h = fakturaDocument(f);
     expect(h).not.toContain('"/znacka-napis.svg"');
     expect(h).not.toContain('"/znacka-figura.svg"');
+  });
+});
+
+describe("qrObrazok", () => {
+  it("vráti bajty obrázka, nie dátovú adresu", () => {
+    const o = qrObrazok("SPD*1.0*ACC:CZ123*AM:7790.00");
+    expect(o.typ).toMatch(/^image\//);
+    expect(o.data.byteLength).toBeGreaterThan(100);
+    // GIF začína „GIF89a" — keby sa vracal text, prvé bajty by boli iné.
+    expect(String.fromCharCode(...new Uint8Array(o.data).slice(0, 3))).toBe("GIF");
   });
 });

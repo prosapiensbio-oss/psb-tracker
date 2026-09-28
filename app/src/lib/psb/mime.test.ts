@@ -88,3 +88,43 @@ describe("adresyMailu", () => {
     expect(adresyMailu("  ,\n ; ")).toEqual({ adresy: [], zle: [] });
   });
 });
+
+describe("HTML a obrázok vnútri správy", () => {
+  const zakl = { od: "info@prosapiens.cz", komu: ["k@k.cz"], predmet: "Test", telo: "holý text" };
+
+  it("bez HTML a bez príloh zostáva správa obyčajný text", () => {
+    const m = mimeSprava(zakl);
+    expect(m).toContain('Content-Type: text/plain; charset="UTF-8"');
+    expect(m).not.toContain("multipart");
+  });
+
+  it("s HTML pribudne alternative a obe podoby", () => {
+    const m = mimeSprava({ ...zakl, html: "<b>ahoj</b>" });
+    expect(m).toContain("multipart/alternative");
+    expect(dekoduj(m.split("Content-Transfer-Encoding: base64")[1].split("--")[0])).toContain("holý text");
+    expect(m).toContain('Content-Type: text/html; charset="UTF-8"');
+  });
+
+  it("obrázok s cid ide do related a nesie Content-ID", () => {
+    const m = mimeSprava({
+      ...zakl, html: '<img src="cid:qr@psb">',
+      prilohy: [{ meno: "qr.gif", typ: "image/gif", data: new Uint8Array([71, 73, 70]).buffer, cid: "qr@psb" }],
+    });
+    expect(m).toContain("multipart/related");
+    expect(m).toContain("Content-ID: <qr@psb>");
+    expect(m).toContain("Content-Disposition: inline");
+  });
+
+  it("príloha na stiahnutie zostáva prílohou, aj keď je v správe obrázok", () => {
+    const m = mimeSprava({
+      ...zakl, html: "<b>x</b>",
+      prilohy: [
+        { meno: "qr.gif", typ: "image/gif", data: new Uint8Array([71]).buffer, cid: "qr@psb" },
+        { meno: "faktura.pdf", typ: "application/pdf", data: new Uint8Array([37, 80]).buffer },
+      ],
+    });
+    expect(m).toContain("multipart/mixed");
+    expect(m).toContain("multipart/related");
+    expect(m).toContain('Content-Disposition: attachment; filename="faktura.pdf"');
+  });
+});

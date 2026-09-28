@@ -1867,3 +1867,37 @@ filtre, ktoré visia na poliach, ktoré nový zdroj nemá. A filter patrí na
 KONIEC, k hotovému riadku, nie do jednej z vetiev, ktorými riadky vznikajú.
 Rozhoduje pritom primárny tréner KLIENTA, nie trénera udalosti: karta je
 o tom, komu predať ďalší balíček, a to je vec toho, kto ho vedie.
+
+## Mail pre klienta: tabuľky namiesto obrázkov, údaje namiesto HTML
+
+Jerry, 28. 9. 2026: „vedeli by sme ten mail spraviť nejako pekne vizuálne?
+A okrem dochádzky a QR platby dať nejaké grafy?" (`mailKlientovi.ts`)
+
+- **Grafy sú z TABULIEK, nie z obrázkov.** Stĺpec je bunka s `bgcolor`
+  a šírkou v percentách — vykreslí ju aj Gmail, aj Outlook, nič sa nesťahuje
+  zvonku a nerastie tým šanca na spam. Doména má DMARC `p=none`, takže
+  obrázkový newsletter je riziko, ktoré si nemusíme pridávať. `<div>` so
+  šírkou v percentách Outlook ignoruje, tabuľková bunka nie.
+- **QR musí byť PRÍLOHA s `Content-ID`.** SVG aj `data:` adresu Gmail
+  v obrázkoch zahadzuje; `cid:` prejde všade. `mimeSprava` preto vie skladať
+  `alternative` (text + HTML), `related` (HTML + obrázky v ňom) a `mixed`
+  (to všetko + prílohy na stiahnutie) — každá vrstva pribudne len vtedy, keď
+  má čo obaliť, takže holý text vyzerá presne ako predtým.
+- **Do poznámky pre príjemcu ide MENO klienta, nie variabilný symbol.**
+  Kokpit páruje bankové príjmy podľa mena v texte platby; číslo, ktoré nikam
+  nepatrí, by párovaniu nepomohlo a klienta by mýlilo.
+- **Obrazovka posiela ÚDAJE, HTML sádže server.** Správa ide cudziemu
+  človeku z našej adresy — hotové HTML z prehliadača by bola zbytočne
+  otvorená cesta. Z prehliadača ide len veta, ktorú Jerry naozaj napísal.
+
+### Čo v tom maili zámerne NIE JE
+
+- **Porovnanie s ostatnými.** Jerry ho chcel („ako je na tom v porovnaní
+  s priemerom"), ale polovica ľudí je z definície pod priemerom — a práve tej
+  polovici by veta „chodíš menej než ostatní" dala dôvod skončiť, nie kúpiť
+  si ďalší balíček. V maili stoja jeho VLASTNÉ čísla.
+- **Bolesť.** Ponúkol som ju ako najsilnejší graf a bol to omyl:
+  `klient_merania` je prázdna a zostane, meranie bolesti Jerry 24. 9. 2026
+  zrušil. Pamäť to hovorí jasne a aj tak som to navrhol znova.
+- **Naše písmo.** Agrandir mailová čítačka nemá a webové písmo Gmail
+  ignoruje. Farby značky nesie zvyšok.

@@ -1430,7 +1430,15 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
           {/* Výpis na poslanie klientovi — pod zoznamom, nie nad ním: najprv
               sa človek pozrie, potom sa rozhodne posielať. */}
           {filter === "vsetko" && os.length > 0 && (
-            <VypisHodinPanel meno={meno} os={os} email={kontaktMail} zostatokTeraz={zostatokTeraz} />
+            <VypisHodinPanel
+              meno={meno} os={os} email={kontaktMail} zostatokTeraz={zostatokTeraz}
+              trener={c?.primaryTrainer || ""}
+              mesacne={poMesiacoch}
+              hodinSpolu={Math.round(c?.totalHours || 0)}
+              odkedy={(c?.firstSession || "").slice(0, 10)}
+              // Cena posledného balíčka — predvyplní sa do QR, keď ju Jerry chce.
+              cenaBalicka={[...mojeBalicky].find((b) => (b.cena_czk || 0) > 0)?.cena_czk || 0}
+            />
           )}
 
           {filter === "poznamky" && (

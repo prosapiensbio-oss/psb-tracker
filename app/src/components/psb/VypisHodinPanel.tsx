@@ -26,7 +26,18 @@ const OBDOBIA = [
   { l: "všetko", m: 0 },
 ];
 
-export function VypisHodinPanel({ meno, os, email, zostatokTeraz }: { meno: string; os: Os; email?: string; zostatokTeraz: number | null }) {
+export function VypisHodinPanel({ meno, os, email, zostatokTeraz, trener = "", mesacne = [], hodinSpolu = 0, odkedy = "", cenaBalicka = 0 }: {
+  meno: string; os: Os; email?: string; zostatokTeraz: number | null;
+  /** Kto ho vedie — mailom sa podpíše. */
+  trener?: string;
+  /** Sedenia po mesiacoch — z nich sú stĺpce v maili. */
+  mesacne?: { mesiac: string; pocet: number }[];
+  hodinSpolu?: number;
+  /** Odkedy klient chodí. */
+  odkedy?: string;
+  /** Cena posledného balíčka — predvyplní sa do QR platby. */
+  cenaBalicka?: number;
+}) {
   const [otvorene, setOtvorene] = useState(false);
   const [mesiacov, setMesiacov] = useState(3);
   const [komu, setKomu] = useState(email || "");
@@ -35,6 +46,9 @@ export function VypisHodinPanel({ meno, os, email, zostatokTeraz }: { meno: stri
   const [rucne, setRucne] = useState(false);
   const [pracujem, setPracujem] = useState(false);
   const [hlaska, setHlaska] = useState("");
+  /** Suma do QR platby; prázdne = platba sa do mailu nedáva. */
+  const [suma, setSuma] = useState("");
+  const [popisPlatby, setPopisPlatby] = useState("Ďalší balíček");
   const [chyba, setChyba] = useState("");
 
   const v = useMemo(() => {
@@ -58,6 +72,26 @@ export function VypisHodinPanel({ meno, os, email, zostatokTeraz }: { meno: stri
         komu: komu.trim(),
         predmet: predmet.trim() || `Výpis hodín — ProSapiens Biomechanic`,
         telo: zobrazenyText,
+        /**
+         * ÚDAJE, NIE HOTOVÉ HTML.
+         *
+         * Mail sádže server z týchto polí — v prehliadači vzniká len to, čo
+         * Jerry naozaj napísal. Správa ide cudziemu človeku z našej adresy,
+         * takže hotové HTML z prehliadača by bola zbytočne otvorená cesta.
+         */
+        vypis: {
+          klient: meno,
+          oslovenie: meno.split(" ")[0],
+          trener,
+          treningy: v.riadky.filter((r) => r.druh === "trening").map((r) => ({ den: r.den, cas: (/\d{1,2}:\d{2}/.exec(r.popis) || [""])[0] })),
+          zostatok: v.koniec,
+          hodinSpolu,
+          odkedy,
+          mesacne,
+          platba: Number(suma) > 0
+            ? { popis: popisPlatby.trim() || "Ďalší balíček", suma: Number(suma), ucet: "2302732185/2010", sprava: meno }
+            : undefined,
+        },
       }),
     }).then((r) => r.json()).catch(() => ({ ok: false, error: "spojenie" }));
     setPracujem(false);
@@ -136,6 +170,36 @@ export function VypisHodinPanel({ meno, os, email, zostatokTeraz }: { meno: stri
           placeholder="Výpis hodín — ProSapiens Biomechanic"
           style={{ flex: "2 1 260px", padding: "6px 8px", borderRadius: 7, fontSize: 12, border: `1px solid ${C.border}`, background: C.bg, color: C.text }}
         />
+      </div>
+
+      {/* QR na platbu sa do mailu dá LEN keď je vyplnená suma. Prázdne pole
+          znamená „len výpis" — a to je bežnejší prípad. Do poznámky pre
+          príjemcu ide meno klienta, podľa neho Kokpit platbu spáruje. */}
+      <div style={{ display: "flex", gap: 7, marginBottom: 8, flexWrap: "wrap", alignItems: "center" }}>
+        <input
+          value={suma}
+          onChange={(e) => setSuma(e.target.value.replace(/[^\d]/g, ""))}
+          placeholder={cenaBalicka ? `QR na platbu — napr. ${cenaBalicka}` : "QR na platbu — suma v Kč"}
+          inputMode="numeric"
+          style={{ flex: "0 1 200px", padding: "6px 8px", borderRadius: 7, fontSize: 12, border: `1px solid ${C.border}`, background: C.bg, color: C.text }}
+        />
+        {!!cenaBalicka && !suma && (
+          <button onClick={() => setSuma(String(Math.round(cenaBalicka)))} style={{ padding: "5px 10px", borderRadius: 7, fontSize: 11.5, cursor: "pointer", fontFamily: "inherit", border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted }}>
+            posledný balíček
+          </button>
+        )}
+        {!!suma && (
+          <input
+            value={popisPlatby}
+            onChange={(e) => setPopisPlatby(e.target.value)}
+            placeholder="za čo to je"
+            style={{ flex: "1 1 200px", padding: "6px 8px", borderRadius: 7, fontSize: 12, border: `1px solid ${C.border}`, background: C.bg, color: C.text }}
+          />
+        )}
+      </div>
+
+      <div style={{ fontSize: 11, color: C.textDim, marginBottom: 6 }}>
+        Text nižšie ide do mailu ako tvoja osobná veta na začiatok; dochádzku, čísla aj QR doplní appka.
       </div>
 
       <textarea

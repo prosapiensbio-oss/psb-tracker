@@ -8,6 +8,9 @@ import { dalsieCislo, splatnostZ, SPLATNOST_DNI, type Faktura } from "../../lib/
 import { fakturaDoPdf } from "../../lib/psb/fakturaPdf.server";
 import { mailFaktury, menoPrilohy } from "../../lib/psb/mailFaktury";
 import { adresyMailu } from "../../lib/psb/mime";
+import { mailKlientovi, type VypisKlienta } from "../../lib/psb/mailKlientovi";
+import { qrObrazok } from "../../lib/psb/fakturaHtml";
+import { DODAVATEL as DOD_FA, spayd } from "../../lib/psb/vydanaFaktura";
 import { rozparsujKontakty } from "../../lib/psb/kontaktyIdokladu";
 import { posliMail } from "../../lib/psb/smtp.server";
 import { jeMesiac, normName } from "../../lib/psb/format";
@@ -359,6 +362,33 @@ export const Route = createFileRoute("/api/vydane-faktury")({
             const { adresy, zle } = adresyMailu(kus(b.komu, 400));
             const komu = adresy.join(", ");
             const telo = String(b.telo || "").slice(0, 20000);
+            /**
+             * VÝPIS SA SÁDŽE TU, NIE V PREHLIADAČI.
+             *
+             * Obrazovka pošle ÚDAJE (tréningy, mesiace, platba) a text, ktorý
+             * Jerry prípadne prepísal; HTML aj QR vznikajú na serveri. Keby
+             * HTML chodilo z prehliadača, dalo by sa doň po ceste dopísať
+             * čokoľvek — a je to správa, ktorá ide cudziemu človeku z našej
+             * adresy.
+             *
+             * Keď `vypis` nepríde, odíde holý text ako doteraz.
+             */
+            const v = b.vypis as VypisKlienta | undefined;
+            let html: string | undefined;
+            const prilohy: { meno: string; typ: string; data: ArrayBuffer; cid?: string }[] = [];
+            if (v && v.oslovenie) {
+              const qrCid = v.platba ? `qr-${crypto.randomUUID()}@prosapiens` : undefined;
+              if (v.platba && qrCid) {
+                // Do správy pre príjemcu ide MENO klienta — podľa neho Kokpit
+                // bankový príjem spáruje. Variabilný symbol by tu nemal komu
+                // patriť, faktúra to nie je.
+                const o = qrObrazok(spayd({
+                  suma: v.platba.suma, vs: "", sprava: v.platba.sprava, prijemca: DOD_FA.meno,
+                }));
+                prilohy.push({ meno: "qr-platba.gif", typ: o.typ, data: o.data, cid: qrCid });
+              }
+              html = mailKlientovi({ ...v, qrCid, odkaz: telo.trim() || undefined }).html;
+            }
             if (zle.length) {
               return Response.json({ ok: false, error: `Toto nie je e-mailová adresa: ${zle.join(", ")}` }, { status: 400 });
             }
@@ -375,7 +405,9 @@ export const Route = createFileRoute("/api/vydane-faktury")({
                 odMeno: "ProSapiens Biomechanic",
                 komu: adresy,
                 predmet: kus(b.predmet, 200) || "Výpis hodín — ProSapiens Biomechanic",
-                telo,
+                telo: v && v.oslovenie ? mailKlientovi({ ...v, odkaz: telo.trim() || undefined }).text : telo,
+                html,
+                prilohy: prilohy.length ? prilohy : undefined,
               },
             );
             if (!vysledok.ok) {
