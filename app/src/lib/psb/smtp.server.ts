@@ -13,8 +13,19 @@ import { CRLF, base64Text, mimeSprava, poLudsky, type Priloha, type Sprava } fro
  * vie odpovedať — a odpoveď padne Jerrymu do schránky, nie do appky.
  *
  * Workers nemajú SMTP knižnicu, ale majú `connect()` — TCP von na ľubovoľný
- * port okrem 25. Websupport počúva na 587, hovorí STARTTLS a `AUTH LOGIN`
- * (overené 26. 9. 2026).
+ * port okrem 25.
+ *
+ * DVE CESTY, A 465 JE TÁ, KTORÚ WEBSUPPORT SÁM UVÁDZA.
+ *
+ * Prvá verzia (26. 9. 2026) išla na 587 so STARTTLS — zistené skúšaním, lebo
+ * to fungovalo. V administrácii Websupportu ale pri schránke stojí „Server
+ * odchádzajúcej pošty: smtp.m1.websupport.sk, port 465, Bezpečnosť SSL/TLS"
+ * (pozreté 28. 9. 2026, keď odosielanie zrazu prestalo chodiť). 587 je tam
+ * tiež otvorený, len nie je ten dokumentovaný.
+ *
+ * Skúša sa preto najprv 465 (šifrované od prvého bajtu, žiadny STARTTLS)
+ * a až potom 587. Keď zlyhajú obe, vráti sa chyba z tej DRUHEJ — prvá by
+ * povedala len „na 465 to nešlo", čo bez druhej polovice nič nehovorí.
  *
  * ČO JE TU KRITICKÉ
  *
@@ -41,7 +52,11 @@ type Zasuvka = {
   startTls(): Zasuvka;
 };
 
-export type SmtpUcet = { host: string; port: number; pouzivatel: string; heslo: string };
+/** `port` je nepovinný: bez neho sa skúsi 465 a potom 587. */
+export type SmtpUcet = { host: string; port?: number; pouzivatel: string; heslo: string };
+
+/** Ako sa spojenie šifruje: od začiatku (465), alebo až po STARTTLS (587). */
+type Rezim = "tls" | "starttls";
 
 /** Čítanie odpovedí po riadkoch — jeden buffer pre celé spojenie. */
 class Citac {
@@ -84,21 +99,34 @@ class Citac {
  * faktúry, ktorá je už vystavená.
  */
 export async function posliMail(u: SmtpUcet, s: Sprava, strop = 25000): Promise<{ ok: boolean; chyba?: string }> {
+  const cesty: { port: number; rezim: Rezim }[] = u.port
+    ? [{ port: u.port, rezim: u.port === 465 ? "tls" : "starttls" }]
+    : [{ port: 465, rezim: "tls" }, { port: 587, rezim: "starttls" }];
   /**
    * Strop na celý rozhovor. Bez neho sa dá čakať donekonečna: keď server
    * neodpovie, `read()` sa jednoducho nevráti a visí celá požiadavka —
    * človek pozerá na „posielam…" a nedozvie sa nič.
    */
   return await Promise.race([
-    rozhovor(u, s),
+    (async () => {
+      let posledna: { ok: boolean; chyba?: string } = { ok: false, chyba: "žiadna cesta na server" };
+      for (const c of cesty) {
+        posledna = await rozhovor(u, s, c.port, c.rezim);
+        if (posledna.ok) return posledna;
+      }
+      return posledna;
+    })(),
     new Promise<{ ok: boolean; chyba?: string }>((ok) => setTimeout(() => ok({ ok: false, chyba: `server neodpovedal do ${Math.round(strop / 1000)} s` }), strop)),
   ]);
 }
 
-async function rozhovor(u: SmtpUcet, s: Sprava): Promise<{ ok: boolean; chyba?: string }> {
+async function rozhovor(u: SmtpUcet, s: Sprava, port: number, rezim: Rezim): Promise<{ ok: boolean; chyba?: string }> {
   let socket: Zasuvka | null = null;
   try {
-    socket = connect({ hostname: u.host, port: u.port }, { secureTransport: "starttls", allowHalfOpen: false }) as unknown as Zasuvka;
+    socket = connect(
+      { hostname: u.host, port },
+      { secureTransport: rezim === "tls" ? "on" : "starttls", allowHalfOpen: false },
+    ) as unknown as Zasuvka;
     let citac = new Citac(socket.readable.getReader());
     let zapis = socket.writable.getWriter();
     const kodovac = new TextEncoder();
@@ -112,19 +140,23 @@ async function rozhovor(u: SmtpUcet, s: Sprava): Promise<{ ok: boolean; chyba?: 
     await cakaj([220], "pripojenie");
     await posli("EHLO kokpit.prosapiens.cz");
     await cakaj([250], "EHLO");
-    await posli("STARTTLS");
-    await cakaj([220], "STARTTLS");
 
-    // Od tohto miesta je spojenie šifrované — až teraz smie ísť heslo.
-    citac.pusti();
-    zapis.releaseLock();
-    const bezpecny = socket.startTls();
-    socket = bezpecny;
-    citac = new Citac(bezpecny.readable.getReader());
-    zapis = bezpecny.writable.getWriter();
+    if (rezim === "starttls") {
+      await posli("STARTTLS");
+      await cakaj([220], "STARTTLS");
 
-    await posli("EHLO kokpit.prosapiens.cz");
-    await cakaj([250], "EHLO po TLS");
+      // Od tohto miesta je spojenie šifrované — až teraz smie ísť heslo.
+      citac.pusti();
+      zapis.releaseLock();
+      const bezpecny = socket.startTls();
+      socket = bezpecny;
+      citac = new Citac(bezpecny.readable.getReader());
+      zapis = bezpecny.writable.getWriter();
+
+      await posli("EHLO kokpit.prosapiens.cz");
+      await cakaj([250], "EHLO po TLS");
+    }
+    // Pri 465 je šifrované už samo spojenie, takže heslo smie ísť hneď.
     await posli("AUTH LOGIN");
     await cakaj([334], "AUTH");
     await posli(base64Text(u.pouzivatel));
@@ -148,7 +180,7 @@ async function rozhovor(u: SmtpUcet, s: Sprava): Promise<{ ok: boolean; chyba?: 
     await posli("QUIT");
     return { ok: true };
   } catch (e) {
-    return { ok: false, chyba: poLudsky(String(e instanceof Error ? e.message : e)) };
+    return { ok: false, chyba: `${poLudsky(String(e instanceof Error ? e.message : e))} (port ${port})` };
   } finally {
     try { await socket?.close(); } catch { /* spojenie už spadlo */ }
   }

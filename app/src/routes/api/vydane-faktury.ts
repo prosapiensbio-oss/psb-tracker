@@ -369,7 +369,7 @@ export const Route = createFileRoute("/api/vydane-faktury")({
               return Response.json({ ok: false, error: "Schránka nie je nastavená — doplň ju v Údajoch." }, { status: 400 });
             }
             const vysledok = await posliMail(
-              { host: n.host.replace(/^imap\./, "smtp."), port: 587, pouzivatel: n.user, heslo: n.heslo },
+              { host: n.host.replace(/^imap\./, "smtp."), pouzivatel: n.user, heslo: n.heslo },
               {
                 od: n.user,
                 odMeno: "ProSapiens Biomechanic",
@@ -426,9 +426,10 @@ export const Route = createFileRoute("/api/vydane-faktury")({
             const pdf = await fakturaDoPdf(BROWSER, ASSETS, faktura, new URL(request.url).origin);
             const text = mailFaktury(faktura);
             const vysledok = await posliMail(
-              // Čítanie chodí na IMAP (993), odosielanie na SMTP (587) —
-              // ten istý stroj, iný port a iná služba.
-              { host: n.host.replace(/^imap\./, "smtp."), port: 587, pouzivatel: n.user, heslo: n.heslo },
+              // Čítanie chodí na IMAP (993), odosielanie na SMTP — ten istý
+              // stroj, iná služba. Port si vyberie klient: najprv 465, ktorý
+              // Websupport pri schránke sám uvádza, potom 587.
+              { host: n.host.replace(/^imap\./, "smtp."), pouzivatel: n.user, heslo: n.heslo },
               {
                 od: n.user,
                 odMeno: "ProSapiens Biomechanic",

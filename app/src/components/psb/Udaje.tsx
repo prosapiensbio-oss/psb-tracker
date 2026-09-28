@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
+import { OKNA_HODIN } from "../../lib/psb/mailOkno";
 import { fmtDMY } from "../../lib/psb/format";
 import { jeBankovyVypis } from "../../lib/psb/fio";
 import { C, mix, S, badge, btn } from "../../lib/psb/theme";
@@ -832,6 +833,8 @@ function NapojenieMailu() {
         {p?.chyba && stav.poslednyUspech
           ? ` Naposledy úspešne ${fmtDMY(stav.poslednyUspech.kedy.slice(0, 10))} (prečítaných ${stav.poslednyUspech.precitanych}). Jedno zlyhanie býva dočasné — ďalší beh je o pár hodín.`
           : ""}
+        {/* Nech je vidieť, že ticho medzi behmi je rozvrh, nie porucha. */}
+        {` Automaticky sa číta ráno o ${OKNA_HODIN[0]}:00 a večer o ${OKNA_HODIN[1]}:00; tlačidlo vyššie číta hneď.`}
       </div>
 
       {/* Vyradené správy sú vidieť zámerne: tichý filter sa nedá odlíšiť od

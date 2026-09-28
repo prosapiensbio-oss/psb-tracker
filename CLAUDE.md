@@ -1622,3 +1622,34 @@ A vecne: **„peniaze sú Jerryho" neplatí na faktúry.** Front nepriradených
 príjmov z banky je administratíva nad celým účtom a Terezku nezaujíma;
 doklad pre klienta, ktorého vedie, je jej robota. Dve rôzne práce, ktoré
 dostali jedno pravidlo.
+
+## „Nesprávne heslo" znamenalo nesprávnu KRAJINU
+
+28. 9. 2026 prestali chodiť faktúry aj čítanie dopytov. Server vracal
+`535 5.7.8 authentication failed` na SMTP a `[AUTHENTICATIONFAILED]` na IMAP,
+pritom Jerryho webmail to isté heslo bral. Dvakrát som z toho usúdil zlú vec:
+najprv „heslo je zmenené" (nebolo), potom „je to len na odosielaní" (nebolo —
+zlyhávalo aj čítanie, len som si prečítal skrátený text na obrazovke namiesto
+dát).
+
+Príčina je v administrácii Websupportu, v nastaveniach schránky:
+**GEO ochrana**. Je zapnutá a púšťa len Maďarsko, Rakúsko, Slovensko a Česko.
+Kokpit beží na Cloudflare Workers a tie idú von z toho dátového centra, kde
+požiadavku spracujú — keď padne na Prahu alebo Viedeň, prejde; keď na
+Frankfurt alebo Varšavu, schránka ho odmietne. **A odmietne ho vetou o hesle.**
+Preto to ráno fungovalo, na obed nie a večer zase áno.
+
+Čo z toho platí:
+
+- **Chybová hláška servera hovorí, čo sa stalo, nie prečo.** Tri hodiny
+  diagnostiky išli po hesle, lebo to server napísal. Keď to isté heslo inde
+  funguje a kód sa nezmenil, príčina nie je v tom, čo hláška tvrdí.
+- **Rovnaká chyba na dvoch nezávislých protokoloch nie je náhoda.** IMAP
+  (993) a SMTP (465 aj 587) majú iný kód aj inú knižnicu; keď odmietnu naraz,
+  chyba je pred nimi — v sieti alebo v pravidle na účte.
+- **Aplikácia bez pevnej výstupnej IP neprejde geo filtrom spoľahlivo.**
+  Nedá sa to obísť pridaním krajín: zoznam by musel obsahovať celý svet.
+- **`smtp.m1.websupport.sk` má v administrácii uvedený port 465 (SSL/TLS).**
+  587 so STARTTLS funguje tiež, ale dokumentovaný je 465. Klient skúša 465
+  a potom 587 (`smtp.server.ts`), a chyba nesie číslo portu — inak sa nedá
+  odlíšiť „neprešlo ani jedno" od „skúsilo sa len jedno".

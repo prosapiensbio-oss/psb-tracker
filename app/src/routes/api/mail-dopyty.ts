@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import type { D1Database } from "@cloudflare/workers-types";
 
+import { jeCasCitat, najblizsieOkno } from "../../lib/psb/mailOkno";
 import { audit } from "../../lib/psb/audit.server";
 import { isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
@@ -120,6 +121,24 @@ export const Route = createFileRoute("/api/mail-dopyty")({
 
         const { DB } = bindings();
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });
+
+        /**
+         * RÁNO A VEČER, NIE KAŽDÚ HODINU.
+         *
+         * Plánovač volá každú hodinu a rozvrh sa mu meniť nedá (beží mimo
+         * tohto repa), tak sa rozhodne tu: mimo okna sa na schránku vôbec
+         * nesiaha. Ručné „Stiahnuť teraz" z obrazovky sa tým NEOBMEDZUJE —
+         * to je človek, ktorý vie, prečo klikol.
+         */
+        if (url.searchParams.get("cron") === "1") {
+          const r = await DB.prepare("SELECT value FROM vzas_settings WHERE key = 'mail_stav'")
+            .first<{ value: string }>().catch(() => null);
+          let poslednyBeh: string | null = null;
+          try { poslednyBeh = JSON.parse(JSON.parse(r?.value || '""') || "null")?.kedy ?? null; } catch { /* prvý beh */ }
+          if (!jeCasCitat(new Date(), poslednyBeh)) {
+            return Response.json({ ok: true, preskocene: `mimo okna — číta sa ${najblizsieOkno(new Date())}` });
+          }
+        }
         let b: Record<string, unknown> = {};
         try { b = (await request.json()) as Record<string, unknown>; } catch { /* prázdne telo je v poriadku */ }
         const akcia = String(b.akcia || "stiahni");
