@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { datumNarodenia, parseAnamneza, jeIkonaMiestoCisla, parsePackages } from "./parse";
+import { datumNarodenia, detectCSVType, jeIkonaMiestoCisla, parseAnamneza, parseIdoklad, parsePackages } from "./parse";
 
 /**
  * Anamnéza je Google Forms a ľudia si do nej píšu sami. Preto sa z nej berie
@@ -87,5 +87,32 @@ describe("PTminder vie miesto čísla vyexportovať ikonu", () => {
   test("keď je tam ikona, zostatok je 0/0 — appka ho dopočíta z názvu", () => {
     const csv = `${hlavicka}\nAlbert,Matl,Active Client,OFF - 6h BEZ viazanosti,CZK7790,6 per 8-week,0 per week,${ikona},${ikona},active,20 Sep; 2026,16 Sep  2026 - 10 Nov  2026,1 8-weekly,none`;
     expect(parsePackages(csv)[0]).toMatchObject({ remaining: 0, total: 0, validFrom: "2026-09-16" });
+  });
+});
+
+describe("vydané faktúry z iDokladu", () => {
+  const csv = [
+    "Číslo dokladu,Popis,Název/Jméno,Vystaveno,Splatnost,Celkem,Měna,Stav úhrady",
+    "20260037,Individualni vzdelávací program,FSH Devices s.r.o.,09/13/2026,09/20/2026,6990.00,Kč,Uhrazeno",
+    "20260032,Fakturujem 6 blokov,\"DK Consulting, s.r.o.\",08/31/2026,09/14/2026,15580.00,Kč,Uhrazeno",
+  ].join("\n");
+
+  test("rozpozná sa podľa hlavičky", () => {
+    expect(detectCSVType(csv)).toBe("idoklad");
+  });
+
+  test("dátum je AMERICKÝ — 09/13 je september, nie 9. trinásty", () => {
+    expect(parseIdoklad(csv)[0]).toMatchObject({
+      cislo: "20260037", nazov: "FSH Devices s.r.o.", suma: 6990,
+      vystaveno: "2026-09-13", splatnost: "2026-09-20", stav: "Uhrazeno",
+    });
+  });
+
+  test("meno s čiarkou v úvodzovkách sa nerozpadne", () => {
+    expect(parseIdoklad(csv)[1]).toMatchObject({ cislo: "20260032", nazov: "DK Consulting, s.r.o.", suma: 15580 });
+  });
+
+  test("riadok bez čísla dokladu sa preskočí", () => {
+    expect(parseIdoklad(`${csv}\n,Poznámka,,,,,,`)).toHaveLength(2);
   });
 });

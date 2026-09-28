@@ -180,6 +180,8 @@ export function parsePoplatky(text: string): PoplatokRow[] {
 export function detectCSVType(text: string): CSVType | null {
   const h = text.slice(0, 600).toLowerCase();
   if (h.includes("payments recorded report")) return "payments";
+  // Vydané faktúry z iDokladu — český export s bodkočiarkou aj čiarkou.
+  if (h.includes("číslo dokladu") && h.includes("název/jméno")) return "idoklad";
   // Transactions z Financií — pozná sa podľa súhrnnej hlavičky na začiatku.
   if (h.includes("total charges") && h.includes("amount due")) return "transakcie";
   if (h.includes("session name")) return "sessions";
@@ -359,6 +361,56 @@ function ptDatum(s: string): string {
     .indexOf(m[2].toLowerCase().slice(0, 3));
   if (mes < 0) return "";
   return `${m[3]}-${String(mes + 1).padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+}
+
+/**
+ * VYDANÉ FAKTÚRY Z IDOKLADU.
+ *
+ * „Seznam vydaných faktur …csv" — číslo dokladu, na koho je vystavená, suma
+ * a stav úhrady. Dátum chodí americky (`08/26/2026`), nie európsky; prehodiť
+ * si deň s mesiacom by tu bolo tiché a v polovici prípadov neviditeľné.
+ *
+ * Číslo dokladu je variabilný symbol, ktorý stojí v texte prevodu — a je to
+ * najtvrdší dôkaz o tom, komu platba patrí. Meno na faktúre býva FIRMA
+ * („FSH Devices s.r.o."), takže na klienta sa prekladá cez
+ * `fakturacne_kontakty`.
+ */
+export type IdokladFaktura = {
+  cislo: string; nazov: string; popis: string; suma: number;
+  vystaveno: string; splatnost: string; stav: string;
+};
+
+const datumUS = (v: string): string => {
+  const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec((v || "").trim());
+  return m ? `${m[3]}-${m[1].padStart(2, "0")}-${m[2].padStart(2, "0")}` : "";
+};
+
+export function parseIdoklad(text: string): IdokladFaktura[] {
+  const ls = lines(text);
+  if (!ls.length) return [];
+  const oddelovac = (ls[0].match(/;/g) || []).length > (ls[0].match(/,/g) || []).length ? ";" : ",";
+  const hlavicka = (oddelovac === ";" ? ls[0].split(";") : splitCSVLine(ls[0])).map((x) => x.trim().toLowerCase());
+  const idx = (...m: string[]) => hlavicka.findIndex((x) => m.some((y) => x.includes(y)));
+  const iCislo = idx("číslo dokladu"), iNazov = idx("název/jméno"), iPopis = idx("popis");
+  const iSuma = idx("celkem"), iVyst = idx("vystaveno"), iSpl = idx("splatnost"), iStav = idx("stav úhrady");
+  if (iCislo < 0 || iNazov < 0) return [];
+
+  const out: IdokladFaktura[] = [];
+  for (let i = 1; i < ls.length; i++) {
+    const p = oddelovac === ";" ? ls[i].split(";") : splitCSVLine(ls[i]);
+    const cislo = (p[iCislo] || "").trim();
+    if (!/^\d{4,}$/.test(cislo)) continue;
+    out.push({
+      cislo,
+      nazov: (p[iNazov] || "").trim(),
+      popis: iPopis >= 0 ? (p[iPopis] || "").trim().slice(0, 300) : "",
+      suma: iSuma >= 0 ? Number(String(p[iSuma] || "").replace(/[^\d.]/g, "")) || 0 : 0,
+      vystaveno: iVyst >= 0 ? datumUS(p[iVyst] || "") : "",
+      splatnost: iSpl >= 0 ? datumUS(p[iSpl] || "") : "",
+      stav: iStav >= 0 ? (p[iStav] || "").trim() : "",
+    });
+  }
+  return out;
 }
 
 export function parsePackages(text: string): PackageRow[] {

@@ -1505,3 +1505,28 @@ nie chybová stránka — to je ten istý druh tichej chyby ako zhltnutý catch,
 len hlučnejší a rovnako nepoužiteľný. Diely sa musia zložiť na sumu
 pohybu (tolerancia koruna); rozdelenie, ktoré nesedí, sa nezapíše. A
 odosielateľ sa pri rozdelení NEUČÍ: vzor by ukazoval na dvoch ľudí naraz.
+
+## Číslo faktúry je najtvrdší dôkaz — a appka ho dovtedy nemala
+
+28. 9. 2026 Jerry: „vidím, že tie ťažko identifikovateľné platby sú faktúry —
+vedel by si to porovnať ešte s faktúrami?" Mal pravdu a chýbal celý zdroj.
+
+V texte prevodu stojí „20260037 MGR. FILIP STRANAVSKY" — číslo dokladu
+a meno PRÍJEMCU. Meno klienta tam nie je vôbec, takže príjem zostával bez
+návrhu. `klientPodlaFaktury` pritom existuje a stojí na vrchole poradia
+dôvery — len čítala `vydane_faktury`, teda doklady vystavené v Kokpite (od
+26. 9. 2026 ich je jeden). Osemdesiatštyri starších faktúr žije v iDoklade
+a do appky sa nikdy nedostalo.
+
+- **`idoklad_faktury`** (migrácia 0083) je zrkadlo exportu „Seznam vydaných
+  faktur". Je to INÁ tabuľka než `vydane_faktury`: tamtie appka tvorí, tieto
+  len číta. Jedna spoločná by znamenala, že import prepíše Kokpitom vystavený
+  doklad alebo naopak.
+- **Dátum v iDoklade je AMERICKÝ** (`08/26/2026`). Prehodené dni a mesiace by
+  boli tiché a v polovici prípadov (deň ≤ 12) aj neviditeľné.
+- **Meno na faktúre je FIRMA, nie klient** („FSH Devices s.r.o." → Jan Kral).
+  Preklad je cez `fakturacne_kontakty` — tie isté párovania, ktoré Jerry robil
+  26. 9. Bez nich je faktúra len číslo.
+- **Výťažnosť je malá, ale je to istota, nie odhad:** z 55 nepriradených
+  nesú číslo faktúry tri. Rastie to s každou vystavenou faktúrou a na rozdiel
+  od zhody sumy sa nedá pomýliť.

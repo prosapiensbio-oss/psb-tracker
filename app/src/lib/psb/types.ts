@@ -237,4 +237,4 @@ export const EMPTY_DATA: PSBData = {
   magnety: [],
 };
 
-export type CSVType = "sessions" | "services" | "payments" | "packages" | "transakcie" | "cennik" | "metricool" | "ga4" | "gsc" | "anamneza" | "kanaly";
+export type CSVType = "sessions" | "services" | "payments" | "packages" | "transakcie" | "cennik" | "idoklad" | "metricool" | "ga4" | "gsc" | "anamneza" | "kanaly";

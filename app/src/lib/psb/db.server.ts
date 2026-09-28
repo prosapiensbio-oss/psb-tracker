@@ -13,6 +13,7 @@ import {
   parseSessions,
   paymentKey,
   jeIkonaMiestoCisla,
+  parseIdoklad,
   serviceKey,
   sessionKey,
 } from "./parse";
@@ -449,6 +450,21 @@ export async function ingest(DB: D1Database, filename: string, text: string, act
     ];
     await DB.batch(stmts);
     added = rows.length;
+  } else if (type === "idoklad") {
+    /**
+     * Faktúry z iDokladu sú ZRKADLO exportu: `INSERT OR REPLACE` podľa čísla
+     * dokladu. Stav úhrady sa mení a riadok sa má aktualizovať, nie zdvojiť;
+     * faktúra, ktorá v novšom exporte nie je, sa ale nemaže — export býva za
+     * obdobie a staršie doklady sú stále platný variabilný symbol.
+     */
+    const rows = parseIdoklad(text);
+    const stmts = rows.map((r) =>
+      DB.prepare(
+        "INSERT OR REPLACE INTO idoklad_faktury (cislo,nazov,popis,suma_czk,vystaveno,splatnost,stav,updated_at) VALUES (?,?,?,?,?,?,?,datetime('now'))",
+      ).bind(r.cislo, r.nazov, r.popis, r.suma, r.vystaveno, r.splatnost, r.stav),
+    );
+    added = rows.length;
+    if (stmts.length) await DB.batch(stmts);
   } else if (type === "packages") {
     // Per-client MERGE, not a wholesale replace: refresh package rows only for the
     // clients present in THIS file, and leave every other client's packages intact.

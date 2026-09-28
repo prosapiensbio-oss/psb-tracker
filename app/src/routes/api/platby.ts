@@ -3,6 +3,7 @@ import type { D1Database } from "@cloudflare/workers-types";
 
 import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
+import { normName } from "../../lib/psb/format";
 import { bindings } from "../../lib/bindings.server";
 import { nepriradene, porovnajPlatby, smieSaZapamatat, vzorPlatby, type FioRiadok, type Platba } from "../../lib/psb/platbyEvidencia";
 
@@ -66,7 +67,7 @@ export const Route = createFileRoute("/api/platby")({
           return Response.json({ ok: true, platby: r.results || [] });
         }
 
-        const [vlastne, fio, mapa, nieKlient, mena, pt, horizont, faktury, firmy] = await DB.batch([
+        const [vlastne, fio, mapa, nieKlient, mena, pt, horizont, faktury, firmy, idoklad, kontakty] = await DB.batch([
           DB.prepare("SELECT id, klient, datum, suma_czk, sposob, fio_id, poznamka, zrusene_at FROM platby ORDER BY datum DESC"),
           DB.prepare("SELECT id, date, amount_czk, counterparty, note, typ FROM fio_transactions WHERE amount_czk > 0 ORDER BY date DESC"),
           DB.prepare("SELECT vzor, klient FROM platba_mapovanie"),
@@ -79,6 +80,12 @@ export const Route = createFileRoute("/api/platby")({
           // údaj KLIENTA, nie cudzia strana (Jerry, 26. 9. 2026).
           DB.prepare("SELECT cislo, klient FROM vydane_faktury WHERE storno_at IS NULL"),
           DB.prepare("SELECT klient, firma, ico FROM klient_fakturacia WHERE firma <> '' OR ico <> ''"),
+          // Faktúry vystavené v iDoklade. Číslo dokladu stojí v texte prevodu
+          // („20260037 MGR. FILIP STRANAVSKY") a je to variabilný symbol —
+          // najtvrdší dôkaz, aký v tom texte býva. Meno na faktúre je ale
+          // firma, takže sa prekladá cez spárované fakturačné kontakty.
+          DB.prepare("SELECT cislo, nazov FROM idoklad_faktury"),
+          DB.prepare("SELECT firma, klient FROM fakturacne_kontakty WHERE klient IS NOT NULL AND klient <> ''"),
         ]);
 
         const platby = ((vlastne.results || []) as unknown as PlatbaRiadok[]);
@@ -102,14 +109,36 @@ export const Route = createFileRoute("/api/platby")({
 
         const ptPlatby = ((pt.results || []) as unknown as { client_name: string; date: string; amount_czk: number; payment_method: string }[])
           .map((p) => ({ klient: p.client_name, datum: p.date, suma: p.amount_czk, metoda: p.payment_method }));
+        /**
+         * Faktúra z iDokladu → klient. Meno na doklade býva firma
+         * („FSH Devices s.r.o."), preto cez spárované kontakty; keď je
+         * vystavená priamo na človeka, hľadá sa medzi klientmi.
+         */
+        const menaKlientov = ((mena.results || []) as unknown as { client_name: string }[]).map((x) => x.client_name);
+        const podlaFirmy = new Map<string, string>();
+        for (const k of ((kontakty.results || []) as unknown as { firma: string; klient: string }[])) {
+          podlaFirmy.set(normName(k.firma), k.klient);
+        }
+        const zIdokladu = ((idoklad.results || []) as unknown as { cislo: string; nazov: string }[])
+          .map((f) => ({
+            cislo: f.cislo,
+            klient: podlaFirmy.get(normName(f.nazov))
+              || menaKlientov.find((m) => normName(m) === normName(f.nazov))
+              || "",
+          }))
+          .filter((f) => f.klient);
+
         const vsetkyNepriradene = nepriradene(
           (fio.results || []) as unknown as FioRiadok[],
           platby.map(naPlatbu),
           mapovanie,
           new Set(((nieKlient.results || []) as unknown as { fio_id: string }[]).map((x) => x.fio_id)),
-          ((mena.results || []) as unknown as { client_name: string }[]).map((x) => x.client_name),
+          menaKlientov,
           ptPlatby,
-          ((faktury.results || []) as unknown as { cislo: string; klient: string }[]).filter((f) => f.cislo),
+          [
+            ...((faktury.results || []) as unknown as { cislo: string; klient: string }[]).filter((f) => f.cislo),
+            ...zIdokladu,
+          ],
           ((firmy.results || []) as unknown as { klient: string; firma: string; ico: string }[]),
         );
         const celkomNepriradenych = vsetkyNepriradene.length;
