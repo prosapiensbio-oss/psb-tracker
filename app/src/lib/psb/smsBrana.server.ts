@@ -5,7 +5,10 @@
  * koruny za správu. Podporované sú dve:
  *
  *  • **SMS Manager** (smsmanager.cz) — český, jeden kľúč, jedno HTTP volanie.
- *    Predvolený, lebo nemá čo pokaziť.
+ *    Predvolený, lebo nemá čo pokaziť. Ide cez ich JSON API v2
+ *    (`api.smsmngr.com/v2`), lebo kľúč z ich administrácie patrí k nemu;
+ *    staršie `http-api-lts` je síce stále živé, ale nové kľúče sa vydávajú
+ *    pre v2 a odpoveď z neho sa lepšie číta.
  *  • **Twilio** — keby Jerry raz potreboval aj zahraničie alebo doručenky.
  *
  * Pridať tretiu je pár riadkov: celé rozhranie je „vezmi číslo a text, vráť
@@ -31,24 +34,40 @@ export type VysledokSms = { ok: boolean; chyba?: string; id?: string };
 const kus = (s: string) => s.replace(/\s+/g, " ").trim().slice(0, 200);
 
 async function smsManager(u: BranaUcet, cislo: string, text: string): Promise<VysledokSms> {
-  /**
-   * `type=utf` MUSÍ BYŤ. Bez neho brána zhodí diakritiku a klientovi príde
-   * „v balicku ti zostavaju 2 h". Appka pritom pred odoslaním počíta dĺžku
-   * ako UCS-2 (70 znakov) — bez tohto parametra by ukazovala jedno a brána
-   * posielala druhé. Overené v dokumentácii HTTP API, 29. 9. 2026.
-   */
-  const telo = new URLSearchParams({ apikey: u.kluc, number: cislo, message: text, type: "utf" });
-  // Odosielateľ je nepovinný — bez neho príde správa z čísla brány.
-  if (u.odosielatel) telo.set("sender", u.odosielatel);
-  const r = await fetch("https://http-api-lts.smsmanager.cz", {
+  const r = await fetch("https://api.smsmngr.com/v2/message", {
     method: "POST",
-    headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: telo.toString(),
+    headers: { "x-api-key": u.kluc, "content-type": "application/json" },
+    body: JSON.stringify({
+      body: text,
+      // v2 chce číslo BEZ úvodného plusu; `cisloPreBranu` ho pridáva.
+      to: [{ phone_number: cislo.replace(/^\+/, "") }],
+      /**
+       * `transactional` nie je kozmetika. Marketingové správy brána doručuje
+       * len medzi 8:00 a 20:00 — a toto je oznámenie klientovi, že dochodil
+       * balíček, nie kampaň. Pod cudzie pravidlá sa dobrovoľne nedávame.
+       */
+      tag: "transactional",
+      flow: [{ sms: {
+        /**
+         * `type: "utf"` MUSÍ BYŤ. Bez neho brána diakritiku ODSTRÁNI a
+         * klientovi príde „v balicku ti zostavaju 2 h". Appka pritom dĺžku
+         * počíta ako UCS-2 (70 znakov) — bez tohto by ukazovala jedno
+         * a brána robila druhé.
+         */
+        type: "utf",
+        // Meno odosielateľa treba v ČR predregistrovať; bez neho príde SMS z čísla.
+        ...(u.odosielatel ? { sender: u.odosielatel } : {}),
+      } }],
+    }),
   });
-  const odpoved = kus(await r.text());
-  // „OK|932125742|420777111222" alebo „ERROR|102".
-  if (r.ok && /^OK\b/i.test(odpoved)) return { ok: true, id: odpoved.split("|")[1] || "" };
-  return { ok: false, chyba: odpoved || `brána odpovedala ${r.status}` };
+  const j = await r.json().catch(() => null) as {
+    request_id?: string;
+    accepted?: { message_id?: string }[];
+    message?: string; error?: string; detail?: string;
+  } | null;
+  const id = j?.accepted?.[0]?.message_id || j?.request_id || "";
+  if (r.ok && id) return { ok: true, id: String(id) };
+  return { ok: false, chyba: kus(j?.message || j?.error || j?.detail || `brána odpovedala ${r.status}`) };
 }
 
 async function twilio(u: BranaUcet, cislo: string, text: string): Promise<VysledokSms> {
