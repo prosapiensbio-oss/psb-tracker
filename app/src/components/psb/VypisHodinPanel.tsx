@@ -3,7 +3,21 @@ import { useMemo, useState } from "react";
 import { fmtCZK, fmtDMY } from "../../lib/psb/format";
 import type { osCasuKlienta } from "../../lib/psb/klientOsCasu";
 import { C, mix } from "../../lib/psb/theme";
-import { hod, poslednychMesiacov, vypisAkoText, vypisHodin } from "../../lib/psb/vypisHodin";
+import { hod, poslednychMesiacov, vypisAkoText, vypisHodin, zaciatokBalicka } from "../../lib/psb/vypisHodin";
+import type { RiadokVypisu } from "../../lib/psb/vypisHodin";
+
+/**
+ * Ten istý riadok, ale slovami pre klienta.
+ *
+ * V profile stojí „tréning 5:00pm · Jerry" a „zaplatil prevodom" — to je
+ * jazyk appky. Klientovi ide veta o ňom: čo si kúpil, kedy prišiel, čo
+ * zaplatil. Čas sa neopakuje, ten nesie os pod popisom.
+ */
+const popisPreKlienta = (r: RiadokVypisu): string => {
+  if (r.druh === "balicekOd") return r.popis.split("·")[0].trim();
+  if (r.druh === "platba") return `zaplatené ${r.popis.replace(/^(platba|zaplatil)\s*/i, "").split("·")[0].trim()}`;
+  return "tréning";
+};
 
 /**
  * VÝPIS HODÍN PRE KLIENTA.
@@ -20,6 +34,14 @@ import { hod, poslednychMesiacov, vypisAkoText, vypisHodin } from "../../lib/psb
 type Os = ReturnType<typeof osCasuKlienta>;
 
 const OBDOBIA = [
+  /**
+   * `-1` = od začiatku posledného balíčka.
+   *
+   * Je to predvolené obdobie, lebo mail hovorí o TOMTO balíčku: ako sa minul
+   * a čo príde ďalej. Kalendárne okno (mesiac, tri) by os začalo uprostred
+   * a prvý bod „6 h" by v nej chýbal.
+   */
+  { l: "posledný balíček", m: -1 },
   { l: "posledný mesiac", m: 1 },
   { l: "3 mesiace", m: 3 },
   { l: "6 mesiacov", m: 6 },
@@ -39,7 +61,7 @@ export function VypisHodinPanel({ meno, os, email, zostatokTeraz, trener = "", m
   cenaBalicka?: number;
 }) {
   const [otvorene, setOtvorene] = useState(false);
-  const [mesiacov, setMesiacov] = useState(3);
+  const [mesiacov, setMesiacov] = useState(-1);
   const [komu, setKomu] = useState(email || "");
   const [telo, setTelo] = useState("");
   const [predmet, setPredmet] = useState("");
@@ -52,8 +74,8 @@ export function VypisHodinPanel({ meno, os, email, zostatokTeraz, trener = "", m
   const [chyba, setChyba] = useState("");
 
   const v = useMemo(() => {
-    const { od, do: doDna } = mesiacov ? poslednychMesiacov(mesiacov) : { od: "", do: "" };
-    return vypisHodin(os, od, doDna, zostatokTeraz);
+    const { od, do: doDna } = mesiacov > 0 ? poslednychMesiacov(mesiacov) : { od: "", do: "" };
+    return vypisHodin(os, mesiacov === -1 ? zaciatokBalicka(os) : od, doDna, zostatokTeraz);
   }, [os, mesiacov, zostatokTeraz]);
 
   // Text sa prepočíta pri zmene obdobia — ale len dovtedy, kým doň človek
@@ -83,7 +105,21 @@ export function VypisHodinPanel({ meno, os, email, zostatokTeraz, trener = "", m
           klient: meno,
           oslovenie: meno.split(" ")[0],
           trener,
-          treningy: v.riadky.filter((r) => r.druh === "trening").map((r) => ({ den: r.den, cas: (/\d{1,2}:\d{2}/.exec(r.popis) || [""])[0] })),
+          /**
+           * Os ide do mailu OD NAJSTARŠIEHO — číta sa ako príbeh smerom dole.
+           * V profile je najnovšie hore, lebo tam Jerry hľadá poslednú vec;
+           * klient chce vidieť, ako sa balíček míňal.
+           */
+          os: [...v.riadky].reverse()
+            .filter((r) => r.druh !== "balicekDo")
+            .map((r) => ({
+              den: r.den,
+              cas: (/\d{1,2}:\d{2}/.exec(r.popis) || [""])[0] || undefined,
+              popis: popisPreKlienta(r),
+              druh: r.druh as "balicekOd" | "trening" | "platba",
+              zostatok: r.zostatok,
+              dlh: r.dlh,
+            })),
           zostatok: v.koniec,
           hodinSpolu,
           odkedy,

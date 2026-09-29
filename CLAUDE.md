@@ -1873,6 +1873,18 @@ o tom, komu predať ďalší balíček, a to je vec toho, kto ho vedie.
 Jerry, 28. 9. 2026: „vedeli by sme ten mail spraviť nejako pekne vizuálne?
 A okrem dochádzky a QR platby dať nejaké grafy?" (`mailKlientovi.ts`)
 
+- **Tréningy sú ČASOVÁ OS, nie zoznam dátumov.** Jerry, 28. 9. 2026: „páčilo
+  by sa mi, keby si z toho spravil časovú os, čiaru s bodkami — 6 h posledného
+  balíka, deň a dátum, hodina, bodka, ďalšia bodka bude platba, a potom
+  klasicky 5 h, 4 h." Zoznam dátumov hovorí, KEDY klient bol; os hovorí, ako
+  sa balíček míňal — a to je to, kvôli čomu mail chodí. Na osi stoja aj
+  platby a začiatok balíčka, nie iba tréningy, a ide OD NAJSTARŠIEHO (v
+  profile je najnovšie hore, lebo tam Jerry hľadá poslednú vec; klient číta
+  príbeh smerom dole). Predvolené obdobie je preto „posledný balíček", nie
+  kalendárny mesiac — ten by os začal uprostred a prvý bod by chýbal.
+- **Hodiny a mínus stoja VEDĽA seba.** „6 h −1" sú dve rôzne veci: koľká
+  hodina balíčka to bola a koľký tréning to bol bez krytia. Prvá verzia
+  mínusom hodiny prekryla a z osi zmizlo, že balíček vtedy ešte plný bol.
 - **Grafy sú z TABULIEK, nie z obrázkov.** Stĺpec je bunka s `bgcolor`
   a šírkou v percentách — vykreslí ju aj Gmail, aj Outlook, nič sa nesťahuje
   zvonku a nerastie tým šanca na spam. Doména má DMARC `p=none`, takže

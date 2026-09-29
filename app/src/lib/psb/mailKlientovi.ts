@@ -33,7 +33,22 @@ const F = {
   linka: "#d8d3c2",
 } as const;
 
-export type TreningRiadok = { den: string; cas?: string; trener?: string };
+/**
+ * Jeden bod na osi. Je to ten istý riadok, aký vidí Jerry v profile —
+ * len bez vecí, ktoré klientovi nič nehovoria.
+ */
+export type BodOsi = {
+  den: string;
+  /** Čas tréningu, keď ho poznáme. */
+  cas?: string;
+  /** Čo sa stalo — názov balíčka, „tréning", „zaplatené". */
+  popis: string;
+  druh: "balicekOd" | "trening" | "platba" | "balicekDo";
+  /** Koľká hodina balíčka to bola (stav PRED tréningom). */
+  zostatok?: number | null;
+  /** Koľkátý tréning bez krytia — kreslí sa ako −1, −2. */
+  dlh?: number | null;
+};
 
 export type VypisKlienta = {
   klient: string;
@@ -42,7 +57,8 @@ export type VypisKlienta = {
   trener: string;
   /** Osobná veta na začiatok; keď je prázdna, mail začne rovno vecou. */
   odkaz?: string;
-  treningy: TreningRiadok[];
+  /** Os času od začiatku posledného balíčka po dnešok. */
+  os: BodOsi[];
   /** Koľko hodín zostáva; `null` = appka to nevie povedať. */
   zostatok: number | null;
   /** Odtrénované hodiny spolu a odkedy klient chodí. */
@@ -100,7 +116,8 @@ function stlpec(popis: string, hodnota: number, max: number): string {
 
 /** Predmet, textová aj HTML podoba tej istej správy. */
 export function mailKlientovi(v: VypisKlienta): { predmet: string; text: string; html: string } {
-  const posledny = v.treningy[0]?.den || "";
+  const treningy = v.os.filter((b) => b.druh === "trening");
+  const posledny = treningy[treningy.length - 1]?.den || "";
   const doslo = v.zostatok !== null && v.zostatok <= 0;
   const predmet = doslo
     ? "Balíček dochodený — výpis a platba"
@@ -119,8 +136,14 @@ export function mailKlientovi(v: VypisKlienta): { predmet: string; text: string;
     v.odkaz ? `${v.odkaz}\n` : "",
     uvod,
     "",
-    "Tréningy:",
-    ...v.treningy.map((t) => `  ${denSK(t.den)}${t.cas ? ` · ${t.cas}` : ""}`),
+    "Ako sa míňal balíček:",
+    ...v.os.map((b) => {
+      const cislo = b.druh !== "trening" ? "" : [
+        b.zostatok != null ? `${b.zostatok} h` : "",
+        b.dlh ? `−${b.dlh}` : "",
+      ].filter(Boolean).join(", ");
+      return `  ${denSK(b.den)}${b.cas ? ` · ${b.cas}` : ""} — ${b.popis}${cislo ? ` (${cislo})` : ""}`;
+    }),
     "",
     `Spolu odtrénované: ${v.hodinSpolu} h${v.odkedy ? ` od ${denSK(v.odkedy)}` : ""}`,
     v.platba ? `\n${v.platba.popis}: ${czk(v.platba.suma)}\nÚčet ${v.platba.ucet}, do poznámky uveď: ${v.platba.sprava}` : "",
@@ -130,10 +153,47 @@ export function mailKlientovi(v: VypisKlienta): { predmet: string; text: string;
   ].filter((x) => x !== "").join("\n");
 
   const maxMesiac = Math.max(1, ...v.mesacne.map((m) => m.pocet));
-  const riadkyTreningov = v.treningy.map((t) => `<tr>
-    <td style="padding:6px 0;border-bottom:1px solid ${F.linka};font-size:14px;color:${F.text}">${denSK(t.den)}</td>
-    <td style="padding:6px 0;border-bottom:1px solid ${F.linka};font-size:14px;color:${F.slaba};text-align:right">${esc(t.cas || "")}</td>
-  </tr>`).join("");
+  /**
+   * OS ČASU S BODKAMI.
+   *
+   * Jerry, 28. 9. 2026: „páčilo by sa mi, keby si z toho spravil časovú os,
+   * čiaru s bodkami — 6 h posledného balíka, deň a dátum, hodina, bodka,
+   * ďalšia bodka bude platba, a potom klasicky 5 h, 4 h."
+   *
+   * Zoznam dátumov hovorí, KEDY klient bol. Os hovorí, ako sa balíček míňal —
+   * a to je to, kvôli čomu mail chodí.
+   *
+   * Čiara je `border-left` na ľavej bunke, bodka na nej sedí cez záporný
+   * okraj. Outlook záporné okraje ani zaoblenie nepozná, takže tam z bodky
+   * bude malý štvorček vedľa čiary — čitateľné to zostane.
+   */
+  const bodka = (b: BodOsi) => (b.druh === "platba" ? F.zelena : b.druh === "trening" ? F.svetla : F.zelena);
+  const riadkyOsi = v.os.map((b, i) => {
+    const posledna = i === v.os.length - 1;
+    /**
+     * HODINY A MÍNUS STOJA VEDĽA SEBA, NIE JEDNO NAMIESTO DRUHÉHO.
+     *
+     * Jerry, 28. 9. 2026: „ak nezaplatil, bude tam 6 h − 1, a potom platba
+     * a potom klasicky 5 h, 4 h." Sú to dve rôzne veci: koľká hodina balíčka
+     * to bola, a koľký tréning to bol bez krytia. Prvá verzia mínusom hodiny
+     * prekryla a z osi zmizlo, že balíček vtedy ešte plný bol.
+     */
+    const cislo = b.druh !== "trening" ? "" : [
+      b.zostatok != null ? `<b>${b.zostatok} h</b>` : "",
+      b.dlh ? `<span style="color:#b4674a;font-weight:700">−${b.dlh}</span>` : "",
+    ].filter(Boolean).join(" ");
+    const velka = b.druh !== "trening";
+    return `<tr>
+      <td width="22" valign="top" style="border-left:2px solid ${F.linka};padding:0">
+        <div style="width:${velka ? 11 : 9}px;height:${velka ? 11 : 9}px;background:${bodka(b)};border-radius:50%;margin:${velka ? 5 : 6}px 0 0 ${velka ? -6 : -5}px"></div>
+      </td>
+      <td style="padding:0 0 ${posledna ? 0 : 14}px 4px">
+        <div style="font-size:14px;color:${F.text};line-height:1.35">${esc(b.popis)}</div>
+        <div style="font-size:12.5px;color:${F.slaba};line-height:1.35">${denSK(b.den)}${b.cas ? ` · ${esc(b.cas)}` : ""}</div>
+      </td>
+      <td width="52" valign="top" style="padding:0 0 ${posledna ? 0 : 14}px 8px;text-align:right;font-size:14px;color:${F.text};white-space:nowrap">${cislo}</td>
+    </tr>`;
+  }).join("");
 
   const html = `<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"></head>
@@ -151,8 +211,8 @@ export function mailKlientovi(v: VypisKlienta): { predmet: string; text: string;
     ${v.odkaz ? `<div style="font-size:15px;color:${F.text};line-height:1.6;margin-top:10px">${esc(v.odkaz)}</div>` : ""}
     <div style="font-size:15px;color:${F.text};line-height:1.6;margin-top:10px">${esc(uvod)}</div>
 
-    <div style="margin-top:22px;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:${F.slaba}">Tréningy</div>
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:6px">${riadkyTreningov}</table>
+    <div style="margin-top:22px;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:${F.slaba}">Ako sa míňal balíček</div>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:10px">${riadkyOsi}</table>
 
     ${v.mesacne.length > 1 ? `
     <div style="margin-top:24px;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:${F.slaba}">Koľko si chodil po mesiacoch</div>
