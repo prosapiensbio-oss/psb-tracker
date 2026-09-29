@@ -355,6 +355,22 @@ function extractSessions(parts: string[]): { remaining: number; total: number } 
   return fallback ?? { remaining: 0, total: 0 };
 }
 
+/**
+ * 6 per 8-week alebo 8 per month — počet hodín na obdobie členstva.
+ *
+ * Nie je to zostatok (ten PTminder v exporte členstiev schováva za ikonu),
+ * ale koľko hodín dané obdobie MÁ — vrátane prenesených. Kalva a Martinek
+ * majú pri „OFF - 6h S viazanostou" 8, lebo sa im preniesli dve hodiny.
+ * Stĺpec tried („0 per week") sa preskočí tým, že berie prvé nenulové.
+ */
+export function hodinNaObdobie(parts: string[]): number {
+  for (const raw of parts) {
+    const m = /^(\d+)\s+per\s+\S+/i.exec(raw.trim());
+    if (m && Number(m[1]) > 0) return Number(m[1]);
+  }
+  return 0;
+}
+
 // "05 Jul; 2026" | "30 Jun  2026" → ISO deň
 function ptDatum(s: string): string {
   const m = /(\d{1,2})\s+([A-Za-z]{3})[a-z]*;?\s+(\d{4})/.exec(s || "");
@@ -505,6 +521,7 @@ export function parsePackages(text: string): PackageRow[] {
       validFrom: od, validTo: do_,
       payment: Number.isFinite(platba) && platba > 0 ? platba : undefined,
       kind: jeClenstvo ? "membership" : "package",
+      naObdobie: jeClenstvo ? hodinNaObdobie(parts) : 0,
     });
   }
   return rows;

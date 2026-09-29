@@ -113,7 +113,7 @@ const SLUZBA_JE_BALICEK = (typ: string) => typ === "Membership" || typ === "Pack
 
 type Sedenie = { client: string; date: string; time?: string; sessionTrainer?: string; sessionName?: string; duration?: number };
 type Platba = { client: string; date: string; amount: number; method: string; note?: string };
-type Balicek = { client: string; package: string; total: number; remaining: number; validFrom?: string; validTo?: string; payment?: number; kind?: string; added?: string };
+type Balicek = { client: string; package: string; total: number; remaining: number; validFrom?: string; validTo?: string; payment?: number; kind?: string; added?: string; naObdobie?: number };
 type Sluzba = { client: string; date: string; serviceType: string; description: string; price: number };
 type Poplatok = { klient: string; datum: string; popis: string; suma: number };
 type KalUdalost = { zaciatok: string; klient: string | null; typ: string | null };
@@ -191,8 +191,10 @@ export function osCasuKlienta(
     // lebo sa nevie kam. Radšej vynechať než hádať deň.
     // Export mlčí (0/0) → hodiny z názvu, a riadok to prizná značkou ≈.
     const zNazvu = hodinZNazvuBalicka(b.package);
-    const hodin = b.total || zNazvu;
-    const odvodene = !b.total && zNazvu > 0;
+    // Počet na obdobie z exportu členstiev (8 per month) má prednosť pred názvom — nesie
+    // v sebe prenesené hodiny, názov nie.
+    const hodin = b.total || b.naObdobie || zNazvu;
+    const odvodene = !b.total && hodin > 0;
     if (od) out.push({ druh: "balicekOd", den: od, nazov: b.package, hodin, doDna: doDna || undefined, zaplatene: b.payment, odvodene });
     if (doDna && doDna <= dnes) out.push({ druh: "balicekDo", den: doDna, nazov: b.package, hodin, odvodene });
   }

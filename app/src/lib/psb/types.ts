@@ -44,6 +44,11 @@ export type PackageRow = {
   /** Koľko klient za TENTO balíček zaplatil — nesie v sebe jeho zľavy. */
   payment?: number;
   kind?: string; // package | membership
+  /**
+   * Hodín na obdobie členstva podľa PTmindera („8 per month") — vrátane
+   * prenesených. 0 = export to nepovedal (balíčky, staré exporty).
+   */
+  naObdobie?: number;
 };
 
 export type Lead = {

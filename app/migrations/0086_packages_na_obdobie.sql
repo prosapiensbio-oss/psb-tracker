@@ -1,0 +1,16 @@
+-- KOĽKO HODÍN MÁ ČLENSTVO V TOMTO OBDOBÍ — TAK, AKO TO VIE PTMINDER.
+--
+-- Export členstiev nesie v stĺpci „# of sessions" hodnotu „6 per 8-week"
+-- alebo „8 per month". Parser rozpoznával len tvar „X left from Y", takže
+-- toto číslo ticho zahadzoval a appka padala späť na hodiny z NÁZVU.
+--
+-- Pri väčšine je to jedno (6h → 6 per …). Nie je to jedno tam, kde sa hodiny
+-- PRENIESLI: Jerry, 29. 9. 2026 — „oni majú 8, pretože sa im preniesli 2
+-- hodiny do ďalšieho mesiaca" (Jaroslav Kalva, Robin Martinek, obaja
+-- „OFF - 6h S viazanostou"). Kokpit im rátal 6 a zostatok mali o dve hodiny
+-- nižší, než je pravda. Monika Čechová má naopak „5 per 8-week".
+--
+-- Zostatok (koľko z toho ešte zostáva) PTminder v tomto exporte schováva za
+-- ikonu, takže `sessions_remaining`/`sessions_total` zostávajú 0 a appka ho
+-- dopočíta — ale z tohto čísla, nie z názvu.
+ALTER TABLE packages ADD COLUMN na_obdobie INTEGER NOT NULL DEFAULT 0;

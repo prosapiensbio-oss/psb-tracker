@@ -452,7 +452,14 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
     // Hanus potom svietil s odznakom bez menovateľa. Keď export total nedal,
     // vezme sa z názvu; kto číslo v názve nemá, zostáva na nule a karta
     // o ňom mlčí ako doteraz.
-    const totalZNazvu = hodinZNazvuBalicka(active?.package || "");
+    /**
+     * Počet hodín členstva: najprv to, čo povie PTminder pre TOTO obdobie
+     * (8 per month — vrátane prenesených hodín), až potom názov.
+     *
+     * Do 29. 9. 2026 sa bral len názov a Kalva s Martinekom mali pri
+     * „OFF - 6h S viazanostou" o dve hodiny menej, než PTminder vie.
+     */
+    const totalZNazvu = (active?.naObdobie || 0) > 0 ? active!.naObdobie! : hodinZNazvuBalicka(active?.package || "");
     c.packageTotal = (active?.total || totalZNazvu) ?? 0;
 
     /**
@@ -517,7 +524,7 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
       const minute = odtrenovaneOd(active.validFrom);
       c.packageRemaining = Math.max(0, totalZNazvu - minute);
       c.packageOdvodeny = true;
-      c.packageOdkial = `dopočítané: ${totalZNazvu} h z názvu mínus ${minute} odtrénovaných od ${active.validFrom}`;
+      c.packageOdkial = `dopočítané: ${totalZNazvu} h ${(active.naObdobie || 0) > 0 ? "na obdobie podľa PTmindera" : "z názvu"} mínus ${minute} odtrénovaných od ${active.validFrom}`;
     }
     c.packageStatus = active?.status || "";
     c.membership = active?.package || "";

@@ -101,6 +101,7 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
       validTo: r.valid_to || "",
       payment: r.payment_czk ?? undefined,
       kind: r.kind || "",
+      naObdobie: Number(r.na_obdobie) || 0,
     })),
     vedomosti: (vedomosti.results as any[]).map((r) => ({
       id: r.id, nazov: r.nazov, oCom: r.o_com || "", zdroj: r.zdroj || "",
@@ -653,9 +654,9 @@ export async function ingest(DB: D1Database, filename: string, text: string, act
       ),
       ...rows.map((r) =>
         DB.prepare(
-          "INSERT INTO packages (id,client_name,client_status,package_name,sessions_remaining,sessions_total,added,valid_from,valid_to,payment_czk,kind) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+          "INSERT INTO packages (id,client_name,client_status,package_name,sessions_remaining,sessions_total,added,valid_from,valid_to,payment_czk,kind,na_obdobie) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
         ).bind(uid(), r.client, r.status, r.package, r.remaining, r.total,
-          r.added || "", r.validFrom || "", r.validTo || "", r.payment ?? null, r.kind || ""),
+          r.added || "", r.validFrom || "", r.validTo || "", r.payment ?? null, r.kind || "", r.naObdobie || 0),
       ),
     ];
     if (stmts.length) await DB.batch(stmts);

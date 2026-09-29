@@ -98,10 +98,10 @@ export const Route = createFileRoute("/api/balicky")({
         // ── naliatie z exportu ───────────────────────────────────────────
         if (akcia === "nalej") {
           const pt = ((await DB.prepare(
-            "SELECT id, client_name, package_name, sessions_remaining, sessions_total, valid_from, valid_to, payment_czk, kind FROM packages",
+            "SELECT id, client_name, package_name, sessions_remaining, sessions_total, valid_from, valid_to, payment_czk, kind, na_obdobie FROM packages",
           ).all()).results || []) as unknown as {
             id: string; client_name: string; package_name: string; sessions_remaining: number; sessions_total: number;
-            valid_from: string; valid_to: string; payment_czk: number | null; kind: string;
+            valid_from: string; valid_to: string; payment_czk: number | null; kind: string; na_obdobie: number;
           }[];
           // Dokiaľ siaha export — k tomuto dňu platí zostatok, ktorý z neho
           // preberáme ako otváraciu položku.
@@ -119,7 +119,10 @@ export const Route = createFileRoute("/api/balicky")({
             let doDna = denISO(p.valid_to) || null;
             // Hodiny z exportu; 0 znamená „export mlčí" (offline členstvá aj
             // paušály), a z názvu sa dá počet vyčítať — to už appka vie.
-            let hodiny: number | null = p.sessions_total > 0 ? p.sessions_total : (zNazvu ? Number(zNazvu[1]) : null);
+            // Počet na obdobie z exportu (8 per month, prenesené hodiny) má prednosť pred názvom.
+            let hodiny: number | null = p.sessions_total > 0 ? p.sessions_total
+              : p.na_obdobie > 0 ? p.na_obdobie
+              : (zNazvu ? Number(zNazvu[1]) : null);
             let poznamka: string | null = hodiny == null ? "paušál — zostatok sa nepočíta" : null;
 
             /**

@@ -1,6 +1,6 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, it, test } from "bun:test";
 
-import { datumNarodenia, detectCSVType, jeIkonaMiestoCisla, parseAnamneza, parseClientList, parseIdoklad, parsePackages } from "./parse";
+import { hodinNaObdobie, datumNarodenia, detectCSVType, jeIkonaMiestoCisla, parseAnamneza, parseClientList, parseIdoklad, parsePackages } from "./parse";
 
 /**
  * Anamnéza je Google Forms a ľudia si do nej píšu sami. Preto sa z nej berie
@@ -144,5 +144,40 @@ describe("zoznam klientov z PTmindera", () => {
     const kratky = "Client List\nName,Email,Mobile Number,Client Status\nJan Kral,jan@kralovo.cz,721962648,Active";
     expect(detectCSVType(kratky)).toBe("klienti");
     expect(parseClientList(kratky)[0]).toMatchObject({ meno: "Jan Kral", email: "jan@kralovo.cz", narodeniny: "" });
+  });
+});
+
+describe("hodiny na obdobie členstva („8 per month“)", () => {
+  /**
+   * Jaroslav Kalva a Robin Martinek majú pri „OFF - 6h S viazanostou" v exporte
+   * „8 per month" — preniesli sa im dve hodiny. Parser to do 29. 9. 2026
+   * zahadzoval a appka brala 6 z názvu.
+   */
+  const hlavicka = "First Name,Last Name,Client Status,Membership,Payment,# of sessions,# of classes,# of sessions in current period,# of classes in current period,Status,Added,Dates,Duration,Payments Schedule";
+  const ikona = "<i class=bootstrap-tooltip far fa-question-circle credits-in-current-period data-type=sessions></i>";
+  const riadok = (meno: string, clenstvo: string, pocet: string) =>
+    `${meno},Active Client,${clenstvo},CZK6990,${pocet},0 per week,${ikona},${ikona},active,20 Sep; 2026,17 Sep  2026 - 16 Oct  2026,1 months,none`;
+
+  it("prenesené hodiny prídu z exportu, nie z názvu", () => {
+    const [r] = parsePackages(`${hlavicka}\n${riadok("Jaroslav,Kalva", "OFF - 6h S viazanostou", "8 per month")}`);
+    expect(r.naObdobie).toBe(8);
+    // Zostatok export neuvádza — zostáva „mlčí", appka ho dopočíta.
+    expect(r.total).toBe(0);
+  });
+
+  it("menej, než hovorí názov, sa tiež berie z exportu", () => {
+    const [r] = parsePackages(`${hlavicka}\n${riadok("Monika,Čechova", "OFF - 6h BEZ viazanosti", "5 per 8-week")}`);
+    expect(r.naObdobie).toBe(5);
+  });
+
+  it("stĺpec tried („0 per week“) sa za hodiny nepovažuje", () => {
+    expect(hodinNaObdobie(["0 per week", "6 per 8-week"])).toBe(6);
+  });
+
+  it("balíček (nie členstvo) žiadne „per“ nemá", () => {
+    const h = "First Name,Last Name,Client Status,Package,Payment,# of sessions,# of classes,Status,Added,Expiry,Duration";
+    const [r] = parsePackages(`${h}\nPatrik,Lutonsky,Active Client,Doplnenie členstva,CZK0,4 left from 6,0 left from 0,active,05 Sep; 2026,,`);
+    expect(r.naObdobie).toBe(0);
+    expect(r.total).toBe(6);
   });
 });
