@@ -18,20 +18,33 @@ Stav k **29. 9. 2026**.
 
 ## 0 · Odchod z PTmindera — od 1. 10. 2026 je Kokpit pravda
 
-Rozhodnuté 29. 9. 2026. PTminder je odvtedy kontrola. Tretiny po poradí:
+Rozhodnuté 29. 9. 2026. PTminder je odvtedy kontrola.
 
-- [x] **Dochádzka z kalendára** — nasadené, zapne sa sama 1. 10.
-  (`sedeniaZKalendara.ts`). Cena tréningu z balíčka v Kokpite.
-- [ ] **Naliať chýbajúce balíčky** — Jerry klikne „Naliať z PTmindera"
-  (naliatie je od 29. 9. bez zdvojenia). Pribudne 8 členstiev kúpených po
-  20. 9. + Jankino živé doplnenie. Bez toho majú títo klienti od 1. 10.
-  v Kokpite zlý zostatok aj cenu tréningu.
-- [ ] **Hodiny: karta klienta z balíčkov v Kokpite** — dnes `compute.ts`
-  číta balíčky z PTmindera (Vítězslav: nový balíček len v Kokpite → karta 0 h).
-  Kým to nie je, tréningy treba zapisovať aj do PTmindera.
+- [x] **Dochádzka z kalendára** — nasadené, zapne sa 1. 10. (`sedeniaZKalendara.ts`).
+- [x] **Hodiny: karta z balíčkov v Kokpite** — nasadené, zapne sa 1. 10.
+  (`zostatokKokpitu.ts`). Simulácia po naliatí: 76/86 rovnako, rozdiely
+  vysvetlené (prekryv 18 h — Kokpit presnejší; Marcela — Kokpit sčíta obe).
+- [ ] **Jerry: „Doplniť nové z PTmindera"** (Prechod → balíčky) — 29. 9.
+  NEPREBEHLO (v audite nič). Pridá 8 členstiev + Jankino doplnenie. Bez toho
+  majú Barbora, Malinová, Martinek, Pecková, Pavlík, Jitka od 1. 10. zlý zostatok.
+- [ ] **Jerry: 3 minuté doplnenia 1 h** (Petra Bambúšková, Tsiolis, Jitka) —
+  v PTminderi už nie sú; navrhnuté ukončiť v Kokpite k 29. 9.
+- [ ] **Jerry: Janka Šnirychová má v Kokpite „SPECIAL 3" od 22. 9.**, v PTminderi
+  je SPECIAL 3 z 20. 9. na Josefa. Čí je?
 - [ ] **Peniaze z banky a zošita** — `platby_od` = 2026-10.
 - [ ] **Os času a „dnes"** — os počíta celý dnešný deň, nové sedenia len to,
-  čo už začalo. Rozdiel ±1 h do konca dňa; zjednotiť pri hodinách.
+  čo začalo. ±1 h do konca dňa.
+
+## 0b · Ostatné otvorené z 29. 9.
+
+- [ ] **Nedeľná pripomienka** (`/api/push-nedela`) je postavená, ale nebeží —
+  treba ju naplánovať tam, kde je `/api/push-rano`. Jerry neodpovedal kde.
+- [ ] **5 tréningov v Jerryho kalendári, ktoré v PTminderi nie sú**: Kríž 28. 1.,
+  Kouřil 24. 5. a 14. 6. (nedele), Kadličková a Tsiolis („Akis") 17. 6. —
+  pri Tsiolisovi má PTminder v tom čase Kaňovského.
+- [ ] **Import služieb stále len pridáva** — zdvojený predaj Dan Kouřil 9. 7.
+  (7 790 Kč) zostal.
+- [ ] Export Sessions s 28.–29. 9., keď ich Jerry dopíše.
 
 ## 1 · Čaká na Jerryho slovo
 
