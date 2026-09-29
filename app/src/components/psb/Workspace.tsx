@@ -42,7 +42,7 @@ import { Card } from "./ui";
 const kc = (n: number) => `${Math.round(n).toLocaleString("sk-SK")} Kč`;
 const den = (s: string) => (s ? `${Number(s.slice(8))}. ${Number(s.slice(5, 7))}.` : "");
 
-export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, btc, onOverride, otvorKlienta, onOtvoreny, fakturaPredvolba, onFakturaPredvolbaSpracovana }: {
+export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, btc, onOverride, otvorKlienta, onOtvoreny, fakturaPredvolba, onFakturaPredvolbaSpracovana, vypisPredvolba, onVypisPredvolbaSpracovana }: {
   clients: Record<string, ClientAgg>;
   mena: string[];
   ktoSom: string | null;
@@ -55,6 +55,9 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   onOverride?: (meno: string, kluc: string, hodnota: unknown) => Promise<boolean>;
   /** Faktúra vypýtaná mimo Workspace (Prechod → balíčky). */
   fakturaPredvolba?: FakturaPredvolba | null;
+  /** Komu sa ide písať — otvorí jeho stôl a na ňom rovno výpis tréningov. */
+  vypisPredvolba?: string | null;
+  onVypisPredvolbaSpracovana?: () => void;
   onFakturaPredvolbaSpracovana?: () => void;
   /** Koho otvoriť rovno po prepnutí sem (klik na klienta inde v appke). */
   otvorKlienta?: string | null;
@@ -194,10 +197,10 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   // Klik na klienta inde v appke otvorí kartu Klient — inak by človek pristál
   // na kope a musel sa k stolu preklikať sám (24. 9. 2026).
   useEffect(() => {
-    if (!otvorKlienta) return;
+    if (!otvorKlienta && !vypisPredvolba) return;
     const idx = zive.findIndex((x) => x.druh === "klient");
     if (idx >= 0) setI(idx);
-  }, [otvorKlienta, zive]);
+  }, [otvorKlienta, vypisPredvolba, zive]);
 
   /** Faktúra vypýtaná odinakiaľ (Prechod → balíčky) otvorí kartu Faktúry. */
   useEffect(() => {
@@ -669,7 +672,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                 );
               })}
 
-              {k.druh === "klient" && <KlientStol clients={clients} mena={mena} data={data} kalUdalosti={kalUdalosti} btcSats={btcSats} btc={btc} onOverride={onOverride} otvorKlienta={otvorKlienta} onOtvoreny={onOtvoreny} onFaktura={setPredvolbaFaktury} menoZvonku={klientNaStole} setMenoZvonku={setKlientNaStole} />}
+              {k.druh === "klient" && <KlientStol clients={clients} mena={mena} data={data} kalUdalosti={kalUdalosti} btcSats={btcSats} btc={btc} onOverride={onOverride} otvorKlienta={vypisPredvolba || otvorKlienta} onOtvoreny={onOtvoreny} onFaktura={setPredvolbaFaktury} otvorVypis={vypisPredvolba} onVypisOtvoreny={onVypisPredvolbaSpracovana} menoZvonku={klientNaStole} setMenoZvonku={setKlientNaStole} />}
 
               {k.druh === "platby" && (() => {
                 const pripravene = davkaPlatieb(k.polozky);

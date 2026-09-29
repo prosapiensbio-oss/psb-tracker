@@ -54,7 +54,7 @@ type Platba = {
 
 const dnesISO = () => new Date().toISOString().slice(0, 10);
 
-export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onOverride, otvorKlienta, onOtvoreny, onFaktura, menoZvonku, setMenoZvonku }: {
+export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onOverride, otvorKlienta, onOtvoreny, onFaktura, menoZvonku, setMenoZvonku , otvorVypis, onVypisOtvoreny}: {
   clients: Record<string, ClientAgg>;
   mena: string[];
   data: PSBData;
@@ -101,6 +101,9 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
    * sa nahadzujú TU, na karte klienta.
    */
   onFaktura?: (p: { klient: string; popis: string; cena: number; balicekId?: string }) => void;
+  /** Meno z karty „Balíček dojde" — stôl sa otvorí s rozbaleným výpisom. */
+  otvorVypis?: string | null;
+  onVypisOtvoreny?: () => void;
 }) {
   const [hladam, setHladam] = useState("");
   const [novy, setNovy] = useState(false);
@@ -1437,6 +1440,8 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
             <VypisHodinPanel
               meno={meno} os={os} email={kontaktMail} zostatokTeraz={zostatokTeraz}
               trener={c?.primaryTrainer || ""}
+              otvorHned={!!otvorVypis && normName(otvorVypis) === normName(meno)}
+              onOtvorene={onVypisOtvoreny}
               mesiacov={c ? Math.round(mesiacovVztahu(c)) : 0}
               hodinSpolu={Math.round(c?.totalHours || 0)}
               tempo={c ? tempoMesacne(c) : 0}

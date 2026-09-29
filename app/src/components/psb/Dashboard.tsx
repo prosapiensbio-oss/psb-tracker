@@ -440,6 +440,7 @@ export function Dashboard({
   capacity,
   actions,
   onNavigate,
+  onVypisKlientovi,
   assistantChat,
   onClientClick,
   trainer,
@@ -458,6 +459,8 @@ export function Dashboard({
   capacity: CapacityRow[];
   actions: Actions;
   onNavigate: (tab: string, sub?: string, focus?: NavFocus) => void;
+  /** „Napísať" z karty „Balíček dojde" — otvorí stôl klienta s výpisom. */
+  onVypisKlientovi?: (meno: string) => void;
   assistantChat: AssistantChat;
   onClientClick: (name: string) => void;
   trainer: string;
@@ -1653,6 +1656,7 @@ export function Dashboard({
         poslednyReport={poslednyReportBalickov}
         style={{ marginBottom: 0, height: "100%" }}
         onKlient={(meno) => onNavigate("klienti", undefined, { client: meno, nonce: Date.now() })}
+        onVypis={onVypisKlientovi}
       >
         {platnostKonci.length > 0 && (
           <div style={{ marginTop: 14 }}>

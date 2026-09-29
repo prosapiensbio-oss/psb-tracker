@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { fmtCZK, fmtDMY } from "../../lib/psb/format";
 import type { osCasuKlienta } from "../../lib/psb/klientOsCasu";
@@ -49,7 +49,7 @@ const OBDOBIA = [
   { l: "všetko", m: 0 },
 ];
 
-export function VypisHodinPanel({ meno, os, email, zostatokTeraz, trener = "", mesiacov = 0, hodinSpolu = 0, tempo = 0, odkedy = "", cenaBalicka = 0, telefon = "" }: {
+export function VypisHodinPanel({ meno, os, email, zostatokTeraz, trener = "", mesiacov = 0, hodinSpolu = 0, tempo = 0, odkedy = "", cenaBalicka = 0, telefon = "", otvorHned = false, onOtvorene }: {
   meno: string; os: Os; email?: string; zostatokTeraz: number | null;
   /** Kto ho vedie — mailom sa podpíše. */
   trener?: string;
@@ -64,9 +64,23 @@ export function VypisHodinPanel({ meno, os, email, zostatokTeraz, trener = "", m
   cenaBalicka?: number;
   /** Telefón klienta — bez neho sa SMS neponúka. */
   telefon?: string;
+  /**
+   * Otvor výpis hneď — prišlo sa sem z karty „Balíček dojde" preto, aby sa
+   * klientovi napísalo. Nechať človeka rozklikávať panel, o ktorý si pred
+   * sekundou povedal, je polovičná práca.
+   */
+  otvorHned?: boolean;
+  onOtvorene?: () => void;
 }) {
-  const [otvorene, setOtvorene] = useState(false);
+  const [otvorene, setOtvorene] = useState(otvorHned);
   const [obdobie, setObdobie] = useState(-1);
+  // Signál príde až potom, ako je panel na obrazovke — meno sa na stôl
+  // dostáva o krok neskôr než pokyn „píš mu".
+  useEffect(() => {
+    if (!otvorHned) return;
+    setOtvorene(true);
+    onOtvorene?.();
+  }, [otvorHned, onOtvorene]);
   const [komu, setKomu] = useState(email || "");
   const [telo, setTelo] = useState("");
   const [predmet, setPredmet] = useState("");

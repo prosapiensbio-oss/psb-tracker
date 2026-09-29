@@ -1584,7 +1584,7 @@ export function odtrenovaneMimoExportu(
  * (ozvať sa, kým klienta ešte vidíš na hodine), a tie patria na prvú obrazovku.
  * Kalendár je miesto, kde sa dáta zbierajú; Kokpit je miesto, kde sa konajú.
  */
-export function Balicky({ udalosti, buduce = [], clients, sedenia = [], onObnov, style, onKlient, matchTrener, children, poslednyReport }: {
+export function Balicky({ udalosti, buduce = [], clients, sedenia = [], onObnov, style, onKlient, onVypis, matchTrener, children, poslednyReport }: {
   udalosti: KalUdalost[];
   /**
    * Objednané tréningy ĎALEKO dopredu — len klient a deň.
@@ -1603,6 +1603,18 @@ export function Balicky({ udalosti, buduce = [], clients, sedenia = [], onObnov,
   style?: React.CSSProperties;
   /** Klik na meno — na Kokpite otvára profil klienta. */
   onKlient?: (meno: string) => void;
+  /**
+   * „Napísať" — otvorí stôl klienta s pripraveným výpisom (mail + SMS).
+   *
+   * Číslo bez akcie je Jerryho test pre každú metriku. Karta doteraz
+   * povedala „Richardovi dnes došiel balíček" a tým skončila; napísať mu
+   * znamenalo nájsť ho v Klientoch, otvoriť stôl a rozkliknúť výpis.
+   * SMS naschvál NEODCHÁDZA odtiaľto: naše číslo hodín je pri časti
+   * klientov dopočítané a správa „dnes si mal poslednú hodinu" človeku,
+   * ktorý má ešte tri, sa späť vziať nedá. Preto sa otvorí výpis, kde je
+   * text aj počet správ pred odoslaním vidieť.
+   */
+  onVypis?: (meno: string) => void;
   /** Prepínač trénera na Kokpite — týka sa klientov bez termínu v kalendári. */
   matchTrener?: (t: string) => boolean;
   /** Doplnková sekcia pod zoznamom (na Kokpite končiace platnosti členstiev). */
@@ -1934,6 +1946,18 @@ export function Balicky({ udalosti, buduce = [], clients, sedenia = [], onObnov,
                   )}
                 </span>
               </div>
+              {onVypis && (
+                <button
+                  onClick={() => onVypis(r.meno)}
+                  title={`Napísať ${r.meno} — výpis tréningov, QR na ďalší balíček a SMS`}
+                  style={{
+                    flexShrink: 0, padding: "3px 8px", borderRadius: 7, fontSize: 11, cursor: "pointer",
+                    border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted,
+                  }}
+                >
+                  Napísať
+                </button>
+              )}
             </div>
           ))}
         </div>

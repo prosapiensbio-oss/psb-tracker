@@ -400,6 +400,13 @@ export function PSBApp() {
    * nemusel nič prepisovať.
    */
   const [fakturaPredvolba, setFakturaPredvolba] = useState<FakturaPredvolba | null>(null);
+  /**
+   * Meno klienta, ktorému sa ide písať — z karty „Balíček dojde".
+   *
+   * Otvorí jeho stôl a rovno na ňom rozbalí výpis tréningov. Rovnaká cesta
+   * ako `fakturaPredvolba`, len iný formulár.
+   */
+  const [vypisPredvolba, setVypisPredvolba] = useState<string | null>(null);
   /** Ktorá polovica Mesiaca je otvorená: dáta a uzávierka, alebo výsledky. */
   const [vysledkySub, setVysledkySub] = useState("kvartalne");
   const [vysledkyFocus, setVysledkyFocus] = useState<NavFocus | null>(null);
@@ -2688,7 +2695,7 @@ function skupinaFaktur(
           </div>
         )}
         {active === "dashboard" && (
-          <Dashboard trainer={trainer} onTrainer={setTrainer} data={data} clients={clients} kalendar={kalUdalosti} buduceTreningy={buduceTreningy} kalZmeny={kalZmeny} kalNevysvetlene={kalNevysvetlene} register={registerAll} sixM={sixM} capacity={capacity} actions={actions} onNavigate={navigate} assistantChat={chat} onClientClick={onClientClick} />
+          <Dashboard trainer={trainer} onTrainer={setTrainer} data={data} clients={clients} kalendar={kalUdalosti} buduceTreningy={buduceTreningy} kalZmeny={kalZmeny} kalNevysvetlene={kalNevysvetlene} register={registerAll} sixM={sixM} capacity={capacity} actions={actions} onNavigate={navigate} assistantChat={chat} onClientClick={onClientClick} onVypisKlientovi={(m) => { setVypisPredvolba(m); setActive("workspace"); }} />
         )}
 
         {/* Bitcoinová evidencia vnútri Kokpitu (Jerry, 6. 9. 2026 — jedno okno).
@@ -2723,7 +2730,7 @@ function skupinaFaktur(
             onFaktura={(p) => { setFakturaPredvolba(p); setActive("workspace"); }}
           />
         )}
-        {active === "workspace" && <Workspace clients={clients} mena={Object.keys(clients)} ktoSom={ktoSom} data={data} kalUdalosti={kalUdalosti} btcSats={btcSatsKlienti} btc={{ platby: btcPlatby, kurz: btcKurz.kurz, kedy: btcKurz.kedy }} otvorKlienta={workspaceKlient} onOtvoreny={() => setWorkspaceKlient(null)} onOverride={(m, k, v) => actions.setOverride(m, k as never, v)} fakturaPredvolba={fakturaPredvolba} onFakturaPredvolbaSpracovana={() => setFakturaPredvolba(null)} />}
+        {active === "workspace" && <Workspace clients={clients} mena={Object.keys(clients)} ktoSom={ktoSom} data={data} kalUdalosti={kalUdalosti} btcSats={btcSatsKlienti} btc={{ platby: btcPlatby, kurz: btcKurz.kurz, kedy: btcKurz.kedy }} otvorKlienta={workspaceKlient} onOtvoreny={() => setWorkspaceKlient(null)} vypisPredvolba={vypisPredvolba} onVypisPredvolbaSpracovana={() => setVypisPredvolba(null)} onOverride={(m, k, v) => actions.setOverride(m, k as never, v)} fakturaPredvolba={fakturaPredvolba} onFakturaPredvolbaSpracovana={() => setFakturaPredvolba(null)} />}
 
         {active === "jarvis" && (
           <JarvisOkno
