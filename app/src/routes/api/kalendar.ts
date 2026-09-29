@@ -6,8 +6,8 @@ import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 import { typZNazvu } from "../../lib/psb/kalendar";
 import { casUdalosti, nejednoznacneMena, vyberMapu, type Mapa } from "../../lib/psb/kalendarMena";
-import { vlozUdalost, zrusUdalost } from "../../lib/psb/gcal.server";
-import { icsUid, KALENDAR_TRENERA, pripravTrening } from "../../lib/psb/nahodTrening";
+import { idPreZasah, presunUdalost, vlozUdalost, zrusUdalost } from "../../lib/psb/gcal.server";
+import { icsUid, KALENDAR_TRENERA, pripravCas, pripravTrening } from "../../lib/psb/nahodTrening";
 import { porovnajTyzdne } from "../../lib/psb/porovnanieDochadzky";
 import { odkedyKalendar, porovnajMesiace } from "../../lib/psb/porovnanieMesiacov";
 import { porovnajDvojmo } from "../../lib/psb/dvojityVypocet";
@@ -48,7 +48,7 @@ type ZdrojStav = {
   id: string; trener: string; aktivny: number; posledne_ok: string | null; posledna_chyba: string | null;
   snimka_kedy: string | null; snimka_ok: number | null; snimka_chyba: string | null;
 };
-type Ulozena = { uid: string; trener: string; zaciatok: string; koniec: string; nazov: string; klient: string | null; typ: string | null; zmizla_at: string | null };
+type Ulozena = { uid: string; trener: string; zaciatok: string; koniec: string; nazov: string; klient: string | null; typ: string | null; zmizla_at: string | null; prvy_raz: string | null };
 
 function okno() {
   const d = new Date();
@@ -94,7 +94,7 @@ async function snimka(DB: D1Database, z: Zdroj) {
   }
 
   const stare = ((await DB.prepare(
-    "SELECT uid, trener, zaciatok, koniec, nazov, klient, typ, zmizla_at FROM kal_udalosti WHERE trener = ? AND zaciatok >= ? AND zaciatok <= ?",
+    "SELECT uid, trener, zaciatok, koniec, nazov, klient, typ, zmizla_at, prvy_raz FROM kal_udalosti WHERE trener = ? AND zaciatok >= ? AND zaciatok <= ?",
   ).bind(z.trener, od, do_).all()).results || []) as unknown as Ulozena[];
   const prveStiahnutie = stare.length === 0;
   const podlaUid = new Map(stare.map((s) => [s.uid, s]));
@@ -149,6 +149,13 @@ async function snimka(DB: D1Database, z: Zdroj) {
   // o zmazanom plávaní sa nikto pýtať nechce.
   for (const s of stare) {
     if (videne.has(s.uid) || s.zmizla_at) continue;
+    // ČERSTVÝ RIADOK STARÁ KEŠ NEPOCHOVÁVA. Google drží ICS feed v keši aj
+    // hodiny (viď „snímka vyjde ~1 z 3") — tréning nahodený z Kokpitu
+    // (trening-nahod) v ňom chvíľu nie je a snímka by ho označila za zrušený,
+    // hoci v kalendári stojí. Riadok mladší než 12 hodín sa preto nechá tak;
+    // naozaj zmazanú novú udalosť ohlási najbližšia snímka po vyprchaní keše
+    // a zmazanie CEZ KOKPIT sa poistky netýka — to zapisuje zmizla_at priamo.
+    if (s.prvy_raz && Date.parse(kedy) - Date.parse(s.prvy_raz) < 12 * 3600 * 1000) continue;
     prikazy.push(DB.prepare("UPDATE kal_udalosti SET zmizla_at = ? WHERE uid = ? AND trener = ?").bind(kedy, s.uid, z.trener));
     zmena("zrusene", s.uid, s.nazov, s.klient, s.zaciatok, null, s.typ);
   }
@@ -468,6 +475,8 @@ export const Route = createFileRoute("/api/kalendar")({
             minut: b.minut == null ? undefined : Number(b.minut), trener: String(b.trener || ""),
           });
           if (!v.ok) return Response.json({ ok: false, error: v.chyba }, { status: 400 });
+          // Druh si vyberá okno v mriežke — úvodný tréning je tiež termín s menom.
+          const typNovej = String(b.typ || "trening") === "uvodny" ? "uvodny" : "trening";
 
           let idUdalosti = "";
           try {
@@ -481,22 +490,73 @@ export const Route = createFileRoute("/api/kalendar")({
             return Response.json({ ok: false, error: `Google kalendár zápis odmietol: ${sprava}.${rada}` }, { status: 502 });
           }
 
-          const uid = icsUid(idUdalosti);
+          // Kľúč v tvare snímky: `<ics uid>|<začiatok>`. Holé ics uid by najbližšia
+          // snímka nespoznala — založila by druhý riadok a tento ohlásila ako
+          // „zrušený tréning", hoci sa nič nezrušilo.
+          const uid = `${icsUid(idUdalosti)}|${v.t.zaciatok}`;
           const kedy = teraz();
           await DB.batch([
             DB.prepare(
               `INSERT OR REPLACE INTO kal_udalosti (uid, trener, zaciatok, koniec, nazov, klient, typ, prvy_raz, naposledy, zmizla_at)
-               VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'trening', ?7, ?7, NULL)`,
-            ).bind(uid, v.t.trener, v.t.zaciatok, v.t.koniec, v.t.nazov, String(b.klient || "").trim(), kedy),
+               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?8, ?7, ?7, NULL)`,
+            ).bind(uid, v.t.trener, v.t.zaciatok, v.t.koniec, v.t.nazov, String(b.klient || "").trim(), kedy, typNovej),
             // Mapovanie: plné meno klienta ako názov → klient. Bez času,
             // platí pre všetky jeho budúce udalosti s týmto názvom.
             DB.prepare(
-              `INSERT OR IGNORE INTO kal_mapovanie (nazov, trener, cas, klient, typ, vedome) VALUES (?1, ?2, '', ?1, 'trening', 1)`,
-            ).bind(String(b.klient || "").trim(), v.t.trener),
+              `INSERT OR IGNORE INTO kal_mapovanie (nazov, trener, cas, klient, typ, vedome) VALUES (?1, ?2, '', ?1, ?3, 1)`,
+            ).bind(String(b.klient || "").trim(), v.t.trener, typNovej),
           ]);
           const kto = (await currentUser(request)) || "";
           await audit(DB, { action: "trening-nahodeny", predmet: `${v.t.nazov} · ${v.t.zaciatok} · ${v.t.trener}`, neu: uid, actor: kto });
           return Response.json({ ok: true, uid, zaciatok: v.t.zaciatok });
+        }
+
+        /**
+         * PRESUNÚŤ UDALOSŤ na iný deň alebo čas — v Googli aj u nás naraz.
+         * Funguje na každú udalosť z kalendára trénera (uid je z Googlu),
+         * nielen na tie nahodené Kokpitom: rozvrh je jeden a Jerry ho chce
+         * ťahať myšou v Kokpite rovnako ako v Googli.
+         */
+        if (akcia === "trening-presun") {
+          const kluc = (bindings() as { GCAL_SA_KLUC?: string }).GCAL_SA_KLUC;
+          if (!kluc) return Response.json({ ok: false, error: "Servisný účet nie je nastavený (GCAL_SA_KLUC)." }, { status: 503 });
+          const uid = String(b.uid || "");
+          const trener = String(b.trener || "");
+          const kalendar = KALENDAR_TRENERA[trener];
+          // uid zo snímky je zložený: `<ics uid>|<pôvodný začiatok>`.
+          const ics = uid.split("|")[0];
+          if (!ics.endsWith("@google.com") || !kalendar) return Response.json({ ok: false, error: "Chýba uid alebo tréner." }, { status: 400 });
+          const c = pripravCas(String(b.den || ""), String(b.cas || ""), b.minut == null ? undefined : Number(b.minut));
+          if (!c.ok) return Response.json({ ok: false, error: c.chyba }, { status: 400 });
+
+          const povodna = await DB.prepare("SELECT zaciatok FROM kal_udalosti WHERE uid = ?1 AND trener = ?2")
+            .bind(uid, trener).first<{ zaciatok: string }>();
+          if (!povodna) return Response.json({ ok: false, error: "Túto udalosť appka nepozná." }, { status: 404 });
+          let seria = false;
+          try {
+            const zasah = await idPreZasah(kluc, kalendar, ics.replace(/@google\.com$/, ""), povodna.zaciatok);
+            seria = zasah.seria;
+            await presunUdalost(kluc, kalendar, zasah.id, c.zaciatok, c.koniec);
+          } catch (e) {
+            const sprava = String(e instanceof Error ? e.message : e);
+            const rada = /not.*found|forbidden|403|404/i.test(sprava)
+              ? ` Skontroluj, či je kalendár ${kalendar} zdieľaný účtu kokpit-kalendar@evident-catcher-510117-k6.iam.gserviceaccount.com s právom robiť zmeny.`
+              : "";
+            return Response.json({ ok: false, error: `Google kalendár presun odmietol: ${sprava}.${rada}` }, { status: 502 });
+          }
+          // Samostatná udalosť mení v snímke aj KĽÚČ (druhá polovica uid je jej
+          // začiatok); bez prepisu by najbližšia snímka hlásila „zrušené + pridané".
+          // Výskyt série si kľúč drží — RECURRENCE-ID nesie pôvodný čas.
+          if (seria) {
+            await DB.prepare("UPDATE kal_udalosti SET zaciatok = ?1, koniec = ?2, naposledy = ?3 WHERE uid = ?4 AND trener = ?5")
+              .bind(c.zaciatok, c.koniec, teraz(), uid, trener).run();
+          } else {
+            await DB.prepare("UPDATE OR REPLACE kal_udalosti SET uid = ?1, zaciatok = ?2, koniec = ?3, naposledy = ?4 WHERE uid = ?5 AND trener = ?6")
+              .bind(`${ics}|${c.zaciatok}`, c.zaciatok, c.koniec, teraz(), uid, trener).run();
+          }
+          const kto = (await currentUser(request)) || "";
+          await audit(DB, { action: "trening-presunuty", predmet: `${uid} · ${trener}`, old: povodna?.zaciatok || "", neu: c.zaciatok, actor: kto });
+          return Response.json({ ok: true, zaciatok: c.zaciatok, koniec: c.koniec });
         }
 
         /**
@@ -510,9 +570,15 @@ export const Route = createFileRoute("/api/kalendar")({
           const uid = String(b.uid || "");
           const trener = String(b.trener || "");
           const kalendar = KALENDAR_TRENERA[trener];
-          if (!uid.endsWith("@google.com") || !kalendar) return Response.json({ ok: false, error: "Chýba uid alebo tréner." }, { status: 400 });
+          const ics = uid.split("|")[0];
+          if (!ics.endsWith("@google.com") || !kalendar) return Response.json({ ok: false, error: "Chýba uid alebo tréner." }, { status: 400 });
+          const riadok = await DB.prepare("SELECT zaciatok FROM kal_udalosti WHERE uid = ?1 AND trener = ?2")
+            .bind(uid, trener).first<{ zaciatok: string }>();
+          if (!riadok) return Response.json({ ok: false, error: "Túto udalosť appka nepozná." }, { status: 404 });
           try {
-            await zrusUdalost(kluc, kalendar, uid.replace(/@google\.com$/, ""));
+            // Séria sa NIKDY nemaže celá — zásah ide na jeden výskyt.
+            const zasah = await idPreZasah(kluc, kalendar, ics.replace(/@google\.com$/, ""), riadok.zaciatok);
+            await zrusUdalost(kluc, kalendar, zasah.id);
           } catch (e) {
             return Response.json({ ok: false, error: `Google kalendár zrušenie odmietol: ${String(e instanceof Error ? e.message : e)}` }, { status: 502 });
           }

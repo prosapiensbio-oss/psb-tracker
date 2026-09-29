@@ -79,6 +79,54 @@ export async function vlozUdalost(klucJson: string, u: NovaUdalost): Promise<str
   return j.id;
 }
 
+/**
+ * Id, na ktorom sa smie operovať. Jerryho tréningy sú v Googli často
+ * OPAKOVANÉ SÉRIE — DELETE či PATCH na id série by zmazal alebo posunul
+ * VŠETKY výskyty naraz. Séria preto vracia id jedného výskytu, nájdeného
+ * podľa aktuálneho začiatku v pražskom čase.
+ */
+export async function idPreZasah(klucJson: string, kalendar: string, googleId: string, zaciatok: string): Promise<{ id: string; seria: boolean }> {
+  const token = await pristupovyToken(klucJson);
+  const zakl = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(kalendar)}/events`;
+  const r = await fetch(`${zakl}/${encodeURIComponent(googleId)}`, { headers: { authorization: `Bearer ${token}` } });
+  const j = await r.json() as { recurrence?: unknown; status?: string; error?: { message?: string } };
+  if (!r.ok) throw new Error(j.error?.message || `kalendár odpovedal ${r.status}`);
+  // PATCH na zrušenú udalosť Google ticho prijme (200) a nič neoživí —
+  // presun by sa tváril hotový nad hrobom. Stalo sa 29. 9. 2026 pri teste.
+  if (j.status === "cancelled") throw new Error("udalosť je v Googli už zrušená — stiahni kalendár, nech to vidí aj Kokpit");
+  if (!j.recurrence) return { id: googleId, seria: false };
+
+  // Okno deň pred a dva dni po začiatku — posun časového pásma nič neodreže.
+  const d = new Date(`${zaciatok.slice(0, 10)}T00:00:00Z`);
+  const min = new Date(d.getTime() - 86400000).toISOString();
+  const max = new Date(d.getTime() + 2 * 86400000).toISOString();
+  const ri = await fetch(`${zakl}/${encodeURIComponent(googleId)}/instances?timeZone=Europe%2FPrague&timeMin=${encodeURIComponent(min)}&timeMax=${encodeURIComponent(max)}&maxResults=100`, {
+    headers: { authorization: `Bearer ${token}` },
+  });
+  const ji = await ri.json() as { items?: { id: string; start?: { dateTime?: string } }[]; error?: { message?: string } };
+  if (!ri.ok) throw new Error(ji.error?.message || `kalendár odpovedal ${ri.status}`);
+  const vyskyt = (ji.items || []).find((i) => (i.start?.dateTime || "").slice(0, 16) === zaciatok);
+  if (!vyskyt) throw new Error("výskyt opakovanej udalosti sa v Googli nenašiel — stiahni kalendár a skús znova");
+  return { id: vyskyt.id, seria: true };
+}
+
+/** Presunie udalosť na iný čas — PATCH mení len začiatok a koniec, názov zostáva. */
+export async function presunUdalost(klucJson: string, kalendar: string, id: string, zaciatok: string, koniec: string): Promise<void> {
+  const token = await pristupovyToken(klucJson);
+  const r = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(kalendar)}/events/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+    body: JSON.stringify({
+      start: { dateTime: `${zaciatok}:00`, timeZone: "Europe/Prague" },
+      end: { dateTime: `${koniec}:00`, timeZone: "Europe/Prague" },
+    }),
+  });
+  if (!r.ok) {
+    const j = await r.json().catch(() => null) as { error?: { message?: string } } | null;
+    throw new Error(j?.error?.message || `kalendár odpovedal ${r.status}`);
+  }
+}
+
 export async function zrusUdalost(klucJson: string, kalendar: string, id: string): Promise<void> {
   const token = await pristupovyToken(klucJson);
   const r = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(kalendar)}/events/${encodeURIComponent(id)}`, {

@@ -1,6 +1,6 @@
 import { oznam } from "../../lib/psb/obnovaSignal";
 import type { NavFocus } from "./App";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fmtDMY, normName } from "../../lib/psb/format";
 
 import { fetchBtcReserve, type BtcVyplata } from "../../lib/psb/client";
@@ -12,7 +12,7 @@ import { guillermoZostatok } from "../../lib/psb/guillermo";
 import type { PSBData } from "../../lib/psb/types";
 import { SmsKlientovi } from "./SmsKlientovi";
 import { C, mix } from "../../lib/psb/theme";
-import { Card, Empty, H3, Info, Modal, Select, TrenerPills } from "./ui";
+import { Card, Empty, H3, Info, Select, TrenerPills } from "./ui";
 
 /**
  * Kalendár — čo sa chystá a čo sa práve zmenilo.
@@ -112,9 +112,7 @@ export function Kalendar({ clients, data, focus, ktoSom, trainer, onTrainer }: {
   const [chyba, setChyba] = useState("");
   const [sprava, setSprava] = useState("");
   const [pracuje, setPracuje] = useState(false);
-  const [upravovana, setUpravovana] = useState<KalUdalost | null>(null);
-  /** Klik na voľný čas v mriežke týždňa — deň a čas nového tréningu. */
-  const [novyTrening, setNovyTrening] = useState<{ den: string; cas: string } | null>(null);
+
   /**
    * Filter trénera platí na CELÚ kartu, nie len na mriežku.
    *
@@ -222,28 +220,18 @@ export function Kalendar({ clients, data, focus, ktoSom, trainer, onTrainer }: {
           práve to pripojenie. */}
       {!pripojene && <Pripojenie zdroje={stav.zdroje} onZmena={nacitaj} />}
 
-      {pripojene && <Tyzden udalosti={udalostiF} onKlik={setUpravovana} onNovy={(den, cas) => setNovyTrening({ den, cas })} trener={trener} onTrener={setTrener} />}
-
-      {novyTrening && (
-        <NovyTrening
-          den={novyTrening.den}
-          cas={novyTrening.cas}
-          trener={KALENDAR_TRENERA[trener] ? trener : (trenerZPrihlasenia(ktoSom ?? null) || "Jerry")}
-          mena={menaKlientov}
-          onZavri={() => setNovyTrening(null)}
-          onHotovo={async () => { setNovyTrening(null); await nacitaj(); oznam("kalendar"); }}
-        />
-      )}
-
-      {upravovana && (
-        <UpravaUdalosti
-          udalost={upravovana}
+      {pripojene && (
+        <Tyzden
+          udalosti={udalostiF}
           mena={menaKlientov}
           clients={clients}
-          onZavri={() => setUpravovana(null)}
-          onHotovo={async () => { setUpravovana(null); await nacitaj(); oznam("kalendar"); }}
+          trener={trener}
+          onTrener={setTrener}
+          predvolenyTrener={KALENDAR_TRENERA[trener] ? trener : (trenerZPrihlasenia(ktoSom ?? null) || "Jerry")}
+          onObnov={async () => { await nacitaj(); oznam("kalendar"); }}
         />
       )}
+
       {pripojene && <div id="kal-zmeny"><Zmeny zmeny={zmenyF} vybavene={vybaveneF} onHotovo={async () => { await nacitaj(); oznam("kalendar"); }} mena={menaKlientov} /></div>}
       {/* „Nové názvy" idú NAD „Chýba v PTminderi" (Jerry, 22. 8. 2026).
           Je to poradie práce, nie estetika: kým sa meno z názvu udalosti
@@ -1192,19 +1180,43 @@ function Zmeny({ zmeny, vybavene, onHotovo, mena }: { zmeny: Zmena[]; vybavene: 
  * diery medzi hodinami, dvojité obsadenie ani to, že piatok je prázdny. Mriežka
  * to ukáže bez čítania, lebo tvar dňa je v nej priamo vidieť.
  *
- * Rozsah hodín sa počíta z dát, nie natvrdo: kto trénuje od siedmej do ôsmej
- * večer, nemá pozerať na prázdny pás od polnoci.
+ * Od 29. 9. 2026 sa v nej aj PRACUJE, nielen pozerá (Jerry: „keď kliknem na
+ * konkrétny čas, vyskočí všetko, čo potrebujem pre zapísanie tréningu…
+ * označí sa daná hodina, môžem s ňou rovno manipulovať a okno je vedľa nej,
+ * nie na začiernenom pozadí"):
  *
- * DOZADU SA IDE TRI TÝŽDNE. Pôvodne sa späť nedalo vôbec („história patrí do
- * PTmindera") a bola to zlá úvaha: PTminder ukáže, čo sa vyfakturovalo, nie
- * čo v ten deň stálo v kalendári — a práve rozdiel medzi tým dvojím appka
- * odteraz hlási ako chýbajúce sedenie. Bez pohľadu späť sa taká notifikácia
- * nedá overiť. Tri týždne preto, že tak ďaleko siaha aj sťahovanie kalendára
- * (DOZADU_DNI v api/kalendar.ts); za tou hranicou by týždeň zíval prázdnotou,
- * ktorá vyzerá ako zrušené tréningy.
+ *   • klik na voľný čas OZNAČÍ hodinu (zameriavač) a vedľa nej otvorí okno,
+ *   • klik na udalosť ju označí — okno vie zmeniť druh, meno, čas aj ju zmazať,
+ *   • označený blok sa dá ťahať myšou po mriežke (deň aj čas, krok 15 minút);
+ *     zápis do Googlu ide až tlačidlom v okne, nie pri každom pohybe.
+ *
+ * Rozsah hodín sa počíta z dát, nie natvrdo.
  */
-function Tyzden({ udalosti, onKlik, onNovy, trener, onTrener }: { udalosti: KalUdalost[]; onKlik: (u: KalUdalost) => void; onNovy: (den: string, cas: string) => void; trener: string; onTrener: (t: string) => void }) {
+type VyberMriezky = {
+  /** Vybraná existujúca udalosť; null = nahadzuje sa nová. */
+  u: KalUdalost | null;
+  den: string;
+  cas: string;
+  minut: number;
+};
+
+const trvanieMin = (u: KalUdalost) => {
+  const m = (s: string) => Number(s.slice(11, 13)) * 60 + Number(s.slice(14, 16));
+  return Math.max(15, m(u.koniec) - m(u.zaciatok));
+};
+
+function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, onObnov }: {
+  udalosti: KalUdalost[];
+  mena: string[];
+  clients: Record<string, ClientAgg>;
+  trener: string;
+  onTrener: (t: string) => void;
+  /** Komu sa nová udalosť predvyplní — z filtra, inak z prihlásenia. */
+  predvolenyTrener: string;
+  onObnov: () => Promise<void>;
+}) {
   const [posun, setPosun] = useState(0);
+  const [vyber, setVyber] = useState<VyberMriezky | null>(null);
 
   // Pondelok ako začiatok týždňa — tak to má Jerry aj v Google Kalendári.
   const pondelok = useMemo(() => {
@@ -1227,10 +1239,20 @@ function Tyzden({ udalosti, onKlik, onNovy, trener, onTrener }: { udalosti: KalU
 
   const vTyzdni = udalosti.filter((u) => dni.includes(u.zaciatok.slice(0, 10)));
   const minuty = (s: string) => Number(s.slice(11, 13)) * 60 + Number(s.slice(14, 16));
+  const p2 = (n: number) => String(n).padStart(2, "0");
 
   // Rozsah podľa skutočných hodín, s hodinou rezervy na oboch koncoch.
-  const od = vTyzdni.length ? Math.max(0, Math.floor(Math.min(...vTyzdni.map((u) => minuty(u.zaciatok))) / 60) - 1) : 7;
-  const doH = vTyzdni.length ? Math.min(24, Math.ceil(Math.max(...vTyzdni.map((u) => minuty(u.koniec))) / 60) + 1) : 20;
+  // Označená hodina rozsah rozširuje — ťahom ani vpísaným časom nesmie
+  // vyjsť z mriežky do neviditeľna.
+  const vyberMin = vyber && dni.includes(vyber.den) ? Number(vyber.cas.slice(0, 2)) * 60 + Number(vyber.cas.slice(3, 5)) : null;
+  const od = Math.min(
+    vTyzdni.length ? Math.max(0, Math.floor(Math.min(...vTyzdni.map((u) => minuty(u.zaciatok))) / 60) - 1) : 7,
+    vyberMin == null ? 24 : Math.floor(vyberMin / 60),
+  );
+  const doH = Math.max(
+    vTyzdni.length ? Math.min(24, Math.ceil(Math.max(...vTyzdni.map((u) => minuty(u.koniec))) / 60) + 1) : 20,
+    vyberMin == null ? 0 : Math.min(24, Math.ceil((vyberMin + (vyber?.minut || 60)) / 60)),
+  );
   const hodin = Math.max(1, doH - od);
   const VYSKA = 46; // px na hodinu
 
@@ -1249,12 +1271,78 @@ function Tyzden({ udalosti, onKlik, onNovy, trener, onTrener }: { udalosti: KalU
 
   const popisTyzdna = `${pondelok.getDate()}. ${pondelok.getMonth() + 1}. – ${new Date(pondelok.getTime() + 6 * 86400000).getDate()}. ${new Date(pondelok.getTime() + 6 * 86400000).getMonth() + 1}.`;
 
+  /**
+   * ŤAHANIE PO MRIEŽKE.
+   *
+   * Jeden mechanizmus pre nový aj existujúci blok: pointerdown si zapamätá,
+   * kde v bloku sa človek chytil (offset), a pohyb prepočítava deň zo stĺpca
+   * a čas z výšky, zaokrúhlene na 15 minút. Klik bez pohybu (< 6 px) je výber,
+   * nie ťah — inak by sa okno nedalo otvoriť bez toho, aby sa udalosť pohla.
+   * Zápis sa NEDEJE pri pustení myši: ťah len mení označenie a okno vedľa
+   * neho; do Googlu sa píše až tlačidlom. Omyl v ťahu tak nič nepokazí.
+   */
+  const mriezkaRef = useRef<HTMLDivElement | null>(null);
+  const tah = useRef<{ u: KalUdalost | null; posunuty: boolean; offsetMin: number; minut: number; startX: number; startY: number } | null>(null);
+  /** Klik, ktorý príde hneď po ťahu, patrí ťahu — stĺpec ho nesmie čítať ako „nová udalosť". */
+  const ignorujKlikDo = useRef(0);
+
+  const casZBodu = (clientX: number, clientY: number, minut: number, offsetMin: number) => {
+    const el = mriezkaRef.current;
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    const stlpec = (r.width - 42 - 3 * 7) / 7;
+    const idx = Math.max(0, Math.min(6, Math.floor((clientX - r.left - 42 - 3) / (stlpec + 3))));
+    const surove = od * 60 + ((clientY - r.top) / VYSKA) * 60 - offsetMin;
+    const m = Math.max(0, Math.min(24 * 60 - minut, Math.round(surove / 15) * 15));
+    return { den: dni[idx], cas: `${p2(Math.floor(m / 60))}:${p2(m % 60)}` };
+  };
+
+  const zacniTah = (e: React.PointerEvent, u: KalUdalost | null, den: string, cas: string, minut: number) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const el = mriezkaRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const zac = Number(cas.slice(0, 2)) * 60 + Number(cas.slice(3, 5));
+    const bod = od * 60 + ((e.clientY - r.top) / VYSKA) * 60;
+    tah.current = { u, posunuty: false, offsetMin: bod - zac, minut, startX: e.clientX, startY: e.clientY };
+
+    const pohyb = (ev: PointerEvent) => {
+      const t = tah.current;
+      if (!t) return;
+      if (!t.posunuty && Math.hypot(ev.clientX - t.startX, ev.clientY - t.startY) < 6) return;
+      t.posunuty = true;
+      const nove = casZBodu(ev.clientX, ev.clientY, t.minut, t.offsetMin);
+      if (nove) setVyber({ u: t.u, den: nove.den, cas: nove.cas, minut: t.minut });
+    };
+    const koniec = () => {
+      window.removeEventListener("pointermove", pohyb);
+      window.removeEventListener("pointerup", koniec);
+      const t = tah.current;
+      tah.current = null;
+      if (!t) return;
+      if (t.posunuty) { ignorujKlikDo.current = Date.now() + 250; return; }
+      // Klik bez ťahu na udalosť = označiť ju a otvoriť okno.
+      if (t.u) setVyber({ u: t.u, den: t.u.zaciatok.slice(0, 10), cas: t.u.zaciatok.slice(11, 16), minut: trvanieMin(t.u) });
+    };
+    window.addEventListener("pointermove", pohyb);
+    window.addEventListener("pointerup", koniec);
+  };
+
+  const vybranaUdalost = (u: KalUdalost) => !!vyber?.u && vyber.u.uid === u.uid && vyber.u.trener === u.trener;
+
+  // Poloha okna: vedľa stĺpca označenej hodiny — vpravo od neho, pri konci
+  // týždňa vľavo, aby nevyšlo z obrazovky. Žiadne stmavené pozadie.
+  const vyberIdx = vyber ? dni.indexOf(vyber.den) : -1;
+  const vyberTop = vyber && vyberMin != null ? ((vyberMin - od * 60) / 60) * VYSKA : 0;
+
   return (
     <Card>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
         <H3>
           <Info
-            text="Týždeň tak, ako ho vidíš v Google Kalendári. Je to predpoveď, nie zápis — skutočnosť napíše až nedeľný export z PTmindera. Súkromné udalosti sú sivé a do počtu hodín sa nerátajú."
+            text="Týždeň tak, ako ho vidíš v Google Kalendári. Klik na voľný čas nahodí tréning, klik na udalosť ju otvorí — meno, druh, čas aj zmazanie. Označený blok sa dá ťahať myšou; zapíše sa až tlačidlom v okne. Súkromné udalosti sú sivé a do počtu hodín sa nerátajú."
             label="Týždeň"
           />
         </H3>
@@ -1290,88 +1378,135 @@ function Tyzden({ udalosti, onKlik, onNovy, trener, onTrener }: { udalosti: KalU
 
       {/* Mriežka sa kreslí aj pre prázdny týždeň — inak by sa do budúceho
           týždňa nedal nahodiť prvý tréning: nebolo by na čo kliknúť. */}
-      {(
-        <ScrollX>
-          <div style={{ minWidth: 620 }}>
-            {/* Hlavička dní */}
-            <div style={{ display: "grid", gridTemplateColumns: "42px repeat(7, 1fr)", gap: 3, marginBottom: 3 }}>
-              <div />
-              {dni.map((d, i) => {
-                const jeDnes = d === dnesIso;
-                return (
-                  <div key={d} style={{
-                    textAlign: "center", fontSize: 11.5, padding: "3px 0", borderRadius: 6,
-                    fontWeight: jeDnes ? 700 : 600,
-                    color: jeDnes ? C.accentLight : C.textMuted,
-                    background: jeDnes ? mix(C.accent, 12) : "transparent",
-                  }}>
-                    {DNI_SK[i]} {Number(d.slice(8, 10))}.
-                  </div>
-                );
-              })}
-            </div>
+      <ScrollX>
+        <div style={{ minWidth: 620 }}>
+          {/* Hlavička dní */}
+          <div style={{ display: "grid", gridTemplateColumns: "42px repeat(7, 1fr)", gap: 3, marginBottom: 3 }}>
+            <div />
+            {dni.map((d, i) => {
+              const jeDnes = d === dnesIso;
+              return (
+                <div key={d} style={{
+                  textAlign: "center", fontSize: 11.5, padding: "3px 0", borderRadius: 6,
+                  fontWeight: jeDnes ? 700 : 600,
+                  color: jeDnes ? C.accentLight : C.textMuted,
+                  background: jeDnes ? mix(C.accent, 12) : "transparent",
+                }}>
+                  {DNI_SK[i]} {Number(d.slice(8, 10))}.
+                </div>
+              );
+            })}
+          </div>
 
-            {/* Mriežka */}
-            <div style={{ display: "grid", gridTemplateColumns: "42px repeat(7, 1fr)", gap: 3 }}>
-              <div style={{ position: "relative", height: hodin * VYSKA }}>
-                {Array.from({ length: hodin }, (_, i) => (
-                  <div key={i} style={{ position: "absolute", top: i * VYSKA - 6, right: 4, fontSize: 10.5, color: C.textDim }}>
-                    {String(od + i).padStart(2, "0")}:00
-                  </div>
-                ))}
-              </div>
-              {dni.map((d) => (
-                <div
-                  key={d}
-                  title="Klikni na voľný čas — nahodíš tréning do kalendára"
-                  onClick={(e) => {
-                    // Klik na PRÁZDNE miesto stĺpca = nový tréning o tom čase.
-                    // Udalosti sú tlačidlá nad stĺpcom a klik si zastavia samy.
-                    const r = e.currentTarget.getBoundingClientRect();
-                    const min = od * 60 + ((e.clientY - r.top) / VYSKA) * 60;
-                    const zaokruhlene = Math.max(0, Math.min(23 * 60 + 30, Math.floor(min / 30) * 30));
-                    const p2 = (n: number) => String(n).padStart(2, "0");
-                    onNovy(d, `${p2(Math.floor(zaokruhlene / 60))}:${p2(zaokruhlene % 60)}`);
-                  }}
-                  style={{
-                    position: "relative", height: hodin * VYSKA, borderRadius: 7,
-                    background: d === dnesIso ? mix(C.accent, 5) : mix(C.border, 14),
-                    overflow: "hidden", cursor: "copy",
-                  }}
-                >
-                  {Array.from({ length: hodin }, (_, i) => (
-                    <div key={i} style={{ position: "absolute", top: i * VYSKA, left: 0, right: 0, borderTop: `1px solid ${mix(C.border, 40)}` }} />
-                  ))}
-                  {vTyzdni.filter((u) => u.zaciatok.slice(0, 10) === d).map((u) => {
-                    const top = ((minuty(u.zaciatok) - od * 60) / 60) * VYSKA;
-                    const vyska = Math.max(18, ((minuty(u.koniec) - minuty(u.zaciatok)) / 60) * VYSKA - 2);
-                    const f = farba(u);
-                    return (
-                      <button
-                        key={`${u.uid}|${u.trener}`}
-                        onClick={(e) => { e.stopPropagation(); onKlik(u); }}
-                        title={`${cas(u.zaciatok)}–${cas(u.koniec)} · ${u.nazov}${u.klient ? ` → ${u.klient}` : ""} · ${u.trener} — klikni na úpravu`}
-                        style={{
-                          position: "absolute", top, left: 2, right: 2, height: vyska,
-                          borderRadius: 5, padding: "2px 4px", overflow: "hidden",
-                          background: mix(f, 16), borderLeft: `3px solid ${f}`,
-                          border: "none", borderLeftStyle: "solid", textAlign: "left", cursor: "pointer",
-                          fontSize: 10.5, lineHeight: 1.25, color: C.text, fontFamily: "inherit",
-                        }}
-                      >
-                        <div style={{ fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                          {u.klient || u.nazov}{!u.klient && u.typ !== "sukromne" && u.typ !== "netrening" && <span style={{ color: C.orange }}> ?</span>}
-                        </div>
-                        {vyska > 30 && <div style={{ color: C.textDim, fontSize: 10 }}>{cas(u.zaciatok)}</div>}
-                      </button>
-                    );
-                  })}
+          {/* Mriežka — position: relative kvôli oknu, ktoré sa lepí k stĺpcu. */}
+          <div ref={mriezkaRef} style={{ display: "grid", gridTemplateColumns: "42px repeat(7, 1fr)", gap: 3, position: "relative" }}>
+            <div style={{ position: "relative", height: hodin * VYSKA }}>
+              {Array.from({ length: hodin }, (_, i) => (
+                <div key={i} style={{ position: "absolute", top: i * VYSKA - 6, right: 4, fontSize: 10.5, color: C.textDim }}>
+                  {String(od + i).padStart(2, "0")}:00
                 </div>
               ))}
             </div>
+            {dni.map((d) => (
+              <div
+                key={d}
+                title="Klikni na voľný čas — nahodíš tréning do kalendára"
+                onClick={(e) => {
+                  if (Date.now() < ignorujKlikDo.current) return;
+                  // Klik na PRÁZDNE miesto stĺpca = zameriavač o tom čase.
+                  const r = e.currentTarget.getBoundingClientRect();
+                  const min = od * 60 + ((e.clientY - r.top) / VYSKA) * 60;
+                  const z = Math.max(0, Math.min(23 * 60 + 30, Math.floor(min / 30) * 30));
+                  setVyber({ u: null, den: d, cas: `${p2(Math.floor(z / 60))}:${p2(z % 60)}`, minut: 60 });
+                }}
+                style={{
+                  position: "relative", height: hodin * VYSKA, borderRadius: 7,
+                  background: d === dnesIso ? mix(C.accent, 5) : mix(C.border, 14),
+                  overflow: "hidden", cursor: "copy",
+                }}
+              >
+                {Array.from({ length: hodin }, (_, i) => (
+                  <div key={i} style={{ position: "absolute", top: i * VYSKA, left: 0, right: 0, borderTop: `1px solid ${mix(C.border, 40)}` }} />
+                ))}
+                {vTyzdni.filter((u) => u.zaciatok.slice(0, 10) === d && !vybranaUdalost(u)).map((u) => {
+                  const top = ((minuty(u.zaciatok) - od * 60) / 60) * VYSKA;
+                  const vyska = Math.max(18, ((minuty(u.koniec) - minuty(u.zaciatok)) / 60) * VYSKA - 2);
+                  const f = farba(u);
+                  return (
+                    <button
+                      key={`${u.uid}|${u.trener}`}
+                      onPointerDown={(e) => zacniTah(e, u, u.zaciatok.slice(0, 10), u.zaciatok.slice(11, 16), trvanieMin(u))}
+                      onClick={(e) => e.stopPropagation()}
+                      title={`${cas(u.zaciatok)}–${cas(u.koniec)} · ${u.nazov}${u.klient ? ` → ${u.klient}` : ""} · ${u.trener} — klikni: upraviť či zmazať, ťahaj: presunúť`}
+                      style={{
+                        position: "absolute", top, left: 2, right: 2, height: vyska,
+                        borderRadius: 5, padding: "2px 4px", overflow: "hidden",
+                        background: mix(f, 16), borderLeft: `3px solid ${f}`,
+                        border: "none", borderLeftStyle: "solid", textAlign: "left", cursor: "grab",
+                        fontSize: 10.5, lineHeight: 1.25, color: C.text, fontFamily: "inherit",
+                        touchAction: "none",
+                      }}
+                    >
+                      <div style={{ fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {u.klient || u.nazov}{!u.klient && u.typ !== "sukromne" && u.typ !== "netrening" && <span style={{ color: C.orange }}> ?</span>}
+                      </div>
+                      {vyska > 30 && <div style={{ color: C.textDim, fontSize: 10 }}>{cas(u.zaciatok)}</div>}
+                    </button>
+                  );
+                })}
+
+                {/* ZAMERIAVAČ — označená hodina. Ťahá sa za ňu; okno stojí vedľa. */}
+                {vyber && vyber.den === d && vyberMin != null && (
+                  <div
+                    onPointerDown={(e) => zacniTah(e, vyber.u, vyber.den, vyber.cas, vyber.minut)}
+                    onClick={(e) => e.stopPropagation()}
+                    style={{
+                      position: "absolute",
+                      top: ((vyberMin - od * 60) / 60) * VYSKA,
+                      left: 1, right: 1,
+                      height: Math.max(18, (vyber.minut / 60) * VYSKA - 2),
+                      borderRadius: 5, padding: "2px 4px", overflow: "hidden",
+                      background: mix(C.green, 22),
+                      border: `1.5px dashed ${C.green}`,
+                      cursor: "grab", zIndex: 3,
+                      fontSize: 10.5, lineHeight: 1.25, color: C.text,
+                      touchAction: "none",
+                    }}
+                  >
+                    <div style={{ fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {vyber.u ? (vyber.u.klient || vyber.u.nazov) : "nový tréning"}
+                    </div>
+                    <div style={{ color: C.textMuted, fontSize: 10 }}>{vyber.cas}</div>
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {/* OKNO vedľa označenej hodiny — nie modal, nič sa nestmavuje. */}
+            {vyber && (
+              <OknoUdalosti
+                key={vyber.u ? `${vyber.u.uid}|${vyber.u.trener}` : "novy"}
+                vyber={vyber}
+                mena={mena}
+                clients={clients}
+                predvolenyTrener={predvolenyTrener}
+                onZmen={setVyber}
+                onZavri={() => setVyber(null)}
+                onHotovo={async () => { setVyber(null); await onObnov(); }}
+                style={{
+                  position: "absolute", zIndex: 6, width: 280,
+                  top: Math.max(0, Math.min(vyberIdx >= 0 ? vyberTop : 0, hodin * VYSKA - 300)),
+                  left: vyberIdx < 0
+                    ? "calc(42px + 6px)"
+                    : vyberIdx <= 3
+                      ? `calc(42px + ${vyberIdx + 1} * ((100% - 42px) / 7) + 5px)`
+                      : `calc(42px + ${vyberIdx} * ((100% - 42px) / 7) - 289px)`,
+                }}
+              />
+            )}
           </div>
-        </ScrollX>
-      )}
+        </div>
+      </ScrollX>
 
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 10, fontSize: 11, color: C.textDim }}>
         {[["Tréning", C.accent], ["Úvodný", C.blue], ["Guillermo", C.green], ["Súkromné", C.textDim]].map(([l, f]) => (
@@ -1385,231 +1520,223 @@ function Tyzden({ udalosti, onKlik, onNovy, trener, onTrener }: { udalosti: KalU
 }
 
 /**
- * Oprava toho, čo appka o udalosti usúdila.
+ * Okno vedľa označenej hodiny — jedno pre nový tréning aj úpravu existujúcej
+ * udalosti. Nie je to modal: mriežka zostáva viditeľná a blok sa dá popri
+ * otvorenom okne ďalej ťahať (deň a čas v okne sa menia s ním).
  *
- * Mení sa PRAVIDLO, nie jeden výskyt: „Gazo" v Jerryho kalendári znamená vždy
- * toho istého človeka, takže oprava platí na všetky jeho hodiny — minulé aj
- * budúce. Opravovať každý týždeň zvlášť by znamenalo tú istú chybu prepisovať
- * donekonečna.
+ * Pri existujúcej udalosti vie tri veci naraz:
+ *   • DRUH a MENO — cez `mapuj`, teda pravidlo pre všetky udalosti s tým
+ *     istým názvom u trénera (ako doteraz v „Upraviť udalosť"),
+ *   • ČAS — cez `trening-presun`, zapíše sa do Googlu aj do kal_udalosti,
+ *   • ZMAZANIE — cez `trening-zrus`, s potvrdením; maže z reálneho kalendára.
  *
- * Je to napísané aj na obrazovke. Kto opravuje meno, má vedieť, čoho sa to týka
- * — inak by čakal zmenu jednej dlaždice a prekvapilo by ho, že sa prekreslil
- * celý mesiac.
+ * Presun a zmazanie fungujú len na udalosti z Googlu (uid @google.com)
+ * v kalendári trénera, ktorý je zdieľaný servisnému účtu — chyba z Googlu
+ * sa ukazuje doslovne aj s radou, čo zdieľať.
  */
-function UpravaUdalosti({
-  udalost, mena, clients, onZavri, onHotovo,
-}: {
-  udalost: KalUdalost;
+function OknoUdalosti({ vyber, mena, clients, predvolenyTrener, onZmen, onZavri, onHotovo, style }: {
+  vyber: VyberMriezky;
   mena: string[];
   clients: Record<string, ClientAgg>;
+  predvolenyTrener: string;
+  onZmen: (v: VyberMriezky) => void;
   onZavri: () => void;
   onHotovo: () => Promise<void>;
+  style: React.CSSProperties;
 }) {
-  const navrh = useMemo(() => navrhni(udalost.nazov, clients), [udalost.nazov, clients]);
-  const [klient, setKlient] = useState(udalost.klient || "");
-  const [typ, setTyp] = useState(udalost.typ || navrh.typ);
+  const u = vyber.u;
+  const navrh = useMemo(() => (u ? navrhni(u.nazov, clients) : null), [u, clients]);
+  const [klient, setKlient] = useState(u ? (u.klient || "") : "");
+  const [typ, setTyp] = useState(u ? (u.typ || navrh?.typ || "trening") : "trening");
+  const [trenerNovej, setTrenerNovej] = useState(predvolenyTrener);
   const [uklada, setUklada] = useState(false);
+  const [mazem, setMazem] = useState(false);
+  const [potvrdMazanie, setPotvrdMazanie] = useState(false);
   const [chyba, setChyba] = useState("");
 
   const sMenom = typ === "trening" || typ === "uvodny";
-  const daSa = sMenom ? klient.trim().length >= 3 : true;
+  const trener = u ? u.trener : trenerNovej;
+  const zGoogle = !u || u.uid.split("|")[0].endsWith("@google.com");
+  const casZmeneny = !!u && (
+    vyber.den !== u.zaciatok.slice(0, 10) || vyber.cas !== u.zaciatok.slice(11, 16) || vyber.minut !== trvanieMin(u)
+  );
+  const mapaZmenena = !!u && (typ !== (u.typ || "") || (sMenom ? klient.trim() : "") !== (u.klient || ""));
+  const daSa = !uklada && (u ? (casZmeneny || mapaZmenena) : (sMenom && klient.trim().length >= 3));
+
+  const pole = { padding: "6px 9px", borderRadius: 7, fontSize: 12.5, border: `1px solid ${C.border}`, background: C.bg, color: C.text, colorScheme: "dark" } as const;
+  const popisok = { display: "flex", flexDirection: "column", gap: 3, fontSize: 10.5, color: C.textDim } as const;
 
   const uloz = async () => {
     if (!daSa) return;
     setUklada(true); setChyba("");
-    const j = await posli({
-      akcia: "mapuj", nazov: udalost.nazov, trener: udalost.trener,
-      typ, klient: sMenom ? klient.trim() : null,
-    }).catch(() => ({ ok: false, error: "spojenie" }));
-    setUklada(false);
-    // Modal sa zatvára cez onHotovo — pri neúspechu zostáva otvorený
-    // a povie prečo, namiesto tichého zatvorenia nad nezapísaným menom.
-    if (!j.ok) { setChyba(j.error || "Nepodarilo sa uložiť."); return; }
+    try {
+      if (!u) {
+        const j = await posli({ akcia: "trening-nahod", klient: klient.trim(), den: vyber.den, cas: vyber.cas, minut: vyber.minut, trener, typ })
+          .catch(() => ({ ok: false as const, error: "spojenie zlyhalo — tréning sa nezapísal" }));
+        if (!j.ok) { setChyba(j.error || "Nepodarilo sa zapísať do kalendára."); return; }
+      } else {
+        // Poradie: najprv čas (Google), potom pravidlo mena — keď padne prvé,
+        // druhé sa ani neskúsi a okno povie prečo. Nič sa nezapíše napoly potichu.
+        if (casZmeneny) {
+          if (!zGoogle) { setChyba("Táto udalosť nie je z Google kalendára — presunúť sa nedá."); return; }
+          const j = await posli({ akcia: "trening-presun", uid: u.uid, trener: u.trener, den: vyber.den, cas: vyber.cas, minut: vyber.minut })
+            .catch(() => ({ ok: false as const, error: "spojenie zlyhalo — presun sa nezapísal" }));
+          if (!j.ok) { setChyba(j.error || "Presun sa nepodaril."); return; }
+        }
+        if (mapaZmenena) {
+          const j = await posli({ akcia: "mapuj", nazov: u.nazov, trener: u.trener, typ, klient: sMenom ? klient.trim() : null })
+            .catch(() => ({ ok: false as const, error: "spojenie" }));
+          if (!j.ok) { setChyba(j.error || "Nepodarilo sa uložiť meno a druh."); return; }
+        }
+      }
+      await onHotovo();
+    } finally {
+      setUklada(false);
+    }
+  };
+
+  const vymaz = async () => {
+    if (!u) return;
+    setMazem(true); setChyba("");
+    const j = await posli({ akcia: "trening-zrus", uid: u.uid, trener: u.trener })
+      .catch(() => ({ ok: false as const, error: "spojenie zlyhalo — nezmazalo sa" }));
+    setMazem(false);
+    if (!j.ok) { setChyba(j.error || "Zmazanie sa nepodarilo."); return; }
     await onHotovo();
   };
 
   return (
-    <Modal title="Upraviť udalosť" onClose={onZavri}>
-      <div style={{ fontSize: 12.5, color: C.textMuted, lineHeight: 1.6, marginBottom: 12 }}>
-        V kalendári stojí <b style={{ color: C.text }}>„{udalost.nazov}"</b> ·{" "}
-        {den(udalost.zaciatok)} {cas(udalost.zaciatok)}–{cas(udalost.koniec)} · {udalost.trener}
+    <div
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        ...style,
+        background: C.bg, border: `1px solid ${C.border}`, borderRadius: 11,
+        padding: "12px 13px", boxShadow: "0 10px 32px rgba(0,0,0,0.45)",
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, marginBottom: 8 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>
+          {u ? "Udalosť" : "Nahodiť tréning"}
+        </div>
+        <button onClick={onZavri} aria-label="Zavrieť" style={{ background: "none", border: "none", color: C.textDim, fontSize: 15, cursor: "pointer", lineHeight: 1 }}>✕</button>
       </div>
 
-      <label style={{ fontSize: 11.5, color: C.textMuted, display: "block", marginBottom: 5 }}>Čo to je</label>
-      <Select value={typ} onChange={setTyp} options={TYPY} />
+      <div style={{ fontSize: 11.5, color: C.textMuted, lineHeight: 1.5, marginBottom: 10 }}>
+        {u
+          ? <>V kalendári stojí <b style={{ color: C.text }}>„{u.nazov}"</b> · {u.trener}</>
+          : <>{den(`${vyber.den}T${vyber.cas}`)} o <b style={{ color: C.text }}>{vyber.cas}</b> — blok sa dá ťahať myšou.</>}
+      </div>
+
+      <label style={{ ...popisok, marginBottom: 8 }}>
+        druh
+        <select value={typ} onChange={(e) => setTyp(e.target.value)} style={pole}>
+          {(u ? TYPY : TYPY.filter((t) => t.value === "trening" || t.value === "uvodny")).map((t) => (
+            <option key={t.value} value={t.value}>{t.label}</option>
+          ))}
+        </select>
+      </label>
 
       {sMenom && (
-        <>
-          <label style={{ fontSize: 11.5, color: C.textMuted, display: "block", margin: "12px 0 5px" }}>Klient</label>
+        <label style={{ ...popisok, marginBottom: 8 }}>
+          klient
           <input
-            list="uprava-klienti"
+            list="okno-udalosti-klienti"
             value={klient}
             onChange={(e) => setKlient(e.target.value)}
             placeholder="píš meno…"
-            style={{
-              width: "100%", padding: "8px 11px", borderRadius: 8, fontSize: 13,
-              border: `1px solid ${klient && !mena.includes(klient) ? C.orange : C.border}`,
-              background: C.bg, color: C.text,
-            }}
+            autoFocus={!u}
+            style={{ ...pole, border: `1px solid ${klient && !mena.includes(klient) ? C.orange : C.border}` }}
           />
-          <datalist id="uprava-klienti">
-            {mena.map((m) => <option key={m} value={m} />)}
-          </datalist>
-          {klient.trim().length >= 3 && !mena.includes(klient) && (
-            <div style={{ fontSize: 11, color: C.textDim, marginTop: 6 }}>
-              Zatiaľ nie je klientom — uloží sa tak, ako ho napíšeš, a spáruje sa sám,
-              keď sa objaví v PTminderi.
-            </div>
-          )}
-          {navrh.kandidati.length > 0 && (
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 8 }}>
-              {navrh.kandidati.filter((k) => k !== klient).slice(0, 3).map((k) => (
-                <button key={k} onClick={() => setKlient(k)}
-                  style={{ padding: "4px 10px", borderRadius: 6, fontSize: 11.5, cursor: "pointer", border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted }}>
-                  {k}
-                </button>
-              ))}
-            </div>
-          )}
-        </>
+        </label>
       )}
-
-      <div style={{ fontSize: 11, color: C.textDim, margin: "14px 0 12px", lineHeight: 1.55 }}>
-        Oprava platí na <b>všetky udalosti s týmto názvom</b> u tohto trénera — minulé aj budúce.
-        Rovnaký názov u druhého trénera zostáva nedotknutý, lebo to nemusí byť ten istý človek.
-      </div>
-
-      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-        {chyba && <div style={{ fontSize: 12, color: C.red, marginBottom: 8 }}>{chyba}</div>}
-        <button
-          onClick={() => void uloz()}
-          disabled={uklada || !daSa}
-          style={{
-            padding: "8px 18px", borderRadius: 9, fontSize: 13, fontWeight: 600,
-            cursor: daSa ? "pointer" : "not-allowed",
-            border: `1px solid ${mix(C.green, 50)}`,
-            background: daSa ? mix(C.green, 12) : "transparent",
-            color: daSa ? C.green : C.textDim,
-          }}
-        >
-          {uklada ? "Ukladám…" : "Uložiť"}
-        </button>
-        <button onClick={onZavri} style={{ background: "none", border: "none", color: C.textDim, fontSize: 12.5, cursor: "pointer" }}>
-          Zrušiť
-        </button>
-      </div>
-    </Modal>
-  );
-}
-
-/**
- * Nový tréning z kliku do mriežky týždňa.
- *
- * Jerry, 29. 9. 2026: „musí to fungovať tak, že keď v záložke Kalendár
- * kliknem na konkrétny čas, tak mi vyskočí všetko, čo potrebujem pre
- * zapísanie tréningu." Deň, čas aj tréner sú z kliku predvyplnené — dopísať
- * treba len meno klienta. Zapíše ho server cez servisný účet do Google
- * kalendára trénera a v tej istej chvíli do kal_udalosti, takže sa v mriežke
- * ukáže hneď.
- */
-function NovyTrening({ den: denV, cas: casV, trener: trenerV, mena, onZavri, onHotovo }: {
-  den: string;
-  cas: string;
-  trener: string;
-  mena: string[];
-  onZavri: () => void;
-  onHotovo: () => Promise<void>;
-}) {
-  const [klient, setKlient] = useState("");
-  const [d, setD] = useState(denV);
-  const [c, setC] = useState(casV);
-  const [minut, setMinut] = useState("60");
-  const [trener, setTrener] = useState(trenerV);
-  const [uklada, setUklada] = useState(false);
-  const [chyba, setChyba] = useState("");
-
-  const daSa = klient.trim().length >= 3 && !!d && !!c && !uklada;
-
-  const uloz = async () => {
-    if (!daSa) return;
-    setUklada(true); setChyba("");
-    const j = await posli({ akcia: "trening-nahod", klient: klient.trim(), den: d, cas: c, minut: Number(minut) || 60, trener })
-      .catch(() => ({ ok: false as const, error: "spojenie zlyhalo — tréning sa nezapísal" }));
-    setUklada(false);
-    // Pri neúspechu modal zostáva otvorený a povie prečo — chyba z Googlu
-    // nesie aj radu (najčastejšie chýbajúce zdieľanie kalendára).
-    if (!j.ok) { setChyba(j.error || "Nepodarilo sa zapísať do kalendára."); return; }
-    await onHotovo();
-  };
-
-  const pole = { padding: "8px 11px", borderRadius: 8, fontSize: 13, border: `1px solid ${C.border}`, background: C.bg, color: C.text, colorScheme: "dark" } as const;
-
-  return (
-    <Modal title="Nahodiť tréning" onClose={onZavri}>
-      <div style={{ fontSize: 12.5, color: C.textMuted, lineHeight: 1.6, marginBottom: 12 }}>
-        {den(`${d}T${c}`)} o <b style={{ color: C.text }}>{c}</b> · {trener} — zapíše sa rovno do
-        Google kalendára a hneď aj sem do týždňa.
-      </div>
-
-      <label style={{ fontSize: 11.5, color: C.textMuted, display: "block", marginBottom: 5 }}>Klient</label>
-      <input
-        list="novy-trening-klienti"
-        value={klient}
-        onChange={(e) => setKlient(e.target.value)}
-        placeholder="píš meno…"
-        autoFocus
-        style={{ ...pole, width: "100%", border: `1px solid ${klient && !mena.includes(klient) ? C.orange : C.border}` }}
-      />
-      <datalist id="novy-trening-klienti">
+      <datalist id="okno-udalosti-klienti">
         {mena.map((m) => <option key={m} value={m} />)}
       </datalist>
-      {klient.trim().length >= 3 && !mena.includes(klient) && (
-        <div style={{ fontSize: 11, color: C.textDim, marginTop: 6 }}>
-          Toto meno appka nepozná ako klienta — udalosť vznikne aj tak, ale tréning nebude mať komu patriť.
+      {sMenom && !!navrh && navrh.kandidati.length > 0 && (
+        <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 8 }}>
+          {navrh.kandidati.filter((k) => k !== klient).slice(0, 3).map((k) => (
+            <button key={k} onClick={() => setKlient(k)}
+              style={{ padding: "3px 9px", borderRadius: 6, fontSize: 11, cursor: "pointer", border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted }}>
+              {k}
+            </button>
+          ))}
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 10, flexWrap: "wrap", margin: "12px 0" }}>
-        <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 11.5, color: C.textMuted }}>
+      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+        <label style={popisok}>
           deň
-          <input type="date" value={d} onChange={(e) => setD(e.target.value)} style={{ ...pole, width: 150 }} />
+          <input type="date" value={vyber.den} onChange={(e) => onZmen({ ...vyber, den: e.target.value })} style={{ ...pole, width: 128 }} />
         </label>
-        <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 11.5, color: C.textMuted }}>
+        <label style={popisok}>
           čas
-          <input type="time" value={c} onChange={(e) => setC(e.target.value)} style={{ ...pole, width: 105 }} />
+          <input type="time" value={vyber.cas} onChange={(e) => onZmen({ ...vyber, cas: e.target.value })} style={{ ...pole, width: 84 }} />
         </label>
-        <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 11.5, color: C.textMuted }}>
+        <label style={popisok}>
           minút
-          <input type="number" value={minut} onChange={(e) => setMinut(e.target.value)} style={{ ...pole, width: 78 }} />
-        </label>
-        <label style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 11.5, color: C.textMuted }}>
-          tréner
-          <select value={trener} onChange={(e) => setTrener(e.target.value)} style={{ ...pole, width: 110 }}>
-            {Object.keys(KALENDAR_TRENERA).map((m) => <option key={m} value={m}>{m}</option>)}
-          </select>
+          <input type="number" value={vyber.minut} onChange={(e) => onZmen({ ...vyber, minut: Math.max(15, Math.min(240, Number(e.target.value) || 60)) })} style={{ ...pole, width: 58 }} />
         </label>
       </div>
 
-      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-        {chyba && <div style={{ fontSize: 12, color: C.red, flexBasis: "100%" }}>{chyba}</div>}
+      {!u && (
+        <label style={{ ...popisok, marginBottom: 8 }}>
+          tréner
+          <select value={trenerNovej} onChange={(e) => setTrenerNovej(e.target.value)} style={pole}>
+            {Object.keys(KALENDAR_TRENERA).map((m) => <option key={m} value={m}>{m}</option>)}
+          </select>
+        </label>
+      )}
+
+      {u && mapaZmenena && (
+        <div style={{ fontSize: 10.5, color: C.textDim, lineHeight: 1.5, marginBottom: 8 }}>
+          Meno a druh platia na <b>všetky udalosti „{u.nazov}"</b> u tohto trénera. Čas sa mení len tejto jednej.
+        </div>
+      )}
+      {chyba && <div style={{ fontSize: 11.5, color: C.red, lineHeight: 1.5, marginBottom: 8 }}>{chyba}</div>}
+
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
         <button
           onClick={() => void uloz()}
           disabled={!daSa}
           style={{
-            padding: "8px 18px", borderRadius: 9, fontSize: 13, fontWeight: 600,
+            padding: "7px 14px", borderRadius: 8, fontSize: 12.5, fontWeight: 700,
             cursor: daSa ? "pointer" : "not-allowed",
             border: `1px solid ${mix(C.green, 50)}`,
             background: daSa ? mix(C.green, 12) : "transparent",
             color: daSa ? C.green : C.textDim,
           }}
         >
-          {uklada ? "Zapisujem…" : "Nahodiť do kalendára"}
+          {uklada ? "Zapisujem…" : u ? "Uložiť" : "Nahodiť do kalendára"}
         </button>
-        <button onClick={onZavri} style={{ background: "none", border: "none", color: C.textDim, fontSize: 12.5, cursor: "pointer" }}>
+        {u && zGoogle && !potvrdMazanie && (
+          <button onClick={() => setPotvrdMazanie(true)}
+            style={{ padding: "7px 12px", borderRadius: 8, fontSize: 12, cursor: "pointer", border: `1px solid ${mix(C.red, 45)}`, background: "transparent", color: C.red }}>
+            Vymazať
+          </button>
+        )}
+        <button onClick={onZavri} style={{ background: "none", border: "none", color: C.textDim, fontSize: 12, cursor: "pointer" }}>
           Zrušiť
         </button>
       </div>
-    </Modal>
+
+      {u && potvrdMazanie && (
+        <div style={{ marginTop: 8, padding: "8px 10px", borderRadius: 8, border: `1px solid ${mix(C.red, 45)}`, background: mix(C.red, 8) }}>
+          <div style={{ fontSize: 11.5, color: C.textMuted, lineHeight: 1.5 }}>
+            Zmaže udalosť aj z <b style={{ color: C.text }}>Google kalendára ({u.trener})</b>. Nedá sa vrátiť.
+          </div>
+          <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+            <button onClick={() => void vymaz()} disabled={mazem}
+              style={{ padding: "5px 11px", borderRadius: 7, fontSize: 11.5, fontWeight: 700, cursor: mazem ? "wait" : "pointer", border: `1px solid ${mix(C.red, 55)}`, background: mix(C.red, 16), color: C.red }}>
+              {mazem ? "Mažem…" : "Vymazať naozaj"}
+            </button>
+            <button onClick={() => setPotvrdMazanie(false)}
+              style={{ padding: "5px 11px", borderRadius: 7, fontSize: 11.5, cursor: "pointer", border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted }}>
+              Nechať tak
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
