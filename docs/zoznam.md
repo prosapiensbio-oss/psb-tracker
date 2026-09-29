@@ -47,6 +47,18 @@ Rozhodnuté 29. 9. 2026. PTminder je odvtedy kontrola.
   (500 Kč + 500 Kč/mes.), po schválení zapísať „ProSapiens" v Údaje → SMS.
 - [ ] Import služieb stále len pridáva (oprava v PTminderi → zdvojený predaj).
 - [ ] Export Sessions s 28.–29. 9., keď ich Jerry dopíše.
+- [x] **Nahadzovanie tréningov do Google kalendára z Kokpitu** — hotové 29. 9.
+  (servisný účet kokpit-kalendar@evident-catcher-510117-k6.iam.gserviceaccount.com,
+  secret GCAL_SA_KLUC; stôl klienta → všetko → „+ Nahodiť tréning do kalendára").
+  Overené naostro: AATest 30. 9. 10:00 je v Google aj v kal_udalosti.
+- [ ] **Terezkin kalendár zdieľať servisnému účtu** — z jej účtu
+  (teres.zat@gmail.com) zdieľať kalendár adrese vyššie s právom „Robiť zmeny
+  a vidieť všetky podrobnosti udalostí". Dovtedy zápis jej klientom vráti chybu s návodom.
+- [ ] Jerry: zmazať súbor kľúča ~/Downloads/evident-catcher-510117-k6-c9f048e10703.json
+  (v appke už je ako secret, na disku ho netreba).
+- [ ] Zrušenie tréningu z Kokpitu — API `trening-zrus` existuje, tlačidlo na
+  obrazovke zatiaľ nie (maže z reálneho kalendára, chce potvrdenie). Ak ho Jerry
+  bude chcieť, doplniť k objednaným termínom.
 
 ## 1 · Čaká na Jerryho slovo
 
