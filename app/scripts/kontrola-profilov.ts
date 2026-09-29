@@ -31,6 +31,9 @@ const sessions = nacitaj("sessions").map((r: any) => ({
 const packages = nacitaj("packages").map((r: any) => ({
   client: r.client_name, package: r.package_name, total: r.sessions_total, remaining: r.sessions_remaining,
   validFrom: r.valid_from, validTo: r.valid_to, payment: r.payment_czk, added: r.added,
+  // Bez týchto dvoch kontrolór počíta inak než appka: `kind` rozlišuje
+  // členstvo od balíčka, `naObdobie` nesie prenesené hodiny (8 per month).
+  kind: r.kind || "", naObdobie: Number(r.na_obdobie) || 0,
 }));
 const services = nacitaj("services").map((r: any) => ({
   client: r.client_name, date: r.date, serviceType: r.service_type,

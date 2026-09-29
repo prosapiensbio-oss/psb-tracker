@@ -83,6 +83,7 @@ export const Route = createFileRoute("/api/push-nedela")({
              LEFT JOIN kal_konanie kk ON kk.uid = u.uid AND kk.trener = u.trener
             WHERE u.zmizla_at IS NOT NULL AND u.zmizla_at > u.koniec
               AND u.typ IN ('trening','uvodny') AND u.klient IS NOT NULL AND kk.uid IS NULL
+              AND u.zaciatok >= date('now', '-14 days')
               AND NOT EXISTS (SELECT 1 FROM sessions s WHERE s.client_name = u.klient AND substr(s.date,1,10) = substr(u.zaciatok,1,10))`,
         ).all()).results as unknown as { klient: string; trener: string }[];
 

@@ -514,10 +514,22 @@ function UploadCard({ data, missing, actions, chat }: { data: PSBData; missing: 
 
               {r.chybaju && r.chybaju.length > 0 && (
                 <div style={{ padding: 9, marginBottom: 8, fontSize: 12, borderRadius: 8, background: C.orangeBg, color: C.orange }}>
-                  Pozor: {r.chybaju.length}{" "}
-                  {r.chybaju.length === 1 ? "klient má" : r.chybaju.length < 5 ? "klienti majú" : "klientov má"}{" "}
-                  v appke živý balíček, ale v tomto súbore {r.chybaju.length === 1 ? "nie je" : "nie sú"} —
-                  ich zostatky ostali nezmenené. Ak to nemá byť tak, exportuj z PTminderu širší rozsah.
+                  {r.vynulovane ? (
+                    <>
+                      {r.chybaju.length}{" "}
+                      {r.chybaju.length === 1 ? "klient mal" : r.chybaju.length < 5 ? "klienti mali" : "klientov malo"}{" "}
+                      v appke živý balíček, ale v exporte už {r.chybaju.length === 1 ? "nie je" : "nie sú"} — PTminder
+                      vyčerpaný balíček nevyváža, takže im appka zostatok nastavila na nulu. Ak to bol čiastkový
+                      export, nahraj úplný a zostatky sa vrátia.
+                    </>
+                  ) : (
+                    <>
+                      Pozor: {r.chybaju.length}{" "}
+                      {r.chybaju.length === 1 ? "klient má" : r.chybaju.length < 5 ? "klienti majú" : "klientov má"}{" "}
+                      v appke živý balíček, ale v tomto súbore {r.chybaju.length === 1 ? "nie je" : "nie sú"} —
+                      ich zostatky ostali nezmenené. Ak to nemá byť tak, exportuj z PTminderu širší rozsah.
+                    </>
+                  )}
                   {/* Pri úplne čiastkovom súbore ich môže byť aj štyridsať —
                       stena mien nikoho neinformuje, prvá desiatka stačí na to,
                       aby bolo vidno, o aký druh ľudí ide. */}

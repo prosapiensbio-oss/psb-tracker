@@ -245,6 +245,8 @@ export type IngestResult = {
    * vracajú von: čiastočný export vyzerá presne ako úplný.
    */
   chybaju?: string[];
+  /** `true` = chýbajúcim sa vyčerpaný balíček vynuloval (pohľad `package`). */
+  vynulovane?: boolean;
 };
 
 export async function ingest(DB: D1Database, filename: string, text: string, actor?: string): Promise<IngestResult> {
@@ -254,6 +256,8 @@ export async function ingest(DB: D1Database, filename: string, text: string, act
   let added = 0;
   let skipped = 0;
   let chybaju: string[] = [];
+  /** Pri pohľade `package` sa chýbajúcim zostatok vynuluje — hláška to povie. */
+  let vynulovane = false;
   let bezZostatku = 0;
   /** Údaje, ktoré sa v appke a v zdroji líšia — import ich NEPREPÍŠE. */
   const rozdiely: string[] = [];
@@ -648,7 +652,28 @@ export async function ingest(DB: D1Database, filename: string, text: string, act
       : [];
     const vSubore = new Set(clientsInFile);
     chybaju = aktivni.filter((meno) => !vSubore.has(meno)).sort();
+    /**
+     * KTO Z EXPORTU BALÍČKOV ZMIZOL, TEN UŽ HODINY NEMÁ.
+     *
+     * Export balíčkov nesie len riadky so zostatkom — vyčerpaný balíček v ňom
+     * jednoducho nie je (zmerané 19. 8. 2026: z 21 riadkov nula s nulovým
+     * zostatkom). Doteraz sa to len hlásilo („N aktívnych klientov v súbore
+     * chýba") a starý riadok zostal so zostatkom, ktorý už neplatil. 29. 9.
+     * 2026 tak Kokpit považoval za živé doplnenia Martina Vaška, Veroniky
+     * Stoklaskovej či Petry Bambúškovej, hoci ich PTminder mal minuté —
+     * a súhrn toho istého exportu (5 doplnení, 2 ONE YEAR, 1 SPECIAL 3)
+     * sedel presne na riadky v súbore.
+     *
+     * Riadok sa NEMAŽE, len sa mu zostatok nastaví na nulu: história, že
+     * balíček bol, zostáva. Týka sa to LEN pohľadu `package` — pri členstvách
+     * rozhoduje platnosť a tú riadok nesie sám.
+     */
+    const vycerpane = kindInFile === "package" ? chybaju : [];
+    vynulovane = vycerpane.length > 0;
     const stmts = [
+      ...vycerpane.map((name) =>
+        DB.prepare("UPDATE packages SET sessions_remaining = 0 WHERE client_name = ? AND kind = 'package' AND sessions_remaining > 0").bind(name),
+      ),
       ...clientsInFile.map((name) =>
         DB.prepare("DELETE FROM packages WHERE client_name = ? AND (kind = ? OR kind = '')").bind(name, kindInFile),
       ),
@@ -670,11 +695,11 @@ export async function ingest(DB: D1Database, filename: string, text: string, act
   await audit(DB, {
     action: "import",
     predmet: filename,
-    neu: `${type}: +${added} riadkov, ${skipped} duplicít${zamknutych ? `, ${zamknutych} odmietnutých (uzavretý mesiac)` : ""}${chybaju.length ? `, ${chybaju.length} aktívnych klientov v súbore chýba` : ""}`,
+    neu: `${type}: +${added} riadkov, ${skipped} duplicít${zamknutych ? `, ${zamknutych} odmietnutých (uzavretý mesiac)` : ""}${chybaju.length ? (vynulovane ? `, ${chybaju.length} klientom vyčerpaný balíček (v exporte už nie sú)` : `, ${chybaju.length} aktívnych klientov v súbore chýba`) : ""}`,
     actor,
   });
 
-  return { filename, type, added, skipped, zamknute: zamknutych, chybaju, bezZostatku, rozdiely };
+  return { filename, type, added, skipped, zamknute: zamknutych, chybaju, vynulovane, bezZostatku, rozdiely };
 }
 
 // Zapíše JEDEN stĺpec. Nie celý riadok — a to je oprava skutočnej chyby.

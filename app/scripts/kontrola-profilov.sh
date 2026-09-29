@@ -46,7 +46,7 @@ stiahni() {
 
 echo "▸ sťahujem ostré dáta"
 stiahni sessions   "SELECT date,time,client_name,session_trainer,session_name,session_type,duration_min,price_czk FROM sessions"
-stiahni packages   "SELECT client_name,package_name,sessions_total,sessions_remaining,valid_from,valid_to,payment_czk,added FROM packages"
+stiahni packages   "SELECT client_name,package_name,sessions_total,sessions_remaining,valid_from,valid_to,payment_czk,added,kind,na_obdobie FROM packages"
 stiahni services   "SELECT date,client_name,service_type,service_description,price_czk,is_6m,trainer FROM services"
 stiahni payments   "SELECT date,client_name,amount_czk,payment_method FROM payments"
 stiahni platby     "SELECT klient,datum,suma_czk,sposob,fio_id FROM platby WHERE zrusene_at IS NULL"

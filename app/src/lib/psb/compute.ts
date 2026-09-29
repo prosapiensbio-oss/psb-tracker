@@ -422,7 +422,26 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
     // české „členství", nie slovo „one".
     const jeDoplnok = (p: string) => DOPLNKOVY_NAZOV.test(p || "");
     const skutocne = packs.filter((p) => !jeDoplnok(p.package));
-    const zdroj = skutocne.length ? skutocne : packs;
+    /**
+     * ŽIVÉ DOPLNENIE PREBIJE ČLENSTVO, KTORÉMU SKONČILA PLATNOSŤ.
+     *
+     * Jerry, 29. 9. 2026: doplnenie dostane klient, keď mu skončila platnosť
+     * a hodiny zostali — je to presne tých pár hodín, na ktorých ďalej
+     * trénuje. Pravidlo „doplnky sa do výberu neberú, kým existuje čokoľvek
+     * iné" ich ale vyradilo aj vtedy, keď to „iné" bolo členstvo po platnosti.
+     * Markéta Lozias mala na karte 0 h (členstvo do 24. 9.), hoci PTminder
+     * ukazoval doplnenie 1 z 3; Sofia Resnerová 2 h namiesto 1, Regina
+     * Obrovská 5 namiesto 3.
+     *
+     * Živé = zostatok väčší ako nula. Export balíčkov vyčerpaný riadok vôbec
+     * nenesie a paušálové doplnky (GOLD, DIAMOND) stoja navždy na 0/N, takže
+     * tie sa sem nedostanú. A prebíja LEN členstvo s ZNÁMYM koncom v minulosti
+     * — riadok starého formátu bez dátumov nechá výber tak, ako bol.
+     */
+    const dnesVyber = new Date().toISOString().slice(0, 10);
+    const ziveDoplnky = packs.filter((p) => jeDoplnok(p.package) && p.remaining > 0);
+    const clenstvaPoPlatnosti = skutocne.length > 0 && skutocne.every((p) => !!p.validTo && p.validTo < dnesVyber);
+    const zdroj = clenstvaPoPlatnosti && ziveDoplnky.length ? ziveDoplnky : skutocne.length ? skutocne : packs;
     // Ktorý riadok je AKTUÁLNY balíček: rozhoduje platnosť a dátum, nie zostatok.
     //
     // Pôvodné „ber ten s najväčším zostatkom" malo preskočiť dochodené

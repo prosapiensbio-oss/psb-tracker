@@ -366,3 +366,24 @@ describe("stavPreSpravu", () => {
     expect(stavPreSpravu(v, "2026-09-29").dnesnyTrening).toBe(false);
   });
 });
+
+describe("doplnenie po konci platnosti vs. počas nej", () => {
+  it("po konci platnosti nepridáva — sú to tie isté hodiny (Sofia Resnerová)", () => {
+    const os: Udalost[] = [
+      bal("2026-07-20", 6, { doDna: "2026-09-13" }),
+      ...["2026-07-20", "2026-07-21", "2026-09-02", "2026-09-09", "2026-09-16"].map((den) => ({ druh: "trening", den }) as Udalost),
+      bal("2026-09-20", 2, { doplnenie: true }),
+    ];
+    expect(priebehBalickov(os, null, "2026-09-27").koniec).toBe(1);
+  });
+
+  it("počas platnosti pridáva — sú to hodiny navyše (Markéta Lozias)", () => {
+    const os: Udalost[] = [
+      bal("2026-07-31", 6, { doDna: "2026-09-24" }),
+      ...["2026-08-03", "2026-08-10", "2026-08-17", "2026-08-24", "2026-08-31", "2026-09-07"].map((den) => ({ druh: "trening", den }) as Udalost),
+      bal("2026-09-12", 3, { doplnenie: true }),
+      ...["2026-09-14", "2026-09-21"].map((den) => ({ druh: "trening", den }) as Udalost),
+    ];
+    expect(priebehBalickov(os, null, "2026-09-27").koniec).toBe(1);
+  });
+});

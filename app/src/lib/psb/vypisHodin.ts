@@ -243,12 +243,31 @@ export function priebehBalickov(
   const neznameDoplnenie = (u: Usek): boolean =>
     u.riadky.some((r) => r.druh === "balicekOd" && r.doplnenie && !r.hodin);
 
+  /**
+   * PRIDÁVA DOPLNENIE HODINY, ALEBO LEN PREDLŽUJE TIE ISTÉ?
+   *
+   * Jerry, 29. 9. 2026: doplnenie dostane klient, keď mu skončila platnosť
+   * a hodiny zostali — „presne toľko, koľko mu ostalo". Také doplnenie NIČ
+   * NEPRIDÁVA, len drží pri živote hodiny, ktoré os už počíta. Sofia
+   * Resnerová: členstvo do 13. 9. s dvoma hodinami, 16. 9. tréning, 20. 9.
+   * doplnenie na tie isté dve hodiny — os ich pripočítala druhýkrát a mala 3
+   * namiesto 1.
+   *
+   * Doplnenie POČAS platnosti je iná vec: Markéta Lozias 12. 9. dostala tri
+   * hodiny k členstvu, ktoré platilo do 24. 9. a už bolo minuté. To sú
+   * hodiny navyše.
+   *
+   * Keď koniec platnosti nepoznáme, pridáva sa ako doteraz.
+   */
+  const pridavaHodiny = (u: Extract<Udalost, { druh: "balicekOd" }>, clenstvo: Usek["balicek"]): boolean =>
+    !(clenstvo?.doDna && u.den > clenstvo.doDna);
+
   const prvyNekryty = (u: Usek): number => {
     if (!u.balicek || u.hodin <= 0 || neznameDoplnenie(u)) return -1;
     let zostava = u.hodin;
     for (let i = 0; i < u.riadky.length; i++) {
       const r = u.riadky[i];
-      if (r.druh === "balicekOd" && r.doplnenie && r.hodin > 0) zostava += r.hodin;
+      if (r.druh === "balicekOd" && r.doplnenie && r.hodin > 0 && pridavaHodiny(r, u.balicek)) zostava += r.hodin;
       const h = hodinTreningu(r);
       if (!h) continue;
       if (zostava < h) return i;
@@ -306,7 +325,17 @@ export function priebehBalickov(
     const b = usek.balicek;
     let bezi: number | null = b ? (usek.hodin > 0 ? usek.hodin : null) : null;
     // Dokúpené hodiny sa k bežiacemu členstvu PRIPOČÍTAJÚ, nezačínajú odznova.
-    const maDokupene = usek.riadky.some((u) => u.druh === "balicekOd" && u.doplnenie && u.hodin > 0);
+    /**
+     * Zrovnaniu s kartou bráni LEN doplnenie zapísané v Kokpite.
+     *
+     * To karta nepozná (ráta z exportu PTmindera) a zrovnať by ho znamenalo
+     * zmazať. Doplnenie z PTmindera karta pozná — od 29. 9. 2026 ho berie ako
+     * aktuálny zostatok, keď členstvu skončila platnosť — a je to najpresnejšie
+     * číslo, aké existuje. Bez zrovnania os pripočítala doplnenie navrch:
+     * Patrik Lutonský mal na osi 10 h, v PTminderi 4, lebo doplnenie JE ten
+     * zvyšok z členstva, nie hodiny navyše.
+     */
+    const maDokupene = usek.riadky.some((u) => u.druh === "balicekOd" && u.doplnenie && u.hodin > 0 && u.zKokpitu);
 
     const platbaKBalicku = b
       ? usek.riadky.find((u) => u.druh === "platba" && dniMedzi(b.den, u.den) <= 30)?.den
@@ -321,7 +350,7 @@ export function priebehBalickov(
     for (const u of usek.riadky) {
       let dlh: number | null = null;
       let zostatok: number | null = null;
-      if (u.druh === "balicekOd" && u.doplnenie && u.hodin > 0) bezi = (bezi || 0) + u.hodin;
+      if (u.druh === "balicekOd" && u.doplnenie && u.hodin > 0 && pridavaHodiny(u, b)) bezi = (bezi || 0) + u.hodin;
       /**
        * MÍNUS SA PLATBOU VYNULUJE.
        *

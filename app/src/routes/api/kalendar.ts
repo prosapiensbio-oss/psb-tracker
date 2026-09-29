@@ -285,6 +285,14 @@ export const Route = createFileRoute("/api/kalendar")({
                 AND u.typ IN ('trening','uvodny')
                 AND u.klient IS NOT NULL
                 AND k.uid IS NULL
+                /*
+                 * LEN POSLEDNÉ DVA TÝŽDNE. Tréning, ktorý sa konal, je do pár
+                 * dní v PTminderi. Čo zmizlo z kalendára pred viac ako 14 dňami
+                 * a v PTminderi stále nie je, sa nekonalo — 29. 9. 2026 to
+                 * potvrdil bookings report na všetkých 38 takých tréningoch.
+                 * Pýtať sa na ne by bola tá istá chyba ako s doplneniami.
+                 */
+                AND u.zaciatok >= date('now', '-14 days')
                 AND NOT EXISTS (
                   SELECT 1 FROM sessions s
                    WHERE s.client_name = u.klient
