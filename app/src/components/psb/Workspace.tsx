@@ -807,18 +807,15 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
               {k.druh === "doplnenia" && k.polozky.map((x) => {
                 const kluc = klucPolozky("doplnenia", x);
                 if (odpovedane.has(kluc)) return null;
-                const vBeziacom = !!x.posledny && x.den >= x.posledny;
                 return (
                   <div key={kluc} style={{ ...riadok, flexWrap: "wrap" }}>
                     <button onClick={() => naStol(x.klient)} style={{ ...vedlajsie, fontSize: 13.5, fontWeight: 600, color: C.text, minWidth: uzke ? 0 : 150, textAlign: "left" }}>
                       {x.klient}
                     </button>
                     <span style={{ fontSize: 12, color: C.textMuted, minWidth: 96 }}>{den(x.den)}</span>
-                    {vBeziacom && (
-                      <span style={{ fontSize: 10.5, color: C.orange, fontWeight: 600 }} title="Je v práve bežiacom balíčku — mení číslo, ktoré klientovi ide do mailu">
-                        v bežiacom balíčku
-                      </span>
-                    )}
+                    <span style={{ fontSize: 10.5, color: C.textDim }} title="Balíček, v ktorom to doplnenie stojí">
+                      balíček od {den(x.posledny || "")}
+                    </span>
                     <input
                       type="number" min={0} step={1} inputMode="decimal"
                       placeholder="hodín"

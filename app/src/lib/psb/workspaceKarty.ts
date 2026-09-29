@@ -218,11 +218,18 @@ export function postavKarty(z: ZdrojeKariet): Karta[] {
    * Prednosť majú tie v práve bežiacom balíčku: menia číslo, ktoré dnes ide
    * klientovi do mailu. Staré sa pýtajú tiež, len nižšie.
    */
-  const doplnenia = ja === "Terezka" ? [] : (z.doplnenia || []);
+  /**
+   * V KARTE SÚ LEN ŽIVÉ DOPLNENIA — tie v práve bežiacom balíčku.
+   *
+   * Doplnenie spred roka, v balíčku, ktorý je dávno minutý, nemení žiadne
+   * dnešné číslo. Zoznam všetkých by bol 209 riadkov a človek by ho zavrel
+   * — to je tá istá chyba ako „keď svieti všetko, nesvieti nič".
+   */
+  const doplnenia = ja === "Terezka" ? [] : (z.doplnenia || []).filter((x) => !!x.posledny && x.den >= x.posledny);
   if (doplnenia.length) karty.push({
     druh: "doplnenia",
     nadpis: "Koľko hodín pridalo doplnenie?",
-    podnadpis: `${doplnenia.length} ${pocet(doplnenia.length, "doplnenie bez", "doplnenia bez", "doplnení bez")} počtu hodín`,
+    podnadpis: `${doplnenia.length} ${pocet(doplnenia.length, "doplnenie v bežiacom", "doplnenia v bežiacich", "doplnení v bežiacich")} balíčku`,
     polozky: doplnenia,
   });
   if (mena.length) karty.push({
