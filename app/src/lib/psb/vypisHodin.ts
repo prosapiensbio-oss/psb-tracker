@@ -342,7 +342,18 @@ export function priebehBalickov(
       : undefined;
     // Otvorený poplatok = nezaplatené dodnes. Inak platí deň platby; keď
     // v období platba nie je vôbec, predpokladá sa, že sa platilo dopredu.
-    const zaplateneOd = b?.nezaplatene ? null : platbaKBalicku || (b ? b.den : undefined);
+    /**
+     * OBDOBIE PRED PRVÝM BALÍČKOM MÁ TIEŽ PLATBY.
+     *
+     * Úvodný tréning sa platí sám za seba, bez členstva. Úsek bez balíčka
+     * ale platby vôbec nečítal, takže prvý tréning klienta niesol −1 aj
+     * vtedy, keď ho v ten istý deň zaplatil — a od 29. 9. 2026 ide os
+     * v maili „celá história" priamo klientovi. Kryje sa prvou platbou
+     * úseku, rovnako ako pri balíčku.
+     */
+    const zaplateneOd = b?.nezaplatene ? null
+      : b ? (platbaKBalicku || b.den)
+      : usek.riadky.find((u) => u.druh === "platba")?.den;
 
     const neznameHodiny = neznameDoplnenie(usek);
     let dlhPocet = 0;

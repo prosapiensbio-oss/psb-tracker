@@ -387,3 +387,26 @@ describe("doplnenie po konci platnosti vs. počas nej", () => {
     expect(priebehBalickov(os, null, "2026-09-27").koniec).toBe(1);
   });
 });
+
+describe("úvodný tréning pred prvým balíčkom", () => {
+  it("zaplatený v ten istý deň nenesie mínus — os ide klientovi", () => {
+    const os: Udalost[] = [
+      { druh: "trening", den: "2026-03-20" },
+      { druh: "platba", den: "2026-03-20", suma: 1100, metoda: "prevodom" },
+      bal("2026-03-27", 6),
+      { druh: "trening", den: "2026-03-27" },
+    ];
+    const { stavy } = priebehBalickov(os, null, "2026-03-30");
+    const uvodny = os[0];
+    expect(stavy.get(uvodny)?.dlh).toBeNull();
+  });
+
+  it("tréning pred akoukoľvek platbou mínus nesie ďalej", () => {
+    const os: Udalost[] = [
+      { druh: "trening", den: "2026-03-18" },
+      { druh: "platba", den: "2026-03-20", suma: 1100, metoda: "prevodom" },
+    ];
+    const { stavy } = priebehBalickov(os, null, "2026-03-30");
+    expect(stavy.get(os[0])?.dlh).toBe(1);
+  });
+});
