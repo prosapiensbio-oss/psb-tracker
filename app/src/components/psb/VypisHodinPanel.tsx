@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import { fmtCZK, fmtDMY } from "../../lib/psb/format";
 import type { osCasuKlienta } from "../../lib/psb/klientOsCasu";
 import { C, mix } from "../../lib/psb/theme";
+import { cisloPreBranu, dlzkaSpravy, textSms } from "../../lib/psb/sms";
 import { hod, poslednychMesiacov, vypisAkoText, vypisHodin, zaciatokBalicka } from "../../lib/psb/vypisHodin";
 import type { RiadokVypisu } from "../../lib/psb/vypisHodin";
 
@@ -48,7 +49,7 @@ const OBDOBIA = [
   { l: "všetko", m: 0 },
 ];
 
-export function VypisHodinPanel({ meno, os, email, zostatokTeraz, trener = "", mesacne = [], hodinSpolu = 0, tempo = 0, odkedy = "", cenaBalicka = 0 }: {
+export function VypisHodinPanel({ meno, os, email, zostatokTeraz, trener = "", mesacne = [], hodinSpolu = 0, tempo = 0, odkedy = "", cenaBalicka = 0, telefon = "" }: {
   meno: string; os: Os; email?: string; zostatokTeraz: number | null;
   /** Kto ho vedie — mailom sa podpíše. */
   trener?: string;
@@ -61,6 +62,8 @@ export function VypisHodinPanel({ meno, os, email, zostatokTeraz, trener = "", m
   odkedy?: string;
   /** Cena posledného balíčka — predvyplní sa do QR platby. */
   cenaBalicka?: number;
+  /** Telefón klienta — bez neho sa SMS neponúka. */
+  telefon?: string;
 }) {
   const [otvorene, setOtvorene] = useState(false);
   const [mesiacov, setMesiacov] = useState(-1);
@@ -73,6 +76,18 @@ export function VypisHodinPanel({ meno, os, email, zostatokTeraz, trener = "", m
   /** Suma do QR platby; prázdne = platba sa do mailu nedáva. */
   const [suma, setSuma] = useState("");
   const [popisPlatby, setPopisPlatby] = useState("Ďalší balíček");
+  /**
+   * SMS je ZVONČEK K MAILU, nie druhá správa.
+   *
+   * Jerry, 28. 9. 2026: „stačilo by, že by klientovi došla SMS, že dnes máš
+   * posledný tréning." Celý prehľad je v maili; SMS má jedinú úlohu — aby si
+   * ho klient otvoril v deň, keď na tom záleží. Preto sa posiela tým istým
+   * tlačidlom a text sa píše zvlášť: do mailu sa zmestí veta navyše, do SMS
+   * sedemdesiat znakov.
+   */
+  const [smskou, setSmskou] = useState(false);
+  const [smsText, setSmsText] = useState("");
+  const [smsRucne, setSmsRucne] = useState(false);
   const [chyba, setChyba] = useState("");
 
   const v = useMemo(() => {
@@ -84,6 +99,14 @@ export function VypisHodinPanel({ meno, os, email, zostatokTeraz, trener = "", m
   // nesiahol. Prepísaný text sa prepnutím filtra nemá stratiť.
   const navrhTela = useMemo(() => vypisAkoText(v, meno), [v, meno]);
   const zobrazenyText = rucne ? telo : navrhTela;
+
+  const navrhSms = useMemo(
+    () => textSms({ oslovenie: meno.split(" ")[0], trener: trener || "Jerry", zostatok: v.koniec ?? 0, sMailom: true }),
+    [meno, trener, v.koniec],
+  );
+  const zobrazenaSms = smsRucne ? smsText : navrhSms;
+  const dlzka = useMemo(() => dlzkaSpravy(zobrazenaSms), [zobrazenaSms]);
+  const cisloOk = !!cisloPreBranu(telefon);
 
   const posli = async () => {
     setPracujem(true); setChyba(""); setHlaska("");
@@ -135,7 +158,26 @@ export function VypisHodinPanel({ meno, os, email, zostatokTeraz, trener = "", m
     }).then((r) => r.json()).catch(() => ({ ok: false, error: "spojenie" }));
     setPracujem(false);
     if (!j?.ok) { setChyba(j?.error || "Nepodarilo sa odoslať."); return; }
-    setHlaska(`Výpis odišiel na ${komu.trim()}.`);
+
+    /**
+     * SMS ide AŽ PO maili a len keď mail prešiel.
+     *
+     * Správa hovorí „v maili nájdeš dochádzku a QR" — poslať ju skôr než
+     * mail (alebo vtedy, keď mail neodišiel) by klienta poslalo do prázdnej
+     * schránky. Keď zlyhá SMS, mail už odišiel a povie sa to; opačne to
+     * naopraviteľné nie je.
+     */
+    if (!smskou) { setHlaska(`Výpis odišiel na ${komu.trim()}.`); return; }
+    const s = await fetch("/api/sms", {
+      method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ klient: meno, telefon, text: zobrazenaSms }),
+    }).then((r) => r.json()).catch(() => ({ ok: false, error: "spojenie" }));
+    if (!s?.ok) {
+      setHlaska(`Výpis odišiel na ${komu.trim()}.`);
+      setChyba(s?.error || "SMS sa nepodarilo odoslať.");
+      return;
+    }
+    setHlaska(`Výpis odišiel na ${komu.trim()} a SMS na ${telefon}.`);
   };
 
   if (!otvorene) {
@@ -236,6 +278,34 @@ export function VypisHodinPanel({ meno, os, email, zostatokTeraz, trener = "", m
           />
         )}
       </div>
+
+      {/* SMS — zvonček k mailu. Ponúka sa len vtedy, keď má klient použiteľné
+          číslo; „nemá telefón" je iná vec než „SMS nechcem" a mlčať o tom by
+          znamenalo, že Jerry klikne a nič sa nestane. */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap", alignItems: "center" }}>
+        <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 12, color: cisloOk ? C.textMuted : C.textDim, cursor: cisloOk ? "pointer" : "not-allowed" }}>
+          <input type="checkbox" checked={smskou} disabled={!cisloOk} onChange={(e) => setSmskou(e.target.checked)} />
+          poslať aj SMS {cisloOk ? `na ${telefon}` : "— klient nemá použiteľné číslo"}
+        </label>
+        {smskou && (
+          <span style={{ fontSize: 11, color: dlzka.sprav > 2 ? C.orange : C.textDim }}>
+            {dlzka.znakov} znakov · {dlzka.sprav} {dlzka.sprav === 1 ? "správa" : dlzka.sprav < 5 ? "správy" : "správ"}
+            {dlzka.unicode ? " (diakritika — 70 znakov na správu)" : ""}
+          </span>
+        )}
+      </div>
+      {smskou && (
+        <textarea
+          value={zobrazenaSms}
+          onChange={(e) => { setSmsRucne(true); setSmsText(e.target.value); }}
+          rows={2}
+          style={{
+            width: "100%", boxSizing: "border-box", padding: "7px 9px", borderRadius: 8, fontSize: 12,
+            border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontFamily: "inherit",
+            lineHeight: 1.5, resize: "vertical", marginBottom: 8,
+          }}
+        />
+      )}
 
       <div style={{ fontSize: 11, color: C.textDim, marginBottom: 6 }}>
         Text nižšie ide do mailu ako tvoja osobná veta na začiatok; dochádzku, čísla aj QR doplní appka.

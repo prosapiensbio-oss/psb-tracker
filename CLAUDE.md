@@ -1940,3 +1940,30 @@ PODPÍSAL. Klient si kupuje balíček hodín alebo předplatné.
 - **Staré produkty sa neprekladajú.** SILVER, BRONZ, GOLD, ČLENSTVÍ ONE
   a spol. sú z roku 2025 a už sa nepredávajú; premenovať ich by znamenalo
   prepisovať históriu na niečo, čo si klient nikdy nekúpil.
+
+## SMS je zvonček k mailu, nie druhá správa
+
+Jerry, 28. 9. 2026: „mne by stačilo, že by klientovi došla SMS, že dnes máš
+posledný tréning." Celý prehľad — dochádzka, tempo, QR — je v maili; SMS má
+jedinú úlohu: aby si ho klient otvoril v deň, keď na tom záleží.
+
+- **SMS má 70 znakov, nie 160.** Limit 160 platí len v GSM abecede; jediný
+  mäkčeň prepne správu na UCS-2 a limit padne na 70. Zoznam tréningov by bol
+  päť správ a vyzeral by ako vysypaná tabuľka do telefónu — preto v SMS nie
+  je. `dlzkaSpravy` to počíta a obrazovka to ukáže PRED odoslaním: „jedna
+  veta" a „tri SMS" sú dve rôzne veci.
+- **Posiela sa AŽ PO maili a len keď mail prešiel.** Správa hovorí „v maili
+  nájdeš dochádzku a QR"; poslať ju do prázdnej schránky je horšie než
+  neposlať nič. Keď zlyhá SMS, mail už odišiel a povie sa to — opačne sa to
+  napraviť nedá.
+- **Nikdy sa neposielajú samy.** Naše číslo hodín je pri časti klientov
+  dopočítané (`packageOdvodeny`) a správa „dnes si mal poslednú hodinu"
+  človeku, ktorý má ešte tri, ide von k zákazníkovi a späť sa vziať nedá.
+  Žiadny cron, žiadna dávka — jedna správa, ktorú niekto pred odoslaním videl.
+- **Číslo sa normalizuje a nezmysel sa neposiela** (`cisloPreBranu`). V
+  dátach sú „605965949", „776 491 800" aj osemciferný preklep; bez predvoľby
+  sa predpokladá české číslo, domáci tvar s nulou je slovenský.
+- **Brána je vymeniteľná** (`smsBrana.server.ts`): SMS Manager (predvolená,
+  jeden kľúč, jedno volanie) a Twilio. Kľúč sa zadáva v Údajoch, von sa už
+  nevracia a do chýb ide odpoveď brány, nie to, čím sme sa prihlásili —
+  tá istá zásada ako pri hesle do schránky.

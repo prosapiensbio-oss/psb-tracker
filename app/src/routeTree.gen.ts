@@ -31,6 +31,7 @@ import { Route as ApiTitulkaNavrhRouteImport } from './routes/api/titulka-navrh'
 import { Route as ApiTemaRouteImport } from './routes/api/tema'
 import { Route as ApiSsoRouteImport } from './routes/api/sso'
 import { Route as ApiSpravaRouteImport } from './routes/api/sprava'
+import { Route as ApiSmsRouteImport } from './routes/api/sms'
 import { Route as ApiSessionRouteImport } from './routes/api/session'
 import { Route as ApiSekvenciaNavrhRouteImport } from './routes/api/sekvencia-navrh'
 import { Route as ApiResetRouteImport } from './routes/api/reset'
@@ -185,6 +186,11 @@ const ApiSsoRoute = ApiSsoRouteImport.update({
 const ApiSpravaRoute = ApiSpravaRouteImport.update({
   id: '/api/sprava',
   path: '/api/sprava',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSmsRoute = ApiSmsRouteImport.update({
+  id: '/api/sms',
+  path: '/api/sms',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiSessionRoute = ApiSessionRouteImport.update({
@@ -464,6 +470,7 @@ export interface FileRoutesByFullPath {
   '/api/reset': typeof ApiResetRoute
   '/api/sekvencia-navrh': typeof ApiSekvenciaNavrhRoute
   '/api/session': typeof ApiSessionRoute
+  '/api/sms': typeof ApiSmsRoute
   '/api/sprava': typeof ApiSpravaRoute
   '/api/sso': typeof ApiSsoRoute
   '/api/tema': typeof ApiTemaRoute
@@ -533,6 +540,7 @@ export interface FileRoutesByTo {
   '/api/reset': typeof ApiResetRoute
   '/api/sekvencia-navrh': typeof ApiSekvenciaNavrhRoute
   '/api/session': typeof ApiSessionRoute
+  '/api/sms': typeof ApiSmsRoute
   '/api/sprava': typeof ApiSpravaRoute
   '/api/sso': typeof ApiSsoRoute
   '/api/tema': typeof ApiTemaRoute
@@ -603,6 +611,7 @@ export interface FileRoutesById {
   '/api/reset': typeof ApiResetRoute
   '/api/sekvencia-navrh': typeof ApiSekvenciaNavrhRoute
   '/api/session': typeof ApiSessionRoute
+  '/api/sms': typeof ApiSmsRoute
   '/api/sprava': typeof ApiSpravaRoute
   '/api/sso': typeof ApiSsoRoute
   '/api/tema': typeof ApiTemaRoute
@@ -674,6 +683,7 @@ export interface FileRouteTypes {
     | '/api/reset'
     | '/api/sekvencia-navrh'
     | '/api/session'
+    | '/api/sms'
     | '/api/sprava'
     | '/api/sso'
     | '/api/tema'
@@ -743,6 +753,7 @@ export interface FileRouteTypes {
     | '/api/reset'
     | '/api/sekvencia-navrh'
     | '/api/session'
+    | '/api/sms'
     | '/api/sprava'
     | '/api/sso'
     | '/api/tema'
@@ -812,6 +823,7 @@ export interface FileRouteTypes {
     | '/api/reset'
     | '/api/sekvencia-navrh'
     | '/api/session'
+    | '/api/sms'
     | '/api/sprava'
     | '/api/sso'
     | '/api/tema'
@@ -882,6 +894,7 @@ export interface RootRouteChildren {
   ApiResetRoute: typeof ApiResetRoute
   ApiSekvenciaNavrhRoute: typeof ApiSekvenciaNavrhRoute
   ApiSessionRoute: typeof ApiSessionRoute
+  ApiSmsRoute: typeof ApiSmsRoute
   ApiSpravaRoute: typeof ApiSpravaRoute
   ApiSsoRoute: typeof ApiSsoRoute
   ApiTemaRoute: typeof ApiTemaRoute
@@ -1055,6 +1068,13 @@ declare module '@tanstack/react-router' {
       path: '/api/sprava'
       fullPath: '/api/sprava'
       preLoaderRoute: typeof ApiSpravaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/sms': {
+      id: '/api/sms'
+      path: '/api/sms'
+      fullPath: '/api/sms'
+      preLoaderRoute: typeof ApiSmsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/session': {
@@ -1426,6 +1446,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiResetRoute: ApiResetRoute,
   ApiSekvenciaNavrhRoute: ApiSekvenciaNavrhRoute,
   ApiSessionRoute: ApiSessionRoute,
+  ApiSmsRoute: ApiSmsRoute,
   ApiSpravaRoute: ApiSpravaRoute,
   ApiSsoRoute: ApiSsoRoute,
   ApiTemaRoute: ApiTemaRoute,

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 
 import { OKNA_HODIN } from "../../lib/psb/mailOkno";
 import { fmtDMY } from "../../lib/psb/format";
@@ -104,6 +104,7 @@ export function Udaje({ data, actions, chat, prekazky, kroky, podklady, onNaviga
         </H3>
         <NapojenieWebu />
         <NapojenieMailu />
+        <NapojenieSms />
         <NapojenieMeta />
         <NapojenieMailer />
         <CoJarvisVieZvonku data={data} />
@@ -724,6 +725,84 @@ function snippetWeb(url: string, tajne: string): string {
  * ako tokeny na Metu a Google) a von sa už nikdy neposiela — obrazovka
  * dostane len odpoveď „uložené".
  */
+/**
+ * BRÁNA NA SMS.
+ *
+ * Kokpit nemá vlastnú SIM — správy posiela cez službu, ktorá za to berie
+ * okolo koruny. Kľúč sa zadáva raz a von sa už nevracia, rovnako ako heslo
+ * do schránky; obrazovka vidí len to, či je vyplnený.
+ *
+ * SMS sa NEPOSIELAJÚ samy. Posielajú sa na klik z karty klienta, kde je
+ * pred odoslaním vidieť text aj to, koľko správ z neho bude.
+ */
+function NapojenieSms() {
+  const [stav, setStav] = useState<{ brana: string; odosielatel: string; kluc: string; poslanych: number; posledna: string | null } | null>(null);
+  const [brana, setBrana] = useState("smsmanager");
+  const [kluc, setKluc] = useState("");
+  const [odosielatel, setOdosielatel] = useState("");
+  const [hlaska, setHlaska] = useState("");
+  const [bezi, setBezi] = useState(false);
+
+  const nacitaj = useCallback(async () => {
+    const r = await fetch("/api/sms", { credentials: "same-origin" }).then((x) => x.json()).catch(() => null);
+    if (!r?.ok) return;
+    setStav(r);
+    setBrana(r.brana || "smsmanager");
+    setOdosielatel(r.odosielatel || "");
+  }, []);
+  useEffect(() => { void nacitaj(); }, [nacitaj]);
+
+  const uloz = async () => {
+    setBezi(true); setHlaska("");
+    const r = await fetch("/api/sms", {
+      method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ akcia: "nastav", brana, kluc: kluc.trim(), odosielatel: odosielatel.trim() }),
+    }).then((x) => x.json()).catch(() => ({ ok: false }));
+    setBezi(false);
+    setHlaska(r?.ok ? "uložené" : "nepodarilo sa uložiť");
+    setKluc("");
+    await nacitaj();
+  };
+
+  if (!stav) return null;
+  const vstup = { background: C.bg, color: C.text, border: `1px solid ${C.border}`, borderRadius: 6, padding: "5px 8px", fontSize: 12, fontFamily: "inherit" } as const;
+
+  return (
+    <div style={{ marginTop: 14, padding: 12, background: mix(C.blue, 6), borderRadius: 8 }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: C.textMuted, marginBottom: 6 }}>
+        <Info
+          label="SMS klientom"
+          text="Jedna krátka správa v deň, keď klientovi dôjde balíček — zvonček k mailu, v ktorom je dochádzka aj QR na platbu. Kokpit nemá vlastnú SIM, posiela cez bránu (SMS Manager alebo Twilio) a účet si zakladáš ty; kľúč sem zadáš raz a von sa už nevracia. SMS sa nikdy neposielajú samy: naše číslo hodín je pri časti klientov dopočítané a správa „dnes si mal poslednú hodinu“ človeku, ktorý má ešte tri, sa späť vziať nedá. Posiela sa na klik z karty klienta, kde je pred odoslaním vidieť text aj počet správ."
+        />
+      </div>
+      <div style={{ display: "flex", gap: 7, flexWrap: "wrap", alignItems: "center" }}>
+        <select value={brana} onChange={(e) => setBrana(e.target.value)} style={{ ...vstup, width: 150 }}>
+          <option value="smsmanager">SMS Manager</option>
+          <option value="twilio">Twilio</option>
+        </select>
+        <input
+          value={kluc} onChange={(e) => setKluc(e.target.value)} type="password"
+          placeholder={stav.kluc ? "kľúč je uložený — prepíš len pri zmene" : brana === "twilio" ? "SID:token" : "API kľúč"}
+          style={{ ...vstup, flex: "1 1 220px" }}
+        />
+        <input
+          value={odosielatel} onChange={(e) => setOdosielatel(e.target.value)}
+          placeholder={brana === "twilio" ? "číslo odosielateľa (povinné)" : "odosielateľ (nepovinné)"}
+          style={{ ...vstup, flex: "0 1 200px" }}
+        />
+        <button onClick={() => void uloz()} disabled={bezi} style={{ ...vstup, cursor: "pointer", background: mix(C.accent, 14), color: C.accentLight, border: `1px solid ${mix(C.accent, 45)}` }}>
+          {bezi ? "…" : "Uložiť"}
+        </button>
+      </div>
+      <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 8, lineHeight: 1.55 }}>
+        {stav.kluc ? "Brána je nastavená." : "Brána zatiaľ nastavená nie je — bez kľúča sa SMS neodošle."}
+        {stav.poslanych > 0 ? ` Odoslaných správ: ${stav.poslanych}${stav.posledna ? `, posledná ${fmtDMY(stav.posledna.slice(0, 10))}` : ""}.` : ""}
+        {hlaska ? ` ${hlaska}` : ""}
+      </div>
+    </div>
+  );
+}
+
 function NapojenieMailu() {
   type Stav = {
     nastavene: { host: string; port: number; user: string; od: string; heslo: string; ignoruj: string };

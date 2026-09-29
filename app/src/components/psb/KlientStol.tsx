@@ -221,15 +221,18 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
    */
   /** Mail klienta z fakturačných údajov — predvyplní sa do výpisu. */
   const [kontaktMail, setKontaktMail] = useState("");
+  /** Telefón z fakturačných údajov — predvyplní sa do SMS. */
+  const [kontaktTelefon, setKontaktTelefon] = useState("");
   useEffect(() => {
     let zive = true;
     void fetch("/api/vydane-faktury", { credentials: "same-origin" })
       .then((r) => r.json())
       .then((j) => {
         if (!zive) return;
-        const u = (j?.udaje || []).find((x: { klient: string; email?: string; dalsie_maily?: string }) => x.klient === meno);
+        const u = (j?.udaje || []).find((x: { klient: string; email?: string; dalsie_maily?: string; telefon?: string }) => x.klient === meno);
         // Keď má klient dva maily, výpis odíde na oba — nevieme, ktorý číta.
         setKontaktMail(adresyMailu([u?.email || "", u?.dalsie_maily || ""].join(",")).adresy.join(", "));
+        setKontaktTelefon(String(u?.telefon || ""));
       })
       .catch(() => null);
     return () => { zive = false; };
@@ -1437,6 +1440,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
               mesacne={poMesiacoch}
               hodinSpolu={Math.round(c?.totalHours || 0)}
               tempo={c ? tempoMesacne(c) : 0}
+              telefon={kontaktTelefon}
               odkedy={(c?.firstSession || "").slice(0, 10)}
               // Cena posledného balíčka — predvyplní sa do QR, keď ju Jerry chce.
               cenaBalicka={[...mojeBalicky].find((b) => (b.cena_czk || 0) > 0)?.cena_czk || 0}
