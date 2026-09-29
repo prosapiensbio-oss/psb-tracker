@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
 import type { Udalost } from "./klientOsCasu";
-import { hod, hodinTreningu, poslednychMesiacov, priebehBalickov, vypisAkoText, vypisHodin, zaciatokBalicka } from "./vypisHodin";
+import { hod, hodinTreningu, poslednychMesiacov, priebehBalickov, stavPreSpravu, type Vypis, vypisAkoText, vypisHodin, zaciatokBalicka } from "./vypisHodin";
 
 const bal = (den: string, hodin: number, extra: Partial<Extract<Udalost, { druh: "balicekOd" }>> = {}): Udalost =>
   ({ druh: "balicekOd", den, nazov: hodin ? `OFF - ${hodin}h` : "SILVER členství", hodin, ...extra });
@@ -343,5 +343,26 @@ describe("doplnenie členstva bez počtu hodín", () => {
     const { stavy } = priebehBalickov(bez, null, "2026-06-15");
     const siedmy = bez.filter((u) => u.druh === "trening")[6];
     expect(stavy.get(siedmy)?.dlh).toBe(1);
+  });
+});
+
+describe("stavPreSpravu", () => {
+  const riadok = (den: string, zostatok: number | null, dlh: number | null) =>
+    ({ den, druh: "trening", popis: "tréning", zostatok, dlh }) as Vypis["riadky"][number];
+
+  it("dva tréningy nad rámec sú −2, nie „dochodený“", () => {
+    const v = { riadky: [riadok("2026-09-29", null, 2), riadok("2026-09-22", null, 1)], koniec: 0 } as Vypis;
+    expect(stavPreSpravu(v, "2026-09-29")).toEqual({ zostatok: -2, dnesnyTrening: true });
+  });
+
+  it("nezaplatená hodina v balíčku nie je hodina nad rámec", () => {
+    // Tréning mal hodinu (zostatok 3), len ešte nebol zaplatený — dlh 1.
+    const v = { riadky: [riadok("2026-09-20", 3, 1)], koniec: 2 } as Vypis;
+    expect(stavPreSpravu(v, "2026-09-29").zostatok).toBe(2);
+  });
+
+  it("o dnešku len vtedy, keď tréning dnes naozaj bol", () => {
+    const v = { riadky: [riadok("2026-09-25", 1, null)], koniec: 0 } as Vypis;
+    expect(stavPreSpravu(v, "2026-09-29").dnesnyTrening).toBe(false);
   });
 });

@@ -4,7 +4,7 @@ import { fmtCZK, fmtDMY } from "../../lib/psb/format";
 import type { osCasuKlienta } from "../../lib/psb/klientOsCasu";
 import { C, mix } from "../../lib/psb/theme";
 import { cisloPreBranu, dlzkaSpravy, textSms } from "../../lib/psb/sms";
-import { hod, poslednychMesiacov, vypisAkoText, vypisHodin, zaciatokBalicka } from "../../lib/psb/vypisHodin";
+import { hod, poslednychMesiacov, vypisAkoText, vypisHodin, zaciatokBalicka, stavPreSpravu } from "../../lib/psb/vypisHodin";
 import type { RiadokVypisu } from "../../lib/psb/vypisHodin";
 
 /**
@@ -116,9 +116,11 @@ export function VypisHodinPanel({ meno, os, email, zostatokTeraz, trener = "", m
   const navrhTela = useMemo(() => vypisAkoText(v, meno), [v, meno]);
   const zobrazenyText = rucne ? telo : navrhTela;
 
+  /** Stav so znamienkom — `v.koniec` sa na nule zastaví (viď `stavPreSpravu`). */
+  const stav = useMemo(() => stavPreSpravu(v, new Date().toISOString().slice(0, 10)), [v]);
   const navrhSms = useMemo(
-    () => textSms({ oslovenie: meno.split(" ")[0], trener: trener || "Jerry", zostatok: v.koniec ?? 0, sMailom: true }),
-    [meno, trener, v.koniec],
+    () => textSms({ oslovenie: meno.split(" ")[0], trener: trener || "Jerry", zostatok: stav.zostatok ?? 0, sMailom: true, dnesnyTrening: stav.dnesnyTrening }),
+    [meno, trener, stav],
   );
   const zobrazenaSms = smsRucne ? smsText : navrhSms;
   const dlzka = useMemo(() => dlzkaSpravy(zobrazenaSms), [zobrazenaSms]);
@@ -161,7 +163,7 @@ export function VypisHodinPanel({ meno, os, email, zostatokTeraz, trener = "", m
               zostatok: r.zostatok,
               dlh: r.dlh,
             })),
-          zostatok: v.koniec,
+          zostatok: stav.zostatok,
           hodinSpolu,
           tempo,
           odkedy,

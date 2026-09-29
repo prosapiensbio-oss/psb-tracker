@@ -1644,6 +1644,7 @@ export function Balicky({ udalosti, buduce = [], clients, sedenia = [], onObnov,
   const vsetky = useMemo(() => {
     const teraz = new Date();
     const dnes = teraz.toISOString().slice(0, 10);
+    const terazVPrahe = new Date().toLocaleString("sv-SE", { timeZone: "Europe/Prague" }).replace(" ", "T").slice(0, 16);
     /**
      * Zostatok v PTminderi je pravda k poslednému importu, nie k tejto minúte.
      *
@@ -1743,7 +1744,12 @@ export function Balicky({ udalosti, buduce = [], clients, sedenia = [], onObnov,
           // Dopočítaný počet hodín sa musí povedať pred odoslaním SMS.
           odvodene: !!c.packageOdvodeny, trener: c.primaryTrainer || "",
           // Bol posledný tréning dnes? Rozhoduje, či SMS smie povedať „dnes".
-          poslednyDnes: (c.sessions || []).some((x) => String(x.date).slice(0, 10) === dnes),
+          // Dnešný tréning býva v kalendári, do PTmindera sa dostane o deň-dva.
+          // Čas udalosti je pražský, preto aj „teraz“ musí byť pražské, nie UTC.
+          // Bez kalendára by SMS v deň, keď na tom záleží, nepovedala „dnes".
+          poslednyDnes: (c.sessions || []).some((x) => String(x.date).slice(0, 10) === dnes)
+            || udalosti.some((u) => !!u.klient && normName(u.klient) === normName(meno)
+              && (u.typ === "trening" || u.typ === "uvodny") && u.zaciatok.slice(0, 10) === dnes && u.zaciatok.slice(0, 16) <= terazVPrahe),
           po: c.packageRemaining - kusov - uz, platnostDo: c.packageValidTo || "",
           dojde, teraz, uzDosiel: teraz <= 0,
           // Členstvo, ktorému už skončila platnosť, hodiny nemíňa — tie

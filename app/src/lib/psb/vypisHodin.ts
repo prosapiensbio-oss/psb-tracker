@@ -478,3 +478,27 @@ export function vypisAkoText(v: Vypis, klient: string): string {
     "Dĺžka tréningu sa berie zo záznamu o sedení; bežný tréning je hodina.",
   ].filter((r, i, p) => r !== "" || p[i - 1] !== "").join("\n");
 }
+
+/**
+ * SKUTOČNÝ STAV PRE SPRÁVU KLIENTOVI — aj so znamienkom.
+ *
+ * `koniec` sa na nule zastaví (`Math.max(0, …)`), lebo pre odpočet v balíčku
+ * záporné hodiny nedávajú zmysel. Pre správu áno: klient, ktorý má dva
+ * tréningy nad rámec, nemá „dochodený balíček", má −2. Mail aj SMS do
+ * 29. 9. 2026 hovorili „balíček máš dochodený", hoci riadky osi ukazovali
+ * −1 — náhľad pre Vítězslava bol stavaný ručne a ten rozdiel skryl.
+ *
+ * Mínus sa berie LEN z tréningu, na ktorý hodina nezostala (`zostatok`
+ * je prázdny). Tréning s hodinou, ktorý ešte nie je zaplatený, má tiež
+ * `dlh` — ale to je nezaplatená faktúra, nie hodina nad rámec, a klientovi
+ * sa to hovorí inak.
+ *
+ * `dnesnyTrening` = posledný tréning bol v deň `dnes`; bez toho sa správa
+ * na dnešok neodvoláva.
+ */
+export function stavPreSpravu(v: Vypis, dnes: string): { zostatok: number | null; dnesnyTrening: boolean } {
+  const posledny = v.riadky.find((r) => r.druh === "trening");
+  const dnesnyTrening = !!posledny && posledny.den.slice(0, 10) === dnes;
+  if (posledny && posledny.zostatok == null && posledny.dlh) return { zostatok: -posledny.dlh, dnesnyTrening };
+  return { zostatok: v.koniec, dnesnyTrening };
+}
