@@ -31,7 +31,13 @@ export type VysledokSms = { ok: boolean; chyba?: string; id?: string };
 const kus = (s: string) => s.replace(/\s+/g, " ").trim().slice(0, 200);
 
 async function smsManager(u: BranaUcet, cislo: string, text: string): Promise<VysledokSms> {
-  const telo = new URLSearchParams({ apikey: u.kluc, number: cislo, message: text });
+  /**
+   * `type=utf` MUSÍ BYŤ. Bez neho brána zhodí diakritiku a klientovi príde
+   * „v balicku ti zostavaju 2 h". Appka pritom pred odoslaním počíta dĺžku
+   * ako UCS-2 (70 znakov) — bez tohto parametra by ukazovala jedno a brána
+   * posielala druhé. Overené v dokumentácii HTTP API, 29. 9. 2026.
+   */
+  const telo = new URLSearchParams({ apikey: u.kluc, number: cislo, message: text, type: "utf" });
   // Odosielateľ je nepovinný — bez neho príde správa z čísla brány.
   if (u.odosielatel) telo.set("sender", u.odosielatel);
   const r = await fetch("https://http-api-lts.smsmanager.cz", {
