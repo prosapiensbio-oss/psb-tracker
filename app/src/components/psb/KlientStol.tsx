@@ -325,6 +325,29 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
       .sort((a, b) => b.datum.localeCompare(a.datum));
   }, [btc, meno]);
 
+  /**
+   * Tréningy, ktoré sa odtrénovali, ale v exporte z PTmindera ešte nie sú.
+   *
+   * Bez nich hovoril profil („≈2 h zostáva") niečo iné než karta „Balíček
+   * dojde" (0/6) o tom istom klientovi v tú istú chvíľu — Jerry, 29. 9.
+   * 2026 nad Lukášom Hanusom. Dve obrazovky, dve čísla; obe „správne" podľa
+   * svojej definície a človek nemá ako vedieť, ktorej veriť.
+   *
+   * Číslo z karty klienta platí ku dňu exportu. Profil preto ukazuje to isté
+   * číslo po odčítaní toho, čo medzitým prebehlo, a POVIE, že to tak robí.
+   */
+  const mimoExportu = useMemo(() => {
+    const d = dnesISO();
+    const dniZExportu = new Set(
+      (data.sessions || []).filter((x) => normName(x.client) === normName(meno)).map((x) => String(x.date).slice(0, 10)),
+    );
+    return (kalUdalosti || []).filter((u) =>
+      u.klient && normName(u.klient) === normName(meno)
+      && (u.typ === "trening" || u.typ === "uvodny")
+      && u.zaciatok.slice(0, 10) <= d
+      && !dniZExportu.has(u.zaciatok.slice(0, 10))).length;
+  }, [kalUdalosti, data.sessions, meno]);
+
   const buduce = useMemo(() => {
     const d = dnesISO();
     return (kalUdalosti || [])
@@ -919,12 +942,18 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
         {c && c.packageTotal > 0 && (
           <div style={{ padding: "11px 13px", borderRadius: 11, background: mix(C.accent, 10), border: `1px solid ${mix(C.accent, 40)}` }}>
             <div style={{ fontSize: 17, fontWeight: 800, color: C.accentLight }}>
-              {c.packageOdvodeny ? "≈" : ""}{c.packageRemaining} h zostáva
+              {c.packageOdvodeny || mimoExportu > 0 ? "≈" : ""}{c.packageRemaining - mimoExportu} h zostáva
             </div>
             <div style={{ fontSize: 11, color: C.textMuted, marginTop: 3 }}>
               {nazovProduktu(c.membership) || `z ${c.packageTotal}`}
               {c.packageValidTo ? ` · do ${fmtDMY(c.packageValidTo)}` : ""}
             </div>
+            {mimoExportu > 0 && (
+              <div style={{ fontSize: 10.5, color: C.textDim, marginTop: 4, lineHeight: 1.45 }}>
+                PTminder hovorí {c.packageRemaining} h k poslednému exportu;
+                {" "}{mimoExportu} {mimoExportu === 1 ? "hodina sa odtrénovala" : mimoExportu < 5 ? "hodiny sa odtrénovali" : "hodín sa odtrénovalo"} po ňom a vie o nich zatiaľ len kalendár.
+              </div>
+            )}
           </div>
         )}
 
