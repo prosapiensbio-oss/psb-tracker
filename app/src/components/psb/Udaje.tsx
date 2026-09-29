@@ -742,6 +742,31 @@ function NapojenieSms() {
   const [odosielatel, setOdosielatel] = useState("");
   const [hlaska, setHlaska] = useState("");
   const [bezi, setBezi] = useState(false);
+  /**
+   * SKÚŠOBNÁ SMS.
+   *
+   * Inak sa SMS posiela len z karty klienta a až potom, čo prejde mail —
+   * takže sa nedalo overiť, či je brána napojená, bez toho, aby niekomu
+   * odišla naozajstná správa. Jerry, 29. 9. 2026: „sms neprišla" a v audite
+   * nebola ani stopa po pokuse; chýbalo miesto, kde to zlyhá nahlas.
+   */
+  const [skusobne, setSkusobne] = useState("");
+  const [skusam, setSkusam] = useState(false);
+
+  const posliSkusku = async () => {
+    setSkusam(true); setHlaska("");
+    const r = await fetch("/api/sms", {
+      method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        klient: "skúška",
+        telefon: skusobne.trim(),
+        text: "Skúška z Kokpitu — diakritika: ľščťžý. Ak ti toto prišlo, brána funguje.",
+      }),
+    }).then((x) => x.json()).catch(() => ({ ok: false, error: "spojenie" }));
+    setSkusam(false);
+    setHlaska(r?.ok ? `odoslané na ${r.cislo} (${r.sprav} ${r.sprav === 1 ? "správa" : "správy"})` : r?.error || "nepodarilo sa");
+    await nacitaj();
+  };
 
   const nacitaj = useCallback(async () => {
     const r = await fetch("/api/sms", { credentials: "same-origin" }).then((x) => x.json()).catch(() => null);
@@ -794,6 +819,22 @@ function NapojenieSms() {
           {bezi ? "…" : "Uložiť"}
         </button>
       </div>
+      {stav.kluc && (
+        <div style={{ display: "flex", gap: 7, flexWrap: "wrap", alignItems: "center", marginTop: 7 }}>
+          <input
+            value={skusobne} onChange={(e) => setSkusobne(e.target.value)}
+            placeholder="skúšobná SMS na číslo"
+            style={{ ...vstup, flex: "0 1 200px" }}
+          />
+          <button
+            onClick={() => void posliSkusku()} disabled={skusam || !skusobne.trim()}
+            style={{ ...vstup, cursor: skusobne.trim() ? "pointer" : "default", opacity: skusobne.trim() ? 1 : 0.5 }}
+          >
+            {skusam ? "…" : "Poslať skúšku"}
+          </button>
+          <span style={{ fontSize: 11.5, color: C.textDim }}>ide na tvoje číslo, nie klientovi</span>
+        </div>
+      )}
       <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 8, lineHeight: 1.55 }}>
         {stav.kluc ? "Brána je nastavená." : "Brána zatiaľ nastavená nie je — bez kľúča sa SMS neodošle."}
         {stav.poslanych > 0 ? ` Odoslaných správ: ${stav.poslanych}${stav.posledna ? `, posledná ${fmtDMY(stav.posledna.slice(0, 10))}` : ""}.` : ""}
