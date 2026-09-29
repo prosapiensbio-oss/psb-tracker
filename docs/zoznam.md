@@ -12,9 +12,26 @@ v správach, a tie sa strácajú.
 patrí to SEM v tom istom ťahu. Hotová vec sa z hornej časti maže a jednou
 vetou dopíše do „Zavreté" dolu — aby sa už nikdy neotvárala odznova.
 
-Stav k **26. 9. 2026**.
+Stav k **29. 9. 2026**.
 
 ---
+
+## 0 · Odchod z PTmindera — od 1. 10. 2026 je Kokpit pravda
+
+Rozhodnuté 29. 9. 2026. PTminder je odvtedy kontrola. Tretiny po poradí:
+
+- [x] **Dochádzka z kalendára** — nasadené, zapne sa sama 1. 10.
+  (`sedeniaZKalendara.ts`). Cena tréningu z balíčka v Kokpite.
+- [ ] **Naliať chýbajúce balíčky** — Jerry klikne „Naliať z PTmindera"
+  (naliatie je od 29. 9. bez zdvojenia). Pribudne 8 členstiev kúpených po
+  20. 9. + Jankino živé doplnenie. Bez toho majú títo klienti od 1. 10.
+  v Kokpite zlý zostatok aj cenu tréningu.
+- [ ] **Hodiny: karta klienta z balíčkov v Kokpite** — dnes `compute.ts`
+  číta balíčky z PTmindera (Vítězslav: nový balíček len v Kokpite → karta 0 h).
+  Kým to nie je, tréningy treba zapisovať aj do PTmindera.
+- [ ] **Peniaze z banky a zošita** — `platby_od` = 2026-10.
+- [ ] **Os času a „dnes"** — os počíta celý dnešný deň, nové sedenia len to,
+  čo už začalo. Rozdiel ±1 h do konca dňa; zjednotiť pri hodinách.
 
 ## 1 · Čaká na Jerryho slovo
 
