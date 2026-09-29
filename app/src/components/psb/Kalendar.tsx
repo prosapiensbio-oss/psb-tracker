@@ -9,6 +9,7 @@ import type { TyzdenPorovnania } from "../../lib/psb/porovnanieDochadzky";
 import { trenerZPrihlasenia } from "../../lib/psb/workspaceKarty";
 import { guillermoZostatok } from "../../lib/psb/guillermo";
 import type { PSBData } from "../../lib/psb/types";
+import { SmsKlientovi } from "./SmsKlientovi";
 import { C, mix } from "../../lib/psb/theme";
 import { Card, Empty, H3, Info, Modal, Select, TrenerPills } from "./ui";
 
@@ -1739,6 +1740,8 @@ export function Balicky({ udalosti, buduce = [], clients, sedenia = [], onObnov,
         const dojde = teraz <= 0 ? "" : (dni[teraz - 1] || "");
         return {
           meno, kusov, uz, zostava: c.packageRemaining, spolu: c.packageTotal,
+          // Dopočítaný počet hodín sa musí povedať pred odoslaním SMS.
+          odvodene: !!c.packageOdvodeny, trener: c.primaryTrainer || "",
           po: c.packageRemaining - kusov - uz, platnostDo: c.packageValidTo || "",
           dojde, teraz, uzDosiel: teraz <= 0,
           // Členstvo, ktorému už skončila platnosť, hodiny nemíňa — tie
@@ -1881,7 +1884,7 @@ export function Balicky({ udalosti, buduce = [], clients, sedenia = [], onObnov,
            viditeľný naraz a poradie (najväčší mínus prvý) číta po riadkoch. */
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 8 }}>
           {riadky.map((r) => (
-            <div key={r.meno} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 10px", background: mix(C.text, 4), border: `1px solid ${C.border}`, borderRadius: 9, minWidth: 0 }}>
+            <div key={r.meno} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 10px", background: mix(C.text, 4), border: `1px solid ${C.border}`, borderRadius: 9, minWidth: 0, flexWrap: "wrap" }}>
               {/* Odznak = STAV Z PTMINDERA, presne to číslo, ktoré Jerry vidí
                   v PTminderi — žiadna projekcia. Prvá verzia ukazovala zostatok
                   PO objednaných („−2/17") a proti PTminderu vyzerala ako chyba;
@@ -1946,6 +1949,7 @@ export function Balicky({ udalosti, buduce = [], clients, sedenia = [], onObnov,
                   )}
                 </span>
               </div>
+              <SmsKlientovi meno={r.meno} zostatok={Math.max(0, r.teraz)} trener={r.trener} odvodene={r.odvodene} maly />
               {onVypis && (
                 <button
                   onClick={() => onVypis(r.meno)}

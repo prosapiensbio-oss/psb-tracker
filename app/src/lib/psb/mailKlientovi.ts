@@ -81,6 +81,15 @@ export type VypisKlienta = {
    * mena v texte platby.
    */
   platba?: { popis: string; suma: number; ucet: string; sprava: string };
+  /**
+   * Dnešný dátum (YYYY-MM-DD).
+   *
+   * Mail pôvodne písal „dnes si mal poslednú hodinu" vždy, keď bol zostatok
+   * nula — aj Vítězslavovi, ktorý dochodil 15. 9. a píše sa mu 29. Veta
+   * o dnešku v maili, ktorý príde o dva týždne, je nepravda o tom, čo sa
+   * stalo. Bez tohto poľa sa na dnešok nikde neodvoláva.
+   */
+  dnes?: string;
   /** `cid` obrázkov — vkladá ich odosielateľ. */
   qrCid?: string;
   logoCid?: string;
@@ -126,8 +135,13 @@ export function mailKlientovi(v: VypisKlienta): { predmet: string; text: string;
 
   const predmet = doslo ? "Balíček dochodený — výpis a platba" : "Tvoja dochádzka v ProSapiens";
   const nadpis = doslo ? "Balíček dochodený" : "Tvoja dochádzka";
+  const dnesnaHodina = !!v.dnes && !!posledny && posledny.slice(0, 10) === v.dnes;
   const uvod = doslo
-    ? "dnes si mal poslednú hodinu z balíčka."
+    ? dnesnaHodina
+      ? "dnes si mal poslednú hodinu z balíčka."
+      : posledny
+        ? `balíček máš dochodený — posledná hodina bola ${denSK(posledny)}.`
+        : "balíček máš dochodený."
     : v.zostatok !== null ? `v balíčku ti ${zostavaHodin(v.zostatok)}.` : "posielam ti prehľad tréningov.";
 
   /**

@@ -164,6 +164,7 @@ export function VypisHodinPanel({ meno, os, email, zostatokTeraz, trener = "", m
           tempo,
           odkedy,
           mesiacov,
+          dnes: new Date().toISOString().slice(0, 10),
           platba: Number(suma) > 0
             ? { popis: popisPlatby.trim() || "Ďalší balíček", suma: Number(suma), ucet: "2302732185/2010", sprava: meno }
             : undefined,

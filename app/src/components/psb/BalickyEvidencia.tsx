@@ -37,10 +37,19 @@ async function posli(telo: Record<string, unknown>) {
   return (await r.json()) as { ok: boolean; error?: string; id?: string; pridanych?: number; preskocenych?: number; preskocene?: string[] };
 }
 
-export function BalickyEvidencia({ mena, onFaktura }: {
+export function BalickyEvidencia({ mena, onFaktura, onVypis }: {
   mena: string[];
   /** Ponuka „vystaviť faktúru" po zapísaní balíčka; bez nej sa neukáže. */
   onFaktura?: (p: { klient: string; popis: string; cena: number; balicekId?: string }) => void;
+  /**
+   * „Poslať výpis a QR" — otvorí stôl klienta s pripraveným mailom.
+   *
+   * Jerry, 29. 9. 2026: „niekto chce faktúru a niekto chce len QR platbu."
+   * Sú to dve rôzne veci, nie dva názvy tej istej: faktúra je doklad pre
+   * účtovníčku, výpis je správa pre klienta — dochádzka, tempo a QR na
+   * ďalší balíček. Preto stoja vedľa seba a ani jedno nie je povinné.
+   */
+  onVypis?: (meno: string) => void;
 }) {
   const [balicky, setBalicky] = useState<Balicek[] | null>(null);
   const [p, setP] = useState<Porovnanie | null>(null);
@@ -236,18 +245,29 @@ export function BalickyEvidencia({ mena, onFaktura }: {
         </div>
       )}
 
-      {posledny && onFaktura && (
+      {posledny && (onFaktura || onVypis) && (
         <div style={{ marginTop: 10, padding: "9px 11px", borderRadius: 9, border: `1px solid ${mix(C.accentLight, 40)}`, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           <span style={{ fontSize: 12.5, color: C.text }}>
             Zapísaný balíček <b>{posledny.nazov}</b> pre {posledny.klient}
             {posledny.cena ? ` za ${Math.round(posledny.cena)} Kč` : ""}.
           </span>
-          <button
-            onClick={() => { onFaktura({ klient: posledny.klient, popis: posledny.nazov, cena: posledny.cena, balicekId: posledny.id }); setPosledny(null); }}
-            style={{ padding: "6px 12px", borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: "pointer", border: `1px solid ${mix(C.accent, 45)}`, background: mix(C.accent, 12), color: C.accentLight }}
-          >
-            Vystaviť faktúru
-          </button>
+          {onFaktura && (
+            <button
+              onClick={() => { onFaktura({ klient: posledny.klient, popis: posledny.nazov, cena: posledny.cena, balicekId: posledny.id }); setPosledny(null); }}
+              style={{ padding: "6px 12px", borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: "pointer", border: `1px solid ${mix(C.accent, 45)}`, background: mix(C.accent, 12), color: C.accentLight }}
+            >
+              Vystaviť faktúru
+            </button>
+          )}
+          {onVypis && (
+            <button
+              onClick={() => { onVypis(posledny.klient); setPosledny(null); }}
+              title="Mail s dochádzkou a QR na platbu — bez faktúry"
+              style={{ padding: "6px 12px", borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: "pointer", border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted }}
+            >
+              Poslať výpis a QR
+            </button>
+          )}
           <button
             onClick={() => setPosledny(null)}
             style={{ background: "none", border: "none", color: C.textDim, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}

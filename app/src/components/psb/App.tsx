@@ -2728,6 +2728,7 @@ function skupinaFaktur(
           <Prechod
             mena={Object.keys(clients)}
             onFaktura={(p) => { setFakturaPredvolba(p); setActive("workspace"); }}
+            onVypis={(m) => { setVypisPredvolba(m); setActive("workspace"); }}
           />
         )}
         {active === "workspace" && <Workspace clients={clients} mena={Object.keys(clients)} ktoSom={ktoSom} data={data} kalUdalosti={kalUdalosti} btcSats={btcSatsKlienti} btc={{ platby: btcPlatby, kurz: btcKurz.kurz, kedy: btcKurz.kedy }} otvorKlienta={workspaceKlient} onOtvoreny={() => setWorkspaceKlient(null)} vypisPredvolba={vypisPredvolba} onVypisPredvolbaSpracovana={() => setVypisPredvolba(null)} onOverride={(m, k, v) => actions.setOverride(m, k as never, v)} fakturaPredvolba={fakturaPredvolba} onFakturaPredvolbaSpracovana={() => setFakturaPredvolba(null)} />}

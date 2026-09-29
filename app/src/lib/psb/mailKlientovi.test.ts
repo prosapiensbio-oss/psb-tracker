@@ -17,7 +17,7 @@ const zaklad: VypisKlienta = {
 
 describe("mailKlientovi", () => {
   it("keď balíček došiel, povie to hneď v predmete aj v prvej vete", () => {
-    const v = mailKlientovi(zaklad);
+    const v = mailKlientovi({ ...zaklad, dnes: "2026-09-28" });
     expect(v.predmet).toContain("dochodený");
     expect(v.text).toContain("dnes si mal poslednú hodinu");
     expect(v.html).toContain("dnes si mal poslednú hodinu");
@@ -132,5 +132,24 @@ describe("koniec osi", () => {
   it("prázdne riadky v textovej podobe zostávajú", () => {
     const v = mailKlientovi({ ...zaklad, zostatok: 2 });
     expect(v.text.split("\n")[1]).toBe("");
+  });
+});
+
+describe("kedy padla posledná hodina", () => {
+  it("o dnešku hovorí len vtedy, keď bol tréning naozaj dnes", () => {
+    const v = mailKlientovi({ ...zaklad, dnes: "2026-09-28" });
+    expect(v.text).toContain("dnes si mal poslednú hodinu");
+  });
+
+  it("keď balíček dochodil skôr, povie kedy — nie „dnes“", () => {
+    // Vítězslav Papiež dochodil 15. 9. a píše sa mu 29. — „dnes" by bola lož.
+    const v = mailKlientovi({ ...zaklad, dnes: "2026-09-29" });
+    expect(v.text).not.toContain("dnes si mal");
+    expect(v.text).toContain("posledná hodina bola 28. 9. 2026");
+  });
+
+  it("bez dnešného dátumu sa na dnešok neodvoláva vôbec", () => {
+    const v = mailKlientovi(zaklad);
+    expect(v.text).not.toContain("dnes si mal");
   });
 });
