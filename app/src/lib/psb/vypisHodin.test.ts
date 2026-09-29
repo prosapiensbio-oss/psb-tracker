@@ -315,3 +315,33 @@ describe("tréning zadarmo", () => {
     expect(v.riadky.filter((r) => r.druh === "trening")).toHaveLength(3);
   });
 });
+
+describe("doplnenie členstva bez počtu hodín", () => {
+  /**
+   * Lukáš Hanus, 29. 9. 2026: na piatich tréningoch po sebe mu appka
+   * ukazovala −1 až −5, hoci mal všetko zaplatené. „Doplnenie členstva"
+   * nemá v názve počet hodín, `hodinZNazvuBalicka` z neho vyčíta 0 a appka
+   * to brala ako „nepridalo sa nič" — deficit sa potom valil cez všetky
+   * ďalšie balíčky.
+   */
+  const os: Udalost[] = [
+    { druh: "balicekOd", den: "2026-04-29", nazov: "OFF - 6h S viazanostou", hodin: 6 },
+    { druh: "platba", den: "2026-04-29", suma: 6990, metoda: "prevodom" },
+    { druh: "balicekOd", den: "2026-05-02", nazov: "Doplnenie členstva", hodin: 0, doplnenie: true },
+    ...["2026-05-03", "2026-05-07", "2026-05-13", "2026-05-19", "2026-05-27", "2026-06-03", "2026-06-11"]
+      .map((den) => ({ druh: "trening", den }) as Udalost),
+  ];
+
+  it("neznáme doplnenie neznamená nula hodín — dlh sa v tom období nepočíta", () => {
+    const { stavy } = priebehBalickov(os, null, "2026-06-15");
+    const dlhy = os.filter((u) => u.druh === "trening").map((u) => stavy.get(u)?.dlh ?? null);
+    expect(dlhy.every((d) => d === null)).toBe(true);
+  });
+
+  it("bez doplnenia sa dlh počíta ďalej — mlčať sa má len tam, kde sa nevie", () => {
+    const bez = os.filter((u) => !(u.druh === "balicekOd" && u.doplnenie));
+    const { stavy } = priebehBalickov(bez, null, "2026-06-15");
+    const siedmy = bez.filter((u) => u.druh === "trening")[6];
+    expect(stavy.get(siedmy)?.dlh).toBe(1);
+  });
+});

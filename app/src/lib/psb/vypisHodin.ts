@@ -224,8 +224,27 @@ export function priebehBalickov(
    * Index prvého tréningu, na ktorý už v členstve nezostala hodina.
    * −1 = všetko sa zmestilo (alebo je to obdobie bez hodín).
    */
+  /**
+   * „DOPLNENIE ČLENSTVA" BEZ POČTU HODÍN ZNAMENÁ NEZNÁMO, NIE NULU.
+   *
+   * PTminder vyváža doplnenie hodín ako službu „Doplnenie členstva" — bez
+   * počtu v názve a s cenou 0. `hodinZNazvuBalicka` z toho vyčíta 0 a appka
+   * to donedávna brala ako „nepridalo sa nič". Tým klientovi po každom
+   * doplnení chýbali hodiny, ďalší balíček ich zhltol a ten deficit sa valil
+   * dopredu: Lukáš Hanus mal 29. 9. 2026 na piatich tréningoch po sebe −1
+   * až −5, hoci mal všetko zaplatené a odtrénoval presne toľko, koľko kúpil.
+   *
+   * Je to 223 doplnení u 80 klientov, čiže nie výnimka.
+   *
+   * Kokpit preto v takom období NEPOČÍTA dlh a NEPREBERÁ z neho tréningy do
+   * ďalšieho balíčka. Nevieme, koľko hodín pribudlo — a vymyslené číslo by
+   * išlo klientovi do mailu aj do SMS.
+   */
+  const neznameDoplnenie = (u: Usek): boolean =>
+    u.riadky.some((r) => r.druh === "balicekOd" && r.doplnenie && !r.hodin);
+
   const prvyNekryty = (u: Usek): number => {
-    if (!u.balicek || u.hodin <= 0) return -1;
+    if (!u.balicek || u.hodin <= 0 || neznameDoplnenie(u)) return -1;
     let zostava = u.hodin;
     for (let i = 0; i < u.riadky.length; i++) {
       const r = u.riadky[i];
@@ -296,6 +315,7 @@ export function priebehBalickov(
     // v období platba nie je vôbec, predpokladá sa, že sa platilo dopredu.
     const zaplateneOd = b?.nezaplatene ? null : platbaKBalicku || (b ? b.den : undefined);
 
+    const neznameHodiny = neznameDoplnenie(usek);
     let dlhPocet = 0;
     const doUseku: { u: Udalost; po: number | null }[] = [];
     for (const u of usek.riadky) {
@@ -326,7 +346,12 @@ export function priebehBalickov(
         const vycerpane = bezi !== null && bezi < hodinTreningu(u);
         if (bezi !== null && !vycerpane) zostatok = bezi;
         if (bezi !== null) bezi = Math.max(0, bezi - hodinTreningu(u));
-        if (vycerpane || !zaplateneOd || u.den < zaplateneOd) dlh = (dlhPocet += 1);
+        /**
+         * Dlh sa nepočíta tam, kde appka nevie, koľko hodín obdobie malo.
+         * Nulou to nie je — je to neznámo (viď `neznameDoplnenie`).
+         */
+        if (neznameHodiny) dlh = null;
+        else if (vycerpane || !zaplateneOd || u.den < zaplateneOd) dlh = (dlhPocet += 1);
         else dlhPocet = 0;
       }
       doUseku.push({ u, po: u.druh === "trening" ? bezi : null });
