@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { OKNA_HODIN } from "../../lib/psb/mailOkno";
 import { fmtDMY } from "../../lib/psb/format";
 import { jeBankovyVypis } from "../../lib/psb/fio";
+import { chybaOdosielatela } from "../../lib/psb/sms";
 import { C, mix, S, badge, btn } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import type { AssistantChat } from "./Assistant";
@@ -812,8 +813,8 @@ function NapojenieSms() {
         />
         <input
           value={odosielatel} onChange={(e) => setOdosielatel(e.target.value)}
-          placeholder={brana === "twilio" ? "číslo odosielateľa (povinné)" : "odosielateľ (nepovinné)"}
-          style={{ ...vstup, flex: "0 1 200px" }}
+          placeholder={brana === "twilio" ? "číslo odosielateľa (povinné)" : "odosielateľ (nepovinné, max 11)"}
+          style={{ ...vstup, flex: "0 1 200px", borderColor: chybaOdosielatela(odosielatel, brana) && odosielatel ? C.red : C.border }}
         />
         <button onClick={() => void uloz()} disabled={bezi} style={{ ...vstup, cursor: "pointer", background: mix(C.accent, 14), color: C.accentLight, border: `1px solid ${mix(C.accent, 45)}` }}>
           {bezi ? "…" : "Uložiť"}
@@ -839,6 +840,9 @@ function NapojenieSms() {
         {stav.kluc ? "Brána je nastavená." : "Brána zatiaľ nastavená nie je — bez kľúča sa SMS neodošle."}
         {stav.poslanych > 0 ? ` Odoslaných správ: ${stav.poslanych}${stav.posledna ? `, posledná ${fmtDMY(stav.posledna.slice(0, 10))}` : ""}.` : ""}
         {hlaska ? ` ${hlaska}` : ""}
+        {odosielatel && chybaOdosielatela(odosielatel, brana)
+          ? ` ${chybaOdosielatela(odosielatel, brana)}`
+          : ""}
       </div>
     </div>
   );

@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
-import { cisloPreBranu, dlzkaSpravy } from "../../lib/psb/sms";
+import { chybaOdosielatela, cisloPreBranu, dlzkaSpravy } from "../../lib/psb/sms";
 import { posliSms, type BranaUcet } from "../../lib/psb/smsBrana.server";
 
 /**
@@ -65,8 +65,13 @@ export const Route = createFileRoute("/api/sms")({
         const kto = (await currentUser(request)) || "";
 
         if (b.akcia === "nastav") {
+          const brana = kus(b.brana, 40) || "smsmanager";
+          // Meno, ktoré brána odmietne, sa nesmie uložiť — SMS by potom ticho
+          // odchádzala z čísla a nikto by nevedel prečo.
+          const zle = chybaOdosielatela(kus(b.odosielatel, 40), brana);
+          if (zle) return Response.json({ ok: false, error: zle }, { status: 400 });
           const ulozit: [string, string][] = [
-            ["sms_brana", kus(b.brana, 40) || "smsmanager"],
+            ["sms_brana", brana],
             ["sms_odosielatel", kus(b.odosielatel, 40)],
           ];
           // Prázdny kľúč NEPREPISUJE uložený — obrazovka ho nikdy nedostane

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { cisloPreBranu, dlzkaSpravy, textSms } from "./sms";
+import { chybaOdosielatela, cisloPreBranu, dlzkaSpravy, textSms } from "./sms";
 
 describe("cisloPreBranu", () => {
   it("české číslo bez predvoľby dostane +420", () => {
@@ -66,5 +66,29 @@ describe("textSms", () => {
 
   it("bez mailu sa naň neodkazuje", () => {
     expect(textSms({ oslovenie: "Eva", trener: "Jerry", zostatok: 0, sMailom: false })).not.toContain("maili");
+  });
+});
+
+describe("chybaOdosielatela", () => {
+  it("celý názov firmy sa do SMS nezmestí", () => {
+    // 22 znakov — brána by ho ticho zahodila a SMS by odišla z čísla.
+    expect(chybaOdosielatela("ProSapiens Biomechanic")).toContain("11 znakov");
+  });
+
+  it("skrátené meno prejde", () => {
+    expect(chybaOdosielatela("ProSapiens")).toBeNull();
+  });
+
+  it("diakritika v mene odosielateľa nie je", () => {
+    expect(chybaOdosielatela("ProSápiens")).toContain("diakritiky");
+  });
+
+  it("prázdne je v poriadku — SMS pôjde z čísla", () => {
+    expect(chybaOdosielatela("")).toBeNull();
+  });
+
+  it("Twilio bez čísla neposiela", () => {
+    expect(chybaOdosielatela("", "twilio")).toContain("číslo");
+    expect(chybaOdosielatela("+420777123456", "twilio")).toBeNull();
   });
 });

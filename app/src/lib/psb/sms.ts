@@ -96,3 +96,26 @@ export function textSms(v: SpravaProKlienta): string {
   const kam = v.sMailom ? " V maili nájdeš dochádzku aj QR na platbu." : "";
   return `${uvod}${kam} ${v.trener}, ProSapiens`;
 }
+
+/**
+ * ODOSIELATEĽ — ČO BRÁNA VEZME.
+ *
+ * Alfanumerické meno má **11 znakov**. Nie je to pravidlo brány, ale limit
+ * samotnej SMS, takže „ProSapiens Biomechanic" (22) neprejde nikdy a nikde.
+ * Kokpit to musí povedať pri zadávaní; inak by sa to uložilo, SMS by ticho
+ * odišla z čísla a nikto by nevedel prečo.
+ *
+ * Číslo (samé číslice, prípadne s +) je v poriadku v ľubovoľnej dĺžke —
+ * to nie je meno, ale virtuálne číslo.
+ *
+ * Vracia dôvod odmietnutia, alebo `null` keď je všetko v poriadku.
+ */
+export function chybaOdosielatela(odosielatel: string, druh = "smsmanager"): string | null {
+  const o = String(odosielatel || "").trim();
+  if (!o) return druh === "twilio" ? "Twilio potrebuje číslo odosielateľa." : null;
+  if (/^\+?\d+$/.test(o)) return null;
+  if (druh === "twilio") return "Twilio berie ako odosielateľa len číslo.";
+  if ([...o].length > 11) return `Meno odosielateľa má najviac 11 znakov, toto má ${[...o].length}.`;
+  if (!/^[A-Za-z0-9 ]+$/.test(o)) return "Meno odosielateľa môže mať len písmená bez diakritiky, číslice a medzery.";
+  return null;
+}
