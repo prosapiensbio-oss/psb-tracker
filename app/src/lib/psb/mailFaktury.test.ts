@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
-import { TRENERI, krstne, mailFaktury, menoPrilohy } from "./mailFaktury";
+import { mailFakturyHtml, TRENERI, krstne, mailFaktury, menoPrilohy } from "./mailFaktury";
+import { FARBY_MAILU } from "./mailKlientovi";
 import type { Faktura } from "./vydanaFaktura";
 
 const zaklad: Faktura = {
@@ -95,5 +96,42 @@ describe("tykanie a vykanie sa dá prepnúť", () => {
   it("bez voľby rozhoduje, či je to firma", () => {
     expect(mailFaktury(zaklad).vykanie).toBe(false);
     expect(mailFaktury({ ...zaklad, odberatel: { ...zaklad.odberatel, firma: "FSH Devices s.r.o." } }).vykanie).toBe(true);
+  });
+});
+
+describe("mailFakturyHtml — návrh 1, rovnaký šat ako výpis", () => {
+  const f: Faktura = {
+    ...zaklad, klient: "Martin Vaško", splatnost: "2026-10-11",
+    popis: "Rehabilitačno-kondiční cvičení — balíček 6 h", cena: 7790, celkom: 7790,
+  };
+
+  it("nesie sumu, VS, splatnosť aj položku", () => {
+    const h = mailFakturyHtml(f, { qrCid: "qr@psb", logoCid: "logo@psb" });
+    expect(h).toContain("7 790 Kč");
+    expect(h).toContain("VS 20261001");
+    expect(h).toContain("splatnost 11. 10. 2026");
+    expect(h).toContain("cid:qr@psb");
+    expect(h).toContain("cid:logo@psb");
+    expect(h).toContain("Faktura 20261001.pdf");
+  });
+
+  it("má tú istú paletu ako mail s výpisom — jeden zdroj farieb", () => {
+    expect(mailFakturyHtml(f)).toContain(FARBY_MAILU.pozadie);
+    expect(mailFakturyHtml(f)).toContain(FARBY_MAILU.platba);
+  });
+
+  it("tykanie oslovuje krstným menom, vykanie bez mena", () => {
+    expect(mailFakturyHtml(f, { vykanie: false })).toContain("Martin, posílám fakturu");
+    expect(mailFakturyHtml(f, { vykanie: true })).toContain("Dobrý den, posílám fakturu č. 20261001");
+  });
+
+  it("osobná veta prebije predvolenú", () => {
+    const h = mailFakturyHtml(f, { uvod: "tady je slíbená faktura, měj se!" });
+    expect(h).toContain("Martin, tady je slíbená faktura");
+    expect(h).not.toContain("posílám fakturu —");
+  });
+
+  it("bez loga zostáva textová značka — mail nesmie prísť bez hlavy", () => {
+    expect(mailFakturyHtml(f)).toContain("ProSapiens Biomechanic");
   });
 });

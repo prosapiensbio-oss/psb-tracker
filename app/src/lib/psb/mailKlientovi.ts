@@ -28,7 +28,14 @@
  */
 
 /** Farby značky. Tmavá zelená je pozadie, svetlá je platba. */
-const F = {
+/**
+ * Paleta oboch mailov klientovi — výpisu aj faktúry.
+ *
+ * Jerry, 29. 9. 2026 pri faktúre: „vyhráva 1, nech sú rovnaké." Rovnaké
+ * znamená jeden zdroj farieb: mailFaktury si ich odtiaľto importuje,
+ * takže zmena odtieňa tu prefarbí oba maily naraz.
+ */
+export const FARBY_MAILU = {
   pozadie: "#232b1c",
   karta: "#2c3524",
   linka: "#3a4630",
@@ -41,6 +48,7 @@ const F = {
   platbaSlaba: "#4d5940",
   minus: "#e2a07f",
 } as const;
+const F = FARBY_MAILU;
 
 export type BodOsi = {
   den: string;
@@ -81,6 +89,19 @@ export type VypisKlienta = {
    * mena v texte platby.
    */
   platba?: { popis: string; suma: number; ucet: string; sprava: string };
+  /**
+   * Celá história na vyžiadanie klienta.
+   *
+   * Jerry, 29. 9. 2026: „možnosť pre klienta na vyžiadanie — celá história
+   * hodín aj platieb do mailu." Je to ten istý mail, len sa inak volá
+   * („Celá história", nie „Balíček dochodený" — klient si pýtal prehľad,
+   * nie upomienku), v dlaždiciach je namiesto tempa zaplatená suma a os
+   * nesie všetko od prvého tréningu vrátane platieb.
+   */
+  uplna?: boolean;
+  /** Zaplatené spolu (Kč) — dlaždica pri úplnej histórii. */
+  zaplateneSpolu?: number;
+
   /**
    * Dnešný dátum (YYYY-MM-DD).
    *
@@ -143,8 +164,10 @@ export function mailKlientovi(v: VypisKlienta): { predmet: string; text: string;
   const posledny = treningy[treningy.length - 1]?.den || "";
   const doslo = v.zostatok !== null && v.zostatok <= 0;
 
-  const predmet = doslo ? "Balíček dochodený — výpis a platba" : "Tvoja dochádzka v ProSapiens";
-  const nadpis = doslo ? "Balíček dochodený" : "Tvoja dochádzka";
+  const predmet = v.uplna
+    ? "Tvoje tréningy a platby — ProSapiens"
+    : doslo ? "Balíček dochodený — výpis a platba" : "Tvoja dochádzka v ProSapiens";
+  const nadpis = v.uplna ? "Celá história" : doslo ? "Balíček dochodený" : "Tvoja dochádzka";
   const dnesnaHodina = !!v.dnes && !!posledny && posledny.slice(0, 10) === v.dnes;
   /**
    * Hodiny NAD RÁMEC balíčka. Tie sa nesmú schovať za „dochodený": klient
@@ -152,7 +175,11 @@ export function mailKlientovi(v: VypisKlienta): { predmet: string; text: string;
    * než nechať ho zistiť to z čísla na faktúre.
    */
   const navyse = v.zostatok !== null && v.zostatok < 0 ? -v.zostatok : 0;
-  const uvod = navyse
+  // Pri úplnej histórii sa nehovorí o dochodenom balíčku — klient si pýtal
+  // prehľad; stav balíčka aj tak vidí na konci osi.
+  const uvod = v.uplna
+    ? "posielam celú históriu tréningov aj platieb."
+    : navyse
     ? `${dnesnaHodina ? "dnes si mal" : "mal si"} ${navyse === 1 ? "hodinu" : `${navyse} hodiny`} nad rámec balíčka — ${navyse === 1 ? "je" : "sú"} v ďalšej platbe.`
     : doslo
       ? dnesnaHodina
@@ -191,7 +218,11 @@ export function mailKlientovi(v: VypisKlienta): { predmet: string; text: string;
   /** Tri čísla, ktoré o klientovi niečo hovoria. „0 h zostáva" medzi ne nepatrí. */
   const staty: [string, string][] = [
     [`${v.hodinSpolu} h`, "odtrénované spolu"],
-    ...(v.tempo ? [[tempoSK(v.tempo), "tréningov mesačne"] as [string, string]] : []),
+    // Úplná história je odpoveď aj na „koľko som u vás nechal" — tempo by tu
+    // bolo vata, zaplatená suma je to, čo si klient pýtal.
+    ...(v.uplna && v.zaplateneSpolu
+      ? [[czk(v.zaplateneSpolu), "zaplatené spolu"] as [string, string]]
+      : v.tempo ? [[tempoSK(v.tempo), "tréningov mesačne"] as [string, string]] : []),
     ...(v.mesiacov ? [[mesiacovSK(v.mesiacov), v.odkedy ? `chodíš od ${denSK(v.odkedy)}` : "chodíš u nás"] as [string, string]] : []),
   ];
 
@@ -207,7 +238,7 @@ export function mailKlientovi(v: VypisKlienta): { predmet: string; text: string;
     v.odkaz || null,
     uvod,
     "",
-    "Ako sa míňal balíček:",
+    v.uplna ? "Tréningy a platby:" : "Ako sa míňal balíček:",
     ...os.map((b) => {
       const cislo = b.druh !== "trening" ? "" : [
         b.zostatok != null ? `${b.zostatok} h` : "",
@@ -298,7 +329,7 @@ export function mailKlientovi(v: VypisKlienta): { predmet: string; text: string;
   <tr><td>
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:${F.karta};border-radius:14px">
       <tr><td style="padding:20px 22px">
-        <div style="font-size:10.5px;letter-spacing:1.6px;text-transform:uppercase;color:${F.slaba};padding-bottom:14px">Ako sa míňal balíček</div>
+        <div style="font-size:10.5px;letter-spacing:1.6px;text-transform:uppercase;color:${F.slaba};padding-bottom:14px">${v.uplna ? "Tréningy a platby" : "Ako sa míňal balíček"}</div>
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">${riadkyOsi}</table>
       </td></tr>
     </table>

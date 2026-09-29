@@ -103,7 +103,7 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana 
    * cudziemu človeku — posledný pohľad pred odoslaním je lacnejší než
    * ospravedlnenie.
    */
-  const [mail, setMail] = useState<{ id: string; cislo: string; komu: string; predmet: string; telo: string; vykanie: boolean; znova: boolean } | null>(null);
+  const [mail, setMail] = useState<{ id: string; cislo: string; komu: string; predmet: string; telo: string; uvod: string; trener: string; vykanie: boolean; znova: boolean } | null>(null);
 
   const nacitaj = useCallback(async () => {
     const j = await fetch("/api/vydane-faktury", { credentials: "same-origin" })
@@ -198,7 +198,7 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana 
     if (!komu) { setChyba(`${r.klient} nemá e-mail — doplň ho vo fakturačných údajoch nižšie.`); return; }
     const t = mailFaktury(naFakturu(r), { trener: treneri?.[r.klient] });
     setChyba("");
-    setMail({ id: r.id, cislo: r.cislo, komu, predmet: t.predmet, telo: t.telo, vykanie: t.vykanie, znova: !!r.odoslane_at });
+    setMail({ id: r.id, cislo: r.cislo, komu, predmet: t.predmet, telo: t.telo, uvod: "", trener: treneri?.[r.klient] || "", vykanie: t.vykanie, znova: !!r.odoslane_at });
   };
 
   /** Prepnutie tykania/vykania prepíše text — ale len ten nezmenený. */
@@ -215,7 +215,7 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana 
 
   const posliMailTeraz = async () => {
     if (!mail) return;
-    const j = await posli({ akcia: "posli-mail", id: mail.id, komu: mail.komu, predmet: mail.predmet, telo: mail.telo }, mail.id);
+    const j = await posli({ akcia: "posli-mail", id: mail.id, komu: mail.komu, predmet: mail.predmet, telo: mail.telo, uvod: mail.uvod, vykanie: mail.vykanie, trener: mail.trener }, mail.id);
     if (j) {
       setHlaska(`Faktúra ${mail.cislo} odišla na ${mail.komu}.`);
       setMail(null);
@@ -437,7 +437,17 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana 
               Odíde na {adresati.adresy.length} adresy naraz — klient má v Kokpite dva maily.
             </div>
           ) : null}
-          <span style={popisStyl}>Text — čo prepíšeš, to odíde</span>
+          {/* Mail odchádza v šate výpisového mailu (Jerry, 29. 9. 2026:
+              „nech sú rovnaké"): značka, dlaždice, QR. Prvá veta je jediné,
+              čo sa doň píše rukou — zvyšok skladá appka z faktúry. */}
+          <span style={popisStyl}>Osobná veta na začiatok — nechaj prázdne a appka použije vlastnú</span>
+          <input
+            value={mail.uvod}
+            onChange={(e) => setMail({ ...mail, uvod: e.target.value })}
+            placeholder={mail.vykanie ? "posílám fakturu č. … — PDF je v příloze…" : "posílám fakturu — PDF je v příloze…"}
+            style={{ ...poleStyl, marginBottom: 10 }}
+          />
+          <span style={popisStyl}>Textová podoba pre staré čítačky — čo prepíšeš, to odíde v texte</span>
           <textarea
             value={mail.telo}
             onChange={(e) => setMail({ ...mail, telo: e.target.value })}

@@ -34,7 +34,7 @@ const popisPreKlienta = (r: RiadokVypisu): string => {
 
 type Os = ReturnType<typeof osCasuKlienta>;
 
-const OBDOBIA = [
+const OBDOBIA: { l: string; m: number; uplna?: boolean }[] = [
   /**
    * `-1` = od začiatku posledného balíčka.
    *
@@ -47,6 +47,12 @@ const OBDOBIA = [
   { l: "3 mesiace", m: 3 },
   { l: "6 mesiacov", m: 6 },
   { l: "všetko", m: 0 },
+  /**
+   * Na vyžiadanie klienta (Jerry, 29. 9. 2026): celá história hodín AJ
+   * platieb. To isté okno ako „všetko", ale mail sa inak volá, nehovorí
+   * o dochodenom balíčku a v dlaždici je zaplatená suma namiesto tempa.
+   */
+  { l: "celá história + platby", m: 0, uplna: true },
 ];
 
 export function VypisHodinPanel({ meno, os, email, zostatokTeraz, trener = "", mesiacov = 0, hodinSpolu = 0, tempo = 0, odkedy = "", cenaBalicka = 0, telefon = "", dalsi = "", otvorHned = false, onOtvorene }: {
@@ -75,7 +81,9 @@ export function VypisHodinPanel({ meno, os, email, zostatokTeraz, trener = "", m
   onOtvorene?: () => void;
 }) {
   const [otvorene, setOtvorene] = useState(otvorHned);
-  const [obdobie, setObdobie] = useState(-1);
+  const [volba, setVolba] = useState(0);
+  const obdobie = OBDOBIA[volba].m;
+  const uplna = !!OBDOBIA[volba].uplna;
   // Signál príde až potom, ako je panel na obrazovke — meno sa na stôl
   // dostáva o krok neskôr než pokyn „píš mu".
   useEffect(() => {
@@ -84,9 +92,9 @@ export function VypisHodinPanel({ meno, os, email, zostatokTeraz, trener = "", m
     onOtvorene?.();
   }, [otvorHned, onOtvorene]);
   const [komu, setKomu] = useState(email || "");
-  const [telo, setTelo] = useState("");
+  /** Osobná veta na začiatok HTML mailu; prázdna = predvolená veta appky. */
+  const [uvod, setUvod] = useState("");
   const [predmet, setPredmet] = useState("");
-  const [rucne, setRucne] = useState(false);
   const [pracujem, setPracujem] = useState(false);
   const [hlaska, setHlaska] = useState("");
   /** Suma do QR platby; prázdne = platba sa do mailu nedáva. */
@@ -111,10 +119,15 @@ export function VypisHodinPanel({ meno, os, email, zostatokTeraz, trener = "", m
     return vypisHodin(os, obdobie === -1 ? zaciatokBalicka(os) : od, doDna, zostatokTeraz);
   }, [os, obdobie, zostatokTeraz]);
 
-  // Text sa prepočíta pri zmene obdobia — ale len dovtedy, kým doň človek
-  // nesiahol. Prepísaný text sa prepnutím filtra nemá stratiť.
-  const navrhTela = useMemo(() => vypisAkoText(v, meno), [v, meno]);
-  const zobrazenyText = rucne ? telo : navrhTela;
+  /**
+   * TABUĽKA UŽ NIE JE TELO MAILU.
+   *
+   * Do 29. 9. 2026 sa celý tento text posielal ako „osobná veta" a v HTML
+   * maili by stál pod nadpisom dvakrát — raz ako intro, raz ako os času.
+   * Mail skladá server z údajov; tu zostáva textová podoba len na čítanie
+   * a kopírovanie (Jerry ňou odpovedá na otázky v chate s klientom).
+   */
+  const zobrazenyText = useMemo(() => vypisAkoText(v, meno), [v, meno]);
 
   /** Stav so znamienkom — `v.koniec` sa na nule zastaví (viď `stavPreSpravu`). */
   const stav = useMemo(() => stavPreSpravu(v, new Date().toISOString().slice(0, 10)), [v]);
@@ -135,8 +148,9 @@ export function VypisHodinPanel({ meno, os, email, zostatokTeraz, trener = "", m
         akcia: "posli-vypis",
         klient: meno,
         komu: komu.trim(),
-        predmet: predmet.trim() || `Výpis hodín — ProSapiens Biomechanic`,
+        predmet: predmet.trim() || (uplna ? "Tvoje tréningy a platby — ProSapiens" : `Výpis hodín — ProSapiens Biomechanic`),
         telo: zobrazenyText,
+        uvod: uvod.trim(),
         /**
          * ÚDAJE, NIE HOTOVÉ HTML.
          *
@@ -169,6 +183,8 @@ export function VypisHodinPanel({ meno, os, email, zostatokTeraz, trener = "", m
           odkedy,
           mesiacov,
           dnes: new Date().toISOString().slice(0, 10),
+          uplna,
+          zaplateneSpolu: uplna ? v.zaplatene : undefined,
           dalsi,
           platba: Number(suma) > 0
             ? { popis: popisPlatby.trim() || "Ďalší balíček", suma: Number(suma), ucet: "2302732185/2010", sprava: meno }
@@ -219,15 +235,15 @@ export function VypisHodinPanel({ meno, os, email, zostatokTeraz, trener = "", m
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 8 }}>
         <b style={{ fontSize: 12.5, color: C.text }}>Výpis hodín — {meno}</b>
         <div style={{ display: "flex", gap: 4 }}>
-          {OBDOBIA.map((o) => (
+          {OBDOBIA.map((o, i) => (
             <button
               key={o.l}
-              onClick={() => { setObdobie(o.m); setRucne(false); }}
+              onClick={() => setVolba(i)}
               style={{
                 padding: "4px 9px", borderRadius: 999, fontSize: 11.5, cursor: "pointer", fontFamily: "inherit",
-                border: `1px solid ${obdobie === o.m ? C.accent : C.border}`,
-                background: obdobie === o.m ? mix(C.accent, 14) : "transparent",
-                color: obdobie === o.m ? C.accentLight : C.textMuted,
+                border: `1px solid ${volba === i ? C.accent : C.border}`,
+                background: volba === i ? mix(C.accent, 14) : "transparent",
+                color: volba === i ? C.accentLight : C.textMuted,
               }}
             >
               {o.l}
@@ -327,13 +343,26 @@ export function VypisHodinPanel({ meno, os, email, zostatokTeraz, trener = "", m
         />
       )}
 
+      <div style={{ fontSize: 11, color: C.textDim, marginBottom: 4 }}>
+        Osobná veta na začiatok mailu — nechaj prázdne a appka použije vlastnú.
+      </div>
+      <input
+        value={uvod}
+        onChange={(e) => setUvod(e.target.value)}
+        placeholder="posielam prehľad aj QR na ďalší."
+        style={{
+          width: "100%", boxSizing: "border-box", padding: "7px 9px", borderRadius: 8, fontSize: 12,
+          border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontFamily: "inherit", marginBottom: 8,
+        }}
+      />
+
       <div style={{ fontSize: 11, color: C.textDim, marginBottom: 6 }}>
-        Text nižšie ide do mailu ako tvoja osobná veta na začiatok; dochádzku, čísla aj QR doplní appka.
+        Textová podoba — len na čítanie a kopírovanie; mail s dlaždicami, osou a QR skladá appka.
       </div>
 
       <textarea
         value={zobrazenyText}
-        onChange={(e) => { setRucne(true); setTelo(e.target.value); }}
+        readOnly
         rows={14}
         style={{
           width: "100%", boxSizing: "border-box", padding: "8px 9px", borderRadius: 8, fontSize: 12,

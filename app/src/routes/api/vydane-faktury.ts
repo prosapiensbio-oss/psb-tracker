@@ -6,7 +6,7 @@ import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 import { dalsieCislo, splatnostZ, SPLATNOST_DNI, type Faktura } from "../../lib/psb/vydanaFaktura";
 import { fakturaDoPdf } from "../../lib/psb/fakturaPdf.server";
-import { mailFaktury, menoPrilohy } from "../../lib/psb/mailFaktury";
+import { mailFaktury, mailFakturyHtml, menoPrilohy } from "../../lib/psb/mailFaktury";
 import { adresyMailu } from "../../lib/psb/mime";
 import { mailKlientovi, type VypisKlienta } from "../../lib/psb/mailKlientovi";
 import { qrObrazok } from "../../lib/psb/fakturaHtml";
@@ -403,13 +403,22 @@ export const Route = createFileRoute("/api/vydane-faktury")({
                 }));
                 prilohy.push({ meno: "qr-platba.gif", typ: o.typ, data: o.data, cid: qrCid });
               }
-              html = mailKlientovi({ ...v, qrCid, logoCid: logo ? logoCid : undefined, odkaz: telo.trim() || undefined }).html;
+              /**
+               * OSOBNÁ VETA JE `uvod`, NIE `telo`.
+               *
+               * Po prerobení na HTML tu ako intro chodil celý textový výpis
+               * (14 riadkov tabuľky pod nadpisom) — pozostatok čias, keď bol
+               * mail len text. `telo` zostáva textovou podobou pre staré
+               * čítačky; do HTML ide krátka veta z vlastného políčka.
+               */
+              html = mailKlientovi({ ...v, qrCid, logoCid: logo ? logoCid : undefined, odkaz: kus(b.uvod, 600) || undefined }).html;
             }
             if (zle.length) {
               return Response.json({ ok: false, error: `Toto nie je e-mailová adresa: ${zle.join(", ")}` }, { status: 400 });
             }
             if (!adresy.length) return Response.json({ ok: false, error: "Chýba e-mail klienta." }, { status: 400 });
-            if (telo.trim().length < 20) return Response.json({ ok: false, error: "Výpis je prázdny." }, { status: 400 });
+            // Bez údajov na sadzbu musí prísť aspoň text; s nimi je prázdne pole len „použi predvolenú vetu".
+            if (!html && telo.trim().length < 20) return Response.json({ ok: false, error: "Výpis je prázdny." }, { status: 400 });
             const n = await nastaveniaMailu(DB);
             if (!n.host || !n.user || !n.heslo) {
               return Response.json({ ok: false, error: "Schránka nie je nastavená — doplň ju v Údajoch." }, { status: 400 });
@@ -421,7 +430,7 @@ export const Route = createFileRoute("/api/vydane-faktury")({
                 odMeno: "ProSapiens Biomechanic",
                 komu: adresy,
                 predmet: kus(b.predmet, 200) || "Výpis hodín — ProSapiens Biomechanic",
-                telo: v && v.oslovenie ? mailKlientovi({ ...v, odkaz: telo.trim() || undefined }).text : telo,
+                telo: v && v.oslovenie ? mailKlientovi({ ...v, odkaz: kus(b.uvod, 600) || undefined }).text : telo,
                 html,
                 prilohy: prilohy.length ? prilohy : undefined,
               },
@@ -472,7 +481,29 @@ export const Route = createFileRoute("/api/vydane-faktury")({
 
             const faktura = naFakturu(r);
             const pdf = await fakturaDoPdf(BROWSER, ASSETS, faktura, new URL(request.url).origin);
-            const text = mailFaktury(faktura);
+            const vykanie = b.vykanie == null ? undefined : !!b.vykanie;
+            const text = mailFaktury(faktura, { trener: kus(b.trener, 40) || undefined, vykanie });
+
+            /**
+             * HTML v šate výpisového mailu (Jerry, 29. 9. 2026: „nech sú
+             * rovnaké"). Logo aj QR idú prílohou s `cid:` — nič sa nesťahuje
+             * z nášho servera a QR je ten istý SPAYD ako na priloženom PDF,
+             * takže klient zaplatí rovno z náhľadu mailu.
+             */
+            const logoCid = `logo-${crypto.randomUUID()}@prosapiens`;
+            const logo = await ASSETS?.fetch(new Request(`${new URL(request.url).origin}/znacka-napis-mail.png`))
+              .then((x) => (x.ok ? x.arrayBuffer() : null))
+              .catch(() => null);
+            const qrCid = `qr-${crypto.randomUUID()}@prosapiens`;
+            const qr = qrObrazok(spayd({
+              suma: faktura.celkom, vs: faktura.cislo,
+              sprava: `Faktura ${faktura.cislo} PSB`, splatnost: faktura.splatnost, prijemca: DOD_FA.meno,
+            }));
+            const html = mailFakturyHtml(faktura, {
+              trener: kus(b.trener, 40) || undefined, vykanie,
+              uvod: kus(b.uvod, 600) || undefined,
+              qrCid, logoCid: logo ? logoCid : undefined,
+            });
             const vysledok = await posliMail(
               // Čítanie chodí na IMAP (993), odosielanie na SMTP — ten istý
               // stroj, iná služba. Port si vyberie klient: najprv 465, ktorý
@@ -500,7 +531,12 @@ export const Route = createFileRoute("/api/vydane-faktury")({
                  */
                 predmet: String(b.predmet || text.predmet).slice(0, 200),
                 telo: String(b.telo || text.telo).slice(0, 5000),
-                prilohy: [{ meno: menoPrilohy(String(r.cislo)), typ: "application/pdf", data: pdf }],
+                html,
+                prilohy: [
+                  ...(logo ? [{ meno: "znacka.png", typ: "image/png", data: logo, cid: logoCid }] : []),
+                  { meno: "qr-platba.gif", typ: qr.typ, data: qr.data, cid: qrCid },
+                  { meno: menoPrilohy(String(r.cislo)), typ: "application/pdf", data: pdf },
+                ],
               },
             );
             if (!vysledok.ok) {

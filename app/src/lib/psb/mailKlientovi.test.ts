@@ -177,3 +177,29 @@ describe("hodiny nad rámec a najbližší termín", () => {
     expect(v.text).not.toContain("Najbližší");
   });
 });
+
+describe("celá história na vyžiadanie", () => {
+  const uplny = { ...zaklad, uplna: true, zaplateneSpolu: 31160, zostatok: 0 };
+
+  it("volá sa história, nie dochodený balíček — klient si pýtal prehľad", () => {
+    const v = mailKlientovi(uplny);
+    expect(v.predmet).toBe("Tvoje tréningy a platby — ProSapiens");
+    expect(v.html).toContain("Celá história");
+    expect(v.text).toContain("posielam celú históriu tréningov aj platieb.");
+    expect(v.text).not.toContain("dochodený —");
+    expect(v.text).toContain("Tréningy a platby:");
+  });
+
+  it("v dlaždici je zaplatená suma namiesto tempa", () => {
+    const v = mailKlientovi(uplny);
+    expect(v.html).toContain("31 160 Kč");
+    expect(v.html).toContain("zaplatené spolu");
+    expect(v.html).not.toContain("tréningov mesačne");
+  });
+
+  it("bežný výpis sa nemení", () => {
+    const v = mailKlientovi({ ...zaklad, zostatok: 3 });
+    expect(v.predmet).toBe("Tvoja dochádzka v ProSapiens");
+    expect(v.html).toContain("Ako sa míňal balíček");
+  });
+});
