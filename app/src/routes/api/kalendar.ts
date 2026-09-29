@@ -6,6 +6,8 @@ import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 import { typZNazvu } from "../../lib/psb/kalendar";
 import { casUdalosti, nejednoznacneMena, vyberMapu, type Mapa } from "../../lib/psb/kalendarMena";
+import { vlozUdalost, zrusUdalost } from "../../lib/psb/gcal.server";
+import { icsUid, KALENDAR_TRENERA, pripravTrening } from "../../lib/psb/nahodTrening";
 import { porovnajTyzdne } from "../../lib/psb/porovnanieDochadzky";
 import { odkedyKalendar, porovnajMesiace } from "../../lib/psb/porovnanieMesiacov";
 import { porovnajDvojmo } from "../../lib/psb/dvojityVypocet";
@@ -446,6 +448,77 @@ export const Route = createFileRoute("/api/kalendar")({
             neu: konal ? "bol tam" : "neprišiel",
             actor: kto,
           });
+          return Response.json({ ok: true });
+        }
+
+        /**
+         * NAHODIŤ TRÉNING — z Kokpitu rovno do Google kalendára trénera.
+         *
+         * Zapíše sa na OBE miesta naraz: do Google cez servisný účet
+         * (gcal.server) a hneď aj do kal_udalosti pod tým istým ics uid,
+         * takže obrazovky ho vidia okamžite a najbližšia snímka ho už len
+         * potvrdí, nie objaví. Meno udalosti je plné meno klienta a mapovanie
+         * sa doučí samo — snímke sa potom nezjaví ako neznámy názov.
+         */
+        if (akcia === "trening-nahod") {
+          const kluc = (bindings() as { GCAL_SA_KLUC?: string }).GCAL_SA_KLUC;
+          if (!kluc) return Response.json({ ok: false, error: "Servisný účet nie je nastavený (GCAL_SA_KLUC)." }, { status: 503 });
+          const v = pripravTrening({
+            klient: String(b.klient || ""), den: String(b.den || ""), cas: String(b.cas || ""),
+            minut: b.minut == null ? undefined : Number(b.minut), trener: String(b.trener || ""),
+          });
+          if (!v.ok) return Response.json({ ok: false, error: v.chyba }, { status: 400 });
+
+          let idUdalosti = "";
+          try {
+            idUdalosti = await vlozUdalost(kluc, v.t);
+          } catch (e) {
+            const sprava = String(e instanceof Error ? e.message : e);
+            // Terezkin kalendár ešte nemusí byť zdieľaný — povedz to rovno.
+            const rada = /not.*found|forbidden|403|404/i.test(sprava)
+              ? ` Skontroluj, či je kalendár ${v.t.kalendar} zdieľaný účtu kokpit-kalendar@evident-catcher-510117-k6.iam.gserviceaccount.com s právom robiť zmeny.`
+              : "";
+            return Response.json({ ok: false, error: `Google kalendár zápis odmietol: ${sprava}.${rada}` }, { status: 502 });
+          }
+
+          const uid = icsUid(idUdalosti);
+          const kedy = teraz();
+          await DB.batch([
+            DB.prepare(
+              `INSERT OR REPLACE INTO kal_udalosti (uid, trener, zaciatok, koniec, nazov, klient, typ, prvy_raz, naposledy, zmizla_at)
+               VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'trening', ?7, ?7, NULL)`,
+            ).bind(uid, v.t.trener, v.t.zaciatok, v.t.koniec, v.t.nazov, String(b.klient || "").trim(), kedy),
+            // Mapovanie: plné meno klienta ako názov → klient. Bez času,
+            // platí pre všetky jeho budúce udalosti s týmto názvom.
+            DB.prepare(
+              `INSERT OR IGNORE INTO kal_mapovanie (nazov, trener, cas, klient, typ, vedome) VALUES (?1, ?2, '', ?1, 'trening', 1)`,
+            ).bind(String(b.klient || "").trim(), v.t.trener),
+          ]);
+          const kto = (await currentUser(request)) || "";
+          await audit(DB, { action: "trening-nahodeny", predmet: `${v.t.nazov} · ${v.t.zaciatok} · ${v.t.trener}`, neu: uid, actor: kto });
+          return Response.json({ ok: true, uid, zaciatok: v.t.zaciatok });
+        }
+
+        /**
+         * ZRUŠIŤ TRÉNING nahodený z Kokpitu (alebo hocijaký budúci s uid
+         * z Googlu): zmaže udalosť v Google a u nás ju označí ako zmiznutú —
+         * presne to, čo by o nej povedala aj najbližšia snímka.
+         */
+        if (akcia === "trening-zrus") {
+          const kluc = (bindings() as { GCAL_SA_KLUC?: string }).GCAL_SA_KLUC;
+          if (!kluc) return Response.json({ ok: false, error: "Servisný účet nie je nastavený (GCAL_SA_KLUC)." }, { status: 503 });
+          const uid = String(b.uid || "");
+          const trener = String(b.trener || "");
+          const kalendar = KALENDAR_TRENERA[trener];
+          if (!uid.endsWith("@google.com") || !kalendar) return Response.json({ ok: false, error: "Chýba uid alebo tréner." }, { status: 400 });
+          try {
+            await zrusUdalost(kluc, kalendar, uid.replace(/@google\.com$/, ""));
+          } catch (e) {
+            return Response.json({ ok: false, error: `Google kalendár zrušenie odmietol: ${String(e instanceof Error ? e.message : e)}` }, { status: 502 });
+          }
+          await DB.prepare("UPDATE kal_udalosti SET zmizla_at = ?1 WHERE uid = ?2 AND trener = ?3").bind(teraz(), uid, trener).run();
+          const kto = (await currentUser(request)) || "";
+          await audit(DB, { action: "trening-zruseny-z-kokpitu", predmet: uid, actor: kto });
           return Response.json({ ok: true });
         }
 

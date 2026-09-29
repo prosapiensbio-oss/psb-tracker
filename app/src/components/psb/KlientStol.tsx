@@ -11,6 +11,7 @@ import { adresyMailu } from "../../lib/psb/mime";
 import { menoKluc } from "../../lib/psb/compute";
 import { satsNaCzk } from "../../lib/psb/btcKontrola";
 import { CENNIK, platnostDo } from "../../lib/psb/cennik";
+import { KALENDAR_TRENERA } from "../../lib/psb/nahodTrening";
 import { osCasuKlienta, treningyVBalicku } from "../../lib/psb/klientOsCasu";
 import { mesiacovVztahu, sedeniaPoMesiacoch, tempoMesacne } from "../../lib/psb/profil";
 import { zdravieKlienta } from "../../lib/psb/klientZdravie";
@@ -134,6 +135,9 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
   const [penazSub, setPenazSub] = useState<"platby" | "bitcoin">("platby");
   const [pisem, setPisem] = useState(false);
   const [f, setF] = useState({ nazov: "", hodiny: "", platnostOd: dnesISO(), platnostDo: "", cenaCzk: "", poznamka: "", zlava: "" });
+  /** Nahodenie tréningu rovno do Google kalendára trénera (Jerry, 29. 9. 2026). */
+  const [pisemTrening, setPisemTrening] = useState(false);
+  const [tr, setTr] = useState({ den: dnesISO(), cas: "", minut: "60", trener: "" });
   const [pracujem, setPracujem] = useState(false);
   const [chyba, setChyba] = useState("");
   /** Práve nahodený balíček — kvôli ponuke faktúry hneď pod formulárom. */
@@ -637,6 +641,28 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
   };
 
   /**
+   * Tréning z Kokpitu rovno do Google kalendára. Zapisuje ho SERVER cez
+   * servisný účet a v tej istej chvíli aj do kal_udalosti — preto stačí
+   * oznam("kalendar") a termín sa objaví medzi objednanými hneď, nie až
+   * po najbližšej snímke. Chyba z Googlu sa ukáže doslovne: hovorí presne,
+   * čo treba spraviť (najčastejšie zdieľať kalendár servisnému účtu).
+   */
+  const nahodTrening = async () => {
+    setPracujem(true); setChyba(""); setChybaJeDobra(false);
+    const r = await fetch("/api/kalendar", {
+      method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ akcia: "trening-nahod", klient: meno, den: tr.den, cas: tr.cas, minut: Number(tr.minut) || 60, trener: tr.trener }),
+    }).then((x) => x.json()).catch(() => ({ ok: false, error: "spojenie zlyhalo — tréning sa nezapísal" }));
+    setPracujem(false);
+    if (!r.ok) { setChyba(r.error || "nepodarilo sa zapísať do kalendára"); return; }
+    setChybaJeDobra(true);
+    setChyba(`Tréning ${fmtDMY(tr.den)} o ${tr.cas} je v kalendári (${tr.trener}).`);
+    setPisemTrening(false);
+    setTr({ den: dnesISO(), cas: "", minut: "60", trener: "" });
+    oznam("kalendar");
+  };
+
+  /**
    * Oprava a zrušenie — pre to, čo appka vie, že napísal človek.
    *
    * Riadky z banky a z PTmindera sa tu neupravujú: ich pravdou je výpis,
@@ -1087,6 +1113,21 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
             „nahodiť balíček" pri zozname tréningov je ponuka na vec, ktorú
             človek v tej chvíli nerieši — a pri piatich takých tlačidlách sa
             prestanú čítať všetky. */}
+        {/* Nahodenie tréningu patrí k záložke „všetko" — tam sú termíny.
+            Tréner sa predvyplní podľa toho, čí klient to je; zapísať sa dá
+            len tomu, koho kalendár appka pozná (KALENDAR_TRENERA). */}
+        {filter === "vsetko" && (
+          <button
+            onClick={() => {
+              const bude = !pisemTrening;
+              setPisemTrening(bude);
+              if (bude) setTr({ den: dnesISO(), cas: "", minut: "60", trener: c?.primaryTrainer && KALENDAR_TRENERA[c.primaryTrainer] ? c.primaryTrainer : "Jerry" });
+            }}
+            style={{ ...navrhTlacidlo, marginTop: 10, alignSelf: "flex-start", borderColor: mix(C.green, 45), color: C.green, fontWeight: 600 }}
+          >
+            {pisemTrening ? "Zavrieť" : "+ Nahodiť tréning do kalendára"}
+          </button>
+        )}
         {filter === "balicky" && (
           <button onClick={() => setPisem(!pisem)} style={{ ...navrhTlacidlo, marginTop: 10, alignSelf: "flex-start", borderColor: mix(C.green, 45), color: C.green, fontWeight: 600 }}>
             {pisem ? "Zavrieť" : "+ Nahodiť balíček alebo členstvo"}
@@ -1107,6 +1148,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
             )}
           </div>
         )}
+        {filter === "vsetko" && pisemTrening && <FormularTreningu t={tr} setT={setTr} pracujem={pracujem} onUloz={() => void nahodTrening()} />}
         {filter === "balicky" && pisem && <FormularBalicka f={f} setF={setF} pracujem={pracujem} onUloz={() => void pridaj()} />}
         {filter === "peniaze" && penazSub === "platby" && pisemPlatbu && !upravaPlatby && (
           <FormularPlatby
@@ -1664,6 +1706,64 @@ function RiadokOsi({ u, stav, treningy, rozbalene, onRozbal, pisemZdarma, dovod,
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Nahodenie tréningu — deň, čas, dĺžka, tréner. Nič viac: meno udalosti je
+ * plné meno klienta (tak ju spozná snímka aj mapovanie) a všetko ostatné
+ * overí server v `pripravTrening`, aby obrazovka a API nemali dve pravdy
+ * o tom, čo je platný termín.
+ */
+function FormularTreningu({ t, setT, pracujem, onUloz }: {
+  t: { den: string; cas: string; minut: string; trener: string };
+  setT: (v: { den: string; cas: string; minut: string; trener: string }) => void;
+  pracujem: boolean;
+  onUloz: () => void;
+}) {
+  const vyplnene = !!t.den && !!t.cas && !!t.trener;
+  return (
+    <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end", padding: "11px 12px", borderRadius: 10, background: mix(C.border, 40) }}>
+      {([
+        { k: "den" as const, l: "deň", w: 145, typ: "date" },
+        { k: "cas" as const, l: "čas", w: 105, typ: "time" },
+        { k: "minut" as const, l: "minút", w: 70, typ: "number" },
+      ]).map((x) => (
+        <label key={x.k} style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 10.5, color: C.textDim }}>
+          {x.l}
+          <input
+            type={x.typ}
+            value={t[x.k]}
+            onChange={(e) => setT({ ...t, [x.k]: e.target.value })}
+            style={{ width: x.w, padding: "6px 8px", borderRadius: 7, fontSize: 12, border: `1px solid ${C.border}`, background: C.bg, color: C.text, colorScheme: "dark" }}
+          />
+        </label>
+      ))}
+      <label style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 10.5, color: C.textDim }}>
+        tréner
+        <select
+          value={t.trener}
+          onChange={(e) => setT({ ...t, trener: e.target.value })}
+          style={{ width: 110, padding: "6px 8px", borderRadius: 7, fontSize: 12, border: `1px solid ${C.border}`, background: C.bg, color: C.text }}
+        >
+          {Object.keys(KALENDAR_TRENERA).map((m) => <option key={m} value={m}>{m}</option>)}
+        </select>
+      </label>
+      <button
+        onClick={onUloz}
+        disabled={pracujem || !vyplnene}
+        style={{
+          padding: "7px 14px", borderRadius: 7, fontSize: 12, fontWeight: 700,
+          cursor: pracujem || !vyplnene ? "not-allowed" : "pointer",
+          border: `1px solid ${mix(C.green, 55)}`,
+          background: vyplnene ? mix(C.green, 14) : "transparent",
+          color: vyplnene ? C.green : C.textDim,
+        }}
+      >{pracujem ? "zapisujem…" : "Nahodiť do kalendára"}</button>
+      <div style={{ flexBasis: "100%", fontSize: 10.5, color: C.textDim, lineHeight: 1.5 }}>
+        Zapíše sa rovno do Google kalendára trénera a hneď aj medzi objednané termíny tu.
+      </div>
     </div>
   );
 }
