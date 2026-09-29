@@ -7,6 +7,7 @@ import { isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 import { stiahniSpravy, testSpojenia } from "../../lib/psb/imap";
 import { naDopyt } from "../../lib/psb/mailDopyt";
+import { posli as posliPush, type Odber } from "../../lib/psb/push.server";
 
 /**
  * Schránka info@prosapiens.cz ako zdroj dopytov.
@@ -32,6 +33,14 @@ import { naDopyt } from "../../lib/psb/mailDopyt";
  * informáciu o tom, z ktorej reklamy človek prišiel. Dopĺňa sa len to, čo je
  * prázdne.
  */
+
+/** VAPID kľúče — tie isté, aké používa ranná dávka. */
+async function klucePush(DB: D1Database) {
+  const rs = await DB.prepare("SELECT key, value FROM vzas_settings WHERE key IN ('vapid_public','vapid_private')").all();
+  const m: Record<string, string> = {};
+  for (const r of rs.results as { key: string; value: string }[]) m[r.key] = r.value;
+  return { verejny: m.vapid_public || "", sukromny: m.vapid_private || "", kontakt: "mailto:prosapiensbio@gmail.com" };
+}
 
 type Nast = { host: string; port: number; user: string; heslo: string; od: string; ignoruj: string[]; vlastne: string[] };
 
@@ -184,6 +193,33 @@ export const Route = createFileRoute("/api/mail-dopyty")({
             const v = naDopyt(s, n.vlastne, n.ignoruj);
             if ("preskocene" in v) {
               preskocene.push({ predmet: (s.predmet || s.od).slice(0, 90), preco: v.preskocene });
+              continue;
+            }
+            /**
+             * Klient klikol v maili na „Chcem celú históriu". Nie je to nový
+             * dopyt — človek už klientom je. Jerrymu príde push a v zázname
+             * behu to zostane viditeľné; mail sám sa neposiela NIKDY, história
+             * odchádza až Jerryho klikom zo stola klienta (rovnaké pravidlo
+             * ako pri SMS: naše čísla sú miestami dopočítané).
+             */
+            if ("historia" in v) {
+              preskocene.push({ predmet: `${v.historia.meno} si pýta celú históriu`, preco: "žiadosť klienta — poslaná notifikácia" });
+              await audit(DB, { action: "historia-vyziadana", predmet: `${v.historia.meno} · ${v.historia.email}`, actor: "klient" });
+              try {
+                const k = await klucePush(DB);
+                if (k.verejny && k.sukromny) {
+                  const odbery = (await DB.prepare("SELECT endpoint, p256dh, auth, kto FROM push_odbery").all())
+                    .results as unknown as (Odber & { kto: string })[];
+                  for (const o of odbery) {
+                    if ((o.kto || "").trim().toLowerCase() !== "jerry") continue;
+                    await posliPush(o, {
+                      titulok: "Žiadosť o históriu",
+                      text: `${v.historia.meno} si pýta celú históriu tréningov a platieb. Pošleš mu ju zo stola klienta — voľba „celá história + platby".`,
+                      url: "/#workspace", znacka: `historia-${v.historia.email}`,
+                    }, k);
+                  }
+                }
+              } catch { /* push nesmie zhodiť čítanie schránky */ }
               continue;
             }
             const d = v.dopyt;

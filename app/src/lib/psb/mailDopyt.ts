@@ -30,7 +30,20 @@ export type MailDopyt = {
   zFormulara: boolean;
 };
 
-export type MailVysledok = { dopyt: MailDopyt } | { preskocene: string };
+export type MailVysledok =
+  | { dopyt: MailDopyt }
+  | { preskocene: string }
+  /** Klient klikol v maili na „Chcem celú históriu" — nie je to nový dopyt. */
+  | { historia: { meno: string; email: string } };
+
+/**
+ * Žiadosť o históriu sa pozná podľa PREDMETU, ktorý skladá naše vlastné
+ * tlačidlo v maili (mailKlientovi.PREDMET_HISTORIE). Berie sa aj s „Re:" —
+ * niektoré čítačky predmet pri mailto ponechajú, iné doň vlepia odpoveď.
+ */
+export function jeZiadostOHistoriu(predmet: string): boolean {
+  return /cel[áa]\s+hist[óo]ri[ae].{0,10}tr[ée]ning/i.test(predmet || "");
+}
 
 /** Technické adresy, ktoré nikdy nie sú dopyt. */
 const TECHNICKE = [
@@ -223,6 +236,14 @@ export function naDopyt(v: MailVstup, vlastne: string[] = [], ignoruj: string[] 
   if (TECHNICKE.some((t) => lokalne.includes(t))) return { preskocene: `technická adresa (${lokalne})` };
   if (SLUZBY.some((d) => domena === d || domena.endsWith("." + d))) return { preskocene: `služba (${domena})` };
   if (STROJOVE.some((s) => predmet.includes(s))) return { preskocene: "strojový predmet" };
+  // Klient si tlačidlom v maili vyžiadal celú históriu. Musí to stáť pred
+  // filtrom odpovedí: predmet nesie meno klienta z nášho mailu, meno pri
+  // adrese býva hocijaké („lukas.h").
+  if (jeZiadostOHistoriu(v.predmet || "")) {
+    const zPredmetu = (v.predmet || "").split("—")[1]?.trim() || "";
+    return { historia: { meno: zPredmetu || meno || email, email } };
+  }
+
   // Odpoveď na vlastný mail nie je nový dopyt — človek už v Kokpite je.
   if (/^(re|odp|fwd|fw)\s*:/i.test(v.predmet || "")) return { preskocene: "odpoveď v rozhovore" };
 

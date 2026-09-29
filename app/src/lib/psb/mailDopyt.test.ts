@@ -210,3 +210,27 @@ describe("obchodná ponuka sa nesmie vydávať za formulár", () => {
     expect(naDopyt(v, ["info@prosapiens.cz"])).toHaveProperty("preskocene");
   });
 });
+
+describe("žiadosť o históriu z tlačidla v maili", () => {
+  const mail = (predmet: string) => ({
+    uid: "1", od: "Lukas <lukas.h@seznam.cz>", komu: "info@prosapiens.cz",
+    predmet, datum: "2026-09-29", text: "Dobrý den, prosím o celou historii mých tréninků a plateb.",
+  });
+
+  it("spozná sa podľa predmetu z nášho tlačidla, aj s Re:", () => {
+    const v = naDopyt(mail("Celá história tréningov a platieb — Lukas Hanus"));
+    expect("historia" in v && v.historia).toEqual({ meno: "Lukas Hanus", email: "lukas.h@seznam.cz" });
+    const re = naDopyt(mail("Re: Celá história tréningov a platieb — Lukas Hanus"));
+    expect("historia" in re).toBe(true);
+  });
+
+  it("nezaloží sa z nej dopyt — človek už klientom je", () => {
+    const v = naDopyt(mail("Celá história tréningov a platieb — Lukas Hanus"));
+    expect("dopyt" in v).toBe(false);
+  });
+
+  it("obyčajný mail o tréningu sa nemení", () => {
+    const v = naDopyt(mail("Chcem začať trénovať"));
+    expect("historia" in v).toBe(false);
+  });
+});

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { mailKlientovi, tempoSK, type VypisKlienta } from "./mailKlientovi";
+import { ADRESA_HISTORIE, mailKlientovi, tempoSK, type VypisKlienta } from "./mailKlientovi";
 
 const zaklad: VypisKlienta = {
   klient: "Richard Matl", oslovenie: "Richard", trener: "Jerry",
@@ -201,5 +201,21 @@ describe("celá história na vyžiadanie", () => {
     const v = mailKlientovi({ ...zaklad, zostatok: 3 });
     expect(v.predmet).toBe("Tvoja dochádzka v ProSapiens");
     expect(v.html).toContain("Ako sa míňal balíček");
+  });
+});
+
+describe("tlačidlo „chcem celú históriu“", () => {
+  it("v bežnom výpise je a nesie meno klienta v predmete", () => {
+    const v = mailKlientovi({ ...zaklad, zostatok: 3 });
+    expect(v.html).toContain("Chcem celú históriu tréningov a platieb");
+    expect(v.html).toContain(`mailto:${ADRESA_HISTORIE}`);
+    expect(v.html).toContain(encodeURIComponent("Celá história tréningov a platieb — Richard Matl"));
+    expect(v.text).toContain("Napíš na info@prosapiens.cz");
+  });
+
+  it("v úplnej histórii tlačidlo nie je — klient ju práve drží v ruke", () => {
+    const v = mailKlientovi({ ...zaklad, uplna: true, zaplateneSpolu: 1000 });
+    expect(v.html).not.toContain("Chcem celú históriu");
+    expect(v.text).not.toContain("Napíš na info@");
   });
 });

@@ -158,6 +158,19 @@ const mesiacovSK = (n: number) => `${n} ${n === 1 ? "mesiac" : n < 5 ? "mesiace"
  */
 export const zostavaHodin = (n: number): string => `${n >= 2 && n <= 4 ? "zostávajú" : "zostáva"} ${n} h`;
 
+/**
+ * Predmet žiadosti o históriu — podľa NEHO Kokpit žiadosť spozná pri čítaní
+ * schránky (`jeZiadostOHistoriu` v mailDopyt.ts). Meniť ich treba spolu.
+ */
+export const PREDMET_HISTORIE = "Celá história tréningov a platieb";
+export const ADRESA_HISTORIE = "info@prosapiens.cz";
+
+const mailtoHistoria = (klient: string): string => {
+  const subject = encodeURIComponent(`${PREDMET_HISTORIE} — ${klient}`);
+  const body = encodeURIComponent("Dobrý den, prosím o celou historii mých tréninků a plateb.");
+  return `mailto:${ADRESA_HISTORIE}?subject=${subject}&amp;body=${body}`;
+};
+
 /** Predmet, textová aj HTML podoba tej istej správy. */
 export function mailKlientovi(v: VypisKlienta): { predmet: string; text: string; html: string } {
   const treningy = v.os.filter((b) => b.druh === "trening");
@@ -252,6 +265,7 @@ export function mailKlientovi(v: VypisKlienta): { predmet: string; text: string;
     v.platba
       ? `\n${v.platba.popis}: ${czk(v.platba.suma)}\nÚčet ${v.platba.ucet}, do poznámky uveď: ${v.platba.sprava}`
       : null,
+    v.uplna ? null : `\nChceš celú históriu tréningov a platieb? Napíš na ${ADRESA_HISTORIE}.`,
     "",
     v.trener,
     "ProSapiens Biomechanic",
@@ -348,6 +362,19 @@ export function mailKlientovi(v: VypisKlienta): { predmet: string; text: string;
       </tr>
     </table>
   </td></tr>` : ""}
+
+  ${v.uplna ? "" : `<tr><td align="center" style="padding:26px 0 2px">
+    <!--
+      Tlačidlo pre KLIENTA (Jerry, 29. 9. 2026: „aby na neho mohol klient
+      kliknúť"). Je to mailto, nie odkaz na server: klik otvorí klientovi
+      rozpísaný mail na info@ s predmetom, podľa ktorého žiadosť spozná
+      Kokpit pri čítaní schránky. Verejná adresa s históriou klienta by
+      musela byť podpísaná a aj tak by ju otvárali antivírusy — mailto
+      nič neposiela, kým klient sám nestlačí Odoslať.
+    -->
+    <a href="${mailtoHistoria(v.klient)}" style="display:inline-block;background:${F.karta};border:1px solid ${F.linka};border-radius:10px;padding:11px 20px;font-size:13px;font-weight:600;color:${F.text};text-decoration:none">Chcem celú históriu tréningov a platieb</a>
+  </td></tr>
+  <tr><td align="center" style="font-size:11px;color:${F.slabsia};padding-bottom:2px">jedným klikom si ju vyžiadaš mailom — pošleme ti ju v tomto istom prehľade</td></tr>`}
 
   <tr><td style="padding:24px 4px 0;font-size:15px;color:${F.biela}">${esc(v.trener)}</td></tr>
   <tr><td style="padding:16px 4px 0;font-size:11.5px;color:${F.slabsia}">
