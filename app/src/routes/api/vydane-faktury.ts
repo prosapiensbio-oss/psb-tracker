@@ -377,6 +377,22 @@ export const Route = createFileRoute("/api/vydane-faktury")({
             let html: string | undefined;
             const prilohy: { meno: string; typ: string; data: ArrayBuffer; cid?: string }[] = [];
             if (v && v.oslovenie) {
+              /**
+               * ZNAČKA IDE PRÍLOHOU, NIE ODKAZOM NA NÁŠ SERVER.
+               *
+               * Obrázok načítaný z adresy Kokpitu by povedal odosielateľovi
+               * aj to, kedy si klient mail otvoril, a hlavne by ho polovica
+               * čítačiek nestiahla. `cid:` prejde všade a nič sa nesťahuje.
+               *
+               * PNG je v `public/` naschvál: logo je SVG s `currentColor`
+               * a to v maili nefunguje — svetlú verziu treba mať hotovú.
+               */
+              const logoCid = `logo-${crypto.randomUUID()}@prosapiens`;
+              const logo = await ASSETS?.fetch(new Request(`${new URL(request.url).origin}/znacka-napis-mail.png`))
+                .then((r) => (r.ok ? r.arrayBuffer() : null))
+                .catch(() => null);
+              if (logo) prilohy.push({ meno: "znacka.png", typ: "image/png", data: logo, cid: logoCid });
+
               const qrCid = v.platba ? `qr-${crypto.randomUUID()}@prosapiens` : undefined;
               if (v.platba && qrCid) {
                 // Do správy pre príjemcu ide MENO klienta — podľa neho Kokpit
@@ -387,7 +403,7 @@ export const Route = createFileRoute("/api/vydane-faktury")({
                 }));
                 prilohy.push({ meno: "qr-platba.gif", typ: o.typ, data: o.data, cid: qrCid });
               }
-              html = mailKlientovi({ ...v, qrCid, odkaz: telo.trim() || undefined }).html;
+              html = mailKlientovi({ ...v, qrCid, logoCid: logo ? logoCid : undefined, odkaz: telo.trim() || undefined }).html;
             }
             if (zle.length) {
               return Response.json({ ok: false, error: `Toto nie je e-mailová adresa: ${zle.join(", ")}` }, { status: 400 });

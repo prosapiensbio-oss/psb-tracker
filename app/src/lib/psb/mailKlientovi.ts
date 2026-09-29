@@ -1,42 +1,47 @@
 /**
  * VÝPIS PRE KLIENTA — MAIL, KTORÝ SA DÁ ČÍTAŤ.
  *
- * Jerry, 28. 9. 2026: „vedeli by sme ten mail spraviť nejako pekne vizuálne?
- * A okrem dochádzky a QR platby dať nejaké grafy?" Doteraz odchádzal holý
- * text — presný, ale vyzeral ako výpis z terminálu.
+ * Jerry si z piatich návrhov vybral tmavý zelený (29. 9. 2026): značka na
+ * celej ploche, tri čísla o klientovi, časová os balíčka a platba ako jediná
+ * svetlá vec v maili — tá má vyskočiť, lebo kvôli nej mail chodí.
  *
  * ČO V ŇOM ZÁMERNE NIE JE
  *
  *  • **Porovnanie s ostatnými.** Jerry ho pôvodne chcel, ale polovica ľudí je
  *    z definície pod priemerom — a práve tej polovici by veta „chodíš menej
  *    než ostatní" dala dôvod skončiť, nie kúpiť si ďalší balíček. V maili
- *    stoja jeho VLASTNÉ čísla: koľko chodil po mesiacoch a koľko odtrénoval
- *    spolu. To je príbeh „posunul si sa", nie „si podpriemerný".
- *  • **Bolesť.** Ponúkol som ju ako najsilnejší graf — a bol to omyl:
+ *    stoja jeho VLASTNÉ čísla.
+ *  • **Bolesť.** Ponúkol som ju ako najsilnejší graf a bol to omyl:
  *    `klient_merania` je prázdna a zostane, Jerry meranie bolesti 24. 9. 2026
  *    zrušil. Nepripomínať a neponúkať.
- *  • **Obrázky okrem QR.** Čím viac obrázkov, tým vyššia šanca na spam,
- *    a doména PSB má DMARC `p=none`. Grafy sú preto poskladané z tabuliek
- *    s farebným pozadím — vykreslí ich aj Gmail, aj Outlook, a nič sa
- *    nesťahuje zvonku.
- *  • **Naše písmo.** Agrandir mailová čítačka nemá a webové písmo Gmail
- *    ignoruje. Zostáva systémové; farby značky nesie zvyšok.
+ *  • **„Zostáva 0 h".** Jerry, 29. 9. 2026: „písať tam 0 h zostáva v balíčku
+ *    mi príde zbytočné." Hovorí to nadpis.
+ *  • **Zaokrúhlené tempo.** „4× mesačne" tiež odmietol; tempo sa píše na
+ *    desatinu, v tom istom tvare ako v profile klienta („4,0").
+ *  • **Stĺpce mesiacov.** Tri čísla hore povedia to isté kratšie.
+ *
+ * OBRÁZKY SÚ DVA A OBA IDÚ PRÍLOHOU S `Content-ID`.
+ *
+ * Logo aj QR. SVG ani dátovú adresu (`data:`) Gmail v obrázkoch nezobrazí;
+ * `cid:` prejde všade. Viac obrázkov než tieto dva sem nepatrí — doména má
+ * DMARC `p=none` a obrázkový mail je pre spamový filter horší.
  */
 
-/** Farby značky. Tie isté, aké nesie faktúra. */
+/** Farby značky. Tmavá zelená je pozadie, svetlá je platba. */
 const F = {
-  zelena: "#3d4a2f",
-  svetla: "#7d8a6a",
-  papier: "#f6f4ec",
-  text: "#2b2b28",
-  slaba: "#6b7560",
-  linka: "#d8d3c2",
+  pozadie: "#232b1c",
+  karta: "#2c3524",
+  linka: "#3a4630",
+  text: "#e8ead9",
+  slaba: "#8a9a72",
+  slabsia: "#7e8b68",
+  biela: "#ffffff",
+  platba: "#d9e0c8",
+  platbaText: "#232b1c",
+  platbaSlaba: "#4d5940",
+  minus: "#e2a07f",
 } as const;
 
-/**
- * Jeden bod na osi. Je to ten istý riadok, aký vidí Jerry v profile —
- * len bez vecí, ktoré klientovi nič nehovoria.
- */
 export type BodOsi = {
   den: string;
   /** Čas tréningu, keď ho poznáme. */
@@ -64,213 +69,215 @@ export type VypisKlienta = {
   /** Odtrénované hodiny spolu a odkedy klient chodí. */
   hodinSpolu: number;
   odkedy: string;
-  /**
-   * Koľko tréningov mesačne chodí za posledné obdobie.
-   *
-   * Jerry, 29. 9. 2026: „k odtrénovaným hodinám by som pridal ešte tempo."
-   * Súčet hovorí, koľko toho má za sebou; tempo hovorí, ako chodí TERAZ —
-   * a to je číslo, z ktorého si klient sám odvodí, kedy mu balíček dôjde.
-   * `0` = nekreslí sa.
-   */
+  /** Tréningov mesačne — ten istý výpočet a tvar ako v profile („4,0"). */
   tempo?: number;
-  /** Sedenia po mesiacoch — vstup do stĺpcov. */
-  mesacne: { mesiac: string; pocet: number }[];
+  /** Koľko mesiacov u nás chodí. */
+  mesiacov?: number;
   /**
    * Platba za ďalší balíček; bez nej sa QR ani suma nekreslia.
    *
    * `sprava` je to, čo má klient napísať do poznámky pre príjemcu — a je to
    * jeho MENO, nie variabilný symbol. Kokpit páruje bankové príjmy podľa
-   * mena v texte platby; číslo, ktoré nikto nikam nezapíše, by párovaniu
-   * nepomohlo a klienta by len mýlilo.
+   * mena v texte platby.
    */
   platba?: { popis: string; suma: number; ucet: string; sprava: string };
-  /** `cid` obrázka s QR kódom — vkladá ho odosielateľ. */
+  /** `cid` obrázkov — vkladá ich odosielateľ. */
   qrCid?: string;
+  logoCid?: string;
 };
 
 const esc = (s: string) =>
   String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-const MESIACE = ["január", "február", "marec", "apríl", "máj", "jún", "júl", "august", "september", "október", "november", "december"];
-
 const denSK = (iso: string) => {
   const d = (iso || "").slice(0, 10).split("-");
   return d.length === 3 ? `${Number(d[2])}. ${Number(d[1])}. ${d[0]}` : iso;
 };
-const mesiacSK = (kluc: string) => {
-  const [r, m] = (kluc || "").split("-");
-  return MESIACE[Number(m) - 1] ? `${MESIACE[Number(m) - 1]} ${r}` : kluc;
+const denKratko = (iso: string) => {
+  const d = (iso || "").slice(0, 10).split("-");
+  return d.length === 3 ? `${Number(d[2])}. ${Number(d[1])}.` : iso;
 };
-/**
- * Tempo ľudsky. „2,3 tréningu mesačne" nikto nepovie — povie sa „zhruba
- * raz týždenne". Číslo zostáva v zátvorke pre toho, kto ho chce presne.
- */
-export function tempoSK(zaMesiac: number): string {
-  const t = Math.round(zaMesiac * 10) / 10;
-  const slovom = t >= 7 ? "takmer obdeň"
-    : t >= 5.5 ? "zhruba 1,5× týždenne"
-      : t >= 3.4 ? "zhruba raz týždenne"
-        : t >= 1.6 ? "zhruba každé dva týždne"
-          : t >= 0.8 ? "zhruba raz mesačne"
-            : "menej než raz mesačne";
-  return `${slovom} (${t.toLocaleString("sk-SK")}× mesačne)`;
-}
-
 export const czk = (n: number) => `${Math.round(n).toLocaleString("sk-SK").replace(/ /g, " ")} Kč`;
 
 /**
- * Jeden stĺpec grafu ako tabuľka.
+ * Tempo na desatinu — ten istý tvar, aký stojí v profile klienta.
  *
- * `<div>` so šírkou v percentách Outlook ignoruje, tabuľková bunka nie —
- * preto je to takto rozpísané, hoci to v kóde vyzerá starosvetsky.
+ * Jerry, 29. 9. 2026: „4× mesačne mi príde zbytočné, páči sa mi, ako je to
+ * vyjadrené v profile — 3,9 mesačne." Zaokrúhlenie na celé robí z čísla
+ * dojem odhadu; desatina hovorí, že sa to naozaj počítalo.
  */
-function stlpec(popis: string, hodnota: number, max: number): string {
-  const pct = max > 0 ? Math.max(3, Math.round((hodnota / max) * 100)) : 3;
-  return `<tr>
-  <td style="padding:3px 10px 3px 0;font-size:13px;color:${F.slaba};white-space:nowrap">${esc(popis)}</td>
-  <td style="padding:3px 0" width="100%">
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
-      <td bgcolor="${F.svetla}" width="${pct}%" style="height:12px;line-height:12px;font-size:0;border-radius:3px">&nbsp;</td>
-      <td>&nbsp;</td>
-    </tr></table>
-  </td>
-  <td style="padding:3px 0 3px 10px;font-size:13px;font-weight:700;color:${F.text};text-align:right">${hodnota}</td>
-</tr>`;
-}
+export const tempoSK = (zaMesiac: number): string => zaMesiac.toFixed(1).replace(".", ",");
+
+const mesiacovSK = (n: number) => `${n} ${n === 1 ? "mesiac" : n < 5 ? "mesiace" : "mesiacov"}`;
+
+/**
+ * „zostáva 1 h", „zostávajú 2 h", „zostáva 5 h".
+ *
+ * Sloveso sa v slovenčine pri dvoch až štyroch mení a mail, ktorý číta
+ * zákazník, si to nemôže dovoliť zle. Tú istú vetu používa aj SMS.
+ */
+export const zostavaHodin = (n: number): string => `${n >= 2 && n <= 4 ? "zostávajú" : "zostáva"} ${n} h`;
 
 /** Predmet, textová aj HTML podoba tej istej správy. */
 export function mailKlientovi(v: VypisKlienta): { predmet: string; text: string; html: string } {
   const treningy = v.os.filter((b) => b.druh === "trening");
   const posledny = treningy[treningy.length - 1]?.den || "";
   const doslo = v.zostatok !== null && v.zostatok <= 0;
-  const predmet = doslo
-    ? "Balíček dochodený — výpis a platba"
-    : "Tvoja dochádzka v ProSapiens";
 
+  const predmet = doslo ? "Balíček dochodený — výpis a platba" : "Tvoja dochádzka v ProSapiens";
+  const nadpis = doslo ? "Balíček dochodený" : "Tvoja dochádzka";
   const uvod = doslo
-    ? `dnes si mal poslednú hodinu z balíčka.`
-    : v.zostatok !== null
-      ? `v balíčku ti zostáva ${v.zostatok} h.`
-      : `posielam ti prehľad tréningov.`;
+    ? "dnes si mal poslednú hodinu z balíčka."
+    : v.zostatok !== null ? `v balíčku ti ${zostavaHodin(v.zostatok)}.` : "posielam ti prehľad tréningov.";
+
+  /**
+   * OS KONČÍ TÝM, ČO KLIENTA ZAUJÍMA — koľko mu zostáva.
+   *
+   * Obrazovka posiela len to, čo sa naozaj stalo (balíček, tréningy, platby);
+   * poslednú bodku dopĺňa mail, lebo je to odpoveď, nie udalosť — a nemá
+   * dátum, aby nevyzerala ako ďalší tréning. Keď appka zostatok nevie
+   * (`null`), bodka tam nie je; vymyslené číslo ide von k zákazníkovi.
+   */
+  const os = v.zostatok === null || v.os[v.os.length - 1]?.druh === "balicekDo"
+    ? v.os
+    : [...v.os, {
+      den: "",
+      popis: v.zostatok <= 0 ? "Balíček dochodený" : zostavaHodin(v.zostatok).replace(/^./, (z) => z.toUpperCase()),
+      druh: "balicekDo" as const,
+    }];
+
+  /** Tri čísla, ktoré o klientovi niečo hovoria. „0 h zostáva" medzi ne nepatrí. */
+  const staty: [string, string][] = [
+    [`${v.hodinSpolu} h`, "odtrénované spolu"],
+    ...(v.tempo ? [[tempoSK(v.tempo), "tréningov mesačne"] as [string, string]] : []),
+    ...(v.mesiacov ? [[mesiacovSK(v.mesiacov), v.odkedy ? `chodíš od ${denSK(v.odkedy)}` : "chodíš u nás"] as [string, string]] : []),
+  ];
 
   // ── textová podoba: to isté, len bez ozdôb ────────────────────────────
+  /**
+   * `null` = časť, ktorá tam teraz nie je (odkaz, platba); prázdny reťazec je
+   * naschvál prázdny riadok. Pôvodne sa filtrovalo na `!== ""` a vypadli aj
+   * tie — textová podoba bola jeden zlepenec bez medzier.
+   */
   const text = [
     `Ahoj ${v.oslovenie},`,
     "",
-    v.odkaz ? `${v.odkaz}\n` : "",
+    v.odkaz || null,
     uvod,
     "",
     "Ako sa míňal balíček:",
-    ...v.os.map((b) => {
+    ...os.map((b) => {
       const cislo = b.druh !== "trening" ? "" : [
         b.zostatok != null ? `${b.zostatok} h` : "",
         b.dlh ? `−${b.dlh}` : "",
       ].filter(Boolean).join(", ");
-      return `  ${denSK(b.den)}${b.cas ? ` · ${b.cas}` : ""} — ${b.popis}${cislo ? ` (${cislo})` : ""}`;
+      const kedy = b.den ? `${denSK(b.den)}${b.cas ? ` · ${b.cas}` : ""} — ` : "";
+      return `  ${kedy}${b.popis}${cislo ? ` (${cislo})` : ""}`;
     }),
     "",
-    `Spolu odtrénované: ${v.hodinSpolu} h${v.odkedy ? ` od ${denSK(v.odkedy)}` : ""}`,
-    v.tempo ? `Tempo: ${tempoSK(v.tempo)}` : "",
-    v.platba ? `\n${v.platba.popis}: ${czk(v.platba.suma)}\nÚčet ${v.platba.ucet}, do poznámky uveď: ${v.platba.sprava}` : "",
+    ...staty.map(([cislo, popis]) => `${popis}: ${cislo}`),
+    v.platba
+      ? `\n${v.platba.popis}: ${czk(v.platba.suma)}\nÚčet ${v.platba.ucet}, do poznámky uveď: ${v.platba.sprava}`
+      : null,
     "",
     v.trener,
     "ProSapiens Biomechanic",
-  ].filter((x) => x !== "").join("\n");
+  ].filter((x) => x !== null).join("\n");
 
-  const maxMesiac = Math.max(1, ...v.mesacne.map((m) => m.pocet));
   /**
-   * OS ČASU S BODKAMI.
+   * ČASOVÁ OS S ČIAROU.
    *
-   * Jerry, 28. 9. 2026: „páčilo by sa mi, keby si z toho spravil časovú os,
-   * čiaru s bodkami — 6 h posledného balíka, deň a dátum, hodina, bodka,
-   * ďalšia bodka bude platba, a potom klasicky 5 h, 4 h."
-   *
-   * Zoznam dátumov hovorí, KEDY klient bol. Os hovorí, ako sa balíček míňal —
-   * a to je to, kvôli čomu mail chodí.
+   * Jerry, 29. 9. 2026: „pridaj mi tam tú časovú os." Bodky bez čiary sú
+   * zoznam s odrážkami; čiara z nich robí os, na ktorej je vidieť, že medzi
+   * dvoma tréningami niečo bolo — napríklad platba.
    *
    * Čiara je `border-left` na ľavej bunke, bodka na nej sedí cez záporný
    * okraj. Outlook záporné okraje ani zaoblenie nepozná, takže tam z bodky
    * bude malý štvorček vedľa čiary — čitateľné to zostane.
    */
-  const bodka = (b: BodOsi) => (b.druh === "platba" ? F.zelena : b.druh === "trening" ? F.svetla : F.zelena);
-  const riadkyOsi = v.os.map((b, i) => {
-    const posledna = i === v.os.length - 1;
-    /**
-     * HODINY A MÍNUS STOJA VEDĽA SEBA, NIE JEDNO NAMIESTO DRUHÉHO.
-     *
-     * Jerry, 28. 9. 2026: „ak nezaplatil, bude tam 6 h − 1, a potom platba
-     * a potom klasicky 5 h, 4 h." Sú to dve rôzne veci: koľká hodina balíčka
-     * to bola, a koľký tréning to bol bez krytia. Prvá verzia mínusom hodiny
-     * prekryla a z osi zmizlo, že balíček vtedy ešte plný bol.
-     */
+  const riadkyOsi = os.map((b, i) => {
+    const posledna = i === os.length - 1;
+    const velka = b.druh !== "trening";
     const cislo = b.druh !== "trening" ? "" : [
       b.zostatok != null ? `<b>${b.zostatok} h</b>` : "",
-      b.dlh ? `<span style="color:#b4674a;font-weight:700">−${b.dlh}</span>` : "",
+      b.dlh ? `<span style="color:${F.minus};font-weight:700">−${b.dlh}</span>` : "",
     ].filter(Boolean).join(" ");
-    const velka = b.druh !== "trening";
+    /**
+     * Posledná bodka čiaru KONČÍ. Keby aj pod ňou pokračovala, os by vyzerala
+     * useknutá uprostred — akoby ďalšie body boli a len sa nezmestili.
+     * Preto tam namiesto rámika ide kúsok čiary nad bodkou.
+     */
+    const bodka = `<div style="width:${velka ? 11 : 8}px;height:${velka ? 11 : 8}px;background:${velka ? F.text : F.slaba};border-radius:50%`;
+    const lavy = posledna
+      ? `<td width="20" valign="top" style="padding:0">
+        <div style="width:2px;height:${velka ? 5 : 7}px;background:${F.linka};font-size:0;line-height:0">&nbsp;</div>
+        ${bodka};margin:0 0 0 ${velka ? -4 : -3}px"></div>
+      </td>`
+      : `<td width="20" valign="top" style="border-left:2px solid ${F.linka};padding:0">
+        ${bodka};margin:${velka ? 5 : 7}px 0 0 ${velka ? -6 : -5}px"></div>
+      </td>`;
     return `<tr>
-      <td width="22" valign="top" style="border-left:2px solid ${F.linka};padding:0">
-        <div style="width:${velka ? 11 : 9}px;height:${velka ? 11 : 9}px;background:${bodka(b)};border-radius:50%;margin:${velka ? 5 : 6}px 0 0 ${velka ? -6 : -5}px"></div>
+      ${lavy}
+      <td style="padding:0 0 ${posledna ? 0 : 13}px 6px">
+        <div style="font-size:14px;color:${velka ? F.biela : F.text};line-height:1.35">${esc(b.popis)}</div>
+        ${b.den ? `<div style="font-size:12px;color:${F.slabsia};line-height:1.35">${denKratko(b.den)}${b.cas ? ` · ${esc(b.cas)}` : ""}</div>` : ""}
       </td>
-      <td style="padding:0 0 ${posledna ? 0 : 14}px 4px">
-        <div style="font-size:14px;color:${F.text};line-height:1.35">${esc(b.popis)}</div>
-        <div style="font-size:12.5px;color:${F.slaba};line-height:1.35">${denSK(b.den)}${b.cas ? ` · ${esc(b.cas)}` : ""}</div>
-      </td>
-      <td width="52" valign="top" style="padding:0 0 ${posledna ? 0 : 14}px 8px;text-align:right;font-size:14px;color:${F.text};white-space:nowrap">${cislo}</td>
+      <td width="56" valign="top" style="padding:0 0 ${posledna ? 0 : 13}px 8px;text-align:right;font-size:14px;color:${F.text};white-space:nowrap">${cislo}</td>
     </tr>`;
   }).join("");
 
   const html = `<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:${F.papier}">
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:${F.papier}">
-<tr><td align="center" style="padding:24px 12px">
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="560" style="max-width:560px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif">
+<body style="margin:0;padding:0;background:${F.pozadie}">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:${F.pozadie}">
+<tr><td align="center" style="padding:30px 14px">
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="540" style="max-width:540px;width:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif">
 
-  <tr><td style="background:${F.zelena};padding:18px 24px">
-    <div style="font-size:17px;font-weight:700;color:#ffffff;letter-spacing:.3px">ProSapiens Biomechanic</div>
+  <tr><td align="center" style="padding-bottom:24px">
+    ${v.logoCid
+    ? `<img src="cid:${esc(v.logoCid)}" width="200" alt="ProSapiens Biomechanic" style="display:block;border:0">`
+    : `<div style="font-size:11px;letter-spacing:3px;text-transform:uppercase;color:${F.slaba}">ProSapiens Biomechanic</div>`}
   </td></tr>
 
-  <tr><td style="padding:24px">
-    <div style="font-size:15px;color:${F.text};line-height:1.6">Ahoj ${esc(v.oslovenie)},</div>
-    ${v.odkaz ? `<div style="font-size:15px;color:${F.text};line-height:1.6;margin-top:10px">${esc(v.odkaz)}</div>` : ""}
-    <div style="font-size:15px;color:${F.text};line-height:1.6;margin-top:10px">${esc(uvod)}</div>
+  <tr><td style="text-align:center;font-size:32px;font-weight:700;color:${F.biela};line-height:1.15;padding-bottom:8px">${esc(nadpis)}</td></tr>
+  <tr><td style="text-align:center;font-size:15px;color:${F.slaba};line-height:1.6;padding-bottom:24px">
+    ${esc(v.oslovenie)}, ${esc(v.odkaz || uvod)}
+  </td></tr>
 
-    <div style="margin-top:22px;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:${F.slaba}">Ako sa míňal balíček</div>
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:10px">${riadkyOsi}</table>
+  ${staty.length ? `<tr><td style="padding-bottom:20px">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%"><tr>
+      ${staty.map(([cislo, popis], i) => `${i ? '<td width="10"></td>' : ""}<td width="33%" style="padding:16px 8px;background:${F.karta};border-radius:12px;text-align:center">
+        <div style="font-size:23px;font-weight:700;color:${F.biela};line-height:1.1">${esc(cislo)}</div>
+        <div style="font-size:11px;color:${F.slaba};margin-top:5px;line-height:1.4">${esc(popis)}</div>
+      </td>`).join("")}
+    </tr></table>
+  </td></tr>` : ""}
 
-    ${v.mesacne.length > 1 ? `
-    <div style="margin-top:24px;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:${F.slaba}">Koľko si chodil po mesiacoch</div>
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:8px">
-      ${v.mesacne.map((m) => stlpec(mesiacSK(m.mesiac), m.pocet, maxMesiac)).join("")}
-    </table>` : ""}
+  <tr><td>
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:${F.karta};border-radius:14px">
+      <tr><td style="padding:20px 22px">
+        <div style="font-size:10.5px;letter-spacing:1.6px;text-transform:uppercase;color:${F.slaba};padding-bottom:14px">Ako sa míňal balíček</div>
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">${riadkyOsi}</table>
+      </td></tr>
+    </table>
+  </td></tr>
 
-    <div style="margin-top:22px;padding:12px 14px;background:${F.papier};border-radius:8px;font-size:14px;color:${F.text}">
-      Spolu odtrénované: <b>${v.hodinSpolu} h</b>${v.odkedy ? ` <span style="color:${F.slaba}">od ${denSK(v.odkedy)}</span>` : ""}
-      ${v.tempo ? `<br>Tempo: <b>${tempoSK(v.tempo)}</b>` : ""}
-      ${v.zostatok !== null && v.zostatok > 0 ? `<br>V balíčku zostáva: <b>${v.zostatok} h</b>` : ""}
-    </div>
-
-    ${v.platba ? `
-    <div style="margin-top:24px;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:${F.slaba}">Ďalší balíček</div>
-    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:8px">
+  ${v.platba ? `<tr><td style="padding:22px 0 0">
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:${F.platba};border-radius:14px">
       <tr>
-        <td style="vertical-align:top;font-size:14px;color:${F.text};line-height:1.7">
-          ${esc(v.platba.popis)}<br>
-          <b style="font-size:19px">${czk(v.platba.suma)}</b><br>
-          <span style="color:${F.slaba}">Účet ${esc(v.platba.ucet)}<br>Do poznámky uveď: ${esc(v.platba.sprava)}</span>
+        <td style="padding:20px 22px;font-size:14px;color:${F.platbaText};line-height:1.7">
+          Ďalší ${esc(v.platba.popis.toLowerCase())}<br><b style="font-size:24px">${czk(v.platba.suma)}</b><br>
+          <span style="color:${F.platbaSlaba}">${esc(v.platba.ucet)}<br>do poznámky: ${esc(v.platba.sprava)}</span>
         </td>
-        ${v.qrCid ? `<td width="132" style="text-align:right;vertical-align:top">
-          <img src="cid:${esc(v.qrCid)}" width="120" height="120" alt="QR platba" style="display:block;border:0;margin-left:auto">
-          <div style="font-size:11px;color:${F.slaba};margin-top:4px">naskenuj v bankovej appke</div>
+        ${v.qrCid ? `<td width="128" style="padding:20px 22px 20px 0;text-align:right">
+          <img src="cid:${esc(v.qrCid)}" width="110" height="110" alt="QR platba" style="display:block;background:#fff;padding:5px;border-radius:8px;margin-left:auto;border:0">
         </td>` : ""}
       </tr>
-    </table>` : ""}
+    </table>
+  </td></tr>` : ""}
 
-    <div style="margin-top:26px;font-size:15px;color:${F.text};line-height:1.6">${esc(v.trener)}</div>
-  </td></tr>
-
-  <tr><td style="padding:14px 24px;border-top:1px solid ${F.linka};font-size:12px;color:${F.slaba}">
+  <tr><td style="padding:24px 4px 0;font-size:15px;color:${F.biela}">${esc(v.trener)}</td></tr>
+  <tr><td style="padding:16px 4px 0;font-size:11.5px;color:${F.slabsia}">
     ProSapiens Biomechanic${posledny ? ` · posledný tréning ${denSK(posledny)}` : ""}
   </td></tr>
 

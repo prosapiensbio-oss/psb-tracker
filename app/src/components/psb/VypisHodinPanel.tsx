@@ -49,12 +49,12 @@ const OBDOBIA = [
   { l: "všetko", m: 0 },
 ];
 
-export function VypisHodinPanel({ meno, os, email, zostatokTeraz, trener = "", mesacne = [], hodinSpolu = 0, tempo = 0, odkedy = "", cenaBalicka = 0, telefon = "" }: {
+export function VypisHodinPanel({ meno, os, email, zostatokTeraz, trener = "", mesiacov = 0, hodinSpolu = 0, tempo = 0, odkedy = "", cenaBalicka = 0, telefon = "" }: {
   meno: string; os: Os; email?: string; zostatokTeraz: number | null;
   /** Kto ho vedie — mailom sa podpíše. */
   trener?: string;
-  /** Sedenia po mesiacoch — z nich sú stĺpce v maili. */
-  mesacne?: { mesiac: string; pocet: number }[];
+  /** Koľko mesiacov klient chodí — tretie číslo v maili. */
+  mesiacov?: number;
   hodinSpolu?: number;
   /** Tréningov mesačne — ten istý výpočet, aký ukazuje profil. */
   tempo?: number;
@@ -66,7 +66,7 @@ export function VypisHodinPanel({ meno, os, email, zostatokTeraz, trener = "", m
   telefon?: string;
 }) {
   const [otvorene, setOtvorene] = useState(false);
-  const [mesiacov, setMesiacov] = useState(-1);
+  const [obdobie, setObdobie] = useState(-1);
   const [komu, setKomu] = useState(email || "");
   const [telo, setTelo] = useState("");
   const [predmet, setPredmet] = useState("");
@@ -91,9 +91,9 @@ export function VypisHodinPanel({ meno, os, email, zostatokTeraz, trener = "", m
   const [chyba, setChyba] = useState("");
 
   const v = useMemo(() => {
-    const { od, do: doDna } = mesiacov > 0 ? poslednychMesiacov(mesiacov) : { od: "", do: "" };
-    return vypisHodin(os, mesiacov === -1 ? zaciatokBalicka(os) : od, doDna, zostatokTeraz);
-  }, [os, mesiacov, zostatokTeraz]);
+    const { od, do: doDna } = obdobie > 0 ? poslednychMesiacov(obdobie) : { od: "", do: "" };
+    return vypisHodin(os, obdobie === -1 ? zaciatokBalicka(os) : od, doDna, zostatokTeraz);
+  }, [os, obdobie, zostatokTeraz]);
 
   // Text sa prepočíta pri zmene obdobia — ale len dovtedy, kým doň človek
   // nesiahol. Prepísaný text sa prepnutím filtra nemá stratiť.
@@ -149,7 +149,7 @@ export function VypisHodinPanel({ meno, os, email, zostatokTeraz, trener = "", m
           hodinSpolu,
           tempo,
           odkedy,
-          mesacne,
+          mesiacov,
           platba: Number(suma) > 0
             ? { popis: popisPlatby.trim() || "Ďalší balíček", suma: Number(suma), ucet: "2302732185/2010", sprava: meno }
             : undefined,
@@ -202,12 +202,12 @@ export function VypisHodinPanel({ meno, os, email, zostatokTeraz, trener = "", m
           {OBDOBIA.map((o) => (
             <button
               key={o.l}
-              onClick={() => { setMesiacov(o.m); setRucne(false); }}
+              onClick={() => { setObdobie(o.m); setRucne(false); }}
               style={{
                 padding: "4px 9px", borderRadius: 999, fontSize: 11.5, cursor: "pointer", fontFamily: "inherit",
-                border: `1px solid ${mesiacov === o.m ? C.accent : C.border}`,
-                background: mesiacov === o.m ? mix(C.accent, 14) : "transparent",
-                color: mesiacov === o.m ? C.accentLight : C.textMuted,
+                border: `1px solid ${obdobie === o.m ? C.accent : C.border}`,
+                background: obdobie === o.m ? mix(C.accent, 14) : "transparent",
+                color: obdobie === o.m ? C.accentLight : C.textMuted,
               }}
             >
               {o.l}

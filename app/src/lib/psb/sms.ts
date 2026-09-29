@@ -17,6 +17,8 @@
  * rôzne veci a človek to má vedieť predtým, než klikne.
  */
 
+import { zostavaHodin } from "./mailKlientovi";
+
 /** Znaky, ktoré sa zmestia do GSM 03.38 — všetko ostatné prepne na UCS-2. */
 const GSM = "@£$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ !\"#¤%&'()*+,-./0123456789:;<=>?"
   + "¡ABCDEFGHIJKLMNOPQRSTUVWXYZÄÖÑÜ§¿abcdefghijklmnopqrstuvwxyzäöñüà";
@@ -90,7 +92,7 @@ export type SpravaProKlienta = {
 export function textSms(v: SpravaProKlienta): string {
   const uvod = v.zostatok <= 0
     ? `${v.oslovenie}, dnes si mal poslednú hodinu z balíčka.`
-    : `${v.oslovenie}, v balíčku ti zostáva ${v.zostatok} h.`;
+    : `${v.oslovenie}, v balíčku ti ${zostavaHodin(v.zostatok)}.`;
   const kam = v.sMailom ? " V maili nájdeš dochádzku aj QR na platbu." : "";
   return `${uvod}${kam} ${v.trener}, ProSapiens`;
 }

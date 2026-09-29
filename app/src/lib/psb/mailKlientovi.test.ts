@@ -12,7 +12,7 @@ const zaklad: VypisKlienta = {
     { den: "2026-09-28", cas: "17:00", popis: "tréning", druh: "trening", zostatok: null, dlh: 1 },
   ],
   zostatok: 0, hodinSpolu: 19, odkedy: "2026-06-01",
-  mesacne: [{ mesiac: "2026-08", pocet: 4 }, { mesiac: "2026-09", pocet: 3 }],
+  tempo: 4, mesiacov: 4,
 };
 
 describe("mailKlientovi", () => {
@@ -25,16 +25,16 @@ describe("mailKlientovi", () => {
 
   it("keď hodiny ešte sú, povie koľko", () => {
     const v = mailKlientovi({ ...zaklad, zostatok: 3 });
-    expect(v.text).toContain("zostáva 3 h");
+    expect(v.text).toContain("zostávajú 3 h");
     expect(v.predmet).not.toContain("dochodený");
   });
 
   it("textová aj HTML podoba nesú tie isté dni", () => {
     const v = mailKlientovi(zaklad);
-    for (const den of ["28. 9. 2026", "23. 9. 2026", "10. 8. 2026"]) {
-      expect(v.text).toContain(den);
-      expect(v.html).toContain(den);
-    }
+    // Text nesie celý dátum, os v maili krátky — v stĺpci pod sebou je rok
+    // pri každom riadku len šum.
+    for (const den of ["28. 9. 2026", "23. 9. 2026", "10. 8. 2026"]) expect(v.text).toContain(den);
+    for (const den of ["28. 9.", "23. 9.", "10. 8."]) expect(v.html).toContain(den);
   });
 
   it("os ukazuje, ako sa balíček míňal — hodiny aj mínus", () => {
@@ -54,15 +54,26 @@ describe("mailKlientovi", () => {
     expect(v.text).toContain("tréning (6 h, −1)");
   });
 
-  it("mesiace sa píšu po slovensky a stĺpec najväčšieho je najdlhší", () => {
+  it("tri čísla hore: hodiny, tempo, dĺžka vzťahu", () => {
     const v = mailKlientovi(zaklad);
-    expect(v.html).toContain("august 2026");
-    expect(v.html).toContain('width="100%" style="height:12px');
+    expect(v.html).toContain("19 h");
+    expect(v.html).toContain("tréningov mesačne");
+    expect(v.html).toContain("4 mesiace");
+    // „0 h zostáva" medzi ne nepatrí — hovorí to nadpis (Jerry, 29. 9. 2026).
+    expect(v.html).not.toContain("zostáva v balíčku");
   });
 
-  it("jediný mesiac stĺpce nekreslí — graf o jednom stĺpci nič nehovorí", () => {
-    const v = mailKlientovi({ ...zaklad, mesacne: [{ mesiac: "2026-09", pocet: 3 }] });
-    expect(v.html).not.toContain("Koľko si chodil");
+  it("bez tempa a dĺžky vzťahu zostane len počet hodín", () => {
+    const v = mailKlientovi({ ...zaklad, tempo: undefined, mesiacov: undefined });
+    expect(v.html).toContain("odtrénované spolu");
+    expect(v.html).not.toContain("tréningov mesačne");
+  });
+
+  it("logo je príloha, nie odkaz na náš server", () => {
+    expect(mailKlientovi(zaklad).html).not.toContain("cid:znacka");
+    const v = mailKlientovi({ ...zaklad, logoCid: "logo@psb" });
+    expect(v.html).toContain('src="cid:logo@psb"');
+    expect(v.html).not.toContain("http");
   });
 
   it("bez platby nie je ani QR, ani suma", () => {
@@ -95,17 +106,31 @@ describe("mailKlientovi", () => {
   });
 });
 
-describe("tempo", () => {
-  it("hovorí sa slovom, číslo je v zátvorke", () => {
-    // „2,3 tréningu mesačne" nikto nepovie; „zhruba raz týždenne" áno.
-    expect(tempoSK(4.1)).toBe("zhruba raz týždenne (4,1× mesačne)");
-    expect(tempoSK(2)).toBe("zhruba každé dva týždne (2× mesačne)");
-    expect(tempoSK(0.5)).toBe("menej než raz mesačne (0,5× mesačne)");
+describe("tempoSK", () => {
+  it("píše sa na desatinu, ako v profile klienta", () => {
+    // Jerry, 29. 9. 2026: „4× mesačne mi príde zbytočné" — zaokrúhlenie
+    // robí z čísla dojem odhadu.
+    expect(tempoSK(3.94)).toBe("3,9");
+    expect(tempoSK(4)).toBe("4,0");
+    expect(tempoSK(0.5)).toBe("0,5");
+  });
+});
+
+describe("koniec osi", () => {
+  it("poslednou bodkou je zostatok a nemá dátum", () => {
+    const v = mailKlientovi({ ...zaklad, zostatok: 2 });
+    // „Zostávajú 2 h" je odpoveď, nie udalosť — dátum by z nej robil tréning.
+    expect(v.text.trimEnd().split("\n").find((r) => r.includes("Zostávajú 2 h"))).toBe("  Zostávajú 2 h");
+    expect(v.html).toContain("Zostávajú 2 h");
   });
 
-  it("bez tempa sa riadok nekreslí", () => {
-    expect(mailKlientovi(zaklad).html).not.toContain("Tempo:");
-    expect(mailKlientovi({ ...zaklad, tempo: 4 }).html).toContain("Tempo:");
-    expect(mailKlientovi({ ...zaklad, tempo: 4 }).text).toContain("Tempo: zhruba raz týždenne");
+  it("keď appka zostatok nevie, žiadnu poslednú bodku si nevymyslí", () => {
+    const v = mailKlientovi({ ...zaklad, zostatok: null });
+    expect(v.text).not.toContain("Zostáv");
+  });
+
+  it("prázdne riadky v textovej podobe zostávajú", () => {
+    const v = mailKlientovi({ ...zaklad, zostatok: 2 });
+    expect(v.text.split("\n")[1]).toBe("");
   });
 });

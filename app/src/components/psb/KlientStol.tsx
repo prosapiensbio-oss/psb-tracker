@@ -12,7 +12,7 @@ import { menoKluc } from "../../lib/psb/compute";
 import { satsNaCzk } from "../../lib/psb/btcKontrola";
 import { CENNIK, platnostDo } from "../../lib/psb/cennik";
 import { osCasuKlienta, treningyVBalicku } from "../../lib/psb/klientOsCasu";
-import { sedeniaPoMesiacoch, tempoMesacne } from "../../lib/psb/profil";
+import { mesiacovVztahu, sedeniaPoMesiacoch, tempoMesacne } from "../../lib/psb/profil";
 import { zdravieKlienta } from "../../lib/psb/klientZdravie";
 import type { ClientAgg } from "../../lib/psb/compute";
 import type { PSBData } from "../../lib/psb/types";
@@ -1437,7 +1437,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
             <VypisHodinPanel
               meno={meno} os={os} email={kontaktMail} zostatokTeraz={zostatokTeraz}
               trener={c?.primaryTrainer || ""}
-              mesacne={poMesiacoch}
+              mesiacov={c ? Math.round(mesiacovVztahu(c)) : 0}
               hodinSpolu={Math.round(c?.totalHours || 0)}
               tempo={c ? tempoMesacne(c) : 0}
               telefon={kontaktTelefon}

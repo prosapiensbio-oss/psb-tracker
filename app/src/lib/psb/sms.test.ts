@@ -61,7 +61,7 @@ describe("textSms", () => {
 
   it("keď hodiny ešte sú, povie koľko", () => {
     expect(textSms({ oslovenie: "Eva", trener: "Terezka", zostatok: 2, sMailom: false }))
-      .toBe("Eva, v balíčku ti zostáva 2 h. Terezka, ProSapiens");
+      .toBe("Eva, v balíčku ti zostávajú 2 h. Terezka, ProSapiens");
   });
 
   it("bez mailu sa naň neodkazuje", () => {
