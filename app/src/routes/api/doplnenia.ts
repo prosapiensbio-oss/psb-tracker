@@ -53,6 +53,17 @@ export const Route = createFileRoute("/api/doplnenia")({
                ON d.klient = s.client_name AND d.den = substr(s.date,1,10)
             WHERE s.service_description LIKE '%oplnen%'
               AND d.klient IS NULL
+              /**
+               * Len klienti, ktorí EŠTE CHODIA. Doplnenie človeka, ktorý
+               * prestal chodiť vlani, nemení žiadne dnešné číslo — jeho
+               * balíček je zavretý spolu s ním. Bez tejto podmienky ich
+               * bolo 45, s ňou 14 (29. 9. 2026).
+               */
+              AND EXISTS (
+                SELECT 1 FROM sessions x
+                 WHERE x.client_name = s.client_name
+                   AND substr(x.date,1,10) >= date('now','-60 days')
+              )
               AND NOT EXISTS (
                 SELECT 1 FROM packages p
                  WHERE p.client_name = s.client_name
