@@ -7,6 +7,14 @@ import { isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 import { stiahniSpravy, testSpojenia } from "../../lib/psb/imap";
 import { naDopyt } from "../../lib/psb/mailDopyt";
+import { adresyMailu } from "../../lib/psb/mime";
+import { deriveClients } from "../../lib/psb/compute";
+import { historiaPreMail } from "../../lib/psb/historiaMail";
+import { loadData } from "../../lib/psb/db.server";
+import { mailKlientovi } from "../../lib/psb/mailKlientovi";
+import { normName } from "../../lib/psb/format";
+import { osCasuKlienta } from "../../lib/psb/klientOsCasu";
+import { posliMail } from "../../lib/psb/smtp.server";
 import { posli as posliPush, type Odber } from "../../lib/psb/push.server";
 
 /**
@@ -43,6 +51,72 @@ async function klucePush(DB: D1Database) {
 }
 
 type Nast = { host: string; port: number; user: string; heslo: string; od: string; ignoruj: string[]; vlastne: string[] };
+
+/**
+ * Automatická odpoveď na „Chcem celú históriu". Poistky:
+ *
+ *  1. Klient sa hľadá PRESNE podľa mena z predmetu (normName) — predmet
+ *     skladá naše tlačidlo, takže meno je naše vlastné. Nula alebo dvaja
+ *     kandidáti = nič sa neposiela.
+ *  2. Ide VÝHRADNE na adresy uložené pri klientovi vo fakturačných údajoch.
+ *     Odosielateľ žiadosti nedostane nič — pravému klientovi pristane
+ *     história v jeho vlastnej schránke, podvrhnuté meno nič nezíska.
+ *  3. Najviac raz denne na klienta (audit `historia-odoslana`).
+ *
+ * QR ani výzva na platbu v automatickej odpovedi nie sú — história je
+ * archív; sumu ďalšieho balíčka nemá automat odkiaľ vziať bez hádania.
+ */
+async function posliHistoriu(DB: D1Database, menoZPredmetu: string, n: Nast): Promise<{ ok: true; komu: string } | { ok: false; preco: string }> {
+  if (!n.host || !n.user || !n.heslo) return { ok: false, preco: "schránka nie je nastavená" };
+
+  const data = await loadData(DB);
+  const clients = deriveClients(data);
+  const kandidati = Object.values(clients).filter((c) => normName(c.name) === normName(menoZPredmetu));
+  if (kandidati.length !== 1) return { ok: false, preco: kandidati.length ? "meno sedí na viacerých" : "klient sa nenašiel" };
+  const c = kandidati[0];
+
+  const fa = await DB.prepare("SELECT email, dalsie_maily FROM klient_fakturacia WHERE klient = ?1")
+    .bind(c.name).first<{ email: string; dalsie_maily: string }>();
+  const { adresy } = adresyMailu([fa?.email || "", fa?.dalsie_maily || ""].join(","));
+  if (!adresy.length) return { ok: false, preco: "klient nemá uloženú adresu" };
+
+  const dnesUTC = new Date().toISOString().slice(0, 10);
+  const uzDnes = await DB.prepare(
+    "SELECT COUNT(*) n FROM vzas_audit WHERE action = 'historia-odoslana' AND payment_id LIKE ?1 AND at >= ?2",
+  ).bind(`${c.name} ·%`, dnesUTC).first<{ n: number }>();
+  if ((uzDnes?.n || 0) > 0) return { ok: false, preco: "dnes už raz odišla" };
+
+  const os = osCasuKlienta(c.name, {
+    sessions: data.sessions, payments: data.payments, packages: data.packages,
+    services: data.services, poplatky: data.poplatky, treningyZdarma: data.treningyZdarma,
+    doplneniaHodiny: data.doplneniaHodiny || {},
+  }, dnesUTC);
+  const dalsi = ((await DB.prepare(
+    "SELECT MIN(zaciatok) z FROM kal_udalosti WHERE zmizla_at IS NULL AND klient = ?1 AND typ IN ('trening','uvodny') AND zaciatok > ?2",
+  ).bind(c.name, new Date().toISOString().slice(0, 16)).first<{ z: string | null }>())?.z) || undefined;
+
+  const vypis = historiaPreMail(c.name, os, c, dnesUTC, dalsi);
+  const logoCid = `logo-${crypto.randomUUID()}@prosapiens`;
+  const { ASSETS } = bindings();
+  const logo = await ASSETS?.fetch(new Request("https://kokpit.prosapiensbio.workers.dev/znacka-napis-mail.png"))
+    .then((r) => (r.ok ? r.arrayBuffer() : null)).catch(() => null);
+  const m = mailKlientovi({ ...vypis, logoCid: logo ? logoCid : undefined });
+
+  const vysledok = await posliMail(
+    { host: n.host.replace(/^imap\./, "smtp."), pouzivatel: n.user, heslo: n.heslo },
+    {
+      od: n.user, odMeno: "ProSapiens Biomechanic", komu: adresy,
+      predmet: m.predmet, telo: m.text, html: m.html,
+      prilohy: logo ? [{ meno: "znacka.png", typ: "image/png", data: logo, cid: logoCid }] : [],
+    },
+  );
+  if (!vysledok.ok) {
+    await audit(DB, { action: "historia-mail-zlyhal", predmet: `${c.name} · ${adresy.join(", ")}`, old: vysledok.chyba, actor: "automat" });
+    return { ok: false, preco: "odoslanie zlyhalo" };
+  }
+  await audit(DB, { action: "historia-odoslana", predmet: `${c.name} · ${adresy.join(", ")}`, actor: "automat" });
+  return { ok: true, komu: adresy.join(", ") };
+}
 
 async function nastavenia(DB: D1Database): Promise<Nast> {
   const rs = await DB.prepare(
@@ -203,8 +277,18 @@ export const Route = createFileRoute("/api/mail-dopyty")({
              * ako pri SMS: naše čísla sú miestami dopočítané).
              */
             if ("historia" in v) {
-              preskocene.push({ predmet: `${v.historia.meno} si pýta celú históriu`, preco: "žiadosť klienta — poslaná notifikácia" });
               await audit(DB, { action: "historia-vyziadana", predmet: `${v.historia.meno} · ${v.historia.email}`, actor: "klient" });
+              /**
+               * Automatická odpoveď (Jerry, 29. 9. 2026: „vedeli by sme to
+               * automatizovať?"). Poistky sú v `posliHistoriu`; keď niektorá
+               * nepustí, spadne sa späť na push a Jerry pošle históriu ručne.
+               */
+              const auto = await posliHistoriu(DB, v.historia.meno, n);
+              if (auto.ok) {
+                preskocene.push({ predmet: `${v.historia.meno} si pýtal celú históriu`, preco: `odoslaná automaticky na ${auto.komu}` });
+                continue;
+              }
+              preskocene.push({ predmet: `${v.historia.meno} si pýta celú históriu`, preco: `automat sa stiahol (${auto.preco}) — poslaná notifikácia` });
               try {
                 const k = await klucePush(DB);
                 if (k.verejny && k.sukromny) {
@@ -214,7 +298,7 @@ export const Route = createFileRoute("/api/mail-dopyty")({
                     if ((o.kto || "").trim().toLowerCase() !== "jerry") continue;
                     await posliPush(o, {
                       titulok: "Žiadosť o históriu",
-                      text: `${v.historia.meno} si pýta celú históriu tréningov a platieb. Pošleš mu ju zo stola klienta — voľba „celá história + platby".`,
+                      text: `${v.historia.meno} si pýta celú históriu tréningov a platieb (${auto.preco}). Pošleš mu ju zo stola klienta — voľba „celá história + platby".`,
                       url: "/#workspace", znacka: `historia-${v.historia.email}`,
                     }, k);
                   }
