@@ -42,7 +42,9 @@ const SUBY: Record<string, string[]> = {
 };
 
 /** Ciele bez podzáložiek. */
-const HOLE = new Set(["dashboard", "kalendar", "tracker", "jarvis", "udaje", "6m", "mesiac"]);
+// „workspace" je Kopa — register na ňu odkazuje pri veciach, ktoré sa tam
+// odklikávajú (doplnenia členstva, „Bol tam, alebo nie?").
+const HOLE = new Set(["dashboard", "kalendar", "tracker", "jarvis", "udaje", "6m", "mesiac", "workspace"]);
 /** Staré id, ktoré navigate() prekladá — nie sú chyba. */
 const ALIAS: Record<string, string> = { financie: "vzas", vysledky: "vysledky", udaje: "mesiac", "6m": "klienti", tracker: "tracker" };
 

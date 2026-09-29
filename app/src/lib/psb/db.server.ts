@@ -25,7 +25,7 @@ import { EMPTY_DATA } from "./types";
 const uid = () => crypto.randomUUID();
 
 export async function loadData(DB: D1Database): Promise<PSBData> {
-  const [sessions, services, payments, packages, overrides, acks, log, leads, zavery, vedomosti, poplatky, zdarma, vlastnePlatby] = await Promise.all([
+  const [sessions, services, payments, packages, overrides, acks, log, leads, zavery, vedomosti, poplatky, zdarma, vlastnePlatby, doplneniaH] = await Promise.all([
     DB.prepare("SELECT * FROM sessions").all(),
     DB.prepare("SELECT * FROM services").all(),
     DB.prepare("SELECT * FROM payments").all(),
@@ -56,6 +56,8 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
     // poplatkov odrátali tie, ktoré už niekto zaplatil (viď nižšie).
     DB.prepare("SELECT id, klient, datum, suma_czk, sposob, fio_id, zrusene_at FROM platby")
       .all().catch(() => ({ results: [] })),
+    // Koľko hodín pridalo „Doplnenie členstva" — viď migráciu 0085.
+    DB.prepare("SELECT klient, den, hodiny FROM doplnenia_hodiny").all().catch(() => ({ results: [] })),
   ]);
 
   const data: PSBData = {
@@ -131,6 +133,16 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
         sposob: r.sposob, fioId: r.fio_id, zruseneAt: r.zrusene_at,
       })),
     ).otvorene,
+    /**
+     * Odpovede na „koľko hodín pridalo doplnenie" — kľúč `klient|deň`.
+     *
+     * Ide to cez `loadData`, lebo os času klienta stavia päť obrazoviek
+     * a každá by si to inak musela doťahovať sama. Jedno miesto, jeden
+     * zdroj (viď „nové pole = celá reťaz" v CLAUDE.md).
+     */
+    doplneniaHodiny: Object.fromEntries(
+      (doplneniaH.results as any[]).map((r) => [`${r.klient}|${String(r.den).slice(0, 10)}`, Number(r.hodiny) || 0]),
+    ),
     treningyZdarma: (zdarma.results as any[]).map((r) => ({
       id: r.id, klient: r.client_name, den: String(r.den).slice(0, 10), dovod: r.dovod || "", kto: r.kto || "",
     })),
@@ -536,8 +548,10 @@ export async function ingest(DB: D1Database, filename: string, text: string, act
                  updated_at = ?4 WHERE klient = ?1`,
             ).bind(r.meno, mail, tel, new Date().toISOString(), druhy)
             : DB.prepare(
-              "INSERT INTO klient_fakturacia (klient, firma, email, telefon, updated_at) VALUES (?1, ?1, ?2, ?3, ?4)",
-            ).bind(r.meno, mail, tel, new Date().toISOString()),
+              // `dalsie_maily` patrí aj sem. Bez neho klient, ktorý v tabuľke
+              // ešte nebol, druhý mail pri prvom zápise ticho stratil.
+              "INSERT INTO klient_fakturacia (klient, firma, email, telefon, dalsie_maily, updated_at) VALUES (?1, ?1, ?2, ?3, ?5, ?4)",
+            ).bind(r.meno, mail, tel, new Date().toISOString(), druhy),
         );
         added++;
       }

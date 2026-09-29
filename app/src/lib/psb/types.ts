@@ -172,6 +172,8 @@ export type PSBData = {
   poplatky: PoplatokZaznam[];
   /** Tréningy zadarmo — hodina sa odtrénovala, z členstva sa nestrhla. */
   treningyZdarma: TreningZdarma[];
+  /** Koľko hodín pridalo „Doplnenie členstva" — kľúč `klient|deň`. */
+  doplneniaHodiny?: Record<string, number>;
   /** Vedomosti zvonku (rešerše, príručky). Text sa do kontextu neposiela — len prehľad. */
   vedomosti: VedomostRow[];
 };
@@ -225,6 +227,7 @@ export const EMPTY_DATA: PSBData = {
   zavery: [],
   poplatky: [],
   treningyZdarma: [],
+  doplneniaHodiny: {},
   vedomosti: [],
   sessions: [],
   services: [],

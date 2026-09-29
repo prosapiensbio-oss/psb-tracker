@@ -1,5 +1,6 @@
 import { oznam } from "../../lib/psb/obnovaSignal";
 import { podlaKlienta, type PodlaKlienta } from "../../lib/psb/sporneKonanie";
+import type { Doplnenie } from "../../lib/psb/workspaceKarty";
 import { nazovProduktu } from "../../lib/psb/nazvyProduktov";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -66,7 +67,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
 }) {
   const [balicky, setBalicky] = useState<BalicekRiadok[]>([]);
   const [vlastnePlatby, setVlastnePlatby] = useState<PlatbaRiadok[]>([]);
-  const [zdroje, setZdroje] = useState<{ zmeny: Zmena[]; nezname: { nazov: string; trener: string; pocet: number; najblizsi: string }[]; platby: { fioId: string; datum: string; suma: number; text: string; kandidati: string[] }[]; konanie: PodlaKlienta[] } | null>(null);
+  const [zdroje, setZdroje] = useState<{ zmeny: Zmena[]; nezname: { nazov: string; trener: string; pocet: number; najblizsi: string }[]; platby: { fioId: string; datum: string; suma: number; text: string; kandidati: string[] }[]; konanie: PodlaKlienta[]; doplnenia: Doplnenie[] } | null>(null);
   const [hotove, setHotove] = useState<Set<string>>(new Set());
   const [texty, setTexty] = useState<Record<string, string>>({});
   const [i, setI] = useState(0);
@@ -99,15 +100,16 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   }, [clients]);
 
   const nacitaj = useCallback(async () => {
-    const [k, p, b, vp] = await Promise.all([
+    const [k, p, b, vp, dp] = await Promise.all([
       fetch("/api/kalendar", { credentials: "same-origin" }).then((r) => r.json()).catch(() => null),
       fetch("/api/platby", { credentials: "same-origin" }).then((r) => r.json()).catch(() => null),
       // Vlastná evidencia balíčkov aj platieb — bez nej by karta „Bez balíčka"
       // svietila na klienta aj potom, čo mu Jerry balíček nahodil.
       fetch("/api/balicky", { credentials: "same-origin" }).then((r) => r.json()).catch(() => null),
       fetch("/api/platby?klient=1", { credentials: "same-origin" }).then((r) => r.json()).catch(() => null),
+      fetch("/api/doplnenia", { credentials: "same-origin" }).then((r) => r.json()).catch(() => null),
     ]);
-    setZdroje({ zmeny: (k?.zmeny || []) as Zmena[], nezname: k?.nezname || [], platby: p?.nepriradene || [], konanie: podlaKlienta(k?.sporneKonanie || []) });
+    setZdroje({ zmeny: (k?.zmeny || []) as Zmena[], nezname: k?.nezname || [], platby: p?.nepriradene || [], konanie: podlaKlienta(k?.sporneKonanie || []), doplnenia: (dp?.cakaju || []) as Doplnenie[] });
     setBalicky(b?.balicky || []);
     setVlastnePlatby(vp?.platby || []);
   }, []);
@@ -129,6 +131,9 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
       services: (data.services || []) as never,
       poplatky: (data.poplatky || []) as never,
       treningyZdarma: (data.treningyZdarma || []) as never,
+      // Odpovede „koľko hodín pridalo doplnenie" — bez nich appka v tom
+      // období nepočíta dlh (viď migráciu 0085).
+      doplneniaHodiny: data.doplneniaHodiny || {},
       balicky: evidencia as never,
       kalUdalosti: (kalUdalosti || []) as never,
     };
@@ -410,6 +415,24 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
    * kalendára; inak by obrazovky držali staré číslo.
    */
   const [odpovedane, setOdpovedane] = useState<Set<string>>(new Set());
+  const [hodinyDoplnenia, setHodinyDoplnenia] = useState<Record<string, string>>({});
+
+  /**
+   * Počet hodín doplnenia mení zostatok klienta, takže sa po zápise musia
+   * pretiahnuť dáta — inak by obrazovky držali staré číslo aj po odpovedi.
+   */
+  const ulozDoplnenie = async (x: Doplnenie, kluc: string) => {
+    const hodiny = Number((hodinyDoplnenia[kluc] ?? "").replace(",", "."));
+    if (!Number.isFinite(hodiny) || hodiny < 0) return;
+    const r = await fetch("/api/doplnenia", {
+      method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ klient: x.klient, den: x.den, hodiny }),
+    }).then((v) => v.json()).catch(() => ({ ok: false }));
+    if (!r?.ok) return;
+    setOdpovedane((s) => new Set([...s, kluc]));
+    // Doplnenie mení zostatok hodín — to čítajú balíčkové obrazovky.
+    oznam("peniaze");
+  };
   const odpovedzKonanie = async (p: { uid: string; trener: string; klient: string; zaciatok: string }, konal: boolean) => {
     const r = await fetch("/api/kalendar", {
       method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
@@ -776,6 +799,44 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                   </>
                 );
               })()}
+
+              {/* DOPLNENIE ČLENSTVA — jediná otázka je číslo, tak je tu
+                  políčko a nie tlačidlá. Nula je platná odpoveď („nepridalo
+                  nič") a musí sa dať zapísať rovnako ľahko ako trojka, inak
+                  sa riadok nechá visieť a Kokpit bude ďalej mlčať o dlhu. */}
+              {k.druh === "doplnenia" && k.polozky.map((x) => {
+                const kluc = klucPolozky("doplnenia", x);
+                if (odpovedane.has(kluc)) return null;
+                const vBeziacom = !!x.posledny && x.den >= x.posledny;
+                return (
+                  <div key={kluc} style={{ ...riadok, flexWrap: "wrap" }}>
+                    <button onClick={() => naStol(x.klient)} style={{ ...vedlajsie, fontSize: 13.5, fontWeight: 600, color: C.text, minWidth: uzke ? 0 : 150, textAlign: "left" }}>
+                      {x.klient}
+                    </button>
+                    <span style={{ fontSize: 12, color: C.textMuted, minWidth: 96 }}>{den(x.den)}</span>
+                    {vBeziacom && (
+                      <span style={{ fontSize: 10.5, color: C.orange, fontWeight: 600 }} title="Je v práve bežiacom balíčku — mení číslo, ktoré klientovi ide do mailu">
+                        v bežiacom balíčku
+                      </span>
+                    )}
+                    <input
+                      type="number" min={0} step={1} inputMode="decimal"
+                      placeholder="hodín"
+                      value={hodinyDoplnenia[kluc] ?? ""}
+                      onChange={(e) => setHodinyDoplnenia((m) => ({ ...m, [kluc]: e.target.value }))}
+                      onKeyDown={(e) => { if (e.key === "Enter") void ulozDoplnenie(x, kluc); }}
+                      style={{ width: 74, background: C.bg, color: C.text, border: `1px solid ${C.border}`, borderRadius: 6, padding: "4px 7px", fontSize: 12.5, fontFamily: "inherit" }}
+                    />
+                    <button
+                      onClick={() => void ulozDoplnenie(x, kluc)}
+                      disabled={(hodinyDoplnenia[kluc] ?? "").trim() === ""}
+                      style={{ ...vedlajsie, border: `1px solid ${mix(C.accent, 45)}`, background: mix(C.accent, 12), color: C.accentLight, fontWeight: 600, opacity: (hodinyDoplnenia[kluc] ?? "").trim() === "" ? 0.5 : 1 }}
+                    >
+                      zapísať
+                    </button>
+                  </div>
+                );
+              })}
 
               {/* BOL TAM, ALEBO NIE? — každá nerozhodnutá hodina je hodina,
                   o ktorú je zostatok klienta vedľa. Odpovedá sa po jednej,

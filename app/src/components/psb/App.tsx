@@ -1000,6 +1000,8 @@ export function PSBApp() {
    * Kokpit pýta. Kým nie je odpoveď, tréning sa nepočíta.
    */
   const [sporneKonanie, setSporneKonanie] = useState<SporneKonanie[]>([]);
+  /** Doplnenia bez odpovede — do registra ide len to, čo je v bežiacom balíčku. */
+  const [doplneniaCakaju, setDoplneniaCakaju] = useState<{ klient: string; vBeziacom: boolean }[]>([]);
   // Guillermo (FP Spain) záznamy + jeho tréningy — do Jarvisovho kontextu, nech
   // vie zostatok sedení. Berú sa z toho istého /api/kalendar fetchu ako udalosti.
   const [guillermoZazn, setGuillermoZazn] = useState<{ datum: string; druh: string; hodiny: number }[]>([]);
@@ -1081,6 +1083,21 @@ export function PSBApp() {
       })
       .catch(() => {});
   }, [dataHotove, kalVerzia]);
+
+  /**
+   * Doplnenia bez odpovede — do registra ide len to, čo je v bežiacom
+   * balíčku; ostatné by register zaplavili (222 doplnení celkom).
+   */
+  useEffect(() => {
+    if (!dataHotove) return;
+    void fetch("/api/doplnenia", { credentials: "same-origin" })
+      .then((r) => r.json())
+      .then((j: { ok?: boolean; cakaju?: { klient: string; den: string; posledny: string | null }[] }) => {
+        if (!j.ok || !Array.isArray(j.cakaju)) return;
+        setDoplneniaCakaju(j.cakaju.map((x) => ({ klient: x.klient, vBeziacom: !!x.posledny && x.den >= x.posledny })));
+      })
+      .catch(() => null);
+  }, [dataHotove]);
 
   /**
    * Vysvetlenie z registra sa doručí Kalendáru.
@@ -1892,6 +1909,7 @@ function skupinaFaktur(
       dnes: new Date().toISOString().slice(0, 10),
       zmeny: kalNevysvetlene.map((z) => ({ druh: z.druh, trener: z.trener })),
       sporneKonanie: sporneKonanie.map((x) => ({ klient: x.klient, trener: x.trener })),
+      doplnenia: doplneniaCakaju,
       // Lievik za posledných 12 mesiacov — tie isté čísla, aké vidno
       // v Marketingu. Keby sa počítali zvlášť, appka by spochybňovala niečo
       // iné, než ukazuje.
@@ -1911,7 +1929,7 @@ function skupinaFaktur(
         ];
       })(),
     }).map((r: ReturnType<typeof nezapisaneDoRegistra>[number]) => ({ ...r, ...stavPolozky(r.key) })),
-    [data.leads, clients, kalNevysvetlene, sporneKonanie, stavPolozky],
+    [data.leads, clients, kalNevysvetlene, sporneKonanie, doplneniaCakaju, stavPolozky],
   );
 
   /**
@@ -2290,6 +2308,9 @@ function skupinaFaktur(
       services: (data.services || []) as never,
       poplatky: (data.poplatky || []) as never,
       treningyZdarma: (data.treningyZdarma || []) as never,
+      // Odpovede „koľko hodín pridalo doplnenie" — bez nich appka v tom
+      // období nepočíta dlh (viď migráciu 0085).
+      doplneniaHodiny: data.doplneniaHodiny || {},
       balicky: evidencia as never,
       kalUdalosti: (kalUdalosti || []) as never,
     };

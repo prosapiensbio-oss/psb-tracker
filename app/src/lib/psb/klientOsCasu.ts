@@ -129,7 +129,19 @@ const den = (s: string) => (s || "").slice(0, 10);
 
 export function osCasuKlienta(
   meno: string,
-  zdroj: { sessions: Sedenie[]; payments: Platba[]; packages: Balicek[]; kalUdalosti?: KalUdalost[]; services?: Sluzba[]; poplatky?: Poplatok[]; treningyZdarma?: Zdarma[]; balicky?: BalicekKokpitu[] },
+  zdroj: {
+    sessions: Sedenie[]; payments: Platba[]; packages: Balicek[]; kalUdalosti?: KalUdalost[];
+    services?: Sluzba[]; poplatky?: Poplatok[]; treningyZdarma?: Zdarma[]; balicky?: BalicekKokpitu[];
+    /**
+     * Koľko hodín pridalo „Doplnenie členstva" — kľúč `klient|deň`.
+     *
+     * Export to nenesie (223× ten istý riadok s cenou 0) a vyrátať sa to
+     * nedá: hodiny z členstva s viazanosťou na konci platnosti prepadajú,
+     * ak sa Jerry nerozhodne inak, a doplnenie je záznam práve toho
+     * rozhodnutia. Preto sa na to Kokpit pýta — viď migráciu 0085.
+     */
+    doplneniaHodiny?: Record<string, number>;
+  },
   dnes: string = new Date().toISOString().slice(0, 10),
 ): Udalost[] {
   const k = normName(meno);
@@ -217,14 +229,18 @@ export function osCasuKlienta(
     // Kľúč po hodinách drží aj tu: ten istý predaj môže mať v Kokpite iné
     // meno než v exporte (Balíček 6 h vs. OFF - 6h BEZ viazanosti).
     uzJe.add(`${d}|h${zNazvu}`);
+    const doplnenie = jeDoplnenie(sl.description) || undefined;
+    // Odpovedané doplnenie má hodiny ako ktorýkoľvek iný balíček; bez
+    // odpovede zostáva 0 a obdobie sa berie ako neisté (`priebehBalickov`).
+    const odpoved = doplnenie ? zdroj.doplneniaHodiny?.[`${sl.client}|${d}`] : undefined;
     out.push({
       druh: "balicekOd",
       den: d,
       nazov: sl.description,
-      hodin: zNazvu,
+      hodin: odpoved ?? zNazvu,
       zaplatene: sl.price || undefined,
       nezaplatene: nezaplateneDni.has(d) || undefined,
-      doplnenie: jeDoplnenie(sl.description) || undefined,
+      doplnenie,
     });
   }
   /**

@@ -3576,6 +3576,12 @@ export type NezapisaneVstup = {
    * na ne neodpovedal. Každý je hodina, o ktorú je zostatok klienta vedľa.
    */
   sporneKonanie?: { klient: string; trener: string }[];
+  /**
+   * „Doplnenie členstva" bez odpovede, koľko hodín pridalo. `vBeziacom`
+   * = je v práve bežiacom balíčku, teda mení číslo, ktoré klientovi dnes
+   * ide do mailu.
+   */
+  doplnenia?: { klient: string; vBeziacom: boolean }[];
   /** Kľúčové podiely, ktoré má appka spochybniť, keď vyzerajú príliš dobre. */
   podiely?: Podiel[];
 };
@@ -3720,6 +3726,26 @@ export function nezapisaneDoRegistra(v: NezapisaneVstup): Omit<RegisterItem, "ac
       detail: `${hodin} ${hodin === 1 ? "tréning zmizol" : hodin < 5 ? "tréningy zmizli" : "tréningov zmizlo"} z kalendára až po tom, čo sa mal konať, a v PTminderi zápis nemá — u ${klienti.size} ${klienti.size === 1 ? "klienta" : "klientov"}. Kým sa neodpovie, appka im ráta o toľko hodín viac, než možno majú, a podľa toho im píše. Odpovedá sa v Kope.`,
       client: "kalendar|",
       priority: 13,
+    });
+  }
+
+  // ── doplnenia členstva bez počtu hodín ───────────────────────────────────
+  //
+  // Hlási sa len to, čo mení ŽIVÉ číslo. Doplnení je 222 a väčšina je stará;
+  // register, ktorý by hlásil všetky, by bol presne tá stena, kde „keď svieti
+  // všetko, nesvieti nič". Staré sa dajú dopovedať v Kope, keď je chvíľa.
+  const doplneniaZive = (v.doplnenia || []).filter((x) => x.vBeziacom);
+  if (doplneniaZive.length) {
+    const ludi = new Set(doplneniaZive.map((x) => x.klient)).size;
+    von.push({
+      key: "balicky|doplnenia",
+      category: "Zmena",
+      tone: "orange",
+      trener: "Jerry",
+      title: `Doplnenie bez počtu hodín (${doplneniaZive.length})`,
+      detail: `U ${ludi} ${ludi === 1 ? "klienta" : "klientov"} je v práve bežiacom balíčku „Doplnenie členstva" a appka nevie, koľko hodín ním pribudlo — export to nenesie. Kým sa neodpovie, v tom období nepočíta dlh, takže mu môže tvrdiť, že hodiny má, hoci ich nemá. Odpovedá sa v Kope.`,
+      client: "workspace|",
+      priority: 12,
     });
   }
 

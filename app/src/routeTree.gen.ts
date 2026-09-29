@@ -70,6 +70,7 @@ import { Route as ApiGoogleRouteImport } from './routes/api/google'
 import { Route as ApiFioRouteImport } from './routes/api/fio'
 import { Route as ApiFakturyRouteImport } from './routes/api/faktury'
 import { Route as ApiExportRouteImport } from './routes/api/export'
+import { Route as ApiDoplneniaRouteImport } from './routes/api/doplnenia'
 import { Route as ApiDataRouteImport } from './routes/api/data'
 import { Route as ApiClientNotesRouteImport } from './routes/api/client-notes'
 import { Route as ApiClientDeleteRouteImport } from './routes/api/client-delete'
@@ -384,6 +385,11 @@ const ApiExportRoute = ApiExportRouteImport.update({
   path: '/api/export',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDoplneniaRoute = ApiDoplneniaRouteImport.update({
+  id: '/api/doplnenia',
+  path: '/api/doplnenia',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiDataRoute = ApiDataRouteImport.update({
   id: '/api/data',
   path: '/api/data',
@@ -439,6 +445,7 @@ export interface FileRoutesByFullPath {
   '/api/client-delete': typeof ApiClientDeleteRoute
   '/api/client-notes': typeof ApiClientNotesRoute
   '/api/data': typeof ApiDataRoute
+  '/api/doplnenia': typeof ApiDoplneniaRoute
   '/api/export': typeof ApiExportRoute
   '/api/faktury': typeof ApiFakturyRoute
   '/api/fio': typeof ApiFioRoute
@@ -510,6 +517,7 @@ export interface FileRoutesByTo {
   '/api/client-delete': typeof ApiClientDeleteRoute
   '/api/client-notes': typeof ApiClientNotesRoute
   '/api/data': typeof ApiDataRoute
+  '/api/doplnenia': typeof ApiDoplneniaRoute
   '/api/export': typeof ApiExportRoute
   '/api/faktury': typeof ApiFakturyRoute
   '/api/fio': typeof ApiFioRoute
@@ -582,6 +590,7 @@ export interface FileRoutesById {
   '/api/client-delete': typeof ApiClientDeleteRoute
   '/api/client-notes': typeof ApiClientNotesRoute
   '/api/data': typeof ApiDataRoute
+  '/api/doplnenia': typeof ApiDoplneniaRoute
   '/api/export': typeof ApiExportRoute
   '/api/faktury': typeof ApiFakturyRoute
   '/api/fio': typeof ApiFioRoute
@@ -655,6 +664,7 @@ export interface FileRouteTypes {
     | '/api/client-delete'
     | '/api/client-notes'
     | '/api/data'
+    | '/api/doplnenia'
     | '/api/export'
     | '/api/faktury'
     | '/api/fio'
@@ -726,6 +736,7 @@ export interface FileRouteTypes {
     | '/api/client-delete'
     | '/api/client-notes'
     | '/api/data'
+    | '/api/doplnenia'
     | '/api/export'
     | '/api/faktury'
     | '/api/fio'
@@ -797,6 +808,7 @@ export interface FileRouteTypes {
     | '/api/client-delete'
     | '/api/client-notes'
     | '/api/data'
+    | '/api/doplnenia'
     | '/api/export'
     | '/api/faktury'
     | '/api/fio'
@@ -869,6 +881,7 @@ export interface RootRouteChildren {
   ApiClientDeleteRoute: typeof ApiClientDeleteRoute
   ApiClientNotesRoute: typeof ApiClientNotesRoute
   ApiDataRoute: typeof ApiDataRoute
+  ApiDoplneniaRoute: typeof ApiDoplneniaRoute
   ApiExportRoute: typeof ApiExportRoute
   ApiFakturyRoute: typeof ApiFakturyRoute
   ApiFioRoute: typeof ApiFioRoute
@@ -1356,6 +1369,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiExportRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/doplnenia': {
+      id: '/api/doplnenia'
+      path: '/api/doplnenia'
+      fullPath: '/api/doplnenia'
+      preLoaderRoute: typeof ApiDoplneniaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/data': {
       id: '/api/data'
       path: '/api/data'
@@ -1429,6 +1449,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiClientDeleteRoute: ApiClientDeleteRoute,
   ApiClientNotesRoute: ApiClientNotesRoute,
   ApiDataRoute: ApiDataRoute,
+  ApiDoplneniaRoute: ApiDoplneniaRoute,
   ApiExportRoute: ApiExportRoute,
   ApiFakturyRoute: ApiFakturyRoute,
   ApiFioRoute: ApiFioRoute,

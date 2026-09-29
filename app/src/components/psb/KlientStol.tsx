@@ -208,6 +208,9 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
       services: (data.services || []) as never,
       poplatky: (data.poplatky || []) as never,
       treningyZdarma: (data.treningyZdarma || []) as never,
+      // Odpovede „koľko hodín pridalo doplnenie" — bez nich appka v tom
+      // období nepočíta dlh (viď migráciu 0085).
+      doplneniaHodiny: data.doplneniaHodiny || {},
       // Vlastná evidencia balíčkov: bez nej by sa po nahodení nového balíčka
       // na osi nezmenilo nič a odpočet by ostal stáť na vyčerpanom členstve.
       balicky: balicky as never,
