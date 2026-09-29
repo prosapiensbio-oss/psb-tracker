@@ -1,6 +1,7 @@
 // All derived analytics for the PSB Tracker. Pure functions over PSBData —
 // no browser globals. Reused across every module.
 import { daysBetween, fmtDMY, monthKey, monthLabel, monthsBetween, normName, quarterKey, quarterLabel, weekKey, weekLabel } from "./format";
+import { jePredplatne } from "./nazvyProduktov";
 import { moznostiPlatnosti, vetaPlatnosti, zostavaPoPlatnosti } from "./platnostZostatok";
 import { menoZNazvuUvodneho } from "./kalendar";
 import { bezDuplicitBalickov, hodinZNazvuBalicka } from "./klientOsCasu";
@@ -169,7 +170,7 @@ export type ClientAgg = {
 export function sixMClientSet(data: PSBData): Set<string> {
   const set = new Set<string>();
   for (const s of data.services) if (s.is6m) set.add(s.client);
-  for (const p of data.packages) if (/s viazanost/i.test(p.package)) set.add(p.client);
+  for (const p of data.packages) if (jePredplatne(p.package)) set.add(p.client);
   // Ručná oprava má posledné slovo. Pravidlo hore je správne a zostáva
   // (balíček „S viazanostou" a platba 6 990 Kč SÚ 6M členstvo — Jerry to
   // potvrdil 9. 8. 2026), ale odvodenie je stále len odvodenie: klient si
@@ -3010,8 +3011,10 @@ export function platnostMesiacov(nazovBalicka: string): number {
   const n = (nazovBalicka || "").toLowerCase();
   if (n.includes("one year")) return 12;
   if (n.includes("18 hod")) return 6;
-  if (n.includes("s viazanost")) return 1;      // mesačné, max 2 h sa prenášajú
-  if (n.includes("bez viazanost")) return 2;    // 8 týždňov
+  // Předplatné je mesačné (a najviac 2 h sa prenášajú), balíček osemtýždňový.
+  // Pozná starý aj nový názov — v dátach sú oba a ešte dlho budú.
+  if (jePredplatne(n)) return 1;
+  if (n.includes("bez viazanost") || /^balíček/i.test(n)) return 2;
   if (n.includes("8 hod")) return 2;            // 8 týždňov
   if (n.includes("1 hodina")) return 1;         // 4 týždne
   return 2;                                     // doplnenie členstva a neznáme

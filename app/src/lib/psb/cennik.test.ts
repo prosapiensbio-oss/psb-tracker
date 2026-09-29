@@ -1,13 +1,26 @@
 import { describe, expect, it } from "bun:test";
 
 import { CENNIK, platnostDo } from "./cennik";
+import { nazovProduktu } from "./nazvyProduktov";
 
 describe("cenník", () => {
-  it("názvy sú presne tie, čo stoja v exporte PTmindera", () => {
-    // Keby sa líšili, vznikol by pri nahodení druhý „typ" balíčka a
-    // porovnanie s PTminderom by ho hlásilo ako rozdiel navždy.
-    const vExporte = ["OFF - 6h BEZ viazanosti", "OFF - 6h S viazanostou", "OFF - 18 hodín offline", "OFF - 8 hodín offline", "Doplnenie členstva", "SPECIAL 3", "ONE YEAR"];
-    for (const n of vExporte) expect(CENNIK.some((s) => s.nazov === n)).toBe(true);
+  it("názvy sú v novom slovníku — Balíček a Předplatné", () => {
+    // Jerry, 29. 9. 2026: „nemôže to byť bez viazanosti a s viazanosťou, ale
+    // Balíček a Předplatné." Staré názvy chodia ďalej z PTmindera; `nazovProduktu`
+    // ich prekladá na tieto, takže sa slovník zjednotí sám.
+    for (const n of ["Balíček 6 h", "Předplatné 6 h", "Balíček 8 h", "Balíček 18 h", "Doplnenie členstva"]) {
+      expect(CENNIK.some((s) => s.nazov === n)).toBe(true);
+    }
+    expect(CENNIK.some((s) => /viazanost/i.test(s.nazov))).toBe(false);
+  });
+
+  it("každý názov z exportu sa preloží na niektorý z cenníka", () => {
+    // Keby sa preklad a cenník rozišli, klient by na faktúre videl jeden
+    // názov a v appke iný.
+    const vExporte = ["OFF - 6h BEZ viazanosti", "OFF - 6h S viazanostou", "OFF - 18 hodín offline", "OFF - 8 hodín offline", "OFF - 1 hodina offline", "ON - 6h BEZ viazanosti"];
+    for (const n of vExporte) {
+      expect(CENNIK.some((s) => s.nazov === nazovProduktu(n))).toBe(true);
+    }
   });
 
   it("doplnenie členstva nemá pevný počet hodín ani platnosť", () => {

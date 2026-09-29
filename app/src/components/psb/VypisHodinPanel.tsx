@@ -48,13 +48,15 @@ const OBDOBIA = [
   { l: "všetko", m: 0 },
 ];
 
-export function VypisHodinPanel({ meno, os, email, zostatokTeraz, trener = "", mesacne = [], hodinSpolu = 0, odkedy = "", cenaBalicka = 0 }: {
+export function VypisHodinPanel({ meno, os, email, zostatokTeraz, trener = "", mesacne = [], hodinSpolu = 0, tempo = 0, odkedy = "", cenaBalicka = 0 }: {
   meno: string; os: Os; email?: string; zostatokTeraz: number | null;
   /** Kto ho vedie — mailom sa podpíše. */
   trener?: string;
   /** Sedenia po mesiacoch — z nich sú stĺpce v maili. */
   mesacne?: { mesiac: string; pocet: number }[];
   hodinSpolu?: number;
+  /** Tréningov mesačne — ten istý výpočet, aký ukazuje profil. */
+  tempo?: number;
   /** Odkedy klient chodí. */
   odkedy?: string;
   /** Cena posledného balíčka — predvyplní sa do QR platby. */
@@ -122,6 +124,7 @@ export function VypisHodinPanel({ meno, os, email, zostatokTeraz, trener = "", m
             })),
           zostatok: v.koniec,
           hodinSpolu,
+          tempo,
           odkedy,
           mesacne,
           platba: Number(suma) > 0

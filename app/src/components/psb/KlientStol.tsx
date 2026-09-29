@@ -1,4 +1,5 @@
 import { oznam } from "../../lib/psb/obnovaSignal";
+import { nazovProduktu } from "../../lib/psb/nazvyProduktov";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { dlhKlienta } from "../../lib/psb/dlhKlienta";
@@ -11,7 +12,7 @@ import { menoKluc } from "../../lib/psb/compute";
 import { satsNaCzk } from "../../lib/psb/btcKontrola";
 import { CENNIK, platnostDo } from "../../lib/psb/cennik";
 import { osCasuKlienta, treningyVBalicku } from "../../lib/psb/klientOsCasu";
-import { sedeniaPoMesiacoch } from "../../lib/psb/profil";
+import { sedeniaPoMesiacoch, tempoMesacne } from "../../lib/psb/profil";
 import { zdravieKlienta } from "../../lib/psb/klientZdravie";
 import type { ClientAgg } from "../../lib/psb/compute";
 import type { PSBData } from "../../lib/psb/types";
@@ -915,7 +916,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
               {c.packageOdvodeny ? "≈" : ""}{c.packageRemaining} h zostáva
             </div>
             <div style={{ fontSize: 11, color: C.textMuted, marginTop: 3 }}>
-              {c.membership || `z ${c.packageTotal}`}
+              {nazovProduktu(c.membership) || `z ${c.packageTotal}`}
               {c.packageValidTo ? ` · do ${fmtDMY(c.packageValidTo)}` : ""}
             </div>
           </div>
@@ -1435,6 +1436,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
               trener={c?.primaryTrainer || ""}
               mesacne={poMesiacoch}
               hodinSpolu={Math.round(c?.totalHours || 0)}
+              tempo={c ? tempoMesacne(c) : 0}
               odkedy={(c?.firstSession || "").slice(0, 10)}
               // Cena posledného balíčka — predvyplní sa do QR, keď ju Jerry chce.
               cenaBalicka={[...mojeBalicky].find((b) => (b.cena_czk || 0) > 0)?.cena_czk || 0}

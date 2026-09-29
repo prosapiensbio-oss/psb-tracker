@@ -64,6 +64,15 @@ export type VypisKlienta = {
   /** Odtrénované hodiny spolu a odkedy klient chodí. */
   hodinSpolu: number;
   odkedy: string;
+  /**
+   * Koľko tréningov mesačne chodí za posledné obdobie.
+   *
+   * Jerry, 29. 9. 2026: „k odtrénovaným hodinám by som pridal ešte tempo."
+   * Súčet hovorí, koľko toho má za sebou; tempo hovorí, ako chodí TERAZ —
+   * a to je číslo, z ktorého si klient sám odvodí, kedy mu balíček dôjde.
+   * `0` = nekreslí sa.
+   */
+  tempo?: number;
   /** Sedenia po mesiacoch — vstup do stĺpcov. */
   mesacne: { mesiac: string; pocet: number }[];
   /**
@@ -92,6 +101,21 @@ const mesiacSK = (kluc: string) => {
   const [r, m] = (kluc || "").split("-");
   return MESIACE[Number(m) - 1] ? `${MESIACE[Number(m) - 1]} ${r}` : kluc;
 };
+/**
+ * Tempo ľudsky. „2,3 tréningu mesačne" nikto nepovie — povie sa „zhruba
+ * raz týždenne". Číslo zostáva v zátvorke pre toho, kto ho chce presne.
+ */
+export function tempoSK(zaMesiac: number): string {
+  const t = Math.round(zaMesiac * 10) / 10;
+  const slovom = t >= 7 ? "takmer obdeň"
+    : t >= 5.5 ? "zhruba 1,5× týždenne"
+      : t >= 3.4 ? "zhruba raz týždenne"
+        : t >= 1.6 ? "zhruba každé dva týždne"
+          : t >= 0.8 ? "zhruba raz mesačne"
+            : "menej než raz mesačne";
+  return `${slovom} (${t.toLocaleString("sk-SK")}× mesačne)`;
+}
+
 export const czk = (n: number) => `${Math.round(n).toLocaleString("sk-SK").replace(/ /g, " ")} Kč`;
 
 /**
@@ -146,6 +170,7 @@ export function mailKlientovi(v: VypisKlienta): { predmet: string; text: string;
     }),
     "",
     `Spolu odtrénované: ${v.hodinSpolu} h${v.odkedy ? ` od ${denSK(v.odkedy)}` : ""}`,
+    v.tempo ? `Tempo: ${tempoSK(v.tempo)}` : "",
     v.platba ? `\n${v.platba.popis}: ${czk(v.platba.suma)}\nÚčet ${v.platba.ucet}, do poznámky uveď: ${v.platba.sprava}` : "",
     "",
     v.trener,
@@ -222,6 +247,7 @@ export function mailKlientovi(v: VypisKlienta): { predmet: string; text: string;
 
     <div style="margin-top:22px;padding:12px 14px;background:${F.papier};border-radius:8px;font-size:14px;color:${F.text}">
       Spolu odtrénované: <b>${v.hodinSpolu} h</b>${v.odkedy ? ` <span style="color:${F.slaba}">od ${denSK(v.odkedy)}</span>` : ""}
+      ${v.tempo ? `<br>Tempo: <b>${tempoSK(v.tempo)}</b>` : ""}
       ${v.zostatok !== null && v.zostatok > 0 ? `<br>V balíčku zostáva: <b>${v.zostatok} h</b>` : ""}
     </div>
 

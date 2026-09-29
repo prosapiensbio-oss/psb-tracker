@@ -1,4 +1,5 @@
 import { oznam } from "../../lib/psb/obnovaSignal";
+import { nazovProduktu } from "../../lib/psb/nazvyProduktov";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { navrhniKlientaKandidati, type ClientAgg } from "../../lib/psb/compute";
@@ -773,7 +774,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                     </div>
                     <div style={{ flex: uzke ? "1 1 100%" : "1 1 200px", minWidth: uzke ? 0 : 160, fontSize: 11.5, color: C.textMuted, order: 3 }}>
                       {x.dovod}
-                      {x.membership ? ` · ${x.membership}` : ""}
+                      {x.membership ? ` · ${nazovProduktu(x.membership)}` : ""}
                       {x.dovod === "platnosť skončila" && x.platnostDo ? ` ${den(x.platnostDo)}` : ""}
                       {uzke ? ` · ${x.dni >= 0 ? `pred ${x.dni} dňami` : "netrénoval"}` : ""}
                     </div>
@@ -825,7 +826,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                     </div>
                     <div style={{ flex: uzke ? "1 1 100%" : "1 1 180px", minWidth: uzke ? 0 : 150, fontSize: 11.5, color: C.textMuted }}>
                       {x.dni < 0 ? `končí ${den(x.platnostDo)}` : `skončila ${den(x.platnostDo)}`}
-                      {` · ${x.membership}`}
+                      {` · ${nazovProduktu(x.membership)}`}
                       {x.predplatne ? " · predplatné" : ""}
                     </div>
                     <div style={{ display: "flex", gap: 6, flexWrap: "wrap", flex: uzke ? "1 1 100%" : undefined }}>

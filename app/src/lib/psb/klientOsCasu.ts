@@ -197,7 +197,12 @@ export function osCasuKlienta(
    * Riadok z `packages` má prednosť, lebo vie aj platnosť a zostatok; služba
    * v ten istý deň s tým istým názvom sa preto preskočí.
    */
-  const uzJe = new Set(out.filter((x) => x.druh === "balicekOd").map((x) => `${x.den}|${normName(x.nazov)}`));
+  const uzJe = new Set<string>();
+  for (const x of out) {
+    if (x.druh !== "balicekOd") continue;
+    uzJe.add(`${x.den}|${normName(x.nazov)}`);
+    uzJe.add(`${x.den}|h${x.hodin}`);
+  }
   const nezaplateneDni = new Set(
     (zdroj.poplatky || []).filter((p) => normName(p.klient) === k).map((p) => den(p.datum)),
   );
@@ -207,8 +212,11 @@ export function osCasuKlienta(
     if (!d || d > dnes) continue;
     const kluc = `${d}|${normName(sl.description)}`;
     if (uzJe.has(kluc)) continue;
-    uzJe.add(kluc);
     const zNazvu = hodinZNazvuBalicka(sl.description);
+    uzJe.add(kluc);
+    // Kľúč po hodinách drží aj tu: ten istý predaj môže mať v Kokpite iné
+    // meno než v exporte (Balíček 6 h vs. OFF - 6h BEZ viazanosti).
+    uzJe.add(`${d}|h${zNazvu}`);
     out.push({
       druh: "balicekOd",
       den: d,
@@ -242,15 +250,26 @@ export function osCasuKlienta(
     if (normName(b.klient) !== k || b.zrusene_at) continue;
     const d = den(b.platnost_od);
     if (!d || d > dnes) continue;
+    /**
+     * ZDVOJENIE SA POZNÁ PO DNI A HODINÁCH, NIE PO NÁZVE.
+     *
+     * Kým Kokpit aj PTminder hovorili „OFF - 6h BEZ viazanosti", stačil
+     * názov. Od 29. 9. 2026 sa produkty volajú „Balíček 6 h" a „Předplatné
+     * 6 h", takže ten istý predaj má v každom systéme iné meno — a počas
+     * súbežného chodu ho Jerry zapisuje do oboch. Bez tohto by taký balíček
+     * stál na osi dvakrát a hodiny by sa zdvojili.
+     */
+    const hodinRucne = Number(b.hodiny) > 0 ? Number(b.hodiny) : hodinZNazvuBalicka(b.nazov);
     const kluc = `${d}|${normName(b.nazov)}`;
-    if (uzJe.has(kluc)) continue;
+    if (uzJe.has(kluc) || uzJe.has(`${d}|h${hodinRucne}`)) continue;
     uzJe.add(kluc);
+    uzJe.add(`${d}|h${hodinRucne}`);
     out.push({
       druh: "balicekOd",
       den: d,
       nazov: b.nazov,
       // Hodiny sú zapísané ručne; keď chýbajú, ostáva názov ako pri exporte.
-      hodin: Number(b.hodiny) > 0 ? Number(b.hodiny) : hodinZNazvuBalicka(b.nazov),
+      hodin: hodinRucne,
       doDna: den(b.platnost_do || "") || undefined,
       zaplatene: b.cena_czk || undefined,
       nezaplatene: nezaplateneDni.has(d) || undefined,

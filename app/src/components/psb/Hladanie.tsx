@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { ClientAgg } from "../../lib/psb/compute";
+import { nazovProduktu } from "../../lib/psb/nazvyProduktov";
 import type { Lead } from "../../lib/psb/types";
 import { najdiKlienta } from "../../lib/psb/compute";
 import { normName, fmtDMY} from "../../lib/psb/format";
@@ -163,7 +164,7 @@ export function HladanieKlienta({
             >
               <span style={{ fontSize: 12.5, color: C.text, display: "block" }}>{c.name}</span>
               <span style={{ fontSize: 10.5, color: C.textDim }}>
-                {c.status === "Neaktívny" ? "neaktívny · " : ""}{c.membership || "bez balíčka"} · {c.primaryTrainer || "—"}
+                {c.status === "Neaktívny" ? "neaktívny · " : ""}{nazovProduktu(c.membership) || "bez balíčka"} · {c.primaryTrainer || "—"}
                 {c.zdrojKto && normName(c.zdrojKto).includes(normName(q.trim())) && !normName(c.name).includes(normName(q.trim())) ? ` · odporučil(a): ${c.zdrojKto}` : ""}
                 {/* Dátum sa ukáže len vtedy, keď je dôvodom nálezu — inak by
                     v zozname pribudol stĺpec, ktorý nikto nehľadal. */}

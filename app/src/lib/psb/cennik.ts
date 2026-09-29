@@ -28,15 +28,23 @@ export type Sablona = {
 };
 
 export const CENNIK: Sablona[] = [
-  { nazov: "OFF - 6h BEZ viazanosti", hodiny: 6, cena: 7790, tyzdnov: 8, skupina: "Offline" },
-  { nazov: "OFF - 6h S viazanostou", hodiny: 6, cena: 6990, tyzdnov: 4, skupina: "Offline" },
-  { nazov: "OFF - 8 hodín offline", hodiny: 8, cena: 9400, tyzdnov: 8, skupina: "Offline" },
-  { nazov: "OFF - 18 hodín offline", hodiny: 18, cena: 21150, tyzdnov: 26, skupina: "Offline" },
-  { nazov: "OFF - 1 hodina offline", hodiny: 1, cena: 1450, tyzdnov: 4, skupina: "Offline" },
+  /**
+   * NÁZVY SÚ „BALÍČEK" A „PŘEDPLATNÉ" (Jerry, 29. 9. 2026).
+   *
+   * „BEZ viazanosti" a „S viazanostou" bol pohľad zvnútra — hovorilo to
+   * o tom, čo klient podpísal, nie o tom, čo si kúpil. Staré názvy chodia
+   * ďalej z PTmindera a `nazovProduktu` ich prekladá na tieto; nové predaje
+   * ich nesú rovno, takže sa slovník časom zjednotí sám.
+   */
+  { nazov: "Balíček 6 h", hodiny: 6, cena: 7790, tyzdnov: 8, skupina: "Offline" },
+  { nazov: "Předplatné 6 h", hodiny: 6, cena: 6990, tyzdnov: 4, skupina: "Offline" },
+  { nazov: "Balíček 8 h", hodiny: 8, cena: 9400, tyzdnov: 8, skupina: "Offline" },
+  { nazov: "Balíček 18 h", hodiny: 18, cena: 21150, tyzdnov: 26, skupina: "Offline" },
+  { nazov: "Balíček 1 h", hodiny: 1, cena: 1450, tyzdnov: 4, skupina: "Offline" },
 
-  { nazov: "ON - 6h BEZ viazanosti", hodiny: 6, cena: 6590, tyzdnov: 8, skupina: "Online" },
-  { nazov: "ON - 6h S viazanostou", hodiny: 6, cena: 5640, tyzdnov: 4, skupina: "Online" },
-  { nazov: "ON - 1 hodina online", hodiny: 1, cena: 1390, tyzdnov: 4, skupina: "Online" },
+  { nazov: "Balíček 6 h online", hodiny: 6, cena: 6590, tyzdnov: 8, skupina: "Online" },
+  { nazov: "Předplatné 6 h online", hodiny: 6, cena: 5640, tyzdnov: 4, skupina: "Online" },
+  { nazov: "Balíček 1 h online", hodiny: 1, cena: 1390, tyzdnov: 4, skupina: "Online" },
 
   { nazov: "ONE YEAR", hodiny: 78, cena: 90870, tyzdnov: 52, skupina: "Špeciálne" },
   { nazov: "SPECIAL 3", hodiny: 3, cena: 3990, tyzdnov: 8, skupina: "Špeciálne" },

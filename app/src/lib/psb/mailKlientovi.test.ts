@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { mailKlientovi, type VypisKlienta } from "./mailKlientovi";
+import { mailKlientovi, tempoSK, type VypisKlienta } from "./mailKlientovi";
 
 const zaklad: VypisKlienta = {
   klient: "Richard Matl", oslovenie: "Richard", trener: "Jerry",
@@ -92,5 +92,20 @@ describe("mailKlientovi", () => {
   it("osobná veta sa pridá len keď je napísaná", () => {
     expect(mailKlientovi(zaklad).html).not.toContain("margin-top:10px\">Uvidíme");
     expect(mailKlientovi({ ...zaklad, odkaz: "Uvidíme sa v pondelok." }).text).toContain("Uvidíme sa v pondelok.");
+  });
+});
+
+describe("tempo", () => {
+  it("hovorí sa slovom, číslo je v zátvorke", () => {
+    // „2,3 tréningu mesačne" nikto nepovie; „zhruba raz týždenne" áno.
+    expect(tempoSK(4.1)).toBe("zhruba raz týždenne (4,1× mesačne)");
+    expect(tempoSK(2)).toBe("zhruba každé dva týždne (2× mesačne)");
+    expect(tempoSK(0.5)).toBe("menej než raz mesačne (0,5× mesačne)");
+  });
+
+  it("bez tempa sa riadok nekreslí", () => {
+    expect(mailKlientovi(zaklad).html).not.toContain("Tempo:");
+    expect(mailKlientovi({ ...zaklad, tempo: 4 }).html).toContain("Tempo:");
+    expect(mailKlientovi({ ...zaklad, tempo: 4 }).text).toContain("Tempo: zhruba raz týždenne");
   });
 });

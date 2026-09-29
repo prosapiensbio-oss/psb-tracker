@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { menoKluc, najdiKlienta, duchOdpoved, membershipBucket, MEMBERSHIP_ORDER, TRAINERS, type CakajuciKlient, type CapacityRow, type ClientAgg, type SixMRow, type ZmenaVKalendari } from "../../lib/psb/compute";
+import { nazovProduktu } from "../../lib/psb/nazvyProduktov";
 import { fmtCZK, fmtDate, fmtDMY, normName } from "../../lib/psb/format";
 import { C, MEMBERSHIP_COLORS, mix, S } from "../../lib/psb/theme";
 import { KlientProfil } from "./KlientProfil";
@@ -20,7 +21,8 @@ const STATUS_RANK: Record<string, number> = { "Aktívny": 0, "Sporadický": 1, "
 const statusTone = (s: string) =>
   s === "Aktívny" ? "green" : s === "Sporadický" ? "blue" : s === "Pauza" ? "orange" : "muted";
 const SEGMENTS = ["Anchor", "Stabilný", "Sporadický"] as const;
-const shortPkg = (m: string) => m.replace(/^OFF - /, "").replace(/^ON - /, "ON ").replace(" hodín offline", "h").replace("hodina offline", "h");
+/* Skracovanie názvu balíčka nahradil `nazovProduktu` (29. 9. 2026) — ten
+   nielen skracuje, ale aj prekladá do slovníka, ktorý vidí klient. */
 
 // Štandard rodiny T (roky chronologicky, potom okná od najdlhšieho).
 const KPI_WINDOWS = [
@@ -677,7 +679,7 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
                   {c.statusOverride && <span title={`Auto: ${c.statusAuto}`} style={{ fontSize: 9, color: C.textDim, marginLeft: 4 }}>✎</span>}
                 </td>
                 <td style={S.td}><Badge tone={segTone(c.segment)}>{c.segment}</Badge></td>
-                <td style={{ ...S.td, fontSize: 12, color: c.is6m ? C.accentLight : C.textMuted }} title={c.membership}>{c.membership ? shortPkg(c.membership) : c.clientType}</td>
+                <td style={{ ...S.td, fontSize: 12, color: c.is6m ? C.accentLight : C.textMuted }} title={nazovProduktu(c.membership)}>{c.membership ? nazovProduktu(c.membership) : c.clientType}</td>
                 <td style={{ ...S.td, textAlign: "right" }} title={c.packageOdvodeny ? "Dopočítané: export z PTmindera pri tomto členstve zostatok nedáva, tak sa odčítali odtrénované hodiny od počtu v názve balíčka." : undefined}>
                   {c.packageTotal ? `${c.packageOdvodeny ? "≈" : ""}${c.packageRemaining}/${c.packageTotal}` : "—"}</td>
                 <td style={{ ...S.td, textAlign: "right" }} title={`${c.totalHours.toFixed(0)} hodín`}>{c.sessionCount}</td>
@@ -729,7 +731,7 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
           <Premenovanie meno={editC.name} onHotovo={async (nove) => { setEdit(null); await actions.refresh(); void nove; }} />
           {editC.membership && (
             <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 12 }}>
-              Predplatné: <strong style={{ color: C.text }}>{editC.membership}</strong>
+              Predplatné: <strong style={{ color: C.text }}>{nazovProduktu(editC.membership)}</strong>
               {editC.packageTotal ? ` · zostatok ${editC.packageOdvodeny ? "≈" : ""}${editC.packageRemaining}/${editC.packageTotal}` : ""}
               {editC.packageOdkial ? <span style={{ color: C.textDim }}> · {editC.packageOdkial}</span> : null}
             </div>

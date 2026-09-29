@@ -1913,3 +1913,30 @@ A okrem dochádzky a QR platby dať nejaké grafy?" (`mailKlientovi.ts`)
   zrušil. Pamäť to hovorí jasne a aj tak som to navrhol znova.
 - **Naše písmo.** Agrandir mailová čítačka nemá a webové písmo Gmail
   ignoruje. Farby značky nesie zvyšok.
+
+## Balíček a Předplatné — slovník, nie prepis dát
+
+Jerry, 29. 9. 2026: „musíme zmeniť názvy balíkov — nemôže to byť bez
+viazanosti a s viazanosťou, ale Balíček a Předplatné." Mal pravdu v tom,
+čo tie slová hovoria: „BEZ viazanosti" je pohľad zvnútra, opisuje, čo klient
+PODPÍSAL. Klient si kupuje balíček hodín alebo předplatné.
+
+- **Dáta sa NEPREPISUJÚ.** Názvy chodia z PTmindera (133 + 89 riadkov
+  exportu); prepísať ich v databáze by znamenalo rozísť sa so zdrojom —
+  najbližší import ich prinesie späť a appka by mala od každého balíčka dve
+  verzie. Preklad je na povrchu (`nazvyProduktov.ts`), pod ním zostáva
+  pôvodný názov a všetko, čo z neho appka číta.
+- **Nové predaje nesú nové názvy** (`cennik.ts`), takže sa slovník zjednotí
+  sám. Parser hodín si s „Balíček 6 h" poradí rovnako ako s „OFF - 6h".
+- **Sémantiku číta `jePredplatne`, nie `includes("s viazanost")`.** Na tom
+  viseli DVE veci: príslušnosť k 6M (`sixMClientSet`) a dĺžka platnosti
+  (`platnostMesiacov`, předplatné = 1 mesiac). Keby sa aktualizoval len
+  cenník, nový „Předplatné 6 h" by prestal byť 6M a dostal by osemtýždňovú
+  platnosť namiesto mesačnej.
+- **Zdvojenie na osi sa odteraz pozná po DNI A HODINÁCH, nie po názve.**
+  Ten istý predaj má počas súbežného chodu v Kokpite iné meno než v exporte
+  a Jerry ho zapisuje do oboch — bez tejto zmeny by stál na osi dvakrát
+  a hodiny by sa zdvojili.
+- **Staré produkty sa neprekladajú.** SILVER, BRONZ, GOLD, ČLENSTVÍ ONE
+  a spol. sú z roku 2025 a už sa nepredávajú; premenovať ich by znamenalo
+  prepisovať históriu na niečo, čo si klient nikdy nekúpil.

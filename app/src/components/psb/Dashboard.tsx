@@ -1,4 +1,5 @@
 import { oznam } from "../../lib/psb/obnovaSignal";
+import { nazovProduktu } from "../../lib/psb/nazvyProduktov";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 
@@ -1676,7 +1677,7 @@ export function Dashboard({
                   </span>
                   <button
                     onClick={() => onNavigate("klienti", undefined, { client: c.name, nonce: Date.now() })}
-                    title={`${c.name} — ${c.membership || "—"} · ${c.primaryTrainer} · chodí ${frekvencia.toFixed(1)}× týždenne`}
+                    title={`${c.name} — ${nazovProduktu(c.membership) || "—"} · ${c.primaryTrainer} · chodí ${frekvencia.toFixed(1)}× týždenne`}
                     style={{ flex: 1, minWidth: 0, background: "none", border: "none", padding: 0, textAlign: "left", cursor: "pointer" }}
                   >
                     <span style={{ fontSize: 13, color: C.text, fontWeight: 500, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.name}</span>

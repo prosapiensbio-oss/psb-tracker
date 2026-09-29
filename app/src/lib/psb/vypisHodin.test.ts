@@ -239,7 +239,9 @@ describe("text pre klienta", () => {
   it("nesie začiatok členstva, odpočet aj mínus", () => {
     const t = vypisAkoText(vypisHodin(os, "", DNES, 5), "Dan Kouřil");
     expect(t).toContain("Výpis hodín — Dan Kouřil");
-    expect(t).toContain("OFF - 6h BEZ viazanosti · 6 h · do 28. 10. 2026");
+    // Názov sa klientovi ukazuje v novom slovníku (Jerry, 29. 9. 2026);
+    // v dátach zostáva pôvodný „OFF - 6h BEZ viazanosti" z PTmindera.
+    expect(t).toContain("Balíček 6 h · 6 h · do 28. 10. 2026");
     expect(t).toContain("zostávalo 6 h · nezaplatené · 1. tréning");
     expect(t).toContain("Tréningov na nezaplatenom členstve: 1");
     expect(t).toContain("tréning 15:00 · Jerry");

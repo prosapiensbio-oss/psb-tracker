@@ -1,5 +1,6 @@
 import type { Udalost } from "./klientOsCasu";
 import { denVTyzdni } from "./format";
+import { nazovProduktu } from "./nazvyProduktov";
 
 /**
  * VÝPIS HODÍN — čo klient kúpil, čo odtrénoval a koľko mu zostáva.
@@ -119,7 +120,7 @@ export const hod = (n: number): string => (Number.isInteger(n) ? String(n) : n.t
 const METODY: Record<string, string> = { bank: "prevodom", cash: "v hotovosti", card: "kartou" };
 
 const popisZ = (u: Udalost): string => {
-  if (u.druh === "balicekOd") return `${u.nazov}${u.hodin ? ` · ${u.odvodene ? "≈" : ""}${u.hodin} h` : ""}${u.doDna ? ` · do ${datum(u.doDna)}` : ""}`;
+  if (u.druh === "balicekOd") return `${nazovProduktu(u.nazov)}${u.hodin ? ` · ${u.odvodene ? "≈" : ""}${u.hodin} h` : ""}${u.doDna ? ` · do ${datum(u.doDna)}` : ""}`;
   if (u.druh === "balicekDo") return `koniec platnosti — ${u.nazov}`;
   if (u.druh === "platba") return `platba ${suma(u.suma)} Kč${u.metoda ? ` · ${METODY[u.metoda] || u.metoda}` : ""}`;
   const zdarma = u.zdarma !== undefined ? ` · zdarma${u.zdarma ? ` (${u.zdarma})` : ""}` : "";
