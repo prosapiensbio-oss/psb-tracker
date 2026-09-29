@@ -27,23 +27,22 @@ Rozhodnuté 29. 9. 2026. PTminder je odvtedy kontrola.
 - [ ] **Jerry: „Doplniť nové z PTmindera"** (Prechod → balíčky) — 29. 9.
   NEPREBEHLO (v audite nič). Pridá 8 členstiev + Jankino doplnenie. Bez toho
   majú Barbora, Malinová, Martinek, Pecková, Pavlík, Jitka od 1. 10. zlý zostatok.
-- [ ] **Jerry: 3 minuté doplnenia 1 h** (Petra Bambúšková, Tsiolis, Jitka) —
-  v PTminderi už nie sú; navrhnuté ukončiť v Kokpite k 29. 9.
-- [ ] **Jerry: Janka Šnirychová má v Kokpite „SPECIAL 3" od 22. 9.**, v PTminderi
-  je SPECIAL 3 z 20. 9. na Josefa. Čí je?
+- [x] 3 minuté doplnenia 1 h (Petra Bambúšková, Tsiolis, Jitka) — ukončené k 29. 9.
+- [x] Janka Šnirychová „SPECIAL 3" je v poriadku — berú ho obaja Šnirychovci.
 - [ ] **Peniaze z banky a zošita** — `platby_od` = 2026-10.
 - [ ] **Os času a „dnes"** — os počíta celý dnešný deň, nové sedenia len to,
   čo začalo. ±1 h do konca dňa.
 
 ## 0b · Ostatné otvorené z 29. 9.
 
-- [ ] **Nedeľná pripomienka** (`/api/push-nedela`) je postavená, ale nebeží —
-  treba ju naplánovať tam, kde je `/api/push-rano`. Jerry neodpovedal kde.
-- [ ] **5 tréningov v Jerryho kalendári, ktoré v PTminderi nie sú**: Kríž 28. 1.,
-  Kouřil 24. 5. a 14. 6. (nedele), Kadličková a Tsiolis („Akis") 17. 6. —
-  pri Tsiolisovi má PTminder v tom čase Kaňovského.
-- [ ] **Import služieb stále len pridáva** — zdvojený predaj Dan Kouřil 9. 7.
-  (7 790 Kč) zostal.
+- [x] Nedeľná pripomienka — zrušená (Jerry: stačí karta „Balíček dojde" na dashboarde).
+- [x] Tréningy v kalendári, ktoré v PTminderi nie sú — **pred 1. 10. je PTminder
+  pravda**, čo v ňom nie je, sa nekonalo (Jerry, 29. 9.). 38 sporných uzavretých
+  ako „neprišiel"; 5 z Jerryho kalendára (jan.–jún) sa nezapisuje.
+- [x] Dan Kouřil 9. 7. (7 790 Kč) — zmazaný, platil len členstvo od 2. 7.
+- [ ] **SMS od „ProSapiens"** — Jerry chce. Objednať odosielateľa v SmsManageri
+  (500 Kč + 500 Kč/mes.), po schválení zapísať „ProSapiens" v Údaje → SMS.
+- [ ] Import služieb stále len pridáva (oprava v PTminderi → zdvojený predaj).
 - [ ] Export Sessions s 28.–29. 9., keď ich Jerry dopíše.
 
 ## 1 · Čaká na Jerryho slovo
