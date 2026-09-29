@@ -182,6 +182,11 @@ export type PSBData = {
    * Pre výpočty platí `sessions`, ktoré sú od toho dňa z kalendára.
    */
   sessionsPtminder?: SessionRow[];
+  /**
+   * Balíčky zapísané v Kokpite (vrátane naliatych z PTmindera). Od 1. 10.
+   * 2026 sa z nich počíta zostatok na karte klienta (`zostatokKokpitu`).
+   */
+  balickyKokpit?: import("./zostatokKokpitu").BalicekPreZostatok[];
   /** Koľko hodín pridalo „Doplnenie členstva" — kľúč `klient|deň`. */
   doplneniaHodiny?: Record<string, number>;
   /** Vedomosti zvonku (rešerše, príručky). Text sa do kontextu neposiela — len prehľad. */

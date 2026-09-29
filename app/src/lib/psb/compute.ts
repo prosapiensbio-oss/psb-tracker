@@ -1,5 +1,7 @@
 // All derived analytics for the PSB Tracker. Pure functions over PSBData —
 // no browser globals. Reused across every module.
+import { KOKPIT_OD } from "./sedeniaZKalendara";
+import { zostatokKokpitu } from "./zostatokKokpitu";
 import { daysBetween, fmtDMY, monthKey, monthLabel, monthsBetween, normName, quarterKey, quarterLabel, weekKey, weekLabel } from "./format";
 import { jePredplatne } from "./nazvyProduktov";
 import { moznostiPlatnosti, vetaPlatnosti, zostavaPoPlatnosti } from "./platnostZostatok";
@@ -156,6 +158,13 @@ export type ClientAgg = {
   packageOdvodeny: boolean;
   /** Odkiaľ zostatok je — prázdne = priamo z exportu PTmindera. */
   packageOdkial: string;
+  /**
+   * Od 1. 10. 2026 je zostatok z balíčkov v Kokpite. Toto je číslo, ktoré
+   * by ukazoval PTminder — len na kontrolu; `null` pred prepnutím.
+   */
+  packageRemainingPtminder?: number | null;
+  /** Hodín odtrénovaných nad rámec balíčkov v Kokpite (od 1. 10. 2026). */
+  packageNadRamec?: number;
   /** Ručná kotva: čo ukazoval PTminder a ku ktorému dňu. */
   balicekZostatok: number | null;
   balicekKDatumu: string;
@@ -548,6 +557,33 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
     c.packageStatus = active?.status || "";
     c.membership = active?.package || "";
     c.packageValidTo = active?.validTo || "";
+
+    /**
+     * OD 1. 10. 2026 JE ZOSTATOK Z KOKPITU, PTMINDER JE KONTROLA.
+     *
+     * Hodiny aktívnych balíčkov v Kokpite mínus odtrénované (z dochádzky
+     * appky — od 1. 10. z kalendára). Číslo z PTmindera zostáva v
+     * `packageRemainingPtminder` na porovnanie. Klient, ktorý v Kokpite
+     * aktívny balíček nemá, drží číslo z PTmindera a karta to povie —
+     * tváriť sa, že má nulu, by bola nepravda o tom, čo si kúpil.
+     */
+    if (dnesPack >= KOKPIT_OD && data.balickyKokpit) {
+      const k = zostatokKokpitu(data.balickyKokpit, c.name, c.sessions.map((x) => ({ client: c.name, date: x.date, duration: x.duration })), dnesPack, zdarmaDni);
+      c.packageRemainingPtminder = c.packageRemaining;
+      if (k) {
+        c.membership = k.nazov;
+        c.packageValidTo = k.platnostDo || "";
+        c.packageTotal = k.pausal ? 0 : k.spolu;
+        c.packageRemaining = k.zostatok;
+        c.packageNadRamec = k.nadRamec;
+        c.packageOdvodeny = false;
+        c.packageOdkial = k.pausal
+          ? "Kokpit: paušál — hodiny sa nepočítajú"
+          : `Kokpit: ${k.spolu} h v balíčkoch mínus ${k.minute} odtrénovaných od ${k.od}`;
+      } else if (c.packageTotal > 0) {
+        c.packageOdkial = `z PTmindera — v Kokpite nie je aktívny balíček${c.packageOdkial ? ` (${c.packageOdkial})` : ""}`;
+      }
+    }
 
     let off = 0;
     let on = 0;

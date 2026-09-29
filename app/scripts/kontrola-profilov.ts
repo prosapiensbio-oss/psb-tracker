@@ -73,6 +73,13 @@ const balicky = nacitaj("balicky");
 
 const data: PSBData = {
   ...EMPTY_DATA, sessions, packages, services, payments, poplatky, treningyZdarma,
+  // Od 1. 10. 2026 sa zostatok na karte počíta z týchto balíčkov — bez nich
+  // by kontrolór videl iné číslo než appka.
+  balickyKokpit: balicky.map((r: any) => ({
+    klient: r.klient, nazov: r.nazov, hodiny: r.hodiny ?? null,
+    platnostOd: String(r.platnost_od || "").slice(0, 10), platnostDo: r.platnost_do ? String(r.platnost_do).slice(0, 10) : null,
+    zruseneAt: r.zrusene_at || null, kotva: /^zostatok prevzatý/i.test(String(r.poznamka || "")),
+  })),
   /**
    * RUČNÉ ZÁSAHY SA MUSIA VOLAŤ `clientOverrides` A BYŤ MAPA PODĽA MENA.
    *

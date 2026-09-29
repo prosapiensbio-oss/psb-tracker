@@ -72,7 +72,7 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
           AND u.zaciatok >= ?1`,
     ).bind(KOKPIT_OD).all().catch(() => ({ results: [] })),
     // Balíčky v Kokpite — z nich cena tréningu z kalendára.
-    DB.prepare("SELECT klient, nazov, zdroj, platnost_od, platnost_do, hodiny, cena_czk, zrusene_at FROM balicky")
+    DB.prepare("SELECT klient, nazov, zdroj, platnost_od, platnost_do, hodiny, cena_czk, zrusene_at, poznamka FROM balicky")
       .all().catch(() => ({ results: [] })),
   ]);
 
@@ -260,6 +260,14 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
     const { sessions: spojene, kontrola } = spojDochadzku(sessionsPtminder, zKalendara);
     data.sessions = spojene;
     data.sessionsPtminder = kontrola;
+    // Balíčky v Kokpite pre zostatok na karte. Kotva = zostatok prevzatý
+    // z PTmindera k dňu naliatia (poznámka to hovorí doslova).
+    data.balickyKokpit = (balickyK.results as any[]).map((r) => ({
+      klient: r.klient, nazov: r.nazov, hodiny: r.hodiny ?? null,
+      platnostOd: String(r.platnost_od || "").slice(0, 10), platnostDo: r.platnost_do ? String(r.platnost_do).slice(0, 10) : null,
+      zruseneAt: r.zrusene_at || null,
+      kotva: /^zostatok prevzatý/i.test(String(r.poznamka || "")),
+    }));
   }
 
   return data;
