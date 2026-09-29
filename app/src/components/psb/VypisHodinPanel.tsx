@@ -49,7 +49,7 @@ const OBDOBIA = [
   { l: "všetko", m: 0 },
 ];
 
-export function VypisHodinPanel({ meno, os, email, zostatokTeraz, trener = "", mesiacov = 0, hodinSpolu = 0, tempo = 0, odkedy = "", cenaBalicka = 0, telefon = "", otvorHned = false, onOtvorene }: {
+export function VypisHodinPanel({ meno, os, email, zostatokTeraz, trener = "", mesiacov = 0, hodinSpolu = 0, tempo = 0, odkedy = "", cenaBalicka = 0, telefon = "", dalsi = "", otvorHned = false, onOtvorene }: {
   meno: string; os: Os; email?: string; zostatokTeraz: number | null;
   /** Kto ho vedie — mailom sa podpíše. */
   trener?: string;
@@ -64,6 +64,8 @@ export function VypisHodinPanel({ meno, os, email, zostatokTeraz, trener = "", m
   cenaBalicka?: number;
   /** Telefón klienta — bez neho sa SMS neponúka. */
   telefon?: string;
+  /** Najbližší dohodnutý termín z kalendára — posledný bod osi v maili. */
+  dalsi?: string;
   /**
    * Otvor výpis hneď — prišlo sa sem z karty „Balíček dojde" preto, aby sa
    * klientovi napísalo. Nechať človeka rozklikávať panel, o ktorý si pred
@@ -165,6 +167,7 @@ export function VypisHodinPanel({ meno, os, email, zostatokTeraz, trener = "", m
           odkedy,
           mesiacov,
           dnes: new Date().toISOString().slice(0, 10),
+          dalsi,
           platba: Number(suma) > 0
             ? { popis: popisPlatby.trim() || "Ďalší balíček", suma: Number(suma), ucet: "2302732185/2010", sprava: meno }
             : undefined,

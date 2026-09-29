@@ -48,7 +48,7 @@ export type BodOsi = {
   cas?: string;
   /** Čo sa stalo — názov balíčka, „tréning", „zaplatené". */
   popis: string;
-  druh: "balicekOd" | "trening" | "platba" | "balicekDo";
+  druh: "balicekOd" | "trening" | "platba" | "balicekDo" | "dalsi";
   /** Koľká hodina balíčka to bola (stav PRED tréningom). */
   zostatok?: number | null;
   /** Koľkátý tréning bez krytia — kreslí sa ako −1, −2. */
@@ -90,6 +90,16 @@ export type VypisKlienta = {
    * stalo. Bez tohto poľa sa na dnešok nikde neodvoláva.
    */
   dnes?: string;
+  /**
+   * Najbližší dohodnutý termín z kalendára (ISO `2026-10-06T10:30`).
+   *
+   * Jerry, 29. 9. 2026: „môže tam byť aj poznámka typu a najbližšie ste
+   * dohodnutý na tento termín." Mail hovorí o tom, čo sa minulo, a končí
+   * výzvou zaplatiť — bez tejto vety je to účet. S ňou je to prehľad:
+   * tu si bol, toto zostalo, tu sa vidíme. Keď termín dohodnutý nie je,
+   * nepíše sa nič a je to samo osebe informácia.
+   */
+  dalsi?: string;
   /** `cid` obrázkov — vkladá ich odosielateľ. */
   qrCid?: string;
   logoCid?: string;
@@ -136,13 +146,21 @@ export function mailKlientovi(v: VypisKlienta): { predmet: string; text: string;
   const predmet = doslo ? "Balíček dochodený — výpis a platba" : "Tvoja dochádzka v ProSapiens";
   const nadpis = doslo ? "Balíček dochodený" : "Tvoja dochádzka";
   const dnesnaHodina = !!v.dnes && !!posledny && posledny.slice(0, 10) === v.dnes;
-  const uvod = doslo
-    ? dnesnaHodina
-      ? "dnes si mal poslednú hodinu z balíčka."
-      : posledny
-        ? `balíček máš dochodený — posledná hodina bola ${denSK(posledny)}.`
-        : "balíček máš dochodený."
-    : v.zostatok !== null ? `v balíčku ti ${zostavaHodin(v.zostatok)}.` : "posielam ti prehľad tréningov.";
+  /**
+   * Hodiny NAD RÁMEC balíčka. Tie sa nesmú schovať za „dochodený": klient
+   * ich odtrénoval a sú v ďalšej platbe. Povedať to rovno je slušnejšie
+   * než nechať ho zistiť to z čísla na faktúre.
+   */
+  const navyse = v.zostatok !== null && v.zostatok < 0 ? -v.zostatok : 0;
+  const uvod = navyse
+    ? `${dnesnaHodina ? "dnes si mal" : "mal si"} ${navyse === 1 ? "hodinu" : `${navyse} hodiny`} nad rámec balíčka — ${navyse === 1 ? "je" : "sú"} v ďalšej platbe.`
+    : doslo
+      ? dnesnaHodina
+        ? "dnes si mal poslednú hodinu z balíčka."
+        : posledny
+          ? `balíček máš dochodený — posledná hodina bola ${denSK(posledny)}.`
+          : "balíček máš dochodený."
+      : v.zostatok !== null ? `v balíčku ti ${zostavaHodin(v.zostatok)}.` : "posielam ti prehľad tréningov.";
 
   /**
    * OS KONČÍ TÝM, ČO KLIENTA ZAUJÍMA — koľko mu zostáva.
@@ -152,13 +170,23 @@ export function mailKlientovi(v: VypisKlienta): { predmet: string; text: string;
    * dátum, aby nevyzerala ako ďalší tréning. Keď appka zostatok nevie
    * (`null`), bodka tam nie je; vymyslené číslo ide von k zákazníkovi.
    */
-  const os = v.zostatok === null || v.os[v.os.length - 1]?.druh === "balicekDo"
-    ? v.os
-    : [...v.os, {
-      den: "",
-      popis: v.zostatok <= 0 ? "Balíček dochodený" : zostavaHodin(v.zostatok).replace(/^./, (z) => z.toUpperCase()),
-      druh: "balicekDo" as const,
-    }];
+  const os = [
+    ...(v.zostatok === null || v.os[v.os.length - 1]?.druh === "balicekDo"
+      ? v.os
+      : [...v.os, {
+        den: "",
+        popis: v.zostatok <= 0 ? "Balíček dochodený" : zostavaHodin(v.zostatok).replace(/^./, (z) => z.toUpperCase()),
+        druh: "balicekDo" as const,
+      }]),
+    // Najbližší termín je posledný bod osi, lebo ňou naozaj je — os ide
+    // ďalej, nekončí účtom.
+    ...(v.dalsi ? [{
+      den: v.dalsi.slice(0, 10),
+      cas: v.dalsi.length > 10 ? v.dalsi.slice(11, 16) : undefined,
+      popis: "Najbližší tréning",
+      druh: "dalsi" as const,
+    }] : []),
+  ];
 
   /** Tri čísla, ktoré o klientovi niečo hovoria. „0 h zostáva" medzi ne nepatrí. */
   const staty: [string, string][] = [

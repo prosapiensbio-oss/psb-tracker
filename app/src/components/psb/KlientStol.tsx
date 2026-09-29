@@ -1446,6 +1446,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
               hodinSpolu={Math.round(c?.totalHours || 0)}
               tempo={c ? tempoMesacne(c) : 0}
               telefon={kontaktTelefon}
+              dalsi={buduce[0] || ""}
               odkedy={(c?.firstSession || "").slice(0, 10)}
               // Cena posledného balíčka — predvyplní sa do QR, keď ju Jerry chce.
               cenaBalicka={[...mojeBalicky].find((b) => (b.cena_czk || 0) > 0)?.cena_czk || 0}

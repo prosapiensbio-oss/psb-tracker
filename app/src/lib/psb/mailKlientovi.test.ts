@@ -153,3 +153,27 @@ describe("kedy padla posledná hodina", () => {
     expect(v.text).not.toContain("dnes si mal");
   });
 });
+
+describe("hodiny nad rámec a najbližší termín", () => {
+  it("mínusové hodiny sa nechovajú za „dochodený“", () => {
+    const v = mailKlientovi({ ...zaklad, zostatok: -1, dnes: "2026-09-29" });
+    expect(v.text).toContain("hodinu nad rámec balíčka");
+    expect(v.text).toContain("v ďalšej platbe");
+  });
+
+  it("dve hodiny navyše sa skloňujú", () => {
+    const v = mailKlientovi({ ...zaklad, zostatok: -2 });
+    expect(v.text).toContain("2 hodiny nad rámec balíčka");
+  });
+
+  it("najbližší termín je posledný bod osi", () => {
+    const v = mailKlientovi({ ...zaklad, dalsi: "2026-10-06T10:30" });
+    const riadky = v.text.split("\n").filter((r) => r.startsWith("  "));
+    expect(riadky[riadky.length - 1]).toBe("  6. 10. 2026 · 10:30 — Najbližší tréning");
+  });
+
+  it("bez dohodnutého termínu sa nepíše nič", () => {
+    const v = mailKlientovi(zaklad);
+    expect(v.text).not.toContain("Najbližší");
+  });
+});
