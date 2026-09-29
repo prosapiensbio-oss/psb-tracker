@@ -150,7 +150,7 @@ async function snimka(DB: D1Database, z: Zdroj) {
   for (const s of stare) {
     if (videne.has(s.uid) || s.zmizla_at) continue;
     // ČERSTVÝ RIADOK STARÁ KEŠ NEPOCHOVÁVA. Google drží ICS feed v keši aj
-    // hodiny (viď „snímka vyjde ~1 z 3") — tréning nahodený z Kokpitu
+    // hodiny (viď „snímka vyjde ~1 z 3“) — tréning nahodený z Kokpitu
     // (trening-nahod) v ňom chvíľu nie je a snímka by ho označila za zrušený,
     // hoci v kalendári stojí. Riadok mladší než 12 hodín sa preto nechá tak;
     // naozaj zmazanú novú udalosť ohlási najbližšia snímka po vyprchaní keše
@@ -492,7 +492,7 @@ export const Route = createFileRoute("/api/kalendar")({
 
           // Kľúč v tvare snímky: `<ics uid>|<začiatok>`. Holé ics uid by najbližšia
           // snímka nespoznala — založila by druhý riadok a tento ohlásila ako
-          // „zrušený tréning", hoci sa nič nezrušilo.
+          // „zrušený tréning“, hoci sa nič nezrušilo.
           const uid = `${icsUid(idUdalosti)}|${v.t.zaciatok}`;
           const kedy = teraz();
           await DB.batch([
@@ -545,7 +545,7 @@ export const Route = createFileRoute("/api/kalendar")({
             return Response.json({ ok: false, error: `Google kalendár presun odmietol: ${sprava}.${rada}` }, { status: 502 });
           }
           // Samostatná udalosť mení v snímke aj KĽÚČ (druhá polovica uid je jej
-          // začiatok); bez prepisu by najbližšia snímka hlásila „zrušené + pridané".
+          // začiatok); bez prepisu by najbližšia snímka hlásila „zrušené + pridané“.
           // Výskyt série si kľúč drží — RECURRENCE-ID nesie pôvodný čas.
           if (seria) {
             await DB.prepare("UPDATE kal_udalosti SET zaciatok = ?1, koniec = ?2, naposledy = ?3 WHERE uid = ?4 AND trener = ?5")
