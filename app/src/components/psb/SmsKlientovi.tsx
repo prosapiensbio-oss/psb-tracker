@@ -39,11 +39,18 @@ const kontakty = () => {
   return cacheKontaktov;
 };
 
-export function SmsKlientovi({ meno, zostatok, trener, odvodene = false, sMailom = false, maly = false }: {
+export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, odvodene = false, sMailom = false, maly = false }: {
   meno: string;
   /** Koľko hodín zostáva; 0 alebo menej = balíček došiel. */
-  zostatok: number;
-  trener: string;
+  zostatok?: number;
+  trener?: string;
+  /**
+   * Hotový text namiesto predvoleného.
+   *
+   * Pri zápise balíčka sa nepíše „balíček ti došiel", ale „zapísal som ti
+   * nový" — je to iný okamih, nie iná formulácia tej istej veci.
+   */
+  predvolenyText?: string;
   /** `true` = počet hodín je dopočítaný z názvu členstva, nie z exportu. */
   odvodene?: boolean;
   /** Ide spolu s mailom? Mení vetu o tom, kde nájde dochádzku. */
@@ -62,8 +69,8 @@ export function SmsKlientovi({ meno, zostatok, trener, odvodene = false, sMailom
     if (!otvorene || nacitane.current) return;
     nacitane.current = true;
     void kontakty().then((u) => setTelefon(String(u.find((x) => x.klient === meno)?.telefon || "")));
-    setText(textSms({ oslovenie: meno.split(" ")[0], trener, zostatok, sMailom }));
-  }, [otvorene, meno, trener, zostatok, sMailom]);
+    setText(predvolenyText || textSms({ oslovenie: meno.split(" ")[0], trener, zostatok, sMailom }));
+  }, [otvorene, meno, trener, zostatok, sMailom, predvolenyText]);
 
   const posli = async () => {
     setBezi(true); setHlaska("");

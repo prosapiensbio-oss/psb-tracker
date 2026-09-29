@@ -1,4 +1,5 @@
 import { oznam } from "../../lib/psb/obnovaSignal";
+import { SmsKlientovi } from "./SmsKlientovi";
 import { useCallback, useEffect, useState } from "react";
 
 import type { RiadokPorovnania } from "../../lib/psb/balickyEvidencia";
@@ -259,6 +260,11 @@ export function BalickyEvidencia({ mena, onFaktura, onVypis }: {
               Vystaviť faktúru
             </button>
           )}
+          <SmsKlientovi
+            meno={posledny.klient}
+            predvolenyText={`${posledny.klient.split(" ")[0]}, zapísal som ti ${posledny.nazov}. QR na platbu máš v maili. ProSapiens`}
+            maly
+          />
           {onVypis && (
             <button
               onClick={() => { onVypis(posledny.klient); setPosledny(null); }}
