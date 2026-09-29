@@ -53,7 +53,7 @@ describe("dlzkaSpravy", () => {
 
 describe("textSms", () => {
   it("keď balíček došiel, povie to hneď", () => {
-    const t = textSms({ oslovenie: "Richard", trener: "Jerry", zostatok: 0, sMailom: true });
+    const t = textSms({ oslovenie: "Richard", trener: "Jerry", zostatok: 0, sMailom: true, dnesnyTrening: true });
     expect(t).toBe("Richard, dnes si mal poslednú hodinu z balíčka. V maili nájdeš dochádzku aj QR na platbu. Jerry, ProSapiens");
     // Dve správy — s diakritikou sa inak nedá.
     expect(dlzkaSpravy(t).sprav).toBe(2);
@@ -90,5 +90,23 @@ describe("chybaOdosielatela", () => {
   it("Twilio bez čísla neposiela", () => {
     expect(chybaOdosielatela("", "twilio")).toContain("číslo");
     expect(chybaOdosielatela("+420777123456", "twilio")).toBeNull();
+  });
+});
+
+describe("textSms podľa skutočnosti", () => {
+  const z = { oslovenie: "Vítězslave", trener: "Jerry", sMailom: false };
+
+  it("mínus hodiny povie ako mínus, nie ako „posledná hodina“", () => {
+    expect(textSms({ ...z, zostatok: -2, dnesnyTrening: true }))
+      .toBe("Vítězslave, dnešným tréningom máš 2 hodiny nad rámec balíčka. Jerry, ProSapiens");
+  });
+
+  it("jedna hodina navyše sa skloňuje", () => {
+    expect(textSms({ ...z, zostatok: -1 })).toContain("máš 1 hodinu nad rámec balíčka");
+  });
+
+  it("presná nula je posledná hodina — ale len keď bola dnes", () => {
+    expect(textSms({ ...z, zostatok: 0, dnesnyTrening: true })).toContain("dnes si mal poslednú hodinu");
+    expect(textSms({ ...z, zostatok: 0 })).toContain("balíček máš dochodený");
   });
 });

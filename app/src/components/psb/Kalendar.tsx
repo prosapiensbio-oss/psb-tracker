@@ -1742,6 +1742,8 @@ export function Balicky({ udalosti, buduce = [], clients, sedenia = [], onObnov,
           meno, kusov, uz, zostava: c.packageRemaining, spolu: c.packageTotal,
           // Dopočítaný počet hodín sa musí povedať pred odoslaním SMS.
           odvodene: !!c.packageOdvodeny, trener: c.primaryTrainer || "",
+          // Bol posledný tréning dnes? Rozhoduje, či SMS smie povedať „dnes".
+          poslednyDnes: (c.sessions || []).some((x) => String(x.date).slice(0, 10) === dnes),
           po: c.packageRemaining - kusov - uz, platnostDo: c.packageValidTo || "",
           dojde, teraz, uzDosiel: teraz <= 0,
           // Členstvo, ktorému už skončila platnosť, hodiny nemíňa — tie
@@ -1949,7 +1951,7 @@ export function Balicky({ udalosti, buduce = [], clients, sedenia = [], onObnov,
                   )}
                 </span>
               </div>
-              <SmsKlientovi meno={r.meno} zostatok={Math.max(0, r.teraz)} trener={r.trener} odvodene={r.odvodene} maly />
+              <SmsKlientovi meno={r.meno} zostatok={r.teraz} trener={r.trener} odvodene={r.odvodene} dnesnyTrening={r.poslednyDnes} maly />
               {onVypis && (
                 <button
                   onClick={() => onVypis(r.meno)}

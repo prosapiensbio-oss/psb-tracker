@@ -23,6 +23,8 @@ import type { BezBalicka } from "./bezBalicka";
 import type { Dlznik } from "./dlznici";
 import type { ZostavaPoPlatnosti } from "./platnostZostatok";
 
+import type { PodlaKlienta } from "./sporneKonanie";
+
 export type Zmena = { id: string; druh: string; klient: string | null; nazov: string | null; pred: string | null; po: string | null; kedy: string; trener: string };
 export type NeznamyNazov = { nazov: string; trener: string; pocet: number; najblizsi: string; navrh: string };
 export type NepriradenaPlatba = { fioId: string; datum: string; suma: number; text: string; navrh: string };
@@ -38,6 +40,11 @@ export type Karta =
    * a na ďalšom peniaze." Obe otázky sa dali dovtedy zodpovedať len
    * prechádzaním klientov po jednom.
    */
+  /**
+   * Tréningy, ktoré z kalendára zmizli až po tom, čo sa mali konať.
+   * Jedna položka = jeden klient so všetkými svojimi spornými hodinami.
+   */
+  | { druh: "konanie"; nadpis: string; podnadpis: string; polozky: PodlaKlienta[] }
   | { druh: "bezBalicka"; nadpis: string; podnadpis: string; polozky: BezBalicka[] }
   | { druh: "dlznici"; nadpis: string; podnadpis: string; polozky: Dlznik[] }
   /**
@@ -69,6 +76,8 @@ export type ZdrojeKariet = {
   zmeny: Zmena[];
   /** Aktívni klienti, ktorým nezostala hodina. */
   bezBalicka?: BezBalicka[];
+  /** „Bol tam, alebo nie?" — zoskupené po klientovi. */
+  konanie?: PodlaKlienta[];
   /** Kto dlží peniaze — poplatky z PTmindera aj nezaplatené balíčky. */
   dlznici?: Dlznik[];
   /** Komu končí platnosť a zostávajú hodiny. */
@@ -181,6 +190,20 @@ export function postavKarty(z: ZdrojeKariet): Karta[] {
     podnadpis: `${zmeny.length} ${pocet(zmeny.length, "zmena čaká", "zmeny čakajú", "zmien čaká")} na dôvod`,
     polozky: zmeny,
   });
+  /**
+   * „Bol tam, alebo nie?" stojí VYSOKO — hneď za zmenami v kalendári.
+   *
+   * Každá nerozhodnutá položka je hodina, o ktorú je zostatok klienta vedľa.
+   * Kým sa neodpovie, Kokpit mu tvrdí, že má viac hodín, než má — a podľa
+   * toho mu aj píše maily a SMS.
+   */
+  const konanie = (z.konanie || []).filter((k) => (ja ? k.polozky.some((p) => p.trener === ja) : true));
+  if (konanie.length) karty.push({
+    druh: "konanie",
+    nadpis: "Bol tam, alebo nie?",
+    podnadpis: `${konanie.length} ${pocet(konanie.length, "klient s hodinou", "klienti s hodinami", "klientov s hodinami")}, o ktorej sa nevie`,
+    polozky: konanie,
+  });
   if (mena.length) karty.push({
     druh: "mena",
     nadpis: "Nové názvy v kalendári",
@@ -242,7 +265,7 @@ export function postavKarty(z: ZdrojeKariet): Karta[] {
 
 export function klucPolozky(
   druh: Karta["druh"],
-  p: Zmena | NeznamyNazov | NepriradenaPlatba | BezBalicka | Dlznik | ZostavaPoPlatnosti,
+  p: Zmena | NeznamyNazov | NepriradenaPlatba | BezBalicka | Dlznik | ZostavaPoPlatnosti | PodlaKlienta,
 ): string {
   if (druh === "zmeny") return `zmeny|${(p as Zmena).id}`;
   if (druh === "mena") return `mena|${(p as NeznamyNazov).nazov}|${(p as NeznamyNazov).trener}`;
@@ -254,6 +277,9 @@ export function klucPolozky(
    * prvom pohybe. „Vybavené" tu znamená „s týmto človekom som to riešil".
    */
   if (druh === "bezBalicka") return `bezBalicka|${(p as BezBalicka).meno}`;
+  // Kľúč je meno klienta — kým má čo i len jednu nerozhodnutú hodinu, otázka
+  // stojí. Zmizne sama, keď sa odpovie na všetky; odklepnúť sa nedá.
+  if (druh === "konanie") return `konanie|${(p as PodlaKlienta).klient}`;
   if (druh === "dlznici") return `dlznici|${(p as Dlznik).meno}`;
   // Kľúč je ten istý, aký nesie notifikácia — odklepnutie na karte tým
   // umlčí aj upozornenie a nepýta sa to na dvoch miestach zvlášť.

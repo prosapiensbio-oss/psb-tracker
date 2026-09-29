@@ -79,6 +79,8 @@ export type SpravaProKlienta = {
   zostatok: number;
   /** Posiela sa aj mail s dochádzkou a QR? */
   sMailom: boolean;
+  /** Bol tréning DNES? Bez toho sa SMS na dnešok neodvoláva. */
+  dnesnyTrening?: boolean;
 };
 
 /**
@@ -90,9 +92,30 @@ export type SpravaProKlienta = {
  * na vetu navyše, SMS má sedemdesiat znakov.
  */
 export function textSms(v: SpravaProKlienta): string {
-  const uvod = v.zostatok <= 0
-    ? `${v.oslovenie}, dnes si mal poslednú hodinu z balíčka.`
-    : `${v.oslovenie}, v balíčku ti ${zostavaHodin(v.zostatok)}.`;
+  /**
+   * Text sa riadi SKUTOČNOSŤOU, nie jedným prípadom.
+   *
+   * Jerry, 29. 9. 2026: „ak je Vítězslav −1 tréning, nemôže mu prísť SMS,
+   * že dnes mal poslednú hodinu." Mal pravdu — bola to nepravda o tom, čo
+   * sa stalo, a klient si to vie prerátať. Tri stavy, tri vety:
+   *
+   *   > 0   „v balíčku ti zostávajú 2 h."
+   *   = 0   „dnes si mal poslednú hodinu z balíčka."
+   *   < 0   „máš 2 hodiny nad rámec balíčka."
+   *
+   * O DNEŠKU sa hovorí len vtedy, keď tréning naozaj dnes bol. SMS je síce
+   * zvonček k mailu a posiela sa v deň tréningu, ale posiela ju človek —
+   * a v nedeľu podvečer je „dnes" o štvrtkovej hodine nepravda.
+   */
+  const navyse = v.zostatok < 0 ? -v.zostatok : 0;
+  const hodin = (n: number) => `${n} ${n === 1 ? "hodinu" : n < 5 ? "hodiny" : "hodín"}`;
+  const uvod = navyse
+    ? `${v.oslovenie}, ${v.dnesnyTrening ? "dnešným tréningom máš" : "máš"} ${hodin(navyse)} nad rámec balíčka.`
+    : v.zostatok === 0
+      ? v.dnesnyTrening
+        ? `${v.oslovenie}, dnes si mal poslednú hodinu z balíčka.`
+        : `${v.oslovenie}, balíček máš dochodený.`
+      : `${v.oslovenie}, v balíčku ti ${zostavaHodin(v.zostatok)}.`;
   const kam = v.sMailom ? " V maili nájdeš dochádzku aj QR na platbu." : "";
   return `${uvod}${kam} ${v.trener}, ProSapiens`;
 }

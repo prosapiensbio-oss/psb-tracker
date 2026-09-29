@@ -1,4 +1,5 @@
 import { oznam, pocuvaj } from "../../lib/psb/obnovaSignal";
+import type { SporneKonanie } from "../../lib/psb/sporneKonanie";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { nazovFazy } from "../../lib/psb/mapaCyklu";
@@ -992,6 +993,13 @@ export function PSBApp() {
   // od 31. 7. a v tej chvíli ich mala v databáze 18. Nevidel ich, lebo
   // kalendár si sťahovala len obrazovka Kalendár, do kontextu nešiel.
   const [kalZmeny, setKalZmeny] = useState<KalZmena[]>([]);
+  /**
+   * Tréningy, ktoré z kalendára zmizli až po tom, čo sa mali konať.
+   *
+   * Nedá sa z nich automaticky nič vyvodiť (viď migráciu 0084), tak sa
+   * Kokpit pýta. Kým nie je odpoveď, tréning sa nepočíta.
+   */
+  const [sporneKonanie, setSporneKonanie] = useState<SporneKonanie[]>([]);
   // Guillermo (FP Spain) záznamy + jeho tréningy — do Jarvisovho kontextu, nech
   // vie zostatok sedení. Berú sa z toho istého /api/kalendar fetchu ako udalosti.
   const [guillermoZazn, setGuillermoZazn] = useState<{ datum: string; druh: string; hodiny: number }[]>([]);
@@ -1048,7 +1056,7 @@ export function PSBApp() {
     if (!dataHotove) return;
     void fetch("/api/kalendar", { credentials: "same-origin" })
       .then((r) => r.json())
-      .then((j: { ok?: boolean; udalosti?: KalUdalost[]; zmenyHistoria?: KalZmena[]; zmeny?: KalZmena[]; guillermo?: { datum: string; druh: string; hodiny: number }[]; guillermoUdalosti?: KalUdalost[]; buduceTreningy?: { klient: string | null; zaciatok: string }[]; porovnanie?: PorovnanieDochadzky }) => {
+      .then((j: { ok?: boolean; udalosti?: KalUdalost[]; zmenyHistoria?: KalZmena[]; zmeny?: KalZmena[]; guillermo?: { datum: string; druh: string; hodiny: number }[]; guillermoUdalosti?: KalUdalost[]; buduceTreningy?: { klient: string | null; zaciatok: string }[]; sporneKonanie?: SporneKonanie[]; porovnanie?: PorovnanieDochadzky }) => {
         if (!j.ok || !Array.isArray(j.udalosti)) return;
         setKalUdalosti(j.udalosti);
         if (j.porovnanie) setKalPorovnanie(j.porovnanie);
@@ -1056,6 +1064,7 @@ export function PSBApp() {
         if (Array.isArray(j.guillermoUdalosti)) setGuillermoUdal(j.guillermoUdalosti);
         if (Array.isArray(j.buduceTreningy)) setBuduceTreningy(j.buduceTreningy);
         if (Array.isArray(j.zmenyHistoria)) setKalZmeny(j.zmenyHistoria);
+        if (Array.isArray(j.sporneKonanie)) setSporneKonanie(j.sporneKonanie);
         // Nevysvetlené zmeny idú do registra — dovtedy o nich vedel len ten,
         // kto sám zašiel do Kalendára.
         if (Array.isArray(j.zmeny)) setKalNevysvetlene(j.zmeny);
@@ -1882,6 +1891,7 @@ function skupinaFaktur(
       menaKlientov: Object.keys(clients),
       dnes: new Date().toISOString().slice(0, 10),
       zmeny: kalNevysvetlene.map((z) => ({ druh: z.druh, trener: z.trener })),
+      sporneKonanie: sporneKonanie.map((x) => ({ klient: x.klient, trener: x.trener })),
       // Lievik za posledných 12 mesiacov — tie isté čísla, aké vidno
       // v Marketingu. Keby sa počítali zvlášť, appka by spochybňovala niečo
       // iné, než ukazuje.
@@ -1901,7 +1911,7 @@ function skupinaFaktur(
         ];
       })(),
     }).map((r: ReturnType<typeof nezapisaneDoRegistra>[number]) => ({ ...r, ...stavPolozky(r.key) })),
-    [data.leads, clients, kalNevysvetlene, stavPolozky],
+    [data.leads, clients, kalNevysvetlene, sporneKonanie, stavPolozky],
   );
 
   /**

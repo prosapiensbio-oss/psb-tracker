@@ -214,7 +214,7 @@ export const Route = createFileRoute("/api/kalendar")({
         if (!(await isAuthed(request))) return unauthorized();
         const { od, do_ } = okno();
 
-        const [zdroje, zmeny, zmenyHistoria, mapovanie, udalosti, guillermo, buduce, guillermoUdalosti] = await Promise.all([
+        const [zdroje, zmeny, zmenyHistoria, mapovanie, udalosti, guillermo, buduce, guillermoUdalosti, sporne] = await Promise.all([
           DB.prepare(`SELECT z.id, z.trener, z.aktivny, z.posledne_ok, z.posledna_chyba,
             (SELECT s.kedy FROM kal_snimky s WHERE s.trener = z.trener ORDER BY s.kedy DESC LIMIT 1) AS snimka_kedy,
             (SELECT s.ok FROM kal_snimky s WHERE s.trener = z.trener ORDER BY s.kedy DESC LIMIT 1) AS snimka_ok,
@@ -231,7 +231,23 @@ export const Route = createFileRoute("/api/kalendar")({
           // `undefined.startsWith` — chýbajúci stĺpec vyzeral ako prázdny.
           DB.prepare("SELECT id, kedy, trener, uid, druh, nazov, klient, pred, po, vysvetlene, poznamka, odpovedane_at FROM kal_zmeny ORDER BY kedy DESC LIMIT 300").all(),
           DB.prepare("SELECT nazov, trener, cas, klient, typ, vedome FROM kal_mapovanie ORDER BY trener, nazov, cas").all(),
-          DB.prepare("SELECT uid, trener, zaciatok, koniec, nazov, klient, typ FROM kal_udalosti WHERE zmizla_at IS NULL AND zaciatok >= ? AND zaciatok <= ? ORDER BY zaciatok").bind(od, do_).all(),
+          /**
+           * Udalosti v okne — živé PLUS tie, o ktorých Jerry povedal, že sa
+           * konali, hoci z kalendára zmizli.
+           *
+           * Zmiznutie samo osebe nie je dôkaz zrušenia: klient niekedy
+           * oznámi neúčasť v deň tréningu a udalosť sa maže až o pár dní.
+           * Bez odpovede zostáva tréning nezapočítaný — mlčanie nesmie
+           * klientovi pridať hodinu.
+           */
+          DB.prepare(
+            `SELECT u.uid, u.trener, u.zaciatok, u.koniec, u.nazov, u.klient, u.typ
+               FROM kal_udalosti u
+               LEFT JOIN kal_konanie k ON k.uid = u.uid AND k.trener = u.trener
+              WHERE (u.zmizla_at IS NULL OR k.konal = 1)
+                AND u.zaciatok >= ? AND u.zaciatok <= ?
+              ORDER BY u.zaciatok`,
+          ).bind(od, do_).all(),
           DB.prepare("SELECT id, datum, druh, hodiny, suma_czk, poznamka FROM guillermo_hodiny ORDER BY datum DESC").all(),
           /**
            * OBJEDNANÉ TERMÍNY ĎALEKO DOPREDU — len klient a deň.
@@ -251,6 +267,31 @@ export const Route = createFileRoute("/api/kalendar")({
           // starší by z počtu vypadol a zostatok by ticho narástol späť. Preto
           // sa guillermo udalosti berú bez ohľadu na okno (je ich pár).
           DB.prepare("SELECT uid, trener, zaciatok, koniec, nazov, klient, typ FROM kal_udalosti WHERE typ = 'guillermo' AND zmizla_at IS NULL ORDER BY zaciatok").all(),
+          /**
+           * BOL TAM, ALEBO NIE? — tréningy, ktoré z kalendára zmizli až po
+           * tom, čo sa mali konať, v PTminderi zápis nemajú a nikto na ne
+           * zatiaľ neodpovedal.
+           *
+           * Bez okna: je ich rádovo desiatky a každý je hodina, ktorú buď
+           * niekto odtrénoval, alebo nie. Starý neznamená nepodstatný —
+           * znamená len, že o ňom dlho nikto nerozhodol.
+           */
+          DB.prepare(
+            `SELECT u.uid, u.trener, u.zaciatok, u.nazov, u.klient, u.typ, u.zmizla_at
+               FROM kal_udalosti u
+               LEFT JOIN kal_konanie k ON k.uid = u.uid AND k.trener = u.trener
+              WHERE u.zmizla_at IS NOT NULL
+                AND u.zmizla_at > u.koniec
+                AND u.typ IN ('trening','uvodny')
+                AND u.klient IS NOT NULL
+                AND k.uid IS NULL
+                AND NOT EXISTS (
+                  SELECT 1 FROM sessions s
+                   WHERE s.client_name = u.klient
+                     AND substr(s.date,1,10) = substr(u.zaciatok,1,10)
+                )
+              ORDER BY u.zaciatok DESC`,
+          ).all(),
         ]);
 
         /**
@@ -342,6 +383,7 @@ export const Route = createFileRoute("/api/kalendar")({
           guillermo: guillermo.results || [],
           buduceTreningy: buduce.results || [],
           guillermoUdalosti: guillermoUdalosti.results || [],
+          sporneKonanie: sporne.results || [],
           nezname: Object.values(nezname).sort((a, b) => b.pocet - a.pocet),
           porovnanie,
         });
@@ -370,6 +412,32 @@ export const Route = createFileRoute("/api/kalendar")({
           await DB.prepare("DELETE FROM kal_zdroje WHERE trener = ?").bind(trener).run();
           await DB.prepare("INSERT INTO kal_zdroje (id, trener, url, aktivny, created_at) VALUES (?,?,?,1,?)")
             .bind(uid(), trener, url, teraz()).run();
+          return Response.json({ ok: true });
+        }
+
+        /**
+         * BOL TAM, ALEBO NIE — odpoveď na tréning, ktorý z kalendára zmizol
+         * až po tom, čo sa mal konať.
+         *
+         * Odpoveď sa PÍŠE, aj keď znie „nebol": bez zápisu by sa Kokpit
+         * pýtal na to isté donekonečna. `konal = 0` je rovnako platná
+         * odpoveď ako `1`, len nemení počet hodín.
+         */
+        if (akcia === "konanie") {
+          const kluc = String(b.uid || "");
+          const trener = String(b.trener || "");
+          if (!kluc || !trener) return Response.json({ ok: false, error: "chýba udalosť" }, { status: 400 });
+          const konal = b.konal ? 1 : 0;
+          const kto = (await currentUser(request)) || "";
+          await DB.prepare(
+            "INSERT INTO kal_konanie (uid, trener, konal, kto, kedy) VALUES (?1,?2,?3,?4,?5) ON CONFLICT(uid, trener) DO UPDATE SET konal=excluded.konal, kto=excluded.kto, kedy=excluded.kedy",
+          ).bind(kluc, trener, konal, kto, teraz()).run();
+          await audit(DB, {
+            action: "kalendar-konanie",
+            predmet: `${String(b.klient || "")} · ${String(b.zaciatok || "").slice(0, 16)}`,
+            neu: konal ? "bol tam" : "neprišiel",
+            actor: kto,
+          });
           return Response.json({ ok: true });
         }
 

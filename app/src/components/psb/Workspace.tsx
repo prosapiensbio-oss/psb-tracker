@@ -1,4 +1,5 @@
 import { oznam } from "../../lib/psb/obnovaSignal";
+import { podlaKlienta, type PodlaKlienta } from "../../lib/psb/sporneKonanie";
 import { nazovProduktu } from "../../lib/psb/nazvyProduktov";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -65,7 +66,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
 }) {
   const [balicky, setBalicky] = useState<BalicekRiadok[]>([]);
   const [vlastnePlatby, setVlastnePlatby] = useState<PlatbaRiadok[]>([]);
-  const [zdroje, setZdroje] = useState<{ zmeny: Zmena[]; nezname: { nazov: string; trener: string; pocet: number; najblizsi: string }[]; platby: { fioId: string; datum: string; suma: number; text: string; kandidati: string[] }[] } | null>(null);
+  const [zdroje, setZdroje] = useState<{ zmeny: Zmena[]; nezname: { nazov: string; trener: string; pocet: number; najblizsi: string }[]; platby: { fioId: string; datum: string; suma: number; text: string; kandidati: string[] }[]; konanie: PodlaKlienta[] } | null>(null);
   const [hotove, setHotove] = useState<Set<string>>(new Set());
   const [texty, setTexty] = useState<Record<string, string>>({});
   const [i, setI] = useState(0);
@@ -106,7 +107,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
       fetch("/api/balicky", { credentials: "same-origin" }).then((r) => r.json()).catch(() => null),
       fetch("/api/platby?klient=1", { credentials: "same-origin" }).then((r) => r.json()).catch(() => null),
     ]);
-    setZdroje({ zmeny: (k?.zmeny || []) as Zmena[], nezname: k?.nezname || [], platby: p?.nepriradene || [] });
+    setZdroje({ zmeny: (k?.zmeny || []) as Zmena[], nezname: k?.nezname || [], platby: p?.nepriradene || [], konanie: podlaKlienta(k?.sporneKonanie || []) });
     setBalicky(b?.balicky || []);
     setVlastnePlatby(vp?.platby || []);
   }, []);
@@ -397,6 +398,27 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
    * a to appka nevie.
    */
   const oznacHotove = (kluc: string) => setHotove((s) => new Set([...s, kluc]));
+
+  /**
+   * ODPOVEĎ NA „BOL TAM?" SA ZAPISUJE, POTOM MIZNE Z OBRAZOVKY.
+   *
+   * Nie naopak. Riadok, ktorý zmizne pred zápisom, je presne tá tichá strata,
+   * ktorú appka inde nikde nepripúšťa — človek by mal pocit, že odpovedal,
+   * a po načítaní by tam otázka stála znova.
+   *
+   * Zápis „bol tam" mení počet odtrénovaných hodín, takže sa oznámi obnova
+   * kalendára; inak by obrazovky držali staré číslo.
+   */
+  const [odpovedane, setOdpovedane] = useState<Set<string>>(new Set());
+  const odpovedzKonanie = async (p: { uid: string; trener: string; klient: string; zaciatok: string }, konal: boolean) => {
+    const r = await fetch("/api/kalendar", {
+      method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ akcia: "konanie", uid: p.uid, trener: p.trener, klient: p.klient, zaciatok: p.zaciatok, konal }),
+    }).then((x) => x.json()).catch(() => ({ ok: false }));
+    if (!r?.ok) return;
+    setOdpovedane((s) => new Set([...s, `${p.uid}|${p.trener}`]));
+    if (konal) oznam("kalendar");
+  };
 
   /** Otvorí kartu Klient s týmto človekom na stole. */
   const naStol = (meno: string) => {
@@ -754,6 +776,43 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                   </>
                 );
               })()}
+
+              {/* BOL TAM, ALEBO NIE? — každá nerozhodnutá hodina je hodina,
+                  o ktorú je zostatok klienta vedľa. Odpovedá sa po jednej,
+                  lebo každá je iný deň a človek si spomenie na konkrétny
+                  termín, nie na „tie štyri". Odpoveď „nebol" sa tiež píše:
+                  bez zápisu by sa Kokpit pýtal donekonečna. */}
+              {k.druh === "konanie" && k.polozky.map((x) => {
+                const kluc = klucPolozky("konanie", x);
+                const zostavajuce = x.polozky.filter((p) => !odpovedane.has(`${p.uid}|${p.trener}`));
+                if (!zostavajuce.length) return null;
+                return (
+                  <div key={kluc} style={{ ...riadok, flexWrap: "wrap", alignItems: "flex-start" }}>
+                    <button onClick={() => naStol(x.klient)} style={{ ...vedlajsie, fontSize: 13.5, fontWeight: 600, color: C.text, minWidth: uzke ? 0 : 150, flex: uzke ? "1 1 100%" : undefined, textAlign: "left" }}>
+                      {x.klient}
+                    </button>
+                    <div style={{ flex: "1 1 100%", display: "flex", flexDirection: "column", gap: 5, marginTop: 4 }}>
+                      {zostavajuce.map((p) => (
+                        <div key={`${p.uid}|${p.trener}`} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                          <span style={{ fontSize: 12.5, color: C.text, minWidth: 138 }}>
+                            {den(p.zaciatok.slice(0, 10))} · {p.zaciatok.slice(11, 16)}
+                          </span>
+                          <span style={{ fontSize: 11, color: C.textDim, flex: "1 1 130px" }}>
+                            z kalendára zmizlo {den(p.zmizla_at.slice(0, 10))}
+                          </span>
+                          <button
+                            onClick={() => void odpovedzKonanie(p, true)}
+                            style={{ ...vedlajsie, border: `1px solid ${mix(C.green, 40)}`, background: mix(C.green, 10), color: C.green, fontWeight: 600 }}
+                          >
+                            bol tam
+                          </button>
+                          <button onClick={() => void odpovedzKonanie(p, false)} style={{ ...vedlajsie }}>neprišiel</button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
 
               {/* BEZ BALÍČKA — jeden riadok = jeden telefonát „kúp si ďalší".
                   Klik na meno otvorí jeho stôl, kde sa balíček nahadzuje. */}

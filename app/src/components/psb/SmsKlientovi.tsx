@@ -39,7 +39,7 @@ const kontakty = () => {
   return cacheKontaktov;
 };
 
-export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, odvodene = false, sMailom = false, maly = false }: {
+export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, odvodene = false, sMailom = false, dnesnyTrening = false, maly = false }: {
   meno: string;
   /** Koľko hodín zostáva; 0 alebo menej = balíček došiel. */
   zostatok?: number;
@@ -55,6 +55,8 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
   odvodene?: boolean;
   /** Ide spolu s mailom? Mení vetu o tom, kde nájde dochádzku. */
   sMailom?: boolean;
+  /** Bol tréning dnes? Bez toho sa správa na dnešok neodvoláva. */
+  dnesnyTrening?: boolean;
   maly?: boolean;
 }) {
   const [otvorene, setOtvorene] = useState(false);
@@ -69,8 +71,8 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
     if (!otvorene || nacitane.current) return;
     nacitane.current = true;
     void kontakty().then((u) => setTelefon(String(u.find((x) => x.klient === meno)?.telefon || "")));
-    setText(predvolenyText || textSms({ oslovenie: meno.split(" ")[0], trener, zostatok, sMailom }));
-  }, [otvorene, meno, trener, zostatok, sMailom, predvolenyText]);
+    setText(predvolenyText || textSms({ oslovenie: meno.split(" ")[0], trener, zostatok, sMailom, dnesnyTrening }));
+  }, [otvorene, meno, trener, zostatok, sMailom, dnesnyTrening, predvolenyText]);
 
   const posli = async () => {
     setBezi(true); setHlaska("");

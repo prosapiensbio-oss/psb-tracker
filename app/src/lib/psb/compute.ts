@@ -3571,6 +3571,11 @@ export type NezapisaneVstup = {
   menaKlientov: string[];
   /** Nevysvetlené zmeny z kalendára (`vysvetlene = 0`). */
   zmeny: { druh: string; trener: string }[];
+  /**
+   * Tréningy, ktoré z kalendára zmizli až po tom, čo sa mali konať, a nikto
+   * na ne neodpovedal. Každý je hodina, o ktorú je zostatok klienta vedľa.
+   */
+  sporneKonanie?: { klient: string; trener: string }[];
   /** Kľúčové podiely, ktoré má appka spochybniť, keď vyzerajú príliš dobre. */
   podiely?: Podiel[];
 };
@@ -3690,6 +3695,31 @@ export function nezapisaneDoRegistra(v: NezapisaneVstup): Omit<RegisterItem, "ac
       detail: `${rozpis}. Bez dôvodu sa nedá povedať, či to bolo zrušenie klientom, presun po dohode, alebo chyba v zápise — a práve to rozhoduje, či ide o stratu. Vysvetľuje sa v Kalendári.`,
       client: "kalendar|",
       priority: 11,
+    });
+  }
+
+  // ── bol tam, alebo nie? ──────────────────────────────────────────────────
+  //
+  // Toto NIE JE to isté ako zmeny v kalendári. Tam appka nevie DÔVOD, tu
+  // nevie, či sa tréning vôbec konal — a od toho sa odvíja zostatok hodín,
+  // ktorý ide klientovi do mailu aj do SMS. Preto vyššia priorita a vlastný
+  // riadok: „vysvetlím to niekedy" je pri dôvode únosné, pri počte hodín nie.
+  const sporne = new Map<string, Set<string>>();
+  for (const x of v.sporneKonanie || []) {
+    const t = x.trener || "";
+    sporne.set(t, (sporne.get(t) || new Set()).add(x.klient));
+  }
+  for (const [trener, klienti] of sporne) {
+    const hodin = (v.sporneKonanie || []).filter((x) => (x.trener || "") === trener).length;
+    von.push({
+      key: `kalendar|konanie|${trener || "bez"}`,
+      category: "Zmena",
+      tone: "orange",
+      trener: trener || undefined,
+      title: `Bol tam, alebo nie? (${hodin})`,
+      detail: `${hodin} ${hodin === 1 ? "tréning zmizol" : hodin < 5 ? "tréningy zmizli" : "tréningov zmizlo"} z kalendára až po tom, čo sa mal konať, a v PTminderi zápis nemá — u ${klienti.size} ${klienti.size === 1 ? "klienta" : "klientov"}. Kým sa neodpovie, appka im ráta o toľko hodín viac, než možno majú, a podľa toho im píše. Odpovedá sa v Kope.`,
+      client: "kalendar|",
+      priority: 13,
     });
   }
 
