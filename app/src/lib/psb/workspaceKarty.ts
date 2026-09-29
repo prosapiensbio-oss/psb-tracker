@@ -25,9 +25,6 @@ import type { ZostavaPoPlatnosti } from "./platnostZostatok";
 
 import type { PodlaKlienta } from "./sporneKonanie";
 
-/** Služba „Doplnenie členstva", o ktorej sa nevie, koľko hodín pridala. */
-export type Doplnenie = { klient: string; den: string; posledny: string | null };
-
 export type Zmena = { id: string; druh: string; klient: string | null; nazov: string | null; pred: string | null; po: string | null; kedy: string; trener: string };
 export type NeznamyNazov = { nazov: string; trener: string; pocet: number; najblizsi: string; navrh: string };
 export type NepriradenaPlatba = { fioId: string; datum: string; suma: number; text: string; navrh: string };
@@ -48,8 +45,6 @@ export type Karta =
    * Jedna položka = jeden klient so všetkými svojimi spornými hodinami.
    */
   | { druh: "konanie"; nadpis: string; podnadpis: string; polozky: PodlaKlienta[] }
-  /** „Doplnenie členstva" bez počtu hodín — jeden riadok = jedno doplnenie. */
-  | { druh: "doplnenia"; nadpis: string; podnadpis: string; polozky: Doplnenie[] }
   | { druh: "bezBalicka"; nadpis: string; podnadpis: string; polozky: BezBalicka[] }
   | { druh: "dlznici"; nadpis: string; podnadpis: string; polozky: Dlznik[] }
   /**
@@ -83,8 +78,6 @@ export type ZdrojeKariet = {
   bezBalicka?: BezBalicka[];
   /** „Bol tam, alebo nie?" — zoskupené po klientovi. */
   konanie?: PodlaKlienta[];
-  /** Doplnenia bez odpovede. Nemajú trénera — sú to Jerryho rozhodnutia. */
-  doplnenia?: Doplnenie[];
   /** Kto dlží peniaze — poplatky z PTmindera aj nezaplatené balíčky. */
   dlznici?: Dlznik[];
   /** Komu končí platnosť a zostávajú hodiny. */
@@ -211,27 +204,6 @@ export function postavKarty(z: ZdrojeKariet): Karta[] {
     podnadpis: `${konanie.length} ${pocet(konanie.length, "klient s hodinou", "klienti s hodinami", "klientov s hodinami")}, o ktorej sa nevie`,
     polozky: konanie,
   });
-  /**
-   * DOPLNENIA sú Jerryho, nie Terezkine — bolo to jeho rozhodnutie pri
-   * konci platnosti. Terezke by to bol šum.
-   *
-   * Prednosť majú tie v práve bežiacom balíčku: menia číslo, ktoré dnes ide
-   * klientovi do mailu. Staré sa pýtajú tiež, len nižšie.
-   */
-  /**
-   * V KARTE SÚ LEN ŽIVÉ DOPLNENIA — tie v práve bežiacom balíčku.
-   *
-   * Doplnenie spred roka, v balíčku, ktorý je dávno minutý, nemení žiadne
-   * dnešné číslo. Zoznam všetkých by bol 209 riadkov a človek by ho zavrel
-   * — to je tá istá chyba ako „keď svieti všetko, nesvieti nič".
-   */
-  const doplnenia = ja === "Terezka" ? [] : (z.doplnenia || []).filter((x) => !!x.posledny && x.den >= x.posledny);
-  if (doplnenia.length) karty.push({
-    druh: "doplnenia",
-    nadpis: "Koľko hodín pridalo doplnenie?",
-    podnadpis: `${doplnenia.length} ${pocet(doplnenia.length, "doplnenie v bežiacom", "doplnenia v bežiacich", "doplnení v bežiacich")} balíčku`,
-    polozky: doplnenia,
-  });
   if (mena.length) karty.push({
     druh: "mena",
     nadpis: "Nové názvy v kalendári",
@@ -293,7 +265,7 @@ export function postavKarty(z: ZdrojeKariet): Karta[] {
 
 export function klucPolozky(
   druh: Karta["druh"],
-  p: Zmena | NeznamyNazov | NepriradenaPlatba | BezBalicka | Dlznik | ZostavaPoPlatnosti | PodlaKlienta | Doplnenie,
+  p: Zmena | NeznamyNazov | NepriradenaPlatba | BezBalicka | Dlznik | ZostavaPoPlatnosti | PodlaKlienta,
 ): string {
   if (druh === "zmeny") return `zmeny|${(p as Zmena).id}`;
   if (druh === "mena") return `mena|${(p as NeznamyNazov).nazov}|${(p as NeznamyNazov).trener}`;
@@ -308,7 +280,6 @@ export function klucPolozky(
   // Kľúč je meno klienta — kým má čo i len jednu nerozhodnutú hodinu, otázka
   // stojí. Zmizne sama, keď sa odpovie na všetky; odklepnúť sa nedá.
   if (druh === "konanie") return `konanie|${(p as PodlaKlienta).klient}`;
-  if (druh === "doplnenia") return `doplnenia|${(p as Doplnenie).klient}|${(p as Doplnenie).den}`;
   if (druh === "dlznici") return `dlznici|${(p as Dlznik).meno}`;
   // Kľúč je ten istý, aký nesie notifikácia — odklepnutie na karte tým
   // umlčí aj upozornenie a nepýta sa to na dvoch miestach zvlášť.
