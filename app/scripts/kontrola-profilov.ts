@@ -17,6 +17,7 @@ import { normName } from "../src/lib/psb/format";
 import { hodinZNazvuBalicka, osCasuKlienta, type Udalost } from "../src/lib/psb/klientOsCasu";
 import { EMPTY_DATA, type PSBData } from "../src/lib/psb/types";
 import { priebehBalickov, vypisHodin } from "../src/lib/psb/vypisHodin";
+import { doplnHodinySpolu, KOKPIT_OD, sedeniaZKalendara, spojDochadzku } from "../src/lib/psb/sedeniaZKalendara";
 
 const D = process.env.KONTROLA_DATA;
 if (!D) throw new Error("chýba KONTROLA_DATA — pusti ./scripts/kontrola-profilov.sh");
@@ -51,6 +52,24 @@ const treningyZdarma = nacitaj("zdarma").map((r: any) => ({
 }));
 const kal = nacitaj("kal");
 const balicky = nacitaj("balicky");
+
+/**
+ * Tá istá dochádzka ako v appke: pred KOKPIT_OD PTminder, od neho kalendár.
+ * Bez toho by kontrolór od 1. 10. 2026 počítal z iných tréningov než appka
+ * a hlásil rozdiely, ktoré v nej nie sú.
+ */
+{
+  const terazPraha = new Date().toLocaleString("sv-SE", { timeZone: "Europe/Prague" }).replace(" ", "T").slice(0, 16);
+  const bal = doplnHodinySpolu(
+    balicky.map((r: any) => ({ klient: r.klient, nazov: r.nazov, zdroj: r.zdroj, platnost_od: String(r.platnost_od || ""), platnost_do: r.platnost_do || null, hodiny: r.hodiny ?? null, cena_czk: r.cena_czk ?? null, zrusene_at: r.zrusene_at || null })),
+    packages.map((p: any) => ({ client: p.client, package: p.package, total: p.total, naObdobie: p.naObdobie })),
+    hodinZNazvuBalicka,
+  );
+  const zKal = sedeniaZKalendara(kal.filter((u: any) => u.zaciatok >= KOKPIT_OD), bal, terazPraha);
+  const spojene = spojDochadzku(sessions, zKal).sessions;
+  sessions.length = 0;
+  sessions.push(...spojene);
+}
 
 const data: PSBData = {
   ...EMPTY_DATA, sessions, packages, services, payments, poplatky, treningyZdarma,

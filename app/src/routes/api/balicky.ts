@@ -108,12 +108,32 @@ export const Route = createFileRoute("/api/balicky")({
           const horizont = String(((await DB.prepare("SELECT MAX(substr(date,1,10)) den FROM sessions").first<{ den: string }>())?.den) || "").slice(0, 10);
           const uz = new Set(((await DB.prepare("SELECT ptminder_id FROM balicky WHERE ptminder_id IS NOT NULL").all()).results || [])
             .map((r) => String((r as { ptminder_id: string }).ptminder_id)));
+          /**
+           * ČO UŽ V KOKPITE JE, SA POZNÁ PODĽA OBSAHU, NIE PODĽA ID.
+           *
+           * `ptminder_id` je id riadku v `packages` — a import balíčkov riadky
+           * klientov zo súboru pri každom nahratí zmaže a založí s NOVÝM id.
+           * Naliatie sa tak po každom importe tvárilo, že všetko je nové:
+           * 29. 9. 2026 by založilo 96 balíčkov, z toho 59 už v Kokpite boli,
+           * a tým klientom by sa zdvojnásobili hodiny. Od 1. 10. sú pritom
+           * balíčky v Kokpite jediný zdroj zostatkov.
+           *
+           * Kľúč: klient + názov + začiatok platnosti. Riadok bez dátumu
+           * (ročný balíček, doplnenie) sa berie ako už naliaty, keď ten istý
+           * klient má ten istý názov — jeho zostatok sa prevzal raz a druhé
+           * prevzatie by ho zdvojilo.
+           */
+          const vKokpite = ((await DB.prepare("SELECT klient, nazov, platnost_od FROM balicky WHERE zrusene_at IS NULL").all()).results || []) as unknown as { klient: string; nazov: string; platnost_od: string }[];
+          const podlaObsahu = new Set(vKokpite.map((r) => `${r.klient}|${r.nazov}|${String(r.platnost_od).slice(0, 10)}`));
+          const podlaNazvu = new Set(vKokpite.map((r) => `${r.klient}|${r.nazov}`));
 
           const kedy = teraz();
           const prikazy = [];
           const preskocene: string[] = [];
           for (const p of pt) {
             if (uz.has(p.id)) continue;
+            const odExportu = denISO(p.valid_from);
+            if (odExportu ? podlaObsahu.has(`${p.client_name}|${p.package_name}|${odExportu}`) : podlaNazvu.has(`${p.client_name}|${p.package_name}`)) continue;
             const zNazvu = /(\d+)\s*(h|hod)/i.exec(p.package_name || "");
             let od = denISO(p.valid_from);
             let doDna = denISO(p.valid_to) || null;

@@ -5,6 +5,8 @@ import type { D1Database } from "@cloudflare/workers-types";
 import { poplatkyPoOdrataniPlatieb } from "./platbyEvidencia";
 import { audit, jeZamknuty, zamknuteMesiace } from "./audit.server";
 import { nahradenieObdobia, type RiadokVKokpite } from "./nahradenieObdobia";
+import { doplnHodinySpolu, KOKPIT_OD, sedeniaZKalendara, spojDochadzku, type UdalostKalendara } from "./sedeniaZKalendara";
+import { hodinZNazvuBalicka } from "./klientOsCasu";
 import { normName } from "./format";
 import { parseAnamneza, parseCennik, parseGa4, parseGsc, parseKanaly, parseMetricool, parsePoplatky } from "./parse";
 import {
@@ -20,13 +22,13 @@ import {
   serviceKey,
   sessionKey,
 } from "./parse";
-import type { ClientOverride, PSBData } from "./types";
+import type { ClientOverride, PSBData, SessionRow } from "./types";
 import { EMPTY_DATA } from "./types";
 
 const uid = () => crypto.randomUUID();
 
 export async function loadData(DB: D1Database): Promise<PSBData> {
-  const [sessions, services, payments, packages, overrides, acks, log, leads, zavery, vedomosti, poplatky, zdarma, vlastnePlatby, doplneniaH] = await Promise.all([
+  const [sessions, services, payments, packages, overrides, acks, log, leads, zavery, vedomosti, poplatky, zdarma, vlastnePlatby, doplneniaH, kalOd, balickyK] = await Promise.all([
     DB.prepare("SELECT * FROM sessions").all(),
     DB.prepare("SELECT * FROM services").all(),
     DB.prepare("SELECT * FROM payments").all(),
@@ -59,22 +61,37 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
       .all().catch(() => ({ results: [] })),
     // Koľko hodín pridalo „Doplnenie členstva" — viď migráciu 0085.
     DB.prepare("SELECT klient, den, hodiny FROM doplnenia_hodiny").all().catch(() => ({ results: [] })),
+    // Dochádzka z kalendára od KOKPIT_OD (viď sedeniaZKalendara.ts). Zmiznutá
+    // udalosť sa berie len vtedy, keď o nej Jerry povedal „bol tam".
+    DB.prepare(
+      `SELECT u.klient, u.trener, u.zaciatok, u.koniec, u.nazov, u.typ
+         FROM kal_udalosti u
+         LEFT JOIN kal_konanie k ON k.uid = u.uid AND k.trener = u.trener
+        WHERE u.klient IS NOT NULL AND u.typ IN ('trening','uvodny')
+          AND (u.zmizla_at IS NULL OR k.konal = 1)
+          AND u.zaciatok >= ?1`,
+    ).bind(KOKPIT_OD).all().catch(() => ({ results: [] })),
+    // Balíčky v Kokpite — z nich cena tréningu z kalendára.
+    DB.prepare("SELECT klient, nazov, zdroj, platnost_od, platnost_do, hodiny, cena_czk, zrusene_at FROM balicky")
+      .all().catch(() => ({ results: [] })),
   ]);
 
+  const sessionsPtminder: SessionRow[] = (sessions.results as any[]).map((r) => ({
+    date: r.date,
+    time: r.time,
+    client: r.client_name,
+    sessionTrainer: r.session_trainer,
+    sessionName: r.session_name,
+    sessionType: r.session_type,
+    duration: r.duration_min,
+    price: r.price_czk,
+  }));
   const data: PSBData = {
     ...EMPTY_DATA,
     clientOverrides: {},
     anomalyAck: {},
-    sessions: (sessions.results as any[]).map((r) => ({
-      date: r.date,
-      time: r.time,
-      client: r.client_name,
-      sessionTrainer: r.session_trainer,
-      sessionName: r.session_name,
-      sessionType: r.session_type,
-      duration: r.duration_min,
-      price: r.price_czk,
-    })),
+    // Zatiaľ PTminder celý; od KOKPIT_OD ho na konci nahradí kalendár.
+    sessions: sessionsPtminder,
     services: (services.results as any[]).map((r) => ({
       date: r.date,
       client: r.client_name,
@@ -222,6 +239,29 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
   for (const r of acks.results as any[]) {
     data.anomalyAck[r.anomaly_key] = { note: r.note || "", ackedAt: r.acked_at, actor: r.actor || "" };
   }
+  /**
+   * DOCHÁDZKA: PRED KOKPIT_OD PTMINDER, OD NEHO KALENDÁR.
+   *
+   * Jedno miesto pre celú appku — zostatky, karty, dlh, mail, tržby podľa
+   * trénera aj Jarvis čítajú `data.sessions`. Tréningy z PTmindera za obdobie
+   * od KOKPIT_OD sú v `sessionsPtminder` a slúžia len na kontrolu.
+   */
+  {
+    const terazPraha = new Date().toLocaleString("sv-SE", { timeZone: "Europe/Prague" }).replace(" ", "T").slice(0, 16);
+    const balicky = doplnHodinySpolu(
+      (balickyK.results as any[]).map((r) => ({
+        klient: r.klient, nazov: r.nazov, zdroj: r.zdroj, platnost_od: String(r.platnost_od || ""),
+        platnost_do: r.platnost_do || null, hodiny: r.hodiny ?? null, cena_czk: r.cena_czk ?? null, zrusene_at: r.zrusene_at || null,
+      })),
+      data.packages.map((p) => ({ client: p.client, package: p.package, total: p.total, naObdobie: p.naObdobie })),
+      hodinZNazvuBalicka,
+    );
+    const zKalendara = sedeniaZKalendara((kalOd.results as any[]) as UdalostKalendara[], balicky, terazPraha);
+    const { sessions: spojene, kontrola } = spojDochadzku(sessionsPtminder, zKalendara);
+    data.sessions = spojene;
+    data.sessionsPtminder = kontrola;
+  }
+
   return data;
 }
 

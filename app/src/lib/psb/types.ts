@@ -177,6 +177,11 @@ export type PSBData = {
   poplatky: PoplatokZaznam[];
   /** Tréningy zadarmo — hodina sa odtrénovala, z členstva sa nestrhla. */
   treningyZdarma: TreningZdarma[];
+  /**
+   * Tréningy z PTmindera od KOKPIT_OD (1. 10. 2026) — len na kontrolu.
+   * Pre výpočty platí `sessions`, ktoré sú od toho dňa z kalendára.
+   */
+  sessionsPtminder?: SessionRow[];
   /** Koľko hodín pridalo „Doplnenie členstva" — kľúč `klient|deň`. */
   doplneniaHodiny?: Record<string, number>;
   /** Vedomosti zvonku (rešerše, príručky). Text sa do kontextu neposiela — len prehľad. */

@@ -34,6 +34,14 @@ const holy = (s: string) =>
  * appka ukáže a zle zaradenú nie.
  */
 const PODLA_SLOVA: { slovo: string; typ: string }[] = [
+  /**
+   * Zrušený tréning, ktorý Jerry v kalendári premenuje namiesto zmazania
+   * („Storno Online Jiri", „Zruseny Online Jiri"). Od 1. 10. 2026 je kalendár
+   * zdroj dochádzky, takže taký názov nesmie prejsť ako tréning — a musí
+   * vyhrať aj nad „úvodným" („Storno úvodný …" je stále storno).
+   */
+  { slovo: "storno", typ: "netrening" },
+  { slovo: "zrusen", typ: "netrening" },
   { slovo: "uvodn", typ: "uvodny" },      // úvodný, úvodní, uvodny, ÚVODNÍ TRÉNINK
   { slovo: "guillermo", typ: "guillermo" },
 ];

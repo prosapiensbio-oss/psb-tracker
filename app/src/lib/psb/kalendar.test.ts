@@ -32,3 +32,14 @@ describe("typ z názvu udalosti", () => {
     expect(typeof typZNazvu("Úvodní trénink — Jana")).toBe("string");
   });
 });
+
+describe("zrušený tréning premenovaný v kalendári", () => {
+  it("storno ani zrušený nie je tréning — od 1. 10. je kalendár zdroj dochádzky", () => {
+    expect(typZNazvu("Storno Online Jiri Majerovdky")).toBe("netrening");
+    expect(typZNazvu("Zruseny Online Jiri")).toBe("netrening");
+    expect(typZNazvu("Zrušený Peter G")).toBe("netrening");
+  });
+  it("storno vyhrá aj nad úvodným", () => {
+    expect(typZNazvu("Storno úvodný Jan Novák")).toBe("netrening");
+  });
+});

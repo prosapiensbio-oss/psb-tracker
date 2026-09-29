@@ -449,6 +449,7 @@ Používateľ ti môže priložiť aj OBRÁZOK (screenshot). Popíš/rozober, č
 // potvrdí človek (psb-action nižšie).
 
 const SCHEMA_DB = `sessions(id, date, time, client_name, session_trainer, session_name, session_type, duration_min, price_czk)
+  POZOR: od 1. 10. 2026 je tabuľka sessions z PTmindera už len KONTROLA. Dochádzka appky (zostatky, karty, tržby podľa trénera) sa od toho dňa berie z Google kalendára (kal_udalosti s klientom a typom trening/uvodny; zmiznutá udalosť len s kal_konanie.konal = 1), cena tréningu = cena balíčka v balicky / jeho hodiny. Na otázky o dochádzke od 1. 10. čítaj kalendár, nie sessions.
   session_type: OFFLINE | ONLINE | UVODNE. date je ISO text s časom, na porovnanie roka použi substr(date,1,4).
   POZOR NA MZDOVÉ HODINY: do mzdy trénera sa rátajú len OFFLINE a ONLINE — ÚVODNÉ NIE, tie sa platia zvlášť.
   „Koľko hodín odrobila Terezka v júli" = SUM(duration_min)/60 WHERE session_type <> 'UVODNE'. Bez tejto podmienky
