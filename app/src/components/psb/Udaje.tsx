@@ -512,6 +512,26 @@ function UploadCard({ data, missing, actions, chat }: { data: PSBData; missing: 
                 </div>
               )}
 
+              {/* Mazanie sa MUSÍ ukázať — tréning, ktorý ticho zmizne, je horší
+                  než tréning navyše. Zoznam je celý, lebo každý riadok je opravený
+                  zápis a Jerry ho má vedieť spoznať. */}
+              {!!r.odstranene?.length && (
+                <div style={{ padding: 9, marginBottom: 8, fontSize: 12, borderRadius: 8, background: mix(C.blue, 10), color: C.text }}>
+                  {r.odstranene.length}{" "}
+                  {r.odstranene.length === 1 ? "tréning zmizol" : r.odstranene.length < 5 ? "tréningy zmizli" : "tréningov zmizlo"} —
+                  {" "}v PTminderi {r.odstranene.length === 1 ? "je" : "sú"} za toto obdobie opravené (iný klient alebo čas), takže
+                  {" "}{r.odstranene.length === 1 ? "starý zápis bol" : "staré zápisy boli"} v Kokpite navyše:
+                  <div style={{ marginTop: 4, opacity: 0.85, lineHeight: 1.5 }}>
+                    {r.odstranene.map((x) => <div key={x}>{x}</div>)}
+                  </div>
+                </div>
+              )}
+              {r.nahradenieZastavene && (
+                <div style={{ padding: 9, marginBottom: 8, fontSize: 12, borderRadius: 8, background: C.orangeBg, color: C.orange }}>
+                  Pozor: {r.nahradenieZastavene}
+                </div>
+              )}
+
               {r.chybaju && r.chybaju.length > 0 && (
                 <div style={{ padding: 9, marginBottom: 8, fontSize: 12, borderRadius: 8, background: C.orangeBg, color: C.orange }}>
                   {r.vynulovane ? (

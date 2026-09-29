@@ -4,6 +4,7 @@ import type { D1Database } from "@cloudflare/workers-types";
 
 import { poplatkyPoOdrataniPlatieb } from "./platbyEvidencia";
 import { audit, jeZamknuty, zamknuteMesiace } from "./audit.server";
+import { nahradenieObdobia, type RiadokVKokpite } from "./nahradenieObdobia";
 import { normName } from "./format";
 import { parseAnamneza, parseCennik, parseGa4, parseGsc, parseKanaly, parseMetricool, parsePoplatky } from "./parse";
 import {
@@ -245,6 +246,10 @@ export type IngestResult = {
    * vracajú von: čiastočný export vyzerá presne ako úplný.
    */
   chybaju?: string[];
+  /** Tréningy, ktoré import zmazal (PTminder ich za obdobie súboru už nemá). */
+  odstranene?: string[];
+  /** Nastavené, keď poistka mazanie zastavila. */
+  nahradenieZastavene?: string;
   /** `true` = chýbajúcim sa vyčerpaný balíček vynuloval (pohľad `package`). */
   vynulovane?: boolean;
 };
@@ -256,6 +261,10 @@ export async function ingest(DB: D1Database, filename: string, text: string, act
   let added = 0;
   let skipped = 0;
   let chybaju: string[] = [];
+  /** Tréningy, ktoré import Sessions zmazal, lebo ich PTminder za to obdobie už nemá. */
+  let odstraneneSedenia: string[] = [];
+  /** Keď poistka mazanie zastavila — dôvod. */
+  let nahradenieZastavene = "";
   /** Pri pohľade `package` sa chýbajúcim zostatok vynuluje — hláška to povie. */
   let vynulovane = false;
   let bezZostatku = 0;
@@ -291,6 +300,29 @@ export async function ingest(DB: D1Database, filename: string, text: string, act
       added++;
     }
     if (stmts.length) await DB.batch(stmts);
+
+    /**
+     * Nahradenie obdobia — čo v súbore za to isté obdobie nie je, zmizne.
+     * Pravidlá a poistky sú v `nahradenieObdobia`; tu sa len načíta, čo
+     * v rozsahu je, a zmaže. Jeden dopyt na rozsah (nie celú tabuľku) —
+     * limit D1 sme už raz minuli.
+     */
+    if (rows.length) {
+      const dni = rows.map((r) => String(r.date).slice(0, 10)).filter(Boolean).sort();
+      const vRozsahu = (await DB.prepare(
+        "SELECT id, date, time, client_name, session_trainer, dedup_key FROM sessions WHERE substr(date,1,10) BETWEEN ?1 AND ?2",
+      ).bind(dni[0], dni[dni.length - 1]).all()).results as unknown as RiadokVKokpite[];
+      const n = nahradenieObdobia(
+        rows.map((r) => ({ date: r.date, sessionTrainer: r.sessionTrainer, kluc: sessionKey(r) })),
+        vRozsahu,
+        (d) => jeZamknuty(zamky, d),
+      );
+      odstraneneSedenia = n.odstranit.map((r) => `${String(r.date).slice(0, 10)} ${r.time} ${r.client_name} (${r.session_trainer})`);
+      nahradenieZastavene = n.zastavene || "";
+      for (let i = 0; i < n.odstranit.length; i += 50) {
+        await DB.batch(n.odstranit.slice(i, i + 50).map((r) => DB.prepare("DELETE FROM sessions WHERE id = ?1").bind(r.id)));
+      }
+    }
   } else if (type === "services") {
     const rows = parseServices(text);
     const existing = new Set(
@@ -695,11 +727,11 @@ export async function ingest(DB: D1Database, filename: string, text: string, act
   await audit(DB, {
     action: "import",
     predmet: filename,
-    neu: `${type}: +${added} riadkov, ${skipped} duplicít${zamknutych ? `, ${zamknutych} odmietnutých (uzavretý mesiac)` : ""}${chybaju.length ? (vynulovane ? `, ${chybaju.length} klientom vyčerpaný balíček (v exporte už nie sú)` : `, ${chybaju.length} aktívnych klientov v súbore chýba`) : ""}`,
+    neu: `${type}: +${added} riadkov, ${skipped} duplicít${odstraneneSedenia.length ? `, ${odstraneneSedenia.length} zmazaných (v PTminderi opravené): ${odstraneneSedenia.join("; ")}` : ""}${nahradenieZastavene ? ` — ${nahradenieZastavene}` : ""}${zamknutych ? `, ${zamknutych} odmietnutých (uzavretý mesiac)` : ""}${chybaju.length ? (vynulovane ? `, ${chybaju.length} klientom vyčerpaný balíček (v exporte už nie sú)` : `, ${chybaju.length} aktívnych klientov v súbore chýba`) : ""}`,
     actor,
   });
 
-  return { filename, type, added, skipped, zamknute: zamknutych, chybaju, vynulovane, bezZostatku, rozdiely };
+  return { filename, type, added, skipped, zamknute: zamknutych, chybaju, vynulovane, odstranene: odstraneneSedenia, nahradenieZastavene, bezZostatku, rozdiely };
 }
 
 // Zapíše JEDEN stĺpec. Nie celý riadok — a to je oprava skutočnej chyby.
