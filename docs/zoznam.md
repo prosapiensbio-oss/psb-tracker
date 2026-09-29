@@ -29,7 +29,10 @@ Rozhodnuté 29. 9. 2026. PTminder je odvtedy kontrola.
   majú Barbora, Malinová, Martinek, Pecková, Pavlík, Jitka od 1. 10. zlý zostatok.
 - [x] 3 minuté doplnenia 1 h (Petra Bambúšková, Tsiolis, Jitka) — ukončené k 29. 9.
 - [x] Janka Šnirychová „SPECIAL 3" je v poriadku — berú ho obaja Šnirychovci.
-- [ ] **Peniaze z banky a zošita** — `platby_od` = 2026-10.
+- [ ] **Peniaze z banky a zošita** — `platby_od` = 2026-10. Pri tom doplniť
+  platby zapísané v Kokpite aj do osi času klienta (`osCasuKlienta` číta len
+  PTminder `payments`) — inak „celá história + platby" v maili od októbra
+  nové platby neuvidí.
 - [ ] **Os času a „dnes"** — os počíta celý dnešný deň, nové sedenia len to,
   čo začalo. ±1 h do konca dňa.
 
