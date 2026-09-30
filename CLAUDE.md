@@ -2032,3 +2032,35 @@ jedinú úlohu: aby si ho klient otvoril v deň, keď na tom záleží.
   jeden kľúč, jedno volanie) a Twilio. Kľúč sa zadáva v Údajoch, von sa už
   nevracia a do chýb ide odpoveď brány, nie to, čím sme sa prihlásili —
   tá istá zásada ako pri hesle do schránky.
+
+
+## Zrušené rozhodnutie sa môže vrátiť — keď padne jeho DÔVOD
+
+Meranie bolesti Jerry 24. 9. 2026 zrušil a v pamäti stálo „neponúkať to
+znova". 30. 9. 2026 to otvoril sám a z druhej strany: „to, čo sme povedali,
+že robiť nebudeme, lebo je to robota navyše — tak že by to robil ten klient
+sám."
+
+Zrušené nebolo MERANIE, zrušená bola práca navyše pre trénera. Keď sa tá istá
+vec spýta stránky, na ktorú klient aj tak klikne z SMS, dôvod neexistuje.
+Pri každom „toto sme zamietli" sa preto pýtaj, či dnešný návrh nesie ten istý
+dôvod — a nie len tú istú tému.
+
+**Pocitovka** (`lib/psb/pocitovka.ts`, `pocitovkaStranka.ts`) — tri otázky
+1–10 na verejnej stránke klienta:
+
+- **Smer NIE JE pri všetkých rovnaký a je to zámer.** Bolesť sa na svete meria
+  tak, že desať je najhoršie; prevrátiť ju „aby všetko rástlo" by znamenalo,
+  že klient klepne sedmičku v opačnom význame, než v akom ju pozná. Každá
+  otázka nesie `lepsie` a nikde sa smer nepočíta z hlavy.
+- **Zmena sa počíta PRE KAŽDÚ OTÁZKU ZVLÁŠŤ**, z jej prvej a poslednej
+  vyplnenej hodnoty. Klient nemusí zakaždým klepnúť všetky tri a spoločné
+  „prvé a posledné meranie" by porovnávalo dva rôzne dni v jednej vete.
+- **Bez JavaScriptu.** Stránka sa otvára z SMS, často v okne, ktoré si otvorí
+  správa; skript, ktorý sa nenačíta, by z otázok spravil mŕtve políčka.
+- **Klepnutie musí byť VIDNO.** Prvá verzia mala predvýber len zo servera:
+  hodnoty sa zapisovali správne, ale kým bol klient na stránke, klepol na
+  číslo a nestalo sa nič viditeľné — odosielal by naslepo. Rieši to
+  `:checked + span` v `<style>`, teda zase bez skriptu.
+- **Jedno hodnotenie nie je výsledok** a appka to hovorí nahlas. Je to tá istá
+  veta ako pri „zostal rok je vernosť, nie zlepšenie".

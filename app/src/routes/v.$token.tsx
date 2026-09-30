@@ -7,6 +7,8 @@ import { historiaPreMail } from "../lib/psb/historiaMail";
 import { loadData } from "../lib/psb/db.server";
 import { mailKlientovi } from "../lib/psb/mailKlientovi";
 import { osCasuKlienta } from "../lib/psb/klientOsCasu";
+import { blokPocitovky } from "../lib/psb/pocitovkaStranka";
+import { platnaHodnota, type Meranie } from "../lib/psb/pocitovka";
 import { qrObrazok } from "../lib/psb/fakturaHtml";
 import { DODAVATEL, spayd } from "../lib/psb/vydanaFaktura";
 
@@ -90,12 +92,29 @@ export const Route = createFileRoute("/v/$token")({
           };
         }
 
+        /**
+         * POCITOVKA — tri otázky, ktoré si klepne klient sám. Sedí na tej
+         * istej stránke, na ktorú aj tak klikne z SMS; vlastný odkaz by
+         * znamenal druhý token, druhú stránku a druhú vetu v správe.
+         */
+        const dnesne = await DB.prepare(
+          "SELECT datum, bolest, pohyb, posun FROM klient_merania WHERE klient = ?1 AND datum = ?2 AND zdroj = 'klient'",
+        ).bind(c.name, dnes).first<Meranie>().catch(() => null);
+        const pocity = blokPocitovky({
+          dnesne: dnesne || undefined,
+          vdaka: new URL(request.url).searchParams.get("vdaka") === "1",
+        });
+
         const m = mailKlientovi({ ...vypis, qrUrl, logoUrl: `${origin}/znacka-napis-mail.png` });
         // Mailová sadzba nemá viewport — telefón by stránku zmenšil na známku.
-        const html = m.html.replace(
-          '<meta charset="utf-8">',
-          '<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex">',
-        );
+        const html = m.html
+          .replace(
+            '<meta charset="utf-8">',
+            '<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex">',
+          )
+          // Blok ide na KONIEC tela: výpis tréningov je to, kvôli čomu klient
+          // prišiel, otázky sú to, o čo ho prosíme.
+          .replace("</body>", `<div style="max-width:560px;margin:0 auto;padding:0 16px 28px;font-family:Arial,Helvetica,sans-serif;color:#f2f0e4">${pocity}</div></body>`);
 
         await DB.prepare("UPDATE klient_odkazy SET otvorene = otvorene + 1, posledne_otvorene = ?1 WHERE token = ?2")
           .bind(new Date().toISOString(), token).run().catch(() => null);
@@ -103,6 +122,47 @@ export const Route = createFileRoute("/v/$token")({
         return new Response(html, {
           headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex" },
         });
+      },
+
+      /**
+       * ODPOVEĎ NA TRI OTÁZKY. Autorizuje TOKEN v adrese — ten istý, ktorý
+       * stránku otvoril; nič iné sa z formulára neberie, takže sa cezeň nedá
+       * zapísať nikomu inému.
+       *
+       * Zápis PREPISUJE dnešok (`ON CONFLICT`), nepridáva druhý riadok:
+       * klient si to vie rozmyslieť a klepnúť znova, a oprava má odpoveď
+       * zmeniť, nie postaviť vedľa nej ďalšiu. Čo neklepol, sa nemaže
+       * (`COALESCE`) — prázdno nie je odpoveď.
+       */
+      POST: async ({ request, params }) => {
+        const token = String((params as { token?: string }).token || "");
+        const { DB } = bindings();
+        const spat = (vdaka: boolean) => new Response(null, {
+          status: 303,
+          headers: { location: `/v/${encodeURIComponent(token)}${vdaka ? "?vdaka=1" : ""}`, "cache-control": "no-store" },
+        });
+        if (!DB || !/^[A-Za-z0-9]{8,24}$/.test(token)) return new Response("Tento odkaz neplatí.", { status: 404 });
+
+        const r = await DB.prepare("SELECT klient FROM klient_odkazy WHERE token = ?1").bind(token).first<{ klient: string }>();
+        if (!r) return new Response("Tento odkaz neplatí.", { status: 404 });
+
+        const f = await request.formData();
+        const bolest = platnaHodnota(f.get("bolest"));
+        const pohyb = platnaHodnota(f.get("pohyb"));
+        const posun = platnaHodnota(f.get("posun"));
+        if (bolest == null && pohyb == null && posun == null) return spat(false);
+
+        const dnes = new Date().toISOString().slice(0, 10);
+        await DB.prepare(
+          `INSERT INTO klient_merania (id, klient, datum, bolest, pohyb, posun, poznamka, autor, created_at, zdroj)
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6, '', 'klient', ?7, 'klient')
+           ON CONFLICT (klient, datum, zdroj) DO UPDATE SET
+             bolest = COALESCE(excluded.bolest, klient_merania.bolest),
+             pohyb  = COALESCE(excluded.pohyb,  klient_merania.pohyb),
+             posun  = COALESCE(excluded.posun,  klient_merania.posun)`,
+        ).bind(`${dnes}-${crypto.randomUUID().slice(0, 8)}`, r.klient, dnes, bolest, pohyb, posun, new Date().toISOString()).run();
+
+        return spat(true);
       },
     },
   },

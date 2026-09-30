@@ -177,6 +177,8 @@ export type PSBData = {
   poplatky: PoplatokZaznam[];
   /** Tréningy zadarmo — hodina sa odtrénovala, z členstva sa nestrhla. */
   treningyZdarma: TreningZdarma[];
+  /** Pocitovka — čo si klient sám klepol na stupnici 1–10 (viď pocitovka.ts). */
+  merania: MeranieRow[];
   /**
    * Tréningy z PTmindera od KOKPIT_OD (1. 10. 2026) — len na kontrolu.
    * Pre výpočty platí `sessions`, ktoré sú od toho dňa z kalendára.
@@ -238,10 +240,22 @@ export type PoplatokZaznam = { id: string; datum: string; klient: string; popis:
  */
 export type TreningZdarma = { id: string; klient: string; den: string; dovod: string; kto: string };
 
+/**
+ * Jeden deň hodnotenia. `zdroj` rozlišuje, KTO to povedal — klient na svojej
+ * stránke, alebo tréner. Bez toho sa po roku nedá povedať, čie je to číslo,
+ * a sú to dve rôzne veci.
+ */
+export type MeranieRow = {
+  klient: string; datum: string;
+  bolest: number | null; pohyb: number | null; posun: number | null;
+  zdroj: string;
+};
+
 export const EMPTY_DATA: PSBData = {
   zavery: [],
   poplatky: [],
   treningyZdarma: [],
+  merania: [],
   doplneniaHodiny: {},
   vedomosti: [],
   sessions: [],

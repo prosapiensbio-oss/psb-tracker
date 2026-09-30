@@ -28,7 +28,7 @@ import { EMPTY_DATA } from "./types";
 const uid = () => crypto.randomUUID();
 
 export async function loadData(DB: D1Database): Promise<PSBData> {
-  const [sessions, services, payments, packages, overrides, acks, log, leads, zavery, vedomosti, poplatky, zdarma, vlastnePlatby, doplneniaH, kalOd, balickyK] = await Promise.all([
+  const [sessions, services, payments, packages, overrides, acks, log, leads, zavery, vedomosti, poplatky, zdarma, vlastnePlatby, doplneniaH, kalOd, balickyK, merania] = await Promise.all([
     DB.prepare("SELECT * FROM sessions").all(),
     DB.prepare("SELECT * FROM services").all(),
     DB.prepare("SELECT * FROM payments").all(),
@@ -73,6 +73,14 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
     ).bind(KOKPIT_OD).all().catch(() => ({ results: [] })),
     // Balíčky v Kokpite — z nich cena tréningu z kalendára.
     DB.prepare("SELECT klient, nazov, zdroj, platnost_od, platnost_do, hodiny, cena_czk, zrusene_at, poznamka FROM balicky")
+      .all().catch(() => ({ results: [] })),
+    /**
+     * Pocitovka — tri otázky 1–10, ktoré si klepne klient sám na svojej
+     * verejnej stránke. Ide to cez `loadData`, lebo to isté číslo číta
+     * profil klienta aj Jarvisov kontext; dve cesty k jednému číslu sa
+     * skôr či neskôr rozídu.
+     */
+    DB.prepare("SELECT klient, datum, bolest, pohyb, posun, zdroj FROM klient_merania ORDER BY datum")
       .all().catch(() => ({ results: [] })),
   ]);
 
@@ -164,6 +172,13 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
     ),
     treningyZdarma: (zdarma.results as any[]).map((r) => ({
       id: r.id, klient: r.client_name, den: String(r.den).slice(0, 10), dovod: r.dovod || "", kto: r.kto || "",
+    })),
+    merania: (merania.results as any[]).map((r) => ({
+      klient: String(r.klient), datum: String(r.datum).slice(0, 10),
+      bolest: r.bolest == null ? null : Number(r.bolest),
+      pohyb: r.pohyb == null ? null : Number(r.pohyb),
+      posun: r.posun == null ? null : Number(r.posun),
+      zdroj: String(r.zdroj || "trener"),
     })),
     /**
      * V `leads` sú LEN dopyty na úvodný tréning.

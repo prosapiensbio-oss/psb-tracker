@@ -60,7 +60,12 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
   „Janka Kadlčková" = **Anna Kadličkova**, „MIchaela MIchalíková" =
   **Miroslava Michalikova**, „Jerry Martinek" = **Robin Martinek**.
   Riadky sú v `Anmnéza klientů 3.csv`, stačí ich poslať cez `import-stary`.
-- [ ] Zmazať skúšobnú anamnézu AATestu pri upratovaní testovacích dát.
+- [ ] Zmazať skúšobnú anamnézu AATestu pri upratovaní testovacích dát —
+  a s ňou aj skúšobné hodnotenie v `klient_merania` (AATest, 30. 9. 2026).
+- [ ] **Pocitovka beží od 30. 9. 2026** — o mesiac sa pozrieť, koľkí klienti
+  odpovedali. Keď to bude pár ľudí, nie je to dôkaz, že sa nezlepšujú, ale
+  že sa nepýtame dosť nahlas; vtedy zvážiť pripomenutie v SMS po treťom
+  tréningu.
 
 ## 0b · Ostatné otvorené z 29. 9.
 

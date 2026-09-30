@@ -79,7 +79,7 @@ describe("textSms", () => {
       oslovenie: "Eva", trener: "Jerry", zostatok: 0, sMailom: true, dnesnyTrening: true, rod: "z",
       odkaz: "https://kokpit.prosapiensbio.workers.dev/v/Ab3xK9mQ2r",
     });
-    expect(t).toContain("Treningy a platba: https://");
+    expect(t).toContain("Treningy, platba a 3 otazky ako ti je: https://");
     expect(t).not.toContain("maili");
     expect(dlzkaSpravy(t).sprav).toBe(1);
   });

@@ -22,6 +22,7 @@ import { C, mix } from "../../lib/psb/theme";
 import { Dennik } from "./Dennik";
 import { Info } from "./ui";
 import { useUzke } from "./useUzke";
+import { POCITOVKA, zhrnutiePocitov } from "../../lib/psb/pocitovka";
 
 /**
  * Pracovný stôl jedného klienta — vyhľadaj a rob na ňom.
@@ -440,6 +441,16 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
   }, [data.clientOverrides, meno, c]);
 
   const uzke = useUzke();
+
+  /**
+   * Čo si klient sám klepol na svojej stránke (1–10). Berie sa z `loadData`,
+   * nie z vlastného fetchu — to isté číslo číta Jarvis a dve cesty k jednému
+   * číslu sa raz rozídu.
+   */
+  const pocity = useMemo(
+    () => zhrnutiePocitov((data.merania || []).filter((x) => x.klient === meno && x.zdroj === "klient")),
+    [data.merania, meno],
+  );
 
   /** Zrušené tréningy za 90 dní — z histórie zmien v kalendári. */
   const [zruseneKal, setZruseneKal] = useState<{ klient: string | null; druh: string; kedy: string }[]>([]);
@@ -1015,6 +1026,44 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
                 {" "}{mimoExportu} {mimoExportu === 1 ? "hodina sa odtrénovala" : mimoExportu < 5 ? "hodiny sa odtrénovali" : "hodín sa odtrénovalo"} po ňom a vie o nich zatiaľ len kalendár.
               </div>
             )}
+          </div>
+        )}
+
+        {/*
+          AKO SA CÍTI — jediné miesto v appke, ktoré meria ZMENU STAVU.
+          Tržby a dochádzka hovoria o vernosti, nie o výsledku. Odpovedá si
+          klient sám na svojej stránke (viď pocitovka.ts), preto to Jerryho
+          nestojí ani klik — to bol jediný dôvod, prečo sa meranie 24. 9.
+          2026 zrušilo.
+        */}
+        {!!pocity.pocet && (
+          <div style={{ padding: "10px 12px", borderRadius: 10, border: `1px solid ${mix(C.border, 110)}` }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
+              <div style={{ fontSize: 11, letterSpacing: 0.7, textTransform: "uppercase", color: C.textDim }}>Ako sa cíti</div>
+              <div style={{ fontSize: 10.5, color: C.textDim }}>
+                {fmtDMY(pocity.posledne?.datum || "")}{pocity.pocet > 1 ? ` · ${pocity.pocet}×` : ""}
+              </div>
+            </div>
+            {POCITOVKA.map((o) => {
+              const h = pocity.posledne?.[o.id];
+              if (h == null) return null;
+              const zm = pocity.zmeny[o.id];
+              const farba = !zm || zm.lepsieO === 0 ? C.textMuted : zm.lepsieO > 0 ? C.green : C.orange;
+              return (
+                <div key={o.id} style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 6 }}>
+                  <span style={{ flexGrow: 1, minWidth: 0, fontSize: 12, color: C.textMuted }}>{o.text}</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: C.text, fontVariantNumeric: "tabular-nums" }}>{h}</span>
+                  <span style={{ fontSize: 10.5, color: farba, minWidth: 34, textAlign: "right" }}>
+                    {!zm ? "prvé" : zm.lepsieO === 0 ? "=" : `${zm.lepsieO > 0 ? "▲" : "▼"} ${Math.abs(zm.lepsieO)}`}
+                  </span>
+                </div>
+              );
+            })}
+            <div style={{ fontSize: 10.5, color: C.textDim, marginTop: 7, lineHeight: 1.5 }}>
+              {pocity.pocet === 1
+                ? "Prvé hodnotenie — porovnávať sa zatiaľ nemá s čím."
+                : "Šípka porovnáva s prvou odpoveďou. Pri bolesti je lepšie menej, pri zvyšku viac."}
+            </div>
           </div>
         )}
 

@@ -51,6 +51,7 @@ import { monthLabel, normName, weekKey, weekLabel } from "./format";
 import type { PorovnanieDochadzky } from "./porovnanieDochadzky";
 import type { PSBData } from "./types";
 import { CIEL_MESIACOV, chybaDoCiela } from "./rezerva";
+import { POCITOVKA, zhrnutiePocitov } from "./pocitovka";
 
 const r1 = (n: number) => Math.round(n * 10) / 10;
 const r0 = (n: number) => Math.round(n);
@@ -1142,10 +1143,33 @@ export function buildAiContext(
         return null;
       }
     })(),
-    vysledkyKlientov: {
-      poznamka: "Bolesť klientov na stupnici 0–10 v čase (tabuľka klient_merania, zapisuje sa v „+ Zápis“ pri denníku). PSB predáva zmenu stavu — toto je JEDINÉ miesto v appke, ktoré ju meria; tržby a dochádzka hovoria o vernosti, nie o výsledku. Keď je meraní málo, povedz to nahlas: chýbajúce meranie NEZNAMENÁ, že sa ľudia nezlepšujú, ale že sa to nezapisovalo. Podrobnosti si vytiahni dopytom — porovnaj prvé a posledné meranie toho istého človeka.",
-      poznamkaMeranie: "Zapisuje sa jedným klikom pri zápise do denníka, teda hneď po tréningu.",
-    },
+    vysledkyKlientov: (() => {
+      const odKlientov = (data.merania || []).filter((m) => m.zdroj === "klient");
+      const podlaKlienta = new Map<string, typeof odKlientov>();
+      for (const m of odKlientov) podlaKlienta.set(m.klient, [...(podlaKlienta.get(m.klient) || []), m]);
+
+      const zhrnutia = [...podlaKlienta.entries()].map(([klient, riadky]) => ({ klient, z: zhrnutiePocitov(riadky) }));
+      const porovnatelni = zhrnutia.filter(({ z }) => Object.keys(z.zmeny).length > 0);
+      const podlaOtazky = Object.fromEntries(POCITOVKA.map((o) => {
+        const s = porovnatelni.map(({ z }) => z.zmeny[o.id]).filter(Boolean) as { lepsieO: number }[];
+        return [o.id, {
+          otazka: o.text,
+          lepsieJe: o.lepsie === "menej" ? "nižšie číslo" : "vyššie číslo",
+          porovnatelnych: s.length,
+          zlepsilo: s.filter((x) => x.lepsieO > 0).length,
+          bezZmeny: s.filter((x) => x.lepsieO === 0).length,
+          zhorsilo: s.filter((x) => x.lepsieO < 0).length,
+        }];
+      }));
+
+      return {
+        poznamka: "PREČÍTAJ, NEPOČÍTAJ. Pocitovka — tri otázky na stupnici 1–10, ktoré si klepne KLIENT SÁM na svojej verejnej stránke (odkaz mu chodí v SMS). Od 30. 9. 2026; predtým sa nemeralo nič, takže malý počet odpovedí NEZNAMENÁ, že sa ľudia nezlepšujú — znamená, že sa ešte len začalo zbierať. PSB predáva zmenu stavu a toto je JEDINÉ miesto v appke, ktoré ju meria; tržby a dochádzka hovoria o vernosti, nie o výsledku. SMER NIE JE PRI VŠETKÝCH ROVNAKÝ: pri bolesti je lepšie NIŽŠIE číslo, pri zvyšku vyššie — riaď sa poľom „lepsieJe“ a nehádaj. Jeden záznam nie je výsledok; porovnáva sa prvá a posledná odpoveď toho istého človeka na tú istú otázku. Podrobnosti si vytiahni dopytom do klient_merania (WHERE zdroj = 'klient').",
+        odpovedaloKlientov: podlaKlienta.size,
+        zaznamovSpolu: odKlientov.length,
+        maAsponDveOdpovede: porovnatelni.length,
+        podlaOtazky,
+      };
+    })(),
     odmlcani: (() => {
       const zoznam = odmlcaniKlienti(clients, kalendar?.udalosti || []);
       return {
