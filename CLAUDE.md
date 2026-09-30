@@ -1824,12 +1824,28 @@ mali pevný stĺpec vedľa obsahu a na 375 px zostalo na obsah sto pixelov:
   osemdesiat pixelov a text sa lámal po jednom písmene. Rebrík je na
   telefóne vodorovný pás.
 - **Kalendár** (`Tyzden`) — sedem stĺpcov po osemdesiat pixelov a okno
-  udalosti mimo obrazovky. Na telefóne sa kreslí JEDEN deň, týždeň zostáva
-  nad mriežkou ako pás dní s počtom tréningov, a okno sa lepí na spodok
-  obrazovky.
+  udalosti mimo obrazovky. Okno sa na telefóne lepí na spodok obrazovky.
+  Mriežka najprv kreslila JEDEN deň s pásom dní nad ním; fungovalo to, ale
+  Jerry chcel celý týždeň ako v Google Calendari (30. 9. 2026, so snímkou) —
+  týždeň sa inak nedá prehliadnuť jedným pohľadom a to je dôvod, prečo sa
+  kalendár otvára. Sedem stĺpcov sa do 390 px vojde, len sa musí ubrať
+  všade: pás hodín 22 px a holé čísla, medzery 1 px, mriežka si vezme aj
+  odsadenie karty (`marginInline: -12`), písmo 9,5 px, čas v bloku sa
+  nekreslí (v Googli tiež nie — hodinu povie poloha).
+  **Zostane 46 px na stĺpec a to je na meno málo** — preto `menoDoBloku`:
+  sám v hodine → „Monika Č.", pri prekryve (22 px) → iniciály „MČ" na jeden
+  riadok. Pôvodné lámanie `overflowWrap: anywhere` z „Anna Nová" spravilo
+  „An / na / No / vá"; dve písmená na riadok nie sú meno.
 
 Hranica je JEDNA: `useUzke()` v `components/psb/useUzke.ts` (640 px). Vlastná
 kópia s inou hranicou znamená na jednej obrazovke dva rôzne telefóny.
+
+**Stĺpce pod seba nestačia — musí sa dať aj rolovať.** Karta klienta má
+`overflowY: visible`, lebo si výšku riadi sama; to platí len vedľa seba. Keď
+sa stĺpce poskladajú pod seba, nerolovalo NIČ a spodok profilu sa nedal
+dosiahnuť (Jerry, 30. 9. 2026: „v profile klienta sa mi nedá scrolovať").
+Na telefóne preto roluje CELÁ karta a os času vnútri nej nie — vnorené
+rolovanie sa prstom trafiť nedá.
 
 **Pri tom istom pohľade sa našlo, že hodiny v rovnakom čase sa kreslili JEDNA
 NA DRUHEJ** — všetky mali `left: 2, right: 2`. Rieši to `rozlozUdalosti`

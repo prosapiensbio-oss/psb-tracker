@@ -636,8 +636,11 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
             <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 3 }}>{k.podnadpis}</div>
 
             <div style={{ marginTop: 14, flexGrow: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-              {/* Zoznamy rolujú vnútri; karta klienta si výšku riadi sama. */}
-              <div style={{ flexGrow: 1, minHeight: 0, overflowY: k.druh === "klient" ? "visible" : "auto", display: k.druh === "klient" ? "flex" : "block", flexDirection: "column" }}>
+              {/* Zoznamy rolujú vnútri; karta klienta si výšku riadi sama —
+                  ale LEN na monitore. Na telefóne idú jej stĺpce pod seba,
+                  takže rolovať musí karta, inak sa spodok profilu nedá
+                  dosiahnuť (Jerry, 30. 9. 2026). */}
+              <div style={{ flexGrow: 1, minHeight: 0, overflowY: k.druh === "klient" && !uzke ? "visible" : "auto", display: k.druh === "klient" ? "flex" : "block", flexDirection: "column" }}>
               {k.druh === "faktury" && (
                 <VydaneFaktury
                   mena={mena}

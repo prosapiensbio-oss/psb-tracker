@@ -44,3 +44,26 @@ export function rozlozUdalosti(useky: Usek[]): Miesto[] {
   uzavri();
   return miesta;
 }
+
+/**
+ * Meno do bloku na telefóne. Stĺpec má na 390 px asi 46 px, a keď sa v tej
+ * hodine prekrývajú dvaja tréneri, ostane na jedno meno 22 px — „Anna Nová"
+ * sa tam láme na „An / na / No / vá". Dve písmená na riadok nie sú meno,
+ * sú to schody.
+ *
+ *   • jedna udalosť v hodine → „Monika Č." (krstné celé, priezvisko skratkou)
+ *   • dve a viac vedľa seba  → „MČ" (iniciály; celé meno povie klepnutie)
+ *
+ * Na monitore sa nič neskracuje — tam je miesta dosť.
+ */
+export function menoDoBloku(nazov: string, uzke: boolean, zo: number): string {
+  const cele = String(nazov || "").trim();
+  if (!uzke || !cele) return cele;
+  const kusy = cele.split(/\s+/).filter(Boolean);
+  if (zo > 1) {
+    if (kusy.length === 1) return kusy[0].slice(0, 3);
+    return kusy.slice(0, 2).map((k) => k[0].toUpperCase()).join("");
+  }
+  if (kusy.length === 1) return kusy[0];
+  return `${kusy[0]} ${kusy[1][0].toUpperCase()}.`;
+}

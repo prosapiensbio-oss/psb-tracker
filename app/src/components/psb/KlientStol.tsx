@@ -1192,7 +1192,11 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
         )}
         {chyba && <div style={{ fontSize: 12, color: chybaJeDobra ? C.green : C.red, marginTop: 8 }}>{chyba}</div>}
 
-        <div style={{ flexGrow: 1, minHeight: 0, overflowY: "auto", marginTop: 10 }}>
+        {/* Na telefóne roluje CELÁ karta, nie os času vnútri nej — vnorené
+            rolovanie sa prstom trafiť nedá a spodok profilu zostal
+            nedostupný (Jerry, 30. 9. 2026: „v profile klienta sa mi nedá
+            scrolovať"). */}
+        <div style={{ flexGrow: 1, minHeight: 0, overflowY: uzke ? "visible" : "auto", marginTop: 10 }}>
           {filter === "zdravie" && zdravie && (
             <div style={{ display: "flex", flexDirection: "column", gap: 13 }}>
               {/* DVA PÁSY POD SEBOU — klient a priemer.
