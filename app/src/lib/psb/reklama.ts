@@ -35,8 +35,13 @@ export type ReklamaVstup = {
   kanaly: { mesiac: string; metrika: string; hodnota: number }[];
   /** Výdavok po mesiacoch z Metricool exportu — použije sa, keď zostava chýba. */
   mktMesacne: { m: string; spend: number }[];
-  /** Kampane z Meta API (voliteľné). */
-  kampane: { id: string; nazov: string; mesiac: string; ciel: string; spend: number }[];
+  /**
+   * Kampane z Meta API (voliteľné). `akcie` je surový JSON z Mety — pole
+   * dvojíc `[typ, počet]`. Berú sa z neho `link_click` a `landing_page_view`:
+   * rozdiel medzi nimi je jediné miesto, kde appka vidí, koľko zaplatených
+   * klikov sa na web NEDOSTALO.
+   */
+  kampane: { id: string; nazov: string; mesiac: string; ciel: string; spend: number; akcie?: string | null }[];
   dopyty: { date: string; name: string; source: string; kampan?: string }[];
   /** Mená klientov, ktorí prešli prahom `jeKlient`. */
   menaKlientov: string[];
@@ -68,10 +73,45 @@ export type ReklamaSuhrn = {
       klienti: { meno: string; trzbaVOkne: number }[];
     };
   };
+  /**
+   * Zo zaplatených klikov na odkaz — koľko sa ich dočkalo načítania stránky.
+   * `podiel` je `null`, keď v okne nie je ani jedna kampaň s odkazom
+   * (napr. samé boosty príspevkov) — tam sa táto otázka nedá položiť.
+   */
+  dorazilo: {
+    klikov: number;
+    navstev: number;
+    podiel: number | null;
+    poMesiacoch: { mesiac: string; klikov: number; navstev: number; podiel: number | null }[];
+  };
   zmiesana: { novychSpolu: number; cenaZaKlienta: number | null };
   poMesiacoch: { mesiac: string; spend: number; dopytov: number; klientov: number }[];
   poKampaniach: { id: string; nazov: string; ciel: string; spend: number; dopytov: number; klientov: number }[];
 };
+
+/**
+ * Akcie z Mety do mapy `typ → počet`.
+ *
+ * Meta ich posiela ako pole dvojíc a ukladajú sa surové (`mkt_kampane.akcie`) —
+ * zámerne, lebo tú istú konverziu hlási pod piatimi názvami a sčítať ich
+ * naslepo dalo 12. 8. 2026 trojnásobok skutočnosti. Tu sa preto čítajú len
+ * menovite známe typy.
+ */
+export function akcieZJson(s: string | null | undefined): Record<string, number> {
+  if (!s) return {};
+  try {
+    const d = JSON.parse(s);
+    if (!Array.isArray(d)) return {};
+    const out: Record<string, number> = {};
+    for (const r of d) {
+      if (Array.isArray(r) && r.length >= 2) out[String(r[0])] = Number(r[1]) || 0;
+      else if (r && typeof r === "object" && "action_type" in r) out[String((r as Record<string, unknown>).action_type)] = Number((r as Record<string, unknown>).value) || 0;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
 
 /** Je tento dopyt z platenej cesty? */
 export const zReklamy = (l: { source: string; kampan?: string }): boolean =>
@@ -134,6 +174,45 @@ export function reklamaSuhrn(v: ReklamaVstup): ReklamaSuhrn {
 
   const podiel = (a: number, b: number) => (b > 0 ? a / b : null);
 
+  // ── Dorazilo na stránku ────────────────────────────────────────────────
+  //
+  // 21. 9. 2026: Meta hlásila 715 klikov na odkaz, ale len 285 načítaní
+  // stránky — 60 % zaplatených ľudí odišlo počas načítavania (stránka mala
+  // 7,6 MB a LCP 16 s). Číslo, ktoré to ukázalo, existovalo len v mojom
+  // ručnom výpočte; na obrazovke nebolo. Má pritom akciu ako máloktoré:
+  // keď klesne, pokazilo sa niečo na webe, nie v reklame.
+  //
+  // Kampane BEZ odkazu (boosty príspevkov, cieľ zapojenie) sa do pomeru
+  // nezapočítavajú — nemajú kliky na odkaz ani návštevy, takže by ho
+  // neznižovali, len by mlčali. Preto sa preskakujú celé.
+  const dorazilo = (() => {
+    const poMes = new Map<string, { klikov: number; navstev: number }>();
+    let klikov = 0, navstev = 0;
+    for (const k of v.kampane) {
+      if (!okno.has(k.mesiac)) continue;
+      const a = akcieZJson(k.akcie);
+      const lc = a.link_click || 0;
+      // `omni_landing_page_view` je tá istá udalosť pod druhým menom —
+      // sčítať obe by dalo dvojnásobok.
+      const lpv = a.landing_page_view || 0;
+      if (!lc && !lpv) continue;
+      klikov += lc;
+      navstev += lpv;
+      const e = poMes.get(k.mesiac) || { klikov: 0, navstev: 0 };
+      e.klikov += lc;
+      e.navstev += lpv;
+      poMes.set(k.mesiac, e);
+    }
+    return {
+      klikov,
+      navstev,
+      podiel: podiel(navstev, klikov),
+      poMesiacoch: [...poMes.entries()]
+        .map(([mesiac, e]) => ({ mesiac, ...e, podiel: podiel(e.navstev, e.klikov) }))
+        .sort((a, b) => a.mesiac.localeCompare(b.mesiac)),
+    };
+  })();
+
   // ── Rozpady — tie isté súčty, len inak pokrájané ───────────────────────
   const poMesiacoch = v.mesiace.map((m) => {
     const d = platene.filter((l) => monthKey(l.date) === m);
@@ -187,6 +266,7 @@ export function reklamaSuhrn(v: ReklamaVstup): ReklamaSuhrn {
       navratnost: podiel(trzba, spend),
       kto: { dopyty: ktoDopyty, klienti: ktoKlienti },
     },
+    dorazilo,
     zmiesana: { novychSpolu: v.novychSpolu, cenaZaKlienta: podiel(spend, v.novychSpolu) },
     poMesiacoch,
     poKampaniach,

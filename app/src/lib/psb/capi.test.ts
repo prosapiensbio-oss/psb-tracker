@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { hash, normEmail, normTelefon, telo } from "./capi";
+import { fbcZAdresy, hash, normEmail, normTelefon, telo } from "./capi";
 
 describe("normalizácia pred hašovaním", () => {
   it("e-mail sa oreže a zmenší", () => {
@@ -78,5 +78,42 @@ describe("telo udalosti", () => {
   it("bez adresy sa `event_source_url` neposiela prázdne", async () => {
     const t = await telo({ ...zaklad, stranka: "" });
     expect(t.data[0]).not.toHaveProperty("event_source_url");
+  });
+});
+
+describe("spárovanie s reklamou", () => {
+  const zaklad = {
+    id: "web-2026-09-30-jan@novak.cz",
+    email: "jan@novak.cz",
+    telefon: "777123456",
+    stranka: "https://www.prosapiens.cz/uvodni-trenink/?utm_source=meta&fbclid=IwAbCdEf123",
+  };
+
+  it("`fbc` sa zostaví z `fbclid` v adrese, keď cookie nepríde", async () => {
+    // Bez tohto Meta udalosť prijme, ale nepripíše ju reklame — a presne
+    // preto nemali septembrové kampane ani jednu konverziu, hoci audit
+    // pri každom dopyte hlásil „nahlásené Mete".
+    expect(fbcZAdresy(zaklad.stranka, 1_780_000_000)).toBe("fb.1.1780000000000.IwAbCdEf123");
+    const t = await telo({ ...zaklad, cas: 1_780_000_000 });
+    expect((t.data[0].user_data as Record<string, string>).fbc).toBe("fb.1.1780000000000.IwAbCdEf123");
+  });
+
+  it("cookie z prehliadača má prednosť pred adresou", async () => {
+    const t = await telo({ ...zaklad, fbc: "fb.1.999.zCookie" });
+    expect((t.data[0].user_data as Record<string, string>).fbc).toBe("fb.1.999.zCookie");
+  });
+
+  it("adresa bez `fbclid` `fbc` nevyrobí", async () => {
+    expect(fbcZAdresy("https://www.prosapiens.cz/uvodni-trenink/")).toBe("");
+    const t = await telo({ ...zaklad, stranka: "https://www.prosapiens.cz/kontakt/" });
+    expect((t.data[0].user_data as Record<string, unknown>).fbc).toBeUndefined();
+  });
+
+  it("magnet ide ako iná udalosť než dopyt", async () => {
+    // Keby stiahnutý protokol išiel ako `Lead`, kampaň na dopyty by sa učila
+    // zháňať sťahovačov e-booku.
+    expect((await telo(zaklad)).data[0].event_name).toBe("Lead");
+    expect((await telo({ ...zaklad, udalost: "CompleteRegistration" as const })).data[0].event_name)
+      .toBe("CompleteRegistration");
   });
 });

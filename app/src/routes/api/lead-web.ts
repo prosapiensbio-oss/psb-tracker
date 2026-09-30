@@ -131,6 +131,27 @@ export const Route = createFileRoute("/api/lead-web")({
         const stranka = kus(b.page ?? b.stranka, 300) || kus(referer, 300);
         const jeMagnet = /lead magnet/i.test(poznamka) || /protokol-o-myofascialnim/i.test(stranka);
 
+        /**
+         * Robot sa Mete nehlási.
+         *
+         * 26.–29. 9. 2026 prešlo formulárom päť strojových odoslaní (náhodné
+         * meno, adresa typu `s.epu.r.e.v.i.4.44@gmail.com`) a KAŽDÉ z nich
+         * odišlo do Mety ako dopyt. Za ten týždeň to boli tri skutočné dopyty
+         * proti piatim vymysleným — pixel by sa učil na šume a retargeting by
+         * si staval publikum z robotov.
+         *
+         * Podpis je v adrese: Gmail bodky ignoruje, takže si ich stroje sypú
+         * medzi jednotlivé písmená. Tri a viac bodiek A ZÁROVEŇ dva a viac
+         * jednoznakových úsekov nemá bežná ľudská adresa (`kacka.kunesova123`
+         * má jednu bodku, `j.novak` tiež).
+         *
+         * Dopyt sa aj tak ZAPÍŠE — tiché zahadzovanie došlej pošty je horšie
+         * než riadok navyše v Dopytoch. Nehlási sa len Mete a dôvod je v audite.
+         */
+        const lokal = email.split("@")[0] || "";
+        const useky = lokal.split(".");
+        const jeRobot = useky.length >= 4 && useky.filter((u) => u.length === 1).length >= 2;
+
         await DB.prepare(
           `INSERT INTO leads (id,date,name,source,referrer,status,note,created_at,email,telefon,kampan,utm,stranka,druh)
            VALUES (?1,?2,?3,?4,'',?5,?6,?7,?8,?9,?10,?11,?12,?13)
@@ -166,11 +187,18 @@ export const Route = createFileRoute("/api/lead-web")({
         for (const r of (nast.results as { key: string; value: string }[]) || []) {
           try { m[r.key] = String(JSON.parse(r.value)); } catch { m[r.key] = r.value; }
         }
-        if (m.meta_capi_token && m.meta_pixel_id) {
+        if (jeRobot) {
+          capi = " · Mete sa nehlásilo: vyzerá to na robota";
+        } else if (m.meta_capi_token && m.meta_pixel_id) {
           const v = await posliLead(m.meta_pixel_id, m.meta_capi_token, {
             id: kluc,
             email, telefon,
-            stranka: kus(b.page ?? b.stranka, 300),
+            // Stiahnutý protokol nie je dopyt na tréning — Meta to musí vedieť
+            // rozlíšiť rovnako ako Kokpit, inak sa kampaň učí na nesprávnom.
+            udalost: jeMagnet ? "CompleteRegistration" : "Lead",
+            // Adresa so všetkým, čo v nej je — práve z nej sa vytiahne
+            // `fbclid`, keď prehliadač cookie `_fbc` nepošle.
+            stranka,
             // `_fbc` a `_fbp` posiela web, ak ich vie prečítať z cookies.
             fbc: kus(b.fbc, 200) || undefined,
             fbp: kus(b.fbp, 200) || undefined,

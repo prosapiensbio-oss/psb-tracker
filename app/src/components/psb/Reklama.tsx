@@ -31,7 +31,7 @@ import { Card, Empty, FilterObdobia, H3, Info, RolovaciaTabulka } from "./ui";
 export function Reklama({ data, clients }: { data: PSBData; clients: Record<string, ClientAgg> }) {
   const [obdobie, setObdobie] = useState("12m");
   const kanaly = useMemo(() => KANALY, [marketingVerzia()]); // eslint-disable-line react-hooks/exhaustive-deps
-  const [kampane, setKampane] = useState<{ id: string; nazov: string; mesiac: string; ciel: string; spend: number }[]>([]);
+  const [kampane, setKampane] = useState<{ id: string; nazov: string; mesiac: string; ciel: string; spend: number; akcie?: string | null }[]>([]);
   const [reklamy, setReklamy] = useState<ReklamaRiadok[]>([]);
   const [nacitane, setNacitane] = useState(false);
 
@@ -128,6 +128,15 @@ export function Reklama({ data, clients }: { data: PSBData; clients: Record<stri
       nadpis: `Cena za klienta = ${fmtCZK(v.spend)} (výdavok, zoznam „Minuté“) ÷ ${v.platena.klientov} klientov (zoznam „Z nich klientov“)`,
       riadky: v.platena.kto.klienti.map((x) => ({ meno: x.meno, vpravo: `tržba v okne ${fmtCZK(x.trzbaVOkne)}` })),
     },
+    dorazilo: {
+      nadpis: v.dorazilo.klikov
+        ? `Zo zaplatených klikov na odkaz sa načítania stránky dočkalo ${v.dorazilo.navstev} z ${v.dorazilo.klikov} — po mesiacoch`
+        : "V tomto okne nemám ani jednu kampaň s odkazom na web — boosty príspevkov kliky na odkaz nemajú",
+      riadky: v.dorazilo.poMesiacoch.map((r) => ({
+        meno: r.mesiac,
+        vpravo: `${r.navstev} z ${r.klikov}${r.podiel == null ? "" : ` · ${Math.round(r.podiel * 100)} %`}`,
+      })),
+    },
     navratnost: {
       nadpis: `Návratnosť = tržba v okne od klientov z reklamy ${fmtCZK(v.platena.trzba)} ÷ výdavok ${fmtCZK(v.spend)}`,
       riadky: v.platena.kto.klienti.map((x) => ({ meno: x.meno, vpravo: fmtCZK(x.trzbaVOkne) })),
@@ -177,6 +186,12 @@ export function Reklama({ data, clients }: { data: PSBData; clients: Record<stri
         <>
           <div style={{ display: "flex", gap: 22, flexWrap: "wrap", margin: "10px 0 6px" }}>
             {stat("minute", fmtCZK(v.spend), "Minuté", C.orange, `Výdavok na reklamu za zvolené obdobie, ${zdroj}. Zdroje sa nesčítavajú — mesačná zostava aj Metricool popisujú tie isté peniaze.`)}
+            {/* Jerry, 30. 9. 2026: „dorob aj tu dlazdicu". Do dnešného dňa toto
+                číslo existovalo len v ručnom výpočte — pritom práve ono 21. 9.
+                ukázalo, že brzdou nie je reklama, ale rýchlosť stránky. */}
+            {stat("dorazilo", v.dorazilo.podiel == null ? "—" : `${Math.round(v.dorazilo.podiel * 100)} %`, "Dorazilo na stránku",
+              v.dorazilo.podiel == null ? C.textDim : v.dorazilo.podiel >= 0.6 ? C.green : v.dorazilo.podiel >= 0.4 ? C.orange : C.red,
+              "Koľko zo zaplatených klikov na odkaz sa dočkalo načítania stránky (landing_page_view ÷ link_click). Zvyšok ľudí odišiel počas načítavania — sú to peniaze minuté za klik, z ktorého nikto nič nevidel. 8.–21. 9. to bolo 41 %, po odľahčení stránky 68 %. Keď číslo klesne, pokazilo sa niečo na webe, nie v reklame. Kampane bez odkazu (boosty príspevkov) sa nepočítajú.")}
             {stat("dopyty", String(v.platena.dopytov), "Dopytov z reklamy", C.blue, "Dopyty so zdrojom „reklama” alebo s vyplnenou kampaňou. Jeden človek, ktorý napísal dvakrát, je jeden dopyt.")}
             {/* Jerry, 20. 9. 2026: „vidím prvý dopyt z reklamy, ale nevidím cenu za
                 dopyt". Vrchný pás ju má, ale počíta ju len z PLNÝCH mesiacov, takže

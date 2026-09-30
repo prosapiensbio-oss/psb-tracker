@@ -289,7 +289,11 @@ export const Route = createFileRoute("/api/meta")({
           }
         }
         const kampane = await DB.prepare(
-          `SELECT id, mesiac, nazov, ciel, spend, impressions, clicks, vysledky, stav, stav_sad
+          // `akcie` je surový JSON z Mety. Obrazovka z neho číta `link_click`
+          // a `landing_page_view` — rozdiel medzi nimi je dlaždica „Dorazilo
+          // na stránku" (30. 9. 2026). Bez tohto stĺpca by ju nemala z čoho
+          // počítať a mlčala by, hoci dáta v databáze sú.
+          `SELECT id, mesiac, nazov, ciel, spend, impressions, clicks, vysledky, stav, stav_sad, akcie
              FROM mkt_kampane ORDER BY mesiac DESC, spend DESC`,
         ).all();
         const reklamy = await DB.prepare(

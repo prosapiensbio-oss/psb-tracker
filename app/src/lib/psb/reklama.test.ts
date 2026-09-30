@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { reklamaSuhrn, zReklamy, type ReklamaVstup } from "./reklama";
+import { akcieZJson, reklamaSuhrn, zReklamy, type ReklamaVstup } from "./reklama";
 
 /**
  * Štyri karty odpovedali na „čo priniesla reklama" štyrmi výpočtami a žiadne
@@ -134,5 +134,65 @@ describe("zReklamy", () => {
     expect(zReklamy({ source: "instagram", kampan: "Leto 2026" })).toBe(true);
     expect(zReklamy({ source: "instagram" })).toBe(false);
     expect(zReklamy({ source: "referencia", kampan: "  " })).toBe(false);
+  });
+});
+
+describe("dorazilo na stránku", () => {
+  const akcie = (lc: number, lpv: number) =>
+    JSON.stringify([["link_click", lc], ["landing_page_view", lpv], ["omni_landing_page_view", lpv], ["post_engagement", 900]]);
+
+  it("pomer je návštevy ÷ kliky na odkaz", () => {
+    const v = reklamaSuhrn(zaklad({
+      kampane: [{ id: "k1", nazov: "A", mesiac: "2026-07", ciel: "OUTCOME_TRAFFIC", spend: 1000, akcie: akcie(400, 100) }],
+    }));
+    expect(v.dorazilo.klikov).toBe(400);
+    expect(v.dorazilo.navstev).toBe(100);
+    expect(v.dorazilo.podiel).toBe(0.25);
+  });
+
+  it("`omni_landing_page_view` sa nepripočíta druhýkrát", () => {
+    // Meta hlási tú istú udalosť pod viacerými menami; sčítanie vzorkou dalo
+    // 12. 8. 2026 trojnásobok skutočnosti.
+    const v = reklamaSuhrn(zaklad({
+      kampane: [{ id: "k1", nazov: "A", mesiac: "2026-07", ciel: "OUTCOME_TRAFFIC", spend: 1000, akcie: akcie(100, 50) }],
+    }));
+    expect(v.dorazilo.navstev).toBe(50);
+  });
+
+  it("kampaň bez odkazu pomer neznižuje", () => {
+    // Boost príspevku (cieľ zapojenie) nemá kliky na odkaz ani návštevy.
+    // Keby sa počítal, Jarkova sada by stlačila pomer k nule a vyzeralo by to
+    // ako pokazená stránka.
+    const v = reklamaSuhrn(zaklad({
+      kampane: [
+        { id: "k1", nazov: "A", mesiac: "2026-07", ciel: "OUTCOME_TRAFFIC", spend: 1000, akcie: akcie(100, 70) },
+        { id: "k2", nazov: "B", mesiac: "2026-07", ciel: "OUTCOME_ENGAGEMENT", spend: 2000, akcie: JSON.stringify([["post_engagement", 34635], ["video_view", 34583]]) },
+      ],
+    }));
+    expect(v.dorazilo.podiel).toBe(0.7);
+    expect(v.dorazilo.poMesiacoch).toHaveLength(1);
+  });
+
+  it("bez kampaní s odkazom je pomlčka, nie nula", () => {
+    // Nula by tvrdila „nikto nedorazil"; pravda je „nemáme z čoho počítať".
+    expect(reklamaSuhrn(zaklad()).dorazilo.podiel).toBeNull();
+  });
+
+  it("mesiac mimo okna sa nepočíta", () => {
+    const v = reklamaSuhrn(zaklad({
+      mesiace: ["2026-07"],
+      kampane: [
+        { id: "k1", nazov: "A", mesiac: "2026-07", ciel: "t", spend: 10, akcie: akcie(10, 5) },
+        { id: "k2", nazov: "B", mesiac: "2026-06", ciel: "t", spend: 10, akcie: akcie(1000, 10) },
+      ],
+    }));
+    expect(v.dorazilo.klikov).toBe(10);
+  });
+
+  it("pokazený JSON nezhodí výpočet", () => {
+    expect(akcieZJson("{nie json")).toEqual({});
+    expect(akcieZJson(null)).toEqual({});
+    // Tvar z Graph API (objekty) sa prečíta rovnako ako naše dvojice.
+    expect(akcieZJson(JSON.stringify([{ action_type: "link_click", value: "12" }]))).toEqual({ link_click: 12 });
   });
 });

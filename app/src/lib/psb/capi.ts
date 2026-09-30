@@ -30,6 +30,14 @@
 const V = "v21.0";
 
 export type LeadUdalost = {
+  /**
+   * Názov udalosti. `Lead` = človek sa pýta na tréning; `CompleteRegistration`
+   * = stiahol si lead magnet. Sú to dve rôzne veci a Meta ich musí vedieť
+   * rozlíšiť rovnako ako Kokpit (Jerry, 24. 9. 2026: „keď má lead magnet, to
+   * nie je úplne dopyt"). Keby išlo oboje ako `Lead`, kampaň optimalizovaná
+   * na dopyty by sa učila zháňať sťahovačov e-booku.
+   */
+  udalost?: "Lead" | "CompleteRegistration";
   /** Kľúč dopytu z Kokpitu — slúži aj ako `event_id` na odstránenie duplicít. */
   id: string;
   email: string;
@@ -44,6 +52,31 @@ export type LeadUdalost = {
   /** Sekundy, nie milisekundy — Meta iné neberie. */
   cas?: number;
 };
+
+/**
+ * `_fbc` z adresy, keď ho prehliadač nepošle.
+ *
+ * TOTO JE DÔVOD, PREČO SA CAPI NEPREJAVILO V KAMPANIACH
+ *
+ * Udalosti Mete odchádzali od 18. 8. 2026 („nahlásené Mete" v audite), ale
+ * v septembrových kampaniach nebola ANI JEDNA konverzia. Meta totiž nevie
+ * udalosť pripísať reklame, kým nedostane `fbc` — a ten sa berie z cookie
+ * `_fbc`, ktorú nastavuje pixel v prehliadači. Pixel je za súhlasom s cookies,
+ * takže pri väčšine ľudí cookie neexistuje a s ňou zmizne aj spojenie
+ * „tento dopyt prišiel z tejto reklamy".
+ *
+ * `fbclid` je pritom priamo v adrese, na ktorej človek formulár odoslal —
+ * Meta ho tam sama pripojí pri kliknutí na reklamu. Tvar `fb.1.<čas>.<fbclid>`
+ * je presne to, čo by cookie obsahovala.
+ */
+export function fbcZAdresy(stranka: string | undefined, cas?: number): string {
+  const s = String(stranka || "");
+  const m = /[?&]fbclid=([^&#\s]+)/.exec(s);
+  if (!m) return "";
+  const id = decodeURIComponent(m[1]).slice(0, 400);
+  if (!id) return "";
+  return `fb.1.${(cas ?? Math.floor(Date.now() / 1000)) * 1000}.${id}`;
+}
 
 /** SHA-256 v hex podobe. Web Crypto je vo Workers dostupné bez závislosti. */
 export async function hash(s: string): Promise<string> {
@@ -77,14 +110,17 @@ export async function telo(u: LeadUdalost, testKod?: string) {
   const tel = normTelefon(u.telefon || "");
   if (tel) user_data.ph = [await hash(tel)];
   // Tieto Meta chce NEZAHAŠOVANÉ — sú to technické údaje, nie osobné.
-  if (u.fbc) user_data.fbc = u.fbc;
+  // Keď web `_fbc` nepošle (odmietnuté cookies), zostaví sa z `fbclid`
+  // v adrese — inak Meta udalosť prijme, ale nepripíše ju žiadnej reklame.
+  const fbc = u.fbc || fbcZAdresy(u.stranka, u.cas);
+  if (fbc) user_data.fbc = fbc;
   if (u.fbp) user_data.fbp = u.fbp;
   if (u.ip) user_data.client_ip_address = u.ip;
   if (u.userAgent) user_data.client_user_agent = u.userAgent;
 
   return {
     data: [{
-      event_name: "Lead",
+      event_name: u.udalost || "Lead",
       event_time: u.cas ?? Math.floor(Date.now() / 1000),
       // Rovnaké `event_id` pri opakovanom odoslaní → Meta si udalosť započíta
       // raz. Chráni to aj pred dvojklikom na tlačidlo vo formulári.
