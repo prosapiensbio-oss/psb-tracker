@@ -13,6 +13,8 @@ import type { PSBData } from "../../lib/psb/types";
 import { SmsKlientovi } from "./SmsKlientovi";
 import { C, mix } from "../../lib/psb/theme";
 import { Card, Empty, H3, Info, Select, TrenerPills } from "./ui";
+import { useUzke } from "./useUzke";
+import { rozlozUdalosti } from "../../lib/psb/kalendarRozlozenie";
 
 /**
  * Kalendár — čo sa chystá a čo sa práve zmenilo.
@@ -1237,6 +1239,17 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
     [pondelok],
   );
 
+  /**
+   * Na telefóne je v mriežke JEDEN DEŇ, nie sedem. Sedem stĺpcov sa do 375 px
+   * nezmestí: stĺpec má osemdesiat pixelov, z mena je „Lukas Han…" a okno
+   * udalosti vyjde mimo obrazovky (Jerry, 30. 9. 2026). Týždeň zostáva nad
+   * mriežkou ako pás dní s počtom tréningov — prehľad sa tým nestratí,
+   * len sa nekreslí naraz.
+   */
+  const uzke = useUzke();
+  const [denIdx, setDenIdx] = useState(() => (new Date().getDay() + 6) % 7);
+  useEffect(() => { setDenIdx(posun === 0 ? (new Date().getDay() + 6) % 7 : 0); }, [posun]);
+
   const vTyzdni = udalosti.filter((u) => dni.includes(u.zaciatok.slice(0, 10)));
   const minuty = (s: string) => Number(s.slice(11, 13)) * 60 + Number(s.slice(14, 16));
   const p2 = (n: number) => String(n).padStart(2, "0");
@@ -1244,6 +1257,17 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
   // Rozsah podľa skutočných hodín, s hodinou rezervy na oboch koncoch.
   // Označená hodina rozsah rozširuje — ťahom ani vpísaným časom nesmie
   // vyjsť z mriežky do neviditeľna.
+  /** Klik na udalosť z pásu zmien (alebo ťah) môže ukazovať na iný deň, než je
+   *  na obrazovke — vtedy sa deň prepne, inak by sa okno otvorilo do prázdna. */
+  useEffect(() => {
+    if (!uzke || !vyber) return;
+    const idx = dni.indexOf(vyber.den);
+    if (idx >= 0 && idx !== denIdx) setDenIdx(idx);
+  }, [uzke, vyber, dni, denIdx]);
+
+  const viditelne = uzke ? [dni[denIdx]] : dni;
+  const POCET = viditelne.length;
+
   const vyberMin = vyber && dni.includes(vyber.den) ? Number(vyber.cas.slice(0, 2)) * 60 + Number(vyber.cas.slice(3, 5)) : null;
   const od = Math.min(
     vTyzdni.length ? Math.max(0, Math.floor(Math.min(...vTyzdni.map((u) => minuty(u.zaciatok))) / 60) - 1) : 7,
@@ -1290,11 +1314,11 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
     const el = mriezkaRef.current;
     if (!el) return null;
     const r = el.getBoundingClientRect();
-    const stlpec = (r.width - 42 - 3 * 7) / 7;
-    const idx = Math.max(0, Math.min(6, Math.floor((clientX - r.left - 42 - 3) / (stlpec + 3))));
+    const stlpec = (r.width - 42 - 3 * POCET) / POCET;
+    const idx = Math.max(0, Math.min(POCET - 1, Math.floor((clientX - r.left - 42 - 3) / (stlpec + 3))));
     const surove = od * 60 + ((clientY - r.top) / VYSKA) * 60 - offsetMin;
     const m = Math.max(0, Math.min(24 * 60 - minut, Math.round(surove / 15) * 15));
-    return { den: dni[idx], cas: `${p2(Math.floor(m / 60))}:${p2(m % 60)}` };
+    return { den: viditelne[idx], cas: `${p2(Math.floor(m / 60))}:${p2(m % 60)}` };
   };
 
   const zacniTah = (e: React.PointerEvent, u: KalUdalost | null, den: string, cas: string, minut: number) => {
@@ -1378,12 +1402,38 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
 
       {/* Mriežka sa kreslí aj pre prázdny týždeň — inak by sa do budúceho
           týždňa nedal nahodiť prvý tréning: nebolo by na čo kliknúť. */}
+      {/* Pás dní — na telefóne nahrádza sedem stĺpcov. Ukazuje, kde v týždni
+          čo je, a prepína, ktorý deň sa kreslí. */}
+      {uzke && (
+        <div style={{ display: "flex", gap: 5, overflowX: "auto", paddingBottom: 8, marginBottom: 2, scrollbarWidth: "none" }}>
+          {dni.map((d, i) => {
+            const pocet = vTyzdni.filter((u) => u.zaciatok.slice(0, 10) === d && u.typ !== "sukromne" && u.typ !== "netrening").length;
+            const tu = i === denIdx;
+            return (
+              <button key={d} onClick={() => setDenIdx(i)} style={{
+                flexShrink: 0, padding: "5px 9px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit",
+                border: `1px solid ${tu ? C.accent : d === dnesIso ? mix(C.accent, 45) : C.border}`,
+                background: tu ? mix(C.accent, 16) : "transparent",
+                color: tu ? C.text : d === dnesIso ? C.accentLight : C.textMuted,
+                fontSize: 12, fontWeight: tu ? 700 : 600, whiteSpace: "nowrap",
+              }}>
+                {DNI_SK[i]} {Number(d.slice(8, 10))}.
+                <span style={{ marginLeft: 5, fontSize: 10.5, color: pocet ? (tu ? C.accentLight : C.textDim) : C.textDim, fontVariantNumeric: "tabular-nums" }}>
+                  {pocet || "–"}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       <ScrollX>
-        <div style={{ minWidth: 620 }}>
+        <div style={{ minWidth: uzke ? 0 : 620 }}>
           {/* Hlavička dní */}
-          <div style={{ display: "grid", gridTemplateColumns: "42px repeat(7, 1fr)", gap: 3, marginBottom: 3 }}>
+          <div style={{ display: "grid", gridTemplateColumns: `42px repeat(${POCET}, 1fr)`, gap: 3, marginBottom: 3 }}>
             <div />
-            {dni.map((d, i) => {
+            {viditelne.map((d) => {
+              const i = dni.indexOf(d);
               const jeDnes = d === dnesIso;
               return (
                 <div key={d} style={{
@@ -1399,7 +1449,7 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
           </div>
 
           {/* Mriežka — position: relative kvôli oknu, ktoré sa lepí k stĺpcu. */}
-          <div ref={mriezkaRef} style={{ display: "grid", gridTemplateColumns: "42px repeat(7, 1fr)", gap: 3, position: "relative" }}>
+          <div ref={mriezkaRef} style={{ display: "grid", gridTemplateColumns: `42px repeat(${POCET}, 1fr)`, gap: 3, position: "relative" }}>
             <div style={{ position: "relative", height: hodin * VYSKA }}>
               {Array.from({ length: hodin }, (_, i) => (
                 <div key={i} style={{ position: "absolute", top: i * VYSKA - 6, right: 4, fontSize: 10.5, color: C.textDim }}>
@@ -1407,7 +1457,7 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
                 </div>
               ))}
             </div>
-            {dni.map((d) => (
+            {viditelne.map((d) => (
               <div
                 key={d}
                 title="Klikni na voľný čas — nahodíš tréning do kalendára"
@@ -1428,10 +1478,14 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
                 {Array.from({ length: hodin }, (_, i) => (
                   <div key={i} style={{ position: "absolute", top: i * VYSKA, left: 0, right: 0, borderTop: `1px solid ${mix(C.border, 40)}` }} />
                 ))}
-                {vTyzdni.filter((u) => u.zaciatok.slice(0, 10) === d && !vybranaUdalost(u)).map((u) => {
+                {((vDni) => {
+                  // Prekrývajúce sa hodiny vedľa seba, nie na sebe.
+                  const miesta = rozlozUdalosti(vDni.map((u) => ({ od: minuty(u.zaciatok), do: minuty(u.koniec) })));
+                  return vDni.map((u, poz) => {
                   const top = ((minuty(u.zaciatok) - od * 60) / 60) * VYSKA;
                   const vyska = Math.max(18, ((minuty(u.koniec) - minuty(u.zaciatok)) / 60) * VYSKA - 2);
                   const f = farba(u);
+                  const { stlpec, zo } = miesta[poz];
                   return (
                     <button
                       key={`${u.uid}|${u.trener}`}
@@ -1439,7 +1493,9 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
                       onClick={(e) => e.stopPropagation()}
                       title={`${cas(u.zaciatok)}–${cas(u.koniec)} · ${u.nazov}${u.klient ? ` → ${u.klient}` : ""} · ${u.trener} — klikni: upraviť či zmazať, ťahaj: presunúť`}
                       style={{
-                        position: "absolute", top, left: 2, right: 2, height: vyska,
+                        position: "absolute", top, height: vyska,
+                        left: `calc(${(stlpec / zo) * 100}% + 2px)`,
+                        width: `calc(${100 / zo}% - 4px)`,
                         borderRadius: 5, padding: "2px 4px", overflow: "hidden",
                         background: mix(f, 16), borderLeft: `3px solid ${f}`,
                         border: "none", borderLeftStyle: "solid", textAlign: "left", cursor: "grab",
@@ -1453,7 +1509,8 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
                       {vyska > 30 && <div style={{ color: C.textDim, fontSize: 10 }}>{cas(u.zaciatok)}</div>}
                     </button>
                   );
-                })}
+                  });
+                })(vTyzdni.filter((u) => u.zaciatok.slice(0, 10) === d && !vybranaUdalost(u)))}
 
                 {/* ZAMERIAVAČ — označená hodina. Ťahá sa za ňu; okno stojí vedľa. */}
                 {vyber && vyber.den === d && vyberMin != null && (
@@ -1493,15 +1550,24 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
                 onZmen={setVyber}
                 onZavri={() => setVyber(null)}
                 onHotovo={async () => { setVyber(null); await onObnov(); }}
-                style={{
-                  position: "absolute", zIndex: 6, width: 280,
-                  top: Math.max(0, Math.min(vyberIdx >= 0 ? vyberTop : 0, hodin * VYSKA - 300)),
-                  left: vyberIdx < 0
-                    ? "calc(42px + 6px)"
-                    : vyberIdx <= 3
-                      ? `calc(42px + ${vyberIdx + 1} * ((100% - 42px) / 7) + 5px)`
-                      : `calc(42px + ${vyberIdx} * ((100% - 42px) / 7) - 289px)`,
-                }}
+                style={uzke
+                  ? {
+                    // Na telefóne sa okno lepí na SPODOK obrazovky. Plávajúce
+                    // vedľa stĺpca vychádzalo z obrazovky a dalo sa naň dostať
+                    // len bočným rolovaním mriežky.
+                    position: "fixed", zIndex: 40, left: 8, right: 8, bottom: 8,
+                    width: "auto", maxHeight: "62vh", overflowY: "auto",
+                    boxShadow: "0 -8px 28px rgba(0,0,0,.45)",
+                  }
+                  : {
+                    position: "absolute", zIndex: 6, width: 280,
+                    top: Math.max(0, Math.min(vyberIdx >= 0 ? vyberTop : 0, hodin * VYSKA - 300)),
+                    left: vyberIdx < 0
+                      ? "calc(42px + 6px)"
+                      : vyberIdx <= 3
+                        ? `calc(42px + ${vyberIdx + 1} * ((100% - 42px) / 7) + 5px)`
+                        : `calc(42px + ${vyberIdx} * ((100% - 42px) / 7) - 289px)`,
+                  }}
               />
             )}
           </div>

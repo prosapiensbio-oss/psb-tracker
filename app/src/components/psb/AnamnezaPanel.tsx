@@ -4,6 +4,7 @@ import { doSchranky } from "../../lib/psb/kopirovanie";
 import { oznam } from "../../lib/psb/obnovaSignal";
 import { OBLASTI, zobrazit, type Formular, type Otazka, type Sekcia } from "../../lib/psb/anamnezaFormular";
 import { C, mix } from "../../lib/psb/theme";
+import { useUzke } from "./useUzke";
 
 /**
  * ANAMNÉZA — JEDNA SEKCIA NA OKNO.
@@ -69,6 +70,7 @@ export function AnamnezaPanel({ meno }: { meno: string }) {
   const [stav, setStav] = useState<Stav | null>(null);
   const [odp, setOdp] = useState<Odpovede>({});
   /** Index sekcie. `=== počet sekcií` znamená záverečný prehľad. */
+  const uzke = useUzke();
   const [i, setI] = useState(0);
   const [bezi, setBezi] = useState(false);
   const [hlaska, setHlaska] = useState("");
@@ -190,11 +192,22 @@ export function AnamnezaPanel({ meno }: { meno: string }) {
   const archiv = odp._archiv as { kedy: string; polozky: [string, string][] } | undefined;
 
   return (
-    <div style={{ display: "flex", gap: 18, minHeight: 470, height: "100%" }}>
+    <div style={{ display: "flex", flexDirection: uzke ? "column" : "row", gap: uzke ? 12 : 18, minHeight: uzke ? 0 : 470, height: "100%" }}>
 
       {/* ── REBRÍK SEKCIÍ A KONTEXT ── */}
-      <div style={{ width: 216, flexShrink: 0, display: "flex", flexDirection: "column", gap: 16, borderRight: `1px solid ${mix(C.border, 60)}`, paddingRight: 16 }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+      <div style={uzke
+        ? { width: "100%", display: "flex", flexDirection: "column", gap: 10, borderBottom: `1px solid ${mix(C.border, 60)}`, paddingBottom: 12 }
+        : { width: 216, flexShrink: 0, display: "flex", flexDirection: "column", gap: 16, borderRight: `1px solid ${mix(C.border, 60)}`, paddingRight: 16 }}>
+        {/*
+          Na telefóne je z rebríka VODOROVNÝ PÁS. Stĺpec 216 px vedľa obsahu
+          nechal na otázky osemdesiat pixelov a text sa lámal po jednom
+          písmene (Jerry, 30. 9. 2026: „veľa vecí sa mi nezobrazuje, pretože
+          sa to tam nezmestí“). Pás sa dá rolovať prstom a kroky zostávajú
+          na očiach.
+        */}
+        <div style={uzke
+          ? { display: "flex", gap: 6, overflowX: "auto", paddingBottom: 2, scrollbarWidth: "none" }
+          : { display: "flex", flexDirection: "column", gap: 1 }}>
           {sekcie.map((x, idx) => {
             const hotovych = x.otazky.filter((o) => maOdpoved(o, odp[o.id])).length;
             const cela = hotovych === x.otazky.length;
@@ -204,10 +217,13 @@ export function AnamnezaPanel({ meno }: { meno: string }) {
                 key={x.s.id}
                 onClick={() => { setArchivOtvoreny(false); chod(idx); }}
                 style={{
-                  display: "flex", alignItems: "center", gap: 9, padding: "8px 8px", borderRadius: 8,
-                  border: "none", background: jeTu ? mix(C.accent, 14) : "transparent",
+                  display: "flex", alignItems: "center", gap: uzke ? 6 : 9, padding: "8px 8px", borderRadius: 8,
+                  border: uzke ? `1px solid ${jeTu ? C.accent : mix(C.border, 80)}` : "none",
+                  background: jeTu ? mix(C.accent, 14) : "transparent",
                   color: jeTu ? C.text : C.textMuted, fontSize: 12.5, textAlign: "left",
-                  cursor: "pointer", fontFamily: "inherit", width: "100%",
+                  cursor: "pointer", fontFamily: "inherit",
+                  width: uzke ? "auto" : "100%", flexShrink: uzke ? 0 : undefined,
+                  whiteSpace: uzke ? "nowrap" : undefined,
                 }}
               >
                 <span style={{
@@ -217,7 +233,7 @@ export function AnamnezaPanel({ meno }: { meno: string }) {
                   background: jeTu ? C.accent : "transparent",
                   color: cela ? C.green : C.onAccent,
                 }}>{cela ? "✓" : ""}</span>
-                <span style={{ flexGrow: 1, minWidth: 0 }}>{x.s.nazov}</span>
+                <span style={{ flexGrow: uzke ? 0 : 1, minWidth: 0 }}>{x.s.nazov}</span>
                 <span style={{ fontSize: 10, color: C.textDim, fontVariantNumeric: "tabular-nums" }}>{hotovych}/{x.otazky.length}</span>
               </button>
             );
@@ -226,33 +242,42 @@ export function AnamnezaPanel({ meno }: { meno: string }) {
             <button
               onClick={() => setArchivOtvoreny((x) => !x)}
               style={{
-                display: "flex", alignItems: "center", gap: 9, padding: "8px 8px", borderRadius: 8, marginTop: 4,
-                border: "none", background: archivOtvoreny ? mix(C.accent, 14) : "transparent",
+                display: "flex", alignItems: "center", gap: uzke ? 6 : 9, padding: "8px 8px", borderRadius: 8,
+                marginTop: uzke ? 0 : 4,
+                border: uzke ? `1px solid ${archivOtvoreny ? C.accent : mix(C.border, 80)}` : "none",
+                background: archivOtvoreny ? mix(C.accent, 14) : "transparent",
                 color: archivOtvoreny ? C.text : C.textDim, fontSize: 12.5, textAlign: "left",
-                cursor: "pointer", fontFamily: "inherit", width: "100%",
+                cursor: "pointer", fontFamily: "inherit",
+                width: uzke ? "auto" : "100%", flexShrink: uzke ? 0 : undefined,
+                whiteSpace: uzke ? "nowrap" : undefined,
               }}
             >
-              <span style={{ width: 17, flexShrink: 0 }} />
-              <span style={{ flexGrow: 1, minWidth: 0 }}>Pôvodná z Google Forms</span>
+              {!uzke && <span style={{ width: 17, flexShrink: 0 }} />}
+              <span style={{ flexGrow: uzke ? 0 : 1, minWidth: 0 }}>{uzke ? "Google Forms" : "Pôvodná z Google Forms"}</span>
               <span style={{ fontSize: 10, color: C.textDim }}>{archiv.polozky.length}</span>
             </button>
           )}
           <button
             onClick={() => { setArchivOtvoreny(false); chod(sekcie.length); }}
             style={{
-              display: "flex", alignItems: "center", gap: 9, padding: "8px 8px", borderRadius: 8, marginTop: 4,
-              border: "none", background: koniec && !archivOtvoreny ? mix(C.accent, 14) : "transparent",
+              display: "flex", alignItems: "center", gap: uzke ? 6 : 9, padding: "8px 8px", borderRadius: 8,
+              marginTop: uzke ? 0 : 4,
+              border: uzke ? `1px solid ${koniec && !archivOtvoreny ? C.accent : mix(C.border, 80)}` : "none",
+              background: koniec && !archivOtvoreny ? mix(C.accent, 14) : "transparent",
               color: koniec && !archivOtvoreny ? C.text : C.textDim, fontSize: 12.5, textAlign: "left",
-              cursor: "pointer", fontFamily: "inherit", width: "100%",
+              cursor: "pointer", fontFamily: "inherit",
+              width: uzke ? "auto" : "100%", flexShrink: uzke ? 0 : undefined,
+              whiteSpace: uzke ? "nowrap" : undefined,
             }}
           >
-            <span style={{ width: 17, flexShrink: 0 }} />
-            <span>Prehľad a uloženie</span>
+            {!uzke && <span style={{ width: 17, flexShrink: 0 }} />}
+            <span>{uzke ? "Prehľad" : "Prehľad a uloženie"}</span>
           </button>
         </div>
 
+        <div style={{ display: "flex", flexDirection: uzke ? "row" : "column", flexWrap: "wrap", gap: uzke ? 8 : 16 }}>
         {/* Odkaz pre klienta — patrí ku kontextu, nie medzi otázky. */}
-        <div style={{ padding: "10px 12px", borderRadius: 9, background: mix(C.border, 40) }}>
+        <div style={{ padding: "10px 12px", borderRadius: 9, background: mix(C.border, 40), flex: uzke ? "1 1 150px" : undefined, minWidth: 0 }}>
           <div style={{ fontSize: 10, letterSpacing: 0.8, textTransform: "uppercase", color: C.textDim }}>Pred úvodným</div>
           {!stav.odkaz ? (
             <button onClick={() => void vyrobOdkaz()} disabled={bezi} style={{ ...maleTlacidlo, borderColor: mix(C.green, 45), color: C.green, marginTop: 7 }}>
@@ -273,7 +298,7 @@ export function AnamnezaPanel({ meno }: { meno: string }) {
 
         {/* Výstup testu postury — kontext po celý čas, nie otázka. */}
         {test && (test.odchylky.length > 0 || test.vzorec) && (
-          <div style={{ padding: "10px 12px", borderRadius: 9, background: mix(C.accent, 8), borderLeft: `2px solid ${C.accent}` }}>
+          <div style={{ padding: "10px 12px", borderRadius: 9, background: mix(C.accent, 8), borderLeft: `2px solid ${C.accent}`, flex: uzke ? "1 1 170px" : undefined, minWidth: 0 }}>
             <div style={{ fontSize: 10, letterSpacing: 0.8, textTransform: "uppercase", color: C.accentLight }}>
               Test postury{test.kedy ? ` · ${denCz(test.kedy)}` : ""}
             </div>
@@ -283,10 +308,13 @@ export function AnamnezaPanel({ meno }: { meno: string }) {
             </div>
           </div>
         )}
-
-        <div style={{ marginTop: "auto", fontSize: 10.5, color: C.textDim, lineHeight: 1.6 }}>
-          Zdravotné odpovede sú v databáze zašifrované — vidíš ich len ty.
         </div>
+
+        {!uzke && (
+          <div style={{ marginTop: "auto", fontSize: 10.5, color: C.textDim, lineHeight: 1.6 }}>
+            Zdravotné odpovede sú v databáze zašifrované — vidíš ich len ty.
+          </div>
+        )}
       </div>
 
       {/* ── CELÁ SEKCIA NA JEDNO OKNO ── */}
@@ -306,8 +334,8 @@ export function AnamnezaPanel({ meno }: { meno: string }) {
             </div>
             <div ref={telo} style={{ flexGrow: 1, minHeight: 0, overflowY: "auto", paddingTop: 14 }}>
               {archiv.polozky.map(([otazka, odpoved]) => (
-                <div key={otazka} style={{ display: "flex", gap: 14, alignItems: "baseline", padding: "7px 0", borderBottom: `1px solid ${mix(C.border, 40)}` }}>
-                  <span style={{ width: 210, flexShrink: 0, fontSize: 11.5, color: C.textDim, lineHeight: 1.45 }}>{otazka}</span>
+                <div key={otazka} style={{ display: "flex", flexDirection: uzke ? "column" : "row", gap: uzke ? 3 : 14, alignItems: uzke ? "stretch" : "baseline", padding: "7px 0", borderBottom: `1px solid ${mix(C.border, 40)}` }}>
+                  <span style={{ width: uzke ? "auto" : 210, flexShrink: 0, fontSize: 11.5, color: C.textDim, lineHeight: 1.45 }}>{otazka}</span>
                   <span style={{ flexGrow: 1, minWidth: 0, fontSize: 13, color: C.text, lineHeight: 1.55 }}>{odpoved}</span>
                 </div>
               ))}
@@ -332,12 +360,13 @@ export function AnamnezaPanel({ meno }: { meno: string }) {
                         key={o.id}
                         onClick={() => chod(idx)}
                         style={{
-                          display: "flex", gap: 14, alignItems: "baseline", width: "100%", textAlign: "left",
+                          display: "flex", flexDirection: uzke ? "column" : "row", gap: uzke ? 3 : 14,
+                        alignItems: uzke ? "stretch" : "baseline", width: "100%", textAlign: "left",
                           padding: "6px 0", border: "none", borderBottom: `1px solid ${mix(C.border, 40)}`,
                           background: "none", cursor: "pointer", fontFamily: "inherit",
                         }}
                       >
-                        <span style={{ width: 178, flexShrink: 0, fontSize: 11.5, color: C.textDim, lineHeight: 1.45 }}>{o.text}</span>
+                        <span style={{ width: uzke ? "auto" : 178, flexShrink: 0, fontSize: 11.5, color: C.textDim, lineHeight: 1.45 }}>{o.text}</span>
                         <span style={{ flexGrow: 1, minWidth: 0, fontSize: 13, color: v ? C.text : C.textDim, fontStyle: v ? "normal" : "italic", lineHeight: 1.5 }}>
                           {v || "prázdne"}
                         </span>

@@ -56,11 +56,10 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
   Potrebuje R2 bucket (účet ho zatiaľ nemá); do D1 nepatria.
 - [x] **Import 56 starých anamnéz** k existujúcim klientom aj s pôvodným
   dátumom (Jerry odklepol 30. 9.) — hotové 30. 9., 53 priradených.
-- [ ] **Tri anamnézy čakajú na Jerryho** — meno v CSV a mail ukazujú na dvoch
-  rôznych ľudí, tak sa nenaimportovali: „Janka Kadlčková" (mail
-  `kadlckovaanna@gmail.com` = Anna Kadličkova), „MIchaela MIchalíková"
-  (`mirusura@seznam.cz` = Miroslava Michalikova), „Jerry Martinek"
-  (`martinek@mobis.cz` = Robin Martinek). Stačí povedať, komu patria.
+- [ ] **Doimportovať tri anamnézy** — Jerry rozhodol 30. 9. 2026, komu patria:
+  „Janka Kadlčková" = **Anna Kadličkova**, „MIchaela MIchalíková" =
+  **Miroslava Michalikova**, „Jerry Martinek" = **Robin Martinek**.
+  Riadky sú v `Anmnéza klientů 3.csv`, stačí ich poslať cez `import-stary`.
 - [ ] Zmazať skúšobnú anamnézu AATestu pri upratovaní testovacích dát.
 
 ## 0b · Ostatné otvorené z 29. 9.

@@ -1813,6 +1813,37 @@ prejdú testy a nie keď to dáva zmysel.
 **Pravidlo:** keď karta pribudne do kopy, pozri sa na ňu aj v šírke telefónu.
 Súčet `minWidth` v jednom riadku je strop, pod ktorý sa layout nezmestí.
 
+**A to isté platí pre každý DVOJSTĹPCOVÝ layout.** 30. 9. 2026: „veľa vecí sa
+mi nezobrazuje, pretože sa to tam nezmestí, vrátane profilu." Tri obrazovky
+mali pevný stĺpec vedľa obsahu a na 375 px zostalo na obsah sto pixelov:
+
+- **Profil klienta** (`KlientStol`) — 250 px vľavo, os času a jej filtre za
+  okrajom karty. Na telefóne idú stĺpce pod seba a vnútorné rolovanie sa
+  vypína; dve rolovacie plochy v sebe sa na dotyk ovládať nedajú.
+- **Anamnéza** (`AnamnezaPanel`) — rebrík sekcií 216 px vľavo, z otázok
+  osemdesiat pixelov a text sa lámal po jednom písmene. Rebrík je na
+  telefóne vodorovný pás.
+- **Kalendár** (`Tyzden`) — sedem stĺpcov po osemdesiat pixelov a okno
+  udalosti mimo obrazovky. Na telefóne sa kreslí JEDEN deň, týždeň zostáva
+  nad mriežkou ako pás dní s počtom tréningov, a okno sa lepí na spodok
+  obrazovky.
+
+Hranica je JEDNA: `useUzke()` v `components/psb/useUzke.ts` (640 px). Vlastná
+kópia s inou hranicou znamená na jednej obrazovke dva rôzne telefóny.
+
+**Pri tom istom pohľade sa našlo, že hodiny v rovnakom čase sa kreslili JEDNA
+NA DRUHEJ** — všetky mali `left: 2, right: 2`. Rieši to `rozlozUdalosti`
+(`lib/psb/kalendarRozlozenie.ts`): skupina prekrytí sa hľadá tranzitívne
+(A–B, B–C → jedna skupina rovnakej šírky), stĺpec sa po skončení hodiny
+uvoľní. Platí to na monitore rovnako ako na telefóne; na monitore sa to len
+dalo prehliadnuť.
+
+**Overiť to v prehliadači sa nemuselo dať.** Jerryho Chrome má priblíženie
+~35 %, takže `innerWidth` je 1665 aj v malom okne a `resize_window` s tým nič
+neurobí (ohlási úspech a `innerWidth` sa nehne — to je tá istá lož ako
+„No updated asset files to upload"). Cesta je podstrčiť `window.matchMedia`
+a prepnúť záložku tam a späť, aby sa komponent nanovo pripojil.
+
 ## Platnosť skončila a hodiny zostali — tri východiská, appka nevyberá
 
 Jerry, 28. 9. 2026: „keď niekomu skončí platnosť členstva, ale ostane mu tam

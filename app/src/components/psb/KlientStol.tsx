@@ -21,6 +21,7 @@ import type { PSBData } from "../../lib/psb/types";
 import { C, mix } from "../../lib/psb/theme";
 import { Dennik } from "./Dennik";
 import { Info } from "./ui";
+import { useUzke } from "./useUzke";
 
 /**
  * Pracovný stôl jedného klienta — vyhľadaj a rob na ňom.
@@ -437,6 +438,8 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
     if (!od) return 0;
     return c.sessions.filter((x) => x.date.slice(0, 10) > od).length;
   }, [data.clientOverrides, meno, c]);
+
+  const uzke = useUzke();
 
   /** Zrušené tréningy za 90 dní — z histórie zmien v kalendári. */
   const [zruseneKal, setZruseneKal] = useState<{ klient: string | null; druh: string; kedy: string }[]>([]);
@@ -879,9 +882,22 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
      * Naľavo je preto len to, na čo sa človek pýta zakaždým; zvyšok je pod
      * jedným tlačidlom a nekričí.
      */
-    <div style={{ display: "flex", gap: 20, height: "100%", minHeight: 0 }}>
+    <div style={{
+      display: "flex", flexDirection: uzke ? "column" : "row",
+      gap: uzke ? 14 : 20, height: uzke ? "auto" : "100%", minHeight: 0,
+    }}>
 
-      <div style={{ width: 250, flexShrink: 0, display: "flex", flexDirection: "column", gap: 10, overflowY: "auto", minHeight: 0 }}>
+      {/*
+        Na telefóne idú oba stĺpce POD SEBA. Vedľa seba zostávalo na históriu
+        sto pixelov a filtre aj os času boli odrezané za okrajom karty
+        (Jerry, 30. 9. 2026: „veľa vecí sa mi nezobrazuje… vrátane profilu“).
+        Vlastné rolovanie stĺpca sa tam tiež vypína — dve rolovacie plochy
+        v sebe sa na dotyk ovládať nedajú.
+      */}
+      <div style={{
+        width: uzke ? "100%" : 250, flexShrink: 0, display: "flex", flexDirection: "column", gap: 10,
+        overflowY: uzke ? "visible" : "auto", minHeight: 0,
+      }}>
         <div>
           {/* Krok späť patrí hore vľavo (Jerry, 23. 9. 2026) — dole na konci
               stĺpca ho pri dlhom profile nebolo vidno bez rolovania. */}
@@ -1111,7 +1127,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
 
       </div>
 
-      <div style={{ flexGrow: 1, minWidth: 0, display: "flex", flexDirection: "column", minHeight: 0 }}>
+      <div style={{ flexGrow: 1, minWidth: 0, display: "flex", flexDirection: "column", minHeight: 0, borderTop: uzke ? `1px solid ${mix(C.border, 60)}` : undefined, paddingTop: uzke ? 12 : undefined }}>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", flexShrink: 0 }}>
           <div style={{ fontSize: 11, fontWeight: 700, color: C.textDim, letterSpacing: 0.5 }}>VŠETKO V ČASE</div>
           <div style={{ flexGrow: 1 }} />
