@@ -34,43 +34,79 @@ export const Route = createFileRoute("/api/anamneza")({
         const q = new URL(request.url).searchParams;
 
         /**
-         * ZOZNAM PRE KOPU KARIET — kto anamnézu ešte nemá hotovú.
+         * ZOZNAM PRE KARTU ANAMNÉZY — všetky pokope.
          *
-         * Jerry, 30. 9. 2026: „anamnézu a jej vypĺňanie by som pridal do
-         * workspace." Fronta sa počíta z ÚVODNÝCH TRÉNINGOV, nie zo zoznamu
-         * klientov: anamnéza patrí k prvému stretnutiu, a kto chodí rok, ju
-         * už buď má, alebo ju nikto spätne vypĺňať nejde.
+         * Jerry, 30. 9. 2026: „chcem mať celú jednu kartu, kde budú všetky
+         * anamnézy pokope." Nie je to teda fronta toho, čo chýba, ale
+         * kartotéka: rozpracované hore, hotové pod nimi.
          *
-         * Obsah odpovedí sa tu NEROZŠIFRÚVA — stačí stav. Zoznam prechádza
-         * cez celú kopu kariet a rozšifrovať päťdesiat záznamov kvôli tomu,
-         * aby sa ukázal počet, je zbytočná práca s citlivými dátami.
+         * Do zoznamu patria aj klienti, ktorí anamnézu ešte NEMAJÚ a idú na
+         * úvodný tréning (okno ±30 dní) — inak by sa nový človek objavil
+         * až potom, čo mu niekto ručne založí riadok.
+         *
+         * Obsah odpovedí sa tu NEROZŠIFRÚVA. Na zoznam stačí stav a dátumy;
+         * rozšifrovať päťdesiat zdravotných záznamov kvôli výpisu mien je
+         * zbytočná práca s citlivými dátami.
          */
         if (q.get("zoznam")) {
           const dnes = new Date().toISOString().slice(0, 10);
           const od = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
           const doDna = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+          const origin = new URL(request.url).origin;
+
           const rs = await DB.prepare(
-            `SELECT u.klient, u.trener, MIN(u.zaciatok) AS uvodny, a.stav, a.token, a.klient_vyplnil_at
+            `SELECT a.klient, a.stav, a.token, a.klient_vyplnil_at, a.zapis_at, a.vytvorene_at,
+                    (SELECT MIN(u.zaciatok) FROM kal_udalosti u
+                      WHERE u.klient = a.klient AND u.typ = 'uvodny' AND u.zmizla_at IS NULL) AS uvodny
+               FROM anamnezy a`,
+          ).all();
+
+          // Kto ide na úvodný a riadok ešte nemá.
+          const chybaju = await DB.prepare(
+            `SELECT u.klient, u.trener, MIN(u.zaciatok) AS uvodny
                FROM kal_udalosti u
-               LEFT JOIN anamnezy a ON a.klient = u.klient
               WHERE u.zmizla_at IS NULL AND u.typ = 'uvodny' AND u.klient IS NOT NULL
                 AND substr(u.zaciatok, 1, 10) BETWEEN ?1 AND ?2
-                AND (a.stav IS NULL OR a.stav <> 'hotova')
-              GROUP BY u.klient, u.trener, a.stav, a.token, a.klient_vyplnil_at
-              ORDER BY uvodny`,
+                AND NOT EXISTS (SELECT 1 FROM anamnezy a WHERE a.klient = u.klient)
+              GROUP BY u.klient, u.trener`,
           ).bind(od, doDna).all();
-          const origin = new URL(request.url).origin;
-          const polozky = ((rs.results || []) as unknown as {
-            klient: string; trener: string; uvodny: string; stav: string | null; token: string | null; klient_vyplnil_at: string | null;
-          }[]).map((r) => ({
-            klient: r.klient, trener: r.trener, uvodny: r.uvodny,
-            stav: r.stav || "ceka",
-            odkaz: r.token ? `${origin}/a/${r.token}` : null,
-            klientVyplnilAt: r.klient_vyplnil_at,
-            // Úvodný, ktorý už bol, je naliehavejší než ten budúci: po ňom
-            // sa zápis píše, pred ním sa len posiela odkaz.
-            uzBol: r.uvodny.slice(0, 10) <= dnes,
-          }));
+
+          // Tréner klienta — zoznam sa filtruje ním, nie trénerom udalosti.
+          const treneri = new Map<string, string>();
+          for (const r of ((await DB.prepare("SELECT name, primary_trainer FROM client_overrides WHERE primary_trainer IS NOT NULL").all()).results || []) as unknown as { name: string; primary_trainer: string }[]) {
+            treneri.set(r.name, r.primary_trainer);
+          }
+
+          type Riadok = { klient: string; stav: string; token: string | null; klient_vyplnil_at: string | null; zapis_at: string | null; vytvorene_at: string | null; uvodny: string | null; trener?: string };
+          const polozky = [
+            ...((rs.results || []) as unknown as Riadok[]).map((r) => ({
+              klient: r.klient,
+              trener: treneri.get(r.klient) || "",
+              uvodny: r.uvodny,
+              stav: r.stav || "ceka",
+              odkaz: r.token ? `${origin}/a/${r.token}` : null,
+              klientVyplnilAt: r.klient_vyplnil_at,
+              zapisAt: r.zapis_at,
+              uzBol: !!r.uvodny && r.uvodny.slice(0, 10) <= dnes,
+            })),
+            ...((chybaju.results || []) as unknown as Riadok[]).map((r) => ({
+              klient: r.klient,
+              trener: treneri.get(r.klient) || r.trener || "",
+              uvodny: r.uvodny,
+              stav: "ceka" as const,
+              odkaz: null,
+              klientVyplnilAt: null,
+              zapisAt: null,
+              uzBol: !!r.uvodny && r.uvodny.slice(0, 10) <= dnes,
+            })),
+          ];
+
+          // Rozpracované hore (najbližší úvodný prvý), hotové dole.
+          polozky.sort((a, b) => {
+            const h = (x: typeof a) => (x.zapisAt ? 1 : 0);
+            if (h(a) !== h(b)) return h(a) - h(b);
+            return String(b.uvodny || b.klient).localeCompare(String(a.uvodny || a.klient));
+          });
           return Response.json({ ok: true, polozky }, { headers: { "cache-control": "no-store" } });
         }
 

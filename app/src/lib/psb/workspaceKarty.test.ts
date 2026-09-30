@@ -24,7 +24,7 @@ describe("karta je kategória, nie položka", () => {
     // karty. Jerry 23. 9. 2026: „predstavoval som si celé kategórie."
     // Karta „klient" je navyše — nie je to fronta, je to pracovný stôl.
     const k = postavKarty({ ...zdroje, ktoSom: null });
-    expect(k.map((x) => x.druh)).toEqual(["klient", "faktury", "zmeny", "mena", "platby"]);
+    expect(k.map((x) => x.druh)).toEqual(["klient", "faktury", "anamnezy", "zmeny", "mena", "platby"]);
     expect(k.find((x) => x.druh === "zmeny")!.polozky.length).toBe(2);
   });
 
@@ -34,12 +34,14 @@ describe("karta je kategória, nie položka", () => {
     // vznikajú pri balíčku, ktorý sa nahadzuje o kartu vedľa.
     const k = postavKarty({ ...zdroje, ktoSom: null });
     expect(k[1].druh).toBe("faktury");
-    expect(k[4].druh).toBe("platby");
+    // Anamnézy sú tretie — kartotéka bez fronty, stavia sa vždy.
+    expect(k[2].druh).toBe("anamnezy");
+    expect(k[5].druh).toBe("platby");
   });
 
   it("prázdna kategória kartu nevyrobí", () => {
     const k = postavKarty({ ...zdroje, zmeny: [], nezname: [], ktoSom: null });
-    expect(k.map((x) => x.druh)).toEqual(["klient", "faktury", "platby"]);
+    expect(k.map((x) => x.druh)).toEqual(["klient", "faktury", "anamnezy", "platby"]);
   });
 });
 
@@ -56,7 +58,7 @@ describe("karta patrí prihlásenému", () => {
     // ale jej robota — a bez karty tlačidlo „Vystaviť faktúru" na karte
     // klienta ticho nerobilo nič (28. 9. 2026, Janka šnirychova).
     const k = postavKarty({ ...zdroje, ktoSom: "terezka" });
-    expect(k.map((x) => x.druh)).toEqual(["klient", "faktury", "zmeny", "mena"]);
+    expect(k.map((x) => x.druh)).toEqual(["klient", "faktury", "anamnezy", "zmeny", "mena"]);
     expect(k.find((x) => x.druh === "zmeny")!.polozky.map((p) => (p as Zmena).id)).toEqual(["z2"]);
   });
 
@@ -123,7 +125,7 @@ describe("prihlásenie sa porovnáva bez ohľadu na veľkosť písmen", () => {
 
   it("aj „Terezka“ s veľkým T", () => {
     const k = postavKarty({ ...zdroje, ktoSom: "Terezka" });
-    expect(k.map((x) => x.druh)).toEqual(["klient", "faktury", "zmeny", "mena"]);
+    expect(k.map((x) => x.druh)).toEqual(["klient", "faktury", "anamnezy", "zmeny", "mena"]);
   });
 
   it("„app“ (spoločné prihlásenie) nefiltruje", () => {
@@ -132,12 +134,12 @@ describe("prihlásenie sa porovnáva bez ohľadu na veľkosť písmen", () => {
 });
 
 describe("karta klienta je stôl, nie fronta", () => {
-  it("stôl aj faktúry sú tam vždy, aj keď nič nečaká", () => {
+  it("stôl, faktúry aj anamnézy sú tam vždy, aj keď nič nečaká", () => {
     // Ostatné karty sú zoznamy toho, čo čaká, a keď sa vyprázdnia, zmiznú.
-    // Tieto dve nie — sú to miesta, kam sa chodí robiť.
+    // Tieto tri nie — sú to miesta, kam sa chodí robiť.
     const k = postavKarty({ zmeny: [], nezname: [], platby: [], navrhMena: () => "", ktoSom: "Jerry" });
-    expect(k.map((x) => x.druh)).toEqual(["klient", "faktury"]);
-    expect(BEZ_FRONTY).toEqual(["klient", "faktury"]);
+    expect(k.map((x) => x.druh)).toEqual(["klient", "faktury", "anamnezy"]);
+    expect(BEZ_FRONTY).toEqual(["klient", "faktury", "anamnezy"]);
   });
 
   it("nemá položky, takže sa nedá „vybaviť“", () => {

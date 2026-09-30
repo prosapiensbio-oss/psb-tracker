@@ -4,7 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 
 import { dlhKlienta } from "../../lib/psb/dlhKlienta";
 import { VypisHodinPanel } from "./VypisHodinPanel";
-import { AnamnezaPanel } from "./AnamnezaPanel";
+import { AnamnezaZhrnutie } from "./AnamnezaZhrnutie";
 import { cas24, hod, priebehBalickov, type StavRiadku } from "../../lib/psb/vypisHodin";
 import { normName, fmtCZK, fmtDMY, denVTyzdni } from "../../lib/psb/format";
 import { jeBeta } from "../../lib/psb/beta";
@@ -56,7 +56,7 @@ type Platba = {
 
 const dnesISO = () => new Date().toISOString().slice(0, 10);
 
-export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onOverride, otvorKlienta, onOtvoreny, onFaktura, menoZvonku, setMenoZvonku , otvorVypis, onVypisOtvoreny, otvorAnamnezu, onAnamnezaOtvorena}: {
+export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onOverride, otvorKlienta, onOtvoreny, onFaktura, menoZvonku, setMenoZvonku , otvorVypis, onVypisOtvoreny, otvorAnamnezu, onAnamnezaOtvorena, onOtvorAnamnezu}: {
   clients: Record<string, ClientAgg>;
   mena: string[];
   data: PSBData;
@@ -109,6 +109,8 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
   /** Otvoriť tohto klienta rovno na záložke anamnéza (z kopy kariet). */
   otvorAnamnezu?: string | null;
   onAnamnezaOtvorena?: () => void;
+  /** Preklik zo zhrnutia do karty Anamnézy. */
+  onOtvorAnamnezu?: (meno: string) => void;
 }) {
   const [hladam, setHladam] = useState("");
   const [novy, setNovy] = useState(false);
@@ -1541,7 +1543,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
             />
           )}
 
-          {filter === "anamneza" && <AnamnezaPanel meno={meno} />}
+          {filter === "anamneza" && <AnamnezaZhrnutie meno={meno} onOtvor={(m) => onOtvorAnamnezu?.(m)} />}
 
           {filter === "poznamky" && (
             <>

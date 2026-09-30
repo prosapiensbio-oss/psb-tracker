@@ -29,10 +29,10 @@ export type Zmena = { id: string; druh: string; klient: string | null; nazov: st
 export type NeznamyNazov = { nazov: string; trener: string; pocet: number; najblizsi: string; navrh: string };
 export type NepriradenaPlatba = { fioId: string; datum: string; suma: number; text: string; navrh: string };
 /** Klient pred úvodným tréningom alebo tesne po ňom, bez hotovej anamnézy. */
-export type ChybaAnamneza = {
-  klient: string; trener: string; uvodny: string;
-  stav: "ceka" | "klient_vyplnil"; odkaz: string | null;
-  klientVyplnilAt: string | null; uzBol: boolean;
+export type AnamnezaRiadok = {
+  klient: string; trener: string; uvodny: string | null;
+  stav: "ceka" | "klient_vyplnil" | "hotova"; odkaz: string | null;
+  klientVyplnilAt: string | null; zapisAt: string | null; uzBol: boolean;
 };
 
 export type Karta =
@@ -75,18 +75,17 @@ export type Karta =
    */
   | { druh: "faktury"; nadpis: string; podnadpis: string; polozky: never[] }
   /**
-   * Anamnéza (Jerry, 30. 9. 2026: „anamnézu a jej vypĺňanie by som pridal
-   * do workspace"). Fronta sa počíta z ÚVODNÝCH TRÉNINGOV v okne ±30 dní,
-   * nie zo zoznamu klientov: anamnéza patrí k prvému stretnutiu.
+   * Anamnézy — kartotéka, nie fronta.
    *
-   * Dva stavy, dve rôzne práce — a preto jedna karta, nie dve: pred
-   * tréningom sa posiela odkaz, po ňom sa píše zápis. Je to ten istý
-   * človek a tá istá vec, len o týždeň neskôr.
+   * Jerry, 30. 9. 2026: „chcem mať celú jednu kartu, kde budú všetky
+   * anamnézy pokope a bude tam aj Nová anamnéza." Preto je v BEZ_FRONTY:
+   * nemá počet a z kopy nikdy nezmizne, rovnako ako Klient a Faktúry.
+   * Rozpracované stoja hore, hotové pod nimi.
    */
-  | { druh: "anamneza"; nadpis: string; podnadpis: string; polozky: ChybaAnamneza[] };
+  | { druh: "anamnezy"; nadpis: string; podnadpis: string; polozky: AnamnezaRiadok[] };
 
 /** Karty, ktoré nie sú fronta — nemajú počet a z kopy nikdy nezmiznú. */
-export const BEZ_FRONTY: Karta["druh"][] = ["klient", "faktury"];
+export const BEZ_FRONTY: Karta["druh"][] = ["klient", "faktury", "anamnezy"];
 
 export type ZdrojeKariet = {
   zmeny: Zmena[];
@@ -98,8 +97,8 @@ export type ZdrojeKariet = {
   dlznici?: Dlznik[];
   /** Komu končí platnosť a zostávajú hodiny. */
   platnost?: ZostavaPoPlatnosti[];
-  /** Kto ide na úvodný (alebo bol) a anamnézu nemá hotovú. */
-  anamnezy?: ChybaAnamneza[];
+  /** Všetky anamnézy — rozpracované aj hotové. */
+  anamnezy?: AnamnezaRiadok[];
   nezname: { nazov: string; trener: string; pocet: number; najblizsi: string }[];
   platby: { fioId: string; datum: string; suma: number; text: string; kandidati: string[]; klientsky?: boolean }[];
   navrhMena: (nazov: string) => string;
@@ -203,18 +202,23 @@ export function postavKarty(z: ZdrojeKariet): Karta[] {
     polozky: [],
   });
   /**
-   * ANAMNÉZA HNEĎ ZA FAKTÚRAMI.
+   * ANAMNÉZY HNEĎ ZA FAKTÚRAMI.
    *
-   * Nie je to denná fronta ako zmeny v kalendári, ale má tvrdý termín:
-   * odkaz musí odísť PRED úvodným tréningom, inak je celá bezpečnostná
-   * časť zbytočná. Preto stojí vysoko a zmizne až vtedy, keď je zápis
-   * hotový.
+   * Nie je to fronta, ale kartotéka — preto sa stavia vždy, aj keď je
+   * prázdna. Termín má napriek tomu tvrdý: odkaz musí odísť PRED úvodným
+   * tréningom, inak je celá bezpečnostná časť zbytočná.
+   *
+   * Za faktúrami, nie pred nimi: nový klient príde párkrát mesačne,
+   * doklad sa vystavuje každý týždeň.
    */
-  const anamnezy = moje(z.anamnezy || []);
-  if (anamnezy.length) karty.push({
-    druh: "anamneza",
-    nadpis: "Anamnéza",
-    podnadpis: `${anamnezy.length} ${pocet(anamnezy.length, "klient čaká", "klienti čakajú", "klientov čaká")} na anamnézu`,
+  const anamnezy = z.anamnezy || [];
+  const caka = anamnezy.filter((a) => !a.zapisAt).length;
+  karty.push({
+    druh: "anamnezy",
+    nadpis: "Anamnézy",
+    podnadpis: caka
+      ? `${caka} ${pocet(caka, "rozpracovaná", "rozpracované", "rozpracovaných")} · založ novú alebo otvor hotovú`
+      : "kartotéka anamnéz — založ novú alebo otvor hotovú",
     polozky: anamnezy,
   });
   if (zmeny.length) karty.push({
@@ -298,7 +302,7 @@ export function postavKarty(z: ZdrojeKariet): Karta[] {
 
 export function klucPolozky(
   druh: Karta["druh"],
-  p: Zmena | NeznamyNazov | NepriradenaPlatba | BezBalicka | Dlznik | ZostavaPoPlatnosti | PodlaKlienta | ChybaAnamneza,
+  p: Zmena | NeznamyNazov | NepriradenaPlatba | BezBalicka | Dlznik | ZostavaPoPlatnosti | PodlaKlienta | AnamnezaRiadok,
 ): string {
   if (druh === "zmeny") return `zmeny|${(p as Zmena).id}`;
   if (druh === "mena") return `mena|${(p as NeznamyNazov).nazov}|${(p as NeznamyNazov).trener}`;
@@ -317,10 +321,8 @@ export function klucPolozky(
   // Kľúč je ten istý, aký nesie notifikácia — odklepnutie na karte tým
   // umlčí aj upozornenie a nepýta sa to na dvoch miestach zvlášť.
   if (druh === "platnost") return `platnost|${(p as ZostavaPoPlatnosti).meno}|${(p as ZostavaPoPlatnosti).platnostDo}`;
-  /**
-   * Anamnéza sa NEODKLEPÁVA — zmizne sama, keď je zápis hotový.
-   * Kľúč je aj tak potrebný, lebo ním kopa počíta zostávajúce položky.
-   */
-  if (druh === "anamneza") return `anamneza|${(p as ChybaAnamneza).klient}`;
+  // Anamnézy sú kartotéka (BEZ_FRONTY) — nič sa v nich neodklepáva,
+  // kľúč je tu len pre úplnosť.
+  if (druh === "anamnezy") return `anamnezy|${(p as AnamnezaRiadok).klient}`;
   return `platby|${(p as NepriradenaPlatba).fioId}`;
 }
