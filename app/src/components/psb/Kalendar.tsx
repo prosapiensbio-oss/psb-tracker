@@ -1469,6 +1469,34 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
 
       {/* Mriežka sa kreslí aj pre prázdny týždeň — inak by sa do budúceho
           týždňa nedal nahodiť prvý tréning: nebolo by na čo kliknúť. */}
+      {/* Pás dní pri jednom dni — prepínanie v rámci týždňa bez šípok
+          (Jerry, 30. 9. 2026: „pri 1 dni mi daj možnosť prepínať medzi dňami
+          tak, ako to bolo v pôvodnom návrhu"). Šípky zostávajú: nimi sa dá
+          prejsť aj do susedného týždňa, pás ukazuje len ten, v ktorom stojíš,
+          a k tomu povie, koľko je kde tréningov. */}
+      {rozsah === 1 && (
+        <div style={{ display: "flex", gap: 5, overflowX: "auto", paddingBottom: 8, marginBottom: 2, scrollbarWidth: "none" }}>
+          {dni.map((d, i) => {
+            const pocet = vTyzdni.filter((u) => u.zaciatok.slice(0, 10) === d && u.typ !== "sukromne" && u.typ !== "netrening").length;
+            const tu = i === zaciatok;
+            return (
+              <button key={d} onClick={() => { setZac(i); setVyber(null); }} style={{
+                flexShrink: 0, padding: "5px 9px", borderRadius: 8, cursor: "pointer", fontFamily: "inherit",
+                border: `1px solid ${tu ? C.accent : d === dnesIso ? mix(C.accent, 45) : C.border}`,
+                background: tu ? mix(C.accent, 16) : "transparent",
+                color: tu ? C.text : d === dnesIso ? C.accentLight : C.textMuted,
+                fontSize: 12, fontWeight: tu ? 700 : 600, whiteSpace: "nowrap",
+              }}>
+                {DNI_SK[i]} {Number(d.slice(8, 10))}.
+                <span style={{ marginLeft: 5, fontSize: 10.5, color: tu ? C.accentLight : C.textDim, fontVariantNumeric: "tabular-nums" }}>
+                  {pocet || "–"}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       <ScrollX>
         <div style={{ minWidth: uzke ? 0 : 620, marginLeft: uzke ? -12 : 0, marginRight: uzke ? -12 : 0 }}>
           {/* Hlavička dní */}
