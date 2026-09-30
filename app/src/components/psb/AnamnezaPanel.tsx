@@ -377,13 +377,19 @@ export function AnamnezaPanel({ meno }: { meno: string }) {
  * zmestí, lebo výška políčka rastie s obsahom.
  */
 const SIRKA_PISANIA = 340;
-/** Voľné pole začína nízko a rastie s textom. Strop, aby sekcia neušla. */
-const MAX_VYSKA = 190;
+/**
+ * Voľné pole začína NA JEDNOM RIADKU a rastie s textom (Jerry, 30. 9. 2026:
+ * „myslím výšku tých okien o polovicu zmenši"). Prázdna anamnéza tak nie je
+ * stena prázdnych obdĺžnikov a vidno viac otázok naraz; kto píše odstavec,
+ * dostane miesto sám od seba. Strop je tu preto, aby jedna dlhá odpoveď
+ * neodtlačila zvyšok sekcie mimo obrazovku.
+ */
+const MAX_VYSKA = 150;
 
 /** Ovládanie jednej otázky. Veľké natoľko, aby sa dalo trafiť bez pozerania. */
 function Pole({ o, hodnota, prve, onZmen }: { o: Otazka; hodnota: unknown; prve: boolean; onZmen: (v: unknown) => void }) {
   const vstup = {
-    padding: "9px 11px", borderRadius: 9, fontSize: 14, fontFamily: "inherit",
+    padding: "6px 10px", borderRadius: 8, fontSize: 14, fontFamily: "inherit",
     border: `1px solid ${C.border}`, background: C.bg, color: C.text, boxSizing: "border-box" as const,
   };
 
@@ -459,10 +465,10 @@ function Pole({ o, hodnota, prve, onZmen }: { o: Otazka; hodnota: unknown; prve:
         ref={rast}
         value={String(hodnota ?? "")}
         onChange={(e) => { rast(e.target); onZmen(e.target.value); }}
-        rows={2}
+        rows={1}
         autoFocus={prve}
         placeholder="píš…"
-        style={{ ...vstup, width: "100%", maxWidth: SIRKA_PISANIA, resize: "vertical", lineHeight: 1.55, overflow: "hidden" }}
+        style={{ ...vstup, width: "100%", maxWidth: SIRKA_PISANIA, resize: "vertical", lineHeight: 1.45, overflow: "hidden" }}
       />
     );
   }
