@@ -8,7 +8,7 @@ import { loadData } from "../lib/psb/db.server";
 import { mailKlientovi } from "../lib/psb/mailKlientovi";
 import { osCasuKlienta } from "../lib/psb/klientOsCasu";
 import { blokPocitovky } from "../lib/psb/pocitovkaStranka";
-import { oblastiZJson, platnaHodnota, POSUN, type Meranie, type Oblast } from "../lib/psb/pocitovka";
+import { oblastiZJson, platnaHodnota, posledneHodnoty, POSUN, type Meranie, type Oblast } from "../lib/psb/pocitovka";
 import { podlaKlienta } from "../lib/psb/anamneza.server";
 import { qrObrazok } from "../lib/psb/fakturaHtml";
 import { DODAVATEL, spayd } from "../lib/psb/vydanaFaktura";
@@ -98,12 +98,19 @@ export const Route = createFileRoute("/v/$token")({
          * istej stránke, na ktorú aj tak klikne z SMS; vlastný odkaz by
          * znamenal druhý token, druhú stránku a druhú vetu v správe.
          */
-        const r0 = await DB.prepare(
-          "SELECT datum, oblasti_json, tazkost, posun, poznamka FROM klient_merania WHERE klient = ?1 AND datum = ?2 AND zdroj = 'klient'",
-        ).bind(c.name, dnes).first<{ datum: string; oblasti_json: string | null; tazkost: number | null; posun: number | null; poznamka: string | null }>().catch(() => null);
-        const dnesne: Meranie | undefined = r0
-          ? { datum: r0.datum, oblasti: oblastiZJson(r0.oblasti_json), tazkost: r0.tazkost, posun: r0.posun, poznamka: r0.poznamka || "" }
-          : undefined;
+        /**
+         * Minulé odpovede sa ukazujú ako OBRYS, nie ako predvyber (Jerry,
+         * 30. 9. 2026). Berú sa zo VŠETKÝCH doterajších hodnotení, nie len
+         * z dnešného — „minule 6" je informácia aj o mesiac starej odpovedi.
+         */
+        const predosle = ((await DB.prepare(
+          "SELECT datum, oblasti_json, posun, poznamka FROM klient_merania WHERE klient = ?1 AND zdroj = 'klient' ORDER BY datum",
+        ).bind(c.name).all().catch(() => ({ results: [] }))).results || []) as unknown as
+          { datum: string; oblasti_json: string | null; posun: number | null; poznamka: string | null }[];
+        const merania: Meranie[] = predosle.map((r) => ({
+          datum: r.datum, oblasti: oblastiZJson(r.oblasti_json), posun: r.posun, poznamka: r.poznamka || "",
+        }));
+        const sOdkazom = [...merania].reverse().find((m) => m.poznamka.trim());
 
         /**
          * Oblasti Z JEHO ANAMNÉZY — to, s čím prišiel. Zápis trénera prebíja
@@ -122,7 +129,8 @@ export const Route = createFileRoute("/v/$token")({
 
         const pocity = blokPocitovky({
           oblasti: oblastiKlienta,
-          dnesne,
+          minule: posledneHodnoty(merania),
+          poslednyOdkaz: sOdkazom ? { datum: sOdkazom.datum, text: sOdkazom.poznamka.trim() } : undefined,
           vdaka: new URL(request.url).searchParams.get("vdaka") === "1",
         });
 
@@ -174,24 +182,22 @@ export const Route = createFileRoute("/v/$token")({
         const oblasti: Oblast[] = mena
           .map((oblast, i) => ({ oblast, sila: platnaHodnota(f.get(`oblast_sila_${i}`)) }))
           .filter((o) => o.sila != null);
-        const tazkost = platnaHodnota(f.get("tazkost"));
         const posun = platnaHodnota(f.get("posun"), 1, POSUN.moznosti.length);
         const poznamka = String(f.get("poznamka") ?? "").trim().slice(0, 1000);
-        if (!oblasti.length && tazkost == null && posun == null && !poznamka) return spat(false);
+        if (!oblasti.length && posun == null && !poznamka) return spat(false);
 
         const dnes = new Date().toISOString().slice(0, 10);
         await DB.prepare(
-          `INSERT INTO klient_merania (id, klient, datum, oblasti_json, tazkost, posun, poznamka, autor, created_at, zdroj)
-           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'klient', ?8, 'klient')
+          `INSERT INTO klient_merania (id, klient, datum, oblasti_json, posun, poznamka, autor, created_at, zdroj)
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'klient', ?7, 'klient')
            ON CONFLICT (klient, datum, zdroj) DO UPDATE SET
              oblasti_json = COALESCE(excluded.oblasti_json, klient_merania.oblasti_json),
-             tazkost      = COALESCE(excluded.tazkost,      klient_merania.tazkost),
              posun        = COALESCE(excluded.posun,        klient_merania.posun),
              poznamka     = CASE WHEN excluded.poznamka = '' THEN klient_merania.poznamka ELSE excluded.poznamka END`,
         ).bind(
           `${dnes}-${crypto.randomUUID().slice(0, 8)}`, r.klient, dnes,
           oblasti.length ? JSON.stringify(oblasti) : null,
-          tazkost, posun, poznamka, new Date().toISOString(),
+          posun, poznamka, new Date().toISOString(),
         ).run();
 
         return spat(true);

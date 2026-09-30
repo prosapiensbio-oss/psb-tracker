@@ -450,7 +450,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
   const pocity = useMemo(
     () => zhrnutiePocitov((data.merania || [])
       .filter((x) => x.klient === meno && x.zdroj === "klient")
-      .map((x) => ({ datum: x.datum, oblasti: x.oblasti, tazkost: x.tazkost, posun: x.posun, poznamka: x.poznamka }))),
+      .map((x) => ({ datum: x.datum, oblasti: x.oblasti, posun: x.posun, poznamka: x.poznamka }))),
     [data.merania, meno],
   );
 

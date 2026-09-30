@@ -2082,12 +2082,26 @@ až po mesiaci a spoločné „prvé a posledné meranie" by ho porovnávalo s k
 **Meno oblasti ide do skrytého políčka, hodnota sa páruje PORADÍM.**
 „hrudní páteř" ani „lokty / zápěstí" sa do názvu poľa dať nedajú.
 
-**Smer je JEDEN pre celú pocitovku: nižšie je lepšie.** Otázka o bežných
-veciach sa preto pýta na ŤAŽKOSŤ, nie na ľahkosť, a stĺpec sa volá
-`tazkost` (migrácia 0090 ho premenovala z `pohyb`). Jerry to rozsekol takto:
-„pokiaľ bude vedľa 1 napísané najlepšie a vedľa 10 najhoršie, každý to
-pochopí." Mal pravdu — dva smery v jednom formulári sú drahšie než jedna
-otázka postavená naopak.
+**Smer je JEDEN — a stojí pri stupnici napísaný slovom.** Jerry, 30. 9.
+2026: „vedľa nuly naľavo daj najlepšie a vedľa 10 napravo daj najhoršie."
+Sú pod krajnými číslami, nie vedľa nich: vedľa by sa im na 375 px nezmestili
+tak, aby na číslo zostal palec. Otázka „ako ťažko ti išli bežné veci" je od
+toho istého dňa preč (migrácia 0091) — bola jediná, ktorá sa nepýtala na to,
+s čím klient prišiel, a pocitovka má byť tak krátka, aby ju človek klepol
+cestou z tréningu.
+
+**NIČ sa nepredklepáva.** Jerry, 30. 9. 2026: „pôvodnú odpoveď nevyznačuj
+napevno, ale iba daj inou farbou alebo orámikuj." Je to viac než vzhľad:
+predvybraná odpoveď by sa odoslala aj vtedy, keď sa jej klient ani nedotkol,
+a z „nechcelo sa mi" by spravila tvrdenie o jeho tele. Minulá hodnota sa
+kreslí prerušovaným rámikom a vetou „minule 9 · 15. 8."; to isté platí pre
+napísaný odkaz — ukáže sa ako citát nad prázdnym políčkom.
+
+**Je to DOBROVOĽNÉ a stojí to hneď pri nadpise.** Jerry, 30. 9. 2026: „toto
+je vec, ktorou nechceme klientov obťažovať, toto by mali spraviť, keď tak,
+z vlastnej vôle." Preto „Ako ti je? — nepovinné, len ak sa ti chce", žiadne
+`required` a v Jarvisovom kontexte veta, že chýbajúca odpoveď NIE JE
+odpoveď.
 
 **Posun nie je stupnica, sú to tri možnosti** (vôbec / trochu / veľmi).
 Je to otázka na pocit zo zmeny, nie na stav tela; desať stupňov by z nej

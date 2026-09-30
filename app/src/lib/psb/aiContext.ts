@@ -1151,13 +1151,13 @@ export function buildAiContext(
       const zhrnutia = [...podlaKlienta.entries()].map(([klient, riadky]) => ({
         klient,
         z: zhrnutiePocitov(riadky.map((x) => ({
-          datum: x.datum, oblasti: x.oblasti, tazkost: x.tazkost, posun: x.posun, poznamka: x.poznamka,
+          datum: x.datum, oblasti: x.oblasti, posun: x.posun, poznamka: x.poznamka,
         }))),
       }));
       const sPorovnanim = zhrnutia.filter(({ z }) => z.rady.some((r) => r.body.length > 1));
 
       return {
-        poznamka: "PREČÍTAJ, NEPOČÍTAJ. Pocitovka — čo si klient sám klepne na svojej verejnej stránke (odkaz mu chodí v SMS). Pýta sa na TIE ISTÉ oblasti tela, ktoré si označil v anamnéze, na stupnici 0–10, plus jedna otázka na ťažkosť bežných vecí, jedna na pocit zmeny (vôbec / trochu / veľmi) a otvorená „Čo sa zmenilo?“. V CELEJ POCITOVKE JE NIŽŠIE ČÍSLO LEPŠIE — „lepsieO“ je už prepočítané tak, že kladné znamená zlepšenie; NEOTÁČAJ to sám. Beží od 30. 9. 2026, takže malý počet odpovedí NEZNAMENÁ, že sa ľudia nezlepšujú — znamená, že sa ešte len začalo zbierať. PSB predáva zmenu stavu a toto je JEDINÉ miesto v appke, ktoré ju meria; tržby a dochádzka hovoria o vernosti, nie o výsledku. Jeden záznam nie je výsledok. Podrobnosti si vytiahni dopytom do klient_merania (WHERE zdroj = 'klient'), oblasti sú v oblasti_json.",
+        poznamka: "PREČÍTAJ, NEPOČÍTAJ. Pocitovka — čo si klient sám klepne na svojej verejnej stránke (odkaz mu chodí v SMS). Pýta sa na TIE ISTÉ oblasti tela, ktoré si označil v anamnéze, na stupnici 0–10 (0 = najlepšie, 10 = najhoršie), na pocit zmeny (vôbec / trochu / veľmi) a otvorenou otázkou „Čo sa zmenilo?“. JE TO DOBROVOĽNÉ — klient nemusí odpovedať a nič sa mu nepredvyberá, takže chýbajúca odpoveď NIE JE odpoveď. V CELEJ POCITOVKE JE NIŽŠIE ČÍSLO LEPŠIE — „lepsieO“ je už prepočítané tak, že kladné znamená zlepšenie; NEOTÁČAJ to sám. Beží od 30. 9. 2026, takže malý počet odpovedí NEZNAMENÁ, že sa ľudia nezlepšujú — znamená, že sa ešte len začalo zbierať. PSB predáva zmenu stavu a toto je JEDINÉ miesto v appke, ktoré ju meria; tržby a dochádzka hovoria o vernosti, nie o výsledku. Jeden záznam nie je výsledok. Podrobnosti si vytiahni dopytom do klient_merania (WHERE zdroj = 'klient'), oblasti sú v oblasti_json.",
         odpovedaloKlientov: podlaKlienta.size,
         zaznamovSpolu: odKlientov.length,
         maPorovnanie: sPorovnanim.length,

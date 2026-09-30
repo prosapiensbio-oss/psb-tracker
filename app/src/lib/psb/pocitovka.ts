@@ -13,26 +13,23 @@
  * stupnici 0–10. Prvá hodnota je tým pádom to, čo povedal na úvodnom,
  * a graf v profile má odkiaľ začať.
  *
- * JEDEN SMER PRE CELÚ POCITOVKU: nižšie číslo je lepšie. Otázka o bežných
- * veciach sa kvôli tomu pýta na ŤAŽKOSŤ, nie na ľahkosť — Jerry, 30. 9.
- * 2026: „pokiaľ bude vedľa 1 napísané najlepšie a vedľa 10 najhoršie, každý
- * to pochopí." Mal pravdu a je to lacnejšie než pamätať si dva smery.
+ * JEDEN SMER: nižšie číslo je lepšie, a stojí to pri stupnici napísané
+ * slovom — Jerry, 30. 9. 2026: „vedľa nuly naľavo daj najlepšie a vedľa 10
+ * napravo daj najhoršie." Vtedy sa nedá pomýliť a netreba si pamätať nič.
+ *
+ * JE TO DOBROVOĽNÉ. Jerry, 30. 9. 2026: „toto je vec, ktorou nechceme
+ * klientov obťažovať, toto by mali spraviť, keď tak, z vlastnej vôle —
+ * nie je to povinné." Preto to stojí napísané hneď pri nadpise, nič sa
+ * nevynucuje a nič sa nepredklepáva.
  */
 
 /** Oblasť bolesti a jej sila — TEN ISTÝ tvar, aký má anamnéza. */
 export type Oblast = { oblast: string; sila: number | null };
 
-export const STUPNICA = { min: 0, max: 10, nizke: "žiadna", vysoke: "najhoršia, akú poznám" };
+export const STUPNICA = { min: 0, max: 10, nizke: "najlepšie", vysoke: "najhoršie" };
 
 /** Keď v anamnéze nie sú oblasti, pýta sa jeden všeobecný riadok. */
 export const CELKOVO = "celkovo";
-
-export const TAZKOST = {
-  id: "tazkost" as const,
-  text: "Ako ťažko ti išli bežné veci — schody, sedenie, nosenie?",
-  nizke: "bez problémov",
-  vysoke: "veľmi ťažko",
-};
 
 /**
  * Posun NIE JE stupnica, sú to tri možnosti (Jerry, 30. 9. 2026: „vôbec,
@@ -58,7 +55,6 @@ export const POZNAMKA = {
 export type Meranie = {
   datum: string;
   oblasti: Oblast[];
-  tazkost: number | null;
   posun: number | null;
   poznamka: string;
 };
@@ -91,7 +87,7 @@ export function oblastiZJson(s: unknown): Oblast[] {
 export type Bod = { datum: string; hodnota: number };
 
 export type Rad = {
-  /** Oblasť tela, `CELKOVO`, alebo `tazkost`. */
+  /** Oblasť tela, alebo `CELKOVO`, keď anamnéza žiadne neuvádza. */
   kluc: string;
   nazov: string;
   body: Bod[];
@@ -130,20 +126,18 @@ export function zhrnutiePocitov(merania: Meranie[]): ZhrnutiePocitov {
   };
   for (const m of zoradene) {
     for (const o of m.oblasti) pridaj(o.oblast, m.datum, o.sila);
-    pridaj(TAZKOST.id, m.datum, m.tazkost);
   }
 
   const rady: Rad[] = [...zbierka.entries()].map(([kluc, body]) => ({
     kluc,
-    nazov: kluc === TAZKOST.id ? "bežné veci" : kluc === CELKOVO ? "bolesť celkovo" : kluc,
+    nazov: kluc === CELKOVO ? "bolesť celkovo" : kluc,
     body,
     prva: body[0].hodnota,
     posledna: body[body.length - 1].hodnota,
     lepsieO: body[0].hodnota - body[body.length - 1].hodnota,
     dni: denDo(body[0].datum, body[body.length - 1].datum),
   }));
-  // Bolesť pred „bežnými vecami" — to je to, kvôli čomu klient prišiel.
-  rady.sort((a, b) => Number(a.kluc === TAZKOST.id) - Number(b.kluc === TAZKOST.id) || a.nazov.localeCompare(b.nazov));
+  rady.sort((a, b) => a.nazov.localeCompare(b.nazov));
 
   const poslednyPosun = [...zoradene].reverse().find((m) => m.posun != null);
   const posun = poslednyPosun && poslednyPosun.posun != null
@@ -161,6 +155,24 @@ export function zhrnutiePocitov(merania: Meranie[]): ZhrnutiePocitov {
     posun,
     odkazy: zoradene.filter((m) => m.poznamka.trim()).map((m) => ({ datum: m.datum, text: m.poznamka.trim() })).reverse(),
   };
+}
+
+/**
+ * Posledná známa hodnota pre každú oblasť a dátum, kedy ju klient povedal.
+ *
+ * Kreslí sa na stránke ako OBRYS, nie ako predklepnutá odpoveď — Jerry,
+ * 30. 9. 2026: „pôvodnú odpoveď nevyznačuj napevno, ale iba daj napr. inou
+ * farbou alebo orámikuj." Predklepnutá odpoveď by sa odoslala aj vtedy, keď
+ * sa jej klient ani nedotkol, a z „nechcelo sa mi" by spravila tvrdenie
+ * o jeho tele.
+ */
+export function posledneHodnoty(merania: Meranie[]): Record<string, { hodnota: number; datum: string }> {
+  const von: Record<string, { hodnota: number; datum: string }> = {};
+  for (const m of merania.slice().sort((a, b) => a.datum.localeCompare(b.datum))) {
+    for (const o of m.oblasti) if (o.sila != null) von[o.oblast] = { hodnota: o.sila, datum: m.datum };
+    if (m.posun != null) von[POSUN.id] = { hodnota: m.posun, datum: m.datum };
+  }
+  return von;
 }
 
 /**

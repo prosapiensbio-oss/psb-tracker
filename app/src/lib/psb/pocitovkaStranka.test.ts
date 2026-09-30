@@ -1,7 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
 import { blokPocitovky } from "./pocitovkaStranka";
-import { CELKOVO, POSUN, TAZKOST } from "./pocitovka";
+import { CELKOVO, POSUN } from "./pocitovka";
 
 describe("blok na verejnej stránke", () => {
   it("pýta sa na oblasti Z ANAMNÉZY, nie na bolesť všeobecne", () => {
@@ -19,20 +19,19 @@ describe("blok na verejnej stránke", () => {
     expect(h).toContain(`name="oblast_meno" value="${CELKOVO}"`);
   });
 
-  it("stupnica je 0–10 a nikde ju neprekročí", () => {
+  it("pri kraji stupnice stojí slovom, ktorý koniec je ktorý", () => {
     const h = blokPocitovky({ oblasti: ["krk"] });
     expect(h).toContain('name="oblast_sila_0" value="0"');
     expect(h).toContain('name="oblast_sila_0" value="10"');
     expect(h).not.toContain('name="oblast_sila_0" value="11"');
-    expect(h).toContain("0 = žiadna");
-    expect(h).toContain("10 = najhoršia, akú poznám");
+    expect(h).toContain("najlepšie");
+    expect(h).toContain("najhoršie");
   });
 
-  it("bežné veci sa pýtajú na ŤAŽKOSŤ — nižšie je lepšie všade", () => {
-    const h = blokPocitovky({});
-    expect(h).toContain(TAZKOST.text);
-    expect(h).toContain("0 = bez problémov");
-    expect(h).toContain("10 = veľmi ťažko");
+  it("na ťažkosť bežných vecí sa už nepýta", () => {
+    const h = blokPocitovky({ oblasti: ["krk"] });
+    expect(h).not.toContain("bežné veci");
+    expect(h).not.toContain('name="tazkost"');
   });
 
   it("posun sú tri možnosti, nie stupnica", () => {
@@ -42,34 +41,46 @@ describe("blok na verejnej stránke", () => {
     expect(h).not.toContain('name="posun" value="4"');
   });
 
-  it("otvorená otázka je nepovinná", () => {
+  it("nadpis hneď hovorí, že je to dobrovoľné", () => {
     const h = blokPocitovky({});
-    expect(h).toContain("Čo sa zmenilo?");
-    expect(h).toContain('name="poznamka"');
+    expect(h).toContain("Ako ti je?");
+    expect(h).toContain("nepovinné");
     expect(h).not.toContain("required");
   });
 
+  it("NIČ sa nepredklepáva — ani minulá odpoveď", () => {
+    // Predvybraná odpoveď by sa odoslala aj vtedy, keď sa jej klient ani
+    // nedotkol, a z „nechcelo sa mi" by spravila tvrdenie o jeho tele.
+    const h = blokPocitovky({
+      oblasti: ["krk"],
+      minule: { krk: { hodnota: 6, datum: "2026-08-15" }, posun: { hodnota: 2, datum: "2026-08-15" } },
+    });
+    // `:checked` v štýle je pravidlo pre klepnutie, nie predvyber — test
+    // sa musí pýtať na samotné prepínače.
+    expect(h).not.toMatch(/<input[^>]*\schecked/);
+  });
+
+  it("minulá odpoveď je obrys a povie aj kedy", () => {
+    const h = blokPocitovky({ oblasti: ["krk"], minule: { krk: { hodnota: 6, datum: "2026-08-15" } } });
+    expect(h).toContain("minule 6 · 15. 8.");
+    // Obrys = prerušovaný rámik na tom jednom čísle, nie výplň.
+    expect(h).toMatch(/value="6"[\s\S]{0,200}?1px dashed/);
+    expect(h).not.toMatch(/value="5"[\s\S]{0,200}?1px dashed/);
+  });
+
+  it("minulý odkaz sa ukáže ako citát, nie ako predvyplnený text", () => {
+    const h = blokPocitovky({ poslednyOdkaz: { datum: "2026-08-15", text: "lepšie sa mi spí" } });
+    expect(h).toContain("minule si napísal: „lepšie sa mi spí“");
+    expect(h).toContain("<textarea name=\"poznamka\" rows=\"3\"");
+    expect(h).not.toContain(">lepšie sa mi spí</textarea>");
+  });
+
   it("odosiela sa bez JavaScriptu a klepnutie je vidno", () => {
-    // Stránka sa otvára z SMS, často v okne správy. Skript, ktorý sa
-    // nenačíta, by spravil z otázok mŕtve políčka; a bez `:checked + span`
-    // by klient klepol a nestalo by sa nič viditeľné.
     const h = blokPocitovky({});
     expect(h).toContain('<form method="post">');
     expect(h).toContain(".psb-stupnica input:checked + span");
     expect(h).not.toContain("<script");
     expect(h).not.toContain("onclick");
-  });
-
-  it("dnešná odpoveď je predklepnutá aj v texte", () => {
-    const h = blokPocitovky({
-      oblasti: ["krk"],
-      dnesne: { datum: "2026-09-30", oblasti: [{ oblast: "krk", sila: 4 }], tazkost: 2, posun: 3, poznamka: "lepšie sa mi spí" },
-    });
-    expect(h).toContain('name="oblast_sila_0" value="4" checked');
-    expect(h).toContain('name="tazkost" value="2" checked');
-    expect(h).toContain('name="posun" value="3" checked');
-    expect(h).toContain("lepšie sa mi spí");
-    expect(h).toContain("Dnes si už odpovedal");
   });
 
   it("meno oblasti sa do HTML nevloží surové", () => {

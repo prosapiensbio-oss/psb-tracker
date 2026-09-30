@@ -249,7 +249,6 @@ export type MeranieRow = {
   klient: string; datum: string;
   /** Oblasti z jeho vlastnej anamnézy a sila 0–10 (nižšie je lepšie). */
   oblasti: { oblast: string; sila: number | null }[];
-  tazkost: number | null;
   /** 1 vôbec · 2 trochu · 3 veľmi — nie stupnica, tri možnosti. */
   posun: number | null;
   poznamka: string;

@@ -1,14 +1,13 @@
 import { describe, expect, it } from "bun:test";
 
-import { CELKOVO, oblastiZJson, platnaHodnota, TAZKOST, vetaOPocitoch, zhrnutiePocitov, type Meranie } from "./pocitovka";
+import { CELKOVO, oblastiZJson, platnaHodnota, posledneHodnoty, POSUN, vetaOPocitoch, zhrnutiePocitov, type Meranie } from "./pocitovka";
 
 const m = (
   datum: string,
   oblasti: { oblast: string; sila: number | null }[] = [],
-  tazkost: number | null = null,
   posun: number | null = null,
   poznamka = "",
-): Meranie => ({ datum, oblasti, tazkost, posun, poznamka });
+): Meranie => ({ datum, oblasti, posun, poznamka });
 
 describe("hodnota zo stránky", () => {
   it("berie celé čísla vrátane nuly — nula je odpoveď „nebolí“", () => {
@@ -50,13 +49,13 @@ describe("oblasti z uloženého JSON", () => {
 });
 
 describe("každá oblasť je vlastný rad", () => {
-  it("nižšie číslo je lepšie — v celej pocitovke", () => {
+  it("nižšie číslo je lepšie", () => {
     const z = zhrnutiePocitov([
-      m("2026-01-10", [{ oblast: "krk", sila: 8 }], 6),
-      m("2026-03-11", [{ oblast: "krk", sila: 3 }], 2),
+      m("2026-01-10", [{ oblast: "krk", sila: 8 }]),
+      m("2026-03-11", [{ oblast: "krk", sila: 3 }]),
     ]);
     expect(z.rady.find((r) => r.kluc === "krk")?.lepsieO).toBe(5);
-    expect(z.rady.find((r) => r.kluc === TAZKOST.id)?.lepsieO).toBe(4);
+    expect(z.rady.find((r) => r.kluc === "krk")?.dni).toBe(60);
   });
 
   it("zhoršenie je záporné, nie zamlčané", () => {
@@ -78,14 +77,15 @@ describe("každá oblasť je vlastný rad", () => {
   });
 
   it("prázdna hodnota do radu nevstúpi", () => {
-    const z = zhrnutiePocitov([m("2026-01-10", [{ oblast: "krk", sila: null }], null)]);
+    const z = zhrnutiePocitov([m("2026-01-10", [{ oblast: "krk", sila: null }])]);
     expect(z.rady).toHaveLength(0);
     expect(z.pocet).toBe(1);
   });
 
-  it("bolesť stojí pred bežnými vecami", () => {
-    const z = zhrnutiePocitov([m("2026-01-10", [{ oblast: CELKOVO, sila: 4 }], 5)]);
-    expect(z.rady.map((r) => r.kluc)).toEqual([CELKOVO, TAZKOST.id]);
+  it("bez oblastí z anamnézy je jeden všeobecný rad", () => {
+    const z = zhrnutiePocitov([m("2026-01-10", [{ oblast: CELKOVO, sila: 4 }])]);
+    expect(z.rady.map((r) => r.kluc)).toEqual([CELKOVO]);
+    expect(z.rady[0].nazov).toBe("bolesť celkovo");
   });
 
   it("poradie na vstupe nerozhoduje, dátum áno", () => {
@@ -97,16 +97,16 @@ describe("každá oblasť je vlastný rad", () => {
 
 describe("posun a odkazy", () => {
   it("posun berie POSLEDNÚ odpoveď, nie prvú", () => {
-    const z = zhrnutiePocitov([m("2026-01-10", [], null, 1), m("2026-02-10", [], null, 3)]);
+    const z = zhrnutiePocitov([m("2026-01-10", [], 1), m("2026-02-10", [], 3)]);
     expect(z.posun?.text).toBe("veľmi");
     expect(z.posun?.datum).toBe("2026-02-10");
   });
 
   it("odkazy idú od najnovšieho a prázdne sa nezbierajú", () => {
     const z = zhrnutiePocitov([
-      m("2026-01-10", [], null, null, "bolí to menej"),
-      m("2026-02-10", [], null, null, "   "),
-      m("2026-03-10", [], null, null, "lepšie sa mi spí"),
+      m("2026-01-10", [], null, "bolí to menej"),
+      m("2026-02-10", [], null, "   "),
+      m("2026-03-10", [], null, "lepšie sa mi spí"),
     ]);
     expect(z.odkazy.map((o) => o.text)).toEqual(["lepšie sa mi spí", "bolí to menej"]);
   });
@@ -118,7 +118,7 @@ describe("veta pre obrazovku aj Jarvisa", () => {
   });
 
   it("prvé hodnotenie to povie nahlas", () => {
-    const v = vetaOPocitoch(zhrnutiePocitov([m("2026-01-10", [{ oblast: "krk", sila: 8 }], 5, 2)]));
+    const v = vetaOPocitoch(zhrnutiePocitov([m("2026-01-10", [{ oblast: "krk", sila: 8 }], 2)]));
     expect(v).toContain("krk: 8/10");
     expect(v).toContain("zmenu k lepšiemu cíti: trochu");
     expect(v).toContain("porovnávať sa nemá s čím");
@@ -131,5 +131,29 @@ describe("veta pre obrazovku aj Jarvisa", () => {
     ]));
     expect(v).toContain("lepšie o 3");
     expect(v).not.toContain("porovnávať");
+  });
+});
+
+
+describe("minulá odpoveď je len obrys", () => {
+  it("berie POSLEDNÚ známu hodnotu každej oblasti aj posunu", () => {
+    const p = posledneHodnoty([
+      m("2026-01-10", [{ oblast: "krk", sila: 8 }, { oblast: "bedra", sila: 5 }], 1),
+      m("2026-03-11", [{ oblast: "krk", sila: 3 }], 3),
+    ]);
+    expect(p.krk).toEqual({ hodnota: 3, datum: "2026-03-11" });
+    // Bedrá v marci neklepol — platí januárová hodnota a jej dátum.
+    expect(p.bedra).toEqual({ hodnota: 5, datum: "2026-01-10" });
+    expect(p[POSUN.id]).toEqual({ hodnota: 3, datum: "2026-03-11" });
+  });
+
+  it("prázdna odpoveď sa nepamätá ako nula", () => {
+    const p = posledneHodnoty([m("2026-01-10", [{ oblast: "krk", sila: null }])]);
+    expect(p.krk).toBeUndefined();
+  });
+
+  it("nula je odpoveď „nebolí“ a pamätá sa", () => {
+    const p = posledneHodnoty([m("2026-01-10", [{ oblast: "krk", sila: 0 }])]);
+    expect(p.krk?.hodnota).toBe(0);
   });
 });
