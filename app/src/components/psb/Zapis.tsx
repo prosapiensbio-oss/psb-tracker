@@ -111,7 +111,15 @@ type Polozka = {
  * v záložkách — a rozcestník, ktorý pozná všetko okrem tej jednej veci, čo sa
  * robí pri každom novom klientovi, nie je rozcestník.
  */
-const ANAMNEZA = "https://docs.google.com/forms/d/e/1FAIpQLScNbp8yLutGZAZqUIM3TqfOaI5IacAIBimsJnRhRV1pYF53rg/viewform";
+/**
+ * Anamnéza je od 30. 9. 2026 v Kokpite, nie v Google Forms.
+ *
+ * Starý odkaz viedol na `docs.google.com/forms/…` a otváral sa v novej
+ * karte. Zmizol celý: zápis, ktorý vedie VON z appky, sa do appky nikdy
+ * nevráti — a presne to bol dôvod, prečo sa 56 anamnéz muselo spätne
+ * importovať. Teraz sa ide do kopy kariet, kde karta Anamnéza ukáže,
+ * kto na ňu čaká.
+ */
 
 /**
  * Rituály po ľuďoch sa v tomto zozname zlučujú do JEDNÉHO riadku.
@@ -253,9 +261,9 @@ export function ZapisButton({
   //   bola položka, ktorá nikam nevedie a nič neurýchli.
   const polozky: Polozka[] = [
     {
-      nadpis: "Nový klient · úvodný tréning",
-      popis: "Otvorí anamnézu v Google Forms. Do Kokpitu sa klient dostane sám z PTmindera; odtiaľto sa berie len to, odkiaľ sa o nás dozvedel.",
-      odkaz: ANAMNEZA,
+      nadpis: "Nový klient · anamnéza",
+      popis: "Karta Anamnéza v kope: komu poslať odkaz pred úvodným tréningom a komu ešte chýba zápis po ňom.",
+      tab: "workspace",
     },
     ...zlucRitualy(ritualy),
   ];

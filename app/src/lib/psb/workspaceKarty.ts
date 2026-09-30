@@ -28,6 +28,12 @@ import type { PodlaKlienta } from "./sporneKonanie";
 export type Zmena = { id: string; druh: string; klient: string | null; nazov: string | null; pred: string | null; po: string | null; kedy: string; trener: string };
 export type NeznamyNazov = { nazov: string; trener: string; pocet: number; najblizsi: string; navrh: string };
 export type NepriradenaPlatba = { fioId: string; datum: string; suma: number; text: string; navrh: string };
+/** Klient pred úvodným tréningom alebo tesne po ňom, bez hotovej anamnézy. */
+export type ChybaAnamneza = {
+  klient: string; trener: string; uvodny: string;
+  stav: "ceka" | "klient_vyplnil"; odkaz: string | null;
+  klientVyplnilAt: string | null; uzBol: boolean;
+};
 
 export type Karta =
   | { druh: "zmeny"; nadpis: string; podnadpis: string; polozky: Zmena[] }
@@ -67,7 +73,17 @@ export type Karta =
    * faktúra vzniká pri balíčku, a balíčky sa nahadzujú na karte klienta
    * hneď vedľa.
    */
-  | { druh: "faktury"; nadpis: string; podnadpis: string; polozky: never[] };
+  | { druh: "faktury"; nadpis: string; podnadpis: string; polozky: never[] }
+  /**
+   * Anamnéza (Jerry, 30. 9. 2026: „anamnézu a jej vypĺňanie by som pridal
+   * do workspace"). Fronta sa počíta z ÚVODNÝCH TRÉNINGOV v okne ±30 dní,
+   * nie zo zoznamu klientov: anamnéza patrí k prvému stretnutiu.
+   *
+   * Dva stavy, dve rôzne práce — a preto jedna karta, nie dve: pred
+   * tréningom sa posiela odkaz, po ňom sa píše zápis. Je to ten istý
+   * človek a tá istá vec, len o týždeň neskôr.
+   */
+  | { druh: "anamneza"; nadpis: string; podnadpis: string; polozky: ChybaAnamneza[] };
 
 /** Karty, ktoré nie sú fronta — nemajú počet a z kopy nikdy nezmiznú. */
 export const BEZ_FRONTY: Karta["druh"][] = ["klient", "faktury"];
@@ -82,6 +98,8 @@ export type ZdrojeKariet = {
   dlznici?: Dlznik[];
   /** Komu končí platnosť a zostávajú hodiny. */
   platnost?: ZostavaPoPlatnosti[];
+  /** Kto ide na úvodný (alebo bol) a anamnézu nemá hotovú. */
+  anamnezy?: ChybaAnamneza[];
   nezname: { nazov: string; trener: string; pocet: number; najblizsi: string }[];
   platby: { fioId: string; datum: string; suma: number; text: string; kandidati: string[]; klientsky?: boolean }[];
   navrhMena: (nazov: string) => string;
@@ -184,6 +202,21 @@ export function postavKarty(z: ZdrojeKariet): Karta[] {
     podnadpis: "vystav doklad, pošli QR platbu a veď si, čo je zaplatené",
     polozky: [],
   });
+  /**
+   * ANAMNÉZA HNEĎ ZA FAKTÚRAMI.
+   *
+   * Nie je to denná fronta ako zmeny v kalendári, ale má tvrdý termín:
+   * odkaz musí odísť PRED úvodným tréningom, inak je celá bezpečnostná
+   * časť zbytočná. Preto stojí vysoko a zmizne až vtedy, keď je zápis
+   * hotový.
+   */
+  const anamnezy = moje(z.anamnezy || []);
+  if (anamnezy.length) karty.push({
+    druh: "anamneza",
+    nadpis: "Anamnéza",
+    podnadpis: `${anamnezy.length} ${pocet(anamnezy.length, "klient čaká", "klienti čakajú", "klientov čaká")} na anamnézu`,
+    polozky: anamnezy,
+  });
   if (zmeny.length) karty.push({
     druh: "zmeny",
     nadpis: "Zmeny v kalendári",
@@ -265,7 +298,7 @@ export function postavKarty(z: ZdrojeKariet): Karta[] {
 
 export function klucPolozky(
   druh: Karta["druh"],
-  p: Zmena | NeznamyNazov | NepriradenaPlatba | BezBalicka | Dlznik | ZostavaPoPlatnosti | PodlaKlienta,
+  p: Zmena | NeznamyNazov | NepriradenaPlatba | BezBalicka | Dlznik | ZostavaPoPlatnosti | PodlaKlienta | ChybaAnamneza,
 ): string {
   if (druh === "zmeny") return `zmeny|${(p as Zmena).id}`;
   if (druh === "mena") return `mena|${(p as NeznamyNazov).nazov}|${(p as NeznamyNazov).trener}`;
@@ -284,5 +317,10 @@ export function klucPolozky(
   // Kľúč je ten istý, aký nesie notifikácia — odklepnutie na karte tým
   // umlčí aj upozornenie a nepýta sa to na dvoch miestach zvlášť.
   if (druh === "platnost") return `platnost|${(p as ZostavaPoPlatnosti).meno}|${(p as ZostavaPoPlatnosti).platnostDo}`;
+  /**
+   * Anamnéza sa NEODKLEPÁVA — zmizne sama, keď je zápis hotový.
+   * Kľúč je aj tak potrebný, lebo ním kopa počíta zostávajúce položky.
+   */
+  if (druh === "anamneza") return `anamneza|${(p as ChybaAnamneza).klient}`;
   return `platby|${(p as NepriradenaPlatba).fioId}`;
 }

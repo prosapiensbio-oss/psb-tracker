@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { doSchranky } from "../../lib/psb/kopirovanie";
+import { oznam } from "../../lib/psb/obnovaSignal";
 import { OBLASTI, viditelne, type Formular, type Otazka } from "../../lib/psb/anamnezaFormular";
 import { C, mix } from "../../lib/psb/theme";
 
@@ -85,6 +86,9 @@ export function AnamnezaPanel({ meno }: { meno: string }) {
     if (!r?.ok) { setChyba(r?.error || "Zápis sa neuložil."); return; }
     setHlaska("Zapísané.");
     dotknute.current = false;
+    // Bez oznámenia by karta Anamnéza v kope svietila ďalej — zoznam si
+    // ťahá vlastným fetchom a o zápise by sa nedozvedela.
+    oznam("klienti");
     await nacitaj();
   };
 
@@ -96,6 +100,7 @@ export function AnamnezaPanel({ meno }: { meno: string }) {
     }).then((x) => x.json()).catch(() => ({ ok: false, error: "spojenie" }));
     setBezi(false);
     if (!r?.ok) { setChyba(r?.error || "Odkaz sa nepodarilo vyrobiť."); return; }
+    oznam("klienti");
     await nacitaj();
   };
 

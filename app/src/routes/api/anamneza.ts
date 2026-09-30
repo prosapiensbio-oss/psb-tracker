@@ -31,7 +31,50 @@ export const Route = createFileRoute("/api/anamneza")({
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });
         if (!ANAMNEZA_KLUC) return Response.json({ ok: false, error: "Šifrovací kľúč nie je nastavený (ANAMNEZA_KLUC)." }, { status: 503 });
 
-        const klient = kus(new URL(request.url).searchParams.get("klient"), 120);
+        const q = new URL(request.url).searchParams;
+
+        /**
+         * ZOZNAM PRE KOPU KARIET — kto anamnézu ešte nemá hotovú.
+         *
+         * Jerry, 30. 9. 2026: „anamnézu a jej vypĺňanie by som pridal do
+         * workspace." Fronta sa počíta z ÚVODNÝCH TRÉNINGOV, nie zo zoznamu
+         * klientov: anamnéza patrí k prvému stretnutiu, a kto chodí rok, ju
+         * už buď má, alebo ju nikto spätne vypĺňať nejde.
+         *
+         * Obsah odpovedí sa tu NEROZŠIFRÚVA — stačí stav. Zoznam prechádza
+         * cez celú kopu kariet a rozšifrovať päťdesiat záznamov kvôli tomu,
+         * aby sa ukázal počet, je zbytočná práca s citlivými dátami.
+         */
+        if (q.get("zoznam")) {
+          const dnes = new Date().toISOString().slice(0, 10);
+          const od = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+          const doDna = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+          const rs = await DB.prepare(
+            `SELECT u.klient, u.trener, MIN(u.zaciatok) AS uvodny, a.stav, a.token, a.klient_vyplnil_at
+               FROM kal_udalosti u
+               LEFT JOIN anamnezy a ON a.klient = u.klient
+              WHERE u.zmizla_at IS NULL AND u.typ = 'uvodny' AND u.klient IS NOT NULL
+                AND substr(u.zaciatok, 1, 10) BETWEEN ?1 AND ?2
+                AND (a.stav IS NULL OR a.stav <> 'hotova')
+              GROUP BY u.klient, u.trener, a.stav, a.token, a.klient_vyplnil_at
+              ORDER BY uvodny`,
+          ).bind(od, doDna).all();
+          const origin = new URL(request.url).origin;
+          const polozky = ((rs.results || []) as unknown as {
+            klient: string; trener: string; uvodny: string; stav: string | null; token: string | null; klient_vyplnil_at: string | null;
+          }[]).map((r) => ({
+            klient: r.klient, trener: r.trener, uvodny: r.uvodny,
+            stav: r.stav || "ceka",
+            odkaz: r.token ? `${origin}/a/${r.token}` : null,
+            klientVyplnilAt: r.klient_vyplnil_at,
+            // Úvodný, ktorý už bol, je naliehavejší než ten budúci: po ňom
+            // sa zápis píše, pred ním sa len posiela odkaz.
+            uzBol: r.uvodny.slice(0, 10) <= dnes,
+          }));
+          return Response.json({ ok: true, polozky }, { headers: { "cache-control": "no-store" } });
+        }
+
+        const klient = kus(q.get("klient"), 120);
         if (!klient) return Response.json({ ok: false, error: "Chýba klient." }, { status: 400 });
 
         const a = await podlaKlienta(DB, klient, ANAMNEZA_KLUC);

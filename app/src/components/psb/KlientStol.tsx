@@ -56,7 +56,7 @@ type Platba = {
 
 const dnesISO = () => new Date().toISOString().slice(0, 10);
 
-export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onOverride, otvorKlienta, onOtvoreny, onFaktura, menoZvonku, setMenoZvonku , otvorVypis, onVypisOtvoreny}: {
+export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onOverride, otvorKlienta, onOtvoreny, onFaktura, menoZvonku, setMenoZvonku , otvorVypis, onVypisOtvoreny, otvorAnamnezu, onAnamnezaOtvorena}: {
   clients: Record<string, ClientAgg>;
   mena: string[];
   data: PSBData;
@@ -106,6 +106,9 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
   /** Meno z karty „Balíček dojde" — stôl sa otvorí s rozbaleným výpisom. */
   otvorVypis?: string | null;
   onVypisOtvoreny?: () => void;
+  /** Otvoriť tohto klienta rovno na záložke anamnéza (z kopy kariet). */
+  otvorAnamnezu?: string | null;
+  onAnamnezaOtvorena?: () => void;
 }) {
   const [hladam, setHladam] = useState("");
   const [novy, setNovy] = useState(false);
@@ -154,6 +157,16 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
    * horšia než žiadna — vyzerá ako niečo, čo sa práve stalo tomuto.
    */
   useEffect(() => { if (meno) setChyba(""); }, [meno]);
+
+  /**
+   * Príchod z karty Anamnéza v kope — otvor rovno tú záložku.
+   * Bez toho by človek pristál na zdraví a musel prepínať sám.
+   */
+  useEffect(() => {
+    if (!otvorAnamnezu || normName(otvorAnamnezu) !== normName(meno)) return;
+    setFilter("anamneza");
+    onAnamnezaOtvorena?.();
+  }, [otvorAnamnezu, meno, onAnamnezaOtvorena]);
 
   /**
    * Kam bol zoznam odrolovaný, keď z neho človek odišiel do profilu.

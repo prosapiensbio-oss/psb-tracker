@@ -1,11 +1,12 @@
-import { oznam } from "../../lib/psb/obnovaSignal";
+import { oznam, pocuvaj } from "../../lib/psb/obnovaSignal";
+import { doSchranky } from "../../lib/psb/kopirovanie";
 import { podlaKlienta, type PodlaKlienta } from "../../lib/psb/sporneKonanie";
 import { nazovProduktu } from "../../lib/psb/nazvyProduktov";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { navrhniKlientaKandidati, type ClientAgg } from "../../lib/psb/compute";
 import { krokGesta, krokSvihu, novyStavGesta, novyStavSvihu, zacniSvih } from "../../lib/psb/gestoKariet";
-import { BEZ_FRONTY, klucPolozky, popisZmeny, postavKarty, trenerZPrihlasenia, type Karta, type NeznamyNazov, type NepriradenaPlatba, type Zmena } from "../../lib/psb/workspaceKarty";
+import { BEZ_FRONTY, klucPolozky, popisZmeny, postavKarty, trenerZPrihlasenia, type ChybaAnamneza, type Karta, type NeznamyNazov, type NepriradenaPlatba, type Zmena } from "../../lib/psb/workspaceKarty";
 import { bezAktivnehoBalicka, treningyZObochZdrojov, vMinuseKlienta, type BezBalicka } from "../../lib/psb/bezBalicka";
 import { dlznici as spocitajDlznikov, type Dlznik } from "../../lib/psb/dlznici";
 import { zostavaPoPlatnosti, type ZostavaPoPlatnosti } from "../../lib/psb/platnostZostatok";
@@ -73,6 +74,10 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   // Otvorený klient prežije prepnutie karty, nie odchod zo záložky — viď
   // `menoZvonku` v KlientStol.
   const [klientNaStole, setKlientNaStole] = useState("");
+  /** Kto čaká na anamnézu. Vlastný fetch — obsah odpovedí sa sem neťahá. */
+  const [anamnezy, setAnamnezy] = useState<ChybaAnamneza[]>([]);
+  /** Klient, ktorého anamnézu má karta Klient otvoriť rovno. */
+  const [anamnezaPre, setAnamnezaPre] = useState<string | null>(null);
   /** Pohyb, ktorý sa práve delí medzi viacerých klientov, a jeho diely. */
   const [delim, setDelim] = useState("");
   const [diely, setDiely] = useState<{ klient: string; suma: string }[]>([]);
@@ -85,6 +90,8 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
    */
   const [ktoreVeci, setKtoreVeci] = useState<"auto" | "Jerry" | "Terezka" | "vsetko">("auto");
   const [chyba, setChyba] = useState("");
+  /** Krátke potvrdenie po skopírovaní odkazu — zmizne samo. */
+  const [hlaska, setHlaska] = useState("");
   /**
    * Rozpracovaná faktúra. Príde buď z karty klienta (ponuka po nahodení
    * balíčka), alebo zvonka z Prechodu — v oboch prípadoch treba prepnúť na
@@ -168,6 +175,16 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
     );
   }, [data.poplatky, balicky, vlastnePlatby, clients]);
 
+  const nacitajAnamnezy = useCallback(async () => {
+    const r = await fetch("/api/anamneza?zoznam=1", { credentials: "same-origin" })
+      .then((x) => x.json()).catch(() => null) as { ok?: boolean; polozky?: ChybaAnamneza[] } | null;
+    setAnamnezy(r?.ok ? (r.polozky || []) : []);
+  }, []);
+  useEffect(() => { void nacitajAnamnezy(); }, [nacitajAnamnezy]);
+  // Zápis anamnézy zmizne z kopy až po obnovení zoznamu — signál chodí
+  // z panela na karte klienta.
+  useEffect(() => pocuvaj("klienti", () => { void nacitajAnamnezy(); }), [nacitajAnamnezy]);
+
   /** Komu končí platnosť a zostávajú hodiny — to isté, čo hlási notifikácia. */
   const platnost = useMemo(() => zostavaPoPlatnosti(Object.values(clients)), [clients]);
 
@@ -178,6 +195,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
       bezBalicka,
       dlznici: dlzniciRiadky,
       platnost,
+      anamnezy,
       ktoSom,
       trener: ktoreVeci === "auto" ? undefined : ktoreVeci === "vsetko" ? null : ktoreVeci,
       navrhMena: (nazov) => {
@@ -185,7 +203,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
         return v.typ === "uvodny" ? (v.kandidati[0] || v.meno) : (v.kandidati.length === 1 ? v.kandidati[0] : "");
       },
     });
-  }, [zdroje, clients, ktoSom, ktoreVeci, bezBalicka, dlzniciRiadky, platnost]);
+  }, [zdroje, clients, ktoSom, ktoreVeci, bezBalicka, dlzniciRiadky, platnost, anamnezy]);
 
   // Karta, v ktorej už nič nezostalo, z kopy zmizne — ale až po tom, čo sa
   // v nej naozaj odklikalo; inak by zmizla pod rukami uprostred práce.
@@ -205,6 +223,14 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
     const idx = zive.findIndex((x) => x.druh === "klient");
     if (idx >= 0) setI(idx);
   }, [otvorKlienta, vypisPredvolba, zive]);
+
+  /** „Vyplniť" v karte Anamnéza otvorí stôl klienta rovno na jej záložke. */
+  useEffect(() => {
+    if (!anamnezaPre) return;
+    setKlientNaStole(anamnezaPre);
+    const idx = zive.findIndex((x) => x.druh === "klient");
+    if (idx >= 0) setI(idx);
+  }, [anamnezaPre, zive]);
 
   /** Faktúra vypýtaná odinakiaľ (Prechod → balíčky) otvorí kartu Faktúry. */
   useEffect(() => {
@@ -610,6 +636,53 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                   onPredvolbaSpracovana={() => setPredvolbaFaktury(null)}
                 />
               )}
+              {/* ANAMNÉZA — pred úvodným sa posiela odkaz, po ňom sa píše zápis.
+                  Je to tá istá vec o týždeň neskôr, preto jedna karta. */}
+              {k.druh === "anamneza" && k.polozky.map((a) => {
+                const den = a.uvodny.slice(0, 10);
+                const kedy = `${Number(den.slice(8))}. ${Number(den.slice(5, 7))}.`;
+                return (
+                  <div key={a.klient} style={{ padding: "11px 0", borderBottom: `1px solid ${mix(C.border, 45)}` }}>
+                    <div style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
+                      <b style={{ fontSize: 14 }}>{a.klient}</b>
+                      <span style={{ fontSize: 11.5, color: a.uzBol ? C.orange : C.textDim }}>
+                        úvodný {a.uzBol ? "bol" : "bude"} {kedy} · {a.trener}
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 11.5, color: a.klientVyplnilAt ? C.green : C.textMuted, marginTop: 3 }}>
+                      {a.klientVyplnilAt
+                        ? "Klient vyplnil — zostáva zápis z tréningu."
+                        : a.odkaz ? "Odkaz je vyrobený, klient zatiaľ nevyplnil." : "Odkaz ešte nemá."}
+                    </div>
+                    <div style={{ display: "flex", gap: 7, marginTop: 8, flexWrap: "wrap" }}>
+                      {!a.klientVyplnilAt && (
+                        <button
+                          onClick={() => void (async () => {
+                            let url = a.odkaz;
+                            if (!url) {
+                              const r = await fetch("/api/anamneza", {
+                                method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+                                body: JSON.stringify({ akcia: "odkaz", klient: a.klient }),
+                              }).then((x) => x.json()).catch(() => null) as { ok?: boolean; odkaz?: string } | null;
+                              if (!r?.ok || !r.odkaz) { setChyba("Odkaz sa nepodarilo vyrobiť."); return; }
+                              url = r.odkaz;
+                              await nacitajAnamnezy();
+                            }
+                            const ok = await doSchranky(url);
+                            setChyba(ok ? "" : "Skopíruj odkaz ručne — schránka odmietla.");
+                            if (ok) { setHlaska(`Odkaz pre ${a.klient} je v schránke.`); setTimeout(() => setHlaska(""), 2500); }
+                          })()}
+                          style={{ ...tlacidloKarty, borderColor: mix(C.green, 45), color: C.green }}
+                        >{a.odkaz ? "Kopírovať odkaz" : "Vyrobiť odkaz"}</button>
+                      )}
+                      <button
+                        onClick={() => setAnamnezaPre(a.klient)}
+                        style={{ ...tlacidloKarty, borderColor: mix(C.accent, 45), color: C.accentLight }}
+                      >Vyplniť anamnézu</button>
+                    </div>
+                  </div>
+                );
+              })}
               {k.druh === "zmeny" && k.polozky.map((z) => {
                 const kluc = klucPolozky("zmeny", z);
                 if (hotove.has(kluc)) return null;
@@ -697,7 +770,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                 );
               })}
 
-              {k.druh === "klient" && <KlientStol clients={clients} mena={mena} data={data} kalUdalosti={kalUdalosti} btcSats={btcSats} btc={btc} onOverride={onOverride} otvorKlienta={vypisPredvolba || otvorKlienta} onOtvoreny={onOtvoreny} onFaktura={setPredvolbaFaktury} otvorVypis={vypisPredvolba} onVypisOtvoreny={onVypisPredvolbaSpracovana} menoZvonku={klientNaStole} setMenoZvonku={setKlientNaStole} />}
+              {k.druh === "klient" && <KlientStol clients={clients} mena={mena} data={data} kalUdalosti={kalUdalosti} btcSats={btcSats} btc={btc} onOverride={onOverride} otvorKlienta={vypisPredvolba || otvorKlienta} onOtvoreny={onOtvoreny} onFaktura={setPredvolbaFaktury} otvorVypis={vypisPredvolba} onVypisOtvoreny={onVypisPredvolbaSpracovana} menoZvonku={klientNaStole} setMenoZvonku={setKlientNaStole} otvorAnamnezu={anamnezaPre} onAnamnezaOtvorena={() => setAnamnezaPre(null)} />}
 
               {k.druh === "platby" && (() => {
                 const pripravene = davkaPlatieb(k.polozky);
@@ -944,6 +1017,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
             </div>
             <datalist id="ws-klienti">{mena.map((m) => <option key={m} value={m} />)}</datalist>
             {chyba && <div style={{ fontSize: 12, color: C.red, marginTop: 10 }}>{chyba}</div>}
+            {hlaska && <div style={{ fontSize: 12, color: C.green, marginTop: 10 }}>{hlaska}</div>}
           </Card>
         </div>
       </div>
@@ -1065,3 +1139,8 @@ const bocnaSipka = (strana: "left" | "right", aktivna: boolean, uzke = false) =>
   opacity: aktivna ? 1 : 0.35,
 });
 
+/** Tlačidlo v položke karty — rovnaké všade, nech kopa nevyzerá zlepená. */
+const tlacidloKarty = {
+  padding: "5px 11px", borderRadius: 7, fontSize: 12, cursor: "pointer", fontFamily: "inherit",
+  border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted,
+} as const;
