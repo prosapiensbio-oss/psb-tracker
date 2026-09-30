@@ -367,11 +367,31 @@ export function AnamnezaPanel({ meno }: { meno: string }) {
   );
 }
 
+/**
+ * Šírka políčok na písanie.
+ *
+ * Jerry, 30. 9. 2026: „tie okná na písanie daj o polovicu menšie."
+ * Boli na celú šírku stĺpca (680 px) a dve zbytočné veci robili naraz:
+ * riadok textu sa tiahol cez celé okno, takže sa horšie čítal, a prázdne
+ * pole vyzeralo ako veľa práce. Polovica stačí — a dlhý text sa aj tak
+ * zmestí, lebo výška políčka rastie s obsahom.
+ */
+const SIRKA_PISANIA = 340;
+/** Voľné pole začína nízko a rastie s textom. Strop, aby sekcia neušla. */
+const MAX_VYSKA = 190;
+
 /** Ovládanie jednej otázky. Veľké natoľko, aby sa dalo trafiť bez pozerania. */
 function Pole({ o, hodnota, prve, onZmen }: { o: Otazka; hodnota: unknown; prve: boolean; onZmen: (v: unknown) => void }) {
   const vstup = {
-    padding: "10px 12px", borderRadius: 9, fontSize: 14.5, fontFamily: "inherit",
+    padding: "9px 11px", borderRadius: 9, fontSize: 14, fontFamily: "inherit",
     border: `1px solid ${C.border}`, background: C.bg, color: C.text, boxSizing: "border-box" as const,
+  };
+
+  /** Prispôsobí výšku obsahu — bez toho by nízke pole dlhý text orezalo. */
+  const rast = (el: HTMLTextAreaElement | null) => {
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, MAX_VYSKA)}px`;
   };
 
   if (o.typ === "oblasti") {
@@ -436,12 +456,13 @@ function Pole({ o, hodnota, prve, onZmen }: { o: Otazka; hodnota: unknown; prve:
   if (o.typ === "dlhy") {
     return (
       <textarea
+        ref={rast}
         value={String(hodnota ?? "")}
-        onChange={(e) => onZmen(e.target.value)}
-        rows={3}
+        onChange={(e) => { rast(e.target); onZmen(e.target.value); }}
+        rows={2}
         autoFocus={prve}
         placeholder="píš…"
-        style={{ ...vstup, width: "100%", resize: "vertical", lineHeight: 1.6 }}
+        style={{ ...vstup, width: "100%", maxWidth: SIRKA_PISANIA, resize: "vertical", lineHeight: 1.55, overflow: "hidden" }}
       />
     );
   }
@@ -452,7 +473,7 @@ function Pole({ o, hodnota, prve, onZmen }: { o: Otazka; hodnota: unknown; prve:
       value={String(hodnota ?? "")}
       onChange={(e) => onZmen(o.typ === "cislo" ? (e.target.value === "" ? "" : Number(e.target.value)) : e.target.value)}
       autoFocus={prve}
-      style={{ ...vstup, width: o.typ === "cislo" ? 120 : "100%", colorScheme: "dark" }}
+      style={{ ...vstup, width: o.typ === "cislo" ? 90 : "100%", maxWidth: SIRKA_PISANIA, colorScheme: "dark" }}
     />
   );
 }
