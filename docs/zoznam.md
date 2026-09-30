@@ -48,9 +48,10 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
   z odpovedí klienta, testu postury a Dopytov.
 - [x] **Šifrovanie** zdravotných odpovedí (`ANAMNEZA_KLUC`); súhlas
   zámerne nešifrovaný.
-- [ ] **Editor formulára** pre Jerryho — sekcie, otázky, možnosti, poradie,
-  vetvenie. Tabuľka `anamneza_formular` (verzované znenie) čaká prázdna;
-  kým je prázdna, platí definícia z `anamnezaFormular.ts`.
+- [x] **Karta Anamnéza v kope** + „+ Zápis → Nový klient" už nevedie do
+  Google Forms, ale na ňu.
+- [~] **Editor formulára** — Jerry 30. 9. zrušil („editor nechaj tak").
+  Tabuľka `anamneza_formular` zostáva pripravená, keby sa to vrátilo.
 - [ ] **Kartotéka fotiek** — fotky držania tela z úvodného + poznámka.
   Potrebuje R2 bucket (účet ho zatiaľ nemá); do D1 nepatria.
 - [ ] **Import 56 starých anamnéz** k existujúcim klientom aj s pôvodným
