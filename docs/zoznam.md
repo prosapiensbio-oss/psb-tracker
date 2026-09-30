@@ -38,29 +38,24 @@ Rozhodnuté 29. 9. 2026. PTminder je odvtedy kontrola.
 
 ## 0c · Anamnéza v Kokpite (Jerry, 30. 9. 2026)
 
-Jerry: „už sú tam maily, mená atď. a podľa mňa by sme zvládli spraviť nejaké
-základné zabezpečenie pre tie údaje" — anamnéza (dnes Google Forms, 34 otázok,
-6 sekcií) sa má presunúť do Kokpitu a z nej sa má rovno zakladať profil
-klienta s vyplnenými dátami.
+Presťahovaná z Google Forms. Návrh, podľa ktorého sa stavala:
+https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
 
-- [ ] **Zdravotné údaje sú osobitná kategória GDPR** — obsah odpovedí šifrovaný
-  (kľúč ako Worker secret), mimo Jarvisa aj mimo kontrolných skriptov; meno,
-  mail, telefón zostávajú čitateľné ako dnes. Súhlas výslovne pomenuje
-  ZDRAVOTNÉ údaje (dnešné „zpracování osobních údajů" na to nestačí).
-- [ ] **Editor formulára** ako Google Forms: sekcie, typy otázok (text, dlhý
-  text, jedna z možností, viac možností, škála, dátum, číslo), povinné pole,
-  vetvenie na Áno/Nie. Verzia formulára sa drží — staré odpovede sa nesmú
-  rozsypať pri úprave otázok.
-- [ ] **Predvyplnenie z Kokpitu**: dnešný dátum, deň úvodného, meno, priezvisko,
-  mail, telefón, narodeniny, „ako sa o nás dozvedeli" (zdroj z Dopytov).
-- [ ] **Dve cesty vyplnenia**: klient doma cez odkaz (ako /v/<token>) + spolu
-  pri úvodnom; trénerská časť (čo Jerry videl a nameral) je oddelená.
-- [ ] **Súhlasy** s preklikom na web (obchodné podmienky, spracovanie údajov,
-  newsletter zvlášť) + uložený dátum a verzia dokumentu.
-- [ ] Revízia otázok (odovzdaná 30. 9.): chýbajú červené vlajky
-  (lieky, vyžarovanie do končatín, závraty, nočná bolesť, zákaz od lekára),
-  spánok, „kde to bolí"; cieľ ako checkbox bez priority; Áno/Nie otázky sú
-  v Google Forms omylom checkboxy; preklepy a mix SK/CZ.
+- [x] **Klientska časť** `/a/<token>` — tri otázky, vetvenie podľa „Co vás
+  k nám přivádí", oblasti so stupnicou ku každej, červené vlajky, súhlasy
+  blokujúce odoslanie. Overené naostro na AATestovi.
+- [x] **Zápis trénera** na karte klienta (záložka anamnéza), predvyplnený
+  z odpovedí klienta, testu postury a Dopytov.
+- [x] **Šifrovanie** zdravotných odpovedí (`ANAMNEZA_KLUC`); súhlas
+  zámerne nešifrovaný.
+- [ ] **Editor formulára** pre Jerryho — sekcie, otázky, možnosti, poradie,
+  vetvenie. Tabuľka `anamneza_formular` (verzované znenie) čaká prázdna;
+  kým je prázdna, platí definícia z `anamnezaFormular.ts`.
+- [ ] **Kartotéka fotiek** — fotky držania tela z úvodného + poznámka.
+  Potrebuje R2 bucket (účet ho zatiaľ nemá); do D1 nepatria.
+- [ ] **Import 56 starých anamnéz** k existujúcim klientom aj s pôvodným
+  dátumom (Jerry odklepol 30. 9.).
+- [ ] Zmazať skúšobnú anamnézu AATestu pri upratovaní testovacích dát.
 
 ## 0b · Ostatné otvorené z 29. 9.
 
