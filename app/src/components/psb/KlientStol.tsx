@@ -4,6 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 
 import { dlhKlienta } from "../../lib/psb/dlhKlienta";
 import { VypisHodinPanel } from "./VypisHodinPanel";
+import { AnamnezaPanel } from "./AnamnezaPanel";
 import { cas24, hod, priebehBalickov, type StavRiadku } from "../../lib/psb/vypisHodin";
 import { normName, fmtCZK, fmtDMY, denVTyzdni } from "../../lib/psb/format";
 import { jeBeta } from "../../lib/psb/beta";
@@ -112,7 +113,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
   const [menoVnutri, setMenoVnutri] = useState("");
   const meno = menoZvonku ?? menoVnutri;
   const setMeno = setMenoZvonku ?? setMenoVnutri;
-  const [filter, setFilter] = useState<"zdravie" | "vsetko" | "peniaze" | "balicky" | "poznamky">("zdravie");
+  const [filter, setFilter] = useState<"zdravie" | "vsetko" | "peniaze" | "balicky" | "anamneza" | "poznamky">("zdravie");
   const [detaily, setDetaily] = useState(false);
   const [pisemPlatbu, setPisemPlatbu] = useState(false);
   /** Deň, ktorého tréning sa práve označuje ako zdarma (píše sa k nemu dôvod). */
@@ -1103,7 +1104,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
             {/* „Tréningy" a „Odkiaľ prišiel" sú preč (Jerry, 23. 9. 2026):
                 prvé bolo to isté, čo „všetko" bez dvoch riadkov, druhé sa
                 pozerá raz za život a kradlo miesto tomu, čo sa rieši denne. */}
-            {([["zdravie", "zdravie"], ["vsetko", "všetko"], ["peniaze", "peniaze"], ["balicky", "balíčky"], ["poznamky", "poznámky"]] as const).map(([id, l]) => (
+            {([["zdravie", "zdravie"], ["vsetko", "všetko"], ["peniaze", "peniaze"], ["balicky", "balíčky"], ["anamneza", "anamnéza"], ["poznamky", "poznámky"]] as const).map(([id, l]) => (
               <button key={id} onClick={() => setFilter(id)} style={prepinac(filter === id)}>{l}</button>
             ))}
           </div>
@@ -1526,6 +1527,8 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
               cenaBalicka={[...mojeBalicky].find((b) => (b.cena_czk || 0) > 0)?.cena_czk || 0}
             />
           )}
+
+          {filter === "anamneza" && <AnamnezaPanel meno={meno} />}
 
           {filter === "poznamky" && (
             <>

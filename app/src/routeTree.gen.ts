@@ -77,7 +77,9 @@ import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as ApiBtcReserveRouteImport } from './routes/api/btc-reserve'
 import { Route as ApiBalickyRouteImport } from './routes/api/balicky'
 import { Route as ApiAnomalyRouteImport } from './routes/api/anomaly'
+import { Route as ApiAnamnezaRouteImport } from './routes/api/anamneza'
 import { Route as ApiAlgoRouteImport } from './routes/api/algo'
+import { Route as ATokenRouteImport } from './routes/a.$token'
 
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
@@ -419,9 +421,19 @@ const ApiAnomalyRoute = ApiAnomalyRouteImport.update({
   path: '/api/anomaly',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAnamnezaRoute = ApiAnamnezaRouteImport.update({
+  id: '/api/anamneza',
+  path: '/api/anamneza',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiAlgoRoute = ApiAlgoRouteImport.update({
   id: '/api/algo',
   path: '/api/algo',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ATokenRoute = ATokenRouteImport.update({
+  id: '/a/$token',
+  path: '/a/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -431,7 +443,9 @@ export interface FileRoutesByFullPath {
   '/navrhy-titulky': typeof NavrhyTitulkyRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/a/$token': typeof ATokenRoute
   '/api/algo': typeof ApiAlgoRoute
+  '/api/anamneza': typeof ApiAnamnezaRoute
   '/api/anomaly': typeof ApiAnomalyRoute
   '/api/balicky': typeof ApiBalickyRoute
   '/api/btc-reserve': typeof ApiBtcReserveRoute
@@ -502,7 +516,9 @@ export interface FileRoutesByTo {
   '/navrhy-titulky': typeof NavrhyTitulkyRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/a/$token': typeof ATokenRoute
   '/api/algo': typeof ApiAlgoRoute
+  '/api/anamneza': typeof ApiAnamnezaRoute
   '/api/anomaly': typeof ApiAnomalyRoute
   '/api/balicky': typeof ApiBalickyRoute
   '/api/btc-reserve': typeof ApiBtcReserveRoute
@@ -574,7 +590,9 @@ export interface FileRoutesById {
   '/navrhy-titulky': typeof NavrhyTitulkyRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/a/$token': typeof ATokenRoute
   '/api/algo': typeof ApiAlgoRoute
+  '/api/anamneza': typeof ApiAnamnezaRoute
   '/api/anomaly': typeof ApiAnomalyRoute
   '/api/balicky': typeof ApiBalickyRoute
   '/api/btc-reserve': typeof ApiBtcReserveRoute
@@ -647,7 +665,9 @@ export interface FileRouteTypes {
     | '/navrhy-titulky'
     | '/robots.txt'
     | '/sitemap.xml'
+    | '/a/$token'
     | '/api/algo'
+    | '/api/anamneza'
     | '/api/anomaly'
     | '/api/balicky'
     | '/api/btc-reserve'
@@ -718,7 +738,9 @@ export interface FileRouteTypes {
     | '/navrhy-titulky'
     | '/robots.txt'
     | '/sitemap.xml'
+    | '/a/$token'
     | '/api/algo'
+    | '/api/anamneza'
     | '/api/anomaly'
     | '/api/balicky'
     | '/api/btc-reserve'
@@ -789,7 +811,9 @@ export interface FileRouteTypes {
     | '/navrhy-titulky'
     | '/robots.txt'
     | '/sitemap.xml'
+    | '/a/$token'
     | '/api/algo'
+    | '/api/anamneza'
     | '/api/anomaly'
     | '/api/balicky'
     | '/api/btc-reserve'
@@ -861,7 +885,9 @@ export interface RootRouteChildren {
   NavrhyTitulkyRoute: typeof NavrhyTitulkyRoute
   RobotsDottxtRoute: typeof RobotsDottxtRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  ATokenRoute: typeof ATokenRoute
   ApiAlgoRoute: typeof ApiAlgoRoute
+  ApiAnamnezaRoute: typeof ApiAnamnezaRoute
   ApiAnomalyRoute: typeof ApiAnomalyRoute
   ApiBalickyRoute: typeof ApiBalickyRoute
   ApiBtcReserveRoute: typeof ApiBtcReserveRoute
@@ -1405,11 +1431,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAnomalyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/anamneza': {
+      id: '/api/anamneza'
+      path: '/api/anamneza'
+      fullPath: '/api/anamneza'
+      preLoaderRoute: typeof ApiAnamnezaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/algo': {
       id: '/api/algo'
       path: '/api/algo'
       fullPath: '/api/algo'
       preLoaderRoute: typeof ApiAlgoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/a/$token': {
+      id: '/a/$token'
+      path: '/a/$token'
+      fullPath: '/a/$token'
+      preLoaderRoute: typeof ATokenRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -1421,7 +1461,9 @@ const rootRouteChildren: RootRouteChildren = {
   NavrhyTitulkyRoute: NavrhyTitulkyRoute,
   RobotsDottxtRoute: RobotsDottxtRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
+  ATokenRoute: ATokenRoute,
   ApiAlgoRoute: ApiAlgoRoute,
+  ApiAnamnezaRoute: ApiAnamnezaRoute,
   ApiAnomalyRoute: ApiAnomalyRoute,
   ApiBalickyRoute: ApiBalickyRoute,
   ApiBtcReserveRoute: ApiBtcReserveRoute,
