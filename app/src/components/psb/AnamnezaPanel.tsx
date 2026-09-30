@@ -74,6 +74,8 @@ export function AnamnezaPanel({ meno }: { meno: string }) {
   const [hlaska, setHlaska] = useState("");
   const [chyba, setChyba] = useState("");
   const [skopirovane, setSkopirovane] = useState(false);
+  /** Pôvodná anamnéza z Google Forms — otvára sa cez rebrík, na čítanie. */
+  const [archivOtvoreny, setArchivOtvoreny] = useState(false);
   /**
    * Kým sa políčok nikto nedotkol, draft zrkadlí prichádzajúce dáta — inak
    * by neskorší fetch prepísal rozpísaný zápis (pravidlo z 29. 8. 2026).
@@ -179,6 +181,14 @@ export function AnamnezaPanel({ meno }: { meno: string }) {
   const vsetky = sekcie.flatMap((x) => x.otazky);
   const vyplnenych = vsetky.filter((o) => maOdpoved(o, odp[o.id])).length;
 
+  /**
+   * Pôvodná anamnéza z Google Forms, keď sa k tomuto klientovi preniesla.
+   * Otázky, ktoré dnešný formulár nemá („ochotní obetovať", stará ponuka
+   * cieľov, intenzita bolesti bez miesta), sa nemapovali — ležia tu.
+   * Bez tejto obrazovky by boli v databáze a nikde inde.
+   */
+  const archiv = odp._archiv as { kedy: string; polozky: [string, string][] } | undefined;
+
   return (
     <div style={{ display: "flex", gap: 18, minHeight: 470, height: "100%" }}>
 
@@ -188,11 +198,11 @@ export function AnamnezaPanel({ meno }: { meno: string }) {
           {sekcie.map((x, idx) => {
             const hotovych = x.otazky.filter((o) => maOdpoved(o, odp[o.id])).length;
             const cela = hotovych === x.otazky.length;
-            const jeTu = !koniec && idx === i;
+            const jeTu = !koniec && !archivOtvoreny && idx === i;
             return (
               <button
                 key={x.s.id}
-                onClick={() => chod(idx)}
+                onClick={() => { setArchivOtvoreny(false); chod(idx); }}
                 style={{
                   display: "flex", alignItems: "center", gap: 9, padding: "8px 8px", borderRadius: 8,
                   border: "none", background: jeTu ? mix(C.accent, 14) : "transparent",
@@ -212,12 +222,27 @@ export function AnamnezaPanel({ meno }: { meno: string }) {
               </button>
             );
           })}
+          {archiv && (
+            <button
+              onClick={() => setArchivOtvoreny((x) => !x)}
+              style={{
+                display: "flex", alignItems: "center", gap: 9, padding: "8px 8px", borderRadius: 8, marginTop: 4,
+                border: "none", background: archivOtvoreny ? mix(C.accent, 14) : "transparent",
+                color: archivOtvoreny ? C.text : C.textDim, fontSize: 12.5, textAlign: "left",
+                cursor: "pointer", fontFamily: "inherit", width: "100%",
+              }}
+            >
+              <span style={{ width: 17, flexShrink: 0 }} />
+              <span style={{ flexGrow: 1, minWidth: 0 }}>Pôvodná z Google Forms</span>
+              <span style={{ fontSize: 10, color: C.textDim }}>{archiv.polozky.length}</span>
+            </button>
+          )}
           <button
-            onClick={() => chod(sekcie.length)}
+            onClick={() => { setArchivOtvoreny(false); chod(sekcie.length); }}
             style={{
               display: "flex", alignItems: "center", gap: 9, padding: "8px 8px", borderRadius: 8, marginTop: 4,
-              border: "none", background: koniec ? mix(C.accent, 14) : "transparent",
-              color: koniec ? C.text : C.textDim, fontSize: 12.5, textAlign: "left",
+              border: "none", background: koniec && !archivOtvoreny ? mix(C.accent, 14) : "transparent",
+              color: koniec && !archivOtvoreny ? C.text : C.textDim, fontSize: 12.5, textAlign: "left",
               cursor: "pointer", fontFamily: "inherit", width: "100%",
             }}
           >
@@ -267,7 +292,28 @@ export function AnamnezaPanel({ meno }: { meno: string }) {
       {/* ── CELÁ SEKCIA NA JEDNO OKNO ── */}
       <div style={{ flexGrow: 1, minWidth: 0, display: "flex", flexDirection: "column", minHeight: 0 }}>
 
-        {koniec ? (
+        {archivOtvoreny && archiv ? (
+          <>
+            <div style={{ paddingBottom: 14, borderBottom: `1px solid ${mix(C.border, 60)}` }}>
+              <div style={{ fontSize: 10.5, letterSpacing: 1.2, textTransform: "uppercase", color: C.textDim }}>
+                Len na čítanie{archiv.kedy ? ` · vyplnené ${denCz(archiv.kedy)}` : ""}
+              </div>
+              <div style={{ fontSize: 25, fontWeight: 700, lineHeight: 1.2, letterSpacing: -0.3, marginTop: 5 }}>Pôvodná anamnéza</div>
+              <div style={{ fontSize: 12.5, color: C.textMuted, marginTop: 6, lineHeight: 1.6, maxWidth: "62ch" }}>
+                Otázky zo starého formulára v Google Forms, ktoré dnešná anamnéza nemá — preto sa neprepísali do polí vyššie.
+                Zvyšok odpovedí je rozpísaný v sekciách.
+              </div>
+            </div>
+            <div ref={telo} style={{ flexGrow: 1, minHeight: 0, overflowY: "auto", paddingTop: 14 }}>
+              {archiv.polozky.map(([otazka, odpoved]) => (
+                <div key={otazka} style={{ display: "flex", gap: 14, alignItems: "baseline", padding: "7px 0", borderBottom: `1px solid ${mix(C.border, 40)}` }}>
+                  <span style={{ width: 210, flexShrink: 0, fontSize: 11.5, color: C.textDim, lineHeight: 1.45 }}>{otazka}</span>
+                  <span style={{ flexGrow: 1, minWidth: 0, fontSize: 13, color: C.text, lineHeight: 1.55 }}>{odpoved}</span>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : koniec ? (
           <>
             <div style={{ paddingBottom: 14, borderBottom: `1px solid ${mix(C.border, 60)}` }}>
               <div style={{ fontSize: 23, fontWeight: 700, letterSpacing: -0.3 }}>Prejdené. Skontroluj a ulož.</div>

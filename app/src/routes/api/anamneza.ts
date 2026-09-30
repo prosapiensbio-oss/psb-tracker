@@ -5,6 +5,8 @@ import { bindings } from "../../lib/bindings.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { FORMULAR } from "../../lib/psb/anamnezaFormular";
 import { podlaKlienta, predvyplnZapisu, ulozZapis, zalozAleboNajdi } from "../../lib/psb/anamneza.server";
+import { prevezmi, type StaryRiadok } from "../../lib/psb/anamnezaImport";
+import { zasifruj } from "../../lib/psb/sifra.server";
 
 /**
  * ANAMNÉZA — strana trénera.
@@ -151,6 +153,70 @@ export const Route = createFileRoute("/api/anamneza")({
         try { b = (await request.json()) as Record<string, unknown>; }
         catch { return Response.json({ ok: false, error: "bad_request" }, { status: 400 }); }
         const kto = (await currentUser(request)) || "";
+        /**
+         * IMPORT STARÝCH ANAMNÉZ Z GOOGLE FORMS.
+         *
+         * Beží tadiaľto, a nie skriptom z príkazového riadka, z jediného
+         * dôvodu: šifrovací kľúč je Worker secret a mimo workera k nemu
+         * nikto nemá prístup — ani ja. Zdravotné odpovede sa tým pádom
+         * zašifrujú na tom istom mieste, kde vznikajú aj bežné zápisy.
+         *
+         * Klienta určuje VOLAJÚCI (párovanie mena a mailu je spravené
+         * a ukázané mimo appky); server ho len overí. Hádať by sa tu
+         * nesmelo: zle priradená anamnéza je cudzí zdravotný záznam na
+         * karte klienta, a to sa spätne nedá poznať.
+         *
+         * NIKDY NEPREPÍŠE HOTOVÝ ZÁPIS. Opakované spustenie preto nič
+         * nepokazí — druhýkrát sa riadok preskočí.
+         */
+        if (b.akcia === "import-stary") {
+          /**
+           * Dva tvary dávky, lebo hlavička exportu má cez dva kilobajty.
+           * Pri päťdesiatich riadkoch by sa poslala päťdesiatkrát; s `hlavicka`
+           * ide raz a riadok nesie len hodnoty v tom istom poradí.
+           */
+          const hlavicka = (Array.isArray(b.hlavicka) ? b.hlavicka : []) as string[];
+          const riadky = ((Array.isArray(b.riadky) ? b.riadky : []) as { klient: string; data?: StaryRiadok; h?: string[] }[])
+            .map((r) => ({
+              klient: r.klient,
+              data: r.data || Object.fromEntries((r.h || []).map((v, idx) => [hlavicka[idx] || `#${idx}`, v])),
+            }));
+          if (!riadky.length) return Response.json({ ok: false, error: "Prázdna dávka." }, { status: 400 });
+
+          const vysledky: { klient: string; stav: string }[] = [];
+          for (const r of riadky) {
+            const klientR = kus(r.klient, 120);
+            if (!klientR) { vysledky.push({ klient: "?", stav: "bez mena" }); continue; }
+
+            const jeKlient = await DB.prepare(
+              "SELECT 1 x FROM sessions WHERE client_name = ?1 LIMIT 1",
+            ).bind(klientR).first<{ x: number }>();
+            if (!jeKlient) { vysledky.push({ klient: klientR, stav: "klient v Kokpite nie je" }); continue; }
+
+            const uz = await DB.prepare("SELECT zapis_at FROM anamnezy WHERE klient = ?1").bind(klientR).first<{ zapis_at: string | null }>();
+            if (uz?.zapis_at) { vysledky.push({ klient: klientR, stav: "preskočené — zápis už má" }); continue; }
+
+            const v = prevezmi(r.data || {});
+            if (!Object.keys(v.odpovede).length) { vysledky.push({ klient: klientR, stav: "prázdny riadok" }); continue; }
+
+            const a = await zalozAleboNajdi(DB, klientR, ANAMNEZA_KLUC, kto);
+            const sifra = await zasifruj(JSON.stringify(v.odpovede), ANAMNEZA_KLUC);
+            await DB.prepare(
+              `UPDATE anamnezy SET zapis_json = ?1, zapis_at = ?2, stav = 'hotova',
+                      suhlasy_json = COALESCE(suhlasy_json, ?3)
+                WHERE klient = ?4`,
+            ).bind(sifra, v.kedy || new Date().toISOString(), v.suhlasy ? JSON.stringify(v.suhlasy) : null, klientR).run();
+            vysledky.push({ klient: klientR, stav: `prevzaté · ${a.token ? "" : ""}${(v.kedy || "").slice(0, 10)}` });
+          }
+
+          await audit(DB, {
+            action: "anamnezy-import",
+            predmet: `${vysledky.filter((x) => x.stav.startsWith("prevzaté")).length} z ${riadky.length} z Google Forms`,
+            actor: kto,
+          });
+          return Response.json({ ok: true, vysledky });
+        }
+
         const klient = kus(b.klient, 120);
         if (!klient) return Response.json({ ok: false, error: "Chýba klient." }, { status: 400 });
 
