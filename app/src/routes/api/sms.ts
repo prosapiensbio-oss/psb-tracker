@@ -84,6 +84,28 @@ export const Route = createFileRoute("/api/sms")({
           return Response.json({ ok: true });
         }
 
+        /**
+         * ODKAZ NA STRÁNKU KLIENTA (/v/<token>) — do SMS.
+         *
+         * Token je na klienta JEDEN a nemení sa: klient si odkaz môže uložiť
+         * a bude mu platiť. Zneplatnenie = zmazať riadok v klient_odkazy.
+         */
+        if (b.akcia === "odkaz") {
+          const klient = kus(b.klient, 120);
+          if (!klient) return Response.json({ ok: false, error: "Chýba klient." }, { status: 400 });
+          let riadok = await DB.prepare("SELECT token FROM klient_odkazy WHERE klient = ?1").bind(klient).first<{ token: string }>();
+          if (!riadok) {
+            // Bez 0/O/I/l/1 — token sa občas prepisuje ručne z telefónu.
+            const abeceda = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+            const nahodne = crypto.getRandomValues(new Uint8Array(12));
+            const token = [...nahodne].map((x) => abeceda[x % abeceda.length]).join("");
+            await DB.prepare("INSERT INTO klient_odkazy (token, klient, vytvorene) VALUES (?1, ?2, ?3)")
+              .bind(token, klient, new Date().toISOString()).run();
+            riadok = { token };
+          }
+          return Response.json({ ok: true, url: `${new URL(request.url).origin}/v/${riadok.token}` });
+        }
+
         const klient = kus(b.klient, 120);
         const text = String(b.text ?? "").slice(0, 600).trim();
         const cislo = cisloPreBranu(kus(b.telefon, 40));

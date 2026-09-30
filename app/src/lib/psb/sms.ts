@@ -81,7 +81,27 @@ export type SpravaProKlienta = {
   sMailom: boolean;
   /** Bol tréning DNES? Bez toho sa SMS na dnešok neodvoláva. */
   dnesnyTrening?: boolean;
+  /** Rod klienta — „mal si" verzus „mala si". */
+  rod?: "m" | "z";
+  /** Odkaz na stránku s tréningmi a platbou — keď je, prebije vetu o maili. */
+  odkaz?: string;
 };
+
+/** SMS ide bez diakritiky — jediný mäkčeň prepne správu na 70 znakov. */
+export const bezDiakritiky = (t: string): string => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+/**
+ * Rod z mena — HEURISTIKA, nie pravda. Ženu prezradí priezvisko na -ová/-á,
+ * inak krstné meno na -a/-e (Hana, Lucie). „Nikita" či „Saša" to pomýli,
+ * preto je v SMS paneli prepínač a text sa dá vždy prepísať rukou.
+ */
+export function rodZMena(meno: string): "m" | "z" {
+  const casti = String(meno || "").trim().split(/\s+/);
+  const priezvisko = (casti[casti.length - 1] || "").toLowerCase();
+  if (/(ova|ová|á)$/.test(priezvisko)) return "z";
+  const krstne = (casti[0] || "").toLowerCase();
+  return /[ae]$/.test(bezDiakritiky(krstne)) ? "z" : "m";
+}
 
 /**
  * Predvolený text. Jerry ho pred odoslaním vidí a môže prepísať —
@@ -109,15 +129,22 @@ export function textSms(v: SpravaProKlienta): string {
    */
   const navyse = v.zostatok < 0 ? -v.zostatok : 0;
   const hodin = (n: number) => `${n} ${n === 1 ? "hodinu" : n < 5 ? "hodiny" : "hodín"}`;
+  // „mal si" / „mala si" — jediné miesto, kde rod mení tvar.
+  const mal = v.rod === "z" ? "mala" : "mal";
   const uvod = navyse
-    ? `${v.oslovenie}, ${v.dnesnyTrening ? "dnešným tréningom máš" : "máš"} ${hodin(navyse)} nad rámec balíčka.`
+    ? `Ahoj ${v.oslovenie}, ${v.dnesnyTrening ? "dnešným tréningom máš" : "máš"} ${hodin(navyse)} nad rámec balíčka.`
     : v.zostatok === 0
       ? v.dnesnyTrening
-        ? `${v.oslovenie}, dnes si mal poslednú hodinu z balíčka.`
-        : `${v.oslovenie}, balíček máš dochodený.`
-      : `${v.oslovenie}, v balíčku ti ${zostavaHodin(v.zostatok)}.`;
-  const kam = v.sMailom ? " V maili nájdeš dochádzku aj QR na platbu." : "";
-  return `${uvod}${kam} ${v.trener}, ProSapiens`;
+        ? `Ahoj ${v.oslovenie}, dnes si ${mal} poslednú hodinu z balíčka.`
+        : `Ahoj ${v.oslovenie}, balíček máš dochodený.`
+      : `Ahoj ${v.oslovenie}, v balíčku ti ${zostavaHodin(v.zostatok)}.`;
+  // Odkaz prebíja vetu o maili: klik je bližšie než hľadanie v schránke.
+  const kam = v.odkaz
+    ? ` Tréningy a platba: ${v.odkaz}`
+    : v.sMailom ? " V maili nájdeš dochádzku aj QR na platbu." : "";
+  // Bez diakritiky sa celá veta aj s odkazom zmestí do JEDNEJ správy;
+  // s mäkčeňmi by to boli tri. Klientom SMS bez diakritiky chodia bežne.
+  return bezDiakritiky(`${uvod}${kam} ${v.trener}, ProSapiens`);
 }
 
 /**

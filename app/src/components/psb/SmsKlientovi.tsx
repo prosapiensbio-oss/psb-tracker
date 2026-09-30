@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-import { dlzkaSpravy, textSms } from "../../lib/psb/sms";
+import { dlzkaSpravy, rodZMena, textSms } from "../../lib/psb/sms";
 import { C, mix } from "../../lib/psb/theme";
 
 /**
@@ -65,14 +65,36 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
   const [bezi, setBezi] = useState(false);
   const [hlaska, setHlaska] = useState("");
   const [hotovo, setHotovo] = useState(false);
+  /** Rod klienta — heuristika z mena, prepínač M/Ž ju opraví. */
+  const [rod, setRod] = useState<"m" | "z">("m");
+  /** Odkaz na /v/<token> — stránka s tréningmi a QR na platbu. */
+  const [odkaz, setOdkaz] = useState("");
   const nacitane = useRef(false);
 
   useEffect(() => {
     if (!otvorene || nacitane.current) return;
     nacitane.current = true;
+    setRod(rodZMena(meno));
     void kontakty().then((u) => setTelefon(String(u.find((x) => x.klient === meno)?.telefon || "")));
-    setText(predvolenyText || textSms({ oslovenie: meno.split(" ")[0], trener, zostatok, sMailom, dnesnyTrening }));
-  }, [otvorene, meno, trener, zostatok, sMailom, dnesnyTrening, predvolenyText]);
+    // Odkaz sa pýta serveru (token na klienta je jeden); text sa preskladá,
+    // keď dorazí — preto je v druhom effecte nižšie.
+    if (!predvolenyText) {
+      void fetch("/api/sms", {
+        method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ akcia: "odkaz", klient: meno }),
+      }).then((x) => x.json()).then((j: { ok?: boolean; url?: string }) => { if (j?.ok && j.url) setOdkaz(j.url); }).catch(() => null);
+    }
+  }, [otvorene, meno, predvolenyText]);
+
+  /**
+   * Predvolený text sa skladá znova pri zmene rodu aj po príchode odkazu.
+   * Prepíše aj rozpísaný text — prepínač rodu je vedomé „presklad mi to";
+   * odkaz dorazí do sekundy od otvorenia, skôr než sa dá čokoľvek napísať.
+   */
+  useEffect(() => {
+    if (!otvorene) return;
+    setText(predvolenyText || textSms({ oslovenie: meno.split(" ")[0], trener, zostatok, sMailom, dnesnyTrening, rod, odkaz: odkaz || undefined }));
+  }, [otvorene, meno, trener, zostatok, sMailom, dnesnyTrening, predvolenyText, rod, odkaz]);
 
   const posli = async () => {
     setBezi(true); setHlaska("");
@@ -115,6 +137,25 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
         </div>
       ) : (
         <>
+          {/* Rod mení „mal si" na „mala si". Heuristika z mena sa mýli
+              (Saša, Nikita), preto prepínač — a preskladá celý text. */}
+          {!predvolenyText && (
+            <div style={{ display: "flex", gap: 4, alignItems: "center", marginBottom: 5 }}>
+              {([["m", "on"], ["z", "ona"]] as const).map(([r, l]) => (
+                <button
+                  key={r}
+                  onClick={() => setRod(r)}
+                  style={{
+                    padding: "2px 9px", borderRadius: 6, fontSize: 10.5, cursor: "pointer", fontFamily: "inherit",
+                    border: `1px solid ${rod === r ? mix(C.accent, 55) : C.border}`,
+                    background: rod === r ? mix(C.accent, 14) : "transparent",
+                    color: rod === r ? C.accentLight : C.textDim, fontWeight: rod === r ? 700 : 400,
+                  }}
+                >{l}</button>
+              ))}
+              {odkaz && <span style={{ fontSize: 10.5, color: C.textDim }}>· odkaz na tréningy a platbu je v texte</span>}
+            </div>
+          )}
           <textarea
             value={text} onChange={(e) => setText(e.target.value)} rows={3}
             style={{ width: "100%", boxSizing: "border-box", background: C.bg, color: C.text, border: `1px solid ${C.border}`, borderRadius: 6, padding: "5px 7px", fontSize: 12, fontFamily: "inherit", resize: "vertical" }}

@@ -14,6 +14,7 @@ import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
 import { Route as NavrhyTitulkyRouteImport } from './routes/navrhy-titulky'
 import { Route as NatacaciListRouteImport } from './routes/natacaci-list'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as VTokenRouteImport } from './routes/v.$token'
 import { Route as AssetsSplatRouteImport } from './routes/assets/$'
 import { Route as ApiZositRouteImport } from './routes/api/zosit'
 import { Route as ApiWishlistRouteImport } from './routes/api/wishlist'
@@ -101,6 +102,11 @@ const NatacaciListRoute = NatacaciListRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VTokenRoute = VTokenRouteImport.update({
+  id: '/v/$token',
+  path: '/v/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AssetsSplatRoute = AssetsSplatRouteImport.update({
@@ -488,6 +494,7 @@ export interface FileRoutesByFullPath {
   '/api/wishlist': typeof ApiWishlistRoute
   '/api/zosit': typeof ApiZositRoute
   '/assets/$': typeof AssetsSplatRoute
+  '/v/$token': typeof VTokenRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -558,6 +565,7 @@ export interface FileRoutesByTo {
   '/api/wishlist': typeof ApiWishlistRoute
   '/api/zosit': typeof ApiZositRoute
   '/assets/$': typeof AssetsSplatRoute
+  '/v/$token': typeof VTokenRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -629,6 +637,7 @@ export interface FileRoutesById {
   '/api/wishlist': typeof ApiWishlistRoute
   '/api/zosit': typeof ApiZositRoute
   '/assets/$': typeof AssetsSplatRoute
+  '/v/$token': typeof VTokenRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -701,6 +710,7 @@ export interface FileRouteTypes {
     | '/api/wishlist'
     | '/api/zosit'
     | '/assets/$'
+    | '/v/$token'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -771,6 +781,7 @@ export interface FileRouteTypes {
     | '/api/wishlist'
     | '/api/zosit'
     | '/assets/$'
+    | '/v/$token'
   id:
     | '__root__'
     | '/'
@@ -841,6 +852,7 @@ export interface FileRouteTypes {
     | '/api/wishlist'
     | '/api/zosit'
     | '/assets/$'
+    | '/v/$token'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -912,6 +924,7 @@ export interface RootRouteChildren {
   ApiWishlistRoute: typeof ApiWishlistRoute
   ApiZositRoute: typeof ApiZositRoute
   AssetsSplatRoute: typeof AssetsSplatRoute
+  VTokenRoute: typeof VTokenRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -949,6 +962,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/v/$token': {
+      id: '/v/$token'
+      path: '/v/$token'
+      fullPath: '/v/$token'
+      preLoaderRoute: typeof VTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/assets/$': {
@@ -1464,6 +1484,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiWishlistRoute: ApiWishlistRoute,
   ApiZositRoute: ApiZositRoute,
   AssetsSplatRoute: AssetsSplatRoute,
+  VTokenRoute: VTokenRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

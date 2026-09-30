@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { chybaOdosielatela, cisloPreBranu, dlzkaSpravy, textSms } from "./sms";
+import { chybaOdosielatela, cisloPreBranu, dlzkaSpravy, rodZMena, textSms } from "./sms";
 
 describe("cisloPreBranu", () => {
   it("české číslo bez predvoľby dostane +420", () => {
@@ -52,20 +52,51 @@ describe("dlzkaSpravy", () => {
 });
 
 describe("textSms", () => {
-  it("keď balíček došiel, povie to hneď", () => {
+  it("keď balíček došiel, povie to hneď — a bez diakritiky za JEDNU správu", () => {
     const t = textSms({ oslovenie: "Richard", trener: "Jerry", zostatok: 0, sMailom: true, dnesnyTrening: true });
-    expect(t).toBe("Richard, dnes si mal poslednú hodinu z balíčka. V maili nájdeš dochádzku aj QR na platbu. Jerry, ProSapiens");
-    // Dve správy — s diakritikou sa inak nedá.
-    expect(dlzkaSpravy(t).sprav).toBe(2);
+    // SMS ide bez diakritiky: jediný mäkčeň by limit zrazil zo 160 na 70
+    // znakov a z jednej správy by boli dve (Jerry, 30. 9. 2026).
+    expect(t).toBe("Ahoj Richard, dnes si mal poslednu hodinu z balicka. V maili najdes dochadzku aj QR na platbu. Jerry, ProSapiens");
+    expect(dlzkaSpravy(t).sprav).toBe(1);
+  });
+
+  it("žene píše „mala si“", () => {
+    const t = textSms({ oslovenie: "Hana", trener: "Jerry", zostatok: 0, sMailom: false, dnesnyTrening: true, rod: "z" });
+    expect(t).toContain("dnes si mala poslednu hodinu");
   });
 
   it("keď hodiny ešte sú, povie koľko", () => {
     expect(textSms({ oslovenie: "Eva", trener: "Terezka", zostatok: 2, sMailom: false }))
-      .toBe("Eva, v balíčku ti zostávajú 2 h. Terezka, ProSapiens");
+      .toBe("Ahoj Eva, v balicku ti zostavaju 2 h. Terezka, ProSapiens");
   });
 
   it("bez mailu sa naň neodkazuje", () => {
     expect(textSms({ oslovenie: "Eva", trener: "Jerry", zostatok: 0, sMailom: false })).not.toContain("maili");
+  });
+
+  it("odkaz prebije vetu o maili a vojde sa do jednej správy", () => {
+    const t = textSms({
+      oslovenie: "Eva", trener: "Jerry", zostatok: 0, sMailom: true, dnesnyTrening: true, rod: "z",
+      odkaz: "https://kokpit.prosapiensbio.workers.dev/v/Ab3xK9mQ2r",
+    });
+    expect(t).toContain("Treningy a platba: https://");
+    expect(t).not.toContain("maili");
+    expect(dlzkaSpravy(t).sprav).toBe(1);
+  });
+});
+
+describe("rodZMena — heuristika, prepínač ju opraví", () => {
+  it("priezvisko na -ová je žena", () => {
+    expect(rodZMena("Hana Marková")).toBe("z");
+    expect(rodZMena("Monika Schonwalderova")).toBe("z");
+  });
+  it("Lucie aj Naďa sú ženy podľa krstného mena", () => {
+    expect(rodZMena("Lucie Podolova")).toBe("z");
+    expect(rodZMena("Naďa Khamaziuk")).toBe("z");
+  });
+  it("muž zostáva mužom", () => {
+    expect(rodZMena("Peter Gažo")).toBe("m");
+    expect(rodZMena("Tomaš Krčmar")).toBe("m");
   });
 });
 
@@ -98,15 +129,15 @@ describe("textSms podľa skutočnosti", () => {
 
   it("mínus hodiny povie ako mínus, nie ako „posledná hodina“", () => {
     expect(textSms({ ...z, zostatok: -2, dnesnyTrening: true }))
-      .toBe("Vítězslave, dnešným tréningom máš 2 hodiny nad rámec balíčka. Jerry, ProSapiens");
+      .toBe("Ahoj Vitezslave, dnesnym treningom mas 2 hodiny nad ramec balicka. Jerry, ProSapiens");
   });
 
   it("jedna hodina navyše sa skloňuje", () => {
-    expect(textSms({ ...z, zostatok: -1 })).toContain("máš 1 hodinu nad rámec balíčka");
+    expect(textSms({ ...z, zostatok: -1 })).toContain("mas 1 hodinu nad ramec balicka");
   });
 
   it("presná nula je posledná hodina — ale len keď bola dnes", () => {
-    expect(textSms({ ...z, zostatok: 0, dnesnyTrening: true })).toContain("dnes si mal poslednú hodinu");
-    expect(textSms({ ...z, zostatok: 0 })).toContain("balíček máš dochodený");
+    expect(textSms({ ...z, zostatok: 0, dnesnyTrening: true })).toContain("dnes si mal poslednu hodinu");
+    expect(textSms({ ...z, zostatok: 0 })).toContain("balicek mas dochodeny");
   });
 });

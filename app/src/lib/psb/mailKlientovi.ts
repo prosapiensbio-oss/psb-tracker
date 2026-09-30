@@ -124,6 +124,9 @@ export type VypisKlienta = {
   /** `cid` obrázkov — vkladá ich odosielateľ. */
   qrCid?: string;
   logoCid?: string;
+  /** Namiesto cid: — pre verejnú stránku /v/<token>, kde prílohy nie sú. */
+  qrUrl?: string;
+  logoUrl?: string;
 };
 
 const esc = (s: string) =>
@@ -321,8 +324,8 @@ export function mailKlientovi(v: VypisKlienta): { predmet: string; text: string;
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="540" style="max-width:540px;width:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif">
 
   <tr><td align="center" style="padding-bottom:24px">
-    ${v.logoCid
-    ? `<img src="cid:${esc(v.logoCid)}" width="200" alt="ProSapiens Biomechanic" style="display:block;border:0">`
+    ${v.logoCid || v.logoUrl
+    ? `<img src="${v.logoCid ? `cid:${esc(v.logoCid)}` : esc(v.logoUrl || "")}" width="200" alt="ProSapiens Biomechanic" style="display:block;border:0">`
     : `<div style="font-size:11px;letter-spacing:3px;text-transform:uppercase;color:${F.slaba}">ProSapiens Biomechanic</div>`}
   </td></tr>
 
@@ -353,11 +356,11 @@ export function mailKlientovi(v: VypisKlienta): { predmet: string; text: string;
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:${F.platba};border-radius:14px">
       <tr>
         <td style="padding:20px 22px;font-size:14px;color:${F.platbaText};line-height:1.7">
-          Ďalší ${esc(v.platba.popis.toLowerCase())}<br><b style="font-size:24px">${czk(v.platba.suma)}</b><br>
+          ${esc(v.platba.popis)}<br><b style="font-size:24px">${czk(v.platba.suma)}</b><br>
           <span style="color:${F.platbaSlaba}">${esc(v.platba.ucet)}<br>do poznámky: ${esc(v.platba.sprava)}</span>
         </td>
-        ${v.qrCid ? `<td width="128" style="padding:20px 22px 20px 0;text-align:right">
-          <img src="cid:${esc(v.qrCid)}" width="110" height="110" alt="QR platba" style="display:block;background:#fff;padding:5px;border-radius:8px;margin-left:auto;border:0">
+        ${v.qrCid || v.qrUrl ? `<td width="128" style="padding:20px 22px 20px 0;text-align:right">
+          <img src="${v.qrCid ? `cid:${esc(v.qrCid)}` : esc(v.qrUrl || "")}" width="110" height="110" alt="QR platba" style="display:block;background:#fff;padding:5px;border-radius:8px;margin-left:auto;border:0">
         </td>` : ""}
       </tr>
     </table>
