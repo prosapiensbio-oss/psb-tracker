@@ -1843,6 +1843,9 @@ mali pevný stĺpec vedľa obsahu a na 375 px zostalo na obsah sto pixelov:
   okraj týždňa; a čísla nad mriežkou („37 tréningov · 37 h") aj výška
   mriežky sa počítajú z TOHO, ČO JE NA OBRAZOVKE, nie z týždňa — inak
   obrazovka ukazuje jeden deň a tvrdí súčet za sedem.
+  Pri JEDNOM dni je nad mriežkou pás dní s počtom tréningov — prepínanie
+  v rámci týždňa bez šípok. Šípky zostávajú vedľa neho, lebo nimi sa dá
+  prejsť aj do susedného týždňa, kam pás nedočiahne.
 
 Hranica je JEDNA: `useUzke()` v `components/psb/useUzke.ts` (640 px). Vlastná
 kópia s inou hranicou znamená na jednej obrazovke dva rôzne telefóny.
