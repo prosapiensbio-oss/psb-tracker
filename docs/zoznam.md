@@ -36,6 +36,32 @@ Rozhodnuté 29. 9. 2026. PTminder je odvtedy kontrola.
 - [ ] **Os času a „dnes"** — os počíta celý dnešný deň, nové sedenia len to,
   čo začalo. ±1 h do konca dňa.
 
+## 0c · Anamnéza v Kokpite (Jerry, 30. 9. 2026)
+
+Jerry: „už sú tam maily, mená atď. a podľa mňa by sme zvládli spraviť nejaké
+základné zabezpečenie pre tie údaje" — anamnéza (dnes Google Forms, 34 otázok,
+6 sekcií) sa má presunúť do Kokpitu a z nej sa má rovno zakladať profil
+klienta s vyplnenými dátami.
+
+- [ ] **Zdravotné údaje sú osobitná kategória GDPR** — obsah odpovedí šifrovaný
+  (kľúč ako Worker secret), mimo Jarvisa aj mimo kontrolných skriptov; meno,
+  mail, telefón zostávajú čitateľné ako dnes. Súhlas výslovne pomenuje
+  ZDRAVOTNÉ údaje (dnešné „zpracování osobních údajů" na to nestačí).
+- [ ] **Editor formulára** ako Google Forms: sekcie, typy otázok (text, dlhý
+  text, jedna z možností, viac možností, škála, dátum, číslo), povinné pole,
+  vetvenie na Áno/Nie. Verzia formulára sa drží — staré odpovede sa nesmú
+  rozsypať pri úprave otázok.
+- [ ] **Predvyplnenie z Kokpitu**: dnešný dátum, deň úvodného, meno, priezvisko,
+  mail, telefón, narodeniny, „ako sa o nás dozvedeli" (zdroj z Dopytov).
+- [ ] **Dve cesty vyplnenia**: klient doma cez odkaz (ako /v/<token>) + spolu
+  pri úvodnom; trénerská časť (čo Jerry videl a nameral) je oddelená.
+- [ ] **Súhlasy** s preklikom na web (obchodné podmienky, spracovanie údajov,
+  newsletter zvlášť) + uložený dátum a verzia dokumentu.
+- [ ] Revízia otázok (odovzdaná 30. 9.): chýbajú červené vlajky
+  (lieky, vyžarovanie do končatín, závraty, nočná bolesť, zákaz od lekára),
+  spánok, „kde to bolí"; cieľ ako checkbox bez priority; Áno/Nie otázky sú
+  v Google Forms omylom checkboxy; preklepy a mix SK/CZ.
+
 ## 0b · Ostatné otvorené z 29. 9.
 
 - [x] Nedeľná pripomienka — zrušená (Jerry: stačí karta „Balíček dojde" na dashboarde).
