@@ -1836,6 +1836,13 @@ mali pevný stĺpec vedľa obsahu a na 375 px zostalo na obsah sto pixelov:
   sám v hodine → „Monika Č.", pri prekryve (22 px) → iniciály „MČ" na jeden
   riadok. Pôvodné lámanie `overflowWrap: anywhere` z „Anna Nová" spravilo
   „An / na / No / vá"; dve písmená na riadok nie sú meno.
+  **Prepínač Týždeň / 3 dni / Deň** (Jerry, 30. 9. 2026) drží voľbu
+  v `localStorage`. Dve veci, ktoré k nemu patria a nesmú sa zabudnúť:
+  šípky posúvajú o TOĽKO, KOĽKO JE VIDNO (skok o týždeň by pri troch dňoch
+  preskočil štyri dni, o ktorých sa človek nedozvie) a prechádzajú cez
+  okraj týždňa; a čísla nad mriežkou („37 tréningov · 37 h") aj výška
+  mriežky sa počítajú z TOHO, ČO JE NA OBRAZOVKE, nie z týždňa — inak
+  obrazovka ukazuje jeden deň a tvrdí súčet za sedem.
 
 Hranica je JEDNA: `useUzke()` v `components/psb/useUzke.ts` (640 px). Vlastná
 kópia s inou hranicou znamená na jednej obrazovke dva rôzne telefóny.
@@ -1846,6 +1853,14 @@ sa stĺpce poskladajú pod seba, nerolovalo NIČ a spodok profilu sa nedal
 dosiahnuť (Jerry, 30. 9. 2026: „v profile klienta sa mi nedá scrolovať").
 Na telefóne preto roluje CELÁ karta a os času vnútri nej nie — vnorené
 rolovanie sa prstom trafiť nedá.
+
+**Okno nad obsahom nesmie byť priesvitné — `C.surface`, nie `C.bg`.** Okno
+udalosti v kalendári malo `background: C.bg`; pod sklenenými paletami je to
+priesvitná plocha a na telefóne, kde okno stojí nad mriežkou, sa cezeň čítali
+mená tréningov (Jerry, 30. 9. 2026: „je to priesvitné, na tom telefóne je to
+okno nečitateľné"). `C.surface` je práve tá nepriehľadná plocha a komentár nad
+ňou v `theme.ts` to hovorí doslova: sklo funguje nad plochou, nie nad textom.
+Platí to pre každý modál, pripnutý riadok a plávajúce okno.
 
 **Pri tom istom pohľade sa našlo, že hodiny v rovnakom čase sa kreslili JEDNA
 NA DRUHEJ** — všetky mali `left: 2, right: 2`. Rieši to `rozlozUdalosti`

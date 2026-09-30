@@ -1253,26 +1253,43 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
    */
   const uzke = useUzke();
 
+  /**
+   * Koľko dní je naraz na obrazovke (Jerry, 30. 9. 2026: „sprav mi v tom
+   * kalendári prepínač na týždeň, 3 dni a 1 deň"). Voľba sa pamätá — inak by
+   * si ju na telefóne vyberal pri každom otvorení.
+   */
+  const [rozsah, setRozsah] = useState<7 | 3 | 1>(() => {
+    try {
+      const x = Number(localStorage.getItem("psb-kalendar-rozsah"));
+      return x === 1 || x === 3 ? x : 7;
+    } catch { return 7; }
+  });
+  const dnesVTyzdni = (new Date().getDay() + 6) % 7;
+  const [zac, setZac] = useState(() => dnesVTyzdni);
+
   const vTyzdni = udalosti.filter((u) => dni.includes(u.zaciatok.slice(0, 10)));
   const minuty = (s: string) => Number(s.slice(11, 13)) * 60 + Number(s.slice(14, 16));
   const p2 = (n: number) => String(n).padStart(2, "0");
 
-  // Rozsah podľa skutočných hodín, s hodinou rezervy na oboch koncoch.
-  // Označená hodina rozsah rozširuje — ťahom ani vpísaným časom nesmie
-  // vyjsť z mriežky do neviditeľna.
-  const viditelne = dni;
+  const zaciatok = Math.max(0, Math.min(7 - rozsah, zac));
+  const viditelne = rozsah === 7 ? dni : dni.slice(zaciatok, zaciatok + rozsah);
   const POCET = viditelne.length;
+  /** Čísla nad mriežkou aj výška mriežky hovoria o TOM, ČO JE VIDNO — nie o týždni. */
+  const vZobrazeni = vTyzdni.filter((u) => viditelne.includes(u.zaciatok.slice(0, 10)));
   /** Pás hodín a medzery — na telefóne užšie, aby na stĺpce zostalo viac. */
   const PAS = uzke ? 22 : 42;
   const GAP = uzke ? 1 : 3;
 
-  const vyberMin = vyber && dni.includes(vyber.den) ? Number(vyber.cas.slice(0, 2)) * 60 + Number(vyber.cas.slice(3, 5)) : null;
+  // Rozsah podľa skutočných hodín, s hodinou rezervy na oboch koncoch.
+  // Označená hodina rozsah rozširuje — ťahom ani vpísaným časom nesmie
+  // vyjsť z mriežky do neviditeľna.
+  const vyberMin = vyber && viditelne.includes(vyber.den) ? Number(vyber.cas.slice(0, 2)) * 60 + Number(vyber.cas.slice(3, 5)) : null;
   const od = Math.min(
-    vTyzdni.length ? Math.max(0, Math.floor(Math.min(...vTyzdni.map((u) => minuty(u.zaciatok))) / 60) - 1) : 7,
+    vZobrazeni.length ? Math.max(0, Math.floor(Math.min(...vZobrazeni.map((u) => minuty(u.zaciatok))) / 60) - 1) : 7,
     vyberMin == null ? 24 : Math.floor(vyberMin / 60),
   );
   const doH = Math.max(
-    vTyzdni.length ? Math.min(24, Math.ceil(Math.max(...vTyzdni.map((u) => minuty(u.koniec))) / 60) + 1) : 20,
+    vZobrazeni.length ? Math.min(24, Math.ceil(Math.max(...vZobrazeni.map((u) => minuty(u.koniec))) / 60) + 1) : 20,
     vyberMin == null ? 0 : Math.min(24, Math.ceil((vyberMin + (vyber?.minut || 60)) / 60)),
   );
   const hodin = Math.max(1, doH - od);
@@ -1281,7 +1298,7 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
   const dnesIso = new Date().toISOString().slice(0, 10);
   const DNI_SK = ["Po", "Ut", "St", "Št", "Pi", "So", "Ne"];
 
-  const trening = vTyzdni.filter((u) => u.typ !== "sukromne" && u.typ !== "netrening");
+  const trening = vZobrazeni.filter((u) => u.typ !== "sukromne" && u.typ !== "netrening");
   const hodinSpolu = trening.reduce((a, u) => a + (minuty(u.koniec) - minuty(u.zaciatok)) / 60, 0);
 
   // Farba nesie typ, nie meno — rovnako, ako si Jerry farbí Google Kalendár.
@@ -1292,6 +1309,46 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
           : u.trener === "Terezka" ? C.blue : C.accent;
 
   const popisTyzdna = `${pondelok.getDate()}. ${pondelok.getMonth() + 1}. – ${new Date(pondelok.getTime() + 6 * 86400000).getDate()}. ${new Date(pondelok.getTime() + 6 * 86400000).getMonth() + 1}.`;
+
+  /** Popis toho, čo je vidno — pri jednom dni je to deň, nie týždeň. */
+  const denPopis = (iso: string) => `${Number(iso.slice(8, 10))}. ${Number(iso.slice(5, 7))}.`;
+  const popisRozsahu = rozsah === 7
+    ? (posun === 0 ? "tento týždeň" : popisTyzdna)
+    : rozsah === 1
+      ? `${DNI_SK[dni.indexOf(viditelne[0])]} ${denPopis(viditelne[0])}`
+      : `${denPopis(viditelne[0])} – ${denPopis(viditelne[viditelne.length - 1])}`;
+
+  /**
+   * Šípky posúvajú o toľko, koľko je vidno. Pri troch dňoch by skok o celý
+   * týždeň preskočil štyri dni, o ktorých by sa človek nedozvedel.
+   * Cez okraj týždňa sa prechádza na susedný týždeň — hranica −3 až +2 je
+   * tam, kam siaha stiahnutý kalendár, a platí ďalej.
+   */
+  const naZaciatok = posun <= -3 && zaciatok === 0;
+  const naKonci = posun >= 2 && zaciatok >= 7 - rozsah;
+  const krok = (smer: 1 | -1) => {
+    setVyber(null);
+    if (rozsah === 7) { setPosun(posun + smer); return; }
+    const novy = zaciatok + smer * rozsah;
+    if (novy < 0) {
+      if (posun <= -3) return;
+      setPosun(posun - 1);
+      setZac(7 - rozsah);
+    } else if (novy > 7 - rozsah) {
+      if (posun >= 2) return;
+      setPosun(posun + 1);
+      setZac(0);
+    } else setZac(novy);
+  };
+
+  const prepniRozsah = (r: 7 | 3 | 1) => {
+    setRozsah(r);
+    setVyber(null);
+    // Nový rozsah sa otvára tam, kde je dnešok — ak je tento týždeň na
+    // obrazovke. Inak od pondelka.
+    setZac(Math.max(0, Math.min(7 - r, posun === 0 ? dnesVTyzdni : 0)));
+    try { localStorage.setItem("psb-kalendar-rozsah", String(r)); } catch { /* súkromné okno */ }
+  };
 
   /**
    * ŤAHANIE PO MRIEŽKE.
@@ -1370,18 +1427,30 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
         </H3>
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           <TrenerPills value={trener} onChange={onTrener} />
+          <div style={{ display: "flex", gap: 3 }}>
+            {([[7, "Týždeň"], [3, "3 dni"], [1, "Deň"]] as [7 | 3 | 1, string][]).map(([r, l]) => (
+              <button key={r} onClick={() => prepniRozsah(r)} style={{
+                padding: "4px 9px", borderRadius: 7, fontSize: 12, cursor: "pointer", fontFamily: "inherit",
+                border: `1px solid ${rozsah === r ? C.accent : C.border}`,
+                background: rozsah === r ? mix(C.accent, 14) : "transparent",
+                color: rozsah === r ? C.accentLight : C.textMuted,
+                fontWeight: rozsah === r ? 700 : 500,
+              }}>{l}</button>
+            ))}
+          </div>
           {/* Tri týždne dozadu, dva dopredu — presne tam, kam siaha stiahnutý
               kalendár. Ďalej by týždeň zíval prázdnotou, ktorá vyzerá ako
               zrušené tréningy. */}
-          <button onClick={() => setPosun(posun - 1)} disabled={posun <= -3}
-            style={{ padding: "4px 10px", borderRadius: 7, fontSize: 13, cursor: posun <= -3 ? "not-allowed" : "pointer", border: `1px solid ${C.border}`, background: "transparent", color: posun <= -3 ? C.textDim : C.textMuted }}>←</button>
+          <button onClick={() => krok(-1)} disabled={naZaciatok}
+            style={{ padding: "4px 10px", borderRadius: 7, fontSize: 13, cursor: naZaciatok ? "not-allowed" : "pointer", border: `1px solid ${C.border}`, background: "transparent", color: naZaciatok ? C.textDim : C.textMuted }}>←</button>
           <span style={{ fontSize: 12.5, color: C.text, fontWeight: 600, minWidth: 116, textAlign: "center" }}>
-            {posun === 0 ? "tento týždeň" : popisTyzdna}
+            {popisRozsahu}
           </span>
-          <button onClick={() => setPosun(posun + 1)} disabled={posun >= 2}
-            style={{ padding: "4px 10px", borderRadius: 7, fontSize: 13, cursor: posun >= 2 ? "not-allowed" : "pointer", border: `1px solid ${C.border}`, background: "transparent", color: posun >= 2 ? C.textDim : C.textMuted }}>→</button>
-          {posun !== 0 && (
-            <button onClick={() => setPosun(0)} style={{ background: "none", border: "none", color: C.accentLight, fontSize: 12, cursor: "pointer" }}>dnes</button>
+          <button onClick={() => krok(1)} disabled={naKonci}
+            style={{ padding: "4px 10px", borderRadius: 7, fontSize: 13, cursor: naKonci ? "not-allowed" : "pointer", border: `1px solid ${C.border}`, background: "transparent", color: naKonci ? C.textDim : C.textMuted }}>→</button>
+          {(posun !== 0 || (rozsah !== 7 && zaciatok !== Math.max(0, Math.min(7 - rozsah, dnesVTyzdni)))) && (
+            <button onClick={() => { setPosun(0); setZac(Math.max(0, Math.min(7 - rozsah, dnesVTyzdni))); }}
+              style={{ background: "none", border: "none", color: C.accentLight, fontSize: 12, cursor: "pointer" }}>dnes</button>
           )}
         </div>
       </div>
@@ -1390,7 +1459,7 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
         {trening.length} tréningov · {Math.round(hodinSpolu)} h · predbežné
       </div>
 
-      {!vTyzdni.length && (
+      {!vZobrazeni.length && (
         <Empty>
           {trener === "all"
             ? "V tomto týždni zatiaľ nie je nič — klikni na voľný čas a nahoď prvý tréning."
@@ -1659,8 +1728,17 @@ function OknoUdalosti({ vyber, mena, clients, predvolenyTrener, onZmen, onZavri,
       onClick={(e) => e.stopPropagation()}
       style={{
         ...style,
-        background: C.bg, border: `1px solid ${C.border}`, borderRadius: 11,
-        padding: "12px 13px", boxShadow: "0 10px 32px rgba(0,0,0,0.45)",
+        /**
+         * NEPRIEHĽADNÉ. Pod sklenenými paletami je `C.bg` priesvitná a okno
+         * na telefóne stálo nad mriežkou, takže sa cezeň čítali mená
+         * tréningov a políčka sa nedali prečítať vôbec (Jerry, 30. 9. 2026:
+         * „je to priesvitné, na tom telefóne je to okno nečitateľné").
+         * `C.surface` je práve tá plocha, ktorá sa nesmie presvitať — sklo
+         * funguje nad plochou, nie nad textom.
+         */
+        background: C.surface, backdropFilter: "none", WebkitBackdropFilter: "none",
+        border: `1px solid ${C.border}`, borderRadius: 11,
+        padding: "12px 13px", boxShadow: "0 10px 32px rgba(0,0,0,0.55)",
       }}
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8, marginBottom: 8 }}>
