@@ -2064,3 +2064,33 @@ dôvod — a nie len tú istú tému.
   `:checked + span` v `<style>`, teda zase bez skriptu.
 - **Jedno hodnotenie nie je výsledok** a appka to hovorí nahlas. Je to tá istá
   veta ako pri „zostal rok je vernosť, nie zlepšenie".
+
+**Personalizovaná je tým, že sa pýta na JEHO oblasti.** Jerry, 30. 9. 2026:
+„v anamnéze môže človek zakliknúť, ak ho niečo bolí, preto by mala byť tá
+správa personalizovaná a človek by mohol zaškrtávať stále tie svoje
+problémy, ktoré mal na počiatku." Jedno číslo „bolesť" to nevie: klient má
+v anamnéze krk 7 a koleno 3 a po troch mesiacoch sa jedno zlepší a druhé
+nie. Stránka preto číta oblasti z jeho anamnézy (`podlaKlienta`, zápis
+trénera prebíja to, čo odklikol klient) a pýta sa na ne v TOM ISTOM tvare
+`[{oblast, sila}]` a na tej istej stupnici 0–10 — prvá hodnota je tým pádom
+to, čo povedal na úvodnom, a graf má odkiaľ začať. Bez anamnézy sa pýta
+jeden všeobecný riadok; otázka bez anamnézy je lepšia než žiadna.
+
+**Každá oblasť je vlastný rad s vlastným začiatkom.** Klient pridá „koleno"
+až po mesiaci a spoločné „prvé a posledné meranie" by ho porovnávalo s krkom.
+
+**Meno oblasti ide do skrytého políčka, hodnota sa páruje PORADÍM.**
+„hrudní páteř" ani „lokty / zápěstí" sa do názvu poľa dať nedajú.
+
+**Smer je JEDEN pre celú pocitovku: nižšie je lepšie.** Otázka o bežných
+veciach sa preto pýta na ŤAŽKOSŤ, nie na ľahkosť, a stĺpec sa volá
+`tazkost` (migrácia 0090 ho premenovala z `pohyb`). Jerry to rozsekol takto:
+„pokiaľ bude vedľa 1 napísané najlepšie a vedľa 10 najhoršie, každý to
+pochopí." Mal pravdu — dva smery v jednom formulári sú drahšie než jedna
+otázka postavená naopak.
+
+**Posun nie je stupnica, sú to tri možnosti** (vôbec / trochu / veľmi).
+Je to otázka na pocit zo zmeny, nie na stav tela; desať stupňov by z nej
+spravilo meranie, ktorým nie je. A vedľa nej stojí otvorená „Čo sa
+zmenilo?" — to je to, čo sa z čísel nevyčíta, a v profile aj v Jarvisovom
+kontexte sa ukazuje doslovne.

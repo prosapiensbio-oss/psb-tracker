@@ -51,7 +51,7 @@ import { monthLabel, normName, weekKey, weekLabel } from "./format";
 import type { PorovnanieDochadzky } from "./porovnanieDochadzky";
 import type { PSBData } from "./types";
 import { CIEL_MESIACOV, chybaDoCiela } from "./rezerva";
-import { POCITOVKA, zhrnutiePocitov } from "./pocitovka";
+import { zhrnutiePocitov } from "./pocitovka";
 
 const r1 = (n: number) => Math.round(n * 10) / 10;
 const r0 = (n: number) => Math.round(n);
@@ -1148,26 +1148,33 @@ export function buildAiContext(
       const podlaKlienta = new Map<string, typeof odKlientov>();
       for (const m of odKlientov) podlaKlienta.set(m.klient, [...(podlaKlienta.get(m.klient) || []), m]);
 
-      const zhrnutia = [...podlaKlienta.entries()].map(([klient, riadky]) => ({ klient, z: zhrnutiePocitov(riadky) }));
-      const porovnatelni = zhrnutia.filter(({ z }) => Object.keys(z.zmeny).length > 0);
-      const podlaOtazky = Object.fromEntries(POCITOVKA.map((o) => {
-        const s = porovnatelni.map(({ z }) => z.zmeny[o.id]).filter(Boolean) as { lepsieO: number }[];
-        return [o.id, {
-          otazka: o.text,
-          lepsieJe: o.lepsie === "menej" ? "nižšie číslo" : "vyššie číslo",
-          porovnatelnych: s.length,
-          zlepsilo: s.filter((x) => x.lepsieO > 0).length,
-          bezZmeny: s.filter((x) => x.lepsieO === 0).length,
-          zhorsilo: s.filter((x) => x.lepsieO < 0).length,
-        }];
+      const zhrnutia = [...podlaKlienta.entries()].map(([klient, riadky]) => ({
+        klient,
+        z: zhrnutiePocitov(riadky.map((x) => ({
+          datum: x.datum, oblasti: x.oblasti, tazkost: x.tazkost, posun: x.posun, poznamka: x.poznamka,
+        }))),
       }));
+      const sPorovnanim = zhrnutia.filter(({ z }) => z.rady.some((r) => r.body.length > 1));
 
       return {
-        poznamka: "PREČÍTAJ, NEPOČÍTAJ. Pocitovka — tri otázky na stupnici 1–10, ktoré si klepne KLIENT SÁM na svojej verejnej stránke (odkaz mu chodí v SMS). Od 30. 9. 2026; predtým sa nemeralo nič, takže malý počet odpovedí NEZNAMENÁ, že sa ľudia nezlepšujú — znamená, že sa ešte len začalo zbierať. PSB predáva zmenu stavu a toto je JEDINÉ miesto v appke, ktoré ju meria; tržby a dochádzka hovoria o vernosti, nie o výsledku. SMER NIE JE PRI VŠETKÝCH ROVNAKÝ: pri bolesti je lepšie NIŽŠIE číslo, pri zvyšku vyššie — riaď sa poľom „lepsieJe“ a nehádaj. Jeden záznam nie je výsledok; porovnáva sa prvá a posledná odpoveď toho istého človeka na tú istú otázku. Podrobnosti si vytiahni dopytom do klient_merania (WHERE zdroj = 'klient').",
+        poznamka: "PREČÍTAJ, NEPOČÍTAJ. Pocitovka — čo si klient sám klepne na svojej verejnej stránke (odkaz mu chodí v SMS). Pýta sa na TIE ISTÉ oblasti tela, ktoré si označil v anamnéze, na stupnici 0–10, plus jedna otázka na ťažkosť bežných vecí, jedna na pocit zmeny (vôbec / trochu / veľmi) a otvorená „Čo sa zmenilo?“. V CELEJ POCITOVKE JE NIŽŠIE ČÍSLO LEPŠIE — „lepsieO“ je už prepočítané tak, že kladné znamená zlepšenie; NEOTÁČAJ to sám. Beží od 30. 9. 2026, takže malý počet odpovedí NEZNAMENÁ, že sa ľudia nezlepšujú — znamená, že sa ešte len začalo zbierať. PSB predáva zmenu stavu a toto je JEDINÉ miesto v appke, ktoré ju meria; tržby a dochádzka hovoria o vernosti, nie o výsledku. Jeden záznam nie je výsledok. Podrobnosti si vytiahni dopytom do klient_merania (WHERE zdroj = 'klient'), oblasti sú v oblasti_json.",
         odpovedaloKlientov: podlaKlienta.size,
         zaznamovSpolu: odKlientov.length,
-        maAsponDveOdpovede: porovnatelni.length,
-        podlaOtazky,
+        maPorovnanie: sPorovnanim.length,
+        zlepsiloSaAsponVJednom: sPorovnanim.filter(({ z }) => z.rady.some((r) => r.body.length > 1 && r.lepsieO > 0)).length,
+        zhorsiloSaAsponVJednom: sPorovnanim.filter(({ z }) => z.rady.some((r) => r.body.length > 1 && r.lepsieO < 0)).length,
+        klienti: zhrnutia.map(({ klient, z }) => ({
+          klient,
+          poslednyDatum: z.posledne?.datum || null,
+          hodnoteni: z.pocet,
+          rady: z.rady.map((r) => ({
+            co: r.nazov, prva: r.prva, posledna: r.posledna,
+            lepsieO: r.body.length > 1 ? r.lepsieO : null, dni: r.dni,
+          })),
+          citiZmenu: z.posun?.text || null,
+          // Vlastné slová klienta — to je to, čo z čísel nevyčítaš.
+          napisal: z.odkazy.slice(0, 3),
+        })),
       };
     })(),
     odmlcani: (() => {

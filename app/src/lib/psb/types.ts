@@ -247,7 +247,12 @@ export type TreningZdarma = { id: string; klient: string; den: string; dovod: st
  */
 export type MeranieRow = {
   klient: string; datum: string;
-  bolest: number | null; pohyb: number | null; posun: number | null;
+  /** Oblasti z jeho vlastnej anamnézy a sila 0–10 (nižšie je lepšie). */
+  oblasti: { oblast: string; sila: number | null }[];
+  tazkost: number | null;
+  /** 1 vôbec · 2 trochu · 3 veľmi — nie stupnica, tri možnosti. */
+  posun: number | null;
+  poznamka: string;
   zdroj: string;
 };
 

@@ -24,6 +24,7 @@ import {
 } from "./parse";
 import type { ClientOverride, PSBData, SessionRow } from "./types";
 import { EMPTY_DATA } from "./types";
+import { oblastiZJson } from "./pocitovka";
 
 const uid = () => crypto.randomUUID();
 
@@ -80,7 +81,7 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
      * profil klienta aj Jarvisov kontext; dve cesty k jednému číslu sa
      * skôr či neskôr rozídu.
      */
-    DB.prepare("SELECT klient, datum, bolest, pohyb, posun, zdroj FROM klient_merania ORDER BY datum")
+    DB.prepare("SELECT klient, datum, oblasti_json, tazkost, posun, poznamka, zdroj FROM klient_merania ORDER BY datum")
       .all().catch(() => ({ results: [] })),
   ]);
 
@@ -175,9 +176,10 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
     })),
     merania: (merania.results as any[]).map((r) => ({
       klient: String(r.klient), datum: String(r.datum).slice(0, 10),
-      bolest: r.bolest == null ? null : Number(r.bolest),
-      pohyb: r.pohyb == null ? null : Number(r.pohyb),
+      oblasti: oblastiZJson(r.oblasti_json),
+      tazkost: r.tazkost == null ? null : Number(r.tazkost),
       posun: r.posun == null ? null : Number(r.posun),
+      poznamka: String(r.poznamka || ""),
       zdroj: String(r.zdroj || "trener"),
     })),
     /**

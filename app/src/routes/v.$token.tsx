@@ -8,7 +8,8 @@ import { loadData } from "../lib/psb/db.server";
 import { mailKlientovi } from "../lib/psb/mailKlientovi";
 import { osCasuKlienta } from "../lib/psb/klientOsCasu";
 import { blokPocitovky } from "../lib/psb/pocitovkaStranka";
-import { platnaHodnota, type Meranie } from "../lib/psb/pocitovka";
+import { oblastiZJson, platnaHodnota, POSUN, type Meranie, type Oblast } from "../lib/psb/pocitovka";
+import { podlaKlienta } from "../lib/psb/anamneza.server";
 import { qrObrazok } from "../lib/psb/fakturaHtml";
 import { DODAVATEL, spayd } from "../lib/psb/vydanaFaktura";
 
@@ -32,7 +33,7 @@ export const Route = createFileRoute("/v/$token")({
     handlers: {
       GET: async ({ request, params }) => {
         const token = String((params as { token?: string }).token || "");
-        const { DB } = bindings();
+        const { DB, ANAMNEZA_KLUC } = bindings() as { DB?: import("@cloudflare/workers-types").D1Database; ANAMNEZA_KLUC?: string };
         const prec = (text: string, status: number) => new Response(
           `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>ProSapiens</title></head>
 <body style="margin:0;background:#232b1c;color:#f2f0e4;font-family:Arial,Helvetica,sans-serif"><div style="max-width:420px;margin:80px auto;padding:0 20px;text-align:center">
@@ -97,11 +98,31 @@ export const Route = createFileRoute("/v/$token")({
          * istej stránke, na ktorú aj tak klikne z SMS; vlastný odkaz by
          * znamenal druhý token, druhú stránku a druhú vetu v správe.
          */
-        const dnesne = await DB.prepare(
-          "SELECT datum, bolest, pohyb, posun FROM klient_merania WHERE klient = ?1 AND datum = ?2 AND zdroj = 'klient'",
-        ).bind(c.name, dnes).first<Meranie>().catch(() => null);
+        const r0 = await DB.prepare(
+          "SELECT datum, oblasti_json, tazkost, posun, poznamka FROM klient_merania WHERE klient = ?1 AND datum = ?2 AND zdroj = 'klient'",
+        ).bind(c.name, dnes).first<{ datum: string; oblasti_json: string | null; tazkost: number | null; posun: number | null; poznamka: string | null }>().catch(() => null);
+        const dnesne: Meranie | undefined = r0
+          ? { datum: r0.datum, oblasti: oblastiZJson(r0.oblasti_json), tazkost: r0.tazkost, posun: r0.posun, poznamka: r0.poznamka || "" }
+          : undefined;
+
+        /**
+         * Oblasti Z JEHO ANAMNÉZY — to, s čím prišiel. Zápis trénera prebíja
+         * to, čo odklikol klient (tá istá prednosť ako v zhrnutí anamnézy):
+         * na úvodnom sa to prejde spolu a upresní.
+         *
+         * Keď anamnéza nie je alebo sa nedá prečítať, pýta sa jeden
+         * všeobecný riadok — otázka bez anamnézy je lepšia než žiadna.
+         */
+        let oblastiKlienta: string[] = [];
+        if (ANAMNEZA_KLUC) {
+          const a = await podlaKlienta(DB, c.name, ANAMNEZA_KLUC).catch(() => null);
+          const z = a ? (a.zapisOdpovede.oblasti ?? a.klientOdpovede.oblasti) : null;
+          oblastiKlienta = oblastiZJson(z).map((o) => o.oblast);
+        }
+
         const pocity = blokPocitovky({
-          dnesne: dnesne || undefined,
+          oblasti: oblastiKlienta,
+          dnesne,
           vdaka: new URL(request.url).searchParams.get("vdaka") === "1",
         });
 
@@ -147,20 +168,31 @@ export const Route = createFileRoute("/v/$token")({
         if (!r) return new Response("Tento odkaz neplatí.", { status: 404 });
 
         const f = await request.formData();
-        const bolest = platnaHodnota(f.get("bolest"));
-        const pohyb = platnaHodnota(f.get("pohyb"));
-        const posun = platnaHodnota(f.get("posun"));
-        if (bolest == null && pohyb == null && posun == null) return spat(false);
+        // Meno oblasti a jej hodnota sa páruje PORADÍM — „hrudní páteř" ani
+        // „lokty / zápěstí" sa do názvu poľa dať nedajú.
+        const mena = f.getAll("oblast_meno").map((x) => String(x).trim().slice(0, 60)).filter(Boolean);
+        const oblasti: Oblast[] = mena
+          .map((oblast, i) => ({ oblast, sila: platnaHodnota(f.get(`oblast_sila_${i}`)) }))
+          .filter((o) => o.sila != null);
+        const tazkost = platnaHodnota(f.get("tazkost"));
+        const posun = platnaHodnota(f.get("posun"), 1, POSUN.moznosti.length);
+        const poznamka = String(f.get("poznamka") ?? "").trim().slice(0, 1000);
+        if (!oblasti.length && tazkost == null && posun == null && !poznamka) return spat(false);
 
         const dnes = new Date().toISOString().slice(0, 10);
         await DB.prepare(
-          `INSERT INTO klient_merania (id, klient, datum, bolest, pohyb, posun, poznamka, autor, created_at, zdroj)
-           VALUES (?1, ?2, ?3, ?4, ?5, ?6, '', 'klient', ?7, 'klient')
+          `INSERT INTO klient_merania (id, klient, datum, oblasti_json, tazkost, posun, poznamka, autor, created_at, zdroj)
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'klient', ?8, 'klient')
            ON CONFLICT (klient, datum, zdroj) DO UPDATE SET
-             bolest = COALESCE(excluded.bolest, klient_merania.bolest),
-             pohyb  = COALESCE(excluded.pohyb,  klient_merania.pohyb),
-             posun  = COALESCE(excluded.posun,  klient_merania.posun)`,
-        ).bind(`${dnes}-${crypto.randomUUID().slice(0, 8)}`, r.klient, dnes, bolest, pohyb, posun, new Date().toISOString()).run();
+             oblasti_json = COALESCE(excluded.oblasti_json, klient_merania.oblasti_json),
+             tazkost      = COALESCE(excluded.tazkost,      klient_merania.tazkost),
+             posun        = COALESCE(excluded.posun,        klient_merania.posun),
+             poznamka     = CASE WHEN excluded.poznamka = '' THEN klient_merania.poznamka ELSE excluded.poznamka END`,
+        ).bind(
+          `${dnes}-${crypto.randomUUID().slice(0, 8)}`, r.klient, dnes,
+          oblasti.length ? JSON.stringify(oblasti) : null,
+          tazkost, posun, poznamka, new Date().toISOString(),
+        ).run();
 
         return spat(true);
       },

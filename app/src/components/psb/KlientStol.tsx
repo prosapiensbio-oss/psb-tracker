@@ -22,7 +22,7 @@ import { C, mix } from "../../lib/psb/theme";
 import { Dennik } from "./Dennik";
 import { Info } from "./ui";
 import { useUzke } from "./useUzke";
-import { POCITOVKA, zhrnutiePocitov } from "../../lib/psb/pocitovka";
+import { zhrnutiePocitov, type Rad } from "../../lib/psb/pocitovka";
 
 /**
  * Pracovný stôl jedného klienta — vyhľadaj a rob na ňom.
@@ -448,7 +448,9 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
    * číslu sa raz rozídu.
    */
   const pocity = useMemo(
-    () => zhrnutiePocitov((data.merania || []).filter((x) => x.klient === meno && x.zdroj === "klient")),
+    () => zhrnutiePocitov((data.merania || [])
+      .filter((x) => x.klient === meno && x.zdroj === "klient")
+      .map((x) => ({ datum: x.datum, oblasti: x.oblasti, tazkost: x.tazkost, posun: x.posun, poznamka: x.poznamka }))),
     [data.merania, meno],
   );
 
@@ -1034,7 +1036,8 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
           Tržby a dochádzka hovoria o vernosti, nie o výsledku. Odpovedá si
           klient sám na svojej stránke (viď pocitovka.ts), preto to Jerryho
           nestojí ani klik — to bol jediný dôvod, prečo sa meranie 24. 9.
-          2026 zrušilo.
+          2026 zrušilo. Pýta sa na TIE ISTÉ oblasti, ktoré si označil
+          v anamnéze, takže graf má odkiaľ začať.
         */}
         {!!pocity.pocet && (
           <div style={{ padding: "10px 12px", borderRadius: 10, border: `1px solid ${mix(C.border, 110)}` }}>
@@ -1044,25 +1047,43 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
                 {fmtDMY(pocity.posledne?.datum || "")}{pocity.pocet > 1 ? ` · ${pocity.pocet}×` : ""}
               </div>
             </div>
-            {POCITOVKA.map((o) => {
-              const h = pocity.posledne?.[o.id];
-              if (h == null) return null;
-              const zm = pocity.zmeny[o.id];
-              const farba = !zm || zm.lepsieO === 0 ? C.textMuted : zm.lepsieO > 0 ? C.green : C.orange;
+
+            <GrafPocitov rady={pocity.rady} />
+
+            {pocity.rady.map((r, i) => {
+              const farba = !r.body.length || r.body.length < 2 || r.lepsieO === 0
+                ? C.textMuted : r.lepsieO > 0 ? C.green : C.orange;
               return (
-                <div key={o.id} style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 6 }}>
-                  <span style={{ flexGrow: 1, minWidth: 0, fontSize: 12, color: C.textMuted }}>{o.text}</span>
-                  <span style={{ fontSize: 14, fontWeight: 700, color: C.text, fontVariantNumeric: "tabular-nums" }}>{h}</span>
-                  <span style={{ fontSize: 10.5, color: farba, minWidth: 34, textAlign: "right" }}>
-                    {!zm ? "prvé" : zm.lepsieO === 0 ? "=" : `${zm.lepsieO > 0 ? "▲" : "▼"} ${Math.abs(zm.lepsieO)}`}
+                <div key={r.kluc} style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 5 }}>
+                  <span style={{ width: 9, height: 9, borderRadius: 2, background: FARBY_POCITOV[i % FARBY_POCITOV.length], flexShrink: 0 }} />
+                  <span style={{ flexGrow: 1, minWidth: 0, fontSize: 12, color: C.textMuted }}>{r.nazov}</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: C.text, fontVariantNumeric: "tabular-nums" }}>{r.posledna}</span>
+                  <span style={{ fontSize: 10.5, color: farba, minWidth: 40, textAlign: "right" }}>
+                    {r.body.length < 2 ? "prvé" : r.lepsieO === 0 ? "=" : `${r.lepsieO > 0 ? "▼" : "▲"} ${Math.abs(r.lepsieO)}`}
                   </span>
                 </div>
               );
             })}
-            <div style={{ fontSize: 10.5, color: C.textDim, marginTop: 7, lineHeight: 1.5 }}>
-              {pocity.pocet === 1
+
+            {pocity.posun && (
+              <div style={{ fontSize: 12, color: C.textMuted, marginTop: 8 }}>
+                Zmenu k lepšiemu cíti: <b style={{ color: C.text }}>{pocity.posun.text}</b>
+                <span style={{ color: C.textDim }}> · {fmtDMY(pocity.posun.datum)}</span>
+              </div>
+            )}
+
+            {/* Vlastnými slovami — to je to, čo z čísel nevyčítaš. */}
+            {pocity.odkazy.slice(0, 3).map((o) => (
+              <div key={o.datum} style={{ marginTop: 7, paddingLeft: 9, borderLeft: `2px solid ${mix(C.accent, 55)}` }}>
+                <div style={{ fontSize: 12, color: C.text, lineHeight: 1.5 }}>„{o.text}“</div>
+                <div style={{ fontSize: 10, color: C.textDim }}>{fmtDMY(o.datum)}</div>
+              </div>
+            ))}
+
+            <div style={{ fontSize: 10.5, color: C.textDim, marginTop: 8, lineHeight: 1.5 }}>
+              {pocity.rady.every((r) => r.body.length < 2)
                 ? "Prvé hodnotenie — porovnávať sa zatiaľ nemá s čím."
-                : "Šípka porovnáva s prvou odpoveďou. Pri bolesti je lepšie menej, pri zvyšku viac."}
+                : "Nižšie číslo je lepšie; šípka porovnáva s prvou odpoveďou."}
             </div>
           </div>
         )}
@@ -2515,3 +2536,49 @@ const podzalozka = (on: boolean) => ({
   background: on ? C.accentBg : "transparent",
   color: on ? C.accentLight : C.textMuted,
 });
+
+
+/** Farby radov v grafe pocitovky — v poradí, v akom rady prichádzajú. */
+const FARBY_POCITOV = [C.accent, C.blue, C.green, C.orange, C.red, C.textMuted];
+
+/**
+ * Graf zmeny — čiara na rad, os y je stupnica 0–10 a DOLE je lepšie.
+ *
+ * Nula je dole a desiatka hore, takže klesajúca čiara = úľava. Obrátiť os
+ * „aby zlepšenie stúpalo" by znamenalo, že klient aj tréner pozerajú na ten
+ * istý údaj v opačnom smere než na stránke, kde ho klient klepol.
+ */
+function GrafPocitov({ rady }: { rady: Rad[] }) {
+  const body = rady.flatMap((r) => r.body);
+  if (body.length < 2) return null;
+
+  const cas = (d: string) => Date.parse(`${d}T00:00:00Z`);
+  const od = Math.min(...body.map((b) => cas(b.datum)));
+  const doK = Math.max(...body.map((b) => cas(b.datum)));
+  const S = 300, V = 86, OKRAJ = 6;
+  // Jediný deň v osi x by delil nulou — vtedy sa kreslí len bodka.
+  const x = (d: string) => (doK === od ? S / 2 : OKRAJ + ((cas(d) - od) / (doK - od)) * (S - 2 * OKRAJ));
+  const y = (h: number) => OKRAJ + ((10 - h) / 10) * (V - 2 * OKRAJ);
+
+  return (
+    <svg viewBox={`0 0 ${S} ${V}`} width="100%" height={V} style={{ display: "block", marginTop: 8 }} aria-hidden="true">
+      {[0, 5, 10].map((h) => (
+        <line key={h} x1={0} x2={S} y1={y(h)} y2={y(h)} stroke={mix(C.border, 70)} strokeWidth={1} />
+      ))}
+      {rady.map((r, i) => {
+        const f = FARBY_POCITOV[i % FARBY_POCITOV.length];
+        return (
+          <g key={r.kluc}>
+            {r.body.length > 1 && (
+              <polyline
+                points={r.body.map((b) => `${x(b.datum)},${y(b.hodnota)}`).join(" ")}
+                fill="none" stroke={f} strokeWidth={1.8} strokeLinejoin="round" strokeLinecap="round"
+              />
+            )}
+            {r.body.map((b) => <circle key={b.datum} cx={x(b.datum)} cy={y(b.hodnota)} r={2.6} fill={f} />)}
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
