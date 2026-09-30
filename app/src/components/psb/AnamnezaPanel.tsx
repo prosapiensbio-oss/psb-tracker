@@ -1,24 +1,29 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { doSchranky } from "../../lib/psb/kopirovanie";
 import { oznam } from "../../lib/psb/obnovaSignal";
-import { OBLASTI, viditelne, type Formular, type Otazka } from "../../lib/psb/anamnezaFormular";
+import { OBLASTI, zobrazit, type Formular, type Otazka, type Sekcia } from "../../lib/psb/anamnezaFormular";
 import { C, mix } from "../../lib/psb/theme";
 
 /**
- * ANAMNÉZA NA KARTE KLIENTA.
+ * ANAMNÉZA — JEDNA OTÁZKA NARAZ.
  *
- * Dve veci naraz: odkaz, ktorý sa pošle klientovi pred úvodným tréningom,
- * a zápis, ktorý Jerry píše pri tréningu.
+ * Jerry, 30. 9. 2026: „príde mi to také nevýrazné, že keď to budem vypĺňať,
+ * ťažšie sa v tom orientujem." Mal pravdu a príčina nebola vo farbách:
+ * tridsať polí pod sebou vyzerá rovnako dôležito, takže oko nemá kam sadnúť
+ * a človek nevie, kde v tom je.
  *
- * ČO PRIŠLO OD KLIENTA, JE UŽ VYPLNENÉ. Jerry, 30. 9. 2026: „keď klient
- * nejaké veci vyplní pred úvodným, mali by sa automaticky zobraziť
- * v anamnéze, ktorú s ním budem vypĺňať ja." Nestojí to bokom ako citát —
- * je to predvyplnená odpoveď v tej otázke, ktorú by inak písal on sám,
- * a nad ňou vetička, odkiaľ sa vzala.
+ * Zo troch návrhov si vybral rozhovor (30. 9. 2026). Orientácia stojí na
+ * troch veciach a každá rieši inú polovicu problému:
  *
- * Zdravotné odpovede sú v databáze šifrované; sem prichádzajú rozšifrované
- * z `/api/anamneza`, ktoré ich vydá len prihlásenému.
+ *   • NA OBRAZOVKE JE PRÁVE JEDNA OTÁZKA — niet sa kam stratiť.
+ *   • VĽAVO REBRÍK SEKCIÍ s počtom vyplnených — vidno, kde si a koľko ešte.
+ *   • HORE PREPIS ODPOVEDANÉHO, drobným — vidno, čo je za tebou, a dá sa
+ *     tam kliknúť späť.
+ *
+ * Kontext, ktorý treba mať pri ruke počas celého vypĺňania (klient, odkaz
+ * pre neho, výstup testu postury), je v ľavom stĺpci — nie vo fronte otázok.
+ * Test postury sa preto NEPÝTA; je to výstup, ktorý appka klientovi poslala.
  */
 
 type Oblast = { oblast: string; sila: number | null };
@@ -41,55 +46,103 @@ type Stav = {
 };
 
 const jeOblasti = (x: unknown): x is Oblast[] =>
-  Array.isArray(x) && x.every((o) => o && typeof o === "object" && "oblast" in (o as object));
+  Array.isArray(x) && x.every((o) => !!o && typeof o === "object" && "oblast" in (o as object));
 
 const denCz = (iso: string | null) => (iso ? `${Number(iso.slice(8, 10))}. ${Number(iso.slice(5, 7))}. ${iso.slice(0, 4)}` : "");
+
+/** Odpoveď ako jedna čitateľná veta — do prepisu aj do prehľadu na konci. */
+function akoText(o: Otazka, v: unknown): string {
+  if (v == null || v === "") return "";
+  if (o.typ === "oblasti" && jeOblasti(v)) {
+    return v.map((x) => (x.sila == null ? x.oblast : `${x.oblast} ${x.sila}/10`)).join(" · ");
+  }
+  if (Array.isArray(v)) return v.join(", ");
+  if (o.typ === "skala") return `${v}/10`;
+  return String(v);
+}
+
+const maOdpoved = (o: Otazka, v: unknown): boolean => akoText(o, v).length > 0;
 
 export function AnamnezaPanel({ meno }: { meno: string }) {
   const [stav, setStav] = useState<Stav | null>(null);
   const [odp, setOdp] = useState<Odpovede>({});
+  const [i, setI] = useState(0);
   const [bezi, setBezi] = useState(false);
   const [hlaska, setHlaska] = useState("");
   const [chyba, setChyba] = useState("");
   const [skopirovane, setSkopirovane] = useState(false);
   /**
-   * Kým sa políčok nikto nedotkol, draft zrkadlí prichádzajúce dáta.
-   * Bez toho by neskoršia odpoveď z fetchu prepísala rozpísaný zápis —
-   * tá istá pasca ako pri týždenných poznámkach (29. 8. 2026).
+   * Kým sa políčok nikto nedotkol, draft zrkadlí prichádzajúce dáta — inak
+   * by neskorší fetch prepísal rozpísaný zápis (pravidlo z 29. 8. 2026).
    */
   const dotknute = useRef(false);
+  /** Je čo uložiť? Presun na inú otázku to uloží sám. */
+  const neulozene = useRef(false);
 
   const nacitaj = useCallback(async () => {
     const r = await fetch(`/api/anamneza?klient=${encodeURIComponent(meno)}`, { credentials: "same-origin" })
-      .then((x) => x.json())
-      .catch(() => null) as (Stav & { ok?: boolean; error?: string }) | null;
+      .then((x) => x.json()).catch(() => null) as (Stav & { ok?: boolean; error?: string }) | null;
     if (!r?.ok) { setChyba(r?.error || "Anamnézu sa nepodarilo načítať."); return; }
     setStav(r);
-    if (!dotknute.current) {
-      // Predvyplnené prebíja len tam, kde zápis ešte nič nemá — raz
-      // prepísanú odpoveď trénera nesmie prepísať nič.
-      setOdp({ ...r.predvyplnene.hodnoty, ...(r.anamneza?.zapisOdpovede || {}) });
-    }
+    if (!dotknute.current) setOdp({ ...r.predvyplnene.hodnoty, ...(r.anamneza?.zapisOdpovede || {}) });
   }, [meno]);
 
-  useEffect(() => { dotknute.current = false; setStav(null); setOdp({}); setHlaska(""); setChyba(""); void nacitaj(); }, [nacitaj]);
+  useEffect(() => {
+    dotknute.current = false; neulozene.current = false;
+    setStav(null); setOdp({}); setI(0); setHlaska(""); setChyba("");
+    void nacitaj();
+  }, [nacitaj]);
 
-  const zmen = (id: string, v: unknown) => { dotknute.current = true; setOdp((p) => ({ ...p, [id]: v })); };
+  /** Otázky v jednom rade — vetvenie sa prepočítava z aktuálnych odpovedí. */
+  const rad = useMemo(() => {
+    if (!stav) return [] as { sekcia: Sekcia; o: Otazka }[];
+    return stav.formular.zapis.flatMap((s) =>
+      s.otazky
+        // Test postury nie je otázka, je to výstup — patrí do stĺpca vedľa.
+        .filter((o) => o.typ !== "len-citat" && zobrazit(o, odp))
+        .map((o) => ({ sekcia: s, o })));
+  }, [stav, odp]);
 
-  const uloz = async () => {
-    setBezi(true); setChyba(""); setHlaska("");
+  const uloz = useCallback(async (ticho: boolean) => {
+    if (!ticho) { setBezi(true); setChyba(""); setHlaska(""); }
     const r = await fetch("/api/anamneza", {
       method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
       body: JSON.stringify({ akcia: "zapis", klient: meno, odpovede: odp }),
     }).then((x) => x.json()).catch(() => ({ ok: false, error: "spojenie" }));
-    setBezi(false);
-    if (!r?.ok) { setChyba(r?.error || "Zápis sa neuložil."); return; }
-    setHlaska("Zapísané.");
-    dotknute.current = false;
-    // Bez oznámenia by karta Anamnéza v kope svietila ďalej — zoznam si
-    // ťahá vlastným fetchom a o zápise by sa nedozvedela.
-    oznam("klienti");
-    await nacitaj();
+    if (!ticho) setBezi(false);
+    if (!r?.ok) { setChyba(r?.error || "Zápis sa neuložil."); return false; }
+    neulozene.current = false;
+    if (!ticho) {
+      setHlaska("Uložené.");
+      dotknute.current = false;
+      oznam("klienti");
+      await nacitaj();
+    }
+    return true;
+  }, [meno, odp, nacitaj]);
+
+  /**
+   * Posun v rade. Čo je rozpísané, sa uloží po ceste — nič sa nestratí.
+   *
+   * `kam` je FUNKCIA z aktuálneho indexu, nie číslo: dve kliknutia v tom
+   * istom tiku by sa inak obe počítali zo starého `i` a posunuli o jedno.
+   */
+  const chod = useCallback((kam: number | ((p: number) => number)) => {
+    setI((p) => {
+      const ciel = typeof kam === "function" ? kam(p) : kam;
+      const novy = Math.max(0, Math.min(rad.length, ciel));
+      if (novy !== p && neulozene.current) void uloz(true);
+      return novy;
+    });
+    setHlaska("");
+  }, [rad.length, uloz]);
+  const dalej = useCallback(() => chod((p) => p + 1), [chod]);
+  const spat = useCallback(() => chod((p) => p - 1), [chod]);
+
+  const zmen = (id: string, v: unknown) => {
+    dotknute.current = true;
+    neulozene.current = true;
+    setOdp((p) => ({ ...p, [id]: v }));
   };
 
   const vyrobOdkaz = async () => {
@@ -109,127 +162,228 @@ export function AnamnezaPanel({ meno }: { meno: string }) {
 
   const a = stav.anamneza;
   const test = stav.predvyplnene.test;
+  const hotovo = i >= rad.length;
+  const teraz = rad[i];
+  const vyplnenych = rad.filter((x) => maOdpoved(x.o, odp[x.o.id])).length;
+
+  /** Sekcie s počtom vyplnených — rebrík vľavo. */
+  const sekcie = stav.formular.zapis.map((s) => {
+    const moje = rad.filter((x) => x.sekcia.id === s.id);
+    const hotovych = moje.filter((x) => maOdpoved(x.o, odp[x.o.id])).length;
+    return {
+      s, hotovych, spolu: moje.length,
+      prvy: rad.findIndex((x) => x.sekcia.id === s.id),
+      jeTu: !hotovo && teraz?.sekcia.id === s.id,
+      cela: moje.length > 0 && hotovych === moje.length,
+    };
+  });
+
+  /** Čo je za tebou — posledné tri odpovedané, na preklik späť. */
+  const prepis = rad
+    .slice(0, i)
+    .map((x, idx) => ({ ...x, idx }))
+    .filter((x) => maOdpoved(x.o, odp[x.o.id]))
+    .slice(-3);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-      {/* ── odkaz pre klienta ── */}
-      <div style={{ padding: "12px 14px", borderRadius: 10, background: mix(C.border, 40), border: `1px solid ${C.border}` }}>
-        <div style={{ fontSize: 11, letterSpacing: 0.6, textTransform: "uppercase", color: C.textDim }}>Pred úvodným tréningom</div>
-        {!stav.odkaz ? (
-          <>
-            <div style={{ fontSize: 12.5, color: C.textMuted, margin: "7px 0 9px", lineHeight: 1.55 }}>
-              Tri otázky o zdraví, ktoré si klient odklikne sám. Odkaz patrí do úvodnej správy — nad video, nie pod neho.
-            </div>
-            <button onClick={() => void vyrobOdkaz()} disabled={bezi} style={tlacidlo(C.green)}>
-              {bezi ? "…" : "Vyrobiť odkaz pre klienta"}
+    <div
+      style={{ display: "flex", gap: 18, minHeight: 470, height: "100%" }}
+      onKeyDown={(e) => {
+        // Enter posúva ďalej. V dlhom texte robí nový riadok, tam je to cmd+Enter.
+        if (e.key !== "Enter") return;
+        const dlhy = (e.target as HTMLElement).tagName === "TEXTAREA";
+        if (dlhy && !(e.metaKey || e.ctrlKey)) return;
+        e.preventDefault();
+        dalej();
+      }}
+    >
+      {/* ── REBRÍK SEKCIÍ A KONTEXT ── */}
+      <div style={{ width: 216, flexShrink: 0, display: "flex", flexDirection: "column", gap: 16, borderRight: `1px solid ${mix(C.border, 60)}`, paddingRight: 16 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+          {sekcie.map((x) => (
+            <button
+              key={x.s.id}
+              onClick={() => x.prvy >= 0 && chod(x.prvy)}
+              style={{
+                display: "flex", alignItems: "center", gap: 9, padding: "7px 8px", borderRadius: 8,
+                border: "none", background: x.jeTu ? mix(C.accent, 14) : "transparent",
+                color: x.jeTu ? C.text : C.textMuted, fontSize: 12.5, textAlign: "left",
+                cursor: "pointer", fontFamily: "inherit", width: "100%",
+              }}
+            >
+              <span style={{
+                width: 17, height: 17, flexShrink: 0, borderRadius: "50%", fontSize: 9.5, fontWeight: 700,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                border: `1.5px solid ${x.cela ? C.green : x.jeTu ? C.accent : mix(C.border, 90)}`,
+                background: x.jeTu ? C.accent : "transparent",
+                color: x.cela ? C.green : C.onAccent,
+              }}>{x.cela ? "✓" : ""}</span>
+              <span style={{ flexGrow: 1, minWidth: 0 }}>{x.s.nazov}</span>
+              <span style={{ fontSize: 10, color: C.textDim, fontVariantNumeric: "tabular-nums" }}>{x.hotovych}/{x.spolu}</span>
             </button>
-          </>
-        ) : (
-          <>
-            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 8 }}>
-              <code style={{
-                flex: 1, minWidth: 200, fontSize: 11.5, color: C.text, background: C.bg,
-                border: `1px solid ${C.border}`, borderRadius: 7, padding: "7px 9px", overflowX: "auto", whiteSpace: "nowrap",
-              }}>{stav.odkaz}</code>
+          ))}
+        </div>
+
+        {/* Odkaz pre klienta — patrí ku kontextu, nie medzi otázky. */}
+        <div style={{ padding: "10px 12px", borderRadius: 9, background: mix(C.border, 40) }}>
+          <div style={{ fontSize: 10, letterSpacing: 0.8, textTransform: "uppercase", color: C.textDim }}>Pred úvodným</div>
+          {!stav.odkaz ? (
+            <button onClick={() => void vyrobOdkaz()} disabled={bezi} style={{ ...maleTlacidlo, borderColor: mix(C.green, 45), color: C.green, marginTop: 7 }}>
+              {bezi ? "…" : "Vyrobiť odkaz"}
+            </button>
+          ) : (
+            <>
+              <div style={{ fontSize: 11.5, color: a?.klientVyplnilAt ? C.green : C.textMuted, marginTop: 5, lineHeight: 1.5 }}>
+                {a?.klientVyplnilAt ? `Klient vyplnil ${denCz(a.klientVyplnilAt)}` : "Klient zatiaľ nevyplnil"}
+              </div>
               <button
-                onClick={() => void doSchranky(stav.odkaz || "").then((ok) => { setSkopirovane(ok); if (!ok) setChyba("Skopíruj to prosím ručne — schránka odmietla."); })}
-                style={tlacidlo(C.accent)}
-              >{skopirovane ? "skopírované" : "Kopírovať"}</button>
+                onClick={() => void doSchranky(stav.odkaz || "").then((ok) => { setSkopirovane(ok); if (!ok) setChyba("Skopíruj odkaz ručne — schránka odmietla."); })}
+                style={{ ...maleTlacidlo, marginTop: 7 }}
+              >{skopirovane ? "skopírované" : "Kopírovať odkaz"}</button>
+            </>
+          )}
+        </div>
+
+        {/* Výstup testu postury — kontext po celý čas, nie otázka. */}
+        {test && (test.odchylky.length > 0 || test.vzorec) && (
+          <div style={{ padding: "10px 12px", borderRadius: 9, background: mix(C.accent, 8), borderLeft: `2px solid ${C.accent}` }}>
+            <div style={{ fontSize: 10, letterSpacing: 0.8, textTransform: "uppercase", color: C.accentLight }}>
+              Test postury{test.kedy ? ` · ${denCz(test.kedy)}` : ""}
             </div>
-            <div style={{ fontSize: 11.5, color: a?.klientVyplnilAt ? C.green : C.textDim, marginTop: 8 }}>
-              {a?.klientVyplnilAt
-                ? `Klient vyplnil ${denCz(a.klientVyplnilAt)}. Súhlasy má odklepnuté.`
-                : "Klient zatiaľ nevyplnil."}
+            <div style={{ fontSize: 11.5, color: C.text, marginTop: 5, lineHeight: 1.55 }}>
+              {test.odchylky.length > 0 && <>{test.odchylky.join(", ")}<br /></>}
+              {test.vzorec && <b>{test.vzorec}</b>}
             </div>
-          </>
+          </div>
         )}
+
+        <div style={{ marginTop: "auto", fontSize: 10.5, color: C.textDim, lineHeight: 1.6 }}>
+          Zdravotné odpovede sú v databáze zašifrované — vidíš ich len ty.
+        </div>
       </div>
 
-      {/* ── čo ukázal test postury ── */}
-      {test && (test.oblasti.length > 0 || test.vzorec) && (
-        <div style={{ padding: "12px 14px", borderRadius: 10, background: mix(C.accent, 8), borderLeft: `3px solid ${C.accent}` }}>
-          <div style={{ fontSize: 11, letterSpacing: 0.6, textTransform: "uppercase", color: C.accentLight }}>
-            Z testu postury{test.kedy ? ` · ${denCz(test.kedy)}` : ""}
+      {/* ── JEDNA OTÁZKA NARAZ ── */}
+      <div style={{ flexGrow: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+
+        {/* čo už je za tebou */}
+        {prepis.length > 0 && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 5, paddingBottom: 13, borderBottom: `1px solid ${mix(C.border, 60)}` }}>
+            {prepis.map((x) => (
+              <button
+                key={x.o.id}
+                onClick={() => chod(x.idx)}
+                style={{ display: "flex", gap: 12, alignItems: "baseline", padding: 0, border: "none", background: "none", textAlign: "left", cursor: "pointer", fontFamily: "inherit", width: "100%" }}
+              >
+                <span style={{ width: 150, flexShrink: 0, fontSize: 11, color: C.textDim, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{x.o.text}</span>
+                <span style={{ flexGrow: 1, minWidth: 0, fontSize: 12.5, color: C.textMuted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{akoText(x.o, odp[x.o.id])}</span>
+              </button>
+            ))}
           </div>
-          <div style={{ fontSize: 12.5, color: C.text, marginTop: 6, lineHeight: 1.65 }}>
-            {test.odchylky.length > 0 && <>Odchýlky: <b>{test.odchylky.join(", ")}</b><br /></>}
-            {test.vzorec && <>Vzorec: <b>{test.vzorec}</b></>}
+        )}
+
+        {hotovo ? (
+          <Prehlad rad={rad} odp={odp} onSpat={(idx) => chod(idx)} />
+        ) : (
+          <div style={{ flexGrow: 1, display: "flex", flexDirection: "column", justifyContent: "center", gap: 18, padding: "18px 0", minHeight: 0 }}>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 9, flexWrap: "wrap" }}>
+                <span style={{ fontSize: 10.5, letterSpacing: 1.2, textTransform: "uppercase", color: C.textDim }}>
+                  {teraz.sekcia.nazov}
+                </span>
+                {stav.predvyplnene.odkial[teraz.o.id] && (
+                  <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.4, padding: "2px 8px", borderRadius: 6, background: mix(C.green, 16), color: C.green, textTransform: "uppercase" }}>
+                    {stav.predvyplnene.odkial[teraz.o.id]}
+                  </span>
+                )}
+              </div>
+              <div style={{ fontSize: 25, fontWeight: 700, lineHeight: 1.2, letterSpacing: -0.3, maxWidth: "26ch" }}>
+                {teraz.o.text}
+              </div>
+              {teraz.o.pomoc && (
+                <div style={{ fontSize: 12.5, color: C.textMuted, marginTop: 8, lineHeight: 1.6, maxWidth: "52ch" }}>{teraz.o.pomoc}</div>
+              )}
+            </div>
+
+            <VelkePole
+              key={teraz.o.id}
+              o={teraz.o}
+              hodnota={odp[teraz.o.id]}
+              onZmen={(v) => zmen(teraz.o.id, v)}
+            />
+          </div>
+        )}
+
+        {/* posun ďalej */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12, paddingTop: 13, borderTop: `1px solid ${mix(C.border, 60)}`, flexWrap: "wrap" }}>
+          {hotovo ? (
+            <button onClick={() => void uloz(false)} disabled={bezi} style={{ ...velkeTlacidlo, background: mix(C.green, 16), borderColor: mix(C.green, 55), color: C.green }}>
+              {bezi ? "Ukladám…" : "Uložiť zápis"}
+            </button>
+          ) : (
+            <button onClick={dalej} style={velkeTlacidlo}>Ďalej</button>
+          )}
+          {i > 0 && <button onClick={spat} style={{ ...maleTlacidlo, border: "none" }}>späť</button>}
+          {!hotovo && (
+            <span style={{ fontSize: 11.5, color: C.textDim }}>
+              alebo <b style={{ color: C.textMuted }}>Enter</b>{teraz.o.typ === "dlhy" ? " (cmd+Enter)" : ""}
+            </span>
+          )}
+          <div style={{ flexGrow: 1 }} />
+          {hlaska && <span style={{ fontSize: 12, color: C.green }}>{hlaska}</span>}
+          {chyba && <span style={{ fontSize: 12, color: C.red }}>{chyba}</span>}
+          <span style={{ fontSize: 11.5, color: C.textDim, fontVariantNumeric: "tabular-nums" }}>
+            {vyplnenych} z {rad.length} vyplnených
+          </span>
+          <div style={{ width: 120, height: 4, borderRadius: 3, background: mix(C.border, 90), overflow: "hidden" }}>
+            <div style={{ width: `${rad.length ? (vyplnenych / rad.length) * 100 : 0}%`, height: "100%", background: C.accent }} />
           </div>
         </div>
-      )}
-
-      {/* ── zápis z úvodného ── */}
-      {stav.formular.zapis.map((s) => {
-        const otazky = viditelne(s, odp);
-        if (!otazky.length) return null;
-        return (
-          <div key={s.id}>
-            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.5, color: C.textDim, textTransform: "uppercase", paddingBottom: 8, borderBottom: `1px solid ${mix(C.border, 60)}` }}>
-              {s.nazov}
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10 }}>
-              {otazky.map((o) => (
-                <PoleOtazky
-                  key={o.id}
-                  o={o}
-                  hodnota={odp[o.id]}
-                  odkial={stav.predvyplnene.odkial[o.id]}
-                  test={o.id === "test_postury" ? test : null}
-                  onZmen={(v) => zmen(o.id, v)}
-                />
-              ))}
-            </div>
-          </div>
-        );
-      })}
-
-      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-        <button onClick={() => void uloz()} disabled={bezi} style={{ ...tlacidlo(C.green), fontWeight: 700, padding: "8px 16px" }}>
-          {bezi ? "Ukladám…" : "Uložiť zápis"}
-        </button>
-        {hlaska && <span style={{ fontSize: 12, color: C.green }}>{hlaska}</span>}
-        {chyba && <span style={{ fontSize: 12, color: C.red }}>{chyba}</span>}
-        {a?.zapisAt && !hlaska && <span style={{ fontSize: 11.5, color: C.textDim }}>naposledy {denCz(a.zapisAt)}</span>}
-      </div>
-
-      <div style={{ fontSize: 11, color: C.textDim, lineHeight: 1.6 }}>
-        Zdravotné odpovede sú v databáze zašifrované — neuvidí ich Jarvis ani kontrolné skripty, len prihlásený tréner tu.
       </div>
     </div>
   );
 }
 
-function PoleOtazky({ o, hodnota, odkial, test, onZmen }: {
-  o: Otazka;
-  hodnota: unknown;
-  odkial?: string;
-  test: { oblasti: string[]; odchylky: string[]; vzorec: string; kedy: string } | null;
-  onZmen: (v: unknown) => void;
+/** Koniec radu — prehľad všetkého pred uložením, s preklikom späť. */
+function Prehlad({ rad, odp, onSpat }: {
+  rad: { sekcia: Sekcia; o: Otazka }[];
+  odp: Odpovede;
+  onSpat: (idx: number) => void;
 }) {
-  const vstup = {
-    width: "100%", boxSizing: "border-box" as const, padding: "7px 9px", borderRadius: 7, fontSize: 12.5,
-    border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontFamily: "inherit",
-  };
-
-  // Otázka len na čítanie — výstup, ktorý appka klientovi sama poslala.
-  if (o.typ === "len-citat") {
-    if (!test || (!test.odchylky.length && !test.vzorec)) return null;
-    return (
-      <div style={{ fontSize: 12, color: C.textMuted }}>
-        <div style={{ color: C.textDim, marginBottom: 3 }}>{o.text}</div>
-        {test.vzorec || test.odchylky.join(", ")}
+  return (
+    <div style={{ flexGrow: 1, minHeight: 0, overflowY: "auto", padding: "16px 0" }}>
+      <div style={{ fontSize: 21, fontWeight: 700, letterSpacing: -0.3, marginBottom: 4 }}>Prejdené. Skontroluj a ulož.</div>
+      <div style={{ fontSize: 12.5, color: C.textMuted, marginBottom: 16 }}>
+        Klikni na ktorýkoľvek riadok, keď chceš niečo prepísať. Prázdne sa doplniť dá aj neskôr.
       </div>
-    );
-  }
-
-  const popis = (
-    <div style={{ fontSize: 12, color: C.textMuted, marginBottom: 4 }}>
-      {o.text}
-      {odkial && (
-        <span style={{ fontSize: 10.5, color: C.green, marginLeft: 7, whiteSpace: "nowrap" }}>✓ {odkial}</span>
-      )}
+      {rad.map((x, idx) => {
+        const v = akoText(x.o, odp[x.o.id]);
+        return (
+          <button
+            key={x.o.id}
+            onClick={() => onSpat(idx)}
+            style={{
+              display: "flex", gap: 14, alignItems: "baseline", width: "100%", textAlign: "left",
+              padding: "7px 0", border: "none", borderBottom: `1px solid ${mix(C.border, 40)}`,
+              background: "none", cursor: "pointer", fontFamily: "inherit",
+            }}
+          >
+            <span style={{ width: 170, flexShrink: 0, fontSize: 11.5, color: C.textDim, lineHeight: 1.45 }}>{x.o.text}</span>
+            <span style={{ flexGrow: 1, minWidth: 0, fontSize: 13, color: v ? C.text : C.textDim, fontStyle: v ? "normal" : "italic", lineHeight: 1.5 }}>
+              {v || "prázdne"}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
+}
+
+/** Ovládanie jednej otázky — veľké, aby sa dalo trafiť bez pozerania. */
+function VelkePole({ o, hodnota, onZmen }: { o: Otazka; hodnota: unknown; onZmen: (v: unknown) => void }) {
+  const vstup = {
+    padding: "11px 13px", borderRadius: 9, fontSize: 15, fontFamily: "inherit",
+    border: `1px solid ${C.border}`, background: C.bg, color: C.text, boxSizing: "border-box" as const,
+  };
 
   if (o.typ === "oblasti") {
     const vybrane: Oblast[] = jeOblasti(hodnota) ? hodnota : [];
@@ -237,38 +391,24 @@ function PoleOtazky({ o, hodnota, odkial, test, onZmen }: {
       const je = vybrane.some((x) => x.oblast === m);
       onZmen(je ? vybrane.filter((x) => x.oblast !== m) : [...vybrane, { oblast: m, sila: null }]);
     };
-    const nastavSilu = (m: string, s: number) =>
-      onZmen(vybrane.map((x) => (x.oblast === m ? { ...x, sila: s } : x)));
     return (
-      <div>
-        {popis}
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+      <div style={{ display: "flex", flexDirection: "column", gap: 14, maxWidth: 640 }}>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
           {OBLASTI.map((m) => {
             const je = vybrane.some((x) => x.oblast === m);
-            return (
-              <button key={m} onClick={() => prepni(m)} style={{
-                padding: "3px 10px", borderRadius: 7, fontSize: 12, cursor: "pointer", fontFamily: "inherit",
-                border: `1px solid ${je ? mix(C.accent, 55) : C.border}`,
-                background: je ? mix(C.accent, 16) : "transparent",
-                color: je ? C.accentLight : C.textMuted, fontWeight: je ? 600 : 400,
-              }}>{m}</button>
-            );
+            return <button key={m} onClick={() => prepni(m)} style={pilulka(je)}>{m}</button>;
           })}
         </div>
         {/* Jedna oblasť = jedna stupnica. Tri zaškrtnuté = tri stupnice. */}
         {vybrane.map((x) => (
-          <div key={x.oblast} style={{ marginTop: 8 }}>
-            <div style={{ fontSize: 11.5, color: C.textMuted, marginBottom: 4 }}>{x.oblast} — ako silné, keď je to najhoršie?</div>
-            <div style={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
-              {Array.from({ length: 11 }, (_, i) => (
-                <button key={i} onClick={() => nastavSilu(x.oblast, i)} style={{
-                  width: 26, height: 24, borderRadius: 6, fontSize: 11.5, cursor: "pointer", fontFamily: "inherit",
-                  border: `1px solid ${x.sila === i ? mix(C.accent, 55) : C.border}`,
-                  background: x.sila === i ? mix(C.accent, 20) : "transparent",
-                  color: x.sila === i ? C.accentLight : C.textDim, fontWeight: x.sila === i ? 700 : 400,
-                }}>{i}</button>
-              ))}
+          <div key={x.oblast}>
+            <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 6 }}>
+              <b style={{ color: C.text }}>{x.oblast}</b> — ako silné, keď je to najhoršie?
             </div>
+            <Stupnica
+              hodnota={x.sila}
+              onZmen={(n) => onZmen(vybrane.map((y) => (y.oblast === x.oblast ? { ...y, sila: n } : y)))}
+            />
           </div>
         ))}
       </div>
@@ -278,80 +418,92 @@ function PoleOtazky({ o, hodnota, odkial, test, onZmen }: {
   if (o.typ === "viac") {
     const vybrane = Array.isArray(hodnota) ? (hodnota as string[]) : [];
     return (
-      <div>
-        {popis}
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
-          {(o.moznosti || []).map((m) => {
-            const je = vybrane.includes(m);
-            return (
-              <button key={m} onClick={() => onZmen(je ? vybrane.filter((x) => x !== m) : [...vybrane, m])} style={{
-                padding: "3px 10px", borderRadius: 7, fontSize: 12, cursor: "pointer", fontFamily: "inherit",
-                border: `1px solid ${je ? mix(C.accent, 55) : C.border}`,
-                background: je ? mix(C.accent, 16) : "transparent",
-                color: je ? C.accentLight : C.textMuted, fontWeight: je ? 600 : 400,
-              }}>{m}</button>
-            );
-          })}
-        </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 7, maxWidth: 640 }}>
+        {(o.moznosti || []).map((m) => {
+          const je = vybrane.includes(m);
+          return (
+            <button key={m} onClick={() => onZmen(je ? vybrane.filter((x) => x !== m) : [...vybrane, m])} style={pilulka(je)}>{m}</button>
+          );
+        })}
       </div>
     );
   }
 
-  if (o.typ === "jedna") {
+  if (o.typ === "jedna" || o.typ === "ano-nie") {
+    const moznosti = o.typ === "ano-nie" ? ["Ano", "Ne"] : (o.moznosti || []);
     return (
-      <div>
-        {popis}
-        <select value={String(hodnota ?? "")} onChange={(e) => onZmen(e.target.value)} style={vstup}>
-          <option value="">—</option>
-          {(o.moznosti || []).map((m) => <option key={m} value={m}>{m}</option>)}
-        </select>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 7, maxWidth: 640 }}>
+        {moznosti.map((m) => (
+          <button key={m} onClick={() => onZmen(hodnota === m ? "" : m)} style={pilulka(hodnota === m)}>{m}</button>
+        ))}
       </div>
     );
   }
 
   if (o.typ === "skala") {
-    const n = typeof hodnota === "number" ? hodnota : null;
-    return (
-      <div>
-        {popis}
-        <div style={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
-          {Array.from({ length: 11 }, (_, i) => (
-            <button key={i} onClick={() => onZmen(i)} style={{
-              width: 26, height: 24, borderRadius: 6, fontSize: 11.5, cursor: "pointer", fontFamily: "inherit",
-              border: `1px solid ${n === i ? mix(C.accent, 55) : C.border}`,
-              background: n === i ? mix(C.accent, 20) : "transparent",
-              color: n === i ? C.accentLight : C.textDim, fontWeight: n === i ? 700 : 400,
-            }}>{i}</button>
-          ))}
-        </div>
-      </div>
-    );
+    return <Stupnica hodnota={typeof hodnota === "number" ? hodnota : null} onZmen={(n) => onZmen(n)} />;
   }
 
   if (o.typ === "dlhy") {
     return (
-      <div>
-        {popis}
-        <textarea value={String(hodnota ?? "")} onChange={(e) => onZmen(e.target.value)} rows={2} style={{ ...vstup, resize: "vertical" }} />
-        {o.pomoc && <div style={{ fontSize: 10.5, color: C.textDim, marginTop: 3 }}>{o.pomoc}</div>}
-      </div>
+      <textarea
+        value={String(hodnota ?? "")}
+        onChange={(e) => onZmen(e.target.value)}
+        rows={4}
+        autoFocus
+        placeholder="píš…"
+        style={{ ...vstup, width: "100%", maxWidth: 640, resize: "vertical", lineHeight: 1.6 }}
+      />
     );
   }
 
   return (
-    <div>
-      {popis}
-      <input
-        type={o.typ === "cislo" ? "number" : "text"}
-        value={String(hodnota ?? "")}
-        onChange={(e) => onZmen(o.typ === "cislo" ? (e.target.value === "" ? "" : Number(e.target.value)) : e.target.value)}
-        style={{ ...vstup, width: o.typ === "cislo" ? 90 : "100%" }}
-      />
+    <input
+      type={o.typ === "cislo" ? "number" : o.typ === "datum" ? "date" : "text"}
+      value={String(hodnota ?? "")}
+      onChange={(e) => onZmen(o.typ === "cislo" ? (e.target.value === "" ? "" : Number(e.target.value)) : e.target.value)}
+      autoFocus
+      style={{ ...vstup, width: o.typ === "cislo" ? 120 : "100%", maxWidth: 640, colorScheme: "dark" }}
+    />
+  );
+}
+
+function Stupnica({ hodnota, onZmen }: { hodnota: number | null; onZmen: (n: number) => void }) {
+  return (
+    <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+      {Array.from({ length: 11 }, (_, n) => {
+        const je = hodnota === n;
+        return (
+          <button
+            key={n}
+            onClick={() => onZmen(n)}
+            style={{
+              width: 38, height: 36, borderRadius: 8, fontSize: 14, cursor: "pointer", fontFamily: "inherit",
+              border: `1px solid ${je ? mix(C.accent, 60) : C.border}`,
+              background: je ? C.accent : "transparent",
+              color: je ? C.onAccent : C.textMuted, fontWeight: je ? 700 : 400,
+            }}
+          >{n}</button>
+        );
+      })}
     </div>
   );
 }
 
-const tlacidlo = (farba: string) => ({
-  padding: "6px 12px", borderRadius: 8, fontSize: 12.5, cursor: "pointer", fontFamily: "inherit",
-  border: `1px solid ${mix(farba, 45)}`, background: mix(farba, 12), color: farba,
+const pilulka = (je: boolean) => ({
+  padding: "8px 15px", borderRadius: 9, fontSize: 14, cursor: "pointer", fontFamily: "inherit",
+  border: `1.5px solid ${je ? mix(C.accent, 60) : C.border}`,
+  background: je ? mix(C.accent, 16) : "transparent",
+  color: je ? C.accentLight : C.textMuted,
+  fontWeight: je ? 600 : 400,
 });
+
+const velkeTlacidlo = {
+  padding: "9px 20px", borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit",
+  border: `1px solid ${mix(C.accent, 55)}`, background: mix(C.accent, 14), color: C.accentLight,
+};
+
+const maleTlacidlo = {
+  padding: "5px 11px", borderRadius: 7, fontSize: 12, cursor: "pointer", fontFamily: "inherit",
+  border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted,
+};
