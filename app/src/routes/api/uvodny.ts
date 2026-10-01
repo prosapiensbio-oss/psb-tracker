@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
+import { verejnyOdkaz } from "../../lib/psb/verejnyOdkaz";
 
 /**
  * ODKAZ NA STRÁNKU PRED ÚVODNÝM / PO ŇOM.
@@ -82,9 +83,10 @@ export const Route = createFileRoute("/api/uvodny")({
             actor: (await currentUser(request)) || undefined,
           });
 
-          const origin = new URL(request.url).origin;
+          // Krátka adresa — v SMS je rozdiel medzi jednou a dvoma správami.
+          const odkaz = verejnyOdkaz(`/u/${r.token}`, new URL(request.url).origin);
           return Response.json(
-            { ok: true, token: r.token, odkaz: `${origin}/u/${r.token}` },
+            { ok: true, token: r.token, odkaz },
             { headers: { "cache-control": "no-store" } },
           );
         } catch (e) {

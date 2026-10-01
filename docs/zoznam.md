@@ -62,9 +62,10 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
   Riadky sú v `Anmnéza klientů 3.csv`, stačí ich poslať cez `import-stary`.
 - [ ] Zmazať skúšobnú anamnézu AATestu pri upratovaní testovacích dát.
 - [x] **Odkaz /u/ v potvrdzovacej notifikácii Terezky** — hotové 1. 10. 2026.
-- [ ] **Krátka adresa pre odkaz** (`prosapiens.cz/u/<token>` namiesto
-  workers.dev): správa má teraz 172 znakov = dve SMS, s krátkou doménou 139 =
-  jedna. Pri 56 úvodných ročne je to 56 SMS len za dĺžku adresy.
+- [x] **Krátka adresa pre odkazy v SMS** — hotové 1. 10. 2026, správa má
+  153 znakov = jedna SMS. Platí pre `/u/` aj `/v/` (výpis hodín a končiace
+  členstvo). Presmerovanie je WP snippet id 26 — keby niekto raz čistil
+  snippety, bez neho prestanú chodiť odkazy v SMS.
 - [ ] **Spam prešiel filtrom dopytov** — „Your Company" z `michelle.lamy.eu`
   (30. 9. 2026) leží v `leads` ako nový dopyt. Studená obchodná pošta sa má
   zahadzovať; pozrieť, prečo prešla.

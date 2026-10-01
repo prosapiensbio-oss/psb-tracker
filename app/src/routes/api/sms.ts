@@ -5,6 +5,7 @@ import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 import { chybaOdosielatela, cisloPreBranu, dlzkaSpravy } from "../../lib/psb/sms";
 import { posliSms, type BranaUcet } from "../../lib/psb/smsBrana.server";
+import { verejnyOdkaz } from "../../lib/psb/verejnyOdkaz";
 
 /**
  * SMS KLIENTOVI.
@@ -103,7 +104,8 @@ export const Route = createFileRoute("/api/sms")({
               .bind(token, klient, new Date().toISOString()).run();
             riadok = { token };
           }
-          return Response.json({ ok: true, url: `${new URL(request.url).origin}/v/${riadok.token}` });
+          // Krátka adresa — viď verejnyOdkaz.ts; v SMS ide o jednu správu.
+          return Response.json({ ok: true, url: verejnyOdkaz(`/v/${riadok.token}`, new URL(request.url).origin) });
         }
 
         const klient = kus(b.klient, 120);

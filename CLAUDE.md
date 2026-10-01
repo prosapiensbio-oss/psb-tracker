@@ -2161,6 +2161,18 @@ appka vyrobí odkaz a pripraví SMS. Pravidlá:
   tréningu: ide von k cudziemu človeku a späť sa vziať nedá.
 - **Keď dopyt nemá telefón, povie to** („odkaz vyrobím, poslať ho budeš
   musieť ručne") namiesto tlačidla, ktoré nič neurobí.
-- **Adresa workers.dev stojí jednu SMS navyše.** Odkaz má 54 znakov a celá
-  správa 172 = dve SMS; na `prosapiens.cz/u/<token>` by to bolo 139 = jedna.
-  Pri 56 úvodných ročne je to 56 SMS len za dĺžku domény.
+- **Odkazy v SMS idú cez `prosapiens.cz`, nie cez workers.dev**
+  (`lib/psb/verejnyOdkaz.ts`, od 1. 10. 2026). Adresa workera má 46 znakov
+  a správa s ňou mala 172 = dve SMS; cez vlastnú doménu má 28 a správa 153 =
+  jedna. Pri 56 úvodných ročne je to 56 správ zadarmo.
+  Presmerovanie robí WordPress — snippet „Krátky odkaz pre SMS (/u/ a /v/)",
+  id 26: `/u/<token>` a `/v/<token>` pošle 302 na workera, všetko ostatné
+  nechá na webe. **Doména NIE JE na Cloudflare** (DNS je na Websupporte),
+  takže vlastná doména workera ani Workers Route neprichádzajú do úvahy —
+  preto redirect na webe a nie elegantnejšia cesta.
+  `verejnyOdkaz` púšťa cez doménu LEN to, čo snippet pozná (`/u/`, `/v/`
+  a tvar tokenu); čokoľvek iné ide priamo na workera. Odkaz, ktorý skončí
+  na 404, je horší než dlhá adresa — a snippet sa dá zmeniť len na webe,
+  kým appka sa nasadzuje odtiaľto.
+  Keď sa presmerovanie raz rozbije, mení sa JEDNA konštanta
+  (`VEREJNA_DOMENA`) a odkazy idú znova priamo.
