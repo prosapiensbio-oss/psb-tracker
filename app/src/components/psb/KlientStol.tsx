@@ -1059,7 +1059,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
                     <span style={{ color: C.textDim }}>
                       {" "}({odhadDojde.tyzdneOd === odhadDojde.tyzdneDo
                         ? tyzdne(odhadDojde.tyzdneOd)
-                        : `${odhadDojde.tyzdneOd}–${odhadDojde.tyzdneDo} týždňov`})
+                        : `${odhadDojde.tyzdneOd}–${odhadDojde.tyzdneDo} ${slovoTyzden(odhadDojde.tyzdneDo)}`})
                     </span>
                   </>
                 )}
@@ -1729,12 +1729,19 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
 }
 
 /** Koľko dní do najbližších narodenín. null = dátum nedáva zmysel. */
-/** „1 týždeň / 2 týždne / 5 týždňov" — bez toho by karta písala „1 týždňov". */
+/**
+ * „1 týždeň / 2 týždne / 5 týždňov". Pri ROZPÄTÍ sa slovo riadi DRUHÝM
+ * číslom — hovorí sa „2–3 týždne", nie „2–3 týždňov".
+ */
+function slovoTyzden(n: number): string {
+  if (n === 1) return "týždeň";
+  if (n >= 2 && n <= 4) return "týždne";
+  return "týždňov";
+}
+
 function tyzdne(n: number): string {
   if (n <= 0) return "tento týždeň";
-  if (n === 1) return "1 týždeň";
-  if (n < 5) return `${n} týždne`;
-  return `${n} týždňov`;
+  return `${n} ${slovoTyzden(n)}`;
 }
 
 /**
@@ -1822,12 +1829,24 @@ function UpravitProfil({ meno, c, email, telefon, zapis, onUlozene }: {
     );
   }
 
+  /**
+   * Narodeniny sú `type="date"`, nie textové pole. Jerry, 1. 10. 2026:
+   * „keď chcem upraviť dátum narodenia, potrebujem, aby mi vyskočil
+   * kalendár a ja som to mohol len vyťukať — a nedávaj mi americký, ale
+   * európsky formát."
+   *
+   * Prehliadač kreslí kalendár sám a poradie dňa a mesiaca berie z jazyka
+   * zariadenia; Jerryho Chrome je `sk-SK`, takže ukazuje `dd.mm.rrrr`
+   * (overené v jeho prehliadači, nie odhadnuté). Do databázy ide tak či tak
+   * `RRRR-MM-DD` — `value` dátumového poľa je vždy ISO, nech sa zobrazuje
+   * akokoľvek. Preto sa nemusí nič prekladať ani parsovať.
+   */
   const polia = [
-    { k: "email" as const, l: "e-mail", w: 210 },
-    { k: "telefon" as const, l: "telefón", w: 150 },
-    { k: "narodeniny" as const, l: "narodeniny (RRRR-MM-DD)", w: 170 },
-    { k: "zdroj" as const, l: "odkiaľ prišiel", w: 150 },
-    { k: "zdrojKto" as const, l: "kto ho priviedol", w: 170 },
+    { k: "email" as const, l: "e-mail", w: 210, typ: "email" },
+    { k: "telefon" as const, l: "telefón", w: 150, typ: "tel" },
+    { k: "narodeniny" as const, l: "narodeniny", w: 150, typ: "date" },
+    { k: "zdroj" as const, l: "odkiaľ prišiel", w: 150, typ: "text" },
+    { k: "zdrojKto" as const, l: "kto ho priviedol", w: 170, typ: "text" },
   ];
 
   return (
@@ -1838,9 +1857,16 @@ function UpravitProfil({ meno, c, email, telefon, zapis, onUlozene }: {
           <label key={x.k} style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 10.5, color: C.textDim }}>
             {x.l}
             <input
+              type={x.typ}
               value={f[x.k]}
               onChange={(e) => setF({ ...f, [x.k]: e.target.value })}
-              style={{ width: x.w, padding: "7px 9px", borderRadius: 8, fontSize: 12.5, border: `1px solid ${C.border}`, background: C.bg, color: C.text }}
+              style={{
+                width: x.w, padding: "7px 9px", borderRadius: 8, fontSize: 12.5,
+                border: `1px solid ${C.border}`, background: C.bg, color: C.text,
+                // Bez toho nakreslí prehliadač kalendár v svetlom — v tmavej
+                // appke oslepujúci biely obdĺžnik.
+                colorScheme: "dark",
+              }}
             />
           </label>
         ))}
@@ -2405,20 +2431,24 @@ function NovyKlient({ zapis, onHotovo }: {
       <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 8 }}>Nový klient</div>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
         {([
-          { k: "meno" as const, l: "meno a priezvisko", w: 220 },
-          { k: "email" as const, l: "e-mail", w: 210 },
-          { k: "telefon" as const, l: "telefón", w: 150 },
-          { k: "narodeniny" as const, l: "narodeniny (RRRR-MM-DD)", w: 170 },
-          { k: "zdroj" as const, l: "odkiaľ prišiel", w: 150 },
-          { k: "zdrojKto" as const, l: "kto ho priviedol", w: 170 },
-          { k: "poznamka" as const, l: "poznámka", w: 200 },
+          { k: "meno" as const, l: "meno a priezvisko", w: 220, typ: "text" },
+          { k: "email" as const, l: "e-mail", w: 210, typ: "email" },
+          { k: "telefon" as const, l: "telefón", w: 150, typ: "tel" },
+          { k: "narodeniny" as const, l: "narodeniny", w: 150, typ: "date" },
+          { k: "zdroj" as const, l: "odkiaľ prišiel", w: 150, typ: "text" },
+          { k: "zdrojKto" as const, l: "kto ho priviedol", w: 170, typ: "text" },
+          { k: "poznamka" as const, l: "poznámka", w: 200, typ: "text" },
         ]).map((x) => (
           <label key={x.k} style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 10.5, color: C.textDim }}>
             {x.l}
             <input
+              type={x.typ}
               value={f[x.k]}
               onChange={(e) => setF({ ...f, [x.k]: e.target.value })}
-              style={{ width: x.w, padding: "7px 9px", borderRadius: 8, fontSize: 12.5, border: `1px solid ${C.border}`, background: C.bg, color: C.text }}
+              style={{
+                width: x.w, padding: "7px 9px", borderRadius: 8, fontSize: 12.5,
+                border: `1px solid ${C.border}`, background: C.bg, color: C.text, colorScheme: "dark",
+              }}
             />
           </label>
         ))}
