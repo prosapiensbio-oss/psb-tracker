@@ -27,6 +27,7 @@ import { objednaneVerzia,
   pocetUvodnych,
 } from "../../lib/psb/compute";
 import { fmtCZK, fmtDMY, monthLabel, normName, weekKey, weekLabel, kedyStrucne } from "../../lib/psb/format";
+import { SmsKlientovi } from "./SmsKlientovi";
 import { C, mix, S, badge, btn } from "../../lib/psb/theme";
 import { Balicky, odtrenovaneMimoExportu, type KalUdalost } from "./Kalendar";
 import { jeKlient } from "./MarketingLievik";
@@ -1745,6 +1746,18 @@ export function Dashboard({
                       {fmtDMY(p.datum)} · {p.popis.split(" - from ")[0] || "poplatok"}
                     </span>
                   </button>
+                  {/* Jerry, 1. 10. 2026: „Danielka je v mínuse 9 400, ale
+                      neviem, kde by som mohol kliknúť na to, aby som jej
+                      poslal SMS?" Dlaždica vedela povedať, kto dlží, a tým
+                      skončila — ďalší krok bol cez stôl klienta a späť.
+                      Dátum poplatku ide do textu: suma bez dôvodu je
+                      obvinenie, suma s dátumom je pripomienka. */}
+                  <SmsKlientovi
+                    meno={p.klient}
+                    trener={clients[p.klient]?.primaryTrainer || ""}
+                    platba={{ suma: p.suma, datum: fmtDMY(p.datum) }}
+                    maly
+                  />
                 </div>
               ))}
             </div>

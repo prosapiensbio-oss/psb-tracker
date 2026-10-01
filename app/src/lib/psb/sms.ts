@@ -159,21 +159,50 @@ export function textSms(v: SpravaProKlienta): string {
  *
  * Jerry, 1. 10. 2026: „Danielka Šašinkova je v mínuse 9 400, ale neviem, kde
  * by som mohol kliknúť na to, aby som jej poslal SMS?" Nikde — karta
- * dlžníkov mala len meno, sumu a „vybavené". Všetky ostatné správy appky sú
- * o hodinách, nie o peniazoch.
+ * nezaplatených mala len meno, sumu a klik na stôl klienta. Všetky ostatné
+ * správy appky sú o hodinách, nie o peniazoch.
  *
- * TEXT HOVORÍ, ZA ČO TO JE. „Dlhuješ 9 400" je obvinenie; „za balíček
- * z 9. 9." je pripomienka a klient si to vie overiť. Dátum je to jediné,
- * čo z jednej sumy robí konkrétnu vec.
+ * DVE VECI, KTORÉ PRVÉ ZNENIE ROBILO ZLE
+ *
+ * Jerry o ňom: „‚Pošleš ju prosím' je také pasívne agresívne" a „‚už si ju
+ * poslal' mi príde — no nie kokot, veď preto ti píšem, lebo som neposlala".
+ *
+ *  1. **Nerozkazuje.** „Pošleš ju prosím?" je otázka len tvarom. Správa
+ *     povie, čo appka vidí, a nechá klienta konať.
+ *  2. **Netvrdí, že klient nezaplatil.** Appka to vedieť NEMÔŽE: poplatok
+ *     v PTminderi stojí otvorený, kým ho niekto nezmaže, a platba a balíček
+ *     sa nemusia stretnúť ani v jednom smere. Preto „chýba mi" (chyba je na
+ *     mojej strane evidencie) a výslovná odpustka „ak už odišla, nič nerieš".
+ *     Bez nej správa obviňuje človeka, ktorý zaplatil včera.
+ *
+ * SUMA MÁ MAŤ DÔVOD. „Dlhuješ 9 400" je obvinenie; „za balíček z 9. 9." je
+ * pripomienka, ktorú si klient vie overiť. Keď sa dátum aj s odkazom do
+ * jednej SMS nezmestí, vypadne dátum — nie odpustka: za odkazom je celý
+ * posledný balíček aj QR, takže informácia sa nestráca, len sa presúva.
  *
  * Suma sa píše bez medzier v tisícoch — „9400 Kc" prežije každú bránu,
  * kým úzka medzera sa občas zmení na otáznik.
  */
-export function textSmsPlatba(v: { oslovenie: string; trener: string; suma: number; datum?: string }): string {
-  const za = v.datum ? ` za balíček z ${v.datum}` : "";
-  return bezDiakritiky(
-    `Ahoj ${v.oslovenie}, evidujem ešte neuhradenú platbu ${Math.round(v.suma)} Kc${za}. Pošleš ju prosím? Ďakujem, ${v.trener}, ProSapiens`,
-  );
+export function textSmsPlatba(v: {
+  oslovenie: string; trener: string; suma: number;
+  /** Dátum balíčka, za ktorý sa platí — „9. 9.". */
+  datum?: string;
+  /** Odkaz na /v/<token>: posledný balíček a QR na platbu. */
+  odkaz?: string;
+}): string {
+  const zloz = (sDatumom: boolean) => {
+    // Bez dátumu sa poradie slov mení: „za balíček z 9. 9. mi chýba" —
+    // ale „mi chýba" na začiatku vety je nezmysel.
+    const comu = sDatumom && v.datum ? `za balíček z ${v.datum} mi chýba` : "chýba mi";
+    // Krátko zámerne: odkaz má 55 znakov a s dlhším menom by sa správa
+    // prehupla do druhej SMS. Čo za odkazom je, povie stránka sama.
+    const kam = v.odkaz ? ` Prehľad a QR: ${v.odkaz}` : "";
+    return bezDiakritiky(
+      `Ahoj ${v.oslovenie}, ${comu} platba ${Math.round(v.suma)} Kc. Ak už odišla, nič nerieš.${kam} ${v.trener}, ProSapiens`,
+    );
+  };
+  const sDatumom = zloz(true);
+  return dlzkaSpravy(sDatumom).sprav > 1 ? zloz(false) : sDatumom;
 }
 
 /**

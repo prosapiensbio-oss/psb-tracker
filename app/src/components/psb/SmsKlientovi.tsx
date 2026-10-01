@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-import { dlzkaSpravy, rodZMena, textSms } from "../../lib/psb/sms";
+import { dlzkaSpravy, rodZMena, textSms, textSmsPlatba } from "../../lib/psb/sms";
 import { C, mix } from "../../lib/psb/theme";
 
 /**
@@ -39,7 +39,7 @@ const kontakty = () => {
   return cacheKontaktov;
 };
 
-export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, odvodene = false, sMailom = false, dnesnyTrening = false, maly = false }: {
+export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, platba, odvodene = false, sMailom = false, dnesnyTrening = false, maly = false }: {
   meno: string;
   /** Koľko hodín zostáva; 0 alebo menej = balíček došiel. */
   zostatok?: number;
@@ -51,6 +51,14 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
    * nový" — je to iný okamih, nie iná formulácia tej istej veci.
    */
   predvolenyText?: string;
+  /**
+   * Pripomienka platby namiesto správy o hodinách.
+   *
+   * Nie je to `predvolenyText`: ten text je hotový a odkaz sa pri ňom
+   * nepýta. Tu odkaz TREBA — za ním je QR na platbu, kvôli ktorému sa
+   * správa píše — takže text sa skladá až po jeho príchode.
+   */
+  platba?: { suma: number; datum?: string };
   /** `true` = počet hodín je dopočítaný z názvu členstva, nie z exportu. */
   odvodene?: boolean;
   /** Ide spolu s mailom? Mení vetu o tom, kde nájde dochádzku. */
@@ -93,8 +101,17 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
    */
   useEffect(() => {
     if (!otvorene) return;
-    setText(predvolenyText || textSms({ oslovenie: meno.split(" ")[0], trener, zostatok, sMailom, dnesnyTrening, rod, odkaz: odkaz || undefined }));
-  }, [otvorene, meno, trener, zostatok, sMailom, dnesnyTrening, predvolenyText, rod, odkaz]);
+    const oslovenie = meno.split(" ")[0];
+    setText(
+      predvolenyText
+        || (platba
+          ? textSmsPlatba({ oslovenie, trener, suma: platba.suma, datum: platba.datum, odkaz: odkaz || undefined })
+          : textSms({ oslovenie, trener, zostatok, sMailom, dnesnyTrening, rod, odkaz: odkaz || undefined })),
+    );
+    // Závislosťou sú HODNOTY, nie objekt `platba`: nový literál pri každom
+    // prekreslení rodiča by text preskladal aj uprostred písania.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [otvorene, meno, trener, zostatok, sMailom, dnesnyTrening, predvolenyText, platba?.suma, platba?.datum, rod, odkaz]);
 
   const posli = async () => {
     setBezi(true); setHlaska("");
@@ -139,7 +156,7 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
         <>
           {/* Rod mení „mal si" na „mala si". Heuristika z mena sa mýli
               (Saša, Nikita), preto prepínač — a preskladá celý text. */}
-          {!predvolenyText && (
+          {!predvolenyText && !platba && (
             <div style={{ display: "flex", gap: 4, alignItems: "center", marginBottom: 5 }}>
               {([["m", "on"], ["z", "ona"]] as const).map(([r, l]) => (
                 <button

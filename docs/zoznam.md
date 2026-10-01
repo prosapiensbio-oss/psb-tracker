@@ -78,6 +78,16 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
 - [x] **Po úvodnom: to isté tlačidlo** v notifikácii „SMS po úvodnom"
   (1. 10. 2026) — tá istá obsluha, len `druh: "po"`, bez ceny a telefón
   z fakturačných kontaktov.
+- [x] **Stránka za odkazom prepísaná** (1. 10. 2026) — česká, svetlá, so
+  sadzbou zo živého webu; os času končí pri poslednom balíčku (Markétin
+  výpis mal na telefóne 7 487 px), celá história chodí mailom na vyžiadanie
+  cez tlačidlo na stránke, a pri dlhu je na nej QR na platbu. Dlh sa počíta
+  z otvorených poplatkov PTmindera, nie len z balíčkov v Kokpite.
+- [x] **SMS k nezaplatenej platbe** (1. 10. 2026) — tlačidlo je na dlaždici
+  „Nezaplatené" na dashboarde. Text nerozkazuje a netvrdí, že klient
+  nezaplatil: appka to vedieť nemôže, preto „chýba mi" a „ak už odišla, nič
+  nerieš". Odkaz na stránku s QR je v nej; dátum balíčka ustúpi, keby sa
+  správa nezmestila do jednej SMS.
 - [ ] **Profil trenéra na webe** — stránka Jerryho ani Terezky neexistuje,
   odkaz zatiaľ vedie na `/o-nas/`.
   (Skúšobné hodnotenia v `klient_merania` už zmazané sú — tabuľka je prázdna.)

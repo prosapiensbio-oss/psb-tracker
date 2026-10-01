@@ -157,6 +157,28 @@ describe("textSmsPlatba", () => {
     expect(dlzkaSpravy(t).sprav).toBe(1);
   });
 
+  it("nerozkazuje a netvrdí, že klient nezaplatil", () => {
+    // Jerry, 1. 10. 2026: „‚Pošleš ju prosím' je také pasívne agresívne" a
+    // „‚už si ju poslal' mi príde — no nie kokot, veď preto ti píšem, lebo
+    // som neposlala." Appka nevie, či platba odišla; vie len, že ju nevidí.
+    const t = textSmsPlatba({ oslovenie: "Daniela", trener: "Terezka", suma: 9400, datum: "9. 9." });
+    expect(t).not.toContain("Posles");
+    expect(t).not.toContain("neuhraden");
+    expect(t).toContain("mi chyba platba");
+    expect(t).toContain("Ak uz odisla");
+  });
+
+  it("s odkazom sa do jednej správy zmestí aj dlhé meno — dátum ustúpi odkazu", () => {
+    const odkaz = "https://kokpit.prosapiensbio.workers.dev/v/NXWYvSt7uctn";
+    for (const oslovenie of ["Jan", "Daniela", "Bartolomej"]) {
+      const t = textSmsPlatba({ oslovenie, trener: "Terezka", suma: 9400, datum: "9. 9.", odkaz });
+      expect(dlzkaSpravy(t).sprav).toBe(1);
+      expect(t).toContain(odkaz);
+      // Odpustka zostáva vždy; dátum je to, čo ustúpi — nesie ho stránka.
+      expect(t).toContain("Ak uz odisla");
+    }
+  });
+
   it("bez dátumu sa veta nerozsype", () => {
     const t = textSmsPlatba({ oslovenie: "Jan", trener: "Terezka", suma: 1100 });
     expect(t).toContain("1100 Kc");
