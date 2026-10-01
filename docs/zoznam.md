@@ -237,7 +237,12 @@ k 25. 9. 2026:
 | závery po termíne overenia | 13 z 18 otvorených |
 | šesť konkrétnych dôvodov odchodu — Andrea Čonkova, Vojta Bartoň, Viera Adamkova, Josef Žiška, Jiri Kubik, Denisa Chmelarova | 6, všetky prázdne od 15. 9. |
 
-## 6 · Nový web (téma psb-spready, nahraná neaktívna)
+## 6 · Nový web (téma psb-spready — ŽIVÁ, od 1. 10. 2026 overené)
+
+Téma je na webe AKTÍVNA (admin hlási „Theme: ProSapiens Spready 1.0"),
+nie nahratá bokom — nadpis tu tvrdil opak. Zmena v nej sa preto robí na
+DVOCH miestach: v repe (`navrhy-webu/tema/psb-spready/`) aj cez Editor
+šablón vo WordPresse, inak ju prvé nahratie témy prepíše.
 
 Z posledného kola kontroly (17.–18. 9.) zostalo:
 
