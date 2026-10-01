@@ -127,7 +127,7 @@ function PoleOdporucatela({ meno, hodnota, mena, onUloz }: { meno: string; hodno
  * Je to nevratná operácia nad reálnymi tréningami a platbami. Náhľad s počtami
  * je jediná príležitosť všimnúť si, že sa premenúva niekto iný, než sa myslelo.
  */
-function Premenovanie({ meno, onHotovo }: { meno: string; onHotovo: (nove: string) => void | Promise<void> }) {
+export function Premenovanie({ meno, onHotovo }: { meno: string; onHotovo: (nove: string) => void | Promise<void> }) {
   const [otvorene, setOtvorene] = useState(false);
   const [nove, setNove] = useState(meno);
   const [nahlad, setNahlad] = useState<{ spolu: number; dotknute: Record<string, number> } | null>(null);

@@ -15,6 +15,8 @@ import { CENNIK, platnostDo } from "../../lib/psb/cennik";
 import { KALENDAR_TRENERA } from "../../lib/psb/nahodTrening";
 import { osCasuKlienta, treningyVBalicku } from "../../lib/psb/klientOsCasu";
 import { mesiacovVztahu, sedeniaPoMesiacoch, tempoMesacne } from "../../lib/psb/profil";
+import { odhadVycerpania } from "../../lib/psb/odhadVycerpania";
+import { Premenovanie } from "./Klienti";
 import { zdravieKlienta } from "../../lib/psb/klientZdravie";
 import type { ClientAgg } from "../../lib/psb/compute";
 import type { PSBData } from "../../lib/psb/types";
@@ -506,7 +508,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
    * nemeškal nikto.
    */
   const rytmus = useMemo(() => {
-    const prazdny = { dni: null as number | null, obvykle: null as number | null, farba: C.textMuted };
+    const prazdny = { dni: null as number | null, obvykle: null as number | null, odstupy: [] as number[], farba: C.textMuted };
     if (!c) return prazdny;
     const dniS = c.sessions.map((x) => x.date.slice(0, 10)).sort();
     const posledny = dniS[dniS.length - 1];
@@ -520,9 +522,27 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
     return {
       dni: odKedy,
       obvykle,
+      /** Tie isté medzery použije odhad vyčerpania balíčka — nech sa nepočítajú dvakrát. */
+      odstupy,
       farba: !obvykle ? C.textMuted : pomer >= 2.5 ? C.red : pomer >= 1.5 ? C.orange : C.green,
     };
   }, [c]);
+
+  /**
+   * Kedy balíček dôjde. Zostatok sám o sebe nepovie, kedy treba zavolať —
+   * štyri hodiny sú pri dvoch tréningoch týždenne dva týždne a pri jednom
+   * za tri týždne tri mesiace (Jerry, 1. 10. 2026).
+   */
+  const odhadDojde = useMemo(() => {
+    if (!c || c.packageTotal <= 0) return null;
+    const zostava = c.packageRemaining - mimoExportu;
+    // Koľko hodín ukrojí JEHO tréning — 90-minútové míňajú balíček rýchlejšie.
+    const trvania = c.sessions.map((x) => x.duration || 60).filter((x) => x > 0);
+    const hodinNaTrening = trvania.length
+      ? Math.round((trvania.reduce((a, b) => a + b, 0) / trvania.length / 60) * 100) / 100
+      : 1;
+    return odhadVycerpania({ zostava, odstupy: rytmus.odstupy, buduce, dnes: dnesISO(), hodinNaTrening });
+  }, [c, mimoExportu, rytmus.odstupy, buduce]);
 
   /** Rytmus klienta po mesiacoch — do záložky „všetko". */
   const poMesiacoch = useMemo(() => (c ? sedeniaPoMesiacoch(c) : []), [c]);
@@ -1022,6 +1042,36 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
               {nazovProduktu(c.membership) || `z ${c.packageTotal}`}
               {c.packageValidTo ? ` · do ${fmtDMY(c.packageValidTo)}` : ""}
             </div>
+            {/* Kedy dôjde. Pri objednaných termínoch je to dátum, nie odhad —
+                a karta to rozlišuje slovom, lebo podľa toho sa volá klientovi. */}
+            {odhadDojde && (
+              <div style={{ fontSize: 11.5, color: C.text, marginTop: 6, lineHeight: 1.5 }}>
+                {odhadDojde.iste ? (
+                  <>
+                    <span style={{ color: C.textDim }}>vyčerpá objednanými termínmi</span>{" "}
+                    <b>{fmtDMY(odhadDojde.od)}</b>
+                    <span style={{ color: C.textDim }}> ({tyzdne(odhadDojde.tyzdneOd)})</span>
+                  </>
+                ) : (
+                  <>
+                    <span style={{ color: C.textDim }}>približne dôjde</span>{" "}
+                    <b>{fmtDMY(odhadDojde.od)} – {fmtDMY(odhadDojde.do)}</b>
+                    <span style={{ color: C.textDim }}>
+                      {" "}({odhadDojde.tyzdneOd === odhadDojde.tyzdneDo
+                        ? tyzdne(odhadDojde.tyzdneOd)
+                        : `${odhadDojde.tyzdneOd}–${odhadDojde.tyzdneDo} týždňov`})
+                    </span>
+                  </>
+                )}
+                {/* Platnosť, ktorá skončí skôr, odhad popiera — povedz to rovno,
+                    inak karta sľubuje hodiny, ktoré klient nestihne vyčerpať. */}
+                {c.packageValidTo && c.packageValidTo.slice(0, 10) < odhadDojde.od && (
+                  <div style={{ color: C.orange, fontSize: 10.5, marginTop: 2 }}>
+                    platnosť ale končí skôr — {fmtDMY(c.packageValidTo)}
+                  </div>
+                )}
+              </div>
+            )}
             {mimoExportu > 0 && (
               <div style={{ fontSize: 10.5, color: C.textDim, marginTop: 4, lineHeight: 1.45 }}>
                 PTminder hovorí {c.packageRemaining} h k poslednému exportu;
@@ -1120,6 +1170,14 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
               </div>
             )}
             {c.zdrojKto && <div><span style={{ color: C.textDim }}>priviedol</span> {c.zdrojKto}</div>}
+            <UpravitProfil
+              meno={meno}
+              c={c}
+              email={kontaktMail}
+              telefon={kontaktTelefon}
+              zapis={zapisOverride}
+              onUlozene={() => { oznam("klienti"); oznam("peniaze"); }}
+            />
           </div>
         )}
 
@@ -1671,6 +1729,139 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
 }
 
 /** Koľko dní do najbližších narodenín. null = dátum nedáva zmysel. */
+/** „1 týždeň / 2 týždne / 5 týždňov" — bez toho by karta písala „1 týždňov". */
+function tyzdne(n: number): string {
+  if (n <= 0) return "tento týždeň";
+  if (n === 1) return "1 týždeň";
+  if (n < 5) return `${n} týždne`;
+  return `${n} týždňov`;
+}
+
+/**
+ * ÚPRAVA PROFILU KLIENTA.
+ *
+ * Jerry, 1. 10. 2026: „v profile klienta mi chýba upravovanie profilu — čo
+ * keď chcem niekomu prepísať narodeniny alebo meno, mailovú adresu? Viem
+ * meniť fakturačné údaje, ale žiadne iné."
+ *
+ * Mal pravdu: založiť klienta s týmito poliami sa dalo (NovyKlient), opraviť
+ * ich už nie. Údaje pritom nežijú na jednom mieste a formulár to rešpektuje:
+ *
+ *  • narodeniny, odkiaľ prišiel a kto ho priviedol sú ručné opravy
+ *    (`client_overrides`) a idú cestou appky, nie vlastným fetchom — inak by
+ *    ostatné obrazovky držali starú hodnotu (pravidlo z 23. 9. 2026),
+ *  • e-mail a telefón patria do tabuľky, z ktorej sa berie aj faktúra;
+ *    vedľajšia kópia by znamenala dve adresy toho istého človeka,
+ *  • MENO sa tu nemení. Je v siedmich tabuľkách a v troch z nich v kľúči
+ *    importu — preto na to appka má vlastnú cestu s náhľadom dopadu a tá sa
+ *    sem len pripája. Mlčky premenovať klienta spolu s narodeninami by
+ *    znamenalo nevratnú operáciu schovanú v bežnom uložení.
+ */
+function UpravitProfil({ meno, c, email, telefon, zapis, onUlozene }: {
+  meno: string;
+  c: { narodeniny?: string; zdroj?: string; zdrojKto?: string } | null;
+  email: string;
+  telefon: string;
+  zapis: (kluc: string, hodnota: unknown) => Promise<void>;
+  onUlozene: () => void;
+}) {
+  const [otvorene, setOtvorene] = useState(false);
+  const [f, setF] = useState({ email: "", telefon: "", narodeniny: "", zdroj: "", zdrojKto: "" });
+  const [pracujem, setPracujem] = useState(false);
+  const [hlaska, setHlaska] = useState("");
+
+  const otvor = () => {
+    setF({
+      email, telefon,
+      narodeniny: c?.narodeniny || "",
+      zdroj: c?.zdroj || "",
+      zdrojKto: c?.zdrojKto || "",
+    });
+    setHlaska("");
+    setOtvorene(true);
+  };
+
+  const uloz = async () => {
+    setPracujem(true); setHlaska("");
+    // Posielajú sa LEN zmenené polia. Prepisovať nezmenené by zbytočne
+    // prepísalo `updated_at` a v histórii by to vyzeralo ako zásah.
+    if ((c?.narodeniny || "") !== f.narodeniny.trim()) await zapis("narodeniny", f.narodeniny.trim());
+    if ((c?.zdroj || "") !== f.zdroj.trim()) await zapis("zdroj", f.zdroj.trim());
+    if ((c?.zdrojKto || "") !== f.zdrojKto.trim()) await zapis("zdrojKto", f.zdrojKto.trim());
+    if (email !== f.email.trim() || telefon !== f.telefon.trim()) {
+      // Klient môže mať viac adries. Prvá je hlavná, zvyšok ide do
+      // `dalsieMaily` — poslať ich spojené čiarkou by neprešlo overením
+      // formátu a zápis by ticho spadol na 400.
+      const adresy = adresyMailu(f.email).adresy;
+      const odpoved = await fetch("/api/vydane-faktury", {
+        method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          akcia: "udaje", klient: meno,
+          email: adresy[0] || "",
+          dalsieMaily: adresy.slice(1).join("\n"),
+          telefon: f.telefon.trim(),
+        }),
+      }).then((r) => r.json()).catch(() => ({ ok: false, error: "spojenie zlyhalo" }));
+      if (!odpoved?.ok) {
+        setPracujem(false);
+        setHlaska(odpoved?.error || "Kontakt sa nepodarilo uložiť.");
+        return;
+      }
+    }
+    setPracujem(false);
+    setHlaska("Uložené.");
+    onUlozene();
+  };
+
+  if (!otvorene) {
+    return (
+      <button onClick={otvor} style={{
+        marginTop: 8, padding: "5px 11px", borderRadius: 7, fontSize: 11.5, cursor: "pointer",
+        fontFamily: "inherit", border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted,
+      }}>Upraviť profil</button>
+    );
+  }
+
+  const polia = [
+    { k: "email" as const, l: "e-mail", w: 210 },
+    { k: "telefon" as const, l: "telefón", w: 150 },
+    { k: "narodeniny" as const, l: "narodeniny (RRRR-MM-DD)", w: 170 },
+    { k: "zdroj" as const, l: "odkiaľ prišiel", w: 150 },
+    { k: "zdrojKto" as const, l: "kto ho priviedol", w: 170 },
+  ];
+
+  return (
+    <div style={{ marginTop: 10, padding: "12px 13px", borderRadius: 10, border: `1px solid ${mix(C.accent, 32)}`, background: mix(C.accent, 7) }}>
+      <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 8, color: C.text }}>Upraviť profil</div>
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-end" }}>
+        {polia.map((x) => (
+          <label key={x.k} style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 10.5, color: C.textDim }}>
+            {x.l}
+            <input
+              value={f[x.k]}
+              onChange={(e) => setF({ ...f, [x.k]: e.target.value })}
+              style={{ width: x.w, padding: "7px 9px", borderRadius: 8, fontSize: 12.5, border: `1px solid ${C.border}`, background: C.bg, color: C.text }}
+            />
+          </label>
+        ))}
+        <button onClick={() => void uloz()} disabled={pracujem} style={{
+          padding: "8px 15px", borderRadius: 9, fontSize: 12.5, fontWeight: 700, cursor: pracujem ? "default" : "pointer",
+          fontFamily: "inherit", border: `1px solid ${mix(C.accent, 55)}`, background: mix(C.accent, 16), color: C.accentLight,
+        }}>{pracujem ? "…" : "Uložiť"}</button>
+        <button onClick={() => setOtvorene(false)} style={{
+          padding: "8px 12px", borderRadius: 9, fontSize: 12, cursor: "pointer", fontFamily: "inherit",
+          border: "none", background: "transparent", color: C.textDim,
+        }}>zavrieť</button>
+      </div>
+      {hlaska && <div style={{ fontSize: 11.5, color: hlaska === "Uložené." ? C.green : C.orange, marginTop: 7 }}>{hlaska}</div>}
+      {/* Meno má vlastnú cestu — nevratná operácia nepatrí do bežného uloženia. */}
+      <div style={{ marginTop: 10, paddingTop: 9, borderTop: `1px solid ${mix(C.border, 70)}` }}>
+        <Premenovanie meno={meno} onHotovo={() => { setOtvorene(false); onUlozene(); }} />
+      </div>
+    </div>
+  );
+}
+
 function doNarodenin(narodeniny: string): number | null {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(narodeniny);
   if (!m) return null;

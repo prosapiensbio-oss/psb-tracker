@@ -139,22 +139,44 @@ export const Route = createFileRoute("/api/vydane-faktury")({
           if (b.akcia === "udaje") {
             const klient = await kanonickeMeno(DB, kus(b.klient, 120));
             if (!klient) return Response.json({ ok: false, error: "Chýba klient." }, { status: 400 });
+            /**
+             * ZÁPIS ZLUČUJE, NEPREPISUJE CELÝ RIADOK.
+             *
+             * Dovtedy sa `UPDATE SET` nastavoval zo VŠETKÝCH polí, nech ich
+             * volajúci poslal alebo nie. Formulár fakturačných údajov posiela
+             * všetky, takže to roky nevadilo — ale stačilo, aby niekto poslal
+             * len e-mail a telefón (presne to robí „Upraviť profil" od 1. 10.
+             * 2026), a klientovi by zmizla adresa, IČO, mesto aj kontaktná
+             * osoba. Tichý zápis, ktorý maže viac, než sa poslalo.
+             *
+             * Preto sa mení LEN to, čo v požiadavke naozaj je. Prázdny reťazec
+             * je stále platná hodnota — `firma: ""` pole vyčistí, chýbajúci
+             * kľúč ho nechá tak. Bez toho rozdielu by sa údaj nedal zmazať.
+             */
+            const bolo = await DB.prepare(
+              `SELECT stat, firma, ico, dic, ulica, psc, mesto, email, dalsie_maily, telefon, web,
+                      os_titul, os_meno, os_priezvisko, os_mobil FROM klient_fakturacia WHERE klient = ?`,
+            ).bind(klient).first<Record<string, string | null>>().catch(() => null);
+            const je = (k: string) => Object.prototype.hasOwnProperty.call(b, k);
+            const stare = (k: string) => String(bolo?.[k] ?? "");
             const v = {
-              stat: kus(b.stat, 60) || "Česká republika",
-              firma: kus(b.firma, 160),
-              ico: kus(b.ico, 20),
-              dic: kus(b.dic, 20),
-              ulica: kus(b.ulica, 120),
-              psc: kus(b.psc, 20),
-              mesto: kus(b.mesto, 80),
-              email: kus(b.email, 160).toLowerCase(),
-              dalsie_maily: String(b.dalsieMaily ?? "").split(/[\n,;]/).map((x) => x.trim().toLowerCase()).filter(Boolean).join("\n").slice(0, 400),
-              telefon: kus(b.telefon, 40),
-              web: kus(b.web, 120),
-              os_titul: kus(b.osTitul, 30),
-              os_meno: kus(b.osMeno, 60),
-              os_priezvisko: kus(b.osPriezvisko, 60),
-              os_mobil: kus(b.osMobil, 40),
+              stat: je("stat") ? (kus(b.stat, 60) || "Česká republika") : (stare("stat") || "Česká republika"),
+              firma: je("firma") ? kus(b.firma, 160) : stare("firma"),
+              ico: je("ico") ? kus(b.ico, 20) : stare("ico"),
+              dic: je("dic") ? kus(b.dic, 20) : stare("dic"),
+              ulica: je("ulica") ? kus(b.ulica, 120) : stare("ulica"),
+              psc: je("psc") ? kus(b.psc, 20) : stare("psc"),
+              mesto: je("mesto") ? kus(b.mesto, 80) : stare("mesto"),
+              email: je("email") ? kus(b.email, 160).toLowerCase() : stare("email"),
+              dalsie_maily: je("dalsieMaily")
+                ? String(b.dalsieMaily ?? "").split(/[\n,;]/).map((x) => x.trim().toLowerCase()).filter(Boolean).join("\n").slice(0, 400)
+                : stare("dalsie_maily"),
+              telefon: je("telefon") ? kus(b.telefon, 40) : stare("telefon"),
+              web: je("web") ? kus(b.web, 120) : stare("web"),
+              os_titul: je("osTitul") ? kus(b.osTitul, 30) : stare("os_titul"),
+              os_meno: je("osMeno") ? kus(b.osMeno, 60) : stare("os_meno"),
+              os_priezvisko: je("osPriezvisko") ? kus(b.osPriezvisko, 60) : stare("os_priezvisko"),
+              os_mobil: je("osMobil") ? kus(b.osMobil, 40) : stare("os_mobil"),
             };
             if (v.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v.email)) {
               return Response.json({ ok: false, error: "E-mail nevyzerá ako e-mail." }, { status: 400 });
