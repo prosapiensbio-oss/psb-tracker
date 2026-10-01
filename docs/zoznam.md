@@ -263,6 +263,18 @@ Z posledného kola kontroly (17.–18. 9.) zostalo:
 
 ## Zavreté (aby sa neotvárali odznova)
 
+### Notifikácie „konal sa tréning?" — opravené 1. 10. 2026
+
+Bolo ich 695, z toho 650 z roku 2024: kontrola strážila len horný koniec
+pokrytia exportu, spodný nie. Doplnená spodná hranica + vek nálezu 31 dní.
+Po nasadení ich je v registri nula — staršie boli falošné, septembrové sú
+vysvetlené ručnými zrušeniami (138 zapísaných) alebo odklepnuté.
+
+**Dátum spotreby:** kontrola vznikla, keď bol pravdou PTminder. Keď doň Jerry
+prestane zapisovať, bude „v kalendári áno, v PTminderi nie" normálny stav
+každého tréningu — vtedy ju vypnúť. Nástupca už existuje: karta „Vydrží
+kalendár sám?" v Prechode.
+
 ### Nepoužívané skripty a štýly preč — 169 kB (1. 10. 2026)
 
 Pristávacia stránka ťahala ~215 kB JavaScriptu a ~90 kB štýlov. Po odrátaní

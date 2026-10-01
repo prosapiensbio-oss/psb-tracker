@@ -366,6 +366,31 @@ A keď si obsluha hranicu aj tak vynucuje (`Math.max(15, …)`), patrí
 do políčka tiež — inak človek klikne, uvidí nezmysel a appka mu ho ticho
 prepíše na niečo iné.
 
+## Okno sa stráži z OBOCH strán, inak sa appka pýta na prehistóriu
+
+Kontrola „tréning je v kalendári, ale v PTminderi nie — konal sa?" strážila
+len horný koniec pokrytia exportu. Spodný chýbal. Export v Kokpite začína
+3. 1. 2025, kalendár drží série z roku 2024 (RRULE sa nesmie zahodiť) — a tak
+sa appka pýtala na obdobie, o ktorom PTminder v Kokpite nikdy nič nemal.
+Zmerané 1. 10. 2026: **695 otázok, z toho 650 z roku 2024**, pri dvadsiatich
+odklepnutiach za celý čas.
+
+Jerry: „veľa notifikácií naraz takých istých bude iba áno áno áno a nebudem
+tomu venovať pozornosť." To je presne ten spôsob, akým register prestane
+fungovať — nie tým, že mlčí, ale tým, že svieti celý.
+
+**Pravidlo:** keď sa niečo porovnáva s dátami, ktoré pokrývajú OBDOBIE,
+ohranič ho z oboch strán — `MIN` aj `MAX` zdroja. A ku každému nálezu, ktorý
+čaká na človeka, pridaj vek: otázka, s ktorou sa už nedá nič urobiť (tréning
+spred dvoch mesiacov nikto spätne nedopíše), nepatrí do zoznamu vôbec.
+
+**A pozor na dátum spotreby celej kontroly.** Táto vznikla, keď bol PTminder
+pravda. Od 1. 10. 2026 je pravdou Kokpit — až Jerry prestane do PTmindera
+zapisovať, bude „v kalendári áno, v PTminderi nie" normálny stav KAŽDÉHO
+tréningu a kontrolu treba vypnúť. Jej nástupca už existuje: karta „Vydrží
+kalendár sám?" v Prechode hovorí to isté ako jedno číslo za týždeň namiesto
+jednej otázky na tréning.
+
 ## Odporúčanie bez pamäte sa opakuje donekonečna
 
 Karta „Čo publikovať ďalej" navrhovala napísať stránky, ktoré už napísané
