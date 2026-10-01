@@ -2184,3 +2184,35 @@ appka vyrobí odkaz a pripraví SMS. Pravidlá:
   žiadna obrazovka nemala. **Zmena témy sa robí na DVOCH miestach**: v repe
   (`navrhy-webu/tema/psb-spready/`, zdroj pravdy) a cez Editor šablón vo
   WordPresse (živý web) — inak sa pri najbližšom nahratí témy prepíše.
+
+
+## `<datalist>` kreslí prehliadač — a na telefóne si ju položí, kam chce
+
+1. 10. 2026 Jerry nahadzoval tréningy z iPadu: zoznam klientov sa zjavil
+**odtrhnutý v ľavom hornom rohu obrazovky** a po prvom písmene zmizol úplne
+(iPadOS ho prehodí do pásu nad klávesnicou). Na MacBooku sa nad roletu
+položila **ponuka KONTAKTOV z telefónu** a náš zoznam ostal schovaný pod ňou.
+
+Ani jedno nie je chyba v našom kóde — je to presne to, čo `<datalist>` robí:
+dáva vzhľad aj umiestnenie prehliadaču. Pri poli, ktoré sa volá „meno",
+si ho navyše operačný systém vyloží ako kolónku na meno z adresára.
+
+**Roletu preto kreslí appka** (`components/psb/VyberMena.tsx`), filter je
+`najdiMena` v `lib/psb/vyberMena.ts`:
+
+- **Políčko musí systému povedať, že o kontakty nestojí**: `autoComplete`,
+  `autoCorrect`, `autoCapitalize` na `off`, `spellCheck` false a `name`,
+  v ktorom nie je slovo meno (`psb-vyber`). Bez toho ponuka kontaktov
+  prebije čokoľvek, čo nakreslíme.
+- **Roleta je NEPRIEHĽADNÁ** (`C.surface`) — pravidlo z 30. 9. 2026 platí aj
+  tu; cez priesvitnú by sa čítal text pod ňou.
+- **`onMouseDown` na položke robí `preventDefault`.** Bez toho políčko
+  stratí fokus skôr, než klik dobehne, roleta sa zavrie a nevyberie sa nič.
+- **Filter je lepší než prehliadačový**: nerozlišuje diakritiku ani veľkosť
+  písmen, hľadá aj v priezvisku a dve slová musia sedieť obe („martin v" →
+  Martin Vaško). Kto začína hľadaným, je hore.
+- Šípky, Enter a Escape fungujú — na MacBooku je to rýchlejšie než myš a je
+  to to isté, čo robila pôvodná roleta.
+
+V Kalendári boli takéto polia ŠTYRI; vymenili sa všetky naraz. Keď pribudne
+ďalšie pole s menom klienta, patrí doň `VyberMena`, nie `<datalist>`.

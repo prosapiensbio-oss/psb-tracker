@@ -15,6 +15,7 @@ import { C, mix } from "../../lib/psb/theme";
 import { Card, Empty, H3, Info, Select, TrenerPills } from "./ui";
 import { useUzke } from "./useUzke";
 import { menoDoBloku, rozlozUdalosti } from "../../lib/psb/kalendarRozlozenie";
+import { VyberMena } from "./VyberMena";
 
 /**
  * Kalendár — čo sa chystá a čo sa práve zmenilo.
@@ -707,20 +708,14 @@ function Mapovanie({ nezname: nezmameVsetky, mena, clients, onHotovo, trener, kt
                 {/* Sto šestnásť mien v rolete sa nedá prejsť očami. Písanie
                     filtruje priebežne — a keď appka niekoho navrhla, meno už
                     v poli stojí a stačí ho potvrdiť. */}
-                <input
-                  list={`kl-${n.trener}-${n.nazov}`}
-                  value={v.klient}
-                  onChange={(e) => setVyber({ ...vyber, [k]: { ...v, klient: e.target.value } })}
-                  placeholder="píš meno…"
-                  style={{
-                    flex: "1 1 190px", minWidth: 170, padding: "7px 10px", borderRadius: 8, fontSize: 12.5,
-                    border: `1px solid ${v.klient && !mena.includes(v.klient) ? C.orange : C.border}`,
-                    background: C.bg, color: C.text,
-                  }}
-                />
-                <datalist id={`kl-${n.trener}-${n.nazov}`}>
-                  {mena.map((m) => <option key={m} value={m} />)}
-                </datalist>
+                <div style={{ flex: "1 1 190px", minWidth: 170 }}>
+                  <VyberMena
+                    hodnota={v.klient}
+                    mena={mena}
+                    onZmen={(x) => setVyber({ ...vyber, [k]: { ...v, klient: x } })}
+                    varovanie={!!v.klient && !mena.includes(v.klient)}
+                  />
+                </div>
                 {!mena.includes(v.klient) && v.klient.trim().length >= 3 && (
                   <span style={{ fontSize: 11, color: C.textDim, flexBasis: "100%" }}>
                     Zatiaľ nie je klientom — uloží sa tak, ako si ho napísal, a spáruje sa sám,
@@ -805,20 +800,14 @@ function Mapovanie({ nezname: nezmameVsetky, mena, clients, onHotovo, trener, kt
                 </div>
                 <Select value={v.typ} onChange={(t) => setVyber({ ...vyber, [k]: { ...v, typ: t } })} options={TYPY} />
                 {(v.typ === "trening" || v.typ === "uvodny") && (
-                  <input
-                    value={v.klient}
-                    onChange={(e) => setVyber({ ...vyber, [k]: { ...v, klient: e.target.value } })}
-                    placeholder="píš meno…"
-                    list={`kl2-${n.trener}-${n.nazov}`}
-                    style={{
-                      flex: "1 1 170px", minWidth: 150, padding: "6px 9px", borderRadius: 8, fontSize: 12.5,
-                      border: `1px solid ${C.border}`, background: C.bg, color: C.text,
-                    }}
-                  />
+                  <div style={{ flex: "1 1 170px", minWidth: 150 }}>
+                    <VyberMena
+                      hodnota={v.klient}
+                      mena={mena}
+                      onZmen={(x) => setVyber({ ...vyber, [k]: { ...v, klient: x } })}
+                    />
+                  </div>
                 )}
-                <datalist id={`kl2-${n.trener}-${n.nazov}`}>
-                  {mena.map((m) => <option key={m} value={m} />)}
-                </datalist>
                 <button
                   onClick={() => void uloz(n)}
                   disabled={uklada === k || !daSa(v)}
@@ -1036,14 +1025,9 @@ function Zmeny({ zmeny, vybavene, onHotovo, mena }: { zmeny: Zmena[]; vybavene: 
         <option value="zrusene">Zrušený tréning</option>
         <option value="nahrada">Náhrada</option>
       </select>
-      <input
-        list="psb-kal-klienti"
-        value={novy.klient}
-        onChange={(e) => setNovy({ ...novy, klient: e.target.value })}
-        placeholder="klient"
-        style={{ flex: "1 1 180px", padding: "6px 10px", borderRadius: 7, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 12 }}
-      />
-      <datalist id="psb-kal-klienti">{mena.map((m) => <option key={m} value={m} />)}</datalist>
+      <div style={{ flex: "1 1 180px" }}>
+        <VyberMena hodnota={novy.klient} mena={mena} onZmen={(x) => setNovy({ ...novy, klient: x })} placeholder="klient" />
+      </div>
       <input
         type="date"
         value={novy.datum}
@@ -1794,19 +1778,16 @@ function OknoUdalosti({ vyber, mena, clients, predvolenyTrener, onZmen, onZavri,
       {sMenom && (
         <label style={{ ...popisok, marginBottom: 8 }}>
           klient
-          <input
-            list="okno-udalosti-klienti"
-            value={klient}
-            onChange={(e) => setKlient(e.target.value)}
-            placeholder="píš meno…"
+          <VyberMena
+            hodnota={klient}
+            mena={mena}
+            onZmen={setKlient}
             autoFocus={!u}
-            style={{ ...pole, border: `1px solid ${klient && !mena.includes(klient) ? C.orange : C.border}` }}
+            varovanie={!!klient && !mena.includes(klient)}
+            style={{ ...pole, width: "100%" }}
           />
         </label>
       )}
-      <datalist id="okno-udalosti-klienti">
-        {mena.map((m) => <option key={m} value={m} />)}
-      </datalist>
       {sMenom && !!navrh && navrh.kandidati.length > 0 && (
         <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 8 }}>
           {navrh.kandidati.filter((k) => k !== klient).slice(0, 3).map((k) => (
