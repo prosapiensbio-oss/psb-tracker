@@ -966,7 +966,15 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
                 background: zabudnutaPauza ? mix(C.orange, 15) : C.card,
                 color: zabudnutaPauza ? C.orange : C.textMuted,
               }}>
-              <option value="">{c ? `${c.status} (počíta appka)` : "čaká na prvý tréning"}</option>
+              {/* „Neaktívny" je pri človeku pred prvým tréningom nepravda:
+                  nie je to niekto, kto prestal chodiť, ale niekto, kto ešte
+                  nezačal. Appka ho pozná len preto, že má v kalendári
+                  dohodnutý úvodný (Jerry, 1. 10. 2026). */}
+              <option value="">{
+                c?.objednanyUvodny && !c.sessionCount
+                  ? `úvodný ${fmtDMY(c.objednanyUvodny)} — ešte netrénoval`
+                  : c ? `${c.status} (počíta appka)` : "čaká na prvý tréning"
+              }</option>
               {["Aktívny", "Pauza", "Neaktívny"].map((x) => <option key={x} value={x}>{x}</option>)}
             </select>
             {/* Tréner sa dá prepnúť (Jerry, 23. 9. 2026). Appka ho počíta

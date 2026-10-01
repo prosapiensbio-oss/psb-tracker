@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { doSchranky } from "../../lib/psb/kopirovanie";
 import { oznam } from "../../lib/psb/obnovaSignal";
-import { OBLASTI, zobrazit, type Formular, type Otazka, type Sekcia } from "../../lib/psb/anamnezaFormular";
+import { OBLASTI, zobrazit, type Formular, type Otazka, type Sekcia, popisOdchylky } from "../../lib/psb/anamnezaFormular";
 import { C, mix } from "../../lib/psb/theme";
 import { useUzke } from "./useUzke";
 
@@ -303,7 +303,7 @@ export function AnamnezaPanel({ meno }: { meno: string }) {
               Test postury{test.kedy ? ` · ${denCz(test.kedy)}` : ""}
             </div>
             <div style={{ fontSize: 11.5, color: C.text, marginTop: 5, lineHeight: 1.55 }}>
-              {test.odchylky.length > 0 && <>{test.odchylky.join(", ")}<br /></>}
+              {test.odchylky.length > 0 && <>{test.odchylky.map(popisOdchylky).join(", ")}<br /></>}
               {test.vzorec && <b>{test.vzorec}</b>}
             </div>
           </div>
@@ -391,6 +391,32 @@ export function AnamnezaPanel({ meno }: { meno: string }) {
 
             <div ref={telo} style={{ flexGrow: 1, minHeight: 0, overflowY: "auto", paddingTop: 16 }}>
               <div style={{ display: "flex", flexDirection: "column", gap: 18, maxWidth: 680 }}>
+                {/* ČO UŽ KLIENT O SEBE VIE — pred prvou otázkou, nie vedľa nej.
+                    Jerry, 1. 10. 2026: „nech sa tréner môže odkázať na to, čo
+                    už klient vie z testu." Výstup testu stál v bočnom stĺpci
+                    ako kontext; prvá veta rozhovoru sa ale píše tu a na bok sa
+                    pri písaní nepozerá nikto. Preto to isté na začiatku prvej
+                    sekcie — a v reči človeka: „predsunutahlab, vysazena-panev"
+                    sú hodnoty tlačidiel z webu, nie slová, ktorými sa dá začať. */}
+                {i === 0 && test && (test.oblasti.length > 0 || test.odchylky.length > 0 || test.vzorec) && (
+                  <div style={{ padding: "12px 14px", borderRadius: 10, background: mix(C.accent, 8), borderLeft: `3px solid ${C.accent}` }}>
+                    <div style={{ fontSize: 10.5, letterSpacing: 1.1, textTransform: "uppercase", color: C.accentLight }}>
+                      Toto si o sebe odklikol v teste postury{test.kedy ? ` · ${denCz(test.kedy)}` : ""}
+                    </div>
+                    <div style={{ fontSize: 13, color: C.text, marginTop: 7, lineHeight: 1.65 }}>
+                      {test.vzorec && <div><b>{test.vzorec}</b></div>}
+                      {test.odchylky.length > 0 && (
+                        <div style={{ marginTop: 3 }}>Odchýlky: {test.odchylky.map(popisOdchylky).join(", ")}</div>
+                      )}
+                      {test.oblasti.length > 0 && (
+                        <div style={{ marginTop: 3 }}>Bolesť: {test.oblasti.join(", ")}</div>
+                      )}
+                    </div>
+                    <div style={{ fontSize: 11, color: C.textDim, marginTop: 8, lineHeight: 1.55 }}>
+                      Klient to o sebe povedal sám a dostal k tomu analýzu — dá sa na to odvolať. Overuje sa to, nie opisuje.
+                    </div>
+                  </div>
+                )}
                 {teraz.otazky.map((o, idx) => (
                   <div key={o.id}>
                     <div style={{ display: "flex", alignItems: "baseline", gap: 9, marginBottom: 7, flexWrap: "wrap" }}>

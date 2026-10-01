@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { FORMULAR, viditelne, zobrazit, zTestuPostury, type Otazka } from "./anamnezaFormular";
+import { FORMULAR, viditelne, zobrazit, zTestuPostury, type Otazka, popisOdchylky } from "./anamnezaFormular";
 
 const klientskaSekcia = FORMULAR.klient[0];
 const otazka = (id: string): Otazka => {
@@ -105,5 +105,30 @@ describe("kľúče odpovedí sú stabilné", () => {
     const zdroj = FORMULAR.zapis.flatMap((s) => s.otazky).find((o) => o.id === "zdroj");
     expect(zdroj?.moznosti?.join(" ")).not.toContain("LinkedIn");
     expect(zdroj?.moznosti?.join(" ")).not.toContain("Facebook");
+  });
+});
+
+describe("popisOdchylky", () => {
+  it("slug z testu sa prečíta po česky", () => {
+    expect(popisOdchylky("predsunutahlab")).toBe("předsunutá hlava");
+    expect(popisOdchylky("vysazena-panev")).toBe("vysazená pánev");
+    expect(popisOdchylky("PREPADLA-KOLENA")).toBe("kolena padají dovnitř");
+  });
+
+  it("neznámy slug prejde, nezmizne", () => {
+    // Keď na webe pribudne tlačidlo, tréner má vidieť aspoň jeho hodnotu —
+    // prázdne miesto by vyzeralo, že klient nič neoznačil.
+    expect(popisOdchylky("nove-neco")).toBe("nove-neco");
+  });
+
+  it("odchýlky Josefa Pávka sa dajú prečítať celé", () => {
+    const t = zTestuPostury(
+      "NOVÝ TEST POSTURY OBLASTI BOLESTI: koleno, bedro, krc POSTURÁLNÍ ODCHYLKY: "
+      + "predsunutahlab, jedno-rameno-nize, vysazena-panev, prepadla-kolena "
+      + "IDENTIFIKOVANÝ VZOREC: 08 — Vzorec globální posturální dysbalance POZNÁMKA OD KLIENTA: nic",
+    );
+    expect(t?.odchylky.map(popisOdchylky)).toEqual(
+      ["předsunutá hlava", "jedno rameno níže", "vysazená pánev", "kolena padají dovnitř"],
+    );
   });
 });

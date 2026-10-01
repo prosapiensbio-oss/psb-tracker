@@ -43,6 +43,7 @@ const klient = (name: string, sessions: SessionRow[], extra: Partial<ClientAgg> 
   sessionCount: sessions.length, totalHours: sessions.length, totalPrice: 0, paidAvg: 0, avgPrice: 0,
   firstSession: sessions[0]?.date || "", lastSession: sessions[sessions.length - 1]?.date || "",
   attendance: 1, segment: "Stabilný", trainersNedavno: {}, trainers: { Jerry: sessions.length },
+  objednanyUvodny: "", objednanyUvodnyTrener: "",
   primaryTrainer: "Jerry", primaryTrainerOverride: false, substituteCount: 0,
   statusAuto: "Aktívny", status: "Aktívny", statusOverride: false,
   specialRate: false, specialRateNote: "", trainerNote: "", contractSigned: false, bitcoin: false,

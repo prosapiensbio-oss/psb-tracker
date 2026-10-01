@@ -845,6 +845,14 @@ export function buildAiContext(
       meno: c.name,
       segment: c.segment,
       status: c.status,
+      /**
+       * Človek pred prvým tréningom. Status má „Neaktívny", lebo nemá ani
+       * jedno sedenie — ale neprestal chodiť, ešte nezačal. Bez tohto poľa
+       * by Jarvis na otázku „kto príde na úvodný" odpovedal „neviem",
+       * hoci to appka vie z kalendára (Jerry, 1. 10. 2026).
+       */
+      objednanyUvodny: c.objednanyUvodny || undefined,
+      esteNetrenoval: c.objednanyUvodny && !c.sessionCount ? true : undefined,
       statusAuto: c.statusAuto,
       statusManual: c.statusOverride,
       pauzaDo: c.pauseUntil || null,

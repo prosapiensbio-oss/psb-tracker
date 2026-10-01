@@ -191,6 +191,15 @@ export type PSBData = {
   balickyKokpit?: import("./zostatokKokpitu").BalicekPreZostatok[];
   /** Koľko hodín pridalo „Doplnenie členstva" — kľúč `klient|deň`. */
   doplneniaHodiny?: Record<string, number>;
+  /**
+   * Dohodnuté úvodné tréningy, ktoré sa ešte neodohrali.
+   *
+   * Jerry, 1. 10. 2026: „najdôležitejšie je, aby keď je úvodný tréning,
+   * vznikol jeho profil rovno." Klient v Kokpite dovtedy vznikal zo SEDENÍ,
+   * a sedenie z budúcej udalosti nevzniká — Josef Pávek mal úvodný
+   * nasledujúce ráno a v appke neexistoval vôbec.
+   */
+  objednaneUvodne?: { klient: string; den: string; trener: string }[];
   /** Vedomosti zvonku (rešerše, príručky). Text sa do kontextu neposiela — len prehľad. */
   vedomosti: VedomostRow[];
 };
@@ -270,6 +279,7 @@ export const EMPTY_DATA: PSBData = {
   anomalyAck: {},
   uploadLog: [],
   leads: [],
+  objednaneUvodne: [],
   magnety: [],
 };
 

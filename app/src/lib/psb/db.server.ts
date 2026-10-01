@@ -273,6 +273,14 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
       hodinZNazvuBalicka,
     );
     const zKalendara = sedeniaZKalendara((kalOd.results as any[]) as UdalostKalendara[], balicky, terazPraha);
+    /**
+     * Úvodné, ktoré ešte len budú. Ten istý zoznam udalostí, z ktorého sa
+     * rátajú sedenia — len opačný koniec: `sedeniaZKalendara` budúce
+     * preskakuje (tréning sa ešte nekonal), a práve tie tu treba.
+     */
+    data.objednaneUvodne = ((kalOd.results as any[]) as UdalostKalendara[])
+      .filter((u) => u.typ === "uvodny" && !!u.klient && String(u.zaciatok || "").slice(0, 16) > terazPraha)
+      .map((u) => ({ klient: String(u.klient), den: String(u.zaciatok || "").slice(0, 10), trener: String(u.trener || "") }));
     const { sessions: spojene, kontrola } = spojDochadzku(sessionsPtminder, zKalendara);
     data.sessions = spojene;
     data.sessionsPtminder = kontrola;

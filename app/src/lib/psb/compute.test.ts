@@ -930,3 +930,46 @@ describe("nový dopyt čaká na odpoveď", () => {
     expect(x.detail).toContain("cez formulár na webe");
   });
 });
+
+describe("profil pri dohodnutom úvodnom", () => {
+  const ses = (client: string, date: string) => ({
+    id: `${client}-${date}`, date, time: "10:00", client, sessionTrainer: "Jerry",
+    sessionName: "x", sessionType: "1:1", durationMin: 60, price: 1000,
+  });
+  const postav = (objednaneUvodne: { klient: string; den: string; trener: string }[], sedenia: ReturnType<typeof ses>[] = []) =>
+    deriveClients({
+      sessions: sedenia, payments: [], packages: [], services: [], leads: [],
+      clientOverrides: {}, anomalyAck: {}, objednaneUvodne,
+    } as never);
+
+  it("človek s úvodným zajtra má profil už dnes", () => {
+    // Jerry, 1. 10. 2026: Josef Pávek mal úvodný nasledujúce ráno a v appke
+    // neexistoval — profil dovtedy vznikal až zo sedenia, teda z minulosti.
+    const c = postav([{ klient: "Josef Pávek", den: "2026-10-02", trener: "Terezka" }])["Josef Pávek"];
+    expect(c).toBeTruthy();
+    expect(c.objednanyUvodny).toBe("2026-10-02");
+    expect(c.primaryTrainer).toBe("Terezka");
+  });
+
+  it("taký profil nepletie štatistiky: nula sedení, nula dochádzky, neaktívny", () => {
+    const c = postav([{ klient: "Josef Pávek", den: "2026-10-02", trener: "Terezka" }])["Josef Pávek"];
+    expect(c.sessionCount).toBe(0);
+    expect(c.attendance).toBe(0);
+    expect(c.status).toBe("Neaktívny");
+    expect(c.totalPrice).toBe(0);
+  });
+
+  it("kto sedenie má, profil z neho NEPREBÍJA — ten je bohatší", () => {
+    const c = postav(
+      [{ klient: "Stály", den: "2026-10-02", trener: "Terezka" }],
+      [ses("Stály", "2026-09-01"), ses("Stály", "2026-09-08")],
+    )["Stály"];
+    expect(c.sessionCount).toBe(2);
+    expect(c.objednanyUvodny).toBe("");
+    expect(c.primaryTrainer).toBe("Jerry");
+  });
+
+  it("bez zoznamu sa nič nepridáva", () => {
+    expect(Object.keys(postav([]))).toHaveLength(0);
+  });
+});

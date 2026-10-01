@@ -170,6 +170,16 @@ export type ClientAgg = {
   balicekZostatok: number | null;
   balicekKDatumu: string;
   /** Klient má v exporte len doplnky k členstvu, nie balíček s hodinami. */
+  /**
+   * Deň dohodnutého úvodného tréningu, ktorý sa ešte neodohral.
+   *
+   * Len pri človeku, ktorý ZATIAĽ nemá ani jedno sedenie. Je to jediný
+   * dôvod, prečo taký profil vôbec existuje — a obrazovka to musí povedať,
+   * inak vyzerá ako klient, ktorý prestal chodiť.
+   */
+  objednanyUvodny: string;
+  /** Kto ten úvodný vedie. Jediný podklad pre primárneho trénera, kým nie sú sedenia. */
+  objednanyUvodnyTrener: string;
   lenDoplnky: boolean;
 };
 
@@ -193,6 +203,64 @@ export function sixMClientSet(data: PSBData): Set<string> {
   return set;
 }
 
+/**
+ * Prázdny profil. Jedno miesto, kde sa vymenúvajú všetky polia — druhá
+ * kópia by sa pri pridaní stĺpca rozišla a jedna vetva by ho nemala.
+ */
+function prazdnyKlient(meno: string, den: string): ClientAgg {
+  return {
+  name: meno,
+  sessions: [],
+  sessionCount: 0,
+  totalHours: 0,
+  totalPrice: 0,
+  paidAvg: 0,
+  avgPrice: 0,
+  firstSession: den,
+  lastSession: den,
+  attendance: 0,
+  segment: "Sporadický",
+  trainers: {},
+  trainersNedavno: {},
+  primaryTrainer: "—",
+  primaryTrainerOverride: false,
+  substituteCount: 0,
+  statusAuto: "Neaktívny",
+  status: "Neaktívny",
+  statusOverride: false,
+  pauzaZrusenaTreningom: false,
+  specialRate: false,
+  specialRateNote: "",
+  trainerNote: "",
+  contractSigned: false,
+  bitcoin: false,
+  duch: "",
+  packageValidTo: "",
+  zdroj: "",
+  zdrojKto: "",
+  narodeniny: "",
+  prvyKontakt: "",
+  vratenie: false,
+  clientType: "Balíček",
+  is6m: false,
+  v6m: "",
+  precoNeprisiel: "",
+  membership: "",
+  modality: "Offline",
+  serviceCount: 0,
+  packageRemaining: 0,
+  packageTotal: 0,
+  packageStatus: "",
+  packageOdvodeny: false,
+  packageOdkial: "",
+  balicekZostatok: null,
+  balicekKDatumu: "",
+  lenDoplnky: false,
+  objednanyUvodny: "",
+  objednanyUvodnyTrener: "",
+  };
+}
+
 export function deriveClients(data: PSBData): Record<string, ClientAgg> {
   // Šesť mesiacov: dosť dlho na to, aby jeden zástup nerozhodol, a dosť krátko
   // na to, aby sa zmena trénera prejavila v tej istej sezóne.
@@ -208,55 +276,7 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
   for (const s of data.sessions) {
     let c = map[s.client];
     if (!c) {
-      c = map[s.client] = {
-        name: s.client,
-        sessions: [],
-        sessionCount: 0,
-        totalHours: 0,
-        totalPrice: 0,
-        paidAvg: 0,
-        avgPrice: 0,
-        firstSession: s.date,
-        lastSession: s.date,
-        attendance: 0,
-        segment: "Sporadický",
-        trainers: {},
-        trainersNedavno: {},
-        primaryTrainer: "—",
-        primaryTrainerOverride: false,
-        substituteCount: 0,
-        statusAuto: "Neaktívny",
-        status: "Neaktívny",
-        statusOverride: false,
-        pauzaZrusenaTreningom: false,
-        specialRate: false,
-        specialRateNote: "",
-        trainerNote: "",
-        contractSigned: false,
-        bitcoin: false,
-        duch: "",
-        packageValidTo: "",
-        zdroj: "",
-        zdrojKto: "",
-        narodeniny: "",
-        prvyKontakt: "",
-        vratenie: false,
-        clientType: "Balíček",
-        is6m: false,
-        v6m: "",
-        precoNeprisiel: "",
-        membership: "",
-        modality: "Offline",
-        serviceCount: 0,
-        packageRemaining: 0,
-        packageTotal: 0,
-        packageStatus: "",
-        packageOdvodeny: false,
-        packageOdkial: "",
-        balicekZostatok: null,
-        balicekKDatumu: "",
-        lenDoplnky: false,
-      };
+      c = map[s.client] = prazdnyKlient(s.client, s.date);
     }
     c.sessions.push(s);
     c.trainers[s.sessionTrainer] = (c.trainers[s.sessionTrainer] || 0) + 1;
@@ -268,6 +288,33 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
     if (s.date > c.lastSession) c.lastSession = s.date;
     c.totalHours += s.duration / 60;
     c.totalPrice += s.price;
+  }
+
+  /**
+   * PROFIL VZNIKNE UŽ PRI DOHODNUTOM ÚVODNOM, nie až po ňom.
+   *
+   * Jerry, 1. 10. 2026: „najdôležitejšie je, aby keď je úvodný tréning,
+   * vznikol jeho profil rovno." Klient dovtedy vznikal zo SEDENÍ, čiže
+   * z toho, čo sa už stalo. Josef Pávek mal úvodný nasledujúce ráno,
+   * v kalendári stál celý, s menom aj druhom — a v appke nebol nikde:
+   * nedal sa otvoriť, nedala sa mu založiť anamnéza ani poslať SMS.
+   *
+   * ČO TAKÝ PROFIL NEROZBIJE. Nemá sedenia, takže `attendance` je 0
+   * a status „Neaktívny" — zo zoznamov aktívnych klientov, z tempa aj
+   * z tržieb vypadne sám. `jeKlient` ho tiež nepočíta (žiadne sedenie
+   * okrem úvodného, žiadna platba), takže lievik marketingu zostáva, ako
+   * bol. Pridáva sa LEN tam, kde ešte nikto taký nie je — kto už sedenie
+   * má, má profil z neho a ten je bohatší.
+   */
+  for (const u of data.objednaneUvodne || []) {
+    const meno = (u.klient || "").trim();
+    if (!meno || map[meno]) continue;
+    const c = map[meno] = prazdnyKlient(meno, u.den);
+    c.objednanyUvodny = u.den;
+    // Tréner sa NEZAPISUJE do `trainers`: to je počet odtrénovaných hodín
+    // a tu ešte žiadna nie je. Nesie ho `objednanyUvodnyTrener`, ktorý sa
+    // použije nižšie, keď `vlastnikKlienta` nemá z čoho rátať.
+    c.objednanyUvodnyTrener = u.trener || "";
   }
 
   const sixMSet = sixMClientSet(data);
@@ -336,7 +383,9 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
       prvyDatum: c.firstSession,
       zakladatelia: TRAINERS,
     });
-    c.primaryTrainer = ov?.primaryTrainer || autoPrimary;
+    // Bez jediného sedenia nemá `vlastnikKlienta` z čoho rátať a vráti „—".
+    // Pri dohodnutom úvodnom je vlastník známy: ten, kto ho vedie.
+    c.primaryTrainer = ov?.primaryTrainer || (c.sessions.length ? autoPrimary : c.objednanyUvodnyTrener || autoPrimary);
     c.primaryTrainerOverride = !!ov?.primaryTrainer;
     c.substituteCount = c.sessions.filter((s) => s.sessionTrainer !== c.primaryTrainer).length;
 

@@ -66,6 +66,37 @@ export const OBLAST_Z_TESTU: Record<string, string> = {
   loket: "lokty / zápěstí", zapesti: "lokty / zápěstí",
 };
 
+/**
+ * Posturálne odchýlky z testu — slug z webu na to, čo sa dá prečítať nahlas.
+ *
+ * Jerry, 1. 10. 2026: „keď je niekto ako on z testu postury, bolo by super,
+ * keby na začiatku anamnézy boli výsledky zohľadnené … nech sa tréner môže
+ * odkázať na to, čo už klient vie z testu."
+ *
+ * Odkázať sa na „predsunutahlab, vysazena-panev" sa nedá. Sú to hodnoty
+ * tlačidiel z `test-postury.html`, nie slová — a práve v nich je to, čo si
+ * klient o sebe pred mesiacom odklikol. Mapa je kópia popisiek z tej
+ * stránky; čo v nej nie je, prejde nezmenené (radšej slug než nič).
+ */
+export const ODCHYLKA_Z_TESTU: Record<string, string> = {
+  predsunutahlab: "předsunutá hlava",
+  "zaokrouhlena-ramena": "zaoblená ramena",
+  "jedno-rameno-nize": "jedno rameno níže",
+  hyperkyfoza: "hyperkyfóza",
+  "propadly-hrudnik": "propadlý hrudník",
+  "rib-flare": "vystouplá žebra (rib flare)",
+  "vysazena-panev": "vysazená pánev",
+  "rotovana-panev": "rotovaná pánev",
+  "prepadla-kolena": "kolena padají dovnitř",
+  "plocha-chodidla": "plochá chodidla",
+  skolioza: "skolióza / asymetrie trupu",
+  "odstupujici-lopatky": "odstupující lopatky",
+};
+
+/** Odchýlka v reči človeka. Neznámy slug sa vráti taký, aký prišiel. */
+export const popisOdchylky = (slug: string): string =>
+  ODCHYLKA_Z_TESTU[String(slug || "").trim().toLowerCase()] || String(slug || "").trim();
+
 export const CIELE = [
   "Zbavit se chronické bolesti",
   "Zlepšit držení těla a způsob pohybu",

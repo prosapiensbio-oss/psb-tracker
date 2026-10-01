@@ -112,13 +112,68 @@ export const Route = createFileRoute("/api/vydane-faktury")({
              FROM vydane_faktury ORDER BY cislo DESC`,
           ).all();
           const u = await DB.prepare("SELECT * FROM klient_fakturacia").all();
+          /**
+           * MAIL A TELEFÓN Z DOPYTU, KÝM ICH NIKTO NEPREPÍSAL.
+           *
+           * Jerry, 1. 10. 2026: „keď je úvodný tréning, nech vznikne jeho
+           * profil rovno, aby sa doň naimportovali informácie ako meno, mail,
+           * telefónne číslo." Klient ich pri dopyte vyplnil — Josef Pávek
+           * 13. 9. — a Kokpit ich mal celý čas v `leads`, len o kúsok vedľa:
+           * SMS hlásila „nemá v Kokpite telefón" a mail nemal kam ísť.
+           *
+           * NEKOPÍRUJE SA DO DATABÁZY, DOPĹŇA SA PRI ČÍTANÍ. Dve kópie toho
+           * istého čísla by sa raz rozišli a nikto by nevedel, ktorá platí.
+           * Takto zostáva dopyt jediným zdrojom, kým to človek v profile
+           * nezapíše sám — a jeho zápis potom prebíja (dopĺňa sa len to, čo
+           * je prázdne).
+           *
+           * FAKTÚRA SA TÝM NEMENÍ. Doklad číta `klient_fakturacia` priamo
+           * (akcia „faktura"), nie tento zoznam, takže mail z dopytu sa na
+           * faktúru nedostane, kým ho niekto vedome neuloží.
+           *
+           * Riadok NAVYŠE dostane len ten, kto má v kalendári úvodný. Dopytov
+           * je štyridsaťosem a väčšina z nich klientom nikdy nebude; vyrobiť
+           * im fakturačné riadky by bol zoznam cudzích ľudí vo faktúrach.
+           */
+          type Kontakt = { email: string; telefon: string; meno: string };
+          const zDopytu = new Map<string, Kontakt>();
+          for (const r of ((await DB.prepare(
+            "SELECT name, email, telefon FROM leads WHERE (email <> '' OR telefon <> '') ORDER BY date",
+          ).all().catch(() => ({ results: [] }))).results || []) as { name: string; email: string; telefon: string }[]) {
+            const meno = String(r.name || "").trim();
+            if (!meno) continue;
+            // Zoradené od najstaršieho, takže novší dopyt prepíše starší.
+            zDopytu.set(meno.toLowerCase(), { email: String(r.email || ""), telefon: String(r.telefon || ""), meno });
+          }
+          const maRiadok = new Set(((u.results || []) as { klient?: string }[])
+            .map((r) => String(r.klient || "").trim().toLowerCase()));
+          const uvodne = ((await DB.prepare(
+            `SELECT DISTINCT klient FROM kal_udalosti
+              WHERE typ = 'uvodny' AND klient IS NOT NULL AND klient <> '' AND zmizla_at IS NULL`,
+          ).all().catch(() => ({ results: [] }))).results || []) as { klient: string }[];
+
+          const udaje: Record<string, unknown>[] = ((u.results || []) as Record<string, unknown>[]).map((r) => {
+            const z = zDopytu.get(String(r.klient || "").trim().toLowerCase());
+            if (!z) return r;
+            const email = String(r.email || "") || z.email;
+            const telefon = String(r.telefon || "") || z.telefon;
+            return { ...r, email, telefon, zDopytu: (!String(r.email || "") && !!z.email) || (!String(r.telefon || "") && !!z.telefon) ? 1 : 0 };
+          });
+          for (const { klient } of uvodne) {
+            const kluc = String(klient || "").trim().toLowerCase();
+            if (!kluc || maRiadok.has(kluc)) continue;
+            const z = zDopytu.get(kluc);
+            if (!z) continue;
+            maRiadok.add(kluc);
+            udaje.push({ klient, email: z.email, telefon: z.telefon, zDopytu: 1 });
+          }
           // Kontakty na spárovanie — bez klienta a neodložené.
           const k = await DB.prepare(
             "SELECT id, firma, ico, dic, email, telefon, os_meno, os_priezvisko, klient, odlozene_at FROM fakturacne_kontakty ORDER BY firma",
           ).all().catch(() => ({ results: [] }));
           // Bez keše: faktúra sa číta hneď po vystavení a stará odpoveď by
           // ukázala doklad bez čísla.
-          return Response.json({ ok: true, faktury: f.results || [], udaje: u.results || [], kontakty: k.results || [] },
+          return Response.json({ ok: true, faktury: f.results || [], udaje, kontakty: k.results || [] },
             { headers: { "cache-control": "no-store" } });
         } catch (e) {
           return Response.json({ ok: false, error: String(e).slice(0, 300) }, { status: 500 });
