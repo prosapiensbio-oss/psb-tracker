@@ -56,21 +56,22 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
   Potrebuje R2 bucket (účet ho zatiaľ nemá); do D1 nepatria.
 - [x] **Import 56 starých anamnéz** k existujúcim klientom aj s pôvodným
   dátumom (Jerry odklepol 30. 9.) — hotové 30. 9., 53 priradených.
-- [ ] **Doimportovať tri anamnézy** — Jerry rozhodol 30. 9. 2026, komu patria:
-  „Janka Kadlčková" = **Anna Kadličkova**, „MIchaela MIchalíková" =
-  **Miroslava Michalikova**, „Jerry Martinek" = **Robin Martinek**.
-  Riadky sú v `Anmnéza klientů 3.csv`, stačí ich poslať cez `import-stary`.
-- [ ] Zmazať skúšobnú anamnézu AATestu pri upratovaní testovacích dát.
+- [x] **Doimportované všetky anamnézy** — 1. 10. 2026 aj posledné tri
+  (Anna Kadličkova, Miroslava Michalikova, Robin Martinek).
+- [x] Skúšobné dáta AATestu zmazané (1. 10. 2026): anamnéza, oba odkazy
+  `/u/`, odkaz `/v/` aj hodnotenia v `klient_merania`.
 - [x] **Odkaz /u/ v potvrdzovacej notifikácii Terezky** — hotové 1. 10. 2026.
 - [x] **Krátka adresa pre odkazy v SMS** — hotové 1. 10. 2026, správa má
   153 znakov = jedna SMS. Platí pre `/u/` aj `/v/` (výpis hodín a končiace
   členstvo). Presmerovanie je WP snippet id 26 — keby niekto raz čistil
   snippety, bez neho prestanú chodiť odkazy v SMS.
-- [ ] **Spam prešiel filtrom dopytov** — „Your Company" z `michelle.lamy.eu`
-  (30. 9. 2026) leží v `leads` ako nový dopyt. Studená obchodná pošta sa má
-  zahadzovať; pozrieť, prečo prešla.
-- [ ] **Po úvodnom: to isté z notifikácie trénera**, ktorý úvodný viedol
-  (`druh: "po"`).
+- [x] **Spam vo filtri dopytov opravený** (1. 10. 2026). Prešiel na
+  BODKOČIARKE: predmet „Re;mezinárodní pošta#…" a filter na odpovede hľadal
+  len dvojbodku. Odteraz sa berie každý bežný oddeľovač a slová sa hľadajú na
+  hranici slova („termin" v „determinado" už dopyt nerobí). Riadok zmazaný.
+- [x] **Po úvodnom: to isté tlačidlo** v notifikácii „SMS po úvodnom"
+  (1. 10. 2026) — tá istá obsluha, len `druh: "po"`, bez ceny a telefón
+  z fakturačných kontaktov.
 - [ ] **Profil trenéra na webe** — stránka Jerryho ani Terezky neexistuje,
   odkaz zatiaľ vedie na `/o-nas/`.
   (Skúšobné hodnotenia v `klient_merania` už zmazané sú — tabuľka je prázdna.)
