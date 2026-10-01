@@ -143,45 +143,39 @@ describe("textSms podľa skutočnosti", () => {
 });
 
 describe("textSmsPlatba", () => {
-  it("povie sumu aj za čo to je — suma bez dôvodu je obvinenie", () => {
-    const t = textSmsPlatba({ oslovenie: "Daniela", trener: "Jerry", suma: 9400, datum: "9. 9." });
-    expect(t).toContain("9400 Kc");
-    expect(t).toContain("9. 9.");
-    expect(t).toContain("Jerry, ProSapiens");
-  });
+  const ODKAZ = "https://prosapiens.cz/v/NXWYvSt7uctn";
 
-  it("ide bez diakritiky a zmestí sa do jednej správy", () => {
-    // Jediný mäkčeň zráža limit zo 160 znakov na 70 — dve SMS namiesto jednej.
-    const t = textSmsPlatba({ oslovenie: "Daniela", trener: "Jerry", suma: 9400, datum: "9. 9." });
-    expect(t).not.toMatch(/[áäčďéíľĺňóôŕšťúýžÁČĎÉÍĽŇÓŠŤÚÝŽ]/);
-    expect(dlzkaSpravy(t).sprav).toBe(1);
-  });
-
-  it("nerozkazuje a netvrdí, že klient nezaplatil", () => {
-    // Jerry, 1. 10. 2026: „‚Pošleš ju prosím' je také pasívne agresívne" a
-    // „‚už si ju poslal' mi príde — no nie kokot, veď preto ti píšem, lebo
-    // som neposlala." Appka nevie, či platba odišla; vie len, že ju nevidí.
-    const t = textSmsPlatba({ oslovenie: "Daniela", trener: "Terezka", suma: 9400, datum: "9. 9." });
-    expect(t).not.toContain("Posles");
-    expect(t).not.toContain("neuhraden");
-    expect(t).toContain("mi chyba platba");
-    expect(t).toContain("Ak uz odisla");
-  });
-
-  it("s odkazom sa do jednej správy zmestí aj dlhé meno — dátum ustúpi odkazu", () => {
-    const odkaz = "https://kokpit.prosapiensbio.workers.dev/v/NXWYvSt7uctn";
-    for (const oslovenie of ["Jan", "Daniela", "Bartolomej"]) {
-      const t = textSmsPlatba({ oslovenie, trener: "Terezka", suma: 9400, datum: "9. 9.", odkaz });
-      expect(dlzkaSpravy(t).sprav).toBe(1);
-      expect(t).toContain(odkaz);
-      // Odpustka zostáva vždy; dátum je to, čo ustúpi — nesie ho stránka.
-      expect(t).toContain("Ak uz odisla");
+  it("je služba, nie upomienka — nehovorí, či klient zaplatil", () => {
+    // Jerryho znenie, 1. 10. 2026. Moje tri pokusy sa obvineniu vyhýbali tým,
+    // že o ňom hovorili („ešte neuhradená platba", „chýba mi platba, ak už
+    // odišla, nič nerieš"). Appka nevie, či platba odišla — tak o tom mlčí.
+    const t = textSmsPlatba({ oslovenie: "Daniela", trener: "Jerry", suma: 9400, datum: "9. 9.", odkaz: ODKAZ });
+    expect(t).toBe("Ahoj Daniela, tady mas prehled hodin a QR na platbu za balicek z 9. 9.: " + ODKAZ + " Jerry");
+    for (const slovo of ["neuhraden", "dlh", "dluz", "chyba", "Posles", "prosim"]) {
+      expect(t).not.toContain(slovo);
     }
   });
 
+  it("ide bez diakritiky a zmestí sa do jednej správy aj s dlhým menom", () => {
+    // Jediný mäkčeň zráža limit zo 160 znakov na 70 — dve SMS namiesto jednej.
+    for (const oslovenie of ["Jan", "Daniela", "Bartolomej"]) {
+      const t = textSmsPlatba({ oslovenie, trener: "Terezka", suma: 9400, datum: "9. 9. 2026", odkaz: ODKAZ });
+      expect(t).not.toMatch(/[áäčďéíľĺňóôŕšťúýžÁČĎÉÍĽŇÓŠŤÚÝŽěřůŘ]/);
+      expect(dlzkaSpravy(t).sprav).toBe(1);
+      expect(t).toContain(ODKAZ);
+    }
+  });
+
+  it("bez odkazu veta neskončí dvojbodkou do prázdna", () => {
+    const t = textSmsPlatba({ oslovenie: "Daniela", trener: "Jerry", suma: 9400, datum: "9. 9." });
+    expect(t).toBe("Ahoj Daniela, za balicek z 9. 9. je k uhrade 9400 Kc. Jerry");
+    expect(t).not.toContain(":");
+  });
+
   it("bez dátumu sa veta nerozsype", () => {
-    const t = textSmsPlatba({ oslovenie: "Jan", trener: "Terezka", suma: 1100 });
-    expect(t).toContain("1100 Kc");
+    const t = textSmsPlatba({ oslovenie: "Jan", trener: "Terezka", suma: 1100, odkaz: ODKAZ });
+    expect(t).toContain("QR na platbu:");
     expect(t).not.toContain("undefined");
   });
 });
+

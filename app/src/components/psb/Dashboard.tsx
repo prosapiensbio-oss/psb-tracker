@@ -1750,8 +1750,9 @@ export function Dashboard({
                       neviem, kde by som mohol kliknúť na to, aby som jej
                       poslal SMS?" Dlaždica vedela povedať, kto dlží, a tým
                       skončila — ďalší krok bol cez stôl klienta a späť.
-                      Dátum poplatku ide do textu: suma bez dôvodu je
-                      obvinenie, suma s dátumom je pripomienka. */}
+                      Správa neupomína, posiela odkaz na prehľad hodin
+                      a QR; dátum poplatku v nej hovorí, za ktorý balíček
+                      to je. Sumu nesie QR, nie text. */}
                   <SmsKlientovi
                     meno={p.klient}
                     trener={clients[p.klient]?.primaryTrainer || ""}

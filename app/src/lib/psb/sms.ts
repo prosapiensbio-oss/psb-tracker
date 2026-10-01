@@ -158,30 +158,27 @@ export function textSms(v: SpravaProKlienta): string {
  * PRIPOMIENKA NEZAPLATENEJ PLATBY.
  *
  * Jerry, 1. 10. 2026: „Danielka Šašinkova je v mínuse 9 400, ale neviem, kde
- * by som mohol kliknúť na to, aby som jej poslal SMS?" Nikde — karta
- * nezaplatených mala len meno, sumu a klik na stôl klienta. Všetky ostatné
- * správy appky sú o hodinách, nie o peniazoch.
+ * by som mohol kliknúť na to, aby som jej poslal SMS?" Nikde — dlaždica
+ * „Nezaplatené" mala len meno, sumu a klik na stôl klienta.
  *
- * DVE VECI, KTORÉ PRVÉ ZNENIE ROBILO ZLE
+ * TEXT NAPÍSAL JERRY A JE LEPŠÍ NEŽ TRI MOJE POKUSY.
  *
- * Jerry o ňom: „‚Pošleš ju prosím' je také pasívne agresívne" a „‚už si ju
- * poslal' mi príde — no nie kokot, veď preto ti píšem, lebo som neposlala".
+ * Moje znenia sa snažili vyhnúť obvineniu tým, že o ňom hovorili: „ešte
+ * neuhradená platba" (obvinenie priamo), potom „chýba mi platba, ak už
+ * odišla, nič nerieš" (obvinenie aj s ospravedlnením). Jerry ho vynechal
+ * celé:
  *
- *  1. **Nerozkazuje.** „Pošleš ju prosím?" je otázka len tvarom. Správa
- *     povie, čo appka vidí, a nechá klienta konať.
- *  2. **Netvrdí, že klient nezaplatil.** Appka to vedieť NEMÔŽE: poplatok
- *     v PTminderi stojí otvorený, kým ho niekto nezmaže, a platba a balíček
- *     sa nemusia stretnúť ani v jednom smere. Preto „chýba mi" (chyba je na
- *     mojej strane evidencie) a výslovná odpustka „ak už odišla, nič nerieš".
- *     Bez nej správa obviňuje človeka, ktorý zaplatil včera.
+ *   „Ahoj Daniela, tady máš přehled hodin a QR na platbu za balíček
+ *    z 9. 9.: prosapiens.cz/v/… Jerry"
  *
- * SUMA MÁ MAŤ DÔVOD. „Dlhuješ 9 400" je obvinenie; „za balíček z 9. 9." je
- * pripomienka, ktorú si klient vie overiť. Keď sa dátum aj s odkazom do
- * jednej SMS nezmestí, vypadne dátum — nie odpustka: za odkazom je celý
- * posledný balíček aj QR, takže informácia sa nestráca, len sa presúva.
+ * Je to SLUŽBA, nie upomienka. Nehovorí, či klient zaplatil — a appka to
+ * ani vedieť nemôže: poplatok v PTminderi stojí otvorený, kým ho niekto
+ * nezmaže, a platba a balíček sa nemusia stretnúť ani v jednom smere. Kto
+ * zaplatil včera, dostane odkaz a nič ho nebodne; kto nezaplatil, má QR
+ * priamo v ruke. Ani suma v texte netreba — nesie ju QR aj stránka.
  *
- * Suma sa píše bez medzier v tisícoch — „9400 Kc" prežije každú bránu,
- * kým úzka medzera sa občas zmení na otáznik.
+ * Bez odkazu by veta skončila dvojbodkou do prázdna, preto má náhradu:
+ * holé konštatovanie sumy, tiež bez výzvy.
  */
 export function textSmsPlatba(v: {
   oslovenie: string; trener: string; suma: number;
@@ -190,17 +187,16 @@ export function textSmsPlatba(v: {
   /** Odkaz na /v/<token>: posledný balíček a QR na platbu. */
   odkaz?: string;
 }): string {
-  const zloz = (sDatumom: boolean) => {
-    // Bez dátumu sa poradie slov mení: „za balíček z 9. 9. mi chýba" —
-    // ale „mi chýba" na začiatku vety je nezmysel.
-    const comu = sDatumom && v.datum ? `za balíček z ${v.datum} mi chýba` : "chýba mi";
-    // Krátko zámerne: odkaz má 55 znakov a s dlhším menom by sa správa
-    // prehupla do druhej SMS. Čo za odkazom je, povie stránka sama.
-    const kam = v.odkaz ? ` Prehľad a QR: ${v.odkaz}` : "";
-    return bezDiakritiky(
-      `Ahoj ${v.oslovenie}, ${comu} platba ${Math.round(v.suma)} Kc. Ak už odišla, nič nerieš.${kam} ${v.trener}, ProSapiens`,
+  const za = v.datum ? ` za balíček z ${v.datum}` : "";
+  if (!v.odkaz) {
+    return bezDiakritiky(`Ahoj ${v.oslovenie},${za} je k úhrade ${Math.round(v.suma)} Kc. ${v.trener}`);
+  }
+  const zloz = (sDatumom: boolean) =>
+    bezDiakritiky(
+      `Ahoj ${v.oslovenie}, tady máš přehled hodin a QR na platbu${sDatumom ? za : ""}: ${v.odkaz} ${v.trener}`,
     );
-  };
+  // Keby meno a dátum raz pretiekli do druhej SMS, ustúpi dátum: ten je aj
+  // za odkazom, kým odkaz je dôvod, prečo sa správa píše.
   const sDatumom = zloz(true);
   return dlzkaSpravy(sDatumom).sprav > 1 ? zloz(false) : sDatumom;
 }

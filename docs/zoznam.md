@@ -84,10 +84,9 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
   cez tlačidlo na stránke, a pri dlhu je na nej QR na platbu. Dlh sa počíta
   z otvorených poplatkov PTmindera, nie len z balíčkov v Kokpite.
 - [x] **SMS k nezaplatenej platbe** (1. 10. 2026) — tlačidlo je na dlaždici
-  „Nezaplatené" na dashboarde. Text nerozkazuje a netvrdí, že klient
-  nezaplatil: appka to vedieť nemôže, preto „chýba mi" a „ak už odišla, nič
-  nerieš". Odkaz na stránku s QR je v nej; dátum balíčka ustúpi, keby sa
-  správa nezmestila do jednej SMS.
+  „Nezaplatené" na dashboarde. Text napísal Jerry a nie je to upomienka:
+  „tady máš přehled hodin a QR na platbu za balíček z 9. 9.: …". O tom, či
+  klient zaplatil, mlčí — appka to vedieť nemôže. Sumu nesie QR, nie text.
 - [ ] **Profil trenéra na webe** — stránka Jerryho ani Terezky neexistuje,
   odkaz zatiaľ vedie na `/o-nas/`.
   (Skúšobné hodnotenia v `klient_merania` už zmazané sú — tabuľka je prázdna.)
