@@ -232,6 +232,35 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
     if (idx >= 0) setI(idx);
   }, [otvorKlienta, vypisPredvolba, zive]);
 
+  /**
+   * Komu sa dá založiť anamnéza.
+   *
+   * NIELEN existujúcim KLIENTOM. Jerry, 1. 10. 2026: „Josef Pávek má
+   * dohodnutý úvodný, prečo nie je v anamnézach na výber na vytvorenie?"
+   * Zoznam stál na `clients`, a ten vzniká zo SEDENÍ — čiže z toho, čo sa
+   * už odohralo. Kto má úvodný až zajtra, žiadne sedenie nemá a v appke ako
+   * klient ešte neexistuje. Lenže anamnéza má prísť PRED tréningom; to je
+   * celý jej zmysel.
+   *
+   * Preto sa k menám klientov pridávajú ľudia s objednaným termínom
+   * v kalendári. Okno kalendára je −21/+14 dní, takže to presne pokrýva
+   * „má to pozajtra".
+   */
+  const menaPreAnamnezu = useMemo(() => {
+    const zname = new Set(mena.map((m) => normName(m)));
+    const dnes = new Date().toISOString().slice(0, 10);
+    const navyse: string[] = [];
+    for (const u of kalUdalosti || []) {
+      const m = (u.klient || "").trim();
+      if (!m || (u.zaciatok || "").slice(0, 10) < dnes) continue;
+      const k = normName(m);
+      if (zname.has(k)) continue;
+      zname.add(k);
+      navyse.push(m);
+    }
+    return [...mena, ...navyse.sort((a, b) => a.localeCompare(b, "cs"))];
+  }, [mena, kalUdalosti]);
+
   /** Preklik zo zhrnutia na karte klienta — otvor kartu Anamnézy na ňom. */
   useEffect(() => {
     if (!anamnezaPre) return;
@@ -685,7 +714,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                     }}
                   />
                   <div style={{ marginTop: 8 }}>
-                    {mena
+                    {menaPreAnamnezu
                       .filter((m) => normName(m).includes(normName(hladanieAnamnezy)))
                       .slice(0, 12)
                       .map((m) => {
@@ -700,7 +729,9 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                             }}
                           >
                             {m}
-                            {uz && <span style={{ color: C.textDim, fontSize: 11, marginLeft: 8 }}>už ju má — otvorí sa</span>}
+                            {uz
+                              ? <span style={{ color: C.textDim, fontSize: 11, marginLeft: 8 }}>už ju má — otvorí sa</span>
+                              : !mena.includes(m) && <span style={{ color: C.textMuted, fontSize: 11, marginLeft: 8 }}>objednaný termín — klientom ešte nie je</span>}
                           </button>
                         );
                       })}

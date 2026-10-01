@@ -1774,6 +1774,18 @@ function OknoUdalosti({ vyber, mena, clients, predvolenyTrener, onZmen, onZavri,
           ))}
         </select>
       </label>
+      {/* NÁZOV HOVORÍ „ÚVODNÝ", DRUH HOVORÍ NIEČO INÉ.
+          Josef Pávek mal 2. 10. 2026 v kalendári „Josef Pávek-úvodný"
+          a v appke druh „tréning" — uložený odtiaľto 28. 9. Odpoveď človeka
+          vyhráva nad názvom navždy a potichu, takže Jerry 1. 10. hľadal,
+          prečo ten človek nie je v anamnézach: úvodný, ktorý nie je úvodný,
+          nezaloží profil, nevypýta anamnézu ani SMS po úvodnom.
+          Voľbu to nemení — len to povie nahlas skôr, než sa uloží. */}
+      {navrh?.typ === "uvodny" && typ !== "uvodny" && (
+        <div style={{ fontSize: 11, color: C.orange, lineHeight: 1.5, marginBottom: 8 }}>
+          V názve stojí „úvodný", ale druh je iný. Takto sa klientovi nezaloží profil ani anamnéza.
+        </div>
+      )}
 
       {sMenom && (
         <label style={{ ...popisok, marginBottom: 8 }}>
