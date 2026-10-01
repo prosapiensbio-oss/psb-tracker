@@ -22,6 +22,24 @@ describe("nepotvrdeneTreningy", () => {
     expect(von[0]).toMatchObject({ klient: "Richard Matl", datum: "2026-08-10" });
   });
 
+  it("tréning PRED začiatkom exportu sa nehlási — tam PTminder nikdy nič nemal", () => {
+    // Toto stálo 650 falošných otázok (zmerané 1. 10. 2026). Export v Kokpite
+    // začína 2025, kalendár drží série z 2024 — a appka sa na ne pýtala
+    // „konal sa tréning?", hoci ich PTminder nikdy pokrývať nemohol.
+    const sedenia = [s("Richard Matl", "2026-08-03"), s("Iny Klient", "2026-08-13")];
+    expect(nepotvrdeneTreningy(sedenia, [u("2024-05-06T18:00:00Z", "Richard Matl")], [], DNES)).toHaveLength(0);
+    expect(nepotvrdeneTreningy(sedenia, [u("2026-08-02T18:00:00Z", "Richard Matl")], [], DNES)).toHaveLength(0);
+  });
+
+  it("starší nález než mesiac sa nehlási — spätne ho už nikto nedopíše", () => {
+    const dnesNeskor = new Date("2026-10-01T12:00:00Z");
+    const sedenia = [s("Richard Matl", "2026-01-05"), s("Iny Klient", "2026-09-29")];
+    // 10. 8. je v pokrytí exportu, ale 52 dní starý
+    expect(nepotvrdeneTreningy(sedenia, [u("2026-08-10T18:00:00Z", "Richard Matl")], [], dnesNeskor)).toHaveLength(0);
+    // 20. 9. je v okne a hlási sa
+    expect(nepotvrdeneTreningy(sedenia, [u("2026-09-20T18:00:00Z", "Richard Matl")], [], dnesNeskor)).toHaveLength(1);
+  });
+
   it("tréning za hranicou exportu sa NEHLÁSI — to je len bežné oneskorenie", () => {
     // Toto je celá hodnota pravidla: bez neho by appka hlásila každý včerajšok.
     expect(nepotvrdeneTreningy(SEDENIA, [u("2026-08-16T18:00:00Z", "Richard Matl")], [], DNES)).toHaveLength(0);

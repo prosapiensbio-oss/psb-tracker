@@ -1407,6 +1407,12 @@ export function minutyZCasu(t: string | undefined | null): number | null {
 
 export type NepotvrdenyTrening = { klient: string; datum: string; trener: string | null };
 
+/**
+ * Ako starý nález sa ešte hlási. Mesiac je toľko, koľko sa dá zreálna
+ * dopísať do PTmindera; staršie otázky už len zapĺňajú register.
+ */
+const VEK_NEPOTVRDENEHO = 31;
+
 export function nepotvrdeneTreningy(
   sedenia: { client: string; date: string; time?: string }[],
   udalosti: { zaciatok: string; klient: string | null; typ: string | null; trener?: string }[] | undefined,
@@ -1416,6 +1422,21 @@ export function nepotvrdeneTreningy(
   // Kam až siaha export. Bez neho sa nedá povedať, či niečo chýba.
   const pokryteDo = sedenia.reduce((m, s) => (s.date > m ? s.date : m), "").slice(0, 10);
   if (!pokryteDo) return [];
+  /**
+   * ...A ODKIAĽ SIAHA. Toto tu chýbalo a stálo to 650 falošných otázok.
+   *
+   * Kontroloval sa len horný koniec pokrytia. Lenže export v Kokpite začína
+   * 3. 1. 2025, kým v kalendári sú udalosti z roku 2024 (série s RRULE sa
+   * držia, aj keď začali dávno). Každá taká udalosť tým pádom „chýbala
+   * v PTminderi" — appka sa pýtala „konal sa tréning?" na obdobie, o ktorom
+   * PTminder v Kokpite nikdy nič nemal. Zmerané 1. 10. 2026: 695 otázok,
+   * z toho 650 z roku 2024.
+   *
+   * Jerry: „veľa notifikácií naraz takých istých bude iba áno áno áno a
+   * nebudem tomu venovať pozornosť." Presne tak — register, ktorý svieti
+   * celý, nesvieti vôbec.
+   */
+  const pokryteOd = sedenia.reduce((m, s) => (!m || s.date < m ? s.date : m), "").slice(0, 10);
   /**
    * Posledný deň exportu je pokrytý len po hodinu, po ktorú siaha.
    *
@@ -1453,7 +1474,11 @@ export function nepotvrdeneTreningy(
   for (const u of udalosti || []) {
     if ((u.typ !== "trening" && u.typ !== "uvodny") || !u.klient) continue;
     const d = (u.zaciatok || "").slice(0, 10);
-    if (!d || d > den || d > pokryteDo) continue;
+    if (!d || d > den || d > pokryteDo || d < pokryteOd) continue;
+    // Starší nález sa už nedá vybaviť: tréning spred mesiaca nikto spätne
+    // do PTmindera nedopíše a odpoveď „áno, konal sa" nikam nevedie. Otázka
+    // má zmysel, kým sa s ňou dá niečo urobiť.
+    if (d < posun(den, -VEK_NEPOTVRDENEHO)) continue;
     if (d === pokryteDo) {
       // Posledný deň sa posudzuje len po hodinu, po ktorú export naozaj siaha.
       const min = Number(u.zaciatok.slice(11, 13)) * 60 + Number(u.zaciatok.slice(14, 16));
