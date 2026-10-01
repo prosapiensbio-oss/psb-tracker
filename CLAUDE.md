@@ -2148,3 +2148,19 @@ ktoré k tomu patria:
 - **Nová routa potrebuje preklad stromu.** `routeTree.gen.ts` generuje vite,
   takže `tsc` pred buildom o novej routy nevie a `hotovo.sh` spadne na typoch.
   Pusti `bunx vite build` raz a potom celý reťazec.
+
+**Odkaz sa vyrába z NOTIFIKÁCIE o novom dopyte** (`odpoved|<id>`, Terezkina).
+Tlačidlo „Úvodný dohodnutý" otvorí rovno tam dátum, čas, kto povedie a cenu;
+appka vyrobí odkaz a pripraví SMS. Pravidlá:
+
+- **Telefón nesie POLOŽKA REGISTRA** (`RegisterItem.telefon`), nie prop cez
+  pol komponentu. Nesie ho len tá jedna položka — číslo, ktoré nikto
+  nepotrebuje, je ďalší údaj navyše.
+- **Správa sa neposiela sama.** Je v políčku, dá sa prepísať a odošle sa až
+  klikom; vedľa stojí počet znakov a SMS. To isté pravidlo ako pri SMS po
+  tréningu: ide von k cudziemu človeku a späť sa vziať nedá.
+- **Keď dopyt nemá telefón, povie to** („odkaz vyrobím, poslať ho budeš
+  musieť ručne") namiesto tlačidla, ktoré nič neurobí.
+- **Adresa workers.dev stojí jednu SMS navyše.** Odkaz má 54 znakov a celá
+  správa 172 = dve SMS; na `prosapiens.cz/u/<token>` by to bolo 139 = jedna.
+  Pri 56 úvodných ročne je to 56 SMS len za dĺžku domény.

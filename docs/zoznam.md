@@ -61,10 +61,13 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
   **Miroslava Michalikova**, „Jerry Martinek" = **Robin Martinek**.
   Riadky sú v `Anmnéza klientů 3.csv`, stačí ich poslať cez `import-stary`.
 - [ ] Zmazať skúšobnú anamnézu AATestu pri upratovaní testovacích dát.
-- [ ] **Doplniť odkaz /u/ do potvrdzovacej notifikácie Terezky** — keď
-  odklepne, že je úvodný dohodnutý, vyplní dátum, čas a prípadnú zľavu
-  a jedným klikom vyrobí odkaz + pošle SMS. Stránka aj endpoint
-  (`POST /api/uvodny`) sú hotové od 1. 10. 2026, chýba len to tlačidlo.
+- [x] **Odkaz /u/ v potvrdzovacej notifikácii Terezky** — hotové 1. 10. 2026.
+- [ ] **Krátka adresa pre odkaz** (`prosapiens.cz/u/<token>` namiesto
+  workers.dev): správa má teraz 172 znakov = dve SMS, s krátkou doménou 139 =
+  jedna. Pri 56 úvodných ročne je to 56 SMS len za dĺžku adresy.
+- [ ] **Spam prešiel filtrom dopytov** — „Your Company" z `michelle.lamy.eu`
+  (30. 9. 2026) leží v `leads` ako nový dopyt. Studená obchodná pošta sa má
+  zahadzovať; pozrieť, prečo prešla.
 - [ ] **Po úvodnom: to isté z notifikácie trénera**, ktorý úvodný viedol
   (`druh: "po"`).
 - [ ] **Profil trenéra na webe** — stránka Jerryho ani Terezky neexistuje,

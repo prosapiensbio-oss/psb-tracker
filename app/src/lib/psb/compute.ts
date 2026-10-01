@@ -2592,6 +2592,14 @@ export type RegisterItem = {
    */
   navrh?: { nazov: string; trener: string; typ: string; klient: string };
   /**
+   * Telefón človeka, o ktorého ide — aby sa SMS dala poslať rovno
+   * z notifikácie a nikto ju nemusel hľadať v Dopytoch.
+   *
+   * Nesie ho len položka, pri ktorej to má zmysel (nový dopyt). Inde je
+   * prázdny: číslo, ktoré nikto nepotrebuje, je len ďalší údaj navyše.
+   */
+  telefon?: string;
+  /**
    * MOŽNOSTI NA JEDEN KLIK PRIAMO V NOTIFIKÁCII.
    *
    * Jerry, 28. 9. 2026: „vidím, že môžeš dať do notifikácií rovno možnosť
@@ -2775,7 +2783,7 @@ export function deriveRegister(
     client?: string,
     rodina?: string,
     /** Komu položka patrí, keď to z klienta nevyplýva — filter podľa trénera. */
-    kto?: { trener?: string | null; oKom?: string; navrh?: RegisterItem["navrh"]; akcie?: RegisterItem["akcie"] },
+    kto?: { trener?: string | null; oKom?: string; navrh?: RegisterItem["navrh"]; akcie?: RegisterItem["akcie"]; telefon?: string },
   ) =>
     items.push({
       key,
@@ -2789,6 +2797,7 @@ export function deriveRegister(
       oKom: kto?.oKom,
       navrh: kto?.navrh,
       akcie: kto?.akcie,
+      telefon: kto?.telefon || undefined,
       // Umlčanie AJ odloženie sa počítajú tu, nie v komponente: register čítajú
       // tri miesta (Kokpit, Jarvisov kontext, mesačná správa) a musia platiť
       // vo všetkých rovnako.
@@ -3035,11 +3044,11 @@ export function deriveRegister(
       // bez čísla vyzeralo rovnako po hodine aj po dvadsiatich troch, a to
       // je práve to okno, v ktorom sa rozhoduje, či človek napíše inam.
       `${l.source === "mail" ? "Nový mail" : "Nový dopyt"} — ${meno} (čaká ${caka})`,
-      `${meno} sa ozval ${fmtDMY(den)} ${odkial}${kontakt ? ` (${kontakt})` : ""} a nikto zatiaľ neodpísal.${uryvok ? ` Píše: „${uryvok}“` : ""} Keď si sa ozval, klikni rovno tu na „ozval som sa" — zapíše sa čas a z neho sa počíta rýchlosť prvej odpovede.`,
+      `${meno} sa ozval ${fmtDMY(den)} ${odkial}${kontakt ? ` (${kontakt})` : ""} a nikto zatiaľ neodpísal.${uryvok ? ` Píše: „${uryvok}“` : ""} Keď si sa ozval, klikni rovno tu na „ozval som sa" — zapíše sa čas a z neho sa počíta rýchlosť prvej odpovede. Keď je úvodný dohodnutý, doplň termín tlačidlom vedľa a appka pripraví SMS s odkazom.`,
       dni >= 1 ? 2 : 4,
       "marketing|dopyty",
       "odpoved",
-      { trener: "Terezka", oKom: meno },
+      { trener: "Terezka", oKom: meno, telefon: String(l.telefon || "").trim() },
     );
   }
 
