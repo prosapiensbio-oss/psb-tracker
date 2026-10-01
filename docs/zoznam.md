@@ -24,9 +24,15 @@ Rozhodnuté 29. 9. 2026. PTminder je odvtedy kontrola.
 - [x] **Hodiny: karta z balíčkov v Kokpite** — nasadené, zapne sa 1. 10.
   (`zostatokKokpitu.ts`). Simulácia po naliatí: 76/86 rovnako, rozdiely
   vysvetlené (prekryv 18 h — Kokpit presnejší; Marcela — Kokpit sčíta obe).
-- [ ] **Jerry: „Doplniť nové z PTmindera"** (Prechod → balíčky) — 29. 9.
-  NEPREBEHLO (v audite nič). Pridá 8 členstiev + Jankino doplnenie. Bez toho
-  majú Barbora, Malinová, Martinek, Pecková, Pavlík, Jitka od 1. 10. zlý zostatok.
+- [x] **„Doplniť nové z PTmindera"** — spravené 1. 10. 2026 (Jerry: „tak mi
+  tie balíčky doplň ty"). Pridaných 9, preskočených 35. Pavlík 0 → 5 h,
+  Pečková 0 → 15 h — tí dvaja mali na karte zlú NULU, nie záložné číslo
+  z PTmindera, lebo im starý balíček ešte platil a bol vyčerpaný.
+  Baláž 16 → 15 h, Kalmusov augustový riadok sa nezapočítal (po platnosti).
+  **Na pozretie:** Robin Martinek dostal 8 h pri balíčku s názvom „OFF - 6h".
+  Nie je to chyba appky — export PTmindera hovorí `na_obdobie = 8` a číslo
+  z exportu má prednosť pred názvom (prenesené hodiny). Jitka má v tom istom
+  tvare 6, takže to nie je plošné. Posúdiť vie len ten, kto balíček predal.
 - [x] 3 minuté doplnenia 1 h (Petra Bambúšková, Tsiolis, Jitka) — ukončené k 29. 9.
 - [x] Janka Šnirychová „SPECIAL 3" je v poriadku — berú ho obaja Šnirychovci.
 - [ ] **Peniaze z banky a zošita** — `platby_od` = 2026-10. Pri tom doplniť
