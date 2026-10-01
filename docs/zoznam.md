@@ -112,8 +112,8 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
 | 9 falošných zrušení („zmizol tréning", ktorý sa nezmizol) | 25. 9. | označiť ako vysvetlené, alebo prejde sám? |
 | Dovolenka Anny Kadličkovej a Jakuba Kaňovského zapísaná k 7. 10. | 25. 9. | patrí k 30. 9.; tlačidlo „Vrátiť späť" už existuje |
 | Odskok augusta: zisk 18 072 → −26 154 Kč za pár hodín | 25. 9. | mám zistiť, odkiaľ ten rozdiel 44 226 Kč prišiel? |
-| reCAPTCHA na /uvodni-trenink/ (1 084 kB) | 21. 9. | vymeniť za honeypot? bez toho sa LCP pod 7 s nedostane |
 | Instagram feed v pätičke (~200 kB, celý web) | 21. 9. | odstrániť? |
+| PSI kľúč v Údajoch je neplatný (41 znakov, má mať 39) | 1. 10. | meranie rýchlosti beží bez kľúča a Google ho odmieta — dáš nový z Google Cloud? |
 
 ## 2 · Prijaté, nezačaté
 
@@ -257,6 +257,33 @@ Z posledného kola kontroly (17.–18. 9.) zostalo:
 ---
 
 ## Zavreté (aby sa neotvárali odznova)
+
+### reCAPTCHA na webe — odložená za prvý dotyk (1. 10. 2026)
+
+Otázka bola „vymeniť za honeypot?" a odpoveď je, že netreba: reCAPTCHA
+zostáva, len sa prestala naťahovať pred vykreslením. Zmerané na
+`/uvodni-trenink/`: z prvého načítania ubralo **353 kB zo 782 kB** (45 %)
+a bola to najväčšia jediná vec na stránke — viac než všetky skripty,
+obrázky aj písma dohromady. Robí to snippet 24 v Code Snippets, kópia kódu
+je v `philipjerry-web/navrhy-webu/snippety/24-recaptcha-odlozene.php`.
+
+Odkladá sa LEN Google `api.js`. Modul Contact Form 7 má celý kód v
+`DOMContentLoaded`, takže odložený sa nespustí vôbec — token by nebol,
+CF7 by každý dopyt vyhodnotil ako spam a dopyty by ticho mizli bez mailu
+aj bez zápisu do Kokpitu. Presne túto chybu mala prvá verzia snippetu
+z 21. 9. a kvôli tomu bol vypnutý.
+
+Overené naživo odoslaním testovacieho dopytu cez formulár na
+`/uvodni-trenink/`: token 2 233 znakov, web presmeroval na Poděkování, lead
+dorazil do `leads` celý (testovací záznam zmazaný). To isté overené na
+`/test-postury/` (iný formulár, cf7:5111). Pasca na botov (`psb-web`,
+snippet 16) beží ďalej nezávisle.
+
+Čo z toho zostáva otvorené: **LCP pod 7 s to samo nedostane.** Prvé
+načítanie je teraz 429 kB a najťažšie v ňom je naše písmo
+`agrandir.woff2` (124 kB), potom `tld.min.js` z PixelYourSite (40 kB),
+`style.css` (37 kB), `app.js` (37 kB), jQuery (31 kB).
+
 
 - **Meranie bolesti** — Jerry 24. 9. 2026 zrušil natrvalo. Neponúkať.
 - **Peniaze bez pohybov z banky** a **Marketing zoradený ako cesta** —
