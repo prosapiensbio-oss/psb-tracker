@@ -294,10 +294,21 @@ Overené po zmene: pixel **3288091694795887** sa načíta, CAPI endpoint
 `/wp-json/pys-facebook/v1/event` odpovedá, `gtag` aj `dataLayerPYS` bežia,
 formulár aj reCAPTCHA fungujú. `tldjs.getDomain()` vracia `prosapiens.cz`.
 
-**Vedľajší nález: Instagram feed v pätičke sa nevykresľuje na žiadnej z 78
-stránok.** Otázka zo zoznamu („odstrániť ~200 kB?") je tým zodpovedaná inak,
-než sa čakalo — feed tam nie je, zostávali po ňom len štýly. Ak ho Jerry
-chce mať funkčný, treba sa pozrieť na plugin (v menu svieti upozornenie).
+**Instagram feed — plugin deaktivovaný 1. 10. 2026 (Jerryho rozhodnutie).**
+Feed sa nevykresľoval na žiadnej zo 78 stránok a boli na to DVA nezávislé
+dôvody: nová téma `psb-spready` neregistruje ani jednu widget oblasť (v
+administrácii sa *Vzhled → Widgety* ani neotvorí), takže widget zo starej
+pätičky nemal kam ísť; a zdroj mal odobratú autorizáciu („An account admin
+has deauthorized the Smash Balloon app"). Shortcode `[instagram-feed feed=2]`
+je vedený ako použitý na 3 miestach, ale téma spúšťa shortcody len
+v článkoch a v skrytých formulároch, nie na obrazovkových stránkach.
+Sedemdňová lehota na zmazanie dát sa týkala keše príspevkov pre feed, ktorý
+nikde nebežal.
+Nastavenia oboch feedov zostávajú uložené, keby sa to malo vrátiť — vtedy to
+ale treba postaviť ako obrazovku v téme, nie ako widget.
+**Riadky `sbi_styles` a `sbi-tokens-local` som zo snippetu 28 vyhodil:**
+odpojený štýl vypnutého pluginu by po jeho opätovnom zapnutí ticho rozbil
+vzhľad feedu.
 
 Spolu za 1. 10. 2026 ubudlo z prvého načítania **~577 kB**: reCAPTCHA 353,
 písmo 55, JavaScript 126, štýly 43.
