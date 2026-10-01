@@ -112,7 +112,6 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
 | 9 falošných zrušení („zmizol tréning", ktorý sa nezmizol) | 25. 9. | označiť ako vysvetlené, alebo prejde sám? |
 | Dovolenka Anny Kadličkovej a Jakuba Kaňovského zapísaná k 7. 10. | 25. 9. | patrí k 30. 9.; tlačidlo „Vrátiť späť" už existuje |
 | Odskok augusta: zisk 18 072 → −26 154 Kč za pár hodín | 25. 9. | mám zistiť, odkiaľ ten rozdiel 44 226 Kč prišiel? |
-| Instagram feed v pätičke (~200 kB, celý web) | 21. 9. | odstrániť? |
 | PSI kľúč v Údajoch je neplatný (41 znakov, má mať 39) | 1. 10. | meranie rýchlosti beží bez kľúča a Google ho odmieta — dáš nový z Google Cloud? |
 
 ## 2 · Prijaté, nezačaté
@@ -257,6 +256,51 @@ Z posledného kola kontroly (17.–18. 9.) zostalo:
 ---
 
 ## Zavreté (aby sa neotvárali odznova)
+
+### Nepoužívané skripty a štýly preč — 169 kB (1. 10. 2026)
+
+Pristávacia stránka ťahala ~215 kB JavaScriptu a ~90 kB štýlov. Po odrátaní
+toho, čo naozaj treba, zostávalo zhruba **169 kB na každom načítaní každej
+stránky za funkcie, ktoré na webe nie sú nikde**. Robí to snippet 28, kópia
+v `philipjerry-web/navrhy-webu/snippety/28-nepouzivane-assety.php`.
+
+Overené stiahnutím **všetkých 78 stránok** a hľadaním vykresleného obsahu
+(nie značiek `<script>`, tie tam sú vždy): galéria/lightbox 0×, Twitter 0×,
+ikony sociálnych sietí 0×, Instagram feed 0×, Simple Download Monitor 0×.
+Protokol MFR sa doručuje formulárom, nie cez SDM.
+
+| čo | koľko |
+|---|---|
+| `tld.min.js` (PixelYourSite) | 40 kB |
+| Responsive Lightbox (5 skriptov + 2 štýly) | ~20 kB |
+| ikony sociálnych sietí (5 sád ikon!) | 28 kB |
+| Instagram feed — štýly | 8 kB |
+| Simple Download Monitor | 5 kB |
+| Twitter feed | 4 kB |
+| **JavaScript spolu** | **215 → 89 kB** |
+| **štýly spolu** | **90 → 47 kB** |
+
+**`tld.min.js` nestačilo vyhodiť.** Je to kompletný zoznam koncoviek celého
+internetu (141 kB kódu) kvôli jedinému volaniu `tldjs.getDomain()`, ktorým
+PixelYourSite zisťuje doménu pre svoje cookie. Keby chýbal, PYS má záložnú
+vetvu, ktorá vráti `www.prosapiens.cz` namiesto `prosapiens.cz` — iná doména
+pre cookie, teda tichá zmena v meraní reklamy. Preto trojriadková náhrada,
+ktorá vracia presne to, čo vracal zoznam.
+
+**jQuery (35 kB) ZOSTÁVA.** Závisí od neho PixelYourSite (81 volaní — reklamy
+a Meta CAPI) aj cookie lišta. Nie je za čo ich vymeniť.
+
+Overené po zmene: pixel **3288091694795887** sa načíta, CAPI endpoint
+`/wp-json/pys-facebook/v1/event` odpovedá, `gtag` aj `dataLayerPYS` bežia,
+formulár aj reCAPTCHA fungujú. `tldjs.getDomain()` vracia `prosapiens.cz`.
+
+**Vedľajší nález: Instagram feed v pätičke sa nevykresľuje na žiadnej z 78
+stránok.** Otázka zo zoznamu („odstrániť ~200 kB?") je tým zodpovedaná inak,
+než sa čakalo — feed tam nie je, zostávali po ňom len štýly. Ak ho Jerry
+chce mať funkčný, treba sa pozrieť na plugin (v menu svieti upozornenie).
+
+Spolu za 1. 10. 2026 ubudlo z prvého načítania **~577 kB**: reCAPTCHA 353,
+písmo 55, JavaScript 126, štýly 43.
 
 ### Písmo Agrandir — 124 → 69 kB, naživo od 1. 10. 2026
 
