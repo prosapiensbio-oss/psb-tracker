@@ -404,6 +404,16 @@ Z toho platí navyše:
 - **Nová položka registra sa pred nasadením púšťa cez `naostro.sh`.** Typy
   a testy overia pravidlo na vymyslených dátach; koľko riadkov z toho vznikne
   nad ostrou databázou, povie len tá kontrola.
+- **A ani `naostro.sh` nestačí — tretia chyba sa dala vidieť len na
+  obrazovke.** Prvý deň okna sa nedá súdiť: tolerancia ±1 deň sa tam nemá
+  o čo oprieť, lebo udalosť z predošlého dňa už v poli nie je, a presunutá
+  hodina vyzerá ako chýbajúca. Kontrola to prepustila (každý človek mal len
+  jednu otázku), ale na Dnes stálo pätnásť mien s tým istým dátumom.
+  Hranica preto je **najstaršia udalosť PLUS JEDEN DEŇ**.
+- **Najlacnejšie overenie je spočítať si to v prehliadači PRED nasadením.**
+  `/api/data` a `/api/kalendar` sa dajú zavolať z konzoly a pravidlo
+  prepočítať nad tými istými dátami, s ktorými beží appka. Dve minúty; mňa
+  to 1. 10. 2026 stálo dve zbytočné nasadenia, kým som na to prišiel.
 
 **A pozor na dátum spotreby celej kontroly.** Táto vznikla, keď bol PTminder
 pravda. Od 1. 10. 2026 je pravdou Kokpit — až Jerry prestane do PTmindera

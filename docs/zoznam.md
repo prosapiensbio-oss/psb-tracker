@@ -270,10 +270,23 @@ pokrytia exportu, spodný nie. Doplnená spodná hranica + vek nálezu 31 dní.
 Po nasadení ich je v registri nula — staršie boli falošné, septembrové sú
 vysvetlené ručnými zrušeniami (138 zapísaných) alebo odklepnuté.
 
-**Dátum spotreby:** kontrola vznikla, keď bol pravdou PTminder. Keď doň Jerry
-prestane zapisovať, bude „v kalendári áno, v PTminderi nie" normálny stav
-každého tréningu — vtedy ju vypnúť. Nástupca už existuje: karta „Vydrží
-kalendár sám?" v Prechode.
+**Dátum spotreby:** kontrola vznikla, keď bol pravdou PTminder. Jerry 1. 10.
+najprv povedal „vypni to", potom to vzal späť — do PTmindera bude zapisovať
+ďalej, lebo je to teraz kontrola. Zostáva teda zapnutá.
+
+### Nová notifikácia: tréning, ktorý nie je v Google kalendári (1. 10. 2026)
+
+Jerry: „všetko by malo byť v Google kalendári." Od 1. 10. je kalendár pravda
+o dochádzke, takže toto je ten nebezpečný smer — sedenie, o ktorom zdroj
+pravdy nevie, po odchode z PTmindera zmizne. Appka to vedela len v karte
+„Vydrží kalendár sám?".
+
+Na obrazovke sú teraz dve položky: **Lenka Prinosilova (17. 9.)** a
+**AATest Testový** (15., 22., 29. 9.).
+
+**Pre Jerryho:** AATest je stále v PTminderi a chodí do exportu — kým ho tam
+nezmažeš, bude z neho notifikácia. Zmazať riadky v Kokpite nestačí, najbližší
+export ich vráti.
 
 ### Nepoužívané skripty a štýly preč — 169 kB (1. 10. 2026)
 
