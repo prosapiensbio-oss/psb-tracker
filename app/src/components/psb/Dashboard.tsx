@@ -2343,7 +2343,17 @@ function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar }: { i
    * ktorú niekto pred odoslaním videl. Ide von k cudziemu človeku a späť sa
    * vziať nedá.
    */
+  /**
+   * To isté tlačidlo pri DVOCH notifikáciách:
+   *   • „Nový dopyt" (Terezkina) → stránka PRED úvodným,
+   *   • „SMS po úvodnom" (toho, kto ho viedol) → stránka PO ňom.
+   *
+   * Je to tá istá práca — termín, odkaz, správa — len v inom bode cyklu,
+   * takže je to jedna obsluha a jeden formulár. Dve kópie by sa rozišli.
+   */
   const jeNovyDopyt = item.key.startsWith("odpoved|");
+  const jePoUvodnom = item.key.startsWith("sms|");
+  const uvDruh: "pred" | "po" = jePoUvodnom ? "po" : "pred";
   const [uvOtvoreny, setUvOtvoreny] = useState(false);
   const [uvDatum, setUvDatum] = useState("");
   const [uvCas, setUvCas] = useState("10:00");
@@ -2353,7 +2363,21 @@ function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar }: { i
   const [uvOdkaz, setUvOdkaz] = useState("");
   const [uvBusy, setUvBusy] = useState(false);
   const [uvChyba, setUvChyba] = useState("");
-  const uvCislo = cisloPreBranu(item.telefon || "");
+  /**
+   * Telefón: dopyt si ho nesie sám, klient po úvodnom je už vo fakturačných
+   * kontaktoch — ten istý zdroj, z akého ho berie SMS po tréningu.
+   */
+  const [uvTelefon, setUvTelefon] = useState(item.telefon || "");
+  useEffect(() => {
+    if (!jePoUvodnom || !item.oKom || uvTelefon) return;
+    void fetch("/api/vydane-faktury", { credentials: "same-origin" })
+      .then((r) => r.json())
+      .then((j: { udaje?: { klient: string; telefon?: string }[] }) => {
+        setUvTelefon(String((j.udaje || []).find((u) => u.klient === item.oKom)?.telefon || ""));
+      })
+      .catch(() => setUvTelefon(""));
+  }, [jePoUvodnom, item.oKom, uvTelefon]);
+  const uvCislo = cisloPreBranu(uvTelefon);
 
   const pripravUvodny = async () => {
     if (!item.oKom || !uvDatum || !uvCas || uvBusy) return;
@@ -2364,17 +2388,19 @@ function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar }: { i
         method: "POST", credentials: "same-origin",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          akcia: "odkaz", klient: item.oKom, druh: "pred",
+          akcia: "odkaz", klient: item.oKom, druh: uvDruh,
           trener: uvTrener, kedy: `${uvDatum}T${uvCas}`,
-          cena: uvCena.trim() === "" ? null : Number(uvCena),
+          // Cena patrí k úvodnému; po ňom sa už platí za balíček.
+          cena: uvDruh === "po" || uvCena.trim() === "" ? null : Number(uvCena),
         }),
       }).then((x) => x.json() as Promise<{ ok?: boolean; odkaz?: string; error?: string }>);
       if (!r.ok || !r.odkaz) { setUvChyba(r.error || "Odkaz sa nepodarilo vyrobiť."); return; }
       setUvOdkaz(r.odkaz);
       // Bez diakritiky: s mäkčeňmi má SMS limit 70 znakov namiesto 160
       // a z jednej správy by boli tri.
-      setUvText(bezDiakritiky(
-        `Vitejte v ProSapiens Biomechanic. Vsechny informace k Vasi uvodni lekci - termin, adresu i co si vzit - najdete zde: ${r.odkaz}`,
+      setUvText(bezDiakritiky(uvDruh === "po"
+        ? `Dekujeme za ucast na uvodni lekci. Termin dalsiho treninku, souhrn i doporucene cteni najdete zde: ${r.odkaz}`
+        : `Vitejte v ProSapiens Biomechanic. Vsechny informace k Vasi uvodni lekci - termin, adresu i co si vzit - najdete zde: ${r.odkaz}`,
       ));
     } catch {
       setUvChyba("Odkaz sa nepodarilo vyrobiť — skús znova.");
@@ -2391,11 +2417,13 @@ function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar }: { i
       const r = await fetch("/api/sms", {
         method: "POST", credentials: "same-origin",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ klient: item.oKom, telefon: item.telefon, text: uvText.trim() }),
+        body: JSON.stringify({ klient: item.oKom, telefon: uvTelefon, text: uvText.trim() }),
       }).then((x) => x.json() as Promise<{ ok?: boolean; error?: string }>);
       if (!r.ok) { setUvChyba(r.error || "SMS neodišla."); return; }
       setUvOtvoreny(false);
-      vybav(`úvodný dohodnutý ${uvDatum} ${uvCas} · ${uvTrener} · SMS odoslaná`);
+      vybav(uvDruh === "po"
+        ? `SMS po úvodnom odoslaná · ďalší tréning ${uvDatum} ${uvCas}`
+        : `úvodný dohodnutý ${uvDatum} ${uvCas} · ${uvTrener} · SMS odoslaná`);
     } catch {
       setUvChyba("SMS neodišla — skús znova.");
     } finally {
@@ -2628,7 +2656,12 @@ function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar }: { i
             </button>
           )}
           {jeSms && !item.acked && (
-            <button onClick={() => vybav("SMS poslaná")} style={{ ...linkBtn, color: C.green }}>Poslané</button>
+            <button onClick={() => setUvOtvoreny((o) => !o)} style={{ ...linkBtn, color: uvOtvoreny ? C.accentLight : C.green }}>
+              {uvOtvoreny ? "Zavrieť" : "Pripraviť SMS"}
+            </button>
+          )}
+          {jeSms && !item.acked && (
+            <button onClick={() => vybav("SMS poslaná")} style={{ ...linkBtn, color: C.textMuted }}>Poslané ručne</button>
           )}
           {jeOdmena && !item.acked && (
             <button onClick={() => vybav("zľava 10 % daná")} style={{ ...linkBtn, color: C.green }}>Zľava daná</button>
@@ -2837,7 +2870,7 @@ function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar }: { i
       {uvOtvoreny && (
         <div style={{ marginTop: 9, paddingTop: 9, borderTop: `1px solid ${mix(C.border, 70)}`, display: "flex", flexDirection: "column", gap: 8 }}>
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            <span style={{ fontSize: 12, color: C.textMuted }}>Termín:</span>
+            <span style={{ fontSize: 12, color: C.textMuted }}>{uvDruh === "po" ? "Ďalší tréning:" : "Termín:"}</span>
             <input type="date" value={uvDatum} onChange={(e) => setUvDatum(e.target.value)}
               style={{ padding: "5px 9px", borderRadius: 7, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 12, colorScheme: "dark" }} />
             <input type="time" value={uvCas} onChange={(e) => setUvCas(e.target.value)}
@@ -2849,10 +2882,14 @@ function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar }: { i
                 {t}
               </button>
             ))}
-            <span style={{ fontSize: 12, color: C.textMuted, marginLeft: 4 }}>cena:</span>
-            <input value={uvCena} onChange={(e) => setUvCena(e.target.value.replace(/[^\d]/g, ""))} inputMode="numeric"
-              style={{ padding: "5px 9px", borderRadius: 7, border: `1px solid ${uvCena !== "1100" ? C.green : C.border}`, background: C.bg, color: C.text, fontSize: 12, width: 72 }} />
-            <span style={{ fontSize: 11.5, color: C.textDim }}>Kč{uvCena !== "1100" ? " · zľava sa ukáže aj na stránke" : ""}</span>
+            {uvDruh === "pred" && (
+              <>
+                <span style={{ fontSize: 12, color: C.textMuted, marginLeft: 4 }}>cena:</span>
+                <input value={uvCena} onChange={(e) => setUvCena(e.target.value.replace(/[^\d]/g, ""))} inputMode="numeric"
+                  style={{ padding: "5px 9px", borderRadius: 7, border: `1px solid ${uvCena !== "1100" ? C.green : C.border}`, background: C.bg, color: C.text, fontSize: 12, width: 72 }} />
+                <span style={{ fontSize: 11.5, color: C.textDim }}>Kč{uvCena !== "1100" ? " · zľava sa ukáže aj na stránke" : ""}</span>
+              </>
+            )}
           </div>
 
           {!uvOdkaz ? (
@@ -2861,7 +2898,7 @@ function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar }: { i
                 style={{ padding: "5px 13px", borderRadius: 7, border: `1px solid ${mix(C.green, 50)}`, background: mix(C.green, 12), color: C.green, fontSize: 12, fontWeight: 600, cursor: !uvDatum || uvBusy ? "default" : "pointer", opacity: !uvDatum || uvBusy ? 0.45 : 1, fontFamily: "inherit" }}>
                 {uvBusy ? "Pripravujem…" : "Pripraviť odkaz a SMS"}
               </button>
-              {!uvCislo && <span style={{ fontSize: 12, color: C.orange }}>Dopyt nemá telefón — odkaz vyrobím, poslať ho budeš musieť ručne.</span>}
+              {!uvCislo && <span style={{ fontSize: 12, color: C.orange }}>{uvDruh === "po" ? "Klient nemá v Kokpite telefón" : "Dopyt nemá telefón"} — odkaz vyrobím, poslať ho budeš musieť ručne.</span>}
             </div>
           ) : (
             <>

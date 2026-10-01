@@ -234,3 +234,45 @@ describe("žiadosť o históriu z tlačidla v maili", () => {
     expect("historia" in v).toBe(false);
   });
 });
+
+describe("spam s bodkočiarkou za „Re“ neprejde", () => {
+  /**
+   * 30. 9. 2026 sa do Dopytov dostal španielsky spam s predmetom
+   * „Re;mezinárodní pošta# 001877461". Filter na odpovede hľadal len
+   * dvojbodku, takže bodkočiarka stačila — a rozosielače to robia zámerne.
+   */
+  const spam = sprava({
+    od: "Your Company <llqrlzyo@michelle.lamy.eu>",
+    predmet: "Re;mezinárodní pošta# 001877461",
+    text: "Hola Jacinta, la cena de hoy. Hacerlo lenguaje ellas ministro autoridades sociales ex entrar.",
+  });
+
+  const preco = (v: ReturnType<typeof naDopyt>) => ("preskocene" in v ? v.preskocene : "");
+
+  it("predmet s „Re;“ je odpoveď, nie nový dopyt", () => {
+    expect(preco(naDopyt(spam))).toBe("odpoveď v rozhovore");
+  });
+
+  it("a rovnako „Fwd-“, „RE ,“ aj „Odpov:“", () => {
+    for (const p of ["Fwd-nieco", "RE , nieco", "Odpov: nieco", "re] nieco"]) {
+      expect(preco(naDopyt({ ...spam, predmet: p }))).toBe("odpoveď v rozhovore");
+    }
+  });
+
+  it("bežný predmet sa tým nezhodí", () => {
+    const d = naDopyt(sprava({ predmet: "Rezervace úvodní lekce", text: "Chtěl bych se objednat na úvodní trénink." }));
+    expect(d).toHaveProperty("dopyt");
+  });
+});
+
+describe("slovo sa hľadá na hranici slova", () => {
+  it("„termin“ v „determinado“ dopyt nerobí", () => {
+    const v = naDopyt(sprava({ predmet: "Informacion", text: "Es un asunto determinado que no tiene nada que ver." }));
+    expect("preskocene" in v && v.preskocene).toBe("nevyzerá ako dopyt na tréning");
+  });
+
+  it("ohnutý tvar sa stále chytí", () => {
+    expect(naDopyt(sprava({ predmet: "Dotaz", text: "Dobrý den, chtěl bych se objednat na termíny rehabilitace." })))
+      .toHaveProperty("dopyt");
+  });
+});

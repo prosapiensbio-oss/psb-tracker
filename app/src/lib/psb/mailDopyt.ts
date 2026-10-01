@@ -101,6 +101,28 @@ const DOPYT_SLOVA = [
   "pomoct", "pomôc", "pomoci", "zranění", "zraneni", "operac", "doporučil", "doporucil",
 ];
 
+/**
+ * Slovo musí ZAČÍNAŤ na hranici slova, nie ležať uprostred iného.
+ *
+ * `includes` našlo „termin" v „determinado" a „krk" v kuse base64, ktorý
+ * sa nerozkódoval. Pri cudzojazyčnom spame to znamená, že z filtra prejde
+ * skoro čokoľvek — stačí dosť dlhý text. Koncovku neskúmame zámerne: tieto
+ * slová sú kmene („postur", „rehabilit") a majú chytať aj ohnuté tvary.
+ *
+ * `\b` v JS pozná len ASCII (viď CLAUDE.md), takže hranicu si overujeme
+ * sami: znak pred nálezom nesmie byť písmeno ani číslica.
+ */
+export function obsahujeSlovo(text: string, slovo: string): boolean {
+  let od = 0;
+  for (;;) {
+    const i = text.indexOf(slovo, od);
+    if (i < 0) return false;
+    const pred = i === 0 ? "" : text[i - 1];
+    if (!pred || !/[\p{L}\p{N}]/u.test(pred)) return true;
+    od = i + 1;
+  }
+}
+
 const MESIACE_ISO = (d: Date, pasmo = "Europe/Prague") => {
   const f = new Intl.DateTimeFormat("en-CA", { timeZone: pasmo, year: "numeric", month: "2-digit", day: "2-digit" });
   return f.format(d);
@@ -244,14 +266,21 @@ export function naDopyt(v: MailVstup, vlastne: string[] = [], ignoruj: string[] 
     return { historia: { meno: zPredmetu || meno || email, email } };
   }
 
-  // Odpoveď na vlastný mail nie je nový dopyt — človek už v Kokpite je.
-  if (/^(re|odp|fwd|fw)\s*:/i.test(v.predmet || "")) return { preskocene: "odpoveď v rozhovore" };
+  /**
+   * Odpoveď na vlastný mail nie je nový dopyt — človek už v Kokpite je.
+   *
+   * Oddeľovač NIE JE len dvojbodka. 30. 9. 2026 prešiel filtrom španielsky
+   * spam s predmetom „Re;mezinárodní pošta# 001877461" — bodkočiarka namiesto
+   * dvojbodky stačila. Rozosielače to robia zámerne, práve aby sa minuli
+   * filtrom; preto sem patrí každý bežný oddeľovač.
+   */
+  if (/^\s*(re|odp|odpov|fwd|fw)\s*[:;,.\-\]]/i.test(v.predmet || "")) return { preskocene: "odpoveď v rozhovore" };
 
   // Až sem sa dostane pošta od človeka. Teraz otázka, či niečo CHCE.
   const cely = `${v.predmet} ${v.text}`.toLowerCase();
   const obchod = OBCHODNE.find((o) => cely.includes(o));
   if (obchod) return { preskocene: `obchodná ponuka („${obchod}“)` };
-  if (!DOPYT_SLOVA.some((d) => cely.includes(d))) return { preskocene: "nevyzerá ako dopyt na tréning" };
+  if (!DOPYT_SLOVA.some((d) => obsahujeSlovo(cely, d))) return { preskocene: "nevyzerá ako dopyt na tréning" };
 
   return {
     dopyt: {
