@@ -349,6 +349,23 @@ záver odporuje tomu, čo Jerry hovorí zo skúsenosti.
   súbore. Keď spadne, buď stĺpec do INSERTu dopíš, alebo ho pridaj do VYNIMKY
   aj s dôvodom; zoznam výnimiek je krátky a každá v ňom má vetu, prečo tam je.
 
+## Číselné políčko bez spodnej hranice vyrobí −1
+
+`<input type="number">` bez `min` spraví pri šípke dole z PRÁZDNEHO poľa
+hodnotu **−1**. Nie je to preklep používateľa a nič na to neupozorní —
+1. 10. 2026 tak stála v jednej anamnéze výška −1 cm. Overené na odhodenom
+políčku: bez hranice vyjde −1, s `min={0}` vyjde 0.
+
+Pri každom novom číselnom poli sa teda pýtaj, aký je najmenší zmysluplný
+údaj, a napíš ho. **Ale nie všade:** v appke je 11 číselných polí a päť
+z nich hranicu mať NESMIE, lebo sú to peniaze a mínus je tam normálny stav
+(ručný pohyb v banke — výdavok je záporný, položky faktúry kvôli dobropisu,
+bunka P&L, cieľová hodnota). Hranica tam nie je oprava, ale tichá prekážka.
+
+A keď si obsluha hranicu aj tak vynucuje (`Math.max(15, …)`), patrí
+do políčka tiež — inak človek klikne, uvidí nezmysel a appka mu ho ticho
+prepíše na niečo iné.
+
 ## Odporúčanie bez pamäte sa opakuje donekonečna
 
 Karta „Čo publikovať ďalej" navrhovala napísať stránky, ktoré už napísané
