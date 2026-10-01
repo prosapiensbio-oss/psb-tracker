@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { chybaOdosielatela, cisloPreBranu, dlzkaSpravy, rodZMena, textSms } from "./sms";
+import { chybaOdosielatela, cisloPreBranu, dlzkaSpravy, rodZMena, textSms, textSmsPlatba } from "./sms";
 
 describe("cisloPreBranu", () => {
   it("české číslo bez predvoľby dostane +420", () => {
@@ -139,5 +139,27 @@ describe("textSms podľa skutočnosti", () => {
   it("presná nula je posledná hodina — ale len keď bola dnes", () => {
     expect(textSms({ ...z, zostatok: 0, dnesnyTrening: true })).toContain("dnes si mal poslednu hodinu");
     expect(textSms({ ...z, zostatok: 0 })).toContain("balicek mas dochodeny");
+  });
+});
+
+describe("textSmsPlatba", () => {
+  it("povie sumu aj za čo to je — suma bez dôvodu je obvinenie", () => {
+    const t = textSmsPlatba({ oslovenie: "Daniela", trener: "Jerry", suma: 9400, datum: "9. 9." });
+    expect(t).toContain("9400 Kc");
+    expect(t).toContain("9. 9.");
+    expect(t).toContain("Jerry, ProSapiens");
+  });
+
+  it("ide bez diakritiky a zmestí sa do jednej správy", () => {
+    // Jediný mäkčeň zráža limit zo 160 znakov na 70 — dve SMS namiesto jednej.
+    const t = textSmsPlatba({ oslovenie: "Daniela", trener: "Jerry", suma: 9400, datum: "9. 9." });
+    expect(t).not.toMatch(/[áäčďéíľĺňóôŕšťúýžÁČĎÉÍĽŇÓŠŤÚÝŽ]/);
+    expect(dlzkaSpravy(t).sprav).toBe(1);
+  });
+
+  it("bez dátumu sa veta nerozsype", () => {
+    const t = textSmsPlatba({ oslovenie: "Jan", trener: "Terezka", suma: 1100 });
+    expect(t).toContain("1100 Kc");
+    expect(t).not.toContain("undefined");
   });
 });

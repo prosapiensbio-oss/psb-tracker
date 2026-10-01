@@ -42,6 +42,35 @@ export type Dlznik = {
 
 const den = (s: string) => (s || "").slice(0, 10);
 
+/**
+ * DLH JEDNÉHO KLIENTA — to isté, čo ráta karta dlžníkov, len pre jedného.
+ *
+ * Jerry, 1. 10. 2026 nad stránkou pre klienta: „prečo tam nie je QR na
+ * platbu?" Lebo stránka počítala dlh len z balíčkov zapísaných v Kokpite
+ * (`dlhKlienta`), kým karta dlžníkov k nim pripočítava aj otvorené poplatky
+ * z PTmindera. Danielin dlh 9 400 Kč je práve taký poplatok — karta ho
+ * ukázala, stránka tvrdila nulu a QR sa nenakreslil.
+ *
+ * Dve definície toho istého slova sa raz rozídu; toto je to miesto, kde sa
+ * zišli späť. Poplatky prichádzajú už očistené o platby zapísané v Kokpite
+ * (robí to `loadData`) — tu sa len sčítavajú.
+ */
+export function dlhJednehoKlienta(
+  poplatky: Poplatok[],
+  balicky: BalicekDlh[],
+  platby: PlatbaDlh[],
+): { dlzi: number; pocet: number; popis: string } {
+  const zPoplatkov = poplatky.reduce((a, p) => a + (p.suma || 0), 0);
+  const zBalickov = dlhKlienta(balicky, platby);
+  const dlzi = Math.max(0, Math.round(zPoplatkov + zBalickov.dlzi));
+  const pocet = poplatky.length + zBalickov.pocet;
+  // Popis hovorí, za ČO to je — suma bez dôvodu je výzva na nedorozumenie.
+  const popis = poplatky.length === 1 && !zBalickov.pocet
+    ? poplatky[0].popis
+    : pocet === 1 ? "nezaplacený balíček" : `nezaplacené balíčky (${pocet})`;
+  return { dlzi, pocet, popis };
+}
+
 export function dlznici(
   poplatky: Poplatok[],
   /** Balíčky a platby podľa klienta — kľúčom je meno tak, ako stojí v dátach. */

@@ -4,6 +4,10 @@ import { bindings } from "../lib/bindings.server";
 import { deriveClients } from "../lib/psb/compute";
 import { dlhKlienta, type BalicekDlh, type PlatbaDlh } from "../lib/psb/dlhKlienta";
 import { historiaPreMail } from "../lib/psb/historiaMail";
+import { klientStranka } from "../lib/psb/klientStranka";
+import { normName } from "../lib/psb/format";
+import { nastavenia, posliHistoriu } from "./api/mail-dopyty";
+import { dlhJednehoKlienta } from "../lib/psb/dlznici";
 import { loadData } from "../lib/psb/db.server";
 import { mailKlientovi } from "../lib/psb/mailKlientovi";
 import { osCasuKlienta } from "../lib/psb/klientOsCasu";
@@ -72,12 +76,24 @@ export const Route = createFileRoute("/v/$token")({
         const platby = ((await DB.prepare(
           "SELECT suma_czk, datum, zrusene_at FROM platby WHERE klient = ?1",
         ).bind(c.name).all()).results || []) as unknown as { suma_czk: number; datum: string; zrusene_at: string | null }[];
-        const dlh = dlhKlienta(
+        /**
+         * DLH AJ S OTVORENÝMI POPLATKAMI z PTmindera — tá istá definícia,
+         * akú ukazuje karta dlžníkov. Dovtedy stránka počítala len balíčky
+         * zapísané v Kokpite, takže Daniele Šašinkovej s dlhom 9 400 Kč
+         * tvrdila nulu a QR sa nenakreslil (Jerry, 1. 10. 2026: „prečo tam
+         * nie je QR na platbu?").
+         */
+        const mojePoplatky = (data.poplatky || [])
+          .filter((p) => normName(p.klient) === normName(c.name))
+          .map((p) => ({ datum: p.datum, klient: c.name, popis: p.popis, suma: p.suma }));
+        const dlh = dlhJednehoKlienta(
+          mojePoplatky,
           balicky.map((b): BalicekDlh => ({ cena: b.cena_czk, platnostOd: b.platnost_od, zdroj: b.zdroj, zruseneAt: b.zrusene_at, nazov: b.nazov })),
           platby.map((p): PlatbaDlh => ({ suma: p.suma_czk, datum: p.datum, zruseneAt: p.zrusene_at })),
         );
 
-        const vypis = historiaPreMail(c.name, os, c, dnes, dalsi);
+        // Stránka ukazuje POSLEDNÝ balíček; celá história chodí mailom na vyžiadanie.
+        const vypis = historiaPreMail(c.name, os, c, dnes, dalsi, false);
         const origin = new URL(request.url).origin;
         let qrUrl: string | undefined;
         if (dlh.dlzi > 0) {
@@ -88,7 +104,7 @@ export const Route = createFileRoute("/v/$token")({
           for (let i = 0; i < bajty.length; i += 4096) bin += String.fromCharCode(...bajty.subarray(i, i + 4096));
           qrUrl = `data:${o.typ};base64,${btoa(bin)}`;
           vypis.platba = {
-            popis: dlh.pocet === 1 ? "nezaplatený balíček" : `nezaplatené balíčky (${dlh.pocet})`,
+            popis: dlh.popis,
             suma: dlh.dlzi, ucet: DODAVATEL.ucet, sprava: c.name,
           };
         }
@@ -134,16 +150,18 @@ export const Route = createFileRoute("/v/$token")({
           vdaka: new URL(request.url).searchParams.get("vdaka") === "1",
         });
 
-        const m = mailKlientovi({ ...vypis, qrUrl, logoUrl: `${origin}/znacka-napis-mail.png` });
-        // Mailová sadzba nemá viewport — telefón by stránku zmenšil na známku.
-        const html = m.html
-          .replace(
-            '<meta charset="utf-8">',
-            '<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex">',
-          )
-          // Blok ide na KONIEC tela: výpis tréningov je to, kvôli čomu klient
-          // prišiel, otázky sú to, o čo ho prosíme.
-          .replace("</body>", `<div style="max-width:560px;margin:0 auto;padding:0 16px 28px;font-family:Arial,Helvetica,sans-serif;color:#f2f0e4">${pocity}</div></body>`);
+        /**
+         * VLASTNÁ SADZBA, NIE RECYKLOVANÝ MAIL. Stránka bola dovtedy HTML
+         * z mailu s prilepeným viewportom — preto bola tmavá a slovenská.
+         * Mail zostáva ako bol; toto je to, čo klient otvorí z SMS.
+         */
+        const html = klientStranka({
+          ...vypis,
+          qrUrl,
+          pocitovka: pocity,
+          logoUrl: `${origin}/znacka-napis-tmava.svg`,
+          historiaPoslana: new URL(request.url).searchParams.get("historia") === "1",
+        });
 
         await DB.prepare("UPDATE klient_odkazy SET otvorene = otvorene + 1, posledne_otvorene = ?1 WHERE token = ?2")
           .bind(new Date().toISOString(), token).run().catch(() => null);
@@ -176,6 +194,28 @@ export const Route = createFileRoute("/v/$token")({
         if (!r) return new Response("Tento odkaz neplatí.", { status: 404 });
 
         const f = await request.formData();
+
+        /**
+         * CTA „Poslat na e-mail" — celá história.
+         *
+         * Jerry, 1. 10. 2026: „celá história by mala prísť na vyžiadanie
+         * a preto by v tom odkaze malo byť CTA na žiadosť o celú históriu."
+         * Posiela to TÁ ISTÁ funkcia, ktorá odpovedá na mailovú žiadosť
+         * (`posliHistoriu`) — vrátane stropu raz za deň na klienta a toho,
+         * že mail ide na adresu uloženú pri klientovi, nie kamkoľvek.
+         * Druhá kópia by znamenala dva rôzne maily s tým istým názvom.
+         */
+        if (String(f.get("akcia") || "") === "historia") {
+          const n = await nastavenia(DB);
+          const v = await posliHistoriu(DB, r.klient, n).catch(() => ({ ok: false as const, preco: "zlyhalo" }));
+          return new Response(null, {
+            status: 303,
+            headers: {
+              location: `/v/${encodeURIComponent(token)}${v.ok ? "?historia=1" : "?historia=0"}`,
+              "cache-control": "no-store",
+            },
+          });
+        }
         // Meno oblasti a jej hodnota sa páruje PORADÍM — „hrudní páteř" ani
         // „lokty / zápěstí" sa do názvu poľa dať nedajú.
         const mena = f.getAll("oblast_meno").map((x) => String(x).trim().slice(0, 60)).filter(Boolean);

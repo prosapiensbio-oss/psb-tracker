@@ -155,6 +155,28 @@ export function textSms(v: SpravaProKlienta): string {
 }
 
 /**
+ * PRIPOMIENKA NEZAPLATENEJ PLATBY.
+ *
+ * Jerry, 1. 10. 2026: „Danielka Šašinkova je v mínuse 9 400, ale neviem, kde
+ * by som mohol kliknúť na to, aby som jej poslal SMS?" Nikde — karta
+ * dlžníkov mala len meno, sumu a „vybavené". Všetky ostatné správy appky sú
+ * o hodinách, nie o peniazoch.
+ *
+ * TEXT HOVORÍ, ZA ČO TO JE. „Dlhuješ 9 400" je obvinenie; „za balíček
+ * z 9. 9." je pripomienka a klient si to vie overiť. Dátum je to jediné,
+ * čo z jednej sumy robí konkrétnu vec.
+ *
+ * Suma sa píše bez medzier v tisícoch — „9400 Kc" prežije každú bránu,
+ * kým úzka medzera sa občas zmení na otáznik.
+ */
+export function textSmsPlatba(v: { oslovenie: string; trener: string; suma: number; datum?: string }): string {
+  const za = v.datum ? ` za balíček z ${v.datum}` : "";
+  return bezDiakritiky(
+    `Ahoj ${v.oslovenie}, evidujem ešte neuhradenú platbu ${Math.round(v.suma)} Kc${za}. Pošleš ju prosím? Ďakujem, ${v.trener}, ProSapiens`,
+  );
+}
+
+/**
  * ODOSIELATEĽ — ČO BRÁNA VEZME.
  *
  * Alfanumerické meno má **11 znakov**. Nie je to pravidlo brány, ale limit

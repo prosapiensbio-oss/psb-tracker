@@ -66,7 +66,7 @@ type Nast = { host: string; port: number; user: string; heslo: string; od: strin
  * QR ani výzva na platbu v automatickej odpovedi nie sú — história je
  * archív; sumu ďalšieho balíčka nemá automat odkiaľ vziať bez hádania.
  */
-async function posliHistoriu(DB: D1Database, menoZPredmetu: string, n: Nast): Promise<{ ok: true; komu: string } | { ok: false; preco: string }> {
+export async function posliHistoriu(DB: D1Database, menoZPredmetu: string, n: Nast): Promise<{ ok: true; komu: string } | { ok: false; preco: string }> {
   if (!n.host || !n.user || !n.heslo) return { ok: false, preco: "schránka nie je nastavená" };
 
   const data = await loadData(DB);
@@ -118,7 +118,7 @@ async function posliHistoriu(DB: D1Database, menoZPredmetu: string, n: Nast): Pr
   return { ok: true, komu: adresy.join(", ") };
 }
 
-async function nastavenia(DB: D1Database): Promise<Nast> {
+export async function nastavenia(DB: D1Database): Promise<Nast> {
   const rs = await DB.prepare(
     `SELECT key, value FROM vzas_settings
       WHERE key IN ('mail_host','mail_port','mail_user','mail_heslo','mail_od','mail_ignoruj','mail_vlastne')`,

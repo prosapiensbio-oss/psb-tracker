@@ -26,7 +26,13 @@
 /** Oblasť bolesti a jej sila — TEN ISTÝ tvar, aký má anamnéza. */
 export type Oblast = { oblast: string; sila: number | null };
 
-export const STUPNICA = { min: 0, max: 10, nizke: "najlepšie", vysoke: "najhoršie" };
+/**
+ * Popisky krajov stupnice. ČESKY — číta ich klient, nie tréner.
+ * Jerry, 1. 10. 2026: „sprav tú stránku česky." Celá klientska strana appky
+ * hovorí po česky (stránka pred úvodným aj web), len tieto otázky zostali
+ * slovenské, lebo vznikli ako prvé.
+ */
+export const STUPNICA = { min: 0, max: 10, nizke: "nejlepší", vysoke: "nejhorší" };
 
 /** Keď v anamnéze nie sú oblasti, pýta sa jeden všeobecný riadok. */
 export const CELKOVO = "celkovo";
@@ -38,18 +44,18 @@ export const CELKOVO = "celkovo";
  */
 export const POSUN = {
   id: "posun" as const,
-  text: "Cítiš, že sa v tele niečo mení k lepšiemu?",
+  text: "Cítíš, že se v těle něco mění k lepšímu?",
   moznosti: [
-    { hodnota: 1, text: "vôbec" },
+    { hodnota: 1, text: "vůbec" },
     { hodnota: 2, text: "trochu" },
-    { hodnota: 3, text: "veľmi" },
+    { hodnota: 3, text: "hodně" },
   ],
 };
 
 export const POZNAMKA = {
   id: "poznamka" as const,
-  text: "Čo sa zmenilo?",
-  pomoc: "Čokoľvek, čo by sme mali vedieť — aj keď je to k horšiemu. Nemusíš písať nič.",
+  text: "Co se změnilo?",
+  pomoc: "Cokoliv, co bychom měli vědět — i když je to k horšímu. Nemusíš psát nic.",
 };
 
 export type Meranie = {

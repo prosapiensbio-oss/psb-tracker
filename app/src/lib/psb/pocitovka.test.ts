@@ -98,7 +98,7 @@ describe("každá oblasť je vlastný rad", () => {
 describe("posun a odkazy", () => {
   it("posun berie POSLEDNÚ odpoveď, nie prvú", () => {
     const z = zhrnutiePocitov([m("2026-01-10", [], 1), m("2026-02-10", [], 3)]);
-    expect(z.posun?.text).toBe("veľmi");
+    expect(z.posun?.text).toBe("hodně");
     expect(z.posun?.datum).toBe("2026-02-10");
   });
 

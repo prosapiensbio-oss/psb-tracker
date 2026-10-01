@@ -46,11 +46,31 @@ export function historiaPreMail(
   dnes: string,
   /** Najbližší dohodnutý termín (ISO), keď existuje. */
   dalsi?: string,
+  /**
+   * `true` = celá história od prvého tréningu, `false` = len posledný balíček.
+   *
+   * Jerry, 1. 10. 2026: „stále vypisuješ celú históriu, prečo? Ľudí nezaujíma
+   * každý jeden tréning, zaujíma ich posledný balík." Markétin výpis mal na
+   * telefóne 7 487 px — vyše deväť obrazoviek po jednom riadku na tréning.
+   * Mail na vyžiadanie celú históriu ďalej posiela; stránka za odkazom nie.
+   */
+  uplna: boolean = true,
 ): VypisKlienta {
   const zostatokTeraz = klient.packageTotal > 0 ? klient.packageRemaining : null;
   const v = vypisHodin(os, "", dnes, zostatokTeraz);
-  const body = [...v.riadky].reverse()
-    .filter((r) => r.druh !== "balicekDo")
+  // Posledný balíček = od posledného začiatku členstva po dnešok. Keď žiadny
+  // začiatok nie je (starý klient, export ho nenesie), berie sa všetko —
+  // prázdna os by klientovi nepovedala nič.
+  /**
+   * `v.riadky` idú od NAJNOVŠIEHO (`vypisHodin` ich na konci otáča). Posledný
+   * balíček je teda PRVÝ `balicekOd` od začiatku poľa, nie od konca — pri
+   * prvom pokuse som hľadal z opačnej strany a stránka ukázala február 2026
+   * namiesto posledného členstva. Vidno to bolo len na živých dátach.
+   */
+  const vsetky = v.riadky.filter((r) => r.druh !== "balicekDo");
+  const prvyBalicek = vsetky.findIndex((r) => r.druh === "balicekOd");
+  const vyrez = uplna || prvyBalicek < 0 ? vsetky : vsetky.slice(0, prvyBalicek + 1);
+  const body = [...vyrez].reverse()
     .map((r) => ({
       den: r.den,
       cas: (/\d{1,2}:\d{2}/.exec(r.popis) || [""])[0] || undefined,
@@ -70,7 +90,7 @@ export function historiaPreMail(
     odkedy: (klient.firstSession || "").slice(0, 10),
     mesiacov: Math.round(mesiacovVztahu(klient, new Date(dnes))),
     tempo: tempoMesacne(klient, new Date(dnes)),
-    uplna: true,
+    uplna,
     zaplateneSpolu: v.zaplatene,
     dnes,
     dalsi,

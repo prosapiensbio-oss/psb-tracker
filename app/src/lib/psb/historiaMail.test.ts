@@ -49,4 +49,24 @@ describe("popisPreKlienta", () => {
     expect(popisPreKlienta({ druh: "trening", den: "", popis: "tréning 10:00 · Jerry", zostatok: null, dlh: null } as never)).toBe("tréning");
     expect(popisPreKlienta({ druh: "platba", den: "", popis: "platba 6 990 Kč · prevodom", zostatok: null, dlh: null } as never)).toBe("zaplatené 6 990 Kč");
   });
+
+  it("bez `uplna` vráti LEN posledný balíček — riadky idú od najnovšieho", () => {
+    // Pozor na smer: `vypisHodin` vracia riadky od najnovšieho. Hľadanie
+    // z opačného konca našlo NAJSTARŠÍ balíček a stránka ukázala február.
+    const os: Udalost[] = [
+      { den: "2026-02-15", druh: "balicekOd", popis: "Balíček 6 h", hodin: 6 },
+      { den: "2026-02-18", druh: "trening", popis: "tréning · 08:30" },
+      { den: "2026-09-09", druh: "balicekOd", popis: "Balíček 8 h", hodin: 8 },
+      { den: "2026-09-15", druh: "trening", popis: "tréning · 08:30" },
+    ] as unknown as Udalost[];
+    const k = { packageRemaining: 7, packageTotal: 8, firstSession: "2026-02-15", sessions: [], primaryTrainer: "Jerry" };
+    const posledny = historiaPreMail("Kto Vie", os, k as never, "2026-10-01", undefined, false);
+    const dni = posledny.os.map((b) => b.den);
+    expect(dni).toContain("2026-09-09");
+    expect(dni).not.toContain("2026-02-15");
+    expect(dni).not.toContain("2026-02-18");
+
+    const cela = historiaPreMail("Kto Vie", os, k as never, "2026-10-01", undefined, true);
+    expect(cela.os.map((b) => b.den)).toContain("2026-02-15");
+  });
 });

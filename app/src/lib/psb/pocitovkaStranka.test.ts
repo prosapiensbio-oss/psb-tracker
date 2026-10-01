@@ -6,8 +6,8 @@ import { CELKOVO, POSUN } from "./pocitovka";
 describe("blok na verejnej stránke", () => {
   it("pýta sa na oblasti Z ANAMNÉZY, nie na bolesť všeobecne", () => {
     const h = blokPocitovky({ oblasti: ["krk", "hrudní páteř"] });
-    expect(h).toContain("krk — koľko to bolí?");
-    expect(h).toContain("hrudní páteř — koľko to bolí?");
+    expect(h).toContain("krk — jak moc to bolí?");
+    expect(h).toContain("hrudní páteř — jak moc to bolí?");
     expect(h).toContain('name="oblast_meno" value="krk"');
     expect(h).toContain('name="oblast_sila_0"');
     expect(h).toContain('name="oblast_sila_1"');
@@ -15,7 +15,7 @@ describe("blok na verejnej stránke", () => {
 
   it("bez anamnézy sa pýta jeden všeobecný riadok", () => {
     const h = blokPocitovky({});
-    expect(h).toContain("Koľko ťa to bolí?");
+    expect(h).toContain("Jak moc to bolí?");
     expect(h).toContain(`name="oblast_meno" value="${CELKOVO}"`);
   });
 
@@ -24,8 +24,8 @@ describe("blok na verejnej stránke", () => {
     expect(h).toContain('name="oblast_sila_0" value="0"');
     expect(h).toContain('name="oblast_sila_0" value="10"');
     expect(h).not.toContain('name="oblast_sila_0" value="11"');
-    expect(h).toContain("najlepšie");
-    expect(h).toContain("najhoršie");
+    expect(h).toContain("nejlepší");
+    expect(h).toContain("nejhorší");
   });
 
   it("na ťažkosť bežných vecí sa už nepýta", () => {
@@ -43,7 +43,7 @@ describe("blok na verejnej stránke", () => {
 
   it("nadpis hneď hovorí, že je to dobrovoľné", () => {
     const h = blokPocitovky({});
-    expect(h).toContain("Ako ti je?");
+    expect(h).toContain("Jak ti je?");
     expect(h).toContain("nepovinné");
     expect(h).not.toContain("required");
   });
@@ -70,7 +70,7 @@ describe("blok na verejnej stránke", () => {
 
   it("minulý odkaz sa ukáže ako citát, nie ako predvyplnený text", () => {
     const h = blokPocitovky({ poslednyOdkaz: { datum: "2026-08-15", text: "lepšie sa mi spí" } });
-    expect(h).toContain("minule si napísal: „lepšie sa mi spí“");
+    expect(h).toContain("minule jsi napsal: „lepšie sa mi spí“");
     expect(h).toContain("<textarea name=\"poznamka\" rows=\"3\"");
     expect(h).not.toContain(">lepšie sa mi spí</textarea>");
   });
@@ -90,6 +90,6 @@ describe("blok na verejnej stránke", () => {
   });
 
   it("po odoslaní poďakuje a nemlčí", () => {
-    expect(blokPocitovky({ vdaka: true })).toContain("Ďakujeme");
+    expect(blokPocitovky({ vdaka: true })).toContain("Díky");
   });
 });
