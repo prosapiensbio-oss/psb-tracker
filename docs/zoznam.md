@@ -114,6 +114,7 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
 | Odskok augusta: zisk 18 072 → −26 154 Kč za pár hodín | 25. 9. | mám zistiť, odkiaľ ten rozdiel 44 226 Kč prišiel? |
 | Instagram feed v pätičke (~200 kB, celý web) | 21. 9. | odstrániť? |
 | PSI kľúč v Údajoch je neplatný (41 znakov, má mať 39) | 1. 10. | meranie rýchlosti beží bez kľúča a Google ho odmieta — dáš nový z Google Cloud? |
+| Písmo Agrandir: 141 → 69 kB, pripravené v repe | 1. 10. | prihlásiš sa do WordPressu? binárne súbory sa cez editor šablón nahrať nedajú |
 
 ## 2 · Prijaté, nezačaté
 
@@ -257,6 +258,34 @@ Z posledného kola kontroly (17.–18. 9.) zostalo:
 ---
 
 ## Zavreté (aby sa neotvárali odznova)
+
+### Písmo Agrandir — pripravené, čaká na prihlásenie do WordPressu (1. 10. 2026)
+
+`fonts/agrandir.woff2` **nebol woff2** — bol to premenovaný TrueType: 303 kB
+na disku, 141 kB po drôte (server ho gzipoval). Skutočný WOFF2 z neho spravil
+106 kB; vybratie osi `ital` ďalších 37 kB. Výsledok **69 kB**, teda o 72 kB
+menej na každom načítaní každej stránky.
+
+Os `ital` používalo jediné pravidlo `.book em` — a `.book` je na živom webe
+len na `/o-nas/`, kde nie je ani jeden `<em>`. Tá os teda stála 38 kB na každom
+načítaní a nevykreslila nič. Kurzíva je odteraz samostatný súbor **14 kB**,
+ktorý prehliadač stiahne len na stránkach, kde kurzíva naozaj je — články
+s citáciami tak dostanú skutočnú italiku namiesto dnešnej falošnej šikmej.
+
+Osi `wght` aj `wdth` zostali celé, takže všetkých 25 `font-variation-settings`
+v téme platí ďalej. Overené dvakrát: šírky textu pri 11 nastaveniach, ktoré
+téma používa, sedia **do znaku** (fontTools) aj **na pol pixela** (prehliadač).
+Podmnožinu znakov som NEROBIL — ušetrila by 5 kB a stála by 57 glyfov.
+
+Hotové v repe: `navrhy-webu/tema/psb-spready/fonts/agrandir-var.woff2`,
+`agrandir-italic.woff2`, upravený `style.css`. Balík na nahratie:
+`~/Downloads/psb-spready-pismo.zip`.
+
+**Prečo to nie je naživo:** administrácia WordPressu sa počas práce odhlásila
+a prihlasovacia adresa je skrytá (heslo nemám a zadávať ho ani nesmiem).
+Binárny súbor sa navyše cez Editor šablón nahrať nedá, takže cesta je
+nahratie témy. Keď sa Jerry prihlási: najprv porovnať PHP súbory témy
+s repom (JS, CSS aj parts sedia na bajt), potom nahrať balík a vymazať keš.
 
 ### reCAPTCHA na webe — odložená za prvý dotyk (1. 10. 2026)
 
