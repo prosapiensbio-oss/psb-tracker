@@ -17,6 +17,7 @@ import { osCasuKlienta, treningyVBalicku } from "../../lib/psb/klientOsCasu";
 import { mesiacovVztahu, sedeniaPoMesiacoch, tempoMesacne } from "../../lib/psb/profil";
 import { odhadVycerpania } from "../../lib/psb/odhadVycerpania";
 import { Premenovanie } from "./Klienti";
+import { SmsKlientovi } from "./SmsKlientovi";
 import { zdravieKlienta } from "../../lib/psb/klientZdravie";
 import type { ClientAgg } from "../../lib/psb/compute";
 import type { PSBData } from "../../lib/psb/types";
@@ -568,6 +569,21 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
   /** Čo klient naozaj dlhuje — otvorené poplatky z PTmindera, nie odhad. */
   const dlzi = Math.round(poplatkyKlienta.reduce((a, x) => a + (x.suma || 0), 0));
 
+  /**
+   * Dátum, ktorý ide do SMS — „za balíček z 9. 9.".
+   *
+   * Najnovší z toho, čo je otvorené: poplatok z PTmindera alebo balíček
+   * nahodený v Kokpite. Keď je otvorených viac, správa hovorí o tom
+   * poslednom; Jerry ju pred odoslaním vidí a vie ju prepísať.
+   */
+  const datumDlhu = useMemo(() => {
+    const dni = [
+      ...poplatkyKlienta.map((x) => String(x.datum || "")),
+      ...(dlh.dlzi > 0 ? mojeBalicky.map((b) => String(b.platnost_od || "")) : []),
+    ].filter(Boolean).sort();
+    return dni.length ? fmtDMY(dni[dni.length - 1]) : undefined;
+  }, [poplatkyKlienta, mojeBalicky, dlh.dlzi]);
+
   const pridajPlatbu = async () => {
     setPracujem(true); setChyba("");
     const r = await fetch("/api/platby", {
@@ -1029,6 +1045,25 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
             <div style={{ fontSize: 10.5, color: C.textDim, marginTop: 4, lineHeight: 1.45 }}>
               + {fmtCZK(mojePlatby.reduce((a, x) => a + x.suma_czk, 0))} zapísané v Kokpite
               {dlzi > 0 ? " — kým nepríde nový export, dlh o ne nevie" : ""}
+            </div>
+          )}
+          {/* SMS rovno odtiaľto (Jerry, 1. 10. 2026: „strašne mi chýba
+              možnosť poslať SMS priamo v profile"). Doteraz sa to dalo len
+              z dlaždice na dashboarde — teda z inej obrazovky, než na ktorej
+              človek dlh číta.
+
+              Tlačidlo sa kreslí LEN pri dlhu. Keď je zaplatené, nemá čo
+              poslať: správa znie „tady máš přehled hodin a QR na platbu"
+              a QR na nulu je výzva na omyl — to isté pravidlo, podľa
+              ktorého platobný blok chýba aj na stránke klienta. */}
+          {dlzi + dlh.dlzi > 0 && (
+            <div style={{ marginTop: 9 }}>
+              <SmsKlientovi
+                meno={meno}
+                trener={c?.primaryTrainer || ""}
+                platba={{ suma: dlzi + dlh.dlzi, datum: datumDlhu }}
+                maly
+              />
             </div>
           )}
         </div>
