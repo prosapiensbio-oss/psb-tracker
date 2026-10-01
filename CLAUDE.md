@@ -384,6 +384,27 @@ ohranič ho z oboch strán — `MIN` aj `MAX` zdroja. A ku každému nálezu, kt
 čaká na človeka, pridaj vek: otázka, s ktorou sa už nedá nič urobiť (tréning
 spred dvoch mesiacov nikto spätne nedopíše), nepatrí do zoznamu vôbec.
 
+**A TÚ ISTÚ CHYBU SOM O HODINU NESKÔR SPRAVIL ZNOVA, ZRKADLOVO.** Nová
+kontrola v opačnom smere („v PTminderi áno, v kalendári nie") sa pýtala
+31 dní dozadu — lenže pole udalostí, s ktorým appka pracuje, siaha len
+**21 dní** (`okno()` v `api/kalendar.ts`). Sedenia spred 22–31 dní tak nemali
+s čím sedieť a appka ohlásila ako chýbajúce desiatky tréningov, ktoré
+v kalendári celý čas sú: 33 klientov, niektorí s piatimi otázkami naraz.
+Prešlo to typmi aj testami; zastavila to až kontrola ostrých dát
+(`naostro.sh`, sekcia „tá istá otázka dvakrát") — a bolo to už nasadené.
+
+Z toho platí navyše:
+- **Hranica okna sa berie Z DÁT, nie z konštanty.** `mimoKalendara.ts` si
+  spodnú hranicu zisťuje z najstaršej udalosti v poli; 31 dní je len strop,
+  keby okno niekto rozšíril. Konštanta, ktorá „bude bezpečne vnútri", je
+  predpoklad — a ten sa raz zmení bez toho, aby si to niekto všimol.
+- **Prázdny zdroj = mlčanie.** Žiadne udalosti neznamená „nič nie je
+  v kalendári", znamená „nevie sa nič". Je to tá istá veta ako „prázdna
+  odpoveď nie je dôkaz", len o krok vyššie.
+- **Nová položka registra sa pred nasadením púšťa cez `naostro.sh`.** Typy
+  a testy overia pravidlo na vymyslených dátach; koľko riadkov z toho vznikne
+  nad ostrou databázou, povie len tá kontrola.
+
 **A pozor na dátum spotreby celej kontroly.** Táto vznikla, keď bol PTminder
 pravda. Od 1. 10. 2026 je pravdou Kokpit — až Jerry prestane do PTmindera
 zapisovať, bude „v kalendári áno, v PTminderi nie" normálny stav KAŽDÉHO
