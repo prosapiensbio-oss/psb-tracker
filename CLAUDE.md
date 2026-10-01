@@ -2176,3 +2176,11 @@ appka vyrobí odkaz a pripraví SMS. Pravidlá:
   kým appka sa nasadzuje odtiaľto.
   Keď sa presmerovanie raz rozbije, mení sa JEDNA konštanta
   (`VEREJNA_DOMENA`) a odkazy idú znova priamo.
+- **Ceník je na `/sluzby/`, nie na `/jak-to-funguje/`.** Jerry, 1. 10. 2026.
+  Odkaz vedie na `/sluzby/#cenik` — kotvu som pridal do témy
+  (`parts/sluzby.html`, `<div class="spread" id="cenik">`), lebo stránka je
+  vodorovné listovanie a bez nej človek pristane na začiatku a ceny musí
+  nalistovať. Téma kotvy vie (`anchorGo` v `js/app.js`), len ich dovtedy
+  žiadna obrazovka nemala. **Zmena témy sa robí na DVOCH miestach**: v repe
+  (`navrhy-webu/tema/psb-spready/`, zdroj pravdy) a cez Editor šablón vo
+  WordPresse (živý web) — inak sa pri najbližšom nahratí témy prepíše.

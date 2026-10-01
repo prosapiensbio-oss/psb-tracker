@@ -37,7 +37,13 @@ export const UVODNY = { minut: 60, cenaCzk: 1100 };
 
 export const ODKAZY = {
   video: "https://youtu.be/A_yymlfMJes",
-  cennik: "https://www.prosapiens.cz/jak-to-funguje/#cenik",
+  /**
+   * Ceník je na /sluzby/, nie na /jak-to-funguje/ (Jerry, 1. 10. 2026).
+   * `#cenik` je kotva na obrazovke s cenami — téma webu ju vie nájsť
+   * (`anchorGo` v app.js), takže klient pristane rovno na cenách a nemusí
+   * listovať. Kotva je v `parts/sluzby.html` v téme psb-spready.
+   */
+  cennik: "https://www.prosapiens.cz/sluzby/#cenik",
   profil: "https://www.prosapiens.cz/o-nas/",
   poUvodnej: "https://www.prosapiens.cz/informace-po-uvodni-lekci/",
   coOcekavat: "https://www.prosapiens.cz/co-ocekavat-od-biomechanickeho-treninku/",
