@@ -443,23 +443,35 @@ export function AnamnezaPanel({ meno }: { meno: string }) {
 }
 
 /**
- * Šírka políčok na písanie.
+ * Šírka políčok na písanie. Stĺpec má 680 px, pole ich zámerne nevyužije
+ * všetky: riadok cez celé okno sa horšie číta a prázdne pole na celú šírku
+ * vyzerá ako veľa práce (Jerry, 30. 9. 2026: „tie okná na písanie daj
+ * o polovicu menšie" — vtedy 680 → 340).
  *
- * Jerry, 30. 9. 2026: „tie okná na písanie daj o polovicu menšie."
- * Boli na celú šírku stĺpca (680 px) a dve zbytočné veci robili naraz:
- * riadok textu sa tiahol cez celé okno, takže sa horšie čítal, a prázdne
- * pole vyzeralo ako veľa práce. Polovica stačí — a dlhý text sa aj tak
- * zmestí, lebo výška políčka rastie s obsahom.
+ * 1. 10. 2026 sa vrátilo späť na 420. Pri 340 bolo pole užšie než veta,
+ * ktorá sa doň píše, a vedľa troch pilulkových tlačidiel pôsobilo ako
+ * zvyšok miesta. 420 je ešte stále pohodlný riadok (~70 znakov pri 14 px)
+ * a už to vyzerá ako hlavná vec na obrazovke.
  */
-const SIRKA_PISANIA = 340;
+const SIRKA_PISANIA = 420;
 /**
- * Voľné pole začína NA JEDNOM RIADKU a rastie s textom (Jerry, 30. 9. 2026:
- * „myslím výšku tých okien o polovicu zmenši"). Prázdna anamnéza tak nie je
- * stena prázdnych obdĺžnikov a vidno viac otázok naraz; kto píše odstavec,
- * dostane miesto sám od seba. Strop je tu preto, aby jedna dlhá odpoveď
- * neodtlačila zvyšok sekcie mimo obrazovku.
+ * Strop výšky — aby jedna dlhá odpoveď neodtlačila zvyšok sekcie mimo
+ * obrazovku. Výška políčka inak rastie s textom, takže kto píše odstavec,
+ * dostane miesto sám od seba.
  */
 const MAX_VYSKA = 150;
+/**
+ * Spodná hranica. Voľné pole začínalo na JEDNOM riadku (30. 9. 2026) a to
+ * bolo o riadok málo: prázdne malo 340×32, kým políčko na výšku vedľa neho
+ * 90×34. Hlavná otázka celej anamnézy tak vyzerala ako škára a dve čísla
+ * vedľa nej ako hlavná vec. Jerry, 1. 10. 2026: „pozri sa na veľkosť toho
+ * okna — výška, váha super veľké oproti ‚hlavní obtíž‘; to môže byť väčšie
+ * a výška, váha naopak trošku menšie."
+ *
+ * Dva riadky (54 px) to otáčajú späť a stena prázdnych obdĺžnikov z toho
+ * nevznikne — otázok s voľným textom je v sekcii pár, zvyšok sú pilulky.
+ */
+const MIN_VYSKA = 54;
 
 /** Ovládanie jednej otázky. Veľké natoľko, aby sa dalo trafiť bez pozerania. */
 function Pole({ o, hodnota, prve, onZmen }: { o: Otazka; hodnota: unknown; prve: boolean; onZmen: (v: unknown) => void }) {
@@ -472,7 +484,7 @@ function Pole({ o, hodnota, prve, onZmen }: { o: Otazka; hodnota: unknown; prve:
   const rast = (el: HTMLTextAreaElement | null) => {
     if (!el) return;
     el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, MAX_VYSKA)}px`;
+    el.style.height = `${Math.min(Math.max(el.scrollHeight, MIN_VYSKA), MAX_VYSKA)}px`;
   };
 
   if (o.typ === "oblasti") {
@@ -540,7 +552,7 @@ function Pole({ o, hodnota, prve, onZmen }: { o: Otazka; hodnota: unknown; prve:
         ref={rast}
         value={String(hodnota ?? "")}
         onChange={(e) => { rast(e.target); onZmen(e.target.value); }}
-        rows={1}
+        rows={2}
         autoFocus={prve}
         placeholder="píš…"
         style={{ ...vstup, width: "100%", maxWidth: SIRKA_PISANIA, resize: "vertical", lineHeight: 1.45, overflow: "hidden" }}
@@ -551,10 +563,22 @@ function Pole({ o, hodnota, prve, onZmen }: { o: Otazka; hodnota: unknown; prve:
   return (
     <input
       type={o.typ === "cislo" ? "number" : o.typ === "datum" ? "date" : "text"}
+      // Bez spodnej hranice spraví šípka dole z PRÁZDNEHO políčka „−1" —
+      // a presne to v jednej anamnéze stálo ako výška v centimetroch
+      // (nájdené 1. 10. 2026). Záporná výška ani váha neexistuje.
+      {...(o.typ === "cislo" ? { min: 0, step: 1 } : null)}
       value={String(hodnota ?? "")}
       onChange={(e) => onZmen(o.typ === "cislo" ? (e.target.value === "" ? "" : Number(e.target.value)) : e.target.value)}
       autoFocus={prve}
-      style={{ ...vstup, width: o.typ === "cislo" ? 90 : "100%", maxWidth: SIRKA_PISANIA, colorScheme: "dark" }}
+      style={{
+        ...vstup,
+        width: o.typ === "cislo" ? 72 : "100%",
+        maxWidth: SIRKA_PISANIA,
+        colorScheme: "dark",
+        // Výška a váha sú tri číslice, nie veta — nech nie sú mohutnejšie
+        // než pole, do ktorého sa píše hlavná obtiaž.
+        ...(o.typ === "cislo" ? { padding: "4px 8px" } : null),
+      }}
     />
   );
 }

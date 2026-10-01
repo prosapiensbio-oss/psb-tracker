@@ -1810,7 +1810,9 @@ function OknoUdalosti({ vyber, mena, clients, predvolenyTrener, onZmen, onZavri,
         </label>
         <label style={popisok}>
           minút
-          <input type="number" value={vyber.minut} onChange={(e) => onZmen({ ...vyber, minut: Math.max(15, Math.min(240, Number(e.target.value) || 60)) })} style={{ ...pole, width: 58 }} />
+          {/* Hranice sú tie isté, aké si obsluha aj tak vynúti — bez nich šípka
+              dole z poľa urobí nezmysel a kód ho ticho prepíše na 15. */}
+          <input type="number" min={15} max={240} step={15} value={vyber.minut} onChange={(e) => onZmen({ ...vyber, minut: Math.max(15, Math.min(240, Number(e.target.value) || 60)) })} style={{ ...pole, width: 58 }} />
         </label>
       </div>
 
