@@ -15,6 +15,7 @@ import { Route as NavrhyTitulkyRouteImport } from './routes/navrhy-titulky'
 import { Route as NatacaciListRouteImport } from './routes/natacaci-list'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as VTokenRouteImport } from './routes/v.$token'
+import { Route as UTokenRouteImport } from './routes/u.$token'
 import { Route as AssetsSplatRouteImport } from './routes/assets/$'
 import { Route as ApiZositRouteImport } from './routes/api/zosit'
 import { Route as ApiWishlistRouteImport } from './routes/api/wishlist'
@@ -25,6 +26,7 @@ import { Route as ApiVzasSettingsRouteImport } from './routes/api/vzas-settings'
 import { Route as ApiVzasNotesRouteImport } from './routes/api/vzas-notes'
 import { Route as ApiVydaneFakturyRouteImport } from './routes/api/vydane-faktury'
 import { Route as ApiVedomostRouteImport } from './routes/api/vedomost'
+import { Route as ApiUvodnyRouteImport } from './routes/api/uvodny'
 import { Route as ApiUsersRouteImport } from './routes/api/users'
 import { Route as ApiTreningZdarmaRouteImport } from './routes/api/trening-zdarma'
 import { Route as ApiTitulkaObrazokRouteImport } from './routes/api/titulka-obrazok'
@@ -111,6 +113,11 @@ const VTokenRoute = VTokenRouteImport.update({
   path: '/v/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const UTokenRoute = UTokenRouteImport.update({
+  id: '/u/$token',
+  path: '/u/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AssetsSplatRoute = AssetsSplatRouteImport.update({
   id: '/assets/$',
   path: '/assets/$',
@@ -159,6 +166,11 @@ const ApiVydaneFakturyRoute = ApiVydaneFakturyRouteImport.update({
 const ApiVedomostRoute = ApiVedomostRouteImport.update({
   id: '/api/vedomost',
   path: '/api/vedomost',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiUvodnyRoute = ApiUvodnyRouteImport.update({
+  id: '/api/uvodny',
+  path: '/api/uvodny',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiUsersRoute = ApiUsersRouteImport.update({
@@ -498,6 +510,7 @@ export interface FileRoutesByFullPath {
   '/api/titulka-obrazok': typeof ApiTitulkaObrazokRoute
   '/api/trening-zdarma': typeof ApiTreningZdarmaRoute
   '/api/users': typeof ApiUsersRoute
+  '/api/uvodny': typeof ApiUvodnyRoute
   '/api/vedomost': typeof ApiVedomostRoute
   '/api/vydane-faktury': typeof ApiVydaneFakturyRoute
   '/api/vzas-notes': typeof ApiVzasNotesRoute
@@ -508,6 +521,7 @@ export interface FileRoutesByFullPath {
   '/api/wishlist': typeof ApiWishlistRoute
   '/api/zosit': typeof ApiZositRoute
   '/assets/$': typeof AssetsSplatRoute
+  '/u/$token': typeof UTokenRoute
   '/v/$token': typeof VTokenRoute
 }
 export interface FileRoutesByTo {
@@ -571,6 +585,7 @@ export interface FileRoutesByTo {
   '/api/titulka-obrazok': typeof ApiTitulkaObrazokRoute
   '/api/trening-zdarma': typeof ApiTreningZdarmaRoute
   '/api/users': typeof ApiUsersRoute
+  '/api/uvodny': typeof ApiUvodnyRoute
   '/api/vedomost': typeof ApiVedomostRoute
   '/api/vydane-faktury': typeof ApiVydaneFakturyRoute
   '/api/vzas-notes': typeof ApiVzasNotesRoute
@@ -581,6 +596,7 @@ export interface FileRoutesByTo {
   '/api/wishlist': typeof ApiWishlistRoute
   '/api/zosit': typeof ApiZositRoute
   '/assets/$': typeof AssetsSplatRoute
+  '/u/$token': typeof UTokenRoute
   '/v/$token': typeof VTokenRoute
 }
 export interface FileRoutesById {
@@ -645,6 +661,7 @@ export interface FileRoutesById {
   '/api/titulka-obrazok': typeof ApiTitulkaObrazokRoute
   '/api/trening-zdarma': typeof ApiTreningZdarmaRoute
   '/api/users': typeof ApiUsersRoute
+  '/api/uvodny': typeof ApiUvodnyRoute
   '/api/vedomost': typeof ApiVedomostRoute
   '/api/vydane-faktury': typeof ApiVydaneFakturyRoute
   '/api/vzas-notes': typeof ApiVzasNotesRoute
@@ -655,6 +672,7 @@ export interface FileRoutesById {
   '/api/wishlist': typeof ApiWishlistRoute
   '/api/zosit': typeof ApiZositRoute
   '/assets/$': typeof AssetsSplatRoute
+  '/u/$token': typeof UTokenRoute
   '/v/$token': typeof VTokenRoute
 }
 export interface FileRouteTypes {
@@ -720,6 +738,7 @@ export interface FileRouteTypes {
     | '/api/titulka-obrazok'
     | '/api/trening-zdarma'
     | '/api/users'
+    | '/api/uvodny'
     | '/api/vedomost'
     | '/api/vydane-faktury'
     | '/api/vzas-notes'
@@ -730,6 +749,7 @@ export interface FileRouteTypes {
     | '/api/wishlist'
     | '/api/zosit'
     | '/assets/$'
+    | '/u/$token'
     | '/v/$token'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -793,6 +813,7 @@ export interface FileRouteTypes {
     | '/api/titulka-obrazok'
     | '/api/trening-zdarma'
     | '/api/users'
+    | '/api/uvodny'
     | '/api/vedomost'
     | '/api/vydane-faktury'
     | '/api/vzas-notes'
@@ -803,6 +824,7 @@ export interface FileRouteTypes {
     | '/api/wishlist'
     | '/api/zosit'
     | '/assets/$'
+    | '/u/$token'
     | '/v/$token'
   id:
     | '__root__'
@@ -866,6 +888,7 @@ export interface FileRouteTypes {
     | '/api/titulka-obrazok'
     | '/api/trening-zdarma'
     | '/api/users'
+    | '/api/uvodny'
     | '/api/vedomost'
     | '/api/vydane-faktury'
     | '/api/vzas-notes'
@@ -876,6 +899,7 @@ export interface FileRouteTypes {
     | '/api/wishlist'
     | '/api/zosit'
     | '/assets/$'
+    | '/u/$token'
     | '/v/$token'
   fileRoutesById: FileRoutesById
 }
@@ -940,6 +964,7 @@ export interface RootRouteChildren {
   ApiTitulkaObrazokRoute: typeof ApiTitulkaObrazokRoute
   ApiTreningZdarmaRoute: typeof ApiTreningZdarmaRoute
   ApiUsersRoute: typeof ApiUsersRoute
+  ApiUvodnyRoute: typeof ApiUvodnyRoute
   ApiVedomostRoute: typeof ApiVedomostRoute
   ApiVydaneFakturyRoute: typeof ApiVydaneFakturyRoute
   ApiVzasNotesRoute: typeof ApiVzasNotesRoute
@@ -950,6 +975,7 @@ export interface RootRouteChildren {
   ApiWishlistRoute: typeof ApiWishlistRoute
   ApiZositRoute: typeof ApiZositRoute
   AssetsSplatRoute: typeof AssetsSplatRoute
+  UTokenRoute: typeof UTokenRoute
   VTokenRoute: typeof VTokenRoute
 }
 
@@ -995,6 +1021,13 @@ declare module '@tanstack/react-router' {
       path: '/v/$token'
       fullPath: '/v/$token'
       preLoaderRoute: typeof VTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/u/$token': {
+      id: '/u/$token'
+      path: '/u/$token'
+      fullPath: '/u/$token'
+      preLoaderRoute: typeof UTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/assets/$': {
@@ -1065,6 +1098,13 @@ declare module '@tanstack/react-router' {
       path: '/api/vedomost'
       fullPath: '/api/vedomost'
       preLoaderRoute: typeof ApiVedomostRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/uvodny': {
+      id: '/api/uvodny'
+      path: '/api/uvodny'
+      fullPath: '/api/uvodny'
+      preLoaderRoute: typeof ApiUvodnyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/users': {
@@ -1516,6 +1556,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiTitulkaObrazokRoute: ApiTitulkaObrazokRoute,
   ApiTreningZdarmaRoute: ApiTreningZdarmaRoute,
   ApiUsersRoute: ApiUsersRoute,
+  ApiUvodnyRoute: ApiUvodnyRoute,
   ApiVedomostRoute: ApiVedomostRoute,
   ApiVydaneFakturyRoute: ApiVydaneFakturyRoute,
   ApiVzasNotesRoute: ApiVzasNotesRoute,
@@ -1526,6 +1567,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiWishlistRoute: ApiWishlistRoute,
   ApiZositRoute: ApiZositRoute,
   AssetsSplatRoute: AssetsSplatRoute,
+  UTokenRoute: UTokenRoute,
   VTokenRoute: VTokenRoute,
 }
 export const routeTree = rootRouteImport

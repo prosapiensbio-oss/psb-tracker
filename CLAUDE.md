@@ -2108,3 +2108,43 @@ Je to otázka na pocit zo zmeny, nie na stav tela; desať stupňov by z nej
 spravilo meranie, ktorým nie je. A vedľa nej stojí otvorená „Čo sa
 zmenilo?" — to je to, čo sa z čísel nevyčíta, a v profile aj v Jarvisovom
 kontexte sa ukazuje doslovne.
+
+
+## Šesť SMS nie je správa, je to stránka poslaná po kúskoch
+
+Text, ktorý Jerry posielal pred úvodným tréningom, má 780 znakov. To je
+v GSM abecede šesť SMS — a s diakritikou dvanásť, lebo jediný mäkčeň zhodí
+limit zo 160 na 70 znakov. Klient to dostal rozsypané na šesť bubliniek,
+v ktorých sa odkaz na YouTube môže zalomiť.
+
+Od 1. 10. 2026 chodí jedna veta s odkazom na `/u/<token>`
+(`routes/u.$token.tsx`, obsah skladá `lib/psb/uvodnaStranka.ts`). Pravidlá,
+ktoré k tomu patria:
+
+- **Termín sa berie ŽIVO Z KALENDÁRA**, nie z riadku odkazu. Keď sa hodina
+  presunie, stránka ukáže nový čas — a presne to je dôvod, prečo je za SMS
+  stránka a nie šesť bubliniek s dátumom, ktorý sa už nedá opraviť. Uložené
+  `kedy` je len záchranná sieť. Dopyt MUSÍ mať `zmizla_at IS NULL`, inak
+  stránka pozve na zrušenú hodinu.
+- **CENA PATRÍ K ODKAZU, nie do konštanty.** Jerry, 1. 10. 2026: „niekedy
+  chceme dať klientovi za úvodný tréning zľavu — a vtedy by sa mala upraviť
+  aj cena v tom odkaze." `uvodne_odkazy.cena_czk`: NULL = bežných 1100,
+  nula = zadarmo (rozhodnutie, nie chýbajúci údaj). Zľava sa NEZAMLČÍ —
+  pôvodná cena zostane prečiarknutá vedľa novej, inak klient vidí len iné
+  číslo, než aké mu niekto povedal po telefóne.
+- **Stránka patrí tomu trénerovi, ktorý ten tréning vedie.** Meno, podpis,
+  telefón aj cieľ tlačidiel berie `TRENERI` z `mailFaktury.ts`. Keď vedie
+  úvodný Terezka, Jerryho číslo tam nesmie byť nikde — test to stráži.
+- **Potvrdenie otvorí SPRÁVU s vyplneným číslom aj textom** (`sms:` s
+  `?&body=`). Odoslať ju musí človek: žiadny systém nedovolí stránke poslať
+  SMS za niekoho, a je to tak dobre — inak by chodili potvrdenia od omylom
+  klepnutých tlačidiel. V HTML je `&` ako `&amp;`; prehliadač ho dekóduje.
+- **Žiadny JavaScript.** Otvára sa z SMS, často v okne, ktoré si otvorí
+  správa; skript, ktorý sa nenačíta, by z tlačidiel spravil mŕtve obdĺžniky.
+- **Sadzba je zo ŽIVÉHO WEBU** (biela, `#1A2E24`, akcent `#2D7D5A`, Raleway
+  a Open Sans, polomer 32 px), nie z Kokpitu — klient nie je používateľ
+  appky a Kokpit je tmavý. Logo je `znacka-napis-tmava.svg`: PNG z mailu je
+  BIELA a na bielom pozadí nebolo vidieť nič.
+- **Nová routa potrebuje preklad stromu.** `routeTree.gen.ts` generuje vite,
+  takže `tsc` pred buildom o novej routy nevie a `hotovo.sh` spadne na typoch.
+  Pusti `bunx vite build` raz a potom celý reťazec.

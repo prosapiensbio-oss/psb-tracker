@@ -61,6 +61,14 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
   **Miroslava Michalikova**, „Jerry Martinek" = **Robin Martinek**.
   Riadky sú v `Anmnéza klientů 3.csv`, stačí ich poslať cez `import-stary`.
 - [ ] Zmazať skúšobnú anamnézu AATestu pri upratovaní testovacích dát.
+- [ ] **Doplniť odkaz /u/ do potvrdzovacej notifikácie Terezky** — keď
+  odklepne, že je úvodný dohodnutý, vyplní dátum, čas a prípadnú zľavu
+  a jedným klikom vyrobí odkaz + pošle SMS. Stránka aj endpoint
+  (`POST /api/uvodny`) sú hotové od 1. 10. 2026, chýba len to tlačidlo.
+- [ ] **Po úvodnom: to isté z notifikácie trénera**, ktorý úvodný viedol
+  (`druh: "po"`).
+- [ ] **Profil trenéra na webe** — stránka Jerryho ani Terezky neexistuje,
+  odkaz zatiaľ vedie na `/o-nas/`.
   (Skúšobné hodnotenia v `klient_merania` už zmazané sú — tabuľka je prázdna.)
 - [ ] **Pocitovka beží od 30. 9. 2026** — o mesiac sa pozrieť, koľkí klienti
   odpovedali. Keď to bude pár ľudí, nie je to dôkaz, že sa nezlepšujú, ale
