@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { terazPraha } from "../../lib/psb/cas";
 import type { D1Database } from "@cloudflare/workers-types";
 
 import { jeCasCitat, najblizsieOkno } from "../../lib/psb/mailOkno";
@@ -93,7 +94,7 @@ export async function posliHistoriu(DB: D1Database, menoZPredmetu: string, n: Na
   }, dnesUTC);
   const dalsi = ((await DB.prepare(
     "SELECT MIN(zaciatok) z FROM kal_udalosti WHERE zmizla_at IS NULL AND klient = ?1 AND typ IN ('trening','uvodny') AND zaciatok > ?2",
-  ).bind(c.name, new Date().toISOString().slice(0, 16)).first<{ z: string | null }>())?.z) || undefined;
+  ).bind(c.name, terazPraha()).first<{ z: string | null }>())?.z) || undefined;
 
   const vypis = historiaPreMail(c.name, os, c, dnesUTC, dalsi);
   const logoCid = `logo-${crypto.randomUUID()}@prosapiens`;

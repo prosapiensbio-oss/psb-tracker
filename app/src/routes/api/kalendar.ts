@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { terazPraha } from "../../lib/psb/cas";
 import type { D1Database, D1PreparedStatement } from "@cloudflare/workers-types";
 
 import { audit } from "../../lib/psb/audit.server";
@@ -270,7 +271,7 @@ export const Route = createFileRoute("/api/kalendar")({
            */
           DB.prepare(
             "SELECT klient, zaciatok FROM kal_udalosti WHERE zmizla_at IS NULL AND klient IS NOT NULL AND typ IN ('trening','uvodny') AND zaciatok > ? AND zaciatok <= ? ORDER BY zaciatok",
-          ).bind(new Date().toISOString().slice(0, 16), new Date(Date.now() + 120 * 86400000).toISOString().slice(0, 16)).all(),
+          ).bind(terazPraha(), new Date(Date.now() + 120 * 86400000).toISOString().slice(0, 16)).all(),
           // Guillermo tréningy MIMO okna: zostatok sedení sa počíta od kotvy
           // (napr. 9. 8.), ale okno udalostí siaha len 21 dní dozadu — tréning
           // starší by z počtu vypadol a zostatok by ticho narástol späť. Preto

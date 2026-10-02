@@ -92,15 +92,51 @@ function blokPlatby(v: VypisKlienta, qrUrl?: string): string {
 <div style="margin-top:6px;font-size:12px;color:#4d5940">Načti QR v bankovní aplikaci</div>
 </div>`
     : "";
+  /**
+   * ULOŽIŤ QR DO FOTIEK.
+   *
+   * Jerry, 2. 10. 2026: „bolo by super, keby pri tom QR bola možnosť kliknúť
+   * a predvyplnilo by sa to v ebankingu."
+   *
+   * ODKAZ, KTORÝ OTVORÍ BANKU S PREDVYPLNENOU PLATBOU, V ČESKU NEEXISTUJE.
+   * SPAYD je štandard pre obsah QR kódu, nie pre adresu; banky nemajú
+   * spoločnú schému a každá vlastná by u ostatných neurobila nič.
+   *
+   * Čo funguje všade: stiahnuť QR do fotiek a v bankovej aplikácii ho načítať
+   * z galérie — to vedia všetky české banky. Klient tak nepotrebuje druhý
+   * telefón, čo bol jediný praktický dôvod, prečo QR na vlastnom mobile
+   * nepoužil.
+   *
+   * `download` na `data:` adrese funguje bez JavaScriptu. Keď ho prehliadač
+   * ignoruje (staršie Safari), obrázok sa otvorí a dá sa podržať prstom —
+   * horší, ale stále priechodný koniec.
+   */
+  const ulozQr = qrUrl
+    ? `<div style="margin-top:14px">
+<a href="${esc(qrUrl)}" download="platba-prosapiens.gif" style="display:inline-block;text-decoration:none;border:2px solid ${s.pozadie};border-radius:999px;padding:11px 22px;font-size:14px;font-weight:700;color:${s.pozadie}">Uložit QR do fotek</a>
+<div style="margin-top:7px;font-size:12px;line-height:1.5;color:#4d5940">V bankovní aplikaci pak dej „načíst QR z galerie" — umí to všechny české banky.</div>
+</div>`
+    : "";
+
   return `<div style="margin-top:26px;background:${s.zelena};border-radius:18px;padding:20px;text-align:center">
 <div style="font-size:11px;letter-spacing:2.4px;color:#4d5940;text-transform:uppercase">K úhradě</div>
 <div style="margin-top:5px;font-family:'Raleway',sans-serif;font-weight:800;font-size:36px;line-height:1.1;color:${s.pozadie}">${esc(kc(v.platba.suma))}</div>
 <div style="margin-top:3px;font-size:14px;color:#4d5940">${esc(cesky(v.platba.popis))}</div>
 ${qr}
 <div style="margin-top:14px;font-size:13px;line-height:1.6;color:${s.pozadie}">
-Účet <b>${esc(v.platba.ucet)}</b><br>
 Do zprávy pro příjemce napiš <b>${esc(v.platba.sprava)}</b> — podle toho platbu spárujeme.
 </div>
+<!-- Číslo účtu v poli, nie v texte: dlhé podržanie ponúkne Kopírovať bez
+     toho, aby klient trafil presne začiatok a koniec čísla. Prepísať sa
+     nedá (readonly) a klávesnica na telefóne nevyskočí (inputmode none).
+     onfocus je len uľahčenie — keď skript nebeží, pole sa označí prstom
+     ako ktorýkoľvek iný text. Nič tu na JavaScripte nestojí; to je pri
+     stránke, ktorá sa otvára z SMS, podmienka. -->
+<label style="display:block;margin-top:12px;text-align:left">
+<span style="display:block;font-size:11px;letter-spacing:1.6px;text-transform:uppercase;color:#4d5940">Číslo účtu — ťukni a zkopíruj</span>
+<input value="${esc(v.platba.ucet)}" readonly inputmode="none" onfocus="this.select()" style="width:100%;box-sizing:border-box;margin-top:5px;padding:11px 12px;border:1px solid #4d5940;border-radius:10px;background:transparent;color:${s.pozadie};font-family:ui-monospace,Menlo,monospace;font-size:16px;font-weight:700;text-align:center">
+</label>
+${ulozQr}
 </div>`;
 }
 

@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { terazPraha } from "../lib/psb/cas";
 
 import { audit } from "../lib/psb/audit.server";
 import { bindings } from "../lib/bindings.server";
@@ -49,7 +50,7 @@ async function kontext(DB: import("@cloudflare/workers-types").D1Database, klien
     .bind(klient).first<{ email: string | null; telefon: string | null }>();
   const u = await DB.prepare(
     "SELECT MIN(zaciatok) z FROM kal_udalosti WHERE zmizla_at IS NULL AND klient = ?1 AND typ IN ('trening','uvodny') AND zaciatok > ?2",
-  ).bind(klient, new Date().toISOString().slice(0, 16)).first<{ z: string | null }>();
+  ).bind(klient, terazPraha()).first<{ z: string | null }>();
   return { kontakt: { email: fa?.email, telefon: fa?.telefon }, uvodny: popisUvodneho(u?.z || null) };
 }
 

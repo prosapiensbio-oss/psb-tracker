@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { terazPraha } from "../lib/psb/cas";
 
 import { bindings } from "../lib/bindings.server";
 import { deriveClients } from "../lib/psb/compute";
@@ -82,7 +83,7 @@ export const Route = createFileRoute("/v/$token")({
         }, dnes);
         const dalsi = ((await DB.prepare(
           "SELECT MIN(zaciatok) z FROM kal_udalosti WHERE zmizla_at IS NULL AND klient = ?1 AND typ IN ('trening','uvodny') AND zaciatok > ?2",
-        ).bind(c.name, new Date().toISOString().slice(0, 16)).first<{ z: string | null }>())?.z) || undefined;
+        ).bind(c.name, terazPraha()).first<{ z: string | null }>())?.z) || undefined;
 
         /**
          * DLH LEN Z VLASTNEJ EVIDENCIE — tá istá matematika ako mínus na

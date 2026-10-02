@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { terazPraha } from "../lib/psb/cas";
 
 import { bindings } from "../lib/bindings.server";
 import { uvodnaStrankaHtml } from "../lib/psb/uvodnaStranka";
@@ -37,7 +38,7 @@ export const Route = createFileRoute("/u/$token")({
         if (!r) return prec("Tento odkaz neplatí. Ozvěte se nám a pošleme nový.", 404);
 
         const druh = r.druh === "po" ? "po" : "pred";
-        const teraz = new Date().toISOString().slice(0, 16);
+        const teraz = terazPraha();
 
         /**
          * Pred úvodným hľadáme najbližší ÚVODNÝ, po ňom najbližší bežný

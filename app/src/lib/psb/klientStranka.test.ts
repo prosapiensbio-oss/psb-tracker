@@ -149,3 +149,34 @@ describe("klientStranka", () => {
     expect(klientStranka(zaklad)).not.toContain("<script");
   });
 });
+
+describe("platba na telefóne", () => {
+  const platba = { popis: "Balíček 8 h", suma: 9400, ucet: "2702034550/2010", sprava: "Josef Pavek" };
+  const zaklad2: VypisKlienta = {
+    klient: "Josef Pávek", oslovenie: "Josef", trener: "Terezka",
+    os: [{ den: "2026-09-09", popis: "Balíček 8 h", druh: "balicekOd", zostatok: null, dlh: null }],
+    zostatok: 0, hodinSpolu: 8, odkedy: "2026-09-09", dnes: "2026-10-02",
+  };
+
+  it("QR sa dá uložiť do fotiek — odkaz do banky v Česku neexistuje", () => {
+    // Jerry, 2. 10. 2026: „keby pri tom QR bola možnosť kliknúť a predvyplnilo
+    // by sa to v ebankingu." SPAYD je štandard pre obsah kódu, nie pre adresu;
+    // spoločná schéma na otvorenie banky neexistuje. Galériu vedia všetky.
+    const h = klientStranka({ ...zaklad2, platba, qrUrl: "data:image/gif;base64,AAA" });
+    expect(h).toContain('download="platba-prosapiens.gif"');
+    expect(h).toContain("načíst QR z galerie");
+  });
+
+  it("bez QR sa tlačidlo na uloženie nekreslí", () => {
+    expect(klientStranka({ ...zaklad2, platba })).not.toContain("Uložit QR do fotek");
+  });
+
+  it("číslo účtu je v poli, aby sa dalo skopírovať jedným podržaním", () => {
+    const h = klientStranka({ ...zaklad2, platba });
+    expect(h).toMatch(/<input value="2702034550\/2010" readonly/);
+  });
+
+  it("nič z toho nestojí na JavaScripte", () => {
+    expect(klientStranka({ ...zaklad2, platba, qrUrl: "data:image/gif;base64,AAA" })).not.toContain("<script");
+  });
+});
