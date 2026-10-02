@@ -87,6 +87,12 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
   „Nezaplatené" na dashboarde. Text napísal Jerry a nie je to upomienka:
   „tady máš přehled hodin a QR na platbu za balíček z 9. 9.: …". O tom, či
   klient zaplatil, mlčí — appka to vedieť nemôže. Sumu nesie QR, nie text.
+- [x] **Karta „Hodiny bez balíčka"** (2. 10. 2026) — kto trénoval nad rámec
+  a nový balíček si nekúpil. Na ostrých dátach 10 ľudí, 39 h. Doteraz boli
+  neviditeľní: karta „Balíček dojde" stojí na objednaných termínoch, takže
+  kto dochodil a nič si nedohodol, v nej nie je. Ráta sa len od posledného
+  známeho balíčka (PTminder ich vyváža až od marca 2026) a len 90 dní
+  dozadu.
 - [ ] **Profil trenéra na webe** — stránka Jerryho ani Terezky neexistuje,
   odkaz zatiaľ vedie na `/o-nas/`.
   (Skúšobné hodnotenia v `klient_merania` už zmazané sú — tabuľka je prázdna.)
