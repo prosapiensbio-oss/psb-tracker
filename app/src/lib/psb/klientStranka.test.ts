@@ -123,15 +123,14 @@ describe("klientStranka", () => {
     expect(h).toContain("Poslední balíček");
   });
 
-  it("otázky sú na stránke vždy — jedna podoba, nech je stav akýkoľvek", () => {
+  it("otázky kreslí stránka, keď ich dostane — rozhoduje route", () => {
+    // Jerry, 2. 10. 2026: „v Zostávajú hodiny by som dal preč Jak ti je."
+    // Rozhodnutie je v `v.$token.tsx` (prázdny reťazec pri zostatku > 0),
+    // stránka len vykreslí, čo dostane — inak by to pravidlo bolo na dvoch
+    // miestach a raz by sa rozišlo.
     const pocitovka = "<!--POCITOVKA-->";
-    for (const zostatok of [4, 0, -3]) {
-      expect(klientStranka({ ...zaklad, zostatok, pocitovka })).toContain(pocitovka);
-    }
-    expect(klientStranka({
-      ...zaklad, zostatok: -3, pocitovka,
-      platba: { popis: "x", suma: 9400, ucet: "1/2", sprava: "y" },
-    })).toContain(pocitovka);
+    expect(klientStranka({ ...zaklad, zostatok: -3, pocitovka })).toContain(pocitovka);
+    expect(klientStranka({ ...zaklad, zostatok: 4, pocitovka: "" })).not.toContain(pocitovka);
   });
 
   it("celá história je úplne dole, pod pocitovkou", () => {
@@ -202,5 +201,32 @@ describe("prečo balíček nezačína na plnom počte", () => {
 
   it("keď balíček nič nepreberal, veta tam nie je", () => {
     expect(klientStranka(zaklad)).not.toContain("padly na starší tréninky");
+  });
+});
+
+describe("ponuka ďalšieho balíčka", () => {
+  const zaklad3: VypisKlienta = {
+    klient: "Lukas Hanus", oslovenie: "Lukas", trener: "Jerry",
+    os: [{ den: "2026-09-09", popis: "6h Předplatné", druh: "balicekOd", zostatok: null, dlh: null }],
+    zostatok: 0, hodinSpolu: 6, odkedy: "2026-03-01", dnes: "2026-10-02",
+  };
+  const novy = (odpocet: number) => ({ popis: "6h Předplatné", suma: 6990, ucet: "1/2", sprava: "Lukas Hanus", odpocet, novy: true });
+
+  it("pri dochodenom na nulu je to NOVÝ BALÍČEK, nie dlh", () => {
+    // Odvodzovať to z `odpocet > 0` nešlo: kto dochodil presne na nulu, má
+    // odpočet nula a stále si kupuje ďalší balíček.
+    const h = klientStranka({ ...zaklad3, platba: novy(0) });
+    expect(h).toContain("Nový balíček");
+    expect(h).not.toContain("K úhradě");
+  });
+
+  it("nad rámec povie, koľko hodín sa z neho hneď odpíše", () => {
+    expect(klientStranka({ ...zaklad3, zostatok: -3, platba: novy(3) })).toContain("3 h se hned odečte");
+  });
+
+  it("otvorený dlh zostáva K úhradě", () => {
+    const h = klientStranka({ ...zaklad3, platba: { popis: "nezaplacený balíček", suma: 9400, ucet: "1/2", sprava: "x" } });
+    expect(h).toContain("K úhradě");
+    expect(h).not.toContain("Nový balíček");
   });
 });

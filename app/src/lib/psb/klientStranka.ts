@@ -119,7 +119,7 @@ function blokPlatby(v: VypisKlienta, qrUrl?: string): string {
     : "";
 
   return `<div style="margin-top:26px;background:${s.zelena};border-radius:18px;padding:20px;text-align:center">
-<div style="font-size:11px;letter-spacing:2.4px;color:#4d5940;text-transform:uppercase">${v.platba.odpocet ? "Nový balíček" : "K úhradě"}</div>
+<div style="font-size:11px;letter-spacing:2.4px;color:#4d5940;text-transform:uppercase">${v.platba.novy ? "Nový balíček" : "K úhradě"}</div>
 <div style="margin-top:5px;font-family:'Raleway',sans-serif;font-weight:800;font-size:36px;line-height:1.1;color:${s.pozadie}">${esc(kc(v.platba.suma))}</div>
 <div style="margin-top:3px;font-size:14px;color:#4d5940">${esc(cesky(v.platba.popis))}${v.platba.odpocet ? ` · ${esc(hod(v.platba.odpocet))} se hned odečte` : ""}</div>
 ${qr}

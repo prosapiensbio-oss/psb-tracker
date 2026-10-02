@@ -101,6 +101,13 @@ export type VypisKlienta = {
     popis: string; suma: number; ucet: string; sprava: string;
     /** Koľko hodín sa z nového balíčka hneď odpíše (tréningy nad rámec). */
     odpocet?: number;
+    /**
+     * `true` = je to ponuka ĎALŠIEHO balíčka, nie dlh za starý.
+     *
+     * Samostatný príznak, nie odvodenie z `odpocet > 0`: klient, ktorý
+     * dochodil presne na nulu, má odpočet nula a stále je to nový balíček.
+     */
+    novy?: boolean;
   };
   /**
    * Celá história na vyžiadanie klienta.

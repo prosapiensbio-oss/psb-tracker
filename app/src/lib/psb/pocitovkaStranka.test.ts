@@ -93,3 +93,35 @@ describe("blok na verejnej stránke", () => {
     expect(blokPocitovky({ vdaka: true })).toContain("Díky");
   });
 });
+
+describe("číslo z úvodného ako kotva", () => {
+  it("kreslí sa hrubým rámom a popisom na úvodním", () => {
+    const h = blokPocitovky({ oblasti: ["kolena"], zUvodneho: { kolena: 7 } });
+    expect(h).toContain("na úvodním 7");
+    expect(h).toMatch(/border:2px solid/);
+  });
+
+  it("keď je kotva, obrys poslednej odpovede sa už nekreslí — jedna značka", () => {
+    // Jerry, 2. 10. 2026: „malo by byť IBA zhrubnutý rám a číslo z úvodného."
+    const h = blokPocitovky({
+      oblasti: ["kolena"],
+      zUvodneho: { kolena: 7 },
+      minule: { kolena: { hodnota: 3, datum: "2026-09-20" } },
+    });
+    expect(h).toContain("na úvodním 7");
+    expect(h).not.toContain("minule 3");
+    expect(h).not.toMatch(/dashed/);
+  });
+
+  it("bez kotvy zostáva obrys poslednej odpovede", () => {
+    const h = blokPocitovky({ oblasti: ["kolena"], minule: { kolena: { hodnota: 3, datum: "2026-09-20" } } });
+    expect(h).toContain("minule 3");
+    expect(h).toMatch(/dashed/);
+  });
+
+  it("nič sa nepredklepáva ani s kotvou", () => {
+    // Hľadá sa ATRIBÚT, nie slovo: „input:checked" stojí aj v CSS pravidle.
+    const h = blokPocitovky({ oblasti: ["kolena"], zUvodneho: { kolena: 7 } });
+    expect(h).not.toMatch(/<input[^>]*\schecked/);
+  });
+});

@@ -45,6 +45,18 @@ export function blokPocitovky(v: {
   oblasti?: string[];
   /** Posledná známa odpoveď na každú oblasť (a na „posun") — len ako obrys. */
   minule?: Record<string, { hodnota: number; datum: string }>;
+  /**
+   * Čo klient povedal NA ÚVODNOM TRÉNINGU — číslo z anamnézy, oblasť → 0–10.
+   *
+   * Jerry, 2. 10. 2026: „Jak ti je by malo byť iba zhrubnutý rám a číslo to,
+   * ktoré vyplnil na úvodnom tréningu." Je to jediný bod, voči ktorému sa dá
+   * merať zmena — a presne to PSB predáva. Posledná odpoveď hovorí o minulom
+   * týždni; úvodný hovorí, odkiaľ klient vyšiel.
+   *
+   * Kreslí sa hrubým rámom, nie čiarkovaným: je to kotva, nie návrh.
+   * Keď je k dispozícii, nahrádza obrys „minule" — Jerry chce JEDNU značku.
+   */
+  zUvodneho?: Record<string, number>;
   /** Po odoslaní: poďakovanie namiesto ticha. */
   vdaka?: boolean;
   /** Čo klient napísal naposledy — ukáže sa ako citát, nie ako predvyplnený text. */
@@ -53,6 +65,7 @@ export function blokPocitovky(v: {
   const oblasti = (v.oblasti || []).filter(Boolean);
   const riadky = oblasti.length ? oblasti : [CELKOVO];
   const minule = v.minule || {};
+  const uvodne = v.zUvodneho || {};
 
   /**
    * Minulá odpoveď je OBRYS, dnešné klepnutie je plná farba. Rozdiel medzi
@@ -66,22 +79,31 @@ export function blokPocitovky(v: {
 
   const den = (iso: string) => `${Number(iso.slice(8, 10))}. ${Number(iso.slice(5, 7))}.`;
 
-  const stupnica = (pole: string, minula?: { hodnota: number; datum: string }) => {
+  const stupnica = (pole: string, minula?: { hodnota: number; datum: string }, zUvodneho?: number) => {
     const cisla = Array.from({ length: STUPNICA.max - STUPNICA.min + 1 }, (_, i) => {
       const n = STUPNICA.min + i;
-      const bolo = minula?.hodnota === n;
+      /**
+       * JEDNA ZNAČKA, NIE DVE. Keď appka pozná číslo z úvodného, kreslí sa
+       * ono — hrubým rámom, lebo je to kotva, voči ktorej sa meria zmena.
+       * Inak sa ukáže posledná odpoveď čiarkovane, ako doteraz.
+       */
+      const kotva = zUvodneho === n;
+      const bolo = !zUvodneho && minula?.hodnota === n;
+      const ram = kotva ? `2px solid ${ZELENA}` : bolo ? `1px dashed ${ZELENA}` : `1px solid ${RAMIK}`;
       return `<label class="psb-stupnica" style="display:inline-block;margin:0 2px 4px 0">
 <input type="radio" name="${esc(pole)}" value="${n}" style="position:absolute;opacity:0;width:0;height:0">
-<span style="display:inline-block;min-width:21px;padding:8px 0;text-align:center;border-radius:7px;font-size:13px;border:1px ${bolo ? "dashed" : "solid"} ${bolo ? ZELENA : RAMIK};background:${VNUTRO};color:${TEXT}">${n}</span>
+<span style="display:inline-block;min-width:21px;padding:${kotva ? 7 : 8}px 0;text-align:center;border-radius:7px;font-size:13px;border:${ram};background:${VNUTRO};color:${TEXT}${kotva ? ";font-weight:700" : ""}">${n}</span>
 </label>`;
     }).join("");
     // „najlepšie" a „najhoršie" pod krajnými číslami — vedľa seba sa im na
     // 375 px nezmestia tak, aby na číslo zostal palec.
     const kraje = `<div style="display:flex;justify-content:space-between;font-size:11px;color:${TLMENY};margin-top:1px">
 <span>${esc(STUPNICA.nizke)}</span><span>${esc(STUPNICA.vysoke)}</span></div>`;
-    const minulaVeta = minula
-      ? `<div style="font-size:11px;color:${TLMENY};margin-top:4px">minule ${minula.hodnota} · ${den(minula.datum)}</div>`
-      : "";
+    const minulaVeta = zUvodneho != null
+      ? `<div style="font-size:11px;color:${TLMENY};margin-top:4px">na úvodním ${zUvodneho}</div>`
+      : minula
+        ? `<div style="font-size:11px;color:${TLMENY};margin-top:4px">minule ${minula.hodnota} · ${den(minula.datum)}</div>`
+        : "";
     return `<div>${cisla}</div>${kraje}${minulaVeta}`;
   };
 
@@ -90,7 +112,7 @@ export function blokPocitovky(v: {
     return `<div style="margin-bottom:16px">
 <input type="hidden" name="oblast_meno" value="${esc(o)}">
 <div style="font-size:14px;line-height:1.45;margin-bottom:7px">${nadpis}</div>
-${stupnica(`oblast_sila_${i}`, minule[o])}
+${stupnica(`oblast_sila_${i}`, minule[o], uvodne[o])}
 </div>`;
   }).join("");
 

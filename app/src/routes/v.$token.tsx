@@ -156,6 +156,7 @@ export const Route = createFileRoute("/v/$token")({
             suma, ucet: DODAVATEL.ucet, sprava: c.name,
             // Koľko hodín mu po zaplatení naozaj zostane.
             odpocet: dlh.dlzi > 0 ? 0 : Math.max(0, -(vypis.zostatok ?? 0)),
+            novy: dlh.dlzi === 0,
           };
         }
 
@@ -187,15 +188,36 @@ export const Route = createFileRoute("/v/$token")({
          * všeobecný riadok — otázka bez anamnézy je lepšia než žiadna.
          */
         let oblastiKlienta: string[] = [];
+        /**
+         * Číslo z ÚVODNÉHO — kotva, voči ktorej sa meria zmena.
+         *
+         * Jerry, 2. 10. 2026: „Jak ti je by malo byť iba zhrubnutý rám
+         * a číslo to, ktoré vyplnil na úvodnom tréningu." Berie sa z tej
+         * istej anamnézy, z ktorej už beriem názvy oblastí — žiadne nové
+         * čítanie šifrovaných odpovedí, len `sila` vedľa mena oblasti.
+         */
+        const zUvodneho: Record<string, number> = {};
         if (ANAMNEZA_KLUC) {
           const a = await podlaKlienta(DB, c.name, ANAMNEZA_KLUC).catch(() => null);
           const z = a ? (a.zapisOdpovede.oblasti ?? a.klientOdpovede.oblasti) : null;
-          oblastiKlienta = oblastiZJson(z).map((o) => o.oblast);
+          for (const o of oblastiZJson(z)) {
+            oblastiKlienta.push(o.oblast);
+            if (o.sila != null) zUvodneho[o.oblast] = o.sila;
+          }
         }
 
-        const pocity = blokPocitovky({
+        /**
+         * OTÁZKY LEN PRI DOCHODENOM BALÍČKU A NAD RÁMEC.
+         *
+         * Jerry, 2. 10. 2026: „v Zostávajú hodiny by som dal preč Jak ti je."
+         * Počas balíčka je to otázka navyše k ničomu — klient chodí ďalej
+         * a nič sa nerozhoduje. Pri dochodenom balíčku je to iný okamih:
+         * vtedy sa rozhoduje, či bude pokračovať.
+         */
+        const pocity = (vypis.zostatok ?? 1) > 0 ? "" : blokPocitovky({
           oblasti: oblastiKlienta,
           minule: posledneHodnoty(merania),
+          zUvodneho,
           poslednyOdkaz: sOdkazom ? { datum: sOdkazom.datum, text: sOdkazom.poznamka.trim() } : undefined,
           vdaka: new URL(request.url).searchParams.get("vdaka") === "1",
         });
