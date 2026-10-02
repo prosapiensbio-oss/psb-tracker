@@ -104,106 +104,55 @@ export function rodZMena(meno: string): "m" | "z" {
 }
 
 /**
- * Predvolený text. Jerry ho pred odoslaním vidí a môže prepísať —
- * appka dáva tvar, slová zostávajú na ňom.
+ * JEDNA SPRÁVA PRE VŠETKY SITUÁCIE OKOLO HODÍN.
  *
- * Text SMS a úvod mailu NIE SÚ to isté (Jerry, 28. 9. 2026: „úvodný text
- * toho mailu by nemusel byť taký istý ako text tej SMS"). Mail má priestor
- * na vetu navyše, SMS má sedemdesiat znakov.
+ * Jerry, 2. 10. 2026: „tieto SMS mám pocit, že to celé skomplikovali,
+ * musíme to nejako zjednodušiť… a SMS je najlepšia ‚tady máš přehled hodin
+ * a QR na platbu za balíček z 9. 9. 2026'. Okrem toho sa už len upravuje
+ * nadpis — a to je definované počtom a aktuálnou situáciou, pričom obsah
+ * odkazu vyzerá vždy rovnako."
+ *
+ * PREDTÝM BOLO PÄŤ ZNENÍ: zostávajú hodiny, dnes posledná, dochodený, nad
+ * rámec, nezaplatená platba. Všetkých päť viedlo na TEN ISTÝ odkaz a tá
+ * stránka si stav aj tak povie sama — presnejšie než veta v správe. Appka
+ * teda hovorila dvakrát to isté a pri Lukášovi Hanusovi sa to rozišlo:
+ * SMS tvrdila jedno, stránka druhé.
+ *
+ * Jedno znenie to rieši natrvalo: nedá sa poslať nepravda o stave, text
+ * neprestane platiť pri zmene stránky a človek si nemusí pamätať, ktoré
+ * tlačidlo kedy. Rod klienta sa už nerieši — v texte nie je ani jedno
+ * sloveso v minulom čase.
+ *
+ * Suma sa do textu NEPÍŠE. Nesie ju QR aj stránka, a keď sa zmení, text
+ * zostáva pravdivý.
  */
-export function textSms(v: SpravaProKlienta): string {
-  /**
-   * Text sa riadi SKUTOČNOSŤOU, nie jedným prípadom.
-   *
-   * Jerry, 29. 9. 2026: „ak je Vítězslav −1 tréning, nemôže mu prísť SMS,
-   * že dnes mal poslednú hodinu." Mal pravdu — bola to nepravda o tom, čo
-   * sa stalo, a klient si to vie prerátať. Tri stavy, tri vety:
-   *
-   *   > 0   „v balíčku ti zostávajú 2 h."
-   *   = 0   „dnes si mal poslednú hodinu z balíčka."
-   *   < 0   „máš 2 hodiny nad rámec balíčka."
-   *
-   * O DNEŠKU sa hovorí len vtedy, keď tréning naozaj dnes bol. SMS je síce
-   * zvonček k mailu a posiela sa v deň tréningu, ale posiela ju človek —
-   * a v nedeľu podvečer je „dnes" o štvrtkovej hodine nepravda.
-   */
-  const navyse = v.zostatok < 0 ? -v.zostatok : 0;
-  const hodin = (n: number) => `${n} ${n === 1 ? "hodinu" : n < 5 ? "hodiny" : "hodín"}`;
-  // „mal si" / „mala si" — jediné miesto, kde rod mení tvar.
-  const mal = v.rod === "z" ? "mala" : "mal";
-  const uvod = navyse
-    ? `Ahoj ${v.oslovenie}, ${v.dnesnyTrening ? "dnešným tréningom máš" : "máš"} ${hodin(navyse)} nad rámec balíčka.`
-    : v.zostatok === 0
-      ? v.dnesnyTrening
-        ? `Ahoj ${v.oslovenie}, dnes si ${mal} poslednú hodinu z balíčka.`
-        : `Ahoj ${v.oslovenie}, balíček máš dochodený.`
-      : `Ahoj ${v.oslovenie}, v balíčku ti ${zostavaHodin(v.zostatok)}.`;
-  /**
-   * Odkaz prebíja vetu o maili: klik je bližšie než hľadanie v schránke.
-   *
-   * ZNENIE NAPÍSAL JERRY, 2. 10. 2026: „Všetky informácie nájdeš tu."
-   * Moje bolo „Tréningy, platba a 3 otázky ako ti je" — vymenúvalo, čo za
-   * odkazom je, aby klient o pocitovke vedel. Lenže zoznam troch vecí
-   * v SMS číta človek ako ponuku a vyberá si z nej; „všetky informácie"
-   * nedáva na výber a stránka si poradie povie sama.
-   *
-   * Je to aj odolnejšie: keď na stránke niečo pribudne alebo ubudne, text
-   * SMS zostáva pravdivý. Predtým by klamal pri prvej zmene.
-   */
-  const kam = v.odkaz
-    ? ` Vsetky informace naleznes zde ${v.odkaz}`
-    : v.sMailom ? " V maili nájdeš dochádzku aj QR na platbu." : "";
+export function textSms(v: {
+  oslovenie: string;
+  trener: string;
+  /** Dátum balíčka, o ktorý ide — „9. 9. 2026". Bez neho veta drží. */
+  datum?: string;
+  /** Odkaz na /v/<token>. Bez neho sa pošle aspoň veta o maili. */
+  odkaz?: string;
+  /** Starý režim bez odkazu: dochádzka chodila mailom. */
+  sMailom?: boolean;
+}): string {
+  const za = v.datum ? ` za balíček z ${v.datum}` : "";
+  const telo = v.odkaz
+    ? `tady máš přehled hodin a QR na platbu${za}: ${v.odkaz}`
+    : v.sMailom
+      ? `v maili najdeš dochádzku aj QR na platbu${za}.`
+      : `ozvi sa mi, prejdeme si hodiny${za}.`;
   // Bez diakritiky sa celá veta aj s odkazom zmestí do JEDNEJ správy;
   // s mäkčeňmi by to boli tri. Klientom SMS bez diakritiky chodia bežne.
-  return bezDiakritiky(`${uvod}${kam} ${v.trener}, ProSapiens`);
+  return bezDiakritiky(`Ahoj ${v.oslovenie}, ${telo} ${v.trener}`);
 }
 
 /**
- * PRIPOMIENKA NEZAPLATENEJ PLATBY.
- *
- * Jerry, 1. 10. 2026: „Danielka Šašinkova je v mínuse 9 400, ale neviem, kde
- * by som mohol kliknúť na to, aby som jej poslal SMS?" Nikde — dlaždica
- * „Nezaplatené" mala len meno, sumu a klik na stôl klienta.
- *
- * TEXT NAPÍSAL JERRY A JE LEPŠÍ NEŽ TRI MOJE POKUSY.
- *
- * Moje znenia sa snažili vyhnúť obvineniu tým, že o ňom hovorili: „ešte
- * neuhradená platba" (obvinenie priamo), potom „chýba mi platba, ak už
- * odišla, nič nerieš" (obvinenie aj s ospravedlnením). Jerry ho vynechal
- * celé:
- *
- *   „Ahoj Daniela, tady máš přehled hodin a QR na platbu za balíček
- *    z 9. 9.: prosapiens.cz/v/… Jerry"
- *
- * Je to SLUŽBA, nie upomienka. Nehovorí, či klient zaplatil — a appka to
- * ani vedieť nemôže: poplatok v PTminderi stojí otvorený, kým ho niekto
- * nezmaže, a platba a balíček sa nemusia stretnúť ani v jednom smere. Kto
- * zaplatil včera, dostane odkaz a nič ho nebodne; kto nezaplatil, má QR
- * priamo v ruke. Ani suma v texte netreba — nesie ju QR aj stránka.
- *
- * Bez odkazu by veta skončila dvojbodkou do prázdna, preto má náhradu:
- * holé konštatovanie sumy, tiež bez výzvy.
+ * Pôvodný názov pre pripomienku platby. Je to TÁ ISTÁ správa — ponechaný
+ * len preto, aby sa nemuseli prepisovať volania, ktoré o nej hovoria menom.
  */
-export function textSmsPlatba(v: {
-  oslovenie: string; trener: string; suma: number;
-  /** Dátum balíčka, za ktorý sa platí — „9. 9.". */
-  datum?: string;
-  /** Odkaz na /v/<token>: posledný balíček a QR na platbu. */
-  odkaz?: string;
-}): string {
-  const za = v.datum ? ` za balíček z ${v.datum}` : "";
-  if (!v.odkaz) {
-    return bezDiakritiky(`Ahoj ${v.oslovenie},${za} je k úhrade ${Math.round(v.suma)} Kc. ${v.trener}`);
-  }
-  const zloz = (sDatumom: boolean) =>
-    bezDiakritiky(
-      `Ahoj ${v.oslovenie}, tady máš přehled hodin a QR na platbu${sDatumom ? za : ""}: ${v.odkaz} ${v.trener}`,
-    );
-  // Keby meno a dátum raz pretiekli do druhej SMS, ustúpi dátum: ten je aj
-  // za odkazom, kým odkaz je dôvod, prečo sa správa píše.
-  const sDatumom = zloz(true);
-  return dlzkaSpravy(sDatumom).sprav > 1 ? zloz(false) : sDatumom;
-}
+export const textSmsPlatba = (v: { oslovenie: string; trener: string; suma?: number; datum?: string; odkaz?: string }): string =>
+  textSms({ oslovenie: v.oslovenie, trener: v.trener, datum: v.datum, odkaz: v.odkaz });
 
 /**
  * ODOSIELATEĽ — ČO BRÁNA VEZME.

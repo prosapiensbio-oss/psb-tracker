@@ -132,7 +132,7 @@ export function VypisHodinPanel({ meno, os, email, zostatokTeraz, trener = "", m
   /** Stav so znamienkom — `v.koniec` sa na nule zastaví (viď `stavPreSpravu`). */
   const stav = useMemo(() => stavPreSpravu(v, new Date().toISOString().slice(0, 10)), [v]);
   const navrhSms = useMemo(
-    () => textSms({ oslovenie: meno.split(" ")[0], trener: trener || "Jerry", zostatok: stav.zostatok ?? 0, sMailom: true, dnesnyTrening: stav.dnesnyTrening }),
+    () => textSms({ oslovenie: meno.split(" ")[0], trener: trener || "Jerry", sMailom: true }),
     [meno, trener, stav],
   );
   const zobrazenaSms = smsRucne ? smsText : navrhSms;

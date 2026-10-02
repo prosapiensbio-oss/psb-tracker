@@ -51,40 +51,50 @@ describe("dlzkaSpravy", () => {
   });
 });
 
-describe("textSms", () => {
-  it("keď balíček došiel, povie to hneď — a bez diakritiky za JEDNU správu", () => {
-    const t = textSms({ oslovenie: "Richard", trener: "Jerry", zostatok: 0, sMailom: true, dnesnyTrening: true });
-    // SMS ide bez diakritiky: jediný mäkčeň by limit zrazil zo 160 na 70
-    // znakov a z jednej správy by boli dve (Jerry, 30. 9. 2026).
-    expect(t).toBe("Ahoj Richard, dnes si mal poslednu hodinu z balicka. V maili najdes dochadzku aj QR na platbu. Jerry, ProSapiens");
-    expect(dlzkaSpravy(t).sprav).toBe(1);
+describe("textSms — jedno znenie pre všetky situácie okolo hodín", () => {
+  const ODKAZ = "https://prosapiens.cz/v/cVz4vMRTHMKT";
+
+  it("je to Jerryho veta, 2. 10. 2026", () => {
+    expect(textSms({ oslovenie: "Lukas", trener: "Jerry", datum: "9. 9. 2026", odkaz: ODKAZ }))
+      .toBe(`Ahoj Lukas, tady mas prehled hodin a QR na platbu za balicek z 9. 9. 2026: ${ODKAZ} Jerry`);
   });
 
-  it("žene píše „mala si“", () => {
-    const t = textSms({ oslovenie: "Hana", trener: "Jerry", zostatok: 0, sMailom: false, dnesnyTrening: true, rod: "z" });
-    expect(t).toContain("dnes si mala poslednu hodinu");
+  it("stav klienta do textu NEVSTUPUJE — povie ho stránka", () => {
+    // Päť znení (zostáva / dnes posledná / dochodený / nad rámec / platba)
+    // viedlo na ten istý odkaz a appka hovorila dvakrát to isté. Pri
+    // Lukášovi Hanusovi sa to rozišlo: SMS tvrdila jedno, stránka druhé.
+    const spolu = { oslovenie: "Lukas", trener: "Jerry", datum: "9. 9. 2026", odkaz: ODKAZ };
+    const t = textSms(spolu);
+    for (const slovo of ["zostava", "zostavaju", "poslednu", "dochodeny", "nad ramec", "chyba", "Kc"]) {
+      expect(t).not.toContain(slovo);
+    }
   });
 
-  it("keď hodiny ešte sú, povie koľko", () => {
-    expect(textSms({ oslovenie: "Eva", trener: "Terezka", zostatok: 2, sMailom: false }))
-      .toBe("Ahoj Eva, v balicku ti zostavaju 2 h. Terezka, ProSapiens");
+  it("rod sa nerieši — v texte nie je sloveso v minulom čase", () => {
+    expect(textSms({ oslovenie: "Marketa", trener: "Terezka", odkaz: ODKAZ })).not.toMatch(/mal|mala/);
   });
 
-  it("bez mailu sa naň neodkazuje", () => {
-    expect(textSms({ oslovenie: "Eva", trener: "Jerry", zostatok: 0, sMailom: false })).not.toContain("maili");
+  it("bez dátumu veta drží", () => {
+    expect(textSms({ oslovenie: "Jan", trener: "Terezka", odkaz: ODKAZ }))
+      .toBe(`Ahoj Jan, tady mas prehled hodin a QR na platbu: ${ODKAZ} Terezka`);
   });
 
-  it("odkaz prebije vetu o maili a vojde sa do jednej správy", () => {
-    const t = textSms({
-      oslovenie: "Eva", trener: "Jerry", zostatok: 0, sMailom: true, dnesnyTrening: true, rod: "z",
-      odkaz: "https://kokpit.prosapiensbio.workers.dev/v/Ab3xK9mQ2r",
-    });
-    // Jerryho znenie, 2. 10. 2026. Nevymenúva, čo za odkazom je: zoznam
-    // v SMS človek číta ako ponuku a vyberá si z nej — a text prestane byť
-    // pravdivý, len čo na stránke niečo pribudne.
-    expect(t).toContain("Vsetky informace naleznes zde https://");
-    expect(t).not.toContain("maili");
-    expect(dlzkaSpravy(t).sprav).toBe(1);
+  it("bez diakritiky a do jednej správy aj s dlhým menom", () => {
+    for (const oslovenie of ["Jan", "Lukas", "Bartolomej"]) {
+      const t = textSms({ oslovenie, trener: "Terezka", datum: "9. 9. 2026", odkaz: ODKAZ });
+      expect(t).not.toMatch(/[áäčďéíľĺňóôŕšťúýžÁČĎÉÍĽŇÓŠŤÚÝŽěřůŘ]/);
+      expect(dlzkaSpravy(t).sprav).toBe(1);
+    }
+  });
+
+  it("bez odkazu sa neposiela veta do prázdna", () => {
+    expect(textSms({ oslovenie: "Jan", trener: "Jerry", sMailom: true })).toContain("v maili");
+    expect(textSms({ oslovenie: "Jan", trener: "Jerry" })).toContain("ozvi sa mi");
+  });
+
+  it("textSmsPlatba je tá istá správa — len iný názov", () => {
+    const v = { oslovenie: "Lukas", trener: "Jerry", datum: "9. 9. 2026", odkaz: ODKAZ };
+    expect(textSmsPlatba({ ...v, suma: 6990 })).toBe(textSms(v));
   });
 });
 
@@ -124,61 +134,6 @@ describe("chybaOdosielatela", () => {
   it("Twilio bez čísla neposiela", () => {
     expect(chybaOdosielatela("", "twilio")).toContain("číslo");
     expect(chybaOdosielatela("+420777123456", "twilio")).toBeNull();
-  });
-});
-
-describe("textSms podľa skutočnosti", () => {
-  const z = { oslovenie: "Vítězslave", trener: "Jerry", sMailom: false };
-
-  it("mínus hodiny povie ako mínus, nie ako „posledná hodina“", () => {
-    expect(textSms({ ...z, zostatok: -2, dnesnyTrening: true }))
-      .toBe("Ahoj Vitezslave, dnesnym treningom mas 2 hodiny nad ramec balicka. Jerry, ProSapiens");
-  });
-
-  it("jedna hodina navyše sa skloňuje", () => {
-    expect(textSms({ ...z, zostatok: -1 })).toContain("mas 1 hodinu nad ramec balicka");
-  });
-
-  it("presná nula je posledná hodina — ale len keď bola dnes", () => {
-    expect(textSms({ ...z, zostatok: 0, dnesnyTrening: true })).toContain("dnes si mal poslednu hodinu");
-    expect(textSms({ ...z, zostatok: 0 })).toContain("balicek mas dochodeny");
-  });
-});
-
-describe("textSmsPlatba", () => {
-  const ODKAZ = "https://prosapiens.cz/v/NXWYvSt7uctn";
-
-  it("je služba, nie upomienka — nehovorí, či klient zaplatil", () => {
-    // Jerryho znenie, 1. 10. 2026. Moje tri pokusy sa obvineniu vyhýbali tým,
-    // že o ňom hovorili („ešte neuhradená platba", „chýba mi platba, ak už
-    // odišla, nič nerieš"). Appka nevie, či platba odišla — tak o tom mlčí.
-    const t = textSmsPlatba({ oslovenie: "Daniela", trener: "Jerry", suma: 9400, datum: "9. 9.", odkaz: ODKAZ });
-    expect(t).toBe("Ahoj Daniela, tady mas prehled hodin a QR na platbu za balicek z 9. 9.: " + ODKAZ + " Jerry");
-    for (const slovo of ["neuhraden", "dlh", "dluz", "chyba", "Posles", "prosim"]) {
-      expect(t).not.toContain(slovo);
-    }
-  });
-
-  it("ide bez diakritiky a zmestí sa do jednej správy aj s dlhým menom", () => {
-    // Jediný mäkčeň zráža limit zo 160 znakov na 70 — dve SMS namiesto jednej.
-    for (const oslovenie of ["Jan", "Daniela", "Bartolomej"]) {
-      const t = textSmsPlatba({ oslovenie, trener: "Terezka", suma: 9400, datum: "9. 9. 2026", odkaz: ODKAZ });
-      expect(t).not.toMatch(/[áäčďéíľĺňóôŕšťúýžÁČĎÉÍĽŇÓŠŤÚÝŽěřůŘ]/);
-      expect(dlzkaSpravy(t).sprav).toBe(1);
-      expect(t).toContain(ODKAZ);
-    }
-  });
-
-  it("bez odkazu veta neskončí dvojbodkou do prázdna", () => {
-    const t = textSmsPlatba({ oslovenie: "Daniela", trener: "Jerry", suma: 9400, datum: "9. 9." });
-    expect(t).toBe("Ahoj Daniela, za balicek z 9. 9. je k uhrade 9400 Kc. Jerry");
-    expect(t).not.toContain(":");
-  });
-
-  it("bez dátumu sa veta nerozsype", () => {
-    const t = textSmsPlatba({ oslovenie: "Jan", trener: "Terezka", suma: 1100, odkaz: ODKAZ });
-    expect(t).toContain("QR na platbu:");
-    expect(t).not.toContain("undefined");
   });
 });
 

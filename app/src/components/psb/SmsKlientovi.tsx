@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-import { dlzkaSpravy, rodZMena, textSms, textSmsPlatba } from "../../lib/psb/sms";
+import { dlzkaSpravy, textSms } from "../../lib/psb/sms";
 import { C, mix } from "../../lib/psb/theme";
 
 /**
@@ -39,7 +39,7 @@ const kontakty = () => {
   return cacheKontaktov;
 };
 
-export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, platba, odvodene = false, sMailom = false, dnesnyTrening = false, maly = false }: {
+export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, platba, datum, odvodene = false, sMailom = false, dnesnyTrening = false, maly = false }: {
   meno: string;
   /** Koľko hodín zostáva; 0 alebo menej = balíček došiel. */
   zostatok?: number;
@@ -59,6 +59,11 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
    * správa píše — takže text sa skladá až po jeho príchode.
    */
   platba?: { suma: number; datum?: string };
+  /**
+   * Dátum balíčka, o ktorý ide — „9. 9. 2026". Ide do vety „za balíček z…".
+   * Keď ho obrazovka nepozná, veta drží aj bez neho.
+   */
+  datum?: string;
   /** `true` = počet hodín je dopočítaný z názvu členstva, nie z exportu. */
   odvodene?: boolean;
   /** Ide spolu s mailom? Mení vetu o tom, kde nájde dochádzku. */
@@ -73,8 +78,6 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
   const [bezi, setBezi] = useState(false);
   const [hlaska, setHlaska] = useState("");
   const [hotovo, setHotovo] = useState(false);
-  /** Rod klienta — heuristika z mena, prepínač M/Ž ju opraví. */
-  const [rod, setRod] = useState<"m" | "z">("m");
   /** Odkaz na /v/<token> — stránka s tréningmi a QR na platbu. */
   const [odkaz, setOdkaz] = useState("");
   /** Tá istá stránka pre náhľad: priamo z workera a bez počítadla otvorení. */
@@ -84,7 +87,6 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
   useEffect(() => {
     if (!otvorene || nacitane.current) return;
     nacitane.current = true;
-    setRod(rodZMena(meno));
     void kontakty().then((u) => setTelefon(String(u.find((x) => x.klient === meno)?.telefon || "")));
     // Odkaz sa pýta serveru (token na klienta je jeden); text sa preskladá,
     // keď dorazí — preto je v druhom effecte nižšie.
@@ -109,14 +111,12 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
     const oslovenie = meno.split(" ")[0];
     setText(
       predvolenyText
-        || (platba
-          ? textSmsPlatba({ oslovenie, trener, suma: platba.suma, datum: platba.datum, odkaz: odkaz || undefined })
-          : textSms({ oslovenie, trener, zostatok, sMailom, dnesnyTrening, rod, odkaz: odkaz || undefined })),
+        || textSms({ oslovenie, trener, datum: platba?.datum || datum, sMailom, odkaz: odkaz || undefined }),
     );
     // Závislosťou sú HODNOTY, nie objekt `platba`: nový literál pri každom
     // prekreslení rodiča by text preskladal aj uprostred písania.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [otvorene, meno, trener, zostatok, sMailom, dnesnyTrening, predvolenyText, platba?.suma, platba?.datum, rod, odkaz]);
+  }, [otvorene, meno, trener, sMailom, predvolenyText, platba?.datum, datum, odkaz]);
 
   const posli = async () => {
     setBezi(true); setHlaska("");
@@ -209,23 +209,12 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
       ) : (
         <div style={{ display: "flex", gap: 18, alignItems: "flex-start", flexWrap: "wrap" }}>
         <div style={{ flex: "1 1 320px", minWidth: 0 }}>
-          {/* Rod mení „mal si" na „mala si". Heuristika z mena sa mýli
-              (Saša, Nikita), preto prepínač — a preskladá celý text. */}
-          {!predvolenyText && !platba && (
-            <div style={{ display: "flex", gap: 4, alignItems: "center", marginBottom: 5 }}>
-              {([["m", "on"], ["z", "ona"]] as const).map(([r, l]) => (
-                <button
-                  key={r}
-                  onClick={() => setRod(r)}
-                  style={{
-                    padding: "2px 9px", borderRadius: 6, fontSize: 10.5, cursor: "pointer", fontFamily: "inherit",
-                    border: `1px solid ${rod === r ? mix(C.accent, 55) : C.border}`,
-                    background: rod === r ? mix(C.accent, 14) : "transparent",
-                    color: rod === r ? C.accentLight : C.textDim, fontWeight: rod === r ? 700 : 400,
-                  }}
-                >{l}</button>
-              ))}
-              {odkaz && <span style={{ fontSize: 10.5, color: C.textDim }}>· odkaz na tréningy a platbu je v texte</span>}
+          {/* Prepínač rodu je preč: od 2. 10. 2026 je znenie jedno pre
+              všetky situácie a nie je v ňom ani jedno sloveso v minulom
+              čase, takže sa „mal/mala" nemá kde pomýliť. */}
+          {odkaz && (
+            <div style={{ fontSize: 10.5, color: C.textDim, marginBottom: 5 }}>
+              odkaz na tréningy, QR a otázky je v texte
             </div>
           )}
           <textarea

@@ -79,8 +79,8 @@ const cesky = (t: string) =>
 function hlavnyStav(v: VypisKlienta): { velke: string; pod: string } {
   if (v.zostatok == null) return { velke: "Tvoje tréninky", pod: "Přehled posledního balíčku." };
   if (v.zostatok > 0) return { velke: `Zbývá ti ${hod(v.zostatok)}`, pod: "z posledního balíčku" };
-  if (v.zostatok === 0) return { velke: "Balíček máš dochozený", pod: "poslední hodina je vyčerpaná" };
-  return { velke: `${hod(-v.zostatok)} nad rámec`, pod: "odtrénováno nad zaplacený balíček" };
+  if (v.zostatok === 0) return { velke: "Poslední hodina", pod: "balíček máš dochozený" };
+  return { velke: `Nad rámec ${hod(-v.zostatok)}`, pod: "odtrénováno nad zaplacený balíček" };
 }
 
 function blokPlatby(v: VypisKlienta, qrUrl?: string): string {
@@ -294,19 +294,22 @@ export function klientStranka(v: VypisKlienta & {
     : `<div style="font-family:'Raleway',sans-serif;font-weight:700;font-size:12px;letter-spacing:3.4px;color:${s.tlmeny}">PROSAPIENS BIOMECHANIC</div>`;
 
   /**
-   * PORADIE BLOKOV SA RIADI TÝM, PREČO KLIENT STRÁNKU OTVORIL.
+   * STRÁNKA VYZERÁ VŽDY ROVNAKO. MENÍ SA LEN NADPIS.
    *
-   * Dlží → navrchu suma s QR, os sa skladá (Jerry, 2. 10. 2026: „históriu
-   * posledného balíčka by som dal za rozbaľovací trojuholník"). Nedlží →
-   * os je hlavná vec a nič sa neskladá.
+   * Jerry, 2. 10. 2026: „balíček došiel je východzia SMS-ka, čiže je tam
+   * časová os, je tam QR platba, sú tam otázky a je tam žiadosť o celú
+   * históriu… okrem toho sa už len upravuje nadpis — a to je definované
+   * počtom a aktuálnou situáciou, pričom obsah odkazu vyzerá vždy rovnako."
    *
-   * „Jak ti je" sa pýta LEN pri dochodenom balíčku bez dlhu. Počas balíčka
-   * je to otázka navyše k ničomu a pri dlhu je netakt: najprv zaplať,
-   * potom nám povedz, ako sa cítiš.
+   * Nahrádza to pravidlá z predchádzajúceho dňa (os sa pri dlhu skladala,
+   * pocitovka sa pýtala len pri dochodenom balíčku). Jedna podoba stránky
+   * znamená, že sa SMS a stránka nemajú ako rozísť — a presne to sa pri
+   * Lukášovi Hanusovi stalo.
+   *
+   * Tri nadpisy podľa stavu: „Zbývá ti 4 h", „Poslední hodina",
+   * „Nad rámec 3 h".
    */
-  const dlzi = !!v.platba && v.platba.suma > 0;
-  const dochodeny = v.zostatok != null && v.zostatok <= 0;
-  const pocitovka = !dlzi && dochodeny ? (v.pocitovka || "") : "";
+  const pocitovka = v.pocitovka || "";
 
   const dalsi = v.dalsi
     ? `<div style="margin-top:9px;font-size:15px;color:${s.tlmeny}">Další trénink: <b style="color:${s.biela}">${esc(DNI[new Date(`${v.dalsi.slice(0, 10)}T12:00:00Z`).getUTCDay()])} ${esc(den(v.dalsi))}</b>${v.dalsi.length > 10 ? ` · ${esc(v.dalsi.slice(11, 16))}` : ""}</div>`
@@ -341,8 +344,8 @@ details[open] .psb-sip{transform:rotate(90deg)}
 <div style="margin-top:6px;font-size:15px;color:${s.tlmeny}">${esc(stav.pod)}</div>
 ${dalsi}
 
+${blokOsi(v, false)}
 ${blokPlatby(v, v.qrUrl)}
-${blokOsi(v, dlzi)}
 ${pocitovka}
 ${blokHistorie(!!v.historiaPoslana)}
 

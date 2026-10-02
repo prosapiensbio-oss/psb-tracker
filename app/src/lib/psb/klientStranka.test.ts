@@ -26,9 +26,13 @@ describe("klientStranka", () => {
     expect(h).not.toContain("#F6F8F6");
   });
 
-  it("dochodený balíček a hodiny nad rámec sú iné vety než zostatok", () => {
-    expect(klientStranka({ ...zaklad, zostatok: 0 })).toContain("dochozený");
-    expect(klientStranka({ ...zaklad, zostatok: -2 })).toContain("2 h nad rámec");
+  it("tri nadpisy podľa stavu — inak sa nemení nič", () => {
+    // Jerry, 2. 10. 2026: „okrem toho sa už len upravuje nadpis — a to je
+    // definované počtom a aktuálnou situáciou, pričom obsah odkazu vyzerá
+    // vždy rovnako."
+    expect(klientStranka({ ...zaklad, zostatok: 4 })).toContain("Zbývá ti 4 h");
+    expect(klientStranka({ ...zaklad, zostatok: 0 })).toContain("Poslední hodina");
+    expect(klientStranka({ ...zaklad, zostatok: -3 })).toContain("Nad rámec 3 h");
   });
 
   it("QR a suma sa kreslia LEN keď klient dlží", () => {
@@ -107,10 +111,10 @@ describe("klientStranka", () => {
     expect(rozpis.indexOf("Balíček 8 h")).toBeLessThan(rozpis.indexOf("trénink"));
   });
 
-  it("pri dlhu je suma hore a os sa skladá", () => {
+  it("os stojí rozbalená vždy, aj pri dlhu — stránka má jednu podobu", () => {
     const h = klientStranka({ ...zaklad, platba: { popis: "Balíček 8 h", suma: 9400, ucet: "1/2", sprava: "x" } });
-    expect(h.indexOf("K úhradě")).toBeLessThan(h.indexOf("Poslední balíček"));
-    expect(h).toContain("Poslední balíček — co se stalo");
+    expect(h).not.toContain("Poslední balíček — co se stalo");
+    expect(h.indexOf("Poslední balíček")).toBeLessThan(h.indexOf("K úhradě"));
   });
 
   it("bez dlhu os stojí rozbalená a nadpis je obyčajný", () => {
@@ -119,15 +123,15 @@ describe("klientStranka", () => {
     expect(h).toContain("Poslední balíček");
   });
 
-  it("otázka Jak ti je sa kladie len pri dochodenom balíčku bez dlhu", () => {
-    // Jerry, 2. 10. 2026: vymazať z priebehu balíčka aj z dlhu.
+  it("otázky sú na stránke vždy — jedna podoba, nech je stav akýkoľvek", () => {
     const pocitovka = "<!--POCITOVKA-->";
-    expect(klientStranka({ ...zaklad, zostatok: 0, pocitovka })).toContain(pocitovka);
-    expect(klientStranka({ ...zaklad, zostatok: 4, pocitovka })).not.toContain(pocitovka);
+    for (const zostatok of [4, 0, -3]) {
+      expect(klientStranka({ ...zaklad, zostatok, pocitovka })).toContain(pocitovka);
+    }
     expect(klientStranka({
-      ...zaklad, zostatok: 0, pocitovka,
+      ...zaklad, zostatok: -3, pocitovka,
       platba: { popis: "x", suma: 9400, ucet: "1/2", sprava: "y" },
-    })).not.toContain(pocitovka);
+    })).toContain(pocitovka);
   });
 
   it("celá história je úplne dole, pod pocitovkou", () => {
