@@ -141,13 +141,17 @@ export function textSms(v: SpravaProKlienta): string {
   /**
    * Odkaz prebíja vetu o maili: klik je bližšie než hľadanie v schránke.
    *
-   * Za tým istým odkazom sú od 30. 9. 2026 aj tri otázky, na ktoré si klient
-   * odpovedá sám (`pocitovka.ts`). Správa ich menuje — inak by na ne klient
-   * narazil až na konci stránky a väčšina by dočítala po platbu. Sú to tri
-   * slová navyše a do jednej SMS sa to stále zmestí; stráži to test.
+   * ZNENIE NAPÍSAL JERRY, 2. 10. 2026: „Všetky informácie nájdeš tu."
+   * Moje bolo „Tréningy, platba a 3 otázky ako ti je" — vymenúvalo, čo za
+   * odkazom je, aby klient o pocitovke vedel. Lenže zoznam troch vecí
+   * v SMS číta človek ako ponuku a vyberá si z nej; „všetky informácie"
+   * nedáva na výber a stránka si poradie povie sama.
+   *
+   * Je to aj odolnejšie: keď na stránke niečo pribudne alebo ubudne, text
+   * SMS zostáva pravdivý. Predtým by klamal pri prvej zmene.
    */
   const kam = v.odkaz
-    ? ` Treningy, platba a 3 otazky ako ti je: ${v.odkaz}`
+    ? ` Vsetky informace naleznes zde ${v.odkaz}`
     : v.sMailom ? " V maili nájdeš dochádzku aj QR na platbu." : "";
   // Bez diakritiky sa celá veta aj s odkazom zmestí do JEDNEJ správy;
   // s mäkčeňmi by to boli tri. Klientom SMS bez diakritiky chodia bežne.

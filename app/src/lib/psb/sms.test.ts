@@ -79,7 +79,10 @@ describe("textSms", () => {
       oslovenie: "Eva", trener: "Jerry", zostatok: 0, sMailom: true, dnesnyTrening: true, rod: "z",
       odkaz: "https://kokpit.prosapiensbio.workers.dev/v/Ab3xK9mQ2r",
     });
-    expect(t).toContain("Treningy, platba a 3 otazky ako ti je: https://");
+    // Jerryho znenie, 2. 10. 2026. Nevymenúva, čo za odkazom je: zoznam
+    // v SMS človek číta ako ponuku a vyberá si z nej — a text prestane byť
+    // pravdivý, len čo na stránke niečo pribudne.
+    expect(t).toContain("Vsetky informace naleznes zde https://");
     expect(t).not.toContain("maili");
     expect(dlzkaSpravy(t).sprav).toBe(1);
   });
