@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 
 import type { Udalost } from "./klientOsCasu";
 import { hod, hodinTreningu, poslednychMesiacov, priebehBalickov, stavPreSpravu, type Vypis, vypisAkoText, vypisHodin, zaciatokBalicka } from "./vypisHodin";
+import { osCasuKlienta } from "./klientOsCasu";
 
 const bal = (den: string, hodin: number, extra: Partial<Extract<Udalost, { druh: "balicekOd" }>> = {}): Udalost =>
   ({ druh: "balicekOd", den, nazov: hodin ? `OFF - ${hodin}h` : "SILVER členství", hodin, ...extra });
@@ -408,5 +409,47 @@ describe("úvodný tréning pred prvým balíčkom", () => {
     ];
     const { stavy } = priebehBalickov(os, null, "2026-03-30");
     expect(stavy.get(os[0])?.dlh).toBe(1);
+  });
+});
+
+describe("os bez kalendára preskočí hodinu (Lukáš Hanus, 2. 10. 2026)", () => {
+  /**
+   * Jerry: „poslal som Hanusovi SMS, prečo tam chýba 5 h?"
+   *
+   * Stránka klienta stavala os BEZ kalendára, kým zostatok sa kotví na
+   * čísle, ktoré kalendár pozná. Tréning z 29. 9. je len v kalendári —
+   * export ho ešte nemá a je spred KOKPIT_OD, takže sedenie z neho
+   * nevznikne. V zozname chýbal, v čísle bol.
+   */
+  const ses = (den: string) => ({
+    client: "Lukas Hanus", date: `${den}T00:00:00.000Z`, time: "16:00", sessionTrainer: "Jerry",
+    sessionName: "OFFLINE - 60min", sessionType: "OFFLINE", duration: 60, price: 1165,
+  });
+  const zdroj = (kal: boolean) => ({
+    sessions: ["2026-09-09", "2026-09-14", "2026-09-16", "2026-09-21", "2026-09-25"].map(ses),
+    payments: [], packages: [{
+      client: "Lukas Hanus", package: "OFF - 6h S viazanostou", remaining: 0, total: 0,
+      added: "2026-09-13", validFrom: "2026-09-09", validTo: "2026-10-08", payment: 6990, naObdobie: 6,
+    }],
+    kalUdalosti: kal
+      ? [{ klient: "Lukas Hanus", trener: "Jerry", zaciatok: "2026-09-29T11:30", koniec: "2026-09-29T12:30", nazov: "Lukas Hanus", typ: "trening" }]
+      : undefined,
+  });
+  const retaz = (kal: boolean) => {
+    const os = osCasuKlienta("Lukas Hanus", zdroj(kal) as never, "2026-10-02");
+    return vypisHodin(os as never, "", "2026-10-02", null)
+      .riadky.filter((r) => r.druh === "trening")
+      .map((r) => r.zostatok)
+      .reverse();
+  };
+
+  it("s kalendárom je na osi aj tréning, ktorý export ešte nemá", () => {
+    expect(retaz(true)).toEqual([6, 5, 4, 3, 2, 1]);
+  });
+
+  it("bez kalendára jeden tréning zo zoznamu vypadne", () => {
+    // Päť riadkov namiesto šiestich — a práve ten chýbajúci robí dieru
+    // medzi číslom na balíčku a prvým číslom v zozname.
+    expect(retaz(false)).toEqual([6, 5, 4, 3, 2]);
   });
 });

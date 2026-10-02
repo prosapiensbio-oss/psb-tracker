@@ -93,6 +93,8 @@ export type VolbyStranky = {
   cenaCzk?: number | null;
   /** Adresa loga na tom istom webe (Kokpit ho servíruje z `public/`). */
   logoUrl: string;
+  /** Biela figúra do pravého horného rohu zelenej hlavičky. */
+  figuraUrl?: string | null;
   /**
    * Odkaz na anamnézu (`/a/<token>`) — druhé CTA vedľa videa.
    *
@@ -226,9 +228,19 @@ a:hover{color:#1A2E24}
 <div style="max-width:560px;margin:0 auto;box-sizing:border-box;font-family:'Open Sans',sans-serif;color:#1A2E24;background:#FFFFFF">
 
 <div style="background:#1A2E24;color:#FFFFFF;padding:26px 24px 30px">
+<!-- Figúra vpravo hore do voľnej zelenej plochy (Jerry, 2. 10. 2026).
+     Je dekorácia, nie informácia: prázdny alt a aria-hidden, aby ju čítačka
+     nehlásila druhýkrát — názov značky stojí hneď vedľa nej v texte.
+     Nescvrkne sa (flex-shrink 0) ani pri dlhom dátume, napríklad
+     „čtvrtek 31. prosince"; inak by z nej bola nudlička. -->
+<div style="display:flex;align-items:flex-start;gap:16px">
+<div style="flex-grow:1;min-width:0">
 <div style="font-family:'Raleway',sans-serif;font-weight:700;font-size:13px;letter-spacing:3.6px;color:#9FBCA9">PROSAPIENS BIOMECHANIC</div>
 ${hlavicka}
 ${cenaDlzka}
+</div>
+${v.figuraUrl ? `<img src="${esc(v.figuraUrl)}" alt="" aria-hidden="true" width="54" style="width:54px;flex-shrink:0;height:auto;opacity:.92">` : ""}
+</div>
 </div>
 
 <!-- Jeden oblúk, nič viac: zelená plocha končí, biela na ňu nasadá. -->

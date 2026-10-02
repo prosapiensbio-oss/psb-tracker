@@ -69,6 +69,7 @@ export const Route = createFileRoute("/u/$token")({
           kedy: zKalendara || r.kedy,
           cenaCzk: r.cena_czk,
           logoUrl: `${new URL(request.url).origin}/znacka-napis-tmava.svg`,
+          figuraUrl: `${new URL(request.url).origin}/znacka-figura-biela.svg`,
           anamnezaUrl: anamneza ? `${new URL(request.url).origin}/a/${anamneza}` : null,
           odpovedPoslana: new URL(request.url).searchParams.get("odpoved") === "1",
         });

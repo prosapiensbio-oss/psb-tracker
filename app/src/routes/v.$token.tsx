@@ -55,10 +55,30 @@ export const Route = createFileRoute("/v/$token")({
         if (!c) return prec("Tento odkaz neplatí. Ozvi sa nám a pošleme ti nový.", 404);
 
         const dnes = new Date().toISOString().slice(0, 10);
+        /**
+         * KALENDÁR PATRÍ NA OS, INAK ČÍSLO NESEDÍ SO ZOZNAMOM.
+         *
+         * Jerry, 2. 10. 2026 nad Lukášom Hanusom: „prečo tam chýba 5 h?"
+         * Lebo os sa stavala BEZ kalendára, kým zostatok sa kotví na
+         * `packageRemaining`, ktorý kalendár pozná. Hanus má 29. 9. tréning,
+         * ktorý je len v kalendári (export ho ešte nemá a je spred KOKPIT_OD,
+         * takže sedenie z neho nevznikne) — v zozname chýbal, v čísle bol.
+         * Reťaz sa potom začala o hodinu nižšie, než hovoril balíček, a to
+         * vyzerá presne ako preskočená hodina.
+         *
+         * Tie isté udalosti číta aj stôl klienta (`KlientStol`), takže obe
+         * obrazovky hovoria o tom istom.
+         */
+        const kalUdalosti = ((await DB.prepare(
+          `SELECT klient, trener, zaciatok, koniec, nazov, typ FROM kal_udalosti
+            WHERE zmizla_at IS NULL AND klient = ?1 AND typ IN ('trening','uvodny')`,
+        ).bind(c.name).all().catch(() => ({ results: [] }))).results || []) as unknown as
+          { klient: string; trener: string; zaciatok: string; koniec: string; nazov: string; typ: string }[];
+
         const os = osCasuKlienta(c.name, {
           sessions: data.sessions, payments: data.payments, packages: data.packages,
           services: data.services, poplatky: data.poplatky, treningyZdarma: data.treningyZdarma,
-          doplneniaHodiny: data.doplneniaHodiny || {},
+          doplneniaHodiny: data.doplneniaHodiny || {}, kalUdalosti,
         }, dnes);
         const dalsi = ((await DB.prepare(
           "SELECT MIN(zaciatok) z FROM kal_udalosti WHERE zmizla_at IS NULL AND klient = ?1 AND typ IN ('trening','uvodny') AND zaciatok > ?2",

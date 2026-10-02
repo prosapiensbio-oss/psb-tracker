@@ -118,3 +118,28 @@ describe("bez termínu stránka neklame", () => {
     expect(h).toContain(encodeURIComponent("Potvrzuji termín."));
   });
 });
+
+describe("figúra v hlavičke", () => {
+  const z = { trener: "Terezka", kedy: "2026-10-16T09:00", cenaCzk: null, logoUrl: "/l.svg" } as const;
+
+  it("kreslí sa vpravo hore, keď je adresa zadaná", () => {
+    // Jerry, 2. 10. 2026: „zmestil by sa tam logo náš panáčik napravo hore
+    // do toho zeleného voľného miesta, biely."
+    const h = uvodnaStrankaHtml({ ...z, druh: "po", figuraUrl: "/znacka-figura-biela.svg" });
+    expect(h).toContain("znacka-figura-biela.svg");
+    expect(h).toMatch(/<img[^>]*aria-hidden="true"/);
+    // Nesmie ju čítačka hlásiť druhýkrát — názov značky stojí hneď vedľa.
+    expect(h).toContain('alt=""');
+  });
+
+  it("bez adresy sa nekreslí nič — prázdny obrázok je rozbitá ikona", () => {
+    // Hľadá sa ZNAČKA, nie slovo: „aria-hidden" stojí aj v komentári nad ňou.
+    expect(uvodnaStrankaHtml({ ...z, druh: "po" })).not.toMatch(/<img[^>]*aria-hidden/);
+  });
+
+  it("je na oboch podobách stránky", () => {
+    for (const druh of ["pred", "po"] as const) {
+      expect(uvodnaStrankaHtml({ ...z, druh, figuraUrl: "/f.svg" })).toContain('src="/f.svg"');
+    }
+  });
+});
