@@ -2009,6 +2009,17 @@ function RiadokOsi({ u, stav, treningy, rozbalene, onRozbal, pisemZdarma, dovod,
             {" "}· {u.hodin ? `${u.odvodene ? "≈" : ""}${u.hodin} h` : u.doplnenie ? "dokúpené hodiny" : "paušál"}{u.doDna ? ` · do ${fmtDMY(u.doDna)}` : ""}
             {u.zaplatene ? ` · ${fmtCZK(u.zaplatene)}` : ""}
           </span>
+          {/* PREČO PRVÝ TRÉNING NEZAČÍNA NA PLNOM POČTE.
+              Jerry, 2. 10. 2026 nad Lukášom Hanusom: „prečo tam chýba 5 h?"
+              Balíček mal 6 h a prvý tréning ukázal 4, lebo dve hodiny
+              zaplatili tréningy z 25. 8. a 3. 9., ktoré predošlý balíček
+              nepokryl. Appka to robí tak, ako si to Jerry 28. 9. vypýtal
+              — len to nehovorila nahlas a vyzeralo to ako preskočené číslo. */}
+          {!!stav?.prevzate && (
+            <span style={{ marginLeft: 7, fontSize: 11, color: C.orange }}>
+              {stav.prevzate} h padlo na staršie tréningy
+            </span>
+          )}
         </span>
         {/* Koľko hodín sa naň naozaj vybralo — a klikom ktoré. */}
         {pocet > 0 && (

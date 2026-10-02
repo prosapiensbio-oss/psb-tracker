@@ -116,7 +116,7 @@ type Platba = { client: string; date: string; amount: number; method: string; no
 type Balicek = { client: string; package: string; total: number; remaining: number; validFrom?: string; validTo?: string; payment?: number; kind?: string; added?: string; naObdobie?: number };
 type Sluzba = { client: string; date: string; serviceType: string; description: string; price: number };
 type Poplatok = { klient: string; datum: string; popis: string; suma: number };
-type KalUdalost = { zaciatok: string; klient: string | null; typ: string | null };
+type KalUdalost = { zaciatok: string; klient: string | null; typ: string | null; trener?: string | null };
 type Zdarma = { klient: string; den: string; dovod: string };
 /** Riadok z vlastnej evidencie balíčkov (tabuľka `balicky`). */
 type BalicekKokpitu = {
@@ -162,7 +162,16 @@ export function osCasuKlienta(
     const d = den(u.zaciatok);
     if (d > dnes || dniZExportu.has(d)) continue;
     dniZExportu.add(d);
-    out.push({ druh: "trening", den: d, cas: u.zaciatok.slice(11, 16), zKalendara: true });
+    /**
+     * TRÉNER SA NESIE AJ Z KALENDÁRA.
+     *
+     * Jerry, 2. 10. 2026: „prečo 29. 9. Jerry nie je, ale 2. 10. je?" Lebo
+     * 2. 10. je už za KOKPIT_OD, takže z neho vznikne sedenie s trénerom,
+     * kým 29. 9. prišiel touto cestou — a tá trénera zahadzovala, hoci
+     * kalendár patrí konkrétnemu trénerovi a appka ho pozná. Dva riadky
+     * o tom istom teda vyzerali ako dva rôzne druhy záznamu.
+     */
+    out.push({ druh: "trening", den: d, cas: u.zaciatok.slice(11, 16), trener: u.trener || undefined, zKalendara: true });
   }
 
   for (const p of moje(zdroj.payments)) {

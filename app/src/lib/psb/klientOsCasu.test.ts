@@ -159,3 +159,24 @@ describe("balíčky nahodené v Kokpite", () => {
     expect(b).toMatchObject({ hodin: 18 });
   });
 });
+
+describe("tréner pri tréningu z kalendára", () => {
+  it("nesie sa rovnako ako pri tréningu z exportu", () => {
+    // Jerry, 2. 10. 2026: „prečo 29. 9. Jerry nie je, ale 2. 10. je?"
+    // Dva riadky o tom istom nemajú vyzerať ako dva druhy záznamu.
+    const os = osCasuKlienta("Lukas Hanus", {
+      sessions: [], payments: [], packages: [],
+      kalUdalosti: [{ zaciatok: "2026-09-29T11:30", klient: "Lukas Hanus", typ: "trening", trener: "Jerry" }],
+    } as never, "2026-10-02");
+    const t = os.find((u) => u.druh === "trening") as { trener?: string };
+    expect(t.trener).toBe("Jerry");
+  });
+
+  it("keď kalendár trénera nenesie, pole zostane prázdne — nehádа sa", () => {
+    const os = osCasuKlienta("X", {
+      sessions: [], payments: [], packages: [],
+      kalUdalosti: [{ zaciatok: "2026-09-29T11:30", klient: "X", typ: "trening", trener: null }],
+    } as never, "2026-10-02");
+    expect((os.find((u) => u.druh === "trening") as { trener?: string }).trener).toBeUndefined();
+  });
+});

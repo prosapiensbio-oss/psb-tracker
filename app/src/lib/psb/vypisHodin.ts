@@ -47,6 +47,8 @@ export type RiadokVypisu = {
   zKalendara?: boolean;
   /** Hodiny balíčka sú z názvu, nie z exportu. */
   odvodene?: boolean;
+  /** Koľko hodín si balíček odpísal za staršie tréningy hneď pri vzniku. */
+  prevzate?: number;
 };
 
 export type Vypis = {
@@ -167,6 +169,18 @@ export type StavRiadku = {
   zostatok: number | null;
   /** Koľkátý tréning na nezaplatenom balíčku to je (1, 2, 3…). */
   dlh: number | null;
+  /**
+   * Koľko hodín si balíček hneď pri vzniku odpísal za staršie tréningy.
+   *
+   * Jerry, 2. 10. 2026 nad Lukášom Hanusom: „prečo tam chýba 5 h?" Balíček
+   * mal 6 h a prvý tréning na ňom ukázal 4 — lebo dve hodiny zaplatili
+   * tréningy z 25. 8. a 3. 9., ktoré predošlý balíček nepokryl. Appka to
+   * robí správne (a presne tak, ako si to Jerry 28. 9. vypýtal), ale
+   * nehovorila to nahlas, takže to vyzeralo ako preskočené číslo.
+   *
+   * Len na riadku balíčka a len keď je to viac než nula.
+   */
+  prevzate?: number;
 };
 
 /**
@@ -218,7 +232,7 @@ export function priebehBalickov(
   const stavy = new Map<Udalost, StavRiadku>();
 
   // Hranice členstiev: každý balíček s hodinami otvára nové obdobie.
-  type Usek = { balicek: Extract<Udalost, { druh: "balicekOd" }> | null; hodin: number; riadky: Udalost[] };
+  type Usek = { balicek: Extract<Udalost, { druh: "balicekOd" }> | null; hodin: number; riadky: Udalost[]; prevzate?: number };
   const useky: Usek[] = [{ balicek: null, hodin: 0, riadky: [] }];
   /**
    * Index prvého tréningu, na ktorý už v členstve nezostala hodina.
@@ -306,7 +320,11 @@ export function priebehBalickov(
        */
       if (u.hodin > 0) {
         const od = prvyNekryty(posl);
-        if (od >= 0) novy.riadky.push(...posl.riadky.splice(od));
+        if (od >= 0) {
+          const prevzate = posl.riadky.splice(od);
+          novy.prevzate = prevzate.filter((x) => x.druh === "trening" && x.zdarma === undefined).length;
+          novy.riadky.push(...prevzate);
+        }
       }
       useky.push(novy);
     }
@@ -395,7 +413,7 @@ export function priebehBalickov(
         else dlhPocet = 0;
       }
       doUseku.push({ u, po: u.druh === "trening" ? bezi : null });
-      stavy.set(u, { zostatok, dlh, usek: b?.den || "" });
+      stavy.set(u, { zostatok, dlh, usek: b?.den || "", prevzate: u === b && usek.prevzate ? usek.prevzate : undefined });
     }
 
     // Posledné členstvo sa zrovná s číslom, ktoré appka ukazuje na karte.
@@ -467,6 +485,7 @@ export function vypisHodin(os: Udalost[], od = "", doDna = "", zostatokTeraz: nu
       druh: u.druh,
       zKalendara: u.druh === "trening" ? u.zKalendara : undefined,
       odvodene: u.druh === "balicekOd" || u.druh === "balicekDo" ? u.odvodene : undefined,
+      prevzate: stav?.prevzate,
     });
   }
 

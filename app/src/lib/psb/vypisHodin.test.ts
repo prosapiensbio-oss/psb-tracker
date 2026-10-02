@@ -453,3 +453,35 @@ describe("os bez kalendára preskočí hodinu (Lukáš Hanus, 2. 10. 2026)", () 
     expect(retaz(false)).toEqual([6, 5, 4, 3, 2]);
   });
 });
+
+describe("balíček, ktorý hneď platí staršie tréningy", () => {
+  /**
+   * Jerry, 2. 10. 2026 nad Lukášom Hanusom: „prečo tam chýba 5 h?"
+   *
+   * Nechýba. Balíček mal 6 h a prvý tréning na ňom ukázal 4, lebo dve
+   * hodiny zaplatili tréningy, ktoré predošlý balíček nepokryl. Appka to
+   * robí správne — len to nehovorila nahlas.
+   */
+  const ses = (den: string) => ({ client: "X", date: `${den}T00:00:00.000Z`, time: "16:00",
+    sessionTrainer: "Jerry", sessionName: "OFFLINE - 60min", sessionType: "OFFLINE", duration: 60, price: 1000 });
+  const bal = (od: string) => ({ client: "X", package: "OFF - 2h", remaining: 0, total: 0, added: od,
+    validFrom: od, validTo: "2026-12-31", payment: 2330, naObdobie: 2 });
+
+  // Balíček 2 h, tri tréningy (jeden nekrytý), potom nový balíček 2 h.
+  const os = osCasuKlienta("X", {
+    sessions: ["2026-08-01", "2026-08-08", "2026-08-15", "2026-09-05"].map(ses),
+    payments: [], packages: [bal("2026-08-01"), bal("2026-09-01")],
+  } as never, "2026-09-10");
+  const riadky = vypisHodin(os as never, "", "2026-09-10", null).riadky;
+
+  it("balíček povie, koľko hodín si odpísal za staršie tréningy", () => {
+    const b = riadky.filter((r) => r.druh === "balicekOd");
+    expect(b[0].prevzate).toBe(1);   // novší (riadky sú od najnovšieho)
+    expect(b[1].prevzate).toBeUndefined();
+  });
+
+  it("prvý tréning na ňom preto nezačína na plnom počte", () => {
+    const poNovom = riadky.filter((r) => r.druh === "trening" && r.den >= "2026-09-01");
+    expect(poNovom[0].zostatok).toBe(1);
+  });
+});
