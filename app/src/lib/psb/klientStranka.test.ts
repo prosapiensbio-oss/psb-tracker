@@ -13,14 +13,17 @@ const zaklad: VypisKlienta = {
 };
 
 describe("klientStranka", () => {
-  it("je česká a svetlá — klient nie je používateľ Kokpitu", () => {
+  it("je česká a zelená — tá istá paleta, akou chodí celá história mailom", () => {
+    // Jerry, 1. 10. 2026: „sprav tú stránku česky a svetlú." Svetlá sa
+    // ukázala ako nedorozumenie — 2. 10.: „prečo sa z toho zeleného návrhu
+    // stal tento biely?" Čeština platí ďalej, farby sa vracajú k mailu.
     const h = klientStranka(zaklad);
     expect(h).toContain('lang="cs"');
-    expect(h).toContain("background:#FFFFFF");
+    expect(h).toContain("background:#232b1c");
     expect(h).toContain("Zbývá ti 4 h");
-    // tmavá paleta z mailu sa sem nesmie dostať
-    expect(h).not.toContain("#232b1c");
-    expect(h).not.toContain("#f2f0e4");
+    // svetlá paleta zo živého webu patrí stránke PRED úvodným, nie sem
+    expect(h).not.toContain("#1A2E24");
+    expect(h).not.toContain("#F6F8F6");
   });
 
   it("dochodený balíček a hodiny nad rámec sú iné vety než zostatok", () => {
@@ -84,6 +87,56 @@ describe("klientStranka", () => {
     const p = { popis: "Balíček 8 h", suma: 9400, ucet: "1/2", sprava: "x" };
     expect(klientStranka({ ...zaklad, platba: p, qrUrl: "data:image/gif;base64,AAA" })).toContain('alt="QR platba"');
     expect(klientStranka({ ...zaklad, platba: p })).not.toContain("QR platba");
+  });
+
+  it("vodorovná os začína tým, čo bolo naposledy", () => {
+    // Jerry, 2. 10. 2026: „chcel by som, aby to začínalo najaktuálnejším dňom
+    // a ako sa posúvaš doprava, tak ideš do minulosti."
+    const h = klientStranka(zaklad);
+    const naposledy = h.indexOf("naposledy");
+    expect(naposledy).toBeGreaterThan(-1);
+    // Za značkou „naposledy" stojí najnovší bod, nie najstarší.
+    const poNej = h.slice(naposledy, naposledy + 400);
+    expect(poNej).toContain("15. 9.");
+    expect(poNej).not.toContain("9. 9.");
+  });
+
+  it("zvislý rozpis ide opačne — najstaršie hore", () => {
+    const h = klientStranka(zaklad);
+    const rozpis = h.slice(h.indexOf("Rozbalit celý balíček"));
+    expect(rozpis.indexOf("Balíček 8 h")).toBeLessThan(rozpis.indexOf("trénink"));
+  });
+
+  it("pri dlhu je suma hore a os sa skladá", () => {
+    const h = klientStranka({ ...zaklad, platba: { popis: "Balíček 8 h", suma: 9400, ucet: "1/2", sprava: "x" } });
+    expect(h.indexOf("K úhradě")).toBeLessThan(h.indexOf("Poslední balíček"));
+    expect(h).toContain("Poslední balíček — co se stalo");
+  });
+
+  it("bez dlhu os stojí rozbalená a nadpis je obyčajný", () => {
+    const h = klientStranka(zaklad);
+    expect(h).not.toContain("Poslední balíček — co se stalo");
+    expect(h).toContain("Poslední balíček");
+  });
+
+  it("otázka Jak ti je sa kladie len pri dochodenom balíčku bez dlhu", () => {
+    // Jerry, 2. 10. 2026: vymazať z priebehu balíčka aj z dlhu.
+    const pocitovka = "<!--POCITOVKA-->";
+    expect(klientStranka({ ...zaklad, zostatok: 0, pocitovka })).toContain(pocitovka);
+    expect(klientStranka({ ...zaklad, zostatok: 4, pocitovka })).not.toContain(pocitovka);
+    expect(klientStranka({
+      ...zaklad, zostatok: 0, pocitovka,
+      platba: { popis: "x", suma: 9400, ucet: "1/2", sprava: "y" },
+    })).not.toContain(pocitovka);
+  });
+
+  it("celá história je úplne dole, pod pocitovkou", () => {
+    const h = klientStranka({ ...zaklad, zostatok: 0, pocitovka: "<!--POCITOVKA-->" });
+    expect(h.indexOf("<!--POCITOVKA-->")).toBeLessThan(h.indexOf("Chceš celou historii?"));
+  });
+
+  it("posuvník osi je skrytý — vyzeral ako ďalší prvok osi", () => {
+    expect(klientStranka(zaklad)).toContain("::-webkit-scrollbar");
   });
 
   it("cudzí text sa neprepašuje do HTML", () => {

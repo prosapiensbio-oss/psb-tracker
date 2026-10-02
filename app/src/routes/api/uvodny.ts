@@ -4,6 +4,7 @@ import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 import { verejnyOdkaz } from "../../lib/psb/verejnyOdkaz";
+import { zalozAleboNajdi } from "../../lib/psb/anamneza.server";
 
 /**
  * ODKAZ NA STRÁNKU PRED ÚVODNÝM / PO ŇOM.
@@ -30,7 +31,7 @@ export const Route = createFileRoute("/api/uvodny")({
     handlers: {
       POST: async ({ request }) => {
         if (!(await isAuthed(request))) return unauthorized();
-        const { DB } = bindings();
+        const { DB, ANAMNEZA_KLUC } = bindings() as { DB?: import("@cloudflare/workers-types").D1Database; ANAMNEZA_KLUC?: string };
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });
 
         let b: Record<string, unknown>;
@@ -76,6 +77,25 @@ export const Route = createFileRoute("/api/uvodny")({
             "SELECT token FROM uvodne_odkazy WHERE klient = ?1 AND druh = ?2",
           ).bind(klient, druh).first<{ token: string }>();
           if (!r) return Response.json({ ok: false, error: "Odkaz sa nepodarilo vyrobiť." }, { status: 500 });
+
+          /**
+           * ANAMNÉZA VZNIKNE SPOLU S ODKAZOM PRED ÚVODNÝM.
+           *
+           * Stránka `/u/` kreslí tlačidlo „Vyplnit 3 otázky" len vtedy, keď
+           * klient už anamnézu má — GET nemá nič zapisovať. Tu je na to
+           * správny okamih: termín sa potvrdzuje rukou a od tej chvíle je
+           * jasné, že ten človek na úvodný ide.
+           *
+           * Zlyhanie sa prehltne zámerne: keď sa anamnéza nezaloží, SMS má
+           * aj tak odísť — tlačidlo sa len nenakreslí a dá sa založiť z karty.
+           */
+          if (druh === "pred") {
+            // Bez kľúča sa anamnéza nezakladá — šifrovanie zdravotných
+            // odpovedí nie je voliteľné.
+            if (ANAMNEZA_KLUC) {
+              await zalozAleboNajdi(DB, klient, ANAMNEZA_KLUC, (await currentUser(request)) || "app").catch(() => null);
+            }
+          }
 
           await audit(DB, {
             action: "uvodny-odkaz", predmet: klient,

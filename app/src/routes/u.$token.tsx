@@ -51,12 +51,26 @@ export const Route = createFileRoute("/u/$token")({
         ).bind(r.klient, druh === "pred" ? "uvodny" : "trening", teraz)
           .first<{ z: string | null }>().catch(() => null))?.z || null;
 
+        /**
+         * Odkaz na anamnézu — druhé CTA vedľa videa (Jerry, 2. 10. 2026).
+         * Berie sa ten, čo klient UŽ MÁ; nový sa tu nezakladá, lebo GET nemá
+         * nič zapisovať. Keď riadok ešte neexistuje, tlačidlo sa nekreslí —
+         * odkaz, ktorý nikam nevedie, je horší než žiadny. Riadok vzniká pri
+         * príprave SMS pred úvodným (`/api/uvodny`).
+         */
+        const anamneza = druh === "pred"
+          ? (await DB.prepare("SELECT token FROM anamnezy WHERE klient = ?1")
+              .bind(r.klient).first<{ token: string }>().catch(() => null))?.token || null
+          : null;
+
         const html = uvodnaStrankaHtml({
           druh,
           trener: r.trener,
           kedy: zKalendara || r.kedy,
           cenaCzk: r.cena_czk,
           logoUrl: `${new URL(request.url).origin}/znacka-napis-tmava.svg`,
+          anamnezaUrl: anamneza ? `${new URL(request.url).origin}/a/${anamneza}` : null,
+          odpovedPoslana: new URL(request.url).searchParams.get("odpoved") === "1",
         });
 
         await DB.prepare(
@@ -66,6 +80,50 @@ export const Route = createFileRoute("/u/$token")({
         return new Response(html, {
           headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex" },
         });
+      },
+
+      /**
+       * ČO KLIENT NAPÍŠE PO ÚVODNOM.
+       *
+       * Jerry, 2. 10. 2026: „SMS po úvodnom — jak se dnes cítíte — mohol by
+       * tam byť priestor, kde by ten klient mohol odpovedať."
+       *
+       * Ukladá sa do `klient_merania` so `zdroj = 'klient'`, teda tam, kam
+       * píše aj pocitovka. Nie je to lenivosť: je to tá istá vec — klientove
+       * vlastné slová o tom, ako mu je — a tým pádom sa objaví všade, kde sa
+       * už číta (denník klienta, Jarvis), bez nového stĺpca a bez druhého
+       * miesta, na ktoré by sa dalo zabudnúť.
+       *
+       * Prázdne sa neukladá a existujúci zápis z toho dňa sa neprepíše
+       * prázdnom — tá istá poistka, akú má pocitovka.
+       */
+      POST: async ({ request, params }) => {
+        const token = String((params as { token?: string }).token || "");
+        const { DB } = bindings();
+        const spat = (ok: boolean) => new Response(null, {
+          status: 303,
+          headers: { location: `/u/${encodeURIComponent(token)}${ok ? "?odpoved=1" : ""}`, "cache-control": "no-store" },
+        });
+        if (!DB || !/^[A-Za-z0-9]{8,24}$/.test(token)) return spat(false);
+
+        const r = await DB.prepare("SELECT klient, druh FROM uvodne_odkazy WHERE token = ?1")
+          .bind(token).first<{ klient: string; druh: string }>();
+        if (!r || r.druh !== "po") return spat(false);
+
+        const f = await request.formData().catch(() => null);
+        const text = String(f?.get("odpoved") ?? "").trim().slice(0, 1000);
+        if (!text) return spat(false);
+
+        const dnes = new Date().toISOString().slice(0, 10);
+        await DB.prepare(
+          `INSERT INTO klient_merania (id, klient, datum, poznamka, autor, created_at, zdroj)
+           VALUES (?1, ?2, ?3, ?4, 'klient', ?5, 'klient')
+           ON CONFLICT (klient, datum, zdroj) DO UPDATE SET
+             poznamka = CASE WHEN excluded.poznamka = '' THEN klient_merania.poznamka ELSE excluded.poznamka END`,
+        ).bind(`${dnes}-${crypto.randomUUID().slice(0, 8)}`, r.klient, dnes, text, new Date().toISOString())
+          .run().catch(() => null);
+
+        return spat(true);
       },
     },
   },

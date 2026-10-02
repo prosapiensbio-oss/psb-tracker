@@ -1121,6 +1121,21 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
                 {" "}{mimoExportu} {mimoExportu === 1 ? "hodina sa odtrénovala" : mimoExportu < 5 ? "hodiny sa odtrénovali" : "hodín sa odtrénovalo"} po ňom a vie o nich zatiaľ len kalendár.
               </div>
             )}
+            {/* SMS O HODINÁCH — aj odtiaľto, nielen z Kalendára.
+                Jerry, 2. 10. 2026: „počas balíčka po tréningu — kde nájdem
+                možnosť, aby som mu tú SMS poslal?" Nenašiel, lebo tlačidlo
+                bolo len v karte „Balíček dojde" v Kalendári, teda na inej
+                obrazovke, než na ktorej sa na zostatok pozerá. Text sa skladá
+                sám podľa zostatku — zostávajú hodiny, dochodený, nad rámec. */}
+            <div style={{ marginTop: 9 }}>
+              <SmsKlientovi
+                meno={meno}
+                zostatok={c.packageRemaining - mimoExportu}
+                trener={c.primaryTrainer}
+                odvodene={c.packageOdvodeny}
+                maly
+              />
+            </div>
           </div>
         )}
 

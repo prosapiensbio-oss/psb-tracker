@@ -93,6 +93,18 @@ export type VolbyStranky = {
   cenaCzk?: number | null;
   /** Adresa loga na tom istom webe (Kokpit ho servíruje z `public/`). */
   logoUrl: string;
+  /**
+   * Odkaz na anamnézu (`/a/<token>`) — druhé CTA vedľa videa.
+   *
+   * Jerry, 2. 10. 2026: „nemala by byť v tej SMS pred úvodným vedľa pustiť
+   * video ďalšia CTA, zelená, vyplňte 3 otázky?" Odkaz sa dovtedy kopíroval
+   * ručne z karty Anamnézy, takže klientovi často neprišiel vôbec. Bez
+   * tokenu sa tlačidlo NEKRESLÍ — odkaz, ktorý nikam nevedie, je horší než
+   * žiadny.
+   */
+  anamnezaUrl?: string | null;
+  /** `true` = klient práve odoslal odpoveď; namiesto poľa sa poďakuje. */
+  odpovedPoslana?: boolean;
 };
 
 const sipka = `<svg width="9" height="15" viewBox="0 0 9 15" aria-hidden="true" style="flex-shrink:0"><path d="M1 1 L7.5 7.5 L1 14" fill="none" stroke="#2D7D5A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>`;
@@ -158,7 +170,11 @@ export function uvodnaStrankaHtml(v: VolbyStranky): string {
 
 <h2 style="margin:26px 0 7px;font-family:'Raleway',sans-serif;font-weight:700;font-size:19px">Před lekcí</h2>
 <p style="margin:0 0 12px;font-size:16px;line-height:1.65;color:#3C4C42">Podívejte se prosím na toto krátké video. Připravíte se tak lépe na to, co budeme společně zkoumat.</p>
+<div style="display:flex;gap:10px;flex-wrap:wrap">
 <a href="${esc(ODKAZY.video)}" style="display:inline-block;text-decoration:none;border:2px solid #1A2E24;border-radius:32px;padding:12px 22px;font-size:15px;font-weight:600;color:#1A2E24">Pustit video · 3 min</a>
+${v.anamnezaUrl ? `<a href="${esc(v.anamnezaUrl)}" style="display:inline-block;text-decoration:none;background:#1A2E24;border-radius:32px;padding:14px 24px;font-size:15px;font-weight:600;color:#FFFFFF">Vyplnit 3 otázky</a>` : ""}
+</div>
+${v.anamnezaUrl ? `<p style="margin:10px 0 0;font-size:14px;line-height:1.6;color:#5B6B60">Otázky jsou o tom, co Vás trápí — ať nemusíme ztrácet čas na místě.</p>` : ""}
 
 ${riadokOdkazu(ODKAZY.cennik, "Ceník", "co stojí tréninky a balíčky")}
 
@@ -168,6 +184,15 @@ ${riadokOdkazu(ODKAZY.cennik, "Ceník", "co stojí tréninky a balíčky")}
 </div>`
     : `<h1 style="margin:0 0 8px;font-family:'Raleway',sans-serif;font-weight:700;font-size:28px;line-height:1.2">Jak se dnes cítíte?</h1>
 <p style="margin:0;font-size:16px;line-height:1.65;color:#3C4C42">Děkuji za účast a jsem rád, že jsme domluvili pokračování.</p>
+
+${v.odpovedPoslana
+  ? `<div style="margin-top:22px;border-left:3px solid #2D7D5A;background:#F6F8F6;border-radius:10px;padding:14px 16px;font-size:15px;line-height:1.6;color:#3C4C42">Děkuji, přečtu si to.</div>`
+  : `<form method="post" style="margin-top:22px;border:1px solid #DCE3DD;border-radius:18px;padding:18px">
+<div style="font-size:15.5px;line-height:1.6;color:#3C4C42">Napište mi pár slov — co Vás překvapilo, co bolí, na co se ptáte. Nemusíte psát nic.</div>
+<textarea name="odpoved" rows="4" maxlength="1000" placeholder="pár slov stačí…" style="width:100%;box-sizing:border-box;margin-top:12px;padding:13px 14px;border:1px solid #DCE3DD;border-radius:12px;font-family:inherit;font-size:15px;color:#1A2E24;line-height:1.6;resize:vertical"></textarea>
+<div style="margin-top:12px"><button type="submit" style="border:0;background:#1A2E24;color:#FFFFFF;border-radius:32px;padding:13px 26px;font-family:inherit;font-size:15px;font-weight:600;cursor:pointer">Odeslat ${esc(tr.krstne)}</button></div>
+<div style="font-size:13px;color:#5B6B60;margin-top:11px;line-height:1.55">Přijde to rovnou ${esc(tr.krstne)}, nikam jinam.</div>
+</form>`}
 
 <h2 style="margin:28px 0 7px;font-family:'Raleway',sans-serif;font-weight:700;font-size:19px">Souhrn z dnešní lekce</h2>
 <p style="margin:0;font-size:16px;line-height:1.65;color:#3C4C42">Všechno, co jsem Vám dnes říkal, je sepsané tady.</p>

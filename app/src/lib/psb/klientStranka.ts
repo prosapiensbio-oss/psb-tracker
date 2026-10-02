@@ -29,13 +29,21 @@ import type { VypisKlienta } from "./mailKlientovi";
 const esc = (s: string) => String(s)
   .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
+/**
+ * ZELENÁ — tie isté hodnoty, akými chodí celá história mailom
+ * (`FARBY_MAILU`). Nie podobné, doslova tie isté.
+ */
 export const SADZBA = {
-  text: "#1A2E24",
-  tlmeny: "#5B6B60",
-  jemny: "#3C4C42",
-  ramik: "#DCE3DD",
-  zelena: "#2D7D5A",
-  plocha: "#F6F8F6",
+  pozadie: "#232b1c",
+  text: "#e8ead9",
+  biela: "#ffffff",
+  tlmeny: "#8a9a72",
+  jemny: "#e8ead9",
+  slabsia: "#7e8b68",
+  ramik: "#3a4630",
+  zelena: "#d9e0c8",
+  plocha: "#2c3524",
+  minus: "#e2a07f",
 };
 
 const kc = (n: number) => `${Math.round(n).toLocaleString("cs-CZ").replace(/ /g, " ")} Kč`;
@@ -81,44 +89,122 @@ function blokPlatby(v: VypisKlienta, qrUrl?: string): string {
   const qr = qrUrl
     ? `<div style="margin-top:14px;text-align:center">
 <img src="${esc(qrUrl)}" alt="QR platba" width="190" height="190" style="width:190px;height:190px;display:inline-block;border-radius:10px;background:#FFFFFF">
-<div style="margin-top:6px;font-size:12px;color:${s.tlmeny}">Načti QR v bankovní aplikaci</div>
+<div style="margin-top:6px;font-size:12px;color:#4d5940">Načti QR v bankovní aplikaci</div>
 </div>`
     : "";
-  return `<div style="margin-top:26px;border:2px solid ${s.zelena};border-radius:18px;padding:18px 18px 20px">
-<div style="font-size:12px;letter-spacing:2.2px;color:${s.tlmeny};text-transform:uppercase">K úhradě</div>
-<div style="margin-top:6px;font-family:'Raleway',sans-serif;font-weight:700;font-size:34px;line-height:1.1;color:${s.zelena}">${esc(kc(v.platba.suma))}</div>
-<div style="margin-top:4px;font-size:15px;color:${s.jemny}">${esc(cesky(v.platba.popis))}</div>
+  return `<div style="margin-top:26px;background:${s.zelena};border-radius:18px;padding:20px;text-align:center">
+<div style="font-size:11px;letter-spacing:2.4px;color:#4d5940;text-transform:uppercase">K úhradě</div>
+<div style="margin-top:5px;font-family:'Raleway',sans-serif;font-weight:800;font-size:36px;line-height:1.1;color:${s.pozadie}">${esc(kc(v.platba.suma))}</div>
+<div style="margin-top:3px;font-size:14px;color:#4d5940">${esc(cesky(v.platba.popis))}</div>
 ${qr}
-<div style="margin-top:14px;font-size:13px;line-height:1.6;color:${s.jemny}">
+<div style="margin-top:14px;font-size:13px;line-height:1.6;color:${s.pozadie}">
 Účet <b>${esc(v.platba.ucet)}</b><br>
 Do zprávy pro příjemce napiš <b>${esc(v.platba.sprava)}</b> — podle toho platbu spárujeme.
 </div>
 </div>`;
 }
 
-/** Os času POSLEDNÉHO balíčka. Celá história chodí mailom na vyžiadanie. */
-function blokOsi(v: VypisKlienta): string {
+/**
+ * OS ČASU POSLEDNÉHO BALÍČKA. Celá história chodí mailom na vyžiadanie.
+ *
+ * DVE PODOBY, DVE RÔZNE OTÁZKY (Jerry, 2. 10. 2026).
+ *
+ *  • **Vodorovná**, hneď viditeľná: vľavo to, čo bolo NAPOSLEDY, a čím
+ *    ďalej doprava, tým hlbšie do minulosti. Odpovedá na „čo bolo teraz".
+ *  • **Zvislá**, za rozbaľovačkou: zhora nadol ako príbeh — vznik balíčka,
+ *    platba, tréningy, prečerpanie. Čísla VĽAVO, popisy VPRAVO.
+ *
+ * Posuvník je skrytý zámerne: sivá čiarka pod osou vyzerá ako ďalší jej
+ * prvok. Že sa dá ťahať, hovorí veta pod ňou.
+ *
+ * Žiadny JavaScript — rozbaľovanie je `<details>`. Stránka sa otvára z SMS,
+ * často v okne, ktoré si otvorí samotná správa.
+ */
+type BodOsi = VypisKlienta["os"][number];
+
+/** Veľká bodka = balíček alebo platba, malá = tréning. */
+const jeMedznik = (b: BodOsi) => b.druh === "balicekOd" || b.druh === "platba";
+
+const farbaBodu = (b: BodOsi): string =>
+  b.dlh ? SADZBA.minus
+    : b.druh === "balicekOd" ? SADZBA.biela
+      : b.druh === "platba" ? SADZBA.zelena
+        : SADZBA.tlmeny;
+
+/** Číslo vpravo (vodorovne) / vľavo (zvisle): zostatok, suma alebo dlh. */
+function cisloBodu(b: BodOsi): string {
+  if (b.dlh) return `−${b.dlh}`;
+  if (b.druh === "trening" && b.zostatok != null) return hod(b.zostatok);
+  const m = /(\d[\d\s  ]*)\s*(Kč|h)\b/.exec(b.popis);
+  return m ? `${m[1].trim()} ${m[2]}` : "";
+}
+
+const popisBodu = (b: BodOsi) => (b.druh === "trening" ? "trénink" : cesky(b.popis));
+
+const denPlne = (b: BodOsi) =>
+  `${DNI[new Date(`${b.den}T12:00:00Z`).getUTCDay()]} ${den(b.den)}${b.cas ? ` · ${b.cas}` : ""}`;
+
+/** Vodorovná os: najnovšie vľavo, doprava do minulosti. */
+function osVodorovna(os: BodOsi[]): string {
+  const s = SADZBA;
+  const karty = [...os].reverse().map((b, i) => {
+    const p = jeMedznik(b) ? 13 : 10;
+    const cislo = cisloBodu(b);
+    const hlavicka = i === 0
+      ? `<div style="font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:${b.dlh ? s.minus : s.tlmeny};margin-bottom:3px">naposledy</div>`
+      : `<div style="height:16px"></div>`;
+    return `<div style="flex:0 0 120px;scroll-snap-align:start">${hlavicka}
+<div style="height:50px;display:flex;flex-direction:column;justify-content:flex-end;padding:0 10px 7px 0">
+<div style="font-size:12.5px;color:${jeMedznik(b) ? s.biela : s.text};line-height:1.25${jeMedznik(b) ? ";font-weight:700" : ""}">${esc(popisBodu(b))}</div>
+<div style="font-size:11px;color:${s.slabsia}">${esc(denPlne(b))}</div></div>
+<div style="height:14px;display:flex;align-items:center"><div style="width:${p}px;height:${p}px;border-radius:50%;background:${farbaBodu(b)}"></div></div>
+<div style="font-family:'Raleway',sans-serif;font-weight:700;font-size:14.5px;margin-top:9px;color:${b.dlh ? s.minus : s.text}">${esc(cislo)}</div></div>`;
+  }).join("");
+  return `<div class="psb-os" style="position:relative;margin:0 -22px;padding:0 22px;overflow-x:auto;-webkit-overflow-scrolling:touch">
+<div style="display:flex;position:relative;min-width:max-content;padding-bottom:4px">
+<div style="position:absolute;left:0;right:0;top:72px;height:2px;background:${s.ramik}"></div>
+${karty}</div></div>
+<div style="font-size:11.5px;color:${s.slabsia};margin-top:10px">← posouvej doprava, jdeš do minulosti</div>`;
+}
+
+/** Zvislý rozpis: najstaršie hore, čísla vľavo, popisy vpravo. */
+function osZvisla(os: BodOsi[]): string {
+  const s = SADZBA;
+  return os.map((b, i) => {
+    const p = jeMedznik(b) ? 13 : 10;
+    const prvy = i === 0;
+    const posledny = i === os.length - 1;
+    return `<div style="display:flex;align-items:center;min-height:52px">
+<div style="flex:1;text-align:right;padding-right:15px;font-family:'Raleway',sans-serif;font-weight:700;font-size:15px;color:${b.dlh ? s.minus : s.text}">${esc(cisloBodu(b))}</div>
+<div style="width:15px;flex-shrink:0;align-self:stretch;display:flex;flex-direction:column;align-items:center">
+<div style="width:2px;flex:1;background:${prvy ? "transparent" : s.ramik}"></div>
+<div style="width:${p}px;height:${p}px;border-radius:50%;background:${farbaBodu(b)};flex-shrink:0"></div>
+<div style="width:2px;flex:1;background:${posledny ? "transparent" : s.ramik}"></div></div>
+<div style="flex:1;padding-left:15px">
+<div style="font-size:14.5px;color:${jeMedznik(b) ? s.biela : s.text};line-height:1.3${jeMedznik(b) ? ";font-weight:700" : ""}">${esc(popisBodu(b))}</div>
+<div style="font-size:11.5px;color:${s.slabsia}">${esc(denPlne(b))}</div></div></div>`;
+  }).join("");
+}
+
+/**
+ * Celý blok osi. Pri dlhu sa SKLADÁ: navrchu stránky vtedy stojí suma s QR
+ * a história je kontext, nie hlavná vec (Jerry, 2. 10. 2026).
+ */
+function blokOsi(v: VypisKlienta, zlozena: boolean): string {
   const s = SADZBA;
   if (!v.os.length) return "";
-  const riadky = [...v.os].reverse().map((b) => {
-    const jeTrening = b.druh === "trening";
-    const vpravo = jeTrening && b.zostatok != null
-      ? `<span style="font-weight:700;color:${s.text};white-space:nowrap">${esc(hod(b.zostatok))}</span>`
-      : b.dlh ? `<span style="font-weight:700;color:#B4522F;white-space:nowrap">−${b.dlh}</span>` : "";
-    const d = new Date(`${b.den}T12:00:00Z`);
-    const popis = jeTrening ? "trénink" : cesky(b.popis);
-    return `<tr>
-<td style="padding:7px 0;border-bottom:1px solid ${s.ramik};vertical-align:top">
-<div style="font-size:15px;color:${s.text}">${esc(popis)}</div>
-<div style="font-size:12.5px;color:${s.tlmeny}">${esc(DNI[d.getUTCDay()])} ${esc(den(b.den))}${b.cas ? ` · ${esc(b.cas)}` : ""}</div>
-</td>
-<td style="padding:7px 0;border-bottom:1px solid ${s.ramik};text-align:right;vertical-align:top;font-size:14px">${vpravo}</td>
-</tr>`;
-  }).join("");
+  const rozpis = `<details style="margin-top:16px;border-top:1px solid ${s.ramik};padding-top:14px">
+<summary style="font-size:13.5px;font-weight:600;color:${s.zelena}"><span class="psb-sip">▸</span>Rozbalit celý balíček pod sebou</summary>
+<div style="margin-top:16px">${osZvisla(v.os)}</div></details>`;
+  if (zlozena) {
+    return `<div style="margin-top:28px">
+<details style="border-top:1px solid ${s.ramik};border-bottom:1px solid ${s.ramik};padding:14px 0">
+<summary style="font-size:14px;font-weight:600;color:${s.zelena}"><span class="psb-sip">▸</span>Poslední balíček — co se stalo</summary>
+<div style="margin-top:18px">${osVodorovna(v.os)}${rozpis}</div></details></div>`;
+  }
   return `<div style="margin-top:30px">
-<div style="font-size:12px;letter-spacing:2.2px;color:${s.tlmeny};text-transform:uppercase">Poslední balíček</div>
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:8px">${riadky}</table>
-</div>`;
+<div style="font-size:11px;letter-spacing:2.4px;color:${s.tlmeny};text-transform:uppercase;margin-bottom:12px">Poslední balíček</div>
+${osVodorovna(v.os)}${rozpis}</div>`;
 }
 
 /**
@@ -129,15 +215,15 @@ function blokOsi(v: VypisKlienta): string {
 function blokHistorie(poslane: boolean): string {
   const s = SADZBA;
   if (poslane) {
-    return `<div style="margin-top:26px;background:${s.plocha};border-left:3px solid ${s.zelena};border-radius:10px;padding:14px 16px;font-size:15px;line-height:1.55;color:${s.jemny}">
+    return `<div style="margin-top:26px;background:${s.plocha};border-left:3px solid ${s.zelena};border-radius:10px;padding:14px 16px;font-size:15px;line-height:1.55;color:${s.text}">
 Poslali jsme ti celou historii na e-mail. Kdyby nedorazila, mrkni do spamu.</div>`;
   }
-  return `<div style="margin-top:26px;background:${s.plocha};border:1px solid ${s.ramik};border-radius:14px;padding:18px">
-<div style="font-size:16px;font-weight:600;color:${s.text}">Chceš celou historii?</div>
-<div style="margin-top:4px;font-size:14px;line-height:1.55;color:${s.jemny}">Všechny tréninky i platby od začátku ti pošleme na e-mail.</div>
+  return `<div style="margin-top:26px;padding-top:20px;border-top:1px solid ${s.ramik};text-align:center">
+<div style="font-size:15px;font-weight:700;color:${s.biela}">Chceš celou historii?</div>
+<div style="margin-top:4px;font-size:13.5px;line-height:1.55;color:${s.tlmeny}">Všechny tréninky i platby od začátku ti pošleme na e-mail.</div>
 <form method="post" style="margin-top:12px">
 <input type="hidden" name="akcia" value="historia">
-<button type="submit" style="background:transparent;border:2px solid ${s.text};color:${s.text};border-radius:32px;padding:12px 24px;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit">Poslat na e-mail</button>
+<button type="submit" style="background:transparent;border:2px solid ${s.zelena};color:${s.zelena};border-radius:32px;padding:12px 26px;font-size:14.5px;font-weight:700;cursor:pointer;font-family:inherit">Poslat na e-mail</button>
 </form>
 </div>`;
 }
@@ -156,10 +242,25 @@ export function klientStranka(v: VypisKlienta & {
   const stav = hlavnyStav(v);
   const logo = v.logoUrl
     ? `<img src="${esc(v.logoUrl)}" alt="ProSapiens Biomechanic" width="200" style="width:200px;max-width:62%;height:auto;display:block">`
-    : `<div style="font-family:'Raleway',sans-serif;font-weight:700;font-size:13px;letter-spacing:3.6px;color:${s.tlmeny}">PROSAPIENS BIOMECHANIC</div>`;
+    : `<div style="font-family:'Raleway',sans-serif;font-weight:700;font-size:12px;letter-spacing:3.4px;color:${s.tlmeny}">PROSAPIENS BIOMECHANIC</div>`;
+
+  /**
+   * PORADIE BLOKOV SA RIADI TÝM, PREČO KLIENT STRÁNKU OTVORIL.
+   *
+   * Dlží → navrchu suma s QR, os sa skladá (Jerry, 2. 10. 2026: „históriu
+   * posledného balíčka by som dal za rozbaľovací trojuholník"). Nedlží →
+   * os je hlavná vec a nič sa neskladá.
+   *
+   * „Jak ti je" sa pýta LEN pri dochodenom balíčku bez dlhu. Počas balíčka
+   * je to otázka navyše k ničomu a pri dlhu je netakt: najprv zaplať,
+   * potom nám povedz, ako sa cítiš.
+   */
+  const dlzi = !!v.platba && v.platba.suma > 0;
+  const dochodeny = v.zostatok != null && v.zostatok <= 0;
+  const pocitovka = !dlzi && dochodeny ? (v.pocitovka || "") : "";
 
   const dalsi = v.dalsi
-    ? `<div style="margin-top:8px;font-size:15px;color:${s.jemny}">Další trénink: <b style="color:${s.text}">${esc(DNI[new Date(`${v.dalsi.slice(0, 10)}T12:00:00Z`).getUTCDay()])} ${esc(den(v.dalsi))}</b>${v.dalsi.length > 10 ? ` · ${esc(v.dalsi.slice(11, 16))}` : ""}</div>`
+    ? `<div style="margin-top:9px;font-size:15px;color:${s.tlmeny}">Další trénink: <b style="color:${s.biela}">${esc(DNI[new Date(`${v.dalsi.slice(0, 10)}T12:00:00Z`).getUTCDay()])} ${esc(den(v.dalsi))}</b>${v.dalsi.length > 10 ? ` · ${esc(v.dalsi.slice(11, 16))}` : ""}</div>`
     : "";
 
   return `<!doctype html>
@@ -170,27 +271,34 @@ export function klientStranka(v: VypisKlienta & {
 <title>Tvoje tréninky — ProSapiens Biomechanic</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600&family=Raleway:wght@600;700&display=swap">
 <style>
-body{margin:0;background:#FFFFFF}
+body{margin:0;background:${s.pozadie}}
 a{color:${s.zelena}}
-a:hover{color:${s.text}}
+a:hover{color:${s.biela}}
+summary{list-style:none;cursor:pointer}
+summary::-webkit-details-marker{display:none}
+.psb-sip{display:inline-block;transition:transform .15s;margin-right:8px}
+details[open] .psb-sip{transform:rotate(90deg)}
+/* Posuvník preč: sivá čiarka pod osou vyzerá ako ďalší jej prvok. */
+.psb-os{scrollbar-width:none;-ms-overflow-style:none}
+.psb-os::-webkit-scrollbar{display:none;height:0}
 </style>
 </head>
 <body>
-<div style="max-width:560px;margin:0 auto;padding:0 22px 48px;box-sizing:border-box;font-family:'Open Sans',sans-serif;color:${s.text};background:#FFFFFF">
+<div style="max-width:560px;margin:0 auto;padding:0 22px 48px;box-sizing:border-box;font-family:'Open Sans',sans-serif;color:${s.text};background:${s.pozadie}">
 
 <div style="padding:26px 0 20px">${logo}</div>
 
-<h1 style="margin:0;font-family:'Raleway',sans-serif;font-weight:700;font-size:32px;line-height:1.15">${esc(stav.velke)}</h1>
-<div style="margin-top:5px;font-size:16px;color:${s.jemny}">${esc(stav.pod)}</div>
+<h1 style="margin:0;font-family:'Raleway',sans-serif;font-weight:700;font-size:32px;line-height:1.15;color:${s.biela}">${esc(stav.velke)}</h1>
+<div style="margin-top:6px;font-size:15px;color:${s.tlmeny}">${esc(stav.pod)}</div>
 ${dalsi}
 
 ${blokPlatby(v, v.qrUrl)}
-${blokOsi(v)}
+${blokOsi(v, dlzi)}
+${pocitovka}
 ${blokHistorie(!!v.historiaPoslana)}
-${v.pocitovka || ""}
 
 <div style="margin-top:38px;padding-top:24px;border-top:1px solid ${s.ramik}">
-<div style="font-family:'Raleway',sans-serif;font-weight:700;font-size:22px;line-height:1.2">${esc(v.trener)}</div>
+<div style="font-family:'Raleway',sans-serif;font-weight:700;font-size:22px;line-height:1.2;color:${s.biela}">${esc(v.trener)}</div>
 <div style="font-size:15px;color:${s.tlmeny};margin-top:3px">ProSapiens Biomechanic</div>
 </div>
 
