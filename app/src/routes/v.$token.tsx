@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { terazPraha } from "../lib/psb/cas";
 
 import { bindings } from "../lib/bindings.server";
+import { isAuthed } from "../lib/psb/auth.server";
 import { deriveClients } from "../lib/psb/compute";
 import { dlhKlienta, type BalicekDlh, type PlatbaDlh } from "../lib/psb/dlhKlienta";
 import { historiaPreMail } from "../lib/psb/historiaMail";
@@ -184,8 +185,24 @@ export const Route = createFileRoute("/v/$token")({
           historiaPoslana: new URL(request.url).searchParams.get("historia") === "1",
         });
 
-        await DB.prepare("UPDATE klient_odkazy SET otvorene = otvorene + 1, posledne_otvorene = ?1 WHERE token = ?2")
-          .bind(new Date().toISOString(), token).run().catch(() => null);
+        /**
+         * NÁHĽAD NEPOČÍTA OTVORENIE.
+         *
+         * Jerry, 2. 10. 2026: „keď kliknem na SMS, nech sa otvorí okno, kde
+         * bude text tej SMS a náhľad obsahu odkazu." Lenže `otvorene` je
+         * jediné miesto, z ktorého sa dá zistiť, či klient na odkaz klikol —
+         * a keby ho dvíhal aj náhľad z Kokpitu, to číslo by prestalo o čomkoľvek
+         * vypovedať.
+         *
+         * Preto `?nahlad=1` a LEN pre prihláseného. Bez prihlásenia sa
+         * správa ako bežné otvorenie, takže kto adresu odkukne z SMS,
+         * počítadlo neobíde.
+         */
+        const jeNahlad = new URL(request.url).searchParams.get("nahlad") === "1" && await isAuthed(request);
+        if (!jeNahlad) {
+          await DB.prepare("UPDATE klient_odkazy SET otvorene = otvorene + 1, posledne_otvorene = ?1 WHERE token = ?2")
+            .bind(new Date().toISOString(), token).run().catch(() => null);
+        }
 
         return new Response(html, {
           headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex" },

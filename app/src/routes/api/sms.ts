@@ -105,7 +105,15 @@ export const Route = createFileRoute("/api/sms")({
             riadok = { token };
           }
           // Krátka adresa — viď verejnyOdkaz.ts; v SMS ide o jednu správu.
-          return Response.json({ ok: true, url: verejnyOdkaz(`/v/${riadok.token}`, new URL(request.url).origin) });
+          // `nahlad` je tá istá stránka pre okno pred odoslaním: ide priamo
+          // na workera (presmerovanie z webu by sa do iframu neprenieslo)
+          // a nezdvíha počítadlo otvorení.
+          const origin = new URL(request.url).origin;
+          return Response.json({
+            ok: true,
+            url: verejnyOdkaz(`/v/${riadok.token}`, origin),
+            nahlad: `${origin}/v/${riadok.token}?nahlad=1`,
+          });
         }
 
         const klient = kus(b.klient, 120);

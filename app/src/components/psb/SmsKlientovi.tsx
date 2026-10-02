@@ -77,6 +77,8 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
   const [rod, setRod] = useState<"m" | "z">("m");
   /** Odkaz na /v/<token> — stránka s tréningmi a QR na platbu. */
   const [odkaz, setOdkaz] = useState("");
+  /** Tá istá stránka pre náhľad: priamo z workera a bez počítadla otvorení. */
+  const [nahlad, setNahlad] = useState("");
   const nacitane = useRef(false);
 
   useEffect(() => {
@@ -90,7 +92,10 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
       void fetch("/api/sms", {
         method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
         body: JSON.stringify({ akcia: "odkaz", klient: meno }),
-      }).then((x) => x.json()).then((j: { ok?: boolean; url?: string }) => { if (j?.ok && j.url) setOdkaz(j.url); }).catch(() => null);
+      }).then((x) => x.json()).then((j: { ok?: boolean; url?: string; nahlad?: string }) => {
+        if (j?.ok && j.url) setOdkaz(j.url);
+        if (j?.nahlad) setNahlad(j.nahlad);
+      }).catch(() => null);
     }
   }, [otvorene, meno, predvolenyText]);
 
@@ -124,6 +129,18 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
     setHlaska(r?.error || "nepodarilo sa");
   };
 
+  /**
+   * Esc zavrie okno. Hook stojí NAD skorými návratmi — pod nimi by sa pri
+   * zatvorenom okne nezavolal a React by spadol na zmenenom poradí hookov
+   * (viď eslint.hooks.config.js).
+   */
+  useEffect(() => {
+    if (!otvorene) return;
+    const f = (e: KeyboardEvent) => { if (e.key === "Escape") setOtvorene(false); };
+    window.addEventListener("keydown", f);
+    return () => window.removeEventListener("keydown", f);
+  }, [otvorene]);
+
   const tlacidlo = {
     padding: maly ? "3px 8px" : "6px 12px", borderRadius: maly ? 7 : 8,
     fontSize: maly ? 11 : 12.5, cursor: "pointer", fontFamily: "inherit",
@@ -144,8 +161,45 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
   }
 
   const kolko = dlzkaSpravy(text);
+  /**
+   * SAMOSTATNÉ OKNO, NIE RIADOK V DLAŽDICI.
+   *
+   * Jerry, 2. 10. 2026: „keď kliknem na SMS hocikomu, nech sa otvorí
+   * samostatné okno, kde bude text tej SMS a náhľad obsahu odkazu — a keď to
+   * skontrolujem, tak to pošlem."
+   *
+   * Dovtedy sa panel rozbalil vnútri dlaždice: text sa dal prečítať, ale to,
+   * ČO klient za odkazom uvidí, nie. A práve to je vec, ktorá sa mení podľa
+   * stavu klienta (QR, dochodený balíček, os času) a stojí za kontrolu
+   * predtým, než správa odíde — späť sa vziať nedá.
+   *
+   * Náhľad je ŽIVÁ stránka, nie obrázok: ten istý worker, tá istá adresa,
+   * len s `?nahlad=1`, ktoré nezdvíha počítadlo otvorení.
+   */
   return (
-    <div style={{ flexBasis: "100%", marginTop: 6, padding: "8px 10px", borderRadius: 8, background: mix(C.text, 4), border: `1px solid ${C.border}` }}>
+    <div
+      onClick={() => setOtvorene(false)}
+      style={{
+        position: "fixed", inset: 0, zIndex: 90, background: "rgba(0,0,0,.55)",
+        display: "flex", alignItems: "center", justifyContent: "center", padding: 18,
+      }}
+    >
+    <div
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        width: "min(980px, 100%)", maxHeight: "92vh", overflowY: "auto",
+        padding: "16px 18px 18px", borderRadius: 14, background: C.surface,
+        border: `1px solid ${C.border}`, boxShadow: "0 18px 48px rgba(0,0,0,.5)",
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 10, marginBottom: 12 }}>
+        <div style={{ fontSize: 15, fontWeight: 700, color: C.text }}>SMS pre {meno}</div>
+        <button
+          onClick={() => setOtvorene(false)}
+          aria-label="Zavrieť"
+          style={{ background: "none", border: "none", color: C.textDim, fontSize: 16, cursor: "pointer", lineHeight: 1 }}
+        >✕</button>
+      </div>
       {telefon === null ? (
         <div style={{ fontSize: 11.5, color: C.textDim }}>hľadám číslo…</div>
       ) : !telefon ? (
@@ -153,7 +207,8 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
           {meno} nemá v Kokpite telefón — doplň ho vo fakturačných údajoch.
         </div>
       ) : (
-        <>
+        <div style={{ display: "flex", gap: 18, alignItems: "flex-start", flexWrap: "wrap" }}>
+        <div style={{ flex: "1 1 320px", minWidth: 0 }}>
           {/* Rod mení „mal si" na „mala si". Heuristika z mena sa mýli
               (Saša, Nikita), preto prepínač — a preskladá celý text. */}
           {!predvolenyText && !platba && (
@@ -201,8 +256,33 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
             </span>
             {hlaska && <span style={{ fontSize: 11.5, color: C.red }}>{hlaska}</span>}
           </div>
-        </>
+        </div>
+
+        {/* ČO KLIENT UVIDÍ ZA ODKAZOM.
+            Živá stránka, nie obrázok — mení sa podľa jeho stavu (QR pri dlhu,
+            dochodený balíček, os času). `?nahlad=1` nezdvíha počítadlo
+            otvorení, inak by sa z neho nedalo zistiť, či klient klikol. */}
+        {nahlad && (
+          <div style={{ flex: "0 0 300px", maxWidth: "100%" }}>
+            <div style={{ fontSize: 11, letterSpacing: 1.2, textTransform: "uppercase", color: C.textDim, marginBottom: 7 }}>
+              Čo uvidí za odkazom
+            </div>
+            <div style={{ height: 420, borderRadius: 14, overflow: "hidden", border: `1px solid ${C.border}`, background: "#232b1c" }}>
+              <iframe
+                src={nahlad}
+                title={`Stránka klienta — ${meno}`}
+                style={{ width: 400, height: 560, border: 0, transform: "scale(.75)", transformOrigin: "0 0" }}
+              />
+            </div>
+            <a
+              href={nahlad} target="_blank" rel="noreferrer"
+              style={{ display: "inline-block", marginTop: 7, fontSize: 11.5, color: C.accentLight }}
+            >otvoriť celú stránku ↗</a>
+          </div>
+        )}
+        </div>
       )}
+    </div>
     </div>
   );
 }
