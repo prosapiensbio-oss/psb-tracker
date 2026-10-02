@@ -135,10 +135,21 @@ export function textSms(v: {
   odkaz?: string;
   /** Starý režim bez odkazu: dochádzka chodila mailom. */
   sMailom?: boolean;
+  /** Je na stránke QR? Vtedy a len vtedy ho správa menuje. */
+  sQr?: boolean;
 }): string {
+  /**
+   * O QR SA PÍŠE LEN VTEDY, KEĎ NA STRÁNKE NAOZAJ JE.
+   *
+   * Jerry, 2. 10. 2026: pri zostávajúcich hodinách „tady máš přehled hodin",
+   * pri dochodenom a nad rámec „tady máš přehled hodin a QR na platbu za
+   * balíček z 9. 9. 2026". Je to ten istý rozdiel ako na stránke: QR sa
+   * kreslí, až keď je čo zaplatiť. Správa, ktorá sľúbi QR a klient ho tam
+   * nenájde, je horšia než stručná.
+   */
   const za = v.datum ? ` za balíček z ${v.datum}` : "";
   const telo = v.odkaz
-    ? `tady máš přehled hodin a QR na platbu${za}: ${v.odkaz}`
+    ? (v.sQr ? `tady máš přehled hodin a QR na platbu${za}: ${v.odkaz}` : `tady máš přehled hodin: ${v.odkaz}`)
     : v.sMailom
       ? `v maili najdeš dochádzku aj QR na platbu${za}.`
       : `ozvi sa mi, prejdeme si hodiny${za}.`;
@@ -152,7 +163,7 @@ export function textSms(v: {
  * len preto, aby sa nemuseli prepisovať volania, ktoré o nej hovoria menom.
  */
 export const textSmsPlatba = (v: { oslovenie: string; trener: string; suma?: number; datum?: string; odkaz?: string }): string =>
-  textSms({ oslovenie: v.oslovenie, trener: v.trener, datum: v.datum, odkaz: v.odkaz });
+  textSms({ oslovenie: v.oslovenie, trener: v.trener, datum: v.datum, odkaz: v.odkaz, sQr: true });
 
 /**
  * ODOSIELATEĽ — ČO BRÁNA VEZME.

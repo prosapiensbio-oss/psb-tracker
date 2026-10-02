@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { nazovProduktu } from "../../lib/psb/nazvyProduktov";
 
 import { jeBeta } from "../../lib/psb/beta";
 import { osCasuKlienta, treningovVBalicku, type Udalost } from "../../lib/psb/klientOsCasu";
@@ -80,7 +81,7 @@ function Riadok({ u, os }: { u: Udalost; os: Udalost[] }) {
       <div style={{ ...zaklad, background: mix(C.accent, 10), borderRadius: 6, padding: "8px 8px", marginTop: 4 }}>
         <span style={denStyl}>{fmtDMY(u.den)}</span>
         <span style={{ flex: 1, color: C.text }}>
-          <b>{u.nazov}</b>
+          <b>{nazovProduktu(u.nazov)}</b>
           <span style={{ color: C.textMuted }}>
             {" "}· {u.hodin ? `${u.hodin} h` : "bez limitu"}
             {u.doDna ? ` · platí do ${fmtDMY(u.doDna)}` : " · bez konca"}
@@ -100,7 +101,7 @@ function Riadok({ u, os }: { u: Udalost; os: Udalost[] }) {
     return (
       <div style={{ ...zaklad, color: C.textDim }}>
         <span style={denStyl}>{fmtDMY(u.den)}</span>
-        <span style={{ flex: 1 }}>skončila platnosť — {u.nazov}</span>
+        <span style={{ flex: 1 }}>skončila platnosť — {nazovProduktu(u.nazov)}</span>
       </div>
     );
   }
@@ -125,7 +126,7 @@ function Riadok({ u, os }: { u: Udalost; os: Udalost[] }) {
         tréning
         {u.cas ? ` ${u.cas}` : ""}
         {u.trener ? ` · ${u.trener}` : ""}
-        {u.nazov ? <span style={{ color: C.textDim }}> · {u.nazov}</span> : null}
+        {u.nazov ? <span style={{ color: C.textDim }}> · {nazovProduktu(u.nazov)}</span> : null}
       </span>
       {u.zKalendara && (
         <span style={{ color: C.blue, fontSize: 11, whiteSpace: "nowrap" }} title="V kalendári je, v PTminderi ešte nie">

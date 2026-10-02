@@ -54,9 +54,15 @@ describe("dlzkaSpravy", () => {
 describe("textSms — jedno znenie pre všetky situácie okolo hodín", () => {
   const ODKAZ = "https://prosapiens.cz/v/cVz4vMRTHMKT";
 
-  it("je to Jerryho veta, 2. 10. 2026", () => {
-    expect(textSms({ oslovenie: "Lukas", trener: "Jerry", datum: "9. 9. 2026", odkaz: ODKAZ }))
+  it("keď je na stránke QR, správa ho menuje", () => {
+    expect(textSms({ oslovenie: "Lukas", trener: "Jerry", datum: "9. 9. 2026", odkaz: ODKAZ, sQr: true }))
       .toBe(`Ahoj Lukas, tady mas prehled hodin a QR na platbu za balicek z 9. 9. 2026: ${ODKAZ} Jerry`);
+  });
+
+  it("keď QR na stránke nie je, nesľubuje ho", () => {
+    // Jerry, 2. 10. 2026: pri zostávajúcich hodinách „tady máš přehled hodin".
+    expect(textSms({ oslovenie: "Lukas", trener: "Jerry", odkaz: ODKAZ }))
+      .toBe(`Ahoj Lukas, tady mas prehled hodin: ${ODKAZ} Jerry`);
   });
 
   it("stav klienta do textu NEVSTUPUJE — povie ho stránka", () => {
@@ -75,13 +81,13 @@ describe("textSms — jedno znenie pre všetky situácie okolo hodín", () => {
   });
 
   it("bez dátumu veta drží", () => {
-    expect(textSms({ oslovenie: "Jan", trener: "Terezka", odkaz: ODKAZ }))
+    expect(textSms({ oslovenie: "Jan", trener: "Terezka", odkaz: ODKAZ, sQr: true }))
       .toBe(`Ahoj Jan, tady mas prehled hodin a QR na platbu: ${ODKAZ} Terezka`);
   });
 
   it("bez diakritiky a do jednej správy aj s dlhým menom", () => {
     for (const oslovenie of ["Jan", "Lukas", "Bartolomej"]) {
-      const t = textSms({ oslovenie, trener: "Terezka", datum: "9. 9. 2026", odkaz: ODKAZ });
+      const t = textSms({ oslovenie, trener: "Terezka", datum: "9. 9. 2026", odkaz: ODKAZ, sQr: true });
       expect(t).not.toMatch(/[áäčďéíľĺňóôŕšťúýžÁČĎÉÍĽŇÓŠŤÚÝŽěřůŘ]/);
       expect(dlzkaSpravy(t).sprav).toBe(1);
     }
@@ -94,7 +100,7 @@ describe("textSms — jedno znenie pre všetky situácie okolo hodín", () => {
 
   it("textSmsPlatba je tá istá správa — len iný názov", () => {
     const v = { oslovenie: "Lukas", trener: "Jerry", datum: "9. 9. 2026", odkaz: ODKAZ };
-    expect(textSmsPlatba({ ...v, suma: 6990 })).toBe(textSms(v));
+    expect(textSmsPlatba({ ...v, suma: 6990 })).toBe(textSms({ ...v, sQr: true }));
   });
 });
 

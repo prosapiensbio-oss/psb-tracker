@@ -97,7 +97,11 @@ export type VypisKlienta = {
    * jeho MENO, nie variabilný symbol. Kokpit páruje bankové príjmy podľa
    * mena v texte platby.
    */
-  platba?: { popis: string; suma: number; ucet: string; sprava: string };
+  platba?: {
+    popis: string; suma: number; ucet: string; sprava: string;
+    /** Koľko hodín sa z nového balíčka hneď odpíše (tréningy nad rámec). */
+    odpocet?: number;
+  };
   /**
    * Celá história na vyžiadanie klienta.
    *

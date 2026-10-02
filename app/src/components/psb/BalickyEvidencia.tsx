@@ -1,4 +1,5 @@
 import { oznam } from "../../lib/psb/obnovaSignal";
+import { nazovProduktu } from "../../lib/psb/nazvyProduktov";
 import { SmsKlientovi } from "./SmsKlientovi";
 import { useCallback, useEffect, useState } from "react";
 
@@ -249,7 +250,7 @@ export function BalickyEvidencia({ mena, onFaktura, onVypis }: {
       {posledny && (onFaktura || onVypis) && (
         <div style={{ marginTop: 10, padding: "9px 11px", borderRadius: 9, border: `1px solid ${mix(C.accentLight, 40)}`, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           <span style={{ fontSize: 12.5, color: C.text }}>
-            Zapísaný balíček <b>{posledny.nazov}</b> pre {posledny.klient}
+            Zapísaný balíček <b>{nazovProduktu(posledny.nazov)}</b> pre {posledny.klient}
             {posledny.cena ? ` za ${Math.round(posledny.cena)} Kč` : ""}.
           </span>
           {onFaktura && (
@@ -262,7 +263,7 @@ export function BalickyEvidencia({ mena, onFaktura, onVypis }: {
           )}
           <SmsKlientovi
             meno={posledny.klient}
-            predvolenyText={`${posledny.klient.split(" ")[0]}, zapísal som ti ${posledny.nazov}. QR na platbu máš v maili. ProSapiens`}
+            predvolenyText={`${posledny.klient.split(" ")[0]}, zapísal som ti ${nazovProduktu(posledny.nazov)}. QR na platbu máš v maili. ProSapiens`}
             maly
           />
           {onVypis && (

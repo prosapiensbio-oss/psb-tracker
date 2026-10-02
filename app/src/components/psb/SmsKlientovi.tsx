@@ -111,12 +111,23 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
     const oslovenie = meno.split(" ")[0];
     setText(
       predvolenyText
-        || textSms({ oslovenie, trener, datum: platba?.datum || datum, sMailom, odkaz: odkaz || undefined }),
+        || textSms({
+          oslovenie, trener, sMailom, odkaz: odkaz || undefined,
+          datum: platba?.datum || datum,
+          /**
+           * QR sľubuje len vtedy, keď na stránke naozaj bude. Stránka ho
+           * kreslí pri dlhu a pri dochodenom alebo prečerpanom balíčku
+           * (vtedy ponúkne ďalší za cenu toho posledného). Pri zostávajúcich
+           * hodinách nie je čo platiť — a správa, ktorá sľúbi QR a klient ho
+           * tam nenájde, je horšia než stručná.
+           */
+          sQr: !!platba || zostatok <= 0,
+        }),
     );
     // Závislosťou sú HODNOTY, nie objekt `platba`: nový literál pri každom
     // prekreslení rodiča by text preskladal aj uprostred písania.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [otvorene, meno, trener, sMailom, predvolenyText, platba?.datum, datum, odkaz]);
+  }, [otvorene, meno, trener, sMailom, predvolenyText, platba, zostatok, datum, odkaz]);
 
   const posli = async () => {
     setBezi(true); setHlaska("");

@@ -6,6 +6,7 @@ import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { normName } from "../../lib/psb/format";
 import { bindings } from "../../lib/bindings.server";
 import { nepriradene, porovnajPlatby, smieSaZapamatat, vzorPlatby, type FioRiadok, type Platba } from "../../lib/psb/platbyEvidencia";
+import { balicekZPlatby } from "../../lib/psb/balicekZPlatby";
 
 /**
  * Vlastná evidencia platieb: banka z výpisu, hotovosť zo zošita.
@@ -193,7 +194,25 @@ export const Route = createFileRoute("/api/platby")({
           }
           await DB.batch(prikazy);
           await audit(DB, { action: "platba-priradena", predmet: klient, neu: `${r.amount_czk} Kč · ${r.date.slice(0, 10)}`, actor: kto });
-          return Response.json({ ok: true, zapamatane: naucil });
+
+          /**
+           * BALÍČEK VZNIKÁ Z PENAZÍ, NIE ZO ZÁMERU.
+           *
+           * Jerry, 2. 10. 2026: „áno, dorob to." SMS s QR je ponuka; keby
+           * balíček vznikol pri jej odoslaní, klientovi by sa hneď ukázalo
+           * „Zbývá ti 6 h" a QR by zmizlo skôr, než zaplatí — a kto
+           * nezaplatí, nechá v appke balíček, ktorý nikdy nebol.
+           *
+           * Tu je ten správny okamih: peniaze dorazili. Appka len NAVRHNE,
+           * čo si klient zrejme kúpil; zapíše sa to až kliknutím.
+           */
+          const jehoBalicky = ((await DB.prepare(
+            "SELECT nazov, cena_czk, platnost_od, zrusene_at FROM balicky WHERE klient = ?1",
+          ).bind(klient).all().catch(() => ({ results: [] }))).results || []) as unknown as
+            { nazov: string; cena_czk: number | null; platnost_od: string; zrusene_at: string | null }[];
+          const navrh = balicekZPlatby({ suma: r.amount_czk, den: r.date.slice(0, 10), balicky: jehoBalicky });
+
+          return Response.json({ ok: true, zapamatane: naucil, navrh });
         }
 
         /**

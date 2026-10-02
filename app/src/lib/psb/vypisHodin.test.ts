@@ -242,7 +242,7 @@ describe("text pre klienta", () => {
     expect(t).toContain("Výpis hodín — Dan Kouřil");
     // Názov sa klientovi ukazuje v novom slovníku (Jerry, 29. 9. 2026);
     // v dátach zostáva pôvodný „OFF - 6h BEZ viazanosti" z PTmindera.
-    expect(t).toContain("Balíček 6 h · 6 h · do 28. 10. 2026");
+    expect(t).toContain("6h Balíček · 6 h · do 28. 10. 2026");
     expect(t).toContain("zostávalo 6 h · nezaplatené · 1. tréning");
     expect(t).toContain("Tréningov na nezaplatenom členstve: 1");
     expect(t).toContain("tréning 15:00 · Jerry");

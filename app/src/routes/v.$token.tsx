@@ -8,6 +8,7 @@ import { dlhKlienta, type BalicekDlh, type PlatbaDlh } from "../lib/psb/dlhKlien
 import { historiaPreMail } from "../lib/psb/historiaMail";
 import { klientStranka } from "../lib/psb/klientStranka";
 import { normName } from "../lib/psb/format";
+import { nazovProduktu } from "../lib/psb/nazvyProduktov";
 import { nastavenia, posliHistoriu } from "./api/mail-dopyty";
 import { dlhJednehoKlienta } from "../lib/psb/dlznici";
 import { loadData } from "../lib/psb/db.server";
@@ -117,17 +118,44 @@ export const Route = createFileRoute("/v/$token")({
         // Stránka ukazuje POSLEDNÝ balíček; celá história chodí mailom na vyžiadanie.
         const vypis = historiaPreMail(c.name, os, c, dnes, dalsi, false);
         const origin = new URL(request.url).origin;
+        /**
+         * QR JE NA STRÁNKE VŽDY, KEĎ JE ČO ZAPLATIŤ — a to sú dva prípady.
+         *
+         * Jerry, 2. 10. 2026: „pri POSLEDNÁ HODINA potrebujem QR, keď je nad
+         * rámec potrebuje QR… appka má sama ponúknuť ďalší balíček za cenu
+         * toho posledného."
+         *
+         *  1. **Má otvorený dlh** — suma je, čo dlží. (Daniela Šašinková.)
+         *  2. **Dochodil balíček alebo trénuje nad rámec a nedlží nič** —
+         *     suma je cena JEHO POSLEDNÉHO balíčka. Appka si ju nevymýšľa:
+         *     je to to, čo si naposledy kúpil. Keď sa má zmeniť, Jerry
+         *     nahodí nový balíček a SMS odíde z tej obrazovky.
+         *
+         * Hodiny nad rámec sa z nového balíčka odpíšu samy (`priebehBalickov`),
+         * takže sa na stránke píše, koľko mu po zaplatení naozaj zostane.
+         */
+        const poslednyBal = balicky
+          .filter((b) => !b.zrusene_at && (b.cena_czk || 0) > 0)
+          .sort((a, b) => b.platnost_od.localeCompare(a.platnost_od))[0];
+        const nadramec = (vypis.zostatok ?? 1) <= 0;
+        const suma = dlh.dlzi > 0 ? dlh.dlzi : (nadramec ? Math.round(poslednyBal?.cena_czk || 0) : 0);
+        const popisPlatby = dlh.dlzi > 0
+          ? dlh.popis
+          : nazovProduktu(poslednyBal?.nazov || "") || "Nový balíček";
+
         let qrUrl: string | undefined;
-        if (dlh.dlzi > 0) {
+        if (suma > 0) {
           // Do správy pre príjemcu ide MENO — podľa neho Kokpit platbu spáruje.
-          const o = qrObrazok(spayd({ suma: dlh.dlzi, vs: "", sprava: c.name, prijemca: DODAVATEL.meno }));
+          const o = qrObrazok(spayd({ suma, vs: "", sprava: c.name, prijemca: DODAVATEL.meno }));
           const bajty = new Uint8Array(o.data);
           let bin = "";
           for (let i = 0; i < bajty.length; i += 4096) bin += String.fromCharCode(...bajty.subarray(i, i + 4096));
           qrUrl = `data:${o.typ};base64,${btoa(bin)}`;
           vypis.platba = {
-            popis: dlh.popis,
-            suma: dlh.dlzi, ucet: DODAVATEL.ucet, sprava: c.name,
+            popis: popisPlatby,
+            suma, ucet: DODAVATEL.ucet, sprava: c.name,
+            // Koľko hodín mu po zaplatení naozaj zostane.
+            odpocet: dlh.dlzi > 0 ? 0 : Math.max(0, -(vypis.zostatok ?? 0)),
           };
         }
 

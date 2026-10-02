@@ -25,7 +25,7 @@ describe("historiaPreMail — automat skladá to isté, čo panel", () => {
     expect(v.os[0]).toMatchObject({ den: "2026-03-20", druh: "trening", popis: "tréning" });
     expect(v.os.some((b) => b.popis.startsWith("zaplatené 6 990"))).toBe(true);
     // Interné „OFF - 6h S viazanostou" ide klientovi ako „Předplatné 6 h".
-    expect(v.os.some((b) => b.popis === "Předplatné 6 h")).toBe(true);
+    expect(v.os.some((b) => b.popis === "6h Předplatné")).toBe(true);
   });
 
   it("je to úplná história so zaplatenou sumou a termínom", () => {
@@ -54,9 +54,9 @@ describe("popisPreKlienta", () => {
     // Pozor na smer: `vypisHodin` vracia riadky od najnovšieho. Hľadanie
     // z opačného konca našlo NAJSTARŠÍ balíček a stránka ukázala február.
     const os: Udalost[] = [
-      { den: "2026-02-15", druh: "balicekOd", popis: "Balíček 6 h", hodin: 6 },
+      { den: "2026-02-15", druh: "balicekOd", popis: "6h Balíček", hodin: 6 },
       { den: "2026-02-18", druh: "trening", popis: "tréning · 08:30" },
-      { den: "2026-09-09", druh: "balicekOd", popis: "Balíček 8 h", hodin: 8 },
+      { den: "2026-09-09", druh: "balicekOd", popis: "8h Balíček", hodin: 8 },
       { den: "2026-09-15", druh: "trening", popis: "tréning · 08:30" },
     ] as unknown as Udalost[];
     const k = { packageRemaining: 7, packageTotal: 8, firstSession: "2026-02-15", sessions: [], primaryTrainer: "Jerry" };

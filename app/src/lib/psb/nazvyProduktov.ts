@@ -52,7 +52,9 @@ export function nazovProduktu(nazov: string): string {
   const kanal = m[1].toUpperCase();
   const druh = jePredplatne(raw) ? "Předplatné" : "Balíček";
   const kde = kanal === "ON" ? " online" : kanal === "TC" ? " TrueCoach" : "";
-  return `${druh} ${hodin} h${kde}`;
+  // Počet hodín VPREDU (Jerry, 2. 10. 2026: „6h Balíček", „6h Předplatné").
+  // Je to prvé, na čo sa človek pozerá — názov druhu je až druhá informácia.
+  return `${hodin}h ${druh}${kde}`;
 }
 
 /**
@@ -68,5 +70,5 @@ export function skupinaProduktu(nazov: string): string {
   if (!/^(OFF|ON|TC)\s*-\s*/i.test(raw)) return "Staršie členstvo";
   const hodin = hodinyZNazvu(raw);
   const druh = jePredplatne(raw) ? "Předplatné" : "Balíček";
-  return hodin ? `${druh} ${hodin} h` : druh;
+  return hodin ? `${hodin}h ${druh}` : druh;
 }

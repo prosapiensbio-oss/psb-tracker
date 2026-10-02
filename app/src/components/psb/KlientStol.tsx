@@ -1489,7 +1489,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
               {ponukniFakturu && onFaktura && (
                 <div style={{ margin: "0 0 10px", padding: "9px 11px", borderRadius: 9, border: `1px solid ${mix(C.accentLight, 40)}`, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
                   <span style={{ fontSize: 12.5, color: C.text }}>
-                    Nahodený <b>{ponukniFakturu.nazov}</b>{ponukniFakturu.cena ? ` za ${fmtCZK(ponukniFakturu.cena)}` : ""}. Chceš naň faktúru?
+                    Nahodený <b>{nazovProduktu(ponukniFakturu.nazov)}</b>{ponukniFakturu.cena ? ` za ${fmtCZK(ponukniFakturu.cena)}` : ""}. Chceš naň faktúru?
                   </span>
                   <button
                     onClick={() => { onFaktura({ klient: meno, popis: ponukniFakturu.nazov, cena: ponukniFakturu.cena, balicekId: ponukniFakturu.id }); setPonukniFakturu(null); }}
@@ -1522,7 +1522,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
                   <div style={riadok}>
                     <span style={stlpecDen}>{denVTyzdni(b.platnost_od)} {fmtDMY(b.platnost_od)}</span>
                     <span style={{ flex: 1 }}>
-                      {b.nazov}
+                      {nazovProduktu(b.nazov)}
                       <span style={{ color: C.textDim }}>
                         {b.hodiny ? ` · ${b.hodiny} h` : ""}
                         {b.platnost_do ? ` · do ${fmtDMY(b.platnost_do)}` : ""}

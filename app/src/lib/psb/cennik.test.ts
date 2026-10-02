@@ -8,7 +8,7 @@ describe("cenník", () => {
     // Jerry, 29. 9. 2026: „nemôže to byť bez viazanosti a s viazanosťou, ale
     // Balíček a Předplatné." Staré názvy chodia ďalej z PTmindera; `nazovProduktu`
     // ich prekladá na tieto, takže sa slovník zjednotí sám.
-    for (const n of ["Balíček 6 h", "Předplatné 6 h", "Balíček 8 h", "Balíček 18 h", "Doplnenie členstva"]) {
+    for (const n of ["6h Balíček", "6h Předplatné", "8h Balíček", "18h Balíček", "Doplnenie členstva"]) {
       expect(CENNIK.some((s) => s.nazov === n)).toBe(true);
     }
     expect(CENNIK.some((s) => /viazanost/i.test(s.nazov))).toBe(false);

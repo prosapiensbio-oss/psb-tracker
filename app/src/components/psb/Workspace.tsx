@@ -1,6 +1,7 @@
 import { oznam, pocuvaj } from "../../lib/psb/obnovaSignal";
 import { doSchranky } from "../../lib/psb/kopirovanie";
-import { normName } from "../../lib/psb/format";
+import { fmtCZK, fmtDMY, normName } from "../../lib/psb/format";
+import { SmsKlientovi } from "./SmsKlientovi";
 import { AnamnezaPanel } from "./AnamnezaPanel";
 import { podlaKlienta, type PodlaKlienta } from "../../lib/psb/sporneKonanie";
 import { nazovProduktu } from "../../lib/psb/nazvyProduktov";
@@ -84,6 +85,16 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   /** Otvorená anamnéza v karte Anamnézy. Prázdne = zoznam. */
   const [anamnezaOtvorena, setAnamnezaOtvorena] = useState("");
   /** Archív anamnéz je zložený; otvorí sa klikom a dá sa v ňom hľadať. */
+  /**
+   * Čo appka ponúkne zapísať po priradení platby.
+   *
+   * Jerry, 2. 10. 2026: balíček nemá vznikať pri odoslaní SMS (to je ponuka),
+   * ale keď dorazia peniaze. Návrh skladá `balicekZPlatby`; zapíše sa až
+   * kliknutím — appka si hodiny nevymýšľa.
+   */
+  const [ponukaBalicka, setPonukaBalicka] = useState<
+    { klient: string; nazov: string; hodiny: number | null; cena: number; platnostOd: string; platnostDo: string | null; preco: string } | null
+  >(null);
   const [archivOtvoreny, setArchivOtvoreny] = useState(false);
   const [hladanieArchivu, setHladanieArchivu] = useState("");
   /** Zakladá sa nová — vyhľadávanie klienta. */
@@ -507,6 +518,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
     // Register na Dnes drží vlastnú kópiu kalendára — bez oznámenia by
     // vybavená zmena svietila ďalej (kontrola 24. 9. 2026).
     oznam(url.includes("platby") ? "peniaze" : "kalendar");
+    return j as { navrh?: typeof ponukaBalicka } | undefined;
   };
 
   /**
@@ -972,7 +984,10 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                           {!delenie && (
                             <>
                               <input list="ws-klienti" value={t} onChange={(e) => nastavText(kluc, e.target.value)} placeholder="komu patrí…" style={vstup(!!t && !mena.includes(t))} />
-                              <button onClick={() => void vybav(kluc, "/api/platby", { akcia: "priradz", fioId: p.fioId, klient: t.trim(), zapamataj: true })} disabled={pracujem === kluc || t.trim().length < 3} style={hlavne(t.trim().length >= 3)}>
+                              <button onClick={() => void (async () => {
+                                const j = await vybav(kluc, "/api/platby", { akcia: "priradz", fioId: p.fioId, klient: t.trim(), zapamataj: true });
+                                if (j?.navrh) setPonukaBalicka({ ...j.navrh, klient: t.trim() });
+                              })()} disabled={pracujem === kluc || t.trim().length < 3} style={hlavne(t.trim().length >= 3)}>
                                 {pracujem === kluc ? "…" : "Priradiť"}
                               </button>
                               {/* Jeden prevod, dvaja klienti — Jerry, 28. 9. 2026: „15 580
@@ -1188,6 +1203,44 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
               </div>
             </div>
             <datalist id="ws-klienti">{mena.map((m) => <option key={m} value={m} />)}</datalist>
+            {/* PONUKA BALÍČKA PO PRIRADENÍ PLATBY.
+                Peniaze dorazili — appka navrhne, čo si klient zrejme kúpil,
+                a zapíše to až na kliknutie. Vedľa toho rovno SMS, nech sa
+                nemusí chodiť na stôl klienta. */}
+            {ponukaBalicka && (
+              <div style={{ marginTop: 12, padding: "12px 14px", borderRadius: 10, background: mix(C.green, 10), border: `1px solid ${mix(C.green, 40)}` }}>
+                <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6 }}>
+                  Platba sedí s <b>{ponukaBalicka.nazov}</b>
+                  {ponukaBalicka.hodiny != null ? ` · ${ponukaBalicka.hodiny} h` : ""} za {fmtCZK(ponukaBalicka.cena)}
+                  {" "}<span style={{ color: C.textDim }}>({ponukaBalicka.preco})</span>. Zapísať ho {ponukaBalicka.klient}?
+                </div>
+                <div style={{ display: "flex", gap: 8, marginTop: 9, flexWrap: "wrap", alignItems: "center" }}>
+                  <button
+                    onClick={() => void (async () => {
+                      const j = await posli("/api/balicky", {
+                        akcia: "pridaj", klient: ponukaBalicka.klient, nazov: ponukaBalicka.nazov,
+                        hodiny: ponukaBalicka.hodiny ?? "", platnostOd: ponukaBalicka.platnostOd,
+                        platnostDo: ponukaBalicka.platnostDo || "", cenaCzk: ponukaBalicka.cena,
+                      }).catch(() => ({ ok: false, error: "spojenie" }));
+                      if (!j.ok) { setChyba(j.error || "Balíček sa nepodarilo zapísať."); return; }
+                      setHlaska(`Zapísané: ${ponukaBalicka.nazov} pre ${ponukaBalicka.klient}.`);
+                      setPonukaBalicka(null);
+                      oznam("peniaze");
+                    })()}
+                    style={{ ...tlacidloKarty, borderColor: mix(C.green, 45), color: C.green, fontWeight: 600 }}
+                  >Zapísať balíček</button>
+                  <SmsKlientovi
+                    meno={ponukaBalicka.klient}
+                    trener={clients[ponukaBalicka.klient]?.primaryTrainer || ""}
+                    datum={fmtDMY(ponukaBalicka.platnostOd)}
+                    maly
+                  />
+                  <button onClick={() => setPonukaBalicka(null)} style={{ background: "none", border: "none", color: C.textDim, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>
+                    nie, nezapisovať
+                  </button>
+                </div>
+              </div>
+            )}
             {chyba && <div style={{ fontSize: 12, color: C.red, marginTop: 10 }}>{chyba}</div>}
             {hlaska && <div style={{ fontSize: 12, color: C.green, marginTop: 10 }}>{hlaska}</div>}
           </Card>
