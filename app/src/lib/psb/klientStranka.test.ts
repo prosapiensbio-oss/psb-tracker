@@ -180,3 +180,23 @@ describe("platba na telefóne", () => {
     expect(klientStranka({ ...zaklad2, platba, qrUrl: "data:image/gif;base64,AAA" })).not.toContain("<script");
   });
 });
+
+describe("prečo balíček nezačína na plnom počte", () => {
+  it("stránka to povie klientovi, nielen trénerovi", () => {
+    // Jerry, 2. 10. 2026: „znovu mi tam je předplatné 6 hodin, chybí tam 5 h,
+    // tá bola kedy?" Vysvetlenie bolo len na internej obrazovke.
+    const h = klientStranka({
+      klient: "Lukas Hanus", oslovenie: "Lukas", trener: "Jerry",
+      os: [
+        { den: "2026-09-09", popis: "Předplatné 6 h", druh: "balicekOd", zostatok: null, dlh: null, prevzate: 2 },
+        { den: "2026-09-09", cas: "16:00", popis: "tréning", druh: "trening", zostatok: 4, dlh: null },
+      ],
+      zostatok: 4, hodinSpolu: 1, odkedy: "2026-09-09", dnes: "2026-10-02",
+    } as never);
+    expect(h).toContain("2 h padly na starší tréninky");
+  });
+
+  it("keď balíček nič nepreberal, veta tam nie je", () => {
+    expect(klientStranka(zaklad)).not.toContain("padly na starší tréninky");
+  });
+});

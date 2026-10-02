@@ -78,6 +78,7 @@ export function historiaPreMail(
       druh: r.druh as "balicekOd" | "trening" | "platba",
       zostatok: r.zostatok,
       dlh: r.dlh,
+      prevzate: r.prevzate,
     }));
   return {
     klient: meno,

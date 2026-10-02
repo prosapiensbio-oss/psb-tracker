@@ -177,6 +177,17 @@ function cisloBodu(b: BodOsi): string {
 
 const popisBodu = (b: BodOsi) => (b.druh === "trening" ? "trénink" : cesky(b.popis));
 
+/**
+ * „2 h padly na starší tréninky" — prečo balíček nezačína na plnom počte.
+ *
+ * Jerry, 2. 10. 2026: „znovu mi tam je předplatné 6 hodin, chybí tam 5 h,
+ * tá bola kedy?" Hodina nechýba: dve hodiny z balíčka zaplatili tréningy,
+ * ktoré predošlý balíček nepokryl. Klient to má vidieť rovnako ako tréner —
+ * inak mu stránka tvrdí 6 h a hneď pod tým 4.
+ */
+const poznamkaBodu = (b: BodOsi): string =>
+  b.prevzate ? `${b.prevzate} h padly na starší tréninky` : "";
+
 const denPlne = (b: BodOsi) =>
   `${DNI[new Date(`${b.den}T12:00:00Z`).getUTCDay()]} ${den(b.den)}${b.cas ? ` · ${b.cas}` : ""}`;
 
@@ -192,7 +203,8 @@ function osVodorovna(os: BodOsi[]): string {
     return `<div style="flex:0 0 120px;scroll-snap-align:start">${hlavicka}
 <div style="height:50px;display:flex;flex-direction:column;justify-content:flex-end;padding:0 10px 7px 0">
 <div style="font-size:12.5px;color:${jeMedznik(b) ? s.biela : s.text};line-height:1.25${jeMedznik(b) ? ";font-weight:700" : ""}">${esc(popisBodu(b))}</div>
-<div style="font-size:11px;color:${s.slabsia}">${esc(denPlne(b))}</div></div>
+<div style="font-size:11px;color:${s.slabsia}">${esc(denPlne(b))}</div>
+${poznamkaBodu(b) ? `<div style="font-size:10.5px;color:${s.minus};line-height:1.3;margin-top:2px">${esc(poznamkaBodu(b))}</div>` : ""}</div>
 <div style="height:14px;display:flex;align-items:center"><div style="width:${p}px;height:${p}px;border-radius:50%;background:${farbaBodu(b)}"></div></div>
 <div style="font-family:'Raleway',sans-serif;font-weight:700;font-size:14.5px;margin-top:9px;color:${b.dlh ? s.minus : s.text}">${esc(cislo)}</div></div>`;
   }).join("");
@@ -218,7 +230,8 @@ function osZvisla(os: BodOsi[]): string {
 <div style="width:2px;flex:1;background:${posledny ? "transparent" : s.ramik}"></div></div>
 <div style="flex:1;padding-left:15px">
 <div style="font-size:14.5px;color:${jeMedznik(b) ? s.biela : s.text};line-height:1.3${jeMedznik(b) ? ";font-weight:700" : ""}">${esc(popisBodu(b))}</div>
-<div style="font-size:11.5px;color:${s.slabsia}">${esc(denPlne(b))}</div></div></div>`;
+<div style="font-size:11.5px;color:${s.slabsia}">${esc(denPlne(b))}</div>
+${poznamkaBodu(b) ? `<div style="font-size:11px;color:${s.minus};line-height:1.35">${esc(poznamkaBodu(b))}</div>` : ""}</div></div>`;
   }).join("");
 }
 

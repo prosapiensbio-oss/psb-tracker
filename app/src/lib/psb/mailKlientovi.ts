@@ -61,6 +61,15 @@ export type BodOsi = {
   zostatok?: number | null;
   /** Koľkátý tréning bez krytia — kreslí sa ako −1, −2. */
   dlh?: number | null;
+  /**
+   * Koľko hodín si balíček odpísal za staršie tréningy hneď pri vzniku.
+   *
+   * Jerry, 2. 10. 2026 druhý raz nad Hanusom: „znovu mi tam je predplatné
+   * 6 hodín, chýba tam 5 h, tá bola kedy?" Vysvetlenie som vtedy pridal len
+   * na internú obrazovku — na stránku pre klienta a do mailu sa nedostalo,
+   * takže skok zo 6 na 4 ďalej vyzeral ako chyba.
+   */
+  prevzate?: number;
 };
 
 export type VypisKlienta = {
@@ -311,6 +320,7 @@ export function mailKlientovi(v: VypisKlienta): { predmet: string; text: string;
       <td style="padding:0 0 ${posledna ? 0 : 13}px 6px">
         <div style="font-size:14px;color:${velka ? F.biela : F.text};line-height:1.35">${esc(b.popis)}</div>
         ${b.den ? `<div style="font-size:12px;color:${F.slabsia};line-height:1.35">${denKratko(b.den)}${b.cas ? ` · ${esc(b.cas)}` : ""}</div>` : ""}
+        ${b.prevzate ? `<div style="font-size:11.5px;color:${F.minus};line-height:1.35">${b.prevzate} h padly na starší tréninky</div>` : ""}
       </td>
       <td width="56" valign="top" style="padding:0 0 ${posledna ? 0 : 13}px 8px;text-align:right;font-size:14px;color:${F.text};white-space:nowrap">${cislo}</td>
     </tr>`;
