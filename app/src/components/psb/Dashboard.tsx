@@ -28,6 +28,7 @@ import { objednaneVerzia,
 } from "../../lib/psb/compute";
 import { fmtCZK, fmtDMY, monthLabel, normName, weekKey, weekLabel, kedyStrucne } from "../../lib/psb/format";
 import { SmsKlientovi } from "./SmsKlientovi";
+import { hodinyBezBalicka } from "../../lib/psb/hodinyBezBalicka";
 import { C, mix, S, badge, btn } from "../../lib/psb/theme";
 import { Balicky, odtrenovaneMimoExportu, type KalUdalost } from "./Kalendar";
 import { jeKlient } from "./MarketingLievik";
@@ -1344,6 +1345,33 @@ export function Dashboard({
    * Nezaplatené poplatky. Filtruje sa podľa prepínača trénera rovnako ako
    * zvyšok karty — inak by Terezka videla Jerryho dlžníkov a naopak.
    */
+  /**
+   * HODINY, KTORÉ NEKRYJE ŽIADNY BALÍČEK.
+   *
+   * Jerry, 2. 10. 2026: „to by znamenalo, že klientom dávam zadarmo
+   * tréningy." Prečerpané hodiny sa z ďalšieho balíčka odpíšu samy — keď si
+   * ho klient kúpi. Kto si ho nekúpil, visel doteraz mimo appky: z karty
+   * „Balíček dojde" vypadol, lebo tá stojí na OBJEDNANÝCH termínoch, a kto
+   * dochodil a nič si nedohodol, v nej nie je.
+   *
+   * Filtruje sa trénerom ako zvyšok dashboardu.
+   */
+  const bezBalicka = useMemo(
+    () => hodinyBezBalicka(
+      Object.keys(clients).filter((m) => matchT(clients[m]?.primaryTrainer)),
+      {
+        sessions: data.sessions as never, payments: data.payments as never,
+        packages: (data.packages || []) as never, services: (data.services || []) as never,
+        poplatky: (data.poplatky || []) as never, treningyZdarma: (data.treningyZdarma || []) as never,
+        doplneniaHodiny: data.doplneniaHodiny || {},
+        kalUdalosti: kalendar as never,
+      },
+      (m) => clients[m]?.primaryTrainer || "",
+    ),
+    [clients, data.sessions, data.payments, data.packages, data.services, data.poplatky, data.treningyZdarma, data.doplneniaHodiny, kalendar, matchT],
+  );
+  const bezBalickaHodin = useMemo(() => bezBalicka.reduce((a, x) => a + x.hodin, 0), [bezBalicka]);
+
   const nezaplatene = useMemo(
     () => (data.poplatky || []).filter((p) => {
       const c = clients[p.klient];
@@ -1702,6 +1730,40 @@ export function Dashboard({
                   >
                     ×
                   </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* HODINY BEZ BALÍČKA — klient trénoval nad rámec a nový si nekúpil.
+            Sedí NAD nezaplatenými zámerne: tam ide o peniaze, ktoré už majú
+            doklad, tu o hodiny, ktoré ho ešte nemajú. */}
+        {bezBalicka.length > 0 && (
+          <div style={{ marginTop: 18 }}>
+            <H3 style={{ marginBottom: 8 }}>
+              <Info
+                text="Tréningy, ktoré neodkryl žiadny balíček. Prečerpané hodiny sa z ďalšieho balíčka odpíšu samy — hneď ako si ho klient kúpi. Tu sú tí, ktorí si ho zatiaľ nekúpili, takže tie hodiny visia. Ráta sa len od posledného známeho balíčka (PTminder ich vyváža až od marca 2026) a len za posledných 90 dní — kto odišiel pred rokom, je strata, nie úloha. Títo ľudia zároveň nie sú v karte „Balíček dojde“: tá stojí na objednaných termínoch a kto dochodil a nič si nedohodol, v nej nie je."
+                label={<>Hodiny bez balíčka ({bezBalicka.length}) · <span style={{ color: C.orange }}>{bezBalickaHodin} h</span></>}
+              />
+            </H3>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 8 }}>
+              {bezBalicka.map((b) => (
+                <div key={b.klient} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 10px", background: mix(C.text, 4), border: `1px solid ${C.border}`, borderRadius: 9, width: "100%", minWidth: 0 }}>
+                  <span style={{ ...badge("orange"), fontSize: 10, flexShrink: 0, whiteSpace: "nowrap" }}>−{b.hodin} h</span>
+                  <button
+                    onClick={() => onNavigate("klienti", undefined, { client: b.klient, nonce: Date.now() })}
+                    title={`Posledný balíček ${fmtDMY(b.balicek)}`}
+                    style={{ flex: 1, minWidth: 0, background: "none", border: "none", padding: 0, textAlign: "left", cursor: "pointer" }}
+                  >
+                    <span style={{ fontSize: 13, color: C.text, fontWeight: 500, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.klient}</span>
+                    <span style={{ fontSize: 11, color: C.textDim, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      od {fmtDMY(b.odKedy)}{b.trener ? ` · ${b.trener}` : ""}
+                    </span>
+                  </button>
+                  {/* Text SMS sa skladá sám zo zostatku — pri mínuse povie
+                      „máš N hodín nad rámec balíčka", nie „zostávajú ti". */}
+                  <SmsKlientovi meno={b.klient} zostatok={-b.hodin} trener={b.trener} maly />
                 </div>
               ))}
             </div>
