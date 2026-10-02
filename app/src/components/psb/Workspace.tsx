@@ -8,7 +8,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { navrhniKlientaKandidati, type ClientAgg } from "../../lib/psb/compute";
 import { krokGesta, krokSvihu, novyStavGesta, novyStavSvihu, zacniSvih } from "../../lib/psb/gestoKariet";
-import { BEZ_FRONTY, klucPolozky, popisZmeny, postavKarty, trenerZPrihlasenia, type AnamnezaRiadok, type Karta, type NeznamyNazov, type NepriradenaPlatba, type Zmena } from "../../lib/psb/workspaceKarty";
+import { BEZ_FRONTY, klucPolozky, popisZmeny, postavKarty, rozdelAnamnezy, trenerZPrihlasenia, type AnamnezaRiadok, type Karta, type NeznamyNazov, type NepriradenaPlatba, type Zmena } from "../../lib/psb/workspaceKarty";
 import { bezAktivnehoBalicka, treningyZObochZdrojov, vMinuseKlienta, type BezBalicka } from "../../lib/psb/bezBalicka";
 import { dlznici as spocitajDlznikov, type Dlznik } from "../../lib/psb/dlznici";
 import { zostavaPoPlatnosti, type ZostavaPoPlatnosti } from "../../lib/psb/platnostZostatok";
@@ -83,6 +83,9 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   const [anamnezaPre, setAnamnezaPre] = useState<string | null>(null);
   /** Otvorená anamnéza v karte Anamnézy. Prázdne = zoznam. */
   const [anamnezaOtvorena, setAnamnezaOtvorena] = useState("");
+  /** Archív anamnéz je zložený; otvorí sa klikom a dá sa v ňom hľadať. */
+  const [archivOtvoreny, setArchivOtvoreny] = useState(false);
+  const [hladanieArchivu, setHladanieArchivu] = useState("");
   /** Zakladá sa nová — vyhľadávanie klienta. */
   const [novaAnamneza, setNovaAnamneza] = useState(false);
   const [hladanieAnamnezy, setHladanieAnamnezy] = useState("");
@@ -744,64 +747,112 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                     style={{ ...tlacidloKarty, borderColor: mix(C.green, 45), color: C.green, fontWeight: 600, marginBottom: 12 }}
                   >+ Nová anamnéza</button>
 
-                  {k.polozky.length === 0 && (
-                    <div style={{ fontSize: 12.5, color: C.textDim, lineHeight: 1.6 }}>
-                      Zatiaľ žiadna anamnéza. Klient, ktorý ide na úvodný tréning, sa tu objaví sám —
-                      alebo ju rovno založ tlačidlom vyššie.
-                    </div>
-                  )}
-
-                  {k.polozky.map((a) => {
-                    const den = (a.uvodny || "").slice(0, 10);
-                    const kedy = den ? `${Number(den.slice(8))}. ${Number(den.slice(5, 7))}.` : "";
-                    const stavText = a.zapisAt ? "hotová"
-                      : a.klientVyplnilAt ? "klient vyplnil — chýba zápis"
-                        : a.odkaz ? "čaká na klienta" : "odkaz ešte nemá";
-                    const farba = a.zapisAt ? C.green : a.klientVyplnilAt ? C.accentLight : C.textMuted;
+{(() => {
+                    /* Riadok sa kreslí raz a používa sa na karte aj v archíve.
+                       Dve kópie by sa rozišli pri prvej zmene tlačidiel. */
+                    const riadokAnamnezy = (a: AnamnezaRiadok) => {
+                        const den = (a.uvodny || "").slice(0, 10);
+                        const kedy = den ? `${Number(den.slice(8))}. ${Number(den.slice(5, 7))}.` : "";
+                        const stavText = a.zapisAt ? "hotová"
+                          : a.klientVyplnilAt ? "klient vyplnil — chýba zápis"
+                            : a.odkaz ? "čaká na klienta" : "odkaz ešte nemá";
+                        const farba = a.zapisAt ? C.green : a.klientVyplnilAt ? C.accentLight : C.textMuted;
+                        return (
+                          <div key={a.klient} style={{ padding: "10px 0", borderBottom: `1px solid ${mix(C.border, 45)}` }}>
+                            <div style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
+                              <button
+                                onClick={() => setAnamnezaOtvorena(a.klient)}
+                                style={{ background: "none", border: "none", padding: 0, color: C.text, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
+                              >{a.klient}</button>
+                              {kedy && (
+                                <span style={{ fontSize: 11.5, color: a.uzBol ? C.textDim : C.orange }}>
+                                  úvodný {a.uzBol ? "bol" : "bude"} {kedy}
+                                </span>
+                              )}
+                              {a.trener && <span style={{ fontSize: 11.5, color: C.textDim }}>· {a.trener}</span>}
+                              <div style={{ flexGrow: 1 }} />
+                              <span style={{ fontSize: 11.5, color: farba }}>{stavText}</span>
+                            </div>
+                            <div style={{ display: "flex", gap: 7, marginTop: 7, flexWrap: "wrap" }}>
+                              {!a.klientVyplnilAt && (
+                                <button
+                                  onClick={() => void (async () => {
+                                    let url = a.odkaz;
+                                    if (!url) {
+                                      const r = await fetch("/api/anamneza", {
+                                        method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+                                        body: JSON.stringify({ akcia: "odkaz", klient: a.klient }),
+                                      }).then((x) => x.json()).catch(() => null) as { ok?: boolean; odkaz?: string } | null;
+                                      if (!r?.ok || !r.odkaz) { setChyba("Odkaz sa nepodarilo vyrobiť."); return; }
+                                      url = r.odkaz;
+                                      await nacitajAnamnezy();
+                                    }
+                                    const ok = await doSchranky(url);
+                                    setChyba(ok ? "" : "Skopíruj odkaz ručne — schránka odmietla.");
+                                    if (ok) { setHlaska(`Odkaz pre ${a.klient} je v schránke.`); setTimeout(() => setHlaska(""), 2500); }
+                                  })()}
+                                  style={{ ...tlacidloKarty, borderColor: mix(C.green, 45), color: C.green }}
+                                >{a.odkaz ? "Kopírovať odkaz" : "Vyrobiť odkaz"}</button>
+                              )}
+                              <button onClick={() => setAnamnezaOtvorena(a.klient)} style={tlacidloKarty}>
+                                {a.zapisAt ? "Otvoriť" : "Vyplniť"}
+                              </button>
+                            </div>
+                          </div>
+                        );
+                    };
+                    const { aktualne, archiv } = rozdelAnamnezy(k.polozky as AnamnezaRiadok[], new Date().toISOString().slice(0, 10));
+                    const najdene = archiv.filter((a) => normName(a.klient).includes(normName(hladanieArchivu)));
                     return (
-                      <div key={a.klient} style={{ padding: "10px 0", borderBottom: `1px solid ${mix(C.border, 45)}` }}>
-                        <div style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
-                          <button
-                            onClick={() => setAnamnezaOtvorena(a.klient)}
-                            style={{ background: "none", border: "none", padding: 0, color: C.text, fontSize: 14, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" }}
-                          >{a.klient}</button>
-                          {kedy && (
-                            <span style={{ fontSize: 11.5, color: a.uzBol ? C.textDim : C.orange }}>
-                              úvodný {a.uzBol ? "bol" : "bude"} {kedy}
-                            </span>
-                          )}
-                          {a.trener && <span style={{ fontSize: 11.5, color: C.textDim }}>· {a.trener}</span>}
-                          <div style={{ flexGrow: 1 }} />
-                          <span style={{ fontSize: 11.5, color: farba }}>{stavText}</span>
-                        </div>
-                        <div style={{ display: "flex", gap: 7, marginTop: 7, flexWrap: "wrap" }}>
-                          {!a.klientVyplnilAt && (
+                      <>
+                        {aktualne.length === 0 && (
+                          <div style={{ fontSize: 12.5, color: C.textDim, lineHeight: 1.6, paddingBottom: 4 }}>
+                            Nikto nečaká. Klient, ktorý ide na úvodný tréning, sa tu objaví sám.
+                          </div>
+                        )}
+                        {aktualne.map(riadokAnamnezy)}
+
+                        {/* ARCHÍV. Jerry, 2. 10. 2026: „staré anamnézy zabaľ do
+                            archívu." Karta mala 57 riadkov a všetky hotové —
+                            v takom zozname sa to jedno meno, na ktorom dnes
+                            záleží, nedá nájsť. Nič sa nemaže ani neskrýva:
+                            je to jeden klik a dá sa v ňom hľadať. */}
+                        {archiv.length > 0 && (
+                          <div style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${mix(C.border, 60)}` }}>
                             <button
-                              onClick={() => void (async () => {
-                                let url = a.odkaz;
-                                if (!url) {
-                                  const r = await fetch("/api/anamneza", {
-                                    method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
-                                    body: JSON.stringify({ akcia: "odkaz", klient: a.klient }),
-                                  }).then((x) => x.json()).catch(() => null) as { ok?: boolean; odkaz?: string } | null;
-                                  if (!r?.ok || !r.odkaz) { setChyba("Odkaz sa nepodarilo vyrobiť."); return; }
-                                  url = r.odkaz;
-                                  await nacitajAnamnezy();
-                                }
-                                const ok = await doSchranky(url);
-                                setChyba(ok ? "" : "Skopíruj odkaz ručne — schránka odmietla.");
-                                if (ok) { setHlaska(`Odkaz pre ${a.klient} je v schránke.`); setTimeout(() => setHlaska(""), 2500); }
-                              })()}
-                              style={{ ...tlacidloKarty, borderColor: mix(C.green, 45), color: C.green }}
-                            >{a.odkaz ? "Kopírovať odkaz" : "Vyrobiť odkaz"}</button>
-                          )}
-                          <button onClick={() => setAnamnezaOtvorena(a.klient)} style={tlacidloKarty}>
-                            {a.zapisAt ? "Otvoriť" : "Vyplniť"}
-                          </button>
-                        </div>
-                      </div>
+                              onClick={() => setArchivOtvoreny((p) => !p)}
+                              style={{ background: "none", border: "none", padding: 0, color: C.textMuted, fontSize: 12.5, cursor: "pointer", fontFamily: "inherit" }}
+                            >
+                              <span style={{ display: "inline-block", width: 13, fontSize: 9 }}>{archivOtvoreny ? "▼" : "▶"}</span>
+                              Archív ({archiv.length})
+                            </button>
+                            {archivOtvoreny && (
+                              <div style={{ marginTop: 9 }}>
+                                <input
+                                  value={hladanieArchivu}
+                                  onChange={(e) => setHladanieArchivu(e.target.value)}
+                                  placeholder="hľadať v archíve…"
+                                  style={{
+                                    width: "100%", boxSizing: "border-box", padding: "7px 10px", borderRadius: 8, fontSize: 12.5,
+                                    border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontFamily: "inherit",
+                                  }}
+                                />
+                                {najdene.length === 0 && (
+                                  <div style={{ fontSize: 12, color: C.textDim, marginTop: 9 }}>Nikto taký v archíve nie je.</div>
+                                )}
+                                {najdene.slice(0, 40).map(riadokAnamnezy)}
+                                {najdene.length > 40 && (
+                                  <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 8 }}>
+                                    …a ďalších {najdene.length - 40}. Napíš meno, nájde sa.
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </>
                     );
-                  })}
+                  })()}
                 </div>
               ))}
               {k.druh === "zmeny" && k.polozky.map((z) => {

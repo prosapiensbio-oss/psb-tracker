@@ -1,7 +1,7 @@
 // Workspace — jedna karta = jeden DRUH práce, a patrí tomu, kto je prihlásený.
 import { describe, expect, it } from "bun:test";
 
-import { BEZ_FRONTY, popisZmeny, postavKarty, type Zmena } from "./workspaceKarty";
+import { BEZ_FRONTY, popisZmeny, postavKarty, type Zmena, rozdelAnamnezy, type AnamnezaRiadok } from "./workspaceKarty";
 
 const zmena = (o: Partial<Zmena> & { id: string; trener: string }): Zmena => ({
   id: o.id, druh: o.druh ?? "zrusene", klient: o.klient ?? "Martin Vaško", nazov: null,
@@ -174,5 +174,43 @@ describe("čie veci sa ukazujú", () => {
   it("null znamená všetko, undefined znamená „nechaj to na prihlásenie“", () => {
     expect(postav("Jerry", null).length).toBe(2);
     expect(postav("Jerry", undefined).length).toBe(1);
+  });
+});
+
+describe("rozdelAnamnezy", () => {
+  const r = (klient: string, uvodny: string | null, zapisAt: string | null = "2026-09-01"): AnamnezaRiadok => ({
+    klient, trener: "Terezka", uvodny, stav: zapisAt ? "hotova" : "ceka",
+    odkaz: null, klientVyplnilAt: null, zapisAt, uzBol: false,
+  });
+
+  it("úvodný pred nami zostáva na karte", () => {
+    const { aktualne, archiv } = rozdelAnamnezy([r("Petr Baťa", "2026-10-05T17:00")], "2026-10-02");
+    expect(aktualne.map((x) => x.klient)).toEqual(["Petr Baťa"]);
+    expect(archiv).toHaveLength(0);
+  });
+
+  it("úvodný spred týždňa tiež — zápis sa píše PO tréningu", () => {
+    // Keby riadok zmizol o minútu po začiatku úvodného, stratil by sa presne
+    // vtedy, keď ho tréner potrebuje.
+    const { aktualne } = rozdelAnamnezy([r("Josef Pávek", "2026-09-28T09:00")], "2026-10-02");
+    expect(aktualne.map((x) => x.klient)).toEqual(["Josef Pávek"]);
+  });
+
+  it("starý úvodný ide do archívu", () => {
+    const { aktualne, archiv } = rozdelAnamnezy([r("Albert Matl", "2026-09-14T18:00")], "2026-10-02");
+    expect(aktualne).toHaveLength(0);
+    expect(archiv.map((x) => x.klient)).toEqual(["Albert Matl"]);
+  });
+
+  it("nedokončená zostáva navrchu bez ohľadu na dátum", () => {
+    const { aktualne } = rozdelAnamnezy([r("Stará Rozrobená", "2025-03-01T10:00", null)], "2026-10-02");
+    expect(aktualne.map((x) => x.klient)).toEqual(["Stará Rozrobená"]);
+  });
+
+  it("anamnéza bez úvodného v kalendári a hotová patrí do archívu", () => {
+    // 56 doimportovaných z roku 2025 nemá v kalendári nič.
+    const { aktualne, archiv } = rozdelAnamnezy([r("Dávny Klient", null)], "2026-10-02");
+    expect(aktualne).toHaveLength(0);
+    expect(archiv).toHaveLength(1);
   });
 });

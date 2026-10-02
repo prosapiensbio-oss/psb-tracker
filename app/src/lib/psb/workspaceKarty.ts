@@ -326,3 +326,41 @@ export function klucPolozky(
   if (druh === "anamnezy") return `anamnezy|${(p as AnamnezaRiadok).klient}`;
   return `platby|${(p as NepriradenaPlatba).fioId}`;
 }
+
+/**
+ * ČO PATRÍ NA KARTU A ČO DO ARCHÍVU.
+ *
+ * Jerry, 2. 10. 2026: „staré anamnézy zabaľ do archívu a aktuálne, teda tie,
+ * ktoré majú dohodnutý úvodný, nech sú na karte zobrazené."
+ *
+ * Karta mala 57 riadkov a všetky hotové — zoznam, v ktorom sa to jedno meno,
+ * na ktorom dnes záleží, nedá nájsť. Archív sa nemaže ani neskrýva, len sa
+ * zloží; otvorí sa jedným klikom a dá sa v ňom hľadať.
+ *
+ * OKNO SIAHA AJ DOZADU, nie len dopredu. Zápis sa píše PO tréningu, nie
+ * pred ním: keby sa riadok stratil o minútu po začiatku úvodného, zmizol by
+ * presne vtedy, keď ho tréner potrebuje. Štrnásť dní je dosť na to, aby sa
+ * k nemu stihol vrátiť, a málo na to, aby sa karta znova zaplnila.
+ *
+ * Nedokončená anamnéza zostáva navrchu VŽDY, bez ohľadu na dátum — čaká
+ * na človeka a to je presne to, čo karta ukazuje.
+ */
+export const DNI_PO_UVODNOM = 14;
+
+export function rozdelAnamnezy(
+  riadky: AnamnezaRiadok[],
+  dnes: string,
+): { aktualne: AnamnezaRiadok[]; archiv: AnamnezaRiadok[] } {
+  const hranica = new Date(`${dnes}T00:00:00Z`);
+  hranica.setUTCDate(hranica.getUTCDate() - DNI_PO_UVODNOM);
+  const od = hranica.toISOString().slice(0, 10);
+
+  const aktualne: AnamnezaRiadok[] = [];
+  const archiv: AnamnezaRiadok[] = [];
+  for (const r of riadky) {
+    const den = (r.uvodny || "").slice(0, 10);
+    const cerstvy = !!den && den >= od;
+    (cerstvy || !r.zapisAt ? aktualne : archiv).push(r);
+  }
+  return { aktualne, archiv };
+}
