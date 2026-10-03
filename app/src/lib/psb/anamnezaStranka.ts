@@ -43,10 +43,10 @@ const STYL = `
      nevšimnú. */
   .viem a{color:${F.slaba};text-decoration:none}
   .oprava{margin-top:9px}
-  .oprava summary{font-size:11.5px;color:${F.slaba};cursor:pointer;list-style:none}
+  .oprava summary{font-size:12.5px;color:${F.slaba};cursor:pointer;list-style:none}
   .oprava summary::-webkit-details-marker{display:none}
-  .oprava summary:after{content:" ›";opacity:.7}
-  .oprava[open] summary:after{content:" ×"}
+  .oprava summary u{color:${F.text};text-underline-offset:3px}
+  .oprava[open] summary:after{content:"×";margin-left:6px;opacity:.75}
   .oprava .poly{display:flex;flex-direction:column;gap:9px;margin-top:11px}
   .oprava label{display:block;font-size:11.5px;color:${F.slaba}}
   .oprava input{margin-top:4px}
@@ -141,7 +141,7 @@ export function strankaHtml(v: VstupStranky): string {
           <span>${[v.kontakt.email, v.kontakt.telefon].filter(Boolean).map(esc).join(" · ")}</span>
           ${v.uvodny ? `<br><span>úvodní trénink: ${esc(v.uvodny)}</span>` : ""}
           <details class="oprava">
-            <summary>Nesedí něco? Opravte nás.</summary>
+            <summary>Nesedí něco? <u>Opravte nás.</u></summary>
             <div class="poly">
               <label>Jméno a příjmení<input type="text" name="oprava_meno" value="${esc(v.klient)}" autocomplete="name"></label>
               <label>E-mail<input type="email" name="oprava_email" value="${esc(v.kontakt.email || "")}" autocomplete="email" inputmode="email"></label>

@@ -15,7 +15,12 @@ describe("údaje o klientovi na anamnéze", () => {
     // Jerry, 3. 10. 2026: „daj tam možnosť Nesedí něco? Opravte nás —
     // keď klikne, upraví to ten klient sám."
     const h = strankaHtml(z);
-    expect(h).toContain("Nesedí něco? Opravte nás.");
+    // Jerry, 3. 10. 2026: „polia tam nemusia byť dostupné, ale Opravte nás
+    // môže byť podčiarknuté a keď na to klikne, rozbalí sa to." Zabalené
+    // sú — `details` bez `open` — a podčiarknutie je jediné, čo o tom hovorí.
+    expect(h).toContain("Nesedí něco? <u>Opravte nás.</u>");
+    expect(h).toContain("<details class=\"oprava\">");
+    expect(h).not.toContain('<details class="oprava" open>');
     expect(h).toContain('name="oprava_meno"');
     expect(h).toContain('name="oprava_email"');
     expect(h).toContain('name="oprava_telefon"');
