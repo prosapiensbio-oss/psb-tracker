@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { chybaOdosielatela, cisloPreBranu, dlzkaSpravy, rodZMena, textSms, textSmsPlatba } from "./sms";
+import { chybaOdosielatela, cisloPreBranu, dlzkaSpravy, rodZMena, textSms, textSmsPlatba, bezDiakritiky } from "./sms";
 
 describe("cisloPreBranu", () => {
   it("české číslo bez predvoľby dostane +420", () => {
@@ -143,3 +143,14 @@ describe("chybaOdosielatela", () => {
   });
 });
 
+
+describe("žiadna správa klientovi nesmie mať diakritiku", () => {
+  it("jeden mäkčeň zráža limit zo 160 znakov na 70", () => {
+    // Jerry, 3. 10. 2026 si vypýtal všetky znenia pokope a vyšlo najavo,
+    // že správa o zapísanom balíčku ide ako DVE SMS — bola napísaná priamo
+    // v obrazovke Balíčky, mimo `textSms`, ktorý diakritiku odstraňuje sám.
+    const sMakcenmi = "Lukas, zapísal som ti 6h Předplatné. QR na platbu máš v maili. ProSapiens";
+    expect(dlzkaSpravy(sMakcenmi).sprav).toBe(2);
+    expect(dlzkaSpravy(bezDiakritiky(sMakcenmi)).sprav).toBe(1);
+  });
+});

@@ -1,6 +1,7 @@
 import { oznam } from "../../lib/psb/obnovaSignal";
 import { nazovProduktu } from "../../lib/psb/nazvyProduktov";
 import { SmsKlientovi } from "./SmsKlientovi";
+import { bezDiakritiky } from "../../lib/psb/sms";
 import { useCallback, useEffect, useState } from "react";
 
 import type { RiadokPorovnania } from "../../lib/psb/balickyEvidencia";
@@ -263,7 +264,12 @@ export function BalickyEvidencia({ mena, onFaktura, onVypis }: {
           )}
           <SmsKlientovi
             meno={posledny.klient}
-            predvolenyText={`${posledny.klient.split(" ")[0]}, zapísal som ti ${nazovProduktu(posledny.nazov)}. QR na platbu máš v maili. ProSapiens`}
+            /* BEZ DIAKRITIKY — jediná správa, ktorá ju mala. Jeden mäkčeň zráža
+                limit zo 160 znakov na 70, takže z nej boli DVE SMS namiesto
+                jednej; vyšlo to najavo 3. 10. 2026, keď si Jerry vypýtal
+                všetky znenia pokope. Ostatné idú cez `textSms`, ktorý
+                diakritiku odstraňuje sám. */
+            predvolenyText={bezDiakritiky(`${posledny.klient.split(" ")[0]}, zapísal som ti ${nazovProduktu(posledny.nazov)}. QR na platbu máš v maili. ProSapiens`)}
             maly
           />
           {onVypis && (
