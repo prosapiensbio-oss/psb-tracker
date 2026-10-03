@@ -199,9 +199,15 @@ function cisloBodu(b: BodOsi): string {
   const hodina = maHodinu(b)
     ? `<span>${esc(hod(b.zostatok as number))}</span>`
     : b.buduca != null ? `<span style="color:${s.tlmeny}">${esc(hod(b.buduca))}</span>` : "";
-  if (minus || hodina) return [minus, hodina].filter(Boolean).join(" ");
-  const m = /(\d[\d\s  ]*)\s*(Kč|h)\b/.exec(b.popis);
-  return m ? esc(`${m[1].trim()} ${m[2]}`) : "";
+  /**
+   * ČÍSLO PATRÍ LEN TRÉNINGU.
+   *
+   * Pri balíčku stálo vľavo „6 h" a hneď vedľa „6h Předplatné" — to isté
+   * dvakrát. Jerry, 3. 10. 2026: „tu je zbytočné 6h, pretože to je
+   * předplatné a je tam vidieť, že 4 h je 9. 9." Platba číslo nikdy nemala.
+   * Ľavý stĺpec je teda odpočet hodín a nič iné: 6, 5, 4, 3, 2, 1 a mínusy.
+   */
+  return [minus, hodina].filter(Boolean).join(" ");
 }
 
 const popisBodu = (b: BodOsi) => (b.druh === "trening" ? "trénink" : cesky(b.popis));

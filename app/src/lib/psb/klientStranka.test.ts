@@ -304,3 +304,22 @@ describe("odpočet hodín sa nepretrhne", () => {
     expect(sam).not.toContain("6 h</span>");
   });
 });
+
+describe("ľavý stĺpec je odpočet hodín a nič iné", () => {
+  it("balíček ani platba číslo nemajú — nesie ho ich názov", () => {
+    // Jerry, 3. 10. 2026: „tu je zbytočné 6h, pretože to je předplatné."
+    const h = klientStranka({
+      klient: "Kto Vie", oslovenie: "Kto", trener: "Jerry",
+      os: [
+        { den: "2026-09-09", popis: "6h Předplatné", druh: "balicekOd", zostatok: null, dlh: null },
+        { den: "2026-09-09", popis: "zaplaceno 6 990 Kč", druh: "platba", zostatok: null, dlh: null },
+        { den: "2026-09-12", cas: "16:00", popis: "tréning", druh: "trening", zostatok: 6, dlh: null },
+      ],
+      zostatok: 5, hodinSpolu: 1, odkedy: "2026-09-09", dnes: "2026-10-03",
+    } as never);
+    // Názov balíčka zostáva, číslo vedľa neho nie.
+    expect(h).toContain("6h Předplatné");
+    expect(h).not.toContain(">6 h</div>");
+    expect(h).toContain("<span>6 h</span>");
+  });
+});
