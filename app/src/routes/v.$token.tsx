@@ -118,10 +118,30 @@ export const Route = createFileRoute("/v/$token")({
         ).bind(c.name).all().catch(() => ({ results: [] }))).results || []) as unknown as
           { klient: string; trener: string; zaciatok: string; koniec: string; nazov: string; typ: string }[];
 
+        const balicky = ((await DB.prepare(
+          `SELECT klient, nazov, hodiny, cena_czk, platnost_od, platnost_do, zdroj, zrusene_at
+             FROM balicky WHERE klient = ?1`,
+        ).bind(c.name).all()).results || []) as unknown as {
+          klient: string; nazov: string; hodiny: number | null; cena_czk: number | null;
+          platnost_od: string; platnost_do: string | null; zdroj: string; zrusene_at: string | null;
+        }[];
+
+        /**
+         * BALÍČKY NAHODENÉ V KOKPITE PATRIA AJ NA KLIENTOVU OS.
+         *
+         * Jerry, 3. 10. 2026 nad Martinom Vaškom: „keď vymažem to členstvo,
+         * mal by sa rovno upraviť aj obsah odkazu." Stránka ich doteraz
+         * nečítala — stavala sa len z PTmindera — takže balíček zapísaný
+         * v Kokpite na nej nebol vidieť a jeho zmazanie s ňou nehlo. Od
+         * 1. 10. 2026 pritom všetky nové balíčky vznikajú práve tam.
+         *
+         * Dvojitý zápis toho istého predaja (ručne v Kokpite aj z exportu)
+         * spája `osCasuKlienta` podľa dňa a hodín, takže sa nezdvojí.
+         */
         const os = osCasuKlienta(c.name, {
           sessions: data.sessions, payments: data.payments, packages: data.packages,
           services: data.services, poplatky: data.poplatky, treningyZdarma: data.treningyZdarma,
-          doplneniaHodiny: data.doplneniaHodiny || {}, kalUdalosti,
+          doplneniaHodiny: data.doplneniaHodiny || {}, kalUdalosti, balicky,
         }, dnes);
         const dalsi = ((await DB.prepare(
           "SELECT MIN(zaciatok) z FROM kal_udalosti WHERE zmizla_at IS NULL AND klient = ?1 AND typ IN ('trening','uvodny') AND zaciatok > ?2",
@@ -133,9 +153,6 @@ export const Route = createFileRoute("/v/$token")({
          * Keď nič nedlhuje, platobný blok sa nekreslí — QR na nulu je výzva
          * na omyl.
          */
-        const balicky = ((await DB.prepare(
-          "SELECT cena_czk, platnost_od, zdroj, zrusene_at, nazov FROM balicky WHERE klient = ?1",
-        ).bind(c.name).all()).results || []) as unknown as { cena_czk: number | null; platnost_od: string; zdroj: string; zrusene_at: string | null; nazov: string }[];
         const platby = ((await DB.prepare(
           "SELECT suma_czk, datum, zrusene_at FROM platby WHERE klient = ?1",
         ).bind(c.name).all()).results || []) as unknown as { suma_czk: number; datum: string; zrusene_at: string | null }[];
