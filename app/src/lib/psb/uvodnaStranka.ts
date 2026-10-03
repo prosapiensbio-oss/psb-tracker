@@ -1,3 +1,4 @@
+import { CENNIK } from "./cennik";
 import { TRENERI } from "./mailFaktury";
 
 /**
@@ -23,6 +24,18 @@ export const MIESTO = {
   mesto: "Brno-Žabovřesky",
   upresnenie: "přízemí, první dveře vpravo",
   mapa: "https://maps.google.com/?q=Fanderl%C3%ADkova+70+Brno",
+  /**
+   * Mapka je OBRÁZOK, nie vložená mapa.
+   *
+   * Jerry, 3. 10. 2026: „mohla by tam byť malá mapa, na ktorú keď sa klikne,
+   * rozklikne sa to rovno v Google Maps." Vložená mapa by znamenala cudzí
+   * skript, súhlas s cookies a čakanie na načítanie v stránke, ktorú klient
+   * otvára z SMS na dátach. Toto je 63 kB statická dlaždicová mapa z
+   * OpenStreetMap (sadzba jednorazová, `scripts/mapa.py`), špendlík je
+   * nakreslený. Klik ide na Google Maps, kde si človek zapne navigáciu.
+   */
+  obrazok: "/mapa-studio.webp",
+  zdrojMapy: "© OpenStreetMap",
 };
 
 /**
@@ -126,10 +139,67 @@ export type VolbyStranky = {
   odpovedPoslana?: boolean;
 };
 
+/**
+ * CENÍK PRIAMO NA STRÁNKE, nie preklik na web.
+ *
+ * Jerry, 3. 10. 2026: „ceník by som dal skôr ako rozbaľovacie menu, kde by
+ * bolo všetko to, čo posielam na screenshote, bez úvodného tréningu."
+ * Úvodný tam nepatrí — jeho cenu má klient v zelenej hlavičke hore a vie ju
+ * mať inú (zľava).
+ *
+ * Ceny sa NEPÍŠU sem, berú sa z CENNIK — toho istého zoznamu, z ktorého sa
+ * zapisujú balíčky. Keď Jerry zdvihne cenu, zdvihne sa aj tu. Cena za hodinu
+ * sa počíta, nie opisuje: web pri balíčku uvádza 1 289 Kč, pričom
+ * 7 790 / 6 = 1 298 Kč.
+ */
+const CENNIK_STRANKY: { off: string; on: string; nadpis: string; popis: string; pozn?: string }[] = [
+  { off: "6h Předplatné", on: "6h Předplatné online", nadpis: "Předplatné 6 hodin", pozn: "měsíčně", popis: "6 měsíců, garance termínů, přednostní rezervace." },
+  { off: "6h Balíček", on: "6h Balíček online", nadpis: "Balíček 6 hodin", popis: "Platnost 2 měsíce. Plánujete podle svých časových možností." },
+  { off: "1h Balíček", on: "1h Balíček online", nadpis: "Jednorázová lekce", popis: "1 hodina. Bez závazku." },
+];
+
+/** 7790 → „7 790 Kč"; medzera je pevná, aby sa cena nezalomila na dva riadky. */
+const kc = (n: number) => `${String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, "\u00a0")}\u00a0Kč`;
+
+function cennikHtml(): string {
+  const naj = (nazov: string) => CENNIK.find((x) => x.nazov === nazov) || null;
+  const riadky = CENNIK_STRANKY.map((r) => {
+    const o = naj(r.off);
+    const ol = naj(r.on);
+    if (!o?.cena) return "";
+    const zaHodinu = o.hodiny && o.hodiny > 1 ? ` ${kc(o.cena / o.hodiny)} za hodinu.` : "";
+    return `<div style="padding:15px 0;border-top:1px solid #DCE3DD">
+<div style="display:flex;gap:12px;align-items:baseline">
+<div style="flex-grow:1;min-width:0;font-family:'Raleway',sans-serif;font-weight:700;font-size:17px;line-height:1.25">${esc(r.nadpis)}</div>
+<div style="text-align:right;flex-shrink:0">
+<div style="font-family:'Raleway',sans-serif;font-weight:700;font-size:17px">${esc(kc(o.cena))}</div>
+${ol?.cena ? `<div style="font-size:11px;letter-spacing:1.4px;color:#5B6B60;margin-top:2px">${r.pozn ? `${esc(r.pozn.toUpperCase())} · ` : ""}ONLINE ${esc(kc(ol.cena))}</div>` : ""}
+</div>
+</div>
+<div style="margin-top:5px;font-size:14.5px;line-height:1.55;color:#5B6B60">${esc(r.popis + zaHodinu)}</div>
+</div>`;
+  }).join("");
+
+  return `<details style="margin-top:12px;border:1px solid #DCE3DD;border-radius:16px">
+<summary style="display:flex;align-items:center;gap:12px;padding:16px 18px;cursor:pointer;list-style:none">
+<span style="flex-grow:1;min-width:0">
+<span style="display:block;font-size:17px;font-weight:600;color:#1A2E24">Ceník</span>
+<span style="display:block;font-size:14px;color:#5B6B60;margin-top:2px">co stojí tréninky a balíčky</span>
+</span>
+<span class="rozbal">${sipka}</span>
+</summary>
+<div style="padding:0 18px 16px">${riadky}
+<a href="${esc(ODKAZY.cennik)}" target="_blank" rel="noopener" style="display:inline-block;margin-top:14px;font-size:14px;font-weight:600">Celý ceník na webu</a>
+</div>
+</details>`;
+}
+
 const sipka = `<svg width="9" height="15" viewBox="0 0 9 15" aria-hidden="true" style="flex-shrink:0"><path d="M1 1 L7.5 7.5 L1 14" fill="none" stroke="#2D7D5A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>`;
 
+// Každý odkaz von ide do NOVEJ KARTY (Jerry, 3. 10. 2026) — stránka z SMS
+// je zoznam vecí na vybavenie a klient sa na ňu po videu či mape vracia.
 const riadokOdkazu = (href: string, nadpis: string, popis: string) =>
-  `<a href="${esc(href)}" style="display:flex;align-items:center;gap:12px;text-decoration:none;border:1px solid #DCE3DD;border-radius:16px;padding:16px 18px;margin-top:12px">
+  `<a href="${esc(href)}" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:12px;text-decoration:none;border:1px solid #DCE3DD;border-radius:16px;padding:16px 18px;margin-top:12px">
 <span style="flex-grow:1;min-width:0">
 <span style="display:block;font-size:17px;font-weight:600;color:#1A2E24">${esc(nadpis)}</span>
 <span style="display:block;font-size:14px;color:#5B6B60;margin-top:2px">${esc(popis)}</span>
@@ -180,24 +250,33 @@ export function uvodnaStrankaHtml(v: VolbyStranky): string {
 </div>`
     : "";
 
+  /**
+   * PORADIE JE JERRYHO (3. 10. 2026): „1. Před lekcí 2. Kde 3. Co si vzít
+   * 4. Ceník." Video je prvé zámerne — 60 % klientov si ho nepozrie a čím
+   * nižšie by bolo, tým menej. Adresa má mapku, do ktorej sa dá klepnúť.
+   */
   const telo = predUvodnym
-    ? `<div style="font-size:11px;letter-spacing:2.2px;color:#5B6B60">KDE</div>
+    ? `<h2 style="margin:24px 0 7px;font-family:'Raleway',sans-serif;font-weight:700;font-size:19px">Před lekcí</h2>
+<p style="margin:0 0 12px;font-size:16px;line-height:1.65;color:#3C4C42">Podívejte se prosím na toto krátké video. Připravíte se tak lépe na to, co budeme společně zkoumat.</p>
+<div style="display:flex;gap:10px;flex-wrap:wrap">
+<a href="${esc(ODKAZY.video)}" target="_blank" rel="noopener" style="display:inline-block;text-decoration:none;border:2px solid #1A2E24;border-radius:32px;padding:12px 22px;font-size:15px;font-weight:600;color:#1A2E24">Pustit video · 3 min</a>
+${v.anamnezaUrl ? `<a href="${esc(v.anamnezaUrl)}" target="_blank" rel="noopener" style="display:inline-block;text-decoration:none;background:#1A2E24;border-radius:32px;padding:14px 24px;font-size:15px;font-weight:600;color:#FFFFFF">Vyplnit 3 otázky</a>` : ""}
+</div>
+${v.anamnezaUrl ? `<p style="margin:10px 0 0;font-size:14px;line-height:1.6;color:#5B6B60">Otázky jsou o tom, co Vás trápí — ať nemusíme ztrácet čas na místě.</p>` : ""}
+
+<div style="margin-top:30px;font-size:11px;letter-spacing:2.2px;color:#5B6B60">KDE</div>
 <div style="margin-top:6px;font-family:'Raleway',sans-serif;font-weight:700;font-size:22px;line-height:1.3">${esc(MIESTO.ulica)}<br>${esc(MIESTO.mesto)}</div>
 <div style="margin-top:5px;font-size:15px;color:#3C4C42">${esc(MIESTO.upresnenie)}</div>
-<a href="${esc(MIESTO.mapa)}" style="display:inline-block;margin-top:10px;font-size:15px;font-weight:600">Ukázat na mapě</a>
+<a href="${esc(MIESTO.mapa)}" target="_blank" rel="noopener" style="display:block;margin-top:12px;text-decoration:none;border-radius:16px;overflow:hidden;border:1px solid #DCE3DD">
+<img src="${esc(MIESTO.obrazok)}" alt="Mapa — ${esc(MIESTO.ulica)}, ${esc(MIESTO.mesto)}" width="1024" height="400" style="display:block;width:100%;height:auto">
+<span style="display:flex;align-items:center;gap:10px;padding:13px 16px;background:#FFFFFF">
+<span style="flex-grow:1;min-width:0;font-size:15px;font-weight:600;color:#1A2E24">Otevřít v Google Mapách</span>${sipka}</span>
+</a>
 
 <h2 style="margin:30px 0 7px;font-family:'Raleway',sans-serif;font-weight:700;font-size:19px">Co si vzít</h2>
 <p style="margin:0;font-size:16px;line-height:1.65;color:#3C4C42">Nezapomeňte si prosím sportovní oblečení – ideálně krátké legíny, šortky nebo jiné přiléhavé oblečení, aby bylo dobře vidět držení těla.</p>
 
-<h2 style="margin:26px 0 7px;font-family:'Raleway',sans-serif;font-weight:700;font-size:19px">Před lekcí</h2>
-<p style="margin:0 0 12px;font-size:16px;line-height:1.65;color:#3C4C42">Podívejte se prosím na toto krátké video. Připravíte se tak lépe na to, co budeme společně zkoumat.</p>
-<div style="display:flex;gap:10px;flex-wrap:wrap">
-<a href="${esc(ODKAZY.video)}" style="display:inline-block;text-decoration:none;border:2px solid #1A2E24;border-radius:32px;padding:12px 22px;font-size:15px;font-weight:600;color:#1A2E24">Pustit video · 3 min</a>
-${v.anamnezaUrl ? `<a href="${esc(v.anamnezaUrl)}" style="display:inline-block;text-decoration:none;background:#1A2E24;border-radius:32px;padding:14px 24px;font-size:15px;font-weight:600;color:#FFFFFF">Vyplnit 3 otázky</a>` : ""}
-</div>
-${v.anamnezaUrl ? `<p style="margin:10px 0 0;font-size:14px;line-height:1.6;color:#5B6B60">Otázky jsou o tom, co Vás trápí — ať nemusíme ztrácet čas na místě.</p>` : ""}
-
-${riadokOdkazu(ODKAZY.cennik, "Ceník", "co stojí tréninky a balíčky")}
+${cennikHtml()}
 
 <div style="margin-top:26px;display:flex;gap:11px;align-items:center;border:1px solid #DCE3DD;border-radius:18px;padding:16px 18px">
 <span style="font-size:26px;line-height:1" role="img" aria-label="pes">🐕</span>
@@ -241,6 +320,10 @@ ${riadokOdkazu(ODKAZY.idealniPristup, "Ideální přístup", "číst i poslechno
 body{margin:0;background:#FFFFFF}
 a{color:#2D7D5A}
 a:hover{color:#1A2E24}
+summary{list-style:none}
+summary::-webkit-details-marker{display:none}
+.rozbal{display:flex;transition:transform .15s ease}
+details[open] .rozbal{transform:rotate(90deg)}
 </style>
 </head>
 <body>
@@ -277,7 +360,7 @@ ${telo}
 <div style="font-family:'Raleway',sans-serif;font-weight:700;font-size:26px;line-height:1.2">${esc(tr.krstne === "Filip" ? "Filip Stráňavský" : tr.formalne)}</div>
 <div style="font-size:16px;color:#5B6B60;margin-top:4px">${esc(t === "Jerry" ? "Jerry · váš trenér" : "váš trenér")}</div>
 <div style="margin-top:14px;display:flex;flex-wrap:wrap;gap:10px">
-<a href="${esc(profilUrl || ODKAZY.profil)}" style="display:inline-block;text-decoration:none;border:1px solid #DCE3DD;border-radius:32px;padding:11px 20px;font-size:15px;font-weight:600;color:#1A2E24">${profilUrl ? `Profil — ${esc(tr.krstne)}` : "O nás a trenérech"}</a>
+<a href="${esc(profilUrl || ODKAZY.profil)}" target="_blank" rel="noopener" style="display:inline-block;text-decoration:none;border:1px solid #DCE3DD;border-radius:32px;padding:11px 20px;font-size:15px;font-weight:600;color:#1A2E24">Profil trenéra</a>
 <a href="tel:${esc(tel)}" style="display:inline-block;text-decoration:none;border:1px solid #DCE3DD;border-radius:32px;padding:11px 20px;font-size:15px;font-weight:600;color:#1A2E24">${esc(tr.telefon)}</a>
 </div>
 ${zaver}

@@ -12,7 +12,7 @@ v správach, a tie sa strácajú.
 patrí to SEM v tom istom ťahu. Hotová vec sa z hornej časti maže a jednou
 vetou dopíše do „Zavreté" dolu — aby sa už nikdy neotvárala odznova.
 
-Stav k **1. 10. 2026**.
+Stav k **3. 10. 2026**.
 
 ---
 
@@ -231,6 +231,12 @@ nemaže — padnú do odkladiska.
   bolesti Jerry 24. 9. zrušil natrvalo — pozri „Zavreté").
 - **Google Ads „Basic"** — žiadosť podaná 14. 8. 2026, stále bez verdiktu.
   Dovtedy sa objem hľadania merať nedá a do appky sa odhady nepíšu.
+- **Kotva `#cenik` na webe** (od 3. 10. 2026) — odkaz „Celý ceník na webu"
+  pristane na obrazovke „Co je součástí vašeho balíčku", nie na cenách.
+  Kotva je o jednu obrazovku nižšie, než má byť (CENÍK je 02/07 v
+  `parts/sluzby.html` v téme psb-spready). Opraviť vo WordPresse — do
+  Kokpitu to nepatrí. Na stránke pred úvodným už ceny sú priamo, takže to
+  klienta nebrzdí.
 
 ## 4 · Odložené do vypnutia PTmindera
 

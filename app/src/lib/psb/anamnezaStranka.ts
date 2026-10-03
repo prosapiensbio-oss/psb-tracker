@@ -37,6 +37,20 @@ const STYL = `
   .viem{margin-top:20px;padding:13px 15px;border-radius:11px;background:${F.karta};font-size:13px;line-height:1.75}
   .viem b{color:${F.text}}
   .viem span{color:${F.slaba}}
+  /* iOS si z čísla spraví vlastný modrý odkaz — Jerry, 3. 10. 2026:
+     „to číslo je superkriklavo modrou, že sa nedá ani prečítať." Vypína to
+     meta format-detection, toto je poistka pre prehliadače, čo si ju
+     nevšimnú. */
+  .viem a{color:${F.slaba};text-decoration:none}
+  .oprava{margin-top:9px}
+  .oprava summary{font-size:11.5px;color:${F.slaba};cursor:pointer;list-style:none}
+  .oprava summary::-webkit-details-marker{display:none}
+  .oprava summary:after{content:" ›";opacity:.7}
+  .oprava[open] summary:after{content:" ×"}
+  .oprava .poly{display:flex;flex-direction:column;gap:9px;margin-top:11px}
+  .oprava label{display:block;font-size:11.5px;color:${F.slaba}}
+  .oprava input{margin-top:4px}
+  input[type=email],input[type=tel]{width:100%;padding:11px 12px;border-radius:9px;border:1px solid ${F.linka};background:${F.pozadie};color:${F.text};font:inherit;font-size:14px}
   fieldset{border:0;margin:26px 0 0;padding:0}
   legend{padding:0;font-size:16px;line-height:1.4}
   .pomoc{font-size:12.5px;color:${F.slaba};margin-top:5px}
@@ -126,7 +140,15 @@ export function strankaHtml(v: VstupStranky): string {
           <b>${esc(v.klient)}</b><br>
           <span>${[v.kontakt.email, v.kontakt.telefon].filter(Boolean).map(esc).join(" · ")}</span>
           ${v.uvodny ? `<br><span>úvodní trénink: ${esc(v.uvodny)}</span>` : ""}
-          <br><span style="font-size:11.5px">Nesedí něco? Napište nám, opravíme to.</span>
+          <details class="oprava">
+            <summary>Nesedí něco? Opravte nás.</summary>
+            <div class="poly">
+              <label>Jméno a příjmení<input type="text" name="oprava_meno" value="${esc(v.klient)}" autocomplete="name"></label>
+              <label>E-mail<input type="email" name="oprava_email" value="${esc(v.kontakt.email || "")}" autocomplete="email" inputmode="email"></label>
+              <label>Telefon<input type="tel" name="oprava_telefon" value="${esc(v.kontakt.telefon || "")}" autocomplete="tel" inputmode="tel"></label>
+              <div class="pomoc">Opravené údaje se uloží spolu s odpověďmi.</div>
+            </div>
+          </details>
         </div>
         ${sekcia.otazky.map(otazkaHtml).join("")}
         <div class="suhlasy">
@@ -147,6 +169,7 @@ export function strankaHtml(v: VstupStranky): string {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
+<meta name="format-detection" content="telephone=no">
 <title>Než přijdete — ProSapiens</title>
 <style>${STYL}</style>
 </head><body><div class="obal">

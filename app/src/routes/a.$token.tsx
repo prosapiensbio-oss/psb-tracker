@@ -55,6 +55,56 @@ async function kontext(DB: import("@cloudflare/workers-types").D1Database, klien
   return { kontakt: { email: fa?.email, telefon: fa?.telefon }, uvodny: popisUvodneho(u?.z || null) };
 }
 
+/**
+ * KLIENT SI OPRAVÍ, ČO O ŇOM VIEME.
+ *
+ * Jerry, 3. 10. 2026: „daj tam možnosť Nesedí něco? Opravte nás — keď klikne,
+ * upraví to ten klient sám."
+ *
+ * Mail a telefón sa prepíšu rovno: je to jediné miesto v appke, kde kontakt
+ * na klienta žije, a nikto iný ho nevie opraviť lepšie než on sám. MENO sa
+ * NEPREPISUJE — meno je kľúč, pod ktorým sú v Kokpite zviazané tréningy,
+ * platby aj balíčky, a tichá zmena by ich roztrhla (stalo sa to pri
+ * override-och). Z opraveného mena je preto zápis do denníka, ktorý tréner
+ * uvidí a prepíše ho tam, kde skutočne vzniká — v kalendári a PTminderi.
+ */
+async function ulozOpravu(
+  DB: import("@cloudflare/workers-types").D1Database,
+  klient: string,
+  stare: { email?: string | null; telefon?: string | null },
+  nove: { meno: string; email: string; telefon: string },
+): Promise<void> {
+  const zmeny: string[] = [];
+  const email = nove.email.trim().slice(0, 200);
+  const telefon = nove.telefon.trim().slice(0, 60);
+  const inak = (a: string | null | undefined, b: string) => b !== "" && (a || "").trim() !== b;
+
+  if (inak(stare.email, email) || inak(stare.telefon, telefon)) {
+    const teraz = new Date().toISOString();
+    await DB.prepare(
+      `INSERT INTO klient_fakturacia (klient, firma, email, telefon, updated_at) VALUES (?1, ?1, ?2, ?3, ?4)
+       ON CONFLICT(klient) DO UPDATE SET
+         email = CASE WHEN ?2 = '' THEN email ELSE ?2 END,
+         telefon = CASE WHEN ?3 = '' THEN telefon ELSE ?3 END,
+         updated_at = ?4`,
+    ).bind(klient, email, telefon, teraz).run();
+    if (inak(stare.email, email)) zmeny.push(`e-mail: ${stare.email || "—"} → ${email}`);
+    if (inak(stare.telefon, telefon)) zmeny.push(`telefon: ${stare.telefon || "—"} → ${telefon}`);
+  }
+
+  // Meno sa porovnáva bez diakritiky a veľkých písmen — „Josef Pavek"
+  // a „Josef Pávek" je ten istý človek a zápis o ničom nikomu nepomôže.
+  const kluc = (x: string) => x.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+  const meno = nove.meno.trim().slice(0, 120);
+  const zleMeno = meno && kluc(meno) !== kluc(klient);
+  if (zleMeno) zmeny.push(`jméno: ${klient} → ${meno} (v Kokpitu NEPŘEPSÁNO — oprav v kalendáři a PTminderu)`);
+
+  if (!zmeny.length) return;
+  await DB.prepare(
+    "INSERT INTO client_notes (id, client_name, note, author, created_at) VALUES (?1, ?2, ?3, ?4, ?5)",
+  ).bind(crypto.randomUUID(), klient, `Klient si v anamnéze opravil údaje — ${zmeny.join("; ")}.`, "klient", new Date().toISOString()).run();
+}
+
 export const Route = createFileRoute("/a/$token")({
   server: {
     handlers: {
@@ -93,6 +143,17 @@ export const Route = createFileRoute("/a/$token")({
       POST: async ({ request, params }) => {
         const token = String((params as { token?: string }).token || "");
         const { DB, ANAMNEZA_KLUC } = bindings() as { DB?: import("@cloudflare/workers-types").D1Database; ANAMNEZA_KLUC?: string };
+
+        // Ukážka sa tvári, že odoslala — ale neuloží NIČ. Keď si Jerry skúša
+        // SMS na svojom telefóne, dôjde až na koniec formulára a nesmie tam
+        // naraziť na „Tento odkaz neplatí".
+        if (jeUkazka(token)) {
+          return new Response(strankaHtml({
+            formular: FORMULAR, klient: UKAZKA_KLIENT, kontakt: {},
+            uvodny: "pátek 9. 10. v 9:00", hotovo: true,
+          }), { headers: hlavicky });
+        }
+
         if (!DB || !ANAMNEZA_KLUC || !/^[A-Za-z0-9]{10,30}$/.test(token)) return odkaz("Tento odkaz neplatí.", 404);
 
         const a = await podlaTokenu(DB, token, ANAMNEZA_KLUC);
@@ -142,6 +203,16 @@ export const Route = createFileRoute("/a/$token")({
           kedy: new Date().toISOString(),
           verziaFormulara: FORMULAR.verzia,
         };
+
+        // Oprava kontaktu ide pred uložením odpovedí: keď sa niečo pokazí,
+        // nech je pokazené to menej dôležité. Zlyhanie zápisu kontaktu nesmie
+        // zhodiť celý formulár — klient ho už vypĺňať druhýkrát nebude.
+        const kStare = await kontext(DB, a.klient);
+        try {
+          await ulozOpravu(DB, a.klient, kStare.kontakt, {
+            meno: jedno("oprava_meno"), email: jedno("oprava_email"), telefon: jedno("oprava_telefon"),
+          });
+        } catch { /* ticho — odpovede sú dôležitejšie */ }
 
         const ok = await ulozKlienta(DB, token, odpovede, suhlasy, ANAMNEZA_KLUC);
         if (!ok) return odkaz("Odeslání se nepodařilo. Zkuste to prosím znovu.", 500);

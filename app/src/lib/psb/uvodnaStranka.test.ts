@@ -148,18 +148,18 @@ describe("figúra v hlavičke", () => {
 describe("profil trenéra", () => {
   const z = { kedy: "2026-10-09T09:00", cenaCzk: null, logoUrl: "/l.svg", druh: "pred" } as const;
 
-  it("klient vidí profil TOHO, kto ho trénuje, aj s menom", () => {
+  it("klient vidí profil TOHO, kto ho trénuje", () => {
     // Jerry, 3. 10. 2026: „a toto je čo? prosapiens.cz/jerry" a „Terezka má
     // svoju, takže keď bude posielať svojmu klientovi, mal by tam byť jej
     // profil s jej menom." Obe stránky existujú; jej je na /terezia/,
     // nie /terezka/ — preto mi prvý pokus vrátil 404.
     const j = uvodnaStrankaHtml({ ...z, trener: "Jerry" });
     expect(j).toContain("prosapiens.cz/jerry/");
-    expect(j).toContain("Profil — Filip");
+    expect(j).toContain(">Profil trenéra<");
 
     const t = uvodnaStrankaHtml({ ...z, trener: "Terezka" });
     expect(t).toContain("prosapiens.cz/terezia/");
-    expect(t).toContain("Profil — Terezka");
+    expect(t).toContain(">Profil trenéra<");
     expect(t).not.toContain("prosapiens.cz/jerry/");
   });
 
@@ -169,12 +169,53 @@ describe("profil trenéra", () => {
     // na webe ešte nemá. Dnes taký nie je — stráži to test nižšie.
     const h = uvodnaStrankaHtml({ ...z, trener: "Niekto Nový" });
     expect(h).toContain("prosapiens.cz/jerry/");
-    expect(h).toContain("Profil — Filip");
+    expect(h).toContain(">Profil trenéra<");
   });
 
   it("každý tréner z TRENERI má svoj odkaz", () => {
     for (const meno of Object.keys(TRENERI)) {
       expect(ODKAZY.profilTrenera[meno]).toBeTruthy();
+    }
+  });
+});
+
+describe("poradie, mapa a ceník", () => {
+  const z = { kedy: "2026-10-09T09:00", cenaCzk: null, logoUrl: "/l.svg", druh: "pred", trener: "Jerry" } as const;
+  const h = uvodnaStrankaHtml(z);
+
+  it("ide to v Jerryho poradí: před lekcí, kde, co si vzít, ceník", () => {
+    // Jerry, 3. 10. 2026: „zmenil by som poradie na tom odkaze."
+    const poradie = ["Před lekcí", "KDE", "Co si vzít", ">Ceník<"].map((x) => h.indexOf(x));
+    expect(poradie.every((i) => i >= 0)).toBe(true);
+    expect([...poradie].sort((a, b) => a - b)).toEqual(poradie);
+  });
+
+  it("mapka je obrázok a klik na ňu vedie do Google Map v novej karte", () => {
+    expect(h).toContain('src="/mapa-studio.webp"');
+    const i = h.indexOf("mapa-studio.webp");
+    const odkaz = h.lastIndexOf("<a href=", i);
+    expect(h.slice(odkaz, i)).toContain("maps.google.com");
+    expect(h.slice(odkaz, i)).toContain('target="_blank"');
+  });
+
+  it("ceník je rozbaľovačka s cenami z CENNIK, bez úvodného tréningu", () => {
+    expect(h).toContain("<details");
+    expect(h).toContain("Předplatné 6 hodin");
+    expect(h).toContain("Balíček 6 hodin");
+    expect(h).toContain("Jednorázová lekce");
+    // 6990, 7790, 1450 a online 5640, 6590, 1390 — pevná medzera v tisícoch.
+    for (const c of ["6 990", "7 790", "1 450", "5 640", "6 590", "1 390"]) {
+      expect(h).toContain(c);
+    }
+    // 6990 / 6 = 1165 Kč za hodinu; jednorázová lekce cenu za hodinu nemá.
+    expect(h).toContain("1 165 Kč za hodinu");
+    expect(h).not.toContain("Úvodní trénink 1");
+  });
+
+  it("každý odkaz von sa otvára v novej karte", () => {
+    for (const m of h.matchAll(/<a href="(http[^"]+)"[^>]*>/g)) {
+      expect(m[0]).toContain('target="_blank"');
+      expect(m[0]).toContain('rel="noopener"');
     }
   });
 });
