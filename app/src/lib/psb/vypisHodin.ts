@@ -51,6 +51,8 @@ export type RiadokVypisu = {
   prevzate?: number;
   /** Dni tých tréningov — bez nich je to číslo bez odpovede. */
   prevzateDni?: string[];
+  /** „Doplnenie členstva" — vnútorný záznam, nie predaj. */
+  doplnenie?: boolean;
 };
 
 export type Vypis = {
@@ -498,6 +500,7 @@ export function vypisHodin(os: Udalost[], od = "", doDna = "", zostatokTeraz: nu
       druh: u.druh,
       zKalendara: u.druh === "trening" ? u.zKalendara : undefined,
       odvodene: u.druh === "balicekOd" || u.druh === "balicekDo" ? u.odvodene : undefined,
+      doplnenie: u.druh === "balicekOd" ? u.doplnenie : undefined,
       prevzate: stav?.prevzate,
       prevzateDni: stav?.prevzateDni,
     });

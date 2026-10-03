@@ -25,7 +25,7 @@
 import { mesiacovVztahu, tempoMesacne } from "./profil";
 import type { ClientAgg } from "./compute";
 import { vypisHodin, type RiadokVypisu } from "./vypisHodin";
-import type { Udalost } from "./klientOsCasu";
+import { hodinZNazvuBalicka, type Udalost } from "./klientOsCasu";
 import type { VypisKlienta } from "./mailKlientovi";
 
 /**
@@ -77,10 +77,35 @@ export function historiaPreMail(
    * prvom pokuse som hľadal z opačnej strany a stránka ukázala február 2026
    * namiesto posledného členstva. Vidno to bolo len na živých dátach.
    */
-  const vsetky = v.riadky.filter((r) => r.druh !== "balicekDo");
+  /**
+   * DOPLNENIE ČLENSTVA SA KLIENTOVI NEUKAZUJE.
+   *
+   * Jerry, 3. 10. 2026 nad odkazom Martina Vaška: „doplnenie členstva môže
+   * byť pre klientov mätúce, je to skôr interný údaj, o ktorom nemusia
+   * vedieť." Je to prenos zvyšku hodín, keď členstvu skončila platnosť —
+   * nič si nekúpil a nič sa mu nestalo. Hodiny, ktoré pridalo, sa z osi
+   * nestrácajú, len sa nad ňou neobjaví riadok, ktorý sa nedá vysvetliť.
+   *
+   * Vypadáva aj z HRANÍC: doplnenie je v dátach `balicekOd`, takže rez
+   * „posledný balíček" naň sadal a Nikol Pešková či David Novotný potom
+   * videli výpis, čo sa začína riadkom „Doplnenie členstva" a nemá jediné
+   * číslo. Rez teraz hľadá skutočný balíček.
+   */
+  const vsetky = v.riadky.filter((r) => r.druh !== "balicekDo" && !r.doplnenie);
   // Hranice balíčkov od najnovšieho. Pri `balickov` = 2 sa režie až za
   // DRUHÝM `balicekOd`, takže v zozname zostanú dva celé balíčky.
-  const zaciatky = vsetky.reduce<number[]>((a, r, i) => (r.druh === "balicekOd" ? [...a, i] : a), []);
+  /**
+   * Hranicu robí len balíček S HODINAMI. Staré členstvá (BRONZ, SILVER,
+   * EXKLUZIVNÍ PLÁN) hodiny nemajú a odpočet z nich nevzniká — rez na nich by
+   * otvoril výpis obdobím, v ktorom nemá ani jeden riadok číslo.
+   *
+   * Hodiny sa hľadajú aj V NÁZVE, nielen v počte. Offline členstvá vyváža
+   * PTminder ako 0/0 (viď „Balíčky 0/0") a hodiny sa dopočítavajú až ďalej —
+   * na riadku je vtedy nula. Keď som rezal len podľa nej, Monike Čechovej sa
+   * výpis roztiahol na celú históriu od marca.
+   */
+  const maHodiny = (r: RiadokVypisu) => r.zmena > 0 || hodinZNazvuBalicka(r.popis) > 0;
+  const zaciatky = vsetky.reduce<number[]>((a, r, i) => (r.druh === "balicekOd" && maHodiny(r) ? [...a, i] : a), []);
   const kolko = Math.max(1, Math.floor(balickov));
   const hranica = zaciatky[kolko - 1];
   /**
