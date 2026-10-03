@@ -55,11 +55,32 @@ const den = (s: string) => (s || "").slice(0, 10);
  * zišli späť. Poplatky prichádzajú už očistené o platby zapísané v Kokpite
  * (robí to `loadData`) — tu sa len sčítavajú.
  */
+/**
+ * TEN ISTÝ PREDAJ ZAPÍSANÝ V OBOCH SYSTÉMOCH SA NEPOČÍTA DVAKRÁT.
+ *
+ * Jerry, 3. 10. 2026: „ak som nahodil členstvo cez Kokpit v rovnaký deň ako
+ * v PTminderi, tak platí ten Kokpit." Martin Vaško mal 27. 9. jeden predaj za
+ * 6 990 Kč — zapísaný ručne v Kokpite a zároveň otvorený ako poplatok
+ * v PTminderi. Appka ho sčítala a jeho stránka pýtala QR na 13 980 Kč.
+ *
+ * Páruje sa deň a suma: dva rôzne predaje v jeden deň za tú istú sumu by
+ * boli zriedkavé a aj tak by sa jeden z nich zapísal len raz.
+ */
+const bezZdvojenych = (poplatky: Poplatok[], balicky: BalicekDlh[]): Poplatok[] => {
+  const nase = new Set(
+    balicky
+      .filter((b) => !b.zruseneAt && b.zdroj === "rucne" && (b.cena || 0) > 0)
+      .map((b) => `${den(b.platnostOd)}|${Math.round(b.cena || 0)}`),
+  );
+  return nase.size ? poplatky.filter((p) => !nase.has(`${den(p.datum)}|${Math.round(p.suma || 0)}`)) : poplatky;
+};
+
 export function dlhJednehoKlienta(
   poplatky: Poplatok[],
   balicky: BalicekDlh[],
   platby: PlatbaDlh[],
 ): { dlzi: number; pocet: number; popis: string } {
+  poplatky = bezZdvojenych(poplatky, balicky);
   const zPoplatkov = poplatky.reduce((a, p) => a + (p.suma || 0), 0);
   const zBalickov = dlhKlienta(balicky, platby);
   const dlzi = Math.max(0, Math.round(zPoplatkov + zBalickov.dlzi));
@@ -94,7 +115,12 @@ export function dlznici(
     return d;
   };
 
-  for (const p of poplatky) {
+  for (const p of poplatky.filter((x) => {
+    // To isté párovanie ako pri jednom klientovi — inak by karta dlžníkov
+    // a stránka klienta hovorili dve rôzne sumy o tom istom človeku.
+    const b = balicky[x.klient] || balicky[normName(x.klient)] || [];
+    return bezZdvojenych([x], b).length > 0;
+  })) {
     const d = daj(p.klient);
     d.zPoplatkov += p.suma;
     d.polozky.push({ datum: den(p.datum), popis: p.popis, suma: p.suma });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { dlznici } from "./dlznici";
+import { dlhJednehoKlienta, dlznici } from "./dlznici";
 
 const DNES = "2026-09-28";
 const pop = (klient: string, datum: string, suma: number, popis = "OFF - 6h") => ({ klient, datum, suma, popis });
@@ -51,5 +51,28 @@ describe("dlznici", () => {
       {}, {}, { "Veľký": "Terezka", "Malý": "Jerry" }, DNES,
     );
     expect(v.map((x) => [x.meno, x.trener])).toEqual([["Veľký", "Terezka"], ["Malý", "Jerry"]]);
+  });
+});
+
+describe("ten istý predaj v oboch systémoch", () => {
+  it("sa do dlhu nepočíta dvakrát", () => {
+    // Martin Vaško, 3. 10. 2026: predaj za 6 990 Kč z 27. 9. mal zapísaný
+    // ručne v Kokpite aj otvorený ako poplatok v PTminderi — stránka mu
+    // pýtala 13 980 Kč.
+    const poplatky = [{ datum: "2026-09-27", klient: "Martin Vaško", popis: "OFF - 6h S viazanostou", suma: 6990 }];
+    const balicky = [{ cena: 6990, platnostOd: "2026-09-27", zdroj: "rucne", zruseneAt: null }];
+    expect(dlhJednehoKlienta(poplatky, balicky, []).dlzi).toBe(6990);
+  });
+
+  it("iný deň alebo iná suma sú dva rôzne predaje", () => {
+    const poplatky = [{ datum: "2026-09-20", klient: "X", popis: "balíček", suma: 6990 }];
+    const balicky = [{ cena: 6990, platnostOd: "2026-09-27", zdroj: "rucne", zruseneAt: null }];
+    expect(dlhJednehoKlienta(poplatky, balicky, []).dlzi).toBe(13980);
+  });
+
+  it("balíček z importu poplatok neumazáva — dlh z neho nevzniká", () => {
+    const poplatky = [{ datum: "2026-09-27", klient: "X", popis: "balíček", suma: 6990 }];
+    const balicky = [{ cena: 6990, platnostOd: "2026-09-27", zdroj: "ptminder", zruseneAt: null }];
+    expect(dlhJednehoKlienta(poplatky, balicky, []).dlzi).toBe(6990);
   });
 });
