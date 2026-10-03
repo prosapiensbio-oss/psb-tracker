@@ -161,16 +161,38 @@ type BodOsi = VypisKlienta["os"][number];
 /** Veľká bodka = balíček alebo platba, malá = tréning. */
 const jeMedznik = (b: BodOsi) => b.druh === "balicekOd" || b.druh === "platba";
 
+/**
+ * MÍNUS LEN TAM, KDE HODINA NAOZAJ NIE JE.
+ *
+ * Tréning, na ktorý balíček hodinu má, je obyčajný bod — aj keď sa v ten deň
+ * ešte nezaplatilo. Že sa platilo neskôr, je vec medzi Jerrym a klientom,
+ * nie dôvod svietiť na klientovej stránke červeným mínusom za hodinu, ktorú
+ * má zaplatenú.
+ */
+const maHodinu = (b: BodOsi) => b.druh === "trening" && b.zostatok != null;
+
 const farbaBodu = (b: BodOsi): string =>
-  b.dlh ? SADZBA.minus
+  b.dlh && !maHodinu(b) ? SADZBA.minus
     : b.druh === "balicekOd" ? SADZBA.biela
       : b.druh === "platba" ? SADZBA.zelena
         : SADZBA.tlmeny;
 
-/** Číslo vpravo (vodorovne) / vľavo (zvisle): zostatok, suma alebo dlh. */
+/**
+ * ODPOČET 6, 5, 4, 3, 2, 1 JE PEVNÝ A NEPRETRHNE SA.
+ *
+ * Jerry, 3. 10. 2026: „6h 5h 4h 3h 2h 1h sú pevne dané, tie sa vždy
+ * odpočítavajú za sebou v rade. −1 −2 −3 sa pri vzniku balíčka upravuje
+ * a dosadzuje sa tam 6h 5h 4h."
+ *
+ * Presne to appka aj počíta: keď balíček prevezme tréningy, na ktoré
+ * predošlý nemal hodinu, dostanú hodiny nového (24. 7. = 6 h, 26. 7. = 5 h).
+ * Lenže bod kreslil prednostne DLH — poradové číslo tréningu bez krytia —
+ * takže na mieste šestky svietilo −1 a rad vyzeral deravý. Hodina má
+ * prednosť; mínus zostáva len tam, kde hodina naozaj nie je.
+ */
 function cisloBodu(b: BodOsi): string {
+  if (maHodinu(b)) return hod(b.zostatok as number);
   if (b.dlh) return `−${b.dlh}`;
-  if (b.druh === "trening" && b.zostatok != null) return hod(b.zostatok);
   const m = /(\d[\d\s  ]*)\s*(Kč|h)\b/.exec(b.popis);
   return m ? `${m[1].trim()} ${m[2]}` : "";
 }
@@ -197,7 +219,7 @@ function osVodorovna(os: BodOsi[]): string {
     const p = jeMedznik(b) ? 13 : 10;
     const cislo = cisloBodu(b);
     const hlavicka = i === 0
-      ? `<div style="font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:${b.dlh ? s.minus : s.tlmeny};margin-bottom:3px">naposledy</div>`
+      ? `<div style="font-size:10px;letter-spacing:1.4px;text-transform:uppercase;color:${b.dlh && !maHodinu(b) ? s.minus : s.tlmeny};margin-bottom:3px">naposledy</div>`
       : `<div style="height:16px"></div>`;
     return `<div style="flex:0 0 120px;scroll-snap-align:start">${hlavicka}
 <div style="height:50px;display:flex;flex-direction:column;justify-content:flex-end;padding:0 10px 7px 0">
@@ -205,7 +227,7 @@ function osVodorovna(os: BodOsi[]): string {
 <div style="font-size:11px;color:${s.slabsia}">${esc(denPlne(b))}</div>
 ${poznamkaBodu(b) ? `<div style="font-size:10.5px;color:${s.minus};line-height:1.3;margin-top:2px">${esc(poznamkaBodu(b))}</div>` : ""}</div>
 <div style="height:14px;display:flex;align-items:center"><div style="width:${p}px;height:${p}px;border-radius:50%;background:${farbaBodu(b)}"></div></div>
-<div style="font-family:'Raleway',sans-serif;font-weight:700;font-size:14.5px;margin-top:9px;color:${b.dlh ? s.minus : s.text}">${esc(cislo)}</div></div>`;
+<div style="font-family:'Raleway',sans-serif;font-weight:700;font-size:14.5px;margin-top:9px;color:${b.dlh && !maHodinu(b) ? s.minus : s.text}">${esc(cislo)}</div></div>`;
   }).join("");
   return `<div class="psb-os" style="position:relative;margin:0 -22px;padding:0 22px;overflow-x:auto;-webkit-overflow-scrolling:touch">
 <div style="display:flex;position:relative;min-width:max-content;padding-bottom:4px">
@@ -222,7 +244,7 @@ function osZvisla(os: BodOsi[]): string {
     const prvy = i === 0;
     const posledny = i === os.length - 1;
     return `<div style="display:flex;align-items:center;min-height:52px">
-<div style="flex:1;text-align:right;padding-right:15px;font-family:'Raleway',sans-serif;font-weight:700;font-size:15px;color:${b.dlh ? s.minus : s.text}">${esc(cisloBodu(b))}</div>
+<div style="flex:1;text-align:right;padding-right:15px;font-family:'Raleway',sans-serif;font-weight:700;font-size:15px;color:${b.dlh && !maHodinu(b) ? s.minus : s.text}">${esc(cisloBodu(b))}</div>
 <div style="width:15px;flex-shrink:0;align-self:stretch;display:flex;flex-direction:column;align-items:center">
 <div style="width:2px;flex:1;background:${prvy ? "transparent" : s.ramik}"></div>
 <div style="width:${p}px;height:${p}px;border-radius:50%;background:${farbaBodu(b)};flex-shrink:0"></div>

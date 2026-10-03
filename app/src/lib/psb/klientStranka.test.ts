@@ -256,3 +256,36 @@ describe("nadpis osi hovorí, koľko histórie klient vidí", () => {
     expect(klientStranka(z)).toContain("Poslední balíček");
   });
 });
+
+describe("odpočet hodín sa nepretrhne", () => {
+  // Jerryho reťaz z 3. 10. 2026: balíček 10. 8. prevzal tréningy 24. a 26. 7.,
+  // takže tie nesú hodiny 6 a 5 a rad pokračuje 4, 3, 2, 1.
+  const z = {
+    klient: "Lukas Hanus", oslovenie: "Lukas", trener: "Jerry",
+    os: [
+      { den: "2026-07-24", cas: "09:00", popis: "tréning", druh: "trening" as const, zostatok: 6, dlh: 1 },
+      { den: "2026-07-26", cas: "10:00", popis: "tréning", druh: "trening" as const, zostatok: 5, dlh: 2 },
+      { den: "2026-08-10", popis: "6h Předplatné", druh: "balicekOd" as const, zostatok: null, dlh: null, prevzate: 2, prevzateDni: ["2026-07-24", "2026-07-26"] },
+      { den: "2026-08-10", cas: "11:00", popis: "tréning", druh: "trening" as const, zostatok: 4, dlh: null },
+      { den: "2026-08-25", cas: "10:30", popis: "tréning", druh: "trening" as const, zostatok: null, dlh: 1 },
+    ],
+    zostatok: -1, hodinSpolu: 4, odkedy: "2026-02-01", dnes: "2026-10-03",
+  };
+  const h = klientStranka(z);
+
+  it("prevzatý tréning ukáže hodinu, nie mínus", () => {
+    // 6 h aj 5 h musia byť na osi a −2 nikde: tréning 26. 7. má hodinu.
+    expect(h).toContain(">6 h<");
+    expect(h).toContain(">5 h<");
+    expect(h).not.toContain(">−2<");
+    // Jediné zostávajúce −1 patrí 25. 8., na ktorý hodina naozaj nie je;
+    // os je raz vodorovná a raz zvislá, takže je v HTML dvakrát.
+    expect(h.split(">−1<").length - 1).toBe(2);
+  });
+
+  it("mínus zostáva tam, kde hodina naozaj nie je", () => {
+    const sam = klientStranka({ ...z, os: [z.os[4]] });
+    expect(sam).toContain(">−1<");
+    expect(sam).not.toContain(">6 h<");
+  });
+});
