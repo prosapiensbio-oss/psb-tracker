@@ -70,6 +70,31 @@ describe("popisPreKlienta", () => {
     expect(cela.os.map((b) => b.den)).toContain("2026-02-15");
   });
 
+  it("posledný balíček berie aj tréningy, ktoré si prevzal", () => {
+    // Jerry, 3. 10. 2026: odpočet 6, 5, 4… sa nesmie pretrhnúť. Hodiny 6 a 5
+    // minuli tréningy spred balíčka — bez nich sa os otvorí šestkou
+    // a pokračuje štvorkou, čo vyzerá ako chýbajúca hodina.
+    const os: Udalost[] = [
+      { den: "2026-06-29", druh: "balicekOd", popis: "6h Balíček", hodin: 2 },
+      { den: "2026-06-29", druh: "trening", popis: "tréning" },
+      { den: "2026-07-02", druh: "trening", popis: "tréning" },
+      { den: "2026-07-24", druh: "trening", popis: "tréning" },
+      { den: "2026-07-26", druh: "trening", popis: "tréning" },
+      { den: "2026-08-10", druh: "balicekOd", popis: "6h Balíček", hodin: 6 },
+      { den: "2026-08-12", druh: "trening", popis: "tréning" },
+    ] as unknown as Udalost[];
+    const k = { packageRemaining: 3, packageTotal: 6, firstSession: "2026-06-29", sessions: [], primaryTrainer: "Jerry" };
+    const v = historiaPreMail("Kto Vie", os, k as never, "2026-10-01", undefined, false);
+    const dni = v.os.map((b) => b.den);
+    expect(dni).toContain("2026-07-24");
+    expect(dni).toContain("2026-07-26");
+    // Staršie tréningy, ktoré balíček neprevzal, tam ale nie sú.
+    expect(dni).not.toContain("2026-06-29");
+    // A odpočet ide bez diery: 6, 5, potom 4 po balíčku.
+    const hodiny = v.os.filter((b) => b.druh === "trening").map((b) => b.zostatok);
+    expect(hodiny).toEqual([6, 5, 4]);
+  });
+
   it("vie vrátiť viac posledných balíčkov naraz", () => {
     // Jerry, 3. 10. 2026 nad Hanusom: komu sa mínus prenáša z balíčka do
     // balíčka, tomu jeden balíček nevysvetlí, kam sa hodiny podeli.

@@ -83,7 +83,22 @@ export function historiaPreMail(
   const zaciatky = vsetky.reduce<number[]>((a, r, i) => (r.druh === "balicekOd" ? [...a, i] : a), []);
   const kolko = Math.max(1, Math.floor(balickov));
   const hranica = zaciatky[kolko - 1];
-  const vyrez = uplna || hranica == null ? vsetky : vsetky.slice(0, hranica + 1);
+  /**
+   * REZ IDE ZA TRÉNINGY, KTORÉ SI BALÍČEK PREVZAL — nie po jeho riadok.
+   *
+   * Prvé hodiny balíčka minuli tréningy, ktoré sa stali PRED ním (Hanusovi
+   * 25. 8. a 3. 9. zobrali hodiny 6 a 5). Keď sa rez spraví po riadku
+   * balíčka, odpadnú — a odpočet sa klientovi otvorí šestkou a hneď pokračuje
+   * štvorkou. Presne to Jerry videl 2. aj 3. 10. 2026: „chybí tam 5 h."
+   * Tie tréningy k balíčku patria, lebo sú z neho zaplatené.
+   */
+  const dni = hranica == null ? null : vsetky[hranica]?.prevzateDni;
+  let rez = hranica;
+  if (rez != null && dni?.length) {
+    const najstarsi = dni.reduce((a, b) => (a < b ? a : b));
+    for (let i = rez; i < vsetky.length; i++) if (vsetky[i].den >= najstarsi) rez = i;
+  }
+  const vyrez = uplna || rez == null ? vsetky : vsetky.slice(0, rez + 1);
   const body = [...vyrez].reverse()
     .map((r) => ({
       den: r.den,

@@ -166,6 +166,33 @@ export const Route = createFileRoute("/v/$token")({
          */
         const rozsah = Math.max(0, Math.round(Number(r.balickov ?? 1)));
         const vypis = historiaPreMail(c.name, os, c, dnes, dalsi, rozsah === 0, Math.max(1, rozsah));
+
+        /**
+         * TRÉNINGY BEZ HODINY SÚ HODINY NAD RÁMEC — aj keď číslo hovorí nulu.
+         *
+         * `priebehBalickov` zostatok pod nulu nepúšťa (`Math.max(0, …)`);
+         * tréningy, na ktoré už hodina nebola, nesie `dlh` a os ich kreslí
+         * ako −1, −2, −3. Nadpis a odpočet ale čítali ten zastropovaný
+         * zostatok, takže Lukášovi Hanusovi stránka 3. 10. 2026 tvrdila
+         * „Poslední hodina — balíček máš dochozený", hoci odvtedy trénoval
+         * trikrát, a QR mu ponúkalo 6 h, z ktorých tri sú už odtrénované.
+         *
+         * Jerry, 3. 10. 2026: tie mínusy sa pri novom balíčku prepíšu na 6, 5
+         * a 4 — klient teda musí dopredu vedieť, že z balíčka mu po zaplatení
+         * zostanú tri hodiny, nie šesť.
+         */
+        const nadRamec = (() => {
+          let n = 0;
+          // `os` ide od najstaršieho; počítajú sa tréningy na konci.
+          for (let i = vypis.os.length - 1; i >= 0; i--) {
+            const b = vypis.os[i];
+            if (b.druh !== "trening") continue;
+            if (b.zostatok != null || !b.dlh) break;
+            n += 1;
+          }
+          return n;
+        })();
+        if ((vypis.zostatok ?? 0) === 0 && nadRamec > 0) vypis.zostatok = -nadRamec;
         const origin = new URL(request.url).origin;
         /**
          * QR JE NA STRÁNKE VŽDY, KEĎ JE ČO ZAPLATIŤ — a to sú dva prípady.
