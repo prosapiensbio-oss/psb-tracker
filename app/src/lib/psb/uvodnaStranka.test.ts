@@ -219,3 +219,21 @@ describe("poradie, mapa a ceník", () => {
     }
   });
 });
+
+describe("ceník vyzerá ako tlačidlo", () => {
+  const h = uvodnaStrankaHtml({ kedy: "2026-10-09T09:00", cenaCzk: null, logoUrl: "/l.svg", druh: "pred", trener: "Jerry" });
+
+  it("má zelený rámček a zelené písmo tej istej zelenej ako Potvrdit termín", () => {
+    // Jerry, 3. 10. 2026. Zelená #2D7D5A je tá z tlačidla „Potvrdit termín".
+    const i = h.indexOf("<details");
+    const summary = h.slice(i, h.indexOf("</summary>", i));
+    expect(summary).toContain("border:2px solid #2D7D5A");
+    expect(summary).toContain('color:#2D7D5A">Ceník');
+    expect(h).toContain("background:#2D7D5A");
+  });
+
+  it("šípka mieri dole, nie doprava", () => {
+    expect(h).toContain(".rozbal{display:flex;transform:rotate(90deg)");
+    expect(h).toContain("details[open] .rozbal{transform:rotate(-90deg)}");
+  });
+});

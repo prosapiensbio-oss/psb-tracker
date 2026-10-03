@@ -180,11 +180,15 @@ ${ol?.cena ? `<div style="font-size:11px;letter-spacing:1.4px;color:#5B6B60;marg
 </div>`;
   }).join("");
 
-  return `<details style="margin-top:12px;border:1px solid #DCE3DD;border-radius:16px">
-<summary style="display:flex;align-items:center;gap:12px;padding:16px 18px;cursor:pointer;list-style:none">
+  // Jerry, 3. 10. 2026: zelený rámček a zelené písmo tej istej zelenej ako
+  // „Potvrdit termín", šípka nie doprava, ale dole. Rozbaľovačka tak vyzerá
+  // ako tlačidlo, lebo sa ako tlačidlo aj správa — na rozdiel od sivých
+  // kariet pod ňou, ktoré vedú preč zo stránky.
+  return `<details style="margin-top:12px;border:2px solid #2D7D5A;border-radius:16px">
+<summary style="display:flex;align-items:center;gap:12px;padding:15px 17px;cursor:pointer;list-style:none">
 <span style="flex-grow:1;min-width:0">
-<span style="display:block;font-size:17px;font-weight:600;color:#1A2E24">Ceník</span>
-<span style="display:block;font-size:14px;color:#5B6B60;margin-top:2px">co stojí tréninky a balíčky</span>
+<span style="display:block;font-size:17px;font-weight:600;color:#2D7D5A">Ceník</span>
+<span style="display:block;font-size:14px;color:#2D7D5A;margin-top:2px">co stojí tréninky a balíčky</span>
 </span>
 <span class="rozbal">${sipka}</span>
 </summary>
@@ -322,8 +326,8 @@ a{color:#2D7D5A}
 a:hover{color:#1A2E24}
 summary{list-style:none}
 summary::-webkit-details-marker{display:none}
-.rozbal{display:flex;transition:transform .15s ease}
-details[open] .rozbal{transform:rotate(90deg)}
+.rozbal{display:flex;transform:rotate(90deg);transition:transform .15s ease}
+details[open] .rozbal{transform:rotate(-90deg)}
 </style>
 </head>
 <body>
