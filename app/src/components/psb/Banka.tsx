@@ -121,7 +121,7 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
   const btcVMesiaci = (btcVyplaty || []).filter(
     (v) => !!nahlad?.some((r) => r.datum.slice(0, 7) === v.datum.slice(0, 7)),
   );
-  const [chyba, setChyba] = useState<{ chyba: string; ukazka: string[] } | null>(null);
+  const [chyba, setChyba] = useState<{ chyba: string; ukazka: string[]; zBanky?: boolean } | null>(null);
   const [vysledok, setVysledok] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const KAT = useMemo(kategorieZoznam, []);
@@ -203,7 +203,18 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
    * Kategórie sú odhad a odhad nemá tiecť do P&L bez človeka, takže aj tu
    * platí druhý krok.
    */
+  /**
+   * Bez dátumov sa pýta POSLEDNÝCH 90 DNÍ, nie „všetko od posledného
+   * stiahnutia". Fio staršie dáta bez silnej autorizácie v internetbankingu
+   * nedá a `/last/` na čerstvom tokene siaha od začiatku účtu — takže
+   * tlačidlo bez dátumov vždy skončilo chybou. Deväťdesiat dní je presne to
+   * okno, ktoré banka pustí bez pýtania.
+   */
   const stiahniZBanky = async (od?: string, doDna?: string) => {
+    const dnes = new Date();
+    const pred90 = new Date(dnes.getTime() - 89 * 86400000);
+    const isoD = (d: Date) => d.toISOString().slice(0, 10);
+    if (!od && !doDna) { od = isoD(pred90); doDna = isoD(dnes); }
     setBusy(true); setChyba(null); setVysledok(null);
     let r: { ok?: boolean; chyba?: string; error?: string; [k: string]: unknown };
     try {
@@ -217,10 +228,10 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
       r = { ok: false, chyba: `Nepodarilo sa spojiť so serverom: ${e instanceof Error ? e.message : String(e)}` };
     }
     setBusy(false);
-    if (!r.ok) { setChyba({ chyba: r.chyba || String(r.error || "Neznáma chyba"), ukazka: [] }); return; }
+    if (!r.ok) { setChyba({ chyba: r.chyba || String(r.error || "Neznáma chyba"), ukazka: [], zBanky: true }); return; }
     const riadky = (r.riadky as Nahlad[]) || [];
     if (!riadky.length) {
-      setChyba({ chyba: `Banka nevrátila ani jeden pohyb (${String(r.zdroj || "")}). Keď si sťahoval dnes, zarážka je už posunutá — vyber obdobie.`, ukazka: [] });
+      setChyba({ chyba: `Za ${String(r.zdroj || "toto obdobie")} nevrátila banka ani jeden pohyb.`, ukazka: [], zBanky: true });
       return;
     }
     setNahlad(riadky);
@@ -342,28 +353,37 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
    * pohyby dajú stiahnuť rovno z banky, a to tlačidlo musí byť kde-tu vidieť.
    * Preto zostane karta s jedným riadkom: stiahnuť a odkedy–dokedy.
    */
-  if (!vstup && !nahlad && !busy && !chyba && !vysledok) {
-    return (
-      <Card>
-        <H3><Info text="Pohyby prídu rovno z Fio cez API — bez sťahovania súboru. Bez dátumov sa pýta len to, čo pribudlo od posledného stiahnutia; s dátumami celé obdobie. Nič sa nezapíše hneď, najprv uvidíš náhľad." label="Pohyby z banky" /></H3>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 10 }}>
-          <button
-            onClick={() => void stiahniZBanky(odDna || undefined, doDna || undefined)}
-            style={{ padding: "7px 14px", borderRadius: 8, fontSize: 12.5, cursor: "pointer", fontFamily: "inherit", border: `1px solid ${mix(C.accent, 45)}`, background: mix(C.accent, 12), color: C.accentLight, fontWeight: 600 }}
-          >
-            Stiahnuť z Fio
-          </button>
-          <input type="date" value={odDna} onChange={(e) => setOdDna(e.target.value)} style={{ ...S.input, padding: "6px 9px", fontSize: 12.5 }} />
-          <span style={{ fontSize: 12, color: C.textDim }}>–</span>
-          <input type="date" value={doDna} onChange={(e) => setDoDna(e.target.value)} style={{ ...S.input, padding: "6px 9px", fontSize: 12.5 }} />
-          <span style={{ fontSize: 11.5, color: C.textDim }}>bez dátumov: len nové pohyby</span>
-        </div>
-      </Card>
-    );
-  }
+  /**
+   * KARTA „POHYBY Z BANKY" JE VIDIEŤ VŽDY.
+   *
+   * Prvý deň visela len vtedy, keď nebolo nič iné — takže po prvej chybe
+   * tlačidlo ZMIZLO a nedalo sa skúsiť znova. Jerry, 3. 10. 2026: „neviem
+   * dohľadať tie zápisy z banky." Chyba sa ukáže pod ňou, tlačidlo zostáva.
+   */
+  const kartaBanka = (
+    <Card>
+      <H3><Info text="Pohyby prídu rovno z Fio cez API — bez sťahovania súboru. Bez dátumov sa pýta posledných 90 dní; staršie banka bez silnej autorizácie v internetbankingu nedá. Nič sa nezapíše hneď, najprv uvidíš náhľad." label="Pohyby z banky" /></H3>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 10 }}>
+        <button
+          onClick={() => void stiahniZBanky(odDna || undefined, doDna || undefined)}
+          disabled={busy}
+          style={{ padding: "7px 14px", borderRadius: 8, fontSize: 12.5, cursor: busy ? "default" : "pointer", fontFamily: "inherit", border: `1px solid ${mix(C.accent, 45)}`, background: mix(C.accent, 12), color: C.accentLight, fontWeight: 600, opacity: busy ? 0.5 : 1 }}
+        >
+          {busy ? "sťahujem…" : "Stiahnuť z Fio"}
+        </button>
+        <input type="date" value={odDna} onChange={(e) => setOdDna(e.target.value)} style={{ ...S.input, padding: "6px 9px", fontSize: 12.5 }} />
+        <span style={{ fontSize: 12, color: C.textDim }}>–</span>
+        <input type="date" value={doDna} onChange={(e) => setDoDna(e.target.value)} style={{ ...S.input, padding: "6px 9px", fontSize: 12.5 }} />
+        <span style={{ fontSize: 11.5, color: C.textDim }}>bez dátumov: posledných 90 dní</span>
+      </div>
+    </Card>
+  );
+
+  if (!vstup && !nahlad && !busy && !chyba && !vysledok) return kartaBanka;
 
   return (
     <>
+      {kartaBanka}
       <Card>
         <H3><Info text="Nič sa nezapíše hneď — najprv uvidíš, čo appka z výpisu pochopila, a kategórie sa dajú prepnúť. Čo zaradíš, to si zapamätá ako pravidlo a nabudúce navrhne sama. Rozumie CSV „Pohyby na všech účtech“ aj textu skopírovanému z internetbankingu." label="Bankový výpis — náhľad pred zápisom" /></H3>
         <div style={{ fontSize: 12.5, color: C.textMuted, margin: "6px 0 0", lineHeight: 1.55 }}>
@@ -375,7 +395,7 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
         {vysledok && <div style={{ marginTop: 10, padding: "9px 12px", borderRadius: 8, background: mix(C.green, 12), color: C.text, fontSize: 12.5 }}>{vysledok}</div>}
         {chyba && (
           <div style={{ marginTop: 10, padding: "10px 13px", borderRadius: 8, background: mix(C.orange, 12), border: `1px solid ${mix(C.orange, 30)}`, fontSize: 12.5, color: C.text, lineHeight: 1.55 }}>
-            <b>Výpisu nerozumiem.</b> {chyba.chyba}
+            <b>{chyba.zBanky ? "Banka dáta nedala." : "Výpisu nerozumiem."}</b> {chyba.chyba}
             {chyba.ukazka.length > 0 && (
               <div style={{ marginTop: 8, fontFamily: "ui-monospace, monospace", fontSize: 11, color: C.textDim, whiteSpace: "pre-wrap" }}>
                 {chyba.ukazka.slice(0, 4).join("\n")}

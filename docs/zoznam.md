@@ -236,20 +236,23 @@ os za odkazom áno — a čísla sa rozídu.
 Vidno to na Hanusovi: os ukazuje 3, 2, 1 a nadpis „Poslední hodina", lebo
 karta jeho balíček z 2. 10. ešte nepozná.
 
-## 2d · Lukáš Kríž je v dátach dvakrát
+## 2d · Luky Kríž je SYN, nie preklep — kalendár ho posiela otcovi
 
-PTminder ho od 28. 9. 2026 vyváža ako **„Luky Križ"**, pričom celá jeho
-história je pod **„Lukáš Kríž"** (35 sedení 7/2025–4/2026, 7 predajov) a tak
-sa volá aj v kalendári. Nový balíček za 7 790 Kč aj otvorený poplatok visia
-na novom mene.
+Jerry, 3. 10. 2026: „Lukaš Kríž a Luky Kríž sú dve osoby, je to jeho syn."
+Pôvodne som to čítal ako rozdvojené meno — nie je.
 
-Pre appku sú to dvaja ľudia: jeden prestal chodiť v apríli, druhý prišiel
-v septembri. Padá na tom aj kontrola `naostro.sh` (reťaz „Netrénoval" pri
-nezhode) — a právom, nie je to chyba appky.
+**Čo je zle:** udalosť v kalendári **„Luky Kriz", 28. 9. 14:00** je
+namapovaná na klienta **Lukáš Kríž** (otec). V PTminderi je ten tréning
+správne na **Luky Križ** (syn, 14:00, Jerry) a na jeho meno visí aj nový
+balíček 7 790 Kč a otvorený poplatok.
 
-Opraviť v PTminderi (premenovať/zlúčiť na jedno meno), potom znovu
-naimportovať. Alternatíva je prezývka na strane Kokpitu, ale meno v zdroji
-je lacnejšie.
+**Dôsledok:** otcovi appka pripisuje synov tréning, takže sa netvári, že
+prestal chodiť (naposledy bol 3. 4. 2026), a synovi chýba v kalendári.
+Padá na tom kontrola `naostro.sh` — reťaz „Netrénoval" pri nezhode.
+
+**Oprava:** premapovať názov „Luky Kriz" na klienta Luky Križ (obrazovka
+s novými názvami v kalendári). Potom sa otec správne ozve ako „prestal
+chodiť" a syn dostane svoj tréning.
 
 ## 3 · Blokované niečím mimo Kokpitu
 
