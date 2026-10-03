@@ -119,6 +119,15 @@ export type VypisKlienta = {
    * nesie všetko od prvého tréningu vrátane platieb.
    */
   uplna?: boolean;
+  /**
+   * Koľko posledných balíčkov os ukazuje (1 = len ten posledný).
+   *
+   * Nie je to počet na spočítanie, je to NÁZOV toho, čo klient vidí: podľa
+   * neho sa píše „Poslední balíček" alebo „Poslední dva balíčky". Rozsah
+   * vyberá Jerry v okne pred odoslaním SMS — klientovi, ktorému sa mínus
+   * prenáša, jeden balíček nestačí (Hanus, 3. 10. 2026).
+   */
+  balickov?: number;
   /** Zaplatené spolu (Kč) — dlaždica pri úplnej histórii. */
   zaplateneSpolu?: number;
 

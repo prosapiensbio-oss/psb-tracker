@@ -239,20 +239,38 @@ ${poznamkaBodu(b) ? `<div style="font-size:11px;color:${s.minus};line-height:1.3
  * Celý blok osi. Pri dlhu sa SKLADÁ: navrchu stránky vtedy stojí suma s QR
  * a história je kontext, nie hlavná vec (Jerry, 2. 10. 2026).
  */
+/**
+ * Ako sa volá to, čo klient na osi vidí.
+ *
+ * Jerry určuje rozsah v okne pred odoslaním SMS, takže nadpis nesmie tvrdiť
+ * „Poslední balíček", keď sú na osi dva — pri Hanusovi by to bola presne tá
+ * nejasnosť, kvôli ktorej sa rozsah zavádzal.
+ */
+function nazovRozsahu(balickov: number | undefined): string {
+  const n = balickov ?? 1;
+  if (n === 0) return "Celá historie";
+  if (n === 1) return "Poslední balíček";
+  if (n === 2) return "Poslední dva balíčky";
+  if (n === 3) return "Poslední tři balíčky";
+  return `Posledních ${n} balíčků`;
+}
+
 function blokOsi(v: VypisKlienta, zlozena: boolean): string {
   const s = SADZBA;
   if (!v.os.length) return "";
+  const nazov = nazovRozsahu(v.balickov);
+  const rozbal = (v.balickov ?? 1) === 1 ? "Rozbalit celý balíček pod sebou" : "Rozbalit vše pod sebou";
   const rozpis = `<details style="margin-top:16px;border-top:1px solid ${s.ramik};padding-top:14px">
-<summary style="font-size:13.5px;font-weight:600;color:${s.zelena}"><span class="psb-sip">▸</span>Rozbalit celý balíček pod sebou</summary>
+<summary style="font-size:13.5px;font-weight:600;color:${s.zelena}"><span class="psb-sip">▸</span>${esc(rozbal)}</summary>
 <div style="margin-top:16px">${osZvisla(v.os)}</div></details>`;
   if (zlozena) {
     return `<div style="margin-top:28px">
 <details style="border-top:1px solid ${s.ramik};border-bottom:1px solid ${s.ramik};padding:14px 0">
-<summary style="font-size:14px;font-weight:600;color:${s.zelena}"><span class="psb-sip">▸</span>Poslední balíček — co se stalo</summary>
+<summary style="font-size:14px;font-weight:600;color:${s.zelena}"><span class="psb-sip">▸</span>${esc(nazov)} — co se stalo</summary>
 <div style="margin-top:18px">${osVodorovna(v.os)}${rozpis}</div></details></div>`;
   }
   return `<div style="margin-top:30px">
-<div style="font-size:11px;letter-spacing:2.4px;color:${s.tlmeny};text-transform:uppercase;margin-bottom:12px">Poslední balíček</div>
+<div style="font-size:11px;letter-spacing:2.4px;color:${s.tlmeny};text-transform:uppercase;margin-bottom:12px">${esc(nazov)}</div>
 ${osVodorovna(v.os)}${rozpis}</div>`;
 }
 

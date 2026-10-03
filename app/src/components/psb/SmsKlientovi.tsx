@@ -82,6 +82,23 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
   const [odkaz, setOdkaz] = useState("");
   /** Tá istá stránka pre náhľad: priamo z workera a bez počítadla otvorení. */
   const [nahlad, setNahlad] = useState("");
+  /**
+   * KOĽKO BALÍČKOV HISTÓRIE klient za odkazom uvidí. 0 = celá história.
+   *
+   * Jerry, 3. 10. 2026: „Hanus bol v mínuse, keď platil naposledy, aj teraz.
+   * Keď mu pošlem iba posledný balík, bude to neprehľadné — keby som ale
+   * v okne pred odoslaním mal možnosť poslať mnou určenú históriu, mohlo by
+   * sa mu to vyjasniť."
+   *
+   * Nedrží sa to v adrese, ale pri tokene (`klient_odkazy.balickov`) —
+   * presmerovanie z prosapiens.cz query string zahadzuje. Preto sa zmena
+   * najprv ULOŽÍ a až potom sa prekreslí náhľad: to, čo Jerry vidí, je to,
+   * čo si vypýta prehliadač klienta.
+   */
+  const [balickov, setBalickov] = useState(1);
+  const [rozsahBezi, setRozsahBezi] = useState(false);
+  /** Zmena čísla donúti iframe načítať stránku znova. */
+  const [verzia, setVerzia] = useState(0);
   const nacitane = useRef(false);
 
   useEffect(() => {
@@ -94,9 +111,10 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
       void fetch("/api/sms", {
         method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
         body: JSON.stringify({ akcia: "odkaz", klient: meno }),
-      }).then((x) => x.json()).then((j: { ok?: boolean; url?: string; nahlad?: string }) => {
+      }).then((x) => x.json()).then((j: { ok?: boolean; url?: string; nahlad?: string; balickov?: number }) => {
         if (j?.ok && j.url) setOdkaz(j.url);
         if (j?.nahlad) setNahlad(j.nahlad);
+        if (typeof j?.balickov === "number") setBalickov(j.balickov);
       }).catch(() => null);
     }
   }, [otvorene, meno, predvolenyText]);
@@ -128,6 +146,23 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
     // prekreslení rodiča by text preskladal aj uprostred písania.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [otvorene, meno, trener, sMailom, predvolenyText, platba, zostatok, datum, odkaz]);
+
+  /**
+   * Rozsah sa ULOŽÍ, až potom sa prekreslí náhľad. Keď zápis zlyhá, číslo
+   * sa vráti späť a povie sa to — inak by Jerry poslal odkaz v presvedčení,
+   * že klient uvidí dva balíčky, a klient by videl jeden.
+   */
+  const zmenRozsah = async (n: number) => {
+    const bolo = balickov;
+    setBalickov(n); setRozsahBezi(true); setHlaska("");
+    const r = await fetch("/api/sms", {
+      method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ akcia: "rozsah", klient: meno, balickov: n }),
+    }).then((x) => x.json()).catch(() => ({ ok: false }));
+    setRozsahBezi(false);
+    if (!r?.ok) { setBalickov(bolo); setHlaska("rozsah sa neuložil"); return; }
+    setVerzia((v) => v + 1);
+  };
 
   const posli = async () => {
     setBezi(true); setHlaska("");
@@ -267,9 +302,32 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
             <div style={{ fontSize: 11, letterSpacing: 1.2, textTransform: "uppercase", color: C.textDim, marginBottom: 7 }}>
               Čo uvidí za odkazom
             </div>
+            {/* Koľko histórie mu stránka ukáže. Pri klientovi, ktorému sa
+                mínus prenáša z balíčka do balíčka, jeden nestačí — z jedného
+                sa nedá vyčítať, kam sa hodiny podeli. */}
+            <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginBottom: 7, alignItems: "center" }}>
+              {[1, 2, 3, 0].map((n) => (
+                <button
+                  key={n}
+                  onClick={() => void zmenRozsah(n)}
+                  disabled={rozsahBezi}
+                  title={n === 0 ? "celá história od prvého tréningu" : `posledných ${n} balíčkov`}
+                  style={{
+                    padding: "3px 8px", borderRadius: 7, fontSize: 11, cursor: "pointer", fontFamily: "inherit",
+                    border: `1px solid ${balickov === n ? mix(C.accent, 55) : C.border}`,
+                    background: balickov === n ? mix(C.accent, 14) : "transparent",
+                    color: balickov === n ? C.accentLight : C.textDim,
+                  }}
+                >
+                  {n === 0 ? "celá" : `${n} balíček${n > 1 ? "y" : ""}`}
+                </button>
+              ))}
+              {rozsahBezi && <span style={{ fontSize: 10.5, color: C.textDim }}>…</span>}
+            </div>
             <div style={{ height: 420, borderRadius: 14, overflow: "hidden", border: `1px solid ${C.border}`, background: "#232b1c" }}>
               <iframe
-                src={nahlad}
+                key={verzia}
+                src={verzia ? `${nahlad}&v=${verzia}` : nahlad}
                 title={`Stránka klienta — ${meno}`}
                 style={{ width: 400, height: 560, border: 0, transform: "scale(.75)", transformOrigin: "0 0" }}
               />

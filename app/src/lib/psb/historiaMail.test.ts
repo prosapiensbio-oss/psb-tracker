@@ -69,4 +69,27 @@ describe("popisPreKlienta", () => {
     const cela = historiaPreMail("Kto Vie", os, k as never, "2026-10-01", undefined, true);
     expect(cela.os.map((b) => b.den)).toContain("2026-02-15");
   });
+
+  it("vie vrátiť viac posledných balíčkov naraz", () => {
+    // Jerry, 3. 10. 2026 nad Hanusom: komu sa mínus prenáša z balíčka do
+    // balíčka, tomu jeden balíček nevysvetlí, kam sa hodiny podeli.
+    const os: Udalost[] = [
+      { den: "2026-02-15", druh: "balicekOd", popis: "6h Balíček", hodin: 6 },
+      { den: "2026-02-18", druh: "trening", popis: "tréning · 08:30" },
+      { den: "2026-06-01", druh: "balicekOd", popis: "6h Balíček", hodin: 6 },
+      { den: "2026-06-05", druh: "trening", popis: "tréning · 08:30" },
+      { den: "2026-09-09", druh: "balicekOd", popis: "8h Balíček", hodin: 8 },
+      { den: "2026-09-15", druh: "trening", popis: "tréning · 08:30" },
+    ] as unknown as Udalost[];
+    const k = { packageRemaining: 7, packageTotal: 8, firstSession: "2026-02-15", sessions: [], primaryTrainer: "Jerry" };
+
+    const dva = historiaPreMail("Kto Vie", os, k as never, "2026-10-01", undefined, false, 2);
+    expect(dva.os.map((b) => b.den)).toContain("2026-06-01");
+    expect(dva.os.map((b) => b.den)).not.toContain("2026-02-15");
+    expect(dva.balickov).toBe(2);
+
+    // Keď balíčkov toľko nie je, vráti sa všetko — nie prázdna os.
+    const devat = historiaPreMail("Kto Vie", os, k as never, "2026-10-01", undefined, false, 9);
+    expect(devat.os.map((b) => b.den)).toContain("2026-02-15");
+  });
 });

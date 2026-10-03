@@ -55,6 +55,16 @@ export function historiaPreMail(
    * Mail na vyžiadanie celú históriu ďalej posiela; stránka za odkazom nie.
    */
   uplna: boolean = true,
+  /**
+   * Koľko POSLEDNÝCH balíčkov ukázať, keď `uplna` nie je. 1 = len ten
+   * posledný (predvolené).
+   *
+   * Jerry, 3. 10. 2026: „Hanus bol v mínuse, keď platil naposledy, aj teraz.
+   * Keď mu pošlem iba posledný balík, bude to neprehľadné." Jeden balíček je
+   * dosť na bežný prípad, ale nie na človeka, ktorému sa mínus prenáša —
+   * ten potrebuje vidieť aj predošlý, inak nerozumie, kam sa hodiny podeli.
+   */
+  balickov: number = 1,
 ): VypisKlienta {
   const zostatokTeraz = klient.packageTotal > 0 ? klient.packageRemaining : null;
   const v = vypisHodin(os, "", dnes, zostatokTeraz);
@@ -68,8 +78,12 @@ export function historiaPreMail(
    * namiesto posledného členstva. Vidno to bolo len na živých dátach.
    */
   const vsetky = v.riadky.filter((r) => r.druh !== "balicekDo");
-  const prvyBalicek = vsetky.findIndex((r) => r.druh === "balicekOd");
-  const vyrez = uplna || prvyBalicek < 0 ? vsetky : vsetky.slice(0, prvyBalicek + 1);
+  // Hranice balíčkov od najnovšieho. Pri `balickov` = 2 sa režie až za
+  // DRUHÝM `balicekOd`, takže v zozname zostanú dva celé balíčky.
+  const zaciatky = vsetky.reduce<number[]>((a, r, i) => (r.druh === "balicekOd" ? [...a, i] : a), []);
+  const kolko = Math.max(1, Math.floor(balickov));
+  const hranica = zaciatky[kolko - 1];
+  const vyrez = uplna || hranica == null ? vsetky : vsetky.slice(0, hranica + 1);
   const body = [...vyrez].reverse()
     .map((r) => ({
       den: r.den,
@@ -92,6 +106,7 @@ export function historiaPreMail(
     mesiacov: Math.round(mesiacovVztahu(klient, new Date(dnes))),
     tempo: tempoMesacne(klient, new Date(dnes)),
     uplna,
+    balickov: uplna ? 0 : kolko,
     zaplateneSpolu: v.zaplatene,
     dnes,
     dalsi,

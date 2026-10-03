@@ -1,0 +1,14 @@
+-- Koľko balíčkov histórie ukazuje stránka za odkazom (/v/<token>).
+--
+-- Jerry, 3. 10. 2026: „Hanus bol v mínuse, keď platil naposledy, aj teraz.
+-- Keď mu pošlem iba posledný balík, bude to neprehľadné — keby som ale
+-- v okne pred odoslaním SMS mal možnosť poslať mnou určenú históriu, mohlo
+-- by sa mu to vyjasniť."
+--
+-- Rozsah NIE JE v adrese. Krátky odkaz prosapiens.cz/v/<token> je vo
+-- WordPresse presmerovanie a to query string ZAHADZUJE (overené: ?h=3 sa
+-- do workera nedostane). Keby rozsah visel na `?h=`, klient by vždy videl
+-- jeden balíček a nikto by nevedel prečo. Preto je pri tokene.
+--
+-- 1 = posledný balíček (tak to chodilo doteraz), 0 = celá história.
+ALTER TABLE klient_odkazy ADD COLUMN balickov INTEGER NOT NULL DEFAULT 1;

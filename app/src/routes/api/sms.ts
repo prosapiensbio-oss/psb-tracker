@@ -109,11 +109,34 @@ export const Route = createFileRoute("/api/sms")({
           // na workera (presmerovanie z webu by sa do iframu neprenieslo)
           // a nezdvíha počítadlo otvorení.
           const origin = new URL(request.url).origin;
+          const rozsah = await DB.prepare("SELECT balickov FROM klient_odkazy WHERE token = ?1")
+            .bind(riadok.token).first<{ balickov: number | null }>().catch(() => null);
           return Response.json({
             ok: true,
             url: verejnyOdkaz(`/v/${riadok.token}`, origin),
             nahlad: `${origin}/v/${riadok.token}?nahlad=1`,
+            balickov: rozsah?.balickov ?? 1,
           });
+        }
+
+        /**
+         * KOĽKO HISTÓRIE UVIDÍ KLIENT ZA ODKAZOM.
+         *
+         * Nastavuje sa pri TOKENE, nie v adrese: krátky odkaz
+         * prosapiens.cz/v/… je vo WordPresse presmerovanie a to query string
+         * zahadzuje, takže `?h=2` by sa do workera nikdy nedostalo a klient
+         * by vždy videl jeden balíček. Zmena platí aj pre odkaz, ktorý už
+         * odišiel — to je zámer: keď sa Jerry rozhodne ukázať viac, nemusí
+         * posielať druhú SMS.
+         */
+        if (b.akcia === "rozsah") {
+          const klient = kus(b.klient, 120);
+          const kolko = Math.max(0, Math.min(9, Math.round(Number(b.balickov) || 0)));
+          if (!klient) return Response.json({ ok: false, error: "Chýba klient." }, { status: 400 });
+          const r = await DB.prepare("UPDATE klient_odkazy SET balickov = ?2 WHERE klient = ?1")
+            .bind(klient, kolko).run().catch(() => null);
+          if (!r) return Response.json({ ok: false, error: "Rozsah sa neuložil." }, { status: 500 });
+          return Response.json({ ok: true, balickov: kolko });
         }
 
         const klient = kus(b.klient, 120);

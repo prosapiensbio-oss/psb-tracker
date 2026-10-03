@@ -230,3 +230,29 @@ describe("ponuka ďalšieho balíčka", () => {
     expect(h).not.toContain("Nový balíček");
   });
 });
+
+describe("nadpis osi hovorí, koľko histórie klient vidí", () => {
+  const z = {
+    klient: "Lukas Hanus", oslovenie: "Lukas", trener: "Jerry",
+    os: [
+      { den: "2026-09-09", popis: "6h Balíček", druh: "balicekOd" as const, zostatok: null, dlh: null },
+      { den: "2026-09-12", cas: "16:00", popis: "tréning", druh: "trening" as const, zostatok: 5, dlh: null },
+    ],
+    zostatok: 5, hodinSpolu: 1, odkedy: "2026-02-01", dnes: "2026-10-03",
+  };
+
+  it("jeden balíček sa volá balíček, dva sa volajú dva", () => {
+    expect(klientStranka({ ...z, balickov: 1 })).toContain("Poslední balíček");
+    const dva = klientStranka({ ...z, balickov: 2 });
+    expect(dva).toContain("Poslední dva balíčky");
+    expect(dva).toContain("Rozbalit vše pod sebou");
+  });
+
+  it("celá história sa tak aj volá", () => {
+    expect(klientStranka({ ...z, balickov: 0 })).toContain("Celá historie");
+  });
+
+  it("bez údaja ostáva pri poslednom balíčku", () => {
+    expect(klientStranka(z)).toContain("Poslední balíček");
+  });
+});

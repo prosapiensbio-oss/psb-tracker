@@ -89,7 +89,8 @@ export const Route = createFileRoute("/v/$token")({
         }
 
         if (!DB) return prec("Tento odkaz neplatí.", 404);
-        const r = await DB.prepare("SELECT klient FROM klient_odkazy WHERE token = ?1").bind(token).first<{ klient: string }>();
+        const r = await DB.prepare("SELECT klient, balickov FROM klient_odkazy WHERE token = ?1")
+          .bind(token).first<{ klient: string; balickov: number | null }>();
         if (!r) return prec("Tento odkaz neplatí. Ozvi sa nám a pošleme ti nový.", 404);
 
         const data = await loadData(DB);
@@ -154,8 +155,17 @@ export const Route = createFileRoute("/v/$token")({
           platby.map((p): PlatbaDlh => ({ suma: p.suma_czk, datum: p.datum, zruseneAt: p.zrusene_at })),
         );
 
-        // Stránka ukazuje POSLEDNÝ balíček; celá história chodí mailom na vyžiadanie.
-        const vypis = historiaPreMail(c.name, os, c, dnes, dalsi, false);
+        /**
+         * KOĽKO HISTÓRIE — podľa toho, čo Jerry vybral pred odoslaním SMS.
+         *
+         * Predvolene posledný balíček; celá história chodí mailom na
+         * vyžiadanie. Jerry, 3. 10. 2026 nad Hanusom: „bol v mínuse, keď
+         * platil naposledy, aj teraz — keď mu pošlem iba posledný balík,
+         * bude to neprehľadné." Rozsah sedí pri tokene, nie v adrese:
+         * presmerovanie z prosapiens.cz query string zahadzuje.
+         */
+        const rozsah = Math.max(0, Math.round(Number(r.balickov ?? 1)));
+        const vypis = historiaPreMail(c.name, os, c, dnes, dalsi, rozsah === 0, Math.max(1, rozsah));
         const origin = new URL(request.url).origin;
         /**
          * QR JE NA STRÁNKE VŽDY, KEĎ JE ČO ZAPLATIŤ — a to sú dva prípady.
