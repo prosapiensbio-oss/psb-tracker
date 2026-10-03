@@ -5,6 +5,7 @@ import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 import { porovnajBalicky, type Balicek, type PtBalicek } from "../../lib/psb/balickyEvidencia";
+import { hodinZNazvuBalicka } from "../../lib/psb/klientOsCasu";
 import { jeMesiac } from "../../lib/psb/format";
 
 /**
@@ -126,6 +127,18 @@ export const Route = createFileRoute("/api/balicky")({
           const vKokpite = ((await DB.prepare("SELECT klient, nazov, platnost_od FROM balicky WHERE zrusene_at IS NULL").all()).results || []) as unknown as { klient: string; nazov: string; platnost_od: string }[];
           const podlaObsahu = new Set(vKokpite.map((r) => `${r.klient}|${r.nazov}|${String(r.platnost_od).slice(0, 10)}`));
           const podlaNazvu = new Set(vKokpite.map((r) => `${r.klient}|${r.nazov}`));
+          /**
+           * TEN ISTÝ PREDAJ POD INÝM MENOM — deň a počet hodín.
+           *
+           * Kokpit volá produkt „Předplatné 6 h", PTminder „OFF - 6h
+           * S viazanostou"; podľa názvu sa nestretnú a naliatie by založilo
+           * druhý riadok. 3. 10. 2026 sa to stalo Vítězslavovi Papiežovi
+           * a karta mu hneď ukázala 11 h namiesto 5. Ten istý kľúč používa
+           * aj os času (`osCasuKlienta`), nech obe miesta párujú rovnako.
+           */
+          const podlaHodin = new Set(
+            vKokpite.map((r) => `${r.klient}|${String(r.platnost_od).slice(0, 10)}|h${hodinZNazvuBalicka(r.nazov) || ""}`),
+          );
 
           const kedy = teraz();
           const prikazy = [];
@@ -134,6 +147,8 @@ export const Route = createFileRoute("/api/balicky")({
             if (uz.has(p.id)) continue;
             const odExportu = denISO(p.valid_from);
             if (odExportu ? podlaObsahu.has(`${p.client_name}|${p.package_name}|${odExportu}`) : podlaNazvu.has(`${p.client_name}|${p.package_name}`)) continue;
+            const hodinZExportu = p.sessions_total > 0 ? p.sessions_total : (p.na_obdobie > 0 ? p.na_obdobie : hodinZNazvuBalicka(p.package_name || ""));
+            if (odExportu && hodinZExportu > 0 && podlaHodin.has(`${p.client_name}|${odExportu}|h${hodinZExportu}`)) continue;
             const zNazvu = /(\d+)\s*(h|hod)/i.exec(p.package_name || "");
             let od = denISO(p.valid_from);
             let doDna = denISO(p.valid_to) || null;
