@@ -30,6 +30,46 @@ const uid = () => crypto.randomUUID();
 // Jedna definícia s klientom — viď fio.fioKluc (poradie duplicít bez ID).
 const kluc = fioKluc;
 
+/**
+ * UŽ TO MÁME? Ten istý pohyb má z API iný kľúč než z CSV.
+ *
+ * Z API je kľúč `fio:<ID pohybu>`, z exportu „Pohyby na všech účtech" (ktorý
+ * ID nemá) `dátum|suma|protistrana`. A protistrana sa v oboch zdrojoch volá
+ * inak: CSV ju pri prevodoch vyčítalo z popisu („Jerry vyplata"), API vracia
+ * číslo účtu („2323438014/3030"). Kľúč teda nesadne ani po oprave.
+ *
+ * Preto trojstupňovo: presný kľúč → kľúč bez ID → a nakoniec DEŇ A SUMA.
+ * Posledný krok je párovanie po kusoch: keď v ten deň s tou sumou stoja
+ * v databáze dva riadky, spária sa dva — nie všetky. Dve výplaty po 1 500 Kč
+ * v jeden deň sú bežné a zliať ich by znamenalo stratiť jednu.
+ *
+ * Platí len na riadky s ID, teda z API; pre CSV sa nič nemení.
+ */
+type Zhoda = { kluce: Set<string>; dvojice: Map<string, number> };
+
+const uzJeV = (e: Zhoda, r: FioRiadok): boolean => {
+  if (e.kluce.has(kluc(r))) return true;
+  if (!r.id) return false;
+  if (e.kluce.has(kluc({ ...r, id: undefined }))) return true;
+  const dvojica = `${r.datum}|${r.suma}`;
+  const kolko = e.dvojice.get(dvojica) || 0;
+  if (kolko <= 0) return false;
+  e.dvojice.set(dvojica, kolko - 1);
+  return true;
+};
+
+/** Čo už v databáze je — kľúče aj počty dvojíc deň+suma. */
+async function uzZapisane(DB: import("@cloudflare/workers-types").D1Database): Promise<Zhoda> {
+  const r = ((await DB.prepare("SELECT dedup_key, date, amount_czk FROM fio_transactions").all()).results || []) as
+    { dedup_key: string; date: string; amount_czk: number }[];
+  const dvojice = new Map<string, number>();
+  for (const x of r) {
+    const k = `${String(x.date).slice(0, 10)}|${x.amount_czk}`;
+    dvojice.set(k, (dvojice.get(k) || 0) + 1);
+  }
+  return { kluce: new Set(r.map((x) => x.dedup_key)), dvojice };
+}
+
 export const Route = createFileRoute("/api/fio")({
   server: {
     handlers: {
@@ -91,7 +131,19 @@ export const Route = createFileRoute("/api/fio")({
           // Token sa do adresy dostane, ale NIKDY do odpovede ani do auditu.
           const url = od && doDna ? urlObdobie(token, od, doDna) : urlNove(token);
           let odpoved: Response;
-          try { odpoved = await fetch(url); }
+          /**
+           * S HLAVIČKAMI, INAK FIO VRACIA PÄŤSTOVKU.
+           *
+           * `fetch` z Workera ide bez User-Agenta a Fio na taký dotaz
+           * odpovedá HTML stránkou „Chyba 500" — vyzerá to ako neplatný
+           * token, ale je to ich webová vrstva, ktorá dotaz zahodí skôr,
+           * než sa dostane k API.
+           */
+          try {
+            odpoved = await fetch(url, {
+              headers: { "user-agent": "Kokpit/1.0 (ProSapiens Biomechanic)", accept: "application/json" },
+            });
+          }
           catch { return Response.json({ ok: false, chyba: "Na banku sa nepodarilo pripojiť." }, { status: 502 }); }
           if (!odpoved.ok) {
             // Čo banka naozaj povedala. Bez toho zostane po „500" len hádanie
@@ -116,14 +168,11 @@ export const Route = createFileRoute("/api/fio")({
           catch { return Response.json({ ok: false, chyba: "Banka vrátila odpoveď, ktorej appka nerozumie." }, { status: 502 }); }
           const pohyby = pohybyZOdpovede(json, pravidla);
 
-          const existujuce = new Set(
-            ((await DB.prepare("SELECT dedup_key FROM fio_transactions").all()).results as { dedup_key: string }[])
-              .map((r) => r.dedup_key),
-          );
+          const existujuce = await uzZapisane(DB);
           const zamky = await zamknuteMesiace(DB);
           const riadky = pohyby.map((r) => ({
             ...r,
-            uzMame: existujuce.has(kluc(r)),
+            uzMame: uzJeV(existujuce, r),
             zamknuty: jeZamknuty(zamky, r.datum),
           }));
           const info = json?.accountStatement?.info;
@@ -153,14 +202,11 @@ export const Route = createFileRoute("/api/fio")({
           if (!v.ok) return Response.json({ ok: false, chyba: v.chyba, ukazka: v.ukazka });
 
           // Čo už v databáze je, nech sa v náhľade neponúka znova.
-          const existujuce = new Set(
-            ((await DB.prepare("SELECT dedup_key FROM fio_transactions").all()).results as { dedup_key: string }[])
-              .map((r) => r.dedup_key),
-          );
+          const existujuce = await uzZapisane(DB);
           const zamky = await zamknuteMesiace(DB);
           const riadky = v.riadky.map((r) => ({
             ...r,
-            uzMame: existujuce.has(kluc(r)),
+            uzMame: uzJeV(existujuce, r),
             zamknuty: jeZamknuty(zamky, r.datum),
           }));
           // Kontrola proti hlavičke výpisu: sedí súčet toho, čo parser prečítal,
@@ -182,10 +228,7 @@ export const Route = createFileRoute("/api/fio")({
           const riadky = Array.isArray(b.riadky) ? b.riadky.slice(0, 2000) : [];
           if (!riadky.length) return Response.json({ ok: false, error: "no_rows" }, { status: 400 });
           const zamky = await zamknuteMesiace(DB);
-          const existujuce = new Set(
-            ((await DB.prepare("SELECT dedup_key FROM fio_transactions").all()).results as { dedup_key: string }[])
-              .map((r) => r.dedup_key),
-          );
+          const existujuce = await uzZapisane(DB);
 
           const stmts = [];
           let pridane = 0, preskocene = 0, zamknute = 0;
@@ -193,8 +236,9 @@ export const Route = createFileRoute("/api/fio")({
           for (const r of riadky) {
             if (jeZamknuty(zamky, r.datum)) { zamknute++; continue; }
             const k = kluc(r);
-            if (existujuce.has(k)) { preskocene++; continue; }
-            existujuce.add(k);
+            if (uzJeV(existujuce, r)) { preskocene++; continue; }
+            existujuce.kluce.add(k);
+            existujuce.dvojice.set(`${r.datum}|${r.suma}`, (existujuce.dvojice.get(`${r.datum}|${r.suma}`) || 0));
             stmts.push(
               DB.prepare(
                 `INSERT OR IGNORE INTO fio_transactions (id, date, amount_czk, counterparty, note, typ, category, dedup_key, created_at)

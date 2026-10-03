@@ -42,6 +42,25 @@ describe("pohyby z Fio API", () => {
     expect(poznamkaPohybu({ ...pohyb, column16: null, column5: st("0") })).toBe("");
   });
 
+  it("pri platbe kartou vyberie obchodníka z textu", () => {
+    // Kartová platba nemá ani názov, ani protiúčet — obchodník je v popise.
+    // Bez toho by mali všetky kartové platby prázdnu protistranu a september
+    // by sa z API naimportoval druhýkrát, lebo kľúč z CSV ju obsahuje.
+    const karta = {
+      column22: st(1148734999, "ID pohybu", 22),
+      column0: st("2026-09-26+0200"),
+      column1: st(-110.03),
+      column2: null, column3: null, column10: null, column12: null, column5: st("1851"),
+      column16: st("Nákup: CLOUDFLARE, CLOUDFLARE.CO, US, dne 25.9.2026, částka  5.00 USD"),
+      column25: st("Nákup: CLOUDFLARE, CLOUDFLARE.CO, US, dne 25.9.2026, částka  5.00 USD"),
+      column18: st("Nákup: CLOUDFLARE, CLOUDFLARE.CO, US, dne 25.9.2026, částka  5.00 USD"),
+      column8: st("Platba kartou"),
+    };
+    expect(protistranaPohybu(karta)).toBe("CLOUDFLARE");
+    // Ten istý text v troch stĺpcoch sa nesmie zopakovať trikrát.
+    expect(poznamkaPohybu(karta).match(/Nákup:/g)?.length).toBe(1);
+  });
+
   it("pohyby idú od najstaršieho a bez dátumu sa zahodia", () => {
     const o = { accountStatement: { transactionList: { transaction: [
       { ...pohyb, column0: st("2026-09-28+0200") },

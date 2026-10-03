@@ -22,7 +22,7 @@
  * v databáze ani v odpovedi API. Preto sa v tomto súbore ani raz nelogu je.
  */
 
-import { odhadniKategoriu, type FioRiadok } from "./fio";
+import { odhadniKategoriu, protistranaZPopisu, type FioRiadok } from "./fio";
 
 const ZAKLAD = "https://fioapi.fio.cz/v1/rest";
 
@@ -72,9 +72,19 @@ export function datumPohybu(s: Stlpec): string {
 export function protistranaPohybu(p: Pohyb): string {
   const nazov = text(p.column10);
   if (nazov) return nazov;
+  /**
+   * PLATBA KARTOU NEMÁ PROTIÚČET — obchodník je v texte.
+   *
+   * „Nákup: APPLE.COM/BILL, APPLE.COM/BIL, IE, dne 25.9.2026…" Bez tohto by
+   * mali všetky kartové platby prázdnu protistranu: naučené pravidlá by na ne
+   * nesadli a hlavne by sa nepoznali ako tie isté pohyby, čo už v databáze sú
+   * z CSV — a september by sa naimportoval druhýkrát.
+   */
   const ucet = text(p.column2);
   const kod = text(p.column3);
-  return ucet ? (kod ? `${ucet}/${kod}` : ucet) : text(p.column12);
+  if (ucet) return kod ? `${ucet}/${kod}` : ucet;
+  const zPopisu = protistranaZPopisu([text(p.column16), text(p.column25), text(p.column18)].filter(Boolean).join(" "));
+  return zPopisu || text(p.column12);
 }
 
 /**
@@ -83,7 +93,13 @@ export function protistranaPohybu(p: Pohyb): string {
  * pripája na koniec, lebo niektorí klienti sa podpisujú práve ním.
  */
 export function poznamkaPohybu(p: Pohyb): string {
-  const kusy = [text(p.column16), text(p.column25), text(p.column18), text(p.column7)].filter(Boolean);
+  // Fio vracia pri kartových platbách TEN ISTÝ text v troch stĺpcoch naraz
+  // (správa, komentár, upresnenie). Bez zlúčenia by poznámka hovorila to isté
+  // trikrát za sebou a v tabuľke by sa nedalo nič prečítať.
+  const kusy: string[] = [];
+  for (const x of [text(p.column16), text(p.column25), text(p.column18), text(p.column7)]) {
+    if (x && !kusy.some((y) => y === x)) kusy.push(x);
+  }
   const vs = text(p.column5);
   if (vs && vs !== "0") kusy.push(`VS ${vs}`);
   return kusy.join(" · ").slice(0, 300);
