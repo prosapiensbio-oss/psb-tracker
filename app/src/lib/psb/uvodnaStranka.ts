@@ -45,13 +45,23 @@ export const ODKAZY = {
    */
   cennik: "https://www.prosapiens.cz/sluzby/#cenik",
   /**
-   * Vedie na /o-nas/, lebo vlastná stránka trenéra NEEXISTUJE (je to na
-   * zozname). Jerry, 3. 10. 2026: „keď kliknem na profil trenéra, vedie to
-   * na Kousek lesa uprostřed města." Odkaz je správny, sľub bol zlý —
-   * tlačidlo sa preto volá „O nás a trenérech", nie „Profil trenéra".
-   * Keď stránka vznikne, zmení sa adresa aj názov späť.
+   * Profil trenéra — PODĽA TOHO, KTO TEN TRÉNING VEDIE.
+   *
+   * Jerry, 3. 10. 2026: „keď kliknem na profil trenéra, vedie to na Kousek
+   * lesa uprostřed města." Viedlo, lebo odkaz bol natvrdo na /o-nas/ — a ja
+   * som tvrdil, že vlastná stránka neexistuje. Existujú obe:
+   * prosapiens.cz/jerry/ a prosapiens.cz/terezia/ (nie /terezka/, preto mi
+   * prvý pokus vrátil 404 a ja som z toho spravil záver). Našla sa až
+   * v mape stránok — tam, kde som mal hľadať hneď.
+   *
+   * Klient teda vidí profil TOHO, kto ho trénuje, s jeho menom. /o-nas/
+   * zostáva ako záchrana, keby pribudol tréner bez vlastnej stránky.
    */
   profil: "https://www.prosapiens.cz/o-nas/",
+  profilTrenera: {
+    Jerry: "https://www.prosapiens.cz/jerry/",
+    Terezka: "https://www.prosapiens.cz/terezia/",
+  } as Record<string, string>,
   poUvodnej: "https://www.prosapiens.cz/informace-po-uvodni-lekci/",
   coOcekavat: "https://www.prosapiens.cz/co-ocekavat-od-biomechanickeho-treninku/",
   idealniPristup: "https://www.prosapiens.cz/idealni-pristup-2/",
@@ -134,6 +144,8 @@ const riadokOdkazu = (href: string, nadpis: string, popis: string) =>
 export function uvodnaStrankaHtml(v: VolbyStranky): string {
   const t = TRENERI[v.trener] ? v.trener : "Jerry";
   const tr = TRENERI[t];
+  /** Vlastná stránka trenéra, keď ju má. */
+  const profilUrl = ODKAZY.profilTrenera[t] || "";
   const tel = cisloDoOdkazu(tr.telefon);
   const kedy = termin(v.kedy);
   const predUvodnym = v.druh === "pred";
@@ -265,7 +277,7 @@ ${telo}
 <div style="font-family:'Raleway',sans-serif;font-weight:700;font-size:26px;line-height:1.2">${esc(tr.krstne === "Filip" ? "Filip Stráňavský" : tr.formalne)}</div>
 <div style="font-size:16px;color:#5B6B60;margin-top:4px">${esc(t === "Jerry" ? "Jerry · váš trenér" : "váš trenér")}</div>
 <div style="margin-top:14px;display:flex;flex-wrap:wrap;gap:10px">
-<a href="${esc(ODKAZY.profil)}" style="display:inline-block;text-decoration:none;border:1px solid #DCE3DD;border-radius:32px;padding:11px 20px;font-size:15px;font-weight:600;color:#1A2E24">O nás a trenérech</a>
+<a href="${esc(profilUrl || ODKAZY.profil)}" style="display:inline-block;text-decoration:none;border:1px solid #DCE3DD;border-radius:32px;padding:11px 20px;font-size:15px;font-weight:600;color:#1A2E24">${profilUrl ? `Profil — ${esc(tr.krstne)}` : "O nás a trenérech"}</a>
 <a href="tel:${esc(tel)}" style="display:inline-block;text-decoration:none;border:1px solid #DCE3DD;border-radius:32px;padding:11px 20px;font-size:15px;font-weight:600;color:#1A2E24">${esc(tr.telefon)}</a>
 </div>
 ${zaver}

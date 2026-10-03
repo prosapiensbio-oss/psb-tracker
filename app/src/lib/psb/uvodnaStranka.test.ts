@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
-import { termin, uvodnaStrankaHtml, UVODNY } from "./uvodnaStranka";
+import { TRENERI } from "./mailFaktury";
+import { ODKAZY, termin, uvodnaStrankaHtml, UVODNY } from "./uvodnaStranka";
 
 const JERRY = "+420702090289";
 const TEREZKA = "+420702147704";
@@ -140,6 +141,40 @@ describe("figúra v hlavičke", () => {
   it("je na oboch podobách stránky", () => {
     for (const druh of ["pred", "po"] as const) {
       expect(uvodnaStrankaHtml({ ...z, druh, figuraUrl: "/f.svg" })).toContain('src="/f.svg"');
+    }
+  });
+});
+
+describe("profil trenéra", () => {
+  const z = { kedy: "2026-10-09T09:00", cenaCzk: null, logoUrl: "/l.svg", druh: "pred" } as const;
+
+  it("klient vidí profil TOHO, kto ho trénuje, aj s menom", () => {
+    // Jerry, 3. 10. 2026: „a toto je čo? prosapiens.cz/jerry" a „Terezka má
+    // svoju, takže keď bude posielať svojmu klientovi, mal by tam byť jej
+    // profil s jej menom." Obe stránky existujú; jej je na /terezia/,
+    // nie /terezka/ — preto mi prvý pokus vrátil 404.
+    const j = uvodnaStrankaHtml({ ...z, trener: "Jerry" });
+    expect(j).toContain("prosapiens.cz/jerry/");
+    expect(j).toContain("Profil — Filip");
+
+    const t = uvodnaStrankaHtml({ ...z, trener: "Terezka" });
+    expect(t).toContain("prosapiens.cz/terezia/");
+    expect(t).toContain("Profil — Terezka");
+    expect(t).not.toContain("prosapiens.cz/jerry/");
+  });
+
+  it("neznámy tréner sa chová ako Jerry, nie ako cudzí človek", () => {
+    // Stránka neznáme meno prepíše na Jerryho (telefón, podpis aj profil),
+    // takže /o-nas/ je len záchrana pre trénera, čo v TRENERI je a stránku
+    // na webe ešte nemá. Dnes taký nie je — stráži to test nižšie.
+    const h = uvodnaStrankaHtml({ ...z, trener: "Niekto Nový" });
+    expect(h).toContain("prosapiens.cz/jerry/");
+    expect(h).toContain("Profil — Filip");
+  });
+
+  it("každý tréner z TRENERI má svoj odkaz", () => {
+    for (const meno of Object.keys(TRENERI)) {
+      expect(ODKAZY.profilTrenera[meno]).toBeTruthy();
     }
   });
 });
