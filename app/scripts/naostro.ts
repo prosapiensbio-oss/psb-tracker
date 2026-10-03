@@ -193,7 +193,17 @@ else {
   const dniOdPosledneho = posledne
     ? Math.floor((Date.now() - Date.parse(`${posledne}T00:00:00Z`)) / 86400000)
     : Infinity;
+  /**
+   * Keď ten istý deň stojí aj v PTminderi, odpoveď „netrénoval" z kalendára
+   * sedenie nezmaže — klient teda ďalej trénoval a „prestal chodiť" sa
+   * právom neozve. 3. 10. 2026 na tom spadol Lukáš Kríž: vrátil sa 28. 9. po
+   * polroku a ten istý deň priniesol aj čerstvý export z PTmindera. SIEDMY
+   * prípad, keď sa mýli kontrola, nie appka (viď varovanie v hlavičke).
+   */
+  const denJeVExporte = base.sessions.some((x) => x.client === n.klient && x.date.slice(0, 10) === n.datum);
+
   if (!maSedenia) console.log("  (nový klient bez sedení — gone sa naňho nevzťahuje, preskakujem)");
+  else if (denJeVExporte) console.log("  (ten deň je aj v PTminderi — odpoveď z kalendára ho neruší, preskakujem)");
   else if (dniOdPosledneho < DNI_ODMLCANY) console.log(`  (posledný tréning pred ${dniOdPosledneho} dňami — na „prestal chodiť" treba ${DNI_ODMLCANY}, preskakujem)`);
   else if (odchodZodpovedany) console.log("  (odchod už zodpovedaný v registri — gone/duch sa právom neozve, preskakujem)");
   else if (inyKryje) ok(!po.has(`gone|${n.klient}`), "kalendar ho kryje inym treningom - prestal chodit sa NEVRACIA");

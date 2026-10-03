@@ -293,8 +293,17 @@ export function osCasuKlienta(
     const d = den(sl.date);
     if (!d || d > dnes) continue;
     const kluc = `${d}|${normName(sl.description)}`;
-    if (uzJe.has(kluc)) continue;
     const zNazvu = hodinZNazvuBalicka(sl.description);
+    /**
+     * DVOJICU TREBA HĽADAŤ AJ PODĽA HODÍN, NIELEN PODĽA NÁZVU.
+     *
+     * Ten istý predaj sa v Kokpite volá „Předplatné 6 h" a v exporte
+     * „OFF - 6h S viazanostou" — podľa názvu sa nestretnú. Kľúč `deň|hhodiny`
+     * sa tu dovtedy len ZAPISOVAL, nečítal, a odkedy ide Kokpit prvý, prestal
+     * fungovať: Vítězslav Papiež mal 29. 9. dva balíčky po šesť hodín a na
+     * odkaze mu svietilo 12 h namiesto 6.
+     */
+    if (uzJe.has(kluc) || (zNazvu > 0 && uzJe.has(`${d}|h${zNazvu}`))) continue;
     uzJe.add(kluc);
     // Kľúč po hodinách drží aj tu: ten istý predaj môže mať v Kokpite iné
     // meno než v exporte (Balíček 6 h vs. OFF - 6h BEZ viazanosti).

@@ -223,30 +223,33 @@ s `viditelny` sa pri každom vykreslení počítajú odznova (pri 200 nápadoch
 dá premenovať, prefarbiť, prehodiť na druhú stranu a zmazať. Zmazanie nápady
 nemaže — padnú do odkladiska.
 
-## 2c · Dochádzka 28.–30. 9. 2026 — kalendár áno, PTminder nie
+## 2c · Doplniť balíčky z PTmindera do Kokpitu
 
-Nájdené 3. 10. 2026 pri Vaškovi a Čechovej, odložené (PTminder ešte nie je
-nahodený).
+Od 1. 10. 2026 karta klienta počíta zostatok z `balicky` (Kokpit), ale nové
+predaje prichádzajú do `services` (PTminder) a do `balicky` ich prepisuje
+RUČNÁ akcia „Doplniť nové z PTmindera". Bez nej karta o balíčku nevie, hoci
+os za odkazom áno — a čísla sa rozídu.
 
-**Čo je zle:** 28 tréningov z 28., 29. a 30. 9. pozná len Google Kalendár —
-export z PTmindera ich nemá. Karta klienta ich nepočíta (`KOKPIT_OD` je
-1. 10.), stránka za odkazom áno — preto sa 19 ľuďom rozchádza nadpis odkazu
-s kartou presne o hodinu. Hlási to kontrolór profilov, sekcia „ODKAZ PRE
-KLIENTA".
+Čaká (stav k 3. 10. 2026): **Richard Matl** (28. 9.), **Luky Križ** (28. 9.),
+**Lukas Hanus** (2. 10.), **Lucie Podolova** (2. 10.).
 
-Mená: 28. 9. Gažo, Gerich, Križova, Kríž, Rupova, Matlova, Krčmar, Matl ·
-29. 9. Nova, Kalmus, Čechova, Papiež, Hanus, Přínosil, Doležalova,
-Vopalenský, Vankova, Vaško · 30. 9. Obrovska, Kral, Khamaziuk, Podolova,
-Přinosilová, Martinek, Broskva a ďalší.
+Vidno to na Hanusovi: os ukazuje 3, 2, 1 a nadpis „Poslední hodina", lebo
+karta jeho balíček z 2. 10. ešte nepozná.
 
-**Dve cesty:**
-1. Posunúť `KOKPIT_OD` z 1. 10. na 28. 9. — jedna konštanta, karta aj odkaz
-   začnú hovoriť to isté. ~25 klientom klesne zostatok o hodinu (správne).
-2. Spraviť posledný export z PTmindera za 28.–30. 9. a doimportovať ho —
-   hranica zostane, kde je.
+## 2d · Lukáš Kríž je v dátach dvakrát
 
-Jerry, 3. 10. 2026: „toto budeme musieť doriešiť neskôr, lebo PTminder
-nemáme ešte nahodený."
+PTminder ho od 28. 9. 2026 vyváža ako **„Luky Križ"**, pričom celá jeho
+história je pod **„Lukáš Kríž"** (35 sedení 7/2025–4/2026, 7 predajov) a tak
+sa volá aj v kalendári. Nový balíček za 7 790 Kč aj otvorený poplatok visia
+na novom mene.
+
+Pre appku sú to dvaja ľudia: jeden prestal chodiť v apríli, druhý prišiel
+v septembri. Padá na tom aj kontrola `naostro.sh` (reťaz „Netrénoval" pri
+nezhode) — a právom, nie je to chyba appky.
+
+Opraviť v PTminderi (premenovať/zlúčiť na jedno meno), potom znovu
+naimportovať. Alternatíva je prezývka na strane Kokpitu, ale meno v zdroji
+je lacnejšie.
 
 ## 3 · Blokované niečím mimo Kokpitu
 
