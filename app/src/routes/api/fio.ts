@@ -4,9 +4,11 @@ import { audit, jeZamknuty, zamknuteMesiace } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 import { fioKluc, parseFio, type FioRiadok } from "../../lib/psb/fio";
+import { chybaOdpovede, pohybyZOdpovede, urlNove, urlObdobie, zostatokZOdpovede, type FioOdpoved } from "../../lib/psb/fioApi";
 
 // Import bankového výpisu — dvojkrokovo.
 //
+//   POST { akcia: "stiahni", od?, do? } → to isté, ale rovno z Fio API
 //   POST { akcia: "nahlad", text }   → nič nezapíše, vráti, čo z výpisu pochopil
 //   POST { akcia: "zapis", riadky }  → zapíše potvrdené riadky a naučí sa pravidlá
 //   GET                              → uložené pohyby + naučené pravidlá
@@ -57,9 +59,77 @@ export const Route = createFileRoute("/api/fio")({
         if (!(await isAuthed(request))) return unauthorized();
         const { DB } = bindings();
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });
-        let b: { akcia?: string; text?: string; riadky?: FioRiadok[]; zmeny?: { kluc: string; kategoria: string; datum?: string; poznamka?: string }[] };
+        let b: { akcia?: string; text?: string; od?: string; do?: string; riadky?: FioRiadok[]; zmeny?: { kluc: string; kategoria: string; datum?: string; poznamka?: string }[] };
         try { b = (await request.json()) as typeof b; }
         catch { return Response.json({ ok: false, error: "bad_request" }, { status: 400 }); }
+
+        /**
+         * POHYBY ROVNO Z BANKY — bez nahrávania súboru.
+         *
+         * Jerry, 3. 10. 2026: „existuje nejaké API na Fio banku?" Existuje, a
+         * je to lepší zdroj než export: nesie `ID pohybu`, ktorý z CSV od
+         * 9/2026 zmizol a bez ktorého sa dve rovnaké platby v jeden deň zlejú
+         * do jednej.
+         *
+         * NEZAPISUJE. Vracia to isté, čo náhľad súboru, a zapisuje sa tým
+         * istým druhým krokom — kategórie sú odhad a odhad nemá tiecť do P&L
+         * bez človeka. Bez dátumov sa pýta `/last/`, teda len to, čo pribudlo
+         * od posledného stiahnutia.
+         */
+        if (b.akcia === "stiahni") {
+          const token = (bindings() as { FIO_TOKEN?: string }).FIO_TOKEN || "";
+          if (!token) {
+            return Response.json({
+              ok: false,
+              chyba: "Fio token nie je nastavený. Vytvor ho v internetbankingu (Nastavení → API, právo „Sledování účtu\") a ulož príkazom: npx wrangler secret put FIO_TOKEN",
+            }, { status: 400 });
+          }
+          const den = (x: unknown) => (/^\d{4}-\d{2}-\d{2}$/.test(String(x || "")) ? String(x) : "");
+          const od = den(b.od), doDna = den(b.do);
+          // Token sa do adresy dostane, ale NIKDY do odpovede ani do auditu.
+          const url = od && doDna ? urlObdobie(token, od, doDna) : urlNove(token);
+          let odpoved: Response;
+          try { odpoved = await fetch(url); }
+          catch { return Response.json({ ok: false, chyba: "Na banku sa nepodarilo pripojiť." }, { status: 502 }); }
+          if (!odpoved.ok) return Response.json({ ok: false, chyba: chybaOdpovede(odpoved.status) }, { status: 502 });
+
+          const pr = await DB.prepare("SELECT text_pattern, category FROM vzas_rules WHERE active = 1 ORDER BY priority").all()
+            .catch(() => ({ results: [] as Record<string, unknown>[] }));
+          const pravidla = (pr.results as Record<string, unknown>[])
+            .map((r) => ({ vzor: String(r.text_pattern || ""), kategoria: String(r.category || "") }))
+            .filter((r) => r.vzor && r.kategoria);
+
+          let json: FioOdpoved;
+          try { json = (await odpoved.json()) as FioOdpoved; }
+          catch { return Response.json({ ok: false, chyba: "Banka vrátila odpoveď, ktorej appka nerozumie." }, { status: 502 }); }
+          const pohyby = pohybyZOdpovede(json, pravidla);
+
+          const existujuce = new Set(
+            ((await DB.prepare("SELECT dedup_key FROM fio_transactions").all()).results as { dedup_key: string }[])
+              .map((r) => r.dedup_key),
+          );
+          const zamky = await zamknuteMesiace(DB);
+          const riadky = pohyby.map((r) => ({
+            ...r,
+            uzMame: existujuce.has(kluc(r)),
+            zamknuty: jeZamknuty(zamky, r.datum),
+          }));
+          const info = json?.accountStatement?.info;
+          return Response.json({
+            ok: true,
+            riadky,
+            hlavicka: {
+              ucet: String(info?.accountId || ""),
+              od: String(info?.dateStart || "").slice(0, 10),
+              do: String(info?.dateEnd || "").slice(0, 10),
+            },
+            zostatok: zostatokZOdpovede(json),
+            // Z API má ID každý pohyb — toto číslo je tu preto, aby bolo vidieť,
+            // že sa duplicity už nemajú ako zliať.
+            bezId: riadky.filter((r) => !r.id).length,
+            zdroj: od && doDna ? `${od} – ${doDna}` : "od posledného stiahnutia",
+          });
+        }
 
         if (b.akcia === "nahlad") {
           const pr = await DB.prepare("SELECT text_pattern, category FROM vzas_rules WHERE active = 1 ORDER BY priority").all()

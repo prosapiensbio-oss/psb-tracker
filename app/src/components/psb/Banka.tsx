@@ -100,6 +100,9 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
   const [kontrola, setKontrola] = useState<{ prijmy: number; vydaje: number; obdobie: string; vypisov: number; precitanePrijmy: number; precitaneVydaje: number; sedi: boolean | null; zostatok?: number; zostatokKu?: string } | null>(null);
   const [bezId, setBezId] = useState(0);
   const [potvrdZahodit, setPotvrdZahodit] = useState(false);
+  /** Obdobie pre sťahovanie z Fio API; prázdne = len nové pohyby. */
+  const [odDna, setOdDna] = useState("");
+  const [doDna, setDoDna] = useState("");
   // Príjmy a výdavky vedľa seba v jednej tabuľke sa zle prechádzajú — zaraďujú
   // sa hlavne výdavky, príjmy sú len kontrola proti PTminderu.
   const [filter, setFilter] = useState<"vsetko" | "vydaje" | "prijmy" | "vyplaty" | "nezaradene">("vsetko");
@@ -187,6 +190,46 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
     // z hlavičky, ktorý so zápisom pohybov nemá nič spoločné.
     if (typeof k?.zostatok === "number" && k.zostatokKu) {
       void saveVzasSetting("fio_zostatok", { suma: Math.round(k.zostatok), datum: k.zostatokKu });
+    }
+  };
+
+  /**
+   * POHYBY ROVNO Z BANKY — bez sťahovania a nahrávania súboru.
+   *
+   * Jerry, 3. 10. 2026: „existuje nejaké API na Fio banku?" Existuje a je to
+   * lepší zdroj: nesie `ID pohybu`, ktorý z CSV exportu od 9/2026 zmizol.
+   *
+   * Končí tam, kde náhľad súboru — v tej istej tabuľke a s tým istým zápisom.
+   * Kategórie sú odhad a odhad nemá tiecť do P&L bez človeka, takže aj tu
+   * platí druhý krok.
+   */
+  const stiahniZBanky = async (od?: string, doDna?: string) => {
+    setBusy(true); setChyba(null); setVysledok(null);
+    let r: { ok?: boolean; chyba?: string; error?: string; [k: string]: unknown };
+    try {
+      const res = await fetch("/api/fio", {
+        method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ akcia: "stiahni", od, do: doDna }),
+      });
+      r = (await res.json()) as typeof r;
+      if (!res.ok && !r.chyba && !r.error) r = { ...r, ok: false, chyba: `Server odpovedal ${res.status}.` };
+    } catch (e) {
+      r = { ok: false, chyba: `Nepodarilo sa spojiť so serverom: ${e instanceof Error ? e.message : String(e)}` };
+    }
+    setBusy(false);
+    if (!r.ok) { setChyba({ chyba: r.chyba || String(r.error || "Neznáma chyba"), ukazka: [] }); return; }
+    const riadky = (r.riadky as Nahlad[]) || [];
+    if (!riadky.length) {
+      setChyba({ chyba: `Banka nevrátila ani jeden pohyb (${String(r.zdroj || "")}). Keď si sťahoval dnes, zarážka je už posunutá — vyber obdobie.`, ukazka: [] });
+      return;
+    }
+    setNahlad(riadky);
+    setKontrola(null);
+    setBezId(Number(r.bezId) || 0);
+    // Zostatok z hlavičky — to isté, čo si appka berie z výpisu.
+    const h = r.hlavicka as { do?: string } | undefined;
+    if (typeof r.zostatok === "number" && h?.do) {
+      void saveVzasSetting("fio_zostatok", { suma: Math.round(r.zostatok as number), datum: h.do });
     }
   };
 
@@ -294,7 +337,30 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
   // Prázdny komponent sa nevykresľuje — obrazovka Údaje ho renderuje vždy,
   // aby vedel obnoviť rozrobené zaraďovanie, ale keď nie je čo ukázať, nemá
   // tam visieť prázdna karta.
-  if (!vstup && !nahlad && !busy && !chyba && !vysledok) return null;
+  /**
+   * Keď nie je čo ukazovať, nevisí tu prázdna karta — ale od 3. 10. 2026 sa
+   * pohyby dajú stiahnuť rovno z banky, a to tlačidlo musí byť kde-tu vidieť.
+   * Preto zostane karta s jedným riadkom: stiahnuť a odkedy–dokedy.
+   */
+  if (!vstup && !nahlad && !busy && !chyba && !vysledok) {
+    return (
+      <Card>
+        <H3><Info text="Pohyby prídu rovno z Fio cez API — bez sťahovania súboru. Bez dátumov sa pýta len to, čo pribudlo od posledného stiahnutia; s dátumami celé obdobie. Nič sa nezapíše hneď, najprv uvidíš náhľad." label="Pohyby z banky" /></H3>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 10 }}>
+          <button
+            onClick={() => void stiahniZBanky(odDna || undefined, doDna || undefined)}
+            style={{ padding: "7px 14px", borderRadius: 8, fontSize: 12.5, cursor: "pointer", fontFamily: "inherit", border: `1px solid ${mix(C.accent, 45)}`, background: mix(C.accent, 12), color: C.accentLight, fontWeight: 600 }}
+          >
+            Stiahnuť z Fio
+          </button>
+          <input type="date" value={odDna} onChange={(e) => setOdDna(e.target.value)} style={{ ...S.input, padding: "6px 9px", fontSize: 12.5 }} />
+          <span style={{ fontSize: 12, color: C.textDim }}>–</span>
+          <input type="date" value={doDna} onChange={(e) => setDoDna(e.target.value)} style={{ ...S.input, padding: "6px 9px", fontSize: 12.5 }} />
+          <span style={{ fontSize: 11.5, color: C.textDim }}>bez dátumov: len nové pohyby</span>
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <>
