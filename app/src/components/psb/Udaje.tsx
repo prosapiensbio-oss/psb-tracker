@@ -823,6 +823,8 @@ function NapojenieSms() {
    * SMS — preto je tlačidlo vedľa skúšobnej, nie namiesto nej.
    */
   const [vsetkyBezi, setVsetkyBezi] = useState(false);
+  // Počet znení sa mení (päť sa zlúčilo na štyri), tak sa nikde nepíše ručne.
+  const pocetZneni = ukazkoveSms().length;
 
   const posliVsetky = async () => {
     const cislo = skusobne.trim();
@@ -839,7 +841,7 @@ function NapojenieSms() {
       else if (!chyba) chyba = r?.error || "nepodarilo sa";
     }
     setVsetkyBezi(false);
-    setHlaska(chyba ? `odoslaných ${preslo} z 5 · ${chyba}` : `odoslaných všetkých ${preslo} znení na ${cislo}`);
+    setHlaska(chyba ? `odoslaných ${preslo} z ${pocetZneni} · ${chyba}` : `odoslaných všetkých ${preslo} znení na ${cislo}`);
     await nacitaj();
   };
 
@@ -898,14 +900,14 @@ function NapojenieSms() {
           >
             {skusam ? "…" : "Poslať skúšku"}
           </button>
-          {/* Všetkých päť znení naraz — presne tak, ako ich dostane klient.
-              Vedľa skúšky, nie namiesto nej: päť SMS stojí päť SMS. */}
+          {/* Všetky znenia naraz — presne tak, ako ich dostane klient.
+              Vedľa skúšky, nie namiesto nej: každé znenie stojí jednu SMS. */}
           <button
             onClick={() => void posliVsetky()} disabled={vsetkyBezi || skusam || !skusobne.trim()}
-            title="Pošle všetkých 5 znení, ktoré môžu klientovi odísť"
+            title={`Pošle všetkých ${pocetZneni} znení, ktoré môžu klientovi odísť`}
             style={{ ...vstup, cursor: skusobne.trim() ? "pointer" : "default", opacity: skusobne.trim() ? 1 : 0.5 }}
           >
-            {vsetkyBezi ? "posielam…" : "Poslať všetkých 5 znení"}
+            {vsetkyBezi ? "posielam…" : `Poslať všetkých ${pocetZneni} znení`}
           </button>
           <span style={{ fontSize: 11.5, color: C.textDim }}>ide na tvoje číslo, nie klientovi</span>
         </div>
