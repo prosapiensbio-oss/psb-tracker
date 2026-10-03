@@ -3,6 +3,7 @@ import { terazPraha } from "../lib/psb/cas";
 
 import { bindings } from "../lib/bindings.server";
 import { uvodnaStrankaHtml } from "../lib/psb/uvodnaStranka";
+import { UKAZKA, jeUkazka } from "../lib/psb/ukazka";
 
 /**
  * STRÁNKA ZA ODKAZOM V SMS — `/u/<token>`.
@@ -30,7 +31,30 @@ export const Route = createFileRoute("/u/$token")({
 <div style="font-size:15px;line-height:1.6">${text}</div></div></body></html>`,
           { status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex" } },
         );
-        if (!DB || !/^[A-Za-z0-9]{8,24}$/.test(token)) return prec("Tento odkaz neplatí.", 404);
+        if (!/^[A-Za-z0-9]{8,24}$/.test(token)) return prec("Tento odkaz neplatí.", 404);
+
+        /**
+         * UKÁŽKA — vymyslený termín, žiadny klient, žiadne počítadlo.
+         * Viď `ukazka.ts`: skúšobné SMS musia niesť odkazy, ktoré sa dajú
+         * otvoriť, inak sa nimi nedá nič overiť.
+         */
+        if (jeUkazka(token)) {
+          const o = new URL(request.url).origin;
+          const html = uvodnaStrankaHtml({
+            druh: token === UKAZKA.poUvodnom ? "po" : "pred",
+            trener: "Jerry",
+            kedy: token === UKAZKA.poUvodnom ? "2026-10-16T09:00" : "2026-10-09T09:00",
+            cenaCzk: null,
+            logoUrl: `${o}/znacka-napis-tmava.svg`,
+            figuraUrl: `${o}/znacka-figura-biela.svg`,
+            anamnezaUrl: token === UKAZKA.poUvodnom ? null : `${o}/a/UKAZKAANAMNEZA`,
+          });
+          return new Response(html, {
+            headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex" },
+          });
+        }
+
+        if (!DB) return prec("Tento odkaz neplatí.", 404);
 
         const r = await DB.prepare(
           "SELECT klient, druh, trener, kedy, cena_czk FROM uvodne_odkazy WHERE token = ?1",

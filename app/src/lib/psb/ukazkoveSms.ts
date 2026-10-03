@@ -1,4 +1,6 @@
 import { bezDiakritiky, textSms } from "./sms";
+import { UKAZKA } from "./ukazka";
+import { verejnyOdkaz } from "./verejnyOdkaz";
 
 /**
  * VŠETKY ZNENIA, KTORÉ MÔŽU KLIENTOVI ODÍSŤ — na jednom mieste.
@@ -17,22 +19,35 @@ import { bezDiakritiky, textSms } from "./sms";
  */
 export type UkazkaSms = { kedy: string; kde: string; text: string };
 
-export function ukazkoveSms(v: { odkazU?: string; odkazV?: string } = {}): UkazkaSms[] {
-  const U = v.odkazU || "https://prosapiens.cz/u/UKAZKA1234";
-  const V = v.odkazV || "https://prosapiens.cz/v/UKAZKA1234";
+export function ukazkoveSms(v: { zaklad?: string } = {}): UkazkaSms[] {
+  /**
+   * Odkazy musia byť OTVORITEĽNÉ. Prvá verzia niesla vymyslený token
+   * a Jerry dostal päť SMS, z ktorých ani jedna nikam neviedla —
+   * presne opak toho, čo sa skúškou overuje. Teraz vedú na ukážkové
+   * stránky s vymyslenými dátami (`ukazka.ts`).
+   *
+   * Ide sa KRÁTKOU adresou cez `verejnyOdkaz` — tá istá, akú dostane
+   * klient. Adresa workera je o osemnásť znakov dlhšia a prvá správa by
+   * s ňou prerástla do dvoch SMS, takže by sa skúškou meralo niečo iné,
+   * než čo naozaj odchádza.
+   */
+  const z = v.zaklad || "";
+  const Upred = verejnyOdkaz(`/u/${UKAZKA.predUvodnym}`, z);
+  const Upo = verejnyOdkaz(`/u/${UKAZKA.poUvodnom}`, z);
+  const V = verejnyOdkaz(`/v/${UKAZKA.prehlad}`, z);
   return [
     {
       kedy: "pred úvodným",
       kde: "Dnes → nový dopyt",
       text: bezDiakritiky(
-        `Vitejte v ProSapiens Biomechanic. Vsechny informace k Vasi uvodni lekci - termin, adresu i co si vzit - najdete zde: ${U}`,
+        `Vitejte v ProSapiens Biomechanic. Vsechny informace k Vasi uvodni lekci - termin, adresu i co si vzit - najdete zde: ${Upred}`,
       ),
     },
     {
       kedy: "po úvodnom",
       kde: "Dnes → SMS po úvodnom",
       text: bezDiakritiky(
-        `Dekujeme za ucast na uvodni lekci. Termin dalsiho treninku, souhrn i doporucene cteni najdete zde: ${U}`,
+        `Dekujeme za ucast na uvodni lekci. Termin dalsiho treninku, souhrn i doporucene cteni najdete zde: ${Upo}`,
       ),
     },
     {

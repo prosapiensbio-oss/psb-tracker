@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 
 import { dlzkaSpravy } from "./sms";
 import { ukazkoveSms } from "./ukazkoveSms";
+import { UKAZKA, jeUkazka } from "./ukazka";
 
 describe("ukazkoveSms — stráž nad všetkými znaniami naraz", () => {
   const vsetky = ukazkoveSms();
@@ -30,5 +31,32 @@ describe("ukazkoveSms — stráž nad všetkými znaniami naraz", () => {
   it("je ich päť a každé má, kde v appke vzniká", () => {
     expect(vsetky).toHaveLength(5);
     for (const s of vsetky) expect(s.kde.length).toBeGreaterThan(3);
+  });
+});
+
+describe("odkazy v skúšobných SMS musia viesť na ukážkové stránky", () => {
+  it("nesú vyhradené tokeny, nie vymyslené", () => {
+    // Jerry, 3. 10. 2026: „prišlo mi 5 SMS, ale ani jeden odkaz sa nedal
+    // otvoriť." Token UKAZKA1234 v databáze nebol a stránka vrátila 404.
+    const s = ukazkoveSms().map((x) => x.text).join("\n");
+    expect(s).toContain(`/u/${UKAZKA.predUvodnym}`);
+    expect(s).toContain(`/u/${UKAZKA.poUvodnom}`);
+    expect(s).toContain(`/v/${UKAZKA.prehlad}`);
+    expect(s).not.toContain("UKAZKA1234");
+  });
+
+  it("idú KRÁTKOU adresou — adresa workera je o 18 znakov dlhšia a správa by prerástla", () => {
+    for (const x of ukazkoveSms()) {
+      if (!x.text.includes("http")) continue;
+      expect(x.text).toContain("https://prosapiens.cz/");
+    }
+  });
+
+  it("každý vyhradený token prejde filtrom routy", () => {
+    for (const t of Object.values(UKAZKA)) {
+      expect(t).toMatch(/^[A-Za-z0-9]{8,24}$/);
+      expect(jeUkazka(t)).toBe(true);
+    }
+    expect(jeUkazka("cVz4vMRTHMKT")).toBe(false);
   });
 });

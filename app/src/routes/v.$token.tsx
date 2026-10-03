@@ -8,6 +8,7 @@ import { dlhKlienta, type BalicekDlh, type PlatbaDlh } from "../lib/psb/dlhKlien
 import { historiaPreMail } from "../lib/psb/historiaMail";
 import { klientStranka } from "../lib/psb/klientStranka";
 import { normName } from "../lib/psb/format";
+import { UKAZKA_KLIENT, jeUkazka } from "../lib/psb/ukazka";
 import { nazovProduktu } from "../lib/psb/nazvyProduktov";
 import { nastavenia, posliHistoriu } from "./api/mail-dopyty";
 import { dlhJednehoKlienta } from "../lib/psb/dlznici";
@@ -48,8 +49,46 @@ export const Route = createFileRoute("/v/$token")({
 <div style="margin-top:18px;font-size:12px;color:#9aa284">ProSapiens Biomechanic · ${DODAVATEL.telefon}</div></div></body></html>`,
           { status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex" } },
         );
-        if (!DB || !/^[A-Za-z0-9]{8,24}$/.test(token)) return prec("Tento odkaz neplatí.", 404);
+        if (!/^[A-Za-z0-9]{8,24}$/.test(token)) return prec("Tento odkaz neplatí.", 404);
 
+        /**
+         * UKÁŽKA — vymyslené dáta, žiadny klient, žiadne počítadlo.
+         *
+         * Jerry, 3. 10. 2026: „prišlo mi 5 SMS, ale ani jeden odkaz sa nedal
+         * otvoriť." Skúšobné správy niesli neexistujúci token. Posielať
+         * odkaz, ktorý nikam nevedie, je horšie než neposlať nič — človek si
+         * overuje práve to, či to klientovi funguje.
+         *
+         * Stojí PRED kontrolou databázy: ukážka nepotrebuje ani DB.
+         */
+        if (jeUkazka(token)) {
+          const qrU = qrObrazok(spayd({ suma: 6990, vs: "", sprava: UKAZKA_KLIENT, prijemca: DODAVATEL.meno }));
+          const bajtyU = new Uint8Array(qrU.data);
+          let binU = "";
+          for (let i = 0; i < bajtyU.length; i += 4096) binU += String.fromCharCode(...bajtyU.subarray(i, i + 4096));
+          const html = klientStranka({
+            klient: UKAZKA_KLIENT, oslovenie: "Ukážko", trener: "Jerry",
+            os: [
+              { den: "2026-09-09", popis: "6h Předplatné", druh: "balicekOd", zostatok: null, dlh: null },
+              { den: "2026-09-12", cas: "16:00", popis: "tréning", druh: "trening", zostatok: 6, dlh: null },
+              { den: "2026-09-19", cas: "16:00", popis: "tréning", druh: "trening", zostatok: 5, dlh: null },
+              { den: "2026-09-26", cas: "16:00", popis: "tréning", druh: "trening", zostatok: 4, dlh: null },
+              { den: "2026-10-01", cas: "16:00", popis: "tréning", druh: "trening", zostatok: 3, dlh: null },
+              { den: "2026-10-02", cas: "16:00", popis: "tréning", druh: "trening", zostatok: 2, dlh: null },
+              { den: "2026-10-03", cas: "16:00", popis: "tréning", druh: "trening", zostatok: 1, dlh: null },
+            ],
+            zostatok: 0, hodinSpolu: 6, odkedy: "2026-09-09", dnes: new Date().toISOString().slice(0, 10),
+            platba: { popis: "6h Předplatné", suma: 6990, ucet: DODAVATEL.ucet, sprava: UKAZKA_KLIENT, odpocet: 0, novy: true },
+            qrUrl: `data:${qrU.typ};base64,${btoa(binU)}`,
+            pocitovka: blokPocitovky({ oblasti: ["bedra", "kolena"], zUvodneho: { bedra: 7, kolena: 5 } }),
+            logoUrl: `${new URL(request.url).origin}/znacka-napis-tmava.svg`,
+          });
+          return new Response(html, {
+            headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex" },
+          });
+        }
+
+        if (!DB) return prec("Tento odkaz neplatí.", 404);
         const r = await DB.prepare("SELECT klient FROM klient_odkazy WHERE token = ?1").bind(token).first<{ klient: string }>();
         if (!r) return prec("Tento odkaz neplatí. Ozvi sa nám a pošleme ti nový.", 404);
 
