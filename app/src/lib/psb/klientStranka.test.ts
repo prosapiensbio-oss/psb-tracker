@@ -185,22 +185,23 @@ describe("platba na telefóne", () => {
 });
 
 describe("prečo balíček nezačína na plnom počte", () => {
-  it("stránka to povie klientovi, nielen trénerovi", () => {
-    // Jerry, 2. 10. 2026: „znovu mi tam je předplatné 6 hodin, chybí tam 5 h,
-    // tá bola kedy?" Vysvetlenie bolo len na internej obrazovke.
-    const h = klientStranka({
-      klient: "Lukas Hanus", oslovenie: "Lukas", trener: "Jerry",
-      os: [
-        { den: "2026-09-09", popis: "Předplatné 6 h", druh: "balicekOd", zostatok: null, dlh: null, prevzate: 2 },
-        { den: "2026-09-09", cas: "16:00", popis: "tréning", druh: "trening", zostatok: 4, dlh: null },
-      ],
-      zostatok: 4, hodinSpolu: 1, odkedy: "2026-09-09", dnes: "2026-10-02",
-    } as never);
-    expect(h).toContain("2 h padly na starší tréninky");
-  });
+  // Do 3. 10. 2026 to hovorila veta „2 h padly na starší tréninky". Odkedy
+  // tréning nesie mínus AJ hodinu, hovorila to isté druhýkrát a Jerry ju dal
+  // preč: „týmto zápiskom je tá veta zbytočná."
+  const prevzal = {
+    klient: "Lukas Hanus", oslovenie: "Lukas", trener: "Jerry",
+    os: [
+      { den: "2026-08-25", cas: "10:30", popis: "tréning", druh: "trening", zostatok: 6, dlh: 1 },
+      { den: "2026-09-09", popis: "Předplatné 6 h", druh: "balicekOd", zostatok: null, dlh: null, prevzate: 1, prevzateDni: ["2026-08-25"] },
+      { den: "2026-09-09", cas: "16:00", popis: "tréning", druh: "trening", zostatok: 5, dlh: null },
+    ],
+    zostatok: 5, hodinSpolu: 2, odkedy: "2026-08-01", dnes: "2026-10-03",
+  } as never;
 
-  it("keď balíček nič nepreberal, veta tam nie je", () => {
-    expect(klientStranka(zaklad)).not.toContain("padly na starší tréninky");
+  it("povedia to čísla, nie veta navyše", () => {
+    const h = klientStranka(prevzal);
+    expect(h).toContain("−1</span> <span>6 h</span>");
+    expect(h).not.toContain("padly na");
   });
 });
 

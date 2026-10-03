@@ -1,4 +1,4 @@
-import { vetaPrevzatych, type VypisKlienta } from "./mailKlientovi";
+import type { VypisKlienta } from "./mailKlientovi";
 
 /**
  * STRÁNKA ZA ODKAZOM V SMS — prehľad pre klienta.
@@ -207,14 +207,15 @@ function cisloBodu(b: BodOsi): string {
 const popisBodu = (b: BodOsi) => (b.druh === "trening" ? "trénink" : cesky(b.popis));
 
 /**
- * „2 h padly na starší tréninky" — prečo balíček nezačína na plnom počte.
+ * ŽIADNA VETA O PREVZATÝCH HODINÁCH.
  *
- * Jerry, 2. 10. 2026: „znovu mi tam je předplatné 6 hodin, chybí tam 5 h,
- * tá bola kedy?" Hodina nechýba: dve hodiny z balíčka zaplatili tréningy,
- * ktoré predošlý balíček nepokryl. Klient to má vidieť rovnako ako tréner —
- * inak mu stránka tvrdí 6 h a hneď pod tým 4.
+ * „2 h padly na tréninky 25. 8. a 3. 9." tu stála dva dni. Odkedy nesie
+ * tréning obe čísla (−1 a 6 h), hovorí to isté dvakrát — Jerry, 3. 10. 2026:
+ * „týmto zápiskom je tá veta zbytočná." Dáta (`prevzate`, `prevzateDni`)
+ * zostávajú, číta ich stôl klienta.
  */
-const poznamkaBodu = (b: BodOsi): string => vetaPrevzatych(b);
+
+
 
 const denPlne = (b: BodOsi) =>
   `${DNI[new Date(`${b.den}T12:00:00Z`).getUTCDay()]} ${den(b.den)}${b.cas ? ` · ${b.cas}` : ""}`;
@@ -232,7 +233,7 @@ function osVodorovna(os: BodOsi[]): string {
 <div style="height:50px;display:flex;flex-direction:column;justify-content:flex-end;padding:0 10px 7px 0">
 <div style="font-size:12.5px;color:${jeMedznik(b) ? s.biela : s.text};line-height:1.25${jeMedznik(b) ? ";font-weight:700" : ""}">${esc(popisBodu(b))}</div>
 <div style="font-size:11px;color:${s.slabsia}">${esc(denPlne(b))}</div>
-${poznamkaBodu(b) ? `<div style="font-size:10.5px;color:${s.minus};line-height:1.3;margin-top:2px">${esc(poznamkaBodu(b))}</div>` : ""}</div>
+</div>
 <div style="height:14px;display:flex;align-items:center"><div style="width:${p}px;height:${p}px;border-radius:50%;background:${farbaBodu(b)}"></div></div>
 <div style="font-family:'Raleway',sans-serif;font-weight:700;font-size:14.5px;margin-top:9px;color:${s.text}">${cislo}</div></div>`;
   }).join("");
@@ -259,7 +260,7 @@ function osZvisla(os: BodOsi[]): string {
 <div style="flex:1;padding-left:15px">
 <div style="font-size:14.5px;color:${jeMedznik(b) ? s.biela : s.text};line-height:1.3${jeMedznik(b) ? ";font-weight:700" : ""}">${esc(popisBodu(b))}</div>
 <div style="font-size:11.5px;color:${s.slabsia}">${esc(denPlne(b))}</div>
-${poznamkaBodu(b) ? `<div style="font-size:11px;color:${s.minus};line-height:1.35">${esc(poznamkaBodu(b))}</div>` : ""}</div></div>`;
+</div></div>`;
   }).join("");
 }
 

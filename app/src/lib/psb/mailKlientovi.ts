@@ -189,10 +189,14 @@ const denKratko = (iso: string) => {
  *
  * Jerry sa na tú chýbajúcu hodinu pýtal trikrát (2. a 3. 10. 2026) a zakaždým
  * tou istou vetou: „tá bola kedy?" Počet hovorí, koľko ich padlo; dátum
- * hovorí, ktoré to boli — a to je odpoveď, po ktorej sa už nikto nepýta.
+ * hovorí, ktoré to boli.
  *
- * Nad tri dátumy sa vypíšu prvé dva a zvyšok sa zhrnie; dlhší zoznam by na
- * osi prerástol samotný bod.
+ * ZO STRÁNKY KLIENTA A Z MAILU JE VETA PREČ (3. 10. 2026). Odkedy tréning
+ * nesie obe čísla — mínus aj hodinu, ktorú z balíčka dostal — hovorila to
+ * isté druhýkrát. Jerry: „týmto zápiskom je tá veta zbytočná." Zostáva na
+ * stole klienta, kde je os pracovná a dátumy šetria klikanie.
+ *
+ * Nad tri dátumy sa vypíšu prvé dva a zvyšok sa zhrnie.
  */
 export function vetaPrevzatych(b: { prevzate?: number; prevzateDni?: string[] }, hodina = "h"): string {
   const n = b.prevzate || 0;
@@ -376,7 +380,6 @@ export function mailKlientovi(v: VypisKlienta): { predmet: string; text: string;
       <td style="padding:0 0 ${posledna ? 0 : 13}px 6px">
         <div style="font-size:14px;color:${velka ? F.biela : F.text};line-height:1.35">${esc(b.popis)}</div>
         ${b.den ? `<div style="font-size:12px;color:${F.slabsia};line-height:1.35">${denKratko(b.den)}${b.cas ? ` · ${esc(b.cas)}` : ""}</div>` : ""}
-        ${b.prevzate ? `<div style="font-size:11.5px;color:${F.minus};line-height:1.35">${vetaPrevzatych(b)}</div>` : ""}
       </td>
       <td width="56" valign="top" style="padding:0 0 ${posledna ? 0 : 13}px 8px;text-align:right;font-size:14px;color:${F.text};white-space:nowrap">${cislo}</td>
     </tr>`;
