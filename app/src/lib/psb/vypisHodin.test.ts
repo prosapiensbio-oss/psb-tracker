@@ -169,13 +169,16 @@ describe("dlh — tréning na nezaplatenom členstve", () => {
 });
 
 describe("posledné členstvo sa zrovná s PTminderom", () => {
-  it("doplnené hodiny posunú celý rad, nech koniec sedí", () => {
-    // „Doplnenie členstva" nehovorí, o koľko hodín ide. Keď PTminder tvrdí
-    // viac, než vychádza z názvu, posunie sa celé posledné obdobie.
+  it("doplnené hodiny dorovnajú KONIEC, odpočet zostáva taký, aký bol", () => {
+    // „Doplnenie členstva" nehovorí, o koľko hodín ide, takže karta môže
+    // tvrdiť viac, než vychádza z názvu. Do 3. 10. 2026 sa ten rozdiel
+    // rozpustil do celého radu a balíček sa otváral osmičkou, hoci má šesť.
+    // Jerry: „6, 5, 4, 3, 2, 1 sú pevne dané, to sa nikdy nemá meniť."
     const os: Udalost[] = [bal("2026-09-02", 6), tre("2026-09-09"), tre("2026-09-16")];
     const v = vypisHodin(os, "", DNES, 6);
-    expect(v.koniec).toBe(6);
-    expect(v.riadky.find((r) => r.den === "2026-09-09")!.zostatok).toBe(8);   // prvý tréning
+    expect(v.koniec).toBe(6);                                               // karta
+    expect(v.riadky.find((r) => r.den === "2026-09-09")!.zostatok).toBe(6);  // prvý tréning
+    expect(v.riadky.find((r) => r.den === "2026-09-16")!.zostatok).toBe(5);  // druhý
   });
 
   it("zrovnáva sa ku dňu exportu, nie k tréningu z kalendára", () => {

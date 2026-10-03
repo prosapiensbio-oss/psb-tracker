@@ -441,14 +441,20 @@ export function priebehBalickov(
     // Balíček nahodený v Kokpite karta klienta NEPOZNÁ — tá ráta z exportu
     // PTmindera. Zrovnať sa s ňou by znamenalo stiahnuť nový balíček na
     // zostatok toho vyčerpaného, teda na nulu.
+    /**
+     * ZROVNÁVA SA LEN KONEČNÉ ČÍSLO, NIE JEDNOTLIVÉ RIADKY.
+     *
+     * Dovtedy sa rozdiel oproti karte rozpustil do celého radu: Lukášovi
+     * Hanusovi tak stáli pred novým balíčkom riadky 8 h a 7 h, hoci z toho
+     * starého mu zostávali 2 a 1. Jerry, 3. 10. 2026: „6, 5, 4, 3, 2, 1 sú
+     * pevne dané, to sa nikdy nemá meniť." Odpočet teda zostáva taký, aký
+     * naozaj bol, a rozdiel sedí tam, kde vznikol — na hranici balíčkov.
+     *
+     * Karta sa tým nemení: `bezi` (a teda nadpis „Zbývá ti…") sa dorovná
+     * ďalej, len sa to už nepremieta do histórie.
+     */
     if (b && b === posledny && !b.zKokpitu && !maDokupene && zostatokTeraz != null && kExportu != null && kExportu !== zostatokTeraz) {
-      const posun = zostatokTeraz - kExportu;
-      if (bezi !== null) bezi += posun;
-      for (const { u } of doUseku) {
-        const st = stavy.get(u);
-        if (!st || st.zostatok === null) continue;
-        stavy.set(u, { zostatok: st.zostatok + posun, dlh: st.dlh, usek: st.usek });
-      }
+      if (bezi !== null) bezi += zostatokTeraz - kExportu;
     }
 
     if (b === posledny) koniec = bezi;
