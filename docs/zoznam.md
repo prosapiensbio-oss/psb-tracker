@@ -223,6 +223,31 @@ s `viditelny` sa pri každom vykreslení počítajú odznova (pri 200 nápadoch
 dá premenovať, prefarbiť, prehodiť na druhú stranu a zmazať. Zmazanie nápady
 nemaže — padnú do odkladiska.
 
+## 2c · Dochádzka 28.–30. 9. 2026 — kalendár áno, PTminder nie
+
+Nájdené 3. 10. 2026 pri Vaškovi a Čechovej, odložené (PTminder ešte nie je
+nahodený).
+
+**Čo je zle:** 28 tréningov z 28., 29. a 30. 9. pozná len Google Kalendár —
+export z PTmindera ich nemá. Karta klienta ich nepočíta (`KOKPIT_OD` je
+1. 10.), stránka za odkazom áno — preto sa 19 ľuďom rozchádza nadpis odkazu
+s kartou presne o hodinu. Hlási to kontrolór profilov, sekcia „ODKAZ PRE
+KLIENTA".
+
+Mená: 28. 9. Gažo, Gerich, Križova, Kríž, Rupova, Matlova, Krčmar, Matl ·
+29. 9. Nova, Kalmus, Čechova, Papiež, Hanus, Přínosil, Doležalova,
+Vopalenský, Vankova, Vaško · 30. 9. Obrovska, Kral, Khamaziuk, Podolova,
+Přinosilová, Martinek, Broskva a ďalší.
+
+**Dve cesty:**
+1. Posunúť `KOKPIT_OD` z 1. 10. na 28. 9. — jedna konštanta, karta aj odkaz
+   začnú hovoriť to isté. ~25 klientom klesne zostatok o hodinu (správne).
+2. Spraviť posledný export z PTmindera za 28.–30. 9. a doimportovať ho —
+   hranica zostane, kde je.
+
+Jerry, 3. 10. 2026: „toto budeme musieť doriešiť neskôr, lebo PTminder
+nemáme ešte nahodený."
+
 ## 3 · Blokované niečím mimo Kokpitu
 
 - **NDA pri fotkách pred/po** (od 8. 9.) — kým nie sú skontrolované súhlasy
