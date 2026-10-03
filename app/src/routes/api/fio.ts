@@ -77,7 +77,9 @@ export const Route = createFileRoute("/api/fio")({
          * od posledného stiahnutia.
          */
         if (b.akcia === "stiahni") {
-          const token = (bindings() as { FIO_TOKEN?: string }).FIO_TOKEN || "";
+          // Okolo vloženého tajomstva býva zalomenie riadku; banka naň odpovie
+          // päťstovkou a na nič sa nedá prísť. Preto sa oreže.
+          const token = ((bindings() as { FIO_TOKEN?: string }).FIO_TOKEN || "").trim();
           if (!token) {
             return Response.json({
               ok: false,
@@ -91,7 +93,17 @@ export const Route = createFileRoute("/api/fio")({
           let odpoved: Response;
           try { odpoved = await fetch(url); }
           catch { return Response.json({ ok: false, chyba: "Na banku sa nepodarilo pripojiť." }, { status: 502 }); }
-          if (!odpoved.ok) return Response.json({ ok: false, chyba: chybaOdpovede(odpoved.status) }, { status: 502 });
+          if (!odpoved.ok) {
+            // Čo banka naozaj povedala. Bez toho zostane po „500" len hádanie
+            // — a hláška, ktorá nič nehovorí, je horšia než žiadna.
+            const detail = await odpoved.text().catch(() => "");
+            return Response.json({
+              ok: false,
+              // Fio pri chybe vracia HTML stránku — zo značiek sa nedá čítať,
+              // tak sa vyberie len text.
+              chyba: `${chybaOdpovede(odpoved.status)}${detail.trim() ? ` (banka: ${detail.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim().slice(0, 300)})` : ""}`,
+            }, { status: 502 });
+          }
 
           const pr = await DB.prepare("SELECT text_pattern, category FROM vzas_rules WHERE active = 1 ORDER BY priority").all()
             .catch(() => ({ results: [] as Record<string, unknown>[] }));
