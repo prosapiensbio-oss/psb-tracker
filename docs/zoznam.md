@@ -236,24 +236,6 @@ os za odkazom áno — a čísla sa rozídu.
 Vidno to na Hanusovi: os ukazuje 3, 2, 1 a nadpis „Poslední hodina", lebo
 karta jeho balíček z 2. 10. ešte nepozná.
 
-## 2d · Luky Kríž je SYN, nie preklep — kalendár ho posiela otcovi
-
-Jerry, 3. 10. 2026: „Lukaš Kríž a Luky Kríž sú dve osoby, je to jeho syn."
-Pôvodne som to čítal ako rozdvojené meno — nie je.
-
-**Čo je zle:** udalosť v kalendári **„Luky Kriz", 28. 9. 14:00** je
-namapovaná na klienta **Lukáš Kríž** (otec). V PTminderi je ten tréning
-správne na **Luky Križ** (syn, 14:00, Jerry) a na jeho meno visí aj nový
-balíček 7 790 Kč a otvorený poplatok.
-
-**Dôsledok:** otcovi appka pripisuje synov tréning, takže sa netvári, že
-prestal chodiť (naposledy bol 3. 4. 2026), a synovi chýba v kalendári.
-Padá na tom kontrola `naostro.sh` — reťaz „Netrénoval" pri nezhode.
-
-**Oprava:** premapovať názov „Luky Kriz" na klienta Luky Križ (obrazovka
-s novými názvami v kalendári). Potom sa otec správne ozve ako „prestal
-chodiť" a syn dostane svoj tréning.
-
 ## 3 · Blokované niečím mimo Kokpitu
 
 - **NDA pri fotkách pred/po** (od 8. 9.) — kým nie sú skontrolované súhlasy
@@ -314,6 +296,12 @@ Z posledného kola kontroly (17.–18. 9.) zostalo:
 ---
 
 ## Zavreté (aby sa neotvárali odznova)
+
+- **Luky Kríž má vlastný profil** (3. 10. 2026). Nie je to preklep mena —
+  je to SYN Lukáša Kríža. Udalosť „Luky Kriz" v kalendári bola namapovaná
+  na otca, takže otcovi sa pripisoval synov tréning a syn v appke nebol.
+  Premapované na „Luky Križ" (vedome = 1). Otec má teraz posledný tréning
+  3. 4. 2026, syn balíček zo 7 790 Kč a jeden tréning z 28. 9.
 
 ### Notifikácie „konal sa tréning?" — opravené 1. 10. 2026
 
