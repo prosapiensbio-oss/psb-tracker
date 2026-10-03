@@ -264,12 +264,13 @@ export function BalickyEvidencia({ mena, onFaktura, onVypis }: {
           )}
           <SmsKlientovi
             meno={posledny.klient}
-            /* BEZ DIAKRITIKY — jediná správa, ktorá ju mala. Jeden mäkčeň zráža
-                limit zo 160 znakov na 70, takže z nej boli DVE SMS namiesto
-                jednej; vyšlo to najavo 3. 10. 2026, keď si Jerry vypýtal
-                všetky znenia pokope. Ostatné idú cez `textSms`, ktorý
-                diakritiku odstraňuje sám. */
-            predvolenyText={bezDiakritiky(`${posledny.klient.split(" ")[0]}, zapísal som ti ${nazovProduktu(posledny.nazov)}. QR na platbu máš v maili. ProSapiens`)}
+            /* ŽIADNY VLASTNÝ TEXT — ide tá istá správa ako všade inde.
+               Jerry, 3. 10. 2026: „jedna SMS prišla bez linku." Táto jediná
+               mala vlastné znenie („zapísal som ti… QR máš v maili") a tým
+               pádom ani odkaz, na ktorý sa dá ťuknúť. Pritom stránka za
+               odkazom ukáže nový balíček aj QR lepšie než veta o maili —
+               a je to presne to pravidlo, ktoré Jerry zaviedol o deň skôr:
+               stav hovorí stránka, nie text správy. */
             maly
           />
           {onVypis && (

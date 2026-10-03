@@ -47,7 +47,7 @@ export const Route = createFileRoute("/u/$token")({
             cenaCzk: null,
             logoUrl: `${o}/znacka-napis-tmava.svg`,
             figuraUrl: `${o}/znacka-figura-biela.svg`,
-            anamnezaUrl: token === UKAZKA.poUvodnom ? null : `${o}/a/UKAZKAANAMNEZA`,
+            anamnezaUrl: token === UKAZKA.poUvodnom ? null : `${o}/a/${UKAZKA.anamneza}`,
           });
           return new Response(html, {
             headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex" },

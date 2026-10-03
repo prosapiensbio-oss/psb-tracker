@@ -44,6 +44,13 @@ export const ODKAZY = {
    * listovať. Kotva je v `parts/sluzby.html` v téme psb-spready.
    */
   cennik: "https://www.prosapiens.cz/sluzby/#cenik",
+  /**
+   * Vedie na /o-nas/, lebo vlastná stránka trenéra NEEXISTUJE (je to na
+   * zozname). Jerry, 3. 10. 2026: „keď kliknem na profil trenéra, vedie to
+   * na Kousek lesa uprostřed města." Odkaz je správny, sľub bol zlý —
+   * tlačidlo sa preto volá „O nás a trenérech", nie „Profil trenéra".
+   * Keď stránka vznikne, zmení sa adresa aj názov späť.
+   */
   profil: "https://www.prosapiens.cz/o-nas/",
   poUvodnej: "https://www.prosapiens.cz/informace-po-uvodni-lekci/",
   coOcekavat: "https://www.prosapiens.cz/co-ocekavat-od-biomechanickeho-treninku/",
@@ -258,7 +265,7 @@ ${telo}
 <div style="font-family:'Raleway',sans-serif;font-weight:700;font-size:26px;line-height:1.2">${esc(tr.krstne === "Filip" ? "Filip Stráňavský" : tr.formalne)}</div>
 <div style="font-size:16px;color:#5B6B60;margin-top:4px">${esc(t === "Jerry" ? "Jerry · váš trenér" : "váš trenér")}</div>
 <div style="margin-top:14px;display:flex;flex-wrap:wrap;gap:10px">
-<a href="${esc(ODKAZY.profil)}" style="display:inline-block;text-decoration:none;border:1px solid #DCE3DD;border-radius:32px;padding:11px 20px;font-size:15px;font-weight:600;color:#1A2E24">Profil trenéra</a>
+<a href="${esc(ODKAZY.profil)}" style="display:inline-block;text-decoration:none;border:1px solid #DCE3DD;border-radius:32px;padding:11px 20px;font-size:15px;font-weight:600;color:#1A2E24">O nás a trenérech</a>
 <a href="tel:${esc(tel)}" style="display:inline-block;text-decoration:none;border:1px solid #DCE3DD;border-radius:32px;padding:11px 20px;font-size:15px;font-weight:600;color:#1A2E24">${esc(tr.telefon)}</a>
 </div>
 ${zaver}

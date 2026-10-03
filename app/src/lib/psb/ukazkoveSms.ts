@@ -51,13 +51,8 @@ export function ukazkoveSms(v: { zaklad?: string } = {}): UkazkaSms[] {
       ),
     },
     {
-      kedy: "zapísaný balíček",
-      kde: "Balíčky · po priradení platby",
-      text: bezDiakritiky("Lukas, zapísal som ti 6h Předplatné. QR na platbu máš v maili. ProSapiens"),
-    },
-    {
-      kedy: "zostávajú hodiny",
-      kde: "Kalendár · stôl klienta",
+      kedy: "zostávajú hodiny · zapísaný balíček",
+      kde: "Kalendár · stôl klienta · Balíčky",
       text: textSms({ oslovenie: "Lukas", trener: "Jerry", odkaz: V }),
     },
     {

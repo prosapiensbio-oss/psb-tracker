@@ -4,6 +4,7 @@ import { terazPraha } from "../lib/psb/cas";
 import { audit } from "../lib/psb/audit.server";
 import { bindings } from "../lib/bindings.server";
 import { FORMULAR } from "../lib/psb/anamnezaFormular";
+import { UKAZKA_KLIENT, jeUkazka } from "../lib/psb/ukazka";
 import { podlaTokenu, ulozKlienta } from "../lib/psb/anamneza.server";
 import { strankaHtml } from "../lib/psb/anamnezaStranka";
 
@@ -60,7 +61,24 @@ export const Route = createFileRoute("/a/$token")({
       GET: async ({ params }) => {
         const token = String((params as { token?: string }).token || "");
         const { DB, ANAMNEZA_KLUC } = bindings() as { DB?: import("@cloudflare/workers-types").D1Database; ANAMNEZA_KLUC?: string };
-        if (!DB || !ANAMNEZA_KLUC || !/^[A-Za-z0-9]{10,30}$/.test(token)) return odkaz("Tento odkaz neplatí.", 404);
+        if (!/^[A-Za-z0-9]{10,30}$/.test(token)) return odkaz("Tento odkaz neplatí.", 404);
+
+        /**
+         * UKÁŽKA — formulár s vymyslenými dátami, nič sa neukladá.
+         *
+         * Jerry, 3. 10. 2026: „v SMS pred úvodným je Vyplnit 3 otázky a to
+         * nikam nevedie." Tlačidlo na ukážkovej stránke mierilo na token,
+         * ktorý routa nepoznala, takže končilo na „Tento odkaz neplatí".
+         */
+        if (jeUkazka(token)) {
+          return new Response(strankaHtml({
+            formular: FORMULAR, klient: UKAZKA_KLIENT,
+            kontakt: { email: "ukazka@prosapiens.cz", telefon: "+420 000 000 000", narodeniny: null },
+            uvodny: "pátek 9. 10. v 9:00",
+          }), { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store", "x-robots-tag": "noindex" } });
+        }
+
+        if (!DB || !ANAMNEZA_KLUC) return odkaz("Tento odkaz neplatí.", 404);
 
         const a = await podlaTokenu(DB, token, ANAMNEZA_KLUC);
         if (!a) return odkaz("Tento odkaz neplatí. Ozvěte se nám a pošleme vám nový.", 404);

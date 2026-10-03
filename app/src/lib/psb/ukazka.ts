@@ -18,10 +18,11 @@ export const UKAZKA = {
   prehlad: "UKAZKAPREHLAD",
   predUvodnym: "UKAZKAPREDUVOD",
   poUvodnom: "UKAZKAPOUVOD",
+  anamneza: "UKAZKAANAMNEZA",
 } as const;
 
 export const jeUkazka = (token: string): boolean =>
-  token === UKAZKA.prehlad || token === UKAZKA.predUvodnym || token === UKAZKA.poUvodnom;
+  (Object.values(UKAZKA) as string[]).includes(token);
 
 /** Meno, ktoré sa na ukážke ukazuje. Zjavne vymyslené, nie „Lukas Hanus". */
 export const UKAZKA_KLIENT = "Ukážkový Klient";

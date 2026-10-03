@@ -28,8 +28,11 @@ describe("ukazkoveSms — stráž nad všetkými znaniami naraz", () => {
     }
   });
 
-  it("je ich päť a každé má, kde v appke vzniká", () => {
-    expect(vsetky).toHaveLength(5);
+  it("sú štyri a každé má, kde v appke vzniká", () => {
+    // Bolo ich päť. Správa o zapísanom balíčku mala vlastné znenie bez
+    // odkazu („QR máš v maili") a 3. 10. 2026 ju nahradila tá spoločná —
+    // stav hovorí stránka, nie text správy.
+    expect(vsetky).toHaveLength(4);
     for (const s of vsetky) expect(s.kde.length).toBeGreaterThan(3);
   });
 });
