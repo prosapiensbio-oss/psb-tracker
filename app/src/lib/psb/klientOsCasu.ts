@@ -178,6 +178,66 @@ export function osCasuKlienta(
     out.push({ druh: "platba", den: den(p.date), suma: p.amount, metoda: p.method, poznamka: p.note });
   }
 
+  const nezaplateneDni = new Set(
+    (zdroj.poplatky || []).filter((p) => normName(p.klient) === k).map((p) => den(p.datum)),
+  );
+  /** Kľúče `deň|názov` a `deň|hhodiny` balíčkov z Kokpitu — PTminder im ustúpi. */
+  const zKokpitu = new Set<string>();
+  /**
+   * BALÍČKY NAHODENÉ V KOKPITE PATRIA NA OS.
+   *
+   * Do 28. 9. 2026 na nej nestáli — os čítala len PTminder. Jerry vtedy pri
+   * Richardovi Matlovi: „keď mu nahodím nový balík, chcem, aby sa od tej −1
+   * znovu odpočítaval počet tréningov, ktoré mu nahodím." Bez tohto zdroja
+   * sa nemalo čo odpočítavať: klient mal vyčerpané členstvo, Jerry mu zapísal
+   * nové a na osi sa nezmenilo nič.
+   *
+   * Berú sa LEN ručne nahodené (`zdroj = "rucne"`). Zvyšných 82 riadkov
+   * nalial do `balicky` import z exportu a 22 z nich sú OTVÁRACIE POLOŽKY
+   * ku dňu exportu („Doplnenie členstva", 20. 9. 2026) — nie predaje. Keby
+   * sa dostali na os, otvorili by v ten deň nové obdobie a každému klientovi
+   * by prepísali odpočet zostatkom, ktorý sa tvári ako nový balíček.
+   *
+   * OD 1. 10. 2026 JE KOKPIT NADRADENÝ A PTMINDER KONTROLA (Jerry, 3. 10.
+   * 2026): „ak som nahodil členstvo cez Kokpit v rovnaký deň ako v PTminderi,
+   * tak platí ten Kokpit." Preto sa tieto balíčky kladú na os PRVÉ a to, čo
+   * k nim v ten deň sedí z exportu, ustúpi. Dovtedy to bolo naopak a Martin
+   * Vaško videl na odkaze riadok z PTmindera, hoci ten istý predaj má
+   * zapísaný v Kokpite.
+   */
+  for (const b of zdroj.balicky || []) {
+    if (b.zdroj !== "rucne") continue;
+    if (normName(b.klient) !== k || b.zrusene_at) continue;
+    const d = den(b.platnost_od);
+    if (!d || d > dnes) continue;
+    /**
+     * ZDVOJENIE SA POZNÁ PO DNI A HODINÁCH, NIE PO NÁZVE.
+     *
+     * Kým Kokpit aj PTminder hovorili „OFF - 6h BEZ viazanosti", stačil
+     * názov. Od 29. 9. 2026 sa produkty volajú „Balíček 6 h" a „Předplatné
+     * 6 h", takže ten istý predaj má v každom systéme iné meno — a počas
+     * súbežného chodu ho Jerry zapisuje do oboch. Bez tohto by taký balíček
+     * stál na osi dvakrát a hodiny by sa zdvojili.
+     */
+    const hodinRucne = Number(b.hodiny) > 0 ? Number(b.hodiny) : hodinZNazvuBalicka(b.nazov);
+    const kluc = `${d}|${normName(b.nazov)}`;
+    if (zKokpitu.has(kluc) || zKokpitu.has(`${d}|h${hodinRucne}`)) continue;
+    zKokpitu.add(kluc);
+    zKokpitu.add(`${d}|h${hodinRucne}`);
+    out.push({
+      druh: "balicekOd",
+      den: d,
+      nazov: b.nazov,
+      // Hodiny sú zapísané ručne; keď chýbajú, ostáva názov ako pri exporte.
+      hodin: hodinRucne,
+      doDna: den(b.platnost_do || "") || undefined,
+      zaplatene: b.cena_czk || undefined,
+      nezaplatene: nezaplateneDni.has(d) || undefined,
+      zKokpitu: true,
+    });
+  }
+
+
   for (const b of bezDuplicitBalickov(moje(zdroj.packages), zdroj.services)) {
     /**
      * DOKÚPENÉ HODINY MAJÚ DEŇ AJ POČET — len inde.
@@ -196,6 +256,8 @@ export function osCasuKlienta(
     }
     const od = den(b.validFrom || "");
     const doDna = den(b.validTo || "");
+    // Ten istý predaj zapísaný v Kokpite má prednosť — viď vyššie.
+    if (od && (zKokpitu.has(`${od}|${normName(b.package)}`) || zKokpitu.has(`${od}|h${b.total || hodinZNazvuBalicka(b.package)}`))) continue;
     // Doplnenie členstva nemá v exporte dátumy — na os ho položiť nejde,
     // lebo sa nevie kam. Radšej vynechať než hádať deň.
     // Export mlčí (0/0) → hodiny z názvu, a riadok to prizná značkou ≈.
@@ -220,15 +282,12 @@ export function osCasuKlienta(
    * Riadok z `packages` má prednosť, lebo vie aj platnosť a zostatok; služba
    * v ten istý deň s tým istým názvom sa preto preskočí.
    */
-  const uzJe = new Set<string>();
+  const uzJe = new Set<string>(zKokpitu);
   for (const x of out) {
     if (x.druh !== "balicekOd") continue;
     uzJe.add(`${x.den}|${normName(x.nazov)}`);
     uzJe.add(`${x.den}|h${x.hodin}`);
   }
-  const nezaplateneDni = new Set(
-    (zdroj.poplatky || []).filter((p) => normName(p.klient) === k).map((p) => den(p.datum)),
-  );
   for (const sl of (zdroj.services || []).filter((x) => normName(x.client) === k)) {
     if (!SLUZBA_JE_BALICEK(sl.serviceType)) continue;
     const d = den(sl.date);
@@ -254,56 +313,6 @@ export function osCasuKlienta(
       doplnenie,
     });
   }
-  /**
-   * BALÍČKY NAHODENÉ V KOKPITE PATRIA NA OS.
-   *
-   * Do 28. 9. 2026 na nej nestáli — os čítala len PTminder. Jerry vtedy pri
-   * Richardovi Matlovi: „keď mu nahodím nový balík, chcem, aby sa od tej −1
-   * znovu odpočítaval počet tréningov, ktoré mu nahodím." Bez tohto zdroja
-   * sa nemalo čo odpočítavať: klient mal vyčerpané členstvo, Jerry mu zapísal
-   * nové a na osi sa nezmenilo nič.
-   *
-   * Berú sa LEN ručne nahodené (`zdroj = "rucne"`). Zvyšných 82 riadkov
-   * nalial do `balicky` import z exportu a 22 z nich sú OTVÁRACIE POLOŽKY
-   * ku dňu exportu („Doplnenie členstva", 20. 9. 2026) — nie predaje. Keby
-   * sa dostali na os, otvorili by v ten deň nové obdobie a každému klientovi
-   * by prepísali odpočet zostatkom, ktorý sa tvári ako nový balíček.
-   *
-   * Navyše je to tá istá dvojica ako pri službách: keď v ten deň s tým istým
-   * názvom už balíček stojí, tento sa preskočí.
-   */
-  for (const b of zdroj.balicky || []) {
-    if (b.zdroj !== "rucne") continue;
-    if (normName(b.klient) !== k || b.zrusene_at) continue;
-    const d = den(b.platnost_od);
-    if (!d || d > dnes) continue;
-    /**
-     * ZDVOJENIE SA POZNÁ PO DNI A HODINÁCH, NIE PO NÁZVE.
-     *
-     * Kým Kokpit aj PTminder hovorili „OFF - 6h BEZ viazanosti", stačil
-     * názov. Od 29. 9. 2026 sa produkty volajú „Balíček 6 h" a „Předplatné
-     * 6 h", takže ten istý predaj má v každom systéme iné meno — a počas
-     * súbežného chodu ho Jerry zapisuje do oboch. Bez tohto by taký balíček
-     * stál na osi dvakrát a hodiny by sa zdvojili.
-     */
-    const hodinRucne = Number(b.hodiny) > 0 ? Number(b.hodiny) : hodinZNazvuBalicka(b.nazov);
-    const kluc = `${d}|${normName(b.nazov)}`;
-    if (uzJe.has(kluc) || uzJe.has(`${d}|h${hodinRucne}`)) continue;
-    uzJe.add(kluc);
-    uzJe.add(`${d}|h${hodinRucne}`);
-    out.push({
-      druh: "balicekOd",
-      den: d,
-      nazov: b.nazov,
-      // Hodiny sú zapísané ručne; keď chýbajú, ostáva názov ako pri exporte.
-      hodin: hodinRucne,
-      doDna: den(b.platnost_do || "") || undefined,
-      zaplatene: b.cena_czk || undefined,
-      nezaplatene: nezaplateneDni.has(d) || undefined,
-      zKokpitu: true,
-    });
-  }
-
   // Nezaplatené sa musí prilepiť aj na riadok, ktorý prišiel z `packages`.
   for (const u of out) {
     if (u.druh === "balicekOd" && nezaplateneDni.has(u.den)) u.nezaplatene = true;
