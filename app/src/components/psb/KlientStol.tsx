@@ -6,6 +6,7 @@ import { dlhKlienta } from "../../lib/psb/dlhKlienta";
 import { VypisHodinPanel } from "./VypisHodinPanel";
 import { AnamnezaZhrnutie } from "./AnamnezaZhrnutie";
 import { cas24, hod, priebehBalickov, type StavRiadku } from "../../lib/psb/vypisHodin";
+import { vetaPrevzatych } from "../../lib/psb/mailKlientovi";
 import { normName, fmtCZK, fmtDMY, denVTyzdni } from "../../lib/psb/format";
 import { jeBeta } from "../../lib/psb/beta";
 import { adresyMailu } from "../../lib/psb/mime";
@@ -2017,7 +2018,7 @@ function RiadokOsi({ u, stav, treningy, rozbalene, onRozbal, pisemZdarma, dovod,
               — len to nehovorila nahlas a vyzeralo to ako preskočené číslo. */}
           {!!stav?.prevzate && (
             <span style={{ marginLeft: 7, fontSize: 11, color: C.orange }}>
-              {stav.prevzate} h padlo na staršie tréningy
+              {vetaPrevzatych(stav, "h").replace("padly na tréninky", "padlo na tréningy").replace("padla na tréninky", "padla na tréning")}
             </span>
           )}
         </span>

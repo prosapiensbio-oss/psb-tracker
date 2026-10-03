@@ -68,8 +68,13 @@ export type BodOsi = {
    * 6 hodín, chýba tam 5 h, tá bola kedy?" Vysvetlenie som vtedy pridal len
    * na internú obrazovku — na stránku pre klienta a do mailu sa nedostalo,
    * takže skok zo 6 na 4 ďalej vyzeral ako chyba.
+   *
+   * Jerry sa 3. 10. 2026 spýtal TRETÍ RAZ. Samotný počet na to neodpovedá:
+   * pýta sa „tá hodina bola kedy?", a to je dátum. Preto `prevzateDni`.
    */
   prevzate?: number;
+  /** Dni tých tréningov (YYYY-MM-DD), v poradí, ako sa stali. */
+  prevzateDni?: string[];
 };
 
 export type VypisKlienta = {
@@ -169,6 +174,27 @@ const denKratko = (iso: string) => {
   const d = (iso || "").slice(0, 10).split("-");
   return d.length === 3 ? `${Number(d[2])}. ${Number(d[1])}.` : iso;
 };
+/**
+ * „2 h padly na tréninky 24. 7. a 26. 7." — s DÁTUMAMI, nie len s počtom.
+ *
+ * Jerry sa na tú chýbajúcu hodinu pýtal trikrát (2. a 3. 10. 2026) a zakaždým
+ * tou istou vetou: „tá bola kedy?" Počet hovorí, koľko ich padlo; dátum
+ * hovorí, ktoré to boli — a to je odpoveď, po ktorej sa už nikto nepýta.
+ *
+ * Nad tri dátumy sa vypíšu prvé dva a zvyšok sa zhrnie; dlhší zoznam by na
+ * osi prerástol samotný bod.
+ */
+export function vetaPrevzatych(b: { prevzate?: number; prevzateDni?: string[] }, hodina = "h"): string {
+  const n = b.prevzate || 0;
+  if (!n) return "";
+  const dni = (b.prevzateDni || []).map(denKratko);
+  if (!dni.length) return `${n} ${hodina} padly na starší tréninky`;
+  const zoznam = dni.length <= 3
+    ? dni.length === 1 ? dni[0] : `${dni.slice(0, -1).join(", ")} a ${dni[dni.length - 1]}`
+    : `${dni.slice(0, 2).join(", ")} a dalších ${dni.length - 2}`;
+  return `${n} ${hodina} ${n === 1 ? "padla" : "padly"} na tréninky ${zoznam}`;
+}
+
 export const czk = (n: number) => `${Math.round(n).toLocaleString("sk-SK").replace(/ /g, " ")} Kč`;
 
 /**
@@ -340,7 +366,7 @@ export function mailKlientovi(v: VypisKlienta): { predmet: string; text: string;
       <td style="padding:0 0 ${posledna ? 0 : 13}px 6px">
         <div style="font-size:14px;color:${velka ? F.biela : F.text};line-height:1.35">${esc(b.popis)}</div>
         ${b.den ? `<div style="font-size:12px;color:${F.slabsia};line-height:1.35">${denKratko(b.den)}${b.cas ? ` · ${esc(b.cas)}` : ""}</div>` : ""}
-        ${b.prevzate ? `<div style="font-size:11.5px;color:${F.minus};line-height:1.35">${b.prevzate} h padly na starší tréninky</div>` : ""}
+        ${b.prevzate ? `<div style="font-size:11.5px;color:${F.minus};line-height:1.35">${vetaPrevzatych(b)}</div>` : ""}
       </td>
       <td width="56" valign="top" style="padding:0 0 ${posledna ? 0 : 13}px 8px;text-align:right;font-size:14px;color:${F.text};white-space:nowrap">${cislo}</td>
     </tr>`;

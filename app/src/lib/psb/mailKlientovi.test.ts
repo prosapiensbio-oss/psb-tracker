@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { ADRESA_HISTORIE, mailKlientovi, tempoSK, type VypisKlienta } from "./mailKlientovi";
+import { ADRESA_HISTORIE, mailKlientovi, tempoSK, type VypisKlienta, vetaPrevzatych } from "./mailKlientovi";
 
 const zaklad: VypisKlienta = {
   klient: "Richard Matl", oslovenie: "Richard", trener: "Jerry",
@@ -217,5 +217,29 @@ describe("tlačidlo „chcem celú históriu“", () => {
     const v = mailKlientovi({ ...zaklad, uplna: true, zaplateneSpolu: 1000 });
     expect(v.html).not.toContain("Chcem celú históriu");
     expect(v.text).not.toContain("Napíš na info@");
+  });
+});
+
+describe("hodiny, čo padli na staršie tréningy", () => {
+  it("povie KEDY, nie len koľko", () => {
+    // Jerry sa pýtal trikrát (2. a 3. 10. 2026) tou istou vetou: „chybí tam
+    // 5 h, tá bola kedy?" Počet na to neodpovedá, dátum áno.
+    expect(vetaPrevzatych({ prevzate: 2, prevzateDni: ["2026-07-24", "2026-07-26"] }))
+      .toBe("2 h padly na tréninky 24. 7. a 26. 7.");
+  });
+
+  it("jedna hodina je jedna", () => {
+    expect(vetaPrevzatych({ prevzate: 1, prevzateDni: ["2026-08-25"] }))
+      .toBe("1 h padla na tréninky 25. 8.");
+  });
+
+  it("dlhý zoznam sa na osi neroztiahne", () => {
+    const v = vetaPrevzatych({ prevzate: 4, prevzateDni: ["2026-07-01", "2026-07-03", "2026-07-08", "2026-07-10"] });
+    expect(v).toBe("4 h padly na tréninky 1. 7., 3. 7. a dalších 2");
+  });
+
+  it("bez dátumov zostane pri starej vete, nie pri prázdne", () => {
+    expect(vetaPrevzatych({ prevzate: 2 })).toBe("2 h padly na starší tréninky");
+    expect(vetaPrevzatych({})).toBe("");
   });
 });

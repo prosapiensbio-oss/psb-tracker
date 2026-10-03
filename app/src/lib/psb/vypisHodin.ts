@@ -49,6 +49,8 @@ export type RiadokVypisu = {
   odvodene?: boolean;
   /** Koľko hodín si balíček odpísal za staršie tréningy hneď pri vzniku. */
   prevzate?: number;
+  /** Dni tých tréningov — bez nich je to číslo bez odpovede. */
+  prevzateDni?: string[];
 };
 
 export type Vypis = {
@@ -181,6 +183,8 @@ export type StavRiadku = {
    * Len na riadku balíčka a len keď je to viac než nula.
    */
   prevzate?: number;
+  /** Dni prevzatých tréningov, v poradí, ako sa stali. */
+  prevzateDni?: string[];
 };
 
 /**
@@ -232,7 +236,7 @@ export function priebehBalickov(
   const stavy = new Map<Udalost, StavRiadku>();
 
   // Hranice členstiev: každý balíček s hodinami otvára nové obdobie.
-  type Usek = { balicek: Extract<Udalost, { druh: "balicekOd" }> | null; hodin: number; riadky: Udalost[]; prevzate?: number };
+  type Usek = { balicek: Extract<Udalost, { druh: "balicekOd" }> | null; hodin: number; riadky: Udalost[]; prevzate?: number; prevzateDni?: string[] };
   const useky: Usek[] = [{ balicek: null, hodin: 0, riadky: [] }];
   /**
    * Index prvého tréningu, na ktorý už v členstve nezostala hodina.
@@ -322,7 +326,12 @@ export function priebehBalickov(
         const od = prvyNekryty(posl);
         if (od >= 0) {
           const prevzate = posl.riadky.splice(od);
-          novy.prevzate = prevzate.filter((x) => x.druh === "trening" && x.zdarma === undefined).length;
+          const treningy = prevzate.filter((x) => x.druh === "trening" && x.zdarma === undefined);
+          novy.prevzate = treningy.length;
+          // Dni sa nesú ďalej, lebo na otázku „tá hodina bola kedy?" odpovedá
+          // len dátum. Jerry sa pýtal dvakrát (2. a 3. 10. 2026) — po prvý raz
+          // som pridal iba počet, a to je to isté číslo, nie odpoveď.
+          novy.prevzateDni = treningy.map((x) => x.den);
           novy.riadky.push(...prevzate);
         }
       }
@@ -413,7 +422,11 @@ export function priebehBalickov(
         else dlhPocet = 0;
       }
       doUseku.push({ u, po: u.druh === "trening" ? bezi : null });
-      stavy.set(u, { zostatok, dlh, usek: b?.den || "", prevzate: u === b && usek.prevzate ? usek.prevzate : undefined });
+      stavy.set(u, {
+        zostatok, dlh, usek: b?.den || "",
+        prevzate: u === b && usek.prevzate ? usek.prevzate : undefined,
+        prevzateDni: u === b && usek.prevzate ? usek.prevzateDni : undefined,
+      });
     }
 
     // Posledné členstvo sa zrovná s číslom, ktoré appka ukazuje na karte.
@@ -486,6 +499,7 @@ export function vypisHodin(os: Udalost[], od = "", doDna = "", zostatokTeraz: nu
       zKalendara: u.druh === "trening" ? u.zKalendara : undefined,
       odvodene: u.druh === "balicekOd" || u.druh === "balicekDo" ? u.odvodene : undefined,
       prevzate: stav?.prevzate,
+      prevzateDni: stav?.prevzateDni,
     });
   }
 

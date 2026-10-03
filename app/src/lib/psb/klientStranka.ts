@@ -1,4 +1,4 @@
-import type { VypisKlienta } from "./mailKlientovi";
+import { vetaPrevzatych, type VypisKlienta } from "./mailKlientovi";
 
 /**
  * STRÁNKA ZA ODKAZOM V SMS — prehľad pre klienta.
@@ -185,8 +185,7 @@ const popisBodu = (b: BodOsi) => (b.druh === "trening" ? "trénink" : cesky(b.po
  * ktoré predošlý balíček nepokryl. Klient to má vidieť rovnako ako tréner —
  * inak mu stránka tvrdí 6 h a hneď pod tým 4.
  */
-const poznamkaBodu = (b: BodOsi): string =>
-  b.prevzate ? `${b.prevzate} h padly na starší tréninky` : "";
+const poznamkaBodu = (b: BodOsi): string => vetaPrevzatych(b);
 
 const denPlne = (b: BodOsi) =>
   `${DNI[new Date(`${b.den}T12:00:00Z`).getUTCDay()]} ${den(b.den)}${b.cas ? ` · ${b.cas}` : ""}`;
