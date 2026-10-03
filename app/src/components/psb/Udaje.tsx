@@ -4,6 +4,7 @@ import { OKNA_HODIN } from "../../lib/psb/mailOkno";
 import { fmtDMY } from "../../lib/psb/format";
 import { jeBankovyVypis } from "../../lib/psb/fio";
 import { chybaOdosielatela } from "../../lib/psb/sms";
+import { ukazkoveSms } from "../../lib/psb/ukazkoveSms";
 import { C, mix, S, badge, btn } from "../../lib/psb/theme";
 import type { PSBData } from "../../lib/psb/types";
 import type { AssistantChat } from "./Assistant";
@@ -810,6 +811,38 @@ function NapojenieSms() {
   }, []);
   useEffect(() => { void nacitaj(); }, [nacitaj]);
 
+  /**
+   * VŠETKY ZNENIA NARAZ NA VLASTNÉ ČÍSLO.
+   *
+   * Jerry, 3. 10. 2026: „pošli ich." Z môjho konca to nejde — brána je za
+   * prihlásením a heslo do Kokpitu nemám. Toto je to isté na jeden klik:
+   * päť správ, presne tak, ako ich dostane klient, na číslo, ktoré napíšeš.
+   *
+   * Posiela sa POSTUPNE a každá sa počíta zvlášť; keď jedna zlyhá, ostatné
+   * sa aj tak pošlú a na konci je vidieť, koľko prešlo. Päť SMS stojí päť
+   * SMS — preto je tlačidlo vedľa skúšobnej, nie namiesto nej.
+   */
+  const [vsetkyBezi, setVsetkyBezi] = useState(false);
+
+  const posliVsetky = async () => {
+    const cislo = skusobne.trim();
+    if (!cislo) return;
+    setVsetkyBezi(true); setHlaska("");
+    let preslo = 0;
+    let chyba = "";
+    for (const s of ukazkoveSms()) {
+      const r = await fetch("/api/sms", {
+        method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ klient: `skúška — ${s.kedy}`, telefon: cislo, text: s.text }),
+      }).then((x) => x.json()).catch(() => ({ ok: false, error: "spojenie" }));
+      if (r?.ok) preslo += 1;
+      else if (!chyba) chyba = r?.error || "nepodarilo sa";
+    }
+    setVsetkyBezi(false);
+    setHlaska(chyba ? `odoslaných ${preslo} z 5 · ${chyba}` : `odoslaných všetkých ${preslo} znení na ${cislo}`);
+    await nacitaj();
+  };
+
   const uloz = async () => {
     setBezi(true); setHlaska("");
     const r = await fetch("/api/sms", {
@@ -864,6 +897,15 @@ function NapojenieSms() {
             style={{ ...vstup, cursor: skusobne.trim() ? "pointer" : "default", opacity: skusobne.trim() ? 1 : 0.5 }}
           >
             {skusam ? "…" : "Poslať skúšku"}
+          </button>
+          {/* Všetkých päť znení naraz — presne tak, ako ich dostane klient.
+              Vedľa skúšky, nie namiesto nej: päť SMS stojí päť SMS. */}
+          <button
+            onClick={() => void posliVsetky()} disabled={vsetkyBezi || skusam || !skusobne.trim()}
+            title="Pošle všetkých 5 znení, ktoré môžu klientovi odísť"
+            style={{ ...vstup, cursor: skusobne.trim() ? "pointer" : "default", opacity: skusobne.trim() ? 1 : 0.5 }}
+          >
+            {vsetkyBezi ? "posielam…" : "Poslať všetkých 5 znení"}
           </button>
           <span style={{ fontSize: 11.5, color: C.textDim }}>ide na tvoje číslo, nie klientovi</span>
         </div>
