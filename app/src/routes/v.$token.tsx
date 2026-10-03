@@ -14,7 +14,7 @@ import { nastavenia, posliHistoriu } from "./api/mail-dopyty";
 import { dlhJednehoKlienta } from "../lib/psb/dlznici";
 import { loadData } from "../lib/psb/db.server";
 import { mailKlientovi } from "../lib/psb/mailKlientovi";
-import { osCasuKlienta } from "../lib/psb/klientOsCasu";
+import { hodinZNazvuBalicka, osCasuKlienta } from "../lib/psb/klientOsCasu";
 import { blokPocitovky } from "../lib/psb/pocitovkaStranka";
 import { oblastiZJson, platnaHodnota, posledneHodnoty, POSUN, type Meranie, type Oblast } from "../lib/psb/pocitovka";
 import { podlaKlienta } from "../lib/psb/anamneza.server";
@@ -193,6 +193,28 @@ export const Route = createFileRoute("/v/$token")({
           return n;
         })();
         if ((vypis.zostatok ?? 0) === 0 && nadRamec > 0) vypis.zostatok = -nadRamec;
+
+        /**
+         * KOĽKOU HODINOU SA TÉN TRÉNING STANE, KEĎ KLIENT ZAPLATÍ.
+         *
+         * Jerry, 3. 10. 2026: „−1 6h, −2 5h, −3 4h — podľa mňa by to malo byť
+         * takto napísané." Mínus hovorí, že tréning zatiaľ balíček nemá;
+         * číslo vedľa neho hovorí, čím sa stane. Je to ten istý balíček, aký
+         * stránka hneď pod osou ponúka cez QR — tá istá veľkosť ako posledný.
+         *
+         * Keď je tréningov nad rámec viac, než má balíček hodín, tie ďalšie
+         * ostanú len s mínusom: na ne by ani nový balíček nestačil a číslo,
+         * ktoré sa nenaplní, je horšie než žiadne.
+         */
+        const hodinBaliecka = hodinZNazvuBalicka(
+          [...vypis.os].reverse().find((b) => b.druh === "balicekOd")?.popis || "",
+        );
+        if (nadRamec > 0 && hodinBaliecka > 0) {
+          const bezHodiny = vypis.os.filter((b) => b.druh === "trening" && b.zostatok == null && b.dlh).slice(-nadRamec);
+          bezHodiny.forEach((b, i) => {
+            if (hodinBaliecka - i > 0) b.buduca = hodinBaliecka - i;
+          });
+        }
         const origin = new URL(request.url).origin;
         /**
          * QR JE NA STRÁNKE VŽDY, KEĎ JE ČO ZAPLATIŤ — a to sú dva prípady.

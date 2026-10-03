@@ -62,6 +62,16 @@ export type BodOsi = {
   /** Koľkátý tréning bez krytia — kreslí sa ako −1, −2. */
   dlh?: number | null;
   /**
+   * Hodina, ktorú tomuto tréningu dá AŽ ĎALŠÍ balíček — 6, 5, 4…
+   *
+   * Jerry, 3. 10. 2026: „−1 6h, −2 5h, −3 4h — podľa mňa by to malo byť
+   * takto napísané." Mínus hovorí, že tréning zatiaľ balíček nemá; toto
+   * číslo hovorí, koľkou hodinou sa stane, keď si klient ďalší kúpi. Je to
+   * predpoveď, nie stav, preto sa kreslí tlmene a počíta sa z veľkosti
+   * posledného balíčka — toho istého, ktorý stránka ponúka cez QR.
+   */
+  buduca?: number;
+  /**
    * Koľko hodín si balíček odpísal za staršie tréningy hneď pri vzniku.
    *
    * Jerry, 2. 10. 2026 druhý raz nad Hanusom: „znovu mi tam je predplatné

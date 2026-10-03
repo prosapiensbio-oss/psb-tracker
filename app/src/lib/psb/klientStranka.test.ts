@@ -274,18 +274,32 @@ describe("odpočet hodín sa nepretrhne", () => {
   const h = klientStranka(z);
 
   it("prevzatý tréning ukáže hodinu, nie mínus", () => {
-    // 6 h aj 5 h musia byť na osi a −2 nikde: tréning 26. 7. má hodinu.
-    expect(h).toContain(">6 h<");
-    expect(h).toContain(">5 h<");
-    expect(h).not.toContain(">−2<");
-    // Jediné zostávajúce −1 patrí 25. 8., na ktorý hodina naozaj nie je;
-    // os je raz vodorovná a raz zvislá, takže je v HTML dvakrát.
-    expect(h.split(">−1<").length - 1).toBe(2);
+    // 6 h aj 5 h musia byť na osi — a hodina stojí vedľa mínusu, nie namiesto.
+    expect(h).toContain("6 h</span>");
+    expect(h).toContain("5 h</span>");
+    expect(h).toContain("−1</span> <span>6 h</span>");
+  });
+
+  it("prevzatý tréning nesie OBE čísla — mínus aj hodinu", () => {
+    // Jerry, 3. 10. 2026: „−1 6h, −2 5h, −3 4h — takto by to malo byť."
+    const h2 = klientStranka(z);
+    expect(h2).toContain("−1</span> <span>6 h</span>");
+    expect(h2).toContain("−2</span> <span>5 h</span>");
+  });
+
+  it("tréning bez balíčka ukáže, koľkou hodinou sa stane po zaplatení", () => {
+    const h3 = klientStranka({
+      ...z,
+      os: [{ den: "2026-09-25", cas: "16:00", popis: "tréning", druh: "trening" as const, zostatok: null, dlh: 1, buduca: 6 }],
+    });
+    // Mínus je stav, budúca hodina je predpoveď — preto je tlmená.
+    expect(h3).toContain("−1</span>");
+    expect(h3).toContain("6 h</span>");
   });
 
   it("mínus zostáva tam, kde hodina naozaj nie je", () => {
     const sam = klientStranka({ ...z, os: [z.os[4]] });
-    expect(sam).toContain(">−1<");
-    expect(sam).not.toContain(">6 h<");
+    expect(sam).toContain("−1</span>");
+    expect(sam).not.toContain("6 h</span>");
   });
 });

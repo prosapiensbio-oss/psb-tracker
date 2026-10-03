@@ -191,10 +191,17 @@ const farbaBodu = (b: BodOsi): string =>
  * prednosť; mínus zostáva len tam, kde hodina naozaj nie je.
  */
 function cisloBodu(b: BodOsi): string {
-  if (maHodinu(b)) return hod(b.zostatok as number);
-  if (b.dlh) return `−${b.dlh}`;
+  const s = SADZBA;
+  // Mínus a hodina stoja VEDĽA SEBA, nie jedno namiesto druhého (Jerry,
+  // 3. 10. 2026). Mínus hovorí „tento tréning balíček nemal", hodina hovorí,
+  // ktorou hodinou je — alebo sa ňou stane, keď klient zaplatí.
+  const minus = b.dlh ? `<span style="color:${s.minus}">−${b.dlh}</span>` : "";
+  const hodina = maHodinu(b)
+    ? `<span>${esc(hod(b.zostatok as number))}</span>`
+    : b.buduca != null ? `<span style="color:${s.tlmeny}">${esc(hod(b.buduca))}</span>` : "";
+  if (minus || hodina) return [minus, hodina].filter(Boolean).join(" ");
   const m = /(\d[\d\s  ]*)\s*(Kč|h)\b/.exec(b.popis);
-  return m ? `${m[1].trim()} ${m[2]}` : "";
+  return m ? esc(`${m[1].trim()} ${m[2]}`) : "";
 }
 
 const popisBodu = (b: BodOsi) => (b.druh === "trening" ? "trénink" : cesky(b.popis));
@@ -227,7 +234,7 @@ function osVodorovna(os: BodOsi[]): string {
 <div style="font-size:11px;color:${s.slabsia}">${esc(denPlne(b))}</div>
 ${poznamkaBodu(b) ? `<div style="font-size:10.5px;color:${s.minus};line-height:1.3;margin-top:2px">${esc(poznamkaBodu(b))}</div>` : ""}</div>
 <div style="height:14px;display:flex;align-items:center"><div style="width:${p}px;height:${p}px;border-radius:50%;background:${farbaBodu(b)}"></div></div>
-<div style="font-family:'Raleway',sans-serif;font-weight:700;font-size:14.5px;margin-top:9px;color:${b.dlh && !maHodinu(b) ? s.minus : s.text}">${esc(cislo)}</div></div>`;
+<div style="font-family:'Raleway',sans-serif;font-weight:700;font-size:14.5px;margin-top:9px;color:${s.text}">${cislo}</div></div>`;
   }).join("");
   return `<div class="psb-os" style="position:relative;margin:0 -22px;padding:0 22px;overflow-x:auto;-webkit-overflow-scrolling:touch">
 <div style="display:flex;position:relative;min-width:max-content;padding-bottom:4px">
@@ -244,7 +251,7 @@ function osZvisla(os: BodOsi[]): string {
     const prvy = i === 0;
     const posledny = i === os.length - 1;
     return `<div style="display:flex;align-items:center;min-height:52px">
-<div style="flex:1;text-align:right;padding-right:15px;font-family:'Raleway',sans-serif;font-weight:700;font-size:15px;color:${b.dlh && !maHodinu(b) ? s.minus : s.text}">${esc(cisloBodu(b))}</div>
+<div style="flex:1;text-align:right;padding-right:15px;font-family:'Raleway',sans-serif;font-weight:700;font-size:15px;color:${s.text}">${cisloBodu(b)}</div>
 <div style="width:15px;flex-shrink:0;align-self:stretch;display:flex;flex-direction:column;align-items:center">
 <div style="width:2px;flex:1;background:${prvy ? "transparent" : s.ramik}"></div>
 <div style="width:${p}px;height:${p}px;border-radius:50%;background:${farbaBodu(b)};flex-shrink:0"></div>
