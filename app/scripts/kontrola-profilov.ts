@@ -17,6 +17,9 @@ import { normName } from "../src/lib/psb/format";
 import { hodinZNazvuBalicka, osCasuKlienta, type Udalost } from "../src/lib/psb/klientOsCasu";
 import { EMPTY_DATA, type PSBData } from "../src/lib/psb/types";
 import { priebehBalickov, vypisHodin } from "../src/lib/psb/vypisHodin";
+import { historiaPreMail } from "../src/lib/psb/historiaMail";
+import { dlhJednehoKlienta, dlznici } from "../src/lib/psb/dlznici";
+import type { BalicekDlh, PlatbaDlh } from "../src/lib/psb/dlhKlienta";
 import { doplnHodinySpolu, KOKPIT_OD, sedeniaZKalendara, spojDochadzku } from "../src/lib/psb/sedeniaZKalendara";
 
 const D = process.env.KONTROLA_DATA;
@@ -319,6 +322,97 @@ sekcia("CENY A HODINY");
 
   const zd = treningyZdarma.map((z: any) => `${z.klient} · ${z.den}${z.dovod ? ` — ${z.dovod}` : " — BEZ DÔVODU"}`);
   hlas("tréningy označené ako zdarma", zd, "hodina sa z členstva nestrhla");
+}
+
+// ───────────────────────────────────────── ODKAZ PRE KLIENTA
+/**
+ * ČO UVIDÍ KLIENT ZA ODKAZOM — a či to sedí s tým, čo vidí Jerry.
+ *
+ * Jerry, 3. 10. 2026: „zápisy v tých odkazoch by mali byť totožné s tým, čo
+ * nájdem u každého klienta jednotlivo." Stránka `/v/<token>` a stôl klienta
+ * dnes čítajú tie isté tabuľky a tú istú funkciu, ale sú to dve miesta v kóde
+ * a raz sa rozídu. Táto kontrola to hlási skôr, než to uvidí klient:
+ *
+ *   • tréning bez čísla — ani hodina, ani mínus,
+ *   • diera v odpočte — 6, 5, 3 namiesto 6, 5, 4,
+ *   • nadpis stránky („Zbývá ti…") proti číslu na karte,
+ *   • suma na QR proti karte dlžníkov.
+ *
+ * Kontroluje sa KAŽDÝ klient, nielen tých pár, čo odkaz už dostali — SMS sa
+ * posiela na klik a nikto si pred ňou nebude prechádzať os ručne.
+ */
+sekcia("ODKAZ PRE KLIENTA");
+{
+  /** Balíčky a platby jedného klienta v tvare, aký čaká výpočet dlhu. */
+  const balickyDlh = (m: string): BalicekDlh[] => balicky
+    .filter((b: any) => normName(b.klient) === normName(m))
+    .map((b: any) => ({
+      cena: b.cena_czk ?? null, platnostOd: String(b.platnost_od || "").slice(0, 10),
+      zdroj: String(b.zdroj || ""), zruseneAt: b.zrusene_at || null, nazov: String(b.nazov || ""),
+    }));
+  const platbyDlh = (m: string): PlatbaDlh[] => platby
+    .filter((p: any) => normName(p.klient) === normName(m))
+    .map((p: any) => ({ suma: Number(p.suma_czk) || 0, datum: String(p.datum || "").slice(0, 10), zruseneAt: p.zrusene_at || null }));
+
+  const prazdne: string[] = [];
+  const diery: string[] = [];
+  const nadpisy: string[] = [];
+  const sumy: string[] = [];
+  const dlzniciPodlaMena = new Map(dlznici(
+    poplatky,
+    Object.fromEntries(mena.map((m) => [m, balickyDlh(m)])),
+    Object.fromEntries(mena.map((m) => [m, platbyDlh(m)])),
+    {}, DNES,
+  ).map((d) => [normName(d.meno), d.spolu]));
+
+  /**
+   * Len ľudia, ktorým SMS naozaj môže odísť — kto netrénoval tri mesiace,
+   * odkaz nedostane a jeho os z roku 2025 by kontrolu len zasypala. Nálezy
+   * sa počítajú po KLIENTOVI, nie po riadku: „David Novotný má 40 prázdnych
+   * riadkov" je jeden problém, nie štyridsať.
+   */
+  const hranicaAktivity = new Date(Date.parse(`${DNES}T12:00:00Z`) - 90 * 86400000).toISOString().slice(0, 10);
+  for (const m of mena) {
+    const c = clients[m];
+    const posledny = (osi.get(m) || []).filter((u) => u.druh === "trening").map((u) => u.den).sort().pop() || "";
+    if (posledny < hranicaAktivity) continue;
+    const v = historiaPreMail(m, osi.get(m)!, c, DNES, undefined, false);
+
+    /**
+     * Prázdny riadok sa počíta LEN tam, kde výpis stojí na balíčku. Kto
+     * balíček nemá (platí tréning po tréningu, starý paušál), nemá odkiaľ
+     * vziať číslo a prázdno je pravda, nie chyba.
+     */
+    if (v.os.some((b) => b.druh === "balicekOd")) {
+      const bez = v.os.filter((b) => b.druh === "trening" && b.zostatok == null && !b.dlh);
+      if (bez.length) prazdne.push(`${m} — ${bez.length}× (naposledy ${bez[bez.length - 1].den})`);
+    }
+
+    const hodiny = v.os.filter((b) => b.druh === "trening" && b.zostatok != null).map((b) => b.zostatok as number);
+    for (let i = 1; i < hodiny.length; i++) {
+      // Nový balíček smie číslo zdvihnúť; pokles o viac než hodinu nie.
+      if (hodiny[i] < hodiny[i - 1] - 1) diery.push(`${m} · ${hodiny[i - 1]} → ${hodiny[i]}`);
+    }
+
+    // Nadpis stránky vychádza zo `zostatok`; karta klienta z `packageRemaining`.
+    if (v.zostatok != null && c.packageTotal > 0 && v.zostatok !== c.packageRemaining) {
+      nadpisy.push(`${m} — odkaz ${v.zostatok} h · karta ${c.packageRemaining} h`);
+    }
+
+    const dlh = dlhJednehoKlienta(
+      poplatky.filter((p: any) => normName(p.klient) === normName(m)),
+      balickyDlh(m), platbyDlh(m),
+    );
+    const naKarte = dlzniciPodlaMena.get(normName(m)) || 0;
+    if (Math.round(dlh.dlzi) !== Math.round(naKarte)) {
+      sumy.push(`${m} — odkaz ${Math.round(dlh.dlzi)} Kč · karta dlžníkov ${Math.round(naKarte)} Kč`);
+    }
+  }
+
+  hlas("tréning bez čísla na osi", prazdne, "klient vidí riadok, ktorý nič nehovorí");
+  hlas("diera v odpočte hodín", diery, "6, 5, 4… sa nesmie preskočiť");
+  hlas("nadpis odkazu proti karte klienta", nadpisy, "obe čísla majú hovoriť to isté");
+  hlas("suma na QR proti karte dlžníkov", sumy, "dve definície dlhu sa rozišli");
 }
 
 console.log(`\n${nalezov ? `\u001b[33m${nalezov} vecí na pozretie\u001b[0m` : "\u001b[32mbez nálezov\u001b[0m"}\n`);
