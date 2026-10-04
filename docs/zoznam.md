@@ -223,18 +223,59 @@ s `viditelny` sa pri každom vykreslení počítajú odznova (pri 200 nápadoch
 dá premenovať, prefarbiť, prehodiť na druhú stranu a zmazať. Zmazanie nápady
 nemaže — padnú do odkladiska.
 
-## 2c · Doplniť balíčky z PTmindera do Kokpitu
+## 2c · Balíčky: história z PTmindera a jedno pravidlo „zaplatený"
 
-Od 1. 10. 2026 karta klienta počíta zostatok z `balicky` (Kokpit), ale nové
-predaje prichádzajú do `services` (PTminder) a do `balicky` ich prepisuje
-RUČNÁ akcia „Doplniť nové z PTmindera". Bez nej karta o balíčku nevie, hoci
-os za odkazom áno — a čísla sa rozídu.
+Stav k 3. 10. 2026 večer (audit, `docs/kontrola-clenstiev.md`):
 
-Čaká (stav k 3. 10. 2026): **Richard Matl** (28. 9.), **Luky Križ** (28. 9.),
-**Lukas Hanus** (2. 10.), **Lucie Podolova** (2. 10.).
-
-Vidno to na Hanusovi: os ukazuje 3, 2, 1 a nadpis „Poslední hodina", lebo
-karta jeho balíček z 2. 10. ešte nepozná.
+- [x] Matl, Luky Križ, Hanus, Podolova — v `balicky` už sú (naliate 3. 10.).
+- [x] **Nezaplatený balíček je nula, zostatok má znamienko** — nasadené
+  3. 10. večer (`zostatokKokpitu`, `priebehBalickov`, `osKlientaZoServera`).
+  Hanus −1 h a 6 990 Kč, Šašinková −3, Vaško −3. Viď CLAUDE.md.
+- [x] **História balíčkov z PTmindera** — 4. 10. 2026 (Jerry: „neriaď sa
+  podľa názvu"). Tabuľka `ptminder_historia`, 1 232 riadkov; os času z nej
+  berie skutočné hodiny a koniec členstiev. Upload ju odteraz plní sám.
+  Doplnenia z nej zámerne nie (viď CLAUDE.md).
+- [ ] **Karta ≠ zoznam ešte u 8 klientov** (4. 10. 2026, nad ostrými dátami):
+  s odkazom **Veronika Stoklasková** (karta 1, zoznam 0) a **Jakub Gerich**
+  (karta 6, nové členstvo až od 7. 10.); ďalej ročné členstvá a doplnenia,
+  kde zoznam nepozná zostatok prevzatý z PTmindera (Broskva 48/49, Krčmar
+  65/68, Obrovská 2/0, Přinosilová 8/7, Šnirychová 4/2) a Holubová (pauza).
+  Iná príčina než Hanuš — kotvy a doplnenia, nie hodiny z názvu.
+- [ ] **Prenos mínusu zo skončeného členstva** je od 4. 10. vypnutý (poistka
+  proti vymysleným deficitom). Jerryho pravidlo z 28. 9. hovorí, že nový
+  balíček mínus preberá — 13 klientov má skutočne pretrénované skončené
+  členstvo (napr. Vaňková −1 tesne pred súčasným). Zapnúť späť sa dá, až
+  keď aj karta počíta prenos, inak sa karta a zoznam rozídu znova.
+- [ ] ~~ROZHODNUTIE (Jerry): naliať históriu balíčkov z PTmindera.~~ Hotové vyššie.
+  Pôvodný text: **naliať históriu balíčkov z PTmindera.** Kokpit
+  má z reportu „Packages & Memberships" len stav *Active* (124 riadkov).
+  Pod *Finished* je 553 balíčkov a 634 členstiev s obdobiami až do 2022
+  (Cancelled/Paused/Expired sú prázdne). Súbory: `~/Downloads/ptminder-2026-10-03/`.
+  Bežný import ich NESMIE dostať — `packages` import je po klientoch výmena
+  a Active by zmizlo; treba vlastnú cestu do `balicky` (parsePackages ich
+  číta, dedup klient|názov|platnosť_od). Dopad: hodiny sa pohnú u veľkej
+  časti klientov — preto najprv simulácia, potom Jerry.
+- [ ] **Jedno pravidlo „zaplatený"** aj pre dlh: `dlhKlienta` (ceny ručných −
+  platby), `platbyEvidencia` (poplatok vs platba s oknom), `vypisHodin`
+  (platba do 30 dní). Hodiny už čítajú jedno (otvorený poplatok z dňa
+  začiatku); dlh ešte tri. Pri tom `platnyBalicek` v `sedeniaZKalendara`
+  oceňuje hodinu aj z nezaplateného balíčka (tržby, nie hodiny).
+- [ ] **Deň z UTC** (audit D): 30+ miest s `toISOString().slice(0,10)` alebo
+  `Date.parse(pražský reťazec)` — medzi polnocou a druhou ráno appka žije
+  vo včerajšku. Najhoršie: `compute.ts` `dnesneTreningy` ignoruje parameter
+  `dnes` (push-ráno), `poslednyTrening` na serveri, `api/kalendar.ts okno()`.
+  `cas.ts` má `dnesPraha`, ktorý nikto nepoužíval.
+- [ ] **SMS rozhoduje o QR z iného čísla než stránka** (`SmsKlientovi.tsx:142`
+  vs `v.$token.tsx`): overiť po nasadení, či po zjednotení `packageRemaining`
+  ešte môžu nesúhlasiť; ak áno, SMS má stav nečítať vôbec (pamäť „Jedna SMS").
+- [ ] `KlientStol`/`Dashboard`/`Kalendar` odčítavajú `mimoExportu` od čísla,
+  ktoré od 1. 10. kalendár už obsahuje — overiť, že je po 1. 10. vždy nula.
+- [ ] `objednaneUvodne` zakladá profil s `lastSession` v budúcnosti (Petr Baťa
+  5. 10.) → `daysBetween` záporné na troch miestach v `compute.ts`.
+- [ ] **Pre Jerryho:** Gerich (hodina 28. 9. po konci viazanosti 2. 9.;
+  15 580 Kč 30. 9. = dva balíčky, v `balicky` jeden), Čechová (DB 5 h pri
+  názve „6h"), Gažo (všetky platby len v PTminder `payments`, v `platby` nič),
+  Kalva/Martinek/Vaško (6h balíček s 8/8/7 h z `na_obdobie`).
 
 ## 3 · Blokované niečím mimo Kokpitu
 

@@ -232,6 +232,8 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
       // Export služieb je kniha predajov od 1/2025 — bez neho stojí na osi
       // jediný balíček a odpočet nemá kde začať.
       services: (data.services || []) as never,
+      // Skutočné hodiny minulých členstiev z PTmindera — nie z názvu.
+      historia: (data.historiaBalickov || []) as never,
       poplatky: (data.poplatky || []) as never,
       treningyZdarma: (data.treningyZdarma || []) as never,
       // Odpovede „koľko hodín pridalo doplnenie" — bez nich appka v tom
@@ -1118,7 +1120,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
             )}
             {mimoExportu > 0 && (
               <div style={{ fontSize: 10.5, color: C.textDim, marginTop: 4, lineHeight: 1.45 }}>
-                PTminder hovorí {c.packageRemaining} h k poslednému exportu;
+                {c.packageOdkial?.startsWith("Kokpit") ? "Kokpit hovorí" : "PTminder hovorí"} {c.packageRemaining} h k poslednému exportu;
                 {" "}{mimoExportu} {mimoExportu === 1 ? "hodina sa odtrénovala" : mimoExportu < 5 ? "hodiny sa odtrénovali" : "hodín sa odtrénovalo"} po ňom a vie o nich zatiaľ len kalendár.
               </div>
             )}
@@ -2079,7 +2081,10 @@ function RiadokOsi({ u, stav, treningy, rozbalene, onRozbal, pisemZdarma, dovod,
           title={zdarma ? "Zrušiť — hodina sa bude z členstva odpočítavať" : "Hodinu z členstva neodpočítať"}
           style={{ background: "none", border: "none", cursor: "pointer", fontSize: 10.5, color: zdarma ? C.textDim : C.textMuted, padding: "2px 4px" }}
         >
-          {zdarma ? "zrušiť" : "zdarma"}
+          {/* Je to AKCIA, nie stav. Holé „zdarma" pri každom riadku Jerry
+              3. 10. 2026 čítal ako údaj („zdarma pri každom tréningu") —
+              sloveso to rozlíši. Stav sa kreslí zelenou vyššie. */}
+          {zdarma ? "zrušiť zdarma" : "označiť zdarma"}
         </button>
       )}
       <StavHodin stav={stav} />

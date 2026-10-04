@@ -180,3 +180,43 @@ describe("tréner pri tréningu z kalendára", () => {
     expect((os.find((u) => u.druh === "trening") as { trener?: string }).trener).toBeUndefined();
   });
 });
+
+describe("skutočné hodiny minulého členstva sú v histórii z PTmindera, nie v názve", () => {
+  // Lukáš Hanus, 4. 10. 2026: júlové „OFF - 6h S viazanostou" malo v PTminderi
+  // 8 hodín (8 per month). Z názvu appka počítala šesť, vymyslela deficit −2
+  // a ten sa valil cez august a september — v zozname −3 namiesto −1.
+  const sl = (date: string, description: string) =>
+    ({ client: "Lukas Hanus", date: `${date}T00:00:00.000Z`, serviceType: "Membership", description, price: 6990 });
+  const hist = (od: string, doDna: string, naObdobie: number) =>
+    ({ client: "Lukas Hanus", package: "OFF - 6h S viazanostou", total: 0, remaining: 0, validFrom: od, validTo: doDna, naObdobie, kind: "membership", stav: "expired" });
+  const zdroj = (historia: unknown[]) => ({
+    sessions: [], payments: [], packages: [],
+    services: [sl("2026-06-29", "OFF - 6h S viazanostou")],
+    historia: historia as never,
+  });
+
+  it("s históriou má členstvo hodiny aj koniec z PTmindera", () => {
+    const b = osCasuKlienta("Lukas Hanus", zdroj([hist("2026-06-29", "2026-07-28", 8)]), "2026-10-04").find((u) => u.druh === "balicekOd");
+    expect(b).toMatchObject({ hodin: 8, doDna: "2026-07-28" });
+  });
+
+  it("bez histórie zostáva názov — tak ako doteraz", () => {
+    const b = osCasuKlienta("Lukas Hanus", zdroj([]), "2026-10-04").find((u) => u.druh === "balicekOd");
+    expect(b).toMatchObject({ hodin: 6 });
+  });
+
+  it("história iného obdobia (viac než 3 dni od predaja) sa nepoužije", () => {
+    const b = osCasuKlienta("Lukas Hanus", zdroj([hist("2026-07-10", "2026-08-09", 8)]), "2026-10-04").find((u) => u.druh === "balicekOd");
+    expect(b).toMatchObject({ hodin: 6 });
+  });
+
+  it("doplnenie z histórie hodiny NEBERIE — je to zvyšok, nie nové hodiny", () => {
+    const z = {
+      sessions: [], payments: [], packages: [],
+      services: [{ client: "Daniela Šašinkova", date: "2026-09-12T00:00:00.000Z", serviceType: "Package", description: "Doplnenie členstva", price: 0 }],
+      historia: [{ client: "Daniela Šašinkova", package: "Doplnenie členstva", total: 1, remaining: 0, added: "2026-09-12", kind: "package", stav: "expired" }] as never,
+    };
+    const b = osCasuKlienta("Daniela Šašinkova", z, "2026-10-04").find((u) => u.druh === "balicekOd");
+    expect(b).toMatchObject({ hodin: 0, doplnenie: true });
+  });
+});

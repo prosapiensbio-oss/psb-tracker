@@ -1438,7 +1438,73 @@ Z toho vzišiel model odpočtu, ktorý si Jerry vypýtal (`priebehBalickov`):
   „Doplnenia členstva" (144 riadkov v exporte a ani jedno nehovorí, o koľko
   hodín ide). Zrovnávať sa musí ku dňu exportu, nie k dnešku — tréning, ktorý
   prišiel po ňom z kalendára, PTminder ešte nevidel a Danovi Kouřilovi
-  nafukoval šesťhodinový balíček na sedem.
+  nafukoval šesťhodinový balíček na sedem. **Od 3. 10. 2026 sa zrovnáva len
+  KONIEC, nie rad** (6, 5, 4, 3, 2, 1 sú pevné) a číslo z karty je od 1. 10.
+  z Kokpitu (`zostatokKokpitu`), nie z exportu — viď „Nezaplatený balíček je
+  nula" nižšie.
+
+## Nezaplatený balíček je nula a zostatok má znamienko
+
+3. 10. 2026 Jerry: „nezaplatený balík je 0" a „keď Hanušovi pošlem odkaz a má
+tam −3, tak to je naozaj tak a nie že bude mať pocit, že ho chcem oklamať."
+Lukáš Hanus mal zaplatené členstvo 6 h od 9. 9., sedem tréningov od vtedy
+a druhé členstvo od 2. 10. s otvoreným poplatkom 6 990 Kč. Karta hovorila
++5 h (12 − 7), stránka 3 h, Jerry −1 — a Jerry mal pravdu. To isté Daniela
+Šašinková (+5 namiesto −3) a Martin Vaško. Traja dlžníci videli plus.
+
+- **Balíček s otvoreným poplatkom hodiny nedáva, kým sa nezaplatí.** Jedna
+  definícia „nezaplatený" pre kartu aj os: poplatok v `poplatky` z dňa
+  `platnost_od` (`klucNezaplateneho` v `zostatokKokpitu.ts`; os ho má ako
+  `nezaplatene` na `balicekOd`). Nezaplatený balíček zostáva aktívny — určuje
+  názov členstva a odkedy sa počíta — len jeho hodiny sú nula.
+- **Zostatok má znamienko.** `zostatokKokpitu` ani `priebehBalickov.koniec`
+  už nestropujú na nule: −1 znamená jeden tréning bez hodiny. Mínus nie je
+  dlh v korunách (ten je `dlhJednehoKlienta`), je to značka, ktorú ďalší
+  zaplatený balíček prepíše na hodiny — na osi ich prevezme (`prevzate`).
+- **Nový balíček preberá tréningy len z členstva, ktoré v ten deň ešte
+  platí (ostro: koniec v deň začiatku ďalšieho je obnova, nie prekryv).**
+  4. 10. 2026: karta −1, zoznam −3 u Hanuša. Zoznam si do balíčka z 9. 9.
+  preniesol dva tréningy zo skončeného augustového členstva, o ktorom appka
+  pozná len názov „6h" (júl mal v skutočnosti 8 h, doplnenia bez počtu) —
+  vymyslený deficit sa valil cez celý rok a balíček začal na 4 namiesto 6.
+  Skončené členstvo si mínus nechá na vlastných riadkoch; bez známeho konca
+  platnosti sa neprenáša nič. Tým sa zmenilo Jerryho želanie z 28. 9. (Matl:
+  „nech sa od tej −1 odpočítava nový balík") — tam, kde staré členstvo už
+  skončilo, nový balíček začína na svojich hodinách a karta s osou sedia.
+- **Hodiny minulého členstva sú v histórii z PTmindera, nie v názve**
+  (`ptminder_historia`, migrácia 0095, od 4. 10. 2026). Toto bola skutočná
+  príčina Hanušovho −3: júlové „OFF - 6h S viazanostou" malo v PTminderi
+  8 hodín, appka ho poznala len z knihy predajov a počítala šesť. Rovnako
+  na tom bolo 9 členstiev u 8 klientov (Kral 1 → 4, Gažo 8 → 16, Kalva,
+  Vaško, Martinek 6 → 8, Čechová 6 → 5). Report „Packages & Memberships"
+  so stavom **Finished** sa nahráva cez Upload ako ktorýkoľvek export:
+  `ingest` ho pozná podľa stĺpca Status (všetko `expired`) a zapíše LEN do
+  histórie — do snímky `packages` nie, lebo tú import po klientoch nahrádza
+  a Finished by klientom zmazal živé balíčky. Každý export Active ide do
+  histórie tiež.
+  **Doplnenia sa z histórie neberú.** Skúšané 4. 10. nad všetkými klientmi:
+  doplnenie je „presne toľko, koľko mu ostalo" (Jerry) a z exportu sa nedá
+  poznať, ku ktorému členstvu patrí — Šašinkovej doplnenie 1 h zo
+  skončeného členstva sa pripočítalo k novému a z −3 bolo −2. Overenie nad
+  ostrými dátami: nesúhlas karta/zoznam z 10 na 8, žiadny nový.
+- **Karta, stránka `/v/`, mail „celá história", register aj Jarvis čítajú
+  to isté číslo** (`packageRemaining`). Stránka a mail stavajú os cez
+  `osKlientaZoServera` — jedno miesto, s kalendárom aj balíčkami z Kokpitu
+  (mail ich dovtedy nemal) — a s pražským časom aj hodinou, takže dnešný
+  tréning o 18:00 nie je o 15:00 odtrénovaný.
+- **Pasca: tlačidlo, ktoré sa číta ako stav.** Stôl klienta mal pri každom
+  tréningu tlačidlo s holým „zdarma" a Jerry ho čítal ako údaj („zdarma pri
+  každom tréningu, hoci je `treningy_zdarma` prázdna"). Akcia má sloveso
+  („označiť zdarma"), stav sa kreslí inak.
+- **Pasca: `?1` a `.catch(() => ({ results: [] }))`.** Dopyt na kalendár
+  v `loadData` používa číslovaný parameter `?1`; shim, ktorý nahrádzal len
+  `?`, ho rozbil a `.catch` z toho ticho spravil prázdny zoznam — appka by
+  od 1. 10. nevidela ani jeden tréning a nikomu by nič nepovedala. Pri každom
+  takom `.catch` sa pýtaj, kto sa dozvie, že padol.
+- **Čo ešte nie je jedno pravidlo (3. 10. 2026):** „zaplatený" má v kóde
+  ďalšie tri definície — `dlhKlienta` (ceny ručných − platby), `platbyEvidencia`
+  (poplatok vs platba s oknom), `vypisHodin` (platba do 30 dní od úseku).
+  Hodiny ich nečítajú; dlh áno. Zjednotenie je v `docs/zoznam.md`.
 
 **Hodiny, ktoré nie sú v názve, sú v exporte Packages & Memberships**
 („50 left from 78"). Odtiaľ je ONE YEAR = 78 a SPECIAL 3 = 3 v mape

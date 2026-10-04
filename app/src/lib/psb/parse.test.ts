@@ -181,3 +181,12 @@ describe("hodiny na obdobie členstva („8 per month“)", () => {
     expect(r.total).toBe(6);
   });
 });
+
+describe("export Packages & Memberships nesie stav riadku", () => {
+  it("Finished = expired, podľa toho import nepreváži snímku Active", () => {
+    const csv = "\uFEFFFirst Name,Last Name,Client Status,Membership,Payment,# of sessions,# of classes,Status,Added,Dates,Duration,Payments Schedule\n"
+      + "Lukas,Hanus,Active Client,OFF - 6h S viazanostou,CZK6990,8 per month,0 per week,expired,05 Jul; 2026,29 Jun  2026 - 28 Jul  2026,1 months,none\n";
+    const [r] = parsePackages(csv.replace(/^\uFEFF/, ""));
+    expect(r).toMatchObject({ client: "Lukas Hanus", stav: "expired", kind: "membership", naObdobie: 8, validFrom: "2026-06-29", validTo: "2026-07-28" });
+  });
+});

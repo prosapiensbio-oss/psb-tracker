@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { terazPraha } from "../../lib/psb/cas";
+import { dnesPraha, terazPraha } from "../../lib/psb/cas";
+import { osKlientaZoServera } from "../../lib/psb/osKlienta.server";
 import type { D1Database } from "@cloudflare/workers-types";
 
 import { jeCasCitat, najblizsieOkno } from "../../lib/psb/mailOkno";
@@ -87,16 +88,14 @@ export async function posliHistoriu(DB: D1Database, menoZPredmetu: string, n: Na
   ).bind(`${c.name} ·%`, dnesUTC).first<{ n: number }>();
   if ((uzDnes?.n || 0) > 0) return { ok: false, preco: "dnes už raz odišla" };
 
-  const os = osCasuKlienta(c.name, {
-    sessions: data.sessions, payments: data.payments, packages: data.packages,
-    services: data.services, poplatky: data.poplatky, treningyZdarma: data.treningyZdarma,
-    doplneniaHodiny: data.doplneniaHodiny || {},
-  }, dnesUTC);
+  // Tá istá os ako na stránke `/v/` — s kalendárom a balíčkami z Kokpitu.
+  // Dovtedy mail staval os len z PTmindera a klient dostal v SMS inú než v maili.
+  const { os } = await osKlientaZoServera(DB, data, c.name, terazPraha());
   const dalsi = ((await DB.prepare(
     "SELECT MIN(zaciatok) z FROM kal_udalosti WHERE zmizla_at IS NULL AND klient = ?1 AND typ IN ('trening','uvodny') AND zaciatok > ?2",
   ).bind(c.name, terazPraha()).first<{ z: string | null }>())?.z) || undefined;
 
-  const vypis = historiaPreMail(c.name, os, c, dnesUTC, dalsi);
+  const vypis = historiaPreMail(c.name, os, c, dnesPraha(), dalsi);
   const logoCid = `logo-${crypto.randomUUID()}@prosapiens`;
   const { ASSETS } = bindings();
   const logo = await ASSETS?.fetch(new Request("https://kokpit.prosapiensbio.workers.dev/znacka-napis-mail.png"))

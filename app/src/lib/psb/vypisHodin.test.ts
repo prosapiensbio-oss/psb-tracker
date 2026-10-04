@@ -39,20 +39,24 @@ describe("odpočet sa vracia na začiatku každého členstva", () => {
 
 describe("dlh — tréning na nezaplatenom členstve", () => {
   // Jerryho príklad: Dan Kouřil, balíček z 2. 9. s otvoreným poplatkom
-  // 7 790 Kč a tri tréningy → −1, −2, −3, kým odpočet beží 5, 4, 3.
+  // 7 790 Kč a tri tréningy → −1, −2, −3. Od 3. 10. 2026 („nezaplatený balík
+  // je 0") odpočet na nezaplatenom členstve NEBEŽÍ: hodina pri tréningu nie
+  // je, kým sa nezaplatí — dovtedy odpočet 5, 4, 3 sľuboval hodiny, ktoré
+  // klient nemal.
   const os: Udalost[] = [
     bal("2026-09-02", 6, { nezaplatene: true }), tre("2026-09-02"), tre("2026-09-10"), tre("2026-09-18"),
   ];
 
-  it("počíta tréningy, nie hodiny do mínusu", () => {
-    const v = vypisHodin(os, "", DNES, 3);
+  it("počíta tréningy, nie hodiny do mínusu — a hodinu nedáva", () => {
+    const v = vypisHodin(os, "", DNES, -3);
     expect(v.riadky.map((r) => [r.den, r.dlh, r.zostatok])).toEqual([
-      ["2026-09-18", 3, 4],
-      ["2026-09-10", 2, 5],
-      ["2026-09-02", 1, 6],
+      ["2026-09-18", 3, null],
+      ["2026-09-10", 2, null],
+      ["2026-09-02", 1, null],
       ["2026-09-02", null, null],
     ]);
     expect(v.naDlh).toBe(3);
+    expect(v.koniec).toBe(-3);
   });
 
   it("tréning pred platbou je dlh, tréning po nej už nie", () => {
@@ -116,8 +120,10 @@ describe("dlh — tréning na nezaplatenom členstve", () => {
     // Richard Matl: 6 h z 10. 8. minul do 23. 9., 28. 9. odtrénoval na dlh
     // (−1, bez hodín). Keď mu Jerry 29. 9. nahodí ďalších 6 h, ten tréning
     // sa stane šiestou hodinou nového balíčka — mínus mu zostáva.
+    // Staré členstvo ešte platí (do 1. 10.) — len z platného sa tréningy
+    // preberajú; zo skončeného nie (Hanuš, 4. 10. 2026: karta −1, zoznam −3).
     const bezNoveho: Udalost[] = [
-      bal("2026-09-01", 2), tre("2026-09-05"), tre("2026-09-12"), tre("2026-09-20"),
+      bal("2026-09-01", 2, { doDna: "2026-10-01" }), tre("2026-09-05"), tre("2026-09-12"), tre("2026-09-20"),
     ];
     const v1 = vypisHodin(bezNoveho, "", "2026-09-29", 0);
     expect(v1.riadky.find((r) => r.den === "2026-09-20")!.zostatok).toBeNull();
@@ -246,7 +252,9 @@ describe("text pre klienta", () => {
     // Názov sa klientovi ukazuje v novom slovníku (Jerry, 29. 9. 2026);
     // v dátach zostáva pôvodný „OFF - 6h BEZ viazanosti" z PTmindera.
     expect(t).toContain("6h Balíček · 6 h · do 28. 10. 2026");
-    expect(t).toContain("zostávalo 6 h · nezaplatené · 1. tréning");
+    // Nezaplatené členstvo hodinu nedáva — pri tréningu stojí len mínus.
+    expect(t).toContain("nezaplatené · 1. tréning");
+    expect(t).not.toContain("zostávalo 6 h · nezaplatené");
     expect(t).toContain("Tréningov na nezaplatenom členstve: 1");
     expect(t).toContain("tréning 15:00 · Jerry");
   });
@@ -300,12 +308,14 @@ describe("tréning zadarmo", () => {
   ];
 
   it("z odpočtu ani z dlhu sa nepočíta", () => {
+    // Členstvo je nezaplatené, takže platené tréningy sú bez hodiny a s mínusom;
+    // darovaný tréning nemá ani mínus a koniec ho nepočíta.
     const v = vypisHodin(os, "", DNES, null);
     const r = new Map(v.riadky.filter((x) => x.druh === "trening").map((x) => [x.den, x]));
-    expect(r.get("2026-09-02")).toMatchObject({ zostatok: 6, dlh: 1 });
+    expect(r.get("2026-09-02")).toMatchObject({ zostatok: null, dlh: 1 });
     expect(r.get("2026-09-09")).toMatchObject({ zostatok: null, dlh: null });
-    expect(r.get("2026-09-16")).toMatchObject({ zostatok: 5, dlh: 2 });
-    expect(v.koniec).toBe(4);
+    expect(r.get("2026-09-16")).toMatchObject({ zostatok: null, dlh: 2 });
+    expect(v.koniec).toBe(-2);
   });
 
   it("dôvod je v texte pre klienta", () => {
@@ -486,5 +496,84 @@ describe("balíček, ktorý hneď platí staršie tréningy", () => {
   it("prvý tréning na ňom preto nezačína na plnom počte", () => {
     const poNovom = riadky.filter((r) => r.druh === "trening" && r.den >= "2026-09-01");
     expect(poNovom[0].zostatok).toBe(1);
+  });
+});
+
+describe("zo skončeného členstva sa tréningy neprenášajú", () => {
+  it("Hanuš 4. 10.: augustové členstvo skončilo, balíček z 9. 9. začína na šestke, koniec −1", () => {
+    const os: Udalost[] = [
+      bal("2026-08-10", 6, { doDna: "2026-09-09" }), tre("2026-08-12"), tre("2026-08-14"), tre("2026-08-18"), tre("2026-08-21"), tre("2026-08-25"), tre("2026-09-03"), tre("2026-09-05"),
+      pla("2026-09-04", 6990), bal("2026-09-09", 6, { doDna: "2026-10-08" }),
+      tre("2026-09-09"), tre("2026-09-14"), tre("2026-09-16"), tre("2026-09-21"), tre("2026-09-25"), tre("2026-09-29"),
+      bal("2026-10-02", 6, { doDna: "2026-11-01", nezaplatene: true }), tre("2026-10-02"),
+    ];
+    const { stavy, koniec } = priebehBalickov(os, null, "2026-10-04");
+    const st = (den: string) => [...stavy.entries()].find(([u]) => u.druh === "trening" && u.den === den)![1];
+    // August prekročil svojich 6 h o jeden tréning — ten si nechá mínus u seba…
+    expect(st("2026-09-05")).toMatchObject({ zostatok: null, dlh: 1 });
+    // …a balíček z 9. 9. začína na svojich šiestich.
+    expect(["2026-09-09", "2026-09-14", "2026-09-16", "2026-09-21", "2026-09-25", "2026-09-29"].map((d) => st(d).zostatok)).toEqual([6, 5, 4, 3, 2, 1]);
+    expect(st("2026-10-02")).toMatchObject({ zostatok: null, dlh: 1 });
+    expect(koniec).toBe(-1);
+    const b = [...stavy.entries()].find(([u]) => u.druh === "balicekOd" && u.den === "2026-09-09")![1];
+    expect(b.prevzate).toBeUndefined();
+  });
+});
+
+describe("nezaplatené členstvo hodiny nedáva (Jerry, 3. 10. 2026: nezaplatený balík je 0)", () => {
+  // Lukáš Hanus 3. 10. 2026: členstvo 6 h od 9. 9. zaplatené 4. 9., sedem
+  // tréningov, druhé členstvo od 2. 10. s otvoreným poplatkom.
+  const hanus = (nezaplatene: boolean): Udalost[] => [
+    pla("2026-09-04", 6990), bal("2026-09-09", 6, { doDna: "2026-10-08" }),
+    tre("2026-09-09"), tre("2026-09-14"), tre("2026-09-16"), tre("2026-09-21"), tre("2026-09-25"), tre("2026-09-29"),
+    bal("2026-10-02", 6, { doDna: "2026-11-01", nezaplatene: nezaplatene || undefined }), tre("2026-10-02"),
+  ];
+
+  it("koniec je −1: tréning na nezaplatenom členstve je bez hodiny a s mínusom", () => {
+    const { stavy, koniec } = priebehBalickov(hanus(true), null, "2026-10-03");
+    const st = (den: string) => [...stavy.entries()].find(([u]) => u.druh === "trening" && u.den === den)![1];
+    expect(st("2026-09-09").zostatok).toBe(6);
+    expect(st("2026-09-29").zostatok).toBe(1);
+    expect(st("2026-10-02")).toMatchObject({ zostatok: null, dlh: 1 });
+    expect(koniec).toBe(-1);
+  });
+
+  it("po zaplatení dáva to isté členstvo hodiny: 6 → tréning 2. 10. je šiestka, koniec 5", () => {
+    const { stavy, koniec } = priebehBalickov(hanus(false), null, "2026-10-03");
+    const st = (den: string) => [...stavy.entries()].find(([u]) => u.druh === "trening" && u.den === den)![1];
+    expect(st("2026-10-02")).toMatchObject({ zostatok: 6, dlh: null });
+    expect(koniec).toBe(5);
+  });
+
+  it("rad 6, 5, 4, 3, 2, 1 sa nezaplateným členstvom nemení", () => {
+    const { stavy } = priebehBalickov(hanus(true), null, "2026-10-03");
+    const rad = ["2026-09-09", "2026-09-14", "2026-09-16", "2026-09-21", "2026-09-25", "2026-09-29"]
+      .map((d) => [...stavy.entries()].find(([u]) => u.druh === "trening" && u.den === d)![1].zostatok);
+    expect(rad).toEqual([6, 5, 4, 3, 2, 1]);
+  });
+
+  it("karta a os hovoria to isté číslo aj so zrovnaním: zrovnanie na −1 nič neposunie", () => {
+    const { koniec } = priebehBalickov(hanus(true), -1, "2026-10-03");
+    expect(koniec).toBe(-1);
+  });
+
+  it("Šašinková: jediné členstvo nezaplatené, tri tréningy → −3, každý s mínusom", () => {
+    const os: Udalost[] = [bal("2026-09-09", 8, { doDna: "2026-11-03", nezaplatene: true }), tre("2026-09-16"), tre("2026-09-23"), tre("2026-10-01")];
+    const { stavy, koniec } = priebehBalickov(os, null, "2026-10-03");
+    expect([...stavy.values()].filter((s) => s.dlh).map((s) => s.dlh)).toEqual([1, 2, 3]);
+    expect(koniec).toBe(-3);
+  });
+});
+
+describe("dnešný tréning sa počíta, až keď sa začal", () => {
+  it("s časom v `dnes` tréning o 18:00 o 15:00 na osi nie je, o 18:01 áno", () => {
+    const zdroj = {
+      sessions: [], payments: [], packages: [], services: [],
+      kalUdalosti: [{ klient: "Petr Test", trener: "Jerry", zaciatok: "2026-10-03T18:00", koniec: "2026-10-03T19:00", nazov: "Petr Test", typ: "trening" }],
+    };
+    expect(osCasuKlienta("Petr Test", zdroj as never, "2026-10-03T15:00").filter((u) => u.druh === "trening")).toHaveLength(0);
+    expect(osCasuKlienta("Petr Test", zdroj as never, "2026-10-03T18:01").filter((u) => u.druh === "trening")).toHaveLength(1);
+    // Deň bez času sa správa ako doteraz — celý deň sa počíta.
+    expect(osCasuKlienta("Petr Test", zdroj as never, "2026-10-03").filter((u) => u.druh === "trening")).toHaveLength(1);
   });
 });

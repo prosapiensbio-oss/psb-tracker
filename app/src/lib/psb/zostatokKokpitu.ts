@@ -22,6 +22,19 @@
  * naliatia („zostatok prevzatý z PTmindera k 2026-09-20"). Tréning z toho
  * dňa sa neodpočítava — PTminder ho v tom čísle už má. Rovnaké pravidlo
  * platí pre ručnú kotvu na karte klienta.
+ *
+ * NEZAPLATENÝ BALÍČEK JE NULA. Jerry, 3. 10. 2026: „nezaplatený balík je 0."
+ * Balíček, na ktorom v PTminderi visí otvorený poplatok, hodiny nedáva, kým
+ * nepríde platba — inak klient, ktorý dlží, vidí na karte aj na stránke plus.
+ * Lukáš Hanus mal 3. 10. zaplatené členstvo 6 h od 9. 9., sedem tréningov
+ * od vtedy a druhé členstvo od 2. 10. s otvoreným poplatkom 6 990 Kč: karta
+ * hovorila +5 h (12 − 7), pravda je −1 h. To isté Daniela Šašinková (+5
+ * namiesto −3) a Martin Vaško. Nezaplatený balíček zostáva „aktívny" — určuje
+ * názov členstva aj odkedy sa počíta — len jeho hodiny sú nula.
+ *
+ * ZOSTATOK MÁ ZNAMIENKO. Mínus nie je dlh, je to značka, že klient trénuje
+ * nad rámec; ďalší zaplatený balíček ju prepíše na hodiny. Karta, stránka
+ * klienta a register preto ukazujú to isté záporné číslo, nie nulu.
  */
 import { normName } from "./format";
 
@@ -40,12 +53,14 @@ export type BalicekPreZostatok = {
 export type SedeniePreZostatok = { client: string; date: string; duration?: number };
 
 export type ZostatokKokpitu = {
-  /** Koľko hodín zostáva (nie menej ako 0). */
+  /** Koľko hodín zostáva. Záporné = odtrénované nad rámec zaplatených. */
   zostatok: number;
-  /** Koľko hodín je odtrénovaných nad rámec balíčkov. */
+  /** Koľko hodín je odtrénovaných nad rámec balíčkov (kladná časť mínusu). */
   nadRamec: number;
-  /** Hodín v aktívnych balíčkoch spolu. */
+  /** Hodín v aktívnych ZAPLATENÝCH balíčkoch spolu. */
   spolu: number;
+  /** Hodín v aktívnych balíčkoch, ktoré ešte nie sú zaplatené — tie sa nepočítajú. */
+  nezaplateneHodin: number;
   minute: number;
   od: string;
   /** Najnovší aktívny balíček — ten sa ukazuje ako „členstvo". */
@@ -63,12 +78,21 @@ export const jeAktivnyBalicek = (b: BalicekPreZostatok, dnes: string): boolean =
  * `null` = klient nemá v Kokpite žiadny aktívny balíček. To nie je nula —
  * appka o ňom nevie a karta to má povedať, nie tváriť sa, že hodiny minul.
  */
+/** Kľúč nezaplateného balíčka: `normName(klient)|platnostOd` — deň otvoreného poplatku. */
+export const klucNezaplateneho = (klient: string, den: string): string => `${normName(klient)}|${String(den || "").slice(0, 10)}`;
+
 export function zostatokKokpitu(
   balicky: BalicekPreZostatok[],
   klient: string,
   sedenia: SedeniePreZostatok[],
   dnes: string,
   zadarmo: Set<string> = new Set(),
+  /**
+   * Balíčky s otvoreným poplatkom (kľúč `klucNezaplateneho`). Tá istá
+   * definícia ako na osi klienta (`klientOsCasu`: poplatok s dátumom dňa,
+   * keď balíček začal) — jedno pravidlo, nie dve.
+   */
+  nezaplatene: Set<string> = new Set(),
 ): ZostatokKokpitu | null {
   const k = normName(klient);
   const aktivne = balicky
@@ -82,7 +106,9 @@ export function zostatokKokpitu(
   // Deň kotvy sa vynechá, len keď je kotvou práve ten najstarší balíček —
   // inak by sa vynechal deň, ktorý iný aktívny balíček normálne pokrýva.
   const odVylucne = aktivne.some((b) => b.kotva && den(b.platnostOd) === od);
-  const spolu = pausal ? 0 : aktivne.reduce((a, b) => a + (b.hodiny || 0), 0);
+  const jeNezaplateny = (b: BalicekPreZostatok) => nezaplatene.has(klucNezaplateneho(b.klient, b.platnostOd));
+  const spolu = pausal ? 0 : aktivne.filter((b) => !jeNezaplateny(b)).reduce((a, b) => a + (b.hodiny || 0), 0);
+  const nezaplateneHodin = pausal ? 0 : aktivne.filter(jeNezaplateny).reduce((a, b) => a + (b.hodiny || 0), 0);
 
   let minute = 0;
   for (const s of sedenia) {
@@ -93,10 +119,11 @@ export function zostatokKokpitu(
   }
   minute = Math.round(minute * 100) / 100;
 
+  const rozdiel = Math.round((spolu - minute) * 100) / 100;
   return {
-    zostatok: pausal ? 0 : Math.max(0, Math.round((spolu - minute) * 100) / 100),
-    nadRamec: pausal ? 0 : Math.max(0, Math.round((minute - spolu) * 100) / 100),
-    spolu, minute, od,
+    zostatok: pausal ? 0 : rozdiel,
+    nadRamec: pausal ? 0 : Math.max(0, -rozdiel),
+    spolu, nezaplateneHodin, minute, od,
     nazov: najnovsi.nazov,
     platnostDo: najnovsi.platnostDo || null,
     pausal,

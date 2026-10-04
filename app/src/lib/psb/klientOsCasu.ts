@@ -131,6 +131,12 @@ export function osCasuKlienta(
   meno: string,
   zdroj: {
     sessions: Sedenie[]; payments: Platba[]; packages: Balicek[]; kalUdalosti?: KalUdalost[];
+    /**
+     * História z PTmindera (`ptminder_historia`): skutočné hodiny a koniec
+     * platnosti minulých členstiev a doplnení. Bez nej sa hodiny čítajú
+     * z názvu — a „6h" v názve nemusí byť šesť hodín (Hanus, júl 2026: 8).
+     */
+    historia?: Balicek[];
     services?: Sluzba[]; poplatky?: Poplatok[]; treningyZdarma?: Zdarma[]; balicky?: BalicekKokpitu[];
     /**
      * Koľko hodín pridalo „Doplnenie členstva" — kľúč `klient|deň`.
@@ -155,12 +161,21 @@ export function osCasuKlienta(
 
   // Tréningy, ktoré sú v kalendári a v exporte ešte nie. Porovnáva sa po
   // DŇOCH: v jeden deň klient druhýkrát netrénuje a dvojica by len mýlila.
+  /**
+   * DNEŠNÝ TRÉNING SA POČÍTA AŽ KEĎ SA ZAČAL.
+   *
+   * Porovnanie len po dňoch (`d > dnes`) bralo tréning o 18:00 ako konaný
+   * už ráno — a stránka klienta ho o 15:00 odpočítala a zároveň ponúkla ako
+   * „Ďalší tréning". `dnes` preto smie niesť aj čas (`2026-10-03T15:02`,
+   * pražský, ako `terazPraha()`); porovnáva sa na jeho dĺžku. Deň bez času
+   * sa správa ako doteraz (celý deň sa počíta).
+   */
   const dniZExportu = new Set(out.map((x) => x.den));
   for (const u of zdroj.kalUdalosti || []) {
     if (!u.klient || normName(u.klient) !== k) continue;
     if (u.typ !== "trening" && u.typ !== "uvodny") continue;
     const d = den(u.zaciatok);
-    if (d > dnes || dniZExportu.has(d)) continue;
+    if (String(u.zaciatok).slice(0, dnes.length) > dnes || dniZExportu.has(d)) continue;
     dniZExportu.add(d);
     /**
      * TRÉNER SA NESIE AJ Z KALENDÁRA.
@@ -288,6 +303,41 @@ export function osCasuKlienta(
     uzJe.add(`${x.den}|${normName(x.nazov)}`);
     uzJe.add(`${x.den}|h${x.hodin}`);
   }
+  /**
+   * SKUTOČNÉ HODINY MINULÉHO ČLENSTVA SÚ V HISTÓRII, NIE V NÁZVE.
+   *
+   * Jerry, 4. 10. 2026: „neriaď sa podľa názvu." Kniha predajov nesie len
+   * názov a deň; koľko hodín obdobie naozaj malo (aj s prenesenými), vie
+   * PTminder v reporte Packages & Memberships. Párovanie: ten istý klient,
+   * začiatok obdobia najviac 3 dni od predaja a rovnaký názov. Bez zhody
+   * zostáva názov — tak, ako doteraz.
+   *
+   * LEN ČLENSTVÁ, NIE DOPLNENIA. Doplnenie je podľa Jerryho „presne toľko,
+   * koľko mu ostalo" — hodiny, ktoré už v čísle sú. Z exportu sa nedá
+   * poznať, ku ktorému členstvu patria: Daniele Šašinkovej prišlo 12. 9.
+   * doplnenie 1 h zo skončeného členstva, os ho pripočítala k novému
+   * (nezaplatenému) a z −3 spravila −2; Markéte Resnerovej to isté s
+   * doplnením z 20. 9. Skúšané 4. 10. 2026 nad všetkými klientmi a vrátené.
+   */
+  const mojaHistoria = moje(zdroj.historia || []);
+  const zHistorie = (nazov: string, d: string, doplnenie: boolean) => {
+    if (doplnenie) return null;
+    const n = normName(nazov);
+    let naj: Balicek | null = null;
+    let najDni = 99;
+    for (const h of mojaHistoria) {
+      if (normName(h.package) !== n) continue;
+      if (h.kind && h.kind !== "membership") continue;
+      const kotva = den(h.validFrom || "");
+      if (!kotva) continue;
+      const dni = Math.abs(Date.parse(`${kotva}T12:00:00Z`) - Date.parse(`${d}T12:00:00Z`)) / 86400000;
+      if (dni <= 3 && dni < najDni) { naj = h; najDni = dni; }
+    }
+    if (!naj) return null;
+    const hodin = naj.naObdobie || naj.total;
+    return hodin > 0 ? { hodin, doDna: den(naj.validTo || "") || undefined } : null;
+  };
+
   for (const sl of (zdroj.services || []).filter((x) => normName(x.client) === k)) {
     if (!SLUZBA_JE_BALICEK(sl.serviceType)) continue;
     const d = den(sl.date);
@@ -312,11 +362,15 @@ export function osCasuKlienta(
     // Odpovedané doplnenie má hodiny ako ktorýkoľvek iný balíček; bez
     // odpovede zostáva 0 a obdobie sa berie ako neisté (`priebehBalickov`).
     const odpoved = doplnenie ? zdroj.doplneniaHodiny?.[`${sl.client}|${d}`] : undefined;
+    const hist = zHistorie(sl.description, d, !!doplnenie);
+    if (hist) uzJe.add(`${d}|h${hist.hodin}`);
     out.push({
       druh: "balicekOd",
       den: d,
       nazov: sl.description,
-      hodin: odpoved ?? zNazvu,
+      // Jerryho odpoveď > PTminder (história) > názov.
+      hodin: odpoved ?? hist?.hodin ?? zNazvu,
+      doDna: hist?.doDna,
       zaplatene: sl.price || undefined,
       nezaplatene: nezaplateneDni.has(d) || undefined,
       doplnenie,

@@ -224,10 +224,24 @@ export type StavRiadku = {
  * Natália Pečková má balíček z 29. 4. a platbu 16. 9., a appke by vyšlo, že
  * celé leto trénovala na dlh.
  *
- * POSLEDNÉ ČLENSTVO SA ZROVNÁ S PTMINDEROM. Dopredný odpočet sedel na ostrých
+ * NEZAPLATENÉ ČLENSTVO HODINY NEDÁVA. Jerry, 3. 10. 2026: „nezaplatený balík
+ * je 0." Členstvo s otvoreným poplatkom sa na osi otvorí, ale s nulou hodín:
+ * každý tréning na ňom je bez hodiny a s mínusom, a až ďalší ZAPLATENÝ balíček
+ * (alebo platba za tento) ich prepíše na hodiny. Lukáš Hanus 3. 10.: členstvo
+ * 6 h od 9. 9. zaplatené, sedem tréningov, druhé členstvo od 2. 10. s otvoreným
+ * poplatkom — koniec je −1, nie +5. To isté číslo ukazuje karta
+ * (`zostatokKokpitu`), s tou istou definíciou „nezaplatený" (poplatok z dňa,
+ * keď balíček začal).
+ *
+ * KONIEC MÁ ZNAMIENKO. `koniec` je zostatok na konci posledného členstva:
+ * kladný = koľko hodín zostáva, záporný = koľko tréningov je bez hodiny.
+ * Mínus nie je dlh v korunách — je to značka, ktorú ďalší balíček prepíše.
+ *
+ * POSLEDNÉ ČLENSTVO SA ZROVNÁ S KARTOU. Dopredný odpočet sedel na ostrých
  * dátach v 28 z 35 prípadov; rozdiel robia „Doplnenia členstva" (144 riadkov
- * v exporte, ani jedno nehovorí koľko hodín) a zrušené hodiny. Rad posledného
- * členstva sa preto posunie tak, aby skončil na čísle z karty klienta.
+ * v exporte, ani jedno nehovorí koľko hodín) a zrušené hodiny. Rad zostáva
+ * taký, aký bol (6, 5, 4, 3, 2, 1 sú pevné), len KONIEC sa dorovná na číslo
+ * z karty — od 1. 10. 2026 je to číslo z Kokpitu, nie z exportu PTmindera.
  */
 export function priebehBalickov(
   os: Udalost[],
@@ -282,9 +296,17 @@ export function priebehBalickov(
   const pridavaHodiny = (u: Extract<Udalost, { druh: "balicekOd" }>, clenstvo: Usek["balicek"]): boolean =>
     !(clenstvo?.doDna && u.den > clenstvo.doDna);
 
+  /** Hodiny, z ktorých sa v období naozaj odpočítava: nezaplatené členstvo má nulu. */
+  const hodinUseku = (u: Usek): number => (u.balicek?.nezaplatene ? 0 : u.hodin);
+
   const prvyNekryty = (u: Usek): number => {
-    if (!u.balicek || u.hodin <= 0 || neznameDoplnenie(u)) return -1;
-    let zostava = u.hodin;
+    if (!u.balicek || neznameDoplnenie(u)) return -1;
+    if (hodinUseku(u) <= 0) {
+      // Bez hodín (nezaplatené) je nekrytý prvý tréning, ktorý tam je.
+      const i = u.riadky.findIndex((r) => hodinTreningu(r) > 0);
+      return i;
+    }
+    let zostava = hodinUseku(u);
     for (let i = 0; i < u.riadky.length; i++) {
       const r = u.riadky[i];
       if (r.druh === "balicekOd" && r.doplnenie && r.hodin > 0 && pridavaHodiny(r, u.balicek)) zostava += r.hodin;
@@ -324,7 +346,28 @@ export function priebehBalickov(
        * Mínus im zostáva: odtrénované boli skôr, než balíček vznikol, a to
        * je iná informácia než koľká hodina to bola.
        */
-      if (u.hodin > 0) {
+      /**
+       * PREBERÁ SA LEN ZO ČLENSTVA, KTORÉ EŠTE PLATÍ.
+       *
+       * Jerry, 4. 10. 2026 nad Lukášom Hanusom: karta −1, zoznam −3. Zoznam
+       * si do balíčka z 9. 9. preniesol dva tréningy zo skončeného augustového
+       * členstva („2 h padlo na tréningy 25. 8. a 3. 9."), balíček začal na
+       * 4 namiesto 6 a každý ďalší riadok bol o dva nižšie. Lenže o tom
+       * augustovom členstve appka pozná len názov — hodiny z názvu, nie
+       * skutočné (júl mal 8, nie 6; doplnenia bez počtu) — a deficit, ktorý
+       * z toho vznikol, sa valil cez celý rok. Karta počíta len platné
+       * balíčky a preto sedela s Jerrym.
+       *
+       * Prenášajú sa teda len tréningy z členstva, ktoré v deň nového ešte
+       * PLATÍ (prekryv: „akoby dve členstvá"). Skončené členstvo si svoj mínus
+       * nechá ako značku na vlastných riadkoch; nový balíček začína na svojich
+       * hodinách. Bez známeho konca platnosti sa neprenáša nič — vymyslený
+       * prenos je horší než žiadny.
+       */
+      // Ostro: členstvo, ktoré končí v deň, keď ďalšie začína, je obnova,
+      // nie prekryv (PTminder: „10 Aug – 09 Sep", ďalšie „09 Sep – 08 Oct").
+      const prekryv = !!(posl.balicek?.doDna && posl.balicek.doDna > u.den);
+      if (u.hodin > 0 && prekryv) {
         const od = prvyNekryty(posl);
         if (od >= 0) {
           const prevzate = posl.riadky.splice(od);
@@ -352,7 +395,10 @@ export function priebehBalickov(
 
   for (const usek of useky) {
     const b = usek.balicek;
-    let bezi: number | null = b ? (usek.hodin > 0 ? usek.hodin : null) : null;
+    // Nezaplatené členstvo pozná svoje hodiny, ale nedáva ich: beží od nuly.
+    let bezi: number | null = b ? (usek.hodin > 0 ? hodinUseku(usek) : null) : null;
+    /** Tréningy v období, na ktoré nebola hodina — pre znamienko konca. */
+    let nekryte = 0;
     // Dokúpené hodiny sa k bežiacemu členstvu PRIPOČÍTAJÚ, nezačínajú odznova.
     /**
      * Zrovnaniu s kartou bráni LEN doplnenie zapísané v Kokpite.
@@ -415,6 +461,7 @@ export function priebehBalickov(
         const vycerpane = bezi !== null && bezi < hodinTreningu(u);
         if (bezi !== null && !vycerpane) zostatok = bezi;
         if (bezi !== null) bezi = Math.max(0, bezi - hodinTreningu(u));
+        if (bezi !== null && vycerpane) nekryte += 1;
         /**
          * Dlh sa nepočíta tam, kde appka nevie, koľko hodín obdobie malo.
          * Nulou to nie je — je to neznámo (viď `neznameDoplnenie`).
@@ -423,7 +470,8 @@ export function priebehBalickov(
         else if (vycerpane || !zaplateneOd || u.den < zaplateneOd) dlh = (dlhPocet += 1);
         else dlhPocet = 0;
       }
-      doUseku.push({ u, po: u.druh === "trening" ? bezi : null });
+      // Stav po tréningu so znamienkom: pod nulou sú to tréningy bez hodiny.
+      doUseku.push({ u, po: u.druh === "trening" && bezi !== null ? bezi - nekryte : null });
       stavy.set(u, {
         zostatok, dlh, usek: b?.den || "",
         prevzate: u === b && usek.prevzate ? usek.prevzate : undefined,
@@ -435,7 +483,8 @@ export function priebehBalickov(
     // Keď v členstve ešte nebol žiadny tréning, zrovnáva sa jeho otváracia
     // hodnota — inak by sa nemalo čoho chytiť a rad by ostal na hodinách
     // z názvu (Josef Šnirych: „SPECIAL 3" kúpené 20. 9., PTminder hovorí 2 z 3).
-    const kExportu = [...doUseku].reverse().find((x) => x.u.den <= (denExportu || dnes) && x.po !== null)?.po ?? bezi;
+    const kExportu = [...doUseku].reverse().find((x) => x.u.den <= (denExportu || dnes) && x.po !== null)?.po
+      ?? (bezi !== null ? bezi - nekryte : null);
     // Keď appka pozná dokúpené hodiny, je informovanejšia než karta klienta
     // (tá ráta len z aktívneho členstva) a zrovnávať sa nemá načím.
     // Balíček nahodený v Kokpite karta klienta NEPOZNÁ — tá ráta z exportu
@@ -453,11 +502,12 @@ export function priebehBalickov(
      * Karta sa tým nemení: `bezi` (a teda nadpis „Zbývá ti…") sa dorovná
      * ďalej, len sa to už nepremieta do histórie.
      */
+    let koniecUseku: number | null = bezi !== null ? bezi - nekryte : null;
     if (b && b === posledny && !b.zKokpitu && !maDokupene && zostatokTeraz != null && kExportu != null && kExportu !== zostatokTeraz) {
-      if (bezi !== null) bezi += zostatokTeraz - kExportu;
+      if (koniecUseku !== null) koniecUseku += zostatokTeraz - kExportu;
     }
 
-    if (b === posledny) koniec = bezi;
+    if (b === posledny) koniec = koniecUseku;
   }
 
   return { stavy, koniec };

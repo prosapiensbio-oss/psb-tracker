@@ -1364,11 +1364,12 @@ export function Dashboard({
         packages: (data.packages || []) as never, services: (data.services || []) as never,
         poplatky: (data.poplatky || []) as never, treningyZdarma: (data.treningyZdarma || []) as never,
         doplneniaHodiny: data.doplneniaHodiny || {},
+        historia: (data.historiaBalickov || []) as never,
         kalUdalosti: kalendar as never,
       },
       (m) => clients[m]?.primaryTrainer || "",
     ),
-    [clients, data.sessions, data.payments, data.packages, data.services, data.poplatky, data.treningyZdarma, data.doplneniaHodiny, kalendar, matchT],
+    [clients, data.sessions, data.payments, data.packages, data.services, data.poplatky, data.treningyZdarma, data.doplneniaHodiny, data.historiaBalickov, kalendar, matchT],
   );
   const bezBalickaHodin = useMemo(() => bezBalicka.reduce((a, x) => a + x.hodin, 0), [bezBalicka]);
 

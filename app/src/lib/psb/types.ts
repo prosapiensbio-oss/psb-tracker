@@ -44,6 +44,8 @@ export type PackageRow = {
   /** Koľko klient za TENTO balíček zaplatil — nesie v sebe jeho zľavy. */
   payment?: number;
   kind?: string; // package | membership
+  /** Stav riadku v exporte (stĺpec Status): `active` | `expired`. */
+  stav?: string;
   /**
    * Hodín na obdobie členstva podľa PTmindera („8 per month") — vrátane
    * prenesených. 0 = export to nepovedal (balíčky, staré exporty).
@@ -161,6 +163,12 @@ export type PSBData = {
   services: ServiceRow[];
   payments: PaymentRow[];
   packages: PackageRow[];
+  /**
+   * História balíčkov a členstiev z PTmindera (stav Finished aj Active,
+   * tabuľka `ptminder_historia`). Os času z nej berie SKUTOČNÉ hodiny
+   * a koniec platnosti minulých období — kniha predajov nesie len názov.
+   */
+  historiaBalickov?: PackageRow[];
   clientOverrides: Record<string, ClientOverride>;
   anomalyAck: Record<string, AnomalyAck>;
   uploadLog: UploadLogEntry[];

@@ -1,7 +1,7 @@
 // All derived analytics for the PSB Tracker. Pure functions over PSBData —
 // no browser globals. Reused across every module.
 import { KOKPIT_OD } from "./sedeniaZKalendara";
-import { zostatokKokpitu } from "./zostatokKokpitu";
+import { klucNezaplateneho, zostatokKokpitu } from "./zostatokKokpitu";
 import { daysBetween, fmtDMY, monthKey, monthLabel, monthsBetween, normName, quarterKey, quarterLabel, weekKey, weekLabel } from "./format";
 import { jePredplatne } from "./nazvyProduktov";
 import { moznostiPlatnosti, vetaPlatnosti, zostavaPoPlatnosti } from "./platnostZostatok";
@@ -272,6 +272,12 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
   // Tréningy, ktoré sa z členstva neodpočítavajú — kľúč je klient + deň,
   // rovnako ako na osi času (migrácia 0081).
   const zdarmaDni = new Set((data.treningyZdarma || []).map((z) => `${normName(z.klient)}|${z.den}`));
+  /**
+   * Balíčky s otvoreným poplatkom v PTminderi — tie hodiny nedávajú, kým sa
+   * nezaplatí (Jerry, 3. 10. 2026: „nezaplatený balík je 0"). Kľúč je deň
+   * začiatku balíčka, rovnako ako na osi klienta (`klientOsCasu`).
+   */
+  const nezaplateneBalicky = new Set((data.poplatky || []).map((p) => klucNezaplateneho(p.klient, p.datum)));
 
   for (const s of data.sessions) {
     let c = map[s.client];
@@ -618,18 +624,20 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
      * tváriť sa, že má nulu, by bola nepravda o tom, čo si kúpil.
      */
     if (dnesPack >= KOKPIT_OD && data.balickyKokpit) {
-      const k = zostatokKokpitu(data.balickyKokpit, c.name, c.sessions.map((x) => ({ client: c.name, date: x.date, duration: x.duration })), dnesPack, zdarmaDni);
+      const k = zostatokKokpitu(data.balickyKokpit, c.name, c.sessions.map((x) => ({ client: c.name, date: x.date, duration: x.duration })), dnesPack, zdarmaDni, nezaplateneBalicky);
       c.packageRemainingPtminder = c.packageRemaining;
       if (k) {
         c.membership = k.nazov;
         c.packageValidTo = k.platnostDo || "";
         c.packageTotal = k.pausal ? 0 : k.spolu;
+        // Záporné číslo sa nechá — mínus je značka, ktorú ďalší zaplatený
+        // balíček prepíše na hodiny; nula by klientovi aj Jerrymu klamala.
         c.packageRemaining = k.zostatok;
         c.packageNadRamec = k.nadRamec;
         c.packageOdvodeny = false;
         c.packageOdkial = k.pausal
           ? "Kokpit: paušál — hodiny sa nepočítajú"
-          : `Kokpit: ${k.spolu} h v balíčkoch mínus ${k.minute} odtrénovaných od ${k.od}`;
+          : `Kokpit: ${k.spolu} h v zaplatených balíčkoch mínus ${k.minute} odtrénovaných od ${k.od}${k.nezaplateneHodin ? ` (${k.nezaplateneHodin} h čaká na zaplatenie)` : ""}`;
       } else if (c.packageTotal > 0) {
         c.packageOdkial = `z PTmindera — v Kokpite nie je aktívny balíček${c.packageOdkial ? ` (${c.packageOdkial})` : ""}`;
       }

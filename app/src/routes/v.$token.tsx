@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { terazPraha } from "../lib/psb/cas";
+import { dnesPraha, terazPraha } from "../lib/psb/cas";
+import { osKlientaZoServera } from "../lib/psb/osKlienta.server";
 
 import { bindings } from "../lib/bindings.server";
 import { isAuthed } from "../lib/psb/auth.server";
@@ -97,7 +98,8 @@ export const Route = createFileRoute("/v/$token")({
         const c = deriveClients(data)[r.klient];
         if (!c) return prec("Tento odkaz neplatí. Ozvi sa nám a pošleme ti nový.", 404);
 
-        const dnes = new Date().toISOString().slice(0, 10);
+        // Pražský deň, nie UTC: medzi polnocou a druhou ráno je UTC ešte včera.
+        const dnes = dnesPraha();
         /**
          * KALENDÁR PATRÍ NA OS, INAK ČÍSLO NESEDÍ SO ZOZNAMOM.
          *
@@ -112,37 +114,13 @@ export const Route = createFileRoute("/v/$token")({
          * Tie isté udalosti číta aj stôl klienta (`KlientStol`), takže obe
          * obrazovky hovoria o tom istom.
          */
-        const kalUdalosti = ((await DB.prepare(
-          `SELECT klient, trener, zaciatok, koniec, nazov, typ FROM kal_udalosti
-            WHERE zmizla_at IS NULL AND klient = ?1 AND typ IN ('trening','uvodny')`,
-        ).bind(c.name).all().catch(() => ({ results: [] }))).results || []) as unknown as
-          { klient: string; trener: string; zaciatok: string; koniec: string; nazov: string; typ: string }[];
-
-        const balicky = ((await DB.prepare(
-          `SELECT klient, nazov, hodiny, cena_czk, platnost_od, platnost_do, zdroj, zrusene_at
-             FROM balicky WHERE klient = ?1`,
-        ).bind(c.name).all()).results || []) as unknown as {
-          klient: string; nazov: string; hodiny: number | null; cena_czk: number | null;
-          platnost_od: string; platnost_do: string | null; zdroj: string; zrusene_at: string | null;
-        }[];
-
         /**
-         * BALÍČKY NAHODENÉ V KOKPITE PATRIA AJ NA KLIENTOVU OS.
-         *
-         * Jerry, 3. 10. 2026 nad Martinom Vaškom: „keď vymažem to členstvo,
-         * mal by sa rovno upraviť aj obsah odkazu." Stránka ich doteraz
-         * nečítala — stavala sa len z PTmindera — takže balíček zapísaný
-         * v Kokpite na nej nebol vidieť a jeho zmazanie s ňou nehlo. Od
-         * 1. 10. 2026 pritom všetky nové balíčky vznikajú práve tam.
-         *
-         * Dvojitý zápis toho istého predaja (ručne v Kokpite aj z exportu)
-         * spája `osCasuKlienta` podľa dňa a hodín, takže sa nezdvojí.
+         * Kalendár aj balíčky z Kokpitu číta jedno miesto (`osKlientaZoServera`)
+         * — to isté používa mail „celá história", takže SMS a mail hovoria
+         * o tej istej osi. `terazPraha()` nesie hodinu: dnešný tréning, ktorý
+         * sa ešte nezačal, na osi nie je a stránka ho ponúkne ako ďalší.
          */
-        const os = osCasuKlienta(c.name, {
-          sessions: data.sessions, payments: data.payments, packages: data.packages,
-          services: data.services, poplatky: data.poplatky, treningyZdarma: data.treningyZdarma,
-          doplneniaHodiny: data.doplneniaHodiny || {}, kalUdalosti, balicky,
-        }, dnes);
+        const { os, balicky } = await osKlientaZoServera(DB, data, c.name, terazPraha());
         const dalsi = ((await DB.prepare(
           "SELECT MIN(zaciatok) z FROM kal_udalosti WHERE zmizla_at IS NULL AND klient = ?1 AND typ IN ('trening','uvodny') AND zaciatok > ?2",
         ).bind(c.name, terazPraha()).first<{ z: string | null }>())?.z) || undefined;

@@ -286,6 +286,24 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
     data.sessionsPtminder = kontrola;
     // Balíčky v Kokpite pre zostatok na karte. Kotva = zostatok prevzatý
     // z PTmindera k dňu naliatia (poznámka to hovorí doslova).
+    /**
+     * HISTÓRIA BALÍČKOV Z PTMINDERA (`ptminder_historia`, migrácia 0095).
+     * Os času z nej berie skutočné hodiny minulých členstiev — kniha predajov
+     * nesie len názov a „6h" v názve neznamená šesť hodín (Hanus, júl: 8).
+     * Pred migráciou tabuľka nie je; prázdna história = os sa správa ako
+     * doteraz (hodiny z názvu), nič sa nerozbije.
+     */
+    const hist = await DB.prepare(
+      "SELECT klient, nazov, druh, stav, hodiny, zostatok, od, do, pridane, platba FROM ptminder_historia",
+    ).all().catch(() => ({ results: [] }));
+    data.historiaBalickov = (hist.results as any[]).map((r) => ({
+      client: r.klient, status: "", package: r.nazov,
+      remaining: Number(r.zostatok) || 0,
+      total: r.druh === "package" ? Number(r.hodiny) || 0 : 0,
+      naObdobie: r.druh === "membership" ? Number(r.hodiny) || 0 : 0,
+      added: r.pridane || "", validFrom: r.od || "", validTo: r.do || "",
+      payment: r.platba ?? undefined, kind: r.druh, stav: r.stav || undefined,
+    }));
     data.balickyKokpit = (balickyK.results as any[]).map((r) => ({
       klient: r.klient, nazov: r.nazov, hodiny: r.hodiny ?? null,
       platnostOd: String(r.platnost_od || "").slice(0, 10), platnostDo: r.platnost_do ? String(r.platnost_do).slice(0, 10) : null,
@@ -693,6 +711,32 @@ export async function ingest(DB: D1Database, filename: string, text: string, act
     // wholesale replace would wipe clients missing from the file. This way uploads
     // accumulate safely by client, and a client's rows are always the latest snapshot.
     const rows = parsePackages(text);
+    /**
+     * KAŽDÝ EXPORT IDE AJ DO HISTÓRIE (`ptminder_historia`).
+     *
+     * Export so stavom Finished (všetky riadky `expired`) ide LEN tam: snímka
+     * `packages` je stav Active a import ju po klientoch NAHRÁDZA — Finished
+     * by tak klientom zmazal ich živé balíčky. Toto je presne pasca, pre
+     * ktorú história do 4. 10. 2026 v appke nebola vôbec.
+     */
+    const jeHistoria = rows.length > 0 && rows.every((r) => r.stav === "expired");
+    const teraz = new Date().toISOString();
+    const historia = rows.map((r) => {
+      const hodiny = r.kind === "membership" ? (r.naObdobie || 0) : (r.total || 0);
+      const kluc = [r.kind, r.client, r.package, r.validFrom || "", r.added || "", hodiny].join("|");
+      return DB.prepare(
+        `INSERT INTO ptminder_historia (id, klient, nazov, druh, stav, hodiny, zostatok, od, do, pridane, platba, dedup_key, importovane)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+         ON CONFLICT(dedup_key) DO UPDATE SET stav = excluded.stav, zostatok = excluded.zostatok, do = excluded.do,
+           platba = excluded.platba, importovane = excluded.importovane`,
+      ).bind(uid(), r.client, r.package, r.kind || "", r.stav || null, hodiny || null,
+        r.kind === "package" ? r.remaining : null, r.validFrom || null, r.validTo || null,
+        r.added || null, r.payment ?? null, kluc, teraz);
+    });
+    for (let i = 0; i < historia.length; i += 50) await DB.batch(historia.slice(i, i + 50));
+    if (jeHistoria) {
+      added = rows.length;
+    } else {
     // Ticho by to prešlo ako „0 left from 0" — a karta klienta by odvtedy
     // ukazovala dopočítané číslo namiesto toho z PTminderu.
     bezZostatku = text.split(/\r?\n/).slice(1).filter((r) => r.trim() && jeIkonaMiestoCisla(r)).length;
@@ -790,6 +834,7 @@ export async function ingest(DB: D1Database, filename: string, text: string, act
     ];
     if (stmts.length) await DB.batch(stmts);
     added = rows.length;
+    }
   }
 
   await DB.prepare(

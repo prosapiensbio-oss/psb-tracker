@@ -75,7 +75,8 @@ describe("popisPreKlienta", () => {
     // minuli tréningy spred balíčka — bez nich sa os otvorí šestkou
     // a pokračuje štvorkou, čo vyzerá ako chýbajúca hodina.
     const os: Udalost[] = [
-      { den: "2026-06-29", druh: "balicekOd", popis: "6h Balíček", hodin: 2 },
+      // Platí do 28. 8., takže nový balíček z 10. 8. si z neho tréningy prevezme.
+      { den: "2026-06-29", druh: "balicekOd", popis: "6h Balíček", hodin: 2, doDna: "2026-08-28" },
       { den: "2026-06-29", druh: "trening", popis: "tréning" },
       { den: "2026-07-02", druh: "trening", popis: "tréning" },
       { den: "2026-07-24", druh: "trening", popis: "tréning" },

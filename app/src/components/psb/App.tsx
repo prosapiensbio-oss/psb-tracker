@@ -2294,6 +2294,8 @@ function skupinaFaktur(
       // Odpovede „koľko hodín pridalo doplnenie" — bez nich appka v tom
       // období nepočíta dlh (viď migráciu 0085).
       doplneniaHodiny: data.doplneniaHodiny || {},
+      // Skutočné hodiny minulých členstiev z PTmindera — nie z názvu.
+      historia: (data.historiaBalickov || []) as never,
       balicky: evidencia as never,
       kalUdalosti: (kalUdalosti || []) as never,
     };

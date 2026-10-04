@@ -860,6 +860,10 @@ export function buildAiContext(
       trenerManual: c.primaryTrainerOverride,
       balicek: c.membership || "Bez balíčka",
       zostatokSedeni: c.packageTotal ? `${c.packageOdvodeny ? "≈" : ""}${c.packageRemaining}/${c.packageTotal}` : null,
+      // Záporný zostatok = tréningy nad rámec ZAPLATENÝCH hodín (Jerry, 3. 10.
+      // 2026: „nezaplatený balík je 0"). Balíček s otvoreným poplatkom hodiny
+      // nedáva, kým sa nezaplatí; mínus nie je dlh v korunách, dlh je v `dlh`.
+      zostatokNadRamec: c.packageTotal && c.packageRemaining < 0 ? -c.packageRemaining : undefined,
       // „≈" znamená, že export zostatok nedal a appka ho dopočítala z odtrénovaných
       // hodín. Povedz to, keď sa na zostatok niekto pýta — nie je to výpis z PTmindera.
       zostatokDopocitany: c.packageOdvodeny || undefined,

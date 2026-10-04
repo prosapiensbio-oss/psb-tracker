@@ -493,6 +493,9 @@ export function parsePackages(text: string): PackageRow[] {
   const iObdobie = idx("dates");
   const iExpiry = idx("expiry");
   const jeClenstvo = hlavicka.some((h) => h.includes("membership"));
+  // „Status" (active/expired) — nie „Client Status". Podľa neho sa pozná
+  // export so stavom Finished, ktorý nesmie prepísať snímku Active.
+  const iStav = hlavicka.findIndex((h) => h === "status");
 
   const rows: PackageRow[] = [];
   for (let i = 1; i < ls.length; i++) {
@@ -522,6 +525,7 @@ export function parsePackages(text: string): PackageRow[] {
       payment: Number.isFinite(platba) && platba > 0 ? platba : undefined,
       kind: jeClenstvo ? "membership" : "package",
       naObdobie: jeClenstvo ? hodinNaObdobie(parts) : 0,
+      stav: iStav >= 0 ? (parts[iStav] || "").trim().toLowerCase() : undefined,
     });
   }
   return rows;
