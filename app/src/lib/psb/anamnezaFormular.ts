@@ -129,6 +129,8 @@ export const ZDROJE = [
 const PRIVADZA = ["Něco mě bolí", "Konkrétní diagnóza — skolióza, výhřez, asymetrie…", "Nic mě nebolí, chci se líp hýbat"];
 /** Vetva „niečo ma bolí" — sem patrí aj diagnóza, tá bolesť obvykle sprevádza. */
 const BOLI = [PRIVADZA[0], PRIVADZA[1]];
+/** Voľba, ktorú v zápise trénera má každá otázka klienta s možnosťami. */
+export const JINE = "Jiné";
 
 export const FORMULAR: Formular = {
   verzia: 1,
@@ -321,4 +323,88 @@ export function zTestuPostury(poznamka: string): { oblasti: string[]; odchylky: 
     odchylky: zoznam("POSTUR[ÁA]LN[ÍI] ODCHYLKY"),
     vzorec: hodnota("IDENTIFIKOVAN[ÝY] VZOREC"),
   };
+}
+
+/**
+ * SEKCIE ZÁPISU TRÉNERA — prvá sú VŽDY otázky klienta.
+ *
+ * Jerry, 4. 10. 2026: „tie 3 otázky sa majú zobraziť v anamnéze za
+ * všetkých okolností — keď ich klient nevyplní, budú prázdne a vyplnia sa
+ * priamo s trénerom na úvodnom; keď vyplní, trénerovi sa ukážu." Dovtedy
+ * zápis prevzal od klienta len oblasti a cieľ; varovné príznaky, lieky
+ * a zákaz od lekára tréner v anamnéze nevidel vôbec.
+ *
+ * Odpovede idú do toho istého políčka (rovnaké `id`), takže čo tréner
+ * doplní na úvodnom, číta súhrn aj Jarvis rovnako, ako keby to vyplnil
+ * klient. `<otázka>_popis` pri „áno/nie" je doplnenie, ktoré stránka klienta
+ * pýta pri „Ano". Čo už stojí medzi otázkami klienta (oblasti, cieľ), sa
+ * v zápise trénera neopakuje — dve políčka pre jednu odpoveď by sa rozišli.
+ */
+export function sekcieZapisu(
+  formular: Formular,
+  odp: Record<string, unknown>,
+  /** Kedy klient vyplnil (ISO), alebo `null`. */
+  vyplnil: string | null,
+): { s: Sekcia; otazky: Otazka[] }[] {
+  const denCz = (iso: string) => `${Number(iso.slice(8, 10))}. ${Number(iso.slice(5, 7))}. ${iso.slice(0, 4)}`;
+  /**
+   * „HLAVNÍ OBTÍŽ" STOJÍ HNEĎ POD „CO VÁS K NÁM PŘIVÁDÍ?".
+   *
+   * Jerry, 4. 10. 2026: tie dve otázky „mi prídu podobné". Sú — prvá je
+   * kategória (bolesť / diagnóza / nič), druhá to isté vlastnými slovami
+   * a s dĺžkou trvania. Tréner ich preto vypĺňa spolu, na jednom mieste,
+   * a v sekcii „Co ho trápí" sa obtiaž už nepýta druhýkrát. `id` zostáva
+   * `obtiz`, takže súhrn aj staré zápisy ju čítajú ako doteraz. Pri „Nic
+   * mě nebolí" sa nepýta — nie je čo opisovať.
+   */
+  const obtiz = formular.zapis.flatMap((s) => s.otazky).find((o) => o.id === "obtiz");
+  const klientske = formular.klient.map((s) => {
+    const otazky: Otazka[] = [];
+    for (const povodna of s.otazky) {
+      if (!zobrazit(povodna, odp)) continue;
+      /**
+       * „JINÉ" — NA OSOBNOM STRETNUTÍ SA ODPOVEDÁ INAK NEŽ V DOTAZNÍKU.
+       *
+       * Jerry, 4. 10. 2026: „predsa len je iné odpovedať na otázky
+       * v dotazníku a iné pri osobnom stretnutí — daj mi ‚Jiné' a keď dá
+       * Jiné, vytvorí sa možnosť na písanie." Len v zápise trénera;
+       * dotazník pre klienta ostáva, aký bol. Text ide do `<otázka>_jine`.
+       * Pri varovných príznakoch sa nepridáva políčko navyše — „Jiné"
+       * tam otvorí už existujúce „Popište to krátce".
+       */
+      const sVolbami = (povodna.typ === "jedna" || povodna.typ === "viac") && povodna.moznosti?.length;
+      const o: Otazka = sVolbami && !povodna.moznosti!.includes(JINE)
+        ? { ...povodna, moznosti: [...povodna.moznosti!, JINE] }
+        : povodna;
+      otazky.push(o);
+      if (sVolbami && o.id !== "vlajky") {
+        const jine: Otazka = { id: `${o.id}_jine`, text: "Jiné — čo presne?", typ: "text", vetva: { otazka: o.id, hodnoty: [JINE] } };
+        if (zobrazit(jine, odp)) otazky.push(jine);
+      }
+      if (o.id === "privadza" && obtiz && odp.privadza !== PRIVADZA[2]) otazky.push(obtiz);
+      if (o.typ === "ano-nie") {
+        const popis: Otazka = { id: `${o.id}_popis`, text: "Čo presne?", typ: "text", vetva: { otazka: o.id, hodnoty: ["Ano"] } };
+        if (zobrazit(popis, odp)) otazky.push(popis);
+      }
+    }
+    return {
+      s: {
+        ...s,
+        nazov: "Otázky pred úvodným",
+        pozn: vyplnil
+          ? `Vyplnil klient ${denCz(vyplnil.slice(0, 10))}. Prejdite ich spolu a upresnite, čo treba.`
+          : "Klient ich pred úvodným nevyplnil — vyplňte ich spolu na úvodnom tréningu.",
+      },
+      otazky,
+    };
+  });
+  const uz = new Set(klientske.flatMap((x) => x.otazky.map((o) => o.id)));
+  // Obtiaž sa pýta len pri „Co vás k nám přivádí?" — ani pri „Nic mě nebolí" sa nevracia dolu.
+  uz.add("obtiz");
+  const zapis = formular.zapis.map((s) => ({
+    s,
+    // Test postury nie je otázka, je to výstup — patrí do stĺpca vedľa.
+    otazky: s.otazky.filter((o) => o.typ !== "len-citat" && zobrazit(o, odp) && !uz.has(o.id)),
+  }));
+  return [...klientske, ...zapis].filter((x) => x.otazky.length > 0);
 }

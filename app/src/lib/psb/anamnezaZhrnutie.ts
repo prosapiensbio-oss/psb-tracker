@@ -49,7 +49,14 @@ export function zhrnutieAnamnezy(
     return null;
   };
 
-  const privadza = text(berTo("privadza"));
+  /**
+   * „Jiné" samo nič nehovorí — v súhrne stojí namiesto neho to, čo tréner
+   * dopísal (`<otázka>_jine`, pri varovných príznakoch `vlajky_popis`).
+   */
+  const sJinym = (hodnoty: string[], jine: string): string[] =>
+    hodnoty.flatMap((h) => (h === "Jiné" ? (jine ? [jine] : ["iné"]) : [h]));
+
+  const privadza = sJinym([text(berTo("privadza"))].filter(Boolean), text(berTo("privadza_jine")))[0] || "";
   if (privadza) out.push({ popis: "privádza ho", hodnota: privadza });
 
   const obtiz = text(berTo("obtiz"));
@@ -65,7 +72,7 @@ export function zhrnutieAnamnezy(
     });
   }
 
-  const vlajky = vlajkyBezNicoho(berTo("vlajky"));
+  const vlajky = sJinym(vlajkyBezNicoho(berTo("vlajky")), text(berTo("vlajky_popis")));
   if (vlajky.length) out.push({ popis: "pozor", hodnota: vlajky.join(", "), vlajka: true });
 
   const lieky = text(berTo("lieky"));
@@ -79,7 +86,7 @@ export function zhrnutieAnamnezy(
     out.push({ popis: "lekár niečo zakázal", hodnota: text(berTo("zakaz_popis")) || "áno — pozri anamnézu", vlajka: true });
   }
 
-  const ciel = pole(berTo("ciel"));
+  const ciel = sJinym(pole(berTo("ciel")), text(berTo("ciel_jine")));
   if (ciel.length) out.push({ popis: "cieľ", hodnota: ciel.join(", ") });
 
   const uspech = text(berTo("uspech"));

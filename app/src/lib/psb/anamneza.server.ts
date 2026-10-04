@@ -9,7 +9,7 @@
 
 import type { D1Database } from "@cloudflare/workers-types";
 
-import { OBLAST_Z_TESTU, zTestuPostury } from "./anamnezaFormular";
+import { FORMULAR, OBLAST_Z_TESTU, zTestuPostury } from "./anamnezaFormular";
 import { odsifruj, zasifruj } from "./sifra.server";
 
 export type Anamneza = {
@@ -155,9 +155,14 @@ export function predvyplnZapisu(v: {
     if (v.zdrojKto) { hodnoty.zdroj_kto = v.zdrojKto; odkial.zdroj_kto = "z Dopytov"; }
   }
 
-  // 3. Čo odklikol klient — prebíja všetko.
+  // 3. Čo odklikol klient — prebíja všetko. VŠETKY jeho otázky, nie len
+  // oblasti a cieľ: Jerry, 4. 10. 2026 — „tie 3 otázky sa majú zobraziť
+  // v anamnéze za všetkých okolností". Varovné príznaky, lieky a zákaz od
+  // lekára sa dovtedy do zápisu trénera nedostali vôbec, hoci ich klient
+  // vyplnil (súhrn ich čítal, zápis nie).
   const kedy = v.klientVyplnilAt ? ` · ${den(v.klientVyplnilAt)}` : "";
-  for (const kluc of ["oblasti", "ciel"]) {
+  const klientske = FORMULAR.klient.flatMap((s) => s.otazky.flatMap((o) => (o.typ === "ano-nie" ? [o.id, `${o.id}_popis`] : [o.id])));
+  for (const kluc of klientske) {
     const x = v.klientOdpovede[kluc];
     if (x != null && !(Array.isArray(x) && x.length === 0)) {
       hodnoty[kluc] = x;

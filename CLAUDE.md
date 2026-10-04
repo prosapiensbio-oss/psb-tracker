@@ -1502,6 +1502,19 @@ a druhé členstvo od 2. 10. s otvoreným poplatkom 6 990 Kč. Karta hovorila
   klientovi preložený (`popisPoplatku`: „6h Předplatné · 2. 10. – 2. 11.
   2026" namiesto „OFF - 6h S viazanostou - from 02/10/2026…"). Overené po
   nasadení na všetkých 12 živých odkazoch: nadpis aj suma zhodné s výpočtom.
+- **Otázky klienta sú v anamnéze VŽDY** (4. 10. 2026, `sekcieZapisu`
+  v anamnezaFormular.ts). Prvá sekcia zápisu trénera sú otázky, ktoré
+  dostáva klient pred úvodným: vyplnené jeho odpoveďami, alebo prázdne
+  s pokynom vyplniť ich spolu na úvodnom. Odpovede idú do tých istých `id`,
+  takže súhrn aj Jarvis ich čítajú rovnako, nech ich vyplnil ktokoľvek.
+  Dovtedy `predvyplnZapisu` prevzal od klienta len oblasti a cieľ a varovné
+  príznaky, lieky a zákaz od lekára tréner v zápise nevidel. Jerry
+  upozornenie „klient nevyplnil" odmietol v prospech tohto — nestavať ho.
+  V zápise trénera má každá otázka klienta s možnosťami aj **„Jiné"**
+  s políčkom `<otázka>_jine` („na osobnom stretnutí sa odpovedá inak než
+  v dotazníku"); dotazník pre klienta ho nemá. **„Hlavní obtíž" (`obtiz`)
+  stojí hneď pod „Co vás k nám přivádí?"** a v „Co ho trápí" sa už nepýta —
+  Jerrymu sa zdali rovnaké. Súhrn ukáže namiesto „Jiné" dopísaný text.
 - **Pasca: tlačidlo, ktoré sa číta ako stav.** Stôl klienta mal pri každom
   tréningu tlačidlo s holým „zdarma" a Jerry ho čítal ako údaj („zdarma pri
   každom tréningu, hoci je `treningy_zdarma` prázdna"). Akcia má sloveso

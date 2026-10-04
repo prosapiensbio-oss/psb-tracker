@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { doSchranky } from "../../lib/psb/kopirovanie";
 import { oznam } from "../../lib/psb/obnovaSignal";
-import { OBLASTI, zobrazit, type Formular, type Otazka, type Sekcia, popisOdchylky } from "../../lib/psb/anamnezaFormular";
+import { sekcieZapisu, OBLASTI, zobrazit, type Formular, type Otazka, type Sekcia, popisOdchylky } from "../../lib/psb/anamnezaFormular";
 import { C, mix } from "../../lib/psb/theme";
 import { useUzke } from "./useUzke";
 
@@ -109,13 +109,8 @@ export function AnamnezaPanel({ meno }: { meno: string }) {
    */
   const sekcie = useMemo(() => {
     if (!stav) return [] as { s: Sekcia; otazky: Otazka[] }[];
-    return stav.formular.zapis
-      .map((s) => ({
-        s,
-        // Test postury nie je otázka, je to výstup — patrí do stĺpca vedľa.
-        otazky: s.otazky.filter((o) => o.typ !== "len-citat" && zobrazit(o, odp)),
-      }))
-      .filter((x) => x.otazky.length > 0);
+    // Prvá sekcia sú VŽDY otázky klienta — viď `sekcieZapisu`.
+    return sekcieZapisu(stav.formular, odp, stav.anamneza?.klientVyplnilAt || null);
   }, [stav, odp]);
 
   const uloz = useCallback(async (ticho: boolean) => {
