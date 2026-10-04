@@ -97,6 +97,12 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
    */
   const [balickov, setBalickov] = useState(1);
   const [rozsahBezi, setRozsahBezi] = useState(false);
+  /**
+   * Čo klient za odkazom NAOZAJ uvidí — vypočítané serverom tým istým
+   * kódom, ktorý stránku kreslí (`obsahOdkazu`). Číslo `zostatok`, ktoré
+   * pošle obrazovka, je len záloha, kým odpoveď nepríde.
+   */
+  const [stavStranky, setStavStranky] = useState<{ sQr: boolean } | null>(null);
   /** Zmena čísla donúti iframe načítať stránku znova. */
   const [verzia, setVerzia] = useState(0);
   const nacitane = useRef(false);
@@ -111,8 +117,9 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
       void fetch("/api/sms", {
         method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
         body: JSON.stringify({ akcia: "odkaz", klient: meno }),
-      }).then((x) => x.json()).then((j: { ok?: boolean; url?: string; nahlad?: string; balickov?: number }) => {
+      }).then((x) => x.json()).then((j: { ok?: boolean; url?: string; nahlad?: string; balickov?: number; stav?: { sQr: boolean } | null }) => {
         if (j?.ok && j.url) setOdkaz(j.url);
+        if (j?.stav) setStavStranky(j.stav);
         if (j?.nahlad) setNahlad(j.nahlad);
         if (typeof j?.balickov === "number") setBalickov(j.balickov);
       }).catch(() => null);
@@ -139,13 +146,13 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
            * hodinách nie je čo platiť — a správa, ktorá sľúbi QR a klient ho
            * tam nenájde, je horšia než stručná.
            */
-          sQr: !!platba || zostatok <= 0,
+          sQr: stavStranky ? stavStranky.sQr : (!!platba || zostatok <= 0),
         }),
     );
     // Závislosťou sú HODNOTY, nie objekt `platba`: nový literál pri každom
     // prekreslení rodiča by text preskladal aj uprostred písania.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [otvorene, meno, trener, sMailom, predvolenyText, platba, zostatok, datum, odkaz]);
+  }, [otvorene, meno, trener, sMailom, predvolenyText, platba, zostatok, datum, odkaz, stavStranky]);
 
   /**
    * Rozsah sa ULOŽÍ, až potom sa prekreslí náhľad. Keď zápis zlyhá, číslo

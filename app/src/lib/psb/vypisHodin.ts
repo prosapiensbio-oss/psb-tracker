@@ -53,6 +53,8 @@ export type RiadokVypisu = {
   prevzateDni?: string[];
   /** „Doplnenie členstva" — vnútorný záznam, nie predaj. */
   doplnenie?: boolean;
+  /** Koľkou hodinou ďalšieho balíčka sa tréning stane po zaplatení (`StavRiadku.buduca`). */
+  buduca?: number;
 };
 
 export type Vypis = {
@@ -187,6 +189,14 @@ export type StavRiadku = {
   prevzate?: number;
   /** Dni prevzatých tréningov, v poradí, ako sa stali. */
   prevzateDni?: string[];
+  /**
+   * Koľkou hodinou ďalšieho balíčka sa tento tréning stane, keď klient
+   * zaplatí. Len pri tréningoch bez hodiny na konci posledného balíčka.
+   * Jerry, 3. 10. 2026: „−1 6h, −2 5h, −3 4h" — a 4. 10. nad Šašinkovou:
+   * „prečo tam nemá odpočet 8 h, 7 h, 6 h?" Stránka za odkazom ho mala,
+   * profil nie, lebo sa počítal len pri stránke. Odteraz tu, pre oboch.
+   */
+  buduca?: number;
 };
 
 /**
@@ -465,8 +475,24 @@ export function priebehBalickov(
         /**
          * Dlh sa nepočíta tam, kde appka nevie, koľko hodín obdobie malo.
          * Nulou to nie je — je to neznámo (viď `neznameDoplnenie`).
+         *
+         * ALE TRÉNING BEZ HODINY SA KRESLÍ VŽDY. Jerry, 4. 10. 2026 nad
+         * Danielou Šašinkovou: „prečo tam nie je −1 −2 −3?" Mala nezaplatené
+         * členstvo od 9. 9. a 12. 9. doplnenie bez počtu hodín; riadky pre to
+         * mlčali, kým nadpis aj karta hovorili −4 — lebo koniec osi (`nekryte`)
+         * tréningy bez hodiny počíta vždy. Ticho tu teda nechránilo pred
+         * vymysleným číslom, len zatajilo, odkiaľ sa to číslo vzalo.
+         *
+         * LEN V AKTUÁLNOM BALÍČKU A LEN KEĎ AJ KARTA HOVORÍ MÍNUS. Riadky
+         * majú vysvetliť číslo na karte, nie mu odporovať. V starších
+         * obdobiach ticho zostáva — tam neznáme doplnenie 29. 9. 2026
+         * vyrábalo Hanusovi vymyslené −1 až −5. A tam, kde karta mínus
+         * nehlási, os pravdu nemá: Marcela Hrůzová má naraz online balíček
+         * (4 h) a offline 1 h, os ich nevie viesť vedľa seba a online
+         * tréningy by jej ukázala ako −1, −2; karta sčíta oba a hovorí 1 h.
          */
-        if (neznameHodiny) dlh = null;
+        const kartaVMinuse = zostatokTeraz != null && zostatokTeraz < 0;
+        if (neznameHodiny && !(vycerpane && b === posledny && kartaVMinuse)) dlh = null;
         else if (vycerpane || !zaplateneOd || u.den < zaplateneOd) dlh = (dlhPocet += 1);
         else dlhPocet = 0;
       }
@@ -507,7 +533,21 @@ export function priebehBalickov(
       if (koniecUseku !== null) koniecUseku += zostatokTeraz - kExportu;
     }
 
-    if (b === posledny) koniec = koniecUseku;
+    if (b === posledny) {
+      koniec = koniecUseku;
+      // Tréningy bez hodiny na KONCI balíčka dostanú hodiny ďalšieho
+      // (rovnako veľkého) balíčka: najstarší z nich je jeho prvá hodina.
+      const bezHodiny: StavRiadku[] = [];
+      for (let i = usek.riadky.length - 1; i >= 0; i--) {
+        const u = usek.riadky[i];
+        if (u.druh !== "trening" || u.zdarma !== undefined) continue;
+        const st = stavy.get(u);
+        if (!st || st.zostatok != null || !st.dlh) break;
+        bezHodiny.unshift(st);
+      }
+      const hodinBalicka = b?.hodin || 0;
+      bezHodiny.forEach((st, i) => { if (hodinBalicka - i > 0) st.buduca = hodinBalicka - i; });
+    }
   }
 
   return { stavy, koniec };
@@ -559,6 +599,7 @@ export function vypisHodin(os: Udalost[], od = "", doDna = "", zostatokTeraz: nu
       doplnenie: u.druh === "balicekOd" ? u.doplnenie : undefined,
       prevzate: stav?.prevzate,
       prevzateDni: stav?.prevzateDni,
+      buduca: stav?.buduca,
     });
   }
 

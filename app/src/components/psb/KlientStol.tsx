@@ -1980,6 +1980,9 @@ function StavHodin({ stav }: { stav?: StavRiadku }) {
       {stav.dlh ? <b style={{ color: C.orange }} title="tréning na nezaplatenom členstve">−{stav.dlh}</b> : null}
       {stav.zostatok !== null ? (
         <span style={{ marginLeft: stav.dlh ? 8 : 0, color: stav.zostatok <= 1 ? C.orange : C.textDim }}>{hod(stav.zostatok)} h</span>
+      ) : stav.buduca != null ? (
+        // Tá istá hodina, akú vidí klient za odkazom: čím sa tréning stane po zaplatení.
+        <span style={{ marginLeft: 8, color: C.textDim }} title="hodina z ďalšieho balíčka, keď ho zaplatí">{hod(stav.buduca)} h</span>
       ) : null}
     </span>
   );

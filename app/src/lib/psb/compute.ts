@@ -629,7 +629,15 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
       if (k) {
         c.membership = k.nazov;
         c.packageValidTo = k.platnostDo || "";
-        c.packageTotal = k.pausal ? 0 : k.spolu;
+        /**
+         * Veľkosť balíčka, aj keď ešte nie je zaplatený. Hodiny nedáva
+         * (`spolu` ich nepočíta), ale klient ho MÁ — a `packageTotal > 0` je
+         * brána, cez ktorú karta „… h zostáva", zoznamy aj odkaz vôbec
+         * ukážu zostatok. Daniela Šašinková mala 4. 10. 2026 jediný balíček
+         * nezaplatený, `spolu` 0, a karta v profile zmizla, hoci zostatok
+         * bol −4 (Jerry: „prečo tam nie je −1 −2 −3?").
+         */
+        c.packageTotal = k.pausal ? 0 : (k.spolu > 0 ? k.spolu : k.nezaplateneHodin);
         // Záporné číslo sa nechá — mínus je značka, ktorú ďalší zaplatený
         // balíček prepíše na hodiny; nula by klientovi aj Jerrymu klamala.
         c.packageRemaining = k.zostatok;

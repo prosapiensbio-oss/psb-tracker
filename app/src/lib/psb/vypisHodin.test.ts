@@ -346,10 +346,25 @@ describe("doplnenie členstva bez počtu hodín", () => {
       .map((den) => ({ druh: "trening", den }) as Udalost),
   ];
 
-  it("neznáme doplnenie neznamená nula hodín — dlh sa v tom období nepočíta", () => {
-    const { stavy } = priebehBalickov(os, null, "2026-06-15");
+  it("neznáme doplnenie neznamená nula hodín — v STARŠOM období sa dlh nepočíta", () => {
+    // Za obdobím nasleduje ďalšie členstvo, takže je to história, nie dnešok.
+    const sNovym: Udalost[] = [...os, { druh: "balicekOd", den: "2026-06-29", nazov: "OFF - 6h S viazanostou", hodin: 8 }];
+    const { stavy } = priebehBalickov(sNovym, null, "2026-07-01");
     const dlhy = os.filter((u) => u.druh === "trening").map((u) => stavy.get(u)?.dlh ?? null);
     expect(dlhy.every((d) => d === null)).toBe(true);
+  });
+
+  it("v AKTUÁLNOM balíčku sa tréning bez hodiny kreslí, keď aj karta hovorí mínus", () => {
+    const { stavy, koniec } = priebehBalickov(os, -1, "2026-06-15");
+    const siedmy = os.filter((u) => u.druh === "trening")[6];
+    expect(stavy.get(siedmy)?.dlh).toBe(1);
+    expect(koniec).toBe(-1);
+  });
+
+  it("keď karta mínus nehlási, os mlčí aj v aktuálnom balíčku (Hrůzová: dva balíčky naraz)", () => {
+    const { stavy } = priebehBalickov(os, 1, "2026-06-15");
+    const siedmy = os.filter((u) => u.druh === "trening")[6];
+    expect(stavy.get(siedmy)?.dlh ?? null).toBeNull();
   });
 
   it("bez doplnenia sa dlh počíta ďalej — mlčať sa má len tam, kde sa nevie", () => {
@@ -575,5 +590,36 @@ describe("dnešný tréning sa počíta, až keď sa začal", () => {
     expect(osCasuKlienta("Petr Test", zdroj as never, "2026-10-03T18:01").filter((u) => u.druh === "trening")).toHaveLength(1);
     // Deň bez času sa správa ako doteraz — celý deň sa počíta.
     expect(osCasuKlienta("Petr Test", zdroj as never, "2026-10-03").filter((u) => u.druh === "trening")).toHaveLength(1);
+  });
+});
+
+describe("tréning bez hodiny sa kreslí aj v období s neznámym doplnením", () => {
+  it("Šašinková 4. 10.: nezaplatené členstvo, doplnenie bez počtu, štyri tréningy → −1 −2 −3 −4", () => {
+    const os: Udalost[] = [
+      bal("2026-09-09", 8, { doDna: "2026-11-03", nezaplatene: true }), tre("2026-09-09"),
+      { druh: "balicekOd", den: "2026-09-12", nazov: "Doplnenie členstva", hodin: 0, doplnenie: true },
+      tre("2026-09-23"), tre("2026-10-01"), tre("2026-10-04"),
+    ];
+    // Karta hovorí −4 (balíček nezaplatený, štyri tréningy) — riadky ju vysvetlia.
+    const { stavy, koniec } = priebehBalickov(os, -4, "2026-10-04");
+    expect([...stavy.entries()].filter(([u]) => u.druh === "trening").map(([, s]) => s.dlh)).toEqual([1, 2, 3, 4]);
+    expect(koniec).toBe(-4);
+  });
+});
+
+describe("koľkou hodinou sa tréning bez hodiny stane po zaplatení", () => {
+  it("Šašinková: −1 · 8 h, −2 · 7 h, −3 · 6 h, −4 · 5 h — profil aj odkaz z jedného miesta", () => {
+    const os: Udalost[] = [
+      bal("2026-09-09", 8, { doDna: "2026-11-03", nezaplatene: true }), tre("2026-09-09"),
+      tre("2026-09-23"), tre("2026-10-01"), tre("2026-10-04"),
+    ];
+    const { stavy } = priebehBalickov(os, -4, "2026-10-04");
+    const t = [...stavy.entries()].filter(([u]) => u.druh === "trening").map(([, s]) => [s.dlh, s.buduca]);
+    expect(t).toEqual([[1, 8], [2, 7], [3, 6], [4, 5]]);
+  });
+
+  it("tréning s hodinou budúcu hodinu nemá", () => {
+    const { stavy } = priebehBalickov([bal("2026-09-09", 6), tre("2026-09-10")], 5, "2026-10-04");
+    expect([...stavy.values()].every((s) => s.buduca === undefined)).toBe(true);
   });
 });

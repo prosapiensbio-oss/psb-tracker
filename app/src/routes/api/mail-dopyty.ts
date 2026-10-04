@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { dnesPraha, terazPraha } from "../../lib/psb/cas";
-import { osKlientaZoServera } from "../../lib/psb/osKlienta.server";
+import { terazPraha } from "../../lib/psb/cas";
+import { obsahOdkazu } from "../../lib/psb/obsahOdkazu.server";
 import type { D1Database } from "@cloudflare/workers-types";
 
 import { jeCasCitat, najblizsieOkno } from "../../lib/psb/mailOkno";
@@ -11,11 +11,9 @@ import { stiahniSpravy, testSpojenia } from "../../lib/psb/imap";
 import { naDopyt } from "../../lib/psb/mailDopyt";
 import { adresyMailu } from "../../lib/psb/mime";
 import { deriveClients } from "../../lib/psb/compute";
-import { historiaPreMail } from "../../lib/psb/historiaMail";
 import { loadData } from "../../lib/psb/db.server";
 import { mailKlientovi } from "../../lib/psb/mailKlientovi";
 import { normName } from "../../lib/psb/format";
-import { osCasuKlienta } from "../../lib/psb/klientOsCasu";
 import { posliMail } from "../../lib/psb/smtp.server";
 import { posli as posliPush, type Odber } from "../../lib/psb/push.server";
 
@@ -88,14 +86,13 @@ export async function posliHistoriu(DB: D1Database, menoZPredmetu: string, n: Na
   ).bind(`${c.name} ·%`, dnesUTC).first<{ n: number }>();
   if ((uzDnes?.n || 0) > 0) return { ok: false, preco: "dnes už raz odišla" };
 
-  // Tá istá os ako na stránke `/v/` — s kalendárom a balíčkami z Kokpitu.
-  // Dovtedy mail staval os len z PTmindera a klient dostal v SMS inú než v maili.
-  const { os } = await osKlientaZoServera(DB, data, c.name, terazPraha());
-  const dalsi = ((await DB.prepare(
-    "SELECT MIN(zaciatok) z FROM kal_udalosti WHERE zmizla_at IS NULL AND klient = ?1 AND typ IN ('trening','uvodny') AND zaciatok > ?2",
-  ).bind(c.name, terazPraha()).first<{ z: string | null }>())?.z) || undefined;
-
-  const vypis = historiaPreMail(c.name, os, c, dnesPraha(), dalsi);
+  /**
+   * Ten istý obsah ako stránka `/v/` (`obsahOdkazu`) — os s históriou
+   * členstiev, kalendárom a balíčkami z Kokpitu, rovnaký nadpis aj mínusy.
+   * Celá história a bez platby: mail chodí na vyžiadanie histórie, platba
+   * a QR sú na stránke.
+   */
+  const { vypis } = await obsahOdkazu(DB, data, c, { rozsah: 0, teraz: terazPraha(), sPlatbou: false });
   const logoCid = `logo-${crypto.randomUUID()}@prosapiens`;
   const { ASSETS } = bindings();
   const logo = await ASSETS?.fetch(new Request("https://kokpit.prosapiensbio.workers.dev/znacka-napis-mail.png"))

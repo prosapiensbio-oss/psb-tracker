@@ -1492,6 +1492,16 @@ a druhé členstvo od 2. 10. s otvoreným poplatkom 6 990 Kč. Karta hovorila
   `osKlientaZoServera` — jedno miesto, s kalendárom aj balíčkami z Kokpitu
   (mail ich dovtedy nemal) — a s pražským časom aj hodinou, takže dnešný
   tréning o 18:00 nie je o 15:00 odtrénovaný.
+- **Obsah odkazu má jedno miesto: `obsahOdkazu.server.ts`** (4. 10. 2026,
+  Jerry: „aby z toho, čo vyšlo, sa sťahovali dáta pre obsah odkazov").
+  Stránka `/v/` z neho kreslí nadpis, os, mínusy aj platbu; okno SMS sa ho
+  pýta cez `/api/sms` (akcia `odkaz` vracia `stav.sQr`), takže veta „a QR na
+  platbu" sa riadi tým, čo stránka naozaj nakreslí — nie číslom, ktoré
+  pošle obrazovka (karta, Kalendár a Dnes posielali tri rôzne); mail „celá
+  história" z neho berie os bez platby. Popis poplatku z PTmindera ide
+  klientovi preložený (`popisPoplatku`: „6h Předplatné · 2. 10. – 2. 11.
+  2026" namiesto „OFF - 6h S viazanostou - from 02/10/2026…"). Overené po
+  nasadení na všetkých 12 živých odkazoch: nadpis aj suma zhodné s výpočtom.
 - **Pasca: tlačidlo, ktoré sa číta ako stav.** Stôl klienta mal pri každom
   tréningu tlačidlo s holým „zdarma" a Jerry ho čítal ako údaj („zdarma pri
   každom tréningu, hoci je `treningy_zdarma` prázdna"). Akcia má sloveso

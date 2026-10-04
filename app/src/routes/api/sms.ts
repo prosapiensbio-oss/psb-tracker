@@ -1,4 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { loadData } from "../../lib/psb/db.server";
+import { deriveClients } from "../../lib/psb/compute";
+import { obsahOdkazu } from "../../lib/psb/obsahOdkazu.server";
 
 import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
@@ -111,11 +114,28 @@ export const Route = createFileRoute("/api/sms")({
           const origin = new URL(request.url).origin;
           const rozsah = await DB.prepare("SELECT balickov FROM klient_odkazy WHERE token = ?1")
             .bind(riadok.token).first<{ balickov: number | null }>().catch(() => null);
+          /**
+           * STAV STRÁNKY Z TOHO ISTÉHO VÝPOČTU, KTORÝ JU KRESLÍ (`obsahOdkazu`).
+           *
+           * SMS do 4. 10. 2026 sľubovala „a QR na platbu" podľa čísla, ktoré
+           * jej poslala obrazovka, z ktorej sa otvorila — a karta klienta,
+           * Kalendár a Dnes posielali tri rôzne. Správa tak vedela sľúbiť QR,
+           * ktoré klient na stránke nenašiel. Teraz sa pýta stránky samej.
+           * Keď výpočet zlyhá, `stav` chýba a SMS sa správa ako doteraz.
+           */
+          const stav = await (async () => {
+            const data = await loadData(DB);
+            const c = deriveClients(data)[klient];
+            if (!c) return null;
+            const o = await obsahOdkazu(DB, data, c, { rozsah: Number(rozsah?.balickov ?? 1) });
+            return { zostatok: o.vypis.zostatok, suma: o.suma, sQr: o.sQr };
+          })().catch(() => null);
           return Response.json({
             ok: true,
             url: verejnyOdkaz(`/v/${riadok.token}`, origin),
             nahlad: `${origin}/v/${riadok.token}?nahlad=1`,
             balickov: rozsah?.balickov ?? 1,
+            stav,
           });
         }
 

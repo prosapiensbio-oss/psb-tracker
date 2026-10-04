@@ -1,21 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { dnesPraha, terazPraha } from "../lib/psb/cas";
-import { osKlientaZoServera } from "../lib/psb/osKlienta.server";
+import { terazPraha } from "../lib/psb/cas";
+import { obsahOdkazu } from "../lib/psb/obsahOdkazu.server";
 
 import { bindings } from "../lib/bindings.server";
 import { isAuthed } from "../lib/psb/auth.server";
 import { deriveClients } from "../lib/psb/compute";
-import { dlhKlienta, type BalicekDlh, type PlatbaDlh } from "../lib/psb/dlhKlienta";
-import { historiaPreMail } from "../lib/psb/historiaMail";
 import { klientStranka } from "../lib/psb/klientStranka";
-import { normName } from "../lib/psb/format";
 import { UKAZKA_KLIENT, jeUkazka } from "../lib/psb/ukazka";
-import { nazovProduktu } from "../lib/psb/nazvyProduktov";
 import { nastavenia, posliHistoriu } from "./api/mail-dopyty";
-import { dlhJednehoKlienta } from "../lib/psb/dlznici";
 import { loadData } from "../lib/psb/db.server";
 import { mailKlientovi } from "../lib/psb/mailKlientovi";
-import { hodinZNazvuBalicka, osCasuKlienta } from "../lib/psb/klientOsCasu";
 import { blokPocitovky } from "../lib/psb/pocitovkaStranka";
 import { oblastiZJson, platnaHodnota, posledneHodnoty, POSUN, type Meranie, type Oblast } from "../lib/psb/pocitovka";
 import { podlaKlienta } from "../lib/psb/anamneza.server";
@@ -98,8 +92,6 @@ export const Route = createFileRoute("/v/$token")({
         const c = deriveClients(data)[r.klient];
         if (!c) return prec("Tento odkaz neplatí. Ozvi sa nám a pošleme ti nový.", 404);
 
-        // Pražský deň, nie UTC: medzi polnocou a druhou ráno je UTC ešte včera.
-        const dnes = dnesPraha();
         /**
          * KALENDÁR PATRÍ NA OS, INAK ČÍSLO NESEDÍ SO ZOZNAMOM.
          *
@@ -115,142 +107,22 @@ export const Route = createFileRoute("/v/$token")({
          * obrazovky hovoria o tom istom.
          */
         /**
-         * Kalendár aj balíčky z Kokpitu číta jedno miesto (`osKlientaZoServera`)
-         * — to isté používa mail „celá história", takže SMS a mail hovoria
-         * o tej istej osi. `terazPraha()` nesie hodinu: dnešný tréning, ktorý
-         * sa ešte nezačal, na osi nie je a stránka ho ponúkne ako ďalší.
-         */
-        const { os, balicky } = await osKlientaZoServera(DB, data, c.name, terazPraha());
-        const dalsi = ((await DB.prepare(
-          "SELECT MIN(zaciatok) z FROM kal_udalosti WHERE zmizla_at IS NULL AND klient = ?1 AND typ IN ('trening','uvodny') AND zaciatok > ?2",
-        ).bind(c.name, terazPraha()).first<{ z: string | null }>())?.z) || undefined;
-
-        /**
-         * DLH LEN Z VLASTNEJ EVIDENCIE — tá istá matematika ako mínus na
-         * karte klienta (dlhKlienta): ručne nahodené balíčky mínus platby.
-         * Keď nič nedlhuje, platobný blok sa nekreslí — QR na nulu je výzva
-         * na omyl.
-         */
-        const platby = ((await DB.prepare(
-          "SELECT suma_czk, datum, zrusene_at FROM platby WHERE klient = ?1",
-        ).bind(c.name).all()).results || []) as unknown as { suma_czk: number; datum: string; zrusene_at: string | null }[];
-        /**
-         * DLH AJ S OTVORENÝMI POPLATKAMI z PTmindera — tá istá definícia,
-         * akú ukazuje karta dlžníkov. Dovtedy stránka počítala len balíčky
-         * zapísané v Kokpite, takže Daniele Šašinkovej s dlhom 9 400 Kč
-         * tvrdila nulu a QR sa nenakreslil (Jerry, 1. 10. 2026: „prečo tam
-         * nie je QR na platbu?").
-         */
-        const mojePoplatky = (data.poplatky || [])
-          .filter((p) => normName(p.klient) === normName(c.name))
-          .map((p) => ({ datum: p.datum, klient: c.name, popis: p.popis, suma: p.suma }));
-        const dlh = dlhJednehoKlienta(
-          mojePoplatky,
-          balicky.map((b): BalicekDlh => ({ cena: b.cena_czk, platnostOd: b.platnost_od, zdroj: b.zdroj, zruseneAt: b.zrusene_at, nazov: b.nazov })),
-          platby.map((p): PlatbaDlh => ({ suma: p.suma_czk, datum: p.datum, zruseneAt: p.zrusene_at })),
-        );
-
-        /**
-         * KOĽKO HISTÓRIE — podľa toho, čo Jerry vybral pred odoslaním SMS.
-         *
-         * Predvolene posledný balíček; celá história chodí mailom na
-         * vyžiadanie. Jerry, 3. 10. 2026 nad Hanusom: „bol v mínuse, keď
-         * platil naposledy, aj teraz — keď mu pošlem iba posledný balík,
-         * bude to neprehľadné." Rozsah sedí pri tokene, nie v adrese:
-         * presmerovanie z prosapiens.cz query string zahadzuje.
+         * OBSAH ODKAZU sa skladá na jednom mieste (`obsahOdkazu`) — to isté
+         * číta SMS pred odoslaním aj mail „celá história". Tu sa už len
+         * kreslí: QR, pocitovka, sadzba.
          */
         const rozsah = Math.max(0, Math.round(Number(r.balickov ?? 1)));
-        const vypis = historiaPreMail(c.name, os, c, dnes, dalsi, rozsah === 0, Math.max(1, rozsah));
-
-        /**
-         * TRÉNINGY BEZ HODINY SÚ HODINY NAD RÁMEC — aj keď číslo hovorí nulu.
-         *
-         * `priebehBalickov` zostatok pod nulu nepúšťa (`Math.max(0, …)`);
-         * tréningy, na ktoré už hodina nebola, nesie `dlh` a os ich kreslí
-         * ako −1, −2, −3. Nadpis a odpočet ale čítali ten zastropovaný
-         * zostatok, takže Lukášovi Hanusovi stránka 3. 10. 2026 tvrdila
-         * „Poslední hodina — balíček máš dochozený", hoci odvtedy trénoval
-         * trikrát, a QR mu ponúkalo 6 h, z ktorých tri sú už odtrénované.
-         *
-         * Jerry, 3. 10. 2026: tie mínusy sa pri novom balíčku prepíšu na 6, 5
-         * a 4 — klient teda musí dopredu vedieť, že z balíčka mu po zaplatení
-         * zostanú tri hodiny, nie šesť.
-         */
-        const nadRamec = (() => {
-          let n = 0;
-          // `os` ide od najstaršieho; počítajú sa tréningy na konci.
-          for (let i = vypis.os.length - 1; i >= 0; i--) {
-            const b = vypis.os[i];
-            if (b.druh !== "trening") continue;
-            if (b.zostatok != null || !b.dlh) break;
-            n += 1;
-          }
-          return n;
-        })();
-        if ((vypis.zostatok ?? 0) === 0 && nadRamec > 0) vypis.zostatok = -nadRamec;
-
-        /**
-         * KOĽKOU HODINOU SA TÉN TRÉNING STANE, KEĎ KLIENT ZAPLATÍ.
-         *
-         * Jerry, 3. 10. 2026: „−1 6h, −2 5h, −3 4h — podľa mňa by to malo byť
-         * takto napísané." Mínus hovorí, že tréning zatiaľ balíček nemá;
-         * číslo vedľa neho hovorí, čím sa stane. Je to ten istý balíček, aký
-         * stránka hneď pod osou ponúka cez QR — tá istá veľkosť ako posledný.
-         *
-         * Keď je tréningov nad rámec viac, než má balíček hodín, tie ďalšie
-         * ostanú len s mínusom: na ne by ani nový balíček nestačil a číslo,
-         * ktoré sa nenaplní, je horšie než žiadne.
-         */
-        const hodinBaliecka = hodinZNazvuBalicka(
-          [...vypis.os].reverse().find((b) => b.druh === "balicekOd")?.popis || "",
-        );
-        if (nadRamec > 0 && hodinBaliecka > 0) {
-          const bezHodiny = vypis.os.filter((b) => b.druh === "trening" && b.zostatok == null && b.dlh).slice(-nadRamec);
-          bezHodiny.forEach((b, i) => {
-            if (hodinBaliecka - i > 0) b.buduca = hodinBaliecka - i;
-          });
-        }
+        const { vypis, suma, sprava } = await obsahOdkazu(DB, data, c, { rozsah, teraz: terazPraha() });
         const origin = new URL(request.url).origin;
-        /**
-         * QR JE NA STRÁNKE VŽDY, KEĎ JE ČO ZAPLATIŤ — a to sú dva prípady.
-         *
-         * Jerry, 2. 10. 2026: „pri POSLEDNÁ HODINA potrebujem QR, keď je nad
-         * rámec potrebuje QR… appka má sama ponúknuť ďalší balíček za cenu
-         * toho posledného."
-         *
-         *  1. **Má otvorený dlh** — suma je, čo dlží. (Daniela Šašinková.)
-         *  2. **Dochodil balíček alebo trénuje nad rámec a nedlží nič** —
-         *     suma je cena JEHO POSLEDNÉHO balíčka. Appka si ju nevymýšľa:
-         *     je to to, čo si naposledy kúpil. Keď sa má zmeniť, Jerry
-         *     nahodí nový balíček a SMS odíde z tej obrazovky.
-         *
-         * Hodiny nad rámec sa z nového balíčka odpíšu samy (`priebehBalickov`),
-         * takže sa na stránke píše, koľko mu po zaplatení naozaj zostane.
-         */
-        const poslednyBal = balicky
-          .filter((b) => !b.zrusene_at && (b.cena_czk || 0) > 0)
-          .sort((a, b) => b.platnost_od.localeCompare(a.platnost_od))[0];
-        const nadramec = (vypis.zostatok ?? 1) <= 0;
-        const suma = dlh.dlzi > 0 ? dlh.dlzi : (nadramec ? Math.round(poslednyBal?.cena_czk || 0) : 0);
-        const popisPlatby = dlh.dlzi > 0
-          ? dlh.popis
-          : nazovProduktu(poslednyBal?.nazov || "") || "Nový balíček";
 
         let qrUrl: string | undefined;
         if (suma > 0) {
           // Do správy pre príjemcu ide MENO — podľa neho Kokpit platbu spáruje.
-          const o = qrObrazok(spayd({ suma, vs: "", sprava: c.name, prijemca: DODAVATEL.meno }));
+          const o = qrObrazok(spayd({ suma, vs: "", sprava, prijemca: DODAVATEL.meno }));
           const bajty = new Uint8Array(o.data);
           let bin = "";
           for (let i = 0; i < bajty.length; i += 4096) bin += String.fromCharCode(...bajty.subarray(i, i + 4096));
           qrUrl = `data:${o.typ};base64,${btoa(bin)}`;
-          vypis.platba = {
-            popis: popisPlatby,
-            suma, ucet: DODAVATEL.ucet, sprava: c.name,
-            // Koľko hodín mu po zaplatení naozaj zostane.
-            odpocet: dlh.dlzi > 0 ? 0 : Math.max(0, -(vypis.zostatok ?? 0)),
-            novy: dlh.dlzi === 0,
-          };
         }
 
         /**
