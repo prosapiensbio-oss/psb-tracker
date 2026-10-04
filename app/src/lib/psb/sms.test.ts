@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { chybaOdosielatela, cisloPreBranu, dlzkaSpravy, rodZMena, textSms, textSmsPlatba, bezDiakritiky } from "./sms";
+import { chybaOdosielatela, cisloNaUkazku, cisloPreBranu, dlzkaSpravy, rodZMena, textSms, textSmsPlatba, bezDiakritiky } from "./sms";
 
 describe("cisloPreBranu", () => {
   it("české číslo bez predvoľby dostane +420", () => {
@@ -152,5 +152,21 @@ describe("žiadna správa klientovi nesmie mať diakritiku", () => {
     const sMakcenmi = "Lukas, zapísal som ti 6h Předplatné. QR na platbu máš v maili. ProSapiens";
     expect(dlzkaSpravy(sMakcenmi).sprav).toBe(2);
     expect(dlzkaSpravy(bezDiakritiky(sMakcenmi)).sprav).toBe(1);
+  });
+});
+
+describe("slovenské číslo bez predvoľby", () => {
+  it("deväť číslic na 9 je slovenský mobil, nie české (Pavlík, 2. 10. 2026)", () => {
+    expect(cisloPreBranu("944096975")).toBe("+421944096975");
+    expect(cisloPreBranu("944 096 975")).toBe("+421944096975");
+    expect(cisloPreBranu("0944096975")).toBe("+421944096975");
+  });
+  it("české mobily zostávajú české", () => {
+    expect(cisloPreBranu("735920248")).toBe("+420735920248");
+    expect(cisloPreBranu("605965949")).toBe("+420605965949");
+  });
+  it("na ukážku s medzerami a krajinou", () => {
+    expect(cisloNaUkazku("+421944096975")).toBe("+421 944 096 975 (Slovensko)");
+    expect(cisloNaUkazku("+420735920248")).toBe("+420 735 920 248 (Česko)");
   });
 });

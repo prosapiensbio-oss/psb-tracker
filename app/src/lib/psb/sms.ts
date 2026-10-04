@@ -67,8 +67,24 @@ export function cisloPreBranu(telefon: string, predvolba = "420"): string | null
   if (/^(420|421)\d{9}$/.test(c)) return `+${c}`;
   // Domáci tvar s nulou na začiatku (slovenský zápis): 0905… → +421905…
   if (/^0\d{9}$/.test(c)) return `+421${c.slice(1)}`;
+  /**
+   * DEVÄŤ ČÍSLIC ZAČÍNAJÚCICH DEVIATKOU JE SLOVENSKÝ MOBIL.
+   *
+   * Roman Pavlík, 2. 10. 2026: v PTminderi „944096975" (O2 Slovensko bez
+   * nuly), appka predpokladala Česko a SMS odišla na +420 944 096 975 —
+   * číslo, ktoré nepatrí nikomu. České mobily začínajú šestkou alebo
+   * sedmičkou; čísla na 9 sú v Česku spoplatnené linky, nie ľudia.
+   */
+  if (/^9\d{8}$/.test(c)) return `+421${c}`;
   if (/^\d{9}$/.test(c)) return `+${predvolba}${c}`;
   return null;
+}
+
+/** „+421944096975" → „+421 944 096 975 (Slovensko)" — aby človek videl, kam to odíde. */
+export function cisloNaUkazku(medzinarodne: string): string {
+  const m = /^\+(420|421)(\d{3})(\d{3})(\d{3})$/.exec(medzinarodne);
+  if (!m) return medzinarodne;
+  return `+${m[1]} ${m[2]} ${m[3]} ${m[4]} (${m[1] === "421" ? "Slovensko" : "Česko"})`;
 }
 
 export type SpravaProKlienta = {

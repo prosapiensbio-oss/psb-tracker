@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import { oznam, pocuvaj } from "../../lib/psb/obnovaSignal";
+import { VyberMena } from "./VyberMena";
 
-import { dlzkaSpravy, textSms } from "../../lib/psb/sms";
+import { dlzkaSpravy, textSms, cisloPreBranu, cisloNaUkazku } from "../../lib/psb/sms";
 import { C, mix } from "../../lib/psb/theme";
 
 /**
@@ -29,15 +31,22 @@ import { C, mix } from "../../lib/psb/theme";
 
 type Kontakt = { klient: string; telefon?: string };
 
-/** Telefóny sa ťahajú raz za načítanie obrazovky, nie pri každom riadku. */
-let cacheKontaktov: Promise<Kontakt[]> | null = null;
-const kontakty = () => {
-  cacheKontaktov ??= fetch("/api/vydane-faktury", { credentials: "same-origin" })
+/** Príjemca, ktorý nie je klient — číslo sa napíše rukou a nikam neukladá. */
+const JINE_PRIJEMCA = "Jiné (nie je klient)";
+
+/**
+ * Telefóny sa ťahajú PRI KAŽDOM OTVORENÍ okna, nie raz za načítanie stránky.
+ *
+ * Jerry, 4. 10. 2026 nad Romanom Pavlíkom: „upravil som číslo v profile, ale
+ * pri odosielaní SMS sa neprepísalo." Okno si zoznam pamätalo od prvého
+ * otvorenia, takže oprava v profile sa prejavila až po obnovení celej
+ * stránky. Jeden dopyt pri otvorení nestojí nič; staré číslo v SMS áno.
+ */
+const kontakty = () =>
+  fetch("/api/vydane-faktury", { credentials: "same-origin", cache: "no-store" })
     .then((r) => r.json())
     .then((j) => (j?.udaje || []) as Kontakt[])
     .catch(() => [] as Kontakt[]);
-  return cacheKontaktov;
-};
 
 export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, platba, datum, odvodene = false, sMailom = false, dnesnyTrening = false, maly = false }: {
   meno: string;
@@ -74,6 +83,25 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
 }) {
   const [otvorene, setOtvorene] = useState(false);
   const [telefon, setTelefon] = useState<string | null>(null);
+  /** Kam správa naozaj odíde — ten istý prevod, aký urobí server. */
+  const cislo = telefon ? cisloPreBranu(telefon) : null;
+  /**
+   * KOMU SPRÁVA IDE (Jerry, 4. 10. 2026): „poslať niekomu inému — rozbaľovací
+   * zoznam klientov + Jiné, keby to išlo niekomu, kto nie je klient." Predvolene
+   * klient sám; `JINE_PRIJEMCA` = číslo napísané rukou, ktoré sa nikam neukladá.
+   */
+  const [komu, setKomu] = useState(meno);
+  const [vsetkyKontakty, setVsetkyKontakty] = useState<Kontakt[]>([]);
+  /** Rozpísané číslo v úprave; `null` = neupravuje sa. */
+  const [upravaCisla, setUpravaCisla] = useState<string | null>(null);
+  const [ukladamCislo, setUkladamCislo] = useState(false);
+  const jeJine = komu === JINE_PRIJEMCA;
+  /**
+   * Kým sa meno v „Komu" len píše, príjemca nie je vybraný a číslo patrí
+   * predošlému — poslať sa nesmie (správa by odišla niekomu inému, než je
+   * napísané v políčku).
+   */
+  const platnyKomu = komu === meno || jeJine || vsetkyKontakty.some((x) => x.klient === komu);
   const [text, setText] = useState("");
   const [bezi, setBezi] = useState(false);
   const [hlaska, setHlaska] = useState("");
@@ -108,9 +136,15 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
   const nacitane = useRef(false);
 
   useEffect(() => {
-    if (!otvorene || nacitane.current) return;
+    // Zatvorené okno zabudne číslo — pri ďalšom otvorení sa načíta znova.
+    if (!otvorene) { nacitane.current = false; setKomu(meno); setUpravaCisla(null); return; }
+    if (nacitane.current) return;
     nacitane.current = true;
-    void kontakty().then((u) => setTelefon(String(u.find((x) => x.klient === meno)?.telefon || "")));
+    setTelefon(null);
+    void kontakty().then((u) => {
+      setVsetkyKontakty(u);
+      setTelefon(String(u.find((x) => x.klient === meno)?.telefon || ""));
+    });
     // Odkaz sa pýta serveru (token na klienta je jeden); text sa preskladá,
     // keď dorazí — preto je v druhom effecte nižšie.
     if (!predvolenyText) {
@@ -171,11 +205,45 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
     setVerzia((v) => v + 1);
   };
 
+  /** Výber príjemcu: klient zo zoznamu dostane svoje číslo, „Jiné" prázdne políčko. */
+  const vyberKomu = (kto: string) => {
+    setKomu(kto);
+    setHlaska("");
+    if (kto === JINE_PRIJEMCA) { setTelefon(""); setUpravaCisla(""); return; }
+    setUpravaCisla(null);
+    setTelefon(String(vsetkyKontakty.find((x) => x.klient === kto)?.telefon || ""));
+  };
+
+  /**
+   * ÚPRAVA ČÍSLA. Pri klientovi sa uloží DO PROFILU (ten istý zápis ako
+   * „Upraviť profil", posiela sa len telefón a zvyšok kontaktu server
+   * zachová) a oznámi sa to — profil aj ďalšie okná SMS majú hneď to isté.
+   * Pri „Jiné" sa číslo nikam neukladá: patrí niekomu, kto klientom nie je.
+   */
+  const ulozCislo = async () => {
+    const nove = (upravaCisla || "").trim();
+    if (jeJine) { setTelefon(nove); setUpravaCisla(null); return; }
+    setUkladamCislo(true); setHlaska("");
+    const r = await fetch("/api/vydane-faktury", {
+      method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ akcia: "udaje", klient: komu, telefon: nove }),
+    }).then((x) => x.json()).catch(() => ({ ok: false, error: "spojenie zlyhalo" }));
+    setUkladamCislo(false);
+    if (!r?.ok) { setHlaska(r?.error || "číslo sa neuložilo"); return; }
+    setTelefon(nove);
+    setVsetkyKontakty((xs) => xs.some((x) => x.klient === komu)
+      ? xs.map((x) => (x.klient === komu ? { ...x, telefon: nove } : x))
+      : [...xs, { klient: komu, telefon: nove }]);
+    setUpravaCisla(null);
+    setHlaska("číslo uložené aj v profile");
+    oznam("klienti");
+  };
+
   const posli = async () => {
     setBezi(true); setHlaska("");
     const r = await fetch("/api/sms", {
       method: "POST", credentials: "same-origin", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ klient: meno, telefon, text }),
+      body: JSON.stringify({ klient: meno, telefon, text, prijemca: komu === meno ? undefined : (jeJine ? "iné číslo" : komu) }),
     }).then((x) => x.json()).catch(() => ({ ok: false, error: "spojenie" }));
     setBezi(false);
     if (r?.ok) { setHotovo(true); setHlaska("odoslané"); return; }
@@ -187,6 +255,20 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
    * zatvorenom okne nezavolal a React by spadol na zmenenom poradí hookov
    * (viď eslint.hooks.config.js).
    */
+  /**
+   * Číslo opravené v profile, kým je okno otvorené, sa prejaví hneď —
+   * profil po uložení oznámi „klienti". Rozpísanú úpravu to neprepíše.
+   */
+  useEffect(() => {
+    if (!otvorene) return;
+    return pocuvaj("klienti", () => {
+      void kontakty().then((u) => {
+        setVsetkyKontakty(u);
+        if (upravaCisla === null && komu !== JINE_PRIJEMCA) setTelefon(String(u.find((x) => x.klient === komu)?.telefon || ""));
+      });
+    });
+  }, [otvorene, komu, upravaCisla]);
+
   useEffect(() => {
     if (!otvorene) return;
     const f = (e: KeyboardEvent) => { if (e.key === "Escape") setOtvorene(false); };
@@ -253,11 +335,56 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
           style={{ background: "none", border: "none", color: C.textDim, fontSize: 16, cursor: "pointer", lineHeight: 1 }}
         >✕</button>
       </div>
+      {telefon !== null && (
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 10, fontSize: 12 }}>
+          <span style={{ color: C.textDim }}>Komu:</span>
+          <div style={{ width: 230 }}>
+            <VyberMena
+              hodnota={komu}
+              mena={[meno, ...vsetkyKontakty.map((x) => x.klient).filter((m) => m !== meno).sort((a, b) => a.localeCompare(b, "cs")), JINE_PRIJEMCA]}
+              onZmen={(v) => { if (v === meno || v === JINE_PRIJEMCA || vsetkyKontakty.some((x) => x.klient === v)) vyberKomu(v); else setKomu(v); }}
+              placeholder="komu poslať…"
+              style={{ width: "100%", padding: "4px 8px", fontSize: 12 }}
+            />
+          </div>
+          {upravaCisla === null ? (
+            <>
+              <span style={{ color: cislo ? C.text : C.orange, fontVariantNumeric: "tabular-nums" }}>
+                {cislo ? cisloNaUkazku(cislo) : telefon ? `${telefon} — nedá sa poslať` : "bez čísla"}
+              </span>
+              <button onClick={() => setUpravaCisla(telefon || "")} style={{ background: "none", border: "none", color: C.accentLight, fontSize: 12, cursor: "pointer", fontFamily: "inherit", padding: 0 }}>
+                {telefon ? "upraviť" : "doplniť číslo"}
+              </button>
+            </>
+          ) : (
+            <>
+              <input
+                autoFocus value={upravaCisla} onChange={(e) => setUpravaCisla(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") void ulozCislo(); if (e.key === "Escape") { e.stopPropagation(); setUpravaCisla(null); } }}
+                placeholder="+421 944 096 975"
+                style={{ width: 150, padding: "4px 8px", borderRadius: 6, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 12, fontFamily: "inherit" }}
+              />
+              {upravaCisla.trim() && (
+                <span style={{ fontSize: 11, color: cisloPreBranu(upravaCisla) ? C.textDim : C.orange }}>
+                  {cisloPreBranu(upravaCisla) ? cisloNaUkazku(cisloPreBranu(upravaCisla)!) : "toto nie je číslo"}
+                </span>
+              )}
+              <button onClick={() => void ulozCislo()} disabled={ukladamCislo || !cisloPreBranu(upravaCisla)}
+                style={{ ...tlacidlo, border: `1px solid ${C.border}`, background: "transparent", color: C.accentLight }}>
+                {ukladamCislo ? "…" : jeJine ? "použiť" : "uložiť aj do profilu"}
+              </button>
+              {!jeJine && (
+                <button onClick={() => setUpravaCisla(null)} style={{ background: "none", border: "none", color: C.textDim, fontSize: 12, cursor: "pointer", fontFamily: "inherit" }}>zrušiť</button>
+              )}
+            </>
+          )}
+        </div>
+      )}
       {telefon === null ? (
         <div style={{ fontSize: 11.5, color: C.textDim }}>hľadám číslo…</div>
       ) : !telefon ? (
         <div style={{ fontSize: 11.5, color: C.orange }}>
-          {meno} nemá v Kokpite telefón — doplň ho vo fakturačných údajoch.
+          {jeJine ? "Napíš číslo, na ktoré má správa odísť." : `${komu} nemá v Kokpite telefón — doplň ho vyššie, uloží sa aj do profilu.`}
         </div>
       ) : (
         <div style={{ display: "flex", gap: 18, alignItems: "flex-start", flexWrap: "wrap" }}>
@@ -281,10 +408,10 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
           )}
           <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginTop: 6 }}>
             <button
-              onClick={() => void posli()} disabled={bezi || !text.trim()}
+              onClick={() => void posli()} disabled={bezi || !text.trim() || !cislo || !platnyKomu || upravaCisla !== null}
               style={{ ...tlacidlo, border: `1px solid ${mix(C.accent, 45)}`, background: mix(C.accent, 12), color: C.accentLight, fontWeight: 600 }}
             >
-              {bezi ? "…" : `Poslať na ${telefon}`}
+              {bezi ? "…" : !platnyKomu ? "vyber, komu poslať" : upravaCisla !== null ? "najprv ulož číslo" : cislo ? `Poslať na ${cisloNaUkazku(cislo)}` : "číslo nedáva zmysel — oprav ho vyššie"}
             </button>
             <button
               onClick={() => setOtvorene(false)}

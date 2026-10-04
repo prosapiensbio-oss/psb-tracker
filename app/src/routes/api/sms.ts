@@ -172,10 +172,14 @@ export const Route = createFileRoute("/api/sms")({
           await audit(DB, { action: "sms-zlyhala", predmet: `${klient} · ${cislo}`, old: v.chyba, actor: kto });
           return Response.json({ ok: false, error: `SMS neodišla — ${v.chyba}` }, { status: 502 });
         }
+        // Komu správa naozaj odišla, keď nie klientovi samému (rodič, partner,
+        // ten, kto platí) — inak by sa z histórie nedalo poznať, prečo číslo
+        // nesedí s profilom.
+        const prijemca = kus(b.prijemca, 120);
         await audit(DB, {
           action: "sms-odoslana",
           predmet: `${klient} · ${cislo}`,
-          neu: `${kolko.sprav} ${kolko.sprav === 1 ? "správa" : "správy"}${v.id ? ` · ${v.id}` : ""}`,
+          neu: `${kolko.sprav} ${kolko.sprav === 1 ? "správa" : "správy"}${v.id ? ` · ${v.id}` : ""}${prijemca ? ` · pre: ${prijemca}` : ""}`,
           actor: kto,
         });
         return Response.json({ ok: true, cislo, sprav: kolko.sprav });

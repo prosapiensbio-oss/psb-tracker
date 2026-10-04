@@ -1,4 +1,4 @@
-import { oznam } from "../../lib/psb/obnovaSignal";
+import { oznam, pocuvaj } from "../../lib/psb/obnovaSignal";
 import { nazovProduktu } from "../../lib/psb/nazvyProduktov";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
@@ -257,9 +257,16 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
   const [kontaktMail, setKontaktMail] = useState("");
   /** Telefón z fakturačných údajov — predvyplní sa do SMS. */
   const [kontaktTelefon, setKontaktTelefon] = useState("");
+  /**
+   * Kontakt sa načíta znova aj vtedy, keď ho niekto zmení inde — číslo
+   * opravené v okne SMS (Jerry, 4. 10. 2026: „profil a SMS majú mať to isté
+   * číslo") oznámi „klienti" a profil ho hneď ukáže.
+   */
+  const [kontaktVerzia, setKontaktVerzia] = useState(0);
+  useEffect(() => pocuvaj("klienti", () => setKontaktVerzia((v) => v + 1)), []);
   useEffect(() => {
     let zive = true;
-    void fetch("/api/vydane-faktury", { credentials: "same-origin" })
+    void fetch("/api/vydane-faktury", { credentials: "same-origin", cache: "no-store" })
       .then((r) => r.json())
       .then((j) => {
         if (!zive) return;
@@ -270,7 +277,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
       })
       .catch(() => null);
     return () => { zive = false; };
-  }, [meno]);
+  }, [meno, kontaktVerzia]);
 
   // Číslo z karty klienta je jediná pravda o zostatku (export / ručná kotva
    // / dopočet z názvu). Os času sa od neho odvíja, nie naopak.
