@@ -264,9 +264,8 @@ Stav k 3. 10. 2026 večer (audit, `docs/kontrola-clenstiev.md`):
   karta 2 správne (doplnenie 5 h). Přinosilová: májové členstvo malo 17 h,
   nie 18 — opravené v DB, karta 7 = PTminder. Holubová: hodiny prepadli,
   karta 0 správne. Gerich: karta 6 správne, 15 580 = členstvo + kredit vopred.
-- [ ] **Šnirychová** — PTminder: Janka doplnenie 3 h (2 zostávajú), Josef
-  SPECIAL 3 (2 zostávajú). V Kokpite má Janka navyše ručný „SPECIAL 3"
-  z 22. 9. (3 990 Kč, bez platby) → karta 4. Zrušiť ho? Čaká na Jerryho.
+- [x] **Šnirychová** (5. 10. 2026) — Janke zrušený duplicitný ručný „SPECIAL 3"
+  z 22. 9. (Jerry odklepol); karta aj zoznam 2 h = PTminder (doplnenie 3 h).
 - [ ] **Prenos mínusu zo skončeného členstva** je od 4. 10. vypnutý (poistka
   proti vymysleným deficitom). Jerryho pravidlo z 28. 9. hovorí, že nový
   balíček mínus preberá — 13 klientov má skutočne pretrénované skončené
