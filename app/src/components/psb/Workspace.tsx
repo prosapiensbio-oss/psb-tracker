@@ -14,6 +14,7 @@ import { BEZ_FRONTY, klucPolozky, krokyBety, popisZmeny, postavKarty, rozdelAnam
 import { Dopyty } from "./Dopyty";
 import { REPORTS, UploadCard } from "./Udaje";
 import { BankaUlozene } from "./BankaUlozene";
+import { BankovyImport } from "./Banka";
 import { Zosit } from "./Zosit";
 import { KamOdisliCard, OtazkyMesiaca } from "./Vzas";
 import { RegisterRow } from "./Dashboard";
@@ -62,7 +63,9 @@ import { useUzke } from "./useUzke";
  */
 
 const kc = (n: number) => `${Math.round(n).toLocaleString("sk-SK")} Kč`;
-const den = (s: string) => (s ? `${Number(s.slice(8))}. ${Number(s.slice(5, 7))}.` : "");
+// Deň berie dve číslice za mesiacom — `najblizsi` pri nových názvoch prichádza
+// aj s časom („2026-10-06T09:00") a celý zvyšok dával „NaN. 10.".
+const den = (s: string) => (s ? `${Number(s.slice(8, 10))}. ${Number(s.slice(5, 7))}.` : "");
 /** Pondelok týždňa, do ktorého deň patrí — kľúč týždenného náhľadu. */
 const tyzdenOd = (s: string): string => {
   const d = new Date(`${String(s).slice(0, 10)}T12:00:00Z`);
@@ -130,7 +133,20 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   const [zdroje, setZdroje] = useState<{ zmeny: Zmena[]; nezname: { nazov: string; trener: string; pocet: number; najblizsi: string }[]; platby: { fioId: string; datum: string; suma: number; text: string; kandidati: string[]; rozdelenie?: { klient: string; suma: number }[]; poznamka?: string }[]; konanie: PodlaKlienta[] } | null>(null);
   const [hotove, setHotove] = useState<Set<string>>(new Set());
   const [texty, setTexty] = useState<Record<string, string>>({});
-  const [i, setI] = useState(0);
+  /**
+   * Na ktorej karte človek stál — aj po odchode z Workspace a návrate
+   * (Jerry, 5. 10. 2026: „po návrate mám byť presne tam, kde som skončil").
+   */
+  const [i, setIRaw] = useState(() => {
+    try { return Number(sessionStorage.getItem("psb-workspace-karta") || 0) || 0; } catch { return 0; }
+  });
+  const setI = useCallback((v: number | ((x: number) => number)) => {
+    setIRaw((x) => {
+      const n = typeof v === "function" ? v(x) : v;
+      try { sessionStorage.setItem("psb-workspace-karta", String(n)); } catch { /* bez úložiska len v pamäti */ }
+      return n;
+    });
+  }, []);
   // Otvorený klient prežije prepnutie karty, nie odchod zo záložky — viď
   // `menoZvonku` v KlientStol.
   const [klientNaStole, setKlientNaStole] = useState("");
@@ -1354,14 +1370,21 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
             const nahravanie = (co: string) => actions ? (
               <>
                 <div style={{ fontSize: 11.5, color: C.textMuted, marginBottom: 6 }}>{co}</div>
-                <UploadCard data={data} missing={REPORTS.filter((r) => ((data[r.key] as unknown[]) || []).length === 0)} actions={actions} chat={chat} />
+                <UploadCard bezBanky data={data} missing={REPORTS.filter((r) => ((data[r.key] as unknown[]) || []).length === 0)} actions={actions} chat={chat} />
               </>
             ) : null;
             const upozornenia = (register || []).filter((r) => r.key.includes(mk) && !r.acked && r.category !== "Zápis");
             return {
               ptminder: nahravanie("Pretiahni sem exporty z PTmindera — appka sama pozná, ktorý report je ktorý."),
               metricool: nahravanie(`Pretiahni sem export z Metricoolu za ${mk} (CSV príspevkov alebo mesačný PDF report).`),
-              fio: <BankaUlozene focus={{ month: mk, nonce: 1 }} pohybSplits={pohybSplits} onSplit={nastavPohybSplit} />,
+              // Pohyby z banky patria sem: rozrobený náhľad výpisu aj zapísané
+              // pohyby mesiaca na zaradenie (Jerry, 5. 10. 2026).
+              fio: (
+                <>
+                  <BankovyImport vstup="" onHotovo={() => void actions?.refresh()} />
+                  <BankaUlozene focus={{ month: mk, nonce: 1 }} pohybSplits={pohybSplits} onSplit={nastavPohybSplit} />
+                </>
+              ),
               zosit: <Zosit onZapisane={() => void actions?.refresh()} />,
               otazky: <OtazkyMesiaca mesiac={mk} />,
               hotovostStav: <KamOdisliCard />,
@@ -1522,15 +1545,34 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
             a ľavej strane, kde prepínam, bolo stále na tom istom mieste."
             Šípka, ktorá pri každej karte skočí inam, sa hľadá očami — a to je
             presne tá práca navyše, ktorú mala kopa odstrániť. */}
-        <div style={{ position: "relative", zIndex: 1, margin: uzke ? "0 30px" : "0 46px", height: "100%", ...pohybKarty(prechod) }}>
+        {/* KARTY OSTÁVAJÚ NAČÍTANÉ, NEAKTÍVNE SA LEN SKRYJÚ.
+            Jerry, 5. 10. 2026: „nech na ktorejkoľvek karte robím čokoľvek —
+            mám otvorený profil, píšem, vyberám — a prepnem zámerne alebo
+            omylom doľava či doprava, po návrate mám byť presne tam, kde som
+            skončil, so všetkým, čo som tam robil." Doteraz sa kreslila len
+            aktívna karta a prepnutie zahodilo rozpísaný text, otvorený
+            profil aj rolovanie. `visibility` (nie `display: none`) drží aj
+            pozíciu rolovania. */}
+        {zive.map((kk) => {
+          const aktivna = kk === k;
+          return (
+        <div
+          key={`${kk.druh}|${kk.druh === "krok" ? kk.krok : ""}`}
+          aria-hidden={!aktivna}
+          style={{
+            position: "absolute", top: 0, bottom: 0, left: uzke ? 30 : 46, right: uzke ? 30 : 46,
+            zIndex: aktivna ? 1 : 0, visibility: aktivna ? "visible" : "hidden",
+            ...(aktivna ? pohybKarty(prechod) : {}),
+          }}
+        >
           <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-              <div style={{ fontSize: 18, fontWeight: 800 }}>{k.nadpis}</div>
-              {!BEZ_FRONTY.includes(k.druh) && <div style={{ fontSize: 11.5, color: C.textMuted }}>{zostava(k)} zostáva</div>}
+              <div style={{ fontSize: 18, fontWeight: 800 }}>{kk.nadpis}</div>
+              {!BEZ_FRONTY.includes(kk.druh) && <div style={{ fontSize: 11.5, color: C.textMuted }}>{zostava(kk)} zostáva</div>}
             </div>
             <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 3 }}>
-              {k.podnadpis}
-              {k.druh === "krok" && k.krok === "sms" && pocetSms != null ? ` · ${pocetSms} ${pocetSms === 1 ? "klient" : pocetSms < 5 ? "klienti" : "klientov"}` : ""}
+              {kk.podnadpis}
+              {kk.druh === "krok" && kk.krok === "sms" && pocetSms != null ? ` · ${pocetSms} ${pocetSms === 1 ? "klient" : pocetSms < 5 ? "klienti" : "klientov"}` : ""}
             </div>
 
             <div style={{ marginTop: 14, flexGrow: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
@@ -1538,10 +1580,12 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                   ale LEN na monitore. Na telefóne idú jej stĺpce pod seba,
                   takže rolovať musí karta, inak sa spodok profilu nedá
                   dosiahnuť (Jerry, 30. 9. 2026). */}
-              <div style={{ flexGrow: 1, minHeight: 0, overflowY: k.druh === "klient" && !uzke ? "visible" : "auto", display: k.druh === "klient" ? "flex" : "block", flexDirection: "column" }}>
-              {k.druh === "krok" ? kresliKrok(k) : obsahKarty(k)}
+              <div style={{ flexGrow: 1, minHeight: 0, overflowY: kk.druh === "klient" && !uzke ? "visible" : "auto", display: kk.druh === "klient" ? "flex" : "block", flexDirection: "column" }}>
+              {kk.druh === "krok" ? kresliKrok(kk) : obsahKarty(kk)}
               </div>
             </div>
+            {aktivna && (
+              <>
             <datalist id="ws-klienti">{mena.map((m) => <option key={m} value={m} />)}</datalist>
             {/* PONUKA BALÍČKA PO PRIRADENÍ PLATBY.
                 Peniaze dorazili — appka navrhne, čo si klient zrejme kúpil,
@@ -1583,8 +1627,12 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
             )}
             {chyba && <div style={{ fontSize: 12, color: C.red, marginTop: 10 }}>{chyba}</div>}
             {hlaska && <div style={{ fontSize: 12, color: C.green, marginTop: 10 }}>{hlaska}</div>}
+              </>
+            )}
           </Card>
         </div>
+          );
+        })}
       </div>
 
       {/* Bodky hovoria, koľko kariet je dokopy a kde v nich stojíš — číslo

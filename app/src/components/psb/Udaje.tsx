@@ -188,7 +188,14 @@ function Verzia() {
   );
 }
 
-export function UploadCard({ data, missing, actions, chat }: { data: PSBData; missing: typeof REPORTS; actions: Actions ; chat?: AssistantChat }) {
+export function UploadCard({ data, missing, actions, chat, bezBanky = false }: {
+  data: PSBData; missing: typeof REPORTS; actions: Actions; chat?: AssistantChat;
+  /**
+   * Bez náhľadu pohybov z banky — v uzávierke vo Workspace patria pohyby do
+   * kroku Fio, nie k PTminderu (Jerry, 5. 10. 2026).
+   */
+  bezBanky?: boolean;
+}) {
   const [uploadResult, setUploadResult] = useState<IngestResult[] | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -436,9 +443,11 @@ export function UploadCard({ data, missing, actions, chat }: { data: PSBData; mi
           keď žiadny súbor práve nepribudol, ale v prehliadači zostalo
           rozrobené zaraďovanie. Ak nemá ani vstup ani rozrobené, nevykreslí
           sa sám od seba. */}
-      <div style={{ marginTop: 12 }}>
-        <BankovyImport vstup={bankovyText} onHotovo={() => { setBankovyText(""); void actions.refresh(); }} />
-      </div>
+      {!bezBanky && (
+        <div style={{ marginTop: 12 }}>
+          <BankovyImport vstup={bankovyText} onHotovo={() => { setBankovyText(""); void actions.refresh(); }} />
+        </div>
+      )}
       {fakturaChyba.length > 0 && (
         <div style={{ marginTop: 12, padding: "10px 13px", borderRadius: 9, background: mix(C.orange, 8), border: `1px solid ${mix(C.orange, 28)}`, fontSize: 12.5, color: C.text, lineHeight: 1.55 }}>
           {fakturaChyba.map((ch, i) => (

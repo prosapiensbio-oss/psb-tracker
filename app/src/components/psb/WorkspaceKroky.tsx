@@ -610,48 +610,56 @@ export function KrokPlatnost({ polozky, acks, trener, onVybavene }: {
     onVybavene();
   };
 
+  /**
+   * OBRÁTENÁ LOGIKA (Jerry, 5. 10. 2026): „prirodzene nech je doplnenie
+   * členstva, ale posuvníkom sa dá, že prepadne 1 alebo 2 hodiny." Bez
+   * pohnutia je zelené „Potvrdiť 2 h doplnenie"; posuvník hovorí, koľko
+   * prepadne. Pri předplatnom je vedľa rovnako zelené „Preniesť do ďalšieho
+   * balíčka" — najviac 2 h z toho, čo neprepadne.
+   */
   return (
     <>
       <NadpisSekcie pocet={zive.length}>Platnosť končí, hodiny zostávajú</NadpisSekcie>
       {chyba && <div style={{ fontSize: 12, color: C.red }}>{chyba}</div>}
       {zive.map((x) => {
         const kluc = `platnost|${x.meno}|${x.platnostDo}`;
-        const doplnit = Math.min(x.hodin, hodnoty[kluc] ?? 0);
-        const prepadne = Math.round((x.hodin - doplnit) * 100) / 100;
+        const prepadne = Math.min(x.hodin, hodnoty[kluc] ?? 0);
+        const zostava = Math.round((x.hodin - prepadne) * 100) / 100;
+        const presun = x.predplatne ? Math.min(2, zostava) : 0;
+        const predplatne = x.predplatne || /předplatn|predplatn|s viazanost/i.test(x.membership);
+        const farba = predplatne ? C.blue : C.accent;
         return (
-          <div key={kluc} style={{ ...riadok, alignItems: "flex-start" }}>
-            <div style={{ minWidth: 170 }}>
-              <div style={{ fontSize: 13.5, fontWeight: 600, color: C.text }}>{x.meno}</div>
-              <div style={{ fontSize: 11, color: C.textDim }}>
-                {nazovProduktu(x.membership)} · {x.dni < 0 ? `končí ${fmtDMY(x.platnostDo)}` : `skončila ${fmtDMY(x.platnostDo)}`}
-              </div>
-            </div>
-            <div style={{ flex: "1 1 320px" }}>
-              <div style={{ fontSize: 13, color: C.text, marginBottom: 4 }}>
-                <b style={{ color: prepadne ? C.orange : C.green }}>{prepadne} h prepadne</b>
-                {doplnit ? <span style={{ color: C.textMuted }}> · {doplnit} h ako doplnenie členstva</span> : null}
-              </div>
-              <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-                <span style={{ fontSize: 11.5, color: C.textDim }}>doplnenie</span>
-                <input
-                  type="range" min={0} max={x.hodin} step={1} value={doplnit}
-                  onChange={(e) => setHodnoty((s) => ({ ...s, [kluc]: Number(e.target.value) }))}
-                  style={{ width: 180, accentColor: C.accent }}
-                  aria-label={`Koľko hodín z ${x.hodin} dostane ${x.meno} ako doplnenie`}
-                />
-                <span style={{ fontSize: 13, fontWeight: 700, color: C.text, minWidth: 54 }}>{doplnit} / {x.hodin} h</span>
-                <button disabled={bezi === kluc} style={hlavne(bezi !== kluc)} onClick={() => void odpovedz(x, doplnit, 0)}>
-                  {bezi === kluc ? "…" : doplnit ? `Potvrdiť: ${doplnit} h doplnenie, ${prepadne} h prepadne` : `Potvrdiť: ${x.hodin} h prepadne`}
+          <div key={kluc} style={{ ...riadok, alignItems: "center" }}>
+            <span style={{ fontSize: 13.5, fontWeight: 600, color: C.text, minWidth: 160 }}>{x.meno}</span>
+            <span style={{
+              fontSize: 11.5, fontWeight: 700, padding: "3px 9px", borderRadius: 999, whiteSpace: "nowrap",
+              color: farba, background: mix(farba, 14), border: `1px solid ${mix(farba, 45)}`,
+            }}>{nazovProduktu(x.membership)}</span>
+            <span style={{ fontSize: 12, color: x.dni >= 0 ? C.orange : C.textMuted, minWidth: 104 }}>
+              {x.dni < 0 ? `končí ${fmtDMY(x.platnostDo)}` : `skončila ${fmtDMY(x.platnostDo)}`}
+            </span>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
+              <span style={{ fontSize: 11.5, color: C.textDim }}>prepadne</span>
+              <input
+                type="range" min={0} max={x.hodin} step={1} value={prepadne}
+                onChange={(e) => setHodnoty((s) => ({ ...s, [kluc]: Number(e.target.value) }))}
+                style={{ width: 110, accentColor: C.orange }}
+                aria-label={`Koľko hodín z ${x.hodin} prepadne — ${x.meno}`}
+              />
+              <span style={{ fontSize: 12.5, fontWeight: 700, color: prepadne ? C.orange : C.textDim, minWidth: 36 }}>{prepadne} h</span>
+            </span>
+            <span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap", marginLeft: "auto" }}>
+              <button disabled={bezi === kluc} style={hlavne(bezi !== kluc)} onClick={() => void odpovedz(x, zostava, 0)}>
+                {bezi === kluc ? "…" : zostava ? `Potvrdiť: ${zostava} h doplnenie` : `Potvrdiť: ${x.hodin} h prepadne`}
+              </button>
+              {predplatne && presun > 0 && (
+                <button disabled={bezi === kluc} style={hlavne(bezi !== kluc)}
+                  title="Hodiny sa pridajú k ďalšiemu balíčku — 6h Předplatné bude mať o toľko viac."
+                  onClick={() => void odpovedz(x, 0, presun)}>
+                  Preniesť {presun} h do ďalšieho balíčka
                 </button>
-                {x.predplatne && x.presunHodin > 0 && (
-                  <button disabled={bezi === kluc} style={vedlajsie}
-                    title="Hodiny sa pridajú k ďalšiemu balíčku — 6h Předplatné bude mať 8 h."
-                    onClick={() => void odpovedz(x, 0, x.presunHodin)}>
-                    preniesť {x.presunHodin} h do ďalšieho balíčka{x.hodin > x.presunHodin ? `, ${Math.round((x.hodin - x.presunHodin) * 100) / 100} h prepadne` : ""}
-                  </button>
-                )}
-              </div>
-            </div>
+              )}
+            </span>
           </div>
         );
       })}

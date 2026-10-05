@@ -2479,3 +2479,17 @@ Jerry: „Workspace má byť miesto práce." V bete (`jeBeta()` vo Workspace):
 - **Peniaze podľa trénera** (`rozdelPeniaze` v `postavKarty`): dlžníci a platby
   z banky podľa trénera klienta; platba bez návrhu ostáva Jerrymu. Faktúry
   vo Workspace cez `lenTrenera`. Naostro zostávajú peniaze celé Jerryho.
+
+## Workspace drží prácu na každej karte (pravidlo, 5. 10. 2026)
+
+Jerry: „nech na ktorejkoľvek karte robím čokoľvek — mám otvorený profil,
+píšem, vyberám — a prepnem zámerne alebo omylom doľava či doprava, po návrate
+mám byť presne tam, kde som skončil, so všetkým, čo som tam robil."
+- Všetky karty kopy ostávajú NAČÍTANÉ; neaktívne majú `visibility: hidden`
+  (nie `display: none` a nie odmontovanie) — drží sa stav komponentov aj
+  rolovanie. Nová karta sa preto nesmie spoliehať na „pri otvorení sa
+  načítam znova"; obnovu rieši signál (`oznam`/`pocuvaj`).
+- Index karty je v `sessionStorage` (`psb-workspace-karta`) — návrat do
+  Workspace aj obnovenie stránky pristane na tej istej karte.
+- Platnosť končí: predvolene doplnenie všetkých hodín, posuvník určí, koľko
+  prepadne; předplatné má vedľa zelené „Preniesť N h" (najviac 2).
