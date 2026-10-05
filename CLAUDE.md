@@ -2548,7 +2548,7 @@ dostane `zmizla_at`, takže ju snímka nehlási ako zrušenie.
 
 ## Hromadná správa (5. 10. 2026)
 
-Workspace → 2 · SMS → „Hromadná správa" (`HromadnaSprava.tsx`): filter
+Workspace → 2 · SMS → „Hromadná správa" (úplne dole) (`HromadnaSprava.tsx`): filter
 Aktívni / + pauza / Všetci, „len moji klienti", ručný výber zaškrtnutím
 a hľadanie kohokoľvek; `{meno}` = krstné meno. Odosiela sa po DRUHOM
 potvrdení s počtom SMS, po jednej cez `/api/sms` (dá sa zastaviť). Čísla
