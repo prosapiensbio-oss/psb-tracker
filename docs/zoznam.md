@@ -45,9 +45,9 @@ každom: overiť nad kópiou ostrej DB pred aj po, testy, až potom nasadiť.
 5. [x] **Myšlienková mapa** — hotové 5. 10. 2026: ↑↓ a ⌘↑↓, Osnova, hromadný
        výber s číslicou 1–5, ⌘F naprieč mapami, Enter vkladá hneď za
        a koncept sa ukladá bez čakania (sekcia 2b).
-6. [~] **Web na tablete** — hotové v téme 5. 10. 2026, ČAKÁ NA NAHRATIE do
-       WordPressu (style.css + js/app.js, viď sekcia 6). Zelené zvýraznenia
-       už boli v poriadku.
+6. [x] **Web na tablete** — naostro 5. 10. 2026 (style.css + js/app.js cez
+       Editor šablón, Jerry povolil; WP Fastest Cache vymazaná, overené na
+       webe). Zelené zvýraznenia už boli v poriadku.
 7. [ ] **Kartotéka fotiek** (treba úložisko R2) a profil trénera na webe.
 
 Rozhodnutia, ktoré na to čakajú, sú v sekcii 1 a 2c (prenos mínusu,
@@ -391,8 +391,10 @@ odvtedy aj zaplnenie obrazovky a zeleň; `--tablet`, alebo rozmery `820x1180`):
   `growScale` — riedka obrazovka na tablete sa celá zväčší (najviac 1,35×).
 - viditeľný text overený zhodný so starou verziou; menia sa len `style.css`
   a `js/app.js`. Náhľad: https://psb-tema.prosapiensbio.workers.dev
-- **Nenahraté:** zápis do Editora šablón mi automatický režim zamietol
-  („Production Deploy“) — nahráva Jerry, alebo povolí.
+- **Nahraté 5. 10. 2026** cez Editor šablón (Jerry výslovne povolil; bez
+  toho automatický režim zápis zamieta ako „Production Deploy“). Overené:
+  návštevník dostáva nové `?ver=`, na 820×1180 sa Cena a Otázky na Úvodnom
+  tréningu zväčšia 1,345×, nič nepreteká, konzola bez chýb.
 
 Z posledného kola kontroly (17.–18. 9.) zostalo (stav pred 5. 10.):
 
