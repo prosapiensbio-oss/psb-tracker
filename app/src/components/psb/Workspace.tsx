@@ -23,7 +23,6 @@ import type { AssistantChat } from "./Assistant";
 import type { RegisterItem } from "../../lib/psb/compute";
 import type { PohybSplits, SplitCiast } from "../../lib/psb/pohybSplit";
 import { ritualy } from "../../lib/psb/rituals";
-import { jeBeta } from "../../lib/psb/beta";
 import { KrokDopyty, KrokKontroly, KrokUzavierka, type KrokUzavierkyKarta } from "./WorkspaceKroky";
 import { VytazenostTyzdna } from "./WorkspaceKroky";
 import { AutomatickeBalicky, FioPrijmy, TyzdenKalendara, type Zvyraznenie, KrokPlatnost, KrokSms, NadpisSekcie, OtazkyPlatieb, VsetkoVybavene } from "./WorkspaceKroky";
@@ -96,7 +95,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   /** Prechod na inú obrazovku appky (uzávierka, kontroly, dopyty). */
   onNavigate?: (tab: string, sub?: string, focus?: never) => void;
   /**
-   * Pre kroky uzávierky priamo vo Workspace (beta, 5. 10. 2026): nahrávanie
+   * Pre kroky uzávierky priamo vo Workspace (od 5. 10. 2026): nahrávanie
    * (`actions.ingest`), upozornenia mesiaca (`register`) a rozdelenie pohybov
    * v banke (`pohybSplits`). Tie isté hodnoty, aké dostávajú Údaje a Dnes.
    */
@@ -117,11 +116,10 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
    * bolo vidieť, ktoré správanie k tomu patrí.
    */
   const poKrokoch = true;
-  /**
-   * BETA (5. 10. 2026): peniaze a faktúry podľa trénera klienta, karty
-   * Dopyty, Uzávierka mesiaca a Mesačné kontroly. Naostro zatiaľ nie.
+  /*
+   * Naostro od 5. 10. 2026 (predtým beta): peniaze a faktúry podľa trénera
+   * klienta, karty Dopyty, Uzávierka mesiaca a Mesačné kontroly.
    */
-  const beta = jeBeta();
   /** Ktorý riadok kroku Kalendár má pod sebou rozbalený týždeň (kľúč položky). */
   const [denOtvoreny, setDenOtvoreny] = useState("");
   /**
@@ -303,7 +301,8 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
       platnost,
       anamnezy,
       ktoSom,
-      rozdelPeniaze: beta,
+      // Každý rieši peniaze svojich klientov (naostro od 5. 10. 2026).
+      rozdelPeniaze: true,
       trenerKlienta: (m: string) => clients[m]?.primaryTrainer || "",
       trener: ktoreVeci === "auto" ? undefined : ktoreVeci === "vsetko" ? null : ktoreVeci,
       navrhMena: (nazov) => {
@@ -317,7 +316,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   // v nej naozaj odklikalo; inak by zmizla pod rukami uprostred práce.
   const trenerKroku: string | null = ktoreVeci === "vsetko" ? null
     : ktoreVeci === "auto" ? trenerZPrihlasenia(ktoSom) : ktoreVeci;
-  const kartyKopy = useMemo(() => (poKrokoch ? krokyBety(karty, { mesacne: beta, ja: trenerKroku }) : karty), [poKrokoch, beta, karty, trenerKroku]);
+  const kartyKopy = useMemo(() => (poKrokoch ? krokyBety(karty, { mesacne: true, ja: trenerKroku }) : karty), [poKrokoch, karty, trenerKroku]);
   const zive = useMemo(
     // Karta klienta nie je fronta — nemá položky a nikdy nezmizne. Ostatné
     // zmiznú, keď sa v nich všetko odklikalo.
@@ -679,7 +678,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                 <VydaneFaktury
                   mena={mena}
                   treneri={treneriKlientov}
-                  lenTrenera={beta ? trenerKroku : undefined}
+                  lenTrenera={trenerKroku}
                   predvolba={predvolbaFaktury}
                   onPredvolbaSpracovana={() => setPredvolbaFaktury(null)}
                 />

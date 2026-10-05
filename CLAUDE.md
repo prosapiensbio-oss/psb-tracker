@@ -2455,9 +2455,11 @@ vybavené". SMS sa posielajú LEN z kroku 2 (z Dnes a Kalendára preč).
 - Platba mení hodiny → App po `oznam("peniaze")` načíta `/api/data` znova.
 - Beta nemá `FIO_TOKEN` — „Stiahnuť príjmy z Fio" tam hlási chýbajúci token.
 
-## Workspace — mesačné karty a peniaze podľa trénera (beta, 5. 10. 2026)
+## Workspace — mesačné karty a peniaze podľa trénera (naostro od 5. 10. 2026)
 
-Jerry: „Workspace má byť miesto práce." V bete (`jeBeta()` vo Workspace):
+Jerry: „Workspace má byť miesto práce." Najprv v bete, naostro od 5. 10. 2026
+(„postav v Kokpite aj Dopyty, Uzávierku a Kontroly" — s nimi aj peniaze podľa
+trénera, lebo Jerry videl u seba Terezkinu dlžníčku Šašinkovú):
 - **Dopyty** (`KrokDopyty`) — Terezkina karta: čaká na odpoveď (od 12. 8.,
   bez klientov a bez termínu — tie isté pravidlá ako `Dopyty.tsx`), dopyty
   bez výsledku, úvodní bez zdroja (jej krok uzávierky), celý zoznam zabalený.
@@ -2491,7 +2493,7 @@ Jerry: „Workspace má byť miesto práce." V bete (`jeBeta()` vo Workspace):
   (`CoBoloIne`) — výplaty neutrálne modré, nižšia výplata nie je úspora.
 - **Peniaze podľa trénera** (`rozdelPeniaze` v `postavKarty`): dlžníci a platby
   z banky podľa trénera klienta; platba bez návrhu ostáva Jerrymu. Faktúry
-  vo Workspace cez `lenTrenera`. Naostro zostávajú peniaze celé Jerryho.
+  vo Workspace cez `lenTrenera`.
 
 ## Workspace drží prácu na každej karte (pravidlo, 5. 10. 2026)
 
