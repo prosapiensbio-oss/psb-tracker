@@ -48,11 +48,13 @@ každom: overiť nad kópiou ostrej DB pred aj po, testy, až potom nasadiť.
 6. [x] **Web na tablete** — naostro 5. 10. 2026 (style.css + js/app.js cez
        Editor šablón, Jerry povolil; WP Fastest Cache vymazaná, overené na
        webe). Zelené zvýraznenia už boli v poriadku.
-7. [~] **Kartotéka fotiek** — naostro 5. 10. 2026 (panel anamnézy → Fotky
+7. [x] **Kartotéka fotiek** — naostro 5. 10. 2026 (panel anamnézy → Fotky
        držania tela). R2 zapnuté (Jerry odsúhlasil, 0 $), bucket
        `kokpit-fotky`, väzba STORAGE. Overené na vymyslenom klientovi:
        nahratie, šifra v R2 aj D1, poznámka, pohľad, zmazanie, audit.
-       Zostáva: **profil trénera na webe**.
+       „Profil trénera na webe" bola zastaraná položka — vyriešené už 3. 10.
+       (stránky /jerry/ a /terezia/ existujú, odkaz z /u/ vedie na profil
+       toho, kto úvodný vedie; `ODKAZY.profilTrenera` v uvodnaStranka.ts).
 
 Rozhodnutia, ktoré na to čakajú, sú v sekcii 1 a 2c (prenos mínusu,
 online z offline balíčka, Čechová/Gažo/Kalva-Martinek-Vaško).
@@ -158,8 +160,8 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
   kto dochodil a nič si nedohodol, v nej nie je. Ráta sa len od posledného
   známeho balíčka (PTminder ich vyváža až od marca 2026) a len 90 dní
   dozadu.
-- [ ] **Profil trenéra na webe** — stránka Jerryho ani Terezky neexistuje,
-  odkaz zatiaľ vedie na `/o-nas/`.
+- [x] **Profil trenéra na webe** — vyriešené 3. 10. 2026: stránky /jerry/
+  a /terezia/ existujú (predtým som ich hľadal pod zlou adresou).
   (Skúšobné hodnotenia v `klient_merania` už zmazané sú — tabuľka je prázdna.)
 - [ ] **Pocitovka beží od 30. 9. 2026** — o mesiac sa pozrieť, koľkí klienti
   odpovedali. Keď to bude pár ľudí, nie je to dôkaz, že sa nezlepšujú, ale
