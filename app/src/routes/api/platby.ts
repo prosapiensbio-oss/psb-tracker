@@ -5,8 +5,13 @@ import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { normName } from "../../lib/psb/format";
 import { bindings } from "../../lib/bindings.server";
-import { nepriradene, porovnajPlatby, smieSaZapamatat, vzorPlatby, type FioRiadok, type Platba } from "../../lib/psb/platbyEvidencia";
+import {
+  nepriradene, porovnajPlatby, smieSaZapamatat, vzorPlatby,
+  type CenaBalicka, type Diel, type FakturaVzor, type FioRiadok, type Platba,
+} from "../../lib/psb/platbyEvidencia";
 import { balicekZPlatby } from "../../lib/psb/balicekZPlatby";
+import { nezaplateneZKokpitu } from "../../lib/psb/dlhKlienta";
+import { poplatkyPoOdrataniPlatieb } from "../../lib/psb/platbyEvidencia";
 
 /**
  * Vlastná evidencia platieb: banka z výpisu, hotovosť zo zošita.
@@ -41,6 +46,114 @@ const naPlatbu = (r: PlatbaRiadok): Platba => ({
   sposob: r.sposob, fioId: r.fio_id, zruseneAt: r.zrusene_at,
 });
 
+type FakturaRiadok = { id: string; cislo: string; klient: string; ks: number; cena_czk: number };
+type PolozkaRiadok = { faktura_id: string; klient: string; celkom_czk: number };
+
+/**
+ * Faktúry z Kokpitu na párovanie podľa variabilného symbolu. Faktúra
+ * s položkami za ďalších klientov dostane `diely` — komu koľko z nej patrí.
+ * Viac položiek toho istého klienta sa sčíta do jedného dielu.
+ */
+function fakturyKokpitu(faktury: FakturaRiadok[], polozky: PolozkaRiadok[]): FakturaVzor[] {
+  const dalsie = new Map<string, PolozkaRiadok[]>();
+  for (const p of polozky) dalsie.set(p.faktura_id, [...(dalsie.get(p.faktura_id) || []), p]);
+  return faktury.filter((f) => f.cislo).map((f) => {
+    const jeho = dalsie.get(f.id) || [];
+    if (!jeho.length) return { cislo: f.cislo, klient: f.klient };
+    const diely = new Map<string, number>();
+    const pridaj = (k: string, n: number) => {
+      const kl = normName(k);
+      const kto = [...diely.keys()].find((x) => normName(x) === kl) || k;
+      diely.set(kto, (diely.get(kto) || 0) + Math.round(n));
+    };
+    pridaj(f.klient, (Number(f.ks) || 1) * (Number(f.cena_czk) || 0));
+    for (const p of jeho) pridaj(p.klient, Number(p.celkom_czk) || 0);
+    return {
+      cislo: f.cislo, klient: f.klient,
+      ...(diely.size > 1 ? { diely: [...diely].map(([klient, suma]) => ({ klient, suma })) } : {}),
+    };
+  });
+}
+
+/**
+ * JE TÁTO PLATBA VOPRED?
+ *
+ * Jerry, 4. 10. 2026: „ak klient zaplatí skôr, ako bude mať tréning, platba
+ * sa zapíše, ale nový balíček má vzniknúť prvou odtrénovanou hodinou."
+ * Balíček teda v tej chvíli ešte nie je a platba by sa pri počítaní dlhu
+ * stratila (počítajú sa platby od prvého balíčka z Kokpitu). Príznak ju
+ * udrží: platba je vopred, keď klient v čase priradenia NIČ NEDLŽÍ — ani
+ * otvorený poplatok z PTmindera, ani nezaplatený balíček z Kokpitu.
+ * Vtedy nepatrí ničomu, čo už existuje, a čaká na balíček, ktorý príde.
+ */
+async function jeVopred(DB: D1Database, klient: string): Promise<boolean> {
+  const k = normName(klient);
+  const [bal, pl, pop] = await DB.batch([
+    DB.prepare("SELECT klient, nazov, cena_czk, platnost_od, zdroj, zrusene_at FROM balicky"),
+    DB.prepare("SELECT id, klient, datum, suma_czk, sposob, fio_id, zrusene_at, vopred FROM platby"),
+    DB.prepare("SELECT id, datum, client_name, popis, suma_czk FROM poplatky"),
+  ]);
+  type B = { klient: string; nazov: string; cena_czk: number | null; platnost_od: string; zdroj: string; zrusene_at: string | null };
+  type P = { id: string; klient: string; datum: string; suma_czk: number; sposob: string; fio_id: string | null; zrusene_at: string | null; vopred: number | null };
+  type O = { id: string; datum: string; client_name: string; popis: string; suma_czk: number };
+  const moje = <T,>(xs: T[], meno: (x: T) => string) => xs.filter((x) => normName(meno(x)) === k);
+  const balicky = moje((bal.results || []) as unknown as B[], (x) => x.klient);
+  const platby = moje((pl.results || []) as unknown as P[], (x) => x.klient);
+  const poplatky = moje((pop.results || []) as unknown as O[], (x) => x.client_name);
+  const otvorene = poplatkyPoOdrataniPlatieb(
+    poplatky.map((p) => ({ klient: p.client_name, datum: p.datum, suma: Number(p.suma_czk) || 0 })),
+    platby.map((p) => ({ id: p.id, klient: p.klient, datum: p.datum, sumaCzk: p.suma_czk, sposob: p.sposob, fioId: p.fio_id, zruseneAt: p.zrusene_at })),
+  ).otvorene;
+  if (otvorene.length) return false;
+  return nezaplateneZKokpitu(
+    balicky.map((b) => ({ cena: b.cena_czk, platnostOd: String(b.platnost_od).slice(0, 10), zdroj: b.zdroj, zruseneAt: b.zrusene_at, nazov: b.nazov })),
+    platby.map((p) => ({ suma: Number(p.suma_czk) || 0, datum: String(p.datum).slice(0, 10), zruseneAt: p.zrusene_at, vopred: p.vopred })),
+  ).length === 0;
+}
+
+/**
+ * Zapíše diely jedného pohybu — každý ako samostatnú platbu s tým istým
+ * `fio_id`. Spoločné pre ručné rozdelenie aj dávku. Diely sa musia zložiť
+ * na sumu pohybu (tolerancia koruna); inak sa nezapíše nič.
+ */
+async function zapisDiely(
+  DB: D1Database, r: FioRiadok, kusy: Diel[], kto: string | undefined,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  if (kusy.length < 2) return { ok: false, error: "Na rozdelenie treba aspoň dvoch klientov." };
+  if (kusy.some((d) => !d.klient || d.suma <= 0)) return { ok: false, error: "Každý diel potrebuje klienta a kladnú sumu." };
+  const spolu = kusy.reduce((n, d) => n + d.suma, 0);
+  if (Math.abs(spolu - Math.round(r.amount_czk)) > 1) {
+    return { ok: false, error: `Diely dávajú ${spolu} Kč, pohyb je ${Math.round(r.amount_czk)} Kč.` };
+  }
+  // Bez try/catch vracia worker HTML stránku „This page didn't load"
+  // a na obrazovke to vyzerá, že sa neudialo nič. Presne tak vyzerala
+  // zrazená unikátna stráž nad `fio_id` (migrácia 0082).
+  const vopred = await Promise.all(kusy.map((d) => jeVopred(DB, d.klient)));
+  try {
+    await DB.batch(kusy.map((d, i) =>
+      DB.prepare(
+        "INSERT INTO platby (id, klient, datum, suma_czk, sposob, fio_id, poznamka, created_at, autor, vopred) VALUES (?,?,?,?,'banka',?,?,?,?,?)",
+      ).bind(uid(), d.klient, r.date.slice(0, 10), d.suma, r.id,
+        `rozdelené · ${(r.counterparty || "").slice(0, 160)}`, teraz(), kto || null, vopred[i] ? 1 : 0),
+    ));
+  } catch (e) {
+    const t = String(e instanceof Error ? e.message : e);
+    return {
+      ok: false,
+      error: /UNIQUE/i.test(t)
+        ? "Tento pohyb už má priradenú platbu pre toho istého klienta."
+        : `Diely sa nezapísali: ${t.slice(0, 160)}`,
+    };
+  }
+  await audit(DB, {
+    action: "platba-rozdelena",
+    predmet: `${r.date.slice(0, 10)} · ${Math.round(r.amount_czk)} Kč`,
+    neu: kusy.map((d) => `${d.klient}: ${d.suma}`).join(" · "),
+    actor: kto,
+  });
+  return { ok: true };
+}
+
 /** Ručné spôsoby platby. Fio si svoje riadky značí samo cez fio_id. */
 const SPOSOBY = ["hotovost", "prevod", "bitcoin", "ine"];
 
@@ -63,13 +176,13 @@ export const Route = createFileRoute("/api/platby")({
         // Tabuľka má stovky riadkov, takže sa vráti celá a triedi sa hore.
         if (new URL(request.url).searchParams.has("klient")) {
           const r = await DB.prepare(
-            "SELECT id, klient, datum, suma_czk, sposob, fio_id, poznamka, zrusene_at FROM platby ORDER BY datum DESC",
+            "SELECT id, klient, datum, suma_czk, sposob, fio_id, poznamka, zrusene_at, vopred, created_at FROM platby ORDER BY datum DESC",
           ).all();
           return Response.json({ ok: true, platby: r.results || [] });
         }
 
-        const [vlastne, fio, mapa, nieKlient, mena, pt, horizont, faktury, firmy, idoklad, kontakty] = await DB.batch([
-          DB.prepare("SELECT id, klient, datum, suma_czk, sposob, fio_id, poznamka, zrusene_at FROM platby ORDER BY datum DESC"),
+        const [vlastne, fio, mapa, nieKlient, mena, pt, horizont, faktury, firmy, idoklad, kontakty, polozky, ceny] = await DB.batch([
+          DB.prepare("SELECT id, klient, datum, suma_czk, sposob, fio_id, poznamka, zrusene_at, vopred, created_at FROM platby ORDER BY datum DESC"),
           DB.prepare("SELECT id, date, amount_czk, counterparty, note, typ FROM fio_transactions WHERE amount_czk > 0 ORDER BY date DESC"),
           DB.prepare("SELECT vzor, klient FROM platba_mapovanie"),
           DB.prepare("SELECT fio_id FROM platba_nie_klient"),
@@ -79,7 +192,7 @@ export const Route = createFileRoute("/api/platby")({
           // Faktúry a firmy klientov — dva najtvrdšie dôkazy v texte platby.
           // Číslo faktúry chodí ako variabilný symbol; firma je fakturačný
           // údaj KLIENTA, nie cudzia strana (Jerry, 26. 9. 2026).
-          DB.prepare("SELECT cislo, klient FROM vydane_faktury WHERE storno_at IS NULL"),
+          DB.prepare("SELECT id, cislo, klient, ks, cena_czk FROM vydane_faktury WHERE storno_at IS NULL"),
           DB.prepare("SELECT klient, firma, ico FROM klient_fakturacia WHERE firma <> '' OR ico <> ''"),
           // Faktúry vystavené v iDoklade. Číslo dokladu stojí v texte prevodu
           // („20260037 MGR. FILIP STRANAVSKY") a je to variabilný symbol —
@@ -87,6 +200,13 @@ export const Route = createFileRoute("/api/platby")({
           // firma, takže sa prekladá cez spárované fakturačné kontakty.
           DB.prepare("SELECT cislo, nazov FROM idoklad_faktury"),
           DB.prepare("SELECT firma, klient FROM fakturacne_kontakty WHERE klient IS NOT NULL AND klient <> ''"),
+          // Faktúra za viacerých klientov — podľa položiek sa platba rozdelí.
+          DB.prepare("SELECT faktura_id, klient, celkom_czk FROM vydane_faktury_polozky ORDER BY poradie"),
+          // Ceny balíčkov — spoločný prevod, keď PTminder už nepíše.
+          // + história členstiev z PTmindera: balíčky v Kokpite začínajú
+          // až jeseňou 2026, staršie ceny sú len tam.
+          DB.prepare(`SELECT klient, platnost_od od, cena_czk cena FROM balicky WHERE zrusene_at IS NULL AND cena_czk > 0
+                      UNION ALL SELECT klient, od, platba cena FROM ptminder_historia WHERE platba > 0`),
         ]);
 
         const platby = ((vlastne.results || []) as unknown as PlatbaRiadok[]);
@@ -136,11 +256,12 @@ export const Route = createFileRoute("/api/platby")({
           new Set(((nieKlient.results || []) as unknown as { fio_id: string }[]).map((x) => x.fio_id)),
           menaKlientov,
           ptPlatby,
-          [
-            ...((faktury.results || []) as unknown as { cislo: string; klient: string }[]).filter((f) => f.cislo),
-            ...zIdokladu,
-          ],
+          [...fakturyKokpitu(
+            (faktury.results || []) as unknown as FakturaRiadok[],
+            (polozky.results || []) as unknown as PolozkaRiadok[],
+          ), ...zIdokladu],
           ((firmy.results || []) as unknown as { klient: string; firma: string; ico: string }[]),
+          (ceny.results || []) as unknown as CenaBalicka[],
         );
         const celkomNepriradenych = vsetkyNepriradene.length;
 
@@ -180,8 +301,8 @@ export const Route = createFileRoute("/api/platby")({
           if (!r) return Response.json({ ok: false, error: "Riadok výpisu neexistuje." }, { status: 404 });
           const prikazy = [
             DB.prepare(
-              "INSERT OR IGNORE INTO platby (id, klient, datum, suma_czk, sposob, fio_id, poznamka, created_at, autor) VALUES (?,?,?,?,'banka',?,?,?,?)",
-            ).bind(uid(), klient, r.date.slice(0, 10), r.amount_czk, fioId, (r.counterparty || "").slice(0, 200), teraz(), kto || null),
+              "INSERT OR IGNORE INTO platby (id, klient, datum, suma_czk, sposob, fio_id, poznamka, created_at, autor, vopred) VALUES (?,?,?,?,'banka',?,?,?,?,?)",
+            ).bind(uid(), klient, r.date.slice(0, 10), r.amount_czk, fioId, (r.counterparty || "").slice(0, 200), teraz(), kto || null, (await jeVopred(DB, klient)) ? 1 : 0),
           ];
           // Pravidlo sa učí LEN vtedy, keď je klient priamo v odosielateľovi.
           // Inak by sa naučilo zo sprostredkovaného prevodu a každý ďalší
@@ -230,7 +351,7 @@ export const Route = createFileRoute("/api/platby")({
          * dvadsiatich.
          */
         if (akcia === "priradz-davka") {
-          const polozky = (Array.isArray(b.polozky) ? b.polozky : []) as { fioId?: unknown; klient?: unknown }[];
+          const polozky = (Array.isArray(b.polozky) ? b.polozky : []) as { fioId?: unknown; klient?: unknown; diely?: unknown }[];
           if (!polozky.length) return Response.json({ ok: false, error: "Nič na priradenie." }, { status: 400 });
           if (polozky.length > 100) return Response.json({ ok: false, error: "Naraz najviac sto platieb." }, { status: 400 });
 
@@ -240,6 +361,21 @@ export const Route = createFileRoute("/api/platby")({
           for (const p of polozky) {
             const fioId = String(p.fioId || "");
             const klient = String(p.klient || "").trim();
+            /**
+             * SPOLOČNÝ PREVOD V DÁVKE. Diely sa zapíšu každému zvlášť a
+             * pravidlo sa neučí — vzor by ukazoval na dvoch ľudí naraz.
+             */
+            if (fioId && Array.isArray(p.diely) && p.diely.length >= 2) {
+              const r = await DB.prepare("SELECT id, date, amount_czk, counterparty, note, typ FROM fio_transactions WHERE id = ?")
+                .bind(fioId).first<FioRiadok>();
+              if (!r) { chyby.push(`${fioId.slice(0, 8)}: riadok výpisu neexistuje`); continue; }
+              const kusy = (p.diely as { klient?: unknown; suma?: unknown }[])
+                .map((d) => ({ klient: String(d.klient || "").trim(), suma: Math.round(Number(d.suma) || 0) }));
+              const v = await zapisDiely(DB, r, kusy, kto);
+              if (!v.ok) { chyby.push(`${r.date.slice(0, 10)} ${Math.round(r.amount_czk)} Kč: ${v.error}`); continue; }
+              hotovo++;
+              continue;
+            }
             if (!fioId || !klient) { chyby.push("chýba platba alebo klient"); continue; }
             const r = await DB.prepare("SELECT id, date, amount_czk, counterparty, note, typ FROM fio_transactions WHERE id = ?")
               .bind(fioId).first<FioRiadok>();
@@ -248,8 +384,8 @@ export const Route = createFileRoute("/api/platby")({
             const naucil = smieSaZapamatat(vzor, klient);
             const prikazy = [
               DB.prepare(
-                "INSERT OR IGNORE INTO platby (id, klient, datum, suma_czk, sposob, fio_id, poznamka, created_at, autor) VALUES (?,?,?,?,'banka',?,?,?,?)",
-              ).bind(uid(), klient, r.date.slice(0, 10), r.amount_czk, fioId, (r.counterparty || "").slice(0, 200), teraz(), kto || null),
+                "INSERT OR IGNORE INTO platby (id, klient, datum, suma_czk, sposob, fio_id, poznamka, created_at, autor, vopred) VALUES (?,?,?,?,'banka',?,?,?,?,?)",
+              ).bind(uid(), klient, r.date.slice(0, 10), r.amount_czk, fioId, (r.counterparty || "").slice(0, 200), teraz(), kto || null, (await jeVopred(DB, klient)) ? 1 : 0),
             ];
             if (naucil) {
               prikazy.push(DB.prepare("INSERT OR REPLACE INTO platba_mapovanie (vzor, klient, potvrdene_at) VALUES (?,?,?)")
@@ -291,43 +427,9 @@ export const Route = createFileRoute("/api/platby")({
           const r = await DB.prepare("SELECT id, date, amount_czk, counterparty, note, typ FROM fio_transactions WHERE id = ?")
             .bind(fioId).first<FioRiadok>();
           if (!r) return Response.json({ ok: false, error: "Riadok výpisu neexistuje." }, { status: 404 });
-
           const kusy = diely.map((d) => ({ klient: String(d.klient || "").trim(), suma: Math.round(Number(d.suma) || 0) }));
-          if (kusy.some((d) => !d.klient || d.suma <= 0)) {
-            return Response.json({ ok: false, error: "Každý diel potrebuje klienta a kladnú sumu." }, { status: 400 });
-          }
-          const spolu = kusy.reduce((n, d) => n + d.suma, 0);
-          if (Math.abs(spolu - Math.round(r.amount_czk)) > 1) {
-            return Response.json(
-              { ok: false, error: `Diely dávajú ${spolu} Kč, pohyb je ${Math.round(r.amount_czk)} Kč.` },
-              { status: 400 },
-            );
-          }
-          // Bez try/catch vracia worker HTML stránku „This page didn't load"
-          // a na obrazovke to vyzerá, že sa neudialo nič. Presne tak vyzerala
-          // zrazená unikátna stráž nad `fio_id` (migrácia 0082).
-          try {
-            await DB.batch(kusy.map((d) =>
-              DB.prepare(
-                "INSERT INTO platby (id, klient, datum, suma_czk, sposob, fio_id, poznamka, created_at, autor) VALUES (?,?,?,?,'banka',?,?,?,?)",
-              ).bind(uid(), d.klient, r.date.slice(0, 10), d.suma, fioId,
-                `rozdelené · ${(r.counterparty || "").slice(0, 160)}`, teraz(), kto || null),
-            ));
-          } catch (e) {
-            const t = String(e instanceof Error ? e.message : e);
-            return Response.json({
-              ok: false,
-              error: /UNIQUE/i.test(t)
-                ? "Tento pohyb už má priradenú platbu pre toho istého klienta."
-                : `Diely sa nezapísali: ${t.slice(0, 160)}`,
-            }, { status: 500 });
-          }
-          await audit(DB, {
-            action: "platba-rozdelena",
-            predmet: `${r.date.slice(0, 10)} · ${Math.round(r.amount_czk)} Kč`,
-            neu: kusy.map((d) => `${d.klient}: ${d.suma}`).join(" · "),
-            actor: kto,
-          });
+          const v = await zapisDiely(DB, r, kusy, kto);
+          if (!v.ok) return Response.json(v, { status: /dávajú|potrebuje|aspoň/.test(v.error) ? 400 : 500 });
           return Response.json({ ok: true, dielov: kusy.length });
         }
 
@@ -353,8 +455,8 @@ export const Route = createFileRoute("/api/platby")({
           if (suma <= 0) return Response.json({ ok: false, error: "Suma musí byť kladná." }, { status: 400 });
           const sposob = SPOSOBY.includes(String(b.sposob)) ? String(b.sposob) : "hotovost";
           await DB.prepare(
-            "INSERT INTO platby (id, klient, datum, suma_czk, sposob, fio_id, poznamka, created_at, autor) VALUES (?,?,?,?,?,NULL,?,?,?)",
-          ).bind(uid(), klient, datum, suma, sposob, String(b.poznamka || "").slice(0, 300) || null, teraz(), kto || null).run();
+            "INSERT INTO platby (id, klient, datum, suma_czk, sposob, fio_id, poznamka, created_at, autor, vopred) VALUES (?,?,?,?,?,NULL,?,?,?,?)",
+          ).bind(uid(), klient, datum, suma, sposob, String(b.poznamka || "").slice(0, 300) || null, teraz(), kto || null, (await jeVopred(DB, klient)) ? 1 : 0).run();
           await audit(DB, { action: "platba-hotovost", predmet: klient, neu: `${suma} Kč · ${datum}`, actor: kto });
           return Response.json({ ok: true });
         }

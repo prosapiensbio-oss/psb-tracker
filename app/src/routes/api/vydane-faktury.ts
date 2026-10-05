@@ -4,7 +4,7 @@ import type { D1Database } from "@cloudflare/workers-types";
 import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
-import { dalsieCislo, splatnostZ, SPLATNOST_DNI, type Faktura } from "../../lib/psb/vydanaFaktura";
+import { dalsieCislo, splatnostZ, SPLATNOST_DNI, type Faktura, type PolozkaFaktury } from "../../lib/psb/vydanaFaktura";
 import { fakturaDoPdf } from "../../lib/psb/fakturaPdf.server";
 import { mailFaktury, mailFakturyHtml, menoPrilohy } from "../../lib/psb/mailFaktury";
 import { adresyMailu } from "../../lib/psb/mime";
@@ -75,7 +75,29 @@ async function nastaveniaMailu(DB: D1Database): Promise<{ host: string; user: st
 }
 
 /** Riadok z databázy na doklad. Jedno miesto, nech sa PDF a obrazovka nerozídu. */
-const naFakturu = (r: Record<string, string | number | null>): Faktura => ({
+/**
+ * Ďalšie položky faktúr (za iných klientov) podľa id faktúry.
+ * Chýbajúca tabuľka (migrácia ešte nebežala) = žiadne položky, nie pád.
+ */
+async function dalsiePolozky(DB: D1Database, idFaktury?: string): Promise<Map<string, PolozkaFaktury[]>> {
+  const rs = await (idFaktury
+    ? DB.prepare("SELECT faktura_id, klient, balicek_id, popis, ks, cena_czk, celkom_czk FROM vydane_faktury_polozky WHERE faktura_id = ?1 ORDER BY poradie").bind(idFaktury)
+    : DB.prepare("SELECT faktura_id, klient, balicek_id, popis, ks, cena_czk, celkom_czk FROM vydane_faktury_polozky ORDER BY poradie")
+  ).all().catch(() => ({ results: [] }));
+  const out = new Map<string, PolozkaFaktury[]>();
+  for (const r of (rs.results || []) as Record<string, string | number | null>[]) {
+    const id = String(r.faktura_id);
+    out.set(id, [...(out.get(id) || []), {
+      klient: String(r.klient), popis: String(r.popis), ks: Number(r.ks) || 1,
+      cena: Number(r.cena_czk) || 0, celkom: Number(r.celkom_czk) || 0,
+      balicekId: r.balicek_id ? String(r.balicek_id) : null,
+    }]);
+  }
+  return out;
+}
+
+const naFakturu = (r: Record<string, string | number | null>, dalsie: PolozkaFaktury[] = []): Faktura => ({
+  ...(dalsie.length ? { dalsie } : {}),
   cislo: String(r.cislo), klient: String(r.klient),
   vystavene: String(r.vystavene), splatnost: String(r.splatnost),
   popis: String(r.popis), ks: Number(r.ks) || 1,
@@ -173,7 +195,12 @@ export const Route = createFileRoute("/api/vydane-faktury")({
           ).all().catch(() => ({ results: [] }));
           // Bez keše: faktúra sa číta hneď po vystavení a stará odpoveď by
           // ukázala doklad bez čísla.
-          return Response.json({ ok: true, faktury: f.results || [], udaje, kontakty: k.results || [] },
+          const polozky = await dalsiePolozky(DB);
+          const faktury = ((f.results || []) as Record<string, unknown>[]).map((r) => {
+            const d = polozky.get(String(r.id));
+            return d ? { ...r, dalsie: d } : r;
+          });
+          return Response.json({ ok: true, faktury, udaje, kontakty: k.results || [] },
             { headers: { "cache-control": "no-store" } });
         } catch (e) {
           return Response.json({ ok: false, error: String(e).slice(0, 300) }, { status: 500 });
@@ -209,7 +236,7 @@ export const Route = createFileRoute("/api/vydane-faktury")({
              * kľúč ho nechá tak. Bez toho rozdielu by sa údaj nedal zmazať.
              */
             const bolo = await DB.prepare(
-              `SELECT stat, firma, ico, dic, ulica, psc, mesto, email, dalsie_maily, telefon, web,
+              `SELECT stat, firma, ico, dic, ulica, psc, mesto, email, dalsie_maily, telefon, telefon2, web,
                       os_titul, os_meno, os_priezvisko, os_mobil FROM klient_fakturacia WHERE klient = ?`,
             ).bind(klient).first<Record<string, string | null>>().catch(() => null);
             const je = (k: string) => Object.prototype.hasOwnProperty.call(b, k);
@@ -227,6 +254,8 @@ export const Route = createFileRoute("/api/vydane-faktury")({
                 ? String(b.dalsieMaily ?? "").split(/[\n,;]/).map((x) => x.trim().toLowerCase()).filter(Boolean).join("\n").slice(0, 400)
                 : stare("dalsie_maily"),
               telefon: je("telefon") ? kus(b.telefon, 40) : stare("telefon"),
+              // Druhé číslo (rodič, partner) — z okna SMS, migrácia 0097.
+              telefon2: je("telefon2") ? kus(b.telefon2, 40) : stare("telefon2"),
               web: je("web") ? kus(b.web, 120) : stare("web"),
               os_titul: je("osTitul") ? kus(b.osTitul, 30) : stare("os_titul"),
               os_meno: je("osMeno") ? kus(b.osMeno, 60) : stare("os_meno"),
@@ -238,13 +267,13 @@ export const Route = createFileRoute("/api/vydane-faktury")({
             }
             await DB.prepare(
               `INSERT INTO klient_fakturacia (klient, stat, firma, ico, dic, ulica, psc, mesto, email, dalsie_maily,
-                 telefon, web, os_titul, os_meno, os_priezvisko, os_mobil, updated_at)
-               VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17)
+                 telefon, web, os_titul, os_meno, os_priezvisko, os_mobil, updated_at, telefon2)
+               VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18)
                ON CONFLICT(klient) DO UPDATE SET stat=?2, firma=?3, ico=?4, dic=?5, ulica=?6, psc=?7, mesto=?8,
                  email=?9, dalsie_maily=?10, telefon=?11, web=?12, os_titul=?13, os_meno=?14, os_priezvisko=?15,
-                 os_mobil=?16, updated_at=?17`,
+                 os_mobil=?16, updated_at=?17, telefon2=?18`,
             ).bind(klient, v.stat, v.firma, v.ico, v.dic, v.ulica, v.psc, v.mesto, v.email, v.dalsie_maily,
-              v.telefon, v.web, v.os_titul, v.os_meno, v.os_priezvisko, v.os_mobil, teraz()).run();
+              v.telefon, v.web, v.os_titul, v.os_meno, v.os_priezvisko, v.os_mobil, teraz(), v.telefon2).run();
             await audit(DB, { action: "fakturacne-udaje", predmet: klient, actor: kto });
             return Response.json({ ok: true, klient });
           }
@@ -355,6 +384,29 @@ export const Route = createFileRoute("/api/vydane-faktury")({
             if (!klient) return Response.json({ ok: false, error: "Chýba klient." }, { status: 400 });
             if (popis.length < 3) return Response.json({ ok: false, error: "Popis je príliš krátky." }, { status: 400 });
             if (cena <= 0) return Response.json({ ok: false, error: "Cena musí byť kladná." }, { status: 400 });
+
+            /**
+             * ĎALŠÍ KLIENTI NA TEJ ISTEJ FAKTÚRE.
+             *
+             * Jerry, 4. 10. 2026: „Dan a Monika platia na jednu faktúru —
+             * jedna faktúra za oboch, preto je to 15 580, ale v Kokpite sa
+             * zapíše každému členstvo a platba za 7 790." Každá položka nesie
+             * svojho klienta; podľa nej sa platba za faktúru rozdelí.
+             */
+            const dalsie: PolozkaFaktury[] = [];
+            for (const x of (Array.isArray(b.dalsie) ? b.dalsie : []) as Record<string, unknown>[]) {
+              const kl = await kanonickeMeno(DB, kus(x.klient, 120));
+              const pp = String(x.popis ?? "").trim().slice(0, 600);
+              const cc = Math.round((Number(x.cena) || 0) * 100) / 100;
+              const kk = Math.max(0.01, Math.round((Number(x.ks) || 1) * 100) / 100);
+              if (!kl) return Response.json({ ok: false, error: "Ďalšia položka nemá klienta." }, { status: 400 });
+              if (pp.length < 3) return Response.json({ ok: false, error: `Popis položky za ${kl} je príliš krátky.` }, { status: 400 });
+              if (cc <= 0) return Response.json({ ok: false, error: `Cena položky za ${kl} musí byť kladná.` }, { status: 400 });
+              dalsie.push({ klient: kl, popis: pp, ks: kk, cena: cc, celkom: Math.round(kk * cc * 100) / 100, balicekId: kus(x.balicekId, 40) || null });
+            }
+            if (dalsie.length > 9) return Response.json({ ok: false, error: "Na jednej faktúre najviac desať položiek." }, { status: 400 });
+            const celkom = Math.round((ks * cena + dalsie.reduce((n, d) => n + d.celkom, 0)) * 100) / 100;
+
             const vystavene = denISO(b.vystavene) || new Date().toISOString().slice(0, 10);
             const dni = b.splatnostDni == null ? SPLATNOST_DNI : Math.max(0, Math.min(180, Math.round(Number(b.splatnostDni) || 0)));
             const splatnost = denISO(b.splatnost) || splatnostZ(vystavene, dni);
@@ -387,9 +439,19 @@ export const Route = createFileRoute("/api/vydane-faktury")({
                  odb_firma, odb_ico, odb_dic, odb_ulica, odb_psc, odb_mesto, odb_stat, odb_email, poznamka, created_at, autor)
                VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21)`,
             ).bind(id, cislo, klient, kus(b.balicekId, 40) || null, vystavene, splatnost, popis, ks, cena,
-              Math.round(ks * cena * 100) / 100, odb.firma, odb.ico, odb.dic, odb.ulica, odb.psc, odb.mesto,
+              celkom, odb.firma, odb.ico, odb.dic, odb.ulica, odb.psc, odb.mesto,
               odb.stat, odb.email, String(b.poznamka ?? "").slice(0, 600), teraz(), kto).run();
-            await audit(DB, { action: "faktura-vystavena", predmet: `${cislo} · ${klient}`, neu: `${Math.round(ks * cena)} Kč`, actor: kto });
+            if (dalsie.length) {
+              await DB.batch(dalsie.map((d, i) => DB.prepare(
+                `INSERT INTO vydane_faktury_polozky (id, faktura_id, poradie, klient, balicek_id, popis, ks, cena_czk, celkom_czk)
+                 VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)`,
+              ).bind(uid(), id, i + 1, d.klient, d.balicekId || null, d.popis, d.ks, d.cena, d.celkom)));
+            }
+            await audit(DB, {
+              action: "faktura-vystavena",
+              predmet: `${cislo} · ${[klient, ...dalsie.map((d) => d.klient)].join(" + ")}`,
+              neu: `${Math.round(celkom)} Kč`, actor: kto,
+            });
             return Response.json({ ok: true, id, cislo });
           }
 
@@ -407,7 +469,10 @@ export const Route = createFileRoute("/api/vydane-faktury")({
               `UPDATE vydane_faktury SET popis=?2, ks=?3, cena_czk=?4, celkom_czk=?5, splatnost=?6, poznamka=?7,
                  odb_firma=?8, odb_ico=?9, odb_dic=?10, odb_ulica=?11, odb_psc=?12, odb_mesto=?13, odb_stat=?14, odb_email=?15
                WHERE id=?1 AND storno_at IS NULL`,
-            ).bind(id, popis, ks, cena, Math.round(ks * cena * 100) / 100, splatnost, String(b.poznamka ?? "").slice(0, 600),
+            ).bind(id, popis, ks, cena,
+              // Ďalšie položky zostávajú; celkom je súčet všetkých.
+              Math.round((ks * cena + ((await dalsiePolozky(DB, id)).get(id) || []).reduce((n, d) => n + d.celkom, 0)) * 100) / 100,
+              splatnost, String(b.poznamka ?? "").slice(0, 600),
               kus(b.odbFirma, 160), kus(b.odbIco, 20), kus(b.odbDic, 20), kus(b.odbUlica, 120), kus(b.odbPsc, 20),
               kus(b.odbMesto, 80), kus(b.odbStat, 60), kus(b.odbEmail, 160).toLowerCase()).run();
             await audit(DB, { action: "faktura-uprava", predmet: id, actor: kto });
@@ -556,7 +621,7 @@ export const Route = createFileRoute("/api/vydane-faktury")({
               return Response.json({ ok: false, error: "Schránka nie je nastavená — doplň ju v Údajoch." }, { status: 400 });
             }
 
-            const faktura = naFakturu(r);
+            const faktura = naFakturu(r, (await dalsiePolozky(DB, id)).get(id));
             const pdf = await fakturaDoPdf(BROWSER, ASSETS, faktura, new URL(request.url).origin);
             const vykanie = b.vykanie == null ? undefined : !!b.vykanie;
             const text = mailFaktury(faktura, { trener: kus(b.trener, 40) || undefined, vykanie });
@@ -639,7 +704,8 @@ export const Route = createFileRoute("/api/vydane-faktury")({
                FROM vydane_faktury WHERE id = ?1`,
             ).bind(kus(b.id, 40)).first<Record<string, string | number | null>>();
             if (!r) return Response.json({ ok: false, error: "Taká faktúra neexistuje." }, { status: 404 });
-            const pdf = await fakturaDoPdf(BROWSER, ASSETS, naFakturu(r), new URL(request.url).origin);
+            const pdfId = kus(b.id, 40);
+            const pdf = await fakturaDoPdf(BROWSER, ASSETS, naFakturu(r, (await dalsiePolozky(DB, pdfId)).get(pdfId)), new URL(request.url).origin);
             return new Response(pdf, {
               headers: {
                 "content-type": "application/pdf",
@@ -668,6 +734,7 @@ export const Route = createFileRoute("/api/vydane-faktury")({
             ).bind(id).first<{ cislo: string; klient: string; celkom_czk: number; odoslane_at: string | null }>();
             if (!f) return Response.json({ ok: false, error: "Taká faktúra neexistuje." }, { status: 404 });
             await DB.prepare("DELETE FROM vydane_faktury WHERE id = ?1").bind(id).run();
+            await DB.prepare("DELETE FROM vydane_faktury_polozky WHERE faktura_id = ?1").bind(id).run().catch(() => null);
             await audit(DB, {
               action: "faktura-zmazana",
               predmet: `${f.cislo} · ${f.klient}`,

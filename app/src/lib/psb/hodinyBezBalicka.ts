@@ -68,6 +68,7 @@ export function hodinyBezBalicka(
   const packages = podla(zdroj.packages, (x) => x.client);
   const services = podla(zdroj.services, (x) => x.client);
   const poplatky = podla(zdroj.poplatky, (x) => x.klient);
+  const nezaplateneKokpit = podla(zdroj.nezaplateneKokpit, (x) => x.klient);
   const zdarma = podla(zdroj.treningyZdarma, (x) => x.klient);
   const balicky = podla(zdroj.balicky, (x) => x.klient);
   const historia = podla(zdroj.historia, (x) => x.client);
@@ -87,6 +88,7 @@ export function hodinyBezBalicka(
       services: services.get(k) || [],
       historia: historia.get(k) || [],
       poplatky: poplatky.get(k) || [],
+      nezaplateneKokpit: nezaplateneKokpit.get(k) || [],
       treningyZdarma: zdarma.get(k) || [],
       balicky: balicky.get(k) || [],
       kalUdalosti: kal.get(k) || [],

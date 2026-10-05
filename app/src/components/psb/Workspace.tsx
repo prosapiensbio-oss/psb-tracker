@@ -8,18 +8,21 @@ import { nazovProduktu } from "../../lib/psb/nazvyProduktov";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { navrhniKlientaKandidati, type ClientAgg } from "../../lib/psb/compute";
+import { kandidatiPlatby, otazkyPlatieb } from "../../lib/psb/workspaceKroky";
 import { krokGesta, krokSvihu, novyStavGesta, novyStavSvihu, zacniSvih } from "../../lib/psb/gestoKariet";
-import { BEZ_FRONTY, klucPolozky, popisZmeny, postavKarty, rozdelAnamnezy, trenerZPrihlasenia, type AnamnezaRiadok, type Karta, type NeznamyNazov, type NepriradenaPlatba, type Zmena } from "../../lib/psb/workspaceKarty";
+import { BEZ_FRONTY, klucPolozky, krokyBety, popisZmeny, postavKarty, rozdelAnamnezy, trenerZPrihlasenia, type AnamnezaRiadok, type Karta, type NeznamyNazov, type NepriradenaPlatba, type Zmena } from "../../lib/psb/workspaceKarty";
+import { AutomatickeBalicky, FioPrijmy, TyzdenKalendara, type Zvyraznenie, KrokPlatnost, KrokSms, NadpisSekcie, OtazkyPlatieb, VsetkoVybavene } from "./WorkspaceKroky";
 import { bezAktivnehoBalicka, treningyZObochZdrojov, vMinuseKlienta, type BezBalicka } from "../../lib/psb/bezBalicka";
 import { dlznici as spocitajDlznikov, type Dlznik } from "../../lib/psb/dlznici";
 import { zostavaPoPlatnosti, type ZostavaPoPlatnosti } from "../../lib/psb/platnostZostatok";
 
 /** Riadky z `/api/balicky` a `/api/platby` — len to, čo tieto karty potrebujú. */
 type BalicekRiadok = {
-  klient: string; nazov: string; hodiny: number | null; platnost_od: string;
+  id?: string; klient: string; nazov: string; hodiny: number | null; platnost_od: string;
   platnost_do: string | null; cena_czk: number | null; zdroj: string; zrusene_at: string | null;
+  poznamka?: string | null; created_at?: string | null;
 };
-type PlatbaRiadok = { klient: string; datum: string; suma_czk: number; zrusene_at: string | null };
+type PlatbaRiadok = { klient: string; datum: string; suma_czk: number; zrusene_at: string | null; vopred?: number | null; created_at?: string | null };
 import { VydaneFaktury, type FakturaPredvolba } from "./VydaneFaktury";
 import type { PSBData } from "../../lib/psb/types";
 import { KlientStol } from "./KlientStol";
@@ -47,13 +50,18 @@ import { useUzke } from "./useUzke";
 
 const kc = (n: number) => `${Math.round(n).toLocaleString("sk-SK")} Kč`;
 const den = (s: string) => (s ? `${Number(s.slice(8))}. ${Number(s.slice(5, 7))}.` : "");
+/** Pondelok týždňa, do ktorého deň patrí — kľúč týždenného náhľadu. */
+const tyzdenOd = (s: string): string => {
+  const d = new Date(`${String(s).slice(0, 10)}T12:00:00Z`);
+  return new Date(d.getTime() - ((d.getUTCDay() + 6) % 7) * 86400000).toISOString().slice(0, 10);
+};
 
 export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, btc, onOverride, otvorKlienta, onOtvoreny, fakturaPredvolba, onFakturaPredvolbaSpracovana, vypisPredvolba, onVypisPredvolbaSpracovana }: {
   clients: Record<string, ClientAgg>;
   mena: string[];
   ktoSom: string | null;
   data: PSBData;
-  kalUdalosti?: { zaciatok: string; klient: string | null; typ: string | null }[];
+  kalUdalosti?: { zaciatok: string; klient: string | null; typ: string | null; uid?: string; trener?: string; koniec?: string; nazov?: string }[];
   btcSats?: Record<string, number>;
   /** Bitcoinová kniha a kurz — profil klienta z nej sádže záložku ₿. */
   btc?: { platby: { klient: string | null; datum: string; sats?: number; czk: number | null }[]; kurz: number | null; kedy: string | null };
@@ -71,7 +79,16 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
 }) {
   const [balicky, setBalicky] = useState<BalicekRiadok[]>([]);
   const [vlastnePlatby, setVlastnePlatby] = useState<PlatbaRiadok[]>([]);
-  const [zdroje, setZdroje] = useState<{ zmeny: Zmena[]; nezname: { nazov: string; trener: string; pocet: number; najblizsi: string }[]; platby: { fioId: string; datum: string; suma: number; text: string; kandidati: string[] }[]; konanie: PodlaKlienta[] } | null>(null);
+  /**
+   * WORKSPACE PO KROKOCH — naostro od 5. 10. 2026 (Jerry: „postav to
+   * v Kokpite"). Do toho dňa sa to skúšalo len v bete. Premenná ostáva, aby
+   * bolo vidieť, ktoré správanie k tomu patrí.
+   */
+  const poKrokoch = true;
+  /** Ktorý riadok kroku Kalendár má pod sebou rozbalený týždeň (kľúč položky). */
+  const [denOtvoreny, setDenOtvoreny] = useState("");
+  const [pocetSms, setPocetSms] = useState<number | null>(null);
+  const [zdroje, setZdroje] = useState<{ zmeny: Zmena[]; nezname: { nazov: string; trener: string; pocet: number; najblizsi: string }[]; platby: { fioId: string; datum: string; suma: number; text: string; kandidati: string[]; rozdelenie?: { klient: string; suma: number }[]; poznamka?: string }[]; konanie: PodlaKlienta[] } | null>(null);
   const [hotove, setHotove] = useState<Set<string>>(new Set());
   const [texty, setTexty] = useState<Record<string, string>>({});
   const [i, setI] = useState(0);
@@ -140,6 +157,12 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
     setBalicky(b?.balicky || []);
     setVlastnePlatby(vp?.platby || []);
   }, []);
+  /**
+   * Zápis v kroku zmení balíčky aj hodiny: Workspace si načíta svoje zoznamy
+   * a App celé dáta (karta klienta, nezaplatené balíčky) — inak by krok
+   * ukazoval stav spred kliknutia.
+   */
+  const poZapise = useCallback(() => { void nacitaj(); oznam("klienti"); }, [nacitaj]);
   useEffect(() => { void nacitaj(); }, [nacitaj]);
 
   /** Aktívni bez hodín — pýta sa exportu aj vlastnej evidencie naraz. */
@@ -157,6 +180,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
       packages: (data.packages || []) as never,
       services: (data.services || []) as never,
       poplatky: (data.poplatky || []) as never,
+      nezaplateneKokpit: data.nezaplateneKokpit || [],
       treningyZdarma: (data.treningyZdarma || []) as never,
       // Odpovede „koľko hodín pridalo doplnenie" — bez nich appka v tom
       // období nepočíta dlh (viď migráciu 0085).
@@ -193,11 +217,13 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
         cena: b.cena_czk, platnostOd: (b.platnost_od || "").slice(0, 10), zdroj: b.zdroj, zruseneAt: b.zrusene_at, nazov: b.nazov,
       }))])),
       Object.fromEntries(Object.entries(podlaKlienta(vlastnePlatby)).map(([m, ps]) => [m, ps.map((p) => ({
-        suma: p.suma_czk, datum: (p.datum || "").slice(0, 10), zruseneAt: p.zrusene_at,
+        suma: p.suma_czk, datum: (p.datum || "").slice(0, 10), zruseneAt: p.zrusene_at, vopred: p.vopred,
       }))])),
       treneri,
+      undefined,
+      data.dlhKokpit,
     );
-  }, [data.poplatky, balicky, vlastnePlatby, clients]);
+  }, [data.poplatky, data.dlhKokpit, balicky, vlastnePlatby, clients]);
 
   const nacitajAnamnezy = useCallback(async () => {
     const r = await fetch("/api/anamneza?zoznam=1", { credentials: "same-origin" })
@@ -231,13 +257,17 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
 
   // Karta, v ktorej už nič nezostalo, z kopy zmizne — ale až po tom, čo sa
   // v nej naozaj odklikalo; inak by zmizla pod rukami uprostred práce.
+  const kartyKopy = useMemo(() => (poKrokoch ? krokyBety(karty) : karty), [poKrokoch, karty]);
   const zive = useMemo(
     // Karta klienta nie je fronta — nemá položky a nikdy nezmizne. Ostatné
     // zmiznú, keď sa v nich všetko odklikalo.
-    () => karty.filter((k) => BEZ_FRONTY.includes(k.druh)
+    () => kartyKopy.filter((k) => BEZ_FRONTY.includes(k.druh)
       || (k.polozky as (Zmena | NeznamyNazov | NepriradenaPlatba | BezBalicka | Dlznik | ZostavaPoPlatnosti)[]).some((p) => !hotove.has(klucPolozky(k.druh, p)))),
-    [karty, hotove],
+    [kartyKopy, hotove],
   );
+  const dlhyPodlaMena = useMemo(() => Object.fromEntries(dlzniciRiadky.map((d) => [d.meno, d.spolu])), [dlzniciRiadky]);
+  const trenerKroku: string | null = ktoreVeci === "vsetko" ? null
+    : ktoreVeci === "auto" ? trenerZPrihlasenia(ktoSom) : ktoreVeci;
   const k = zive[Math.min(i, Math.max(0, zive.length - 1))];
 
   // Klik na klienta inde v appke otvorí kartu Klient — inak by človek pristál
@@ -579,114 +609,13 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
     ? [1, 2].slice(0, Math.min(2, zive.length - 1)).map((o) => zive[(i + o) % zive.length])
     : [];
 
-  return (
-    // Celá šírka obrazovky, nie 1200 px ako zvyšok appky. Karta je pracovná
-    // plocha — čím širšia, tým viac riadkov sa vybaví bez rolovania, a vpravo
-    // zostane miesto na to, čo príde. Vylomenie z `maxWidth` rodiča je bežný
-    // trik: 100vw a posun o polovicu rozdielu doľava.
-    <div style={{ width: "100vw", marginLeft: "calc(50% - 50vw)", padding: "0 20px", boxSizing: "border-box" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 14, flexWrap: "wrap" }}>
-        <div style={{ fontSize: 11.5, color: C.textMuted, fontWeight: 700, whiteSpace: "nowrap" }}>
-          Karta {Math.min(i + 1, zive.length)} z {zive.length}
-        </div>
-        <div style={{ flexGrow: 1, minWidth: 120, height: 4, background: C.border, borderRadius: 2, overflow: "hidden" }}>
-          <div style={{ width: `${spolu ? (vybavenych / spolu) * 100 : 0}%`, height: "100%", background: C.accent, transition: "width .25s" }} />
-        </div>
-        <div style={{ fontSize: 12, color: C.textDim, whiteSpace: "nowrap" }}>
-          {vybavenych > 0 ? `${vybavenych} vybavených` : `${spolu} vecí celkom`}
-        </div>
-        {/* Čie veci — vždy vidieť, aj keď to appka vybrala sama. Doteraz to
-            bola len veta na konci riadku a pri identite „app" nebola žiadna. */}
-        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-          {([["auto", automat ? (automat === "Jerry" ? "Jerryho" : "Terezkine") : "všetko"], ["Jerry", "Jerryho"], ["Terezka", "Terezkine"], ["vsetko", "všetko"]] as const)
-            .filter(([id]) => id !== "auto" || !!automat)
-            .filter(([id]) => !(automat && id === automat))
-            .map(([id, l]) => (
-              <button key={id} onClick={() => setKtoreVeci(id)} style={{
-                padding: "4px 10px", borderRadius: 14, fontSize: 11.5, cursor: "pointer",
-                border: `1px solid ${ktoreVeci === id ? C.accent : C.border}`,
-                background: ktoreVeci === id ? C.accentBg : "transparent",
-                color: ktoreVeci === id ? C.accentLight : C.textMuted,
-              }}>{l}</button>
-            ))}
-        </div>
-        {!automat && ktoreVeci === "auto" && (
-          <div style={{ fontSize: 11, color: C.orange, whiteSpace: "nowrap" }}>
-            Appka nevie, kto si — ukazuje všetko. Prihlás sa menom, nie spoločným heslom.
-          </div>
-        )}
-      </div>
-
-      {/* KOPA: aktívna karta je cez celú šírku, ostatné ležia pod ňou a
-          vykúkajú vpravo len okrajom.
-          Predtým stáli vedľa seba v mriežke a Jerry na to povedal jasne:
-          „ale ja chcem široké cez celú." Vedľa seba sa nedá mať oboje —
-          buď je karta široká, alebo je vedľa nej miesto. Takto je: široká
-          je, a to, že za ňou niečo je, hovorí okraj, nie stĺpec. */}
-      {/* PEVNÁ výška, nie minimálna. Minimálna výšku len nadstavuje — karta
-          s dlhým zoznamom aj tak narástla a šípky skákali. Fixná výška
-          + `minHeight: 0` na rolovacom vnútri je jediná dvojica, ktorá vo
-          flexe naozaj drží: bez tej nuly sa dieťa odmietne zmenšiť pod svoj
-          obsah a `overflow` sa nikdy nezapne. */}
-      <div ref={kopa} style={{ position: "relative", height: "min(72vh, 660px)", touchAction: "pan-y" }}>
-        {dalsie.map((d, j) => (
-          <div
-            key={d.druh}
-            aria-hidden="true"
-            style={{
-              position: "absolute",
-              top: (j + 1) * 9,
-              left: (j + 1) * 9,
-              right: -((j + 1) * 11),
-              bottom: -((j + 1) * 9),
-              borderRadius: 14,
-              background: mix(C.border, 90),
-              border: `1px solid ${mix(C.border, 150)}`,
-              // Plátky vzadu sa pri prepnutí posunú tiež — inak by karta
-              // odletela sama a kopa by stála, čo vyzerá ako chyba.
-              opacity: prechod?.faza === "von" ? (j === 0 ? 0.85 : 0.5) : j === 0 ? 0.6 : 0.3,
-              transform: prechod?.faza === "von" ? `translateX(${-prechod.smer * 7}px)` : "none",
-              transition: "transform .15s ease-in, opacity .15s ease-in",
-              zIndex: 0,
-            }}
-          />
-        ))}
-        {/* Šípky sedia na BOKOCH karty, nie pod ňou.
-            Jerry, 23. 9. 2026: „prepínanie medzi kartami by malo byť po
-            stranách kariet, pretože keď chcem prepnúť, musím ďaleko
-            zoskrolovať." Karta má vnútri zoznam na pol obrazovky, takže
-            tlačidlo pod ňou je zakaždým na inom mieste a často mimo
-            dohľadu. Bok je vždy tam, kde bol. */}
-        {/* Kolotoč: z poslednej karty sa ide na prvú a naopak (Jerry, 23. 9.
-            2026). Šípka na konci, ktorá sa nedá stlačiť, je slepá ulička —
-            človek musí prejsť celú kopu späť, aby sa dostal o jednu ďalej. */}
-        {/* ŠÍPKY ZOSTÁVAJÚ AJ NA TELEFÓNE.
-            28. 9. 2026 som ich na úzkej obrazovke skryl s tým, že ich nahradí
-            ťah prsta — a Jerry zostal bez oboch: „teraz mi to nejde už vôbec,
-            pretože tam nie sú ani tie gombíky po strane." Náhrada sa smie
-            zapnúť až vtedy, keď je overené, že naozaj funguje; dovtedy platí
-            to, čo fungovalo. Na telefóne sú len užšie. */}
-        <button onClick={() => prepni(-1)} aria-label="Predchádzajúca karta" style={bocnaSipka("left", zive.length > 1, uzke)}>‹</button>
-        <button onClick={() => prepni(1)} aria-label="Ďalšia karta" style={bocnaSipka("right", zive.length > 1, uzke)}>›</button>
-        {/* Karta má PEVNÚ výšku. Jerry, 23. 9. 2026: „karty musia byť stále
-            rovnako veľké, aj keď je tam menej textu, aby miesto na pravej
-            a ľavej strane, kde prepínam, bolo stále na tom istom mieste."
-            Šípka, ktorá pri každej karte skočí inam, sa hľadá očami — a to je
-            presne tá práca navyše, ktorú mala kopa odstrániť. */}
-        <div style={{ position: "relative", zIndex: 1, margin: uzke ? "0 30px" : "0 46px", height: "100%", ...pohybKarty(prechod) }}>
-          <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-              <div style={{ fontSize: 18, fontWeight: 800 }}>{k.nadpis}</div>
-              {!BEZ_FRONTY.includes(k.druh) && <div style={{ fontSize: 11.5, color: C.textMuted }}>{zostava(k)} zostáva</div>}
-            </div>
-            <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 3 }}>{k.podnadpis}</div>
-
-            <div style={{ marginTop: 14, flexGrow: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-              {/* Zoznamy rolujú vnútri; karta klienta si výšku riadi sama —
-                  ale LEN na monitore. Na telefóne idú jej stĺpce pod seba,
-                  takže rolovať musí karta, inak sa spodok profilu nedá
-                  dosiahnuť (Jerry, 30. 9. 2026). */}
-              <div style={{ flexGrow: 1, minHeight: 0, overflowY: k.druh === "klient" && !uzke ? "visible" : "auto", display: k.druh === "klient" ? "flex" : "block", flexDirection: "column" }}>
+  /**
+   * OBSAH JEDNEJ KARTY. Vytiahnuté do funkcie, aby ho krok v bete vedel
+   * nakresliť ako sekciu — tá istá karta, ten istý kód, len pod nadpisom
+   * kroku (Jerry, 4. 10. 2026: „všetko na jednom mieste").
+   */
+  const obsahKarty = (k: Karta): React.ReactNode => (
+    <>
               {k.druh === "faktury" && (
                 <VydaneFaktury
                   mena={mena}
@@ -876,9 +805,33 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                 return (
                   <div key={kluc} style={riadok}>
                     <div style={{ minWidth: 150, flex: "1 1 190px" }}>
-                      <div style={{ fontSize: 12.5, fontWeight: 700 }}>{z.klient || z.nazov || "(bez mena)"}</div>
+                      {poKrokoch ? (
+                        <button onClick={() => setDenOtvoreny(denOtvoreny === kluc ? "" : kluc)} title="Ukázať týždeň v kalendári"
+                          style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, color: C.text, textAlign: "left" }}>
+                          {z.klient || z.nazov || "(bez mena)"} {denOtvoreny === kluc ? "▴" : "▾"}
+                        </button>
+                      ) : (
+                        <div style={{ fontSize: 12.5, fontWeight: 700 }}>{z.klient || z.nazov || "(bez mena)"}</div>
+                      )}
                       <div style={{ fontSize: 11, color: C.textDim }}>{popisZmeny(z)} · {z.trener}</div>
                     </div>
+                    {/* Týždeň pod riadkom (order: 99 ho dá na koniec riadku,
+                        pod tlačidlá) — Jerry, 4. 10. 2026. */}
+                    {poKrokoch && denOtvoreny === kluc && (
+                      <div style={{ flexBasis: "100%", order: 99 }}>
+                        {[...new Set([z.pred, z.po].filter(Boolean).map((x) => tyzdenOd(String(x))))].map((t) => (
+                          <TyzdenKalendara
+                            key={t} den={t} trener={z.trener}
+                            zvyraznenia={([
+                              z.druh === "zrusene" && z.pred ? { druh: "zmazane", zaciatok: z.pred, popis: `${z.klient || z.nazov || ""} — zmazané` } : null,
+                              z.druh === "posunute" && z.pred ? { druh: "presunZ", zaciatok: z.pred, popis: `${z.klient || z.nazov || ""} — odtiaľto` } : null,
+                              z.druh === "posunute" && z.po ? { druh: "presunNa", zaciatok: z.po, popis: `${z.klient || z.nazov || ""} — sem` } : null,
+                              z.druh === "pridane" && z.po ? { druh: "nove", zaciatok: z.po, popis: `${z.klient || z.nazov || ""} — pribudlo` } : null,
+                            ].filter(Boolean)) as Zvyraznenie[]}
+                          />
+                        ))}
+                      </div>
+                    )}
                     <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
                       {["klient zrušil", "presunuli sme", "chyba v zápise"].map((d) => (
                         <button key={d} onClick={() => nastavText(kluc, d)} style={stitok(t === d)}>{d}</button>
@@ -929,9 +882,21 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                 return (
                   <div key={kluc} style={riadok}>
                     <div style={{ minWidth: 130, flex: "1 1 160px" }}>
-                      <div style={{ fontSize: 12.5, fontWeight: 700 }}>{n.nazov}</div>
+                      {poKrokoch ? (
+                        <button onClick={() => setDenOtvoreny(denOtvoreny === kluc ? "" : kluc)} title="Ukázať týždeň v kalendári"
+                          style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700, color: C.text, textAlign: "left" }}>
+                          {n.nazov} {denOtvoreny === kluc ? "▴" : "▾"}
+                        </button>
+                      ) : (
+                        <div style={{ fontSize: 12.5, fontWeight: 700 }}>{n.nazov}</div>
+                      )}
                       <div style={{ fontSize: 11, color: C.textDim }}>{n.trener} · {n.pocet}× · {den(n.najblizsi)}</div>
                     </div>
+                    {poKrokoch && denOtvoreny === kluc && n.najblizsi && (
+                      <div style={{ flexBasis: "100%", order: 99 }}>
+                        <TyzdenKalendara den={tyzdenOd(n.najblizsi)} trener={n.trener} zvyraznenia={[{ druh: "nazov", nazov: n.nazov }]} />
+                      </div>
+                    )}
                     <input list="ws-klienti" value={t} onChange={(e) => nastavText(kluc, e.target.value)} placeholder="kto to je…" style={vstup(!!t && !mena.includes(t))} />
                     <button
                       onClick={() => void vybav(kluc, "/api/kalendar", { akcia: "mapuj", nazov: n.nazov, trener: n.trener, typ: "trening", klient: t.trim() })}
@@ -982,7 +947,15 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                         <div key={kluc} style={{ ...riadok, flexWrap: "wrap" }}>
                           <div style={{ minWidth: 50, fontSize: 11.5, color: C.textDim }}>{den(p.datum)}</div>
                           <div style={{ minWidth: 80, fontSize: 13, fontWeight: 700, textAlign: "right" }}>{kc(p.suma)}</div>
-                          <div style={{ flex: "1 1 200px", minWidth: 150, fontSize: 11, color: C.textMuted }}>{p.text.slice(0, 96)}</div>
+                          <div style={{ flex: "1 1 200px", minWidth: 150, fontSize: 11, color: C.textMuted }}>
+                            {p.text.slice(0, 96)}
+                            {p.poznamka && <div style={{ color: C.orange, marginTop: 2 }}>{p.poznamka}</div>}
+                            {p.rozdelenie && !delenie && (
+                              <div style={{ color: C.accentLight, marginTop: 2 }}>
+                                jeden prevod za viacerých: {p.rozdelenie.map((d) => `${d.klient} ${kc(d.suma)}`).join(" + ")}
+                              </div>
+                            )}
+                          </div>
                           {!delenie && (
                             <>
                               <input list="ws-klienti" value={t} onChange={(e) => nastavText(kluc, e.target.value)} placeholder="komu patrí…" style={vstup(!!t && !mena.includes(t))} />
@@ -995,10 +968,18 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                               {/* Jeden prevod, dvaja klienti — Jerry, 28. 9. 2026: „15 580
                                   DK Consulting je Dan Kouřil spoločne s Monikou." */}
                               <button
-                                onClick={() => { setDelim(p.fioId); setDiely([{ klient: t.trim(), suma: String(Math.round(p.suma / 2)) }, { klient: "", suma: String(Math.round(p.suma) - Math.round(p.suma / 2)) }]); }}
-                                style={vedlajsie}
+                                onClick={() => {
+                                  setDelim(p.fioId);
+                                  // Návrh appky, keď ho má (faktúra s položkami,
+                                  // dvojica, čo už spolu platila); inak napoly.
+                                  setDiely(p.rozdelenie
+                                    ? p.rozdelenie.map((d) => ({ klient: d.klient, suma: String(Math.round(d.suma)) }))
+                                    : [{ klient: t.trim(), suma: String(Math.round(p.suma / 2)) }, { klient: "", suma: String(Math.round(p.suma) - Math.round(p.suma / 2)) }]);
+                                }}
+                                style={p.rozdelenie ? hlavne(true) : vedlajsie}
+                                title={p.rozdelenie ? `Návrh: ${p.rozdelenie.map((d) => `${d.klient} ${d.suma} Kč`).join(" + ")}` : undefined}
                               >
-                                Rozdeliť
+                                {p.rozdelenie ? `Rozdeliť: ${p.rozdelenie.map((d) => d.klient.split(" ")[0]).join(" + ")}` : "Rozdeliť"}
                               </button>
                               <button onClick={() => void vybav(kluc, "/api/platby", { akcia: "nieKlient", fioId: p.fioId })} style={vedlajsie}>Nie je klient</button>
                             </>
@@ -1053,8 +1034,14 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                 if (!zostavajuce.length) return null;
                 return (
                   <div key={kluc} style={{ ...riadok, flexWrap: "wrap", alignItems: "flex-start" }}>
-                    <button onClick={() => naStol(x.klient)} style={{ ...vedlajsie, fontSize: 13.5, fontWeight: 600, color: C.text, minWidth: uzke ? 0 : 150, flex: uzke ? "1 1 100%" : undefined, textAlign: "left" }}>
-                      {x.klient}
+                    {/* V bete klik na meno rozbalí deň v kalendári trénera
+                        (Jerry, 4. 10. 2026) — profil je o kartu vedľa. */}
+                    <button
+                      onClick={() => (poKrokoch ? setDenOtvoreny(denOtvoreny === kluc ? "" : kluc) : naStol(x.klient))}
+                      title={poKrokoch ? "Ukázať deň v kalendári" : undefined}
+                      style={{ ...vedlajsie, fontSize: 13.5, fontWeight: 600, color: C.text, minWidth: uzke ? 0 : 150, flex: uzke ? "1 1 100%" : undefined, textAlign: "left" }}
+                    >
+                      {x.klient}{poKrokoch ? (denOtvoreny === kluc ? " ▴" : " ▾") : ""}
                     </button>
                     <div style={{ flex: "1 1 100%", display: "flex", flexDirection: "column", gap: 5, marginTop: 4 }}>
                       {zostavajuce.map((p) => (
@@ -1074,6 +1061,16 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                           <button onClick={() => void odpovedzKonanie(p, false)} style={{ ...vedlajsie }}>neprišiel</button>
                         </div>
                       ))}
+                      {poKrokoch && denOtvoreny === kluc && [...new Set(zostavajuce.map((p) => `${tyzdenOd(p.zaciatok)}|${p.trener}`))].map((tk) => {
+                        const [t, tr] = tk.split("|");
+                        return (
+                          <TyzdenKalendara
+                            key={tk} den={t} trener={tr}
+                            zvyraznenia={zostavajuce.filter((p) => tyzdenOd(p.zaciatok) === t && p.trener === tr)
+                              .map((p): Zvyraznenie => ({ druh: "sporne", zaciatok: p.zaciatok.slice(0, 16), popis: `${x.klient} — zmizlo z kalendára` }))}
+                          />
+                        );
+                      })}
                     </div>
                   </div>
                 );
@@ -1185,9 +1182,22 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                 if (hotove.has(kluc)) return null;
                 return (
                   <div key={kluc} style={{ ...riadok, flexWrap: "wrap" }}>
-                    <button onClick={() => naStol(x.meno)} style={{ ...vedlajsie, fontSize: 13.5, fontWeight: 600, color: C.text, minWidth: uzke ? 0 : 150, flex: uzke ? "1 1 auto" : undefined, textAlign: "left" }}>
-                      {x.meno}
+                    <button
+                      onClick={() => (poKrokoch ? setDenOtvoreny(denOtvoreny === kluc ? "" : kluc) : naStol(x.meno))}
+                      title={poKrokoch ? "Ukázať platby z banky, ktoré k nemu môžu patriť" : undefined}
+                      style={{ ...vedlajsie, fontSize: 13.5, fontWeight: 600, color: C.text, minWidth: uzke ? 0 : 150, flex: uzke ? "1 1 auto" : undefined, textAlign: "left" }}
+                    >
+                      {x.meno}{poKrokoch ? (denOtvoreny === kluc ? " ▴" : " ▾") : ""}
                     </button>
+                    {/* Koľko je v mínuse — pred sumou (Jerry, 4. 10. 2026:
+                        „Daniela Šašinková −3 · 9 400 · 9. 9. OFF…"). */}
+                    {poKrokoch && (
+                      <div style={{ minWidth: uzke ? 0 : 46, fontSize: 13, fontWeight: 700, textAlign: "right", color: (clients[x.meno]?.packageRemaining ?? 0) < 0 ? C.orange : C.textDim }}>
+                        {clients[x.meno] && clients[x.meno].packageTotal > 0
+                          ? `${clients[x.meno].packageRemaining < 0 ? "−" : ""}${Math.abs(Math.round(clients[x.meno].packageRemaining * 100) / 100)} h`
+                          : ""}
+                      </div>
+                    )}
                     <div style={{ minWidth: uzke ? 0 : 90, fontSize: 13, fontWeight: 700, textAlign: "right", color: C.red }}>{kc(x.spolu)}</div>
                     <div style={{ flex: uzke ? "1 1 100%" : "1 1 200px", minWidth: uzke ? 0 : 180, fontSize: 11, color: C.textMuted }}>
                       {x.polozky.length
@@ -1198,10 +1208,217 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                     <div style={{ fontSize: 11.5, color: x.dni > 30 ? C.orange : C.textDim, minWidth: 80, textAlign: "right" }}>
                       {x.dni >= 0 ? `${x.dni} dní` : ""}
                     </div>
-                    <button onClick={() => oznacHotove(kluc)} style={vedlajsie}>vybavené</button>
+                    {/* V bete „vybavené" nie je: dlh zmizne až spárovanou platbou
+                        (Jerry, 4. 10. 2026: „keď dám vybavené, zmizne to a nič sa
+                        nenapáruje"). */}
+                    {!poKrokoch && <button onClick={() => oznacHotove(kluc)} style={vedlajsie}>vybavené</button>}
+                    {poKrokoch && denOtvoreny === kluc && (() => {
+                      const pary = kandidatiPlatby(x.meno, x, zdroje?.platby || [], data.nezaplateneKokpit || []);
+                      return (
+                        <div style={{ flexBasis: "100%", margin: "4px 0 6px", padding: "8px 10px", borderRadius: 9, border: `1px solid ${C.border}`, background: mix(C.card, 70) }}>
+                          {!pary.length && (
+                            <div style={{ fontSize: 12, color: C.textMuted }}>
+                              Žiadna platba z Fio, ktorá by k {x.meno} sedela — ani menom, ani sumou {kc(x.spolu)}. Výpis z banky siaha
+                              po posledné stiahnutie; nové príjmy stiahneš hore v tomto kroku.
+                            </div>
+                          )}
+                          {pary.map((p) => (
+                            <div key={p.fioId} style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", padding: "4px 0" }}>
+                              <span style={{ fontSize: 12, color: C.textDim, minWidth: 74 }}>{fmtDMY(p.datum)}</span>
+                              <span style={{ fontSize: 13, fontWeight: 700, minWidth: 80, textAlign: "right" }}>{kc(p.suma)}</span>
+                              <span style={{ fontSize: 11.5, color: C.textMuted, flex: "1 1 220px" }}>{p.text.slice(0, 90)}</span>
+                              <span style={{ fontSize: 11, color: C.textDim }}>{p.preco === "meno+suma" ? "meno aj suma sedia" : p.preco === "meno" ? "meno v platbe" : "suma sedí"}</span>
+                              <button
+                                disabled={pracujem === p.fioId}
+                                onClick={() => void (async () => {
+                                  await vybav(p.fioId, "/api/platby", { akcia: "priradz", fioId: p.fioId, klient: x.meno, zapamataj: true });
+                                  poZapise();
+                                })()}
+                                style={hlavne(true)}
+                              >
+                                {pracujem === p.fioId ? "…" : `Spárovať s ${x.meno.split(" ")[0]}`}
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               })}
+    </>
+  );
+
+  /** Krok bety: jeho sekcie (staré karty) a nové časti, ktoré patria len sem. */
+  const kresliKrok = (k: Extract<Karta, { druh: "krok" }>): React.ReactNode => {
+    const zivych = (x: Karta) => (x.polozky as (Zmena | NeznamyNazov | NepriradenaPlatba | BezBalicka | Dlznik | ZostavaPoPlatnosti)[])
+      .filter((p) => !hotove.has(klucPolozky(x.druh, p))).length;
+    const sekcie = k.sekcie.filter((x) => zivych(x) > 0);
+    const sekcieKresli = sekcie.map((x) => (
+      <div key={x.druh}>
+        <NadpisSekcie pocet={zivych(x)}>{x.nadpis}</NadpisSekcie>
+        {obsahKarty(x)}
+      </div>
+    ));
+    if (k.krok === "sms") {
+      return (
+        <KrokSms
+          clients={clients} dlhy={dlhyPodlaMena} udalosti={kalUdalosti || []}
+          balicky={balicky} platby={vlastnePlatby} trener={trenerKroku} onPocet={setPocetSms}
+        />
+      );
+    }
+    if (k.krok === "platby") {
+      /**
+       * PLATBY A BALÍČKY V JEDNOM KROKU (Jerry, 5. 10. 2026: „súhlas" so
+       * zrušením samostatnej karty Balíčky). Balíčky vznikajú samy; ostali
+       * len dve rozhodnutia — končiaca platnosť a „sedí?" po návrate — a obe
+       * menia, čo klient dlží, takže patria k párovaniu platieb.
+       */
+      const autoOtazok = balicky.filter((b) => b.id && !b.zrusene_at && /^automaticky/i.test(String(b.poznamka || ""))
+        && /návrat/i.test(String(b.poznamka || "")) && !data.anomalyAck?.[`balicek-sedi|${b.id}`]
+        && (!trenerKroku || clients[b.klient]?.primaryTrainer === trenerKroku)).length;
+      const platnostOtazok = platnost.filter((x) => !data.anomalyAck?.[`platnost|${x.meno}|${x.platnostDo}`]
+        && (!trenerKroku || x.trener === trenerKroku)).length;
+      const sumaOtazok = otazkyPlatieb(
+        balicky.filter((b) => b.id).map((b) => ({
+          id: String(b.id), klient: b.klient, nazov: b.nazov, hodiny: b.hodiny, cena: b.cena_czk,
+          platnostOd: b.platnost_od, zdroj: b.zdroj, zruseneAt: b.zrusene_at,
+        })),
+        vlastnePlatby.map((p) => ({ klient: p.klient, datum: p.datum, suma: p.suma_czk, zruseneAt: p.zrusene_at, vopred: p.vopred })),
+      ).filter((o) => !trenerKroku || clients[o.klient]?.primaryTrainer === trenerKroku).length;
+      const prazdne = !sekcie.length && !autoOtazok && !platnostOtazok && !sumaOtazok;
+      return (
+        <>
+          <FioPrijmy onZapisane={poZapise} />
+          <OtazkyPlatieb balicky={balicky} platby={vlastnePlatby} trener={trenerKroku} clients={clients} onOpravene={poZapise} />
+          {sekcieKresli}
+          <KrokPlatnost polozky={platnost} acks={data.anomalyAck || {}} trener={trenerKroku} onVybavene={poZapise} />
+          <AutomatickeBalicky balicky={balicky} acks={data.anomalyAck || {}} clients={clients} trener={trenerKroku} onVybavene={poZapise} />
+          {prazdne && <VsetkoVybavene text="Všetko vybavené — každá platba má klienta, nikto nedlží a o balíčkoch netreba nič rozhodnúť." />}
+        </>
+      );
+    }
+    return (
+      <>
+        {sekcieKresli}
+        {!sekcie.length && <VsetkoVybavene text="Všetko vybavené — kalendár nemá výnimky." />}
+      </>
+    );
+  };
+
+  return (
+    // Celá šírka obrazovky, nie 1200 px ako zvyšok appky. Karta je pracovná
+    // plocha — čím širšia, tým viac riadkov sa vybaví bez rolovania, a vpravo
+    // zostane miesto na to, čo príde. Vylomenie z `maxWidth` rodiča je bežný
+    // trik: 100vw a posun o polovicu rozdielu doľava.
+    <div style={{ width: "100vw", marginLeft: "calc(50% - 50vw)", padding: "0 20px", boxSizing: "border-box" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 14, flexWrap: "wrap" }}>
+        <div style={{ fontSize: 11.5, color: C.textMuted, fontWeight: 700, whiteSpace: "nowrap" }}>
+          Karta {Math.min(i + 1, zive.length)} z {zive.length}
+        </div>
+        <div style={{ flexGrow: 1, minWidth: 120, height: 4, background: C.border, borderRadius: 2, overflow: "hidden" }}>
+          <div style={{ width: `${spolu ? (vybavenych / spolu) * 100 : 0}%`, height: "100%", background: C.accent, transition: "width .25s" }} />
+        </div>
+        <div style={{ fontSize: 12, color: C.textDim, whiteSpace: "nowrap" }}>
+          {vybavenych > 0 ? `${vybavenych} vybavených` : `${spolu} vecí celkom`}
+        </div>
+        {/* Čie veci — vždy vidieť, aj keď to appka vybrala sama. Doteraz to
+            bola len veta na konci riadku a pri identite „app" nebola žiadna. */}
+        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+          {([["auto", automat ? (automat === "Jerry" ? "Jerryho" : "Terezkine") : "všetko"], ["Jerry", "Jerryho"], ["Terezka", "Terezkine"], ["vsetko", "všetko"]] as const)
+            .filter(([id]) => id !== "auto" || !!automat)
+            .filter(([id]) => !(automat && id === automat))
+            .map(([id, l]) => (
+              <button key={id} onClick={() => setKtoreVeci(id)} style={{
+                padding: "4px 10px", borderRadius: 14, fontSize: 11.5, cursor: "pointer",
+                border: `1px solid ${ktoreVeci === id ? C.accent : C.border}`,
+                background: ktoreVeci === id ? C.accentBg : "transparent",
+                color: ktoreVeci === id ? C.accentLight : C.textMuted,
+              }}>{l}</button>
+            ))}
+        </div>
+        {!automat && ktoreVeci === "auto" && (
+          <div style={{ fontSize: 11, color: C.orange, whiteSpace: "nowrap" }}>
+            Appka nevie, kto si — ukazuje všetko. Prihlás sa menom, nie spoločným heslom.
+          </div>
+        )}
+      </div>
+
+      {/* KOPA: aktívna karta je cez celú šírku, ostatné ležia pod ňou a
+          vykúkajú vpravo len okrajom.
+          Predtým stáli vedľa seba v mriežke a Jerry na to povedal jasne:
+          „ale ja chcem široké cez celú." Vedľa seba sa nedá mať oboje —
+          buď je karta široká, alebo je vedľa nej miesto. Takto je: široká
+          je, a to, že za ňou niečo je, hovorí okraj, nie stĺpec. */}
+      {/* PEVNÁ výška, nie minimálna. Minimálna výšku len nadstavuje — karta
+          s dlhým zoznamom aj tak narástla a šípky skákali. Fixná výška
+          + `minHeight: 0` na rolovacom vnútri je jediná dvojica, ktorá vo
+          flexe naozaj drží: bez tej nuly sa dieťa odmietne zmenšiť pod svoj
+          obsah a `overflow` sa nikdy nezapne. */}
+      <div ref={kopa} style={{ position: "relative", height: "min(72vh, 660px)", touchAction: "pan-y" }}>
+        {dalsie.map((d, j) => (
+          <div
+            key={d.druh}
+            aria-hidden="true"
+            style={{
+              position: "absolute",
+              top: (j + 1) * 9,
+              left: (j + 1) * 9,
+              right: -((j + 1) * 11),
+              bottom: -((j + 1) * 9),
+              borderRadius: 14,
+              background: mix(C.border, 90),
+              border: `1px solid ${mix(C.border, 150)}`,
+              // Plátky vzadu sa pri prepnutí posunú tiež — inak by karta
+              // odletela sama a kopa by stála, čo vyzerá ako chyba.
+              opacity: prechod?.faza === "von" ? (j === 0 ? 0.85 : 0.5) : j === 0 ? 0.6 : 0.3,
+              transform: prechod?.faza === "von" ? `translateX(${-prechod.smer * 7}px)` : "none",
+              transition: "transform .15s ease-in, opacity .15s ease-in",
+              zIndex: 0,
+            }}
+          />
+        ))}
+        {/* Šípky sedia na BOKOCH karty, nie pod ňou.
+            Jerry, 23. 9. 2026: „prepínanie medzi kartami by malo byť po
+            stranách kariet, pretože keď chcem prepnúť, musím ďaleko
+            zoskrolovať." Karta má vnútri zoznam na pol obrazovky, takže
+            tlačidlo pod ňou je zakaždým na inom mieste a často mimo
+            dohľadu. Bok je vždy tam, kde bol. */}
+        {/* Kolotoč: z poslednej karty sa ide na prvú a naopak (Jerry, 23. 9.
+            2026). Šípka na konci, ktorá sa nedá stlačiť, je slepá ulička —
+            človek musí prejsť celú kopu späť, aby sa dostal o jednu ďalej. */}
+        {/* ŠÍPKY ZOSTÁVAJÚ AJ NA TELEFÓNE.
+            28. 9. 2026 som ich na úzkej obrazovke skryl s tým, že ich nahradí
+            ťah prsta — a Jerry zostal bez oboch: „teraz mi to nejde už vôbec,
+            pretože tam nie sú ani tie gombíky po strane." Náhrada sa smie
+            zapnúť až vtedy, keď je overené, že naozaj funguje; dovtedy platí
+            to, čo fungovalo. Na telefóne sú len užšie. */}
+        <button onClick={() => prepni(-1)} aria-label="Predchádzajúca karta" style={bocnaSipka("left", zive.length > 1, uzke)}>‹</button>
+        <button onClick={() => prepni(1)} aria-label="Ďalšia karta" style={bocnaSipka("right", zive.length > 1, uzke)}>›</button>
+        {/* Karta má PEVNÚ výšku. Jerry, 23. 9. 2026: „karty musia byť stále
+            rovnako veľké, aj keď je tam menej textu, aby miesto na pravej
+            a ľavej strane, kde prepínam, bolo stále na tom istom mieste."
+            Šípka, ktorá pri každej karte skočí inam, sa hľadá očami — a to je
+            presne tá práca navyše, ktorú mala kopa odstrániť. */}
+        <div style={{ position: "relative", zIndex: 1, margin: uzke ? "0 30px" : "0 46px", height: "100%", ...pohybKarty(prechod) }}>
+          <Card style={{ marginBottom: 0, height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+              <div style={{ fontSize: 18, fontWeight: 800 }}>{k.nadpis}</div>
+              {!BEZ_FRONTY.includes(k.druh) && <div style={{ fontSize: 11.5, color: C.textMuted }}>{zostava(k)} zostáva</div>}
+            </div>
+            <div style={{ fontSize: 11.5, color: C.textDim, marginTop: 3 }}>
+              {k.podnadpis}
+              {k.druh === "krok" && k.krok === "sms" && pocetSms != null ? ` · ${pocetSms} ${pocetSms === 1 ? "klient" : pocetSms < 5 ? "klienti" : "klientov"}` : ""}
+            </div>
+
+            <div style={{ marginTop: 14, flexGrow: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+              {/* Zoznamy rolujú vnútri; karta klienta si výšku riadi sama —
+                  ale LEN na monitore. Na telefóne idú jej stĺpce pod seba,
+                  takže rolovať musí karta, inak sa spodok profilu nedá
+                  dosiahnuť (Jerry, 30. 9. 2026). */}
+              <div style={{ flexGrow: 1, minHeight: 0, overflowY: k.druh === "klient" && !uzke ? "visible" : "auto", display: k.druh === "klient" ? "flex" : "block", flexDirection: "column" }}>
+              {k.druh === "krok" ? kresliKrok(k) : obsahKarty(k)}
               </div>
             </div>
             <datalist id="ws-klienti">{mena.map((m) => <option key={m} value={m} />)}</datalist>

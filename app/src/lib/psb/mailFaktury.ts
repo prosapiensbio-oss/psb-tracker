@@ -1,5 +1,5 @@
 import { FARBY_MAILU as FM, czk } from "./mailKlientovi";
-import { DODAVATEL, den, suma, type Faktura } from "./vydanaFaktura";
+import { DODAVATEL, den, klientiFaktury, polozkyFaktury, popisFaktury, suma, type Faktura } from "./vydanaFaktura";
 
 /**
  * TEXT MAILU, KTORÝM ODCHÁDZA FAKTÚRA.
@@ -61,7 +61,7 @@ export function mailFaktury(f: Faktura, volby: VolbyMailu = {}): MailFaktury {
     ? [
       "Dobrý den,",
       "",
-      `posílám fakturu č. ${f.cislo} na ${ciastka} se splatností ${den(f.splatnost)} za ${f.popis}.`,
+      `posílám fakturu č. ${f.cislo} na ${ciastka} se splatností ${den(f.splatnost)} za ${popisFaktury(f)}.`,
       "",
       "V příloze je PDF s QR platbou — po načtení v mobilním bankovnictví se částka",
       "i variabilní symbol předvyplní.",
@@ -171,7 +171,9 @@ export function mailFakturyHtml(f: Faktura, volby: VolbyHtmlMailu = {}): string 
     <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:${FM.platba};border-radius:14px">
       <tr>
         <td style="padding:20px 22px;font-size:14px;color:${FM.platbaText};line-height:1.7">
-          ${escH(f.popis)}${f.ks > 1 ? ` · ${f.ks} ks` : ""}<br><b style="font-size:24px">${czk(f.celkom)}</b><br>
+          ${klientiFaktury(f).length > 1
+    ? polozkyFaktury(f).map((p) => `${escH(p.popis)} · ${escH(p.klient)} · ${czk(p.celkom)}`).join("<br>")
+    : `${escH(f.popis)}${f.ks > 1 ? ` · ${f.ks} ks` : ""}`}<br><b style="font-size:24px">${czk(f.celkom)}</b><br>
           <span style="color:${FM.platbaSlaba}">Účet ${escH(DODAVATEL.ucet)}<br>VS ${escH(f.cislo)} · splatnost ${escH(denCz(f.splatnost))}</span>
         </td>
         ${volby.qrCid ? `<td width="128" style="padding:20px 22px 20px 0;text-align:right">

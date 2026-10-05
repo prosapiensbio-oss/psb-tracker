@@ -85,15 +85,16 @@ export async function obsahOdkazu(
    * tá istá definícia, akú ukazuje karta dlžníkov (`dlhJednehoKlienta`).
    */
   const platby = ((await DB.prepare(
-    "SELECT suma_czk, datum, zrusene_at FROM platby WHERE klient = ?1",
-  ).bind(c.name).all().catch(() => ({ results: [] }))).results || []) as unknown as { suma_czk: number; datum: string; zrusene_at: string | null }[];
+    "SELECT suma_czk, datum, zrusene_at, vopred FROM platby WHERE klient = ?1",
+  ).bind(c.name).all().catch(() => ({ results: [] }))).results || []) as unknown as { suma_czk: number; datum: string; zrusene_at: string | null; vopred?: number | null }[];
   const mojePoplatky = (data.poplatky || [])
     .filter((p) => normName(p.klient) === normName(c.name))
     .map((p) => ({ datum: p.datum, klient: c.name, popis: p.popis, suma: p.suma }));
   const dlh = dlhJednehoKlienta(
     mojePoplatky,
     balicky.map((b): BalicekDlh => ({ cena: b.cena_czk, platnostOd: b.platnost_od, zdroj: b.zdroj, zruseneAt: b.zrusene_at, nazov: b.nazov })),
-    platby.map((p): PlatbaDlh => ({ suma: p.suma_czk, datum: p.datum, zruseneAt: p.zrusene_at })),
+    platby.map((p): PlatbaDlh => ({ suma: p.suma_czk, datum: p.datum, zruseneAt: p.zrusene_at, vopred: p.vopred })),
+    data.dlhKokpit ? (data.dlhKokpit[normName(c.name)] || { dlzi: 0, pocet: 0 }) : null,
   );
 
   const vypis = historiaPreMail(c.name, os, c, dnes, dalsi, rozsah === 0, Math.max(1, rozsah));

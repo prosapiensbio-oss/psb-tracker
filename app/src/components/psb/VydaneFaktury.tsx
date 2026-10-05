@@ -6,7 +6,7 @@ import { vytlacFakturu } from "../../lib/psb/fakturaHtml";
 import { adresyMailu } from "../../lib/psb/mime";
 import { mailFaktury } from "../../lib/psb/mailFaktury";
 import {
-  DODAVATEL, POPISY, SPLATNOST_DNI, den, poSplatnosti, splatnostZ, suma, type Faktura,
+  DODAVATEL, POPISY, SPLATNOST_DNI, den, poSplatnosti, splatnostZ, suma, type Faktura, type PolozkaFaktury,
 } from "../../lib/psb/vydanaFaktura";
 import { Card, H3, Info } from "./ui";
 
@@ -29,7 +29,12 @@ type Riadok = {
   odb_psc: string; odb_mesto: string; odb_stat: string; odb_email: string;
   poznamka: string; odoslane_at: string | null; odoslane_komu: string;
   uhradene_at: string | null; storno_at: string | null; storno_dovod: string;
+  /** Položky za ďalších klientov na tej istej faktúre. */
+  dalsie?: PolozkaFaktury[];
 };
+
+/** Rozpísaná položka za ďalšieho klienta — čísla ako text, kým sa píšu. */
+type DalsiaPolozka = { klient: string; popis: string; ks: string; cena: string };
 
 type Udaje = {
   klient: string; stat: string; firma: string; ico: string; dic: string;
@@ -52,6 +57,7 @@ const naFakturu = (r: Riadok): Faktura => ({
   cislo: r.cislo, klient: r.klient, vystavene: r.vystavene, splatnost: r.splatnost,
   popis: r.popis, ks: r.ks, cena: r.cena_czk, celkom: r.celkom_czk,
   poznamka: r.poznamka, stornoAt: r.storno_at, uhradeneAt: r.uhradene_at,
+  ...(r.dalsie?.length ? { dalsie: r.dalsie } : {}),
   odberatel: {
     firma: r.odb_firma, ico: r.odb_ico, dic: r.odb_dic, ulica: r.odb_ulica,
     psc: r.odb_psc, mesto: r.odb_mesto, stat: r.odb_stat, email: r.odb_email,
@@ -95,6 +101,12 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana 
     splatnostDni: String(SPLATNOST_DNI), poznamka: "", balicekId: "",
   });
   const [u, setU] = useState<Omit<Udaje, "klient">>(PRAZDNE_UDAJE);
+  /**
+   * Ďalší klienti na tej istej faktúre. Jerry, 4. 10. 2026: „Dan a Monika
+   * platia na jednu faktúru" — firma dostane jeden doklad, ale každý z nich
+   * má svoje členstvo a svoju platbu.
+   */
+  const [dalsie, setDalsie] = useState<DalsiaPolozka[]>([]);
   /**
    * Rozpísaný mail pred odoslaním.
    *
@@ -177,8 +189,10 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana 
       cena: Number(f.cena) || 0, vystavene: f.vystavene,
       splatnostDni: Number(f.splatnostDni) || SPLATNOST_DNI,
       poznamka: f.poznamka, balicekId: f.balicekId || undefined,
+      dalsie: dalsie.map((d) => ({ klient: d.klient.trim(), popis: d.popis, ks: Number(d.ks) || 1, cena: Number(d.cena) || 0 })),
     }, "vystav");
     if (!j) return;
+    setDalsie([]);
     setHlaska(`Vystavená faktúra ${j.cislo}. Otvor ju a ulož ako PDF.`);
     setOtvorenaNova(false);
     setF((s) => ({ ...s, popis: "", cena: "", poznamka: "", balicekId: "" }));
@@ -315,9 +329,47 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana 
             <Pole label="Počet m. j." hodnota={f.ks} nastav={(v) => setF((s) => ({ ...s, ks: v }))} typ="number" />
             <Pole label="Cena za m. j. (Kč)" hodnota={f.cena} nastav={(v) => setF((s) => ({ ...s, cena: v }))} typ="number" />
             <div style={{ flex: "1 1 150px", alignSelf: "flex-end", paddingBottom: 6 }}>
-              <span style={{ fontSize: 11.5, color: C.textDim }}>celkom </span>
+              <span style={{ fontSize: 11.5, color: C.textDim }}>{dalsie.length ? `za ${f.klient || "klienta"} ` : "celkom "}</span>
               <b style={{ fontSize: 15, color: C.text }}>{suma((Number(f.ks) || 0) * (Number(f.cena) || 0))} Kč</b>
             </div>
+          </div>
+
+          {dalsie.map((d, i) => {
+            const nastav = (zmena: Partial<DalsiaPolozka>) => setDalsie((s) => s.map((x, j) => (j === i ? { ...x, ...zmena } : x)));
+            return (
+              <div key={i} style={{ padding: "8px 10px", borderRadius: 9, border: `1px dashed ${C.border}`, marginBottom: 8 }}>
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 6 }}>
+                  <div style={{ flex: "2 1 200px" }}>
+                    <span style={popisStyl}>Ďalší klient na tejto faktúre</span>
+                    <input list="faktura-klienti" value={d.klient} onChange={(e) => nastav({ klient: e.target.value })} style={{ ...poleStyl, borderColor: d.klient && !mena.includes(d.klient.trim()) ? C.orange : C.border }} placeholder="meno klienta" />
+                  </div>
+                  <Pole label="Počet m. j." hodnota={d.ks} nastav={(v) => nastav({ ks: v })} typ="number" />
+                  <Pole label="Cena za m. j. (Kč)" hodnota={d.cena} nastav={(v) => nastav({ cena: v })} typ="number" />
+                  <button type="button" onClick={() => setDalsie((s) => s.filter((_, j) => j !== i))} style={{ alignSelf: "flex-end", padding: "7px 10px", borderRadius: 8, border: `1px solid ${C.border}`, background: "transparent", color: C.textDim, cursor: "pointer", fontSize: 12 }}>odobrať</button>
+                </div>
+                <input value={d.popis} onChange={(e) => nastav({ popis: e.target.value })} placeholder="popis položky" style={poleStyl} />
+              </div>
+            );
+          })}
+          <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap", marginBottom: 10 }}>
+            <button
+              type="button"
+              // Predvyplní sa to isté, čo má prvá položka — pri Danovi a
+              // Monike je to ten istý balíček za tú istú cenu.
+              onClick={() => setDalsie((s) => [...s, { klient: "", popis: f.popis, ks: f.ks || "1", cena: f.cena }])}
+              style={{ padding: "6px 11px", borderRadius: 8, fontSize: 12, cursor: "pointer", border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted, fontFamily: "inherit" }}
+            >
+              + ďalší klient na tejto faktúre
+            </button>
+            {dalsie.length > 0 && (
+              <span style={{ fontSize: 12.5, color: C.textMuted }}>
+                spolu na faktúre <b style={{ fontSize: 15, color: C.text }}>{suma(
+                  (Number(f.ks) || 0) * (Number(f.cena) || 0)
+                  + dalsie.reduce((n, d) => n + (Number(d.ks) || 0) * (Number(d.cena) || 0), 0),
+                )} Kč</b>
+                <span style={{ color: C.textDim }}> · platba sa potom rozdelí každému zvlášť</span>
+              </span>
+            )}
           </div>
 
           <span style={popisStyl}>Poznámka pod položkou (nepovinné)</span>
@@ -501,6 +553,7 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana 
                 <b style={{ fontSize: 12.5, color: C.text, fontVariantNumeric: "tabular-nums" }}>{r.cislo}</b>
                 <span style={{ fontSize: 12.5, color: C.text, flex: "1 1 160px" }}>
                   {r.odb_firma && r.odb_firma !== r.klient ? `${r.odb_firma} · ${r.klient}` : r.klient}
+                  {!!r.dalsie?.length && <span style={{ color: C.accentLight }}> + {[...new Set(r.dalsie.map((d) => d.klient))].join(", ")}</span>}
                   <span style={{ color: C.textDim }}> — {r.popis.length > 46 ? `${r.popis.slice(0, 44)}…` : r.popis}</span>
                 </span>
                 <span style={{ fontSize: 12.5, color: C.text, fontVariantNumeric: "tabular-nums" }}>{suma(r.celkom_czk)} Kč</span>

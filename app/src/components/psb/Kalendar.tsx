@@ -10,7 +10,6 @@ import { trenerZPrihlasenia } from "../../lib/psb/workspaceKarty";
 import { KALENDAR_TRENERA } from "../../lib/psb/nahodTrening";
 import { guillermoZostatok } from "../../lib/psb/guillermo";
 import type { PSBData } from "../../lib/psb/types";
-import { SmsKlientovi } from "./SmsKlientovi";
 import { C, mix } from "../../lib/psb/theme";
 import { Card, Empty, H3, Info, Select, TrenerPills } from "./ui";
 import { useUzke } from "./useUzke";
@@ -2002,7 +2001,7 @@ export function odtrenovaneMimoExportu(
  * (ozvať sa, kým klienta ešte vidíš na hodine), a tie patria na prvú obrazovku.
  * Kalendár je miesto, kde sa dáta zbierajú; Kokpit je miesto, kde sa konajú.
  */
-export function Balicky({ udalosti, buduce = [], clients, sedenia = [], onObnov, style, onKlient, onVypis, matchTrener, children, poslednyReport }: {
+export function Balicky({ udalosti, buduce = [], clients, sedenia = [], onObnov, style, onKlient, onVypis, matchTrener, children, poslednyReport, hore }: {
   udalosti: KalUdalost[];
   /**
    * Objednané tréningy ĎALEKO dopredu — len klient a deň.
@@ -2037,6 +2036,8 @@ export function Balicky({ udalosti, buduce = [], clients, sedenia = [], onObnov,
   matchTrener?: (t: string) => boolean;
   /** Doplnková sekcia pod zoznamom (na Kokpite končiace platnosti členstiev). */
   children?: React.ReactNode;
+  /** Sekcia NAD zoznamom — v bete nezaplatené (Jerry, 4. 10. 2026). */
+  hore?: React.ReactNode;
   /** Posledný import balíčkov — pri pohľade „PTminder" hovorí, k akej chvíli
    *  ten stav platí. Bez neho je potvrdené číslo bez dátumu, čiže na nič. */
   poslednyReport?: { date: string; filename: string } | null;
@@ -2238,6 +2239,7 @@ export function Balicky({ udalosti, buduce = [], clients, sedenia = [], onObnov,
 
   return (
     <Card style={style}>
+      {hore && <div style={{ marginBottom: 18 }}>{hore}</div>}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
         <H3>
           <Info
@@ -2374,7 +2376,8 @@ export function Balicky({ udalosti, buduce = [], clients, sedenia = [], onObnov,
                   )}
                 </span>
               </div>
-              <SmsKlientovi meno={r.meno} zostatok={r.teraz} trener={r.trener} odvodene={r.odvodene} dnesnyTrening={r.poslednyDnes} maly />
+              {/* SMS sa od 5. 10. 2026 posielajú len z Workspace, krok „SMS pre
+                  klientov" (Jerry: „chcel by som to na jednom mieste"). */}
               {onVypis && (
                 <button
                   onClick={() => onVypis(r.meno)}

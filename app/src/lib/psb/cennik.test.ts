@@ -44,12 +44,30 @@ describe("cenník", () => {
 
 describe("platnostDo", () => {
   it("osem týždňov od 1. 9.", () => {
-    expect(platnostDo("2026-09-01", 8)).toBe("2026-10-27");
+    expect(platnostDo("2026-09-01", 8)).toBe("2026-10-26");
   });
   it("bez týždňov nepredvypĺňa nič — doplnenie členstva platnosť nemá", () => {
     expect(platnostDo("2026-09-01", null)).toBe("");
   });
   it("nezmyselný dátum nevyrobí nezmyselný koniec", () => {
     expect(platnostDo("", 8)).toBe("");
+  });
+});
+
+describe("platnosť ako v PTminderi", () => {
+  it("8 týždňov: Dan Kouřil 2. 9. → 27. 10.", () => {
+    expect(platnostDo("2026-09-02", 8)).toBe("2026-10-27");
+  });
+  it("4 týždne: +27 dní", () => {
+    expect(platnostDo("2026-02-17", 4)).toBe("2026-03-16");
+  });
+  it("mesiac: 24. 3. → 23. 4.", () => {
+    expect(platnostDo("2026-03-24", 4, 1)).toBe("2026-04-23");
+  });
+  it("pol roka: 12. 2. → 11. 8.", () => {
+    expect(platnostDo("2026-02-12", 26, 6)).toBe("2026-08-11");
+  });
+  it("31. 1. + mesiac sa zarazí na konci februára", () => {
+    expect(platnostDo("2026-01-31", 4, 1)).toBe("2026-02-27");
   });
 });

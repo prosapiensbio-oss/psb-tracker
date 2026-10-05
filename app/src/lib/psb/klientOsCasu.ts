@@ -137,7 +137,7 @@ export function osCasuKlienta(
      * z názvu — a „6h" v názve nemusí byť šesť hodín (Hanus, júl 2026: 8).
      */
     historia?: Balicek[];
-    services?: Sluzba[]; poplatky?: Poplatok[]; treningyZdarma?: Zdarma[]; balicky?: BalicekKokpitu[];
+    services?: Sluzba[]; poplatky?: Poplatok[]; nezaplateneKokpit?: { klient: string; den: string }[]; treningyZdarma?: Zdarma[]; balicky?: BalicekKokpitu[];
     /**
      * Koľko hodín pridalo „Doplnenie členstva" — kľúč `klient|deň`.
      *
@@ -193,9 +193,11 @@ export function osCasuKlienta(
     out.push({ druh: "platba", den: den(p.date), suma: p.amount, metoda: p.method, poznamka: p.note });
   }
 
-  const nezaplateneDni = new Set(
-    (zdroj.poplatky || []).filter((p) => normName(p.klient) === k).map((p) => den(p.datum)),
-  );
+  const nezaplateneDni = new Set([
+    ...(zdroj.poplatky || []).filter((p) => normName(p.klient) === k).map((p) => den(p.datum)),
+    // Balíček z Kokpitu bez platby — viď `nezaplateneZKokpitu`.
+    ...(zdroj.nezaplateneKokpit || []).filter((b) => normName(b.klient) === k).map((b) => den(b.den)),
+  ]);
   /** Kľúče `deň|názov` a `deň|hhodiny` balíčkov z Kokpitu — PTminder im ustúpi. */
   const zKokpitu = new Set<string>();
   /**

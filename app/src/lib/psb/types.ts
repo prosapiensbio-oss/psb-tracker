@@ -169,6 +169,17 @@ export type PSBData = {
    * a koniec platnosti minulých období — kniha predajov nesie len názov.
    */
   historiaBalickov?: PackageRow[];
+  /**
+   * Balíčky z Kokpitu, ktoré platby nepokryli (`nezaplateneZKokpitu`).
+   * Hodiny nedávajú, kým sa nezaplatí — karta aj os ich berú ako
+   * nezaplatené, rovnako ako otvorený poplatok z PTmindera.
+   */
+  nezaplateneKokpit?: { klient: string; den: string; cena: number; nazov: string; doplatit?: number }[];
+  /**
+   * Dlh za balíčky z Kokpitu podľa klienta (kľúč `normName`) — súčet
+   * `nezaplateneKokpit`. Jediný zdroj pre kartu dlžníkov, profil aj QR.
+   */
+  dlhKokpit?: Record<string, { dlzi: number; pocet: number }>;
   clientOverrides: Record<string, ClientOverride>;
   anomalyAck: Record<string, AnomalyAck>;
   uploadLog: UploadLogEntry[];

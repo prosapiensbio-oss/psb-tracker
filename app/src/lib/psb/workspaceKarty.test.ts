@@ -1,7 +1,7 @@
 // Workspace — jedna karta = jeden DRUH práce, a patrí tomu, kto je prihlásený.
 import { describe, expect, it } from "bun:test";
 
-import { BEZ_FRONTY, popisZmeny, postavKarty, type Zmena, rozdelAnamnezy, type AnamnezaRiadok } from "./workspaceKarty";
+import { BEZ_FRONTY, krokyBety, popisZmeny, postavKarty, type Zmena, rozdelAnamnezy, type AnamnezaRiadok } from "./workspaceKarty";
 
 const zmena = (o: Partial<Zmena> & { id: string; trener: string }): Zmena => ({
   id: o.id, druh: o.druh ?? "zrusene", klient: o.klient ?? "Martin Vaško", nazov: null,
@@ -139,7 +139,8 @@ describe("karta klienta je stôl, nie fronta", () => {
     // Tieto tri nie — sú to miesta, kam sa chodí robiť.
     const k = postavKarty({ zmeny: [], nezname: [], platby: [], navrhMena: () => "", ktoSom: "Jerry" });
     expect(k.map((x) => x.druh)).toEqual(["klient", "faktury", "anamnezy"]);
-    expect(BEZ_FRONTY).toEqual(["klient", "faktury", "anamnezy"]);
+    // „krok" je karta bety (4. 10. 2026) — prázdna povie „Všetko vybavené".
+    expect(BEZ_FRONTY).toEqual(["klient", "faktury", "anamnezy", "krok"]);
   });
 
   it("nemá položky, takže sa nedá „vybaviť“", () => {
@@ -212,5 +213,15 @@ describe("rozdelAnamnezy", () => {
     const { aktualne, archiv } = rozdelAnamnezy([r("Dávny Klient", null)], "2026-10-02");
     expect(aktualne).toHaveLength(0);
     expect(archiv).toHaveLength(1);
+  });
+});
+
+describe("beta: tri kroky", () => {
+  it("staré karty sa zložia do krokov v poradí týždňa a kroky nemiznú", () => {
+    const k = postavKarty({ zmeny: [zmena({ id: "z1", trener: "Jerry" })], nezname: [], platby: [], navrhMena: () => "", ktoSom: "Jerry" });
+    const b = krokyBety(k);
+    expect(b.map((x) => (x.druh === "krok" ? x.krok : x.druh))).toEqual(["klient", "kalendar", "sms", "platby", "faktury", "anamnezy"]);
+    const kal = b.find((x) => x.druh === "krok" && x.krok === "kalendar");
+    expect(kal && kal.druh === "krok" ? kal.sekcie.map((s) => s.druh) : []).toEqual(["zmeny"]);
   });
 });

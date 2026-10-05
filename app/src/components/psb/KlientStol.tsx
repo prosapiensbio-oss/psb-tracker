@@ -58,6 +58,8 @@ type Balicek = {
 type Platba = {
   id: string; klient: string; datum: string; suma_czk: number;
   sposob: string; fio_id: string | null; poznamka: string | null; zrusene_at: string | null;
+  /** Zaplatené vopred na balíček, ktorý ešte nevznikol (migrácia 0097). */
+  vopred?: number | null;
 };
 
 const dnesISO = () => new Date().toISOString().slice(0, 10);
@@ -235,6 +237,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
       // Skutočné hodiny minulých členstiev z PTmindera — nie z názvu.
       historia: (data.historiaBalickov || []) as never,
       poplatky: (data.poplatky || []) as never,
+      nezaplateneKokpit: data.nezaplateneKokpit || [],
       treningyZdarma: (data.treningyZdarma || []) as never,
       // Odpovede „koľko hodín pridalo doplnenie" — bez nich appka v tom
       // období nepočíta dlh (viď migráciu 0085).
@@ -244,7 +247,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
       balicky: balicky as never,
       kalUdalosti,
     }) : []),
-    [meno, data.sessions, data.payments, data.packages, data.services, data.poplatky, data.treningyZdarma, balicky, kalUdalosti],
+    [meno, data.sessions, data.payments, data.packages, data.services, data.poplatky, data.nezaplateneKokpit, data.treningyZdarma, balicky, kalUdalosti],
   );
 
   /**
@@ -321,13 +324,20 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
    * z nich) sú v `dlhKlienta.ts`.
    */
   const dlh = useMemo(
-    () => dlhKlienta(
-      balicky.filter((b) => normName(b.klient) === normName(meno))
-        .map((b) => ({ cena: b.cena_czk, platnostOd: b.platnost_od, zdroj: b.zdroj, zruseneAt: b.zrusene_at, nazov: b.nazov })),
-      vlastnePlatby.filter((x) => normName(x.klient) === normName(meno))
-        .map((x) => ({ suma: x.suma_czk, datum: x.datum, zruseneAt: x.zrusene_at })),
-    ),
-    [balicky, vlastnePlatby, meno],
+    // Server spočítal dlh aj s ohľadom na PTminder (`data.dlhKokpit`) — ten
+    // istý, aký vidí zoznam dlžníkov a QR za odkazom.
+    () => {
+      const lokal = dlhKlienta(
+        balicky.filter((b) => normName(b.klient) === normName(meno))
+          .map((b) => ({ cena: b.cena_czk, platnostOd: b.platnost_od, zdroj: b.zdroj, zruseneAt: b.zrusene_at, nazov: b.nazov })),
+        vlastnePlatby.filter((x) => normName(x.klient) === normName(meno))
+          .map((x) => ({ suma: x.suma_czk, datum: x.datum, zruseneAt: x.zrusene_at, vopred: x.vopred })),
+      );
+      // Rozpis (za koľko, koľko zaplatené) z vlastného výpočtu, samotný dlh
+      // zo servera — ten pozná aj PTminder.
+      return data.dlhKokpit ? { ...lokal, ...(data.dlhKokpit[normName(meno)] || { dlzi: 0, pocet: 0 }) } : lokal;
+    },
+    [balicky, vlastnePlatby, meno, data.dlhKokpit],
   );
 
   const mojePlatby = useMemo(
@@ -2203,7 +2213,7 @@ function FormularBalicka({ f, setF, pracujem, onUloz, popis = "Nahodiť" }: {
       nazov: sab.nazov,
       hodiny: sab.hodiny == null ? "" : String(sab.hodiny),
       cenaCzk: sab.cena == null ? "" : String(sab.cena),
-      platnostDo: platnostDo(f.platnostOd, sab.tyzdnov),
+      platnostDo: platnostDo(f.platnostOd, sab.tyzdnov, sab.mesiacov),
     } as never);
   };
 
@@ -2217,7 +2227,7 @@ function FormularBalicka({ f, setF, pracujem, onUloz, popis = "Nahodiť" }: {
    */
   const zmenOd = (od: string) => {
     const sab = CENNIK.find((x) => x.nazov === f.nazov);
-    setF({ ...f, platnostOd: od, platnostDo: sab ? platnostDo(od, sab.tyzdnov) : f.platnostDo } as never);
+    setF({ ...f, platnostOd: od, platnostDo: sab ? platnostDo(od, sab.tyzdnov, sab.mesiacov) : f.platnostDo } as never);
   };
 
   const skupiny = ["Offline", "Online", "Špeciálne"] as const;

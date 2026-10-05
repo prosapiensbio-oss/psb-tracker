@@ -277,7 +277,11 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
    * nezaplatí (Jerry, 3. 10. 2026: „nezaplatený balík je 0"). Kľúč je deň
    * začiatku balíčka, rovnako ako na osi klienta (`klientOsCasu`).
    */
-  const nezaplateneBalicky = new Set((data.poplatky || []).map((p) => klucNezaplateneho(p.klient, p.datum)));
+  const nezaplateneBalicky = new Set([
+    ...(data.poplatky || []).map((p) => klucNezaplateneho(p.klient, p.datum)),
+    // Balíčky z Kokpitu, ktoré platby nepokryli — to isté pravidlo (4. 10. 2026).
+    ...(data.nezaplateneKokpit || []).map((b) => klucNezaplateneho(b.klient, b.den)),
+  ]);
 
   for (const s of data.sessions) {
     let c = map[s.client];

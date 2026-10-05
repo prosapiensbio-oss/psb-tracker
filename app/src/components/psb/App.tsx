@@ -64,7 +64,7 @@ type BalicekRiadok = {
   klient: string; nazov: string; hodiny: number | null; platnost_od: string;
   platnost_do: string | null; cena_czk: number | null; zdroj: string; zrusene_at: string | null;
 };
-type PlatbaRiadok = { klient: string; datum: string; suma_czk: number; zrusene_at: string | null };
+type PlatbaRiadok = { klient: string; datum: string; suma_czk: number; zrusene_at: string | null; vopred?: number | null };
 import type { PorovnanieDochadzky } from "../../lib/psb/porovnanieDochadzky";
 import { Assistant, useAssistantChat } from "./Assistant";
 import { JarvisOkno } from "./JarvisOkno";
@@ -683,6 +683,13 @@ export function PSBApp() {
   // Zmazanie alebo premenovanie klienta mení `/api/data` — bez tohto by appka
   // posielala človeka obnoviť stránku, čo je ospravedlnenie, nie riešenie.
   useEffect(() => pocuvaj("klienti", () => void load(true)), [load]);
+  /**
+   * PLATBA MENÍ HODINY (od 4. 10. 2026). Nezaplatený balíček z Kokpitu
+   * hodiny nedáva a platba ho zaplatí — `nezaplateneKokpit` počíta server
+   * v `/api/data`. Bez nového načítania by po priradení platby karta
+   * klienta ďalej ukazovala mínus, hoci peniaze prišli.
+   */
+  useEffect(() => pocuvaj("peniaze", () => void load(true)), [load]);
 
   const clients = useMemo(() => deriveClients(data), [data]);
   // Latest clients for tolerant name resolution in setOverride (e.g. AI passes "Jakub Stigut" → "Jakub Štigut").
@@ -1010,6 +1017,32 @@ export function PSBApp() {
   // opravy v zamknutom mesiaci a vedel povedať „júl sa už dá zamknúť".
   /** Hlavné dáta sú načítané — až potom sa smú spustiť ďalšie ťažké dopyty. */
   const [dataHotove, setDataHotove] = useState(false);
+  /**
+   * BALÍČEK PRVÝM TRÉNINGOM — automaticky (Jerry, 4. 10. 2026: „balíčky
+   * vznikajú automaticky začatím prvej hodiny"). Server prejde klientov
+   * a tomu, kto trénuje bez balíčka, ho založí (`/api/balicky` akcia
+   * `automaticky`). S ODSTUPOM po načítaní: ťažké dopyty naraz zhodili
+   * 1. 9. 2026 worker (viď nižšie); a najviac raz za 10 minút na kartu.
+   */
+  useEffect(() => {
+    if (!dataHotove) return;
+    try {
+      const kluc = "psb-automaticke-balicky";
+      const posledne = Number(sessionStorage.getItem(kluc) || 0);
+      if (Date.now() - posledne < 10 * 60 * 1000) return;
+      sessionStorage.setItem(kluc, String(Date.now()));
+    } catch { /* bez úložiska sa beží pri každom načítaní — server je idempotentný */ }
+    const t = setTimeout(() => {
+      void fetch("/api/balicky", {
+        method: "POST", credentials: "same-origin",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ akcia: "automaticky" }),
+      }).then((r) => r.json()).then((j: { ok?: boolean; vznikli?: unknown[] }) => {
+        if (j?.ok && j.vznikli?.length) oznam("klienti");
+      }).catch(() => null);
+    }, 8000);
+    return () => clearTimeout(t);
+  }, [dataHotove]);
   const [zamknuteMesiace, setZamknuteMesiace] = useState<string[]>([]);
   useEffect(() => {
     void fetchPeriods().then(({ periods }) => setZamknuteMesiace(periods.filter((p) => p.locked).map((p) => p.month)));
@@ -2290,6 +2323,7 @@ function skupinaFaktur(
       packages: (data.packages || []) as never,
       services: (data.services || []) as never,
       poplatky: (data.poplatky || []) as never,
+      nezaplateneKokpit: data.nezaplateneKokpit || [],
       treningyZdarma: (data.treningyZdarma || []) as never,
       // Odpovede „koľko hodín pridalo doplnenie" — bez nich appka v tom
       // období nepočíta dlh (viď migráciu 0085).
@@ -2311,9 +2345,11 @@ function skupinaFaktur(
           cena: b.cena_czk, platnostOd: (b.platnost_od || "").slice(0, 10), zdroj: b.zdroj, zruseneAt: b.zrusene_at, nazov: b.nazov,
         }))])),
         Object.fromEntries(Object.entries(podla(vlastnePlatby)).map(([m, ps]) => [m, ps.map((p) => ({
-          suma: p.suma_czk, datum: (p.datum || "").slice(0, 10), zruseneAt: p.zrusene_at,
+          suma: p.suma_czk, datum: (p.datum || "").slice(0, 10), zruseneAt: p.zrusene_at, vopred: p.vopred,
         }))])),
         treneri,
+        undefined,
+        data.dlhKokpit,
       ),
     };
   }, [clients, balickyRiadky, vlastnePlatby, data, kalUdalosti]);

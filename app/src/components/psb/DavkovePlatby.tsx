@@ -28,6 +28,15 @@ import { Card, H3, Info } from "./ui";
 type Navrh = {
   fioId: string; datum: string; suma: number; text: string;
   kandidati: string[]; klientsky?: boolean; zdrojNavrhu?: string;
+  rozdelenie?: { klient: string; suma: number }[];
+  zdrojRozdelenia?: "faktura" | "spolocne" | "ptminder";
+  poznamka?: string;
+};
+
+const ZDROJ_ROZDELENIA: Record<string, string> = {
+  faktura: "podľa položiek faktúry",
+  spolocne: "už raz platili spolu",
+  ptminder: "tak to zapísal PTminder",
 };
 
 const ZDROJ: Record<string, string> = {
@@ -43,6 +52,8 @@ export function DavkovePlatby({ mena }: { mena: string[] }) {
   const zoradene = useMemo(() => [...mena].sort((a, b) => a.localeCompare(b, "sk")), [mena]);
   const [vsetky, setVsetky] = useState<Navrh[] | null>(null);
   const [vyber, setVyber] = useState<Record<string, string>>({});
+  /** Spoločné prevody, ktoré sa majú zapísať rozdelené. */
+  const [rozdelit, setRozdelit] = useState<Record<string, boolean>>({});
   const [pracujem, setPracujem] = useState(false);
   const [hlaska, setHlaska] = useState("");
   const [chyba, setChyba] = useState("");
@@ -65,24 +76,35 @@ export function DavkovePlatby({ mena }: { mena: string[] }) {
      * odkliknúť sám.
      */
     const predvolene: Record<string, string> = {};
+    const delene: Record<string, boolean> = {};
     for (const p of n) {
+      // Spoločný prevod sa jednému človeku celý nepredvyplní nikdy.
+      if (p.rozdelenie) { if (p.zdrojRozdelenia !== "ptminder") delene[p.fioId] = true; continue; }
       if (p.kandidati.length === 1 && p.zdrojNavrhu !== "suma") predvolene[p.fioId] = p.kandidati[0];
     }
     setVyber(predvolene);
+    setRozdelit(delene);
   }, []);
   useEffect(() => { void nacitaj(); }, [nacitaj]);
 
-  const { jednoznacne, podlaSumy, naVyber } = useMemo(() => ({
-    jednoznacne: (vsetky || []).filter((p) => p.kandidati.length === 1 && p.zdrojNavrhu !== "suma"),
-    // Odhad zo sumy má vlastnú kopu — nie je to dôkaz, je to zhoda čísla.
-    podlaSumy: (vsetky || []).filter((p) => p.kandidati.length === 1 && p.zdrojNavrhu === "suma"),
-    naVyber: (vsetky || []).filter((p) => p.kandidati.length > 1),
-  }), [vsetky]);
+  const { jednoznacne, podlaSumy, naVyber, spolocne } = useMemo(() => {
+    const cele = (vsetky || []).filter((p) => !p.rozdelenie);
+    return {
+      jednoznacne: cele.filter((p) => p.kandidati.length === 1 && p.zdrojNavrhu !== "suma"),
+      // Odhad zo sumy má vlastnú kopu — nie je to dôkaz, je to zhoda čísla.
+      podlaSumy: cele.filter((p) => p.kandidati.length === 1 && p.zdrojNavrhu === "suma"),
+      naVyber: cele.filter((p) => p.kandidati.length > 1),
+      // Jeden prevod za viacerých — Dan a Monika, 4. 10. 2026.
+      spolocne: (vsetky || []).filter((p) => p.rozdelenie),
+    };
+  }, [vsetky]);
 
-  const oznacene = useMemo(
-    () => Object.entries(vyber).filter(([, k]) => k).map(([fioId, klient]) => ({ fioId, klient })),
-    [vyber],
-  );
+  const oznacene = useMemo(() => {
+    const cele = Object.entries(vyber).filter(([fioId, k]) => k && !rozdelit[fioId]).map(([fioId, klient]) => ({ fioId, klient }));
+    const delene = (vsetky || []).filter((p) => p.rozdelenie && rozdelit[p.fioId])
+      .map((p) => ({ fioId: p.fioId, klient: "", diely: p.rozdelenie }));
+    return [...cele, ...delene];
+  }, [vyber, rozdelit, vsetky]);
   const sumaOznacenych = useMemo(() => {
     const podla = new Map((vsetky || []).map((p) => [p.fioId, p.suma]));
     return oznacene.reduce((a, o) => a + (podla.get(o.fioId) || 0), 0);
@@ -100,12 +122,13 @@ export function DavkovePlatby({ mena }: { mena: string[] }) {
     setHlaska(`Priradených ${j.hotovo} platieb${j.naucenych ? `, z toho ${j.naucenych} pravidiel si appka zapamätala` : ""}.`);
     if (j.chyby?.length) setChyba(j.chyby.join(" · "));
     setVyber({});
+    setRozdelit({});
     await nacitaj();
     oznam("peniaze");
   };
 
   if (!vsetky) return null;
-  if (!jednoznacne.length && !naVyber.length && !podlaSumy.length) {
+  if (!jednoznacne.length && !naVyber.length && !podlaSumy.length && !spolocne.length) {
     return (
       <Card>
         <H3>Bankové príjmy bez klienta</H3>
@@ -149,6 +172,26 @@ export function DavkovePlatby({ mena }: { mena: string[] }) {
           <span style={{ fontSize: 10.5, color: C.textDim }}> · {ZDROJ[p.zdrojNavrhu || ""] || "odhad"}</span>
         </span>
       )}
+      {p.poznamka && <div style={{ flexBasis: "100%", fontSize: 11, color: C.orange, paddingLeft: 24 }}>{p.poznamka}</div>}
+    </div>
+  );
+
+  /** Spoločný prevod: diely sa ukážu presne tak, ako sa zapíšu. */
+  const riadokSpolocny = (p: Navrh) => (
+    <div key={p.fioId} style={{ display: "flex", gap: 9, alignItems: "center", padding: "5px 0", borderBottom: `1px solid ${mix(C.border, 35)}`, flexWrap: "wrap" }}>
+      <input
+        type="checkbox"
+        checked={!!rozdelit[p.fioId]}
+        onChange={(e) => setRozdelit((v) => ({ ...v, [p.fioId]: e.target.checked }))}
+        style={{ cursor: "pointer" }}
+      />
+      <span style={{ width: 62, fontSize: 11.5, color: C.textDim }}>{fmtDMY(p.datum)}</span>
+      <span style={{ width: 82, fontSize: 12.5, fontWeight: 700, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{fmtCZK(p.suma)}</span>
+      <span style={{ flex: "1 1 180px", minWidth: 140, fontSize: 11, color: C.textMuted }}>{p.text.slice(0, 80)}</span>
+      <span style={{ minWidth: 170, fontSize: 12.5, color: C.text }}>
+        {(p.rozdelenie || []).map((d) => `${d.klient} ${fmtCZK(d.suma)}`).join(" + ")}
+        <span style={{ fontSize: 10.5, color: C.textDim }}> · {ZDROJ_ROZDELENIA[p.zdrojRozdelenia || ""] || "odhad"}</span>
+      </span>
     </div>
   );
 
@@ -163,7 +206,7 @@ export function DavkovePlatby({ mena }: { mena: string[] }) {
 
       <div style={{ display: "flex", gap: 20, flexWrap: "wrap", margin: "6px 0 12px" }}>
         <div>
-          <div style={{ fontSize: 26, fontWeight: 800, lineHeight: 1.1, color: C.accentLight }}>{jednoznacne.length}</div>
+          <div style={{ fontSize: 26, fontWeight: 800, lineHeight: 1.1, color: C.accentLight }}>{jednoznacne.length + spolocne.length}</div>
           <div style={{ fontSize: 11.5, color: C.textMuted }}>jednoznačných<br /><span style={{ color: C.textDim }}>predzaškrtnuté</span></div>
         </div>
         <div>
@@ -193,9 +236,19 @@ export function DavkovePlatby({ mena }: { mena: string[] }) {
         {pracujem ? "priraďujem…" : `Priradiť označené (${oznacene.length})`}
       </button>
 
+      {spolocne.length > 0 && (
+        <>
+          <div style={{ fontSize: 10, fontWeight: 700, color: C.textDim, letterSpacing: 0.6, marginBottom: 2 }}>JEDEN PREVOD ZA VIACERÝCH — ROZDELÍ SA</div>
+          <div style={{ fontSize: 11, color: C.textDim, marginBottom: 4, lineHeight: 1.5 }}>
+            Každý dostane svoju platbu zvlášť, tak ako má každý svoje členstvo. Keď rozdelenie nesedí,
+            odškrtni ho a rozdeľ ručne vo Workspace.
+          </div>
+          {spolocne.map(riadokSpolocny)}
+        </>
+      )}
       {jednoznacne.length > 0 && (
         <>
-          <div style={{ fontSize: 10, fontWeight: 700, color: C.textDim, letterSpacing: 0.6, marginBottom: 2 }}>JEDNOZNAČNÉ</div>
+          <div style={{ fontSize: 10, fontWeight: 700, color: C.textDim, letterSpacing: 0.6, margin: spolocne.length ? "12px 0 2px" : "0 0 2px" }}>JEDNOZNAČNÉ</div>
           {jednoznacne.map((p) => riadok(p, false))}
         </>
       )}

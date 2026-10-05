@@ -44,6 +44,26 @@ export const Route = createFileRoute("/api/sms")({
         if (!(await isAuthed(request))) return unauthorized();
         const { DB } = bindings();
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });
+        /**
+         * KOMU UŽ SMS ODIŠLA — karta „SMS pre klientov" vo Workspace.
+         *
+         * Jerry, 4. 10. 2026: „po odoslaní nech klient zo zoznamu zmizne, kým
+         * sa jeho stav nezmení, aby sa dal zoznam vyčistiť." Odoslanie stojí
+         * v audite (meno · číslo); stačí posledný čas na klienta.
+         */
+        if (new URL(request.url).searchParams.get("odoslane") === "1") {
+          const rs = await DB.prepare(
+            `SELECT payment_id predmet, MAX(at) kedy FROM vzas_audit
+              WHERE action = 'sms-odoslana' AND at >= datetime('now', '-120 days')
+              GROUP BY payment_id`,
+          ).all<{ predmet: string; kedy: string }>().catch(() => ({ results: [] as { predmet: string; kedy: string }[] }));
+          const podla: Record<string, string> = {};
+          for (const r of rs.results || []) {
+            const klient = String(r.predmet || "").split(" · ")[0].trim();
+            if (klient && (!podla[klient] || r.kedy > podla[klient])) podla[klient] = r.kedy;
+          }
+          return Response.json({ ok: true, odoslane: podla });
+        }
         const n = await nastavenia(DB);
         const poslane = await DB.prepare(
           "SELECT COUNT(*) n, MAX(at) posledna FROM vzas_audit WHERE action = 'sms-odoslana'",

@@ -2378,3 +2378,79 @@ si ho navyše operačný systém vyloží ako kolónku na meno z adresára.
 
 V Kalendári boli takéto polia ŠTYRI; vymenili sa všetky naraz. Keď pribudne
 ďalšie pole s menom klienta, patrí doň `VyberMena`, nie `<datalist>`.
+
+## Jeden prevod za viacerých klientov — každý dostane svoju platbu
+
+Jerry, 4. 10. 2026: „Dan a Monika platia na jednu faktúru… jedna faktúra za
+oboch, preto je to 15 580, ale v PTminderi/Kokpite sa zapíše každému členstvo
+a platba za 7 790." Dávka 28. 9. zapísala 15 580 z DK Consulting (15. 5.
+a 26. 7.) celé Danovi, lebo variabilný symbol ukazoval na jeho firmu.
+
+- **Faktúra za viacerých** — `vydane_faktury_polozky` (migrácia 0096). Hlavný
+  riadok faktúry je prvá položka platiteľa; `celkom_czk` je SÚČET všetkých.
+  Každá ďalšia položka nesie svojho klienta. Formulár: „+ ďalší klient na
+  tejto faktúre". Doklad aj mail píšu pri každej položke meno.
+- **Návrh rozdelenia** (`navrhniRozdelenie`, `rozdelenieZFaktury` v
+  `platbyEvidencia.ts`) — v poradí: položky faktúry podľa VS → spoloční
+  platitelia (dvojica z už rozdelených pohybov; diely z PTmindera alebo
+  z ceny balíčka, aj z `ptminder_historia`) → PTminder sám. Návrh len keď je
+  jediný. Spoločný prevod sa NIKDY nepredvyplní jednému človeku celý —
+  dávka, Workspace aj zoznam platieb ho ponúknu ako diely.
+- **PTminder hovorí iné meno** — keď navrhnutý klient v PTminderi tú platbu
+  nemá a v ten deň ju má niekto iný, návrh prestane byť jednoznačný (obaja
+  do výberu + veta). Platí aj pre naučené pravidlo: z dávky sa naučilo
+  „hrdina michal" → Michal Knapčok.
+- Diely zapisuje jedno miesto, `zapisDiely` v `api/platby.ts` (ručné
+  rozdelenie aj dávka). Pravidlo odosielateľa sa pri dieloch neučí.
+
+## Workspace po krokoch a balíček z prvého tréningu (naostro od 5. 10. 2026)
+
+Jerry: „z 12 krokov sa stanú štyri — a na každý ten krok chcem vo Workspace
+jeden list." Od 5. 10. 2026 naostro (predtým beta) má kopa karty Kalendár · SMS · Platby a balíčky
+(od 5. 10. 2026 bez samostatnej karty Balíčky — balíčky vznikajú samy, jej dve
+rozhodnutia, končiaca platnosť a „sedí?" po návrate, sú v kroku Platby) (`krokyBety` vo `workspaceKarty.ts`, pravidlá vo `workspaceKroky.ts`,
+obrazovka vo `WorkspaceKroky.tsx`). Krok nezmizne, prázdny povie „Všetko
+vybavené". SMS sa posielajú LEN z kroku 2 (z Dnes a Kalendára preč).
+
+- **Nezaplatený balíček z Kokpitu ide do mínusu** (`nezaplateneZKokpitu`,
+  počíta `loadData` raz → `data.nezaplateneKokpit`, `data.dlhKokpit`).
+  Platby sa kladú na balíčky od najstaršieho; čiastočná platba = nezaplatené.
+  Kartu, os aj dlh (zoznam dlžníkov, profil, QR za odkazom) rozhoduje to isté.
+- **Poistka z PTmindera** (`zaplateneVPtminderi`): kým beží PTminder, jeho
+  platba alebo členstvo bez otvoreného poplatku = zaplatené. Bez nej by
+  Papiež a Šnirychová vyšli ako dlžníci — Kokpit mal výpis z Fio len do 27. 9.
+  **Pravidlo je pravdivé len pri stiahnutej a spárovanej banke.**
+- **Platba vopred** (`platby.vopred`, migrácia 0097): nastaví sa pri priradení,
+  keď klient nič nedlží (`jeVopred` v `api/platby.ts`). Počíta sa do dlhu aj
+  spred prvého balíčka z Kokpitu → pokryje balíček, ktorý vznikne neskôr.
+- **Balíček vzniká SÁM** (`automatickeBalicky.server.ts`, `/api/balicky`
+  akcia `automaticky`): App ho volá 8 s po načítaní dát, najviac raz za 10 min
+  (ťažké dopyty naraz zhodili worker 1. 9.). Idempotentné; poznámka začína
+  „automaticky —". Klient s nerozhodnutou platnosťou čaká (doplnenie ide prvé).
+  Naliatie z PTmindera preskočí balíček s rovnakými hodinami do 14 dní od
+  automatického; poplatok z PTmindera sa s balíčkom z Kokpitu páruje pri
+  rovnakej cene do 3 dní. Krok Platby a balíčky sa pýta len „sedí?" pri návrate.
+- **Kalendár v kroku 1**: klik na meno rozbalí týždeň trénera
+  (`TyzdenKalendara`, `/api/kalendar?tyzden=`): zmazané červeno, presun bliká
+  žlto medzi starým a novým časom, nový názov sa zvýrazní.
+- **Platby v kroku 3**: klik na dlžníka ukáže nepriradené platby z Fio, ktoré
+  k nemu sedia menom alebo sumou (`kandidatiPlatby`); „vybavené" tam nie je.
+- **Dashboard**: nezaplatené (aj z Kokpitu) navrchu karty balíčkov,
+  „Hodiny bez balíčka" preč, pri „Balíček dojde" bez „napísať".
+- **Nový balíček z prvého tréningu** (`navrhNovehoBalicka`): len POSLEDNÉ
+  obdobie klienta; tréning s odpočtom (`zostatok`) je krytý aj s mínusom
+  (to je „odtrénované pred platbou"); na nezaplatenom balíčku sú nekryté len
+  tréningy nad jeho hodiny. Veľkosť ako naposledy, cena z cenníka (stála iná
+  cena dvakrát po sebe sa drží). Návrat po > 60 dňoch = otázka „sedí?".
+  V bete sa zapisuje klikom — beta píše do ostrej DB.
+- **Platnosť ako PTminder** (`platnostDo` v `cennik.ts`): 8 týždňov = +55 dní,
+  4 týždne +27, mesiac/pol roka = deň pred tým istým dňom.
+- **Končiaca platnosť** (`KrokPlatnost`): posuvník doplnenia 0…X h, zvyšok
+  prepadá; předplatné aj „preniesť 2 h do ďalšieho balíčka" (`balicky_presun`,
+  pridá ich prvý ďalší balíček). Odpoveď ide do `anomaly_ack` — nevráti sa.
+- **Suma nesedí** (`otazkyPlatieb`): platba na balíček nesedí → „je to 6h?"
+  (prepíše veľkosť) / „zľava 10 %" / iná cena s dôvodom / doplatí zvyšok.
+- **Druhé číslo klienta** (`klient_fakturacia.telefon2`): okno SMS ponúkne
+  uložiť číslo, ktoré nepatrí nikomu, ako druhé; prepínač medzi číslami.
+- Platba mení hodiny → App po `oznam("peniaze")` načíta `/api/data` znova.
+- Beta nemá `FIO_TOKEN` — „Stiahnuť príjmy z Fio" tam hlási chýbajúci token.

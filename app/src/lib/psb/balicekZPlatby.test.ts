@@ -13,8 +13,9 @@ describe("balicekZPlatby", () => {
     });
     expect(n).toMatchObject({ nazov: "6h Předplatné", hodiny: 6, cena: 6990, platnostOd: "2026-10-09" });
     expect(n?.preco).toBe("to isté, čo si kúpil naposledy");
-    // Platnosť sa dopočíta z cenníka, nie z hlavy.
-    expect(n?.platnostDo).toBe("2026-11-06");
+    // Platnosť sa dopočíta z cenníka, nie z hlavy. Předplatné je MESIAC
+    // ako v PTminderi (9. 10. → 8. 11.), nie štyri týždne.
+    expect(n?.platnostDo).toBe("2026-11-08");
   });
 
   it("keď posledný balíček nesedí sumou, hľadá sa v cenníku", () => {

@@ -27,7 +27,13 @@ import type { PodlaKlienta } from "./sporneKonanie";
 
 export type Zmena = { id: string; druh: string; klient: string | null; nazov: string | null; pred: string | null; po: string | null; kedy: string; trener: string };
 export type NeznamyNazov = { nazov: string; trener: string; pocet: number; najblizsi: string; navrh: string };
-export type NepriradenaPlatba = { fioId: string; datum: string; suma: number; text: string; navrh: string };
+export type NepriradenaPlatba = {
+  fioId: string; datum: string; suma: number; text: string; navrh: string;
+  /** Jeden prevod za viacerých — návrh dielov (Dan a Monika, 4. 10. 2026). */
+  rozdelenie?: { klient: string; suma: number }[];
+  /** Keď PTminder hovorí iné meno než text platby. */
+  poznamka?: string;
+};
 /** Klient pred úvodným tréningom alebo tesne po ňom, bez hotovej anamnézy. */
 export type AnamnezaRiadok = {
   klient: string; trener: string; uvodny: string | null;
@@ -82,10 +88,47 @@ export type Karta =
    * nemá počet a z kopy nikdy nezmizne, rovnako ako Klient a Faktúry.
    * Rozpracované stoja hore, hotové pod nimi.
    */
-  | { druh: "anamnezy"; nadpis: string; podnadpis: string; polozky: AnamnezaRiadok[] };
+  | { druh: "anamnezy"; nadpis: string; podnadpis: string; polozky: AnamnezaRiadok[] }
+  /**
+   * KROK — jedna karta na jeden krok týždňa (beta, Jerry 4. 10. 2026).
+   * V sebe nesie staré karty ako sekcie, takže sa nič nekreslí dvakrát.
+   */
+  | { druh: "krok"; krok: Krok; nadpis: string; podnadpis: string; polozky: never[]; sekcie: Karta[] };
+
+/** Tri kroky v poradí, v akom idú v týždni (balíčky sú od 5. 10. súčasťou platieb). */
+export type Krok = "kalendar" | "sms" | "platby";
 
 /** Karty, ktoré nie sú fronta — nemajú počet a z kopy nikdy nezmiznú. */
-export const BEZ_FRONTY: Karta["druh"][] = ["klient", "faktury", "anamnezy"];
+export const BEZ_FRONTY: Karta["druh"][] = ["klient", "faktury", "anamnezy", "krok"];
+
+/**
+ * KARTY BETY — štyri kroky namiesto ôsmich kariet.
+ *
+ * Jerry, 4. 10. 2026: „V Kokpite sa z tvojich 12 krokov stanú štyri — a na
+ * každý ten krok by som chcel vo Workspace jeden list." Krok z kopy NEZMIZNE,
+ * keď je prázdny: povie „Všetko vybavené" (pri SMS to Jerry chcel výslovne,
+ * pri ostatných je to to isté pravidlo — miesto, kam sa chodí, má byť stále
+ * na tom istom mieste).
+ *
+ * „Bez balíčka" v kroku Balíčky nie je: klient, ktorému sa minuli hodiny
+ * a trénuje ďalej, dostane návrh nového balíčka, a ten, kto je na nule,
+ * patrí do SMS. Dve karty o tom istom človeku by sa pýtali dvakrát.
+ */
+export function krokyBety(karty: Karta[]): Karta[] {
+  const daj = (d: Karta["druh"]) => karty.filter((k) => k.druh === d);
+  const krok = (k: Krok, nadpis: string, podnadpis: string, sekcie: Karta[]): Karta =>
+    ({ druh: "krok", krok: k, nadpis, podnadpis, polozky: [], sekcie });
+  return [
+    ...daj("klient"),
+    krok("kalendar", "1 · Kalendár", "len výnimky — zmeny, „bol tam?“ a nové mená", [...daj("zmeny"), ...daj("konanie"), ...daj("mena")]),
+    krok("sms", "2 · SMS pre klientov", "komu to práve dáva zmysel — nula, mínus, dlh", []),
+    // Balíčky vznikajú samy prvým tréningom; ich dve rozhodnutia (končiaca
+    // platnosť, „sedí?" po návrate) sú súčasťou tohto kroku (5. 10. 2026).
+    krok("platby", "3 · Platby a balíčky", "stiahnuť z banky, spárovať s dlhmi, rozhodnúť o končiacej platnosti", [...daj("platby"), ...daj("dlznici")]),
+    ...daj("faktury"),
+    ...daj("anamnezy"),
+  ];
+}
 
 export type ZdrojeKariet = {
   zmeny: Zmena[];
@@ -100,7 +143,7 @@ export type ZdrojeKariet = {
   /** Všetky anamnézy — rozpracované aj hotové. */
   anamnezy?: AnamnezaRiadok[];
   nezname: { nazov: string; trener: string; pocet: number; najblizsi: string }[];
-  platby: { fioId: string; datum: string; suma: number; text: string; kandidati: string[]; klientsky?: boolean }[];
+  platby: { fioId: string; datum: string; suma: number; text: string; kandidati: string[]; klientsky?: boolean; rozdelenie?: { klient: string; suma: number }[]; poznamka?: string }[];
   navrhMena: (nazov: string) => string;
   /** „jerry" | „terezka" | null (nevie sa / spoločné prihlásenie). */
   ktoSom: string | null;
@@ -166,7 +209,10 @@ export function postavKarty(z: ZdrojeKariet): Karta[] {
     fioId: p.fioId, datum: p.datum, suma: p.suma, text: p.text,
     // Jednoznačný návrh sa predvyplní; pri dvoch a viacerých nie — hádať sa
     // nesmie, to je pravidlo platné všade v appke.
-    navrh: p.kandidati.length === 1 ? p.kandidati[0] : "",
+    // Spoločný prevod sa jednému človeku nepredvyplní — patrí viacerým.
+    navrh: !p.rozdelenie && p.kandidati.length === 1 ? p.kandidati[0] : "",
+    ...(p.rozdelenie ? { rozdelenie: p.rozdelenie } : {}),
+    ...(p.poznamka ? { poznamka: p.poznamka } : {}),
   }));
 
   const karty: Karta[] = [];

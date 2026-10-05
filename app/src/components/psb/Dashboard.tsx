@@ -27,8 +27,6 @@ import { objednaneVerzia,
   pocetUvodnych,
 } from "../../lib/psb/compute";
 import { fmtCZK, fmtDMY, monthLabel, normName, weekKey, weekLabel, kedyStrucne } from "../../lib/psb/format";
-import { SmsKlientovi } from "./SmsKlientovi";
-import { hodinyBezBalicka } from "../../lib/psb/hodinyBezBalicka";
 import { C, mix, S, badge, btn } from "../../lib/psb/theme";
 import { Balicky, odtrenovaneMimoExportu, type KalUdalost } from "./Kalendar";
 import { jeKlient } from "./MarketingLievik";
@@ -1345,33 +1343,6 @@ export function Dashboard({
    * Nezaplatené poplatky. Filtruje sa podľa prepínača trénera rovnako ako
    * zvyšok karty — inak by Terezka videla Jerryho dlžníkov a naopak.
    */
-  /**
-   * HODINY, KTORÉ NEKRYJE ŽIADNY BALÍČEK.
-   *
-   * Jerry, 2. 10. 2026: „to by znamenalo, že klientom dávam zadarmo
-   * tréningy." Prečerpané hodiny sa z ďalšieho balíčka odpíšu samy — keď si
-   * ho klient kúpi. Kto si ho nekúpil, visel doteraz mimo appky: z karty
-   * „Balíček dojde" vypadol, lebo tá stojí na OBJEDNANÝCH termínoch, a kto
-   * dochodil a nič si nedohodol, v nej nie je.
-   *
-   * Filtruje sa trénerom ako zvyšok dashboardu.
-   */
-  const bezBalicka = useMemo(
-    () => hodinyBezBalicka(
-      Object.keys(clients).filter((m) => matchT(clients[m]?.primaryTrainer)),
-      {
-        sessions: data.sessions as never, payments: data.payments as never,
-        packages: (data.packages || []) as never, services: (data.services || []) as never,
-        poplatky: (data.poplatky || []) as never, treningyZdarma: (data.treningyZdarma || []) as never,
-        doplneniaHodiny: data.doplneniaHodiny || {},
-        historia: (data.historiaBalickov || []) as never,
-        kalUdalosti: kalendar as never,
-      },
-      (m) => clients[m]?.primaryTrainer || "",
-    ),
-    [clients, data.sessions, data.payments, data.packages, data.services, data.poplatky, data.treningyZdarma, data.doplneniaHodiny, data.historiaBalickov, kalendar, matchT],
-  );
-  const bezBalickaHodin = useMemo(() => bezBalicka.reduce((a, x) => a + x.hodin, 0), [bezBalicka]);
 
   const nezaplatene = useMemo(
     () => (data.poplatky || []).filter((p) => {
@@ -1381,6 +1352,18 @@ export function Dashboard({
     [data.poplatky, clients, matchT],
   );
   const nezaplateneSpolu = useMemo(() => nezaplatene.reduce((a, p) => a + p.suma, 0), [nezaplatene]);
+  /**
+   * V bete aj balíčky z Kokpitu, ktoré platby nepokryli (`data.nezaplateneKokpit`)
+   * — okrem tých, ktoré už stoja ako poplatok z PTmindera (tá istá suma do 14 dní).
+   */
+  const nezaplateneNaKarte = useMemo(() => {
+    const dni = (a: string, b: string) => Math.abs(Date.parse(`${a.slice(0, 10)}T00:00:00Z`) - Date.parse(`${b.slice(0, 10)}T00:00:00Z`)) / 86400000;
+    const zKokpitu = (data.nezaplateneKokpit || [])
+      .filter((b) => { const c = clients[b.klient]; return !c || matchT(c.primaryTrainer); })
+      .filter((b) => !nezaplatene.some((p) => normName(p.klient) === normName(b.klient) && Math.round(p.suma) === Math.round(b.doplatit ?? b.cena) && dni(p.datum, b.den) <= 14))
+      .map((b) => ({ id: `kokpit|${b.klient}|${b.den}`, klient: b.klient, datum: b.den, popis: `${b.nazov} · z Kokpitu`, suma: b.doplatit ?? b.cena }));
+    return [...zKokpitu, ...nezaplatene].sort((a, b) => b.suma - a.suma);
+  }, [nezaplatene, data.nezaplateneKokpit, clients, matchT]);
 
   const platnostKonci = useMemo(() => {
     const dnes = new Date().toISOString().slice(0, 10);
@@ -1454,6 +1437,69 @@ export function Dashboard({
     zvladneEste: capacity.length ? capacity.reduce((a, c) => a + c.canTake, 0) : null,
   }), [weeklyHours, zones, weekStats, capacity]);
   const extraNodes = useExtraGrafy({ data, clients, aktivne, onNavigate, kpiSkryte: layout.kpiSkryte, obdobie, vytazenie: vytazenieVstup, trainer, kalZmeny });
+
+  /**
+   * NEZAPLATENÉ — blok karty balíčkov. V bete stojí úplne navrchu a nesie aj
+   * balíčky z Kokpitu bez platby (Jerry, 4. 10. 2026: „hodiny bez balíčka by
+   * nemali existovať, nový balíček vzniká prvou hodinou — skôr hodiny bez
+   * platby; celé sa to môže zrušiť a nezaplatené dať úplne navrch").
+   */
+  const nezaplateneBlok = (
+    <>
+        {/* NEZAPLATENÉ — poplatky, ktoré v PTminderi stále stoja otvorené.
+            V PTminderi sa poplatok po zaplatení zmaže, takže tu netreba nič
+            párovať: čo je v exporte, to je otvorené (Jerry, 31. 8. 2026).
+            Sedí to pod balíčkami zámerne — sú to tí istí ľudia o krok ďalej:
+            balíček majú, zaplatený ho nemajú. */}
+        {nezaplateneNaKarte.length > 0 && (
+          <div style={{ marginTop: 18 }}>
+            {/* Nadpis nesie H3, rovnako ako „Balíček dojde po objednaných
+                hodinách" nad ním. Malý sivý popisok (ako „Končí platnosť
+                členstva") hovorí „toto je podčasť predošlého zoznamu" — lenže
+                nezaplatené nie sú podčasť balíčkov, je to samostatné číslo
+                o peniazoch. Jerry, 31. 8. 2026. */}
+            <H3 style={{ marginBottom: 8 }}>
+              <Info
+                text="Poplatky, ktoré v PTminderi stále stoja otvorené — Finances → Transactions. Po zaplatení sa poplatok v PTminderi maže, takže tu je presne to, čo ešte neprišlo; netreba to s ničím párovať. Zoznam je zrkadlo posledného importu: keď niekto zaplatí, zmizne až po ďalšom nahratí Transactions. Že je ten istý človek aj v balíčkoch vyššie, nie je nezrovnalosť: balíček sa v PTminderi nahodí hneď a klient z neho čerpá, platba príde neskôr."
+                /* Suma červeno, tou istou farbou ako odznaky pri menách nižšie.
+                   Nadpis a zoznam tak hovoria jednou farbou o jednej veci —
+                   inak nadpis vyzeral ako neutrálny popisok a červené pilulky
+                   pod ním ako niečo iné. Nie je to pilulka, len text: pilulka
+                   vo veľkosti H3 by nadpis roztiahla a prebila by odznaky,
+                   ktoré nesú konkrétne čísla. */
+                label={<>Nezaplatené ({nezaplateneNaKarte.length}) · <span style={{ color: C.red }}>{fmtCZK(nezaplateneNaKarte.reduce((a, p) => a + p.suma, 0))}</span></>}
+              />
+            </H3>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 8 }}>
+              {nezaplateneNaKarte.map((p) => (
+                <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 10px", background: mix(C.text, 4), border: `1px solid ${C.border}`, borderRadius: 9, width: "100%", minWidth: 0 }}>
+                  <span style={{ ...badge("red"), fontSize: 10, flexShrink: 0, whiteSpace: "nowrap" }}>{fmtCZK(p.suma)}</span>
+                  <button
+                    onClick={() => onNavigate("klienti", undefined, { client: p.klient, nonce: Date.now() })}
+                    title={p.popis}
+                    style={{ flex: 1, minWidth: 0, background: "none", border: "none", padding: 0, textAlign: "left", cursor: "pointer" }}
+                  >
+                    <span style={{ fontSize: 13, color: C.text, fontWeight: 500, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.klient}</span>
+                    <span style={{ fontSize: 11, color: C.textDim, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {fmtDMY(p.datum)} · {p.popis.split(" - from ")[0] || "poplatok"}
+                    </span>
+                  </button>
+                  {/* Jerry, 1. 10. 2026: „Danielka je v mínuse 9 400, ale
+                      neviem, kde by som mohol kliknúť na to, aby som jej
+                      poslal SMS?" Dlaždica vedela povedať, kto dlží, a tým
+                      skončila — ďalší krok bol cez stôl klienta a späť.
+                      Správa neupomína, posiela odkaz na prehľad hodin
+                      a QR; dátum poplatku v nej hovorí, za ktorý balíček
+                      to je. Sumu nesie QR, nie text. */}
+                  {/* SMS sa od 5. 10. 2026 posielajú z Workspace, krok
+                      „SMS pre klientov" — jedno miesto (Jerry). */}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+    </>
+  );
 
   const nodes: Record<string, ReactNode> = {
     ...extraNodes,
@@ -1687,7 +1733,9 @@ export function Dashboard({
         poslednyReport={poslednyReportBalickov}
         style={{ marginBottom: 0, height: "100%" }}
         onKlient={(meno) => onNavigate("klienti", undefined, { client: meno, nonce: Date.now() })}
-        onVypis={onVypisKlientovi}
+        // Bez „napísať" — správy idú z Workspace, krok SMS; klik na meno
+        // otvorí profil (Jerry, 4. 10. 2026).
+        hore={nezaplateneBlok}
       >
         {platnostKonci.length > 0 && (
           <div style={{ marginTop: 14 }}>
@@ -1737,96 +1785,10 @@ export function Dashboard({
           </div>
         )}
 
-        {/* HODINY BEZ BALÍČKA — klient trénoval nad rámec a nový si nekúpil.
-            Sedí NAD nezaplatenými zámerne: tam ide o peniaze, ktoré už majú
-            doklad, tu o hodiny, ktoré ho ešte nemajú. */}
-        {bezBalicka.length > 0 && (
-          <div style={{ marginTop: 18 }}>
-            <H3 style={{ marginBottom: 8 }}>
-              <Info
-                text="Tréningy, ktoré neodkryl žiadny balíček. Prečerpané hodiny sa z ďalšieho balíčka odpíšu samy — hneď ako si ho klient kúpi. Tu sú tí, ktorí si ho zatiaľ nekúpili, takže tie hodiny visia. Ráta sa len od posledného známeho balíčka (PTminder ich vyváža až od marca 2026) a len za posledných 90 dní — kto odišiel pred rokom, je strata, nie úloha. Títo ľudia zároveň nie sú v karte „Balíček dojde“: tá stojí na objednaných termínoch a kto dochodil a nič si nedohodol, v nej nie je."
-                label={<>Hodiny bez balíčka ({bezBalicka.length}) · <span style={{ color: C.orange }}>{bezBalickaHodin} h</span></>}
-              />
-            </H3>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 8 }}>
-              {bezBalicka.map((b) => (
-                <div key={b.klient} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 10px", background: mix(C.text, 4), border: `1px solid ${C.border}`, borderRadius: 9, width: "100%", minWidth: 0 }}>
-                  <span style={{ ...badge("orange"), fontSize: 10, flexShrink: 0, whiteSpace: "nowrap" }}>−{b.hodin} h</span>
-                  <button
-                    onClick={() => onNavigate("klienti", undefined, { client: b.klient, nonce: Date.now() })}
-                    title={`Posledný balíček ${fmtDMY(b.balicek)}`}
-                    style={{ flex: 1, minWidth: 0, background: "none", border: "none", padding: 0, textAlign: "left", cursor: "pointer" }}
-                  >
-                    <span style={{ fontSize: 13, color: C.text, fontWeight: 500, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.klient}</span>
-                    <span style={{ fontSize: 11, color: C.textDim, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      od {fmtDMY(b.odKedy)}{b.trener ? ` · ${b.trener}` : ""}
-                    </span>
-                  </button>
-                  {/* Text SMS sa skladá sám zo zostatku — pri mínuse povie
-                      „máš N hodín nad rámec balíčka", nie „zostávajú ti". */}
-                  <SmsKlientovi meno={b.klient} zostatok={-b.hodin} trener={b.trener} maly />
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* NEZAPLATENÉ — poplatky, ktoré v PTminderi stále stoja otvorené.
-            V PTminderi sa poplatok po zaplatení zmaže, takže tu netreba nič
-            párovať: čo je v exporte, to je otvorené (Jerry, 31. 8. 2026).
-            Sedí to pod balíčkami zámerne — sú to tí istí ľudia o krok ďalej:
-            balíček majú, zaplatený ho nemajú. */}
-        {nezaplatene.length > 0 && (
-          <div style={{ marginTop: 18 }}>
-            {/* Nadpis nesie H3, rovnako ako „Balíček dojde po objednaných
-                hodinách" nad ním. Malý sivý popisok (ako „Končí platnosť
-                členstva") hovorí „toto je podčasť predošlého zoznamu" — lenže
-                nezaplatené nie sú podčasť balíčkov, je to samostatné číslo
-                o peniazoch. Jerry, 31. 8. 2026. */}
-            <H3 style={{ marginBottom: 8 }}>
-              <Info
-                text="Poplatky, ktoré v PTminderi stále stoja otvorené — Finances → Transactions. Po zaplatení sa poplatok v PTminderi maže, takže tu je presne to, čo ešte neprišlo; netreba to s ničím párovať. Zoznam je zrkadlo posledného importu: keď niekto zaplatí, zmizne až po ďalšom nahratí Transactions. Že je ten istý človek aj v balíčkoch vyššie, nie je nezrovnalosť: balíček sa v PTminderi nahodí hneď a klient z neho čerpá, platba príde neskôr."
-                /* Suma červeno, tou istou farbou ako odznaky pri menách nižšie.
-                   Nadpis a zoznam tak hovoria jednou farbou o jednej veci —
-                   inak nadpis vyzeral ako neutrálny popisok a červené pilulky
-                   pod ním ako niečo iné. Nie je to pilulka, len text: pilulka
-                   vo veľkosti H3 by nadpis roztiahla a prebila by odznaky,
-                   ktoré nesú konkrétne čísla. */
-                label={<>Nezaplatené ({nezaplatene.length}) · <span style={{ color: C.red }}>{fmtCZK(nezaplateneSpolu)}</span></>}
-              />
-            </H3>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(230px, 1fr))", gap: 8 }}>
-              {nezaplatene.map((p) => (
-                <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 9, padding: "8px 10px", background: mix(C.text, 4), border: `1px solid ${C.border}`, borderRadius: 9, width: "100%", minWidth: 0 }}>
-                  <span style={{ ...badge("red"), fontSize: 10, flexShrink: 0, whiteSpace: "nowrap" }}>{fmtCZK(p.suma)}</span>
-                  <button
-                    onClick={() => onNavigate("klienti", undefined, { client: p.klient, nonce: Date.now() })}
-                    title={p.popis}
-                    style={{ flex: 1, minWidth: 0, background: "none", border: "none", padding: 0, textAlign: "left", cursor: "pointer" }}
-                  >
-                    <span style={{ fontSize: 13, color: C.text, fontWeight: 500, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.klient}</span>
-                    <span style={{ fontSize: 11, color: C.textDim, display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {fmtDMY(p.datum)} · {p.popis.split(" - from ")[0] || "poplatok"}
-                    </span>
-                  </button>
-                  {/* Jerry, 1. 10. 2026: „Danielka je v mínuse 9 400, ale
-                      neviem, kde by som mohol kliknúť na to, aby som jej
-                      poslal SMS?" Dlaždica vedela povedať, kto dlží, a tým
-                      skončila — ďalší krok bol cez stôl klienta a späť.
-                      Správa neupomína, posiela odkaz na prehľad hodin
-                      a QR; dátum poplatku v nej hovorí, za ktorý balíček
-                      to je. Sumu nesie QR, nie text. */}
-                  <SmsKlientovi
-                    meno={p.klient}
-                    trener={clients[p.klient]?.primaryTrainer || ""}
-                    platba={{ suma: p.suma, datum: fmtDMY(p.datum) }}
-                    maly
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* „Hodiny bez balíčka" tu od 5. 10. 2026 nie sú: balíček vzniká sám
+            prvým tréningom, takže hodina bez balíčka nevznikne — je nanajvýš
+            nezaplatená, a tie sú navrchu karty (Jerry: „celé sa to môže
+            zrušiť a nezaplatené dať úplne navrch"). */}
       </Balicky>
     ),
   };

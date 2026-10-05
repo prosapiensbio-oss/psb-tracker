@@ -55,7 +55,7 @@ export function balicekZPlatby(v: {
       hodiny: zCennika?.hodiny ?? null,
       cena: suma,
       platnostOd: v.den,
-      platnostDo: (zCennika && platnostDo(v.den, zCennika.tyzdnov)) || null,
+      platnostDo: (zCennika && platnostDo(v.den, zCennika.tyzdnov, zCennika.mesiacov)) || null,
       preco: "to isté, čo si kúpil naposledy",
     };
   }
@@ -67,7 +67,7 @@ export function balicekZPlatby(v: {
     const s = zCennika[0];
     return {
       nazov: s.nazov, hodiny: s.hodiny ?? null, cena: suma,
-      platnostOd: v.den, platnostDo: platnostDo(v.den, s.tyzdnov) || null,
+      platnostOd: v.den, platnostDo: platnostDo(v.den, s.tyzdnov, s.mesiacov) || null,
       preco: "suma sedí s cenníkom",
     };
   }

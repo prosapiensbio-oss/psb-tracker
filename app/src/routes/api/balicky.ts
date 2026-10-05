@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import type { D1Database } from "@cloudflare/workers-types";
 
+import { navrhyNovychBalickov } from "../../lib/psb/automatickeBalicky.server";
 import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
@@ -45,7 +46,7 @@ const naBalicek = (r: Riadok): Balicek => ({
 
 async function nacitaj(DB: D1Database) {
   const [vlastne, pt, udalosti, horizont] = await DB.batch([
-    DB.prepare("SELECT id, klient, nazov, hodiny, platnost_od, platnost_do, cena_czk, zdroj, ptminder_id, poznamka, zrusene_at FROM balicky ORDER BY klient, platnost_od"),
+    DB.prepare("SELECT id, klient, nazov, hodiny, platnost_od, platnost_do, cena_czk, zdroj, ptminder_id, poznamka, zrusene_at, created_at FROM balicky ORDER BY klient, platnost_od"),
     DB.prepare("SELECT client_name, package_name, sessions_remaining, sessions_total, valid_from, valid_to FROM packages"),
     // Kalendár nesie odtrénované hodiny. Berie sa celá história tabuľky, nie
     // okno — balíček môže bežať pol roka a okno má 21 dní.
@@ -75,6 +76,45 @@ async function nacitaj(DB: D1Database) {
   };
 }
 
+
+/**
+ * ZÁPIS NOVÉHO BALÍČKA — ručný aj automatický (prvým tréningom) idú tadiaľto.
+ *
+ * Čakajúci presun hodín sa pridá k prvému balíčku, ktorý po ňom vznikne —
+ * „6h Předplatné" s ôsmimi hodinami vo vnútri (Jerry, 4. 10. 2026).
+ * Doplnenie členstva presun nedostane: to nie je ďalší balíček, len
+ * predĺžené staré hodiny.
+ */
+async function zapisBalicek(
+  DB: D1Database,
+  b: { klient: string; nazov: string; hodiny: number | null; od: string; doDna: string | null; cena: number | null; poznamka: string | null },
+  kto: string | null | undefined,
+  akcia = "balicek-novy",
+): Promise<{ id: string; prenesene: number }> {
+  const id = uid();
+  const caka = b.hodiny != null && !/doplnenie/i.test(b.nazov)
+    ? (((await DB.prepare(
+      "SELECT id, hodiny, z_platnosti_do FROM balicky_presun WHERE klient = ?1 AND pouzite_balicek_id IS NULL AND z_platnosti_do < ?2",
+    ).bind(b.klient, b.od).all().catch(() => ({ results: [] }))).results || []) as unknown as { id: string; hodiny: number; z_platnosti_do: string }[])
+    : [];
+  const prenesene = caka.reduce((a, x) => a + (Number(x.hodiny) || 0), 0);
+  const hodinySpolu = b.hodiny == null ? null : b.hodiny + prenesene;
+  const poznamkaSpolu = prenesene
+    ? [b.poznamka, `+${prenesene} h prenesené z balíčka do ${caka.map((x) => x.z_platnosti_do).join(", ")}`].filter(Boolean).join(" · ").slice(0, 400)
+    : b.poznamka;
+  await DB.prepare(
+    `INSERT INTO balicky (id, klient, nazov, hodiny, platnost_od, platnost_do, cena_czk, zdroj, ptminder_id, poznamka, created_at, autor)
+     VALUES (?,?,?,?,?,?,?,'rucne',NULL,?,?,?)`,
+  ).bind(id, b.klient, b.nazov, hodinySpolu, b.od, b.doDna, b.cena, poznamkaSpolu, teraz(), kto || null).run();
+  if (caka.length) {
+    await DB.batch(caka.map((x) => DB.prepare(
+      "UPDATE balicky_presun SET pouzite_balicek_id = ?1, pouzite_at = ?2 WHERE id = ?3",
+    ).bind(id, teraz(), x.id)));
+  }
+  await audit(DB, { action: akcia, predmet: `${b.klient} — ${b.nazov}`, neu: `${hodinySpolu ?? "paušál"} h, ${b.od}–${b.doDna || "bez konca"}${prenesene ? ` (z toho ${prenesene} h prenesené)` : ""}`, actor: kto || undefined });
+  return { id, prenesene };
+}
+
 export const Route = createFileRoute("/api/balicky")({
   server: {
     handlers: {
@@ -83,7 +123,11 @@ export const Route = createFileRoute("/api/balicky")({
         const { DB } = bindings();
         if (!DB) return Response.json({ ok: false, error: "no_db" }, { status: 500 });
         const { riadky, porovnanie } = await nacitaj(DB);
-        return Response.json({ ok: true, balicky: riadky, porovnanie });
+        // Presuny hodín, ktoré ešte čakajú na ďalší balíček (migrácia 0097).
+        const presuny = ((await DB.prepare(
+          "SELECT klient, hodiny, z_platnosti_do FROM balicky_presun WHERE pouzite_balicek_id IS NULL",
+        ).all().catch(() => ({ results: [] }))).results || []) as unknown as { klient: string; hodiny: number; z_platnosti_do: string }[];
+        return Response.json({ ok: true, balicky: riadky, porovnanie, presuny });
       },
 
       POST: async ({ request }) => {
@@ -124,7 +168,18 @@ export const Route = createFileRoute("/api/balicky")({
            * klient má ten istý názov — jeho zostatok sa prevzal raz a druhé
            * prevzatie by ho zdvojilo.
            */
-          const vKokpite = ((await DB.prepare("SELECT klient, nazov, platnost_od FROM balicky WHERE zrusene_at IS NULL").all()).results || []) as unknown as { klient: string; nazov: string; platnost_od: string }[];
+          const vKokpite = ((await DB.prepare("SELECT klient, nazov, platnost_od, poznamka FROM balicky WHERE zrusene_at IS NULL").all()).results || []) as unknown as { klient: string; nazov: string; platnost_od: string; poznamka: string | null }[];
+          /**
+           * BALÍČEK, KTORÝ KOKPIT UŽ ZALOŽIL SÁM (prvým tréningom, 4. 10. 2026).
+           * PTminder ho mal nahodiť Jerry v iný deň — pri predaji, nie pri
+           * tréningu — takže deň sa nestretne. Ten istý klient a začiatok do
+           * 14 dní od automatického = ten istý balíček; druhý by zdvojil hodiny.
+           */
+          const automaticke = vKokpite.filter((r) => /^automaticky/i.test(String(r.poznamka || "")));
+          // Ten istý klient, rovnaký počet hodín a začiatok do 14 dní.
+          const maAutomaticky = (klient: string, od: string, hodin: number) => automaticke.some((r) => r.klient === klient
+            && (!hodin || hodinZNazvuBalicka(r.nazov) === hodin)
+            && Math.abs(Date.parse(`${String(r.platnost_od).slice(0, 10)}T00:00:00Z`) - Date.parse(`${od}T00:00:00Z`)) <= 14 * 86400000);
           const podlaObsahu = new Set(vKokpite.map((r) => `${r.klient}|${r.nazov}|${String(r.platnost_od).slice(0, 10)}`));
           const podlaNazvu = new Set(vKokpite.map((r) => `${r.klient}|${r.nazov}`));
           /**
@@ -146,6 +201,7 @@ export const Route = createFileRoute("/api/balicky")({
           for (const p of pt) {
             if (uz.has(p.id)) continue;
             const odExportu = denISO(p.valid_from);
+            if (odExportu && maAutomaticky(p.client_name, odExportu, p.sessions_total > 0 ? p.sessions_total : (p.na_obdobie > 0 ? p.na_obdobie : hodinZNazvuBalicka(p.package_name || "")))) { preskocene.push(`${p.client_name} — ${p.package_name} (Kokpit ho založil prvým tréningom)`); continue; }
             if (odExportu ? podlaObsahu.has(`${p.client_name}|${p.package_name}|${odExportu}`) : podlaNazvu.has(`${p.client_name}|${p.package_name}`)) continue;
             const hodinZExportu = p.sessions_total > 0 ? p.sessions_total : (p.na_obdobie > 0 ? p.na_obdobie : hodinZNazvuBalicka(p.package_name || ""));
             if (odExportu && hodinZExportu > 0 && podlaHodin.has(`${p.client_name}|${odExportu}|h${hodinZExportu}`)) continue;
@@ -215,13 +271,74 @@ export const Route = createFileRoute("/api/balicky")({
             await audit(DB, { action: "balicek-uprava", predmet: `${klient} — ${nazov}`, neu: `${hodiny ?? "paušál"} h, ${od}–${doDna || "bez konca"}`, actor: kto });
             return Response.json({ ok: true, id });
           }
-          const id = uid();
-          await DB.prepare(
-            `INSERT INTO balicky (id, klient, nazov, hodiny, platnost_od, platnost_do, cena_czk, zdroj, ptminder_id, poznamka, created_at, autor)
-             VALUES (?,?,?,?,?,?,?,'rucne',NULL,?,?,?)`,
-          ).bind(id, klient, nazov, hodiny, od, doDna, cena, poznamka, teraz(), kto || null).run();
-          await audit(DB, { action: "balicek-novy", predmet: `${klient} — ${nazov}`, neu: `${hodiny ?? "paušál"} h, ${od}–${doDna || "bez konca"}`, actor: kto });
-          return Response.json({ ok: true, id });
+          const { id, prenesene } = await zapisBalicek(DB, { klient, nazov, hodiny, od, doDna, cena, poznamka }, kto);
+          return Response.json({ ok: true, id, prenesene });
+        }
+
+        /**
+         * AUTOMATICKY — balíček prvým tréningom (viď automatickeBalicky.server.ts).
+         *
+         * Volá to appka pri otvorení. Je to bezpečné opakovať: klient, ktorému
+         * balíček vznikol, už nekrytý tréning nemá, a pre istotu sa nezapíše
+         * druhý balíček z Kokpitu s tým istým dňom začiatku.
+         */
+        if (akcia === "automaticky") {
+          const dnes = new Date().toISOString().slice(0, 10);
+          const navrhy = await navrhyNovychBalickov(DB, dnes);
+          const vznikli: { klient: string; nazov: string; od: string; navrat: boolean }[] = [];
+          for (const n of navrhy) {
+            const uz = await DB.prepare(
+              "SELECT id FROM balicky WHERE klient = ?1 AND platnost_od = ?2 AND zrusene_at IS NULL AND zdroj = 'rucne' LIMIT 1",
+            ).bind(n.klient, n.odDna).first().catch(() => null);
+            if (uz) continue;
+            const den = (d: string) => `${Number(d.slice(8, 10))}. ${Number(d.slice(5, 7))}. ${d.slice(0, 4)}`;
+            const poznamka = [
+              `automaticky — vznikol prvým tréningom ${den(n.odDna)}`,
+              n.navrat ? `návrat po ${n.pauzaDni} dňoch — over, či sedí` : "",
+              n.cenaPoznamka || "",
+            ].filter(Boolean).join(" · ");
+            await zapisBalicek(DB, {
+              klient: n.klient, nazov: n.nazov, hodiny: n.hodiny, od: n.odDna,
+              doDna: n.platnostDo || null, cena: n.cena, poznamka,
+            }, kto || "kokpit", "balicek-automaticky");
+            vznikli.push({ klient: n.klient, nazov: n.nazov, od: n.odDna, navrat: n.navrat });
+          }
+          return Response.json({ ok: true, vznikli });
+        }
+
+        /**
+         * PRESUN HODÍN DO ĎALŠIEHO BALÍČKA — len při předplatnom, najviac 2 h.
+         *
+         * Jerry, 4. 10. 2026: „pri viazanosti/předplatnom má byť vždy možnosť
+         * presunúť 2 hodiny do ďalšieho balíčka a tým by vznikol balíček
+         * 6h Předplatné, ale s 8 hodinami vo vnútri." Keď ďalší balíček
+         * z Kokpitu už je, hodiny sa mu pridajú hneď; inak presun počká
+         * a pridá ich prvý balíček, ktorý vznikne (`pridaj` vyššie).
+         */
+        if (akcia === "presun") {
+          const klient = String(b.klient || "").trim();
+          const zDo = denISO(b.zPlatnostiDo);
+          const h = Math.round((Number(b.hodiny) || 0) * 100) / 100;
+          if (!klient || !zDo) return Response.json({ ok: false, error: "Chýba klient alebo koniec platnosti." }, { status: 400 });
+          if (h <= 0 || h > 2) return Response.json({ ok: false, error: "Presunúť sa dá najviac 2 hodiny." }, { status: 400 });
+          const dalsi = await DB.prepare(
+            `SELECT id, hodiny, poznamka FROM balicky WHERE klient = ?1 AND zdroj = 'rucne' AND zrusene_at IS NULL
+               AND platnost_od > ?2 AND hodiny IS NOT NULL AND nazov NOT LIKE '%oplnenie%' ORDER BY platnost_od LIMIT 1`,
+          ).bind(klient, zDo).first<{ id: string; hodiny: number; poznamka: string | null }>().catch(() => null);
+          const idPresunu = uid();
+          if (dalsi) {
+            await DB.batch([
+              DB.prepare("UPDATE balicky SET hodiny = hodiny + ?1, poznamka = ?2 WHERE id = ?3")
+                .bind(h, [dalsi.poznamka, `+${h} h prenesené z balíčka do ${zDo}`].filter(Boolean).join(" · ").slice(0, 400), dalsi.id),
+              DB.prepare("INSERT INTO balicky_presun (id, klient, hodiny, z_platnosti_do, created_at, autor, pouzite_balicek_id, pouzite_at) VALUES (?1,?2,?3,?4,?5,?6,?7,?5)")
+                .bind(idPresunu, klient, h, zDo, teraz(), kto || null, dalsi.id),
+            ]);
+          } else {
+            await DB.prepare("INSERT INTO balicky_presun (id, klient, hodiny, z_platnosti_do, created_at, autor) VALUES (?1,?2,?3,?4,?5,?6)")
+              .bind(idPresunu, klient, h, zDo, teraz(), kto || null).run();
+          }
+          await audit(DB, { action: "balicek-presun-hodin", predmet: klient, neu: `${h} h z balíčka do ${zDo}${dalsi ? " → hneď do ďalšieho" : " → čaká na ďalší balíček"}`, actor: kto });
+          return Response.json({ ok: true, hned: !!dalsi });
         }
 
         /**

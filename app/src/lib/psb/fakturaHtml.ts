@@ -1,6 +1,6 @@
 import qrcode from "qrcode-generator";
 
-import { DODAVATEL, den, spayd, suma, type Faktura } from "./vydanaFaktura";
+import { DODAVATEL, den, klientiFaktury, polozkyFaktury, spayd, suma, type Faktura } from "./vydanaFaktura";
 
 /**
  * Faktúra ako tlačiteľný dokument.
@@ -80,6 +80,10 @@ export function fakturaDocument(f: Faktura): string {
   });
   const o = f.odberatel;
   const odberatel = o.firma || f.klient;
+  // Faktúra za viacerých klientov: každá položka nesie meno toho, za koho je.
+  const polozky = polozkyFaktury(f);
+  const klienti = klientiFaktury(f);
+  const viacKlientov = klienti.length > 1;
   const ic = [o.ico && `IČ ${esc(o.ico)}`, o.dic && `DIČ ${esc(o.dic)}`].filter(Boolean).join(" · ");
   return `<!doctype html>
 <html lang="cs">
@@ -165,19 +169,19 @@ export function fakturaDocument(f: Faktura): string {
         <div style="font-size:9.5pt;line-height:1.6;color:${B.slaba}">
           ${adresa([o.ulica, [o.psc, o.mesto].filter(Boolean).join(" ")])}
           ${ic ? `${ic}<br>` : ""}
-          ${odberatel !== f.klient ? `Za: ${esc(f.klient)}` : ""}
+          ${viacKlientov ? `Za: ${klienti.map(esc).join(", ")}` : odberatel !== f.klient ? `Za: ${esc(f.klient)}` : ""}
         </div>
       </div>
     </div>
 
     <table>
       <thead><tr><th style="width:52%">Označení dodávky</th><th>Počet m. j.</th><th>Cena za m. j.</th><th>Celkem</th></tr></thead>
-      <tbody><tr>
-        <td>${esc(f.popis)}</td>
-        <td class="n">${suma(f.ks)}</td>
-        <td class="n">${suma(f.cena)}</td>
-        <td class="n">${suma(f.celkom)}</td>
-      </tr></tbody>
+      <tbody>${polozky.map((p) => `<tr>
+        <td>${esc(p.popis)}${viacKlientov ? `<div style="font-size:8.5pt;color:${B.slaba};margin-top:1mm">${esc(p.klient)}</div>` : ""}</td>
+        <td class="n">${suma(p.ks)}</td>
+        <td class="n">${suma(p.cena)}</td>
+        <td class="n">${suma(p.celkom)}</td>
+      </tr>`).join("")}</tbody>
     </table>
 
     <div class="suma">

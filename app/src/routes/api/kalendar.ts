@@ -222,6 +222,26 @@ export const Route = createFileRoute("/api/kalendar")({
         }
 
         if (!(await isAuthed(request))) return unauthorized();
+
+        /**
+         * JEDEN TÝŽDEŇ TRÉNERA — náhľad pod menom v kroku Kalendár (beta).
+         * Jerry, 4. 10. 2026: „po kliknutí na meno sa pod ním rozbalí
+         * kalendár a zvýrazní sa daná zmena." Berú sa aj ZMIZNUTÉ udalosti
+         * (so `zmizla_at`), lebo práve o tie sa zmena často týka.
+         */
+        const tyzden = q0.get("tyzden") || "";
+        if (/^\d{4}-\d{2}-\d{2}$/.test(tyzden)) {
+          const d = new Date(`${tyzden}T12:00:00Z`);
+          const pondelok = new Date(d.getTime() - ((d.getUTCDay() + 6) % 7) * 86400000).toISOString().slice(0, 10);
+          const dalsi = new Date(Date.parse(`${pondelok}T12:00:00Z`) + 7 * 86400000).toISOString().slice(0, 10);
+          const trener = q0.get("trener") || "";
+          const rs = await DB.prepare(
+            `SELECT uid, trener, zaciatok, koniec, nazov, klient, typ, zmizla_at FROM kal_udalosti
+              WHERE zaciatok >= ?1 AND zaciatok < ?2 AND (?3 = '' OR trener = ?3) ORDER BY zaciatok`,
+          ).bind(pondelok, dalsi, trener).all().catch(() => ({ results: [] }));
+          return Response.json({ ok: true, pondelok, udalosti: rs.results || [] });
+        }
+
         const { od, do_ } = okno();
 
         const [zdroje, zmeny, zmenyHistoria, mapovanie, udalosti, guillermo, buduce, guillermoUdalosti, sporne] = await Promise.all([

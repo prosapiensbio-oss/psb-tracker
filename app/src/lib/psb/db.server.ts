@@ -8,6 +8,7 @@ import { nahradenieObdobia, type RiadokVKokpite } from "./nahradenieObdobia";
 import { doplnHodinySpolu, KOKPIT_OD, sedeniaZKalendara, spojDochadzku, type UdalostKalendara } from "./sedeniaZKalendara";
 import { hodinZNazvuBalicka } from "./klientOsCasu";
 import { normName } from "./format";
+import { nezaplateneZKokpitu, zaplateneVPtminderi, type BalicekDlh, type PlatbaDlh } from "./dlhKlienta";
 import { parseAnamneza, parseCennik, parseGa4, parseGsc, parseKanaly, parseMetricool, parsePoplatky } from "./parse";
 import {
   detectCSVType,
@@ -58,7 +59,7 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
       .all().catch(() => ({ results: [] })),
     // Vlastná evidencia platieb — potrebná na to, aby sa z otvorených
     // poplatkov odrátali tie, ktoré už niekto zaplatil (viď nižšie).
-    DB.prepare("SELECT id, klient, datum, suma_czk, sposob, fio_id, zrusene_at FROM platby")
+    DB.prepare("SELECT id, klient, datum, suma_czk, sposob, fio_id, zrusene_at, vopred FROM platby")
       .all().catch(() => ({ results: [] })),
     // Koľko hodín pridalo „Doplnenie členstva" — viď migráciu 0085.
     DB.prepare("SELECT klient, den, hodiny FROM doplnenia_hodiny").all().catch(() => ({ results: [] })),
@@ -304,6 +305,49 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
       added: r.pridane || "", validFrom: r.od || "", validTo: r.do || "",
       payment: r.platba ?? undefined, kind: r.druh, stav: r.stav || undefined,
     }));
+    /**
+     * Nezaplatené balíčky z Kokpitu — platby sa kladú na najstarší
+     * (`nezaplateneZKokpitu`). Počíta sa TU, na serveri, raz: kartu, os
+     * klienta aj stránku za odkazom tak rozhoduje to isté pravidlo.
+     */
+    {
+      const bal: Record<string, BalicekDlh[]> = {};
+      for (const r of balickyK.results as any[]) {
+        (bal[normName(r.klient)] ||= []).push({
+          cena: r.cena_czk == null ? null : Number(r.cena_czk), platnostOd: String(r.platnost_od || "").slice(0, 10),
+          zdroj: r.zdroj, zruseneAt: r.zrusene_at || null, nazov: r.nazov,
+        });
+      }
+      const pl: Record<string, PlatbaDlh[]> = {};
+      for (const r of vlastnePlatby.results as any[]) {
+        (pl[normName(r.klient)] ||= []).push({
+          suma: Number(r.suma_czk) || 0, datum: String(r.datum || "").slice(0, 10), zruseneAt: r.zrusene_at || null, vopred: !!r.vopred,
+        });
+      }
+      const mena = new Map((balickyK.results as any[]).map((r) => [normName(r.klient), String(r.klient)]));
+      const podlaKokpitu = Object.entries(bal).flatMap(([k, bs]) =>
+        nezaplateneZKokpitu(bs, pl[k] || []).map((b) => ({ ...b, klient: mena.get(k) || k })));
+      data.nezaplateneKokpit = zaplateneVPtminderi(
+        podlaKokpitu,
+        (payments.results as any[]).map((r) => ({ klient: String(r.client_name || ""), datum: String(r.date || "").slice(0, 10), suma: Number(r.amount_czk) || 0 })),
+        (data.historiaBalickov || []).map((h) => ({ klient: h.client, od: String(h.validFrom || "").slice(0, 10) })),
+        (data.poplatky || []).map((p) => ({ klient: p.klient, datum: String(p.datum || "").slice(0, 10) })),
+        normName,
+      ).map((b) => ({ klient: b.klient, den: b.platnostOd, cena: b.cena || 0, nazov: b.nazov || "", doplatit: b.doplatit }));
+      /**
+       * DLH ZA BALÍČKY Z KOKPITU — z tých istých nezaplatených balíčkov.
+       * Karta (hodiny) aj zoznam dlžníkov a QR za odkazom tak čítajú jedno
+       * rozhodnutie; keby si dlh počítal každý sám, Papiež by mal hodiny
+       * a zároveň dlh za ten istý zaplatený balíček.
+       */
+      data.dlhKokpit = {};
+      for (const b of data.nezaplateneKokpit) {
+        const k = normName(b.klient);
+        const d = data.dlhKokpit[k] || { dlzi: 0, pocet: 0 };
+        d.dlzi += b.doplatit ?? b.cena; d.pocet += 1;
+        data.dlhKokpit[k] = d;
+      }
+    }
     data.balickyKokpit = (balickyK.results as any[]).map((r) => ({
       klient: r.klient, nazov: r.nazov, hodiny: r.hodiny ?? null,
       platnostOd: String(r.platnost_od || "").slice(0, 10), platnostDo: r.platnost_do ? String(r.platnost_do).slice(0, 10) : null,

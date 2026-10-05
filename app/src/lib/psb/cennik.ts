@@ -24,6 +24,12 @@ export type Sablona = {
   cena: number | null;
   /** Bežná platnosť v týždňoch. null = bez konca alebo sa nedá predvyplniť. */
   tyzdnov: number | null;
+  /**
+   * Platnosť v MESIACOCH, keď ju PTminder počíta mesiacmi (předplatné
+   * „1 month", 18 h „6-month"). Prebíja `tyzdnov` — mesiac nie sú štyri
+   * týždne a za pol roka by sa rozdiel nazbieral na tri dni.
+   */
+  mesiacov?: number;
   skupina: "Offline" | "Online" | "Špeciálne";
 };
 
@@ -37,9 +43,9 @@ export const CENNIK: Sablona[] = [
    * ich nesú rovno, takže sa slovník časom zjednotí sám.
    */
   { nazov: "6h Balíček", hodiny: 6, cena: 7790, tyzdnov: 8, skupina: "Offline" },
-  { nazov: "6h Předplatné", hodiny: 6, cena: 6990, tyzdnov: 4, skupina: "Offline" },
+  { nazov: "6h Předplatné", hodiny: 6, cena: 6990, tyzdnov: 4, mesiacov: 1, skupina: "Offline" },
   { nazov: "8h Balíček", hodiny: 8, cena: 9400, tyzdnov: 8, skupina: "Offline" },
-  { nazov: "18h Balíček", hodiny: 18, cena: 21150, tyzdnov: 26, skupina: "Offline" },
+  { nazov: "18h Balíček", hodiny: 18, cena: 21150, tyzdnov: 26, mesiacov: 6, skupina: "Offline" },
   { nazov: "1h Balíček", hodiny: 1, cena: 1450, tyzdnov: 4, skupina: "Offline" },
 
   { nazov: "6h Balíček online", hodiny: 6, cena: 6590, tyzdnov: 8, skupina: "Online" },
@@ -53,8 +59,37 @@ export const CENNIK: Sablona[] = [
   { nazov: "Doplnenie členstva", hodiny: null, cena: 0, tyzdnov: null, skupina: "Špeciálne" },
 ];
 
-/** Koniec platnosti podľa šablóny — predvyplnenie, nie pravidlo. */
-export function platnostDo(od: string, tyzdnov: number | null): string {
-  if (!tyzdnov || !/^\d{4}-\d{2}-\d{2}$/.test(od)) return "";
-  return new Date(Date.parse(`${od}T00:00:00Z`) + tyzdnov * 7 * 86400000).toISOString().slice(0, 10);
+/**
+ * Koniec platnosti podľa šablóny — tak, ako ho počíta PTminder.
+ *
+ * Overené 4. 10. 2026 na 236 členstvách z `ptminder_historia`: posledný deň
+ * je DEŇ PRED uplynutím obdobia. 8 týždňov z 2. 9. končí 27. 10. (+55 dní),
+ * 4 týždne +27, mesiac z 24. 3. končí 23. 4. a pol roka z 12. 2. končí 11. 8.
+ * Do toho dňa Kokpit pripočítaval celé obdobie, takže každý balíček mu
+ * platil o deň dlhšie než v PTminderi.
+ */
+export function platnostDo(od: string, tyzdnov: number | null, mesiacov?: number): string {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(od)) return "";
+  if (mesiacov) {
+    const [r, m, d] = od.split("-").map(Number);
+    // Mesiac bez takého dňa (31. 1. + 1 mesiac) sa zarazí na jeho konci.
+    const posledny = new Date(Date.UTC(r, m - 1 + mesiacov + 1, 0)).getUTCDate();
+    const koniec = new Date(Date.UTC(r, m - 1 + mesiacov, Math.min(d, posledny)));
+    return new Date(koniec.getTime() - 86400000).toISOString().slice(0, 10);
+  }
+  if (!tyzdnov) return "";
+  return new Date(Date.parse(`${od}T00:00:00Z`) + (tyzdnov * 7 - 1) * 86400000).toISOString().slice(0, 10);
+}
+
+/** Koniec platnosti pre šablónu z cenníka. */
+export const koniecPlatnosti = (od: string, s: Pick<Sablona, "tyzdnov" | "mesiacov">): string =>
+  platnostDo(od, s.tyzdnov, s.mesiacov);
+
+/**
+ * Šablóna z cenníka podľa názvu balíčka, aj starého z PTmindera
+ * („OFF - 6h BEZ viazanosti" → „6h Balíček").
+ */
+export function sablonaPodlaNazvu(nazov: string, preloz: (n: string) => string): Sablona | undefined {
+  const n = preloz(nazov);
+  return CENNIK.find((s) => s.nazov === n);
 }

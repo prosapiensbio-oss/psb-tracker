@@ -75,7 +75,49 @@ export type Faktura = {
   poznamka?: string;
   stornoAt?: string | null;
   uhradeneAt?: string | null;
+  /**
+   * Ďalšie položky za iných klientov (Dan a Monika na jednej faktúre,
+   * 4. 10. 2026). Hlavná položka je `popis`/`ks`/`cena` a patrí `klient`;
+   * `celkom` je súčet všetkých.
+   */
+  dalsie?: PolozkaFaktury[];
 };
+
+/** Jedna položka faktúry — vždy za konkrétneho klienta. */
+export type PolozkaFaktury = {
+  klient: string;
+  popis: string;
+  ks: number;
+  cena: number;
+  celkom: number;
+  balicekId?: string | null;
+};
+
+const zaokruhli = (n: number) => Math.round(n * 100) / 100;
+
+/** Všetky položky v poradí, hlavná prvá. */
+export function polozkyFaktury(f: Pick<Faktura, "klient" | "popis" | "ks" | "cena" | "dalsie">): PolozkaFaktury[] {
+  return [
+    { klient: f.klient, popis: f.popis, ks: f.ks, cena: f.cena, celkom: zaokruhli(f.ks * f.cena) },
+    ...(f.dalsie || []),
+  ];
+}
+
+/** Za koľkých rôznych klientov faktúra je. */
+export function klientiFaktury(f: Pick<Faktura, "klient" | "popis" | "ks" | "cena" | "dalsie">): string[] {
+  return [...new Set(polozkyFaktury(f).map((p) => p.klient))];
+}
+
+/**
+ * Popis jednou vetou — do mailu („…za 6 hodín tréningu").
+ * Pri viacerých klientoch je pri každej položke meno, inak by účtovníčka
+ * nevedela, za koho platí.
+ */
+export function popisFaktury(f: Pick<Faktura, "klient" | "popis" | "ks" | "cena" | "dalsie">): string {
+  const p = polozkyFaktury(f);
+  if (klientiFaktury(f).length < 2) return f.popis;
+  return p.map((x) => `${x.popis} (${x.klient})`).join("; ");
+}
 
 export type Odberatel = {
   firma: string;

@@ -21,7 +21,12 @@ import { Card, H3, Info } from "./ui";
  */
 
 type Platba = { id: string; klient: string; datum: string; suma_czk: number; sposob: string; fio_id: string | null; poznamka: string | null; zrusene_at: string | null };
-type Nepriradena = { fioId: string; datum: string; suma: number; text: string; kandidati: string[]; klientsky?: boolean };
+type Nepriradena = {
+  fioId: string; datum: string; suma: number; text: string; kandidati: string[]; klientsky?: boolean;
+  /** Jeden prevod za viacerých — návrh dielov. */
+  rozdelenie?: { klient: string; suma: number }[];
+  poznamka?: string;
+};
 type Mesiac = { mesiac: string; kokpit: number; ptminder: number; rozdiel: number; kokpitHotovost: number; kokpitBanka: number; kokpitIne: number };
 type Porovnanie = { mesiace: Mesiac[]; kokpit: number; ptminder: number; rozdiel: number; sediacich: number };
 
@@ -167,7 +172,8 @@ export function PlatbyEvidencia({ mena }: { mena: string[] }) {
             a vklady sa v kope vo Workspace neukazujú, lebo tam ide o dennú prácu s klientmi, ale celý výpis sa rieši TU.
           </div>
           {nepriradene.slice(0, 30).map((n) => {
-            const v = vyber[n.fioId] ?? (n.kandidati.length === 1 ? n.kandidati[0] : "");
+            // Spoločný prevod sa jednému človeku nepredvyplní.
+            const v = vyber[n.fioId] ?? (!n.rozdelenie && n.kandidati.length === 1 ? n.kandidati[0] : "");
             return (
               <div key={n.fioId} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 0", borderBottom: `1px solid ${mix(C.border, 55)}` }}>
                 <div style={{ minWidth: 60, fontSize: 12, color: C.textDim }}>{denKratko(n.datum)}</div>
@@ -176,7 +182,21 @@ export function PlatbyEvidencia({ mena }: { mena: string[] }) {
                   {n.text.slice(0, 90)}
                   {n.kandidati.length > 1 && <span style={{ color: C.orange }}> · {n.kandidati.length} možností</span>}
                   {n.klientsky === false && <span style={{ color: C.textDim }}> · nevyzerá na klienta</span>}
+                  {n.poznamka && <div style={{ color: C.orange, marginTop: 2 }}>{n.poznamka}</div>}
                 </div>
+                {n.rozdelenie && (
+                  <button
+                    onClick={() => void akcia({ akcia: "rozdel", fioId: n.fioId, diely: n.rozdelenie }, n.fioId)}
+                    disabled={pracujem === n.fioId}
+                    title="Každý dostane svoju platbu zvlášť. Iné rozdelenie sa dá zadať vo Workspace."
+                    style={{
+                      padding: "6px 12px", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer",
+                      border: `1px solid ${mix(C.accent, 45)}`, background: mix(C.accent, 12), color: C.accentLight,
+                    }}
+                  >
+                    Rozdeliť: {n.rozdelenie.map((d) => `${d.klient.split(" ")[0]} ${kc(d.suma)}`).join(" + ")}
+                  </button>
+                )}
                 <input
                   list="platby-klienti"
                   value={v}

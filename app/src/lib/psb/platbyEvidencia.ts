@@ -192,10 +192,28 @@ export type NepriradenaPlatba = {
   klientsky: boolean;
   /** Odkiaľ je návrh: aby človek vedel, čomu verí. */
   zdrojNavrhu: "naucene" | "faktura" | "firma" | "meno" | "meno+suma" | "suma" | "";
+  /**
+   * Jeden prevod za viacerých klientov — návrh, komu koľko.
+   * Keď je vyplnené, platba sa NEMÁ priradiť jednému človeku celá.
+   */
+  rozdelenie?: Diel[];
+  /** Odkiaľ je rozdelenie: faktúra s položkami, spoloční platitelia, PTminder. */
+  zdrojRozdelenia?: "faktura" | "spolocne" | "ptminder";
+  /** Veta pre človeka, keď sa návrh s niečím bije (PTminder hovorí inak). */
+  poznamka?: string;
 };
 
-/** Vystavená faktúra — na párovanie podľa variabilného symbolu. */
-export type FakturaVzor = { cislo: string; klient: string };
+/** Diel spoločnej platby: komu a koľko. */
+export type Diel = { klient: string; suma: number };
+
+/**
+ * Vystavená faktúra — na párovanie podľa variabilného symbolu.
+ * `diely` má len faktúra s položkami za viacerých klientov.
+ */
+export type FakturaVzor = { cislo: string; klient: string; diely?: Diel[] };
+
+/** Cena balíčka klienta — na rozdelenie spoločnej platby, keď PTminder mlčí. */
+export type CenaBalicka = { klient: string; od: string; cena: number };
 
 /**
  * Firma, na ktorú sa klientovi fakturuje.
@@ -341,6 +359,140 @@ export function volnePtPlatby(ptPlatby: PtPlatba[], platby: Platba[]): PtPlatba[
   });
 }
 
+// Riadok bez dátumu dá NaN a každé porovnanie s ním je nepravda — nepadne nič.
+const dniMedzi = (a: string, b: string) =>
+  Math.abs(Date.parse(`${String(a ?? "").slice(0, 10)}T00:00:00Z`) - Date.parse(`${String(b ?? "").slice(0, 10)}T00:00:00Z`)) / 86400000;
+
+/**
+ * SPOLOČNÍ PLATITELIA — kto už raz poslal peniaze jedným prevodom s kým.
+ *
+ * Odvodené z rozdelených platieb (rovnaké `fio_id`, dvaja a viac klientov),
+ * nie z ručného zoznamu: Dan Kouřil a Monika Schonwalderova sa tak stali
+ * dvojicou 3. 4. 2026, keď Jerry rozdelil prvý spoločný prevod.
+ */
+export function spolocniPlatitelia(platby: Platba[]): Map<string, Set<string>> {
+  const poPohybe = new Map<string, Set<string>>();
+  for (const p of platby) {
+    if (p.zruseneAt || !p.fioId) continue;
+    const s = poPohybe.get(p.fioId) || new Set<string>();
+    s.add(p.klient);
+    poPohybe.set(p.fioId, s);
+  }
+  const out = new Map<string, Set<string>>();
+  for (const s of poPohybe.values()) {
+    if (s.size < 2) continue;
+    for (const a of s) {
+      const k = normName(a);
+      const m = out.get(k) || new Set<string>();
+      for (const b of s) if (normName(b) !== k) m.add(b);
+      out.set(k, m);
+    }
+  }
+  return out;
+}
+
+/** Cena balíčka, ktorý klient začal najbližšie k dňu platby (do troch týždňov). */
+function cenaOkolo(ceny: CenaBalicka[], klient: string, den: string): number | null {
+  const jeho = ceny
+    .filter((c) => normName(c.klient) === normName(klient) && c.cena > 0 && dniMedzi(c.od, den) <= 21)
+    .sort((a, b) => dniMedzi(a.od, den) - dniMedzi(b.od, den));
+  return jeho.length ? Math.round(jeho[0].cena) : null;
+}
+
+/**
+ * JEDEN PREVOD, VIAC KLIENTOV — NÁVRH ROZDELENIA.
+ *
+ * Jerry, 4. 10. 2026: „Dan a Monika platia na jednu faktúru… v PTminderi aj
+ * v Kokpite sa zapíše každému členstvo a platba za 7 790." Appka 15 580 Kč
+ * z DK Consulting 15. 5. a 26. 7. ponúkla celú Danovi (variabilný symbol
+ * ukazoval na jeho firmu) a v dávke 28. 9. sa tak aj zapísala. Monike tým
+ * v Kokpite chýbali dve platby, Danovi dve prebývali.
+ *
+ * Dva dôkazy, v tomto poradí:
+ *  1. SPOLOČNÍ PLATITELIA — kandidát už raz platil s niekým jedným prevodom.
+ *     Diely sa berú z PTmindera (platba každého v okne troch dní), a keď
+ *     PTminder už nepíše (Kokpit je pravda od 1. 10. 2026), z ceny balíčka,
+ *     ktorý si každý z nich v tom čase kúpil. Bez mena v platbe (kandidát
+ *     neznámy) sa ceny balíčkov nepoužijú — to by bol len súčet čísel.
+ *  2. PTMINDER — kandidát má v PTminderi menšiu platbu a zvyšok sumy má
+ *     v tom okne práve jeden ďalší človek. Slabší dôkaz: predzaškrtnutý nie je.
+ *
+ * Návrh vznikne len vtedy, keď je JEDINÝ. Dve možné dvojice = rozhodne človek.
+ */
+export function navrhniRozdelenie(
+  r: Pick<FioRiadok, "date" | "amount_czk">,
+  kandidati: string[],
+  volne: PtPlatba[],
+  spolocni: Map<string, Set<string>>,
+  ceny: CenaBalicka[] = [],
+): { diely: Diel[]; zdroj: "spolocne" | "ptminder" } | null {
+  const suma = Math.round(r.amount_czk);
+  const den = r.date.slice(0, 10);
+  if (!suma || kandidati.length > 1) return null;
+  const pt = volne.filter((p) => p.metoda === "bank" && dniMedzi(p.datum, den) <= 3);
+  const sumyPt = (k: string) => [...new Set(pt.filter((p) => normName(p.klient) === normName(k)).map((p) => Math.round(p.suma)))];
+  /**
+   * Pri spoločných platiteľoch sa berie aj platba zapísaná inak než prevod.
+   * 26. 7. 2026 PTminder zapísal Danovu polovicu ako hotovosť, hoci prišla
+   * jedným prevodom s Monikinou — dôkazom je tu dvojica, nie spôsob platby.
+   */
+  const vOkne = volne.filter((p) => dniMedzi(p.datum, den) <= 3);
+  const sumyDvojice = (k: string) => [...new Set(vOkne.filter((p) => normName(p.klient) === normName(k)).map((p) => Math.round(p.suma)))];
+  const kandidat = kandidati[0];
+  // PTminder pozná celú sumu pri kandidátovi → nie je čo deliť.
+  if (kandidat && sumyPt(kandidat).includes(suma)) return null;
+
+  const kluc = (d: Diel[]) => d.map((x) => `${normName(x.klient)}:${x.suma}`).sort().join("|");
+  const riesenia = new Map<string, Diel[]>();
+  // Bez kandidáta sa skúšajú všetky známe dvojice; každá sa nájde z oboch
+  // strán, ale kľúč riešenia je zoradený, takže sa započíta raz.
+  const kotvy = kandidat ? [kandidat] : [...new Set([...spolocni.values()].flatMap((s) => [...s]))];
+  const moznosti = (k: string): number[] => {
+    const zPt = sumyDvojice(k);
+    if (zPt.length) return zPt;
+    const c = kandidat ? cenaOkolo(ceny, k, den) : null;
+    return c ? [c] : [];
+  };
+  for (const k of kotvy) {
+    for (const m of spolocni.get(normName(k)) || []) {
+      for (const a of moznosti(k)) for (const b of moznosti(m)) {
+        if (a > 0 && b > 0 && a + b === suma) {
+          const d = [{ klient: k, suma: a }, { klient: m, suma: b }];
+          riesenia.set(kluc(d), d);
+        }
+      }
+    }
+  }
+  if (riesenia.size === 1) return { diely: [...riesenia.values()][0], zdroj: "spolocne" };
+  if (riesenia.size > 1 || !kandidat) return null;
+
+  const partneri = new Map<string, Diel[]>();
+  for (const a of sumyPt(kandidat)) {
+    if (a >= suma) continue;
+    for (const p of pt) {
+      if (normName(p.klient) === normName(kandidat) || Math.round(p.suma) !== suma - a) continue;
+      const d = [{ klient: kandidat, suma: a }, { klient: p.klient, suma: suma - a }];
+      partneri.set(kluc(d), d);
+    }
+  }
+  return partneri.size === 1 ? { diely: [...partneri.values()][0], zdroj: "ptminder" } : null;
+}
+
+/**
+ * Rozdelenie podľa faktúry s položkami za viacerých klientov.
+ * Platí len vtedy, keď suma pohybu sedí na celú faktúru — čiastočná úhrada
+ * sa rozdeliť nedá, to musí povedať človek.
+ */
+export function rozdelenieZFaktury(text: string, suma: number, faktury: FakturaVzor[]): Diel[] | null {
+  const cisla = new Set(text.match(/\d{6,10}/g) || []);
+  for (const f of faktury) {
+    if (!f.diely || f.diely.length < 2 || !cisla.has(f.cislo)) continue;
+    const spolu = f.diely.reduce((n, d) => n + d.suma, 0);
+    if (Math.abs(spolu - Math.round(suma)) <= 1) return f.diely;
+  }
+  return null;
+}
+
 export function nepriradene(
   fio: FioRiadok[],
   platby: Platba[],
@@ -353,8 +505,11 @@ export function nepriradene(
   faktury: FakturaVzor[] = [],
   /** Firmy klientov — platba z firmy patrí človeku, ktorý za ňou stojí. */
   firmy: FirmaKlienta[] = [],
+  /** Ceny balíčkov — na rozdelenie spoločného prevodu, keď PTminder mlčí. */
+  ceny: CenaBalicka[] = [],
 ): NepriradenaPlatba[] {
   const uz = new Set(platby.filter((p) => !p.zruseneAt && p.fioId).map((p) => p.fioId as string));
+  const spolocni = spolocniPlatitelia(platby);
   // Platba z PTmindera, ktorú už vysvetľuje priradený pohyb, nesmie byť
   // kandidátom pre druhý — viď `volnePtPlatby`.
   const volne = volnePtPlatby(ptPlatby, platby);
@@ -406,20 +561,65 @@ export function nepriradene(
       const prienik = kandidati.filter((k) => parujPodlaSumy(r, volne).includes(k));
       if (prienik.length === 1) { kandidati = prienik; rozhodlaSuma = true; }
     }
+    const zdrojNavrhu: NepriradenaPlatba["zdrojNavrhu"] = naucene ? "naucene"
+      : podlaFaktury.length ? "faktura"
+        : podlaFirmy.length ? "firma"
+          : podlaMena.length ? (rozhodlaSuma ? "meno+suma" : "meno")
+            : podlaSumy.length ? "suma" : "";
+
+    /** Spoločný prevod — viď `navrhniRozdelenie` a `rozdelenieZFaktury`. */
+    let rozdelenie: Diel[] | undefined;
+    let zdrojRozdelenia: NepriradenaPlatba["zdrojRozdelenia"];
+    const zFaktury = podlaFaktury.length ? rozdelenieZFaktury(text, r.amount_czk, faktury) : null;
+    if (zFaktury) { rozdelenie = zFaktury; zdrojRozdelenia = "faktura"; }
+    else if (zdrojNavrhu !== "suma") {
+      const n = navrhniRozdelenie(r, kandidati, volne, spolocni, ceny);
+      if (n) { rozdelenie = n.diely; zdrojRozdelenia = n.zdroj; }
+    }
+
+    /**
+     * KEĎ PTMINDER HOVORÍ INÉ MENO.
+     *
+     * V dávke 28. 9. 2026 sa zapísali štyri platby človeku, pri ktorom ich
+     * PTminder nemá — a má ich v ten deň pri niekom inom:
+     *  • 12. 3. 1 100 Kč z DK Consulting (firma → Dan) — PTminder: Monika,
+     *  • 23. 1. „Musilova irina" (meno → Irina Dyldina) — PTminder: Irena Muselova,
+     *  • 12. 4. „…6x - novy ucet" (slovo „novy" → Ondrej Nový) — PTminder: Janka Šnirychová,
+     *  • 7. 8. „Hrdina Michal" (krstné meno → Michal Knapčok) — PTminder: Hana Hrdinová.
+     * Návrh sa preto nezahodí, ale prestane byť jednoznačný: obaja idú do
+     * výberu a rozhodne človek.
+     *
+     * Platí to aj pre NAUČENÉ pravidlo. Tá istá dávka sa naučila „hrdina
+     * michal" → Michal Knapčok (krstné meno v odosielateľovi stačilo na
+     * `smieSaZapamatat`), takže každý ďalší prevod Michala Hrdinu by išiel
+     * Knapčokovi bez otázky. Pravidlo z dávky nie je to isté ako pravidlo,
+     * nad ktorým človek rozmýšľal.
+     */
+    let poznamka: string | undefined;
+    if (!rozdelenie && kandidati.length === 1 && zdrojNavrhu !== "suma") {
+      const k = kandidati[0];
+      const den = r.date.slice(0, 10);
+      const rovnaka = volne.filter((p) => p.metoda === "bank" && Math.round(p.suma) === Math.round(r.amount_czk));
+      const maJu = rovnaka.some((p) => normName(p.klient) === normName(k) && dniMedzi(p.datum, den) <= 3);
+      const ini = [...new Set(rovnaka.filter((p) => normName(p.klient) !== normName(k) && dniMedzi(p.datum, den) <= 1).map((p) => p.klient))];
+      if (!maJu && ini.length === 1) {
+        kandidati = [k, ini[0]];
+        poznamka = `PTminder má túto platbu pri ${ini[0]}, nie pri ${k}.`;
+      }
+    }
+
     out.push({
       fioId: r.id,
       datum: r.date.slice(0, 10),
       suma: r.amount_czk,
       text,
       kandidati,
+      ...(rozdelenie ? { rozdelenie, zdrojRozdelenia } : {}),
+      ...(poznamka ? { poznamka } : {}),
       // Naučené priradenie prebíja odhad: keď už niekto raz povedal, že tento
       // odosielateľ je klient, appka to nemá spochybňovať.
       klientsky: !!naucene || vyzeraNaKlienta(r),
-      zdrojNavrhu: naucene ? "naucene"
-        : podlaFaktury.length ? "faktura"
-          : podlaFirmy.length ? "firma"
-            : podlaMena.length ? (rozhodlaSuma ? "meno+suma" : "meno")
-              : podlaSumy.length ? "suma" : "",
+      zdrojNavrhu,
     });
   }
   return out.sort((a, b) => b.datum.localeCompare(a.datum));

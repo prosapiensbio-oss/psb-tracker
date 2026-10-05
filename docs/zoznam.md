@@ -16,6 +16,27 @@ Stav k **3. 10. 2026**.
 
 ---
 
+## 0a · Workspace po krokoch — naostro od 5. 10. 2026
+
+Jerry: štyri kroky týždňa, každý jedna karta (Kalendár · SMS · Platby ·
+Balíčky). Postavené v bete; pravidlá v CLAUDE.md „Workspace po krokoch".
+
+- [x] **Naostro od 5. 10. 2026** (Jerry: „postav to v Kokpite") — Workspace má
+      tri kroky, SMS len z kroku 2, dashboard s nezaplatenými navrchu.
+- [x] **Automatické zakladanie balíčka prvým tréningom** — od 4. 10. 2026
+      beží samo pri otvorení appky (aj naostro, spoločná DB). Prvý beh: 0 balíčkov.
+- [ ] **Jerry prejde v bete** týždenný náhľad kalendára, páry platieb
+      a dashboard s nezaplatenými navrchu.
+- [ ] **FIO_TOKEN v bete** — bez neho „Stiahnuť príjmy z Fio" v bete nejde.
+      Jerry: `npx wrangler secret put FIO_TOKEN --name kokpit-beta`.
+- [ ] **Banka od 27. 9. nestiahnutá** — pravidlo „nezaplatený balíček = mínus"
+      drží poistka z PTmindera; po odchode z neho musí byť banka spárovaná.
+- [ ] **Opravy platieb čakajú na súhlas** (finančné dáta): 12. 3. 1 100 Dan →
+      Monika; 15. 5. a 26. 7. 15 580 Dan → 7 790 + 7 790 Monika; 23. 1. Irina
+      Dyldina → Irena Muselova; 12. 4. Ondrej Nový → Janka Šnirychová; 7. 8.
+      Michal Knapčok → Hana Hrdinová; 11. 7. 7 011 Kateřina Matlová → Richard
+      Matl; zmazať pravidlo „hrdina michal" → Knapčok.
+
 ## 0 · Odchod z PTmindera — od 1. 10. 2026 je Kokpit pravda
 
 Rozhodnuté 29. 9. 2026. PTminder je odvtedy kontrola.

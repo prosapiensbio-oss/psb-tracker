@@ -66,23 +66,46 @@ const den = (s: string) => (s || "").slice(0, 10);
  * Páruje sa deň a suma: dva rôzne predaje v jeden deň za tú istú sumu by
  * boli zriedkavé a aj tak by sa jeden z nich zapísal len raz.
  */
+/**
+ * Poplatok z PTmindera, ktorý je ten istý predaj ako balíček z Kokpitu.
+ *
+ * Do 4. 10. 2026 len ten istý deň a cena. Odkedy balíček vzniká sám prvým
+ * tréningom, jeho deň je deň tréningu, kým PTminder zapíše deň predaja —
+ * rozdiel býva deň-dva. Rovnaká cena do troch dní = ten istý predaj; o týždeň
+ * neskôr už je to druhý predaj (předplatné ide každý mesiac za tú istú sumu).
+ * Každý balíček páruje najviac jeden poplatok.
+ */
 const bezZdvojenych = (poplatky: Poplatok[], balicky: BalicekDlh[]): Poplatok[] => {
-  const nase = new Set(
-    balicky
-      .filter((b) => !b.zruseneAt && b.zdroj === "rucne" && (b.cena || 0) > 0)
-      .map((b) => `${den(b.platnostOd)}|${Math.round(b.cena || 0)}`),
-  );
-  return nase.size ? poplatky.filter((p) => !nase.has(`${den(p.datum)}|${Math.round(p.suma || 0)}`)) : poplatky;
+  const nase = balicky
+    .filter((b) => !b.zruseneAt && b.zdroj === "rucne" && (b.cena || 0) > 0)
+    .map((b) => ({ den: den(b.platnostOd), cena: Math.round(b.cena || 0), pouzity: false }));
+  if (!nase.length) return poplatky;
+  const dni = (a: string, b: string) => Math.abs(Date.parse(`${a}T00:00:00Z`) - Date.parse(`${b}T00:00:00Z`)) / 86400000;
+  return poplatky.filter((p) => {
+    const d = den(p.datum);
+    const c = Math.round(p.suma || 0);
+    const presne = nase.find((b) => !b.pouzity && b.cena === c && b.den === d);
+    const blizko = presne || nase.find((b) => !b.pouzity && b.cena === c && dni(b.den, d) <= 3);
+    if (!blizko) return true;
+    blizko.pouzity = true;
+    return false;
+  });
 };
 
 export function dlhJednehoKlienta(
   poplatky: Poplatok[],
   balicky: BalicekDlh[],
   platby: PlatbaDlh[],
+  /**
+   * Dlh za balíčky z Kokpitu, ako ho spočítal server (`data.dlhKokpit`).
+   * Keď je, prebíja vlastný výpočet — server pozná aj PTminder (poistka
+   * na čas prechodu), takže dlh a hodiny na karte hovoria to isté.
+   */
+  zoServera?: { dlzi: number; pocet: number } | null,
 ): { dlzi: number; pocet: number; popis: string } {
   poplatky = bezZdvojenych(poplatky, balicky);
   const zPoplatkov = poplatky.reduce((a, p) => a + (p.suma || 0), 0);
-  const zBalickov = dlhKlienta(balicky, platby);
+  const zBalickov = zoServera ?? dlhKlienta(balicky, platby);
   const dlzi = Math.max(0, Math.round(zPoplatkov + zBalickov.dlzi));
   const pocet = poplatky.length + zBalickov.pocet;
   // Popis hovorí, za ČO to je — suma bez dôvodu je výzva na nedorozumenie.
@@ -100,6 +123,8 @@ export function dlznici(
   /** Ku ktorému trénerovi klient patrí; chýbajúci zostáva bez mena trénera. */
   treneri: Record<string, string> = {},
   dnes: string = new Date().toISOString().slice(0, 10),
+  /** Dlh za balíčky z Kokpitu zo servera, kľúč `normName` — viď `dlhJednehoKlienta`. */
+  zoServera?: Record<string, { dlzi: number; pocet: number }>,
 ): Dlznik[] {
   const podla = new Map<string, Dlznik>();
   const daj = (meno: string): Dlznik => {
@@ -127,9 +152,17 @@ export function dlznici(
   }
 
   // Mená z oboch zdrojov: kto dlží len za balíček, v poplatkoch nestojí.
-  for (const meno of Object.keys(balicky)) {
-    const dlh = dlhKlienta(balicky[meno], platby[meno] || []);
-    if (dlh.dlzi > 0) daj(meno).zBalickov += dlh.dlzi;
+  if (zoServera) {
+    for (const [k, d] of Object.entries(zoServera)) {
+      if (d.dlzi <= 0) continue;
+      const meno = Object.keys(balicky).find((m) => normName(m) === k) || k;
+      daj(meno).zBalickov += d.dlzi;
+    }
+  } else {
+    for (const meno of Object.keys(balicky)) {
+      const dlh = dlhKlienta(balicky[meno], platby[meno] || []);
+      if (dlh.dlzi > 0) daj(meno).zBalickov += dlh.dlzi;
+    }
   }
 
   const out = [...podla.values()];
