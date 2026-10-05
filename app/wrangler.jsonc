@@ -51,6 +51,13 @@
   // Je to VÄZBA, nie kľúč: beží na tom istom účte ako appka, takže tu nie je
   // čo nastavovať ani čo utajovať. Účtuje sa za obrázok (rádovo desatina
   // centa), preto sa volá len na kliknutie, nikdy sama.
+  // Kartotéka fotiek držania tela (5. 10. 2026). Fotky sú v úložisku
+  // zašifrované kľúčom anamnézy; verejná adresa neexistuje — čítajú sa len
+  // cez /api/fotky po prihlásení. Väzba sa volá STORAGE (bindings.server.ts).
+  "r2_buckets": [
+    { "binding": "STORAGE", "bucket_name": "kokpit-fotky" }
+  ],
+
   "ai": { "binding": "AI" },
 
   // Browser Rendering — PDF faktúry vyrobené NA SERVERI.

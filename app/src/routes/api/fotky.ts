@@ -60,9 +60,10 @@ export const Route = createFileRoute("/api/fotky")({
             return new Response(cista as unknown as ArrayBuffer, {
               headers: {
                 "content-type": "image/jpeg",
-                // Fotka sa pod rovnakým id nemení. Len do prehliadača toho,
-                // kto je prihlásený — nikdy do zdieľanej keše.
-                "cache-control": "private, max-age=3600",
+                // Len do prehliadača toho, kto je prihlásený — nikdy do
+                // zdieľanej keše — a vždy sa spýtať servera: zmazaná fotka
+                // by inak z keše išla ešte hodinu (overené 5. 10. 2026).
+                "cache-control": "private, no-cache",
                 "x-robots-tag": "noindex",
               },
             });

@@ -2704,8 +2704,11 @@ a poznámka k foteniu. Panel anamnézy → stupienok „Fotky držania tela"
 - **Fotka sa zmenšuje v prehliadači** (2000 px, JPEG, `imageOrientation:
   from-image` — inak by fotka z iPadu na výšku prišla naležato; EXIF aj
   poloha sa tým zahodia).
-- **R2 musí zapnúť Jerry v dashboarde** (podmienky + platobná karta, aj
-  keď je do 10 GB zadarmo). Kým nie je, appka beží bez väzby a kartotéka to
-  povie vetou. Po zapnutí: `wrangler r2 bucket create kokpit-fotky`,
-  do `wrangler.jsonc` `r2_buckets` s `binding: "STORAGE"`, nasadiť.
+- **R2 zapnuté 5. 10. 2026** (Jerry odsúhlasil predplatné za 0 $, karta
+  na účte), bucket `kokpit-fotky`, väzba `STORAGE` vo `wrangler.jsonc`.
+  Overené naostro na vymyslenom klientovi: bez súhlasu odmietne, v R2 je
+  `PSB1…` (nie JPEG), poznámka v D1 `v1:…`, zmazanie zmaže R2 aj riadok
+  a zapíše audit.
+- **Fotka ide s `cache-control: private, no-cache`.** S `max-age` išla
+  zmazaná fotka v tom istom prehliadači ešte hodinu z keše.
 - Beta nemá `ANAMNEZA_KLUC`, takže kartotéka tam nič neuloží.
