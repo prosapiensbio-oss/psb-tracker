@@ -34,11 +34,14 @@ Balíčky). Postavené v bete; pravidlá v CLAUDE.md „Workspace po krokoch".
       Jerry: `npx wrangler secret put FIO_TOKEN --name kokpit-beta`.
 - [ ] **Banka od 27. 9. nestiahnutá** — pravidlo „nezaplatený balíček = mínus"
       drží poistka z PTmindera; po odchode z neho musí byť banka spárovaná.
-- [ ] **Opravy platieb čakajú na súhlas** (finančné dáta): 12. 3. 1 100 Dan →
-      Monika; 15. 5. a 26. 7. 15 580 Dan → 7 790 + 7 790 Monika; 23. 1. Irina
-      Dyldina → Irena Muselova; 12. 4. Ondrej Nový → Janka Šnirychová; 7. 8.
-      Michal Knapčok → Hana Hrdinová; 11. 7. 7 011 Kateřina Matlová → Richard
-      Matl; zmazať pravidlo „hrdina michal" → Knapčok.
+- [x] **Opravy platieb z dávky 28. 9.** — 5. 10. 2026 (Jerry odklepol): Dan →
+      Monika 12. 3.; 15 580 rozdelené na Dana a Moniku 15. 5. a 26. 7.;
+      Dyldina → Muselova; Nový → Šnirychová; Knapčok → Hrdinová; pravidlo
+      „hrdina michal" zmazané. Každá má záznam `platba-oprava` vo `vzas_audit`.
+- [ ] **11. 7. 7 011 Matlová → Richard Matl NEUROBENÉ** — PTminder má 7 011
+      u Kateřiny a 7 790 u Richarda v ten istý deň; Kateřina má balíček 6. 7.,
+      Richard 3. 7. Presun by jej balíček nechal nezaplatený a Richard by mal
+      dve platby. Čaká na Jerryho: platila Kateřina za seba so zľavou 10 %?
 
 ## 0 · Odchod z PTmindera — od 1. 10. 2026 je Kokpit pravda
 
