@@ -894,8 +894,15 @@ const nazovMesiaca = (mk: string) => {
  *    stiahne tu, všetky pohyby (aj výdavky) sa zapíšu a zaradia podľa
  *    naučených pravidiel. Čo pravidlo nemá, zaradí sa v Banke.
  */
-export function KrokUzavierka({ mesiac, kroky, prekazky, onNavigate, trener, onZmena }: {
+export function KrokUzavierka({ mesiac, kroky, prekazky, onNavigate, trener, onZmena, obsahKroku = {} }: {
   mesiac: string;
+  /**
+   * Pracovné miesto každého kroku — rozbalí sa pod ním (Jerry, 5. 10. 2026:
+   * „aby som uzávierku mohol robiť odtiaľto: klik na PTminder a dole sa
+   * zobrazí miesto, kde to nahrám"). Komponenty sú tie isté ako v Údajoch
+   * a vo VZAS, takže sa nič nerobí dvakrát inak.
+   */
+  obsahKroku?: Record<string, React.ReactNode>;
   kroky: KrokUzavierkyKarta[];
   prekazky: string[];
   onNavigate?: (tab: string, sub?: string, focus?: never) => void;
@@ -903,6 +910,7 @@ export function KrokUzavierka({ mesiac, kroky, prekazky, onNavigate, trener, onZ
   onZmena: () => void;
 }) {
   const [zamknuty, setZamknuty] = useState<boolean | null>(null);
+  const [otvoreny, setOtvoreny] = useState("");
   const [bezi, setBezi] = useState("");
   const [hlaska, setHlaska] = useState("");
   const [chyba, setChyba] = useState("");
@@ -963,24 +971,36 @@ export function KrokUzavierka({ mesiac, kroky, prekazky, onNavigate, trener, onZ
       </div>
       {chyba && <div style={{ fontSize: 12, color: C.red, marginBottom: 6 }}>{chyba}</div>}
       {hlaska && <div style={{ fontSize: 12, color: C.green, marginBottom: 6 }}>{hlaska}</div>}
-      {viditelne.map((k) => (
-        <div key={k.id} style={riadok}>
-          <span style={{ width: 20, fontSize: 14, color: k.hotovo ? C.green : C.textDim }}>{k.hotovo ? "✓" : "○"}</span>
-          <span style={{ fontSize: 13, fontWeight: 600, color: C.text, minWidth: 170 }}>
-            {k.id === "fio" ? "Fio — stiahnuté a zaradené" : k.id === "ptminder" ? "PTminder (kým beží súbežne)" : k.label}
-          </span>
-          <span style={{ fontSize: 11.5, color: k.hotovo ? C.textDim : C.textMuted, flex: "1 1 220px" }}>{k.detail}</span>
-          {!trener && <span style={{ fontSize: 11, color: C.textDim, minWidth: 54 }}>{kto(k.id)}</span>}
-          {k.id === "fio" && (
-            <button disabled={!!bezi} style={hlavne(!bezi)} onClick={() => void stiahniMesiac()}>
-              {bezi === "fio" ? "sťahujem…" : "Stiahnuť mesiac z Fio"}
-            </button>
-          )}
-          {k.tab && onNavigate && (
-            <button style={vedlajsie} onClick={() => onNavigate(k.tab as string, k.sub, k.focus as never)}>otvoriť</button>
-          )}
-        </div>
-      ))}
+      {viditelne.map((k) => {
+        const otvorene = otvoreny === k.id;
+        const maObsah = !!obsahKroku[k.id];
+        return (
+          <div key={k.id} style={{ borderBottom: `1px solid ${mix(C.border, 55)}` }}>
+            <div style={{ ...riadok, borderBottom: "none" }}>
+              <span style={{ width: 20, fontSize: 14, color: k.hotovo ? C.green : C.textDim }}>{k.hotovo ? "✓" : "○"}</span>
+              <button
+                onClick={() => maObsah && setOtvoreny(otvorene ? "" : k.id)}
+                disabled={!maObsah}
+                aria-expanded={otvorene}
+                style={{ background: "none", border: "none", padding: 0, cursor: maObsah ? "pointer" : "default", fontFamily: "inherit", textAlign: "left", fontSize: 13, fontWeight: 600, color: C.text, minWidth: 190 }}
+              >
+                {maObsah ? (otvorene ? "▾ " : "▸ ") : ""}{k.id === "fio" ? "Fio — stiahnuté a zaradené" : k.id === "ptminder" ? "PTminder (kým beží súbežne)" : k.label}
+              </button>
+              <span style={{ fontSize: 11.5, color: k.hotovo ? C.textDim : C.textMuted, flex: "1 1 220px" }}>{k.detail}</span>
+              {!trener && <span style={{ fontSize: 11, color: C.textDim, minWidth: 54 }}>{kto(k.id)}</span>}
+              {k.id === "fio" && (
+                <button disabled={!!bezi} style={hlavne(!bezi)} onClick={() => void stiahniMesiac()}>
+                  {bezi === "fio" ? "sťahujem…" : "Stiahnuť mesiac z Fio"}
+                </button>
+              )}
+              {!maObsah && k.tab && onNavigate && (
+                <button style={vedlajsie} onClick={() => onNavigate(k.tab as string, k.sub, k.focus as never)}>otvoriť</button>
+              )}
+            </div>
+            {otvorene && <div style={{ padding: "4px 0 12px 28px" }}>{obsahKroku[k.id]}</div>}
+          </div>
+        );
+      })}
       {(!trener || trener === "Jerry") && !zamknuty && (
         <div style={{ marginTop: 12, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
           <button disabled={!!bezi || prekazky.length > 0} style={hlavne(!bezi && !prekazky.length)} onClick={() => void zamkni()}>

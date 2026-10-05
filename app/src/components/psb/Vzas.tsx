@@ -1811,7 +1811,7 @@ type FioZostatok = { suma: number; datum: string; rucne?: boolean };
  *   • hotovosť — koľko je fyzicky v obálke; opisuje sa pri uzávierke,
  *   • bitcoin — prepočítaný kurzom z druhej appky.
  */
-function KamOdisliCard() {
+export function KamOdisliCard() {
   const [res, setRes] = useState<BtcReserve | null>(null);
   const [fio, setFio] = useState<FioZostatok | null>(null);
   const [stav, setStav] = useState<StavPenazi | null>(null);
@@ -3434,5 +3434,25 @@ export function Vysledky({
       {sub === "ciele" && <CieleTab data={data} />}
       {sub === "report" && <Report data={data} clients={clients} sixM={sixM} capacity={capacity} register={register} />}
     </>
+  );
+}
+
+/**
+ * OTÁZKY MESIACA mimo tabuľky Výsledkov — krok „Otázky mesiaca" v karte
+ * Uzávierka mesiaca vo Workspace (Jerry, 5. 10. 2026: „uzávierku chcem robiť
+ * odtiaľto"). Ten istý riadok (`MonthNoteRow`) a to isté ukladanie, len
+ * obalený do vlastnej tabuľky.
+ */
+export function OtazkyMesiaca({ mesiac }: { mesiac: string }) {
+  const [notes, setNotes] = useState<Record<string, MonthNote>>({});
+  useEffect(() => { fetchMonthNotes().then(setNotes); }, []);
+  const mi = VZAS_MONTHS.indexOf(mesiac);
+  if (mi < 0) return <div style={{ fontSize: 12, color: C.textDim }}>Mesiac {mesiac} vo VZAS nie je.</div>;
+  return (
+    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+      <tbody>
+        <MonthNoteRow mi={mi} colSpan={1} notes={notes} onSaved={(nn) => setNotes((p) => ({ ...p, [nn.month]: nn }))} />
+      </tbody>
+    </table>
   );
 }

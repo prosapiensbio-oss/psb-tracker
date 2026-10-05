@@ -2467,6 +2467,15 @@ Jerry: „Workspace má byť miesto práce." V bete (`jeBeta()` vo Workspace):
   všetky pohyby (aj výdavky) s kategóriou z pravidiel. Zámok cez /api/periods.
 - **Mesačné kontroly** (`KrokKontroly`) — štyri z `ritualy`; odškrtnutie je
   ten istý kľúč ako register (`zapis|kontrola-…`).
+- **Kto čo vidí** (`krokyBety` `ja`): Dopyty len Terezka, Uzávierka
+  a Kontroly len Jerry; pri „všetko" všetky.
+- **Uzávierka sa robí v karte**: klik na krok rozbalí jeho pracovné miesto
+  (`obsahKroku`) — tie isté komponenty ako v Údajoch a VZAS: `UploadCard`
+  (PTminder, Metricool), `BankaUlozene` s filtrom mesiaca (Fio, zaradenie),
+  `Zosit`, `OtazkyMesiaca` (obal `MonthNoteRow`), `KamOdisliCard`
+  (hotovosť), `RegisterRow` (upozornenia). App kvôli tomu posiela Workspace
+  `actions`, `chat`, `register`, `pohybSplits`. Marketing sa po nahratí
+  načíta znova (`data.uploadLog`), inak krok Metricool ostal neodškrtnutý.
 - **Peniaze podľa trénera** (`rozdelPeniaze` v `postavKarty`): dlžníci a platby
   z banky podľa trénera klienta; platba bez návrhu ostáva Jerrymu. Faktúry
   vo Workspace cez `lenTrenera`. Naostro zostávajú peniaze celé Jerryho.

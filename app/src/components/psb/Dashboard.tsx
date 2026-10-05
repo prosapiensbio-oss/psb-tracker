@@ -2216,7 +2216,7 @@ function sMenomTucne(item: RegisterItem) {
   );
 }
 
-function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar }: { item: RegisterItem; actions: Actions; onNavigate: (tab: string, sub?: string, focus?: NavFocus) => void; chat?: AssistantChat; clients?: Record<string, ClientAgg>; kalendar?: KalUdalost[] }) {
+export function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar }: { item: RegisterItem; actions: Actions; onNavigate: (tab: string, sub?: string, focus?: NavFocus) => void; chat?: AssistantChat; clients?: Record<string, ClientAgg>; kalendar?: KalUdalost[] }) {
   /** Otvorené okienko odpovede pre túto položku. */
   const [odpoved, setOdpoved] = useState(false);
   const [text, setText] = useState("");

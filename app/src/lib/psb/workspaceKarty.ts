@@ -114,7 +114,12 @@ export const BEZ_FRONTY: Karta["druh"][] = ["klient", "faktury", "anamnezy", "kr
  * a trénuje ďalej, dostane návrh nového balíčka, a ten, kto je na nule,
  * patrí do SMS. Dve karty o tom istom človeku by sa pýtali dvakrát.
  */
-export function krokyBety(karty: Karta[], volby: { mesacne?: boolean } = {}): Karta[] {
+export function krokyBety(karty: Karta[], volby: { mesacne?: boolean; ja?: string | null } = {}): Karta[] {
+  /**
+   * Čie sú mesačné karty (Jerry, 5. 10. 2026): dopyty len Terezkine,
+   * uzávierka a kontroly len jeho. Pri „všetko" (`ja` prázdne) sú všetky.
+   */
+  const pre = (kto: string) => !volby.ja || volby.ja === kto;
   const daj = (d: Karta["druh"]) => karty.filter((k) => k.druh === d);
   const krok = (k: Krok, nadpis: string, podnadpis: string, sekcie: Karta[]): Karta =>
     ({ druh: "krok", krok: k, nadpis, podnadpis, polozky: [], sekcie });
@@ -132,9 +137,11 @@ export function krokyBety(karty: Karta[], volby: { mesacne?: boolean } = {}): Ka
      * žiť len na Dnes alebo v Údajoch.
      */
     ...(volby.mesacne ? [
-      krok("dopyty", "Dopyty", "kto čaká na odpoveď, čo z dopytu bolo a odkiaľ prišli noví", []),
-      krok("uzavierka", "Uzávierka mesiaca", "prvý víkend nového mesiaca — podklady, otázky, hotovosť, zámok", []),
-      krok("kontroly", "Mesačné kontroly", "jedna oblasť každý týždeň — peniaze, klienti, marketing, Jarvis", []),
+      ...(pre("Terezka") ? [krok("dopyty", "Dopyty", "kto čaká na odpoveď, čo z dopytu bolo a odkiaľ prišli noví", [])] : []),
+      ...(pre("Jerry") ? [
+        krok("uzavierka", "Uzávierka mesiaca", "prvý víkend nového mesiaca — klik na krok otvorí miesto, kde sa robí", []),
+        krok("kontroly", "Mesačné kontroly", "jedna oblasť každý týždeň — peniaze, klienti, marketing, Jarvis", []),
+      ] : []),
     ] : []),
     ...daj("faktury"),
     ...daj("anamnezy"),

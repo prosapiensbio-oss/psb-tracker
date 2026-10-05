@@ -38,7 +38,7 @@ import { Konta, KontaNadpis } from "./Konta";
 // Zdroj `banka` nie je v PSBData — bankové pohyby žijú vo vlastnej tabuľke a
 // načítavajú sa až na obrazovke, kde treba. V zozname je preto zvlášť: nie je
 // z PTmindera, ale je to piaty súbor, bez ktorého appka nevie, kam idú peniaze.
-const REPORTS: { key: keyof PSBData; label: string; path: string }[] = [
+export const REPORTS: { key: keyof PSBData; label: string; path: string }[] = [
   { key: "sessions", label: "Payroll by Session", path: "PTminder → Payroll Reports › By Session" },
   { key: "services", label: "Payroll by Service", path: "PTminder → Payroll Reports › By Service" },
   { key: "payments", label: "Payments Recorded", path: "PTminder → Financial Reports › Payments Recorded" },
@@ -188,7 +188,7 @@ function Verzia() {
   );
 }
 
-function UploadCard({ data, missing, actions, chat }: { data: PSBData; missing: typeof REPORTS; actions: Actions ; chat?: AssistantChat }) {
+export function UploadCard({ data, missing, actions, chat }: { data: PSBData; missing: typeof REPORTS; actions: Actions ; chat?: AssistantChat }) {
   const [uploadResult, setUploadResult] = useState<IngestResult[] | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [busy, setBusy] = useState(false);

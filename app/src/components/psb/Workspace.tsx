@@ -12,6 +12,15 @@ import { kandidatiPlatby, otazkyPlatieb } from "../../lib/psb/workspaceKroky";
 import { krokGesta, krokSvihu, novyStavGesta, novyStavSvihu, zacniSvih } from "../../lib/psb/gestoKariet";
 import { BEZ_FRONTY, klucPolozky, krokyBety, popisZmeny, postavKarty, rozdelAnamnezy, trenerZPrihlasenia, type AnamnezaRiadok, type Karta, type NeznamyNazov, type NepriradenaPlatba, type Zmena } from "../../lib/psb/workspaceKarty";
 import { Dopyty } from "./Dopyty";
+import { REPORTS, UploadCard } from "./Udaje";
+import { BankaUlozene } from "./BankaUlozene";
+import { Zosit } from "./Zosit";
+import { KamOdisliCard, OtazkyMesiaca } from "./Vzas";
+import { RegisterRow } from "./Dashboard";
+import type { Actions } from "./App";
+import type { AssistantChat } from "./Assistant";
+import type { RegisterItem } from "../../lib/psb/compute";
+import type { PohybSplits, SplitCiast } from "../../lib/psb/pohybSplit";
 import { ritualy } from "../../lib/psb/rituals";
 import { jeBeta } from "../../lib/psb/beta";
 import { KrokDopyty, KrokKontroly, KrokUzavierka, type KrokUzavierkyKarta } from "./WorkspaceKroky";
@@ -60,7 +69,7 @@ const tyzdenOd = (s: string): string => {
   return new Date(d.getTime() - ((d.getUTCDay() + 6) % 7) * 86400000).toISOString().slice(0, 10);
 };
 
-export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, btc, onOverride, otvorKlienta, onOtvoreny, fakturaPredvolba, onFakturaPredvolbaSpracovana, vypisPredvolba, onVypisPredvolbaSpracovana, krokyUzavierky, prekazkyUzavierky, onNavigate }: {
+export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, btc, onOverride, otvorKlienta, onOtvoreny, fakturaPredvolba, onFakturaPredvolbaSpracovana, vypisPredvolba, onVypisPredvolbaSpracovana, krokyUzavierky, prekazkyUzavierky, onNavigate, actions, chat, register, pohybSplits, nastavPohybSplit }: {
   clients: Record<string, ClientAgg>;
   mena: string[];
   ktoSom: string | null;
@@ -82,6 +91,16 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   prekazkyUzavierky?: (mesiac: string) => string[];
   /** Prechod na inú obrazovku appky (uzávierka, kontroly, dopyty). */
   onNavigate?: (tab: string, sub?: string, focus?: never) => void;
+  /**
+   * Pre kroky uzávierky priamo vo Workspace (beta, 5. 10. 2026): nahrávanie
+   * (`actions.ingest`), upozornenia mesiaca (`register`) a rozdelenie pohybov
+   * v banke (`pohybSplits`). Tie isté hodnoty, aké dostávajú Údaje a Dnes.
+   */
+  actions?: Actions;
+  chat?: AssistantChat;
+  register?: RegisterItem[];
+  pohybSplits?: PohybSplits;
+  nastavPohybSplit?: (kluc: string, casti: SplitCiast[]) => void;
   /** Koho otvoriť rovno po prepnutí sem (klik na klienta inde v appke). */
   otvorKlienta?: string | null;
   onOtvoreny?: () => void;
@@ -279,7 +298,9 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
 
   // Karta, v ktorej už nič nezostalo, z kopy zmizne — ale až po tom, čo sa
   // v nej naozaj odklikalo; inak by zmizla pod rukami uprostred práce.
-  const kartyKopy = useMemo(() => (poKrokoch ? krokyBety(karty, { mesacne: beta }) : karty), [poKrokoch, beta, karty]);
+  const trenerKroku: string | null = ktoreVeci === "vsetko" ? null
+    : ktoreVeci === "auto" ? trenerZPrihlasenia(ktoSom) : ktoreVeci;
+  const kartyKopy = useMemo(() => (poKrokoch ? krokyBety(karty, { mesacne: beta, ja: trenerKroku }) : karty), [poKrokoch, beta, karty, trenerKroku]);
   const zive = useMemo(
     // Karta klienta nie je fronta — nemá položky a nikdy nezmizne. Ostatné
     // zmiznú, keď sa v nich všetko odklikalo.
@@ -288,8 +309,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
     [kartyKopy, hotove],
   );
   const dlhyPodlaMena = useMemo(() => Object.fromEntries(dlzniciRiadky.map((d) => [d.meno, d.spolu])), [dlzniciRiadky]);
-  const trenerKroku: string | null = ktoreVeci === "vsetko" ? null
-    : ktoreVeci === "auto" ? trenerZPrihlasenia(ktoSom) : ktoreVeci;
+
   const k = zive[Math.min(i, Math.max(0, zive.length - 1))];
 
   // Klik na klienta inde v appke otvorí kartu Klient — inak by človek pristál
@@ -1329,6 +1349,29 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
           onNavigate={onNavigate}
           trener={trenerKroku}
           onZmena={() => oznam("klienti")}
+          obsahKroku={(() => {
+            const mk = mesiacUzavierky;
+            const nahravanie = (co: string) => actions ? (
+              <>
+                <div style={{ fontSize: 11.5, color: C.textMuted, marginBottom: 6 }}>{co}</div>
+                <UploadCard data={data} missing={REPORTS.filter((r) => ((data[r.key] as unknown[]) || []).length === 0)} actions={actions} chat={chat} />
+              </>
+            ) : null;
+            const upozornenia = (register || []).filter((r) => r.key.includes(mk) && !r.acked && r.category !== "Zápis");
+            return {
+              ptminder: nahravanie("Pretiahni sem exporty z PTmindera — appka sama pozná, ktorý report je ktorý."),
+              metricool: nahravanie(`Pretiahni sem export z Metricoolu za ${mk} (CSV príspevkov alebo mesačný PDF report).`),
+              fio: <BankaUlozene focus={{ month: mk, nonce: 1 }} pohybSplits={pohybSplits} onSplit={nastavPohybSplit} />,
+              zosit: <Zosit onZapisane={() => void actions?.refresh()} />,
+              otazky: <OtazkyMesiaca mesiac={mk} />,
+              hotovostStav: <KamOdisliCard />,
+              upozornenia: actions && onNavigate ? (
+                upozornenia.length
+                  ? <>{upozornenia.map((r) => <RegisterRow key={r.key} item={r} actions={actions} onNavigate={onNavigate as never} chat={chat} clients={clients} />)}</>
+                  : <div style={{ fontSize: 12, color: C.green }}>Za tento mesiac je všetko vysvetlené.</div>
+              ) : null,
+            };
+          })()}
         />
       );
     }
