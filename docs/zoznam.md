@@ -258,24 +258,15 @@ Stav k 3. 10. 2026 večer (audit, `docs/kontrola-clenstiev.md`):
   podľa názvu"). Tabuľka `ptminder_historia`, 1 232 riadkov; os času z nej
   berie skutočné hodiny a koniec členstiev. Upload ju odteraz plní sám.
   Doplnenia z nej zámerne nie (viď CLAUDE.md).
-- [ ] **Karta ≠ zoznam — príčiny zistené 5. 10. 2026** (nad kópiou ostrej DB,
-  tými istými funkciami ako karta a profil):
-  - Stoklasková — už sedí (1 = 1).
-  - Broskva (+1) a Krčmar (+3) — PTminder strhol z nového ONE YEAR aj
-    tréningy tesne PRED kúpou (Broskva 5. 5., Krčmar 23., 28., 30. 7.); zoznam
-    začína členstvo dňom pridania. Karta má pravdu. Oprava: zoznam má nový
-    balíček nechať prevziať nekryté tréningy pred ním (rovnako ako pri
-    balíčkoch z Kokpitu).
-  - Obrovská (karta 2, zoznam 0) — doplnenie 5 h z PTmindera; zoznam
-    doplnenia zámerne nepočíta (rozhodnutie 4. 10.). Karta má pravdu.
-  - Přinosilová (8 / 7) — dve 18 h členstvá cez seba; karta ráta aj 1 h,
-    ktorá ostala v májovom (platí do 11. 11.), zoznam začne nové na 18.
-  - Šnirychová (karta 4, zoznam 5, PTminder 2) — SPECIAL 3 je spoločný
-    s Josefom; Kokpit ho dal Janke, PTminder Josefovi. Čaká na Jerryho.
-  - Holubová (karta 0, zoznam ukazuje 3 nevyčerpané) — pauza od mája,
-    aprílové členstvo s 3 h, v PTminderi doplnenie 0/4. Prepadli?
-  - Gerich — nie chyba: karta už ukazuje členstvo od 7. 10. (6 h), zoznam
-    končí augustovým. Platba 15 580 z 30. 9. sú dva balíčky, PTminder má jeden.
+- [x] **Karta ≠ zoznam — overené v PTminderi 5. 10. 2026**:
+  Stoklasková sedí (1). Broskva a Krčmar opravené v kóde (nový balíček
+  preberá nekryté tréningy pred sebou — PTminder ich tam má). Obrovská:
+  karta 2 správne (doplnenie 5 h). Přinosilová: májové členstvo malo 17 h,
+  nie 18 — opravené v DB, karta 7 = PTminder. Holubová: hodiny prepadli,
+  karta 0 správne. Gerich: karta 6 správne, 15 580 = členstvo + kredit vopred.
+- [ ] **Šnirychová** — PTminder: Janka doplnenie 3 h (2 zostávajú), Josef
+  SPECIAL 3 (2 zostávajú). V Kokpite má Janka navyše ručný „SPECIAL 3"
+  z 22. 9. (3 990 Kč, bez platby) → karta 4. Zrušiť ho? Čaká na Jerryho.
 - [ ] **Prenos mínusu zo skončeného členstva** je od 4. 10. vypnutý (poistka
   proti vymysleným deficitom). Jerryho pravidlo z 28. 9. hovorí, že nový
   balíček mínus preberá — 13 klientov má skutočne pretrénované skončené

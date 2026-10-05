@@ -623,3 +623,37 @@ describe("koľkou hodinou sa tréning bez hodiny stane po zaplatení", () => {
     expect([...stavy.values()].every((s) => s.buduca === undefined)).toBe(true);
   });
 });
+
+describe("nový balíček preberá nekryté tréningy pred sebou (overené v PTminderi 5. 10. 2026)", () => {
+  // Krčmar v malom: predošlé obdobie 3 h, päť tréningov (dva bez hodiny),
+  // platba 23. 7., nový balíček zapísaný až 2. 8. Karta (PTminder) hovorí 8,
+  // teda ročné členstvo pokrylo aj tie dva tréningy pred svojím zápisom.
+  const os: Udalost[] = [
+    bal("2026-06-01", 3), tre("2026-06-10"), tre("2026-06-20"), tre("2026-07-01"),
+    tre("2026-07-23"), pla("2026-07-23", 10000), tre("2026-07-28"),
+    bal("2026-08-02", 12), tre("2026-08-21"), tre("2026-09-01"),
+  ];
+
+  it("zoberie toľko najnovších nekrytých, koľko hovorí karta — a s nimi aj platbu", () => {
+    const { stavy, koniec } = priebehBalickov(os, 8, DNES);
+    const st = (den: string) => [...stavy].find(([u]) => u.druh === "trening" && u.den === den)![1];
+    expect(st("2026-07-23").zostatok).toBe(12);
+    expect(st("2026-07-28").zostatok).toBe(11);
+    expect(st("2026-07-23").dlh).toBeNull();
+    expect(st("2026-09-01").zostatok).toBe(9);
+    expect(koniec).toBe(8);
+  });
+
+  it("bez rozdielu proti karte nepreberá nič", () => {
+    const { stavy } = priebehBalickov(os, 10, DNES);
+    const st = [...stavy].find(([u]) => u.druh === "trening" && u.den === "2026-07-28")![1];
+    expect(st.zostatok).toBeNull();
+  });
+
+  it("starý balíček, ktorý sa už nepoužíva, nepreberá (Holubová — hodiny prepadli)", () => {
+    const stary: Udalost[] = [bal("2026-01-01", 2), tre("2026-01-05"), tre("2026-01-10"), tre("2026-03-01"), bal("2026-04-10", 6), tre("2026-04-17"), tre("2026-05-08")];
+    const { stavy } = priebehBalickov(stary, 0, DNES);
+    const st = [...stavy].find(([u]) => u.druh === "trening" && u.den === "2026-03-01")![1];
+    expect(st.usek).toBe("2026-01-01");
+  });
+});

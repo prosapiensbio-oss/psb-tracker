@@ -2555,3 +2555,16 @@ potvrdení s počtom SMS, po jednej cez `/api/sms` (dá sa zastaviť). Čísla
 z `klient_fakturacia` (`/api/vydane-faktury` → `udaje`). V audite ako
 `sms-hromadna`, NIE `sms-odoslana` — inak by oznam pre všetkých vyčistil
 zoznam kroku SMS, ktorý stojí na stave hodín.
+
+## Nový balíček preberá nekryté tréningy pred sebou (5. 10. 2026)
+
+PTminder („Sessions allocation") pripíše novému balíčku aj tréningy pred jeho
+zápisom, na ktoré predošlé obdobie nemalo hodinu: Broskva ONE YEAR (9. 5.)
+má 5. 5., Krčmar (2. 8.) 23., 28., 30. 7. Koľko ich je, sa z exportu presne
+nevyčíta (doplnenia bez počtu), tak ho prezradí karta: o koľko by posledný
+balíček mal viac než `packageRemaining`, toľko NAJNOVŠÍCH nekrytých
+tréningov (do 60 dní pred ním) prevezme — aj s platbami od prvého z nich
+(Krčmar platil 23. a 24. 7. v dvoch častiach). Len balíček, ktorý sa ešte
+používa (tréning za posledných 60 dní od dneška) — inak by si ho zobral aj
+klient s prepadnutými hodinami (Holubová). Overené nad celou DB: mení presne
+Broskvu a Krčmara. `priebehBalickov` vo `vypisHodin.ts`, testy tam.

@@ -401,6 +401,76 @@ export function priebehBalickov(
   // inak by sa balíček Dana Kouřila nafúkol zo 6 na 7 hodín.
   let denExportu = "";
   for (const u of rad) if (u.druh === "trening" && !u.zKalendara && u.den > denExportu) denExportu = u.den;
+
+  /**
+   * NOVÝ BALÍČEK PREBERÁ NEKRYTÉ TRÉNINGY PRED SEBOU — TOĽKO, KOĽKO HOVORÍ PTMINDER.
+   *
+   * Overené v PTminderi 5. 10. 2026 („Sessions allocation"): ročné členstvo
+   * Jaroslava Broskvu (kúpené 9. 5.) obsahuje aj tréning z 5. 5. a Tomáša
+   * Krčmara (2. 8.) tréningy z 23., 28. a 30. 7. — tie, na ktoré už
+   * predošlé obdobie hodinu nemalo. Zoznam začínal balíček dňom kúpy a
+   * vychádzal o 1 a 3 hodiny vyšší než karta.
+   *
+   * Koľko tréningov prešlo, sa z exportu presne nevyčíta (doplnenia bez
+   * počtu, viď `neznameDoplnenie`). Číslo z karty ho ale prezradí: o koľko
+   * by posledný balíček mal ku dňu exportu viac než karta, toľko
+   * NAJNOVŠÍCH nekrytých tréningov pred ním mu patrí. Len do 60 dní pred
+   * jeho začiatkom, len z obdobia, ktoré malo balíček s hodinami (nie čas
+   * pred prvým balíčkom ani paušál), a nikdy viac, než koľko ich nekrytých je.
+   */
+  if (zostatokTeraz != null) {
+    const iu = useky.findIndex((x) => x.balicek && x.balicek === posledny);
+    const usek = iu > 0 ? useky[iu] : null;
+    const prev = iu > 0 ? useky[iu - 1] : null;
+    const nb = usek?.balicek;
+    const vlastneDoplnenie = !!usek?.riadky.some((r) => r.druh === "balicekOd" && r.doplnenie && r.zKokpitu);
+    // Len balíček, ktorý ešte PLATÍ. Po skončení platnosti karta hovorí
+    // o niečom inom (doplnenie, prepadnuté hodiny — Klára Holubová, Jerry
+    // 5. 10. 2026: „hodiny prepadli") a rozdiel nie je prevzatý tréning.
+    // Koniec platnosti os často nepozná (balíček z knihy predajov), preto
+    // aj druhá stráž: posledný tréning v ňom nie je starší než 60 dní.
+    const poslTrening = usek?.riadky.filter((r) => r.druh === "trening").map((r) => r.den).sort().pop() || "";
+    // Meria sa od DNEŠKA: `denExportu` je posledný tréning tohto klienta,
+    // takže pri niekom, kto od mája nechodí, by bol tiež máj.
+    const platiEste = (!nb?.doDna || nb.doDna >= dnes)
+      && !!poslTrening && dniMedzi(poslTrening, dnes) <= 60;
+    if (usek && prev && nb && platiEste && !nb.zKokpitu && !nb.nezaplatene && usek.hodin > 0 && !usek.prevzate && !vlastneDoplnenie
+      && prev.balicek && prev.hodin > 0) {
+      let k = hodinUseku(usek);
+      for (const r of usek.riadky) {
+        if (r.druh === "balicekOd" && r.doplnenie && r.hodin > 0 && pridavaHodiny(r, nb)) k += r.hodin;
+        if (r.druh === "trening" && r.zdarma === undefined && r.den <= (denExportu || dnes)) k -= hodinTreningu(r);
+      }
+      const navyse = k - zostatokTeraz;
+      if (navyse > 0) {
+        let bezi = hodinUseku(prev);
+        const nekryte: number[] = [];
+        prev.riadky.forEach((r, i) => {
+          if (r.druh === "balicekOd" && r.doplnenie && r.hodin > 0 && pridavaHodiny(r, prev.balicek)) bezi += r.hodin;
+          if (r.druh !== "trening" || r.zdarma !== undefined) return;
+          const h = hodinTreningu(r);
+          if (bezi < h) nekryte.push(i); else bezi -= h;
+        });
+        const treningy = nekryte.filter((i) => dniMedzi(prev.riadky[i].den, nb.den) <= 60).slice(-navyse);
+        if (treningy.length) {
+          // S tréningami idú aj platby od prvého z nich: balíček sa často
+          // platí skôr, než ho PTminder zapíše (Krčmar zaplatil ročné
+          // členstvo 23. a 24. 7. v dvoch častiach, zapísané je 2. 8.).
+          // Bez nich by prevzaté tréningy vyšli ako nezaplatené.
+          const odDna = prev.riadky[treningy[0]].den;
+          const vyber = prev.riadky
+            .map((_, i) => i)
+            .filter((i) => treningy.includes(i) || (prev.riadky[i].druh === "platba" && prev.riadky[i].den >= odDna));
+          const presun = vyber.map((i) => prev.riadky[i]);
+          prev.riadky = prev.riadky.filter((_, i) => !vyber.includes(i));
+          usek.riadky.unshift(...presun);
+          usek.prevzate = presun.filter((x) => x.druh === "trening").length;
+          usek.prevzateDni = presun.filter((x) => x.druh === "trening").map((x) => x.den);
+        }
+      }
+    }
+  }
+
   let koniec: number | null = null;
 
   for (const usek of useky) {
