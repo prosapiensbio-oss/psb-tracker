@@ -38,10 +38,10 @@ Balíčky). Postavené v bete; pravidlá v CLAUDE.md „Workspace po krokoch".
       Monika 12. 3.; 15 580 rozdelené na Dana a Moniku 15. 5. a 26. 7.;
       Dyldina → Muselova; Nový → Šnirychová; Knapčok → Hrdinová; pravidlo
       „hrdina michal" zmazané. Každá má záznam `platba-oprava` vo `vzas_audit`.
-- [ ] **11. 7. 7 011 Matlová → Richard Matl NEUROBENÉ** — PTminder má 7 011
-      u Kateřiny a 7 790 u Richarda v ten istý deň; Kateřina má balíček 6. 7.,
-      Richard 3. 7. Presun by jej balíček nechal nezaplatený a Richard by mal
-      dve platby. Čaká na Jerryho: platila Kateřina za seba so zľavou 10 %?
+- [x] **11. 7. 7 011 ostáva u Kateřiny Matlovej** — Jerry 5. 10.: platila za
+      seba, −10 % za odporúčanie Richarda (Richard dostane −10 % za Alberta).
+- [x] **AATest zmazaný** (5. 10. 2026) — platba, 3 balíčky, udalosť,
+      override a fakturačný kontakt; v audite ostal záznam `test-zmazany`.
 
 ## 0 · Odchod z PTmindera — od 1. 10. 2026 je Kokpit pravda
 
