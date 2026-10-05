@@ -1445,14 +1445,14 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
         </>
       );
     }
-    // Vyťaženosť týždňa navrchu kroku Kalendár (beta, Jerry 5. 10. 2026) —
+    // Vyťaženosť týždňa navrchu kroku Kalendár (naostro od 5. 10. 2026) —
     // vždy za seba: pri „všetko" za toho, kto je prihlásený. `key` je nutný:
     // bez neho si okno pri prepnutí Jerryho → Terezkine nechalo Jerryho
     // „zabalené" a Terezke nevyplnený týždeň neukázalo (5. 10. 2026).
     const kto = trenerKroku || trenerZPrihlasenia(ktoSom);
     return (
       <>
-        {beta && (kto === "Jerry" || kto === "Terezka") && <VytazenostTyzdna key={kto} kto={kto} udalosti={(kalUdalosti || []) as never} />}
+        {(kto === "Jerry" || kto === "Terezka") && <VytazenostTyzdna key={kto} kto={kto} udalosti={(kalUdalosti || []) as never} />}
         {sekcieKresli}
         {!sekcie.length && <VsetkoVybavene text="Všetko vybavené — kalendár nemá výnimky." />}
       </>

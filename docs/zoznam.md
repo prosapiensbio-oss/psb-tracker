@@ -16,7 +16,6 @@ Stav k **3. 10. 2026**.
 
 ---
 
-- **Vyťaženosť vo Workspace** — v bete od 5. 10. 2026 navrchu kroku 1 („Kalendár a vyťaženosť"); naostro až na Jerryho „postav to v Kokpite".
 
 ## 0a · Workspace po krokoch — naostro od 5. 10. 2026
 

@@ -127,7 +127,7 @@ export function krokyBety(karty: Karta[], volby: { mesacne?: boolean; ja?: strin
     ({ druh: "krok", krok: k, nadpis, podnadpis, polozky: [], sekcie });
   return [
     ...daj("klient"),
-    krok("kalendar", volby.mesacne ? "1 · Kalendár a vyťaženosť" : "1 · Kalendár", "len výnimky — zmeny, „bol tam?“ a nové mená", [...daj("zmeny"), ...daj("konanie"), ...daj("mena")]),
+    krok("kalendar", "1 · Kalendár a vyťaženosť", "len výnimky — zmeny, „bol tam?“ a nové mená", [...daj("zmeny"), ...daj("konanie"), ...daj("mena")]),
     krok("sms", "2 · SMS pre klientov", "komu to práve dáva zmysel — nula, mínus, dlh", []),
     // Balíčky vznikajú samy prvým tréningom; ich dve rozhodnutia (končiaca
     // platnosť, „sedí?" po návrate) sú súčasťou tohto kroku (5. 10. 2026).
