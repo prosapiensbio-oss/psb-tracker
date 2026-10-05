@@ -2676,3 +2676,11 @@ okamžite a kto potrebuje skutočné id (dieťa, kotva), počká naň
 nezahadzuje a `posli` dočasné id serveru nepošle. **Rýchle písanie sa overuje
 skutočnými klávesmi v prehliadači, nie dispatchom udalostí** — chyba sa
 ukáže len pri reálnom poradí focus/blur.
+
+Nezávislá kontrola (subagent) k tomu našla ďalšie tri veci, všetky opravené:
+**načítanie, ktoré príde neskôr než novšie** alebo bolo odoslané pred
+zápisom, sa zahodí (`nacitanieCislo`/`platneOd`), inak riadok zmizne spod
+kurzora; **rozpísaný text načítanie neprepíše** (`upravene`); a **D1 batch
+sa pri UPDATE s nulou zmien NEVRÁTI** — kontrola, či všetky id existujú,
+ide PRED zápis. Zoznam id do SQL ide cez `json_each(?)`: D1 pustí najviac
+100 parametrov na dopyt.
