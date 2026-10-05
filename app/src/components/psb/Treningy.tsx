@@ -10,6 +10,7 @@ import type { NavFocus } from "./App";
 import { rozborUvodnych } from "../../lib/psb/uvodneTreningy";
 import { SessionTrend } from "./SessionTrend";
 import { Card, Donut, Empty, H3, Info, LineChart, Select, SortTh, StatCard, StatGrid, SubTabs, TableWrap, Toolbar, TrenerPills, useSort } from "./ui";
+import { dnesPraha } from "../../lib/psb/cas";
 
 const PEOPLE = [
   { key: "jerry", label: "Jerry" },
@@ -65,7 +66,7 @@ function Prehlad({ data, focus, trainer, onTrainer }: { data: PSBData; focus?: N
     // Roky ako pevné hranice, okná ako posun od dneška. Štandard rodiny T.
     if (win === "2026" || win === "2025") return { from: `${win}-01-01`, to: `${win}-12-31` };
     const dni: Record<string, number> = { "6m": 183, "3m": 92, "1m": 31, "1t": 7 };
-    if (dni[win]) return { from: new Date(Date.now() - dni[win] * 86400000).toISOString().slice(0, 10) };
+    if (dni[win]) return { from: dnesPraha(new Date(Date.now() - dni[win] * 86400000)) };
     return undefined;
   }, [period, from, to, win]);
 
@@ -89,11 +90,11 @@ function Prehlad({ data, focus, trainer, onTrainer }: { data: PSBData; focus?: N
     // a do nedele, keď dorazí export, spomienka na náročnosť týždňa vyprchá.
     // Nájdené 24. 8. 2026 — funkcia z 14. 8. bola celý čas vypnutá filtrom.
     if (period !== "week") return zo;
-    const teraz = new Date();
-    const dnesIso = teraz.toISOString().slice(0, 10);
+    const dnesIso = dnesPraha();
     if (range?.from && dnesIso < range.from) return zo;
     if (range?.to && dnesIso > range.to) return zo;
-    const kluc = periodInfo(teraz.toISOString(), "week");
+    const kluc = periodInfo(dnesIso, "week");
+    const teraz = new Date(`${dnesIso}T12:00:00Z`);
     if (zo.some((g) => g.key === kluc.label)) return zo;
     // Začiatok týždňa (pondelok) ako `ts` — riadok sa tým zaradí chronologicky
     // na správne miesto, nielen na koniec.

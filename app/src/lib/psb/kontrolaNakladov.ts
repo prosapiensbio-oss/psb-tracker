@@ -1,3 +1,4 @@
+import { dnesPraha } from "./cas";
 // Náklad, ktorý zmizol — a nezhoda s Excelom.
 //
 // Všetky doterajšie kontroly appky sa pozerajú na to, ČO V DÁTACH JE: klient,
@@ -302,7 +303,7 @@ export function zastaranaBanka(
   // z čoho počítať vek a hlásiť „0 dní" by bola lož; na prázdny stav
   // upozorňuje uzávierka.
   if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return null;
-  const dni = Math.floor((Date.parse(`${dnes.toISOString().slice(0, 10)}T00:00:00Z`) - Date.parse(`${d}T00:00:00Z`)) / 86400_000);
+  const dni = Math.floor((Date.parse(`${dnesPraha(dnes)}T00:00:00Z`) - Date.parse(`${d}T00:00:00Z`)) / 86400_000);
   if (dni < BANKA_PRAH_DNI) return null;
   return { dni, poslednyPohyb: d, tone: dni >= BANKA_PRAH_CERVENA ? "red" : "orange" };
 }

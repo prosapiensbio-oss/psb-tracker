@@ -26,6 +26,7 @@
 // otvorí appku znova, musí tam byť tá istá — inak sa nedá „nechať uležať".
 
 import { DOKUMENTY, FAZY } from "./mapaCyklu";
+import { dnesPraha } from "./cas";
 
 export type TemaDna = {
   /** Krátka veta do notifikácie. */
@@ -54,7 +55,7 @@ const TVRDENIA = [
 ];
 
 /** Deň od epochy — jednotka rotácie. */
-const denCislo = (d: Date) => Math.floor(Date.parse(`${d.toISOString().slice(0, 10)}T00:00:00Z`) / 86400000);
+const denCislo = (d: Date) => Math.floor(Date.parse(`${dnesPraha(d)}T00:00:00Z`) / 86400000);
 
 /**
  * Poradie druhov. Päť druhov znamená, že ten istý sa vráti raz za päť dní —

@@ -15,6 +15,7 @@ import { Card, Empty, H3, Info, Select, TrenerPills } from "./ui";
 import { useUzke } from "./useUzke";
 import { menoDoBloku, rozlozUdalosti } from "../../lib/psb/kalendarRozlozenie";
 import { VyberMena } from "./VyberMena";
+import { dnesPraha, terazPraha } from "../../lib/psb/cas";
 
 /**
  * Kalendár — čo sa chystá a čo sa práve zmenilo.
@@ -959,7 +960,7 @@ function Zmeny({ zmeny, vybavene, onHotovo, mena, cakaVoWorkspace }: { zmeny: Zm
   const [novy, setNovy] = useState({
     druh: "zrusene" as "zrusene" | "nahrada",
     klient: "",
-    datum: new Date().toISOString().slice(0, 10),
+    datum: dnesPraha(),
     trener: "",
     poznamka: "",
   });
@@ -1292,7 +1293,7 @@ function Tyzden({ udalosti, mena, clients, trener, onTrener, predvolenyTrener, o
   const hodin = Math.max(1, doH - od);
   const VYSKA = uzke ? 58 : 46; // px na hodinu; na telefóne vyšší kvôli zalomeným menám
 
-  const dnesIso = new Date().toISOString().slice(0, 10);
+  const dnesIso = dnesPraha();
   const DNI_SK = ["Po", "Ut", "St", "Št", "Pi", "So", "Ne"];
 
   const trening = vZobrazeni.filter((u) => u.typ !== "sukromne" && u.typ !== "netrening");
@@ -2075,7 +2076,7 @@ export function nezapisaneTreningy(
   dnesok: "prebehnute" | "vynechaj" = "prebehnute",
 ): KalUdalost[] {
   const teraz = new Date();
-  const dnes = teraz.toISOString().slice(0, 10);
+  const dnes = dnesPraha(teraz);
   const zapisane = new Set(sedenia.map((x) => `${normName(x.client)}|${x.date.slice(0, 10)}`));
   const posun = (d: string, o: number) => new Date(Date.parse(`${d}T00:00:00Z`) + o * 86400000).toISOString().slice(0, 10);
   return udalosti.filter((u) => {
@@ -2169,8 +2170,8 @@ export function Balicky({ udalosti, buduce = [], clients, sedenia = [], onObnov,
   const [zdroj, setZdroj] = useState<"kalendar" | "ptminder">("kalendar");
   const vsetky = useMemo(() => {
     const teraz = new Date();
-    const dnes = teraz.toISOString().slice(0, 10);
-    const terazVPrahe = new Date().toLocaleString("sv-SE", { timeZone: "Europe/Prague" }).replace(" ", "T").slice(0, 16);
+    const dnes = dnesPraha(teraz);
+    const terazVPrahe = terazPraha(teraz);
     /**
      * Zostatok v PTminderi je pravda k poslednému importu, nie k tejto minúte.
      *
@@ -2317,7 +2318,7 @@ export function Balicky({ udalosti, buduce = [], clients, sedenia = [], onObnov,
      * pri šesťhodinových balíčkoch a týždennom tempe dôjde niekomu stále.
      * Dva týždne sú toľko, koľko sa dá za týždeň naozaj obvolať.
      */
-    const hranica = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10);
+    const hranica = dnesPraha(new Date(Date.now() + 14 * 86400000));
     /**
      * Do zoznamu patrí len ten, komu balíček NAOZAJ dôjde:
      *   • hodiny už nemá,
@@ -2529,7 +2530,7 @@ export function GuillermoKarta() {
   const [udalosti, setUdalosti] = useState<KalUdalost[]>([]);
   const [platby, setPlatby] = useState<BtcVyplata[]>([]);
   const [kotvaOtvorena, setKotvaOtvorena] = useState(false);
-  const [datum, setDatum] = useState(new Date().toISOString().slice(0, 10));
+  const [datum, setDatum] = useState(dnesPraha());
   const [stav, setStav] = useState("");
   const [sedeni, setSedeni] = useState<Record<string, string>>({});
   const [uklada, setUklada] = useState("");
@@ -2547,7 +2548,7 @@ export function GuillermoKarta() {
   }, []);
   useEffect(() => { void nacitaj(); }, [nacitaj]);
 
-  const dnes = new Date().toISOString().slice(0, 10);
+  const dnes = dnesPraha();
   const kotva = zaznamy.filter((z) => z.druh === "zostatok").sort((a, b) => b.datum.localeCompare(a.datum))[0] || null;
   const odKedy = kotva?.datum || "0000-00-00";
   const nakupy = zaznamy.filter((z) => z.druh === "nakup");

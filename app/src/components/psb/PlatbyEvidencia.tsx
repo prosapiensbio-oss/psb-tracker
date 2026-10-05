@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { C, mix } from "../../lib/psb/theme";
 import { Card, H3, Info } from "./ui";
+import { dnesPraha } from "../../lib/psb/cas";
 
 /**
  * Platby: banka z výpisu, hotovosť zo zošita.
@@ -54,7 +55,7 @@ export function PlatbyEvidencia({ mena }: { mena: string[] }) {
   const [pracujem, setPracujem] = useState("");
   const [chyba, setChyba] = useState("");
   const [pisem, setPisem] = useState(false);
-  const [f, setF] = useState({ klient: "", datum: new Date().toISOString().slice(0, 10), suma: "", poznamka: "" });
+  const [f, setF] = useState({ klient: "", datum: dnesPraha(), suma: "", poznamka: "" });
 
   const nacitaj = useCallback(async () => {
     const r = await fetch("/api/platby", { credentials: "same-origin" });

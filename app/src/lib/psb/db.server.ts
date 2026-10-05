@@ -25,6 +25,7 @@ import {
 import type { ClientOverride, PSBData, SessionRow } from "./types";
 import { EMPTY_DATA } from "./types";
 import { oblastiZJson } from "./pocitovka";
+import { dnesPraha } from "./cas";
 
 const uid = () => crypto.randomUUID();
 
@@ -812,7 +813,7 @@ export async function ingest(DB: D1Database, filename: string, text: string, act
     // doplnkami (Anna Nová, Jakub Štigut, Janka Šnirychová, Jarek Heinrich,
     // Klára Holubová, Patrik Lutonský), ktorí doň nikdy patriť nemali, a
     // membership súbor troch, ktorým dobehla platnosť.
-    const dnesISO = new Date().toISOString().slice(0, 10);
+    const dnesISO = dnesPraha();
     // Dosadené parametre sa musia zhodovať s tým, čo dopyt naozaj obsahuje —
     // preto sa spolu s podmienkou skladá aj ich zoznam.
     const [patriDoExportu, param] = kindInFile === "package"

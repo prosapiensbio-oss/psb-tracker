@@ -4,6 +4,7 @@ import type { D1Database } from "@cloudflare/workers-types";
 import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
+import { dnesPraha } from "../../lib/psb/cas";
 import {
   ga4Mesiace, ga4Strany, gscMesiace, gscRebricek, normProperty, normSite, odKedy, zariadenia,
 } from "../../lib/psb/google";
@@ -150,7 +151,7 @@ export const Route = createFileRoute("/api/google")({
             if (!site) casti.push("Search Console: nie je zadaná adresa webu.");
             else {
               const r = await post(GSC(site), t.token, {
-                startDate: odKedy(new Date(), 2), endDate: new Date().toISOString().slice(0, 10),
+                startDate: odKedy(new Date(), 2), endDate: dnesPraha(),
                 dimensions: [], rowLimit: 1,
               });
               const v = ((r.data?.rows as { clicks?: number }[]) || [])[0]?.clicks;
@@ -163,7 +164,7 @@ export const Route = createFileRoute("/api/google")({
           if (b.akcia === "stiahni") {
             const mesiacov = Math.min(Math.max(Number(b.mesiacov) || 18, 1), 36);
             const od = odKedy(new Date(), mesiacov);
-            const do_ = new Date().toISOString().slice(0, 10);
+            const do_ = dnesPraha();
             const now = new Date().toISOString();
             const hlasky: string[] = [];
             const chyby: string[] = [];

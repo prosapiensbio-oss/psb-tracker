@@ -52,6 +52,7 @@ import type { PorovnanieDochadzky } from "./porovnanieDochadzky";
 import type { PSBData } from "./types";
 import { CIEL_MESIACOV, chybaDoCiela } from "./rezerva";
 import { zhrnutiePocitov } from "./pocitovka";
+import { dnesPraha } from "./cas";
 
 const r1 = (n: number) => Math.round(n * 10) / 10;
 const r0 = (n: number) => Math.round(n);
@@ -422,8 +423,8 @@ export function buildAiContext(
 
   const kalendarBlok = (() => {
     if (!kalendar) return null;
-    const dnes = new Date().toISOString().slice(0, 10);
-    const posun = (d: number) => new Date(Date.now() + d * 86400000).toISOString().slice(0, 10);
+    const dnes = dnesPraha();
+    const posun = (d: number) => dnesPraha(new Date(Date.now() + d * 86400000));
     const od = posun(-30), doKedy = posun(14);
     const den = (z: { pred: string | null; po: string | null; kedy: string }) => (z.pred || z.po || z.kedy || "").slice(0, 10);
 
@@ -985,7 +986,7 @@ export function buildAiContext(
       };
     })(),
     meta: {
-      generatedAt: new Date().toISOString().slice(0, 10),
+      generatedAt: dnesPraha(),
       note: "Súhrnné čísla sú za OBOCH trénerov spolu (Jerry + Terezka), ak nie je uvedené inak. Rozpisy po trénerovi máš v zarobky.mesacne (jerry/terezka), tyzdennePodlaTrenera a kapacita.podlaTrenera. Detail každého klienta (aj editovateľné polia) je v klientiDetail.",
       totalClients: clientList.length,
       kotvaDat: {

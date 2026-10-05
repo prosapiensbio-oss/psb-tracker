@@ -78,6 +78,7 @@ import { BankaUlozene } from "./BankaUlozene";
 import type { PohybSplits, SplitCiast } from "../../lib/psb/pohybSplit";
 import { Nakupy } from "./Nakupy";
 import { Report } from "./Report";
+import { dnesPraha } from "../../lib/psb/cas";
 
 const MONTHS = VZAS_MONTH_LABELS;
 const money = (n: number) => (n === 0 ? "—" : fmtCZK(n).replace(" CZK", ""));
@@ -1831,7 +1832,7 @@ export function KamOdisliCard() {
         // do vlastného kľúča.
         const stary = st["stav_penazi"] as { fio?: number; datum?: string } | undefined;
         if (stary && typeof stary.fio === "number" && stary.fio > 0) {
-          const v: FioZostatok = { suma: stary.fio, datum: stary.datum || new Date().toISOString().slice(0, 10), rucne: true };
+          const v: FioZostatok = { suma: stary.fio, datum: stary.datum || dnesPraha(), rucne: true };
           setFio(v); setFioTxt(String(v.suma)); setFioDatum(v.datum);
         }
       }
@@ -1849,7 +1850,7 @@ export function KamOdisliCard() {
     // Stav hotovosti zhasína krok uzávierky aj dlaždicu Rezerva — obe si ho
     // čítali raz pri štarte (kontrola 24. 9. 2026).
     const predtym = stav;
-    const v: StavPenazi = { hotovost: cislo(hotTxt), datum: new Date().toISOString().slice(0, 10) };
+    const v: StavPenazi = { hotovost: cislo(hotTxt), datum: dnesPraha() };
     setStav(v);
     setUprava("");
     const ok = await saveVzasSetting("stav_penazi", v);
@@ -1865,7 +1866,7 @@ export function KamOdisliCard() {
     const predtym = fio;
     const v: FioZostatok = {
       suma: cislo(fioTxt),
-      datum: fioDatum || new Date().toISOString().slice(0, 10),
+      datum: fioDatum || dnesPraha(),
       rucne: true,
     };
     setFio(v);
@@ -3134,7 +3135,8 @@ function CieleTab({ data }: { data: PSBData }) {
 
   const bezi = ciele.filter((g) => g.stav === "bezi").length;
   const hotove = ciele.filter((g) => g.stav === "hotove").length;
-  const poTermine = ciele.filter((g) => g.termin && g.stav !== "hotove" && g.stav !== "zrusene" && g.termin < new Date().toISOString().slice(0, 10)).length;
+  const dnes = dnesPraha();
+  const poTermine = ciele.filter((g) => g.termin && g.stav !== "hotove" && g.stav !== "zrusene" && g.termin < dnes).length;
 
   return (
     <>
@@ -3190,7 +3192,7 @@ function CieleTab({ data }: { data: PSBData }) {
               <span style={{ fontSize: 11, padding: "2px 9px", borderRadius: 999, border: `1px solid ${mix(stavFarba(g.stav), 45)}`, color: stavFarba(g.stav), whiteSpace: "nowrap" }}>
                 {GOAL_STAV_LABEL[g.stav]}
               </span>
-              <span style={{ fontSize: 11.5, color: g.termin && g.termin < new Date().toISOString().slice(0, 10) && !zoslabene ? C.red : C.textDim, minWidth: 78, textAlign: "right" }}>
+              <span style={{ fontSize: 11.5, color: g.termin && g.termin < dnesPraha() && !zoslabene ? C.red : C.textDim, minWidth: 78, textAlign: "right" }}>
                 {g.termin ? new Date(g.termin).toLocaleDateString("sk-SK") : "bez termínu"}
               </span>
             </div>

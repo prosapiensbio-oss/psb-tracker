@@ -93,6 +93,7 @@ import { mimoWorkspace, ritualy as spocitajRitualy } from "../../lib/psb/rituals
 import { nastavRozpis, pridajDoRozpisu, type PohybZaBunku } from "../../lib/psb/rozpis";
 import { chybajuceNaklady, dvojiteZapisy, nezhodyPrijmov, nezhodySExcelom, zastaranaBanka, type BankovyMesiac, type Pohyb } from "../../lib/psb/kontrolaNakladov";
 import { MKT_MESACNE, nastavIgPrispevky, nastavMarketingZImportu, nastavWebZImportu, nastavAdsZImportu, nastavWebStranky, nastavWebRychlost, nastavKanaly } from "../../lib/psb/marketing";
+import { dnesPraha } from "../../lib/psb/cas";
 
 export type Actions = {
   /** Vráti `false`, keď zápis na serveri neprešiel — obrazovka to nesmie zamlčať. */
@@ -1108,7 +1109,7 @@ export function PSBApp() {
         if (Array.isArray(j.zmeny)) setKalNevysvetlene(j.zmeny);
         // Objednané hodiny idú do predikcie tržieb — centrálne, aby dashboard,
         // grafy, Financie aj VZAS počítali z toho istého.
-        const dnes = new Date().toISOString().slice(0, 10);
+        const dnes = dnesPraha();
         const objednane: Record<string, number> = {};
         for (const u of j.udalosti) {
           if ((u.typ !== "trening" && u.typ !== "uvodny") || !u.klient) continue;
@@ -1698,7 +1699,7 @@ function skupinaFaktur(
     // notifikácií na telefón, takže sa obrazovka a telefón nemôžu rozísť.
     out.push(...polozkyBtcNesedi(data.payments, btcPlatby, data.anomalyAck || {}));
 
-    const beziaci = new Date().toISOString().slice(0, 7);
+    const beziaci = dnesPraha().slice(0, 7);
     const mesiace = Object.keys(bankaSumy).filter((m) => m < beziaci).sort();
     if (!mesiace.length) return out;
     const posledny = mesiace[mesiace.length - 1];
@@ -1814,7 +1815,7 @@ function skupinaFaktur(
     // horší než chýbajúci. Register mal pritom osem takých mesiacov naraz —
     // osem položiek, ktoré sa nedali vybaviť, len prehliadať.
     {
-      const beziaci = new Date().toISOString().slice(0, 7);
+      const beziaci = dnesPraha().slice(0, 7);
       const toky = tokyKlientov(data, clients).mesacne;
       for (const [mk, v] of toky) {
         if (mk < PRVY_MESIAC_OTAZOK || mk >= beziaci || !v.odisli.length) continue;
@@ -1867,7 +1868,7 @@ function skupinaFaktur(
 
   const zmenyMetrik = useMemo(() => {
     const ack = data.anomalyAck || {};
-    const beziaci = new Date().toISOString().slice(0, 7);
+    const beziaci = dnesPraha().slice(0, 7);
     const out: typeof register = [];
     const over = (rad: { m: string; v: number }[], kluc: string, nazov: string, ciel: string) => {
       const uzavrete = rad.filter((r) => r.m < beziaci && r.v > 0).sort((a, b) => a.m.localeCompare(b.m));
@@ -1930,7 +1931,7 @@ function skupinaFaktur(
     () => nezapisaneDoRegistra({
       leads: data.leads || [],
       menaKlientov: Object.keys(clients),
-      dnes: new Date().toISOString().slice(0, 10),
+      dnes: dnesPraha(),
       zmeny: kalNevysvetlene.map((z) => ({ druh: z.druh, trener: z.trener })),
       sporneKonanie: sporneKonanie.map((x) => ({ klient: x.klient, trener: x.trener })),
       // Lievik za posledných 12 mesiacov — tie isté čísla, aké vidno
@@ -1968,7 +1969,7 @@ function skupinaFaktur(
     if (!Number.isFinite(dni) || dni < 30) return [] as RegisterItem[];
     // Kľúč nesie MESIAC, nie deň: inak by sa položka po skrytí vrátila zajtra
     // s novým kľúčom a „Skryť" by vyzeralo ako pokazené.
-    const key = `web|text|${new Date().toISOString().slice(0, 7)}`;
+    const key = `web|text|${dnesPraha().slice(0, 7)}`;
     return [{
       key, category: "Anomália" as const, tone: "blue" as const,
       title: `Text webu sa nečítal ${dni} dní`,
@@ -2045,7 +2046,7 @@ function skupinaFaktur(
     // Téma dňa — Jerryho, úplne dole (priorita 90), modrá, informatívna.
     // Kľúč nesie DEŇ, takže „Skryť" ju umlčí len na dnes a zajtra príde nová.
     const temaPolozka = temaDna ? [{
-      key: `tema|${new Date().toISOString().slice(0, 10)}`,
+      key: `tema|${dnesPraha()}`,
       category: "Zápis" as const,
       tone: "blue" as const,
       title: "🎥 Téma na hovorené video",
@@ -2054,7 +2055,7 @@ function skupinaFaktur(
       detail: `${temaDna.tema}${temaDna.druh ? ` 🎬 Pred kamerou maj hotové dve vety — otvorenie: ${OTVORENIE_PODLA_DRUHU[temaDna.druh]} A zavretie: ${ZAVER_PODLA_DRUHU[temaDna.druh]}` : ""} · zdroj: ${temaDna.odkial}. Nemusíš to nakrútiť — je to inšpirácia na deň, keď máš čas a priestor.`,
       trener: "Jerry",
       priority: 90,
-      ...stavPolozky(`tema|${new Date().toISOString().slice(0, 10)}`),
+      ...stavPolozky(`tema|${dnesPraha()}`),
     }] : [];
     return odstranDuplicity(
       [...extra, ...nezapisane, ...kontrolaBanky, ...zmenyMetrik, ...kontrolaWebu, ...pripomienky, ...dovody, ...register, ...temaPolozka],
@@ -2512,7 +2513,7 @@ function skupinaFaktur(
         if (j?.ok && Array.isArray(j.udalosti)) {
           setKalUdalosti(j.udalosti);
           if (Array.isArray(j.zmenyHistoria)) setKalZmeny(j.zmenyHistoria as KalZmena[]);
-          const dnesK = new Date().toISOString().slice(0, 10);
+          const dnesK = dnesPraha();
           const obj: Record<string, number> = {};
           for (const u of j.udalosti as KalUdalost[]) {
             if ((u.typ !== "trening" && u.typ !== "uvodny") || !u.klient) continue;

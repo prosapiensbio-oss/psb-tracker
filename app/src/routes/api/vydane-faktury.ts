@@ -14,6 +14,7 @@ import { DODAVATEL as DOD_FA, spayd } from "../../lib/psb/vydanaFaktura";
 import { rozparsujKontakty } from "../../lib/psb/kontaktyIdokladu";
 import { posliMail } from "../../lib/psb/smtp.server";
 import { jeMesiac, normName } from "../../lib/psb/format";
+import { dnesPraha } from "../../lib/psb/cas";
 
 /**
  * VYDANÉ FAKTÚRY.
@@ -407,7 +408,7 @@ export const Route = createFileRoute("/api/vydane-faktury")({
             if (dalsie.length > 9) return Response.json({ ok: false, error: "Na jednej faktúre najviac desať položiek." }, { status: 400 });
             const celkom = Math.round((ks * cena + dalsie.reduce((n, d) => n + d.celkom, 0)) * 100) / 100;
 
-            const vystavene = denISO(b.vystavene) || new Date().toISOString().slice(0, 10);
+            const vystavene = denISO(b.vystavene) || dnesPraha();
             const dni = b.splatnostDni == null ? SPLATNOST_DNI : Math.max(0, Math.min(180, Math.round(Number(b.splatnostDni) || 0)));
             const splatnost = denISO(b.splatnost) || splatnostZ(vystavene, dni);
             if (splatnost < vystavene) return Response.json({ ok: false, error: "Splatnosť je pred vystavením." }, { status: 400 });

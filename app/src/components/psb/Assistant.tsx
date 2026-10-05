@@ -14,6 +14,7 @@ import { C, mix } from "../../lib/psb/theme";
 import type { Actions } from "./App";
 import { nastavPnlBunku, pnlOverridesNaUlozenie } from "../../lib/psb/vzas";
 import { ZABER_MAPA } from "../../lib/psb/zabery";
+import { dnesPraha } from "../../lib/psb/cas";
 
 type ParsedAction = {
   type: "ack-anomaly" | "unack-anomaly" | "set-override" | "zapis-zaver" | "vyhodnot-zaver" | "novy-ciel" | "kronika" | "odloz-anomaliu" | "uprav-pnl" | "zarad-pohyby" | "mkt-znacka" | "spusti-kampan" | "zastav-kampan" | "naplanuj-obsah" | "uloz-plan";
@@ -810,7 +811,7 @@ export function useAssistantChat(
         if (mes && fakt) {
           void fetchMonthNotes().then((n) => {
             const stara = n[mes]?.note || "";
-            const dnes = new Date().toISOString().slice(0, 10);
+            const dnes = dnesPraha();
             const riadok = `• ${fakt} (zapísal Jarvis ${dnes})`;
             if (stara.includes(fakt)) return; // to isté dvakrát nie
             void saveMonthNote(mes, [stara, riadok].filter(Boolean).join("\n"), n[mes]?.answers || {}, "jarvis")
@@ -864,7 +865,7 @@ export function useAssistantChat(
    * navrhne, sa ticho ignoruje; kto chce viac, otvorí chat.
    */
   async function spracujDennik(meno: string, zapis: string): Promise<string | null> {
-    const dnes = new Date().toISOString().slice(0, 10);
+    const dnes = dnesPraha();
     const res = await sendChat(
       [{
         role: "user",

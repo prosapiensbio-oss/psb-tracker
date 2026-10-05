@@ -11,6 +11,7 @@ import type { ClientAgg } from "../../lib/psb/compute";
 import type { PSBData } from "../../lib/psb/types";
 import type { AssistantChat } from "./Assistant";
 import { Card, H3, Info, Modal, Select } from "./ui";
+import { dnesPraha } from "../../lib/psb/cas";
 
 /**
  * Marketingový plán — cieľ, obdobie, metriky, prístup, rozpočet.
@@ -26,7 +27,7 @@ import { Card, H3, Info, Modal, Select } from "./ui";
 
 type PlanRiadok = Plan & { created_at?: string; updated_at?: string };
 
-const dnesMesiac = () => new Date().toISOString().slice(0, 7);
+const dnesMesiac = () => dnesPraha().slice(0, 7);
 
 /** O rok dopredu od mesiaca — východzí koniec nového plánu. */
 function oMesiacov(m: string, n: number): string {

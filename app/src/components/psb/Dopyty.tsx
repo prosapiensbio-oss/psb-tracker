@@ -7,6 +7,7 @@ import { C, mix, S } from "../../lib/psb/theme";
 import type { Lead } from "../../lib/psb/types";
 import { Card, Empty, H3, Info, Modal, RolovaciaTabulka, Select, StatCard, TableWrap } from "./ui";
 import { SOURCES, STATUSES, statusColor } from "./Klienti";
+import { dnesPraha } from "../../lib/psb/cas";
 
 /**
  * Dopyty — kto sa ozval a čo sa s ním stalo.
@@ -238,7 +239,7 @@ export function Dopyty({ leads, clients, refresh, focus }: { leads: Lead[]; clie
     setBusy(false);
   };
   const openAdd = () => {
-    setDraft({ date: new Date().toISOString().slice(0, 10), source: "instagram", status: "novy", name: "", referrer: "", note: "" });
+    setDraft({ date: dnesPraha(), source: "instagram", status: "novy", name: "", referrer: "", note: "" });
     setAdding(true);
   };
   const submitAdd = async () => {
@@ -321,7 +322,7 @@ export function Dopyty({ leads, clients, refresh, focus }: { leads: Lead[]; clie
               detailu, ale prvý zápis musí trvať desať sekúnd — inak sa nestane.
               Meno a zdroj stačia; dátum je dnešok a stav „ozval sa". */}
           <form
-            onSubmit={(e) => { e.preventDefault(); if (!rychleMeno.trim()) return; void save({ date: new Date().toISOString().slice(0, 10), name: rychleMeno.trim(), source: rychlyZdroj as Lead["source"], status: "novy", referrer: "", note: "", odpovedaneAt: uzOzvane ? new Date().toISOString() : "" }); setRychleMeno(""); }}
+            onSubmit={(e) => { e.preventDefault(); if (!rychleMeno.trim()) return; void save({ date: dnesPraha(), name: rychleMeno.trim(), source: rychlyZdroj as Lead["source"], status: "novy", referrer: "", note: "", odpovedaneAt: uzOzvane ? new Date().toISOString() : "" }); setRychleMeno(""); }}
             style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}
           >
             <input

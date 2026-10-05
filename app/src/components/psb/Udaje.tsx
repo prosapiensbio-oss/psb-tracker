@@ -830,7 +830,7 @@ function snippetWeb(url: string, tajne: string): string {
     // prišla prvá odozva na reklamu. Výsledok testu ide do správy dopytu.
     "      var email=(v('your-email')||v('email')||v('psb-email')).trim().toLowerCase();var tel=v('your-tel')||v('tel')||v('telefon')||v('psb-phone');var meno=v('your-name')||v('meno')||v('psb-name');",
     "      var test=v('psb-insight')?['TEST POSTURY','bolí: '+(v('psb-pain')||'-'),'postura: '+(v('psb-posture')||'-'),'výsledok: '+v('psb-insight'),'hovor: '+(v('psb-call')||'-')].join(' | '):'';",
-    "      var den=new Date().toISOString().slice(0,10);",
+    "      var den=new Date().toLocaleDateString('sv-SE',{timeZone:'Europe/Prague'});",
     "      var id=('web-'+den+'-'+(email||tel||meno).toLowerCase()).slice(0,64);",
     "      var u={};try{u=JSON.parse(localStorage.getItem('psb_utm')||'{}');}catch(x){}",
     "      var ck=function(n){var m=document.cookie.match('(^|;)\\s*'+n+'\\s*=\\s*([^;]+)');return m?m.pop():'';};",

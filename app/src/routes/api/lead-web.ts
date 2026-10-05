@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { audit } from "../../lib/psb/audit.server";
 import { posliLead } from "../../lib/psb/capi";
 import { bindings } from "../../lib/bindings.server";
+import { dnesPraha } from "../../lib/psb/cas";
 
 /**
  * Dopyt z webového formulára (Contact Form 7 na prosapiens.cz).
@@ -100,7 +101,7 @@ export const Route = createFileRoute("/api/lead-web")({
           kus(b.utm_term, 80) && `term=${kus(b.utm_term, 80)}`,
         ].filter(Boolean).join(" · ");
 
-        const dnes = new Date().toISOString().slice(0, 10);
+        const dnes = dnesPraha();
         // Ten istý človek v ten istý deň = jeden dopyt. Dvojklik na tlačidlo
         // ani opakovaný pokus CF7 nesmie vyrobiť dva riadky.
         /**

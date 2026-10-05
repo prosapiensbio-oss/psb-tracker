@@ -8,6 +8,7 @@ import { preTrenera, registerZoServera } from "../../lib/psb/registerServer";
 import { posli, type Odber } from "../../lib/psb/push.server";
 import { polozkaZastaranaBanka, polozkyBtcNesedi } from "../../lib/psb/penazneNotifikacie";
 import { TRAINERS } from "../../lib/psb/compute";
+import { terazPraha } from "../../lib/psb/cas";
 
 // Ranná dávka notifikácií na telefón.
 //
@@ -90,8 +91,8 @@ export const Route = createFileRoute("/api/push-rano")({
         if (!odbery.length) return Response.json({ ok: true, poslane: 0, dovod: "ziadne_odbery" });
 
         const data = await loadData(DB);
-        const od = new Date(Date.now() - 21 * 86400000).toISOString().slice(0, 16);
-        const do_ = new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 16);
+        const od = terazPraha(new Date(Date.now() - 21 * 86400000));
+        const do_ = terazPraha(new Date(Date.now() + 14 * 86400000));
         const [ud, zm] = await DB.batch([
           DB.prepare("SELECT zaciatok, klient, typ, nazov, trener, zmizla_at FROM kal_udalosti WHERE zmizla_at IS NULL AND zaciatok >= ? AND zaciatok <= ? ORDER BY zaciatok").bind(od, do_),
           DB.prepare("SELECT kedy, trener, druh, nazov, klient, pred, po, vysvetlene, poznamka FROM kal_zmeny ORDER BY kedy DESC LIMIT 300"),

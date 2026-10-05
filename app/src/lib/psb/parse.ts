@@ -3,6 +3,7 @@
 // "Jun 29; 2026" dates, and the hierarchical Payments Recorded format.
 import { jeMesiac } from "./format";
 import type { CSVType, PackageRow, PaymentRow, ServiceRow, SessionRow } from "./types";
+import { dnesPraha } from "./cas";
 
 export const parseCZK = (s: string | number | null | undefined): number => {
   if (s == null) return 0;
@@ -33,7 +34,7 @@ function paymentYearResolver(text: string): (monthIdx: number) => number {
     })
     .filter((x): x is { month: number; year: number } => !!x);
   if (parsed.length === 0) {
-    const y = new Date().getFullYear();
+    const y = Number(dnesPraha().slice(0, 4));
     return () => y;
   }
   const start = parsed[0];
@@ -699,7 +700,10 @@ const denZDatumu = (s: string | undefined): string => {
   const m = t.match(/(\d{4})-(\d{2})-(\d{2})/);
   if (m) return `${m[1]}-${m[2]}-${m[3]}`;
   const d = new Date(t);
-  return isNaN(d.getTime()) ? "" : d.toISOString().slice(0, 10);
+  // Reťazec bez pásma sa číta v miestnom čase — deň sa teda berie miestny,
+  // nie UTC (v prehliadači by inak polnoc padla na predošlý deň).
+  const p2 = (n: number) => String(n).padStart(2, "0");
+  return isNaN(d.getTime()) ? "" : `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())}`;
 };
 
 export function parseMetricool(text: string): MktPrispevok[] {

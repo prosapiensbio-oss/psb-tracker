@@ -45,6 +45,7 @@ import { KlientStol } from "./KlientStol";
 import { C, mix } from "../../lib/psb/theme";
 import { Card } from "./ui";
 import { useUzke } from "./useUzke";
+import { dnesPraha } from "../../lib/psb/cas";
 
 /**
  * Workspace — administratíva ako kopa kariet, jedna karta = jeden DRUH práce.
@@ -360,7 +361,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
    */
   const menaPreAnamnezu = useMemo(() => {
     const zname = new Set(mena.map((m) => normName(m)));
-    const dnes = new Date().toISOString().slice(0, 10);
+    const dnes = dnesPraha();
     const navyse: string[] = [];
     for (const u of kalUdalosti || []) {
       const m = (u.klient || "").trim();
@@ -825,7 +826,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                           </div>
                         );
                     };
-                    const { aktualne, archiv } = rozdelAnamnezy(k.polozky as AnamnezaRiadok[], new Date().toISOString().slice(0, 10));
+                    const { aktualne, archiv } = rozdelAnamnezy(k.polozky as AnamnezaRiadok[], dnesPraha());
                     const najdene = archiv.filter((a) => normName(a.klient).includes(normName(hladanieArchivu)));
                     return (
                       <>

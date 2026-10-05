@@ -48,6 +48,7 @@ import type { PSBData } from "../../lib/psb/types";
 import type { Actions, NavFocus } from "./App";
 import type { AssistantChat } from "./Assistant";
 import { Card, Donut, Empty, H3, Info, Select, ValueBars, ZoneBars } from "./ui";
+import { dnesPraha, posunDen } from "../../lib/psb/cas";
 
 const catTone = (c: RegisterItem["category"]) =>
   c === "6M" ? "accent" : c === "Kapacita" || c === "Rozhodnutie" || c === "Zápis" ? "blue" : "orange";  // „Zmena" padá do orange — je to výstraha, nie informácia
@@ -576,7 +577,7 @@ export function Dashboard({
     // Bežiaci mesiac zvlášť. Import z PTmindera chodí TÝŽDENNE, takže tržba za
     // rozbehnutý mesiac je živé číslo, ktoré sa dá sledovať — na rozdiel od
     // zisku, kde náklady pribudnú z Fio až raz mesačne (Jerry, 10. 8.).
-    const beziaciMk = new Date().toISOString().slice(0, 7);
+    const beziaciMk = dnesPraha().slice(0, 7);
     const vsetkyMes = monthlyFinance(data);
     const beziaci = vsetkyMes.find((m) => m.month === beziaciMk);
     const beziaciCash = beziaci ? beziaci.cash : 0;
@@ -629,7 +630,7 @@ export function Dashboard({
   // preto sa tam namiesto nuly ukazuje „?" — nula by klamala smerom k dobrému.
   const toky = useMemo(() => {
     const t = tokyKlientov(data, clients);
-    const bezici = new Date().toISOString().slice(0, 7);
+    const bezici = dnesPraha().slice(0, 7);
     const zrele = t.kotva ? new Date(Date.parse(t.kotva) - 60 * 86400000).toISOString().slice(0, 7) : bezici;
     // Najnovší mesiac hore — čítať zoznam zdola nahor je proti zvyku a pri
     // troch riadkoch sa to nedá zachrániť ani nadpisom.
@@ -646,7 +647,7 @@ export function Dashboard({
   // ničím. Uzavretý mesiac je celé číslo, ktoré niečo znamená; bežiaci mesiac
   // sa dopočíta vedľa ako priebeh, nie ako výsledok.
   const lievikMes = useMemo(() => {
-    const mes = kotva.plny || new Date().toISOString().slice(0, 7);
+    const mes = kotva.plny || dnesPraha().slice(0, 7);
     const zaMesiac = (mk: string) => {
       const dopyty = (data.leads || []).filter((l) => (l.date || "").slice(0, 7) === mk);
       const uvodne = pocetUvodnych(data.sessions.filter((s) => s.date.slice(0, 7) === mk));
@@ -663,7 +664,7 @@ export function Dashboard({
     for (const l of u.dopyty) zdroje.set(l.source, (zdroje.get(l.source) || 0) + 1);
     // Bežiaci mesiac ako doplnok — nie ako hlavné číslo. Ukáže sa, len keď v
     // ňom už niečo je, nech prvý deň v mesiaci nesvieti riadok s nulami.
-    const bezici = new Date().toISOString().slice(0, 7);
+    const bezici = dnesPraha().slice(0, 7);
     const b = bezici > mes ? zaMesiac(bezici) : null;
     const priebeh = b && (b.dopyty.length || b.uvodne || b.novi)
       ? { mes: bezici, dopyty: b.dopyty.length, uvodne: b.uvodne, novi: b.novi }
@@ -757,7 +758,7 @@ export function Dashboard({
     // rozbehnutého mesiaca je živá. Zisk zostáva — v tenkom riadku pod
     // prístrojmi, lebo náklady z banky prídu raz mesačne a živý zisk by bola
     // vymyslenina (9. 8. takto ukázal august ako 34 155 Kč).
-    const dnesIso2 = new Date().toISOString().slice(0, 10);
+    const dnesIso2 = dnesPraha();
     // „Čaká sa" = obnovy, ktorých termín padne do KONCA TOHTO mesiaca.
     //
     // Prvá verzia filtrovala perClient podľa `kedy === bežiaci mesiac` — a to
@@ -1084,7 +1085,7 @@ export function Dashboard({
   // je teraz prvá sekcia — dal filter prepnúť a nezmenilo sa nič, čo z neho
   // robilo ozdobu. Týždeň patrí do okna podľa mesiaca, v ktorom začína.
   const okno = useMemo(
-    () => hraniceObdobia(obdobie, kotva.plny || new Date().toISOString().slice(0, 7)),
+    () => hraniceObdobia(obdobie, kotva.plny || dnesPraha().slice(0, 7)),
     [obdobie, kotva.plny],
   );
   const vOkne = (mk: string) => mk >= okno.od && mk <= okno.do_;
@@ -1149,7 +1150,9 @@ export function Dashboard({
     dnesD.setHours(0, 0, 0, 0);
     dnesD.setDate(dnesD.getDate() - ((dnesD.getDay() + 6) % 7)); // pondelok
     const pondelokIso = `${dnesD.getFullYear()}-${p2(dnesD.getMonth() + 1)}-${p2(dnesD.getDate())}`;
-    const koniecIso = new Date(dnesD.getTime() + 6 * 86400000).toISOString().slice(0, 10);
+    // Nedeľa z pondelka po dňoch — cez `toISOString` by miestna polnoc
+    // spadla na sobotu a nedeľné tréningy by z týždňa vypadli.
+    const koniecIso = posunDen(pondelokIso, 6);
 
     const tyz = { Jerry: 0, Terezka: 0, iny: 0 };
     let maKalendar = false;
@@ -1358,7 +1361,7 @@ export function Dashboard({
   );
 
   const platnostKonci = useMemo(() => {
-    const dnes = new Date().toISOString().slice(0, 10);
+    const dnes = dnesPraha();
     const dni = (d: string) => Math.round((Date.parse(d) - Date.parse(dnes)) / 86400000);
     const ack = data.anomalyAck || {};
     // Zostatok po hodinách, ktoré už prebehli, ale export ich ešte nevidel —
@@ -2215,7 +2218,7 @@ export function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar
   const [odlozit, setOdlozit] = useState(false);
 
   const odloz = (dni: number) => {
-    const d = new Date(Date.now() + dni * 86400000).toISOString().slice(0, 10);
+    const d = dnesPraha(new Date(Date.now() + dni * 86400000));
     actions.ackAnomaly(item.key, `odlozene|${d}|`, true);
     setOdlozit(false);
   };
@@ -2338,7 +2341,7 @@ export function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar
   const [dopytChyba, setDopytChyba] = useState("");
   const zapisDopyt = async () => {
     const meno = item.oKom || "";
-    const datum = item.key.split("|")[1] || new Date().toISOString().slice(0, 10);
+    const datum = item.key.split("|")[1] || dnesPraha();
     if (!meno || !dopytZdroj || dopytBusy) return;
     setDopytBusy(true);
     setDopytChyba("");
@@ -2564,7 +2567,7 @@ export function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar
     if (!item.client) return;
     // Dátum v odpovedi viaže odpoveď na TÚTO epizódu ticha — keď sa klient
     // vráti a o rok znova stíchne, otázka sa položí znova.
-    void zapis(actions.setOverride(item.client, "duch" as never, `ano|${new Date().toISOString().slice(0, 10)}`), "Odpoveď o duchovi")
+    void zapis(actions.setOverride(item.client, "duch" as never, `ano|${dnesPraha()}`), "Odpoveď o duchovi")
       .then((ok) => ok && actions.setOverride(item.client!, "status" as never, "Neaktívny"))
       .then((ok) => { if (ok === false) setChybaZapisu("Stav klienta sa NEZAPÍSAL — skús znova."); });
     // A odpoveď spraví aj to, čo z nej vyplýva. Doteraz sa len zapísala: klient
@@ -2633,7 +2636,7 @@ export function RegisterRow({ item, actions, onNavigate, chat, clients, kalendar
       // zrušenie — jeden zápis, o ktorom vedia obe strany. Notifikácie o ňom
       // stíchnu okamžite (chip v + Zápis, dnešná hodina, SMS po úvodnom)
       // a Kalendár má záznam aj dôvod, takže sa nespýta druhýkrát.
-      const dnes = new Date().toISOString().slice(0, 10);
+      const dnes = dnesPraha();
       const maDnesTrening = (kalendar || []).some(
         (u) => u.klient && normName(u.klient) === normName(meno!) && u.zaciatok.slice(0, 10) === dnes
           && (u.typ === "trening" || u.typ === "uvodny"),

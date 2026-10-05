@@ -30,6 +30,7 @@
  * nie je dôkaz, že tréning v kalendári nebol.
  */
 import { normName } from "./format";
+import { dnesPraha } from "./cas";
 
 export type MimoKalendara = { klient: string; datum: string; trener: string | null };
 
@@ -45,7 +46,7 @@ export function sedeniaMimoKalendara(
   udalosti: { zaciatok: string; klient: string | null; typ: string | null; zmizlaAt?: string | null }[] | undefined,
   dnes: Date = new Date(),
 ): MimoKalendara[] {
-  const dnesDen = dnes.toISOString().slice(0, 10);
+  const dnesDen = dnesPraha(dnes);
   // Bez udalostí sa porovnávať nedá — mlčanie je jediná správna odpoveď.
   if (!udalosti || !udalosti.length) return [];
   // Odkiaľ pole udalostí vôbec siaha. Ďalej než ono sa pýtať nemá zmysel.

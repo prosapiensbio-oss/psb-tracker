@@ -31,6 +31,7 @@ import { fmtDMY, monthKey, monthLabel } from "./format";
 import { GA4_MESACNE, GSC_DOPYTY, GSC_MESACNE, MKT_MESACNE, MKT_TOP } from "./marketing";
 import { FARBY, pruhovyGraf, stlpcovyGraf } from "./reportGrafy";
 import type { PSBData } from "./types";
+import { dnesPraha } from "./cas";
 
 export type SekciaId = "peniaze" | "klienti" | "treningy" | "marketing" | "dopyty" | "signaly";
 
@@ -97,7 +98,7 @@ export function buildReport(
   out.push(`# ProSapiens Biomechanic — report za ${obdobie}`);
   out.push("");
   out.push(
-    `*Vygenerované ${new Date().toISOString().slice(0, 10)} z Trackera.* ` +
+    `*Vygenerované ${dnesPraha()} z Trackera.* ` +
       (trenerFilter
         ? `Filter: **${f.trener}** — platí na sedenia, hodiny a vyfakturované. Prijaté tržby trénera nerozlišujú (platba v PTminderi nemá trénera), takže sú za celé štúdio.`
         : "Čísla sú za oboch trénerov spolu."),
@@ -150,7 +151,7 @@ export function buildReport(
     // viac ako 30 dní. Zámerne sa to neopiera o status: ten sa dá prepísať
     // ručne a report by potom hovoril o rozhodnutí, nie o skutočnosti. Tridsať
     // dní je tá istá hranica, akú používa signál „Prestal chodiť" na dashboarde.
-    const dnes = new Date().toISOString().slice(0, 10);
+    const dnes = dnesPraha();
     // Klient na dohodnutej pauze neprestal chodiť — to je dohoda, nie strata.
     // Keď pauza skončí a nepríde, spadne sem sám.
     const stratili = zoznam.filter(

@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
+import { dnesPraha } from "../../lib/psb/cas";
 
 // Kompletná záloha databázy ako jeden JSON na stiahnutie.
 //
@@ -49,7 +50,7 @@ export const Route = createFileRoute("/api/export")({
           }
         }
 
-        const den = new Date().toISOString().slice(0, 10);
+        const den = dnesPraha();
         await audit(DB, {
           action: "zaloha",
           predmet: `psb-zaloha-${den}.json`,

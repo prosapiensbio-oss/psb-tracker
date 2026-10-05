@@ -20,6 +20,7 @@ import {
 } from "./compute";
 import { mimoWorkspace, ritualy } from "./rituals";
 import type { PSBData } from "./types";
+import { dnesPraha } from "./cas";
 
 export type KalendarPreRegister = {
   udalosti: { zaciatok: string; klient: string | null; typ: string | null; zmizlaAt?: string | null; nazov?: string; trener?: string }[];
@@ -88,7 +89,7 @@ export function registerZoServera(
     ...nezapisaneDoRegistra({
       leads: data.leads || [],
       menaKlientov: Object.keys(clients),
-      dnes: dnes.toISOString().slice(0, 10),
+      dnes: dnesPraha(dnes),
       zmeny: zm.filter((z) => !z.vysvetlene).map((z) => ({ druh: z.druh, trener: String(z.trener || "") })),
       // Podozrivé podiely potrebujú celý lievik; do rannej správy nepatria,
       // sú to čísla na pozretie, nie práca na dnes.

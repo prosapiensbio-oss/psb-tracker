@@ -1,6 +1,7 @@
 import { osCasuKlienta } from "./klientOsCasu";
 import { normName } from "./format";
 import { vypisHodin } from "./vypisHodin";
+import { dnesPraha } from "./cas";
 
 /**
  * HODINY, KTORÉ NEKRYJE ŽIADNY BALÍČEK.
@@ -46,7 +47,7 @@ export function hodinyBezBalicka(
   mena: string[],
   zdroj: Zdroj,
   trenerKlienta: (meno: string) => string,
-  dnes: string = new Date().toISOString().slice(0, 10),
+  dnes: string = dnesPraha(),
 ): BezBalicka[] {
   /**
    * Dáta sa rozdelia podľa klienta RAZ. `osCasuKlienta` si inak každé pole

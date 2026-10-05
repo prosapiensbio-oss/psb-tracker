@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { terazPraha } from "../lib/psb/cas";
+import { terazPraha, dnesPraha } from "../lib/psb/cas";
 
 import { bindings } from "../lib/bindings.server";
 import { uvodnaStrankaHtml } from "../lib/psb/uvodnaStranka";
@@ -140,7 +140,7 @@ export const Route = createFileRoute("/u/$token")({
         const text = String(f?.get("odpoved") ?? "").trim().slice(0, 1000);
         if (!text) return spat(false);
 
-        const dnes = new Date().toISOString().slice(0, 10);
+        const dnes = dnesPraha();
         await DB.prepare(
           `INSERT INTO klient_merania (id, klient, datum, poznamka, autor, created_at, zdroj)
            VALUES (?1, ?2, ?3, ?4, 'klient', ?5, 'klient')

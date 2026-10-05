@@ -2600,3 +2600,27 @@ Vaško 13 980 namiesto 6 990). Odteraz:
 - Overenie: snímka pred/po nad kópiou ostrej DB pre všetkých 127 klientov
   (hodiny, dlh, dlžníci, príznaky na osi, mínus, otázky, návrhy balíčkov) —
   zhodné; jediná zmena na obrazovkách je oprava Vaškovho profilu.
+
+## Deň podľa Prahy, nie UTC (5. 10. 2026)
+
+`toISOString().slice(0, 10)` je UTC deň — medzi polnocou a 01:00/02:00
+v Prahe bola appka vo včerajšku (na serveri aj ranná piatková pripomienka,
+„dnešné" tréningy, týždeň v registri). Pravidlá:
+
+- **„Dnes" je `dnesPraha()`**, „teraz" na porovnanie s kalendárom
+  `terazPraha()`, posun dní `posunDen`, mesiac `mesiacPraha`, deň v týždni
+  `denVTyzdniPraha` — všetko v `lib/psb/cas.ts`. Formátovač sa stavia raz
+  a výsledok sa pamätá na minútu (toLocaleString stál 42 µs na volanie).
+- **`kal_udalosti.zaciatok` je pražský čas bez pásma.** Neparsuj ho cez
+  `Date.parse` a neporovnávaj s `Date.now()` (server ho číta ako UTC) —
+  porovnávaj reťazce `zaciatok.slice(0, 16)` s `terazPraha()`.
+- **Časy zápisu (`created_at`, `vzas_audit.at`) sú UTC.** S holým dňom ich
+  neporovnávaj; začiatok pražského dňa je `polnocPrahaUtc()`.
+- **Okno kalendára (`okno()` v `api/kalendar.ts`) musí byť pre databázu aj
+  pre `citajIcal` z tých istých reťazcov** — `citajIcal` číta miestny čas
+  ako „…Z". Rozídené okná = každý tréning o 21 dní neskôr „pribudol".
+- **Pozor na hromadné nahrádzanie v reťazcoch**: snippet pre web v Údajoch
+  je JavaScript v texte — `dnesPraha()` tam neexistuje.
+- Testy púšťaj aj s `TZ=UTC` (tak beží server): `TZ=UTC bun test src/lib/psb src/components/psb`.
+- Lokálny čas v module zostal len tam, kde beží iba v prehliadači
+  (`vzas.ts` mesiace, `nextMonthKeys`) — na serveri ich nič nečíta.

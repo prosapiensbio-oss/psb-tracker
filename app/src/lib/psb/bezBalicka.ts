@@ -25,6 +25,7 @@ import { jeAktivny, odtrenovane, type Balicek } from "./balickyEvidencia";
 import { osCasuKlienta } from "./klientOsCasu";
 import { priebehBalickov } from "./vypisHodin";
 import { normName } from "./format";
+import { dnesPraha } from "./cas";
 
 /** Len to, čo z karty klienta naozaj potrebujeme. */
 export type KlientPreKartu = {
@@ -131,7 +132,7 @@ export function vMinuseKlienta(
   meno: string,
   zdroj: Parameters<typeof osCasuKlienta>[1],
   zostatokTeraz: number | null,
-  dnes: string = new Date().toISOString().slice(0, 10),
+  dnes: string = dnesPraha(),
 ): number {
   const os = osCasuKlienta(meno, zdroj, dnes);
   const { stavy } = priebehBalickov(os, zostatokTeraz, dnes);
@@ -146,7 +147,7 @@ export function bezAktivnehoBalicka(
   clients: KlientPreKartu[],
   vlastne: Balicek[],
   udalosti: Udalost[],
-  dnes: string = new Date().toISOString().slice(0, 10),
+  dnes: string = dnesPraha(),
   /**
    * Koľko je klient v mínuse. Dáva ho volajúci, lebo potrebuje celú os času
    * — a tá sa oplatí postaviť len tým pár ľuďom, ktorí v zozname naozaj sú,

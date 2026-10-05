@@ -4,6 +4,7 @@ import { WEB_STRANKY , marketingVerzia } from "../../lib/psb/marketing";
 import { MIN_DENNE_KC, MIN_STROP_KC, OBLASTI, OKRUH_MAX_KM, OKRUH_MIN_KM, UCET_REKLAM, adsManagerOdkaz, navrhNazvu, pripravKampan, type CielKampane, type Oblast } from "../../lib/psb/kampanPlan";
 import { C, mix, S } from "../../lib/psb/theme";
 import { Card, H3, Info } from "./ui";
+import { dnesPraha } from "../../lib/psb/cas";
 
 // ── Pripraviť kampaň ─────────────────────────────────────────────────────────
 //
@@ -167,7 +168,7 @@ export function PripravitKampan({ akoKarta = true, navrh }: { akoKarta?: boolean
     // než dobehne /api/marketing (tá istá chyba ako PlanObsahu, 18. 8.).
   }, [marketingVerzia()]); // eslint-disable-line react-hooks/exhaustive-deps
   const cielovaStranka = stranka || stranky[0] || "";
-  const mesiac = new Date().toISOString().slice(0, 7);
+  const mesiac = dnesPraha().slice(0, 7);
   const menoKampane = nazov || navrhNazvu(ciel, cielovaStranka, mesiac);
 
   /**

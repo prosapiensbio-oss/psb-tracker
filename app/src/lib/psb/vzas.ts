@@ -20,6 +20,7 @@
 // by sa opakovala každý mesiac. Excel končí júnom 2026 — všetko po ňom plnia
 // importy (PTminder, Fio), takže stačí, aby mesiac existoval.
 import { ltvSpoluprace } from "./compute";
+import { dnesPraha } from "./cas";
 const POSLEDNY_Z_EXCELU = "2026-06";
 const MESIACE_SK = ["Jan", "Feb", "Mar", "Apr", "Máj", "Jún", "Júl", "Aug", "Sep", "Okt", "Nov", "Dec"];
 
@@ -1775,7 +1776,7 @@ export function computeKpis(year: string, sessions: SessionLike[], payments: Pay
    * Rovnaká slučka ako `poslednyUzavretyIdx` v rezerva.ts — importovať sa
    * nedá (rezerva.ts importuje odtiaľto, bol by kruh), tak je tu inline.
    */
-  const beziaci = new Date().toISOString().slice(0, 7);
+  const beziaci = dnesPraha().slice(0, 7);
   const idxCele = YEAR_IDX[year] ?? [];
   const idxUzavrete = idxCele.filter((i) => (VZAS_MONTHS[i] as string) < beziaci);
   const idx = idxUzavrete.length ? idxUzavrete : idxCele;

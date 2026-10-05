@@ -9,6 +9,7 @@ import { C, mix, S } from "../../lib/psb/theme";
 import { PNL, SPOLOCNE, VZAS_MONTHS } from "../../lib/psb/vzas";
 import { VyberKategorie } from "./VyberKategorie";
 import { Card, H3, Info, TableWrap } from "./ui";
+import { dnesPraha, posunDen } from "../../lib/psb/cas";
 
 // Import bankového výpisu — s náhľadom, nie naslepo.
 //
@@ -211,10 +212,7 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
    * okno, ktoré banka pustí bez pýtania.
    */
   const stiahniZBanky = async (od?: string, doDna?: string) => {
-    const dnes = new Date();
-    const pred90 = new Date(dnes.getTime() - 89 * 86400000);
-    const isoD = (d: Date) => d.toISOString().slice(0, 10);
-    if (!od && !doDna) { od = isoD(pred90); doDna = isoD(dnes); }
+    if (!od && !doDna) { doDna = dnesPraha(); od = posunDen(doDna, -89); }
     setBusy(true); setChyba(null); setVysledok(null);
     let r: { ok?: boolean; chyba?: string; error?: string; [k: string]: unknown };
     try {
@@ -289,7 +287,7 @@ export function BankovyImport({ vstup, onHotovo }: { vstup: string; onHotovo?: (
     : r.suma < 0 && !r.kategoria);
 
   const pridajRucne = () => {
-    const dnes = new Date().toISOString().slice(0, 10);
+    const dnes = dnesPraha();
     setNahlad((n) => [
       { id: `rucne:${dnes}:${Math.random().toString(36).slice(2, 9)}`, datum: dnes, suma: 0,
         protistrana: "", poznamka: "hotovosť — dopísané ručne", typ: "Hotovosť", kategoria: "" },

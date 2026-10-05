@@ -1,3 +1,4 @@
+import { dnesPraha } from "./cas";
 /**
  * DVOJITÝ VÝPOČET: to isté číslo dvoma cestami.
  *
@@ -126,7 +127,7 @@ export function porovnajDvojmo(
   /** Koľko mesiacov dozadu. Jerryho horizont sú dva. */
   kolko = 3,
   /** Dnešok — kvôli odrezaniu budúcnosti. */
-  dnes = new Date().toISOString().slice(0, 7),
+  dnes = dnesPraha().slice(0, 7),
   /** Rozdelenie na trénerov; prázdne, keď sa nesleduje. */
   trenerExport: StranaTrenera[] = [],
   trenerVlastne: StranaTrenera[] = [],

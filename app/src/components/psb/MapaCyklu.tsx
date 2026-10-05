@@ -19,6 +19,7 @@ import { ZaberUkazka } from "./ZaberUkazka";
 import { Sekvencia } from "./Sekvencia";
 import { ZABER_MAPA, ZABERY, zaberyPreFazu } from "../../lib/psb/zabery";
 import { CLAUDE_PROJECT } from "./Zadanie";
+import { dnesPraha } from "../../lib/psb/cas";
 
 /**
  * Mapa nákupného cyklu — čo už vyšlo a čo sa chystá, v čase a vo fázach.
@@ -68,7 +69,7 @@ type Vyber =
   | { druh: "novy"; mesiac: string; faza: number }
   | null;
 
-const dnesMesiac = () => new Date().toISOString().slice(0, 7);
+const dnesMesiac = () => dnesPraha().slice(0, 7);
 
 const nadpisOkna = (v: NonNullable<Vyber>) =>
   v.druh === "vyslo" ? "Zverejnený príspevok"

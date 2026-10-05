@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { terazPraha } from "../../lib/psb/cas";
+import { terazPraha, dnesPraha } from "../../lib/psb/cas";
 import type { D1Database, D1PreparedStatement } from "@cloudflare/workers-types";
 
 import { audit } from "../../lib/psb/audit.server";
@@ -52,10 +52,15 @@ type ZdrojStav = {
 type Ulozena = { uid: string; trener: string; zaciatok: string; koniec: string; nazov: string; klient: string | null; typ: string | null; zmizla_at: string | null; prvy_raz: string | null };
 
 function okno() {
-  const d = new Date();
-  const od = new Date(d.getTime() - DOZADU_DNI * 86400000);
-  const doM = new Date(d.getTime() + DOPREDU_DNI * 86400000);
-  return { odMs: od.getTime(), doMs: doM.getTime(), od: od.toISOString().slice(0, 16), do_: doM.toISOString().slice(0, 16) };
+  // Hranice v PRAŽSKOM čase — `kal_udalosti.zaciatok` nesie miestny čas bez
+  // pásma. A z TÝCH ISTÝCH reťazcov aj milisekundy pre `citajIcal`, ktorý
+  // miestny čas číta ako „…Z" (`naMs`): obe okná sa musia kryť, inak udalosti
+  // na okraji prídu z iCalu, ale v databáze ich niet → každý tréning by sa
+  // o 21 dní neskôr ohlásil ako „pribudol" (nález kontroly 5. 10. 2026).
+  const d = Date.now();
+  const od = terazPraha(new Date(d - DOZADU_DNI * 86400000));
+  const do_ = terazPraha(new Date(d + DOPREDU_DNI * 86400000));
+  return { od, do_, odMs: Date.parse(`${od}:00Z`), doMs: Date.parse(`${do_}:00Z`) };
 }
 
 /**
@@ -291,7 +296,7 @@ export const Route = createFileRoute("/api/kalendar")({
            */
           DB.prepare(
             "SELECT klient, zaciatok FROM kal_udalosti WHERE zmizla_at IS NULL AND klient IS NOT NULL AND typ IN ('trening','uvodny') AND zaciatok > ? AND zaciatok <= ? ORDER BY zaciatok",
-          ).bind(terazPraha(), new Date(Date.now() + 120 * 86400000).toISOString().slice(0, 16)).all(),
+          ).bind(terazPraha(), terazPraha(new Date(Date.now() + 120 * 86400000))).all(),
           // Guillermo tréningy MIMO okna: zostatok sedení sa počíta od kotvy
           // (napr. 9. 8.), ale okno udalostí siaha len 21 dní dozadu — tréning
           // starší by z počtu vypadol a zostatok by ticho narástol späť. Preto
@@ -341,7 +346,7 @@ export const Route = createFileRoute("/api/kalendar")({
          * v TypeScripte — JOIN mena s menom cez celú históriu je v D1 presne
          * ten kvadratický dopyt, ktorý appku už raz položil.
          */
-        const odKedy = new Date(Date.now() - 84 * 86400000).toISOString().slice(0, 10);
+        const odKedy = dnesPraha(new Date(Date.now() - 84 * 86400000));
         const [udalostiP, sedeniaP, prveSnimky] = await DB.batch([
           DB.prepare("SELECT klient, zaciatok, typ FROM kal_udalosti WHERE zmizla_at IS NULL AND klient IS NOT NULL AND zaciatok >= ?").bind(odKedy),
           DB.prepare("SELECT client_name, date, session_trainer FROM sessions WHERE date >= ?").bind(odKedy),
@@ -788,7 +793,7 @@ export const Route = createFileRoute("/api/kalendar")({
               stranu((kal.results as unknown as R[]) || [], "vlastne"),
               doDna,
               3,
-              new Date().toISOString().slice(0, 7),
+              dnesPraha().slice(0, 7),
               poTrenerovi((trenExp.results as unknown as T[]) || []),
               poTrenerovi((trenKal.results as unknown as T[]) || []),
             ),

@@ -9,6 +9,7 @@ import { pocetOtazok } from "../../lib/psb/otazky";
 import { nacitajDokument } from "./jarvis-dokument";
 import { blokyNaSpravu, type StreamBlok } from "../../lib/psb/chatBloky";
 import { brief } from "../../lib/psb/zamerania";
+import { dnesPraha } from "../../lib/psb/cas";
 
 // Sonnet 5 runs every normal turn — fast enough that the answer starts well inside
 // the ~30s gateway window. "Hlboká debata" swaps in Opus for the strategic
@@ -741,7 +742,7 @@ async function novinkyAlgoritmov(): Promise<string> {
   const { DB } = bindings();
   if (!DB) return "";
   try {
-    const od = new Date(Date.now() - 183 * 86400000).toISOString().slice(0, 10);
+    const od = dnesPraha(new Date(Date.now() - 183 * 86400000));
     const rs = await DB.prepare(
       `SELECT zdroj, titulok, url, datum FROM algo_novinky
         WHERE relevantne = 1 AND datum >= ?1 ORDER BY datum DESC LIMIT 25`,
@@ -772,7 +773,7 @@ async function nacitajPamat(): Promise<string> {
     ).all();
     const rows = rs.results as Record<string, string>[];
     if (!rows.length) return "";
-    const dnes = new Date().toISOString().slice(0, 10);
+    const dnes = dnesPraha();
     const riadky = rows.map((r) => {
       const dozrelo = r.stav === "otvoreny" && r.overit_do && r.overit_do <= dnes;
       return `- [${r.datum} · ${r.tema}] ${r.zaver}` +

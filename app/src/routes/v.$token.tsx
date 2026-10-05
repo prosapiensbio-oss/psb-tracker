@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { terazPraha } from "../lib/psb/cas";
+import { terazPraha, dnesPraha } from "../lib/psb/cas";
 import { obsahOdkazu } from "../lib/psb/obsahOdkazu.server";
 
 import { bindings } from "../lib/bindings.server";
@@ -74,7 +74,7 @@ export const Route = createFileRoute("/v/$token")({
               { den: "2026-10-02", cas: "16:00", popis: "tréning", druh: "trening", zostatok: 2, dlh: null },
               { den: "2026-10-03", cas: "16:00", popis: "tréning", druh: "trening", zostatok: 1, dlh: null },
             ],
-            zostatok: 0, hodinSpolu: 6, odkedy: "2026-09-09", dnes: new Date().toISOString().slice(0, 10),
+            zostatok: 0, hodinSpolu: 6, odkedy: "2026-09-09", dnes: dnesPraha(),
             platba: { popis: "6h Předplatné", suma: 6990, ucet: DODAVATEL.ucet, sprava: UKAZKA_KLIENT, odpocet: 0, novy: true },
             qrUrl: `data:${qrU.typ};base64,${btoa(binU)}`,
             pocitovka: blokPocitovky({ oblasti: ["bedra", "kolena"], zUvodneho: { bedra: 7, kolena: 5 } }),
@@ -339,7 +339,7 @@ export const Route = createFileRoute("/v/$token")({
         const poznamka = String(f.get("poznamka") ?? "").trim().slice(0, 1000);
         if (!oblasti.length && posun == null && !poznamka) return spat(false);
 
-        const dnes = new Date().toISOString().slice(0, 10);
+        const dnes = dnesPraha();
         await DB.prepare(
           `INSERT INTO klient_merania (id, klient, datum, oblasti_json, posun, poznamka, autor, created_at, zdroj)
            VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'klient', ?7, 'klient')

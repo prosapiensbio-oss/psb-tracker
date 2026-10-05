@@ -7,6 +7,7 @@ import { jeFaza } from "../../lib/psb/mapaCyklu";
 import { ODKLADISKO, jeFarba, jeVetva, vetvyMapy } from "../../lib/psb/mapaNapadov";
 import { jeMesiac as platnyMesiac } from "../../lib/psb/format";
 import { ZABER_MAPA } from "../../lib/psb/zabery";
+import { dnesPraha } from "../../lib/psb/cas";
 
 /**
  * Marketingové nápady.
@@ -333,7 +334,7 @@ export const Route = createFileRoute("/api/napady")({
             // Deň použitia sa zapíše sám pri prechode na „použitý" — nikto ho
             // nebude vypĺňať ručne a bez neho sa nedá povedať, za ako dlho sa
             // nápad premení na obsah.
-            const pouzite = stav === "pouzity" ? new Date().toISOString().slice(0, 10) : null;
+            const pouzite = stav === "pouzity" ? dnesPraha() : null;
             await DB.prepare(
               `UPDATE mkt_napady SET text = COALESCE(?23, text),
                  stav = COALESCE(?2, stav), poznamka = COALESCE(?3, poznamka),
@@ -367,7 +368,7 @@ export const Route = createFileRoute("/api/napady")({
           const zdroj = ZDROJE.has(String(b.zdroj)) ? String(b.zdroj) : "vlastny";
           const datum = /^\d{4}-\d{2}-\d{2}$/.test(String(b.datum))
             ? String(b.datum)
-            : new Date().toISOString().slice(0, 10);
+            : dnesPraha();
           const novy = `n${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
           const autor = (await currentUser(request)) || "";
 

@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import { isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
+import { dnesPraha } from "../../lib/psb/cas";
 
 // Čo sa mení v algoritmoch — z oficiálnych zdrojov, nie z blogov o marketingu.
 //
@@ -140,7 +141,7 @@ export const Route = createFileRoute("/api/algo")({
         const now = new Date().toISOString();
         // Staršie než rok nezaujímajú — zmena algoritmu spred roka už buď
         // zafungovala, alebo ju prevalcovala ďalšia.
-        const hranica = new Date(Date.now() - 365 * 86400000).toISOString().slice(0, 10);
+        const hranica = dnesPraha(new Date(Date.now() - 365 * 86400000));
         let pridane = 0, chybne = 0;
 
         for (const z of ZDROJE) {

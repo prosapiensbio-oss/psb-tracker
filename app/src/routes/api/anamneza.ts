@@ -7,6 +7,7 @@ import { FORMULAR } from "../../lib/psb/anamnezaFormular";
 import { podlaKlienta, predvyplnZapisu, ulozZapis, zalozAleboNajdi } from "../../lib/psb/anamneza.server";
 import { prevezmi, type StaryRiadok } from "../../lib/psb/anamnezaImport";
 import { zasifruj } from "../../lib/psb/sifra.server";
+import { dnesPraha } from "../../lib/psb/cas";
 
 /**
  * ANAMNÉZA — strana trénera.
@@ -51,9 +52,9 @@ export const Route = createFileRoute("/api/anamneza")({
          * zbytočná práca s citlivými dátami.
          */
         if (q.get("zoznam")) {
-          const dnes = new Date().toISOString().slice(0, 10);
-          const od = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
-          const doDna = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+          const dnes = dnesPraha();
+          const od = dnesPraha(new Date(Date.now() - 30 * 86400000));
+          const doDna = dnesPraha(new Date(Date.now() + 30 * 86400000));
           const origin = new URL(request.url).origin;
 
           const rs = await DB.prepare(

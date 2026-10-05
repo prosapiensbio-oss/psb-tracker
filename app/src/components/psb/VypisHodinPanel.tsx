@@ -6,6 +6,7 @@ import { C, mix } from "../../lib/psb/theme";
 import { cisloPreBranu, dlzkaSpravy, textSms } from "../../lib/psb/sms";
 import { hod, poslednychMesiacov, vypisAkoText, vypisHodin, zaciatokBalicka, stavPreSpravu } from "../../lib/psb/vypisHodin";
 import type { RiadokVypisu } from "../../lib/psb/vypisHodin";
+import { dnesPraha } from "../../lib/psb/cas";
 
 /**
  * Ten istý riadok, ale slovami pre klienta.
@@ -130,7 +131,7 @@ export function VypisHodinPanel({ meno, os, email, zostatokTeraz, trener = "", m
   const zobrazenyText = useMemo(() => vypisAkoText(v, meno), [v, meno]);
 
   /** Stav so znamienkom — `v.koniec` sa na nule zastaví (viď `stavPreSpravu`). */
-  const stav = useMemo(() => stavPreSpravu(v, new Date().toISOString().slice(0, 10)), [v]);
+  const stav = useMemo(() => stavPreSpravu(v, dnesPraha()), [v]);
   const navrhSms = useMemo(
     () => textSms({ oslovenie: meno.split(" ")[0], trener: trener || "Jerry", sMailom: true }),
     [meno, trener, stav],
@@ -182,7 +183,7 @@ export function VypisHodinPanel({ meno, os, email, zostatokTeraz, trener = "", m
           tempo,
           odkedy,
           mesiacov,
-          dnes: new Date().toISOString().slice(0, 10),
+          dnes: dnesPraha(),
           uplna,
           zaplateneSpolu: uplna ? v.zaplatene : undefined,
           dalsi,

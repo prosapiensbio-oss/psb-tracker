@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { terazPraha } from "../../lib/psb/cas";
+import { terazPraha, dnesPraha, polnocPrahaUtc } from "../../lib/psb/cas";
 import { obsahOdkazu } from "../../lib/psb/obsahOdkazu.server";
 import type { D1Database } from "@cloudflare/workers-types";
 
@@ -80,10 +80,11 @@ export async function posliHistoriu(DB: D1Database, menoZPredmetu: string, n: Na
   const { adresy } = adresyMailu([fa?.email || "", fa?.dalsie_maily || ""].join(","));
   if (!adresy.length) return { ok: false, preco: "klient nemá uloženú adresu" };
 
-  const dnesUTC = new Date().toISOString().slice(0, 10);
+  // `at` je UTC čas zápisu — porovnáva sa s okamihom pražskej polnoci.
+  const odPolnoci = polnocPrahaUtc();
   const uzDnes = await DB.prepare(
     "SELECT COUNT(*) n FROM vzas_audit WHERE action = 'historia-odoslana' AND payment_id LIKE ?1 AND at >= ?2",
-  ).bind(`${c.name} ·%`, dnesUTC).first<{ n: number }>();
+  ).bind(`${c.name} ·%`, odPolnoci).first<{ n: number }>();
   if ((uzDnes?.n || 0) > 0) return { ok: false, preco: "dnes už raz odišla" };
 
   /**
@@ -132,7 +133,7 @@ export async function nastavenia(DB: D1Database): Promise<Nast> {
     heslo: m.mail_heslo || "",
     // Bez dátumu by prvý beh čítal celú schránku. Týždeň dozadu stačí:
     // staršie dopyty sú už v appke prepísané ručne.
-    od: m.mail_od || new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10),
+    od: m.mail_od || dnesPraha(new Date(Date.now() - 7 * 864e5)),
     ignoruj: zoznam(m.mail_ignoruj),
     vlastne: [m.mail_user || "", ...zoznam(m.mail_vlastne)].filter(Boolean),
   };

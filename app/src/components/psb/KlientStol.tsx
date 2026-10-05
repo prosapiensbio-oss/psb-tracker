@@ -27,6 +27,7 @@ import { Dennik } from "./Dennik";
 import { Info } from "./ui";
 import { useUzke } from "./useUzke";
 import { zhrnutiePocitov, type Rad } from "../../lib/psb/pocitovka";
+import { dnesPraha } from "../../lib/psb/cas";
 
 /**
  * Pracovný stôl jedného klienta — vyhľadaj a rob na ňom.
@@ -62,7 +63,7 @@ type Platba = {
   vopred?: number | null;
 };
 
-const dnesISO = () => new Date().toISOString().slice(0, 10);
+const dnesISO = () => dnesPraha();
 
 export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onOverride, otvorKlienta, onOtvoreny, onFaktura, menoZvonku, setMenoZvonku , otvorVypis, onVypisOtvoreny, otvorAnamnezu, onAnamnezaOtvorena, onOtvorAnamnezu}: {
   clients: Record<string, ClientAgg>;
@@ -480,7 +481,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
    * Výpočet žije v `lib/psb/klientZdravie.ts`, aby ho mohla použiť aj
    * notifikácia a Jarvis, keď na to príde — dve kópie by sa raz rozišli.
    */
-  const dni = useCallback((n: number) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10), []);
+  const dni = useCallback((n: number) => dnesPraha(new Date(Date.now() - n * 86400000)), []);
 
   /**
    * Priemery klientely — RAZ nad všetkými, nie odvodené od otvoreného klienta.

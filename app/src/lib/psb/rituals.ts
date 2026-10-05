@@ -13,6 +13,7 @@
 // pôvodný zámer týždenných zápisov.
 
 import { weekKey, weekLabel } from "./format";
+import { denVTyzdniPraha, dnesPraha, mesiacPraha } from "./cas";
 
 export type Ritual = {
   id: string;
@@ -43,8 +44,6 @@ export type Ritual = {
 
 const PEOPLE = ["jerry", "terezka"] as const;
 
-const dvoj = (n: number) => String(n).padStart(2, "0");
-const mesiacKluc = (d: Date) => `${d.getFullYear()}-${dvoj(d.getMonth() + 1)}`;
 
 /**
  * Prvý deň, keď má zmysel pýtať si mesačnú uzávierku.
@@ -69,9 +68,6 @@ export function prvyVikendMesiaca(rok: number, mesiacOd0: number): Date {
   const doPiatku = den <= 4 ? 5 - den : 12 - den;
   return new Date(Date.UTC(rok, mesiacOd0, 1 + doPiatku));
 }
-
-/** Poradie dňa v týždni s pondelkom ako 1 a nedeľou ako 7. */
-const denVTyzdni = (d: Date) => d.getDay() || 7;
 
 /**
  * Pripomienky, ktoré už NEPATRIA do registra ani do „+ Zápis".
@@ -109,8 +105,12 @@ export function ritualy(
 ): Ritual[] {
   const nacitane = opts?.nacitane ?? true;
   const out: Ritual[] = [];
-  const den = denVTyzdni(dnes);
-  const denVMesiaci = dnes.getDate();
+  // Všetko podľa PRAŽSKÉHO dňa — ranná správa beží na serveri v UTC a medzi
+  // polnocou a druhou by tam bol ešte včerajšok (piatok by bol štvrtok).
+  const dD = dnesPraha(dnes);
+  const [rokP, mesP, denP] = dD.split("-").map(Number);
+  const den = denVTyzdniPraha(dnes);
+  const denVMesiaci = denP;
 
   // ── Týždenný ────────────────────────────────────────────────────────────
   // Zapisuje sa za PREBIEHAJÚCI týždeň, cez víkend. Piatok je najskorší deň,
@@ -129,7 +129,7 @@ export function ritualy(
   // nikdy nepripomenul (tak zostal prázdny týždeň 17. 8.). S väčším rozsahom
   // by sa zas nakopil stĺpec starých riadkov, čo je presne tá tapeta, ktorej
   // sa celý modul vyhýba.
-  const tw = weekKey(dnes.toISOString());
+  const tw = weekKey(dD);
   // Pondelok o týždeň skôr. Počíta sa v UTC z UTC polnoci, takže sa cez
   // zmenu času neposunie o deň.
   const twMinuly = weekKey(new Date(Date.parse(`${tw}T00:00:00Z`) - 7 * 86400_000).toISOString());
@@ -172,8 +172,7 @@ export function ritualy(
   // stalo: 4. augusta odznak zmizol, hoci júl bol stále prázdny. Pripomienka,
   // ktorá zmizne skôr než práca, je horšia než žiadna — tvári sa, že je
   // hotovo. Jeden trvalý riadok za jeden chýbajúci mesiac nie je tapeta.
-  const minuly = new Date(dnes.getFullYear(), dnes.getMonth() - 1, 1);
-  const mk = mesiacKluc(minuly);
+  const mk = mesiacPraha(dnes, -1);
   const zapis = monthNotes[mk];
   // Mesiac je zapísaný, keď naň odpovedal ČLOVEK.
   //
@@ -211,7 +210,7 @@ export function ritualy(
     // Ale NEZHASÍNA kalendárom, iba zápisom (viď komentár vyššie). Sú to dve
     // rôzne veci: kedy sa má začať pýtať a kedy má prestať. Prvá verzia ich
     // zliala do jedného a chýbajúci júl tak zmizol z obrazovky 4. augusta.
-    splatne: nacitane && !maMesiac && dnes.getTime() >= prvyVikendMesiaca(dnes.getFullYear(), dnes.getMonth()).getTime(),
+    splatne: nacitane && !maMesiac && dD >= prvyVikendMesiaca(rokP, mesP - 1).toISOString().slice(0, 10),
     hotove: maMesiac,
   });
 
@@ -233,18 +232,18 @@ export function ritualy(
       ? `Stav hotovosti ku koncu ${mk} je zapísaný.`
       : `Spočítaj obálku a zapíš stav hotovosti ku koncu ${mk} — treba to na uzávierku (účet aj bitcoin appka doplní sama).`,
     ciel: { tab: "workspace", sub: "uzavierka" },
-    splatne: nacitane && !hotovostHotova && dnes.getTime() >= prvyVikendMesiaca(dnes.getFullYear(), dnes.getMonth()).getTime(),
+    splatne: nacitane && !hotovostHotova && dD >= prvyVikendMesiaca(rokP, mesP - 1).toISOString().slice(0, 10),
     hotove: hotovostHotova,
   });
 
   // ── Kvartálny ───────────────────────────────────────────────────────────
   // Len v prvých desiatich dňoch po skončení kvartálu a s najnižšou
   // naliehavosťou — Jerry sám hovorí, že kvartál ho zaujíma najmenej.
-  const mesiac = dnes.getMonth();
+  const mesiac = mesP - 1;
   const poKvartali = mesiac % 3 === 0 && denVMesiaci <= 10;
   const kvartal = `Q${Math.floor(((mesiac + 11) % 12) / 3) + 1}`;
   out.push({
-    id: `kvartal-${dnes.getFullYear()}-${kvartal}`,
+    id: `kvartal-${rokP}-${kvartal}`,
     druh: "kvartal",
     nadpis: `Kvartálny pohľad ${kvartal}`,
     detail: "Prejdi ciele a KPI za kvartál — čo sa pohlo a čo sa nepohlo.",
@@ -296,7 +295,7 @@ export function ritualy(
   ];
   for (const k of KONTROLY) {
     out.push({
-      id: `kontrola-${k.id}-${mesiacKluc(dnes)}`,
+      id: `kontrola-${k.id}-${dD.slice(0, 7)}`,
       druh: "kontrola",
       trener: "Jerry",
       nadpis: k.nadpis,

@@ -11,6 +11,7 @@ import {
 } from "../../lib/psb/platbyEvidencia";
 import { balicekZPlatby } from "../../lib/psb/balicekZPlatby";
 import { dlhyKlientov } from "../../lib/psb/zaplatene";
+import { dnesPraha } from "../../lib/psb/cas";
 
 /**
  * Vlastná evidencia platieb: banka z výpisu, hotovosť zo zošita.
@@ -225,7 +226,7 @@ export const Route = createFileRoute("/api/platby")({
         const platby = ((vlastne.results || []) as unknown as PlatbaRiadok[]);
         const mapovanie: Record<string, string> = {};
         for (const m of ((mapa.results || []) as unknown as { vzor: string; klient: string }[])) mapovanie[m.vzor] = m.klient;
-        const poExport = String(((horizont.results || [])[0] as { den?: string } | undefined)?.den || new Date().toISOString().slice(0, 10));
+        const poExport = String(((horizont.results || [])[0] as { den?: string } | undefined)?.den || dnesPraha());
 
         /**
          * Odkedy sa porovnáva — a prečo to nie je „odjakživa".
@@ -239,7 +240,7 @@ export const Route = createFileRoute("/api/platby")({
          */
         const odMesiaca = String(
           (await DB.prepare("SELECT value FROM vzas_settings WHERE key = 'platby_od'").first<{ value: string }>())?.value || "",
-        ).replace(/"/g, "") || new Date().toISOString().slice(0, 7);
+        ).replace(/"/g, "") || dnesPraha().slice(0, 7);
 
         const ptPlatby = ((pt.results || []) as unknown as { client_name: string; date: string; amount_czk: number; payment_method: string }[])
           .map((p) => ({ klient: p.client_name, datum: p.date, suma: p.amount_czk, metoda: p.payment_method }));

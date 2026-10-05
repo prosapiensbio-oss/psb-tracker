@@ -21,7 +21,10 @@ describe("kedy stručne", () => {
   const dnes = new Date("2026-08-24T12:00:00Z");
   it("rozlíši dnes, včera a predvčerom", () => {
     expect(kedyStrucne("2026-08-24T08:00:00Z", dnes)).toBe("dnes");
-    expect(kedyStrucne("2026-08-23T22:00:00Z", dnes)).toBe("včera");
+    // 23. 8. 22:00 UTC je v Prahe už 24. 8. o polnoci — teda dnes (5. 10. 2026:
+    // dni podľa Prahy, nie UTC).
+    expect(kedyStrucne("2026-08-23T22:00:00Z", dnes)).toBe("dnes");
+    expect(kedyStrucne("2026-08-23T21:00:00Z", dnes)).toBe("včera");
     expect(kedyStrucne("2026-08-22T01:00:00Z", dnes)).toBe("predvčerom");
   });
 

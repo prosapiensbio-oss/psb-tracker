@@ -23,6 +23,7 @@
  */
 
 import { normName } from "./format";
+import { dnesPraha, terazPraha } from "./cas";
 
 export type Udalost =
   | { druh: "platba"; den: string; suma: number; metoda: string; poznamka?: string }
@@ -154,7 +155,7 @@ export function osCasuKlienta(
      */
     doplneniaHodiny?: Record<string, number>;
   },
-  dnes: string = new Date().toISOString().slice(0, 10),
+  dnes: string = dnesPraha(),
 ): Udalost[] {
   const k = normName(meno);
   const moje = <T extends { client: string }>(xs: T[]) => xs.filter((x) => normName(x.client) === k);

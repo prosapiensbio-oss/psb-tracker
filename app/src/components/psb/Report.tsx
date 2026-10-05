@@ -8,6 +8,7 @@ import { C, mix } from "../../lib/psb/theme";
 import { doSchranky } from "../../lib/psb/kopirovanie";
 import type { PSBData } from "../../lib/psb/types";
 import { Card, H3, Info, Select } from "./ui";
+import { dnesPraha } from "../../lib/psb/cas";
 
 // Report — appka po sebe napíše, ako jej to išlo, a text sa dá vziať preč.
 //
@@ -35,7 +36,7 @@ export function Report({
   register: RegisterItem[];
 }) {
   const mesiace = useMemo(() => dostupneMesiace(data), [data]);
-  const posledny = mesiace[mesiace.length - 1] || new Date().toISOString().slice(0, 7);
+  const posledny = mesiace[mesiace.length - 1] || dnesPraha().slice(0, 7);
 
   const [od, setOd] = useState(() => {
     const p = posunMesiac(posledny, -2);

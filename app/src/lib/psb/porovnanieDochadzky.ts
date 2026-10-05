@@ -39,6 +39,7 @@
  */
 
 import { normName, weekKey, weekLabel } from "./format";
+import { dnesPraha } from "./cas";
 
 export type TyzdenPorovnania = {
   tyzden: string;
@@ -100,7 +101,7 @@ export function porovnajTyzdne(
 
   // Okno: odkedy sa kalendáre čítajú, dokiaľ siaha export — a nikdy nie
   // dnešok ani budúcnosť (dnešný zápis do PTmindera ešte len príde).
-  const vcera = posun(new Date(dnes.getTime()).toISOString().slice(0, 10), -1);
+  const vcera = posun(dnesPraha(dnes), -1);
   const zaciatky = Object.values(kalendarOd).filter(Boolean).sort();
   const od = zaciatky[0] || "";
   const doExport = zapisy.length ? zapisy.reduce((a, z) => (z.den > a ? z.den : a), zapisy[0].den) : "";

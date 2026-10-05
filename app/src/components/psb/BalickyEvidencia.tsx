@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { RiadokPorovnania } from "../../lib/psb/balickyEvidencia";
 import { C, mix } from "../../lib/psb/theme";
 import { Card, H3, Info } from "./ui";
+import { dnesPraha } from "../../lib/psb/cas";
 
 /**
  * Vlastná evidencia balíčkov a jej porovnanie s PTminderom.
@@ -61,7 +62,7 @@ export function BalickyEvidencia({ mena, onFaktura, onVypis }: {
   const [hlaska, setHlaska] = useState("");
   const [pisem, setPisem] = useState(false);
   const [detail, setDetail] = useState(false);
-  const [f, setF] = useState({ klient: "", nazov: "", hodiny: "", platnostOd: new Date().toISOString().slice(0, 10), platnostDo: "", cenaCzk: "", poznamka: "" });
+  const [f, setF] = useState({ klient: "", nazov: "", hodiny: "", platnostOd: dnesPraha(), platnostDo: "", cenaCzk: "", poznamka: "" });
   /**
    * Čo sa práve zapísalo — kvôli ponuke faktúry.
    *

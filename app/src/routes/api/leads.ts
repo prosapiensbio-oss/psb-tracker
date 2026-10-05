@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
+import { dnesPraha } from "../../lib/psb/cas";
 
 // MUSÍ sedieť so SOURCES v Klienti.tsx. Revízia 18. 8. 2026 našla, že tu tri
 // hodnoty chýbali — a keďže neznámy zdroj sa ticho prepisuje na „ine", každý
@@ -57,7 +58,7 @@ export const Route = createFileRoute("/api/leads")({
           await audit(DB, { action: "zmazanie-dopytu", predmet: id, actor: await currentUser(request) || undefined });
           return Response.json({ ok: true, id });
         }
-        const date = typeof b.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(b.date) ? b.date : new Date().toISOString().slice(0, 10);
+        const date = typeof b.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(b.date) ? b.date : dnesPraha();
         const source = SOURCES.includes(String(b.source)) ? String(b.source) : "ine";
         const status = STATUSES.includes(String(b.status)) ? String(b.status) : "novy";
         await DB.prepare(

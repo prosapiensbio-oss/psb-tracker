@@ -5,6 +5,7 @@ import { fetchMonthNotes, saveMonthNote } from "../../lib/psb/client";
 import { monthLabel } from "../../lib/psb/format";
 import { C, mix } from "../../lib/psb/theme";
 import { Modal } from "./ui";
+import { dnesPraha } from "../../lib/psb/cas";
 
 /**
  * Mesačná správa do kroniky po zamknutí mesiaca.
@@ -72,7 +73,7 @@ export function SpravaMesiaca({
     setUklada(true);
     const n = await fetchMonthNotes();
     const stara = n[mesiac]?.note || "";
-    const dnes = new Date().toISOString().slice(0, 10);
+    const dnes = dnesPraha();
     const blok = `── Mesačná správa (${dnes}) ──\n${t}`;
     const ok = await saveMonthNote(mesiac, [stara, blok].filter(Boolean).join("\n\n"), n[mesiac]?.answers || {}, "jarvis+jerry");
     oznam("zapisy");

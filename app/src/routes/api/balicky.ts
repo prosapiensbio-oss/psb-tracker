@@ -8,6 +8,7 @@ import { bindings } from "../../lib/bindings.server";
 import { porovnajBalicky, type Balicek, type PtBalicek } from "../../lib/psb/balickyEvidencia";
 import { hodinZNazvuBalicka } from "../../lib/psb/klientOsCasu";
 import { jeMesiac } from "../../lib/psb/format";
+import { dnesPraha } from "../../lib/psb/cas";
 
 /**
  * Vlastná evidencia balíčkov — a jej porovnanie s PTminderom.
@@ -70,7 +71,7 @@ async function nacitaj(DB: D1Database) {
       riadky.map(naBalicek),
       ptZoznam,
       (udalosti.results || []) as unknown as { klient: string | null; zaciatok: string; typ: string | null }[],
-      new Date().toISOString().slice(0, 10),
+      dnesPraha(),
       String(((horizont.results || [])[0] as { den?: string } | undefined)?.den || "") || undefined,
     ),
   };
@@ -283,7 +284,7 @@ export const Route = createFileRoute("/api/balicky")({
          * druhý balíček z Kokpitu s tým istým dňom začiatku.
          */
         if (akcia === "automaticky") {
-          const dnes = new Date().toISOString().slice(0, 10);
+          const dnes = dnesPraha();
           const navrhy = await navrhyNovychBalickov(DB, dnes);
           const vznikli: { klient: string; nazov: string; od: string; navrat: boolean }[] = [];
           for (const n of navrhy) {

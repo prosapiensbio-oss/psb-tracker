@@ -1,4 +1,5 @@
 import { breakEvenRad, poslednyMesiacSDatami, VZAS_MONTHS } from "./vzas";
+import { dnesPraha } from "./cas";
 
 /**
  * Rezerva — koľko mesiacov firma ustojí bez jedinej tržby.
@@ -27,7 +28,7 @@ import { breakEvenRad, poslednyMesiacSDatami, VZAS_MONTHS } from "./vzas";
  */
 export function poslednyUzavretyIdx(): number {
   let i = poslednyMesiacSDatami();
-  const beziaci = new Date().toISOString().slice(0, 7);
+  const beziaci = dnesPraha().slice(0, 7);
   while (i > 0 && (VZAS_MONTHS[i] as string) >= beziaci) i--;
   if ((VZAS_MONTHS[i] as string) >= beziaci) i = poslednyMesiacSDatami();
   return i;

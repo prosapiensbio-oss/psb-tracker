@@ -1,6 +1,7 @@
 import type { Udalost } from "./klientOsCasu";
 import { denVTyzdni } from "./format";
 import { nazovProduktu } from "./nazvyProduktov";
+import { dnesPraha } from "./cas";
 
 /**
  * VÝPIS HODÍN — čo klient kúpil, čo odtrénoval a koľko mu zostáva.
@@ -136,7 +137,7 @@ const popisZ = (u: Udalost): string => {
 };
 
 /** Posledný balíček s hodinami, ktorý už platí. */
-export function poslednyBalicek(os: Udalost[], dnes = new Date().toISOString().slice(0, 10)) {
+export function poslednyBalicek(os: Udalost[], dnes = dnesPraha()) {
   let naj: Extract<Udalost, { druh: "balicekOd" }> | null = null;
   for (const u of os) {
     if (u.druh !== "balicekOd" || u.den > dnes || u.doplnenie || !u.hodin) continue;
@@ -145,7 +146,7 @@ export function poslednyBalicek(os: Udalost[], dnes = new Date().toISOString().s
   return naj;
 }
 
-export function zaciatokBalicka(os: Udalost[], dnes = new Date().toISOString().slice(0, 10)): string {
+export function zaciatokBalicka(os: Udalost[], dnes = dnesPraha()): string {
   return poslednyBalicek(os, dnes)?.den || "";
 }
 
@@ -256,7 +257,7 @@ export type StavRiadku = {
 export function priebehBalickov(
   os: Udalost[],
   zostatokTeraz: number | null = null,
-  dnes = new Date().toISOString().slice(0, 10),
+  dnes = dnesPraha(),
 ): { stavy: Map<Udalost, StavRiadku>; koniec: number | null } {
   const rad = vCase(os).filter((u) => u.den <= dnes);
   const stavy = new Map<Udalost, StavRiadku>();
@@ -631,7 +632,7 @@ export function priebehBalickov(
  *                      radšej prázdny stĺpec než vymyslené číslo.
  */
 export function vypisHodin(os: Udalost[], od = "", doDna = "", zostatokTeraz: number | null = null): Vypis {
-  const dnes = doDna || new Date().toISOString().slice(0, 10);
+  const dnes = doDna || dnesPraha();
   const { stavy, koniec: konecnyZostatok } = priebehBalickov(os, zostatokTeraz, dnes);
   const vsetko = vCase(os);
 
@@ -688,7 +689,7 @@ export function vypisHodin(os: Udalost[], od = "", doDna = "", zostatokTeraz: nu
 }
 
 /** Obdobie „posledné N mesiace" ako dvojica dátumov. */
-export function poslednychMesiacov(n: number, dnes = new Date().toISOString().slice(0, 10)): { od: string; do: string } {
+export function poslednychMesiacov(n: number, dnes = dnesPraha()): { od: string; do: string } {
   const d = new Date(`${dnes}T12:00:00Z`);
   d.setUTCMonth(d.getUTCMonth() - n);
   return { od: d.toISOString().slice(0, 10), do: dnes };

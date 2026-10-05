@@ -1,3 +1,4 @@
+import { dnesPraha } from "./cas";
 // Zostatok sedení u Guillerma (FP Spain) — JEDNA definícia pre kartu aj pre
 // Jarvisov kontext.
 //
@@ -26,7 +27,7 @@ export type GuillermoStav = {
 export function guillermoZostatok(
   zaznamy: GuillermoZaznam[],
   udalosti: GuillermoUdalost[],
-  dnesISO: string = new Date().toISOString().slice(0, 10),
+  dnesISO: string = dnesPraha(),
 ): GuillermoStav {
   const kotva = zaznamy
     .filter((z) => z.druh === "zostatok")

@@ -10,6 +10,7 @@ import { pravidelneNaklady, predikciaNakladov, vzasVerzia } from "../../lib/psb/
 import type { PSBData } from "../../lib/psb/types";
 import type { NavFocus } from "./App";
 import { BarRow, Card, Empty, H3, Info, LineChart, Select, SortTh, StatCard, SubTabs, TableWrap, useSort, ValueBars } from "./ui";
+import { dnesPraha } from "../../lib/psb/cas";
 
 const MAX_SESSIONS_MONTH = 260;
 
@@ -343,7 +344,7 @@ function Sedenia({ monthly }: { monthly: Monthly }) {
   // nadol, akoby bol plný mesiac (revízia 19. 8. 2026, rodina kotvy dát).
   // Súčty ("Sedení spolu", "Prijaté spolu") bežiaci mesiac obsahujú — sú to
   // súčty za obdobie, nie hodnotenie mesiaca.
-  const beziaciMes = new Date().toISOString().slice(0, 7);
+  const beziaciMes = dnesPraha().slice(0, 7);
   const uzavrete = view.filter((m) => m.month < beziaciMes);
   const zaklad = uzavrete.length ? uzavrete : view;
   const sessTotal = view.reduce((a, m) => a + m.sessions, 0);

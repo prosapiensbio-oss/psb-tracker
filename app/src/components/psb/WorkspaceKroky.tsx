@@ -23,6 +23,7 @@ import { menoDoBloku, rozlozUdalosti } from "../../lib/psb/kalendarRozlozenie";
 import type { PSBData } from "../../lib/psb/types";
 import { otazkyPlatieb, zoznamSms, type OtazkaPlatby } from "../../lib/psb/workspaceKroky";
 import { SmsKlientovi } from "./SmsKlientovi";
+import { dnesPraha } from "../../lib/psb/cas";
 
 export type BalicekRiadokKroku = {
   id?: string; klient: string; nazov: string; hodiny: number | null; platnost_od: string;
@@ -203,7 +204,7 @@ export function TyzdenKalendara({ den, trener, zvyraznenia }: { den: string; tre
   // riadkom, nie pracovná plocha — má ukázať, kde v týždni to je.
   const VYSKA = 23;
   const PAS = 30;
-  const dnesIso = new Date().toISOString().slice(0, 10);
+  const dnesIso = dnesPraha();
   // Farba nesie typ, ako v karte Kalendár.
   const farba = (b: Blok) => b.typ === "uvodny" ? C.blue
     : b.typ === "guillermo" ? C.green
@@ -318,7 +319,7 @@ export function KrokSms({ clients, dlhy, udalosti, balicky, platby, trener, onPo
 
   const riadky = useMemo(() => {
     if (!odoslane) return [];
-    const dnes = new Date().toISOString().slice(0, 10);
+    const dnes = dnesPraha();
     const terazIso = new Date().toISOString();
     /**
      * POSLEDNÁ ZMENA STAVU — tréning, ktorý sa začal, platba, balíček.
@@ -412,8 +413,8 @@ export function FioPrijmy({ onZapisane }: { onZapisane: () => void }) {
 
   const stiahni = async () => {
     setBezi(true); setChyba(""); setVysledok(null);
-    const doDna = new Date().toISOString().slice(0, 10);
-    const od = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+    const doDna = dnesPraha();
+    const od = dnesPraha(new Date(Date.now() - 30 * 86400000));
     const j = await posli("/api/fio", { akcia: "stiahni", od, do: doDna });
     if (!j.ok) { setBezi(false); setChyba(String(j.chyba || j.error || "Fio sa nestiahlo.")); return; }
     type R = { datum: string; suma: number; protistrana?: string; poznamka?: string; uzMame?: boolean; zamknuty?: boolean };

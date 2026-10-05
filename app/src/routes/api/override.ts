@@ -6,6 +6,7 @@ import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 import { setOverride } from "../../lib/psb/db.server";
 import type { ClientOverride } from "../../lib/psb/types";
+import { dnesPraha } from "../../lib/psb/cas";
 
 const ALLOWED = new Set<keyof ClientOverride>([
   "status",
@@ -107,7 +108,7 @@ export const Route = createFileRoute("/api/override")({
          */
         const zapisane: Record<string, unknown> = { [key]: value };
         if (key === "balicekZostatok" && ulozene) {
-          const den = value == null || value === "" ? "" : new Date().toISOString().slice(0, 10);
+          const den = value == null || value === "" ? "" : dnesPraha();
           await setOverride(DB, name, "balicekKDatumu" as keyof ClientOverride, den);
           zapisane.balicekKDatumu = den;
         }

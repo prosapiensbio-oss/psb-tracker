@@ -1,3 +1,4 @@
+import { mesiacPraha } from "./cas";
 /**
  * Google — GA4 a Search Console.
  *
@@ -178,8 +179,7 @@ export function normProperty(s: string): string {
 
 /** Prvý deň mesiaca `n` mesiacov dozadu — `YYYY-MM-DD`, na rozsah sťahu. */
 export function odKedy(dnes: Date, mesiacov: number): string {
-  const d = new Date(Date.UTC(dnes.getUTCFullYear(), dnes.getUTCMonth() - mesiacov + 1, 1));
-  return d.toISOString().slice(0, 10);
+  return `${mesiacPraha(dnes, -mesiacov + 1)}-01`;
 }
 
 /**

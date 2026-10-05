@@ -5,6 +5,7 @@ import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 import { odKedy } from "../../lib/psb/google";
+import { dnesPraha } from "../../lib/psb/cas";
 import {
   nastavenie, servisnyUcet, ulozNastavenie, ziskajToken,
 } from "../../lib/psb/googleAuth.server";
@@ -201,7 +202,7 @@ export const Route = createFileRoute("/api/google-ads")({
           const od = odKedy(new Date(), MESIACOV);
           // Koniec rozsahu je dnes. Google chce ohraničenie z OBOCH strán —
           // otvorený rozsah odmietne s EXPECTED_FILTERS_ON_DATE_RANGE.
-          const poKedy = new Date().toISOString().slice(0, 10);
+          const poKedy = dnesPraha();
           const teraz = new Date().toISOString();
 
           // Účty sa objavia samy. Prepisovanie ID z hlavy bolo pri Mete

@@ -11,6 +11,7 @@ import { vlastnikKlienta } from "./zaskok";
 import { sedeniaMimoKalendara } from "./mimoKalendara";
 import { BARTER_KLIENTI } from "./vzas";
 import { podozriveCisla, type Podiel } from "./kontrolaDat";
+import { dnesPraha, terazPraha, posunDen } from "./cas";
 import type {
   Lead,
   PackageRow,
@@ -89,7 +90,7 @@ const lastWeekKeys = (ref: Date): Set<string> => {
   const set = new Set<string>();
   for (let i = 0; i < SEG_WEEKS; i++) {
     const d = new Date(ref.getTime() - i * 7 * 86400000);
-    set.add(weekKey(d.toISOString()));
+    set.add(weekKey(dnesPraha(d)));
   }
   return set;
 };
@@ -264,7 +265,7 @@ function prazdnyKlient(meno: string, den: string): ClientAgg {
 export function deriveClients(data: PSBData): Record<string, ClientAgg> {
   // Šesť mesiacov: dosť dlho na to, aby jeden zástup nerozhodol, a dosť krátko
   // na to, aby sa zmena trénera prejavila v tej istej sezóne.
-  const hranicaNedavnych = new Date(Date.now() - 183 * 86400000).toISOString().slice(0, 10);
+  const hranicaNedavnych = dnesPraha(new Date(Date.now() - 183 * 86400000));
 
   const ref = refNow(data);
   const window = lastWeekKeys(ref);
@@ -511,7 +512,7 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
      * tie sa sem nedostanú. A prebíja LEN členstvo s ZNÁMYM koncom v minulosti
      * — riadok starého formátu bez dátumov nechá výber tak, ako bol.
      */
-    const dnesVyber = new Date().toISOString().slice(0, 10);
+    const dnesVyber = dnesPraha();
     const ziveDoplnky = packs.filter((p) => jeDoplnok(p.package) && p.remaining > 0);
     const clenstvaPoPlatnosti = skutocne.length > 0 && skutocne.every((p) => !!p.validTo && p.validTo < dnesVyber);
     const zdroj = clenstvaPoPlatnosti && ziveDoplnky.length ? ziveDoplnky : skutocne.length ? skutocne : packs;
@@ -527,7 +528,7 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
     // added) pred starším → a až pri riadkoch úplne bez dátumov (starý formát
     // exportu) zostáva pôvodná heuristika zostatku. Tú ambiguitu vyrieši až
     // nový upload — dnešný export dátumy nesie.
-    const dnesPack = new Date().toISOString().slice(0, 10);
+    const dnesPack = dnesPraha();
     const platnyDnes = (p: typeof zdroj[number]) =>
       !!p.validFrom && !!p.validTo && p.validFrom <= dnesPack && dnesPack <= p.validTo ? 1 : 0;
     const datumPack = (p: typeof zdroj[number]) => p.validFrom || p.added || "";
@@ -964,7 +965,7 @@ export function vytazenieSpolu(capacity: Pick<CapacityRow, "recentWeekly" | "bus
 export function capacityByTrainer(
   clients: Record<string, ClientAgg>,
   sessions: SessionRow[],
-  dnes: string = new Date().toISOString().slice(0, 10),
+  dnes: string = dnesPraha(),
 ): CapacityRow[] {
   const koniecTyzdna = (pondelok: string) => {
     const d = new Date(`${pondelok}T00:00:00Z`);
@@ -1424,12 +1425,12 @@ export function poslednyTrening(
     podlaMena[normName(c.name)] = c.name;
   }
   const zrusene = zruseneTreningy(zmeny);
-  const den = dnes.toISOString().slice(0, 10);
+  const den = dnesPraha(dnes);
   for (const u of udalosti || []) {
     if ((u.typ !== "trening" && u.typ !== "uvodny") || !u.klient) continue;
     const d = (u.zaciatok || "").slice(0, 10);
     // Tréning, ktorý sa ešte len chystá, nie je dôkaz o ničom.
-    if (!d || d > den || (d === den && Date.parse(u.zaciatok) > dnes.getTime())) continue;
+    if (!d || d > den || (d === den && u.zaciatok.slice(0, 16) > terazPraha(dnes))) continue;
     const kluc = normName(u.klient);
     if (zrusene.has(`${kluc}|${d}`)) continue;
     const meno = podlaMena[kluc];
@@ -1542,7 +1543,7 @@ export function nepotvrdeneTreningy(
   const zrusene = zruseneTreningy(zmeny);
   const zapisane = new Set(sedenia.map((s) => `${normName(s.client)}|${s.date.slice(0, 10)}`));
   const posun = (d: string, o: number) => new Date(Date.parse(`${d}T00:00:00Z`) + o * 86400_000).toISOString().slice(0, 10);
-  const den = dnes.toISOString().slice(0, 10);
+  const den = dnesPraha(dnes);
   const out: NepotvrdenyTrening[] = [];
   const videne = new Set<string>();
   for (const u of udalosti || []) {
@@ -1757,15 +1758,18 @@ export function neznameUdalosti(
   udalosti: { zaciatok: string; koniec?: string; typ: string | null; nazov?: string; trener?: string }[] | undefined,
   dnes: Date = new Date(),
 ): { trener: string; nazvy: string[]; pocet: number; hodin: number }[] {
-  const pon = new Date(Date.parse(`${dnes.toISOString().slice(0, 10)}T00:00:00Z`));
-  pon.setUTCDate(pon.getUTCDate() - ((pon.getUTCDay() || 7) - 1));
-  const do_ = new Date(pon.getTime() + 7 * 86400000);
+  // Pražský týždeň ako reťazce dní — `zaciatok` je miestny čas bez pásma
+  // a `Date.parse` ho na serveri (UTC) a v prehliadači číta inak.
+  const dnesD = dnesPraha(dnes);
+  const ponD = posunDen(dnesD, -((new Date(`${dnesD}T12:00:00Z`).getUTCDay() || 7) - 1));
+  const doD = posunDen(ponD, 7);
 
   const podla: Record<string, { nazvy: Set<string>; pocet: number; hodin: number }> = {};
   for (const u of udalosti || []) {
     if (u.typ) continue;                       // pozná ho — netreba nič
+    const dU = u.zaciatok.slice(0, 10);
+    if (!(dU >= ponD && dU < doD)) continue;
     const t = Date.parse(u.zaciatok);
-    if (!(t >= pon.getTime() && t < do_.getTime())) continue;
     const kto = String(u.trener || "").trim() || "—";
     const z = podla[kto] || (podla[kto] = { nazvy: new Set(), pocet: 0, hodin: 0 });
     z.nazvy.add(String(u.nazov || "(bez názvu)").trim());
@@ -1783,7 +1787,7 @@ export function udalostiBezMena(
   udalosti: { zaciatok: string; klient: string | null; typ: string | null; nazov?: string; trener?: string }[] | undefined,
   dnes: Date = new Date(),
 ): { nazov: string; datum: string; typ: string; trener: string | null }[] {
-  const den = dnes.toISOString().slice(0, 10);
+  const den = dnesPraha(dnes);
   return (udalosti || [])
     // Úvodný, ktorého meno sa dá prečítať z názvu, sa hlási ako NOVÝ KLIENT —
     // to je tá istá vec povedaná užitočnejšie.
@@ -1830,7 +1834,7 @@ export function cakajuciKlienti(
 ): CakajuciKlient[] {
   const zname = new Set(Object.keys(clients).map(normName));
   const zrusene = zruseneTreningy(zmeny);
-  const den = dnes.toISOString().slice(0, 10);
+  const den = dnesPraha(dnes);
   const najdene: Record<string, CakajuciKlient> = {};
   for (const u of udalosti || []) {
     /**
@@ -1852,7 +1856,7 @@ export function cakajuciKlienti(
     if (!meno) continue;
     const d = (u.zaciatok || "").slice(0, 10);
     // Úvodný, ktorý sa ešte nekonal, nikoho klientom nerobí.
-    if (!d || d > den || (d === den && Date.parse(u.zaciatok) > dnes.getTime())) continue;
+    if (!d || d > den || (d === den && u.zaciatok.slice(0, 16) > terazPraha(dnes))) continue;
     const k = normName(meno);
     if (zrusene.has(`${k}|${d}`) || zname.has(k)) continue;
     // Fuzzy zhoda podrží preklep aj diakritiku — Prochadzka verzus Procházka.
@@ -1890,7 +1894,7 @@ export function najblizsiTermin(
   udalosti: { zaciatok: string; klient: string | null; typ: string | null; zmizlaAt?: string | null }[] | undefined,
   dnes: Date = new Date(),
 ): string | null {
-  const od = dnes.toISOString().slice(0, 10);
+  const od = dnesPraha(dnes);
   const buduce = (udalosti || [])
     .filter((u) => (u.typ === "trening" || u.typ === "uvodny") && !u.zmizlaAt && u.klient
       && normName(u.klient) === normName(meno) && u.zaciatok.slice(0, 10) >= od)
@@ -1940,7 +1944,7 @@ export function zaverUzMaTermin(
   // Krátke mená sa v texte trafia náhodou — preto aspoň päť znakov.
   const meno = menaKlientov.find((n) => normName(n).length >= 5 && text.includes(normName(n)));
   if (!meno) return null;
-  const od = dnes.toISOString().slice(0, 10);
+  const od = dnesPraha(dnes);
   // Termín sa počíta, aj keď udalosť ešte NIE JE zmapovaná: budúci tréning
   // pod skratkou „Lukas H." patrí Lukasovi rovnako ako zmapovaný. Bez tohto
   // sa appka pýtala „má Lukas ďalší termín?", hoci ho mala v kalendári —
@@ -1986,7 +1990,7 @@ export function zaverKryjeKlienta(
   meno: string,
   dnes: Date = new Date(),
 ): { id: string; datum: string; zaver: string; plati_do: string } | null {
-  const dnesStr = dnes.toISOString().slice(0, 10);
+  const dnesStr = dnesPraha(dnes);
   const ciel = normName(meno);
   // Krátke mená sa v texte trafia náhodou — rovnaká poistka ako inde.
   if (ciel.length < 5) return null;
@@ -2018,7 +2022,7 @@ export function deriveAnomalies(
 
   const serviceClients = new Set(data.services.map((s) => s.client));
   const now = new Date();
-  const dnesISO = now.toISOString().slice(0, 10);
+  const dnesISO = dnesPraha(now);
   // Kalendár má rovnaké slovo ako export — a hovorí skôr.
   const posledny = poslednyTrening(clients, kal?.udalosti, kal?.zmeny, now);
 
@@ -2047,10 +2051,10 @@ export function deriveAnomalies(
     if (!c.narodeniny || c.status === "Neaktívny") continue;
     const md = c.narodeniny.slice(5); // MM-DD
     if (!/^\d{2}-\d{2}$/.test(md)) continue;
-    const rok = now.getUTCFullYear();
+    const rok = Number(dnesPraha(now).slice(0, 4));
     // Narodeniny v decembri a dnešok v januári: najbližší výskyt je vlani.
     const kandidati = [rok - 1, rok, rok + 1].map((r) => Date.parse(`${r}-${md}T00:00:00Z`));
-    const dnesUTC = Date.parse(`${now.toISOString().slice(0, 10)}T00:00:00Z`);
+    const dnesUTC = Date.parse(`${dnesPraha(now)}T00:00:00Z`);
     const najblizsie = kandidati
       .map((t) => ({ t, dni: Math.round((t - dnesUTC) / 86400000) }))
       .filter((x) => x.dni >= 0)
@@ -2195,7 +2199,7 @@ export function deriveAnomalies(
   //
   // Záver sa NEZATVÁRA, len sa nehlási. Keď sa termín z kalendára stratí,
   // pripomienka sa vráti sama — presne vtedy, keď je zase pravdivá.
-  const dnes = new Date().toISOString().slice(0, 10);
+  const dnes = dnesPraha();
   const menaKlientov = Object.keys(clients);
   for (const z of data.zavery || []) {
     if (!z.overitDo || z.overitDo > dnes) continue;
@@ -2297,7 +2301,7 @@ export function deriveAnomalies(
     // Kľúč nesie mesiac, nie deň: inak by sa odloženie umlčalo o deň neskôr
     // a pripomienka by prišla znova zajtra.
     push(
-      `vedomost|${v.id}|${new Date().toISOString().slice(0, 7)}`,
+      `vedomost|${v.id}|${dnesPraha().slice(0, 7)}`,
       "blue",
       "Rešerš treba obnoviť",
       `„${v.nazov}" má ${dni} dní a mala sa obnovovať po ${v.obnovovatPoDnoch}. ${v.oCom} `
@@ -2408,7 +2412,7 @@ export function stavPolozkyRegistra(
   }
   const m = /^odlozene\|(\d{4}-\d{2}-\d{2})\|?([\s\S]*)$/.exec(z.note || "");
   if (!m) return { acked: true, note: z.note, rodina, kto: z.actor || undefined };
-  const den = dnes.toISOString().slice(0, 10);
+  const den = dnesPraha(dnes);
   // Dátum už prešiel → položka sa vracia medzi živé, aj s poznámkou prečo.
   if (m[1] <= den) return { acked: false, note: `odložené na ${m[1]}${m[2] ? ` — ${m[2]}` : ""}`, vratene: true, rodina };
   return { acked: true, note: `odložené do ${m[1]}${m[2] ? ` — ${m[2]}` : ""}`, rodina };
@@ -2792,7 +2796,7 @@ export function dnesneTreningy(
   const stavPolozky = (key: string, rodina?: string) => stavPolozkyRegistra(key, ack, rodina, dnes);
   const kalUdalosti = kal?.udalosti || [];
   const kalZmeny = kal?.zmeny;
-    const dnesIso = new Date().toISOString().slice(0, 10);
+    const dnesIso = dnesPraha(dnes);
     // Zrušené sa nehlási. Google Kalendár appka prečíta sama (zmiznutá
     // udalosť sa sem vôbec nedostane), ale zrušenie zapísané ručne
     // v Kalendári dovtedy nikto okrem Kalendára nečítal — a appka ďalej
@@ -2912,7 +2916,7 @@ export function deriveRegister(
   // rozdiel medzi „nič sa nedialo" a „nič sme nenahrali" ešte zistiteľný.
   const posledneData = data.sessions.reduce((m, s) => (s.date > m ? s.date : m), "");
   if (posledneData) {
-    const dniStare = Math.floor(daysBetween(posledneData, new Date()));
+    const dniStare = Math.floor(daysBetween(posledneData.slice(0, 10), dnesPraha()));
     if (dniStare >= 4) {
       add(
         `data|${posledneData.slice(0, 10)}`,
@@ -3123,7 +3127,7 @@ export function deriveRegister(
       }
     }
     if (nejasne.length) {
-      const key = `nezname|${n.trener}|${weekKey(new Date().toISOString())}`;
+      const key = `nezname|${n.trener}|${weekKey(dnesPraha())}`;
       const mena = nejasne.slice(0, 6).join(", ") + (nejasne.length > 6 ? `, +${nejasne.length - 6}` : "");
       add(
         key,
@@ -3178,7 +3182,7 @@ export function deriveRegister(
     if (l.status !== "novy" || String(l.odpovedaneAt || "").trim()) continue;
     const den = String(l.date || "").slice(0, 10);
     if (!den) continue;
-    const dni = Math.floor(daysBetween(den, dnesOdpoved));
+    const dni = Math.floor(daysBetween(den, dnesPraha(dnesOdpoved)));
     if (dni < 0 || dni > 14) continue;
     const meno = String(l.name || "").trim() || String(l.email || "").trim() || "(bez mena)";
     const odkial = l.source === "mail" ? "mailom na info@"
@@ -3678,7 +3682,7 @@ export function tokyKlientov(data: PSBData, clients: Record<string, ClientAgg>, 
   // Uzavretý mesiac sa riadi KOTVOU DÁT, nie kalendárom. Keď PTminder nie je
   // nahratý mesiac dozadu, kalendárne „uzavretý" mesiac je v dátach prázdny —
   // a nula príchodov by sa čítala ako „nikto neprišiel" namiesto „nevieme".
-  const beziaci = new Date().toISOString().slice(0, 7);
+  const beziaci = dnesPraha().slice(0, 7);
   const plny = kotvaDat(data).plny || beziaci;
   // Priemer sa delí KALENDÁRNYMI mesiacmi okna, nie mesiacmi prítomnými
   // v mape. Mesiac bez jediného príchodu aj odchodu (10/2025) v mape vôbec
@@ -3972,7 +3976,7 @@ export function odmlcaniKlienti(
   opts?: { trener?: (t: string | null | undefined) => boolean; dnes?: number; zmeny?: ZmenaVKalendari[] },
 ): OdmlcanyKlient[] {
   const teraz = opts?.dnes ?? Date.now();
-  const den = new Date(teraz).toISOString().slice(0, 10);
+  const den = dnesPraha(new Date(teraz));
   // Tá istá odpoveď ako v registri: kalendár vie skôr než export.
   const posledny = poslednyTrening(clients, udalosti, opts?.zmeny, new Date(teraz));
   const maTermin = new Set(
@@ -4088,7 +4092,7 @@ export function bezDohodnutehoTerminu(
 ): BezTerminu[] {
   const dnes = opts?.dnes ?? new Date();
   const teraz = dnes.getTime();
-  const den = dnes.toISOString().slice(0, 10);
+  const den = dnesPraha(dnes);
   const posledny = poslednyTrening(clients, udalosti, opts?.zmeny, dnes);
   // Termín dopredu = človek je zapísaný, nie je čo riešiť. Zrušená udalosť
   // sa nepočíta: zrušený termín je presne ten prípad, keď treba dohodnúť nový.
@@ -4096,11 +4100,11 @@ export function bezDohodnutehoTerminu(
   const maTermin = new Set(
     (udalosti || [])
       .filter((u) => (u.typ === "trening" || u.typ === "uvodny") && u.klient)
-      .filter((u) => u.zaciatok.slice(0, 10) >= den && Date.parse(u.zaciatok) >= teraz)
+      .filter((u) => u.zaciatok.slice(0, 10) >= den && u.zaciatok.slice(0, 16) >= terazPraha(dnes))
       .filter((u) => !zrusene.has(`${normName(u.klient as string)}|${u.zaciatok.slice(0, 10)}`))
       .map((u) => normName(u.klient as string)),
   );
-  const odkedy = new Date(teraz - BEZ_TERMINU_OKNO_TYZDNOV * 7 * 86400000).toISOString().slice(0, 10);
+  const odkedy = posunDen(den, -BEZ_TERMINU_OKNO_TYZDNOV * 7);
 
   // Posledné vysvetlenie ku každému menu. Berie sa najnovšie: keď Jerry zapísal
   // najprv „necítil sa dobre" a o týždeň „zápal, ide k lekárovi", platí to
@@ -4184,7 +4188,7 @@ export function pripomienkySlubov(
   // Rovnaký stav ako všade inde — vrátane odloženia. Kým to tu bolo napísané
   // druhýkrát a bez neho, „Odložiť o týždeň" pri SMS znamenalo navždy.
   const stav = (key: string, rodina: string) => stavPolozkyRegistra(key, ack, rodina, dnes);
-  const den = (d: Date) => d.toISOString().slice(0, 10);
+  const den = (d: Date) => dnesPraha(d);
   const dnesStr = den(dnes);
 
   // ── SMS po úvodnom tréningu ──────────────────────────────────────────────
@@ -4368,7 +4372,7 @@ export function pripomienkaDovodu(
   ack: Record<string, { note?: string } | undefined>,
   dnes: Date = new Date(),
 ): RegisterItem[] {
-  const hranica = new Date(dnes.getTime() - DOVOD_OKNO_DNI * 86400_000).toISOString().slice(0, 10);
+  const hranica = dnesPraha(new Date(dnes.getTime() - DOVOD_OKNO_DNI * 86400_000));
   return poUvodnomNikdy(clients, balicky, udalosti)
     .filter((c) => !c.preco && c.uvodny >= hranica)
     .map((c) => {
@@ -4415,7 +4419,7 @@ export function ktoDnesTrenoval(
   opts?: { dnes?: Date; trener?: (t: string | null | undefined) => boolean; zmeny?: ZmenaVKalendari[] },
 ): string[] {
   const teraz = opts?.dnes ?? new Date();
-  const den = teraz.toISOString().slice(0, 10);
+  const den = dnesPraha(teraz);
   // Ručne zapísané zrušenie platí rovnako ako to, ktoré appka videla sama.
   // Ponúkať meno človeka, o ktorom Jerry pred hodinou zapísal, že nepríde,
   // je pozvánka zapísať si tréning, ktorý sa nekonal.
@@ -4429,7 +4433,7 @@ export function ktoDnesTrenoval(
     if (meno && zrusene.has(`${normName(meno)}|${den}`)) continue;
     // Tréning, ktorý sa ešte len chystá, do denníka nepatrí — nemá sa čo
     // zapisovať o niečom, čo sa nestalo.
-    if (!meno || Date.parse(u.zaciatok) > teraz.getTime()) continue;
+    if (!meno || u.zaciatok.slice(0, 16) > terazPraha(teraz)) continue;
     if (!von.includes(meno)) von.push(meno);
   }
   return von;

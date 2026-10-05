@@ -25,8 +25,11 @@ každom: overiť nad kópiou ostrej DB pred aj po, testy, až potom nasadiť.
        `data.dlhy`, `data.bezHodin`); overené pred/po nad ostrou DB a
        nezávislou kontrolou subagenta. Zostatok: `dlhKlienta()` a
        `hodinyBezBalicka.ts` už nikto v appke nevolá (len testy) — upratať.
-2. [ ] **Deň podľa Prahy, nie UTC** — medzi polnocou a druhou ráno appka
-       žije vo včerajšku (30+ miest).
+2. [x] **Deň podľa Prahy, nie UTC** — hotové 5. 10. 2026 (~150 miest v 76
+       súboroch, `lib/psb/cas.ts`); dve nezávislé kontroly subagentom, testy
+       aj v `TZ=UTC`. Zostatok (len prehliadač, neškodí): `vzas.ts` mesiace pri
+       načítaní modulu, `nextMonthKeys` (31. + `setMonth`), `Kalendar.tsx`
+       `Date.parse(zaciatok)` v prehliadači.
 3. [ ] **Platby z Kokpitu na osi času klienta a v maili s históriou.**
 4. [ ] **Drobnosti v kóde** — profil pre úvodný v budúcnosti, `mimoExportu`
        po 1. 10., QR v SMS proti stránke klienta.
@@ -302,11 +305,7 @@ Stav k 3. 10. 2026 večer (audit, `docs/kontrola-clenstiev.md`):
   číta, dedup klient|názov|platnosť_od). Dopad: hodiny sa pohnú u veľkej
   časti klientov — preto najprv simulácia, potom Jerry.
 - [x] **Jedno pravidlo „zaplatený"** — hotové 5. 10. 2026, viď PORADIE PRÁCE.
-- [ ] **Deň z UTC** (audit D): 30+ miest s `toISOString().slice(0,10)` alebo
-  `Date.parse(pražský reťazec)` — medzi polnocou a druhou ráno appka žije
-  vo včerajšku. Najhoršie: `compute.ts` `dnesneTreningy` ignoruje parameter
-  `dnes` (push-ráno), `poslednyTrening` na serveri, `api/kalendar.ts okno()`.
-  `cas.ts` má `dnesPraha`, ktorý nikto nepoužíval.
+- [x] **Deň z UTC** — hotové 5. 10. 2026, viď PORADIE PRÁCE.
 - [ ] **SMS rozhoduje o QR z iného čísla než stránka** (`SmsKlientovi.tsx:142`
   vs `v.$token.tsx`): overiť po nasadení, či po zjednotení `packageRemaining`
   ešte môžu nesúhlasiť; ak áno, SMS má stav nečítať vôbec (pamäť „Jedna SMS").

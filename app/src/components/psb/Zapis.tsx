@@ -7,6 +7,7 @@ import { SOURCES } from "./Klienti";
 import { normName } from "../../lib/psb/format";
 import { C, mix } from "../../lib/psb/theme";
 import { Modal, enterPosle } from "./ui";
+import { dnesPraha } from "../../lib/psb/cas";
 
 // „+ Zápis" — jedno tlačidlo na všetko, čo sa do appky píše ručne.
 //
@@ -196,7 +197,7 @@ export function ZapisButton({
   const [dopytOdKoho, setDopytOdKoho] = useState("");
   const [dopytOdKohoIne, setDopytOdKohoIne] = useState("");
   /** Kedy sa človek OZVAL, nie kedy si to zapísal — z toho počíta lievik. */
-  const [dopytDatum, setDopytDatum] = useState(() => new Date().toISOString().slice(0, 10));
+  const [dopytDatum, setDopytDatum] = useState(() => dnesPraha());
   const [dopytBusy, setDopytBusy] = useState(false);
   const [dopytOk, setDopytOk] = useState("");
   const [dopytChyba, setDopytChyba] = useState("");
@@ -204,7 +205,7 @@ export function ZapisButton({
   // Kampaň / akcia — vlajka do marketingových grafov. Pomenované po ľudsky:
   // „značka" nehovorí nič o tom, aký typ informácie sa čaká.
   const [akciaText, setAkciaText] = useState("");
-  const [akciaDatum, setAkciaDatum] = useState(() => new Date().toISOString().slice(0, 10));
+  const [akciaDatum, setAkciaDatum] = useState(() => dnesPraha());
   const [akciaBusy, setAkciaBusy] = useState(false);
   const [akciaOk, setAkciaOk] = useState("");
   const [akciaOtvorena, setAkciaOtvorena] = useState(false);
@@ -322,7 +323,7 @@ export function ZapisButton({
               if (!m || dopytBusy) return;
               setDopytBusy(true);
               const referrer = dopytZdroj === "referencia" ? (dopytOdKoho === "__ine__" ? dopytOdKohoIne.trim() : dopytOdKoho) : "";
-              void saveLead({ date: dopytDatum || new Date().toISOString().slice(0, 10), name: m, source: dopytZdroj as never, status: "novy", referrer, note: "" })
+              void saveLead({ date: dopytDatum || dnesPraha(), name: m, source: dopytZdroj as never, status: "novy", referrer, note: "" })
                 // Dátum sa po uložení ZÁMERNE nevracia na dnešok: kto dopisuje
                 // viac dopytov z jedného dňa, nastaví ho raz. Meno sa maže,
                 // dátum a zdroj zostávajú — to je poradie, v akom sa to píše.
@@ -347,7 +348,7 @@ export function ZapisButton({
                 type="date"
                 value={dopytDatum}
                 onChange={(e) => setDopytDatum(e.target.value)}
-                max={new Date().toISOString().slice(0, 10)}
+                max={dnesPraha()}
                 title="Kedy sa ozval — nie kedy to zapisuješ. Z toho sa počíta lievik."
                 style={{ flex: "0 1 132px", minWidth: 0, padding: "6px 8px", borderRadius: 8, border: `1px solid ${C.border}`, background: C.bg, color: C.text, fontSize: 12.5, colorScheme: "dark" }}
               />

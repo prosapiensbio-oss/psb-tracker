@@ -60,6 +60,7 @@ import type { AssistantChat } from "./Assistant";
 import type { ClientAgg } from "../../lib/psb/compute";
 import type { Lead, PSBData } from "../../lib/psb/types";
 import { Card, Empty, FilterObdobia, H3, Hlasenie, Info, OdkazStranky, Select, StatCard, SubTabs, ValueBars, useRolovanie } from "./ui";
+import { dnesPraha } from "../../lib/psb/cas";
 
 // Marketing — skeleton. Four questions in the order Jerry asked them: what did I
 // try, what worked, what did it cost, and what should I try next. The section
@@ -269,7 +270,7 @@ function useZnacky() {
 
 function ZnackyBlok({ znacky, uloz, okno }: { znacky: MktZnacka[]; uloz: (z: MktZnacka[]) => Promise<void>; okno: string[] }) {
   const [pridavam, setPridavam] = useState(false);
-  const [datum, setDatum] = useState(() => new Date().toISOString().slice(0, 10));
+  const [datum, setDatum] = useState(() => dnesPraha());
   const [text, setText] = useState("");
   const vOkne = znacky.filter((z) => okno.includes(z.datum.slice(0, 7))).sort((a, b) => b.datum.localeCompare(a.datum));
   return (

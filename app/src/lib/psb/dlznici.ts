@@ -20,6 +20,7 @@
 
 import type { DlhPolozka } from "./zaplatene";
 import { normName } from "./format";
+import { dnesPraha } from "./cas";
 
 export type Poplatok = { datum: string; klient: string; popis: string; suma: number };
 
@@ -64,7 +65,7 @@ export function dlznici(
   dlhy: DlhPolozka[] | undefined,
   /** Ku ktorému trénerovi klient patrí; chýbajúci zostáva bez mena trénera. */
   treneri: Record<string, string> = {},
-  dnes: string = new Date().toISOString().slice(0, 10),
+  dnes: string = dnesPraha(),
 ): Dlznik[] {
   const podla = new Map<string, Dlznik>();
   for (const x of dlhy || []) {

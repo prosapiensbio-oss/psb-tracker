@@ -19,6 +19,7 @@ import { ZDROJE } from "./Klienti";
 import { tokyKlientov } from "./Fluktuacia";
 import { PlatobneKanaly } from "./PlatobneKanaly";
 import { BarRow, Card, Donut, Empty, H3, Info, LineChart, Modal, ValueBars } from "./ui";
+import { dnesPraha, mesiacPraha } from "../../lib/psb/cas";
 
 // Knižnica grafov.
 //
@@ -59,7 +60,7 @@ export const SEKCIE: { id: SekciaId; label: string; popis: string }[] = [
 // Výsledkov — a v knižnici si v každej karte odškrtneš, ktoré riadky chceš
 // vidieť. Deväť KPI naraz je tabuľka; tri, ktoré práve riešiš, sú prístroj.
 const KPI_ROK = (() => {
-  const r = new Date().toISOString().slice(0, 4);
+  const r = dnesPraha().slice(0, 4);
   return r === "2025" ? "2025" : "2026";
 })();
 export const KPI_KARTY: { id: string; group: KpiGroup }[] = [
@@ -729,7 +730,7 @@ export function useExtraGrafy({
 
     // Ciele sú ročné — porovnávať ich s neúplným rokom je najľahší spôsob, ako
     // spraviť z dobrého roka neúspech. Preto sa prepočítajú na uplynulé mesiace.
-    const rok = new Date().toISOString().slice(0, 4);
+    const rok = dnesPraha().slice(0, 4);
     const ciel = VZAS_TARGETS_BY_YEAR[rok] || VZAS_TARGETS_BY_YEAR["2026"];
     // Len uplynulé mesiace roka. Predtým sa počítali všetky, ktoré sú v poli —
     // vrátane prázdnych dopredu. Cieľ sa tak delil na viac mesiacov, než koľko
@@ -1904,8 +1905,8 @@ export function useExtraGrafy({
     const lievikMk = (() => {
       const den = dataAll.sessions.reduce((m, x) => (x.date > m ? x.date : m), "");
       const mk = den.slice(0, 7);
-      const bezici = new Date().toISOString().slice(0, 7);
-      return mk && mk < bezici ? mk : (() => { const d = new Date(); d.setMonth(d.getMonth() - 1); return d.toISOString().slice(0, 7); })();
+      const bezici = dnesPraha().slice(0, 7);
+      return mk && mk < bezici ? mk : mesiacPraha(new Date(), -1);
     })();
     const lievikK = {
       dopyty: (dataAll.leads || []).filter((l) => (l.date || "").slice(0, 7) === lievikMk).length,
@@ -2014,9 +2015,8 @@ function CenaZaKlienta({
   const od30 = dnes - 30 * 86400000;
   const vOkne = (mk: string) => {
     if (okno === "2026" || okno === "2025") return mk.startsWith(okno);
-    const od = new Date();
-    od.setMonth(od.getMonth() - 3);
-    return mk >= od.toISOString().slice(0, 7);
+    // Mesiac po mesiacoch, nie `setMonth` — 31. 12. mínus 3 by bol „31. 9." = 1. 10.
+    return mk >= mesiacPraha(new Date(), -3);
   };
   const vOkneDatum = (d: string) => {
     if (!d) return false;

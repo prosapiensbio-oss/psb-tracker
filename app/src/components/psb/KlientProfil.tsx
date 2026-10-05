@@ -8,6 +8,7 @@ import type { PSBData } from "../../lib/psb/types";
 import { Dennik } from "./Dennik";
 import { Card, Info, ValueBars } from "./ui";
 import { KlientOsCasu, osCasuZapnuta } from "./KlientOsCasu";
+import { dnesPraha } from "../../lib/psb/cas";
 
 // Profil klienta — všetko o jednom človeku na jednej obrazovke.
 //
@@ -198,7 +199,7 @@ export function KlientProfil({ meno, data, clients, onZavri, btcSats, onDennikZa
             narodeniny sa zvýraznia, nech ich netreba hľadať. */}
         {c.narodeniny && (() => {
           const md = c.narodeniny.slice(5);
-          const dnesISO = new Date().toISOString().slice(0, 10);
+          const dnesISO = dnesPraha();
           const dnes = Date.parse(`${dnesISO}T00:00:00Z`);
           const rok = Number(dnesISO.slice(0, 4));
           // Najbližší výskyt: tento rok, a keď už bol, tak budúci.

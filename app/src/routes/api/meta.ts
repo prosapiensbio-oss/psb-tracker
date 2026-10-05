@@ -10,6 +10,7 @@ import { kategoriaHooku, krstneMenaKlientov } from "../../lib/psb/hook";
 import { MIN_DENNE_KC, UCET_REKLAM, adsManagerOdkaz, jeUcetReklam, pripravKampan, pripravSadu, skontrolujPredSpustenim, stavDorucovania, type StavKampanePredSpustenim } from "../../lib/psb/kampanPlan";
 import { OKNO_DNI, stavPristupu } from "../../lib/psb/metaPristup";
 import { jeFaza } from "../../lib/psb/mapaCyklu";
+import { dnesPraha } from "../../lib/psb/cas";
 
 /**
  * Meta Graph API — reklama a Instagram.
@@ -91,7 +92,7 @@ let DB_PRE_POCITADLO: D1Database | null | undefined = null;
 function zapisVolanie(ok: boolean): void {
   const DB = DB_PRE_POCITADLO;
   if (!DB) return;
-  const den = new Date().toISOString().slice(0, 10);
+  const den = dnesPraha();
   void DB.prepare(
     `INSERT INTO meta_volania (den, volani, chyb) VALUES (?1, 1, ?2)
      ON CONFLICT(den) DO UPDATE SET volani = volani + 1, chyb = chyb + ?2`,
@@ -309,11 +310,11 @@ export const Route = createFileRoute("/api/meta")({
           // dopredu povedať, či sa kampaň na konverzie vôbec dá pustiť.
           dopytovTyzdenne: await (async () => {
             const r = await DB.prepare("SELECT COUNT(*) n FROM leads WHERE date >= ?1")
-              .bind(new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10)).first<{ n: number }>();
+              .bind(dnesPraha(new Date(Date.now() - 90 * 86400000))).first<{ n: number }>();
             return Math.round(((Number(r?.n) || 0) / (90 / 7)) * 10) / 10;
           })(),
           pristup: await (async () => {
-            const od = new Date(Date.now() - OKNO_DNI * 86400000).toISOString().slice(0, 10);
+            const od = dnesPraha(new Date(Date.now() - OKNO_DNI * 86400000));
             const r = await DB.prepare(
               "SELECT COALESCE(SUM(volani),0) v, COALESCE(SUM(chyb),0) c FROM meta_volania WHERE den >= ?1",
             ).bind(od).first<{ v: number; c: number }>();
@@ -492,7 +493,7 @@ export const Route = createFileRoute("/api/meta")({
           // kampaň, ktorá sa nemá z čoho učiť.
           const dopytyR = await DB.prepare(
             "SELECT COUNT(*) n FROM leads WHERE date >= ?1",
-          ).bind(new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10)).first<{ n: number }>();
+          ).bind(dnesPraha(new Date(Date.now() - 90 * 86400000))).first<{ n: number }>();
           const dopytovTyzdenne = Math.round(((Number(dopytyR?.n) || 0) / (90 / 7)) * 10) / 10;
 
           const plan = pripravKampan({
@@ -676,7 +677,7 @@ export const Route = createFileRoute("/api/meta")({
           const ucet = `act_${UCET_REKLAM}`;
           const denneKc = Number(b.denneKc) || MIN_DENNE_KC;
           const dni = Number(b.dni) || 7;
-          const nazov = String(b.nazov || "").trim() || `PSB — propagovaný príspevok ${new Date().toISOString().slice(0, 10)}`;
+          const nazov = String(b.nazov || "").trim() || `PSB — propagovaný príspevok ${dnesPraha()}`;
           const odkaz = String(b.odkaz || "").trim();
 
           /**
@@ -1054,7 +1055,7 @@ export const Route = createFileRoute("/api/meta")({
          */
         if (akcia === "reklamy") {
           const od = String(b.od || "2025-01-01").slice(0, 10);
-          const doD = String(b.do || new Date().toISOString().slice(0, 10)).slice(0, 10);
+          const doD = String(b.do || dnesPraha()).slice(0, 10);
           const ucet = `act_${UCET_REKLAM}`;
           const r = await graph(
             `${ucet}/insights?level=ad&time_increment=monthly&limit=300` +
@@ -1118,7 +1119,7 @@ export const Route = createFileRoute("/api/meta")({
         // Manageri, a prvý rozpor by stál hodinu hľadania.
         if (akcia === "kampane") {
           const od = String(b.od || "2025-01-01").slice(0, 10);
-          const doD = String(b.do || new Date().toISOString().slice(0, 10)).slice(0, 10);
+          const doD = String(b.do || dnesPraha()).slice(0, 10);
           if (!n.adAccount) return Response.json({ ok: false, error: "chyba_ad_ucet" }, { status: 400 });
           const ucet = n.adAccount.startsWith("act_") ? n.adAccount : `act_${n.adAccount}`;
           const r = await graph(

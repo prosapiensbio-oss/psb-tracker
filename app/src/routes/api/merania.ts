@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
+import { dnesPraha } from "../../lib/psb/cas";
 
 /**
  * Výsledky klientov — bolesť na stupnici 0–10 v čase.
@@ -86,7 +87,7 @@ export const Route = createFileRoute("/api/merania")({
           return Response.json({ ok: false, error: "Zapíš číslo alebo poznámku." }, { status: 400 });
         }
 
-        const datum = /^\d{4}-\d{2}-\d{2}$/.test(String(b.datum)) ? String(b.datum) : new Date().toISOString().slice(0, 10);
+        const datum = /^\d{4}-\d{2}-\d{2}$/.test(String(b.datum)) ? String(b.datum) : dnesPraha();
         const id = crypto.randomUUID();
         const autor = (await currentUser(request)) || "";
         try {

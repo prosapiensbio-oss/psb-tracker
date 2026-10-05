@@ -42,6 +42,7 @@
  */
 
 import { normName } from "./format";
+import { dnesPraha } from "./cas";
 
 export type Balicek = {
   id: string;
@@ -103,7 +104,7 @@ export function porovnajBalicky(
   vlastne: Balicek[],
   ptminder: PtBalicek[],
   udalosti: Udalost[],
-  dnes: string = new Date().toISOString().slice(0, 10),
+  dnes: string = dnesPraha(),
   /** Posledný deň, ktorý export z PTmindera pokrýva. Po ňom sa neporovnáva. */
   poExport: string = dnes,
 ): { riadky: RiadokPorovnania[]; spolu: number; sedi: number; rozdiel: number; mlci: number; poExport: string } {

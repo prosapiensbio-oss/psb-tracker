@@ -1,3 +1,4 @@
+import { dnesPraha } from "./cas";
 // Pure formatting + date helpers. No browser globals — SSR/server safe.
 
 export const fmtDate = (d?: string | null): string =>
@@ -121,10 +122,11 @@ export function kedyStrucne(iso: string, dnes: Date = new Date()): string {
   const t = Date.parse(iso || "");
   if (!Number.isFinite(t)) return "naposledy";
   const den = (d: number) => Math.floor(d / 86400000);
-  const rozdiel = den(Date.parse(dnes.toISOString().slice(0, 10))) - den(Date.parse(new Date(t).toISOString().slice(0, 10)));
+  // Dni podľa Prahy — čas zápisu je UTC a o pol jednej v noci by bol „včera".
+  const denZapisu = dnesPraha(new Date(t));
+  const rozdiel = den(Date.parse(dnesPraha(dnes))) - den(Date.parse(denZapisu));
   if (rozdiel <= 0) return "dnes";
   if (rozdiel === 1) return "včera";
   if (rozdiel === 2) return "predvčerom";
-  const d = new Date(t);
-  return `${d.getUTCDate()}. ${d.getUTCMonth() + 1}.`;
+  return `${Number(denZapisu.slice(8, 10))}. ${Number(denZapisu.slice(5, 7))}.`;
 }

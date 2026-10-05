@@ -1,3 +1,4 @@
+import { dnesPraha } from "./cas";
 /**
  * PLATNOSŤ SKONČILA, HODINY ZOSTALI.
  *
@@ -62,7 +63,7 @@ const dniMedzi = (a: string, b: string) => Math.round((Date.parse(b) - Date.pars
  */
 export function zostavaPoPlatnosti(
   clients: KlientPlatnost[],
-  dnes: string = new Date().toISOString().slice(0, 10),
+  dnes: string = dnesPraha(),
 ): ZostavaPoPlatnosti[] {
   const out: ZostavaPoPlatnosti[] = [];
   for (const c of clients) {

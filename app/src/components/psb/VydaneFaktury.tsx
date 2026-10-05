@@ -9,6 +9,7 @@ import {
   DODAVATEL, POPISY, SPLATNOST_DNI, den, poSplatnosti, splatnostZ, suma, type Faktura, type PolozkaFaktury,
 } from "../../lib/psb/vydanaFaktura";
 import { Card, H3, Info } from "./ui";
+import { dnesPraha } from "../../lib/psb/cas";
 
 /**
  * VYDANÉ FAKTÚRY.
@@ -51,7 +52,7 @@ const PRAZDNE_UDAJE: Omit<Udaje, "klient"> = {
   os_titul: "", os_meno: "", os_priezvisko: "", os_mobil: "",
 };
 
-const dnes = () => new Date().toISOString().slice(0, 10);
+const dnes = () => dnesPraha();
 
 const naFakturu = (r: Riadok): Faktura => ({
   cislo: r.cislo, klient: r.klient, vystavene: r.vystavene, splatnost: r.splatnost,

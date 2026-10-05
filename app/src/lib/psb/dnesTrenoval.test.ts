@@ -16,7 +16,10 @@ describe("koho si dnes trénoval", () => {
 
   it("tréning, ktorý sa ešte len chystá, medzi nimi nie je", () => {
     // Zapisovať do denníka niečo, čo sa nestalo, nedáva zmysel.
-    expect(ktoDnesTrenoval([u("2026-08-17T20:00:00Z", "Neskorší")], { dnes: DNES })).toEqual([]);
+    // `zaciatok` je pražský čas bez pásma (tak ho drží kal_udalosti);
+    // DNES = 18:00 UTC = 20:00 v Prahe.
+    expect(ktoDnesTrenoval([u("2026-08-17T20:30", "Neskorší")], { dnes: DNES })).toEqual([]);
+    expect(ktoDnesTrenoval([u("2026-08-17T19:30", "Skorší")], { dnes: DNES })).toEqual(["Skorší"]);
   });
 
   it("včerajšie, zrušené, súkromné ani udalosti bez mena sa nerátajú", () => {

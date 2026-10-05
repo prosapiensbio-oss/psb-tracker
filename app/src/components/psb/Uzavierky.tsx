@@ -8,6 +8,7 @@ import { SpravaMesiaca } from "./SpravaMesiaca";
 import { fetchKonta, fetchPeriods, setPeriodLock, ulozKonto, type AuditRiadok, type Konto, type Obdobie } from "../../lib/psb/client";
 import { C, mix } from "../../lib/psb/theme";
 import { Card, Empty, H3, Info } from "./ui";
+import { dnesPraha } from "../../lib/psb/cas";
 
 // Uzávierky a audit — brána pred importom z banky.
 //
@@ -167,7 +168,7 @@ export function Uzavierky({ prekazky, kroky, podklady, onNavigate, chat }: {
   // takže júl, prvý mesiac, ktorý reálne treba uzavrieť pred bankou, sa nedal
   // zamknúť. Bežiaci mesiac sa nezamyká: dáta doň ešte pribúdajú (uzávierka je
   // prvý víkend nasledujúceho).
-  const dnesMesiac = new Date().toISOString().slice(0, 7);
+  const dnesMesiac = dnesPraha().slice(0, 7);
   const mesiace = useMemo(() => {
     const out: string[] = [];
     for (let rok = 2025; rok <= Number(dnesMesiac.slice(0, 4)); rok++) {

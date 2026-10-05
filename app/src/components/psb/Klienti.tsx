@@ -13,6 +13,7 @@ import { Dennik } from "./Dennik";
 import { RastAStrata } from "./Fluktuacia";
 import { SixMTracker } from "./SixM";
 import { Badge, Card, Donut, Empty, H3, Info, Modal, Select, SortTh, StatCard, SubTabs, TableWrap, TrenerPills, useSort } from "./ui";
+import { dnesPraha } from "../../lib/psb/cas";
 
 const segTone = (s: string) => (s === "Anchor" ? "green" : s === "Stabilný" ? "orange" : "red");
 const segColor = (s: string) => (s === "Anchor" ? C.green : s === "Stabilný" ? C.orange : C.red);
@@ -669,7 +670,7 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
                     // Pauza, ktorej dátum už prešiel, je to jediné, čo si
                     // z tohto zoznamu pýta ruku: mala skončiť a klient sa
                     // neozval. Preto je oranžová rovnako ako pauza bez dátumu.
-                    const vyprsala = !!c.pauseUntil && c.pauseUntil < new Date().toISOString().slice(0, 10);
+                    const vyprsala = !!c.pauseUntil && c.pauseUntil < dnesPraha();
                     return (
                       <span style={{ fontSize: 10, color: !c.pauseUntil || vyprsala ? C.orange : C.textMuted, marginLeft: 5 }}>
                         {!c.pauseUntil ? "bez dátumu" : vyprsala ? `vypršala ${fmtDate(c.pauseUntil)}` : `do ${fmtDate(c.pauseUntil)}`}
