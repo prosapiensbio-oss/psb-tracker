@@ -124,7 +124,8 @@ export function krokyBety(karty: Karta[]): Karta[] {
     krok("sms", "2 · SMS pre klientov", "komu to práve dáva zmysel — nula, mínus, dlh", []),
     // Balíčky vznikajú samy prvým tréningom; ich dve rozhodnutia (končiaca
     // platnosť, „sedí?" po návrate) sú súčasťou tohto kroku (5. 10. 2026).
-    krok("platby", "3 · Platby a balíčky", "stiahnuť z banky, spárovať s dlhmi, rozhodnúť o končiacej platnosti", [...daj("platby"), ...daj("dlznici")]),
+    // Dlžníci hore, všetky platby z banky pod nimi (Jerry, 5. 10. 2026: „otoč to").
+    krok("platby", "3 · Platby a balíčky", "stiahnuť z banky, spárovať s dlhmi, rozhodnúť o končiacej platnosti", [...daj("dlznici"), ...daj("platby")]),
     ...daj("faktury"),
     ...daj("anamnezy"),
   ];
