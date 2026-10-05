@@ -4,6 +4,7 @@ import { doSchranky } from "../../lib/psb/kopirovanie";
 import { oznam } from "../../lib/psb/obnovaSignal";
 import { sekcieZapisu, OBLASTI, zobrazit, type Formular, type Otazka, type Sekcia, popisOdchylky } from "../../lib/psb/anamnezaFormular";
 import { C, mix } from "../../lib/psb/theme";
+import { KartotekaFotiek } from "./KartotekaFotiek";
 import { useUzke } from "./useUzke";
 
 /**
@@ -78,6 +79,8 @@ export function AnamnezaPanel({ meno }: { meno: string }) {
   const [skopirovane, setSkopirovane] = useState(false);
   /** Pôvodná anamnéza z Google Forms — otvára sa cez rebrík, na čítanie. */
   const [archivOtvoreny, setArchivOtvoreny] = useState(false);
+  /** Časť C — kartotéka fotiek. Samostatný stupienok, lebo sa robí po zápise, nie v ňom. */
+  const [fotkyOtvorene, setFotkyOtvorene] = useState(false);
   /**
    * Kým sa políčok nikto nedotkol, draft zrkadlí prichádzajúce dáta — inak
    * by neskorší fetch prepísal rozpísaný zápis (pravidlo z 29. 8. 2026).
@@ -206,11 +209,11 @@ export function AnamnezaPanel({ meno }: { meno: string }) {
           {sekcie.map((x, idx) => {
             const hotovych = x.otazky.filter((o) => maOdpoved(o, odp[o.id])).length;
             const cela = hotovych === x.otazky.length;
-            const jeTu = !koniec && !archivOtvoreny && idx === i;
+            const jeTu = !koniec && !archivOtvoreny && !fotkyOtvorene && idx === i;
             return (
               <button
                 key={x.s.id}
-                onClick={() => { setArchivOtvoreny(false); chod(idx); }}
+                onClick={() => { setArchivOtvoreny(false); setFotkyOtvorene(false); chod(idx); }}
                 style={{
                   display: "flex", alignItems: "center", gap: uzke ? 6 : 9, padding: "8px 8px", borderRadius: 8,
                   border: uzke ? `1px solid ${jeTu ? C.accent : mix(C.border, 80)}` : "none",
@@ -235,7 +238,7 @@ export function AnamnezaPanel({ meno }: { meno: string }) {
           })}
           {archiv && (
             <button
-              onClick={() => setArchivOtvoreny((x) => !x)}
+              onClick={() => { setFotkyOtvorene(false); setArchivOtvoreny((x) => !x); }}
               style={{
                 display: "flex", alignItems: "center", gap: uzke ? 6 : 9, padding: "8px 8px", borderRadius: 8,
                 marginTop: uzke ? 0 : 4,
@@ -253,13 +256,13 @@ export function AnamnezaPanel({ meno }: { meno: string }) {
             </button>
           )}
           <button
-            onClick={() => { setArchivOtvoreny(false); chod(sekcie.length); }}
+            onClick={() => { setArchivOtvoreny(false); setFotkyOtvorene(false); chod(sekcie.length); }}
             style={{
               display: "flex", alignItems: "center", gap: uzke ? 6 : 9, padding: "8px 8px", borderRadius: 8,
               marginTop: uzke ? 0 : 4,
-              border: uzke ? `1px solid ${koniec && !archivOtvoreny ? C.accent : mix(C.border, 80)}` : "none",
-              background: koniec && !archivOtvoreny ? mix(C.accent, 14) : "transparent",
-              color: koniec && !archivOtvoreny ? C.text : C.textDim, fontSize: 12.5, textAlign: "left",
+              border: uzke ? `1px solid ${koniec && !archivOtvoreny && !fotkyOtvorene ? C.accent : mix(C.border, 80)}` : "none",
+              background: koniec && !archivOtvoreny && !fotkyOtvorene ? mix(C.accent, 14) : "transparent",
+              color: koniec && !archivOtvoreny && !fotkyOtvorene ? C.text : C.textDim, fontSize: 12.5, textAlign: "left",
               cursor: "pointer", fontFamily: "inherit",
               width: uzke ? "auto" : "100%", flexShrink: uzke ? 0 : undefined,
               whiteSpace: uzke ? "nowrap" : undefined,
@@ -267,6 +270,22 @@ export function AnamnezaPanel({ meno }: { meno: string }) {
           >
             {!uzke && <span style={{ width: 17, flexShrink: 0 }} />}
             <span>{uzke ? "Prehľad" : "Prehľad a uloženie"}</span>
+          </button>
+          <button
+            onClick={() => { setArchivOtvoreny(false); setFotkyOtvorene(true); }}
+            style={{
+              display: "flex", alignItems: "center", gap: uzke ? 6 : 9, padding: "8px 8px", borderRadius: 8,
+              marginTop: uzke ? 0 : 4,
+              border: uzke ? `1px solid ${fotkyOtvorene ? C.accent : mix(C.border, 80)}` : "none",
+              background: fotkyOtvorene ? mix(C.accent, 14) : "transparent",
+              color: fotkyOtvorene ? C.text : C.textDim, fontSize: 12.5, textAlign: "left",
+              cursor: "pointer", fontFamily: "inherit",
+              width: uzke ? "auto" : "100%", flexShrink: uzke ? 0 : undefined,
+              whiteSpace: uzke ? "nowrap" : undefined,
+            }}
+          >
+            {!uzke && <span style={{ width: 17, flexShrink: 0 }} />}
+            <span>{uzke ? "Fotky" : "Fotky držania tela"}</span>
           </button>
         </div>
 
@@ -315,7 +334,20 @@ export function AnamnezaPanel({ meno }: { meno: string }) {
       {/* ── CELÁ SEKCIA NA JEDNO OKNO ── */}
       <div style={{ flexGrow: 1, minWidth: 0, display: "flex", flexDirection: "column", minHeight: 0 }}>
 
-        {archivOtvoreny && archiv ? (
+        {fotkyOtvorene ? (
+          <>
+            <div style={{ paddingBottom: 14, borderBottom: `1px solid ${mix(C.border, 60)}` }}>
+              <div style={{ fontSize: 10.5, letterSpacing: 1.2, textTransform: "uppercase", color: C.textDim }}>Po úvodnom tréningu · kartotéka</div>
+              <div style={{ fontSize: 25, fontWeight: 700, lineHeight: 1.2, letterSpacing: -0.3, marginTop: 5 }}>Fotky držania tela</div>
+              <div style={{ fontSize: 12.5, color: C.textMuted, marginTop: 6, lineHeight: 1.6, maxWidth: "62ch" }}>
+                Zboku, spredu, zozadu — a poznámka k foteniu. Pri ďalšom fotení sa priložia k tomu istému klientovi a prvá s poslednou stoja vedľa seba.
+              </div>
+            </div>
+            <div ref={telo} style={{ flexGrow: 1, minHeight: 0, overflowY: "auto", paddingTop: 14 }}>
+              <KartotekaFotiek meno={meno} uzke={uzke} />
+            </div>
+          </>
+        ) : archivOtvoreny && archiv ? (
           <>
             <div style={{ paddingBottom: 14, borderBottom: `1px solid ${mix(C.border, 60)}` }}>
               <div style={{ fontSize: 10.5, letterSpacing: 1.2, textTransform: "uppercase", color: C.textDim }}>
@@ -433,8 +465,8 @@ export function AnamnezaPanel({ meno }: { meno: string }) {
           </>
         )}
 
-        {/* posun medzi sekciami */}
-        <div style={{ display: "flex", alignItems: "center", gap: 12, paddingTop: 13, borderTop: `1px solid ${mix(C.border, 60)}`, flexWrap: "wrap" }}>
+        {/* posun medzi sekciami — pri fotkách nie: tie sa ukladajú samé */}
+        <div style={{ display: fotkyOtvorene ? "none" : "flex", alignItems: "center", gap: 12, paddingTop: 13, borderTop: `1px solid ${mix(C.border, 60)}`, flexWrap: "wrap" }}>
           {koniec ? (
             <button onClick={() => void uloz(false)} disabled={bezi} style={{ ...velkeTlacidlo, background: mix(C.green, 16), borderColor: mix(C.green, 55), color: C.green }}>
               {bezi ? "Ukladám…" : "Uložiť zápis"}

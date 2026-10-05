@@ -80,3 +80,39 @@ export async function odsifruj(text: string, tajomstvo: string): Promise<string>
 
 /** `true` = reťazec je zašifrovaný. Na kontroly, nie na vetvenie logiky. */
 export const jeZasifrovane = (text: string): boolean => String(text || "").startsWith(PREDPONA);
+
+/**
+ * FOTKY (kartotéka, 5. 10. 2026) — ten istý kľúč a algoritmus, len bajty
+ * namiesto textu: `PSB1` + IV (12 bajtov) + šifra. Base64 by fotku nafúklo
+ * o tretinu a v R2 ho netreba. Hlavička je tam z toho istého dôvodu ako
+ * `v1:` pri texte — aby sa dal algoritmus raz vymeniť.
+ */
+const HLAVICKA = new TextEncoder().encode("PSB1");
+
+export async function zasifrujBajty(data: ArrayBuffer | Uint8Array, tajomstvo: string): Promise<Uint8Array> {
+  const kluc = await nacitajKluc(tajomstvo);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const sifra = new Uint8Array(await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv: iv as unknown as ArrayBuffer },
+    kluc,
+    (data instanceof Uint8Array ? data : new Uint8Array(data)) as unknown as ArrayBuffer,
+  ));
+  const von = new Uint8Array(HLAVICKA.length + iv.length + sifra.length);
+  von.set(HLAVICKA, 0);
+  von.set(iv, HLAVICKA.length);
+  von.set(sifra, HLAVICKA.length + iv.length);
+  return von;
+}
+
+/** Rozšifruje fotku. Pri zlom kľúči alebo poškodenom súbore hádže. */
+export async function odsifrujBajty(data: ArrayBuffer | Uint8Array, tajomstvo: string): Promise<Uint8Array> {
+  const b = data instanceof Uint8Array ? data : new Uint8Array(data);
+  if (b.length < HLAVICKA.length + 12 + 16 || !HLAVICKA.every((x, i) => b[i] === x)) throw new Error("poškodená fotka");
+  const kluc = await nacitajKluc(tajomstvo);
+  const iv = b.subarray(HLAVICKA.length, HLAVICKA.length + 12);
+  return new Uint8Array(await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv: iv as unknown as ArrayBuffer },
+    kluc,
+    b.subarray(HLAVICKA.length + 12) as unknown as ArrayBuffer,
+  ));
+}

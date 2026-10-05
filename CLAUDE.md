@@ -2684,3 +2684,28 @@ kurzora; **rozpísaný text načítanie neprepíše** (`upravene`); a **D1 batch
 sa pri UPDATE s nulou zmien NEVRÁTI** — kontrola, či všetky id existujú,
 ide PRED zápis. Zoznam id do SQL ide cez `json_each(?)`: D1 pustí najviac
 100 parametrov na dopyt.
+
+## Kartotéka fotiek držania tela (5. 10. 2026)
+
+Časť C návrhu anamnézy: fotky z úvodného (a každého ďalšieho fotenia)
+a poznámka k foteniu. Panel anamnézy → stupienok „Fotky držania tela"
+(`KartotekaFotiek.tsx`, `/api/fotky`, `lib/psb/kartoteka.ts`).
+
+- **Obrázky nie sú v D1** — ležia v R2 (väzba `STORAGE`, bucket
+  `kokpit-fotky`) **zašifrované kľúčom anamnézy** (`zasifrujBajty`,
+  hlavička `PSB1`). Bez kľúča sa nedajú ani nahrať, ani pozrieť. Verejná
+  adresa neexistuje — každé čítanie ide cez `/api/fotky?id=` a prihlásenie.
+  Kľúč objektu nenesie meno klienta (objavuje sa v logoch).
+- **Poznámka k foteniu je tiež zašifrovaná** (`klient_fotky_poznamky`).
+- **Súhlas:** z anamnézy (`suhlasy_json.gdpr.fotky`, nová anamnéza sa pýta
+  „včetně fotografií držení těla… nikde se nezveřejňují"); staré z Google
+  Forms ho nemajú — vtedy tréner potvrdí osobný súhlas a pri fotke sa
+  zapíše `suhlas = 'osobne'` aj kto. Bez jedného z nich server fotku odmietne.
+- **Fotka sa zmenšuje v prehliadači** (2000 px, JPEG, `imageOrientation:
+  from-image` — inak by fotka z iPadu na výšku prišla naležato; EXIF aj
+  poloha sa tým zahodia).
+- **R2 musí zapnúť Jerry v dashboarde** (podmienky + platobná karta, aj
+  keď je do 10 GB zadarmo). Kým nie je, appka beží bez väzby a kartotéka to
+  povie vetou. Po zapnutí: `wrangler r2 bucket create kokpit-fotky`,
+  do `wrangler.jsonc` `r2_buckets` s `binding: "STORAGE"`, nasadiť.
+- Beta nemá `ANAMNEZA_KLUC`, takže kartotéka tam nič neuloží.

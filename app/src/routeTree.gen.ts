@@ -69,6 +69,7 @@ import { Route as ApiInspiraciaRouteImport } from './routes/api/inspiracia'
 import { Route as ApiIngestRouteImport } from './routes/api/ingest'
 import { Route as ApiGoogleAdsRouteImport } from './routes/api/google-ads'
 import { Route as ApiGoogleRouteImport } from './routes/api/google'
+import { Route as ApiFotkyRouteImport } from './routes/api/fotky'
 import { Route as ApiFioRouteImport } from './routes/api/fio'
 import { Route as ApiFakturyRouteImport } from './routes/api/faktury'
 import { Route as ApiExportRouteImport } from './routes/api/export'
@@ -383,6 +384,11 @@ const ApiGoogleRoute = ApiGoogleRouteImport.update({
   path: '/api/google',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiFotkyRoute = ApiFotkyRouteImport.update({
+  id: '/api/fotky',
+  path: '/api/fotky',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiFioRoute = ApiFioRouteImport.update({
   id: '/api/fio',
   path: '/api/fio',
@@ -468,6 +474,7 @@ export interface FileRoutesByFullPath {
   '/api/export': typeof ApiExportRoute
   '/api/faktury': typeof ApiFakturyRoute
   '/api/fio': typeof ApiFioRoute
+  '/api/fotky': typeof ApiFotkyRoute
   '/api/google': typeof ApiGoogleRoute
   '/api/google-ads': typeof ApiGoogleAdsRoute
   '/api/ingest': typeof ApiIngestRoute
@@ -543,6 +550,7 @@ export interface FileRoutesByTo {
   '/api/export': typeof ApiExportRoute
   '/api/faktury': typeof ApiFakturyRoute
   '/api/fio': typeof ApiFioRoute
+  '/api/fotky': typeof ApiFotkyRoute
   '/api/google': typeof ApiGoogleRoute
   '/api/google-ads': typeof ApiGoogleAdsRoute
   '/api/ingest': typeof ApiIngestRoute
@@ -619,6 +627,7 @@ export interface FileRoutesById {
   '/api/export': typeof ApiExportRoute
   '/api/faktury': typeof ApiFakturyRoute
   '/api/fio': typeof ApiFioRoute
+  '/api/fotky': typeof ApiFotkyRoute
   '/api/google': typeof ApiGoogleRoute
   '/api/google-ads': typeof ApiGoogleAdsRoute
   '/api/ingest': typeof ApiIngestRoute
@@ -696,6 +705,7 @@ export interface FileRouteTypes {
     | '/api/export'
     | '/api/faktury'
     | '/api/fio'
+    | '/api/fotky'
     | '/api/google'
     | '/api/google-ads'
     | '/api/ingest'
@@ -771,6 +781,7 @@ export interface FileRouteTypes {
     | '/api/export'
     | '/api/faktury'
     | '/api/fio'
+    | '/api/fotky'
     | '/api/google'
     | '/api/google-ads'
     | '/api/ingest'
@@ -846,6 +857,7 @@ export interface FileRouteTypes {
     | '/api/export'
     | '/api/faktury'
     | '/api/fio'
+    | '/api/fotky'
     | '/api/google'
     | '/api/google-ads'
     | '/api/ingest'
@@ -922,6 +934,7 @@ export interface RootRouteChildren {
   ApiExportRoute: typeof ApiExportRoute
   ApiFakturyRoute: typeof ApiFakturyRoute
   ApiFioRoute: typeof ApiFioRoute
+  ApiFotkyRoute: typeof ApiFotkyRoute
   ApiGoogleRoute: typeof ApiGoogleRoute
   ApiGoogleAdsRoute: typeof ApiGoogleAdsRoute
   ApiIngestRoute: typeof ApiIngestRoute
@@ -1401,6 +1414,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiGoogleRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/fotky': {
+      id: '/api/fotky'
+      path: '/api/fotky'
+      fullPath: '/api/fotky'
+      preLoaderRoute: typeof ApiFotkyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/fio': {
       id: '/api/fio'
       path: '/api/fio'
@@ -1514,6 +1534,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiExportRoute: ApiExportRoute,
   ApiFakturyRoute: ApiFakturyRoute,
   ApiFioRoute: ApiFioRoute,
+  ApiFotkyRoute: ApiFotkyRoute,
   ApiGoogleRoute: ApiGoogleRoute,
   ApiGoogleAdsRoute: ApiGoogleAdsRoute,
   ApiIngestRoute: ApiIngestRoute,

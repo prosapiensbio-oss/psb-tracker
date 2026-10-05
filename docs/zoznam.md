@@ -48,7 +48,10 @@ každom: overiť nad kópiou ostrej DB pred aj po, testy, až potom nasadiť.
 6. [x] **Web na tablete** — naostro 5. 10. 2026 (style.css + js/app.js cez
        Editor šablón, Jerry povolil; WP Fastest Cache vymazaná, overené na
        webe). Zelené zvýraznenia už boli v poriadku.
-7. [ ] **Kartotéka fotiek** (treba úložisko R2) a profil trénera na webe.
+7. [~] **Kartotéka fotiek** — postavená a nasadená 5. 10. 2026 (panel
+       anamnézy → Fotky držania tela); ČAKÁ NA ZAPNUTIE R2 Jerrym v Cloudflare
+       dashboarde, potom bucket + väzba STORAGE + nasadiť (CLAUDE.md).
+       Ďalej: profil trénera na webe.
 
 Rozhodnutia, ktoré na to čakajú, sú v sekcii 1 a 2c (prenos mínusu,
 online z offline balíčka, Čechová/Gažo/Kalva-Martinek-Vaško).
@@ -120,8 +123,7 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
   Google Forms, ale na ňu.
 - [~] **Editor formulára** — Jerry 30. 9. zrušil („editor nechaj tak").
   Tabuľka `anamneza_formular` zostáva pripravená, keby sa to vrátilo.
-- [ ] **Kartotéka fotiek** — fotky držania tela z úvodného + poznámka.
-  Potrebuje R2 bucket (účet ho zatiaľ nemá); do D1 nepatria.
+- [~] **Kartotéka fotiek** — postavená 5. 10. 2026, čaká na zapnutie R2.
 - [x] **Import 56 starých anamnéz** k existujúcim klientom aj s pôvodným
   dátumom (Jerry odklepol 30. 9.) — hotové 30. 9., 53 priradených.
 - [x] **Doimportované všetky anamnézy** — 1. 10. 2026 aj posledné tri
