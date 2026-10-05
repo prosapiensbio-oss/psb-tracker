@@ -16,6 +16,8 @@ import { verejnyOdkaz } from "../../lib/psb/verejnyOdkaz";
  *   GET                        → či je brána nastavená (kľúč sa nevracia)
  *   POST { akcia: "nastav" }   → uloží bránu, kľúč a odosielateľa
  *   POST { klient, telefon, text } → pošle jednu správu
+ *   POST { …, hromadna: true }     → to isté, ale v audite ako `sms-hromadna`
+ *                                    (oznam pre všetkých nemení zoznam v kroku SMS)
  *
  * ODOSIELA SA NA KLIK, NIKDY SAMO. Naše číslo hodín je pri časti klientov
  * dopočítané (viď `packageOdvodeny`) a správa „dnes si mal poslednú hodinu"
@@ -197,7 +199,7 @@ export const Route = createFileRoute("/api/sms")({
         // nesedí s profilom.
         const prijemca = kus(b.prijemca, 120);
         await audit(DB, {
-          action: "sms-odoslana",
+          action: b.hromadna === true ? "sms-hromadna" : "sms-odoslana",
           predmet: `${klient} · ${cislo}`,
           neu: `${kolko.sprav} ${kolko.sprav === 1 ? "správa" : "správy"}${v.id ? ` · ${v.id}` : ""}${prijemca ? ` · pre: ${prijemca}` : ""}`,
           actor: kto,

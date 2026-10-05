@@ -2545,3 +2545,13 @@ Okno udalosti (`OknoUdalosti`) má pri tréningu s klientom „Duplikovať"
 trénera, až potom zmaže pôvodnú. Keď zlyhá zmazanie, vráti `castocne: true`
 a vetu „bude dvakrát" — opačné poradie by vedelo tréning stratiť. Pôvodná
 dostane `zmizla_at`, takže ju snímka nehlási ako zrušenie.
+
+## Hromadná správa (5. 10. 2026)
+
+Workspace → 2 · SMS → „Hromadná správa" (`HromadnaSprava.tsx`): filter
+Aktívni / + pauza / Všetci, „len moji klienti", ručný výber zaškrtnutím
+a hľadanie kohokoľvek; `{meno}` = krstné meno. Odosiela sa po DRUHOM
+potvrdení s počtom SMS, po jednej cez `/api/sms` (dá sa zastaviť). Čísla
+z `klient_fakturacia` (`/api/vydane-faktury` → `udaje`). V audite ako
+`sms-hromadna`, NIE `sms-odoslana` — inak by oznam pre všetkých vyčistil
+zoznam kroku SMS, ktorý stojí na stave hodín.

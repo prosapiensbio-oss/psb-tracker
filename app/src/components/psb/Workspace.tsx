@@ -17,6 +17,7 @@ import { BankaUlozene } from "./BankaUlozene";
 import { BankovyImport } from "./Banka";
 import { Zosit } from "./Zosit";
 import { Uzavierky } from "./Uzavierky";
+import { HromadnaSprava } from "./HromadnaSprava";
 import { KamOdisliCard, OtazkyMesiaca } from "./Vzas";
 import { RegisterRow } from "./Dashboard";
 import type { Actions } from "./App";
@@ -131,6 +132,8 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
    */
   /** „Všetky mesiace" pod kartou Uzávierka — zabalené, otvára sa zriedka. */
   const [vsetkyMesiace, setVsetkyMesiace] = useState(false);
+  /** Hromadná správa pod krokom SMS — zabalená, píše sa zriedka. */
+  const [hromadna, setHromadna] = useState(false);
   /** Ktorý riadok kroku Kalendár má pod sebou rozbalený týždeň (kľúč položky). */
   const [denOtvoreny, setDenOtvoreny] = useState("");
   /**
@@ -1455,10 +1458,22 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
     }
     if (k.krok === "sms") {
       return (
-        <KrokSms
-          clients={clients} dlhy={dlhyPodlaMena} udalosti={kalUdalosti || []}
-          balicky={balicky} platby={vlastnePlatby} trener={trenerKroku} onPocet={setPocetSms}
-        />
+        <>
+          {/* Hromadná správa navrchu, zabalená (Jerry, 5. 10. 2026: „pre
+              všetkých klientov alebo pre tých, ktorých vyberiem"). */}
+          <div style={{ marginBottom: 12, padding: hromadna ? "10px 12px" : "6px 12px", borderRadius: 10,
+            border: `1px solid ${hromadna ? mix(C.accent, 55) : mix(C.border, 70)}`, background: hromadna ? mix(C.accent, 6) : "transparent" }}>
+            <button onClick={() => setHromadna((v) => !v)} aria-expanded={hromadna}
+              style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit", fontSize: 13, fontWeight: 700, color: C.text, textAlign: "left", width: "100%" }}>
+              {hromadna ? "▾" : "▸"} Hromadná správa <span style={{ fontWeight: 500, fontSize: 12, color: C.textMuted }}>— všetkým alebo vybraným klientom</span>
+            </button>
+            {hromadna && <div style={{ marginTop: 10 }}><HromadnaSprava clients={clients} trener={trenerKroku} /></div>}
+          </div>
+          <KrokSms
+            clients={clients} dlhy={dlhyPodlaMena} udalosti={kalUdalosti || []}
+            balicky={balicky} platby={vlastnePlatby} trener={trenerKroku} onPocet={setPocetSms}
+          />
+        </>
       );
     }
     if (k.krok === "platby") {
