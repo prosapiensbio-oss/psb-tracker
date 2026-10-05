@@ -63,13 +63,39 @@ export async function kurzBtc(
       if (k?.czkZaBtc > 0 && dnesMs - Date.parse(k.kedy) < 10 * 60_000) return k;
     } catch { /* pokazený zápis sa prepíše novým */ }
   }
+  /**
+   * TRI ZDROJE, NIE JEDEN.
+   *
+   * CoinGecko na voľnom pláne obmedzuje podľa IP a Cloudflare chodí von
+   * zdieľanými adresami — z Workera sa tak dá ľahko naraziť na odmietnutie,
+   * hoci z notebooku to ide. Keď prvý zdroj mlčí, skúsi sa ďalší; kurz je
+   * číslo, bez ktorého sa platba bitcoinom nedá ukázať vôbec.
+   */
+  const zdroje: { url: string; vyber: (j: unknown) => number }[] = [
+    {
+      url: "https://api.coinbase.com/v2/exchange-rates?currency=BTC",
+      vyber: (j) => Number((j as { data?: { rates?: { CZK?: string } } })?.data?.rates?.CZK) || 0,
+    },
+    {
+      url: "https://blockchain.info/ticker",
+      vyber: (j) => Number((j as { CZK?: { last?: number } })?.CZK?.last) || 0,
+    },
+    {
+      url: "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=czk",
+      vyber: (j) => Number((j as { bitcoin?: { czk?: number } })?.bitcoin?.czk) || 0,
+    },
+  ];
   try {
-    const r = await fetch("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=czk", {
-      headers: { accept: "application/json", "user-agent": "Kokpit/1.0 (ProSapiens Biomechanic)" },
-    });
-    if (!r.ok) return null;
-    const j = (await r.json()) as { bitcoin?: { czk?: number } };
-    const czkZaBtc = Number(j?.bitcoin?.czk) || 0;
+    let czkZaBtc = 0;
+    for (const z of zdroje) {
+      const r = await fetch(z.url, {
+        headers: { accept: "application/json", "user-agent": "Kokpit/1.0 (ProSapiens Biomechanic)" },
+      }).catch(() => null);
+      if (!r?.ok) continue;
+      const j = await r.json().catch(() => null);
+      czkZaBtc = z.vyber(j);
+      if (czkZaBtc > 0) break;
+    }
     if (!(czkZaBtc > 0)) return null;
     const kurz: Kurz = { czkZaBtc, kedy: new Date(dnesMs).toISOString() };
     await DB.prepare(
