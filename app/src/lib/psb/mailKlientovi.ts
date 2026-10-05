@@ -128,9 +128,9 @@ export type VypisKlienta = {
    * Platba BITCOINOM namiesto prevodu na účet.
    *
    * Jerry, 5. 10. 2026: časť klientov platí v BTC a chce im namiesto QR na
-   * bankový účet ukázať lightningovú faktúru. `bolt11` je faktúra so sumou
-   * (vyrobená pri otvorení stránky, platí `platiMinut`); keď ju nemáme,
-   * zostane statická adresa a sumu si klient zadá sám.
+   * bankový účet ukázať lightningovú faktúru. `bolt11` je faktúra so sumou,
+   * vyrobená pri otvorení stránky cez LNURL-pay; keď ju nemáme, zostane
+   * statická adresa a sumu si klient zadá sám.
    */
   lightning?: {
     /** Suma v satoshi, už po zľave. */
@@ -144,7 +144,6 @@ export type VypisKlienta = {
     kurzKedy: string;
     adresa: string;
     bolt11?: string;
-    platiMinut?: number;
   };
 
   /**

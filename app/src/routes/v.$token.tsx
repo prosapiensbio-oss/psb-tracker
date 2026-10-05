@@ -14,7 +14,7 @@ import { blokPocitovky } from "../lib/psb/pocitovkaStranka";
 import { oblastiZJson, platnaHodnota, posledneHodnoty, POSUN, type Meranie, type Oblast } from "../lib/psb/pocitovka";
 import { podlaKlienta } from "../lib/psb/anamneza.server";
 import { qrObrazok } from "../lib/psb/fakturaHtml";
-import { cenaPoZlave, kurzBtc, LIGHTNING_ADRESA, penazenkaZKesu, satsText, satsZaCzk, vytvorFakturu } from "../lib/psb/lightning";
+import { cenaPoZlave, kurzBtc, LIGHTNING_ADRESA, satsText, satsZaCzk, vytvorFakturu } from "../lib/psb/lightning";
 import type { VypisKlienta } from "../lib/psb/mailKlientovi";
 import { DODAVATEL, spayd } from "../lib/psb/vydanaFaktura";
 
@@ -138,11 +138,10 @@ export const Route = createFileRoute("/v/$token")({
           const kurz = await kurzBtc(DB).catch(() => null);
           const sats = kurz ? satsZaCzk(czk, kurz.czkZaBtc) : null;
           if (sats) {
-            const kluc = (bindings() as { BLINK_API_KEY?: string }).BLINK_API_KEY || "";
-            const penazenka = kluc ? await penazenkaZKesu(DB, kluc).catch(() => null) : null;
-            const faktura = penazenka
-              ? await vytvorFakturu(kluc, penazenka, sats, `ProSapiens — ${c.name}`, 60).catch(() => null)
-              : null;
+            // Faktúra sa pýta priamo Lightning adresy (LNURL-pay) — kľúč ani
+            // účet na to netreba, a keď Jerry prejde k inej peňaženke, stačí
+            // vymeniť adresu.
+            const faktura = await vytvorFakturu(LIGHTNING_ADRESA, sats, `ProSapiens — ${c.name}`).catch(() => null);
             lightning = {
               sats: satsText(sats),
               czk, plnaCena: suma, zlava,
@@ -150,7 +149,6 @@ export const Route = createFileRoute("/v/$token")({
               kurzKedy: kurz!.kedy.slice(11, 16),
               adresa: LIGHTNING_ADRESA,
               bolt11: faktura?.bolt11,
-              platiMinut: faktura ? 60 : undefined,
             };
             // QR nesie faktúru, keď je; inak samotnú adresu — tú prečítajú
             // bežné peňaženky tiež, len si klient sumu zadá sám.

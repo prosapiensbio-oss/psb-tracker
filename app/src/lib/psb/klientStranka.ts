@@ -115,7 +115,7 @@ function blokLightning(v: VypisKlienta, qrUrl?: string): string {
 <div style="margin-top:5px;font-family:'Raleway',sans-serif;font-weight:800;font-size:36px;line-height:1.1;color:${s.pozadie}">${esc(l.sats)} sats</div>
 <div style="margin-top:3px;font-size:14px;color:#4d5940">${esc(kc(l.czk))}${l.zlava ? ` · sleva ${l.zlava} % z ${esc(kc(l.plnaCena))}` : ""}</div>
 ${qr}
-${l.bolt11 ? `<div style="margin-top:12px;font-size:13px;line-height:1.6;color:${s.pozadie}">Načti QR v Lightning peněžence.${l.platiMinut ? ` Faktura platí ${l.platiMinut} minut — když vyprší, stačí stránku obnovit.` : ""}</div>` : ""}
+${l.bolt11 ? `<div style="margin-top:12px;font-size:13px;line-height:1.6;color:${s.pozadie}">Načti QR v Lightning peněžence. Faktura má omezenou platnost — když ji peněženka odmítne, stačí stránku obnovit.</div>` : ""}
 <label style="display:block;margin-top:12px;text-align:left">
 <span style="display:block;font-size:11px;letter-spacing:1.6px;text-transform:uppercase;color:#4d5940">${l.bolt11 ? "Nebo pošli na adresu" : "Pošli na adresu"}</span>
 <input value="${esc(l.adresa)}" readonly inputmode="none" onfocus="this.select()" style="width:100%;box-sizing:border-box;margin-top:5px;padding:11px 12px;border:1px solid #4d5940;border-radius:10px;background:transparent;color:${s.pozadie};font-family:ui-monospace,Menlo,monospace;font-size:15px;font-weight:700;text-align:center">

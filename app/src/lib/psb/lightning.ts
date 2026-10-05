@@ -22,8 +22,6 @@
 /** Statická adresa na príjem; nevyprší, ale sumu si klient zadá sám. */
 export const LIGHTNING_ADRESA = "prosapiens_bio@blink.sv";
 
-const BLINK = "https://api.blink.sv/graphql";
-
 /** Cena po zľave, zaokrúhlená na celé koruny nahor (zľava je v percentách). */
 export function cenaPoZlave(czk: number, zlava?: number | null): number {
   const z = Math.max(0, Math.min(100, Number(zlava) || 0));
@@ -107,76 +105,64 @@ export async function kurzBtc(
   }
 }
 
-async function blink<T>(apiKey: string, query: string, variables: Record<string, unknown>): Promise<T | null> {
+/**
+ * FAKTÚRA PRIAMO Z LIGHTNING ADRESY — bez kľúča, bez účtu, bez tajomstva.
+ *
+ * Jerry sa 5. 10. 2026 nevedel prihlásiť do Blink dashboardu (overovací kód
+ * z mailu nikdy neprišiel), takže API kľúč nebol. Ukázalo sa, že ho netreba:
+ * Lightning Address JE verejné LNURL-pay rozhranie a na faktúru s presnou
+ * sumou stačia dva dotazy, ktoré smie spraviť ktokoľvek:
+ *
+ *   1. `https://<doména>/.well-known/lnurlp/<meno>` → `callback`
+ *   2. `callback?amount=<milisatoshi>` → `{ "pr": "lnbc…" }`
+ *
+ * Je to štandard (LUD-06/16), nie vlastnosť Blinku — keď Jerry raz prejde
+ * k inej peňaženke, stačí vymeniť adresu. Pozor na jednotku: suma sa posiela
+ * v MILISATOSHI, nie v satoshi; so stonásobkom brána odpovie „amount out of
+ * range" a stránka zostane bez QR.
+ *
+ * Odpoveď nesie aj `verify` — odkaz, cez ktorý sa dá neskôr zistiť, či bola
+ * faktúra zaplatená. Zatiaľ sa len odkladá.
+ */
+type LnurlPay = { callback?: string; minSendable?: number; maxSendable?: number; commentAllowed?: number };
+
+async function lnurlPay(adresa: string): Promise<LnurlPay | null> {
+  const [meno, domena] = adresa.split("@");
+  if (!meno || !domena) return null;
   try {
-    const r = await fetch(BLINK, {
-      method: "POST",
-      headers: { "content-type": "application/json", "X-API-KEY": apiKey, accept: "application/json" },
-      body: JSON.stringify({ query, variables }),
+    const r = await fetch(`https://${domena}/.well-known/lnurlp/${encodeURIComponent(meno)}`, {
+      headers: { accept: "application/json" },
     });
     if (!r.ok) return null;
-    const j = (await r.json()) as { data?: T; errors?: unknown[] };
-    return j?.errors?.length ? null : (j.data ?? null);
+    const j = (await r.json()) as LnurlPay;
+    return j?.callback ? j : null;
   } catch {
     return null;
   }
 }
 
-/** Id bitcoinovej peňaženky účtu — faktúra musí vedieť, kam má prísť. */
-export async function btcPenazenka(apiKey: string): Promise<string | null> {
-  const d = await blink<{ me?: { defaultAccount?: { wallets?: { id: string; walletCurrency: string }[] } } }>(
-    apiKey,
-    "query Me { me { defaultAccount { wallets { id walletCurrency } } } }",
-    {},
-  );
-  return d?.me?.defaultAccount?.wallets?.find((w) => w.walletCurrency === "BTC")?.id || null;
-}
+export type Faktura = { bolt11: string; sats: number; overit?: string };
 
 /**
- * Id peňaženky sa pýta raz za deň, nie pri každom otvorení stránky — je to
- * druhé volanie do Blinku a mení sa raz za nikdy.
- */
-export async function penazenkaZKesu(
-  DB: import("@cloudflare/workers-types").D1Database, apiKey: string, dnesMs = Date.now(),
-): Promise<string | null> {
-  const ulozene = await DB.prepare("SELECT value FROM vzas_settings WHERE key = 'blink_penazenka'")
-    .first<{ value: string }>().catch(() => null);
-  if (ulozene?.value) {
-    try {
-      const k = JSON.parse(ulozene.value) as { id: string; kedy: string };
-      if (k?.id && dnesMs - Date.parse(k.kedy) < 24 * 3600_000) return k.id;
-    } catch { /* pokazený zápis sa prepíše */ }
-  }
-  const id = await btcPenazenka(apiKey);
-  if (!id) return null;
-  await DB.prepare(
-    "INSERT INTO vzas_settings (key, value) VALUES ('blink_penazenka', ?1) ON CONFLICT(key) DO UPDATE SET value = ?1",
-  ).bind(JSON.stringify({ id, kedy: new Date(dnesMs).toISOString() })).run().catch(() => null);
-  return id;
-}
-
-export type Faktura = { bolt11: string; sats: number; platiDo: string };
-
-/**
- * Faktúra na danú sumu v satoshi. `minut` je platnosť — hodina stačí na to,
- * aby klient otvoril peňaženku, a nenechá po sebe QR, ktoré o týždeň nikam
- * nevedie.
+ * Faktúra na presnú sumu. `komentar` sa posiela, keď ho adresa dovolí —
+ * v peňaženke tak pri platbe stojí meno klienta a nemusí sa hádať zo sumy.
  */
 export async function vytvorFakturu(
-  apiKey: string, penazenka: string, sats: number, popis: string, minut = 60,
+  adresa: string, sats: number, komentar = "",
 ): Promise<Faktura | null> {
-  const d = await blink<{ lnInvoiceCreate?: { invoice?: { paymentRequest?: string; satoshis?: number }; errors?: { message: string }[] } }>(
-    apiKey,
-    `mutation LnInvoiceCreate($input: LnInvoiceCreateInput!) {
-       lnInvoiceCreate(input: $input) { invoice { paymentRequest satoshis } errors { message } }
-     }`,
-    { input: { walletId: penazenka, amount: Math.round(sats), memo: popis.slice(0, 120), expiresIn: minut } },
-  );
-  const inv = d?.lnInvoiceCreate?.invoice;
-  if (!inv?.paymentRequest) return null;
-  return {
-    bolt11: inv.paymentRequest,
-    sats: Number(inv.satoshis) || Math.round(sats),
-    platiDo: new Date(Date.now() + minut * 60_000).toISOString(),
-  };
+  const p = await lnurlPay(adresa);
+  if (!p?.callback) return null;
+  const msat = Math.round(sats) * 1000;
+  if ((p.minSendable && msat < p.minSendable) || (p.maxSendable && msat > p.maxSendable)) return null;
+  try {
+    const url = new URL(p.callback);
+    url.searchParams.set("amount", String(msat));
+    if (p.commentAllowed && komentar) url.searchParams.set("comment", komentar.slice(0, p.commentAllowed));
+    const r = await fetch(url.toString(), { headers: { accept: "application/json" } });
+    if (!r.ok) return null;
+    const j = (await r.json()) as { pr?: string; verify?: string };
+    return j?.pr ? { bolt11: j.pr, sats: Math.round(sats), overit: j.verify } : null;
+  } catch {
+    return null;
+  }
 }

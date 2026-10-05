@@ -204,6 +204,11 @@ const TABS = [
   // nie je jej zhrnutie, je to zoznam toho, čo dnes čaká na ruku. `id`
   // zostáva „dashboard" — visia naň adresy, ciele rituálov aj Jarvisove odkazy.
   { id: "dashboard", label: "Dnes", icon: "home" },
+  // Workspace — administratíva ako kopa kariet: to, čo sa v appke VYPĹŇA.
+  // Poradie radu od 5. 10. 2026 (Jerry): Dnes · Workspace · Kalendár ·
+  // Firma · Marketing · Prechod · Upload — denná práca vpredu, pohľady za ňou.
+  { id: "workspace", label: "Workspace", icon: "kopa" },
+  { id: "kalendar", label: "Kalendár", icon: "calendar" },
   // Obsahom je prevádzka — tréningy, klienti, 6M, fluktuácia — ale všetko
   // sú to ľudia, tak sa to tak aj volá.
   // Klienti, Peniaze a Výsledky sa 22. 9. 2026 zliali do jednej záložky
@@ -214,25 +219,17 @@ const TABS = [
   // tlačidlo a prepína sa medzi nimi o riadok nižšie.
   { id: "tracker", label: "Klienti", icon: "userCheck", skupina: "firma" },
   { id: "vzas", label: "Peniaze", icon: "wallet", skupina: "firma" },
-  // Workspace — administratíva ako kopa kariet: to, čo sa v appke VYPĹŇA.
-  // Sedí hneď za Firmou (Jerry, 23. 9. 2026), lebo tam patrí významom:
-  // Firma sú tri pohľady na to, ako sa firme darí, a vo všetkých troch sa
-  // len pozerá. Workspace je jediné miesto, kde sa niečo dopisuje — a chodí
-  // sa doň denne, takže na konci radu, za Kalendárom a Prechodom, bol ďaleko
-  // od ruky aj od zmyslu.
-  { id: "workspace", label: "Workspace", icon: "kopa" },
-  { id: "marketing", label: "Marketing", icon: "activity" },
-  { id: "kalendar", label: "Kalendár", icon: "calendar" },
-  // Dočasná záložka na odchod od PTmindera (22. 9. 2026). Tri meradlá
-  // súbežného chodu najprv viseli v Kalendári — Jerry v ten istý deň: „keď
-  // kliknem na kalendár, už to nie je len kalendár, ale aj platby atď."
-  // Jedna otázka na záložku; a keď sa PTminder vypne, táto sa celá zmaže.
-  { id: "prechod", label: "Prechod", icon: "prechod" },
   // Výsledky = mesačné a kvartálne pohľady, KPI, ciele, správa mesiaca.
   // Nahrávanie dát a uzávierka odišli do záložky Upload — robili sa
   // striedavo, ale sú to dva rôzne úkony a nahrať CSV treba aj mimo
   // uzávierky. `id` zostáva „mesiac“, adresa je aj tak #vysledky/…
   { id: "mesiac", label: "Výsledky", icon: "barChart", skupina: "firma" },
+  { id: "marketing", label: "Marketing", icon: "activity" },
+  // Dočasná záložka na odchod od PTmindera (22. 9. 2026). Tri meradlá
+  // súbežného chodu najprv viseli v Kalendári — Jerry v ten istý deň: „keď
+  // kliknem na kalendár, už to nie je len kalendár, ale aj platby atď."
+  // Jedna otázka na záložku; a keď sa PTminder vypne, táto sa celá zmaže.
+  { id: "prechod", label: "Prechod", icon: "prechod" },
   // Upload = nahrať exporty a zavrieť mesiac. `id` zostáva „udaje", lebo naň
   // visia adresy (#udaje), ciele rituálov aj Jarvisove odkazy — nápis je vec
   // pre človeka, id je vec pre kód.

@@ -333,7 +333,7 @@ describe("platba bitcoinom", () => {
     lightning: {
       sats: "54 120", czk: 4893, plnaCena: 6990, zlava: 30,
       kurz: "9 041 000", kurzKedy: "14:12", adresa: "prosapiens_bio@blink.sv",
-      bolt11: "lnbc1pvjluezpp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqdp", platiMinut: 60,
+      bolt11: "lnbc1pvjluezpp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqdp",
     },
   };
 
@@ -349,9 +349,9 @@ describe("platba bitcoinom", () => {
   });
 
   it("bez faktúry zostane adresa a suma sa zadáva ručne", () => {
-    const h = klientStranka({ ...z, lightning: { ...z.lightning, bolt11: undefined, platiMinut: undefined } } as never);
+    const h = klientStranka({ ...z, lightning: { ...z.lightning, bolt11: undefined } } as never);
     expect(h).toContain("Pošli na adresu");
     expect(h).toContain("zadej v peněžence sám");
-    expect(h).not.toContain("Faktura platí");
+    expect(h).not.toContain("omezenou platnost");
   });
 });
