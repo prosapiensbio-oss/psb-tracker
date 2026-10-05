@@ -238,7 +238,7 @@ export function Kalendar({ clients, data, focus, ktoSom, trainer, onTrainer, onN
           — Jerry: „aby to nebolo na dvoch miestach". Tu ostáva odkaz, ručný
           zápis toho, čo kalendár nevidel, a „Nedávno vybavené" s krokom späť. */}
       {pripojene && <div id="kal-zmeny"><Zmeny zmeny={onNavigate ? [] : zmenyF} vybavene={vybaveneF} onHotovo={async () => { await nacitaj(); oznam("kalendar"); }} mena={menaKlientov}
-        cakaVoWorkspace={onNavigate ? { zmien: zmenyF.length, nazvov: stav.nezname.length, otvor: () => onNavigate("workspace", "kalendar") } : undefined} /></div>}
+        cakaVoWorkspace={onNavigate ? { zmien: zmenyF.length, nazvov: (trener === "all" ? stav.nezname : stav.nezname.filter((n) => n.trener === trener)).length, otvor: () => onNavigate("workspace", "kalendar") } : undefined} /></div>}
       {/* „Nové názvy" idú NAD „Chýba v PTminderi" (Jerry, 22. 8. 2026).
           Je to poradie práce, nie estetika: kým sa meno z názvu udalosti
           nepriradí človeku, tréning nemá komu patriť — a presne preto potom

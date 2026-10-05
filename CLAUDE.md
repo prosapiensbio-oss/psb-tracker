@@ -2514,3 +2514,23 @@ mám byť presne tam, kde som skončil, so všetkým, čo som tam robil."
   (tie isté polia ako Tréningy → Prehľad, server zlučuje). Od piatku sa pýta
   na bežiaci týždeň, po–št na minulý (`tyzdenVytazenosti`); rozbalená, kým
   chýba MOJE číslo, po uložení sa zabalí. Pri „všetko" za prihláseného. Předplatné má vedľa zelené „Preniesť N h" (najviac 2).
+## Workspace je jediné miesto, kde sa niečo ROBÍ (5. 10. 2026)
+
+Jerry: „dáva zmysel, aby to bolo na dvoch miestach?" Nie. Pravidlo: vo
+Workspace sa vybavuje, ostatné záložky sa pozerajú a ukazujú naň.
+- **Kalendár**: zoznam zmien a „Nové názvy" sa tu nevybavujú — riadok „N zmien
+  · M nových názvov → Vybaviť vo Workspace". Ostáva ručný zápis toho, čo
+  kalendár nevidel, „Nedávno vybavené" (krok späť), Jedno meno – viac
+  klientov a Chýba v PTminderi.
+- **Upload**: bez zošita, pohybov z banky a uzávierky. Ostáva nahrávanie
+  súborov, ktoré inde miesto nemajú (iDoklad, Alza, Klienti, cenník…),
+  BTC párovanie a nastavenia. Zoznam všetkých mesiacov so zámkom/odomknutím
+  (`Uzavierky`) je zbalený pod kartou Uzávierka mesiaca.
+- **Tréningy → Prehľad**: náročnosť len na čítanie (stĺpce „N", farby už
+  správne — nízke je dobré).
+- **Register / + Zápis**: týždenná vyťaženosť a mesačné kontroly sa
+  vyfiltrujú (`mimoWorkspace` v `rituals.ts`, aj v `registerServer`).
+  Uzávierka a stav hotovosti ostávajú ako pripomienka, ale vedú do Workspace.
+- **Preklik na krok**: `navigate("workspace", "<krok>")` → `otvorKrok`.
+  Upozornenia o zmenách, „bol tam?" a nových názvoch majú `workspace|kalendar`.
+- Karta Klient je v kope POSLEDNÁ; kopa sa otvára na kroku 1.
