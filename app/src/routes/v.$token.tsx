@@ -14,6 +14,8 @@ import { blokPocitovky } from "../lib/psb/pocitovkaStranka";
 import { oblastiZJson, platnaHodnota, posledneHodnoty, POSUN, type Meranie, type Oblast } from "../lib/psb/pocitovka";
 import { podlaKlienta } from "../lib/psb/anamneza.server";
 import { qrObrazok } from "../lib/psb/fakturaHtml";
+import { cenaPoZlave, kurzBtc, LIGHTNING_ADRESA, penazenkaZKesu, satsText, satsZaCzk, vytvorFakturu } from "../lib/psb/lightning";
+import type { VypisKlienta } from "../lib/psb/mailKlientovi";
 import { DODAVATEL, spayd } from "../lib/psb/vydanaFaktura";
 
 /**
@@ -115,8 +117,54 @@ export const Route = createFileRoute("/v/$token")({
         const { vypis, suma, sprava } = await obsahOdkazu(DB, data, c, { rozsah, teraz: terazPraha() });
         const origin = new URL(request.url).origin;
 
+        /**
+         * BITCOINOVÝ KLIENT PLATÍ NA LIGHTNING, NIE NA ÚČET.
+         *
+         * Jerry, 5. 10. 2026. Zľava je číslo pri klientovi (`btcZlava`),
+         * lebo pravidlo má výnimky; kurz sa berie z verejného zdroja
+         * a schová na desať minút; faktúra sa vyrába až tu, pri otvorení
+         * stránky, aby nevypršala skôr, než ju klient uvidí.
+         *
+         * Keď čokoľvek z toho zlyhá — kurz, kľúč, Blink — ostáva statická
+         * Lightning Address a suma napísaná slovom. Bankový blok sa
+         * bitcoinovému klientovi neukazuje: platil by dvakrát.
+         */
+        const prepis = data.clientOverrides?.[c.name];
+        const jeBitcoin = !!prepis?.bitcoin;
+        let lightning: VypisKlienta["lightning"];
+        if (jeBitcoin && suma > 0) {
+          const zlava = Number(prepis?.btcZlava) || 0;
+          const czk = cenaPoZlave(suma, zlava);
+          const kurz = await kurzBtc(DB).catch(() => null);
+          const sats = kurz ? satsZaCzk(czk, kurz.czkZaBtc) : null;
+          if (sats) {
+            const kluc = (bindings() as { BLINK_API_KEY?: string }).BLINK_API_KEY || "";
+            const penazenka = kluc ? await penazenkaZKesu(DB, kluc).catch(() => null) : null;
+            const faktura = penazenka
+              ? await vytvorFakturu(kluc, penazenka, sats, `ProSapiens — ${c.name}`, 60).catch(() => null)
+              : null;
+            lightning = {
+              sats: satsText(sats),
+              czk, plnaCena: suma, zlava,
+              kurz: Math.round(kurz!.czkZaBtc).toLocaleString("cs-CZ").replace(/\u00a0/g, " "),
+              kurzKedy: kurz!.kedy.slice(11, 16),
+              adresa: LIGHTNING_ADRESA,
+              bolt11: faktura?.bolt11,
+              platiMinut: faktura ? 60 : undefined,
+            };
+            // QR nesie faktúru, keď je; inak samotnú adresu — tú prečítajú
+            // bežné peňaženky tiež, len si klient sumu zadá sám.
+            const o = qrObrazok((faktura?.bolt11 || LIGHTNING_ADRESA).toUpperCase());
+            const bajty = new Uint8Array(o.data);
+            let bin = "";
+            for (let i = 0; i < bajty.length; i += 4096) bin += String.fromCharCode(...bajty.subarray(i, i + 4096));
+            vypis.lightning = lightning;
+            vypis.qrUrl = `data:${o.typ};base64,${btoa(bin)}`;
+          }
+        }
+
         let qrUrl: string | undefined;
-        if (suma > 0) {
+        if (!jeBitcoin && suma > 0) {
           // Do správy pre príjemcu ide MENO — podľa neho Kokpit platbu spáruje.
           const o = qrObrazok(spayd({ suma, vs: "", sprava, prijemca: DODAVATEL.meno }));
           const bajty = new Uint8Array(o.data);
@@ -194,7 +242,9 @@ export const Route = createFileRoute("/v/$token")({
          */
         const html = klientStranka({
           ...vypis,
-          qrUrl,
+          // Bitcoinový QR je už vo výpise; bankový `qrUrl` je pri takom
+          // klientovi prázdny a prepísať ho ním by znamenalo stránku bez QR.
+          qrUrl: vypis.qrUrl || qrUrl,
           pocitovka: pocity,
           logoUrl: `${origin}/znacka-napis-tmava.svg`,
           historiaPoslana: new URL(request.url).searchParams.get("historia") === "1",

@@ -15,6 +15,7 @@ const ALLOWED = new Set<keyof ClientOverride>([
   "contractSigned",
   "primaryTrainer",
   "bitcoin",
+  "btcZlava",
   "duch",
   "zdroj",
   "zdrojKto",

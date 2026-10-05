@@ -1,0 +1,13 @@
+-- Zľava pre klienta, ktorý platí bitcoinom — v percentách.
+--
+-- Jerry, 5. 10. 2026: „pred rokom 2025 mali všetci klienti 10 % zľavu, po
+-- roku 2025 majú pri prvej platbe 20 % a pri každej ďalšej 5 %." Knapčok má
+-- 10 % za bitcoin a ešte 20 % kamarátsku, teda 30 %.
+--
+-- Prečo číslo pri klientovi a nie pravidlo z histórie: pravidlo má výnimky
+-- (kamarát, starý klient s desiatkou) a Jerry ich chce vedieť zmeniť bez
+-- toho, aby sa prepisoval kód. Pravidlo zostáva ako PREDVYPLNENIE pri novom
+-- bitcoinovom klientovi.
+--
+-- NULL = zľava sa neuplatňuje (bežný klient aj bitcoinový bez dohody).
+ALTER TABLE client_overrides ADD COLUMN btc_zlava INTEGER;

@@ -106,6 +106,14 @@ export type ClientOverride = {
   contractSigned?: boolean;
   primaryTrainer?: string | null;
   bitcoin?: boolean;
+  /**
+   * Zľava pre platbu bitcoinom v percentách; `null` = žiadna.
+   *
+   * Jerry, 5. 10. 2026: pred 2025 mali všetci 10 %, od 2025 je prvá platba
+   * 20 % a každá ďalšia 5 %. Výnimky existujú (Knapčok 30 % — 10 % za bitcoin
+   * a 20 % kamarátska), preto je to číslo pri klientovi, nie pravidlo z kódu.
+   */
+  btcZlava?: number | null;
   /** Odpoveď na otázku „je duch?" — "" = nepýtané, "ano", "nie". */
   duch?: string;
   /** Odkiaľ sa o nás dozvedel — pevný zoznam, viď ZDROJE. */

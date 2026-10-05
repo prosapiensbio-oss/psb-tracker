@@ -16,7 +16,7 @@ Stav k **3. 10. 2026**.
 
 ---
 
-- **Únava (týždenná náročnosť) vo Workspace** — Jerry 5. 10. 2026 sa pýtal, čo si o tom myslím. Návrh: riadok na konci kroku 1 Kalendár, len kým za minulý týždeň chýba MOJE číslo; vedľa odtrénované hodiny z kalendára. Zapisuje do toho istého `jerry_score`/`terezka_score`. Čaká na súhlas.
+- **Vyťaženosť vo Workspace** — v bete od 5. 10. 2026 navrchu kroku 1 („Kalendár a vyťaženosť"); naostro až na Jerryho „postav to v Kokpite".
 
 ## 0a · Workspace po krokoch — naostro od 5. 10. 2026
 

@@ -2504,6 +2504,11 @@ mám byť presne tam, kde som skončil, so všetkým, čo som tam robil."
   načítam znova"; obnovu rieši signál (`oznam`/`pocuvaj`).
 - Index karty je v `sessionStorage` (`psb-workspace-karta`) — návrat do
   Workspace aj obnovenie stránky pristane na tej istej karte.
-- Platnosť končí: posuvník je DOPLNENIE (predvolene všetky hodiny), vedľa
-  „1 h doplnenie · 1 h prepadne" / „2 h prepadne"; druh členstva a koniec
-  platnosti sú pod menom. Předplatné má vedľa zelené „Preniesť N h" (najviac 2).
+- Platnosť končí: posuvník ide od „doplnenie" (vľavo, predvolené) k „prepadne"
+  (vpravo), vedľa „1 h doplnenie · 1 h prepadne" / „2 h prepadne"; druh
+  členstva a koniec platnosti sú pod menom.
+- **Vyťaženosť týždňa navrchu kroku 1** (beta, krok sa volá „Kalendár
+  a vyťaženosť"): `VytazenostTyzdna` píše do `<osoba>_score/_hours/_note`
+  (tie isté polia ako Tréningy → Prehľad, server zlučuje). Od piatku sa pýta
+  na bežiaci týždeň, po–št na minulý (`tyzdenVytazenosti`); rozbalená, kým
+  chýba MOJE číslo, po uložení sa zabalí. Pri „všetko" za prihláseného. Předplatné má vedľa zelené „Preniesť N h" (najviac 2).

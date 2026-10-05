@@ -233,6 +233,7 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
       contractSigned: !!r.contract_signed,
       primaryTrainer: r.primary_trainer,
       bitcoin: !!r.bitcoin,
+      btcZlava: r.btc_zlava == null ? null : Number(r.btc_zlava),
       duch: String(r.duch || ""),
       zdroj: String(r.zdroj || ""),
       zdrojKto: String(r.zdroj_kto || ""),
@@ -928,6 +929,7 @@ export async function setOverride(
     contractSigned: "contract_signed",
     primaryTrainer: "primary_trainer",
     bitcoin: "bitcoin",
+    btcZlava: "btc_zlava",
     duch: "duch",
     zdroj: "zdroj",
     zdrojKto: "zdroj_kto",
@@ -944,6 +946,8 @@ export async function setOverride(
   let v: unknown = value;
   if (col === "special_rate" || col === "contract_signed" || col === "bitcoin") v = value ? 1 : 0;
   if ((col === "status" || col === "primary_trainer") && (value === "" || value == null)) v = null;
+  // Zľava je číslo 0–100; prázdno znamená „žiadna dohoda", nie nulu.
+  if (col === "btc_zlava") v = value === "" || value == null ? null : Math.max(0, Math.min(100, Math.round(Number(value) || 0)));
 
   const r = await DB.prepare(
     `INSERT INTO client_overrides (name, ${col}, updated_at) VALUES (?1, ?2, ?3)

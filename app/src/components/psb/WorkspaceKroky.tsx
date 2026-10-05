@@ -15,6 +15,7 @@ import { maTermin, najdiKlienta, type ClientAgg } from "../../lib/psb/compute";
 import { fmtCZK, fmtDMY, normName } from "../../lib/psb/format";
 import { nazovProduktu } from "../../lib/psb/nazvyProduktov";
 import { oznam } from "../../lib/psb/obnovaSignal";
+import { fetchWeekEntries, saveWeekEntry } from "../../lib/psb/client";
 import type { ZostavaPoPlatnosti } from "../../lib/psb/platnostZostatok";
 import { C, mix } from "../../lib/psb/theme";
 import { menoDoBloku, rozlozUdalosti } from "../../lib/psb/kalendarRozlozenie";
@@ -611,10 +612,9 @@ export function KrokPlatnost({ polozky, acks, trener, onVybavene }: {
   };
 
   /**
-   * POSUVNÍK JE DOPLNENIE (Jerry, 5. 10. 2026): „namiesto prepadne pri tom
-   * posuvníku daj doplnenie — keď má 2 h a posuniem na 1 h, nech napíše
-   * 1 h doplnenie, 1 h prepadne; na nule 2 h prepadne." Predvolene je plný
-   * (doplnenie všetkých hodín). Druh členstva a koniec platnosti stoja pod
+   * POSUVNÍK MEDZI DOPLNENÍM A PREPADNUTÍM (Jerry, 5. 10. 2026): vľavo
+   * „doplnenie", vpravo „prepadne"; vedľa „1 h doplnenie · 1 h prepadne"
+   * alebo „2 h prepadne". Predvolene vľavo (doplnenie všetkých hodín). Druh členstva a koniec platnosti stoja pod
    * menom — vlastný stĺpec riadok len zbytočne rozťahoval.
    */
   return (
@@ -623,8 +623,11 @@ export function KrokPlatnost({ polozky, acks, trener, onVybavene }: {
       {chyba && <div style={{ fontSize: 12, color: C.red }}>{chyba}</div>}
       {zive.map((x) => {
         const kluc = `platnost|${x.meno}|${x.platnostDo}`;
-        const doplnit = Math.max(0, Math.min(x.hodin, hodnoty[kluc] ?? x.hodin));
-        const prepadne = Math.round((x.hodin - doplnit) * 100) / 100;
+        // Posuvník ide od doplnenia (vľavo) k prepadnutiu (vpravo) — Jerry,
+        // 5. 10. 2026: „napravo musí byť prepadne". Hodnota je prepadnutie,
+        // predvolene 0, teda doplnenie všetkých hodín.
+        const prepadne = Math.max(0, Math.min(x.hodin, hodnoty[kluc] ?? 0));
+        const doplnit = Math.round((x.hodin - prepadne) * 100) / 100;
         const predplatne = x.predplatne || /předplatn|predplatn|s viazanost/i.test(x.membership);
         const presun = predplatne ? Math.min(2, doplnit) : 0;
         const farba = predplatne ? C.blue : C.accent;
@@ -644,13 +647,14 @@ export function KrokPlatnost({ polozky, acks, trener, onVybavene }: {
               </span>
             </span>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
-              <span style={{ fontSize: 11.5, color: C.textDim }}>doplnenie</span>
+              <span style={{ fontSize: 11.5, color: C.green }}>doplnenie</span>
               <input
-                type="range" min={0} max={x.hodin} step={1} value={doplnit}
+                type="range" min={0} max={x.hodin} step={1} value={prepadne}
                 onChange={(e) => setHodnoty((s) => ({ ...s, [kluc]: Number(e.target.value) }))}
-                style={{ width: 110, accentColor: C.green }}
-                aria-label={`Koľko hodín z ${x.hodin} ide do doplnenia — ${x.meno}`}
+                style={{ width: 110, accentColor: C.orange }}
+                aria-label={`Koľko hodín z ${x.hodin} prepadne — ${x.meno}`}
               />
+              <span style={{ fontSize: 11.5, color: C.orange }}>prepadne</span>
               <span style={{ fontSize: 12, fontWeight: 600, color: C.textMuted, minWidth: 150 }}>
                 {doplnit ? <span style={{ color: C.green }}>{doplnit} h doplnenie</span> : null}
                 {doplnit && prepadne ? " · " : ""}
@@ -1114,5 +1118,128 @@ export function KrokKontroly({ kontroly, acks, onNavigate, onZmena }: {
         );
       })}
     </>
+  );
+}
+
+/* ───────────────────────── VYŤAŽENOSŤ TÝŽDŇA ─────────────────────────────── */
+
+const isoDen = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+/**
+ * Pondelok týždňa, na ktorý sa práve pýtame. Od piatku je to bežiaci týždeň
+ * (Jerry, 5. 10. 2026: „v piatok sa na úplnom vrchu rozbalí"); pondelok až
+ * štvrtok ešte ten minulý — kto ho cez víkend nevyplnil, nesmie zmiznúť.
+ */
+export function tyzdenVytazenosti(dnes: Date = new Date()): string {
+  const dow = (dnes.getDay() + 6) % 7; // 0 = pondelok
+  const pon = new Date(dnes.getFullYear(), dnes.getMonth(), dnes.getDate() - dow - (dow >= 4 ? 0 : 7));
+  return isoDen(pon);
+}
+
+/**
+ * VYŤAŽENOSŤ TÝŽDŇA na vrchu kroku Kalendár (Jerry, 5. 10. 2026). Rozbalená,
+ * kým za týždeň chýba MOJE hodnotenie; po uložení sa zabalí do jedného riadku.
+ * Zapisuje do tých istých polí ako Tréningy → Prehľad (`<osoba>_score`,
+ * `_hours`, `_note`) — server ich zlučuje, takže Terezkin zápis neprepíše
+ * Jerryho a graf vyhorenia ostáva jeden.
+ */
+export function VytazenostTyzdna({ kto, udalosti }: {
+  kto: "Jerry" | "Terezka";
+  udalosti: { zaciatok: string; koniec?: string; typ: string | null; trener?: string }[];
+}) {
+  const os = kto === "Jerry" ? "jerry" : "terezka";
+  const tyzden = tyzdenVytazenosti();
+  const [zapis, setZapis] = useState<Record<string, string> | null>(null);
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const [otvorene, setOtvorene] = useState<boolean | null>(null);
+  const [bezi, setBezi] = useState(false);
+  const [chyba, setChyba] = useState("");
+
+  useEffect(() => {
+    let zive = true;
+    void fetchWeekEntries().then((w) => {
+      if (!zive) return;
+      const e = w[tyzden] || {};
+      setZapis(e);
+      setDraft({ score: e[`${os}_score`] || "", hours: e[`${os}_hours`] || "", note: e[`${os}_note`] || "" });
+    });
+    return () => { zive = false; };
+  }, [tyzden, os]);
+
+  const vyplnene = !!zapis && Number(zapis[`${os}_score`]) > 0;
+  const rozbalene = otvorene ?? !vyplnene;
+
+  const [r, m, d] = tyzden.split("-").map(Number);
+  const nedela = new Date(r, m - 1, d + 6);
+  const rozsah = `${d}. ${m}.–${nedela.getDate()}. ${nedela.getMonth() + 1}.`;
+  const hodin = useMemo(() => {
+    const od = tyzden, po = isoDen(new Date(r, m - 1, d + 7));
+    let min = 0;
+    for (const u of udalosti) {
+      const den = u.zaciatok.slice(0, 10);
+      if (den < od || den >= po || (u.trener && u.trener !== kto)) continue;
+      if (u.typ !== "trening" && u.typ !== "uvodny") continue;
+      const dlzka = u.koniec ? (new Date(u.koniec).getTime() - new Date(u.zaciatok).getTime()) / 60000 : 60;
+      min += dlzka > 0 && dlzka < 300 ? dlzka : 60;
+    }
+    return Math.round(min / 6) / 10;
+  }, [udalosti, tyzden, kto, r, m, d]);
+
+  if (!zapis) return null;
+  const score = Number(draft.score || 5);
+  const farba = score <= 4 ? C.green : score <= 7 ? C.orange : C.red;
+
+  const uloz = async () => {
+    setBezi(true); setChyba("");
+    const data: Record<string, string> = { [`${os}_score`]: String(score), [`${os}_hours`]: draft.hours || "", [`${os}_note`]: draft.note || "" };
+    const ok = await saveWeekEntry(tyzden, data);
+    setBezi(false);
+    if (!ok) { setChyba("Neuložilo sa — skús znova."); return; }
+    setZapis((z) => ({ ...(z || {}), ...data }));
+    setOtvorene(false);
+    oznam("zapisy");
+  };
+
+  const pole: React.CSSProperties = {
+    background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, color: C.text,
+    fontSize: 12.5, padding: "6px 9px", fontFamily: "inherit",
+  };
+
+  return (
+    <div style={{ marginBottom: 14, padding: rozbalene ? "10px 12px" : "6px 12px", borderRadius: 10,
+      border: `1px solid ${rozbalene ? mix(C.accent, 55) : mix(C.border, 70)}`, background: rozbalene ? mix(C.accent, 7) : "transparent" }}>
+      <button onClick={() => setOtvorene(!rozbalene)} aria-expanded={rozbalene}
+        style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit", textAlign: "left", width: "100%", display: "flex", gap: 10, alignItems: "baseline", flexWrap: "wrap" }}>
+        <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{rozbalene ? "▾" : "▸"} Vyťaženosť týždňa {rozsah}</span>
+        <span style={{ fontSize: 12, color: C.textMuted }}>v kalendári {String(hodin).replace(".", ",")} h tréningov</span>
+        {vyplnene && !rozbalene && (
+          <span style={{ fontSize: 12, fontWeight: 700, color: Number(zapis[`${os}_score`]) <= 4 ? C.green : Number(zapis[`${os}_score`]) <= 7 ? C.orange : C.red }}>
+            {zapis[`${os}_score`]} / 10 ✓
+          </span>
+        )}
+      </button>
+      {rozbalene && (
+        <div style={{ marginTop: 10, display: "grid", gap: 8 }}>
+          <div style={{ fontSize: 11.5, color: C.textMuted }}>Náročnosť týždňa <span style={{ color: C.textDim }}>· 1 = ľahký · 10 = veľmi ťažký</span></div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, maxWidth: 420 }}>
+            <input type="range" min={1} max={10} step={1} value={score}
+              onChange={(e) => setDraft((x) => ({ ...x, score: e.target.value }))}
+              style={{ flex: 1, accentColor: farba }} aria-label="Náročnosť týždňa" />
+            <span style={{ fontSize: 14, fontWeight: 700, minWidth: 44, textAlign: "right", color: farba }}>{score} / 10</span>
+          </div>
+          <label style={{ fontSize: 11.5, color: C.textMuted, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+            Iné hodiny (mimo tréningov)
+            <input type="number" min={0} max={120} value={draft.hours || ""} placeholder="napr. 8"
+              onChange={(e) => setDraft((x) => ({ ...x, hours: e.target.value }))} style={{ ...pole, width: 78 }} />
+          </label>
+          <input value={draft.note || ""} placeholder="jedna veta o týždni…" onChange={(e) => setDraft((x) => ({ ...x, note: e.target.value }))}
+            style={{ ...pole, width: "100%", maxWidth: 520 }} />
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <button disabled={bezi} style={hlavne(!bezi)} onClick={() => void uloz()}>{bezi ? "Ukladám…" : "Uložiť"}</button>
+            {chyba && <span style={{ fontSize: 12, color: C.red }}>{chyba}</span>}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

@@ -28,6 +28,9 @@ type AppEnv = {
   ANTHROPIC_API_KEY?: string;
   // Shared read-only token for the PSB Bitcoin app's /api/reserve endpoint.
   BTC_RESERVE_TOKEN?: string;
+  // Blink — API kľúč na výrobu lightningových faktúr pre klientov, čo platia
+  // bitcoinom. Stačí mu právo na príjem; posielať z neho appka nepotrebuje.
+  BLINK_API_KEY?: string;
   // Fio API — token k JEDNÉMU účtu s právom „Sledování účtu" (len čítanie).
   // Secret, nikdy v databáze: kto ho má, vidí všetky pohyby na účte.
   FIO_TOKEN?: string;

@@ -83,6 +83,49 @@ function hlavnyStav(v: VypisKlienta): { velke: string; pod: string } {
   return { velke: `Nad rámec ${hod(-v.zostatok)}`, pod: "odtrénováno nad zaplacený balíček" };
 }
 
+/**
+ * PLATBA BITCOINOM — namiesto bankového QR lightningová faktúra.
+ *
+ * Jerry, 5. 10. 2026: „mám časť klientov, ktorí platia v BTC — vedeli by sme
+ * im namiesto QR na bankový účet generovať QR na LN adresu?" Vedeli, a so
+ * sumou predvyplnenou: faktúra sa vyrobí v Blinku pri otvorení stránky.
+ *
+ * Píše sa pri tom VŠETKO, čo z čísla robí overiteľné číslo — pôvodná cena,
+ * zľava, suma v korunách, suma v satoshi a kurz s časom. Klient tak vidí,
+ * prečo platí práve toľko, a nemusí veriť appke na slovo.
+ *
+ * Pod QR stojí statická adresa: faktúra po hodine vyprší, adresa nie.
+ */
+function blokLightning(v: VypisKlienta, qrUrl?: string): string {
+  const s = SADZBA;
+  const l = v.lightning;
+  if (!l) return "";
+  const qr = qrUrl
+    ? `<div style="margin-top:16px;background:#ffffff;border-radius:14px;padding:12px;display:inline-block">
+<img src="${esc(qrUrl)}" alt="QR na platbu přes Lightning" width="200" style="display:block;width:200px;height:auto">
+</div>`
+    : "";
+  const ulozQr = qrUrl
+    ? `<div style="margin-top:14px">
+<a href="${esc(qrUrl)}" download="platba-lightning.gif" style="display:inline-block;text-decoration:none;border:2px solid ${s.pozadie};border-radius:999px;padding:11px 22px;font-size:14px;font-weight:700;color:${s.pozadie}">Uložit QR do fotek</a>
+</div>`
+    : "";
+  return `<div style="margin-top:26px;background:${s.zelena};border-radius:18px;padding:20px;text-align:center">
+<div style="font-size:11px;letter-spacing:2.4px;color:#4d5940;text-transform:uppercase">${v.platba?.novy === false ? "K úhradě" : "Nový balíček"} · bitcoin</div>
+<div style="margin-top:5px;font-family:'Raleway',sans-serif;font-weight:800;font-size:36px;line-height:1.1;color:${s.pozadie}">${esc(l.sats)} sats</div>
+<div style="margin-top:3px;font-size:14px;color:#4d5940">${esc(kc(l.czk))}${l.zlava ? ` · sleva ${l.zlava} % z ${esc(kc(l.plnaCena))}` : ""}</div>
+${qr}
+${l.bolt11 ? `<div style="margin-top:12px;font-size:13px;line-height:1.6;color:${s.pozadie}">Načti QR v Lightning peněžence.${l.platiMinut ? ` Faktura platí ${l.platiMinut} minut — když vyprší, stačí stránku obnovit.` : ""}</div>` : ""}
+<label style="display:block;margin-top:12px;text-align:left">
+<span style="display:block;font-size:11px;letter-spacing:1.6px;text-transform:uppercase;color:#4d5940">${l.bolt11 ? "Nebo pošli na adresu" : "Pošli na adresu"}</span>
+<input value="${esc(l.adresa)}" readonly inputmode="none" onfocus="this.select()" style="width:100%;box-sizing:border-box;margin-top:5px;padding:11px 12px;border:1px solid #4d5940;border-radius:10px;background:transparent;color:${s.pozadie};font-family:ui-monospace,Menlo,monospace;font-size:15px;font-weight:700;text-align:center">
+</label>
+${l.bolt11 ? "" : `<div style="margin-top:8px;font-size:12.5px;line-height:1.5;color:#4d5940">Částku ${esc(l.sats)} sats zadej v peněžence sám.</div>`}
+${ulozQr}
+<div style="margin-top:14px;font-size:11.5px;line-height:1.5;color:#4d5940">kurz ${esc(l.kurz)} Kč/BTC${l.kurzKedy ? ` · ${esc(l.kurzKedy)}` : ""}</div>
+</div>`;
+}
+
 function blokPlatby(v: VypisKlienta, qrUrl?: string): string {
   if (!v.platba || v.platba.suma <= 0) return "";
   const s = SADZBA;
@@ -398,7 +441,7 @@ details[open] .psb-sip{transform:rotate(90deg)}
 ${dalsi}
 
 ${blokOsi(v, false)}
-${blokPlatby(v, v.qrUrl)}
+${v.lightning ? blokLightning(v, v.qrUrl) : blokPlatby(v, v.qrUrl)}
 ${pocitovka}
 ${blokHistorie(!!v.historiaPoslana)}
 

@@ -25,6 +25,7 @@ import type { PohybSplits, SplitCiast } from "../../lib/psb/pohybSplit";
 import { ritualy } from "../../lib/psb/rituals";
 import { jeBeta } from "../../lib/psb/beta";
 import { KrokDopyty, KrokKontroly, KrokUzavierka, type KrokUzavierkyKarta } from "./WorkspaceKroky";
+import { VytazenostTyzdna } from "./WorkspaceKroky";
 import { AutomatickeBalicky, FioPrijmy, TyzdenKalendara, type Zvyraznenie, KrokPlatnost, KrokSms, NadpisSekcie, OtazkyPlatieb, VsetkoVybavene } from "./WorkspaceKroky";
 import { bezAktivnehoBalicka, treningyZObochZdrojov, vMinuseKlienta, type BezBalicka } from "../../lib/psb/bezBalicka";
 import { dlznici as spocitajDlznikov, type Dlznik } from "../../lib/psb/dlznici";
@@ -1444,8 +1445,12 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
         </>
       );
     }
+    // Vyťaženosť týždňa navrchu kroku Kalendár (beta, Jerry 5. 10. 2026) —
+    // vždy za seba: pri „všetko" za toho, kto je prihlásený.
+    const kto = trenerKroku || trenerZPrihlasenia(ktoSom);
     return (
       <>
+        {beta && (kto === "Jerry" || kto === "Terezka") && <VytazenostTyzdna kto={kto} udalosti={(kalUdalosti || []) as never} />}
         {sekcieKresli}
         {!sekcie.length && <VsetkoVybavene text="Všetko vybavené — kalendár nemá výnimky." />}
       </>

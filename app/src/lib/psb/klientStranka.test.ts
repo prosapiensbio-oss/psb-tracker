@@ -323,3 +323,35 @@ describe("ľavý stĺpec je odpočet hodín a nič iné", () => {
     expect(h).toContain("<span>6 h</span>");
   });
 });
+
+describe("platba bitcoinom", () => {
+  const z = {
+    klient: "Michal Knapčok", oslovenie: "Michal", trener: "Jerry",
+    os: [{ den: "2026-10-01", cas: "16:00", popis: "tréning", druh: "trening" as const, zostatok: 1, dlh: null }],
+    zostatok: 0, hodinSpolu: 1, odkedy: "2026-01-01", dnes: "2026-10-05",
+    platba: { popis: "6h Balíček", suma: 6990, ucet: "2302732185/2010", sprava: "Michal Knapčok", novy: true },
+    lightning: {
+      sats: "54 120", czk: 4893, plnaCena: 6990, zlava: 30,
+      kurz: "9 041 000", kurzKedy: "14:12", adresa: "prosapiens_bio@blink.sv",
+      bolt11: "lnbc1pvjluezpp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqdp", platiMinut: 60,
+    },
+  };
+
+  it("ukáže satoshi, cenu po zľave aj kurz — a bankový účet NIE", () => {
+    const h = klientStranka(z as never);
+    expect(h).toContain("54 120 sats");
+    expect(h).toContain("sleva 30 %");
+    expect(h).toContain("9 041 000 Kč/BTC");
+    expect(h).toContain("prosapiens_bio@blink.sv");
+    // Bankový blok sa nesmie objaviť — klient by zaplatil dvakrát.
+    expect(h).not.toContain("Číslo účtu");
+    expect(h).not.toContain("2302732185/2010");
+  });
+
+  it("bez faktúry zostane adresa a suma sa zadáva ručne", () => {
+    const h = klientStranka({ ...z, lightning: { ...z.lightning, bolt11: undefined, platiMinut: undefined } } as never);
+    expect(h).toContain("Pošli na adresu");
+    expect(h).toContain("zadej v peněžence sám");
+    expect(h).not.toContain("Faktura platí");
+  });
+});
