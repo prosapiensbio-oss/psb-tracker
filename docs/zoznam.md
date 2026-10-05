@@ -80,8 +80,8 @@ Balíčky). Postavené v bete; pravidlá v CLAUDE.md „Workspace po krokoch".
       + Zápis); duplikovať tréning a presun na iného trénera v kalendári.
 - [ ] **FIO_TOKEN v bete** — bez neho „Stiahnuť príjmy z Fio" v bete nejde.
       Jerry: `npx wrangler secret put FIO_TOKEN --name kokpit-beta`.
-- [ ] **Banka od 27. 9. nestiahnutá** — pravidlo „nezaplatený balíček = mínus"
-      drží poistka z PTmindera; po odchode z neho musí byť banka spárovaná.
+- [x] **Banka stiahnutá** (overené 5. 10. 2026: pohyby do 4. 10.). Pravidlo
+      „nezaplatený balíček = mínus" stojí na spárovanej banke — sťahovať priebežne.
 - [x] **Opravy platieb z dávky 28. 9.** — 5. 10. 2026 (Jerry odklepol): Dan →
       Monika 12. 3.; 15 580 rozdelené na Dana a Moniku 15. 5. a 26. 7.;
       Dyldina → Muselova; Nový → Šnirychová; Knapčok → Hrdinová; pravidlo
@@ -205,19 +205,23 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
 
 ## 2 · Prijaté, nezačaté
 
-- **Dávkové potvrdzovanie bankových platieb** (Jerry, 25. 9.). Z 238 príjmov
+- ~~**Dávkové potvrdzovanie bankových platieb**~~ — HOTOVÉ (akcia
+  `priradz-davka`, použité 28. 9.; pravidlá od 5. 10. len z priezviska).
+  Pôvodne (Jerry, 25. 9.): Z 238 príjmov
   od 1/2026 je priradených 113. Pri poslednom meraní malo 74 nepriradených
   jednoznačný návrh — zoznam s odškrtávaním a jedným potvrdením z toho robí
   prácu na večer, nie na mesiac. Dnes sa potvrdzuje po jednom.
 
-- **Anamnéza klienta v Kokpite** (Jerry, 26. 9.). Argument je jeho: „ak už
+- ~~**Anamnéza klienta v Kokpite**~~ — HOTOVÉ 30. 9. (sekcia 0c), kartotéka
+  fotiek 5. 10. Pôvodne (Jerry, 26. 9.): Argument je jeho: „ak už
   máme citlivé dáta o meraniach klientov, spravme v Kokpite aj anamnézu a tým
   pádom tu bude všetko." Tabuľka `klient_merania` už dnes drží telesné
   merania, takže sa tým nezvyšuje kategória údajov — len prestane byť pravda
   o klientovi roztrhaná medzi appku a papier. Rozsah dohodnúť; pri zdravotných
   údajoch platí „len to, čo sa naozaj používa pri tréningu".
 
-- **Fakturácia v Kokpite** (Jerry, 26. 9.). Rozhovor je v konverzácii z 26. 9.,
+- ~~**Fakturácia v Kokpite**~~ — HOTOVÉ (vydané faktúry s QR a mailom od
+  26. 9., spoločná faktúra za viacerých 4. 10.). Pôvodne (Jerry, 26. 9.): Rozhovor je v konverzácii z 26. 9.,
   fakty: 84 faktúr od 2023, z toho 37 za rok 2026 (347 079 Kč), číselná rada
   `RRRRNNNN`, posledná 20260038. Dnes v iDokladi. Faktúra má vzniknúť pri
   balíčku, niesť QR platbu a odísť mailom.
