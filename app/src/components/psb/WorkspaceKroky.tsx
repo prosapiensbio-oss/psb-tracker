@@ -560,8 +560,8 @@ const VELKOSTI = CENNIK.filter((s) => (s.hodiny || 0) > 0 && (s.cena || 0) > 0 &
  * mohlo byť univerzálne naprieč všetkými členstvami. Pri viazanosti /
  * předplatnom má byť vždy možnosť presunúť 2 hodiny do ďalšieho balíčka."
  *
- * Posuvník od 0 po všetky: 0 = prepadlo všetko, plný = doplnenie všetkých,
- * čokoľvek medzi = doplnenie časti a zvyšok prepadne. Odpoveď sa zapíše do
+ * Posuvník určuje doplnenie, od 0 po všetky: 0 = prepadlo všetko, plný (predvolený)
+ * = doplnenie všetkých, čokoľvek medzi = doplnenie časti a zvyšok prepadne. Odpoveď sa zapíše do
  * `anomaly_ack` s tým istým kľúčom ako upozornenie, takže sa nevráti ani po
  * obnovení stránky — doteraz sa vracala.
  */
@@ -611,11 +611,11 @@ export function KrokPlatnost({ polozky, acks, trener, onVybavene }: {
   };
 
   /**
-   * OBRÁTENÁ LOGIKA (Jerry, 5. 10. 2026): „prirodzene nech je doplnenie
-   * členstva, ale posuvníkom sa dá, že prepadne 1 alebo 2 hodiny." Bez
-   * pohnutia je zelené „Potvrdiť 2 h doplnenie"; posuvník hovorí, koľko
-   * prepadne. Pri předplatnom je vedľa rovnako zelené „Preniesť do ďalšieho
-   * balíčka" — najviac 2 h z toho, čo neprepadne.
+   * POSUVNÍK JE DOPLNENIE (Jerry, 5. 10. 2026): „namiesto prepadne pri tom
+   * posuvníku daj doplnenie — keď má 2 h a posuniem na 1 h, nech napíše
+   * 1 h doplnenie, 1 h prepadne; na nule 2 h prepadne." Predvolene je plný
+   * (doplnenie všetkých hodín). Druh členstva a koniec platnosti stoja pod
+   * menom — vlastný stĺpec riadok len zbytočne rozťahoval.
    */
   return (
     <>
@@ -623,34 +623,43 @@ export function KrokPlatnost({ polozky, acks, trener, onVybavene }: {
       {chyba && <div style={{ fontSize: 12, color: C.red }}>{chyba}</div>}
       {zive.map((x) => {
         const kluc = `platnost|${x.meno}|${x.platnostDo}`;
-        const prepadne = Math.min(x.hodin, hodnoty[kluc] ?? 0);
-        const zostava = Math.round((x.hodin - prepadne) * 100) / 100;
-        const presun = x.predplatne ? Math.min(2, zostava) : 0;
+        const doplnit = Math.max(0, Math.min(x.hodin, hodnoty[kluc] ?? x.hodin));
+        const prepadne = Math.round((x.hodin - doplnit) * 100) / 100;
         const predplatne = x.predplatne || /předplatn|predplatn|s viazanost/i.test(x.membership);
+        const presun = predplatne ? Math.min(2, doplnit) : 0;
         const farba = predplatne ? C.blue : C.accent;
+        const stav = [doplnit ? `${doplnit} h doplnenie` : "", prepadne ? `${prepadne} h prepadne` : ""].filter(Boolean).join(" · ");
         return (
           <div key={kluc} style={{ ...riadok, alignItems: "center" }}>
-            <span style={{ fontSize: 13.5, fontWeight: 600, color: C.text, minWidth: 160 }}>{x.meno}</span>
-            <span style={{
-              fontSize: 11.5, fontWeight: 700, padding: "3px 9px", borderRadius: 999, whiteSpace: "nowrap",
-              color: farba, background: mix(farba, 14), border: `1px solid ${mix(farba, 45)}`,
-            }}>{nazovProduktu(x.membership)}</span>
-            <span style={{ fontSize: 12, color: x.dni >= 0 ? C.orange : C.textMuted, minWidth: 104 }}>
-              {x.dni < 0 ? `končí ${fmtDMY(x.platnostDo)}` : `skončila ${fmtDMY(x.platnostDo)}`}
+            <span style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 150 }}>
+              <span style={{ fontSize: 13.5, fontWeight: 600, color: C.text }}>{x.meno}</span>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
+                <span style={{
+                  fontSize: 10.5, fontWeight: 700, padding: "2px 8px", borderRadius: 999, whiteSpace: "nowrap",
+                  color: farba, background: mix(farba, 14), border: `1px solid ${mix(farba, 45)}`,
+                }}>{nazovProduktu(x.membership)}</span>
+                <span style={{ fontSize: 11.5, color: x.dni >= 0 ? C.orange : C.textMuted, whiteSpace: "nowrap" }}>
+                  {x.dni < 0 ? `končí ${fmtDMY(x.platnostDo)}` : `skončila ${fmtDMY(x.platnostDo)}`}
+                </span>
+              </span>
             </span>
             <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
-              <span style={{ fontSize: 11.5, color: C.textDim }}>prepadne</span>
+              <span style={{ fontSize: 11.5, color: C.textDim }}>doplnenie</span>
               <input
-                type="range" min={0} max={x.hodin} step={1} value={prepadne}
+                type="range" min={0} max={x.hodin} step={1} value={doplnit}
                 onChange={(e) => setHodnoty((s) => ({ ...s, [kluc]: Number(e.target.value) }))}
-                style={{ width: 110, accentColor: C.orange }}
-                aria-label={`Koľko hodín z ${x.hodin} prepadne — ${x.meno}`}
+                style={{ width: 110, accentColor: C.green }}
+                aria-label={`Koľko hodín z ${x.hodin} ide do doplnenia — ${x.meno}`}
               />
-              <span style={{ fontSize: 12.5, fontWeight: 700, color: prepadne ? C.orange : C.textDim, minWidth: 36 }}>{prepadne} h</span>
+              <span style={{ fontSize: 12, fontWeight: 600, color: C.textMuted, minWidth: 150 }}>
+                {doplnit ? <span style={{ color: C.green }}>{doplnit} h doplnenie</span> : null}
+                {doplnit && prepadne ? " · " : ""}
+                {prepadne ? <span style={{ color: C.orange }}>{prepadne} h prepadne</span> : null}
+              </span>
             </span>
             <span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap", marginLeft: "auto" }}>
-              <button disabled={bezi === kluc} style={hlavne(bezi !== kluc)} onClick={() => void odpovedz(x, zostava, 0)}>
-                {bezi === kluc ? "…" : zostava ? `Potvrdiť: ${zostava} h doplnenie` : `Potvrdiť: ${x.hodin} h prepadne`}
+              <button disabled={bezi === kluc} style={hlavne(bezi !== kluc)} title={stav} onClick={() => void odpovedz(x, doplnit, 0)}>
+                {bezi === kluc ? "…" : doplnit ? `Potvrdiť: ${doplnit} h doplnenie` : `Potvrdiť: ${x.hodin} h prepadne`}
               </button>
               {predplatne && presun > 0 && (
                 <button disabled={bezi === kluc} style={hlavne(bezi !== kluc)}
@@ -902,8 +911,10 @@ const nazovMesiaca = (mk: string) => {
  *    stiahne tu, všetky pohyby (aj výdavky) sa zapíšu a zaradia podľa
  *    naučených pravidiel. Čo pravidlo nemá, zaradí sa v Banke.
  */
-export function KrokUzavierka({ mesiac, kroky, prekazky, onNavigate, trener, onZmena, obsahKroku = {} }: {
+export function KrokUzavierka({ mesiac, kroky, prekazky, onNavigate, trener, onZmena, obsahKroku = {}, uploadLog = [] }: {
   mesiac: string;
+  /** Kedy sa čo naposledy nahralo — dátum stojí pri každom kroku (Jerry, 5. 10. 2026). */
+  uploadLog?: { date: string; type: string }[];
   /**
    * Pracovné miesto každého kroku — rozbalí sa pod ním (Jerry, 5. 10. 2026:
    * „aby som uzávierku mohol robiť odtiaľto: klik na PTminder a dole sa
@@ -918,10 +929,12 @@ export function KrokUzavierka({ mesiac, kroky, prekazky, onNavigate, trener, onZ
   onZmena: () => void;
 }) {
   const [zamknuty, setZamknuty] = useState<boolean | null>(null);
-  const [otvoreny, setOtvoreny] = useState("");
+  // Terezke sa otázky mesiaca otvoria hneď — kvôli nim kartu má.
+  const [otvoreny, setOtvoreny] = useState(trener === "Terezka" ? "otazky" : "");
   const [bezi, setBezi] = useState("");
   const [hlaska, setHlaska] = useState("");
   const [chyba, setChyba] = useState("");
+  useEffect(() => { if (trener === "Terezka") setOtvoreny("otazky"); }, [trener]);
 
   useEffect(() => {
     let zive = true;
@@ -932,8 +945,28 @@ export function KrokUzavierka({ mesiac, kroky, prekazky, onNavigate, trener, onZ
     return () => { zive = false; };
   }, [mesiac]);
 
-  const kto = (id: string) => (id === "zdroje" ? "Terezka" : "Jerry");
-  const viditelne = kroky.filter((k) => !trener || kto(k.id) === trener);
+  // Fio a zošit nemajú záznam v upload_log (Fio ide cez API), tak sa pýtame
+  // priamo, kedy pribudol posledný pohyb.
+  const [nahrateFio, setNahrateFio] = useState<Record<string, string | null>>({});
+  useEffect(() => {
+    let zive = true;
+    void fetch("/api/fio?nahrate=1", { credentials: "same-origin", cache: "no-store" })
+      .then((r) => r.json()).then((j) => { if (zive) setNahrateFio(j || {}); })
+      .catch(() => {});
+    return () => { zive = false; };
+  }, [hlaska]);
+  const posledne = (typy: string[]) => uploadLog.filter((l) => typy.includes(l.type)).map((l) => l.date).sort().pop() || "";
+  const dm = (iso?: string | null) => { const d = String(iso || "").slice(0, 10); return d ? `${Number(d.slice(8, 10))}. ${Number(d.slice(5, 7))}.` : ""; };
+  const nahrate: Record<string, string> = {
+    ptminder: dm(posledne(["sessions", "services", "payments", "packages", "transakcie"])),
+    metricool: dm(posledne(["metricool", "kanaly"])),
+    fio: dm(nahrateFio.fio),
+    zosit: dm(nahrateFio.zosit),
+  };
+
+  // Otázky mesiaca sú pre oboch — každý odpovedá za seba.
+  const kto = (id: string) => (id === "zdroje" ? "Terezka" : id === "otazky" ? "obaja" : "Jerry");
+  const viditelne = kroky.filter((k) => !trener || kto(k.id) === trener || kto(k.id) === "obaja");
   const hotovych = viditelne.filter((k) => k.hotovo).length;
 
   const stiahniMesiac = async () => {
@@ -993,6 +1026,7 @@ export function KrokUzavierka({ mesiac, kroky, prekazky, onNavigate, trener, onZ
                 style={{ background: "none", border: "none", padding: 0, cursor: maObsah ? "pointer" : "default", fontFamily: "inherit", textAlign: "left", fontSize: 13, fontWeight: 600, color: C.text, minWidth: 190 }}
               >
                 {maObsah ? (otvorene ? "▾ " : "▸ ") : ""}{k.id === "fio" ? "Fio — stiahnuté a zaradené" : k.id === "ptminder" ? "PTminder (kým beží súbežne)" : k.label}
+                {nahrate[k.id] && <span style={{ display: "block", fontSize: 11, fontWeight: 500, color: C.textDim, marginLeft: maObsah ? 14 : 0 }}>nahraté {nahrate[k.id]}</span>}
               </button>
               <span style={{ fontSize: 11.5, color: k.hotovo ? C.textDim : C.textMuted, flex: "1 1 220px" }}>{k.detail}</span>
               {!trener && <span style={{ fontSize: 11, color: C.textDim, minWidth: 54 }}>{kto(k.id)}</span>}

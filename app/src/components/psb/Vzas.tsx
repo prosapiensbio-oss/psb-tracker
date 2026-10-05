@@ -2443,12 +2443,68 @@ function ForecastCard({ idx }: { idx: number[] }) {
 
 const PEOPLE: PersonKey[] = ["jerry", "terezka"];
 
+/**
+ * ČO BOLO V TOMTO MESIACI INÉ — dlaždice namiesto vety na riadok (Jerry,
+ * 5. 10. 2026: „trošku krajšie graficky, aby to bolo prehľadnejšie").
+ * Každá položka: suma, obvyklá suma, rozdiel a pruh, ktorý ukáže pomer
+ * k obvyklému. Farba hovorí, či to firme pomohlo: viac tržieb alebo menej
+ * nákladov je zelené.
+ */
+function CoBoloIne({ devs }: { devs: ReturnType<typeof monthDeviations> }) {
+  const dobre = (d: (typeof devs)[number]) => (d.group === "Príjmy" ? d.diff > 0 : d.diff < 0);
+  const spolu = devs.reduce((a, d) => a + (d.group === "Príjmy" ? d.diff : -d.diff), 0);
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap", marginBottom: 9 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: C.accent, textTransform: "uppercase", letterSpacing: 0.8 }}>Čo bolo v tomto mesiaci iné</span>
+        <span style={{ fontSize: 11.5, color: C.textDim }}>
+          oproti priemeru ostatných mesiacov roka · spolu na zisku{" "}
+          <b style={{ color: spolu >= 0 ? C.green : C.red }}>{spolu >= 0 ? "+" : ""}{money(Math.round(spolu))}</b>
+        </span>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))", gap: 8 }}>
+        {devs.map((d) => {
+          // Výplata nie je dobrá ani zlá — nižšia znamená menej odrobeného,
+          // nie úsporu. Kreslí sa neutrálne.
+          const f = d.group === "Výplaty" ? C.blue : dobre(d) ? C.green : C.red;
+          const max = Math.max(Math.abs(d.value), Math.abs(d.typical), 1);
+          return (
+            <div key={d.label} style={{ background: C.surface, border: `1px solid ${mix(f, 30)}`, borderRadius: 10, padding: "9px 11px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 6, alignItems: "baseline" }}>
+                <span style={{ fontSize: 12.5, fontWeight: 600, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={d.label}>{d.label}</span>
+                <span style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 0.5, whiteSpace: "nowrap" }}>{d.group}</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 8, margin: "4px 0 6px" }}>
+                <span style={{ fontSize: 16, fontWeight: 700, color: C.text }}>{money(d.value)}</span>
+                <span style={{ fontSize: 11.5, fontWeight: 700, color: f, background: mix(f, 12), borderRadius: 999, padding: "1px 7px" }}>
+                  {d.diff > 0 ? "+" : ""}{money(Math.round(d.diff))}
+                </span>
+              </div>
+              <div style={{ position: "relative", height: 5, borderRadius: 3, background: mix(C.border, 50) }}>
+                <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: `${(Math.abs(d.value) / max) * 100}%`, borderRadius: 3, background: f }} />
+                <div title="obvykle" style={{ position: "absolute", top: -2, bottom: -2, width: 2, left: `calc(${(Math.abs(d.typical) / max) * 100}% - 1px)`, background: C.text, opacity: 0.55 }} />
+              </div>
+              <div style={{ fontSize: 11, color: C.textDim, marginTop: 4 }}>obvykle {money(Math.round(d.typical))}</div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // Numbers say what happened; the note says why. Opens with an auto-computed
 // "what was different" list so the answer usually doesn't have to be recalled.
-function MonthNoteRow({ mi, colSpan, notes, onSaved, kotva }: {
+function MonthNoteRow({ mi, colSpan, notes, onSaved, kotva, ja }: {
   mi: number; colSpan: number; notes: Record<string, MonthNote>; onSaved: (n: MonthNote) => void;
   /** id pre doskrolovanie z registra. */
   kotva?: string;
+  /**
+   * Kto odpovedá (karta Uzávierka vo Workspace): píše len do svojich polí,
+   * odpoveď druhého vidí ako text. Bez toho (tabuľka vo Výsledkoch) sa dá
+   * písať za oboch, ako doteraz.
+   */
+  ja?: PersonKey;
 }) {
   const key = monthKeyOf(mi);
   const existing = notes[key];
@@ -2481,25 +2537,7 @@ function MonthNoteRow({ mi, colSpan, notes, onSaved, kotva }: {
   return (
     <tr id={kotva}>
       <td colSpan={colSpan} style={{ padding: "14px 16px", background: mix(C.accent, 5), borderBottom: `1px solid ${mix(C.border, 55)}` }}>
-        {devs.length > 0 && (
-          <div style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: C.accent, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 7 }}>
-              Čo bolo v tomto mesiaci iné
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              {devs.map((d) => (
-                <div key={d.label} style={{ fontSize: 12.5, color: C.textMuted, lineHeight: 1.5 }}>
-                  <b style={{ color: C.text }}>{d.label}</b> <span style={{ color: C.textDim }}>· {d.group}</span> —{" "}
-                  <b style={{ color: d.diff > 0 ? (d.group === "Príjmy" ? C.green : C.red) : d.group === "Príjmy" ? C.red : C.green }}>
-                    {money(d.value)}
-                  </b>{" "}
-                  namiesto obvyklých {money(Math.round(d.typical))}{" "}
-                  <span style={{ color: d.diff > 0 ? C.red : C.green }}>({d.diff > 0 ? "+" : ""}{money(Math.round(d.diff))})</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        {devs.length > 0 && <CoBoloIne devs={devs} />}
 
         <div style={{ fontSize: 11, fontWeight: 700, color: C.accent, textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 9 }}>Otázky na tento mesiac</div>
 
@@ -2514,13 +2552,19 @@ function MonthNoteRow({ mi, colSpan, notes, onSaved, kotva }: {
                     v JSX — a ten sa nevykreslí ako komentár, ale ako TEXT.
                     Visel tak nad každou otázkou v appke. */}
                 <div style={{ display: "grid", gap: 6 }}>
-                  {PEOPLE.map((pk) => (
+                  {PEOPLE.map((pk) => ja && pk !== ja ? (
+                    (answers[answerKey(q.id, pk)] ?? "").trim() ? (
+                      <div key={pk} style={{ fontSize: 12, color: C.textMuted, lineHeight: 1.5, padding: "4px 10px", borderLeft: `2px solid ${mix(C.border, 80)}` }}>
+                        <span style={{ color: C.textDim }}>{SALARY[pk].label}: </span>{answers[answerKey(q.id, pk)]}
+                      </div>
+                    ) : null
+                  ) : (
                     <textarea
                       key={pk}
                       value={answers[answerKey(q.id, pk)] ?? ""}
                       onChange={(e) => setAnswers({ ...answers, [answerKey(q.id, pk)]: e.target.value })}
                       rows={(answers[answerKey(q.id, pk)] ?? "").length > 90 ? 3 : 1}
-                      placeholder={SALARY[pk].label}
+                      placeholder={ja ? "Tvoja odpoveď…" : SALARY[pk].label}
                       style={{ ...field, padding: "6px 10px" }} />
                   ))}
                 </div>
@@ -3443,15 +3487,19 @@ export function Vysledky({
  * odtiaľto"). Ten istý riadok (`MonthNoteRow`) a to isté ukladanie, len
  * obalený do vlastnej tabuľky.
  */
-export function OtazkyMesiaca({ mesiac }: { mesiac: string }) {
-  const [notes, setNotes] = useState<Record<string, MonthNote>>({});
+export function OtazkyMesiaca({ mesiac, ja }: { mesiac: string; ja?: PersonKey }) {
+  const [notes, setNotes] = useState<Record<string, MonthNote> | null>(null);
   useEffect(() => { fetchMonthNotes().then(setNotes); }, []);
   const mi = VZAS_MONTHS.indexOf(mesiac);
   if (mi < 0) return <div style={{ fontSize: 12, color: C.textDim }}>Mesiac {mesiac} vo VZAS nie je.</div>;
+  // Formulár sa kreslí AŽ s načítanými odpoveďami: `useState` v riadku berie
+  // hodnotu len pri prvom vykreslení a prázdny formulár by po uložení
+  // prepísal, čo tam už bolo (pravidlo z 29. 8. 2026).
+  if (!notes) return <div style={{ fontSize: 12, color: C.textDim }}>načítavam…</div>;
   return (
     <table style={{ width: "100%", borderCollapse: "collapse" }}>
       <tbody>
-        <MonthNoteRow mi={mi} colSpan={1} notes={notes} onSaved={(nn) => setNotes((p) => ({ ...p, [nn.month]: nn }))} />
+        <MonthNoteRow mi={mi} colSpan={1} notes={notes} ja={ja} onSaved={(nn) => setNotes((p) => ({ ...(p || {}), [nn.month]: nn }))} />
       </tbody>
     </table>
   );

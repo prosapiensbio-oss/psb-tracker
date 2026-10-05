@@ -118,6 +118,8 @@ export function krokyBety(karty: Karta[], volby: { mesacne?: boolean; ja?: strin
   /**
    * Čie sú mesačné karty (Jerry, 5. 10. 2026): dopyty len Terezkine,
    * uzávierka a kontroly len jeho. Pri „všetko" (`ja` prázdne) sú všetky.
+   * Uzávierku má od 5. 10. 2026 aj Terezka — „sú tam otázky priamo na ňu";
+   * v karte vidí len svoje kroky (odkiaľ prišli, otázky mesiaca).
    */
   const pre = (kto: string) => !volby.ja || volby.ja === kto;
   const daj = (d: Karta["druh"]) => karty.filter((k) => k.druh === d);
@@ -138,8 +140,10 @@ export function krokyBety(karty: Karta[], volby: { mesacne?: boolean; ja?: strin
      */
     ...(volby.mesacne ? [
       ...(pre("Terezka") ? [krok("dopyty", "Dopyty", "kto čaká na odpoveď, čo z dopytu bolo a odkiaľ prišli noví", [])] : []),
+      krok("uzavierka", "Uzávierka mesiaca", volby.ja === "Terezka"
+        ? "prehľad mesiaca a tvoje odpovede — odkiaľ prišli noví a otázky mesiaca"
+        : "prvý víkend nového mesiaca — klik na krok otvorí miesto, kde sa robí", []),
       ...(pre("Jerry") ? [
-        krok("uzavierka", "Uzávierka mesiaca", "prvý víkend nového mesiaca — klik na krok otvorí miesto, kde sa robí", []),
         krok("kontroly", "Mesačné kontroly", "jedna oblasť každý týždeň — peniaze, klienti, marketing, Jarvis", []),
       ] : []),
     ] : []),

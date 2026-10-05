@@ -16,7 +16,7 @@ import { C } from "../../lib/psb/theme";
  */
 const SKUSA_SA: { text: string; tab: string; sub: string }[] = [
   // Workspace po krokoch je od 5. 10. 2026 naostro. V bete sa skúša:
-  { text: "Workspace: Dopyty, Uzávierka mesiaca, Mesačné kontroly; peniaze a faktúry podľa trénera", tab: "workspace", sub: "" },
+  { text: "Workspace: Dopyty, Uzávierka mesiaca (aj Terezkina), Mesačné kontroly; peniaze a faktúry podľa trénera", tab: "workspace", sub: "" },
 ];
 
 /**

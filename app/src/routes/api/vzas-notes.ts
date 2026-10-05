@@ -44,7 +44,15 @@ export const Route = createFileRoute("/api/vzas-notes")({
         // históriu rozhodnutí („kedy sa Radek stal majiteľom priestoru") a
         // akcia `kronika` do nej PRIPÍSAVA — takže rastie sama od seba.
         const note = typeof body.note === "string" ? body.note : "";
-        const answers = body.answers && typeof body.answers === "object" ? body.answers : {};
+        // Odpovede sa ZLUČUJÚ s uloženými (5. 10. 2026): otázky mesiaca vypĺňa
+        // Jerry aj Terezka, každý z inej karty. Bez zlúčenia by zápis jedného
+        // prepísal odpovede druhého, ktoré jeho obrazovka ešte nevidela.
+        const prichadzajuce = body.answers && typeof body.answers === "object" ? body.answers : {};
+        const povodny = await DB.prepare(`SELECT answers FROM vzas_month_notes WHERE month = ?`).bind(month)
+          .first<{ answers: string | null }>().catch(() => null);
+        let povodne: Record<string, string> = {};
+        try { povodne = povodny?.answers ? JSON.parse(povodny.answers) : {}; } catch { /* nevalidné = prázdne */ }
+        const answers = { ...povodne, ...prichadzajuce };
         const answersJson = JSON.stringify(answers);
         if (note.length > 8000 || answersJson.length > 12000) {
           return Response.json({ ok: false, error: "too_large", poznamka: note.length, odpovede: answersJson.length }, { status: 413 });

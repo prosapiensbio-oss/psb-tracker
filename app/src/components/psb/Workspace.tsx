@@ -1365,18 +1365,19 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
           onNavigate={onNavigate}
           trener={trenerKroku}
           onZmena={() => oznam("klienti")}
+          uploadLog={data.uploadLog}
           obsahKroku={(() => {
             const mk = mesiacUzavierky;
-            const nahravanie = (co: string) => actions ? (
+            const nahravanie = (co: string, zameranie: "ptminder" | "metricool") => actions ? (
               <>
                 <div style={{ fontSize: 11.5, color: C.textMuted, marginBottom: 6 }}>{co}</div>
-                <UploadCard bezBanky data={data} missing={REPORTS.filter((r) => ((data[r.key] as unknown[]) || []).length === 0)} actions={actions} chat={chat} />
+                <UploadCard bezBanky zameranie={zameranie} mesiacKroku={mk} data={data} missing={REPORTS.filter((r) => ((data[r.key] as unknown[]) || []).length === 0)} actions={actions} chat={chat} />
               </>
             ) : null;
             const upozornenia = (register || []).filter((r) => r.key.includes(mk) && !r.acked && r.category !== "Zápis");
             return {
-              ptminder: nahravanie("Pretiahni sem exporty z PTmindera — appka sama pozná, ktorý report je ktorý."),
-              metricool: nahravanie(`Pretiahni sem export z Metricoolu za ${mk} (CSV príspevkov alebo mesačný PDF report).`),
+              ptminder: nahravanie("Pretiahni sem exporty z PTmindera — appka sama pozná, ktorý report je ktorý.", "ptminder"),
+              metricool: nahravanie(`Pretiahni sem export z Metricoolu za ${mk} (CSV príspevkov alebo mesačný PDF report).`, "metricool"),
               // Pohyby z banky patria sem: rozrobený náhľad výpisu aj zapísané
               // pohyby mesiaca na zaradenie (Jerry, 5. 10. 2026).
               fio: (
@@ -1386,7 +1387,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                 </>
               ),
               zosit: <Zosit onZapisane={() => void actions?.refresh()} />,
-              otazky: <OtazkyMesiaca mesiac={mk} />,
+              otazky: <OtazkyMesiaca mesiac={mk} ja={trenerKroku === "Terezka" ? "terezka" : trenerKroku === "Jerry" ? "jerry" : undefined} />,
               hotovostStav: <KamOdisliCard />,
               upozornenia: actions && onNavigate ? (
                 upozornenia.length

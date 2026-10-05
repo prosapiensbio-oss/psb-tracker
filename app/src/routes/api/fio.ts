@@ -77,6 +77,22 @@ export const Route = createFileRoute("/api/fio")({
         if (!(await isAuthed(request))) return unauthorized();
         const { DB } = bindings();
         if (!DB) return Response.json({ ok: false, pohyby: [], pravidla: [] });
+        /**
+         * KEDY SA NAPOSLEDY NAHRÁVALO — pre kroky uzávierky vo Workspace
+         * (Jerry, 5. 10. 2026: „dátum nahratia by mohol byť pri každom — aj
+         * pri Fio, pri zošite"). Banka a zošit sú v tej istej tabuľke; zošit
+         * sa pozná podľa typu „hotovosť".
+         */
+        if (new URL(request.url).searchParams.get("nahrate") === "1") {
+          const r = await DB.prepare(
+            `SELECT MAX(CASE WHEN typ = 'hotovosť' THEN NULL ELSE created_at END) fio,
+                    MAX(CASE WHEN typ = 'hotovosť' THEN created_at END) zosit,
+                    MAX(CASE WHEN typ = 'hotovosť' THEN NULL ELSE date END) fio_do,
+                    MAX(CASE WHEN typ = 'hotovosť' THEN date END) zosit_do
+               FROM fio_transactions`,
+          ).first<Record<string, string | null>>().catch(() => null);
+          return Response.json({ ok: true, ...(r || {}) });
+        }
         try {
           const [t, p] = await Promise.all([
             DB.prepare("SELECT date, amount_czk, counterparty, note, typ, category, dedup_key FROM fio_transactions ORDER BY date DESC LIMIT 2000").all(),

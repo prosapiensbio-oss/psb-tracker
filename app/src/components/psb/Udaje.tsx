@@ -188,8 +188,16 @@ function Verzia() {
   );
 }
 
-export function UploadCard({ data, missing, actions, chat, bezBanky = false }: {
+export function UploadCard({ data, missing, actions, chat, bezBanky = false, zameranie, mesiacKroku }: {
   data: PSBData; missing: typeof REPORTS; actions: Actions; chat?: AssistantChat;
+  /**
+   * Len jeden zdroj — krok uzávierky vo Workspace (Jerry, 5. 10. 2026:
+   * „toto všetko nám nemusí byť napísané"). Namiesto celého zoznamu zdrojov
+   * ukáže len reporty toho kroku, každý s dátumom nahratia.
+   */
+  zameranie?: "ptminder" | "metricool";
+  /** Mesiac uzávierky — report, ktorý ho nepokrýva, nemá fajku. */
+  mesiacKroku?: string;
   /**
    * Bez náhľadu pohybov z banky — v uzávierke vo Workspace patria pohyby do
    * kroku Fio, nie k PTminderu (Jerry, 5. 10. 2026).
@@ -416,8 +424,10 @@ export function UploadCard({ data, missing, actions, chat, bezBanky = false }: {
         <div style={{ fontSize: 24, marginBottom: 6 }}>⬆</div>
         <div style={{ color: C.text }}>{busy ? "Spracúvam…" : "Pretiahni CSV alebo PDF súbory sem alebo klikni"}</div>
         <div style={{ fontSize: 12, color: C.textDim, marginTop: 6 }}>
-          PTminder aj bankový výpis z Fio. Typ rozpozná sám; duplicity preskočí, históriu zachová.
-          Bankový výpis sa najprv ukáže na kontrolu.
+          {zameranie
+            ? "Typ rozpozná sám; duplicity preskočí, históriu zachová."
+            : <>PTminder aj bankový výpis z Fio. Typ rozpozná sám; duplicity preskočí, históriu zachová.
+              Bankový výpis sa najprv ukáže na kontrolu.</>}
         </div>
       </div>
       {pdfStav && (
@@ -573,6 +583,8 @@ export function UploadCard({ data, missing, actions, chat, bezBanky = false }: {
           ))}
         </div>
       )}
+      {zameranie && <ZoznamZdrojaKroku zameranie={zameranie} data={data} obnova={uploadResult} mesiac={mesiacKroku} />}
+      {!zameranie && (<>
       <div onClick={() => setOpen((o) => !o)} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginTop: 14, fontSize: 12, color: C.textDim }}>
         <span>{open ? "▲ skryť" : "▼"} zoznam potrebných CSV a zapísané pohyby</span>
         <span style={{ marginLeft: "auto" }}>Nahrať sa dá aj pretiahnutím do Jarvisa (📎 vpravo dole).</span>
@@ -683,8 +695,85 @@ export function UploadCard({ data, missing, actions, chat, bezBanky = false }: {
         </div>
       </div>
       )}
+      </>)}
       </div>
     </Card>
+  );
+}
+
+/** Deň a mesiac z ISO času — „6. 9.". */
+const denMes = (iso: string) => { const d = String(iso || "").slice(0, 10); return d ? `${Number(d.slice(8, 10))}. ${Number(d.slice(5, 7))}.` : ""; };
+
+/**
+ * REPORTY JEDNÉHO KROKU UZÁVIERKY, každý s dátumom nahratia.
+ *
+ * Jerry, 5. 10. 2026: pri PTminderi len jeho reporty a „dátum nahratia by mal
+ * ostať"; pri Metricoole „stačí, aby tam ostal iba Metricool, a môžeš tam
+ * vypísať zoznam jednotlivých reportov pod seba".
+ */
+function ZoznamZdrojaKroku({ zameranie, data, obnova, mesiac }: { zameranie: "ptminder" | "metricool"; data: PSBData; obnova: unknown; mesiac?: string }) {
+  const [subory, setSubory] = useState<{ filename: string; uploaded_at: string }[] | null>(null);
+  const [pdfZaznam, setPdfZaznam] = useState<{ filename: string; date: string } | null>(null);
+  useEffect(() => {
+    if (zameranie !== "metricool") return;
+    let zive = true;
+    void fetch("/api/raw-uploads?druh=metricool", { credentials: "same-origin", cache: "no-store" })
+      .then((r) => r.json()).then((j) => { if (zive) { setSubory(j.subory || []); setPdfZaznam(j.pdf || null); } })
+      .catch(() => { if (zive) setSubory([]); });
+    return () => { zive = false; };
+  }, [zameranie, obnova]);
+  const log = data.uploadLog || [];
+  const naposledy = (typ: string) => log.filter((l) => l.type === typ).map((l) => l.date).sort().pop() || "";
+  const riadok = (ok: boolean, nazov: string, info: string, kde?: string) => (
+    <div key={nazov} style={{ fontSize: 12, color: C.textMuted, marginBottom: 6, display: "flex", gap: 8 }}>
+      <span style={{ color: ok ? C.green : C.orange, flexShrink: 0 }}>{ok ? "✓" : "✗"}</span>
+      <span>
+        <strong style={{ color: C.text }}>{nazov}</strong>
+        {info && <span style={{ color: ok ? C.accentLight : C.textDim, fontWeight: 500 }}> · {info}</span>}
+        {kde && <><br /><span style={{ color: C.textDim }}>{kde}</span></>}
+      </span>
+    </div>
+  );
+  if (zameranie === "ptminder") {
+    const typLogu: Record<string, string> = { sessions: "sessions", services: "services", payments: "payments", packages: "packages", poplatky: "transakcie" };
+    return (
+      <div style={{ marginTop: 12 }}>
+        {REPORTS.map((r) => {
+          const arr = (data[r.key] as { date?: string }[]) || [];
+          let mx = "";
+          if (r.key !== "packages") for (const x of arr) if (x.date && x.date > mx) mx = x.date;
+          const nahrate = naposledy(typLogu[r.key as string] || "");
+          const info = [mx ? `dáta do ${fmtDMY(mx)}` : "", nahrate ? `nahraté ${denMes(nahrate)}` : ""].filter(Boolean).join(" · ");
+          return riadok(arr.length > 0, r.label, info, r.path.split(". ")[0]);
+        })}
+      </div>
+    );
+  }
+  // Metricool: posledný súbor každého druhu, jeho obdobie z názvu a deň nahratia.
+  const druhy = [
+    { vzor: "instagram-posts", nazov: "Instagram — príspevky (CSV)" },
+    { vzor: "instagram-reels", nazov: "Instagram — reels (CSV)" },
+    { vzor: "instagram-stories", nazov: "Instagram — stories (CSV)" },
+    { vzor: "facebook-posts", nazov: "Facebook — príspevky (CSV)" },
+  ];
+  const rozsah = (f: string) => /(\d{4}-\d{2}-\d{2})_(\d{4}-\d{2}-\d{2})/.exec(f);
+  const obdobie = (f: string) => {
+    const m = rozsah(f);
+    return m ? `${denMes(m[1])}–${denMes(m[2])} ${m[2].slice(0, 4)}` : "";
+  };
+  // Hotové je len to, čo pokrýva mesiac uzávierky — augustový export
+  // septembrovú uzávierku nezavrie, hoci nahratý je.
+  const pokryva = (f: string) => { const m = rozsah(f); return !mesiac || !m || m[2].slice(0, 7) >= mesiac; };
+  const pdf = [naposledy("kanaly"), pdfZaznam?.date || ""].sort().pop() || "";
+  return (
+    <div style={{ marginTop: 12 }}>
+      {subory === null && <div style={{ fontSize: 12, color: C.textDim }}>načítavam…</div>}
+      {subory !== null && druhy.map((d) => {
+        const f = subory.find((x) => x.filename.startsWith(d.vzor));
+        return riadok(!!f && pokryva(f.filename), d.nazov, f ? [obdobie(f.filename), `nahraté ${denMes(f.uploaded_at)}`].filter(Boolean).join(" · ") : "ešte nie je");
+      })}
+      {riadok(!!pdf && (!mesiac || pdf.slice(0, 7) > mesiac), "Mesačná zostava (PDF)", pdf ? `nahraté ${denMes(pdf)}` : "ešte nie je", "číta ju Jarvis — všetky kanály naraz vrátane Facebooku, TikToku a Meta Ads")}
+    </div>
   );
 }
 

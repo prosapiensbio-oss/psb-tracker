@@ -2476,6 +2476,19 @@ Jerry: „Workspace má byť miesto práce." V bete (`jeBeta()` vo Workspace):
   (hotovosť), `RegisterRow` (upozornenia). App kvôli tomu posiela Workspace
   `actions`, `chat`, `register`, `pohybSplits`. Marketing sa po nahratí
   načíta znova (`data.uploadLog`), inak krok Metricool ostal neodškrtnutý.
+- **Krok uzávierky ukazuje len svoj zdroj** (`UploadCard zameranie`): PTminder
+  jeho päť reportov (dáta do / nahraté), Metricool jednotlivé reporty
+  s obdobím z názvu súboru (`/api/raw-uploads?druh=metricool`). Fajku má len
+  report, ktorý POKRÝVA mesiac uzávierky — augustový export septembrovú
+  nezavrie. Mesačná PDF zostava je len v `upload_log` a `data.uploadLog` nesie
+  posledných 40 riadkov, preto ju endpoint vracia zvlášť. Dátum nahratia
+  stojí pri každom kroku; Fio a zošit z `/api/fio?nahrate=1` (nemajú upload_log).
+- **Uzávierku má aj Terezka** — vidí v nej „Odkiaľ prišli" a „Otázky mesiaca"
+  (otvorené hneď) a píše len do svojich polí (`OtazkyMesiaca ja`); Jerryho
+  odpoveď vidí ako text. `/api/vzas-notes` odpovede ZLUČUJE s uloženými,
+  inak by zápis jedného prepísal druhého. `OtazkyMesiaca` kreslí formulár až
+  po načítaní odpovedí (pravidlo z 29. 8.). „Čo bolo iné" sú dlaždice
+  (`CoBoloIne`) — výplaty neutrálne modré, nižšia výplata nie je úspora.
 - **Peniaze podľa trénera** (`rozdelPeniaze` v `postavKarty`): dlžníci a platby
   z banky podľa trénera klienta; platba bez návrhu ostáva Jerrymu. Faktúry
   vo Workspace cez `lenTrenera`. Naostro zostávajú peniaze celé Jerryho.
@@ -2491,5 +2504,6 @@ mám byť presne tam, kde som skončil, so všetkým, čo som tam robil."
   načítam znova"; obnovu rieši signál (`oznam`/`pocuvaj`).
 - Index karty je v `sessionStorage` (`psb-workspace-karta`) — návrat do
   Workspace aj obnovenie stránky pristane na tej istej karte.
-- Platnosť končí: predvolene doplnenie všetkých hodín, posuvník určí, koľko
-  prepadne; předplatné má vedľa zelené „Preniesť N h" (najviac 2).
+- Platnosť končí: posuvník je DOPLNENIE (predvolene všetky hodiny), vedľa
+  „1 h doplnenie · 1 h prepadne" / „2 h prepadne"; druh členstva a koniec
+  platnosti sú pod menom. Předplatné má vedľa zelené „Preniesť N h" (najviac 2).
