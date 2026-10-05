@@ -225,3 +225,32 @@ describe("beta: tri kroky", () => {
     expect(kal && kal.druh === "krok" ? kal.sekcie.map((s) => s.druh) : []).toEqual(["zmeny"]);
   });
 });
+
+describe("beta: peniaze podľa trénera klienta", () => {
+  const platba = (fioId: string, kandidati: string[]) => ({ fioId, datum: "2026-10-03", suma: 6990, text: "x", kandidati, klientsky: true });
+  const dlznik = (meno: string, trener: string) => ({ meno, trener, spolu: 6990, zPoplatkov: 6990, zBalickov: 0, polozky: [], najstarsi: "", dni: 1 });
+  const zdroj = (trener: "Jerry" | "Terezka") => ({
+    zmeny: [], nezname: [], navrhMena: () => "", ktoSom: trener, trener,
+    platby: [platba("a", ["Lukas Hanus"]), platba("b", ["Daniela Šašinkova"]), platba("c", [])],
+    dlznici: [dlznik("Lukas Hanus", "Jerry"), dlznik("Daniela Šašinkova", "Terezka")],
+    rozdelPeniaze: true,
+    trenerKlienta: (m: string) => (m === "Daniela Šašinkova" ? "Terezka" : "Jerry"),
+  });
+  const polozky = (k: ReturnType<typeof postavKarty>, druh: string) => (k.find((x) => x.druh === druh)?.polozky || []) as { fioId?: string; meno?: string }[];
+  it("Terezka vidí platby a dlžníkov svojich klientov", () => {
+    const k = postavKarty(zdroj("Terezka"));
+    expect(polozky(k, "platby").map((p) => p.fioId)).toEqual(["b"]);
+    expect(polozky(k, "dlznici").map((p) => p.meno)).toEqual(["Daniela Šašinkova"]);
+  });
+  it("Jerry svojich a platbu, pri ktorej sa nevie, kto poslal", () => {
+    const k = postavKarty(zdroj("Jerry"));
+    expect(polozky(k, "platby").map((p) => p.fioId)).toEqual(["a", "c"]);
+    expect(polozky(k, "dlznici").map((p) => p.meno)).toEqual(["Lukas Hanus"]);
+  });
+  it("mesačné karty sú len v bete", () => {
+    const k = postavKarty(zdroj("Jerry"));
+    const ids = (b: ReturnType<typeof krokyBety>) => b.filter((x) => x.druh === "krok").map((x) => (x.druh === "krok" ? x.krok : ""));
+    expect(ids(krokyBety(k))).toEqual(["kalendar", "sms", "platby"]);
+    expect(ids(krokyBety(k, { mesacne: true }))).toEqual(["kalendar", "sms", "platby", "dopyty", "uzavierka", "kontroly"]);
+  });
+});

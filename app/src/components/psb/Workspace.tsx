@@ -11,6 +11,10 @@ import { navrhniKlientaKandidati, type ClientAgg } from "../../lib/psb/compute";
 import { kandidatiPlatby, otazkyPlatieb } from "../../lib/psb/workspaceKroky";
 import { krokGesta, krokSvihu, novyStavGesta, novyStavSvihu, zacniSvih } from "../../lib/psb/gestoKariet";
 import { BEZ_FRONTY, klucPolozky, krokyBety, popisZmeny, postavKarty, rozdelAnamnezy, trenerZPrihlasenia, type AnamnezaRiadok, type Karta, type NeznamyNazov, type NepriradenaPlatba, type Zmena } from "../../lib/psb/workspaceKarty";
+import { Dopyty } from "./Dopyty";
+import { ritualy } from "../../lib/psb/rituals";
+import { jeBeta } from "../../lib/psb/beta";
+import { KrokDopyty, KrokKontroly, KrokUzavierka, type KrokUzavierkyKarta } from "./WorkspaceKroky";
 import { AutomatickeBalicky, FioPrijmy, TyzdenKalendara, type Zvyraznenie, KrokPlatnost, KrokSms, NadpisSekcie, OtazkyPlatieb, VsetkoVybavene } from "./WorkspaceKroky";
 import { bezAktivnehoBalicka, treningyZObochZdrojov, vMinuseKlienta, type BezBalicka } from "../../lib/psb/bezBalicka";
 import { dlznici as spocitajDlznikov, type Dlznik } from "../../lib/psb/dlznici";
@@ -56,7 +60,7 @@ const tyzdenOd = (s: string): string => {
   return new Date(d.getTime() - ((d.getUTCDay() + 6) % 7) * 86400000).toISOString().slice(0, 10);
 };
 
-export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, btc, onOverride, otvorKlienta, onOtvoreny, fakturaPredvolba, onFakturaPredvolbaSpracovana, vypisPredvolba, onVypisPredvolbaSpracovana }: {
+export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, btc, onOverride, otvorKlienta, onOtvoreny, fakturaPredvolba, onFakturaPredvolbaSpracovana, vypisPredvolba, onVypisPredvolbaSpracovana, krokyUzavierky, prekazkyUzavierky, onNavigate }: {
   clients: Record<string, ClientAgg>;
   mena: string[];
   ktoSom: string | null;
@@ -73,6 +77,11 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   vypisPredvolba?: string | null;
   onVypisPredvolbaSpracovana?: () => void;
   onFakturaPredvolbaSpracovana?: () => void;
+  /** Kroky a prekážky uzávierky mesiaca — tie isté, aké stráži zámok v Údajoch. */
+  krokyUzavierky?: (mesiac: string) => KrokUzavierkyKarta[];
+  prekazkyUzavierky?: (mesiac: string) => string[];
+  /** Prechod na inú obrazovku appky (uzávierka, kontroly, dopyty). */
+  onNavigate?: (tab: string, sub?: string, focus?: never) => void;
   /** Koho otvoriť rovno po prepnutí sem (klik na klienta inde v appke). */
   otvorKlienta?: string | null;
   onOtvoreny?: () => void;
@@ -85,6 +94,11 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
    * bolo vidieť, ktoré správanie k tomu patrí.
    */
   const poKrokoch = true;
+  /**
+   * BETA (5. 10. 2026): peniaze a faktúry podľa trénera klienta, karty
+   * Dopyty, Uzávierka mesiaca a Mesačné kontroly. Naostro zatiaľ nie.
+   */
+  const beta = jeBeta();
   /** Ktorý riadok kroku Kalendár má pod sebou rozbalený týždeň (kľúč položky). */
   const [denOtvoreny, setDenOtvoreny] = useState("");
   /**
@@ -253,6 +267,8 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
       platnost,
       anamnezy,
       ktoSom,
+      rozdelPeniaze: beta,
+      trenerKlienta: (m: string) => clients[m]?.primaryTrainer || "",
       trener: ktoreVeci === "auto" ? undefined : ktoreVeci === "vsetko" ? null : ktoreVeci,
       navrhMena: (nazov) => {
         const v = navrhniKlientaKandidati(nazov, clients);
@@ -263,7 +279,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
 
   // Karta, v ktorej už nič nezostalo, z kopy zmizne — ale až po tom, čo sa
   // v nej naozaj odklikalo; inak by zmizla pod rukami uprostred práce.
-  const kartyKopy = useMemo(() => (poKrokoch ? krokyBety(karty) : karty), [poKrokoch, karty]);
+  const kartyKopy = useMemo(() => (poKrokoch ? krokyBety(karty, { mesacne: beta }) : karty), [poKrokoch, beta, karty]);
   const zive = useMemo(
     // Karta klienta nie je fronta — nemá položky a nikdy nezmizne. Ostatné
     // zmiznú, keď sa v nich všetko odklikalo.
@@ -626,6 +642,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
                 <VydaneFaktury
                   mena={mena}
                   treneri={treneriKlientov}
+                  lenTrenera={beta ? trenerKroku : undefined}
                   predvolba={predvolbaFaktury}
                   onPredvolbaSpracovana={() => setPredvolbaFaktury(null)}
                 />
@@ -1281,6 +1298,46 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
           {obsahKarty(x)}
         </div>
       )));
+    /** Mesiac, ktorý sa zatvára — predošlý kalendárny (uzávierka je prvý víkend nového). */
+    const mesiacUzavierky = (() => {
+      const d = new Date();
+      return new Date(Date.UTC(d.getFullYear(), d.getMonth() - 1, 1)).toISOString().slice(0, 7);
+    })();
+    if (k.krok === "dopyty") {
+      const zdroje = (krokyUzavierky?.(mesiacUzavierky) || []).find((x) => x.id === "zdroje");
+      const mena = ((zdroje?.focus as { skupina?: { mena?: string[] } } | undefined)?.skupina?.mena) || [];
+      return (
+        <KrokDopyty
+          leads={(data.leads || []) as never}
+          clients={clients}
+          bezZdroja={{
+            mena, mesiac: mesiacUzavierky,
+            otvor: zdroje?.tab && onNavigate ? () => onNavigate(zdroje.tab as string, zdroje.sub, zdroje.focus as never) : undefined,
+          }}
+          onNavigate={onNavigate}
+          onZmena={() => oznam("klienti")}
+          VsetkyDopyty={<Dopyty leads={data.leads || []} clients={clients} refresh={async () => { oznam("klienti"); }} />}
+        />
+      );
+    }
+    if (k.krok === "uzavierka") {
+      return (
+        <KrokUzavierka
+          mesiac={mesiacUzavierky}
+          kroky={krokyUzavierky?.(mesiacUzavierky) || []}
+          prekazky={prekazkyUzavierky?.(mesiacUzavierky) || []}
+          onNavigate={onNavigate}
+          trener={trenerKroku}
+          onZmena={() => oznam("klienti")}
+        />
+      );
+    }
+    if (k.krok === "kontroly") {
+      if (trenerKroku === "Terezka") return <VsetkoVybavene text="Mesačné kontroly sú Jerryho — tu nič nečaká." />;
+      const kontroly = ritualy(new Date(), {}, {}).filter((r) => r.druh === "kontrola")
+        .map((r) => ({ id: r.id, nadpis: r.nadpis, detail: r.detail, splatne: r.splatne, ciel: r.ciel }));
+      return <KrokKontroly kontroly={kontroly} acks={data.anomalyAck || {}} onNavigate={onNavigate} onZmena={() => oznam("klienti")} />;
+    }
     if (k.krok === "sms") {
       return (
         <KrokSms

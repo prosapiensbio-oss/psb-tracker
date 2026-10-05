@@ -96,7 +96,7 @@ export type Karta =
   | { druh: "krok"; krok: Krok; nadpis: string; podnadpis: string; polozky: never[]; sekcie: Karta[] };
 
 /** Tri kroky v poradí, v akom idú v týždni (balíčky sú od 5. 10. súčasťou platieb). */
-export type Krok = "kalendar" | "sms" | "platby";
+export type Krok = "kalendar" | "sms" | "platby" | "dopyty" | "uzavierka" | "kontroly";
 
 /** Karty, ktoré nie sú fronta — nemajú počet a z kopy nikdy nezmiznú. */
 export const BEZ_FRONTY: Karta["druh"][] = ["klient", "faktury", "anamnezy", "krok"];
@@ -114,7 +114,7 @@ export const BEZ_FRONTY: Karta["druh"][] = ["klient", "faktury", "anamnezy", "kr
  * a trénuje ďalej, dostane návrh nového balíčka, a ten, kto je na nule,
  * patrí do SMS. Dve karty o tom istom človeku by sa pýtali dvakrát.
  */
-export function krokyBety(karty: Karta[]): Karta[] {
+export function krokyBety(karty: Karta[], volby: { mesacne?: boolean } = {}): Karta[] {
   const daj = (d: Karta["druh"]) => karty.filter((k) => k.druh === d);
   const krok = (k: Krok, nadpis: string, podnadpis: string, sekcie: Karta[]): Karta =>
     ({ druh: "krok", krok: k, nadpis, podnadpis, polozky: [], sekcie });
@@ -126,6 +126,16 @@ export function krokyBety(karty: Karta[]): Karta[] {
     // platnosť, „sedí?" po návrate) sú súčasťou tohto kroku (5. 10. 2026).
     // Dlžníci hore, všetky platby z banky pod nimi (Jerry, 5. 10. 2026: „otoč to").
     krok("platby", "3 · Platby a balíčky", "stiahnuť z banky, spárovať s dlhmi, rozhodnúť o končiacej platnosti", [...daj("dlznici"), ...daj("platby")]),
+    /**
+     * BETA 5. 10. 2026: dopyty (Terezkine), uzávierka mesiaca a mesačné
+     * kontroly (Jerryho) — „Workspace má byť miesto práce", nič z toho nemá
+     * žiť len na Dnes alebo v Údajoch.
+     */
+    ...(volby.mesacne ? [
+      krok("dopyty", "Dopyty", "kto čaká na odpoveď, čo z dopytu bolo a odkiaľ prišli noví", []),
+      krok("uzavierka", "Uzávierka mesiaca", "prvý víkend nového mesiaca — podklady, otázky, hotovosť, zámok", []),
+      krok("kontroly", "Mesačné kontroly", "jedna oblasť každý týždeň — peniaze, klienti, marketing, Jarvis", []),
+    ] : []),
     ...daj("faktury"),
     ...daj("anamnezy"),
   ];
@@ -150,6 +160,14 @@ export type ZdrojeKariet = {
   ktoSom: string | null;
   /** Ručne zvolený tréner; `null` = všetko, `undefined` = podľa prihlásenia. */
   trener?: "Jerry" | "Terezka" | null;
+  /**
+   * PENIAZE PODĽA TRÉNERA KLIENTA (beta, Jerry 5. 10. 2026: „platby, balíčky
+   * aj faktúry si každý rieši svojich klientov"). Bez toho sú peniaze celé
+   * Jerryho a Terezka ich nevidí.
+   */
+  rozdelPeniaze?: boolean;
+  /** Tréner klienta podľa mena — kvôli platbám z banky, ktoré trénera nemajú. */
+  trenerKlienta?: (meno: string) => string;
 };
 
 /**
@@ -206,7 +224,18 @@ export function postavKarty(z: ZdrojeKariet): Karta[] {
    * každý deň znova zastane a zistí, že to nie je klient.
    * Nezahadzujú sa: obrazovka „Platby z banky" ich ukazuje ďalej.
    */
-  const platby: NepriradenaPlatba[] = ja === "Terezka" ? [] : z.platby.filter((p) => p.klientsky !== false).map((p) => ({
+  /**
+   * Komu patrí platba z banky: tréner navrhnutého klienta. Platba bez návrhu
+   * (appka nevie, kto poslal peniaze) ostáva Jerrymu — peniaze firmy sú jeho.
+   */
+  const trenerPlatby = (p: { kandidati: string[]; rozdelenie?: { klient: string }[] }) => {
+    const kto = p.rozdelenie?.[0]?.klient || (p.kandidati.length === 1 ? p.kandidati[0] : "");
+    return (kto && z.trenerKlienta?.(kto)) || "Jerry";
+  };
+  const platbyZdroj = z.rozdelPeniaze
+    ? z.platby.filter((p) => !ja || trenerPlatby(p) === ja)
+    : ja === "Terezka" ? [] : z.platby;
+  const platby: NepriradenaPlatba[] = platbyZdroj.filter((p) => p.klientsky !== false).map((p) => ({
     fioId: p.fioId, datum: p.datum, suma: p.suma, text: p.text,
     // Jednoznačný návrh sa predvyplní; pri dvoch a viacerých nie — hádať sa
     // nesmie, to je pravidlo platné všade v appke.
@@ -321,7 +350,7 @@ export function postavKarty(z: ZdrojeKariet): Karta[] {
     polozky: bezBalicka,
   });
 
-  const dlzni = ja === "Terezka" ? [] : (z.dlznici || []);
+  const dlzni = z.rozdelPeniaze ? moje(z.dlznici || []) : ja === "Terezka" ? [] : (z.dlznici || []);
   if (dlzni.length) karty.push({
     druh: "dlznici",
     nadpis: "Dlhujú peniaze",

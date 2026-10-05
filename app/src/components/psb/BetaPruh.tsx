@@ -15,7 +15,8 @@ import { C } from "../../lib/psb/theme";
  * inak pruh o pol roka klame rovnako, ako klamal text pod P&L.
  */
 const SKUSA_SA: { text: string; tab: string; sub: string }[] = [
-  // Prázdne: Workspace po krokoch je od 5. 10. 2026 naostro.
+  // Workspace po krokoch je od 5. 10. 2026 naostro. V bete sa skúša:
+  { text: "Workspace: Dopyty, Uzávierka mesiaca, Mesačné kontroly; peniaze a faktúry podľa trénera", tab: "workspace", sub: "" },
 ];
 
 /**

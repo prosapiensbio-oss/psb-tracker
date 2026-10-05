@@ -82,10 +82,15 @@ function Pole({ label, hodnota, nastav, sirka = 1, typ = "text", placeholder = "
   );
 }
 
-export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana }: {
+export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana, lenTrenera }: {
   mena: string[];
   /** Kto klienta vedie — podľa toho sa mail podpíše. */
   treneri?: Record<string, string>;
+  /**
+   * Len faktúry klientov tohto trénera (beta, Jerry 5. 10. 2026: „platby,
+   * balíčky aj faktúry si každý rieši svojich klientov"). Prázdne = všetky.
+   */
+  lenTrenera?: string | null;
   predvolba?: FakturaPredvolba | null;
   onPredvolbaSpracovana?: () => void;
 }) {
@@ -177,7 +182,10 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana 
       : <div style={{ fontSize: 12.5, color: C.textDim }}>načítavam faktúry…</div>;
   }
 
-  const zive = riadky.filter((r) => !r.storno_at);
+  // Faktúry klientov iného trénera sa neukazujú; klient bez trénera ostáva
+  // Jerrymu (peniaze firmy sú jeho).
+  const mojeRiadky = lenTrenera ? riadky.filter((r) => (treneri?.[r.klient] || "Jerry") === lenTrenera) : riadky;
+  const zive = mojeRiadky.filter((r) => !r.storno_at);
   const nezaplatene = zive.filter((r) => !r.uhradene_at);
   const meskajuce = nezaplatene.filter((r) => poSplatnosti(naFakturu(r), dnes()));
   const tentoRok = zive.filter((r) => r.vystavene.startsWith(String(new Date().getFullYear())));
@@ -531,14 +539,14 @@ export function VydaneFaktury({ mena, treneri, predvolba, onPredvolbaSpracovana 
         </div>
       )}
 
-      {riadky.length === 0 ? (
+      {mojeRiadky.length === 0 ? (
         <div style={{ fontSize: 12.5, color: C.textMuted, lineHeight: 1.55 }}>
           Zatiaľ žiadna faktúra. Prvá dostane číslo {new Date().getFullYear()}1001 — stará rada
           z iDokladu (…0038) zostáva nedotknutá.
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          {riadky.map((r) => {
+          {mojeRiadky.map((r) => {
             const mesk = poSplatnosti(naFakturu(r), dnes());
             return (
               <div

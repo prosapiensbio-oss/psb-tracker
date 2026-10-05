@@ -11,7 +11,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { CENNIK, platnostDo } from "../../lib/psb/cennik";
-import type { ClientAgg } from "../../lib/psb/compute";
+import { maTermin, najdiKlienta, type ClientAgg } from "../../lib/psb/compute";
 import { fmtCZK, fmtDMY, normName } from "../../lib/psb/format";
 import { nazovProduktu } from "../../lib/psb/nazvyProduktov";
 import { oznam } from "../../lib/psb/obnovaSignal";
@@ -752,6 +752,305 @@ export function AutomatickeBalicky({ balicky, acks, clients, trener, onVybavene 
           Zmeniť ich ide v profile klienta.
         </div>
       )}
+    </>
+  );
+}
+
+/* ───────────────────────── DOPYTY (Terezka) ──────────────────────────────── */
+
+/**
+ * DOPYTY — Terezkina karta (beta, Jerry 5. 10. 2026: „postav kartu pre
+ * dopyty pre Terezku"). Prvý kontakt s novým klientom má v 99,9 % ona.
+ *
+ * Navrchu to, čo čaká na ňu: komu sa ešte nikto neozval (rýchlosť odpovede
+ * je najsilnejšia páka na to, či z dopytu bude klient), dopyty bez výsledku
+ * a úvodní klienti bez zdroja — to je jej krok mesačnej uzávierky. Pod tým
+ * celý zoznam dopytov, ten istý ako v Marketingu, zabalený.
+ */
+export function KrokDopyty({ leads, clients, bezZdroja, onNavigate, onZmena, VsetkyDopyty }: {
+  leads: { id: string; date: string; name: string; source: string; status: string; email: string; telefon: string; odpovedaneAt: string; dovod: string; druh: string; note: string }[];
+  clients: Record<string, ClientAgg>;
+  /** Úvodní klienti uzatváraného mesiaca bez zdroja (krok uzávierky „Odkiaľ prišli"). */
+  bezZdroja: { mena: string[]; mesiac: string; otvor?: () => void };
+  onNavigate?: (tab: string, sub?: string) => void;
+  onZmena: () => void;
+  /** Celý zoznam dopytov — komponent z Marketingu, aby sa nekreslil dvakrát inak. */
+  VsetkyDopyty: React.ReactNode;
+}) {
+  const [bezi, setBezi] = useState("");
+  const [chyba, setChyba] = useState("");
+  const [vsetky, setVsetky] = useState(false);
+  /**
+   * TIE ISTÉ PRAVIDLÁ AKO OBRAZOVKA DOPYTY v Marketingu (`Dopyty.tsx`) —
+   * dve definície „kto čaká" by si skôr či neskôr protirečili. Prvá verzia
+   * karty brala každý dopyt so stavom „nový" a ukázala 27 ľudí od januára,
+   * medzi nimi Hanusa aj Gericha, ktorí sú dávno klienti.
+   *  • čas odpovede sa meria od 12. 8. 2026 (staršie dopyty pečiatku nemajú),
+   *  • kto je už klient alebo má termín v kalendári, nečaká,
+   *  • „prečo z toho nebol klient" sa pýta až pri dopyte bez výsledku;
+   *    čerstvo dohodnutý (do 30 dní) to ešte nie je.
+   */
+  const menaKlientov = Object.keys(clients);
+  const jeKlient = (l: { name: string }) => !!(l.name && najdiKlienta(menaKlientov, l.name));
+  const dopyty = leads.filter((l) => (l.druh || "dopyt") === "dopyt" && l.date >= "2026-08-12");
+  const cakaju = dopyty
+    .filter((l) => l.status === "novy" && !l.odpovedaneAt && !jeKlient(l) && !maTermin(l.name || ""))
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const bezVysledku = dopyty.filter((l) => {
+    if (cakaju.includes(l) || jeKlient(l) || (l.dovod || "").trim() || maTermin(l.name || "")) return false;
+    if (l.status === "dohodnuty" && (Date.now() - Date.parse(`${l.date}T12:00:00Z`)) / 86400000 <= 30) return false;
+    return l.status !== "novy" || !!l.odpovedaneAt;
+  });
+  const dniOd = (d: string) => Math.max(0, Math.round((Date.now() - Date.parse(`${d}T00:00:00Z`)) / 86400000));
+
+  const ozvalaSom = async (id: string) => {
+    setBezi(id); setChyba("");
+    const j = await posli("/api/leads", { akcia: "ozval-som-sa", id });
+    setBezi("");
+    if (!j.ok) { setChyba(j.error || "Nezapísalo sa."); return; }
+    onZmena();
+  };
+
+  const prazdne = !cakaju.length && !bezVysledku.length && !bezZdroja.mena.length;
+  return (
+    <>
+      {chyba && <div style={{ fontSize: 12, color: C.red }}>{chyba}</div>}
+      {cakaju.length > 0 && <NadpisSekcie pocet={cakaju.length}>Čaká na odpoveď</NadpisSekcie>}
+      {cakaju.map((l) => (
+        <div key={l.id} style={riadok}>
+          <span style={{ fontSize: 13.5, fontWeight: 600, color: C.text, minWidth: 170 }}>{l.name || "(bez mena)"}</span>
+          <span style={{ fontSize: 12, color: dniOd(l.date) > 1 ? C.orange : C.textDim, minWidth: 90 }}>
+            {fmtDMY(l.date)}{dniOd(l.date) ? ` · ${dniOd(l.date)} d` : " · dnes"}
+          </span>
+          <span style={{ fontSize: 11.5, color: C.textMuted, flex: "1 1 200px" }}>
+            {[l.source, l.telefon, l.email].filter(Boolean).join(" · ")}{l.note ? ` · ${l.note.slice(0, 60)}` : ""}
+          </span>
+          <button disabled={bezi === l.id} style={hlavne(bezi !== l.id)} onClick={() => void ozvalaSom(l.id)}>
+            {bezi === l.id ? "…" : "Ozvala som sa"}
+          </button>
+        </div>
+      ))}
+      {bezVysledku.length > 0 && <NadpisSekcie pocet={bezVysledku.length}>Prečo z toho nebol klient</NadpisSekcie>}
+      {bezVysledku.map((l) => (
+        <div key={l.id} style={riadok}>
+          <span style={{ fontSize: 13.5, fontWeight: 600, color: C.text, minWidth: 170 }}>{l.name || "(bez mena)"}</span>
+          <span style={{ fontSize: 12, color: C.textDim, minWidth: 90 }}>{fmtDMY(l.date)}</span>
+          <span style={{ fontSize: 11.5, color: C.textMuted, flex: "1 1 200px" }}>
+            {l.status === "neodpisal" ? "neodpísal" : l.status === "zruseny" ? "zrušený" : l.status === "dohodnuty" ? "dohodnutý, ale neprišiel" : "ozvala si sa, ďalej nič"} — dôvod chýba; doplň ho v zozname nižšie
+          </span>
+          <button style={vedlajsie} onClick={() => setVsetky(true)}>otvoriť zoznam</button>
+        </div>
+      ))}
+      {bezZdroja.mena.length > 0 && (
+        <>
+          <NadpisSekcie pocet={bezZdroja.mena.length}>Odkiaľ prišli — uzávierka {bezZdroja.mesiac}</NadpisSekcie>
+          <div style={{ ...riadok, alignItems: "flex-start" }}>
+            <span style={{ fontSize: 12.5, color: C.text, flex: "1 1 300px", lineHeight: 1.55 }}>
+              Úvodný tréning mali, zdroj nemajú: <b>{bezZdroja.mena.join(", ")}</b>.
+            </span>
+            {bezZdroja.otvor && <button style={hlavne(true)} onClick={bezZdroja.otvor}>Doplniť v Klientoch</button>}
+          </div>
+        </>
+      )}
+      {prazdne && <VsetkoVybavene text="Všetko vybavené — každému dopytu sa niekto ozval." />}
+      <button
+        onClick={() => setVsetky((v) => !v)}
+        aria-expanded={vsetky}
+        style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit", display: "block", width: "100%", textAlign: "left", marginTop: 10 }}
+      >
+        <NadpisSekcie pocet={dopyty.length}><span style={{ display: "inline-block", width: 14 }}>{vsetky ? "▾" : "▸"}</span>Všetky dopyty</NadpisSekcie>
+      </button>
+      {vsetky && VsetkyDopyty}
+      {onNavigate && (
+        <div style={{ fontSize: 11, color: C.textDim, marginTop: 8 }}>
+          Lievik a ceny za dopyt sú v <button style={{ ...vedlajsie, padding: "2px 6px" }} onClick={() => onNavigate("marketing", "lievik")}>Marketing → Lievik</button>
+        </div>
+      )}
+    </>
+  );
+}
+
+/* ───────────────────────── UZÁVIERKA MESIACA ─────────────────────────────── */
+
+export type KrokUzavierkyKarta = {
+  id: string; label: string; hotovo: boolean; detail: string;
+  tab?: string; sub?: string; focus?: unknown;
+};
+
+/** Mesiac v tvare „september 2026". */
+const nazovMesiaca = (mk: string) => {
+  const m = ["január", "február", "marec", "apríl", "máj", "jún", "júl", "august", "september", "október", "november", "december"][Number(mk.slice(5, 7)) - 1] || mk;
+  return `${m} ${mk.slice(0, 4)}`;
+};
+
+/**
+ * UZÁVIERKA MESIACA v jednej karte (beta, Jerry 5. 10. 2026: „na toto by si
+ * mi vedel postaviť tiež jednotnú kartu").
+ *
+ * Kroky sú tie isté, aké stráži zámok v Údajoch (`krokyZamku` v App) — dva
+ * zoznamy „čo je hotové" by sa rozišli. Pridané sú len dve veci:
+ *  • KTO: „Odkiaľ prišli" je Terezkin krok (Jerry), ostatné Jerryho;
+ *  • FIO CEZ API: „je to potrebné, keď je API?" Súbor netreba — mesiac sa
+ *    stiahne tu, všetky pohyby (aj výdavky) sa zapíšu a zaradia podľa
+ *    naučených pravidiel. Čo pravidlo nemá, zaradí sa v Banke.
+ */
+export function KrokUzavierka({ mesiac, kroky, prekazky, onNavigate, trener, onZmena }: {
+  mesiac: string;
+  kroky: KrokUzavierkyKarta[];
+  prekazky: string[];
+  onNavigate?: (tab: string, sub?: string, focus?: never) => void;
+  trener: string | null;
+  onZmena: () => void;
+}) {
+  const [zamknuty, setZamknuty] = useState<boolean | null>(null);
+  const [bezi, setBezi] = useState("");
+  const [hlaska, setHlaska] = useState("");
+  const [chyba, setChyba] = useState("");
+
+  useEffect(() => {
+    let zive = true;
+    void fetch("/api/periods", { credentials: "same-origin", cache: "no-store" })
+      .then((r) => r.json())
+      .then((j: { periods?: { month: string; locked: boolean }[] }) => { if (zive) setZamknuty(!!(j.periods || []).find((p) => p.month === mesiac)?.locked); })
+      .catch(() => { if (zive) setZamknuty(false); });
+    return () => { zive = false; };
+  }, [mesiac]);
+
+  const kto = (id: string) => (id === "zdroje" ? "Terezka" : "Jerry");
+  const viditelne = kroky.filter((k) => !trener || kto(k.id) === trener);
+  const hotovych = viditelne.filter((k) => k.hotovo).length;
+
+  const stiahniMesiac = async () => {
+    setBezi("fio"); setChyba(""); setHlaska("");
+    const od = `${mesiac}-01`;
+    const [r, m] = mesiac.split("-").map(Number);
+    const doDna = new Date(Date.UTC(r, m, 0)).toISOString().slice(0, 10);
+    const j = await posli("/api/fio", { akcia: "stiahni", od, do: doDna });
+    if (!j.ok) { setBezi(""); setChyba(String(j.chyba || j.error || "Fio sa nestiahlo.")); return; }
+    type R = { suma: number; uzMame?: boolean; zamknuty?: boolean; kategoria?: string };
+    const riadky = (Array.isArray(j.riadky) ? j.riadky : []) as R[];
+    const nove = riadky.filter((x) => !x.uzMame && !x.zamknuty);
+    if (nove.length) {
+      const z = await posli("/api/fio", { akcia: "zapis", riadky: nove });
+      if (!z.ok) { setBezi(""); setChyba(String(z.error || "Pohyby sa nezapísali.")); return; }
+    }
+    setBezi("");
+    const nezaradene = nove.filter((x) => !x.kategoria).length;
+    setHlaska(nove.length
+      ? `Zapísané ${nove.length} pohybov za ${nazovMesiaca(mesiac)}${nezaradene ? `, ${nezaradene} bez kategórie — zaraď ich v Banke` : ", všetky majú kategóriu"}.`
+      : `Za ${nazovMesiaca(mesiac)} je z Fio všetko v Kokpite.`);
+    oznam("peniaze");
+    onZmena();
+  };
+
+  const zamkni = async () => {
+    setBezi("zamok"); setChyba("");
+    const j = await posli("/api/periods", { month: mesiac, locked: true, note: "zamknuté z Workspace" });
+    setBezi("");
+    if (!j.ok) { setChyba(j.error || "Mesiac sa nezamkol."); return; }
+    setZamknuty(true);
+    oznam("peniaze");
+    onZmena();
+  };
+
+  return (
+    <>
+      <div style={{ display: "flex", gap: 12, alignItems: "baseline", flexWrap: "wrap", margin: "2px 0 8px" }}>
+        <span style={{ fontSize: 15, fontWeight: 700, color: C.text }}>{nazovMesiaca(mesiac)}</span>
+        <span style={{ fontSize: 12, color: zamknuty ? C.green : C.textMuted }}>
+          {zamknuty ? "zamknutý ✓" : `${hotovych} z ${viditelne.length} hotovo`}
+        </span>
+      </div>
+      {chyba && <div style={{ fontSize: 12, color: C.red, marginBottom: 6 }}>{chyba}</div>}
+      {hlaska && <div style={{ fontSize: 12, color: C.green, marginBottom: 6 }}>{hlaska}</div>}
+      {viditelne.map((k) => (
+        <div key={k.id} style={riadok}>
+          <span style={{ width: 20, fontSize: 14, color: k.hotovo ? C.green : C.textDim }}>{k.hotovo ? "✓" : "○"}</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: C.text, minWidth: 170 }}>
+            {k.id === "fio" ? "Fio — stiahnuté a zaradené" : k.id === "ptminder" ? "PTminder (kým beží súbežne)" : k.label}
+          </span>
+          <span style={{ fontSize: 11.5, color: k.hotovo ? C.textDim : C.textMuted, flex: "1 1 220px" }}>{k.detail}</span>
+          {!trener && <span style={{ fontSize: 11, color: C.textDim, minWidth: 54 }}>{kto(k.id)}</span>}
+          {k.id === "fio" && (
+            <button disabled={!!bezi} style={hlavne(!bezi)} onClick={() => void stiahniMesiac()}>
+              {bezi === "fio" ? "sťahujem…" : "Stiahnuť mesiac z Fio"}
+            </button>
+          )}
+          {k.tab && onNavigate && (
+            <button style={vedlajsie} onClick={() => onNavigate(k.tab as string, k.sub, k.focus as never)}>otvoriť</button>
+          )}
+        </div>
+      ))}
+      {(!trener || trener === "Jerry") && !zamknuty && (
+        <div style={{ marginTop: 12, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <button disabled={!!bezi || prekazky.length > 0} style={hlavne(!bezi && !prekazky.length)} onClick={() => void zamkni()}>
+            {bezi === "zamok" ? "…" : `Zamknúť ${nazovMesiaca(mesiac)}`}
+          </button>
+          {prekazky.length > 0 && <span style={{ fontSize: 11.5, color: C.textMuted }}>Ešte chýba: {prekazky.join(", ")}.</span>}
+        </div>
+      )}
+    </>
+  );
+}
+
+/* ───────────────────────── MESAČNÉ KONTROLY ──────────────────────────────── */
+
+export type KontrolaKarta = { id: string; nadpis: string; detail: string; splatne: boolean; ciel: { tab: string; sub?: string } };
+
+/**
+ * MESAČNÉ KONTROLY v jednej karte (beta, Jerry 5. 10. 2026). Štyri oblasti,
+ * každá v inom týždni mesiaca (`ritualy` → druh „kontrola"). Odškrtnutie
+ * zapíše ten istý kľúč ako register na Dnes (`zapis|<id>`), takže karta
+ * a pripomienka sa nemôžu rozísť.
+ */
+export function KrokKontroly({ kontroly, acks, onNavigate, onZmena }: {
+  kontroly: KontrolaKarta[];
+  acks: Record<string, unknown>;
+  onNavigate?: (tab: string, sub?: string) => void;
+  onZmena: () => void;
+}) {
+  const [bezi, setBezi] = useState("");
+  const [chyba, setChyba] = useState("");
+  const [hotove, setHotove] = useState<Set<string>>(new Set());
+  const jeHotova = (k: KontrolaKarta) => !!acks[`zapis|${k.id}`] || hotove.has(k.id);
+
+  const odskrtni = async (k: KontrolaKarta) => {
+    setBezi(k.id); setChyba("");
+    const j = await posli("/api/anomaly", { key: `zapis|${k.id}`, ack: true, note: "skontrolované z Workspace" });
+    setBezi("");
+    if (!j.ok) { setChyba(j.error || "Nezapísalo sa."); return; }
+    setHotove((s) => new Set([...s, k.id]));
+    onZmena();
+  };
+
+  return (
+    <>
+      {chyba && <div style={{ fontSize: 12, color: C.red }}>{chyba}</div>}
+      {kontroly.map((k, i) => {
+        const hotova = jeHotova(k);
+        return (
+          <div key={k.id} style={{ ...riadok, alignItems: "flex-start", opacity: hotova ? 0.6 : 1 }}>
+            <span style={{ width: 20, fontSize: 14, color: hotova ? C.green : k.splatne ? C.orange : C.textDim }}>{hotova ? "✓" : "○"}</span>
+            <div style={{ flex: "1 1 340px" }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>
+                {k.nadpis.replace(/^Mesačná kontrola: /, "")}
+                <span style={{ fontSize: 11, fontWeight: 500, color: k.splatne && !hotova ? C.orange : C.textDim, marginLeft: 8 }}>
+                  {i + 1}. týždeň mesiaca{k.splatne && !hotova ? " — teraz" : ""}
+                </span>
+              </div>
+              <div style={{ fontSize: 11.5, color: C.textMuted, lineHeight: 1.55, marginTop: 2 }}>{k.detail}</div>
+            </div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {onNavigate && <button style={vedlajsie} onClick={() => onNavigate(k.ciel.tab, k.ciel.sub)}>otvoriť</button>}
+              {!hotova && (
+                <button disabled={bezi === k.id} style={hlavne(bezi !== k.id)} onClick={() => void odskrtni(k)}>
+                  {bezi === k.id ? "…" : "Skontrolované"}
+                </button>
+              )}
+            </div>
+          </div>
+        );
+      })}
     </>
   );
 }

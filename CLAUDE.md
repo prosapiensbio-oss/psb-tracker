@@ -2454,3 +2454,19 @@ vybavené". SMS sa posielajú LEN z kroku 2 (z Dnes a Kalendára preč).
   uložiť číslo, ktoré nepatrí nikomu, ako druhé; prepínač medzi číslami.
 - Platba mení hodiny → App po `oznam("peniaze")` načíta `/api/data` znova.
 - Beta nemá `FIO_TOKEN` — „Stiahnuť príjmy z Fio" tam hlási chýbajúci token.
+
+## Workspace — mesačné karty a peniaze podľa trénera (beta, 5. 10. 2026)
+
+Jerry: „Workspace má byť miesto práce." V bete (`jeBeta()` vo Workspace):
+- **Dopyty** (`KrokDopyty`) — Terezkina karta: čaká na odpoveď (od 12. 8.,
+  bez klientov a bez termínu — tie isté pravidlá ako `Dopyty.tsx`), dopyty
+  bez výsledku, úvodní bez zdroja (jej krok uzávierky), celý zoznam zabalený.
+- **Uzávierka mesiaca** (`KrokUzavierka`) — kroky z `krokyZamku` v App,
+  predošlý kalendárny mesiac; „Odkiaľ prišli" je Terezkin, zvyšok Jerryho.
+  Fio sa nenahráva súborom: „Stiahnuť mesiac z Fio" stiahne cez API a zapíše
+  všetky pohyby (aj výdavky) s kategóriou z pravidiel. Zámok cez /api/periods.
+- **Mesačné kontroly** (`KrokKontroly`) — štyri z `ritualy`; odškrtnutie je
+  ten istý kľúč ako register (`zapis|kontrola-…`).
+- **Peniaze podľa trénera** (`rozdelPeniaze` v `postavKarty`): dlžníci a platby
+  z banky podľa trénera klienta; platba bez návrhu ostáva Jerrymu. Faktúry
+  vo Workspace cez `lenTrenera`. Naostro zostávajú peniaze celé Jerryho.

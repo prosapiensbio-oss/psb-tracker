@@ -27,6 +27,8 @@ Balíčky). Postavené v bete; pravidlá v CLAUDE.md „Workspace po krokoch".
       beží samo pri otvorení appky (aj naostro, spoločná DB). Prvý beh: 0 balíčkov.
 - [ ] **Jerry prejde v bete** týždenný náhľad kalendára, páry platieb
       a dashboard s nezaplatenými navrchu.
+- [ ] **Beta 5. 10. 2026 — Jerry prejde**: karty Dopyty, Uzávierka mesiaca,
+      Mesačné kontroly a peniaze/faktúry rozdelené podľa trénera klienta.
 - [ ] **FIO_TOKEN v bete** — bez neho „Stiahnuť príjmy z Fio" v bete nejde.
       Jerry: `npx wrangler secret put FIO_TOKEN --name kokpit-beta`.
 - [ ] **Banka od 27. 9. nestiahnutá** — pravidlo „nezaplatený balíček = mínus"
