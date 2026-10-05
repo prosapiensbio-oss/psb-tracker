@@ -12,7 +12,7 @@ v správach, a tie sa strácajú.
 patrí to SEM v tom istom ťahu. Hotová vec sa z hornej časti maže a jednou
 vetou dopíše do „Zavreté" dolu — aby sa už nikdy neotvárala odznova.
 
-Stav k **3. 10. 2026**.
+Stav k **5. 10. 2026**.
 
 ---
 
@@ -26,10 +26,10 @@ Balíčky). Postavené v bete; pravidlá v CLAUDE.md „Workspace po krokoch".
       tri kroky, SMS len z kroku 2, dashboard s nezaplatenými navrchu.
 - [x] **Automatické zakladanie balíčka prvým tréningom** — od 4. 10. 2026
       beží samo pri otvorení appky (aj naostro, spoločná DB). Prvý beh: 0 balíčkov.
-- [ ] **Jerry prejde v bete** týždenný náhľad kalendára, páry platieb
-      a dashboard s nezaplatenými navrchu.
-- [ ] **Beta 5. 10. 2026 — Jerry prejde**: karty Dopyty, Uzávierka mesiaca,
-      Mesačné kontroly a peniaze/faktúry rozdelené podľa trénera klienta.
+- [x] Dopyty, Uzávierka (aj Terezkina), Mesačné kontroly, peniaze/faktúry
+      podľa trénera, vyťaženosť, navádzač kariet, hromadná SMS — naostro 5. 10.
+- [x] Duplicity mimo Workspace odstránené (Kalendár, Upload, Tréningy,
+      + Zápis); duplikovať tréning a presun na iného trénera v kalendári.
 - [ ] **FIO_TOKEN v bete** — bez neho „Stiahnuť príjmy z Fio" v bete nejde.
       Jerry: `npx wrangler secret put FIO_TOKEN --name kokpit-beta`.
 - [ ] **Banka od 27. 9. nestiahnutá** — pravidlo „nezaplatený balíček = mínus"
@@ -140,14 +140,10 @@ https://claude.ai/artifact/UUaYYV3UrvrKMahcLmFeAL
   (servisný účet kokpit-kalendar@evident-catcher-510117-k6.iam.gserviceaccount.com,
   secret GCAL_SA_KLUC; stôl klienta → všetko → „+ Nahodiť tréning do kalendára").
   Overené naostro: AATest 30. 9. 10:00 je v Google aj v kal_udalosti.
-- [ ] **Terezkin kalendár zdieľať servisnému účtu** — z jej účtu
-  (teres.zat@gmail.com) zdieľať kalendár adrese vyššie s právom „Robiť zmeny
-  a vidieť všetky podrobnosti udalostí". Dovtedy zápis jej klientom vráti chybu s návodom.
+- [x] **Terezkin kalendár je zdieľaný** — presun tréningu Terezke funguje (5. 10. 2026).
 - [ ] Jerry: zmazať súbor kľúča ~/Downloads/evident-catcher-510117-k6-c9f048e10703.json
   (v appke už je ako secret, na disku ho netreba).
-- [ ] Zrušenie tréningu z Kokpitu — API `trening-zrus` existuje, tlačidlo na
-  obrazovke zatiaľ nie (maže z reálneho kalendára, chce potvrdenie). Ak ho Jerry
-  bude chcieť, doplniť k objednaným termínom.
+- [x] Zrušenie tréningu z Kokpitu — tlačidlo „Vymazať" s potvrdením je v okne udalosti v Kalendári.
 
 ## 1 · Čaká na Jerryho slovo
 
