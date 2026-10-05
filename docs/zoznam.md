@@ -45,7 +45,9 @@ každom: overiť nad kópiou ostrej DB pred aj po, testy, až potom nasadiť.
 5. [x] **Myšlienková mapa** — hotové 5. 10. 2026: ↑↓ a ⌘↑↓, Osnova, hromadný
        výber s číslicou 1–5, ⌘F naprieč mapami, Enter vkladá hneď za
        a koncept sa ukladá bez čakania (sekcia 2b).
-6. [ ] **Web na tablete** a zelené zvýraznenia v článkoch.
+6. [~] **Web na tablete** — hotové v téme 5. 10. 2026, ČAKÁ NA NAHRATIE do
+       WordPressu (style.css + js/app.js, viď sekcia 6). Zelené zvýraznenia
+       už boli v poriadku.
 7. [ ] **Kartotéka fotiek** (treba úložisko R2) a profil trénera na webe.
 
 Rozhodnutia, ktoré na to čakajú, sú v sekcii 1 a 2c (prenos mínusu,
@@ -377,7 +379,22 @@ nie nahratá bokom — nadpis tu tvrdil opak. Zmena v nej sa preto robí na
 DVOCH miestach: v repe (`navrhy-webu/tema/psb-spready/`) aj cez Editor
 šablón vo WordPresse, inak ju prvé nahratie témy prepíše.
 
-Z posledného kola kontroly (17.–18. 9.) zostalo:
+**5. 10. 2026 — premerané a opravené** (`tools/kontrola_tema.py` meria
+odvtedy aj zaplnenie obrazovky a zeleň; `--tablet`, alebo rozmery `820x1180`):
+- tablet na šírku: pretekanie ani prekryv už nie sú (opravilo kolo 19. 9.);
+- zelené zvýraznenia: všade najviac 4 a do 5 slov (2 obrazovky na telefóne
+  so 6 sú ceny — zámer);
+- tablet na výšku: riedke obrazovky 86 → 18 (820×1180), 62 → 16 (768×1024);
+  telefóny tiež o trochu menej, počítač bez zmeny. Tri opravy v prototype:
+  T-1 koniec článku sa centroval na skrytú pätičku `.folio` a padal ku
+  spodku; T-2 vyvažovanie aj medzi susednými kusmi „Text N" článku; T-3
+  `growScale` — riedka obrazovka na tablete sa celá zväčší (najviac 1,35×).
+- viditeľný text overený zhodný so starou verziou; menia sa len `style.css`
+  a `js/app.js`. Náhľad: https://psb-tema.prosapiensbio.workers.dev
+- **Nenahraté:** zápis do Editora šablón mi automatický režim zamietol
+  („Production Deploy“) — nahráva Jerry, alebo povolí.
+
+Z posledného kola kontroly (17.–18. 9.) zostalo (stav pred 5. 10.):
 
 - tablet na šírku 1024×768 — pretekanie pod spodnú lištu na viacerých
   stránkach (Domov, Úvodný tréning, Vzdelávanie, Služby, Online, Test),
