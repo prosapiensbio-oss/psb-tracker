@@ -38,9 +38,8 @@ každom: overiť nad kópiou ostrej DB pred aj po, testy, až potom nasadiť.
        poslala 5 390, 2 400 si nechala); Miřejovský 752 zrušené; Dvořák 1 100
        za tréning 16. 9. platí (mama), balíček 6 h je preventívny a nezaplatený.
        Opravené v kóde: pravidlo platiteľa sa učí len z priezviska, zápis zo
-       zošita sa ukladá ako hotovosť. **Otvorené:** 7 starších pravidiel
-       naučených bez priezviska (marcela, veronika, „prosapiens balicek 6h
-       richard“, …) — čaká na Jerryho.
+       zošita sa ukladá ako hotovosť. Tri rizikové staršie pravidlá zmazané (Jerry 5. 10.: „preto je dôležité, aby sa Kokpit dopytoval“); ponechané 4 so skráteným priezviskom
+       alebo preklepom (katerina/veronika stokla, zdenek l, matej prochazka).
 4. [x] **Drobnosti v kóde** — hotové 5. 10. 2026. Profil len s objednaným
        úvodným má `lastSession` prázdne (nie budúci dátum). `mimoExportu`
        počíta len tréningy, ktoré už začali (jediný nenulový prípad bol
