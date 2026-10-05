@@ -1,7 +1,7 @@
 // Balíček z Kokpitu bez platby ide do mínusu, platba vopred počká (4. 10. 2026).
 import { describe, expect, it } from "bun:test";
 
-import { dlhKlienta, nezaplateneZKokpitu, zaplateneVPtminderi, type BalicekDlh, type PlatbaDlh } from "./dlhKlienta";
+import { nezaplateneZKokpitu, zaplateneVPtminderi, type BalicekDlh, type PlatbaDlh } from "./dlhKlienta";
 import { normName } from "./format";
 
 const b = (od: string, cena: number, zdroj = "rucne"): BalicekDlh => ({ platnostOd: od, cena, zdroj, nazov: "OFF - 6h BEZ viazanosti" });
@@ -30,12 +30,10 @@ describe("nezaplateneZKokpitu", () => {
   it("balíčky z PTmindera sa do toho nemiešajú", () => {
     expect(nezaplateneZKokpitu([b("2026-09-02", 7790, "ptminder")], [])).toEqual([]);
   });
-  it("dlh a nezaplatené balíčky hovoria to isté", () => {
+  it("platba vopred pokryje aj balíček, ktorý vznikne neskôr", () => {
     const bal = [b("2026-09-02", 7790), b("2026-10-28", 7790)];
-    const pl = [p("2026-09-05", 7790)];
-    expect(dlhKlienta(bal, pl).dlzi).toBe(7790);
+    expect(nezaplateneZKokpitu(bal, [p("2026-09-05", 7790)]).map((x) => x.platnostOd)).toEqual(["2026-10-28"]);
     const vopred = [p("2026-08-30", 7790, true), p("2026-09-05", 7790)];
-    expect(dlhKlienta(bal, vopred).dlzi).toBe(0);
     expect(nezaplateneZKokpitu(bal, vopred)).toEqual([]);
   });
 });

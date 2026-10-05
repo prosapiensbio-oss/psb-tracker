@@ -157,11 +157,6 @@ export function navrhNovehoBalicka(
 
 /* ───────────────────────── 3 · PLATBY: SUMA NESEDÍ ───────────────────────── */
 
-export type BalicekPlatby = {
-  id: string; klient: string; nazov: string; hodiny: number | null; cena: number | null;
-  platnostOd: string; zdroj: string; zruseneAt?: string | null;
-};
-export type PlatbaPlatby = { klient: string; datum: string; suma: number; zruseneAt?: string | null; vopred?: boolean | number | null };
 
 export type MoznostPlatby =
   | { druh: "velkost"; popis: string; nazov: string; hodiny: number; cena: number; platnostDo: string }

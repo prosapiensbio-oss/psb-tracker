@@ -28,18 +28,6 @@ export type PlatbaDlh = {
   vopred?: boolean | number | null;
 };
 
-export type Dlh = {
-  /** Koľko ešte nie je pokryté platbami. Nikdy záporné. */
-  dlzi: number;
-  /** Súčet cien ručne nahodených balíčkov. */
-  zaBalicky: number;
-  /** Platby, ktoré sa do toho počítali. */
-  zaplatene: number;
-  /** Odkedy sa platby počítajú — deň prvého ručného balíčka. */
-  od: string;
-  /** Balíčky, ktoré do dlhu vstúpili — na vysvetlenie čísla. */
-  pocet: number;
-};
 
 /** Balíčky, ktoré tvoria dlh: z Kokpitu, nezrušené, s cenou. Od najstaršieho. */
 const balickyKokpitu = (balicky: BalicekDlh[]): BalicekDlh[] => balicky
@@ -81,21 +69,6 @@ export function nezaplateneZKokpitu(balicky: BalicekDlh[], platby: PlatbaDlh[]):
   return out;
 }
 
-export function dlhKlienta(balicky: BalicekDlh[], platby: PlatbaDlh[]): Dlh {
-  const nase = balickyKokpitu(balicky);
-  if (!nase.length) return { dlzi: 0, zaBalicky: 0, zaplatene: 0, od: "", pocet: 0 };
-
-  const od = nase[0].platnostOd;
-  const zaBalicky = nase.reduce((s, b) => s + (b.cena || 0), 0);
-  const zaplatene = zapocitanePlatby(platby, od).reduce((s, p) => s + p.suma, 0);
-  return {
-    dlzi: Math.max(0, Math.round(zaBalicky - zaplatene)),
-    zaBalicky: Math.round(zaBalicky),
-    zaplatene: Math.round(zaplatene),
-    od,
-    pocet: nase.length,
-  };
-}
 
 /**
  * ČO O ZAPLATENÍ VIE PTMINDER — poistka na čas prechodu.

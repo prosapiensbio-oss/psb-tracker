@@ -10,7 +10,7 @@
  *   • `poplatky` — otvorené poplatky z PTmindera. Čo je v exporte, je
  *     nezaplatené; `loadData` z nich navyše odratáva platby zapísané
  *     v Kokpite, takže tu už stojí len to, čo naozaj zostáva.
- *   • `dlhKlienta` — balíčky nahodené v Kokpite, na ktoré ešte neprišla
+ *   • balíčky nahodené v Kokpite, na ktoré ešte neprišla
  *     platba. Pohľadávka vzniká vytvorením balíčka (Jerry, 26. 9. 2026).
  *
  * Sčítať sa MUSIA, lebo hovoria o inom období: PTminder o starom svete,

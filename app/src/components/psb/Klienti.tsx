@@ -317,7 +317,8 @@ export function Klienti({ clients, capacity, actions, focus, leads, trainer, onT
       sessions: (c) => c.sessionCount,
       attendance: (c) => c.attendance,
       avg: (c) => c.paidAvg,
-      last: (c) => new Date(c.lastSession).getTime(),
+      // Kto ešte nebol (objednaný úvodný), má `lastSession` prázdne — na koniec.
+      last: (c) => Date.parse(c.lastSession) || 0,
       bitcoin: (c) => (c.bitcoin ? 1 : 0),
       zdroj: (c) => c.zdroj || "zzz",
     });

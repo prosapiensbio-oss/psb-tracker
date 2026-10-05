@@ -19,7 +19,7 @@ import { EMPTY_DATA, type PSBData } from "../src/lib/psb/types";
 import { priebehBalickov, vypisHodin } from "../src/lib/psb/vypisHodin";
 import { historiaPreMail } from "../src/lib/psb/historiaMail";
 import { dlhJednehoKlienta, dlznici } from "../src/lib/psb/dlznici";
-import type { BalicekDlh, PlatbaDlh } from "../src/lib/psb/dlhKlienta";
+import { dlhyKlientov } from "../src/lib/psb/zaplatene";
 import { doplnHodinySpolu, KOKPIT_OD, sedeniaZKalendara, spojDochadzku } from "../src/lib/psb/sedeniaZKalendara";
 
 const D = process.env.KONTROLA_DATA;
@@ -46,7 +46,7 @@ const services = nacitaj("services").map((r: any) => ({
 const payments = nacitaj("payments").map((r: any) => ({
   client: r.client_name, date: r.date, amount: r.amount_czk, method: r.payment_method,
 }));
-const platby = nacitaj("platby");
+const platby = nacitaj("platby").filter((p: any) => !p.zrusene_at);
 const poplatky = nacitaj("poplatky").map((r: any) => ({
   id: r.id, datum: r.datum, klient: r.client_name, popis: r.popis || "", suma: r.suma_czk,
 }));
@@ -55,6 +55,33 @@ const treningyZdarma = nacitaj("zdarma").map((r: any) => ({
 }));
 const kal = nacitaj("kal");
 const balicky = nacitaj("balicky");
+const historiaBalickov = nacitaj("historia").map((r: any) => ({
+  client: r.klient, status: "", package: r.nazov,
+  remaining: Number(r.zostatok) || 0,
+  total: r.druh === "package" ? Number(r.hodiny) || 0 : 0,
+  naObdobie: r.druh === "membership" ? Number(r.hodiny) || 0 : 0,
+  added: r.pridane || "", validFrom: r.od || "", validTo: r.do || "",
+  payment: r.platba ?? undefined, kind: r.druh, stav: r.stav || undefined,
+}));
+const doplneniaHodiny = Object.fromEntries(
+  nacitaj("doplnenia").map((r: any) => [`${r.klient}|${den(r.den)}`, Number(r.hodiny) || 0]),
+);
+
+/**
+ * Jedno pravidlo „zaplatený" — tie isté vstupy ako `loadData`. Z neho idú
+ * hodiny (`bezHodin`) aj dlh (`dlhy`); kontrolór bez nich počítal inú
+ * kartu aj inú os než appka.
+ */
+const { polozky: dlhy, otvorenePoplatky, dvojcata } = dlhyKlientov({
+  poplatky: poplatky.map((p: any) => ({ id: p.id, klient: p.klient, datum: p.datum, popis: p.popis, suma: Number(p.suma) || 0 })),
+  platby: platby.map((p: any) => ({ id: p.id, klient: p.klient, datum: den(p.datum), suma: Number(p.suma_czk) || 0, zruseneAt: p.zrusene_at || null, vopred: !!p.vopred, sposob: p.sposob, fioId: p.fio_id })),
+  balicky: balicky.map((b: any) => ({ id: b.id, klient: b.klient, nazov: String(b.nazov || ""), cena: b.cena_czk == null ? null : Number(b.cena_czk), platnostOd: den(b.platnost_od), zdroj: String(b.zdroj || ""), zruseneAt: b.zrusene_at || null })),
+  ptPlatby: payments.map((p: any) => ({ klient: String(p.client || ""), datum: den(p.date), suma: Number(p.amount) || 0 })),
+  ptHistoria: historiaBalickov.map((h: any) => ({ klient: h.client, od: den(h.validFrom) })),
+});
+const bezHodin = [...dlhy.map((d) => ({ klient: d.klient, den: d.den })), ...dvojcata];
+const platbyKokpit = platby.filter((p: any) => !p.zrusene_at)
+  .map((p: any) => ({ klient: String(p.klient), datum: den(p.datum), suma: Number(p.suma_czk) || 0, sposob: String(p.sposob || "") }));
 
 /**
  * Tá istá dochádzka ako v appke: pred KOKPIT_OD PTminder, od neho kalendár.
@@ -75,7 +102,8 @@ const balicky = nacitaj("balicky");
 }
 
 const data: PSBData = {
-  ...EMPTY_DATA, sessions, packages, services, payments, poplatky, treningyZdarma,
+  ...EMPTY_DATA, sessions, packages, services, payments, poplatky: otvorenePoplatky, treningyZdarma,
+  dlhy, bezHodin, platbyKokpit, historiaBalickov, doplneniaHodiny,
   // Od 1. 10. 2026 sa zostatok na karte počíta z týchto balíčkov — bez nich
   // by kontrolór videl iné číslo než appka.
   balickyKokpit: balicky.map((r: any) => ({
@@ -120,7 +148,7 @@ const mena = Object.keys(clients);
 const kalUdalosti = kal.map((r: any) => ({ zaciatok: r.zaciatok, klient: r.klient, typ: r.typ }));
 const osi = new Map<string, Udalost[]>();
 for (const m of mena) {
-  osi.set(m, osCasuKlienta(m, { sessions, payments, packages, services, poplatky, treningyZdarma, balicky, kalUdalosti } as never, DNES));
+  osi.set(m, osCasuKlienta(m, { sessions, payments, packages, services, poplatky: otvorenePoplatky, treningyZdarma, balicky, kalUdalosti, bezHodin, platbyKokpit, historia: historiaBalickov, doplneniaHodiny } as never, DNES));
 }
 
 let nalezov = 0;
@@ -272,7 +300,7 @@ sekcia("PLATBY");
     .filter((p: any) => !zPt.has(`${normName(p.klient)}|${den(p.datum)}|${Math.round(p.suma_czk)}`))
     .map((p: any) => `${p.klient} · ${den(p.datum)} · ${Math.round(p.suma_czk)} Kč`);
   hlas("platba je LEN v Kokpite, v PTminderi nie", lenVKokpite,
-    "výpis pre klienta berie platby z PTmindera — tieto v ňom nebudú");
+    "na osi aj vo výpise pre klienta sú (od 5. 10. 2026 `zlucPlatby`), len v PTminderi chýbajú");
 
   const duplicity = new Map<string, number>();
   for (const p of payments) {
@@ -343,27 +371,12 @@ sekcia("CENY A HODINY");
  */
 sekcia("ODKAZ PRE KLIENTA");
 {
-  /** Balíčky a platby jedného klienta v tvare, aký čaká výpočet dlhu. */
-  const balickyDlh = (m: string): BalicekDlh[] => balicky
-    .filter((b: any) => normName(b.klient) === normName(m))
-    .map((b: any) => ({
-      cena: b.cena_czk ?? null, platnostOd: String(b.platnost_od || "").slice(0, 10),
-      zdroj: String(b.zdroj || ""), zruseneAt: b.zrusene_at || null, nazov: String(b.nazov || ""),
-    }));
-  const platbyDlh = (m: string): PlatbaDlh[] => platby
-    .filter((p: any) => normName(p.klient) === normName(m))
-    .map((p: any) => ({ suma: Number(p.suma_czk) || 0, datum: String(p.datum || "").slice(0, 10), zruseneAt: p.zrusene_at || null }));
 
   const prazdne: string[] = [];
   const diery: string[] = [];
   const nadpisy: string[] = [];
   const sumy: string[] = [];
-  const dlzniciPodlaMena = new Map(dlznici(
-    poplatky,
-    Object.fromEntries(mena.map((m) => [m, balickyDlh(m)])),
-    Object.fromEntries(mena.map((m) => [m, platbyDlh(m)])),
-    {}, DNES,
-  ).map((d) => [normName(d.meno), d.spolu]));
+  const dlzniciPodlaMena = new Map(dlznici(dlhy, {}, DNES).map((d) => [normName(d.meno), d.spolu]));
 
   /**
    * Len ľudia, ktorým SMS naozaj môže odísť — kto netrénoval tri mesiace,
@@ -399,10 +412,7 @@ sekcia("ODKAZ PRE KLIENTA");
       nadpisy.push(`${m} — odkaz ${v.zostatok} h · karta ${c.packageRemaining} h`);
     }
 
-    const dlh = dlhJednehoKlienta(
-      poplatky.filter((p: any) => normName(p.klient) === normName(m)),
-      balickyDlh(m), platbyDlh(m),
-    );
+    const dlh = dlhJednehoKlienta(dlhy, m);
     const naKarte = dlzniciPodlaMena.get(normName(m)) || 0;
     if (Math.round(dlh.dlzi) !== Math.round(naKarte)) {
       sumy.push(`${m} — odkaz ${Math.round(dlh.dlzi)} Kč · karta dlžníkov ${Math.round(naKarte)} Kč`);

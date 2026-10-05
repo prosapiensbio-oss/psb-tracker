@@ -1927,6 +1927,14 @@ klientov bez balíčka a appka dvoch.
 **Keď sa harness a appka rozídu, najprv over harness.** Platí to aj pre
 `naostro.sh` — dvakrát sa mýlila kontrola, nie appka.
 
+**Druhýkrát 5. 10. 2026:** po jednom pravidle „zaplatený" kontrolór stavil
+os času bez `bezHodin`, platieb z Kokpitu a histórie z PTmindera a hlásil
+„Janka odkaz 5 h · karta 2 h", ktoré v appke nebolo. Teraz počíta
+`dlhyKlientov` z tých istých tabuliek ako `loadData` a os dostáva tie isté
+polia ako `KlientStol`. **Keď pribudne vstup do `loadData` alebo do volania
+`osCasuKlienta`, pribudne aj do `kontrola-profilov.ts`** (skript `tsc`
+nekontroluje — je mimo `src`).
+
 ## Trackpadové gesto nie je dotykové gesto
 
 28. 9. 2026 Jerry: „na telefóne sa mi nedajú jednotlivé karty vo Workspace

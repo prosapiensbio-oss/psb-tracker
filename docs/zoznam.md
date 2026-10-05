@@ -23,8 +23,8 @@ každom: overiť nad kópiou ostrej DB pred aj po, testy, až potom nasadiť.
 
 1. [x] **Jedno pravidlo „zaplatený"** — hotové 5. 10. 2026 (`zaplatene.ts`,
        `data.dlhy`, `data.bezHodin`); overené pred/po nad ostrou DB a
-       nezávislou kontrolou subagenta. Zostatok: `dlhKlienta()` a
-       `hodinyBezBalicka.ts` už nikto v appke nevolá (len testy) — upratať.
+       nezávislou kontrolou subagenta. Mŕtvy kód (`dlhKlienta()`,
+       `hodinyBezBalicka.ts`) uprataný v bode 4.
 2. [x] **Deň podľa Prahy, nie UTC** — hotové 5. 10. 2026 (~150 miest v 76
        súboroch, `lib/psb/cas.ts`); dve nezávislé kontroly subagentom, testy
        aj v `TZ=UTC`. Zostatok (len prehliadač, neškodí): `vzas.ts` mesiace pri
@@ -35,8 +35,13 @@ každom: overiť nad kópiou ostrej DB pred aj po, testy, až potom nasadiť.
        Na pozretie pre Jerryho: platby len v Kokpite — Jarek Heinrich
        23. 6. 56 000 Kč a 24. 9. 5 390 Kč (patria naozaj jemu?),
        Miřejovský 7. 1. 752 Kč, Dvořák 16. 9. 1 100 Kč.
-4. [ ] **Drobnosti v kóde** — profil pre úvodný v budúcnosti, `mimoExportu`
-       po 1. 10., QR v SMS proti stránke klienta.
+4. [x] **Drobnosti v kóde** — hotové 5. 10. 2026. Profil len s objednaným
+       úvodným má `lastSession` prázdne (nie budúci dátum). `mimoExportu`
+       počíta len tréningy, ktoré už začali (jediný nenulový prípad bol
+       Richardov dnešný tréning o 18:00). SMS bez stavu stránky QR nesľubuje.
+       Mŕtvy kód preč. Kontrolór profilov dostáva tie isté vstupy ako
+       `loadData` (dlh, dni bez hodín, platby z Kokpitu, história) — rozdiel
+       „Janka odkaz 5 h · karta 2 h" bol jeho, nie appky.
 5. [ ] **Myšlienková mapa** — klávesnica, osnova, hromadný výber, hľadanie.
 6. [ ] **Web na tablete** a zelené zvýraznenia v článkoch.
 7. [ ] **Kartotéka fotiek** (treba úložisko R2) a profil trénera na webe.
@@ -308,12 +313,12 @@ Stav k 3. 10. 2026 večer (audit, `docs/kontrola-clenstiev.md`):
   časti klientov — preto najprv simulácia, potom Jerry.
 - [x] **Jedno pravidlo „zaplatený"** — hotové 5. 10. 2026, viď PORADIE PRÁCE.
 - [x] **Deň z UTC** — hotové 5. 10. 2026, viď PORADIE PRÁCE.
-- [ ] **SMS rozhoduje o QR z iného čísla než stránka** (`SmsKlientovi.tsx:142`
+- [x] **SMS rozhoduje o QR z iného čísla než stránka** (`SmsKlientovi.tsx:142`
   vs `v.$token.tsx`): overiť po nasadení, či po zjednotení `packageRemaining`
   ešte môžu nesúhlasiť; ak áno, SMS má stav nečítať vôbec (pamäť „Jedna SMS").
-- [ ] `KlientStol`/`Dashboard`/`Kalendar` odčítavajú `mimoExportu` od čísla,
+- [x] `KlientStol`/`Dashboard`/`Kalendar` odčítavajú `mimoExportu` od čísla,
   ktoré od 1. 10. kalendár už obsahuje — overiť, že je po 1. 10. vždy nula.
-- [ ] `objednaneUvodne` zakladá profil s `lastSession` v budúcnosti (Petr Baťa
+- [x] `objednaneUvodne` zakladá profil s `lastSession` v budúcnosti (Petr Baťa
   5. 10.) → `daysBetween` záporné na troch miestach v `compute.ts`.
 - [ ] **Pre Jerryho:** Gerich (hodina 28. 9. po konci viazanosti 2. 9.;
   15 580 Kč 30. 9. = dva balíčky, v `balicky` jeden), Čechová (DB 5 h pri

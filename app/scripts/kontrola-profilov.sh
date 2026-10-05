@@ -49,7 +49,7 @@ stiahni sessions   "SELECT date,time,client_name,session_trainer,session_name,se
 stiahni packages   "SELECT client_name,package_name,sessions_total,sessions_remaining,valid_from,valid_to,payment_czk,added,kind,na_obdobie FROM packages"
 stiahni services   "SELECT date,client_name,service_type,service_description,price_czk,is_6m,trainer FROM services"
 stiahni payments   "SELECT date,client_name,amount_czk,payment_method FROM payments"
-stiahni platby     "SELECT klient,datum,suma_czk,sposob,fio_id FROM platby WHERE zrusene_at IS NULL"
+stiahni platby     "SELECT id,klient,datum,suma_czk,sposob,fio_id,zrusene_at,vopred FROM platby"
 stiahni poplatky   "SELECT id,datum,client_name,popis,suma_czk FROM poplatky"
 stiahni zdarma     "SELECT client_name,den,dovod,kto FROM treningy_zdarma"
 stiahni overrides  "SELECT * FROM client_overrides"
@@ -57,6 +57,9 @@ stiahni acks       "SELECT * FROM anomaly_ack"
 stiahni leads      "SELECT * FROM leads"
 stiahni kal        "SELECT uid,trener,zaciatok,koniec,nazov,klient,typ,zmizla_at FROM kal_udalosti WHERE zmizla_at IS NULL"
 # Vlastná evidencia balíčkov — od 28. 9. 2026 stojí na osi a mení odpočet.
-stiahni balicky    "SELECT klient,nazov,hodiny,platnost_od,platnost_do,cena_czk,zrusene_at,zdroj,poznamka FROM balicky"
+stiahni balicky    "SELECT id,klient,nazov,hodiny,platnost_od,platnost_do,cena_czk,zrusene_at,zdroj,poznamka FROM balicky"
+# Tie isté vstupy osi ako v loadData — bez nich kontrolór počíta inak než appka.
+stiahni historia   "SELECT klient,nazov,druh,stav,hodiny,zostatok,od,do,pridane,platba FROM ptminder_historia"
+stiahni doplnenia  "SELECT klient,den,hodiny FROM doplnenia_hodiny"
 
 bun run scripts/kontrola-profilov.ts

@@ -951,6 +951,13 @@ describe("profil pri dohodnutom úvodnom", () => {
     expect(c.primaryTrainer).toBe("Terezka");
   });
 
+  it("posledné sedenie je prázdne, nie deň budúceho úvodného", () => {
+    // Petr Baťa, 3. 10. 2026: „naposledy 5. 10." o termíne, ktorý len príde,
+    // a ticho −2 dni.
+    const c = postav([{ klient: "Petr Baťa", den: "2026-10-05", trener: "Jerry" }])["Petr Baťa"];
+    expect(c.lastSession).toBe("");
+  });
+
   it("taký profil nepletie štatistiky: nula sedení, nula dochádzky, neaktívny", () => {
     const c = postav([{ klient: "Josef Pávek", den: "2026-10-02", trener: "Terezka" }])["Josef Pávek"];
     expect(c.sessionCount).toBe(0);

@@ -2085,7 +2085,8 @@ export function nezapisaneTreningy(
     if (den > dnes) return false;
     if (den === dnes) {
       if (dnesok === "vynechaj") return false;
-      if (Date.parse(u.zaciatok) > teraz.getTime()) return false;
+      // Reťazcom — `zaciatok` je pražský čas bez pásma (rovnako ako compute.ts).
+      if (u.zaciatok.slice(0, 16) > terazPraha(teraz)) return false;
     }
     const k = normName(u.klient);
     return ![-1, 0, 1].some((o) => zapisane.has(`${k}|${posun(den, o)}`));
@@ -2204,7 +2205,7 @@ export function Balicky({ udalosti, buduce = [], clients, sedenia = [], onObnov,
     const videne = new Set<string>();
     for (const u of dopredu) {
       const den = u.zaciatok.slice(0, 10);
-      if (!(den > dnes || (den === dnes && Date.parse(u.zaciatok) > teraz.getTime()))) continue;
+      if (!(den > dnes || (den === dnes && u.zaciatok.slice(0, 16) > terazPraha(teraz)))) continue;
       // Ten istý termín môže prísť z oboch radov — počítať ho dvakrát by
       // balíček minulo skôr, než sa naozaj minie.
       const kluc = `${u.klient}|${u.zaciatok.slice(0, 16)}`;

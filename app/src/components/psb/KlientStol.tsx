@@ -27,7 +27,7 @@ import { Dennik } from "./Dennik";
 import { Info } from "./ui";
 import { useUzke } from "./useUzke";
 import { zhrnutiePocitov, type Rad } from "../../lib/psb/pocitovka";
-import { dnesPraha } from "../../lib/psb/cas";
+import { dnesPraha, terazPraha } from "../../lib/psb/cas";
 
 /**
  * Pracovný stôl jedného klienta — vyhľadaj a rob na ňom.
@@ -382,10 +382,16 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
     const dniZExportu = new Set(
       (data.sessions || []).filter((x) => normName(x.client) === normName(meno)).map((x) => String(x.date).slice(0, 10)),
     );
+    // Len tréning, ktorý sa UŽ ZAČAL. Od 1. 10. 2026 sú tréningy z kalendára
+    // v `data.sessions` hneď, ako sa začnú, takže jediné, čo sem padalo, bol
+    // dnešný tréning, ktorý len príde — profil o 17:59 písal „1 hodina sa
+    // odtrénovala" pred tréningom o 18:00 (Richard Matl, 5. 10. 2026).
+    const teraz = terazPraha();
     return (kalUdalosti || []).filter((u) =>
       u.klient && normName(u.klient) === normName(meno)
       && (u.typ === "trening" || u.typ === "uvodny")
       && u.zaciatok.slice(0, 10) <= d
+      && u.zaciatok.slice(0, 16) <= teraz
       && !dniZExportu.has(u.zaciatok.slice(0, 10))).length;
   }, [kalUdalosti, data.sessions, meno]);
 

@@ -326,6 +326,12 @@ export function deriveClients(data: PSBData): Record<string, ClientAgg> {
     if (!meno || map[meno]) continue;
     const c = map[meno] = prazdnyKlient(meno, u.den);
     c.objednanyUvodny = u.den;
+    // Posledné sedenie ešte NEBOLO — deň objednaného úvodného je budúcnosť.
+    // S ním v `lastSession` vychádzalo ticho záporné („−3 dni bez tréningu")
+    // a profil písal „naposledy 9. 10." o termíne, ktorý len príde
+    // (Petr Baťa, nález 3. 10. 2026). Prázdne = „ešte nebol", tak ako ho
+    // čítajú všetky obrazovky (`c.lastSession ? … : ""`).
+    c.lastSession = "";
     // Tréner sa NEZAPISUJE do `trainers`: to je počet odtrénovaných hodín
     // a tu ešte žiadna nie je. Nesie ho `objednanyUvodnyTrener`, ktorý sa
     // použije nižšie, keď `vlastnikKlienta` nemá z čoho rátať.

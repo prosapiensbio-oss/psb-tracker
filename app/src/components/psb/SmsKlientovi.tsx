@@ -188,7 +188,11 @@ export function SmsKlientovi({ meno, zostatok = 0, trener = "", predvolenyText, 
            * hodinách nie je čo platiť — a správa, ktorá sľúbi QR a klient ho
            * tam nenájde, je horšia než stručná.
            */
-          sQr: stavStranky ? stavStranky.sQr : (!!platba || zostatok <= 0),
+          // Kým server nepovie, či QR na stránke bude, správa ho NESĽUBUJE —
+          // obrazovka ráta zostatok inak než stránka a sľub bez QR je horší
+          // než stručná správa (pamäť „Jedna SMS, stav hovorí stránka").
+          // Odpoveď príde do sekundy a text sa preskladá.
+          sQr: stavStranky ? stavStranky.sQr : false,
         }),
     );
     // Závislosťou sú HODNOTY, nie objekt `platba`: nový literál pri každom
