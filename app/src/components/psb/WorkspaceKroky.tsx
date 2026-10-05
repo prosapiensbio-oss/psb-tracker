@@ -389,60 +389,69 @@ export function KrokSms({ clients, dlhy, udalosti, balicky, platby, trener, onPo
 /* ───────────────────────── 3 · PLATBY ────────────────────────────────────── */
 
 /**
- * STIAHNUTIE PRÍJMOV Z FIO priamo v kroku Platby.
+ * STIAHNUTIE PRÍJMOV Z FIO priamo v kroku Platby — JEDNÝM KLIKOM.
+ *
+ * Jerry, 5. 10. 2026: „dal som stiahnuť Fio výpis, ale neukázalo sa mi,
+ * koho stiahlo — Hanus dnes zaplatil a pri ňom nevidím žiadnu platbu."
+ * Prvá verzia mala dva kroky: „Stiahnuť" len spočítalo nové príjmy a zápis
+ * čakal na druhé tlačidlo „Zapísať", ktoré nebolo vidieť ako nutné. Výpis
+ * je fakt z banky, nie rozhodnutie — rozhoduje sa až pri párovaní. Preto
+ * sa príjmy po stiahnutí zapíšu hneď a ukáže sa, kto poslal peniaze.
  *
  * Sťahuje sa OBDOBIE (posledných 30 dní), nie „od posledného stiahnutia":
- * to by v banke posunulo zarážku a pohyby, ktoré sa tu nezapíšu, by sa
- * nabudúce nevrátili. Zapisujú sa len PRÍJMY — výdavky patria obrazovke
- * Banka, kde sa im dáva kategória do P&L.
+ * to by v banke posunulo zarážku. Zapisujú sa len PRÍJMY — výdavky patria
+ * obrazovke Banka, kde sa im dáva kategória do P&L. Duplicity a zamknuté
+ * mesiace stráži server (`/api/fio` zapis).
  */
 export function FioPrijmy({ onZapisane }: { onZapisane: () => void }) {
-  const [stav, setStav] = useState<{ nove: Record<string, unknown>[]; spolu: number } | null>(null);
   const [bezi, setBezi] = useState(false);
-  const [hlaska, setHlaska] = useState("");
+  const [vysledok, setVysledok] = useState<{ datum: string; suma: number; kto: string }[] | null>(null);
   const [chyba, setChyba] = useState("");
 
   const stiahni = async () => {
-    setBezi(true); setChyba(""); setHlaska("");
+    setBezi(true); setChyba(""); setVysledok(null);
     const doDna = new Date().toISOString().slice(0, 10);
     const od = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
     const j = await posli("/api/fio", { akcia: "stiahni", od, do: doDna });
+    if (!j.ok) { setBezi(false); setChyba(String(j.chyba || j.error || "Fio sa nestiahlo.")); return; }
+    type R = { datum: string; suma: number; protistrana?: string; poznamka?: string; uzMame?: boolean; zamknuty?: boolean };
+    const nove = ((Array.isArray(j.riadky) ? j.riadky : []) as R[]).filter((r) => r.suma > 0 && !r.uzMame && !r.zamknuty);
+    if (nove.length) {
+      const z = await posli("/api/fio", { akcia: "zapis", riadky: nove });
+      if (!z.ok) { setBezi(false); setChyba(String(z.error || "Príjmy sa stiahli, ale nezapísali.")); return; }
+    }
     setBezi(false);
-    if (!j.ok) { setChyba(String(j.chyba || j.error || "Fio sa nestiahlo.")); return; }
-    const riadky = (Array.isArray(j.riadky) ? j.riadky : []) as { suma: number; uzMame?: boolean; zamknuty?: boolean }[];
-    const nove = riadky.filter((r) => r.suma > 0 && !r.uzMame && !r.zamknuty);
-    setStav({ nove: nove as unknown as Record<string, unknown>[], spolu: riadky.length });
-  };
-
-  const zapis = async () => {
-    if (!stav?.nove.length) return;
-    setBezi(true); setChyba("");
-    const j = await posli("/api/fio", { akcia: "zapis", riadky: stav.nove });
-    setBezi(false);
-    if (!j.ok) { setChyba(String(j.error || "Príjmy sa nezapísali.")); return; }
-    setHlaska(`Zapísané: ${String(j.pridane ?? stav.nove.length)} príjmov. Nižšie sa dajú priradiť klientom.`);
-    setStav(null);
-    oznam("peniaze");
-    onZapisane();
+    setVysledok(nove
+      .map((r) => ({ datum: String(r.datum).slice(0, 10), suma: r.suma, kto: (r.protistrana || r.poznamka || "").slice(0, 60) }))
+      .sort((a, b) => b.datum.localeCompare(a.datum)));
+    if (nove.length) { oznam("peniaze"); onZapisane(); }
   };
 
   return (
-    <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", padding: "6px 0 10px" }}>
-      <button onClick={() => void stiahni()} disabled={bezi} style={hlavne(!bezi)}>
-        {bezi && !stav ? "sťahujem…" : "Stiahnuť príjmy z Fio"}
-      </button>
-      {stav && (stav.nove.length
-        ? (
-          <>
-            <span style={{ fontSize: 12.5, color: C.text }}>
-              {stav.nove.length} {stav.nove.length === 1 ? "nový príjem" : stav.nove.length < 5 ? "nové príjmy" : "nových príjmov"} za 30 dní
-            </span>
-            <button onClick={() => void zapis()} disabled={bezi} style={hlavne(!bezi)}>{bezi ? "…" : "Zapísať"}</button>
-          </>
-        )
-        : <span style={{ fontSize: 12.5, color: C.green }}>Za 30 dní nie je nový príjem — všetko je zapísané.</span>)}
-      {hlaska && <span style={{ fontSize: 12, color: C.green }}>{hlaska}</span>}
-      {chyba && <span style={{ fontSize: 12, color: C.red, flexBasis: "100%" }}>{chyba}</span>}
+    <div style={{ padding: "6px 0 10px" }}>
+      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+        <button onClick={() => void stiahni()} disabled={bezi} style={hlavne(!bezi)}>
+          {bezi ? "sťahujem a zapisujem…" : "Stiahnuť príjmy z Fio"}
+        </button>
+        {vysledok && !vysledok.length && <span style={{ fontSize: 12.5, color: C.green }}>Za 30 dní nie je nový príjem — všetko už je v Kokpite.</span>}
+        {vysledok && vysledok.length > 0 && (
+          <span style={{ fontSize: 12.5, color: C.green }}>
+            Zapísané: {vysledok.length} {vysledok.length === 1 ? "nový príjem" : vysledok.length < 5 ? "nové príjmy" : "nových príjmov"}. Párujú sa nižšie — pri dlžníkovi alebo v zozname platieb bez klienta.
+          </span>
+        )}
+        {chyba && <span style={{ fontSize: 12, color: C.red, flexBasis: "100%" }}>{chyba}</span>}
+      </div>
+      {vysledok && vysledok.length > 0 && (
+        <div style={{ marginTop: 6, padding: "6px 10px", borderRadius: 9, border: `1px solid ${C.border}`, background: mix(C.card, 70) }}>
+          {vysledok.map((r, i) => (
+            <div key={i} style={{ display: "flex", gap: 10, fontSize: 12, padding: "2px 0" }}>
+              <span style={{ color: C.textDim, minWidth: 70 }}>{fmtDMY(r.datum)}</span>
+              <span style={{ fontWeight: 700, minWidth: 80, textAlign: "right" }}>{fmtCZK(r.suma)}</span>
+              <span style={{ color: C.textMuted }}>{r.kto || "bez textu"}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
