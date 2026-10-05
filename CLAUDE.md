@@ -2624,3 +2624,16 @@ v Prahe bola appka vo včerajšku (na serveri aj ranná piatková pripomienka,
 - Testy púšťaj aj s `TZ=UTC` (tak beží server): `TZ=UTC bun test src/lib/psb src/components/psb`.
 - Lokálny čas v module zostal len tam, kde beží iba v prehliadači
   (`vzas.ts` mesiace, `nextMonthKeys`) — na serveri ich nič nečíta.
+
+## Platby z Kokpitu na osi času klienta (5. 10. 2026)
+
+Os (`osCasuKlienta`) do toho dňa poznala len platby z PTmindera — platba
+videná len v banke chýbala v profile aj v maili „celá história". Teraz
+`loadData` posiela `data.platbyKokpit` a os ich zlúči cez **`zlucPlatby`**
+(`klientOsCasu.ts`): platba z Kokpitu ide na os vždy, z PTmindera ostane len
+to, čo v Kokpite nie je. Párovanie: (1) rovnaká suma ± 1 Kč do 10 dní,
+(2) súčet 2–3 riadkov PTmindera do 3 dní (Albert Matl 1 100 + 7 790 = 8 890),
+(3) preklep do 3 dní a 5 % / 100 Kč (Kalva 990 → 900). Deň sa berie SKORŠÍ —
+banka pripisuje o deň-dva neskôr a tréning v deň platby by dostal −1.
+Overené snímkou pred/po nad ostrou DB: karta, koniec osi, mínus a návrhy
+balíčkov u všetkých 127 klientov bez zmeny; mínusov pri tréningoch 468 → 467.

@@ -2331,7 +2331,7 @@ function skupinaFaktur(
       services: (data.services || []) as never,
       poplatky: (data.poplatky || []) as never,
       nezaplateneKokpit: data.nezaplateneKokpit || [],
-      bezHodin: data.bezHodin,
+      bezHodin: data.bezHodin, platbyKokpit: data.platbyKokpit,
       treningyZdarma: (data.treningyZdarma || []) as never,
       // Odpovede „koľko hodín pridalo doplnenie" — bez nich appka v tom
       // období nepočíta dlh (viď migráciu 0085).

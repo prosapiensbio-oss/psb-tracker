@@ -195,6 +195,11 @@ export type PSBData = {
    * predaj (hodiny dáva len balíček z Kokpitu, a to keď je zaplatený).
    */
   bezHodin?: { klient: string; den: string }[];
+  /**
+   * Platby zapísané v Kokpite (tabuľka `platby`, nezrušené). Na osi času sa
+   * zlučujú s platbami z PTmindera — tá istá platba v oboch je raz.
+   */
+  platbyKokpit?: { klient: string; datum: string; suma: number; sposob: string }[];
   nezaplateneKokpit?: { klient: string; den: string; cena: number; nazov: string; doplatit?: number }[];
     clientOverrides: Record<string, ClientOverride>;
   anomalyAck: Record<string, AnomalyAck>;

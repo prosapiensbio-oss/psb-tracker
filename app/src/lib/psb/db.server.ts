@@ -325,6 +325,11 @@ export async function loadData(DB: D1Database): Promise<PSBData> {
         ptHistoria: (data.historiaBalickov || []).map((h) => ({ klient: h.client, od: String(h.validFrom || "").slice(0, 10) })),
       });
       data.poplatky = otvorenePoplatky as PSBData["poplatky"];
+      // Platby zapísané v Kokpite (banka, zošit) — na os času klienta a do
+      // mailu s históriou (`osCasuKlienta` ich zlúči s platbami z PTmindera).
+      data.platbyKokpit = (vlastnePlatby.results as any[])
+        .filter((r) => !r.zrusene_at)
+        .map((r) => ({ klient: String(r.klient), datum: String(r.datum || "").slice(0, 10), suma: Number(r.suma_czk) || 0, sposob: String(r.sposob || "") }));
       data.dlhy = polozky;
       // Dni balíčkov, ktoré hodiny nedávajú: nezaplatené predaje a dvojča
       // predaja z Kokpitu v PTminderi (viď `dvojcata`).

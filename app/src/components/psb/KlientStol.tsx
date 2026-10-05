@@ -239,7 +239,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
       historia: (data.historiaBalickov || []) as never,
       poplatky: (data.poplatky || []) as never,
       nezaplateneKokpit: data.nezaplateneKokpit || [],
-      bezHodin: data.bezHodin,
+      bezHodin: data.bezHodin, platbyKokpit: data.platbyKokpit,
       treningyZdarma: (data.treningyZdarma || []) as never,
       // Odpovede „koľko hodín pridalo doplnenie" — bez nich appka v tom
       // období nepočíta dlh (viď migráciu 0085).
@@ -249,7 +249,7 @@ export function KlientStol({ clients, mena, data, kalUdalosti, btcSats, btc, onO
       balicky: balicky as never,
       kalUdalosti,
     }) : []),
-    [meno, data.sessions, data.payments, data.packages, data.services, data.poplatky, data.nezaplateneKokpit, data.bezHodin, data.treningyZdarma, balicky, kalUdalosti],
+    [meno, data.sessions, data.payments, data.packages, data.services, data.poplatky, data.nezaplateneKokpit, data.bezHodin, data.platbyKokpit, data.treningyZdarma, balicky, kalUdalosti],
   );
 
   /**

@@ -26,7 +26,7 @@ import { normName } from "./format";
 import { dnesPraha, terazPraha } from "./cas";
 
 export type Udalost =
-  | { druh: "platba"; den: string; suma: number; metoda: string; poznamka?: string }
+  | { druh: "platba"; den: string; suma: number; metoda: string; poznamka?: string; zKokpitu?: boolean }
   | { druh: "trening"; den: string; cas?: string; trener?: string; nazov?: string; zKalendara?: boolean; minut?: number; zdarma?: string }
   | { druh: "balicekOd"; den: string; nazov: string; hodin: number; doDna?: string; zaplatene?: number; odvodene?: boolean; nezaplatene?: boolean; doplnenie?: boolean; zKokpitu?: boolean }
   | { druh: "balicekDo"; den: string; nazov: string; hodin: number; odvodene?: boolean };
@@ -128,6 +128,74 @@ type BalicekKokpitu = {
 
 const den = (s: string) => (s || "").slice(0, 10);
 
+/**
+ * PLATBY Z OBOCH SVETOV, TÁ ISTÁ RAZ (5. 10. 2026).
+ *
+ * Do toho dňa os poznala len platby z PTmindera. Platba, ktorú Kokpit videl
+ * v banke a do PTmindera ju nikto nezapísal, na osi chýbala — klient ju
+ * nevidel ani v maili „celá história". Od 1. 10. je Kokpit pravda, takže
+ * platba z Kokpitu ide na os vždy a z PTmindera ostane len to, čo v Kokpite
+ * nie je. Párovanie jedného klienta, v tomto poradí (overené nad ostrými
+ * dátami — každý krok má v nich svoj prípad):
+ *
+ *  1. rovnaká suma (± 1 Kč) do 10 dní, jedna ku jednej;
+ *  2. jedna platba v banke = SÚČET dvoch-troch riadkov PTmindera do 3 dní
+ *     (Albert Matl: banka 8 890, PTminder 1 100 + 7 790);
+ *  3. preklep v sume v PTminderi: do 3 dní a najviac o 5 % alebo 100 Kč
+ *     (Kalva 6 690 / banka 6 990 a 990 / 900, Richard Matl 7 790 / 7 890)
+ *     — platí suma z banky.
+ *
+ * Pri zhode sa berie SKORŠÍ deň. Banka pripisuje o deň-dva neskôr, než
+ * Jerry platbu zapíše, a tréning v deň platby by inak dostal falošné −1.
+ */
+export function zlucPlatby(
+  pt: { date: string; amount: number; method: string; note?: string }[],
+  kokpit: { datum: string; suma: number; sposob: string }[],
+): Extract<Udalost, { druh: "platba" }>[] {
+  const dni = (a: string, b: string) => Math.abs(Date.parse(`${den(a)}T00:00:00Z`) - Date.parse(`${den(b)}T00:00:00Z`)) / 86400000;
+  const k = kokpit.map((p) => ({ p, den: den(p.datum), pouzita: false }));
+  const t = pt.map((p) => ({ p, pouzita: false }));
+  const spoj = (x: (typeof k)[number], ptDni: string[]) => {
+    x.pouzita = true;
+    for (const d of ptDni) if (d < x.den) x.den = d;
+  };
+  // 1. presná suma do 10 dní — najbližší deň má prednosť
+  for (const y of t) {
+    const n = k.filter((x) => !x.pouzita && Math.abs(Math.round(x.p.suma) - Math.round(y.p.amount)) <= 1 && dni(x.p.datum, y.p.date) <= 10)
+      .sort((a, b) => dni(a.p.datum, y.p.date) - dni(b.p.datum, y.p.date))[0];
+    if (n) { spoj(n, [den(y.p.date)]); y.pouzita = true; }
+  }
+  // 2. jedna platba v banke = súčet 2–3 riadkov PTmindera do 3 dní
+  for (const x of k) {
+    if (x.pouzita) continue;
+    const blizke = t.filter((y) => !y.pouzita && dni(x.p.datum, y.p.date) <= 3);
+    const ciel = Math.round(x.p.suma);
+    let najdene: typeof blizke | null = null;
+    for (let i = 0; i < blizke.length && !najdene; i++) {
+      for (let j = i + 1; j < blizke.length && !najdene; j++) {
+        const dva = Math.round(blizke[i].p.amount) + Math.round(blizke[j].p.amount);
+        if (Math.abs(dva - ciel) <= 1) { najdene = [blizke[i], blizke[j]]; break; }
+        for (let l = j + 1; l < blizke.length; l++) {
+          if (Math.abs(dva + Math.round(blizke[l].p.amount) - ciel) <= 1) { najdene = [blizke[i], blizke[j], blizke[l]]; break; }
+        }
+      }
+    }
+    if (najdene) { spoj(x, najdene.map((y) => den(y.p.date))); for (const y of najdene) y.pouzita = true; }
+  }
+  // 3. preklep v sume: do 3 dní a najviac o 5 %
+  for (const y of t) {
+    if (y.pouzita) continue;
+    const n = k.filter((x) => !x.pouzita && dni(x.p.datum, y.p.date) <= 3
+      && Math.abs(x.p.suma - y.p.amount) <= Math.max(100, 0.05 * Math.max(x.p.suma, y.p.amount)))
+      .sort((a, b) => dni(a.p.datum, y.p.date) - dni(b.p.datum, y.p.date))[0];
+    if (n) { spoj(n, [den(y.p.date)]); y.pouzita = true; }
+  }
+  return [
+    ...k.map((x) => ({ druh: "platba" as const, den: x.den, suma: x.p.suma, metoda: x.p.sposob === "hotovost" ? "cash" : "bank", zKokpitu: true })),
+    ...t.filter((y) => !y.pouzita).map((y) => ({ druh: "platba" as const, den: den(y.p.date), suma: y.p.amount, metoda: y.p.method, poznamka: y.p.note })),
+  ];
+}
+
 export function osCasuKlienta(
   meno: string,
   zdroj: {
@@ -145,6 +213,8 @@ export function osCasuKlienta(
      * sa na to nepoužijú.
      */
     bezHodin?: { klient: string; den: string }[];
+    /** Platby zapísané v Kokpite (`data.platbyKokpit`) — zlúčia sa s `payments`. */
+    platbyKokpit?: { klient: string; datum: string; suma: number; sposob: string }[];
     /**
      * Koľko hodín pridalo „Doplnenie členstva" — kľúč `klient|deň`.
      *
@@ -196,9 +266,10 @@ export function osCasuKlienta(
     out.push({ druh: "trening", den: d, cas: u.zaciatok.slice(11, 16), trener: u.trener || undefined, zKalendara: true });
   }
 
-  for (const p of moje(zdroj.payments)) {
-    out.push({ druh: "platba", den: den(p.date), suma: p.amount, metoda: p.method, poznamka: p.note });
-  }
+  for (const x of zlucPlatby(
+    moje(zdroj.payments),
+    (zdroj.platbyKokpit || []).filter((p) => normName(p.klient) === k),
+  )) out.push(x);
 
   const nezaplateneDni = new Set(zdroj.bezHodin
     ? zdroj.bezHodin.filter((d) => normName(d.klient) === k).map((d) => den(d.den))

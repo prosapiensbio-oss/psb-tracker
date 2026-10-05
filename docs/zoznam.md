@@ -30,7 +30,11 @@ každom: overiť nad kópiou ostrej DB pred aj po, testy, až potom nasadiť.
        aj v `TZ=UTC`. Zostatok (len prehliadač, neškodí): `vzas.ts` mesiace pri
        načítaní modulu, `nextMonthKeys` (31. + `setMonth`), `Kalendar.tsx`
        `Date.parse(zaciatok)` v prehliadači.
-3. [ ] **Platby z Kokpitu na osi času klienta a v maili s históriou.**
+3. [x] **Platby z Kokpitu na osi času klienta a v maili s históriou** —
+       hotové 5. 10. 2026 (`zlucPlatby`, `data.platbyKokpit`).
+       Na pozretie pre Jerryho: platby len v Kokpite — Jarek Heinrich
+       23. 6. 56 000 Kč a 24. 9. 5 390 Kč (patria naozaj jemu?),
+       Miřejovský 7. 1. 752 Kč, Dvořák 16. 9. 1 100 Kč.
 4. [ ] **Drobnosti v kóde** — profil pre úvodný v budúcnosti, `mimoExportu`
        po 1. 10., QR v SMS proti stránke klienta.
 5. [ ] **Myšlienková mapa** — klávesnica, osnova, hromadný výber, hľadanie.
@@ -86,10 +90,8 @@ Rozhodnuté 29. 9. 2026. PTminder je odvtedy kontrola.
   tvare 6, takže to nie je plošné. Posúdiť vie len ten, kto balíček predal.
 - [x] 3 minuté doplnenia 1 h (Petra Bambúšková, Tsiolis, Jitka) — ukončené k 29. 9.
 - [x] Janka Šnirychová „SPECIAL 3" je v poriadku — berú ho obaja Šnirychovci.
-- [ ] **Peniaze z banky a zošita** — `platby_od` = 2026-10. Pri tom doplniť
-  platby zapísané v Kokpite aj do osi času klienta (`osCasuKlienta` číta len
-  PTminder `payments`) — inak „celá história + platby" v maili od októbra
-  nové platby neuvidí.
+- [ ] **Peniaze z banky a zošita** — `platby_od` = 2026-10. (Platby z Kokpitu
+  na osi času a v maili sú od 5. 10. 2026 — `zlucPlatby`.)
 - [ ] **Os času a „dnes"** — os počíta celý dnešný deň, nové sedenia len to,
   čo začalo. ±1 h do konca dňa.
 
