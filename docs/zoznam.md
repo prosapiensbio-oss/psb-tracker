@@ -271,7 +271,7 @@ Stav k 3. 10. 2026 večer (audit, `docs/kontrola-clenstiev.md`):
   balíček mínus preberá — 13 klientov má skutočne pretrénované skončené
   členstvo (napr. Vaňková −1 tesne pred súčasným). Zapnúť späť sa dá, až
   keď aj karta počíta prenos, inak sa karta a zoznam rozídu znova.
-- [ ] ~~ROZHODNUTIE (Jerry): naliať históriu balíčkov z PTmindera.~~ Hotové vyššie.
+- [x] ~~ROZHODNUTIE (Jerry): naliať históriu balíčkov z PTmindera.~~ Hotové vyššie.
   Pôvodný text: **naliať históriu balíčkov z PTmindera.** Kokpit
   má z reportu „Packages & Memberships" len stav *Active* (124 riadkov).
   Pod *Finished* je 553 balíčkov a 634 členstiev s obdobiami až do 2022
