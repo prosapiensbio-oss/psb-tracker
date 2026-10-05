@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { readFileSync } from "node:fs";
-import { ritualy } from "./rituals";
+import { mimoWorkspace, ritualy } from "./rituals";
 
 /**
  * Týždenná únava je zápis JEDNÉHO človeka o sebe.
@@ -79,8 +79,9 @@ describe("cieľ prekliku otvára riadok týždňa", () => {
     expect(dash).not.toContain("week: weekLabel(zapisCiel[2].slice(2))");
   });
 
-  it("Tréningy na tvar RRRR-MM-DD riadok rozbalia", () => {
-    expect(treningy).toContain("setOpenWeek(focus.week)");
+  // Od 5. 10. 2026 sa týždeň v Tréningoch už nerozbaľuje — zapisuje sa
+  // vo Workspace. Tvar RRRR-MM-DD riadok aspoň zvýrazní.
+  it("Tréningy na tvar RRRR-MM-DD riadok zvýraznia", () => {
     expect(treningy).toMatch(/\/\^\\d\{4\}-\\d\{2\}-\\d\{2\}\$\/\.test\(focus\.week\)/);
   });
 });
@@ -137,16 +138,17 @@ describe("dobiehanie minulého týždňa", () => {
  * poznámky, ktoré tam boli. Týždňu 24. 8. tak zmizli obe poznámky.
  */
 describe("formulár týždňa neprepíše, čo už je zapísané", () => {
-  const treningy = readFileSync(new URL("../../components/psb/Treningy.tsx", import.meta.url).pathname, "utf8");
+  const kroky = readFileSync(new URL("../../components/psb/WorkspaceKroky.tsx", import.meta.url).pathname, "utf8");
   const api = readFileSync(new URL("../../routes/api/vzas-weeks.ts", import.meta.url).pathname, "utf8");
 
-  it("draft dobehne dáta, kým sa políčok nikto nedotkol", () => {
-    expect(treningy).toContain("const dotknute = useRef(false)");
-    expect(treningy).toContain("if (!dotknute.current) setDraft(entry ?? {})");
+  // Formulár je od 5. 10. 2026 vo Workspace (VytazenostTyzdna): kreslí sa
+  // až s načítaným týždňom a posiela LEN polia svojej osoby.
+  it("formulár sa nekreslí pred načítaním týždňa", () => {
+    expect(kroky).toContain("if (!zapis) return null;");
   });
 
-  it("po prvom písmene sa draft zamkne", () => {
-    expect(treningy).toContain("dotknute.current = true; setDraft");
+  it("posiela len polia svojej osoby", () => {
+    expect(kroky).toContain("[`${os}_score`]: String(score), [`${os}_hours`]");
   });
 
   it("server zlučuje, neprepisuje celý riadok", () => {
@@ -212,5 +214,22 @@ describe("dobehnutý minulý týždeň zo zoznamu zmizne", () => {
   it("zoznam ich odfiltruje, keď sú hotové", () => {
     const zapis = readFileSync(new URL("../../components/psb/Zapis.tsx", import.meta.url).pathname, "utf8");
     expect(zapis).toContain("zoz[0].tichyKedHotovy && zoz.every((r) => r.hotove)");
+  });
+});
+
+/**
+ * Vyťaženosť a mesačné kontroly sú od 5. 10. 2026 vo Workspace — do registra
+ * a do „+ Zápis" už nejdú (Jerry: „aby to nebolo na dvoch miestach").
+ */
+describe("pripomienky, ktoré žijú vo Workspace", () => {
+  it("týždeň a kontroly sa z registra vyfiltrujú, uzávierka nie", () => {
+    const vsetky = ritualy(PIATOK, {}, {}, { chybaju: [] });
+    const ostane = vsetky.filter(mimoWorkspace);
+    expect(ostane.some((r) => r.druh === "tyzden" || r.druh === "kontrola")).toBe(false);
+    expect(vsetky.some((r) => r.druh === "tyzden")).toBe(true);
+  });
+  it("uzávierka vedie do Workspace", () => {
+    const u = ritualy(new Date("2026-10-04T09:00:00Z"), {}, {}, { chybaju: [] }).filter((r) => r.druh === "mesiac");
+    for (const r of u) expect(r.ciel).toEqual({ tab: "workspace", sub: "uzavierka" });
   });
 });

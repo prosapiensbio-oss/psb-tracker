@@ -3108,9 +3108,9 @@ export function deriveRegister(
           "Zápis",
           "blue",
           `Priradiť „${nazov}“ ku klientovi ${klient}?`,
-          `V kalendári je „${nazov}“ a sedí presne na jedného klienta — ${klient}. Potvrď a appka si to zapamätá navždy; tréning sa započíta do hodín. Ak to nie je on, otvor Kalendár → Nové názvy.`,
+          `V kalendári je „${nazov}“ a sedí presne na jedného klienta — ${klient}. Potvrď a appka si to zapamätá navždy; tréning sa započíta do hodín. Ak to nie je on, priraď ho vo Workspace → 1 · Kalendár.`,
           4,
-          "kalendar|nezname",
+          "workspace|kalendar",
           `mapuj|${n.trener}|${nazov}`,
           { trener, oKom: klient, navrh: { nazov, trener: n.trener, typ: nav.typ, klient } },
         );
@@ -3126,9 +3126,9 @@ export function deriveRegister(
         "Zápis",
         "orange",
         `${nejasne.length} ${nejasne.length === 1 ? "názov" : nejasne.length < 5 ? "názvy" : "názvov"} v kalendári treba priradiť`,
-        `${mena} — appka nevie, kto to je (sedí na viacerých alebo na nikoho), takže sa NEPOČÍTAJÚ do hodín. Priraď ich v Kalendár → Nové názvy: sú to buď tréningy, alebo si ich označ ako súkromné.`,
+        `${mena} — appka nevie, kto to je (sedí na viacerých alebo na nikoho), takže sa NEPOČÍTAJÚ do hodín. Priraď ich vo Workspace → 1 · Kalendár: sú to buď tréningy, alebo si ich označ ako súkromné.`,
         4,
-        "kalendar|nezname",
+        "workspace|kalendar",
         "nezname",
         { trener },
       );
@@ -3142,9 +3142,9 @@ export function deriveRegister(
       "Zápis",
       "orange",
       `${u.typ === "uvodny" ? "Úvodný" : "Tréning"} ${fmtDMY(u.datum)} bez mena klienta`,
-      `${u.nazov ? `„${u.nazov}"` : `${u.typ === "uvodny" ? "Úvodný" : "Tréning"} ${fmtDMY(u.datum)}`} nemá priradeného klienta, takže sa nespočíta nikam. Prirad ho v Kalendár → neznáme názvy.`,
+      `${u.nazov ? `„${u.nazov}"` : `${u.typ === "uvodny" ? "Úvodný" : "Tréning"} ${fmtDMY(u.datum)}`} nemá priradeného klienta, takže sa nespočíta nikam. Priraď ho vo Workspace → 1 · Kalendár.`,
       7,
-      "kalendar|nezname",
+      "workspace|kalendar",
       "bezmena",
       { trener: u.trener },
     );
@@ -3912,8 +3912,8 @@ export function nezapisaneDoRegistra(v: NezapisaneVstup): Omit<RegisterItem, "ac
       // upozornenie navyše než stratené.
       trener: trener || undefined,
       title: `Zmeny v kalendári bez vysvetlenia (${spolu})`,
-      detail: `${rozpis}. Bez dôvodu sa nedá povedať, či to bolo zrušenie klientom, presun po dohode, alebo chyba v zápise — a práve to rozhoduje, či ide o stratu. Vysvetľuje sa v Kalendári.`,
-      client: "kalendar|",
+      detail: `${rozpis}. Bez dôvodu sa nedá povedať, či to bolo zrušenie klientom, presun po dohode, alebo chyba v zápise — a práve to rozhoduje, či ide o stratu. Vysvetľuje sa vo Workspace → 1 · Kalendár.`,
+      client: "workspace|kalendar",
       priority: 11,
     });
   }
@@ -3937,8 +3937,8 @@ export function nezapisaneDoRegistra(v: NezapisaneVstup): Omit<RegisterItem, "ac
       tone: "orange",
       trener: trener || undefined,
       title: `Bol tam, alebo nie? (${hodin})`,
-      detail: `${hodin} ${hodin === 1 ? "tréning zmizol" : hodin < 5 ? "tréningy zmizli" : "tréningov zmizlo"} z kalendára až po tom, čo sa mal konať, a v PTminderi zápis nemá — u ${klienti.size} ${klienti.size === 1 ? "klienta" : "klientov"}. Kým sa neodpovie, appka im ráta o toľko hodín viac, než možno majú, a podľa toho im píše. Odpovedá sa v Kope.`,
-      client: "kalendar|",
+      detail: `${hodin} ${hodin === 1 ? "tréning zmizol" : hodin < 5 ? "tréningy zmizli" : "tréningov zmizlo"} z kalendára až po tom, čo sa mal konať, a v PTminderi zápis nemá — u ${klienti.size} ${klienti.size === 1 ? "klienta" : "klientov"}. Kým sa neodpovie, appka im ráta o toľko hodín viac, než možno majú, a podľa toho im píše. Odpovedá sa vo Workspace → 1 · Kalendár.`,
+      client: "workspace|kalendar",
       priority: 13,
     });
   }

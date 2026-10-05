@@ -16,6 +16,7 @@ import { REPORTS, UploadCard } from "./Udaje";
 import { BankaUlozene } from "./BankaUlozene";
 import { BankovyImport } from "./Banka";
 import { Zosit } from "./Zosit";
+import { Uzavierky } from "./Uzavierky";
 import { KamOdisliCard, OtazkyMesiaca } from "./Vzas";
 import { RegisterRow } from "./Dashboard";
 import type { Actions } from "./App";
@@ -72,7 +73,7 @@ const tyzdenOd = (s: string): string => {
   return new Date(d.getTime() - ((d.getUTCDay() + 6) % 7) * 86400000).toISOString().slice(0, 10);
 };
 
-export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, btc, onOverride, otvorKlienta, onOtvoreny, fakturaPredvolba, onFakturaPredvolbaSpracovana, vypisPredvolba, onVypisPredvolbaSpracovana, krokyUzavierky, prekazkyUzavierky, onNavigate, actions, chat, register, pohybSplits, nastavPohybSplit }: {
+export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, btc, onOverride, otvorKlienta, onOtvoreny, otvorKrok, onKrokOtvoreny, fakturaPredvolba, onFakturaPredvolbaSpracovana, vypisPredvolba, onVypisPredvolbaSpracovana, krokyUzavierky, prekazkyUzavierky, podkladyUzavierky, onNavigate, actions, chat, register, pohybSplits, nastavPohybSplit }: {
   clients: Record<string, ClientAgg>;
   mena: string[];
   ktoSom: string | null;
@@ -92,6 +93,8 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   /** Kroky a prekážky uzávierky mesiaca — tie isté, aké stráži zámok v Údajoch. */
   krokyUzavierky?: (mesiac: string) => KrokUzavierkyKarta[];
   prekazkyUzavierky?: (mesiac: string) => string[];
+  /** Podklady mesiaca pre mesačnú správu — zoznam všetkých mesiacov a zámkov. */
+  podkladyUzavierky?: (mesiac: string) => string;
   /** Prechod na inú obrazovku appky (uzávierka, kontroly, dopyty). */
   onNavigate?: (tab: string, sub?: string, focus?: never) => void;
   /**
@@ -106,6 +109,12 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
   nastavPohybSplit?: (kluc: string, casti: SplitCiast[]) => void;
   /** Koho otvoriť rovno po prepnutí sem (klik na klienta inde v appke). */
   otvorKlienta?: string | null;
+  /**
+   * Krok, na ktorý má kopa skočiť (napr. „kalendar", „uzavierka") — upozornenia
+   * a odkazy z iných záložiek vedú rovno na miesto, kde sa vec robí.
+   */
+  otvorKrok?: string | null;
+  onKrokOtvoreny?: () => void;
   onOtvoreny?: () => void;
 }) {
   const [balicky, setBalicky] = useState<BalicekRiadok[]>([]);
@@ -120,6 +129,8 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
    * Naostro od 5. 10. 2026 (predtým beta): peniaze a faktúry podľa trénera
    * klienta, karty Dopyty, Uzávierka mesiaca a Mesačné kontroly.
    */
+  /** „Všetky mesiace" pod kartou Uzávierka — zabalené, otvára sa zriedka. */
+  const [vsetkyMesiace, setVsetkyMesiace] = useState(false);
   /** Ktorý riadok kroku Kalendár má pod sebou rozbalený týždeň (kľúč položky). */
   const [denOtvoreny, setDenOtvoreny] = useState("");
   /**
@@ -335,6 +346,12 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
     const idx = zive.findIndex((x) => x.druh === "klient");
     if (idx >= 0) setI(idx);
   }, [otvorKlienta, vypisPredvolba, zive]);
+  useEffect(() => {
+    if (!otvorKrok) return;
+    const idx = zive.findIndex((x) => x.druh === "krok" && x.krok === otvorKrok);
+    if (idx >= 0) setI(idx);
+    onKrokOtvoreny?.();
+  }, [otvorKrok, zive]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /**
    * Komu sa dá založiť anamnéza.
@@ -1372,6 +1389,7 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
     }
     if (k.krok === "uzavierka") {
       return (
+        <>
         <KrokUzavierka
           mesiac={mesiacUzavierky}
           kroky={krokyUzavierky?.(mesiacUzavierky) || []}
@@ -1411,6 +1429,22 @@ export function Workspace({ clients, mena, ktoSom, data, kalUdalosti, btcSats, b
             };
           })()}
         />
+        {/* Všetky mesiace so zámkami (aj odomknutie) a podklady pre správu —
+            predtým v Uploade; od 5. 10. 2026 je uzávierka len tu. */}
+        {trenerKroku !== "Terezka" && (
+          <div style={{ marginTop: 16 }}>
+            <button onClick={() => setVsetkyMesiace((v) => !v)} aria-expanded={vsetkyMesiace}
+              style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontFamily: "inherit", fontSize: 12, fontWeight: 600, color: C.textMuted }}>
+              {vsetkyMesiace ? "▾" : "▸"} Všetky mesiace — zamknutie, odomknutie, podklady pre správu
+            </button>
+            {vsetkyMesiace && (
+              <div style={{ marginTop: 8 }}>
+                <Uzavierky prekazky={prekazkyUzavierky} kroky={krokyUzavierky as never} podklady={podkladyUzavierky} onNavigate={onNavigate as never} chat={chat} />
+              </div>
+            )}
+          </div>
+        )}
+        </>
       );
     }
     if (k.krok === "kontroly") {

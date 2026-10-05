@@ -126,7 +126,6 @@ export function krokyBety(karty: Karta[], volby: { mesacne?: boolean; ja?: strin
   const krok = (k: Krok, nadpis: string, podnadpis: string, sekcie: Karta[]): Karta =>
     ({ druh: "krok", krok: k, nadpis, podnadpis, polozky: [], sekcie });
   return [
-    ...daj("klient"),
     krok("kalendar", "1 · Kalendár a vyťaženosť", "len výnimky — zmeny, „bol tam?“ a nové mená", [...daj("zmeny"), ...daj("konanie"), ...daj("mena")]),
     krok("sms", "2 · SMS pre klientov", "komu to práve dáva zmysel — nula, mínus, dlh", []),
     // Balíčky vznikajú samy prvým tréningom; ich dve rozhodnutia (končiaca
@@ -149,6 +148,9 @@ export function krokyBety(karty: Karta[], volby: { mesacne?: boolean; ja?: strin
     ] : []),
     ...daj("faktury"),
     ...daj("anamnezy"),
+    // Klient na konci (Jerry, 5. 10. 2026): kroky 1, 2, 3 idú hneď za sebou;
+    // na profil sa aj tak skáče klikom na meno odkiaľkoľvek.
+    ...daj("klient"),
   ];
 }
 

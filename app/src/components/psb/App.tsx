@@ -89,7 +89,7 @@ import { Udaje } from "./Udaje";
 import { CAS_BUILDU, verziaServera } from "../../lib/psb/verzia";
 import { HladanieKlienta } from "./Hladanie";
 import { ZapisButton } from "./Zapis";
-import { ritualy as spocitajRitualy } from "../../lib/psb/rituals";
+import { mimoWorkspace, ritualy as spocitajRitualy } from "../../lib/psb/rituals";
 import { nastavRozpis, pridajDoRozpisu, type PohybZaBunku } from "../../lib/psb/rozpis";
 import { chybajuceNaklady, dvojiteZapisy, nezhodyPrijmov, nezhodySExcelom, zastaranaBanka, type BankovyMesiac, type Pohyb } from "../../lib/psb/kontrolaNakladov";
 import { MKT_MESACNE, nastavIgPrispevky, nastavMarketingZImportu, nastavWebZImportu, nastavAdsZImportu, nastavWebStranky, nastavWebRychlost, nastavKanaly } from "../../lib/psb/marketing";
@@ -375,6 +375,8 @@ export function PSBApp() {
   const [ktoSom, setKtoSom] = useState<string | null>(null);
   /** Koho otvoriť v pracovnom stole vo Workspace. */
   const [workspaceKlient, setWorkspaceKlient] = useState<string | null>(null);
+  /** Krok Workspace, na ktorý sa má skočiť (odkaz z upozornenia alebo inej záložky). */
+  const [workspaceKrok, setWorkspaceKrok] = useState<string | null>(null);
   const [data, setData] = useState<PSBData>(EMPTY_DATA);
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState("dashboard");
@@ -556,6 +558,12 @@ export function PSBApp() {
     if (focus?.client) {
       setActive("workspace");
       setWorkspaceKlient(focus.client);
+      return;
+    }
+    // „workspace|kalendar", „workspace|uzavierka"… — rovno na krok kopy.
+    if (tab === "workspace") {
+      setActive("workspace");
+      if (sub) setWorkspaceKrok(sub);
       return;
     }
     // „6m" už nie je sekcia — je to pohľad v Klientoch. Staré odkazy (register,
@@ -1912,7 +1920,7 @@ function skupinaFaktur(
   }, [data, bankaSumy, hotovostMesiace, kanalyMesiace]);
 
   const rituals = useMemo(
-    () => spocitajRitualy(new Date(), zapisy.weeks, zapisy.mesiace, chybajuceDoklady, { nacitane: zapisy.nacitane, stavDatum: stavHotovosti?.datum }),
+    () => spocitajRitualy(new Date(), zapisy.weeks, zapisy.mesiace, chybajuceDoklady, { nacitane: zapisy.nacitane, stavDatum: stavHotovosti?.datum }).filter(mimoWorkspace),
     [zapisy, chybajuceDoklady, stavHotovosti],
   );
   // Veci, ktoré čakajú na vetu od človeka — dopyty bez dôvodu a nevysvetlené
@@ -2774,7 +2782,7 @@ function skupinaFaktur(
 
         {active === "marketing" && <Marketing data={data} clients={clients} leads={data.leads} chat={chat} sub={marketingSub} onSub={setMarketingSub} focus={marketingFocus} onOdchodKJarvisovi={(mesiac, faza, napadId) => setNavratDoMapy({ mesiac, faza, napadId })} onKlient={(m) => navigate("klienti", undefined, { client: m, nonce: Date.now() })} refresh={actions.refresh} onPoznamkaStrata={(m, t) => actions.setOverride(m, "precoNeprisiel", t)} onNavigate={navigate} onAck={(k, zapnut, poznamka) => actions.ackAnomaly(k, zapnut ? (poznamka || "skryté hlásenie") : "", zapnut)} />}
         {active === "vzas" && <Vzas sub={vzasSub} onSub={setVzasSub} data={data} clients={clients} focus={vzasFocus} onNavigate={navigate} pohybSplits={pohybSplits} nastavPohybSplit={nastavPohybSplit} />}
-        {active === "kalendar" && <Kalendar clients={clients} data={data} focus={kalendarFocus} ktoSom={ktoSom} trainer={trainer} onTrainer={setTrainer} />}
+        {active === "kalendar" && <Kalendar clients={clients} data={data} focus={kalendarFocus} ktoSom={ktoSom} trainer={trainer} onTrainer={setTrainer} onNavigate={navigate} />}
         {active === "prechod" && (
           <Prechod
             mena={Object.keys(clients)}
@@ -2782,7 +2790,7 @@ function skupinaFaktur(
             onVypis={(m) => { setVypisPredvolba(m); setActive("workspace"); }}
           />
         )}
-        {active === "workspace" && <Workspace clients={clients} mena={Object.keys(clients)} ktoSom={ktoSom} data={data} kalUdalosti={kalUdalosti} btcSats={btcSatsKlienti} btc={{ platby: btcPlatby, kurz: btcKurz.kurz, kedy: btcKurz.kedy }} otvorKlienta={workspaceKlient} onOtvoreny={() => setWorkspaceKlient(null)} vypisPredvolba={vypisPredvolba} onVypisPredvolbaSpracovana={() => setVypisPredvolba(null)} onOverride={(m, k, v) => actions.setOverride(m, k as never, v)} fakturaPredvolba={fakturaPredvolba} onFakturaPredvolbaSpracovana={() => setFakturaPredvolba(null)} krokyUzavierky={krokyZamku} prekazkyUzavierky={prekazkyZamku} onNavigate={navigate} actions={actions} chat={chat} register={registerAll} pohybSplits={pohybSplits} nastavPohybSplit={nastavPohybSplit} />}
+        {active === "workspace" && <Workspace clients={clients} mena={Object.keys(clients)} ktoSom={ktoSom} data={data} kalUdalosti={kalUdalosti} btcSats={btcSatsKlienti} btc={{ platby: btcPlatby, kurz: btcKurz.kurz, kedy: btcKurz.kedy }} otvorKlienta={workspaceKlient} onOtvoreny={() => setWorkspaceKlient(null)} otvorKrok={workspaceKrok} onKrokOtvoreny={() => setWorkspaceKrok(null)} vypisPredvolba={vypisPredvolba} onVypisPredvolbaSpracovana={() => setVypisPredvolba(null)} onOverride={(m, k, v) => actions.setOverride(m, k as never, v)} fakturaPredvolba={fakturaPredvolba} onFakturaPredvolbaSpracovana={() => setFakturaPredvolba(null)} krokyUzavierky={krokyZamku} prekazkyUzavierky={prekazkyZamku} podkladyUzavierky={podkladyMesiaca} onNavigate={navigate} actions={actions} chat={chat} register={registerAll} pohybSplits={pohybSplits} nastavPohybSplit={nastavPohybSplit} />}
 
         {active === "jarvis" && (
           <JarvisOkno

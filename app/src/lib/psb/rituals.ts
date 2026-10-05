@@ -73,6 +73,17 @@ export function prvyVikendMesiaca(rok: number, mesiacOd0: number): Date {
 /** Poradie dňa v týždni s pondelkom ako 1 a nedeľou ako 7. */
 const denVTyzdni = (d: Date) => d.getDay() || 7;
 
+/**
+ * Pripomienky, ktoré už NEPATRIA do registra ani do „+ Zápis".
+ *
+ * Jerry, 5. 10. 2026: „dáva zmysel, aby to bolo na dvoch miestach?" — nie.
+ * Týždenná vyťaženosť sa sama rozbalí navrchu Workspace (krok 1) a mesačné
+ * kontroly majú vlastnú kartu. Druhá pripomienka na Dnes len strašila
+ * druhýkrát. Workspace ich číta z `ritualy()` priamo, preto sa filtrujú až
+ * pri registri.
+ */
+export const mimoWorkspace = <T extends { druh: string }>(r: T): boolean => r.druh !== "tyzden" && r.druh !== "kontrola";
+
 export function ritualy(
   dnes: Date,
   weeks: Record<string, Record<string, string>>,
@@ -192,9 +203,8 @@ export function ritualy(
       : mozeZapisovat
         ? `Mesiac ${mk} má nahraté všetky doklady, ale nie sú zodpovedané otázky mesiaca. Klik otvorí rovno ne.`
         : `Mesiac ${mk} ešte nemá zápis. Najprv treba doplniť: ${chybaju.join(", ")}.`,
-    ciel: mozeZapisovat
-      ? { tab: "vysledky", sub: "mesacne", mesiac: mk }
-      : { tab: "udaje" },
+    // Uzávierka sa od 5. 10. 2026 robí vo Workspace — karta Uzávierka mesiaca.
+    ciel: { tab: "workspace", sub: "uzavierka" },
     // Pýta sa až od prvého víkendu — predtým sa uzávierka nedá spraviť, lebo
     // PTminder ani banka ešte nemajú mesiac zaúčtovaný.
     //
@@ -222,7 +232,7 @@ export function ritualy(
     detail: hotovostHotova
       ? `Stav hotovosti ku koncu ${mk} je zapísaný.`
       : `Spočítaj obálku a zapíš stav hotovosti ku koncu ${mk} — treba to na uzávierku (účet aj bitcoin appka doplní sama).`,
-    ciel: { tab: "vzas", sub: "cashflow" },
+    ciel: { tab: "workspace", sub: "uzavierka" },
     splatne: nacitane && !hotovostHotova && dnes.getTime() >= prvyVikendMesiaca(dnes.getFullYear(), dnes.getMonth()).getTime(),
     hotove: hotovostHotova,
   });

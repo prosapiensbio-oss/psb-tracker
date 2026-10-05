@@ -1,7 +1,7 @@
 import { oznam } from "../../lib/psb/obnovaSignal";
 import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 
-import { fetchWeekEntries, saveWeekEntry, type WeekEntry } from "../../lib/psb/client";
+import { fetchWeekEntries, type WeekEntry } from "../../lib/psb/client";
 import { groupTrainings, periodInfo, kotvaDat, periodZone, sessionAnalysis, TARGET_H, type ClientAgg, type Period, type PeriodRow } from "../../lib/psb/compute";
 import { fmtCZK, monthLabel, weekKey, weekLabel } from "../../lib/psb/format";
 import { C, mix, S } from "../../lib/psb/theme";
@@ -20,102 +20,9 @@ export const wkScore = (p: string) => `${p}_score`;
 export const wkHours = (p: string) => `${p}_hours`;
 export const wkNote = (p: string) => `${p}_note`;
 
-// Energy belongs next to the hours it has to be read against — the app only
-// sees training hours, so the "iné hodiny" estimate is what makes a score
-// interpretable at all. Asked weekly because by month-end you only remember
-// the last week.
-function WeekEnergyRow({ weekKeyIso, colSpan, entry, onSave }: {
-  weekKeyIso: string; colSpan: number; entry: WeekEntry; onSave: (week: string, data: WeekEntry) => void;
-}) {
-  const [draft, setDraft] = useState<WeekEntry>(entry);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  /**
-   * Riadok sa smie otvoriť skôr, než dorazia dáta — a vtedy je `entry` prázdne.
-   *
-   * `useState(entry)` vezme hodnotu LEN pri prvom vykreslení, takže pri
-   * otvorení cez pripomienku sa formulár nakreslil prázdny, hoci týždeň
-   * zapísaný bol. Kto ho vyplnil, prepísal uloženú poznámku prázdnym
-   * formulárom — presne to sa stalo 29. 8. 2026 týždňu 24. 8.
-   *
-   * Kým sa políčok nikto nedotkol, draft zrkadlí `entry`. Po prvom písmene
-   * sa zamkne, aby dobiehajúce dáta nezmazali rozpísaný text.
-   */
-  const dotknute = useRef(false);
-  const entryKluc = JSON.stringify(entry ?? {});
-  useEffect(() => {
-    if (!dotknute.current) setDraft(entry ?? {});
-  }, [entryKluc]); // eslint-disable-line react-hooks/exhaustive-deps
-  const set = (k: string, v: string) => { dotknute.current = true; setDraft((d) => ({ ...d, [k]: v })); };
-  const save = async () => {
-    setSaving(true);
-    const ok = await saveWeekEntry(weekKeyIso, draft);
-    setSaving(false);
-    if (!ok) return; // tlačidlo zostane „Uložiť" — nič sa nezapísalo
-    setSaved(true);
-    onSave(weekKeyIso, draft);
-    // Bez tohto appka pripomínala aj týždeň, ktorý bol práve zapísaný —
-    // `zapisy` v App sa čítali len pri štarte (kontrola 24. 9. 2026).
-    oznam("zapisy");
-    setTimeout(() => setSaved(false), 2000);
-  };
-  const field: CSSProperties = {
-    background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8,
-    color: C.text, fontSize: 12.5, padding: "6px 9px", fontFamily: "inherit",
-  };
-  return (
-    <tr>
-      <td colSpan={colSpan} style={{ padding: "12px 14px", background: mix(C.accent, 5), borderBottom: `1px solid ${C.border}` }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(270px, 1fr))", gap: 12 }}>
-          {PEOPLE.map((p) => {
-            // Škála je RPE, nie „energia": 1 = ľahký týždeň, 10 = veľmi ťažký.
-            // Pôvodne bola opačne a posuvník nemal štítok, takže Jerry aj
-            // Terezka doň prirodzene písali náročnosť (ako RPE, ktoré ako
-            // tréneri používajú denne) a appka to čítala ako vyhorenie.
-            // Nízke je dobré, vysoké je varovanie; východzia je stredná päťka.
-            const score = Number(draft[wkScore(p.key)] ?? 5);
-            const col = score <= 4 ? C.green : score <= 7 ? C.orange : C.red;
-            return (
-              <div key={p.key} style={{ border: `1px solid ${C.border}`, borderRadius: 10, padding: "9px 11px", background: mix(C.accent, 4) }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: p.key === "jerry" ? C.accent : C.blue, marginBottom: 6 }}>{p.label}</div>
-                <div style={{ fontSize: 11, color: C.textMuted, marginBottom: 3 }}>
-                  Náročnosť týždňa <span style={{ color: C.textDim }}>· 1 = ľahký · 10 = veľmi ťažký</span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 7 }}>
-                  <input type="range" min={1} max={10} step={1} value={score}
-                    onChange={(e) => set(wkScore(p.key), e.target.value)} style={{ flex: 1, accentColor: col }} />
-                  <span style={{ fontSize: 14, fontWeight: 700, minWidth: 40, textAlign: "right", color: col, fontVariantNumeric: "tabular-nums" }}>{score} / 10</span>
-                </div>
-                <label style={{ fontSize: 11.5, color: C.textMuted, display: "flex", alignItems: "center", gap: 6, marginBottom: 7 }}>
-                  Iné hodiny (mimo tréningov)
-                  <input type="number" min={0} max={120} value={draft[wkHours(p.key)] ?? ""}
-                    onChange={(e) => set(wkHours(p.key), e.target.value)} placeholder="napr. 8" style={{ ...field, width: 78 }} />
-                </label>
-                {/* Kolónky „Zrušené" a „Presunuté" tu boli preto, že zrušený
-                    tréning sa z kalendára zmaže a neskôr sa už nedá obnoviť —
-                    musel sa zapísať, keď sa to stalo. Snímky kalendára (od
-                    8/2026) ten dôvod zrušili: appka si pamätá, ako týždeň
-                    vyzeral ráno a ako večer, takže zrušenie aj presun zachytí
-                    sama a ešte sa aj spýta prečo. Dvakrát to isté ručne
-                    prepisovať nemá zmysel. Staré zápisy zostávajú v štatistike. */}
-                <input value={draft[wkNote(p.key)] ?? ""} onChange={(e) => set(wkNote(p.key), e.target.value)}
-                  placeholder="jedna veta…" style={{ ...field, width: "100%" }} />
-              </div>
-            );
-          })}
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12 }}>
-          <button onClick={save} disabled={saving}
-            style={{ padding: "5px 14px", borderRadius: 8, border: `1px solid ${C.accent}`, background: C.accentBg, color: C.accentLight, fontSize: 12.5, fontWeight: 600, cursor: saving ? "default" : "pointer", opacity: saving ? 0.6 : 1 }}>
-            {saving ? "Ukladám…" : "Uložiť"}
-          </button>
-          {saved && <span style={{ fontSize: 12, color: C.green }}>✓ Uložené</span>}
-        </div>
-      </td>
-    </tr>
-  );
-}
+// Vyťaženosť týždňa sa od 5. 10. 2026 zapisuje vo Workspace (krok 1
+// „Kalendár a vyťaženosť"), nie tu — Jerry: „aby to nebolo na dvoch
+// miestach". Tabuľka ju ďalej ukazuje v stĺpcoch „N", len na čítanie.
 
 export function Treningy({ data, sub, onSub, focus, trainer, onTrainer }: { data: PSBData; clients: Record<string, ClientAgg>; sub: string; onSub: (s: string) => void; focus?: NavFocus | null; trainer: string; onTrainer: (t: string) => void }) {
   return (
@@ -147,7 +54,6 @@ function Prehlad({ data, focus, trainer, onTrainer }: { data: PSBData; focus?: N
     // posielajú štítok riadku („24.8."). Prvý treba rozbaliť, druhý zvýrazniť —
     // preto sa rozlišujú tvarom, nie ďalším parametrom.
     if (/^\d{4}-\d{2}-\d{2}$/.test(focus.week)) {
-      setOpenWeek(focus.week);
       setSelectedKey(weekLabel(focus.week));
     } else {
       setSelectedKey(focus.week);
@@ -222,7 +128,6 @@ function Prehlad({ data, focus, trainer, onTrainer }: { data: PSBData; focus?: N
   }, [data.sessions, period]);
   const both = trainerF === "all";
   const weekly = period === "week";
-  const [openWeek, setOpenWeek] = useState<string | null>(null);
   const [weeks, setWeeks] = useState<Record<string, WeekEntry>>({});
   useEffect(() => { fetchWeekEntries().then(setWeeks); }, []);
 
@@ -466,9 +371,9 @@ function Prehlad({ data, focus, trainer, onTrainer }: { data: PSBData; focus?: N
             {both ? (
               <>
                 <SortTh label="Jerry h" sortKey="jerry" sort={sort} onSort={toggle} align="right" />
-                {weekly && <th style={{ ...S.th, textAlign: "right" }}><Info text="Ako ťažký bol týždeň podľa Jerryho: 1 = ľahký, 10 = veľmi ťažký (rovnaká logika ako RPE). Nízke číslo je dobré. Klikni na riadok a nastav ho posuvníkom." label="Jerry N" /></th>}
+                {weekly && <th style={{ ...S.th, textAlign: "right" }}><Info text="Ako ťažký bol týždeň podľa Jerryho: 1 = ľahký, 10 = veľmi ťažký (rovnaká logika ako RPE). Nízke číslo je dobré. Zapisuje sa vo Workspace, v kroku 1 Kalendár a vyťaženosť." label="Jerry N" /></th>}
                 <SortTh label="Terezka h" sortKey="terezka" sort={sort} onSort={toggle} align="right" />
-                {weekly && <th style={{ ...S.th, textAlign: "right" }}><Info text="Ako ťažký bol týždeň podľa Terezky: 1 = ľahký, 10 = veľmi ťažký (rovnaká logika ako RPE). Nízke číslo je dobré. Klikni na riadok a nastav ho posuvníkom." label="Terezka N" /></th>}
+                {weekly && <th style={{ ...S.th, textAlign: "right" }}><Info text="Ako ťažký bol týždeň podľa Terezky: 1 = ľahký, 10 = veľmi ťažký (rovnaká logika ako RPE). Nízke číslo je dobré. Zapisuje sa vo Workspace, v kroku 1 Kalendár a vyťaženosť." label="Terezka N" /></th>}
               </>
             ) : null}
             <SortTh label="Spolu h" sortKey="total" sort={sort} onSort={toggle} align="right" />
@@ -489,17 +394,13 @@ function Prehlad({ data, focus, trainer, onTrainer }: { data: PSBData; focus?: N
               const v = entry[wkScore(person)];
               if (!v) return <td style={{ ...S.td, textAlign: "right", color: C.textDim }}>—</td>;
               const n = Number(v);
-              return <td style={{ ...S.td, textAlign: "right", fontWeight: 600, color: n >= 7 ? C.green : n >= 4 ? C.orange : C.red }}>{n}</td>;
+              // Náročnosť je RPE: nízke je dobré. Farby tu boli obrátené.
+              return <td style={{ ...S.td, textAlign: "right", fontWeight: 600, color: n <= 4 ? C.green : n <= 7 ? C.orange : C.red }}>{n}</td>;
             };
-            const nCols = 5 + (both ? (weekly ? 4 : 2) : 0);
             return (
               <Fragment key={g.key}>
               <tr>
-                <td onClick={() => wk && setOpenWeek(openWeek === wk ? null : wk)}
-                  style={{ ...S.td, cursor: wk ? "pointer" : undefined, whiteSpace: "nowrap" }}>
-                  {wk && <span style={{ display: "inline-block", width: 14, color: C.textDim, fontSize: 9 }}>{openWeek === wk ? "▼" : "▶"}</span>}
-                  {g.key}
-                </td>
+                <td style={{ ...S.td, whiteSpace: "nowrap" }}>{g.key}</td>
                 {both ? (
                   <>
                     <td style={{ ...S.td, textAlign: "right", color: jerry ? zoneColor(jerry.hours) : C.textDim }}>{jerry ? jerry.hours.toFixed(0) : "—"}</td>
@@ -514,10 +415,6 @@ function Prehlad({ data, focus, trainer, onTrainer }: { data: PSBData; focus?: N
                 <td style={{ ...S.td, textAlign: "right" }}>{fmtCZK(czk)}</td>
                 <td style={{ ...S.td, textAlign: "right", fontWeight: 600, color: g.score >= 7 ? C.green : g.score >= 4 ? C.orange : C.red }}>{g.score}</td>
               </tr>
-              {wk && openWeek === wk && (
-                <WeekEnergyRow weekKeyIso={wk} colSpan={nCols} entry={entry}
-                  onSave={(w, d) => setWeeks((prev) => ({ ...prev, [w]: d }))} />
-              )}
               </Fragment>
             );
           })}

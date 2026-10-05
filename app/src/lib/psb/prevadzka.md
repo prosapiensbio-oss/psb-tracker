@@ -171,8 +171,9 @@ týždenne prepíše finálny stav.
 
 **Appka to však sleduje — od 31. 7. 2026.** Kalendár sa sťahuje každý večer a
 rozdiel oproti predchádzajúcemu stiahnutiu sa ukladá: zrušené, posunuté aj
-dopísané hodiny sú v **Kalendár → Zmeny v kalendári**, čo kalendár nezachytil
-sa dopĺňa ručne tlačidlom *+ Zrušenie / náhrada*. V kontexte je to pod kľúčom
+dopísané hodiny sa vysvetľujú vo **Workspace → 1 · Kalendár a vyťaženosť**
+(história a ručný zápis toho, čo kalendár nezachytil, sú v **Kalendár → Zmeny
+v kalendári**, tlačidlo *+ Zrušenie / náhrada*). V kontexte je to pod kľúčom
 `kalendar`. Preto:
 
 - „koľko sa mi tento týždeň zrušilo" **odpovedať sa dá** — z `kalendar.zmeny`;

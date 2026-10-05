@@ -220,7 +220,7 @@ describe("beta: tri kroky", () => {
   it("staré karty sa zložia do krokov v poradí týždňa a kroky nemiznú", () => {
     const k = postavKarty({ zmeny: [zmena({ id: "z1", trener: "Jerry" })], nezname: [], platby: [], navrhMena: () => "", ktoSom: "Jerry" });
     const b = krokyBety(k);
-    expect(b.map((x) => (x.druh === "krok" ? x.krok : x.druh))).toEqual(["klient", "kalendar", "sms", "platby", "faktury", "anamnezy"]);
+    expect(b.map((x) => (x.druh === "krok" ? x.krok : x.druh))).toEqual(["kalendar", "sms", "platby", "faktury", "anamnezy", "klient"]);
     const kal = b.find((x) => x.druh === "krok" && x.krok === "kalendar");
     expect(kal && kal.druh === "krok" ? kal.sekcie.map((s) => s.druh) : []).toEqual(["zmeny"]);
   });

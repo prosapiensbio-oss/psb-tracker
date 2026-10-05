@@ -18,7 +18,7 @@ import {
   odstranDuplicity, patriTrenerovi, pripomienkaDovodu, pripomienkySlubov,
   stavPolozkyRegistra, type RegisterItem, type ZmenaVKalendari,
 } from "./compute";
-import { ritualy } from "./rituals";
+import { mimoWorkspace, ritualy } from "./rituals";
 import type { PSBData } from "./types";
 
 export type KalendarPreRegister = {
@@ -42,7 +42,7 @@ function ritualyDoRegistra(
   stavDatum?: string,
 ): RegisterItem[] {
   return ritualy(dnes, weeks, mesiace, { chybaju: [] }, { nacitane: true, stavDatum })
-    .filter((r) => r.splatne)
+    .filter((r) => r.splatne && mimoWorkspace(r))
     .map((r) => ({
       key: `zapis|${r.id}`,
       category: "Zápis" as const,

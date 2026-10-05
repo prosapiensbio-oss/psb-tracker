@@ -1,3 +1,6 @@
+import { CENNIK } from "./cennik";
+import { nazovProduktu } from "./nazvyProduktov";
+
 /**
  * PLATBA BITCOINOM — faktúra na Lightning namiesto QR na bankový účet.
  *
@@ -21,6 +24,27 @@
 
 /** Statická adresa na príjem; nevyprší, ale sumu si klient zadá sám. */
 export const LIGHTNING_ADRESA = "prosapiens_bio@blink.sv";
+
+
+
+/**
+ * KATALÓGOVÁ CENA PRODUKTU — tá, z ktorej sa zľava počíta.
+ *
+ * Jerry, 5. 10. 2026: „prečo 19 089? Malo by to byť 21 150 Kč · sleva 5 %."
+ * Mal pravdu a je to dôležitý rozdiel: v PTminderi je u bitcoinového klienta
+ * zapísaná cena, ktorú NAOZAJ zaplatil — teda už po zľave (Gažo 20 092,50 Kč
+ * = 21 150 − 5 %). Keď sa z nej odpočíta znova, zľava sa dá dvakrát.
+ *
+ * Preto sa základ berie z CENNÍKA podľa názvu produktu. Keď taký produkt
+ * v cenníku nie je (staré členstvá, jednorazovky), zľava sa NEUPLATŇUJE —
+ * lepšie je nedať ju, než ju dať druhý raz.
+ */
+export function katalogovaCena(nazov: string): number | null {
+  const kluc = nazovProduktu(nazov || "").toLowerCase();
+  if (!kluc) return null;
+  const r = CENNIK.find((x) => x.nazov.toLowerCase() === kluc);
+  return r?.cena && r.cena > 0 ? r.cena : null;
+}
 
 /** Cena po zľave, zaokrúhlená na celé koruny nahor (zľava je v percentách). */
 export function cenaPoZlave(czk: number, zlava?: number | null): number {

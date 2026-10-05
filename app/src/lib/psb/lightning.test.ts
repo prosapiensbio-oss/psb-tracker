@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { cenaPoZlave, satsText, satsZaCzk } from "./lightning";
+import { cenaPoZlave, katalogovaCena, satsText, satsZaCzk } from "./lightning";
 
 describe("zľava pri platbe bitcoinom", () => {
   it("počíta sa z ceny balíčka a zaokrúhľuje nahor", () => {
@@ -34,5 +34,22 @@ describe("koruny na satoshi", () => {
   it("satoshi sa píšu po tisícoch", () => {
     expect(satsText(73455)).toBe("73 455");
     expect(satsText(1461288)).toBe("1 461 288");
+  });
+});
+
+describe("základ pre zľavu je cenník, nie zaplatená suma", () => {
+  it("nájde katalógovú cenu podľa názvu z PTmindera", () => {
+    // Gažo má v PTminderi 20 092,50 Kč — to je 21 150 po jeho 5 %. Keby sa
+    // zľava počítala z nej, dala by sa druhýkrát (Jerry, 5. 10. 2026).
+    expect(katalogovaCena("OFF - 18 hodín offline")).toBe(21150);
+    expect(katalogovaCena("OFF - 6h S viazanostou")).toBe(6990);
+    expect(katalogovaCena("ON - 6h S viazanostou")).toBe(5640);
+    expect(cenaPoZlave(katalogovaCena("OFF - 18 hodín offline")!, 5)).toBe(20093);
+  });
+
+  it("čo v cenníku nie je, nemá základ — a zľava sa radšej nedá", () => {
+    expect(katalogovaCena("EXKLUZIVNÍ PLÁN")).toBe(null);
+    expect(katalogovaCena("Doplnenie členstva")).toBe(null);
+    expect(katalogovaCena("")).toBe(null);
   });
 });

@@ -2638,7 +2638,7 @@ function EnergyTrendCard() {
   return (
     <Card>
       <H3>
-        <Info text="Priemer týždenných hodnotení náročnosti za mesiac: 1 = ľahký týždeň, 10 = veľmi ťažký (rovnaká logika ako RPE). NÍZKE číslo je dobré. Zadáva sa raz týždenne v Tréningy → Prehľad, kde sedí vedľa odtrénovaných hodín. Rastúca krivka pri rastúcich hodinách je varovanie skôr, než sa to prejaví na výkone. Zobrazujú sa všetky mesiace, v ktorých je niečo zapísané — aj tie mimo rozsahu VZAS, ktorý končí júnom 2026." label="Náročnosť týždňov a vyhorenie" />
+        <Info text="Priemer týždenných hodnotení náročnosti za mesiac: 1 = ľahký týždeň, 10 = veľmi ťažký (rovnaká logika ako RPE). NÍZKE číslo je dobré. Zapisuje sa raz týždenne vo Workspace (krok 1 Kalendár a vyťaženosť), vedľa odtrénovaných hodín. Rastúca krivka pri rastúcich hodinách je varovanie skôr, než sa to prejaví na výkone. Zobrazujú sa všetky mesiace, v ktorých je niečo zapísané — aj tie mimo rozsahu VZAS, ktorý končí júnom 2026." label="Náročnosť týždňov a vyhorenie" />
       </H3>
       {any ? (
         <>
@@ -2657,7 +2657,7 @@ function EnergyTrendCard() {
           </div>
         </>
       ) : (
-        <Empty>Zatiaľ žiadne týždenné hodnotenia — vyplň ich v Tracker → Tréningy → Prehľad (klik na týždeň).</Empty>
+        <Empty>Zatiaľ žiadne týždenné hodnotenia — zapisujú sa vo Workspace, v kroku 1 Kalendár a vyťaženosť.</Empty>
       )}
     </Card>
   );

@@ -109,7 +109,7 @@ async function posli(telo: Record<string, unknown>) {
   };
 }
 
-export function Kalendar({ clients, data, focus, ktoSom, trainer, onTrainer }: { clients: Record<string, ClientAgg>; data: PSBData; focus?: NavFocus | null; ktoSom?: string | null; trainer?: string; onTrainer?: (t: string) => void }) {
+export function Kalendar({ clients, data, focus, ktoSom, trainer, onTrainer, onNavigate }: { clients: Record<string, ClientAgg>; data: PSBData; focus?: NavFocus | null; ktoSom?: string | null; trainer?: string; onTrainer?: (t: string) => void; onNavigate?: (tab: string, sub?: string) => void }) {
   const [stav, setStav] = useState<Stav | null>(null);
   const [chyba, setChyba] = useState("");
   const [sprava, setSprava] = useState("");
@@ -234,7 +234,11 @@ export function Kalendar({ clients, data, focus, ktoSom, trainer, onTrainer }: {
         />
       )}
 
-      {pripojene && <div id="kal-zmeny"><Zmeny zmeny={zmenyF} vybavene={vybaveneF} onHotovo={async () => { await nacitaj(); oznam("kalendar"); }} mena={menaKlientov} /></div>}
+      {/* Zmeny a nové názvy sa od 5. 10. 2026 VYBAVUJÚ vo Workspace (krok 1)
+          — Jerry: „aby to nebolo na dvoch miestach". Tu ostáva odkaz, ručný
+          zápis toho, čo kalendár nevidel, a „Nedávno vybavené" s krokom späť. */}
+      {pripojene && <div id="kal-zmeny"><Zmeny zmeny={onNavigate ? [] : zmenyF} vybavene={vybaveneF} onHotovo={async () => { await nacitaj(); oznam("kalendar"); }} mena={menaKlientov}
+        cakaVoWorkspace={onNavigate ? { zmien: zmenyF.length, nazvov: stav.nezname.length, otvor: () => onNavigate("workspace", "kalendar") } : undefined} /></div>}
       {/* „Nové názvy" idú NAD „Chýba v PTminderi" (Jerry, 22. 8. 2026).
           Je to poradie práce, nie estetika: kým sa meno z názvu udalosti
           nepriradí človeku, tréning nemá komu patriť — a presne preto potom
@@ -244,7 +248,7 @@ export function Kalendar({ clients, data, focus, ktoSom, trainer, onTrainer }: {
         <div id="kal-nejednoznacne"><DveMena zoznam={stav.nejednoznacne} onHotovo={async () => { await nacitaj(); oznam("kalendar"); }} /></div>
       )}
 
-      {stav.nezname.length > 0 && (
+      {!onNavigate && stav.nezname.length > 0 && (
         <div id="kal-nezname"><Mapovanie nezname={stav.nezname} mena={menaKlientov} clients={clients} onHotovo={async () => { await nacitaj(); oznam("kalendar"); }} trener={trener} ktoSom={ktoSom} /></div>
       )}
       {pripojene && <Kontrola udalosti={udalostiF} data={data} />}
@@ -943,7 +947,7 @@ export function SubeznyChod({ p }: { p: Porovnanie }) {
 }
 
 /** Rozdiely medzi snímkami — materiál na otázky typu „prečo zmizla tá hodina". */
-function Zmeny({ zmeny, vybavene, onHotovo, mena }: { zmeny: Zmena[]; vybavene: Zmena[]; onHotovo: () => Promise<void>; mena: string[] }) {
+function Zmeny({ zmeny, vybavene, onHotovo, mena, cakaVoWorkspace }: { zmeny: Zmena[]; vybavene: Zmena[]; onHotovo: () => Promise<void>; mena: string[]; cakaVoWorkspace?: { zmien: number; nazvov: number; otvor: () => void } }) {
   const [historiaOtvorena, setHistoriaOtvorena] = useState(false);
   const [pisem, setPisem] = useState<Record<string, string>>({});
   const [obnovujem, setObnovujem] = useState(false);
@@ -1111,7 +1115,17 @@ function Zmeny({ zmeny, vybavene, onHotovo, mena }: { zmeny: Zmena[]; vybavene: 
         </div>
         {formular}
         {(chybaZmeny || chybaVysv) && <div style={{ fontSize: 12, color: C.red, marginBottom: 8 }}>{chybaZmeny || chybaVysv}</div>}
-        {!pridavam && <Empty>Od posledného stiahnutia sa nič nezmenilo.</Empty>}
+        {!pridavam && (cakaVoWorkspace && cakaVoWorkspace.zmien + cakaVoWorkspace.nazvov > 0 ? (
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "8px 0" }}>
+            <span style={{ fontSize: 13, color: C.text }}>
+              {[cakaVoWorkspace.zmien ? `${cakaVoWorkspace.zmien} ${cakaVoWorkspace.zmien === 1 ? "zmena čaká" : cakaVoWorkspace.zmien < 5 ? "zmeny čakajú" : "zmien čaká"} na dôvod` : "",
+                cakaVoWorkspace.nazvov ? `${cakaVoWorkspace.nazvov} ${cakaVoWorkspace.nazvov === 1 ? "nový názov" : cakaVoWorkspace.nazvov < 5 ? "nové názvy" : "nových názvov"}` : ""].filter(Boolean).join(" · ")}
+            </span>
+            <button onClick={cakaVoWorkspace.otvor} style={{ padding: "5px 12px", borderRadius: 8, fontSize: 12.5, fontWeight: 600, cursor: "pointer", border: `1px solid ${C.accent}`, background: C.accentBg, color: C.accentLight, fontFamily: "inherit" }}>
+              Vybaviť vo Workspace →
+            </button>
+          </div>
+        ) : <Empty>Od posledného stiahnutia sa nič nezmenilo.</Empty>)}
         {historia}
       </Card>
     );

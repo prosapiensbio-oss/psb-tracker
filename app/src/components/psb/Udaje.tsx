@@ -81,18 +81,20 @@ export function Udaje({ data, actions, chat, prekazky, kroky, podklady, onNaviga
   const missing = REPORTS.filter((r) => (data[r.key] as unknown[]).length === 0);
   return (
     <>
+      {/* Uzávierka, pohyby z banky a zošit sa od 5. 10. 2026 robia vo
+          Workspace (karta Uzávierka mesiaca) — Jerry: „aby to nebolo na dvoch
+          miestach". Pohyby z banky ostávajú na čítanie aj vo Firma → Peniaze.
+          Tu ostáva nahrávanie súborov, ktoré inde miesto nemajú (iDoklad,
+          Alza, Klienti, cenník, GSC…), a nastavenia. */}
+      <div style={{ fontSize: 12, color: C.textMuted, margin: "0 0 10px" }}>
+        Mesačná uzávierka, pohyby z banky a zošit sú vo{" "}
+        {onNavigate
+          ? <button onClick={() => onNavigate("workspace", "uzavierka")} style={{ background: "none", border: "none", padding: 0, color: C.accentLight, cursor: "pointer", fontFamily: "inherit", fontSize: 12, textDecoration: "underline" }}>Workspace → Uzávierka mesiaca</button>
+          : "Workspace → Uzávierka mesiaca"}.
+      </div>
       <UploadCard data={data} missing={missing} actions={actions} chat={chat} />
 
-      {/* Zapísané pohyby majú vlastnú kartu hneď pod nahrávaním — tu sa rozdeľujú
-          pohyby (telefón, príjem, vrátenie), a to sa robí pri uzávierke, nie raz
-          za rok. Predtým boli zahrabané dva rozkliky hlboko (Jerry, 5. 9. 2026). */}
-      <BankaUlozene pohybSplits={pohybSplits} onSplit={nastavPohybSplit} />
-
-      {/* Zošit je zdroj dát ako každý iný — patrí sem, medzi nahrávanie. */}
-      <Zosit onZapisane={() => void actions.refresh()} />
-
       {btc && <BtcParovanie platby={btc.platby} faktury={btc.faktury} parovanie={btc.parovanie} onSparuj={btc.onSparuj} />}
-      <Uzavierky prekazky={prekazky} kroky={kroky} podklady={podklady} onNavigate={onNavigate} chat={chat} />
 
       {/* Napojenia až za uzávierkou (Jerry, 14. 8.): „upload CSV nech je iba
           o CSV." Kľúč sa vkladá raz za rok, CSV sa nahráva každý týždeň —

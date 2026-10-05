@@ -14,7 +14,7 @@ import { blokPocitovky } from "../lib/psb/pocitovkaStranka";
 import { oblastiZJson, platnaHodnota, posledneHodnoty, POSUN, type Meranie, type Oblast } from "../lib/psb/pocitovka";
 import { podlaKlienta } from "../lib/psb/anamneza.server";
 import { qrObrazok } from "../lib/psb/fakturaHtml";
-import { cenaPoZlave, kurzBtc, LIGHTNING_ADRESA, satsText, satsZaCzk, vytvorFakturu } from "../lib/psb/lightning";
+import { cenaPoZlave, katalogovaCena, kurzBtc, LIGHTNING_ADRESA, satsText, satsZaCzk, vytvorFakturu } from "../lib/psb/lightning";
 import type { VypisKlienta } from "../lib/psb/mailKlientovi";
 import { DODAVATEL, spayd } from "../lib/psb/vydanaFaktura";
 
@@ -133,8 +133,20 @@ export const Route = createFileRoute("/v/$token")({
         const jeBitcoin = !!prepis?.bitcoin;
         let lightning: VypisKlienta["lightning"];
         if (jeBitcoin && suma > 0) {
-          const zlava = Number(prepis?.btcZlava) || 0;
-          const czk = cenaPoZlave(suma, zlava);
+          /**
+           * ZĽAVA SA POČÍTA Z CENNÍKA, NIE ZO ZAPLATENEJ SUMY.
+           *
+           * Jerry, 5. 10. 2026: „prečo 19 089? Malo by to byť 21 150 Kč ·
+           * sleva 5 %." V PTminderi je u bitcoinového klienta zapísané, čo
+           * naozaj zaplatil — teda už po zľave (Gažo 20 092,50 = 21 150 − 5 %).
+           * Odpočítať z toho znova by znamenalo zľavu dvakrát.
+           */
+          const zlavaKlienta = Number(prepis?.btcZlava) || 0;
+          const katalog = vypis.platba ? katalogovaCena(vypis.platba.popis) : null;
+          const plna = katalog ?? suma;
+          // Bez katalógovej ceny sa zľava neuplatňuje — nevedno, či v sume už nie je.
+          const zlava = katalog ? zlavaKlienta : 0;
+          const czk = cenaPoZlave(plna, zlava);
           const kurz = await kurzBtc(DB).catch(() => null);
           const sats = kurz ? satsZaCzk(czk, kurz.czkZaBtc) : null;
           if (sats) {
@@ -144,7 +156,7 @@ export const Route = createFileRoute("/v/$token")({
             const faktura = await vytvorFakturu(LIGHTNING_ADRESA, sats, `ProSapiens — ${c.name}`).catch(() => null);
             lightning = {
               sats: satsText(sats),
-              czk, plnaCena: suma, zlava,
+              czk, plnaCena: plna, zlava,
               kurz: Math.round(kurz!.czkZaBtc).toLocaleString("cs-CZ").replace(/\u00a0/g, " "),
               kurzKedy: kurz!.kedy.slice(11, 16),
               adresa: LIGHTNING_ADRESA,
