@@ -530,3 +530,175 @@ export function spojnica(a: Miesto, b: Miesto): string {
   const my = (zy + doy) / 2;
   return `M ${zx} ${zy} C ${zx} ${my}, ${dox} ${my}, ${dox} ${doy}`;
 }
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * PRÁCA S MAPOU KLÁVESNICOU A NAD VIACERÝMI NÁPADMI (5. 10. 2026)
+ *
+ * Štyri veci, ktoré mindmapy majú a naša nie (rešerš 25. 9., `docs/zoznam.md`
+ * 2b): skok na súrodenca a preradenie, osnova ako druhý pohľad, hromadný
+ * výber a hľadanie. Tu je to, čo sa dá otestovať bez obrazovky.
+ * ───────────────────────────────────────────────────────────────────────── */
+
+/** Vetva koreňového uzla — neznáma alebo prázdna padá do odkladiska. */
+const vetvaKorena = (u: Uzol, vetvy: Vetva[]) => (jeVetva(u.vetva, vetvy) ? u.vetva : ODKLADISKO);
+
+/**
+ * Vetva KAŽDÉHO uzla jedným prechodom. `vetvaUzla` stavia mapu id → uzol pri
+ * každom volaní, a keď sa volá v slučke cez všetky uzly (čiary, osnova), je
+ * to n² — pri dvoch stovkách nápadov ~12 ms na každý napísaný znak.
+ * Výsledok je ten istý ako `vetvaUzla` (test to stráži).
+ */
+export function vetvyVsetkych(uzly: Uzol[], vetvy: Vetva[] = VETVY_ZAKLAD): Map<string, string> {
+  const podla = new Map(uzly.map((u) => [u.id, u]));
+  const von = new Map<string, string>();
+  const zisti = (u: Uzol, hlbka: number): string => {
+    const uz = von.get(u.id);
+    if (uz) return uz;
+    let v: string;
+    if (!u.rodic) v = jeVetva(u.vetva, vetvy) ? u.vetva : ODKLADISKO;
+    else if (hlbka > 60) v = ODKLADISKO;
+    else {
+      const r = podla.get(u.rodic);
+      v = r ? zisti(r, hlbka + 1) : ODKLADISKO;
+    }
+    von.set(u.id, v);
+    return v;
+  };
+  for (const u of uzly) zisti(u, 0);
+  return von;
+}
+
+/** Viditeľné uzly naraz (nezakrýva ich zbalený predok). Ten istý výsledok ako `viditelny`. */
+export function viditelneVsetky(uzly: Uzol[]): Set<string> {
+  const podla = new Map(uzly.map((u) => [u.id, u]));
+  const von = new Set<string>();
+  for (const u of uzly) {
+    let n = podla.get(u.rodic || "");
+    let vidno = true;
+    for (let i = 0; n && i < 60; i++) {
+      if (n.zbalene) { vidno = false; break; }
+      n = podla.get(n.rodic || "");
+    }
+    if (vidno) von.add(u.id);
+  }
+  return von;
+}
+
+/**
+ * Súrodenci uzla v poradí, v akom stoja na mape — vrátane neho samého.
+ * Koreňové nápady sú súrodenci len v rámci jednej vetvy; sirota (rodič
+ * zmizol) visí na vetve rovnako ako v `rozlozMapu`.
+ */
+export function surodenci(id: string, uzly: Uzol[], vetvy: Vetva[] = VETVY_ZAKLAD): Uzol[] {
+  const u = uzly.find((x) => x.id === id);
+  if (!u) return [];
+  const su = new Set(uzly.map((x) => x.id));
+  const kluc = u.rodic && su.has(u.rodic) ? u.rodic : "";
+  const vsetci = detiPodla(uzly).get(kluc) || [];
+  if (kluc) return vsetci;
+  const v = vetvaKorena(u, vetvy);
+  return vsetci.filter((x) => vetvaKorena(x, vetvy) === v);
+}
+
+/**
+ * ⌘↑ / ⌘↓ — posunúť nápad o miesto medzi súrodencami.
+ *
+ * Vracia NOVÉ poradie pre tých, ktorým sa zmenilo (súrodenci sa pritom
+ * prečíslujú 0, 1, 2… — staré dáta majú v poradí diery aj zhody, lebo Enter
+ * do 5. 10. 2026 neprečíslovával). `null` = na okraji, niet kam.
+ */
+export function preradenie(
+  id: string, smer: -1 | 1, uzly: Uzol[], vetvy: Vetva[] = VETVY_ZAKLAD,
+): { id: string; poradie: number }[] | null {
+  const s = surodenci(id, uzly, vetvy);
+  const i = s.findIndex((x) => x.id === id);
+  const j = i + smer;
+  if (i < 0 || j < 0 || j >= s.length) return null;
+  const nove = [...s];
+  [nove[i], nove[j]] = [nove[j], nove[i]];
+  return nove.map((x, k) => ({ id: x.id, poradie: k, bolo: x.poradie }))
+    .filter((x) => x.poradie !== x.bolo)
+    .map(({ id: i2, poradie }) => ({ id: i2, poradie }));
+}
+
+/**
+ * ENTER: nový nápad stojí HNEĎ ZA tým, z ktorého vznikol.
+ *
+ * Do 5. 10. 2026 dostal poradie „súrodenec + 1" bez prečíslovania, takže sa
+ * zrazil s ďalším súrodencom a podľa id padol raz pred neho, raz za neho.
+ * Toto prečísluje celý rad a nechá miesto. Volá to server pri zápise —
+ * obrazovka v tej chvíli ešte nevie id práve uloženého konceptu.
+ * Keď kotva v rade nie je, nový ide na koniec a nikto sa nehýbe.
+ */
+export function vlozenieZa(
+  rad: { id: string; poradie: number }[], zaId: string, noveId: string,
+): { id: string; poradie: number }[] {
+  const zoradene = [...rad].sort((a, b) => (a.poradie - b.poradie) || a.id.localeCompare(b.id));
+  const i = zoradene.findIndex((x) => x.id === zaId);
+  if (i < 0) {
+    const koniec = zoradene.reduce((m, x) => Math.max(m, x.poradie + 1), 0);
+    return [{ id: noveId, poradie: koniec }];
+  }
+  const nove = [...zoradene.slice(0, i + 1), { id: noveId, poradie: -1 }, ...zoradene.slice(i + 1)];
+  return nove.map((x, k) => ({ id: x.id, poradie: k, bolo: x.poradie }))
+    .filter((x) => x.id === noveId || x.poradie !== x.bolo)
+    .map(({ id, poradie }) => ({ id, poradie }));
+}
+
+/**
+ * OSNOVA — tie isté nápady ako zoznam.
+ *
+ * XMind Outliner: písanie dvadsiatich viet je v zozname rýchlejšie a celý
+ * mesiac sa dá prečítať naraz. Nie je to druhá pravda, je to druhý POHĽAD:
+ * poradie, hĺbka aj zbalenie sú tie isté polia, ktoré kreslí mapa.
+ */
+export type RiadokOsnovy = { uzol: Uzol; hlbka: number; deti: number };
+
+export function osnova(uzly: Uzol[], vetvy: Vetva[] = VETVY_ZAKLAD): { vetva: Vetva; riadky: RiadokOsnovy[] }[] {
+  const deti = detiPodla(uzly);
+  const korene = deti.get("") || [];
+  return vetvy.map((vetva) => {
+    const riadky: RiadokOsnovy[] = [];
+    const videne = new Set<string>();
+    const chod = (u: Uzol, hlbka: number) => {
+      if (videne.has(u.id) || hlbka > 40) return;
+      videne.add(u.id);
+      const ds = deti.get(u.id) || [];
+      riadky.push({ uzol: u, hlbka, deti: ds.length });
+      if (!u.zbalene) for (const d of ds) chod(d, hlbka + 1);
+    };
+    for (const u of korene) if (vetvaKorena(u, vetvy) === vetva.id) chod(u, 0);
+    return { vetva, riadky };
+  });
+}
+
+/** Text bez diakritiky a veľkých písmen — „strecing" nájde „Strečing". */
+export const bezDiakritiky = (s: string) =>
+  (s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
+/**
+ * HĽADANIE (⌘F). Odkedy je máp viac, „napísal som to už?" nemalo odpoveď.
+ * Každé slovo dopytu musí byť v texte (v akomkoľvek poradí). Zamietnuté sa
+ * nehľadajú — na mape nie sú a skok na ne by viedol do prázdna.
+ */
+export function hladajNapady<T extends { text?: string; stav?: string }>(riadky: T[], dopyt: string): T[] {
+  const slova = bezDiakritiky(dopyt).split(/\s+/).filter(Boolean);
+  if (!slova.length) return [];
+  return riadky.filter((r) => {
+    if (r.stav === "zamietnuty") return false;
+    const t = bezDiakritiky(r.text || "");
+    return slova.every((s) => t.includes(s));
+  });
+}
+
+/** Predkovia uzla od rodiča po koreň — čo treba rozbaliť, aby bol vidieť. */
+export function predkovia(id: string, uzly: Uzol[]): Uzol[] {
+  const podla = new Map(uzly.map((u) => [u.id, u]));
+  const von: Uzol[] = [];
+  let n = podla.get(podla.get(id)?.rodic || "");
+  for (let i = 0; n && i < 60; i++) {
+    von.push(n);
+    n = podla.get(n.rodic || "");
+  }
+  return von;
+}

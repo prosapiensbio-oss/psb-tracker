@@ -4,7 +4,7 @@ import { audit } from "../../lib/psb/audit.server";
 import { currentUser, isAuthed, unauthorized } from "../../lib/psb/auth.server";
 import { bindings } from "../../lib/bindings.server";
 import { jeFaza } from "../../lib/psb/mapaCyklu";
-import { ODKLADISKO, jeFarba, jeVetva, vetvyMapy } from "../../lib/psb/mapaNapadov";
+import { ODKLADISKO, jeFarba, jeVetva, vetvyMapy, vlozenieZa } from "../../lib/psb/mapaNapadov";
 import { jeMesiac as platnyMesiac } from "../../lib/psb/format";
 import { ZABER_MAPA } from "../../lib/psb/zabery";
 import { dnesPraha } from "../../lib/psb/cas";
@@ -194,6 +194,72 @@ export const Route = createFileRoute("/api/napady")({
             return Response.json({ ok: true });
           }
 
+          /**
+           * PRERADENIE V MAPE (⌘↑ / ⌘↓, 5. 10. 2026). Posiela sa zoznam
+           * id → poradie a zapíše sa naraz (D1 batch je transakcia) — polovica
+           * prečíslovaného radu by súrodencov rozhádzala. Zapíše sa len nápad,
+           * ktorý v tej mape naozaj je.
+           */
+          if (b.akcia === "mapa-poradie") {
+            const idMapy = kus(b.mapaId, 40) || "m-hlavna";
+            const zoznam = (Array.isArray(b.poradie) ? b.poradie : []) as { id?: unknown; poradie?: unknown }[];
+            if (!zoznam.length || zoznam.length > 500) return Response.json({ ok: false, error: "Prázdne alebo priveľké poradie." }, { status: 400 });
+            // Overiť PRED zápisom: UPDATE s nulou zmien batch nevráti späť
+            // a polovica radu by sa zapísala pod hláškou o chybe.
+            const idsP = zoznam.map((x) => kus(x.id, 40));
+            const jeTu = await DB.prepare(
+              // json_each: D1 pustí najviac 100 parametrov na dopyt.
+              "SELECT COUNT(*) n FROM mkt_napady WHERE COALESCE(mapa_id, 'm-hlavna') = ?1 AND id IN (SELECT value FROM json_each(?2))",
+            ).bind(idMapy, JSON.stringify(idsP)).first<{ n: number }>();
+            if ((jeTu?.n ?? 0) !== new Set(idsP).size) {
+              return Response.json({ ok: false, error: "Niektorý nápad v mape už nie je — obnov mapu a skús znova." }, { status: 409 });
+            }
+            const prikazy = zoznam.map((x) => DB.prepare(
+              "UPDATE mkt_napady SET poradie = ?2 WHERE id = ?1 AND COALESCE(mapa_id, 'm-hlavna') = ?3",
+            ).bind(kus(x.id, 40), Math.max(0, Math.min(9999, Math.round(Number(x.poradie) || 0))), idMapy));
+            const vysledky = await DB.batch(prikazy);
+            const zmenene = vysledky.reduce((a, v) => a + (v.meta.changes || 0), 0);
+            if (zmenene !== zoznam.length) {
+              return Response.json({ ok: false, error: `Zapísalo sa ${zmenene} z ${zoznam.length} — obnov mapu a skús znova.` }, { status: 409 });
+            }
+            return Response.json({ ok: true });
+          }
+
+          /**
+           * HROMADNÁ FÁZA („Vysyp a usporiadaj", 5. 10. 2026). Dvadsať nápadov
+           * do jednej fázy bolo dvadsať mierení na malé tlačidlo.
+           */
+          if (b.akcia === "napady-faza") {
+            const ids = (Array.isArray(b.ids) ? b.ids : []).map((x: unknown) => kus(x, 40)).filter(Boolean);
+            if (!ids.length || ids.length > 500) return Response.json({ ok: false, error: "Nič nie je vybrané." }, { status: 400 });
+            if (!jeFaza(Number(b.faza))) return Response.json({ ok: false, error: "Neplatná fáza." }, { status: 400 });
+            const jeTuF = await DB.prepare(
+              "SELECT COUNT(*) n FROM mkt_napady WHERE id IN (SELECT value FROM json_each(?1))",
+            ).bind(JSON.stringify(ids)).first<{ n: number }>();
+            if ((jeTuF?.n ?? 0) !== new Set(ids).size) {
+              return Response.json({ ok: false, error: "Niektorý nápad už neexistuje — obnov stránku." }, { status: 409 });
+            }
+            const vysledky = await DB.batch(ids.map((x: string) =>
+              DB.prepare("UPDATE mkt_napady SET faza = ?2 WHERE id = ?1").bind(x, Number(b.faza))));
+            const zmenene = vysledky.reduce((a, v) => a + (v.meta.changes || 0), 0);
+            if (zmenene !== ids.length) {
+              return Response.json({ ok: false, error: `Fázu dostalo ${zmenene} z ${ids.length} — obnov stránku.` }, { status: 409 });
+            }
+            return Response.json({ ok: true, zmenene });
+          }
+
+          /**
+           * Rodič musí existovať a ležať v tej istej mape. Obrazovka to vie
+           * tiež, ale nápad zavesený na neexistujúci uzol by sa stal sirotou
+           * a pod nesprávnym rodičom by ho nikto nehľadal.
+           */
+          const rodicPlatny = async (rodic: string, mapa: string | null, sam: string) => {
+            if (!rodic) return true;
+            if (rodic === sam) return false;
+            const r = await DB.prepare("SELECT COALESCE(mapa_id, 'm-hlavna') m FROM mkt_napady WHERE id = ?1").bind(rodic).first<{ m: string }>();
+            return !!r && (mapa === null || r.m === mapa);
+          };
+
           const id = kus(b.id, 40);
 
           if (b.zmaz === true && id) {
@@ -304,6 +370,14 @@ export const Route = createFileRoute("/api/napady")({
               }
             }
             const rodic = b.rodic === undefined ? null : kus(b.rodic, 40);
+            if (rodic) {
+              const mapaRodica = b.mapaId === undefined
+                ? (await DB.prepare("SELECT COALESCE(mapa_id, 'm-hlavna') m FROM mkt_napady WHERE id = ?1").bind(id).first<{ m: string }>())?.m ?? null
+                : (kus(b.mapaId, 40) || "m-hlavna");
+              if (!(await rodicPlatny(rodic, mapaRodica, id))) {
+                return Response.json({ ok: false, error: "Nápad, pod ktorý to má visieť, neexistuje." }, { status: 400 });
+              }
+            }
             const vetva = b.vetva === undefined ? null : kus(b.vetva, 20);
             const poradie = b.poradie === undefined ? null : Math.max(0, Math.min(9999, Math.round(Number(b.poradie) || 0)));
             const zbalene = b.zbalene === undefined ? null : (b.zbalene ? 1 : 0);
@@ -398,7 +472,7 @@ export const Route = createFileRoute("/api/napady")({
           }
           const nRodic = kus(b.rodic, 40);
           const nVetva = nRodic ? "" : (jeVetva(b.vetva, nVetvyMapy) ? String(b.vetva) : ODKLADISKO);
-          const nPoradie = Math.max(0, Math.min(9999, Math.round(Number(b.poradie) || 0)));
+          let nPoradie = Math.max(0, Math.min(9999, Math.round(Number(b.poradie) || 0)));
           // Nápad z „+ Zápis" mapu nepozná a patrí do prvej — inak by spadol
           // do prázdna a nikde by nebol vidieť.
           const nMapa = kus(b.mapaId, 40) || "m-hlavna";
@@ -406,6 +480,32 @@ export const Route = createFileRoute("/api/napady")({
           if (nMapa !== "m-hlavna") {
             const ma = await DB.prepare("SELECT 1 x FROM mkt_mapy WHERE id = ?1").bind(nMapa).first();
             if (!ma) return Response.json({ ok: false, error: "Taká mapa neexistuje." }, { status: 400 });
+          }
+          if (!(await rodicPlatny(nRodic, nMapa, novy))) {
+            return Response.json({ ok: false, error: "Nápad, pod ktorý to má visieť, neexistuje." }, { status: 400 });
+          }
+          /**
+           * ENTER V MAPE: `za` = id nápadu, za ktorým má nový stáť. Rad
+           * súrodencov sa prečísluje TU, pri zápise — obrazovka v tej chvíli
+           * nepozná id konceptu, ktorý sa práve uložil (Enter v rozpísanej
+           * bubline), a jej poradie by sa zrazilo so susedom (`vlozenieZa`).
+           */
+          const posunySurodencov: ReturnType<typeof DB.prepare>[] = [];
+          const za = kus(b.za, 40);
+          if (za) {
+            const rad = nRodic
+              ? await DB.prepare("SELECT id, poradie FROM mkt_napady WHERE COALESCE(mapa_id, 'm-hlavna') = ?1 AND rodic = ?2").bind(nMapa, nRodic).all()
+              : await DB.prepare(
+                "SELECT id, poradie FROM mkt_napady WHERE COALESCE(mapa_id, 'm-hlavna') = ?1 AND COALESCE(rodic, '') = '' AND (vetva = ?2 OR (?2 = ?3 AND COALESCE(vetva, '') = ''))",
+              ).bind(nMapa, nVetva, ODKLADISKO).all();
+            const radCisty = (rad.results as { id: string; poradie: number }[]).map((x) => ({ id: String(x.id), poradie: Number(x.poradie) || 0 }));
+            // Kotva v rade nie je (sirota, koreň zmazanej vetvy): nechá sa
+            // poradie z obrazovky — koniec radu by nápad po obnovení odhodil.
+            const plan = radCisty.some((x) => x.id === za) ? vlozenieZa(radCisty, za, novy) : [];
+            for (const x of plan) {
+              if (x.id === novy) nPoradie = x.poradie;
+              else posunySurodencov.push(DB.prepare("UPDATE mkt_napady SET poradie = ?2 WHERE id = ?1").bind(x.id, x.poradie));
+            }
           }
           // Aj pri ZAKLADANÍ, nielen pri úprave. Obrazovka hotový text posiela
           // a bez tohto riadka by ho INSERT ticho zahodil — appka by ohlásila
@@ -420,7 +520,7 @@ export const Route = createFileRoute("/api/napady")({
           const nHashtagy = String(b.hashtagy ?? "").replace(/\s+/g, " ").trim().slice(0, 1200);
           const nInspiracia = kus(b.inspiracia, 500);
 
-          await DB.prepare(
+          const vlozenie = DB.prepare(
             // VŠETKY polia, ktoré obrazovka pri zakladaní posiela. Chýbajúci
             // stĺpec v INSERTe neurobí chybu — hodnota sa ticho zahodí a appka
             // ohlási uložené nad stratou. Stalo sa to 23. 8. 2026 dvakrát:
@@ -438,7 +538,9 @@ export const Route = createFileRoute("/api/napady")({
                  nFaza, nMesiac, nKto, nKoncept, nZaber, nHotovy,
                  nSekvencia, nScenar, nHashtagy, nInspiracia, kus(b.poznamka, 600),
                  kus(b.titulka, 4000), riadkyKus(b.uvodneVety, 1500),
-                 nRodic, nVetva, nPoradie, nMapa).run();
+                 nRodic, nVetva, nPoradie, nMapa);
+          // Nový nápad aj posun súrodencov naraz — polovica by rad rozhádzala.
+          await DB.batch([vlozenie, ...posunySurodencov]);
 
           await audit(DB, { action: "zapis", predmet: "marketingový nápad", neu: text.slice(0, 120), actor: autor || undefined });
           return Response.json({ ok: true, id: novy });

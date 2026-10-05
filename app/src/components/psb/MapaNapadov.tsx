@@ -4,7 +4,7 @@ import { doSchranky } from "../../lib/psb/kopirovanie";
 import { FAZA_MAPA, nazovFazy } from "../../lib/psb/mapaCyklu";
 import { oznam, pocuvaj } from "../../lib/psb/obnovaSignal";
 import {
-  FARBY, OKRAJ_ZMESTIT, ODKLADISKO, RIADOK, STRED, farbaUzla, farbaVetvy, jeNaPlan, novaVetva, spojnica, kusovNaMesiac, mapaNaText, rozlozMapu, rozparsujVysyp, smiePresunut, vMedziach, vetvaUzla, vetvyMapy, viditelny, type Uzol, type Vetva,
+  FARBY, OKRAJ_ZMESTIT, ODKLADISKO, RIADOK, STRED, farbaVetvy, hladajNapady, jeNaPlan, novaVetva, osnova, predkovia, preradenie, spojnica, surodenci, kusovNaMesiac, mapaNaText, rozlozMapu, rozparsujVysyp, smiePresunut, vMedziach, vetvyMapy, vetvyVsetkych, viditelneVsetky, FARBA_MAPA, type Uzol, type Vetva,
 } from "../../lib/psb/mapaNapadov";
 import { C, mix } from "../../lib/psb/theme";
 import type { Miesto } from "../../lib/psb/mapaNapadov";
@@ -54,6 +54,24 @@ type Riadok = {
 type Mapa = { id: string; nazov: string; poradie?: number; pozicie?: string; vetvy?: string };
 
 const KLUC_MAPY = "psb-mapa-napadov";
+
+/** Riadky jednej mapy ako uzly. Jedno miesto — mapa, osnova aj hľadanie. */
+const uzlyMapy = (riadky: Riadok[], mapaId: string): Uzol[] => riadky
+  .filter((r) => r.stav !== "zamietnuty")
+  .filter((r) => (r.mapa_id || "m-hlavna") === mapaId)
+  .map((r) => ({
+    id: r.id,
+    text: r.text || "",
+    rodic: r.rodic || "",
+    vetva: r.vetva || "nezaradene",
+    poradie: Number(r.poradie || 0),
+    zbalene: !!r.zbalene,
+    faza: Number(r.faza || 0),
+    stav: r.stav || "novy",
+    posX: r.pos_x ?? null,
+    posY: r.pos_y ?? null,
+    farba: r.farba || "",
+  }));
 
 const DOCASNY = "tmp";
 const KADENCIA = 2;
@@ -109,7 +127,19 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
   const mapaIdRef = useRef(mapaId);
   useEffect(() => { mapaIdRef.current = mapaId; }, [mapaId]);
   const [nacitane, setNacitane] = useState(false);
-  const [pohlad, setPohlad] = useState<"mapa" | "triedenie">("mapa");
+  const [pohlad, setPohlad] = useState<"mapa" | "osnova" | "triedenie">("mapa");
+  /**
+   * HROMADNÝ VÝBER v „Vysyp a usporiadaj". Priradiť fázu dvadsiatim
+   * nápadom bolo dvadsať mierení na malé tlačidlo.
+   */
+  const [vybrane, setVybrane] = useState<Set<string>>(new Set());
+  const poslednyVyber = useRef<string | null>(null);
+  /** Hľadanie (⌘F). `null` = zavreté. */
+  const [hladam, setHladam] = useState<string | null>(null);
+  const hladajRef = useRef<HTMLInputElement | null>(null);
+  /** Nápad, na ktorý sa má pohľad postaviť, keď sa mapa prekreslí. */
+  const cielSkoku = useRef<{ id: string; kedy: number } | null>(null);
+  const [zvyrazneny, setZvyrazneny] = useState<string | null>(null);
   const [chyba, setChyba] = useState("");
   /**
    * Rozpísaný uzol, ktorý na serveri ešte nie je. Vždy najviac jeden.
@@ -120,9 +150,11 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
    * text ostal, do databázy sa nedostal: presne ten tichý zápis, pred ktorým
    * varuje CLAUDE.md. Ref vidí vždy to, čo je napísané teraz.
    */
-  const [novy, setNovy] = useState<{ rodic: string; vetva: string; poradie: number; text: string } | null>(null);
-  const novyRef = useRef<{ rodic: string; vetva: string; poradie: number; text: string } | null>(null);
-  const nastavNovy = (d: { rodic: string; vetva: string; poradie: number; text: string } | null) => {
+  /** `za` = id nápadu, za ktorým má koncept stáť (Enter) — rad prečísluje server. */
+  type Koncept = { rodic: string; vetva: string; poradie: number; text: string; za?: string; kluc: string };
+  const [novy, setNovy] = useState<Koncept | null>(null);
+  const novyRef = useRef<Koncept | null>(null);
+  const nastavNovy = (d: Koncept | null) => {
     novyRef.current = d;
     setNovy(d);
   };
@@ -184,10 +216,55 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
   const setTahanie = (t: Tahanie | null) => { tahanieRef.current = t; setTahanieStav(t); };
   const plochaRef = useRef<HTMLDivElement | null>(null);
 
-  const nacitaj = useCallback(() => void fetch("/api/napady", { credentials: "same-origin" })
+  /**
+   * NÁPADY NA CESTE NA SERVER.
+   *
+   * Do 5. 10. 2026 Enter koncept najprv uložil a až PO odpovedi servera
+   * (~0,4 s) založil ďalší riadok. Čo človek za ten čas napísal, padlo do
+   * prázdna — a raz to skončilo v cudzom riadku (overené v osnove, kde sa
+   * píše rýchlo). Teraz uložený koncept ostane hneď na obrazovke pod
+   * dočasným id `ukladam-N`, nový riadok vznikne okamžite a skutočné id sa
+   * dosadí, keď príde. Kto ho potrebuje skôr (dieťa, „za"), počká naň.
+   */
+  const pocitadlo = useRef(0);
+  const naCeste = useRef(new Map<string, Promise<string | null>>());
+  const prelozene = useRef(new Map<string, string>());
+  /** React kľúč riadku: koncept → dočasný → skutočný si nesú ten istý, aby políčko neodišlo spod kurzora. */
+  const kluce = useRef(new Map<string, string>());
+  /**
+   * Riadky s rozpísaným, ešte neuloženým textom. Načítanie zo servera ich
+   * text neprepíše — inak by zmizlo, čo človek práve píše (napr. počas
+   * automatického uloženia konceptu, kedy kurzor ostáva v políčku).
+   */
+  const upravene = useRef(new Set<string>());
+  /**
+   * Poradie načítaní. Odpoveď, ktorá príde po novšej, alebo dopyt odoslaný
+   * PRED posledným zápisom, sa zahodí — inak by riadok, ktorý sa práve
+   * uložil, na chvíľu zmizol (a s ním kurzor) alebo sa zdvojil.
+   */
+  const nacitanieCislo = useRef(0);
+  const platneOd = useRef(0);
+  const skutocneId = async (id?: string): Promise<string | undefined | null> => {
+    if (!id || !id.startsWith("ukladam-")) return id;
+    return prelozene.current.get(id) ?? (await naCeste.current.get(id)) ?? null;
+  };
+
+  const nacitaj = useCallback(() => {
+    const moje = ++nacitanieCislo.current;
+    return void fetch("/api/napady", { credentials: "same-origin" })
     .then((r) => r.json())
     .then((j: { napady?: Riadok[]; mapy?: Mapa[] }) => {
-      setRiadky(j.napady || []);
+      if (moje < platneOd.current) return;
+      platneOd.current = moje;
+      // Riadky, ktoré sa práve ukladajú, server ešte nepozná — zahodiť ich
+      // by vzalo človeku spod kurzora to, čo práve napísal. Rozpísaný text
+      // ostáva tiež.
+      setRiadky((pred) => {
+        const lokalne = new Map(pred.map((x) => [x.id, x]));
+        const zoServera = (j.napady || []).map((x) => (upravene.current.has(x.id) && lokalne.has(x.id) ? { ...x, text: lokalne.get(x.id)!.text } : x));
+        const su = new Set(zoServera.map((x) => x.id));
+        return [...zoServera, ...pred.filter((x) => x.id.startsWith("ukladam-") && !su.has(x.id))];
+      });
       const zoznam = j.mapy || [];
       setMapy(zoznam);
       // Otvorená mapa, ktorú niekto medzitým zmazal, by nechala prázdnu
@@ -195,7 +272,8 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
       setMapaId((m) => (zoznam.some((x) => x.id === m) ? m : (zoznam[0]?.id || "m-hlavna")));
     })
     .catch(() => {})
-    .finally(() => setNacitane(true)), []);
+    .finally(() => setNacitane(true));
+  }, []);
   useEffect(() => { nacitaj(); }, [nacitaj]);
   // Tri karty nad tými istými riadkami sú na jednej obrazovke (mapa, mapa
   // cyklu, nápady) a Jarvis do nich zapisuje tiež. Bez signálu by každá
@@ -204,6 +282,10 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
 
   /** Zápis na server. Vracia úspech — „uložené“ sa nesmie tvrdiť do prázdna. */
   const posli = async (telo: Record<string, unknown>): Promise<string | null> => {
+    if (typeof telo.id === "string" && telo.id.startsWith("ukladam-")) {
+      setChyba("Nápad sa ešte ukladá — skús o chvíľu.");
+      return null;
+    }
     const j = await fetch("/api/napady", {
       method: "POST", credentials: "same-origin",
       headers: { "content-type": "application/json" },
@@ -219,22 +301,7 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
   };
 
   const uzly = useMemo<Uzol[]>(() => {
-    const zive = riadky
-      .filter((r) => r.stav !== "zamietnuty")
-      .filter((r) => (r.mapa_id || "m-hlavna") === mapaId)
-      .map((r) => ({
-        id: r.id,
-        text: r.text || "",
-        rodic: r.rodic || "",
-        vetva: r.vetva || "nezaradene",
-        poradie: Number(r.poradie || 0),
-        zbalene: !!r.zbalene,
-        faza: Number(r.faza || 0),
-        stav: r.stav || "novy",
-        posX: r.pos_x ?? null,
-        posY: r.pos_y ?? null,
-        farba: r.farba || "",
-      }));
+    const zive = uzlyMapy(riadky, mapaId);
     if (novy) {
       zive.push({ id: DOCASNY, text: novy.text, rodic: novy.rodic, vetva: novy.vetva, poradie: novy.poradie, zbalene: false, faza: 0, stav: "novy", posX: null, posY: null, farba: "" });
     }
@@ -260,25 +327,86 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
     () => rozlozMapu(uzly, { text: nazovMapy }, rucnePozicie, vetvy),
     [uzly, nazovMapy, rucnePozicie, vetvy],
   );
+  /**
+   * Vetva a viditeľnosť všetkých uzlov raz za prekreslenie. Volať
+   * `vetvaUzla` v slučke cez všetky uzly bolo n² — pri dvoch stovkách
+   * nápadov ~12 ms na každý napísaný znak.
+   */
+  const vetvaZ = useMemo(() => vetvyVsetkych(uzly, vetvy), [uzly, vetvy]);
+  const vetvaU = (id: string) => vetvaZ.get(id) ?? ODKLADISKO;
+  const farbaU = (u: Uzol) => FARBA_MAPA.get(u.farba || "")?.farba ?? farbaVetvy(vetvaU(u.id), vetvy);
+  const vidnoSet = useMemo(() => viditelneVsetky(uzly), [uzly]);
+  const stromOsnovy = useMemo(() => osnova(uzly, vetvy), [uzly, vetvy]);
+  /** Poradie riadkov osnovy zhora nadol — kam skočí ↑ a ↓. */
+  const radOsnovy = useMemo(() => stromOsnovy.flatMap((x) => x.riadky.map((r) => r.uzol.id)), [stromOsnovy]);
+  const zhody = useMemo(() => (hladam && hladam.trim() ? hladajNapady(riadky, hladam).slice(0, 40) : []), [riadky, hladam]);
+  const zhodyTu = useMemo(() => new Set(zhody.filter((z) => (z.mapa_id || "m-hlavna") === mapaId).map((z) => z.id)), [zhody, mapaId]);
 
-  /** Uloží rozpísaný uzol (alebo ho zahodí, keď je prázdny). */
-  const dopis = useCallback(async (vratFokus = false): Promise<string | null> => {
+  /**
+   * Odošle rozpísaný uzol (alebo ho zahodí, keď je prázdny) a HNEĎ vráti
+   * dočasné id; skutočné príde v `hotovo`. Riadok zostáva na obrazovke celý
+   * čas — so svojím kľúčom, takže kurzor v ňom ostane, ak tam bol.
+   */
+  const odosliKoncept = useCallback((vratFokus = false): { docasne: string | null; hotovo: Promise<string | null> } => {
     if (casovac.current) { clearTimeout(casovac.current); casovac.current = null; }
+    const nic = { docasne: null, hotovo: Promise.resolve(null) };
     const d = novyRef.current;
-    if (!d) return null;
+    if (!d) return nic;
     nastavNovy(null);
     const t = d.text.trim();
-    if (t.length < 3) { if (t) setChyba("Nápad musí mať aspoň tri znaky — kratší sa nezapísal."); return null; }
-    const id = await posli({ text: t, zdroj: "vlastny", rodic: d.rodic, vetva: d.vetva, poradie: d.poradie, mapaId: mapaIdRef.current });
-    // Keď zápis neprejde, koncept sa VRÁTI na obrazovku aj s textom. Zmiznúť
-    // smie len to, čo je uložené — inak človek napíše vetu a tá sa stratí.
-    if (!id) { nastavNovy(d); return null; }
-    if (vratFokus) zameraj.current = id;
-    zapamataj(`nápad „${t.slice(0, 28)}"`, async () => { await posli({ id, zmaz: true }); });
-    nacitaj();
-    oznam("marketing");
-    return id;
+    if (t.length < 3) { if (t) setChyba("Nápad musí mať aspoň tri znaky — kratší sa nezapísal."); return nic; }
+    const docasne = `ukladam-${++pocitadlo.current}`;
+    const mapa = mapaIdRef.current;
+    kluce.current.set(docasne, d.kluc);
+    setRiadky((r) => [...r, { id: docasne, text: t, rodic: d.rodic, vetva: d.rodic ? "" : d.vetva, poradie: d.poradie, mapa_id: mapa, stav: "novy" }]);
+    if (vratFokus) zameraj.current = docasne;
+    const hotovo = (async () => {
+      const rodic = await skutocneId(d.rodic);
+      const za = await skutocneId(d.za);
+      const id = d.rodic && !rodic
+        ? null
+        : await posli({ text: t, zdroj: "vlastny", rodic: rodic || "", vetva: d.vetva, poradie: d.poradie, za: za || undefined, mapaId: mapa });
+      if (!id) {
+        // Zmiznúť smie len to, čo je uložené. Kým sa do nového riadku nič
+        // nenapísalo, vráti sa text doň; inak ho appka povie nahlas.
+        setRiadky((r) => r.filter((x) => x.id !== docasne));
+        const teraz = novyRef.current;
+        if (!teraz || !teraz.text.trim()) nastavNovy({ ...d, rodic: rodic || "", vetva: d.vetva || ODKLADISKO, za: undefined });
+        else setChyba(`Nezapísalo sa: „${t}“ — napíš to prosím znova.`);
+        return null;
+      }
+      prelozene.current.set(docasne, id);
+      kluce.current.set(id, d.kluc);
+      // Načítania odoslané pred týmto zápisom nový riadok nepoznajú.
+      platneOd.current = nacitanieCislo.current + 1;
+      if (upravene.current.delete(docasne)) upravene.current.add(id);
+      setRiadky((r) => {
+        const miestny = r.find((x) => x.id === docasne);
+        // Načítanie mohlo riadok priniesť skôr než odpoveď na zápis — vtedy
+        // dočasný len zmizne (s textom, ak sa do neho medzitým písalo).
+        const uzJe = r.some((x) => x.id === id);
+        return r
+          .filter((x) => !(uzJe && x.id === docasne))
+          .map((x) => (x.id === docasne ? { ...x, id }
+            : uzJe && x.id === id && miestny && upravene.current.has(id) ? { ...x, text: miestny.text }
+            : x.rodic === docasne ? { ...x, rodic: id } : x));
+      });
+      const teraz = novyRef.current;
+      if (teraz && (teraz.rodic === docasne || teraz.za === docasne)) {
+        nastavNovy({ ...teraz, rodic: teraz.rodic === docasne ? id : teraz.rodic, za: teraz.za === docasne ? id : teraz.za });
+      }
+      if (zameraj.current === docasne) zameraj.current = id;
+      zapamataj(`nápad „${t.slice(0, 28)}"`, async () => { await posli({ id, zmaz: true }); });
+      nacitaj();
+      oznam("marketing");
+      return id;
+    })();
+    naCeste.current.set(docasne, hotovo);
+    return { docasne, hotovo };
   }, [nacitaj]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** Uloží rozpísaný uzol a počká na skutočné id. */
+  const dopis = useCallback((vratFokus = false) => odosliKoncept(vratFokus).hotovo, [odosliKoncept]);
 
   /**
    * Štípanie na trackpade a ctrl+koliesko.
@@ -343,6 +471,54 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
     return () => document.removeEventListener("keydown", na);
   });
 
+  /**
+   * ⌘F nad mapou. Prehliadačové hľadanie nevidí do políčok bublín, takže by
+   * nenašlo nič. Berie sa len vtedy, keď je mapa v strede obrazovky alebo
+   * je v nej kurzor — inde ⌘F patrí prehliadaču.
+   */
+  useEffect(() => {
+    const na = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey || e.key.toLowerCase() !== "f") return;
+      const k = document.getElementById("mapa-napadov");
+      if (!k) return;
+      const kde = document.activeElement;
+      const vnutri = !!kde && k.contains(kde);
+      const r = k.getBoundingClientRect();
+      const vStrede = r.height > 0 && r.top < window.innerHeight * 0.6 && r.bottom > window.innerHeight * 0.4;
+      if (!vnutri && !(vStrede && (!kde || kde === document.body))) return;
+      e.preventDefault();
+      setHladam((h) => h ?? "");
+      requestAnimationFrame(() => { hladajRef.current?.focus(); hladajRef.current?.select(); });
+    };
+    document.addEventListener("keydown", na);
+    return () => document.removeEventListener("keydown", na);
+  }, []);
+
+  /** Po skoku z hľadania: pohľad na nápad a kurzor doň, keď už je na obrazovke. */
+  useEffect(() => {
+    const ciel = cielSkoku.current;
+    if (!ciel) return;
+    // Cieľ, ktorý sa do pár sekúnd nevykreslil, už neplatí — inak by kurzor
+    // skočil naň o hodinu neskôr pri inom prekreslení.
+    if (Date.now() - ciel.kedy > 4000) { cielSkoku.current = null; return; }
+    const id = ciel.id;
+    const el = document.querySelector<HTMLInputElement>(`#mapa-napadov [data-uzol="${id}"]`);
+    if (!el) return;
+    cielSkoku.current = null;
+    const plocha = plochaRef.current;
+    const p = poz[id];
+    if (pohlad === "mapa" && plocha && p) {
+      plocha.scrollLeft = (p.x + p.w / 2) * zoomRef.current - plocha.clientWidth / 2;
+      plocha.scrollTop = (p.y + RIADOK / 2) * zoomRef.current - plocha.clientHeight / 2;
+      el.focus({ preventScroll: true });
+    } else el.focus();
+  });
+  useEffect(() => {
+    if (!zvyrazneny) return;
+    const t = window.setTimeout(() => setZvyrazneny(null), 2500);
+    return () => clearTimeout(t);
+  }, [zvyrazneny]);
+
   /** Postaviť pohľad na kmeň pri danej mierke. */
   const naStredPri = useCallback((z: number) => {
     const el = plochaRef.current;
@@ -399,20 +575,121 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
     void dopis();
   }, [dopis]);
 
-  const zaloz = async (rodic: string, vetva: string, poradie: number) => {
-    // Koncept sa najprv uloží — a keď má byť rodičom práve on, vezme sa jeho
-    // ČERSTVÉ id. Bez toho dostal nový uzol rodiča „tmp", ktorý po uložení
-    // prestal existovať, a bublina sa nikdy nevykreslila.
-    const noveId = await dopis();
-    if (novyRef.current) return;                    // predošlý koncept sa neuložil
-    const skutocny = rodic === DOCASNY ? (noveId || "") : rodic;
-    if (rodic === DOCASNY && !skutocny) return;
+  const zaloz = (rodic: string, vetva: string, poradie: number, za?: string) => {
+    // Koncept sa odošle a nový riadok vznikne HNEĎ — nečaká sa na server.
+    // Keď má byť rodičom (Tab) alebo kotvou (Enter) práve on, dostane nový
+    // riadok jeho dočasné id a skutočné sa dosadí, keď príde.
+    const { docasne } = odosliKoncept();
+    const skutocny = rodic === DOCASNY ? (docasne || "") : rodic;
+    if (rodic === DOCASNY && !skutocny) return;      // koncept bol prázdny — niet pod čo
     // Zbalená vetva by nové dieťa schovala skôr, než by sa doň dalo písať.
     const r = skutocny ? riadky.find((x) => x.id === skutocny) : null;
     if (r?.zbalene) { setRiadky((z) => z.map((x) => (x.id === skutocny ? { ...x, zbalene: 0 } : x))); void posli({ id: skutocny, zbalene: false }); }
-    nastavNovy({ rodic: skutocny, vetva, poradie, text: "" });
+    const kotva = za === DOCASNY ? (docasne || undefined) : za;
+    nastavNovy({ rodic: skutocny, vetva, poradie, text: "", za: kotva, kluc: `k${++pocitadlo.current}` });
+    // Kurzor prejde v tom istom vykreslení (ref), nie až po snímke — inak by
+    // prvé písmeno ešte dopadlo do predošlého riadku.
     zameraj.current = DOCASNY;
+    requestAnimationFrame(() => { if (document.activeElement?.getAttribute("data-uzol") !== DOCASNY) skocNa(DOCASNY); });
   };
+
+  const klucU = (u: Uzol) => (u.id === DOCASNY ? (novy?.kluc || DOCASNY) : (kluce.current.get(u.id) ?? u.id));
+
+  /** Kurzor do bubliny (mapa) alebo riadku (osnova) daného nápadu. */
+  const skocNa = (id: string) => {
+    const el = document.querySelector<HTMLInputElement>(`#mapa-napadov [data-uzol="${id}"]`);
+    if (el) { zameraj.current = null; el.focus(); }
+    else zameraj.current = id;
+  };
+
+  /**
+   * ⌘↑ / ⌘↓ — preradiť medzi súrodencami. Jediný spôsob, ako z výsypu
+   * spraviť poradie bez prepisovania. Rad sa prečísluje celý a zapíše naraz.
+   */
+  const prerad = async (u: Uzol, smer: -1 | 1) => {
+    if (u.id === DOCASNY) return;
+    if (u.id.startsWith("ukladam-") || surodenci(u.id, uzly, vetvy).some((x) => x.id.startsWith("ukladam-"))) {
+      setChyba("Chvíľu — vedľajší nápad sa ešte ukladá.");
+      return;
+    }
+    const plan = preradenie(u.id, smer, uzly.filter((x) => x.id !== DOCASNY), vetvy);
+    if (!plan) return;
+    const predtym = plan.map((x) => ({ id: x.id, poradie: uzly.find((y) => y.id === x.id)?.poradie ?? 0 }));
+    const nove = new Map(plan.map((x) => [x.id, x.poradie]));
+    setRiadky((r) => r.map((x) => (nove.has(x.id) ? { ...x, poradie: nove.get(x.id) } : x)));
+    // V osnove sa riadok v DOM presunie a prehliadač mu vezme kurzor.
+    requestAnimationFrame(() => skocNa(u.id));
+    if (await posli({ akcia: "mapa-poradie", mapaId: mapaIdRef.current, poradie: plan })) {
+      zapamataj("preradenie", async () => { await posli({ akcia: "mapa-poradie", mapaId: mapaIdRef.current, poradie: predtym }); });
+      oznam("marketing");
+    } else nacitaj();
+  };
+
+  /**
+   * ↑ / ↓ — o nápad vyššie / nižšie. Do 5. 10. 2026 sa dalo klávesnicou ísť
+   * len dopredu a späť na štvrtý nápad len myšou. Na mape sú to súrodenci
+   * (a nad prvým jeho rodič), v osnove riadky zhora nadol.
+   */
+  const krokNa = (u: Uzol, smer: -1 | 1) => {
+    if (pohlad === "osnova") {
+      const i = radOsnovy.indexOf(u.id);
+      const ciel = radOsnovy[i + smer];
+      if (i >= 0 && ciel) skocNa(ciel);
+      return;
+    }
+    const s = surodenci(u.id, uzly, vetvy);
+    const i = s.findIndex((x) => x.id === u.id);
+    const ciel = s[i + smer];
+    if (ciel) skocNa(ciel.id);
+    else if (smer === -1 && u.rodic) skocNa(u.rodic);
+  };
+
+  /**
+   * Klávesnica bubliny — JEDNA pre mapu aj osnovu. Dve kópie by sa rozišli
+   * a ten istý kláves by v dvoch pohľadoch na tie isté nápady robil iné veci.
+   */
+  const klavesy = (u: Uzol, deti: number) => (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const cmd = e.metaKey || e.ctrlKey;
+    if ((e.key === "ArrowUp" || e.key === "ArrowDown") && cmd) {
+      e.preventDefault();
+      void prerad(u, e.key === "ArrowUp" ? -1 : 1);
+    } else if ((e.key === "ArrowUp" || e.key === "ArrowDown") && !e.shiftKey && !e.altKey) {
+      e.preventDefault();
+      krokNa(u, e.key === "ArrowUp" ? -1 : 1);
+    } else if (e.key === "Tab" && e.shiftKey) { e.preventDefault(); void oUrovenVyssie(u); }
+    else if (e.key === "Tab") { e.preventDefault(); void zaloz(u.id, "", deti); }
+    else if (e.key === "Enter") {
+      e.preventDefault();
+      // Sirota (rodič zmizol alebo je v inej mape) visí na vetve — nový
+      // súrodenec tiež, inak by ho server odmietol pri každom pokuse.
+      const rodic = u.rodic && uzly.some((x) => x.id === u.rodic) ? u.rodic : "";
+      void zaloz(rodic, rodic ? "" : vetvaU(u.id), u.poradie + 0.01, u.id);
+    }
+    else if (e.key === "Backspace" && !u.text) { e.preventDefault(); void zmaz(u.id); }
+    // Escape ZAHADZUJE — tak to má každá mindmapa (Coggle to má
+    // v dokumentácii doslova) a je to kláves, po ktorom človek siahne,
+    // keď napísal blbosť. Prvá verzia ním ukladala, čo je opak
+    // očakávania. Ukladá blur, Enter a Tab.
+    else if (e.key === "Escape") {
+      e.preventDefault();
+      zahadzuje.current = true;
+      if (u.id === DOCASNY) nastavNovy(null); else { upravene.current.delete(u.id); nacitaj(); }
+      (e.target as HTMLInputElement).blur();
+    }
+  };
+
+  /** Políčko nápadu — spoločné pre bublinu na mape aj riadok osnovy. */
+  const vstupNapadu = (u: Uzol, deti: number) => ({
+    type: "text" as const,
+    "aria-label": "Nápad",
+    "data-uzol": u.id,
+    placeholder: "píš…",
+    value: u.text,
+    ref: (el: HTMLInputElement | null) => { if (el && zameraj.current === u.id) { zameraj.current = null; el.focus(); } },
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => void uprav(u.id, e.target.value),
+    onBlur: () => { if (zahadzuje.current) { zahadzuje.current = false; return; } void ulozText(u.id, u.text); },
+    onKeyDown: klavesy(u, deti),
+  });
 
   const uprav = async (id: string, t: string) => {
     if (id === DOCASNY) {
@@ -421,12 +698,21 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
       casovac.current = window.setTimeout(() => { void dopis(true); }, 1500);
       return;
     }
+    upravene.current.add(id);
     setRiadky((r) => r.map((x) => (x.id === id ? { ...x, text: t } : x)));
   };
 
-  const ulozText = async (id: string, t: string) => {
-    if (id === DOCASNY) { await dopis(); return; }
+  const ulozText = async (povodneId: string, t: string) => {
+    if (povodneId === DOCASNY) { await dopis(); return; }
+    // Riadok, ktorý sa ešte ukladá: počkať na jeho id, inak by sa dopísaný
+    // text stratil (server dočasné id nepozná).
+    // Bez úpravy niet čo zapisovať — odchod z políčka nesmie posielať zápis
+    // ani budiť ostatné karty.
+    if (!upravene.current.has(povodneId)) return;
+    const id = (await skutocneId(povodneId)) || "";
+    if (!id) return;
     if (t.trim().length < 3) {
+      upravene.current.delete(id);
       // Na obrazovke by zostal skrátený text a v databáze pôvodný — tichý
       // rozchod, ktorý si nikto nevšimne. Radšej nahlas a vrátiť.
       setChyba("Nápad musí mať aspoň tri znaky — pôvodný text sa vrátil.");
@@ -435,6 +721,7 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
     }
     const predtym = riadky.find((x) => x.id === id)?.text ?? "";
     if (await posli({ id, text: t.trim() })) {
+      upravene.current.delete(id);
       if (predtym && predtym !== t.trim()) zapamataj("prepísaný text", async () => { await posli({ id, text: predtym }); });
       oznam("marketing");
     }
@@ -479,8 +766,8 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
       if (novyRef.current) nastavNovy({ ...novyRef.current, rodic: "", vetva });
       return;
     }
-    if (!u.rodic && vetvaUzla(u.id, uzly, vetvy) === vetva) return;
-    const koniec = uzly.filter((x) => !x.rodic && vetvaUzla(x.id, uzly, vetvy) === vetva).length;
+    if (!u.rodic && vetvaU(u.id) === vetva) return;
+    const koniec = uzly.filter((x) => !x.rodic && vetvaU(x.id) === vetva).length;
     const predtym = { rodic: u.rodic, vetva: u.vetva, poradie: u.poradie };
     setRiadky((r) => r.map((x) => (x.id === u.id ? { ...x, rodic: "", vetva, poradie: koniec } : x)));
     if (await posli({ id: u.id, rodic: "", vetva, poradie: koniec })) {
@@ -500,7 +787,7 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
       setRiadky((r) => r.map((x) => (x.id === u.id ? { ...x, rodic: rodic.rodic } : x)));
       await posli({ id: u.id, rodic: rodic.rodic });
     } else {
-      await presunDoVetvy(u, vetvaUzla(u.id, uzly, vetvy));
+      await presunDoVetvy(u, vetvaU(u.id));
       return;
     }
     nacitaj();
@@ -519,11 +806,15 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
     setSypem(true);
     const rodicia: string[] = [];
     let hotovo = 0;
+    // Koreňové nápady idú ZA to, čo vo vetve už je — od nuly by sa zrazili
+    // s existujúcimi a premiešali sa s nimi.
+    const koniecVetvy = uzly.filter((x) => !x.rodic && vetvaU(x.id) === vysypVetva)
+      .reduce((m, x) => Math.max(m, x.poradie + 1), 0);
     for (const r of riadkyVysypu) {
       const rodic = r.uroven > 0 ? (rodicia[r.uroven - 1] || "") : "";
       const id = await posli({
         text: r.text, zdroj: "vlastny", mapaId: mapaIdRef.current,
-        rodic, vetva: rodic ? "" : vysypVetva, poradie: hotovo,
+        rodic, vetva: rodic ? "" : vysypVetva, poradie: rodic ? hotovo : koniecVetvy + hotovo,
       });
       if (!id) break;
       rodicia[r.uroven] = id;
@@ -539,10 +830,31 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
 
   const prepniMapu = (id: string) => {
     void dopis();
+    setVybrane(new Set());
+    poslednyVyber.current = null;
     setPresunPre(null);
     setPremenuva(false);
     setMapaId(id);
     try { localStorage.setItem(KLUC_MAPY, id); } catch { /* súkromný režim */ }
+  };
+
+  /**
+   * SKOK NA NÁJDENÝ NÁPAD. Prepne mapu, rozbalí zbalených predkov (inak by
+   * bol cieľ schovaný) a pohľad naň postaví, keď sa mapa prekreslí.
+   */
+  const skocNaNapad = (r: Riadok) => {
+    const mapa = r.mapa_id || "m-hlavna";
+    if (mapa !== mapaId) prepniMapu(mapa);
+    if (pohlad === "triedenie") setPohlad("mapa");
+    const zbalenePredky = predkovia(r.id, uzlyMapy(riadky, mapa)).filter((x) => x.zbalene);
+    if (zbalenePredky.length) {
+      const ids = new Set(zbalenePredky.map((x) => x.id));
+      setRiadky((z) => z.map((x) => (ids.has(x.id) ? { ...x, zbalene: 0 } : x)));
+      for (const x of zbalenePredky) void posli({ id: x.id, zbalene: false });
+    }
+    cielSkoku.current = { id: r.id, kedy: Date.now() };
+    setZvyrazneny(r.id);
+    setHladam(null);
   };
 
   const novaMapa = async () => {
@@ -619,7 +931,7 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
   const zmazVetvu = async (id: string) => {
     if (id === ODKLADISKO) { setChyba("Odkladisko musí zostať — padá doň všetko bez domova."); return; }
     const v = vetvy.find((x) => x.id === id);
-    const kolko = uzly.filter((u) => !u.rodic && vetvaUzla(u.id, uzly, vetvy) === id).length;
+    const kolko = uzly.filter((u) => !u.rodic && vetvaU(u.id) === id).length;
     await ulozVetvy(vetvy.filter((x) => x.id !== id), `vetva „${v?.nazov || id}“`);
     setPresunPre(null);
     if (kolko) setChyba(`Vetva je preč, ${kolko} nápadov spadlo do „Zatiaľ neviem kam".`);
@@ -727,7 +1039,7 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
     } else nacitaj();
   };
 
-  const vidno = uzly.filter((u) => viditelny(u.id, uzly));
+  const vidno = uzly.filter((u) => vidnoSet.has(u.id));
   // Šírka plochy z ROZLOŽENIA, nie natvrdo: pri zbalených vetvách bola
   // dvojtisícpixelová plocha z väčšej časti prázdna a posuvník klamal o tom,
   // koľko mapy ešte je.
@@ -760,6 +1072,8 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
   // v zásobníku by vyhlásil mesiac za pokrytý obsahom, ktorý už vyšiel.
   const naPlan = uzly.filter(jeNaPlan).filter((u) => u.id !== DOCASNY);
   const sFazou = naPlan.filter((u) => u.faza > 0);
+  const bezFazyUzly = naPlan.filter((u) => !u.faza);
+  const bezFazyRad = bezFazyUzly.map((u) => u.id);
   const chybaDoMesiaca = Math.max(0, kusovNaMesiac(KADENCIA) - sFazou.length);
 
   const ciary: { id: string; d: string; farba: string; hrubka: number }[] = [];
@@ -774,8 +1088,8 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
   };
   for (const v of vetvy) spoj(poz["koren"], poz["vetva:" + v.id], v.farba, 3, "v" + v.id);
   for (const u of vidno) {
-    const f = farbaUzla(u, uzly, vetvy);
-    const rodicPoz = u.rodic ? poz[u.rodic] : poz["vetva:" + vetvaUzla(u.id, uzly, vetvy)];
+    const f = farbaU(u);
+    const rodicPoz = u.rodic ? poz[u.rodic] : poz["vetva:" + vetvaU(u.id)];
     spoj(rodicPoz, poz[u.id], f, (poz[u.id]?.hlbka || 2) <= 2 ? 2 : 1.4, "u" + u.id);
   }
 
@@ -971,7 +1285,7 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
   const bublina = (u: Uzol) => {
     const p = poz[u.id];
     if (!p) return null;
-    const f = farbaUzla(u, uzly, vetvy);
+    const f = farbaU(u);
     const deti = uzly.filter((x) => x.rodic === u.id).length;
     // Na ktorej strane kmeňa bublina leží. Tlačidlá patria VŽDY na vonkajšiu
     // stranu — inak „+" pri ľavej vetve ukazuje späť do stredu a nová bublina
@@ -981,36 +1295,17 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
     // otočilo druhýkrát a bolo by to zase zle.
     const strana = stranaPodlaPozicie(p);
     return (
-      <div key={u.id} style={{ position: "absolute", left: p.x - 6, top: p.y - 6, zIndex: presunPre === u.id ? 4 : (tahanie?.id === u.id ? 5 : undefined) }}>
+      <div key={klucU(u)} style={{ position: "absolute", left: p.x - 6, top: p.y - 6, zIndex: presunPre === u.id ? 4 : (tahanie?.id === u.id ? 5 : undefined) }}>
         <div {...tahaj(u.id, u.text, false)} title="Chyť za rám a presuň" style={ramStyl(u.id, u.posX != null)}>
         <input
-          type="text"
-          aria-label="Nápad"
-          placeholder="píš…"
-          value={u.text}
-          ref={(el) => { if (el && zameraj.current === u.id) { zameraj.current = null; el.focus(); } }}
-          onChange={(e) => void uprav(u.id, e.target.value)}
-          onBlur={() => { if (zahadzuje.current) { zahadzuje.current = false; return; } void ulozText(u.id, u.text); }}
-          onKeyDown={(e) => {
-            if (e.key === "Tab" && e.shiftKey) { e.preventDefault(); void oUrovenVyssie(u); }
-            else if (e.key === "Tab") { e.preventDefault(); void zaloz(u.id, "", deti); }
-            else if (e.key === "Enter") { e.preventDefault(); void zaloz(u.rodic, u.rodic ? "" : vetvaUzla(u.id, uzly, vetvy), u.poradie + 1); }
-            else if (e.key === "Backspace" && !u.text) { e.preventDefault(); void zmaz(u.id); }
-            // Escape ZAHADZUJE — tak to má každá mindmapa (Coggle to má
-            // v dokumentácii doslova) a je to kláves, po ktorom človek siahne,
-            // keď napísal blbosť. Prvá verzia ním ukladala, čo je opak
-            // očakávania. Ukladá blur, Enter a Tab.
-            else if (e.key === "Escape") {
-              e.preventDefault();
-              zahadzuje.current = true;
-              if (u.id === DOCASNY) nastavNovy(null); else nacitaj();
-              (e.target as HTMLInputElement).blur();
-            }
-          }}
+          {...vstupNapadu(u, deti)}
           style={{
             width: p.w, boxSizing: "border-box", padding: "12px 17px", borderRadius: 999,
             background: C.card, border: `1px solid ${f}`, color: C.text,
             fontFamily: "inherit", fontSize: 14, outline: "none",
+            // Zhoda hľadania svieti, kým je hľadanie otvorené; cieľ skoku
+            // navyše na chvíľu hrubšie.
+            boxShadow: zvyrazneny === u.id ? `0 0 0 3px ${C.accent}` : (zhodyTu.has(u.id) ? `0 0 0 2px ${mix(C.accent, 70)}` : undefined),
           }}
         />
         </div>
@@ -1077,7 +1372,7 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
             </div>
             <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: 1, color: C.textDim, padding: "2px 8px 6px", borderTop: `1px solid ${mix(C.border, 60)}` }}>PRESUNÚŤ DO VETVY</div>
             {vetvy.map((v: Vetva) => {
-              const tu = !u.rodic && vetvaUzla(u.id, uzly, vetvy) === v.id;
+              const tu = !u.rodic && vetvaU(u.id) === v.id;
               return (
                 <button
                   key={v.id}
@@ -1110,6 +1405,71 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
     );
   };
 
+  /** Klik vyberie / zruší, shift+klik vyberie celý úsek od posledného. */
+  const prepniVyber = (id: string, usek: boolean, rad: string[]) => {
+    const od = poslednyVyber.current;
+    setVybrane((v) => {
+      const n = new Set(v);
+      if (usek && od && rad.includes(od)) {
+        const a = rad.indexOf(od);
+        const b = rad.indexOf(id);
+        for (const x of rad.slice(Math.min(a, b), Math.max(a, b) + 1)) n.add(x);
+      } else if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+    poslednyVyber.current = id;
+  };
+
+  /** Vybraným nápadom bez fázy jedna fáza naraz — jeden zápis, jeden krok späť. */
+  const hromadnaFaza = async (f: number) => {
+    const ids = naPlan.filter((u) => !u.faza && vybrane.has(u.id) && !u.id.startsWith("ukladam-")).map((u) => u.id);
+    if (!ids.length) return;
+    const tieto = new Set(ids);
+    setRiadky((r) => r.map((x) => (tieto.has(x.id) ? { ...x, faza: f } : x)));
+    setVybrane(new Set());
+    poslednyVyber.current = null;
+    if (await posli({ akcia: "napady-faza", ids, faza: f })) {
+      zapamataj(`fáza ${f} pre ${ids.length}`, async () => { await posli({ akcia: "napady-faza", ids, faza: 0 }); });
+      oznam("marketing");
+    } else nacitaj();
+  };
+
+  // Číslica 1–5 priradí fázu vybraným — ruka nemusí z klávesnice na myš.
+  useEffect(() => {
+    if (pohlad !== "triedenie" || !vybrane.size) return;
+    const na = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const kde = document.activeElement as HTMLElement | null;
+      if (kde && (kde.tagName === "INPUT" || kde.tagName === "TEXTAREA" || kde.tagName === "SELECT" || kde.isContentEditable)) return;
+      // Len keď je mapa v strede obrazovky alebo v nej je fokus — číslica
+      // inde na stránke nesmie ticho zaradiť nápady, ktoré nevidno.
+      const k = document.getElementById("mapa-napadov");
+      if (!k) return;
+      const rr = k.getBoundingClientRect();
+      const vnutri = !!kde && k.contains(kde);
+      if (!vnutri && !(rr.top < window.innerHeight * 0.6 && rr.bottom > window.innerHeight * 0.4)) return;
+      if (e.key === "Escape") { setVybrane(new Set()); return; }
+      const f = Number(e.key);
+      if (f >= 1 && f <= 5) { e.preventDefault(); void hromadnaFaza(f); }
+    };
+    document.addEventListener("keydown", na);
+    return () => document.removeEventListener("keydown", na);
+  });
+
+  /** Krok späť — rovnaký odkaz v každom pohľade. */
+  const spatOdkaz = (
+    <button
+      type="button"
+      disabled={!kroky.length}
+      onClick={() => void vratKrok()}
+      title={kroky.length ? `Vrátiť: ${kroky[kroky.length - 1].popis}` : "Zatiaľ nie je čo vrátiť"}
+      style={{ background: "none", border: "none", padding: 0, color: kroky.length ? C.accentLight : C.textDim, fontFamily: "inherit", fontSize: 11.5, cursor: kroky.length ? "pointer" : "default", textDecoration: kroky.length ? "underline" : "none", textUnderlineOffset: 2 }}
+    >
+      ↶ späť{kroky.length ? ` · ${kroky[kroky.length - 1].popis}` : ""}
+    </button>
+  );
+
   const doJarvisa = () => {
     const t = mapaNaText(uzly, { mesiac: `${nazovMapy} · ${mesiacSlovom(new Date())}`, kadenciaTyzdenne: KADENCIA, nazovFazy });
     setText(t);
@@ -1134,7 +1494,7 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
           />
         </H3>
         <div style={{ display: "flex", gap: 4, padding: 4, borderRadius: 11, background: C.card, border: `1px solid ${C.border}` }}>
-          {([["mapa", "Mapa"], ["triedenie", "Vysyp a usporiadaj"]] as const).map(([id, label]) => (
+          {([["mapa", "Mapa"], ["osnova", "Osnova"], ["triedenie", "Vysyp a usporiadaj"]] as const).map(([id, label]) => (
             <button
               key={id}
               type="button"
@@ -1149,6 +1509,58 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
               {label}
             </button>
           ))}
+        </div>
+        {/* HĽADANIE naprieč všetkými mapami. Prehliadačové ⌘F do políčok
+            bublín nevidí, takže „napísal som to už?" nemalo odpoveď. */}
+        <div style={{ position: "relative" }}>
+          {hladam === null ? (
+            <button
+              type="button"
+              onClick={() => { setHladam(""); requestAnimationFrame(() => hladajRef.current?.focus()); }}
+              style={{ padding: "7px 12px", borderRadius: 9, border: `1px solid ${C.border}`, background: "transparent", color: C.textMuted, fontFamily: "inherit", fontSize: 12.5, cursor: "pointer" }}
+            >
+              ⌕ hľadať <span style={{ color: C.textDim }}>⌘F</span>
+            </button>
+          ) : (
+            <input
+              ref={hladajRef}
+              type="search"
+              aria-label="Hľadať v nápadoch"
+              placeholder="hľadať vo všetkých mapách…"
+              value={hladam}
+              onChange={(e) => setHladam(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") { e.preventDefault(); setHladam(null); }
+                if (e.key === "Enter" && zhody[0]) { e.preventDefault(); skocNaNapad(zhody[0]); }
+              }}
+              // Klik do výsledku príde až po blur — bez oneskorenia by sa
+              // zoznam zavrel skôr, než klik dobehne.
+              onBlur={() => window.setTimeout(() => setHladam((h) => (h && h.trim() ? h : null)), 150)}
+              style={{ width: 240, padding: "7px 12px", borderRadius: 9, border: `1px solid ${C.accent}`, background: C.bg, color: C.text, fontFamily: "inherit", fontSize: 12.5 }}
+            />
+          )}
+          {hladam !== null && hladam.trim() !== "" && (
+            <div style={{ position: "absolute", left: 0, top: "calc(100% + 4px)", zIndex: 20, width: 380, maxHeight: 360, overflow: "auto", padding: 6, borderRadius: 11, background: C.surface, border: `1px solid ${mix(C.border, 140)}`, boxShadow: "0 10px 26px rgba(0,0,0,.45)" }}>
+              {!zhody.length && <div style={{ padding: "8px 10px", fontSize: 12.5, color: C.textDim }}>Nič také v mapách nie je.</div>}
+              {zhody.map((z) => {
+                const mapaZ = z.mapa_id || "m-hlavna";
+                return (
+                  <button
+                    key={z.id}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => skocNaNapad(z)}
+                    style={{ ...polozkaPonuky, display: "flex", alignItems: "baseline", gap: 8 }}
+                  >
+                    <span style={{ flexGrow: 1 }}>{z.text}</span>
+                    {mapaZ !== mapaId && <span style={{ flexShrink: 0, fontSize: 11, color: C.textDim }}>{mapy.find((m) => m.id === mapaZ)?.nazov || "iná mapa"}</span>}
+                    {z.stav === "pouzity" && <span style={{ flexShrink: 0, fontSize: 11, color: C.textDim }}>použitý</span>}
+                  </button>
+                );
+              })}
+              {zhody.length >= 40 && <div style={{ padding: "6px 10px", fontSize: 11, color: C.textDim }}>Prvých 40 — spresni hľadanie.</div>}
+            </div>
+          )}
         </div>
         <span style={{ flexGrow: 1 }} />
         {novy && novy.text.trim().length >= 3 && (
@@ -1222,20 +1634,14 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
             <span style={{ color: C.textMuted }}>Klávesnica:</span>
             <span><b style={{ color: C.text }}>Tab</b> vetva nižšie</span>
             <span><b style={{ color: C.text }}>Enter</b> ďalšia vedľa</span>
+            <span><b style={{ color: C.text }}>↑ ↓</b> o nápad vyššie / nižšie</span>
+            <span><b style={{ color: C.text }}>⌘↑ ⌘↓</b> preradiť</span>
             <span><b style={{ color: C.text }}>⌫</b> na prázdnej zmaže</span>
             <span><b style={{ color: C.text }}>Esc</b> zahodí rozpísanú</span>
             <span><b style={{ color: C.text }}>⌘Z</b> krok späť</span>
             <span>klik na <b style={{ color: C.text }}>obvod</b> = farba, fáza, presun</span>
             <span>alebo chyť bublinu <b style={{ color: C.text }}>za rám</b> a pusť ju nad iný nápad</span>
-            <button
-              type="button"
-              disabled={!kroky.length}
-              onClick={() => void vratKrok()}
-              title={kroky.length ? `Vrátiť: ${kroky[kroky.length - 1].popis}` : "Zatiaľ nie je čo vrátiť"}
-              style={{ background: "none", border: "none", padding: 0, color: kroky.length ? C.accentLight : C.textDim, fontFamily: "inherit", fontSize: 11.5, cursor: kroky.length ? "pointer" : "default", textDecoration: kroky.length ? "underline" : "none", textUnderlineOffset: 2 }}
-            >
-              ↶ späť{kroky.length ? ` · ${kroky[kroky.length - 1].popis}` : ""}
-            </button>
+            {spatOdkaz}
             <button
               type="button"
               onClick={() => void vratRozlozenie()}
@@ -1340,7 +1746,7 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
                           type="button"
                           onClick={() => {
                             setPresunPre(null);
-                            void zaloz("", v.id, uzly.filter((x) => !x.rodic && vetvaUzla(x.id, uzly, vetvy) === v.id).length);
+                            void zaloz("", v.id, uzly.filter((x) => !x.rodic && vetvaU(x.id) === v.id).length);
                           }}
                           style={{ display: "flex", alignItems: "center", gap: 8, width: "100%", textAlign: "left", padding: "7px 8px", borderRadius: 8, border: "none", background: "transparent", color: C.text, fontFamily: "inherit", fontSize: 12.5, cursor: "pointer" }}
                         >
@@ -1382,7 +1788,7 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
               {vetvy.map((v: Vetva) => {
                 const p = poz["vetva:" + v.id];
                 if (!p) return null;
-                const kolko = uzly.filter((u) => !u.rodic && vetvaUzla(u.id, uzly, vetvy) === v.id).length;
+                const kolko = uzly.filter((u) => !u.rodic && vetvaU(u.id) === v.id).length;
                 return (
                   <div key={v.id} style={{ position: "absolute", left: p.x - 6, top: p.y - 6, zIndex: tahanie?.id === "vetva:" + v.id ? 5 : undefined }}>
                     <div {...tahaj("vetva:" + v.id, v.nazov, true)} title="Chyť za rám a presuň" style={ramStyl("vetva:" + v.id, !!rucnePozicie["vetva:" + v.id])}>
@@ -1481,14 +1887,131 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
         </>
       )}
 
+      {/* OSNOVA — tie isté nápady ako zoznam (XMind Outliner). Písať dvadsať
+          viet je v zozname rýchlejšie a celý mesiac sa dá prečítať naraz.
+          Klávesnica je tá istá ako na mape; ↑ ↓ tu idú po riadkoch. */}
+      {nacitane && pohlad === "osnova" && (
+        <>
+          <div style={{ display: "flex", gap: 14, flexWrap: "wrap", fontSize: 11.5, color: C.textDim, marginBottom: 8 }}>
+            <span style={{ color: C.textMuted }}>Klávesnica:</span>
+            <span><b style={{ color: C.text }}>Enter</b> ďalší riadok</span>
+            <span><b style={{ color: C.text }}>Tab</b> odsadiť pod</span>
+            <span><b style={{ color: C.text }}>shift+Tab</b> o úroveň vyššie</span>
+            <span><b style={{ color: C.text }}>↑ ↓</b> po riadkoch</span>
+            <span><b style={{ color: C.text }}>⌘↑ ⌘↓</b> preradiť</span>
+            <span><b style={{ color: C.text }}>⌫</b> na prázdnom zmaže</span>
+            {spatOdkaz}
+          </div>
+          <div style={{ maxHeight: 560, overflow: "auto", padding: "6px 4px", border: `1px solid ${mix(C.border, 80)}`, borderRadius: 13, background: mix(C.card, 60) }}>
+            {stromOsnovy.map(({ vetva, riadky: rs }) => {
+              const korenov = rs.filter((x) => x.hlbka === 0).length;
+              return (
+                <div key={vetva.id} style={{ padding: "8px 12px 10px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, paddingBottom: 5, marginBottom: 4, borderBottom: `1px solid ${mix(vetva.farba, 45)}` }}>
+                    <span style={{ width: 9, height: 9, borderRadius: "50%", background: vetva.farba, flexShrink: 0 }} />
+                    <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{vetva.nazov}</span>
+                    <span style={{ fontSize: 11.5, color: C.textDim }}>{rs.filter((x) => x.uzol.id !== DOCASNY).length}</span>
+                    <span style={{ flexGrow: 1 }} />
+                    <button
+                      type="button"
+                      onClick={() => void zaloz("", vetva.id, uzly.filter((x) => !x.rodic && vetvaU(x.id) === vetva.id).reduce((m, x) => Math.max(m, x.poradie + 1), 0))}
+                      style={{ background: "none", border: "none", padding: "2px 4px", color: C.accentLight, fontFamily: "inherit", fontSize: 12, cursor: "pointer" }}
+                    >
+                      + nápad
+                    </button>
+                  </div>
+                  {!korenov && <div style={{ fontSize: 12, color: C.textDim, padding: "4px 0 2px 26px" }}>prázdne</div>}
+                  {rs.map(({ uzol: u, hlbka, deti }) => (
+                    <div key={klucU(u)} style={{ display: "flex", alignItems: "center", gap: 6, paddingLeft: hlbka * 22, minHeight: 30 }}>
+                      <button
+                        type="button"
+                        aria-label={deti ? (u.zbalene ? "Rozbaliť" : "Zbaliť") : "Bez nadväzujúcich nápadov"}
+                        disabled={!deti}
+                        onClick={() => void prepniZbal(u)}
+                        style={{ width: 20, height: 20, flexShrink: 0, padding: 0, border: "none", borderRadius: 5, background: "transparent", color: deti ? C.textMuted : mix(C.textDim, 60), fontFamily: "inherit", fontSize: 11, cursor: deti ? "pointer" : "default" }}
+                      >
+                        {deti ? (u.zbalene ? "▸" : "▾") : "•"}
+                      </button>
+                      <input
+                        {...vstupNapadu(u, deti)}
+                        style={{
+                          flexGrow: 1, minWidth: 0, padding: "5px 8px", borderRadius: 7,
+                          border: `1px solid ${zvyrazneny === u.id ? C.accent : (zhodyTu.has(u.id) ? mix(C.accent, 70) : "transparent")}`,
+                          background: "transparent", color: u.stav === "pouzity" ? C.textMuted : C.text,
+                          fontFamily: "inherit", fontSize: hlbka === 0 ? 13.5 : 13, outline: "none",
+                          borderLeft: `2px solid ${hlbka === 0 ? farbaU(u) : "transparent"}`,
+                        }}
+                      />
+                      {u.zbalene && deti > 0 && <span style={{ fontSize: 11, color: C.textDim, flexShrink: 0 }}>+{deti}</span>}
+                      {u.stav === "pouzity" && <span style={{ fontSize: 10.5, color: C.textDim, flexShrink: 0 }}>použitý</span>}
+                      {u.faza > 0 && (
+                        <span title={nazovFazy(u.faza)} style={{ width: 17, height: 17, flexShrink: 0, borderRadius: 4, background: fazaFarba(u.faza), color: "#10130e", fontSize: 10.5, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>{u.faza}</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+
       {nacitane && pohlad === "triedenie" && (
         <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
           <div style={{ width: 280, flexShrink: 0, display: "flex", flexDirection: "column", gap: 8, padding: 14, borderRadius: 13, background: mix(C.card, 60), border: `1px dashed ${C.border}`, maxHeight: 520, overflow: "auto" }}>
-            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.2, color: C.textDim }}>BEZ FÁZY · {naPlan.length - sFazou.length}</div>
-            {naPlan.filter((u) => !u.faza).map((u) => (
-              <div key={u.id} style={{ padding: "10px 12px", borderRadius: 11, background: C.surface, border: `1px solid ${C.border}` }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.2, color: C.textDim }}>BEZ FÁZY · {bezFazyRad.length}</span>
+              <span style={{ flexGrow: 1 }} />
+              {bezFazyRad.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => setVybrane(vybrane.size === bezFazyRad.length ? new Set() : new Set(bezFazyRad))}
+                  style={{ background: "none", border: "none", padding: 0, color: C.textMuted, fontFamily: "inherit", fontSize: 11.5, cursor: "pointer" }}
+                >
+                  {vybrane.size === bezFazyRad.length ? "zrušiť výber" : "vybrať všetky"}
+                </button>
+              )}
+            </div>
+            {/* Vybraté naraz do jednej fázy. Klik na kartu vyberá, shift+klik
+                vyberie úsek, číslica 1–5 priradí — bez mierenia na tlačidlá. */}
+            {vybrane.size > 0 && (
+              <div style={{ position: "sticky", top: -14, zIndex: 2, margin: "0 -14px", padding: "10px 14px", background: C.surface, borderBottom: `1px solid ${mix(C.border, 120)}` }}>
+                <div style={{ fontSize: 12, color: C.text, marginBottom: 7 }}>
+                  <b>{vybrane.size}</b> vybraných — do fázy <span style={{ color: C.textDim }}>(alebo číslica 1–5)</span>
+                </div>
+                <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
+                  {[1, 2, 3, 4, 5].map((f) => (
+                    <button key={f} type="button" title={nazovFazy(f)} onClick={() => void hromadnaFaza(f)} style={{ width: 32, height: 32, borderRadius: 8, padding: 0, cursor: "pointer", border: "none", background: fazaFarba(f), color: "#10130e", fontFamily: "inherit", fontSize: 12.5, fontWeight: 700 }}>
+                      {f}
+                    </button>
+                  ))}
+                  <span style={{ flexGrow: 1 }} />
+                  <button type="button" onClick={() => setVybrane(new Set())} style={{ background: "none", border: "none", padding: 0, color: C.textDim, fontFamily: "inherit", fontSize: 11.5, cursor: "pointer" }}>zrušiť</button>
+                </div>
+              </div>
+            )}
+            {bezFazyUzly.map((u) => (
+              <div
+                key={u.id}
+                onClick={(e) => {
+                  if ((e.target as HTMLElement).closest("button")) return;
+                  prepniVyber(u.id, e.shiftKey, bezFazyRad);
+                }}
+                style={{
+                  padding: "10px 12px", borderRadius: 11, cursor: "pointer", userSelect: "none",
+                  background: vybrane.has(u.id) ? mix(C.accent, 16) : C.surface,
+                  border: `1px solid ${vybrane.has(u.id) ? C.accent : C.border}`,
+                }}
+              >
                 <div style={{ display: "flex", alignItems: "flex-start", gap: 7 }}>
-                  <span style={{ width: 8, height: 8, flexShrink: 0, marginTop: 5, borderRadius: "50%", background: farbaUzla(u, uzly, vetvy) }} />
+                  <input
+                    type="checkbox"
+                    aria-label={`Vybrať „${u.text}“`}
+                    checked={vybrane.has(u.id)}
+                    onChange={() => { /* klik rieši karta — inak by sa výber prepol dvakrát */ }}
+                    style={{ marginTop: 2, flexShrink: 0, accentColor: C.accent, pointerEvents: "none" }}
+                  />
+                  <span style={{ width: 8, height: 8, flexShrink: 0, marginTop: 5, borderRadius: "50%", background: farbaU(u) }} />
                   <span style={{ fontSize: 12.5, lineHeight: 1.35, color: C.text }}>{u.text}</span>
                 </div>
                 <div style={{ marginTop: 8, display: "flex", gap: 5 }}>
@@ -1522,7 +2045,7 @@ export function MapaNapadov({ chat }: { chat?: AssistantChat }) {
                   </div>
                   {kusy.map((u) => (
                     <div key={u.id} style={{ display: "flex", alignItems: "flex-start", gap: 6, padding: "9px 8px 9px 11px", borderRadius: 9, background: C.surface, border: `1px solid ${C.border}`, borderLeft: `3px solid ${fazaFarba(f)}` }}>
-                      <span style={{ width: 8, height: 8, flexShrink: 0, marginTop: 4, borderRadius: "50%", background: farbaUzla(u, uzly, vetvy) }} />
+                      <span style={{ width: 8, height: 8, flexShrink: 0, marginTop: 4, borderRadius: "50%", background: farbaU(u) }} />
                       <span style={{ flexGrow: 1, fontSize: 12, lineHeight: 1.3, color: C.text }}>{u.text}</span>
                       <button type="button" aria-label="Vrátiť medzi nezaradené" onClick={() => void nastavFazu(u.id, 0)} style={{ width: 22, height: 22, flexShrink: 0, borderRadius: 6, padding: 0, border: "none", background: "transparent", color: C.textDim, fontFamily: "inherit", fontSize: 14, lineHeight: 1, cursor: "pointer" }}>×</button>
                     </div>

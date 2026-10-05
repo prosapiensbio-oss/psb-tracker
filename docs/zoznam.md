@@ -42,7 +42,9 @@ každom: overiť nad kópiou ostrej DB pred aj po, testy, až potom nasadiť.
        Mŕtvy kód preč. Kontrolór profilov dostáva tie isté vstupy ako
        `loadData` (dlh, dni bez hodín, platby z Kokpitu, história) — rozdiel
        „Janka odkaz 5 h · karta 2 h" bol jeho, nie appky.
-5. [ ] **Myšlienková mapa** — klávesnica, osnova, hromadný výber, hľadanie.
+5. [x] **Myšlienková mapa** — hotové 5. 10. 2026: ↑↓ a ⌘↑↓, Osnova, hromadný
+       výber s číslicou 1–5, ⌘F naprieč mapami, Enter vkladá hneď za
+       a koncept sa ukladá bez čakania (sekcia 2b).
 6. [ ] **Web na tablete** a zelené zvýraznenia v článkoch.
 7. [ ] **Kartotéka fotiek** (treba úložisko R2) a profil trénera na webe.
 
@@ -267,10 +269,12 @@ prepojenia medzi vetvami, ikony a priority, prezentačný režim, zdieľanie,
 AI dopĺňanie mapy, šablóny. Každá z nich je rozhodnutie urobené namiesto
 napísania ďalšieho nápadu — a pri jednom človeku s jedným cieľom nič nerieši.
 
-Menšie, zatiaľ neopravené: Enter vloží súrodenca až za nasledujúceho (poradie
-sa neprečíslováva), server neoveruje, že `rodic` existuje, a `vetvaUzla`
-s `viditelny` sa pri každom vykreslení počítajú odznova (pri 200 nápadoch
-~12 ms na znak; dnes desiatky, takže neviditeľné).
+**Všetky štyri postavené 5. 10. 2026** (Jerry: „pokračuj s myšlienkovou
+mapou"), aj s tromi menšími: Enter vkladá hneď za (server prečísluje rad,
+`vlozenieZa`), server overuje `rodic` a vetva/viditeľnosť sa počítajú raz
+za prekreslenie (`vetvyVsetkych`, `viditelneVsetky`). Pri overovaní sa
+našla strata textu pri rýchlom písaní — viď CLAUDE.md „Koncept sa ukladá
+bez čakania".
 
 ~~**Vlastné vetvy.**~~ Hotové 25. 9. 2026 (migrácia 0078): zoznam vetiev
 žije v `mkt_mapy.vetvy`, nová sa píše v ponuke pri kmeni, na obvode vetvy sa

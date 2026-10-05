@@ -2645,3 +2645,34 @@ to, čo v Kokpite nie je. Párovanie: (1) rovnaká suma ± 1 Kč do 10 dní,
 banka pripisuje o deň-dva neskôr a tréning v deň platby by dostal −1.
 Overené snímkou pred/po nad ostrou DB: karta, koniec osi, mínus a návrhy
 balíčkov u všetkých 127 klientov bez zmeny; mínusov pri tréningoch 468 → 467.
+
+## Myšlienková mapa: klávesnica, osnova, výber, hľadanie (5. 10. 2026)
+
+Štyri mechaniky z rešerše 25. 9. (`docs/zoznam.md` 2b), všetko nad tými
+istými riadkami `mkt_napady`:
+
+- **↑ ↓** — na mape súrodenci (nad prvým jeho rodič), v osnove riadky.
+  **⌘↑ ⌘↓** preradí; rad súrodencov sa prečísluje celý a zapíše naraz
+  (`akcia: "mapa-poradie"`, D1 batch). Staré poradie má diery aj zhody.
+- **Osnova** je tretí pohľad, nie druhá pravda. Klávesnica je JEDNA
+  (`klavesy`, `vstupNapadu`) pre mapu aj osnovu — dve kópie by sa rozišli.
+- **Vysyp a usporiadaj**: klik vyberá, shift+klik úsek, číslica 1–5 alebo
+  tlačidlo dá fázu všetkým (`akcia: "napady-faza"`).
+- **⌘F** hľadá vo všetkých mapách bez diakritiky; skok prepne mapu,
+  rozbalí zbalených predkov a postaví na nápad pohľad. Berie ⌘F len keď je
+  mapa v strede obrazovky alebo je v nej kurzor.
+- **Enter vkladá hneď za** (`za` → server `vlozenieZa`): do toho dňa sa nový
+  zrazil s ďalším súrodencom. Server overuje, že `rodic` existuje v tej
+  istej mape.
+
+**Koncept sa ukladá bez čakania.** Enter predtým koncept odstránil, počkal na
+server (~0,4 s) a až potom založil ďalší riadok — čo človek medzitým napísal,
+padlo do prázdna a raz to skončilo v CUDZOM riadku (overené v bete
+skutočnými klávesmi; testy ani typy to nevideli). Teraz `odosliKoncept`
+nechá text hneď na obrazovke pod dočasným id `ukladam-N`, nový riadok vznikne
+okamžite a kto potrebuje skutočné id (dieťa, kotva), počká naň
+(`skutocneId`). React kľúč nesie riadok od konceptu po skutočné id
+(`kluce`), aby políčko neodišlo spod kurzora; `nacitaj` riadky na ceste
+nezahadzuje a `posli` dočasné id serveru nepošle. **Rýchle písanie sa overuje
+skutočnými klávesmi v prehliadači, nie dispatchom udalostí** — chyba sa
+ukáže len pri reálnom poradí focus/blur.
