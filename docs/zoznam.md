@@ -16,6 +16,25 @@ Stav k **5. 10. 2026**.
 
 ---
 
+## PORADIE PRÁCE (Jerry, 5. 10. 2026: „ideme rad za radom")
+
+Platby z banky si Jerry potvrdzuje sám. Moje kroky v tomto poradí — pri
+každom: overiť nad kópiou ostrej DB pred aj po, testy, až potom nasadiť.
+
+1. [ ] **Jedno pravidlo „zaplatený"** — hodiny, dlh, zoznam dlžníkov,
+       evidencia platieb a tržby z kalendára sa pýtajú jednej funkcie.
+2. [ ] **Deň podľa Prahy, nie UTC** — medzi polnocou a druhou ráno appka
+       žije vo včerajšku (30+ miest).
+3. [ ] **Platby z Kokpitu na osi času klienta a v maili s históriou.**
+4. [ ] **Drobnosti v kóde** — profil pre úvodný v budúcnosti, `mimoExportu`
+       po 1. 10., QR v SMS proti stránke klienta.
+5. [ ] **Myšlienková mapa** — klávesnica, osnova, hromadný výber, hľadanie.
+6. [ ] **Web na tablete** a zelené zvýraznenia v článkoch.
+7. [ ] **Kartotéka fotiek** (treba úložisko R2) a profil trénera na webe.
+
+Rozhodnutia, ktoré na to čakajú, sú v sekcii 1 a 2c (prenos mínusu,
+online z offline balíčka, Čechová/Gažo/Kalva-Martinek-Vaško).
+
 
 ## 0a · Workspace po krokoch — naostro od 5. 10. 2026
 
