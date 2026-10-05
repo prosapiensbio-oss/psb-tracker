@@ -50,11 +50,7 @@ export function najdiKlientaVTexte(text: string, menaKlientov: string[]): string
   if (!t.length) return [];
   const sedi = (cast: string) =>
     t.some((x) => x === cast || (x.startsWith(cast) && x.length - cast.length <= 3));
-  const podlaPriezviska = menaKlientov.filter((m) => {
-    const casti = bezY(normName(m)).split(/\s+/).filter(Boolean);
-    const priezvisko = casti[casti.length - 1] || "";
-    return (priezvisko.length >= 4 && sedi(priezvisko)) || sediMuzskyTvar(priezvisko, t);
-  });
+  const podlaPriezviska = menaKlientov.filter((m) => sediPriezviskom(t, m));
   /**
    * CELÉ MENO PREBÍJA SAMOTNÉ PRIEZVISKO.
    *
@@ -178,9 +174,35 @@ export function vzorPlatby(r: FioRiadok): string {
  * a appka by odvtedy každý jeho prevod ponúkala ako platbu Josefa Šnirycha.
  * Sprostredkovateľ nie je platiteľ.
  */
-export function smieSaZapamatat(vzor: string, klient: string): boolean {
-  return najdiKlientaVTexte(vzor, [klient]).length === 1;
+/** Sedí v texte PRIEZVISKO klienta (aj prechýlené alebo v mužskom tvare)? */
+function sediPriezviskom(t: string[], m: string): boolean {
+  const casti = bezY(normName(m)).split(/\s+/).filter(Boolean);
+  const priezvisko = casti[casti.length - 1] || "";
+  const sedi = (cast: string) =>
+    t.some((x) => x === cast || (x.startsWith(cast) && x.length - cast.length <= 3));
+  return (priezvisko.length >= 4 && sedi(priezvisko)) || sediMuzskyTvar(priezvisko, t);
 }
+
+/**
+ * Smie sa z odosielateľa naučiť pravidlo? LEN keď v ňom stojí PRIEZVISKO.
+ *
+ * Do 5. 10. 2026 sa to pýtalo `najdiKlientaVTexte`, a tá pri nezhode
+ * priezviska spadne na krstné meno — to je v poriadku pre NÁVRH, ktorý
+ * potvrdzuje človek, nie pre pravidlo, ktoré potom priraďuje samo. Takto sa
+ * zo zápisu „Jarek" v zošite (56 000 Kč od Jarka Broskvu) naučilo
+ * „jarek → Jarek Heinrich" a každý ďalší Jarek by išiel Heinrichovi.
+ */
+export function smieSaZapamatat(vzor: string, klient: string): boolean {
+  const t = tokeny(vzor);
+  return t.length > 0 && sediPriezviskom(t, klient);
+}
+
+/**
+ * Spôsob platby podľa riadku: zápis zo zošita hotovosti (typ „hotovosť")
+ * nie je banka. Do 5. 10. 2026 sa každé priradenie zapisovalo ako „banka".
+ */
+export const sposobZRiadku = (r: { typ?: string | null }): "hotovost" | "banka" =>
+  /hotovos/i.test(r.typ || "") ? "hotovost" : "banka";
 
 export type NepriradenaPlatba = {
   fioId: string;

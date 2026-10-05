@@ -32,9 +32,15 @@ každom: overiť nad kópiou ostrej DB pred aj po, testy, až potom nasadiť.
        `Date.parse(zaciatok)` v prehliadači.
 3. [x] **Platby z Kokpitu na osi času klienta a v maili s históriou** —
        hotové 5. 10. 2026 (`zlucPlatby`, `data.platbyKokpit`).
-       Na pozretie pre Jerryho: platby len v Kokpite — Jarek Heinrich
-       23. 6. 56 000 Kč a 24. 9. 5 390 Kč (patria naozaj jemu?),
-       Miřejovský 7. 1. 752 Kč, Dvořák 16. 9. 1 100 Kč.
+       Platby len v Kokpite vyriešené 5. 10. 2026 s Jerrym: 56 000 Kč (zošit
+       „Jarek“) patrí Jaroslavovi Broskvovi, nie Heinrichovi (PTminder má
+       54 600 hotovosť — rozdiel 1 400 ostáva); Heinrich 24. 9. = 7 790 (Terka
+       poslala 5 390, 2 400 si nechala); Miřejovský 752 zrušené; Dvořák 1 100
+       za tréning 16. 9. platí (mama), balíček 6 h je preventívny a nezaplatený.
+       Opravené v kóde: pravidlo platiteľa sa učí len z priezviska, zápis zo
+       zošita sa ukladá ako hotovosť. **Otvorené:** 7 starších pravidiel
+       naučených bez priezviska (marcela, veronika, „prosapiens balicek 6h
+       richard“, …) — čaká na Jerryho.
 4. [x] **Drobnosti v kóde** — hotové 5. 10. 2026. Profil len s objednaným
        úvodným má `lastSession` prázdne (nie budúci dátum). `mimoExportu`
        počíta len tréningy, ktoré už začali (jediný nenulový prípad bol

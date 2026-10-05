@@ -7,7 +7,7 @@ import { normName } from "../../lib/psb/format";
 import { bindings } from "../../lib/bindings.server";
 import {
   nepriradene, porovnajPlatby, smieSaZapamatat, vzorPlatby,
-  type CenaBalicka, type Diel, type FakturaVzor, type FioRiadok, type Platba,
+  sposobZRiadku, type CenaBalicka, type Diel, type FakturaVzor, type FioRiadok, type Platba,
 } from "../../lib/psb/platbyEvidencia";
 import { balicekZPlatby } from "../../lib/psb/balicekZPlatby";
 import { dlhyKlientov } from "../../lib/psb/zaplatene";
@@ -146,8 +146,8 @@ async function zapisDiely(
   try {
     await DB.batch(kusy.map((d, i) =>
       DB.prepare(
-        "INSERT INTO platby (id, klient, datum, suma_czk, sposob, fio_id, poznamka, created_at, autor, vopred) VALUES (?,?,?,?,'banka',?,?,?,?,?)",
-      ).bind(uid(), d.klient, r.date.slice(0, 10), d.suma, r.id,
+        "INSERT INTO platby (id, klient, datum, suma_czk, sposob, fio_id, poznamka, created_at, autor, vopred) VALUES (?,?,?,?,?,?,?,?,?,?)",
+      ).bind(uid(), d.klient, r.date.slice(0, 10), d.suma, sposobZRiadku(r), r.id,
         `rozdelené · ${(r.counterparty || "").slice(0, 160)}`, teraz(), kto || null, vopred[i] ? 1 : 0),
     ));
   } catch (e) {
@@ -315,8 +315,8 @@ export const Route = createFileRoute("/api/platby")({
           if (!r) return Response.json({ ok: false, error: "Riadok výpisu neexistuje." }, { status: 404 });
           const prikazy = [
             DB.prepare(
-              "INSERT OR IGNORE INTO platby (id, klient, datum, suma_czk, sposob, fio_id, poznamka, created_at, autor, vopred) VALUES (?,?,?,?,'banka',?,?,?,?,?)",
-            ).bind(uid(), klient, r.date.slice(0, 10), r.amount_czk, fioId, (r.counterparty || "").slice(0, 200), teraz(), kto || null, (await jeVopred(DB, klient)) ? 1 : 0),
+              "INSERT OR IGNORE INTO platby (id, klient, datum, suma_czk, sposob, fio_id, poznamka, created_at, autor, vopred) VALUES (?,?,?,?,?,?,?,?,?,?)",
+            ).bind(uid(), klient, r.date.slice(0, 10), r.amount_czk, sposobZRiadku(r), fioId, (r.counterparty || "").slice(0, 200), teraz(), kto || null, (await jeVopred(DB, klient)) ? 1 : 0),
           ];
           // Pravidlo sa učí LEN vtedy, keď je klient priamo v odosielateľovi.
           // Inak by sa naučilo zo sprostredkovaného prevodu a každý ďalší
@@ -398,8 +398,8 @@ export const Route = createFileRoute("/api/platby")({
             const naucil = smieSaZapamatat(vzor, klient);
             const prikazy = [
               DB.prepare(
-                "INSERT OR IGNORE INTO platby (id, klient, datum, suma_czk, sposob, fio_id, poznamka, created_at, autor, vopred) VALUES (?,?,?,?,'banka',?,?,?,?,?)",
-              ).bind(uid(), klient, r.date.slice(0, 10), r.amount_czk, fioId, (r.counterparty || "").slice(0, 200), teraz(), kto || null, (await jeVopred(DB, klient)) ? 1 : 0),
+                "INSERT OR IGNORE INTO platby (id, klient, datum, suma_czk, sposob, fio_id, poznamka, created_at, autor, vopred) VALUES (?,?,?,?,?,?,?,?,?,?)",
+              ).bind(uid(), klient, r.date.slice(0, 10), r.amount_czk, sposobZRiadku(r), fioId, (r.counterparty || "").slice(0, 200), teraz(), kto || null, (await jeVopred(DB, klient)) ? 1 : 0),
             ];
             if (naucil) {
               prikazy.push(DB.prepare("INSERT OR REPLACE INTO platba_mapovanie (vzor, klient, potvrdene_at) VALUES (?,?,?)")
