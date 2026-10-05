@@ -42,7 +42,10 @@ function ritualyDoRegistra(
   stavDatum?: string,
 ): RegisterItem[] {
   return ritualy(dnes, weeks, mesiace, { chybaju: [] }, { nacitane: true, stavDatum })
-    .filter((r) => r.splatne && mimoWorkspace(r))
+    // Týždenná vyťaženosť ide na TELEFÓN aj naďalej (Jerry, 5. 10. 2026:
+    // „vráť piatkovú notifikáciu na vyťaženosť na telefón") — v appke ju
+    // nahrádza rozbalený krok 1 vo Workspace, na telefóne nie je čo rozbaliť.
+    .filter((r) => r.splatne && (r.druh === "tyzden" || mimoWorkspace(r)))
     .map((r) => ({
       key: `zapis|${r.id}`,
       category: "Zápis" as const,

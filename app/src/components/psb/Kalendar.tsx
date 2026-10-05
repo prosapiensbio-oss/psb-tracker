@@ -1696,6 +1696,24 @@ function OknoUdalosti({ vyber, mena, clients, predvolenyTrener, onZmen, onZavri,
   const [mazem, setMazem] = useState(false);
   const [potvrdMazanie, setPotvrdMazanie] = useState(false);
   const [chyba, setChyba] = useState("");
+  /**
+   * DUPLIKOVAŤ a INÝ TRÉNER (Jerry, 5. 10. 2026). Kópia ide predvolene
+   * o týždeň neskôr v ten istý čas — najčastejší dôvod je „aj budúci
+   * týždeň". Druhý tréner dostane ten istý termín; pôvodný sa zmaže až
+   * po tom, čo nový v Googli naozaj stojí (server).
+   */
+  const [rezim, setRezim] = useState<"" | "kopia" | "trener">("");
+  const [kopiaDen, setKopiaDen] = useState(() => {
+    if (!u) return "";
+    const [r, m, d] = u.zaciatok.slice(0, 10).split("-").map(Number);
+    const t = new Date(Date.UTC(r, m - 1, d + 7));
+    return t.toISOString().slice(0, 10);
+  });
+  const [kopiaCas, setKopiaCas] = useState(u ? u.zaciatok.slice(11, 16) : "");
+  const druhiTreneri = Object.keys(KALENDAR_TRENERA).filter((t) => t !== (u?.trener || ""));
+  const [novyTrener, setNovyTrener] = useState(druhiTreneri[0] || "");
+  const [bezi, setBezi] = useState(false);
+  const [hlaska, setHlaska] = useState("");
 
   const sMenom = typ === "trening" || typ === "uvodny";
   const trener = u ? u.trener : trenerNovej;
@@ -1736,6 +1754,28 @@ function OknoUdalosti({ vyber, mena, clients, predvolenyTrener, onZmen, onZavri,
     } finally {
       setUklada(false);
     }
+  };
+
+  const klientUdalosti = (klient.trim() || u?.klient || "").trim();
+  const duplikuj = async () => {
+    if (!u || !klientUdalosti) return;
+    setBezi(true); setChyba(""); setHlaska("");
+    const j = await posli({ akcia: "trening-nahod", klient: klientUdalosti, den: kopiaDen, cas: kopiaCas, minut: trvanieMin(u), trener: u.trener, typ: u.typ === "uvodny" ? "uvodny" : "trening" })
+      .catch(() => ({ ok: false as const, error: "spojenie zlyhalo — kópia sa nezapísala" }));
+    setBezi(false);
+    if (!j.ok) { setChyba(j.error || "Kópia sa nezapísala."); return; }
+    setHlaska(`Skopírované na ${den(`${kopiaDen}T${kopiaCas}`)} o ${kopiaCas}.`);
+    setRezim("");
+    await onHotovo();
+  };
+  const inemuTrenerovi = async () => {
+    if (!u || !novyTrener) return;
+    setBezi(true); setChyba(""); setHlaska("");
+    const j = await posli({ akcia: "trening-iny-trener", uid: u.uid, trener: u.trener, novy: novyTrener, klient: klientUdalosti })
+      .catch(() => ({ ok: false as const, error: "spojenie zlyhalo — nič sa nezmenilo" }));
+    setBezi(false);
+    if (!j.ok) { setChyba(j.error || "Presun na iného trénera sa nepodaril."); if ((j as { castocne?: boolean }).castocne) await onHotovo(); return; }
+    await onHotovo();
   };
 
   const vymaz = async () => {
@@ -1871,6 +1911,20 @@ function OknoUdalosti({ vyber, mena, clients, predvolenyTrener, onZmen, onZavri,
         >
           {uklada ? "Zapisujem…" : u ? "Uložiť" : "Nahodiť do kalendára"}
         </button>
+        {u && zGoogle && sMenom && !!klientUdalosti && (
+          <>
+            <button onClick={() => setRezim(rezim === "kopia" ? "" : "kopia")}
+              style={{ padding: "7px 12px", borderRadius: 8, fontSize: 12, cursor: "pointer", border: `1px solid ${rezim === "kopia" ? C.accent : C.border}`, background: rezim === "kopia" ? C.accentBg : "transparent", color: rezim === "kopia" ? C.accentLight : C.textMuted }}>
+              Duplikovať
+            </button>
+            {druhiTreneri.length > 0 && (
+              <button onClick={() => setRezim(rezim === "trener" ? "" : "trener")}
+                style={{ padding: "7px 12px", borderRadius: 8, fontSize: 12, cursor: "pointer", border: `1px solid ${rezim === "trener" ? C.accent : C.border}`, background: rezim === "trener" ? C.accentBg : "transparent", color: rezim === "trener" ? C.accentLight : C.textMuted }}>
+                Iný tréner
+              </button>
+            )}
+          </>
+        )}
         {u && zGoogle && !potvrdMazanie && (
           <button onClick={() => setPotvrdMazanie(true)}
             style={{ padding: "7px 12px", borderRadius: 8, fontSize: 12, cursor: "pointer", border: `1px solid ${mix(C.red, 45)}`, background: "transparent", color: C.red }}>
@@ -1882,6 +1936,46 @@ function OknoUdalosti({ vyber, mena, clients, predvolenyTrener, onZmen, onZavri,
         </button>
       </div>
 
+      {hlaska && <div style={{ fontSize: 11.5, color: C.green, lineHeight: 1.5, marginTop: 8 }}>{hlaska}</div>}
+      {u && rezim === "kopia" && (
+        <div style={{ marginTop: 8, padding: "8px 10px", borderRadius: 8, border: `1px solid ${mix(C.accent, 45)}`, background: mix(C.accent, 7) }}>
+          <div style={{ fontSize: 11.5, color: C.textMuted, lineHeight: 1.5, marginBottom: 6 }}>
+            Kópia pre <b style={{ color: C.text }}>{klientUdalosti}</b> · {u.trener} · {trvanieMin(u)} min
+          </div>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "flex-end" }}>
+            <label style={popisok}>
+              deň
+              <input type="date" value={kopiaDen} onChange={(e) => setKopiaDen(e.target.value)} style={{ ...pole, width: 128 }} />
+            </label>
+            <label style={popisok}>
+              čas
+              <input type="time" value={kopiaCas} onChange={(e) => setKopiaCas(e.target.value)} style={{ ...pole, width: 84 }} />
+            </label>
+            <button onClick={() => void duplikuj()} disabled={bezi || !kopiaDen || !kopiaCas}
+              style={{ padding: "6px 12px", borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: bezi ? "wait" : "pointer", border: `1px solid ${mix(C.green, 50)}`, background: mix(C.green, 12), color: C.green }}>
+              {bezi ? "Zapisujem…" : "Vytvoriť kópiu"}
+            </button>
+          </div>
+        </div>
+      )}
+      {u && rezim === "trener" && (
+        <div style={{ marginTop: 8, padding: "8px 10px", borderRadius: 8, border: `1px solid ${mix(C.accent, 45)}`, background: mix(C.accent, 7) }}>
+          <div style={{ fontSize: 11.5, color: C.textMuted, lineHeight: 1.5, marginBottom: 6 }}>
+            Tréning <b style={{ color: C.text }}>{klientUdalosti}</b> {den(u.zaciatok)} o {u.zaciatok.slice(11, 16)} prejde z kalendára {u.trener} do kalendára:
+          </div>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+            {druhiTreneri.length > 1 && (
+              <select value={novyTrener} onChange={(e) => setNovyTrener(e.target.value)} style={pole}>
+                {druhiTreneri.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            )}
+            <button onClick={() => void inemuTrenerovi()} disabled={bezi || !novyTrener}
+              style={{ padding: "6px 12px", borderRadius: 7, fontSize: 12, fontWeight: 700, cursor: bezi ? "wait" : "pointer", border: `1px solid ${mix(C.green, 50)}`, background: mix(C.green, 12), color: C.green }}>
+              {bezi ? "Presúvam…" : `Presunúť ${({ Jerry: "Jerrymu", Terezka: "Terezke" } as Record<string, string>)[novyTrener] || novyTrener}`}
+            </button>
+          </div>
+        </div>
+      )}
       {u && potvrdMazanie && (
         <div style={{ marginTop: 8, padding: "8px 10px", borderRadius: 8, border: `1px solid ${mix(C.red, 45)}`, background: mix(C.red, 8) }}>
           <div style={{ fontSize: 11.5, color: C.textMuted, lineHeight: 1.5 }}>

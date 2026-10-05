@@ -609,6 +609,62 @@ export const Route = createFileRoute("/api/kalendar")({
           return Response.json({ ok: true });
         }
 
+        /**
+         * TRÉNING INÉMU TRÉNEROVI (Jerry, 5. 10. 2026: „možnosť presunúť
+         * tréning na druhého trénera"). Ten istý klient, deň, čas a dĺžka —
+         * len v kalendári druhého trénera. Poradie je zámer: NAJPRV sa založí
+         * nový, až potom zmaže pôvodný. Keď padne zmazanie, ostane tréning
+         * dvakrát a povie sa to nahlas; opačne by mohol zmiznúť úplne.
+         */
+        if (akcia === "trening-iny-trener") {
+          const kluc = (bindings() as { GCAL_SA_KLUC?: string }).GCAL_SA_KLUC;
+          if (!kluc) return Response.json({ ok: false, error: "Servisný účet nie je nastavený (GCAL_SA_KLUC)." }, { status: 503 });
+          const uid = String(b.uid || "");
+          const trener = String(b.trener || "");
+          const novy = String(b.novy || "");
+          const kalendar = KALENDAR_TRENERA[trener];
+          const ics = uid.split("|")[0];
+          if (!ics.endsWith("@google.com") || !kalendar) return Response.json({ ok: false, error: "Chýba uid alebo tréner." }, { status: 400 });
+          if (!KALENDAR_TRENERA[novy] || novy === trener) return Response.json({ ok: false, error: "Vyber iného trénera." }, { status: 400 });
+          const r = await DB.prepare("SELECT zaciatok, koniec, nazov, klient, typ FROM kal_udalosti WHERE uid = ?1 AND trener = ?2")
+            .bind(uid, trener).first<{ zaciatok: string; koniec: string; nazov: string; klient: string | null; typ: string | null }>();
+          if (!r) return Response.json({ ok: false, error: "Túto udalosť appka nepozná." }, { status: 404 });
+          const klient = String(b.klient || r.klient || "").trim();
+          if (!klient) return Response.json({ ok: false, error: "Udalosť nemá klienta — najprv ho priraď." }, { status: 400 });
+          const minut = Math.round((new Date(r.koniec).getTime() - new Date(r.zaciatok).getTime()) / 60000) || 60;
+          const v = pripravTrening({ klient, den: r.zaciatok.slice(0, 10), cas: r.zaciatok.slice(11, 16), minut, trener: novy });
+          if (!v.ok) return Response.json({ ok: false, error: v.chyba }, { status: 400 });
+          const typNovej = r.typ === "uvodny" ? "uvodny" : "trening";
+
+          let idUdalosti = "";
+          try {
+            idUdalosti = await vlozUdalost(kluc, v.t);
+          } catch (e) {
+            return Response.json({ ok: false, error: `Google kalendár (${novy}) zápis odmietol: ${String(e instanceof Error ? e.message : e)}. Nič sa nezmenilo.` }, { status: 502 });
+          }
+          const noveUid = `${icsUid(idUdalosti)}|${v.t.zaciatok}`;
+          const kedy = teraz();
+          await DB.batch([
+            DB.prepare(
+              `INSERT OR REPLACE INTO kal_udalosti (uid, trener, zaciatok, koniec, nazov, klient, typ, prvy_raz, naposledy, zmizla_at)
+               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?8, ?7, ?7, NULL)`,
+            ).bind(noveUid, novy, v.t.zaciatok, v.t.koniec, v.t.nazov, klient, kedy, typNovej),
+            DB.prepare(
+              `INSERT OR IGNORE INTO kal_mapovanie (nazov, trener, cas, klient, typ, vedome) VALUES (?1, ?2, '', ?1, ?3, 1)`,
+            ).bind(klient, novy, typNovej),
+          ]);
+          try {
+            const zasah = await idPreZasah(kluc, kalendar, ics.replace(/@google\.com$/, ""), r.zaciatok);
+            await zrusUdalost(kluc, kalendar, zasah.id);
+          } catch (e) {
+            return Response.json({ ok: false, castocne: true, error: `Tréning je už v kalendári ${novy}, ale u ${trener} sa nezmazal: ${String(e instanceof Error ? e.message : e)}. Zmaž ho tam ručne, inak bude dvakrát.` }, { status: 502 });
+          }
+          await DB.prepare("UPDATE kal_udalosti SET zmizla_at = ?1 WHERE uid = ?2 AND trener = ?3").bind(teraz(), uid, trener).run();
+          const kto = (await currentUser(request)) || "";
+          await audit(DB, { action: "trening-iny-trener", predmet: `${klient} · ${r.zaciatok}`, old: trener, neu: novy, actor: kto });
+          return Response.json({ ok: true, uid: noveUid });
+        }
+
         if (akcia === "zdroj-zmaz") {
           await DB.prepare("DELETE FROM kal_zdroje WHERE trener = ?").bind(String(b.trener || "")).run();
           return Response.json({ ok: true });

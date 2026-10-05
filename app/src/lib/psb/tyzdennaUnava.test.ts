@@ -50,9 +50,9 @@ describe("pripomienka týždennej únavy", () => {
     expect(tyzdenne(STREDA, {}).some((x) => x.splatne)).toBe(false);
   });
 
-  it("klik vedie na konkrétny týždeň v Tréningy → Prehľad", () => {
+  it("klik vedie na krok 1 vo Workspace (tam sa týždeň vypĺňa)", () => {
     for (const r of tyzdenne(PIATOK, {})) {
-      expect(r.ciel).toEqual({ tab: "treningy", sub: "prehled", tyzden: TW });
+      expect(r.ciel).toEqual({ tab: "workspace", sub: "kalendar", tyzden: TW });
     }
   });
 
@@ -113,7 +113,7 @@ describe("dobiehanie minulého týždňa", () => {
 
   it("klik vedie na minulý týždeň, nie na tento", () => {
     for (const r of minuleTyzdne(STREDA, {}, {})) {
-      expect(r.ciel).toEqual({ tab: "treningy", sub: "prehled", tyzden: MINULY });
+      expect(r.ciel).toEqual({ tab: "workspace", sub: "kalendar", tyzden: MINULY });
     }
   });
 
@@ -231,5 +231,12 @@ describe("pripomienky, ktoré žijú vo Workspace", () => {
   it("uzávierka vedie do Workspace", () => {
     const u = ritualy(new Date("2026-10-04T09:00:00Z"), {}, {}, { chybaju: [] }).filter((r) => r.druh === "mesiac");
     for (const r of u) expect(r.ciel).toEqual({ tab: "workspace", sub: "uzavierka" });
+  });
+});
+
+describe("vyťaženosť ide na telefón", () => {
+  const server = readFileSync(new URL("./registerServer.ts", import.meta.url).pathname, "utf8");
+  it("server register (ranná správa) týždeň púšťa, kontroly nie", () => {
+    expect(server).toContain('r.druh === "tyzden" || mimoWorkspace(r)');
   });
 });

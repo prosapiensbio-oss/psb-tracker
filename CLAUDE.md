@@ -2529,8 +2529,19 @@ Workspace sa vybavuje, ostatné záložky sa pozerajú a ukazujú naň.
 - **Tréningy → Prehľad**: náročnosť len na čítanie (stĺpce „N", farby už
   správne — nízke je dobré).
 - **Register / + Zápis**: týždenná vyťaženosť a mesačné kontroly sa
-  vyfiltrujú (`mimoWorkspace` v `rituals.ts`, aj v `registerServer`).
+  vyfiltrujú (`mimoWorkspace` v `rituals.ts`). V `registerServer` (ranná
+  správa na telefón) sa vyťaženosť NEFILTRUJE — Jerry si piatkový push
+  vrátil; klik vedie na `workspace|kalendar`.
   Uzávierka a stav hotovosti ostávajú ako pripomienka, ale vedú do Workspace.
 - **Preklik na krok**: `navigate("workspace", "<krok>")` → `otvorKrok`.
   Upozornenia o zmenách, „bol tam?" a nových názvoch majú `workspace|kalendar`.
 - Karta Klient je v kope POSLEDNÁ; kopa sa otvára na kroku 1.
+
+## Duplikovať a iný tréner v kalendári (5. 10. 2026)
+
+Okno udalosti (`OknoUdalosti`) má pri tréningu s klientom „Duplikovať"
+(predvolene o týždeň, ten istý čas — ide cez `trening-nahod`) a „Iný tréner"
+(`trening-iny-trener`): server NAJPRV založí udalosť v kalendári druhého
+trénera, až potom zmaže pôvodnú. Keď zlyhá zmazanie, vráti `castocne: true`
+a vetu „bude dvakrát" — opačné poradie by vedelo tréning stratiť. Pôvodná
+dostane `zmizla_at`, takže ju snímka nehlási ako zrušenie.

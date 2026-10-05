@@ -145,7 +145,7 @@ export function ritualy(
         ? "Tento týždeň máš zapísaný."
         : "Náročnosť týždňa 1–10 (1 = ľahký, 10 = veľmi ťažký), odtrénované hodiny a poznámka — kým to máš v hlave. V pondelok si to už nikto nepamätá. Klik otvorí rovno tento týždeň.",
       // Bez týždňa dopadol klik na zoznam a človek si musel nájsť riadok sám.
-      ciel: { tab: "treningy", sub: "prehled", tyzden: tw },
+      ciel: { tab: "workspace", sub: "kalendar", tyzden: tw },
       trener: kto,
       splatne: nacitane && !vyplneny && den >= 5,
       hotove: vyplneny,
@@ -158,7 +158,7 @@ export function ritualy(
       detail: vyplnenyMinuly
         ? `Týždeň ${weekLabel(twMinuly)} máš zapísaný.`
         : `Týždeň ${weekLabel(twMinuly)} zostal bez hodnotenia. Toto je posledná pripomienka — v pondelok sa už nevráti. Klik otvorí rovno ten týždeň.`,
-      ciel: { tab: "treningy", sub: "prehled", tyzden: twMinuly },
+      ciel: { tab: "workspace", sub: "kalendar", tyzden: twMinuly },
       trener: kto,
       tichyKedHotovy: true,
       splatne: nacitane && !vyplnenyMinuly,
